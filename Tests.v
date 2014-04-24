@@ -1,4 +1,4 @@
-Require Import QuickCheck.
+Require Import QuickChick.
 
 Require Import List.
 Import ListNotations.
@@ -88,5 +88,4 @@ Definition prop_mirror_reverse (t : Tree nat) :=
 Definition exMain :=
   quickCheck prop_mirror_reverse.
 
-
-
+QuickCheck exMain.

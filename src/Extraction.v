@@ -1,9 +1,7 @@
 Require Import ZArith.
 Require Import Coq.Strings.Ascii.
 Require Import Coq.Strings.String.
-Require Import QuickCheck.
-
-Require Import Tests.
+Require Import Gen Test Show Property.
 
 Extraction Language Haskell.
 
@@ -110,5 +108,3 @@ Extract Constant Show.nl => "[DC.chr 10]".
 Extract Constant Test.defNumTests => "10000".
 Extract Constant Test.defNumDiscards => "(Prelude.*) 2 defNumTests".
 Extract Constant Test.unsafeRandomSeed => "(unsafePerformIO (SR.randomIO :: GHC.Base.IO GHC.Base.Int))".
-
-Extraction "Extracted.hs" exMain.

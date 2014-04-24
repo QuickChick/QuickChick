@@ -1,4 +1,4 @@
-Require Import QuickCheck.
+Require Import QuickChick.
 
 Class Mutateable (A : Type) : Type :=
 {
