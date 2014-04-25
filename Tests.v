@@ -16,10 +16,11 @@ Fixpoint my_delete (x : nat) (l : list nat) : list nat :=
 Definition prop_delete_removes_every_x (x : nat) (l : list nat) :=
   negb (existsb (fun y => beq_nat y x) (my_delete x l)).
 
-(* Uncomment this to run this test
-Definition exMain := 
+Definition test0 := 
   quickCheck prop_delete_removes_every_x.
-*) 
+
+QuickCheck test0.
+
 (* Tree example showing custom datatypes *)
 
 Inductive Tree (A : Type) :=
@@ -85,7 +86,7 @@ Definition prop_mirror_reverse (t : Tree nat) :=
   then true 
   else false.
 
-Definition exMain :=
+Definition testTree :=
   quickCheck prop_mirror_reverse.
 
-QuickCheck exMain.
+QuickCheck testTree.
