@@ -2,8 +2,8 @@ QuickChick
 ==========
 
 Description
-
-  QuickCheck for Coq using Extraction
+ 
+  - QuickCheck for Coq using Extraction
 
 Known to work with
 
@@ -12,12 +12,12 @@ Known to work with
 
 Installation
 
-  make
-  make install
+  - make
+  - make install
 
 Examples
 
-  Tests.v
+  - Tests.v
 
 
 
