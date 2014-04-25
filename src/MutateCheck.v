@@ -5,6 +5,26 @@ Class Mutateable (A : Type) : Type :=
   mutate : A -> list A
 }.
 
+Require Import List.
+Import ListNotations.
+
+(* Default mutateable instance for lists *)
+(* Priority 1, in case someone overrides the default to further mutate 
+   when the A's are mutateable *)
+Instance MutateableList (A : Type) : Mutateable (list A) | 1 :=
+{|
+  mutate l := 
+    let fix f l :=
+        match l with
+          | [] => []
+          | x::xs => xs :: map (fun xs' => x :: xs') (f xs)
+        end 
+    in f l
+|}.
+
+Example mutate_example : mutate [1;2;3] = [[2;3];[1;3];[1;2]].
+Proof. reflexivity. Qed.
+
 Require Import String. Open Scope string_scope.
 
 Definition force {X} (x : X) := x.
