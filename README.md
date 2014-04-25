@@ -1,13 +1,23 @@
 QuickChick
 ==========
 
-QuickCheck for Coq using Extraction
+Description
 
-Known to work with:
-- Coq 8.4pl3
-- GHC 7.6.3
+  QuickCheck for Coq using Extraction
 
-To see an example:
+Known to work with
 
-Tests.v
+  - Coq 8.4pl3
+  - GHC 7.6.3
+
+Installation
+
+  make
+  make install
+
+Examples
+
+  Tests.v
+
+
 
