@@ -1,5 +1,6 @@
 Require Import ZArith.
 Require Import List.
+Import ListNotations.
 
 Set Implicit Arguments.
 
@@ -72,7 +73,7 @@ Definition liftGen5 {A1 A2 A3 A4 A5 R : Type} (F : A1 -> A2 -> A3 -> A4 -> A5 ->
 Definition sequenceGen {A : Type} (ms : list (Gen A)) : Gen (list A) :=
   fold_right (fun m m' => bindGen m  (fun x => 
                           bindGen m' (fun xs =>
-                          returnGen (x :: xs)))) (pure []) ms.
+                          returnGen (x :: xs)))) (returnGen []) ms.
 
 Fixpoint foldGen {A B : Type} (f : A -> B -> Gen A) (l : list B) (a : A) 
 : Gen A :=
