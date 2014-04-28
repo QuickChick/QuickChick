@@ -69,6 +69,18 @@ Definition liftGen5 {A1 A2 A3 A4 A5 R : Type} (F : A1 -> A2 -> A3 -> A4 -> A5 ->
   bindGen m5 (fun x5 =>
   returnGen (F x1 x2 x3 x4 x5)))))).
 
+Definition sequenceGen {A : Type} (ms : list (Gen A)) : Gen (list A) :=
+  fold_right (fun m m' => bindGen m  (fun x => 
+                          bindGen m' (fun xs =>
+                          returnGen (x :: xs)))) (pure []) ms.
+
+Fixpoint foldGen {A B : Type} (f : A -> B -> Gen A) (l : list B) (a : A) 
+: Gen A :=
+  match l with
+    | [] => returnGen a
+    | (x :: xs) => bindGen (f a x) (foldGen f xs)
+  end.
+
 (*
 Require Import Monad.
 
