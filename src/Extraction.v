@@ -22,7 +22,7 @@ Extract Constant Zminus => "(Prelude.-)".
 Extract Constant Zmult => "(Prelude.*)".
 Extract Constant Z.pos_div_eucl => "Prelude.quotRem".
 Extract Constant shift_nat => "(\n m -> 
-  Data.Bits.shiftL m (Prelude.fromIntegral n))".
+  DB.shiftL m (Prelude.fromIntegral n))".
 Extract Constant Z.eq_dec => "(Prelude.==)".
 
 Extract Inductive comparison => "Prelude.Ordering"
