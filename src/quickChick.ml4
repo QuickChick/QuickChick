@@ -1,14 +1,16 @@
 open Names
 open Extract_env
 
-let ghc_cmd fn modn =
-  Printf.sprintf "ghc %s -main-is %s" fn modn
+let ghc_cmd fn modn = Printf.sprintf "ocamlc %s" fn
+  
+(*   Printf.sprintf "ghc %s -main-is %s" fn modn *)
 
 (* Commands are truncated, they do not include the file name on which they *)
 (* operate. *)
 
-let cmds main =
-["sed -i 's/#ifdef __GLASGOW_HASKELL__//'";
+let cmds main = [
+(*
+"sed -i 's/#ifdef __GLASGOW_HASKELL__//'";
 "sed -i 's/import qualified GHC.Base//'";
 "sed -i 's/#else//'";
 "sed -i 's/-- HUGS//'";
@@ -32,16 +34,14 @@ let cmds main =
 
 "sed -i 's/import qualified GHC.Base/import qualified GHC.Base\\\n\\\n"^
 "deriving instance Prelude.Show Result0/' "; (* FIXME *)
-
+*)
 (* The main function should be a MiniML AST *)
 
-"echo \"main :: GHC.Base.IO ()\" >> ";
-"echo \"main = Prelude.print " ^ main ^ "\" >> "]
-
+"echo \"let main = print_string " ^ main ^ "\" >> "]
 
 let quickcheck c =
   let main = Libnames.string_of_reference c in
-  let fn = Filename.temp_file "QuickChick" ".hs" in
+  let fn = Filename.temp_file "QuickChick" ".ml" in
   let execn = Filename.chop_extension fn in
   let modn = Filename.basename execn in
   full_extraction (Some fn) [c];

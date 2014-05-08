@@ -269,14 +269,15 @@ Definition test (st : State) (f : RandomGen -> nat -> QProp) : Result :=
   else runATest st f.
 
 Require Import ZArith.
-Axiom unsafeRandomSeed : Z.
+(* Axiom unsafeRandomSeed : Z. *)
+Axiom newStdGen : RandomGen.
 Definition quickCheckWithResult {prop : Type} {_ : Testable prop}
            (a : Args) (p : prop) : Result :=
   (* ignore terminal - always use trace :D *)
   let (rnd, computeFun) := 
       match replay a with
         | Some (rnd, s) => (rnd, at0 (computeSize' a) s)
-        | None          => (mkRandomGen unsafeRandomSeed, computeSize' a)
+        | None          => (newStdGen, computeSize' a)
         (* make it more random...? need IO action *)
       end in
   test (MkState (maxSuccess a)  (* maxSuccessTests   *)
