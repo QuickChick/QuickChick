@@ -14,6 +14,8 @@ Axiom randomRNat  : nat  * nat  -> RandomGen -> nat  * RandomGen.
 Axiom randomRInt  : Z    * Z    -> RandomGen -> Z    * RandomGen.
 Axiom newStdGen   : RandomGen.
 
+Record Lazy (T : Type) := lazy { force : T }.
+
 Inductive Gen (A : Type) : Type :=
 | MkGen : (RandomGen -> nat -> A) -> Gen A.
 

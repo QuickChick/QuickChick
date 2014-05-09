@@ -17,7 +17,7 @@ Definition prop_delete_removes_every_x (x : nat) (l : list nat) :=
   negb (existsb (fun y => beq_nat y x) (my_delete x l)).
 
 Definition test0 := 
-  quickCheck prop_delete_removes_every_x.
+  showResult (quickCheck prop_delete_removes_every_x).
 
 QuickCheck test0.
 
@@ -87,6 +87,6 @@ Definition prop_mirror_reverse (t : Tree nat) :=
   else false.
 
 Definition testTree :=
-  quickCheck prop_mirror_reverse.
+  showResult (quickCheck prop_mirror_reverse).
 
 QuickCheck testTree.

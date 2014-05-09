@@ -190,7 +190,7 @@ end.
 Fixpoint roseSize (r : Rose Property.Result) : nat :=
   match r with
     | MkRose _ ts =>
-      1 + fold_left (fun acc rose => acc + (roseSize rose)) ts 0
+      1 + fold_left (fun acc rose => acc + (roseSize rose)) (force ts) 0
   end.
 
 Function localMin (st : State) (r : Rose Property.Result)
@@ -198,7 +198,7 @@ Function localMin (st : State) (r : Rose Property.Result)
 : (nat * Property.Result) :=
   match r with
     | MkRose res ts =>
-      match ts return (nat * Property.Result) with 
+      match (force ts) return (nat * Property.Result) with 
         | nil => 
           let zero := callbackPostFinalFailure st res in
           (numSuccessShrinks st + zero, res)
@@ -209,9 +209,9 @@ Function localMin (st : State) (r : Rose Property.Result)
                   localMin (updSuccessShrinks st (fun x => x + 1))
                            (MkRose res' ts')
               else
-                localMin (updTryShrinks st (fun x => x + 1)) (MkRose res t)
+                localMin (updTryShrinks st (fun x => x + 1)) (MkRose res (lazy t))
             | None =>
-              localMin (updTryShrinks st (fun x => x + 1)) (MkRose res t)
+              localMin (updTryShrinks st (fun x => x + 1)) (MkRose res (lazy t))
           end
       end
   end.
@@ -293,7 +293,14 @@ Definition quickCheckWithResult {prop : Type} {_ : Testable prop}
                 0               (* numTryShrinks     *)
        ) (match property p with MkGen g => g end).
 
+Definition showResult (r : Result) :=
+  match r with
+  | Success _ _ _ s => s
+  | GaveUp _ _ s => s
+  | Failure _ _ _ _ _ s _ _ => s
+  | NoExpectedFailure _ _ s => s
+  end.
+
 Definition quickCheck {prop : Type} {_ : Testable prop} 
            (p : prop) : Result :=
   quickCheckWithResult stdArgs p.
-

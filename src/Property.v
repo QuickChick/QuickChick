@@ -51,19 +51,19 @@ Definition addCallback (res : Result) (c : Callback) : Result :=
   end.
 
 Inductive Rose (A : Type) : Type := 
-  MkRose : A -> list (Rose A) -> Rose A.
+  MkRose : A -> Lazy (list (Rose A)) -> Rose A.
 
-Definition returnRose {A : Type} (x : A) := MkRose x nil.
+Definition returnRose {A : Type} (x : A) := MkRose x (lazy nil).
 
 Fixpoint joinRose {A : Type} (r : Rose (Rose A)) : Rose A :=
   match r with
     | MkRose (MkRose a ts) tts =>
-      MkRose a (List.map joinRose tts ++ ts)
+      MkRose a (lazy (List.map joinRose (force tts) ++ (force ts)))
   end.
 
 Fixpoint fmapRose {A B : Type} (f : A -> B) (r : Rose A) : Rose B :=
   match r with
-    | MkRose x rs => MkRose (f x) (List.map (fmapRose f) rs)
+    | MkRose x rs => MkRose (f x) (lazy (List.map (fmapRose f) (force rs)))
   end.
 
 Definition bindRose {A B : Type} (m : Rose A) (k : A -> Rose B) : Rose B :=
@@ -145,9 +145,9 @@ Fixpoint props' {prop A : Type} {t : Testable prop} (n : nat)
          (pf : A -> prop) (shrinker : A -> list A) (x : A) :=
   match n with
     | O => 
-      MkRose (property (pf x)) nil
+      MkRose (property (pf x)) (lazy nil)
     | S n' =>
-      MkRose (property (pf x)) (List.map (props' n' pf shrinker) (shrinker x))
+      MkRose (property (pf x)) (lazy (List.map (props' n' pf shrinker) (shrinker x)))
   end.
 
 (* Arbitrary choice for number of shrinks.. *)
@@ -197,4 +197,3 @@ Definition label {prop : Type} `{_ : Testable prop}
 Definition collect {A prop : Type} `{_ : Show A} `{_ : Testable prop} 
            (x : A) : prop -> Property :=
   label (show x).
-

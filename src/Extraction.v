@@ -3,8 +3,13 @@ Require Import Coq.Strings.Ascii.
 Require Import Coq.Strings.String.
 Require Import Gen Test Show Property.
 
+Require Import ExtrOcamlBasic.
+Require Import ExtrOcamlString.
+Require Import ExtrOcamlNatInt.
+
 (* Extraction Language Haskell. *)
 
+(*
 Extract Inductive unit => "()" [ "()" ].
 
 Extract Inductive positive => "int"
@@ -53,6 +58,7 @@ Extract Inductive bool => "bool"
 Extract Inductive sumbool => "bool"
   [ "true" "false" ]
   "(fun ft ff b -> if b then ft () else ff ())".
+*)
 
 (*
 Extract Inductive list => "[]"
@@ -78,21 +84,25 @@ Extract Inductive string => "Prelude.String"
                   c : s' -> fs c s'; })".
 *)
 
-Extract Constant show_nat =>  "(Printf.sprintf ""%d"")".
+Extract Constant show_nat =>
+  "(fun i -> coqstring_of_string (string_of_int i))".
 Extract Constant show_bool => "(Printf.sprintf ""%b"")".
 Extract Constant show_int =>  "(Printf.sprintf ""%d"")".
 
 Extract Constant RandomGen   => "Random.State.t".
 Extract Constant rndNext     => "Random.State.bits)".
 (* Extract Constant rndGenRange => "SR.genRange".*)
-Extract Constant rndSplit    => "(fun x -> Pair (x,x))".
+Extract Constant rndSplit    => "(fun x -> (x,x))".
 Extract Constant mkRandomGen => "(fun x -> Random.init x; Random.get_state())".
 Extract Constant randomRNat  => 
-  "(fun (Pair (x,y)) r -> Pair (x + (Random.State.int r (y - x)), r))".
+  "(fun (x,y) r -> (x + (Random.State.int r (y - x + 1)), r))".
 Extract Constant randomRBool => "(fun _ r -> Random.State.bool r)".
 Extract Constant randomRInt  => 
-  "(fun (Pair (x,y)) r -> Pair (x + (Random.State.int r (y - x)), r))".
+  "(fun (x,y) r -> (x + (Random.State.int r (y - x + 1)), r))".
 Extract Constant newStdGen   => "(Random.State.make_self_init ())".
+
+Extract Inductive Lazy => "Lazy.t" [lazy].
+Extract Constant force => "Lazy.force".
 
 Extract Constant Test.ltAscii => "(<=)".
 Extract Constant Test.strEq   => "(=)".
@@ -100,7 +110,7 @@ Extract Constant Coq.Numbers.Natural.Peano.NPeano.div => "(/)".
 Extract Constant Coq.Numbers.Natural.Peano.NPeano.modulo => "(fun x y -> x mod y)".
 Extract Constant Test.gte => "(>=)".
 Extract Constant le_gt_dec => "(<=)".
-Extract Constant trace => "(fun x y -> print_string x; y)".
+Extract Constant trace => "(fun x y -> print_string (string_of_coqstring x); y)".
 
 Set Extraction AccessOpaque.
 
