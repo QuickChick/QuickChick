@@ -9,3 +9,4 @@ src/QuickChick.v
 src/quickChick.ml4
 src/Test.v
 src/Extraction.v
+src/quickChickLib.ml

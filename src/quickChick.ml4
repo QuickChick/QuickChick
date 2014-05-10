@@ -1,19 +1,33 @@
 open Names
 open Extract_env
 
+(* Locate QuickChick's files *)
+(* For trunk and forthcoming Coq 8.5:
+let qid = Libnames.make_qualid (DirPath.make [Id.of_string "QuickChick"]) (Id.of_string "QuickChick")
+*)
+let qid = Libnames.make_qualid (make_dirpath [id_of_string "QuickChick"]) (id_of_string "QuickChick")
+let (_,_,path) = Library.locate_qualified_library false qid
+let path = Filename.dirname path
+
 (* Interface with OCaml compiler *)
+let temp_dirname = Filename.get_temp_dir_name ()
+
+let link_files = ["quickChickLib.cmx"]
+
 let comp_mli_cmd fn =
-  Printf.sprintf "ocamlc -rectypes -I %s %s" (Filename.get_temp_dir_name ()) fn
+  Printf.sprintf "ocamlc -rectypes -I %s %s" path fn
 
 let comp_ml_cmd fn out =
-  Printf.sprintf "ocamlopt -rectypes -I %s /tmp/camlCoq.cmx %s -o %s" (Filename.get_temp_dir_name ()) fn out
+  let link_files = List.map (Filename.concat path) link_files in
+  let link_files = String.concat " " link_files in
+  Printf.sprintf "ocamlopt -rectypes -I %s -I %s %s %s -o %s" temp_dirname path link_files fn out
 
 (* Commands are truncated, they do not include the file name on which they *)
 (* operate. *)
 
 let cmds main = [
-(* TODO: move these functions to a separate file *)
-"sed -i '1s/^/let string_of_coqstring (l : char list) =\\\n"^
+"sed -i '1s/^/open QuickChickLib\\\n/'";
+(*
   "let s = String.create (List.length l) in\\\n"^
   "let rec copy i = function\\\n"^
   "| [] -> s\\\n"^
@@ -24,7 +38,7 @@ let cmds main = [
 "  let rec copy acc i =\\\n"^
 "    if i < 0 then acc else copy (s.[i] :: acc) (i-1)\\\n"^
 "  in copy [] (String.length s - 1)\\\n/'";
-
+*)
 (* The main function should be a MiniML AST *)
 
 "echo \"let main = print_string (string_of_coqstring (" ^ main ^ "))\" >> "]
