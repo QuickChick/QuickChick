@@ -8,7 +8,7 @@ Description
 Known to work with
 
   - Coq 8.4pl3
-  - GHC 7.6.3
+  - OCaml 4.01.0
 
 Installation
 
