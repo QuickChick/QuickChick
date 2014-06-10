@@ -128,7 +128,7 @@ Definition promote {M : Type -> Type} {A : Type}
            (m : M (Gen A)) : Gen (M A) :=
   MkGen (fun r n => liftFun (fun g => match g with MkGen m' => m' r n end) m).
 
-Fixpoint rnds (rnd : RandomGen) (n' : nat) :=
+Fixpoint rnds (rnd : RandomGen) (n' : nat) : list RandomGen :=
   match n' with
     | O => nil
     | S n'' => 
@@ -136,7 +136,7 @@ Fixpoint rnds (rnd : RandomGen) (n' : nat) :=
       cons rnd1 (rnds rnd2 n'')
   end.
 
-Fixpoint createRange n acc :=
+Fixpoint createRange (n : nat) (acc : list nat) : list nat :=
   match n with 
     | O => List.rev (cons O acc)
     | S n' => createRange n' (cons n acc)
@@ -148,7 +148,7 @@ Definition sample' (A : Type) (g : Gen A) : list A :=
       let rnd := mkRandomGen 0 in
       let l := List.combine (rnds rnd 20) (createRange 20 nil) in
       List.map (fun (p : RandomGen * nat) => let (r,n) := p in m r n) l
-  end.      
+  end.
 
 Definition resize {A : Type} (n : nat) (g : Gen A) : Gen A :=
   match g with
@@ -158,7 +158,8 @@ Definition resize {A : Type} (n : nat) (g : Gen A) : Gen A :=
 Definition sized (A : Type) (f : nat -> Gen A) : Gen A :=
   MkGen (fun r n => match f n with MkGen m => m r n end).
 
-Definition suchThatMaybe {A : Type} (g : Gen A) (p : A -> bool) :=
+Definition suchThatMaybe {A : Type} (g : Gen A) (p : A -> bool)
+    : Gen (option A) :=
   let t := (fix t (n : nat) (k : nat) : Gen (option A) := 
               match n with
                 | O => returnGen None

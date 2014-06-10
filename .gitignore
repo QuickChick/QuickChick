@@ -6,5 +6,6 @@
 *.o
 *.v.d
 *.ml4.d
+*.ml.d
 *.glob
 *.vo
