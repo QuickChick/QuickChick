@@ -7,13 +7,14 @@ Description
 
 Known to work with
 
-  - Coq 8.4pl3
+  - Coq 8.4pl4
   - OCaml 4.01.0
 
 Installation
 
   - make
-  - make install
+  - make install doesn't work for now, you should use the plugin in the folder
+    where it was built by make or copy all the files manually
 
 Examples
 
