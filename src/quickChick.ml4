@@ -2,12 +2,15 @@ open Names
 open Extract_env
 
 (* Locate QuickChick's files *)
+(* The computation is delayed because QuickChick's libraries are not available
+when the plugin is first loaded. *)
 (* For trunk and forthcoming Coq 8.5:
 let qid = Libnames.make_qualid (DirPath.make [Id.of_string "QuickChick"]) (Id.of_string "QuickChick")
 *)
 let qid = Libnames.make_qualid (make_dirpath [id_of_string "QuickChick"]) (id_of_string "QuickChick")
-let (_,_,path) = Library.locate_qualified_library false qid
-let path = Filename.dirname path
+let path =
+  lazy (let (_,_,path) = Library.locate_qualified_library false qid in path)
+let path = lazy (Filename.dirname (Lazy.force path))
 
 (* Interface with OCaml compiler *)
 let temp_dirname = Filename.get_temp_dir_name ()
@@ -15,12 +18,14 @@ let temp_dirname = Filename.get_temp_dir_name ()
 let link_files = ["quickChickLib.cmx"]
 
 let comp_mli_cmd fn =
-  Printf.sprintf "ocamlc -rectypes -I %s %s" path fn
+  Printf.sprintf "ocamlc -rectypes -I %s %s" (Lazy.force path) fn
 
 let comp_ml_cmd fn out =
+  let path = Lazy.force path in
   let link_files = List.map (Filename.concat path) link_files in
   let link_files = String.concat " " link_files in
-  Printf.sprintf "ocamlopt -rectypes -I %s -I %s %s %s -o %s" temp_dirname path link_files fn out
+  Printf.sprintf "ocamlopt -rectypes -I %s -I %s %s %s -o %s" temp_dirname 
+    path link_files fn out
 
 (* Commands are truncated, they do not include the file name on which they *)
 (* operate. *)
