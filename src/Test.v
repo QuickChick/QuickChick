@@ -164,16 +164,19 @@ nil.
 Definition doneTesting (st : State) (f : RandomGen -> nat -> QProp) : Result :=
  if expectedFailure st then
     Success (numSuccessTests st + 1) (numDiscardedTests st) (summary st) 
-            ("+++ OK, passed " ++ (show (numSuccessTests st)) ++ " tests")
+            ("+++ OK, passed " ++ (show (numSuccessTests st)) ++ " tests"
+                               ++ newline)
   else
     NoExpectedFailure (numSuccessTests st) (summary st) 
                       ("*** Failed! Passed " ++ (show (numSuccessTests st))
-                                             ++ " tests (expected Failure)").
+                                             ++ " tests (expected Failure)"
+                                             ++ newline).
   (* TODO: success st - labels *)
 
 Definition giveUp (st : State) (_ : RandomGen -> nat -> QProp) : Result :=
   GaveUp (numSuccessTests st) (summary st) 
-         ("*** Gave up! Passed only " ++ (show (numSuccessTests st)) ++ " tests").
+         ("*** Gave up! Passed only " ++ (show (numSuccessTests st)) ++ " tests"
+                                      ++ newline).
 
 Definition callbackPostFinalFailure (st : State) (res : Property.Result) 
 : nat :=
@@ -299,7 +302,7 @@ Definition showResult (r : Result) :=
   | GaveUp _ _ s => s
   | Failure _ _ _ _ _ s _ _ => s
   | NoExpectedFailure _ _ s => s
-  end.
+  end ++ newline.
 
 Definition quickCheck {prop : Type} {_ : Testable prop} 
            (p : prop) : Result :=

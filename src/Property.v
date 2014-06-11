@@ -169,7 +169,7 @@ Definition forAllShrink {A prop : Type} {_ : Testable prop}
            (gen : Gen A) (shrinker : A -> list A) (pf : A -> prop) : Property :=
   bindGen gen (fun x => 
     shrinking shrinker x (fun x' =>
-      printTestCase (show x') (pf x'))).
+      printTestCase (show x' ++ newline) (pf x'))).
 
 Instance testFun {A prop : Type} `{_ : Show A}
          `{_ : Arbitrary A} `{_ : Testable prop} : Testable (A -> prop) :=

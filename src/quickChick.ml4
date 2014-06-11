@@ -54,7 +54,7 @@ let quickcheck c =
   let execn = Filename.chop_extension mlf in
   let mlif = execn ^ ".mli" in
   let modn = Filename.basename execn in
-  full_extraction (Some mlf) [c];
+  Flags.silently (full_extraction (Some mlf)) [c];
   (* We should check that the commands below succeed at each step *)
   List.iter (fun cmd -> ignore (Sys.command (cmd ^ " " ^ mlf))) (cmds main);
   Sys.command (comp_mli_cmd mlif);

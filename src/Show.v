@@ -2,6 +2,8 @@ Require Import String.
 Require Import ZArith.
 Require Import List.
 
+Definition newline := String "010" ""%string.
+
 Axiom show_nat  : nat -> string.
 Extract Constant show_nat => "Prelude.show".
 Axiom show_bool : bool -> string.
