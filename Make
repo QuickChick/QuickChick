@@ -1,5 +1,8 @@
 -R src QuickChick
+src/Axioms.v
 src/Arbitrary.v
+src/AbstractGen.v
+src/SetOfOutcomes.v
 src/Gen.v
 src/MutateCheck.v
 src/Property.v

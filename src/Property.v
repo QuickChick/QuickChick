@@ -5,7 +5,7 @@ Require Import String.
 
 Require Import Show.
 Require Import State.
-Require Import Gen.
+Require Import AbstractGen Gen.
 Require Import Arbitrary.
 
 Axiom trace : forall A, string -> A -> A.

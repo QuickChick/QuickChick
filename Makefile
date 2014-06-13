@@ -124,7 +124,10 @@ VFILES:=src/Extraction.v\
   src/Property.v\
   src/MutateCheck.v\
   src/Gen.v\
-  src/Arbitrary.v
+  src/SetOfOutcomes.v\
+  src/AbstractGen.v\
+  src/Arbitrary.v\
+  src/Axioms.v
 
 -include $(addsuffix .d,$(VFILES))
 .SECONDARY: $(addsuffix .d,$(VFILES))

@@ -1,7 +1,7 @@
 Require Import ZArith.
 Require Import Coq.Strings.Ascii.
 Require Import Coq.Strings.String.
-Require Import Gen Test Show Property.
+Require Import Axioms AbstractGen Gen Test Show Property.
 
 Require Import ExtrOcamlBasic.
 Require Import ExtrOcamlString.

@@ -1,4 +1,4 @@
-Require Import Gen.
+Require Import AbstractGen Gen.
 Require Import ZArith.
 Require Import ZArith.Znat.
 Require Import Arith.
@@ -14,7 +14,7 @@ Class Arbitrary (A : Type) : Type :=
 
 Instance arbBool : Arbitrary bool :=
 {|
-  arbitrary := chooseBool (false, true);
+  arbitrary := choose (false, true);
   shrink x  :=
   match x with
       | false => nil
@@ -34,7 +34,7 @@ Qed.
 
 Instance arbNat : Arbitrary nat :=
 {|
-  arbitrary := chooseNat (0, 100);
+  arbitrary := choose (0, 100);
   shrink x := shrinkNat x
 |}.
 
@@ -65,7 +65,7 @@ Instance arbList {A : Type} `{Arb : Arbitrary A}
 Local Open Scope Z_scope.
 Instance arbInt : Arbitrary Z :=
 {|
-  arbitrary := chooseZ (-100, 100);
+  arbitrary := choose (-100, 100);
   shrink x := shrinkZ x
 |}.
 
