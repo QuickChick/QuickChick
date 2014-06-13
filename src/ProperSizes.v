@@ -4,7 +4,7 @@ Require Import List ssreflect ssrbool ssrnat seq.
 (* Experiment on properly tracking sizes
    Conclusion: this seems too complicated to be worth the trouble
    [We can return to this decision if we want to talk about
-    (sized-instance) probability distributions in the future] *)
+    (sized-indexed) probability distributions in the future] *)
 
 Class Sized {A : Type} := {
   size : A -> nat
