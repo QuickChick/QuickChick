@@ -31,7 +31,6 @@ let comp_ml_cmd fn out =
 (* operate. *)
 
 let cmds main = [
-"sed -i '1s/^/open QuickChickLib\\\n/'";
 (*
   "let s = String.create (List.length l) in\\\n"^
   "let rec copy i = function\\\n"^
@@ -46,7 +45,7 @@ let cmds main = [
 *)
 (* The main function should be a MiniML AST *)
 
-"echo \"let main = print_string (string_of_coqstring (" ^ main ^ "))\" >> "]
+"echo \"let main = print_string (QuickChickLib.string_of_coqstring (" ^ main ^ "))\" >> "]
 
 let quickcheck c =
   let main = Libnames.string_of_reference c in

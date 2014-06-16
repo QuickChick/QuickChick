@@ -85,7 +85,7 @@ Extract Inductive string => "Prelude.String"
 *)
 
 Extract Constant show_nat =>
-  "(fun i -> coqstring_of_string (string_of_int i))".
+  "(fun i -> QuickChickLib.coqstring_of_string (string_of_int i))".
 Extract Constant show_bool => "(Printf.sprintf ""%b"")".
 Extract Constant show_int =>  "(Printf.sprintf ""%d"")".
 
@@ -110,7 +110,7 @@ Extract Constant Coq.Numbers.Natural.Peano.NPeano.div => "(/)".
 Extract Constant Coq.Numbers.Natural.Peano.NPeano.modulo => "(fun x y -> x mod y)".
 Extract Constant Test.gte => "(>=)".
 Extract Constant le_gt_dec => "(<=)".
-Extract Constant trace => "(fun x y -> print_string (string_of_coqstring x); y)".
+Extract Constant trace => "(fun x y -> print_string (QuickChickLib.string_of_coqstring x); y)".
 
 Set Extraction AccessOpaque.
 
