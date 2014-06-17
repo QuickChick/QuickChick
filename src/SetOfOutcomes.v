@@ -1,6 +1,7 @@
 Require Import AbstractGen.
 Require Import List ssreflect ssrbool ssrnat seq.
 
+
 Definition Pred (A : Type) := A -> Prop.
 
 (* Equivalence on sets of outcomes *) 
@@ -11,12 +12,16 @@ Definition peq {A} (m1 m2 : Pred A) :=
 Definition pincl {A} (m1 m2 : Pred A) :=
   forall A, m1 A -> m2 A. 
 
-Program Instance GenMonad : GenMonad Pred :=
+Definition bindGen {A B} (m : Pred A) (f : A -> Pred B) : Pred B :=
+  fun b => exists a, m a /\ f a b.
+
+Definition returnGen {A} (a : A) : Pred A :=
+  eq a.
+
+Instance GenMonad : GenMonad Pred :=
   {
-    bindGen A B ma f := 
-      fun b => exists a, ma a /\ f a b;
-    returnGen A a := 
-      eq a;
+    bindGen := @bindGen;
+    returnGen := @returnGen;
     choose A H p := 
       fun a => 
         (cmp (fst p) a = Lt \/
