@@ -1,0 +1,134 @@
+TODO: does shrinking really work? I'm getting 0 shrinks very often now.
+
+TODO: have a look at instruction generation is the imem always of size
+      2? and are the 2 instructions always the same? why?
+
+TODO: a lot of the infrastructure is very primitive;
+      like always changing the function called testNI in Driver.v;
+      that's a pain; I should be able to select such things
+      as command line arguments
+
+TODO P0: simplify our instrumentation by using the stamps and David's
+      per-level allocator idea
+
+TODO: is the stack invariant necessary or not?
+
+TODO: make sure that the distribution on labels is good (i.e. uniform)
+
+TODO: the way principals/labels are generated is horrible; different
+      magic numbers all over the code
+
+TODO: how about also gathering statistics about the discards
+      (e.g. passing in a string and collecting like for successes)?
+
+TODO: consider special-casing generation in case the original machine
+      takes a High -> Low step; try to give high weight to returns to
+      prevent large dicard rate
+
+TODO: naming is a mess
+
+TODO: code in MachineGen seems in need of a cleanup, a lot of
+      duplication and dead code left from LLNI
+
+TODO: could maybe also consider also looking at positive mutants
+      (i.e. add spurious taints + add spurious checks)?
+      although we are idiots if those find bugs in our code
+
+TODO: should also display the current observation label, otherwise
+      it's very high to understand what's low and what high in
+      counterexamples
+
+TODO: stacks don't shrink well, although that should be trivial to do
+      (from the bottom up) -- not sure if Leo's latest commit really
+      fixed this completely
+
+TODO: Have we tested that our variation really returns equivalent things?
+
+TODO: there is a property of stacks that was used in generation
+      to prevent counterexamples; shouldn't that be also part
+      of our invariant / property though? Is it really necessary?
+
+TODO: things like the number of tests to run should be command line
+arguments
+
+TODO: make sure stacks are varied properly for high pcs
+
+3 registers before shrinking -- DONE; 10 now
+- why so little? this puts a lot of preasure on the weights
+- can't shrinking get rid of them anyway?
+  -- TODO: make sure they are properly shrunk
+
+(* CH: TODO: sort the list by frequency / occurence numbers at the end
+       summary calls insSortStr but to no avail; it doesn't
+       seem to be sorting by the right thing anyway *)
+
+(* CH: collection slows things down significantly *)
+
+(* CH: Because of the patching and stuff make is not idempotent:
+       running make after make fails -- DONE(Maxime);
+       it still takes time to run make after make;
+       TODO: patching with sed shouldn't happen in place *)
+
+Seems that many counterexamples are not found
+
+Don't quite get the output when counterexample is found
+- first step in this direction DONE
+- TODO: display both the pre and the post states!
+
+PSetOff - not enough primitive for pointers
+- need a GetOff and GetSize as well -- DONE
+  (or some relative offsetting primitives)
+
+no automatically introduced bugs yet
+- that's a pity; the only way I get confidence is if many old
+  bugs are still found but no new ones; otherwise it could be
+  that the generation strategy is completely broken
+- especially with the separated rule table it should be
+  relatively simple to introduce label-only bugs
+  + we might even be able to do this automatically
+- this is dead code now
+Inductive bug :=
+| NoBug
+| BCallNoLabTaint
+| BRetNoTaint
+| LoadTaintResult
+| LoadNoPtrTaint
+| LoadNoMemTaint
+| StoreNoPcWritedown
+| StoreNoPtrWritedown
+| OutputPcNoTaint
+| AllocLabelNoTaint
+| BinopNoTaint.
+
+nice: the extra frame labels obviate the need for linear pointers or for
+strange bracket hacks to get initialization working
+- now labels of memory locations can be always updated
+
+nice: minimized interaction between registers and brackets
+- brackets assumed to save and restore all registers but return one
+  + no masks or anything like that
+  + basically the register windows Andre proposed a long, long time ago
+- if things would have gotten too complicated could have even left
+  registers out in first instance
+
+only one kind of calls and returns: brackets
+
+only ints are observable
+- can't output pointers; that's a reasonable assumption
+- SSNI does have a condition about outputs
+
+for no recent (Coq) machine we need Halt
+- our new properties are stated in terms of traces of Outputs
+
+Machine has authority values, but no way to create them
+- just drop / ignore them for now
+
+Part of the memory: st_pr, although this never changes
+- could as well make principals be ints; or just ignore
+  (without authorities that's just fine)
+
++ FlowsTo, and LJoin could be binary operations?
+  - now the assumption is that binops return ints, not labels
+
+
+

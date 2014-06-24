@@ -1,0 +1,69 @@
+-- Register convertion
+
+   * Identified ainstr as the key to genByExec
+   * Needed serious retweeking of weights since stuff are not
+     usually consumed. This also resulted in better behavior
+   * BCall hack (stack contains register file to return to)
+   * BRet pops the old register set and just updates one 
+     register that contains the "return value"
+   * For simplicity, allowed operations like Add r1,r1,r1. I don't
+     see this causing any problems, but still is worth mentioning
+
+-- TMU Conversion
+
+   * Need to work on the automation of the relational-executional 
+     semantics correspondence
+   * Some admits remain in the relational-executional semantics 
+     correspondence, but I think it is just a matter of not remembering
+     the results of the TMU
+   * Find out a new way of introducing many bugs - without clogging up 
+     the TMU table
+   * Executional semantics start to get ugly, figure out a prettier 
+     notation to unclog things     
+
+-- Observability relation (modified LLNI)
+   
+   * Introduce an implicit "reference machine" that follows all the 
+     memory and pricipal allocations done in low context
+   * Keep a function that relates actual memory frames to the memory 
+     frames of the reference machine :
+
+        Definition projection (A : Type) := A -> option A.
+
+   * When checking a pair of frame pointers in a variation, those 
+     are either labeled high OR correspond to an allocation that 
+     happend in a low context, so we check for equivalence of the 
+     frame pointers after they are converted to their reference 
+     machine equivalents
+   * We no longer check all pairs of memory frames for equivalence,
+     just the pairs that correspond to low-pc allocations (since
+     high-allocated frames can be arbitrary). The pairs are 
+     calculated based on the projection function.
+   * Do the same thing for principals and principal allocation. 
+     The allocation of principals in low context is captured in 
+     the reference machine. When checking different executions, 
+     we project principals (and labels) to the reference ones
+
+-- Idea for SSNI 
+   
+   * The hard part is getting the dynamic principal generation right 
+   * Proposed idea/invariant: Enforce a different observer level in the 
+     invariant: Starting from the "normal" observability level, calculate 
+     a fixpoint including all the currently observable authorities (since 
+     they can be outputed). The resulting level will be used in the 
+     invariant (ie. everything under that should be *the same* )
+
+-- Allocation instruction semantics
+
+   * Taint with the label of the label
+   * The label of the label argument cannot be higher than the pc ?
+
+
+
+   
+   
+   
+
+
+
+

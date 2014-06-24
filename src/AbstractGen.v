@@ -152,7 +152,7 @@ Section Utilities.
   Definition listOf {A : Type} (g : Gen A) : Gen (list A) :=
     sized (fun n => bindGen (choose (0, n)) (fun k => vectorOf k g)).
 
-  Fixpoint elements {A : Type} (def : A) (l : list A) :=
+  Definition elements {A : Type} (def : A) (l : list A) :=
     let n := length l in
     bindGen (choose (0, n - 1)) (fun n' => 
     returnGen (List.nth n' l def)).
