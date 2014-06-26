@@ -43,7 +43,7 @@ Class GenMonad M :=
     fmapGen : forall {A B: Type}, (A -> B) -> (M A) -> M B; 
     choose : forall {A} {H: Random A}, A * A -> M A;
     sized : forall {A}, (nat -> M A) -> M A;
-    suchThatMaybe : forall A, M A -> (A -> bool) -> M (option A)
+    suchThatMaybe : forall {A}, M A -> (A -> bool) -> M (option A)
   }.
   
 Section Utilities.
@@ -93,8 +93,7 @@ Section Utilities.
   Definition sequenceGen {A : Type} (ms : list (Gen A)) : Gen (list A) :=
     fold_right (fun m m' => bindGen m  (fun x => 
                             bindGen m' (fun xs =>
-
-                          returnGen (x :: xs)))) (returnGen []) ms.
+                            returnGen (x :: xs)))) (returnGen []) ms.
 
   Fixpoint foldGen {A B : Type} (f : A -> B -> Gen A) (l : list B) (a : A) 
   : Gen A :=
@@ -105,7 +104,7 @@ Section Utilities.
 
   Definition oneof {A : Type} (def: Gen A) (gs : list (Gen A)) : Gen A :=
     bindGen (choose (0, length gs - 1))
-            (fun n => List.nth n gs def).
+            (fun n => nth def gs n).
 
   Fixpoint replicate {A : Type} (n : nat) (x : A) : list A :=
     match n with
@@ -117,7 +116,7 @@ Section Utilities.
     match gs with
       | nil => nil
       | cons (n, g) t =>
-        (replicate n g) ++ freqRep t
+        (nseq n g) ++ freqRep t
     end.
 
   Definition frequency {A : Type} (def : Gen A) (gs : list (nat * Gen A)) :=
@@ -129,25 +128,26 @@ Section Utilities.
      the range of choose is (1, 0), which, according to Haskell's interface, 
      is an undefined behavior. *)
  
+    Fixpoint pick {A : Type} (def : Gen A) (n : nat) (xs : list (nat * Gen A)) 
+    : nat * Gen A := 
+      match xs with 
+        | nil => (0, def)
+        | (k, x) :: xs =>  
+          if (n < k) then (k, x) 
+          else pick def (n - k) xs
+      end.
+
   Definition frequency'  {A : Type} (def : Gen A) (gs : list (nat * Gen A)) 
   : Gen A :=
-    let fix pick n xs := 
-        match xs with 
-          | nil => def
-          | (k, x) :: xs =>  
-            if (n <= k) then x 
-            else pick (n - k) xs
-        end
-    in
     let tot := (sumn (map (@fst _ _) gs)) in
-    bindGen (choose (1, tot)) (fun n =>
-    pick n gs).
+    bindGen (choose (0, tot-1)) (fun n =>
+    @snd _ _ (pick def n gs)).
 
   Definition vectorOf {A : Type} (k : nat) (g : Gen A) : Gen (list A) :=  
     fold_right (fun m m' =>
                   bindGen m (fun x => 
                   bindGen m' (fun xs => returnGen (cons x xs)))
-               ) (returnGen nil) (replicate k g).
+               ) (returnGen nil) (nseq k g).
 
   Definition listOf {A : Type} (g : Gen A) : Gen (list A) :=
     sized (fun n => bindGen (choose (0, n)) (fun k => vectorOf k g)).
