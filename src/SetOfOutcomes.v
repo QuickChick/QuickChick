@@ -227,12 +227,19 @@ Proof.
       exists bs. split => //=. 
       apply IHgs. split => //= x HIn. by auto.
 Qed.
-      
+
+
 Lemma foldGen_equiv : 
-  forall {A B : Type} (f : A -> B -> Pred A) (l : list B) (a : A),
-    foldGen f l a <--> fun a => .
+  forall {A B : Type} (f : A -> B -> Pred A) (bs : list B) (a0 : A),
+    foldGen f bs a0 <--> 
+    fun an =>
+      foldr (fun b p => fun a_prev => exists a, f a_prev b a /\ p a) (eq an) bs a0.
 Proof.
-  move => A B f. 
+  move=> A B f bs a0 an. rewrite /foldGen. 
+  elim : bs a0 an => [| b bs IHbs] a0 an; 
+  try (rewrite returnGen_def); try (rewrite bindGen_def); split=> //=;
+  move => [a1 [fa0 /IHbs H]]; by exists a1.  
+Qed.
 
 Lemma vectorOf_equiv:
   forall {A : Type} (k : nat) (g : Pred A),
@@ -495,4 +502,50 @@ Proof.
       rewrite subn0. by auto.
       by left.
 Qed.
+
+
+(* Useless theorems.. *)
+Lemma fold_prop : 
+  forall {A B} (f : A -> B -> A -> Prop) l P P',
+    (P <-> P') -> 
+    (foldl (fun p (args : (A* (B *A))) =>
+                         let (a_prev, ba) := args in
+                         p /\ f a_prev (fst ba) (snd ba)) P l
+     <-> 
+     foldl (fun p (args : (A* (B *A))) =>
+                         let (a_prev, ba) := args in
+                         p /\ f a_prev (fst ba) (snd ba)) P' l). 
+Proof.
+  move => A B f l. 
+  elim: l  => //=. case => a_prev. case => b a xs //= IHxs P P'. 
+  - move => Hequiv. apply/(IHxs (P /\ f a_prev b a))=> //=. 
+    by split; move => [H1 H2]; split => //=; auto; apply/Hequiv.
+Qed.
+
+Lemma foldl_prop : forall {A B} (f : A -> B -> A -> Prop) l init P,
+  P /\ foldl (fun p (args : (A* (B *A))) =>
+                         let (a_prev, ba) := args in
+                         p /\ f a_prev (fst ba) (snd ba)) init l <-> 
+  foldl (fun p (args : (A* (B *A))) =>
+                         let (a_prev, ba) := args in
+                         p /\ f a_prev (fst ba) (snd ba)) (P /\ init) l.
+Proof.
+  move=> A B f l init P.
+  elim : l P init => //=. case => a_prev. case => b a xs IHxs P init.  
+  split.
+  + move => //= [HP Hfold]. 
+    have: ((P /\ init) /\ f a_prev b a) <-> (P /\ init /\ f a_prev b a) by apply and_assoc.
+    move/fold_prop => fold_eq.
+    apply/fold_eq. apply IHxs. by split.
+  + move/IHxs =>  [[HP Hinit] Hfold]. simpl in *. 
+    split => //=. apply IHxs. split => //=.
+Qed.
+
+Lemma zip_nil_l : forall {A B} (l : seq A), zip (@nil B) l = [::]. 
+Proof. by move => A B; case => //. Qed.
+
+Lemma zip_nil_r : forall {A B} (l : seq A), zip l (@nil B) = [::]. 
+Proof. by move => A B; case => //. Qed.
+
+
 
