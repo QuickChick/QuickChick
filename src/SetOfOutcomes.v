@@ -28,39 +28,6 @@ Definition fmapP {A B} (f : A -> B) (a : Pred A) : Pred B :=
  bindP a (fun a => 
  returnP (f a)).
 
-(* Monad laws *)
-Lemma left_identity : forall {A B} (f : A -> Pred B) (a : A),
-  peq (bindP (returnP a) f) (f a).
-Proof. compute. firstorder. subst. assumption. Qed.
-
-Lemma right_identity : forall {A} (m: Pred A),  
-  peq (bindP m returnP) m. 
-Proof. intros. compute. firstorder. subst. assumption. Qed.
-  
-Lemma associativity : forall {A B C} (m : Pred A) (f : A -> Pred B) 
-                             (g : B -> Pred C),
-  peq (bindP (bindP m f) g) (bindP m (fun x => bindP (f x) g)).
-Proof. intros. compute. firstorder. Qed. 
-
-(* Functor laws *)
-Lemma fmap_id: 
-  forall A a, peq (fmapP (@id A) a) (@id (Pred A) a).
-Proof.
-  move => A pa. rewrite /fmapP /peq /bindP /returnP /id.
-  move => a. split => [[a' [H1 H2]]| H] //=. by subst.
-  by exists a; split.
-Qed.
- 
-Lemma fmap_composition:
-  forall A B C (a : Pred A) (f : A -> B) (g : B -> C), 
-    peq (fmapP g (fmapP f a)) (fmapP (fun x => g (f x)) a).
-Proof.  
-  move=> A B C P f g. rewrite /fmapP /peq /bindP /returnP /id. move=> pc.
-  split=> [[b [[a [Pa fa]]] Heq]| [a [Pa Heq]]]; subst. 
-  + by exists a; split.  
-  + exists (f a); split=> //=.
-    by exists a; split.
-Qed.
 
 (* I don't think that this function will be a part if the common interface as
    Gen cannot implement it *)
@@ -86,6 +53,42 @@ Instance PredMonad : GenMonad Pred :=
       fun a => exists n, f n a;
     suchThatMaybe := @suchThatMaybePred
   }.
+
+(* Monad laws *)
+
+Lemma left_identity : forall {A B} (f : A -> Pred B) (a : A),
+  (bindGen (returnGen a) f) <--> (f a).
+Proof. compute. firstorder. subst. assumption. Qed.
+
+Lemma right_identity : forall {A} (m: Pred A),  
+  (bindGen m returnGen) <--> m. 
+Proof. intros. compute. firstorder. subst. assumption. Qed.
+  
+Lemma associativity : forall {A B C} (m : Pred A) (f : A -> Pred B) 
+                             (g : B -> Pred C),
+  peq (bindGen (bindGen m f) g) (bindGen m (fun x => bindGen (f x) g)).
+Proof. intros. compute. firstorder. Qed. 
+
+(* Functor laws *)
+Lemma fmap_id: 
+  forall A a, (fmapP (@id A) a) <--> (@id (Pred A) a).
+Proof.
+  move => A pa. rewrite /fmapP /peq /bindP /returnP /id.
+  move => a. split => [[a' [H1 H2]]| H] //=. by subst.
+  by exists a; split.
+Qed.
+ 
+Lemma fmap_composition:
+  forall A B C (a : Pred A) (f : A -> B) (g : B -> C), 
+    (fmapP g (fmapP f a)) <--> (fmapP (fun x => g (f x)) a).
+Proof.  
+  move=> A B C P f g. rewrite /fmapP /peq /bindP /returnP /id. move=> pc.
+  split=> [[b [[a [Pa fa]]] Heq]| [a [Pa Heq]]]; subst. 
+  + by exists a; split.  
+  + exists (f a); split=> //=.
+    by exists a; split.
+Qed.
+
 
 (* Definitions of primitive combinators so we don't need to unfold the
    definitions each time *)
@@ -231,7 +234,7 @@ Qed.
 
 Lemma foldGen_equiv : 
   forall {A B : Type} (f : A -> B -> Pred A) (bs : list B) (a0 : A),
-    foldGen f bs a0 <--> 
+    foldGen f bs a0 <-->
     fun an =>
       foldr (fun b p => fun a_prev => exists a, f a_prev b a /\ p a) (eq an) bs a0.
 Proof.
@@ -354,7 +357,7 @@ Proof.
 Qed.
 
 (* A rather long frequency proof, probably we can do better *)
-
+ 
 Lemma sum_fst_zero:          
   forall {A} (l: list (nat * A)),
            sumn [seq fst i | i <- l] = 0 <-> forall x, In x l -> fst x == 0.
@@ -419,7 +422,7 @@ Proof.
     by apply (leq_ltn_trans Hleq). 
   rewrite -ltn_subRL.
   by have -> : forall i, (i - i) = 0 by elim.
-  apply IHl. Search _ (_ + _ <= _ + _).
+  apply IHl. 
   rewrite -(leq_add2r i) subnK. by rewrite addnC. 
   by apply/not_lt.
 Qed.
@@ -462,7 +465,7 @@ Proof.
     by rewrite  -[X in _ - X]add0n subnDr subn0.
 Qed.
 
-Lemma frequency_correct :
+Lemma frequency_equiv :
   forall {A} (l : list (nat * Pred A)) (def : Pred A), 
     peq (frequency' def l) 
         (fun e => (exists n, exists g, (In (n, g) l /\ g e /\ n <> 0)) \/ 

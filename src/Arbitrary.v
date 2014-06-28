@@ -1,4 +1,4 @@
-Require Import AbstractGen Gen.
+Require Import AbstractGen.
 Require Import ZArith.
 Require Import ZArith.Znat.
 Require Import Arith.
@@ -6,21 +6,36 @@ Require Import Coq.Numbers.Natural.Peano.NPeano.
 Require Import Recdef.
 Require Import List.
 
+
 Class Arbitrary (A : Type) : Type :=
 {
-  arbitrary : Gen A;
+  arbitrary : forall {Gen : Type -> Type} {H : GenMonad Gen}, Gen A;
   shrink    : A -> list A
 }.
 
-Instance arbBool : Arbitrary bool :=
+
+Section ArbitrarySection.
+  Context {Gen : Type -> Type}
+          {H : GenMonad Gen}.
+
+  Definition arbitraryBool := choose (false, true).
+  Definition arbitraryNat :=  choose (0, 100).
+  Definition arbitraryZ := choose (-100, 100)%Z.
+  Definition arbitraryList {A : Type} {Arb : Arbitrary A} := 
+    listOf arbitrary.
+End ArbitrarySection.
+
+ 
+Global Instance arbBool : Arbitrary bool :=
 {|
-  arbitrary := choose (false, true);
+  arbitrary := @arbitraryBool;
   shrink x  :=
   match x with
       | false => nil
       | true  => cons false nil
   end
 |}.
+
 
 Function shrinkNat (x : nat) {measure (fun x => x) x}: list nat :=
   match x with
@@ -32,9 +47,9 @@ assert (H01 : 0 <= 1) by omega; apply H in H01; subst; clear H.
 destruct (divmod n 1 0 0); destruct n1; simpl; omega.
 Qed.
 
-Instance arbNat : Arbitrary nat :=
+Global Instance arbNat : Arbitrary nat :=
 {|
-  arbitrary := choose (0, 100);
+  arbitrary := @arbitraryNat;
   shrink x := shrinkNat x
 |}.
 
@@ -55,17 +70,17 @@ Fixpoint shrinkList {A : Type} (shr : A -> list A) (l : list A) : list (list A) 
              ++ (map (fun x'  => cons x' xs) (shr x ))
     end.
 
-Instance arbList {A : Type} `{Arb : Arbitrary A}
+Global Instance arbList {A : Type} {Arb : Arbitrary A}
 : Arbitrary (list A) :=
 {|
-  arbitrary := listOf (arbitrary);
+  arbitrary := 
+    fun gen hgen => @arbitraryList gen hgen A Arb;
   shrink l  := shrinkList shrink l
 |}.
 
 Local Open Scope Z_scope.
-Instance arbInt : Arbitrary Z :=
+Global Instance arbInt : Arbitrary Z :=
 {|
-  arbitrary := choose (-100, 100);
+  arbitrary := @arbitraryZ;
   shrink x := shrinkZ x
 |}.
-

@@ -84,7 +84,7 @@ Module Type MEM.
     get_frame m b = Some fr ->
     exists m',
       upd_frame m b fr' = Some m'.
-  Parameter get_upd_ : forall A S (EqS:EqDec S eq) (m m':t A S) (b:block S) fr,
+  Parameter get_upd_frame : forall A S (EqS:EqDec S eq) (m m':t A S) (b:block S) fr,
     upd_frame m b fr = Some m' ->
     forall b', 
       get_frame m' b' = if b == b' then Some fr else get_frame m b'.

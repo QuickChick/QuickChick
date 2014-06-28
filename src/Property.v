@@ -172,7 +172,7 @@ Definition forAllShrink {A prop : Type} {_ : Testable prop}
       printTestCase (show x' ++ newline) (pf x'))).
 
 Instance testFun {A prop : Type} `{_ : Show A}
-         `{_ : Arbitrary A} `{_ : Testable prop} : Testable (A -> prop) :=
+         {_ : Arbitrary A} `{_ : Testable prop} : Testable (A -> prop) :=
 {
   property f := forAllShrink show arbitrary shrink f
 }.
