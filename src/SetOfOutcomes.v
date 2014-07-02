@@ -52,12 +52,8 @@ Instance PredMonad : GenMonad Pred :=
     bindGen := @bindP;
     returnGen := @returnP;
     fmapGen := @fmapP;
-    choose A H p := 
-      fun a => 
-        (cmp (fst p) a <> Gt) /\
-        (cmp (snd p) a <> Lt);
-    sized A f := 
-      fun a => exists n, f n a;
+    choose := @chooseP;
+    sized := @sizedP;
     suchThatMaybe := @suchThatMaybePred
   }.
 
