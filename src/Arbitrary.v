@@ -19,8 +19,14 @@ Section ArbitrarySection.
           {H : GenMonad Gen}.
 
   Definition arbitraryBool := choose (false, true).
-  Definition arbitraryNat :=  choose (0, 100).
-  Definition arbitraryZ := choose (-100, 100)%Z.
+  Definition arbitraryNat :=  
+    sized (fun x => choose (0, x)).
+  (* Definition arbitraryNat :=  choose (0, 100). *)
+  Definition arbitraryZ := 
+    sized (fun x => 
+             let z := Z.of_nat x in 
+             choose (-z, z)%Z).
+  (* Definition arbitraryZ := choose (-100, 100)%Z. *)
   Definition arbitraryList {A : Type} {Arb : Arbitrary A} := 
     listOf arbitrary.
 End ArbitrarySection.

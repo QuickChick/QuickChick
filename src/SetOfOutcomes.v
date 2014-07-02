@@ -12,22 +12,22 @@ Definition peq {A} (m1 m2 : Pred A) :=
 Definition pincl {A} (m1 m2 : Pred A) :=
   forall A, m1 A -> m2 A.
  
-Notation "x <--> y" := (@peq _ x y) (at level 70, no associativity).
-Notation "x --> y" := (@pincl _ x y) (at level 70, no associativity).
+Infix "<-->" := (@peq _) (at level 70, no associativity) : pred_scope.
+
+Open Scope pred_scope. 
 
 (* The set that is equal to A *) 
 Definition all {A} : Pred A := fun _ => True. 
  
-Definition bindP {A B} (m : Pred A) (f : A -> Pred B) : Pred B :=
+Definition bindP {A B} (m : Pred A) (f : A -> Pred B) : Pred B := 
   fun b => exists a, m a /\ f a b.
 
-Definition returnP {A} (a : A) : Pred A :=
-  eq a.
+Definition returnP  {A}  (a : A) : Pred A :=
+  fun x => eq a x.
 
 Definition fmapP {A B} (f : A -> B) (a : Pred A) : Pred B :=
  bindP a (fun a => 
  returnP (f a)).
-
 
 (* I don't think that this function will be a part if the common interface as
    Gen cannot implement it *)
@@ -39,6 +39,13 @@ Definition suchThatMaybePred {A} (g : Pred A) (f : A -> bool)
   fun b => (b = None) \/ 
            (exists y, b = Some y /\ g y /\ f y).
 
+Definition chooseP {A} `{Random A} (p : A * A) : Pred A :=
+  (fun a => 
+     (cmp (fst p) a <> Gt) /\
+     (cmp (snd p) a <> Lt)).
+
+Definition sizedP {A} (f : nat -> Pred A) : Pred A:= 
+  (fun a => exists n, f n a).
 
 Instance PredMonad : GenMonad Pred :=
   {
@@ -54,11 +61,11 @@ Instance PredMonad : GenMonad Pred :=
     suchThatMaybe := @suchThatMaybePred
   }.
 
-(* Monad laws *)
 
 Lemma left_identity : forall {A B} (f : A -> Pred B) (a : A),
   (bindGen (returnGen a) f) <--> (f a).
-Proof. compute. firstorder. subst. assumption. Qed.
+Proof. intros. compute. firstorder. subst. assumption. Qed.
+  
 
 Lemma right_identity : forall {A} (m: Pred A),  
   (bindGen m returnGen) <--> m. 
@@ -296,7 +303,7 @@ Proof.
   + by right; auto.  
 Qed. 
   
-Lemma oneof_correct:  
+Lemma oneof_equiv:  
   forall {A} (l : list (Pred A)) (def : Pred A), 
     (oneof def l) <-->
      (fun e => (exists x, (In x l /\ x e)) \/ (l = nil /\ def e)).
@@ -327,8 +334,8 @@ Proof.
          by apply/nat_compare_ge.
          by [].
 Qed.
-
-Lemma elements_correct :
+ 
+Lemma elements_equiv :
   forall {A} (l: list A) (def : A),
     (elements def l) <--> (fun e => In e l \/ (l = nil /\ e = def)).
 Proof.
@@ -537,7 +544,8 @@ Proof.
   elim : l P init => //=. case => a_prev. case => b a xs IHxs P init.  
   split.
   + move => //= [HP Hfold]. 
-    have: ((P /\ init) /\ f a_prev b a) <-> (P /\ init /\ f a_prev b a) by apply and_assoc.
+    have: ((P /\ init) /\ f a_prev b a) <-> (P /\ init /\ f a_prev b a) 
+      by apply and_assoc.
     move/fold_prop => fold_eq.
     apply/fold_eq. apply IHxs. by split.
   + move/IHxs =>  [[HP Hinit] Hfold]. simpl in *. 
@@ -549,6 +557,8 @@ Proof. by move => A B; case => //. Qed.
 
 Lemma zip_nil_r : forall {A B} (l : seq A), zip l (@nil B) = [::]. 
 Proof. by move => A B; case => //. Qed.
+
+
 
 
 

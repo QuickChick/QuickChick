@@ -613,12 +613,23 @@ Module Zset : ZFSET.
     f_equal.
     assumption.
   Qed.
+ 
+(* Program Lemma elements__label_of_list:  *)
+(*   forall lst,  *)
+(*     elements (fold_left (fun a b => add b a) lst empty) = lst. *)
+(* Proof. *)
+(*   intros lst. induction lst; [reflexivity |]. *)
+(*   simpl. rewrite add.    *)
+(*   => [| x xs IHxs].  *)
+
+ 
+
 
 End Zset.
 
 Lemma Zset_add_incl : forall x s, Zset.incl s (Zset.add x s) = true.
 Proof.
-  intros; rewrite Zset.incl_spec.
+  intros; rewrite Zset.incl_spec. 
   intros a H.
   generalize (Zset.In_add x s a); unfold Zset.In.
   intro T; rewrite T; auto.

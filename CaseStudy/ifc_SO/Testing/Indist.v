@@ -90,7 +90,7 @@ Instance indistFrame : Indist frame :=
    - Recurses down the list making sure that all the frames 
      are pairwise indistinguishable.
 *)
-Fixpoint indistMemHelper (framePairs : list (frame * frame)) 
+Definition indistMemHelper (framePairs : list (frame * frame)) 
          (lab : Label)
          (m1 m2 : memory) :=
   forallb (fun (x : frame * frame) => 

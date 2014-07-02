@@ -69,20 +69,29 @@ Definition gen_label_between_lax (l1 l2 : Label) : Gen Label :=
 Definition gen_label_between_strict (l1 l2 : Label) : Gen Label :=
   elements l2 (filter (fun l => isLow l1 l && negb (label_eq l l1)) (allThingsBelow l2)).
 
+Definition gen_label_inf (inf : Info) : Gen Label :=
+  gen_label (top_prin inf).
+
 Instance smart_gen_label : SmartGen Label :=
 {|
-  smart_gen inf :=
-    gen_label (top_prin inf)
+  smart_gen := gen_label_inf
 |}.
 
 (* Pointers *) 
-
+(* XXX : Changed. With zero as a default  *)
 Definition gen_Pointer (inf : Info) : Gen Pointer :=
     let '(MkInfo def _ dfs _ _) := inf in
     bindGen (elements (def, Z0) dfs) (fun mfl =>
     let (mf, len) := mfl in 
     bindGen (gen_from_length len) (fun addr =>
     returnGen (Ptr mf addr))).
+
+(* Definition gen_Pointer (inf : Info) : Gen Pointer := *)
+(*     let '(MkInfo def _ dfs _ _) := inf in *)
+(*     bindGen (elements (def, Z0) dfs) (fun mfl => *)
+(*     let (mf, len) := mfl in  *)
+(*     bindGen (gen_from_length len) (fun addr => *)
+(*     returnGen (Ptr mf addr))). *)
 
 Instance smart_gen_pointer : SmartGen Pointer :=
   {|
@@ -93,8 +102,8 @@ Instance smart_gen_pointer : SmartGen Pointer :=
  
 Definition gen_Value (inf : Info) : Gen Value := 
   let '(MkInfo def cl dfs prins _) := inf in
-    frequency (liftGen Vint arbitrary)
-              [(1, liftGen Vint  (frequency (pure Z0)
+    frequency' (liftGen Vint arbitrary)
+              [(1, liftGen Vint  (frequency' (pure Z0)
                                     [(10,arbitrary); (1,pure Z0)]));
                       (* prefering 0 over other integers (because of BNZ);
                          an alt would be to use sized here
@@ -176,7 +185,7 @@ Definition smart_gen_stack_loc (f : Label -> Label -> Gen Label)
 (* Make sure the stack invariant is preserved 
  - no need since we only create one *)
 Definition smart_gen_stack (pc : Ptr_atom) inf : Gen Stack :=
-  frequency (pure Mty)
+  frequency' (pure Mty)
             [(1, pure Mty);
              (9, bindGen (smart_gen_stack_loc gen_label_between_lax bot ∂pc inf) (fun sl =>
                  returnGen (RetCons sl Mty)))].
@@ -217,7 +226,7 @@ Definition ainstrSSNI (st : State) : Gen Instruction :=
   let '(dptr, cptr, num, lab) :=
       groupRegisters st regs [] [] [] [] Z0 in
   let genRegPtr := gen_from_length (Zlength regs) in 
-  frequency (pure Nop) [
+  frequency' (pure Nop) [
     (* Nop *)
     (1, pure Nop);
     (* Halt *)
