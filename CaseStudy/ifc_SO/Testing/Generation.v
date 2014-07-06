@@ -296,20 +296,32 @@ Class SmartVary (A : Type) := {
   smart_vary : Label -> Info -> A -> Gen A
 }.
 
+(* This generator assumes that even if the label of the 
+   Atoms is higher that the observable type then their values 
+   have to be of the same constructor. However this is not implied
+   by indistAtom *)
+(* Definition gen_vary_atom (obs: Label) (inf : Info) (a : Atom)  *)
+(* : Gen Atom :=  *)
+(*   let '(v @ l) := a in *)
+(*   if flows l obs then returnGen a *)
+(*   else  *)
+(*     match v with *)
+(*       | Vint  _ => liftGen2 Atm (liftGen Vint  arbitrary) (pure l) *)
+(*       | Vptr  p =>  *)
+(*         liftGen2 Atm (liftGen Vptr (smart_gen inf)) (pure l) *)
+(*       | Vcptr c =>  *)
+(*         liftGen2 Atm (liftGen Vcptr (gen_from_length (code_len inf))) (pure l) *)
+(*       | Vlab  _ => *)
+(*         liftGen2 Atm (liftGen Vlab (smart_gen inf)) (pure l) *)
+(*     end. *)
+
 Definition gen_vary_atom (obs: Label) (inf : Info) (a : Atom) 
 : Gen Atom := 
   let '(v @ l) := a in
   if flows l obs then returnGen a
   else 
-    match v with
-      | Vint  _ => liftGen2 Atm (liftGen Vint  arbitrary) (pure l)
-      | Vptr  p => 
-        liftGen2 Atm (liftGen Vptr (smart_gen inf)) (pure l)
-      | Vcptr c => 
-        liftGen2 Atm (liftGen Vcptr (gen_from_length (code_len inf))) (pure l)
-      | Vlab  _ =>
-        liftGen2 Atm (liftGen Vlab (smart_gen inf)) (pure l)
-    end.
+    bindGen (gen_Value inf) (fun v => 
+    returnGen (v @ l)).  
            
 Instance smart_vary_atom : SmartVary Atom :=
 {|

@@ -454,22 +454,26 @@ Proof.
   move => c. simpl. congruence.
 Qed.
   
+Definition frame_spec (inf : Info) mem mf
+           (mem' : memory) := 
+  match Mem.get_frame mem mf with 
+    | Some (Fr stamp lab data) => 
+      exists fr, Mem.upd_frame mem mf fr = Some mem' /\
+                 let 'Fr stamp' lab' data' := fr in 
+                 lab' = lab /\ stamp' = stamp /\ 
+                 length data' = length data /\ 
+                 forall atm, In atm data' -> atom_spec inf atm
+    | None => mem' = mem
+  end. 
+
+  
 
 Lemma populate_frame_correct : 
   forall inf mem mf,
     (populate_frame inf mem mf) <-->
-    (fun m' => 
-       match Mem.get_frame mem mf with 
-         | Some (Fr stamp lab data) => 
-           exists fr, Mem.upd_frame mem mf fr = Some m' /\
-                      let 'Fr stamp' lab' data' := fr in 
-                      lab' = lab /\ stamp' = stamp /\ 
-                      length data' = length data /\ 
-                      forall atm, In atm data' -> atom_spec inf atm
-         | None => m' = mem
-       end). 
-Proof.
-  move=> inf mem mf mem'.  rewrite /populate_frame.
+    (frame_spec inf mem mf).
+Proof. 
+  move=> inf mem mf mem'.  rewrite /populate_frame /frame_spec.
   remember (Mem.get_frame mem mf) as opt. 
   case: opt Heqopt => [fr | ] Heqopt. 
   case: fr Heqopt => stamp lab data Heq. 
@@ -683,16 +687,78 @@ Proof.
     exists (Z.abs_nat z). rewrite choose_def Zabs2Nat.id_abs. split => /=; 
     [apply/Z.compare_le_iff | apply/Z.compare_ge_iff]; destruct z => //=; apply Z.le_refl. 
 Qed.
-    
-    
 
-(* Main theorem *)
+(* Proofs for variations *) 
 Require Import Indist.
 
-Axiom trace_axiom: forall {A} x (y : A), Property.trace x y = y.
-Lemma MemEqDec : forall fp, Mem.EqDec_block fp fp.
-Proof. admit. Qed.
+Lemma gen_vary_atom_correct :
+  forall (l : Label) (inf : Info) (a : Atom),
+    let 'v @ la := a in 
+    val_spec inf v -> 
+    (gen_vary_atom l inf a) <--> (fun a' => 
+                                    let 'v' @ la' := a' in 
+                                    indist l a a' /\ val_spec inf v').
+Proof.  
+  move=> l inf a. case: a => va la.
+  move=> Hspec; case => va' la'.
+  rewrite /gen_vary_atom /indist /indistAtom /isHigh /isLow.  
+  case: (la <: l). 
+  + (* la lower that observability state *) 
+    split.  
+    * (* Correctness *)
+      rewrite returnGen_def. move  => [Heq1 Heq2]; subst.  
+      split => //. apply/andP; split. 
+      by rewrite /label_eq; apply/andP; split; apply flows_refl. 
+      apply/orP. right. rewrite /indist /indistValue /val_spec in Hspec *.   
+      case: va' Hspec => [i' | Ptr' | i' | lv'] Hspec;
+      repeat
+      (match goal with 
+        | |-  is_true (Z_eq ?n ?n) => 
+          rewrite /Z_eq; by case (Z.eq_dec n n)
+        | |- is_true (label_eq ?l ?l) => 
+          rewrite /label_eq; apply/andP; split; apply flows_refl
+        | |- _ => 
+          case Ptr' => fp z; apply/andP; split; 
+          [rewrite /mframe_eq; case: (Mem.EqDec_block fp fp) => //=; congruence |]
+       end).   
+    * (* Completeness *)
+      move=> [/andP [/andP [Hflows1 Hflows2] /orP [H1 //= | H1]] H2]. 
+      rewrite /indist /indistValue in H1. rewrite returnGen_def. 
+      move: (flows_antisymm _ _ Hflows2 Hflows1) => Heq; subst.
+      case: va Hspec H1 H2 => [i | ptr | i | lv];  
+      case: va' => [i' | ptr' | i' | lv'] => // Hspec H1 H2; try 
+       match goal with 
+         | H : is_true (Z_eq ?i ?i') |- _ => 
+           rewrite /Z_eq in H; by case : (Z.eq_dec i i') H => Heq H;  subst
+         | H: is_true (match ?p with Ptr _ _ => false end) |- _ => by destruct p
+         | H: is_true (label_eq ?l ?l') |- _ => 
+           rewrite /label_eq in H; move/andP : H => [Hf1 Hf2]; 
+           by move: (flows_antisymm _ _ Hf1 Hf2) => Heq; subst
+       end. 
+      case: ptr H1 {Hspec H2}; case : ptr' => fp z fp' z' /andP [H1 H2].
+      rewrite /Z_eq in H2. rewrite /mframe_eq in H1.
+      case: (Z.eq_dec z' z) H2 => //=; case: (Mem.EqDec_block fp' fp) H1 => //=.
+      rewrite /equiv. by move => -> _ ->  _.
+  + (* la higher than observable state *)
+    rewrite bindGen_def. 
+    split.    
+    * (* Correctness *) 
+      case: va Hspec=> [i | ptr | i | lv];  case: va' => [i' | ptr' | i' | lv'];
+      move => Hpec [val [Hgen Hret]];
+      rewrite returnGen_def in Hret; move : Hret => [Heq1 Heq2]; subst;
+      (split; [apply/andP; split => //; rewrite /label_eq; apply/andP; split; 
+                 by apply/flows_refl | 
+               by apply gen_value_correct in Hgen]).
+    * (* Completeness *) 
+      move=> [/andP[/andP [H1 H2] /orP [_| H3]]   H];
+      move: (flows_antisymm _ _ H2 H1) => Heq; subst;
+      exists va'; split => //; by apply gen_value_correct.
+Qed.
+  
+(* Main theorem *)
 
+
+Axiom trace_axiom: forall {A} x (y : A), Property.trace x y = y.
 
 Lemma combine_l : forall {A} (l : list A) x y, 
                     In (x, y) (combine l l) -> x = y.
