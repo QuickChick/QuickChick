@@ -52,15 +52,22 @@ Instance PredMonad : GenMonad Pred :=
     bindGen := @bindP;
     returnGen := @returnP;
     fmapGen := @fmapP;
-    choose A H p := 
-      fun a => 
-        (cmp (fst p) a <> Gt) /\
-        (cmp (snd p) a <> Lt);
-    sized A f := 
-      fun a => exists n, f n a;
+    choose := @chooseP;
+    sized := @sizedP;
     suchThatMaybe := @suchThatMaybePred
   }.
 
+(* Q: Can we plug into Matthieu's generic refinement framework
+   for rewriting with the lemmas below:
+
+A New Look at Generalized Rewriting in Type Theory. Matthieu Sozeau
+Journal of Formalized Reasoning 2 (1), December 2009, pp.41-62.
+http://jfr.cib.unibo.it/article/view/1574/1077
+
+A Gentle Introduction to Type Classes and Rewriting in Coq. Pierre
+Castéran & Matthieu Sozeau, Misc, May 2012.
+http://www.labri.fr/perso/casteran/CoqArt/TypeClassesTut/typeclassestut.pdf
+*)
 
 Lemma left_identity : forall {A B} (f : A -> Pred B) (a : A),
   (bindGen (returnGen a) f) <--> (f a).
@@ -207,6 +214,8 @@ Proof.
   by rewrite /liftGen5.
 Qed.
 
+(* Specification of derived constructs *)
+
 Lemma sequenceGen_equiv : 
   forall {A} (gs : list (Pred A)),
     sequenceGen gs <--> fun l => length l = length gs /\ 
@@ -238,7 +247,7 @@ Proof.
       apply IHgs. split => //= x HIn. by auto.
 Qed.
 
-
+(* (Primitively) recursive construct has (primitively) recursive spec *)
 Lemma foldGen_equiv : 
   forall {A B : Type} (f : A -> B -> Pred A) (bs : list B) (a0 : A),
     foldGen f bs a0 <-->
@@ -250,6 +259,25 @@ Proof.
   try (rewrite returnGen_def); try (rewrite bindGen_def); split=> //=;
   move => [a1 [fa0 /IHbs H]]; by exists a1.  
 Qed.
+
+(* Our induction principle for fold; might be useful in proofs? *)
+Section invariants.
+
+Variable A : Type.
+Variable B : Type.
+Variable I : A -> seq B -> Prop.
+Variable f : A -> B -> A.
+
+Theorem ind : forall acc' xs',
+  I acc' xs' ->
+  (forall x xs acc, I acc (x :: xs) -> I (f acc x) xs) ->
+  I (fold_left f xs' acc') nil.
+Proof.
+  move => acc' xs'. move : acc'. elim : xs' => //= acc' xs' IH acc init step.
+  apply IH; by apply step. 
+Qed.
+
+End invariants.
 
 Lemma vectorOf_equiv:
   forall {A : Type} (k : nat) (g : Pred A),
@@ -272,7 +300,7 @@ Proof.
      split. by apply (Hforall b); left.
      rewrite bindGen_def. exists bs.
      split => //=. apply IHbs. by split => //=; auto.
-Qed. 
+Qed.
 
 Lemma listOf_equiv:
   forall {A : Type} (g : Pred A),
@@ -292,7 +320,6 @@ Proof.
           apply/nat_compare_ge/leP ].
      by apply/vectorOf_equiv.
 Qed.                                 
-
 
 Lemma seqnth_In : 
   forall (A : Type) (n : nat) (l : seq A) (d : A),
