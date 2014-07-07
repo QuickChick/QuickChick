@@ -290,7 +290,7 @@ Class SmartVary (A : Type) := {
 }.
 
 (* This generator assumes that even if the label of the 
-   Atoms is higher that the observable type then their values 
+   Atoms is higher that the observablility level then their values 
    have to be of the same constructor. However this is not implied
    by indistAtom *)
 (* Definition gen_vary_atom (obs: Label) (inf : Info) (a : Atom)  *)
@@ -334,7 +334,7 @@ Definition gen_vary_pc (obs: Label) (inf : Info) (pc : Ptr_atom)
     if (isHigh lpc' obs) then returnGen pc' 
     else returnGen (PAtm addr' (lpc' ∪ lpc))).
 
-(* This generator fails to generate PC's with label higher that the observability 
+(* This generator fails to generate PCs with label higher that the observability 
    level and lower than pc's label *)  
    
 (* Definition gen_vary_pc (obs: Label) (inf : Info) (pc : Ptr_atom) *)
