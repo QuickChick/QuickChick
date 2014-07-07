@@ -504,10 +504,10 @@ Lemma frequency_equiv :
     peq (frequency' def l) 
         (fun e => (exists n, exists g, (In (n, g) l /\ g e /\ n <> 0)) \/ 
                   ((l = nil \/ (forall x, In x l -> fst x = 0)) /\ def e)).
-Proof.
+Proof. 
   move=> A l def a.  Opaque nat_compare. 
   rewrite /frequency' /bindGen /PredMonad /bindP /choose /Randomnat /cmp //=. 
-  split => [[n [[/nat_compare_le/leP Hlo /nat_compare_ge/leP Hhi] H]] |
+  split => [[n [[/nat_compare_le/leP /= Hlo /nat_compare_ge/leP Hhi] H]] |
             [[n [g [H1 [H2 H3]]]] | [[H1 | H1] H2]]]. 
   + rewrite -(leq_add2r 1) addn1 in Hhi.
     remember (sumn [seq fst i | i <- l]) as sum.  
