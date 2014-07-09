@@ -60,5 +60,10 @@ Instance showOpt {A : Type} `{_ : Show A} : Show (option A) :=
 Instance showStr : Show string :=
 {| show x := x |}.
 
+Instance showType : Show Type :=
+{|
+  show x := "nat :)"
+|}.
+
 Require Import Ascii.
 Definition nl : string := String (ascii_of_nat 10) EmptyString.

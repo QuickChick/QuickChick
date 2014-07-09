@@ -90,3 +90,9 @@ Definition testTree :=
   showResult (quickCheck prop_mirror_reverse).
 
 QuickCheck testTree.
+
+Definition prop_length_false (A : Type) (l : list A) :=
+  beq_nat (List.length l) 0.
+
+Definition testTree :=
+  showResult (quickCheck prop_length_false).

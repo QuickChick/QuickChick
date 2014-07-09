@@ -69,3 +69,8 @@ Instance arbInt : Arbitrary Z :=
   shrink x := shrinkZ x
 |}.
 
+Instance arbType : Arbitrary Type :=
+{|
+  arbitrary := returnGen (nat : Type);
+  shrink x := nil
+|}.
