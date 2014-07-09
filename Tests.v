@@ -91,8 +91,10 @@ Definition testTree :=
 
 QuickCheck testTree.
 
-Definition prop_length_false (A : Type) (l : list A) :=
-  beq_nat (List.length l) 0.
+Definition prop_length (A : Type) (l : list A) :=
+  Nat.leb (List.length l) 20.
 
-Definition testTree :=
-  showResult (quickCheck prop_length_false).
+Definition testLength :=
+  showResult (quickCheck prop_length).
+
+QuickCheck testLength.

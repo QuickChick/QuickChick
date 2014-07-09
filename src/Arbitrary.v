@@ -69,8 +69,18 @@ Instance arbInt : Arbitrary Z :=
   shrink x := shrinkZ x
 |}.
 
+(* For these instances to be useful, we would need to support dependent types *)
+
+(*
+Instance arbSet : Arbitrary Set :=
+{|
+  arbitrary := returnGen nat;
+  shrink x := nil
+|}.
+
 Instance arbType : Arbitrary Type :=
 {|
   arbitrary := returnGen (nat : Type);
   shrink x := nil
 |}.
+*)

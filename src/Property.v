@@ -176,7 +176,17 @@ Instance testFun {A prop : Type} `{_ : Show A}
 {
   property f := forAllShrink show arbitrary shrink f
 }.
-  
+
+Instance testPolyFun {prop : Type -> Type} `{_ : Testable (prop nat)} : Testable (forall T, prop T) :=
+{
+  property f := printTestCase "" (f nat)
+}.
+
+Instance testPolyFunSet {prop : Set -> Type} `{_ : Testable (prop nat)} : Testable (forall T, prop T) :=
+{
+  property f := printTestCase "" (f nat)
+}.
+
 (* Test Case Distribution *)
 Definition cover {prop : Type} `{_ : Testable prop}
            (b : bool) (n : nat) (s : string) : prop -> Property :=
