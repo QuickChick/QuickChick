@@ -23,6 +23,13 @@ Section Rules.
 
 Inductive Label := L | H.
 
+Definition label_eq (l1 l2 : Label) : bool :=
+  match l1, l2 with
+    | L, L => true
+    | H, H => true
+    | _, _ => false
+  end.
+
 Definition label_join (l1 l2 : Label) : Label :=
   match l1, l2 with
     | _, H => H
