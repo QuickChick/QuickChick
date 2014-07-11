@@ -8,7 +8,8 @@ Require Import State.
 Require Import AbstractGen Gen.
 Require Import Arbitrary.
 
-Axiom trace : forall A, string -> A -> A.
+(* Extraction will map this to something that additionally prints stuff *)
+Definition trace (A : Type) (s : string) (a : A) : A := a.
 
 (* Note : Simple Callbacks fall under strict positivity of result... *)
 Inductive CallbackKind :=
