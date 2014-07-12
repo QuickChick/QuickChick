@@ -18,6 +18,16 @@ Inductive OpCode : Type :=
   | OpLoad
   | OpStore.
 
+Require Import List. Import ListNotations.
+Definition opCodes := [
+  OpBCall;
+  OpBRet;
+  OpNop;
+  OpPush;
+  OpAdd;
+  OpLoad;
+  OpStore].
+
 Definition opCode_eq_dec : forall o1 o2 : OpCode,
   {o1 = o2} + {o1 <> o2}.
 Proof. decide equality. Defined.

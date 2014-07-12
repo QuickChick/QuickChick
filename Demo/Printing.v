@@ -4,6 +4,7 @@ Require Import List.
 Require Import ZArith.
 
 Require Import Machine.
+Require Import Generation.
 
 Require Import String.
 
@@ -127,4 +128,10 @@ Instance show_state_pair : ShowPair State :=
     "Memory: " ++ nl ++ show_pair mem1 mem2 ++ nl ++
     "Stack: " ++ nl ++ show_pair stk1 stk2 ++ nl ++
     "PC: " ++ show_pair pc1 pc2 ++ nl
+|}.
+
+Instance show_var {A} `{_ :ShowPair A} : Show (@Variation A) :=
+{|
+  show x := 
+    let '(V x1 x2) := x in show_pair x1 x2
 |}.
