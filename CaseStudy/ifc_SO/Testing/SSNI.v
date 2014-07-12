@@ -16,7 +16,7 @@ Open Scope string_scope.
 
 Require Import Show.
 
-Require Import Reachability.
+(* Require Import Reachability. -- unused *)
 Definition propSSNI_helper t v :=
   let '(Var lab st1 st2) := v in
 (*  Property.trace (Show.show lab ++ Show.nl ++
@@ -64,6 +64,7 @@ Definition propSSNI_helper t v :=
                    )
                  else collect "Second not low" (property true)
                       (* This can happen; it's just a discard *)
+                      (* TODO: could check that st2' `indist` st1 *)
                | _ => collect "Second failed H" (property true)
                       (* This can happen; it's just a discard *)
              end
@@ -76,6 +77,7 @@ Definition propSSNI_helper t v :=
              )
        | _ => collect "Failed" (property true)
               (* This can happen; it's just a discard *)
+              (* TODO: could check if st2 does a H -> H step *)
      end
   else collect "Not indist!" (property true)).
        (* XXX this should never happen with a correct generator;

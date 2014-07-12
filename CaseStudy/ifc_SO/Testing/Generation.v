@@ -372,13 +372,16 @@ Definition gen_var_frame (obs: Label) (inf : Info) (f : frame)
       bindGen (smart_gen inf) (fun lab' =>
       bindGen gen_data (fun data' =>
       returnGen (Fr stamp lab' data')))
+                    (* CH: above indistFrame allows different stamp *)
     else if isHigh (stamp ∪ lab) obs then
+      (* CH: Can't understand the need for this case *)
       bindGen gen_data (fun data' =>
       returnGen (Fr stamp lab data'))
-    else 
+    else
       bindGen (sequenceGen (map (smart_vary obs inf) data))
               (fun data' =>
       returnGen (Fr stamp lab data')).
+                    (* CH: above indistFrame allows different High stamp *)
 
  
 Instance smart_vary_frame : SmartVary frame :=
@@ -578,7 +581,7 @@ Definition gen_variation_state : Gen (@Variation State) :=
   let imem := replicate (C.code_len) Nop in
   (* Create initial info - if this fails, fail the generation *)
   match dfs with
-    | (def, _) :: _ => 
+    | (def, _) :: _ =>
       let inf := MkInfo def (Z.of_nat C.code_len) dfs prins C.no_registers in
       (* Generate pc, registers and stack - all pointer stamps are bottom *)
       bindGen (smart_gen inf) (fun pc =>

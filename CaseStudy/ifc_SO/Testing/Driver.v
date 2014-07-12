@@ -36,7 +36,8 @@ Instance mutateable_table : Mutateable table :=
 |}.
 
 Definition testMutants :=
-  mutateCheckMany default_table (fun t => [propSSNI t; prop_preserves_well_formed t]
+  mutateCheckMany default_table (fun t => [propSSNI t;
+    prop_exec_preserves_well_formed t]
 ).
 
 (* *)
@@ -91,7 +92,7 @@ Definition testMutant36 := testMutantX
 Definition testMutantWF x y :=
   let mutant := fun o' =>
     (helper x y o' (default_table o'))  in
-  quickCheck (prop_preserves_well_formed mutant).
+  quickCheck (prop_exec_preserves_well_formed mutant).
 
 Definition testMutant36wf := testMutantWF
   OpAlloc (≪TRUE, Lab2, LabPC ≫).

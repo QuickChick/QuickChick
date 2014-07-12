@@ -42,7 +42,7 @@ Instance indistAtom : Indist Atom :=
     label_eq l1 l2
     && (isHigh l1 lab || indist lab v1 v2)
 |}.
-    
+
 (* Indistinguishability of pcs 
    - If both pc's are lower than the observability level,
      then we need to make sure all their components are pairwise 
@@ -110,6 +110,7 @@ Instance indistMem : Indist memory :=
       list_of_option (map (Mem.get_frame m) (Mem.get_all_blocks lab m)) in
   let frames1 := get_all_frames m1 in
   let frames2 := get_all_frames m2 in
+  (* CH: Why is the following not written with forallb2? *)
   beq_nat (length frames1) (length frames2) &&
   indistMemHelper (combine frames1 frames2) lab m1 m2
 |}.
@@ -197,22 +198,21 @@ Instance indistState : Indist State :=
     let '(St imem2 m2 _ s2 regs2 pc2) := st2 in
     if list_eq_dec instr_eq_dec imem1 imem2 then 
       if isHigh ∂pc1 lab && isHigh ∂pc2 lab then
-        if indist lab m1 m2 then 
+        if indist lab m1 m2 then
           if indist lab s1 s2 then true
           else Property.trace "Stack" false
         else Property.trace "Memory" false
       else 
+        (* next check implies isLow pc1 ... && isLow pc2 ... *)
         if indist lab pc1 pc2 then
           if indist lab regs1 regs2 then
             if indist lab m1 m2 then
               if indist lab s1 s2 then true
+                   (* CH: This still relies on Leo's stack pc invariant;
+                          otherwise should be running indistStackHelper *)
               else Property.trace "Stack" false
             else Property.trace "Memory" false
           else Property.trace "Registers" false
         else Property.trace "PC" false
     else Property.trace "not equal instructions" false
 |}.
-
-
-
-

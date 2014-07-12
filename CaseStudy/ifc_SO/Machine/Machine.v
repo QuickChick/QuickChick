@@ -480,6 +480,7 @@ Definition exec t (st:State) : option (trace * State) :=
       match registerContent r r1, registerContent r r2 with
         | Some (Vint i @ K), Some (Vlab L @ K') =>
           match run_tmr t OpAlloc <|K; K'; L|> LPC with
+            (* checks: ??? *)
             | Some (Some rl, rpcl) =>
               let stmp := K ∪ K' ∪ LPC in
                  (* this stamp is just instrumentation;
@@ -500,7 +501,7 @@ Definition exec t (st:State) : option (trace * State) :=
             let '(v @ L) := a in
             do C <- mlab μ p;
             match run_tmr t OpLoad <|K; C; L|> LPC with
-              | Some (Some rl, rpcl) =>
+              | Some (Some rl (* L *), rpcl (* LPC ∪ K ∪ C *)) =>
                 do r' <- registerUpdate r r2 (v @ rl);
                 Some (nil,
                       St imem μ π σ r' (PAtm (j+1) (rpcl)))
@@ -513,7 +514,8 @@ Definition exec t (st:State) : option (trace * State) :=
         | Some (Vptr p @ K), Some (v @ L) =>
           do C <- mlab μ p;
           match run_tmr t OpStore <|K; C; L|> LPC with
-            | Some (Some rl, rpcl) =>
+            (* check: K ∪ LPC <: C *)
+            | Some (Some rl (* L *), rpcl (* LPC *)) =>
               do μ' <- store μ p (v @ rl);
               Some (nil,
                     St imem μ' π σ r (PAtm (j+1) rpcl))

@@ -17,7 +17,7 @@ Require Import String.
 Local Open Scope string.
 (* Sanity check for stamp generation *)
 
-Definition prop_stamp_generation (st : State) :=
+Definition prop_stamp_generation (st : State) : Property :=
   whenFail (Property.trace (show st)) (well_formed st).
 
 (*
@@ -28,7 +28,7 @@ Definition propStampGeneration (st : State) :=
            (wellFormed st stamps).
 *)
 
-Definition prop_preserves_well_formed (t : table) 
+Definition prop_exec_preserves_well_formed (t : table) 
 : Property :=
   forAllShrink show arbitrary (fun _ => []) (fun st =>
   if well_formed st then

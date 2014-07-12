@@ -109,21 +109,20 @@ Proof.
     by case: z => //= p; omega. 
 Qed.
 
-(* I don't know if this is reasonable, but otherwise some generators are 
-  broken (suck as gen_Pointer) *)
+Section WithDataLenNonEmpty.
 
-Axiom data_len_nonempty : forall (inf : Info), data_len inf <> [].
+Variable inf : Info.
+Hypothesis data_len_nonempty : data_len inf <> [].
 
 Lemma gen_Pointer_correct: 
-  forall inf, 
     (gen_Pointer inf) <--> (fun ptr => 
                               let '(Ptr mf addr) := ptr in
                               (exists len, In (mf, len) (data_len inf) /\ 
                                            (0 <= addr <= len - 1)%Z)). 
 Proof.
-  move => inf ptr. 
-  move: (data_len_nonempty inf) => non_empty. 
-  case: inf non_empty => def clen dlen top regs non_empty. rewrite /gen_Pointer.
+  move => ptr.
+  case: inf data_len_nonempty => def clen dlen top regs non_empty.
+    rewrite /gen_Pointer.
   split.
   * rewrite bindGen_def. move => [[mf z] [/elements_equiv Helem  H]].
     rewrite bindGen_def in H. move : H => [a [/gen_from_length_correct H Hret]].
@@ -145,11 +144,10 @@ Proof.
 Qed.
 
 Lemma gen_value_correct: 
-  forall inf,
     (gen_Value inf) <--> (val_spec inf).
 Proof.
   rewrite /gen_Value /val_spec.
-  case=> def clen dlen top regs. case.
+  case : inf => def clen dlen top regs. case.
   + (* VInt *)
     move => z. split => // _. apply/frequency_equiv.
     left. exists 1. eexists. split. by constructor.
@@ -166,7 +164,7 @@ Proof.
         subst; try (rewrite liftGen_def in H2; move : H2 => [a [H2 H2']]); 
         try discriminate.      
         move/gen_Pointer_correct: H2 H2' => H2 [H2']; subst.
-        move : H2 => //= [len [ HIn Hrng]].  
+        move : H2 => //= [len [ HIn Hrng]].
       * by rewrite liftGen_def in H2; move : H2 => [a [H2 H2']].
     - move => [len [HIn [Hrng1 Hrg2]]].
       apply/frequency_equiv. left. exists 1. eexists. 
@@ -871,8 +869,6 @@ Proof. admit. Qed.
 
 (* Main theorem *)
 
-Axiom trace_axiom: forall {A} x (y : A), Property.trace x y = y.
-
 Lemma combine_l : forall {A} (l : list A) x y, 
                     In (x, y) (combine l l) -> x = y.
 Proof. admit. Qed.
@@ -958,4 +954,6 @@ Abort.
   (*   rewrite returnGen_def in H1. *)
   (*   move : H1 => [Heq1 Heq2 Heq3]; subst. *)
   (*   rewrite /smart_gen in sgen, sgen2, sgen3, sgen4, sgen5, sgen6, sgen7 . *)
-    
+
+
+End WithDataLenNonEmpty.
