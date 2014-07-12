@@ -42,6 +42,7 @@ Inductive Value : Type :=
   | Vint  (n:int)
   | Vptr  (p:Pointer)
   | Vcptr (addr : int) (* CH: Why not just nat? *) (* Maybe we want a CptrOffset? *)
+          (* TODO: remove this crap, we have no way to create them! *)
   | Vlab  (L:Label).
 
 Definition obs_value_to_value (ov:Obs_value) : Value :=

@@ -480,7 +480,7 @@ Definition exec t (st:State) : option (trace * State) :=
       match registerContent r r1, registerContent r r2 with
         | Some (Vint i @ K), Some (Vlab L @ K') =>
           match run_tmr t OpAlloc <|K; K'; L|> LPC with
-            (* checks: *)
+            (* checks: ??? *)
             | Some (Some rl, rpcl) =>
               let stmp := K ∪ K' ∪ LPC in
                  (* this stamp is just instrumentation;
