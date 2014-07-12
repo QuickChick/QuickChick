@@ -246,19 +246,19 @@ Proof.
     apply/gen_atom_correct. by apply Hregs.
 Qed.
 
+Definition stack_loc_spec (inf : Info) g (l1 l2: Label) t : Prop:=
+  let '(ptr_a, lab, regs, ptr_r) := t in
+  In lab (allThingsBelow (top_prin inf)) /\
+  regs_spec inf regs /\
+  (0 <= ptr_r <= (Z.of_nat (no_regs inf) - 1))%Z /\
+  let 'PAtm addr lab' := ptr_a in
+  (0 <= addr <= ((code_len inf) - 1))%Z /\
+  g l1 l2 lab'.
 
-Lemma smart_gen_stack_loc_correct :
+Lemma gen_stack_loc_correct :
   forall f g l1 l2 inf, 
     (f l1 l2) <--> (g l1 l2) ->
-    (smart_gen_stack_loc f l1 l2 inf) <--> 
-    (fun t =>
-       let '(ptr_a, lab, regs, ptr_r) := t in
-       In lab (allThingsBelow (top_prin inf)) /\
-       regs_spec inf regs /\
-       (0 <= ptr_r <= (Z.of_nat (no_regs inf) - 1))%Z /\
-       let 'PAtm addr lab' := ptr_a in
-       (0 <= addr <= ((code_len inf) - 1))%Z /\
-       g l1 l2 lab').
+    (smart_gen_stack_loc f l1 l2 inf) <--> (stack_loc_spec inf g l1 l2).
 Proof.
   move=> f g l1 l2.
   case=> def clen dlen top noregs Hequiv. 
@@ -287,7 +287,6 @@ Proof.
     exists lab. split. by apply /gen_label_inf_correct.
     exists l_a. split => //=. by apply Hequiv.
 Qed.
-
    
 Lemma elements__label_of_list:
   forall (lst : list Z) x zt,
@@ -424,11 +423,13 @@ Proof.
     congruence. 
 Qed.
 
+Definition gen_label_between_lax_spec (l1 l2 l: Label) : Prop := 
+  (l1 <: l /\ l <: l2) \/ l = l2 /\ l1 <: l2 = false.
+
+
 Lemma gen_label_between_lax_correct_admited :
   forall l1 l2,
-    (gen_label_between_lax l1 l2) <--> (fun l => 
-                                          (l1 <: l /\ l <: l2)
-                                          \/ l = l2 /\ l1 <: l2 = false).
+    (gen_label_between_lax l1 l2) <--> (gen_label_between_lax_spec l1 l2).
 Proof.
   move => l1 l2 l.  rewrite /gen_label_between_lax. split. 
   + move/elements_equiv => [ /filter_In [H1 H2] | 
@@ -440,7 +441,7 @@ Proof.
         by apply powerset_in_refl.
   + move => [[H1 H2] | [H1 H2]]; subst; apply elements_equiv.
     left. apply filter_In. split => //.
-    by apply/allThingsBelow_isLow'.  (* Here is the adited part *)
+    by apply/allThingsBelow_isLow'.  (* Here is the admited part *)
     right. split => //. apply filter_nil.  
     right => x /allThingsBelow_isLow In. 
     remember (l1 <: x) as b. symmetry in Heqb. case: b Heqb => heqb //.
@@ -448,6 +449,41 @@ Proof.
     congruence.  
 Qed.
 
+
+Definition stack_spec (pc: Ptr_atom) inf (s: Stack) : Prop :=
+  s = Mty \/ 
+  exists loc, s = loc ::: Mty /\ 
+              stack_loc_spec inf gen_label_between_lax_spec bot ∂pc loc.
+
+Lemma gen_stack_correct: 
+  forall inf (pc: Ptr_atom),
+    (smart_gen_stack pc inf) <--> (stack_spec pc inf). 
+Proof.
+  Opaque smart_gen_stack_loc.
+  rewrite /smart_gen_stack /stack_spec. move => inf pc st.
+  split. 
+  + move/frequency_equiv => [[n [gen [[[Heq1 Heq2] | [[Heq1 Heq2] | //]] [Hg Hneq]]]] | 
+                             [[H1 //= | H1] H2]]; subst.
+    by left; rewrite Hg. 
+    rewrite bindGen_def in Hg. move: Hg => [loc (* [[[ptr_a l] regs] reg_ptr] *) 
+                                              [/gen_stack_loc_correct H1 H2]].
+    rewrite returnGen_def in H2. subst. right.
+    exists loc.  split => //. apply H1.
+   
+    apply gen_label_between_lax_correct_admited.
+    by left; rewrite H2. 
+  +  move => [Heq | H]; subst; apply frequency_equiv.
+     - left; eexists; eexists; split. by constructor. by split => //.
+     - case: st H => [H |loc st [loc' [[H1] H2]]]; left; eexists; eexists; split; subst.
+       * by constructor. by split => //.
+       * by apply in_cons; constructor. 
+         rewrite bindGen_def. split => //. exists loc'.
+         split => //. eapply gen_stack_loc_correct.
+         by apply (gen_label_between_lax_correct_admited ⊥ ∂(pc)).
+         assumption.
+Qed.
+    
+   
 Require Import EquivDec.
 
 Lemma equiv_dec_refl: forall mf : mframe, equiv_dec mf mf.
@@ -810,6 +846,29 @@ Proof.
       by  rewrite -Heqb'. 
 Qed.
   
+
+Axiom frame_spec' : Info -> frame -> Prop.    
+
+Lemma gen_var_frame_correct:
+  forall (obs: Label) (inf: Info) (fr : frame),
+    (frame_spec' inf fr) -> 
+    (gen_var_frame obs inf fr) <--> (fun fr' => 
+                                        indist obs fr fr' /\ frame_spec' inf fr').
+Proof. admit. Qed.
+
+Axiom mem_spec : Info -> memory -> Prop.    
+
+Lemma gen_vary_memory_correct:
+  forall (obs: Label) (inf: Info) (m : memory),
+    (mem_spec inf m) -> 
+    (gen_vary_memory obs inf m) <--> (fun m' => 
+                                        indist obs m m' /\ mem_spec inf m').
+Proof. admit. Qed.
+
+
+
+
+
 (* Main theorem *)
 
 Axiom trace_axiom: forall {A} x (y : A), Property.trace x y = y.
