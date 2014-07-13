@@ -570,7 +570,7 @@ Ltac discr_gen_eq :=
       Hg : ?g _ |- _ => 
         move : H => [Heq1 Heq2]; subst;
         rewrite liftGen_def in Hg; move: Hg => [a [_ H]]; discriminate
-    | H : (_, pure ?a) = (?n, ?g),
+    | H : (_, returnGen ?a) = (?n, ?g),
       Hg : ?g _ |- _ => 
         move : H => [Heq1 Heq2]; subst; discriminate
     | H : (_, liftGen2 ?f ?gen1 ?gen2) = (?n, ?g),
@@ -601,6 +601,8 @@ Ltac discr_or_first :=
 
 Ltac unfold_gen := 
   match goal with
+    | Hg : returnGen _ _ |- _ =>
+      rewrite returnGen_def in Hg; subst
     | Hg : liftGen _ _ _ |- _ => 
       rewrite liftGen_def in Hg; move: Hg => [b [H1 [Heq]]]; subst
     | Hg : liftGen2 _ _ _ _ |- _ => 
@@ -614,26 +616,6 @@ Ltac unfold_gen :=
        move: Hg=>[b [H1 [b' [H2 [b'' [ H3 [b''' [H4 [Heq1 Heq2 Heq3 Heq4]]]]]]]]]; subst
   end.
 
-Ltac try_solve :=
-      match goal with 
-        | |- ~ _ => move => contra; subst
-        | HIn: In _ [] |- _ => by []
-        | Hnonempty : ~ (onNonEmpty [] _ = 0) |- _ =>
-           by rewrite /onNonEmpty in Hnonempty
-        | Hnonempty : ~ (_ * (onNonEmpty [] _))%coq_nat = 0 |- _ => 
-            by rewrite [X in (_ * X)%coq_nat]/onNonEmpty -mult_n_O in Hnonempty
-        | |- _ /\ _ => split => //=
-        | Hand : _ /\ _ |- _ => destruct Hand
-        | Hor : _ \/ _ |- _ => destruct Hor
-        | |- (_ <= _)%Z => by apply/Z.compare_ge_iff
-        | |- (_ <= _)%Z => by apply Z.compare_le_iff
-        | Helem : elements _ _ _ |- _ => 
-          move/elements_equiv : Helem => [Helem //= | [Helem1 Helem2] //=]; subst
-        | Hchoose : choose _ _ |- _ =>
-          rewrite choose_def /= in Hchoose
-        | Hif: ~ ((if ?b then _ else _ ) = _) |- ?b = true =>
-          by case: b Hif
-      end. 
 
 Ltac find_instr instr lst k :=
   match lst with
@@ -670,7 +652,7 @@ Ltac instantiate_exists :=
   match goal with 
     | |- exists n g, In (n, g) ?lst /\ _ ?cnstr /\ _ =>
       find_instr cnstr lst ltac:(fun n g => pose cnstr; exists n; exists g);
-      split; [repeat ((try by apply in_eq); apply in_cons) | split => //=]
+      split; [repeat ((try by apply in_eq); apply in_cons) | split => //]
   end.
 
 Ltac trysolve2 := 
@@ -695,37 +677,61 @@ Ltac trysolve2 :=
     | _ => by []
   end. 
 
-(* Lemma gen_ainstrSSNI_correct : *)
-(*   forall (st : State), (ainstrSSNI st) <--> (Instruction_spec st). *)
-(* Proof.  *)
-(*   move=> st instr. rewrite /ainstrSSNI /Instruction_spec. *)
-(*   case: st => im m pr stk regs pc. *)
-(*   set st := {| *)
-(*              st_imem := im; *)
-(*              st_mem := m; *)
-(*              st_pr := pr; *)
-(*              st_stack := stk; *)
-(*              st_regs := regs; *)
-(*              st_pc := pc |}. *)
-(*   case: (groupRegisters st regs [] [] [] [] Z0)=> [[[dptr cptr] num] lab]. *)
-(*   split. Focus 2. *)
-(*   - case: instr => [r1 r2 | r1 r2 | r | r1 r2 r3 | | r1 r2 r3 | r1 r2 r3 | *)
-(*                     r | | z r | bop r1 r2 r3 | r | z r | r1 r2 | r1 r2 | *)
-(*                     r1 r2 r3 | r1 r2 r3 | r | | r1 r2 | r1 r2]; *)
-(*     move /frequency_equiv =>  [[n [g [HIn [Hg Hn]]]] | [[H | H] H' //=]]; *)
-(*     (repeat discr_or_first); *)
-(*     try by (case: HIn => [[Heq1 Heq2] | HIn]; subst; *)
-(*     try unfold_gen; [by repeat try_solve |  by repeat discr_or_first]). *)
-(*   - Opaque mult. *)
-(*     case: instr => [r1 r2 | r1 r2 | r | r1 r2 r3 | | r1 r2 r3 | r1 r2 r3 | *)
-(*                     r | | z r | bop r1 r2 r3 | r | z r | r1 r2 | r1 r2 | *)
-(*                     r1 r2 r3 | r1 r2 r3 | r | | r1 r2 | r1 r2]; simpl; *)
-(*                    move => H; apply frequency_equiv; left; *)
-(*     instantiate_exists; try by trysolve2. *)
-(*     rewrite liftGen2_def. eexists. split; [| trysolve2]. *)
-(*     exists (Z.abs_nat z). rewrite choose_def Zabs2Nat.id_abs. split => /=; *)
-(*     [apply/Z.compare_le_iff | apply/Z.compare_ge_iff]; destruct z => //=; apply Z.le_refl. *)
-(* Qed. *)
+Ltac try_solve :=
+      match goal with 
+        | |- _ /\ _ => split => //=; by try_solve
+        | Hand : _ /\ _ |- _ => destruct Hand; by try_solve
+        | Hor : _ \/ _ |- _ => destruct Hor; by try_solve
+        | |- ~ _ => move => contra; subst; by try_solve
+       | Hchoose : choose _ _ |- _ =>
+          rewrite choose_def /= in Hchoose; by try_solve
+        | Helem : elements _ _ _ |- _ => 
+          move/elements_equiv : Helem => [Helem //= | [Helem1 Helem2] //=]; subst;
+          by try_solve 
+ 
+        | HIn: In _ [] |- _ => by []
+        | Hnonempty : ~ (onNonEmpty [] _ = 0) |- _ =>
+           by rewrite /onNonEmpty in Hnonempty
+        | Hnonempty : ~ (_ * (onNonEmpty [] _))%coq_nat = 0 |- _ => 
+            by rewrite [X in (_ * X)%coq_nat]/onNonEmpty -mult_n_O in Hnonempty
+        | Hif: ~ ((if ?b then _ else _ ) = _) |- ?b = true =>
+            by case: b Hif
+        | |- (_ <= _)%Z => by apply/Z.compare_ge_iff
+        | |- (_ <= _)%Z => by apply Z.compare_le_iff
+        | |- _ => by []
+      end. 
+
+
+Lemma gen_ainstrSSNI_correct :
+  forall (st : State), (ainstrSSNI st) <--> (Instruction_spec st).
+Proof.
+  move=> st instr. rewrite /ainstrSSNI /Instruction_spec.
+  case: st => im m pr stk regs pc.
+  set st := {|
+             st_imem := im;
+             st_mem := m;
+             st_pr := pr;
+             st_stack := stk;
+             st_regs := regs;
+             st_pc := pc |}.
+  case: (groupRegisters st regs [] [] [] [] Z0)=> [[[dptr cptr] num] lab].
+  split.  
+  - case: instr => [r1 r2 | r1 r2 | r | r1 r2 r3 | | r1 r2 r3 | r1 r2 r3 |
+                    r | | z r | bop r1 r2 r3 | r | z r | r1 r2 | r1 r2 |
+                    r1 r2 r3 | r1 r2 r3 | r | | r1 r2 | r1 r2];
+    move /frequency_equiv =>  [[n [g [HIn [Hg Hn]]]] | [[H | H] H' //=]];
+    rewrite /gen_from_length /pure in HIn; repeat discr_or_first;
+    by (case: HIn => [[Heq1 Heq2] | HIn]; subst;  
+     [by unfold_gen; try_solve | by repeat discr_or_first]).
+ -  Opaque mult choose.
+    case: instr => [r1 r2 | r1 r2 | r | r1 r2 r3 | | r1 r2 r3 | r1 r2 r3 |
+                    r | | z r | bop r1 r2 r3 | r | z r | r1 r2 | r1 r2 |
+                    r1 r2 r3 | r1 r2 r3 | r | | r1 r2 | r1 r2];
+                   move => H; apply frequency_equiv; left; 
+    instantiate_exists; try rewrite /gen_from_length; try by trysolve2.
+    rewrite liftGen2_def. eexists. split; [| trysolve2].
+    rewrite /arbitrary /arbInt. by apply arbInt_correct.
+Qed.
 
 (* Proofs for variations *) 
 Require Import Indist.
