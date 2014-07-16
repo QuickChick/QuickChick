@@ -19,8 +19,8 @@ Definition SSNI (t : table) (v : @Variation State) : Property :=
       | L,L  => 
         match exec t st1, exec t st2 with
           | Some st1', Some st2' => 
-              whenFail ("Initial states: " ++ nl ++ show_pair st1 st2 ++ nl 
-                        ++ "Final states: " ++ nl ++ show_pair st1' st2' ++nl) 
+            (* whenFail ("Initial states: " ++ nl ++ show_pair st1 st2 ++ nl 
+                        ++ "Final states: " ++ nl ++ show_pair st1' st2' ++nl) *)
 
             (* collect ("L -> L")*) (property (indist st1' st2'))
           | _, _ => (* collect "L,L,FAIL" true *) property rejected 
@@ -33,24 +33,24 @@ Definition SSNI (t : table) (v : @Variation State) : Property :=
                         ++ "Final states: " ++ nl ++ show_pair st1' st2' ++nl) *)
               (* collect ("H -> L")*) (property (indist st1' st2') )
             else if is_atom_low (st_pc st1') then
-            whenFail ("States: " ++ nl ++ show_pair st2 st2' ++ nl )
+                   (* whenFail ("States: " ++ nl ++ show_pair st2 st2' ++ nl )*)
               (* collect ("H -> H")*) (property (indist st2 st2'))
             else 
-            whenFail ("States: " ++ nl ++ show_pair st1 st1' ++ nl )
+(*            whenFail ("States: " ++ nl ++ show_pair st1 st1' ++ nl )*)
               (* collect ("H -> H")*) (property (indist st1 st1'))
           | _, _ => property rejected
         end
       | H,_ => 
         match exec t st1 with
           | Some st1' => 
-            whenFail ("States: " ++ nl ++ show_pair st1 st1' ++ nl )
+(*             whenFail ("States: " ++ nl ++ show_pair st1 st1' ++ nl )*)
                       (* collect "H -> H"*) (property (indist st1 st1'))
           | _ => (*collect "H,_,FAIL" true *) property rejected
         end
       | _,H => 
         match exec t st2 with
           | Some st2' => 
-            whenFail ("States: " ++ nl ++ show_pair st2 st2' ++ nl )
+(*             whenFail ("States: " ++ nl ++ show_pair st2 st2' ++ nl )*)
                       (* collect "H -> H"*) (property (indist st2 st2'))
           | _ => (*collect "L,H,FAIL" true *) property rejected 
         end
@@ -93,8 +93,8 @@ Definition testMutants :=
 
 Definition main := 
   (* testMutantX 0.*)
-  (* show testMutants. *)
-  showResult (quickCheck (prop_SSNI default_table)). 
+  show testMutants. 
+  (* showResult (quickCheck (prop_SSNI default_table)). *)
 
 QuickCheck main.
 

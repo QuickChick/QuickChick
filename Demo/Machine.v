@@ -101,7 +101,7 @@ Definition default_table : table := fun op =>
   | OpPush    =>  ≪ TRUE , BOT , LabPC ≫ 
   | OpAdd     =>  ≪ TRUE , JOIN Lab1 Lab2, LabPC ≫ 
   | OpLoad    =>  ≪ TRUE , JOIN Lab1 Lab2 , LabPC ≫ 
-  | OpStore   =>  ≪ LE Lab1 Lab3, JOIN Lab1 Lab2 , LabPC ≫ 
+  | OpStore   =>  ≪ LE (JOIN Lab1 LabPC) Lab3, JOIN LabPC (JOIN Lab1 Lab2) , LabPC ≫ 
 end.
 
 Definition run_tmr (t : table) (op: OpCode)
