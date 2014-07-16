@@ -45,7 +45,7 @@ Definition ainstr (st : State) : Gen Instruction :=
               (if containsRet stk then 10 else 0, returnGen BRet);
               (10, returnGen Add);
               (10, returnGen Load);
-              (10, returnGen Store)].
+              (100, returnGen Store)].
 (*
               (onLength 1 10, liftGen BCall (chooseZ (0, (Z.of_nat sl-1))%Z)); 
               (if containsRet stk then 10 else 0, returnGen BRet);

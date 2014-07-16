@@ -95,7 +95,7 @@ Instance show_atom_pair : ShowPair Atom :=
   show_pair a1 a2 :=
     let '(v1 @ l1) := a1 in
     let '(v2 @ l2) := a2 in
-    show_pair v1 v1 ++ " @ " 
+    show_pair v1 v2 ++ " @ " 
     ++ show_pair l1 l2
 |}.
 

@@ -1,5 +1,7 @@
 Require Import QuickChick.
 
+Require Import List. Import ListNotations.
+
 Require Import Machine.
 Require Import Printing.
 Require Import Generation.
@@ -19,8 +21,8 @@ Definition SSNI (t : table) (v : @Variation State) : Property :=
       | L,L  => 
         match exec t st1, exec t st2 with
           | Some st1', Some st2' => 
-            (* whenFail ("Initial states: " ++ nl ++ show_pair st1 st2 ++ nl 
-                        ++ "Final states: " ++ nl ++ show_pair st1' st2' ++nl) *)
+            whenFail ("Initial states: " ++ nl ++ show_pair st1 st2 ++ nl 
+                        ++ "Final states: " ++ nl ++ show_pair st1' st2' ++nl) 
 
             (* collect ("L -> L")*) (property (indist st1' st2'))
           | _, _ => (* collect "L,L,FAIL" true *) property rejected 
@@ -97,8 +99,21 @@ Definition testMutants :=
   mutateCheckArgs myArgs default_table (fun t => forAllShrink (fun _ => "") 
                                gen_variation_state (fun _ => nil) (SSNI t)).
 
+Definition st1 :=
+  St [Store; Store] [0 @ L] (0 @ L :: 0 @ H :: Mty) (0 @ L).
+Definition st2 :=
+  St [Store; Store] [0 @ L] (0 @ L :: 1 @ H :: Mty) (0 @ L).
+Definition ex_indist : indist st1 st2 = true. auto. Qed.
+
+Definition ex_test := 
+  match nth (mutate_table default_table) 18 with
+    | Some t => showResult (quickCheck (property (SSNI t (V st1 st2))))
+    | _ => ""
+  end.
+
 Definition main := 
- testMutantX 18.
+  (* ex_test.*)
+  testMutantX 18.
 (* show testMutants. *)
   (* showResult (quickCheck (prop_SSNI default_table)). *)
 
