@@ -36,16 +36,23 @@ Definition ainstr (st : State) : Gen Instruction :=
         | _ :: s' => containsRet s'
         | _ => false
       end in
-  let onLength len x := if ltb x len then x else 0 in
+  let onLength len x := if leb x len then x else 0 in
   frequency (returnGen Nop) [
               (1, returnGen Nop);
               (10, liftGen Push gen_Z);
-              (onLength 1 10, liftGen BCall (chooseZ (0, (Z.of_nat sl-1))%Z));
+              (10, liftGen BCall (if beq_nat sl 0 then returnGen 0
+                                  else chooseZ (0, Z.of_nat sl-1))%Z);
+              (if containsRet stk then 10 else 0, returnGen BRet);
+              (10, returnGen Add);
+              (10, returnGen Load);
+              (10, returnGen Store)].
+(*
+              (onLength 1 10, liftGen BCall (chooseZ (0, (Z.of_nat sl-1))%Z)); 
               (if containsRet stk then 10 else 0, returnGen BRet);
               (onLength 2 10, returnGen Add);
               (onLength 1 10, returnGen Load);
               (onLength 2 10, returnGen Store)].
-
+*)
 
 Fixpoint gen_stack (n : nat) (onlyLow : bool) : Gen Stack :=
   let gen_atom := 

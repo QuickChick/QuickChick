@@ -11,12 +11,19 @@ Definition SSNI (t : table) (v : @Variation State) : Property :=
   let '(V st1 st2) := v in
   let '(St _ _ _ (_@l1)) := st1 in
   let '(St _ _ _ (_@l2)) := st2 in
+(*   match lookupInstr st1 with
+    | Some i => 
+      collect (show i) (  *)
   if indist st1 st2 then 
     match l1, l2 with
       | L,L  => 
         match exec t st1, exec t st2 with
-          | Some st1', Some st2' => property (indist st1' st2')
-          | _, _ => collect "L,L,FAIL" true (* property rejected *)
+          | Some st1', Some st2' => 
+              whenFail ("Initial states: " ++ nl ++ show_pair st1 st2 ++ nl 
+                        ++ "Final states: " ++ nl ++ show_pair st1' st2' ++nl) 
+
+            (* collect ("L -> L")*) (property (indist st1' st2'))
+          | _, _ => (* collect "L,L,FAIL" true *) property rejected 
         end
       | H, H => 
         match exec t st1, exec t st2 with
@@ -24,25 +31,34 @@ Definition SSNI (t : table) (v : @Variation State) : Property :=
             if is_atom_low (st_pc st1') && is_atom_low (st_pc st2') then
               (* whenFail ("Initial states: " ++ nl ++ show_pair st1 st2 ++ nl 
                         ++ "Final states: " ++ nl ++ show_pair st1' st2' ++nl) *)
-              property (indist st1' st2') 
+              (* collect ("H -> L")*) (property (indist st1' st2') )
             else if is_atom_low (st_pc st1') then
-              property (indist st2 st2') 
+            whenFail ("States: " ++ nl ++ show_pair st2 st2' ++ nl )
+              (* collect ("H -> H")*) (property (indist st2 st2'))
             else 
-              property (indist st1 st1')
+            whenFail ("States: " ++ nl ++ show_pair st1 st1' ++ nl )
+              (* collect ("H -> H")*) (property (indist st1 st1'))
           | _, _ => property rejected
         end
       | H,_ => 
         match exec t st1 with
-          | Some st1' => property (indist st1 st1')
-          | _ => collect "H,_,FAIL" true (* property rejected*)
+          | Some st1' => 
+            whenFail ("States: " ++ nl ++ show_pair st1 st1' ++ nl )
+                      (* collect "H -> H"*) (property (indist st1 st1'))
+          | _ => (*collect "H,_,FAIL" true *) property rejected
         end
       | _,H => 
         match exec t st2 with
-          | Some st2' => property (indist st2 st2')
-          | _ => collect "L,H,FAIL" true (* property rejected *)
+          | Some st2' => 
+            whenFail ("States: " ++ nl ++ show_pair st2 st2' ++ nl )
+                      (* collect "H -> H"*) (property (indist st2 st2'))
+          | _ => (*collect "L,H,FAIL" true *) property rejected 
         end
     end
-  else collect "Not indist!" true (* property rejected *) .
+  else (* collect "Not indist!" true*)  property rejected 
+              (* )
+    | _ => property rejected
+  end*).
 
 Definition prop_SSNI t := 
   forAllShrink show gen_variation_state (fun _ => nil) (SSNI t).
@@ -59,13 +75,26 @@ Instance mutateable_table : Mutateable table :=
   mutate := mutate_table
 |}.
 
+Require Import ZArith.
+(* *)
+Eval lazy -[labelCount helper] in
+  nth (mutate_table default_table) 18.
+(* *)
+
+Definition testMutantX n := 
+  match nth (mutate_table default_table) n with
+    | Some t => showResult (quickCheck (prop_SSNI t))
+    | _ => ""
+  end.
+
 Definition testMutants :=
   mutateCheck default_table (fun t => forAllShrink (fun _ => "") 
                                gen_variation_state (fun _ => nil) (SSNI t)).
 
 Definition main := 
-  show testMutants.
-  (* showResult (quickCheck (prop_SSNI default_table)). *)
+  (* testMutantX 0.*)
+  (* show testMutants. *)
+  showResult (quickCheck (prop_SSNI default_table)). 
 
 QuickCheck main.
 
