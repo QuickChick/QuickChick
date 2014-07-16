@@ -57,7 +57,7 @@ Fixpoint gen_stack (n : nat) (onlyLow : bool) : Gen Stack :=
     | S n' => 
       frequency (returnGen Mty) [
                   (10, liftGen2 Cons gen_atom (gen_stack n' onlyLow));
-                  (10, bindGen gen_atom (fun pc =>
+                  (4, bindGen gen_atom (fun pc =>
                        liftGen (RetCons pc) (gen_stack n' (is_atom_low pc))))]
   end.
 

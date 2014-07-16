@@ -39,7 +39,7 @@ Definition message (kill : bool) (n1 n2 : nat) :=
   (if kill then "Killed" else "Missed") ++
   " mutant " ++ (if kill then "" else "[") ++ show n2
              ++ (if kill then "" else "]")
-  ++ " (" ++ show n1 ++ " frags)".
+  ++ " (" ++ show n1 ++ " frags)" ++ nl.
 
 Open Scope nat.
 Definition mutateCheckMany {A P : Type} `{_: Testable P}

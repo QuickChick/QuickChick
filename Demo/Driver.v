@@ -22,9 +22,9 @@ Definition SSNI (t : table) (v : @Variation State) : Property :=
         match exec t st1, exec t st2 with
           | Some st1', Some st2' =>
             if is_atom_low (st_pc st1') && is_atom_low (st_pc st2') then
-              whenFail ("Initial states: " ++ nl ++ show_pair st1 st2 ++ nl 
-                        ++ "Final states: " ++ nl ++ show_pair st1' st2' ++nl)
-                       (indist st1' st2') 
+              (* whenFail ("Initial states: " ++ nl ++ show_pair st1 st2 ++ nl 
+                        ++ "Final states: " ++ nl ++ show_pair st1' st2' ++nl) *)
+              property (indist st1' st2') 
             else if is_atom_low (st_pc st1') then
               property (indist st2 st2') 
             else 
@@ -44,15 +44,28 @@ Definition SSNI (t : table) (v : @Variation State) : Property :=
     end
   else collect "Not indist!" true (* property rejected *) .
 
-Definition prop_SSNI := 
-  forAllShrink show gen_variation_state (fun _ => nil) (SSNI default_table).
+Definition prop_SSNI t := 
+  forAllShrink show gen_variation_state (fun _ => nil) (SSNI t).
 
 Definition prop_gen_indist := 
   forAllShrink show gen_variation_state (fun _ => nil) 
                (fun v => let '(V st1 st2) := v in indist st1 st2).
 
+Require Import Mutate.
+Require Import MutateCheck.
+
+Instance mutateable_table : Mutateable table :=
+{|
+  mutate := mutate_table
+|}.
+
+Definition testMutants :=
+  mutateCheck default_table (fun t => forAllShrink (fun _ => "") 
+                               gen_variation_state (fun _ => nil) (SSNI t)).
+
 Definition main := 
-  showResult (quickCheck prop_SSNI).
+  show testMutants.
+  (* showResult (quickCheck (prop_SSNI default_table)). *)
 
 QuickCheck main.
 
@@ -60,3 +73,5 @@ QuickCheck main.
   
   
   
+
+
