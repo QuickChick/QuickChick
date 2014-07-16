@@ -42,22 +42,32 @@ Definition message (kill : bool) (n1 n2 : nat) :=
   ++ " (" ++ show n1 ++ " frags)" ++ nl.
 
 Open Scope nat.
-Definition mutateCheckMany {A P : Type} `{_: Testable P}
-           `{mutA: Mutateable A} 
+Definition mutateCheckManyArgs {A P : Type} `{_: Testable P}
+           `{mutA: Mutateable A} (args : Args)
            (a : A) (ps : A -> list P) :=
   let mutants := mutate a in
   Property.trace ("Fighting " ++ show (List.length mutants) ++ " mutants")
   (List.fold_left
      (fun n m => match n with (n1,n2) =>
-        let kill := List.existsb found_bug (List.map quickCheck (ps m)) in
+        let kill := List.existsb found_bug (List.map (quickCheckWithResult args) (ps m)) in
         let n1' := n1 + (if kill then 1 else 0) in
         let msg := message kill n1' n2 in
         Property.trace msg (n1', n2 + 1)
       end)
      mutants (0, 0)).
 
+Definition mutateCheckMany {A P : Type} `{_: Testable P}
+           `{mutA: Mutateable A} 
+           (a : A) (ps : A -> list P) :=
+  mutateCheckManyArgs stdArgs a ps.
+
+Definition mutateCheckArgs {A P: Type} 
+           `{_: Testable P} `{mutA: Mutateable A} (args : Args)
+           (a : A) (p : A -> P):=
+  mutateCheckManyArgs args a (fun a => cons (p a) nil).
+
 Definition mutateCheck {A P: Type} 
            `{_: Testable P} `{mutA: Mutateable A} 
            (a : A) (p : A -> P):=
-  mutateCheckMany a (fun a => cons (p a) nil).
+  mutateCheckManyArgs stdArgs a (fun a => cons (p a) nil).
 

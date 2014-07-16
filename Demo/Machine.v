@@ -95,7 +95,7 @@ Definition table := forall op, AllowModify (labelCount op).
 
 Definition default_table : table := fun op =>
   match op with
-  | OpBCall   =>  ≪ TRUE , JOIN Lab1 LabPC , JOIN Lab1 LabPC≫ 
+  | OpBCall   =>  ≪ TRUE , LabPC , JOIN Lab1 LabPC≫ 
   | OpBRet    =>  ≪ TRUE , JOIN Lab2 LabPC , Lab1 ≫ 
   | OpNop     =>  ≪ TRUE , __ , LabPC ≫ 
   | OpPush    =>  ≪ TRUE , BOT , LabPC ≫ 

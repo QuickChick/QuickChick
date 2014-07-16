@@ -67,6 +67,12 @@ Definition prop_gen_indist :=
   forAllShrink show gen_variation_state (fun _ => nil) 
                (fun v => let '(V st1 st2) := v in indist st1 st2).
 
+Axiom numTests : nat.
+Extract Constant numTests => "20000".
+Definition myArgs : Args :=
+  let '(MkArgs rp mSuc md mSh mSz c) := stdArgs in
+  MkArgs rp numTests md mSh mSz c.
+
 Require Import Mutate.
 Require Import MutateCheck.
 
@@ -83,17 +89,17 @@ Eval lazy -[labelCount helper] in
 
 Definition testMutantX n := 
   match nth (mutate_table default_table) n with
-    | Some t => showResult (quickCheck (prop_SSNI t))
+    | Some t => showResult (quickCheckWithResult myArgs (prop_SSNI t))
     | _ => ""
   end.
 
 Definition testMutants :=
-  mutateCheck default_table (fun t => forAllShrink (fun _ => "") 
+  mutateCheckArgs myArgs default_table (fun t => forAllShrink (fun _ => "") 
                                gen_variation_state (fun _ => nil) (SSNI t)).
 
 Definition main := 
-  (* testMutantX 0.*)
-  show testMutants. 
+ testMutantX 18.
+(* show testMutants. *)
   (* showResult (quickCheck (prop_SSNI default_table)). *)
 
 QuickCheck main.
