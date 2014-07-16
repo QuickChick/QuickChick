@@ -6,8 +6,9 @@ Require Import Gen Test Show Property.
 Require Import ExtrOcamlBasic.
 Require Import ExtrOcamlString.
 Require Import ExtrOcamlNatInt.
+Require Import ExtrOcamlZInt.
 
-(* Extraction Language Haskell. *)
+Extraction Blacklist String List.
 
 (*
 Extract Inductive unit => "()" [ "()" ].
@@ -90,13 +91,13 @@ Extract Constant show_bool => "(Printf.sprintf ""%b"")".
 Extract Constant show_int =>  "(Printf.sprintf ""%d"")".
 
 Extract Constant RandomGen   => "Random.State.t".
-Extract Constant rndNext     => "Random.State.bits)".
+Extract Constant rndNext     => "(fun r -> Random.State.bits r, r)".
 (* Extract Constant rndGenRange => "SR.genRange".*)
 Extract Constant rndSplit    => "(fun x -> (x,x))".
 Extract Constant mkRandomGen => "(fun x -> Random.init x; Random.get_state())".
 Extract Constant randomRNat  => 
   "(fun (x,y) r -> (x + (Random.State.int r (y - x + 1)), r))".
-Extract Constant randomRBool => "(fun _ r -> Random.State.bool r)".
+Extract Constant randomRBool => "(fun _ r -> Random.State.bool r, r)".
 Extract Constant randomRInt  => 
   "(fun (x,y) r -> (x + (Random.State.int r (y - x + 1)), r))".
 Extract Constant newStdGen   => "(Random.State.make_self_init ())".
@@ -106,8 +107,10 @@ Extract Constant force => "Lazy.force".
 
 Extract Constant Test.ltAscii => "(<=)".
 Extract Constant Test.strEq   => "(=)".
+(*
 Extract Constant Coq.Numbers.Natural.Peano.NPeano.div => "(/)".
 Extract Constant Coq.Numbers.Natural.Peano.NPeano.modulo => "(fun x y -> x mod y)".
+*)
 Extract Constant Test.gte => "(>=)".
 Extract Constant le_gt_dec => "(<=)".
 Extract Constant trace => "(fun x y -> print_string (QuickChickLib.string_of_coqstring x); y)".
