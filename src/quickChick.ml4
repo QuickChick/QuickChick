@@ -37,7 +37,7 @@ let quickcheck c =
   let modn = Filename.basename execn in
   Flags.silently (full_extraction (Some mlf)) [c];
   let oc = open_out_gen [Open_append;Open_text] 0o666 mlf in
-  Printf.fprintf oc "\nlet main = print_string (QuickChickLib.string_of_coqstring (%s))\n" main;
+  Printf.fprintf oc "\nlet _ = print_string (QuickChickLib.string_of_coqstring (%s))\n" main;
   close_out oc;
   (* We should check that the commands below succeed at each step *)
   if Sys.command (comp_mli_cmd mlif) <> 0 then

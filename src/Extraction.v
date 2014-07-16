@@ -87,8 +87,10 @@ Extract Inductive string => "Prelude.String"
 
 Extract Constant show_nat =>
   "(fun i -> QuickChickLib.coqstring_of_string (string_of_int i))".
-Extract Constant show_bool => "(Printf.sprintf ""%b"")".
-Extract Constant show_int =>  "(Printf.sprintf ""%d"")".
+Extract Constant show_bool =>
+  "(fun i -> QuickChickLib.coqstring_of_string (string_of_bool i))".
+Extract Constant show_int =>
+  "(fun i -> QuickChickLib.coqstring_of_string (string_of_int i))".
 
 Extract Constant RandomGen   => "Random.State.t".
 Extract Constant rndNext     => "(fun r -> Random.State.bits r, r)".
