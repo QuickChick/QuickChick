@@ -75,7 +75,7 @@ Class ShowPair (A : Type) : Type :=
 Definition show_variation (s1 s2 : string) :=
   "{ " ++ s1 ++ " / " ++ s2 ++ " }".
 
-Instance show_int_pair : ShowPair int :=
+Instance show_int_pair : ShowPair Z :=
 {|
   show_pair v1 v2 :=
     if Z.eqb v1 v2 then show v1 

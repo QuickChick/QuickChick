@@ -8,12 +8,10 @@ Require Export Instructions.
 Open Scope Z_scope.
 Open Scope bool_scope.
 
-Definition int := Z.
-
 (** * Basic List manipulation *)
 
 (* [nth l n] returns the [n]th element of [l] if [0 <= n < Zlength l] *)
-Definition nth {A:Type} (l:list A) (n:int) : option A :=
+Definition nth {A:Type} (l:list A) (n:Z) : option A :=
   if Z_lt_dec n 0 then None
   else nth_error l (Z.to_nat n).
 
@@ -35,7 +33,7 @@ Fixpoint upd_nat {A:Type} (l:list A) (n:nat) (a:A) : option (list A) :=
 
 (* [upd l n a] returns a list [l'] that is pointwise equal to [l], except the [n]th
     element that is now [a]. Only suceeds if [0 <= n < Zlength l] *)
-Definition upd {A:Type} (l:list A) (n:int) (a:A) : option (list A) :=
+Definition upd {A:Type} (l:list A) (n:Z) (a:A) : option (list A) :=
   if Z_lt_dec n 0 then None
   else upd_nat l (Z.to_nat n) a.
 
@@ -45,13 +43,13 @@ Fixpoint replicate {A:Type} (n:nat) (a:A) : list A :=
   | S n' => a :: replicate n' a
   end.
 
-Definition zreplicate {A:Type} (n:int) (a:A) : option (list A) :=
+Definition zreplicate {A:Type} (n:Z) (a:A) : option (list A) :=
   if Z_lt_dec n 0 then None
   else Some (replicate (Z.to_nat n) a).
 
 (** * Machine definition *)
 
-Inductive Atom : Type := Atm (x:int) (l:Label).
+Inductive Atom : Type := Atm (x:Z) (l:Label).
 Infix "@" := Atm (no associativity, at level 50).
 
 Definition pc_lab (pc : Atom) : Label :=
@@ -138,7 +136,7 @@ Fixpoint findRet (s:Stack) : option (Atom * Stack) :=
     | Mty      => None
   end.                          
 
-Definition insert (s:Stack) (n:int) (a:Atom) : option Stack :=
+Definition insert (s:Stack) (n:Z) (a:Atom) : option Stack :=
   if Z_lt_dec n 0 then None
   else insert_nat s (Z.to_nat n) a.
 

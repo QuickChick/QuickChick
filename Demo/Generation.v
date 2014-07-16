@@ -7,11 +7,11 @@ Import ListNotations.
 Require Import Machine.
 
 (* Overriding default instance to generate "in-bounds" things *)
-Definition gen_int := chooseZ (0,1).
+Definition gen_Z := chooseZ (0,1).
 
 Definition gen_label := elements L [L; H].
 
-Definition gen_atom := liftGen2 Atm gen_int gen_label.
+Definition gen_atom := liftGen2 Atm gen_Z gen_label.
 
 Definition gen_memory := vectorOf 2 gen_atom.
 
@@ -33,7 +33,7 @@ Definition ainstr (st : State) : Gen Instruction :=
   let onLength len x := if ltb x len then x else 0 in
   frequency (returnGen Nop) [
               (1, returnGen Nop);
-              (10, liftGen Push gen_int);
+              (10, liftGen Push gen_Z);
               (onLength 1 10, liftGen BCall (chooseZ (0, (Z.of_nat sl-1))%Z));
               (if containsRet stk then 10 else 0, returnGen BRet);
               (onLength 2 10, returnGen Add);
@@ -42,7 +42,7 @@ Definition ainstr (st : State) : Gen Instruction :=
 
 Fixpoint gen_stack (n : nat) (onlyHigh : bool) : Gen Stack :=
   let gen_atom := 
-      if onlyHigh then liftGen2 Atm gen_int (returnGen H)
+      if onlyHigh then liftGen2 Atm gen_Z (returnGen H)
       else gen_atom
   in
   match n with
