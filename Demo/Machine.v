@@ -83,7 +83,7 @@ Record State := St {
 Definition labelCount (c:OpCode) : nat :=
   match c with
   | OpBCall   => 1
-  | OpBRet    => 1
+  | OpBRet    => 2
   | OpNop     => 0
   | OpPush    => 0
   | OpAdd     => 2
@@ -96,7 +96,7 @@ Definition table := forall op, AllowModify (labelCount op).
 Definition default_table : table := fun op =>
   match op with
   | OpBCall   =>  ≪ TRUE , JOIN Lab1 LabPC , JOIN Lab1 LabPC≫ 
-  | OpBRet    =>  ≪ TRUE , LabPC , Lab1 ≫ 
+  | OpBRet    =>  ≪ TRUE , JOIN Lab2 LabPC , Lab1 ≫ 
   | OpNop     =>  ≪ TRUE , __ , LabPC ≫ 
   | OpPush    =>  ≪ TRUE , BOT , LabPC ≫ 
   | OpAdd     =>  ≪ TRUE , JOIN Lab1 Lab2, LabPC ≫ 
@@ -155,13 +155,13 @@ Definition exec (t : table) (st:State) : option State :=
           Some (St μ m σ' pc')
         | _ => None 
       end
-    | BRet, St μ m (a::σ) (xpc@lpc) =>
+    | BRet, St μ m ((ax@al)::σ) (xpc@lpc) =>
       do tmp <- findRet σ;
       let '(xrpc @ lrpc, σ') := tmp in
-      match run_tmr t OpBRet <|lrpc|> lpc with
-        | Some (_, rpcl) =>
+      match run_tmr t OpBRet <|lrpc; al|> lpc with
+        | Some (Some rl, rpcl) =>
           let pc' := xrpc @ rpcl in
-          Some (St μ m (a::σ') pc')
+          Some (St μ m ((ax@rl)::σ') pc')
         | _ => None
       end
     | Load, St μ m ((x @ l) :: σ) (xpc@lpc) =>

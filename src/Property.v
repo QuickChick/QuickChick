@@ -132,8 +132,8 @@ Definition callback {prop : Type} {_ : Testable prop}
   mapTotalResult (fun r => addCallback r cb).
 
 Definition whenFail {prop : Type} `{_ : Testable prop}
-           (cb : nat -> nat) : prop -> Property :=
-  callback (PostFinalFailure Counterexample (fun _st _sr => cb 0)).
+           (str : string) : prop -> Property :=
+  callback (PostFinalFailure Counterexample (fun _st _sr => trace str 0)).
 
 (* The following function on its own does not have a decreasing argument... 
 

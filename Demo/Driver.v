@@ -22,7 +22,9 @@ Definition SSNI (t : table) (v : @Variation State) : Property :=
         match exec t st1, exec t st2 with
           | Some st1', Some st2' =>
             if is_atom_low (st_pc st1') && is_atom_low (st_pc st2') then
-              property (indist st1' st2') 
+              whenFail ("Initial states: " ++ nl ++ show_pair st1 st2 ++ nl 
+                        ++ "Final states: " ++ nl ++ show_pair st1' st2' ++nl)
+                       (indist st1' st2') 
             else if is_atom_low (st_pc st1') then
               property (indist st2 st2') 
             else 

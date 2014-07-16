@@ -1,6 +1,7 @@
 Require Import QuickChick.
 
 Require Import List.
+Require Import NPeano.
 Require Import ZArith.
 
 Require Import Machine.
@@ -117,6 +118,29 @@ Instance show_stack_pair : ShowPair Stack :=
   show_pair s1 s2 :=
     let len1 := total_stack_length s1 in
     let len2 := total_stack_length s2 in 
+    let fix show_until s n := 
+        match n with 
+          | O => ("",s) 
+          | S n' => 
+            match s with
+              | x :: s' => 
+                let (str, sf) := show_until s' n' in
+                (show x ++ " : " ++ str, sf)
+              | x ::: s' => 
+                let (str, sf) := show_until s' n' in
+                ("R " ++ show x ++ " : " ++ str, sf)
+              | Mty => ("error: Mty", Mty)
+            end
+        end in
+    let '(prefix,(s1,s2)) := 
+        if ltb len1 len2 then
+          let (show_pre, s2') := show_until s2 (len2 - len1)%nat in
+          ("Bigger part of 2: " ++ nl ++ show_pre ++ nl, (s1, s2'))
+        else if ltb len2 len1 then
+          let (show_pre, s1') := show_until s1 (len1 - len2)%nat in
+          ("Bigger part of 1: " ++ nl ++ show_pre ++ nl, (s1', s2))
+        else ("", (s1,s2))
+    in
     let fix aux s1 s2 := 
         match s1, s2 with
           | a1::s1', a2::s2' => show_pair a1 a2 ++ " : " ++ aux s1' s2'
@@ -124,9 +148,8 @@ Instance show_stack_pair : ShowPair Stack :=
           | Mty, Mty => "[]"
           | _, _ => show_variation (show s1) (show s2)
         end
-    in aux s1 s2
+    in prefix ++ "Common part: " ++ nl ++ aux s1 s2
 |}.
-            
 
 Instance show_state_pair : ShowPair State :=
 {|
