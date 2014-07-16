@@ -105,9 +105,18 @@ Instance show_mem_pair : ShowPair Mem :=
                       let (x,y) := xy in show_pair x y) (combine m1 m2) 0
 |}.
 
+Fixpoint total_stack_length s := 
+  match s with 
+    | _ :: s' => S (total_stack_length s')
+    | _ ::: s' => S (total_stack_length s')
+    | _ => O
+  end.
+
 Instance show_stack_pair : ShowPair Stack :=
 {|
   show_pair s1 s2 :=
+    let len1 := total_stack_length s1 in
+    let len2 := total_stack_length s2 in 
     let fix aux s1 s2 := 
         match s1, s2 with
           | a1::s1', a2::s2' => show_pair a1 a2 ++ " : " ++ aux s1' s2'

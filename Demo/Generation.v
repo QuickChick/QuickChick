@@ -15,6 +15,12 @@ Definition gen_atom := liftGen2 Atm gen_Z gen_label.
 
 Definition gen_memory := vectorOf 2 gen_atom.
 
+Definition is_atom_low (a : Atom) :=
+  match a with
+    | _ @ L => true
+    | _     => false
+  end.
+
 Local Open Scope nat.
 Definition ainstr (st : State) : Gen Instruction :=
   let '(St im m stk pc ) := st in
@@ -40,30 +46,26 @@ Definition ainstr (st : State) : Gen Instruction :=
               (onLength 1 10, returnGen Load);
               (onLength 2 10, returnGen Store)].
 
-Fixpoint gen_stack (n : nat) (onlyHigh : bool) : Gen Stack :=
+
+Fixpoint gen_stack (n : nat) (onlyLow : bool) : Gen Stack :=
   let gen_atom := 
-      if onlyHigh then liftGen2 Atm gen_Z (returnGen H)
+      if onlyLow then liftGen2 Atm gen_Z (returnGen L)
       else gen_atom
   in
   match n with
     | O => returnGen Mty
     | S n' => 
       frequency (returnGen Mty) [
-                  (10, liftGen2 Cons gen_atom (gen_stack n' onlyHigh));
+                  (10, liftGen2 Cons gen_atom (gen_stack n' onlyLow));
                   (10, bindGen gen_atom (fun pc =>
-                       let onlyHigh := 
-                           match pc with
-                             | _ @ L => false
-                             | _ @ H => true
-                           end in
-                       liftGen (RetCons pc) (gen_stack n' onlyHigh)))]
+                       liftGen (RetCons pc) (gen_stack n' (is_atom_low pc))))]
   end.
 
 Definition gen_state : Gen State :=
   let imem0 := [Nop; Nop] in
   bindGen gen_atom (fun pc =>
   bindGen gen_memory (fun mem =>
-  bindGen (gen_stack 4 false) (fun stk =>
+  bindGen (gen_stack 4 (is_atom_low pc)) (fun stk =>
   bindGen (ainstr (St imem0 mem stk pc)) (fun i =>
   returnGen (St [i;i] mem stk pc))))).                                              
 
@@ -80,7 +82,7 @@ Instance vary_atom : Vary Atom :=
     let '(x @ l) := a in
     match l with
       | L => returnGen a
-      | H => gen_atom 
+      | H => liftGen2 Atm gen_Z (returnGen H)
     end
 |}.
 

@@ -44,7 +44,7 @@ Definition isSuccess (r : Result) : bool :=
 Axiom defNumTests    : nat.
 Extract Constant defNumTests    => "1000".
 Axiom defNumDiscards : nat.
-Extract Constant defNumDiscards => "500".
+Extract Constant defNumDiscards => "50000".
 Axiom defNumShrinks  : nat.
 Extract Constant defNumShrinks  => "1000".
 Axiom defSize        : nat.
@@ -175,8 +175,8 @@ Definition doneTesting (st : State) (f : RandomGen -> nat -> QProp) : Result :=
 
 Definition giveUp (st : State) (_ : RandomGen -> nat -> QProp) : Result :=
   GaveUp (numSuccessTests st) (summary st) 
-         ("*** Gave up! Passed only " ++ (show (numSuccessTests st)) ++ " tests"
-                                      ++ newline).
+         ("*** Gave up! Passed only " ++ (show (numSuccessTests st)) ++ " tests" 
+          ++  newline ++ "Discarded: " ++ (show (numDiscardedTests st)) ++ newline).
 
 Definition callbackPostFinalFailure (st : State) (res : Property.Result) 
 : nat :=
@@ -296,12 +296,19 @@ Definition quickCheckWithResult {prop : Type} {_ : Testable prop}
                 0               (* numTryShrinks     *)
        ) (match property p with MkGen g => g end).
 
+Fixpoint showCollectStatistics (l : list (string * nat)) :=
+  match l with
+    | nil => ""
+    | cons (s,n) l' => 
+      show n ++ " : " ++ s ++ newline ++ showCollectStatistics l'
+  end.
+
 Definition showResult (r : Result) :=
   match r with
-  | Success _ _ _ s => s
-  | GaveUp _ _ s => s
-  | Failure _ _ _ _ _ s _ _ => s
-  | NoExpectedFailure _ _ s => s
+  | Success _ _ l s => showCollectStatistics l ++ s
+  | GaveUp _ l s => showCollectStatistics l ++ s
+  | Failure _ _ _ _ _ s l _ => showCollectStatistics l ++ s
+  | NoExpectedFailure _ l s => showCollectStatistics l ++ s
   end ++ newline.
 
 Definition quickCheck {prop : Type} {_ : Testable prop} 
