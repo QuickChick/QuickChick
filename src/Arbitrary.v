@@ -21,7 +21,8 @@ Section ArbitrarySection.
   Definition arbitraryBool := choose (false, true).
   Definition arbitraryNat :=  
     sized (fun x => choose (0, x)).
-  (* Definition arbitraryNat :=  choose (0, 100). *)
+  (* Why we  are not using sized to generate Nats like QC?
+      Definition arbitraryNat :=  choose (0, 100). *)
   Definition arbitraryZ := 
     sized (fun x => 
              let z := Z.of_nat x in 
@@ -90,3 +91,20 @@ Global Instance arbInt : Arbitrary Z :=
   arbitrary := @arbitraryZ;
   shrink x := shrinkZ x
 |}.
+
+
+(* For these instances to be useful, we would need to support dependent types *)
+
+(*
+Instance arbSet : Arbitrary Set :=
+{|
+  arbitrary := returnGen nat;
+  shrink x := nil
+|}.
+
+Instance arbType : Arbitrary Type :=
+{|
+  arbitrary := returnGen (nat : Type);
+  shrink x := nil
+|}.
+*)

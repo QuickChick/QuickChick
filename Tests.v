@@ -162,3 +162,14 @@ Proof.
   rewrite /peq /genTree. move=> H tree; split => //= _.
   exists (height tree). apply genTreeS_correct => //=.
 Qed.
+
+
+QuickCheck testTree.
+
+Definition prop_length (A : Type) (l : list A) :=
+  Nat.leb (List.length l) 20.
+
+Definition testLength :=
+  showResult (quickCheck prop_length).
+
+QuickCheck testLength.

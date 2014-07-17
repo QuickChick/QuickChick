@@ -133,8 +133,8 @@ Definition callback {prop : Type} {_ : Testable prop}
   mapTotalResult (fun r => addCallback r cb).
 
 Definition whenFail {prop : Type} `{_ : Testable prop}
-           (cb : nat -> nat) : prop -> Property :=
-  callback (PostFinalFailure Counterexample (fun _st _sr => cb 0)).
+           (str : string) : prop -> Property :=
+  callback (PostFinalFailure Counterexample (fun _st _sr => trace str 0)).
 
 (* The following function on its own does not have a decreasing argument... 
 
@@ -177,7 +177,17 @@ Instance testFun {A prop : Type} `{_ : Show A}
 {
   property f := forAllShrink show arbitrary shrink f
 }.
-  
+
+Instance testPolyFun {prop : Type -> Type} `{_ : Testable (prop nat)} : Testable (forall T, prop T) :=
+{
+  property f := printTestCase "" (f nat)
+}.
+
+Instance testPolyFunSet {prop : Set -> Type} `{_ : Testable (prop nat)} : Testable (forall T, prop T) :=
+{
+  property f := printTestCase "" (f nat)
+}.
+
 (* Test Case Distribution *)
 Definition cover {prop : Type} `{_ : Testable prop}
            (b : bool) (n : nat) (s : string) : prop -> Property :=
