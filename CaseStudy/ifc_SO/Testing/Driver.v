@@ -109,10 +109,9 @@ Definition testMutant37wf := testMutantWF
 
 (* Definition testNI := testMutant37wf. *)
 
-Definition testNI := testMutants.
+Definition testNI := show testMutants.
 
-(* QuickCheck testNI. *)
-
+QuickCheck testNI.
 
 (* QuickCheck testMutants.*)
 (* Definition testNI := testMutant9.*)
