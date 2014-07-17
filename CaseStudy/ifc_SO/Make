@@ -20,3 +20,4 @@ Testing/SanityChecks.v
 Testing/Shrinking.v
 Testing/SingleStateArb.v
 Testing/SSNI.v
+Testing/GenerationProofsHelpers.v

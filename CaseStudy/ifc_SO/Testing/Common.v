@@ -22,10 +22,12 @@ Section GenUtils.
           `{GenMonad Gen}.
 
 Definition pure {A : Type} (x : A) : Gen A := returnGen x.
-Definition sequenceGen {A : Type} (ms : list (Gen A)) : Gen (list A) :=
-  fold_right (fun m m' => bindGen m  (fun x => 
-                          bindGen m' (fun xs =>
-                          returnGen (x :: xs)))) (pure []) ms.
+
+(* This is provided by the interface *)
+(* Definition sequenceGen {A : Type} (ms : list (Gen A)) : Gen (list A) := *)
+(*   fold_right (fun m m' => bindGen m  (fun x =>  *)
+(*                           bindGen m' (fun xs => *)
+(*                           returnGen (x :: xs)))) (pure []) ms. *)
 
 Fixpoint foldGen {A B : Type} (f : A -> B -> Gen A) (l : list B) (a : A) 
 : Gen A :=
