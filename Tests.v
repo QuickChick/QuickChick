@@ -5,6 +5,10 @@ Import ListNotations.
 Require Import EqNat.
 Require Import NPeano.
 
+Set Implicit Arguments.
+Unset Strict Implicit.
+Unset Printing Implicit Defensive.
+
 (* Small example with default arbitrary instances *)
 
 Fixpoint my_delete (x : nat) (l : list nat) : list nat :=
@@ -14,18 +18,47 @@ Fixpoint my_delete (x : nat) (l : list nat) : list nat :=
   end.
 
 Definition prop_delete_removes_every_x (x : nat) (l : list nat) :=
-  negb (existsb (fun y => beq_nat y x) (my_delete x l)).
+  ~~ (existsb (pred1 x) (my_delete x l)).
 
 Definition test0 := 
   showResult (quickCheck prop_delete_removes_every_x).
  
 QuickCheck test0.
 
+Definition prop_length (A : Type) (l : list A) :=
+  (List.length l) <= 20.
+
+Definition testLength :=
+  showResult (quickCheck prop_length).
+
+QuickCheck testLength.
+
 (* Tree example showing custom datatypes *)
 
-Inductive Tree (A : Type) :=
-| Leaf : Tree A
-| Node : A -> Tree A -> Tree A -> Tree A. 
+Inductive tree (A : Type) :=
+| Leaf : tree A
+| Node : A -> tree A -> tree A -> tree A. 
+
+Arguments Leaf {A}.
+Arguments Node {A} _ _ _.
+
+Fixpoint eq_tree (A : eqType) (t1 t2 : tree A) :=
+  match t1, t2 with
+  | Leaf, Leaf => true
+  | Node x1 l1 r1, Node x2 l2 r2 => [&& x1 == x2, eq_tree l1 l2 & eq_tree r1 r2]
+  | _, _ => false
+  end.
+
+Lemma eq_treeP (A : eqType) : Equality.axiom (@eq_tree A).
+Proof.
+move=> t1 t2; apply/(iffP idP) => [|<-].
+elim: t1 t2 => [|x1 l1 IHl1 r1 IHr1] [|x2 l2 r2] //=.
+  by case/and3P=> /eqP-> /IHl1-> /IHr1->.
+by elim: t1 => //= x ? -> ? ->; rewrite eqxx.
+Qed.
+
+Canonical tree_eqMixin (A : eqType) := EqMixin (@eq_treeP A).
+Canonical tree_eqType (A : eqType) := Eval hnf in EqType (tree A) (tree_eqMixin A).
 
 (* Step one: Write custom generators *)
 Section CustomGen.
@@ -33,49 +66,49 @@ Section CustomGen.
           `{AbstractGen.GenMonad M}.
 
 
-  Fixpoint genTreeS {A} (g : M A) (n : nat) : M (Tree A):= nosimpl (
+  Fixpoint gentreeS {A} (g : M A) (n : nat) : M (tree A):= nosimpl (
     match n with
-      | O => returnGen (Leaf A)
+      | O => returnGen Leaf
       | S n' => 
-        frequency' (returnGen (Leaf A)) 
-                  [(1, returnGen (Leaf A));
-                    (n, liftGen3 (Node A) g (genTreeS g n') (genTreeS g n'))]
+        frequency' (returnGen Leaf)
+                  [(1, returnGen Leaf);
+                    (n, liftGen3 Node g (gentreeS g n') (gentreeS g n'))]
     end).
 
-  Definition genTree {A : Type} (g : M A) : M (Tree A) := sized (genTreeS g).
+  Definition gentree {A : Type} (g : M A) : M (tree A) := sized (gentreeS g).
 
 End CustomGen. 
- 
-Instance arbTree {A} `{Arbitrary A} : Arbitrary (Tree A) :=
+
+Instance arbtree {A} `{Arbitrary A} : Arbitrary (tree A) :=
 {|
-  arbitrary gen genM := @genTree gen genM A arbitrary;
-  shrink t :=  
-      let fix shrinkTree (t : Tree A) := 
+  arbitrary gen genM := @gentree gen genM A arbitrary;
+  shrink t :=
+      let fix shrinktree (t : tree A) := 
           match t with 
             | Leaf => []
-            | Node x l r => 
-              map (fun x' => Node A x' l r) (shrink x) ++ 
-              map (fun l' => Node A x l' r) (shrinkTree l) ++
-              map (fun r' => Node A x l r') (shrinkTree r)
+            | Node x l r => [l] ++ [r] ++
+              map (fun x' => Node x' l r) (shrink x) ++ 
+              map (fun l' => Node x l' r) (shrinktree l) ++
+              map (fun r' => Node x l r') (shrinktree r)
           end
-      in shrinkTree t
+      in shrinktree t
 |}.
 
 
 Require Import String.
 Open Scope string.
 
-Instance showTree {A : Type} `{_ : Show A} : Show (Tree A) :=
+Instance showtree {A : Type} `{_ : Show A} : Show (tree A) :=
 {| 
   show t := 
-    let fix showTree (t : Tree A) :=
+    let fix showtree (t : tree A) :=
         match t with
           | Leaf => "Leaf"
           | Node x l r => "Node " ++ show x 
-                                  ++ " ( " ++ showTree l ++ " ) " 
-                                  ++ " ( " ++ showTree r ++ " ) "
+                                  ++ " ( " ++ showtree l ++ " ) " 
+                                  ++ " ( " ++ showtree r ++ " ) "
         end
-    in showTree t
+    in showtree t
 |}.
 
 
@@ -84,33 +117,23 @@ Open Scope list.
 (* Step 2: Use them for generation .. *)
 
 (* Faulty mirror function *)
-Fixpoint mirror {A : Type} (t : Tree A) : Tree A :=
+Fixpoint mirror {A : Type} (t : tree A) : tree A :=
   match t with
-    | Leaf => Leaf A
-    | Node x l r => Node A x r l
+    | Leaf => Leaf
+    | Node x l r => Node x (mirror l) (mirror l)
   end.
 
-Fixpoint tree_to_list {A : Type} (t : Tree A) : list A :=
-  match t with
-    | Leaf => []
-    | Node x l r => [x] ++ tree_to_list l ++ tree_to_list r
-  end.
+Definition mirrorK (t : tree nat) := mirror (mirror t) == t.
 
-Definition prop_mirror_reverse (t : Tree nat) :=
-  if list_eq_dec Nat.eq_dec (tree_to_list t) (rev (tree_to_list (mirror t)))
-  then true 
-  else false.
-
- Definition testTree :=
-  showResult (quickCheck prop_mirror_reverse).
+Definition testtree := showResult (quickCheck mirrorK).
  
-QuickCheck testTree.
+QuickCheck testtree.
 
-(* Step 3 : .. or prove them correct   *)
+(* Step : .. or prove them correct   *)
 
 Require Import SetOfOutcomes.
 
-Fixpoint height {A} (t : Tree A) :=
+Fixpoint height {A} (t : tree A) :=
   match t with
     | Leaf => 0
     | Node a t1 t2 =>
@@ -122,10 +145,10 @@ Proof.
   move=> n m. split; auto.
 Qed.
 
-Lemma genTreeS_correct :
+Lemma gentreeS_correct :
   forall {A} (g : Pred A) n,
-    g <--> (fun _ => True) ->
-    (genTreeS g n) <--> (fun t => (height t) <= n).
+    g <--> all ->
+    (gentreeS g n) <--> (fun t => (height t) <= n).
 Proof.
   move=> A g n. 
   Opaque frequency' liftGen3 returnGen bindGen. 
@@ -135,7 +158,7 @@ Proof.
     + case: t => //= a t1 t2. by rewrite addn1 ltn0. 
   * move/IHn : (Hg)=> HgenT. split => [| Hheight].  
     + move/frequency_equiv. move => 
-      [[n' [gTree [[[Heq1 Heq2] | [[Heq1 Heq2] | //=]] [H2 _]]]] | [H1 H2]]; subst;
+      [[n' [gtree [[[Heq1 Heq2] | [[Heq1 Heq2] | //=]] [H2 _]]]] | [H1 H2]]; subst;
       try (by rewrite returnGen_def in H2; rewrite -H2).
       rewrite liftGen3_def in H2.
       move : H2 => [a1 [ga1 [t1 [/HgenT Hgt1 [t2 [/HgenT Hgt2 Heq]]]]]]; subst.
@@ -147,29 +170,17 @@ Proof.
         by split.
       - rewrite -[X in _ <= X]addn1 leq_add2r.  
         move/leP/Nat.max_lub_iff => [/leP/HgenT leq1 /leP/HgenT leq2]. 
-        exists n.+1. exists (liftGen3 (Node A) g (genTreeS g n) (genTreeS g n)).
+        exists n.+1. exists (liftGen3 Node g (gentreeS g n) (gentreeS g n)).
         split => //=. by right; left. 
         split => //=. rewrite liftGen3_def. 
         by repeat (eexists; split); auto; apply/Hg. 
-Qed.    
-
-Lemma genTree_correct :
-  forall {A} (g : Pred A),
-    peq g (fun _ => True) ->
-    peq ((@genTree Pred _ _) g) (fun _ => True).
-Proof.
-  move=> A g.
-  rewrite /peq /genTree. move=> H tree; split => //= _.
-  exists (height tree). apply genTreeS_correct => //=.
 Qed.
 
-
-QuickCheck testTree.
-
-Definition prop_length (A : Type) (l : list A) :=
-  Nat.leb (List.length l) 20.
-
-Definition testLength :=
-  showResult (quickCheck prop_length).
-
-QuickCheck testLength.
+Lemma gentree_correct :
+  forall {A} (g : Pred A),
+    g <--> all -> (gentree g) <--> all.
+Proof.
+  move=> A g.
+  rewrite /peq /gentree. move=> H tree; split => //= _.
+  exists (height tree). apply gentreeS_correct => //=.
+Qed.

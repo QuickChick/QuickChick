@@ -4,40 +4,14 @@ Require Import Arith List seq ssreflect ssrbool ssrnat eqtype.
 (* The monad carrier *)
 Definition Pred (A : Type) := A -> Prop.
 
-(* Equivalence on sets of outcomes *) 
-Definition peq {A} (m1 m2 : Pred A) := 
-  forall A, m1 A <-> m2 A.
- 
-(* the set of outcomes m1 is a subset of m2 *) 
-Definition pincl {A} (m1 m2 : Pred A) :=
-  forall A, m1 A -> m2 A.
- 
-Infix "<-->" := (@peq _) (at level 70, no associativity) : pred_scope.
-
-Open Scope pred_scope. 
-
-(* The set that is equal to A *) 
-Definition all {A} : Pred A := fun _ => True. 
- 
 Definition bindP {A B} (m : Pred A) (f : A -> Pred B) : Pred B := 
   fun b => exists a, m a /\ f a b.
 
-Definition returnP  {A}  (a : A) : Pred A :=
+Definition returnP {A} (a : A) : Pred A :=
   fun x => eq a x.
 
 Definition fmapP {A B} (f : A -> B) (a : Pred A) : Pred B :=
- bindP a (fun a => 
- returnP (f a)).
-
-(* I don't think that this function will be a part if the common interface as
-   Gen cannot implement it *)
-Definition suchThat {A} (g : Pred A) (f : A -> bool) : Pred A :=  
-  (fun x => g x /\ f x).
-
-Definition suchThatMaybePred {A} (g : Pred A) (f : A -> bool) 
-: Pred (option A) :=  
-  fun b => (b = None) \/ 
-           (exists y, b = Some y /\ g y /\ f y).
+ bindP a (fun a => returnP (f a)).
 
 Definition chooseP {A} `{Random A} (p : A * A) : Pred A :=
   (fun a => 
@@ -47,6 +21,11 @@ Definition chooseP {A} `{Random A} (p : A * A) : Pred A :=
 Definition sizedP {A} (f : nat -> Pred A) : Pred A:= 
   (fun a => exists n, f n a).
 
+Definition suchThatMaybeP {A} (g : Pred A) (f : A -> bool) 
+: Pred (option A) :=  
+  fun b => (b = None) \/ 
+           (exists y, b = Some y /\ g y /\ f y).
+
 Instance PredMonad : GenMonad Pred :=
   {
     bindGen := @bindP;
@@ -54,10 +33,30 @@ Instance PredMonad : GenMonad Pred :=
     fmapGen := @fmapP;
     choose := @chooseP;
     sized := @sizedP;
-    suchThatMaybe := @suchThatMaybePred
+    suchThatMaybe := @suchThatMaybeP
   }.
 
-(* Q: Can we plug into Matthieu's generic refinement framework
+(* Equivalence on sets of outcomes *) 
+Definition peq {A} (m1 m2 : Pred A) := 
+  forall A, m1 A <-> m2 A.
+
+Infix "<-->" := (@peq _) (at level 70, no associativity) : pred_scope.
+
+Open Scope pred_scope.
+
+(* the set of outcomes m1 is a subset of m2 *) 
+Definition pincl {A} (m1 m2 : Pred A) :=
+  forall A, m1 A -> m2 A.
+
+(* The set that is equal to A *) 
+Definition all {A} : Pred A := fun _ => True.
+
+(* I don't think that this function will be a part if the common interface as
+   Gen cannot implement it *)
+Definition suchThat {A} (g : Pred A) (f : A -> bool) : Pred A :=  
+  (fun x => g x /\ f x).
+
+(* Q: Can we plug into Matthieu's generic framework
    for rewriting with the lemmas below:
 
 A New Look at Generalized Rewriting in Type Theory. Matthieu Sozeau
@@ -584,8 +583,3 @@ Proof. by move => A B; case => //. Qed.
 
 Lemma zip_nil_r : forall {A B} (l : seq A), zip l (@nil B) = [::]. 
 Proof. by move => A B; case => //. Qed.
-
-
-
-
-
