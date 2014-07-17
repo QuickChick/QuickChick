@@ -21,3 +21,4 @@ Testing/Shrinking.v
 Testing/SingleStateArb.v
 Testing/SSNI.v
 Testing/GenerationProofsHelpers.v
+Testing/GenerationProofs.v

@@ -12,7 +12,7 @@ Open Scope bool_scope.
 
 (** * Semantics *)
 
-Definition eval_binop (b : BinOpT) : int -> int -> option int :=
+Definition eval_binop (b : BinOpT) : Z -> Z -> option Z :=
   match b with
     | BAdd => fun z1 z2 => Some (z1 + z2)
     | BMult => fun z1 z2 => Some (z1 * z2)
@@ -23,7 +23,7 @@ Definition mframe: Type := Mem.block Label.
 
 (* observables *)
 Inductive Obs_value : Type :=
-  | OVint (n:int)
+  | OVint (n:Z)
 .
 
 Definition Obs_eq_dec : forall o1 o2 : Obs_value, {o1 = o2} + {o1 <> o2}.
@@ -36,12 +36,12 @@ Definition trace := list (Obs_value * Label).
 
 (* values *)
 Inductive Pointer : Type :=
-  | Ptr (fp:mframe) (i:int).
+  | Ptr (fp:mframe) (i:Z).
 
 Inductive Value : Type :=
-  | Vint  (n:int)
+  | Vint  (n:Z)
   | Vptr  (p:Pointer)
-  | Vcptr (addr : int) (* CH: Why not just nat? *) (* Maybe we want a CptrOffset? *)
+  | Vcptr (addr : Z) (* CH: Why not just nat? *) (* Maybe we want a CptrOffset? *)
           (* TODO: remove this crap, we have no way to create them! *)
   | Vlab  (L:Label).
 
@@ -55,7 +55,7 @@ Inductive Atom : Type :=
  | Atm (v:Value) (l:Label).
 
 Inductive Ptr_atom : Type :=
- | PAtm (i:int) (l:Label).
+ | PAtm (i:Z) (l:Label).
 
 Definition imem := list Instruction.
 
@@ -65,7 +65,7 @@ Definition instr_lookup (m:imem) (pc:Ptr_atom) : option Instruction :=
 
 Notation "m [ pc ]" := (instr_lookup m pc) (at level 20).
 
-Definition add_pc (pc:Ptr_atom) (n:int) : Ptr_atom :=
+Definition add_pc (pc:Ptr_atom) (n:Z) : Ptr_atom :=
   let '(PAtm i L) := pc in 
   PAtm (Zplus i n) L.
 Infix "+" := add_pc.
