@@ -110,7 +110,7 @@ Definition incr_ptr (p : Pointer) :=
   let (fp, i) := p in (Ptr fp (Zsucc i)).
 
 (* Simple equalities *)
-Definition Z_eq (i1 i2 : int) : bool :=
+Definition Z_eq (i1 i2 : Z) : bool :=
   if Z.eq_dec i1 i2 then true else false.
 
 Definition reg_eq_dec : forall r1 r2 : regPtr,

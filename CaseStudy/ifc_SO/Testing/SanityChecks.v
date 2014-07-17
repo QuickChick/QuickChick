@@ -17,8 +17,8 @@ Require Import String.
 Local Open Scope string.
 (* Sanity check for stamp generation *)
 
-Definition prop_stamp_generation (st : State) : Property :=
-  whenFail (Property.trace (show st)) (well_formed st).
+Definition prop_stamp_generation (st : State) :=
+  whenFail (show st) (well_formed st).
 
 (*
 Definition propStampGeneration (st : State) := 
@@ -34,8 +34,8 @@ Definition prop_exec_preserves_well_formed (t : table)
   if well_formed st then
     match exec t st with
     | Some (_, st') =>
-      whenFail (Property.trace ("Initial: " ++ show st ++ nl ++
-                                "Step to: " ++ show st' ++ nl))
+      whenFail ("Initial: " ++ show st ++ nl ++
+                "Step to: " ++ show st' ++ nl)
                (well_formed st')
     | _ => property rejected
     end

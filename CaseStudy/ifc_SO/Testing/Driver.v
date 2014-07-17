@@ -40,10 +40,10 @@ Definition testMutants :=
     prop_exec_preserves_well_formed t]
 ).
 
-(* *)
+(*
 Eval lazy -[labelCount helper] in
   nth 26 (mutate_table default_table) default_table.
-(* *)
+*)
 
 Definition testMutantX x y :=
   let mutant := fun o' =>
@@ -109,7 +109,10 @@ Definition testMutant37wf := testMutantWF
 
 (* Definition testNI := testMutant37wf. *)
 
-Definition testNI :=  testMutants.
+Definition testNI := testMutants.
+
+(* QuickCheck testNI. *)
+
 
 (* QuickCheck testMutants.*)
 (* Definition testNI := testMutant9.*)

@@ -24,7 +24,7 @@ Record State := St {
    an alternative? *)
 
 (* List manipulation helpers *)
-Definition nth {A:Type} (l:list A) (n:int) : option A :=
+Definition nth {A:Type} (l:list A) (n:Z) : option A :=
   if Z_lt_dec n 0 then None
   else nth_error l (Z.to_nat n).
 
@@ -42,7 +42,7 @@ Fixpoint upd_nat {A:Type} (l:list A) (n:nat) (a:A) : option (list A) :=
       end
   end.
 
-Definition upd {A:Type} (l:list A) (n:int) (a:A) : option (list A) :=
+Definition upd {A:Type} (l:list A) (n:Z) (a:A) : option (list A) :=
   if Z_lt_dec n 0 then None
   else upd_nat l (Z.to_nat n) a.
 
@@ -480,7 +480,6 @@ Definition exec t (st:State) : option (trace * State) :=
       match registerContent r r1, registerContent r r2 with
         | Some (Vint i @ K), Some (Vlab L @ K') =>
           match run_tmr t OpAlloc <|K; K'; L|> LPC with
-            (* checks: ??? *)
             | Some (Some rl, rpcl) =>
               let stmp := K ∪ K' ∪ LPC in
                  (* this stamp is just instrumentation;

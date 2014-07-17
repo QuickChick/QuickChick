@@ -16,8 +16,8 @@ Open Scope string_scope.
 
 Require Import Show.
 
-(* Require Import Reachability. -- unused *)
-Definition propSSNI_helper t v :=
+Require Import Reachability.
+Definition propSSNI_helper (t : table) (v : Variation) : Property :=
   let '(Var lab st1 st2) := v in
 (*  Property.trace (Show.show lab ++ Show.nl ++
      showStatePair lab frameMap1 frameMap2 st1 st2) *)
@@ -36,9 +36,8 @@ Definition propSSNI_helper t v :=
            match exec t st2 with
              | Some (tr2, st2') =>
                collect "LOW -> *" (
-               whenFail (Property.trace 
-                           ("LOW -> *" ++ nl ++
-                           (show_execution lab [st1; st1'] [st2; st2'])))
+               whenFail ("LOW -> *" ++ nl ++
+                        (show_execution lab [st1; st1'] [st2; st2']))
                    (observe_comp (observe lab tr1) (observe lab tr2) 
                     && (indist lab st1' st2'))
                )
@@ -57,8 +56,8 @@ Definition propSSNI_helper t v :=
                | Some (tr2, st2') =>
                  if is_low_state st2' then 
                    collect "HIGH -> LOW" (
-                   (whenFail (Property.trace ("HIGH -> LOW" ++ Show.nl ++
-                               (show_execution lab [st1; st1'] [st2; st2'])))
+                   (whenFail ("HIGH -> LOW" ++ Show.nl ++
+                               (show_execution lab [st1; st1'] [st2; st2']))
                              (observe_comp (observe lab tr1) (observe lab tr2) 
                               && (indist lab st1' st2')))
                    )
@@ -70,8 +69,8 @@ Definition propSSNI_helper t v :=
              end
            else
              collect "HIGH -> HIGH" (
-             whenFail (Property.trace ("HIGH -> HIGH" ++ Show.nl ++
-                         (show_pair lab st1 st1')))
+             whenFail ("HIGH -> HIGH" ++ Show.nl ++
+                         (show_pair lab st1 st1'))
                       (beq_nat (List.length (observe lab tr1)) 0 
                        && indist lab st1 st1')
              )

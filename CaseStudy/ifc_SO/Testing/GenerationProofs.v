@@ -300,7 +300,7 @@ Proof.
                              [/filter_nil [/allThingsBelow_nonempty //| H1] H2]]. subst.  
     by left. 
     right. split => //=. apply H1. 
-    rewrite /allThingsBelow /allBelow. Search _ (map _ _) In.
+    rewrite /allThingsBelow /allBelow. (* Search _ (map _ _) In. *)
     rewrite -[X in In X _]label_of_list__elements. apply in_map.
     by apply powerset_in_refl.
   + move => [[H1 H2] | [H1 H2]]; subst; apply elements_equiv.
@@ -917,9 +917,9 @@ Proof.
        by move => [val2 lab2] /HIn'/gen_atom_correct HInreg2. 
        rewrite /gen_label_between_lax_spec in H *. 
        move: H => [[H1 H2] | [H1 H2]].
-       
+
+(*              
        Search _ (_ <: _= true). 
-       
        move : Hgen. rewrite bindGen_def. move 
 
 congruence. discriminate. 
@@ -927,7 +927,7 @@ congruence. discriminate.
       Search (length (_ ++ _)).
 
       Set reg2 := nth
-      
+*)    
 Abort.      
       (* rewrite /indist /indistReg in Hind. *)
       
@@ -1026,6 +1026,8 @@ Proof.
            rewrite /stack_loc_spec in Hspec *. 
            move : Hspec  => [HIn' [[H1 H2] [Hrng Hlet]]]. repeat split => //.
            by rewrite Hlen map_length.
+Abort.
+(*
            exact H2. assumption.  move => reg HIn''.
            
            assumption.
@@ -1087,7 +1089,7 @@ Proof.
           split. apply /gen_value_correct. rewrite /val_spec. move/(_ (v2 @ ) ())
 
 Search _ (~~ _  = true). rewrite /isHight in Hhigh.
-          
+         
           
 eassumption. move=> [r1 Predr] HIn. simpl.
       move/Hadm : HIn. rewrite map_length. symmetry in Hlen.
@@ -1105,7 +1107,7 @@ eassumption. move=> [r1 Predr] HIn. simpl.
       rewrite /regs_spec in Hreg. move: Hreg => [_ /(_ (v2@l2) HIn2) [Hval _]].
       exists v1. split. apply gen_value_correct. rewrite /val_spec.
       rewrite /indist /indistPtrAtm in H3. 
-      
+*)    
 
 
 
@@ -1166,6 +1168,8 @@ Proof.
   case: (Zset.incl lab Zset.empty) =>  //=. 
   elim : l0 => // x l0 IHl0. simpl.
   apply/andP. split => //=.
+Abort.
+(*
   case: x => valx labx. rewrite incl_same //=. 
   rewrite /isHigh /isLow .  
   case: (labx <: Zset.empty)=> //= .
@@ -1178,6 +1182,7 @@ Proof.
   (by rewrite /Z_eq; move => n ; case (Z.eq_dec n n)).
   move => L; apply/andP; split; apply incl_same.
 Qed.
+*)
 
 Lemma gen_variation_state_correct :
   gen_variation_state <--> (fun b =>
