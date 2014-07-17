@@ -580,7 +580,7 @@ Ltac try_solve :=
         | |- _ => by []
       end. 
 
-
+(* This is commented out as it takes a lot of time *)
 (* Lemma gen_ainstrSSNI_correct : *)
 (*   forall (st : State), (ainstrSSNI st) <--> (Instruction_spec st). *)
 (* Proof. *)
