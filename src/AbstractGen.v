@@ -41,7 +41,7 @@ Class GenMonad M :=
     bindGen : forall {A B : Type},  M A -> (A -> M B) -> M B;
     returnGen : forall {A : Type}, A -> M A;
     fmapGen : forall {A B : Type}, (A -> B) -> M A -> M B; 
-    choose : forall {A} {Random A}, A * A -> M A;
+    choose : forall {A} `{Random A}, A * A -> M A;
     sized : forall {A}, (nat -> M A) -> M A;
     suchThatMaybe : forall {A}, M A -> (A -> bool) -> M (option A)
   }.
