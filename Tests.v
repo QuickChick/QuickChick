@@ -2,8 +2,6 @@ Require Import QuickChick.
 
 Require Import List seq ssreflect ssrbool ssrnat ZArith eqtype.
 Import ListNotations.
-Require Import EqNat.
-Require Import NPeano.
 
 Set Implicit Arguments.
 Unset Strict Implicit.
@@ -11,17 +9,17 @@ Unset Printing Implicit Defensive.
 
 (* Small example with default arbitrary instances *)
 
-Fixpoint my_delete (x : nat) (l : list nat) : list nat :=
+Fixpoint remove (x : nat) (l : list nat) : list nat :=
   match l with
     | []   => []
-    | h::t => if beq_nat h x then t else h :: my_delete x t
+    | h::t => if beq_nat h x then t else h :: remove x t
   end.
 
-Definition prop_delete_removes_every_x (x : nat) (l : list nat) :=
-  ~~ (existsb (pred1 x) (my_delete x l)).
+Definition removeP (x : nat) (l : list nat) :=
+  ~~ (existsb (pred1 x) (remove x l)).
 
 Definition test0 := 
-  showResult (quickCheck prop_delete_removes_every_x).
+  showResult (quickCheck removeP).
  
 QuickCheck test0.
 
@@ -65,15 +63,14 @@ Section CustomGen.
   Context {M : Type -> Type}
           `{AbstractGen.GenMonad M}.
 
-
-  Fixpoint gentreeS {A} (g : M A) (n : nat) : M (tree A):= nosimpl (
+  Fixpoint gentreeS {A} (g : M A) (n : nat) : M (tree A) :=
     match n with
       | O => returnGen Leaf
       | S n' => 
         frequency' (returnGen Leaf)
                   [(1, returnGen Leaf);
                     (n, liftGen3 Node g (gentreeS g n') (gentreeS g n'))]
-    end).
+    end.
 
   Definition gentree {A : Type} (g : M A) : M (tree A) := sized (gentreeS g).
 
@@ -110,7 +107,6 @@ Instance showtree {A : Type} `{_ : Show A} : Show (tree A) :=
         end
     in showtree t
 |}.
-
 
 Open Scope list.
 
