@@ -133,13 +133,8 @@ Fixpoint height {A} (t : tree A) :=
   match t with
     | Leaf => 0
     | Node a t1 t2 =>
-      (max (height t1) (height t2)) + 1
+      (maxn (height t1) (height t2)) + 1
   end.
-
-Lemma leq_geq : forall n m, (n >= m)%coq_nat <-> (m <= n)%coq_nat.
-Proof.
-  move=> n m. split; auto.
-Qed.
 
 Lemma gentreeS_correct :
   forall {A} (g : Pred A) n,
@@ -158,18 +153,20 @@ Proof.
       try (by rewrite returnGen_def in H2; rewrite -H2).
       rewrite liftGen3_def in H2.
       move : H2 => [a1 [ga1 [t1 [/HgenT Hgt1 [t2 [/HgenT Hgt2 Heq]]]]]]; subst.
-      simpl. rewrite -[X in _ <= X]addn1 leq_add2r. 
-        by apply/leP/Nat.max_lub_iff; split; apply/leP. 
+      simpl. rewrite -[X in _ <= X]addn1 leq_add2r.
+        by rewrite geq_max Hgt1 Hgt2.
     + apply/frequency_equiv. left.  
       case: t Hheight => [| a t1 t2] //=.
       - move => _. exists 1. eexists. split. by constructor.
         by split.
-      - rewrite -[X in _ <= X]addn1 leq_add2r.  
-        move/leP/Nat.max_lub_iff => [/leP/HgenT leq1 /leP/HgenT leq2]. 
+      - rewrite -[X in _ <= X]addn1 leq_add2r.
+        rewrite geq_max => /andP [leq1 le2].
         exists n.+1. exists (liftGen3 Node g (gentreeS g n) (gentreeS g n)).
         split => //=. by right; left. 
-        split => //=. rewrite liftGen3_def. 
-        by repeat (eexists; split); auto; apply/Hg. 
+        split => //=. rewrite liftGen3_def.
+        exists a; split; first exact/Hg.
+        exists t1; split; first exact/IHn.
+        by exists t2; split; first exact/IHn.
 Qed.
 
 Lemma gentree_correct :
