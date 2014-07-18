@@ -14,16 +14,16 @@ Definition SSNI (t : table) (v : @Variation State) : Property :=
   let '(St _ _ _ (_@l1)) := st1 in
   let '(St _ _ _ (_@l2)) := st2 in
 (*   match lookupInstr st1 with
-    | Some i => 
-      collect (show i) (  *)
+    | Some i =>     collect (show i) (  *)
   if indist st1 st2 then 
     match l1, l2 with
       | L,L  => 
         match exec t st1, exec t st2 with
           | Some st1', Some st2' => 
+(*
             whenFail ("Initial states: " ++ nl ++ show_pair st1 st2 ++ nl 
-                        ++ "Final states: " ++ nl ++ show_pair st1' st2' ++nl) 
-
+                        ++ "Final states: " ++ nl ++ show_pair st1' st2' ++nl)
+*)
             (* collect ("L -> L")*) (property (indist st1' st2'))
           | _, _ => (* collect "L,L,FAIL" true *) property rejected 
         end
@@ -69,6 +69,10 @@ Definition prop_gen_indist :=
   forAllShrink show gen_variation_state (fun _ => nil) 
                (fun v => let '(V st1 st2) := v in indist st1 st2).
 
+Definition runSSNIdefaultTable := showResult (quickCheck (prop_SSNI default_table)).
+
+QuickCheck runSSNIdefaultTable.
+
 Axiom numTests : nat.
 Extract Constant numTests => "20000".
 Definition myArgs : Args :=
@@ -84,10 +88,10 @@ Instance mutateable_table : Mutateable table :=
 |}.
 
 Require Import ZArith.
-(* *)
+(*
 Eval lazy -[labelCount helper] in
   nth (mutate_table default_table) 18.
-(* *)
+*)
 
 Definition testMutantX n := 
   match nth (mutate_table default_table) n with
@@ -98,6 +102,10 @@ Definition testMutantX n :=
 Definition testMutants :=
   mutateCheckArgs myArgs default_table (fun t => forAllShrink (fun _ => "") 
                                gen_variation_state (fun _ => nil) (SSNI t)).
+
+Definition runTestMutants := show testMutants.
+
+QuickCheck runTestMutants.
 
 Definition st1 :=
   St [Store; Store] [0 @ L] (0 @ L :: 0 @ H :: Mty) (0 @ L).
@@ -117,11 +125,4 @@ Definition main :=
 (* show testMutants. *)
   (* showResult (quickCheck (prop_SSNI default_table)). *)
 
-QuickCheck main.
-
-
-  
-  
-  
-
-
+(* QuickCheck main. *)

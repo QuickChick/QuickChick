@@ -27,6 +27,14 @@ Definition testTMU :=
 
 Definition testSSNI t := quickCheck (propSSNI t).
 
+(* Testing default table *)
+
+Definition testSSNIdefaultTable := showResult (testSSNI default_table).
+
+QuickCheck testSSNIdefaultTable.
+
+(* Testing mutants *)
+
 Require Import Mutate.
 Require Import MutateCheck.
 
@@ -39,6 +47,12 @@ Definition testMutants :=
   mutateCheckMany default_table (fun t => [propSSNI t;
     prop_exec_preserves_well_formed t]
 ).
+
+Definition runTestMutants := show testMutants.
+
+QuickCheck runTestMutants.
+
+(* The rest of this file is mostly garbage *)
 
 (*
 Eval lazy -[labelCount helper] in
@@ -108,11 +122,6 @@ Definition testMutant37wf := testMutantWF
    during shrinking (probably an infinite loop of some sort) *)
 
 (* Definition testNI := testMutant37wf. *)
-
-Definition testNI := testMutants.
-
-(* QuickCheck testNI. *)
-
 
 (* QuickCheck testMutants.*)
 (* Definition testNI := testMutant9.*)

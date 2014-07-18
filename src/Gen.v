@@ -38,7 +38,7 @@ Definition bindG {A B : Type} (g : Gen A) (k : A -> Gen B) : Gen B :=
   match g with
     | MkGen m =>
       MkGen (fun r n =>
-               let (r1,r2)  := rndSplit r in
+               let (r1,r2) := rndSplit r in
                let '(MkGen m') := k (m r1 n) in
                m' r2 n
             )

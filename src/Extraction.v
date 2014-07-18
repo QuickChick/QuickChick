@@ -115,7 +115,7 @@ Extract Constant Coq.Numbers.Natural.Peano.NPeano.modulo => "(fun x y -> x mod y
 *)
 Extract Constant Test.gte => "(>=)".
 Extract Constant le_gt_dec => "(<=)".
-Extract Constant trace => "(fun x y -> print_string (QuickChickLib.string_of_coqstring x); y)".
+Extract Constant trace => "(fun x -> print_string (QuickChickLib.string_of_coqstring x); flush stdout; fun y -> y)".
 
 Set Extraction AccessOpaque.
 

@@ -40,16 +40,16 @@ Class GenMonad M :=
   {
     bindGen : forall {A B : Type},  M A -> (A -> M B) -> M B;
     returnGen : forall {A : Type}, A -> M A;
-    fmapGen : forall {A B: Type}, (A -> B) -> (M A) -> M B; 
-    choose : forall {A} {H: Random A}, A * A -> M A;
+    fmapGen : forall {A B : Type}, (A -> B) -> M A -> M B; 
+    choose : forall {A} `{Random A}, A * A -> M A;
     sized : forall {A}, (nat -> M A) -> M A;
     suchThatMaybe : forall {A}, M A -> (A -> bool) -> M (option A)
   }.
-  
+
 Section Utilities.
   Context {Gen : Type -> Type}
           {H : GenMonad Gen}. 
-  
+
   Definition liftGen {A B} (f: A -> B) (a : Gen A) 
   : Gen B := nosimpl 
                (bindGen a (fun x =>
@@ -137,7 +137,7 @@ Section Utilities.
           else pick def (n - k) xs
       end).
 
-  Definition frequency'  {A : Type} (def : Gen A) (gs : list (nat * Gen A)) 
+  Definition frequency' {A : Type} (def : Gen A) (gs : list (nat * Gen A)) 
   : Gen A := nosimpl(
     let tot := (sumn (map (@fst _ _) gs)) in
     bindGen (choose (0, tot-1)) (fun n =>

@@ -61,14 +61,14 @@ Instance indist_state : Indist State :=
   indist st1 st2 :=
     let '(St imem1 mem1 stk1 pc1) := st1 in
     let '(St imem2 mem2 stk2 pc2) := st2 in
-    if negb (indist mem1 mem2) then trace "Memory" false
-    else if negb (indist pc1 pc2) then trace "PC" false
+    if negb (indist mem1 mem2) then (* trace "Memory" *) false
+    else if negb (indist pc1 pc2) then (* trace "PC" *) false
     else let (stk1',stk2') := 
            match pc1 with 
              | _ @ H => (cropTop stk1, cropTop stk2)
              | _ => (stk1, stk2)
            end in
-    if negb (indist stk1' stk2') then trace "Stack" false
+    if negb (indist stk1' stk2') then (* trace "Stack" *) false
     else true
 |}.
 
