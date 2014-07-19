@@ -21,5 +21,7 @@ Examples
 
   - Tests.v
 
+Case Studies (IFC)
 
-
+  - ifc/extended -- full-fledged experiment
+  - ifc/basic  -- simplified variant
