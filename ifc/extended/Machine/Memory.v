@@ -98,10 +98,10 @@ Module Type MEM.
 
   Parameter get_all_blocks : forall {A S} {_: AllThingsBelow S}, S -> t A S -> list (block S).
  
-  Parameter get_frame_get_all_blocks:  
-    forall {A S} {H: AllThingsBelow S} (lab : S) (mem: t A S) (b: block S) fr,
-      In (stamp b) (allThingsBelow lab) ->
-      (get_frame mem b = Some fr) ->
+  Parameter get_all_blocks_spec:  
+    forall {A S} {H: AllThingsBelow S} (lab : S) (mem: t A S) (b: block S),
+      In (stamp b) (allThingsBelow lab) /\
+      (exists fr, get_frame mem b = Some fr) <->
       In b (get_all_blocks lab mem).
 
   Parameter empty : forall A S, t A S.
@@ -180,8 +180,8 @@ Module Mem: MEM.
   Record _t {A S} := MEM {
      content :> block S -> option (@frame A S);
      next : S -> Z;     
-     content_next : forall s i, (next s<=i)%Z \/ (i <= 0)%Z  -> 
-                                content (i,s) = None;
+     content_next : forall s i, (1 <= i < next s)%Z  <-> 
+                                (exists fr, content (i,s) = Some fr);
      next_pos : forall s, (1 <= next s)%Z 
      (* content_some :  *)
      (*   forall s i, (1 <= i <= (next s) -1)%Z <->  *)
@@ -224,8 +224,13 @@ Module Mem: MEM.
       (fun b => option_map f (get_frame m b))
       (next m)
       _ _.  
-  Next Obligation.  
-    simpl; rewrite content_next; auto.
+  Next Obligation. 
+    split. 
+    - intros Hrng. destruct (content_next m s i) as [H _]. destruct H. 
+      assumption. eexists. unfold get_frame. rewrite H. reflexivity.
+    - intros [fr Heq]. destruct (content_next m s i) as [_ H].
+      apply H. unfold get_frame in Heq. destruct (m (i, s)).
+      eexists. reflexivity. discriminate.
   Qed.
   Next Obligation.
     destruct m. auto.
@@ -236,9 +241,13 @@ Module Mem: MEM.
   Proof.
     auto.
   Qed.
- 
+  
   Program Definition empty A S : t A S := MEM 
     (fun b => None) (fun _ => 1%Z) _ _.
+  Next Obligation.
+    split. omega. intros [fr contra]. congruence. 
+  Qed.
+    
 
   Lemma get_empty : forall A S b, get_frame (empty A S)  b = None.
   Proof. auto. Qed.
@@ -294,11 +303,18 @@ Module Mem: MEM.
                 (fun b => if b0 == b then Some fr else m b) 
                 (next m) _ _)
     end.
-  Next Obligation.
-    destruct (equiv_dec b0).
-    - destruct b0; inv e.
-      rewrite content_next in Heq_anonymous; congruence.
-    - apply content_next; auto.
+  Next Obligation.  
+    split. 
+    - destruct (equiv_dec b0).
+      + destruct b0; inv e. eexists. reflexivity.
+      + apply content_next; auto.
+    - intros [fr' Hif]. 
+      destruct b0.
+      destruct (equiv_dec (z,s0) (i, s)). inv e.
+      destruct (content_next m s i) as [_ H]. apply H.
+      eexists. symmetry. exact Heq_anonymous. 
+      destruct (content_next m s i) as [_ H]. apply H.
+      eexists. eassumption. 
   Qed.
   Next Obligation.
     destruct m. auto.
@@ -344,9 +360,7 @@ Module Mem: MEM.
     intros until 0.
     generalize (@eq_refl (option (@frame A S)) (@content A S m b)).
     generalize (upd_frame_rich_obligation_3 A S EqS m b fr).
-    simpl.
     generalize (upd_frame_rich_obligation_2 A S EqS m b fr).
-    simpl.
     generalize (upd_frame_rich_obligation_1 A S EqS m b fr).
     simpl.
     intros.
@@ -363,16 +377,29 @@ Module Mem: MEM.
        (fun b' => if (next m s,s) == b' then Some fr else get_frame m b')
        (fun s' => if s == s' then (1 + next m s)%Z else next m s')
        _ _).
-  Next Obligation. 
+  Next Obligation.   
     destruct (equiv_dec (next m s, s)).
-    - inv e.  
-      destruct (equiv_dec s0); try congruence. 
-      destruct H as [H | H]; try omega. 
-      destruct m. simpl in *. specialize (next_pos0 s0). omega.
-    - destruct (equiv_dec s).
-      + inv e.
-        apply content_next; omega.
-      + apply content_next; omega.
+    - inv e. split.
+      + destruct (equiv_dec s0); try congruence. 
+        intros Hrng. eexists. reflexivity.
+      + intros [fr' Heq]. inv Heq. split.
+        apply next_pos.
+        destruct (equiv_dec s0 s0). omega. congruence.
+    - destruct (equiv_dec s s0). 
+      + inv e. split.
+        * intros [Hrng1 Hrng2]. destruct (content_next m s0 i) as [H _]. 
+          apply H. compute in c. split. assumption. 
+          apply Zlt_is_le_bool in Hrng2. 
+          rewrite Z.add_comm, <- Z.add_sub_assoc, Z.add_0_r in Hrng2. 
+          apply Zle_bool_imp_le in Hrng2. apply Zle_lt_or_eq in Hrng2.
+          destruct Hrng2 as [Hrng2 | Hrng2]. assumption.
+          subst. exfalso. apply c. reflexivity.
+        * intros [fr' Heq]. destruct (content_next m s0 i) as [_ H]. 
+          unfold get_frame in Heq.
+          assert (ex: (exists fr0 : frame, m (i, s0) = Some fr0)) 
+            by (eexists; eassumption).
+          destruct (H ex) as [H1 H2]. split; omega.
+      + split; intro Hrng; destruct (content_next m s0 i) as [H1 H2]; auto.
   Qed.
   Next Obligation.
     destruct (equiv_dec s s0); 
@@ -393,7 +420,13 @@ Module Mem: MEM.
   Proof.
     unfold alloc; intros.
     inv H.
-    apply content_next; omega.
+    destruct (content_next m s (next m s)) as [_ H]. 
+    unfold get_frame. 
+    destruct (m (next m s, s)).  
+    - assert (ex: exists fr0 : frame, Some f = Some fr0)
+        by (eexists; reflexivity). 
+      specialize (H ex). omega.
+    - reflexivity.
   Qed.
 
   Lemma alloc_get_frame : forall A S (eqS:EqDec S eq) am (m m':t A S) s fr b, 
@@ -452,47 +485,77 @@ Module Mem: MEM.
     forall z start len,
       (0 <= start)%Z ->
       (0 <= len)%Z -> 
-      (start <= z < len + start)%Z ->
-      In z (Z_seq start len). 
-  Proof.
-    intros z s l.
-    intros Hle1 Hle2 Hrng. unfold Z_seq. 
-    apply in_map_iff. exists (Z.to_nat z).
-    split. apply Z2Nat.id. omega.  
-    destruct Hrng as [H1 H2].  
-    apply Z2Nat.inj_lt in H2; try omega. 
-    rewrite Z2Nat.inj_add in H2; try omega. 
-    apply Z2Nat.inj_le in H1; try omega. 
-    apply Z2Nat.inj_le in Hle1; try omega.  
-    apply Z2Nat.inj_le in Hle2; try omega.
-    simpl in *. remember (Z.to_nat s) as start.
-    remember (Z.to_nat l) as len.
-    remember (Z.to_nat z) as z'. clear Heqlen l Heqstart s Heqz' z Hle1.  
-    generalize dependent start. generalize dependent z'.
-    induction len as [| l IHl]; intros s start Hle1 Hle3.  
-    - omega. 
-    - simpl in *. apply le_lt_or_eq in Hle1. destruct Hle1 as [H1 | H2].
-      right. apply IHl; try omega.  
-      left. assumption.
-Qed.
+      ((start <= z < len + start)%Z <->
+       In z (Z_seq start len)). 
+  Proof. 
+    intros z s l. intros Hle1 Hle2. split.
+    - intros [H1 H2]. unfold Z_seq. 
+      apply in_map_iff. exists (Z.to_nat z).
+      split. apply Z2Nat.id. omega.  
+      apply Z2Nat.inj_lt in H2; try omega. 
+      rewrite Z2Nat.inj_add in H2; try omega. 
+      apply Z2Nat.inj_le in H1; try omega. 
+      apply Z2Nat.inj_le in Hle1; try omega.  
+      apply Z2Nat.inj_le in Hle2; try omega.
+      simpl in *. remember (Z.to_nat s) as start.
+      remember (Z.to_nat l) as len.
+      remember (Z.to_nat z) as z'. clear Heqlen l Heqstart s Heqz' z Hle1.  
+      generalize dependent start. generalize dependent z'.
+      induction len as [| l IHl]; intros s start Hle1 Hle3.  
+      + omega. 
+      + simpl in *. apply le_lt_or_eq in Hle1. destruct Hle1 as [H1 | H2].
+        right. apply IHl; try omega.  
+        left. assumption.
+    - intros HIn. unfold Z_seq in HIn.
+      apply in_map_iff in HIn. destruct HIn as [z' [Heq HIn]]. subst.
+      assert (H: Z.to_nat s <= z' < (Z.to_nat l) + (Z.to_nat s) -> 
+                 (s <= (Z.of_nat z') < l + s)%Z).
+      { intros [H1 H2]. split. 
+        apply Z2Nat.inj_le; try omega. rewrite Nat2Z.id. assumption.
+        apply Z2Nat.inj_lt; try omega. rewrite Nat2Z.id, Z2Nat.inj_add;
+         try omega; assumption. }
+      apply H.
+      apply Z2Nat.inj_le in Hle1; try omega.  
+      apply Z2Nat.inj_le in Hle2; try omega.
+      remember (Z.to_nat s) as start.
+      remember (Z.to_nat l) as len. 
+      clear H Heqlen l Heqstart s. 
+      generalize dependent start. generalize dependent z'.
+      induction len as [| len IHlen]. 
+      + contradiction.
+      + intros z' start Hle HIn. simpl in *.
+        destruct HIn. subst. split; omega.
+        rewrite plus_n_Sm. 
+        assert (H': S start <= z' < len + S start -> 
+                    start <= z' < len + S start).
+        { intros [H1 H2]. split; try omega. }
+        apply H'. apply IHlen; try omega. assumption. 
+  Qed.  
+      
      
-  Lemma get_frame_get_all_blocks : 
-    forall A S (H: AllThingsBelow S) (lab : S) (mem: t A S) b fr,
-      In (stamp _ b) (allThingsBelow lab) ->
-      (get_frame mem b = Some fr) ->
+  Lemma get_all_blocks_spec :  
+    forall A S (H: AllThingsBelow S) (lab : S) (mem: t A S) b,
+      In (stamp _ b) (allThingsBelow lab) /\
+      (exists fr, get_frame mem b = Some fr) <->
       In b (get_all_blocks lab mem).
   Proof.
-    intros A S H lab mem b fr HIn Hget.
-    unfold get_all_blocks. apply in_flat_map. eexists; split; [eassumption |].
-    unfold get_blocks_at_level. apply in_map_iff. exists (fst b); 
-    destruct b; simpl; split. 
-    - reflexivity. 
-    - destruct mem; simpl in *. specialize (next_pos0 s).  
-      apply in_seq_Z; try omega. split.
-      destruct (Z.lt_ge_cases  z 1); try assumption.  
-      rewrite content_next0 in Hget; try discriminate. right; omega.
-      rewrite Z.sub_add. destruct (Z.lt_ge_cases  z (next0 s)); try assumption.
-      rewrite content_next0 in Hget; try discriminate. left; omega.
+    intros A S H lab mem b. 
+    split.  
+    - intros [HIn [fr Hget]].
+      unfold get_all_blocks. apply in_flat_map. eexists; split; [eassumption |].
+      unfold get_blocks_at_level. apply in_map_iff. exists (fst b); 
+      destruct b; simpl; split. 
+      + reflexivity. 
+      + apply in_seq_Z; try omega. 
+        * apply Zle_minus_le_0. apply next_pos.
+        * rewrite <- Z.sub_sub_distr, Z.sub_0_r. simpl. 
+          apply content_next. eexists. eassumption.
+    - intros HIn. unfold get_all_blocks, get_blocks_at_level in *.
+      apply in_flat_map in HIn. destruct HIn as [l [HInl HIn]]. 
+      apply in_map_iff in HIn. destruct HIn as [z [Heq HIn]]. subst.
+      split. assumption.
+      unfold get_frame. apply content_next. apply in_seq_Z in HIn; try omega.
+      apply Zle_minus_le_0. apply next_pos. 
   Qed.
 
 End Mem.
