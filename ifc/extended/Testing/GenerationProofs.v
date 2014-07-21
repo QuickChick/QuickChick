@@ -1171,7 +1171,7 @@ Qed.
 (*          - rewrite -Heqb'. split => //.  *)
 (* Qed. *)
       
-       
+
    
 
 
