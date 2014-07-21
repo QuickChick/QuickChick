@@ -11,7 +11,8 @@ Machine/Primitives.v
 Machine/Rules.v
 Machine/Utils.v
 Testing/Common.v
-Testing/Driver.v
+# Removed to avoid running it each time
+# Testing/Driver.v
 Testing/Generation.v
 Testing/Indist.v
 Testing/Printing.v

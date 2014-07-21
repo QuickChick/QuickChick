@@ -116,6 +116,7 @@ Definition default_table : table := fun op =>
   | OpMSize   =>  ≪ TRUE , Lab2 , JOIN LabPC Lab1 ≫
 end.
 
+
 Definition run_tmr (t : table) (op: OpCode)
   (labs:Vector.t Label (labelCount op)) (pc: Label)
    : option (option Label * Label) :=  

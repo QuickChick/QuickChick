@@ -6,6 +6,8 @@ Require Import EquivDec.
 Require Import String.
 Require Import Show.
 
+ 
+ 
 Fixpoint replicate {A:Type} (n:nat) (a:A) : list A :=
   match n with
     | O => nil
@@ -59,6 +61,7 @@ Class AllThingsBelow (S: Type):=
   allThingsBelow : S -> list S
 }.
 
+
 Module Type MEM.
   (* Type of memory is parameterized by the type of stamps and the type of block *)
   Parameter t : Type -> Type -> Type.
@@ -71,8 +74,8 @@ Module Type MEM.
   Parameter put_stamp : forall {S}, S -> block S -> block S.
   (* For indistinguishability - return all frames with stamps 
      less than a label (called with top) *)
-  Parameter get_all_blocks : forall {A S} {_: AllThingsBelow S}, S -> t A S -> list (block S).
-  (* For printing *)
+               
+ (* For printing *)                
   Declare Instance show_block : forall {S} {_: Show S}, Show (block S).
 
   (* DD -> DP : is a block some kind of "stamped pointer"? *)
@@ -92,24 +95,33 @@ Module Type MEM.
     upd_frame m b fr = Some m' ->
     exists fr', get_frame m b = Some fr'.
 
+
+  Parameter get_all_blocks : forall {A S} {_: AllThingsBelow S}, S -> t A S -> list (block S).
+ 
+  Parameter get_frame_get_all_blocks:  
+    forall {A S} {H: AllThingsBelow S} (lab : S) (mem: t A S) (b: block S) fr,
+      In (stamp b) (allThingsBelow lab) ->
+      (get_frame mem b = Some fr) ->
+      In b (get_all_blocks lab mem).
+
   Parameter empty : forall A S, t A S.
   Parameter get_empty : forall A S (b:block S), get_frame (empty A S) b = None.
 
   (* Create a memory with some block initialized to a frame *)
-  Parameter init : forall A S {eqS:EqDec S eq},
-                     alloc_mode ->
-                     block S ->
-                     @frame A S ->
-                     t A S.
+  (* Parameter init : forall A S {eqS:EqDec S eq}, *)
+  (*                    alloc_mode -> *)
+  (*                    block S -> *)
+  (*                    @frame A S -> *)
+  (*                    t A S. *)
 
-  Parameter get_init_eq : forall A S {eqS:EqDec S eq}
-                                 mode (b : block S) (f : @frame A S),
-                            get_frame (init A S mode b f) b = Some f.
+  (* Parameter get_init_eq : forall A S {eqS:EqDec S eq} *)
+  (*                                mode (b : block S) (f : @frame A S), *)
+  (*                           get_frame (init A S mode b f) b = Some f. *)
 
-  Parameter get_init_neq : forall A S {eqS:EqDec S eq}
-                                  mode (b b' : block S) (f : @frame A S),
-                             b' <> b ->
-                             get_frame (init A S mode b f) b' = None.
+  (* Parameter get_init_neq : forall A S {eqS:EqDec S eq} *)
+  (*                                 mode (b b' : block S) (f : @frame A S), *)
+  (*                            b' <> b -> *)
+  (*                            get_frame (init A S mode b f) b' = None. *)
 
   Parameter alloc :
     forall {A S} {EqS:EqDec S eq}, alloc_mode -> t A S -> S -> @frame A S -> (block S * t A S).
@@ -167,9 +179,15 @@ Module Mem: MEM.
 
   Record _t {A S} := MEM {
      content :> block S -> option (@frame A S);
-     next : S -> Z;
-     content_next : forall s i, (next s<=i)%Z -> content (i,s) = None
+     next : S -> Z;     
+     content_next : forall s i, (next s<=i)%Z \/ (i <= 0)%Z  -> 
+                                content (i,s) = None;
+     next_pos : forall s, (1 <= next s)%Z 
+     (* content_some :  *)
+     (*   forall s i, (1 <= i <= (next s) -1)%Z <->  *)
+     (*               (exists fr, content (i, s) = Some fr) *)
   }.
+
   Implicit Arguments _t [].
   Implicit Arguments MEM [A S].
   Definition t := _t.
@@ -200,14 +218,17 @@ Module Mem: MEM.
       let (z,s) := b in
       ("(" ++ show z ++ " @ " ++ show s ++ ")")%string
   |}.
-
+ 
   Program Definition map {A B S} (f:@frame A S -> @frame B S) (m:t A S) : t B S:= 
     MEM 
       (fun b => option_map f (get_frame m b))
       (next m)
-      _.
-  Next Obligation.
+      _ _.  
+  Next Obligation.  
     simpl; rewrite content_next; auto.
+  Qed.
+  Next Obligation.
+    destruct m. auto.
   Qed.
 
   Lemma map_spec : forall A B S (f:@frame A S -> @frame B S) (m:t A S),
@@ -215,51 +236,51 @@ Module Mem: MEM.
   Proof.
     auto.
   Qed.
-
+ 
   Program Definition empty A S : t A S := MEM 
-    (fun b => None) (fun _ => 1%Z) _.
+    (fun b => None) (fun _ => 1%Z) _ _.
 
   Lemma get_empty : forall A S b, get_frame (empty A S)  b = None.
   Proof. auto. Qed.
 
-  Program Definition init A S {eqS : EqDec S eq} (am : alloc_mode) b f : t A S:= MEM
-    (fun b' : block S => if b' == b then Some f else None)
-    (fun s => if s == stamp _ b then fst b + 1 else 1)%Z
-    _.
-  Next Obligation.
-    simpl in *.
-    destruct (s == s0) as [EQ | NEQ].
-    - compute in EQ. subst s0.
-      destruct (equiv_dec (i,s)) as [contra|]; trivial.
-      inv contra.
-      omega.
-    - destruct (equiv_dec (i,s)) as [E|E]; try congruence.
-  Qed.
+  (* Program Definition init A S {eqS : EqDec S eq} (am : alloc_mode) b f : t A S:= MEM *)
+  (*   (fun b' : block S => if b' == b then Some f else None) *)
+  (*   (fun s => if s == stamp _ b then fst b + 1 else 1)%Z *)
+  (*   _.  *)
+  (* Next Obligation. *)
+  (*   simpl in *. *)
+  (*   destruct (s == s0) as [EQ | NEQ]. *)
+  (*   - compute in EQ. subst s0. *)
+  (*     destruct (equiv_dec (i,s)) as [contra|]; trivial. *)
+  (*     inv contra. *)
+  (*     omega. *)
+  (*   - destruct (equiv_dec (i,s)) as [E|E]; try congruence. *)
+  (* Qed. *)
 
-  Lemma get_init_eq : forall A S {eqS:EqDec S eq}
-                             mode (b : block S) (f : @frame A S),
-                        get_frame (init A S mode b f) b = Some f.
-  Proof.
-    unfold init. simpl.
-    intros.
-    match goal with
-      | |- context [if ?b then _ else _] =>
-        destruct b; congruence
-    end.
-  Qed.
+  (* Lemma get_init_eq : forall A S {eqS:EqDec S eq} *)
+  (*                            mode (b : block S) (f : @frame A S), *)
+  (*                       get_frame (init A S mode b f) b = Some f. *)
+  (* Proof. *)
+  (*   unfold init. simpl. *)
+  (*   intros. *)
+  (*   match goal with *)
+  (*     | |- context [if ?b then _ else _] => *)
+  (*       destruct b; congruence *)
+  (*   end. *)
+  (* Qed. *)
 
-  Lemma get_init_neq : forall A S {eqS:EqDec S eq}
-                              mode (b b' : block S) (f : @frame A S),
-                         b' <> b ->
-                         get_frame (init A S mode b f) b' = None.
-  Proof.
-    unfold init. simpl.
-    intros.
-    match goal with
-      | |- context [if ?b then _ else _] =>
-        destruct b; congruence
-    end.
-  Qed.
+  (* Lemma get_init_neq : forall A S {eqS:EqDec S eq} *)
+  (*                             mode (b b' : block S) (f : @frame A S), *)
+  (*                        b' <> b -> *)
+  (*                        get_frame (init A S mode b f) b' = None. *)
+  (* Proof. *)
+  (*   unfold init. simpl. *)
+  (*   intros. *)
+  (*   match goal with *)
+  (*     | |- context [if ?b then _ else _] => *)
+  (*       destruct b; congruence *)
+  (*   end. *)
+  (* Qed. *)
 
   Program Definition upd_frame_rich {A S} {EqS:EqDec S eq} (m:t A S) (b0:block S) (fr:@frame A S)
   : option { m' : (t A S) |
@@ -271,13 +292,16 @@ Module Mem: MEM.
       | Some _ =>
         Some (MEM
                 (fun b => if b0 == b then Some fr else m b) 
-                (next m) _)
+                (next m) _ _)
     end.
   Next Obligation.
     destruct (equiv_dec b0).
     - destruct b0; inv e.
       rewrite content_next in Heq_anonymous; congruence.
     - apply content_next; auto.
+  Qed.
+  Next Obligation.
+    destruct m. auto.
   Qed.
 
   Definition upd_frame {A S} {EqS:EqDec S eq} (m:t A S) (b0:block S) (fr:@frame A S)
@@ -287,22 +311,19 @@ Module Mem: MEM.
       | Some (exist m' _) => Some m'
     end.
 
-  Lemma upd_get_frame : forall A S (EqS:EqDec S eq) (m:t A S) (b:block S) fr fr',
+  Program Lemma upd_get_frame : forall A S (EqS:EqDec S eq) (m:t A S) (b:block S) fr fr',
     get_frame m b = Some fr ->
     exists m',
       upd_frame m b fr' = Some m'.
-  Proof.
-    (* Sad.... *)
+  Proof. 
     unfold upd_frame, upd_frame_rich, get_frame.
     intros.
-    generalize (@eq_refl (option (@frame A S)) (m b)).
+    generalize (@eq_refl (option (@frame A S)) (m b)). 
+    generalize (upd_frame_rich_obligation_3 A S EqS m b fr').
     generalize (upd_frame_rich_obligation_2 A S EqS m b fr').
-    simpl.
     generalize (upd_frame_rich_obligation_1 A S EqS m b fr').
-    rewrite H.
-    simpl.
-    intros H1 H2 H3.
-    eauto.
+    simpl. 
+    rewrite H. intros. eauto.
   Qed.
 
   Lemma get_upd_frame : forall A S (eqS:EqDec S eq) (m m':t A S) (b:block S) fr,
@@ -314,7 +335,7 @@ Module Mem: MEM.
     destruct (upd_frame_rich m b fr); try congruence.
     destruct s; inv H; intuition.    
   Qed.
-
+ 
   Lemma upd_frame_defined : forall A S (EqS:EqDec S eq) (m m':t A S) (b:block S) fr,
     upd_frame m b fr = Some m' ->
     exists fr', get_frame m b = Some fr'.
@@ -322,6 +343,8 @@ Module Mem: MEM.
     unfold upd_frame, upd_frame_rich, get_frame.
     intros until 0.
     generalize (@eq_refl (option (@frame A S)) (@content A S m b)).
+    generalize (upd_frame_rich_obligation_3 A S EqS m b fr).
+    simpl.
     generalize (upd_frame_rich_obligation_2 A S EqS m b fr).
     simpl.
     generalize (upd_frame_rich_obligation_1 A S EqS m b fr).
@@ -331,7 +354,7 @@ Module Mem: MEM.
   Qed.
 
   Opaque Z.add.
-
+ 
   Program Definition alloc
              {A S} {EqS:EqDec S eq} (am:alloc_mode) (m:t A S) (s:S) (fr:@frame A S) 
             : (block S * t A S) :=
@@ -339,16 +362,23 @@ Module Mem: MEM.
      MEM
        (fun b' => if (next m s,s) == b' then Some fr else get_frame m b')
        (fun s' => if s == s' then (1 + next m s)%Z else next m s')
-       _).
-  Next Obligation.
+       _ _).
+  Next Obligation. 
     destruct (equiv_dec (next m s, s)).
-    - inv e.
-      destruct (equiv_dec s0); try congruence.
-      omega.
+    - inv e.  
+      destruct (equiv_dec s0); try congruence. 
+      destruct H as [H | H]; try omega. 
+      destruct m. simpl in *. specialize (next_pos0 s0). omega.
     - destruct (equiv_dec s).
       + inv e.
         apply content_next; omega.
       + apply content_next; omega.
+  Qed.
+  Next Obligation.
+    destruct (equiv_dec s s0); 
+    destruct m; simpl. 
+    - specialize (next_pos0 s); try omega. 
+    - specialize (next_pos0 s0); assumption. 
   Qed.
 
   Lemma alloc_stamp : forall A S (EqS:EqDec S eq) am (m m':t A S) s fr b, 
@@ -416,6 +446,53 @@ Module Mem: MEM.
   Proof.
     intros A S EqS m s fr1 fr2.
     unfold alloc; simpl; auto.
+  Qed.
+  
+  Lemma in_seq_Z:
+    forall z start len,
+      (0 <= start)%Z ->
+      (0 <= len)%Z -> 
+      (start <= z < len + start)%Z ->
+      In z (Z_seq start len). 
+  Proof.
+    intros z s l.
+    intros Hle1 Hle2 Hrng. unfold Z_seq. 
+    apply in_map_iff. exists (Z.to_nat z).
+    split. apply Z2Nat.id. omega.  
+    destruct Hrng as [H1 H2].  
+    apply Z2Nat.inj_lt in H2; try omega. 
+    rewrite Z2Nat.inj_add in H2; try omega. 
+    apply Z2Nat.inj_le in H1; try omega. 
+    apply Z2Nat.inj_le in Hle1; try omega.  
+    apply Z2Nat.inj_le in Hle2; try omega.
+    simpl in *. remember (Z.to_nat s) as start.
+    remember (Z.to_nat l) as len.
+    remember (Z.to_nat z) as z'. clear Heqlen l Heqstart s Heqz' z Hle1.  
+    generalize dependent start. generalize dependent z'.
+    induction len as [| l IHl]; intros s start Hle1 Hle3.  
+    - omega. 
+    - simpl in *. apply le_lt_or_eq in Hle1. destruct Hle1 as [H1 | H2].
+      right. apply IHl; try omega.  
+      left. assumption.
+Qed.
+     
+  Lemma get_frame_get_all_blocks : 
+    forall A S (H: AllThingsBelow S) (lab : S) (mem: t A S) b fr,
+      In (stamp _ b) (allThingsBelow lab) ->
+      (get_frame mem b = Some fr) ->
+      In b (get_all_blocks lab mem).
+  Proof.
+    intros A S H lab mem b fr HIn Hget.
+    unfold get_all_blocks. apply in_flat_map. eexists; split; [eassumption |].
+    unfold get_blocks_at_level. apply in_map_iff. exists (fst b); 
+    destruct b; simpl; split. 
+    - reflexivity. 
+    - destruct mem; simpl in *. specialize (next_pos0 s).  
+      apply in_seq_Z; try omega. split.
+      destruct (Z.lt_ge_cases  z 1); try assumption.  
+      rewrite content_next0 in Hget; try discriminate. right; omega.
+      rewrite Z.sub_add. destruct (Z.lt_ge_cases  z (next0 s)); try assumption.
+      rewrite content_next0 in Hget; try discriminate. left; omega.
   Qed.
 
 End Mem.

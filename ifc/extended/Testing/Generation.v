@@ -418,25 +418,7 @@ Instance smart_vary_memory : SmartVary memory :=
 (* A variation of gen_vary_stack_loc where pc, lab and r vary
    when pc is high *)
 
- Definition gen_vary_stack_loc (obs: Label) (inf : Info) 
-           (s : Ptr_atom * Label * regSet * regPtr) 
-: Gen  (Ptr_atom * Label * regSet * regPtr) :=
-    let '(pc, lab, rs, r) := s in
-    (* If the return label is low just vary the registers (a bit) *)
-    if isLow ∂pc obs then 
-      bindGen (sequenceGen (map (smart_vary obs inf) rs)) (fun rs' =>
-      returnGen (pc, lab, rs', r))
-    else 
-    (* Return label is high, create new register file *)
-    (* ZP: Why not vary pc, lab and r? *)
-      bindGen (vectorOf (no_regs inf) (smart_gen inf)) (fun rs' =>
-      bindGen (smart_vary obs inf pc) (fun pc' =>
-      bindGen (smart_gen inf) (fun lab' =>
-      bindGen (gen_from_nat_length (no_regs inf)) (fun r' =>
-      returnGen (pc', lab', rs', r'))))).
-
-  
-(* Definition gen_vary_stack_loc (obs: Label) (inf : Info)  *)
+(*  Definition gen_vary_stack_loc (obs: Label) (inf : Info)  *)
 (*            (s : Ptr_atom * Label * regSet * regPtr)  *)
 (* : Gen  (Ptr_atom * Label * regSet * regPtr) := *)
 (*     let '(pc, lab, rs, r) := s in *)
@@ -448,7 +430,25 @@ Instance smart_vary_memory : SmartVary memory :=
 (*     (* Return label is high, create new register file *) *)
 (*     (* ZP: Why not vary pc, lab and r? *) *)
 (*       bindGen (vectorOf (no_regs inf) (smart_gen inf)) (fun rs' => *)
-(*       returnGen (pc, lab, rs', r)). *)
+(*       bindGen (smart_vary obs inf pc) (fun pc' => *)
+(*       bindGen (smart_gen inf) (fun lab' => *)
+(*       bindGen (gen_from_nat_length (no_regs inf)) (fun r' => *)
+(*       returnGen (pc', lab', rs', r'))))). *)
+
+  
+Definition gen_vary_stack_loc (obs: Label) (inf : Info)
+           (s : Ptr_atom * Label * regSet * regPtr)
+: Gen  (Ptr_atom * Label * regSet * regPtr) :=
+    let '(pc, lab, rs, r) := s in
+    (* If the return label is low just vary the registers (a bit) *)
+    if isLow ∂pc obs then
+      bindGen (sequenceGen (map (smart_vary obs inf) rs)) (fun rs' =>
+      returnGen (pc, lab, rs', r))
+    else
+    (* Return label is high, create new register file *)
+    (* ZP: Why not generate new pc, lab and r? *)
+      bindGen (vectorOf (no_regs inf) (smart_gen inf)) (fun rs' =>
+      returnGen (pc, lab, rs', r)).
 
 (* Just vary a single stack location *)
 Instance smart_vary_stack_loc : SmartVary (Ptr_atom * Label * regSet * regPtr) :=
