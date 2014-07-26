@@ -1,4 +1,4 @@
-Require Import QuickChick SetOfOutcomes.
+Require Import Common QuickChick SetOfOutcomes.
 
 Require Import Common Machine Indist Generation GenerationProofsHelpers. 
 
@@ -457,46 +457,45 @@ Proof.
         assumption. } rewrite Hlen'.
       inversion Hsome. reflexivity.
 Qed.
+ 
 
+Definition init_mem_spec (top : Label) (size : nat) (m : memory) 
+           (blocks : list (mframe * Z)) (m': memory)
+  (blocks': list (mframe * Z)) :=
+  exists (lst : list (Label * (list Atom))),
+    length lst = size /\ 
+    (forall l data, 
+        In (l, data) lst -> 
+        (C.min_frame_size <= Z.of_nat (length data) <= C.max_frame_size)%Z /\
+        In l (allThingsBelow top) /\
+        (forall v, In v data ->  v = (Vint 0 @ bot))) /\
+    (m', blocks') = 
+    fold_left 
+      (fun (ml : memory * (list (mframe * Z))) (elem : Label * (list Atom))  =>
+         let '(l, data) := elem in
+         let '(m_i, bs) := ml in 
+         let (b, m) := Mem.alloc Local m_i bot (Fr bot l data) in 
+         (m, (b, Z.of_nat (length data)) :: bs)
+      ) lst (m, blocks). 
 
-Lemma get_all_blocks_no_dubs : 
-  forall (m : memory) b l, In b (Mem.get_all_blocks l m) -> 
-                count_occ (Mem.EqDec_block) (Mem.get_all_blocks l m) b = 1.
-
-
-Definition init_mem_spec (top : Label) (m : memory) :=
+Definition mem_constraints (top : Label) (m : memory) :=
   forall b l st data, 
     Mem.get_frame m b = Some (Fr st l data) ->
     In l (allThingsBelow top) /\
     (C.min_frame_size <= Z.of_nat (length data) <= C.max_frame_size)%Z /\
     st = bot /\ Mem.stamp b = bot. 
 
-
-Lemma gen_init_mem_helper_correct :
-  forall (top : Label) (n: nat) (m : memory),
-    (init_mem_spec top m) -> 
-    (gen_init_mem_helper top n m) <--> 
-    (fun m' => 
-       (exists (lst : list (Label * (list Atom))),
-          length lst = n /\ 
-          (forall l data, 
-             In (l, data) lst -> 
-             (C.min_frame_size <= Z.of_nat (length data) <= C.max_frame_size)%Z /\
-             In l (allThingsBelow top) /\
-             (forall v, In v data ->  v = (Vint 0 @ bot)) 
-          ) /\
-          m' = fold_left 
-                 (fun (m_i : memory) (elem : Label * (list Atom))  =>
-                    let '(l, data) := elem in
-                    let (_, m) := Mem.alloc Local m_i bot (Fr bot l data) in m) lst m) /\ 
-       init_mem_spec top m'
-    ).
+Lemma gen_init_mem_helper_correct:
+  forall (top : Label) (n: nat) (m : memory) (blocks : list (mframe * Z)),
+    (mem_constraints top m) -> 
+    (gen_init_mem_helper top n (m, blocks)) <--> 
+    (fun p => init_mem_spec top n m blocks (fst p) (snd p)).
 Proof.
-  move => top n m Hspec m'. split. 
-  { move => Hgen. generalize dependent m. 
-      induction n as [| n IHn]; intros mem Hspec Hgen.
-      - simpl in *. inv Hgen. split => //.
-        exists []. by repeat split => //.
+  move => top n m blocks Hspec [m' lst']. rewrite /init_mem_spec. split. 
+  { move => Hgen. generalize dependent m. generalize dependent blocks.
+      induction n as [| n IHn]; intros blocks mem Hspec Hgen.
+      - simpl in *. inv Hgen. 
+        exists []. repeat split => //. simpl.
       - unfold gen_init_mem_helper in Hgen. 
         fold gen_init_mem_helper in Hgen.
         move : Hgen => [len [Hchoose [lab [Hlab Hgen]]]]. 
@@ -506,32 +505,32 @@ Proof.
         destruct (zreplicate_spec (Vint 0 @ ⊥) len) as [data [HIn [Heq HSome]]];
         try omega. rewrite HSome in Hgen. 
         remember (Mem.alloc Local mem ⊥ (Fr ⊥ lab data)) as alloc.
-        destruct alloc as [fr mem'].    
-        destruct (IHn mem') as [[lst [Hlen [Hforall Hfold]]] H] => //;  
-        clear IHn.
-        { rewrite /init_mem_spec in Hspec *.
+        destruct alloc as [fr mem'].      
+        destruct (IHn ((fr, Z.of_nat (length data)) :: blocks) mem') 
+          as [lst [Hlen [Hforall Hfold]]] => //=; clear IHn. 
+        + rewrite /init_mem_spec in Hspec *.
           symmetry in Heqalloc. move : (Heqalloc) => Halloc.
           move => fr' lab' st' data' Hget. 
           apply Mem.alloc_get_frame with (b' := fr') in Halloc.
           destruct (equiv_dec fr fr'). 
-          - inv e. rewrite Halloc in Hget. inv Hget. 
+          * inv e. rewrite Halloc in Hget. inv Hget. 
             rewrite /C.min_frame_size /C.max_frame_size Heq.
             repeat split => //; try (rewrite Z2Nat.id; omega).
             by apply gen_label_correct.
             by eapply Mem.alloc_stamp; apply Heqalloc.
-          - apply Hspec. by rewrite -Halloc. } 
-        split => //. exists ((lab, data) :: lst). split => //=; try by subst.
-        split.  
-        + move => lab' data'. move => [eq | HIn'].
-          * inv eq.  
-            rewrite Heq. repeat split; try (rewrite Z2Nat.id; omega).
-            by apply gen_label_correct.
-            assumption.
+          * apply Hspec. by rewrite -Halloc.
+        + rewrite Heq. by rewrite Z2Nat.id; try omega.
+        + exists ((lab, data) :: lst). split => //=; try by subst.
+          split.  
+          * move => lab' data'. move => [eq | HIn'].
+            - inv eq.  
+            - rewrite Heq. repeat split; try (rewrite Z2Nat.id; omega).
+                by apply gen_label_correct. assumption.
           * by apply Hforall.
-        + by rewrite -Heqalloc. }
-  { move => [[lst [Hlen [HIn Hfold]]] Hspec']. generalize dependent lst.
-    generalize dependent m. 
-    induction n as [| n IHn]; intros m Hspec lst Hlen HIn Hfold.
+        + simpl in  *. rewrite -Heqalloc. exact Hfold. }
+  { move => [lst [Hlen [HIn Hfold]]]. generalize dependent lst.
+    generalize dependent m. generalize dependent blocks.
+    induction n as [| n IHn]; intros blocks m Hspec lst Hlen HIn Hfold.
     - destruct lst; simpl in *. 
       rewrite returnGen_def. by auto. 
       congruence.
@@ -553,7 +552,8 @@ Proof.
           apply Mem.alloc_get_frame with (b' := block) in Halloc.
           destruct (equiv_dec fr1 block).
           - inv e.  rewrite Hget in Halloc. inv Halloc. 
-            split => //. split => //. split => //. eapply Mem.alloc_stamp. 
+            split => //. split => //. split => //. 
+            eapply Mem.alloc_stamp. 
             apply Heqfrm. 
           - rewrite Halloc in Hget. by apply Hspec.
        * by inversion Hlen.
@@ -561,61 +561,128 @@ Proof.
          apply in_cons with (a := (lab, data)) in HIn'. by apply HIn in HIn'.
        * simpl in Hfold. by rewrite -Heqfrm in Hfold. }
 Qed.
-      
 
 
-(* Lemma gen_init_mem_helper_soundness_old :  *)
-(*   forall (top : Label) m lst n, *)
-(*     init_mem_spec top m lst ->  *)
-(*     pincl (gen_init_mem_helper top n (m, lst))  *)
-(*          (fun pair' =>  *)
-(*             ((length lst + n)%coq_nat = length (snd pair') /\ *)
-(*              init_mem_spec top (fst pair') (snd pair'))). *)
-(* Proof.  *)
-(*   move => top m lst n [Hspec1 Hspec2] [m' lst']. *)
-(*   { move => Hgen. generalize dependent lst.  generalize dependent m. *)
-(*     generalize dependent m'. *)
-(*     induction n as [| n IHn];  *)
-(*     intros m' m lst Hspec1 Hspec2 Hgen. *)
-(*     - rewrite /gen_init_mem_helper in Hgen. move: Hgen => [eq1 eq2]; subst. *)
-(*       simpl. by split => //.  *)
-(*     - simpl in *.  *)
-(*       move: Hgen => [z [Hchoose [lab [/gen_label_correct Hlab Hgen]]]].  *)
-(*       rewrite /alloc in Hgen. rewrite choose_def /C.min_frame_size in Hchoose. *)
-(*       move: Hchoose => //= [/Z.compare_le_iff Hle1 /Z.compare_ge_iff Hle2]. *)
-(*       destruct (zreplicate_spec (Vint 0 @ Zset.empty) z) as [data [H1 [H2 H3]]];  *)
-(*       try omega. rewrite H3 in Hgen. *)
-(*       remember (Mem.alloc Local m Zset.empty (Fr Zset.empty lab data)) as alloc. *)
-(*       destruct alloc as [block m'']. rewrite -Heqalloc in Hgen.  *)
-(*       have [Heq Hspec']:  *)
-(*         ((length ((block, z) :: lst) + n)%coq_nat = length lst' /\  *)
-(*          init_mem_spec top m' lst'). *)
-(*       { apply : (IHn m' m'') => //.    *)
-(*         - move => block' len HIn. destruct HIn  as [Heq | HIn].    *)
-(*           + inv Heq. repeat split => //. *)
-(*             * symmetry in Heqalloc. by apply Mem.alloc_stamp in Heqalloc. *)
-(*             * exists lab. exists data. split => //.  *)
-(*               symmetry in Heqalloc. by apply alloc_get_frame_new in Heqalloc. *)
-(*               split => //. split => //. by move => v l /H1 [Heq1 Heq2]. *)
-(*           + apply Hspec1 in HIn.  *)
-(*             move : HIn => [H4 [H5 [lab' [data' [H6 [H7 [H8 H9]]]]]]].  *)
-(*             repeat split => //. eexists. eexists. symmetry in Heqalloc. *)
-(*             split => //. eapply alloc_get_frame_old; *)
-(*             eassumption. by split => //. *)
-(*         - move => [stamp lab' data'] b  Heq.  *)
-(*           symmetry in Heqalloc. move : (Heqalloc) => Halloc. *)
-(*           apply Mem.alloc_get_frame with (b' := b)in Heqalloc. *)
-(*           destruct (equiv_dec block b).  *)
-(*           + rewrite Heq in Heqalloc. inv Heqalloc; compute in e; subst.  *)
-(*             split => //. split; [ by apply Mem.alloc_stamp in Halloc |].  *)
-(*             split; [by rewrite H2 Z2Nat.id; try omega; apply in_eq |]. *)
-(*             split => //; [ by move => v l /H1 [Heq1 Heq2] |].  *)
-(*             rewrite H2 Z2Nat.id; try omega. by split => //. *)
-(*           + rewrite Heqalloc in Heq. apply Hspec2 in Heq.  *)
-(*             move : Heq => [H4 [H5 [H6 [H7 H8]]]].  *)
-(*             repeat split => //. by apply in_cons. } *)
-(*       split => //. by rewrite -Heq -plus_n_Sm /=. } *)
-(* Qed.                                     *)
+Lemma gen_init_mem_correct: 
+  forall (top : Label),
+    (gen_init_mem top) <-->    
+    (fun ml => 
+       (exists n, 
+          C.min_no_frames <= n <= C.max_no_frames /\
+          init_mem_spec top n (Mem.empty Atom Label) [] (fst ml) (snd ml))). 
+  Proof.
+    move => top init_mem. split.
+    { move => [len [Hchoose Hgen]].
+      exists len. rewrite choose_def in Hchoose.
+      move: Hchoose => [/nat_compare_le Hle1 /nat_compare_ge Hle2]. simpl in *.
+      edestruct (gen_init_mem_helper_correct top len (Mem.empty Atom Label))
+        as [Hl _]. 
+      - move => b l st data Hget.
+        by rewrite Mem.get_empty in Hget. 
+      - destruct (Hl Hgen) as [lst H]. 
+        split => //. apply/andP; split; apply/leP; omega. 
+        by eauto. }
+    { move => [len [/andP [Hle1 Hle2] Hspec]].
+      edestruct (gen_init_mem_helper_correct top len (Mem.empty Atom Label))
+        as [_ Hr].  
+      - rewrite /init_mem_spec /=. move => b l st data Hget.
+        by rewrite Mem.get_empty in Hget.
+      - rewrite /gen_init_mem. 
+        exists len. split.  
+        + rewrite choose_def. 
+          split; [apply/nat_compare_le | apply/nat_compare_ge]; by apply/leP. 
+          by auto. }
+Qed.
+
+
+Definition init_mem_single_upd_spec (inf : Info) (mem : Mem.t Atom Label) 
+           (mf : Mem.block Label) (mem' : memory) :=
+  match Mem.get_frame mem mf with
+    | Some (Fr stamp lab data) =>
+      exists fr : Memory.frame,
+        Mem.upd_frame mem mf fr = Some mem' /\
+        (let 'Fr stamp' lab' data' := fr in
+         lab' = lab /\
+         stamp' = stamp /\
+         length data' = length data /\
+         (forall atm : Atom, In atm data' -> atom_spec inf atm))
+    | None => mem' = mem
+  end.
+
+Definition populated_memory_spec (m : memory) (m': memory) :=
+  let blocks := map fst (data_len inf) in 
+  seq.foldr (fun block (p : memory -> Prop) m_prev => 
+               exists m, (mem_single_upd_spec inf m_prev block m) /\ p m) 
+            (eq m') blocks m /\
+  (forall b st lab d, 
+     Mem.get_frame m' b = Some (Fr st lab d) -> 
+     st = bot /\
+     In lab (allThingsBelow (top_prin inf)) /\
+     Mem.stamp b = bot /\
+     (C.min_frame_size <= Z.of_nat (length d) <= C.max_frame_size)%Z).
+
+Lemma populate_memory_correct:
+  forall (m : memory), 
+    mem_constraints (top_prin inf) m ->
+    (populate_memory inf m) <-->
+    (populated_memory_spec m ).
+Proof. 
+  move => m Hcontent m'.
+  split.
+  { move => /foldGen_equiv Hgen. rewrite /populated_memory_spec.
+    generalize dependent m. 
+    set lst := ((map fst (data_len inf))).
+    induction lst as [| b bs IHbs]; move=> m Hinit Hfold.
+    - simpl in *; subst. split => // b st l d /Hinit [H1 [H2 [H3 H4]]]. 
+      by repeat split => //.
+   - simpl in *. move: Hfold => [m'' [Hpop Hfold]].
+     have Hcnstr: mem_constraints (top_prin inf) m''.
+     { rewrite /populate_frame in Hpop. 
+       remember (Mem.get_frame m b) as get. 
+       destruct get as [[st l d]|]; try by inv Hpop.
+       symmetry in Heqget. 
+       move : Hpop => [d' [/vectorOf_equiv [Hlen Hforall] Hupd]].
+       destruct (Mem.upd_get_frame _ _ _ _ _ _ (Fr st l d') Heqget) 
+         as [fr Hupd'].
+       rewrite Hupd' in Hupd. inv Hupd. rewrite /mem_constraints.
+       destruct (Hinit _ _ _ _ Heqget) as [H1 [H2 [H3 H4]]]. 
+       subst. move => b' l' st' d'' Hget.
+       move: (Mem.get_upd_frame _ _ _ m m'' _ _ Hupd' b') => Hget'. 
+       case: (equiv_dec b b') Hget' => e Hget'.  inv e.
+       - rewrite Hget in Hget'. inv Hget'. split => //. 
+         split; [by rewrite Hlen | repeat split => //]. 
+       - rewrite Hget in Hget'. symmetry in Hget'. 
+         destruct (Hinit _ _ _ _ Hget') as [H1' [H2' [H3' H4']]]. 
+         repeat split => //.
+     }  
+     destruct (IHbs m'' Hcnstr Hfold) as [Hfold' Hcnstr']. split => //.  
+     exists m''. split=> //. 
+     by apply populate_frame_correct. }
+  { rewrite /populated_memory_spec /populate_memory. move => [Hfold Hconstr].
+    apply foldGen_equiv. generalize dependent m. 
+    set lst := ((map fst (data_len inf))).
+    induction lst as [| b bs IHbs]; move=> m Hinit Hfold.
+    + by simpl in *.
+    + simpl in *. move : Hfold => [m'' [Hupd Hfold]]. eexists. split => //. 
+      * apply populate_frame_correct. eassumption.
+      * apply IHbs => //. rewrite /mem_single_upd_spec in Hupd. 
+       remember (Mem.get_frame m b) as get. 
+       destruct get as [[st l d]|]; try by inv Hupd.
+       symmetry in Heqget. 
+       move : Hupd => [[st' l' d'] [Hupd' [eq1 [eq2 [Hlen Hforall]]]]]; subst.
+       destruct (Mem.upd_get_frame _ _ _ _ _ _ (Fr st l d') Heqget) 
+         as [fr Hupd''].
+       rewrite Hupd'' in Hupd'. inv Hupd'. rewrite /mem_constraints.
+       destruct (Hinit _ _ _ _ Heqget) as [H1 [H2 [H3 H4]]]. 
+       subst. move => b' l' st' d'' Hget.
+       move: (Mem.get_upd_frame _ _ _ m m'' _ _ Hupd'' b') => Hget'. 
+       case: (equiv_dec b b') Hget' => e Hget'.  inv e.
+       - rewrite Hget in Hget'. inv Hget'. split => //. 
+         split; [by rewrite Hlen | repeat split => //]. 
+       - rewrite Hget in Hget'. symmetry in Hget'. 
+         destruct (Hinit _ _ _ _ Hget') as [H1' [H2' [H3' H4']]]. 
+         repeat split => //. }
+Qed.
   
 (* Instruction *)
 
@@ -1494,5 +1561,4 @@ Abort.
   (*   move : H1 => [Heq1 Heq2 Heq3]; subst. *)
   (*   rewrite /smart_gen in sgen, sgen2, sgen3, sgen4, sgen5, sgen6, sgen7 . *)
 
-Abort All.
 End WithDataLenNonEmpty.

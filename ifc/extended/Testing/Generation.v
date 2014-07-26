@@ -552,29 +552,30 @@ Definition gen_top : Gen Label :=
 (* Generates a memory adhering to the above constants *)
 (* Stamps are bottom everywhere - to be created later *)
 
-Fixpoint gen_init_mem_helper top (n : nat) (m : memory) :=
+Fixpoint gen_init_mem_helper top (n : nat) (ml : memory * list (mframe * Z)) :=
   match n with
-    | O    => returnGen m
-    | S n' =>
+    | O    => returnGen ml
+    | S n' => 
+      let (m, l) := ml in
       bindGen (choose (C.min_frame_size,
                        C.max_frame_size)) (fun frame_size =>
       bindGen (gen_label top) (fun lab =>
-        match (alloc frame_size lab bot (Vint Z0 @ bot) m) with
-          | Some (_, m') =>
-            gen_init_mem_helper top n' m'
-          | None => gen_init_mem_helper top n' m
-        end))
+         match (alloc frame_size lab bot (Vint Z0 @ bot) m) with
+           | Some (mf, m') => 
+             gen_init_mem_helper top n' (m', (mf,frame_size) :: l)
+           | None => gen_init_mem_helper top n' ml
+         end))
   end.
 
-
-Definition gen_init_mem (top : Label) : Gen memory :=
+Definition gen_init_mem (top : Label) : Gen (memory * list (mframe * Z)):=
   bindGen (choose (C.min_no_frames,
                       C.max_no_frames)) (fun no_frames =>
-  gen_init_mem_helper top no_frames (Mem.empty Atom Label)).
+  gen_init_mem_helper top no_frames (Mem.empty Atom Label, [])).
 
 Definition failed_state : State :=
   Property.trace "Failed State!" 
                  (St [] (Mem.empty Atom Label) bot Mty [] (PAtm Z0 bot)).
+
 
 Definition populate_frame inf (m : memory) (mf : mframe) : Gen memory :=
   match Mem.get_frame m mf with
@@ -588,8 +589,11 @@ Definition populate_frame inf (m : memory) (mf : mframe) : Gen memory :=
   end.
 
 Definition populate_memory inf (m : memory) : Gen memory :=
-  let all_frames := Mem.get_all_blocks (top_prin inf) m in
+  (* Isn't this supposed to be exactly what is store in Info's data_len field?*)
+  (* let all_frames := Mem.get_all_blocks (top_prin inf) m in *)
+  let all_frames := map fst (data_len inf) in 
   foldGen (populate_frame inf) all_frames m.
+
 
 (* FIX this to instantiate stamps to a non-trivially well-formed state *)
 Definition instantiate_stamps (st : State) : State := st.
@@ -611,8 +615,8 @@ Definition gen_variation_state : Gen (@Variation State) :=
   (* Generate basic machine *)
   bindGen gen_top (fun prins =>            
   (* Generate initial memory and dfs *)
-  bindGen (gen_init_mem prins) (fun init_mem =>
-  let dfs := get_blocks_and_sizes prins init_mem in
+  bindGen (gen_init_mem prins) (fun init_mem_info =>
+  let (init_mem, dfs) := init_mem_info in
   (* Generate initial instruction list *)
   let imem := replicate (C.code_len) Nop in
   (* Create initial info - if this fails, fail the generation *)
@@ -631,7 +635,7 @@ Definition gen_variation_state : Gen (@Variation State) :=
       (* Instantiate stamps *)
       let st := instantiate_stamps st in
       (* Create Variation *)
-(*       bindGen (gen_label_between_lax (get_stack_label stk) prins) (fun obs => *)
+      (* bindGen (gen_label_between_lax (get_stack_label stk) prins) (fun obs => *)
       bindGen (gen_label_between_lax bot prins) (fun obs =>      
       bindGen (smart_vary obs inf st) (fun st' =>
       returnGen (Var obs st st'))))))))
