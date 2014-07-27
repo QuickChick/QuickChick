@@ -1,6 +1,6 @@
 Require Import QuickChick SetOfOutcomes.
 
-Require Import Common Machine Generation. 
+Require Import Common Machine Generation Indist. 
 
 Require Import List.
 Require Import ZArith.
@@ -145,4 +145,18 @@ Proof.
     by case: z => //= p; omega. 
   + apply/Z.compare_ge_iff. rewrite Nat2Z.inj_abs_nat. 
     by case: z => //= p; omega. 
+Qed.
+
+Lemma join_equiv : 
+  forall (l1 l2 l : Label),
+    isLow l1 l = true->
+    (isHigh (join l1 l2) l <-> isHigh l2 l).   
+Proof.
+  rewrite /isHigh /isLow. move => l1 l2 l Hlow. split.
+  +  move => Hnotlow. apply/Bool.eq_true_not_negb => Hlow2. 
+     move: (join_minimal _ _ _ Hlow Hlow2)  => contra. rewrite contra in Hnotlow.
+     discriminate.  
+  + move/Bool.negb_true_iff => Hnotlow. 
+    eapply not_flows_not_join_flows_right in Hnotlow.
+    apply Bool.negb_true_iff. eassumption . 
 Qed.

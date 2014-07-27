@@ -80,7 +80,7 @@ Instance indistFrame : Indist frame :=
       (label_eq l1 l2) &&
       (if isLow l1 lab then forallb2 (indist lab) ds1 ds2
        else true)
-    else true
+    else (label_eq stamp1 stamp2)
 |}.
 
 (* CH: should think of a reachability-based variant of this;

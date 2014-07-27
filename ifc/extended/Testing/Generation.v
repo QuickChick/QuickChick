@@ -372,17 +372,17 @@ Definition gen_var_frame (obs: Label) (inf : Info) (f : frame)
       bindGen (smart_gen inf) (fun lab' =>
       bindGen gen_data (fun data' =>
       returnGen (Fr stamp lab' data')))
-                    (* CH: above indistFrame allows different stamp *)
+    (* CH: above indistFrame allows different stamp *)
     else if isHigh (stamp ∪ lab) obs then
       (* CH: Can't understand the need for this case *)
+      (* This is exactly the same as checking for isHigh lab obs*)
       bindGen gen_data (fun data' =>
       returnGen (Fr stamp lab data'))
     else
       bindGen (sequenceGen (map (smart_vary obs inf) data))
               (fun data' =>
       returnGen (Fr stamp lab data')).
-                    (* CH: above indistFrame allows different High stamp *)
-
+ 
  
 Instance smart_vary_frame : SmartVary frame :=
 {|
@@ -402,6 +402,7 @@ Definition handle_single_mframe obs inf (m : memory) (mf : mframe)
       end)
     | None => returnGen m
   end.
+
 
 Definition gen_vary_memory  obs inf (m : memory)
 : Gen memory := 
