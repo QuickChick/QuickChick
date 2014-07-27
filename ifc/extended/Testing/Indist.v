@@ -77,7 +77,7 @@ Instance indistFrame : Indist frame :=
     let '(Fr stamp1 l1 ds1) := f1 in 
     let '(Fr stamp2 l2 ds2) := f2 in
     if isLow stamp1 lab && isLow stamp2 lab then
-      (label_eq l1 l2) &&
+      (label_eq l1 l2) && (label_eq stamp1 stamp2) &&
       (if isLow l1 lab then forallb2 (indist lab) ds1 ds2
        else true)
     else (label_eq stamp1 stamp2)

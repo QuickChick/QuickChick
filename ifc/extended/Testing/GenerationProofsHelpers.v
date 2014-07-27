@@ -160,3 +160,118 @@ Proof.
     eapply not_flows_not_join_flows_right in Hnotlow.
     apply Bool.negb_true_iff. eassumption . 
 Qed.
+Lemma forallb2_forall : 
+  forall (A : Type) (f : A -> A -> bool) (l1 l2 : list A),
+    forallb2 f l1 l2 = true <-> 
+    (length l1 = length l2 /\ 
+     forall x y : A, In (x, y) (seq.zip l1 l2) -> f x y = true).
+Proof.
+  move=> A f l1 l2. split.
+  + elim: l1 l2 => [| x l1 IHxs]; case => //= y l2 /andP [H1 H2].
+    move/(_ l2 H2) : IHxs => [-> HIn]. split => //. 
+    move=> x' y' [[Heq1 Heq2] | HIn']; subst; by auto.
+  + elim: l1 l2 => [| x l1 IHxs]; case => [|y l2] //=; try by move => [H _].
+    move => [Hlen HIn]. apply/andP; split. by eauto.
+    apply IHxs. split; by eauto.
+Qed.
+
+Lemma zip_combine: 
+  forall {A} {B} (l1 : list A) (l2 : list B), 
+    length l1 = length l2 ->
+    seq.zip l1 l2 = combine l1 l2.
+Proof.
+  move => A B. elim => //= [| x xs IHxs]; case => //= y yx Hlen.
+  rewrite IHxs //. by apply/eq_add_S. 
+Qed.
+ 
+
+Lemma in_zip: 
+  forall {A} {B} (l1 : list A) (l2 : list B) x y, 
+  (In (x, y) (seq.zip l1 l2) -> (In x l1 /\ In y l2)).
+Proof.
+  Opaque In. 
+  move => A B. elim => [| x xs IHxs]; case => // y ys x' y' [[Heq1 Heq2] | HIn]. 
+  + by subst; split; apply in_eq. 
+  + move/IHxs: HIn => [HIn1 HIn2]. split; constructor(assumption).
+Qed.
+
+
+Lemma in_map_zip : 
+  forall {A B C} (l1 : list A) (l2 : list B) x y (f : B -> C), 
+     In (x, y) (seq.zip l1 l2) -> In (x, f y) (seq.zip l1 (map f l2)).
+Proof.
+  move=> A B C. 
+  elim => [| x xs IHxs]; case => // y ys x' y' f [[Heq1 Heq2] | HIn]; subst.
+  + by constructor.
+  + move/IHxs : HIn => /(_ f) HIn. 
+    by constructor(assumption). 
+Qed.
+
+Lemma in_map_zip_iff : 
+  forall {A B C} (l1 : list A) (l2 : list B) x y (f : B -> C), 
+    In (x, y) (seq.zip l1 (map f l2)) <-> 
+     exists z, f z = y /\ In (x, z) (seq.zip l1 l2).
+Proof.
+  move=> A B C. split. 
+  - move: l1 l2 x y.
+    elim => [| x xs IHxs]; case => // y ys x' y' [[Heq1 Heq2] | HIn]; subst.
+    + exists y. split => //. by constructor.
+    + move/IHxs : HIn => [z [Heq HIn]].  
+      exists z. split => //. by constructor(assumption). 
+  - move => [z' [Heq HIn]]. subst. by apply/in_map_zip.
+Qed.
+
+
+Lemma in_zip_swap:
+    forall {A B} (l1 : list A) (l2 : list B) x y, 
+     In (x, y) (seq.zip l1 l2) <->  In (y, x) (seq.zip l2 l1).
+Proof.
+  move=> A B. 
+  elim => [| x xs IHxs]; case => // y ys x' y'. 
+  split; move=>  [[Heq1 Heq2] | HIn] ; subst; (try by constructor);
+  by move/IHxs: HIn => HIn; constructor(assumption).
+Qed.
+
+(* regSet *)
+(* This function is used to smart_vary a regSet. I should edit the above proofs
+   so they use this instead of reproving it every time *)
+
+Lemma in_nth_iff: 
+  forall {A} (l : list A) x,
+    In x l <-> exists n, nth n l x = x /\ n < length l.
+Proof.
+  move=> A l x. split.
+  - move=> HIn.  apply in_split in HIn. move : HIn => [l1 [l2 Heq]]. 
+    exists (length l1). subst. split.
+    + by rewrite app_nth2 // minus_diag. 
+    + rewrite app_length. simpl. apply/ltP. 
+      rewrite -[X in (_ + X)%coq_nat]addn1 [X in (X < _)%coq_nat]plus_n_O. 
+      apply plus_lt_compat_l.  apply/leP. rewrite addn_gt0.  
+      apply/orP; by right. 
+  - move => [n [Heq Hle]]. rewrite -Heq. by apply/nth_In/leP. 
+Qed.
+
+Lemma nth_seqnth : 
+  forall {A} (l : list A) n (x : A),
+    seq.nth x l n = nth n l x.        
+Proof.
+  move=> A. elim. case =>//.  
+  move=> a l H. move => n x. rewrite -seq.cat1s.
+  rewrite seq.nth_cat. simpl. case: n => //= n. rewrite H.
+  by rewrite -addn1 -[X in _ - X]add0n subnDr subn0. 
+Qed.
+
+Lemma nth_foralldef:
+  forall {A} (l: list A) n (x x': A),
+    n < length l -> nth n l x = nth n l x'.
+Proof.
+  move => A. elim=> // x xs IHxs n d d' Hlen. 
+  case: n Hlen => //= n Hlen. auto.
+Qed.
+
+Lemma size_length:
+  forall {A} (l :list A), seq.size l = length l. 
+Proof.
+  move=> A. elim => //.
+Qed.
+
