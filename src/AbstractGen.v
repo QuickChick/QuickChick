@@ -49,7 +49,10 @@ Class GenMonad M :=
     fmapGen : forall {A B : Type}, (A -> B) -> M A -> M B; 
     choose : forall {A} `{Random A}, A * A -> M A;
     sized : forall {A}, (nat -> M A) -> M A;
-    suchThatMaybe : forall {A}, M A -> (A -> bool) -> M (option A)
+    suchThatMaybe : forall {A}, M A -> (A -> bool) -> M (option A);
+    promote : forall {M' : Type -> Type} {A : Type},
+                                   ((M A -> A) -> M' (M A) -> M' A) ->
+                                   (M' (M A)) -> M (M' A)
   }.
 
 Section Utilities.

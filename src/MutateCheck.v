@@ -1,4 +1,4 @@
-Require Import QuickChick.
+Require Import QuickChick Gen.
 
 Class Mutateable (A : Type) : Type :=
 {
@@ -42,7 +42,8 @@ Definition message (kill : bool) (n1 n2 : nat) :=
   ++ " (" ++ show n1 ++ " frags)" ++ nl.
 
 Open Scope nat.
-Definition mutateCheckManyArgs {A P : Type} `{_: Testable P}
+
+Definition mutateCheckManyArgs {A P : Type} {_: Testable P}
            `{mutA: Mutateable A} (args : Args)
            (a : A) (ps : A -> list P) :=
   let mutants := mutate a in
@@ -56,18 +57,18 @@ Definition mutateCheckManyArgs {A P : Type} `{_: Testable P}
       end)
      mutants (0, 0)).
 
-Definition mutateCheckMany {A P : Type} `{_: Testable P}
+Definition mutateCheckMany {A P : Type} {_: Testable P}
            `{mutA: Mutateable A} 
            (a : A) (ps : A -> list P) :=
   mutateCheckManyArgs stdArgs a ps.
 
 Definition mutateCheckArgs {A P: Type} 
-           `{_: Testable P} `{mutA: Mutateable A} (args : Args)
+           {_: Testable P} {mutA: Mutateable A} (args : Args)
            (a : A) (p : A -> P):=
   mutateCheckManyArgs args a (fun a => cons (p a) nil).
 
 Definition mutateCheck {A P: Type} 
-           `{_: Testable P} `{mutA: Mutateable A} 
+           {_: Testable P} {mutA: Mutateable A} 
            (a : A) (p : A -> P):=
   mutateCheckManyArgs stdArgs a (fun a => cons (p a) nil).
 

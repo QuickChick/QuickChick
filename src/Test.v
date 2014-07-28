@@ -1,5 +1,5 @@
 Require Import Show.
-Require Import Gen.
+Require Import AbstractGen Gen.
 Require Import Property.
 Require Import State.
 Require Import Arbitrary.

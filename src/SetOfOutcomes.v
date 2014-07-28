@@ -26,6 +26,13 @@ Definition suchThatMaybeP {A} (g : Pred A) (f : A -> bool)
   fun b => (b = None) \/ 
            (exists y, b = Some y /\ g y /\ f y).
 
+Definition promoteP {M : Type -> Type} {A : Type}
+           (liftFun : (Pred A -> A) -> M (Pred A) -> M A) 
+           (m : M (Pred A)) : Pred (M A) :=
+  fun ma => 
+    exists (a : A), 
+      liftFun (fun _ => a) m = ma.
+
 Instance PredMonad : GenMonad Pred :=
   {
     bindGen := @bindP;
@@ -33,7 +40,8 @@ Instance PredMonad : GenMonad Pred :=
     fmapGen := @fmapP;
     choose := @chooseP;
     sized := @sizedP;
-    suchThatMaybe := @suchThatMaybeP
+    suchThatMaybe := @suchThatMaybeP;
+    promote := @promoteP
   }.
 
 (* Equivalence on sets of outcomes *) 

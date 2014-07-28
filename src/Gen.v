@@ -73,8 +73,8 @@ Proof.
 Definition sizedG {A : Type} (f : nat -> Gen A) : Gen A :=
   MkGen (fun r n => match f n with MkGen m => m r n end).
 
-(* Could this be added to the typeclass too ? *)
-Definition promote {M : Type -> Type} {A : Type}
+(* Could this be added to the typeclass too ? It seems so*)
+Definition promoteG {M : Type -> Type} {A : Type} 
            (liftFun : (Gen A -> A) -> M (Gen A) -> M A) 
            (m : M (Gen A)) : Gen (M A) :=
   MkGen (fun r n => liftFun (fun g => match g with MkGen m' => m' r n end) m).
@@ -152,6 +152,7 @@ Instance realGen : GenMonad Gen :=
     choose A R range := 
       MkGen (fun r _ => fst (randomR range r));
     sized := @sizedG;
-    suchThatMaybe := @suchThatMaybeGen
+    suchThatMaybe := @suchThatMaybeGen;
+    promote := @promoteG
   }.
 
