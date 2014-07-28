@@ -1,3 +1,4 @@
+
 Set Implicit Arguments.
 
 Require Import List.
@@ -173,7 +174,7 @@ Definition printTestCase {prop : Type} {tp : Testable prop}
            (s : string) (p : prop) : Property :=
   callback (PostFinalFailure Counterexample (fun _st _res => trace s 0)) p.
 
-Definition shrinking {prop A : Type} {_ : @Testable prop}
+Definition shrinking {prop A : Type} {_ : Testable prop}
            (shrinker : A -> list A) (x0 : A) (pf : A -> prop) : Property :=
   @fmapGen Gen _ _ _ (fun x => MkProp (joinRose (fmapRose unProp x))) 
        (promote fmapRose ((props pf shrinker x0))).

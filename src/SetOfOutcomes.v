@@ -29,8 +29,8 @@ Definition suchThatMaybeP {A} (g : Pred A) (f : A -> bool)
 Definition promoteP {M : Type -> Type} {A : Type}
            (liftFun : (Pred A -> A) -> M (Pred A) -> M A) 
            (m : M (Pred A)) : Pred (M A) :=
-  fun ma => 
-    exists (a : A), 
+  fun ma =>
+    exists (a : A),
       liftFun (fun _ => a) m = ma.
 
 Instance PredMonad : GenMonad Pred :=
