@@ -5,7 +5,7 @@ Require Import String.
 
 Require Import Show.
 Require Import State.
-Require Import AbstractGen Gen.
+Require Import AbstractGen.
 Require Import Arbitrary.
 
 (* Extraction will map this to something that additionally prints stuff *)
@@ -51,7 +51,7 @@ Definition addCallback (res : Result) (c : Callback) : Result :=
     | MkResult o e r i s cs => MkResult o e r i s (cons c cs)
   end.
 
-Inductive Rose (A : Type) : Type := 
+Inductive Rose (A : Type) : Type :=
   MkRose : A -> Lazy (list (Rose A)) -> Rose A.
 
 Definition returnRose {A : Type} (x : A) := MkRose x (lazy nil).
@@ -75,7 +75,18 @@ Record QProp : Type := MkProp
   unProp : Rose Result
 }.
 
+Section Property.
+  Context {Gen : Type -> Type}
+          {H : GenMonad Gen}. 
+
 Definition Property := Gen QProp.
+
+Definition failure qp :=
+  match qp with
+  | MkProp (MkRose (MkResult (Some false) _ _ _ _ _) _) => true
+  | _ => false
+  end.
+
 Class Testable (A : Type) : Type :=
 {
   property : A -> Property
@@ -84,7 +95,7 @@ Class Testable (A : Type) : Type :=
 Instance testResult : Testable Result :=
 {|
   (* Left a protectResults out! *)
-  property r := returnGen (MkProp (returnRose r)) 
+  property r := returnGen (MkProp (returnRose r))
 |}.
 
 Definition liftBool (b : bool) : Result :=
@@ -95,6 +106,7 @@ Instance testBool : Testable bool :=
   property b := property (liftBool b)
 |}.
 
+(* ZP/CH: what's the relation between unit and discards? *)
 Instance testUnit : Testable unit :=
 {|
   property := fun _ => property rejected
@@ -156,16 +168,20 @@ Definition props {prop A : Type} {t : Testable prop}
            (pf : A -> prop) (shrinker : A -> list A) (x : A) :=
   props' 1000 pf shrinker x.
 
-Definition shrinking {prop A : Type} {_ : Testable prop}
+End Property.
+
+Require Import Gen.
+
+Definition shrinking {prop A : Type} {_ : @Testable Gen prop}
            (shrinker : A -> list A) (x0 : A) (pf : A -> prop) : Property :=
-  fmapGen (fun x => MkProp (joinRose (fmapRose unProp x))) 
+  @fmapGen Gen _ _ _ (fun x => MkProp (joinRose (fmapRose unProp x))) 
        (promote fmapRose ((props pf shrinker x0))).
 
 Definition printTestCase {prop : Type} {tp : Testable prop} 
            (s : string) (p : prop) : Property :=
   callback (PostFinalFailure Counterexample (fun _st _res => trace s 0)) p.
 
-Definition forAllShrink {A prop : Type} {_ : Testable prop}
+Definition forAllShrink {A prop : Type} {_ : @Testable Gen prop}
            (show : A -> string)
            (gen : Gen A) (shrinker : A -> list A) (pf : A -> prop) : Property :=
   bindGen gen (fun x => 

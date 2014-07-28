@@ -2,6 +2,12 @@ Require Import ZArith Axioms.
 Require Import List ssreflect ssrbool ssrnat seq.
 Import ListNotations.
 
+Section Lazy.
+Set Implicit Arguments.
+
+Record Lazy (T : Type) := lazy { force : T }.
+End Lazy.
+
 Class Random (A : Type) :=
   { 
     randomR : A * A -> RandomGen -> A * RandomGen; 

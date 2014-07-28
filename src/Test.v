@@ -229,14 +229,13 @@ Function runATest (st : State) (f : RandomGen -> nat -> QProp)
          {measure decr st} : Result :=
   let size := (computeSize st) (numSuccessTests st) (numDiscardedTests st) in
   let (rnd1, rnd2) := rndSplit (randomSeed st) in
-  let test := 
-      fun (st : State) (f : RandomGen -> nat -> QProp)  =>
+  let test (st : State) (f : RandomGen -> nat -> QProp) :=
         if (gte (numSuccessTests st) (maxSuccessTests st)) then
           doneTesting st f
         else if (gte (numDiscardedTests st) (maxDiscardedTests st)) then
                giveUp st f
         else runATest st f
- in        
+ in
   match st with
     | MkState mst mdt ms cs nst ndt c e r nss nts =>
     match f rnd1 size with

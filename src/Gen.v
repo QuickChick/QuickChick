@@ -4,8 +4,6 @@ Import ListNotations.
 
 Set Implicit Arguments.
 
-Record Lazy (T : Type) := lazy { force : T }.
-
 (* The monad carrier *)
 Inductive Gen (A : Type) : Type :=
   | MkGen : (RandomGen -> nat -> A) -> Gen A.
