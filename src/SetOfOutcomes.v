@@ -30,8 +30,8 @@ Definition promoteP {M : Type -> Type} {A : Type}
            (liftFun : (Pred A -> A) -> M (Pred A) -> M A) 
            (m : M (Pred A)) : Pred (M A) :=
   fun ma => 
-    exists (a : A), 
-      liftFun (fun _ => a) m = ma.
+    exists f, 
+      liftFun f m = ma.
 
 Instance PredMonad : GenMonad Pred :=
   {

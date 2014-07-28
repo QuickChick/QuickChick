@@ -185,7 +185,10 @@ Definition semTestable {A : Type} {_ : @Testable Pred A} (a : A) : Prop :=
   semProperty (property a).
 
 
-
+Goal (semTestable prop_length <-> (forall A (l: seq A),  Datatypes.length l <= 20)).
+Proof.
+  rewrite /semTestable /semProperty. split.
+  move=> Hqp. 
 
 
 
