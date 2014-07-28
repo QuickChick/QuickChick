@@ -186,18 +186,18 @@ Definition forAllShrink {A prop : Type} {_ : Testable prop}
     shrinking shrinker x (fun x' =>
       printTestCase (show x' ++ newline) (pf x'))).
 
-Instance testFun {A prop : Type} `{_ : Show A}
+Global Instance testFun {A prop : Type} `{_ : Show A}
          {_ : Arbitrary A} `{_ : Testable prop} : Testable (A -> prop) :=
 {
   property f := forAllShrink show arbitrary shrink f
 }.
 
-Instance testPolyFun {prop : Type -> Type} `{_ : Testable (prop nat)} : Testable (forall T, prop T) :=
+Global Instance testPolyFun {prop : Type -> Type} `{_ : Testable (prop nat)} : Testable (forall T, prop T) :=
 {
   property f := printTestCase "" (f nat)
 }.
 
-Instance testPolyFunSet {prop : Set -> Type} `{_ : Testable (prop nat)} : Testable (forall T, prop T) :=
+Global Instance testPolyFunSet {prop : Set -> Type} `{_ : Testable (prop nat)} : Testable (forall T, prop T) :=
 {
   property f := printTestCase "" (f nat)
 }.

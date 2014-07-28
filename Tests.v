@@ -52,7 +52,7 @@ Proof.
 move=> t1 t2; apply/(iffP idP) => [|<-].
 elim: t1 t2 => [|x1 l1 IHl1 r1 IHr1] [|x2 l2 r2] //=.
   by case/and3P=> /eqP-> /IHl1-> /IHr1->.
-by elim: t1 => //= x ? -> ? ->; rewrite eqxx.
+  by elim: t1 => //= x ? -> ? ->; rewrite eqxx.
 Qed.
 
 Canonical tree_eqMixin (A : eqType) := EqMixin (@eq_treeP A).
@@ -125,7 +125,7 @@ Definition testtree := showResult (quickCheck mirrorK).
  
 QuickCheck testtree.
 
-(* Step : .. or prove them correct   *)
+(* Step 3 : .. or prove them correct   *)
 
 Require Import SetOfOutcomes.
 
@@ -177,3 +177,16 @@ Proof.
   rewrite /peq /gentree. move=> H tree; split => //= _.
   exists (height tree). apply gentreeS_correct => //=.
 Qed.
+
+Definition semProperty (P : Pred QProp) : Prop :=
+  forall qp, P qp -> failure qp = false.
+
+Definition semTestable {A : Type} {_ : @Testable Pred A} (a : A) : Prop :=
+  semProperty (property a).
+
+
+
+
+
+
+
