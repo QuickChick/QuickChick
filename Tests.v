@@ -178,13 +178,16 @@ Proof.
   exists (height tree). apply gentreeS_correct => //=.
 Qed.
 
-(* Proving equivalence for checkers *)
+(* Proving end-to-end equivalence *)
 
 Require Import Prove.
 
-Goal (semProp removeP <-> (forall (x : nat) l, ~ In x (remove x l))).
+Definition semTestable {A : Type} {_ : @Testable Pred A} (a : A) : Prop :=
+  semProperty (property a).
+
+Goal (semProp removeP) <-> (forall (x : nat) l, ~ In x (remove x l)).
 Proof.
-  rewrite /semProp /proveFun /semProp /proveBool.
+  repeat rewrite /semProp /proveFun /semProp /proveBool. 
   split. 
   - move => H x l. 
     have H': removeP x l. 
