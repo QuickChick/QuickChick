@@ -178,12 +178,7 @@ Proof.
   exists (height tree). apply gentreeS_correct => //=.
 Qed.
 
-Definition semProperty (P : Pred QProp) : Prop :=
-  forall qp, P qp -> failure qp = false.
-
-Definition semTestable {A : Type} {_ : @Testable Pred A} (a : A) : Prop :=
-  semProperty (property a).
-
+(* Proving equivalence for checkers *)
 
 Require Import Prove.
 
