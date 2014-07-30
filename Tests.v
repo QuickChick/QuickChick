@@ -185,11 +185,22 @@ Definition semTestable {A : Type} {_ : @Testable Pred A} (a : A) : Prop :=
   semProperty (property a).
 
 
-Goal (semTestable prop_length <-> (forall A (l: seq A),  Datatypes.length l <= 20)).
+Require Import Prove.
+
+Goal (semProp removeP <-> (forall (x : nat) l, ~ In x (remove x l))).
 Proof.
-  rewrite /semTestable /semProperty. split.
-  move=> Hqp. 
-
-
-
-
+  rewrite /semProp /proveFun /semProp /proveBool.
+  split. 
+  - move => H x l. 
+    have H': removeP x l. 
+    { apply H. by apply arbNat_correct. apply arbList_correct => //.
+      exact arbNat_correct. }
+    rewrite /removeP in H'. move => HIn.
+    have contra : existsb (pred1 x) (remove x l).
+    { apply existsb_exists. exists x. split => //. by rewrite /= eq_refl. }
+    by rewrite contra //= in H'. 
+  -  move => H a _ l _. rewrite /removeP. apply Bool.eq_true_not_negb. 
+     move => /existsb_exists contra. 
+     move : contra => [n [HIn /=/eqP Hpred]]; subst. eapply H.
+     eassumption.
+Qed.
