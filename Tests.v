@@ -180,7 +180,7 @@ Qed.
 
 (* Proving end-to-end equivalence *)
 
-Require Import Prove.
+Require Import EndToEnd.
 
 Definition semTestable {A : Type} {_ : @Testable Pred A} (a : A) : Prop :=
   semProperty (property a).

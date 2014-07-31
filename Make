@@ -6,7 +6,7 @@ src/SetOfOutcomes.v
 src/Gen.v
 src/MutateCheck.v
 src/Property.v
-src/Prove.v
+src/EndToEnd.v
 src/Show.v
 src/State.v
 src/QuickChick.v
