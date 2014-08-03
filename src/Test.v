@@ -274,6 +274,7 @@ Definition test (st : State) (f : RandomGen -> nat -> QProp) : Result :=
 Require Import ZArith.
 (* Axiom unsafeRandomSeed : Z. *)
 Axiom newStdGen : RandomGen.
+
 Definition quickCheckWithResult {prop : Type} {_ : Testable prop}
            (a : Args) (p : prop) : Result :=
   (* ignore terminal - always use trace :D *)

@@ -17,6 +17,8 @@ Require Import String.
 Local Open Scope string.
 (* Sanity check for stamp generation *)
 
+Definition Property := Property Gen.Gen. 
+
 Definition prop_stamp_generation (st : State) :=
   whenFail (show st) (well_formed st).
 

@@ -4,8 +4,8 @@ Require Export Show.
 
 Require Export Axioms.
 Require Export AbstractGen.
-(* Require Export SetOfOutcomes. *)
-(* Require Export Gen. *)
+Require Import SetOfOutcomes.
+Require Import Gen.
 Require Export Arbitrary.
 Require Export State.
 Require Export Property.

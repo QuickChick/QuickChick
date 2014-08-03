@@ -3,6 +3,8 @@ Require Import AbstractGen SetOfOutcomes Arbitrary Property.
 Require Import ssreflect ssrbool eqtype.
 
 
+Definition Property := Property Pred. 
+
 Definition resultCorrect (r : Result) : bool := 
   match r with
     | MkResult (Some res) expected _ _ _ _ => 
@@ -16,12 +18,13 @@ Definition failure qp :=
   end.
 
 (* Maps a Property to a Prop *)
-Definition semProperty (P : Pred QProp) : Prop :=
+Definition semProperty (P : Property) : Prop :=
   forall qp, P qp -> failure qp = false.
 
 (* Maps a Testable to a Prop i.e. gives an equivalent proposition to the 
    property under test *)
-Definition semTestable {A : Type} {_ : @Testable Pred A} (a : A) : Prop :=
+
+Definition semTestable {A : Type} {_ : Testable  A} (a : A) : Prop :=
   semProperty (property a).
 
 (* Lemmas about idempotent combinators i.e. combinators that do not change
@@ -30,9 +33,9 @@ Definition semTestable {A : Type} {_ : @Testable Pred A} (a : A) : Prop :=
 Lemma mapTotalResult_idemp: 
   forall {prop : Type} {H : Testable prop} (f : Result -> Result) (p : prop),
     (forall res, resultCorrect res = resultCorrect (f res)) -> 
-    ((semTestable p) <-> (semProperty (@mapTotalResult Pred _ _ _ f p))).
+    ((semTestable p) <-> (semProperty (mapTotalResult f p))).
 Proof.
-  move=> prop H f p Hyp. 
+  move => prop H f p Hyp. 
   rewrite /semTestable  /mapTotalResult /mapRoseResult /mapProp /semProperty.
   split.
   - move => H1 qp [qp' [/H1 Hprop H2]]. 
@@ -115,7 +118,7 @@ Lemma semLabel_idemp:
 Proof.
   move=> prop H s p. by rewrite /label semClassify_idemp. 
 Qed.
-    
+        
 Lemma semCollect_idemp:
    forall {prop : Type} {H : Testable prop} (s: String.string) 
           (p : prop), 
@@ -128,7 +131,7 @@ Qed.
 (* equivalences for other combinators *)
 
 Lemma semBindGen: 
-  forall {A} (gen : Pred A) (p : A -> @Property Pred),
+  forall {A} (gen : Pred A) (p : A -> Property),
     semProperty (bindGen gen p) <-> forall g, gen g -> semProperty (p g).
 Proof. 
   move=> A gen prop. rewrite /semProperty. split.
@@ -148,7 +151,7 @@ Qed.
 Lemma semForAll : 
   forall {A prop : Type} {H : Testable prop} 
          show (gen : Pred A) (pf : A -> prop),
-  semProperty (@forAll Pred _ _ _ H show gen pf) <->
+  semProperty (forAll show gen pf) <->
   (forall a : A, gen a -> (semTestable (pf a))).
 Proof.  
   move => A prop Htest show gen pf. split => H'.
@@ -161,19 +164,19 @@ Qed.
 Lemma semPredQProp:
   forall (p : Pred QProp), semTestable p <-> (semProperty p).
 Proof.  
-  move=> p. 
-  rewrite /semTestable /property /testGenProp /property /testProp semBindGen. 
-  split.
-  - move => H pq /H Hgen. rewrite returnGen_def /semProperty in Hgen.
-    by apply Hgen.
-  - move => H pq Hgen. rewrite returnGen_def /semProperty.
-    move => qp Heq; subst. rewrite /semProperty in H. by auto.
+  by move=> p. 
+  (* rewrite /semTestable /property /testGenProp /property /testProp semBindGen. *)
+  (* split. *)
+  (* - move => H pq /H Hgen. rewrite returnGen_def /semProperty in Hgen. *)
+  (*   by apply Hgen. *)
+  (* - move => H pq Hgen. rewrite returnGen_def /semProperty. *)
+  (*   move => qp Heq; subst. rewrite /semProperty in H. by auto. *)
 Qed.
 
 Lemma semForAllShrink: 
   forall {A prop : Type} {H : Testable prop}
          show (gen : Pred A) (pf : A -> prop) shrink,
-    semProperty (@forAllShrink Pred _ _ _ H show gen shrink pf) <->
+    semProperty (forAllShrink  show gen shrink pf) <->
     (forall a : A, gen a -> (semTestable (pf a))).
 Proof.
   move => A prop H show gen pf shrink. split.
