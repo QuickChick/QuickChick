@@ -22,27 +22,27 @@ Require Import Show.
 (*
 
 L ->  s1'
-      |    final states indistinguishable
+|     |    final states indistinguishable
 L ->  s2'
 
 
 
 
 L ->  s1'
-      
+|     
 L ->  x    no step for the second state
 
 
 
 H -> L
-     |     final states indistinguishable
+|    |     final states indistinguishable
 H -> L 
 
 
 
 
 H -> L
-         no condition here. Seems a bit strange. 
+|        no condition here. Seems a bit strange. 
 H -> H 
 
 

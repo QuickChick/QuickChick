@@ -42,7 +42,12 @@ Definition prop_exec_preserves_well_formed (t : table)
     | _ => property rejected
     end
   else property false).
-  
+
+Definition exec_preserves_well_formed : Prop := forall t st x st',
+  well_formed st = true ->
+  exec t st = Some (x, st') ->
+  well_formed st' = true.
+
 Definition prop_generate_indist
 : Property :=
   forAllShrink show gen_variation_state (fun _ => []) (* shrinkVState *)
