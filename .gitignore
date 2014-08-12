@@ -12,3 +12,4 @@
 *.v~
 \#*
 *.bak
+Makefile.coq
