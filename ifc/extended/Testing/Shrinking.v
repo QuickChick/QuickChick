@@ -38,7 +38,6 @@ Definition shrinkValue (v : Value) : list Value :=
     | Vint i => map Vint (shrink i)
     | Vptr p => Vint Z0 :: map Vptr (shrinkPointer p)
     | Vlab l => Vint Z0 :: map Vlab (shrinkLabel l)
-    | Vcptr n => Vint Z0 :: map Vcptr (shrink n)
   end.
 
 Definition shrinkAtom (a : Atom) : list Atom :=
@@ -84,8 +83,6 @@ Instance shrVVal : ShrinkV Value :=
         map (fun p => Var lab (Vptr p) (Vptr p)) (shrinkPointer p)
       | Var lab (Vlab l) (Vlab _) =>
         map (fun l => Var lab (Vlab l) (Vlab l)) (shrinkLabel l)
-      | Var lab (Vcptr n) (Vcptr _) =>
-        map (fun n => Var lab (Vcptr n) (Vcptr n)) (shrink n)
       | _ => nil
     end
 |}. 

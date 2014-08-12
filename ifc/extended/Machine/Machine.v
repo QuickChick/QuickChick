@@ -453,7 +453,7 @@ Definition exec t (st:State) : option (trace * State) :=
           end
     | BCall r1 r2 r3 =>
       match registerContent r r1, registerContent r r2 with
-        | Some (Vcptr addr @ L), Some (Vlab B @ K) =>
+        | Some (Vint addr @ L), Some (Vlab B @ K) =>
           match run_tmr t OpBCall <|L; K|> LPC with
             | Some (Some rl, rpcl) =>
               Some (nil, 
@@ -525,7 +525,7 @@ Definition exec t (st:State) : option (trace * State) :=
       end
     | Jump r1 =>
       match registerContent r r1 with
-        | Some (Vcptr addr @ L) =>
+        | Some (Vint addr @ L) =>
           match run_tmr t OpJump <|L|> LPC with
             | Some (None, rpcl) =>
               Some (nil,

@@ -110,7 +110,6 @@ Instance show_val : Show Value :=
       | Vint  v => "Vint  " ++ show v
       | Vptr  v => "Vptr  " ++ show v
       | Vlab  v => "Vlab  " ++ show v
-      | Vcptr v => "Vcptr " ++ show v
     end
 |}.
 
@@ -366,6 +365,3 @@ Fixpoint show_execution (lab : Label)
     | [], _ => "Mach 2 continues: FIXME" 
     | _, [] => "Mach 1 continues: FIXME"
   end.
-
-
-         

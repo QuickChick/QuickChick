@@ -120,14 +120,13 @@ Qed.
 
 (* Value *)
 
-Definition val_spec (inf : Info) (v : Value) :=
+Definition val_spec (inf : Info) (v : Value) : Prop :=
   match v with 
     | Vint _ => True
     | Vptr ptr =>
       let '(Ptr mf addr) := ptr in
       (exists len, In (mf, len) (data_len inf) /\ 
                    (0 <= addr <= len - 1)%Z) 
-    | Vcptr z => (0 <= z <= (code_len inf) - 1)%Z
     | Vlab l => In l (allThingsBelow (top_prin inf))
   end.
 
@@ -165,6 +164,8 @@ Proof.
       reflexivity.
       rewrite liftGen_def. split => //. eexists.
       split => //. 
+Admitted.
+(*
       apply gen_Pointer_correct. exists len. split => //.
    + (* Vcptr *)
      move => addr. split. 
@@ -197,7 +198,8 @@ Proof.
        rewrite liftGen_def. split => //. exists L. split => //=.
        by apply/gen_label_inf_correct.
 Qed.
-      
+*)
+
 (* Atom *) 
 
 Definition atom_spec inf atm  := 
@@ -909,7 +911,7 @@ Proof.
       split => //. apply/andP; split. 
       by rewrite /label_eq; apply/andP; split; apply flows_refl. 
       apply/orP. right. rewrite /indist /indistValue /val_spec in Hspec *.   
-      case: va' Hspec => [i' | Ptr' | i' | lv'] Hspec;
+      case: va' Hspec => [i' | Ptr' | lv'] Hspec;
       repeat
       (match goal with 
         | |-  is_true (Z_eq ?n ?n) => 
@@ -924,8 +926,8 @@ Proof.
       move=> [/andP [/andP [Hflows1 Hflows2] /orP [H1 //= | H1]] H2]. 
       rewrite /indist /indistValue in H1. rewrite returnGen_def. 
       move: (flows_antisymm _ _ Hflows2 Hflows1) => Heq; subst.
-      case: va Hspec H1 H2 => [i | ptr | i | lv];  
-      case: va' => [i' | ptr' | i' | lv'] => // Hspec H1 H2; try 
+      case: va Hspec H1 H2 => [i | ptr | lv];  
+      case: va' => [i' | ptr' | lv'] => // Hspec H1 H2; try 
        match goal with 
          | H : is_true (Z_eq ?i ?i') |- _ => 
            rewrite /Z_eq in H; by case : (Z.eq_dec i i') H => Heq H;  subst
@@ -942,7 +944,7 @@ Proof.
     rewrite bindGen_def. 
     split.    
     * (* Correctness *) 
-      case: va Hspec=> [i | ptr | i | lv];  case: va' => [i' | ptr' | i' | lv'];
+      case: va Hspec=> [i | ptr | lv];  case: va' => [i' | ptr' | lv'];
       move => Hpec [val [Hgen Hret]];
       rewrite returnGen_def in Hret; move : Hret => [Heq1 Heq2]; subst;
       (split; [apply/andP; split => //; rewrite /label_eq; apply/andP; split; 
@@ -1534,4 +1536,3 @@ Abort.
   (*   rewrite /smart_gen in sgen, sgen2, sgen3, sgen4, sgen5, sgen6, sgen7 . *)
 
 End WithDataLenNonEmpty.
-

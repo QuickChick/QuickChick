@@ -22,7 +22,6 @@ Instance indistValue : Indist Value :=
       | Vlab  l1, Vlab l2  => label_eq l1 l2 
       | Vptr (Ptr mf1 i1), Vptr (Ptr mf2 i2) => 
         mframe_eq mf1 mf2 && Z_eq i1 i2 
-      | Vcptr c1, Vcptr c2 => Z_eq c1 c2
       | _, _ => false
     end
 |}.

@@ -97,12 +97,9 @@ Definition gen_Value (inf : Info) : Gen Value :=
   let '(MkInfo def cl dfs prins _) := inf in
     frequency' (liftGen Vint arbitrary)
               [(1, liftGen Vint  (frequency' (pure Z0)
-                                    [(10,arbitrary); (1,pure Z0)]));
+                                    [(10,arbitrary); (1,pure Z0); (10, gen_from_length cl)]));
                       (* prefering 0 over other integers (because of BNZ);
-                         an alt would be to use sized here
-                         (AFAIK numeric generators in Haskell QC
-                          are sized by default) *)
-               (1, liftGen Vcptr (gen_from_length cl));
+                         prefering valid code pointers over invalid ones *)
                (1, liftGen Vptr  (smart_gen inf));
                (1, liftGen Vlab  (smart_gen inf))].
 
@@ -188,7 +185,7 @@ Definition smart_gen_stack (pc : Ptr_atom) inf : Gen Stack :=
 (* ------------------------------------------------------ *)
 
 (* Groups registers into 4 groups, based on their content
-   (data pointers, code pointers, numeric and labels)
+   (data pointers, numeric and labels)
 *)
 Fixpoint groupRegisters (st : State) (rs : regSet) 
          (dptr cptr num lab : list regPtr) (n : Z) :=
@@ -198,8 +195,6 @@ Fixpoint groupRegisters (st : State) (rs : regSet)
       groupRegisters st rs' dptr cptr (n :: num) lab (Zsucc n)
     | (Vptr p @ _ ) :: rs' =>
       groupRegisters st rs' (n :: dptr) cptr num lab (Zsucc n)
-    | (Vcptr _ @ _) :: rs' =>                     
-        groupRegisters st rs' dptr (n :: cptr) num lab (Zsucc n)
     | (Vlab _ @ _) :: rs' =>
       groupRegisters st rs' dptr cptr num (n :: lab) (Zsucc n)
   end.

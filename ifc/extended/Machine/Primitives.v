@@ -41,8 +41,6 @@ Inductive Pointer : Type :=
 Inductive Value : Type :=
   | Vint  (n:Z)
   | Vptr  (p:Pointer)
-  | Vcptr (addr : Z) (* CH: Why not just nat? *) (* Maybe we want a CptrOffset? *)
-          (* TODO: remove this crap, we have no way to create them! *)
   | Vlab  (L:Label).
 
 Definition obs_value_to_value (ov:Obs_value) : Value :=
@@ -123,8 +121,6 @@ Proof.
   - destruct p; destruct p0; 
     destruct (Z.eq_dec i i0); destruct (fp == fp0); 
     try_split_congruence.
-  - destruct addr; destruct addr0; try_split_congruence;
-    destruct (Pos.eq_dec p p0); try_split_congruence.
   - destruct (LatEqDec Label L L0); try_split_congruence.
 Qed.
 
@@ -369,7 +365,6 @@ Inductive match_vals (mi : meminj) : Value -> Value -> Prop :=
 | mv_ptr : forall b1 b2 off
                   (BLOCK : mi b2 = Some b1),
              match_vals mi (Vptr (Ptr b1 off)) (Vptr (Ptr b2 off))
-| mv_cptr : forall z, match_vals mi (Vcptr z) (Vcptr z)
 | mv_vlab : forall l, match_vals mi (Vlab l) (Vlab l).
 Hint Constructors match_vals.
 
