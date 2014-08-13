@@ -4,7 +4,7 @@ Require Import Coq.Numbers.Natural.Peano.NPeano.
 Require Import Recdef.
 Require Import List.
 Require Import SetOfOutcomes.
-Require Import ssreflect. 
+Require Import ssreflect.
 
 Class Arbitrary (A : Type) : Type :=
   {
@@ -18,16 +18,16 @@ Section ArbitrarySection.
           {H : GenMonad Gen}.
 
   Definition arbitraryBool := choose (false, true).
-  Definition arbitraryNat :=  
+  Definition arbitraryNat :=
     sized (fun x => choose (0, x)).
   (* Why we  are not using sized to generate Nats like QC?
       Definition arbitraryNat :=  choose (0, 100). *)
-  Definition arbitraryZ := 
-    sized (fun x => 
-             let z := Z.of_nat x in 
+  Definition arbitraryZ :=
+    sized (fun x =>
+             let z := Z.of_nat x in
              choose (-z, z)%Z).
   (* Definition arbitraryZ := choose (-100, 100)%Z. *)
-  Definition arbitraryList {A : Type} {Arb : Arbitrary A} := 
+  Definition arbitraryList {A : Type} {Arb : Arbitrary A} :=
     listOf arbitrary.
 End ArbitrarySection.
 
@@ -71,14 +71,14 @@ Admitted.
 Fixpoint shrinkList {A : Type} (shr : A -> list A) (l : list A) : list (list A) :=
   match l with
     | nil => nil
-    | cons x xs => 
+    | cons x xs =>
       cons xs (map (fun xs' => cons x xs') (shrinkList shr xs))
            ++ (map (fun x'  => cons x' xs) (shr x ))
   end.
 
 Instance arbList {A : Type} {Arb : Arbitrary A} : Arbitrary (list A) :=
   {|
-    arbitrary := 
+    arbitrary :=
       fun gen hgen => @arbitraryList gen hgen A Arb;
     shrink l  := shrinkList shrink l
   |}.
@@ -113,29 +113,29 @@ Lemma arbBool_correct:
 Proof.
   rewrite /arbitrary /arbBool /arbitraryBool. move => b.
   split => // _. rewrite choose_def.
-  simpl. case: b; split; move => contra; discriminate. 
+  simpl. case: b; split; move => contra; discriminate.
 Qed.
 
 Lemma arbNat_correct:
   arbitrary <--> (fun (_ : nat) => True).
 Proof.
   rewrite /arbitrary /arbNat /arbitraryNat. move => n.
-  split => // _. 
+  split => // _.
   rewrite sized_def. exists n. rewrite choose_def.
   split; [apply nat_compare_le | apply nat_compare_ge]; simpl; omega.
 Qed.
 
-Lemma arbInt_correct: 
+Lemma arbInt_correct:
   arbitrary <--> (fun (_ : Z) => True).
 Proof.
-  rewrite /arbitrary /arbInt /arbitraryZ.  
-  rewrite sized_def. move => z. split => //= _. 
+  rewrite /arbitrary /arbInt /arbitraryZ.
+  rewrite sized_def. move => z. split => //= _.
   exists (Z.abs_nat z).
-  split. 
-  - apply/Z.compare_le_iff. rewrite Nat2Z.inj_abs_nat. 
-    by case: z => //= p; omega. 
-  - apply/Z.compare_ge_iff. rewrite Nat2Z.inj_abs_nat. 
-    by case: z => //= p; omega. 
+  split.
+  - apply/Z.compare_le_iff. rewrite Nat2Z.inj_abs_nat.
+    by case: z => //= p; omega.
+  - apply/Z.compare_ge_iff. rewrite Nat2Z.inj_abs_nat.
+    by case: z => //= p; omega.
 Qed.
 
 Lemma arbList_correct:
@@ -144,7 +144,7 @@ Lemma arbList_correct:
     (arbitrary <--> (fun (_ : list A) => True)).
 Proof.
   move => A H Hcorrect. rewrite /arbitrary /arbList /arbitraryList.
-  move=> l. split => // _. 
+  move=> l. split => // _.
   apply listOf_equiv. move => x _. by apply Hcorrect.
 Qed.
 

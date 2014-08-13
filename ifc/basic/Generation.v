@@ -25,13 +25,13 @@ Local Open Scope nat.
 
 Definition ainstr (st : State) : Gen Instruction :=
   let '(St im m stk pc ) := st in
-  let fix stack_length s := 
-      match s with 
+  let fix stack_length s :=
+      match s with
         | _ :: s' => 1 + stack_length s'
         | _ => 0
       end in
   let sl := stack_length stk in
-  let fix containsRet s := 
+  let fix containsRet s :=
       match s with
         | _ ::: _ => true
         | _ :: s' => containsRet s'
@@ -48,7 +48,7 @@ Definition ainstr (st : State) : Gen Instruction :=
               (10, returnGen Load);
               (100, returnGen Store)].
 (*
-              (onLength 1 10, liftGen BCall (chooseZ (0, (Z.of_nat sl-1))%Z)); 
+              (onLength 1 10, liftGen BCall (chooseZ (0, (Z.of_nat sl-1))%Z));
               (if containsRet stk then 10 else 0, returnGen BRet);
               (onLength 2 10, returnGen Add);
               (onLength 1 10, returnGen Load);
@@ -56,13 +56,13 @@ Definition ainstr (st : State) : Gen Instruction :=
 *)
 
 Fixpoint gen_stack (n : nat) (onlyLow : bool) : Gen Stack :=
-  let gen_atom := 
+  let gen_atom :=
       if onlyLow then liftGen2 Atm gen_Z (returnGen L)
       else gen_atom
   in
   match n with
     | O => returnGen Mty
-    | S n' => 
+    | S n' =>
       frequency (returnGen Mty) [
                   (10, liftGen2 Cons gen_atom (gen_stack n' onlyLow));
                   (4, bindGen gen_atom (fun pc =>
@@ -75,7 +75,7 @@ Definition gen_state : Gen State :=
   bindGen gen_memory (fun mem =>
   bindGen (gen_stack 4 (is_atom_low pc)) (fun stk =>
   bindGen (ainstr (St imem0 mem stk pc)) (fun i =>
-  returnGen (St [i;i] mem stk pc))))).                                              
+  returnGen (St [i;i] mem stk pc))))).
 
 (* State Variations *)
 Inductive Variation {A : Type} := V : A -> A -> @Variation A.
@@ -84,9 +84,9 @@ Class Vary (A : Type) := {
   vary : A -> Gen A
 }.
 
-Instance vary_atom : Vary Atom := 
+Instance vary_atom : Vary Atom :=
 {|
-  vary a := 
+  vary a :=
     let '(x @ l) := a in
     match l with
       | L => returnGen a
@@ -103,7 +103,7 @@ Fixpoint vary_stack (s : Stack) (isLow : bool) : Gen Stack :=
   match s with
     | a :: s'  => if isLow then liftGen2 Cons (vary a) (vary_stack s' isLow)
                   else liftGen2 Cons gen_atom (vary_stack s' isLow)
-    | (x@l) ::: s' => 
+    | (x@l) ::: s' =>
       match l with
         | L => liftGen (RetCons (x@l)) (vary_stack s' true)
         | H => liftGen2 RetCons (vary (x@l)) (vary_stack s' false)
@@ -116,19 +116,19 @@ Instance vary_state : Vary State :=
   vary st :=
     let '(St imem mem stk pc) := st in
     bindGen (vary mem) (fun mem' =>
-    bindGen (vary pc)  (fun pc' => 
+    bindGen (vary pc)  (fun pc' =>
     let isLow := match pc with
                    | _ @ L => true
                    | _ @ H => false
                  end in
-    if isLow then 
+    if isLow then
       bindGen (vary_stack stk isLow) (fun stk' =>
       returnGen (St imem mem' stk' pc'))
     else
       bindGen (vary_stack stk isLow) (fun stk' =>
       bindGen gen_atom (fun extra_elem =>
       returnGen (St imem mem' (extra_elem :: stk') pc')))))
-|}.                          
+|}.
 
 Definition gen_variation_state : Gen (@Variation State) :=
   bindGen gen_state (fun st =>

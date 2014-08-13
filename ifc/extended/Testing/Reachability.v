@@ -26,8 +26,8 @@ Fixpoint nub_by_aux {A : Type} (eq_dec : forall (x y : A), {x = y} + {x <> y})
          (l acc : list A) : list A :=
   match l with
     | [] => acc
-    | h::t => 
-      if elem eq_dec h acc 
+    | h::t =>
+      if elem eq_dec h acc
       then nub_by_aux eq_dec t acc
       else nub_by_aux eq_dec t (h::acc)
   end.
@@ -35,18 +35,18 @@ Fixpoint nub_by_aux {A : Type} (eq_dec : forall (x y : A), {x = y} + {x <> y})
 (* This removes duplicates from a list *)
 Definition nub_by {A : Type} eq_dec (l : list A) := nub_by_aux eq_dec l [].
 
-Definition get_mframes_from_atoms (obs : Label) (st : State) (atoms : list Atom) 
+Definition get_mframes_from_atoms (obs : Label) (st : State) (atoms : list Atom)
   : list mframe :=
-  nub_by Mem.EqDec_block 
+  nub_by Mem.EqDec_block
         (list_of_option (map extract_mframe
                         (filter (is_low_pointer obs st) atoms))).
 
-Fixpoint get_root_set_stack (obs : Label) (st : State) 
+Fixpoint get_root_set_stack (obs : Label) (st : State)
          (acc : list mframe) (s : Stack) : list mframe :=
   match s with
     | Mty => acc
     | RetCons (pc, _, rs, _) s' =>
-      let new_mframes := 
+      let new_mframes :=
           if isLow ∂pc obs then get_mframes_from_atoms obs st rs
           else [] in
       let acc' := nub_by_aux Mem.EqDec_block new_mframes acc in
@@ -55,7 +55,7 @@ Fixpoint get_root_set_stack (obs : Label) (st : State)
 
 Definition get_root_set (obs : Label) (st : State) : list mframe :=
   let '(St _ _ _ s r pc) := st in
-  let init_root_set := 
+  let init_root_set :=
       if isLow ∂pc obs then get_mframes_from_atoms obs st r
       else [] in
   get_root_set_stack obs st init_root_set s.
@@ -68,23 +68,23 @@ Function reachable_from_root_set (obs : Label) (st : State)
   : list mframe :=
   match worklist with
     | [] => visited
-    | h::t => 
+    | h::t =>
       if elem Mem.EqDec_block h visited then
         reachable_from_root_set obs st visited t
-      else 
+      else
         match Mem.get_frame (st_mem st) h with
           | Some (Fr _ L atoms) =>
-            let newCands := 
-                if isLow L obs then 
-                  get_mframes_from_atoms obs st atoms 
+            let newCands :=
+                if isLow L obs then
+                  get_mframes_from_atoms obs st atoms
                 else [] in
             let worklist' := nub_by_aux Mem.EqDec_block newCands t in
             reachable_from_root_set obs st (h :: visited) worklist'
           | _ => reachable_from_root_set obs st (h :: visited) t
         end
   end.
-Proof. 
-admit. admit. admit. 
+Proof.
+admit. admit. admit.
 Defined.
 
 Definition reachable (obs : Label) (st : State) : list mframe :=
@@ -92,11 +92,11 @@ Definition reachable (obs : Label) (st : State) : list mframe :=
   reachable_from_root_set obs st [] root_set.
 
 Definition well_formed_label (st : State) (l : Label) : bool :=
-  let observable := reachable l st in 
+  let observable := reachable l st in
   forallb (fun mf => let s := Mem.stamp mf in isLow s l) observable.
 
 (* Given a state and a stamp configuration, make sure everything is ok *)
-(* LL: This also suggests a way of generating stamps! Namely, get 
+(* LL: This also suggests a way of generating stamps! Namely, get
    the meet of all the labels where a frame is reachable *)
 Definition well_formed (st : State) : bool :=
   let '(St _ _ prins _ _ _) := st in
@@ -111,7 +111,7 @@ Definition list_meet (acc : Label) (ls : list Label) :=
 (* Attempt to reverse the above predicate to get a stamp generator *)
 (* CH: currently unused *)
 Definition generate_stamp (st : State) (mf : mframe) : mframe :=
-  let '(St _ m p _ _ _) := st in 
+  let '(St _ m p _ _ _) := st in
   let all_labels := map lab_of_list (powerset (Zset.elements p)) in
   let cands := filter (fun l => elem Mem.EqDec_block mf (reachable l st))
                       all_labels in

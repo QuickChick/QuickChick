@@ -14,17 +14,17 @@ Definition trace (A : Type) (s : string) (a : A) : A := a.
 
 (* Note : Simple Callbacks fall under strict positivity of result... *)
 Inductive CallbackKind :=
-| Counterexample 
+| Counterexample
 | NotCounterexample.
 
-Inductive SmallResult := 
-  MkSmallResult : option bool -> bool -> string -> bool -> 
+Inductive SmallResult :=
+  MkSmallResult : option bool -> bool -> string -> bool ->
                   list (string * nat) -> SmallResult.
 
 Inductive Callback : Type :=
-| PostTest : 
+| PostTest :
     CallbackKind -> (State -> SmallResult -> nat) -> Callback
-| PostFinalFailure : 
+| PostFinalFailure :
     CallbackKind -> (State -> SmallResult -> nat) -> Callback.
 
 Record Result :=
@@ -69,7 +69,7 @@ Section Property.
   Context
  {Gen : Type -> Type}
           {H: GenMonad Gen}.
-  
+
   Class Testable (A : Type) : Type :=
     {
       property : A -> Property Gen
@@ -106,14 +106,14 @@ Section Property.
       property p := bindGen p property
     |}.
 
-  (* Sometimes it cannot infer this one ... 
+  (* Sometimes it cannot infer this one ...
   Global Instance testProperty : Testable (Property Gen) | 0  :=
     {|
       property p := p
     |}.
 *)
 
-  (* Left out exception handling! 
+  (* Left out exception handling!
    property p :=
     match p with
       | MkProp r => returnGen r
@@ -123,8 +123,8 @@ Section Property.
   Definition mapProp {P : Type} {_ : Testable P}
              (f : QProp -> QProp) (prop : P) : Property Gen :=
     fmapGen f (property prop).
-  
-  Definition mapRoseResult {P : Type} {_ : Testable P} 
+
+  Definition mapRoseResult {P : Type} {_ : Testable P}
              (f : Rose Result -> Rose Result) (prop : P) : Property Gen :=
     mapProp (fun p => match p with MkProp t => MkProp (f t) end) prop.
 
@@ -132,7 +132,7 @@ Section Property.
              (f : Result -> Result) : prop -> Property Gen :=
     mapRoseResult (fmapRose f).
 
-  Definition callback {prop : Type} {_ : Testable prop} 
+  Definition callback {prop : Type} {_ : Testable prop}
              (cb : Callback) : prop -> Property Gen :=
     mapTotalResult (fun r => addCallback r cb).
 
@@ -140,16 +140,16 @@ Section Property.
              (str : string) : prop -> Property Gen :=
     callback (PostFinalFailure Counterexample (fun _st _sr => trace str 0)).
 
-  (* The following function on its own does not have a decreasing argument... 
+  (* The following function on its own does not have a decreasing argument...
 
-Fixpoint props {prop A : Type} {t : Testable prop} 
+Fixpoint props {prop A : Type} {t : Testable prop}
          (pf : A -> prop) (shrinker : A -> list A) (x : A) :=
   MkRose (property (pf x)) (List.map (props pf shrinker) (shrinker x)).
    *)
   Fixpoint props' {prop A : Type} {t : Testable prop} (n : nat)
            (pf : A -> prop) (shrinker : A -> list A) (x : A) :=
     match n with
-      | O => 
+      | O =>
         MkRose (property (pf x)) (lazy nil)
       | S n' =>
         MkRose (property (pf x)) (lazy (List.map (props' n' pf shrinker) (shrinker x)))
@@ -160,25 +160,25 @@ Fixpoint props {prop A : Type} {t : Testable prop}
              (pf : A -> prop) (shrinker : A -> list A) (x : A) : Rose (Property Gen) :=
     props' 1000 pf shrinker x.
 
-  Definition printTestCase {prop : Type} {tp : Testable prop} 
+  Definition printTestCase {prop : Type} {tp : Testable prop}
              (s : string) (p : prop) : Property Gen :=
     callback (PostFinalFailure Counterexample (fun _st _res => trace s 0)) p.
 
   Definition shrinking {prop A : Type} {_ : Testable prop}
              (shrinker : A -> list A) (x0 : A) (pf : A -> prop) : Property Gen :=
-    @fmapGen Gen _ _ _ (fun x => MkProp (joinRose (fmapRose unProp x))) 
+    @fmapGen Gen _ _ _ (fun x => MkProp (joinRose (fmapRose unProp x)))
              (promote (props pf shrinker x0)).
 
   Definition forAllShrink {A prop : Type} {_ : Testable prop}
              (show : A -> string)
              (gen : Gen A) (shrinker : A -> list A) (pf : A -> prop) : Property Gen :=
-    bindGen gen (fun x => 
+    bindGen gen (fun x =>
                    shrinking shrinker x (fun x' =>
                                            printTestCase (show x' ++ newline) (pf x'))).
 
   Definition forAll {A prop : Type} {_ : Testable prop}
              (show : A -> string) (gen : Gen A)  (pf : A -> prop) : Property Gen :=
-    bindGen gen (fun x => 
+    bindGen gen (fun x =>
                    printTestCase (show x ++ newline) (pf x)).
 
   Global Instance testFun {A prop : Type} {_ : Show A}
@@ -200,8 +200,8 @@ Fixpoint props {prop A : Type} {t : Testable prop}
   (* Test Case Distribution *)
   Definition cover {prop : Type} {_ : Testable prop}
              (b : bool) (n : nat) (s : string) : prop -> Property Gen :=
-    if b then 
-      mapTotalResult (fun res => 
+    if b then
+      mapTotalResult (fun res =>
                         let '(MkResult o e r i st c) := res in
                         MkResult o e r i ((s,n)::st) c)
     else property.
@@ -214,7 +214,7 @@ Fixpoint props {prop A : Type} {t : Testable prop}
              (s : string) : prop -> Property Gen :=
     classify true s.
 
-  Definition collect {A prop : Type} `{_ : Show A} {_ : Testable prop} 
+  Definition collect {A prop : Type} `{_ : Show A} {_ : Testable prop}
              (x : A) : prop -> Property Gen :=
     label (show x).
 

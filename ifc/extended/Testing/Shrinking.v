@@ -15,21 +15,21 @@ Require Import Common.
 Local Open Scope nat.
 
 Definition shrinkBinop (b : BinOpT) : list BinOpT := nil.
-Definition shrinkInstr i := 
+Definition shrinkInstr i :=
   match i with
     | Nop => nil
     | _ => [Nop]
   end.
 
 (* Powerset returns the set as its first element, so ignore that *)
-Definition shrinkLabel l := 
+Definition shrinkLabel l :=
     match powerset (Zset.elements l) with
       | [[]] => nil
-      | _::t => map lab_of_list t 
+      | _::t => map lab_of_list t
       | _    => nil
     end.
 
-Definition shrinkPointer (p : Pointer) : list Pointer := 
+Definition shrinkPointer (p : Pointer) : list Pointer :=
   let '(Ptr mf i) := p in
   map (Ptr mf) (shrink i).
 
@@ -42,27 +42,27 @@ Definition shrinkValue (v : Value) : list Value :=
 
 Definition shrinkAtom (a : Atom) : list Atom :=
   let '(Atm val lab) := a in
-  map (flip Atm lab) (shrinkValue val) 
+  map (flip Atm lab) (shrinkValue val)
   ++  map (Atm val) (shrinkLabel lab).
 
-Fixpoint noopShrink (n : nat) (l : Label) (l1 l2 : list Instruction) 
+Fixpoint noopShrink (n : nat) (l : Label) (l1 l2 : list Instruction)
 : list (@Variation (list Instruction)) :=
-  match n with 
+  match n with
     | S n' =>
       match nth n' l1 Nop, nth n' l2 Nop with
         | Nop, Nop =>
-          noopShrink n' l l1 l2 
+          noopShrink n' l l1 l2
         | _, _ =>
           match upd l1 (Z.of_nat n') Nop, upd l2 (Z.of_nat n') Nop with
-            | Some l1', Some l2' => cons (Var l l1' l2') 
+            | Some l1', Some l2' => cons (Var l l1' l2')
                                          (noopShrink n' l l1 l2)
             | _, _ => noopShrink n' l l1 l2
           end
       end
-    | _ => nil    
+    | _ => nil
   end.
 
-Fixpoint noopRemove (l : Label) (l1 l2 : list Instruction) 
+Fixpoint noopRemove (l : Label) (l1 l2 : list Instruction)
          (acc1 acc2 : list Instruction) :=
   match l1, l2 with
     | Nop :: t1, Nop :: t2 =>
@@ -72,7 +72,7 @@ Fixpoint noopRemove (l : Label) (l1 l2 : list Instruction)
       noopRemove l t1 t2 (h1 :: acc1) (h2 :: acc2)
     | _, _ => nil
   end.
-      
+
 Instance shrVVal : ShrinkV Value :=
 {|
   shrinkV vv :=
@@ -85,9 +85,9 @@ Instance shrVVal : ShrinkV Value :=
         map (fun l => Var lab (Vlab l) (Vlab l)) (shrinkLabel l)
       | _ => nil
     end
-|}. 
+|}.
 
-Definition shrinkVLabeled {A B : Type} (c : B -> Label -> A) (b b' : B) 
+Definition shrinkVLabeled {A B : Type} (c : B -> Label -> A) (b b' : B)
            (l lab : Label) : list (@Variation A) :=
   flat_map (fun ls =>
     if flows ls lab then
@@ -118,7 +118,7 @@ Fixpoint shrink_datas (lab : Label) (ds ds' : list Atom) :=
     | h1 :: t1, h2 :: t2 =>
       Var lab t1 t2 ::
       map (fun x => let '(Var _ h1' h2') := x in
-                    Var lab (h1':: t1) (h2'::t2)) (shrinkV (Var lab h1 h2)) 
+                    Var lab (h1':: t1) (h2'::t2)) (shrinkV (Var lab h1 h2))
       ++ map (fun x => let '(Var _ t1' t2') := x in
                        Var lab (h1::t1') (h2::t2')) (shrink_datas lab t1 t2)
     | _, _ => nil
@@ -135,7 +135,7 @@ Instance shrVFrame : ShrinkV frame :=
       map (fun x => let '(Var _ ds1 ds2) := x in
                     Var lab (Fr stmp lab ds1) (Fr stmp2 lab2 ds2))
           (shrink_datas obs data1 data2)
-    else 
+    else
       map (fun data1' => Var lab (Fr stmp lab data1') (Fr stmp2 lab2 data2))
           (shrinkListAtom data1) ++
       map (fun data2' => Var lab (Fr stmp lab data1) (Fr stmp2 lab2 data2'))
@@ -149,12 +149,12 @@ Fixpoint liftFrameMem (mf : mframe) (l : Label) (m1 m2 : mem)
     | [] => []
     | (Var lab f1' f2') :: t =>
       match update_frame m1 mf f1', update_frame m2 mf f2' with
-        | Some m1', Some m2' => (Var lab m1' m2') 
+        | Some m1', Some m2' => (Var lab m1' m2')
                                   :: (liftFrameMem mf l m1 m2 t)
         | _, _ => liftFrameMem mf l m1 m2 t
       end
   end.
-          
+
 Fixpoint shr_v_mem (lim : nat) (mf : mframe) (l : Label) (m1 m2 : mem) :=
   match lim with
     | O => nil
@@ -169,15 +169,15 @@ Fixpoint shr_v_mem (lim : nat) (mf : mframe) (l : Label) (m1 m2 : mem) :=
 
 Instance shrVMem : ShrinkV mem :=
 {|
-  shrinkV vm := 
+  shrinkV vm :=
     match vm with
-      | Var lab m1 m2 => 
+      | Var lab m1 m2 =>
         app (shr_v_mem 42 Z0 lab m1 m2)
             nil
     end
 |}.
 *)
-Fixpoint stackLength (s : Stack) := 
+Fixpoint stackLength (s : Stack) :=
   match s with
     | Mty => 0
     | RetCons _ s' => 1 + stackLength s'
@@ -200,7 +200,7 @@ Function shrink_stacks (lab : Label) (sp : Stack * Stack )
       else if flows (pc_lab pc1) lab then
         (* Mach 2 is high *)
         shrink_stacks lab (s1, t2)
-      else 
+      else
         (* Mach 1 is high *)
         shrink_stacks lab (t1, s2)
     | _, _ => nil
@@ -271,7 +271,7 @@ Definition decrRegInstr (r : regPtr) (i : Instruction) :=
   | BRet => BRet
   | FlowsTo r1 r2 r3 => FlowsTo (cDecr r r1) (cDecr r r2) (cDecr r r3)
   | LJoin r1 r2 r3  => LJoin (cDecr r r1) (cDecr r r2) (cDecr r r3)
-  | PutBot r1 => PutBot (cDecr r r1) 
+  | PutBot r1 => PutBot (cDecr r r1)
   | Nop => Nop
   | Put n r1 => Put n (cDecr r r1)
   | BinOp o r1 r2 r3 => BinOp o (cDecr r r1) (cDecr r r2) (cDecr r r3)
@@ -287,15 +287,15 @@ Definition decrRegInstr (r : regPtr) (i : Instruction) :=
   | PGetOff r1 r2 => PGetOff (cDecr r r1) (cDecr r r2)
   end.
 
-(* TODO 
+(* TODO
 Fixpoint decrRegInFrames (m : mem) (fs : list mframe) (r : regPtr) :=
   match fs with
     | []   => m
-    | h::t => 
+    | h::t =>
       match load_frame m h with
         | Some (CFR is) =>
           match update_frame m h (CFR (map (decrRegInstr r) is)) with
-            | Some m' => 
+            | Some m' =>
               decrRegInFrames m' t r
             | _ => decrRegInFrames m t r
           end
@@ -310,14 +310,14 @@ Definition removeReg (st : State) (r : regPtr) :=
   let rsTl := skipn (S rn) rs in
   St (decrRegInFrames m (allocated m) r) p s (rsHd ++ rsTl) pc.
 *)
-Fixpoint shrinkVRegContents (l : Label) (prev prev' rest rest' : regSet) 
+Fixpoint shrinkVRegContents (l : Label) (prev prev' rest rest' : regSet)
 : list (@Variation regSet) :=
   match rest, rest' with
     | h1 :: t1, h2 :: t2 =>
       let shrunk := shrinkV (Var l h1 h2) in
       map (fun v' =>
         let '(Var _ h1' h2') := v' in
-        Var l (rev_append prev  (h1'::t1)) 
+        Var l (rev_append prev  (h1'::t1))
               (rev_append prev' (h2'::t2))
       ) shrunk ++ shrinkVRegContents l (h1 :: prev) (h2 :: prev') t1 t2
 
@@ -343,7 +343,7 @@ Definition shrinkVRegs (v : @Variation State) :=
     let allRegs := map Z.of_nat (seq 0 regsNo) in
     let sts  := map (removeReg st ) allRegs in
     let sts' := map (removeReg st') allRegs in
-    map (fun x : (State * State) => 
+    map (fun x : (State * State) =>
            let (st1,st2) := x in Var l st1 st2) (combine sts sts') ++*)
     (liftRegsState st st' (shrinkVRegContents l nil nil regs regs')).
 
@@ -354,7 +354,7 @@ Definition shrinkVState (x : @Variation State) :=
   ++ concat (map shrinkStateStack  (shrinkStateMemory x))*)
   ++ shrinkVRegs x.
 (*
-Definition shrinkObsVar v := 
+Definition shrinkObsVar v :=
     let '(V lab st st' mf fm1 fm2) := v in
     let x := obsVarToVar v in
     map (varToObsVar mf fm1 fm2) (shrinkVState x).

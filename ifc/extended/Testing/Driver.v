@@ -127,15 +127,15 @@ Definition testMutant37wf := testMutantWF
 (* Definition testNI := testMutant9.*)
 (* Definition testNI := testSSNI default_table. *)
 (* Definition testNI := quickCheck prop_stamp_generation. *)
-(* Definition testNI := 
+(* Definition testNI :=
   quickCheck (prop_preserves_well_formed default_table). *)
 (* Definition testNI := quickCheck prop_generate_indist. *)
-(*(forAllShrink (fun _ => "implement me!") 
-                           genSingleExecState 
-                           (fun _ => nil)        
+(*(forAllShrink (fun _ => "implement me!")
+                           genSingleExecState
+                           (fun _ => nil)
                            (propWellFormednessPreserved default_table)).*)
 
-(*Definition testNI := 
+(*Definition testNI :=
   let l := lab_of_list [Pos.of_nat 1] in
   let h := lab_of_list [Pos.of_nat 1; Pos.of_nat 2] in
   match alloc 2%Z l bot (Vint Z0 @ bot) (Mem.empty Atom Label) with

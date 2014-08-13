@@ -15,59 +15,59 @@ Definition SSNI (t : table) (v : @Variation State) : Property Gen.Gen :=
   let '(St _ _ _ (_@l2)) := st2 in
 (*   match lookupInstr st1 with
     | Some i =>     collect (show i) (  *)
-  if indist st1 st2 then 
+  if indist st1 st2 then
     match l1, l2 with
-      | L,L  => 
+      | L,L  =>
         match exec t st1, exec t st2 with
-          | Some st1', Some st2' => 
+          | Some st1', Some st2' =>
 (*
-            whenFail ("Initial states: " ++ nl ++ show_pair st1 st2 ++ nl 
+            whenFail ("Initial states: " ++ nl ++ show_pair st1 st2 ++ nl
                         ++ "Final states: " ++ nl ++ show_pair st1' st2' ++nl)
 *)
             (* collect ("L -> L")*) (property (indist st1' st2'))
-          | _, _ => (* collect "L,L,FAIL" true *) property rejected 
+          | _, _ => (* collect "L,L,FAIL" true *) property rejected
         end
-      | H, H => 
+      | H, H =>
         match exec t st1, exec t st2 with
           | Some st1', Some st2' =>
             if is_atom_low (st_pc st1') && is_atom_low (st_pc st2') then
-              (* whenFail ("Initial states: " ++ nl ++ show_pair st1 st2 ++ nl 
+              (* whenFail ("Initial states: " ++ nl ++ show_pair st1 st2 ++ nl
                         ++ "Final states: " ++ nl ++ show_pair st1' st2' ++nl) *)
               (* collect ("H -> L")*) (property (indist st1' st2') )
             else if is_atom_low (st_pc st1') then
                    (* whenFail ("States: " ++ nl ++ show_pair st2 st2' ++ nl )*)
               (* collect ("H -> H")*) (property (indist st2 st2'))
-            else 
+            else
 (*            whenFail ("States: " ++ nl ++ show_pair st1 st1' ++ nl )*)
               (* collect ("H -> H")*) (property (indist st1 st1'))
           | _, _ => property rejected
         end
-      | H,_ => 
+      | H,_ =>
         match exec t st1 with
-          | Some st1' => 
+          | Some st1' =>
 (*             whenFail ("States: " ++ nl ++ show_pair st1 st1' ++ nl )*)
                       (* collect "H -> H"*) (property (indist st1 st1'))
           | _ => (*collect "H,_,FAIL" true *) property rejected
         end
-      | _,H => 
+      | _,H =>
         match exec t st2 with
-          | Some st2' => 
+          | Some st2' =>
 (*             whenFail ("States: " ++ nl ++ show_pair st2 st2' ++ nl )*)
                       (* collect "H -> H"*) (property (indist st2 st2'))
-          | _ => (*collect "L,H,FAIL" true *) property rejected 
+          | _ => (*collect "L,H,FAIL" true *) property rejected
         end
     end
-  else (* collect "Not indist!" true*)  property rejected 
+  else (* collect "Not indist!" true*)  property rejected
               (* )
     | _ => property rejected
   end*).
 
-Definition prop_SSNI t : Property Gen.Gen := 
+Definition prop_SSNI t : Property Gen.Gen :=
   forAllShrink show gen_variation_state (fun _ => nil)
    (SSNI t : Variation -> Gen.Gen QProp).
 
-Definition prop_gen_indist := 
-  forAllShrink show gen_variation_state (fun _ => nil) 
+Definition prop_gen_indist :=
+  forAllShrink show gen_variation_state (fun _ => nil)
                (fun v => let '(V st1 st2) := v in indist st1 st2).
 
 Definition runSSNIdefaultTable := showResult (quickCheck (prop_SSNI default_table : Gen.Gen QProp)).
@@ -94,14 +94,14 @@ Eval lazy -[labelCount helper] in
   nth (mutate_table default_table) 18.
 *)
 
-Definition testMutantX n := 
+Definition testMutantX n :=
   match nth (mutate_table default_table) n with
     | Some t => showResult (quickCheckWithResult myArgs (prop_SSNI t : Gen.Gen QProp))
     | _ => ""
   end.
 
 Definition testMutants :=
-  mutateCheckArgs myArgs default_table (fun t => (forAllShrink (fun _ => "") 
+  mutateCheckArgs myArgs default_table (fun t => (forAllShrink (fun _ => "")
                                gen_variation_state (fun _ => nil) (SSNI t : Variation -> Gen.Gen QProp)) : Gen.Gen QProp).
 
 Definition runTestMutants := show testMutants.
@@ -114,13 +114,13 @@ Definition st2 :=
   St [Store; Store] [0 @ L] (0 @ L :: 1 @ H :: Mty) (0 @ L).
 Definition ex_indist : indist st1 st2 = true. auto. Qed.
 
-Definition ex_test := 
+Definition ex_test :=
   match nth (mutate_table default_table) 18 with
     | Some t => showResult (quickCheck (SSNI t (V st1 st2) : Gen.Gen QProp))
     | _ => ""
   end.
 
-Definition main := 
+Definition main :=
   (* ex_test.*)
   testMutantX 18.
 (* show testMutants. *)

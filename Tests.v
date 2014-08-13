@@ -18,9 +18,9 @@ Fixpoint remove (x : nat) (l : list nat) : list nat :=
 Definition removeP (x : nat) (l : list nat) :=
   ~~ (existsb (pred1 x) (remove x l)).
 
-Definition test0 := 
+Definition test0 :=
   showResult (quickCheck removeP).
- 
+
 QuickCheck test0.
 
 Definition prop_length (A : Type) (l : list A) :=
@@ -35,7 +35,7 @@ QuickCheck testLength.
 
 Inductive tree (A : Type) :=
 | Leaf : tree A
-| Node : A -> tree A -> tree A -> tree A. 
+| Node : A -> tree A -> tree A -> tree A.
 
 Arguments Leaf {A}.
 Arguments Node {A} _ _ _.
@@ -66,7 +66,7 @@ Section CustomGen.
   Fixpoint gentreeS {A} (g : M A) (n : nat) : M (tree A) :=
     match n with
       | O => returnGen Leaf
-      | S n' => 
+      | S n' =>
         frequency' (returnGen Leaf)
                   [(1, returnGen Leaf);
                     (n, liftGen3 Node g (gentreeS g n') (gentreeS g n'))]
@@ -74,17 +74,17 @@ Section CustomGen.
 
   Definition gentree {A : Type} (g : M A) : M (tree A) := sized (gentreeS g).
 
-End CustomGen. 
+End CustomGen.
 
 Instance arbtree {A} `{Arbitrary A} : Arbitrary (tree A) :=
 {|
   arbitrary gen genM := @gentree gen genM A arbitrary;
   shrink t :=
-      let fix shrinktree (t : tree A) := 
-          match t with 
+      let fix shrinktree (t : tree A) :=
+          match t with
             | Leaf => []
             | Node x l r => [l] ++ [r] ++
-              map (fun x' => Node x' l r) (shrink x) ++ 
+              map (fun x' => Node x' l r) (shrink x) ++
               map (fun l' => Node x l' r) (shrinktree l) ++
               map (fun r' => Node x l r') (shrinktree r)
           end
@@ -96,13 +96,13 @@ Require Import String.
 Open Scope string.
 
 Instance showtree {A : Type} `{_ : Show A} : Show (tree A) :=
-{| 
-  show t := 
+{|
+  show t :=
     let fix showtree (t : tree A) :=
         match t with
           | Leaf => "Leaf"
-          | Node x l r => "Node " ++ show x 
-                                  ++ " ( " ++ showtree l ++ " ) " 
+          | Node x l r => "Node " ++ show x
+                                  ++ " ( " ++ showtree l ++ " ) "
                                   ++ " ( " ++ showtree r ++ " ) "
         end
     in showtree t
@@ -122,7 +122,7 @@ Fixpoint mirror {A : Type} (t : tree A) : tree A :=
 Definition mirrorK (t : tree nat) := mirror (mirror t) == t.
 
 Definition testtree := showResult (quickCheck mirrorK).
- 
+
 QuickCheck testtree.
 
 (* Step 3 : .. or prove them correct   *)
@@ -141,28 +141,28 @@ Lemma gentreeS_correct :
     g <--> all ->
     (gentreeS g n) <--> (fun t => (height t) <= n).
 Proof.
-  move=> A g n. 
-  Opaque frequency' liftGen3 returnGen bindGen. 
-  elim : n => //= [| n IHn] Hg t. 
+  move=> A g n.
+  Opaque frequency' liftGen3 returnGen bindGen.
+  elim : n => //= [| n IHn] Hg t.
   * split.
-    + rewrite returnGen_def. by move => <-.  
-    + case: t => //= a t1 t2. by rewrite addn1 ltn0. 
-  * move/IHn : (Hg)=> HgenT. split => [| Hheight].  
-    + move/frequency_equiv. move => 
+    + rewrite returnGen_def. by move => <-.
+    + case: t => //= a t1 t2. by rewrite addn1 ltn0.
+  * move/IHn : (Hg)=> HgenT. split => [| Hheight].
+    + move/frequency_equiv. move =>
       [[n' [gtree [[[Heq1 Heq2] | [[Heq1 Heq2] | //=]] [H2 _]]]] | [H1 H2]]; subst;
       try (by rewrite returnGen_def in H2; rewrite -H2).
       rewrite liftGen3_def in H2.
       move : H2 => [a1 [ga1 [t1 [/HgenT Hgt1 [t2 [/HgenT Hgt2 Heq]]]]]]; subst.
       simpl. rewrite -[X in _ <= X]addn1 leq_add2r.
         by rewrite geq_max Hgt1 Hgt2.
-    + apply/frequency_equiv. left.  
+    + apply/frequency_equiv. left.
       case: t Hheight => [| a t1 t2] //=.
       - move => _. exists 1. eexists. split. by constructor.
         by split.
       - rewrite -[X in _ <= X]addn1 leq_add2r.
         rewrite geq_max => /andP [leq1 le2].
         exists n.+1. exists (liftGen3 Node g (gentreeS g n) (gentreeS g n)).
-        split => //=. by right; left. 
+        split => //=. by right; left.
         split => //=. rewrite liftGen3_def.
         exists a; split; first exact/Hg.
         exists t1; split; first exact/IHn.
@@ -187,18 +187,18 @@ Definition semTestable {A : Type} {_ : @Testable Pred A} (a : A) : Prop :=
 
 Goal (semProp removeP) <-> (forall (x : nat) l, ~ In x (remove x l)).
 Proof.
-  repeat rewrite /semProp /proveFun /semProp /proveBool. 
-  split. 
-  - move => H x l. 
-    have H': removeP x l. 
+  repeat rewrite /semProp /proveFun /semProp /proveBool.
+  split.
+  - move => H x l.
+    have H': removeP x l.
     { apply H. by apply arbNat_correct. apply arbList_correct => //.
       exact arbNat_correct. }
     rewrite /removeP in H'. move => HIn.
     have contra : existsb (pred1 x) (remove x l).
     { apply existsb_exists. exists x. split => //. by rewrite /= eq_refl. }
-    by rewrite contra //= in H'. 
-  -  move => H a _ l _. rewrite /removeP. apply Bool.eq_true_not_negb. 
-     move => /existsb_exists contra. 
+    by rewrite contra //= in H'.
+  -  move => H a _ l _. rewrite /removeP. apply Bool.eq_true_not_negb.
+     move => /existsb_exists contra.
      move : contra => [n [HIn /=/eqP Hpred]]; subst. eapply H.
      eassumption.
 Qed.

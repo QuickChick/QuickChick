@@ -33,7 +33,7 @@ Instance showInt : Show Z :=
 |}.
 
 Fixpoint contents {A : Type} (s : A -> string) (l : list A) : string :=
-  match l with 
+  match l with
     | nil => ""%string
     | cons h nil => s h
     | cons h t => append (append (s h) ", ") (contents s t)

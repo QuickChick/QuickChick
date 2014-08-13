@@ -3,7 +3,7 @@ Require Import QuickChick.
 Require Import Reachability.
 Require Import Printing.
 Require Import SingleStateArb.
-Require Import Indist.  
+Require Import Indist.
 Require Import Shrinking.
 Require Import Generation.
 
@@ -23,9 +23,9 @@ Definition prop_stamp_generation (st : State) : Property Gen.Gen :=
   whenFail (show st) (well_formed st).
 
 (*
-Definition propStampGeneration (st : State) := 
+Definition propStampGeneration (st : State) :=
   let stamps := generateStamps st in
-  whenFail (Property.trace ("Generated: " ++ nl ++ 
+  whenFail (Property.trace ("Generated: " ++ nl ++
                            (showStamps (allocated (st_mem st)) stamps)))
            (wellFormed st stamps).
 *)
@@ -38,8 +38,8 @@ Definition prop_generate_indist : Property Gen.Gen :=
 Section Checkers.
   Context {Gen : Type -> Type}
           {H : GenMonad Gen}.
-  
-  Definition prop_exec_preserves_well_formed (t : table) 
+
+  Definition prop_exec_preserves_well_formed (t : table)
   : Property Gen :=
     forAllShrink show arbitrary (fun _ => []) (fun st =>
     (if well_formed st then
@@ -68,7 +68,7 @@ Lemma genState_well_formed : forall st,
 Admitted.
 
 Lemma prop_exec_preserves_well_formed_equiv:
-  forall (t : table), 
+  forall (t : table),
     semProperty (@prop_exec_preserves_well_formed Pred _ t) <->
     exec_preserves_well_formed t.
 Proof.
@@ -82,6 +82,6 @@ Proof.
   - move /genState_well_formed in arb. rewrite arb. specialize (H st).
     move : H. case (exec t st) => [ [tr st'] | ] H.
     + specialize (H tr st' arb Logic.eq_refl). rewrite H.
-      rewrite semWhenFail_idemp. by rewrite <- semBool.   
+      rewrite semWhenFail_idemp. by rewrite <- semBool.
     + fold (semTestable rejected). rewrite <- semResult. reflexivity.
 Qed.

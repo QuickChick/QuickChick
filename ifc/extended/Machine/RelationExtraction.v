@@ -100,5 +100,5 @@ let rec table1 p1 =
   | MkMVec (OpPGetOff, l1, l2, l3, pc) -> MkRVec (l1, pc)
   | MkMVec (OpMSize, l1, l2, l3, pc) -> MkRVec (l2, (join pc l1))
   | MkMVec (OpOutput, l1, l2, l3, pc) -> MkRVec ((join l1 pc), pc)
-  | _ -> assert false (*  *) 
+  | _ -> assert false (*  *)
 *)

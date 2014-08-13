@@ -219,16 +219,16 @@ Ltac guess v H :=
         end.
 
 
-Ltac eq_H_intros := 
-  repeat 
-    (match goal with 
+Ltac eq_H_intros :=
+  repeat
+    (match goal with
       | [  |- _ = _ -> _ ] =>
         intros ?Heq
     end).
 
-Ltac eq_H_getrid := 
-  repeat 
-    (match goal with 
+Ltac eq_H_getrid :=
+  repeat
+    (match goal with
        | [  |- _ = _ -> _ ] =>
          intros _
      end).
@@ -241,7 +241,7 @@ Ltac decEq :=
   end.
 
 Ltac allinv :=
-  repeat 
+  repeat
     match goal with
       | [ H: Some _ = Some _ |- _ ] => inv H
       | [ H: Some _ = None |- _ ] => inv H
@@ -250,9 +250,9 @@ Ltac allinv :=
     end.
 
 Ltac allinv' :=
-  allinv ; 
-    (match goal with 
-       | [ H1:  ?f _ _ = _ , 
+  allinv ;
+    (match goal with
+       | [ H1:  ?f _ _ = _ ,
            H2:  ?f _ _ = _ |- _ ] => rewrite H1 in H2 ; inv H2
      end).
 
@@ -265,16 +265,16 @@ Ltac simpl_exists_tag :=
 
 
 (* And basic lemmas *)
-Lemma rev_nil_nil (A: Type) : forall (l: list A), 
+Lemma rev_nil_nil (A: Type) : forall (l: list A),
   rev l = nil ->
   l = nil.
 Proof.
   induction l; intros ; auto.
   simpl in *.
-  exploit app_eq_nil ; eauto. 
-  intros [Hcont1 Hcont2]. 
-  inv Hcont2. 
-Qed. 
+  exploit app_eq_nil ; eauto.
+  intros [Hcont1 Hcont2].
+  inv Hcont2.
+Qed.
 
 (* Useful functions on lists *)
 
@@ -288,7 +288,7 @@ Fixpoint span A (p : A -> bool) (xs : list A) : list A * list A :=
       if p x then
         let (ys,zs) := span p xs' in (x::ys,zs)
       else
-        (nil,xs)          
+        (nil,xs)
   end.
 
 Fixpoint group_by A (e : A -> A -> bool) (xs : list A) : list (list A) :=
@@ -333,21 +333,21 @@ Function group_by (A : Type) (e : A -> A -> bool)
 intros. destruct (span' (e x) xs'). simpl. omega.
 Defined.
 
-(* 
-Eval compute in group_by beq_nat (1 :: 2 :: 2 :: 3 :: 3 :: 3 :: nil). 
+(*
+Eval compute in group_by beq_nat (1 :: 2 :: 2 :: 3 :: 3 :: 3 :: nil).
 *)
 
 Fixpoint zip_with_keep_rests (A B C : Type) (f : A -> B -> C)
     (xs : list A) (ys : list B) : (list C * (list A * list B)) :=
   match xs, ys with
-  | x::xs', y::ys' => 
+  | x::xs', y::ys' =>
       let (zs, rest) := zip_with_keep_rests f xs' ys' in
         (f x y :: zs, rest)
   | nil, _ => (nil, (nil, ys))
   | _, nil => (nil, (xs, nil))
   end.
 
-(* 
+(*
 Eval compute in zip_with_keep_rests plus (1 :: 2 :: 3 :: nil)
                                          (1 :: 1 :: nil).
 
@@ -385,7 +385,7 @@ Fixpoint last_with (A B : Type) (f : A -> B) (l : list A) (d : B) : B :=
 
 Definition last_opt (A : Type) xs := last_with (@Some A) xs None.
 
-(* 
+(*
 Eval compute in last_opt (1 :: 2 :: 3 :: nil).
 Eval compute in last_opt (@nil nat).
 *)
@@ -426,7 +426,7 @@ Fixpoint list_to_trace (A : Type) (xs : list A) : trace A :=
   end.
 
 CoFixpoint map_trace (A B: Type) (f: A -> B) (t: trace A) : trace B :=
-  match t with 
+  match t with
     | TNil => TNil
     | TCons a ta => TCons (f a) (map_trace f ta)
   end.
@@ -448,7 +448,7 @@ Fixpoint index_list A n (xs : list A) : option A :=
   | _ :: xs', S n' => index_list n' xs'
   end.
 
-Lemma index_list_nil : forall A pc, 
+Lemma index_list_nil : forall A pc,
   index_list pc nil = @None A .
 Proof.
   induction pc; auto.
@@ -460,15 +460,15 @@ Definition index_list_Z A i (xs: list A) : option A :=
   else
     index_list (Z.to_nat i) xs.
 
-Lemma index_list_Z_nil : forall A i, 
+Lemma index_list_Z_nil : forall A i,
   index_list_Z i nil = @None A .
 Proof.
-  intros. unfold index_list_Z. destruct (i <? 0)%Z. auto. apply index_list_nil. 
-Qed.  
+  intros. unfold index_list_Z. destruct (i <? 0)%Z. auto. apply index_list_nil.
+Qed.
 
 Lemma index_list_Z_nat (A: Type) :
-  forall l i (v:A), 
-    index_list_Z i l = Some v -> 
+  forall l i (v:A),
+    index_list_Z i l = Some v ->
     index_list (Z.to_nat i) l = Some v.
 Proof.
   intros. unfold index_list_Z in *. destruct (i <? 0)%Z. congruence. auto.
@@ -479,84 +479,84 @@ Lemma index_list_cons (T: Type): forall n a (l:list T),
  index_list n l = index_list (n+1)%nat (a :: l).
 Proof.
   intros.
-  replace ((n+1)%nat) with (S n) by omega. 
+  replace ((n+1)%nat) with (S n) by omega.
   gdep n. induction n; intros.
   destruct l ; simpl; auto.
-  destruct l. auto. 
+  destruct l. auto.
   simpl. eauto.
-Qed. 
+Qed.
 
-Lemma index_list_Z_cons (T: Type): forall i (l1: list T) a, 
+Lemma index_list_Z_cons (T: Type): forall i (l1: list T) a,
   (i >= 0)%Z ->
   index_list_Z i l1 = index_list_Z (i+1) (a::l1).
 Proof.
   induction i; intros.
   auto.
-  unfold index_list_Z. simpl. 
+  unfold index_list_Z. simpl.
   replace (Pos.to_nat (p + 1)) with ((Pos.to_nat p)+1)%nat by (zify; omega).
-  eapply index_list_cons with (l:= l1) (a:= a) ; eauto. 
+  eapply index_list_cons with (l:= l1) (a:= a) ; eauto.
   zify; omega.
-Qed. 
-  
-Lemma index_list_Z_app:
-  forall (T : Type)  (l1 l2: list T) (i : Z),
-  i = Z.of_nat (length l1) -> index_list_Z i (l1 ++ l2) = index_list_Z 0 l2. 
-Proof.
-  induction l1; intros. 
-  simpl in *. subst. auto.
-  simpl (length (a::l1)) in H.  zify. 
-  simpl.
-  replace i with (i - 1 + 1)%Z by omega.
-  erewrite <- index_list_Z_cons by try omega. 
-  eapply IHl1. omega.  
 Qed.
 
-Lemma index_list_Z_eq (T: Type) : forall (l1 l2: list T), 
+Lemma index_list_Z_app:
+  forall (T : Type)  (l1 l2: list T) (i : Z),
+  i = Z.of_nat (length l1) -> index_list_Z i (l1 ++ l2) = index_list_Z 0 l2.
+Proof.
+  induction l1; intros.
+  simpl in *. subst. auto.
+  simpl (length (a::l1)) in H.  zify.
+  simpl.
+  replace i with (i - 1 + 1)%Z by omega.
+  erewrite <- index_list_Z_cons by try omega.
+  eapply IHl1. omega.
+Qed.
+
+Lemma index_list_Z_eq (T: Type) : forall (l1 l2: list T),
   (forall i, index_list_Z i l1 = index_list_Z i l2) ->
   l1 = l2.
 Proof.
   induction l1; intros.
   destruct l2 ; auto.
-  assert (HCont:= H 0%Z). inv HCont. 
+  assert (HCont:= H 0%Z). inv HCont.
   destruct l2.
-  assert (HCont:= H 0%Z). inv HCont. 
-  assert (a = t). 
+  assert (HCont:= H 0%Z). inv HCont.
+  assert (a = t).
   assert (Helper:= H 0%Z). inv Helper. auto.
-  inv H0. 
+  inv H0.
   erewrite IHl1 ; eauto.
   intros. destruct i.
   erewrite index_list_Z_cons with (a:= t); eauto; try omega.
-  erewrite H ; eauto.  
+  erewrite H ; eauto.
   erewrite index_list_Z_cons with (a:= t); eauto; try (zify ; omega).
   erewrite H ; eauto. symmetry. eapply index_list_Z_cons; eauto. zify; omega.
   destruct l1, l2 ; auto.
 Qed.
 
 Lemma index_list_valid (T:Type): forall n (l:list T) v,
-   index_list n l = Some v -> n < length l.                                    
+   index_list n l = Some v -> n < length l.
 Proof.
-  induction n; intros; destruct l; simpl in H. 
+  induction n; intros; destruct l; simpl in H.
      inv H.
-     inv H.  simpl.  omega. 
-     inv H. 
+     inv H.  simpl.  omega.
+     inv H.
      pose proof (IHn _ _ H). simpl. omega.
 Qed.
 
 Lemma index_list_Z_valid (T:Type): forall i (l:list T) v,
-   index_list_Z i l = Some v -> (0 <= i)%Z  /\ (Z.to_nat i < length l)%nat.                                      
+   index_list_Z i l = Some v -> (0 <= i)%Z  /\ (Z.to_nat i < length l)%nat.
 Proof.
-   intros. 
-   unfold index_list_Z in H.  destruct ((i <? 0)%Z) eqn:?. inv H. 
-   split. apply Z.ltb_ge; auto. 
-   eapply index_list_valid; eauto.  
+   intros.
+   unfold index_list_Z in H.  destruct ((i <? 0)%Z) eqn:?. inv H.
+   split. apply Z.ltb_ge; auto.
+   eapply index_list_valid; eauto.
 Qed.
 
 Fixpoint update_list A (n : nat) (y : A) (xs : list A) : option (list A) :=
   match xs, n with
   | nil, _ => None
   | _ :: xs', 0 => Some (y :: xs')
-  | a :: xs', S n' => 
-    match update_list n' y xs' with 
+  | a :: xs', S n' =>
+    match update_list n' y xs' with
       | None => None
       | Some l => Some (a::l)
     end
@@ -570,13 +570,13 @@ Proof.
   destruct l; intros.
   destruct a ; simpl in * ; congruence.
   destruct a0 ; simpl in *. congruence.
-  destruct update_list.  inv H. 
+  destruct update_list.  inv H.
   congruence.
   congruence.
 Qed.
 
 
-Lemma index_list_map : forall (A B: Type) m x (e:A) (f: A -> B), 
+Lemma index_list_map : forall (A B: Type) m x (e:A) (f: A -> B),
   index_list x m = Some e ->
   index_list x (map f m) = Some (f e).
 Proof.
@@ -599,13 +599,13 @@ Lemma update_Z_some_not_nil : forall A (v:A) l i l',
   False.
 Proof.
   intros. unfold update_list_Z in *.  destruct (i <? 0)%Z. congruence.
-  eapply update_some_not_nil; eauto. 
+  eapply update_some_not_nil; eauto.
 Qed.
 
 
 Lemma update_list_Z_nat (A: Type) (v:A) l i l':
-  update_list_Z i v l = Some l' -> 
-  update_list (Z.to_nat i) v l = Some l'. 
+  update_list_Z i v l = Some l' ->
+  update_list (Z.to_nat i) v l = Some l'.
 Proof.
   intros. unfold update_list_Z in *. destruct (i <? 0)%Z. congruence.
   auto.
@@ -621,14 +621,14 @@ Proof.
   case_eq (update_list a0 v l) ; intros ; rewrite H in * ; inv H1.
   auto.
 Qed.
-  
+
 Lemma update_list_Z_spec (T: Type) : forall (v: T) l a l',
   update_list_Z a v l = Some l' ->
   index_list_Z a l' = Some v.
 Proof.
-  unfold update_list_Z, index_list_Z. intros. 
+  unfold update_list_Z, index_list_Z. intros.
   destruct (a <? 0)%Z.  congruence.
-  eapply update_list_spec; eauto. 
+  eapply update_list_spec; eauto.
 Qed.
 
 Lemma update_list_spec2 (T:Type) : forall (v:T) l n n' l',
@@ -637,23 +637,23 @@ Lemma update_list_spec2 (T:Type) : forall (v:T) l n n' l',
   index_list n' l = index_list n' l'.
 Proof.
   induction l; intros.
-  destruct n; simpl in *; inv H.  
-  destruct n. 
-    destruct n'. 
-      exfalso; omega. 
-      destruct l'; inv H. 
+  destruct n; simpl in *; inv H.
+  destruct n.
+    destruct n'.
+      exfalso; omega.
+      destruct l'; inv H.
       simpl. auto.
-    destruct n'. 
-      destruct l'; inv H. 
-        destruct (update_list n v l); inv H2. 
-        destruct (update_list n v l); inv H2. 
+    destruct n'.
+      destruct l'; inv H.
+        destruct (update_list n v l); inv H2.
+        destruct (update_list n v l); inv H2.
         auto.
-      destruct l'; inv H.  
-        destruct (update_list n v l); inv H2. 
-        simpl. 
-        destruct  (update_list n v l) eqn:?; inv H2.  
-        eapply IHl; eauto. 
-Qed.  
+      destruct l'; inv H.
+        destruct (update_list n v l); inv H2.
+        simpl.
+        destruct  (update_list n v l) eqn:?; inv H2.
+        eapply IHl; eauto.
+Qed.
 
 
 Lemma update_list_Z_spec2 (T:Type) : forall (v:T) l a a' l',
@@ -664,9 +664,9 @@ Proof.
   unfold update_list_Z, index_list_Z. intros.
   destruct (a <? 0)%Z eqn:?. congruence.
   destruct (a' <? 0)%Z eqn:?. auto.
-  eapply update_list_spec2; eauto. 
-  apply Z.ltb_ge in Heqb. 
-  apply Z.ltb_ge in Heqb0. 
+  eapply update_list_spec2; eauto.
+  apply Z.ltb_ge in Heqb.
+  apply Z.ltb_ge in Heqb0.
   intro. apply H0. apply Z2Nat.inj; eauto.
 Qed.
 
@@ -674,11 +674,11 @@ Lemma update_list_Some (T: Type): forall (v: T) l n,
   n < length l ->
   exists l', update_list n v l = Some l'.
 Proof.
-  induction l; intros. 
-  - inv H. 
-  - destruct n. 
+  induction l; intros.
+  - inv H.
+  - destruct n.
     + simpl.  eauto.
-    + simpl. edestruct IHl as [l' E]. simpl in H. instantiate (1:= n). omega. 
+    + simpl. edestruct IHl as [l' E]. simpl in H. instantiate (1:= n). omega.
       eexists. rewrite E. eauto.
 Qed.
 
@@ -763,12 +763,12 @@ Qed.
 Lemma update_list_Z_Some (T:Type): forall (v:T) l (i:Z),
   (0 <= i)%Z ->
   Z.to_nat i < length l ->
-  exists l', update_list_Z i v l = Some l'. 
+  exists l', update_list_Z i v l = Some l'.
 Proof.
   intros. unfold update_list_Z.
-  destruct (i <? 0)%Z eqn:?. 
-  - rewrite Z.ltb_lt in Heqb. omega. 
-  - eapply update_list_Some; eauto. 
+  destruct (i <? 0)%Z eqn:?.
+  - rewrite Z.ltb_lt in Heqb. omega.
+  - eapply update_list_Some; eauto.
 Qed.
 
 Lemma update_preserves_length: forall T a (vl:T) m m',
@@ -780,16 +780,16 @@ Proof.
     + inv H.
     + inversion H; subst; reflexivity.
   - destruct m; simpl in *.
-    + inv H. 
+    + inv H.
     + destruct (update_list a vl m) eqn:?.
       * exploit IHa; eauto.
         inversion H; subst.
         intros eq; rewrite <- eq; reflexivity.
-      * inv H. 
+      * inv H.
 Qed.
 
-Lemma app_same_length_eq (T: Type): forall (l1 l2 l3 l4: list T), 
-  l1++l2 = l3++l4 -> 
+Lemma app_same_length_eq (T: Type): forall (l1 l2 l3 l4: list T),
+  l1++l2 = l3++l4 ->
   length l1 = length l3 ->
   l1 = l3.
 Proof.
@@ -797,10 +797,10 @@ Proof.
   destruct l3; auto. inv H0.
   destruct l3. inv H0. simpl in *.
   inv H. erewrite IHl1 ; eauto.
-Qed.  
+Qed.
 
-Lemma app_same_length_eq_rest (T: Type): forall (l1 l2 l3 l4: list T), 
-  l1++l2 = l3++l4 -> 
+Lemma app_same_length_eq_rest (T: Type): forall (l1 l2 l3 l4: list T),
+  l1++l2 = l3++l4 ->
   length l1 = length l3 ->
   l2 = l4.
 Proof.
@@ -831,7 +831,7 @@ Inductive match_actions {T1 T2} (match_events : T1 -> T2 -> Prop) : T1+τ -> T2+
 
 (** Reflexive transitive closure. *)
 Definition op_cons (E: Type) (oe: E+τ) (l: list E) :=
-  match oe with 
+  match oe with
       | E e => e::l
       | Silent => l
   end.
@@ -841,25 +841,25 @@ Inductive star (S E: Type) (Rstep: S -> E+τ -> S -> Prop): S -> list E -> S -> 
   | star_refl: forall s,
       star Rstep s nil s
   | star_step: forall s1 s2 s3 e t t',
-      Rstep s1 e s2 -> star Rstep s2 t s3 -> 
+      Rstep s1 e s2 -> star Rstep s2 t s3 ->
       t' = (op_cons e t) ->
       star Rstep s1 t' s3.
 Hint Constructors star.
 
 Lemma op_cons_app : forall E (e: E+τ) t t', (op_cons e t)++t' = op_cons e (t++t').
-Proof. intros. destruct e; reflexivity. Qed.  
+Proof. intros. destruct e; reflexivity. Qed.
 
-Lemma star_right : forall S E (Rstep: S -> E+τ -> S -> Prop) s1 s2 t, 
-                     star Rstep s1 t s2 -> 
-                     forall s3 e t', 
-                       Rstep s2 e s3 -> 
+Lemma star_right : forall S E (Rstep: S -> E+τ -> S -> Prop) s1 s2 t,
+                     star Rstep s1 t s2 ->
+                     forall s3 e t',
+                       Rstep s2 e s3 ->
                        t' = (t++(op_cons e nil)) ->
                        star Rstep s1 t' s3.
 Proof.
   induction 1; intros.
   eapply star_step; eauto.
   exploit IHstar; eauto. intros.
-  inv H3. rewrite op_cons_app; eauto. 
+  inv H3. rewrite op_cons_app; eauto.
 Qed.
 
 Inductive plus (S E: Type) (Rstep: S -> E+τ -> S -> Prop): S -> list E -> S -> Prop :=
@@ -868,15 +868,15 @@ Inductive plus (S E: Type) (Rstep: S -> E+τ -> S -> Prop): S -> list E -> S -> 
       t = (op_cons e nil) ->
       plus Rstep s t s'
   | plus_trans: forall s1 s2 s3 e t t',
-      Rstep s1 e s2 -> plus Rstep s2 t s3 -> 
+      Rstep s1 e s2 -> plus Rstep s2 t s3 ->
       t' = (op_cons e t) ->
       plus Rstep s1 t' s3.
 
 Hint Constructors star.
 Hint Constructors plus.
 
-Lemma plus_right : forall E S (Rstep: S -> E+τ -> S -> Prop) s1 s2 t, 
-                     plus Rstep s1 t s2 -> 
+Lemma plus_right : forall E S (Rstep: S -> E+τ -> S -> Prop) s1 s2 t,
+                     plus Rstep s1 t s2 ->
                      forall s3 e t',
                        t' = (t++(op_cons e nil)) ->
                        Rstep s2 e s3 -> plus Rstep s1 t' s3.
@@ -918,9 +918,9 @@ Proof.
       rewrite op_cons_app; reflexivity.
 Qed.
 
-Fixpoint replicate T (a: T) n : list T := 
-  match n with 
-    | O => nil 
+Fixpoint replicate T (a: T) n : list T :=
+  match n with
+    | O => nil
     | S n => a::(replicate a n)
   end.
 
@@ -1038,7 +1038,7 @@ Fixpoint drop {X:Type} (n:nat) (xs:list X) : list X :=
 match n with
 | O => xs
 | S n' => match xs with
-          | nil => nil     
+          | nil => nil
           | (x::xs') => drop n' xs'
           end
 end.
@@ -1049,12 +1049,12 @@ Definition dropZ {X:Type} (z:Z) (xs:list X) : list X :=
   else drop (Z.to_nat z) xs.
 
 
-Lemma length_drop : forall {X:Type} n (xs:list X), 
+Lemma length_drop : forall {X:Type} n (xs:list X),
            length (drop n xs) = ((length xs) -  n)%nat.
-Proof.  
+Proof.
   intros X n. induction n; intros xs.
-    simpl. omega. 
-    destruct xs. simpl. 
+    simpl. omega.
+    destruct xs. simpl.
        auto.
        simpl. auto.
 Qed.
@@ -1078,8 +1078,8 @@ Proof.
   destruct (dropZ (Z.of_nat (length xs)) xs) eqn:E. auto.
   exfalso.
   unfold dropZ in E.  destruct (Z.of_nat (length xs) <? 0)%Z eqn:M.
-    apply Z.ltb_lt in M.  omega. 
-    rewrite Nat2Z.id in E. 
+    apply Z.ltb_lt in M.  omega.
+    rewrite Nat2Z.id in E.
     assert (length (drop (length xs) xs) = length (x::l)). rewrite E; auto.
     rewrite length_drop in H. simpl in H. replace (length xs - length xs)%nat with O in H by omega. inv H.
 Qed.

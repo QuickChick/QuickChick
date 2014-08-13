@@ -1,12 +1,12 @@
 Require Import ZArith.
 
 Inductive Instruction : Type :=
-  | Nop                     
-  | Push  (n : Z)            
+  | Nop
+  | Push  (n : Z)
   | BCall (n : Z) (* How many things to pass as arguments *)
-  | BRet  
+  | BRet
   | Add
-  | Load                    
+  | Load
   | Store.
 
 Inductive OpCode : Type :=

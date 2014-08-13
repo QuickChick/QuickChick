@@ -15,9 +15,9 @@ Extract Inductive unit => "()" [ "()" ].
 
 Extract Inductive positive => "int"
  [ "(fun x -> 2 * x + 1)" "(fun x -> 2 * x)" "1" ]
- "(fun f2p1 f2p f1 p -> 
+ "(fun f2p1 f2p f1 p ->
    if p <= 1 then f1 () else
-     let q = p / 2 in 
+     let q = p / 2 in
      if p mod 2 = 0 then f2p q else f2p1 q)".
 
 Extract Constant Pos.compare => "compare".
@@ -32,7 +32,7 @@ Extract Constant Z.eq_dec => "(=)".
 
 Extract Inductive comparison => "int"
   [ "0" "(-1)" "1" ]
-  "(fun feq flt fgt c -> 
+  "(fun feq flt fgt c ->
       if c = 0 then feq ()
       else if c < 0 then flt ()
       else fgt ())".
@@ -44,7 +44,7 @@ Extract Inductive N => "int"
 Extract Inductive Z => "int"
  [ "0" "" "(fun x -> (-x))" ]
  "(fun f0 fp fn z ->
-    if z = 0 then f0 ()  
+    if z = 0 then f0 ()
     else if z > 0 then fp z else fp (-z))".
 
 Extract Inductive nat => "int"
@@ -74,8 +74,8 @@ Extract Inductive option => "Prelude.Maybe"
 *)
 (*
 Extract Inductive ascii => "Prelude.Char"
-  [ "(\ b0 b1 b2 b3 b4 b5 b6 b7 -> let f b i = if b then DB.shiftL 1 i else 0 in DC.chr 
-     (f b0 0 Prelude.+ f b1 1 Prelude.+ f b2 2 Prelude.+ f b3 3 Prelude.+ 
+  [ "(\ b0 b1 b2 b3 b4 b5 b6 b7 -> let f b i = if b then DB.shiftL 1 i else 0 in DC.chr
+     (f b0 0 Prelude.+ f b1 1 Prelude.+ f b2 2 Prelude.+ f b3 3 Prelude.+
      f b4 4 Prelude.+ f b5 5 Prelude.+ f b6 6 Prelude.+ f b7 7))" ].
 
 Extract Inductive string => "Prelude.String"
@@ -97,10 +97,10 @@ Extract Constant rndNext     => "(fun r -> Random.State.bits r, r)".
 (* Extract Constant rndGenRange => "SR.genRange".*)
 Extract Constant rndSplit    => "(fun x -> (x,x))".
 Extract Constant mkRandomGen => "(fun x -> Random.init x; Random.get_state())".
-Extract Constant randomRNat  => 
+Extract Constant randomRNat  =>
   "(fun (x,y) r -> (x + (Random.State.int r (y - x + 1)), r))".
 Extract Constant randomRBool => "(fun _ r -> Random.State.bool r, r)".
-Extract Constant randomRInt  => 
+Extract Constant randomRInt  =>
   "(fun (x,y) r -> (x + (Random.State.int r (y - x + 1)), r))".
 Extract Constant newStdGen   => "(Random.State.make_self_init ())".
 

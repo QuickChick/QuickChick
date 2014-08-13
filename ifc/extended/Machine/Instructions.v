@@ -19,8 +19,8 @@ Inductive Instruction : Type :=
   | PutBot   : regPtr -> Instruction
   | Nop      : Instruction
   | Put (n : Z) : regPtr -> Instruction
-  | BinOp (o : BinOpT) : regPtr -> regPtr -> regPtr -> Instruction 
-  | Jump     : regPtr -> Instruction                   
+  | BinOp (o : BinOpT) : regPtr -> regPtr -> regPtr -> Instruction
+  | Jump     : regPtr -> Instruction
   | BNZ (n : Z) : regPtr -> Instruction
   | Load     : regPtr -> regPtr -> Instruction
   | Store    : regPtr -> regPtr -> Instruction

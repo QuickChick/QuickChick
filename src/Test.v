@@ -31,7 +31,7 @@ Record Args := MkArgs {
 Inductive Result :=
   | Success : nat -> nat -> list (string * nat) -> string -> Result
   | GaveUp  : nat -> list (string * nat) -> string -> Result
-  | Failure : nat -> nat -> nat -> RandomGen -> nat -> string -> 
+  | Failure : nat -> nat -> nat -> RandomGen -> nat -> string ->
               list (string * nat) -> string -> Result
   | NoExpectedFailure : nat -> list (string * nat) -> string -> Result.
 
@@ -51,12 +51,12 @@ Extract Constant defNumShrinks  => "1000".
 Axiom defSize        : nat.
 Extract Constant defSize        => "100".
 
-Definition stdArgs := MkArgs None defNumTests defNumDiscards 
+Definition stdArgs := MkArgs None defNumTests defNumDiscards
                              defNumShrinks defSize true.
 
 Definition roundTo n m := mult (div n m) m.
 Definition computeSize' (a : Args) (n : nat) (d : nat) : nat :=
-  if (orb (gte n (maxSuccess a)) 
+  if (orb (gte n (maxSuccess a))
           (gte (maxSuccess a) (roundTo n (maxSize a) + (maxSize a)))) then
     (modulo n (maxSize a)) + (div d 10)
   else
@@ -92,14 +92,14 @@ Fixpoint concatStr (l : list string) : string :=
     | (h :: t) => h ++ concatStr t
   end.
 
-Definition ltAscii (a1 a2 : ascii) := 
+Definition ltAscii (a1 a2 : ascii) :=
   nat_of_ascii a1 <=? nat_of_ascii a2.
 
 Fixpoint ltStr (s1 s2 : string) : bool :=
   match s1, s2 with
     | EmptyString, _ => true
     | _, EmptyString => false
-    | String a1 s1, String a2 s2 => 
+    | String a1 s1, String a2 s2 =>
        andb (ltAscii a1 a2) (ltStr s1 s2)
   end.
 
@@ -117,31 +117,31 @@ Fixpoint insSortStr (l : list string) : list string :=
 
 Fixpoint span {A : Type} (p : A -> bool) (l : list A) : (list A * list A) :=
   match l with
-    | nil => (nil, nil) 
-    | x :: xs => 
+    | nil => (nil, nil)
+    | x :: xs =>
       if p x then let (ys, zs) := span p xs in (x::ys, zs)
       else (nil, xs)
   end.
 
-Function groupBy {A : Type} (eq : A -> A -> bool) (l : list A) 
+Function groupBy {A : Type} (eq : A -> A -> bool) (l : list A)
          {measure length l} : list (list A) :=
   match l with
     | nil => nil
-    | x :: xs => 
+    | x :: xs =>
       let (ys, zs) := span (eq x) xs in
       (x :: ys) :: groupBy eq zs
   end.
 Admitted.
 
-Definition strEq (s1 s2 : string) : bool := 
+Definition strEq (s1 s2 : string) : bool :=
   if string_dec s1 s2 then true else false.
 
-Definition summary (st : State) : list (string * nat) := 
+Definition summary (st : State) : list (string * nat) :=
   let ls := filter (notNull) (map (map (fun p => fst p)) (collected st)) in
   let toSort := map (fun s' => concatStr (intersperse ", "%string s')) ls in
   let sorted := insSortStr toSort in
   let grouped := groupBy strEq sorted in
-  let maped := map (fun ss => (hd "ERROR" ss, 
+  let maped := map (fun ss => (hd "ERROR" ss,
 (* CH: displaying absolute, not relative numbers
                                div (length ss * 100) (numSuccessTests st)
 *)
@@ -164,26 +164,26 @@ nil.
 
 Definition doneTesting (st : State) (f : RandomGen -> nat -> QProp) : Result :=
  if expectedFailure st then
-    Success (numSuccessTests st + 1) (numDiscardedTests st) (summary st) 
+    Success (numSuccessTests st + 1) (numDiscardedTests st) (summary st)
             ("+++ OK, passed " ++ (show (numSuccessTests st)) ++ " tests"
                                ++ newline)
   else
-    NoExpectedFailure (numSuccessTests st) (summary st) 
+    NoExpectedFailure (numSuccessTests st) (summary st)
                       ("*** Failed! Passed " ++ (show (numSuccessTests st))
                                              ++ " tests (expected Failure)"
                                              ++ newline).
   (* TODO: success st - labels *)
 
 Definition giveUp (st : State) (_ : RandomGen -> nat -> QProp) : Result :=
-  GaveUp (numSuccessTests st) (summary st) 
-         ("*** Gave up! Passed only " ++ (show (numSuccessTests st)) ++ " tests" 
+  GaveUp (numSuccessTests st) (summary st)
+         ("*** Gave up! Passed only " ++ (show (numSuccessTests st)) ++ " tests"
           ++  newline ++ "Discarded: " ++ (show (numDiscardedTests st)) ++ newline).
 
-Definition callbackPostFinalFailure (st : State) (res : Property.Result) 
+Definition callbackPostFinalFailure (st : State) (res : Property.Result)
 : nat :=
 match res with
   | MkResult o e r i s c =>
-  fold_left (fun acc callback => 
+  fold_left (fun acc callback =>
                match callback with
                  | PostFinalFailure _ call =>
                    (call st (MkSmallResult o e r i s)) + acc
@@ -202,11 +202,11 @@ Function localMin (st : State) (r : Rose Property.Result)
 : (nat * Property.Result) :=
   match r with
     | MkRose res ts =>
-      match (force ts) return (nat * Property.Result) with 
-        | nil => 
+      match (force ts) return (nat * Property.Result) with
+        | nil =>
           let zero := callbackPostFinalFailure st res in
           (numSuccessShrinks st + zero, res)
-        | cons (MkRose res' ts') t => 
+        | cons (MkRose res' ts') t =>
           match ok res' with
             | Some x =>
               if (negb x) then
@@ -225,7 +225,7 @@ Definition decr (st : State) : nat :=
   ((maxSuccessTests st) + (maxDiscardedTests st))
   - ((numSuccessTests st) + (numDiscardedTests st)).
 
-Function runATest (st : State) (f : RandomGen -> nat -> QProp) 
+Function runATest (st : State) (f : RandomGen -> nat -> QProp)
          {measure decr st} : Result :=
   let size := (computeSize st) (numSuccessTests st) (numDiscardedTests st) in
   let (rnd1, rnd2) := rndSplit (randomSeed st) in
@@ -250,7 +250,7 @@ Function runATest (st : State) (f : RandomGen -> nat -> QProp)
             let pre : string := (if expect res then "*** Failed! "
                        else "+++ OK, failed as expected. ")%string in
             let (numShrinks, res') := localMin st (MkRose res ts) in
-            let suf := ("After " ++ (show (S nst)) ++ " tests and " 
+            let suf := ("After " ++ (show (S nst)) ++ " tests and "
                                 ++ (show numShrinks) ++ " shrinks")%string in
             (* TODO: Output *)
             if (negb (expect res)) then
@@ -278,7 +278,7 @@ Axiom newStdGen : RandomGen.
 Definition quickCheckWithResult {prop : Type} {_ : Testable prop}
            (a : Args) (p : prop) : Result :=
   (* ignore terminal - always use trace :D *)
-  let (rnd, computeFun) := 
+  let (rnd, computeFun) :=
       match replay a with
         | Some (rnd, s) => (rnd, at0 (computeSize' a) s)
         | None          => (newStdGen, computeSize' a)
@@ -300,7 +300,7 @@ Definition quickCheckWithResult {prop : Type} {_ : Testable prop}
 Fixpoint showCollectStatistics (l : list (string * nat)) :=
   match l with
     | nil => ""
-    | cons (s,n) l' => 
+    | cons (s,n) l' =>
       show n ++ " : " ++ s ++ newline ++ showCollectStatistics l'
   end.
 
@@ -312,6 +312,6 @@ Definition showResult (r : Result) :=
   | NoExpectedFailure _ l s => showCollectStatistics l ++ s
   end ++ newline.
 
-Definition quickCheck {prop : Type} {_ : Testable prop} 
+Definition quickCheck {prop : Type} {_ : Testable prop}
            (p : prop) : Result :=
   quickCheckWithResult stdArgs p.

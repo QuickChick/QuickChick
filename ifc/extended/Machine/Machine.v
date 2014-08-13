@@ -12,7 +12,7 @@ Open Scope Z_scope.
 Open Scope bool_scope.
 
 Record State := St {
-  st_imem: imem;   (* instruction memory *)                  
+  st_imem: imem;   (* instruction memory *)
   st_mem: memory;  (* memory *)
   st_pr: Label;     (* prins *)
   st_stack: Stack; (* operand stack *)
@@ -34,7 +34,7 @@ Fixpoint upd_nat {A:Type} (l:list A) (n:nat) (a:A) : option (list A) :=
     | x::q =>
       match n with
         | O => Some (a::q)
-        | S p => 
+        | S p =>
           match upd_nat q p a with
             | None => None
             | Some q' => Some (x::q')
@@ -60,7 +60,7 @@ Definition labelCount (c:OpCode) : nat :=
   | OpMLab    => 2
   | OpPcLab   => 0
   | OpBCall   => 2
-  | OpBRet    => 3 
+  | OpBRet    => 3
   | OpFlowsTo => 2
   | OpLJoin   => 2
   | OpPutBot  => 0
@@ -82,24 +82,24 @@ Definition table := forall op, AllowModify (labelCount op).
 
 Definition default_table : table := fun op =>
   match op with
-  | OpLab     =>  ≪ TRUE , BOT , LabPC ≫ 
-  | OpMLab    =>  ≪ TRUE , Lab1 , LabPC ≫ 
-  | OpPcLab   =>  ≪ TRUE , BOT , LabPC ≫ 
+  | OpLab     =>  ≪ TRUE , BOT , LabPC ≫
+  | OpMLab    =>  ≪ TRUE , Lab1 , LabPC ≫
+  | OpPcLab   =>  ≪ TRUE , BOT , LabPC ≫
   | OpBCall   =>  ≪ TRUE , JOIN Lab2 LabPC , JOIN Lab1 LabPC
                     (* CH: No counterexample justifying joining Lab2 to PC;
                            we did that in all calculi so far, but why?
                            (I vaguely remember this was discussed before) *) ≫
-  | OpBRet    =>  ≪ LE (JOIN Lab1 LabPC) (JOIN Lab2 Lab3) , Lab2 , Lab3 ≫ 
-  | OpFlowsTo =>  ≪ TRUE , JOIN Lab1 Lab2 , LabPC ≫ 
-  | OpLJoin   =>  ≪ TRUE , JOIN Lab1 Lab2 , LabPC ≫ 
-  | OpPutBot  =>  ≪ TRUE , BOT , LabPC ≫ 
-  | OpNop     =>  ≪ TRUE , __ , LabPC ≫ 
-  | OpPut     =>  ≪ TRUE , BOT , LabPC ≫ 
-  | OpBinOp   =>  ≪ TRUE , JOIN Lab1 Lab2, LabPC ≫ 
-  | OpJump    =>  ≪ TRUE , __ , JOIN LabPC Lab1 ≫ 
-  | OpBNZ     =>  ≪ TRUE , __ , JOIN Lab1 LabPC ≫ 
-  | OpLoad    =>  ≪ TRUE , Lab3 , JOIN LabPC (JOIN Lab1 Lab2) ≫ 
-  | OpStore   =>  ≪ LE (JOIN Lab1 LabPC) Lab2 , Lab3 , LabPC ≫ 
+  | OpBRet    =>  ≪ LE (JOIN Lab1 LabPC) (JOIN Lab2 Lab3) , Lab2 , Lab3 ≫
+  | OpFlowsTo =>  ≪ TRUE , JOIN Lab1 Lab2 , LabPC ≫
+  | OpLJoin   =>  ≪ TRUE , JOIN Lab1 Lab2 , LabPC ≫
+  | OpPutBot  =>  ≪ TRUE , BOT , LabPC ≫
+  | OpNop     =>  ≪ TRUE , __ , LabPC ≫
+  | OpPut     =>  ≪ TRUE , BOT , LabPC ≫
+  | OpBinOp   =>  ≪ TRUE , JOIN Lab1 Lab2, LabPC ≫
+  | OpJump    =>  ≪ TRUE , __ , JOIN LabPC Lab1 ≫
+  | OpBNZ     =>  ≪ TRUE , __ , JOIN Lab1 LabPC ≫
+  | OpLoad    =>  ≪ TRUE , Lab3 , JOIN LabPC (JOIN Lab1 Lab2) ≫
+  | OpStore   =>  ≪ LE (JOIN Lab1 LabPC) Lab2 , Lab3 , LabPC ≫
   | OpAlloc   =>  ≪ TRUE (* AND (AND (LE Lab2 LabPC)
                               (LE Lab1 Lab3))
                               (LE LabPC Lab3)*),
@@ -110,7 +110,7 @@ Definition default_table : table := fun op =>
                  why LE LabPC Lab3? (ott had it, but why? no counter!)
                  why join Lab1 to reslult value? no counter! DROPPED! *)
                     JOIN Lab1 Lab2 , LabPC ≫
-  | OpPSetOff =>  ≪ TRUE , JOIN Lab1 Lab2 , LabPC ≫ 
+  | OpPSetOff =>  ≪ TRUE , JOIN Lab1 Lab2 , LabPC ≫
   | OpOutput  =>  ≪ TRUE , JOIN Lab1 LabPC , LabPC ≫
   | OpPGetOff =>  ≪ TRUE , Lab1 , LabPC ≫
   | OpMSize   =>  ≪ TRUE , Lab2 , JOIN LabPC Lab1 ≫
@@ -119,14 +119,14 @@ end.
 
 Definition run_tmr (t : table) (op: OpCode)
   (labs:Vector.t Label (labelCount op)) (pc: Label)
-   : option (option Label * Label) :=  
+   : option (option Label * Label) :=
   let r := t op in
   apply_rule r labs pc.
 
 (** Relational semantics *)
 
 Local Open Scope Z_scope.
-(* TODO : reimplement relational semantics 
+(* TODO : reimplement relational semantics
 Inductive step (t : table) : State -> trace -> State -> Prop :=
  | step_lab: forall im μ σ v K pc r r' r1 r2 j LPC rl rpcl
      (PC: pc = PAtm j LPC)
@@ -135,7 +135,7 @@ Inductive step (t : table) : State -> trace -> State -> Prop :=
      (TMU: run_tmr t OpLab <||> LPC = Some (Some rl, rpcl))
      (UPD: registerUpdate r r2 (Vlab K @ rl) = Some r'),
      step t
-          (St im μ σ r  pc) 
+          (St im μ σ r  pc)
           nil
           (St im μ σ r' (PAtm (j+1) rpcl))
  | step_pclab: forall μ π σ pc r r' r1 j LPC rl rpcl
@@ -178,7 +178,7 @@ Inductive step (t : table) : State -> trace -> State -> Prop :=
      (TMU : run_tmr t OpFlowsTo <|K1; K2|> LPC = Some (Some rl, rpcl))
      (RES : registerUpdate r r3 (Vint res @ rl) = Some r'),
      step t
-       (St μ π σ r pc) 
+       (St μ π σ r pc)
        nil
        (St μ π σ r' (PAtm (j+1) rpcl))
  | step_ljoin: forall μ π σ pc L1 K1 L2 K2 r r' r1 r2 r3 j LPC rl rpcl
@@ -209,7 +209,7 @@ Inductive step (t : table) : State -> trace -> State -> Prop :=
      step t
        (St μ π σ r pc)
        nil
-       (St μ π (((PAtm (jpc+1) rl), B, r, r3 ) ::: σ) 
+       (St μ π (((PAtm (jpc+1) rl), B, r, r3 ) ::: σ)
            r (PAtm j rpcl))
  | step_bret: forall μ π σ pc a r r' r'' r1 R pc' B j j' LPC LPC' rl rpcl
      (PC: pc  = PAtm j  LPC)
@@ -252,7 +252,7 @@ Inductive step (t : table) : State -> trace -> State -> Prop :=
      (PC  : pc = PAtm j LPC)
      (CODE: μ[pc] = Some (Store r1 r2))
      (WRITE: store μ p (v @ L) = Some μ')
-     (MLAB: mlab μ p = Some C) 
+     (MLAB: mlab μ p = Some C)
      (OP1 : registerContent r r1 = Some (Vptr p @ K))
      (OP2 : registerContent r r2  = Some (v @ L))
      (TMU : run_tmr t OpStore <|K; C; L|> LPC = Some (Some rl, rpcl)),
@@ -311,7 +311,7 @@ Inductive step (t : table) : State -> trace -> State -> Prop :=
        ((ov,rl) :: nil)%list
        (St μ π σ r (PAtm (j+1) rpcl))
  | step_push: forall μ π σ pc x r r' r1 fp j LPC rl rpcl
-     (PC: pc = PAtm j LPC)                     
+     (PC: pc = PAtm j LPC)
      (CODE: μ[pc] = Some (Put x r1))
      (TMU : run_tmr t OpPut <||> LPC = Some (Some rl, rpcl))
      (OP1 : registerUpdate r r1 (Vint x @ rl) = Some r'),
@@ -320,7 +320,7 @@ Inductive step (t : table) : State -> trace -> State -> Prop :=
        nil
        (St μ π σ r' (PAtm (j+1) rpcl))
  | step_binop: forall μ π σ pc o n1 L1 n2 L2 n r r1 r2 r3 r' fp j LPC rl rpcl
-     (PC: pc = PAtm j LPC)                     
+     (PC: pc = PAtm j LPC)
      (CODE: μ[pc] = Some (BinOp o r1 r2 r3 ))
      (BINOP: eval_binop o n1 n2 = Some n)
      (OP1 : registerContent r r1 = Some (Vint n1 @ L1))
@@ -369,7 +369,7 @@ Inductive step (t : table) : State -> trace -> State -> Prop :=
 Definition bind (A B:Type) (f:A->option B) (a:option A) : option B :=
     match a with
       | None => None
-      | Some a => f a 
+      | Some a => f a
     end.
 Notation "'do' X <- A ; B" :=
   (bind _ _ (fun X => B) A)
@@ -431,7 +431,7 @@ Definition exec t (st:State) : option (trace * State) :=
             end
         | _, _ => None
       end
-    | LJoin r1 r2 r3 => 
+    | LJoin r1 r2 r3 =>
       match registerContent r r1, registerContent r r2 with
         | Some (Vlab L1 @ K1), Some (Vlab L2 @ K2) =>
           match run_tmr t OpLJoin <|K1; K2|> LPC with
@@ -456,10 +456,10 @@ Definition exec t (st:State) : option (trace * State) :=
         | Some (Vint addr @ L), Some (Vlab B @ K) =>
           match run_tmr t OpBCall <|L; K|> LPC with
             | Some (Some rl, rpcl) =>
-              Some (nil, 
-                    St imem μ π (((PAtm (j+1) rl), B, r, r3) ::: σ) r 
+              Some (nil,
+                    St imem μ π (((PAtm (j+1) rl), B, r, r3) ::: σ) r
                        (PAtm addr rpcl))
-            | _ => None 
+            | _ => None
           end
         | _, _ => None
       end
@@ -519,7 +519,7 @@ Definition exec t (st:State) : option (trace * State) :=
               do μ' <- store μ p (v @ rl);
               Some (nil,
                     St imem μ' π σ r (PAtm (j+1) rpcl))
-            | _ => None 
+            | _ => None
           end
         | _, _ => None
       end
@@ -530,17 +530,17 @@ Definition exec t (st:State) : option (trace * State) :=
             | Some (None, rpcl) =>
               Some (nil,
                 St imem μ π σ r (PAtm addr rpcl))
-            | _ => None 
+            | _ => None
           end
-        | _ => None 
+        | _ => None
       end
     | BNZ n r1 =>
       match registerContent r r1 with
         | Some (Vint m @ K) =>
-          match run_tmr t OpBNZ <|K|> LPC with 
+          match run_tmr t OpBNZ <|K|> LPC with
             | Some (None, rpcl) =>
               let new_pc := (if Z_eq_dec m 0 then j+1 else j+n) in
-                Some (nil, 
+                Some (nil,
                       St imem μ π σ r (PAtm new_pc rpcl))
             | _ => None
           end
@@ -565,7 +565,7 @@ Definition exec t (st:State) : option (trace * State) :=
             | Some (Some rl, rpcl) =>
               Some (((OVint n, rl) :: nil)%list,
                     St imem μ π σ r (PAtm (j+1) rpcl))
-            | _ => None 
+            | _ => None
           end
         | _ => None
       end
@@ -575,7 +575,7 @@ Definition exec t (st:State) : option (trace * State) :=
           do r' <- registerUpdate r r1 (Vint x @ rl);
             Some (nil,
                     St imem μ π σ r' (PAtm (j+1) rpcl))
-        | _ => None 
+        | _ => None
       end
      | BinOp o r1 r2 r3 =>
        match registerContent r r1, registerContent r r2 with
@@ -586,9 +586,9 @@ Definition exec t (st:State) : option (trace * State) :=
                do r' <- registerUpdate r r3 (Vint n @ rl);
                Some (nil,
                      St imem μ π σ r' (PAtm (j+1) rpcl))
-             | _ => None 
+             | _ => None
            end
-         | _, _ => None 
+         | _, _ => None
        end
      | Nop =>
        match run_tmr t OpNop <||> LPC with
@@ -630,26 +630,26 @@ Ltac exec_solver :=
   repeat (simpl; match goal with
             | |- context[registerContent ?rs ?reg] =>
               remember (registerContent rs reg) as Hyp; destruct Hyp
-            | |- context[do _ <- Some ?x; _] => 
-              case_eq x; [simpl; intro; intro|simpl; congruence]  
-            | |- context[do _ <- ?x; _] => 
-              case_eq x; [simpl; intro; intro|simpl; congruence]  
-            | |- context[match ?s with | (_,_) => _ end] => 
+            | |- context[do _ <- Some ?x; _] =>
+              case_eq x; [simpl; intro; intro|simpl; congruence]
+            | |- context[do _ <- ?x; _] =>
+              case_eq x; [simpl; intro; intro|simpl; congruence]
+            | |- context[match ?s with | (_,_) => _ end] =>
               case_eq s; intro; intro; intro
-            | |- context[match ?s with | _ => _ end] => 
+            | |- context[match ?s with | _ => _ end] =>
               destruct s
             | |- context[match ?s with | Some _ => _ | None => _ end] =>
               destruct s
-(*            | |- context[Atm (Vptr (Ptr ?fp ?i)) ?l] => 
+(*            | |- context[Atm (Vptr (Ptr ?fp ?i)) ?l] =>
               replace (Vptr (Ptr fp i) @ l) with (ptr_atom_to_atom (PAtm i l)) by auto
 *)
             | |- Some _ = None -> _ => intros contra; inversion contra
             | |- None = Some _ -> _ => intros contra; inversion contra
-            | |- context[cons (OVint ?n, _) nil] => 
+            | |- context[cons (OVint ?n, _) nil] =>
               replace (Vint n) with (obs_value_to_value (OVint n)) by auto
           end); try congruence;
   try match goal with
-    | |- Some _ = Some _ -> _ => 
+    | |- Some _ = Some _ -> _ =>
       intros T; inversion T; clear T; subst; try (econstructor (solve[eauto]))
   end.
 
@@ -667,7 +667,7 @@ Proof.
   case_eq (μ[pc]); simpl bind; [|simpl bind; congruence].
   intros ins Hins.
   intros st2 tr.
-  destruct ins; 
+  destruct ins;
   exec_solver;
   try solve [econstructor; eauto; auto].
 Admitted.
@@ -680,7 +680,7 @@ Admitted.
   eapply step_ljoin; eauto; auto.
   eapply step_pushbot; eauto; auto.
     instantiate (1 := l); auto.
-  eapply step_push; eauto; auto. 
+  eapply step_push; eauto; auto.
   eapply step_binop; eauto; auto.
   eapply step_jump; eauto; auto. admit.
   eapply step_load; eauto; auto.

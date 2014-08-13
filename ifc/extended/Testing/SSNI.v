@@ -22,7 +22,7 @@ Require Import Reachability.
 Section Checkers.
   Context {Gen : Type -> Type}
           {H : GenMonad Gen}.
-  
+
 (*  Definition Property := Property Gen. *)
 
 
@@ -33,10 +33,10 @@ Set Printing All.
   Definition propSSNI_helper (t : table) (v : Variation) : Property Gen :=
     let '(Var lab st1 st2) := v in
     (*  Property.trace (Show.show lab ++ Show.nl ++
-     showStatePair lab frameMap1 frameMap2 st1 st2) *)   
+     showStatePair lab frameMap1 frameMap2 st1 st2) *)
     collect (option_bind opcode_of_instr
-                         (instr_lookup (st_imem st1) (st_pc st1))) 
-            
+                         (instr_lookup (st_imem st1) (st_pc st1)))
+
     (* collect (show lab) *)
             (if indist lab st1 st2 then
                (* XXX Our generator should always give us this by design.
@@ -50,11 +50,11 @@ Set Printing All.
                                    whenFail
                                      ("LOW -> *" ++ nl ++
                                                  (show_execution lab [st1; st1'] [st2; st2']))
-                                     (observe_comp (observe lab tr1) (observe lab tr2) 
+                                     (observe_comp (observe lab tr1) (observe lab tr2)
                                                    && (indist lab st1' st2')):Gen QProp)
                        | _ => (* 1 took a low step and 2 failed *)
                          collect "Second failed" (property true : Gen QProp)
-                     (* 
+                     (*
                 ((Property.trace (show_pair lab st1 st1'))
                 (property false))
                       *)
@@ -65,11 +65,11 @@ Set Printing All.
                      if is_low_state st1' lab then
                        match exec t st2 with
                          | Some (tr2, st2') =>
-                           if is_low_state st2' lab then 
+                           if is_low_state st2' lab then
                              collect "HIGH -> LOW" (
                                        whenFail ("HIGH -> LOW" ++ Show.nl ++
                                                                 (show_execution lab [st1; st1'] [st2; st2']))
-                                                 (observe_comp (observe lab tr1) (observe lab tr2) 
+                                                 (observe_comp (observe lab tr1) (observe lab tr2)
                                                                && (indist lab st1' st2')) : Gen QProp
                                      )
                            else collect "Second not low" (property true : Gen QProp)
@@ -82,7 +82,7 @@ Set Printing All.
                        collect "HIGH -> HIGH" (
                                  whenFail ("HIGH -> HIGH" ++ Show.nl ++
                                                           (show_pair lab st1 st1'))
-                                          (beq_nat (List.length (observe lab tr1)) 0 
+                                          (beq_nat (List.length (observe lab tr1)) 0
                                        && indist lab st1 st1')
                                : Gen QProp)
                  | _ => collect "Failed" (property true : Gen QProp)
@@ -94,7 +94,7 @@ Set Printing All.
               and prop_generate_indist already tests this;
               so this should either go away or become (propery false) *)
 
-  Definition propSSNI t : Property Gen := 
+  Definition propSSNI t : Property Gen :=
     forAllShrink (fun _ => ""%string) gen_variation_state (fun _ => nil)
       (* shrinkVState *)
       (propSSNI_helper t : @Variation Machine.State -> Gen QProp).

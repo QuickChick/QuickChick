@@ -12,7 +12,7 @@ Notation " [ ] " := nil : list_scope.
 Notation " [ x ] " := (cons x nil) : list_scope.
 Notation " [ x ; .. ; y ] " := (cons x .. (cons y nil) ..) : list_scope.
 
-(* Helper functions *) 
+(* Helper functions *)
 Definition flip {A B C : Type} (f : A -> B -> C) (x : B) (y : A) : C := f y x.
 Definition compose {A B C : Type} (f : B -> C) (g : A -> B) (x : A) : C := f (g x).
 Notation " f << g " := (compose f g) (at level 42). (* F# style, because . *)
@@ -29,7 +29,7 @@ Definition pure {A : Type} (x : A) : Gen A := returnGen x.
 (*                           bindGen m' (fun xs => *)
 (*                           returnGen (x :: xs)))) (pure []) ms. *)
 
-Fixpoint foldGen {A B : Type} (f : A -> B -> Gen A) (l : list B) (a : A) 
+Fixpoint foldGen {A B : Type} (f : A -> B -> Gen A) (l : list B) (a : A)
 : Gen A :=
   match l with
     | [] => returnGen a
@@ -55,7 +55,7 @@ Fixpoint concat {A : Type} (l : list (list A)) : (list A) :=
 Fixpoint powerset {A : Type} (l : list A) : (list (list A)) :=
   match l with
     | [] => [[]]
-    | h::t => 
+    | h::t =>
       let p := powerset t in
       map (cons h) p ++ p
   end.
@@ -135,7 +135,7 @@ Definition label_eq l1 l2 := flows l1 l2 && flows l2 l1.
 
 Definition indistLabel (l1 l2 : Label) := label_eq l1 l2.
 
-Definition mframe_eq (m1 m2 : mframe) : bool := 
+Definition mframe_eq (m1 m2 : mframe) : bool :=
   if Mem.EqDec_block m1 m2 then true else false.
 
 Instance allBelow : AllThingsBelow Label :=

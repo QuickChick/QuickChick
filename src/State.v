@@ -4,20 +4,20 @@ Require Import Gen.
 Require Import Axioms.
 Require Import String.
 
-Record State := MkState 
+Record State := MkState
   { maxSuccessTests   : nat
-  ; maxDiscardedTests : nat                          
+  ; maxDiscardedTests : nat
   ; maxShrinkNo       : nat
   ; computeSize       : nat -> nat -> nat
-                                 
-  ; numSuccessTests   : nat      
-  ; numDiscardedTests : nat      
+
+  ; numSuccessTests   : nat
+  ; numDiscardedTests : nat
   ; collected         : list (list (string * nat))
   ; expectedFailure   : bool
-  ; randomSeed        : RandomGen    
-  
-  ; numSuccessShrinks : nat       
-  ; numTryShrinks     : nat       
+  ; randomSeed        : RandomGen
+
+  ; numSuccessShrinks : nat
+  ; numTryShrinks     : nat
   }.
 
 Definition updTryShrinks (st : State) (f : nat -> nat) : State :=

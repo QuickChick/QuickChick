@@ -9,16 +9,16 @@ Require Import List.
 Import ListNotations.
 
 (* Default mutateable instance for lists *)
-(* Priority 1, in case someone overrides the default to further mutate 
+(* Priority 1, in case someone overrides the default to further mutate
    when the A's are mutateable *)
 Instance MutateableList (A : Type) : Mutateable (list A) | 1 :=
 {|
-  mutate l := 
+  mutate l :=
     let fix f l :=
         match l with
           | [] => []
           | x::xs => xs :: map (fun xs' => x :: xs') (f xs)
-        end 
+        end
     in f l
 |}.
 
@@ -58,17 +58,17 @@ Definition mutateCheckManyArgs {A P : Type} {_: Testable P}
      mutants (0, 0)).
 
 Definition mutateCheckMany {A P : Type} {_: Testable P}
-           `{mutA: Mutateable A} 
+           `{mutA: Mutateable A}
            (a : A) (ps : A -> list P) :=
   mutateCheckManyArgs stdArgs a ps.
 
-Definition mutateCheckArgs {A P: Type} 
+Definition mutateCheckArgs {A P: Type}
            {_: Testable P} {mutA: Mutateable A} (args : Args)
            (a : A) (p : A -> P):=
   mutateCheckManyArgs args a (fun a => cons (p a) nil).
 
-Definition mutateCheck {A P: Type} 
-           {_: Testable P} {mutA: Mutateable A} 
+Definition mutateCheck {A P: Type}
+           {_: Testable P} {mutA: Mutateable A}
            (a : A) (p : A -> P):=
   mutateCheckManyArgs stdArgs a (fun a => cons (p a) nil).
 

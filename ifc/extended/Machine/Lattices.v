@@ -181,7 +181,7 @@ Module Type ZFSET.
 
   Parameter inter : t -> t -> t.
   Parameter In_inter : forall s1 s2 x,
-     In x (inter s1 s2) <-> In x s1 /\ In x s2.                         
+     In x (inter s1 s2) <-> In x s1 /\ In x s2.
 
   Parameter incl : t -> t -> bool.
   Parameter incl_spec : forall s1 s2,
@@ -367,7 +367,7 @@ Module Zset : ZFSET.
       | x::q => (if existsb (Z.eqb x) l2 then (fun l => x::l) else (fun l => l))
                   (inter_list q l2)
     end.
-                                
+
   Lemma sorted_drop : forall l a, sorted (a :: l) = true -> sorted l = true.
     intros. simpl in H.
     destruct l; auto.
@@ -376,7 +376,7 @@ Module Zset : ZFSET.
     auto.
   Qed.
 
-  Lemma sorted_min : forall l1 a, sorted (a :: l1) = true -> 
+  Lemma sorted_min : forall l1 a, sorted (a :: l1) = true ->
                        forall x, List.In x l1 -> (a <? x)%Z = true.
     induction l1.
     - simpl; auto.
@@ -401,11 +401,11 @@ Module Zset : ZFSET.
     - right. eapply IHl1; eauto.
   Qed.
 
-  Lemma sorted_min_head : forall l a, sorted l = true -> 
+  Lemma sorted_min_head : forall l a, sorted l = true ->
                             (forall x, List.In x l -> (a <? x)%Z = true) ->
                             sorted (a :: l) = true.
     intros.
-    simpl. 
+    simpl.
     intros.
     destruct l; auto.
     pose proof (H0 z).
@@ -453,7 +453,7 @@ Module Zset : ZFSET.
         inversion_clear Mem. inversion_clear H.
         + rewrite Z.eqb_eq in H1; subst; auto.
         + pose proof (IHl1 l2 x).
-          inversion_clear H. 
+          inversion_clear H.
           apply H1 in H0.
           inversion_clear H0.
           auto.
@@ -480,7 +480,7 @@ Module Zset : ZFSET.
   Qed.
 
   Lemma In_inter : forall s1 s2 x,
-     In x (inter s1 s2) <-> In x s1 /\ In x s2.  
+     In x (inter s1 s2) <-> In x s1 /\ In x s2.
   Proof.
     unfold inter, In; destruct s1; destruct s2; simpl.
     apply In_inter_list.
@@ -613,7 +613,7 @@ Module Zset : ZFSET.
     f_equal.
     assumption.
   Qed.
- 
+
 (* Program Lemma elements__label_of_list:  *)
 (*   forall lst,  *)
 (*     elements (fold_left (fun a b => add b a) lst empty) = lst. *)
@@ -622,7 +622,7 @@ Module Zset : ZFSET.
 (*   simpl. rewrite add.    *)
 (*   => [| x xs IHxs].  *)
 
- 
+
 
 
 End Zset.
@@ -661,6 +661,6 @@ Defined.
 Definition Label := Zset.t.
 Notation "⊥" := bot.
 Definition flows_to (l1 l2:Label) : Z :=
-  if flows l1 l2 then 1%Z else 0%Z. 
-Definition label_of_list (l : list Z) := 
+  if flows l1 l2 then 1%Z else 0%Z.
+Definition label_of_list (l : list Z) :=
   fold_left (fun a b => Zset.add b a) l Zset.empty.

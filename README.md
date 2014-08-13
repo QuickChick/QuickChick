@@ -2,7 +2,7 @@ QuickChick
 ==========
 
 Description
- 
+
   - QuickCheck for Coq using Extraction
 
 Known to work with

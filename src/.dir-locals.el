@@ -1,5 +1,5 @@
 ((coq-mode
- . ((eval . 
+ . ((eval .
   (progn
     (make-local-variable 'coq-prog-args)
     (setq coq-prog-args `("-emacs"

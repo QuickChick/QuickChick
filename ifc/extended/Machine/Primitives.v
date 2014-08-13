@@ -64,13 +64,13 @@ Definition instr_lookup (m:imem) (pc:Ptr_atom) : option Instruction :=
 Notation "m [ pc ]" := (instr_lookup m pc) (at level 20).
 
 Definition add_pc (pc:Ptr_atom) (n:Z) : Ptr_atom :=
-  let '(PAtm i L) := pc in 
+  let '(PAtm i L) := pc in
   PAtm (Zplus i n) L.
 Infix "+" := add_pc.
 
 Definition pc_lab (pc:Ptr_atom) : Label :=
   let '(PAtm _ L) := pc in L.
-Notation "'∂' pc" := (pc_lab pc) (at level 0). 
+Notation "'∂' pc" := (pc_lab pc) (at level 0).
 (* Remark: the ott file use \mathcal{L} *)
 
 Definition atom_lab (a : Atom) : Label :=
@@ -83,7 +83,7 @@ Definition regSet := list register.
 (* Stack *)
 Inductive Stack :=
   | Mty                                       (* empty stack *)
-  | RetCons (pc_L:Ptr_atom * Label * regSet * regPtr) (s:Stack) 
+  | RetCons (pc_L:Ptr_atom * Label * regSet * regPtr) (s:Stack)
 (* stack frame marker cons (with return pc and protecting label) *)
 .
 Infix ":::" := RetCons (at level 60, right associativity).
@@ -108,18 +108,18 @@ Definition ptr_atom_join (pc:Ptr_atom) (l':Label) : Ptr_atom :=
 Instance JoinAtom : Join Atom := { join_label := atom_join }.
 Instance JoinPtrAtom : Join Ptr_atom := { join_label := ptr_atom_join }.
 
-Ltac try_split_congruence := 
+Ltac try_split_congruence :=
   try solve [left; congruence | right; congruence].
 
 (* Proof-stuff previously in Memory.v *)
 Instance EqDec_block : EqDec Value eq.
 Proof.
-  intros x y; 
+  intros x y;
   unfold complement, equiv; simpl;
   destruct x; destruct y; try_split_congruence.
   - destruct (Z.eq_dec n n0); subst; auto; try_split_congruence.
-  - destruct p; destruct p0; 
-    destruct (Z.eq_dec i i0); destruct (fp == fp0); 
+  - destruct p; destruct p0;
+    destruct (Z.eq_dec i i0); destruct (fp == fp0);
     try_split_congruence.
   - destruct (LatEqDec Label L L0); try_split_congruence.
 Qed.
@@ -150,7 +150,7 @@ Definition store (m : memory) (p : Pointer) (a:Atom)
   let '(Ptr f addr) := p in
   match Mem.get_frame m f with
     | None => None
-    | Some (Fr stamp lab data) => 
+    | Some (Fr stamp lab data) =>
       match update_list_Z addr a data with
         | None => None
         | Some data' => (Mem.upd_frame m f (Fr stamp lab data'))
@@ -175,7 +175,7 @@ Lemma load_alloc : forall size stamp label a m m' mf,
     alloc size stamp label a m = Some (mf, m') ->
     forall mf' ofs',
       load m' (Ptr mf' ofs') =
-        if mf == mf' then 
+        if mf == mf' then
           if Z_le_dec 0 ofs' then
             if Z_lt_dec ofs' size then Some a else None
           else None
@@ -191,9 +191,9 @@ Proof.
   - destruct (equiv_dec mf); try congruence.
 Qed.
 
-Lemma load_store : forall {m m'} {b ofs a}, 
+Lemma load_store : forall {m m'} {b ofs a},
     store m (Ptr b ofs) a = Some m' ->
-    forall b' ofs', 
+    forall b' ofs',
       load m' (Ptr b' ofs') =
       if b == b' then
         if Z_eq_dec ofs ofs' then Some a else load m (Ptr b' ofs')
@@ -215,9 +215,9 @@ Proof.
       eapply update_list_Z_spec2; eauto.
 Qed.
 
-Lemma load_store_old : forall {m m':memory} {b ofs a}, 
+Lemma load_store_old : forall {m m':memory} {b ofs a},
     store m (Ptr b ofs) a = Some m' ->
-    forall b' ofs', 
+    forall b' ofs',
       (b',ofs') <> (b,ofs) ->
       load m' (Ptr b' ofs') = load m (Ptr b' ofs').
 Proof.
@@ -227,7 +227,7 @@ Proof.
   destruct Z.eq_dec; try congruence.
 Qed.
 
-Lemma load_store_new : forall {m m':memory} {b ofs a}, 
+Lemma load_store_new : forall {m m':memory} {b ofs a},
     store m (Ptr b ofs) a = Some m' ->
     load m' (Ptr b ofs) = Some a.
 Proof.
@@ -237,7 +237,7 @@ Proof.
   destruct Z.eq_dec; try congruence.
 Qed.
 
-Lemma load_some_store_some : forall {m:memory} {b ofs a}, 
+Lemma load_some_store_some : forall {m:memory} {b ofs a},
     load m (Ptr b ofs) = Some a ->
     forall a':Atom,
       exists m', store m (Ptr b ofs) a' = Some m'.
@@ -246,7 +246,7 @@ Proof.
   destruct (Mem.get_frame m b) eqn:E; try congruence.
   destruct f eqn:?. (* I don't like this *)
   exploit index_list_Z_valid; eauto.
-  destruct 1.                                
+  destruct 1.
   destruct (@update_list_Z_Some _ a' l ofs); auto.
   rewrite H2.
   eapply Mem.upd_get_frame; eauto.
@@ -511,7 +511,7 @@ Proof.
         constructor.
         inv H.
         constructor; eauto.
-        inv VALS; auto. 
+        inv VALS; auto.
         constructor; auto.
         rewrite update_meminj_neq; eauto.
         cut (mi b2 = None); try congruence.
@@ -544,7 +544,7 @@ Proof.
 
 Qed.
 
-Lemma zreplicate_match_data : 
+Lemma zreplicate_match_data :
   forall mi a1 a2 m size l1 l2,
     match_atoms mi a1 a2 m ->
     zreplicate size a1 = Some l1 ->
@@ -557,15 +557,15 @@ Proof.
   gdep (BinInt.Z.to_nat size).
   clear - H.
   intros n. gdep l1. gdep l2.
-  induction n; intros; simpl in *. 
-  inv H0; inv H1; auto.  
+  induction n; intros; simpl in *.
+  inv H0; inv H1; auto.
   inv H0; inv H1; constructor; auto.
-Qed.  
+Qed.
 (*
 Lemma zreplicate_match_oframes :
   forall z mi a1 a2 m2 stamp lab,
     match_atoms mi a1 a2 m2 ->
-    match_oframes mi (Fr stamp lab (zreplicate z a1)) 
+    match_oframes mi (Fr stamp lab (zreplicate z a1))
                      (Fr stamp lab (zreplicate z a2)) m2.
 Proof.
   intros.
@@ -648,16 +648,16 @@ Proof.
   intros.
   destruct (BinInt.Z.ltb off 0); try congruence.
   gdep (BinInt.Z.to_nat off). clear off.
-  inversion FRAMES. 
-  generalize dependent d1.  
+  inversion FRAMES.
+  generalize dependent d1.
   generalize dependent d2.
   induction H6; intros off INDEX; intros; destruct off;
   simpl in *; try congruence; eauto.
   subst.
-  unfold index_list in *. 
+  unfold index_list in *.
   destruct n; eauto; try inv INDEX0; eauto.
   destruct n; simpl in *; try congruence; eauto.
-  exists x. repeat split; eauto. subst. 
+  exists x. repeat split; eauto. subst.
   inv INDEX0; subst; eauto.
   eapply IHForall2; eauto.
   inv FRAMES; eauto.
@@ -696,7 +696,7 @@ Proof.
   destruct (BinInt.Z.ltb off 0); try congruence.
   gdep (BinInt.Z.to_nat off). clear off.
   gdep f2'.
-  inv FRAMES.  
+  inv FRAMES.
   induction H6; intros f2' off INDEX; intros; destruct off;
   simpl in *; try congruence; eauto.
   - inv INDEX. eauto.
@@ -729,7 +729,7 @@ Lemma match_frames_valid_update :
          (FRAMES : match_frames mi f1 f2 m2)
          (VALID : valid_update m2 m2'),
     match_frames mi f1 f2 m2'.
-Proof. intros. inv FRAMES. induction H; eauto. repeat constructor; eauto. 
+Proof. intros. inv FRAMES. induction H; eauto. repeat constructor; eauto.
        inv IHForall2; eauto. Qed.
 Hint Resolve match_frames_valid_update.
 
@@ -823,7 +823,7 @@ Lemma meminj_alloc : forall mi size lab2 stamp2 m1 a1 m2 a2 b2 m2',
                             (ALLOC : alloc size stamp2 lab2 a2 m2 = Some (b2, m2'))
                             (ATOMS : match_atoms mi a1 a2 m2)
                             (VALID : valid_update m2 m2'),
-                     forall stamp1 lab1, 
+                     forall stamp1 lab1,
                        exists b1 m1',
                          alloc size stamp1 lab1 a1 m1 = Some (b1, m1') /\
                          Meminj m1' m2' (update_meminj mi b2 b1).
@@ -845,7 +845,7 @@ Proof.
 
   Focus 3. eassumption.
   Focus 3. inv ALLOC. eassumption.
-  eauto. 
+  eauto.
 
   inv ATOMS.
   inv ALLOC.
@@ -855,7 +855,7 @@ Proof.
   eapply meminj_mem_alloc; eauto.
 
 
-  
+
 Qed.
 *)
 End Injections.
