@@ -1,7 +1,6 @@
-Require Import Machine.
-Require Import Rules.
-Require Import SSNI.
+
 Require Import String.
+Require Import List.
 
 Require Import QuickChick.
 Require Import Common.
@@ -9,15 +8,34 @@ Require Import Common.
 Require Import Show.
 Require Import Test.
 Require Import ZArith.
-Require Import List.
 
 Require Import Generation.
 Require Import Shrinking.
+Require Import Machine.
+Require Import Rules.
+Require Import SSNI.
 
 Require Import Reachability.
 Require Import SingleStateArb.
 
 Require Import SanityChecks.
+
+(* Testing well-formedness first *)
+
+(* TODO: CH: get rid of all this boiler code *)
+Definition test_stamp_generation :=
+  showResult (quickCheck (prop_stamp_generation : State -> Gen.Gen QProp)).
+QuickCheck test_stamp_generation.
+
+Definition test_generate_indist :=
+  showResult (quickCheck (prop_generate_indist : Gen.Gen QProp)).
+QuickCheck test_generate_indist.
+
+Definition test_exec_preserves_well_formed :=
+  showResult (quickCheck (prop_exec_preserves_well_formed default_table : Gen.Gen QProp)).
+QuickCheck test_exec_preserves_well_formed.
+
+(* Testing non-interference second (default table) *)
 
 Definition testTMU :=
   let H1 := lab_of_list [Z.of_nat 1] in
@@ -33,7 +51,7 @@ Definition testSSNIdefaultTable := showResult (testSSNI default_table).
 
 QuickCheck testSSNIdefaultTable.
 
-(* Testing mutants *)
+(* Testing mutants third *)
 
 Require Import Mutate.
 Require Import MutateCheck.

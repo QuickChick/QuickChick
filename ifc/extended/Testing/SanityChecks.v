@@ -53,11 +53,6 @@ Section Checkers.
 
 End Checkers.
 
-(* TODO: get a way to still run these tests!
-Definition xxx := forAll show arbitrary (prop_stamp_generation : State -> Gen.Gen QProp).
-QuickCheck xxx. Could not run test
-*)
-
 Require Import EndToEnd SetOfOutcomes.
 
 (* This is rather trivial, but it was mentioned below so I've proved it *)
