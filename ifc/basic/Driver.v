@@ -62,14 +62,15 @@ Definition SSNI (t : table) (v : @Variation State) : Property Gen.Gen :=
     | _ => property rejected
   end*).
 
-Definition prop_SSNI t := 
-  forAllShrink show gen_variation_state (fun _ => nil) (SSNI t).
+Definition prop_SSNI t : Property Gen.Gen := 
+  forAllShrink show gen_variation_state (fun _ => nil)
+   (SSNI t : Variation -> Gen.Gen QProp).
 
 Definition prop_gen_indist := 
   forAllShrink show gen_variation_state (fun _ => nil) 
                (fun v => let '(V st1 st2) := v in indist st1 st2).
 
-Definition runSSNIdefaultTable := showResult (quickCheck (prop_SSNI default_table)).
+Definition runSSNIdefaultTable := showResult (quickCheck (prop_SSNI default_table : Gen.Gen QProp)).
 
 QuickCheck runSSNIdefaultTable.
 
@@ -95,13 +96,13 @@ Eval lazy -[labelCount helper] in
 
 Definition testMutantX n := 
   match nth (mutate_table default_table) n with
-    | Some t => showResult (quickCheckWithResult myArgs (prop_SSNI t))
+    | Some t => showResult (quickCheckWithResult myArgs (prop_SSNI t : Gen.Gen QProp))
     | _ => ""
   end.
 
 Definition testMutants :=
-  mutateCheckArgs myArgs default_table (fun t => forAllShrink (fun _ => "") 
-                               gen_variation_state (fun _ => nil) (SSNI t)).
+  mutateCheckArgs myArgs default_table (fun t => (forAllShrink (fun _ => "") 
+                               gen_variation_state (fun _ => nil) (SSNI t : Variation -> Gen.Gen QProp)) : Gen.Gen QProp).
 
 Definition runTestMutants := show testMutants.
 
@@ -115,7 +116,7 @@ Definition ex_indist : indist st1 st2 = true. auto. Qed.
 
 Definition ex_test := 
   match nth (mutate_table default_table) 18 with
-    | Some t => showResult (quickCheck (property (SSNI t (V st1 st2))))
+    | Some t => showResult (quickCheck (SSNI t (V st1 st2) : Gen.Gen QProp))
     | _ => ""
   end.
 

@@ -164,13 +164,13 @@ Qed.
 Lemma semPredQProp:
   forall (p : Pred QProp), semTestable p <-> (semProperty p).
 Proof.  
-  by move=> p. 
-  (* rewrite /semTestable /property /testGenProp /property /testProp semBindGen. *)
-  (* split. *)
-  (* - move => H pq /H Hgen. rewrite returnGen_def /semProperty in Hgen. *)
-  (*   by apply Hgen. *)
-  (* - move => H pq Hgen. rewrite returnGen_def /semProperty. *)
-  (*   move => qp Heq; subst. rewrite /semProperty in H. by auto. *)
+(*  by *) move=> p.
+  rewrite /semTestable /property /testGenProp /property /testProp semBindGen.
+  split.
+  - move => H pq /H Hgen. rewrite returnGen_def /semProperty in Hgen.
+    by apply Hgen.
+  - move => H pq Hgen. rewrite returnGen_def /semProperty.
+    move => qp Heq; subst. rewrite /semProperty in H. by auto.
 Qed.
 
 Lemma semForAllShrink: 

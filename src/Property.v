@@ -81,7 +81,7 @@ Definition failure qp :=
     | _ => false
   end.
 
-Definition Property (Gen: Type -> Type) := Gen QProp.
+Definition Property (Gen: Type -> Type) : Type := Gen QProp.
 
 Section Property.
   Context {Gen : Type -> Type}
@@ -123,11 +123,12 @@ Section Property.
       property p := bindGen p property
     |}.
 
-  (* Sometimes it cannot infer this one ... *)
+  (* Sometimes it cannot infer this one ... 
   Global Instance testProperty : Testable (Property Gen) | 0  :=
     {|
       property p := p
     |}.
+*)
 
   (* Left out exception handling! 
    property p :=
@@ -236,6 +237,3 @@ Fixpoint props {prop A : Type} {t : Testable prop}
     label (show x).
 
 End Property.
-
-
-
