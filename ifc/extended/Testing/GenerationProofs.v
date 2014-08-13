@@ -27,7 +27,7 @@ Proof.
 Qed.
 
 Lemma gen_BinOpT_correct : 
-  peq gen_BinOpT all.
+  set_eq gen_BinOpT all.
 Proof.
   rewrite /gen_BinOpT /all. move => op. 
   split => // _.  
@@ -1233,7 +1233,7 @@ Qed.
 Lemma gen_var_stack_sound_indist: 
   forall st obs pc,
     stack_spec pc inf st -> 
-    pincl (gen_vary_stack obs inf st) (fun st' => 
+    set_incl (gen_vary_stack obs inf st) (fun st' => 
                                    indist obs st st').
 Proof.
   move=> st obs pc Hspec st'.
@@ -1283,7 +1283,7 @@ Fixpoint stack_size (st : Stack) : nat :=
 Lemma gen_var_stack_sound_spec:
   forall st obs pc,
     stack_spec pc inf st -> 
-    pincl (gen_vary_stack obs inf st) (fun st' => 
+    set_incl (gen_vary_stack obs inf st) (fun st' => 
                                    stack_spec pc inf st' /\
                                    stack_size st = stack_size st').
 Proof.
@@ -1331,7 +1331,7 @@ Definition additional_stack_spec (st st' : Stack) obs : Prop:=
 Lemma gen_var_stack_sound_spec_add:
   forall st obs pc,
     stack_spec pc inf st -> 
-    pincl (gen_vary_stack obs inf st) (fun st' => 
+    set_incl (gen_vary_stack obs inf st) (fun st' => 
                                          additional_stack_spec st st' obs).
 Proof.
   move => st obs pc Hspec st'.
@@ -1354,7 +1354,7 @@ Qed.
 Lemma gen_var_stack_complete: 
   forall st obs pc,
     stack_spec pc inf st -> 
-    pincl (fun st' => 
+    set_incl (fun st' => 
              indist obs st st' /\
              stack_spec pc inf st' /\
              stack_size st = stack_size st' /\

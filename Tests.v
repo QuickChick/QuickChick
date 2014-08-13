@@ -174,7 +174,7 @@ Lemma gentree_correct :
     g <--> all -> (gentree g) <--> all.
 Proof.
   move=> A g.
-  rewrite /peq /gentree. move=> H tree; split => //= _.
+  rewrite /set_eq /gentree. move=> H tree; split => //= _.
   exists (height tree). apply gentreeS_correct => //=.
 Qed.
 
