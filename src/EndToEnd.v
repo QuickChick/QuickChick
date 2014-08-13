@@ -1,4 +1,4 @@
-Require Import Show.
+Require Import Show RoseTrees.
 Require Import AbstractGen SetOfOutcomes Arbitrary Property.
 Require Import ssreflect ssrbool eqtype.
 
@@ -79,14 +79,38 @@ Proof.
   move => prop tp s p. by rewrite /printTestCase semCallback_idemp.
 Qed.
 
-(* our current assumption is this one *)
+Lemma semShrinking_idemp_aux:
+  forall {prop A : Type} {H : Testable prop}
+         (shrinker : A -> list A) (x0 : A) (pf : A -> prop) n,
+    semProperty (fmapGen (fun x => MkProp (joinRose (fmapRose unProp x)))
+                         (promote ((props' n pf shrinker x0)))) <->
+    semTestable (pf x0).
+Proof.
+  move=> prop A H shrinker x0 pf n. destruct n. 
+  -  rewrite /semTestable /semProperty !fmapGen_def. split.  
+     + move => Hfail qp Hprop. apply Hfail. eexists.
+       split. rewrite /promote /PredMonad /promoteP /=.
+       exists qp. split => //. by destruct qp as [[[] []]]. 
+     + move=> Hfail qp [rqp  [[qp' [Hprop Heq']] Heq]].
+       rewrite /returnP in Heq'; subst. apply Hfail. 
+       by destruct qp' as [[[] []]].
+  - rewrite /semTestable fmapGen_def /semProperty /= /bindP /returnP /=. 
+    split.
+    + move=> Hfail qp Hprop. apply Hfail. eexists.
+      split. exists qp. split => //. by destruct qp as [[[] []]].
+    + move=> Hfail qp [rqp [[qp' [Hprop eq]] eq']]; subst. 
+      apply Hfail.  by destruct qp' as [[[] []]].
+Qed.
+      
+
 Lemma semShrinking_idemp:
   forall {prop A : Type} {H : Testable prop}
          (shrinker : A -> list A) (x0 : A) (pf : A -> prop),
     semProperty (shrinking shrinker x0 pf) <-> 
     semTestable (pf x0).
-Proof.
-  admit.
+Proof. 
+  move=> prop A H shrinker x0 pf.
+  rewrite /shrinking /props. apply semShrinking_idemp_aux. 
 Qed. 
 
 Lemma semCover_idemp: 
@@ -140,6 +164,16 @@ Proof.
   - move => H qp [a [Hgen Hprop]]. eauto.
 Qed.
 
+Definition promotePt {M : Type -> Type} {A : Type} 
+           (m : Rose (Pred A)) : Pred (Rose A) :=
+  fun (ma : Rose A) => 
+    match m with 
+        | MkRose pred _ => 
+          match ma with 
+            | MkRose a _ => pred a 
+          end
+    end.
+                       
 Lemma semReturnGen: 
   forall (p : QProp),
     semProperty (returnGen p) <-> semProperty (property p).

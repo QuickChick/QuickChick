@@ -1,5 +1,5 @@
 Require Import ZArith List ssreflect ssrbool ssrnat.
-Require Import Axioms AbstractGen.
+Require Import Axioms RoseTrees AbstractGen.
 Import ListNotations.
 
 Set Implicit Arguments.
@@ -73,10 +73,8 @@ Proof.
 Definition sizedG {A : Type} (f : nat -> Gen A) : Gen A :=
   MkGen (fun r n => match f n with MkGen m => m r n end).
 
-Definition promoteG {M : Type -> Type} {A : Type} 
-           (liftFun : (Gen A -> A) -> M (Gen A) -> M A) 
-           (m : M (Gen A)) : Gen (M A) :=
-  MkGen (fun r n => liftFun (fun g => match g with MkGen m' => m' r n end) m).
+Definition promoteG {A : Type} (m : Rose (Gen A)) : Gen (Rose A) :=
+  MkGen (fun r n => fmapRose (fun g => match g with MkGen m' => m' r n end) m).
 
 Fixpoint rnds (rnd : RandomGen) (n' : nat) : list RandomGen :=
   match n' with
@@ -132,16 +130,6 @@ Definition suchThatMaybeGen {A : Type} (g : Gen A) (p : A -> bool)
                   else t (S k) n')
               end) in
   sizedG (fun x => t 0 (max 1 x)).
-
-(* Trying to understand sized and resize... *)
-(* Axiom g : Gen nat. *)
-
-(* Goal   *)
-(*   sized (fun n => resize (n+1) (sized (fun n => resize (n+1) g))) = *)
-(*   sized (fun n => resize (n+1+1) g). *)
-(* Proof. *)
-(*   rewrite /sized /resize //=. by case g. *)
-(* Qed. *)
  
 Instance realGen : GenMonad Gen :=
   { 
@@ -154,4 +142,5 @@ Instance realGen : GenMonad Gen :=
     suchThatMaybe := @suchThatMaybeGen;
     promote := @promoteG
   }.
+
 

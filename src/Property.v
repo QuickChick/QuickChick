@@ -3,6 +3,7 @@ Set Implicit Arguments.
 Require Import List.
 Require Import String.
 
+Require Import RoseTrees.
 Require Import Show.
 Require Import State.
 Require Import AbstractGen.
@@ -51,25 +52,6 @@ Definition addCallback (res : Result) (c : Callback) : Result :=
     | MkResult o e r i s cs => MkResult o e r i s (cons c cs)
   end.
 
-Inductive Rose (A : Type) : Type :=
-  MkRose : A -> Lazy (list (Rose A)) -> Rose A.
-
-Definition returnRose {A : Type} (x : A) := MkRose x (lazy nil).
-
-Fixpoint joinRose {A : Type} (r : Rose (Rose A)) : Rose A :=
-  match r with
-    | MkRose (MkRose a ts) tts =>
-      MkRose a (lazy (List.map joinRose (force tts) ++ (force ts)))
-  end.
-
-Fixpoint fmapRose {A B : Type} (f : A -> B) (r : Rose A) : Rose B :=
-  match r with
-    | MkRose x rs => MkRose (f x) (lazy (List.map (fmapRose f) (force rs)))
-  end.
-
-Definition bindRose {A B : Type} (m : Rose A) (k : A -> Rose B) : Rose B :=
-  joinRose (fmapRose k m).
-
 Record QProp : Type := MkProp
                          {
                            unProp : Rose Result
@@ -84,7 +66,8 @@ Definition failure qp :=
 Definition Property (Gen: Type -> Type) : Type := Gen QProp.
 
 Section Property.
-  Context {Gen : Type -> Type}
+  Context
+ {Gen : Type -> Type}
           {H: GenMonad Gen}.
   
   Class Testable (A : Type) : Type :=
@@ -174,7 +157,7 @@ Fixpoint props {prop A : Type} {t : Testable prop}
 
   (* Arbitrary choice for number of shrinks.. *)
   Definition props {prop A : Type} {t : Testable prop}
-             (pf : A -> prop) (shrinker : A -> list A) (x : A) :=
+             (pf : A -> prop) (shrinker : A -> list A) (x : A) : Rose (Property Gen) :=
     props' 1000 pf shrinker x.
 
   Definition printTestCase {prop : Type} {tp : Testable prop} 
@@ -184,8 +167,7 @@ Fixpoint props {prop A : Type} {t : Testable prop}
   Definition shrinking {prop A : Type} {_ : Testable prop}
              (shrinker : A -> list A) (x0 : A) (pf : A -> prop) : Property Gen :=
     @fmapGen Gen _ _ _ (fun x => MkProp (joinRose (fmapRose unProp x))) 
-             (promote fmapRose ((props pf shrinker x0))).
-
+             (promote (props pf shrinker x0)).
 
   Definition forAllShrink {A prop : Type} {_ : Testable prop}
              (show : A -> string)

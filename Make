@@ -1,6 +1,7 @@
 -R src QuickChick
 src/Axioms.v
 src/Arbitrary.v
+src/RoseTrees.v
 src/AbstractGen.v
 src/SetOfOutcomes.v
 src/Gen.v

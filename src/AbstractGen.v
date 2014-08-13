@@ -1,12 +1,7 @@
-Require Import ZArith Axioms.
-Require Import List ssreflect ssrbool ssrnat seq.
+Require Import Axioms. 
+Require Import RoseTrees.
+Require Import ZArith List ssreflect ssrbool ssrnat seq.
 Import ListNotations.
-
-Section Lazy.
-Set Implicit Arguments.
-
-Record Lazy (T : Type) := lazy { force : T }.
-End Lazy.
 
 Class Random (A : Type) :=
   { 
@@ -50,9 +45,7 @@ Class GenMonad M :=
     choose : forall {A} `{Random A}, A * A -> M A;
     sized : forall {A}, (nat -> M A) -> M A;
     suchThatMaybe : forall {A}, M A -> (A -> bool) -> M (option A);
-    promote : forall {M' : Type -> Type} {A : Type},
-                                   ((M A -> A) -> M' (M A) -> M' A) ->
-                                   (M' (M A)) -> M (M' A)
+    promote : forall  {A : Type}, (Rose (M A)) -> M (Rose A)
   }.
 
 Section Utilities.
@@ -130,29 +123,29 @@ Section Utilities.
 
   Definition frequency {A : Type} (def : Gen A) (gs : list (nat * Gen A)) := nosimpl(
     oneof def (freqRep gs)).
- 
+
+  Fixpoint pick {A : Type} (def : Gen A) (n : nat) (xs : list (nat * Gen A)) 
+  : nat * Gen A := 
+    match xs with 
+      | nil => (0, def)
+      | (k, x) :: xs =>  
+        if (n < k) then (k, x) 
+        else pick def (n - k) xs
+    end.
+
   (* This is the implementation of frequency a la QuickCheck and seems more 
      memory and time efficient. Is there a reason the should stick to the 
      first one? A corner case is when all the keys are set to zero and thus 
      the range of choose is (1, 0), which, according to Haskell's interface, 
      is an undefined behavior. *)
- 
-    Fixpoint pick {A : Type} (def : Gen A) (n : nat) (xs : list (nat * Gen A)) 
-    : nat * Gen A := nosimpl(
-      match xs with 
-        | nil => (0, def)
-        | (k, x) :: xs =>  
-          if (n < k) then (k, x) 
-          else pick def (n - k) xs
-      end).
-
   Definition frequency' {A : Type} (def : Gen A) (gs : list (nat * Gen A)) 
   : Gen A := nosimpl(
     let tot := (sumn (map (@fst _ _) gs)) in
     bindGen (choose (0, tot-1)) (fun n =>
     @snd _ _ (pick def n gs))).
 
-  Definition vectorOf {A : Type} (k : nat) (g : Gen A) : Gen (list A) := nosimpl(
+  Definition vectorOf {A : Type} (k : nat) (g : Gen A) 
+  : Gen (list A) := nosimpl(
     fold_right (fun m m' =>
                   bindGen m (fun x => 
                   bindGen m' (fun xs => returnGen (cons x xs)))

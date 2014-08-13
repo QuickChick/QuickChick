@@ -1,4 +1,4 @@
-Require Import AbstractGen. 
+Require Import AbstractGen RoseTrees. 
 Require Import Arith List seq ssreflect ssrbool ssrnat eqtype.
 
 (* The monad carrier *)
@@ -26,11 +26,38 @@ Definition suchThatMaybeP {A} (g : Pred A) (f : A -> bool)
   fun b => (b = None) \/ 
            (exists y, b = Some y /\ g y /\ f y).
 
-(* Trivial semantics for promoteP in order for shrinking to type check *)
-Definition promoteP {M : Type -> Type} {A : Type} 
-           (liftFun : (Pred A -> A) -> M (Pred A) -> M A) 
-           (m : M (Pred A)) : Pred (M A) :=
-  fun ma => True.
+
+(* semantics of promoteP: 
+   all the nodes of a rose tree that satisfies the predicate
+   have to satisfy the predicate of the corresponding node 
+   at the initial tree *)
+(* Fixpoint promoteP {A : Type}   *)
+(*            (m : Rose (Pred A)) : Pred (Rose A) := *)
+(*   let makelst (l: list (Rose (Pred A))) : (Pred (list (Rose A))) :=  *)
+(*       fold_right  *)
+(*         (fun (m : Rose (Pred A)) (l' : Pred (list (Rose A))) => *)
+(*            bindP (promoteP m) (fun (r : Rose A) => *)
+(*            bindP l' (fun (l : list (Rose A)) => *)
+(*            returnP (r :: l)))) (returnP [::]) l  *)
+(*   in *)
+(*   match m with *)
+(*     | MkRose g l => *)
+(*       bindP g (fun x : A => *)
+(*       bindP (makelst (force l)) (fun (l' : list (Rose A)) => *)
+(*       returnP (MkRose x (lazy l')))) *)
+(*   end. *)
+
+(* Semantics for promoteP that make the lemma about shrinking
+   provable. We should try to prove it with the correct semantics *)
+Fixpoint promoteP {A : Type}  
+           (m : Rose (Pred A)) : Pred (Rose A) :=
+  match m with
+    | MkRose g l =>
+      bindP g (fun x : A =>
+      returnP (MkRose x (lazy nil)))
+  end.
+
+
 
 Instance PredMonad : GenMonad Pred :=
   {
@@ -44,15 +71,15 @@ Instance PredMonad : GenMonad Pred :=
   }.
 
 (* Equivalence on sets of outcomes *) 
-Definition peq {A} (m1 m2 : Pred A) := 
+Definition set_eq {A} (m1 m2 : Pred A) := 
   forall A, m1 A <-> m2 A.
 
-Infix "<-->" := (@peq _) (at level 70, no associativity) : pred_scope.
+Infix "<-->" := set_eq (at level 70, no associativity) : pred_scope.
 
 Open Scope pred_scope.
 
-(* the set of outcomes m1 is a subset of m2 *) 
-Definition pincl {A} (m1 m2 : Pred A) :=
+(* the set f outcomes m1 is a subset of m2 *) 
+Definition set_incl {A} (m1 m2 : Pred A) :=
   forall A, m1 A -> m2 A.
 
 (* The set that is equal to A *) 
@@ -86,14 +113,14 @@ Proof. intros. compute. firstorder. subst. assumption. Qed.
   
 Lemma associativity : forall {A B C} (m : Pred A) (f : A -> Pred B) 
                              (g : B -> Pred C),
-  peq (bindGen (bindGen m f) g) (bindGen m (fun x => bindGen (f x) g)).
+  (bindGen (bindGen m f) g) <--> (bindGen m (fun x => bindGen (f x) g)).
 Proof. intros. compute. firstorder. Qed. 
 
 (* Functor laws *)
 Lemma fmap_id: 
   forall A a, (fmapP (@id A) a) <--> (@id (Pred A) a).
 Proof.
-  move => A pa. rewrite /fmapP /peq /bindP /returnP /id.
+  move => A pa. rewrite /fmapP /set_eq /bindP /returnP /id.
   move => a. split => [[a' [H1 H2]]| H] //=. by subst.
   by exists a; split.
 Qed.
@@ -102,7 +129,7 @@ Lemma fmap_composition:
   forall A B C (a : Pred A) (f : A -> B) (g : B -> C), 
     (fmapP g (fmapP f a)) <--> (fmapP (fun x => g (f x)) a).
 Proof.  
-  move=> A B C P f g. rewrite /fmapP /peq /bindP /returnP /id. move=> pc.
+  move=> A B C P f g. rewrite /fmapP /set_eq /bindP /returnP /id. move=> pc.
   split=> [[b [[a [Pa fa]]] Heq]| [a [Pa Heq]]]; subst. 
   + by exists a; split.  
   + exists (f a); split=> //=.
@@ -228,7 +255,7 @@ Lemma sequenceGen_equiv :
                                  forall x, In x (zip l gs) -> (snd x) (fst x).
 Proof.
   Opaque bindGen returnGen.
-  rewrite /peq /sequenceGen. 
+  rewrite /set_eq /sequenceGen. 
   move => A gs l. split; rewrite returnGen_def.  
   * elim : gs l => //= [| g gs IHxs] l Hfold. by subst.
     case: l Hfold => //= [| b bs] Hfold; 
@@ -507,9 +534,9 @@ Qed.
 
 Lemma frequency_equiv :
   forall {A} (l : list (nat * Pred A)) (def : Pred A), 
-    peq (frequency' def l) 
-        (fun e => (exists n, exists g, (In (n, g) l /\ g e /\ n <> 0)) \/ 
-                  ((l = nil \/ (forall x, In x l -> fst x = 0)) /\ def e)).
+    (frequency' def l) <-->
+    (fun e => (exists n, exists g, (In (n, g) l /\ g e /\ n <> 0)) \/ 
+              ((l = nil \/ (forall x, In x l -> fst x = 0)) /\ def e)).
 Proof. 
   move=> A l def a.  Opaque nat_compare. 
   rewrite /frequency' /bindGen /PredMonad /bindP /choose /Randomnat /cmp //=. 

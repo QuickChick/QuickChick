@@ -1,4 +1,4 @@
-Require Import Show.
+Require Import Show RoseTrees.
 Require Import AbstractGen Gen.
 Require Import Property.
 Require Import State.
