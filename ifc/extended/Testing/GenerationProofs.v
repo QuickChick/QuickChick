@@ -27,7 +27,7 @@ Proof.
 Qed.
 
 Lemma gen_BinOpT_correct :
-  set_eq gen_BinOpT all.
+  gen_BinOpT <--> all.
 Proof.
   rewrite /gen_BinOpT /all. move => op.
   split => // _.
@@ -133,10 +133,11 @@ Definition val_spec (inf : Info) (v : Value) : Prop :=
 
 Lemma gen_value_correct:
     (gen_Value inf) <--> (val_spec inf).
-Proof.
-  rewrite /gen_Value /val_spec.
+Proof. 
+  rewrite /gen_Value /val_spec. 
   clear data_len_nonempty. remember inf as Inf.
-  case : Inf HeqInf => def clen dlen top reg HeqInf. case; rewrite !HeqInf.
+  case : Inf HeqInf => def clen dlen top reg HeqInf. 
+  case; rewrite !HeqInf.
   + (* VInt *)
     move => z. split => // _. apply/frequency_equiv.
     left. exists 1. eexists. split. by constructor.
@@ -160,30 +161,11 @@ Proof.
       * by rewrite liftGen_def in H2; move : H2 => [a [H2 H2']].
     - move => [len [HIn [Hrng1 Hrg2]]].
       apply/frequency_equiv. left. exists 1. eexists.
-      split. apply in_cons.  apply in_cons. constructor.
-      reflexivity.
-      rewrite liftGen_def. split => //. eexists.
-      split => //.
-Admitted.
-(*
-      apply gen_Pointer_correct. exists len. split => //.
-   + (* Vcptr *)
-     move => addr. split.
-     - move/frequency_equiv => [[n [g [H1 [H2 H3]]]] | [H1 H2]].
-       * case: H1 => [[Heq1 Heq2] | [[Heq1 Heq2] | [[Heq1 Heq2] | [[Heq1 Heq2] | //]]]];
-         subst; try (rewrite liftGen_def in H2; move : H2 => [a [H2 H2']]);
-         try discriminate.
-         move : H2 H2' => [/Z.compare_le_iff H1 /Z.compare_ge_iff H2] [H2']; subst.
-         by split.
-       * by rewrite liftGen_def in H2; move : H2 => [a [H2 H2']].
-     - move => [/=  H1  H2].
-       apply/frequency_equiv. left. exists 1. eexists. split.
-       apply in_cons. constructor.
-       reflexivity.
-       rewrite liftGen_def. split => //. exists addr. split => //=.
-       split. by apply/Z.compare_le_iff.
-       rewrite -HeqInf /= in H2.
-       by apply/Z.compare_ge_iff.
+      split => //. apply in_cons.  constructor.
+      reflexivity. 
+      split => //. rewrite liftGen_def. eexists; split; [| reflexivity].
+      rewrite /smart_gen /smart_gen_pointer. apply gen_Pointer_correct.
+      exists len. split => //.
    + (* Vlab *)
      move => L. split.
      - move/frequency_equiv => [[n [g [H1 [H2 H3]]]] | [H1 H2]].
@@ -193,12 +175,11 @@ Admitted.
          by move : H2 H2' => /gen_label_inf_correct H1 [H2']; subst.
        * by rewrite liftGen_def in H2; move : H2 => [a [H2 H2']].
      - move => H. apply/frequency_equiv. left. exists 1. eexists.
-       split. apply in_cons. apply in_cons. apply in_cons. constructor.
+       split. apply in_cons. apply in_cons. constructor. 
        reflexivity.
        rewrite liftGen_def. split => //. exists L. split => //=.
        by apply/gen_label_inf_correct.
 Qed.
-*)
 
 (* Atom *)
 
