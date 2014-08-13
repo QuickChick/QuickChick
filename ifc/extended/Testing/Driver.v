@@ -37,15 +37,7 @@ QuickCheck test_exec_preserves_well_formed.
 
 (* Testing non-interference second (default table) *)
 
-Definition testTMU :=
-  let H1 := lab_of_list [Z.of_nat 1] in
-  let H2 := lab_of_list [Z.of_nat 2] in
-  let TOP := join H1 H2 in
-  show (run_tmr default_table OpAlloc <|bot; TOP; H2|> bot).
-
 Definition testSSNI t := quickCheck (propSSNI t : Gen.Gen QProp).
-
-(* Testing default table *)
 
 Definition testSSNIdefaultTable := showResult (testSSNI default_table).
 

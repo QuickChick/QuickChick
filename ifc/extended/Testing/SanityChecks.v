@@ -20,7 +20,6 @@ Section Checkers.
   Context {Gen : Type -> Type}
           {H : GenMonad Gen}.
 
-  (* Sanity check for stamp generation *)
   Definition prop_stamp_generation (st : State) : Property Gen :=
     (* whenFail (show st) *) (property (well_formed st)).
 
@@ -53,9 +52,10 @@ Section Checkers.
 
 End Checkers.
 
+(* Q: Split off into a separate file with Proofs? *)
 Require Import EndToEnd SetOfOutcomes.
 
-(* This is rather trivial, but it was mentioned below so I've proved it *)
+(* This is trivial, but it was mentioned below so I've proved it *)
 Lemma prop_stamp_generation_equiv :
   semTestable (prop_stamp_generation : State -> Pred QProp) <->
   (forall st, @genState Pred _ st -> well_formed st).
@@ -66,8 +66,25 @@ Proof.
   - rewrite semPredQProp. setoid_rewrite <- semBool. apply H. exact gen.
 Qed.
 
+(* One more rather trivial one;
+   TODO both these would become more interesting if we had declarative
+        variants of well_formed and indist *)
+Lemma prop_generate_indist_equiv :
+  semTestable (prop_generate_indist : Pred QProp) <->
+  (forall lab st1 st2,
+     @gen_variation_state Pred _ (Var lab st1 st2) -> indist lab st1 st2).
+Proof.
+  rewrite /prop_generate_indist. rewrite semPredQProp.
+  setoid_rewrite semForAllShrink.
+  split => [H lab st1 st2 gen | H [lab st1 st2] gen].
+  - specialize (H (Var lab st1 st2) gen). red in H.
+    by move /semPredQProp/semBool in H.
+  - rewrite semPredQProp. apply semBool. by apply H.
+Qed.
+
 (* One direction of this (soundness) is checked by prop_stamp_generation above;
-   this is the high-level spec we need for genState *)
+   this is the high-level spec we need for genState
+   TODO: move this to GenerationProofs? *)
 Lemma genState_well_formed : forall st,
   @genState Pred _ st <-> well_formed st.
 Admitted.
