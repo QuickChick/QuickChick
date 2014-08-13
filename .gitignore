@@ -9,7 +9,9 @@
 *.ml.d
 *.glob
 *.vo
-*.v~
+*.aux
+.coq-native
 \#*
+*~
 *.bak
 Makefile.coq

@@ -25,7 +25,7 @@ Definition testTMU :=
   let TOP := join H1 H2 in
   show (run_tmr default_table OpAlloc <|bot; TOP; H2|> bot).
 
-Definition testSSNI t := quickCheck (propSSNI t).
+Definition testSSNI t := quickCheck (propSSNI t : Gen.Gen QProp).
 
 (* Testing default table *)
 
@@ -45,7 +45,7 @@ Instance mutateable_table : Mutateable table :=
 
 Definition testMutants :=
   mutateCheckMany default_table (fun t => [propSSNI t;
-    prop_exec_preserves_well_formed t]
+    prop_exec_preserves_well_formed t] : list (Gen.Gen QProp)
 ).
 
 Definition runTestMutants := show testMutants.
@@ -106,7 +106,7 @@ Definition testMutant36 := testMutantX
 Definition testMutantWF x y :=
   let mutant := fun o' =>
     (helper x y o' (default_table o'))  in
-  quickCheck (prop_exec_preserves_well_formed mutant).
+  quickCheck (prop_exec_preserves_well_formed mutant : Gen.Gen QProp).
 
 Definition testMutant36wf := testMutantWF
   OpAlloc (≪TRUE, Lab2, LabPC ≫).
