@@ -41,7 +41,7 @@ Section Checkers.
 
   Definition prop_exec_preserves_well_formed (t : table)
   : Property Gen :=
-    forAllShrink show arbitrary (fun _ => []) (fun st =>
+    forAllShrink (* show *)(fun _ => ""%string) arbitrary (fun _ => []) (fun st =>
     (if well_formed st then
       match exec t st with
       | Some (_, st') =>
