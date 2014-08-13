@@ -191,8 +191,10 @@ Fixpoint groupRegisters (st : State) (rs : regSet)
          (dptr cptr num lab : list regPtr) (n : Z) :=
   match rs with
     | nil => (dptr, cptr, num, lab)
-    | (Vint _ @ _) :: rs' =>
-      groupRegisters st rs' dptr cptr (n :: num) lab (Zsucc n)
+    | (Vint i @ _) :: rs' =>
+      let cptr' := if Z.leb 0 i && Z.ltb i (Z_of_nat (length (st_imem st)))
+                   then n :: cptr else cptr in
+      groupRegisters st rs' dptr cptr' (n :: num) lab (Zsucc n)
     | (Vptr p @ _ ) :: rs' =>
       groupRegisters st rs' (n :: dptr) cptr num lab (Zsucc n)
     | (Vlab _ @ _) :: rs' =>
