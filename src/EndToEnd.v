@@ -226,7 +226,7 @@ Qed.
 (* equivalent Props for Testables *)
 
 Lemma semBool:
-  forall (b : bool), (b = true) <-> semTestable b.
+  forall (b : bool), b <-> semTestable b.
 Proof.
   move => b. case: b.
   - split => //. compute.

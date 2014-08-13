@@ -155,27 +155,28 @@ Proof.
     { destruct (exec t st1) as [ [tr1' st1'] |] => //.
       destruct (is_low_state st1 lab).
       - destruct (exec t st2) as [ [tr2' st2'] |] => //.
-          by move/semCollect_idemp/semPredQProp
-                 /semWhenFail_idemp/semBool : H => H.
+          by move/semCollect_idemp(*/semPredQProp
+                 /semWhenFail_idemp*)/semBool : H => H.
       - destruct (is_low_state st1').
         + destruct (exec t st2) as [[tr2 st2'] |] => //.
           destruct (is_low_state st2' lab).
-            by move/semCollect_idemp/semPredQProp/semWhenFail_idemp/semBool : H.
+            by move/semCollect_idemp(*/semPredQProp/semWhenFail_idemp*)/semBool : H.
             by move/semCollect_idemp/semPredQProp/semBool : H.
-        + by move/semCollect_idemp/semPredQProp/semWhenFail_idemp/semBool : H. }
+        + by move/semCollect_idemp(*/semPredQProp/semWhenFail_idemp*)/semBool : H. }
   -  move=> H.
-     destruct (indist lab st1 st2); try by apply/semPredQProp/semCollect_idemp/semBool.
+     destruct (indist lab st1 st2);
+       try by apply/semPredQProp/semCollect_idemp/semPredQProp/semBool.
     { destruct (exec t st1) as [ [tr1' st1'] |].
       destruct (is_low_state st1 lab).
       - destruct (exec t st2) as [ [tr2' st2'] |].
-        by apply/semPredQProp/semCollect_idemp/semPredQProp/semWhenFail_idemp/semBool.
-        by apply/semPredQProp/semCollect_idemp/semBool.
+        by apply/semPredQProp/semCollect_idemp(*/semPredQProp/semWhenFail_idemp*)/semBool.
+        by apply/semPredQProp/semCollect_idemp/semPredQProp/semBool.
       - destruct (is_low_state st1').
         + destruct (exec t st2) as [[tr2 st2'] |].
           * destruct (is_low_state st2' lab).
-            by apply/semPredQProp/semCollect_idemp/semPredQProp/semWhenFail_idemp/semBool.
-            by apply/semPredQProp/semCollect_idemp/semBool.
-          * by apply/semPredQProp/semCollect_idemp/semBool.
-        + by apply/semPredQProp/semCollect_idemp/semPredQProp/semWhenFail_idemp/semBool.
-      - by apply/semPredQProp/semCollect_idemp/semBool. }
+            by apply/semPredQProp/semCollect_idemp(*/semPredQProp/semWhenFail_idemp*)/semBool.
+            by apply/semPredQProp/semCollect_idemp/semPredQProp/semBool.
+          * by apply/semPredQProp/semCollect_idemp/semPredQProp/semBool.
+        + by apply/semPredQProp/semCollect_idemp(*/semPredQProp/semWhenFail_idemp*)/semBool.
+      - by apply/semPredQProp/semCollect_idemp/semPredQProp/semBool. }
 Qed.

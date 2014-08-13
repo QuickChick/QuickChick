@@ -20,7 +20,7 @@ Local Open Scope string.
 
 (* Sanity check for stamp generation *)
 Definition prop_stamp_generation (st : State) : Property Gen.Gen :=
-  whenFail (show st) (well_formed st).
+  (* whenFail (show st) *) (property (well_formed st)).
 
 (*
 Definition propStampGeneration (st : State) :=
@@ -45,9 +45,11 @@ Section Checkers.
     (if well_formed st then
       match exec t st with
       | Some (_, st') =>
+(*
         whenFail ("Initial: " ++ show st ++ nl ++
                   "Step to: " ++ show st' ++ nl)
-                 (well_formed st')
+*)
+                 (property (well_formed st'))
       | _ => property rejected
       end
     else property false) : Gen QProp).
@@ -78,10 +80,13 @@ Proof.
   split => [H st tr st' wf ex | H st arb].
   - assert (@genState Pred _ st) as gs by (by rewrite genState_well_formed).
     specialize (H st gs).
-    rewrite wf ex in H. by move /semWhenFail_idemp /semBool in H.
+    rewrite wf ex in H.
+    (* by move /semWhenFail_idemp /semBool in H. *)    
+    by setoid_rewrite <- semBool in H.
   - move /genState_well_formed in arb. rewrite arb. specialize (H st).
     move : H. case (exec t st) => [ [tr st'] | ] H.
     + specialize (H tr st' arb Logic.eq_refl). rewrite H.
-      rewrite semWhenFail_idemp. by rewrite <- semBool.
+      (* rewrite semWhenFail_idemp. by rewrite <- semBool. *)
+      by setoid_rewrite <- semBool.
     + fold (semTestable rejected). rewrite <- semResult. reflexivity.
 Qed.

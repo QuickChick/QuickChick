@@ -199,8 +199,8 @@ Instance indistState : Indist State :=
       if isHigh ∂pc1 lab && isHigh ∂pc2 lab then
         if indist lab m1 m2 then
           if indist lab s1 s2 then true
-          else Property.trace "Stack" false
-        else Property.trace "Memory" false
+          else (* Property.trace "Stack" *) false
+        else (* Property.trace "Memory" *) false
       else
         (* next check implies isLow pc1 ... && isLow pc2 ... *)
         if indist lab pc1 pc2 then
@@ -209,9 +209,9 @@ Instance indistState : Indist State :=
               if indist lab s1 s2 then true
                    (* CH: This still relies on Leo's stack pc invariant;
                           otherwise should be running indistStackHelper *)
-              else Property.trace "Stack" false
-            else Property.trace "Memory" false
-          else Property.trace "Registers" false
-        else Property.trace "PC" false
-    else Property.trace "not equal instructions" false
+              else (* Property.trace "Stack" *) false
+            else (* Property.trace "Memory" *) false
+          else (* Property.trace "Registers" *) false
+        else (* Property.trace "PC" *) false
+    else (* Property.trace "not equal instructions" *) false
 |}.

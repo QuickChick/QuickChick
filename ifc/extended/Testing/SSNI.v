@@ -47,11 +47,13 @@ Set Printing All.
                      match exec t st2 with
                        | Some (tr2, st2') =>
                          collect "LOW -> *" (
+(*
                                    whenFail
                                      ("LOW -> *" ++ nl ++
                                                  (show_execution lab [st1; st1'] [st2; st2']))
+*)
                                      (observe_comp (observe lab tr1) (observe lab tr2)
-                                                   && (indist lab st1' st2')):Gen QProp)
+                                                   && (indist lab st1' st2'))(*:Gen QProp*))
                        | _ => (* 1 took a low step and 2 failed *)
                          collect "Second failed" (property true : Gen QProp)
                      (*
@@ -67,10 +69,12 @@ Set Printing All.
                          | Some (tr2, st2') =>
                            if is_low_state st2' lab then
                              collect "HIGH -> LOW" (
+(*
                                        whenFail ("HIGH -> LOW" ++ Show.nl ++
                                                                 (show_execution lab [st1; st1'] [st2; st2']))
+*)
                                                  (observe_comp (observe lab tr1) (observe lab tr2)
-                                                               && (indist lab st1' st2')) : Gen QProp
+                                                               && (indist lab st1' st2')) (* : Gen QProp *)
                                      )
                            else collect "Second not low" (property true : Gen QProp)
                          (* This can happen; it's just a discard *)
@@ -80,11 +84,13 @@ Set Printing All.
                        end
                      else
                        collect "HIGH -> HIGH" (
+(*
                                  whenFail ("HIGH -> HIGH" ++ Show.nl ++
                                                           (show_pair lab st1 st1'))
+*)
                                           (beq_nat (List.length (observe lab tr1)) 0
                                        && indist lab st1 st1')
-                               : Gen QProp)
+                               (*: Gen QProp*))
                  | _ => collect "Failed" (property true : Gen QProp)
                (* This can happen; it's just a discard *)
                (* TODO: could check if st2 does a H -> H step *)

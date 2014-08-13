@@ -571,7 +571,7 @@ Definition gen_init_mem (top : Label) : Gen (memory * list (mframe * Z)):=
   gen_init_mem_helper top no_frames (Mem.empty Atom Label, [])).
 
 Definition failed_state : State :=
-  Property.trace "Failed State!"
+  (* Property.trace "Failed State!" *)
                  (St [] (Mem.empty Atom Label) bot Mty [] (PAtm Z0 bot)).
 
 
