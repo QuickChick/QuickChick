@@ -274,4 +274,3 @@ Lemma size_length:
 Proof.
   move=> A. elim => //.
 Qed.
-

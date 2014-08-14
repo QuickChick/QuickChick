@@ -9,7 +9,6 @@ Machine/Machine.v
 Machine/Memory.v
 Machine/Mutate.v
 # Machine/NIAbstractMachine.v
-Machine/Primitives.v
 # Machine/RelationExtraction.v
 Machine/Rules.v
 Machine/Utils.v

@@ -509,13 +509,5 @@ Definition Label := Zset.t.
 Definition label_of_list (l : list Z) :=
   fold_left (fun a b => Zset.add b a) l Zset.empty.
 
-Fixpoint powerset {A : Type} (l : list A) : (list (list A)) :=
-  match l with
-    | [] => [[]]
-    | h::t =>
-      let p := powerset t in
-      map (cons h) p ++ p
-  end.
-
 Definition allThingsBelow (l : Label) :=
   map label_of_list (powerset (Zset.elements l)).

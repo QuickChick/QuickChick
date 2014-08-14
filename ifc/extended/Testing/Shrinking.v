@@ -1,16 +1,13 @@
+Require Import ZArith.
+(*Require Import String.*)
+Require Import List. Import ListNotations.
+Require Import NPeano.
+
 Require Import QuickChick.
 
-Require Import Machine.
-Import Mem.
-
-Require Import ZArith.
-Require Import String.
-Require Import List.
-Require Import Coq.Numbers.Natural.Peano.NPeano.
-
-Require Import Generation.
+Require Import Common. Import Mem.
 Require Import Indist.
-Require Import Common.
+Require Import Generation.
 
 Local Open Scope nat.
 
@@ -21,35 +18,43 @@ Definition shrinkInstr i :=
     | _ => [Nop]
   end.
 
-(* Powerset returns the set as its first element, so ignore that *)
+(* CH: old stuff about sets of prins
+Powerset returns the set as its first element, so ignore that
 Definition shrinkLabel l :=
     match powerset (Zset.elements l) with
       | [[]] => nil
       | _::t => map lab_of_list t
       | _    => nil
     end.
+*)
+Definition shrinkLabel l :=
+  match l with
+  | L       => []
+  | M1 | M2 => [L]
+  | H       => [L;M1;M2]
+  end.
 
 Definition shrinkPointer (p : Pointer) : list Pointer :=
   let '(Ptr mf i) := p in
-  map (Ptr mf) (shrink i).
+  List.map (Ptr mf) (shrink i).
 
 Definition shrinkValue (v : Value) : list Value :=
   match v with
-    | Vint i => map Vint (shrink i)
-    | Vptr p => Vint Z0 :: map Vptr (shrinkPointer p)
-    | Vlab l => Vint Z0 :: map Vlab (shrinkLabel l)
+    | Vint i => List.map Vint (shrink i)
+    | Vptr p => Vint Z0 :: List.map Vptr (shrinkPointer p)
+    | Vlab l => Vint Z0 :: List.map Vlab (shrinkLabel l)
   end.
 
 Definition shrinkAtom (a : Atom) : list Atom :=
   let '(Atm val lab) := a in
-  map (flip Atm lab) (shrinkValue val)
-  ++  map (Atm val) (shrinkLabel lab).
+  List.map (flip Atm lab) (shrinkValue val)
+  ++  List.map (Atm val) (shrinkLabel lab).
 
 Fixpoint noopShrink (n : nat) (l : Label) (l1 l2 : list Instruction)
 : list (@Variation (list Instruction)) :=
   match n with
     | S n' =>
-      match nth n' l1 Nop, nth n' l2 Nop with
+      match List.nth n' l1 Nop, List.nth n' l2 Nop with
         | Nop, Nop =>
           noopShrink n' l l1 l2
         | _, _ =>
@@ -78,11 +83,11 @@ Instance shrVVal : ShrinkV Value :=
   shrinkV vv :=
     match vv with
       | Var lab (Vint i) (Vint _) =>
-        map (fun i => Var lab (Vint i) (Vint i)) (shrink i)
+        List.map (fun i => Var lab (Vint i) (Vint i)) (shrink i)
       | Var lab (Vptr p) (Vptr _) =>
-        map (fun p => Var lab (Vptr p) (Vptr p)) (shrinkPointer p)
+        List.map (fun p => Var lab (Vptr p) (Vptr p)) (shrinkPointer p)
       | Var lab (Vlab l) (Vlab _) =>
-        map (fun l => Var lab (Vlab l) (Vlab l)) (shrinkLabel l)
+        List.map (fun l => Var lab (Vlab l) (Vlab l)) (shrinkLabel l)
       | _ => nil
     end
 |}.
@@ -102,14 +107,14 @@ Instance shrVAtom : ShrinkV Atom :=
   shrinkV va :=
     let '(Var lab (Atm v l) (Atm v' l')) := va in
     if flows l lab then
-      map (fun v => let '(Var _ v1 v2) := v in
+      List.map (fun v => let '(Var _ v1 v2) := v in
                     Var lab (Atm v1 l) (Atm v2 l')) (shrinkV (Var lab v v'))
     else
-      let a1s := map (fun v1 => Atm v1 l) (shrinkValue v)  in
-      let a2s := map (fun v2 => Atm v2 l) (shrinkValue v') in
-      map (fun a => Var lab a (Atm v' l')) a1s ++
-      map (fun a' => Var lab (Atm v l) a') a2s ++
-      concat (map (fun a => map (fun a' => Var lab a a') a2s) a1s)
+      let a1s := List.map (fun v1 => Atm v1 l) (shrinkValue v)  in
+      let a2s := List.map (fun v2 => Atm v2 l) (shrinkValue v') in
+      List.map (fun a => Var lab a (Atm v' l')) a1s ++
+      List.map (fun a' => Var lab (Atm v l) a') a2s ++
+      concat (List.map (fun a => List.map (fun a' => Var lab a a') a2s) a1s)
     ++ shrinkVLabeled Atm v v' l lab
 |}.
 
@@ -117,9 +122,9 @@ Fixpoint shrink_datas (lab : Label) (ds ds' : list Atom) :=
   match ds, ds' with
     | h1 :: t1, h2 :: t2 =>
       Var lab t1 t2 ::
-      map (fun x => let '(Var _ h1' h2') := x in
+      List.map (fun x => let '(Var _ h1' h2') := x in
                     Var lab (h1':: t1) (h2'::t2)) (shrinkV (Var lab h1 h2))
-      ++ map (fun x => let '(Var _ t1' t2') := x in
+      ++ List.map (fun x => let '(Var _ t1' t2') := x in
                        Var lab (h1::t1') (h2::t2')) (shrink_datas lab t1 t2)
     | _, _ => nil
   end.
@@ -132,13 +137,13 @@ Instance shrVFrame : ShrinkV frame :=
   shrinkV vf :=
     let '(Var obs (Fr stmp lab data1) (Fr stmp2 lab2 data2)) := vf in
     if isLow lab obs then
-      map (fun x => let '(Var _ ds1 ds2) := x in
+      List.map (fun x => let '(Var _ ds1 ds2) := x in
                     Var lab (Fr stmp lab ds1) (Fr stmp2 lab2 ds2))
           (shrink_datas obs data1 data2)
     else
-      map (fun data1' => Var lab (Fr stmp lab data1') (Fr stmp2 lab2 data2))
+      List.map (fun data1' => Var lab (Fr stmp lab data1') (Fr stmp2 lab2 data2))
           (shrinkListAtom data1) ++
-      map (fun data2' => Var lab (Fr stmp lab data1) (Fr stmp2 lab2 data2'))
+      List.map (fun data2' => Var lab (Fr stmp lab data1) (Fr stmp2 lab2 data2'))
           (shrinkListAtom data2)
 |}.
 
@@ -315,7 +320,7 @@ Fixpoint shrinkVRegContents (l : Label) (prev prev' rest rest' : regSet)
   match rest, rest' with
     | h1 :: t1, h2 :: t2 =>
       let shrunk := shrinkV (Var l h1 h2) in
-      map (fun v' =>
+      List.map (fun v' =>
         let '(Var _ h1' h2') := v' in
         Var l (rev_append prev  (h1'::t1))
               (rev_append prev' (h2'::t2))

@@ -2,14 +2,14 @@ Require Import ZArith.
 Require Import List.
 
 Require Import Utils.
-Require Import Machine.
-Require Import Lab4.
 Require Import Common.
+
+Open Scope bool.
 
 (* Indistinguishability type class *)
 Class Indist (A : Type) : Type :=
 {
-  indist : Lab4 -> A -> A -> bool
+  indist : Label -> A -> A -> bool
 }.
 
 (* Indistinguishability of Values.
@@ -17,7 +17,7 @@ Class Indist (A : Type) : Type :=
    - For pointers, it is syntactic equality thanks to the per-stamp-level allocator!
 *)
 Set Printing All.
-Instance indistValue : Indist (@Value Lab4) :=
+Instance indistValue : Indist Value :=
 {|
   indist _lab v1 v2 :=
     match v1, v2 with
@@ -93,8 +93,8 @@ Instance indistFrame : Indist frame :=
      are pairwise indistinguishable.
 *)
 Definition indistMemHelper (framePairs : list (frame * frame))
-         (lab : Lab4)
-         (m1 m2 : @memory Lab4) :=
+         (lab : Label)
+         (m1 m2 : memory) :=
   forallb (fun (x : frame * frame) =>
     let (f1, f2) := x in indist lab f1 f2) framePairs.
 
@@ -105,7 +105,7 @@ Definition indistMemHelper (framePairs : list (frame * frame))
      They have to be allocated in the same order so no need for fancy stuff
 *)
 
-Instance indistMem : Indist (@memory Lab4) :=
+Instance indistMem : Indist memory :=
 {|
   indist lab m1 m2 :=
   let get_all_frames (m : memory) : list frame :=
@@ -132,7 +132,7 @@ Instance indistReg : Indist regSet :=
    - The returning pc labels must decrease as we go down the stack.
 *)
 Require Import String.
-Fixpoint well_formed_stack (prev : Lab4) (s : Stack) : bool :=
+Fixpoint well_formed_stack (prev : Label) (s : Stack) : bool :=
   match s with
     | Mty => true
     | RetCons (pc, _, _ ,r) s' =>
@@ -144,7 +144,7 @@ Fixpoint well_formed_stack (prev : Lab4) (s : Stack) : bool :=
    - Takes a stack and keeps its low part.
    INV: Stacks should be wellFormed
 *)
-Fixpoint cropTop (lab : Lab4) (s : Stack) :=
+Fixpoint cropTop (lab : Label) (s : Stack) :=
   match s with
     | Mty => Mty
     | RetCons (pc, _, _, _) s' =>
@@ -160,7 +160,7 @@ Fixpoint cropTop (lab : Lab4) (s : Stack) :=
      * The rest of the stack must be also indistinguishable
    INV: Called only on stacks after cropTop, which means all pc's are low
 *)
-Fixpoint indistStackHelper (lab : Lab4)
+Fixpoint indistStackHelper (lab : Label)
          (s1 s2 : Stack) :=
   match s1, s2 with
     | Mty, Mty => true

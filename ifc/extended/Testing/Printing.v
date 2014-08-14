@@ -6,10 +6,8 @@ Require Import Coq.Numbers.Natural.Peano.NPeano.
 
 Require Import QuickChick.
 
-Require Import Lab4.
 Require Import Common.
 Require Import Indist.
-Require Import Machine.
 
 (* High-level note:
    Deal with printing variations of stuff, then instantiate the
@@ -101,14 +99,14 @@ Instance show_op_code : Show OpCode :=
     end
 |}.
 
-Instance show_pointer : Show (@Pointer Lab4) :=
+Instance show_pointer : Show Pointer :=
 {|
   show ptr :=
     let '(Ptr x y) := ptr in
     "(f=" ++ show x ++ ";i=" ++ show y ++ ")"
 |}.
 
-Instance show_val : Show (@Value Lab4) :=
+Instance show_val : Show Value :=
 {|
   show val :=
     match val with
@@ -128,14 +126,14 @@ Fixpoint numed_contents {A : Type} (s : A -> string) (l : list A) (n : nat)
 
 Definition par (s : string) := "( " ++ s ++ " )".
 
-Instance show_atom : Show (@Atom Lab4) :=
+Instance show_atom : Show Atom :=
 {|
   show a :=
     let '(v @ l) := a in
     show v ++ " @ " ++ show l
 |}.
 
-Instance show_Ptr_atom : Show (@Ptr_atom Lab4) :=
+Instance show_Ptr_atom : Show Ptr_atom :=
 {|
   show p :=
     let '(PAtm i l) := p in show i ++ " @ " ++ show l
@@ -162,7 +160,7 @@ Class ShowPair (A : Type) : Type :=
   show_pair : Lab4 -> A -> A -> string
 }.
 
-Instance show_value_pair : ShowPair (@Value Lab4) :=
+Instance show_value_pair : ShowPair Value :=
 {|
   show_pair lab v1 v2 :=
     if indist lab v1 v2 then show v1
@@ -176,7 +174,7 @@ Instance show_label_pair : ShowPair Lab4 :=
     else show_variation (show l1) (show l2)
 |}.
 
-Instance show_atom_pair : ShowPair (@Atom Lab4) :=
+Instance show_atom_pair : ShowPair Atom :=
 {|
   show_pair lab a1 a2 :=
     let '(v1 @ l1) := a1 in
@@ -185,7 +183,7 @@ Instance show_atom_pair : ShowPair (@Atom Lab4) :=
     ++ show_pair lab l1 l2
 |}.
 
-Instance show_ptr_atom_pair : ShowPair (@Ptr_atom Lab4) :=
+Instance show_ptr_atom_pair : ShowPair Ptr_atom :=
 {|
   show_pair lab p1 p2 :=
     if indist lab p1 p2 then
@@ -267,7 +265,7 @@ Definition show_high_frames m (mfs : list mframe) :=
     | _ => aux mfs
   end.
 
-Definition show_pair_mem (obs : Lab4) (m1 m2 : memory)
+Definition show_pair_mem (obs : Label) (m1 m2 : memory)
 : string :=
   let frames1 := Mem.get_blocks elems m1 in
   let high1 := filter (fun mf => isHigh (Mem.stamp mf) obs) frames1 in

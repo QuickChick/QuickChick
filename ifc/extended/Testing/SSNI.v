@@ -2,8 +2,6 @@ Require Import String.
 Require Import Arith.EqNat.
 Require Import ZArith.
 
-Require Import Machine.
-
 Require Import QuickChick.
 
 Require Import Common.
@@ -103,6 +101,6 @@ Set Printing All.
   Definition propSSNI t : Property Gen :=
     forAllShrink (fun _ => ""%string) gen_variation_state (fun _ => nil)
       (* shrinkVState *)
-      (propSSNI_helper t : @Variation Machine.State -> Gen QProp).
+      (propSSNI_helper t : @Variation State -> Gen QProp).
 
 End Checkers.

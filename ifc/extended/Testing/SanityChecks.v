@@ -8,7 +8,7 @@ Require Import Shrinking.
 Require Import Generation.
 Require Import Machine.
 
-Require Import List.
+Require Import List. Import ListNotations.
 Require Import Common.
 Require Import String.
 

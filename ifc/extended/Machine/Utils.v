@@ -1256,6 +1256,14 @@ Definition option_bind {X Y} (f : X -> option Y) (o : option X) :=
   | None => None
   end.
 
+Fixpoint powerset {A : Type} (l : list A) : (list (list A)) :=
+  match l with
+    | [] => [[]]
+    | h::t =>
+      let p := powerset t in
+      map (cons h) p ++ p
+  end.
+
 (* Helper functions *)
 Definition flip {A B C : Type} (f : A -> B -> C) (x : B) (y : A) : C := f y x.
 Definition compose {A B C : Type} (f : B -> C) (g : A -> B) (x : A) : C := f (g x).

@@ -95,7 +95,6 @@ VFILES:=Testing/SSNICheckerProofs.v\
   Testing/Common.v\
   Machine/Utils.v\
   Machine/Rules.v\
-  Machine/Primitives.v\
   Machine/Mutate.v\
   Machine/Memory.v\
   Machine/Machine.v\

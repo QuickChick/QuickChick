@@ -1,5 +1,6 @@
 Require Import List. Import ListNotations.
 Require Import Rules.
+Require Import Instructions.
 Require Import Machine.
 
 Set Implicit Arguments.

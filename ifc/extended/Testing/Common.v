@@ -5,8 +5,22 @@ Require Import NPeano.
 
 Require Import QuickChick Gen.
 
-Require Import Machine.
-Require Import Lab4.
+Require Export Utils.
+Require Export Labels.
+Require Export Instructions.
+Require Export Memory.
+Require Export Lab4.
+Require Export Machine.
+
+Module Lab4M <: FINLAT.
+  Definition Label := Lab4.
+  Definition JSLat := JoinSemiLattice_Lab4.
+  Definition Lat   := Lattice_Lab4.
+  Definition FLat  := FiniteLattice_Lab4.
+End Lab4M.
+
+Module MachineLab4M := MachineM Lab4M.
+Export MachineLab4M.
 
 Section GenUtils.
   Context {Gen : Type -> Type}
@@ -34,17 +48,17 @@ Class ShrinkV (A : Type) := { shrinkV : @Variation A -> list (@Variation A) }.
 Definition isLow  (l obs : Lab4) := flows l obs.
 Definition isHigh (l obs : Lab4) := negb (isLow l obs).
 
-Definition validJump (st : @State Lab4) (addr : Z) :=
+Definition validJump (st : State) (addr : Z) :=
   let '(St imem _ _ _ _) := st in
   (Z.to_nat addr) <? (List.length imem).
 
-Fixpoint containsRet (stk : @Stack Lab4) :=
+Fixpoint containsRet (stk : Stack) :=
   match stk with
     | Mty => false
     | RetCons _ _ => true
   end.
 
-Definition incr_ptr (p : @Pointer Lab4) :=
+Definition incr_ptr (p : Pointer) :=
   let (fp, i) := p in (Ptr fp (Zsucc i)).
 
 (* Simple equalities *)
@@ -69,7 +83,7 @@ Proof. decide equality. Defined.
 
 Definition instr_eq i1 i2 := if instr_eq_dec i1 i2 then true else false.
 
-Definition label_eq (l1 l2 : Lab4) := flows l1 l2 && flows l2 l1.
+Definition label_eq (l1 l2 : Label) := (flows l1 l2 && flows l2 l1)%bool.
 
-Definition mframe_eq (m1 m2 : @mframe Lab4) : bool :=
+Definition mframe_eq (m1 m2 : mframe) : bool :=
   if Mem.EqDec_block m1 m2 then true else false.
