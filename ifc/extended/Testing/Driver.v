@@ -1,20 +1,16 @@
 
+Require Import ZArith.
 Require Import String.
-Require Import List.
+Require Import List. Import ListNotations.
 
 Require Import QuickChick.
-Require Import Common.
-
 Require Import Show.
 Require Import Test.
-Require Import ZArith.
 
+Require Import Common.
 Require Import Generation.
 Require Import Shrinking.
-Require Import Machine.
-Require Import Rules.
 Require Import SSNI.
-
 Require Import Reachability.
 Require Import SingleStateArb.
 

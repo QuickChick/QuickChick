@@ -85,5 +85,12 @@ Definition instr_eq i1 i2 := if instr_eq_dec i1 i2 then true else false.
 
 Definition label_eq (l1 l2 : Label) := (flows l1 l2 && flows l2 l1)%bool.
 
+Require Import ssrbool.
+Lemma label_eq_correct : forall l1 l2,
+  label_eq l1 l2 = true -> l1 = l2.
+Proof.
+  rewrite /label_eq => l1 l2 /andP [H1 H2]. eapply flows_antisymm; trivial.
+Qed.
+
 Definition mframe_eq (m1 m2 : mframe) : bool :=
   if Mem.EqDec_block m1 m2 then true else false.

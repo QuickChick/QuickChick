@@ -511,3 +511,39 @@ Definition label_of_list (l : list Z) :=
 
 Definition allThingsBelow (l : Label) :=
   map label_of_list (powerset (Zset.elements l)).
+
+Require Import ssreflect ssrbool.
+
+Lemma incl_empty : forall s, Zset.incl Zset.empty s.
+Proof.
+  move=> s. apply Zset.incl_spec. by rewrite Zset.elements_empty.
+Qed.
+
+Lemma incl_same : forall s, Zset.incl s s.
+Proof.
+  move => s.
+  by apply/Zset.incl_spec/incl_refl.
+Qed.
+
+(*
+Lemma forallb_indist :
+  forall (l : list frame),
+    forallb
+      (fun x : frame * frame =>
+         let (f1, f2) := x in indist Zset.empty f1 f2)
+      (combine l l).
+Proof.
+Abort.
+  case: x => valx labx. rewrite incl_same //=.
+  rewrite /isHigh /isLow .
+  case: (labx <: Zset.empty)=> //= .
+  case: valx => //=.
+  try (by rewrite /Z_eq; move => n ; case (Z.eq_dec n n)).
+  case. move => fp i. apply/andP. split => //.
+  rewrite /mframe_eq.
+  case: (Mem.EqDec_block fp fp) => //=.
+  congruence. by rewrite /Z_eq; case: (Z.eq_dec i i).
+  (by rewrite /Z_eq; move => n ; case (Z.eq_dec n n)).
+  move => L; apply/andP; split; apply incl_same.
+Qed.
+*)

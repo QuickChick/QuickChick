@@ -1,9 +1,9 @@
 Require Import QuickChick SetOfOutcomes.
 
-Require Import Common Machine Generation Indist.
-
-Require Import List.
+Require Import List. Import ListNotations.
 Require Import ZArith.
+
+Require Import Common Generation Indist.
 
 Require Import ssreflect ssrbool ssrnat eqtype.
 
@@ -32,6 +32,8 @@ Proof.
        * right. eapply IHxs; eauto.
      - by right; eapply IHxs; eauto.
 Qed.
+
+(*
 Lemma elements__label_of_list:
   forall (lst : list Z) x zt,
     List.In x (Zset.elements (fold_left (fun (a : Zset.t) (b : Z) => Zset.add b a) lst zt)) <->
@@ -68,12 +70,12 @@ Proof.
   by left.
 Qed.
 
+*)
+
 Lemma allThingsBelow_nonempty: forall l2, allThingsBelow l2 <> [].
 Proof.
-  rewrite /allThingsBelow /allBelow.
-  by move =>  l1 /map_eq_nil/powerset_nonempty c.
+  rewrite /allThingsBelow. case; by simpl.
 Qed.
-
 
 Lemma in_nil_powerset :
   forall {A} (l : list A), In [] (powerset l).
@@ -82,26 +84,20 @@ Proof.
   by apply in_or_app; right.
 Qed.
 
-
 Lemma allThingsBelow_isLow :
   forall l l',
     In l (allThingsBelow l') -> l <: l'.
 Proof.
-  move => l l'. (* split *)
-  + move=> /in_map_iff [x [Heq HIn]]. subst.
-    apply/Zset.incl_spec. move => a /elements__label_of_list H.
-    rewrite Zset.elements_empty app_nil_r in H.
-      by eapply powerset_in; eauto.
+  rewrite /allThingsBelow.
+  case; case; simpl; try tauto; firstorder; discriminate.
 Qed.
 
 Lemma allThingsBelow_isLow' :
   forall l l',
     l <: l' -> In l (allThingsBelow l').
 Proof.
-  move => l l'. move=> Hf.
-  rewrite /allThingsBelow /allBelow.
-  rewrite -[X in In X _]label_of_list__elements. apply in_map.
-  admit.
+  rewrite /allThingsBelow.
+  case; case; simpl; try tauto; firstorder; discriminate.
 Qed.
 
 Lemma filter_nil:
@@ -238,7 +234,7 @@ Qed.
 
 Lemma in_nth_iff:
   forall {A} (l : list A) x,
-    In x l <-> exists n, nth n l x = x /\ n < length l.
+    In x l <-> exists n, List.nth n l x = x /\ n < length l.
 Proof.
   move=> A l x. split.
   - move=> HIn.  apply in_split in HIn. move : HIn => [l1 [l2 Heq]].
@@ -253,7 +249,7 @@ Qed.
 
 Lemma nth_seqnth :
   forall {A} (l : list A) n (x : A),
-    seq.nth x l n = nth n l x.
+    seq.nth x l n = List.nth n l x.
 Proof.
   move=> A. elim. case =>//.
   move=> a l H. move => n x. rewrite -seq.cat1s.
@@ -263,7 +259,7 @@ Qed.
 
 Lemma nth_foralldef:
   forall {A} (l: list A) n (x x': A),
-    n < length l -> nth n l x = nth n l x'.
+    n < length l -> List.nth n l x = List.nth n l x'.
 Proof.
   move => A. elim=> // x xs IHxs n d d' Hlen.
   case: n Hlen => //= n Hlen. auto.
