@@ -4,8 +4,6 @@ Require Import List.
 
 Require Import Utils.
 
-Open Scope bool_scope.
-
 Class JoinSemiLattice (Lab : Type) :=
 { bot : Lab
 ; join : Lab -> Lab -> Lab

@@ -1,4 +1,5 @@
-(* Instructions of the micro machine *)
+(* Machine instructions *)
+
 Require Import ZArith.
 Require Import List. Import ListNotations.
 
@@ -7,6 +8,12 @@ Definition regPtr := Z.
 Inductive BinOpT : Type :=
 | BAdd
 | BMult.
+
+Definition eval_binop (b : BinOpT) : Z -> Z -> option Z :=
+  match b with
+    | BAdd => fun z1 z2 => Some (z1 + z2)%Z
+    | BMult => fun z1 z2 => Some (z1 * z2)%Z
+  end.
 
 Inductive Instruction : Type :=
   | Lab      : regPtr -> regPtr -> Instruction
