@@ -54,7 +54,7 @@ Fixpoint get_root_set_stack (obs : Label) (st : State)
   end.
 
 Definition get_root_set (obs : Label) (st : State) : list mframe :=
-  let '(St _ _ _ s r pc) := st in
+  let '(St _ _ s r pc) := st in
   let init_root_set :=
       if isLow ∂pc obs then get_mframes_from_atoms obs st r
       else [] in
@@ -98,9 +98,8 @@ Definition well_formed_label (st : State) (l : Label) : bool :=
 (* Given a state and a stamp configuration, make sure everything is ok *)
 (* LL: This also suggests a way of generating stamps! Namely, get
    the meet of all the labels where a frame is reachable *)
-Definition well_formed (st : State) : bool :=
-  let '(St _ _ prins _ _ _) := st in
-  let all_labels := map lab_of_list (powerset (Zset.elements prins)) in
+Definition well_formed (top_prin : Label) (st : State) : bool :=
+  let all_labels := map lab_of_list (powerset (Zset.elements top_prin)) in
   forallb (well_formed_label st) all_labels.
 
 (* Computes the meet of a list of labels. Must be provided with top as the
@@ -110,12 +109,11 @@ Definition list_meet (acc : Label) (ls : list Label) :=
 
 (* Attempt to reverse the above predicate to get a stamp generator *)
 (* CH: currently unused *)
-Definition generate_stamp (st : State) (mf : mframe) : mframe :=
-  let '(St _ m p _ _ _) := st in
-  let all_labels := map lab_of_list (powerset (Zset.elements p)) in
+Definition generate_stamp (top_prin : Label) (st : State) (mf : mframe) : mframe :=
+  let all_labels := map lab_of_list (powerset (Zset.elements top_prin)) in
   let cands := filter (fun l => elem Mem.EqDec_block mf (reachable l st))
                       all_labels in
-  Mem.put_stamp (list_meet p cands) mf.
+  Mem.put_stamp (list_meet top_prin cands) mf.
 
 
 (* LL: TODO: go through the whole thing and generate stamps! *)

@@ -233,11 +233,11 @@ Fixpoint liftMemState (st1 st2 : State) (lm : list (@Variation mem)) :=
 
 Fixpoint liftStackState (st1 st2 : State) (ls : list (@Variation Stack)) :=
   match st1, st2 with
-    | St im1 m1 p1 _ regs1 pc1, St im2 m2 p2 _ regs2 pc2 =>
+    | St im1 m1 _ regs1 pc1, St im2 m2 _ regs2 pc2 =>
       match ls with
         | nil => nil
         | cons (Var lab s1' s2') t =>
-          cons (Var lab (St im1 m1 p2 s1' regs1 pc1) (St im2 m2 p2 s2' regs2 pc2))
+          cons (Var lab (St im1 m1 s1' regs1 pc1) (St im2 m2 s2' regs2 pc2))
                (liftStackState st1 st2 t)
       end
   end.
@@ -252,8 +252,8 @@ Definition shrinkStateMemory (v : @Variation State) :=
 
 Definition shrinkStateStack (v : @Variation State) :=
   let '(Var lab st1 st2) := v in
-  let '(St _ _ _ s  _ _) := st1 in
-  let '(St _ _ _ s' _ _) := st2 in
+  let '(St _ _ s  _ _) := st1 in
+  let '(St _ _ s' _ _) := st2 in
   liftStackState st1 st2 (shrinkV (Var lab s s')).
 
 Definition shrinkState x :=
@@ -326,19 +326,19 @@ Fixpoint shrinkVRegContents (l : Label) (prev prev' rest rest' : regSet)
 
 Fixpoint liftRegsState (st1 st2 : State) (ls : list (@Variation regSet)) :=
   match st1, st2 with
-    | St im1 m1 p1 s1 _ pc1, St im2 m2 p2 s2 _ pc2 =>
+    | St im1 m1 s1 _ pc1, St im2 m2 s2 _ pc2 =>
       match ls with
         | nil => nil
         | cons (Var lab regs1' regs2') t =>
-          cons (Var lab (St im1 m1 p2 s1 regs1' pc1) (St im2 m2 p2 s2 regs2' pc2))
+          cons (Var lab (St im1 m1 s1 regs1' pc1) (St im2 m2 s2 regs2' pc2))
                (liftRegsState st1 st2 t)
       end
   end.
 
 Definition shrinkVRegs (v : @Variation State) :=
     let '(Var l st st') := v in
-    let '(St _ _ _ _ regs _) := st in
-    let '(St _ _ _ _ regs' _) := st' in
+    let '(St _ _ _ regs _) := st in
+    let '(St _ _ _ regs' _) := st' in
 (*    let regsNo := List.length regs - 1 in
     let allRegs := map Z.of_nat (seq 0 regsNo) in
     let sts  := map (removeReg st ) allRegs in

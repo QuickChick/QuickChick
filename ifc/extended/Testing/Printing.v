@@ -1,14 +1,14 @@
-Require Import Common.
-Require Import Indist.
-
 Require Import String.
-Require Import List.
+Require Import List. Import ListNotations.
 Require Import MSetPositive.
 Require Import ZArith.
 Require Import Coq.Numbers.Natural.Peano.NPeano.
 
 Require Import QuickChick.
 
+Require Import Lab4.
+Require Import Common.
+Require Import Indist.
 Require Import Machine.
 
 (* High-level note:
@@ -26,9 +26,14 @@ Instance showPos : Show positive :=
   show := show_pos
 |}.
 
-Instance show_label : Show Label :=
+Instance show_label : Show Lab4 :=
 {|
-  show lab := show (Zset.elements lab)
+  show lab := match lab with
+                | L  => "L"
+                | M1 => "M1"
+                | M2 => "M2"
+                | H  => "H"
+              end
 |}.
 
 Instance show_bin_op : Show BinOpT :=
@@ -96,14 +101,14 @@ Instance show_op_code : Show OpCode :=
     end
 |}.
 
-Instance show_pointer : Show Pointer :=
+Instance show_pointer : Show (@Pointer Lab4) :=
 {|
   show ptr :=
     let '(Ptr x y) := ptr in
     "(f=" ++ show x ++ ";i=" ++ show y ++ ")"
 |}.
 
-Instance show_val : Show Value :=
+Instance show_val : Show (@Value Lab4) :=
 {|
   show val :=
     match val with
@@ -123,17 +128,17 @@ Fixpoint numed_contents {A : Type} (s : A -> string) (l : list A) (n : nat)
 
 Definition par (s : string) := "( " ++ s ++ " )".
 
-Instance show_atom : Show Atom :=
+Instance show_atom : Show (@Atom Lab4) :=
 {|
   show a :=
-    let '(v @ L) := a in
-    show v ++ " @ " ++ show L
+    let '(v @ l) := a in
+    show v ++ " @ " ++ show l
 |}.
 
-Instance show_Ptr_atom : Show Ptr_atom :=
+Instance show_Ptr_atom : Show (@Ptr_atom Lab4) :=
 {|
   show p :=
-    let '(PAtm i L) := p in show i ++ " @ " ++ show L
+    let '(PAtm i l) := p in show i ++ " @ " ++ show l
 |}.
 
 Instance show_list {A : Type} `{_ : Show A} : Show (list A) :=
@@ -154,24 +159,24 @@ Definition show_variation (s1 s2 : string) :=
 
 Class ShowPair (A : Type) : Type :=
 {
-  show_pair : Label -> A -> A -> string
+  show_pair : Lab4 -> A -> A -> string
 }.
 
-Instance show_value_pair : ShowPair Value :=
+Instance show_value_pair : ShowPair (@Value Lab4) :=
 {|
   show_pair lab v1 v2 :=
     if indist lab v1 v2 then show v1
     else show_variation (show v1) (show v2)
 |}.
 
-Instance show_label_pair : ShowPair Label :=
+Instance show_label_pair : ShowPair Lab4 :=
 {|
   show_pair lab l1 l2 :=
     if label_eq l1 l2 then show l1
     else show_variation (show l1) (show l2)
 |}.
 
-Instance show_atom_pair : ShowPair Atom :=
+Instance show_atom_pair : ShowPair (@Atom Lab4) :=
 {|
   show_pair lab a1 a2 :=
     let '(v1 @ l1) := a1 in
@@ -180,7 +185,7 @@ Instance show_atom_pair : ShowPair Atom :=
     ++ show_pair lab l1 l2
 |}.
 
-Instance show_ptr_atom_pair : ShowPair Ptr_atom :=
+Instance show_ptr_atom_pair : ShowPair (@Ptr_atom Lab4) :=
 {|
   show_pair lab p1 p2 :=
     if indist lab p1 p2 then
@@ -190,7 +195,7 @@ Instance show_ptr_atom_pair : ShowPair Ptr_atom :=
 |}.
 
 Fixpoint show_pair_list {A : Type} `{_ : Show A} `{_ : ShowPair A}
-         (n : nat) (lab : Label)
+         (n : nat) (lab : Lab4)
          (l1 l2 : list A) :=
   match n with
     | O => match l1, l2 with
@@ -262,12 +267,12 @@ Definition show_high_frames m (mfs : list mframe) :=
     | _ => aux mfs
   end.
 
-Definition show_pair_mem (top : Label) (obs : Label) (m1 m2 : memory)
+Definition show_pair_mem (obs : Lab4) (m1 m2 : memory)
 : string :=
-  let frames1 := Mem.get_all_blocks top m1 in
+  let frames1 := Mem.get_blocks elems m1 in
   let high1 := filter (fun mf => isHigh (Mem.stamp mf) obs) frames1 in
   let low1  := filter (fun mf => isLow  (Mem.stamp mf) obs) frames1 in
-  let frames2 := Mem.get_all_blocks top m2 in
+  let frames2 := Mem.get_blocks elems m2 in
   let high2 := filter (fun mf => isHigh (Mem.stamp mf) obs) frames2 in
   let low2  := filter (fun mf => isLow  (Mem.stamp mf) obs) frames2 in
   "DEBUG: " ++ nl ++
@@ -280,7 +285,7 @@ Definition show_pair_mem (top : Label) (obs : Label) (m1 m2 : memory)
 (* Keep top separates the high prefix of the stack
    INV : Assumes well formed! (fix?) CH: yes!
 *)
-Fixpoint keep_top (lab : Label) (s : Stack) :=
+Fixpoint keep_top (lab : Lab4) (s : Stack) :=
   match s with
     | Mty => (Mty, Mty)
     | RetCons (pc, a,b,c) s' =>
@@ -336,12 +341,12 @@ Instance show_stack_pair : ShowPair Stack :=
 Instance show_state_pair : ShowPair State :=
 {|
   show_pair lab st1 st2 :=
-    let '(St im1 m1 prins s1 r1 pc1) := st1 in
-    let '(St im2 m2 _     s2 r2 pc2) := st2 in
+    let '(St im1 m1 s1 r1 pc1) := st1 in
+    let '(St im2 m2 s2 r2 pc2) := st2 in
     "Instructions: " ++ show im1 ++ nl ++
     "PC: "  ++ show_pair lab pc1 pc2 ++ nl ++
     "Mem: " ++ nl ++
-       show_pair_mem prins lab m1 m2 ++ nl ++
+       show_pair_mem lab m1 m2 ++ nl ++
     "Regs: " ++ nl ++
        show_pair_list 0 lab r1 r2 ++ nl ++
     "Stacks: " ++ nl ++
@@ -354,7 +359,7 @@ Instance show_variation_instance : Show Variation :=
             "Obs level:" ++ show lab ++ nl ++ show_pair lab st1 st2
 |}.
 
-Fixpoint show_execution (lab : Label)
+Fixpoint show_execution (lab : Lab4)
          (sts1 sts2 : list State) :=
   match sts1, sts2 with
     | h1::t1, h2::t2 =>

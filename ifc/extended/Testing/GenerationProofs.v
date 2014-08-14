@@ -670,7 +670,7 @@ Qed.
 (* Instruction *)
 
 Definition Instruction_spec (st : State) instr :=
-  let '(St im m pr stk regs pc ) := st in
+  let '(St im m stk regs pc ) := st in
   let '(dptr, cptr, num, lab) :=
       groupRegisters st regs [] [] [] [] Z0 in
   match instr with

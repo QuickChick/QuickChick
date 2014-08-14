@@ -63,16 +63,12 @@ Definition instr_lookup (m:imem) (pc:Ptr_atom) : option Instruction :=
   let '(PAtm i _) := pc in
   index_list_Z i m.
 
-Notation "m [ pc ]" := (instr_lookup m pc) (at level 20).
-
 Definition add_pc (pc:Ptr_atom) (n:Z) : Ptr_atom :=
   let '(PAtm i L) := pc in
   PAtm (Zplus i n) L.
-Infix "+" := add_pc.
 
 Definition pc_lab (pc:Ptr_atom) : Label :=
   let '(PAtm _ L) := pc in L.
-Notation "'∂' pc" := (pc_lab pc) (at level 0).
 (* Remark: the ott file use \mathcal{L} *)
 
 Definition atom_lab (a : Atom) : Label :=
@@ -88,16 +84,12 @@ Inductive Stack :=
   | RetCons (pc_L:Ptr_atom * Label * regSet * regPtr) (s:Stack)
 (* stack frame marker cons (with return pc and protecting label) *)
 .
-Infix ":::" := RetCons (at level 60, right associativity).
-
-Infix "@" := Atm (no associativity, at level 50).
 
 Class Join (t :Type) := {
     join_label: t -> Label -> t
   }.
-Notation "x ∪ y" := (join_label x y) (right associativity, at level 55).
 
-Instance JoinLabel : Join Label := { join_label := join }.
+Global Instance JoinLabel : Join Label := { join_label := join }.
 
 Definition atom_join (a:Atom) (l':Label) : Atom :=
   match a with
@@ -105,16 +97,16 @@ Definition atom_join (a:Atom) (l':Label) : Atom :=
   end.
 
 Definition ptr_atom_join (pc:Ptr_atom) (l':Label) : Ptr_atom :=
-  let '(PAtm i l) := pc in PAtm i (l ∪ l').
+  let '(PAtm i l) := pc in PAtm i (join_label l l').
 
-Instance JoinAtom : Join Atom := { join_label := atom_join }.
-Instance JoinPtrAtom : Join Ptr_atom := { join_label := ptr_atom_join }.
+Global Instance JoinAtom : Join Atom := { join_label := atom_join }.
+Global Instance JoinPtrAtom : Join Ptr_atom := { join_label := ptr_atom_join }.
 
 Ltac try_split_congruence :=
   try solve [left; congruence | right; congruence].
 
 (* Proof-stuff previously in Memory.v *)
-Instance EqDec_block : EqDec Value eq.
+Global Instance EqDec_block : EqDec Value eq.
 Proof.
   intros x y;
   unfold complement, equiv; simpl;
@@ -359,3 +351,10 @@ Proof.
 Qed.
 
 End Primitives.
+
+Notation "m [ pc ]" := (instr_lookup m pc) (at level 20).
+Infix ":::" := RetCons (at level 60, right associativity).
+Infix "@" := Atm (no associativity, at level 50).
+Infix "+" := add_pc.
+Notation "'∂' pc" := (pc_lab pc) (at level 0).
+Notation "x ∪ y" := (join_label x y) (right associativity, at level 55).

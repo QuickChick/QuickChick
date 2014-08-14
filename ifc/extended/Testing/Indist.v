@@ -1,20 +1,23 @@
-Require Import Machine.
-Require Import Common.
-
 Require Import ZArith.
 Require Import List.
+
+Require Import Utils.
+Require Import Machine.
+Require Import Lab4.
+Require Import Common.
 
 (* Indistinguishability type class *)
 Class Indist (A : Type) : Type :=
 {
-  indist : Label -> A -> A -> bool
+  indist : Lab4 -> A -> A -> bool
 }.
 
 (* Indistinguishability of Values.
    - Ignores the label (called only on unlabeled things)
    - For pointers, it is syntactic equality thanks to the per-stamp-level allocator!
 *)
-Instance indistValue : Indist Value :=
+Set Printing All.
+Instance indistValue : Indist (@Value Lab4) :=
 {|
   indist _lab v1 v2 :=
     match v1, v2 with
@@ -90,8 +93,8 @@ Instance indistFrame : Indist frame :=
      are pairwise indistinguishable.
 *)
 Definition indistMemHelper (framePairs : list (frame * frame))
-         (lab : Label)
-         (m1 m2 : memory) :=
+         (lab : Lab4)
+         (m1 m2 : @memory Lab4) :=
   forallb (fun (x : frame * frame) =>
     let (f1, f2) := x in indist lab f1 f2) framePairs.
 
@@ -102,11 +105,12 @@ Definition indistMemHelper (framePairs : list (frame * frame))
      They have to be allocated in the same order so no need for fancy stuff
 *)
 
-Instance indistMem : Indist memory :=
+Instance indistMem : Indist (@memory Lab4) :=
 {|
   indist lab m1 m2 :=
   let get_all_frames (m : memory) : list frame :=
-      list_of_option (map (Mem.get_frame m) (Mem.get_all_blocks lab m)) in
+      list_of_option (map (Mem.get_frame m)
+                          (Mem.get_blocks (allThingsBelow lab) m)) in
   let frames1 := get_all_frames m1 in
   let frames2 := get_all_frames m2 in
   (* CH: Why is the following not written with forallb2? *)
@@ -128,7 +132,7 @@ Instance indistReg : Indist regSet :=
    - The returning pc labels must decrease as we go down the stack.
 *)
 Require Import String.
-Fixpoint well_formed_stack (prev : Label) (s : Stack) : bool :=
+Fixpoint well_formed_stack (prev : Lab4) (s : Stack) : bool :=
   match s with
     | Mty => true
     | RetCons (pc, _, _ ,r) s' =>
@@ -140,7 +144,7 @@ Fixpoint well_formed_stack (prev : Label) (s : Stack) : bool :=
    - Takes a stack and keeps its low part.
    INV: Stacks should be wellFormed
 *)
-Fixpoint cropTop (lab : Label) (s : Stack) :=
+Fixpoint cropTop (lab : Lab4) (s : Stack) :=
   match s with
     | Mty => Mty
     | RetCons (pc, _, _, _) s' =>
@@ -156,7 +160,7 @@ Fixpoint cropTop (lab : Label) (s : Stack) :=
      * The rest of the stack must be also indistinguishable
    INV: Called only on stacks after cropTop, which means all pc's are low
 *)
-Fixpoint indistStackHelper (lab : Label)
+Fixpoint indistStackHelper (lab : Lab4)
          (s1 s2 : Stack) :=
   match s1, s2 with
     | Mty, Mty => true
@@ -193,8 +197,8 @@ Instance indistStack : Indist Stack :=
 Instance indistState : Indist State :=
 {|
   indist lab st1 st2 :=
-    let '(St imem1 m1 _ s1 regs1 pc1) := st1 in
-    let '(St imem2 m2 _ s2 regs2 pc2) := st2 in
+    let '(St imem1 m1 s1 regs1 pc1) := st1 in
+    let '(St imem2 m2 s2 regs2 pc2) := st2 in
     if list_eq_dec instr_eq_dec imem1 imem2 then
       if isHigh ∂pc1 lab && isHigh ∂pc2 lab then
         if indist lab m1 m2 then

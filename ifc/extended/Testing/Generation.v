@@ -45,10 +45,9 @@ Definition gen_from_nat_length (len : nat) :=
 (* ------------------------------------------------------ *)
 
 Record Info := MkInfo
-  { def_block : mframe            (* Default Block (sad)               *)
+  { def_block : mframe           (* Default Block (sad)               *)
   ; code_len  : Z                 (* Length of instruction list        *)
   ; data_len  : list (mframe * Z) (* Existing frames and their lengths *)
-  ; top_prin  : Label             (* Top label                         *)
   ; no_regs   : nat               (* Number of Registers               *)
   }.
 
@@ -212,7 +211,7 @@ Definition onNonEmpty {A : Type} (l : list A) (n : nat) :=
    currently boosting BCalls, Alloc, and Store  *)
 
 Definition ainstrSSNI (st : State) : Gen Instruction :=
-  let '(St im m pr stk regs pc ) := st in
+  let '(St im m stk regs pc ) := st in
   let '(dptr, cptr, num, lab) :=
       groupRegisters st regs [] [] [] [] Z0 in
   let genRegPtr := gen_from_length (Zlength regs) in
@@ -273,10 +272,10 @@ Definition ainstrSSNI (st : State) : Gen Instruction :=
 ].
 
 Definition instantiate_instructions st : Gen State :=
-  let '(St im m p s r pc) := st in
+  let '(St im m s r pc) := st in
   bindGen (ainstrSSNI st) (fun instr =>
   let im' := replicate (length im) instr in
-  returnGen (St im' m p s r pc)).
+  returnGen (St im' m s r pc)).
 
 (* ------------------------------------------------------ *)
 (* -------- Variations ----- ---------------------------- *)
@@ -474,13 +473,13 @@ Instance smart_vary_stack : SmartVary Stack :=
 |}.
 
 Definition gen_vary_state (obs: Label) (inf : Info) (st: State) : Gen State :=
-    let '(St im μ π s r pc) := st in
+    let '(St im μ s r pc) := st in
     if isLow ∂pc obs then
       (* PC is low *)
       bindGen (sequenceGen (map (smart_vary obs inf) r)) (fun r' =>
       bindGen (smart_vary obs inf μ) (fun μ' =>
       bindGen (smart_vary obs inf s) (fun s' =>
-      returnGen (St im μ' π s' r' pc))))
+      returnGen (St im μ' s' r' pc))))
     else
       (* PC is high *)
       bindGen (smart_vary obs inf pc) (fun pc' =>
@@ -507,7 +506,7 @@ Definition gen_vary_state (obs: Label) (inf : Info) (st: State) : Gen State :=
 
       (* Recreate registers *)
       bindGen (vectorOf (no_regs inf) (smart_gen inf)) (fun r' =>
-      returnGen (St im μ' π s' r' pc'))))).
+      returnGen (St im μ' s' r' pc'))))).
 
 
 (* Make sure you create an extra stack loc if pc is high *)
@@ -572,8 +571,7 @@ Definition gen_init_mem (top : Label) : Gen (memory * list (mframe * Z)):=
 
 Definition failed_state : State :=
   (* Property.trace "Failed State!" *)
-                 (St [] (Mem.empty Atom Label) bot Mty [] (PAtm Z0 bot)).
-
+                 (St [] (Mem.empty Atom Label) Mty [] (PAtm Z0 bot)).
 
 Definition populate_frame inf (m : memory) (mf : mframe) : Gen memory :=
   match Mem.get_frame m mf with
@@ -628,7 +626,7 @@ Definition gen_variation_state : Gen (@Variation State) :=
       (* Populate the memory - still all stamps are bottom *)
       bindGen (populate_memory inf init_mem) (fun m =>
       (* Instantiate instructions *)
-      let st := St imem m prins stk regs pc in
+      let st := St imem m stk regs pc in
       bindGen (instantiate_instructions st) (fun st =>
       (* Instantiate stamps *)
       let st := instantiate_stamps st in

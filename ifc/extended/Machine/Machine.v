@@ -1,27 +1,35 @@
 Require Import ZArith.
-Require Export Instructions.
 Require Import List.
-Require Import Rules.
-
-Require Export Lattices.
-Require Export Memory.
-Require Export Primitives.
 Require Import EquivDec.
 
+Require Import Utils. Import DoNotation.
+Require Export Labels.
+Require Import Rules.
+Require Export Memory.
+Require Export Instructions.
+Require Export Primitives.
+
+(*
 Open Scope Z_scope.
 Open Scope bool_scope.
+*)
+
+Section Machine.
+
+Context {Label: Type}.
+(* TODO: CH: Any way to reduce this boilerplate?
+             Why would I need to explicitly mention subclasses? *)
+Context {JSL: JoinSemiLattice Label}.
+Context {LL : Lattice Label}.
+Context {FL: FiniteLattice Label}.
 
 Record State := St {
-  st_imem: imem;   (* instruction memory *)
-  st_mem: memory;  (* memory *)
-  st_pr: Label;     (* prins *)
-  st_stack: Stack; (* operand stack *)
-  st_regs: regSet; (* register set *)
-  st_pc: Ptr_atom  (* program counter *)
+  st_imem  : imem;           (* instruction memory *)
+  st_mem   : @memory Label;  (* data memory *)
+  st_stack : @Stack Label;   (* operand stack *)
+  st_regs  : @regSet Label;  (* register set *)
+  st_pc    : @Ptr_atom Label (* program counter *)
 }.
-(* No longer need to carry the principals without dynamic principal allocation,
-   however it helps with reachability and generation. Is it necessary to find
-   an alternative? *)
 
 (* List manipulation helpers *)
 Definition nth {A:Type} (l:list A) (n:Z) : option A :=
@@ -46,9 +54,9 @@ Definition upd {A:Type} (l:list A) (n:Z) (a:A) : option (list A) :=
   if Z_lt_dec n 0 then None
   else upd_nat l (Z.to_nat n) a.
 
-Definition registerUpdate (rs : regSet) (r : regPtr) (a : Atom) :=
+Definition registerUpdate (rs : regSet) (r : regPtr) (a : @Atom Label) :=
   upd rs r a.
-Definition registerContent (rs : regSet) (r : regPtr) :=
+Definition registerContent (rs : @regSet Label) (r : regPtr) :=
   nth rs r.
 
 (** Rule Table *)
@@ -85,10 +93,7 @@ Definition default_table : table := fun op =>
   | OpLab     =>  ≪ TRUE , BOT , LabPC ≫
   | OpMLab    =>  ≪ TRUE , Lab1 , LabPC ≫
   | OpPcLab   =>  ≪ TRUE , BOT , LabPC ≫
-  | OpBCall   =>  ≪ TRUE , JOIN Lab2 LabPC , JOIN Lab1 LabPC
-                    (* CH: No counterexample justifying joining Lab2 to PC;
-                           we did that in all calculi so far, but why?
-                           (I vaguely remember this was discussed before) *) ≫
+  | OpBCall   =>  ≪ TRUE , JOIN Lab2 LabPC , JOIN Lab1 LabPC ≫
   | OpBRet    =>  ≪ LE (JOIN Lab1 LabPC) (JOIN Lab2 Lab3) , Lab2 , Lab3 ≫
   | OpFlowsTo =>  ≪ TRUE , JOIN Lab1 Lab2 , LabPC ≫
   | OpLJoin   =>  ≪ TRUE , JOIN Lab1 Lab2 , LabPC ≫
@@ -100,16 +105,7 @@ Definition default_table : table := fun op =>
   | OpBNZ     =>  ≪ TRUE , __ , JOIN Lab1 LabPC ≫
   | OpLoad    =>  ≪ TRUE , Lab3 , JOIN LabPC (JOIN Lab1 Lab2) ≫
   | OpStore   =>  ≪ LE (JOIN Lab1 LabPC) Lab2 , Lab3 , LabPC ≫
-  | OpAlloc   =>  ≪ TRUE (* AND (AND (LE Lab2 LabPC)
-                              (LE Lab1 Lab3))
-                              (LE LabPC Lab3)*),
-          (* CH: more restrictive check than I was expecting;
-                 why LE Lab2 LabPC? (falsifiable!)
-                 why LE Lab2 Lab3? (no counter! DROPPED!)
-                 why LE Lab1 Lab3? (ott had it, but why? falsifiable!)
-                 why LE LabPC Lab3? (ott had it, but why? no counter!)
-                 why join Lab1 to reslult value? no counter! DROPPED! *)
-                    JOIN Lab1 Lab2 , LabPC ≫
+  | OpAlloc   =>  ≪ TRUE , JOIN Lab1 Lab2 , LabPC ≫
   | OpPSetOff =>  ≪ TRUE , JOIN Lab1 Lab2 , LabPC ≫
   | OpOutput  =>  ≪ TRUE , JOIN Lab1 LabPC , LabPC ≫
   | OpPGetOff =>  ≪ TRUE , Lab1 , LabPC ≫
@@ -123,10 +119,11 @@ Definition run_tmr (t : table) (op: OpCode)
   let r := t op in
   apply_rule r labs pc.
 
-(** Relational semantics *)
+(** Declarative semantics *)
 
 Local Open Scope Z_scope.
 (* TODO : reimplement relational semantics
+   TODO: CH: we only need the default table!
 Inductive step (t : table) : State -> trace -> State -> Prop :=
  | step_lab: forall im μ σ v K pc r r' r1 r2 j LPC rl rpcl
      (PC: pc = PAtm j LPC)
@@ -366,24 +363,12 @@ Inductive step (t : table) : State -> trace -> State -> Prop :=
 
 (** * Executable semantics *)
 
-Definition bind (A B:Type) (f:A->option B) (a:option A) : option B :=
-    match a with
-      | None => None
-      | Some a => f a
-    end.
-Notation "'do' X <- A ; B" :=
-  (bind _ _ (fun X => B) A)
-  (at level 200, X ident, A at level 100, B at level 200).
-Notation "'do' X : T <- A ; B" :=
-  (bind _ _ (fun X : T => B) A)
-  (at level 200, X ident, A at level 100, B at level 200).
-
 Definition state_instr_lookup (st:State) : option Instruction :=
-  let (μ,_,_,_,_,pc) := st in μ[pc].
+  let (μ,_,_,_,pc) := st in μ[pc].
 
 Definition exec t (st:State) : option (trace * State) :=
   do instr <- state_instr_lookup st;
-  let '(St imem μ π σ r pc) := st in
+  let '(St imem μ σ r pc) := st in
   let '(PAtm j LPC) := pc in
   match instr with
     | Lab r1 r2 =>
@@ -392,7 +377,7 @@ Definition exec t (st:State) : option (trace * State) :=
           match run_tmr t OpLab <||> LPC with
             | Some (Some rl, rpcl) =>
               do r' <- registerUpdate r r2 (Vlab K @ rl);
-                Some (nil, St imem μ π σ r' (PAtm (j+1) rpcl))
+                Some (nil, St imem μ σ r' (PAtm (j+1) rpcl))
             | _ => None
           end
         | None => None
@@ -402,7 +387,7 @@ Definition exec t (st:State) : option (trace * State) :=
         | Some (Some rl, rpcl) =>
           do r' <- registerUpdate r r1 (Vlab (∂ pc) @ rl);
             Some (nil,
-                  St imem μ π σ r' (PAtm (j+1) rpcl))
+                  St imem μ σ r' (PAtm (j+1) rpcl))
         | _ => None
       end
     | MLab r1 r2 =>
@@ -413,7 +398,7 @@ Definition exec t (st:State) : option (trace * State) :=
               | Some (Some rl, rpcl) =>
                 do r' <- registerUpdate r r2 (Vlab C @ rl);
                 Some (nil,
-                  St imem μ π σ r' (PAtm (j+1) rpcl))
+                  St imem μ σ r' (PAtm (j+1) rpcl))
               | _ => None
             end
         | _ => None
@@ -426,7 +411,7 @@ Definition exec t (st:State) : option (trace * State) :=
             | Some (Some rl, rpcl) =>
               do r' <- registerUpdate r r3 (Vint res @ rl);
               Some (nil,
-                  St imem μ π σ r' (PAtm (j+1) rpcl))
+                  St imem μ σ r' (PAtm (j+1) rpcl))
               | _ => None
             end
         | _, _ => None
@@ -438,7 +423,7 @@ Definition exec t (st:State) : option (trace * State) :=
             | Some (Some rl, rpcl) =>
               do r' <- registerUpdate r r3 (Vlab (L1 ∪ L2) @ rl);
               Some (nil,
-                    St imem μ π σ r' (PAtm (j+1) rpcl))
+                    St imem μ σ r' (PAtm (j+1) rpcl))
             | _ => None
           end
         | _, _ => None
@@ -448,7 +433,7 @@ Definition exec t (st:State) : option (trace * State) :=
         | Some (Some rl, rpcl) =>
           do r' <- registerUpdate r r1 (Vlab bot @ rl);
           Some (nil,
-                St imem μ π σ r' (PAtm (j+1) rpcl))
+                St imem μ σ r' (PAtm (j+1) rpcl))
             | _ => None
           end
     | BCall r1 r2 r3 =>
@@ -457,7 +442,7 @@ Definition exec t (st:State) : option (trace * State) :=
           match run_tmr t OpBCall <|L; K|> LPC with
             | Some (Some rl, rpcl) =>
               Some (nil,
-                    St imem μ π (((PAtm (j+1) rl), B, r, r3) ::: σ) r
+                    St imem μ (((PAtm (j+1) rl), B, r, r3) ::: σ) r
                        (PAtm addr rpcl))
             | _ => None
           end
@@ -472,7 +457,7 @@ Definition exec t (st:State) : option (trace * State) :=
             | Some (Some rl, rpcl) =>
               do r' <- registerUpdate savedRegs r1 (a @ rl);
               Some (nil,
-                    St imem μ π σ' r' (PAtm jp' rpcl))
+                    St imem μ σ' r' (PAtm jp' rpcl))
             | _ => None
           end
         | _ => None
@@ -489,7 +474,7 @@ Definition exec t (st:State) : option (trace * State) :=
               let (dfp, μ') := alloc_res in
               do r' <- registerUpdate r r3 (Vptr (Ptr dfp 0) @ rl);
               Some (nil,
-                    St imem μ' π σ r' (PAtm (j+1) rpcl))
+                    St imem μ' σ r' (PAtm (j+1) rpcl))
             | _ => None
           end
         | _, _ => None
@@ -504,7 +489,7 @@ Definition exec t (st:State) : option (trace * State) :=
               | Some (Some rl (* L *), rpcl (* LPC ∪ K ∪ C *)) =>
                 do r' <- registerUpdate r r2 (v @ rl);
                 Some (nil,
-                      St imem μ π σ r' (PAtm (j+1) (rpcl)))
+                      St imem μ σ r' (PAtm (j+1) (rpcl)))
               | _ => None
             end
         | _ => None
@@ -518,7 +503,7 @@ Definition exec t (st:State) : option (trace * State) :=
             | Some (Some rl (* L *), rpcl (* LPC *)) =>
               do μ' <- store μ p (v @ rl);
               Some (nil,
-                    St imem μ' π σ r (PAtm (j+1) rpcl))
+                    St imem μ' σ r (PAtm (j+1) rpcl))
             | _ => None
           end
         | _, _ => None
@@ -529,7 +514,7 @@ Definition exec t (st:State) : option (trace * State) :=
           match run_tmr t OpJump <|L|> LPC with
             | Some (None, rpcl) =>
               Some (nil,
-                St imem μ π σ r (PAtm addr rpcl))
+                St imem μ σ r (PAtm addr rpcl))
             | _ => None
           end
         | _ => None
@@ -541,7 +526,7 @@ Definition exec t (st:State) : option (trace * State) :=
             | Some (None, rpcl) =>
               let new_pc := (if Z_eq_dec m 0 then j+1 else j+n) in
                 Some (nil,
-                      St imem μ π σ r (PAtm new_pc rpcl))
+                      St imem μ σ r (PAtm new_pc rpcl))
             | _ => None
           end
         | _ => None
@@ -553,7 +538,7 @@ Definition exec t (st:State) : option (trace * State) :=
             | Some (Some rl, rpcl) =>
               do r' <- registerUpdate r r3 (Vptr (Ptr fp' n) @ rl);
               Some (nil,
-                    St imem μ π σ r' (PAtm (j+1) rpcl))
+                    St imem μ σ r' (PAtm (j+1) rpcl))
             | _ => None
           end
         | _, _ => None
@@ -564,7 +549,7 @@ Definition exec t (st:State) : option (trace * State) :=
           match run_tmr t OpOutput <| K |> LPC with
             | Some (Some rl, rpcl) =>
               Some (((OVint n, rl) :: nil)%list,
-                    St imem μ π σ r (PAtm (j+1) rpcl))
+                    St imem μ σ r (PAtm (j+1) rpcl))
             | _ => None
           end
         | _ => None
@@ -574,7 +559,7 @@ Definition exec t (st:State) : option (trace * State) :=
         | Some (Some rl, rpcl) =>
           do r' <- registerUpdate r r1 (Vint x @ rl);
             Some (nil,
-                    St imem μ π σ r' (PAtm (j+1) rpcl))
+                    St imem μ σ r' (PAtm (j+1) rpcl))
         | _ => None
       end
      | BinOp o r1 r2 r3 =>
@@ -585,7 +570,7 @@ Definition exec t (st:State) : option (trace * State) :=
              | Some (Some rl, rpcl) =>
                do r' <- registerUpdate r r3 (Vint n @ rl);
                Some (nil,
-                     St imem μ π σ r' (PAtm (j+1) rpcl))
+                     St imem μ σ r' (PAtm (j+1) rpcl))
              | _ => None
            end
          | _, _ => None
@@ -594,7 +579,7 @@ Definition exec t (st:State) : option (trace * State) :=
        match run_tmr t OpNop <||> LPC with
          | Some (None, rpcl) =>
            Some (nil,
-               St imem μ π σ r (PAtm (j+1) rpcl))
+               St imem μ σ r (PAtm (j+1) rpcl))
          | _ => None
        end
     | MSize r1 r2 =>
@@ -606,7 +591,7 @@ Definition exec t (st:State) : option (trace * State) :=
               | Some (Some rl, rpcl) =>
                 do r' <- registerUpdate r r2 (Vint (Z.of_nat n) @ rl);
                 Some (nil,
-                  St imem μ π σ r' (PAtm (j+1) rpcl))
+                  St imem μ σ r' (PAtm (j+1) rpcl))
               | _ => None
             end
         | _ => None
@@ -618,7 +603,7 @@ Definition exec t (st:State) : option (trace * State) :=
             | Some (Some rl, rpcl) =>
               do r' <- registerUpdate r r2 (Vint j' @ rl);
               Some (nil,
-                    St imem μ π σ r' (PAtm (j+1) rpcl))
+                    St imem μ σ r' (PAtm (j+1) rpcl))
             | _ => None
           end
         | _ => None
@@ -641,7 +626,8 @@ Ltac exec_solver :=
             | |- context[match ?s with | Some _ => _ | None => _ end] =>
               destruct s
 (*            | |- context[Atm (Vptr (Ptr ?fp ?i)) ?l] =>
-              replace (Vptr (Ptr fp i) @ l) with (ptr_atom_to_atom (PAtm i l)) by auto
+              replace (Vptr (Ptr fp i) @ l)
+              with (ptr_atom_to_atom (PAtm i l)) by auto
 *)
             | |- Some _ = None -> _ => intros contra; inversion contra
             | |- None = Some _ -> _ => intros contra; inversion contra
@@ -717,3 +703,5 @@ Fixpoint observe_comp (t1 t2 : list Obs_value) : bool :=
       Obs_value_eq o1 o2 && observe_comp t1' t2'
     | _, _ => true
   end%list.
+
+End Machine.

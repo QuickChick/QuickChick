@@ -276,6 +276,25 @@ Proof.
   inv Hcont2.
 Qed.
 
+(* Monad notation *)
+
+Definition bind (A B:Type) (f:A->option B) (a:option A) : option B :=
+    match a with
+      | None => None
+      | Some a => f a
+    end.
+
+Module DoNotation.
+
+Notation "'do' X <- A ; B" :=
+  (bind _ _ (fun X => B) A)
+  (at level 200, X ident, A at level 100, B at level 200).
+Notation "'do' X : T <- A ; B" :=
+  (bind _ _ (fun X : T => B) A)
+  (at level 200, X ident, A at level 100, B at level 200).
+
+End DoNotation.
+
 (* Useful functions on lists *)
 
 Set Implicit Arguments.
@@ -1201,3 +1220,43 @@ Lemma index_list_app' X : forall (l1 l2 : list X) (x : X),
 Proof.
   induction l1 as [|x' l1 IH]; intros; simpl in *; subst; eauto.
 Qed.
+
+(* List helpers *)
+Fixpoint concat {A : Type} (l : list (list A)) : (list A) :=
+  match l with
+    | [] => []
+    | (h :: t) => h ++ concat t
+  end.
+
+Fixpoint forallb2 {A : Type} (f : A -> A -> bool) (l1 l2 :list A) : bool :=
+  match l1, l2 with
+    | nil, nil => true
+    | h1::t1, h2::t2 => f h1 h2 && forallb2 f t1 t2
+    | _, _ => false
+  end%bool.
+
+Fixpoint list_of_option {A : Type} (l : list (option A)) : list A :=
+  match l with
+    | nil => nil
+    | Some h :: t => h :: list_of_option t
+    | None :: t => list_of_option t
+  end.
+
+Fixpoint optOfList {A : Type} (l : list (option A)) (acc : list A)
+: option (list A) :=
+  match l with
+    | nil  => Some acc
+    | None::_ => None
+    | Some h :: t => optOfList t (h :: acc)
+  end.
+
+Definition option_bind {X Y} (f : X -> option Y) (o : option X) :=
+  match o with
+  | Some x => f x
+  | None => None
+  end.
+
+(* Helper functions *)
+Definition flip {A B C : Type} (f : A -> B -> C) (x : B) (y : A) : C := f y x.
+Definition compose {A B C : Type} (f : B -> C) (g : A -> B) (x : A) : C := f (g x).
+Notation " f << g " := (compose f g) (at level 42). (* F# style, because . *)
