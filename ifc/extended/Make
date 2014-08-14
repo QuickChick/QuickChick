@@ -1,7 +1,10 @@
 -I Machine
 -I Testing
 Machine/Instructions.v
-Machine/Lattices.v
+Machine/Labels.v
+Machine/Lab2.v
+#Machine/Lab4.v
+Machine/LabSetsOfPrins.v
 Machine/Machine.v
 Machine/Memory.v
 Machine/Mutate.v
@@ -11,8 +14,6 @@ Machine/Primitives.v
 Machine/Rules.v
 Machine/Utils.v
 Testing/Common.v
-# Removed to avoid running it each time
-# Testing/Driver.v
 Testing/Generation.v
 Testing/Indist.v
 Testing/Printing.v

@@ -99,7 +99,9 @@ VFILES:=Testing/SSNICheckerProofs.v\
   Machine/Mutate.v\
   Machine/Memory.v\
   Machine/Machine.v\
-  Machine/Lattices.v\
+  Machine/LabSetsOfPrins.v\
+  Machine/Lab2.v\
+  Machine/Labels.v\
   Machine/Instructions.v
 
 -include $(addsuffix .d,$(VFILES))
