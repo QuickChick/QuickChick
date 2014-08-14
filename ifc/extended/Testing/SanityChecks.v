@@ -61,9 +61,9 @@ Lemma prop_stamp_generation_equiv :
   (forall st, @genState Pred _ st -> well_formed st).
 Proof.
   rewrite /prop_stamp_generation /semTestable /property /testFun.
-  setoid_rewrite semForAllShrink. split => H st gen.
+  rewrite semForAllShrink. split => H st gen.
   - specialize (H st gen). by move /semPredQProp/semBool in H.
-  - rewrite semPredQProp. setoid_rewrite <- semBool. apply H. exact gen.
+  - rewrite semPredQProp. apply /semBool. apply H. exact gen.
 Qed.
 
 (* One more rather trivial one;

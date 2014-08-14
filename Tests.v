@@ -182,9 +182,6 @@ Qed.
 
 Require Import EndToEnd.
 
-Definition semTestable {A : Type} {_ : @Testable Pred A} (a : A) : Prop :=
-  semProperty (property a).
-
 Goal (semProp removeP) <-> (forall (x : nat) l, ~ In x (remove x l)).
 Proof.
   repeat rewrite /semProp /proveFun /semProp /proveBool.
