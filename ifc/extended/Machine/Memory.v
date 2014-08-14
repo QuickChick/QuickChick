@@ -1,12 +1,11 @@
 Require Import Datatypes.
-Require Import Lattices.
 Require Import ZArith.
 Require Import List.
 Require Import EquivDec.
 Require Import String.
 Require Import Show.
 
-
+Require Import Utils.
 
 Fixpoint replicate {A:Type} (n:nat) (a:A) : list A :=
   match n with
@@ -55,12 +54,6 @@ Inductive alloc_mode := Global | Local.
 (* Any better solutions than the implicit arguments welcome *)
 Inductive frame {A S} := Fr (stamp : S) (label : S) : list A -> @frame A S.
 
-(* Labels have to have an "everything below it" function for generation/indist *)
-Class AllThingsBelow (S: Type):=
-{
-  allThingsBelow : S -> list S
-}.
-
 
 Module Type MEM.
   (* Type of memory is parameterized by the type of stamps and the type of block *)
@@ -96,13 +89,13 @@ Module Type MEM.
     exists fr', get_frame m b = Some fr'.
 
 
-  Parameter get_all_blocks : forall {A S} {_: AllThingsBelow S}, S -> t A S -> list (block S).
+  Parameter get_blocks : forall {A S} , list S -> t A S -> list (block S).
 
-  Parameter get_all_blocks_spec:
-    forall {A S} {H: AllThingsBelow S} (lab : S) (mem: t A S) (b: block S),
-      In (stamp b) (allThingsBelow lab) /\
+  Parameter get_blocks_spec:
+    forall {A S} (labs : list S) (mem: t A S) (b: block S),
+      In (stamp b) labs /\
       (exists fr, get_frame mem b = Some fr) <->
-      In b (get_all_blocks lab mem).
+      In b (get_blocks labs mem).
 
   Parameter empty : forall A S, t A S.
   Parameter get_empty : forall A S (b:block S), get_frame (empty A S) b = None.
@@ -208,9 +201,8 @@ Module Mem: MEM.
     let indices := Z_seq 1%Z (max - 1) in
     map (fun ind => (ind,s)) indices.
 
-  Definition get_all_blocks {A S} {_: AllThingsBelow S} (s : S) (m : t A S)
-: list (block S) :=
-    flat_map (get_blocks_at_level m) (allThingsBelow s).
+  Definition get_blocks {A S} (ss : list S) (m : t A S) : list (block S) :=
+    flat_map (get_blocks_at_level m) ss.
 
   Instance show_block {S} {_: Show S}: Show (block S) :=
   {|
@@ -532,17 +524,16 @@ Module Mem: MEM.
         apply H'. apply IHlen; try omega. assumption.
   Qed.
 
-
-  Lemma get_all_blocks_spec :
-    forall A S (H: AllThingsBelow S) (lab : S) (mem: t A S) b,
-      In (stamp _ b) (allThingsBelow lab) /\
+  Lemma get_blocks_spec :
+    forall A S (labs : list S) (mem: t A S) b,
+      In (stamp _ b) labs /\
       (exists fr, get_frame mem b = Some fr) <->
-      In b (get_all_blocks lab mem).
+      In b (get_blocks labs mem).
   Proof.
-    intros A S H lab mem b.
+    intros A S labs mem b.
     split.
     - intros [HIn [fr Hget]].
-      unfold get_all_blocks. apply in_flat_map. eexists; split; [eassumption |].
+      unfold get_blocks. apply in_flat_map. eexists; split; [eassumption |].
       unfold get_blocks_at_level. apply in_map_iff. exists (fst b);
       destruct b; simpl; split.
       + reflexivity.
@@ -550,7 +541,7 @@ Module Mem: MEM.
         * apply Zle_minus_le_0. apply next_pos.
         * rewrite <- Z.sub_sub_distr, Z.sub_0_r. simpl.
           apply content_next. eexists. eassumption.
-    - intros HIn. unfold get_all_blocks, get_blocks_at_level in *.
+    - intros HIn. unfold get_blocks, get_blocks_at_level in *.
       apply in_flat_map in HIn. destruct HIn as [l [HInl HIn]].
       apply in_map_iff in HIn. destruct HIn as [z [Heq HIn]]. subst.
       split. assumption.
@@ -559,4 +550,3 @@ Module Mem: MEM.
   Qed.
 
 End Mem.
-

@@ -1,7 +1,7 @@
 Require Import List.
 Require Import Omega.
 Require Import Utils.
-Require Import Lattices.
+Require Import Labels.
 Require Import Instructions.
 Require Import Coq.Unicode.Utf8.
 Require Import Coq.Vectors.Vector.
@@ -38,16 +38,6 @@ Inductive LAB (n: nat) : Type :=
 | lab3 : 3 <= n -> LAB n
 | labpc : LAB n.
 
-(*
-Definition lab1_of_1 : LAB 1 := lab1 (le_n _).
-Definition lab1_of_2 : LAB 2 := lab1 (le_S _ _ (le_n _)).
-Definition lab2_of_2 : LAB 2 := lab2 (le_n _).
-Definition lab1_of_3 : LAB 3 := lab1 (le_S _ _ (le_S _ _ (le_n _))).
-Definition lab2_of_3 : LAB 3 := lab2 (le_S _ _ (le_n _)).
-Definition lab3_of_3 : LAB 3 := lab3 (le_n _).
-*)
-
-(* A better alternative... *)
 Fixpoint nlem (n:nat) (m:nat) : n<=(n+m).
 refine
 (match m with
@@ -150,14 +140,6 @@ Notation "'LabPC'" := (L_Var (labpc _)).
 Notation "'Lab1'" := (L_Var (lab1 (nlem _ _))).
 Notation "'Lab2'" := (L_Var (lab2 (nlem _ _))).
 Notation "'Lab3'" := (L_Var (lab3 (nlem _ _))).
-(*
-Notation "'Lab1/1'" := (L_Var lab1_of_1).
-Notation "'Lab1/2'" := (L_Var lab1_of_2).
-Notation "'Lab2/2'" := (L_Var lab2_of_2).
-Notation "'Lab1/3'" := (L_Var lab1_of_3).
-Notation "'Lab2/3'" := (L_Var lab2_of_3).
-Notation "'Lab3/3'" := (L_Var lab3_of_3).
-*)
 Notation "'BOT'" := (L_Bot _).
 Notation "'JOIN'" := L_Join.
 Notation "'TRUE'" := (A_True _).
@@ -166,82 +148,3 @@ Notation "'OR'" := A_Or.
 Notation "'LE'" := A_LE.
 Notation "<||>" := (Vector.nil _).
 Notation " <| x ; .. ; y |> " := (Vector.cons _ x _ .. (Vector.cons _ y _ (Vector.nil _)) ..).
-
-
-(* OLD VERSION OF FETCH_RULE. KEEP IT FOR THE RECORD. *)
-(*Definition fetch_rule (opCode:OpCode) : (AllowModify * (LAB -> option T)):=
-  match oplab with
-    | OpLabelNoop pc => (≪ TRUE , __ , LabPC ≫ ,
-                          fun var => match var with
-                                       | labpc => Some pc
-                                       | _ => None
-                                     end)
-    | OpLabelAdd op1 op2 pc => (≪ TRUE, Join Lab1 Lab2 , LabPC ≫,
-                                fun var =>  match var with
-                                              | lab1 => Some op1
-                                              | lab2 => Some op2
-                                              | labpc => Some pc
-                                              | _ => None
-                                            end)
-    | OpLabelSub op1 op2 pc => (≪ TRUE, Join Lab1 Lab2 , LabPC ≫,
-                                fun var =>  match var with
-                                              | lab1 => Some op1
-                                              | lab2 => Some op2
-                                              | labpc => Some pc
-                                              | _ => None
-                                            end)
-    | OpLabelPush op pc => (≪ TRUE, Lab1 , LabPC ≫,
-                            fun var => match var with
-                                         | lab1 => Some op
-                                         | labpc => Some pc
-                                         | _ => None
-                                       end)
-    | OpLabelLoad loc data pc => (≪ TRUE, Join Lab1 Lab2, LabPC ≫,
-                                  fun var => match var with
-                                               | lab1 => Some loc
-                                               | lab2 => Some data
-                                               | labpc => Some pc
-                                               | _ => None
-                                             end)
-    | OpLabelStore loc new_data old_data pc => (≪ LE (Join Lab1 LabPC) Lab3,
-                                                  Join Lab1 (Join Lab2 LabPC),
-                                                  LabPC ≫,
-                                                fun var => match var with
-                                                             | lab1 => Some loc
-                                                             | lab2 => Some new_data
-                                                             | lab3 => Some old_data
-                                                             | labpc => Some pc
-                                                           end)
-    | OpLabelJump jmp pc => (≪ TRUE, __ , Join Lab1 LabPC ≫,
-                             fun var => match var with
-                                          | lab1 => Some jmp
-                                          | labpc => Some pc
-                                          | _ => None
-                                        end)
-    | OpLabelBranchNZ op pc => (≪ TRUE, __ , Join Lab1 LabPC ≫,
-                                fun var => match var with
-                                             | lab1 => Some op
-                                             | labpc => Some pc
-                                             | _ => None
-                                           end)
-    | OpLabelCall call pc => (≪ TRUE ,LabPC ,Join Lab1 LabPC ≫,
-                              fun var => match var with
-                                           | lab1 => Some call
-                                           | labpc => Some pc
-                                           | _ => None
-                                         end)
-    | OpLabelRet pcl pc => (≪ TRUE, __ , Lab1 ≫,
-                            fun var => match var with
-                                         | lab1 => Some pcl
-                                         | labpc => Some pc
-                                         | _ => None
-                                       end)
-    | OpLabelVRet data pcl pc => (≪ TRUE, Join Lab1 LabPC, Lab2 ≫,
-                                  fun var => match var with
-                                               | lab1 => Some data
-                                               | lab2 => Some pcl
-                                               | labpc => Some pc
-                                               | _ => None
-                                             end)
-    end.
-*)
