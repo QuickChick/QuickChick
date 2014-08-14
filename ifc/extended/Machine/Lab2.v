@@ -1,7 +1,7 @@
 Require Import Labels.
 Require Import List. Import ListNotations.
 
-(** The two point lattice *)
+(** The two point finite lattice *)
 Inductive Lab2 : Set :=
   | L : Lab2
   | H : Lab2.

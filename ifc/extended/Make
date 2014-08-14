@@ -3,7 +3,7 @@
 Machine/Instructions.v
 Machine/Labels.v
 Machine/Lab2.v
-#Machine/Lab4.v
+Machine/Lab4.v
 Machine/LabSetsOfPrins.v
 Machine/Machine.v
 Machine/Memory.v

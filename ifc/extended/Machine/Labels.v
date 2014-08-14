@@ -13,15 +13,21 @@ Class JoinSemiLattice (Lab: Type) :=
 ; meet : Lab -> Lab -> Lab
 ; bot_flows : forall l, flows bot l = true
 ; flows_refl : forall l, flows l l = true
-; flows_trans : forall l1 l2 l3, flows l1 l2 = true -> flows l2 l3 = true -> flows l1 l3 = true
-; flows_antisymm : forall l1 l2, flows l1 l2 = true -> flows l2 l1 = true -> l1 = l2
+; flows_trans : forall l1 l2 l3, flows l1 l2 = true ->
+                                 flows l2 l3 = true ->
+                                 flows l1 l3 = true
+; flows_antisymm : forall l1 l2, flows l1 l2 = true ->
+                                 flows l2 l1 = true -> l1 = l2
 ; flows_join_right : forall l1 l2, flows l1 (join l1 l2) = true
 ; flows_join_left : forall l1 l2, flows l2 (join l1 l2) = true
-; join_minimal : forall l1 l2 l, flows l1 l = true -> flows l2 l = true -> flows (join l1 l2) l = true
+; join_minimal : forall l1 l2 l, flows l1 l = true ->
+                                 flows l2 l = true ->
+                                 flows (join l1 l2) l = true
 }.
 
 Notation "l1 \_/ l2" := (join l1 l2) (at level 40) : type_scope.
-Notation "l1 <: l2" := (flows l1 l2 = true) (at level 50, no associativity) : type_scope.
+Notation "l1 <: l2" := (flows l1 l2 = true)
+  (at level 50, no associativity) : type_scope.
 Notation "⊥" := bot.
 
 Hint Resolve
@@ -40,8 +46,8 @@ Section JoinSemiLattice_properties.
 
 Context {T: Type}.
 
-(* AAA: used to be assumption, not used *)
-Lemma flows_join {L:JoinSemiLattice T} : forall l1 l2, l1 <: l2 <-> l1 \_/ l2 = l2.
+Lemma flows_join {L:JoinSemiLattice T} : forall l1 l2,
+  l1 <: l2 <-> l1 \_/ l2 = l2.
 Proof.
   intros.
   split.
@@ -81,7 +87,7 @@ Lemma join_bot_left {L: JoinSemiLattice T} : forall l,
 Proof. eauto using bot_flows with lat.
 Qed.
 
-Lemma not_flows_not_join_flows_left {L: JoinSemiLattice T}: forall l l1 l2,
+Lemma not_flows_not_join_flows_left {L: JoinSemiLattice T} : forall l l1 l2,
   flows l1 l = false ->
   flows (l1 \_/ l2) l = false.
 Proof.
@@ -91,7 +97,7 @@ Proof.
   auto.
 Qed.
 
-Lemma not_flows_not_join_flows_right {L: JoinSemiLattice T}: forall l l1 l2,
+Lemma not_flows_not_join_flows_right {L: JoinSemiLattice T} : forall l l1 l2,
   flows l2 l = false ->
   flows (l1 \_/ l2) l = false.
 Proof.

@@ -100,6 +100,7 @@ VFILES:=Testing/SSNICheckerProofs.v\
   Machine/Memory.v\
   Machine/Machine.v\
   Machine/LabSetsOfPrins.v\
+  Machine/Lab4.v\
   Machine/Lab2.v\
   Machine/Labels.v\
   Machine/Instructions.v
