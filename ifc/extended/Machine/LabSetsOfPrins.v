@@ -7,7 +7,7 @@ Require Import Bool.
 Require Import Eqdep_dec.
 
 Require Import Utils.
-Require Import Lattices.
+Require Import Labels.
 
 Module Type ZFSET.
 
