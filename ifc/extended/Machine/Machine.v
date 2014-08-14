@@ -93,7 +93,7 @@ Inductive Pointer : Type :=
 Inductive Value : Type :=
   | Vint  (n:Z)
   | Vptr  (p:Pointer)
-  | Vlab  (L:Label).
+  | Vlab  (l:Label).
 
 Definition obs_value_to_value (ov:Obs_value) : Value :=
   match ov with
@@ -117,12 +117,12 @@ Definition instr_lookup (m:imem) (pc:Ptr_atom) : option Instruction :=
 Notation "m [ pc ]" := (instr_lookup m pc) (at level 20).
 
 Definition add_pc (pc:Ptr_atom) (n:Z) : Ptr_atom :=
-  let '(PAtm i L) := pc in
-  PAtm (Zplus i n) L.
+  let '(PAtm i l) := pc in
+  PAtm (Zplus i n) l.
 Infix "+" := add_pc.
 
 Definition pc_lab (pc:Ptr_atom) : Label :=
-  let '(PAtm _ L) := pc in L.
+  let '(PAtm _ l) := pc in l.
 Notation "'∂' pc" := (pc_lab pc) (at level 0).
 
 Definition atom_lab (a : Atom) : Label :=
@@ -135,7 +135,7 @@ Definition regSet := list register.
 (* Stack *)
 Inductive Stack :=
   | Mty                                       (* empty stack *)
-  | RetCons (pc_L:Ptr_atom * Label * regSet * regPtr) (s:Stack).
+  | RetCons (pc_l:Ptr_atom * Label * regSet * regPtr) (s:Stack).
    (* stack frame marker cons (with return pc and protecting label) *)
 Infix ":::" := RetCons (at level 60, right associativity).
 
@@ -170,7 +170,7 @@ Proof.
   - destruct p; destruct p0;
     destruct (Z.eq_dec i i0); destruct (fp == fp0);
     try_split_congruence.
-  - destruct (LatEqDec Label L L0); try_split_congruence.
+  - destruct (LatEqDec Label l l0); try_split_congruence.
 Qed.
 
 Definition val (v1 v2 : Value) : Value :=
@@ -216,7 +216,7 @@ Definition msize (m:memory) (p:Pointer) : option nat :=
 Definition mlab (m:memory) (p:Pointer) : option Label :=
   let (fp,i) := p in
   match Mem.get_frame m fp with
-    | Some (Fr _ L _) => Some L
+    | Some (Fr _ l _) => Some l
     | _ => None
   end.
 
@@ -529,12 +529,12 @@ Inductive step (t : table) : State -> trace -> State -> Prop :=
        (St μ π σ r pc)
        nil
        (St μ π σ r' (PAtm (j+1) rpcl))
- | step_bcall: forall μ π σ pc (pc':Ptr_atom) B K r r1 r2 r3 fp j L jpc Lpc rl rpcl
+ | step_bcall: forall μ π σ pc (pc':Ptr_atom) B K r r1 r2 r3 fp j Ll jpc Lpc rl rpcl
      (PC: pc = PAtm jpc Lpc)
      (CODE: μ[pc] = Some (BCall r1 r2 r3))
-     (OP1 : registerContent r r1 = Some (Vptr (Ptr fp j) @ L))
+     (OP1 : registerContent r r1 = Some (Vptr (Ptr fp j) @ Ll))
      (OP2 : registerContent r r2 = Some (Vlab B @ K))
-     (TMU : run_tmr t OpBCall <|L; K|> Lpc = Some (Some rl, rpcl)),
+     (TMU : run_tmr t OpBCall <|Ll; K|> Lpc = Some (Some rl, rpcl)),
      step t
        (St μ π σ r pc)
        nil
@@ -551,49 +551,49 @@ Inductive step (t : table) : State -> trace -> State -> Prop :=
        (St μ π ((pc',B,r',r1) ::: σ) r pc)
        nil
        (St μ π σ r'' (PAtm j' rpcl))
- | step_alloc: forall μ σ pc mem mem' r r' r1 r2 r3 msize K L K' rl rpcl jpc LPC fp
+ | step_alloc: forall μ σ pc mem mem' r r' r1 r2 r3 msize K Ll K' rl rpcl jpc LPC fp
      (PC: pc = PAtm jpc LPC)
      (CODE: μ[pc] = Some (Alloc r1 r2 r3))
      (OP1 : registerContent r r1 = Some (Vint msize @ K))
-     (OP2 : registerContent r r2 = Some (Vlab L @ K'))
-     (TMU : run_tmr t OpAlloc <|K; K'; L|> LPC = Some (Some rl, rpcl))
-     (ALLOC: alloc msize L rl (Vint 0 @ ⊥) mem = Some (fp, mem'))
-     (* LL: Using label L directly as the label of the mframe,
+     (OP2 : registerContent r r2 = Some (Vlab Ll @ K'))
+     (TMU : run_tmr t OpAlloc <|K; K'; Ll|> LPC = Some (Some rl, rpcl))
+     (ALLOC: alloc msize Ll rl (Vint 0 @ ⊥) mem = Some (fp, mem'))
+     (* LL: Using label Ll directly as the label of the mframe,
         also using rl for both the pointer label and the stamp *)
      (RES : registerUpdate r r3 (Vptr (Ptr fp 0) @ rl) = Some r'),
      step t
        (St μ mem σ r pc)
        nil
        (St μ mem' σ r' (PAtm (jpc+1) rpcl))
- | step_load: forall μ π σ pc C p K r r' r1 r2 fp j LPC v L rl rpcl
+ | step_load: forall μ π σ pc C p K r r' r1 r2 fp j LPC v Ll rl rpcl
      (PC  : pc = PAtm j LPC)
      (CODE: μ[pc] = Some (Load r1 r2))
-     (READ: read μ p = Some (v @ L))
+     (READ: read μ p = Some (v @ Ll))
      (MLAB: mlab μ p = Some C)
      (OP1 : registerContent r r1 = Some (Vptr p @ K))
-     (TMU : run_tmr t OpLoad <|K; C; L|> LPC = Some (Some rl, rpcl))
+     (TMU : run_tmr t OpLoad <|K; C; Ll|> LPC = Some (Some rl, rpcl))
      (RES : registerUpdate r r2 (v @ rl) = Some r'),
      step t
        (St μ π σ r pc)
        nil
        (St μ π σ r' (PAtm (j+1) rpcl))
- | step_store: forall μ π σ pc v L C p K μ' r r1 r2 fp j LPC rpcl rl
+ | step_store: forall μ π σ pc v Ll C p K μ' r r1 r2 fp j LPC rpcl rl
      (PC  : pc = PAtm j LPC)
      (CODE: μ[pc] = Some (Store r1 r2))
-     (WRITE: store μ p (v @ L) = Some μ')
+     (WRITE: store μ p (v @ Ll) = Some μ')
      (MLAB: mlab μ p = Some C)
      (OP1 : registerContent r r1 = Some (Vptr p @ K))
-     (OP2 : registerContent r r2  = Some (v @ L))
-     (TMU : run_tmr t OpStore <|K; C; L|> LPC = Some (Some rl, rpcl)),
+     (OP2 : registerContent r r2  = Some (v @ Ll))
+     (TMU : run_tmr t OpStore <|K; C; Ll|> LPC = Some (Some rl, rpcl)),
      step t
        (St μ π σ r pc)
        nil
        (St μ' π σ r (PAtm (j+1) rpcl))
- | step_jump: forall μ π σ pc (pc':Ptr_atom) fp j L r r1 fpc jpc LPC rpcl
+ | step_jump: forall μ π σ pc (pc':Ptr_atom) fp j Ll r r1 fpc jpc LPC rpcl
      (PC: pc = PAtmc jpc LPC)
      (CODE: μ[pc] = Some (Jump r1))
-     (OP1 : registerContent r r1 = Some (Vptr (Ptr fp j) @ L))
-     (TMU: run_tmr t OpJump <|L|> LPC = Some (None, rpcl)),
+     (OP1 : registerContent r r1 = Some (Vptr (Ptr fp j) @ Ll))
+     (TMU: run_tmr t OpJump <|Ll|> LPC = Some (None, rpcl)),
      step t
        (St μ π σ r pc)
        nil
@@ -770,8 +770,8 @@ Definition exec t (st:State) : option (trace * State) :=
           end
     | BCall r1 r2 r3 =>
       match registerContent r r1, registerContent r r2 with
-        | Some (Vint addr @ L), Some (Vlab B @ K) =>
-          match run_tmr t OpBCall <|L; K|> LPC with
+        | Some (Vint addr @ Ll), Some (Vlab B @ K) =>
+          match run_tmr t OpBCall <|Ll; K|> LPC with
             | Some (Some rl, rpcl) =>
               Some (nil,
                     St imem μ (((PAtm (j+1) rl), B, r, r3) ::: σ) r
@@ -796,13 +796,13 @@ Definition exec t (st:State) : option (trace * State) :=
       end
     | Alloc r1 r2 r3 =>
       match registerContent r r1, registerContent r r2 with
-        | Some (Vint i @ K), Some (Vlab L @ K') =>
-          match run_tmr t OpAlloc <|K; K'; L|> LPC with
+        | Some (Vint i @ K), Some (Vlab Ll @ K') =>
+          match run_tmr t OpAlloc <|K; K'; Ll|> LPC with
             | Some (Some rl, rpcl) =>
               let stmp := K ∪ K' ∪ LPC in
                  (* this stamp is just instrumentation;
                     and it doesn't go via the rule table *)
-              do alloc_res : (mframe * memory) <- alloc i L stmp (Vint 0 @ ⊥) μ;
+              do alloc_res : (mframe * memory) <- alloc i Ll stmp (Vint 0 @ ⊥) μ;
               let (dfp, μ') := alloc_res in
               do r' <- registerUpdate r r3 (Vptr (Ptr dfp 0) @ rl);
               Some (nil,
@@ -815,10 +815,10 @@ Definition exec t (st:State) : option (trace * State) :=
       match registerContent r r1 with
         | Some (Vptr p @ K) =>
             do a <- load μ p;
-            let '(v @ L) := a in
+            let '(v @ Ll) := a in
             do C <- mlab μ p;
-            match run_tmr t OpLoad <|K; C; L|> LPC with
-              | Some (Some rl (* L *), rpcl (* LPC ∪ K ∪ C *)) =>
+            match run_tmr t OpLoad <|K; C; Ll|> LPC with
+              | Some (Some rl (* Ll *), rpcl (* LPC ∪ K ∪ C *)) =>
                 do r' <- registerUpdate r r2 (v @ rl);
                 Some (nil,
                       St imem μ σ r' (PAtm (j+1) (rpcl)))
@@ -828,11 +828,11 @@ Definition exec t (st:State) : option (trace * State) :=
       end
     | Store r1 r2 =>
       match registerContent r r1, registerContent r r2 with
-        | Some (Vptr p @ K), Some (v @ L) =>
+        | Some (Vptr p @ K), Some (v @ Ll) =>
           do C <- mlab μ p;
-          match run_tmr t OpStore <|K; C; L|> LPC with
+          match run_tmr t OpStore <|K; C; Ll|> LPC with
             (* check: K ∪ LPC <: C *)
-            | Some (Some rl (* L *), rpcl (* LPC *)) =>
+            | Some (Some rl (* Ll *), rpcl (* LPC *)) =>
               do μ' <- store μ p (v @ rl);
               Some (nil,
                     St imem μ' σ r (PAtm (j+1) rpcl))
@@ -842,8 +842,8 @@ Definition exec t (st:State) : option (trace * State) :=
       end
     | Jump r1 =>
       match registerContent r r1 with
-        | Some (Vint addr @ L) =>
-          match run_tmr t OpJump <|L|> LPC with
+        | Some (Vint addr @ Ll) =>
+          match run_tmr t OpJump <|Ll|> LPC with
             | Some (None, rpcl) =>
               Some (nil,
                 St imem μ σ r (PAtm addr rpcl))

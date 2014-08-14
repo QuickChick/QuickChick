@@ -5,7 +5,7 @@ Require Import Common.
 
 Definition is_low_pointer (obs : Label) (st : State) (a : Atom) : bool :=
   match a with
-    | Vptr p @ L => isLow L obs
+    | Vptr p @ l => isLow l obs
     | _ => false
   end.
 
