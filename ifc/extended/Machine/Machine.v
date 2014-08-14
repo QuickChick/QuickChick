@@ -454,8 +454,8 @@ Definition run_tmr (t : table) (op: OpCode)
 (** Declarative semantics *)
 
 Local Open Scope Z_scope.
-(* TODO : reimplement relational semantics
-   TODO: CH: we only need the default table!
+(* CH: we only need to instantiate this for the default table,
+       so we could even consider baking it in *)
 Inductive step (t : table) : State -> trace -> State -> Prop :=
  | step_lab: forall im μ σ v K pc r r' r1 r2 j LPC rl rpcl
      (PC: pc = PAtm j LPC)
@@ -464,243 +464,228 @@ Inductive step (t : table) : State -> trace -> State -> Prop :=
      (TMU: run_tmr t OpLab <||> LPC = Some (Some rl, rpcl))
      (UPD: registerUpdate r r2 (Vlab K @ rl) = Some r'),
      step t
-          (St im μ σ r  pc)
+          (St im μ σ r pc)
           nil
           (St im μ σ r' (PAtm (j+1) rpcl))
- | step_pclab: forall μ π σ pc r r' r1 j LPC rl rpcl
+ | step_pclab: forall im μ σ pc r r' r1 j LPC rl rpcl
      (PC: pc = PAtm j LPC)
-     (CODE: μ[pc] = Some (PcLab r1))
+     (CODE: im[pc] = Some (PcLab r1))
      (TMU: run_tmr t OpPcLab <||> LPC = Some (Some rl, rpcl))
      (RES : registerUpdate r r1 (Vlab (∂ pc) @ rl) = Some r'),
      step t
-       (St μ π σ r pc)
+       (St im μ σ r pc)
        nil
-       (St μ π σ r' (PAtm (j+1) rpcl))
-(* | step_memlab: forall μ π σ pc p K C r r' r1 r2 fp j LPC rl rpcl
+       (St im μ σ r' (PAtm (j+1) rpcl))
+ | step_mlab: forall im μ σ pc r r1 r2 p K C j LPC rl r' rpcl
      (PC: pc = PAtm j LPC)
-     (CODE: μ[pc] = Some (MLab r1 r2))
-     (MEMLAB: mlab μ p = Some C)
+     (CODE: im[pc] = Some (MLab r1 r2))
+     (OLD : mlab μ p = Some C)
      (OP1 : registerContent r r1 = Some (Vptr p @ K))
-     (TMU: run_tmr t OpMLab <|K; C|> LPC = Some (Some rl, rpcl))
+     (TMU : run_tmr t OpMLab <|K; C|> LPC = Some (Some rl, rpcl))
      (RES : registerUpdate r r2 (Vlab C @ rl) = Some r'),
      step t
-       (St μ π σ r pc)
+       (St im μ σ r pc)
        nil
-       (St μ π σ r' (PAtm (j+1) rpcl))
-*)
- | step_mlab: forall μ π σ pc r r1 r2 p K j LPC rpcl
-     (CODE: μ[pc] = Some (MLab r1 r2))
+       (St im μ σ r' (PAtm (Zsucc j) rpcl))
+ | step_flowsto: forall im μ σ pc L1 K1 L2 K2 r r' r1 r2 r3 j LPC rl rpcl
      (PC: pc = PAtm j LPC)
-     (OP1 : registerContent r r1 = Some (Vptr p @ K))
-     (TMU : run_tmr t OpMLab <|K; K|> LPC = Some (None, rpcl)),
-     step t
-       (St μ π σ r pc)
-       nil
-       (St μ π σ r (PAtm (Zsucc j) rpcl))
-
-  | step_flowsto: forall μ π σ pc L1 K1 L2 K2 r r' r1 r2 r3 res j LPC rl rpcl
-     (PC: pc = PAtm j LPC)
-     (CODE: μ[pc] = Some (FlowsTo r1 r2 r3))
-     (MEMLAB: res = flows_to L1 L2)
+     (CODE: im[pc] = Some (FlowsTo r1 r2 r3))
      (OP1 : registerContent r r1 = Some (Vlab L1 @ K1))
      (OP2 : registerContent r r2 = Some (Vlab L2 @ K2))
      (TMU : run_tmr t OpFlowsTo <|K1; K2|> LPC = Some (Some rl, rpcl))
-     (RES : registerUpdate r r3 (Vint res @ rl) = Some r'),
+     (RES : registerUpdate r r3 (Vint (flows_to L1 L2) @ rl) = Some r'),
      step t
-       (St μ π σ r pc)
+       (St im μ σ r pc)
        nil
-       (St μ π σ r' (PAtm (j+1) rpcl))
- | step_ljoin: forall μ π σ pc L1 K1 L2 K2 r r' r1 r2 r3 j LPC rl rpcl
+       (St im μ σ r' (PAtm (j+1) rpcl))
+ | step_ljoin: forall im μ σ pc L1 K1 L2 K2 r r' r1 r2 r3 j LPC rl rpcl
      (PC: pc = PAtm j LPC)
-     (CODE: μ[pc] = Some (LJoin r1 r2 r3))
+     (CODE: im[pc] = Some (LJoin r1 r2 r3))
      (OP1 : registerContent r r1 = Some (Vlab L1 @ K1))
      (OP2 : registerContent r r2 = Some (Vlab L2 @ K2))
      (TMU : run_tmr t OpLJoin <|K1; K2|> LPC = Some (Some rl, rpcl))
      (RES : registerUpdate r r3 (Vlab (L1 ∪ L2) @ rl) = Some r'),
      step t
-       (St μ π σ r pc)
+       (St im μ σ r pc)
        nil
-       (St μ π σ r' (PAtm (j+1) rpcl))
- | step_pushbot: forall μ π σ pc r r' r1 j LPC rl rpcl
-     (CODE: μ[pc] = Some (PutBot r1))
+       (St im μ σ r' (PAtm (j+1) rpcl))
+ | step_putbot: forall im μ σ pc r r' r1 j LPC rl rpcl
+     (PC: pc = PAtm j LPC)
+     (CODE: im[pc] = Some (PutBot r1))
      (TMU : run_tmr t OpPutBot <||> LPC = Some (Some rl, rpcl))
      (RES : registerUpdate r r1 (Vlab bot @ rl) = Some r'),
      step t
-       (St μ π σ r pc)
+       (St im μ σ r pc)
        nil
-       (St μ π σ r' (PAtm (j+1) rpcl))
- | step_bcall: forall μ π σ pc (pc':Ptr_atom) B K r r1 r2 r3 fp j Ll jpc Lpc rl rpcl
-     (PC: pc = PAtm jpc Lpc)
-     (CODE: μ[pc] = Some (BCall r1 r2 r3))
-     (OP1 : registerContent r r1 = Some (Vptr (Ptr fp j) @ Ll))
+       (St im μ σ r' (PAtm (j+1) rpcl))
+ | step_bcall: forall im μ σ pc B K r r1 r2 r3 j Ll addr Lpc rl rpcl
+     (PC: pc = PAtm j Lpc)
+     (CODE: im[pc] = Some (BCall r1 r2 r3))
+     (OP1 : registerContent r r1 = Some (Vint addr @ Ll))
      (OP2 : registerContent r r2 = Some (Vlab B @ K))
      (TMU : run_tmr t OpBCall <|Ll; K|> Lpc = Some (Some rl, rpcl)),
      step t
-       (St μ π σ r pc)
+       (St im μ σ r pc)
        nil
-       (St μ π (((PAtm (jpc+1) rl), B, r, r3 ) ::: σ)
-           r (PAtm j rpcl))
- | step_bret: forall μ π σ pc a r r' r'' r1 R pc' B j j' LPC LPC' rl rpcl
+       (St im μ (((PAtm (j+1) rl), B, r, r3) ::: σ) r (PAtm addr rpcl))
+ | step_bret: forall im μ σ pc a r r' r'' r1 R pc' B j j' LPC LPC' rl rpcl
      (PC: pc  = PAtm j  LPC)
-     (PC: pc' = PAtm j' LPC')
-     (CODE: μ[pc] = Some BRet)
+     (PC': pc' = PAtm j' LPC')
+     (CODE: im[pc] = Some BRet)
      (STAYS : registerContent r r1 = Some (a @ R))
      (TMU : run_tmr t OpBRet <|R; B; LPC'|> LPC = Some (Some rl, rpcl))
      (RES : registerUpdate r' r1 (a @ rl) = Some r''),
      step t
-       (St μ π ((pc',B,r',r1) ::: σ) r pc)
+       (St im μ ((pc',B,r',r1) ::: σ) r pc)
        nil
-       (St μ π σ r'' (PAtm j' rpcl))
- | step_alloc: forall μ σ pc mem mem' r r' r1 r2 r3 msize K Ll K' rl rpcl jpc LPC fp
-     (PC: pc = PAtm jpc LPC)
-     (CODE: μ[pc] = Some (Alloc r1 r2 r3))
-     (OP1 : registerContent r r1 = Some (Vint msize @ K))
+       (St im μ σ r'' (PAtm j' rpcl))
+ | step_alloc: forall im μ μ' σ pc r r' r1 r2 r3 i K Ll K' rl rpcl j LPC dfp
+     (PC: pc = PAtm j LPC)
+     (CODE: im[pc] = Some (Alloc r1 r2 r3))
+     (OP1 : registerContent r r1 = Some (Vint i @ K))
      (OP2 : registerContent r r2 = Some (Vlab Ll @ K'))
      (TMU : run_tmr t OpAlloc <|K; K'; Ll|> LPC = Some (Some rl, rpcl))
-     (ALLOC: alloc msize Ll rl (Vint 0 @ ⊥) mem = Some (fp, mem'))
+     (ALLOC: alloc i Ll (K ∪ K' ∪ LPC) (Vint 0 @ ⊥) μ = Some (dfp, μ'))
      (* LL: Using label Ll directly as the label of the mframe,
         also using rl for both the pointer label and the stamp *)
-     (RES : registerUpdate r r3 (Vptr (Ptr fp 0) @ rl) = Some r'),
+     (RES : registerUpdate r r3 (Vptr (Ptr dfp 0) @ rl) = Some r'),
      step t
-       (St μ mem σ r pc)
+       (St im μ σ r pc)
        nil
-       (St μ mem' σ r' (PAtm (jpc+1) rpcl))
- | step_load: forall μ π σ pc C p K r r' r1 r2 fp j LPC v Ll rl rpcl
+       (St im μ' σ r' (PAtm (j+1) rpcl))
+ | step_load: forall im μ σ pc C p K r r' r1 r2 j LPC v Ll rl rpcl
      (PC  : pc = PAtm j LPC)
-     (CODE: μ[pc] = Some (Load r1 r2))
-     (READ: read μ p = Some (v @ Ll))
-     (MLAB: mlab μ p = Some C)
+     (CODE: im[pc] = Some (Load r1 r2))
      (OP1 : registerContent r r1 = Some (Vptr p @ K))
+     (READ: load μ p = Some (v @ Ll))
+     (MLAB: mlab μ p = Some C)
      (TMU : run_tmr t OpLoad <|K; C; Ll|> LPC = Some (Some rl, rpcl))
      (RES : registerUpdate r r2 (v @ rl) = Some r'),
      step t
-       (St μ π σ r pc)
+       (St im μ σ r pc)
        nil
-       (St μ π σ r' (PAtm (j+1) rpcl))
- | step_store: forall μ π σ pc v Ll C p K μ' r r1 r2 fp j LPC rpcl rl
+       (St im μ σ r' (PAtm (j+1) rpcl))
+ | step_store: forall im μ σ pc v Ll C p K μ' r r1 r2 j LPC rpcl rl
      (PC  : pc = PAtm j LPC)
-     (CODE: μ[pc] = Some (Store r1 r2))
-     (WRITE: store μ p (v @ Ll) = Some μ')
-     (MLAB: mlab μ p = Some C)
+     (CODE: im[pc] = Some (Store r1 r2))
      (OP1 : registerContent r r1 = Some (Vptr p @ K))
-     (OP2 : registerContent r r2  = Some (v @ Ll))
-     (TMU : run_tmr t OpStore <|K; C; Ll|> LPC = Some (Some rl, rpcl)),
+     (OP2 : registerContent r r2 = Some (v @ Ll))
+     (MLAB: mlab μ p = Some C)
+     (TMU : run_tmr t OpStore <|K; C; Ll|> LPC = Some (Some rl, rpcl))
+     (WRITE: store μ p (v @ rl) = Some μ'),
      step t
-       (St μ π σ r pc)
+       (St im μ σ r pc)
        nil
-       (St μ' π σ r (PAtm (j+1) rpcl))
- | step_jump: forall μ π σ pc (pc':Ptr_atom) fp j Ll r r1 fpc jpc LPC rpcl
-     (PC: pc = PAtmc jpc LPC)
-     (CODE: μ[pc] = Some (Jump r1))
-     (OP1 : registerContent r r1 = Some (Vptr (Ptr fp j) @ Ll))
+       (St im μ' σ r (PAtm (j+1) rpcl))
+ | step_jump: forall im μ σ pc addr Ll r r1 j LPC rpcl
+     (PC: pc = PAtm j LPC)
+     (CODE: im[pc] = Some (Jump r1))
+     (OP1 : registerContent r r1 = Some (Vint addr @ Ll))
      (TMU: run_tmr t OpJump <|Ll|> LPC = Some (None, rpcl)),
      step t
-       (St μ π σ r pc)
+       (St im μ σ r pc)
        nil
-       (St μ π σ r (PAtm j rpcl))
- | step_bnz_yes: forall μ π σ pc n m K r r1 fp j LPC rpcl
+       (St im μ σ r (PAtm addr rpcl))
+ | step_bnz_yes: forall im μ σ pc n m K r r1 j LPC rpcl
      (PC: pc = PAtm j LPC)
-     (CODE: μ[pc] = Some (BNZ n r1))
-     (TEST: m <> 0)
+     (CODE: im[pc] = Some (BNZ n r1))
      (OP1 : registerContent r r1 = Some (Vint m @ K))
-     (TMU: run_tmr t OpBNZ <|K|> LPC = Some (None, rpcl)),
+     (TMU: run_tmr t OpBNZ <|K|> LPC = Some (None, rpcl))
+     (TEST: m <> 0),
      step t
-       (St μ π σ r pc)
+       (St im μ σ r pc)
        nil
-       (St μ π σ r (PAtm (j + n) rpcl))
- | step_bnz_no: forall μ π σ pc n m K r r1 fp j LPC rpcl
+       (St im μ σ r (PAtm (j + n) rpcl))
+ | step_bnz_no: forall im μ σ pc n m K r r1 j LPC rpcl
      (PC: pc = PAtm j LPC)
-     (CODE: μ[pc] = Some (BNZ n r1))
-     (TEST: m = 0)
+     (CODE: im[pc] = Some (BNZ n r1))
      (OP1 : registerContent r r1 = Some (Vint m @ K))
-     (TMU: run_tmr t OpBNZ <|K|> LPC = Some (None, rpcl)),
+     (TMU: run_tmr t OpBNZ <|K|> LPC = Some (None, rpcl))
+     (TEST: m = 0),
      step t
-       (St μ π σ r pc)
+       (St im μ σ r pc)
        nil
-       (St μ π σ r (PAtm (j + 1) rpcl))
- | step_psetoff: forall μ π σ pc fp j K1 n K2 r r' r1 r2 r3 fpc jpc LPC rl rpcl
-     (PC: pc = PAtmc jpc LPC)
-     (CODE: μ[pc] = Some (PSetOff r1 r2 r3))
-     (OP1 : registerContent r r1 = Some (Vptr (Ptr fp j) @ K1))
+       (St im μ σ r (PAtm (j + 1) rpcl))
+ | step_psetoff: forall im μ σ pc fp' j K1 n K2 r r' r1 r2 r3 j' LPC rl rpcl
+     (PC: pc = PAtm j LPC)
+     (CODE: im[pc] = Some (PSetOff r1 r2 r3))
+     (OP1 : registerContent r r1 = Some (Vptr (Ptr fp' j') @ K1))
      (OP2 : registerContent r r2 = Some (Vint n @ K2))
      (TMU: run_tmr t OpPSetOff <|K1; K2|> LPC = Some (Some rl, rpcl))
-     (RES : registerUpdate r r3 (Vptr (Ptr fp n) @ rl) = Some r'),
+     (RES : registerUpdate r r3 (Vptr (Ptr fp' n) @ rl) = Some r'),
      step t
-       (St μ π σ r pc)
+       (St im μ σ r pc)
        nil
-       (St μ π σ r' (PAtmc (jpc + 1) rpcl))
- | step_output: forall μ π σ pc (ov:Obs_value) v K r r1 fp j LPC rl rpcl
+       (St im μ σ r' (PAtm (j + 1) rpcl))
+ | step_output: forall im μ σ pc (ov:Obs_value) n K r r1 j LPC rl rpcl
      (PC: pc = PAtm j LPC)
-     (CODE: μ[pc] = Some (Output r1))
-     (CONV: obs_value_to_value ov = v)
-     (OP1 : registerContent r r1 = Some (v @ K))
+     (CODE: im[pc] = Some (Output r1))
+     (OP1 : registerContent r r1 = Some (Vint n @ K))
      (TMU : run_tmr t OpOutput <| K |> LPC = Some (Some rl, rpcl)),
      step t
-       (St μ π σ r pc)
-       ((ov,rl) :: nil)%list
-       (St μ π σ r (PAtm (j+1) rpcl))
- | step_push: forall μ π σ pc x r r' r1 fp j LPC rl rpcl
+       (St im μ σ r pc)
+       ((OVint n,rl)::nil)%list
+       (St im μ σ r (PAtm (j+1) rpcl))
+ | step_put: forall im μ σ pc x r r' r1 j LPC rl rpcl
      (PC: pc = PAtm j LPC)
-     (CODE: μ[pc] = Some (Put x r1))
+     (CODE: im[pc] = Some (Put x r1))
      (TMU : run_tmr t OpPut <||> LPC = Some (Some rl, rpcl))
      (OP1 : registerUpdate r r1 (Vint x @ rl) = Some r'),
      step t
-       (St μ π σ r pc)
+       (St im μ σ r pc)
        nil
-       (St μ π σ r' (PAtm (j+1) rpcl))
- | step_binop: forall μ π σ pc o n1 L1 n2 L2 n r r1 r2 r3 r' fp j LPC rl rpcl
+       (St im μ σ r' (PAtm (j+1) rpcl))
+ | step_binop: forall im μ σ pc o n1 L1 n2 L2 n r r1 r2 r3 r' j LPC rl rpcl
      (PC: pc = PAtm j LPC)
-     (CODE: μ[pc] = Some (BinOp o r1 r2 r3 ))
-     (BINOP: eval_binop o n1 n2 = Some n)
+     (CODE: im[pc] = Some (BinOp o r1 r2 r3))
      (OP1 : registerContent r r1 = Some (Vint n1 @ L1))
      (OP2 : registerContent r r2 = Some (Vint n2 @ L2))
      (TMU : run_tmr t OpBinOp <|L1; L2|> LPC = Some (Some rl, rpcl))
+     (BINOP: eval_binop o n1 n2 = Some n)
      (RES : registerUpdate r r3 (Vint n @ rl) = Some r'),
      step t
-       (St μ π σ r pc)
+       (St im μ σ r pc)
        nil
-       (St μ π σ r' (PAtm (j+1) rpcl))
- | step_nop: forall μ π σ pc r fp j LPC rpcl
-     (CODE: μ[pc] = Some Nop)
+       (St im μ σ r' (PAtm (j+1) rpcl))
+ | step_nop: forall im μ σ pc r j LPC rpcl
      (PC: pc = PAtm j LPC)
+     (CODE: im[pc] = Some Nop)
      (TMU : run_tmr t OpNop <||> LPC = Some (None, rpcl)),
      step t
-       (St μ π σ r pc)
+       (St im μ σ r pc)
        nil
-       (St μ π σ r (PAtm (Zsucc j) rpcl))
- | step_msize: forall μ π σ pc p K C r r' r1 r2 fp j LPC rl rpcl n
+       (St im μ σ r (PAtm (j+1) rpcl))
+ | step_msize: forall im μ σ pc p K C r r' r1 r2 j LPC rl rpcl n
      (PC: pc = PAtm j LPC)
-     (CODE: μ[pc] = Some (MSize r1 r2))
-     (MLAB: mlab μ p = Some C)
-     (MSIZE: msize μ p = Some n)
+     (CODE: im[pc] = Some (MSize r1 r2))
      (OP1 : registerContent r r1 = Some (Vptr p @ K))
+     (MLAB: mlab μ p = Some C)
      (TMU: run_tmr t OpMSize <|K; C|> LPC = Some (Some rl, rpcl))
+     (MSIZE: msize μ p = Some n)
      (RES : registerUpdate r r2 (Vint (Z.of_nat n) @ rl) = Some r'),
      step t
-       (St μ π σ r pc)
+       (St im μ σ r pc)
        nil
-       (St μ π σ r' (PAtm (j+1) rpcl))
- | step_pgetoff: forall μ π σ pc fp j K r r' r1 r2 fpc jpc LPC rl rpcl
-     (PC: pc = PAtmc jpc LPC)
-     (CODE: μ[pc] = Some (PGetOff r1 r2))
-     (OP1 : registerContent r r1 = Some (Vptr (Ptr fp j) @ K))
+       (St im μ σ r' (PAtm (j+1) rpcl))
+ | step_pgetoff: forall im μ σ pc fp' j K r r' r1 r2 j' LPC rl rpcl
+     (PC: pc = PAtm j LPC)
+     (CODE: im[pc] = Some (PGetOff r1 r2))
+     (OP1 : registerContent r r1 = Some (Vptr (Ptr fp' j') @ K))
      (TMU: run_tmr t OpPGetOff <|K|> LPC = Some (Some rl, rpcl))
-     (RES : registerUpdate r r2 (Vint j @ rl) = Some r'),
+     (RES : registerUpdate r r2 (Vint j' @ rl) = Some r'),
      step t
-       (St μ π σ r pc)
+       (St im μ σ r pc)
        nil
-       (St μ π σ r' (PAtmc (jpc + 1) rpcl))
-.
-*)
+       (St im μ σ r' (PAtm (j+1) rpcl)).
 
 (** * Executable semantics *)
 
 Definition state_instr_lookup (st:State) : option Instruction :=
-  let (μ,_,_,_,pc) := st in μ[pc].
+  let (im,_,_,_,pc) := st in im[pc].
 
 Definition exec t (st:State) : option (trace * State) :=
   do instr <- state_instr_lookup st;
-  let '(St imem μ σ r pc) := st in
+  let '(St im μ σ r pc) := st in
   let '(PAtm j LPC) := pc in
   match instr with
     | Lab r1 r2 =>
@@ -709,7 +694,7 @@ Definition exec t (st:State) : option (trace * State) :=
           match run_tmr t OpLab <||> LPC with
             | Some (Some rl, rpcl) =>
               do r' <- registerUpdate r r2 (Vlab K @ rl);
-                Some (nil, St imem μ σ r' (PAtm (j+1) rpcl))
+                Some (nil, St im μ σ r' (PAtm (j+1) rpcl))
             | _ => None
           end
         | None => None
@@ -719,7 +704,7 @@ Definition exec t (st:State) : option (trace * State) :=
         | Some (Some rl, rpcl) =>
           do r' <- registerUpdate r r1 (Vlab (∂ pc) @ rl);
             Some (nil,
-                  St imem μ σ r' (PAtm (j+1) rpcl))
+                  St im μ σ r' (PAtm (j+1) rpcl))
         | _ => None
       end
     | MLab r1 r2 =>
@@ -730,7 +715,7 @@ Definition exec t (st:State) : option (trace * State) :=
               | Some (Some rl, rpcl) =>
                 do r' <- registerUpdate r r2 (Vlab C @ rl);
                 Some (nil,
-                  St imem μ σ r' (PAtm (j+1) rpcl))
+                  St im μ σ r' (PAtm (j+1) rpcl))
               | _ => None
             end
         | _ => None
@@ -743,7 +728,7 @@ Definition exec t (st:State) : option (trace * State) :=
             | Some (Some rl, rpcl) =>
               do r' <- registerUpdate r r3 (Vint res @ rl);
               Some (nil,
-                  St imem μ σ r' (PAtm (j+1) rpcl))
+                  St im μ σ r' (PAtm (j+1) rpcl))
               | _ => None
             end
         | _, _ => None
@@ -755,7 +740,7 @@ Definition exec t (st:State) : option (trace * State) :=
             | Some (Some rl, rpcl) =>
               do r' <- registerUpdate r r3 (Vlab (L1 ∪ L2) @ rl);
               Some (nil,
-                    St imem μ σ r' (PAtm (j+1) rpcl))
+                    St im μ σ r' (PAtm (j+1) rpcl))
             | _ => None
           end
         | _, _ => None
@@ -765,7 +750,7 @@ Definition exec t (st:State) : option (trace * State) :=
         | Some (Some rl, rpcl) =>
           do r' <- registerUpdate r r1 (Vlab bot @ rl);
           Some (nil,
-                St imem μ σ r' (PAtm (j+1) rpcl))
+                St im μ σ r' (PAtm (j+1) rpcl))
             | _ => None
           end
     | BCall r1 r2 r3 =>
@@ -774,7 +759,7 @@ Definition exec t (st:State) : option (trace * State) :=
           match run_tmr t OpBCall <|Ll; K|> LPC with
             | Some (Some rl, rpcl) =>
               Some (nil,
-                    St imem μ (((PAtm (j+1) rl), B, r, r3) ::: σ) r
+                    St im μ (((PAtm (j+1) rl), B, r, r3) ::: σ) r
                        (PAtm addr rpcl))
             | _ => None
           end
@@ -789,7 +774,7 @@ Definition exec t (st:State) : option (trace * State) :=
             | Some (Some rl, rpcl) =>
               do r' <- registerUpdate savedRegs r1 (a @ rl);
               Some (nil,
-                    St imem μ σ' r' (PAtm jp' rpcl))
+                    St im μ σ' r' (PAtm jp' rpcl))
             | _ => None
           end
         | _ => None
@@ -806,7 +791,7 @@ Definition exec t (st:State) : option (trace * State) :=
               let (dfp, μ') := alloc_res in
               do r' <- registerUpdate r r3 (Vptr (Ptr dfp 0) @ rl);
               Some (nil,
-                    St imem μ' σ r' (PAtm (j+1) rpcl))
+                    St im μ' σ r' (PAtm (j+1) rpcl))
             | _ => None
           end
         | _, _ => None
@@ -821,7 +806,7 @@ Definition exec t (st:State) : option (trace * State) :=
               | Some (Some rl (* Ll *), rpcl (* LPC ∪ K ∪ C *)) =>
                 do r' <- registerUpdate r r2 (v @ rl);
                 Some (nil,
-                      St imem μ σ r' (PAtm (j+1) (rpcl)))
+                      St im μ σ r' (PAtm (j+1) (rpcl)))
               | _ => None
             end
         | _ => None
@@ -835,7 +820,7 @@ Definition exec t (st:State) : option (trace * State) :=
             | Some (Some rl (* Ll *), rpcl (* LPC *)) =>
               do μ' <- store μ p (v @ rl);
               Some (nil,
-                    St imem μ' σ r (PAtm (j+1) rpcl))
+                    St im μ' σ r (PAtm (j+1) rpcl))
             | _ => None
           end
         | _, _ => None
@@ -846,7 +831,7 @@ Definition exec t (st:State) : option (trace * State) :=
           match run_tmr t OpJump <|Ll|> LPC with
             | Some (None, rpcl) =>
               Some (nil,
-                St imem μ σ r (PAtm addr rpcl))
+                St im μ σ r (PAtm addr rpcl))
             | _ => None
           end
         | _ => None
@@ -858,7 +843,7 @@ Definition exec t (st:State) : option (trace * State) :=
             | Some (None, rpcl) =>
               let new_pc := (if Z_eq_dec m 0 then j+1 else j+n) in
                 Some (nil,
-                      St imem μ σ r (PAtm new_pc rpcl))
+                      St im μ σ r (PAtm new_pc rpcl))
             | _ => None
           end
         | _ => None
@@ -870,7 +855,7 @@ Definition exec t (st:State) : option (trace * State) :=
             | Some (Some rl, rpcl) =>
               do r' <- registerUpdate r r3 (Vptr (Ptr fp' n) @ rl);
               Some (nil,
-                    St imem μ σ r' (PAtm (j+1) rpcl))
+                    St im μ σ r' (PAtm (j+1) rpcl))
             | _ => None
           end
         | _, _ => None
@@ -881,7 +866,7 @@ Definition exec t (st:State) : option (trace * State) :=
           match run_tmr t OpOutput <| K |> LPC with
             | Some (Some rl, rpcl) =>
               Some (((OVint n, rl) :: nil)%list,
-                    St imem μ σ r (PAtm (j+1) rpcl))
+                    St im μ σ r (PAtm (j+1) rpcl))
             | _ => None
           end
         | _ => None
@@ -891,18 +876,18 @@ Definition exec t (st:State) : option (trace * State) :=
         | Some (Some rl, rpcl) =>
           do r' <- registerUpdate r r1 (Vint x @ rl);
             Some (nil,
-                    St imem μ σ r' (PAtm (j+1) rpcl))
+                    St im μ σ r' (PAtm (j+1) rpcl))
         | _ => None
       end
      | BinOp o r1 r2 r3 =>
        match registerContent r r1, registerContent r r2 with
          | Some (Vint n1 @ L1), Some (Vint n2 @ L2) =>
-           do n <- eval_binop o n1 n2;
            match run_tmr t OpBinOp <|L1; L2|> LPC with
              | Some (Some rl, rpcl) =>
+               do n <- eval_binop o n1 n2;
                do r' <- registerUpdate r r3 (Vint n @ rl);
                Some (nil,
-                     St imem μ σ r' (PAtm (j+1) rpcl))
+                     St im μ σ r' (PAtm (j+1) rpcl))
              | _ => None
            end
          | _, _ => None
@@ -911,19 +896,19 @@ Definition exec t (st:State) : option (trace * State) :=
        match run_tmr t OpNop <||> LPC with
          | Some (None, rpcl) =>
            Some (nil,
-               St imem μ σ r (PAtm (j+1) rpcl))
+               St im μ σ r (PAtm (j+1) rpcl))
          | _ => None
        end
     | MSize r1 r2 =>
       match registerContent r r1 with
         | Some (Vptr p @ K) =>
             do C <- mlab μ p;
-            do n <- msize μ p;
             match run_tmr t OpMSize <|K; C|> LPC with
               | Some (Some rl, rpcl) =>
+                do n <- msize μ p;
                 do r' <- registerUpdate r r2 (Vint (Z.of_nat n) @ rl);
                 Some (nil,
-                  St imem μ σ r' (PAtm (j+1) rpcl))
+                  St im μ σ r' (PAtm (j+1) rpcl))
               | _ => None
             end
         | _ => None
@@ -935,7 +920,7 @@ Definition exec t (st:State) : option (trace * State) :=
             | Some (Some rl, rpcl) =>
               do r' <- registerUpdate r r2 (Vint j' @ rl);
               Some (nil,
-                    St imem μ σ r' (PAtm (j+1) rpcl))
+                    St im μ σ r' (PAtm (j+1) rpcl))
             | _ => None
           end
         | _ => None
@@ -971,7 +956,7 @@ Ltac exec_solver :=
       intros T; inversion T; clear T; subst; try (econstructor (solve[eauto]))
   end.
 
-(*
+(* TODO: bring back the equivalence proof
 Hint Unfold run_tmr.
 Hint Unfold apply_rule.
 Hint Unfold default_table.
