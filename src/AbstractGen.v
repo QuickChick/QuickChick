@@ -1,14 +1,15 @@
-Require Import ZArith Axioms.
-Require Import List ssreflect ssrbool ssrnat seq.
+Require Import Axioms.
+Require Import RoseTrees.
+Require Import ZArith List ssreflect ssrbool ssrnat seq.
 Import ListNotations.
 
 Class Random (A : Type) :=
-  { 
-    randomR : A * A -> RandomGen -> A * RandomGen; 
-    
-    (* I need this to convert randomR to set of 
+  {
+    randomR : A * A -> RandomGen -> A * RandomGen;
+
+    (* I need this to convert randomR to set of
        outcomes, taking range into account *)
-    cmp : A -> A -> comparison 
+    cmp : A -> A -> comparison
   }.
 
 
@@ -16,7 +17,7 @@ Instance Randombool : Random bool :=
   {
     randomR := randomRBool;
     cmp b1 b2 :=
-      match b1, b2 with 
+      match b1, b2 with
         | false, true => Lt
         | true, false => Gt
         | _, _ => Eq
@@ -36,22 +37,23 @@ Instance RandomZ : Random Z :=
     cmp := Z.compare
   }.
 
-Class GenMonad M := 
+Class GenMonad M :=
   {
     bindGen : forall {A B : Type},  M A -> (A -> M B) -> M B;
     returnGen : forall {A : Type}, A -> M A;
-    fmapGen : forall {A B : Type}, (A -> B) -> M A -> M B; 
+    fmapGen : forall {A B : Type}, (A -> B) -> M A -> M B;
     choose : forall {A} `{Random A}, A * A -> M A;
     sized : forall {A}, (nat -> M A) -> M A;
-    suchThatMaybe : forall {A}, M A -> (A -> bool) -> M (option A)
+    suchThatMaybe : forall {A}, M A -> (A -> bool) -> M (option A);
+    promote : forall  {A : Type}, (Rose (M A)) -> M (Rose A)
   }.
 
 Section Utilities.
   Context {Gen : Type -> Type}
-          {H : GenMonad Gen}. 
+          {H : GenMonad Gen}.
 
-  Definition liftGen {A B} (f: A -> B) (a : Gen A) 
-  : Gen B := nosimpl 
+  Definition liftGen {A B} (f: A -> B) (a : Gen A)
+  : Gen B := nosimpl
                (bindGen a (fun x =>
                 returnGen (f x))).
 
@@ -61,7 +63,7 @@ Section Utilities.
     nosimpl (bindGen m1 (fun x1 => bindGen m2 (fun x2 => returnGen (C x1 x2)))).
 
   Definition liftGen3 {A1 A2 A3 R} (F : A1 -> A2 -> A3 -> R)
-           (m1 : Gen A1) (m2 : Gen A2) (m3 : Gen A3) 
+           (m1 : Gen A1) (m2 : Gen A2) (m3 : Gen A3)
 
   : Gen R := nosimpl(
     bindGen m1 (fun x1 =>
@@ -79,7 +81,7 @@ Section Utilities.
     bindGen m4 (fun x4 =>
     returnGen (F x1 x2 x3 x4)))))).
 
-  Definition liftGen5 {A1 A2 A3 A4 A5 R} 
+  Definition liftGen5 {A1 A2 A3 A4 A5 R}
              (F : A1 -> A2 -> A3 -> A4 -> A5 -> R)
              (m1 : Gen A1) (m2 : Gen A2) (m3 : Gen A3) (m4: Gen A4) (m5 : Gen A5)
   : Gen R := nosimpl(
@@ -91,11 +93,11 @@ Section Utilities.
     returnGen (F x1 x2 x3 x4 x5))))))).
 
   Definition sequenceGen {A : Type} (ms : list (Gen A)) : Gen (list A) := nosimpl(
-    fold_right (fun m m' => bindGen m  (fun x => 
+    fold_right (fun m m' => bindGen m  (fun x =>
                             bindGen m' (fun xs =>
                             returnGen (x :: xs)))) (returnGen []) ms).
 
-  Fixpoint foldGen {A B : Type} (f : A -> B -> Gen A) (l : list B) (a : A) 
+  Fixpoint foldGen {A B : Type} (f : A -> B -> Gen A) (l : list B) (a : A)
   : Gen A := nosimpl(
     match l with
       | [] => returnGen a
@@ -121,31 +123,31 @@ Section Utilities.
 
   Definition frequency {A : Type} (def : Gen A) (gs : list (nat * Gen A)) := nosimpl(
     oneof def (freqRep gs)).
- 
-  (* This is the implementation of frequency a la QuickCheck and seems more 
-     memory and time efficient. Is there a reason the should stick to the 
-     first one? A corner case is when all the keys are set to zero and thus 
-     the range of choose is (1, 0), which, according to Haskell's interface, 
-     is an undefined behavior. *)
- 
-    Fixpoint pick {A : Type} (def : Gen A) (n : nat) (xs : list (nat * Gen A)) 
-    : nat * Gen A := nosimpl(
-      match xs with 
-        | nil => (0, def)
-        | (k, x) :: xs =>  
-          if (n < k) then (k, x) 
-          else pick def (n - k) xs
-      end).
 
-  Definition frequency' {A : Type} (def : Gen A) (gs : list (nat * Gen A)) 
+  Fixpoint pick {A : Type} (def : Gen A) (n : nat) (xs : list (nat * Gen A))
+  : nat * Gen A :=
+    match xs with
+      | nil => (0, def)
+      | (k, x) :: xs =>
+        if (n < k) then (k, x)
+        else pick def (n - k) xs
+    end.
+
+  (* This is the implementation of frequency a la QuickCheck and seems more
+     memory and time efficient. Is there a reason the should stick to the
+     first one? A corner case is when all the keys are set to zero and thus
+     the range of choose is (1, 0), which, according to Haskell's interface,
+     is an undefined behavior. *)
+  Definition frequency' {A : Type} (def : Gen A) (gs : list (nat * Gen A))
   : Gen A := nosimpl(
     let tot := (sumn (map (@fst _ _) gs)) in
     bindGen (choose (0, tot-1)) (fun n =>
     @snd _ _ (pick def n gs))).
 
-  Definition vectorOf {A : Type} (k : nat) (g : Gen A) : Gen (list A) := nosimpl(
+  Definition vectorOf {A : Type} (k : nat) (g : Gen A)
+  : Gen (list A) := nosimpl(
     fold_right (fun m m' =>
-                  bindGen m (fun x => 
+                  bindGen m (fun x =>
                   bindGen m' (fun xs => returnGen (cons x xs)))
                ) (returnGen nil) (nseq k g)).
 
@@ -154,7 +156,7 @@ Section Utilities.
 
   Definition elements {A : Type} (def : A) (l : list A) := nosimpl(
     let n := length l in
-    bindGen (choose (0, n - 1)) (fun n' => 
+    bindGen (choose (0, n - 1)) (fun n' =>
     returnGen (List.nth n' l def))).
 
 End Utilities.

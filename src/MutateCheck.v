@@ -1,4 +1,4 @@
-Require Import QuickChick.
+Require Import QuickChick Gen.
 
 Class Mutateable (A : Type) : Type :=
 {
@@ -9,16 +9,16 @@ Require Import List.
 Import ListNotations.
 
 (* Default mutateable instance for lists *)
-(* Priority 1, in case someone overrides the default to further mutate 
+(* Priority 1, in case someone overrides the default to further mutate
    when the A's are mutateable *)
 Instance MutateableList (A : Type) : Mutateable (list A) | 1 :=
 {|
-  mutate l := 
+  mutate l :=
     let fix f l :=
         match l with
           | [] => []
           | x::xs => xs :: map (fun xs' => x :: xs') (f xs)
-        end 
+        end
     in f l
 |}.
 
@@ -42,7 +42,8 @@ Definition message (kill : bool) (n1 n2 : nat) :=
   ++ " (" ++ show n1 ++ " frags)" ++ nl.
 
 Open Scope nat.
-Definition mutateCheckManyArgs {A P : Type} `{_: Testable P}
+
+Definition mutateCheckManyArgs {A P : Type} {_: Testable P}
            `{mutA: Mutateable A} (args : Args)
            (a : A) (ps : A -> list P) :=
   let mutants := mutate a in
@@ -56,18 +57,18 @@ Definition mutateCheckManyArgs {A P : Type} `{_: Testable P}
       end)
      mutants (0, 0)).
 
-Definition mutateCheckMany {A P : Type} `{_: Testable P}
-           `{mutA: Mutateable A} 
+Definition mutateCheckMany {A P : Type} {_: Testable P}
+           `{mutA: Mutateable A}
            (a : A) (ps : A -> list P) :=
   mutateCheckManyArgs stdArgs a ps.
 
-Definition mutateCheckArgs {A P: Type} 
-           `{_: Testable P} `{mutA: Mutateable A} (args : Args)
+Definition mutateCheckArgs {A P: Type}
+           {_: Testable P} {mutA: Mutateable A} (args : Args)
            (a : A) (p : A -> P):=
   mutateCheckManyArgs args a (fun a => cons (p a) nil).
 
-Definition mutateCheck {A P: Type} 
-           `{_: Testable P} `{mutA: Mutateable A} 
+Definition mutateCheck {A P: Type}
+           {_: Testable P} {mutA: Mutateable A}
            (a : A) (p : A -> P):=
   mutateCheckManyArgs stdArgs a (fun a => cons (p a) nil).
 

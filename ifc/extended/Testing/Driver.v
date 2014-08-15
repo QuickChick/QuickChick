@@ -1,39 +1,46 @@
-Require Import Machine.
-Require Import Rules.
-Require Import SSNI.
+
+Require Import ZArith.
 Require Import String.
+Require Import List. Import ListNotations.
 
 Require Import QuickChick.
-Require Import Common.
-
 Require Import Show.
 Require Import Test.
-Require Import ZArith.
-Require Import List.
 
+Require Import Rules.
+Require Import Common.
 Require Import Generation.
 Require Import Shrinking.
-
+Require Import SSNI.
 Require Import Reachability.
 Require Import SingleStateArb.
 
 Require Import SanityChecks.
 
-Definition testTMU :=
-  let H1 := lab_of_list [Z.of_nat 1] in
-  let H2 := lab_of_list [Z.of_nat 2] in
-  let TOP := join H1 H2 in
-  show (run_tmr default_table OpAlloc <|bot; TOP; H2|> bot).
+(* Testing well-formedness first *)
 
-Definition testSSNI t := quickCheck (propSSNI t).
+(* TODO: CH: get rid of all this boiler code *)
+Definition test_stamp_generation :=
+  showResult (quickCheck (prop_stamp_generation : State -> Gen.Gen QProp)).
+QuickCheck test_stamp_generation.
 
-(* Testing default table *)
+Definition test_generate_indist :=
+  showResult (quickCheck (prop_generate_indist : Gen.Gen QProp)).
+QuickCheck test_generate_indist.
+
+Definition test_exec_preserves_well_formed :=
+  showResult (quickCheck (prop_exec_preserves_well_formed default_table : Gen.Gen QProp)).
+QuickCheck test_exec_preserves_well_formed.
+
+(* Testing non-interference second (default table) *)
+
+Definition testSSNI t := quickCheck (propSSNI t : Gen.Gen QProp).
 
 Definition testSSNIdefaultTable := showResult (testSSNI default_table).
 
 QuickCheck testSSNIdefaultTable.
 
-(* Testing mutants *)
+(* Testing mutants third *)
 
 Require Import Mutate.
 Require Import MutateCheck.
@@ -45,7 +52,7 @@ Instance mutateable_table : Mutateable table :=
 
 Definition testMutants :=
   mutateCheckMany default_table (fun t => [propSSNI t;
-    prop_exec_preserves_well_formed t]
+    prop_exec_preserves_well_formed t] : list (Gen.Gen QProp)
 ).
 
 Definition runTestMutants := show testMutants.
@@ -106,7 +113,7 @@ Definition testMutant36 := testMutantX
 Definition testMutantWF x y :=
   let mutant := fun o' =>
     (helper x y o' (default_table o'))  in
-  quickCheck (prop_exec_preserves_well_formed mutant).
+  quickCheck (prop_exec_preserves_well_formed mutant : Gen.Gen QProp).
 
 Definition testMutant36wf := testMutantWF
   OpAlloc (≪TRUE, Lab2, LabPC ≫).
@@ -127,15 +134,15 @@ Definition testMutant37wf := testMutantWF
 (* Definition testNI := testMutant9.*)
 (* Definition testNI := testSSNI default_table. *)
 (* Definition testNI := quickCheck prop_stamp_generation. *)
-(* Definition testNI := 
+(* Definition testNI :=
   quickCheck (prop_preserves_well_formed default_table). *)
 (* Definition testNI := quickCheck prop_generate_indist. *)
-(*(forAllShrink (fun _ => "implement me!") 
-                           genSingleExecState 
-                           (fun _ => nil)        
+(*(forAllShrink (fun _ => "implement me!")
+                           genSingleExecState
+                           (fun _ => nil)
                            (propWellFormednessPreserved default_table)).*)
 
-(*Definition testNI := 
+(*Definition testNI :=
   let l := lab_of_list [Pos.of_nat 1] in
   let h := lab_of_list [Pos.of_nat 1; Pos.of_nat 2] in
   match alloc 2%Z l bot (Vint Z0 @ bot) (Mem.empty Atom Label) with

@@ -81,7 +81,8 @@ endif
 #                    #
 ######################
 
-VFILES:=Testing/GenerationProofs.v\
+VFILES:=Testing/SSNICheckerProofs.v\
+  Testing/GenerationProofs.v\
   Testing/GenerationProofsHelpers.v\
   Testing/SSNI.v\
   Testing/SingleStateArb.v\
@@ -91,15 +92,16 @@ VFILES:=Testing/GenerationProofs.v\
   Testing/Printing.v\
   Testing/Indist.v\
   Testing/Generation.v\
-  Testing/Driver.v\
   Testing/Common.v\
   Machine/Utils.v\
   Machine/Rules.v\
-  Machine/Primitives.v\
   Machine/Mutate.v\
   Machine/Memory.v\
   Machine/Machine.v\
-  Machine/Lattices.v\
+  Machine/LabSetsOfPrins.v\
+  Machine/Lab4.v\
+  Machine/Lab2.v\
+  Machine/Labels.v\
   Machine/Instructions.v
 
 -include $(addsuffix .d,$(VFILES))

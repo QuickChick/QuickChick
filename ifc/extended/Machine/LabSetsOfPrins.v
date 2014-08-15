@@ -1,166 +1,13 @@
-Require Import EquivDec.
 Require Export RelationClasses.
 Require Export SetoidClass.
 Require Import ZArith.
 Require Import ListSet.
-Require Import List.
+Require Import List. Import ListNotations.
 Require Import Bool.
 Require Import Eqdep_dec.
 
-Require Export Utils.
-
-Open Scope bool_scope.
-
-(** Assumptions: labels form a join-semi-lattice. *)
-
-(** * Definition *)
-
-Class JoinSemiLattice (Lab: Type) :=
-{ bot : Lab
-; join : Lab -> Lab -> Lab
-; flows : Lab -> Lab -> bool
-; meet : Lab -> Lab -> Lab
-; bot_flows : forall l, flows bot l  = true
-; flows_refl : forall l, flows l l  = true
-; flows_trans : forall l1 l2 l3,  flows l1 l2  = true -> flows l2 l3  = true -> flows l1 l3  = true
-; flows_antisymm : forall l1 l2,  flows l1 l2  = true -> flows l2 l1 = true -> l1 = l2
-; flows_join_right : forall l1 l2, flows l1 (join l1 l2) = true
-; flows_join_left : forall l1 l2, flows l2 (join l1 l2) = true
-; join_minimal : forall l1 l2 l, flows l1 l  = true -> flows l2 l  = true -> flows (join l1 l2) l = true
-}.
-
-Notation "l1 \_/ l2" := (join l1 l2) (at level 40) : type_scope.
-Notation "l1 <: l2" := (flows l1 l2) (at level 50, no associativity) : type_scope.
-
-(* Might be used at some point as the default for clearance
-Parameter top : Lab.
-Hypothesis flows_top : forall l, l <: top. *)
-
-Hint Resolve
-  @flows_refl
-  @flows_trans
-  @flows_join_left
-  @flows_join_right
-  @flows_antisymm
-  @join_minimal: lat.
-
-(** Immediate properties from the semi-lattice structure. *)
-Section JoinSemiLattice_properties.
-
-Context {T: Type}.
-
-(* AAA: used to be assumption, not used *)
-Lemma flows_join {L:JoinSemiLattice T} : forall l1 l2, l1 <: l2 = true <-> l1 \_/ l2 = l2.
-Proof.
-  intros.
-  split.
-  - intros H.
-    apply flows_antisymm.
-    + apply join_minimal; auto with lat.
-    + apply flows_join_left.
-  - intros H.
-    rewrite <- H.
-    auto with lat.
-Qed.
-
-Lemma join_1_rev {L: JoinSemiLattice T} : forall l1 l2 l,
-  l1 \_/ l2 <: l = true -> l1 <: l = true.
-Proof. eauto with lat. Qed.
-
-Lemma join_2_rev {L: JoinSemiLattice T} : forall l1 l2 l,
-  l1 \_/ l2 <: l  = true -> l2 <: l  = true.
-Proof. eauto with lat. Qed.
-
-Lemma join_1 {L: JoinSemiLattice T} : forall l l1 l2,
-  l <: l1  = true -> l <: l1 \_/ l2  = true.
-Proof. eauto with lat. Qed.
-
-Lemma join_2 {L: JoinSemiLattice T}: forall l l1 l2,
-  l <: l2 = true -> l <: l1 \_/ l2 = true.
-Proof. eauto with lat. Qed.
-
-Lemma join_bot_right {L: JoinSemiLattice T} : forall l,
-  l \_/ bot = l.
-Proof.
-  eauto using bot_flows with lat.
-Qed.
-
-Lemma join_bot_left {L: JoinSemiLattice T} : forall l,
-  bot \_/ l = l.
-Proof. eauto using bot_flows with lat.
-Qed.
-
-Lemma not_flows_not_join_flows_left {L: JoinSemiLattice T}: forall l l1 l2,
-  l1 <: l = false ->
-  (l1 \_/ l2) <: l = false.
-Proof.
-  intros.
-  destruct (flows (l1 \_/ l2) l) eqn:E.
-  exploit join_1_rev; eauto.
-  auto.
-Qed.
-
-Lemma not_flows_not_join_flows_right {L: JoinSemiLattice T}: forall l l1 l2,
-  l2 <: l = false ->
-  (l1 \_/ l2) <: l = false.
-Proof.
-  intros.
-  destruct (flows (l1 \_/ l2) l) eqn:E.
-  exploit join_2_rev; eauto.
-  auto.
-Qed.
-
-End JoinSemiLattice_properties.
-
-Hint Resolve
-  @join_1
-  @join_2
-  @bot_flows
-  @not_flows_not_join_flows_right
-  @not_flows_not_join_flows_left : lat.
-
-(*
-(** The two point lattice *)
-Inductive Lab2 : Set :=
-  | L : Lab2
-  | H : Lab2.
-
-Instance HL : JoinSemiLattice Lab :=
-{  bot := L
-;  join l1 l2 :=
-     match l1, l2 with
-       | H, _ => H
-       | _, H => H
-       | L, L => L
-     end
-; flows l1 l2 :=
-    match l1, l2 with
-      | L, _ => true
-      | _, H => true
-      | _, _ => false
-    end
-}.
-Proof.
-auto.
-intros l; destruct l; auto.
-intros l1 l2 l3; destruct l1, l2, l3; auto.
-intros l1 l2; destruct l1, l2; auto.
-intuition.
-intuition.
-intros l1 l2; destruct l1, l2; auto.
-intros l1 l2; destruct l1, l2; auto.
-intros l1 l2 l; destruct l1, l2, l; auto.
-Defined.
-*)
-
-Instance LatEqDec (T : Type) {Lat : JoinSemiLattice T} : EqDec T eq.
-  intros x y.
-  destruct (x <: y) eqn:xy;
-  destruct (y <: x) eqn:yx; try (right; congruence).
-  - left. compute. eauto with lat.
-  - generalize (flows_refl x). intros.
-    right. congruence.
-Defined.
+Require Import Utils.
+Require Import Labels.
 
 Module Type ZFSET.
 
@@ -181,7 +28,7 @@ Module Type ZFSET.
 
   Parameter inter : t -> t -> t.
   Parameter In_inter : forall s1 s2 x,
-     In x (inter s1 s2) <-> In x s1 /\ In x s2.                         
+     In x (inter s1 s2) <-> In x s1 /\ In x s2.
 
   Parameter incl : t -> t -> bool.
   Parameter incl_spec : forall s1 s2,
@@ -367,7 +214,7 @@ Module Zset : ZFSET.
       | x::q => (if existsb (Z.eqb x) l2 then (fun l => x::l) else (fun l => l))
                   (inter_list q l2)
     end.
-                                
+
   Lemma sorted_drop : forall l a, sorted (a :: l) = true -> sorted l = true.
     intros. simpl in H.
     destruct l; auto.
@@ -376,7 +223,7 @@ Module Zset : ZFSET.
     auto.
   Qed.
 
-  Lemma sorted_min : forall l1 a, sorted (a :: l1) = true -> 
+  Lemma sorted_min : forall l1 a, sorted (a :: l1) = true ->
                        forall x, List.In x l1 -> (a <? x)%Z = true.
     induction l1.
     - simpl; auto.
@@ -401,11 +248,11 @@ Module Zset : ZFSET.
     - right. eapply IHl1; eauto.
   Qed.
 
-  Lemma sorted_min_head : forall l a, sorted l = true -> 
+  Lemma sorted_min_head : forall l a, sorted l = true ->
                             (forall x, List.In x l -> (a <? x)%Z = true) ->
                             sorted (a :: l) = true.
     intros.
-    simpl. 
+    simpl.
     intros.
     destruct l; auto.
     pose proof (H0 z).
@@ -453,7 +300,7 @@ Module Zset : ZFSET.
         inversion_clear Mem. inversion_clear H.
         + rewrite Z.eqb_eq in H1; subst; auto.
         + pose proof (IHl1 l2 x).
-          inversion_clear H. 
+          inversion_clear H.
           apply H1 in H0.
           inversion_clear H0.
           auto.
@@ -480,7 +327,7 @@ Module Zset : ZFSET.
   Qed.
 
   Lemma In_inter : forall s1 s2 x,
-     In x (inter s1 s2) <-> In x s1 /\ In x s2.  
+     In x (inter s1 s2) <-> In x s1 /\ In x s2.
   Proof.
     unfold inter, In; destruct s1; destruct s2; simpl.
     apply In_inter_list.
@@ -613,7 +460,7 @@ Module Zset : ZFSET.
     f_equal.
     assumption.
   Qed.
- 
+
 (* Program Lemma elements__label_of_list:  *)
 (*   forall lst,  *)
 (*     elements (fold_left (fun a b => add b a) lst empty) = lst. *)
@@ -622,7 +469,7 @@ Module Zset : ZFSET.
 (*   simpl. rewrite add.    *)
 (*   => [| x xs IHxs].  *)
 
- 
+
 
 
 End Zset.
@@ -659,8 +506,44 @@ Proof.
 Defined.
 
 Definition Label := Zset.t.
-Notation "⊥" := bot.
-Definition flows_to (l1 l2:Label) : Z :=
-  if flows l1 l2 then 1%Z else 0%Z. 
-Definition label_of_list (l : list Z) := 
+Definition label_of_list (l : list Z) :=
   fold_left (fun a b => Zset.add b a) l Zset.empty.
+
+Definition allThingsBelow (l : Label) :=
+  map label_of_list (powerset (Zset.elements l)).
+
+Require Import ssreflect ssrbool.
+
+Lemma incl_empty : forall s, Zset.incl Zset.empty s.
+Proof.
+  move=> s. apply Zset.incl_spec. by rewrite Zset.elements_empty.
+Qed.
+
+Lemma incl_same : forall s, Zset.incl s s.
+Proof.
+  move => s.
+  by apply/Zset.incl_spec/incl_refl.
+Qed.
+
+(*
+Lemma forallb_indist :
+  forall (l : list frame),
+    forallb
+      (fun x : frame * frame =>
+         let (f1, f2) := x in indist Zset.empty f1 f2)
+      (combine l l).
+Proof.
+Abort.
+  case: x => valx labx. rewrite incl_same //=.
+  rewrite /isHigh /isLow .
+  case: (labx <: Zset.empty)=> //= .
+  case: valx => //=.
+  try (by rewrite /Z_eq; move => n ; case (Z.eq_dec n n)).
+  case. move => fp i. apply/andP. split => //.
+  rewrite /mframe_eq.
+  case: (Mem.EqDec_block fp fp) => //=.
+  congruence. by rewrite /Z_eq; case: (Z.eq_dec i i).
+  (by rewrite /Z_eq; move => n ; case (Z.eq_dec n n)).
+  move => L; apply/andP; split; apply incl_same.
+Qed.
+*)

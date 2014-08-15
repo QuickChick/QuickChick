@@ -23,7 +23,7 @@ Fixpoint upd_nat {A:Type} (l:list A) (n:nat) (a:A) : option (list A) :=
     | x::q =>
       match n with
         | O => Some (a::q)
-        | S p => 
+        | S p =>
           match upd_nat q p a with
             | None => None
             | Some q' => Some (x::q')
@@ -54,7 +54,7 @@ Infix "@" := Atm (no associativity, at level 50).
 
 Definition pc_lab (pc : Atom) : Label :=
   let (_,l) := pc in l.
-Notation "'∂' pc" := (pc_lab pc) (at level 0). 
+Notation "'∂' pc" := (pc_lab pc) (at level 0).
 
 Inductive Stack :=
   | Mty                         (* empty stack *)
@@ -95,25 +95,25 @@ Definition table := forall op, AllowModify (labelCount op).
 
 Definition default_table : table := fun op =>
   match op with
-  | OpBCall   =>  ≪ TRUE , LabPC , JOIN Lab1 LabPC≫ 
-  | OpBRet    =>  ≪ TRUE , JOIN Lab2 LabPC , Lab1 ≫ 
-  | OpNop     =>  ≪ TRUE , __ , LabPC ≫ 
-  | OpPush    =>  ≪ TRUE , BOT , LabPC ≫ 
-  | OpAdd     =>  ≪ TRUE , JOIN Lab1 Lab2, LabPC ≫ 
-  | OpLoad    =>  ≪ TRUE , JOIN Lab1 Lab2 , LabPC ≫ 
-  | OpStore   =>  ≪ LE (JOIN Lab1 LabPC) Lab3, JOIN LabPC (JOIN Lab1 Lab2) , LabPC ≫ 
+  | OpBCall   =>  ≪ TRUE , LabPC , JOIN Lab1 LabPC≫
+  | OpBRet    =>  ≪ TRUE , JOIN Lab2 LabPC , Lab1 ≫
+  | OpNop     =>  ≪ TRUE , __ , LabPC ≫
+  | OpPush    =>  ≪ TRUE , BOT , LabPC ≫
+  | OpAdd     =>  ≪ TRUE , JOIN Lab1 Lab2, LabPC ≫
+  | OpLoad    =>  ≪ TRUE , JOIN Lab1 Lab2 , LabPC ≫
+  | OpStore   =>  ≪ LE (JOIN Lab1 LabPC) Lab3, JOIN LabPC (JOIN Lab1 Lab2) , LabPC ≫
 end.
 
 Definition run_tmr (t : table) (op: OpCode)
   (labs:Vector.t Label (labelCount op)) (pc: Label)
-   : option (option Label * Label) :=  
+   : option (option Label * Label) :=
   let r := t op in
   apply_rule r labs pc.
 
 Definition bind (A B:Type) (f:A->option B) (a:option A) : option B :=
     match a with
       | None => None
-      | Some a => f a 
+      | Some a => f a
     end.
 Notation "'do' X <- A ; B" := (bind _ _ (fun X => B) A)
                     (at level 200, X ident, A at level 100, B at level 200).
@@ -123,7 +123,7 @@ Notation "'do' X : T <- A ; B" := (bind _ _ (fun X : T => B) A)
 Fixpoint insert_nat (s:Stack) (n:nat) (a:Atom) : option Stack :=
   match n,s with
     | O, _ => Some (a:::s)
-    | S n', x :: xs => 
+    | S n', x :: xs =>
       do s' <- insert_nat xs n' a;
       Some (x :: s')
     | _, _ => None
@@ -134,7 +134,7 @@ Fixpoint findRet (s:Stack) : option (Atom * Stack) :=
     | x ::: s' => Some (x,s')
     | x :: s'  => findRet s'
     | Mty      => None
-  end.                          
+  end.
 
 Definition insert (s:Stack) (n:Z) (a:Atom) : option Stack :=
   if Z_lt_dec n 0 then None
@@ -153,7 +153,7 @@ Definition exec (t : table) (st:State) : option State :=
           let ret_pc := (xpc + 1 @ rl) in
           do σ' <- insert σ n ret_pc;
           Some (St μ m σ' pc')
-        | _ => None 
+        | _ => None
       end
     | BRet, St μ m ((ax@al)::σ) (xpc@lpc) =>
       do tmp <- findRet σ;

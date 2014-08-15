@@ -13,7 +13,7 @@ Local Open Scope string.
 
 Instance show_label : Show Label :=
 {|
-  show lab := 
+  show lab :=
     match lab with
       | L => "L"
       | H => "H"
@@ -22,27 +22,27 @@ Instance show_label : Show Label :=
 
 Instance show_instruction : Show Instruction :=
 {|
-  show x := 
+  show x :=
     match x with
       | Nop     => "Nop"
-      | Push  n => "Push " ++ show n 
+      | Push  n => "Push " ++ show n
       | BCall n => "BCall " ++ show n
       | BRet    => "BRet"
       | Add     => "Add"
-      | Load    => "Load"                    
+      | Load    => "Load"
       | Store   => "Store"
-    end 
+    end
 |}.
 
-Fixpoint numed_contents {A : Type} (s : A -> string) (l : list A) (n : nat) 
+Fixpoint numed_contents {A : Type} (s : A -> string) (l : list A) (n : nat)
 : string :=
-  match l with 
+  match l with
     | nil => ""%string
     | cons h t => show n ++ " : " ++ s h ++ nl ++ (numed_contents s t (S n))
   end.
 
 Definition par (s : string) := "( " ++ s ++ " )".
-   
+
 Instance show_atom : Show Atom :=
 {|
   show a :=
@@ -57,8 +57,8 @@ Instance show_list {A : Type} `{_ : Show A} : Show (list A) :=
 
 Instance show_stack : Show Stack :=
 {|
-  show s := 
-    let fix aux s := 
+  show s :=
+    let fix aux s :=
         match s with
           | a :: s' => show a ++ " : " ++ aux s'
           | a ::: s' => "R " ++ show a ++ " : " ++ aux s'
@@ -79,7 +79,7 @@ Definition show_variation (s1 s2 : string) :=
 Instance show_int_pair : ShowPair Z :=
 {|
   show_pair v1 v2 :=
-    if Z.eqb v1 v2 then show v1 
+    if Z.eqb v1 v2 then show v1
     else show_variation (show v1) (show v2)
 |}.
 
@@ -95,19 +95,19 @@ Instance show_atom_pair : ShowPair Atom :=
   show_pair a1 a2 :=
     let '(v1 @ l1) := a1 in
     let '(v2 @ l2) := a2 in
-    show_pair v1 v2 ++ " @ " 
+    show_pair v1 v2 ++ " @ "
     ++ show_pair l1 l2
 |}.
 
 Instance show_mem_pair : ShowPair Mem :=
 {|
   show_pair m1 m2 :=
-    numed_contents (fun (xy : Atom * Atom) => 
+    numed_contents (fun (xy : Atom * Atom) =>
                       let (x,y) := xy in show_pair x y) (combine m1 m2) 0
 |}.
 
-Fixpoint total_stack_length s := 
-  match s with 
+Fixpoint total_stack_length s :=
+  match s with
     | _ :: s' => S (total_stack_length s')
     | _ ::: s' => S (total_stack_length s')
     | _ => O
@@ -117,22 +117,22 @@ Instance show_stack_pair : ShowPair Stack :=
 {|
   show_pair s1 s2 :=
     let len1 := total_stack_length s1 in
-    let len2 := total_stack_length s2 in 
-    let fix show_until s n := 
-        match n with 
-          | O => ("",s) 
-          | S n' => 
+    let len2 := total_stack_length s2 in
+    let fix show_until s n :=
+        match n with
+          | O => ("",s)
+          | S n' =>
             match s with
-              | x :: s' => 
+              | x :: s' =>
                 let (str, sf) := show_until s' n' in
                 (show x ++ " : " ++ str, sf)
-              | x ::: s' => 
+              | x ::: s' =>
                 let (str, sf) := show_until s' n' in
                 ("R " ++ show x ++ " : " ++ str, sf)
               | Mty => ("error: Mty", Mty)
             end
         end in
-    let '(prefix,(s1,s2)) := 
+    let '(prefix,(s1,s2)) :=
         if ltb len1 len2 then
           let (show_pre, s2') := show_until s2 (len2 - len1)%nat in
           ("Bigger part of 2: " ++ nl ++ show_pre ++ nl, (s1, s2'))
@@ -141,7 +141,7 @@ Instance show_stack_pair : ShowPair Stack :=
           ("Bigger part of 1: " ++ nl ++ show_pre ++ nl, (s1', s2))
         else ("", (s1,s2))
     in
-    let fix aux s1 s2 := 
+    let fix aux s1 s2 :=
         match s1, s2 with
           | a1::s1', a2::s2' => show_pair a1 a2 ++ " : " ++ aux s1' s2'
           | a1:::s1', a2:::s2' => "R " ++ show_pair a1 a2 ++ " : " ++ aux s1' s2'
@@ -164,6 +164,6 @@ Instance show_state_pair : ShowPair State :=
 
 Instance show_var {A} `{_ :ShowPair A} : Show (@Variation A) :=
 {|
-  show x := 
+  show x :=
     let '(V x1 x2) := x in show_pair x1 x2
 |}.

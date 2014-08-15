@@ -36,7 +36,7 @@ Instance indist_mem : Indist Mem :=
 
 Fixpoint cropTop (s:Stack) : Stack :=
   match s with
-    | Mty        => Mty 
+    | Mty        => Mty
     | x::s'      => cropTop s'
     | (x@H:::s') => cropTop s'
     | (_@L:::_)  => s
@@ -45,7 +45,7 @@ Fixpoint cropTop (s:Stack) : Stack :=
 (* Assumes stacks have been cropTopped! *)
 Instance indist_stack : Indist Stack :=
 {|
-  indist s1 s2 := 
+  indist s1 s2 :=
     let fix aux s1 s2 :=
         match s1, s2 with
           | a1::s1', a2::s2' => indist a1 a2 && aux s1' s2'
@@ -63,8 +63,8 @@ Instance indist_state : Indist State :=
     let '(St imem2 mem2 stk2 pc2) := st2 in
     if negb (indist mem1 mem2) then (* trace "Memory" *) false
     else if negb (indist pc1 pc2) then (* trace "PC" *) false
-    else let (stk1',stk2') := 
-           match pc1 with 
+    else let (stk1',stk2') :=
+           match pc1 with
              | _ @ H => (cropTop stk1, cropTop stk2)
              | _ => (stk1, stk2)
            end in

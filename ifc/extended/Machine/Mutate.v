@@ -1,5 +1,6 @@
 Require Import List. Import ListNotations.
 Require Import Rules.
+Require Import Instructions.
 Require Import Machine.
 
 Set Implicit Arguments.
@@ -119,7 +120,7 @@ Definition mutate_rule n (r : AllowModify n) : list (AllowModify n) :=
   (List.map (fun pc' => almod a res pc') (mutate_expr pc)).
 
 (* Printing
-Eval cbv in (mutate_rule 
+Eval cbv in (mutate_rule
   (≪ AND (LE Lab2 LabPC) (LE (JOIN LabPC (JOIN Lab1 Lab2)) Lab3),
      JOIN Lab1 Lab2, LabPC ≫)).
 *)

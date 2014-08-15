@@ -41,7 +41,7 @@ Inductive low_equiv_atom (o: Label) : relation Atom :=
   low_equiv_atom o (v1@l1) (v2@l2).
 Hint Constructors low_equiv_atom.
 
-Lemma low_equiv_atom_equal: 
+Lemma low_equiv_atom_equal:
   forall (a b: Value) (k l:Label) (o:Label), k <: o = true ->
     low_equiv_atom o (a@k) (b@l) -> a = b.
 Proof.
@@ -95,7 +95,7 @@ Proof.
   try (assert (v'=v) by congruence; subst); econstructor; auto with lat.
 Qed.
 
-(* TODO : Stacks 
+(* TODO : Stacks
 Inductive low_equiv_stkelt (o: Label) : StkElmt Label Label -> StkElmt Label Label -> Prop :=
 | le_data : forall a1 a2
   (LEa: low_equiv_atom o a1 a2),
@@ -467,11 +467,11 @@ Definition low_equiv_frame (o : Label) : relation frame :=
   fun f1 f2 =>
     match f1, f2 with
       | Fr st1 lab1 d1, Fr st2 lab2 d2 =>
-        
+
         Forall2 (low_equiv_atom o))
                     (Mem.get_frame m1 b) (Mem.get_frame m2 b) )
 
-        Forall2 
+        Forall2
 
 (* Low-equivalent memories:
    (1) low-equivalence of frames pointed to by low blocks
