@@ -14,8 +14,6 @@ Require Export Machine.
 
 Module Lab4M <: FINLAT.
   Definition Label := Lab4.
-  Definition JSLat := JoinSemiLattice_Lab4.
-  Definition Lat   := Lattice_Lab4.
   Definition FLat  := FiniteLattice_Lab4.
 End Lab4M.
 

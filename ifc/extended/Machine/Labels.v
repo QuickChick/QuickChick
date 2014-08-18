@@ -123,14 +123,16 @@ Instance LatEqDec (T : Type) {Lat : JoinSemiLattice T} : EqDec T eq.
     right. congruence.
 Defined.
 
-Class Lattice (Lab: Type) `{JoinSemiLattice Lab} :=
-{ top : Lab
+Class Lattice (Lab: Type) :=
+{ jslat :> JoinSemiLattice Lab
+; top : Lab
 ; flows_top : forall l, l <: top
 }.
 
-Class FiniteLattice (Lab : Type) `{Lattice Lab} :=
+Class FiniteLattice (Lab : Type) :=
 {
-  elems : list Lab
+  lat :> Lattice Lab
+; elems : list Lab
 ; all_elems : forall l : Lab, In l elems
 }.
 
