@@ -8,7 +8,7 @@ Definition Property := Property Pred.
 Definition resultCorrect (r : Result) : bool :=
   match r with
     | MkResult (Some res) expected _ _ _ _ =>
-      res == expected
+      if res then true else ~~expected
     | _ => true
   end.
 
@@ -23,63 +23,59 @@ Definition semProperty (P : Property) : Prop :=
 
 (* Maps a Testable to a Prop i.e. gives an equivalent proposition to the
    property under test *)
-
 Definition semTestable {A : Type} {_ : Testable  A} (a : A) : Prop :=
   semProperty (property a).
 
-(* Lemmas about idempotent combinators i.e. combinators that do not change
-   the testing outcome *)
-
-Lemma mapTotalResult_idemp:
+Lemma mapTotalResult_id:
   forall {prop : Type} {H : Testable prop} (f : Result -> Result) (p : prop),
     (forall res, resultCorrect res = resultCorrect (f res)) ->
-    ((semTestable p) <-> (semProperty (mapTotalResult f p))).
+    ((semProperty (mapTotalResult f p)) <-> (semTestable p)).
 Proof.
   move => prop H f p Hyp.
   rewrite /semTestable  /mapTotalResult /mapRoseResult /mapProp /semProperty.
   split.
-  - move => H1 qp [qp' [/H1 Hprop H2]].
-    rewrite /returnP in H2. subst. rewrite /failure.
-    destruct qp' as [[]]. simpl in *. by rewrite -Hyp.
   - move=> H1 qp Hprop.
+    rewrite fmapGen_def in H1.
     set qp' :=
       match qp with
         | {| unProp := t |} => {| unProp := fmapRose f t |}
       end.
     have: failure qp' = false.
-    { apply H1. rewrite fmapGen_def. exists qp; split => //. }
+    { apply H1. exists qp; split => //. }
     destruct qp as [[]]. simpl in *. by rewrite -Hyp.
+  - move => H1 qp [qp' [/H1 Hprop H2]].
+    rewrite /returnP in H2. subst. rewrite /failure.
+    destruct qp' as [[]]. simpl in *. by rewrite -Hyp.
 Qed.
 
-
-Lemma semCallback_idemp:
+Lemma semCallback_id:
   forall {prop : Type} {H : Testable prop} (cb : Callback) (p : prop),
     semProperty (callback cb p) <-> semTestable p.
 Proof.
   move => prop tp cb p. rewrite /callback.
   split; move => H.
-  - apply mapTotalResult_idemp in H => //;
+  - apply mapTotalResult_id in H => //;
     by move => [? ? ? ? ? ?].
-  - apply mapTotalResult_idemp => //;
+  - apply mapTotalResult_id => //;
     by move => [? ? ? ? ? ?].
 Qed.
 
-Lemma semWhenFail_idemp:
+Lemma semWhenFail_id:
   forall {prop : Type} {H : Testable prop} (s : String.string) (p : prop),
     semProperty (whenFail s p) <-> semTestable p.
 Proof.
-  move => prop H s p. by rewrite /whenFail semCallback_idemp.
+  move => prop H s p. by rewrite /whenFail semCallback_id.
 Qed.
 
 
-Lemma semPrintTestCase_idemp:
+Lemma semPrintTestCase_id:
   forall {prop: Type} {tp : Testable prop} (s: String.string) (p: prop),
     semProperty (printTestCase s p) <-> semTestable p.
 Proof.
-  move => prop tp s p. by rewrite /printTestCase semCallback_idemp.
+  move => prop tp s p. by rewrite /printTestCase semCallback_id.
 Qed.
 
-Lemma semShrinking_idemp_aux:
+Lemma semShrinking_id_aux:
   forall {prop A : Type} {H : Testable prop}
          (shrinker : A -> list A) (x0 : A) (pf : A -> prop) n,
     semProperty (fmapGen (fun x => MkProp (joinRose (fmapRose unProp x)))
@@ -102,84 +98,85 @@ Proof.
       apply Hfail.  by destruct qp' as [[[] []]].
 Qed.
 
-
-Lemma semShrinking_idemp:
+Lemma semShrinking_id:
   forall {prop A : Type} {H : Testable prop}
          (shrinker : A -> list A) (x0 : A) (pf : A -> prop),
     semProperty (shrinking shrinker x0 pf) <->
     semTestable (pf x0).
 Proof.
   move=> prop A H shrinker x0 pf.
-  rewrite /shrinking /props. apply semShrinking_idemp_aux.
+  rewrite /shrinking /props. apply semShrinking_id_aux.
 Qed.
 
-Lemma semCover_idemp:
+Lemma semCover_id:
   forall {prop : Type} {H : Testable prop} (b: bool) (n: nat)
          (s: String.string) (p : prop),
     semProperty (cover b n s p) <-> semTestable p.
 Proof.
   move=> prop H b n s p. split.
   - rewrite /cover. case: b => //.
-    move => H1. apply mapTotalResult_idemp in H1 => //.
+    move => H1. apply mapTotalResult_id in H1 => //.
       by move => [? ? ? ? ? ?].
   - move => H1. rewrite /cover. case: b => //.
-    apply mapTotalResult_idemp => //.
+    apply mapTotalResult_id => //.
       by move => [? ? ? ? ? ?].
 Qed.
 
-Lemma semClassify_idemp:
+Lemma semClassify_id:
    forall {prop : Type} {H : Testable prop} (b: bool) (s: String.string)
           (p : prop),
     semProperty (classify b s p) <-> semTestable p.
 Proof.
-  move=> prop H b s p. by rewrite /classify semCover_idemp.
+  move=> prop H b s p. by rewrite /classify semCover_id.
 Qed.
 
-Lemma semLabel_idemp:
+Lemma semLabel_id:
    forall {prop : Type} {H : Testable prop} (s: String.string)
           (p : prop),
     semProperty (label s p) <-> semTestable p.
 Proof.
-  move=> prop H s p. by rewrite /label semClassify_idemp.
+  move=> prop H s p. by rewrite /label semClassify_id.
 Qed.
 
-Lemma semCollect_idemp:
+Lemma semCollect_id:
    forall {prop : Type} {H : Testable prop} (s: String.string)
           (p : prop),
     semProperty (collect s p) <-> semTestable p.
 Proof.
-  move=> prop H s p. by rewrite /collect semLabel_idemp.
+  move=> prop H s p. by rewrite /collect semLabel_id.
 Qed.
 
 
 (* equivalences for other combinators *)
 
 Lemma semBindGen:
-  forall {A} (gen : Pred A) (p : A -> Property),
+  forall {A } (gen : Pred A) (p : A -> Property),
     semProperty (bindGen gen p) <-> forall g, gen g -> semProperty (p g).
 Proof.
   move=> A gen prop. rewrite /semProperty. split.
-  - move => H g Hgen qp Hprop. apply H.
-    rewrite bindGen_def. exists g. split => //.
+  - move => H g Hgen qp Hprop. apply H.  
+    eexists. split; eassumption. 
   - move => H qp [a [Hgen Hprop]]. eauto.
 Qed.
 
-Definition promotePt {M : Type -> Type} {A : Type}
-           (m : Rose (Pred A)) : Pred (Rose A) :=
-  fun (ma : Rose A) =>
-    match m with
-        | MkRose pred _ =>
-          match ma with
-            | MkRose a _ => pred a
-          end
-    end.
-
 Lemma semReturnGen:
   forall (p : QProp),
-    semProperty (returnGen p) <-> semProperty (property p).
+    semProperty (returnGen p) <-> semTestable p.
 Proof.
   move=> p. rewrite /semProperty. split;
   move => H qp Hprop; auto.
+Qed.
+
+Lemma semPredQProp:
+  forall (p : Pred QProp), semTestable p <-> (semProperty p).
+Proof.
+   move=> p.
+  rewrite /semTestable /property /testGenProp /property /testProp semBindGen.
+  split.
+  - move => H pq /H Hgen. rewrite returnGen_def /semProperty in Hgen.
+    by apply Hgen.
+  - move => H pq Hgen. rewrite returnGen_def /semProperty.
+    move => qp Heq; subst. rewrite /semProperty in H. by auto.
 Qed.
 
 Lemma semForAll :
@@ -190,21 +187,9 @@ Lemma semForAll :
 Proof.
   move => A prop Htest show gen pf. split => H'.
   - rewrite /forAll in H'. move/semBindGen : H' => H' a /H' Hgen.
-    by apply semPrintTestCase_idemp in Hgen.
+    by apply semPrintTestCase_id in Hgen.
   - rewrite /forAll in H' *. apply semBindGen => g Hgen.
-    rewrite semPrintTestCase_idemp. by apply H'.
-Qed.
-
-Lemma semPredQProp:
-  forall (p : Pred QProp), semTestable p <-> (semProperty p).
-Proof.
-(*  by *) move=> p.
-  rewrite /semTestable /property /testGenProp /property /testProp semBindGen.
-  split.
-  - move => H pq /H Hgen. rewrite returnGen_def /semProperty in Hgen.
-    by apply Hgen.
-  - move => H pq Hgen. rewrite returnGen_def /semProperty.
-    move => qp Heq; subst. rewrite /semProperty in H. by auto.
+    rewrite semPrintTestCase_id. by apply H'.
 Qed.
 
 Lemma semForAllShrink:
@@ -215,39 +200,39 @@ Lemma semForAllShrink:
 Proof.
   move => A prop H show gen pf shrink. split.
   - rewrite /forAllShrink semBindGen.
-    move=> H' a /H' Hgen. setoid_rewrite semShrinking_idemp in Hgen.
+    move=> H' a /H' Hgen. setoid_rewrite semShrinking_id in Hgen.
     setoid_rewrite semPredQProp in Hgen.
-    by apply semPrintTestCase_idemp in Hgen.
+    by apply semPrintTestCase_id in Hgen.
   - move=> H'. rewrite /forAllShrink semBindGen. move => a g.
-    rewrite semShrinking_idemp. apply semPredQProp.
-    rewrite semPrintTestCase_idemp. by auto.
+    rewrite semShrinking_id. apply semPredQProp.
+    rewrite semPrintTestCase_id. by auto.
 Qed.
 
 (* equivalent Props for Testables *)
 
 Lemma semBool:
-  forall (b : bool), b <-> semTestable b.
-Proof.
+  forall (b : bool), semTestable b <-> b.
+Proof.  
   move => b. case: b.
   - split => //. compute.
     by move => _ qp Heq; subst.
-  - split => //. compute.
-    set qp := {| unProp := returnRose (updReason failed "Falsifiable") |}.
-    move/(_ qp) => H. symmetry. apply H. reflexivity.
+  - split => //. rewrite /semTestable /semProperty. move => H.
+    simpl in H.  rewrite /returnP /= in H. 
+    by specialize (H _ Logic.eq_refl).
 Qed.
 
 Lemma semResult:
-  forall (res: Result), resultCorrect res = true <-> semTestable res.
+  forall (res: Result),  semTestable res <-> resultCorrect res = true.
 Proof.
   rewrite /semTestable /property /testResult /semProperty.
   move => res. split.
-  + move=> H [[res' l]] [Heq1 Heq2]; subst. by rewrite /failure H.
   + move=> /(_ ({| unProp := returnRose res |})) /= H.
     apply Bool.negb_false_iff. by apply H.
+  + move=> H [[res' l]] [Heq1 Heq2]; subst. by rewrite /failure H.
 Qed.
 
 Lemma semUnit:
-  forall (t: unit), True <-> semTestable t.
+  forall (t: unit), semTestable t <-> True.
 Proof.
   move => t. split => // _. compute.
   by move => qp Heq; subst.
@@ -255,26 +240,26 @@ Qed.
 
 Lemma semQProp:
   forall (qp: QProp),
-    failure qp = false <-> semTestable qp.
+    semTestable qp <-> failure qp = false.
 Proof.
   move => qp. rewrite /semTestable /semProperty /property
                       /testProp returnGen_def.
   split.
-  - by move => H qp' Heq; subst.
   - auto.
+  - by move => H qp' Heq; subst.
 Qed.
 
 Lemma semGen:
   forall (P : Type) {H : Testable P} (gen: Pred P),
-    (forall p, gen p -> semTestable p) <-> (semTestable gen).
+    (semTestable gen) <-> (forall p, gen p -> semTestable p).
 Proof.
   move=> P H gen. split.
-  - move => H'. rewrite /semTestable /semProperty. move=> qp prop.
-    rewrite /property /testGenProp in prop. move : prop => [p [/H' Hgen Hprop]].
-    rewrite /semTestable /semProperty in Hgen. by auto.
   - move=> Hsem qp Hgen. rewrite /semTestable /semProperty in Hsem *.
     move => qp' Hprop. apply Hsem. rewrite /property /testGenProp bindGen_def.
     exists qp. split => //.
+  - move => H'. rewrite /semTestable /semProperty. move=> qp prop.
+    rewrite /property /testGenProp in prop. move : prop => [p [/H' Hgen Hprop]].
+    rewrite /semTestable /semProperty in Hgen. by auto.
 Qed.
 
 Lemma semFun:
@@ -293,18 +278,18 @@ Qed.
 (* I think this is the strongest property we can get for polymorphic functions *)
 Lemma semPolyFun:
   forall {prop : Type -> Type} {H : Testable (prop nat)} (f : forall T, prop T),
-    (semTestable (f nat)) <-> (semTestable f).
+    (semTestable f) <-> (semTestable (f nat)).
 Proof.
   move => prop H f. rewrite /semTestable {2}/property /testPolyFun.
-  by rewrite semPrintTestCase_idemp.
+  by rewrite semPrintTestCase_id.
 Qed.
 
 Lemma semPolyFunSet:
   forall {prop : Set -> Type} {H : Testable (prop nat)} (f : forall T, prop T),
-    (semTestable (f nat)) <-> (semTestable f).
+    (semTestable f) <->  (semTestable (f nat)).
 Proof.
   move => prop H f. rewrite /semTestable {2}/property /testPolyFun.
-  by rewrite semPrintTestCase_idemp.
+  by rewrite semPrintTestCase_id.
 Qed.
 
 (* A typeclass so we can automate the application of the previous theorems
@@ -321,7 +306,7 @@ Program Instance proveResult : Provable Result :=
     semProp := resultCorrect
   |}.
 Next Obligation.
-  by apply semResult.
+  by rewrite semResult.
 Qed.
 
 Program Instance proveUnit : Provable unit :=
@@ -329,7 +314,7 @@ Program Instance proveUnit : Provable unit :=
     semProp := fun _ => True
   |}.
 Next Obligation.
-  by apply semUnit.
+  by rewrite semUnit.
 Qed.
 
 Program Instance proveQProp : Provable QProp :=
@@ -337,7 +322,7 @@ Program Instance proveQProp : Provable QProp :=
     semProp qp := failure qp = false
   |}.
 Next Obligation.
-  by apply semQProp.
+  by rewrite semQProp.
 Qed.
 
 Program Instance proveBool : Provable bool :=
@@ -345,7 +330,7 @@ Program Instance proveBool : Provable bool :=
     semProp b :=  b = true
   |}.
 Next Obligation.
-  by apply semBool.
+  by rewrite semBool.
 Qed.
 
 Program Instance proveGenProp {prop : Type} `{Provable prop} :

@@ -161,8 +161,8 @@ Qed.
 
 Lemma choose_def :
   forall {A} `{Random A} (p : A * A),
-    @choose Pred _ _ _ _ p = fun (a : A) => Random.leq (fst p) a /\
-                                            Random.leq a (snd p).
+    @choose Pred _ _ _ p = fun (a : A) => Random.leq (fst p) a /\
+                                          Random.leq a (snd p).
 Proof.
   by rewrite /choose.
 Qed.

@@ -46,8 +46,9 @@ Program Instance OrdZ : OrdType Z :=
   }.
 
 
-Class Random (A : Type) {O : OrdType A}  :=
+Class Random (A : Type)  :=
   {
+    super :> OrdType A;
     randomR : A * A -> RandomGen -> A * RandomGen
   }.
 
@@ -56,7 +57,7 @@ Instance Randombool : Random bool :=
   {
     randomR := randomRBool
   }.
-
+ 
 Instance Randomnat : Random nat :=
   {
     randomR := randomRNat

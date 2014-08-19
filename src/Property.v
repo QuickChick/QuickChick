@@ -52,10 +52,11 @@ Definition addCallback (res : Result) (c : Callback) : Result :=
     | MkResult o e r i s cs => MkResult o e r i s (cons c cs)
   end.
 
-Record QProp : Type := MkProp
-                         {
-                           unProp : Rose Result
-                         }.
+Record QProp : Type := 
+  MkProp
+    {
+      unProp : Rose Result
+    }.
 
 Definition failure qp :=
   match qp with
@@ -66,8 +67,7 @@ Definition failure qp :=
 Definition Property (Gen: Type -> Type) : Type := Gen QProp.
 
 Section Property.
-  Context
- {Gen : Type -> Type}
+  Context {Gen : Type -> Type}
           {H: GenMonad Gen}.
 
   Class Testable (A : Type) : Type :=
@@ -75,21 +75,36 @@ Section Property.
       property : A -> Property Gen
     }.
 
+  (* mapping and lifting functions *)
 
+  Definition liftBool (b : bool) : Result :=
+    if b then succeeded else updReason failed "Falsifiable".
+
+  Definition mapProp {P : Type} {_ : Testable P}
+             (f : QProp -> QProp) (prop : P) : Property Gen :=
+    fmapGen f (property prop).
+
+  Definition mapRoseResult {P : Type} {_ : Testable P}
+             (f : Rose Result -> Rose Result) (prop : P) : Property Gen :=
+    mapProp (fun p => match p with MkProp t => MkProp (f t) end) prop.
+
+  Definition mapTotalResult {prop : Type} {_ : Testable prop}
+             (f : Result -> Result) : prop -> Property Gen :=
+    mapRoseResult (fmapRose f).
+
+  (* Testable Instances *)
   Global Instance testResult : Testable Result :=
     {|
       (* Left a protectResults out! *)
       property r := returnGen (MkProp (returnRose r))
     |}.
-
-  Definition liftBool (b : bool) : Result :=
-    if b then succeeded else updReason failed "Falsifiable".
+  
 
   Global Instance testBool : Testable bool :=
     {|
       property b := property (liftBool b)
     |}.
-
+  
   (* ZP/CH: what's the relation between unit and discards? *)
   Global Instance testUnit : Testable unit :=
     {|
@@ -106,45 +121,14 @@ Section Property.
       property p := bindGen p property
     |}.
 
-  (* Sometimes it cannot infer this one ...
-  Global Instance testProperty : Testable (Property Gen) | 0  :=
-    {|
-      property p := p
-    |}.
-*)
-
-  (* Left out exception handling!
-   property p :=
-    match p with
-      | MkProp r => returnGen r
-    end
-  |}.*)
-
-  Definition mapProp {P : Type} {_ : Testable P}
-             (f : QProp -> QProp) (prop : P) : Property Gen :=
-    fmapGen f (property prop).
-
-  Definition mapRoseResult {P : Type} {_ : Testable P}
-             (f : Rose Result -> Rose Result) (prop : P) : Property Gen :=
-    mapProp (fun p => match p with MkProp t => MkProp (f t) end) prop.
-
-  Definition mapTotalResult {prop : Type} {_ : Testable prop}
-             (f : Result -> Result) : prop -> Property Gen :=
-    mapRoseResult (fmapRose f).
-
-  Definition callback {prop : Type} {_ : Testable prop}
-             (cb : Callback) : prop -> Property Gen :=
-    mapTotalResult (fun r => addCallback r cb).
-
-  Definition whenFail {prop : Type} {_ : Testable prop}
-             (str : string) : prop -> Property Gen :=
-    callback (PostFinalFailure Counterexample (fun _st _sr => trace str 0)).
-
+  
+  (* Property Combinators *)
+  
   (* The following function on its own does not have a decreasing argument...
 
-Fixpoint props {prop A : Type} {t : Testable prop}
-         (pf : A -> prop) (shrinker : A -> list A) (x : A) :=
-  MkRose (property (pf x)) (List.map (props pf shrinker) (shrinker x)).
+     Fixpoint props {prop A : Type} {t : Testable prop}
+                    (pf : A -> prop) (shrinker : A -> list A) (x : A) :=
+       MkRose (property (pf x)) (List.map (props pf shrinker) (shrinker x)).
    *)
   Fixpoint props' {prop A : Type} {t : Testable prop} (n : nat)
            (pf : A -> prop) (shrinker : A -> list A) (x : A) :=
@@ -156,48 +140,34 @@ Fixpoint props {prop A : Type} {t : Testable prop}
     end.
 
   (* Arbitrary choice for number of shrinks.. *)
-  Definition props {prop A : Type} {t : Testable prop}
+  Definition props {prop A : Type} `{Testable prop}
              (pf : A -> prop) (shrinker : A -> list A) (x : A) : Rose (Property Gen) :=
     props' 1000 pf shrinker x.
 
-  Definition printTestCase {prop : Type} {tp : Testable prop}
-             (s : string) (p : prop) : Property Gen :=
-    callback (PostFinalFailure Counterexample (fun _st _res => trace s 0)) p.
-
-  Definition shrinking {prop A : Type} {_ : Testable prop}
+  Definition shrinking {prop A : Type} `{Testable prop}
              (shrinker : A -> list A) (x0 : A) (pf : A -> prop) : Property Gen :=
     @fmapGen Gen _ _ _ (fun x => MkProp (joinRose (fmapRose unProp x)))
              (promote (props pf shrinker x0)).
 
-  Definition forAllShrink {A prop : Type} {_ : Testable prop}
-             (show : A -> string)
-             (gen : Gen A) (shrinker : A -> list A) (pf : A -> prop) : Property Gen :=
-    bindGen gen (fun x =>
-                   shrinking shrinker x (fun x' =>
-                                           printTestCase (show x' ++ newline) (pf x'))).
+  Definition callback {prop : Type} `{Testable prop}
+             (cb : Callback) : prop -> Property Gen :=
+    mapTotalResult (fun r => addCallback r cb).
 
-  Definition forAll {A prop : Type} {_ : Testable prop}
-             (show : A -> string) (gen : Gen A)  (pf : A -> prop) : Property Gen :=
-    bindGen gen (fun x =>
-                   printTestCase (show x ++ newline) (pf x)).
+  Definition printTestCase {prop : Type} `{Testable prop}
+             (s : string) (p : prop) : Property Gen :=
+    callback (PostFinalFailure Counterexample (fun _st _res => trace s 0)) p.
 
-  Global Instance testFun {A prop : Type} {_ : Show A}
-         {_ : Arbitrary A} {_ : Testable prop} : Testable (A -> prop) :=
-    {
-      property f := forAllShrink show arbitrary shrink f
-    }.
+  Definition whenFail {prop : Type} `{Testable prop}
+             (str : string) : prop -> Property Gen :=
+    callback (PostFinalFailure Counterexample (fun _st _sr => trace str 0)).
 
-  Global Instance testPolyFun {prop : Type -> Type} {_ : Testable (prop nat)} : Testable (forall T, prop T) :=
-    {
-      property f := printTestCase "" (f nat)
-    }.
 
-  Global Instance testPolyFunSet {prop : Set -> Type} {_ : Testable (prop nat)} : Testable (forall T, prop T) :=
-    {
-      property f := printTestCase "" (f nat)
-    }.
+  Definition expectFailure (prop: Type) `{Testable prop} (p: prop) := 
+    mapTotalResult (fun res =>
+                      MkResult (ok res) true (reason res) 
+                             (interrupted res) (stamp res) (callbacks res))
+                   p.
 
-  (* Test Case Distribution *)
   Definition cover {prop : Type} {_ : Testable prop}
              (b : bool) (n : nat) (s : string) : prop -> Property Gen :=
     if b then
@@ -217,5 +187,41 @@ Fixpoint props {prop A : Type} {t : Testable prop}
   Definition collect {A prop : Type} `{_ : Show A} {_ : Testable prop}
              (x : A) : prop -> Property Gen :=
     label (show x).
+
+
+  Definition implication {prop : Type} `{Testable prop} (b : bool) (p : prop) :=
+    if b then property p else property rejected.
+       
+  Notation "x ==> y" := (implication x y) (at level 70, right associativity) 
+                        : property_scope.
+ 
+  Definition forAll {A prop : Type} {_ : Testable prop}
+             (show : A -> string) (gen : Gen A)  (pf : A -> prop) : Property Gen :=
+    bindGen gen (fun x =>
+                   printTestCase (show x ++ newline) (pf x)).
+
+   Definition forAllShrink {A prop : Type} {_ : Testable prop}
+             (show : A -> string)
+             (gen : Gen A) (shrinker : A -> list A) (pf : A -> prop) : Property Gen :=
+    bindGen gen (fun x =>
+                   shrinking shrinker x (fun x' =>
+                                           printTestCase (show x' ++ newline) (pf x'))).
+
+  Global Instance testFun {A prop : Type} {_ : Show A}
+         {_ : Arbitrary A} {_ : Testable prop} : Testable (A -> prop) :=
+    {
+      property f := forAllShrink show arbitrary shrink f
+    }.
+
+  Global Instance testPolyFun {prop : Type -> Type} {_ : Testable (prop nat)} : Testable (forall T, prop T) :=
+    {
+      property f := printTestCase "" (f nat)
+    }.
+
+  Global Instance testPolyFunSet {prop : Set -> Type} {_ : Testable (prop nat)} : Testable (forall T, prop T) :=
+    {
+      property f := printTestCase "" (f nat)
+    }.
+
 
 End Property.
