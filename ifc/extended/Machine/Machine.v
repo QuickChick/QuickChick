@@ -63,8 +63,6 @@ end.
 
 Module Type FINLAT.
   Parameter Label : Type.
-  Parameter JSLat : JoinSemiLattice Label.
-  Parameter Lat   : Lattice Label.
   Parameter FLat  : FiniteLattice Label.
 End FINLAT.
 
