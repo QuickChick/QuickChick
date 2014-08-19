@@ -3,7 +3,7 @@ Require Import ZArith.
 Require Import EquivDec.
 
 Require Import QuickChick.
-
+ 
 Require Import Common Indist Generation.
 Require Import SetOfOutcomes GenerationProofsHelpers.
 
@@ -13,13 +13,14 @@ Lemma gen_from_length_correct: forall l,
   (gen_from_length l) <--> (fun z => (Z.le 0 z /\ Z.le z (l-1))).
 Proof.
   move => l z. rewrite /gen_from_length choose_def.
-  split => [[/Z.compare_le_iff H1 /Z.compare_ge_iff H2]|
-            [/Z.compare_le_iff H1 /Z.compare_ge_iff H2]];
-    by split; auto.
+  split => [[/= H1 H2 ]| [H1 H2]].  
+  split; by apply Zle_bool_imp_le.
+  split; by apply Zle_imp_le_bool.
 Qed.
 
 Lemma gen_from_nat_length_correct: forall l,
-  (gen_from_nat_length l) <--> (fun z => (Z.le 0 z /\ Z.le z ((Z.of_nat l)-1))).
+  (gen_from_nat_length l) <--> 
+  (fun z => (Z.le 0 z /\ Z.le z ((Z.of_nat l)-1))).
 Proof.
   move => l z.
   rewrite /gen_from_nat_length.
@@ -35,20 +36,7 @@ Proof.
   case : op; [exists (pure BAdd) | exists (pure BMult)]; split => //=;
   [|right]; by left.
 Qed.
-
-(*
-Lemma gen_label_correct :
-  forall (l : Label),
-    (gen_label l) <--> (fun e => In e (allThingsBelow l)).
-Proof.
-  move=> l. rewrite /gen_label. move => l'.
-  split => [/elements_equiv [H1 | [H1 H2]] //= | HIn]; subst.
-  + rewrite /allThingsBelow  /allBelow in H1. apply map_eq_nil in H1.
-    by move/powerset_nonempty : H1.
-  + apply elements_equiv. by left.
-Qed.
-*)
-
+ 
 Lemma gen_label_correct : gen_label <--> all.
 Proof.
   rewrite /gen_label /all => l. split => [|?] //=.
@@ -59,14 +47,6 @@ Section WithDataLenNonEmpty.
 
 Variable inf : Info.
 Hypothesis data_len_nonempty : data_len inf <> [].
-
-(*
-Lemma gen_label_inf_correct :
-  (gen_label_inf inf) <--> (fun e => In e (allThingsBelow (top_prin inf))).
-Proof.
-  apply/gen_label_correct.
-Qed.
-*)
 
 (* PC *)
 
@@ -121,8 +101,8 @@ Proof.
        apply/elements_equiv.
        by left; rewrite -HeqInf in HIn.
        rewrite bindGen_def.
-       exists z. split => //. split. by apply/Z.compare_le_iff.
-       by apply/Z.compare_ge_iff.
+       exists z. split => //. split;
+       by apply Zle_imp_le_bool.
 Qed.
 
 (* Value *)
@@ -131,7 +111,7 @@ Definition val_spec (inf : Info) (v : Value) : Prop :=
   match v with
     | Vint _ => True
     | Vptr ptr =>
-      let '(Ptr mf addr) := ptr in
+      let '(Ptr mf addr) := ptr in 
       (exists len, In (mf, len) (data_len inf) /\
                    (0 <= addr <= len - 1)%Z)
     | Vlab l => True
@@ -245,13 +225,14 @@ Proof.
   + move =>
     [regs' [/gen_registers_correct Hregs
              [ptr_a' [[lab' [/gen_label_correct Hlab H']]
-                      [z [[/Z.compare_le_iff H1 /Z.compare_ge_iff H2] H]]]]]].
+                      [z [[/Zle_bool_imp_le H1 /Zle_bool_imp_le H2] H]]]]]].
     move: H => [a [/gen_label_correct Hlab' [lab'' [fl1l2 Hret]]]].
     case: ptr_a' lab' Hret Hlab H' => addr_a' lab_a' lab' Hret' Hlab H'.
     move : Hret' => [Heq1 Heq2 Heq3 Heq4]; subst.
     rewrite  /bindGen /returnGen /PredMonad /bindP /returnP //= in H'.
-    move: H' => [z' [[/Z.compare_le_iff H1' /Z.compare_ge_iff H2'] [Heq1 Heq2]]]; subst.
-    repeat (split  => //=; by auto). split => //=. split => //=. split => //=.
+    move: H' => [z' [[/Zle_bool_imp_le H1' /Zle_bool_imp_le H2'] 
+                    [Heq1 Heq2]]]; subst.
+    repeat (split  => //=; by auto). repeat split => //=. 
     by apply Hequiv.
   + case: ptr_a. move => addr_a l_a [? [[? ?] [[? ?] ?]]].
     eexists; split. by apply/gen_registers_correct.
@@ -259,68 +240,40 @@ Proof.
     by apply /gen_label_correct.
     rewrite bindGen_def.
     exists addr_a. split.
-    split. by apply/Z.compare_le_iff.
-    by apply/Z.compare_ge_iff. rewrite returnGen_def. reflexivity.
-    exists ptr_r. split. split.
-    by apply/Z.compare_le_iff. by apply/Z.compare_ge_iff.
+    split; by apply/Zle_imp_le_bool.
+    rewrite returnGen_def. reflexivity.
+    exists ptr_r. split. split; by apply Zle_imp_le_bool.
     exists lab. split. by apply /gen_label_correct.
     exists l_a. split => //=. by apply Hequiv.
 Qed.
 
 (* gen_label_between_lax *)
 
+Definition gen_label_between_lax_spec (l1 l2 l: Label) : Prop :=
+  l1 <: l /\ l <: l2 \/ l = l2 /\ ~ l1 <: l2.
+
 Lemma gen_label_between_lax_correct :
   forall l1 l2,
-    (gen_label_between_lax l1 l2) <--> (fun l =>
-                                          (l1 <: l /\ In l (allThingsBelow l2))
-                                          \/ l = l2 /\ l1 <: l2 = false).
+    (gen_label_between_lax l1 l2) <--> gen_label_between_lax_spec l1 l2.
 Proof.
-  move => l1 l2 l.  rewrite /gen_label_between_lax. split.
-  + move/elements_equiv => [ /filter_In [H1 H2] |
-                             [/filter_nil [/allThingsBelow_nonempty //| H1] H2]]. subst.
-    by left.
-    right. split => //=. 
-Admitted. (* CH: NEW: maybe no longer needed?
-apply H1.
-    rewrite /allThingsBelow /allBelow. (* Search _ (map _ _) In. *)
-    rewrite -[X in In X _]label_of_list__elements. apply in_map.
-    by apply powerset_in_refl.
-  + move => [[H1 H2] | [H1 H2]]; subst; apply elements_equiv.
-    by left; apply filter_In.
-    right.  split => //. apply filter_nil.
-    right => x /allThingsBelow_isLow In.
-    remember (l1 <: x) as b. symmetry in Heqb. case: b Heqb => heqb //.
-    have H : l1 <: l2 = true by eapply flows_trans; eauto.
-    congruence.
-Qed. *)
-
-Definition gen_label_between_lax_spec (l1 l2 l: Label) : Prop :=
-  (l1 <: l /\ l <: l2) \/ l = l2 /\ l1 <: l2 = false.
-
-
-Lemma gen_label_between_lax_correct_admited :
-  forall l1 l2,
-    (gen_label_between_lax l1 l2) <--> (gen_label_between_lax_spec l1 l2).
-Proof.
-  move => l1 l2 l.  rewrite /gen_label_between_lax. split.
-  + move/elements_equiv => [ /filter_In [H1 H2] |
-                             [/filter_nil [/allThingsBelow_nonempty //| H1] H2]]; subst.
-    - left; split => //. by apply/allThingsBelow_isLow.
-    - right. split => //=. 
-Admitted. (* CH: NEW: maybe no longer needed?
-apply H1.
-      rewrite /allThingsBelow /allBelow.
-      rewrite -[X in In X _]label_of_list__elements. apply in_map.
-        by apply powerset_in_refl.
-  + move => [[H1 H2] | [H1 H2]]; subst; apply elements_equiv.
-    left. apply filter_In. split => //.
-    by apply/allThingsBelow_isLow'.  (* Here is the admited part *)
-    right. split => //. apply filter_nil.
-    right => x /allThingsBelow_isLow In.
-    remember (l1 <: x) as b. symmetry in Heqb. case: b Heqb => heqb //.
-    have H : l1 <: l2 = true by eapply flows_trans; eauto.
-    congruence.
-Qed. *)
+  move => l1 l2 l.  rewrite /gen_label_between_lax. split. 
+  - move/elements_equiv => [ /filter_In [H1 H2] |
+                             [/filter_nil [/allThingsBelow_nonempty //| H1] H2]]. 
+    + apply allThingsBelow_isLow in H1.
+      rewrite /isLow in H2.  left; by split.
+    + right. split => //. specialize (H1 l2). rewrite /isLow in H1.
+      move=> contra. setoid_rewrite allThingsBelow_isLow in H1.
+      specialize (H1 (flows_refl _)). by rewrite H1 in contra.
+  - move => [[H1 H2] | [H1 H2]]; apply/elements_equiv.
+    + left. apply /filter_In. split => //.
+      by apply/allThingsBelow_isLow.
+    + right. split => //. apply filter_nil. subst. right. 
+      move => l' /allThingsBelow_isLow HIn. 
+      remember (isLow l1 l') as b. destruct b => //.
+      symmetry in Heqb. 
+      move: (flows_trans _ _ _ Heqb HIn) => contra. 
+      exfalso. auto.
+Qed.
 
 (* Stack *)
 
@@ -343,7 +296,7 @@ Proof.
                                               [/gen_stack_loc_correct H1 H2]].
     rewrite returnGen_def in H2. subst. right.
     exists loc.  split => //. apply H1.
-    apply gen_label_between_lax_correct_admited.
+    apply gen_label_between_lax_correct.
     by left; rewrite H2.
   +  move => [Heq | H]; subst; apply frequency_equiv.
      - left; eexists; eexists; split. by constructor. by split => //.
@@ -352,7 +305,7 @@ Proof.
        * by apply in_cons; constructor.
          rewrite bindGen_def. split => //. exists loc'.
          split => //. eapply gen_stack_loc_correct.
-         by apply (gen_label_between_lax_correct_admited ⊥ ∂(pc)).
+         by apply (gen_label_between_lax_correct ⊥ ∂(pc)).
          assumption.
 Qed.
 
@@ -467,26 +420,26 @@ Definition mem_constraints (m : memory) :=
     (C.min_frame_size <= Z.of_nat (length data) <= C.max_frame_size)%Z /\
     st = bot /\ Mem.stamp b = bot.
 
-(* CH: now unused *)
-Lemma all_bellow_top : forall l,
-  In l (allThingsBelow top).
-Proof. rewrite /allThingsBelow. case; simpl; tauto. Qed.
+(* (* CH: now unused *) *)
+(* Lemma all_bellow_top : forall l, *)
+(*   In l (allThingsBelow top). *)
+(* Proof. rewrite /allThingsBelow. case; simpl; tauto. Qed. *)
 
 Lemma gen_init_mem_helper_correct:
   forall (n: nat) (m : memory) (blocks : list (mframe * Z)),
     (mem_constraints m) ->
     (gen_init_mem_helper n (m, blocks)) <-->
     (fun p => init_mem_spec n m blocks (fst p) (snd p)).
-Proof.
-  move => n m blocks Hspec [m' lst']. rewrite /init_mem_spec. split.
+Proof. 
+  move => n m blocks Hspec [m' lst']. rewrite /init_mem_spec. split. 
   { move => Hgen. generalize dependent m. generalize dependent blocks.
-      induction n as [| n IHn]; intros blocks mem Hspec Hgen.
-      - (* simpl in *. *) inv Hgen.
-        exists []. repeat split => //.
+      induction n as [| n IHn]; intros blocks mem Hspec Hgen. 
+      - inv Hgen.
+        exists []. by repeat split => //.
       - unfold gen_init_mem_helper in Hgen.
         fold gen_init_mem_helper in Hgen.
         move : Hgen => [len [Hchoose [lab [Hlab Hgen]]]].
-        move: Hchoose => [/Z.compare_le_iff Hle1 /Z.compare_ge_iff Hle2].
+        move: Hchoose => [/= /Zle_bool_imp_le Hle1 /Zle_bool_imp_le Hle2].
         rewrite /C.min_frame_size /C.max_frame_size in Hle1 Hle2 *.
         unfold alloc in Hgen.
         destruct (zreplicate_spec (Vint 0 @ ⊥) len) as [data [HIn [Heq HSome]]].
@@ -507,13 +460,13 @@ Proof.
           * eapply Hspec. rewrite -Halloc. eassumption.
         + rewrite Heq. simpl in *; rewrite Z2Nat.id. by []. omega.
         + exists ((lab, data) :: lst). split. by subst.
-          split.
-          * move => lab' data'. move => [eq | HIn'].
-            - inv eq.
-            - rewrite Heq. repeat split; try (simpl in *; rewrite Z2Nat.id; omega).
-              by eauto.
-          * admit. (* CH: NEW *)
-        + simpl in  *. rewrite -Heqalloc. exact Hfold. }
+          split => //=. 
+          * move => l data' [[eq1 eq2] | H]; subst. 
+            split => //. rewrite Heq //. rewrite Z2Nat.id. split => //. 
+            eapply Z.le_trans; [| apply Hle1] => //.
+            edestruct Hforall as [Hrng HIn']. apply H. 
+            split; auto. simpl in Hfold. rewrite Hfold.
+            by rewrite -Heqalloc. }
   { move => [lst [Hlen [HIn Hfold]]]. generalize dependent lst.
     generalize dependent m. generalize dependent blocks.
     induction n as [| n IHn]; intros blocks m Hspec lst Hlen HIn Hfold.
@@ -525,7 +478,7 @@ Proof.
       destruct (HIn lab data) as [[Hle1 Hle2] HInx]; try by apply in_eq.
       exists (Z.of_nat (length data)). split.
       + rewrite choose_def.
-        split; by [apply Z.compare_le_iff | apply Z.compare_ge_iff].
+        split; by apply Zle_imp_le_bool.
       + exists lab. split; try by apply gen_label_correct.
         rewrite /alloc.
         rewrite (zreplicate_eq data); auto; try omega; try by rewrite Nat2Z.id.
@@ -561,13 +514,13 @@ Lemma gen_init_mem_correct:
     move => top init_mem. split.
     { move => [len [Hchoose Hgen]].
       exists len. rewrite choose_def in Hchoose.
-      move: Hchoose => [/nat_compare_le Hle1 /nat_compare_ge Hle2]. simpl in *.
+      move: Hchoose => [/= Hle1 Hle2]. simpl in *.
       edestruct (gen_init_mem_helper_correct len (Mem.empty Atom Label))
         as [Hl _].
       - move => b l st data Hget.
         by rewrite Mem.get_empty in Hget.
       - destruct (Hl Hgen) as [lst H].
-        split => //. apply/andP; split; apply/leP; omega.
+        split => //. apply/andP. split => //. 
         by eauto. }
     { move => [len [/andP [Hle1 Hle2] Hspec]].
       edestruct (gen_init_mem_helper_correct len (Mem.empty Atom Label))
@@ -576,8 +529,7 @@ Lemma gen_init_mem_correct:
         by rewrite Mem.get_empty in Hget.
       - rewrite /gen_init_mem.
         exists len. split.
-        + rewrite choose_def.
-          split; [apply/nat_compare_le | apply/nat_compare_ge]; by apply/leP.
+        + rewrite choose_def. split => //.
           by auto. }
 Qed.
 
@@ -754,6 +706,30 @@ Ltac unfold_gen :=
        move: Hg=>[b [H1 [b' [H2 [b'' [ H3 [b''' [H4 [Heq1 Heq2 Heq3 Heq4]]]]]]]]]; subst
   end.
 
+Ltac try_solve :=
+      match goal with
+        | |- _ /\ _ => split => //=; by try_solve
+        | Hand : _ /\ _ |- _ => destruct Hand; by try_solve
+        | Hor : _ \/ _ |- _ => destruct Hor; by try_solve
+        | |- ~ _ => move => contra; subst; by try_solve
+        | Hchoose : choose _ _ |- _ =>
+          rewrite choose_def /= in Hchoose; by try_solve
+        | Helem : elements _ _ _ |- _ =>
+          move/elements_equiv : Helem => [Helem //= | [Helem1 Helem2] //=]; subst;
+          by try_solve
+
+        | HIn: In _ [] |- _ => by []
+        | Hnonempty : ~ (onNonEmpty [] _ = 0) |- _ =>
+           by rewrite /onNonEmpty in Hnonempty
+        | Hnonempty : ~ (_ * (onNonEmpty [] _))%coq_nat = 0 |- _ =>
+            by rewrite [X in (_ * X)%coq_nat]/onNonEmpty -mult_n_O in Hnonempty
+        | Hif: ~ ((if ?b then _ else _ ) = _) |- ?b = true =>
+            by case: b Hif
+        | |- (_ <= _)%Z => by apply/Zle_bool_imp_le
+        | |- _ => by []
+      end. 
+
+
 
 Ltac find_instr instr lst k :=
   match lst with
@@ -804,8 +780,8 @@ Ltac try_solve2 :=
     | |- liftGen _ _ _ => rewrite liftGen_def; by try_solve2
     | |- elements _ _ _ => apply/elements_equiv; left; by try_solve2
     | |- choose _ _ => rewrite choose_def => /=; by try_solve2
-    | |- ~ (_ ?= _)%Z = Lt => by apply/Z.compare_ge_iff
-    | |- ~ (_ ?= _)%Z = Gt  => by apply/Z.compare_le_iff
+    | |- is_true (_ <=? _)%Z => by apply/Zle_imp_le_bool
+    | |- gen_from_length _ _ => rewrite /gen_from_length; try try_solve2
     | |- ~ onNonEmpty ?l _ = 0 => by destruct l
     | |- exists _, _ => eexists; by try_solve2
     | |- ~ (( _ * onNonEmpty ?c _)%coq_nat * onNonEmpty ?l _)%coq_nat = 0 =>
@@ -813,64 +789,40 @@ Ltac try_solve2 :=
     | |- gen_BinOpT _ => by apply gen_BinOpT_correct
     | |- ~ (if ?b then _ else _) = 0 => by destruct b
     | _ => by []
-  end.
+  end. 
+ 
 
-Ltac try_solve :=
-      match goal with
-        | |- _ /\ _ => split => //=; by try_solve
-        | Hand : _ /\ _ |- _ => destruct Hand; by try_solve
-        | Hor : _ \/ _ |- _ => destruct Hor; by try_solve
-        | |- ~ _ => move => contra; subst; by try_solve
-       | Hchoose : choose _ _ |- _ =>
-          rewrite choose_def /= in Hchoose; by try_solve
-        | Helem : elements _ _ _ |- _ =>
-          move/elements_equiv : Helem => [Helem //= | [Helem1 Helem2] //=]; subst;
-          by try_solve
 
-        | HIn: In _ [] |- _ => by []
-        | Hnonempty : ~ (onNonEmpty [] _ = 0) |- _ =>
-           by rewrite /onNonEmpty in Hnonempty
-        | Hnonempty : ~ (_ * (onNonEmpty [] _))%coq_nat = 0 |- _ =>
-            by rewrite [X in (_ * X)%coq_nat]/onNonEmpty -mult_n_O in Hnonempty
-        | Hif: ~ ((if ?b then _ else _ ) = _) |- ?b = true =>
-            by case: b Hif
-        | |- (_ <= _)%Z => by apply/Z.compare_ge_iff
-        | |- (_ <= _)%Z => by apply Z.compare_le_iff
-        | |- _ => by []
-      end.
-
-(* This is commented out as it takes a lot of time *)
-(* Lemma gen_ainstrSSNI_correct : *)
-(*   forall (st : State), (ainstrSSNI st) <--> (Instruction_spec st). *)
-(* Proof. *)
-(*   move=> st instr. rewrite /ainstrSSNI /Instruction_spec. *)
-(*   case: st => im m pr stk regs pc. *)
-(*   set st := {| *)
-(*              st_imem := im; *)
-(*              st_mem := m; *)
-(*              st_pr := pr; *)
-(*              st_stack := stk; *)
-(*              st_regs := regs; *)
-(*              st_pc := pc |}. *)
-(*   case: (groupRegisters st regs [] [] [] [] Z0)=> [[[dptr cptr] num] lab]. *)
-(*   split.   *)
-(*   - case: instr => [r1 r2 | r1 r2 | r | r1 r2 r3 | | r1 r2 r3 | r1 r2 r3 | *)
-(*                     r | | z r | bop r1 r2 r3 | r | z r | r1 r2 | r1 r2 | *)
-(*                     r1 r2 r3 | r1 r2 r3 | r | | r1 r2 | r1 r2]; *)
-(*     move /frequency_equiv =>  [[n [g [HIn [Hg Hn]]]] | [[H | H] H' //=]]; *)
-(*     rewrite /gen_from_length /pure in HIn; repeat discr_or_first; *)
-(*     by (case: HIn => [[Heq1 Heq2] | HIn]; subst;   *)
-(*      [by unfold_gen; try_solve | by repeat discr_or_first]). *)
-(*  -  Opaque mult choose. *)
-(*     case: instr => [r1 r2 | r1 r2 | r | r1 r2 r3 | | r1 r2 r3 | r1 r2 r3 | *)
-(*                     r | | z r | bop r1 r2 r3 | r | z r | r1 r2 | r1 r2 | *)
-(*                     r1 r2 r3 | r1 r2 r3 | r | | r1 r2 | r1 r2]; *)
-(*                    move => H; apply frequency_equiv; left;  *)
-(*     instantiate_exists; try rewrite /gen_from_length; try by try_solve2. *)
-(*     rewrite liftGen2_def. eexists. split; [| try_solve2]. *)
-(*     rewrite /arbitrary /arbInt. by apply arbInt_correct. *)
-(* Qed. *)
-
+ 
+Lemma gen_ainstrSSNI_correct :
+  forall (st : State), (ainstrSSNI st) <--> (Instruction_spec st).
+Proof.
+  move=> st instr. rewrite /ainstrSSNI /Instruction_spec.
+  case: st => im m stk regs pc.
+  set st := {|
+             st_imem := im;
+             st_mem := m;
+             st_stack := stk;
+             st_regs := regs;
+             st_pc := pc |}.
+  case: (groupRegisters st regs [] [] [] [] Z0)=> [[[dptr cptr] num] lab].
+  split.
+  - case: instr => [r1 r2 | r1 r2 | r | r1 r2 r3 | | r1 r2 r3 | r1 r2 r3 |
+                    r | | z r | bop r1 r2 r3 | r | z r | r1 r2 | r1 r2 |
+                    r1 r2 r3 | r1 r2 r3 | r | | r1 r2 | r1 r2];
+    move /frequency_equiv =>  [[n [g [HIn [Hg Hn]]]] | [[H | H] H' //=]];
+    rewrite /gen_from_length /pure in HIn; repeat discr_or_first;
+    (case: HIn => [[Heq1 Heq2] | HIn]; subst;
+                 [by unfold_gen; try_solve | by repeat discr_or_first]).
+ -  Opaque mult choose.
+   case: instr => [r1 r2 | r1 r2 | r | r1 r2 r3 | | r1 r2 r3 | r1 r2 r3 |
+                    r | | z r | bop r1 r2 r3 | r | z r | r1 r2 | r1 r2 |
+                    r1 r2 r3 | r1 r2 r3 | r | | r1 r2 | r1 r2];
+                   move => H; apply frequency_equiv; left;
+    instantiate_exists; try rewrite /gen_from_lengt; try by try_solve2.
+    rewrite liftGen2_def. eexists. split; [| try_solve2].
+    rewrite /arbitrary /arbInt. by apply arbInt_correct.
+Qed.
 
 
 (* Proofs for variations *)
@@ -941,7 +893,6 @@ Proof.
 Qed.
 
 (* Vary Ptr_atom *)
-
 Lemma gen_vary_pc_correct:
   forall (obs: Label) (pc : Ptr_atom),
     (PC_spec pc) ->
@@ -994,13 +945,6 @@ Definition frame_spec (fr : frame) :=
   let 'Fr _ _ data := fr in
       (forall a, In a data -> atom_spec inf a).
 
-(* CH: we now have another lemma *)
-Ltac label_reflexivity :=
-  match goal with
-    | |- is_true (label_eq ?l ?l) =>
-        by rewrite /label_eq; apply/andP; split; apply flows_refl
-  end.
-
 Lemma gen_vary_frame_correct :
   forall obs fr,
     (frame_spec fr) ->
@@ -1031,18 +975,14 @@ Proof.
                In (x, y) (seq.zip data data') ->
                indist obs x y = true /\ atom_spec inf y).
           { move => [v1 l1] [v2 l2] HIn. apply in_zip_swap in HIn.
-            move: (HIn) => HIn'. apply in_zip in HIn'.
-Admitted. (* CH: NEW: 
-            move: HIn' => [HIn1 /HforallIn [Hval Hlab]].
+            move: (HIn) => HIn'. apply in_zip in HIn'. 
+            move: HIn' => [HIn1 Hval]. apply HforallIn in Hval.
             move : (Hval) => /(gen_vary_atom_correct obs (v1 @ l1)) Hequiv.
             apply in_map_zip with (f := (@gen_vary_atom Pred _ obs inf)) in HIn.
             move: (HIn) => HIn'. apply in_zip in HIn'.
             move/(_ ((v2 @ l2), gen_vary_atom obs inf (v1 @ l1)) HIn)
                : Hforall => /Hequiv /= [ Hindist Hspec].
-            repeat split => //. rewrite /indist /indistAtom in Hindist.
-            move : Hindist => /andP [Heql _].
-            move : Heql => /andP [Hl1 Hl2].
-            by rewrite -(flows_antisymm _ _ Hl1 Hl2).
+            by repeat split => //. 
           }
           repeat (split => //; try apply/andP);
             try (try apply/leP; omega); try by apply flows_refl.
@@ -1054,7 +994,7 @@ Admitted. (* CH: NEW:
             destruct data as [|data_hd data_tl].
             + rewrite Heq in Hlen.  rewrite app_length /= in Hlen. omega.
             + remember (data_hd :: data_tl) as data. clear Heqdata.
-              remember (nth (length data'_pre) data data_hd) as y.
+              remember (List.nth (length data'_pre) data data_hd) as y.
               destruct y as [v1 l1].
               have/Hindist_spec [_ Hspec] :
                 In (v1 @ l1, v2 @ l2) (seq.zip data data').
@@ -1077,65 +1017,63 @@ Admitted. (* CH: NEW:
           move : Hgen => [data'' [[len [Hchoose /vectorOf_equiv [Hlen Hforall]]]
                                   [eq1 eq2 eq3]]]; subst.
           rewrite choose_def in Hchoose.
-          move: Hchoose => [/nat_compare_le Hle3 /nat_compare_ge Hle4].
+          move: Hchoose => [Hle3 Hle4].
           simpl in Hle3, Hle4. rewrite Heqb.
-          repeat (split => //; try apply/andP);
-            try (try apply/leP; try rewrite addn1; omega);
-          try apply flows_refl.
+          repeat (split => //; try apply/andP); (try by rewrite addn1); 
+          try by apply flows_refl.
           by move => a /Hforall/gen_atom_correct Hin. }
     - (* stamp <: obs = false *)
         simpl in *. remember (label <: obs) as b''.
         move: Hgen => [lab [genLab [data'' [Hgen [eq1 eq2 eq3]]]]]; subst.
         move: Hgen => [len [Hchoose /vectorOf_equiv [Hlen HforallIn']]]; subst.
         rewrite choose_def in Hchoose.
-        move: Hchoose => [/nat_compare_le Hle3 /nat_compare_ge Hle4]. simpl in *.
-        repeat (split => //; try apply/andP);
-            try (try apply/leP; try rewrite addn1; omega);
-            try apply flows_refl.
-        by apply gen_label_correct.
+        move: Hchoose => [Hle3 Hle4]. simpl in *.
+        repeat (split => //; try apply/andP); (try by rewrite addn1); 
+          try by apply flows_refl.
         by move => a /HforallIn'; apply gen_atom_correct. }
   { rewrite /indist /indistFrame /frame_spec /gen_var_frame /isHigh /isLow.
-    move =>  [Hindist [[HInst' [HInlab' Hforall]] /andP [le1 le2]]].
-    remember (stamp <: obs) as b. destruct b; simpl in *;
-    remember (stamp' <: obs) as b'; destruct b'; simpl in *;
+    remember (@flows Lab4 _ stamp obs) as b. destruct b; simpl in *;
+    remember (@flows Lab4 _ stamp' obs) as b'; destruct b'; simpl in *;
     try (move: Hindist => /andP [Hl1 Hl2];
          move: (flows_antisymm _ _ Hl1 Hl2) => Heq; congruence).
-    - move: Hindist => /andP [/andP [/andP [Hl1 Hl2] /andP [Hl3 Hl4]] Hif].
+    - move=> [/andP [/andP [/andP [Hl1 Hl2] /andP [Hl3 Hl4]  H1] 
+                    [H2 /andP [Hrng1 Hrng2]]]].
       move: (flows_antisymm _ _ Hl1 Hl2) => Heq {Hl1 Hl2}; subst.
       move: (flows_antisymm _ _ Hl3 Hl4) => Heq {Hl3 Hl4}; subst.
-      remember (label' <: obs) as b''; destruct b''; simpl in *;
+      remember (flows label' obs) as b''; destruct b''; simpl in *;
       symmetry in Heqb, Heqb', Heqb''.
       + (* label' <: obs = true *)
-        move : Hif => /forallb2_forall [Hlen' HforallIn'].
+        rewrite Heqb'' in H1.
+        move : H1 => /forallb2_forall [Hlen' HforallIn'].
         rewrite (join_minimal _ _ _ Heqb Heqb'') /=.
         exists data'. split => //. apply sequenceGen_equiv.
         split => //.
         * by rewrite map_length.
         * move=> [[v' l'] gen] /in_map_zip_iff [[v l] [Heq   HIn]] /=; subst.
           move: (HIn) => /in_zip_swap/HforallIn' HInzip.
-          apply in_zip in HIn. move : HIn => [HIn1 /HforallIn [Hval HInl]].
+          apply in_zip in HIn. move : HIn => [HIn1 /HforallIn Hval].
           apply (gen_vary_atom_correct obs (v @ l) Hval). split => //.
-          by move/Hforall : HIn1=> [Hspec Hlab].
+          by move/H2 : HIn1=> ?.
       + rewrite (not_flows_not_join_flows_right _ _ _ Heqb'') /=.
         exists data'. split => //. exists (length data').
         split.
         * rewrite choose_def.
-          split; [apply nat_compare_le | apply nat_compare_ge]; simpl => //;
-          apply/leP => //. by rewrite -addn1.
+          simpl => //. split => //=.  by rewrite -addn1.
         * apply vectorOf_equiv. split => //.
-          by move => a /Hforall/gen_atom_correct HIn.
-    - move: Hindist => /andP [Hl1 Hl2].
-      move: (flows_antisymm _ _ Hl1 Hl2) => Heq {Hl1 Hl2}; subst.
-      exists label'. split; [by apply gen_label_inf_correct |].
+          by move => a /H2/gen_atom_correct HIn.
+    - move=> [/andP [Hl1 Hl2] _].
+      move: (flows_antisymm _ _ Hl1 Hl2) => Heq {Hl1 Hl2}; subst. congruence.
+    - move=> [/andP [Hl1 Hl2] _].
+      move: (flows_antisymm _ _ Hl1 Hl2) => Heq {Hl1 Hl2}; subst. congruence.
+    - move=> [/andP [Hl1 Hl2] [Hforall /andP [Hle1 Hle2]]].
+      move: (flows_antisymm _ _ Hl1 Hl2) => Heq {Hl1 Hl2}; subst. 
+      exists label'. split; [by apply gen_label_correct |].
       exists data'. split => //.
       + exists (length data'). split.
-        * rewrite choose_def.
-          split; [apply nat_compare_le | apply nat_compare_ge]; simpl => //;
-          apply/leP => //. by rewrite -addn1.
+        * rewrite choose_def. split => //. by rewrite -addn1. 
         * apply vectorOf_equiv. split => //.
           by move => a /Hforall/gen_atom_correct HIn. }
 Qed.
-*)
 
 Lemma gen_vary_regSet_correct:
   forall regs obs,
@@ -1183,10 +1121,9 @@ Proof.
                  (seq.zip regs' (map (@smart_vary _ _ smart_vary_atom  obs inf) regs))
             by apply in_map_zip.
           simpl in Hind. apply in_zip in Hzip.
-Admitted. (* CH: NEW:
-          move : Hzip => [HIn1 /Hspec [Hval HIn2]].
+          move : Hzip => [HIn1 /Hspec Hval].
           move/(gen_vary_atom_correct _ (vr @ lr) Hval) : Hind => [Hind Hval'].
-          split => //. rewrite /indist /indistAtom in Hind.
+          rewrite /indist /indistAtom in Hind.
           move/andP: Hind => [/andP [Hle1 Hle2] _].
             by have -> : lr' = lr by apply/flows_antisymm.
     + (* indist *)
@@ -1196,7 +1133,7 @@ Admitted. (* CH: NEW:
       apply in_zip in HIn'. move: HIn' => [HIn1 HIn2].
       apply in_map_zip with (f := (@smart_vary Pred _ smart_vary_atom obs inf))
         in Hzip. move/HIn : Hzip. simpl (snd _ _).
-      move: r r' HIn1 HIn2 => [vr lr] [vr' lr']  HIn1 /Hspec [Hval HIn2].
+      move: r r' HIn1 HIn2 => [vr lr] [vr' lr']  HIn1 /Hspec Hval.
       by move/(gen_vary_atom_correct obs (vr @ lr) Hval) => [H _].
   - rewrite /regs_spec /indist /indistReg.
     move => [[Hlen' Hreg] /forallb2_forall [Hlen'' Hind]]. apply/sequenceGen_equiv.
@@ -1206,13 +1143,12 @@ Admitted. (* CH: NEW:
     move : (HIn) => /in_zip_swap/Hind Hind'.
     apply in_zip in HIn. move : HIn => [HIn1 HIn2].
     rewrite /smart_vary /smart_vary_atom.
-    move : (Hspec (vr @ lr) HIn2) => [Hval HIn].
+    move : (Hspec (vr @ lr) HIn2) => Hval.
     apply/ (gen_vary_atom_correct obs (vr @ lr) Hval).  split => //.
-    by move : (Hreg (vr' @ lr') HIn1) => [Hval' _].
+    by move : (Hreg (vr' @ lr') HIn1) => ?.
 Qed.
-*)
 
-Lemma gen_var_stack_sound_indist:
+Lemma gen_vary_stack_sound_indist:
   forall st obs pc,
     stack_spec pc inf st ->
     set_incl (gen_vary_stack obs inf st) (fun st' =>
@@ -1236,8 +1172,7 @@ Proof.
       case: pc1 => v_pc1 l_pc1; case: pc2 => v_pc2 l_pc2.
       remember  (isLow l_pc1 obs) as b.
       rewrite /indist /indistStack /cropTop.
-Admitted. (* CH: NEW:
-      case: b Heqb => Heqb [HIn [Hspec [Hrng1 [Hrng2 Hgen]]]]; rewrite -Heqb.
+      case: b Heqb => Heqb  [Hspec [Hrng1 [Hrng2 Hgen]]]. rewrite -Heqb.
       - rewrite bindGen_def.
         move => [regs'' [/sequenceGen_equiv [Hlen HIn'] [eq1 eq2 eq3 eq4 eq5]]];
         subst. rewrite-Heqb /indistStackHelper.
@@ -1250,13 +1185,14 @@ Admitted. (* CH: NEW:
           by apply/in_map_zip/in_zip_swap.
         simpl in H. apply in_zip in HIn''.
         move: Hspec HIn''=> [Hlen' Hval] [/Hval HIn1 HIn2].
-        case: r1 H HIn1 HIn2; case: r2 => v1 l1 v2 l H [Hvalspec HIn1] HIn2.
+        case: r1 H HIn1 HIn2; case: r2 => v1 l1 v2 l H Hvalspec HIn2.
         by  move/(gen_vary_atom_correct obs (v2 @ l) Hvalspec): H => [H _].
-      - rewrite bindGen_def. move => [regs'' [/vectorOf_equiv [Hlen Hvec] H]].
+      - rewrite bindGen_def. rewrite /= -Heqb.
+        move => [regs'' [/vectorOf_equiv [Hlen Hvec] H]].
         move: H. move=> [eq1 eq2 eq3 eq4 eq5]; subst.
         by rewrite -Heqb.
 Qed.
-*)
+
 
 Fixpoint stack_size (st : Stack) : nat :=
   match st with
@@ -1264,7 +1200,7 @@ Fixpoint stack_size (st : Stack) : nat :=
     | _ ::: st => S (stack_size st)
   end.
 
-Lemma gen_var_stack_sound_spec:
+Lemma gen_vary_stack_sound_spec:
   forall st obs pc,
     stack_spec pc inf st ->
     set_incl (gen_vary_stack obs inf st) (fun st' =>
@@ -1272,7 +1208,7 @@ Lemma gen_var_stack_sound_spec:
                                    stack_size st = stack_size st').
 Proof.
   move=> st obs pc Hspec st' Hvary.
-  move : (gen_var_stack_sound_indist st obs pc Hspec st' Hvary) => Hindist.
+  move : (gen_vary_stack_sound_indist st obs pc Hspec st' Hvary) => Hindist.
   rewrite /stack_spec in Hspec.
   move : Hspec => [Heq | [loc [Heq Hspec]]].
  (* Stack empty *)
@@ -1286,8 +1222,7 @@ Proof.
     case: loc Hspec Hvary Hindist => [[[pc1 l1] regs1] reg1].
     case: loc'=> [[[pc2 l2] regs2] reg2].
     rewrite /stack_loc_spec. case: pc1; case: pc2 => zpc1 lpc1 zpc2 lpc2.
-Admitted. (* CH: NEW:
-    move => [HIn [Hregspec [Hrng1 [Hrng2 H]]]].
+    move => [Hregspec [Hrng1 [Hrng2 H]]].
     remember (isLow lpc2 obs) as b.  case: b Heqb => Heqb.
     + simpl.  rewrite -Heqb.
       move=> [regs
@@ -1300,7 +1235,7 @@ Admitted. (* CH: NEW:
       subst. repeat split => //.
       by move => r2 /HIn'/gen_atom_correct Hgen.
 Qed.
-*)
+
 
 (* An additional specification that arises from the way we are generating stacks. *)
 
@@ -1353,31 +1288,31 @@ Proof.
   + (* Stack empty *)
     simpl. case: st' => //. by  move => loc st _ [_ [ _ [_ H]]].
   + (* Stack singleton *)
-    case: st'.
+    case: st'. 
     - rewrite /additional_stack_spec.
       by move => loc; case => [| loc' st'] _ [_ [_ [_ H ]]].
     - rewrite /stack_spec /stack_loc_spec /additional_stack_spec.
       move => [[[ret_pc' lab'] regs'] r'] st' [[[ret_pc lab] regs] r] st.
       move => [// | [loc [[eq1 eq2] Hspec]]]
               [Hind [[//| [loc' [[eq1' eq2'] Hspec']]]]]
-              [_ Hadd]; subst. rewrite /gen_vary_stack.
-      rewrite bindGen_def /smart_vary /smart_vary_stack_loc /gen_vary_stack_loc.
+              [_ Hadd]; subst. rewrite /gen_vary_stack. 
+      rewrite bindGen_def /smart_vary /smart_vary_stack_loc /gen_vary_stack_loc .
       rewrite /indist /indistStack /cropTop in Hind.
-      remember (isLow ∂(ret_pc) obs) as b.
+      remember (isLow ∂(ret_pc) obs) as b. 
       case: b Heqb Hadd Hind => Heqb Hadd Hind /=.
-      * remember (isLow ∂(ret_pc') obs) as b'.
+      * remember (isLow ∂(ret_pc') obs) as b'.   
         case: b' Heqb' Hind => Heqb'  Hind;
         rewrite /indistStackHelper in Hind => //.
         move/andP : Hind => [/andP [/andP [/andP [Heq1 Hind2] Heq3] Hind] _].
         rewrite /Z_eq in Heq3. case: (Z.eq_dec r r') Heq3 => // eq _; subst.
         rewrite /label_eq in Heq1. move/andP : Heq1 => [H1 H2].
         have eq : lab = lab' by apply flows_antisymm. subst.
-        rewrite bindGen_def. clear Hadd H1 H2. eexists. split => //.
-        exists regs'. split=> //.
-        move: Hspec Hspec' => [_ [Hregs _]] [_ [Hregs' _]].
-Admitted. (* CH: NEW:
-        by apply/(gen_vary_regSet_correct regs obs Hregs).
-        rewrite bindGen_def. eexists; split => //.
+        rewrite bindGen_def. clear Hadd H1 H2. eexists. split => //. 
+        exists regs'. split=> //.  
+        move: Hspec Hspec' => [Hregs _] [Hregs' _].
+               apply/(gen_vary_regSet_correct regs obs Hregs).
+        by split => //.
+        eexists; split => //.
         rewrite /indist /indistPtrAtm in Hind2.
         case: ret_pc Heqb Hind2 {Hspec} => pc_i pc_l Heqb Hind2.
         case: ret_pc' Heqb' Hind2 {Hspec'}  => pc_i' pc_l' Heqb' Hind2.
@@ -1388,12 +1323,11 @@ Admitted. (* CH: NEW:
       * move : Hadd => [// | [eq1 [eq2 eq3]]]; subst.
         rewrite -Heqb in Hind. eexists. split; [| eexists; split => //].
         eexists. split=> //. apply vectorOf_equiv.
-        move : Hspec' => [_ [[Hlen Hregs] _]]. split => //.
+        move : Hspec' => [[Heq Hregs] _]. split => //.
         move=> r /Hregs HInd. by apply gen_atom_correct.
 Qed.
-*)
 
-Lemma gen_var_stack_correct:
+Lemma gen_vary_stack_correct:
   forall st obs pc,
     stack_spec pc inf st ->
     (gen_vary_stack obs inf st) <-->
@@ -1405,9 +1339,9 @@ Lemma gen_var_stack_correct:
 Proof.
   move=> st obs pc Hspec st'. split.
   move=> H. split; [| split].
-  * + by apply/gen_var_stack_sound_indist.
+  * + by apply/gen_vary_stack_sound_indist.
     + by apply/gen_var_stack_sound_spec_add.
-    + by apply/gen_var_stack_sound_spec.
+    + by apply/gen_vary_stack_sound_spec.
   * move => [H1 [H2 [H3 H4]]]. by apply/gen_var_stack_complete.
 Qed.
 

@@ -18,8 +18,6 @@ Proof.
   case: (powerset xs) IHxs => //=.
 Qed.
 
-
-
 Lemma powerset_in:
   forall {A} (a : A) (l l' : list A),
     In a l -> In l (powerset l') -> In a l'.
@@ -86,15 +84,7 @@ Qed.
 
 Lemma allThingsBelow_isLow :
   forall l l',
-    In l (allThingsBelow l') -> l <: l'.
-Proof.
-  rewrite /allThingsBelow.
-  case; case; simpl; try tauto; firstorder; discriminate.
-Qed.
-
-Lemma allThingsBelow_isLow' :
-  forall l l',
-    l <: l' -> In l (allThingsBelow l').
+    In l (allThingsBelow l') <-> l <: l'.
 Proof.
   rewrite /allThingsBelow.
   case; case; simpl; try tauto; firstorder; discriminate.
@@ -127,22 +117,6 @@ Proof.
   by apply in_or_app; left; apply in_map.
 Qed.
 
-(* Move it at arbitrary.v ?
-  Sure, at some point. We should prove all the generators
-  at arbitrary.v complete *)
-Lemma arbInt_correct :
-  arbitrary <--> (fun (z : Z) => True).
-Proof.
-  rewrite /arbitrary /arbInt /arbitraryZ.
-  rewrite sized_def. move => z. split => //= _.
-  exists (Z.abs_nat z).
-  split.
-  + apply/Z.compare_le_iff. rewrite Nat2Z.inj_abs_nat.
-    by case: z => //= p; omega.
-  + apply/Z.compare_ge_iff. rewrite Nat2Z.inj_abs_nat.
-    by case: z => //= p; omega.
-Qed.
-
 Lemma join_equiv :
   forall (l1 l2 l : Label),
     isLow l1 l = true->
@@ -156,6 +130,7 @@ Proof.
     eapply not_flows_not_join_flows_right in Hnotlow.
     apply Bool.negb_true_iff. eassumption .
 Qed.
+
 Lemma forallb2_forall :
   forall (A : Type) (f : A -> A -> bool) (l1 l2 : list A),
     forallb2 f l1 l2 = true <->
@@ -227,10 +202,6 @@ Proof.
   split; move=>  [[Heq1 Heq2] | HIn] ; subst; (try by constructor);
   by move/IHxs: HIn => HIn; constructor(assumption).
 Qed.
-
-(* regSet *)
-(* This function is used to smart_vary a regSet. I should edit the above proofs
-   so they use this instead of reproving it every time *)
 
 Lemma in_nth_iff:
   forall {A} (l : list A) x,
