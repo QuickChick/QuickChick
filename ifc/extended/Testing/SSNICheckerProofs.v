@@ -150,33 +150,33 @@ Lemma propSSNI_helper_equiv:
     semProperty (@propSSNI_helper Pred _ t v) <-> propSSNI_prop t v.
 Proof.
   move=> t [lab st1 st2]. split; [move => H; apply/ssniP| move=> /ssniP H];
-  rewrite /propSSNI_helper /propSSNI_bool /semTestable semCollect_idemp in H *.
+  rewrite /propSSNI_helper /propSSNI_bool /semTestable semCollect_id in H *.
   - move=> /semPredQProp H. destruct (indist lab st1 st2) => //.
     { destruct (exec t st1) as [ [tr1' st1'] |] => //.
       destruct (is_low_state st1 lab).
       - destruct (exec t st2) as [ [tr2' st2'] |] => //.
-          by move/semCollect_idemp(*/semPredQProp
-                 /semWhenFail_idemp*)/semBool : H => H.
+          by move/semCollect_id(*/semPredQProp
+                 /semWhenFail_id*)/semBool : H => H.
       - destruct (is_low_state st1').
         + destruct (exec t st2) as [[tr2 st2'] |] => //.
           destruct (is_low_state st2' lab).
-            by move/semCollect_idemp(*/semPredQProp/semWhenFail_idemp*)/semBool : H.
-            by move/semCollect_idemp/semPredQProp/semBool : H.
-        + by move/semCollect_idemp(*/semPredQProp/semWhenFail_idemp*)/semBool : H. }
+            by move/semCollect_id(*/semPredQProp/semWhenFail_id*)/semBool : H.
+            by move/semCollect_id/semPredQProp/semBool : H.
+        + by move/semCollect_id(*/semPredQProp/semWhenFail_id*)/semBool : H. }
   -  move=> H.
      destruct (indist lab st1 st2);
-       try by apply/semPredQProp/semCollect_idemp/semPredQProp/semBool.
+       try by apply/semPredQProp/semCollect_id/semPredQProp/semBool.
     { destruct (exec t st1) as [ [tr1' st1'] |].
       destruct (is_low_state st1 lab).
       - destruct (exec t st2) as [ [tr2' st2'] |].
-        by apply/semPredQProp/semCollect_idemp(*/semPredQProp/semWhenFail_idemp*)/semBool.
-        by apply/semPredQProp/semCollect_idemp/semPredQProp/semBool.
+        by apply/semPredQProp/semCollect_id(*/semPredQProp/semWhenFail_id*)/semBool.
+        by apply/semPredQProp/semCollect_id/semPredQProp/semBool.
       - destruct (is_low_state st1').
         + destruct (exec t st2) as [[tr2 st2'] |].
           * destruct (is_low_state st2' lab).
-            by apply/semPredQProp/semCollect_idemp(*/semPredQProp/semWhenFail_idemp*)/semBool.
-            by apply/semPredQProp/semCollect_idemp/semPredQProp/semBool.
-          * by apply/semPredQProp/semCollect_idemp/semPredQProp/semBool.
-        + by apply/semPredQProp/semCollect_idemp(*/semPredQProp/semWhenFail_idemp*)/semBool.
-      - by apply/semPredQProp/semCollect_idemp/semPredQProp/semBool. }
+            by apply/semPredQProp/semCollect_id(*/semPredQProp/semWhenFail_id*)/semBool.
+            by apply/semPredQProp/semCollect_id/semPredQProp/semBool.
+          * by apply/semPredQProp/semCollect_id/semPredQProp/semBool.
+        + by apply/semPredQProp/semCollect_id(*/semPredQProp/semWhenFail_id*)/semBool.
+      - by apply/semPredQProp/semCollect_id/semPredQProp/semBool. }
 Qed.

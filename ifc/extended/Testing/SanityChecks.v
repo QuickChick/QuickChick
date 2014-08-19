@@ -106,12 +106,12 @@ Proof.
   - assert (@genState Pred _ st) as gs by (by rewrite genState_well_formed).
     specialize (H st gs).
     rewrite wf ex in H.
-    (* by move /semWhenFail_idemp /semBool in H. *)    
-    by setoid_rewrite <- semBool in H.
+    (* by move /semWhenFail_id /semBool in H. *)    
+    by apply semBool in H.
   - move /genState_well_formed in arb. rewrite arb. specialize (H st).
     move : H. case (exec t st) => [ [tr st'] | ] H.
     + specialize (H tr st' arb Logic.eq_refl). rewrite H.
-      (* rewrite semWhenFail_idemp. by rewrite <- semBool. *)
-      by setoid_rewrite <- semBool.
-    + fold (semTestable rejected). rewrite <- semResult. reflexivity.
+      (* rewrite semWhenFail_id. by rewrite <- semBool. *)
+      by apply <- semBool.
+    + fold (semTestable rejected). rewrite semResult. reflexivity.
 Qed.
