@@ -1,41 +1,6 @@
-Require Import Axioms.
-Require Import RoseTrees.
+Require Import Axioms RoseTrees Random.
 Require Import ZArith List ssreflect ssrbool ssrnat seq.
 Import ListNotations.
-
-Class Random (A : Type) :=
-  {
-    randomR : A * A -> RandomGen -> A * RandomGen;
-
-    (* I need this to convert randomR to set of
-       outcomes, taking range into account *)
-    cmp : A -> A -> comparison
-  }.
-
-
-Instance Randombool : Random bool :=
-  {
-    randomR := randomRBool;
-    cmp b1 b2 :=
-      match b1, b2 with
-        | false, true => Lt
-        | true, false => Gt
-        | _, _ => Eq
-      end
-  }.
-
-Instance Randomnat : Random nat :=
-  {
-    randomR := randomRNat;
-    cmp := nat_compare
-  }.
-
-
-Instance RandomZ : Random Z :=
-  {
-    randomR := randomRInt;
-    cmp := Z.compare
-  }.
 
 Class GenMonad M :=
   {
@@ -47,6 +12,7 @@ Class GenMonad M :=
     suchThatMaybe : forall {A}, M A -> (A -> bool) -> M (option A);
     promote : forall  {A : Type}, (Rose (M A)) -> M (Rose A)
   }.
+
 
 Section Utilities.
   Context {Gen : Type -> Type}

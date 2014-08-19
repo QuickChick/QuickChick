@@ -1,5 +1,5 @@
 Require Import ZArith List ssreflect ssrbool ssrnat.
-Require Import Axioms RoseTrees AbstractGen.
+Require Import Axioms RoseTrees Random AbstractGen.
 Import ListNotations.
 
 Set Implicit Arguments.
@@ -103,6 +103,14 @@ Definition resize {A : Type} (n : nat) (g : Gen A) : Gen A :=
     | MkGen m => MkGen (fun r _ => m r n)
   end.
 
+Lemma resize_idempotent: 
+  forall {A} (n m: nat) (g: Gen A), 
+       resize m (resize n g) = resize n g.
+Proof.
+  move=> A n m g.
+  destruct g. reflexivity. 
+Qed. 
+
 (* Does this have a bug or it is something I don't get?
    It seems that it won't do any loop because n will
    match against the first case at the first iteration *)
@@ -119,7 +127,7 @@ Definition resize {A : Type} (n : nat) (g : Gen A) : Gen A :=
 (*               end) in *)
 (*   sized (fun x => t 0 (max 1 x)). *)
 
-Definition suchThatMaybeGen {A : Type} (g : Gen A) (p : A -> bool)
+Definition suchThatMaybeG {A : Type} (g : Gen A) (p : A -> bool)
 : Gen (option A) :=
   let t := (fix t (k : nat) (n : nat) : Gen (option A) :=
               match n with
@@ -131,15 +139,17 @@ Definition suchThatMaybeGen {A : Type} (g : Gen A) (p : A -> bool)
               end) in
   sizedG (fun x => t 0 (max 1 x)).
 
+Definition chooseG {A : Type} `{Random A} (range : A * A) : Gen A := 
+  MkGen (fun r _ => fst (randomR range r)).
+
 Instance realGen : GenMonad Gen :=
   {
     bindGen := @bindG;
     returnGen := @returnG;
     fmapGen := @fmapG;
-    choose A R range :=
-      MkGen (fun r _ => fst (randomR range r));
+    choose := @chooseG;
     sized := @sizedG;
-    suchThatMaybe := @suchThatMaybeGen;
+    suchThatMaybe := @suchThatMaybeG;
     promote := @promoteG
   }.
 

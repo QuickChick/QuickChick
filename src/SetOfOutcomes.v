@@ -1,4 +1,4 @@
-Require Import AbstractGen RoseTrees.
+Require Import Random AbstractGen RoseTrees.
 Require Import Arith List seq ssreflect ssrbool ssrnat eqtype.
 
 (* The monad carrier *)
@@ -13,10 +13,8 @@ Definition returnP {A} (a : A) : Pred A :=
 Definition fmapP {A B} (f : A -> B) (a : Pred A) : Pred B :=
  bindP a (fun a => returnP (f a)).
 
-Definition chooseP {A} `{Random A} (p : A * A) : Pred A :=
-  (fun a =>
-     (cmp (fst p) a <> Gt) /\
-     (cmp (snd p) a <> Lt)).
+Definition chooseP {A : Type} `{Random A} (p : A * A) : Pred A :=
+  (fun a => Random.leq (fst p) a /\ Random.leq a (snd p)). 
 
 Definition sizedP {A} (f : nat -> Pred A) : Pred A:=
   (fun a => exists n, f n a).
@@ -115,10 +113,10 @@ Lemma associativity : forall {A B C} (m : Pred A) (f : A -> Pred B)
                              (g : B -> Pred C),
   (bindGen (bindGen m f) g) <--> (bindGen m (fun x => bindGen (f x) g)).
 Proof. intros. compute. firstorder. Qed.
-
+ 
 (* Functor laws *)
 Lemma fmap_id:
-  forall A a, (fmapP (@id A) a) <--> (@id (Pred A) a).
+  forall A (a: Pred A), (fmapP id a) <--> (id a).
 Proof.
   move => A pa. rewrite /fmapP /set_eq /bindP /returnP /id.
   move => a. split => [[a' [H1 H2]]| H] //=. by subst.
@@ -156,15 +154,15 @@ Qed.
 
 Lemma fmapGen_def :
   forall {A B} (f : A -> B) (g : Pred A),
-    fmapGen f g = fun b => exists a, g a /\ eq (f a) b.
+    fmapGen f g = fun b => exists a, g a /\ f a = b.
 Proof.
   by rewrite /fmapGen.
 Qed.
 
 Lemma choose_def :
   forall {A} `{Random A} (p : A * A),
-    @choose Pred _ _ _ p = fun (a : A) => (cmp (fst p) a <> Gt) /\
-                                          (cmp (snd p) a <> Lt).
+    @choose Pred _ _ _ _ p = fun (a : A) => Random.leq (fst p) a /\
+                                            Random.leq a (snd p).
 Proof.
   by rewrite /choose.
 Qed.
@@ -191,7 +189,7 @@ Lemma liftGen_def :
   forall {A B} (f: A -> B) (g: Pred A),
     liftGen f g =
     fun b =>
-      exists a, g a /\ eq (f a) b.
+      exists a, g a /\ f a = b.
 Proof.
   by rewrite /liftGen.
 Qed.
@@ -201,7 +199,7 @@ Lemma liftGen2_def :
     liftGen2 f g1 g2 =
     fun b =>
       exists a1, g1 a1 /\
-                 (exists a2, g2 a2 /\ eq (f a1 a2) b).
+                 (exists a2, g2 a2 /\ f a1 a2 = b).
 Proof.
   by rewrite /liftGen.
 Qed.
@@ -213,7 +211,7 @@ Lemma liftGen3_def :
     fun b =>
       exists a1, g1 a1 /\
                  (exists a2, g2 a2 /\
-                             (exists a3, g3 a3 /\ eq (f a1 a2 a3) b)).
+                             (exists a3, g3 a3 /\ (f a1 a2 a3) = b)).
 Proof.
   by rewrite /liftGen3.
 Qed.
@@ -242,8 +240,8 @@ Lemma liftGen5_def :
                              (exists a3, g3 a3 /\
                                          (exists a4, g4 a4 /\
                                                      (exists a5, g5 a5 /\
-                                                                 eq (f a1 a2 a3 a4 a5) b)))).
-Proof.
+                                                                 (f a1 a2 a3 a4 a5) = b)))).
+Proof. 
   by rewrite /liftGen5.
 Qed.
 
@@ -284,7 +282,7 @@ Qed.
 Lemma foldGen_equiv :
   forall {A B : Type} (f : A -> B -> Pred A) (bs : list B) (a0 : A),
     foldGen f bs a0 <-->
-    fun an =>
+    fun an => 
       foldr (fun b p => fun a_prev => exists a, f a_prev b a /\ p a) (eq an) bs a0.
 Proof.
   move=> A B f bs a0 an. rewrite /foldGen.
@@ -292,7 +290,7 @@ Proof.
   try (rewrite returnGen_def); try (rewrite bindGen_def); split=> //=;
   move => [a1 [fa0 /IHbs H]]; by exists a1.
 Qed.
-
+ 
 (* Our induction principle for fold; might be useful in proofs? *)
 Section invariants.
 
@@ -348,9 +346,7 @@ Proof.
      exists (length a).
      rewrite bindGen_def. exists (length a).
      split.
-     by rewrite choose_def; split;
-        [ apply/nat_compare_le/leP |
-          apply/nat_compare_ge/leP ].
+     rewrite choose_def; split => //.
      by apply/vectorOf_equiv.
 Qed.
 
@@ -371,7 +367,7 @@ Proof.
   move=> A l def a.
   rewrite /oneof.
   split; rewrite bindGen_def choose_def;
-  [ move=> [n [[/nat_compare_le/leP Hlo /nat_compare_ge/leP Hhi] H]] |
+  [ move=> [n [[/= Hlo Hhi] H]] |
     move=> [[p [Hin pa]] | [Hnil Hdef]]].
   + case: l Hhi Hlo H => //= [|x xs] Hhi Hlo H.
     * by right; split; case : n H Hhi Hlo => //=.
@@ -383,16 +379,12 @@ Proof.
                    subnDr subn0 in Hhi.
   +  * apply In_split in  Hin. move: Hin => [l1 [l2 [Heq]]]. subst.
        exists (length l1).
-       split. split. by apply/nat_compare_le/leP.
-       apply/nat_compare_ge/leP.
+       split. split => //=. 
        by rewrite app_length -addnBA leq_addr.
        rewrite nth_cat  //=.
        have -> : length l1 = size l1 by [].
        by rewrite ltnn -[X in X - X]addn0 subnDl sub0n.
-    * subst. exists 0. split.
-       split. by apply/nat_compare_le.
-         by apply/nat_compare_ge.
-         by [].
+    * subst. exists 0. split => //.
 Qed.
 
 Lemma elements_equiv :
@@ -401,7 +393,7 @@ Lemma elements_equiv :
 Proof.
   move => A l def a.
   rewrite /elements. rewrite bindGen_def choose_def.
-  split => [[n [[/nat_compare_le/leP Hlo /nat_compare_ge/leP Hhi] H]] |
+  split => [[n [[Hlo Hhi] H]] |
             [H | [H1 H2]]]; subst.
   * rewrite returnGen_def in H. subst.
     case : l Hhi Hlo => //= [| x xs] Hhi Hlo.
@@ -412,15 +404,10 @@ Proof.
       right; apply/nth_In/leP.
       by rewrite -[X in _ < X - _]addn1 -{2}[1]add0n subnDr subn0 in Hhi.
   * apply in_split in H. move: H => [l1 [l2 Heq]]; subst.
-    exists (length l1). rewrite returnGen_def. split. split.
-    by apply/nat_compare_le/leP.
-    apply/nat_compare_ge/leP.
+    exists (length l1). rewrite returnGen_def. split. split => //=.
     by rewrite app_length -addnBA leq_addr.
     by rewrite app_nth2 //= NPeano.Nat.sub_diag.
-  * subst. exists 0. split.
-    split. by apply/nat_compare_le.
-    by apply/nat_compare_ge.
-    by rewrite returnGen_def.
+  * subst. exists 0. split => //.
 Qed.
 
 (* A rather long frequency proof, probably we can do better *)
@@ -539,8 +526,8 @@ Lemma frequency_equiv :
               ((l = nil \/ (forall x, In x l -> fst x = 0)) /\ def e)).
 Proof.
   move=> A l def a.  Opaque nat_compare.
-  rewrite /frequency' /bindGen /PredMonad /bindP /choose /Randomnat /cmp //=.
-  split => [[n [[/nat_compare_le/leP /= Hlo /nat_compare_ge/leP Hhi] H]] |
+  rewrite /frequency' /bindGen /PredMonad /bindP /choose /Randomnat //=.
+  split => [[n [[/= Hlo Hhi] H]] |
             [[n [g [H1 [H2 H3]]]] | [[H1 | H1] H2]]].
   + rewrite -(leq_add2r 1) addn1 in Hhi.
     remember (sumn [seq fst i | i <- l]) as sum.
@@ -555,18 +542,13 @@ Proof.
   + - have Hand: In (n, g) l /\ fst (n, g) <> 0 by split.
       move : (pick_In l (n, g) def Hand) => [n' Hpick].
       exists n'. split => //=. split => //=.
-      by apply/nat_compare_le/leP.
-      apply/nat_compare_ge/leP.
       have Hlt: n' < sumn [seq fst i | i <- l]
         by apply/(pick_exists _ _ def)=> //=; exists (n, g).
       rewrite -(leq_add2r 1) addn1 subnK. by auto.
       case: (sumn [seq fst i | i <- l]) Hlt => //=.
       by rewrite  Hpick.
     - subst. simpl. rewrite sub0n. exists 0. split => //=.
-    - exists 0. split. split => //=.
-      move : (sum_fst_zero l) =>  [_ H]. rewrite H.
-      by rewrite sub0n.
-      move => x HIn. apply/eqP. auto.
+    - exists 0. split. split => //=. 
       elim: l H1 => //=. case => n p l IHl H1.
       move/(_ (n, p)): (H1) => //= H. rewrite H => //=.
       rewrite subn0. by auto.

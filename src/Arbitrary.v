@@ -112,8 +112,8 @@ Lemma arbBool_correct:
   arbitrary <--> (fun (_ : bool) => True).
 Proof.
   rewrite /arbitrary /arbBool /arbitraryBool. move => b.
-  split => // _. rewrite choose_def.
-  simpl. case: b; split; move => contra; discriminate.
+  split => // _. rewrite choose_def. 
+  case: b; split => //. 
 Qed.
 
 Lemma arbNat_correct:
@@ -122,7 +122,7 @@ Proof.
   rewrite /arbitrary /arbNat /arbitraryNat. move => n.
   split => // _.
   rewrite sized_def. exists n. rewrite choose_def.
-  split; [apply nat_compare_le | apply nat_compare_ge]; simpl; omega.
+  split=> //.
 Qed.
 
 Lemma arbInt_correct:
@@ -131,11 +131,8 @@ Proof.
   rewrite /arbitrary /arbInt /arbitraryZ.
   rewrite sized_def. move => z. split => //= _.
   exists (Z.abs_nat z).
-  split.
-  - apply/Z.compare_le_iff. rewrite Nat2Z.inj_abs_nat.
-    by case: z => //= p; omega.
-  - apply/Z.compare_ge_iff. rewrite Nat2Z.inj_abs_nat.
-    by case: z => //= p; omega.
+  by split => //=; rewrite Nat2Z.inj_abs_nat; 
+     case: z => //= p; apply Z.leb_refl.
 Qed.
 
 Lemma arbList_correct:
