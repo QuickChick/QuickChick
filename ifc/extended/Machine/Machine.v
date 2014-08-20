@@ -133,7 +133,7 @@ Definition regSet := list register.
 (* Stack *)
 Inductive Stack :=
   | Mty                                       (* empty stack *)
-  | RetCons (pc_l:Ptr_atom * Label * regSet * regPtr) (s:Stack).
+  | RetCons (pc_l:Ptr_atom * Label * regSet * regId) (s:Stack).
    (* stack frame marker cons (with return pc and protecting label) *)
 Infix ":::" := RetCons (at level 60, right associativity).
 
@@ -436,9 +436,9 @@ Definition upd {A:Type} (l:list A) (n:Z) (a:A) : option (list A) :=
   if Z_lt_dec n 0 then None
   else upd_nat l (Z.to_nat n) a.
 
-Definition registerUpdate (rs : regSet) (r : regPtr) (a : Atom) :=
+Definition registerUpdate (rs : regSet) (r : regId) (a : Atom) :=
   upd rs r a.
-Definition registerContent (rs : regSet) (r : regPtr) :=
+Definition registerContent (rs : regSet) (r : regId) :=
   nth rs r.
 
 
@@ -681,7 +681,7 @@ Inductive step (t : table) : State -> trace -> State -> Prop :=
 Definition state_instr_lookup (st:State) : option Instruction :=
   let (im,_,_,_,pc) := st in im[pc].
 
-Definition exec t (st:State) : option (trace * State) :=
+Definition fstep t (st:State) : option (trace * State) :=
   do instr <- state_instr_lookup st;
   let '(St im μ σ r pc) := st in
   let '(PAtm j LPC) := pc in
@@ -926,7 +926,7 @@ Definition exec t (st:State) : option (trace * State) :=
     | _ => None
   end.
 
-Ltac exec_solver :=
+Ltac fstep_solver :=
   repeat (simpl; match goal with
             | |- context[registerContent ?rs ?reg] =>
               remember (registerContent rs reg) as Hyp; destruct Hyp
@@ -959,17 +959,17 @@ Hint Unfold run_tmr.
 Hint Unfold apply_rule.
 Hint Unfold default_table.
 Hint Resolve Ptr_atom_inhabited.
-Theorem exec_make_a_step : forall t st1 st2 tr,
-  exec t st1 = Some (tr, st2) ->
+Theorem fstep_make_a_step : forall t st1 st2 tr,
+  fstep t st1 = Some (tr, st2) ->
   step t st1 tr st2.
 Proof.
   destruct st1 as (μ,π,σ,regs,pc).
-  unfold exec; simpl.
+  unfold fstep; simpl.
   case_eq (μ[pc]); simpl bind; [|simpl bind; congruence].
   intros ins Hins.
   intros st2 tr.
   destruct ins;
-  exec_solver;
+  fstep_solver;
   try solve [econstructor; eauto; auto].
 Admitted.
 (*
@@ -991,13 +991,13 @@ Admitted.
 Qed.
 *)
 *)
-Fixpoint execN t (n : nat) (s : State) : trace * list State :=
+Fixpoint fstepN t (n : nat) (s : State) : trace * list State :=
   match n with
     | O => (nil, s :: nil)
     | S n' =>
-      match exec t s with
+      match fstep t s with
         | Some (tr, s') =>
-          let res := execN t n' s' in
+          let res := fstepN t n' s' in
           (app tr (fst res), s :: snd res)
         | None => (nil, s :: nil)
       end

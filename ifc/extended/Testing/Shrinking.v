@@ -264,10 +264,10 @@ Definition shrinkStateStack (v : @Variation State) :=
 Definition shrinkState x :=
   (* shrinkStateMemory x ++ *) shrinkStateStack x.
 
-Definition cDecr (lim r : regPtr) :=
+Definition cDecr (lim r : regId) :=
   if (lim <=? r)%Z then (r - 1)%Z else r.
 
-Definition decrRegInstr (r : regPtr) (i : Instruction) :=
+Definition decrRegInstr (r : regId) (i : Instruction) :=
   match i with
   | Lab r1 r2 => Lab (cDecr r r1) (cDecr r r2)
   | MLab r1 r2 => MLab (cDecr r r1) (cDecr r r2)
@@ -293,7 +293,7 @@ Definition decrRegInstr (r : regPtr) (i : Instruction) :=
   end.
 
 (* TODO
-Fixpoint decrRegInFrames (m : mem) (fs : list mframe) (r : regPtr) :=
+Fixpoint decrRegInFrames (m : mem) (fs : list mframe) (r : regId) :=
   match fs with
     | []   => m
     | h::t =>
@@ -308,7 +308,7 @@ Fixpoint decrRegInFrames (m : mem) (fs : list mframe) (r : regPtr) :=
       end
 end.
 
-Definition removeReg (st : State) (r : regPtr) :=
+Definition removeReg (st : State) (r : regId) :=
   let '(St m p s rs pc) := st in
   let rn := Z.to_nat r in
   let rsHd := firstn rn rs in

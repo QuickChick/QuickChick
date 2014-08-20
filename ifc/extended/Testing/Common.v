@@ -63,7 +63,7 @@ Definition incr_ptr (p : Pointer) :=
 Definition Z_eq (i1 i2 : Z) : bool :=
   if Z.eq_dec i1 i2 then true else false.
 
-Definition reg_eq_dec : forall r1 r2 : regPtr,
+Definition reg_eq_dec : forall r1 r2 : regId,
   {r1 = r2} + {r1 <> r2}.
 Proof. apply Z_eq_dec. Defined.
 

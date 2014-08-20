@@ -156,7 +156,7 @@ Definition meet_stack_label (s : Stack) (l : Label) : Stack :=
 
 Definition smart_gen_stack_loc (f : Label -> Label -> Gen Label)
            (below_pc above_pc : Label) inf
-: Gen (Ptr_atom * Label * regSet * regPtr) :=
+: Gen (Ptr_atom * Label * regSet * regId) :=
     bindGen (smart_gen inf) (fun regs =>
     bindGen (smart_gen inf) (fun pc   =>
     bindGen (gen_from_nat_length (no_regs inf)) (fun target =>
@@ -182,7 +182,7 @@ Definition smart_gen_stack (pc : Ptr_atom) inf : Gen Stack :=
    (data pointers, numeric and labels)
 *)
 Fixpoint groupRegisters (st : State) (rs : regSet)
-         (dptr cptr num lab : list regPtr) (n : Z) :=
+         (dptr cptr num lab : list regId) (n : Z) :=
   match rs with
     | nil => (dptr, cptr, num, lab)
     | (Vint i @ _) :: rs' =>
@@ -408,8 +408,8 @@ Instance smart_vary_memory : SmartVary memory :=
    when pc is high *)
 
 (*  Definition gen_vary_stack_loc (obs: Label) (inf : Info)  *)
-(*            (s : Ptr_atom * Label * regSet * regPtr)  *)
-(* : Gen  (Ptr_atom * Label * regSet * regPtr) := *)
+(*            (s : Ptr_atom * Label * regSet * regId)  *)
+(* : Gen  (Ptr_atom * Label * regSet * regId) := *)
 (*     let '(pc, lab, rs, r) := s in *)
 (*     (* If the return label is low just vary the registers (a bit) *) *)
 (*     if isLow ∂pc obs then  *)
@@ -426,8 +426,8 @@ Instance smart_vary_memory : SmartVary memory :=
 
 
 Definition gen_vary_stack_loc (obs: Label) (inf : Info)
-           (s : Ptr_atom * Label * regSet * regPtr)
-: Gen  (Ptr_atom * Label * regSet * regPtr) :=
+           (s : Ptr_atom * Label * regSet * regId)
+: Gen  (Ptr_atom * Label * regSet * regId) :=
     let '(pc, lab, rs, r) := s in
     (* If the return label is low just vary the registers (a bit) *)
     if isLow ∂pc obs then
@@ -440,7 +440,7 @@ Definition gen_vary_stack_loc (obs: Label) (inf : Info)
       returnGen (pc, lab, rs', r)).
 
 (* Just vary a single stack location *)
-Instance smart_vary_stack_loc : SmartVary (Ptr_atom * Label * regSet * regPtr) :=
+Instance smart_vary_stack_loc : SmartVary (Ptr_atom * Label * regSet * regId) :=
 {|
   smart_vary := gen_vary_stack_loc
 |}.

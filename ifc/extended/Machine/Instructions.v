@@ -3,7 +3,7 @@
 Require Import ZArith.
 Require Import List. Import ListNotations.
 
-Definition regPtr := Z.
+Definition regId := Z.
 
 Inductive BinOpT : Type :=
 | BAdd
@@ -16,27 +16,27 @@ Definition eval_binop (b : BinOpT) : Z -> Z -> option Z :=
   end.
 
 Inductive Instruction : Type :=
-  | Lab      : regPtr -> regPtr -> Instruction
-  | MLab     : regPtr -> regPtr -> Instruction
-  | PcLab    : regPtr -> Instruction
-  | BCall    : regPtr -> regPtr -> regPtr -> Instruction
+  | Lab      : regId -> regId -> Instruction
+  | MLab     : regId -> regId -> Instruction
+  | PcLab    : regId -> Instruction
+  | BCall    : regId -> regId -> regId -> Instruction
   | BRet     : Instruction
-  | FlowsTo  : regPtr -> regPtr -> regPtr -> Instruction
-  | LJoin    : regPtr -> regPtr -> regPtr -> Instruction
-  | PutBot   : regPtr -> Instruction
+  | FlowsTo  : regId -> regId -> regId -> Instruction
+  | LJoin    : regId -> regId -> regId -> Instruction
+  | PutBot   : regId -> Instruction
   | Nop      : Instruction
-  | Put (n : Z) : regPtr -> Instruction
-  | BinOp (o : BinOpT) : regPtr -> regPtr -> regPtr -> Instruction
-  | Jump     : regPtr -> Instruction
-  | BNZ (n : Z) : regPtr -> Instruction
-  | Load     : regPtr -> regPtr -> Instruction
-  | Store    : regPtr -> regPtr -> Instruction
-  | Alloc    : regPtr -> regPtr -> regPtr -> Instruction
-  | PSetOff  : regPtr -> regPtr -> regPtr -> Instruction
-  | Output   : regPtr -> Instruction
+  | Put (n : Z) : regId -> Instruction
+  | BinOp (o : BinOpT) : regId -> regId -> regId -> Instruction
+  | Jump     : regId -> Instruction
+  | BNZ (n : Z) : regId -> Instruction
+  | Load     : regId -> regId -> Instruction
+  | Store    : regId -> regId -> Instruction
+  | Alloc    : regId -> regId -> regId -> Instruction
+  | PSetOff  : regId -> regId -> regId -> Instruction
+  | Output   : regId -> Instruction
   | Halt     : Instruction
-  | PGetOff  : regPtr -> regPtr -> Instruction
-  | MSize    : regPtr -> regPtr -> Instruction.
+  | PGetOff  : regId -> regId -> Instruction
+  | MSize    : regId -> regId -> Instruction.
 
 Inductive OpCode : Type :=
   | OpLab

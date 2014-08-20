@@ -39,10 +39,10 @@ Set Printing All.
             (if indist lab st1 st2 then
                (* XXX Our generator should always give us this by design.
                   If that's not the case the generator is broken. *)
-               match exec t st1 return Gen QProp with
+               match fstep t st1 return Gen QProp with
                  | Some (tr1, st1') =>
                    if is_low_state st1 lab then
-                     match exec t st2 with
+                     match fstep t st2 with
                        | Some (tr2, st2') =>
                          collect "LOW -> *" (
 (*
@@ -63,7 +63,7 @@ Set Printing All.
                      end
                    else (* is_high st1 *)
                      if is_low_state st1' lab then
-                       match exec t st2 with
+                       match fstep t st2 with
                          | Some (tr2, st2') =>
                            if is_low_state st2' lab then
                              collect "HIGH -> LOW" (

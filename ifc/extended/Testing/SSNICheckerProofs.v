@@ -57,15 +57,15 @@ Definition propSSNI_prop (t : table) (v : Variation) : Prop :=
   let '(Var lab st1 st2) := v in
   (indist lab st1 st2) ->
   (is_low_state st1 lab /\ (forall tr1 st1' tr2 st2',
-                          exec t st1 = Some (tr1, st1') ->
-                          exec t st2 = Some (tr2, st2') ->
+                          fstep t st1 = Some (tr1, st1') ->
+                          fstep t st2 = Some (tr2, st2') ->
                           observe_comp (observe lab tr1) (observe lab tr2) /\
                           (indist lab st1' st2'))) \/
   (~~ is_low_state st1 lab /\ (forall tr1 st1',
-                             exec t st1 = Some (tr1, st1') ->
+                             fstep t st1 = Some (tr1, st1') ->
                              ((is_low_state st1' lab /\
                                forall tr2 st2',
-                                 exec t st2 = Some (tr2, st2') ->
+                                 fstep t st2 = Some (tr2, st2') ->
                                  is_low_state st2' lab ->
                                  observe_comp (observe lab tr1) (observe lab tr2) /\
                                  (indist lab st1' st2')) \/
@@ -76,10 +76,10 @@ Definition propSSNI_prop (t : table) (v : Variation) : Prop :=
 Definition propSSNI_bool (t : table) (v : Variation) : bool :=
     let '(Var lab st1 st2) := v in
     if indist lab st1 st2 then
-      match exec t st1  with
+      match fstep t st1  with
         | Some (tr1, st1') =>
           if is_low_state st1 lab then
-            match exec t st2 with
+            match fstep t st2 with
               | Some (tr2, st2') =>
                 (observe_comp (observe lab tr1) (observe lab tr2)
                               && (indist lab st1' st2'))
@@ -87,7 +87,7 @@ Definition propSSNI_bool (t : table) (v : Variation) : bool :=
             end
           else (* is_high st1 *)
             if is_low_state st1' lab then
-              match exec t st2 with
+              match fstep t st2 with
                 | Some (tr2, st2') =>
                   if is_low_state st2' lab then
                     observe_comp (observe lab tr1) (observe lab tr2)
@@ -109,15 +109,15 @@ Proof.
   move=> t [lab st1 st2]. apply/(@iffP (propSSNI_bool t (Var lab st1 st2))); try (by apply idP);
   rewrite /propSSNI_bool /propSSNI_prop.
   { destruct (indist lab st1 st2) => //.
-    destruct (exec t st1) as [ [tr1' st1'] |].
+    destruct (fstep t st1) as [ [tr1' st1'] |].
     - destruct (is_low_state st1 lab).
-      + destruct (exec t st2) as [ [tr2' st2'] |];
+      + destruct (fstep t st2) as [ [tr2' st2'] |];
         move => H _; left; split => //.
         move=> tr1_ st1'_ st2_ st2'_ [eq1 eq2] [eq3 eq4]; subst.
         by apply/andP.
       + move => H _. right. split => //.
         move=> tr1_ st1'_ [eq1 eq2]; subst.
-        destruct (exec t st2) as [[tr2' st2'] |].
+        destruct (fstep t st2) as [[tr2' st2'] |].
         * destruct (is_low_state st1'_ lab).
           left. split => //. move => tr2_ st2'_ [eq1 eq2] H'; subst.
           destruct (is_low_state st2'_ lab); try congruence.
@@ -132,13 +132,13 @@ Proof.
       + right. split => //. }
   { destruct (indist lab st1 st2) => //. move => /(_ is_true_true) H.
     move: H => [[H1 H2] | [H1 H2]].
-    - rewrite H1. destruct (exec t st1) as [ [tr1' st1'] |] => //.
-      destruct (exec t st2) as [ [tr2' st2'] |] => //.
+    - rewrite H1. destruct (fstep t st1) as [ [tr1' st1'] |] => //.
+      destruct (fstep t st2) as [ [tr2' st2'] |] => //.
       apply/andP. by auto.
     - apply Bool.negb_true_iff  in H1. rewrite H1.
-      destruct (exec t st1) as [ [tr1' st1'] |] => //.
+      destruct (fstep t st1) as [ [tr1' st1'] |] => //.
       move : H2 => /(_ _ _ Logic.eq_refl) [[H2 H3] | [H2 [H3 H4]]].
-      + rewrite H2. destruct (exec t st2) as [ [tr2' st2'] |] => //.
+      + rewrite H2. destruct (fstep t st2) as [ [tr2' st2'] |] => //.
         move: H3 => /(_ _ _ Logic.eq_refl) H3.
         destruct (is_low_state st2' lab) => //. apply/andP; by auto.
       + apply Bool.negb_true_iff in H2. rewrite H2.
@@ -152,13 +152,13 @@ Proof.
   move=> t [lab st1 st2]. split; [move => H; apply/ssniP| move=> /ssniP H];
   rewrite /propSSNI_helper /propSSNI_bool /semTestable semCollect_id in H *.
   - move=> /semPredQProp H. destruct (indist lab st1 st2) => //.
-    { destruct (exec t st1) as [ [tr1' st1'] |] => //.
+    { destruct (fstep t st1) as [ [tr1' st1'] |] => //.
       destruct (is_low_state st1 lab).
-      - destruct (exec t st2) as [ [tr2' st2'] |] => //.
+      - destruct (fstep t st2) as [ [tr2' st2'] |] => //.
           by move/semCollect_id(*/semPredQProp
                  /semWhenFail_id*)/semBool : H => H.
       - destruct (is_low_state st1').
-        + destruct (exec t st2) as [[tr2 st2'] |] => //.
+        + destruct (fstep t st2) as [[tr2 st2'] |] => //.
           destruct (is_low_state st2' lab).
             by move/semCollect_id(*/semPredQProp/semWhenFail_id*)/semBool : H.
             by move/semCollect_id/semPredQProp/semBool : H.
@@ -166,13 +166,13 @@ Proof.
   -  move=> H.
      destruct (indist lab st1 st2);
        try by apply/semPredQProp/semCollect_id/semPredQProp/semBool.
-    { destruct (exec t st1) as [ [tr1' st1'] |].
+    { destruct (fstep t st1) as [ [tr1' st1'] |].
       destruct (is_low_state st1 lab).
-      - destruct (exec t st2) as [ [tr2' st2'] |].
+      - destruct (fstep t st2) as [ [tr2' st2'] |].
         by apply/semPredQProp/semCollect_id(*/semPredQProp/semWhenFail_id*)/semBool.
         by apply/semPredQProp/semCollect_id/semPredQProp/semBool.
       - destruct (is_low_state st1').
-        + destruct (exec t st2) as [[tr2 st2'] |].
+        + destruct (fstep t st2) as [[tr2 st2'] |].
           * destruct (is_low_state st2' lab).
             by apply/semPredQProp/semCollect_id(*/semPredQProp/semWhenFail_id*)/semBool.
             by apply/semPredQProp/semCollect_id/semPredQProp/semBool.
