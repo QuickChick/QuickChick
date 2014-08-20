@@ -75,9 +75,9 @@ Proof. decide equality. Defined.
 
 Hint Resolve bin_op_eq_dec.
 
-Definition instr_eq_dec : forall i1 i2 : Instruction,
+Definition instr_eq_dec : forall i1 i2 : @Instr Label,
   {i1 = i2} + {i1 <> i2}.
-Proof. decide equality. Defined.
+Proof. decide equality. apply label_dec. Defined.
 
 Definition instr_eq i1 i2 := if instr_eq_dec i1 i2 then true else false.
 

@@ -20,7 +20,7 @@ Definition labelCount (c:OpCode) : nat :=
   | OpBRet    => 3
   | OpFlowsTo => 2
   | OpLJoin   => 2
-  | OpPutBot  => 0
+  | OpPutLab  => 0
   | OpNop     => 0
   | OpPut     => 0
   | OpBinOp   => 2
@@ -46,7 +46,7 @@ Definition default_table : table := fun op =>
   | OpBRet    =>  ≪ LE (JOIN Lab1 LabPC) (JOIN Lab2 Lab3) , Lab2 , Lab3 ≫
   | OpFlowsTo =>  ≪ TRUE , JOIN Lab1 Lab2 , LabPC ≫
   | OpLJoin   =>  ≪ TRUE , JOIN Lab1 Lab2 , LabPC ≫
-  | OpPutBot  =>  ≪ TRUE , BOT , LabPC ≫
+  | OpPutLab  =>  ≪ TRUE , BOT , LabPC ≫
   | OpNop     =>  ≪ TRUE , __ , LabPC ≫
   | OpPut     =>  ≪ TRUE , BOT , LabPC ≫
   | OpBinOp   =>  ≪ TRUE , JOIN Lab1 Lab2, LabPC ≫
@@ -107,9 +107,9 @@ Infix "@" := Atm (no associativity, at level 50).
 Inductive Ptr_atom : Type :=
  | PAtm (i:Z) (l:Label).
 
-Definition imem := list Instruction.
+Definition imem := list (@Instr Label).
 
-Definition instr_lookup (m:imem) (pc:Ptr_atom) : option Instruction :=
+Definition instr_lookup (m:imem) (pc:Ptr_atom) : option (@Instr Label) :=
   let '(PAtm i _) := pc in
   index_list_Z i m.
 Notation "m [ pc ]" := (instr_lookup m pc) (at level 20).
@@ -507,11 +507,11 @@ Inductive step (t : table) : State -> trace -> State -> Prop :=
        (St im μ σ r pc)
        nil
        (St im μ σ r' (PAtm (j+1) rpcl))
- | step_putbot: forall im μ σ pc r r' r1 j LPC rl rpcl
+ | step_putlab: forall im μ σ pc r r' r1 j LPC rl rpcl l
      (PC: pc = PAtm j LPC)
-     (CODE: im[pc] = Some (PutBot r1))
-     (TMU : run_tmr t OpPutBot <||> LPC = Some (Some rl, rpcl))
-     (RES : registerUpdate r r1 (Vlab bot @ rl) = Some r'),
+     (CODE: im[pc] = Some (PutLab l r1))
+     (TMU : run_tmr t OpPutLab <||> LPC = Some (Some rl, rpcl))
+     (RES : registerUpdate r r1 (Vlab l @ rl) = Some r'),
      step t
        (St im μ σ r pc)
        nil
@@ -678,7 +678,7 @@ Inductive step (t : table) : State -> trace -> State -> Prop :=
 
 (** * Executable semantics *)
 
-Definition state_instr_lookup (st:State) : option Instruction :=
+Definition state_instr_lookup (st:State) : option (@Instr Label) :=
   let (im,_,_,_,pc) := st in im[pc].
 
 Definition fstep t (st:State) : option (trace * State) :=
@@ -743,10 +743,10 @@ Definition fstep t (st:State) : option (trace * State) :=
           end
         | _, _ => None
       end
-    | PutBot r1 =>
-      match run_tmr t OpPutBot <||> LPC with
+    | PutLab l r1 =>
+      match run_tmr t OpPutLab <||> LPC with
         | Some (Some rl, rpcl) =>
-          do r' <- registerUpdate r r1 (Vlab bot @ rl);
+          do r' <- registerUpdate r r1 (Vlab l @ rl);
           Some (nil,
                 St im μ σ r' (PAtm (j+1) rpcl))
             | _ => None

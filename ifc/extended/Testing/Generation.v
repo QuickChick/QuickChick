@@ -205,7 +205,7 @@ Definition onNonEmpty {A : Type} (l : list A) (n : nat) :=
    while preserving a near to uniform distribution;
    currently boosting BCalls, Alloc, and Store  *)
 
-Definition ainstrSSNI (st : State) : Gen Instruction :=
+Definition ainstrSSNI (st : State) : Gen Instr :=
   let '(St im m stk regs pc ) := st in
   let '(dptr, cptr, num, lab) :=
       groupRegisters st regs [] [] [] [] Z0 in
@@ -229,7 +229,7 @@ Definition ainstrSSNI (st : State) : Gen Instruction :=
     (onNonEmpty lab 10, liftGen3 LJoin (elements Z0 lab)
                                 (elements Z0 lab) genRegPtr);
     (* PutBot *)
-    (10, liftGen PutBot genRegPtr);
+    (10, liftGen2 PutLab gen_label genRegPtr);
     (* BCall *)
     (10 * onNonEmpty cptr 1 * onNonEmpty lab 1,
      liftGen3 BCall (elements Z0 cptr) (elements Z0 lab) genRegPtr);

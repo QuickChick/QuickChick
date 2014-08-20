@@ -39,7 +39,7 @@ Instance show_bin_op : Show BinOpT :=
   show x := "Binop " ++ (match x with BAdd => "+" | BMult => "*" end)
 |}.
 
-Instance show_instr : Show Instruction :=
+Instance show_instr : Show (@Instr Label) :=
 {|
   show i :=
     match i with
@@ -52,7 +52,7 @@ Instance show_instr : Show Instruction :=
       "FlowsTo " ++ show r1 ++ " " ++ show r2 ++ " " ++ show r3
     | LJoin r1 r2 r3  =>
       "LJoin " ++ show r1 ++ " " ++ show r2 ++ " " ++ show r3
-    | PutBot r1 => "PushBot " ++ show r1
+    | PutLab l r => "PutLab " ++ show l ++ " " ++ show r
     | Nop => "Nop"
     | Put n r1 => "Push " ++ show n ++ " " ++ show r1
     | BinOp o r1 r2 r3 => show o ++ " " ++ show r1 ++ " "
@@ -83,7 +83,7 @@ Instance show_op_code : Show OpCode :=
     | OpBRet => "OpBRet"
     | OpFlowsTo => "OpFlowsTo"
     | OpLJoin => "OpLJoin"
-    | OpPutBot => "OpPutBot"
+    | OpPutLab => "OpPutBot"
     | OpNop => "OpNop"
     | OpPut => "OpPut"
     | OpBinOp => "OpBinOp"
