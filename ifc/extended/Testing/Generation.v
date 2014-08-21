@@ -228,7 +228,7 @@ Definition ainstrSSNI (st : State) : Gen Instr :=
     (* LJoin *)
     (onNonEmpty lab 10, liftGen3 LJoin (elements Z0 lab)
                                 (elements Z0 lab) genRegPtr);
-    (* PutBot *)
+    (* PutLab *)
     (10, liftGen2 PutLab gen_label genRegPtr);
     (* BCall *)
     (10 * onNonEmpty cptr 1 * onNonEmpty lab 1,
@@ -251,9 +251,6 @@ Definition ainstrSSNI (st : State) : Gen Instr :=
     (* PSetOff *)
     (10 * onNonEmpty dptr 1 * onNonEmpty num 1,
      liftGen3 PSetOff (elements Z0 dptr) (elements Z0 num) genRegPtr);
-    (* Output *)
-    (onNonEmpty num 10,
-     liftGen Output (elements Z0 num));
     (* Put *)
     (10, liftGen2 Put arbitrary genRegPtr);
     (* BinOp *)
@@ -263,7 +260,9 @@ Definition ainstrSSNI (st : State) : Gen Instr :=
     (* MSize *)
     (onNonEmpty dptr 10, liftGen2 MSize (elements Z0 dptr) genRegPtr);
     (* PGetOff *)
-    (onNonEmpty dptr 10, liftGen2 PGetOff (elements Z0 dptr) genRegPtr)
+    (onNonEmpty dptr 10, liftGen2 PGetOff (elements Z0 dptr) genRegPtr);
+    (* Mov *)
+    (10, liftGen2 Mov genRegPtr genRegPtr)
 ].
 
 Definition instantiate_instructions st : Gen State :=

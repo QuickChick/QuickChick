@@ -65,10 +65,10 @@ Instance show_instr : Show (@Instr Label) :=
       "Alloc " ++ show r1 ++ " " ++ show r2 ++ " " ++ show r3
     | PSetOff r1 r2 r3 =>
       "PSetOff " ++ show r1 ++ " " ++ show r2 ++ " " ++ show r3
-    | Output r1 => "Output " ++ show r1
     | Halt => "Halt"
     | MSize r1 r2 => "MSize " ++ show r1 ++ " " ++ show r2
     | PGetOff r1 r2 => "PGetOff " ++ show r1 ++ " " ++ show r2
+    | Mov r1 r2 => "Mov " ++ show r1 ++ show r2
     end
 |}.
 
@@ -93,9 +93,9 @@ Instance show_op_code : Show OpCode :=
     | OpStore => "OpStore"
     | OpAlloc => "OpAlloc"
     | OpPSetOff => "OpPSetOff"
-    | OpOutput => "OpOutput"
     | OpPGetOff => "OpPGetOff"
     | OpMSize => "OpMSize"
+    | OpMov => "OpMov"
     end
 |}.
 

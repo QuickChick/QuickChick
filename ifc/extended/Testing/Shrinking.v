@@ -288,10 +288,10 @@ Definition decrRegInstr (r : regId) (i : @Instr Label) :=
   | Store r1 r2 => Store (cDecr r r1) (cDecr r r2)
   | Alloc r1 r2 r3 => Alloc (cDecr r r1) (cDecr r r2) (cDecr r r3)
   | PSetOff r1 r2 r3 => PSetOff (cDecr r r1) (cDecr r r2) (cDecr r r3)
-  | Output r1 => Output (cDecr r r1)
   | Halt => Halt
   | MSize r1 r2 => MSize (cDecr r r1) (cDecr r r2)
   | PGetOff r1 r2 => PGetOff (cDecr r r1) (cDecr r r2)
+  | Mov r1 r2 => Mov (cDecr r r1) (cDecr r r2)
   end.
 
 (* TODO

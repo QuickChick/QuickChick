@@ -20,71 +20,77 @@ Section Instr.
 Context {Label : Type}.
 
 Inductive Instr : Type :=
-  | Lab      : regId -> regId -> Instr
-  | MLab     : regId -> regId -> Instr
-  | PcLab    : regId -> Instr
+  (* basic instructions *)
+  | Put (n : Z) : regId -> Instr
+  | Mov      : regId -> regId -> Instr
+  | Load     : regId -> regId -> Instr
+  | Store    : regId -> regId -> Instr
+  | BinOp (o : BinOpT) : regId -> regId -> regId -> Instr
+  | Nop      : Instr
+  | Halt     : Instr
+  | Jump     : regId -> Instr
+  | BNZ (n : Z) : regId -> Instr
   | BCall    : regId -> regId -> regId -> Instr
   | BRet     : Instr
+
+  (* public first-class labels *)
+  | Lab      : regId -> regId -> Instr
+  | PcLab    : regId -> Instr
   | FlowsTo  : regId -> regId -> regId -> Instr
   | LJoin    : regId -> regId -> regId -> Instr
   | PutLab   : Label -> regId -> Instr
-  | Nop      : Instr
-  | Put (n : Z) : regId -> Instr
-  | BinOp (o : BinOpT) : regId -> regId -> regId -> Instr
-  | Jump     : regId -> Instr
-  | BNZ (n : Z) : regId -> Instr
-  | Load     : regId -> regId -> Instr
-  | Store    : regId -> regId -> Instr
+
+  (* dynamic memory allocation *)
   | Alloc    : regId -> regId -> regId -> Instr
-  | PSetOff  : regId -> regId -> regId -> Instr
-  | Output   : regId -> Instr
-  | Halt     : Instr
   | PGetOff  : regId -> regId -> Instr
-  | MSize    : regId -> regId -> Instr.
+  | PSetOff  : regId -> regId -> regId -> Instr
+  | MSize    : regId -> regId -> Instr
+  | MLab     : regId -> regId -> Instr.
 
 Inductive OpCode : Type :=
-  | OpLab
-  | OpMLab
-  | OpPcLab
+  | OpPut
+  | OpMov
+  | OpLoad
+  | OpStore
+  | OpBinOp
+  | OpNop
+  | OpJump
+  | OpBNZ
   | OpBCall
   | OpBRet
+(* missing for Halt *)
+  | OpLab
+  | OpPcLab
   | OpFlowsTo
   | OpLJoin
   | OpPutLab
-  | OpNop
-  | OpPut
-  | OpBinOp
-  | OpJump
-  | OpBNZ
-  | OpLoad
-  | OpStore
   | OpAlloc
-  | OpPSetOff
-  | OpOutput
   | OpPGetOff
-  | OpMSize.
+  | OpPSetOff
+  | OpMSize
+  | OpMLab.
 
 Definition opCodes :=
-  [ OpLab
-  ; OpMLab
-  ; OpPcLab
+  [ OpPut
+  ; OpMov
+  ; OpLoad
+  ; OpStore
+  ; OpBinOp
+  ; OpNop
+  ; OpJump
+  ; OpBNZ
   ; OpBCall
   ; OpBRet
+  ; OpLab
+  ; OpPcLab
   ; OpFlowsTo
   ; OpLJoin
   ; OpPutLab
-  ; OpNop
-  ; OpPut
-  ; OpBinOp
-  ; OpJump
-  ; OpBNZ
-  ; OpLoad
-  ; OpStore
   ; OpAlloc
-  ; OpPSetOff
-  ; OpOutput
   ; OpPGetOff
-  ; OpMSize ].
+  ; OpPSetOff
+  ; OpMSize
+  ; OpMLab ].
 
 Lemma opCodes_correct : forall o : OpCode, In o opCodes.
 Proof. intro o; simpl; destruct o; tauto. Qed.
@@ -95,27 +101,29 @@ Proof. decide equality. Defined.
 
 Definition opcode_of_instr (i : Instr) : option OpCode :=
   match i with
-  | Lab _ _       => Some OpLab
-  | MLab _ _      => Some OpMLab
-  | PcLab _       => Some OpPcLab
+  | Put _ _       => Some OpPut
+  | Mov _ _       => Some OpMov
+  | Load _ _      => Some OpLoad
+  | Store _ _     => Some OpStore
+  | BinOp _ _ _ _ => Some OpBinOp
+  | Nop           => Some OpNop
+  | Halt          => None (* CH: halt has no opcode? why? *)
+  | Jump _        => Some OpJump
+  | BNZ _ _       => Some OpBNZ
   | BCall _ _ _   => Some OpBCall
   | BRet          => Some OpBRet
+
+  | Lab _ _       => Some OpLab
+  | PcLab _       => Some OpPcLab
   | FlowsTo _ _ _ => Some OpFlowsTo
   | LJoin _ _ _   => Some OpLJoin
   | PutLab _ _    => Some OpPutLab
-  | Nop           => Some OpNop
-  | Put _ _       => Some OpPut
-  | BinOp _ _ _ _ => Some OpBinOp
-  | Jump _        => Some OpJump
-  | BNZ _ _       => Some OpBNZ
-  | Load _ _      => Some OpLoad
-  | Store _ _     => Some OpStore
+
   | Alloc _ _ _   => Some OpAlloc
-  | PSetOff _ _ _ => Some OpPSetOff
-  | Output _      => Some OpOutput
   | PGetOff _ _   => Some OpPGetOff
+  | PSetOff _ _ _ => Some OpPSetOff
   | MSize _ _     => Some OpMSize
-  | Halt          => None (* CH: halt has no opcode? why? *)
+  | MLab _ _      => Some OpMLab
 end.
 
 End Instr.

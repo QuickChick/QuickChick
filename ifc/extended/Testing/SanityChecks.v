@@ -40,7 +40,7 @@ Section Checkers.
     forAllShrink (* show *)(fun _ => ""%string) arbitrary (fun _ => []) (fun st =>
     (if well_formed st then
       match fstep t st with
-      | Some (_, st') =>
+      | Some st' =>
 (*
         whenFail ("Initial: " ++ show st ++ nl ++
                   "Step to: " ++ show st' ++ nl)
@@ -89,9 +89,9 @@ Lemma genState_well_formed : forall st,
   @genState Pred _ st <-> well_formed st.
 Admitted.
 
-Definition fstep_preserves_well_formed t : Prop := forall st x st',
+Definition fstep_preserves_well_formed t : Prop := forall st st',
   well_formed st ->
-  fstep t st = Some (x, st') ->
+  fstep t st = Some st' ->
   well_formed st'.
 
 Lemma prop_fstep_preserves_well_formed_equiv :
@@ -102,15 +102,15 @@ Proof.
   move => t.
   rewrite /prop_fstep_preserves_well_formed /fstep_preserves_well_formed
     semForAllShrink /arbitrary /arbState. setoid_rewrite semPredQProp.
-  split => [H st tr st' wf ex | H st arb].
+  split => [H st st' wf ex | H st arb].
   - assert (@genState Pred _ st) as gs by (by rewrite genState_well_formed).
     specialize (H st gs).
     rewrite wf ex in H.
     (* by move /semWhenFail_id /semBool in H. *)    
     by apply semBool in H.
   - move /genState_well_formed in arb. rewrite arb. specialize (H st).
-    move : H. case (fstep t st) => [ [tr st'] | ] H.
-    + specialize (H tr st' arb Logic.eq_refl). rewrite H.
+    move : H. case (fstep t st) => [ st' | ] H.
+    + specialize (H st' arb Logic.eq_refl). rewrite H.
       (* rewrite semWhenFail_id. by rewrite <- semBool. *)
       by apply <- semBool.
     + fold (semTestable rejected). rewrite semResult. reflexivity.

@@ -30,9 +30,9 @@ Definition labelCount (c:OpCode) : nat :=
   | OpStore   => 3
   | OpAlloc   => 3
   | OpPSetOff => 2
-  | OpOutput  => 1
   | OpPGetOff => 1
   | OpMSize   => 2
+  | OpMov     => 1
 end.
 
 Definition table := forall op, AllowModify (labelCount op).
@@ -56,9 +56,9 @@ Definition default_table : table := fun op =>
   | OpStore   =>  ≪ LE (JOIN Lab1 LabPC) Lab2 , Lab3 , LabPC ≫
   | OpAlloc   =>  ≪ TRUE , JOIN Lab1 Lab2 , LabPC ≫
   | OpPSetOff =>  ≪ TRUE , JOIN Lab1 Lab2 , LabPC ≫
-  | OpOutput  =>  ≪ TRUE , JOIN Lab1 LabPC , LabPC ≫
   | OpPGetOff =>  ≪ TRUE , Lab1 , LabPC ≫
   | OpMSize   =>  ≪ TRUE , Lab2 , JOIN LabPC Lab1 ≫
+  | OpMov     =>  ≪ TRUE , Lab1 , LabPC ≫
 end.
 
 Module Type FINLAT.
@@ -72,18 +72,6 @@ Export Lab.
 (** memory frame pointers. *)
 Definition mframe : Type := Mem.block Label.
 
-(* observables *)
-Inductive Obs_value : Type :=
-  | OVint (n:Z).
-
-Definition Obs_eq_dec : forall o1 o2 : Obs_value, {o1 = o2} + {o1 <> o2}.
-  intros. repeat (decide equality).
-Qed.
-
-Definition Obs_value_eq o1 o2 := if Obs_eq_dec o1 o2 then true else false.
-
-Definition trace := list (Obs_value * Label).
-
 (* values *)
 Inductive Pointer : Type :=
   | Ptr (fp:mframe) (i:Z).
@@ -92,12 +80,6 @@ Inductive Value : Type :=
   | Vint  (n:Z)
   | Vptr  (p:Pointer)
   | Vlab  (l:Label).
-
-Definition obs_value_to_value (ov:Obs_value) : Value :=
-  match ov with
-    | OVint n => Vint n
-  end.
-Coercion obs_value_to_value : Obs_value >-> Value.
 
 Inductive Atom : Type :=
  | Atm (v:Value) (l:Label).
@@ -454,7 +436,7 @@ Definition run_tmr (t : table) (op: OpCode)
 Local Open Scope Z_scope.
 (* CH: we only need to instantiate this for the default table,
        so we could even consider baking it in *)
-Inductive step (t : table) : State -> trace -> State -> Prop :=
+Inductive step (t : table) : State -> State -> Prop :=
  | step_lab: forall im μ σ v K pc r r' r1 r2 j LPC rl rpcl
      (PC: pc = PAtm j LPC)
      (CODE: im[pc] = Some (Lab r1 r2))
@@ -463,7 +445,6 @@ Inductive step (t : table) : State -> trace -> State -> Prop :=
      (UPD: registerUpdate r r2 (Vlab K @ rl) = Some r'),
      step t
           (St im μ σ r pc)
-          nil
           (St im μ σ r' (PAtm (j+1) rpcl))
  | step_pclab: forall im μ σ pc r r' r1 j LPC rl rpcl
      (PC: pc = PAtm j LPC)
@@ -472,7 +453,6 @@ Inductive step (t : table) : State -> trace -> State -> Prop :=
      (RES : registerUpdate r r1 (Vlab (∂ pc) @ rl) = Some r'),
      step t
        (St im μ σ r pc)
-       nil
        (St im μ σ r' (PAtm (j+1) rpcl))
  | step_mlab: forall im μ σ pc r r1 r2 p K C j LPC rl r' rpcl
      (PC: pc = PAtm j LPC)
@@ -483,7 +463,6 @@ Inductive step (t : table) : State -> trace -> State -> Prop :=
      (RES : registerUpdate r r2 (Vlab C @ rl) = Some r'),
      step t
        (St im μ σ r pc)
-       nil
        (St im μ σ r' (PAtm (Zsucc j) rpcl))
  | step_flowsto: forall im μ σ pc L1 K1 L2 K2 r r' r1 r2 r3 j LPC rl rpcl
      (PC: pc = PAtm j LPC)
@@ -494,7 +473,6 @@ Inductive step (t : table) : State -> trace -> State -> Prop :=
      (RES : registerUpdate r r3 (Vint (flows_to L1 L2) @ rl) = Some r'),
      step t
        (St im μ σ r pc)
-       nil
        (St im μ σ r' (PAtm (j+1) rpcl))
  | step_ljoin: forall im μ σ pc L1 K1 L2 K2 r r' r1 r2 r3 j LPC rl rpcl
      (PC: pc = PAtm j LPC)
@@ -505,7 +483,6 @@ Inductive step (t : table) : State -> trace -> State -> Prop :=
      (RES : registerUpdate r r3 (Vlab (L1 ∪ L2) @ rl) = Some r'),
      step t
        (St im μ σ r pc)
-       nil
        (St im μ σ r' (PAtm (j+1) rpcl))
  | step_putlab: forall im μ σ pc r r' r1 j LPC rl rpcl l
      (PC: pc = PAtm j LPC)
@@ -514,7 +491,6 @@ Inductive step (t : table) : State -> trace -> State -> Prop :=
      (RES : registerUpdate r r1 (Vlab l @ rl) = Some r'),
      step t
        (St im μ σ r pc)
-       nil
        (St im μ σ r' (PAtm (j+1) rpcl))
  | step_bcall: forall im μ σ pc B K r r1 r2 r3 j Ll addr Lpc rl rpcl
      (PC: pc = PAtm j Lpc)
@@ -524,7 +500,6 @@ Inductive step (t : table) : State -> trace -> State -> Prop :=
      (TMU : run_tmr t OpBCall <|Ll; K|> Lpc = Some (Some rl, rpcl)),
      step t
        (St im μ σ r pc)
-       nil
        (St im μ (((PAtm (j+1) rl), B, r, r3) ::: σ) r (PAtm addr rpcl))
  | step_bret: forall im μ σ pc a r r' r'' r1 R pc' B j j' LPC LPC' rl rpcl
      (PC: pc  = PAtm j  LPC)
@@ -535,7 +510,6 @@ Inductive step (t : table) : State -> trace -> State -> Prop :=
      (RES : registerUpdate r' r1 (a @ rl) = Some r''),
      step t
        (St im μ ((pc',B,r',r1) ::: σ) r pc)
-       nil
        (St im μ σ r'' (PAtm j' rpcl))
  | step_alloc: forall im μ μ' σ pc r r' r1 r2 r3 i K Ll K' rl rpcl j LPC dfp
      (PC: pc = PAtm j LPC)
@@ -549,7 +523,6 @@ Inductive step (t : table) : State -> trace -> State -> Prop :=
      (RES : registerUpdate r r3 (Vptr (Ptr dfp 0) @ rl) = Some r'),
      step t
        (St im μ σ r pc)
-       nil
        (St im μ' σ r' (PAtm (j+1) rpcl))
  | step_load: forall im μ σ pc C p K r r' r1 r2 j LPC v Ll rl rpcl
      (PC  : pc = PAtm j LPC)
@@ -561,7 +534,6 @@ Inductive step (t : table) : State -> trace -> State -> Prop :=
      (RES : registerUpdate r r2 (v @ rl) = Some r'),
      step t
        (St im μ σ r pc)
-       nil
        (St im μ σ r' (PAtm (j+1) rpcl))
  | step_store: forall im μ σ pc v Ll C p K μ' r r1 r2 j LPC rpcl rl
      (PC  : pc = PAtm j LPC)
@@ -573,7 +545,6 @@ Inductive step (t : table) : State -> trace -> State -> Prop :=
      (WRITE: store μ p (v @ rl) = Some μ'),
      step t
        (St im μ σ r pc)
-       nil
        (St im μ' σ r (PAtm (j+1) rpcl))
  | step_jump: forall im μ σ pc addr Ll r r1 j LPC rpcl
      (PC: pc = PAtm j LPC)
@@ -582,7 +553,6 @@ Inductive step (t : table) : State -> trace -> State -> Prop :=
      (TMU: run_tmr t OpJump <|Ll|> LPC = Some (None, rpcl)),
      step t
        (St im μ σ r pc)
-       nil
        (St im μ σ r (PAtm addr rpcl))
  | step_bnz_yes: forall im μ σ pc n m K r r1 j LPC rpcl
      (PC: pc = PAtm j LPC)
@@ -592,7 +562,6 @@ Inductive step (t : table) : State -> trace -> State -> Prop :=
      (TEST: m <> 0),
      step t
        (St im μ σ r pc)
-       nil
        (St im μ σ r (PAtm (j + n) rpcl))
  | step_bnz_no: forall im μ σ pc n m K r r1 j LPC rpcl
      (PC: pc = PAtm j LPC)
@@ -602,7 +571,6 @@ Inductive step (t : table) : State -> trace -> State -> Prop :=
      (TEST: m = 0),
      step t
        (St im μ σ r pc)
-       nil
        (St im μ σ r (PAtm (j + 1) rpcl))
  | step_psetoff: forall im μ σ pc fp' j K1 n K2 r r' r1 r2 r3 j' LPC rl rpcl
      (PC: pc = PAtm j LPC)
@@ -613,17 +581,7 @@ Inductive step (t : table) : State -> trace -> State -> Prop :=
      (RES : registerUpdate r r3 (Vptr (Ptr fp' n) @ rl) = Some r'),
      step t
        (St im μ σ r pc)
-       nil
        (St im μ σ r' (PAtm (j + 1) rpcl))
- | step_output: forall im μ σ pc (ov:Obs_value) n K r r1 j LPC rl rpcl
-     (PC: pc = PAtm j LPC)
-     (CODE: im[pc] = Some (Output r1))
-     (OP1 : registerContent r r1 = Some (Vint n @ K))
-     (TMU : run_tmr t OpOutput <| K |> LPC = Some (Some rl, rpcl)),
-     step t
-       (St im μ σ r pc)
-       ((OVint n,rl)::nil)%list
-       (St im μ σ r (PAtm (j+1) rpcl))
  | step_put: forall im μ σ pc x r r' r1 j LPC rl rpcl
      (PC: pc = PAtm j LPC)
      (CODE: im[pc] = Some (Put x r1))
@@ -631,7 +589,6 @@ Inductive step (t : table) : State -> trace -> State -> Prop :=
      (OP1 : registerUpdate r r1 (Vint x @ rl) = Some r'),
      step t
        (St im μ σ r pc)
-       nil
        (St im μ σ r' (PAtm (j+1) rpcl))
  | step_binop: forall im μ σ pc o n1 L1 n2 L2 n r r1 r2 r3 r' j LPC rl rpcl
      (PC: pc = PAtm j LPC)
@@ -643,7 +600,6 @@ Inductive step (t : table) : State -> trace -> State -> Prop :=
      (RES : registerUpdate r r3 (Vint n @ rl) = Some r'),
      step t
        (St im μ σ r pc)
-       nil
        (St im μ σ r' (PAtm (j+1) rpcl))
  | step_nop: forall im μ σ pc r j LPC rpcl
      (PC: pc = PAtm j LPC)
@@ -651,7 +607,6 @@ Inductive step (t : table) : State -> trace -> State -> Prop :=
      (TMU : run_tmr t OpNop <||> LPC = Some (None, rpcl)),
      step t
        (St im μ σ r pc)
-       nil
        (St im μ σ r (PAtm (j+1) rpcl))
  | step_msize: forall im μ σ pc p K C r r' r1 r2 j LPC rl rpcl n
      (PC: pc = PAtm j LPC)
@@ -663,7 +618,6 @@ Inductive step (t : table) : State -> trace -> State -> Prop :=
      (RES : registerUpdate r r2 (Vint (Z.of_nat n) @ rl) = Some r'),
      step t
        (St im μ σ r pc)
-       nil
        (St im μ σ r' (PAtm (j+1) rpcl))
  | step_pgetoff: forall im μ σ pc fp' j K r r' r1 r2 j' LPC rl rpcl
      (PC: pc = PAtm j LPC)
@@ -673,15 +627,23 @@ Inductive step (t : table) : State -> trace -> State -> Prop :=
      (RES : registerUpdate r r2 (Vint j' @ rl) = Some r'),
      step t
        (St im μ σ r pc)
-       nil
-       (St im μ σ r' (PAtm (j+1) rpcl)).
+       (St im μ σ r' (PAtm (j+1) rpcl))
+ | step_mov: forall im μ σ v K pc r r' r1 r2 j LPC rl rpcl
+     (PC: pc = PAtm j LPC)
+     (CODE: im[pc] = Some (Mov r1 r2))
+     (REG1: registerContent r r1 = Some (v @ K))
+     (TMU: run_tmr t OpMov <|K|> LPC = Some (Some rl, rpcl))
+     (UPD: registerUpdate r r2 (v @ rl) = Some r'),
+     step t
+          (St im μ σ r pc)
+          (St im μ σ r' (PAtm (j+1) rpcl)).
 
 (** * Executable semantics *)
 
 Definition state_instr_lookup (st:State) : option (@Instr Label) :=
   let (im,_,_,_,pc) := st in im[pc].
 
-Definition fstep t (st:State) : option (trace * State) :=
+Definition fstep t (st:State) : option State :=
   do instr <- state_instr_lookup st;
   let '(St im μ σ r pc) := st in
   let '(PAtm j LPC) := pc in
@@ -692,7 +654,7 @@ Definition fstep t (st:State) : option (trace * State) :=
           match run_tmr t OpLab <||> LPC with
             | Some (Some rl, rpcl) =>
               do r' <- registerUpdate r r2 (Vlab K @ rl);
-                Some (nil, St im μ σ r' (PAtm (j+1) rpcl))
+                Some (St im μ σ r' (PAtm (j+1) rpcl))
             | _ => None
           end
         | None => None
@@ -701,8 +663,7 @@ Definition fstep t (st:State) : option (trace * State) :=
       match run_tmr t OpPcLab <||> LPC with
         | Some (Some rl, rpcl) =>
           do r' <- registerUpdate r r1 (Vlab (∂ pc) @ rl);
-            Some (nil,
-                  St im μ σ r' (PAtm (j+1) rpcl))
+            Some (St im μ σ r' (PAtm (j+1) rpcl))
         | _ => None
       end
     | MLab r1 r2 =>
@@ -712,8 +673,7 @@ Definition fstep t (st:State) : option (trace * State) :=
             match run_tmr t OpMLab <|K; C|> LPC with
               | Some (Some rl, rpcl) =>
                 do r' <- registerUpdate r r2 (Vlab C @ rl);
-                Some (nil,
-                  St im μ σ r' (PAtm (j+1) rpcl))
+                Some (St im μ σ r' (PAtm (j+1) rpcl))
               | _ => None
             end
         | _ => None
@@ -725,8 +685,7 @@ Definition fstep t (st:State) : option (trace * State) :=
           match run_tmr t OpFlowsTo <|K1; K2|> LPC with
             | Some (Some rl, rpcl) =>
               do r' <- registerUpdate r r3 (Vint res @ rl);
-              Some (nil,
-                  St im μ σ r' (PAtm (j+1) rpcl))
+              Some (St im μ σ r' (PAtm (j+1) rpcl))
               | _ => None
             end
         | _, _ => None
@@ -737,8 +696,7 @@ Definition fstep t (st:State) : option (trace * State) :=
           match run_tmr t OpLJoin <|K1; K2|> LPC with
             | Some (Some rl, rpcl) =>
               do r' <- registerUpdate r r3 (Vlab (L1 ∪ L2) @ rl);
-              Some (nil,
-                    St im μ σ r' (PAtm (j+1) rpcl))
+              Some (St im μ σ r' (PAtm (j+1) rpcl))
             | _ => None
           end
         | _, _ => None
@@ -747,8 +705,7 @@ Definition fstep t (st:State) : option (trace * State) :=
       match run_tmr t OpPutLab <||> LPC with
         | Some (Some rl, rpcl) =>
           do r' <- registerUpdate r r1 (Vlab l @ rl);
-          Some (nil,
-                St im μ σ r' (PAtm (j+1) rpcl))
+          Some (St im μ σ r' (PAtm (j+1) rpcl))
             | _ => None
           end
     | BCall r1 r2 r3 =>
@@ -756,8 +713,7 @@ Definition fstep t (st:State) : option (trace * State) :=
         | Some (Vint addr @ Ll), Some (Vlab B @ K) =>
           match run_tmr t OpBCall <|Ll; K|> LPC with
             | Some (Some rl, rpcl) =>
-              Some (nil,
-                    St im μ (((PAtm (j+1) rl), B, r, r3) ::: σ) r
+              Some (St im μ (((PAtm (j+1) rl), B, r, r3) ::: σ) r
                        (PAtm addr rpcl))
             | _ => None
           end
@@ -771,8 +727,7 @@ Definition fstep t (st:State) : option (trace * State) :=
           match run_tmr t OpBRet <|R; B; LPC'|> LPC with
             | Some (Some rl, rpcl) =>
               do r' <- registerUpdate savedRegs r1 (a @ rl);
-              Some (nil,
-                    St im μ σ' r' (PAtm jp' rpcl))
+              Some (St im μ σ' r' (PAtm jp' rpcl))
             | _ => None
           end
         | _ => None
@@ -788,8 +743,7 @@ Definition fstep t (st:State) : option (trace * State) :=
               do alloc_res : (mframe * memory) <- alloc i Ll stmp (Vint 0 @ ⊥) μ;
               let (dfp, μ') := alloc_res in
               do r' <- registerUpdate r r3 (Vptr (Ptr dfp 0) @ rl);
-              Some (nil,
-                    St im μ' σ r' (PAtm (j+1) rpcl))
+              Some (St im μ' σ r' (PAtm (j+1) rpcl))
             | _ => None
           end
         | _, _ => None
@@ -803,8 +757,7 @@ Definition fstep t (st:State) : option (trace * State) :=
             match run_tmr t OpLoad <|K; C; Ll|> LPC with
               | Some (Some rl (* Ll *), rpcl (* LPC ∪ K ∪ C *)) =>
                 do r' <- registerUpdate r r2 (v @ rl);
-                Some (nil,
-                      St im μ σ r' (PAtm (j+1) (rpcl)))
+                Some (St im μ σ r' (PAtm (j+1) (rpcl)))
               | _ => None
             end
         | _ => None
@@ -817,8 +770,7 @@ Definition fstep t (st:State) : option (trace * State) :=
             (* check: K ∪ LPC <: C *)
             | Some (Some rl (* Ll *), rpcl (* LPC *)) =>
               do μ' <- store μ p (v @ rl);
-              Some (nil,
-                    St im μ' σ r (PAtm (j+1) rpcl))
+              Some (St im μ' σ r (PAtm (j+1) rpcl))
             | _ => None
           end
         | _, _ => None
@@ -828,8 +780,7 @@ Definition fstep t (st:State) : option (trace * State) :=
         | Some (Vint addr @ Ll) =>
           match run_tmr t OpJump <|Ll|> LPC with
             | Some (None, rpcl) =>
-              Some (nil,
-                St im μ σ r (PAtm addr rpcl))
+              Some (St im μ σ r (PAtm addr rpcl))
             | _ => None
           end
         | _ => None
@@ -840,8 +791,7 @@ Definition fstep t (st:State) : option (trace * State) :=
           match run_tmr t OpBNZ <|K|> LPC with
             | Some (None, rpcl) =>
               let new_pc := (if Z_eq_dec m 0 then j+1 else j+n) in
-                Some (nil,
-                      St im μ σ r (PAtm new_pc rpcl))
+                Some (St im μ σ r (PAtm new_pc rpcl))
             | _ => None
           end
         | _ => None
@@ -852,29 +802,16 @@ Definition fstep t (st:State) : option (trace * State) :=
           match run_tmr t OpPSetOff <|K1; K2|> LPC with
             | Some (Some rl, rpcl) =>
               do r' <- registerUpdate r r3 (Vptr (Ptr fp' n) @ rl);
-              Some (nil,
-                    St im μ σ r' (PAtm (j+1) rpcl))
+              Some (    St im μ σ r' (PAtm (j+1) rpcl))
             | _ => None
           end
         | _, _ => None
-      end
-    | Output r1 =>
-      match registerContent r r1 with
-        | Some (Vint n @ K) =>
-          match run_tmr t OpOutput <| K |> LPC with
-            | Some (Some rl, rpcl) =>
-              Some (((OVint n, rl) :: nil)%list,
-                    St im μ σ r (PAtm (j+1) rpcl))
-            | _ => None
-          end
-        | _ => None
       end
     | Put x r1 =>
       match run_tmr t OpPut <||> LPC with
         | Some (Some rl, rpcl) =>
           do r' <- registerUpdate r r1 (Vint x @ rl);
-            Some (nil,
-                    St im μ σ r' (PAtm (j+1) rpcl))
+            Some (St im μ σ r' (PAtm (j+1) rpcl))
         | _ => None
       end
      | BinOp o r1 r2 r3 =>
@@ -884,8 +821,7 @@ Definition fstep t (st:State) : option (trace * State) :=
              | Some (Some rl, rpcl) =>
                do n <- eval_binop o n1 n2;
                do r' <- registerUpdate r r3 (Vint n @ rl);
-               Some (nil,
-                     St im μ σ r' (PAtm (j+1) rpcl))
+               Some (St im μ σ r' (PAtm (j+1) rpcl))
              | _ => None
            end
          | _, _ => None
@@ -893,8 +829,7 @@ Definition fstep t (st:State) : option (trace * State) :=
      | Nop =>
        match run_tmr t OpNop <||> LPC with
          | Some (None, rpcl) =>
-           Some (nil,
-               St im μ σ r (PAtm (j+1) rpcl))
+           Some (St im μ σ r (PAtm (j+1) rpcl))
          | _ => None
        end
     | MSize r1 r2 =>
@@ -905,8 +840,7 @@ Definition fstep t (st:State) : option (trace * State) :=
               | Some (Some rl, rpcl) =>
                 do n <- msize μ p;
                 do r' <- registerUpdate r r2 (Vint (Z.of_nat n) @ rl);
-                Some (nil,
-                  St im μ σ r' (PAtm (j+1) rpcl))
+                Some (St im μ σ r' (PAtm (j+1) rpcl))
               | _ => None
             end
         | _ => None
@@ -917,13 +851,23 @@ Definition fstep t (st:State) : option (trace * State) :=
           match run_tmr t OpPGetOff <|K|> LPC with
             | Some (Some rl, rpcl) =>
               do r' <- registerUpdate r r2 (Vint j' @ rl);
-              Some (nil,
-                    St im μ σ r' (PAtm (j+1) rpcl))
+              Some (St im μ σ r' (PAtm (j+1) rpcl))
             | _ => None
           end
         | _ => None
       end
-    | _ => None
+    | Mov r1 r2 =>
+      match registerContent r r1 with
+        | Some (v @ K) =>
+          match run_tmr t OpMov <|K|> LPC with
+            | Some (Some rl, rpcl) =>
+              do r' <- registerUpdate r r2 (v @ rl);
+                Some (St im μ σ r' (PAtm (j+1) rpcl))
+            | _ => None
+          end
+        | None => None
+      end
+    | Halt => None
   end.
 
 Ltac fstep_solver :=
@@ -946,8 +890,6 @@ Ltac fstep_solver :=
 *)
             | |- Some _ = None -> _ => intros contra; inversion contra
             | |- None = Some _ -> _ => intros contra; inversion contra
-            | |- context[cons (OVint ?n, _) nil] =>
-              replace (Vint n) with (obs_value_to_value (OVint n)) by auto
           end); try congruence;
   try match goal with
     | |- Some _ = Some _ -> _ =>
@@ -991,32 +933,16 @@ Admitted.
 Qed.
 *)
 *)
-Fixpoint fstepN t (n : nat) (s : State) : trace * list State :=
+Fixpoint fstepN t (n : nat) (s : State) : list State :=
   match n with
-    | O => (nil, s :: nil)
+    | O => (s :: nil)
     | S n' =>
       match fstep t s with
-        | Some (tr, s') =>
+        | Some s' =>
           let res := fstepN t n' s' in
-          (app tr (fst res), s :: snd res)
-        | None => (nil, s :: nil)
+          (s :: res)
+        | None => (s :: nil)
       end
   end%list.
-
-Fixpoint observe (l : Label) (t : trace) : list Obs_value :=
-  match t with
-    | (v, l') :: t' =>
-      if flows l' l then
-        v :: observe l t'
-      else observe l t'
-    | nil => nil
-  end%list.
-
-Fixpoint observe_comp (t1 t2 : list Obs_value) : bool :=
-  match t1, t2 with
-    | o1 :: t1', o2 :: t2' =>
-      Obs_value_eq o1 o2 && observe_comp t1' t2'
-    | _, _ => true
-  end%bool.
 
 End MachineM.

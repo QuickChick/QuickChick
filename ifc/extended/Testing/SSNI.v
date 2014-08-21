@@ -40,18 +40,17 @@ Set Printing All.
                (* XXX Our generator should always give us this by design.
                   If that's not the case the generator is broken. *)
                match fstep t st1 return Gen QProp with
-                 | Some (tr1, st1') =>
+                 | Some st1' =>
                    if is_low_state st1 lab then
                      match fstep t st2 with
-                       | Some (tr2, st2') =>
+                       | Some st2' =>
                          collect "LOW -> *" (
 (*
                                    whenFail
                                      ("LOW -> *" ++ nl ++
                                                  (show_execution lab [st1; st1'] [st2; st2']))
 *)
-                                     (observe_comp (observe lab tr1) (observe lab tr2)
-                                                   && (indist lab st1' st2'))(*:Gen QProp*))
+                                     (indist lab st1' st2')(*:Gen QProp*))
                        | _ => (* 1 took a low step and 2 failed *)
                          collect "Second failed" (property true : Gen QProp)
                      (*
@@ -64,15 +63,14 @@ Set Printing All.
                    else (* is_high st1 *)
                      if is_low_state st1' lab then
                        match fstep t st2 with
-                         | Some (tr2, st2') =>
+                         | Some st2' =>
                            if is_low_state st2' lab then
                              collect "HIGH -> LOW" (
 (*
                                        whenFail ("HIGH -> LOW" ++ Show.nl ++
                                                                 (show_execution lab [st1; st1'] [st2; st2']))
 *)
-                                                 (observe_comp (observe lab tr1) (observe lab tr2)
-                                                               && (indist lab st1' st2')) (* : Gen QProp *)
+                                                 (indist lab st1' st2') (* : Gen QProp *)
                                      )
                            else collect "Second not low" (property true : Gen QProp)
                          (* This can happen; it's just a discard *)
@@ -86,8 +84,7 @@ Set Printing All.
                                  whenFail ("HIGH -> HIGH" ++ Show.nl ++
                                                           (show_pair lab st1 st1'))
 *)
-                                          (beq_nat (List.length (observe lab tr1)) 0
-                                       && indist lab st1 st1')
+                                       (indist lab st1 st1')
                                (*: Gen QProp*))
                  | _ => collect "Failed" (property true : Gen QProp)
                (* This can happen; it's just a discard *)

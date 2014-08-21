@@ -81,9 +81,7 @@ endif
 #                    #
 ######################
 
-VFILES:=Testing/SSNICheckerProofs.v\
-  Testing/GenerationProofs.v\
-  Testing/GenerationProofsHelpers.v\
+VFILES:=Testing/GenerationProofsHelpers.v\
   Testing/SSNI.v\
   Testing/SingleStateArb.v\
   Testing/Shrinking.v\
