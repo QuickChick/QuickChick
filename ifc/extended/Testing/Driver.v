@@ -28,9 +28,9 @@ Definition test_generate_indist :=
   showResult (quickCheck (prop_generate_indist : Gen.Gen QProp)).
 QuickCheck test_generate_indist.
 
-Definition test_exec_preserves_well_formed :=
-  showResult (quickCheck (prop_exec_preserves_well_formed default_table : Gen.Gen QProp)).
-QuickCheck test_exec_preserves_well_formed.
+Definition test_fstep_preserves_well_formed :=
+  showResult (quickCheck (prop_fstep_preserves_well_formed default_table : Gen.Gen QProp)).
+QuickCheck test_fstep_preserves_well_formed.
 
 (* Testing non-interference second (default table) *)
 
@@ -52,7 +52,7 @@ Instance mutateable_table : Mutateable table :=
 
 Definition testMutants :=
   mutateCheckMany default_table (fun t => [propSSNI t;
-    prop_exec_preserves_well_formed t] : list (Gen.Gen QProp)
+    prop_fstep_preserves_well_formed t] : list (Gen.Gen QProp)
 ).
 
 Definition runTestMutants := show testMutants.
@@ -113,7 +113,7 @@ Definition testMutant36 := testMutantX
 Definition testMutantWF x y :=
   let mutant := fun o' =>
     (helper x y o' (default_table o'))  in
-  quickCheck (prop_exec_preserves_well_formed mutant : Gen.Gen QProp).
+  quickCheck (prop_fstep_preserves_well_formed mutant : Gen.Gen QProp).
 
 Definition testMutant36wf := testMutantWF
   OpAlloc (≪TRUE, Lab2, LabPC ≫).

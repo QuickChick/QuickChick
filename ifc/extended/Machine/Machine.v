@@ -495,9 +495,9 @@ Inductive step (t : table) : State -> State -> Prop :=
  | step_bcall: forall im μ σ pc B K r r1 r2 r3 j Ll addr Lpc rl rpcl
      (PC: pc = PAtm j Lpc)
      (CODE: im[pc] = Some (BCall r1 r2 r3))
-     (OP1 : registerContent r r1 = Some (Vint addr @ Ll))
+     (OP1 : registerContent r r1 = Some (Vint addr @ La))
      (OP2 : registerContent r r2 = Some (Vlab B @ K))
-     (TMU : run_tmr t OpBCall <|Ll; K|> Lpc = Some (Some rl, rpcl)),
+     (TMU : run_tmr t OpBCall <|La; K|> Lpc = Some (Some rl, rpcl)),
      step t
        (St im μ σ r pc)
        (St im μ (((PAtm (j+1) rl), B, r, r3) ::: σ) r (PAtm addr rpcl))
