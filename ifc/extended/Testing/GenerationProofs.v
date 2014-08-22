@@ -624,13 +624,13 @@ Qed.
 
 (* Instruction *)
 
-Definition Instruction_spec (st : State) instr :=
+Definition Instruction_spec (st : State) (instr : @Instr Label) :=
   let '(St im m stk regs pc ) := st in
   let '(dptr, cptr, num, lab) :=
       groupRegisters st regs [] [] [] [] Z0 in
   match instr with
     | Nop => True | Halt => False
-    | PcLab z | PutBot z | Put _ z => (0 <= z <= (Zlength regs -1))%Z
+    | PcLab z | PutLab _ z | Put _ z => (0 <= z <= (Zlength regs -1))%Z
     | Lab z1 z2 =>
       (0 <= z1 <= (Zlength regs-1))%Z /\ (0 <= z2 <= (Zlength regs-1))%Z
     | MLab z1 z2 | Load z1 z2 | Store z1 z2 | MSize z1 z2 | PGetOff z1 z2 =>
@@ -808,7 +808,7 @@ Proof.
   case: (groupRegisters st regs [] [] [] [] Z0)=> [[[dptr cptr] num] lab].
   split.
   - case: instr => [r1 r2 | r1 r2 | r | r1 r2 r3 | | r1 r2 r3 | r1 r2 r3 |
-                    r | | z r | bop r1 r2 r3 | r | z r | r1 r2 | r1 r2 |
+                    l r | | z r | bop r1 r2 r3 | r | z r | r1 r2 | r1 r2 |
                     r1 r2 r3 | r1 r2 r3 | r | | r1 r2 | r1 r2];
     move /frequency_equiv =>  [[n [g [HIn [Hg Hn]]]] | [[H | H] H' //=]];
     rewrite /gen_from_length /pure in HIn; repeat discr_or_first;
@@ -816,12 +816,14 @@ Proof.
                  [by unfold_gen; try_solve | by repeat discr_or_first]).
  -  Opaque mult choose.
    case: instr => [r1 r2 | r1 r2 | r | r1 r2 r3 | | r1 r2 r3 | r1 r2 r3 |
-                    r | | z r | bop r1 r2 r3 | r | z r | r1 r2 | r1 r2 |
+                    l r | | z r | bop r1 r2 r3 | r | z r | r1 r2 | r1 r2 |
                     r1 r2 r3 | r1 r2 r3 | r | | r1 r2 | r1 r2];
                    move => H; apply frequency_equiv; left;
     instantiate_exists; try rewrite /gen_from_lengt; try by try_solve2.
-    rewrite liftGen2_def. eexists. split; [| try_solve2].
-    rewrite /arbitrary /arbInt. by apply arbInt_correct.
+    + rewrite liftGen2_def. eexists. split; [| try_solve2].
+      by rewrite gen_label_correct.
+    + rewrite liftGen2_def. eexists. split; [| try_solve2].
+      rewrite /arbitrary /arbInt. by apply arbInt_correct.
 Qed.
 
 

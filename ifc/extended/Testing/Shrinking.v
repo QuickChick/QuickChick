@@ -11,13 +11,6 @@ Require Import Generation.
 
 Local Open Scope nat.
 
-Definition shrinkBinop (b : BinOpT) : list BinOpT := nil.
-Definition shrinkInstr i :=
-  match i with
-    | Nop => nil
-    | _ => [Nop]
-  end.
-
 (* CH: old stuff about sets of prins
 Powerset returns the set as its first element, so ignore that
 Definition shrinkLabel l :=
@@ -32,6 +25,15 @@ Definition shrinkLabel l :=
   | L       => []
   | M1 | M2 => [L]
   | H       => [L;M1;M2]
+  end.
+
+Definition shrinkBinop (b : BinOpT) : list BinOpT := nil.
+Definition shrinkInstr (i : @Instr Label) : list (@Instr Label) :=
+  match i with
+    | Nop => nil
+    | PutLab l r =>
+      List.map (fun l' => PutLab l' r) (shrinkLabel l) ++ [Nop]
+    | _ => [Nop]
   end.
 
 Definition shrinkPointer (p : Pointer) : list Pointer :=
@@ -50,8 +52,8 @@ Definition shrinkAtom (a : Atom) : list Atom :=
   List.map (flip Atm lab) (shrinkValue val)
   ++  List.map (Atm val) (shrinkLabel lab).
 
-Fixpoint noopShrink (n : nat) (l : Label) (l1 l2 : list Instruction)
-: list (@Variation (list Instruction)) :=
+Fixpoint noopShrink (n : nat) (l : Label) (l1 l2 : list (@Instr Label))
+: list (@Variation (list (@Instr Label))) :=
   match n with
     | S n' =>
       match List.nth n' l1 Nop, List.nth n' l2 Nop with
@@ -67,8 +69,8 @@ Fixpoint noopShrink (n : nat) (l : Label) (l1 l2 : list Instruction)
     | _ => nil
   end.
 
-Fixpoint noopRemove (l : Label) (l1 l2 : list Instruction)
-         (acc1 acc2 : list Instruction) :=
+Fixpoint noopRemove (l : Label) (l1 l2 : list (@Instr Label))
+         (acc1 acc2 : list (@Instr Label)) :=
   match l1, l2 with
     | Nop :: t1, Nop :: t2 =>
       (Var l (rev_append acc1 t1)) (rev_append acc2 t2)
@@ -264,10 +266,10 @@ Definition shrinkStateStack (v : @Variation State) :=
 Definition shrinkState x :=
   (* shrinkStateMemory x ++ *) shrinkStateStack x.
 
-Definition cDecr (lim r : regPtr) :=
+Definition cDecr (lim r : regId) :=
   if (lim <=? r)%Z then (r - 1)%Z else r.
 
-Definition decrRegInstr (r : regPtr) (i : Instruction) :=
+Definition decrRegInstr (r : regId) (i : @Instr Label) :=
   match i with
   | Lab r1 r2 => Lab (cDecr r r1) (cDecr r r2)
   | MLab r1 r2 => MLab (cDecr r r1) (cDecr r r2)
@@ -276,7 +278,7 @@ Definition decrRegInstr (r : regPtr) (i : Instruction) :=
   | BRet => BRet
   | FlowsTo r1 r2 r3 => FlowsTo (cDecr r r1) (cDecr r r2) (cDecr r r3)
   | LJoin r1 r2 r3  => LJoin (cDecr r r1) (cDecr r r2) (cDecr r r3)
-  | PutBot r1 => PutBot (cDecr r r1)
+  | PutLab l r1 => PutLab l (cDecr r r1)
   | Nop => Nop
   | Put n r1 => Put n (cDecr r r1)
   | BinOp o r1 r2 r3 => BinOp o (cDecr r r1) (cDecr r r2) (cDecr r r3)
@@ -286,14 +288,14 @@ Definition decrRegInstr (r : regPtr) (i : Instruction) :=
   | Store r1 r2 => Store (cDecr r r1) (cDecr r r2)
   | Alloc r1 r2 r3 => Alloc (cDecr r r1) (cDecr r r2) (cDecr r r3)
   | PSetOff r1 r2 r3 => PSetOff (cDecr r r1) (cDecr r r2) (cDecr r r3)
-  | Output r1 => Output (cDecr r r1)
   | Halt => Halt
   | MSize r1 r2 => MSize (cDecr r r1) (cDecr r r2)
   | PGetOff r1 r2 => PGetOff (cDecr r r1) (cDecr r r2)
+  | Mov r1 r2 => Mov (cDecr r r1) (cDecr r r2)
   end.
 
 (* TODO
-Fixpoint decrRegInFrames (m : mem) (fs : list mframe) (r : regPtr) :=
+Fixpoint decrRegInFrames (m : mem) (fs : list mframe) (r : regId) :=
   match fs with
     | []   => m
     | h::t =>
@@ -308,7 +310,7 @@ Fixpoint decrRegInFrames (m : mem) (fs : list mframe) (r : regPtr) :=
       end
 end.
 
-Definition removeReg (st : State) (r : regPtr) :=
+Definition removeReg (st : State) (r : regId) :=
   let '(St m p s rs pc) := st in
   let rn := Z.to_nat r in
   let rsHd := firstn rn rs in

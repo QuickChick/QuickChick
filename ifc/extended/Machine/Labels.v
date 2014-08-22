@@ -114,6 +114,17 @@ Hint Resolve
   @not_flows_not_join_flows_right
   @not_flows_not_join_flows_left : lat.
 
+Definition label_dec {T : Type} {Lat : JoinSemiLattice T}
+  : forall l1 l2 : T, {l1 = l2} + {l1 <> l2}.
+Proof.
+  intros x y.
+  destruct (flows x y) eqn:xy;
+  destruct (flows y x) eqn:yx; try (right; congruence).
+  - left. eauto with lat.
+  - generalize (flows_refl x). intros.
+    right. congruence.
+Defined.
+
 Instance LatEqDec (T : Type) {Lat : JoinSemiLattice T} : EqDec T eq.
   intros x y.
   destruct (flows x y) eqn:xy;

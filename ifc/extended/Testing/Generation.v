@@ -156,7 +156,7 @@ Definition meet_stack_label (s : Stack) (l : Label) : Stack :=
 
 Definition smart_gen_stack_loc (f : Label -> Label -> Gen Label)
            (below_pc above_pc : Label) inf
-: Gen (Ptr_atom * Label * regSet * regPtr) :=
+: Gen (Ptr_atom * Label * regSet * regId) :=
     bindGen (smart_gen inf) (fun regs =>
     bindGen (smart_gen inf) (fun pc   =>
     bindGen (gen_from_nat_length (no_regs inf)) (fun target =>
@@ -182,7 +182,7 @@ Definition smart_gen_stack (pc : Ptr_atom) inf : Gen Stack :=
    (data pointers, numeric and labels)
 *)
 Fixpoint groupRegisters (st : State) (rs : regSet)
-         (dptr cptr num lab : list regPtr) (n : Z) :=
+         (dptr cptr num lab : list regId) (n : Z) :=
   match rs with
     | nil => (dptr, cptr, num, lab)
     | (Vint i @ _) :: rs' =>
@@ -205,7 +205,7 @@ Definition onNonEmpty {A : Type} (l : list A) (n : nat) :=
    while preserving a near to uniform distribution;
    currently boosting BCalls, Alloc, and Store  *)
 
-Definition ainstrSSNI (st : State) : Gen Instruction :=
+Definition ainstrSSNI (st : State) : Gen Instr :=
   let '(St im m stk regs pc ) := st in
   let '(dptr, cptr, num, lab) :=
       groupRegisters st regs [] [] [] [] Z0 in
@@ -228,8 +228,8 @@ Definition ainstrSSNI (st : State) : Gen Instruction :=
     (* LJoin *)
     (onNonEmpty lab 10, liftGen3 LJoin (elements Z0 lab)
                                 (elements Z0 lab) genRegPtr);
-    (* PutBot *)
-    (10, liftGen PutBot genRegPtr);
+    (* PutLab *)
+    (10, liftGen2 PutLab gen_label genRegPtr);
     (* BCall *)
     (10 * onNonEmpty cptr 1 * onNonEmpty lab 1,
      liftGen3 BCall (elements Z0 cptr) (elements Z0 lab) genRegPtr);
@@ -251,9 +251,6 @@ Definition ainstrSSNI (st : State) : Gen Instruction :=
     (* PSetOff *)
     (10 * onNonEmpty dptr 1 * onNonEmpty num 1,
      liftGen3 PSetOff (elements Z0 dptr) (elements Z0 num) genRegPtr);
-    (* Output *)
-    (onNonEmpty num 10,
-     liftGen Output (elements Z0 num));
     (* Put *)
     (10, liftGen2 Put arbitrary genRegPtr);
     (* BinOp *)
@@ -263,7 +260,9 @@ Definition ainstrSSNI (st : State) : Gen Instruction :=
     (* MSize *)
     (onNonEmpty dptr 10, liftGen2 MSize (elements Z0 dptr) genRegPtr);
     (* PGetOff *)
-    (onNonEmpty dptr 10, liftGen2 PGetOff (elements Z0 dptr) genRegPtr)
+    (onNonEmpty dptr 10, liftGen2 PGetOff (elements Z0 dptr) genRegPtr);
+    (* Mov *)
+    (10, liftGen2 Mov genRegPtr genRegPtr)
 ].
 
 Definition instantiate_instructions st : Gen State :=
@@ -408,8 +407,8 @@ Instance smart_vary_memory : SmartVary memory :=
    when pc is high *)
 
 (*  Definition gen_vary_stack_loc (obs: Label) (inf : Info)  *)
-(*            (s : Ptr_atom * Label * regSet * regPtr)  *)
-(* : Gen  (Ptr_atom * Label * regSet * regPtr) := *)
+(*            (s : Ptr_atom * Label * regSet * regId)  *)
+(* : Gen  (Ptr_atom * Label * regSet * regId) := *)
 (*     let '(pc, lab, rs, r) := s in *)
 (*     (* If the return label is low just vary the registers (a bit) *) *)
 (*     if isLow ∂pc obs then  *)
@@ -426,8 +425,8 @@ Instance smart_vary_memory : SmartVary memory :=
 
 
 Definition gen_vary_stack_loc (obs: Label) (inf : Info)
-           (s : Ptr_atom * Label * regSet * regPtr)
-: Gen  (Ptr_atom * Label * regSet * regPtr) :=
+           (s : Ptr_atom * Label * regSet * regId)
+: Gen  (Ptr_atom * Label * regSet * regId) :=
     let '(pc, lab, rs, r) := s in
     (* If the return label is low just vary the registers (a bit) *)
     if isLow ∂pc obs then
@@ -440,7 +439,7 @@ Definition gen_vary_stack_loc (obs: Label) (inf : Info)
       returnGen (pc, lab, rs', r)).
 
 (* Just vary a single stack location *)
-Instance smart_vary_stack_loc : SmartVary (Ptr_atom * Label * regSet * regPtr) :=
+Instance smart_vary_stack_loc : SmartVary (Ptr_atom * Label * regSet * regId) :=
 {|
   smart_vary := gen_vary_stack_loc
 |}.
