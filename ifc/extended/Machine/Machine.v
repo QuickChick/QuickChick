@@ -870,6 +870,12 @@ Definition fstep t (st:State) : option State :=
     | Halt => None
   end.
 
+Lemma fstepP t st st' : fstep t st = Some st' -> step t st st'.
+Proof.
+admit.
+Qed.
+
+
 Ltac fstep_solver :=
   repeat (simpl; match goal with
             | |- context[registerContent ?rs ?reg] =>
