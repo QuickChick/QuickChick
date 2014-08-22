@@ -1,6 +1,8 @@
 Require Import List. Import ListNotations.
 Require Import ZArith.
 
+Require Import ssreflect ssrfun ssrbool eqtype ssrnat seq choice fintype path fingraph.
+
 Require Import Common.
 
 Definition is_low_pointer (obs : Label) (st : State) (a : Atom) : bool :=
@@ -84,13 +86,26 @@ Function reachable_from_root_set (obs : Label) (st : State)
 Proof.
 Admitted.
 
-Definition reachable (obs : Label) (st : State) : list mframe :=
-  let root_set := get_root_set obs st in
-  reachable_from_root_set obs st [] root_set.
+(* spec:
+x \notin visited ->
+  x \in reachable_from_root_set obs st visited worklist <->
+  exists p, path R (last 
+
+*)
+
+Definition references (obs : Label) (st : State) (f1 f2 : mframe) :=
+  if Mem.get_frame (st_mem st) f1 is Some (Fr _ l atoms) then
+    f2 \in get_mframes_from_atoms obs st atoms
+  else false.
+
+Definition reachable (obs : Label) (st : State) : rel mframe :=
+  connect (references obs st).
 
 Definition well_formed_label (st : State) (l : Label) : bool :=
-  let observable := reachable l st in
-  forallb (fun mf => let s := Mem.stamp mf in isLow s l) observable.
+  let root_set := get_root_set l st in
+  [forall f1, forall f2, (f1 \in root_set) ==> reachable l st f1 f2 ==>
+     let s := Mem.stamp f2 in isLow s l].
+
 
 (* Given a state and a stamp configuration, make sure everything is ok *)
 (* LL: This also suggests a way of generating stamps! Namely, get
@@ -102,18 +117,3 @@ Definition well_formed (st : State) : bool :=
    initial accumulator *)
 Definition list_meet (acc : Label) (ls : list Label) :=
   fold_left meet ls acc.
-
-(* Attempt to reverse the above predicate to get a stamp generator *)
-(* CH: currently unused *)
-Definition generate_stamp (st : State) (mf : mframe) : mframe :=
-  let cands := filter (fun l => elem Mem.EqDec_block mf (reachable l st)) elems in
-  Mem.put_stamp (list_meet top cands) mf.
-
-
-(* LL: TODO: go through the whole thing and generate stamps! *)
-(*
-Definition generateStamps (st : State) : StampMap :=
-  let '(St m p _ _ _) := st in
-  fold_left (fun sm mf => updateStampMap sm mf (generateStamp st mf))
-            (allocated m) emptyStampMap.
-*)
