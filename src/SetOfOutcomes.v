@@ -279,11 +279,48 @@ Proof.
 Qed.
 
 (* (Primitively) recursive construct has (primitively) recursive spec *)
-Lemma foldGen_equiv :
+Lemma foldGen_cat:
+  forall {A B : Type} (f : A -> B -> Pred A) (bn : list B) (a0 : A) (bs : B),
+    foldGen f (bn ++  (bs :: nil)) a0 <--> 
+    bindGen (foldGen f bn a0) (fun an => 
+    f an bs).
+Proof.
+  move=> A B f bn a0 bs an.
+  elim : bn a0 an bs => [| b bn IHbs] a0 an bs.
+  - simpl. split.
+    + move=> [a [Hf an']]. rewrite returnGen_def in an'; subst.
+      exists a0. split => //.
+    + move=> [a [Heq Hf]]. rewrite returnGen_def in Heq; subst.
+      exists an. split => //.
+  - simpl. split.
+    + move=> [a [Hf /IHbs [a' [Hg Hf']]]]. exists a'. split => //. 
+      exists a=> //.
+    + move=> [a [[a' [Hf' Hg]] Hf]]. exists a'. split => //. 
+      apply IHbs. eexists. split; eassumption.
+Qed.
+    
+Lemma foldGen_left_equiv :
+  forall {A B : Type} (f : A -> B -> Pred A) (bs : list B) (a0 : A),
+    foldGen f bs a0 <-->
+    foldl (fun g b => fun x => exists a, g a /\ f a b x) (eq a0) bs.
+Proof.
+  move=> A B f bs a0 an. rewrite /foldGen.
+  elim/last_ind : bs a0 an => [| b bs IHbs] a0 an.
+  - split; auto.
+  - rewrite -cats1. rewrite foldl_cat /=. split.
+    + move => /foldGen_cat [a' [Hfold Hf]].  
+      exists a'. split => //. by apply IHbs. 
+    + move => [a' [Hfold Hf]]. apply foldGen_cat. 
+      exists a'. split=> //. by apply IHbs.
+Qed.
+
+
+Lemma foldGen_right_equiv :
   forall {A B : Type} (f : A -> B -> Pred A) (bs : list B) (a0 : A),
     foldGen f bs a0 <-->
     fun an => 
-      foldr (fun b p => fun a_prev => exists a, f a_prev b a /\ p a) (eq an) bs a0.
+      foldr (fun b p => fun a_prev => exists a, f a_prev b a /\ p a) 
+            (eq an) bs a0.
 Proof.
   move=> A B f bs a0 an. rewrite /foldGen.
   elim : bs a0 an => [| b bs IHbs] a0 an;
@@ -310,7 +347,7 @@ Qed.
 
 End invariants.
 
-Lemma vectorOf_equiv:
+Lemma vectorOf_equiv: 
   forall {A : Type} (k : nat) (g : Pred A),
     vectorOf k g <--> fun l => (length l = k /\ forall x, In x l -> g x).
 Proof.

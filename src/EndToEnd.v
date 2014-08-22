@@ -5,21 +5,21 @@ Require Import ssreflect ssrbool eqtype.
 
 Definition Property := Property Pred.
 
-Definition resultCorrect (r : Result) : bool :=
+Definition resultSuccessful (r : Result) : bool :=
   match r with
     | MkResult (Some res) expected _ _ _ _ =>
       if res then true else ~~expected
     | _ => true
   end.
 
-Definition failure qp :=
+Definition success qp :=
   match qp with
-    | MkProp (MkRose res _) => ~~ (resultCorrect res)
+    | MkProp (MkRose res _) => resultSuccessful res
   end.
 
 (* Maps a Property to a Prop *)
 Definition semProperty (P : Property) : Prop :=
-  forall qp, P qp -> failure qp = false.
+  forall qp, P qp -> success qp = true.
 
 (* Maps a Testable to a Prop i.e. gives an equivalent proposition to the
    property under test *)
@@ -28,7 +28,7 @@ Definition semTestable {A : Type} {_ : Testable  A} (a : A) : Prop :=
 
 Lemma mapTotalResult_id:
   forall {prop : Type} {H : Testable prop} (f : Result -> Result) (p : prop),
-    (forall res, resultCorrect res = resultCorrect (f res)) ->
+    (forall res, resultSuccessful res = resultSuccessful (f res)) ->
     ((semProperty (mapTotalResult f p)) <-> (semTestable p)).
 Proof.
   move => prop H f p Hyp.
@@ -40,11 +40,11 @@ Proof.
       match qp with
         | {| unProp := t |} => {| unProp := fmapRose f t |}
       end.
-    have: failure qp' = false.
+    have: success qp' = true.
     { apply H1. exists qp; split => //. }
     destruct qp as [[]]. simpl in *. by rewrite -Hyp.
   - move => H1 qp [qp' [/H1 Hprop H2]].
-    rewrite /returnP in H2. subst. rewrite /failure.
+    rewrite /returnP in H2. subst. rewrite /success.
     destruct qp' as [[]]. simpl in *. by rewrite -Hyp.
 Qed.
 
@@ -146,7 +146,20 @@ Proof.
   move=> prop H s p. by rewrite /collect semLabel_id.
 Qed.
 
+Open Scope Property_scope.
 
+Lemma semImplication:
+      forall {prop : Type} {H : Testable prop}
+             (p : prop) (b : bool),
+        semProperty (b ==> p) <-> b = true -> semTestable p.
+Proof.
+  move => prop H p b. case: b.
+  - split => /=; auto. apply. reflexivity.
+  - split; try congruence. move => _.
+    rewrite /implication.  rewrite /semProperty /property /testResult.
+    move => qp. rewrite returnGen_def. by move => <-.
+Qed.
+    
 (* equivalences for other combinators *)
 
 Lemma semBindGen:
@@ -222,13 +235,13 @@ Proof.
 Qed.
 
 Lemma semResult:
-  forall (res: Result),  semTestable res <-> resultCorrect res = true.
+  forall (res: Result), semTestable res <-> resultSuccessful res = true.
 Proof.
   rewrite /semTestable /property /testResult /semProperty.
   move => res. split.
   + move=> /(_ ({| unProp := returnRose res |})) /= H.
-    apply Bool.negb_false_iff. by apply H.
-  + move=> H [[res' l]] [Heq1 Heq2]; subst. by rewrite /failure H.
+    by apply H.
+  + move=> H [[res' l]] [Heq1 Heq2]; by subst.
 Qed.
 
 Lemma semUnit:
@@ -240,7 +253,7 @@ Qed.
 
 Lemma semQProp:
   forall (qp: QProp),
-    semTestable qp <-> failure qp = false.
+    semTestable qp <-> success qp = true.
 Proof.
   move => qp. rewrite /semTestable /semProperty /property
                       /testProp returnGen_def.
@@ -303,7 +316,7 @@ Class Provable (A : Type) {H: Testable A} : Type :=
 
 Program Instance proveResult : Provable Result :=
   {|
-    semProp := resultCorrect
+    semProp := resultSuccessful
   |}.
 Next Obligation.
   by rewrite semResult.
@@ -319,7 +332,7 @@ Qed.
 
 Program Instance proveQProp : Provable QProp :=
   {|
-    semProp qp := failure qp = false
+    semProp qp := success qp = true
   |}.
 Next Obligation.
   by rewrite semQProp.

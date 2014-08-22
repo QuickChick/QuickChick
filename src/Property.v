@@ -58,12 +58,6 @@ Record QProp : Type :=
       unProp : Rose Result
     }.
 
-Definition failure qp :=
-  match qp with
-    | MkProp (MkRose (MkResult (Some false) _ _ _ _ _) _) => true
-    | _ => false
-  end.
-
 Definition Property (Gen: Type -> Type) : Type := Gen QProp.
 
 Section Property.
@@ -192,9 +186,7 @@ Section Property.
   Definition implication {prop : Type} `{Testable prop} (b : bool) (p : prop) :=
     if b then property p else property rejected.
        
-  Notation "x ==> y" := (implication x y) (at level 70, right associativity) 
-                        : property_scope.
- 
+
   Definition forAll {A prop : Type} {_ : Testable prop}
              (show : A -> string) (gen : Gen A)  (pf : A -> prop) : Property Gen :=
     bindGen gen (fun x =>
@@ -225,3 +217,9 @@ Section Property.
 
 
 End Property.
+
+Notation "x ==> y" := (implication x y) (at level 55, right associativity) 
+                      : Property_scope.
+
+
+ 
