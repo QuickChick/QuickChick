@@ -18,8 +18,6 @@ Definition labelCount (c:OpCode) : nat :=
   | OpPcLab   => 0
   | OpBCall   => 2
   | OpBRet    => 3
-  | OpFlowsTo => 2
-  | OpLJoin   => 2
   | OpPutLab  => 0
   | OpNop     => 0
   | OpPut     => 0
@@ -44,8 +42,6 @@ Definition default_table : table := fun op =>
   | OpPcLab   =>  ≪ TRUE , BOT , LabPC ≫
   | OpBCall   =>  ≪ TRUE , JOIN Lab2 LabPC , JOIN Lab1 LabPC ≫
   | OpBRet    =>  ≪ LE (JOIN Lab1 LabPC) (JOIN Lab2 Lab3) , Lab2 , Lab3 ≫
-  | OpFlowsTo =>  ≪ TRUE , JOIN Lab1 Lab2 , LabPC ≫
-  | OpLJoin   =>  ≪ TRUE , JOIN Lab1 Lab2 , LabPC ≫
   | OpPutLab  =>  ≪ TRUE , BOT , LabPC ≫
   | OpNop     =>  ≪ TRUE , __ , LabPC ≫
   | OpPut     =>  ≪ TRUE , BOT , LabPC ≫
@@ -155,6 +151,15 @@ Qed.
 
 Definition val (v1 v2 : Value) : Value :=
   Vint (if v1 == v2 then 1 else 0).
+
+Definition eval_binop (b : BinOpT) (v1 v2 : Value) : option Value :=
+  match b, v1, v2 with
+    | BAdd,     Vint z1, Vint z2 => Some (Vint (z1 + z2)%Z)
+    | BMult,    Vint z1, Vint z2 => Some (Vint (z1 * z2)%Z)
+    | BFlowsTo, Vlab l1, Vlab l2 => Some (Vint (flows_to l1 l2))
+    | BJoin,    Vlab l1, Vlab l2 => Some (Vlab (l1 ∪ l2))
+    | _    ,    _      , _       => None
+  end.
 
 Definition memory := Mem.t Atom Label.
 (* Specialize the Memory frame declaration *)
@@ -464,26 +469,6 @@ Inductive step (t : table) : State -> State -> Prop :=
      step t
        (St im μ σ r pc)
        (St im μ σ r' (PAtm (Zsucc j) rpcl))
- | step_flowsto: forall im μ σ pc L1 K1 L2 K2 r r' r1 r2 r3 j LPC rl rpcl
-     (PC: pc = PAtm j LPC)
-     (CODE: im[pc] = Some (FlowsTo r1 r2 r3))
-     (OP1 : registerContent r r1 = Some (Vlab L1 @ K1))
-     (OP2 : registerContent r r2 = Some (Vlab L2 @ K2))
-     (TMU : run_tmr t OpFlowsTo <|K1; K2|> LPC = Some (Some rl, rpcl))
-     (RES : registerUpdate r r3 (Vint (flows_to L1 L2) @ rl) = Some r'),
-     step t
-       (St im μ σ r pc)
-       (St im μ σ r' (PAtm (j+1) rpcl))
- | step_ljoin: forall im μ σ pc L1 K1 L2 K2 r r' r1 r2 r3 j LPC rl rpcl
-     (PC: pc = PAtm j LPC)
-     (CODE: im[pc] = Some (LJoin r1 r2 r3))
-     (OP1 : registerContent r r1 = Some (Vlab L1 @ K1))
-     (OP2 : registerContent r r2 = Some (Vlab L2 @ K2))
-     (TMU : run_tmr t OpLJoin <|K1; K2|> LPC = Some (Some rl, rpcl))
-     (RES : registerUpdate r r3 (Vlab (L1 ∪ L2) @ rl) = Some r'),
-     step t
-       (St im μ σ r pc)
-       (St im μ σ r' (PAtm (j+1) rpcl))
  | step_putlab: forall im μ σ pc r r' r1 j LPC rl rpcl l
      (PC: pc = PAtm j LPC)
      (CODE: im[pc] = Some (PutLab l r1))
@@ -590,14 +575,14 @@ Inductive step (t : table) : State -> State -> Prop :=
      step t
        (St im μ σ r pc)
        (St im μ σ r' (PAtm (j+1) rpcl))
- | step_binop: forall im μ σ pc o n1 L1 n2 L2 n r r1 r2 r3 r' j LPC rl rpcl
+ | step_binop: forall im μ σ pc o v1 L1 v2 L2 v r r1 r2 r3 r' j LPC rl rpcl
      (PC: pc = PAtm j LPC)
      (CODE: im[pc] = Some (BinOp o r1 r2 r3))
-     (OP1 : registerContent r r1 = Some (Vint n1 @ L1))
-     (OP2 : registerContent r r2 = Some (Vint n2 @ L2))
+     (OP1 : registerContent r r1 = Some (v1 @ L1))
+     (OP2 : registerContent r r2 = Some (v2 @ L2))
      (TMU : run_tmr t OpBinOp <|L1; L2|> LPC = Some (Some rl, rpcl))
-     (BINOP: eval_binop o n1 n2 = Some n)
-     (RES : registerUpdate r r3 (Vint n @ rl) = Some r'),
+     (BINOP: eval_binop o v1 v2 = Some v)
+     (RES : registerUpdate r r3 (v @ rl) = Some r'),
      step t
        (St im μ σ r pc)
        (St im μ σ r' (PAtm (j+1) rpcl))
@@ -677,29 +662,6 @@ Definition fstep t (st:State) : option State :=
               | _ => None
             end
         | _ => None
-      end
-    | FlowsTo r1 r2 r3 =>
-      match registerContent r r1, registerContent r r2 with
-        | Some (Vlab L1 @ K1), Some (Vlab L2 @ K2) =>
-          let res := flows_to L1 L2 in
-          match run_tmr t OpFlowsTo <|K1; K2|> LPC with
-            | Some (Some rl, rpcl) =>
-              do r' <- registerUpdate r r3 (Vint res @ rl);
-              Some (St im μ σ r' (PAtm (j+1) rpcl))
-              | _ => None
-            end
-        | _, _ => None
-      end
-    | LJoin r1 r2 r3 =>
-      match registerContent r r1, registerContent r r2 with
-        | Some (Vlab L1 @ K1), Some (Vlab L2 @ K2) =>
-          match run_tmr t OpLJoin <|K1; K2|> LPC with
-            | Some (Some rl, rpcl) =>
-              do r' <- registerUpdate r r3 (Vlab (L1 ∪ L2) @ rl);
-              Some (St im μ σ r' (PAtm (j+1) rpcl))
-            | _ => None
-          end
-        | _, _ => None
       end
     | PutLab l r1 =>
       match run_tmr t OpPutLab <||> LPC with
@@ -816,11 +778,11 @@ Definition fstep t (st:State) : option State :=
       end
      | BinOp o r1 r2 r3 =>
        match registerContent r r1, registerContent r r2 with
-         | Some (Vint n1 @ L1), Some (Vint n2 @ L2) =>
+         | Some (v1 @ L1), Some (v2 @ L2) =>
            match run_tmr t OpBinOp <|L1; L2|> LPC with
              | Some (Some rl, rpcl) =>
-               do n <- eval_binop o n1 n2;
-               do r' <- registerUpdate r r3 (Vint n @ rl);
+               do v <- eval_binop o v1 v2;
+               do r' <- registerUpdate r r3 (v @ rl);
                Some (St im μ σ r' (PAtm (j+1) rpcl))
              | _ => None
            end

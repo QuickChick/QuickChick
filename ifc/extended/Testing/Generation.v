@@ -221,13 +221,6 @@ Definition ainstrSSNI (st : State) : Gen Instr :=
     (10, liftGen2 Lab genRegPtr genRegPtr);
     (* MLab *)
     (onNonEmpty dptr 10, liftGen2 MLab (elements Z0 dptr) genRegPtr);
-    (* FlowsTo *)
-    (onNonEmpty lab 10,
-     liftGen3 FlowsTo (elements Z0 lab)
-              (elements Z0 lab) genRegPtr);
-    (* LJoin *)
-    (onNonEmpty lab 10, liftGen3 LJoin (elements Z0 lab)
-                                (elements Z0 lab) genRegPtr);
     (* PutLab *)
     (10, liftGen2 PutLab gen_label genRegPtr);
     (* BCall *)
@@ -634,6 +627,6 @@ Instance arbBinOpT : Arbitrary BinOpT :=
   arbitrary := @gen_BinOpT;
   shrink o  := match o with
                | BAdd => nil
-               | BMult => [BAdd]
+               | _ => [BAdd]
                end
 |}.

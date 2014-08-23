@@ -36,7 +36,13 @@ Instance show_label : Show Lab4 :=
 
 Instance show_bin_op : Show BinOpT :=
 {|
-  show x := "Binop " ++ (match x with BAdd => "+" | BMult => "*" end)
+  show x := "Binop " ++ (
+            match x with
+              | BAdd => "+"
+              | BMult => "*"
+              | BFlowsTo => "<:"
+              | BJoin => "\/"
+            end)
 |}.
 
 Instance show_instr : Show (@Instr Label) :=
@@ -48,10 +54,6 @@ Instance show_instr : Show (@Instr Label) :=
     | PcLab r1 => "PcLab " ++ show r1
     | BCall r1 r2 r3 => "BCall " ++ show r1 ++ " " ++ show r2 ++ " " ++ show r3
     | BRet => "BRet"
-    | FlowsTo r1 r2 r3 =>
-      "FlowsTo " ++ show r1 ++ " " ++ show r2 ++ " " ++ show r3
-    | LJoin r1 r2 r3  =>
-      "LJoin " ++ show r1 ++ " " ++ show r2 ++ " " ++ show r3
     | PutLab l r => "PutLab " ++ show l ++ " " ++ show r
     | Nop => "Nop"
     | Put n r1 => "Push " ++ show n ++ " " ++ show r1
@@ -81,8 +83,6 @@ Instance show_op_code : Show OpCode :=
     | OpPcLab => "OpPcLab"
     | OpBCall => "OpBCall"
     | OpBRet => "OpBRet"
-    | OpFlowsTo => "OpFlowsTo"
-    | OpLJoin => "OpLJoin"
     | OpPutLab => "OpPutBot"
     | OpNop => "OpNop"
     | OpPut => "OpPut"

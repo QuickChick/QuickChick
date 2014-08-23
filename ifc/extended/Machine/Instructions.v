@@ -7,13 +7,9 @@ Definition regId := Z.
 
 Inductive BinOpT : Type :=
 | BAdd
-| BMult.
-
-Definition eval_binop (b : BinOpT) : Z -> Z -> option Z :=
-  match b with
-    | BAdd => fun z1 z2 => Some (z1 + z2)%Z
-    | BMult => fun z1 z2 => Some (z1 * z2)%Z
-  end.
+| BMult
+| BJoin
+| BFlowsTo.
 
 Section Instr.
 
@@ -36,8 +32,6 @@ Inductive Instr : Type :=
   (* public first-class labels *)
   | Lab      : regId -> regId -> Instr
   | PcLab    : regId -> Instr
-  | FlowsTo  : regId -> regId -> regId -> Instr
-  | LJoin    : regId -> regId -> regId -> Instr
   | PutLab   : Label -> regId -> Instr
 
   (* dynamic memory allocation *)
@@ -61,8 +55,6 @@ Inductive OpCode : Type :=
 (* missing for Halt *)
   | OpLab
   | OpPcLab
-  | OpFlowsTo
-  | OpLJoin
   | OpPutLab
   | OpAlloc
   | OpPGetOff
@@ -83,8 +75,6 @@ Definition opCodes :=
   ; OpBRet
   ; OpLab
   ; OpPcLab
-  ; OpFlowsTo
-  ; OpLJoin
   ; OpPutLab
   ; OpAlloc
   ; OpPGetOff
@@ -115,8 +105,6 @@ Definition opcode_of_instr (i : Instr) : option OpCode :=
 
   | Lab _ _       => Some OpLab
   | PcLab _       => Some OpPcLab
-  | FlowsTo _ _ _ => Some OpFlowsTo
-  | LJoin _ _ _   => Some OpLJoin
   | PutLab _ _    => Some OpPutLab
 
   | Alloc _ _ _   => Some OpAlloc
