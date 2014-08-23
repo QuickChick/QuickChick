@@ -1,11 +1,13 @@
 Require Import List. Import ListNotations.
 Require Import ZArith.
 
-Require Import ssreflect ssrfun ssrbool eqtype ssrnat seq choice fintype path fingraph.
+Require Import ssreflect ssrfun ssrbool eqtype ssrnat seq choice fintype.
+Require Import path fingraph. (* This depends on Mathematical Components 1.5
+                 http://www.msr-inria.fr/projects/mathematical-components-2/ *)
 
 Require Import Common.
 
-Definition is_low_pointer (obs : Label) (st : State) (a : Atom) : bool :=
+Definition is_low_pointer (obs : Label) (a : Atom) : bool :=
   match a with
     | Vptr p @ l => isLow l obs
     | _ => false
@@ -21,7 +23,7 @@ Definition elem {A : Type} (eq_dec : forall (x y : A), {x = y} + {x <> y})
            (x : A) (l : list A) : bool :=
   existsb (fun y => if eq_dec x y then true else false) l.
 
-(* This unions to sets while removing duplicates *)
+(* This unions two sets while removing duplicates *)
 Fixpoint nub_by_aux {A : Type} (eq_dec : forall (x y : A), {x = y} + {x <> y})
          (l acc : list A) : list A :=
   match l with
@@ -35,30 +37,30 @@ Fixpoint nub_by_aux {A : Type} (eq_dec : forall (x y : A), {x = y} + {x <> y})
 (* This removes duplicates from a list *)
 Definition nub_by {A : Type} eq_dec (l : list A) := nub_by_aux eq_dec l [].
 
-Definition get_mframes_from_atoms (obs : Label) (st : State) (atoms : list Atom)
+Definition get_mframes_from_atoms (obs : Label) (atoms : list Atom)
   : list mframe :=
   nub_by Mem.EqDec_block
         (list_of_option (map extract_mframe
-                        (filter (is_low_pointer obs st) atoms))).
+                        (filter (is_low_pointer obs) atoms))).
 
-Fixpoint get_root_set_stack (obs : Label) (st : State)
+Fixpoint get_root_set_stack (obs : Label)
          (acc : list mframe) (s : Stack) : list mframe :=
   match s with
     | Mty => acc
     | RetCons (pc, _, rs, _) s' =>
       let new_mframes :=
-          if isLow ∂pc obs then get_mframes_from_atoms obs st rs
+          if isLow ∂pc obs then get_mframes_from_atoms obs rs
           else [] in
       let acc' := nub_by_aux Mem.EqDec_block new_mframes acc in
-      get_root_set_stack obs st acc' s'
+      get_root_set_stack obs acc' s'
   end.
 
 Definition get_root_set (obs : Label) (st : State) : list mframe :=
   let '(St _ _ s r pc) := st in
   let init_root_set :=
-      if isLow ∂pc obs then get_mframes_from_atoms obs st r
+      if isLow ∂pc obs then get_mframes_from_atoms obs r
       else [] in
-  get_root_set_stack obs st init_root_set s.
+  get_root_set_stack obs init_root_set s.
 
 Function reachable_from_root_set (obs : Label) (st : State)
          (visited worklist : list mframe)
@@ -76,7 +78,7 @@ Function reachable_from_root_set (obs : Label) (st : State)
           | Some (Fr _ l atoms) =>
             let newCands :=
                 if isLow l obs then
-                  get_mframes_from_atoms obs st atoms
+                  get_mframes_from_atoms obs atoms
                 else [] in
             let worklist' := nub_by_aux Mem.EqDec_block newCands t in
             reachable_from_root_set obs st (h :: visited) worklist'
@@ -95,7 +97,7 @@ x \notin visited ->
 
 Definition references (obs : Label) (st : State) (f1 f2 : mframe) :=
   if Mem.get_frame (st_mem st) f1 is Some (Fr _ l atoms) then
-    f2 \in get_mframes_from_atoms obs st atoms
+    f2 \in get_mframes_from_atoms obs atoms
   else false.
 
 Definition reachable (obs : Label) (st : State) : rel mframe :=
