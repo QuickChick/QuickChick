@@ -1,9 +1,11 @@
 Require Import List. Import ListNotations.
 Require Import ZArith.
 
+(*
 Require Import ssreflect ssrfun ssrbool eqtype ssrnat seq choice fintype.
 Require Import path fingraph. (* This depends on Mathematical Components 1.5
                  http://www.msr-inria.fr/projects/mathematical-components-2/ *)
+*)
 
 Require Import Common.
 
@@ -95,6 +97,7 @@ x \notin visited ->
 
 *)
 
+(* CH: had to revert this because it was breaking extraction
 Definition references (obs : Label) (st : State) (f1 f2 : mframe) :=
   if Mem.get_frame (st_mem st) f1 is Some (Fr _ l atoms) then
     f2 \in get_mframes_from_atoms obs atoms
@@ -107,7 +110,15 @@ Definition well_formed_label (st : State) (l : Label) : bool :=
   let root_set := get_root_set l st in
   [forall f1, forall f2, (f1 \in root_set) ==> reachable l st f1 f2 ==>
      let s := Mem.stamp f2 in isLow s l].
+*)
 
+Definition reachable (obs : Label) (st : State) : list mframe :=
+  let root_set := get_root_set obs st in
+  reachable_from_root_set obs st [] root_set.
+
+Definition well_formed_label (st : State) (l : Label) : bool :=
+  let observable := reachable l st in
+  forallb (fun mf => let s := Mem.stamp mf in isLow s l) observable.
 
 (* Given a state and a stamp configuration, make sure everything is ok *)
 (* LL: This also suggests a way of generating stamps! Namely, get
