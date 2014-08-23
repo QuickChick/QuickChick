@@ -89,17 +89,15 @@ Lemma genState_well_formed : forall st,
   @genState Pred _ st <-> well_formed st.
 Admitted.
 
-Definition fstep_preserves_well_formed t : Prop := forall st st',
+Definition fstep_preserves_well_formed : Prop := forall st st',
   well_formed st ->
-  fstep t st = Some st' ->
+  fstep default_table st = Some st' ->
   well_formed st'.
 
 Lemma prop_fstep_preserves_well_formed_equiv :
-  forall (t : table),
-    semProperty (@prop_fstep_preserves_well_formed Pred _ t) <->
-    fstep_preserves_well_formed t.
+    semProperty (@prop_fstep_preserves_well_formed Pred _ default_table) <->
+    fstep_preserves_well_formed.
 Proof.
-  move => t.
   rewrite /prop_fstep_preserves_well_formed /fstep_preserves_well_formed
     semForAllShrink /arbitrary /arbState. setoid_rewrite semPredQProp.
   split => [H st st' wf ex | H st arb].
@@ -109,7 +107,7 @@ Proof.
     (* by move /semWhenFail_id /semBool in H. *)    
     by apply semBool in H.
   - move /genState_well_formed in arb. rewrite arb. specialize (H st).
-    move : H. case (fstep t st) => [ st' | ] H.
+    move : H. case (fstep default_table st) => [ st' | ] H.
     + specialize (H st' arb Logic.eq_refl). rewrite H.
       (* rewrite semWhenFail_id. by rewrite <- semBool. *)
       by apply <- semBool.
