@@ -54,6 +54,7 @@ Definition mutate_expr n (e : rule_expr n) : list (rule_expr n) :=
 Definition eL1 : rule_expr 3 := Lab1.
 Definition eL2 : rule_expr 3 := Lab2.
 Definition eL3 : rule_expr 3 := Lab3.
+Definition ePC : rule_expr 3 := LabPC.
 
 Example ex_break_expr :
   break_expr (L_Join (L_Join eL1 eL2) eL3) = [eL1; eL2; eL3].
@@ -77,6 +78,74 @@ Proof. reflexivity. Qed.
 
 Example ex_mutate_expr_bot : mutate_expr (L_Bot 3) = [].
 Proof. compute. reflexivity. Qed.
+
+(* For the pc we move disjuncts to the result label;
+   to prevent useless mutants we never move the pc label,
+   but we do try to remove it if there is no result label *)
+Fixpoint drop_each_but_not_lpc n (es : list (rule_expr n)) :
+    list (rule_expr n * list (rule_expr n)) :=
+  let f x xs'' := (fst xs'', x :: snd xs'') in
+  match es with
+  | nil => []
+  | (L_Var labpc) :: xs' =>
+      map (f (L_Var (@labpc n))) (drop_each_but_not_lpc xs')
+  | x :: xs' =>
+      (x, xs') :: (map (f x) (drop_each_but_not_lpc xs'))
+  end.
+
+Example ex_drop_each_but_not_lpc_1 :
+  drop_each_but_not_lpc [eL1; ePC] = [(Lab1, [LabPC])].
+Proof. reflexivity. Qed.
+
+Example ex_drop_each_but_not_lpc_1' :
+  drop_each_but_not_lpc [ePC; eL1] = [(Lab1, [LabPC])].
+Proof. reflexivity. Qed.
+
+Example ex_drop_each_but_not_lpc_2 :
+  drop_each_but_not_lpc [eL1; eL2; ePC] =
+    [(Lab1, [Lab2; LabPC]); (Lab2, [Lab1; LabPC])].
+Proof. reflexivity. Qed.
+
+Example ex_drop_each_but_not_lpc_2' :
+  drop_each_but_not_lpc [eL1; ePC; eL2] =
+    [(Lab1, [LabPC; Lab2]); (Lab2, [Lab1; LabPC])].
+Proof. reflexivity. Qed.
+
+Example ex_drop_each_but_not_lpc_2'' :
+  drop_each_but_not_lpc [ePC; eL1; eL2] =
+    [(Lab1, [LabPC; Lab2]); (Lab2, [LabPC; Lab1])].
+Proof. reflexivity. Qed.
+
+Definition mutate_pc n (ores : option (rule_expr n)) (epc : rule_expr n)
+    : list (option (rule_expr n) * (rule_expr n)) :=
+  let es := (break_expr epc) in
+  match es with
+  | nil => []
+  | _ =>
+      match ores with
+      | Some eres =>
+          let f xxs := (Some (L_Join eres (fst xxs)), join_exprs (snd xxs)) in
+          List.map f (drop_each_but_not_lpc es)
+      | None =>
+          (* we just drop each pc disjunct as before *)
+          let f xs := (None, join_exprs xs) in
+          List.map f (drop_each es)
+      end
+  end.
+
+Example ex_mutate_pc_1 :
+  mutate_pc (Some eL2) (L_Join eL1 ePC) = [(Some (JOIN Lab2 Lab1), LabPC)].
+Proof. reflexivity. Qed.
+
+Example ex_mutate_pc_1' :
+  mutate_pc (Some eL2) (L_Join ePC eL1) = [(Some (JOIN Lab2 Lab1), LabPC)].
+Proof. reflexivity. Qed.
+
+Example ex_mutate_pc_2 :
+  mutate_pc (Some eL3) (L_Join (L_Join ePC eL1) eL2) =
+    [(Some (JOIN Lab3 Lab1), JOIN LabPC Lab2);
+     (Some (JOIN Lab3 Lab2), JOIN LabPC Lab1)].
+Proof. reflexivity. Qed.
 
 Definition mutate_scond n (c : rule_scond n) : list (rule_scond n) :=
   let cs := (break_scond c) in
@@ -117,7 +186,7 @@ Definition mutate_rule n (r : AllowModify n) : list (AllowModify n) :=
       List.map (fun lres' => almod a (Some lres') pc) (mutate_expr lres)
    | None => []
    end) ++
-  (List.map (fun pc' => almod a res pc') (mutate_expr pc)).
+  (List.map (fun respc => almod a (fst respc) (snd respc)) (mutate_pc res pc)).
 
 (* Printing
 Eval cbv in (mutate_rule
