@@ -8,6 +8,7 @@ Machine/LabSetsOfPrins.v
 Machine/Machine.v
 Machine/Memory.v
 Machine/Mutate.v
+Machine/NIProof.v
 # Machine/NIAbstractMachine.v
 # Machine/RelationExtraction.v
 Machine/Rules.v
