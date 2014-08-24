@@ -3,8 +3,6 @@ Require Import ZArith.
 Require Import String.
 Require Import NPeano.
 
-Require Import ssreflect ssrfun ssrbool eqtype ssrnat seq choice fintype.
-
 Require Import QuickChick Gen.
 
 Require Export Utils.
@@ -94,20 +92,3 @@ Qed.
 
 Definition mframe_eq (m1 m2 : mframe) : bool :=
   if Mem.EqDec_block m1 m2 then true else false.
-
-(* TODO: prove once mframe is actually made finite *)
-Axiom f : mframe -> ordinal (2^32).
-Axiom g : ordinal (2^32) -> mframe.
-Axiom fgK : cancel f g.
-
-Definition mframe_eqMixin := CanEqMixin fgK.
-Canonical mframe_eqType := Eval hnf in EqType mframe mframe_eqMixin.
-
-Definition mframe_choiceMixin := CanChoiceMixin fgK.
-Canonical mframe_choiceType := Eval hnf in ChoiceType mframe mframe_choiceMixin.
-
-Definition mframe_countMixin := CanCountMixin fgK.
-Canonical mframe_countType := Eval hnf in CountType mframe mframe_countMixin.
-
-Definition mframe_finMixin := CanFinMixin fgK.
-Canonical mframe_finType := Eval hnf in FinType mframe mframe_finMixin.

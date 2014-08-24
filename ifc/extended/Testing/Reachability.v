@@ -2,8 +2,6 @@ Require Import List. Import ListNotations.
 Require Import ZArith.
 
 Require Import ssreflect ssrfun ssrbool eqtype ssrnat seq choice fintype.
-Require Import path fingraph. (* This depends on Mathematical Components 1.5
-                 http://www.msr-inria.fr/projects/mathematical-components-2/ *)
 
 Require Import Common.
 
@@ -106,22 +104,3 @@ Definition well_formed (st : State) : bool :=
    initial accumulator *)
 Definition list_meet (acc : Label) (ls : list Label) :=
   fold_left meet ls acc.
-
-(* The following definitions are better for proofs but cannot be extracted
-(because of a bug in the extractor) and would be inefficient anyway *)
-(* TODO: prove them equivalent to the ones above, which are used for testing *)
-Definition references (obs : Label) (mem : memory) (f1 f2 : mframe) :=
-  if Mem.get_frame mem f1 is Some (Fr _ l atoms) then
-    f2 \in get_mframes_from_atoms obs atoms
-  else false.
-
-Definition reachable' (obs : Label) (mem : memory) : rel mframe :=
-  connect (references obs mem).
-
-Definition well_formed_label' (st : State) (l : Label) : bool :=
-  let root_set := get_root_set l st in
-  [forall f1, forall f2, (f1 \in root_set) ==> reachable' l (st_mem st) f1 f2 ==>
-     let s := Mem.stamp f2 in isLow s l].
-
-Definition well_formed' (st : State) : bool :=
-  forallb (well_formed_label' st) elems.
