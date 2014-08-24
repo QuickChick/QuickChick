@@ -71,6 +71,31 @@ Proof.
 admit.
 Qed.
 
+Lemma joinC l1 l2 : l1 \_/ l2 = l2 \_/ l1.
+Proof.
+by apply/flows_antisymm; rewrite join_minimal ?flows_join_left ?flows_join_right.
+Qed.
+
+Lemma low_join l1 l2 l : isLow (l1 \_/ l2) l = isLow l1 l && isLow l2 l.
+Proof.
+rewrite /isLow.
+case Hl1: (flows l1 l).
+  case Hl2: (flows l2 l).
+    by rewrite (join_minimal _ _ _ Hl1 Hl2).
+  by rewrite joinC (not_flows_not_join_flows_left _ _ _ Hl2).
+by rewrite (not_flows_not_join_flows_left _ _ _ Hl1).
+Qed.
+
+Lemma root_set_registers_join obs r l1 l2 :
+  root_set_registers obs r (l1 \_/ l2) = root_set_registers obs r l1 :&: root_set_registers obs r l2.
+Proof.
+rewrite /root_set_registers /=.
+rewrite low_join.
+case: (isLow l1 obs); last by rewrite set0I.
+case: (isLow l2 obs); first by rewrite setIid.
+by rewrite setI0.
+Qed.
+
 Definition root_set obs (st : State) : {set mframe} :=
   let '(St _ _ s r pc) := st in
   root_set_registers obs r ∂pc :|: root_set_stack obs s.
@@ -96,6 +121,7 @@ Proof.
 move=> wf_st /fstepP step.
 move: wf_st.
 elim: {st st'} step.
+(* Lab *)
 + move=> im μ σ v K pc r r' r1 r2 j LPC rl rpcl -> ? ? [<- <-] upd_r2 wf_st l f1 f2.
   move: wf_st => /(_ l f1 f2) /= wf_st.
   rewrite inE.
@@ -108,6 +134,7 @@ elim: {st st'} step.
       by rewrite inE in_regs_f1 in wf_st; apply: wf_st.
     by rewrite inE.
   by rewrite inE in_stack_f1 orbT in wf_st; apply: wf_st.
+(* PcLab *)
 + move=> im μ σ pc r r' r1 j LPC rl rpcl -> ? [<- <-] upd_r1 wf_st l f1 f2.
   move: wf_st => /(_ l f1 f2) /= wf_st.
   rewrite inE.
@@ -120,6 +147,7 @@ elim: {st st'} step.
       by rewrite inE in_regs_f1 in wf_st; apply: wf_st.
     by rewrite inE.
   by rewrite inE in_stack_f1 orbT in wf_st; apply: wf_st.
+(* MLab *)
 + move=> im μ σ pc r r1 r2 p K C j LPC rl r' rpcl -> ? ? get_r1 [].
   rewrite /Vector.nth_order /= => <- <- upd_r2 wf_st l f1 f2.
   move: wf_st => /(_ l f1 f2) /= wf_st.
@@ -133,6 +161,30 @@ elim: {st st'} step.
       by rewrite inE in_regs_f1 in wf_st; apply: wf_st.
     by rewrite inE.
   by rewrite inE in_stack_f1 orbT in wf_st; apply: wf_st.
+(* PutLab *)
++ move=> im μ σ pc r r' r1 j LPC rl rpcl l' -> ? [<- <-] upd_r1 wf_st l f1 f2.
+  move: wf_st => /(_ l f1 f2) /= wf_st.
+  rewrite inE.
+  case/orP=> [|in_stack_f1].
+    have [? get_r1] : exists atom, registerContent r r1 = Some atom.
+      admit.
+    move/(subsetP (root_set_registers_upd _ _ get_r1 upd_r1)).
+    rewrite inE.
+    case/orP=> [in_regs_f1|].
+      by rewrite inE in_regs_f1 in wf_st; apply: wf_st.
+    by rewrite inE.
+  by rewrite inE in_stack_f1 orbT in wf_st; apply: wf_st.
+(* Call *)
++ move=> im μ σ pc B K r r1 r2 r3 j La addr Lpc rl rpcl -> ? get_r1 get_r2 [<- <-] wf_st l f1 f2.
+  rewrite /Vector.nth_order /=.
+  move: wf_st => /(_ l f1 f2) /= wf_st.
+  rewrite root_set_registers_join !inE; case/orP.
+    by case/andP=> _ in_regs_f1; apply: wf_st; rewrite inE in_regs_f1.
+
+
+
+
+
 Abort.
 
 
