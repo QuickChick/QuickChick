@@ -11,6 +11,12 @@ Set Implicit Arguments.
 Unset Strict Implicit.
 Unset Printing Implicit Defensive.
 
+(* Interface with non-ssr definitions *)
+Lemma replicateE T (a : T) n : replicate n a = nseq n a.
+Proof.
+by elim: n=> //= n ->.
+Qed.
+
 Module NIProof (Lattice : FINLAT).
 
 Module GenericMachine := MachineM Lattice.
@@ -96,19 +102,38 @@ case: ifP => _; first exact: mframes_from_atoms_upd.
 by rewrite sub0set.
 Qed.
 
-Lemma joinC l1 l2 : l1 \_/ l2 = l2 \_/ l1.
+Lemma joinC : commutative join.
 Proof.
+move=> l1 l2.
 by apply/flows_antisymm; rewrite join_minimal ?flows_join_left ?flows_join_right.
 Qed.
 
-Lemma low_join l1 l2 l : isLow (l1 \_/ l2) l = isLow l1 l && isLow l2 l.
+Lemma flows_join l1 l2 l : flows (l1 \_/ l2) l = flows l1 l && flows l2 l.
 Proof.
-rewrite /isLow.
 case Hl1: (flows l1 l).
   case Hl2: (flows l2 l).
     by rewrite (join_minimal _ _ _ Hl1 Hl2).
   by rewrite joinC (not_flows_not_join_flows_left _ _ _ Hl2).
 by rewrite (not_flows_not_join_flows_left _ _ _ Hl1).
+Qed.
+
+Lemma low_join l1 l2 l : isLow (l1 \_/ l2) l = isLow l1 l && isLow l2 l.
+Proof. exact: flows_join. Qed.
+
+Lemma joinA : associative join.
+Proof.
+(* Cannot use wlog because of missing type class resolution *)
+have: forall l1 l2 l3, l1 \_/ (l2 \_/ l3) <: (l1 \_/ l2) \_/ l3.
+  move=> l1 l2 l3.
+  rewrite flows_join.
+  apply/andP; split; first exact/join_1/join_1/flows_refl.
+  rewrite flows_join.
+  apply/andP; split; first exact/join_1/join_2/flows_refl.
+  exact/join_2/flows_refl.
+move=> H l1 l2 l3.
+apply/flows_antisymm; first exact:H.
+rewrite [_ \_/ l3]joinC [l2 \_/ l3]joinC [l1 \_/ l2]joinC.
+by rewrite [l1 \_/ (_ \_/ _)]joinC; apply: H.
 Qed.
 
 Lemma root_set_registers_join obs r l1 l2 :
@@ -140,12 +165,49 @@ Definition well_formed_label (st : State) (l : Label) :=
 Definition well_formed (st : State) :=
   forall l, well_formed_label st l.
 
+Lemma stamp_alloc μ μ' sz lab stamp i li fp :
+  alloc sz lab stamp (Vint i@li) μ = Some (fp, μ') ->
+  Mem.stamp fp = stamp.
+Proof.
+rewrite /alloc /zreplicate.
+case: (ZArith_dec.Z_lt_dec sz 0) => // lt0sz [alloc_sz].
+by rewrite (Mem.alloc_stamp _ _ _ _ _ _ _ _ _ alloc_sz).
+Qed.
+
+Lemma reachable_alloc_int μ μ' sz lab stamp i li fp l f1 f2 :
+  alloc sz lab stamp (Vint i@li) μ = Some (fp, μ') ->
+  reachable l μ' f1 f2 = reachable l μ f1 f2.
+Proof.
+rewrite /alloc /zreplicate.
+case: (ZArith_dec.Z_lt_dec sz 0) => // lt0sz.
+rewrite replicateE => [[]] alloc_sz.
+apply/eq_connect=> x y.
+rewrite /references.
+have [<-|neq_fpx] := fp =P x.
+  (* How about using implicit arguments? *)
+  rewrite (alloc_get_frame_eq _ _ _ _ _ _ alloc_sz) inE /=.
+  rewrite (Mem.alloc_get_fresh _ _ _ _ _ _ _ _ _ alloc_sz).
+  set s := filter _ _.
+  have /eqP->//: s == [::].
+  by rewrite -[_ == _]negbK -has_filter has_nseq andbF.
+by rewrite (alloc_get_frame_neq _ _ _ _ _ _ _ alloc_sz neq_fpx).
+Qed.
+
+Arguments reachable_alloc_int [μ μ' sz lab stamp i li fp l f1 f2] _.
+
+(*
+Lemma reachable_alloc μ μ' sz lab stamp a fp l f1 f2 :
+  alloc sz lab stamp a μ = Some (fp, μ') ->
+  reachable l μ' f1 f2 = reachable l μ f1 f2 || (reachable l μ' f1 a && reachable l μ' a f2).
+
+*)
+
 Lemma well_formed_preservation st st' : well_formed st ->
   fstep default_table st = Some st' -> well_formed st'.
 Proof.
 move=> wf_st /fstepP step.
 move: wf_st.
-elim: {st st'} step.
+case: {st st'} step.
 (* Lab *)
 + move=> im μ σ v K pc r r' r1 r2 j LPC rl rpcl -> ? ? [<- <-] upd_r2 wf_st l f1 f2.
   move: wf_st => /(_ l f1 f2) /= wf_st.
@@ -230,6 +292,28 @@ elim: {st st'} step.
     by rewrite low_LPC in_r_fp in wf_st; apply: wf_st.
   by case: (isLow LPC' l) wf_st; rewrite ?inE in_stack_f1 !orbT; apply.
 (* Alloc *)
++ move=> im μ μ' σ pc r r' r1 r2 r3 i K Ll K' rl rpcl j LPC dfp -> ? get_r1 get_r2 [<- <-] alloc_i.
+  move: (alloc_i); rewrite /alloc.
+  case: (zreplicate i (Vint 0 @ ⊥)) => // ? [malloc].
+  rewrite /Vector.nth_order /= => upd_r3 wf_st l f1 f2.
+  move: wf_st => /(_ l f1 f2) /=.
+  rewrite (reachable_alloc_int alloc_i) !inE => wf_st.
+  case/orP=> [|in_stack_f1].
+    rewrite /root_set_registers.
+    case: ifP => low_LPC; last by rewrite inE.
+    move/(subsetP (mframes_from_atoms_upd _ upd_r3)).
+    rewrite inE.
+    case/orP=> [in_r_f1|].
+      by move: wf_st; rewrite /root_set_registers low_LPC in_r_f1; apply.
+    rewrite /mframes_from_atoms /=.
+    case low_KK': (isLow (K \_/ K') l); last by rewrite inE.
+    rewrite /= !inE => /eqP ->.
+    case/connectP=> [[_ ->|]] /=.
+      by rewrite (stamp_alloc alloc_i) /= joinA low_join low_KK' low_LPC.
+    move=> a s.
+    by rewrite /references /= (Mem.alloc_get_fresh _ _ _ _ _ _ _ _ _ malloc).
+  by move: wf_st; rewrite in_stack_f1 orbT; apply.
+(* Load *)
 Abort.
 
 
