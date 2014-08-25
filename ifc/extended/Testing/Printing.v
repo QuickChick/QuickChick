@@ -63,6 +63,7 @@ Instance show_instr : Show (@Instr Label) :=
     | BNZ n r1 => "BNZ " ++ show n ++ " " ++ show r1
     | Load r1 r2 => "Load " ++ show r1 ++ " " ++ show r2
     | Store r1 r2 => "Store " ++ show r1 ++ " " ++ show r2
+    | Write r1 r2 => "Write " ++ show r1 ++ " " ++ show r2
     | Alloc r1 r2 r3 =>
       "Alloc " ++ show r1 ++ " " ++ show r2 ++ " " ++ show r3
     | PSetOff r1 r2 r3 =>
@@ -91,6 +92,7 @@ Instance show_op_code : Show OpCode :=
     | OpBNZ => "OpBNZ"
     | OpLoad => "OpLoad"
     | OpStore => "OpStore"
+    | OpWrite => "OpStore"
     | OpAlloc => "OpAlloc"
     | OpPSetOff => "OpPSetOff"
     | OpPGetOff => "OpPGetOff"

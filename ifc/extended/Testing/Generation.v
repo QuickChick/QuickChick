@@ -235,6 +235,8 @@ Definition ainstrSSNI (st : State) : Gen Instr :=
     (onNonEmpty dptr 10, liftGen2 Load (elements Z0 dptr) genRegPtr);
     (* Store *)
     (onNonEmpty dptr 100, liftGen2 Store (elements Z0 dptr) genRegPtr);
+    (* Write *)
+    (onNonEmpty dptr 100, liftGen2 Write (elements Z0 dptr) genRegPtr);
     (* Jump *)
     (onNonEmpty cptr 10, liftGen Jump (elements Z0 cptr));
     (* BNZ *)

@@ -21,6 +21,7 @@ Inductive Instr : Type :=
   | Mov      : regId -> regId -> Instr
   | Load     : regId -> regId -> Instr
   | Store    : regId -> regId -> Instr
+  | Write    : regId -> regId -> Instr
   | BinOp (o : BinOpT) : regId -> regId -> regId -> Instr
   | Nop      : Instr
   | Halt     : Instr
@@ -46,6 +47,7 @@ Inductive OpCode : Type :=
   | OpMov
   | OpLoad
   | OpStore
+  | OpWrite
   | OpBinOp
   | OpNop
   | OpJump
@@ -67,6 +69,7 @@ Definition opCodes :=
   ; OpMov
   ; OpLoad
   ; OpStore
+  ; OpWrite
   ; OpBinOp
   ; OpNop
   ; OpJump
@@ -95,6 +98,7 @@ Definition opcode_of_instr (i : Instr) : option OpCode :=
   | Mov _ _       => Some OpMov
   | Load _ _      => Some OpLoad
   | Store _ _     => Some OpStore
+  | Write _ _     => Some OpWrite
   | BinOp _ _ _ _ => Some OpBinOp
   | Nop           => Some OpNop
   | Halt          => None (* CH: halt has no opcode? why? *)

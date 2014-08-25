@@ -284,6 +284,7 @@ Definition decrRegInstr (r : regId) (i : @Instr Label) :=
   | BNZ n r1 => BNZ n (cDecr r r1)
   | Load r1 r2 => Load (cDecr r r1) (cDecr r r2)
   | Store r1 r2 => Store (cDecr r r1) (cDecr r r2)
+  | Write r1 r2 => Write (cDecr r r1) (cDecr r r2)
   | Alloc r1 r2 r3 => Alloc (cDecr r r1) (cDecr r r2) (cDecr r r3)
   | PSetOff r1 r2 r3 => PSetOff (cDecr r r1) (cDecr r r2) (cDecr r r3)
   | Halt => Halt

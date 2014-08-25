@@ -26,6 +26,7 @@ Definition labelCount (c:OpCode) : nat :=
   | OpBNZ     => 1
   | OpLoad    => 3
   | OpStore   => 3
+  | OpWrite   => 4
   | OpAlloc   => 3
   | OpPSetOff => 2
   | OpPGetOff => 1
@@ -50,6 +51,8 @@ Definition default_table : table := fun op =>
   | OpBNZ     =>  ≪ TRUE , __ , JOIN Lab1 LabPC ≫
   | OpLoad    =>  ≪ TRUE , Lab3 , JOIN LabPC (JOIN Lab1 Lab2) ≫
   | OpStore   =>  ≪ LE (JOIN Lab1 LabPC) Lab2 , Lab3 , LabPC ≫
+  | OpWrite   =>  ≪ LE (JOIN (JOIN LabPC Lab1) Lab3)
+                        (JOIN Lab2 Lab4), Lab4, LabPC ≫
   | OpAlloc   =>  ≪ TRUE , JOIN Lab1 Lab2 , LabPC ≫
   | OpPSetOff =>  ≪ TRUE , JOIN Lab1 Lab2 , LabPC ≫
   | OpPGetOff =>  ≪ TRUE , Lab1 , LabPC ≫
@@ -376,7 +379,8 @@ Definition extends (m1 m2 : memory) : Prop :=
 Lemma extends_refl : forall (m : memory), extends m m.
 Proof. unfold extends. auto. Qed.
 
-Lemma extends_trans : forall (m1 m2 m3 : memory), extends m1 m2 -> extends m2 m3 -> extends m1 m3.
+Lemma extends_trans : forall (m1 m2 m3 : memory),
+  extends m1 m2 -> extends m2 m3 -> extends m1 m3.
 Proof. unfold extends. auto. Qed.
 
 Lemma extends_load (m1 m2 : memory) b off a :
@@ -520,13 +524,25 @@ Inductive step (t : table) : State -> State -> Prop :=
      step t
        (St im μ σ r pc)
        (St im μ σ r' (PAtm (j+1) rpcl))
- | step_store: forall im μ σ pc v Ll C p K μ' r r1 r2 j LPC rpcl rl
+ | step_store: forall im μ σ pc v p μ' r r1 r2 j LPC rpcl rl lp lf lv
      (PC  : pc = PAtm j LPC)
      (CODE: im[pc] = Some (Store r1 r2))
-     (OP1 : registerContent r r1 = Some (Vptr p @ K))
-     (OP2 : registerContent r r2 = Some (v @ Ll))
-     (MLAB: mlab μ p = Some C)
-     (TMU : run_tmr t OpStore <|K; C; Ll|> LPC = Some (Some rl, rpcl))
+     (OP1 : registerContent r r1 = Some (Vptr p @ lp))
+     (OP2 : registerContent r r2 = Some (v @ lv))
+     (MLAB: mlab μ p = Some lf)
+     (TMU : run_tmr t OpStore <|lp; lf; lv|> LPC = Some (Some rl, rpcl))
+     (WRITE: store μ p (v @ rl) = Some μ'),
+     step t
+       (St im μ σ r pc)
+       (St im μ' σ r (PAtm (j+1) rpcl))
+ | step_write: forall im μ σ pc v p μ' r r1 r2 j LPC rpcl rl v' lp lv lv' lf
+     (PC  : pc = PAtm j LPC)
+     (CODE: im[pc] = Some (Store r1 r2))
+     (OP1 : registerContent r r1 = Some (Vptr p @ lp))
+     (OP2 : registerContent r r2 = Some (v @ lv))
+     (READ: load μ p = Some (v' @ lv'))
+     (MLAB: mlab μ p = Some lf)
+     (TMU : run_tmr t OpWrite <|lp;lf;lv;lv'|> LPC = Some (Some rl, rpcl))
      (WRITE: store μ p (v @ rl) = Some μ'),
      step t
        (St im μ σ r pc)
@@ -726,11 +742,25 @@ Definition fstep t (st:State) : option State :=
       end
     | Store r1 r2 =>
       match registerContent r r1, registerContent r r2 with
-        | Some (Vptr p @ K), Some (v @ Ll) =>
-          do C <- mlab μ p;
-          match run_tmr t OpStore <|K; C; Ll|> LPC with
-            (* check: K ∪ LPC <: C *)
-            | Some (Some rl (* Ll *), rpcl (* LPC *)) =>
+        | Some (Vptr p @ lp), Some (v @ lv) =>
+          do lf <- mlab μ p;
+          match run_tmr t OpStore <|lp; lf; lv|> LPC with
+            (* check: lp ∪ LPC <: lf *)
+            | Some (Some rl (* lv *), rpcl (* LPC *)) =>
+              do μ' <- store μ p (v @ rl);
+              Some (St im μ' σ r (PAtm (j+1) rpcl))
+            | _ => None
+          end
+        | _, _ => None
+      end
+    | Write r1 r2 =>
+      match registerContent r r1, registerContent r r2 with
+        | Some (Vptr p @ lp), Some (v @ lv) =>
+          do a <- load μ p;
+          let '(_ @ lv') := a in
+          do lf <- mlab μ p;
+          match run_tmr t OpWrite <|lp; lf; lv; lv'|> LPC with
+            | Some (Some rl, rpcl) =>
               do μ' <- store μ p (v @ rl);
               Some (St im μ' σ r (PAtm (j+1) rpcl))
             | _ => None

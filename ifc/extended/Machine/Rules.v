@@ -36,6 +36,7 @@ Inductive LAB (n: nat) : Type :=
 | lab1 : 1 <= n -> LAB n
 | lab2 : 2 <= n -> LAB n
 | lab3 : 3 <= n -> LAB n
+| lab4 : 4 <= n -> LAB n
 | labpc : LAB n.
 
 Fixpoint nlem (n:nat) (m:nat) : n<=(n+m).
@@ -91,9 +92,7 @@ Definition mk_eval_var (n:nat) (v1 v2 v3: option T) (pc: T) : LAB n -> T :=
 Definition mk_eval_var {n:nat} (vs:Vector.t T n) (pc:T) : LAB n -> T :=
 fun lv =>
     match lv with
-     | lab1 p => nth_order vs p
-     | lab2 p => nth_order vs p
-     | lab3 p => nth_order vs p
+     | lab1 p | lab2 p | lab3 p | lab4 p => nth_order vs p
      | labpc => pc
     end.
 
@@ -140,6 +139,7 @@ Notation "'LabPC'" := (L_Var (labpc _)).
 Notation "'Lab1'" := (L_Var (lab1 (nlem _ _))).
 Notation "'Lab2'" := (L_Var (lab2 (nlem _ _))).
 Notation "'Lab3'" := (L_Var (lab3 (nlem _ _))).
+Notation "'Lab4'" := (L_Var (lab4 (nlem _ _))).
 Notation "'BOT'" := (L_Bot _).
 Notation "'JOIN'" := L_Join.
 Notation "'TRUE'" := (A_True _).
