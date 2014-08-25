@@ -11,19 +11,35 @@ Set Implicit Arguments.
 Unset Strict Implicit.
 Unset Printing Implicit Defensive.
 
-(* Interface with non-ssr definitions *)
-Lemma replicateE T (a : T) n : replicate n a = nseq n a.
-Proof.
-by elim: n=> //= n ->.
-Qed.
-
 Module NIProof (Lattice : FINLAT).
 
 Module GenericMachine := MachineM Lattice.
 
 Import GenericMachine.
 
+(* Interface with non-ssr definitions *)
+Lemma replicateE T (a : T) n : replicate n a = nseq n a.
+Proof.
+by elim: n=> //= n ->.
+Qed.
+
 Definition def_atom := Vint 0 @ ⊥.
+
+Lemma upd_natE r r' rk a : upd_nat r rk a = Some r' ->
+  r' = set_nth def_atom r rk a.
+Proof.
+elim: r rk r' => // x l IHl [r' [<-]|rk] // [|y r'] /=.
+  by case: (upd_nat l rk a)=> //.
+case H: (upd_nat l rk a) => //; case=> <- <-.
+by congr cons; apply: IHl.
+Qed.
+
+Lemma updE r r' rk a : registerUpdate r rk a = Some r' ->
+  r' = set_nth def_atom r (BinInt.Z.to_nat rk) a.
+Proof.
+rewrite /registerUpdate /upd; case: (ZArith_dec.Z_lt_dec rk 0)=> // _.
+exact: upd_natE.
+Qed.
 
 Definition mframe_eq (m1 m2 : mframe) : bool :=
   Mem.EqDec_block m1 m2.
@@ -77,8 +93,16 @@ move=> upd_rk.
 rewrite /mframes_from_atoms.
 apply/subsetP=> x.
 rewrite !inE /=.
+rewrite mem_pmap.
+case/mapP=> a.
+rewrite mem_filter.
+case/andP => low_pt.
+case/(nthP def_atom) => i.
+(* TODO: use updE *)
 admit.
 Qed.
+
+Arguments mframes_from_atoms_upd [obs r rk r' atom] _.
 
 Fixpoint root_set_stack obs (s : Stack) : {set mframe} :=
   match s with
@@ -92,6 +116,20 @@ Fixpoint root_set_stack obs (s : Stack) : {set mframe} :=
 Definition root_set_registers obs (r : regSet) pcl :=
   if isLow pcl obs then mframes_from_atoms obs r
   else set0.
+
+Lemma root_set_registers_nth r r1 fp i lbl obs pcl :
+  registerContent r r1 = Some (Vptr (Ptr fp i) @ lbl) ->
+  isLow pcl obs -> isLow lbl obs ->
+  fp \in root_set_registers obs r pcl.
+Proof.
+move=> get_r1 low_pcl low_lbl.
+rewrite /root_set_registers low_pcl.
+rewrite inE.
+rewrite mem_pmap.
+apply/mapP.
+exists (Vptr (Ptr fp i) @ lbl) => //.
+rewrite mem_filter /= low_lbl. admit.
+Qed.
 
 Lemma root_set_registers_upd obs pcl r rk r' atom :
   registerUpdate r rk atom = Some r' ->
@@ -271,25 +309,16 @@ case: {st st'} step.
   rewrite !inE => wf_st.
   case/orP=> [|in_stack_f1].
     rewrite /root_set_registers; case: ifP => low_LPC'; last by rewrite inE.
-    move/(subsetP (mframes_from_atoms_upd _ upd_r1)).
+    move/(subsetP (mframes_from_atoms_upd upd_r1)).
     rewrite inE; case/orP=> [in_r'_f1|].
       by rewrite low_LPC' inE in_r'_f1 orbT in wf_st; apply: wf_st.
-    have r1_in_r: a@R \in r by admit.
-    case: a get_r1 upd_r1 r1_in_r => [?|[fp i]|?] get_r1 upd_r1 r1_in_r; rewrite /mframes_from_atoms /= !inE //.
+    case: a get_r1 upd_r1 => [?|[fp i]|?] get_r1 upd_r1; rewrite /mframes_from_atoms /= !inE //.
     case: ifP=> // low_B.
     rewrite /= inE => /eqP eq_f1.
-    rewrite /root_set_registers in wf_st.
-    have low_RLPC: isLow (R \_/ LPC) l.
-      exact/(flows_trans _ _ _ Hjoins)/join_minimal.
-    rewrite low_join in low_RLPC.
-    case/andP: low_RLPC => low_R low_LPC.
-    have in_r_fp: f1 \in mframes_from_atoms l r.
-      rewrite eq_f1 inE.
-      rewrite mem_pmap.
-      apply/mapP.
-      exists (Vptr (Ptr fp i) @ R) => //.
-      by rewrite mem_filter /= low_R r1_in_r.
-    by rewrite low_LPC in_r_fp in wf_st; apply: wf_st.
+    move: wf_st.
+    rewrite eq_f1 (root_set_registers_nth get_r1); first exact.
+      exact/(join_2_rev R)/(flows_trans _ _ _ Hjoins)/join_minimal.
+    exact/(join_1_rev R LPC)/(flows_trans _ _ _ Hjoins)/join_minimal.
   by case: (isLow LPC' l) wf_st; rewrite ?inE in_stack_f1 !orbT; apply.
 (* Alloc *)
 + move=> im μ μ' σ pc r r' r1 r2 r3 i K Ll K' rl rpcl j LPC dfp -> ? get_r1 get_r2 [<- <-] alloc_i.
@@ -301,7 +330,7 @@ case: {st st'} step.
   case/orP=> [|in_stack_f1].
     rewrite /root_set_registers.
     case: ifP => low_LPC; last by rewrite inE.
-    move/(subsetP (mframes_from_atoms_upd _ upd_r3)).
+    move/(subsetP (mframes_from_atoms_upd upd_r3)).
     rewrite inE.
     case/orP=> [in_r_f1|].
       by move: wf_st; rewrite /root_set_registers low_LPC in_r_f1; apply.
@@ -314,7 +343,47 @@ case: {st st'} step.
     by rewrite /references /= (Mem.alloc_get_fresh _ _ _ _ _ _ _ _ _ malloc).
   by move: wf_st; rewrite in_stack_f1 orbT; apply.
 (* Load *)
-Abort.
++ move=> im μ σ pc C p K r r' r1 r2 j LPC v Ll rl rpcl -> ? get_r1 load_p mlab_p [<- <-].
+  rewrite /Vector.nth_order /= => upd_r2 wf_st l f1 f2 /=.
+  move: wf_st => /(_ l f1 f2) /=.
+  rewrite !inE => wf_st.
+  case/orP.
+    rewrite /root_set_registers.
+    case: ifP => low_LPCKC; last by rewrite inE.
+    move/(subsetP (mframes_from_atoms_upd upd_r2)).
+    rewrite inE; case/orP=> [in_r_f1|].
+      move: low_LPCKC wf_st; rewrite /root_set_registers low_join => /andP [-> _].
+      by rewrite in_r_f1; apply.
+    rewrite inE /=; case: v load_p upd_r2 => // [[fp ?]] load_p upd_r2.
+    case low_Ll: (isLow Ll l) => //=.
+    rewrite !inE.
 
+rewrite /load in load_p.
+    
+admit.
+admit.
+(* Store *)
+admit.
+(* Jump *)
+admit.
+(* BNZ *)
+admit.
+(* BNZ *)
+admit.
+(* PSetOff *)
+admit.
+(* Put *)
+admit.
+(* BinOp *)
+admit.
+(* Nop *)
+admit.
+(* MSize *)
+admit.
+(* PGetOff *)
+admit.
+(* Mov *)
+admit.
+Qed.
 
 End NIProof.
