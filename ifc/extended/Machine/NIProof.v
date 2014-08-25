@@ -20,7 +20,7 @@ Import GenericMachine.
 Definition def_atom := Vint 0 @ ⊥.
 
 Definition mframe_eq (m1 m2 : mframe) : bool :=
-  if Mem.EqDec_block m1 m2 then true else false.
+  Mem.EqDec_block m1 m2.
 
 (* TODO: prove once mframe is actually made finite *)
 Axiom f : mframe -> ordinal (2^32).
@@ -39,6 +39,19 @@ Canonical mframe_countType := Eval hnf in CountType mframe mframe_countMixin.
 Definition mframe_finMixin := CanFinMixin fgK.
 Canonical mframe_finType := Eval hnf in FinType mframe mframe_finMixin.
 
+Definition eqAtom (a1 a2 : Atom) :=
+  match a1, a2 with
+  | v1@l1, v2@l2 => EqDec_block v1 v2 && (LatEqDec _ l1 l2)
+  end.
+
+Lemma eqAtomP : Equality.axiom eqAtom.
+Proof.
+admit.
+Qed.
+
+Canonical Atom_eqMixin := EqMixin eqAtomP.
+Canonical Atom_eqType := Eval hnf in EqType Atom Atom_eqMixin.
+
 Definition isLow (l obs : Label) := flows l obs.
 
 Definition is_low_pointer obs (a : Atom) : bool :=
@@ -49,6 +62,17 @@ Definition extract_mframe (a : Atom) : option mframe :=
 
 Definition mframes_from_atoms obs (atoms : list Atom) : {set mframe} :=
   [set t in pmap extract_mframe (filter (is_low_pointer obs) atoms)].
+
+Lemma mframes_from_atoms_upd obs r rk r' atom :
+  registerUpdate r rk atom = Some r' ->
+  mframes_from_atoms obs r' \subset mframes_from_atoms obs r :|: mframes_from_atoms obs [:: atom].
+Proof.
+move=> upd_rk.
+rewrite /mframes_from_atoms.
+apply/subsetP=> x.
+rewrite !inE /=.
+admit.
+Qed.
 
 Fixpoint root_set_stack obs (s : Stack) : {set mframe} :=
   match s with
@@ -63,12 +87,13 @@ Definition root_set_registers obs (r : regSet) pcl :=
   if isLow pcl obs then mframes_from_atoms obs r
   else set0.
 
-Lemma root_set_registers_upd obs pcl r rk r' atom atom' :
-  registerContent r rk = Some atom ->
-  registerUpdate r rk atom' = Some r' ->
-  root_set_registers obs r' pcl \subset root_set_registers obs r pcl :|: mframes_from_atoms obs [:: atom'].
+Lemma root_set_registers_upd obs pcl r rk r' atom :
+  registerUpdate r rk atom = Some r' ->
+  root_set_registers obs r' pcl \subset root_set_registers obs r pcl :|: mframes_from_atoms obs [:: atom].
 Proof.
-admit.
+rewrite /root_set_registers.
+case: ifP => _; first exact: mframes_from_atoms_upd.
+by rewrite sub0set.
 Qed.
 
 Lemma joinC l1 l2 : l1 \_/ l2 = l2 \_/ l1.
@@ -126,9 +151,7 @@ elim: {st st'} step.
   move: wf_st => /(_ l f1 f2) /= wf_st.
   rewrite inE.
   case/orP=> [|in_stack_f1].
-    have [? get_r2] : exists atom, registerContent r r2 = Some atom.
-      admit.
-    move/(subsetP (root_set_registers_upd _ _ get_r2 upd_r2)).
+    move/(subsetP (root_set_registers_upd _ _ upd_r2)).
     rewrite inE.
     case/orP=> [in_regs_f1|].
       by rewrite inE in_regs_f1 in wf_st; apply: wf_st.
@@ -139,9 +162,7 @@ elim: {st st'} step.
   move: wf_st => /(_ l f1 f2) /= wf_st.
   rewrite inE.
   case/orP=> [|in_stack_f1].
-    have [? get_r1] : exists atom, registerContent r r1 = Some atom.
-      admit.
-    move/(subsetP (root_set_registers_upd _ _ get_r1 upd_r1)).
+    move/(subsetP (root_set_registers_upd _ _ upd_r1)).
     rewrite inE.
     case/orP=> [in_regs_f1|].
       by rewrite inE in_regs_f1 in wf_st; apply: wf_st.
@@ -153,9 +174,7 @@ elim: {st st'} step.
   move: wf_st => /(_ l f1 f2) /= wf_st.
   rewrite inE.
   case/orP=> [|in_stack_f1].
-    have [? get_r2] : exists atom, registerContent r r2 = Some atom.
-      admit.
-    move/(subsetP (root_set_registers_upd _ _ get_r2 upd_r2)).
+    move/(subsetP (root_set_registers_upd _ _ upd_r2)).
     rewrite inE.
     case/orP=> [in_regs_f1|].
       by rewrite inE in_regs_f1 in wf_st; apply: wf_st.
@@ -166,9 +185,7 @@ elim: {st st'} step.
   move: wf_st => /(_ l f1 f2) /= wf_st.
   rewrite inE.
   case/orP=> [|in_stack_f1].
-    have [? get_r1] : exists atom, registerContent r r1 = Some atom.
-      admit.
-    move/(subsetP (root_set_registers_upd _ _ get_r1 upd_r1)).
+    move/(subsetP (root_set_registers_upd _ _ upd_r1)).
     rewrite inE.
     case/orP=> [in_regs_f1|].
       by rewrite inE in_regs_f1 in wf_st; apply: wf_st.
@@ -180,11 +197,39 @@ elim: {st st'} step.
   move: wf_st => /(_ l f1 f2) /= wf_st.
   rewrite root_set_registers_join !inE; case/orP.
     by case/andP=> _ in_regs_f1; apply: wf_st; rewrite inE in_regs_f1.
-
-
-
-
-
+  rewrite low_join.
+  case: ifPn=> [/andP [_ low_Lpc]|_ in_stack_f1].
+    by rewrite /root_set_registers low_Lpc in wf_st *.
+  by rewrite inE in_stack_f1 orbT in wf_st; apply: wf_st.
+(* BRet *)
++ move=> im μ σ pc a r r' r'' r1 R pc' B j j' LPC LPC' rl rpcl -> -> ? get_r1.
+  rewrite /run_tmr /apply_rule /= /Vector.nth_order /=.
+  case: ifPn=> // Hjoins [<- <-] upd_r1 wf_st l f1 f2 /=.
+  move: wf_st => /(_ l f1 f2) /=.
+  rewrite !inE => wf_st.
+  case/orP=> [|in_stack_f1].
+    rewrite /root_set_registers; case: ifP => low_LPC'; last by rewrite inE.
+    move/(subsetP (mframes_from_atoms_upd _ upd_r1)).
+    rewrite inE; case/orP=> [in_r'_f1|].
+      by rewrite low_LPC' inE in_r'_f1 orbT in wf_st; apply: wf_st.
+    have r1_in_r: a@R \in r by admit.
+    case: a get_r1 upd_r1 r1_in_r => [?|[fp i]|?] get_r1 upd_r1 r1_in_r; rewrite /mframes_from_atoms /= !inE //.
+    case: ifP=> // low_B.
+    rewrite /= inE => /eqP eq_f1.
+    rewrite /root_set_registers in wf_st.
+    have low_RLPC: isLow (R \_/ LPC) l.
+      exact/(flows_trans _ _ _ Hjoins)/join_minimal.
+    rewrite low_join in low_RLPC.
+    case/andP: low_RLPC => low_R low_LPC.
+    have in_r_fp: f1 \in mframes_from_atoms l r.
+      rewrite eq_f1 inE.
+      rewrite mem_pmap.
+      apply/mapP.
+      exists (Vptr (Ptr fp i) @ R) => //.
+      by rewrite mem_filter /= low_R r1_in_r.
+    by rewrite low_LPC in_r_fp in wf_st; apply: wf_st.
+  by case: (isLow LPC' l) wf_st; rewrite ?inE in_stack_f1 !orbT; apply.
+(* Alloc *)
 Abort.
 
 
