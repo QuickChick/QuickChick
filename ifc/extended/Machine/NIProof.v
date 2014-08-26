@@ -364,6 +364,8 @@ admit.
 admit.
 (* Store *)
 admit.
+(* Write *)
+admit.
 (* Jump *)
 admit.
 (* BNZ *)
