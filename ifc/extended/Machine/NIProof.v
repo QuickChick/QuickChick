@@ -31,27 +31,27 @@ Proof.
 by elim: l n => [[]|x l IHl [[->]|]].
 Qed.
 
-Lemma nthE T l n (a def : T) : nth l n = Some a ->
-  seq.nth def l (BinInt.Z.to_nat n) = a /\ BinInt.Z.to_nat n < size l.
+Lemma nth_error_ZE T l n (a def : T) : nth_error_Z l n = Some a ->
+  nth def l (BinInt.Z.to_nat n) = a /\ BinInt.Z.to_nat n < size l.
 Proof.
-by rewrite /nth; case: (ZArith_dec.Z_lt_dec n 0) => // _; apply: nth_errorE.
+by rewrite /nth_error_Z; case: (BinInt.Z.ltb n 0) => //; apply: nth_errorE.
 Qed.
 
-Lemma upd_natE T r r' (def : T) rk a : upd_nat r rk a = Some r' ->
+Lemma update_listE T r r' (def : T) rk a : update_list r rk a = Some r' ->
   r' = set_nth def r rk a /\ rk < size r.
 Proof.
 elim: r rk r' => // x l IHl [r' [<-]|rk] // [|y r'] /=.
-  by case: (upd_nat l rk a)=> //.
-case H: (upd_nat l rk a) => [a'|] //; case=> <- <-.
+  by case: (update_list l rk a)=> //.
+case H: (update_list l rk a) => [a'|] //; case=> <- <-.
 by split; case: (IHl rk a') => // <-.
 Qed.
 
-Lemma updE r r' rk a : registerUpdate r rk a = Some r' ->
+Lemma update_list_ZE r r' rk a : update_list_Z r rk a = Some r' ->
   r' = set_nth def_atom r (BinInt.Z.to_nat rk) a /\
   BinInt.Z.to_nat rk < size r.
 Proof.
-rewrite /registerUpdate /upd; case: (ZArith_dec.Z_lt_dec rk 0)=> // _.
-exact: upd_natE.
+rewrite /update_list_Z; case: (BinInt.Z.ltb rk 0)=> //.
+exact: update_listE.
 Qed.
 
 Definition mframe_eq (m1 m2 : mframe) : bool :=
@@ -110,7 +110,7 @@ Lemma mframes_from_atoms_upd obs r rk r' atom :
   registerUpdate r rk atom = Some r' ->
   mframes_from_atoms obs r' \subset mframes_from_atoms obs r :|: mframes_from_atoms obs [:: atom].
 Proof.
-case/updE => ->; set k := BinInt.Z.to_nat rk => lt_k.
+case/update_list_ZE => ->; set k := BinInt.Z.to_nat rk => lt_k.
 rewrite /mframes_from_atoms; apply/subsetP=> x; rewrite !inE /= !mem_pmap.
 case/mapP=> a; rewrite mem_filter; case/andP => low_pt.
 case/(nthP def_atom) => i; rewrite nth_set_nth size_set_nth /=.
@@ -140,7 +140,7 @@ Lemma root_set_registers_nth r r1 fp i lbl obs pcl :
   isLow pcl obs -> isLow lbl obs ->
   fp \in root_set_registers obs r pcl.
 Proof.
-case/(nthE def_atom) => get_r1 lt_r1 low_pcl low_lbl.
+case/(nth_error_ZE def_atom) => get_r1 lt_r1 low_pcl low_lbl.
 rewrite /root_set_registers low_pcl inE mem_pmap; apply/mapP.
 exists (Vptr (Ptr fp i) @ lbl) => //.
 by rewrite mem_filter /= low_lbl -get_r1 mem_nth.
@@ -358,23 +358,25 @@ case: {st st'} step.
     by rewrite /references /= (Mem.alloc_get_fresh _ _ _ _ _ _ _ _ _ malloc).
   by move: wf_st; rewrite in_stack_f1 orbT; apply.
 (* Load *)
-+ move=> im μ σ pc C p K r r' r1 r2 j LPC v Ll rl rpcl -> ? get_r1 load_p mlab_p [<- <-].
++ move=> im μ σ pc C [pv pl] K r r' r1 r2 j LPC v Ll rl rpcl -> ? get_r1 load_p mlab_p [<- <-].
   rewrite /Vector.nth_order /= => upd_r2 wf_st l f1 f2 /=.
-  move: wf_st => /(_ l f1 f2) /=.
-  rewrite !inE => wf_st.
-  case/orP.
+  rewrite inE; case/orP.
     rewrite /root_set_registers.
-    case: ifP => low_LPCKC; last by rewrite inE.
+    case: ifP; last by rewrite inE.
+    rewrite !low_join; case/and3P=> low_LPC low_K low_C.
     move/(subsetP (mframes_from_atoms_upd upd_r2)).
     rewrite inE; case/orP=> [in_r_f1|].
-      move: low_LPCKC wf_st; rewrite /root_set_registers low_join => /andP [-> _].
-      by rewrite in_r_f1; apply.
+      by apply: wf_st; rewrite inE /root_set_registers low_LPC in_r_f1.
     rewrite inE /=; case: v load_p upd_r2 => // [[fp ?]] load_p upd_r2.
     case low_Ll: (isLow Ll l) => //=.
     rewrite !inE.
+move/eqP=> -> reach_f2.
+apply: (wf_st l pv f2); first by rewrite inE (root_set_registers_nth get_r1).
+apply/(connect_trans _ reach_f2)/connect1.
+move: load_p.
+rewrite /references /=.
+case: (Mem.get_frame μ pv) => // [[_ _ fr]].
 
-rewrite /load in load_p.
-    
 admit.
 admit.
 (* Store *)
@@ -402,7 +404,5 @@ admit.
 (* Mov *)
 admit.
 Qed.
-
-Print Assumptions well_formed_preservation.
 
 End NIProof.

@@ -60,7 +60,7 @@ Fixpoint noopShrink (n : nat) (l : Label) (l1 l2 : list (@Instr Label))
         | Nop, Nop =>
           noopShrink n' l l1 l2
         | _, _ =>
-          match upd l1 (Z.of_nat n') Nop, upd l2 (Z.of_nat n') Nop with
+          match update_list_Z l1 (Z.of_nat n') Nop, update_list_Z l2 (Z.of_nat n') Nop with
             | Some l1', Some l2' => cons (Var l l1' l2')
                                          (noopShrink n' l l1 l2)
             | _, _ => noopShrink n' l l1 l2

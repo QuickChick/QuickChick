@@ -17,20 +17,20 @@ Definition zreplicate {A:Type} (n:Z) (a:A) : option (list A) :=
   if Z_lt_dec n 0 then None
   else Some (replicate (Z.to_nat n) a).
 
-Lemma index_list_replicate: forall A n (a:A) n',
-  index_list n' (replicate n a) = if lt_dec n' n then Some a else None.
+Lemma nth_error_replicate: forall A n (a:A) n',
+  nth_error (replicate n a) n' = if lt_dec n' n then Some a else None.
 Proof.
-  induction n; destruct n'; simpl; try congruence.
+  induction n; destruct n'; simpl; try reflexivity.
   rewrite IHn.
   do 2 destruct lt_dec; try congruence; try omega.
 Qed.
 
-Lemma index_list_Z_zreplicate: forall A z (a:A) z' l,
+Lemma nth_error_Z_zreplicate: forall A z (a:A) z' l,
   zreplicate z a = Some l ->
-  index_list_Z z' l = if Z_le_dec 0 z' then
+  nth_error_Z l z' = if Z_le_dec 0 z' then
                         if Z_lt_dec z' z then Some a else None else None.
 Proof.
-  unfold zreplicate, index_list_Z; intros.
+  unfold zreplicate, nth_error_Z; intros.
   destruct (Z_lt_dec z 0); try congruence.
   inv H.
   destruct (z' <? 0)%Z eqn:Ez.
@@ -40,7 +40,7 @@ Proof.
   - assert (~ (z' < 0 )%Z).
     rewrite <- Z.ltb_lt; try congruence.
     destruct Z_le_dec; try omega.
-    rewrite index_list_replicate.
+    rewrite nth_error_replicate.
     assert ( (z'<z)%Z <-> (Z.to_nat z') < (Z.to_nat z)).
       apply Z2Nat.inj_lt; try omega.
     destruct lt_dec; destruct Z_lt_dec; auto; try omega.

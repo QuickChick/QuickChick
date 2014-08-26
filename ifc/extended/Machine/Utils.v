@@ -460,42 +460,33 @@ Theorem frob_eq : forall A (t : trace A), t = frob t.
   destruct t; reflexivity.
 Qed.
 
-Fixpoint index_list A n (xs : list A) : option A :=
-  match xs, n with
-  | nil, _ => None
-  | x :: _, 0 => Some x
-  | _ :: xs', S n' => index_list n' xs'
-  end.
+Definition nth_error_Z {A:Type} (l:list A) (n:Z) : option A :=
+  if Z.ltb n 0 then None
+  else nth_error l (Z.to_nat n).
 
-Lemma index_list_nil : forall A pc,
-  index_list pc nil = @None A .
+Lemma nth_error_nil : forall A pc,
+  nth_error nil pc = @None A .
 Proof.
   induction pc; auto.
 Qed.
 
-Definition index_list_Z A i (xs: list A) : option A :=
-  if Z.ltb i 0 then
-    None
-  else
-    index_list (Z.to_nat i) xs.
-
-Lemma index_list_Z_nil : forall A i,
-  index_list_Z i nil = @None A .
+Lemma nth_error_Z_nil : forall A i,
+  nth_error_Z nil i = @None A .
 Proof.
-  intros. unfold index_list_Z. destruct (i <? 0)%Z. auto. apply index_list_nil.
+  intros. unfold nth_error_Z. destruct (i <? 0)%Z. auto. apply nth_error_nil.
 Qed.
 
-Lemma index_list_Z_nat (A: Type) :
+Lemma nth_error_Z_nat (A: Type) :
   forall l i (v:A),
-    index_list_Z i l = Some v ->
-    index_list (Z.to_nat i) l = Some v.
+    nth_error_Z l i = Some v ->
+    nth_error l (Z.to_nat i) = Some v.
 Proof.
-  intros. unfold index_list_Z in *. destruct (i <? 0)%Z. congruence. auto.
+  intros. unfold nth_error_Z in *. destruct (i <? 0)%Z. congruence. 
+auto.
 Qed.
 
-
-Lemma index_list_cons (T: Type): forall n a (l:list T),
- index_list n l = index_list (n+1)%nat (a :: l).
+Lemma nth_error_cons (T: Type): forall n a (l:list T),
+ nth_error l n = nth_error (a :: l) (n+1)%nat.
 Proof.
   intros.
   replace ((n+1)%nat) with (S n) by omega.
@@ -505,33 +496,34 @@ Proof.
   simpl. eauto.
 Qed.
 
-Lemma index_list_Z_cons (T: Type): forall i (l1: list T) a,
+Lemma nth_error_Z_cons (T: Type): forall i (l1: list T) a,
   (i >= 0)%Z ->
-  index_list_Z i l1 = index_list_Z (i+1) (a::l1).
+  nth_error_Z l1 i = nth_error_Z (a::l1) (i+1).
 Proof.
   induction i; intros.
   auto.
-  unfold index_list_Z. simpl.
+  unfold nth_error_Z. simpl.
   replace (Pos.to_nat (p + 1)) with ((Pos.to_nat p)+1)%nat by (zify; omega).
-  eapply index_list_cons with (l:= l1) (a:= a) ; eauto.
+  eapply nth_error_cons with (l:= l1) (a:= a) ; eauto.
   zify; omega.
 Qed.
 
-Lemma index_list_Z_app:
+Lemma nth_error_Z_app:
   forall (T : Type)  (l1 l2: list T) (i : Z),
-  i = Z.of_nat (length l1) -> index_list_Z i (l1 ++ l2) = index_list_Z 0 l2.
+  i = Z.of_nat (length l1) -> nth_error_Z (l1 ++ l2) i = nth_error_Z l2 0.
 Proof.
   induction l1; intros.
   simpl in *. subst. auto.
   simpl (length (a::l1)) in H.  zify.
   simpl.
   replace i with (i - 1 + 1)%Z by omega.
-  erewrite <- index_list_Z_cons by try omega.
+  erewrite <- nth_error_Z_cons by try omega.
   eapply IHl1. omega.
 Qed.
 
-Lemma index_list_Z_eq (T: Type) : forall (l1 l2: list T),
-  (forall i, index_list_Z i l1 = index_list_Z i l2) ->
+
+Lemma nth_error_Z_eq (T: Type) : forall (l1 l2: list T),
+  (forall i, nth_error_Z l1 i = nth_error_Z l2 i) ->
   l1 = l2.
 Proof.
   induction l1; intros.
@@ -544,15 +536,15 @@ Proof.
   inv H0.
   erewrite IHl1 ; eauto.
   intros. destruct i.
-  erewrite index_list_Z_cons with (a:= t); eauto; try omega.
+  erewrite nth_error_Z_cons with (a:= t); eauto; try omega.
   erewrite H ; eauto.
-  erewrite index_list_Z_cons with (a:= t); eauto; try (zify ; omega).
-  erewrite H ; eauto. symmetry. eapply index_list_Z_cons; eauto. zify; omega.
+  erewrite nth_error_Z_cons with (a:= t); eauto; try (zify ; omega).
+  erewrite H ; eauto. symmetry. eapply nth_error_Z_cons; eauto. zify; omega.
   destruct l1, l2 ; auto.
 Qed.
 
-Lemma index_list_valid (T:Type): forall n (l:list T) v,
-   index_list n l = Some v -> n < length l.
+Lemma nth_error_valid (T:Type): forall n (l:list T) v,
+   nth_error l n = Some v -> n < length l.
 Proof.
   induction n; intros; destruct l; simpl in H.
      inv H.
@@ -561,28 +553,30 @@ Proof.
      pose proof (IHn _ _ H). simpl. omega.
 Qed.
 
-Lemma index_list_Z_valid (T:Type): forall i (l:list T) v,
-   index_list_Z i l = Some v -> (0 <= i)%Z  /\ (Z.to_nat i < length l)%nat.
+
+Lemma nth_error_Z_valid (T:Type): forall i (l:list T) v,
+   nth_error_Z l i = Some v -> (0 <= i)%Z  /\ (Z.to_nat i < length l)%nat.
 Proof.
    intros.
-   unfold index_list_Z in H.  destruct ((i <? 0)%Z) eqn:?. inv H.
+   unfold nth_error_Z in H.  destruct ((i <? 0)%Z) eqn:?. inv H.
    split. apply Z.ltb_ge; auto.
-   eapply index_list_valid; eauto.
+   eapply nth_error_valid; eauto.
 Qed.
 
-Fixpoint update_list A (n : nat) (y : A) (xs : list A) : option (list A) :=
+
+Fixpoint update_list A (xs : list A) (n : nat) (y : A) : option (list A) :=
   match xs, n with
   | nil, _ => None
   | _ :: xs', 0 => Some (y :: xs')
   | a :: xs', S n' =>
-    match update_list n' y xs' with
+    match update_list xs' n' y with
       | None => None
       | Some l => Some (a::l)
     end
   end.
 
 Lemma update_some_not_nil : forall A (v:A) l a l',
-  update_list a v l = Some l' ->
+  update_list l a v = Some l' ->
   l' = nil ->
   False.
 Proof.
@@ -594,26 +588,14 @@ Proof.
   congruence.
 Qed.
 
-
-Lemma index_list_map : forall (A B: Type) m x (e:A) (f: A -> B),
-  index_list x m = Some e ->
-  index_list x (map f m) = Some (f e).
-Proof.
-  induction m ; intros.
-  - rewrite index_list_nil in *. inv H.
-  - destruct x ; simpl in *.
-    inv H; auto.
-    eauto.
-Qed.
-
-Definition update_list_Z A i y (xs: list A) : option (list A) :=
+Definition update_list_Z A (xs: list A) i y : option (list A) :=
   if Z.ltb i 0 then
     None
   else
-    update_list (Z.to_nat i) y xs.
+    update_list xs (Z.to_nat i) y.
 
 Lemma update_Z_some_not_nil : forall A (v:A) l i l',
-  update_list_Z i v l = Some l' ->
+  update_list_Z l i v = Some l' ->
   l' = nil ->
   False.
 Proof.
@@ -623,37 +605,37 @@ Qed.
 
 
 Lemma update_list_Z_nat (A: Type) (v:A) l i l':
-  update_list_Z i v l = Some l' ->
-  update_list (Z.to_nat i) v l = Some l'.
+  update_list_Z l i v = Some l' ->
+  update_list l (Z.to_nat i) v = Some l'.
 Proof.
   intros. unfold update_list_Z in *. destruct (i <? 0)%Z. congruence.
   auto.
 Qed.
 
 Lemma update_list_spec (T: Type) : forall (v: T) l a l',
-  update_list a v l = Some l' ->
-  index_list a l' = Some v.
+  update_list l a v = Some l' ->
+  nth_error l' a = Some v.
 Proof.
   induction l ; intros.
   destruct a ; simpl in *; inv H.
   destruct a0 ; simpl in *; inv H; auto.
-  case_eq (update_list a0 v l) ; intros ; rewrite H in * ; inv H1.
+  case_eq (update_list l a0 v) ; intros ; rewrite H in * ; inv H1.
   auto.
 Qed.
 
 Lemma update_list_Z_spec (T: Type) : forall (v: T) l a l',
-  update_list_Z a v l = Some l' ->
-  index_list_Z a l' = Some v.
+  update_list_Z l a v = Some l' ->
+  nth_error_Z l' a = Some v.
 Proof.
-  unfold update_list_Z, index_list_Z. intros.
+  unfold update_list_Z, nth_error_Z. intros.
   destruct (a <? 0)%Z.  congruence.
   eapply update_list_spec; eauto.
 Qed.
 
 Lemma update_list_spec2 (T:Type) : forall (v:T) l n n' l',
-  update_list n v l = Some l' ->
+  update_list l n v = Some l' ->
   n <> n' ->
-  index_list n' l = index_list n' l'.
+  nth_error l n' = nth_error l' n'.
 Proof.
   induction l; intros.
   destruct n; simpl in *; inv H.
@@ -664,23 +646,23 @@ Proof.
       simpl. auto.
     destruct n'.
       destruct l'; inv H.
-        destruct (update_list n v l); inv H2.
-        destruct (update_list n v l); inv H2.
+        destruct (update_list l n v); inv H2.
+        destruct (update_list l n v); inv H2.
         auto.
       destruct l'; inv H.
-        destruct (update_list n v l); inv H2.
+        destruct (update_list l n v); inv H2.
         simpl.
-        destruct  (update_list n v l) eqn:?; inv H2.
+        destruct  (update_list l n v) eqn:?; inv H2.
         eapply IHl; eauto.
 Qed.
 
 
 Lemma update_list_Z_spec2 (T:Type) : forall (v:T) l a a' l',
-  update_list_Z a v l = Some l' ->
+  update_list_Z l a v = Some l' ->
   a' <> a ->
-  index_list_Z a' l = index_list_Z a' l'.
+  nth_error_Z l a' = nth_error_Z l' a'.
 Proof.
-  unfold update_list_Z, index_list_Z. intros.
+  unfold update_list_Z, nth_error_Z. intros.
   destruct (a <? 0)%Z eqn:?. congruence.
   destruct (a' <? 0)%Z eqn:?. auto.
   eapply update_list_spec2; eauto.
@@ -691,7 +673,7 @@ Qed.
 
 Lemma update_list_Some (T: Type): forall (v: T) l n,
   n < length l ->
-  exists l', update_list n v l = Some l'.
+  exists l', update_list l n v = Some l'.
 Proof.
   induction l; intros.
   - inv H.
@@ -703,18 +685,18 @@ Qed.
 
 Lemma valid_update :
   forall T i (l : list T) x x',
-    index_list_Z i l = Some x ->
+    nth_error_Z l i = Some x ->
     exists l',
-      update_list_Z i x' l = Some l'.
+      update_list_Z l i x' = Some l'.
 Proof.
   intros.
-  unfold index_list_Z, update_list_Z in *.
+  unfold nth_error_Z, update_list_Z in *.
   destruct (i <? 0)%Z; try congruence.
   - remember (Z.to_nat i) as n; clear Heqn.
     generalize dependent n.
     generalize dependent l.
     induction l; intros.
-    + destruct n; simpl in H; try congruence.
+    + destruct n; simpl in H; discriminate.
     + destruct n; simpl in *.
       * simpl; eauto.
       * simpl in *.
@@ -726,8 +708,8 @@ Definition swap T n (l : list T) : option (list T) :=
   match l with
     | nil => None
     | y :: l' =>
-      match index_list n (y :: l') with
-        | Some x => update_list n y (x :: l')
+      match nth_error (y :: l') n with
+        | Some x => update_list (x :: l') n y
         | None => None
       end
   end.
@@ -782,7 +764,7 @@ Qed.
 Lemma update_list_Z_Some (T:Type): forall (v:T) l (i:Z),
   (0 <= i)%Z ->
   Z.to_nat i < length l ->
-  exists l', update_list_Z i v l = Some l'.
+  exists l', update_list_Z l i v = Some l'.
 Proof.
   intros. unfold update_list_Z.
   destruct (i <? 0)%Z eqn:?.
@@ -791,7 +773,7 @@ Proof.
 Qed.
 
 Lemma update_preserves_length: forall T a (vl:T) m m',
-  update_list a vl m = Some m' ->
+  update_list m a vl = Some m' ->
   length m' = length m.
 Proof.
   induction a; intros.
@@ -800,7 +782,7 @@ Proof.
     + inversion H; subst; reflexivity.
   - destruct m; simpl in *.
     + inv H.
-    + destruct (update_list a vl m) eqn:?.
+    + destruct (update_list m a vl) eqn:?.
       * exploit IHa; eauto.
         inversion H; subst.
         intros eq; rewrite <- eq; reflexivity.
@@ -943,9 +925,9 @@ Fixpoint replicate T (a: T) n : list T :=
     | S n => a::(replicate a n)
   end.
 
-Lemma index_list_In :
+Lemma nth_error_In :
   forall T n (l : list T) (x : T),
-    index_list n l = Some x ->
+    nth_error l n = Some x ->
     In x l.
 Proof.
   intros.
@@ -955,18 +937,18 @@ Proof.
   - inv H. auto.
   - auto.
 Qed.
-Hint Resolve index_list_In.
+Hint Resolve nth_error_In.
 
 Lemma update_list_In :
   forall T n x y (l l' : list T)
-         (UPD: update_list n x l = Some l')
+         (UPD: update_list l n x = Some l')
          (IN: In y l'),
     y = x \/ In y l.
 Proof.
   induction n as [|n IH]; intros; destruct l as [|x' l]; simpl in *;
   try solve [inv UPD].
   - inv UPD. destruct IN; eauto.
-  - destruct (update_list n x l) as [l''|] eqn:UPD'; inv UPD.
+  - destruct (update_list l n x) as [l''|] eqn:UPD'; inv UPD.
     destruct IN; auto.
     exploit IH; eauto.
     intros []; eauto.
@@ -983,8 +965,8 @@ Proof.
   destruct l as [|y l]; try congruence.
   destruct n as [|n]; simpl in *.
   - inv SWAP. eauto.
-  - destruct (index_list n l) as [x'|] eqn:IDX; try congruence.
-    destruct (update_list n y l) as [l''|] eqn:UPD; try congruence.
+  - destruct (nth_error l n) as [x'|] eqn:IDX; try congruence.
+    destruct (update_list l n y) as [l''|] eqn:UPD; try congruence.
     inv SWAP.
     destruct IN as [H | H]; subst; eauto.
     clear - UPD H.
@@ -992,10 +974,10 @@ Proof.
     intros []; auto.
 Qed.
 
-Lemma index_list_app :
+Lemma nth_error_app :
   forall T n (l1 l2 : list T) x,
-    index_list n l1 = Some x ->
-    index_list n (l1 ++ l2) = Some x.
+    nth_error l1 n = Some x ->
+    nth_error (l1 ++ l2) n = Some x.
 Proof.
   induction n as [|n IH]; intros [|x' l1] l2 x H; simpl in *;
   try solve [inv H]; auto.
@@ -1003,12 +985,12 @@ Qed.
 
 Lemma update_list_app :
   forall T n x (l1 l1' l2 : list T)
-         (UPD : update_list n x l1 = Some l1'),
-    update_list n x (l1 ++ l2) = Some (l1' ++ l2).
+         (UPD : update_list l1 n x = Some l1'),
+    update_list (l1 ++ l2) n x = Some (l1' ++ l2).
 Proof.
   induction n; intros;
   destruct l1 as [|x' l1]; simpl in *; allinv; auto.
-  destruct (update_list n x l1) as [l1''|] eqn:UPD'; allinv.
+  destruct (update_list l1 n x) as [l1''|] eqn:UPD'; allinv.
   erewrite IHn; eauto.
   simpl.
   reflexivity.
@@ -1022,8 +1004,8 @@ Proof.
   unfold swap.
   intros.
   destruct l1 as [|y l1]; simpl; try congruence.
-  destruct (index_list n (y :: l1)) as [x|] eqn:SWAP'; allinv.
-  eapply index_list_app in SWAP'.
+  destruct (nth_error (y :: l1) n) as [x|] eqn:SWAP'; allinv.
+  eapply nth_error_app in SWAP'.
   simpl in SWAP'.
   rewrite SWAP'.
   eapply update_list_app in SWAP.
@@ -1040,7 +1022,7 @@ Proof.
   unfold swap.
   intros.
   destruct l as [|y l]; try congruence.
-  destruct (index_list n (y :: l)) as [x'|] eqn:IDX; try congruence.
+  destruct (nth_error (y :: l) n) as [x'|] eqn:IDX; try congruence.
   destruct n as [|n]; simpl in *; allinv; simpl in *; eauto.
   match goal with
     | H : (match ?UP with _ => _ end) = _ |- _ =>
@@ -1120,9 +1102,9 @@ Proof.
   congruence.
 Qed.
 
-Lemma index_list_drop_zero :
+Lemma nth_error_drop_zero :
   forall X (i : nat) (l : list X),
-    index_list i l = index_list 0 (drop i l).
+    nth_error l i = nth_error (drop i l) 0.
 Proof.
   intros X i.
   induction i as [|i IH].
@@ -1131,24 +1113,24 @@ Proof.
     simpl. rewrite IH. reflexivity.
 Qed.
 
-Lemma index_list_Z_dropZ_zero :
+Lemma nth_error_Z_dropZ_zero :
   forall X (i : Z) (l : list X)
          (POS : (i >= 0)%Z),
-    index_list_Z i l = index_list_Z 0 (dropZ i l).
+    nth_error_Z l i = nth_error_Z (dropZ i l) 0.
 Proof.
   intros.
-  unfold index_list_Z, dropZ.
+  unfold nth_error_Z, dropZ.
   destruct (Z.ltb_spec0 i 0); try omega.
-  rewrite index_list_drop_zero.
+  rewrite nth_error_drop_zero.
   reflexivity.
 Qed.
 
-Lemma index_list_drop :
+Lemma nth_error_drop :
   forall X (i i' : nat) (l : list X),
-    index_list (i + i') l = index_list i (drop i' l).
+    nth_error l (i + i') = nth_error (drop i' l) i.
 Proof.
   intros X i.
-  induction i as [|i IH]; auto using index_list_drop_zero.
+  induction i as [|i IH]; auto using nth_error_drop_zero.
   intros [|i'] [|a l]; try reflexivity.
   - rewrite plus_0_r. reflexivity.
   - simpl.
@@ -1164,19 +1146,19 @@ Proof.
       destruct i; reflexivity.
 Qed.
 
-Lemma index_list_Z_dropZ :
+Lemma nth_error_Z_dropZ :
   forall X (i i' : Z) (l : list X)
          (POS1 : (i' >= 0)%Z)
          (POS2 : (i >= 0)%Z),
-    index_list_Z (i + i') l = index_list_Z i (dropZ i' l).
+    nth_error_Z l (i + i') = nth_error_Z (dropZ i' l) i.
 Proof.
   intros.
-  unfold index_list_Z, dropZ.
+  unfold nth_error_Z, dropZ.
   destruct (Z.ltb_spec0 i' 0); try omega.
   destruct (Z.ltb_spec0 i 0); try omega.
   destruct (Z.ltb_spec0 (i + i') 0); try omega.
   rewrite Z2Nat.inj_add; try omega.
-  apply index_list_drop.
+  apply nth_error_drop.
 Qed.
 
 Lemma dropZ_cons :
@@ -1215,8 +1197,8 @@ Fixpoint take {T} (n : nat) (l : list T) : list T :=
       end
   end.
 
-Lemma index_list_app' X : forall (l1 l2 : list X) (x : X),
-                            index_list (length l1) (l1 ++ x :: l2) = Some x.
+Lemma nth_error_app' X : forall (l1 l2 : list X) (x : X),
+                            nth_error (l1 ++ x :: l2) (length l1) = Some x.
 Proof.
   induction l1 as [|x' l1 IH]; intros; simpl in *; subst; eauto.
 Qed.

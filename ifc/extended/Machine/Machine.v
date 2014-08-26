@@ -92,7 +92,7 @@ Definition imem := list (@Instr Label).
 
 Definition instr_lookup (m:imem) (pc:Ptr_atom) : option (@Instr Label) :=
   let '(PAtm i _) := pc in
-  index_list_Z i m.
+  nth_error_Z m i.
 Notation "m [ pc ]" := (instr_lookup m pc) (at level 20).
 
 Definition add_pc (pc:Ptr_atom) (n:Z) : Ptr_atom :=
@@ -180,7 +180,7 @@ Definition load (m : memory) (p : Pointer) : option Atom :=
   let '(Ptr f addr) := p in
   match Mem.get_frame m f with
     | None => None
-    | Some (Fr _ _ fr) => index_list_Z addr fr
+    | Some (Fr _ _ fr) => nth_error_Z fr addr
   end.
 
 Definition store (m : memory) (p : Pointer) (a:Atom)
@@ -189,7 +189,7 @@ Definition store (m : memory) (p : Pointer) (a:Atom)
   match Mem.get_frame m f with
     | None => None
     | Some (Fr stamp lab data) =>
-      match update_list_Z addr a data with
+      match update_list_Z data addr a with
         | None => None
         | Some data' => (Mem.upd_frame m f (Fr stamp lab data'))
       end
@@ -225,7 +225,7 @@ Proof.
   destruct (equiv_dec mf).
   - inv e.
     destruct (equiv_dec mf'); try congruence.
-    eapply index_list_Z_zreplicate; eauto.
+    eapply nth_error_Z_zreplicate; eauto.
   - destruct (equiv_dec mf); try congruence.
 Qed.
 
@@ -240,7 +240,7 @@ Proof.
   unfold store, load; intros.
   destruct (Mem.get_frame m b) eqn:E1; try congruence.
   destruct f as [stmp lab l].
-  destruct (update_list_Z ofs a l) eqn:E2; try congruence.
+  destruct (update_list_Z l ofs a) eqn:E2; try congruence.
   rewrite (Mem.get_upd_frame _ _ _ _ _ _ _ H).
   destruct (equiv_dec b);
   destruct (equiv_dec b); try congruence.
@@ -283,7 +283,7 @@ Proof.
   unfold load, store; intros.
   destruct (Mem.get_frame m b) eqn:E; try congruence.
   destruct f eqn:?. (* I don't like this *)
-  exploit index_list_Z_valid; eauto.
+  exploit nth_error_Z_valid; eauto.
   destruct 1.
   destruct (@update_list_Z_Some _ a' l ofs); auto.
   rewrite H2.
@@ -349,7 +349,7 @@ Proof.
   intros.
   destruct (Mem.get_frame m b) as [f|] eqn:FRAME; try congruence.
   destruct f as [stamp lab l] eqn:?.
-  destruct (update_list_Z off a l) as [l'|] eqn:NEWFRAME; try congruence.
+  destruct (update_list_Z l off a) as [l'|] eqn:NEWFRAME; try congruence.
   eapply get_frame_upd_frame_neq; eauto.
 Qed.
 
@@ -405,35 +405,10 @@ Record State := St {
   st_pc    : Ptr_atom (* program counter *)
 }.
 
-(* List manipulation helpers *)
-Definition nth {A:Type} (l:list A) (n:Z) : option A :=
-  if Z_lt_dec n 0 then None
-  else nth_error l (Z.to_nat n).
-
-Fixpoint upd_nat {A:Type} (l:list A) (n:nat) (a:A) : option (list A) :=
-  match l with
-    | nil => None
-    | x::q =>
-      match n with
-        | O => Some (a::q)
-        | S p =>
-          match upd_nat q p a with
-            | None => None
-            | Some q' => Some (x::q')
-          end
-      end
-  end.
-
-Definition upd {A:Type} (l:list A) (n:Z) (a:A) : option (list A) :=
-  if Z_lt_dec n 0 then None
-  else upd_nat l (Z.to_nat n) a.
-
 Definition registerUpdate (rs : regSet) (r : regId) (a : Atom) :=
-  upd rs r a.
+  update_list_Z rs r a.
 Definition registerContent (rs : regSet) (r : regId) :=
-  nth rs r.
-
-
+  nth_error_Z rs r.
 
 Definition run_tmr (t : table) (op: OpCode)
   (labs:Vector.t Label (labelCount op)) (pc: Label)
