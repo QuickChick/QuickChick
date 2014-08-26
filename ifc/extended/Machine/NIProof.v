@@ -26,16 +26,17 @@ Qed.
 Definition def_atom := Vint 0 @ ⊥.
 
 Lemma upd_natE r r' rk a : upd_nat r rk a = Some r' ->
-  r' = set_nth def_atom r rk a.
+  r' = set_nth def_atom r rk a /\ rk < size r.
 Proof.
 elim: r rk r' => // x l IHl [r' [<-]|rk] // [|y r'] /=.
   by case: (upd_nat l rk a)=> //.
-case H: (upd_nat l rk a) => //; case=> <- <-.
-by congr cons; apply: IHl.
+case H: (upd_nat l rk a) => [a'|] //; case=> <- <-.
+by split; case: (IHl rk a') => // <-.
 Qed.
 
 Lemma updE r r' rk a : registerUpdate r rk a = Some r' ->
-  r' = set_nth def_atom r (BinInt.Z.to_nat rk) a.
+  r' = set_nth def_atom r (BinInt.Z.to_nat rk) a /\
+  BinInt.Z.to_nat rk < size r.
 Proof.
 rewrite /registerUpdate /upd; case: (ZArith_dec.Z_lt_dec rk 0)=> // _.
 exact: upd_natE.
@@ -89,17 +90,14 @@ Lemma mframes_from_atoms_upd obs r rk r' atom :
   registerUpdate r rk atom = Some r' ->
   mframes_from_atoms obs r' \subset mframes_from_atoms obs r :|: mframes_from_atoms obs [:: atom].
 Proof.
-move=> upd_rk.
-rewrite /mframes_from_atoms.
-apply/subsetP=> x.
-rewrite !inE /=.
-rewrite mem_pmap.
-case/mapP=> a.
-rewrite mem_filter.
-case/andP => low_pt.
-case/(nthP def_atom) => i.
-(* TODO: use updE *)
-admit.
+case/updE => ->; set k := BinInt.Z.to_nat rk => lt_k.
+rewrite /mframes_from_atoms; apply/subsetP=> x; rewrite !inE /= !mem_pmap.
+case/mapP=> a; rewrite mem_filter; case/andP => low_pt.
+case/(nthP def_atom) => i; rewrite nth_set_nth size_set_nth /=.
+move/maxn_idPr: lt_k => -> lt_i.
+have [_ -> ->|neq_ik eq_a ->] := i =P k.
+  by rewrite [X in _ || X]map_f ?orbT // low_pt inE.
+by rewrite map_f // mem_filter low_pt -eq_a mem_nth.
 Qed.
 
 Arguments mframes_from_atoms_upd [obs r rk r' atom] _.
