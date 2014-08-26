@@ -9,7 +9,8 @@ Inductive BinOpT : Type :=
 | BAdd
 | BMult
 | BJoin
-| BFlowsTo.
+| BFlowsTo
+| BEq.
 
 Section Instr.
 

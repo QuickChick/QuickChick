@@ -42,6 +42,7 @@ Instance show_bin_op : Show BinOpT :=
               | BMult => "*"
               | BFlowsTo => "<:"
               | BJoin => "\/"
+              | BEq => "="
             end)
 |}.
 

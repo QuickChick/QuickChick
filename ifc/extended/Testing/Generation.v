@@ -53,7 +53,8 @@ Class SmartGen (A : Type) := {
   smart_gen : Info -> Gen A
 }.
 
-Definition gen_BinOpT := oneof (pure BAdd) [pure BAdd; pure BMult].
+Definition gen_BinOpT : Gen BinOpT :=
+  elements BAdd [BAdd; BMult; BJoin; BFlowsTo; BEq].
 
 (* Labels *)
 

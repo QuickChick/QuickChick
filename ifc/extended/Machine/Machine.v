@@ -152,7 +152,7 @@ Proof.
   - destruct (LatEqDec Label l l0); try_split_congruence.
 Qed.
 
-Definition val (v1 v2 : Value) : Value :=
+Definition val_eq (v1 v2 : Value) : Value :=
   Vint (if v1 == v2 then 1 else 0).
 
 Definition eval_binop (b : BinOpT) (v1 v2 : Value) : option Value :=
@@ -161,7 +161,8 @@ Definition eval_binop (b : BinOpT) (v1 v2 : Value) : option Value :=
     | BMult,    Vint z1, Vint z2 => Some (Vint (z1 * z2)%Z)
     | BFlowsTo, Vlab l1, Vlab l2 => Some (Vint (flows_to l1 l2))
     | BJoin,    Vlab l1, Vlab l2 => Some (Vlab (l1 ∪ l2))
-    | _    ,    _      , _       => None
+    | BEq,      v1     , v2      => Some (val_eq v1 v2)
+    | _ ,       _ ,      _       => None
   end.
 
 Definition memory := Mem.t Atom Label.
