@@ -25,8 +25,20 @@ Qed.
 
 Definition def_atom := Vint 0 @ ⊥.
 
-Lemma upd_natE r r' rk a : upd_nat r rk a = Some r' ->
-  r' = set_nth def_atom r rk a /\ rk < size r.
+Lemma nth_errorE T l n (a def : T) : nth_error l n = Some a ->
+  seq.nth def l n = a /\ n < size l.
+Proof.
+by elim: l n => [[]|x l IHl [[->]|]].
+Qed.
+
+Lemma nthE T l n (a def : T) : nth l n = Some a ->
+  seq.nth def l (BinInt.Z.to_nat n) = a /\ BinInt.Z.to_nat n < size l.
+Proof.
+by rewrite /nth; case: (ZArith_dec.Z_lt_dec n 0) => // _; apply: nth_errorE.
+Qed.
+
+Lemma upd_natE T r r' (def : T) rk a : upd_nat r rk a = Some r' ->
+  r' = set_nth def r rk a /\ rk < size r.
 Proof.
 elim: r rk r' => // x l IHl [r' [<-]|rk] // [|y r'] /=.
   by case: (upd_nat l rk a)=> //.
@@ -69,7 +81,15 @@ Definition eqAtom (a1 a2 : Atom) :=
 
 Lemma eqAtomP : Equality.axiom eqAtom.
 Proof.
-admit.
+move=> [xv xl] [yv yl] /=.
+case: (EqDec_block xv yv).
+  rewrite /Equivalence.equiv /= => ->.
+  case: (LatEqDec Label xl yl).
+    by rewrite /Equivalence.equiv /= => ->; constructor.
+  rewrite /Equivalence.equiv /RelationClasses.complement /= => neq_l.
+  by constructor; case.
+rewrite /Equivalence.equiv /RelationClasses.complement /= => neq_v.
+by constructor; case.
 Qed.
 
 Canonical Atom_eqMixin := EqMixin eqAtomP.
@@ -120,13 +140,10 @@ Lemma root_set_registers_nth r r1 fp i lbl obs pcl :
   isLow pcl obs -> isLow lbl obs ->
   fp \in root_set_registers obs r pcl.
 Proof.
-move=> get_r1 low_pcl low_lbl.
-rewrite /root_set_registers low_pcl.
-rewrite inE.
-rewrite mem_pmap.
-apply/mapP.
+case/(nthE def_atom) => get_r1 lt_r1 low_pcl low_lbl.
+rewrite /root_set_registers low_pcl inE mem_pmap; apply/mapP.
 exists (Vptr (Ptr fp i) @ lbl) => //.
-rewrite mem_filter /= low_lbl. admit.
+by rewrite mem_filter /= low_lbl -get_r1 mem_nth.
 Qed.
 
 Lemma root_set_registers_upd obs pcl r rk r' atom :
@@ -385,5 +402,7 @@ admit.
 (* Mov *)
 admit.
 Qed.
+
+Print Assumptions well_formed_preservation.
 
 End NIProof.
