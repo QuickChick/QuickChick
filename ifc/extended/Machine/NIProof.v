@@ -106,6 +106,16 @@ Definition extract_mframe (a : Atom) : option mframe :=
 Definition mframes_from_atoms obs (atoms : list Atom) : {set mframe} :=
   [set t in pmap extract_mframe (filter (is_low_pointer obs) atoms)].
 
+Lemma mframes_from_atoms_nth r r1 fp i lbl obs :
+  registerContent r r1 = Some (Vptr (Ptr fp i) @ lbl) -> isLow lbl obs ->
+  fp \in mframes_from_atoms obs r.
+Proof.
+case/(nth_error_ZE def_atom) => get_r1 lt_r1 low_lbl.
+rewrite inE mem_pmap; apply/mapP.
+exists (Vptr (Ptr fp i) @ lbl) => //.
+by rewrite mem_filter /= low_lbl -get_r1 mem_nth.
+Qed.
+
 Lemma mframes_from_atoms_upd obs r rk r' atom :
   registerUpdate r rk atom = Some r' ->
   mframes_from_atoms obs r' \subset mframes_from_atoms obs r :|: mframes_from_atoms obs [:: atom].
@@ -140,10 +150,8 @@ Lemma root_set_registers_nth r r1 fp i lbl obs pcl :
   isLow pcl obs -> isLow lbl obs ->
   fp \in root_set_registers obs r pcl.
 Proof.
-case/(nth_error_ZE def_atom) => get_r1 lt_r1 low_pcl low_lbl.
-rewrite /root_set_registers low_pcl inE mem_pmap; apply/mapP.
-exists (Vptr (Ptr fp i) @ lbl) => //.
-by rewrite mem_filter /= low_lbl -get_r1 mem_nth.
+move=> get_r1 low_pcl low_lbl; rewrite /root_set_registers low_pcl.
+exact: (mframes_from_atoms_nth get_r1).
 Qed.
 
 Lemma root_set_registers_upd obs pcl r rk r' atom :
@@ -360,7 +368,7 @@ case: {st st'} step.
 (* Load *)
 + move=> im μ σ pc C [pv pl] K r r' r1 r2 j LPC v Ll rl rpcl -> ? get_r1 load_p mlab_p [<- <-].
   rewrite /Vector.nth_order /= => upd_r2 wf_st l f1 f2 /=.
-  rewrite inE; case/orP.
+  rewrite inE; case/orP=> [|in_stack_f1].
     rewrite /root_set_registers.
     case: ifP; last by rewrite inE.
     rewrite !low_join; case/and3P=> low_LPC low_K low_C.
@@ -370,15 +378,12 @@ case: {st st'} step.
     rewrite inE /=; case: v load_p upd_r2 => // [[fp ?]] load_p upd_r2.
     case low_Ll: (isLow Ll l) => //=.
     rewrite !inE.
-move/eqP=> -> reach_f2.
-apply: (wf_st l pv f2); first by rewrite inE (root_set_registers_nth get_r1).
-apply/(connect_trans _ reach_f2)/connect1.
-move: load_p.
-rewrite /references /=.
-case: (Mem.get_frame μ pv) => // [[_ _ fr]].
-
-admit.
-admit.
+    move/eqP=> -> reach_f2.
+    apply: (wf_st l pv f2); first by rewrite inE (root_set_registers_nth get_r1).
+    apply/(connect_trans _ reach_f2)/connect1; move: load_p.
+    rewrite /references /=; case: (Mem.get_frame μ pv) => // [[_ _ fr]] get_pl.
+    exact: (mframes_from_atoms_nth get_pl).
+  by apply: wf_st; rewrite inE in_stack_f1 orbT.
 (* Store *)
 admit.
 (* Write *)
