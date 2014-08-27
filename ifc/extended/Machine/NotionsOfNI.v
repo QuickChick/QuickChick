@@ -1,5 +1,7 @@
 Require Import ssreflect ssrbool ssrnat eqtype ssrfun seq.
 
+Set Implicit Arguments.
+
 Section Everything.
 
 Variable A : eqType.
@@ -8,6 +10,8 @@ Variable initial : pred A.
 Variable halted : pred A.
 Variable step : A -> option A.
 Variable equiv : rel A.
+
+Hypothesis equivS : symmetric equiv.
 
 Hypothesis halted_low : subpred halted low.
 
@@ -34,13 +38,12 @@ Fixpoint trace (n : nat) (s : A) : seq A :=
   | _, _ => [:: s]
   end.
 
-Lemma exec_trace n s : exec n s = last s (trace n s).
+Lemma exec_trace s' n s : exec n s = last s' (trace n s).
 Proof.
-  elim: n s => [|n IH] s //=.
-  case E: (step s) => [s'|//=].
-  rewrite IH {IH} /=.
+  elim: n s s' => [|n IH] s s' //=.
+  case E: (step s) => [s''|//=].
+  rewrite (IH _ s) {IH} /=.
   case: n => [|n] //=.
-  by case: (step s') => //=.
 Qed.
 
 Definition eeni : Prop :=
@@ -52,11 +55,139 @@ Definition eeni : Prop :=
     halted (exec n s2) ->
     equiv (exec n s1) (exec n s2).
 
-Fixpoint equivt (t1 t2 : seq A) : bool :=
-  match t1, t2 with
-  | s1 :: t1', s2 :: t2' => equiv s1 s2 && equivt t1' t2'
-  | _, _ => false
-  end.
+Inductive equivt : seq A -> seq A -> Prop :=
+| EquivtNil : forall t, equivt [::] t
+| EquivtConsLow : forall x1 x2 t1 t2,
+                    equiv x1 x2 -> equivt t1 t2 ->
+                    low x1 -> low x2 ->
+                    equivt (x1 :: t1) (x2 :: t2)
+| EquivtConsHigh : forall x1 t1 t2,
+                     equivt t1 t2 ->
+                     high x1 ->
+                     equivt (x1 :: t1) t2
+| EquivtSym : forall t1 t2,
+                equivt t1 t2 ->
+                equivt t2 t1.
+
+Definition equivtb (t1 t2 : seq A) : bool :=
+  all id (map (prod_curry equiv) (zip (filter low t1) (filter low t2))).
+
+Lemma equivtbtN t : equivtb t [::].
+Proof.
+  case: t => [//=|x t] /=.
+  rewrite /equivtb /=.
+  case: (low x); first by [].
+  by case: ([seq x <- t | low x]).
+Qed.
+
+Lemma equivtbNt t : equivtb [::] t.
+  case: t => [//=|x t] /=.
+  rewrite /equivtb /=.
+  case: (low x); first by [].
+  by case: ([seq x <- t | low x]).
+Qed.
+
+Lemma equivt_cons x1 x2 t1 t2 :
+  equivt (x1 :: t1) (x2 :: t2) ->
+  [\/ [/\ equiv x1 x2, low x1, low x2 & equivt t1 t2],
+      [/\ equivt t1 (x2 :: t2) & high x1] |
+      [/\ equivt (x1 :: t1) t2 & high x2] ].
+Proof.
+  move: {1 3}(x1 :: t1) (erefl (x1 :: t1))
+        {1 3}(x2 :: t2) (erefl (x2 :: t2))
+        => t1' Ht1' t2' Ht2' H.
+  elim: H x1 t1 Ht1' x2 t2 Ht2'
+        => {t1' t2'} //= [x1 x2 t1 t2 Ex Et IH L1 L2|x1 t1 t2 Et IH H1|t2 t1 Et IH].
+  - move => ? ? [<- <-] ? ? [<- <-].
+    apply Or31. by constructor.
+  - move => ? ? [<- <-] ? ? ?.
+    apply Or32.
+    split; last by [].
+    congruence.
+  - move => x1 t1' H1 x2 t2' H2.
+    move: IH => /(_ _ _ H2 _ _ H1) [[IH1 IH2 IH3 /(@EquivtSym _) IH4]|[IH1 IH2]|[IH1 IH2]].
+    + apply Or31.
+      rewrite equivS in IH1.
+      by constructor.
+    + apply Or33. split; last by [].
+      apply EquivtSym. congruence.
+    + apply Or32. split; last by [].
+      apply EquivtSym. congruence.
+Qed.
+
+Lemma equivt_consH x1 t1 t2 :
+  high x1 ->
+  equivt (x1 :: t1) t2 ->
+  equivt t1 t2.
+Proof.
+  move => H1.
+  move: {2}(size t1 + size t2) (leqnn (size t1 + size t2)) => n Hn.
+  elim: n t1 t2 Hn => [|n IH] t1 t2 Hn E.
+  - rewrite leqn0 addn_eq0 !size_eq0 in Hn.
+    move: Hn => /andP [/eqP -> /eqP ->].
+    by constructor.
+  - case: t2 Hn E => [|x2 t2] Hn E.
+    { apply EquivtSym. by constructor. }
+    move: E => /(@equivt_cons _) [[_ E _ _]|[E _] //=|[E1 E2]].
+    + by rewrite /high /= E in H1.
+    + apply EquivtSym. apply EquivtConsHigh; last by [].
+      apply EquivtSym. apply IH; last by [].
+      by rewrite /= addnS ltnS in Hn.
+Qed.
+
+Lemma equivtP t1 t2 : reflect (equivt t1 t2) (equivtb t1 t2).
+Proof.
+  move: {2}(size t1 + size t2) (leqnn (size t1 + size t2)) => n Hn.
+  elim: n t1 t2 Hn => [|n IH] t1 t2 Hn.
+  - rewrite leqn0 addn_eq0 !size_eq0 in Hn.
+    move: Hn => /andP [/eqP -> /eqP ->].
+    by do 2! constructor.
+  - case: t1 Hn => [|x1 t1] Hn.
+    { rewrite equivtbNt.
+      by do 2! constructor. }
+    case: t2 Hn => [|x2 t2] Hn.
+    { rewrite equivtbtN.
+      constructor. apply EquivtSym. by constructor. }
+    rewrite /equivtb /=.
+    have [L1|L1] := (boolP (low x1)); have [L2|L2] := (boolP (low x2)) => /=.
+    + rewrite /= addSn addnS ltnS ltn_neqAle in Hn.
+      move: Hn => /andP [_ /(IH _) Hn] {IH}.
+      apply/(iffP idP).
+      * move/andP => [E1 /Hn E2]. by constructor.
+      * move => /(@equivt_cons _) H.
+        rewrite /high /= L1 L2 in H.
+        case: H => //=.
+        move => [-> _ _ H] /=.
+        by apply/Hn.
+    + by move => [_ ?].
+    + by move => [_ ?].
+    + rewrite [size (x2 :: t2)]/= addnS ltnS in Hn.
+      move: Hn => /(IH _) {IH} /= IH.
+      rewrite /equivtb /= L1 in IH.
+      apply/(iffP IH) => H.
+      * apply EquivtSym. apply EquivtConsHigh; try done.
+        by apply EquivtSym.
+      * apply EquivtSym.
+        apply (@equivt_consH x2); first by [].
+        by apply EquivtSym.
+    + rewrite [size (x1 :: t1)]/= addSn ltnS in Hn.
+      move: Hn => /(IH _) {IH} Hn.
+      rewrite /equivtb /= L2 /= in Hn.
+      apply (iffP Hn) => H.
+      * by apply EquivtConsHigh.
+      * by apply (@equivt_consH x1).
+    + rewrite /= addSn addnS ltnS ltn_neqAle in Hn.
+      move: Hn => /andP [_ /(IH _) Hn] {IH}.
+      apply (iffP Hn) => H.
+      * apply EquivtConsHigh; last by [].
+        apply EquivtSym.
+        apply EquivtConsHigh; last by [].
+        by apply EquivtSym.
+      * apply (@equivt_consH x1); first by [].
+        apply EquivtSym.
+        apply (@equivt_consH x2); first by [].
+        by apply EquivtSym.
+Qed.
 
 Definition llni : Prop :=
   forall (s1 s2 : A) (n : nat),
