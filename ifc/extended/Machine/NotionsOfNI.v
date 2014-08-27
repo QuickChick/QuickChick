@@ -1,3 +1,83 @@
+Require Import ssreflect ssrbool ssrnat eqtype ssrfun seq.
+
+Section Everything.
+
+Variable A : eqType.
+Variable low : pred A.
+Variable initial : pred A.
+Variable halted : pred A.
+Variable step : A -> option A.
+Variable equiv : rel A.
+
+Hypothesis halted_low : subpred halted low.
+
+Hypothesis halted_equiv :
+  forall s1 s2,
+    equiv s1 s2 ->
+    halted s1 = halted s2.
+
+Definition high := [pred s | ~~ low s].
+
+Definition stuck := [pred s | step s == None].
+
+Hypothesis halted_stuck : subpred halted stuck.
+
+Fixpoint exec (n : nat) (s : A) : A :=
+  match n, step s with
+  | S n', Some s' => exec n' s'
+  | _, _ => s
+  end.
+
+Fixpoint trace (n : nat) (s : A) : seq A :=
+  match n, step s with
+  | S n', Some s' => s :: trace n' s'
+  | _, _ => [:: s]
+  end.
+
+Lemma exec_trace n s : exec n s = last s (trace n s).
+Proof.
+  elim: n s => [|n IH] s //=.
+  case E: (step s) => [s'|//=].
+  rewrite IH {IH} /=.
+  case: n => [|n] //=.
+  by case: (step s') => //=.
+Qed.
+
+Definition eeni : Prop :=
+  forall (s1 s2 : A) (n : nat),
+    initial s1 ->
+    initial s2 ->
+    equiv s1 s2 ->
+    halted (exec n s1) ->
+    halted (exec n s2) ->
+    equiv (exec n s1) (exec n s2).
+
+Fixpoint equivt (t1 t2 : seq A) : bool :=
+  match t1, t2 with
+  | s1 :: t1', s2 :: t2' => equiv s1 s2 && equivt t1' t2'
+  | _, _ => false
+  end.
+
+Definition llni : Prop :=
+  forall (s1 s2 : A) (n : nat),
+    initial s1 ->
+    initial s2 ->
+    equiv s1 s2 ->
+    stuck (last s1 (trace n s1)) || stuck (last s2 (trace n s2)) ->
+    equivt (filter low (trace n s1)) (filter low (trace n s2)).
+
+Lemma llni_eeni : llni -> eeni.
+Proof.
+  move => LLNI s1 s2 n I1 I2 E12 H1 H2.
+  rewrite !exec_trace in H1 H2 *.
+  move: LLNI => /(_ s1 s2 n I1 I2 E12) LLNI.
+  rewrite (halted_stuck _ H1) in LLNI.
+  move: LLNI  => /(_ erefl) LLNI.
+
+
+
+
+
 Require Import Relations.
 Require Import EqNat.
 Require Import List.
