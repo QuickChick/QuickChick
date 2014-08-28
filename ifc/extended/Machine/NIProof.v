@@ -534,7 +534,15 @@ by apply/(flows_trans _ _ _ low_lv); rewrite flows_join low_lv' low_lf.
       by rewrite inE.
     by apply: wf_st; rewrite inE in_stack_f1 orbT.
 (* PGetOff *)
-admit.
+  + move=> im μ σ pc fp' j K r r' r1 r2 j' LPC rl rpcl -> _ get_r1 [<- <-].
+    rewrite /Vector.nth_order /= => upd_r2 wf_st l f1 f2.
+    rewrite inE; case/orP=> [|in_stack_f1].
+      move/(subsetP (root_set_registers_upd upd_r2)).
+      rewrite inE; case/orP=> [in_regs_f1|] /=.
+        by apply: wf_st; rewrite inE in_regs_f1.
+      by rewrite inE.
+    by apply: wf_st; rewrite inE in_stack_f1 orbT.
+
 (* Mov *)
 admit.
 Qed.
