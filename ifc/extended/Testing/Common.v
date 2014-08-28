@@ -53,10 +53,6 @@ Definition validJump (st : State) (addr : Z) :=
 Definition incr_ptr (p : Pointer) :=
   let (fp, i) := p in (Ptr fp (Zsucc i)).
 
-(* Simple equalities *)
-Definition Z_eq (i1 i2 : Z) : bool :=
-  if Z.eq_dec i1 i2 then true else false.
-
 Definition reg_eq_dec : forall r1 r2 : regId,
   {r1 = r2} + {r1 <> r2}.
 Proof. apply Z_eq_dec. Defined.
@@ -74,8 +70,6 @@ Definition instr_eq_dec : forall i1 i2 : @Instr Label,
 Proof. decide equality. apply label_dec. Defined.
 
 Definition instr_eq i1 i2 := if instr_eq_dec i1 i2 then true else false.
-
-Definition label_eq (l1 l2 : Label) := (flows l1 l2 && flows l2 l1)%bool.
 
 Require Import ssrbool.
 Lemma label_eq_correct : forall l1 l2,

@@ -16,7 +16,6 @@ Class Indist (A : Type) : Type :=
    - Ignores the label (called only on unlabeled things)
    - For pointers, it is syntactic equality thanks to the per-stamp-level allocator!
 *)
-Set Printing All.
 Instance indistValue : Indist Value :=
 {|
   indist _lab v1 v2 :=
@@ -43,23 +42,6 @@ Instance indistAtom : Indist Atom :=
     let '(Atm v2 l2) := a2 in
     label_eq l1 l2
     && (isHigh l1 lab || indist lab v1 v2)
-|}.
-
-(* Indistinguishability of pcs
-   - If both pc's are lower than the observability level,
-     then we need to make sure all their components are pairwise
-     indistinguishable (ie. equal)
-   - Else, if both are high, there is no need for their labels to
-     be equal, since they are protected by the pc themselves.
-*)
-Instance indistPtrAtm : Indist Ptr_atom :=
-{|
-  indist lab p1 p2 :=
-    let '(PAtm i1 l1) := p1 in
-    let '(PAtm i2 l2) := p2 in
-    if isLow l1 lab && isLow l2 lab then
-      label_eq l1 l2 && Z_eq i1 i2
-    else isHigh l1 lab && isHigh l2 lab
 |}.
 
 (* Indistinguishability of Frames
@@ -139,7 +121,7 @@ Instance indistStackFrame : Indist StackFrame :=
   indist lab sf1 sf2 :=
     match sf1, sf2 with
       | SF p1 regs1 r1 l1, SF p2 regs2 r2 l2 =>
-           indist lab p1 p2 (* CH: only called in contexts where this is equality *)
+           pc_eq p1 p2
         && indist lab regs1 regs2
         && Z_eq r1 r2
         && label_eq l1 l2
@@ -185,7 +167,7 @@ Instance indistState : Indist State :=
     indist lab m1 m2 &&
     indist lab s1 s2 &&
     (if isLow ∂pc1 lab && isLow ∂pc2 lab then
-      indist lab pc1 pc2 && (* this really is equality *)
+      pc_eq pc1 pc2 &&
       indist lab regs1 regs2
     else true)
 |}.

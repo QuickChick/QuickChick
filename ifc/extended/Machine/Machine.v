@@ -88,6 +88,13 @@ Infix "@" := Atm (no associativity, at level 50).
 Inductive Ptr_atom : Type :=
  | PAtm (i:Z) (l:Label).
 
+Definition label_eq (l1 l2 : Label) := (flows l1 l2 && flows l2 l1)%bool.
+
+Definition pc_eq (pc1 pc2 : Ptr_atom) : bool :=
+  match pc1, pc2 with
+  | PAtm i1 l1, PAtm i2 l2 => (Z_eq i1 i2 && label_eq l1 l2)%bool
+  end.
+
 Definition imem := list (@Instr Label).
 
 Definition instr_lookup (m:imem) (pc:Ptr_atom) : option (@Instr Label) :=

@@ -1256,3 +1256,7 @@ Definition emptyList {A} (l : list A) : bool :=
   | nil => true
   | _ => false
   end.
+
+(* CH: very silly definition! *)
+Definition Z_eq (i1 i2 : Z) : bool :=
+  if Z.eq_dec i1 i2 then true else false.

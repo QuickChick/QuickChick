@@ -189,7 +189,7 @@ Instance show_atom_pair : ShowPair Atom :=
 Instance show_ptr_atom_pair : ShowPair Ptr_atom :=
 {|
   show_pair lab p1 p2 :=
-    if indist lab p1 p2 then
+    if pc_eq p1 p2 then
       show p1
     else
       show_variation (show p1) (show p2)
