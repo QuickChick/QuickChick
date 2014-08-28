@@ -46,6 +46,21 @@ Proof.
   case: n => [|n] //=.
 Qed.
 
+Lemma trace_halted n s :
+  halted s -> trace n s = [:: s].
+Proof.
+  move => H.
+  case: n => [|n] /=; first by [].
+  by move: H => /(@halted_stuck _)/eqP ->.
+Qed.
+
+Lemma exec_halted n s :
+  halted s -> exec n s = s.
+Proof.
+  move => H.
+  by rewrite (exec_trace s) (trace_halted _ H).
+Qed.
+
 Definition eeni : Prop :=
   forall (s1 s2 : A) (n : nat),
     initial s1 ->
@@ -194,17 +209,131 @@ Definition llni : Prop :=
     initial s1 ->
     initial s2 ->
     equiv s1 s2 ->
-    stuck (last s1 (trace n s1)) || stuck (last s2 (trace n s2)) ->
-    equivt (filter low (trace n s1)) (filter low (trace n s2)).
+    equivtb (trace n s1) (trace n s2).
+
+Record ssni : Prop := {
+
+  ssni_low_low : forall s1 s2 s1' s2',
+                   low s1 -> low s2 ->
+                   equiv s1 s2 ->
+                   step s1 = Some s1' ->
+                   step s2 = Some s2' ->
+                   equiv s1' s2';
+
+  ssni_high_high : forall s s',
+                     high s -> high s' ->
+                     step s = Some s' ->
+                     equiv s s';
+
+  ssni_high_low : forall s1 s2 s1' s2',
+                    high s1 -> high s2 ->
+                    equiv s1 s2 ->
+                    low s1' -> low s2' ->
+                    step s1 = Some s1' ->
+                    step s2 = Some s2' ->
+                    equiv s1' s2'
+
+  (* The fourth condition is now redundant given the assumption about
+     equivalence and halted states, which seems to be needed for the
+     LLNI -> EENI proof. *)
+
+}.
+
+End Everything.
+
+(*
 
 Lemma llni_eeni : llni -> eeni.
 Proof.
   move => LLNI s1 s2 n I1 I2 E12 H1 H2.
-  rewrite !exec_trace in H1 H2 *.
-  move: LLNI => /(_ s1 s2 n I1 I2 E12) LLNI.
-  rewrite (halted_stuck _ H1) in LLNI.
-  move: LLNI  => /(_ erefl) LLNI.
+  move: LLNI => /(_ s1 s2 n I1 I2 E12)/equivtP LLNI {I1 I2}.
+  move: {1 3}(trace n s1) {1 3}(trace n s2) (erefl (trace n s1)) (erefl (trace n s2)) LLNI
+        => t1 t2 Ht1 Ht2 LLNI {E12}.
+  elim: LLNI n {2 4 6}(n) s1 s2 H1 H2 Ht1 Ht2
+        => [t|s1' s2' t1' t2' Ex Et IH Hx1 Hx2| | ] n1 n2 s1 s2 H1 H2 Ht1 Ht2.
+  - case: n1 H1 Ht1 => [|n1] //= H1 Ht1.
+    by case: (step s1) H1 Ht1 => [s1'|].
+  - case: n1 H1 Ht1 => [|n1] //= H1 Ht1.
+    + move: Ht1 => [E1 E2].
+      rewrite E1 in Ex.
+      rewrite (halted_equiv Ex) in H1.
+      case: n2 H2 Ht2 => [|n2] /= H2 Ht2.
+      * by move: Ht2 => [<- _].
 
+
+rewrite /exec /trace
+
+
+
+  move: n {2 4 6 8}(n) {2}(n + n) (leqnn (n + n)) H1 H2 LLNI => n1 n2 n Hn H1 H2 LLNI.
+  elim: n n1 n2 s1 s2 {E12} Hn H1 H2 LLNI
+        => [|n IH] n1 n2 s1 s2 Hn H1 H2 LLNI.
+  - rewrite !leqn0 addn_eq0 in Hn.
+    move: Hn H1 H2 LLNI => /andP [/eqP -> /eqP ->] /= H1 H2 LLNI.
+    by rewrite (halted_low H1) (halted_low H2) /= andbT in LLNI.
+  - case: n1 Hn H1 LLNI => [|n1] /= Hn H1 LLNI;
+    case: n2 Hn H2 LLNI => [|n2] /= Hn H2 LLNI.
+    + by rewrite (halted_low H1) (halted_low H2) /= andbT in LLNI.
+    + case S2: (step s2) H2 LLNI => [s2'|] /= H2 LLNI; last first.
+      { by rewrite (halted_low H1) (halted_low H2) /= andbT in LLNI. }
+      case: (low s2) LLNI => LLNI.
+      { rewrite (halted_low H1) /= andbT in LLNI.
+        rewrite (halted_equiv LLNI) in H1.
+        by move: (halted_stuck H1) S2 => /eqP ->. }
+      rewrite ltnS in Hn.
+      by move: IH => /(_ 0 n2 s1 s2' Hn H1 H2 LLNI) /= IH.
+    + case S1: (step s1) H1 LLNI => [s1'|] /= H1 LLNI; last first.
+      { by rewrite (halted_low H1) (halted_low H2) /= andbT in LLNI. }
+      case: (low s1) LLNI => LLNI.
+      { rewrite (halted_low H2) /= in LLNI.
+        move: LLNI => /andP [LLNI _].
+        rewrite -(halted_equiv LLNI) in H2.
+        by move: (halted_stuck H2) S1 => /eqP ->. }
+      rewrite addn0 ltnS -(addn0 n1) in Hn.
+      by move: IH => /(_ n1 0 s1' s2 Hn H1 H2 LLNI) /= IH.
+    + case S1: (step s1) H1 LLNI => [s1'|] /= H1 LLNI;
+      case S2: (step s2) H2 LLNI => [s2'|] /= H2 LLNI.
+      * case: (low s1) LLNI => LLNI; case: (low s2) LLNI => /= LLNI.
+        - move: LLNI => /andP [_ LLNI].
+          rewrite addnS addSn ltnS ltn_neqAle in Hn.
+
+
+
+
+      rewrite /= in L1.
+
+
+      {
+
+  - rewrite (halted_low H1) in LLNI.
+    case S2: (step s2) H2 LLNI => [s2'|] /= H2 LLNI; last first.
+    { by rewrite (halted_low H2) /= andbT in LLNI. }
+    case: (low s2) LLNI => LLNI.
+    {
+
+rewrite (halted_equiv E12) in H1.
+    by move: H1 => /halted_stuck/eqP ->.
+  - rewrite -(halted_equiv E12) in H2.
+    by move: H2 => /halted_stuck/eqP ->.
+  - case S1: (step s1) H1 LLNI => [s1'|] //= H1 LLNI; last first.
+    { rewrite (halted_equiv E12) in H1.
+      by move: H1 => /halted_stuck/eqP ->. }
+    case S2: (step s2) H2 LLNI => [s2'|] /= H2 LLNI; last first.
+    { rewrite -(halted_equiv E12) in H2.
+      move: H2 => /halted_stuck/eqP H2.
+      congruence. }
+    + rewrite
+
+case: (low s1) LLNI => //= LLNI.
+      *
+
+
+  move: {1 2 3}(trace n s1) {1 2 3}(trace n s2) H1 H2 LLNI => t1 t2 H1 H2 LLNI.
+  elim: t1 t2 s1 s2 E12 H1 H2 LLNI
+        => [|s1' t1 IH] [|s2' t2] //= s1 s2 E12 H1 H2 LLNI.
+
+
+  elim: t1 t2
 
 
 
@@ -846,4 +975,5 @@ Definition start_to_end_noninterference : Prop :=
     weak_equiv s1' s2'.
 
 (* XXX: Since these are finite traces why not represent them as such? *)
+*)
 *)
