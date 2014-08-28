@@ -1,5 +1,6 @@
 Require Import ZArith.
 Require Import List.
+Require Import EquivDec.
 
 Require Import Utils.
 Require Import Common.
@@ -14,18 +15,11 @@ Class Indist (A : Type) : Type :=
 
 (* Indistinguishability of Values.
    - Ignores the label (called only on unlabeled things)
-   - For pointers, it is syntactic equality thanks to the per-stamp-level allocator!
+   - Just syntactic equality thanks to the per-stamp-level allocator!
 *)
 Instance indistValue : Indist Value :=
 {|
-  indist _lab v1 v2 :=
-    match v1, v2 with
-      | Vint  i1, Vint i2  => Z_eq i1 i2
-      | Vlab  l1, Vlab l2  => label_eq l1 l2
-      | Vptr (Ptr mf1 i1), Vptr (Ptr mf2 i2) =>
-        mframe_eq mf1 mf2 && Z_eq i1 i2
-      | _, _ => false
-    end
+  indist _lab v1 v2 := val_eq v1 v2
 |}.
 
 (* Indistinguishability of Atoms.
@@ -44,41 +38,23 @@ Instance indistAtom : Indist Atom :=
     && (isHigh l1 lab || indist lab v1 v2)
 |}.
 
-(* Indistinguishability of Frames
-   - If their stamps are low, then
-     * Their labels are equal
-     ** if these labels are low
-        then their data must be equal as well
-   - If their stamps are high, no condition
-     CH: what about the case when one stamp is low and the other is not,
-         currently that's treated as indistinguishable, but I don't know
-         if it really should
-   ** Note: may need to revisit this to make sure it is okay
-*)
+Instance indistList {A : Type} `{Indist A} : Indist (list A) :=
+{|
+  indist lab := forallb2 (indist lab)
+|}.
+
 Instance indistFrame : Indist frame :=
 {|
   indist lab f1 f2 :=
-    let '(Fr stamp1 l1 ds1) := f1 in
-    let '(Fr stamp2 l2 ds2) := f2 in
+    let '(Fr stamp1 l1 vs1) := f1 in
+    let '(Fr stamp2 l2 vs2) := f2 in
+    (label_eq stamp1 stamp2) &&
     if isLow stamp1 lab && isLow stamp2 lab then
-      (label_eq l1 l2) && (label_eq stamp1 stamp2) &&
-      (if isLow l1 lab then forallb2 (indist lab) ds1 ds2
-       else true)
-    else (label_eq stamp1 stamp2)
+      (* CH: this part is basically the same as indistinguishability of values;
+             try to remove this duplication at some point *)
+      label_eq l1 l2 && (isHigh l1 lab || indist lab vs1 vs2)
+    else true
 |}.
-
-(* CH: should think of a reachability-based variant of this;
-       the root set is the registers and the saved registers on stack *)
-(* Helper function for indistinguishability of memories
-   - Receives a list of corresponding mframes
-   - Recurses down the list making sure that all the frames
-     are pairwise indistinguishable.
-*)
-Definition indistMemHelper (framePairs : list (frame * frame))
-         (lab : Label)
-         (m1 m2 : memory) :=
-  forallb (fun (x : frame * frame) =>
-    let (f1, f2) := x in indist lab f1 f2) framePairs.
 
 (* Indistinguishability of memories
    - Get all corresponding memory frames
@@ -87,30 +63,16 @@ Definition indistMemHelper (framePairs : list (frame * frame))
      They have to be allocated in the same order so no need for fancy stuff
 *)
 
+Definition blocks_stamped_below (lab : Label) (m : memory) : list frame :=
+  list_of_option (map (Mem.get_frame m) (Mem.get_blocks (allThingsBelow lab) m)).
+
 Instance indistMem : Indist memory :=
 {|
   indist lab m1 m2 :=
-  let get_all_frames (m : memory) : list frame :=
-      list_of_option (map (Mem.get_frame m)
-                          (Mem.get_blocks (allThingsBelow lab) m)) in
-  let frames1 := get_all_frames m1 in
-  let frames2 := get_all_frames m2 in
-  (* CH: Why is the following not written with forallb2? *)
-  beq_nat (length frames1) (length frames2) &&
-  indistMemHelper (combine frames1 frames2) lab m1 m2
+    indist lab (blocks_stamped_below lab m1) (blocks_stamped_below lab m2)
 |}.
 
-(* Indistinguishability of registers
-   - Make sure all corresponding registers are indistinguishable
-   INV: called only in low contexts
-*)
-Instance indistReg : Indist regSet :=
-{|
-  indist lab r1 r2 := forallb2 (indist lab) r1 r2
-|}.
-
-(* Indistinguishability of *low* stacks
-   - Pointwise indistinguishability
+(* Indistinguishability of stack frame (pointwise)
      * The returning pc's must be equal
      * The saved registers must be indistinguishable
      * The returning register must be the same
@@ -135,16 +97,6 @@ Definition stackFrameBelow (lab : Label) (sf : StackFrame) : bool :=
 
 Definition filterStack (lab : Label) (s : Stack) : list StackFrame :=
   (List.filter (stackFrameBelow lab) (unStack s)).
-
-Instance indistList {A : Type} `{Indist A} : Indist (list A) :=
-{|
-  indist := fix i lab xs1 xs2 :=
-    match xs1, xs2 with
-    | nil, nil => true
-    | x1 :: xs1', x2 ::xs2' => indist lab x1 x2 && i lab xs1' xs2'
-    | _, _ => false
-    end
-|}.
 
 Instance indistStack : Indist Stack :=
 {|

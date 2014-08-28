@@ -77,6 +77,3 @@ Lemma label_eq_correct : forall l1 l2,
 Proof.
   rewrite /label_eq => l1 l2 /andP [H1 H2]. eapply flows_antisymm; trivial.
 Qed.
-
-Definition mframe_eq (m1 m2 : mframe) : bool :=
-  if Mem.EqDec_block m1 m2 then true else false.

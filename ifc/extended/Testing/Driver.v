@@ -19,7 +19,7 @@ Require Import SanityChecks.
 
 (* Testing well-formedness first *)
 
-(* TODO: CH: get rid of all this boiler code *)
+(* TODO: CH: get rid of all this boilerplate code *)
 Definition test_stamp_generation :=
   showResult (quickCheck (prop_stamp_generation : State -> Gen.Gen QProp)).
 QuickCheck test_stamp_generation.

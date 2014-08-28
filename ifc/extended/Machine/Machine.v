@@ -150,6 +150,22 @@ Global Instance JoinPtrAtom : Join Ptr_atom := { join_label := ptr_atom_join }.
 Ltac try_split_congruence :=
   try solve [left; congruence | right; congruence].
 
+Definition mframe_eq (m1 m2 : mframe) : bool :=
+  if Mem.EqDec_block m1 m2 then true else false.
+
+Definition val_eq (v1 v2 : Value) : bool :=
+  match v1, v2 with
+    | Vint  i1, Vint i2  => Z_eq i1 i2
+    | Vlab  l1, Vlab l2  => label_eq l1 l2
+    | Vptr (Ptr mf1 i1), Vptr (Ptr mf2 i2) =>
+      (mframe_eq mf1 mf2 && Z_eq i1 i2)%bool
+    | _, _ => false
+  end.
+
+Definition val_eq_val (v1 v2 : Value) : Value :=
+  Vint (if val_eq v1 v2 then 1 else 0).
+
+(* CH: TODO: we should get rid of this crap! *)
 (* Proof-stuff previously in Memory.v *)
 Global Instance EqDec_block : EqDec Value eq.
 Proof.
@@ -163,16 +179,13 @@ Proof.
   - destruct (LatEqDec Label l l0); try_split_congruence.
 Qed.
 
-Definition val_eq (v1 v2 : Value) : Value :=
-  Vint (if v1 == v2 then 1 else 0).
-
 Definition eval_binop (b : BinOpT) (v1 v2 : Value) : option Value :=
   match b, v1, v2 with
     | BAdd,     Vint z1, Vint z2 => Some (Vint (z1 + z2)%Z)
     | BMult,    Vint z1, Vint z2 => Some (Vint (z1 * z2)%Z)
     | BFlowsTo, Vlab l1, Vlab l2 => Some (Vint (flows_to l1 l2))
     | BJoin,    Vlab l1, Vlab l2 => Some (Vlab (l1 ∪ l2))
-    | BEq,      v1     , v2      => Some (val_eq v1 v2)
+    | BEq,      v1     , v2      => Some (val_eq_val v1 v2)
     | _ ,       _ ,      _       => None
   end.
 
