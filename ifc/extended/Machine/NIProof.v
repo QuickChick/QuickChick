@@ -74,6 +74,12 @@ Canonical mframe_countType := Eval hnf in CountType mframe mframe_countMixin.
 Definition mframe_finMixin := CanFinMixin fgK.
 Canonical mframe_finType := Eval hnf in FinType mframe mframe_finMixin.
 
+Canonical block_eqType := Eval hnf in EqType (Mem.block Label) mframe_eqMixin.
+Canonical block_choiceType := Eval hnf in ChoiceType (Mem.block Label) mframe_choiceMixin.
+Canonical block_countType := Eval hnf in CountType (Mem.block Label) mframe_countMixin.
+Canonical block_finType := Eval hnf in FinType (Mem.block Label) mframe_finMixin.
+
+
 Definition eqAtom (a1 a2 : Atom) :=
   match a1, a2 with
   | v1@l1, v2@l2 => EqDec_block v1 v2 && (LatEqDec _ l1 l2)
@@ -116,6 +122,16 @@ exists (Vptr (Ptr fp i) @ lbl) => //.
 by rewrite mem_filter /= low_lbl -get_r1 mem_nth.
 Qed.
 
+Lemma mem_set_nth (T : eqType) (x : T) x0 l i v :
+  i < size l -> x \in set_nth x0 l i v -> 
+  x = v \/ x \in l.
+Proof.
+move=> /maxn_idPr eq_size /(nthP x0) [j].
+rewrite nth_set_nth size_set_nth /= => lt_j <-.
+have [_|_] := altP (j =P i); first by left.
+by right; rewrite mem_nth // -eq_size.
+Qed.
+
 Lemma mframes_from_atoms_upd obs r rk r' atom :
   registerUpdate r rk atom = Some r' ->
   mframes_from_atoms obs r' \subset mframes_from_atoms obs r :|: mframes_from_atoms obs [:: atom].
@@ -123,11 +139,9 @@ Proof.
 case/update_list_ZE => ->; set k := BinInt.Z.to_nat rk => lt_k.
 rewrite /mframes_from_atoms; apply/subsetP=> x; rewrite !inE /= !mem_pmap.
 case/mapP=> a; rewrite mem_filter; case/andP => low_pt.
-case/(nthP def_atom) => i; rewrite nth_set_nth size_set_nth /=.
-move/maxn_idPr: lt_k => -> lt_i.
-have [_ -> ->|neq_ik eq_a ->] := i =P k.
+case/mem_set_nth=> // [<- ->|a_in_r ->].
   by rewrite [X in _ || X]map_f ?orbT // low_pt inE.
-by rewrite map_f // mem_filter low_pt -eq_a mem_nth.
+by rewrite map_f // mem_filter low_pt.
 Qed.
 
 Arguments mframes_from_atoms_upd [obs r rk r' atom] _.
@@ -213,7 +227,7 @@ Definition root_set obs (st : State) : {set mframe} :=
 
 Definition references obs (mem : memory) (f1 f2 : mframe) :=
   if Mem.get_frame mem f1 is Some (Fr _ l atoms) then
-    f2 \in mframes_from_atoms obs atoms
+    isLow l obs && (f2 \in mframes_from_atoms obs atoms)
   else false.
 
 Definition reachable obs (mem : memory) : rel mframe :=
@@ -249,19 +263,48 @@ have [<-|neq_fpx] := fp =P x.
   rewrite (alloc_get_frame_eq _ _ _ _ _ _ alloc_sz) inE /=.
   rewrite (Mem.alloc_get_fresh _ _ _ _ _ _ _ _ _ alloc_sz).
   set s := filter _ _.
-  have /eqP->//: s == [::].
+  suff /eqP->: s == [::] by rewrite andbF.
   by rewrite -[_ == _]negbK -has_filter has_nseq andbF.
 by rewrite (alloc_get_frame_neq _ _ _ _ _ _ _ alloc_sz neq_fpx).
 Qed.
 
 Arguments reachable_alloc_int [μ μ' sz lab stamp i li fp l f1 f2] _.
 
-(*
-Lemma reachable_alloc μ μ' sz lab stamp a fp l f1 f2 :
-  alloc sz lab stamp a μ = Some (fp, μ') ->
-  reachable l μ' f1 f2 = reachable l μ f1 f2 || (reachable l μ' f1 a && reachable l μ' a f2).
-
-*)
+Lemma reachable_upd μ μ' pv st lf fr l f1 f2 :
+  Mem.upd_frame μ pv (Fr st lf fr) = Some μ' ->
+  reachable l μ' f1 f2 -> reachable l μ f1 f2
+  \/ isLow lf l /\ reachable l μ f1 pv
+    /\ exists f3, f3 \in mframes_from_atoms l fr /\ reachable l μ f3 f2.
+Proof.
+  (* TODO: use splitPl with pv *)
+move=> upd_pv /connectP [p] /shortenP [p'].
+have references_not_pv: forall (f : mframe), pv != f -> references l μ' f =1 references l μ f.
+  move=> f; rewrite eq_sym => /eqP neq_pv f'; rewrite /references.
+  by rewrite (get_frame_upd_frame_neq _ _ _ _ _ _ _ upd_pv neq_pv).
+have path_not_pv: forall (p : seq mframe) f, pv \notin belast f p -> path (references l μ') f p = path (references l μ) f p.
+  elim=> //= x s IHs f.
+  rewrite inE negb_or.
+  case/andP => neq_pv ?.
+  by rewrite IHs // references_not_pv.
+have [in_path|] := boolP (pv \in f1 :: p').
+  case/splitPl: in_path => p1 [|f3 p2 last_p1].
+    rewrite cats0 => last_p1 path_p1 uniq_p1 _ ->; left; apply/connectP.
+    exists p1 => //; rewrite -path_not_pv //.
+    by move: uniq_p1; rewrite lastI last_p1 rcons_uniq => /andP [].
+  rewrite cat_path last_p1 -cat_cons [f1 :: p1]lastI last_p1 cat_uniq last_cat.
+  rewrite rcons_uniq.
+  case/andP=> path_p1 path_p2 /and3P [/andP [? _] not_pv _] _ /= ->; right.
+  rewrite /= {1}/references (get_frame_upd_frame_eq _ _ _ _ _ _ upd_pv) in path_p2.
+  case/andP: path_p2 => /andP [low_lf ref_f3] path_p2; split=> //; split.
+    by apply/connectP; exists p1=> //; rewrite -path_not_pv.
+  exists f3; split => //; apply/connectP; exists p2 => //.
+  rewrite -path_not_pv //; apply/negP=> pv_in_p2; case/negP: not_pv.
+  apply/(@sub_has _ (pred1 pv)).
+    by move=> ? /= /eqP ->; rewrite mem_rcons inE eqxx.
+  by rewrite has_pred1 lastI mem_rcons inE pv_in_p2 orbT.
+rewrite lastI mem_rcons inE negb_or=> /andP [_ ?] path_p' _ _ ->; left.
+by apply/connectP; exists p' => //; rewrite -path_not_pv.
+Qed.
 
 Lemma well_formed_preservation st st' : well_formed st ->
   fstep default_table st = Some st' -> well_formed st'.
@@ -380,12 +423,30 @@ case: {st st'} step.
     rewrite !inE.
     move/eqP=> -> reach_f2.
     apply: (wf_st l pv f2); first by rewrite inE (root_set_registers_nth get_r1).
-    apply/(connect_trans _ reach_f2)/connect1; move: load_p.
-    rewrite /references /=; case: (Mem.get_frame μ pv) => // [[_ _ fr]] get_pl.
+    apply/(connect_trans _ reach_f2)/connect1; move: load_p mlab_p.
+    rewrite /references /=; case: (Mem.get_frame μ pv) => // [[_ ? fr]] get_pl [->].
+    apply/andP; split=> //.
     exact: (mframes_from_atoms_nth get_pl).
   by apply: wf_st; rewrite inE in_stack_f1 orbT.
 (* Store *)
-admit.
++ move=> im μ σ pc v [fp i] μ' r r1 r2 j LPC rpcl rl lp lf lv -> ? get_r1 get_r2 /= lab_p.
+  rewrite /run_tmr /= /apply_rule /= /Vector.nth_order /=.
+  case: ifP => //; rewrite flows_join; case/andP => low_lp_lf low_LPC_lf [<- <-].
+  case get_fp: (Mem.get_frame μ fp) lab_p => // [[stamp ? fr]] [eq_lf].
+  rewrite eq_lf in get_fp *.
+  case upd_i: (update_list_Z fr i (v @ lv)) => [fr'|] // upd_fp wf_st l f1 f2.
+  rewrite inE /= =>H.
+  case/(reachable_upd upd_fp) => [|[low_lf [reach_fp [f3 []]]]].
+    by apply: wf_st; rewrite inE. 
+    move/(subsetP (mframes_from_atoms_upd upd_i)); rewrite inE.
+    case/orP=> [in_fr_f3 reach_f2|].
+      apply: (wf_st l f1 f2) => /=; first by rewrite inE.
+      apply/(connect_trans reach_fp)/(connect_trans _ reach_f2)/connect1.
+      by rewrite /references get_fp low_lf.
+    case: v get_r2 upd_i => [|[pv pi] get_r2 upd_i|]; rewrite /mframes_from_atoms /= ?inE //.
+    case: ifP => // low_lv; rewrite inE => /eqP ->; apply: wf_st.
+    rewrite inE /= /root_set_registers (root_set_registers_nth get_r2) //.
+    exact/(flows_trans _ _ _ low_LPC_lf).
 (* Write *)
 admit.
 (* Jump *)
