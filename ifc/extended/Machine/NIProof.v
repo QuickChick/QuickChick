@@ -544,7 +544,18 @@ by apply/(flows_trans _ _ _ low_lv); rewrite flows_join low_lv' low_lf.
     by apply: wf_st; rewrite inE in_stack_f1 orbT.
 
 (* Mov *)
-admit.
+  + move=> im μ σ v K pc r r' r1 r2 j LPC rl rpcl -> _ get_r1 [<- <-].
+    rewrite /Vector.nth_order /= => upd_r2 wf_st l f1 f2.
+    rewrite inE; case/orP=> [|in_stack_f1].
+    rewrite /root_set_registers; case: ifP => low_LPC; last by rewrite inE.
+      move/(subsetP (mframes_from_atoms_upd upd_r2)).
+      rewrite inE; case/orP=> [in_regs_f1|] /=.
+        by apply: wf_st; rewrite inE /root_set_registers low_LPC in_regs_f1.
+      case: v get_r1 upd_r2 => [|[? ?]|] get_r1 upd_r2; try by rewrite inE.
+      rewrite inE /=; case: ifP => // low_K /=; rewrite inE=> /eqP ->.
+      apply: wf_st; rewrite inE /root_set_registers low_LPC.
+      by rewrite (mframes_from_atoms_nth get_r1).
+    by apply: wf_st; rewrite inE in_stack_f1 orbT.
 Qed.
 
 End NIProof.
