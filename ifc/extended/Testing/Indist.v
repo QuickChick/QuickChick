@@ -152,7 +152,7 @@ Definition stackFrameBelow (lab : Label) (sf : StackFrame) : bool :=
   flows l_ret_addr lab. 
 
 Definition filterStack (lab : Label) (s : Stack) : list StackFrame :=
-  (List.filter (fun _ => true) (unStack s)).
+  (List.filter (stackFrameBelow lab) (unStack s)).
 
 Instance indistList {A : Type} `{Indist A} : Indist (list A) :=
 {|
