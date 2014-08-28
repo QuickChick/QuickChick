@@ -524,7 +524,15 @@ by apply/(flows_trans _ _ _ low_lv); rewrite flows_join low_lv' low_lf.
   + move=> im μ σ pc r j LPC rpcl -> _ [<-] wf_st l f1 f2.
     exact: wf_st.
 (* MSize *)
-admit.
+  + move=> im μ σ pc p K C r r' r1 r2 j LPC rl rpcl n -> _ get_r1 lab_p [<- <-] size_p.
+    rewrite /Vector.nth_order /= => upd_r2 wf_st l f1 f2.
+    rewrite inE; case/orP=> [|in_stack_f1].
+      rewrite root_set_registers_join inE; case/andP=> in_regs_f1 _.
+      move/(subsetP (root_set_registers_upd upd_r2)): in_regs_f1.
+      rewrite inE; case/orP=> [in_regs_f1|] /=.
+        by apply: wf_st; rewrite inE in_regs_f1.
+      by rewrite inE.
+    by apply: wf_st; rewrite inE in_stack_f1 orbT.
 (* PGetOff *)
 admit.
 (* Mov *)
