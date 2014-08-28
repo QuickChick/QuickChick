@@ -1250,3 +1250,9 @@ Fixpoint powerset {A : Type} (l : list A) : (list (list A)) :=
 Definition flip {A B C : Type} (f : A -> B -> C) (x : B) (y : A) : C := f y x.
 Definition compose {A B C : Type} (f : B -> C) (g : A -> B) (x : A) : C := f (g x).
 Notation " f << g " := (compose f g) (at level 42). (* F# style, because . *)
+
+Definition emptyList {A} (l : list A) : bool :=
+  match l with
+  | nil => true
+  | _ => false
+  end.

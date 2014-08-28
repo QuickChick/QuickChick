@@ -227,7 +227,7 @@ Definition ainstrSSNI (st : State) : Gen Instr :=
     (10 * onNonEmpty cptr 1 * onNonEmpty lab 1,
      liftGen3 BCall (elements Z0 cptr) (elements Z0 lab) genRegPtr);
     (* BRet *)
-    (if emptyStack stk then 50 else 0, pure BRet);
+    (if negb (emptyList (unStack stk)) then 50 else 0, pure BRet);
     (* Alloc *)
     (200 * onNonEmpty num 1 * onNonEmpty lab 1,
      liftGen3 Alloc (elements Z0 num) (elements Z0 lab) genRegPtr);

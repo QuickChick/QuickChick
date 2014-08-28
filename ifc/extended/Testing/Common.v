@@ -50,12 +50,6 @@ Definition validJump (st : State) (addr : Z) :=
   let '(St imem _ _ _ _) := st in
   (Z.to_nat addr) <? (List.length imem).
 
-Definition emptyStack s :=
-  match s with
-  | ST nil => true
-  | ST _ => false
-  end.
-
 Definition incr_ptr (p : Pointer) :=
   let (fp, i) := p in (Ptr fp (Zsucc i)).
 

@@ -231,6 +231,7 @@ Definition copy_table := default_table.
 Eval lazy -[labelCount helper copy_table] in
   (mutate_table' default_table copy_table).
 
+Eval simpl in nth 21 (mutate_table default_table).
 (* can achieve the same with partial application *)
 Eval lazy -[labelCount helper] in
   (mutate_table' default_table).
