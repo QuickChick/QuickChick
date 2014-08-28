@@ -435,7 +435,7 @@ case: {st st'} step.
   case get_fp: (Mem.get_frame μ fp) lab_p => // [[stamp ? fr]] [eq_lf].
   rewrite eq_lf in get_fp *.
   case upd_i: (update_list_Z fr i (v @ lv)) => [fr'|] // upd_fp wf_st l f1 f2.
-  rewrite inE /= =>H.
+  rewrite inE /= => H.
   case/(reachable_upd upd_fp) => [|[low_lf [reach_fp [f3 []]]]].
     by apply: wf_st; rewrite inE. 
     move/(subsetP (mframes_from_atoms_upd upd_i)); rewrite inE.
@@ -448,7 +448,26 @@ case: {st st'} step.
     rewrite inE /= /root_set_registers (root_set_registers_nth get_r2) //.
     exact/(flows_trans _ _ _ low_LPC_lf).
 (* Write *)
-admit.
++ move=> im μ σ pc v [fp i] μ' r r1 r2 j LPC rpcl rl v' lp lv lv' lf -> ? get_r1 get_r2 /= load_fp lab_fp.
+  rewrite /run_tmr /= /apply_rule /= /Vector.nth_order /=.
+  case: ifP => //; rewrite !flows_join=> /andP [/andP [low_LPC low_lp] low_lv] [<- <-].
+  case get_fp: (Mem.get_frame μ fp) lab_fp => // [[stamp ? fr]] [eq_lf].
+  rewrite eq_lf in get_fp *.
+  case upd_i: (update_list_Z fr i (v @ lv')) => [fr'|] // upd_fp wf_st l f1 f2.
+  rewrite inE /= => H.
+  case/(reachable_upd upd_fp) => [|[low_lf [reach_fp [f3 []]]]].
+    by apply: wf_st; rewrite inE. 
+    move/(subsetP (mframes_from_atoms_upd upd_i)); rewrite inE.
+    case/orP=> [in_fr_f3 reach_f2|].
+      apply: (wf_st l f1 f2) => /=; first by rewrite inE.
+      apply/(connect_trans reach_fp)/(connect_trans _ reach_f2)/connect1.
+      by rewrite /references get_fp low_lf.
+    case: v get_r2 upd_i => [|[pv pi] get_r2 upd_i|]; rewrite /mframes_from_atoms /= ?inE //.
+    case: ifP => // low_lv'; rewrite inE => /eqP ->; apply: wf_st.
+    rewrite /isLow in low_lv' low_lf.
+    rewrite inE /= /root_set_registers (root_set_registers_nth get_r2) //.
+      by apply/(flows_trans _ _ _ low_LPC); rewrite flows_join low_lv' low_lf.
+by apply/(flows_trans _ _ _ low_lv); rewrite flows_join low_lv' low_lf.
 (* Jump *)
 admit.
 (* BNZ *)
