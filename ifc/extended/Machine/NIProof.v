@@ -521,7 +521,8 @@ by apply/(flows_trans _ _ _ low_lv); rewrite flows_join low_lv' low_lf.
       by case: o eval; case: v1 get_r1 => ? ; case: v2 get_r2 => ? //= _ _ [<-]; rewrite !inE.
     by apply: wf_st; rewrite inE in_stack_f1 orbT.
 (* Nop *)
-admit.
+  + move=> im μ σ pc r j LPC rpcl -> _ [<-] wf_st l f1 f2.
+    exact: wf_st.
 (* MSize *)
 admit.
 (* PGetOff *)
