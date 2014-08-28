@@ -504,7 +504,14 @@ by apply/(flows_trans _ _ _ low_lv); rewrite flows_join low_lv' low_lf.
     rewrite (root_set_registers_nth get_r1) //.
   by apply: wf_st; rewrite inE in_stack_f1 orbT.
 (* Put *)
-admit.
+  + move=> im μ σ pc x r r' r1 j LPC rl rpcl -> ? [<- <-] upd_r1 wf_st l f1 f2.
+    rewrite inE; case/orP=> [|in_stack_f1] /=.
+      move/(subsetP (root_set_registers_upd upd_r1)).
+      rewrite inE; case/orP=> [in_regs_f1|].
+        by apply: wf_st; rewrite inE in_regs_f1.
+      by rewrite !inE.
+    by apply: wf_st; rewrite inE in_stack_f1 orbT.
+
 (* BinOp *)
 admit.
 (* Nop *)
