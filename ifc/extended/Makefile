@@ -80,7 +80,8 @@ endif
 #                    #
 ######################
 
-VFILES:=GenerationProofsHelpers.v\
+VFILES:=NotionsOfNI.v\
+  GenerationProofsHelpers.v\
   SSNI.v\
   SingleStateArb.v\
   Shrinking.v\
