@@ -8,6 +8,7 @@ Variable A : eqType.
 Variable low : pred A.
 Variable initial : pred A.
 Variable halted : pred A.
+Variable inv : pred A.
 Variable step : A -> option A.
 Variable equiv : rel A.
 
@@ -26,6 +27,14 @@ Hypothesis equiv_low :
   forall s1 s2,
     equiv s1 s2 ->
     low s1 = low s2.
+
+Hypothesis invP :
+  forall s s',
+    inv s ->
+    step s = Some s' ->
+    inv s'.
+
+Hypothesis initial_inv : subpred initial inv.
 
 Definition high := [pred s | ~~ low s].
 
@@ -237,6 +246,7 @@ Definition llni : Prop :=
 Record ssni : Prop := {
 
   ssni_low_low : forall s1 s2 s1' s2',
+                   inv s1 -> inv s2 ->
                    low s1 ->
                    equiv s1 s2 ->
                    step s1 = Some s1' ->
@@ -244,11 +254,13 @@ Record ssni : Prop := {
                    equiv s1' s2';
 
   ssni_high_high : forall s s',
+                     inv s ->
                      high s -> high s' ->
                      step s = Some s' ->
                      equiv s s';
 
   ssni_high_low : forall s1 s2 s1' s2',
+                    inv s1 -> inv s2 ->
                     high s1 ->
                     equiv s1 s2 ->
                     low s1' -> low s2' ->
@@ -302,7 +314,8 @@ Lemma ssni_llni : ssni -> llni.
 Proof.
   move => SSNI s1 s2 n I1 I2 E12.
   move: n {2 4}(n) {2}(n + n) (leqnn (n + n)) => n1 n2 n Hn.
-  elim: n s1 s2 {I1 I2} E12 n1 n2 Hn => [|n IH] s1 s2 E12 n1 n2 Hn.
+  elim: n s1 s2 {I1 I2} (initial_inv I1) (initial_inv I2) E12 n1 n2 Hn
+        => [|n IH] s1 s2 I1 I2 E12 n1 n2 Hn.
   - rewrite leqn0 addn_eq0 in Hn.
     move: Hn => /andP [/eqP -> /eqP ->] /=.
     exact: equivtb_single E12.
@@ -313,31 +326,32 @@ Proof.
     + by case S1: (step s1) => [s1'|] /=; rewrite (equivtb_cons2 _ _ E12) equivtbtN.
     + case S1: (step s1) => [s1'|]; case S2: (step s2) => [s2'|];
       try by rewrite (equivtb_cons2 _ _ E12) ?equivtbNt ?equivtbtN.
+      move: (invP I1 S1) (invP I2 S2) => I1' I2'.
       rewrite /equivtb /= -(equiv_low E12).
       have [L|L] := boolP (low s1) => /=.
       * rewrite E12 /=.
-        apply IH; first by eapply (ssni_low_low SSNI); eauto.
         rewrite addnS addSn ltnS ltn_neqAle in Hn.
-        by move: Hn => /andP [? ?].
+        move: Hn => /andP [? ?].
+        apply IH; try by [].
+        by eapply (ssni_low_low SSNI I1 I2).
       * have [L1'|L1'] := boolP (low s1'); first have [L2'|L2'] := boolP (low s2').
         - rewrite addnS addSn ltnS ltn_neqAle in Hn.
           move: Hn => /andP [_ ?].
-          apply IH; last by [].
-          eapply ssni_high_low; eauto.
-          exact: L.
+          apply IH; try by [].
+          by eapply (ssni_high_low SSNI I1 I2); eauto.
         - rewrite addnS ltnS in Hn.
           have E12': equiv s1 s2'.
           { apply: (equivT E12).
             eapply ssni_high_high; eauto.
             by rewrite /high /= -(equiv_low E12). }
-          move: IH => /(_ s1 s2' E12' _ _ Hn).
+          move: IH => /(_ s1 s2' I1 I2' E12' _ _ Hn).
           by rewrite /equivtb /= S1 /= (negbTE L).
         - rewrite addSn ltnS in Hn.
           have E12': equiv s1' s2.
           { apply: (equivT _ E12).
             rewrite equivS.
             eapply ssni_high_high; eauto. }
-          move: IH => /(_ s1' s2 E12' _ _ Hn).
+          move: IH => /(_ s1' s2 I1' I2 E12' _ _ Hn).
           rewrite (equiv_low E12) in L.
           by rewrite /equivtb /= S2 /= (negbTE L).
 Qed.
