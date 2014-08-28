@@ -285,7 +285,7 @@ Definition show_pair_mem (obs : Label) (m1 m2 : memory)
 
 (* Keep top separates the high prefix of the stack
    INV : Assumes well formed! (fix?) CH: yes!
-*)
+   CH: dropped this crap
 Fixpoint keep_top (lab : Lab4) (s : Stack) :=
   match s with
     | Mty => (Mty, Mty)
@@ -293,19 +293,21 @@ Fixpoint keep_top (lab : Lab4) (s : Stack) :=
       if flows (pc_lab pc) lab then (Mty, s)
       else let (h,l) := keep_top lab s' in (RetCons (pc,a,b,c) h, l)
   end.
+*)
 
-Fixpoint show_single_stack s :=
+Fixpoint show_stack s :=
   match s with
-    | Mty => ""
-    | RetCons (pc, l, rs, r) s' =>
+    | nil => ""
+    | (SF pc rs r l) :: s' =>
       "RetPC: " ++ show pc ++ nl ++
       "RetLAB: " ++ show l ++ nl ++
       "RetRegs: " ++ show rs ++ nl ++
       "RetReg : " ++ show r ++ nl ++
-      show_single_stack s'
+      show_stack s'
   end.
 
-(* Could be a new instance with a "newtype"? *)
+(* CH: dropped this crap
+Could be a new instance with a "newtype"? 
 Fixpoint show_low_stack_pair lab s1 s2 :=
   match s1, s2 with
     | Mty, Mty => " ] "
@@ -338,6 +340,7 @@ Instance show_stack_pair : ShowPair Stack :=
     "Low-comparable stack parts: [ " ++
     show_low_stack_pair lab l1 l2 ++ "]" ++ nl
 |}.
+*)
 
 Instance show_state_pair : ShowPair State :=
 {|
@@ -350,8 +353,10 @@ Instance show_state_pair : ShowPair State :=
        show_pair_mem lab m1 m2 ++ nl ++
     "Regs: " ++ nl ++
        show_pair_list 0 lab r1 r2 ++ nl ++
-    "Stacks: " ++ nl ++
-       show_pair lab s1 s2
+    "Stack1: " ++ nl ++
+       show_stack (unStack s1) ++
+    "Stack2: " ++ nl ++
+       show_stack (unStack s1)
 |}.
 
 Instance show_variation_instance : Show Variation :=

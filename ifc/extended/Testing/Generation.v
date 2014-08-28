@@ -139,11 +139,11 @@ Instance smart_gen_registers : SmartGen regSet :=
     smart_gen := gen_registers
   |}.
 
-(* Helper for well-formed stacks *)
+(* Helper for well-formed stacks *)(* CH: probably nonsense *)
 Definition get_stack_label (s : Stack) : Label :=
   match s with
-    | Mty => bot
-    | RetCons (PAtm _ l, _ , _ , _) _ => l
+    | ST nil => bot
+    | ST ((SF (PAtm _ l) _ _ _) :: _) => l
   end.
 
 (*
@@ -156,24 +156,23 @@ Definition meet_stack_label (s : Stack) (l : Label) : Stack :=
 *)
 
 Definition smart_gen_stack_loc (f : Label -> Label -> Gen Label)
-           (below_pc above_pc : Label) inf
-: Gen (Ptr_atom * Label * regSet * regId) :=
+           (below_pc above_pc : Label) inf : Gen StackFrame :=
     bindGen (smart_gen inf) (fun regs =>
     bindGen (smart_gen inf) (fun pc   =>
     bindGen (gen_from_nat_length (no_regs inf)) (fun target =>
     bindGen (smart_gen inf) (fun retLab =>
     bindGen (f below_pc above_pc) (fun l' =>
     let '(PAtm addr _) := pc in
-    returnGen (PAtm addr l', retLab, regs, target)))))).
+    returnGen (SF (PAtm addr l') regs target retLab)))))).
 
 (* Creates the stack. For SSNI just one is needed *)
 (* Make sure the stack invariant is preserved
- - no need since we only create one *)
+ - no need since we only create one *)(* CH: probably wrong *)
 Definition smart_gen_stack (pc : Ptr_atom) inf : Gen Stack :=
-  frequency' (pure Mty)
-            [(1, pure Mty);
+  frequency' (pure (ST nil))
+            [(1, pure (ST nil));
              (9, bindGen (smart_gen_stack_loc gen_label_between_lax bot ∂pc inf) (fun sl =>
-                 returnGen (RetCons sl Mty)))].
+                 returnGen (ST [sl])))].
 
 (* ------------------------------------------------------ *)
 (* ---------- Instruction generation -------------------- *)
@@ -228,7 +227,7 @@ Definition ainstrSSNI (st : State) : Gen Instr :=
     (10 * onNonEmpty cptr 1 * onNonEmpty lab 1,
      liftGen3 BCall (elements Z0 cptr) (elements Z0 lab) genRegPtr);
     (* BRet *)
-    (if containsRet stk then 50 else 0, pure BRet);
+    (if emptyStack stk then 50 else 0, pure BRet);
     (* Alloc *)
     (200 * onNonEmpty num 1 * onNonEmpty lab 1,
      liftGen3 Alloc (elements Z0 num) (elements Z0 lab) genRegPtr);
@@ -421,33 +420,33 @@ Instance smart_vary_memory : SmartVary memory :=
 
 
 Definition gen_vary_stack_loc (obs: Label) (inf : Info)
-           (s : Ptr_atom * Label * regSet * regId)
-: Gen  (Ptr_atom * Label * regSet * regId) :=
-    let '(pc, lab, rs, r) := s in
+           (s : StackFrame) : Gen (StackFrame) :=
+    let 'SF pc rs r lab := s in
     (* If the return label is low just vary the registers (a bit) *)
     if isLow ∂pc obs then
       bindGen (sequenceGen (map (smart_vary obs inf) rs)) (fun rs' =>
-      returnGen (pc, lab, rs', r))
+      returnGen (SF pc rs' r lab))
     else
     (* Return label is high, create new register file *)
     (* ZP: Why not generate new pc, lab and r? *)
       bindGen (vectorOf (no_regs inf) (smart_gen inf)) (fun rs' =>
-      returnGen (pc, lab, rs', r)).
+      returnGen (SF pc rs' r lab)).
 
 (* Just vary a single stack location *)
-Instance smart_vary_stack_loc : SmartVary (Ptr_atom * Label * regSet * regId) :=
+Instance smart_vary_stack_loc : SmartVary StackFrame :=
 {|
   smart_vary := gen_vary_stack_loc
 |}.
 
-Definition gen_vary_stack (obs: Label) (inf : Info) (s: Stack) : Gen Stack :=
-  let fix aux (s : Stack) :=
+Definition gen_vary_stack (obs: Label) (inf : Info) (s: list StackFrame)
+  : Gen (list StackFrame) :=
+  let fix aux (s : list StackFrame) :=
       match s with
-        | Mty => pure Mty
-        | RetCons sl s' =>
+        | nil => pure nil
+        | sl :: s' =>
           bindGen (smart_vary obs inf sl) (fun sl' =>
             bindGen (aux s') (fun s'' =>
-            returnGen (RetCons sl' s'')))
+            returnGen (sl' :: s'')))
         end in
     aux s.
 
@@ -456,7 +455,7 @@ Definition gen_vary_stack (obs: Label) (inf : Info) (s: Stack) : Gen Stack :=
    create extra "high" stack locations in vary state *)
 Instance smart_vary_stack : SmartVary Stack :=
 {|
-  smart_vary := gen_vary_stack
+  smart_vary l i s := liftGen ST (gen_vary_stack l i (unStack s))
 |}.
 
 Definition gen_vary_state (obs: Label) (inf : Info) (st: State) : Gen State :=
@@ -558,7 +557,7 @@ Definition gen_init_mem : Gen (memory * list (mframe * Z)):=
 
 Definition failed_state : State :=
   (* Property.trace "Failed State!" *)
-                 (St [] (Mem.empty Atom Label) Mty [] (PAtm Z0 bot)).
+                 (St [] (Mem.empty Atom Label) (ST []) [] (PAtm Z0 bot)).
 
 Definition populate_frame inf (m : memory) (mf : mframe) : Gen memory :=
   match Mem.get_frame m mf with

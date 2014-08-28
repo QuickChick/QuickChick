@@ -112,11 +112,15 @@ Definition register := Atom.
 Definition regSet := list register.
 
 (* Stack *)
-Inductive Stack :=
-  | Mty                                       (* empty stack *)
-  | RetCons (pc_l:Ptr_atom * Label * regSet * regId) (s:Stack).
-   (* stack frame marker cons (with return pc and protecting label) *)
-Infix ":::" := RetCons (at level 60, right associativity).
+Record StackFrame := SF {
+  sf_return_addr : Ptr_atom;
+  sf_saved_regs : regSet;
+  sf_result_reg : regId;
+  sf_result_lab : Label
+}.
+
+Inductive Stack : Type := ST : list StackFrame -> Stack.
+Definition unStack s := let 'ST xs := s in xs.
 
 Class Join (t :Type) := {
   join_label: t -> Label -> t
@@ -465,7 +469,7 @@ Inductive step (t : table) : State -> State -> Prop :=
      (TMU : run_tmr t OpBCall <|La; K|> Lpc = Some (Some rl, rpcl)),
      step t
        (St im μ σ r pc)
-       (St im μ (((PAtm (j+1) rl), B, r, r3) ::: σ) r (PAtm addr rpcl))
+       (St im μ (ST (SF (PAtm (j+1) rl) r r3 B :: (unStack σ))) r (PAtm addr rpcl))
  | step_bret: forall im μ σ pc a r r' r'' r1 R pc' B j j' LPC LPC' rl rpcl
      (PC: pc  = PAtm j  LPC)
      (PC': pc' = PAtm j' LPC')
@@ -474,7 +478,7 @@ Inductive step (t : table) : State -> State -> Prop :=
      (TMU : run_tmr t OpBRet <|R; B; LPC'|> LPC = Some (Some rl, rpcl))
      (RES : registerUpdate r' r1 (a @ rl) = Some r''),
      step t
-       (St im μ ((pc',B,r',r1) ::: σ) r pc)
+       (St im μ (ST (SF pc' r' r1 B :: (unStack σ))) r pc)
        (St im μ σ r'' (PAtm j' rpcl))
  | step_alloc: forall im μ μ' σ pc r r' r1 r2 r3 i K Ll K' rl rpcl j LPC dfp
      (PC: pc = PAtm j LPC)
@@ -667,21 +671,21 @@ Definition fstep t (st:State) : option State :=
         | Some (Vint addr @ Ll), Some (Vlab B @ K) =>
           match run_tmr t OpBCall <|Ll; K|> LPC with
             | Some (Some rl, rpcl) =>
-              Some (St im μ (((PAtm (j+1) rl), B, r, r3) ::: σ) r
+              Some (St im μ (ST (SF (PAtm (j+1) rl) r r3 B :: (unStack σ))) r
                        (PAtm addr rpcl))
             | _ => None
           end
         | _, _ => None
       end
     | BRet =>
-      match σ with
-        | (PAtm jp' LPC', B, savedRegs, r1) ::: σ' =>
+      match unStack σ with
+        | SF (PAtm jp' LPC') savedRegs r1 B :: σ' =>
           do r1Cont <- registerContent r r1;
           let '(a @ R) := r1Cont in
           match run_tmr t OpBRet <|R; B; LPC'|> LPC with
             | Some (Some rl, rpcl) =>
               do r' <- registerUpdate savedRegs r1 (a @ rl);
-              Some (St im μ σ' r' (PAtm jp' rpcl))
+              Some (St im μ (ST σ') r' (PAtm jp' rpcl))
             | _ => None
           end
         | _ => None

@@ -184,6 +184,7 @@ Instance shrVMem : ShrinkV mem :=
     end
 |}.
 *)
+(* CH: removed this crap
 Fixpoint stackLength (s : Stack) :=
   match s with
     | Mty => 0
@@ -217,12 +218,15 @@ intros; unfold fst; unfold snd; unfold stackLength; simpl; omega.
 intros; unfold fst; unfold snd; unfold stackLength; simpl; omega.
 intros; unfold fst; unfold snd; unfold stackLength; simpl; omega.
 Defined.
+*)
 
 Instance shrVStack : ShrinkV Stack :=
 {|
-  shrinkV vs :=
-    let '(Var lab s1 s2) := vs in
+  shrinkV vs := []
+(*
+    let '(Var lab s1 s2) := vs in p
     shrink_stacks lab (s1, s2)
+*)
 |}.
 
 (*

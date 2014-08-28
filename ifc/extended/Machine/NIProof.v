@@ -146,10 +146,10 @@ Qed.
 
 Arguments mframes_from_atoms_upd [obs r rk r' atom] _.
 
-Fixpoint root_set_stack obs (s : Stack) : {set mframe} :=
+Fixpoint root_set_stack obs (s : list StackFrame) : {set mframe} :=
   match s with
-    | Mty => set0
-    | RetCons (pc, _, rs, _) s' =>
+    | nil => set0
+    | (SF pc rs _ _) :: s' =>
       if isLow ∂pc obs then
         mframes_from_atoms obs rs :|: root_set_stack obs s'
       else root_set_stack obs s'
@@ -225,7 +225,7 @@ Qed.
 
 Definition root_set obs (st : State) : {set mframe} :=
   let '(St _ _ s r pc) := st in
-  root_set_registers obs r ∂pc :|: root_set_stack obs s.
+  root_set_registers obs r ∂pc :|: root_set_stack obs (unStack s).
 
 Definition references obs (mem : memory) (f1 f2 : mframe) :=
   if Mem.get_frame mem f1 is Some (Fr _ l atoms) then

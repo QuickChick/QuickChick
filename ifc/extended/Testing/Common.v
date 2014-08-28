@@ -50,10 +50,10 @@ Definition validJump (st : State) (addr : Z) :=
   let '(St imem _ _ _ _) := st in
   (Z.to_nat addr) <? (List.length imem).
 
-Fixpoint containsRet (stk : Stack) :=
-  match stk with
-    | Mty => false
-    | RetCons _ _ => true
+Definition emptyStack s :=
+  match s with
+  | ST nil => true
+  | ST _ => false
   end.
 
 Definition incr_ptr (p : Pointer) :=

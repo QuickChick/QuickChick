@@ -42,10 +42,10 @@ Definition get_mframes_from_atoms (obs : Label) (atoms : list Atom)
                         (filter (is_low_pointer obs) atoms))).
 
 Fixpoint get_root_set_stack (obs : Label)
-         (acc : list mframe) (s : Stack) : list mframe :=
+         (acc : list mframe) (s : list StackFrame) : list mframe :=
   match s with
-    | Mty => acc
-    | RetCons (pc, _, rs, _) s' =>
+    | nil => acc
+    | (SF pc rs _ _) :: s' =>
       let new_mframes :=
           if isLow ∂pc obs then get_mframes_from_atoms obs rs
           else [] in
@@ -58,7 +58,7 @@ Definition get_root_set (obs : Label) (st : State) : list mframe :=
   let init_root_set :=
       if isLow ∂pc obs then get_mframes_from_atoms obs r
       else [] in
-  get_root_set_stack obs init_root_set s.
+  get_root_set_stack obs init_root_set (unStack s).
 
 Function reachable_from_root_set (obs : Label) (st : State)
          (visited worklist : list mframe)

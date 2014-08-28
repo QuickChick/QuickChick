@@ -127,95 +127,65 @@ Instance indistReg : Indist regSet :=
   indist lab r1 r2 := forallb2 (indist lab) r1 r2
 |}.
 
-(* LL: Per discussion with Catalin, doing away with this constraint to see what happens *)
-(* Constraint for well formed stacks
-   - The returning pc labels must decrease as we go down the stack.
-*)
-Require Import String.
-Fixpoint well_formed_stack (prev : Label) (s : Stack) : bool :=
-  match s with
-    | Mty => true
-    | RetCons (pc, _, _ ,r) s' =>
-      if isLow ∂pc prev then well_formed_stack ∂pc s'
-      else false
-  end.
-
-(* CropTop helper for stacks.
-   - Takes a stack and keeps its low part.
-   INV: Stacks should be wellFormed
-*)
-Fixpoint cropTop (lab : Label) (s : Stack) :=
-  match s with
-    | Mty => Mty
-    | RetCons (pc, _, _, _) s' =>
-      if isLow ∂pc lab then s else cropTop lab s'
-  end.
-
 (* Indistinguishability of *low* stacks
    - Pointwise indistinguishability
-     * The returning labels must be equal
      * The returning pc's must be equal
      * The saved registers must be indistinguishable
      * The returning register must be the same
-     * The rest of the stack must be also indistinguishable
-   INV: Called only on stacks after cropTop, which means all pc's are low
+     * The returning labels must be equal
 *)
-Fixpoint indistStackHelper (lab : Label)
-         (s1 s2 : Stack) :=
-  match s1, s2 with
-    | Mty, Mty => true
-    | RetCons (p1,l1,regs1,r1) s1, RetCons (p2,l2,regs2,r2) s2 =>
-      label_eq l1 l2
-      && indist lab p1 p2
-      && Z_eq r1 r2
-      && indist lab regs1 regs2
-      && indistStackHelper lab s1 s2
-    | _, _ => false
-  end.
+Instance indistStackFrame : Indist StackFrame :=
+{|
+  indist lab sf1 sf2 :=
+    match sf1, sf2 with
+      | SF p1 regs1 r1 l1, SF p2 regs2 r2 l2 =>
+           indist lab p1 p2 (* CH: only called in contexts where this is equality *)
+        && indist lab regs1 regs2
+        && Z_eq r1 r2
+        && label_eq l1 l2
+    end
+|}.
 
-(* Indistinguishability of stacks
-   - Both must be well formed
-   - Their cropTop parts must be equivalent
-*)
+Definition stackFrameBelow (lab : Label) (sf : StackFrame) : bool :=
+  let 'SF ret_addr  _ _ _ := sf in
+  let 'PAtm _ l_ret_addr := ret_addr in
+  flows l_ret_addr lab. 
+
+Definition filterStack (lab : Label) (s : Stack) : list StackFrame :=
+  (List.filter (fun _ => true) (unStack s)).
+
+Instance indistList {A : Type} `{Indist A} : Indist (list A) :=
+{|
+  indist := fix i lab xs1 xs2 :=
+    match xs1, xs2 with
+    | nil, nil => true
+    | x1 :: xs1', x2 ::xs2' => indist lab x1 x2 && i lab xs1' xs2'
+    | _, _ => false
+    end
+|}.
+
 Instance indistStack : Indist Stack :=
 {|
   indist lab s1 s2 :=
-(*    wellFormed s1 && wellFormed s2
-    && indistStackHelper lab (cropTop lab s1) (cropTop lab s2)*)
-    indistStackHelper lab (cropTop lab s1) (cropTop lab s2)
+    indist lab (filterStack lab s1) (filterStack lab s2)
 |}.
 
+Instance indistImems : Indist imem :=
+{|
+  indist _lab imem1 imem2 :=
+    if list_eq_dec instr_eq_dec imem1 imem2 then true else false
+|}.
 
-(* Indistinguishability of states
-   - If both pc's are high then :
-     -- Memories and Stacks must be indistinguishable (Fix with reachability)
-   - Else if at least one pc is low then :
-     -- Both pc's must be low and equal
-     -- Registers should be indistinguishable
-     -- The high constraints also apply
-*)
 Instance indistState : Indist State :=
 {|
   indist lab st1 st2 :=
     let '(St imem1 m1 s1 regs1 pc1) := st1 in
     let '(St imem2 m2 s2 regs2 pc2) := st2 in
-    if list_eq_dec instr_eq_dec imem1 imem2 then
-      if isHigh ∂pc1 lab && isHigh ∂pc2 lab then
-        if indist lab m1 m2 then
-          if indist lab s1 s2 then true
-          else (* Property.trace "Stack" *) false
-        else (* Property.trace "Memory" *) false
-      else
-        (* next check implies isLow pc1 ... && isLow pc2 ... *)
-        if indist lab pc1 pc2 then
-          if indist lab regs1 regs2 then
-            if indist lab m1 m2 then
-              if indist lab s1 s2 then true
-                   (* CH: This still relies on Leo's stack pc invariant;
-                          otherwise should be running indistStackHelper *)
-              else (* Property.trace "Stack" *) false
-            else (* Property.trace "Memory" *) false
-          else (* Property.trace "Registers" *) false
-        else (* Property.trace "PC" *) false
-    else (* Property.trace "not equal instructions" *) false
+    indist lab imem1 imem2 &&
+    indist lab m1 m2 &&
+    indist lab s1 s2 &&
+    (if isLow ∂pc1 lab && isLow ∂pc2 lab then
+      indist lab pc1 pc2 && (* this really is equality *)
+      indist lab regs1 regs2
+    else true)
 |}.
