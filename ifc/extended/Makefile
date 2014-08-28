@@ -39,8 +39,7 @@ $(call includecmdwithout@,$(COQBIN)coqtop -config)
 #                        #
 ##########################
 
-COQLIBS?=-I Testing\
-  -I Machine 
+COQLIBS?=-I . 
 COQDOCLIBS?=
 
 ##########################
@@ -81,33 +80,33 @@ endif
 #                    #
 ######################
 
-VFILES:=Testing/GenerationProofsHelpers.v\
-  Testing/SSNI.v\
-  Testing/SingleStateArb.v\
-  Testing/Shrinking.v\
-  Testing/SanityChecks.v\
-  Testing/Reachability.v\
-  Testing/Printing.v\
-  Testing/Indist.v\
-  Testing/Generation.v\
-  Testing/Common.v\
-  Machine/Utils.v\
-  Machine/Rules.v\
-  Machine/NIProof.v\
-  Machine/Mutate.v\
-  Machine/Memory.v\
-  Machine/Machine.v\
-  Machine/LabSetsOfPrins.v\
-  Machine/Lab4.v\
-  Machine/Lab2.v\
-  Machine/Labels.v\
-  Machine/Instructions.v
+VFILES:=GenerationProofsHelpers.v\
+  SSNI.v\
+  SingleStateArb.v\
+  Shrinking.v\
+  SanityChecks.v\
+  Reachability.v\
+  Printing.v\
+  Indist.v\
+  Generation.v\
+  Common.v\
+  Utils.v\
+  Rules.v\
+  NIProof.v\
+  Mutate.v\
+  Memory.v\
+  Machine.v\
+  LabSetsOfPrins.v\
+  Lab4.v\
+  Lab2.v\
+  Labels.v\
+  Instructions.v
 
 -include $(addsuffix .d,$(VFILES))
 .SECONDARY: $(addsuffix .d,$(VFILES))
 
 VOFILES:=$(VFILES:.v=.vo)
-VOFILESINC=$(filter $(wildcard Testing/*),$(VOFILES)) $(filter $(wildcard Machine/*),$(VOFILES)) 
+VOFILESINC=$(filter $(wildcard ./*),$(VOFILES)) 
 GLOBFILES:=$(VFILES:.v=.glob)
 VIFILES:=$(VFILES:.v=.vi)
 GFILES:=$(VFILES:.v=.g)

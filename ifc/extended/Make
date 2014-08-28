@@ -1,27 +1,25 @@
--I Machine
--I Testing
-Machine/Instructions.v
-Machine/Labels.v
-Machine/Lab2.v
-Machine/Lab4.v
-Machine/LabSetsOfPrins.v
-Machine/Machine.v
-Machine/Memory.v
-Machine/Mutate.v
-Machine/NIProof.v
-# Machine/NIAbstractMachine.v
-# Machine/RelationExtraction.v
-Machine/Rules.v
-Machine/Utils.v
-Testing/Common.v
-Testing/Generation.v
-Testing/Indist.v
-Testing/Printing.v
-Testing/Reachability.v
-Testing/SanityChecks.v
-Testing/Shrinking.v
-Testing/SingleStateArb.v
-Testing/SSNI.v
-Testing/GenerationProofsHelpers.v
-#Testing/GenerationProofs.v
-#Testing/SSNICheckerProofs.v
+Instructions.v
+Labels.v
+Lab2.v
+Lab4.v
+LabSetsOfPrins.v
+Machine.v
+Memory.v
+Mutate.v
+NIProof.v
+#NIAbstractMachine.v
+#RelationExtraction.v
+Rules.v
+Utils.v
+Common.v
+Generation.v
+Indist.v
+Printing.v
+Reachability.v
+SanityChecks.v
+Shrinking.v
+SingleStateArb.v
+SSNI.v
+GenerationProofsHelpers.v
+#GenerationProofs.v
+#SSNICheckerProofs.v
