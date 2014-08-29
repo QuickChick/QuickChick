@@ -18,9 +18,19 @@ Open Scope bool.
 
 (* Indistinguishability type class *)
 Class Indist (A : Type) : Type :=
-{
-  indist : Label -> A -> A -> bool
-}.
+  indist : Label -> A -> A -> bool.
+
+Instance oindist {T : Type} `{Indist T} : Indist (option T) :=
+  fun obs x1 x2 => match x1, x2 with
+  | None, None => true
+  | Some x1, Some x2 => indist obs x1 x2
+  | _, _ => false
+  end.
+
+Instance indistList {A : Type} `{Indist A} : Indist (list A) :=
+{|
+  indist lab := forallb2 (indist lab)
+|}.
 
 (* Indistinguishability of Values.
    - Ignores the label (called only on unlabeled things)
@@ -45,11 +55,6 @@ Instance indistAtom : Indist Atom :=
     let '(Atm v2 l2) := a2 in
     label_eq l1 l2
     && (isHigh l1 lab || indist lab v1 v2)
-|}.
-
-Instance indistList {A : Type} `{Indist A} : Indist (list A) :=
-{|
-  indist lab := forallb2 (indist lab)
 |}.
 
 Instance indistFrame : Indist frame :=
