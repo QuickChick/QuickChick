@@ -3,7 +3,17 @@ Require Import List.
 Require Import EquivDec.
 
 Require Import Utils.
-Require Import Common.
+Require Import Labels.
+Require Import Memory.
+Require Import Machine.
+(*Require Import Common.*)
+
+Module IndistM (Lattice : FINLAT).
+
+Module GenericMachine := MachineM Lattice.
+
+(* CH: things fail in very strange ways if this is just Import *)
+Export GenericMachine.
 
 Open Scope bool.
 
@@ -123,3 +133,5 @@ Instance indistState : Indist State :=
       indist lab regs1 regs2
     else true)
 |}.
+
+End IndistM.

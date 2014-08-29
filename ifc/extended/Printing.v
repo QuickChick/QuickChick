@@ -6,8 +6,7 @@ Require Import Coq.Numbers.Natural.Peano.NPeano.
 
 Require Import QuickChick.
 
-Require Import Common.
-Require Import Indist.
+Require Import TestingCommon.
 
 (* High-level note:
    Deal with printing variations of stuff, then instantiate the

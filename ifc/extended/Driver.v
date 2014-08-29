@@ -8,7 +8,7 @@ Require Import Show.
 Require Import Test.
 
 Require Import Rules.
-Require Import Common.
+Require Import TestingCommon.
 Require Import Generation.
 Require Import Shrinking.
 Require Import SSNI.

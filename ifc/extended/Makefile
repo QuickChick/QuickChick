@@ -90,7 +90,7 @@ VFILES:=NotionsOfNI.v\
   Printing.v\
   Indist.v\
   Generation.v\
-  Common.v\
+  TestingCommon.v\
   Utils.v\
   Rules.v\
   NIProof.v\

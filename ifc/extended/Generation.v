@@ -1,5 +1,5 @@
 Require Import QuickChick.
-Require Import Common.
+Require Import TestingCommon.
 
 Require Import List. Import ListNotations.
 Require Import ZArith.

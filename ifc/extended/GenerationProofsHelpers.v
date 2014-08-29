@@ -3,7 +3,7 @@ Require Import QuickChick SetOfOutcomes.
 Require Import List. Import ListNotations.
 Require Import ZArith.
 
-Require Import Common Generation Indist.
+Require Import TestingCommon Generation.
 
 Require Import ssreflect ssrbool ssrnat eqtype.
 

@@ -4,11 +4,10 @@ Require Import ZArith.
 
 Require Import QuickChick.
 
-Require Import Common.
+Require Import TestingCommon.
 Require Import Printing.
 Require Import Shrinking.
 Require Import Generation.
-Require Import Indist.
 
 Open Scope string_scope.
 

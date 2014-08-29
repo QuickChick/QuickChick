@@ -3,7 +3,7 @@ Require Import ZArith.
 
 Require Import ssreflect ssrfun ssrbool eqtype ssrnat seq choice fintype.
 
-Require Import Common.
+Require Import TestingCommon.
 
 Definition is_low_pointer (obs : Label) (a : Atom) : bool :=
   match a with

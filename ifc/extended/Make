@@ -11,7 +11,7 @@ NIProof.v
 #RelationExtraction.v
 Rules.v
 Utils.v
-Common.v
+TestingCommon.v
 Generation.v
 Indist.v
 Printing.v

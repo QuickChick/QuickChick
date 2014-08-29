@@ -5,7 +5,7 @@ Require Import Machine.
 Require Import ZArith.
 Require Import List.
 
-Require Import Common.
+Require Import TestingCommon.
 Require Import Indist.
 Require Import Generation.
 Require Import Shrinking.

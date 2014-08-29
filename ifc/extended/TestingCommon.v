@@ -10,6 +10,7 @@ Require Export Labels.
 Require Export Instructions.
 Require Export Memory.
 Require Export Lab4.
+Require Export Indist.
 Require Export Machine.
 
 Module Lab4M <: FINLAT.
@@ -19,6 +20,9 @@ End Lab4M.
 
 Module MachineLab4M := MachineM Lab4M.
 Export MachineLab4M.
+
+Module IndistLab4M := IndistM Lab4M.
+Export IndistLab4M.
 
 Section GenUtils.
   Context {Gen : Type -> Type}

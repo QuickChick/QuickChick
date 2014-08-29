@@ -9,7 +9,7 @@ Require Import Generation.
 Require Import Machine.
 
 Require Import List. Import ListNotations.
-Require Import Common.
+Require Import TestingCommon.
 Require Import String.
 
 Require Import ssreflect ssrbool eqtype.
