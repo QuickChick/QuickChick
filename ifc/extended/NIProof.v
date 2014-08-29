@@ -5,7 +5,7 @@ Require Import path fingraph. (* This depends on Mathematical Components 1.5
                  http://www.msr-inria.fr/projects/mathematical-components-2/ *)
 
 
-Require Import Utils Labels Rules Memory Instructions Machine.
+Require Import Utils Labels Rules Memory Instructions Machine Indist.
 
 Set Implicit Arguments.
 Unset Strict Implicit.
@@ -14,8 +14,11 @@ Unset Printing Implicit Defensive.
 Module NIProof (Lattice : FINLAT).
 
 Module GenericMachine := MachineM Lattice.
+Export GenericMachine.
 
-Import GenericMachine.
+Module GenericIndist := IndistM Lattice.
+Export GenericIndist.
+
 
 (* Interface with non-ssr definitions *)
 Lemma replicateE T (a : T) n : replicate n a = nseq n a.
