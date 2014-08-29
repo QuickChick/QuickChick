@@ -2,10 +2,9 @@ Require Import ZArith.
 Require Import List.
 Require Import EquivDec.
 
-Require Import Utils.
-Require Import Labels.
-Require Import Memory.
-Require Import Machine.
+Require Import ssreflect ssrfun ssrbool eqtype ssrnat seq choice fintype finset.
+
+Require Import Utils Labels Memory Machine.
 (*Require Import Common.*)
 
 Module IndistM (Lattice : FINLAT).
@@ -128,10 +127,9 @@ Instance indistState : Indist State :=
     indist lab imem1 imem2 &&
     indist lab m1 m2 &&
     indist lab s1 s2 &&
-    (if isLow ∂pc1 lab && isLow ∂pc2 lab then
-      pc_eq pc1 pc2 &&
-      indist lab regs1 regs2
-    else true)
+    (isLow ∂pc1 lab || isLow ∂pc2 lab) ==>
+      (pc_eq pc1 pc2 &&
+      indist lab regs1 regs2)
 |}.
 
 End IndistM.
