@@ -80,7 +80,9 @@ endif
 #                    #
 ######################
 
-VFILES:=NotionsOfNI.v\
+VFILES:=Integers.v\
+  Coqlib.v\
+  NotionsOfNI.v\
   GenerationProofsHelpers.v\
   SSNI.v\
   SingleStateArb.v\

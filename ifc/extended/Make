@@ -24,3 +24,5 @@ GenerationProofsHelpers.v
 #GenerationProofs.v
 #SSNICheckerProofs.v
 NotionsOfNI.v
+Coqlib.v
+Integers.v
