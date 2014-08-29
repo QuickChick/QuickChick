@@ -5,7 +5,7 @@ Require Import path fingraph. (* This depends on Mathematical Components 1.5
                  http://www.msr-inria.fr/projects/mathematical-components-2/ *)
 
 
-Require Import Utils Labels Rules Memory Instructions Machine Indist.
+Require Import Utils Labels Rules Memory Instructions Machine Indist NotionsOfNI.
 
 Set Implicit Arguments.
 Unset Strict Implicit.
@@ -81,6 +81,23 @@ Canonical block_eqType := Eval hnf in EqType (Mem.block Label) mframe_eqMixin.
 Canonical block_choiceType := Eval hnf in ChoiceType (Mem.block Label) mframe_choiceMixin.
 Canonical block_countType := Eval hnf in CountType (Mem.block Label) mframe_countMixin.
 Canonical block_finType := Eval hnf in FinType (Mem.block Label) mframe_finMixin.
+
+Axiom eqlabelP : Equality.axiom label_eq.
+
+Definition label_eqMixin := EqMixin eqlabelP.
+Canonical label_eqType := Eval hnf in EqType Label label_eqMixin.
+
+Axiom label_choiceMixin : choiceMixin Label.
+Canonical label_choiceType := Eval hnf in ChoiceType Label label_choiceMixin.
+
+Axiom label_countMixin : Countable.mixin_of Label.
+Canonical label_countType := Eval hnf in CountType Label label_countMixin.
+
+(* TODO: prove using the assumptions in FINLAT *)
+Axiom label_enumP : Finite.axiom (undup elems).
+
+Definition label_finMixin := FinMixin label_enumP.
+Canonical label_finType := Eval hnf in FinType Label label_finMixin.
 
 
 Definition eqAtom (a1 a2 : Atom) :=
@@ -244,6 +261,14 @@ Definition well_formed_label (st : State) (l : Label) :=
 
 Definition well_formed (st : State) :=
   forall l, well_formed_label st l.
+
+(* TODO: prove correspondance views for these two guys *)
+Definition well_formed_labelb (st : State) (l : Label) :=
+  [forall f1, forall f2, (f1 \in root_set l st) ==> (reachable l (st_mem st) f1 f2) ==>
+  (isLow (Mem.stamp f2) l)].
+
+Definition well_formedb (st : State) :=
+  [forall l, well_formed_labelb st l].
 
 Lemma stamp_alloc μ μ' sz lab stamp i li fp :
   alloc sz lab stamp (Vint i@li) μ = Some (fp, μ') ->
