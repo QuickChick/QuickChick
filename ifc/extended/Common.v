@@ -42,38 +42,6 @@ Inductive Variation {A : Type} :=
 Class ShrinkV (A : Type) := { shrinkV : @Variation A -> list (@Variation A) }.
 (* End of to be deleted *)
 
-(* Short for a label l to be low/high compared to an observability label obs *)
-Definition isLow  (l obs : Lab4) := flows l obs.
-Definition isHigh (l obs : Lab4) := negb (isLow l obs).
-
 Definition validJump (st : State) (addr : Z) :=
   let '(St imem _ _ _ _) := st in
   (Z.to_nat addr) <? (List.length imem).
-
-Definition incr_ptr (p : Pointer) :=
-  let (fp, i) := p in (Ptr fp (Zsucc i)).
-
-Definition reg_eq_dec : forall r1 r2 : regId,
-  {r1 = r2} + {r1 <> r2}.
-Proof. apply Z_eq_dec. Defined.
-
-Hint Resolve reg_eq_dec.
-
-Definition bin_op_eq_dec : forall b1 b2 : BinOpT,
-  {b1 = b2} + {b1 <> b2}.
-Proof. decide equality. Defined.
-
-Hint Resolve bin_op_eq_dec.
-
-Definition instr_eq_dec : forall i1 i2 : @Instr Label,
-  {i1 = i2} + {i1 <> i2}.
-Proof. decide equality. apply label_dec. Defined.
-
-Definition instr_eq i1 i2 := if instr_eq_dec i1 i2 then true else false.
-
-Require Import ssrbool.
-Lemma label_eq_correct : forall l1 l2,
-  label_eq l1 l2 = true -> l1 = l2.
-Proof.
-  rewrite /label_eq => l1 l2 /andP [H1 H2]. eapply flows_antisymm; trivial.
-Qed.
