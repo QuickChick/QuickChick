@@ -4197,7 +4197,7 @@ End Notations.
 
 End Word.
 
-Require Import ssreflect ssrbool eqtype fintype.
+Require Import ssreflect ssrbool ssrnat ssrfun eqtype choice fintype.
 
 Lemma int_eqP n : Equality.axiom (@Word.eq n).
 Proof.
@@ -4208,3 +4208,50 @@ Qed.
 
 Definition int_eqMixin n := EqMixin (int_eqP n).
 Canonical int_eqType n := Eval hnf in EqType (Word.int n) (int_eqMixin n).
+
+Lemma int_to_ord_proof n (w : Word.int n) : (Z.to_nat (Word.unsigned w) < 2 ^ n.+1)%N.
+Proof.
+  case: w => [i [H1 H2]] /=.
+  rewrite Word.modulus_power in H2.
+  apply/ltP.
+  rewrite Nat2Z.inj_lt Z2Nat.id; try omega.
+  suff {i H1 H2} H : two_p (Word.zwordsize n) = Z.of_nat (2 ^ n.+1) by congruence.
+  rewrite /Word.zwordsize -two_power_nat_two_p /Word.wordsize.
+  elim: {n} (n.+1) => [|n IH] //=.
+  by rewrite two_power_nat_S expnS -multE Nat2Z.inj_mul IH.
+Qed.
+
+Definition int_to_ord n (w : Word.int n) : 'I_(2^n.+1) :=
+  Ordinal (int_to_ord_proof n w).
+
+Lemma ord_to_int_proof n (i : 'I_(2^n.+1)) : -1 < Z.of_nat i < Word.modulus n.
+Proof.
+  split; first by omega.
+  rewrite Word.modulus_power /Word.zwordsize /Word.wordsize -two_power_nat_two_p.
+  have -> : two_power_nat n.+1 = Z.of_nat (2 ^ n.+1).
+  { elim: {n i} (n.+1) => [|n IH] //=.
+    by rewrite two_power_nat_S expnS -multE Nat2Z.inj_mul IH. }
+  apply inj_lt.
+  apply/ltP.
+  exact: ltn_ord.
+Qed.
+
+Definition ord_to_int n (i : 'I_(2^n.+1)) : Word.int n :=
+  Word.mkint _ _ (ord_to_int_proof n i).
+
+Lemma int_to_ordK n : cancel (int_to_ord n) (ord_to_int n).
+Proof.
+  move => [w ?].
+  apply Word.unsigned_inj => /=.
+  apply Z2Nat.id.
+  omega.
+Qed.
+
+Definition int_choiceMixin n := CanChoiceMixin (int_to_ordK n).
+Canonical int_choiceType n := Eval hnf in ChoiceType _ (int_choiceMixin n).
+
+Definition int_countMixin n := CanCountMixin (int_to_ordK n).
+Canonical int_countType n := Eval hnf in CountType _ (int_countMixin n).
+
+Definition int_finMixin n := CanFinMixin (int_to_ordK n).
+Canonical int_finType n := Eval hnf in FinType _  (int_finMixin n).
