@@ -4,7 +4,7 @@ Set Implicit Arguments.
 
 Section Everything.
 
-Variable A : eqType.
+Variable A : Type.
 Variable low : pred A.
 Variable initial : pred A.
 Variable halted : pred A.
@@ -29,7 +29,7 @@ Hypothesis equiv_low :
 
 Definition high := [pred s | ~~ low s].
 
-Definition stuck := [pred s | step s == None].
+Definition stuck := [pred s | ~~ step s].
 
 Hypothesis halted_stuck : subpred halted stuck.
 
@@ -56,9 +56,9 @@ Qed.
 Lemma trace_halted n s :
   halted s -> trace n s = [:: s].
 Proof.
-  move => H.
-  case: n => [|n] /=; first by [].
-  by move: H => /(@halted_stuck _)/eqP ->.
+move => H; case: n => [|n] //=.
+move/halted_stuck: H.
+by rewrite /stuck /=; case: (step s).
 Qed.
 
 Lemma exec_halted n s :
@@ -144,11 +144,9 @@ Lemma equivt_consH x1 t1 t2 :
 Proof.
   move => H1.
   move: {2}(size t1 + size t2) (leqnn (size t1 + size t2)) => n Hn.
-  elim: n t1 t2 Hn => [|n IH] t1 t2 Hn E.
-  - rewrite leqn0 addn_eq0 !size_eq0 in Hn.
-    move: Hn => /andP [/eqP -> /eqP ->].
-    by constructor.
-  - case: t2 Hn E => [|x2 t2] Hn E.
+  elim: n t1 t2 Hn => [t1 t2|n IH t1].
+  - by rewrite leqn0 addn_eq0; case: t1; case:t2 => //; constructor.
+  - case=> [|x2 t2] Hn E.
     { apply EquivtSym. by constructor. }
     move: E => /(@equivt_cons _) [[_ E _ _]|[E _] //=|[E1 E2]].
     + by rewrite /high /= E in H1.
@@ -176,14 +174,12 @@ Qed.
 Lemma equivtP t1 t2 : reflect (equivt t1 t2) (equivtb t1 t2).
 Proof.
   move: {2}(size t1 + size t2) (leqnn (size t1 + size t2)) => n Hn.
-  elim: n t1 t2 Hn => [|n IH] t1 t2 Hn.
-  - rewrite leqn0 addn_eq0 !size_eq0 in Hn.
-    move: Hn => /andP [/eqP -> /eqP ->].
-    by do 2! constructor.
-  - case: t1 Hn => [|x1 t1] Hn.
+  elim: n t1 t2 Hn => [|n IH] t1 t2.
+  - by rewrite leqn0 addn_eq0; case: t1; case: t2 => //; do 2! constructor.
+  - case: t1 => [|x1 t1].
     { rewrite equivtbNt.
       by do 2! constructor. }
-    case: t2 Hn => [|x2 t2] Hn.
+    case: t2 => [|x2 t2] Hn.
     { rewrite equivtbtN.
       constructor. apply EquivtSym. by constructor. }
     rewrite /equivtb /=.
@@ -278,24 +274,24 @@ Proof.
     + move: Ht1 Ex Hx1 => [-> _] Ex Hx1.
       case S2: (step s2) s2' Ht2 H1 Hx2 H2 Ex => [s2'|] s2'' /= [-> Ht2] {s2''} H1 Hx2 H2 Ex; last by [].
       rewrite (halted_equiv Ex) in H1.
-      by move: (halted_stuck H1) S2 => /eqP ->.
+      by have := halted_stuck H1; rewrite /stuck /= S2.
     + move: Ht2 Ex Hx2 => [-> _] Ex Hx2.
       case S1: (step s1) s1' Ht1 H2 Hx1 H1 Ex => [s1'|] s1'' /= [-> Ht1] {s1''} H2 Hx1 H1 Ex; last by [].
       rewrite -(halted_equiv Ex) in H2.
-      by move: (halted_stuck H2) S1 => /eqP ->.
+      by have := halted_stuck H2; rewrite /stuck /= S1.
     + case S1: (step s1) s1' Ht1 Ex Hx1 H1 => [s1'|] s1'' [-> ?] {s1''} Ex Hx1 H1;
       case S2: (step s2) s2' Ht2 Ex Hx2 H2 => [s2'|] s2'' [-> ?] {s2''} Ex Hx2 H2 //=.
       * by apply IH.
       * rewrite -(halted_equiv Ex) in H2.
-        by move: (halted_stuck H2) S1 => /eqP ->.
+        by have := halted_stuck H2; rewrite /stuck /= S1.
       * rewrite (halted_equiv Ex) in H1.
-        by move: (halted_stuck H1) S2 => /eqP ->.
+        by have := halted_stuck H1; rewrite /stuck /= S2.
   - case: n1 H1 Ht1 => [|n1] //= H1 Ht1.
     { move: Ht1 Hx1 => [-> _] Hx1.
       by rewrite /halted /= (halted_low H1) in Hx1. }
     case S1: (step s1) s1' Ht1 Hx1 H1 => [s1'|] s1'' [-> Ht1] {s1''} Hx1 H1; first by apply IH.
     by rewrite /halted /= (halted_low H1) in Hx1.
-  - rewrite equivS. by apply IH.
+  - by rewrite equivS; apply: IH.
 Qed.
 
 Lemma ssni_llni : ssni -> llni.
