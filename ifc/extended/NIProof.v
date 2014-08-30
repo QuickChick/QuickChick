@@ -592,12 +592,6 @@ by apply/(flows_trans _ _ _ low_lv); rewrite flows_join low_lv' low_lf.
     by apply: wf_st; rewrite inE in_stack_f1 orbT.
 Qed.
 
-(*
-Instance indistState : Indist State | 0 :=
-  fun obs st1 st2 =>
-  [&& well_formedb st1, well_formedb st2 & indist obs st1 st2] .
-*)
-
 Lemma indist_low_pc obs st1 st2 :
   isLow ∂(st_pc st1) obs ->
   indist obs st1 st2 =
