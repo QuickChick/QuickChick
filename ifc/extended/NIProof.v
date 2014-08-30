@@ -683,7 +683,7 @@ constructor=> [obs s1 s2 s1' s2' wf_s1 wf_s2 low_pc indist_s1s2 /fstepP step1|o 
     case: (registerContent regs2 r1) => // [[v2 l2]].
     case/andP => eq_Kl2 ?.
     have indist_v: indist obs (Vlab K @ ⊥) (Vlab l2 @ ⊥).
-      by rewrite /indist /= /indist /= eq_Kl2 eqxx orbT.
+      by rewrite /indist /= eqxx /= /indist /indistValue /eq_op /= eq_Kl2 orbT.
     have /= := indist_registerUpdate r2 indist_s1s2 low_pc indist_v.
     rewrite upd_r2.
     case: (registerUpdate regs2 r2 (Vlab l2 @ ⊥)) => // ?.
@@ -696,7 +696,7 @@ constructor=> [obs s1 s2 s1' s2' wf_s1 wf_s2 low_pc indist_s1s2 /fstepP step1|o 
     rewrite /fstep -(indist_instr indist_s1s2) /state_instr_lookup //= CODE /=.
     case: s2 wf_s2 indist_s1s2 => im2 μ2 σ2 regs2 [pcv2 pcl2] wf_s2 indist_s1s2.
     have indist_v: indist obs (Vlab LPC @ ⊥) (Vlab pcl2 @ ⊥).
-      rewrite /indist /= eqxx /indist /=.
+      rewrite /indist /= eqxx /indist /= /indistValue /eq_op /=.
       case/andP: (indist_pc indist_s1s2) => _ ->.
       by rewrite orbT.
     have /= := indist_registerUpdate r1 indist_s1s2 low_pc indist_v.
@@ -720,7 +720,7 @@ constructor=> [obs s1 s2 s1' s2' wf_s1 wf_s2 low_pc indist_s1s2 /fstepP step1|o 
     have /= := indist_mlab p2 indist_s1s2.
     case: (mlab μ2 p2) => //= lm2 mlab_p2.
     have indist_v: indist obs (Vlab C @ K) (Vlab lm2 @ K).
-      rewrite /indist /= eqxx /=.
+      rewrite /indist /= eqxx /= /indist /indistValue /eq_op /=.
       case/orP: indist_ptr => [->|] // ?.
       have eq_p: p = p2 by admit.
       move: mlab_p2; rewrite -eq_p mlab_p => [[->]].

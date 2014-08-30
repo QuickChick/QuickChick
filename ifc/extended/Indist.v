@@ -41,7 +41,7 @@ Instance indistList {A : Type} `{Indist A} : Indist (list A) :=
 *)
 Instance indistValue : Indist Value :=
 {|
-  indist _lab v1 v2 := val_eq v1 v2
+  indist _lab v1 v2 := v1 == v2
 |}.
 
 (* Indistinguishability of Atoms.
