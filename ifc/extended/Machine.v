@@ -8,6 +8,10 @@ Require Import Rules.
 Require Import Memory.
 Require Import Instructions.
 
+Require ssreflect ssrbool eqtype.
+
+Import LabelEqType.
+
 (** Rule Table *)
 
 Local Open Scope nat.
@@ -92,20 +96,9 @@ Infix "@" := Atm (no associativity, at level 50).
 Inductive Ptr_atom : Type :=
  | PAtm (i:Z) (l:Label).
 
-Definition label_eq (l1 l2 : Label) := (flows l1 l2 && flows l2 l1)%bool.
-
-Section WithSsr.
-Require Import ssrbool.
-Lemma label_eq_correct : forall l1 l2,
-  label_eq l1 l2 = true -> l1 = l2.
-Proof.
-  rewrite /label_eq => l1 l2 /andP [H1 H2]. eapply flows_antisymm; trivial.
-Qed.
-End WithSsr.
-
 Definition pc_eq (pc1 pc2 : Ptr_atom) : bool :=
   match pc1, pc2 with
-  | PAtm i1 l1, PAtm i2 l2 => (Z_eq i1 i2 && label_eq l1 l2)%bool
+  | PAtm i1 l1, PAtm i2 l2 => (Z_eq i1 i2 && (eqtype.eq_op l1 l2))%bool
   end.
 
 Definition reg_eq_dec : forall r1 r2 : regId,
@@ -187,14 +180,14 @@ Definition mframe_eq (m1 m2 : mframe) : bool :=
 Definition val_eq (v1 v2 : Value) : bool :=
   match v1, v2 with
     | Vint  i1, Vint i2  => Z_eq i1 i2
-    | Vlab  l1, Vlab l2  => label_eq l1 l2
+    | Vlab  l1, Vlab l2  => eqtype.eq_op l1 l2
     | Vptr (Ptr mf1 i1), Vptr (Ptr mf2 i2) =>
       (mframe_eq mf1 mf2 && Z_eq i1 i2)%bool
     | _, _ => false
   end.
 
 Definition val_eq_val (v1 v2 : Value) : Value :=
-  Vint (if val_eq v1 v2 then 1 else 0).
+  Vint (if val_eq v1 v2 then 1 else 0)%Z.
 
 (* CH: TODO: we should get rid of this crap! *)
 (* Proof-stuff previously in Memory.v *)
@@ -205,7 +198,7 @@ Proof.
   destruct x; destruct y; try_split_congruence.
   - destruct (Z.eq_dec n n0); subst; auto; try_split_congruence.
   - destruct p; destruct p0;
-    destruct (Z.eq_dec i i0); destruct (fp == fp0);
+    destruct (Z.eq_dec i i0); destruct (equiv_dec fp fp0);
     try_split_congruence.
   - destruct (LatEqDec Label l l0); try_split_congruence.
 Qed.
@@ -268,7 +261,7 @@ Lemma load_alloc : forall size stamp label a m m' mf,
     alloc size stamp label a m = Some (mf, m') ->
     forall mf' ofs',
       load m' (Ptr mf' ofs') =
-        if mf == mf' then
+        if equiv_dec mf mf' then
           if Z_le_dec 0 ofs' then
             if Z_lt_dec ofs' size then Some a else None
           else None
@@ -277,18 +270,19 @@ Proof.
   unfold alloc, load; intros.
   destruct (zreplicate size a) eqn:Ez; try congruence; inv H.
   rewrite (Mem.alloc_get_frame _ _ _ _ _ _ _ _ _ H1).
-  destruct (equiv_dec mf).
+  destruct (equiv_dec mf); simpl in *.
   - inv e.
-    destruct (equiv_dec mf'); try congruence.
+    destruct (equiv_dec mf' mf'); try congruence.
+    simpl.
     eapply nth_error_Z_zreplicate; eauto.
-  - destruct (equiv_dec mf); try congruence.
+  - destruct (equiv_dec mf); simpl in *; try congruence.
 Qed.
 
 Lemma load_store : forall {m m'} {b ofs a},
     store m (Ptr b ofs) a = Some m' ->
     forall b' ofs',
       load m' (Ptr b' ofs') =
-      if b == b' then
+      if equiv_dec b b' then
         if Z_eq_dec ofs ofs' then Some a else load m (Ptr b' ofs')
       else load m (Ptr b' ofs').
 Proof.
@@ -297,10 +291,10 @@ Proof.
   destruct f as [stmp lab l].
   destruct (update_list_Z l ofs a) eqn:E2; try congruence.
   rewrite (Mem.get_upd_frame _ _ _ _ _ _ _ H).
-  destruct (equiv_dec b);
-  destruct (equiv_dec b); try congruence.
+  destruct (equiv_dec b); simpl in *;
+  destruct (equiv_dec b); simpl in *; try congruence.
   - inv e; clear e0.
-    destruct Z.eq_dec.
+    destruct Z.eq_dec; simpl in *.
     + inv e.
       eapply update_list_Z_spec; eauto.
     + rewrite E1.
@@ -316,8 +310,8 @@ Lemma load_store_old : forall {m m':memory} {b ofs a},
 Proof.
   intros.
   rewrite (load_store H).
-  destruct (@equiv_dec mframe); try congruence.
-  destruct Z.eq_dec; try congruence.
+  destruct (@equiv_dec mframe); simpl in *; try congruence.
+  destruct Z.eq_dec; simpl in *; try congruence.
 Qed.
 
 Lemma load_store_new : forall {m m':memory} {b ofs a},
@@ -326,8 +320,8 @@ Lemma load_store_new : forall {m m':memory} {b ofs a},
 Proof.
   intros.
   rewrite (load_store H).
-  destruct (@equiv_dec mframe); try congruence.
-  destruct Z.eq_dec; try congruence.
+  destruct (@equiv_dec mframe); simpl in *; try congruence.
+  destruct Z.eq_dec; simpl in *; try congruence.
 Qed.
 
 Lemma load_some_store_some : forall {m:memory} {b ofs a},
@@ -353,7 +347,7 @@ Lemma alloc_get_frame_old :
 Proof.
   intros.
   erewrite Mem.alloc_get_frame; eauto.
-  destruct (b' == b) as [E | E]; auto.
+  destruct (equiv_dec b' b) as [E | E]; simpl in *; auto.
   compute in E. subst b'.
   exploit Mem.alloc_get_fresh; eauto.
   congruence.
@@ -366,7 +360,7 @@ Lemma alloc_get_frame_new :
 Proof.
   intros.
   erewrite Mem.alloc_get_frame; eauto.
-  destruct (b == b) as [E | E]; auto.
+  destruct (equiv_dec b b) as [E | E]; simpl in *; auto.
   congruence.
 Qed.
 
@@ -391,7 +385,7 @@ Lemma get_frame_upd_frame_neq :
 Proof.
   intros.
   erewrite Mem.get_upd_frame; eauto.
-  destruct (equiv_dec b b'); congruence.
+  destruct (equiv_dec b b'); simpl in *; congruence.
 Qed.
 
 Lemma get_frame_store_neq :
@@ -415,7 +409,7 @@ Lemma alloc_get_frame_eq :
 Proof.
   intros.
   erewrite Mem.alloc_get_frame; eauto.
-  destruct (b == b); congruence.
+  destruct (equiv_dec b b); simpl in *; congruence.
 Qed.
 
 Lemma alloc_get_frame_neq :
@@ -426,7 +420,7 @@ Lemma alloc_get_frame_neq :
 Proof.
   intros.
   erewrite Mem.alloc_get_frame; eauto.
-  destruct (b == b'); congruence.
+  destruct (equiv_dec b b'); simpl in *; congruence.
 Qed.
 
 Definition extends (m1 m2 : memory) : Prop :=
@@ -476,6 +470,9 @@ Definition run_tmr (t : table) (op: OpCode)
 Local Open Scope Z_scope.
 (* CH: we only need to instantiate this for the default table,
        so we could even consider baking it in *)
+
+Close Scope form_scope.
+
 Inductive step (t : table) : State -> State -> Prop :=
  | step_lab: forall im μ σ v K pc r r' r1 r2 j LPC rl rpcl
      (PC: pc = PAtm j LPC)

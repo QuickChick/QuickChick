@@ -2,6 +2,8 @@ Require Import ZArith.
 Require Import EquivDec.
 Require Import List.
 
+Require Import ssreflect ssrbool eqtype.
+
 Require Import Utils.
 
 Class JoinSemiLattice (Lab : Type) :=
@@ -105,6 +107,22 @@ Proof.
   auto.
 Qed.
 
+Definition label_eqb {L : JoinSemiLattice T} l1 l2 :=
+  flows l1 l2 && flows l2 l1.
+
+Lemma label_eqP (L : JoinSemiLattice T) : Equality.axiom label_eqb.
+Proof.
+move => l1 l2.
+rewrite /label_eqb.
+apply/(iffP idP).
+- move/andP => [H1 H2].
+  by apply flows_antisymm.
+- move => -> .
+  by rewrite !flows_refl.
+Qed.
+
+Definition label_eqMixin (L : JoinSemiLattice T) := EqMixin (@label_eqP L).
+
 End JoinSemiLattice_properties.
 
 Hint Resolve
@@ -149,3 +167,9 @@ Class FiniteLattice (Lab : Type) :=
 
 Definition allThingsBelow {L : Type} `{FiniteLattice L} (l : L) : list L :=
   List.filter (fun l' => flows l' l) elems.
+
+Module LabelEqType.
+
+Canonical label_eqType T {L : JoinSemiLattice T} := Eval hnf in EqType _ (label_eqMixin L).
+
+End LabelEqType.

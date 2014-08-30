@@ -11,6 +11,8 @@ Module IndistM (Lattice : FINLAT).
 
 Module GenericMachine := MachineM Lattice.
 
+Import LabelEqType.
+
 (* CH: things fail in very strange ways if this is just Import *)
 Export GenericMachine.
 
@@ -53,7 +55,7 @@ Instance indistAtom : Indist Atom :=
   indist lab a1 a2 :=
     let '(Atm v1 l1) := a1 in
     let '(Atm v2 l2) := a2 in
-    label_eq l1 l2
+    (l1 == l2)
     && (isHigh l1 lab || indist lab v1 v2)
 |}.
 
@@ -62,11 +64,11 @@ Instance indistFrame : Indist frame :=
   indist lab f1 f2 :=
     let '(Fr stamp1 l1 vs1) := f1 in
     let '(Fr stamp2 l2 vs2) := f2 in
-    (label_eq stamp1 stamp2) &&
+    (stamp1 == stamp2) &&
     if isLow stamp1 lab && isLow stamp2 lab then
       (* CH: this part is basically the same as indistinguishability of values;
              try to remove this duplication at some point *)
-      label_eq l1 l2 && (isHigh l1 lab || indist lab vs1 vs2)
+      (l1 == l2) && (isHigh l1 lab || indist lab vs1 vs2)
     else true
 |}.
 
@@ -100,14 +102,14 @@ Instance indistStackFrame : Indist StackFrame :=
            pc_eq p1 p2
         && indist lab regs1 regs2
         && Z_eq r1 r2
-        && label_eq l1 l2
+        && (l1 == l2)
     end
 |}.
 
 Definition stackFrameBelow (lab : Label) (sf : StackFrame) : bool :=
   let 'SF ret_addr  _ _ _ := sf in
   let 'PAtm _ l_ret_addr := ret_addr in
-  flows l_ret_addr lab. 
+  flows l_ret_addr lab.
 
 Definition filterStack (lab : Label) (s : Stack) : list StackFrame :=
   (List.filter (stackFrameBelow lab) (unStack s)).

@@ -82,10 +82,7 @@ Canonical block_choiceType := Eval hnf in ChoiceType (Mem.block Label) mframe_ch
 Canonical block_countType := Eval hnf in CountType (Mem.block Label) mframe_countMixin.
 Canonical block_finType := Eval hnf in FinType (Mem.block Label) mframe_finMixin.
 
-Axiom eqlabelP : Equality.axiom label_eq.
-
-Definition label_eqMixin := EqMixin eqlabelP.
-Canonical label_eqType := Eval hnf in EqType Label label_eqMixin.
+Canonical label_eqType : eqType := Eval hnf in (@LabelEqType.label_eqType _ _).
 
 Axiom label_choiceMixin : choiceMixin Label.
 Canonical label_choiceType := Eval hnf in ChoiceType Label label_choiceMixin.
@@ -141,7 +138,7 @@ by rewrite mem_filter /= low_lbl -get_r1 mem_nth.
 Qed.
 
 Lemma mem_set_nth (T : eqType) (x : T) x0 l i v :
-  i < size l -> x \in set_nth x0 l i v -> 
+  i < size l -> x \in set_nth x0 l i v ->
   x = v \/ x \in l.
 Proof.
 move=> /maxn_idPr eq_size /(nthP x0) [j].
@@ -476,7 +473,7 @@ case: {st st'} step.
   case upd_i: (update_list_Z fr i (v @ lv)) => [fr'|] // upd_fp wf_st l f1 f2.
   rewrite inE /= => H.
   case/(reachable_upd upd_fp) => [|[low_lf [reach_fp [f3 []]]]].
-    by apply: wf_st; rewrite inE. 
+    by apply: wf_st; rewrite inE.
     move/(subsetP (mframes_from_atoms_upd upd_i)); rewrite inE.
     case/orP=> [in_fr_f3 reach_f2|].
       apply: (wf_st l f1 f2) => /=; first by rewrite inE.
@@ -495,7 +492,7 @@ case: {st st'} step.
   case upd_i: (update_list_Z fr i (v @ lv')) => [fr'|] // upd_fp wf_st l f1 f2.
   rewrite inE /= => H.
   case/(reachable_upd upd_fp) => [|[low_lf [reach_fp [f3 []]]]].
-    by apply: wf_st; rewrite inE. 
+    by apply: wf_st; rewrite inE.
     move/(subsetP (mframes_from_atoms_upd upd_i)); rewrite inE.
     case/orP=> [in_fr_f3 reach_f2|].
       apply: (wf_st l f1 f2) => /=; first by rewrite inE.
@@ -776,7 +773,7 @@ constructor=> [obs s1 s2 s1' s2' wf_s1 wf_s2 low_pc indist_s1s2 /fstepP step1||]
     case upd_i: (update_list_Z fr i (v @ lv)) => [fr'|] // upd_fp wf_st l f1 f2.
     rewrite inE /= => H.
     case/(reachable_upd upd_fp) => [|[low_lf [reach_fp [f3 []]]]].
-      by apply: wf_st; rewrite inE. 
+      by apply: wf_st; rewrite inE.
       move/(subsetP (mframes_from_atoms_upd upd_i)); rewrite inE.
       case/orP=> [in_fr_f3 reach_f2|].
       apply: (wf_st l f1 f2) => /=; first by rewrite inE.
@@ -795,7 +792,7 @@ constructor=> [obs s1 s2 s1' s2' wf_s1 wf_s2 low_pc indist_s1s2 /fstepP step1||]
     case upd_i: (update_list_Z fr i (v @ lv')) => [fr'|] // upd_fp wf_st l f1 f2.
     rewrite inE /= => H.
     case/(reachable_upd upd_fp) => [|[low_lf [reach_fp [f3 []]]]].
-      by apply: wf_st; rewrite inE. 
+      by apply: wf_st; rewrite inE.
       move/(subsetP (mframes_from_atoms_upd upd_i)); rewrite inE.
       case/orP=> [in_fr_f3 reach_f2|].
       apply: (wf_st l f1 f2) => /=; first by rewrite inE.
