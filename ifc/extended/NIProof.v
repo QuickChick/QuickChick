@@ -631,7 +631,7 @@ Proof.
 Qed.
 
 Lemma pc_eqS pc pc' l1 l2 :
-  Z_eq (BinInt.Z.add pc 1) (BinInt.Z.add pc' 1) && label_eq l1 l2 =
+  Z_eq (BinInt.Z.add pc 1) (BinInt.Z.add pc' 1) && (l1 == l2) =
   pc_eq (PAtm pc l1) (PAtm pc' l2).
 Proof.
 admit.
@@ -650,7 +650,7 @@ constructor=> [obs s1 s2 s1' s2' wf_s1 wf_s2 low_pc indist_s1s2 /fstepP step1||]
     case: (registerContent regs2 r1) => // [[v2 l2]].
     case/andP => eq_Kl2 ?.
     have indist_v: indist obs (Vlab K @ ⊥) (Vlab l2 @ ⊥).
-      by rewrite /indist /= /indist /= eq_Kl2 /label_eq flows_refl orbT.
+      by rewrite /indist /= /indist /= eq_Kl2 eqxx orbT.
     have /= := indist_registerUpdate r2 indist_s1s2 low_pc indist_v.
     rewrite upd_r2.
     case: (registerUpdate regs2 r2 (Vlab l2 @ ⊥)) => // ?.

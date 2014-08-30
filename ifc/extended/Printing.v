@@ -8,6 +8,10 @@ Require Import QuickChick.
 
 Require Import TestingCommon.
 
+Require ssreflect eqtype.
+
+Import LabelEqType.
+
 (* High-level note:
    Deal with printing variations of stuff, then instantiate the
    single show instances with a variation of the same thing.
@@ -172,7 +176,7 @@ Instance show_value_pair : ShowPair Value :=
 Instance show_label_pair : ShowPair Lab4 :=
 {|
   show_pair lab l1 l2 :=
-    if label_eq l1 l2 then show l1
+    if eqtype.eq_op l1 l2 then show l1
     else show_variation (show l1) (show l2)
 |}.
 
@@ -228,11 +232,11 @@ Fixpoint show_mem_pair_helper (frame_pairs : list (mframe * mframe))
       (* Show actual corresponding frames *)
       match Mem.get_frame m1 f1, Mem.get_frame m2 f2 with
         | Some (Fr stmp1 l1 data1), Some (Fr stmp2 l2 data2) =>
-          (if label_eq stmp1 stmp2 then
+          (if eqtype.eq_op stmp1 stmp2 then
             (* same stamps *)
             "Stamp: " ++ show stmp1
           else "Stamp: " ++ show_variation (show stmp1) (show stmp2)) ++
-          (if label_eq l1 l2 then
+          (if eqtype.eq_op l1 l2 then
             "DFR @ " ++ show l1 ++ " : [ "
                      ++ show_pair_list 0 lab data1 data2 ++ nl
                      ++ show_mem_pair_helper t lab m1 m2 ++ " ]"
@@ -306,7 +310,7 @@ Fixpoint show_stack s :=
   end.
 
 (* CH: dropped this crap
-Could be a new instance with a "newtype"? 
+Could be a new instance with a "newtype"?
 Fixpoint show_low_stack_pair lab s1 s2 :=
   match s1, s2 with
     | Mty, Mty => " ] "

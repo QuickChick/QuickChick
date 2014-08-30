@@ -4,6 +4,10 @@ Require Import TestingCommon.
 Require Import List. Import ListNotations.
 Require Import ZArith.
 
+Require ssreflect eqtype.
+
+Import LabelEqType.
+
 (* ------------------------------------------------------ *)
 (* ---------------- Constants --------------------------- *)
 (* ------------------------------------------------------ *)
@@ -65,7 +69,7 @@ Definition gen_label_between_lax (l1 l2 : Label) : Gen Label :=
   elements l2 (filter (fun l => isLow l1 l) (allThingsBelow l2)).
 
 Definition gen_label_between_strict (l1 l2 : Label) : Gen Label :=
-  elements l2 (filter (fun l => isLow l1 l && negb (label_eq l l1))%bool
+  elements l2 (filter (fun l => isLow l1 l && negb (eqtype.eq_op l l1))%bool
                       (allThingsBelow l2)).
 
 Instance smart_gen_label : SmartGen Label :=
