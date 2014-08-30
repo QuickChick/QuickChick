@@ -129,12 +129,12 @@ Instance indistState : Indist State :=
   indist lab st1 st2 :=
     let '(St imem1 m1 s1 regs1 pc1) := st1 in
     let '(St imem2 m2 s2 regs2 pc2) := st2 in
-    indist lab imem1 imem2 &&
-    indist lab m1 m2 &&
-    indist lab s1 s2 &&
-    ((isLow ∂pc1 lab || isLow ∂pc2 lab) ==>
+    [&& indist lab imem1 imem2,
+    indist lab m1 m2,
+    indist lab s1 s2 &
+    (isLow ∂pc1 lab || isLow ∂pc2 lab) ==>
       (pc_eq pc1 pc2 &&
-      indist lab regs1 regs2))
+      indist lab regs1 regs2)]
 |}.
 
 End IndistM.
