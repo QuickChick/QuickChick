@@ -17,6 +17,8 @@ Hypothesis indistT : forall o, transitive (indist o).
 
 Hypothesis indistS : forall o, symmetric (indist o).
 
+Hypothesis indistR : forall o, reflexive (indist o).
+
 Hypothesis ended_low : forall o, subpred ended (low o).
 
 Hypothesis ended_indist :
@@ -240,32 +242,32 @@ Qed.
 
 Inductive indistt_msni : seq A -> seq A -> Prop :=
 
-| IndisttMsniLowSteps : forall o s1 s1' s2 s2' t1 t2,
+| IndisttMsniLowSteps : forall s1 s1' s2 s2' t1 t2,
     low o s1 -> low o s2 ->
     indist o s1' s2' ->
     indistt_msni (s1' :: t1) (s2' :: t2) ->
     indistt_msni (s1 :: s1' :: t1) (s2 :: s2' :: t2)
 
-| IndisttMsniHighToLowSteps : forall o s1 s1' s2 s2' t1 t2,
+| IndisttMsniHighToLowSteps : forall s1 s1' s2 s2' t1 t2,
     high o s1 -> low o s1' ->
     high o s2 -> low o s2' ->
     indist o s1' s2' ->
     indistt_msni (s1' :: t1) (s2' :: t2) ->
     indistt_msni (s1 :: s1' :: t1) (s2 :: s2' :: t2)
 
-| IndisttMsniHighToHighSteps : forall o s1 s1' s2 t1 t2,
+| IndisttMsniHighToHighSteps : forall s1 s1' s2 t1 t2,
     high o s1 -> high o s1' ->
     indist o s1 s1' ->
     indistt_msni (s1' :: t1) (s2 :: t2) ->
     indistt_msni (s1 :: s1' :: t1) (s2 :: t2)
 
-| IndisttMsniLowStepEnd : forall o s1 s1' s2 t1,
+| IndisttMsniLowStepEnd : forall s1 s1' s2 t1,
     (high o s1 \/ high o s1') ->
-    indistt_msni (s1' :: t1) (s2 :: [::]) ->
-    indistt_msni (s1 :: s1' :: t1) (s2 :: [::])
+    indistt_msni (s1' :: t1) ([:: s2]) ->
+    indistt_msni (s1 :: s1' :: t1) ([:: s2])
 
 | IndisttMsniBothEnd : forall s1 s2,
-    indistt_msni (s1 :: [::]) (s2 :: [::])
+    indistt_msni ([:: s1]) ([:: s2])
 
 | IndisttMsniSym : forall t1 t2,
     indistt_msni t1 t2 ->
@@ -309,6 +311,53 @@ Record ssni : Prop := {
      LLNI -> EENI proof. *)
 
 }.
+
+Definition msni : Prop :=
+  forall (o : O) (s1 s2 : A) (t1 t2 : seq A),
+    indist o s1 s2 ->
+    rtrace s1 t1 ->
+    rtrace s2 t2 ->
+    indistt_msni o t1 t2.
+
+Lemma step_rtrace : forall s s',
+  step s = Some s' ->
+  rtrace s [:: s; s'].
+Proof. exists 1. simpl. by rewrite H. Qed.
+
+Ltac pnp :=
+  match goal with
+  | [HP : is_true ?x, HNP : is_true (negb ?x) |- _] => rewrite HP in HNP
+  end.
+
+Lemma msni_ssni : msni -> ssni.
+Proof.
+  move => MSNI. split.
+  - (* ssni_low_low *)
+    move => o s1 s2 s1' s2' ls1 i12 st1 st2.
+    apply step_rtrace in st1.
+    apply step_rtrace in st2.
+    assert (ls2 : low o s2). erewrite indist_low. eassumption. rewrite indistS. assumption.
+    specialize (MSNI o s1 s2 _ _ i12 st1 st2).
+    inversion MSNI; subst; clear MSNI; unfold high in *; simpl in *;
+      move => //; try tauto; try by pnp.
+      admit. (* hard to prove things with symmetry rule around, expand out in definition?
+                prove equivalent definition? rule induction? *)
+  - (* ssni_high_high *)
+    move => o s s' hs hs' sts.
+    apply step_rtrace in sts.
+    assert(i : indist o s s) by apply indistR.
+    specialize (MSNI o s s _ _ i sts sts).
+    inversion MSNI; subst; clear MSNI; unfold high in *; simpl in *;
+      move  => //; try tauto; try by pnp.
+      admit. (* symmetry again *)
+  - (* ssni_high_low *)
+    move => o s1 s2 s1' s2' h1 i12 l1' l2' st1 st2.
+    apply step_rtrace in st1.
+    apply step_rtrace in st2.
+    assert (h2 : high o s2). unfold high in *; simpl in *. erewrite indist_low.
+      eassumption. by rewrite indistS.
+    admit. (* symmetry again *)
+Admitted.
 
 Lemma llni_eeni : llni -> eeni.
 Proof.
