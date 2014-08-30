@@ -623,9 +623,9 @@ Proof.
   admit.
 Qed.
 
-Theorem SSNI obs : ssni (fun st => isLow ∂(st_pc st) obs) (fstep default_table) (indist obs).
+Theorem SSNI : ssni (fstep default_table) (fun obs st => isLow ∂(st_pc st) obs) (indist).
 Proof.
-constructor=> [s1 s2 s1' s2' low_pc indist_s1s2 step1||].
+constructor=> [obs s1 s2 s1' s2' low_pc indist_s1s2 step1||].
 - case/fstepP: step1 low_pc indist_s1s2.
   (* Lab *)
   + move=> im μ σ v K pc r r' r1 r2 j LPC rl rpcl -> /= instr get_r1 [<- <-] upd_r2 low_pc indist_s1s2.
