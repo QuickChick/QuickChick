@@ -98,7 +98,7 @@ Inductive Ptr_atom : Type :=
 
 Definition pc_eq (pc1 pc2 : Ptr_atom) : bool :=
   match pc1, pc2 with
-  | PAtm i1 l1, PAtm i2 l2 => (Z_eq i1 i2 && (eqtype.eq_op l1 l2))%bool
+  | PAtm i1 l1, PAtm i2 l2 => (eqtype.eq_op i1 i2 && (eqtype.eq_op l1 l2))%bool
   end.
 
 Definition reg_eq_dec : forall r1 r2 : regId,
@@ -179,10 +179,10 @@ Definition mframe_eq (m1 m2 : mframe) : bool :=
 
 Definition val_eq (v1 v2 : Value) : bool :=
   match v1, v2 with
-    | Vint  i1, Vint i2  => Z_eq i1 i2
+    | Vint  i1, Vint i2  => eqtype.eq_op i1 i2
     | Vlab  l1, Vlab l2  => eqtype.eq_op l1 l2
     | Vptr (Ptr mf1 i1), Vptr (Ptr mf2 i2) =>
-      (mframe_eq mf1 mf2 && Z_eq i1 i2)%bool
+      (mframe_eq mf1 mf2 && eqtype.eq_op i1 i2)%bool
     | _, _ => false
   end.
 

@@ -481,7 +481,7 @@ Lemma nth_error_Z_nat (A: Type) :
     nth_error_Z l i = Some v ->
     nth_error l (Z.to_nat i) = Some v.
 Proof.
-  intros. unfold nth_error_Z in *. destruct (i <? 0)%Z. congruence. 
+  intros. unfold nth_error_Z in *. destruct (i <? 0)%Z. congruence.
 auto.
 Qed.
 
@@ -1257,6 +1257,12 @@ Definition emptyList {A} (l : list A) : bool :=
   | _ => false
   end.
 
-(* CH: very silly definition! *)
-Definition Z_eq (i1 i2 : Z) : bool :=
-  if Z.eq_dec i1 i2 then true else false.
+Require Import ssreflect ssrbool eqtype.
+
+Lemma Z_eqbP : Equality.axiom Z.eqb.
+Proof.
+  admit.
+Qed.
+
+Definition Z_eqMixin := EqMixin Z_eqbP.
+Canonical Z_eqType := Eval hnf in EqType _ Z_eqMixin.

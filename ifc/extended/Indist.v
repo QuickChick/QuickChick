@@ -101,7 +101,7 @@ Instance indistStackFrame : Indist StackFrame :=
       | SF p1 regs1 r1 l1, SF p2 regs2 r2 l2 =>
            pc_eq p1 p2
         && indist lab regs1 regs2
-        && Z_eq r1 r2
+        && (r1 == r2 :> Z)
         && (l1 == l2)
     end
 |}.

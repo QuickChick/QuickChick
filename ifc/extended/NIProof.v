@@ -631,7 +631,7 @@ Proof.
 Qed.
 
 Lemma pc_eqS pc pc' l1 l2 :
-  Z_eq (BinInt.Z.add pc 1) (BinInt.Z.add pc' 1) && (l1 == l2) =
+  (BinInt.Z.add pc 1 == BinInt.Z.add pc' 1) && (l1 == l2) =
   pc_eq (PAtm pc l1) (PAtm pc' l2).
 Proof.
 admit.
