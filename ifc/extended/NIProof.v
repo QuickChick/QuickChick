@@ -121,8 +121,6 @@ Qed.
 Canonical Atom_eqMixin := EqMixin eqAtomP.
 Canonical Atom_eqType := Eval hnf in EqType Atom Atom_eqMixin.
 
-Definition isLow (l obs : Label) := flows l obs.
-
 Definition is_low_pointer obs (a : Atom) : bool :=
   if a is Vptr p @ l then isLow l obs else false.
 
@@ -635,6 +633,13 @@ Proof.
   admit.
 Qed.
 
+Lemma pc_eqS pc pc' l1 l2 :
+  Z_eq (BinInt.Z.add pc 1) (BinInt.Z.add pc' 1) && label_eq l1 l2 =
+  pc_eq (PAtm pc l1) (PAtm pc' l2).
+Proof.
+admit.
+Qed.
+
 Theorem SSNI : ssni well_formed (fstep default_table) (fun obs st => isLow ∂(st_pc st) obs) (indist).
 Proof.
 constructor=> [obs s1 s2 s1' s2' wf_s1 wf_s2 low_pc indist_s1s2 /fstepP step1||].
@@ -642,31 +647,22 @@ constructor=> [obs s1 s2 s1' s2' wf_s1 wf_s2 low_pc indist_s1s2 /fstepP step1||]
   (* Lab *)
   + move=> im μ σ v K pc r r' r1 r2 j LPC rl rpcl -> /= instr get_r1 [<- <-] upd_r2 low_pc indist_s1s2.
     rewrite /fstep /= -(indist_instr indist_s1s2) //= instr /=.
-    case: s2 wf_s2 indist_s1s2 => im2 μ2 σ2 regs2 [pcv2 pcl2] wf_s2 indist_s1s2 /=.
-    have /= := (indist_registerContent r1 indist_s1s2 low_pc).
+    case: s2 wf_s2 indist_s1s2 => im2 μ2 σ2 regs2 [pcv2 pcl2] wf_s2 indist_s1s2.
+    have /= := indist_registerContent r1 indist_s1s2 low_pc.
     rewrite get_r1.
-    case: (registerContent regs2 r1) => // [[v2 l2]]; rewrite /indist /= /indist /=.
+    case: (registerContent regs2 r1) => // [[v2 l2]].
     case/andP => eq_Kl2 ?.
     have indist_v: indist obs (Vlab K @ ⊥) (Vlab l2 @ ⊥).
       by rewrite /indist /= /indist /= eq_Kl2 /label_eq flows_refl orbT.
     have /= := indist_registerUpdate r2 indist_s1s2 low_pc indist_v.
     rewrite upd_r2.
     case: (registerUpdate regs2 r2 (Vlab l2 @ ⊥)) => // ?.
-    rewrite /indist /= => indist_regs [<-].
-    rewrite /indistState /=.
-
-    (*
-rewrite /=.
-    rewrite get_r1 /=.
-
-
-
-    rewrite -(indist_registerContent indist_s1s2) //= get_r1.
-*)
-
-
-    (*
+    rewrite /indist /= => indist_r' [<-].
+    case/and4P: indist_s1s2.
+    rewrite indist_r' low_pc pc_eqS !andbT => -> -> -> /=.
+    by case/andP => /andP [-> ->].
   (* PcLab *)
+    (*
   + move=> im μ σ pc r r' r1 j LPC rl rpcl -> ? [<- <-] upd_r1 wf_st l f1 f2.
     move: wf_st => /(_ l f1 f2) /= wf_st.
     rewrite inE.
