@@ -709,7 +709,7 @@ constructor=> [obs s1 s2 s1' s2' wf_s1 wf_s2 low_pc indist_s1s2 /fstepP step1|o 
   (* MLab *)   
   + move=> im μ σ pc r r1 r2 p K C j LPC rl r' rpcl -> /= CODE mlab_p get_r1 [].
     rewrite /Vector.nth_order /= => <- <- upd_r2 low_pc indist_s1s2.
-    rewrite /fstep /= -(indist_instr indist_s1s2) //= CODE /=.
+    rewrite /fstep -(indist_instr indist_s1s2) /state_instr_lookup //= CODE /=.
     case: s2 wf_s2 indist_s1s2 => im2 μ2 σ2 regs2 [pcv2 pcl2] wf_s2 indist_s1s2.
     have /= := indist_registerContent r1 indist_s1s2 low_pc.
     rewrite get_r1.
