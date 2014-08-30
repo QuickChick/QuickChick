@@ -47,6 +47,9 @@ Fixpoint trace (n : nat) (s : A) : seq A :=
   | _, _ => [:: s]
   end.
 
+Definition rtrace (s : A) (ss : seq A) : Prop :=
+  exists n, trace n s = ss.
+
 Lemma exec_trace s' n s : exec n s = last s' (trace n s).
 Proof.
   elim: n s s' => [|n IH] s s' //=.
@@ -70,17 +73,19 @@ Proof.
   by rewrite (exec_trace s) (trace_ended _ H).
 Qed.
 
-(* CH: It's nasty to expose a quantification over n in the property;
-       there are much better ways to do this (equivalent but less proof-oriented);
-       see how we define things in the paper *)
+Definition rexec (s1 s2 : A) : Prop :=
+  exists n, exec n s1 = s2.
+
 Definition eeni : Prop :=
-  forall (o : O) (s1 s2 : A) (n : nat),
+  forall (o : O) (s1 s2 s1' s2' : A),
     start s1 ->
     start s2 ->
     indist o s1 s2 ->
-    ended (exec n s1) ->
-    ended (exec n s2) ->
-    indist o (exec n s1) (exec n s2).
+    rexec s1 s1' ->
+    rexec s2 s2' ->
+    ended s1' ->
+    ended s2' ->
+    indist o s1' s2'.
 
 Section WithO.
 Variable o : O.
@@ -235,15 +240,14 @@ Qed.
 
 End WithO.
 
-(* CH: It's nasty to expose a quantification over n in the property;
-       there are much better ways to do this (equivalent but less proof-oriented);
-       see how we define things in the paper *)
 Definition llni : Prop :=
-  forall (o : O) (s1 s2 : A) (n : nat),
+  forall (o : O) (s1 s2 : A) (t1 t2 : seq A),
     start s1 ->
     start s2 ->
     indist o s1 s2 ->
-    indisttb o (trace n s1) (trace n s2).
+    rtrace s1 t1 ->
+    rtrace s2 t2 ->
+    indisttb o t1 t2.
 
 Record ssni : Prop := {
 
@@ -275,8 +279,10 @@ Record ssni : Prop := {
 
 Lemma llni_eeni : llni -> eeni.
 Proof.
-  move => LLNI o s1 s2 n I1 I2 E12 H1 H2.
-  move: LLNI => /(_ o s1 s2 n I1 I2 E12)/indisttP LLNI {I1 I2}.
+  move => LLNI o s1 s2 s1' s2' I1 I2 E12 [n1 E1] [n2 E2] H1 H2. subst s1' s2'.
+  move: LLNI => /(_ o s1 s2 (trace n1 s1) (trace n2 s2) I1 I2 E12).
+(*
+  /indisttP LLNI {I1 I2}.
   move: {1 3}(trace n s1) {1 3}(trace n s2) (erefl (trace n s1)) (erefl (trace n s2)) LLNI
         => t1 t2 Ht1 Ht2 LLNI {E12}.
   elim: LLNI n {2 4 6}(n) s1 s2 H1 H2 Ht1 Ht2
@@ -307,12 +313,14 @@ Proof.
     case S1: (step s1) s1' Ht1 Hx1 H1 => [s1'|] s1'' [-> Ht1] {s1''} Hx1 H1; first by apply IH.
     by rewrite /ended /= (ended_low o H1) in Hx1.
   - by rewrite indistS; apply: IH.
-Qed.
+Qed. *)
+Admitted.
 
 (* CH: TODO: allow the two indistinguishability relations to vary *)
 Lemma ssni_llni : ssni -> llni.
 Proof.
-  move => SSNI o s1 s2 n I1 I2 E12.
+  move => SSNI o s1 s2 t1 t2 I1 I2 E12 [n1 RT1] [n2 RT2]. subst t1 t2.
+(*
   move: n {2 4}(n) {2}(n + n) (leqnn (n + n)) => n1 n2 n Hn.
   elim: n s1 s2 {I1 I2} E12 n1 n2 Hn => [|n IH] s1 s2 E12 n1 n2 Hn.
   - rewrite leqn0 addn_eq0 in Hn.
@@ -352,6 +360,7 @@ Proof.
           move: IH => /(_ s1' s2 E12' _ _ Hn).
           rewrite (indist_low E12) in L.
           by rewrite /indisttb /= S2 /= (negbTE L).
-Qed.
+Qed. *)
+Admitted.
 
 End Everything.
