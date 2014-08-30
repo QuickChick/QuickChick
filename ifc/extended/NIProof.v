@@ -634,6 +634,21 @@ Proof.
   - by case/andP => _ /IH.
 Qed.
 
+Lemma indist_registerContent_Some obs st1 st2 r v1 :
+  indist obs st1 st2 ->
+  isLow ∂(st_pc st1) obs ->
+  registerContent (st_regs st1) r = Some v1 ->
+  exists2 v2,
+    registerContent (st_regs st2) r = Some v2 &
+    indist obs v1 v2.
+Proof.
+  move => Hindist Hlow Hdef.
+  move: (indist_registerContent r Hindist Hlow).
+  rewrite Hdef.
+  case: (registerContent (st_regs st2) r) => [v2|] //=.
+  by eauto.
+Qed.
+
 Lemma indist_registerUpdate obs st1 st2 r v1 v2 :
   indist obs st1 st2 ->
   isLow ∂(st_pc st1) obs ->
