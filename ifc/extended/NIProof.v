@@ -270,6 +270,17 @@ Definition well_formed_labelb (st : State) (l : Label) :=
 Definition well_formedb (st : State) :=
   [forall l, well_formed_labelb st l].
 
+Lemma well_formed_labelP st obs :
+  reflect (well_formed_label st obs) (well_formed_labelb st obs).
+Proof.
+admit.
+Qed.
+
+Lemma well_formedP st : reflect (well_formed st) (well_formedb st).
+Proof.
+admit.
+Qed.
+
 Lemma stamp_alloc μ μ' sz lab stamp i li fp :
   alloc sz lab stamp (Vint i@li) μ = Some (fp, μ') ->
   Mem.stamp fp = stamp.
@@ -586,9 +597,11 @@ by apply/(flows_trans _ _ _ low_lv); rewrite flows_join low_lv' low_lf.
     by apply: wf_st; rewrite inE in_stack_f1 orbT.
 Qed.
 
+(*
 Instance indistState : Indist State | 0 :=
   fun obs st1 st2 =>
   [&& well_formedb st1, well_formedb st2 & indist obs st1 st2] .
+*)
 
 Lemma indist_instr obs st1 st2 :
   indist obs st1 st2 ->
@@ -596,7 +609,6 @@ Lemma indist_instr obs st1 st2 :
   state_instr_lookup st1 = state_instr_lookup st2.
 Proof.
   case: st1 => im1 mem1 stk1 regs1 pc1; case: st2 => im2 mem2 stk2 regs2 pc2.
-  case/and3P => _ _.
   rewrite /GenericIndist.indist /= /isLow /GenericMachine.isLow.
   (*
   case: (list_eq_dec _ _ _) => [->|] //=.
@@ -623,19 +635,25 @@ Proof.
   admit.
 Qed.
 
-Theorem SSNI : ssni (fstep default_table) (fun obs st => isLow ∂(st_pc st) obs) (indist).
+Theorem SSNI : ssni well_formed (fstep default_table) (fun obs st => isLow ∂(st_pc st) obs) (indist).
 Proof.
-constructor=> [obs s1 s2 s1' s2' low_pc indist_s1s2 step1||].
-- case/fstepP: step1 low_pc indist_s1s2.
+constructor=> [obs s1 s2 s1' s2' wf_s1 wf_s2 low_pc indist_s1s2 /fstepP step1||].
+- case: step1 low_pc indist_s1s2.
   (* Lab *)
   + move=> im μ σ v K pc r r' r1 r2 j LPC rl rpcl -> /= instr get_r1 [<- <-] upd_r2 low_pc indist_s1s2.
     rewrite /fstep /= -(indist_instr indist_s1s2) //= instr /=.
-    case: s2 indist_s1s2 => im2 μ2 σ2 regs2 [pcv2 pcl2] indist_s1s2 /=.
+    case: s2 wf_s2 indist_s1s2 => im2 μ2 σ2 regs2 [pcv2 pcl2] wf_s2 indist_s1s2 /=.
     have /= := (indist_registerContent r1 indist_s1s2 low_pc).
     rewrite get_r1.
     case: (registerContent regs2 r1) => // [[v2 l2]]; rewrite /indist /= /indist /=.
-    case/andP => ? ?.
-    have /= := @indist_registerUpdate obs _ _ r2 (Vlab K @ ⊥) (Vlab l2 @ ⊥).
+    case/andP => eq_Kl2 ?.
+    have indist_v: indist obs (Vlab K @ ⊥) (Vlab l2 @ ⊥).
+      by rewrite /indist /= /indist /= eq_Kl2 /label_eq flows_refl orbT.
+    have /= := indist_registerUpdate r2 indist_s1s2 low_pc indist_v.
+    rewrite upd_r2.
+    case: (registerUpdate regs2 r2 (Vlab l2 @ ⊥)) => // ?.
+    rewrite /indist /= => indist_regs [<-].
+    rewrite /indistState /=.
 
     (*
 rewrite /=.
