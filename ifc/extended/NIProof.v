@@ -639,7 +639,7 @@ Qed.
 
 Theorem SSNI : ssni well_formed (fstep default_table) (fun obs st => isLow ∂(st_pc st) obs) (indist).
 Proof.
-constructor=> [obs s1 s2 s1' s2' wf_s1 wf_s2 low_pc indist_s1s2 /fstepP step1||].
+constructor=> [obs s1 s2 s1' s2' wf_s1 wf_s2 low_pc indist_s1s2 /fstepP step1|o s1 s1' wf_s1 /= high_pc1 high_pc2 /fstepP step1|o s1 s2 s1' s2' wf_s1 wf_s2 /= high_pc1 indist_s1s2 low_pc1' low_pc2' /fstepP step1].
 - case: step1 low_pc indist_s1s2.
   (* Lab *)
   + move=> im μ σ v K pc r r' r1 r2 j LPC rl rpcl -> /= instr get_r1 [<- <-] upd_r2 low_pc indist_s1s2.
@@ -659,242 +659,253 @@ constructor=> [obs s1 s2 s1' s2' wf_s1 wf_s2 low_pc indist_s1s2 /fstepP step1||]
     rewrite indist_r' low_pc pc_eqS !andbT => -> -> -> /=.
     by case/andP => /andP [-> ->].
   (* PcLab *)
-    (*
-  + move=> im μ σ pc r r' r1 j LPC rl rpcl -> ? [<- <-] upd_r1 wf_st l f1 f2.
-    move: wf_st => /(_ l f1 f2) /= wf_st.
-    rewrite inE.
-    case/orP=> [|in_stack_f1].
-    move/(subsetP (root_set_registers_upd upd_r1)).
-    rewrite inE.
-    case/orP=> [in_regs_f1|].
-      by rewrite inE in_regs_f1 in wf_st; apply: wf_st.
-        by rewrite inE.
-          by rewrite inE in_stack_f1 orbT in wf_st; apply: wf_st.
-  (* MLab *)
+  + move=> im μ σ pc r r' r1 j LPC rl rpcl -> ? [<- <-] upd_r1.
+    admit.
+  (* MLab *)   
   + move=> im μ σ pc r r1 r2 p K C j LPC rl r' rpcl -> ? ? get_r1 [].
-    rewrite /Vector.nth_order /= => <- <- upd_r2 wf_st l f1 f2.
-    move: wf_st => /(_ l f1 f2) /= wf_st.
-    rewrite inE.
-    case/orP=> [|in_stack_f1].
-    move/(subsetP (root_set_registers_upd upd_r2)).
-    rewrite inE.
-    case/orP=> [in_regs_f1|].
-      by rewrite inE in_regs_f1 in wf_st; apply: wf_st.
-        by rewrite inE.
-          by rewrite inE in_stack_f1 orbT in wf_st; apply: wf_st.
+    rewrite /Vector.nth_order /= => <- <- upd_r2.
+    admit.
   (* PutLab *)
-  + move=> im μ σ pc r r' r1 j LPC rl rpcl l' -> ? [<- <-] upd_r1 wf_st l f1 f2.
-    move: wf_st => /(_ l f1 f2) /= wf_st.
-    rewrite inE.
-    case/orP=> [|in_stack_f1].
-    move/(subsetP (root_set_registers_upd upd_r1)).
-    rewrite inE.
-    case/orP=> [in_regs_f1|].
-      by rewrite inE in_regs_f1 in wf_st; apply: wf_st.
-        by rewrite inE.
-          by rewrite inE in_stack_f1 orbT in wf_st; apply: wf_st.
+  + move=> im μ σ pc r r' r1 j LPC rl rpcl l' -> ? [<- <-] upd_r1.
+    admit.
   (* Call *)
-  + move=> im μ σ pc B K r r1 r2 r3 j La addr Lpc rl rpcl -> ? get_r1 get_r2 [<- <-] wf_st l f1 f2.
+  + move=> im μ σ pc B K r r1 r2 r3 j La addr Lpc rl rpcl -> ? get_r1 get_r2 [<- <-].
     rewrite /Vector.nth_order /=.
-    move: wf_st => /(_ l f1 f2) /= wf_st.
-    rewrite root_set_registers_join !inE; case/orP.
-      by case/andP=> _ in_regs_f1; apply: wf_st; rewrite inE in_regs_f1.
-      rewrite low_join.
-      case: ifPn=> [/andP [_ low_Lpc]|_ in_stack_f1].
-        by rewrite /root_set_registers low_Lpc in wf_st *.
-          by rewrite inE in_stack_f1 orbT in wf_st; apply: wf_st.
+    admit.
   (* BRet *)
   + move=> im μ σ pc a r r' r'' r1 R pc' B j j' LPC LPC' rl rpcl -> -> ? get_r1.
     rewrite /run_tmr /apply_rule /= /Vector.nth_order /=.
-    case: ifPn=> // Hjoins [<- <-] upd_r1 wf_st l f1 f2 /=.
-    move: wf_st => /(_ l f1 f2) /=.
-    rewrite !inE => wf_st.
-    case/orP=> [|in_stack_f1].
-    rewrite /root_set_registers; case: ifP => low_LPC'; last by rewrite inE.
-    move/(subsetP (mframes_from_atoms_upd upd_r1)).
-    rewrite inE; case/orP=> [in_r'_f1|].
-      by rewrite low_LPC' inE in_r'_f1 orbT in wf_st; apply: wf_st.
-      case: a get_r1 upd_r1 => [?|[fp i]|?] get_r1 upd_r1; rewrite /mframes_from_atoms /= !inE //.
-      case: ifP=> // low_B.
-      rewrite /= inE => /eqP eq_f1.
-      move: wf_st.
-      rewrite eq_f1 (root_set_registers_nth get_r1); first exact.
-      exact/(join_2_rev R)/(flows_trans _ _ _ Hjoins)/join_minimal.
-      exact/(join_1_rev R LPC)/(flows_trans _ _ _ Hjoins)/join_minimal.
-        by case: (isLow LPC' l) wf_st; rewrite ?inE in_stack_f1 !orbT; apply.
+    case: ifPn=> // Hjoins [<- <-] upd_r1.
+    admit.
   (* Alloc *)
   + move=> im μ μ' σ pc r r' r1 r2 r3 i K Ll K' rl rpcl j LPC dfp -> ? get_r1 get_r2 [<- <-] alloc_i.
     move: (alloc_i); rewrite /alloc.
     case: (zreplicate i (Vint 0 @ ⊥)) => // ? [malloc].
-    rewrite /Vector.nth_order /= => upd_r3 wf_st l f1 f2.
-    move: wf_st => /(_ l f1 f2) /=.
-    rewrite (reachable_alloc_int alloc_i) !inE => wf_st.
-    case/orP=> [|in_stack_f1].
-    rewrite /root_set_registers.
-    case: ifP => low_LPC; last by rewrite inE.
-    move/(subsetP (mframes_from_atoms_upd upd_r3)).
-    rewrite inE.
-    case/orP=> [in_r_f1|].
-      by move: wf_st; rewrite /root_set_registers low_LPC in_r_f1; apply.
-      rewrite /mframes_from_atoms /=.
-      case low_KK': (isLow (K \_/ K') l); last by rewrite inE.
-      rewrite /= !inE => /eqP ->.
-      case/connectP=> [[_ ->|]] /=.
-        by rewrite (stamp_alloc alloc_i) /= joinA low_join low_KK' low_LPC.
-        move=> a s.
-          by rewrite /references /= (Mem.alloc_get_fresh _ _ _ _ _ _ _ _ _ malloc).
-            by move: wf_st; rewrite in_stack_f1 orbT; apply.
+    rewrite /Vector.nth_order /= => upd_r3.
+    admit.
   (* Load *)
   + move=> im μ σ pc C [pv pl] K r r' r1 r2 j LPC v Ll rl rpcl -> ? get_r1 load_p mlab_p [<- <-].
-    rewrite /Vector.nth_order /= => upd_r2 wf_st l f1 f2 /=.
-    rewrite inE; case/orP=> [|in_stack_f1].
-    rewrite /root_set_registers.
-    case: ifP; last by rewrite inE.
-    rewrite !low_join; case/and3P=> low_LPC low_K low_C.
-    move/(subsetP (mframes_from_atoms_upd upd_r2)).
-    rewrite inE; case/orP=> [in_r_f1|].
-      by apply: wf_st; rewrite inE /root_set_registers low_LPC in_r_f1.
-      rewrite inE /=; case: v load_p upd_r2 => // [[fp ?]] load_p upd_r2.
-      case low_Ll: (isLow Ll l) => //=.
-      rewrite !inE.
-      move/eqP=> -> reach_f2.
-      apply: (wf_st l pv f2); first by rewrite inE (root_set_registers_nth get_r1).
-      apply/(connect_trans _ reach_f2)/connect1; move: load_p mlab_p.
-      rewrite /references /=; case: (Mem.get_frame μ pv) => // [[_ ? fr]] get_pl [->].
-      apply/andP; split=> //.
-      exact: (mframes_from_atoms_nth get_pl).
-        by apply: wf_st; rewrite inE in_stack_f1 orbT.
+    rewrite /Vector.nth_order /= => upd_r2.
+    admit.
   (* Store *)
   + move=> im μ σ pc v [fp i] μ' r r1 r2 j LPC rpcl rl lp lf lv -> ? get_r1 get_r2 /= lab_p.
     rewrite /run_tmr /= /apply_rule /= /Vector.nth_order /=.
     case: ifP => //; rewrite flows_join; case/andP => low_lp_lf low_LPC_lf [<- <-].
     case get_fp: (Mem.get_frame μ fp) lab_p => // [[stamp ? fr]] [eq_lf].
     rewrite eq_lf in get_fp *.
-    case upd_i: (update_list_Z fr i (v @ lv)) => [fr'|] // upd_fp wf_st l f1 f2.
-    rewrite inE /= => H.
-    case/(reachable_upd upd_fp) => [|[low_lf [reach_fp [f3 []]]]].
-      by apply: wf_st; rewrite inE.
-      move/(subsetP (mframes_from_atoms_upd upd_i)); rewrite inE.
-      case/orP=> [in_fr_f3 reach_f2|].
-      apply: (wf_st l f1 f2) => /=; first by rewrite inE.
-      apply/(connect_trans reach_fp)/(connect_trans _ reach_f2)/connect1.
-        by rewrite /references get_fp low_lf.
-        case: v get_r2 upd_i => [|[pv pi] get_r2 upd_i|]; rewrite /mframes_from_atoms /= ?inE //.
-        case: ifP => // low_lv; rewrite inE => /eqP ->; apply: wf_st.
-        rewrite inE /= /root_set_registers (root_set_registers_nth get_r2) //.
-        exact/(flows_trans _ _ _ low_LPC_lf).
+    case upd_i: (update_list_Z fr i (v @ lv)) => [fr'|] // upd_fp.
+    admit.
   (* Write *)
   + move=> im μ σ pc v [fp i] μ' r r1 r2 j LPC rpcl rl v' lp lv lv' lf -> ? get_r1 get_r2 /= load_fp lab_fp.
     rewrite /run_tmr /= /apply_rule /= /Vector.nth_order /=.
     case: ifP => //; rewrite !flows_join=> /andP [/andP [low_LPC low_lp] low_lv] [<- <-].
     case get_fp: (Mem.get_frame μ fp) lab_fp => // [[stamp ? fr]] [eq_lf].
     rewrite eq_lf in get_fp *.
-    case upd_i: (update_list_Z fr i (v @ lv')) => [fr'|] // upd_fp wf_st l f1 f2.
-    rewrite inE /= => H.
-    case/(reachable_upd upd_fp) => [|[low_lf [reach_fp [f3 []]]]].
-      by apply: wf_st; rewrite inE.
-      move/(subsetP (mframes_from_atoms_upd upd_i)); rewrite inE.
-      case/orP=> [in_fr_f3 reach_f2|].
-      apply: (wf_st l f1 f2) => /=; first by rewrite inE.
-      apply/(connect_trans reach_fp)/(connect_trans _ reach_f2)/connect1.
-        by rewrite /references get_fp low_lf.
-        case: v get_r2 upd_i => [|[pv pi] get_r2 upd_i|]; rewrite /mframes_from_atoms /= ?inE //.
-        case: ifP => // low_lv'; rewrite inE => /eqP ->; apply: wf_st.
-        rewrite /isLow in low_lv' low_lf.
-        rewrite inE /= /root_set_registers (root_set_registers_nth get_r2) //.
-          by apply/(flows_trans _ _ _ low_LPC); rewrite flows_join low_lv' low_lf.
-            by apply/(flows_trans _ _ _ low_lv); rewrite flows_join low_lv' low_lf.
-  (* Jump *)
-  + move=> im μ σ pc addr Ll r r1 j LPC rpcl -> ? get_r1 [<-] wf_st l f1 f2.
-    rewrite /Vector.nth_order /= root_set_registers_join !inE.
-    case/orP=> [/andP [in_regs_f1 _]|in_stack_f1]; apply: wf_st; rewrite inE.
-      by rewrite in_regs_f1.
-        by rewrite in_stack_f1 orbT.
-  (* BNZ *)
-  + move=> im μ σ pc n m K r r1 j LPC rpcl -> ? get_r1 [<-] _ wf_st l f1 f2.
-    rewrite /Vector.nth_order /= root_set_registers_join !inE.
-    case/orP=> [/andP [_ in_regs_f1]|in_stack_f1]; apply: wf_st; rewrite inE.
-      by rewrite in_regs_f1.
-        by rewrite in_stack_f1 orbT.
-  (* BNZ *)
-  + move=> im μ σ pc n m K r r1 j LPC rpcl -> ? get_r1 [<-] _ wf_st l f1 f2.
-    rewrite /Vector.nth_order /= root_set_registers_join !inE.
-    case/orP=> [/andP [_ in_regs_f1]|in_stack_f1]; apply: wf_st; rewrite inE.
-      by rewrite in_regs_f1.
-        by rewrite in_stack_f1 orbT.
+    case upd_i: (update_list_Z fr i (v @ lv')) => [fr'|] // upd_fp.
+    admit.
+(* Jump *)
++ move=> im μ σ pc addr Ll r r1 j LPC rpcl -> ? get_r1 [<-].
+  admit.
+(* BNZ *)
++ move=> im μ σ pc n m K r r1 j LPC rpcl -> ? get_r1 [<-] ?.
+  admit.
+(* BNZ *)
+  + move=> im μ σ pc n m K r r1 j LPC rpcl -> ? get_r1 [<-] ?.
+    admit.
   (* PSetOff *)
   + move=> im μ σ pc fp' j K1 n K2 r r' r1 r2 r3 j' LPC rl rpcl -> ? get_r1 get_r2 [<- <-].
-    rewrite /Vector.nth_order /= => upd_r3 wf_st l f1 f2.
-    rewrite inE; case/orP=> [|in_stack_f1] /=.
-    rewrite /root_set_registers; case: ifP => // low_LPC; last by rewrite inE.
-    move/(subsetP (mframes_from_atoms_upd upd_r3)).
-    rewrite inE; case/orP=> [in_regs_f1|] /=.
-      by apply: wf_st; rewrite inE /root_set_registers low_LPC in_regs_f1.
-      rewrite inE /= low_join.
-      case: ifP => //= /andP [? ?].
-      rewrite inE => /eqP ->.
-      apply: wf_st.
-      rewrite inE.
-      rewrite (root_set_registers_nth get_r1) //.
-        by apply: wf_st; rewrite inE in_stack_f1 orbT.
+    rewrite /Vector.nth_order /= => upd_r3.
+    admit.
   (* Put *)
-  + move=> im μ σ pc x r r' r1 j LPC rl rpcl -> ? [<- <-] upd_r1 wf_st l f1 f2.
-    rewrite inE; case/orP=> [|in_stack_f1] /=.
-    move/(subsetP (root_set_registers_upd upd_r1)).
-    rewrite inE; case/orP=> [in_regs_f1|].
-      by apply: wf_st; rewrite inE in_regs_f1.
-        by rewrite !inE.
-          by apply: wf_st; rewrite inE in_stack_f1 orbT.
+  + move=> im μ σ pc x r r' r1 j LPC rl rpcl -> ? [<- <-] upd_r1.
+    admit.
   (* BinOp *)
   + move=> im μ σ pc o v1 L1 v2 L2 v r r1 r2 r3 r' j LPC rl rpcl -> _ get_r1 get_r2 [<- <-] eval.
-    rewrite /Vector.nth_order /= => upd_r3 wf_st l f1 f2.
-    rewrite inE; case/orP=> [|in_stack_f1].
-    move/(subsetP (root_set_registers_upd upd_r3)).
-    rewrite inE; case/orP=> [in_regs_f1|] /=.
-      by apply: wf_st; rewrite inE in_regs_f1.
-        by case: o eval; case: v1 get_r1 => ? ; case: v2 get_r2 => ? //= _ _ [<-]; rewrite !inE.
-          by apply: wf_st; rewrite inE in_stack_f1 orbT.
+    rewrite /Vector.nth_order /= => upd_r3.
+    admit.
   (* Nop *)
-  + move=> im μ σ pc r j LPC rpcl -> _ [<-] wf_st l f1 f2.
-    exact: wf_st.
+  + move=> im μ σ pc r j LPC rpcl -> _ [<-].
+    admit.
   (* MSize *)
   + move=> im μ σ pc p K C r r' r1 r2 j LPC rl rpcl n -> _ get_r1 lab_p [<- <-] size_p.
-    rewrite /Vector.nth_order /= => upd_r2 wf_st l f1 f2.
-    rewrite inE; case/orP=> [|in_stack_f1].
-    rewrite root_set_registers_join inE; case/andP=> in_regs_f1 _.
-    move/(subsetP (root_set_registers_upd upd_r2)): in_regs_f1.
-    rewrite inE; case/orP=> [in_regs_f1|] /=.
-      by apply: wf_st; rewrite inE in_regs_f1.
-        by rewrite inE.
-          by apply: wf_st; rewrite inE in_stack_f1 orbT.
+    rewrite /Vector.nth_order /= => upd_r2.
+    admit.
   (* PGetOff *)
   + move=> im μ σ pc fp' j K r r' r1 r2 j' LPC rl rpcl -> _ get_r1 [<- <-].
-    rewrite /Vector.nth_order /= => upd_r2 wf_st l f1 f2.
-    rewrite inE; case/orP=> [|in_stack_f1].
-    move/(subsetP (root_set_registers_upd upd_r2)).
-    rewrite inE; case/orP=> [in_regs_f1|] /=.
-      by apply: wf_st; rewrite inE in_regs_f1.
-        by rewrite inE.
-          by apply: wf_st; rewrite inE in_stack_f1 orbT.
-
+    rewrite /Vector.nth_order /= => upd_r2.
+    admit.
   (* Mov *)
   + move=> im μ σ v K pc r r' r1 r2 j LPC rl rpcl -> _ get_r1 [<- <-].
-    rewrite /Vector.nth_order /= => upd_r2 wf_st l f1 f2.
-    rewrite inE; case/orP=> [|in_stack_f1].
-    rewrite /root_set_registers; case: ifP => low_LPC; last by rewrite inE.
-    move/(subsetP (mframes_from_atoms_upd upd_r2)).
-    rewrite inE; case/orP=> [in_regs_f1|] /=.
-      by apply: wf_st; rewrite inE /root_set_registers low_LPC in_regs_f1.
-      case: v get_r1 upd_r2 => [|[? ?]|] get_r1 upd_r2; try by rewrite inE.
-      rewrite inE /=; case: ifP => // low_K /=; rewrite inE=> /eqP ->.
-      apply: wf_st; rewrite inE /root_set_registers low_LPC.
-        by rewrite (mframes_from_atoms_nth get_r1).
-          by apply: wf_st; rewrite inE in_stack_f1 orbT.
-
-*)
-Abort.
-
-
-
+    rewrite /Vector.nth_order /= => upd_r2.
+    admit.
+- case: step1 high_pc1.
+  (* Lab *)
+  + move=> im μ σ v K pc r r' r1 r2 j LPC rl rpcl -> /= instr get_r1 [<- <-] upd_r2 high_pc1.
+    admit.
+  (* PcLab *)
+  + move=> im μ σ pc r r' r1 j LPC rl rpcl -> ? [<- <-] upd_r1.
+    admit.
+  (* MLab *)   
+  + move=> im μ σ pc r r1 r2 p K C j LPC rl r' rpcl -> ? ? get_r1 [].
+    rewrite /Vector.nth_order /= => <- <- upd_r2.
+    admit.
+  (* PutLab *)
+  + move=> im μ σ pc r r' r1 j LPC rl rpcl l' -> ? [<- <-] upd_r1.
+    admit.
+  (* Call *)
+  + move=> im μ σ pc B K r r1 r2 r3 j La addr Lpc rl rpcl -> ? get_r1 get_r2 [<- <-].
+    rewrite /Vector.nth_order /=.
+    admit.
+  (* BRet *)
+  + move=> im μ σ pc a r r' r'' r1 R pc' B j j' LPC LPC' rl rpcl -> -> ? get_r1.
+    rewrite /run_tmr /apply_rule /= /Vector.nth_order /=.
+    case: ifPn=> // Hjoins [<- <-] upd_r1.
+    admit.
+  (* Alloc *)
+  + move=> im μ μ' σ pc r r' r1 r2 r3 i K Ll K' rl rpcl j LPC dfp -> ? get_r1 get_r2 [<- <-] alloc_i.
+    move: (alloc_i); rewrite /alloc.
+    case: (zreplicate i (Vint 0 @ ⊥)) => // ? [malloc].
+    rewrite /Vector.nth_order /= => upd_r3.
+    admit.
+  (* Load *)
+  + move=> im μ σ pc C [pv pl] K r r' r1 r2 j LPC v Ll rl rpcl -> ? get_r1 load_p mlab_p [<- <-].
+    rewrite /Vector.nth_order /= => upd_r2.
+    admit.
+  (* Store *)
+  + move=> im μ σ pc v [fp i] μ' r r1 r2 j LPC rpcl rl lp lf lv -> ? get_r1 get_r2 /= lab_p.
+    rewrite /run_tmr /= /apply_rule /= /Vector.nth_order /=.
+    case: ifP => //; rewrite flows_join; case/andP => low_lp_lf low_LPC_lf [<- <-].
+    case get_fp: (Mem.get_frame μ fp) lab_p => // [[stamp ? fr]] [eq_lf].
+    rewrite eq_lf in get_fp *.
+    case upd_i: (update_list_Z fr i (v @ lv)) => [fr'|] // upd_fp.
+    admit.
+  (* Write *)
+  + move=> im μ σ pc v [fp i] μ' r r1 r2 j LPC rpcl rl v' lp lv lv' lf -> ? get_r1 get_r2 /= load_fp lab_fp.
+    rewrite /run_tmr /= /apply_rule /= /Vector.nth_order /=.
+    case: ifP => //; rewrite !flows_join=> /andP [/andP [low_LPC low_lp] low_lv] [<- <-].
+    case get_fp: (Mem.get_frame μ fp) lab_fp => // [[stamp ? fr]] [eq_lf].
+    rewrite eq_lf in get_fp *.
+    case upd_i: (update_list_Z fr i (v @ lv')) => [fr'|] // upd_fp.
+    admit.
+(* Jump *)
++ move=> im μ σ pc addr Ll r r1 j LPC rpcl -> ? get_r1 [<-].
+  admit.
+(* BNZ *)
++ move=> im μ σ pc n m K r r1 j LPC rpcl -> ? get_r1 [<-] ?.
+  admit.
+(* BNZ *)
+  + move=> im μ σ pc n m K r r1 j LPC rpcl -> ? get_r1 [<-] ?.
+    admit.
+  (* PSetOff *)
+  + move=> im μ σ pc fp' j K1 n K2 r r' r1 r2 r3 j' LPC rl rpcl -> ? get_r1 get_r2 [<- <-].
+    rewrite /Vector.nth_order /= => upd_r3.
+    admit.
+  (* Put *)
+  + move=> im μ σ pc x r r' r1 j LPC rl rpcl -> ? [<- <-] upd_r1.
+    admit.
+  (* BinOp *)
+  + move=> im μ σ pc op v1 L1 v2 L2 v r r1 r2 r3 r' j LPC rl rpcl -> _ get_r1 get_r2 [<- <-] eval.
+    rewrite /Vector.nth_order /= => upd_r3.
+    admit.
+  (* Nop *)
+  + move=> im μ σ pc r j LPC rpcl -> _ [<-].
+    admit.
+  (* MSize *)
+  + move=> im μ σ pc p K C r r' r1 r2 j LPC rl rpcl n -> _ get_r1 lab_p [<- <-] size_p.
+    rewrite /Vector.nth_order /= => upd_r2.
+    admit.
+  (* PGetOff *)
+  + move=> im μ σ pc fp' j K r r' r1 r2 j' LPC rl rpcl -> _ get_r1 [<- <-].
+    rewrite /Vector.nth_order /= => upd_r2.
+    admit.
+  (* Mov *)
+  + move=> im μ σ v K pc r r' r1 r2 j LPC rl rpcl -> _ get_r1 [<- <-].
+    rewrite /Vector.nth_order /= => upd_r2.
+    admit.
+- case: step1 high_pc1 low_pc1' indist_s1s2.
+  (* Lab *)
+  + move=> im μ σ v K pc r r' r1 r2 j LPC rl rpcl -> /= instr get_r1 [<- <-] upd_r2 high_pc1.
+    admit.
+  (* PcLab *)
+  + move=> im μ σ pc r r' r1 j LPC rl rpcl -> ? [<- <-] upd_r1.
+    admit.
+  (* MLab *)   
+  + move=> im μ σ pc r r1 r2 p K C j LPC rl r' rpcl -> ? ? get_r1 [].
+    rewrite /Vector.nth_order /= => <- <- upd_r2.
+    admit.
+  (* PutLab *)
+  + move=> im μ σ pc r r' r1 j LPC rl rpcl l' -> ? [<- <-] upd_r1.
+    admit.
+  (* Call *)
+  + move=> im μ σ pc B K r r1 r2 r3 j La addr Lpc rl rpcl -> ? get_r1 get_r2 [<- <-].
+    rewrite /Vector.nth_order /=.
+    admit.
+  (* BRet *)
+  + move=> im μ σ pc a r r' r'' r1 R pc' B j j' LPC LPC' rl rpcl -> -> ? get_r1.
+    rewrite /run_tmr /apply_rule /= /Vector.nth_order /=.
+    case: ifPn=> // Hjoins [<- <-] upd_r1.
+    admit.
+  (* Alloc *)
+  + move=> im μ μ' σ pc r r' r1 r2 r3 i K Ll K' rl rpcl j LPC dfp -> ? get_r1 get_r2 [<- <-] alloc_i.
+    move: (alloc_i); rewrite /alloc.
+    case: (zreplicate i (Vint 0 @ ⊥)) => // ? [malloc].
+    rewrite /Vector.nth_order /= => upd_r3.
+    admit.
+  (* Load *)
+  + move=> im μ σ pc C [pv pl] K r r' r1 r2 j LPC v Ll rl rpcl -> ? get_r1 load_p mlab_p [<- <-].
+    rewrite /Vector.nth_order /= => upd_r2.
+    admit.
+  (* Store *)
+  + move=> im μ σ pc v [fp i] μ' r r1 r2 j LPC rpcl rl lp lf lv -> ? get_r1 get_r2 /= lab_p.
+    rewrite /run_tmr /= /apply_rule /= /Vector.nth_order /=.
+    case: ifP => //; rewrite flows_join; case/andP => low_lp_lf low_LPC_lf [<- <-].
+    case get_fp: (Mem.get_frame μ fp) lab_p => // [[stamp ? fr]] [eq_lf].
+    rewrite eq_lf in get_fp *.
+    case upd_i: (update_list_Z fr i (v @ lv)) => [fr'|] // upd_fp.
+    admit.
+  (* Write *)
+  + move=> im μ σ pc v [fp i] μ' r r1 r2 j LPC rpcl rl v' lp lv lv' lf -> ? get_r1 get_r2 /= load_fp lab_fp.
+    rewrite /run_tmr /= /apply_rule /= /Vector.nth_order /=.
+    case: ifP => //; rewrite !flows_join=> /andP [/andP [low_LPC low_lp] low_lv] [<- <-].
+    case get_fp: (Mem.get_frame μ fp) lab_fp => // [[stamp ? fr]] [eq_lf].
+    rewrite eq_lf in get_fp *.
+    case upd_i: (update_list_Z fr i (v @ lv')) => [fr'|] // upd_fp.
+    admit.
+(* Jump *)
++ move=> im μ σ pc addr Ll r r1 j LPC rpcl -> ? get_r1 [<-].
+  admit.
+(* BNZ *)
++ move=> im μ σ pc n m K r r1 j LPC rpcl -> ? get_r1 [<-] ?.
+  admit.
+(* BNZ *)
+  + move=> im μ σ pc n m K r r1 j LPC rpcl -> ? get_r1 [<-] ?.
+    admit.
+  (* PSetOff *)
+  + move=> im μ σ pc fp' j K1 n K2 r r' r1 r2 r3 j' LPC rl rpcl -> ? get_r1 get_r2 [<- <-].
+    rewrite /Vector.nth_order /= => upd_r3.
+    admit.
+  (* Put *)
+  + move=> im μ σ pc x r r' r1 j LPC rl rpcl -> ? [<- <-] upd_r1.
+    admit.
+  (* BinOp *)
+  + move=> im μ σ pc op v1 L1 v2 L2 v r r1 r2 r3 r' j LPC rl rpcl -> _ get_r1 get_r2 [<- <-] eval.
+    rewrite /Vector.nth_order /= => upd_r3.
+    admit.
+  (* Nop *)
+  + move=> im μ σ pc r j LPC rpcl -> _ [<-].
+    admit.
+  (* MSize *)
+  + move=> im μ σ pc p K C r r' r1 r2 j LPC rl rpcl n -> _ get_r1 lab_p [<- <-] size_p.
+    rewrite /Vector.nth_order /= => upd_r2.
+    admit.
+  (* PGetOff *)
+  + move=> im μ σ pc fp' j K r r' r1 r2 j' LPC rl rpcl -> _ get_r1 [<- <-].
+    rewrite /Vector.nth_order /= => upd_r2.
+    admit.
+  (* Mov *)
+  + move=> im μ σ v K pc r r' r1 r2 j LPC rl rpcl -> _ get_r1 [<- <-].
+    rewrite /Vector.nth_order /= => upd_r2.
+    admit.
+Qed.
 
 End NIProof.
