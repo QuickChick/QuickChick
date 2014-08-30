@@ -294,6 +294,7 @@ Proof.
   - by rewrite equivS; apply: IH.
 Qed.
 
+(* CH: TODO: allow the two equivalences to vary *)
 Lemma ssni_llni : ssni -> llni.
 Proof.
   move => SSNI s1 s2 n I1 I2 E12.
