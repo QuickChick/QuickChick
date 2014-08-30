@@ -663,6 +663,13 @@ Proof.
 admit.
 Qed.
 
+Lemma indist_mlab obs st1 st2 fp :
+  indist obs st1 st2 ->
+  mlab (st_mem st1) fp = mlab (st_mem st2) fp.
+Proof.
+admit.
+Qed.
+
 Theorem SSNI : ssni well_formed (fstep default_table) (fun obs st => isLow ∂(st_pc st) obs) (indist).
 Proof.
 constructor=> [obs s1 s2 s1' s2' wf_s1 wf_s2 low_pc indist_s1s2 /fstepP step1|o s1 s1' wf_s1 /= high_pc1 high_pc2 /fstepP step1|o s1 s2 s1' s2' wf_s1 wf_s2 /= high_pc1 indist_s1s2 low_pc1' low_pc2' /fstepP step1].
@@ -700,9 +707,31 @@ constructor=> [obs s1 s2 s1' s2' wf_s1 wf_s2 low_pc indist_s1s2 /fstepP step1|o 
     rewrite indist_r' low_pc pc_eqS !andbT => -> -> -> /=.
     by case/andP => ->.
   (* MLab *)   
-  + move=> im μ σ pc r r1 r2 p K C j LPC rl r' rpcl -> ? ? get_r1 [].
-    rewrite /Vector.nth_order /= => <- <- upd_r2.
-    admit.
+  + move=> im μ σ pc r r1 r2 p K C j LPC rl r' rpcl -> /= CODE mlab_p get_r1 [].
+    rewrite /Vector.nth_order /= => <- <- upd_r2 low_pc indist_s1s2.
+    rewrite /fstep /= -(indist_instr indist_s1s2) //= CODE /=.
+    case: s2 wf_s2 indist_s1s2 => im2 μ2 σ2 regs2 [pcv2 pcl2] wf_s2 indist_s1s2.
+    have /= := indist_registerContent r1 indist_s1s2 low_pc.
+    rewrite get_r1.
+    case: (registerContent regs2 r1) => // [[v2 l2]].
+    case: v2 => // p2.
+    case/andP => /eqP <-.
+    rewrite /Vector.nth_order /= => indist_ptr.
+    have /= := indist_mlab p2 indist_s1s2.
+    case: (mlab μ2 p2) => //= lm2 mlab_p2.
+    have indist_v: indist obs (Vlab C @ K) (Vlab lm2 @ K).
+      rewrite /indist /= eqxx /=.
+      case/orP: indist_ptr => [->|] // ?.
+      have eq_p: p = p2 by admit.
+      move: mlab_p2; rewrite -eq_p mlab_p => [[->]].
+      by rewrite /indist /= eqxx orbT.
+    have /= := indist_registerUpdate r2 indist_s1s2 low_pc indist_v.
+    rewrite upd_r2.
+    case: (registerUpdate regs2 r2 (Vlab lm2 @ K)) => //= ?.
+    rewrite /indist /= => indist_r' [<-].
+    case/and4P: indist_s1s2.
+    rewrite indist_r' low_pc pc_eqS !andbT => -> -> -> /=.
+    by case/andP.
   (* PutLab *)
   + move=> im μ σ pc r r' r1 j LPC rl rpcl l' -> ? [<- <-] upd_r1.
     admit.
