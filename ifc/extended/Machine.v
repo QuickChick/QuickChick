@@ -670,7 +670,7 @@ Inductive step (t : table) : State -> State -> Prop :=
 (** * Executable semantics *)
 
 Definition state_instr_lookup (st:State) : option (@Instr Label) :=
-  let (im,_,_,_,pc) := st in im[pc].
+  (st_imem st)[st_pc st].
 
 Definition fstep t (st:State) : option State :=
   do instr <- state_instr_lookup st;
