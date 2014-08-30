@@ -706,7 +706,7 @@ constructor=> [obs s1 s2 s1' s2' wf_s1 wf_s2 low_pc indist_s1s2 /fstepP step1|o 
     case/and4P: indist_s1s2.
     rewrite indist_r' low_pc pc_eqS !andbT => -> -> -> /=.
     by case/andP => ->.
-  (* MLab *)   
+  (* MLab *)
   + move=> im μ σ pc r r1 r2 p K C j LPC rl r' rpcl -> /= CODE mlab_p get_r1 [].
     rewrite /Vector.nth_order /= => <- <- upd_r2 low_pc indist_s1s2.
     rewrite /fstep -(indist_instr indist_s1s2) /state_instr_lookup //= CODE /=.
@@ -812,7 +812,7 @@ constructor=> [obs s1 s2 s1' s2' wf_s1 wf_s2 low_pc indist_s1s2 /fstepP step1|o 
   (* PcLab *)
   + move=> im μ σ pc r r' r1 j LPC rl rpcl -> ? [<- <-] upd_r1.
     admit.
-  (* MLab *)   
+  (* MLab *)
   + move=> im μ σ pc r r1 r2 p K C j LPC rl r' rpcl -> ? ? get_r1 [].
     rewrite /Vector.nth_order /= => <- <- upd_r2.
     admit.
@@ -896,7 +896,7 @@ constructor=> [obs s1 s2 s1' s2' wf_s1 wf_s2 low_pc indist_s1s2 /fstepP step1|o 
   (* PcLab *)
   + move=> im μ σ pc r r' r1 j LPC rl rpcl -> ? [<- <-] upd_r1.
     admit.
-  (* MLab *)   
+  (* MLab *)
   + move=> im μ σ pc r r1 r2 p K C j LPC rl r' rpcl -> ? ? get_r1 [].
     rewrite /Vector.nth_order /= => <- <- upd_r2.
     admit.
