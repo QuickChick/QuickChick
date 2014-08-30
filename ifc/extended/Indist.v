@@ -1,6 +1,7 @@
 Require Import ZArith.
 Require Import List.
 Require Import EquivDec.
+Require Import Instructions.
 
 Require Import ssreflect ssrfun ssrbool eqtype ssrnat seq choice fintype finset.
 
@@ -122,8 +123,7 @@ Instance indistStack : Indist Stack :=
 
 Instance indistImems : Indist imem :=
 {|
-  indist _lab imem1 imem2 :=
-    if list_eq_dec instr_eq_dec imem1 imem2 then true else false
+  indist _lab imem1 imem2 := imem1 == imem2 :> seq (@Instr Label)
 |}.
 
 Instance indistState : Indist State :=
