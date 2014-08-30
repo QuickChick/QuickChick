@@ -93,16 +93,16 @@ Variable o : O.
 Inductive indistt : seq A -> seq A -> Prop :=
 | IndisttNil : forall t, indistt [::] t
 | IndisttConsLow : forall x1 x2 t1 t2,
-                    indist o x1 x2 -> indistt t1 t2 ->
-                    low o x1 -> low o x2 ->
-                    indistt (x1 :: t1) (x2 :: t2)
+                     indist o x1 x2 -> indistt t1 t2 ->
+                     low o x1 -> low o x2 ->
+                     indistt (x1 :: t1) (x2 :: t2)
 | IndisttConsHigh : forall x1 t1 t2,
-                     indistt t1 t2 ->
-                     high o x1 ->
-                     indistt (x1 :: t1) t2
+                      indistt t1 t2 ->
+                      high o x1 ->
+                      indistt (x1 :: t1) t2
 | IndisttSym : forall t1 t2,
-                indistt t1 t2 ->
-                indistt t2 t1.
+                 indistt t1 t2 ->
+                 indistt t2 t1.
 
 Definition indisttb (t1 t2 : seq A) : bool :=
   all id (map (prod_curry (indist o))
@@ -279,13 +279,12 @@ Record ssni : Prop := {
 
 Lemma llni_eeni : llni -> eeni.
 Proof.
-  move => LLNI o s1 s2 s1' s2' I1 I2 E12 [n1 E1] [n2 E2] H1 H2. subst s1' s2'.
-  move: LLNI => /(_ o s1 s2 (trace n1 s1) (trace n2 s2) I1 I2 E12).
-(*
-  /indisttP LLNI {I1 I2}.
-  move: {1 3}(trace n s1) {1 3}(trace n s2) (erefl (trace n s1)) (erefl (trace n s2)) LLNI
+  move => LLNI o s1 s2 s1' s2' I1 I2 E12 [n1 <-] [n2 <-] {s1' s2'} H1 H2.
+  move: LLNI => /(_ o s1 s2 (trace n1 s1) (trace n2 s2) I1 I2 E12
+                    (ex_intro _ n1 erefl) (ex_intro _ n2 erefl)) /indisttP LLNI {I1 I2}.
+  move: {1 3}(trace n1 s1) {1 3}(trace n2 s2) (erefl (trace n1 s1)) (erefl (trace n2 s2)) LLNI
         => t1 t2 Ht1 Ht2 LLNI {E12}.
-  elim: LLNI n {2 4 6}(n) s1 s2 H1 H2 Ht1 Ht2
+  elim: LLNI n1 n2 s1 s2 H1 H2 Ht1 Ht2
         => [t|s1' s2' t1' t2' Ex Et IH Hx1 Hx2|s1' t1' t2' Et IH Hx1|t1' t2' Et IH] n1 n2 s1 s2 H1 H2 Ht1 Ht2.
   - case: n1 H1 Ht1 => [|n1] //= H1 Ht1.
     by case: (step s1) H1 Ht1 => [s1'|].
@@ -313,15 +312,13 @@ Proof.
     case S1: (step s1) s1' Ht1 Hx1 H1 => [s1'|] s1'' [-> Ht1] {s1''} Hx1 H1; first by apply IH.
     by rewrite /ended /= (ended_low o H1) in Hx1.
   - by rewrite indistS; apply: IH.
-Qed. *)
-Admitted.
+Qed.
 
 (* CH: TODO: allow the two indistinguishability relations to vary *)
 Lemma ssni_llni : ssni -> llni.
 Proof.
-  move => SSNI o s1 s2 t1 t2 I1 I2 E12 [n1 RT1] [n2 RT2]. subst t1 t2.
-(*
-  move: n {2 4}(n) {2}(n + n) (leqnn (n + n)) => n1 n2 n Hn.
+  move => SSNI o s1 s2 t1 t2 I1 I2 E12 [n1 <-] [n2 <-] {t1 t2}.
+  move: {2}(n1 + n2) (leqnn (n1 + n2)) => n Hn.
   elim: n s1 s2 {I1 I2} E12 n1 n2 Hn => [|n IH] s1 s2 E12 n1 n2 Hn.
   - rewrite leqn0 addn_eq0 in Hn.
     move: Hn => /andP [/eqP -> /eqP ->] /=.
@@ -360,7 +357,6 @@ Proof.
           move: IH => /(_ s1' s2 E12' _ _ Hn).
           rewrite (indist_low E12) in L.
           by rewrite /indisttb /= S2 /= (negbTE L).
-Qed. *)
-Admitted.
+Qed.
 
 End Everything.
