@@ -638,8 +638,8 @@ admit.
 Qed.
 
 Lemma pc_eqS pc pc' l1 l2 :
-  (BinInt.Z.add pc 1 == BinInt.Z.add pc' 1) && (l1 == l2) =
-  pc_eq (PAtm pc l1) (PAtm pc' l2).
+  (PAtm (BinInt.Z.add pc 1) l1 == PAtm (BinInt.Z.add pc' 1) l2) =
+  (PAtm pc l1 == PAtm pc' l2).
 Proof.
 admit.
 Qed.
@@ -664,7 +664,7 @@ constructor=> [obs s1 s2 s1' s2' wf_s1 wf_s2 low_pc indist_s1s2 /fstepP step1|o 
     rewrite /indist /= => indist_r' [<-].
     case/and4P: indist_s1s2.
     rewrite indist_r' low_pc pc_eqS !andbT => -> -> -> /=.
-    by case/andP => /andP [-> ->].
+    by case/andP => ->.
   (* PcLab *)
   + move=> im μ σ pc r r' r1 j LPC rl rpcl -> /= CODE [<- <-] upd_r1 low_pc indist_s1s2.
     rewrite /fstep /= -(indist_instr indist_s1s2) //= CODE /=.
@@ -679,7 +679,7 @@ constructor=> [obs s1 s2 s1' s2' wf_s1 wf_s2 low_pc indist_s1s2 /fstepP step1|o 
     rewrite /indist /= => indist_r' [<-].
     case/and4P: indist_s1s2.
     rewrite indist_r' low_pc pc_eqS !andbT => -> -> -> /=.
-    by case/andP => /andP [-> ->].
+    by case/andP => ->.
   (* MLab *)   
   + move=> im μ σ pc r r1 r2 p K C j LPC rl r' rpcl -> ? ? get_r1 [].
     rewrite /Vector.nth_order /= => <- <- upd_r2.

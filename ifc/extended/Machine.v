@@ -971,4 +971,12 @@ Fixpoint fstepN t (n : nat) (s : State) : list State :=
       end
   end%list.
 
+Import ssreflect ssrbool eqtype.
+
+Definition pc_eqP : Equality.axiom pc_eq.
+Proof. admit. Qed.
+
+Definition pc_eqMixin := EqMixin pc_eqP.
+Canonical pc_eqType := EqType _ pc_eqMixin.
+
 End MachineM.

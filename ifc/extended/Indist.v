@@ -100,7 +100,7 @@ Instance indistStackFrame : Indist StackFrame :=
   indist lab sf1 sf2 :=
     match sf1, sf2 with
       | SF p1 regs1 r1 l1, SF p2 regs2 r2 l2 =>
-           pc_eq p1 p2
+           (p1 == p2)
         && indist lab regs1 regs2
         && (r1 == r2 :> Z)
         && (l1 == l2)
@@ -135,8 +135,7 @@ Instance indistState : Indist State :=
     indist lab m1 m2,
     indist lab s1 s2 &
     (isLow ∂pc1 lab || isLow ∂pc2 lab) ==>
-      (pc_eq pc1 pc2 &&
-      indist lab regs1 regs2)]
+      [&& pc1 == pc2 & indist lab regs1 regs2]]
 |}.
 
 End IndistM.
