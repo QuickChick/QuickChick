@@ -238,6 +238,39 @@ Proof.
         by apply IndisttSym.
 Qed.
 
+Inductive indistt_msni : seq A -> seq A -> Prop :=
+
+| IndisttMsniLowSteps : forall o s1 s1' s2 s2' t1 t2,
+    low o s1 -> low o s2 ->
+    indist o s1' s2' ->
+    indistt_msni (s1' :: t1) (s2' :: t2) ->
+    indistt_msni (s1 :: s1' :: t1) (s2 :: s2' :: t2)
+
+| IndisttMsniHighToLowSteps : forall o s1 s1' s2 s2' t1 t2,
+    high o s1 -> low o s1' ->
+    high o s2 -> low o s2' ->
+    indist o s1' s2' ->
+    indistt_msni (s1' :: t1) (s2' :: t2) ->
+    indistt_msni (s1 :: s1' :: t1) (s2 :: s2' :: t2)
+
+| IndisttMsniHighToHighSteps : forall o s1 s1' s2 t1 t2,
+    high o s1 -> high o s1' ->
+    indist o s1 s1' ->
+    indistt_msni (s1' :: t1) (s2 :: t2) ->
+    indistt_msni (s1 :: s1' :: t1) (s2 :: t2)
+
+| IndisttMsniLowStepEnd : forall o s1 s1' s2 t1,
+    (high o s1 \/ high o s1') ->
+    indistt_msni (s1' :: t1) (s2 :: [::]) ->
+    indistt_msni (s1 :: s1' :: t1) (s2 :: [::])
+
+| IndisttMsniBothEnd : forall s1 s2,
+    indistt_msni (s1 :: [::]) (s2 :: [::])
+
+| IndisttMsniSym : forall t1 t2,
+    indistt_msni t1 t2 ->
+    indistt_msni t2 t1.
+
 End WithO.
 
 Definition llni : Prop :=
