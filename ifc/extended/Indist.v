@@ -132,9 +132,9 @@ Instance indistState : Indist State :=
     indist lab imem1 imem2 &&
     indist lab m1 m2 &&
     indist lab s1 s2 &&
-    (isLow ∂pc1 lab || isLow ∂pc2 lab) ==>
+    ((isLow ∂pc1 lab || isLow ∂pc2 lab) ==>
       (pc_eq pc1 pc2 &&
-      indist lab regs1 regs2)
+      indist lab regs1 regs2))
 |}.
 
 End IndistM.
