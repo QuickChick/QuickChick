@@ -161,13 +161,11 @@ Proof. abstract by move => _ r; exact: eqxx. Defined.
 Instance indistState : Indist State :=
 {|
   indist lab st1 st2 :=
-    let '(St imem1 m1 s1 regs1 pc1) := st1 in
-    let '(St imem2 m2 s2 regs2 pc2) := st2 in
-    [&& indist lab imem1 imem2,
-    indist lab m1 m2,
-    indist lab s1 s2 &
-    (isLow ∂pc1 lab || isLow ∂pc2 lab) ==>
-      [&& pc1 == pc2 & indist lab regs1 regs2]]
+    [&& indist lab (st_imem st1) (st_imem st2),
+    indist lab (st_mem st1) (st_mem st2),
+    indist lab (st_stack st1) (st_stack st2) &
+    (isLow ∂(st_pc st1) lab || isLow ∂(st_pc st2) lab) ==>
+      [&& st_pc st1 == st_pc st2  & indist lab (st_regs st1) (st_regs st2)]]
 |}.
 
 Proof.
