@@ -257,25 +257,6 @@ Definition well_stamped_label (st : State) (l : Label) :=
 Definition well_stamped (st : State) :=
   forall l, well_stamped_label st l.
 
-(* TODO: prove correspondance views for these two guys *)
-Definition well_stamped_labelb (st : State) (l : Label) :=
-  [forall f1, forall f2, (f1 \in root_set l st) ==> (reachable l (st_mem st) f1 f2) ==>
-  (isLow (Mem.stamp f2) l)].
-
-Definition well_stampedb (st : State) :=
-  [forall l, well_stamped_labelb st l].
-
-Lemma well_stamped_labelP st obs :
-  reflect (well_stamped_label st obs) (well_stamped_labelb st obs).
-Proof.
-admit.
-Qed.
-
-Lemma well_stampedP st : reflect (well_stamped st) (well_stampedb st).
-Proof.
-admit.
-Qed.
-
 Lemma stamp_alloc μ μ' sz lab stamp i li fp :
   alloc sz lab stamp (Vint i@li) μ = Some (fp, μ') ->
   Mem.stamp fp = stamp.
