@@ -23,8 +23,10 @@ Open Scope bool.
 Class Indist (A : Type) : Type := {
   indist : Label -> A -> A -> bool;
 
-  indistR : forall obs, reflexive (indist obs)
+  indistxx : forall obs, reflexive (indist obs)
 }.
+
+Arguments indistxx {_ _} [obs] _.
 
 Instance oindist {T : Type} `{Indist T} : Indist (option T) := {
 
@@ -37,7 +39,7 @@ Instance oindist {T : Type} `{Indist T} : Indist (option T) := {
 
 }.
 
-Proof. abstract by move => obs [x|//=]; rewrite indistR. Defined.
+Proof. abstract by move => obs [x|//=]; rewrite indistxx. Defined.
 
 Instance indistList {A : Type} `{Indist A} : Indist (list A) :=
 {|
@@ -45,7 +47,7 @@ Instance indistList {A : Type} `{Indist A} : Indist (list A) :=
 |}.
 
 Proof.
-  abstract by move => obs; elim => [|x l IH] //=; rewrite indistR IH.
+  abstract by move => obs; elim => [|x l IH] //=; rewrite indistxx IH.
 Defined.
 
 (* Indistinguishability of Values.
@@ -75,7 +77,7 @@ Instance indistAtom : Indist Atom :=
     && (isHigh l1 lab || indist lab v1 v2)
 |}.
 
-Proof. abstract by move => obs [v l]; rewrite eqxx indistR orbT. Defined.
+Proof. abstract by move => obs [v l]; rewrite eqxx indistxx orbT. Defined.
 
 Instance indistFrame : Indist frame :=
 {|
@@ -91,7 +93,7 @@ Instance indistFrame : Indist frame :=
 |}.
 
 Proof.
-  abstract by move => obs [s l vs]; rewrite !eqxx indistR orbT /=; case: (isLow s obs).
+  abstract by move => obs [s l vs]; rewrite !eqxx indistxx orbT /=; case: (isLow s obs).
 Defined.
 
 (* Indistinguishability of memories
@@ -110,7 +112,7 @@ Instance indistMem : Indist memory :=
     indist lab (blocks_stamped_below lab m1) (blocks_stamped_below lab m2)
 |}.
 
-Proof. abstract by move => obs m; rewrite indistR. Defined.
+Proof. abstract by move => obs m; rewrite indistxx. Defined.
 
 (* Indistinguishability of stack frame (pointwise)
      * The returning pc's must be equal
@@ -131,7 +133,7 @@ Instance indistStackFrame : Indist StackFrame :=
 |}.
 
 Proof.
-  abstract by move => obs [p regs r l]; rewrite !eqxx indistR.
+  abstract by move => obs [p regs r l]; rewrite !eqxx indistxx.
 Defined.
 
 Definition stackFrameBelow (lab : Label) (sf : StackFrame) : bool :=
@@ -148,7 +150,7 @@ Instance indistStack : Indist Stack :=
     indist lab (filterStack lab s1) (filterStack lab s2)
 |}.
 
-Proof. abstract by move => obs r; rewrite indistR. Defined.
+Proof. abstract by move => obs r; rewrite indistxx. Defined.
 
 Instance indistImems : Indist imem :=
 {|
@@ -169,7 +171,7 @@ Instance indistState : Indist State :=
 |}.
 
 Proof.
-  abstract by move => obs [imem m stk regs [v l]]; rewrite !indistR eqxx implybT.
+  abstract by move => obs [imem m stk regs [v l]]; rewrite !indistxx eqxx implybT.
 Defined.
 
 End IndistM.
