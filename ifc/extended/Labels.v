@@ -166,7 +166,7 @@ Class FiniteLattice (Lab : Type) :=
 }.
 
 Definition allThingsBelow {L : Type} `{FiniteLattice L} (l : L) : list L :=
-  List.filter (fun l' => flows l' l) elems.
+  filter (fun l' => flows l' l) elems.
 
 Module LabelEqType.
 
