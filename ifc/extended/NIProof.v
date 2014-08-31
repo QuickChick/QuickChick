@@ -617,7 +617,7 @@ Proof.
   by case/and5P: Hindist => /eqP -> _ _ /eqP -> _.
 Qed.
 
-Lemma indist_registerContent obs st1 st2 r :
+Lemma indist_registerContent_aux obs st1 st2 r :
   indist obs st1 st2 ->
   isLow ∂(st_pc st1) obs ->
   indist obs (registerContent (st_regs st1) r) (registerContent (st_regs st2) r).
@@ -634,7 +634,7 @@ Proof.
   - by case/andP => _ /IH.
 Qed.
 
-Lemma indist_registerContent_Some obs st1 st2 r v1 :
+Lemma indist_registerContent obs st1 st2 r v1 :
   indist obs st1 st2 ->
   isLow ∂(st_pc st1) obs ->
   registerContent (st_regs st1) r = Some v1 ->
@@ -643,7 +643,7 @@ Lemma indist_registerContent_Some obs st1 st2 r v1 :
     indist obs v1 v2.
 Proof.
   move => Hindist Hlow Hdef.
-  move: (indist_registerContent r Hindist Hlow).
+  move: (indist_registerContent_aux r Hindist Hlow).
   rewrite Hdef.
   case: (registerContent (st_regs st2) r) => [v2|] //=.
   by eauto.
@@ -690,7 +690,7 @@ Qed.
 
 Lemma indist_pc obs st1 st2 :
   indist obs st1 st2 ->
-  pc_eq (st_pc st1) (st_pc st2).
+  st_pc st1 = st_pc st2.
 Proof.
 admit.
 Qed.
@@ -714,67 +714,54 @@ Proof.
 constructor=> [obs s1 s2 s1' s2' wf_s1 wf_s2 low_pc indist_s1s2 /fstepP step1|o s1 s1' wf_s1 /= high_pc1 high_pc2 /fstepP step1|o s1 s2 s1' s2' wf_s1 wf_s2 /= high_pc1 indist_s1s2 low_pc1' low_pc2' /fstepP step1].
 - case: step1 low_pc indist_s1s2.
   (* Lab *)
-  + move=> im μ σ v K pc r r' r1 r2 j LPC rl rpcl -> /= instr get_r1 [<- <-] upd_r2 low_pc indist_s1s2.
+  + move=> im μ σ v K pc regs1 regs1' r1 r2 j LPC rl rpcl -> /= instr get_r1 [<- <-] upd_r2 low_pc indist_s1s2.
     rewrite /fstep -(indist_instr indist_s1s2) /state_instr_lookup //= instr /=.
     case: s2 wf_s2 indist_s1s2 => im2 μ2 σ2 regs2 [pcv2 pcl2] wf_s2 indist_s1s2.
-    have /= := indist_registerContent r1 indist_s1s2 low_pc.
-    rewrite get_r1.
-    case: (registerContent regs2 r1) => // [[v2 l2]].
-    case/andP => eq_Kl2 ?.
-    have indist_v: indist obs (Vlab K @ ⊥) (Vlab l2 @ ⊥).
-      by rewrite /indist /= eqxx /= /indist /indistValue /eq_op /= eq_Kl2 orbT.
-    have /= := indist_registerUpdate r2 indist_s1s2 low_pc indist_v.
-    rewrite upd_r2.
-    case: (registerUpdate regs2 r2 (Vlab l2 @ ⊥)) => // ?.
-    rewrite /indist /= => indist_r' [<-].
-    case/and4P: indist_s1s2.
-    rewrite indist_r' low_pc pc_eqS !andbT => -> -> -> /=.
-    by case/andP => ->.
+    have /= [[v2 lv2] -> /andP [/eqP <-]] :=
+      indist_registerContent indist_s1s2 low_pc get_r1.
+    have indist_v: indist obs (Vlab K @ ⊥) (Vlab K @ ⊥).
+      by rewrite /indist /= eqxx /indist /indistValue /= eqxx orbT.
+    have /= [regs2' -> indist_regs _ [<-]] :=
+      indist_registerUpdate indist_s1s2 low_pc indist_v upd_r2.
+    rewrite /indist /=; case/and4P: indist_s1s2.
+    rewrite indist_regs low_pc pc_eqS !andbT => -> -> -> /=.
+    by case/andP.
   (* PcLab *)
   + move=> im μ σ pc r r' r1 j LPC rl rpcl -> /= CODE [<- <-] upd_r1 low_pc indist_s1s2.
     rewrite /fstep -(indist_instr indist_s1s2) /state_instr_lookup //= CODE /=.
     case: s2 wf_s2 indist_s1s2 => im2 μ2 σ2 regs2 [pcv2 pcl2] wf_s2 indist_s1s2.
     have indist_v: indist obs (Vlab LPC @ ⊥) (Vlab pcl2 @ ⊥).
-      rewrite /indist /= eqxx /indist /= /indistValue /eq_op /=.
-      case/andP: (indist_pc indist_s1s2) => _ ->.
-      by rewrite orbT.
-    have /= := indist_registerUpdate r1 indist_s1s2 low_pc indist_v.
-    rewrite upd_r1.
-    case: (registerUpdate regs2 r1 (Vlab pcl2 @ ⊥)) => // ?.
-    rewrite /indist /= => indist_r' [<-].
-    case/and4P: indist_s1s2.
+      have /= [_ ->] := (indist_pc indist_s1s2).
+      by rewrite /indist /= eqxx /indist /indistValue /= eqxx orbT.
+    have /= [? -> indist_r' [<-]] :=
+      indist_registerUpdate indist_s1s2 low_pc indist_v upd_r1.
+    rewrite /indist /=; case/and4P: indist_s1s2.
     rewrite indist_r' low_pc pc_eqS !andbT => -> -> -> /=.
-    by case/andP => ->.
+    by case/andP.
   (* MLab *)
   + move=> im μ σ pc r r1 r2 p K C j LPC rl r' rpcl -> /= CODE mlab_p get_r1 [].
     rewrite /Vector.nth_order /= => <- <- upd_r2 low_pc indist_s1s2.
     rewrite /fstep -(indist_instr indist_s1s2) /state_instr_lookup //= CODE /=.
     case: s2 wf_s2 indist_s1s2 => im2 μ2 σ2 regs2 [pcv2 pcl2] wf_s2 indist_s1s2.
-    have /= := indist_registerContent r1 indist_s1s2 low_pc.
-    rewrite get_r1.
-    case: (registerContent regs2 r1) => // [[v2 l2]].
-    case: v2 => // p2.
-    case/andP => /eqP <-.
-    rewrite /Vector.nth_order /= => indist_ptr.
+    have /= [[[] // p2 lv2] -> // /andP [/eqP <- indist_ptr]] :=
+      indist_registerContent indist_s1s2 low_pc get_r1.
     have /= := indist_mlab p2 indist_s1s2.
     case: (mlab μ2 p2) => //= lm2 mlab_p2.
     have indist_v: indist obs (Vlab C @ K) (Vlab lm2 @ K).
       rewrite /indist /= eqxx /= /indist /indistValue /eq_op /=.
-      case/orP: indist_ptr => [->|] // ?.
-      have eq_p: p = p2 by admit.
+      case/orP: indist_ptr => [->|] //.
+      rewrite /indist /indistValue /= => /eqP [eq_p].
       move: mlab_p2; rewrite -eq_p mlab_p => [[->]].
       by rewrite /indist /= eqxx orbT.
-    have /= := indist_registerUpdate r2 indist_s1s2 low_pc indist_v.
-    rewrite upd_r2.
-    case: (registerUpdate regs2 r2 (Vlab lm2 @ K)) => //= ?.
-    rewrite /indist /= => indist_r' [<-].
-    case/and4P: indist_s1s2.
+    have /= [? -> indist_r' [<-]] := indist_registerUpdate indist_s1s2 low_pc indist_v upd_r2.
+    rewrite /indist /=; case/and4P: indist_s1s2.
     rewrite indist_r' low_pc pc_eqS !andbT => -> -> -> /=.
     by case/andP.
   (* PutLab *)
-  + move=> im μ σ pc r r' r1 j LPC rl rpcl l' -> ? [<- <-] upd_r1.
+  + move=> im μ σ pc r r' r1 j LPC rl rpcl l' -> /= CODE [<- <-] upd_r1 low_pc indist_s1s2.
+    rewrite /fstep -(indist_instr indist_s1s2) /state_instr_lookup //= CODE /=.
     admit.
-  (* Call *)
+(* Call *)
   + move=> im μ σ pc B K r r1 r2 r3 j La addr Lpc rl rpcl -> ? get_r1 get_r2 [<- <-].
     rewrite /Vector.nth_order /=.
     admit.
