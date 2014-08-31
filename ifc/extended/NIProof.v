@@ -760,8 +760,14 @@ constructor=> [obs s1 s2 s1' s2' wf_s1 wf_s2 low_pc indist_s1s2 /fstepP step1|o 
   (* PutLab *)
   + move=> im μ σ pc r r' r1 j LPC rl rpcl l' -> /= CODE [<- <-] upd_r1 low_pc indist_s1s2.
     rewrite /fstep -(indist_instr indist_s1s2) /state_instr_lookup //= CODE /=.
-    admit.
-(* Call *)
+    case: s2 wf_s2 indist_s1s2 => im2 μ2 σ2 regs2 [pcv2 pcl2] wf_s2 indist_s1s2.
+    have indist_v: indist obs (Vlab l' @ ⊥) (Vlab l' @ ⊥).
+      by rewrite /indist /= eqxx /indist /indistValue eqxx orbT.
+    have /= [? -> indist_r' [<-]] := indist_registerUpdate indist_s1s2 low_pc indist_v upd_r1.
+    rewrite /indist /=; case/and4P: indist_s1s2.
+    rewrite indist_r' low_pc pc_eqS !andbT => -> -> -> /=.
+    by case/andP.
+   (* Call *)
   + move=> im μ σ pc B K r r1 r2 r3 j La addr Lpc rl rpcl -> ? get_r1 get_r2 [<- <-].
     rewrite /Vector.nth_order /=.
     admit.
