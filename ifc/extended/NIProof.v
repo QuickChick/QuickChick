@@ -690,6 +690,7 @@ Qed.
 
 Lemma indist_pc obs st1 st2 :
   indist obs st1 st2 ->
+  isLow ∂(st_pc st1) obs ->
   st_pc st1 = st_pc st2.
 Proof.
 admit.
@@ -733,7 +734,7 @@ constructor=> [obs s1 s2 s1' s2' wf_s1 wf_s2 low_pc indist_s1s2 /fstepP step1|o 
     rewrite /fstep -(indist_instr indist_s1s2) /state_instr_lookup //= CODE /=.
     case: s2 wf_s2 indist_s1s2 => im2 μ2 σ2 regs2 [pcv2 pcl2] wf_s2 indist_s1s2.
     have indist_v: indist obs (Vlab LPC @ ⊥) (Vlab pcl2 @ ⊥).
-      have /= [_ ->] := (indist_pc indist_s1s2).
+      have /= [_ ->] := (indist_pc indist_s1s2 low_pc).
       by rewrite /indist /= eqxx /indist /indistValue /= eqxx orbT.
     have /= [? -> indist_r' [<-]] :=
       indist_registerUpdate indist_s1s2 low_pc indist_v upd_r1.
