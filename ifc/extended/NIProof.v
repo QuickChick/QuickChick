@@ -649,13 +649,43 @@ Proof.
   by eauto.
 Qed.
 
-Lemma indist_registerUpdate obs st1 st2 r v1 v2 :
+Lemma indist_registerUpdate_aux obs st1 st2 r v1 v2 :
   indist obs st1 st2 ->
   isLow ∂(st_pc st1) obs ->
   indist obs v1 v2 ->
   indist obs (registerUpdate (st_regs st1) r v1) (registerUpdate (st_regs st2) r v2).
 Proof.
-  admit.
+  move => Hindist Hlow.
+  rewrite (indist_low_pc _ Hlow) in Hindist.
+  case/and5P: Hindist => _ _ _ _.
+  rewrite /registerUpdate /update_list_Z.
+  case: (BinInt.Z.ltb r 0) => //=.
+  elim: {Hlow st1 st2 r} (BinInt.Z.to_nat r) (st_regs st1) (st_regs st2)
+        => [|n IH] [|x xs] [|y ys] //=.
+  - rewrite /indist /= /indist /indistList //= /indist.
+    by move => /andP [_ ->] ->.
+  - rewrite /indist /= /indist /indistList /=.
+    move/andP => [Hxy Hxsys] Hv1v2.
+    move: IH Hxy => /(_ xs ys Hxsys Hv1v2) {Hxsys Hv1v2}.
+    case: (update_list xs n v1) => [xs'|]; case: (update_list ys n v2) => [ys'|] //=.
+    rewrite /indist /= /indistList /indist.
+    by move => -> ->.
+Qed.
+
+Lemma indist_registerUpdate obs st1 st2 r v1 v2 regs1 :
+  indist obs st1 st2 ->
+  isLow ∂(st_pc st1) obs ->
+  indist obs v1 v2 ->
+  registerUpdate (st_regs st1) r v1 = Some regs1 ->
+  exists2 regs2,
+    registerUpdate (st_regs st2) r v2 = Some regs2 &
+    indist obs regs1 regs2.
+Proof.
+  move => Hindist Hlow Hv1v2 Hupd.
+  move: (indist_registerUpdate_aux r Hindist Hlow Hv1v2).
+  rewrite Hupd.
+  case: (registerUpdate (st_regs st2) r v2) => [regs2|] //=.
+  by eauto.
 Qed.
 
 Lemma indist_pc obs st1 st2 :
