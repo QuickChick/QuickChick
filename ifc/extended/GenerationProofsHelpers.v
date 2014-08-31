@@ -122,7 +122,7 @@ Lemma join_equiv :
     isLow l1 l = true->
     (isHigh (join l1 l2) l <-> isHigh l2 l).
 Proof.
-  rewrite /isHigh /isLow. move => l1 l2 l Hlow. split.
+  move => l1 l2 l Hlow. split.
   +  move => Hnotlow. apply/Bool.eq_true_not_negb => Hlow2.
      move: (join_minimal _ _ _ Hlow Hlow2)  => contra. rewrite contra in Hnotlow.
      discriminate.

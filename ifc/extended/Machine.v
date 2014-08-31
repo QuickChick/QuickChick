@@ -73,8 +73,8 @@ Module MachineM (Lab : FINLAT).
 Export Lab.
 
 (* Short for a label l to be low/high compared to an observability label obs *)
-Definition isLow  (l obs : Label) := flows l obs.
-Definition isHigh (l obs : Label) := negb (isLow l obs).
+Notation isLow l obs := (flows l obs).
+Notation isHigh l obs := (negb (isLow l obs)).
 
 (** memory frame pointers. *)
 Definition mframe : Type := Mem.block Label.

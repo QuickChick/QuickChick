@@ -500,7 +500,6 @@ case: {st st'} step.
       by rewrite /references get_fp low_lf.
     case: v get_r2 upd_i => [|[pv pi] get_r2 upd_i|]; rewrite /mframes_from_atoms /= ?inE //.
     case: ifP => // low_lv'; rewrite inE => /eqP ->; apply: wf_st.
-    rewrite /isLow in low_lv' low_lf.
     rewrite inE /= /root_set_registers (root_set_registers_nth get_r2) //.
       by apply/(flows_trans _ _ _ low_LPC); rewrite flows_join low_lv' low_lf.
 by apply/(flows_trans _ _ _ low_lv); rewrite flows_join low_lv' low_lf.
@@ -602,7 +601,7 @@ Lemma indist_low_pc obs st1 st2 :
    indist obs (st_regs st1) (st_regs st2)].
 Proof.
   case: st1 => im1 mem1 stk1 regs1 pc1; case: st2 => im2 mem2 stk2 regs2 pc2.
-  rewrite /GenericIndist.indist /= /isLow /GenericMachine.isLow.
+  rewrite /GenericIndist.indist /=.
   by move => -> /=.
 Qed.
 
