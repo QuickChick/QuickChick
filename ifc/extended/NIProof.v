@@ -242,36 +242,36 @@ Definition root_set obs (st : State) : {set mframe} :=
   let '(St _ _ s r pc) := st in
   root_set_registers obs r ∂pc :|: root_set_stack obs (unStack s).
 
-Definition references obs (mem : memory) (f1 f2 : mframe) :=
+Definition link obs (mem : memory) (f1 f2 : mframe) :=
   if Mem.get_frame mem f1 is Some (Fr _ l atoms) then
     isLow l obs && (f2 \in mframes_from_atoms obs atoms)
   else false.
 
 Definition reachable obs (mem : memory) : rel mframe :=
-  connect (references obs mem).
+  connect (link obs mem).
 
-Definition well_formed_label (st : State) (l : Label) :=
+Definition well_stamped_label (st : State) (l : Label) :=
   forall f1 f2, f1 \in root_set l st -> reachable l (st_mem st) f1 f2 ->
   isLow (Mem.stamp f2) l.
 
-Definition well_formed (st : State) :=
-  forall l, well_formed_label st l.
+Definition well_stamped (st : State) :=
+  forall l, well_stamped_label st l.
 
 (* TODO: prove correspondance views for these two guys *)
-Definition well_formed_labelb (st : State) (l : Label) :=
+Definition well_stamped_labelb (st : State) (l : Label) :=
   [forall f1, forall f2, (f1 \in root_set l st) ==> (reachable l (st_mem st) f1 f2) ==>
   (isLow (Mem.stamp f2) l)].
 
-Definition well_formedb (st : State) :=
-  [forall l, well_formed_labelb st l].
+Definition well_stampedb (st : State) :=
+  [forall l, well_stamped_labelb st l].
 
-Lemma well_formed_labelP st obs :
-  reflect (well_formed_label st obs) (well_formed_labelb st obs).
+Lemma well_stamped_labelP st obs :
+  reflect (well_stamped_label st obs) (well_stamped_labelb st obs).
 Proof.
 admit.
 Qed.
 
-Lemma well_formedP st : reflect (well_formed st) (well_formedb st).
+Lemma well_stampedP st : reflect (well_stamped st) (well_stampedb st).
 Proof.
 admit.
 Qed.
@@ -293,7 +293,7 @@ rewrite /alloc /zreplicate.
 case: (ZArith_dec.Z_lt_dec sz 0) => // lt0sz.
 rewrite replicateE => [[]] alloc_sz.
 apply/eq_connect=> x y.
-rewrite /references.
+rewrite /link.
 have [<-|neq_fpx] := fp =P x.
   (* How about using implicit arguments? *)
   rewrite (alloc_get_frame_eq _ _ _ _ _ _ alloc_sz) inE /=.
@@ -314,14 +314,14 @@ Lemma reachable_upd μ μ' pv st lf fr l f1 f2 :
 Proof.
   (* TODO: use splitPl with pv *)
 move=> upd_pv /connectP [p] /shortenP [p'].
-have references_not_pv: forall (f : mframe), pv != f -> references l μ' f =1 references l μ f.
-  move=> f; rewrite eq_sym => /eqP neq_pv f'; rewrite /references.
+have link_not_pv: forall (f : mframe), pv != f -> link l μ' f =1 link l μ f.
+  move=> f; rewrite eq_sym => /eqP neq_pv f'; rewrite /link.
   by rewrite (get_frame_upd_frame_neq _ _ _ _ _ _ _ upd_pv neq_pv).
-have path_not_pv: forall (p : seq mframe) f, pv \notin belast f p -> path (references l μ') f p = path (references l μ) f p.
+have path_not_pv: forall (p : seq mframe) f, pv \notin belast f p -> path (link l μ') f p = path (link l μ) f p.
   elim=> //= x s IHs f.
   rewrite inE negb_or.
   case/andP => neq_pv ?.
-  by rewrite IHs // references_not_pv.
+  by rewrite IHs // link_not_pv.
 have [in_path|] := boolP (pv \in f1 :: p').
   case/splitPl: in_path => p1 [|f3 p2 last_p1].
     rewrite cats0 => last_p1 path_p1 uniq_p1 _ ->; left; apply/connectP.
@@ -330,7 +330,7 @@ have [in_path|] := boolP (pv \in f1 :: p').
   rewrite cat_path last_p1 -cat_cons [f1 :: p1]lastI last_p1 cat_uniq last_cat.
   rewrite rcons_uniq.
   case/andP=> path_p1 path_p2 /and3P [/andP [? _] not_pv _] _ /= ->; right.
-  rewrite /= {1}/references (get_frame_upd_frame_eq _ _ _ _ _ _ upd_pv) in path_p2.
+  rewrite /= {1}/link (get_frame_upd_frame_eq _ _ _ _ _ _ upd_pv) in path_p2.
   case/andP: path_p2 => /andP [low_lf ref_f3] path_p2; split=> //; split.
     by apply/connectP; exists p1=> //; rewrite -path_not_pv.
   exists f3; split => //; apply/connectP; exists p2 => //.
@@ -342,8 +342,8 @@ rewrite lastI mem_rcons inE negb_or=> /andP [_ ?] path_p' _ _ ->; left.
 by apply/connectP; exists p' => //; rewrite -path_not_pv.
 Qed.
 
-Lemma well_formed_preservation st st' : well_formed st ->
-  step default_table st st' -> well_formed st'.
+Lemma well_stamped_preservation st st' : well_stamped st ->
+  step default_table st st' -> well_stamped st'.
 Proof.
 move=> wf_st step.
 move: wf_st.
@@ -442,7 +442,7 @@ case: {st st'} step.
     case/connectP=> [[_ ->|]] /=.
       by rewrite (stamp_alloc alloc_i) /= joinA low_join low_KK' low_LPC.
     move=> a s.
-    by rewrite /references /= (Mem.alloc_get_fresh _ _ _ _ _ _ _ _ _ malloc).
+    by rewrite /link /= (Mem.alloc_get_fresh _ _ _ _ _ _ _ _ _ malloc).
   by move: wf_st; rewrite in_stack_f1 orbT; apply.
 (* Load *)
 + move=> im μ σ pc C [pv pl] K r r' r1 r2 j LPC v Ll rl rpcl -> ? get_r1 load_p mlab_p [<- <-].
@@ -460,7 +460,7 @@ case: {st st'} step.
     move/eqP=> -> reach_f2.
     apply: (wf_st l pv f2); first by rewrite inE (root_set_registers_nth get_r1).
     apply/(connect_trans _ reach_f2)/connect1; move: load_p mlab_p.
-    rewrite /references /=; case: (Mem.get_frame μ pv) => // [[_ ? fr]] get_pl [->].
+    rewrite /link /=; case: (Mem.get_frame μ pv) => // [[_ ? fr]] get_pl [->].
     apply/andP; split=> //.
     exact: (mframes_from_atoms_nth get_pl).
   by apply: wf_st; rewrite inE in_stack_f1 orbT.
@@ -478,7 +478,7 @@ case: {st st'} step.
     case/orP=> [in_fr_f3 reach_f2|].
       apply: (wf_st l f1 f2) => /=; first by rewrite inE.
       apply/(connect_trans reach_fp)/(connect_trans _ reach_f2)/connect1.
-      by rewrite /references get_fp low_lf.
+      by rewrite /link get_fp low_lf.
     case: v get_r2 upd_i => [|[pv pi] get_r2 upd_i|]; rewrite /mframes_from_atoms /= ?inE //.
     case: ifP => // low_lv; rewrite inE => /eqP ->; apply: wf_st.
     rewrite inE /= /root_set_registers (root_set_registers_nth get_r2) //.
@@ -497,7 +497,7 @@ case: {st st'} step.
     case/orP=> [in_fr_f3 reach_f2|].
       apply: (wf_st l f1 f2) => /=; first by rewrite inE.
       apply/(connect_trans reach_fp)/(connect_trans _ reach_f2)/connect1.
-      by rewrite /references get_fp low_lf.
+      by rewrite /link get_fp low_lf.
     case: v get_r2 upd_i => [|[pv pi] get_r2 upd_i|]; rewrite /mframes_from_atoms /= ?inE //.
     case: ifP => // low_lv'; rewrite inE => /eqP ->; apply: wf_st.
     rewrite inE /= /root_set_registers (root_set_registers_nth get_r2) //.
@@ -709,9 +709,13 @@ Proof.
 admit.
 Qed.
 
+(*
+Lemma indist_stack_cons obs :
+*)
+
 Arguments indist : simpl never.
 
-Theorem SSNI : ssni well_formed (fstep default_table) (fun obs st => isLow ∂(st_pc st) obs) (indist).
+Theorem SSNI : ssni well_stamped (fstep default_table) (fun obs st => isLow ∂(st_pc st) obs) (indist).
 Proof.
 constructor=> [obs s1 s2 s1' s2' wf_s1 wf_s2 low_pc indist_s1s2 /fstepP step1|o s1 s1' wf_s1 /= high_pc1 high_pc2 /fstepP step1|o s1 s2 s1' s2' wf_s1 wf_s2 /= high_pc1 indist_s1s2 low_pc1' low_pc2' /fstepP step1].
 - case: step1 low_pc indist_s1s2.
