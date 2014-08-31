@@ -20,20 +20,33 @@ Export GenericMachine.
 Open Scope bool.
 
 (* Indistinguishability type class *)
-Class Indist (A : Type) : Type :=
-  indist : Label -> A -> A -> bool.
+Class Indist (A : Type) : Type := {
+  indist : Label -> A -> A -> bool;
 
-Instance oindist {T : Type} `{Indist T} : Indist (option T) :=
-  fun obs x1 x2 => match x1, x2 with
-  | None, None => true
-  | Some x1, Some x2 => indist obs x1 x2
-  | _, _ => false
-  end.
+  indistR : forall obs, reflexive (indist obs)
+}.
+
+Instance oindist {T : Type} `{Indist T} : Indist (option T) := {
+
+  indist obs x1 x2 :=
+    match x1, x2 with
+    | None, None => true
+    | Some x1, Some x2 => indist obs x1 x2
+    | _, _ => false
+    end
+
+}.
+
+Proof. abstract by move => obs [x|//=]; rewrite indistR. Defined.
 
 Instance indistList {A : Type} `{Indist A} : Indist (list A) :=
 {|
   indist lab := forallb2 (indist lab)
 |}.
+
+Proof.
+  abstract by move => obs; elim => [|x l IH] //=; rewrite indistR IH.
+Defined.
 
 (* Indistinguishability of Values.
    - Ignores the label (called only on unlabeled things)
@@ -43,6 +56,8 @@ Instance indistValue : Indist Value :=
 {|
   indist _lab v1 v2 := v1 == v2
 |}.
+
+Proof. abstract by move => _; exact: eqxx. Defined.
 
 (* Indistinguishability of Atoms.
    - The labels have to be equal (observable labels)
@@ -60,6 +75,8 @@ Instance indistAtom : Indist Atom :=
     && (isHigh l1 lab || indist lab v1 v2)
 |}.
 
+Proof. abstract by move => obs [v l]; rewrite eqxx indistR orbT. Defined.
+
 Instance indistFrame : Indist frame :=
 {|
   indist lab f1 f2 :=
@@ -72,6 +89,10 @@ Instance indistFrame : Indist frame :=
       (l1 == l2) && (isHigh l1 lab || indist lab vs1 vs2)
     else true
 |}.
+
+Proof.
+  abstract by move => obs [s l vs]; rewrite !eqxx indistR orbT /=; case: (isLow s obs).
+Defined.
 
 (* Indistinguishability of memories
    - Get all corresponding memory frames
@@ -88,6 +109,8 @@ Instance indistMem : Indist memory :=
   indist lab m1 m2 :=
     indist lab (blocks_stamped_below lab m1) (blocks_stamped_below lab m2)
 |}.
+
+Proof. abstract by move => obs m; rewrite indistR. Defined.
 
 (* Indistinguishability of stack frame (pointwise)
      * The returning pc's must be equal
@@ -107,6 +130,10 @@ Instance indistStackFrame : Indist StackFrame :=
     end
 |}.
 
+Proof.
+  abstract by move => obs [p regs r l]; rewrite !eqxx indistR.
+Defined.
+
 Definition stackFrameBelow (lab : Label) (sf : StackFrame) : bool :=
   let 'SF ret_addr  _ _ _ := sf in
   let 'PAtm _ l_ret_addr := ret_addr in
@@ -121,10 +148,15 @@ Instance indistStack : Indist Stack :=
     indist lab (filterStack lab s1) (filterStack lab s2)
 |}.
 
+Proof. abstract by move => obs r; rewrite indistR. Defined.
+
 Instance indistImems : Indist imem :=
 {|
   indist _lab imem1 imem2 := imem1 == imem2 :> seq (@Instr Label)
 |}.
+
+Proof. abstract by move => _ r; exact: eqxx. Defined.
+
 
 Instance indistState : Indist State :=
 {|
@@ -137,5 +169,9 @@ Instance indistState : Indist State :=
     (isLow ∂pc1 lab || isLow ∂pc2 lab) ==>
       [&& pc1 == pc2 & indist lab regs1 regs2]]
 |}.
+
+Proof.
+  abstract by move => obs [imem m stk regs [v l]]; rewrite !indistR eqxx implybT.
+Defined.
 
 End IndistM.
