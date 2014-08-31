@@ -2,7 +2,7 @@ Require Import ZArith.
 Require Import EquivDec.
 Require Import List.
 
-Require Import ssreflect ssrbool eqtype.
+Require Import ssreflect ssrbool eqtype seq.
 
 Require Import Utils.
 
