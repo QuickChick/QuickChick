@@ -127,7 +127,11 @@ Require Import ssreflect ssrbool eqtype.
 Require Import Utils.
 
 Lemma BinOpT_beqP : Equality.axiom BinOpT_beq.
-Proof. admit. Qed.
+Proof.
+move=> x y.
+apply/(iffP idP); first exact: internal_BinOpT_dec_bl.
+exact: internal_BinOpT_dec_lb.
+Qed.
 
 Definition BinOpT_eqMixin := EqMixin BinOpT_beqP.
 Canonical BinOpT_eqType := Eval hnf in EqType _ BinOpT_eqMixin.
@@ -158,7 +162,44 @@ Definition instr_eqb (T : eqType) (i1 i2 : @Instr T) : bool :=
   end.
 
 Lemma instr_eqbP T : Equality.axiom (instr_eqb T).
-Proof. admit. Qed.
+Proof.
+move=> i1 i2.
+apply/(iffP idP); case: i1; case: i2 => //=.
++ by move=> ? ? ? ? /andP [/eqP -> /eqP ->].
++ by move=> ? ? ? ? /andP [/eqP -> /eqP ->].
++ by move=> ? ? ? ? /andP [/eqP -> /eqP ->].
++ by move=> ? ? ? ? /andP [/eqP -> /eqP ->].
++ by move=> ? ? ? ? /andP [/eqP -> /eqP ->].
++ by move=> ? ? ? ? ? ? ? ? /and4P [/eqP -> /eqP -> /eqP -> /eqP ->].
++ by move=> ? ? /eqP ->.
++ by move=> ? ? ? ? /andP [/eqP -> /eqP ->].
++ by move=> ? ? ? ? ? ? /and3P [/eqP -> /eqP -> /eqP ->].
++ by move=> ? ? ? ? /andP [/eqP -> /eqP ->].
++ by move=> ? ? /eqP ->.
++ by move=> ? ? ? ? /andP [/eqP -> /eqP ->].
++ by move=> ? ? ? ? ? ? /and3P [/eqP -> /eqP -> /eqP ->].
++ by move=> ? ? ? ? /andP [/eqP -> /eqP ->].
++ by move=> ? ? ? ? ? ? /and3P [/eqP -> /eqP -> /eqP ->].
++ by move=> ? ? ? ? /andP [/eqP -> /eqP ->].
++ by move=> ? ? ? ? /andP [/eqP -> /eqP ->].
++ by move=> ? ? ? ? [-> ->]; rewrite !eqxx.
++ by move=> ? ? ? ? [-> ->]; rewrite !eqxx.
++ by move=> ? ? ? ? [-> ->]; rewrite !eqxx.
++ by move=> ? ? ? ? [-> ->]; rewrite !eqxx.
++ by move=> ? ? ? ? [-> ->]; rewrite !eqxx.
++ by move=> ? ? ? ? ? ? ? ? [-> -> -> ->]; rewrite !eqxx.
++ by move=> ? ? [->]; rewrite !eqxx.
++ by move=> ? ? ? ? [-> ->]; rewrite !eqxx.
++ by move=> ? ? ? ? ? ? [-> -> ->]; rewrite !eqxx.
++ by move=> ? ? ? ? [-> ->]; rewrite !eqxx.
++ by move=> ? ? [->]; rewrite !eqxx.
++ by move=> ? ? ? ? [-> ->]; rewrite !eqxx.
++ by move=> ? ? ? ? ? ? [-> -> ->]; rewrite !eqxx.
++ by move=> ? ? ? ? [-> ->]; rewrite !eqxx.
++ by move=> ? ? ? ? ? ? [-> -> ->]; rewrite !eqxx.
++ by move=> ? ? ? ? [-> ->]; rewrite !eqxx.
++ by move=> ? ? ? ? [-> ->]; rewrite !eqxx.
+Qed.
 
 Definition instr_eqMixin T := EqMixin (instr_eqbP T).
 Canonical instr_eqType T := Eval hnf in EqType _ (instr_eqMixin T).

@@ -974,13 +974,32 @@ Fixpoint fstepN t (n : nat) (s : State) : list State :=
 Import ssreflect ssrbool eqtype.
 
 Lemma pc_eqP : Equality.axiom pc_eq.
-Proof. admit. Qed.
+Proof.
+move=> [xv xl] [yv yl] /=.
+apply/(iffP idP)=> [/andP [] /eqP -> /eqP ->|[-> ->]] //.
+by rewrite !eqxx.
+Qed.
 
 Definition pc_eqMixin := EqMixin pc_eqP.
 Canonical pc_eqType := EqType _ pc_eqMixin.
 
 Lemma val_eqP : Equality.axiom val_eq.
-Proof. admit. Qed.
+Proof.
+move=> v1 v2; apply/(iffP idP).
+case: v1 => v1; case: v2 => v2 //=.
++ by move/eqP ->.
++ by case: v1.
++ case: v1 => fp1 i1; case: v2 => fp2 i2.
+  case/andP; rewrite /mframe_eq.
+  by case: (Mem.EqDec_block fp1 fp2)=> // -> _ /eqP ->.
++ by case: v1.
++ by move/eqP->.
++ move->; rewrite /val_eq.
+  case: v2 => // [[fp2 i2]].
+  apply/andP; split=> //.
+  rewrite /mframe_eq.
+  by case: (Mem.EqDec_block fp2 fp2)=> // [[]].
+Qed.
 
 Definition val_eqMixin := EqMixin val_eqP.
 Canonical val_eqType := EqType _ val_eqMixin.

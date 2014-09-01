@@ -1261,7 +1261,7 @@ Require Import ssreflect ssrbool eqtype.
 
 Lemma Z_eqbP : Equality.axiom Z.eqb.
 Proof.
-  admit.
+by move=> x y; apply: (iffP idP); case: Z.eqb_spec.
 Qed.
 
 Definition Z_eqMixin := EqMixin Z_eqbP.
