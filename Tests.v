@@ -49,10 +49,10 @@ Fixpoint eq_tree (A : eqType) (t1 t2 : tree A) :=
 
 Lemma eq_treeP (A : eqType) : Equality.axiom (@eq_tree A).
 Proof.
-move=> t1 t2; apply/(iffP idP) => [|<-].
-elim: t1 t2 => [|x1 l1 IHl1 r1 IHr1] [|x2 l2 r2] //=.
-  by case/and3P=> /eqP-> /IHl1-> /IHr1->.
-  by elim: t1 => //= x ? -> ? ->; rewrite eqxx.
+  move=> t1 t2; apply/(iffP idP) => [|<-].
+  elim: t1 t2 => [|x1 l1 IHl1 r1 IHr1] [|x2 l2 r2] //=.
+    by case/and3P=> /eqP-> /IHl1-> /IHr1->.
+    by elim: t1 => //= x ? -> ? ->; rewrite eqxx.
 Qed.
 
 Canonical tree_eqMixin (A : eqType) := EqMixin (@eq_treeP A).
@@ -68,7 +68,7 @@ Section CustomGen.
       | O => returnGen Leaf
       | S n' =>
         frequency' (returnGen Leaf)
-                  [(1, returnGen Leaf);
+                   [(1, returnGen Leaf);
                     (n, liftGen3 Node g (gentreeS g n') (gentreeS g n'))]
     end.
 
@@ -118,13 +118,13 @@ Fixpoint mirror {A : Type} (t : tree A) : tree A :=
     | Leaf => Leaf
     | Node x l r => Node x (mirror l) (mirror l)
   end.
-
+  
 Definition mirrorK (t : tree nat) := mirror (mirror t) == t.
-
+ 
 Definition testtree := showResult (quickCheck mirrorK).
-
+ 
 QuickCheck testtree.
-
+ 
 (* Step 3 : .. or prove them correct   *)
 
 Require Import SetOfOutcomes.
@@ -182,7 +182,7 @@ Qed.
 
 Require Import EndToEnd.
 
-Goal (semProp removeP) <-> (forall (x : nat) l, ~ In x (remove x l)).
+Goal (proposition removeP) <-> (forall (x : nat) l, ~ In x (remove x l)).
 Proof.
   repeat rewrite /semProp /proveFun /semProp /proveBool.
   split.
@@ -197,5 +197,5 @@ Proof.
   -  move => H a _ l _. rewrite /removeP. apply Bool.eq_true_not_negb.
      move => /existsb_exists contra.
      move : contra => [n [HIn /=/eqP Hpred]]; subst. eapply H.
-     eassumption.
+     eassumption. 
 Qed.

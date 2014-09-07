@@ -156,9 +156,9 @@ Section Property.
     callback (PostFinalFailure Counterexample (fun _st _sr => trace str 0)).
 
 
-  Definition expectFailure (prop: Type) `{Testable prop} (p: prop) := 
+  Definition expectFailure {prop: Type} `{Testable prop} (p: prop) := 
     mapTotalResult (fun res =>
-                      MkResult (ok res) true (reason res) 
+                      MkResult (ok res) false (reason res) 
                              (interrupted res) (stamp res) (callbacks res))
                    p.
 

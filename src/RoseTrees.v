@@ -13,7 +13,7 @@ Definition returnRose {A : Type} (x : A) := MkRose x (lazy nil).
 Fixpoint joinRose {A : Type} (r : Rose (Rose A)) : Rose A :=
   match r with
     | MkRose (MkRose a ts) tts =>
-      MkRose a (lazy (List.map joinRose (force tts) ++ (force ts)))
+      MkRose a (lazy ((List.map joinRose (force tts)) ++ (force ts)))
   end.
 
 Fixpoint fmapRose {A B : Type} (f : A -> B) (r : Rose A) : Rose B :=

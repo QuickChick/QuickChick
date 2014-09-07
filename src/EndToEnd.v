@@ -2,13 +2,13 @@ Require Import Show RoseTrees.
 Require Import AbstractGen SetOfOutcomes Arbitrary Property.
 Require Import ssreflect ssrbool eqtype.
 
-
+ 
 Definition Property := Property Pred.
 
 Definition resultSuccessful (r : Result) : bool :=
   match r with
     | MkResult (Some res) expected _ _ _ _ =>
-      if res then true else ~~expected
+      res == expected
     | _ => true
   end.
 
@@ -29,7 +29,7 @@ Definition semTestable {A : Type} {_ : Testable  A} (a : A) : Prop :=
 Lemma mapTotalResult_id:
   forall {prop : Type} {H : Testable prop} (f : Result -> Result) (p : prop),
     (forall res, resultSuccessful res = resultSuccessful (f res)) ->
-    ((semProperty (mapTotalResult f p)) <-> (semTestable p)).
+    (semProperty (mapTotalResult f p) <-> semTestable p).
 Proof.
   move => prop H f p Hyp.
   rewrite /semTestable  /mapTotalResult /mapRoseResult /mapProp /semProperty.
@@ -159,7 +159,8 @@ Proof.
     rewrite /implication.  rewrite /semProperty /property /testResult.
     move => qp. rewrite returnGen_def. by move => <-.
 Qed.
-    
+  
+
 (* equivalences for other combinators *)
 
 Lemma semBindGen:
@@ -194,9 +195,9 @@ Qed.
 
 Lemma semForAll :
   forall {A prop : Type} {H : Testable prop}
-         show (gen : Pred A) (pf : A -> prop),
-  semProperty (forAll show gen pf) <->
-  (forall a : A, gen a -> (semTestable (pf a))).
+         show (gen : Pred A) (f : A -> prop),
+    semProperty (forAll show gen f) <->
+    forall a : A, gen a -> semTestable (f a).
 Proof.
   move => A prop Htest show gen pf. split => H'.
   - rewrite /forAll in H'. move/semBindGen : H' => H' a /H' Hgen.
@@ -207,9 +208,9 @@ Qed.
 
 Lemma semForAllShrink:
   forall {A prop : Type} {H : Testable prop}
-         show (gen : Pred A) (pf : A -> prop) shrink,
-    semProperty (forAllShrink  show gen shrink pf) <->
-    (forall a : A, gen a -> (semTestable (pf a))).
+         show (gen : Pred A) (f : A -> prop) shrinker,
+    semProperty (forAllShrink  show gen shrinker f) <->
+    forall a : A, gen a -> semTestable (f a).
 Proof.
   move => A prop H show gen pf shrink. split.
   - rewrite /forAllShrink semBindGen.
@@ -224,7 +225,7 @@ Qed.
 (* equivalent Props for Testables *)
 
 Lemma semBool:
-  forall (b : bool), semTestable b <-> b.
+  forall (b : bool), semTestable b <-> b = true.
 Proof.  
   move => b. case: b.
   - split => //. compute.
@@ -252,8 +253,7 @@ Proof.
 Qed.
 
 Lemma semQProp:
-  forall (qp: QProp),
-    semTestable qp <-> success qp = true.
+  forall (qp: QProp), semTestable qp <-> success qp = true.
 Proof.
   move => qp. rewrite /semTestable /semProperty /property
                       /testProp returnGen_def.
@@ -279,7 +279,7 @@ Lemma semFun:
   forall {A prop : Type} {H1 : Show A} {H2 : Arbitrary A} {H3 : Testable prop}
          (f : A -> prop),
     semTestable f <->
-    (forall (a : A), @arbitrary _ _ Pred _ a -> semTestable (f a)).
+    forall (a : A), (arbitrary : Pred A) a -> semTestable (f a).
 Proof.
   move=> A prop H1 H2 H3 f.
   rewrite /semTestable /property /testFun.
@@ -310,13 +310,13 @@ Qed.
 
 Class Provable (A : Type) {H: Testable A} : Type :=
  {
-    semProp : A -> Prop;
-    _ : forall a, semProp a <-> semTestable a
+    proposition : A -> Prop;
+    _ : forall a, proposition a <-> semTestable a
   }.
 
 Program Instance proveResult : Provable Result :=
   {|
-    semProp := resultSuccessful
+    proposition := resultSuccessful
   |}.
 Next Obligation.
   by rewrite semResult.
@@ -324,7 +324,7 @@ Qed.
 
 Program Instance proveUnit : Provable unit :=
   {|
-    semProp := fun _ => True
+    proposition := fun _ => True
   |}.
 Next Obligation.
   by rewrite semUnit.
@@ -332,7 +332,7 @@ Qed.
 
 Program Instance proveQProp : Provable QProp :=
   {|
-    semProp qp := success qp = true
+    proposition qp := success qp = true
   |}.
 Next Obligation.
   by rewrite semQProp.
@@ -340,7 +340,7 @@ Qed.
 
 Program Instance proveBool : Provable bool :=
   {|
-    semProp b :=  b = true
+    proposition b :=  b = true
   |}.
 Next Obligation.
   by rewrite semBool.
@@ -349,10 +349,10 @@ Qed.
 Program Instance proveGenProp {prop : Type} `{Provable prop} :
   Provable (Pred prop) :=
   {|
-    semProp g := (forall p, g p -> semProp p)
+    proposition g := (forall p, g p -> proposition p)
   |}.
 Next Obligation.
-  destruct H0 as [semP proof]. rewrite /semProp. split.
+  destruct H0 as [semP proof]. rewrite /proposition. split.
   - move => H'. apply semGen=> p Hgen. apply proof. by auto.
   - move => /semGen H' p Hgen. apply proof. by auto.
 Qed.
@@ -360,13 +360,13 @@ Qed.
 Program Instance proveFun {A prop: Type} `{Arbitrary A} `{Show A}
         `{Provable prop}: Provable (A -> prop) :=
   {|
-    semProp p :=
+    proposition p :=
       (forall a,
          @arbitrary _ _ Pred _ a ->
-         semProp (p a))
+         proposition (p a))
   |}.
 Next Obligation.
-  destruct H2 as [semP proof]. rewrite /semProp. split.
+  destruct H2 as [semP proof]. rewrite /proposition. split.
   - move=> H'. apply semFun => a' /H' Hgen.
     by apply proof.
   - move=> H' a' Hgen. apply proof. by apply semFun.
@@ -375,10 +375,10 @@ Qed.
 Program Instance provePolyFun {prop : Type -> Type} `{Provable (prop nat)} :
   Provable (forall T, prop T) :=
   {
-    semProp f := semProp (f nat)
+    proposition f := proposition (f nat)
   }.
 Next Obligation.
-  destruct H0 as [semP proof]. rewrite /semProp. split.
+  destruct H0 as [semP proof]. rewrite /proposition. split.
   - move=> /proof H'. by apply semPolyFun.
   - move=> /semPolyFun H'. by apply proof.
 Qed.
@@ -386,10 +386,10 @@ Qed.
 Program Instance provePolyFunSet {prop : Set -> Type} `{Provable (prop nat)} :
   Provable (forall T, prop T) :=
   {
-    semProp f := semProp (f nat)
+    proposition f := proposition (f nat)
   }.
 Next Obligation.
-  destruct H0 as [semP proof]. rewrite /semProp. split.
+  destruct H0 as [semP proof]. rewrite /proposition. split.
   - move=> /proof H'. by apply semPolyFunSet.
   - move=> /semPolyFunSet H'. by apply proof.
 Qed.

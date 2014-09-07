@@ -31,15 +31,16 @@ Section ArbitrarySection.
     listOf arbitrary.
 End ArbitrarySection.
 
+Function shrinkBool (x : bool) :=
+  match x with
+    | false => nil
+    | true  => cons false nil
+  end.
 
 Instance arbBool : Arbitrary bool :=
   {|
     arbitrary := @arbitraryBool;
-    shrink x  :=
-      match x with
-        | false => nil
-        | true  => cons false nil
-      end
+    shrink  := shrinkBool
   |}.
 
 
@@ -56,7 +57,7 @@ Qed.
 Instance arbNat : Arbitrary nat :=
   {|
     arbitrary := @arbitraryNat;
-    shrink x := shrinkNat x
+    shrink := shrinkNat
   |}.
 
 Function shrinkZ (x : Z) {measure (fun x => Z.abs_nat x) x}: list Z :=
@@ -78,15 +79,14 @@ Fixpoint shrinkList {A : Type} (shr : A -> list A) (l : list A) : list (list A) 
 
 Instance arbList {A : Type} {Arb : Arbitrary A} : Arbitrary (list A) :=
   {|
-    arbitrary :=
-      fun gen hgen => @arbitraryList gen hgen A Arb;
-    shrink l  := shrinkList shrink l
+    arbitrary g H := @arbitraryList g H A Arb;
+    shrink := shrinkList shrink
   |}.
 
 Instance arbInt : Arbitrary Z :=
   {|
     arbitrary := @arbitraryZ;
-    shrink x := shrinkZ x
+    shrink := shrinkZ
   |}.
 
 
