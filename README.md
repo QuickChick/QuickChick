@@ -1,25 +1,24 @@
 QuickChick
 ==========
 
-Description
+### Description
  
   - Property-Based Testing Plugin for Coq
 
-Known to work with
+### Known to work with
 
   - Coq 8.4pl4
   - OCaml 4.01.0
   - SSReflect 1.5
 
-Compilation and Installation
+### Compilation and Installation
 
   - make && make install
 
-Examples
+### Examples
 
   - Tests.v
 
-Case Studies (IFC)
+### Larger Case Study
 
-  - ifc/extended -- full-fledged experiment
-  - ifc/basic  -- simplified variant
+  - See https://github.com/QuickChick/IFC
