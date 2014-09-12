@@ -20,13 +20,7 @@ install: Makefile.coq src/quickChickLib.cmx src/quickChickLib.o
 	cp src/quickChickLib.o $(COQLIB)/user-contrib/QuickChick
 
 tests:
-	$(MAKE) -C ifc/basic
-	$(MAKE) -C ifc/extended
-
-run-tests: tests
 	coqc Tests.v
-	cd ifc/basic && coqc Driver.v
-	cd ifc/extended && coqc -I Machine -I Testing Testing/Driver.v
 
 Makefile.coq: Make
 	coq_makefile -f Make -o Makefile.coq
