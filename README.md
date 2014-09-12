@@ -3,7 +3,7 @@ QuickChick
 
 ### Description
  
-  - Property-Based Testing Plugin for Coq
+  - Randomized Property-Based Testing Plugin for Coq
 
 ### Known to work with
 
@@ -13,7 +13,7 @@ QuickChick
 
 ### Compilation and Installation
 
-  - make && make install
+    make && make install
 
 ### Examples
 
