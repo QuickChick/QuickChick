@@ -56,7 +56,7 @@ Fixpoint promoteP {A : Type}
   end.
 
 
-
+ 
 Instance PredMonad : GenMonad Pred :=
   {
     bindGen := @bindP;
@@ -245,8 +245,8 @@ Proof.
   by rewrite /liftGen5.
 Qed.
 
-(* Specification of derived constructs *)
-
+(* Specifications for derived constructs *)
+ 
 Lemma sequenceGen_equiv :
   forall {A} (gs : list (Pred A)),
     sequenceGen gs <--> fun l => length l = length gs /\
@@ -254,31 +254,23 @@ Lemma sequenceGen_equiv :
 Proof.
   Opaque bindGen returnGen.
   rewrite /set_eq /sequenceGen.
-  move => A gs l. split; rewrite returnGen_def.
-  * elim : gs l => //= [| g gs IHxs] l Hfold. by subst.
-    case: l Hfold => //= [| b bs] Hfold;
-    rewrite !bindGen_def in Hfold;
-    move: Hfold => [a [ga Hfold]];
-    rewrite !bindGen_def in Hfold;
-    move: Hfold => [l  [Hfold Hret]];
-    rewrite returnGen_def in Hret.
-    - discriminate.
-    - move: Hret => [Heq1 Heq2]; subst.
+  move => A gs l. split; rewrite /returnGen /bindGen /PredMonad /bindP /returnP.
+  - elim : gs l => //= [| g gs IHxs] l Hfold; first by subst.
+    case: l Hfold => //= [| b bs] [a [ga [l  [Hfold Hret]]]].
+    + discriminate.
+    + move: Hret => [Heq1 Heq2]; subst.
       move/IHxs: (Hfold) => [Heq H].
       split.
-      + by rewrite Heq.
-      + move=> x [Heq1 | HIn]. by subst => //=. by auto.
-  * elim : gs l => //= [| g gs IHgs] l [Hlen H].
+      * by rewrite Heq.
+      * move=> x [Heq1 | HIn]. by subst => //=. by auto.
+  - elim : gs l => //= [| g gs IHgs] l [Hlen H].
     + by symmetry; apply/size0nil.
     + case: l Hlen H => //= b bs [Hle] H.
-      rewrite bindGen_def. exists b.
-      split. by apply (H (b, g)); left.
-      rewrite bindGen_def.
+      exists b. split; first by apply (H (b, g)); left.
       exists bs. split => //=.
       apply IHgs. split => //= x HIn. by auto.
 Qed.
 
-(* (Primitively) recursive construct has (primitively) recursive spec *)
 Lemma foldGen_cat:
   forall {A B : Type} (f : A -> B -> Pred A) (bn : list B) (a0 : A) (bs : B),
     foldGen f (bn ++  (bs :: nil)) a0 <--> 
@@ -351,23 +343,19 @@ Lemma vectorOf_equiv:
   forall {A : Type} (k : nat) (g : Pred A),
     vectorOf k g <--> fun l => (length l = k /\ forall x, In x l -> g x).
 Proof.
-  move=> A k g l. rewrite /vectorOf. split.
-  + elim : l k => //= [| b bs IHbs] k Hfold;
-    case: k Hfold => //= k Hfold;
-    rewrite bindGen_def in Hfold;
-    move : Hfold => [a [ga Hfold]];
-    rewrite bindGen_def in Hfold;
-    move: Hfold => [l [Hfold ret]].
-    - by [].
-    - rewrite returnGen_def in ret. case: ret => Heq1 Heq2; subst.
-      move/IHbs: Hfold => [Heq Hforall]. subst.
+  move=> A k g l. rewrite /vectorOf. split. 
+  - elim : l k => //= [| b bs IHbs] k Hfold;
+    rewrite /returnGen /bindGen /PredMonad /bindP /returnP;
+    case: k Hfold => //= k [a [ga [l [Hfold ret]]]]; first by []. 
+    case: ret => Heq1 Heq2; subst.
+    move/IHbs: Hfold => [Heq Hforall]. subst.
       by split => //= x [Heq | HIn]; subst; auto.
-   + elim : l k => //= [| b bs IHbs] k [Heq Hforall];
-     rewrite returnGen_def; case: k Heq => //= k [Heq]; subst.
-     rewrite bindGen_def. exists b.
-     split. by apply (Hforall b); left.
-     rewrite bindGen_def. exists bs.
-     split => //=. apply IHbs. by split => //=; auto.
+  - elim : l k => //= [| b bs IHbs] k [Heq Hforall];
+    rewrite returnGen_def; case: k Heq => //= k [Heq]; subst.
+    rewrite bindGen_def. exists b.
+    split; first by apply (Hforall b); left.
+    rewrite bindGen_def. exists bs.
+    split => //=. apply IHbs. by split => //=; auto.
 Qed.
 
 Lemma listOf_equiv:
@@ -395,7 +383,7 @@ Proof.
   + by left.
   + by right; auto.
 Qed.
-
+ 
 Lemma oneof_equiv:
   forall {A} (l : list (Pred A)) (def : Pred A),
     (oneof def l) <-->
@@ -405,46 +393,46 @@ Proof.
   rewrite /oneof.
   split; rewrite bindGen_def choose_def;
   [ move=> [n [[/= Hlo Hhi] H]] |
-    move=> [[p [Hin pa]] | [Hnil Hdef]]].
-  + case: l Hhi Hlo H => //= [|x xs] Hhi Hlo H.
-    * by right; split; case : n H Hhi Hlo => //=.
-    * case: n H Hhi Hlo => [| n] H Hhi Hlo.
-      - by left; eexists; split ; [by left|].
-      - left. exists (nth def xs n). split => //=.
+    move=> /= [[p [Hin pa]] | [Hnil Hdef]]].
+  - case: l Hhi Hlo H => //= [|x xs] Hhi Hlo H.
+    + by right; split; case : n H Hhi Hlo => //=.
+    + case: n H Hhi Hlo => [| n] H Hhi Hlo.
+      * by left; eexists; split ; [by left|].
+      * left. exists (nth def xs n). split => //=.
         right. apply seqnth_In.
         by rewrite -[X in _ < X - 1]addn1 -[X in _ < _ - X]add0n
                    subnDr subn0 in Hhi.
-  +  * apply In_split in  Hin. move: Hin => [l1 [l2 [Heq]]]. subst.
+  -  + apply In_split in  Hin. move: Hin => [l1 [l2 Heq]]. subst.
        exists (length l1).
        split. split => //=. 
        by rewrite app_length -addnBA leq_addr.
        rewrite nth_cat  //=.
        have -> : length l1 = size l1 by [].
        by rewrite ltnn -[X in X - X]addn0 subnDl sub0n.
-    * subst. exists 0. split => //.
+     + subst. exists 0. split => //.
 Qed.
-
+ 
 Lemma elements_equiv :
   forall {A} (l: list A) (def : A),
     (elements def l) <--> (fun e => In e l \/ (l = nil /\ e = def)).
 Proof.
   move => A l def a.
-  rewrite /elements. rewrite bindGen_def choose_def.
+  rewrite /elements bindGen_def choose_def /=.
   split => [[n [[Hlo Hhi] H]] |
-            [H | [H1 H2]]]; subst.
-  * rewrite returnGen_def in H. subst.
+            [H | [H1 H2]]]; subst. 
+  - rewrite returnGen_def in H. subst.
     case : l Hhi Hlo => //= [| x xs] Hhi Hlo.
-    - rewrite sub0n leqn0 in Hhi.
+    + rewrite sub0n leqn0 in Hhi.
       move/eqP : Hhi => Hhi; subst. by right; split.
-    - left. case: n Hhi Hlo => [| n] Hhi Hlo.
+    + left. case: n Hhi Hlo => [| n] Hhi Hlo.
       by left.
       right; apply/nth_In/leP.
       by rewrite -[X in _ < X - _]addn1 -{2}[1]add0n subnDr subn0 in Hhi.
-  * apply in_split in H. move: H => [l1 [l2 Heq]]; subst.
-    exists (length l1). rewrite returnGen_def. split. split => //=.
-    by rewrite app_length -addnBA leq_addr.
-    by rewrite app_nth2 //= NPeano.Nat.sub_diag.
-  * subst. exists 0. split => //.
+  - + apply in_split in H. move: H => [l1 [l2 Heq]]; subst.
+      exists (length l1). rewrite returnGen_def. split. split => //=.
+      by rewrite app_length -addnBA leq_addr.
+      by rewrite app_nth2 //= NPeano.Nat.sub_diag.
+    + subst. exists 0. split => //.
 Qed.
 
 (* A rather long frequency proof, probably we can do better *)
@@ -539,7 +527,7 @@ Proof.
     case: b  Heqb => //= /not_lt/pick_def H.
     rewrite H in Hpick. rewrite -Hpick //= in Hneq.
 Qed.
-
+ 
 Lemma pick_In :
   forall {A} (l: list (nat * Pred A)) x def,
     In x l /\ fst x <> 0 ->
@@ -562,21 +550,21 @@ Lemma frequency_equiv :
     (fun e => (exists n, exists g, (In (n, g) l /\ g e /\ n <> 0)) \/
               ((l = nil \/ (forall x, In x l -> fst x = 0)) /\ def e)).
 Proof.
-  move=> A l def a.  Opaque nat_compare.
+  move=> A l def a.
   rewrite /frequency' /bindGen /PredMonad /bindP /choose /Randomnat //=.
   split => [[n [[/= Hlo Hhi] H]] |
             [[n [g [H1 [H2 H3]]]] | [[H1 | H1] H2]]].
-  + rewrite -(leq_add2r 1) addn1 in Hhi.
+  - rewrite -(leq_add2r 1) addn1 in Hhi.
     remember (sumn [seq fst i | i <- l]) as sum.
     case: sum Heqsum Hhi H => [|sum] Heqsum Hhi H.
-    - symmetry in Heqsum. move/(sum_fst_zero l): Heqsum => HIn.
+    + symmetry in Heqsum. move/(sum_fst_zero l): Heqsum => HIn.
       rewrite pick_filter filter_nil //= in H.
       right. split => //=; right => x HIn'. by apply/eqP; auto.
       move=> x HIn'. by move/eqP: (HIn x HIn') => ->.
-    - rewrite subnK // Heqsum in Hhi.
+    + rewrite subnK // Heqsum in Hhi.
       move/(pick_exists l n def): Hhi => [[i p] //= [H1 [H2 H3]]].
       left. exists i. exists p. by rewrite H2 // in H.
-  + - have Hand: In (n, g) l /\ fst (n, g) <> 0 by split.
+  - + have Hand: In (n, g) l /\ fst (n, g) <> 0 by split.
       move : (pick_In l (n, g) def Hand) => [n' Hpick].
       exists n'. split => //=. split => //=.
       have Hlt: n' < sumn [seq fst i | i <- l]
@@ -584,14 +572,14 @@ Proof.
       rewrite -(leq_add2r 1) addn1 subnK. by auto.
       case: (sumn [seq fst i | i <- l]) Hlt => //=.
       by rewrite  Hpick.
-    - subst. simpl. rewrite sub0n. exists 0. split => //=.
-    - exists 0. split. split => //=. 
-      elim: l H1 => //=. case => n p l IHl H1.
-      move/(_ (n, p)): (H1) => //= H. rewrite H => //=.
-      rewrite subn0. by auto.
-      by left.
+    + * subst. simpl. rewrite sub0n. exists 0. split => //=.
+      * exists 0. split. split => //=. 
+        elim: l H1 => //=. case => n p l IHl H1.
+        move/(_ (n, p)): (H1) => //= H. rewrite H => //=.
+        rewrite subn0. by auto. 
+        by left.
 Qed.
-
+ 
 
 (* Useless theorems.. *)
 Lemma fold_prop :
@@ -610,7 +598,7 @@ Proof.
   - move => Hequiv. apply/(IHxs (P /\ f a_prev b a))=> //=.
     by split; move => [H1 H2]; split => //=; auto; apply/Hequiv.
 Qed.
-
+ 
 Lemma foldl_prop : forall {A B} (f : A -> B -> A -> Prop) l init P,
   P /\ foldl (fun p (args : (A* (B *A))) =>
                          let (a_prev, ba) := args in

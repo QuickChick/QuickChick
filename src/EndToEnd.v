@@ -194,9 +194,9 @@ Proof.
 Qed.
 
 Lemma semForAll :
-  forall {A prop : Type} {H : Testable prop}
-         show (gen : Pred A) (f : A -> prop),
-    semProperty (forAll show gen f) <->
+  forall {A prop : Type} {H : Testable prop} `{Show A} 
+         (gen : Pred A) (f : A -> prop),
+    semProperty (forAll gen f) <->
     forall a : A, gen a -> semTestable (f a).
 Proof.
   move => A prop Htest show gen pf. split => H'.
@@ -207,9 +207,9 @@ Proof.
 Qed.
 
 Lemma semForAllShrink:
-  forall {A prop : Type} {H : Testable prop}
-         show (gen : Pred A) (f : A -> prop) shrinker,
-    semProperty (forAllShrink  show gen shrinker f) <->
+  forall {A prop : Type} {H : Testable prop} `{Show A}
+         (gen : Pred A) (f : A -> prop) shrinker,
+    semProperty (forAllShrink gen shrinker f) <->
     forall a : A, gen a -> semTestable (f a).
 Proof.
   move => A prop H show gen pf shrink. split.

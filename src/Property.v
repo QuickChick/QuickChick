@@ -187,22 +187,21 @@ Section Property.
     if b then property p else property rejected.
        
 
-  Definition forAll {A prop : Type} {_ : Testable prop}
-             (show : A -> string) (gen : Gen A)  (pf : A -> prop) : Property Gen :=
+  Definition forAll {A prop : Type} {_ : Testable prop} `{Show A}
+             (gen : Gen A)  (pf : A -> prop) : Property Gen :=
     bindGen gen (fun x =>
-                   printTestCase (show x ++ newline) (pf x)).
+    printTestCase (show x ++ newline) (pf x)).
 
-   Definition forAllShrink {A prop : Type} {_ : Testable prop}
-             (show : A -> string)
-             (gen : Gen A) (shrinker : A -> list A) (pf : A -> prop) : Property Gen :=
-    bindGen gen (fun x =>
-                   shrinking shrinker x (fun x' =>
-                                           printTestCase (show x' ++ newline) (pf x'))).
+   Definition forAllShrink {A prop : Type} {_ : Testable prop} `{Show A}
+              (gen : Gen A) (shrinker : A -> list A) (pf : A -> prop) : Property Gen :=
+     bindGen gen (fun x =>
+     shrinking shrinker x (fun x' =>
+     printTestCase (show x' ++ newline) (pf x'))).
 
-  Global Instance testFun {A prop : Type} {_ : Show A}
+  Global Instance testFun {A prop : Type} `{Show A}
          {_ : Arbitrary A} {_ : Testable prop} : Testable (A -> prop) :=
     {
-      property f := forAllShrink show arbitrary shrink f
+      property f := forAllShrink arbitrary shrink f
     }.
 
   Global Instance testPolyFun {prop : Type -> Type} {_ : Testable (prop nat)} : Testable (forall T, prop T) :=
