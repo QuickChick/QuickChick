@@ -8,6 +8,6 @@ Require Import SetOfOutcomes.
 Require Import Gen.
 Require Export Arbitrary.
 Require Export State.
-Require Export Property.
+Require Export Checker.
 Require Export Test.
 Require Export Extraction.

@@ -7,7 +7,7 @@ src/AbstractGen.v
 src/SetOfOutcomes.v
 src/Gen.v
 src/MutateCheck.v
-src/Property.v
+src/Checker.v
 src/EndToEnd.v
 src/Show.v
 src/State.v

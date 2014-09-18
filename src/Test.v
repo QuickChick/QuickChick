@@ -1,6 +1,6 @@
 Require Import Show RoseTrees.
 Require Import AbstractGen Gen.
-Require Import Property.
+Require Import Checker.
 Require Import State.
 Require Import Arbitrary.
 Require Import Axioms.
@@ -179,7 +179,7 @@ Definition giveUp (st : State) (_ : RandomGen -> nat -> QProp) : Result :=
          ("*** Gave up! Passed only " ++ (show (numSuccessTests st)) ++ " tests"
           ++  newline ++ "Discarded: " ++ (show (numDiscardedTests st)) ++ newline).
 
-Definition callbackPostFinalFailure (st : State) (res : Property.Result)
+Definition callbackPostFinalFailure (st : State) (res : Checker.Result)
 : nat :=
 match res with
   | MkResult o e r i s c =>
@@ -191,18 +191,18 @@ match res with
                end) c 0
 end.
 
-Fixpoint roseSize (r : Rose Property.Result) : nat :=
+Fixpoint roseSize (r : Rose Checker.Result) : nat :=
   match r with
     | MkRose _ ts =>
       1 + fold_left (fun acc rose => acc + (roseSize rose)) (force ts) 0
   end.
 
-Function localMin (st : State) (r : Rose Property.Result)
+Function localMin (st : State) (r : Rose Checker.Result)
           {measure roseSize r}
-: (nat * Property.Result) :=
+: (nat * Checker.Result) :=
   match r with
     | MkRose res ts =>
-      match (force ts) return (nat * Property.Result) with
+      match (force ts) return (nat * Checker.Result) with
         | nil =>
           let zero := callbackPostFinalFailure st res in
           (numSuccessShrinks st + zero, res)
@@ -275,7 +275,7 @@ Require Import ZArith.
 (* Axiom unsafeRandomSeed : Z. *)
 Axiom newStdGen : RandomGen.
 
-Definition quickCheckWithResult {prop : Type} {_ : Testable prop}
+Definition quickCheckWithResult {prop : Type} {_ : Checkable prop}
            (a : Args) (p : prop) : Result :=
   (* ignore terminal - always use trace :D *)
   let (rnd, computeFun) :=
@@ -295,7 +295,7 @@ Definition quickCheckWithResult {prop : Type} {_ : Testable prop}
                 rnd             (* randomSeed        *)
                 0               (* numSuccessShrinks *)
                 0               (* numTryShrinks     *)
-       ) (match property p with MkGen g => g end).
+       ) (match checker p with MkGen g => g end).
 
 Fixpoint showCollectStatistics (l : list (string * nat)) :=
   match l with
@@ -312,6 +312,6 @@ Definition showResult (r : Result) :=
   | NoExpectedFailure _ l s => showCollectStatistics l ++ s
   end ++ newline.
 
-Definition quickCheck {prop : Type} {_ : Testable prop}
+Definition quickCheck {prop : Type} {_ : Checkable prop}
            (p : prop) : Result :=
   quickCheckWithResult stdArgs p.
