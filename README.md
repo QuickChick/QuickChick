@@ -25,9 +25,11 @@ QuickChick
   - See https://github.com/QuickChick/IFC
 
 ### Documentation
-Yes, we need some! Until then here are some surrogates:
+Yes, we need some! Until then here are some reasonable surrogates:
+  - QuickChick: A Coq Framework For Verified Property-Based Testing
+    (http://prosecco.gforge.inria.fr/personal/hritcu/publications/verified-testing-draft.pdf)
   - Maxime's presentation at the Coq Workshop (2014-07-18)
     (http://prosecco.gforge.inria.fr/personal/hritcu/talks/QuickChick-Coq.pdf)
   - Catalin's presentation at the Coq Working Group @ PPS (2014-03-19)
     (http://prosecco.gforge.inria.fr/personal/hritcu/talks/QuickChick-PPS.pdf)
-  - TODO: release Zoe's Master's Thesis
+  - TODO: release Zoe's defense slides
