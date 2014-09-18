@@ -18,7 +18,9 @@ QuickChick
 
 ### Simple Examples
 
-  - Tests.v
+  - examples/Tests.v
+  - TODO: add examples/RedBlack.v
+  - examples/ifc-basic (not quite finished)
 
 ### Larger Case Study
 
