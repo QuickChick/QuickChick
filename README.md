@@ -34,4 +34,3 @@ Yes, we need some! Until then here are some reasonable surrogates:
     (http://prosecco.gforge.inria.fr/personal/hritcu/talks/QuickChick-Coq.pdf)
   - Catalin's presentation at the Coq Working Group @ PPS (2014-03-19)
     (http://prosecco.gforge.inria.fr/personal/hritcu/talks/QuickChick-PPS.pdf)
-  - TODO: release Zoe's defense slides
