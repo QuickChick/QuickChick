@@ -1,5 +1,5 @@
 Require Import Show RoseTrees.
-Require Import AbstractGen SetOfOutcomes Arbitrary Property.
+Require Import AbstractGen SetOfOutcomes Arbitrary Checker.
 Require Import ssreflect ssrbool eqtype.
 
  
