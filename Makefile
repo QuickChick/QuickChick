@@ -22,7 +22,7 @@ install: Makefile.coq src/quickChickLib.cmx src/quickChickLib.o
 tests:
 	coqc examples/Tests.v
 	make -C examples/ifc-basic
-	coqc examples/Driver.v
+	cd examples/ifc-basic; coqc Driver.v
 
 Makefile.coq: Make
 	coq_makefile -f Make -o Makefile.coq
