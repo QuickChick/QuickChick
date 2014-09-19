@@ -199,7 +199,7 @@ Section Checkers.
      printTestCase (show x' ++ newline) (pf x'))).
 
    Definition forAllShrinkShow {A prop : Type} {_ : Checkable prop}
-              (gen : Gen A) (show' : A -> string) (shrinker : A -> list A) (pf : A -> prop) : Checker Gen :=
+              (gen : Gen A) (shrinker : A -> list A) (show' : A -> string) (pf : A -> prop) : Checker Gen :=
      bindGen gen (fun x =>
      shrinking shrinker x (fun x' =>
      printTestCase (show' x' ++ newline) (pf x'))).

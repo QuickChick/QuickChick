@@ -101,8 +101,10 @@ Definition testMutantX n :=
   end.
 
 Definition testMutants :=
-  mutateCheckArgs myArgs default_table (fun t => (forAllShrink (fun _ => "")
-                               gen_variation_state (fun _ => nil) (SSNI t : Variation -> Gen.Gen QProp)) : Gen.Gen QProp).
+  mutateCheckArgs myArgs default_table
+    (fun t => (forAllShrinkShow
+      gen_variation_state (fun _ => nil) (fun _ => "")
+      (SSNI t : Variation -> Gen.Gen QProp)) : Gen.Gen QProp).
 
 Definition runTestMutants := show testMutants.
 
