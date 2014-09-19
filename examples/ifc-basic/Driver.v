@@ -9,7 +9,7 @@ Require Import Indist.
 
 Require Import String.
 Local Open Scope string.
-Definition SSNI (t : table) (v : @Variation State) : Property Gen.Gen :=
+Definition SSNI (t : table) (v : @Variation State) : Checker Gen.Gen :=
   let '(V st1 st2) := v in
   let '(St _ _ _ (_@l1)) := st1 in
   let '(St _ _ _ (_@l2)) := st2 in
@@ -24,8 +24,8 @@ Definition SSNI (t : table) (v : @Variation State) : Property Gen.Gen :=
             whenFail ("Initial states: " ++ nl ++ show_pair st1 st2 ++ nl
                         ++ "Final states: " ++ nl ++ show_pair st1' st2' ++nl)
 *)
-            (* collect ("L -> L")*) (property (indist st1' st2'))
-          | _, _ => (* collect "L,L,FAIL" true *) property rejected
+            (* collect ("L -> L")*) (checker (indist st1' st2'))
+          | _, _ => (* collect "L,L,FAIL" true *) checker rejected
         end
       | H, H =>
         match exec t st1, exec t st2 with
@@ -33,41 +33,41 @@ Definition SSNI (t : table) (v : @Variation State) : Property Gen.Gen :=
             if is_atom_low (st_pc st1') && is_atom_low (st_pc st2') then
               (* whenFail ("Initial states: " ++ nl ++ show_pair st1 st2 ++ nl
                         ++ "Final states: " ++ nl ++ show_pair st1' st2' ++nl) *)
-              (* collect ("H -> L")*) (property (indist st1' st2') )
+              (* collect ("H -> L")*) (checker (indist st1' st2') )
             else if is_atom_low (st_pc st1') then
                    (* whenFail ("States: " ++ nl ++ show_pair st2 st2' ++ nl )*)
-              (* collect ("H -> H")*) (property (indist st2 st2'))
+              (* collect ("H -> H")*) (checker (indist st2 st2'))
             else
 (*            whenFail ("States: " ++ nl ++ show_pair st1 st1' ++ nl )*)
-              (* collect ("H -> H")*) (property (indist st1 st1'))
-          | _, _ => property rejected
+              (* collect ("H -> H")*) (checker (indist st1 st1'))
+          | _, _ => checker rejected
         end
       | H,_ =>
         match exec t st1 with
           | Some st1' =>
 (*             whenFail ("States: " ++ nl ++ show_pair st1 st1' ++ nl )*)
-                      (* collect "H -> H"*) (property (indist st1 st1'))
-          | _ => (*collect "H,_,FAIL" true *) property rejected
+                      (* collect "H -> H"*) (checker (indist st1 st1'))
+          | _ => (*collect "H,_,FAIL" true *) checker rejected
         end
       | _,H =>
         match exec t st2 with
           | Some st2' =>
 (*             whenFail ("States: " ++ nl ++ show_pair st2 st2' ++ nl )*)
-                      (* collect "H -> H"*) (property (indist st2 st2'))
-          | _ => (*collect "L,H,FAIL" true *) property rejected
+                      (* collect "H -> H"*) (checker (indist st2 st2'))
+          | _ => (*collect "L,H,FAIL" true *) checker rejected
         end
     end
-  else (* collect "Not indist!" true*)  property rejected
+  else (* collect "Not indist!" true*)  checker rejected
               (* )
-    | _ => property rejected
+    | _ => checker rejected
   end*).
 
-Definition prop_SSNI t : Property Gen.Gen :=
-  forAllShrink show gen_variation_state (fun _ => nil)
+Definition prop_SSNI t : Checker Gen.Gen :=
+  forAllShrink gen_variation_state (fun _ => nil)
    (SSNI t : Variation -> Gen.Gen QProp).
 
 Definition prop_gen_indist :=
-  forAllShrink show gen_variation_state (fun _ => nil)
+  forAllShrink gen_variation_state (fun _ => nil)
                (fun v => let '(V st1 st2) := v in indist st1 st2).
 
 Definition runSSNIdefaultTable := showResult (quickCheck (prop_SSNI default_table : Gen.Gen QProp)).

@@ -198,6 +198,12 @@ Section Checkers.
      shrinking shrinker x (fun x' =>
      printTestCase (show x' ++ newline) (pf x'))).
 
+   Definition forAllShrinkShow {A prop : Type} {_ : Checkable prop}
+              (gen : Gen A) (show' : A -> string) (shrinker : A -> list A) (pf : A -> prop) : Checker Gen :=
+     bindGen gen (fun x =>
+     shrinking shrinker x (fun x' =>
+     printTestCase (show' x' ++ newline) (pf x'))).
+
   Global Instance testFun {A prop : Type} `{Show A}
          {_ : Arbitrary A} {_ : Checkable prop} : Checkable (A -> prop) :=
     {
@@ -219,6 +225,3 @@ End Checkers.
 
 Notation "x ==> y" := (implication x y) (at level 55, right associativity) 
                       : Checker_scope.
-
-
- 
