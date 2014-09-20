@@ -9,7 +9,7 @@ QuickChick
 
   - Coq 8.4pl4
   - OCaml 4.01.0
-    - [CH 2014-09-13: Please note that OCaml 4.02.0 does not seem to work with Coq (the OPAM camlp5 package that's needed to compile Coq does not work with OCaml 4.02.0)]
+    - [CH 2014-09-13: Please note that OCaml 4.02.0 does not seem to work with Coq or SSReflect yet.]
   - SSReflect 1.5
 
 ### Compilation and Installation
