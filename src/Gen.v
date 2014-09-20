@@ -8,15 +8,6 @@ Set Implicit Arguments.
 Inductive Gen (A : Type) : Type :=
   | MkGen : (RandomGen -> nat -> A) -> Gen A.
 
-(* Set of outcomes semantics for generators *)
-Require Import Ensembles.
-
-Definition unGen {A : Type} (g : Gen A) : RandomGen -> nat -> A :=
-  match g with MkGen f => f end.
-
-Definition semGen {A : Type} (g : Gen A) : Ensemble A :=
-  fun a => exists seed, exists size, (unGen g) seed size = a.
-
 Definition fmapG {A B : Type} (f : A -> B) (g : Gen A) : Gen B :=
   match g with
     | MkGen h => MkGen (fun r n => f (h r n))
