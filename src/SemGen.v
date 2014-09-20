@@ -26,8 +26,18 @@ Axiom randomSeedInhabitant : RandomGen.
 Lemma semReturn : forall {A} (x : A),
   semGen (returnG x) <--> eq x.
 Proof.
-  move => A x. rewrite /semGen /set_eq => a. split.
+  move => A x a. rewrite /semGen. split.
   - move => [seed [size H]] //.
   - move => H /=. rewrite H.
     exists randomSeedInhabitant. exists 0. reflexivity.
 Qed.
+
+Lemma semBind : forall {A B} (g : Gen A) (f : A -> Gen B),
+  semGen (bindG g f) <--> fun b => exists a, (semGen g) a /\ (semGen (f a)) b.
+Proof.
+  move => A B [g] f b. rewrite /semGen /bindG => /=. split.
+  - move => [seed [size H]] /=.
+    admit. (* will clearly need assumptions on rndSplit *)
+  - move => [a [[seed1 [size1 H1]] [seed2 [size2 H2]]]].
+    admit. (* here we need to put together two seeds and two sizes *)
+Admitted.
