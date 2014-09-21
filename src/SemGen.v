@@ -7,15 +7,14 @@ Set Implicit Arguments.
 (* Set of outcomes semantics for generators *)
 Require Import Ensembles.
 
-(* also fixing counterintuitive order of arguments *)
-Definition unGen {A : Type} (g : Gen A) : nat -> RandomGen -> A :=
-  match g with MkGen f => fun n r => f r n end.
+Definition unGen {A : Type} (g : Gen A) : RandomGen -> nat -> A :=
+  match g with MkGen f => f end.
 
-Definition semSize {A : Type} (g : RandomGen -> A) : Ensemble A :=
-  fun a => exists seed, g seed = a.
+Definition semSize {A : Type} (g : Gen A) (size : nat) : Ensemble A :=
+  fun a => exists seed, (unGen g) seed size = a.
 
 Definition semGen {A : Type} (g : Gen A) : Ensemble A :=
-  fun a => exists size, semSize ((unGen g) size) a.
+  fun a => exists size, semSize g size a.
 
 (* Equivalence on sets of outcomes *)
 Definition set_eq {A} (m1 m2 : Ensemble A) :=
@@ -37,14 +36,14 @@ Open Scope sem_gen_scope.
    could later try to use type classes to beautify/automate things *)
 Definition sizeMon {A : Type} (g : Gen A) := forall size1 size2,
   (size1 <= size2)%coq_nat ->
-  semSize ((unGen g) size1) --> semSize ((unGen g) size2).
+  semSize g size1 --> semSize g size2.
 
 (* One alternative (that doesn't really seem to work)
    is to add size-monotonicity directly into semGen *)
 Definition semGenMon {A : Type} (g : Gen A) : Ensemble A :=
   fun a => exists size, forall size',
    (size <= size')%coq_nat ->
-   semSize ((unGen g) size') a.
+   semSize g size' a.
 
 (* Sanity check: the size-monotonic semantics corresponds to the
    natural one on all size-monotonic generators *)
@@ -74,7 +73,7 @@ Lemma semReturnMon : forall A (x : A),
   semGenMon (returnG x) <--> eq x.
 Proof.
   move => A x a. rewrite /semGenMon. split.
-  - move => [size H]. specialize (H size (le_refl _)). by move : H => /= [_ H].
+  - move => [size H]. specialize (H size (le_refl _)). by move : H => /= [y H].
   - move => H /=. rewrite H.
     exists 0 => [size _]. exists randomSeedInhabitant. reflexivity.
 Qed.
@@ -90,7 +89,7 @@ Lemma semBind : forall A B (g : Gen A) (f : A -> Gen B),
   semGen (bindG g f) <--> fun b => exists a, (semGen g) a /\ (semGen (f a)) b.
 Proof.
   move => A B g f MonG MonF b. rewrite /semGen /bindG => /=. split.
-  - move : MonG. case : g => [g] MonG /= [size [seed H]]. move : H.
+  - move : MonG. case : g => [g] MonG [size [seed H]]. move : H. simpl.
     case (rndSplit seed) => [seed1 seed2].
     exists (g seed1 size). split; do 2 eexists. reflexivity.
     rewrite <- H. case (f (g seed1 size)). reflexivity.
@@ -134,6 +133,21 @@ Proof.
     rewrite Hs. rewrite H1'. move : H2'. by case (f a).
 Abort.
 
+Lemma semBindConcreteSizes : forall A B (g : Gen A) (f : A -> Gen B) (size : nat),
+  semSize (bindG g f) size <-->
+  fun b => exists a, (semSize g size) a /\
+                     (semSize (f a) size) b.
+Proof.
+  move => A B [g] f size b. rewrite /semSize /bindG => /=. split.
+  - case => [seed H]. move : H.
+    case (rndSplit seed) => [seed1 seed2] H.
+    exists (g seed1 size). split; eexists. reflexivity.
+    rewrite <- H. case (f (g seed1 size)). reflexivity.
+  - move => [a [[seed1 H1] [seed2 H2]]].
+    case (rndSplitAssumption seed1 seed2) => [seed Hseed].
+    exists seed. rewrite Hseed. rewrite H1. move : H2. by case (f a).
+Qed.
+
 Lemma semFMap : forall A B (f : A -> B) (g : Gen A),
   semGen (fmapG f g) <-->
     (fun b => exists a, (semGen g) a /\ b = f a).
@@ -163,8 +177,8 @@ Lemma semSized1 : forall A (f : nat -> Gen A),
   (forall size1 size1' size2,
     (size1 <= size2)%coq_nat ->
     (size1' <= size2)%coq_nat ->
-    (semSize (unGen (f size1) size1') -->
-     semSize (unGen (f size2) size2))) ->
+    (semSize (f size1) size1' -->
+     semSize (f size2) size2)) ->
   semGen (sizedG f) <--> (fun a => exists n, semGen (f n) a).
 Proof.
   move => A f Mon a. rewrite /semGen /sizedG => /=. split.
@@ -175,7 +189,7 @@ Proof.
     assert (MaxL : (n <= max n size)%coq_nat) by apply Max.le_max_l.
     assert (MaxR : (size <= max n size)%coq_nat) by apply Max.le_max_r.
     case (Mon _ _ _ MaxL MaxR _ H) => [seed H'].
-    exists seed. move : H'. by case (f (max n size)).
+    exists seed. move : H'. simpl. by case (f (max n size)).
 Qed.
 
 (* This is a stronger (i.e. unconditionally correct) spec, but still
@@ -183,7 +197,7 @@ Qed.
    abstract at what we have in SetOfOutcomes.v). C'est la vie?
    Should we just give up on completely abstracting away the sizes? *)
 Lemma semSized2 : forall A (f : nat -> Gen A),
-  semGen (sizedG f) <--> (fun a => exists n, semSize (unGen (f n) n) a).
+  semGen (sizedG f) <--> (fun a => exists n, semSize (f n) n a).
 Proof.
   move => A f a. rewrite /semGen /semSize /sizedG => /=. split.
   - move => [size [seed H]]. exists size. move : H.
@@ -195,7 +209,7 @@ Qed.
 (* If we get concrete about sizes, we can also support combinators
    like resize *)
 Lemma semResize : forall A (n : nat) (g : Gen A),
-  semGen (resize n g) <--> semSize ((unGen g) n) .
+  semGen (resize n g) <--> semSize g n .
 Proof.
   move => A n [g] a. rewrite /semGen /semSize /resize => /=. split.
   - move => [_ [seed H]]. by eauto.
