@@ -192,6 +192,16 @@ Proof.
     move : H. case (f size) => g H. rewrite /semSize. by eauto.
 Qed.
 
+(* If we get concrete about sizes, we can also support combinators
+   like resize *)
+Lemma semResize : forall A (n : nat) (g : Gen A),
+  semGen (resize n g) <--> semSize ((unGen g) n) .
+Proof.
+  move => A n [g] a. rewrite /semGen /semSize /resize => /=. split.
+  - move => [_ [seed H]]. by eauto.
+  - move => [seed H]. exists 0. by eauto.
+Qed.
+
 Lemma semSuchThatMaybe : forall A (g : Gen A) (f : A -> bool),
   semGen (suchThatMaybeG g f) <-->
   (fun o => (o = None) \/ (exists y, o = Some y /\ semGen g y /\ f y)).
