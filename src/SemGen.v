@@ -158,28 +158,31 @@ Proof.
   - move => H. exists 0. by rewrite randomRAssumption.
 Qed.  
 
-Lemma semSized : forall A (f : nat -> Gen A),
-  (forall size1 size2,
-    (size1 <= size2)%coq_nat -> (semGen (f size2) --> semGen (f size1))) ->
+(* This has the nice abstract conclusion we want, but a super gory premise *)
+Lemma semSized1 : forall A (f : nat -> Gen A),
+  (forall size1 size1' size2,
+    (size1 <= size2)%coq_nat ->
+    (size1' <= size2)%coq_nat ->
+    (semSize (unGen (f size1) size1') -->
+     semSize (unGen (f size2) size2))) ->
   semGen (sizedG f) <--> (fun a => exists n, semGen (f n) a).
 Proof.
-  move => A f Mon a. rewrite /sizedG => /=. split.
-  - rewrite /semGen /semSize => /=.
+  move => A f Mon a. rewrite /semGen /sizedG => /=. split.
+  - rewrite /semSize => /=.
     move => [size [seed H]]. exists size. move : H.
     case (f size) => g H. rewrite /semSize. by eauto.
-  - move => [n H]. pose proof H as H'. case H as [size H].
-    assert (Max : (n <= max n size)%coq_nat) by apply Max.le_max_l.
-(*
-    case (Mon _ _ Max _ H'). => [seed1' H1'].
-    exists (max n size).
-*)
-    admit. (* Hopefully this follows from something like Mon *)
-Admitted.
+  - move => [n [size H]]. exists (max n size).
+    assert (MaxL : (n <= max n size)%coq_nat) by apply Max.le_max_l.
+    assert (MaxR : (size <= max n size)%coq_nat) by apply Max.le_max_r.
+    case (Mon _ _ _ MaxL MaxR _ H) => [seed H'].
+    exists seed. move : H'. by case (f (max n size)).
+Qed.
 
-(* This is a stronger (i.e. unconditionally correct) spec, but also
-   less abstract. Are there any additional assumptions under which
-   this spec is the same as the one above? Like Mon? *)
-Lemma semSized' : forall A (f : nat -> Gen A),
+(* This is a stronger (i.e. unconditionally correct) spec, but still
+   not as abstract as I was hoping for (and in particular not as
+   abstract at what we have in SetOfOutcomes.v). C'est la vie?
+   Should we just give up on completely abstracting away the sizes? *)
+Lemma semSized2 : forall A (f : nat -> Gen A),
   semGen (sizedG f) <--> (fun a => exists n, semSize (unGen (f n) n) a).
 Proof.
   move => A f a. rewrite /semGen /semSize /sizedG => /=. split.
