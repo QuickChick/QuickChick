@@ -102,9 +102,9 @@ Proof. (* this kind of proof should be "trivial by rewriting",
   move => A x. rewrite /semGen.
   (* was hoping to do the rest by rewriting: setoid_rewrite semReturnSize. *)
   pose proof (semReturnSize x) as G. unfold set_eq in G.
-  (* setoid_rewrite H. -- failed constraints *)
-  move => a. split.
-  - move => [size H]. (* setoid_rewrite semReturnSize in H. *)
+  (* setoid_rewrite G. -- failed constraints *)
+  move => a /=. split.
+  - move => [size H]. (* or rewrite -> G in H. exact H. *)
     rewrite <- G. exact H.
   - move => H. exists 0. by rewrite G.
 Qed.
