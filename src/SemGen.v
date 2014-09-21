@@ -31,6 +31,34 @@ Infix "-->" := set_incl (at level 70, no associativity) : sem_gen_scope.
 
 Open Scope sem_gen_scope.
 
+(* We clearly need to reason about sizes:
+   generators need to be size-monotonous functions *)
+(* Went for the most explicit way of doing this,
+   could later try to use type classes to beautify/automate things *)
+Definition sizeMon {A : Type} (g : Gen A) := forall size1 size2,
+  (size1 <= size2)%coq_nat ->
+  semSize ((unGen g) size1) --> semSize ((unGen g) size2).
+
+(* One alternative (that doesn't really seem to work)
+   is to add size-monotonicity directly into semGen *)
+Definition semGenMon {A : Type} (g : Gen A) : Ensemble A :=
+  fun a => exists size, forall size',
+   (size <= size')%coq_nat ->
+   semSize ((unGen g) size') a.
+
+(* Sanity check: the size-monotonic semantics corresponds to the
+   natural one on all size-monotonic generators *)
+Lemma semGenSemGenMon : forall A (g : Gen A),
+  sizeMon g ->
+  semGen g <--> semGenMon g.
+Proof.
+  rewrite /semGen /semGenMon /sizeMon.
+  move => A g Mon a. split.
+  - move => [size H]. exists size => size' Hsize'.
+    eapply Mon. exact Hsize'. exact H.
+  - move => [size H]. specialize (H size (le_refl _)). eexists. exact H.
+Qed.
+
 Axiom randomSeedInhabitant : RandomGen.
 
 Lemma semReturn : forall A (x : A),
@@ -42,22 +70,23 @@ Proof.
     exists 0. exists randomSeedInhabitant. reflexivity.
 Qed.
 
+Lemma semReturnMon : forall A (x : A),
+  semGenMon (returnG x) <--> eq x.
+Proof.
+  move => A x a. rewrite /semGenMon. split.
+  - move => [size H]. specialize (H size (le_refl _)). by move : H => /= [_ H].
+  - move => H /=. rewrite H.
+    exists 0 => [size _]. exists randomSeedInhabitant. reflexivity.
+Qed.
+
 (* This seems like a very strong assumption;
    for cardinality reasons it requires RandomGen to be infinite *)
 Axiom rndSplitAssumption :
   forall s1 s2 : RandomGen, exists s, rndSplit s = (s1,s2).
 
-(* We clearly need to reason about sizes:
-   generators need to be size-monotonous functions *)
-(* Went for the most explicit way of doing this,
-   could later try to use type classes to beautify/automate things *)
-Definition sizeMonGen {A : Type} (g : Gen A) := forall size1 size2,
-  (size1 <= size2)%coq_nat ->
-  semSize ((unGen g) size1) --> semSize ((unGen g) size2).
-
 Lemma semBind : forall A B (g : Gen A) (f : A -> Gen B),
-  sizeMonGen g ->
-  (forall a, sizeMonGen (f a)) ->
+  sizeMon g ->
+  (forall a, sizeMon (f a)) ->
   semGen (bindG g f) <--> fun b => exists a, (semGen g) a /\ (semGen (f a)) b.
 Proof.
   move => A B g f MonG MonF b. rewrite /semGen /bindG => /=. split.
@@ -70,12 +99,40 @@ Proof.
     case (MonG _ _ Hs1 _ H1) => [seed1' H1'].
     assert (Hs2 : (size2 <= max size1 size2)%coq_nat) by apply Max.le_max_r.
     case (MonF _ _ _ Hs2 _ H2) => [seed2' H2'].
-    eexists (max size1 size2). clear H1 H2.
+    exists (max size1 size2). clear H1 H2.
     case (rndSplitAssumption seed1' seed2') => [seed Hs].
     exists seed.
     move : H1' H2'. move : MonG. case : g => [g] MonG /= H1' H2'.
     rewrite Hs. rewrite H1'. move : H2'. by case (f a).
 Qed.
+
+Lemma semBindMon : forall A B (g : Gen A) (f : A -> Gen B),
+  semGenMon (bindG g f) <-->
+  fun b => exists a, (semGenMon g) a /\ (semGenMon (f a)) b.
+Proof.
+  move => A B g f b. rewrite /semGenMon /bindG => /=. split.
+  - (* couldn't prove this (previously easy) case any more;
+       the quantifier alternation is bad, we can no longer choose a so early *)
+    case : g => [g] /= [size H]. pose proof (H size (le_refl _)) as H'.
+    move : H' => [seed H']. move : H'.
+    case (rndSplit seed) => [seed1 seed2].
+    exists (g seed1 size). split; exists size => size' Hsize'.
+    compute. admit. (* stuck *)
+    rewrite <- H'. case (f (g seed1 size)). compute. admit. (* stuck *)
+  - (* this other case got easier, and it holds unconditionally *)
+    move => [a [[size1 H1] [size2 H2]]].
+    exists (max size1 size2) => size Hsize.
+    assert (Hs1 : (size1 <= max size1 size2)%coq_nat) by apply Max.le_max_l.
+    assert (Hs2 : (size2 <= max size1 size2)%coq_nat) by apply Max.le_max_r.
+    specialize (H1 size (le_trans _ _ _ Hs1 Hsize)).
+    specialize (H2 size (le_trans _ _ _ Hs2 Hsize)).
+    case H1 => [seed1' H1'].
+    case H2 => [seed2' H2']. clear H1 H2.
+    case (rndSplitAssumption seed1' seed2') => [seed Hs].
+    exists seed.
+    move : H1' H2'. case : g => [g] /= H1' H2'.
+    rewrite Hs. rewrite H1'. move : H2'. by case (f a).
+Abort.
 
 Lemma semFMap : forall A B (f : A -> B) (g : Gen A),
   semGen (fmapG f g) <-->
@@ -119,7 +176,7 @@ Proof.
     admit. (* Hopefully this follows from something like Mon *)
 Admitted.
 
-(* Is this a stronger (i.e. unconditionally correct) spec, but also
+(* This is a stronger (i.e. unconditionally correct) spec, but also
    less abstract. Are there any additional assumptions under which
    this spec is the same as the one above? Like Mon? *)
 Lemma semSized' : forall A (f : nat -> Gen A),
