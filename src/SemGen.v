@@ -88,13 +88,19 @@ Proof.
     do 2 eexists. rewrite H2. rewrite <- H1. reflexivity.
 Qed.
 
+(* This seems like a reasonable thing to assume of randomR,
+   why not add it directly to the Random type class? *)
+Axiom randomRAssumption : forall A `{Random A} (a1 a2 a : A),
+  (exists seed, fst (randomR (a1, a2) seed) = a) <->
+  leq a1 a /\ leq a a2.
+
 Lemma semChoose : forall A `{Random A} a1 a2,
   semGen (chooseG (a1,a2)) <--> (fun a => Random.leq a1 a /\ Random.leq a a2).
 Proof.
-  move => A H a1 a2. rewrite /semGen. simpl.
-  admit. (* this seems like a reasonable thing to assume of randomR,
-            why not add it directly to the Random type class? *)
-Admitted.
+  move => A R a1 a2 a. rewrite /semGen /semSize. simpl. split.
+  - move => [_ [seed H]]. rewrite <- randomRAssumption. by eauto.
+  - move => H. exists 0. by rewrite randomRAssumption.
+Qed.  
 
 Lemma semSized : forall A (f : nat -> Gen A),
   (forall size1 size2,
