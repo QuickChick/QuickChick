@@ -51,10 +51,9 @@ Axiom rndSplitAssumption :
    generators need to be size-monotonous functions *)
 (* Went for the most explicit way of doing this,
    could later try to use type classes to beautify/automate things *)
-Definition sizeMonGen {A : Type} (g : Gen A) := forall a size1 size2,
+Definition sizeMonGen {A : Type} (g : Gen A) := forall size1 size2,
   (size1 <= size2)%coq_nat ->
-  semSize ((unGen g) size1) a ->
-  semSize ((unGen g) size2) a.
+  semSize ((unGen g) size1) --> semSize ((unGen g) size2).
 
 Lemma semBind : forall A B (g : Gen A) (f : A -> Gen B),
   sizeMonGen g ->
@@ -68,9 +67,9 @@ Proof.
     rewrite <- H. case (f (g seed1 size)). reflexivity.
   - move => [a [[size1 H1] [size2 H2]]].
     assert (Hs1 : (size1 <= max size1 size2)%coq_nat) by apply Max.le_max_l.
-    case (MonG _ _ _ Hs1 H1) => [seed1' H1'].
+    case (MonG _ _ Hs1 _ H1) => [seed1' H1'].
     assert (Hs2 : (size2 <= max size1 size2)%coq_nat) by apply Max.le_max_r.
-    case (MonF _ _ _ _ Hs2 H2) => [seed2' H2'].
+    case (MonF _ _ _ Hs2 _ H2) => [seed2' H2'].
     eexists (max size1 size2). clear H1 H2.
     case (rndSplitAssumption seed1' seed2') => [seed Hs].
     exists seed.
@@ -104,16 +103,34 @@ Qed.
 
 Lemma semSized : forall A (f : nat -> Gen A),
   (forall size1 size2,
-    (size1 <= size2)%coq_nat -> semGen (f size2) --> semGen (f size2)) ->
+    (size1 <= size2)%coq_nat -> (semGen (f size2) --> semGen (f size1))) ->
   semGen (sizedG f) <--> (fun a => exists n, semGen (f n) a).
 Proof.
-  move => A f Mon a. rewrite /semGen /sizedG => /=. split.
-  - move => [size [seed H]]. exists size. move : H.
+  move => A f Mon a. rewrite /sizedG => /=. split.
+  - rewrite /semGen /semSize => /=.
+    move => [size [seed H]]. exists size. move : H.
     case (f size) => g H. rewrite /semSize. by eauto.
-  - move => [n [size [seed H]]].
+  - move => [n H]. pose proof H as H'. case H as [size H].
+    assert (Max : (n <= max n size)%coq_nat) by apply Max.le_max_l.
+(*
+    case (Mon _ _ Max _ H'). => [seed1' H1'].
     exists (max n size).
+*)
     admit. (* Hopefully this follows from something like Mon *)
 Admitted.
+
+(* Is this a stronger (i.e. unconditionally correct) spec, but also
+   less abstract. Are there any additional assumptions under which
+   this spec is the same as the one above? Like Mon? *)
+Lemma semSized' : forall A (f : nat -> Gen A),
+  semGen (sizedG f) <--> (fun a => exists n, semSize (unGen (f n) n) a).
+Proof.
+  move => A f a. rewrite /semGen /semSize /sizedG => /=. split.
+  - move => [size [seed H]]. exists size. move : H.
+    case (f size) => g H. rewrite /semSize. by eauto.
+  - move => [size [seed H]]. exists size. exists seed.
+    move : H. case (f size) => g H. rewrite /semSize. by eauto.
+Qed.
 
 Lemma semSuchThatMaybe : forall A (g : Gen A) (f : A -> bool),
   semGen (suchThatMaybeG g f) <-->
