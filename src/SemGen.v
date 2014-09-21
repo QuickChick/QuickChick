@@ -140,12 +140,14 @@ Proof.
   admit. (* looks a bit scarry *)
 Admitted.
 
+Definition roseRoot {A : Type} (ra : Rose A) : A :=
+  match ra with
+    | MkRose r _ => r
+  end.
+
 Lemma semPromote : forall A (m : Rose (Gen A)),
   semGen (promoteG m) <-->
-  match m with
-    | MkRose g _ =>
-      semGen(bindG g (fun x : A => returnG (MkRose x (lazy nil))))
-  end.
+  fun b => exists a, semGen (roseRoot m) a /\ b = (MkRose a (lazy nil)).
 Proof.
   move => A m a. rewrite /promoteG /fmapRose.
   admit. (* looks a bit scarry *)
