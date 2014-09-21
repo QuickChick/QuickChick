@@ -79,10 +79,14 @@ Proof.
 Qed.
 
 Lemma semFMap : forall A B (f : A -> B) (g : Gen A),
-  semGen (fmapG f g) = semGen (bindG g (fun a => returnG (f a))).
+  semGen (fmapG f g) <-->
+    (fun b => exists a, (semGen g) a /\ b = f a).
 Proof.
-  (* Should be able to prove this without any extra axioms!? *)
-Admitted.
+  move => A B f [g] b. rewrite /semGen /semSize /fmapG => /=. split.
+  - move => [size [seed [H]]]. exists (g seed size). by eauto.
+  - move => [a [[size [seed [H1]]] H2]].
+    do 2 eexists. rewrite H2. rewrite <- H1. reflexivity.
+Qed.
 
 Lemma semChoose : forall A `{Random A} a1 a2,
   semGen (chooseG (a1,a2)) <--> (fun a => Random.leq a1 a /\ Random.leq a a2).
