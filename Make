@@ -6,6 +6,7 @@ src/RoseTrees.v
 src/AbstractGen.v
 src/SetOfOutcomes.v
 src/Gen.v
+src/SemGen.v
 src/MutateCheck.v
 src/Checker.v
 src/EndToEnd.v

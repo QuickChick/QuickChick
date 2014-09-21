@@ -10,8 +10,8 @@ Definition bindP {A B} (m : Pred A) (f : A -> Pred B) : Pred B :=
 Definition returnP {A} (a : A) : Pred A :=
   fun x => eq a x.
 
-Definition fmapP {A B} (f : A -> B) (a : Pred A) : Pred B :=
- bindP a (fun a => returnP (f a)).
+Definition fmapP {A B} (f : A -> B) (g : Pred A) : Pred B :=
+ bindP g (fun a => returnP (f a)).
 
 Definition chooseP {A : Type} `{Random A} (p : A * A) : Pred A :=
   (fun a => Random.leq (fst p) a /\ Random.leq a (snd p)). 
@@ -21,8 +21,8 @@ Definition sizedP {A} (f : nat -> Pred A) : Pred A:=
 
 Definition suchThatMaybeP {A} (g : Pred A) (f : A -> bool)
 : Pred (option A) :=
-  fun b => (b = None) \/
-           (exists y, b = Some y /\ g y /\ f y).
+  fun o => (o = None) \/
+           (exists y, o = Some y /\ g y /\ f y).
 
 
 (* semantics of promoteP:
