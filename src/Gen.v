@@ -6,7 +6,12 @@ Set Implicit Arguments.
 
 (* The monad carrier *)
 Inductive Gen (A : Type) : Type :=
-  | MkGen : (RandomGen -> nat -> A) -> Gen A.
+  | MkGen : (RandomGen -> nat -> A (** RandomGen*)) -> Gen A.
+
+(*
+-> extracted to
+  | MkGen : (ref RandomGen -> nat -> A) -> Gen A.
+*)
 
 Definition fmapG {A B : Type} (f : A -> B) (g : Gen A) : Gen B :=
   match g with

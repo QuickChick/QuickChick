@@ -18,7 +18,7 @@ Definition semGen {A : Type} (g : Gen A) : Ensemble A :=
 
 (* Equivalence on sets of outcomes *)
 Definition set_eq {A} (m1 m2 : Ensemble A) :=
-  forall A, m1 A <-> m2 A.
+  forall (a : A), m1 a <-> m2 a.
 
 Section Rel.
 
@@ -122,6 +122,15 @@ Qed.
    for cardinality reasons it requires RandomGen to be infinite *)
 Axiom rndSplitAssumption :
   forall s1 s2 : RandomGen, exists s, rndSplit s = (s1,s2).
+
+(* Not abstraction in specification (useless):
+Lemma semBindSize : forall A B (g : Gen A) (f : A -> Gen B)
+                    (size : nat) (seed : RandomGen),
+  (fun b => (unGen (bindG g f) seed size) = b) <-->
+  let '(seed1,seed2) := rndSplit seed in
+  fun b => exists a, unGen g seed1 size = a /\
+                     unGen (f a) seed2 size = b.
+*)
 
 Lemma semBindSize : forall A B (g : Gen A) (f : A -> Gen B) (size : nat),
   semSize (bindG g f) size <-->
