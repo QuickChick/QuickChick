@@ -93,8 +93,12 @@ Section Checker.
 
 End Checker.
 
-Definition args := MkArgs None defNumTests defNumDiscards
-                             defNumShrinks 9 true.
+Axiom size : nat.
+Extract Constant size => "9".
+
+Definition args : Args :=
+  let '(MkArgs rp mSuc md mSh mSz c) := stdArgs in
+  MkArgs rp mSuc md mSh size c.
 
 Definition testInsert :=
   showResult (quickCheckWith args insert_is_redblack_checker).
