@@ -275,7 +275,10 @@ Require Import ZArith.
 (* Axiom unsafeRandomSeed : Z. *)
 Axiom newStdGen : RandomGen.
 
-Definition quickCheckWithResult {prop : Type} {_ : Checkable prop}
+
+(* ZP: This was quickCheckResult before but since we always return result 
+       return result there is no reason for such distinction *)
+Definition quickCheckWith {prop : Type} {_ : Checkable prop}
            (a : Args) (p : prop) : Result :=
   (* ignore terminal - always use trace :D *)
   let (rnd, computeFun) :=
@@ -314,4 +317,4 @@ Definition showResult (r : Result) :=
 
 Definition quickCheck {prop : Type} {_ : Checkable prop}
            (p : prop) : Result :=
-  quickCheckWithResult stdArgs p.
+  quickCheckWith stdArgs p.
