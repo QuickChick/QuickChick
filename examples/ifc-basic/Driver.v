@@ -96,7 +96,7 @@ Eval lazy -[labelCount helper] in
 
 Definition testMutantX n :=
   match nth (mutate_table default_table) n with
-    | Some t => showResult (quickCheckWithResult myArgs (prop_SSNI t : Gen.Gen QProp))
+    | Some t => showResult (quickCheckWith myArgs (prop_SSNI t : Gen.Gen QProp))
     | _ => ""
   end.
 
