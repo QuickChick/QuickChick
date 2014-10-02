@@ -93,10 +93,15 @@ Section Checker.
 
 End Checker.
 
+Definition args := MkArgs None defNumTests defNumDiscards
+                             defNumShrinks 9 true.
 
 Definition testInsert :=
-  showResult (quickCheck insert_is_redblack_checker).
+  showResult (quickCheckWith args insert_is_redblack_checker).
 
+QuickCheck testInsert.
+
+(* Correctness proofs *)
 
 Lemma genColor_correct:
   genColor <--> (fun _ => True).
