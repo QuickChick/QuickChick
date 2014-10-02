@@ -50,7 +50,7 @@ Definition mutateCheckManyArgs {A P : Type} {_: Checker.Checkable P}
   Checker.trace ("Fighting " ++ show (List.length mutants) ++ " mutants")
   (List.fold_left
      (fun n m => match n with (n1,n2) =>
-        let kill := List.existsb found_bug (List.map (quickCheckWithResult args) (ps m)) in
+        let kill := List.existsb found_bug (List.map (quickCheckWith args) (ps m)) in
         let n1' := n1 + (if kill then 1 else 0) in
         let msg := message kill n1' n2 in
         Checker.trace msg (n1', n2 + 1)
