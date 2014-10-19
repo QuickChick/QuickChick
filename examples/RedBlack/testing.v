@@ -1,5 +1,7 @@
 Require Import QuickChick.
 Require Import SetOfOutcomes EndToEnd.
+Require Import NPeano.
+
 Require Import ssreflect ssrnat ssrbool eqtype.
 
 Require Import redblack.
@@ -11,32 +13,100 @@ Open Scope string.
 
 Open Scope Checker_scope.
 
+(* Red-Black Tree invariant: executable definition *)
+
+Fixpoint black_height_bool (t: tree) : option nat :=
+  match t with
+    | Leaf => Some 0
+    | Node c tl _ tr =>
+      let h1 := black_height_bool tl in
+      let h2 := black_height_bool tr in
+      match h1, h2 with
+        | Some n1, Some n2 =>
+          if n1 == n2 then
+            match c with
+              | Black => Some (S n1)
+              | Red => Some n1
+            end
+          else None
+        | _, _ => None
+      end
+  end.
+
+Definition is_black_balanced (t : tree) : bool :=
+  isSome (black_height_bool t).
+
+Fixpoint has_no_red_red (t : tree) : bool :=
+  match t with
+  | Leaf => true
+  | Node Red (Node Red _ _ _) _ _ => false
+  | Node Red _ _ (Node Red _ _ _) => false
+  | Node _ tl _ tr => has_no_red_red tl && has_no_red_red tr
+  end.
+
+Definition is_redblack_bool (t : tree) : bool  :=
+  is_black_balanced t && has_no_red_red t.
+
 Fixpoint showColor (c : color) :=
   match c with
-    | Red => "Red "
-    | Black => "Black "
+    | Red => "Red"
+    | Black => "Black"
   end.
 
-Fixpoint RBTree_to_string (t : tree) :=
+Fixpoint tree_to_string (t : tree) :=
   match t with
     | Leaf => "Leaf"
-    | Node c l x r => "Node " ++ showColor c  ++ show x
-                            ++ " ( " ++ RBTree_to_string l ++ " ) "
-                            ++ " ( " ++ RBTree_to_string r ++ " ) "
+    | Node c l x r => "Node " ++ showColor c ++ " "
+                            ++ "(" ++ tree_to_string l ++ ") "
+                            ++ show x ++ " "
+                            ++ "(" ++ tree_to_string r ++ ")"
   end.
 
-Instance showRBTree {A : Type} `{_ : Show A} : Show tree :=
+Instance showTree {A : Type} `{_ : Show A} : Show tree :=
   {|
-    show t := "" (* CH: this causes a 9x increase in runtime
-                    RBTree_to_string t *)
+    show t := "" (* CH: tree_to_string t causes a 9x increase in runtime *)
   |}.
+
+Section Checker.
+  Context {Gen : Type -> Type}
+          {H: GenMonad Gen}.
+
+  Variable genTree : Gen tree.
+
+  Definition insert_is_redblack_checker : Gen QProp :=
+    forAll arbitraryNat (fun n =>
+    (forAll genTree (fun t =>
+      (is_redblack_bool t ==>
+       is_redblack_bool (insert n t)) : Gen QProp)) : Gen QProp).
+
+  Definition genColor := elements Red [Red; Black].
+
+  Fixpoint genAnyTree_max_height (h : nat) : Gen tree :=
+    match h with 
+    | 0 => returnGen Leaf
+    | S h' => (* oneof (returnGen Leaf) [returnGen Leaf; ( *)
+        bindGen genColor (fun c =>
+        bindGen (genAnyTree_max_height h') (fun t1 =>
+        bindGen (genAnyTree_max_height h') (fun t2 =>
+        bindGen arbitraryNat (fun n =>
+        returnGen (Node c t1 n t2))))) (* )] *)
+    end.
+
+Definition genAnyTree : Gen tree := sized genAnyTree_max_height.
+
+End Checker.
+
+Definition testInsertNaive :=
+  showResult (quickCheck (insert_is_redblack_checker genAnyTree)).
+
+Extract Constant defSize => "5".
+Extract Constant Test.defNumTests => "10".
+QuickCheck testInsertNaive.
+Extract Constant Test.defNumTests => "10000".
 
 Section Generators.
   Context {Gen : Type -> Type}
           {H: GenMonad Gen}.
-
-
-  Definition genColor := elements Red [Red; Black].
 
   Fixpoint genRBTree_height (h : nat) (c : color) :=
     match h with
@@ -81,129 +151,7 @@ Section Generators.
 
 End Generators.
 
-Section Checker.
-  Context {Gen : Type -> Type}
-          {H: GenMonad Gen}.
-
-  Definition insert_is_redblack_checker : Gen QProp :=
-    forAll arbitraryNat (fun n =>
-    (forAll genRBTree (fun t =>
-      (is_redblack_bool t ==>
-       is_redblack_bool (insert n t)) : Gen QProp)) : Gen QProp).
-
-End Checker.
-
-Axiom size : nat.
-Extract Constant size => "9".
-
-Definition args : Args :=
-  let '(MkArgs rp mSuc md mSh mSz c) := stdArgs in
-  MkArgs rp mSuc md mSh size c.
-
 Definition testInsert :=
-  showResult (quickCheckWith args insert_is_redblack_checker).
+  showResult (quickCheck (insert_is_redblack_checker genRBTree)).
 
 QuickCheck testInsert.
-
-(* Correctness proofs *)
-
-Lemma genColor_correct:
-  genColor <--> (fun _ => True).
-Proof.
-  rewrite /genColor. intros c. rewrite elements_equiv.
-  split => // _. left.
-  destruct c;  by [ constructor | constructor(constructor)].
-Qed.
-
-(* ugly proof, needs refactoring at some point *)
-Lemma genRBTree_height_correct:
-  forall c h,
-    (genRBTree_height h c) <--> (fun t => is_redblack' t c h).
-Proof.
-  move => c h. move : c. induction h as [| h]; intros c' t.
-  { rewrite /genRBTree_height. split.
-    - destruct c'.
-      + rewrite returnGen_def. by move => <-; constructor.
-      + rewrite oneof_equiv. move => [[gen [H Hgen]] | [// H Hret]].
-        inversion H as [HIn | HIn]; subst.
-        * rewrite returnGen_def in Hgen; subst. by constructor.
-        * inversion HIn as [HIn' |  HIn'] => //; subst.
-        move: Hgen => [n [Hn Hret]]. rewrite returnGen_def in Hret; subst.
-          by constructor; constructor.
-    - move=> H. inversion H; subst.
-      + destruct c' => //. rewrite oneof_equiv. left.
-        eexists. by split; [by apply in_eq |].
-      + rewrite oneof_equiv. left. eexists.
-        split. by constructor(apply in_eq).
-        eexists. split; first by apply arbNat_correct.
-        inversion H0; subst. inversion H1; subst.
-        reflexivity. }
-  { split.
-    - destruct c'.
-      + move => [tl [/IHh Hgentl [tr [/IHh Hgentr [n [_ H]]]]]].
-        rewrite returnGen_def in H; subst.
-        by constructor => //.
-      + move => [[] [Hcol Hgen]].
-        * move : Hgen =>
-          [tl1 [/IHh Htl1 [tl2 [/IHh Htl2 [tr1 [/IHh Htr1 [tr2 [/IHh Htr2 H]]]]]]]].
-          move : H => [n [_ [nl [_ [nr [_ H]]]]]].
-          rewrite returnGen_def in H; subst.
-          constructor; constructor=> //.
-       * move : Hgen => [tl [/IHh Hgentl [tr [/IHh Hgentr [n [_ H]]]]]].
-         rewrite returnGen_def in H; subst.
-         constructor => //.
-    - move => H. inversion H as [| n tl tr h' Hrbl Hrbr |
-                                   c n tl tr h' Hrbl Hrbr]; subst.
-      + inversion Hrbl as [| |c n1 tl1 tr1 h1 Hrbl1 Hrbr1]; subst.
-        inversion Hrbr as [| |c n2 tl2 tr2 h2 Hrbl2 Hrbr2]; subst.
-        exists Red. split; first by apply genColor_correct.
-        exists tl1. split; first by apply IHh.
-        exists tl2. split; first by apply IHh.
-        exists tr1. split; first by apply IHh.
-        exists tr2. split; first by apply IHh.
-        exists n. split; first by apply arbNat_correct.
-        exists n1. split; first by apply arbNat_correct.
-        exists n2. split; first by apply arbNat_correct.
-        reflexivity.
-      + destruct c'.
-        * exists tl. split; first by apply IHh.
-          exists tr. split; first by apply IHh.
-          exists n. split; first by apply arbNat_correct.
-          reflexivity.
-        * exists Black. split; first by apply genColor_correct.
-          exists tl. split; first by apply IHh.
-          exists tr. split; first by apply IHh.
-          exists n. split; first by apply arbNat_correct.
-          reflexivity. }
-Qed.
-
-Lemma genRBTree_correct:
-  genRBTree <--> is_redblack.
-Proof.
-  move => t. split.
-  - rewrite /genRBTree sized_def.
-    move => [n /genRBTree_height_correct Hgen].
-    eexists. eassumption.
-  - rewrite /is_redblack. move => [h /genRBTree_height_correct  Hgen].
-    rewrite /genRBTree sized_def. by exists h.
-Qed.
-
-Lemma insert_is_redblack_checker_correct:
-  semChecker insert_is_redblack_checker <-> insert_preserves_redblack.
-Proof.
-  rewrite /insert_is_redblack_checker /insert_preserves_redblack semForAll.
-  split.
-  + move => H x s Hrb.
-    have /H/semPredQProp/semForAll H' : @arbitraryNat Pred _ x
-      by apply arbNat_correct.
-    have /H'/semPredQProp/semImplication H'': @genRBTree Pred _ s
-      by apply genRBTree_correct.
-    apply/is_redblackP.
-    by move/is_redblackP/H''/semBool: Hrb.
-  + move=> H a _.
-    apply/semPredQProp/semForAll. move => t Hgen.
-    apply/semPredQProp/semImplication. move => Hrb.
-    apply/semBool. apply/is_redblackP.
-    move: Hrb => /is_redblackP [n Hrb]. eapply H.
-    eexists. eassumption.
-Qed.

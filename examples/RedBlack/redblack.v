@@ -3,155 +3,13 @@ Require Import ssreflect ssrnat ssrbool eqtype.
 (* Formalization inspired from
    https://www.cs.princeton.edu/~appel/papers/redblack.pdf *)
 
+(* An implementation of Red-Black Trees (insert only) *)
+
 Inductive color := Red | Black.
 
 Inductive tree :=
   | Leaf : tree
   | Node : color -> tree -> nat -> tree -> tree.
-
-
-(* RedBlack invariant *)
-
-(* Inductive *)
-Inductive is_redblack' : tree -> color -> nat -> Prop :=
-  | IsRB_leaf: forall c, is_redblack' Leaf c 0
-  | IsRB_r: forall n tl tr h,
-              is_redblack' tl Red h -> is_redblack' tr Red h ->
-              is_redblack' (Node Red tl n tr) Black h
-  | IsRB_b: forall c n tl tr h,
-              is_redblack' tl Black h -> is_redblack' tr Black h ->
-              is_redblack' (Node Black tl n tr) c (S h).
-
-Definition is_redblack t := exists h, is_redblack' t Red h.
-
-(* Boolean *)
-
-Fixpoint black_height_bool (t: tree) : option nat :=
-  match t with
-    | Leaf => Some 0
-    | Node c tl _ tr =>
-      let h1 := black_height_bool tl in
-      let h2 := black_height_bool tr in
-      match h1, h2 with
-        | Some n1, Some n2 =>
-          if n1 == n2 then
-            match c with
-              | Black => Some (S n1)
-              | Red => Some n1
-            end
-          else None
-        | _, _ => None
-      end
-  end.
-
-Definition is_black_balanced (t : tree) : bool :=
-  isSome (black_height_bool t).
-
-Fixpoint has_no_red_red (t : tree) : bool :=
-  match t with
-  | Leaf => true
-  | Node Red (Node Red _ _ _) _ _ => false
-  | Node Red _ _ (Node Red _ _ _) => false
-  | Node _ tl _ tr => has_no_red_red tr && has_no_red_red tr
-  end.
-
-(* This is simpler and much more efficient (overall time: 5.19s vs 8.53s) *)
-Definition is_redblack_bool (t : tree) : bool  :=
-  is_black_balanced t && has_no_red_red t.
-
-Lemma is_redblackP :
-  forall (t : tree),
-    reflect (is_redblack t)
-            (is_redblack_bool t).
-Proof.
-  move => t. induction t.
-  - constructor. rewrite /is_redblack. exists 0. by constructor.
-  - admit.
-Admitted. (* TODO *)
-
-(* CH: the following implementation seems to me rather inefficient
-   (quadratic in the tree height); there seems to be too much
-   redundancy between the two fixpoints (as shown formally by
-   has_black_height), can't they be merged? Or can't at least the
-   checks in black_height be all removed?
-
-   Matt Might has a simpler and more efficient implementation:
-   http://matt.might.net/articles/quick-quickcheck/
-   Implemented above as is_redblack_bool'' 
-
-Fixpoint is_redblack_bool (t : tree) (c: color) : bool  :=
-  match t with
-    | Leaf => true
-    | Node c' tl _ tr =>
-      match c' with
-        | Black =>
-          (black_height_bool tl == black_height_bool tr) &&
-          is_redblack_bool tl Black && is_redblack_bool tr Black
-        | Red =>
-          match c with
-            | Black =>
-              (black_height_bool tl == black_height_bool tr) &&
-              is_redblack_bool tl Red && is_redblack_bool tr Red
-            | Red => false
-          end
-      end
-  end.
-
-Lemma has_black_height :
-  forall t c, is_redblack_bool t c -> exists n, black_height_bool t = Some n.
-Proof.
-  move=> t. induction t; move => c' Hdec; first by exists 0.
-  destruct c'; destruct c; simpl in *; (try by discriminate);
-  move/andP: Hdec => [/andP [/eqP Heq  /IHt1 [n1 Ht1]]  /IHt2 [n2 Ht2]];
-  remember (black_height_bool t1) as h1;
-  remember (black_height_bool t2) as h2;
-  destruct h1, h2; (try discriminate);
-  inversion Heq; subst; eexists; by rewrite eq_refl.
-Qed.
-
-Lemma is_redblackP :
-  forall (t : tree) (c : color) n,
-    reflect (is_redblack t c n)
-            (is_redblack_bool t c && (black_height_bool t == Some n)).
-Proof.
-  move => t c n.
-  apply (@iffP (is_redblack_bool t c && (black_height_bool t == Some n)));
-    first by apply/idP.
-  - move: c n. induction t; intros c' n' Hrb.
-    + move/andP : Hrb => [_ /= /eqP [Hn]]; subst. by constructor.
-    + move/andP : Hrb => [Hdec /eqP Hheight].
-      destruct c'; destruct c; simpl in *; (try by discriminate);
-      move/andP: Hdec => [/andP [/eqP Heq  Ht1]  Ht2];
-      remember (black_height_bool t1) as h1;
-      remember (black_height_bool t2) as h2;
-      destruct h1, h2; (try discriminate);
-      inversion Heq; subst; rewrite eq_refl in Hheight;
-      inversion Hheight; subst;
-      constructor;
-      (try by (apply IHt1; apply/andP; split => //));
-      by (apply IHt2; apply/andP; split => //).
-  - move=> Hrb. induction Hrb; (try by reflexivity);
-    move/andP: IHHrb1 => [Htl /eqP Hhtl];
-    move/andP: IHHrb2 => [Htr /eqP Hhtr]; subst; simpl;
-    rewrite Hhtl Hhtr; repeat (apply/andP; split => //);
-    by rewrite eq_refl.
-Qed.
-
-Lemma is_redblack_exP :
-  forall (t : tree) (c : color),
-    reflect (exists n, is_redblack t c n)
-            (is_redblack_bool t c).
-Proof.
-  move=> t c.
-  apply (@iffP (is_redblack_bool t c));
-    first by apply/idP.
-  - move=> Hrb.  move/has_black_height: (Hrb) => [n Hh]. exists n.
-    apply/is_redblackP. apply/andP; split. exact Hrb.
-      by apply/eqP.
-  - by move => [n /is_redblackP/andP [Hrb _]].
-Qed.
-
-*)
 
 (* insertion *)
 
@@ -190,16 +48,21 @@ Definition makeBlack t :=
 
 Definition insert x s := makeBlack (ins x s).
 
+(* Red-Black Tree invariant: declarative definition *)
+Inductive is_redblack' : tree -> color -> nat -> Prop :=
+  | IsRB_leaf: forall c, is_redblack' Leaf c 0
+  | IsRB_r: forall n tl tr h,
+              is_redblack' tl Red h -> is_redblack' tr Red h ->
+              is_redblack' (Node Red tl n tr) Black h
+  | IsRB_b: forall c n tl tr h,
+              is_redblack' tl Black h -> is_redblack' tr Black h ->
+              is_redblack' (Node Black tl n tr) c (S h).
+
+Definition is_redblack t := exists h, is_redblack' t Red h.
+
 Definition insert_preserves_redblack :=
   forall x s, is_redblack s -> is_redblack (insert x s).
 
-Definition insert_preserves_redblack_bool :=
-  forall x s, is_redblack_bool s -> is_redblack_bool (insert x s).
-
-Lemma insert_preserves_redblack_equiv:
-  insert_preserves_redblack <-> insert_preserves_redblack_bool.
-Proof.
-  rewrite /insert_preserves_redblack /insert_preserves_redblack_bool. split.
-  - move => H x s /is_redblackP H'. apply/is_redblackP. by apply H.
-  - move => H x s Hrb. apply/is_redblackP. apply H. by apply/is_redblackP.
-Qed.
+(* Declarative Property *)
+Lemma insert_preserves_redblack_correct : insert_preserves_redblack.
+Abort. (* if this wasn't about testing, we would just prove this *)
