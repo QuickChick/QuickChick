@@ -84,15 +84,15 @@ Section Checker.
   Fixpoint genAnyTree_max_height (h : nat) : Gen tree :=
     match h with 
     | 0 => returnGen Leaf
-    | S h' => (* oneof (returnGen Leaf) [returnGen Leaf; ( *)
+    | S h' =>
         bindGen genColor (fun c =>
         bindGen (genAnyTree_max_height h') (fun t1 =>
         bindGen (genAnyTree_max_height h') (fun t2 =>
         bindGen arbitraryNat (fun n =>
-        returnGen (Node c t1 n t2))))) (* )] *)
+        returnGen (Node c t1 n t2)))))
     end.
 
-Definition genAnyTree : Gen tree := sized genAnyTree_max_height.
+  Definition genAnyTree : Gen tree := sized genAnyTree_max_height.
 
 End Checker.
 
@@ -154,4 +154,5 @@ End Generators.
 Definition testInsert :=
   showResult (quickCheck (insert_is_redblack_checker genRBTree)).
 
+Extract Constant defSize => "10".
 QuickCheck testInsert.

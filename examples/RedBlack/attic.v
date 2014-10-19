@@ -1,3 +1,4 @@
+
 Definition showDiscards (r : Result) :=
   match r with
   | Success ns nd _ _ => "Success: number of successes " ++ show ns ++ newline ++
@@ -7,6 +8,35 @@ Definition showDiscards (r : Result) :=
 
 Definition testInsertNaiveShowDiscards :=
   showDiscards (quickCheck (insert_is_redblack_checker genAnyTree)).
+
+(* replacing bind with liftGen4 doesn't help *)
+  Fixpoint genAnyTree_max_height' (h : nat) : Gen tree :=
+    match h with 
+    | 0 => returnGen Leaf
+    | S h' => liftGen4 Node genColor
+                            (genAnyTree_max_height h')
+                            arbitraryNat
+                            (genAnyTree_max_height h')
+    end.
+
+  Definition genAnyTree' : Gen tree := sized genAnyTree_max_height'.
+
+(* making the property trivial (discard everything) doesn't help much *)
+  Definition insert_is_redblack_checker : Gen QProp :=
+    (forAll genTree (fun t =>
+      (false ==> true) : Gen QProp)).
+
+(* Generating 2000 trees natively takes 83s! (the same for size 5 and 10!) *)
+Require Import Gen.
+Fixpoint repeatn (n : nat) (f : nat -> nat) : nat :=
+  match n with
+  | 0 => f 0
+  | S n' => f n + repeatn n' f
+  end.
+
+Extract Constant defSize => "5".
+Definition testSample := show (repeatn 100 (fun _ => (List.length (sample' genAnyTree)))).
+QuickCheck testSample.
 
 (* QuickCheck testInsertNaiveShowDiscards. *)
 

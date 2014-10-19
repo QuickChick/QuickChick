@@ -19,7 +19,7 @@ Proof.
 Admitted. (* TODO *)
 
 Lemma genColor_correct:
-  genColor <--> (fun _ => True).
+  genColor <--> all.
 Proof.
   rewrite /genColor. intros c. rewrite elements_equiv.
   split => // _. left.
