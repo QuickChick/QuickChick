@@ -31,7 +31,8 @@ Inductive is_redblack : tree -> color -> nat -> Prop :=
    checks in black_height be all removed?
 
    Matt Might has a simpler and more efficient implementation:
-   http://matt.might.net/articles/quick-quickcheck/ *)
+   http://matt.might.net/articles/quick-quickcheck/
+   Implemented below as is_redblack_bool'' *)
 
 (* is_redblack can be turned into a predicate directly (probably even
    automatically); the only reason this is not enough is that h gets
@@ -81,8 +82,7 @@ Fixpoint has_no_red_red (t : tree) : bool :=
   | Node _ tl _ tr => has_no_red_red tr && has_no_red_red tr
   end.
 
-(* This is simpler and should be more efficient,
-   still it doesn't seem like the performance bottleneck *)
+(* This is simpler and much more efficient (overall time: 5.19s vs 8.53s) *)
 Definition is_redblack_bool'' (t : tree) : bool  :=
   is_black_balanced t && has_no_red_red t.
 
