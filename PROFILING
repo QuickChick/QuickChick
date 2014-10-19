@@ -1,0 +1,6 @@
+
+cd /tmp
+ocamlopt -rectypes -I ~/Apps/coq-8.4pl4/user-contrib/QuickChick quickChickLib.cmx QuickChick8baf2f.ml -p -o QuickChick8baf2f
+gprof QuickChick8baf2f > profile.txt
+gprof2dot profile.txt > profile.dot
+dot -Tpng profile.dot > profile.png

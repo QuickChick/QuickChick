@@ -23,6 +23,29 @@ Inductive is_redblack : tree -> color -> nat -> Prop :=
               is_redblack (Node Black tl n tr) c (S h).
 
 (* Boolean *)
+
+(* CH: the following implementation seems to me rather inefficient
+   (quadratic in the tree height); there seems to be too much
+   redundancy between the two fixpoints (as shown formally by
+   has_black_height), can't they be merged? Or can't at least the
+   checks in black_height be all removed?
+
+   Matt Might has a simpler and more efficient implementation:
+   http://matt.might.net/articles/quick-quickcheck/ *)
+
+(* is_redblack can be turned into a predicate directly (probably even
+   automatically); the only reason this is not enough is that h gets
+   existentially quantified later *)
+Fixpoint is_redblack_bool' (t : tree) (c : color) (h : nat) : bool :=
+  match t, c, h with
+  | Leaf, _, 0 => true
+  | (Node Red tl n tr), Black, _ =>
+    is_redblack_bool' tl Red h && is_redblack_bool' tr Red h
+  | (Node Black tl n tr), _, S h' =>
+    is_redblack_bool' tl Black h' && is_redblack_bool' tr Black h'
+  | _, _, _ => false
+  end.
+
 Fixpoint black_height_bool (t: tree) : option nat :=
   match t with
     | Leaf => Some 0
@@ -40,6 +63,28 @@ Fixpoint black_height_bool (t: tree) : option nat :=
         | _, _ => None
       end
   end.
+
+Definition is_some {A : Type} (o : option A) : bool :=
+  match o with
+  | Some _ => true
+  | _ => false
+  end.
+
+Definition is_black_balanced (t : tree) : bool :=
+  is_some (black_height_bool t).
+
+Fixpoint has_no_red_red (t : tree) : bool :=
+  match t with
+  | Leaf => true
+  | Node Red (Node Red _ _ _) _ _ => false
+  | Node Red _ _ (Node Red _ _ _) => false
+  | Node _ tl _ tr => has_no_red_red tr && has_no_red_red tr
+  end.
+
+(* This is simpler and should be more efficient,
+   still it doesn't seem like the performance bottleneck *)
+Definition is_redblack_bool'' (t : tree) : bool  :=
+  is_black_balanced t && has_no_red_red t.
 
 Fixpoint is_redblack_bool (t : tree) (c: color) : bool  :=
   match t with

@@ -27,9 +27,9 @@ Fixpoint RBTree_to_string (t : tree) :=
 
 Instance showRBTree {A : Type} `{_ : Show A} : Show tree :=
   {|
-    show := RBTree_to_string
+    show t := "" (* CH: this causes a 9x increase in runtime
+                    RBTree_to_string t *)
   |}.
-
 
 Section Generators.
   Context {Gen : Type -> Type}
