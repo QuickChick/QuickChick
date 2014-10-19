@@ -109,10 +109,8 @@ Extract Constant force => "Lazy.force".
 
 Extract Constant Test.ltAscii => "(<=)".
 Extract Constant Test.strEq   => "(=)".
-(*
 Extract Constant Coq.Numbers.Natural.Peano.NPeano.div => "(/)".
 Extract Constant Coq.Numbers.Natural.Peano.NPeano.modulo => "(fun x y -> x mod y)".
-*)
 Extract Constant Test.gte => "(>=)".
 Extract Constant le_gt_dec => "(<=)".
 Extract Constant trace => "(fun x -> print_string (QuickChickLib.string_of_coqstring x); flush stdout; fun y -> y)".
@@ -123,3 +121,6 @@ Extract Constant Show.nl => "['\n']".
 Extract Constant Test.defNumTests => "10000".
 Extract Constant Test.defNumDiscards => "(2 * defNumTests)".
 (*Extract Constant Test.unsafeRandomSeed => "(unsafePerformIO (SR.randomIO :: GHC.Base.IO GHC.Base.Int))". *)
+
+Require Import ssreflect ssrnat ssrbool eqtype.
+Extract Constant eqn => "(==)".
