@@ -88,8 +88,8 @@ Section Checker.
   Definition insert_is_redblack_checker : Gen QProp :=
     forAll arbitraryNat (fun n =>
     (forAll genRBTree (fun t =>
-      (is_redblack_bool t Red ==>
-       is_redblack_bool (insert n t) Red) : Gen QProp)) : Gen QProp).
+      (is_redblack_bool t ==>
+       is_redblack_bool (insert n t)) : Gen QProp)) : Gen QProp).
 
 End Checker.
 
@@ -118,7 +118,7 @@ Qed.
 (* ugly proof, needs refactoring at some point *)
 Lemma genRBTree_height_correct:
   forall c h,
-    (genRBTree_height h c) <--> (fun t => is_redblack t c h).
+    (genRBTree_height h c) <--> (fun t => is_redblack' t c h).
 Proof.
   move => c h. move : c. induction h as [| h]; intros c' t.
   { rewrite /genRBTree_height. split.
@@ -178,33 +178,32 @@ Proof.
 Qed.
 
 Lemma genRBTree_correct:
-  genRBTree <--> (fun t => exists h, is_redblack t Red h).
+  genRBTree <--> is_redblack.
 Proof.
   move => t. split.
   - rewrite /genRBTree sized_def.
     move => [n /genRBTree_height_correct Hgen].
-      by exists n.
-  - move => [n /genRBTree_height_correct Hgen].
-    rewrite /genRBTree sized_def. by exists n.
+    eexists. eassumption.
+  - rewrite /is_redblack. move => [h /genRBTree_height_correct  Hgen].
+    rewrite /genRBTree sized_def. by exists h.
 Qed.
-
 
 Lemma insert_is_redblack_checker_correct:
   semChecker insert_is_redblack_checker <-> insert_preserves_redblack.
 Proof.
   rewrite /insert_is_redblack_checker /insert_preserves_redblack semForAll.
   split.
-  + move => H x s n Hrb.
+  + move => H x s Hrb.
     have /H/semPredQProp/semForAll H' : @arbitraryNat Pred _ x
       by apply arbNat_correct.
     have /H'/semPredQProp/semImplication H'': @genRBTree Pred _ s
-      by apply genRBTree_correct; eexists; eassumption.
-    apply/is_redblack_exP.
-    by move/is_redblack_exP/H''/semBool: (ex_intro _ _ Hrb).
+      by apply genRBTree_correct.
+    apply/is_redblackP.
+    by move/is_redblackP/H''/semBool: Hrb.
   + move=> H a _.
     apply/semPredQProp/semForAll. move => t Hgen.
     apply/semPredQProp/semImplication. move => Hrb.
-    apply/semBool. apply/is_redblack_exP.
-    move: Hrb => /is_redblack_exP [n Hrb]. eapply H.
-    eassumption.
+    apply/semBool. apply/is_redblackP.
+    move: Hrb => /is_redblackP [n Hrb]. eapply H.
+    eexists. eassumption.
 Qed.

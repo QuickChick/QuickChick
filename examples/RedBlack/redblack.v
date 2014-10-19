@@ -13,39 +13,18 @@ Inductive tree :=
 (* RedBlack invariant *)
 
 (* Inductive *)
-Inductive is_redblack : tree -> color -> nat -> Prop :=
-  | IsRB_leaf: forall c, is_redblack Leaf c 0
+Inductive is_redblack' : tree -> color -> nat -> Prop :=
+  | IsRB_leaf: forall c, is_redblack' Leaf c 0
   | IsRB_r: forall n tl tr h,
-              is_redblack tl Red h -> is_redblack tr Red h ->
-              is_redblack (Node Red tl n tr) Black h
+              is_redblack' tl Red h -> is_redblack' tr Red h ->
+              is_redblack' (Node Red tl n tr) Black h
   | IsRB_b: forall c n tl tr h,
-              is_redblack tl Black h -> is_redblack tr Black h ->
-              is_redblack (Node Black tl n tr) c (S h).
+              is_redblack' tl Black h -> is_redblack' tr Black h ->
+              is_redblack' (Node Black tl n tr) c (S h).
+
+Definition is_redblack t := exists h, is_redblack' t Red h.
 
 (* Boolean *)
-
-(* CH: the following implementation seems to me rather inefficient
-   (quadratic in the tree height); there seems to be too much
-   redundancy between the two fixpoints (as shown formally by
-   has_black_height), can't they be merged? Or can't at least the
-   checks in black_height be all removed?
-
-   Matt Might has a simpler and more efficient implementation:
-   http://matt.might.net/articles/quick-quickcheck/
-   Implemented below as is_redblack_bool'' *)
-
-(* is_redblack can be turned into a predicate directly (probably even
-   automatically); the only reason this is not enough is that h gets
-   existentially quantified later *)
-Fixpoint is_redblack_bool' (t : tree) (c : color) (h : nat) : bool :=
-  match t, c, h with
-  | Leaf, _, 0 => true
-  | (Node Red tl n tr), Black, _ =>
-    is_redblack_bool' tl Red h && is_redblack_bool' tr Red h
-  | (Node Black tl n tr), _, S h' =>
-    is_redblack_bool' tl Black h' && is_redblack_bool' tr Black h'
-  | _, _, _ => false
-  end.
 
 Fixpoint black_height_bool (t: tree) : option nat :=
   match t with
@@ -65,14 +44,8 @@ Fixpoint black_height_bool (t: tree) : option nat :=
       end
   end.
 
-Definition is_some {A : Type} (o : option A) : bool :=
-  match o with
-  | Some _ => true
-  | _ => false
-  end.
-
 Definition is_black_balanced (t : tree) : bool :=
-  is_some (black_height_bool t).
+  isSome (black_height_bool t).
 
 Fixpoint has_no_red_red (t : tree) : bool :=
   match t with
@@ -83,8 +56,28 @@ Fixpoint has_no_red_red (t : tree) : bool :=
   end.
 
 (* This is simpler and much more efficient (overall time: 5.19s vs 8.53s) *)
-Definition is_redblack_bool'' (t : tree) : bool  :=
+Definition is_redblack_bool (t : tree) : bool  :=
   is_black_balanced t && has_no_red_red t.
+
+Lemma is_redblackP :
+  forall (t : tree),
+    reflect (is_redblack t)
+            (is_redblack_bool t).
+Proof.
+  move => t. induction t.
+  - constructor. rewrite /is_redblack. exists 0. by constructor.
+  - admit.
+Admitted. (* TODO *)
+
+(* CH: the following implementation seems to me rather inefficient
+   (quadratic in the tree height); there seems to be too much
+   redundancy between the two fixpoints (as shown formally by
+   has_black_height), can't they be merged? Or can't at least the
+   checks in black_height be all removed?
+
+   Matt Might has a simpler and more efficient implementation:
+   http://matt.might.net/articles/quick-quickcheck/
+   Implemented above as is_redblack_bool'' 
 
 Fixpoint is_redblack_bool (t : tree) (c: color) : bool  :=
   match t with
@@ -158,6 +151,7 @@ Proof.
   - by move => [n /is_redblackP/andP [Hrb _]].
 Qed.
 
+*)
 
 (* insertion *)
 
@@ -196,20 +190,16 @@ Definition makeBlack t :=
 
 Definition insert x s := makeBlack (ins x s).
 
-
 Definition insert_preserves_redblack :=
-  forall x s h, is_redblack s Red h ->
-                exists h', is_redblack (insert x s) Red h'.
+  forall x s, is_redblack s -> is_redblack (insert x s).
 
 Definition insert_preserves_redblack_bool :=
-  forall x s, is_redblack_bool s Red -> is_redblack_bool (insert x s) Red.
+  forall x s, is_redblack_bool s -> is_redblack_bool (insert x s).
 
 Lemma insert_preserves_redblack_equiv:
   insert_preserves_redblack <-> insert_preserves_redblack_bool.
 Proof.
   rewrite /insert_preserves_redblack /insert_preserves_redblack_bool. split.
-  - move => H x s /is_redblack_exP [n /H Hrb]. apply/is_redblack_exP.
-    apply Hrb.
-  - move => H x s n Hrb. apply/is_redblack_exP. apply H. apply/is_redblack_exP.
-    by exists n.
+  - move => H x s /is_redblackP H'. apply/is_redblackP. by apply H.
+  - move => H x s Hrb. apply/is_redblackP. apply H. by apply/is_redblackP.
 Qed.
