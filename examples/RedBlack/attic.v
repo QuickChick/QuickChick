@@ -9,6 +9,8 @@ Definition showDiscards (r : Result) :=
 Definition testInsertNaiveShowDiscards :=
   showDiscards (quickCheck (insert_is_redblack_checker genAnyTree)).
 
+(* QuickCheck testInsertNaiveShowDiscards. *)
+
 (* replacing bind with liftGen4 doesn't help *)
   Fixpoint genAnyTree_max_height' (h : nat) : Gen tree :=
     match h with 
@@ -38,7 +40,19 @@ Extract Constant defSize => "5".
 Definition testSample := show (repeatn 100 (fun _ => (List.length (sample' genAnyTree)))).
 QuickCheck testSample.
 
-(* QuickCheck testInsertNaiveShowDiscards. *)
+(* It has to do with discards though, since if I make the property
+   true => true, then it runs fast, as fast as the property at the
+   bottom of the file *)
+
+  Definition insert_is_redblack_checker : Gen QProp :=
+    forAll arbitraryNat (fun n =>
+    (forAll genTree (fun t =>
+      (true ==>
+       true) : Gen QProp)) : Gen QProp).
+
+Extract Constant defSize => "10".
+Extract Constant Test.defNumTests => "10000".
+QuickCheck testInsertNaive.
 
 (* CH: the following implementation seems to me rather inefficient
    (quadratic in the tree height); there seems to be too much
