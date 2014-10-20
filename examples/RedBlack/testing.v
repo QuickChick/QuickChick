@@ -151,8 +151,16 @@ Section Generators.
 
 End Generators.
 
+Definition showDiscards (r : Result) :=
+  match r with
+  | Success ns nd _ _ => "Success: number of successes " ++ show (ns-1) ++ newline ++
+                         "         number of discards "  ++ show nd ++ newline
+  | _ => showResult r
+  end.
+
 Definition testInsert :=
-  showResult (quickCheck (insert_is_redblack_checker genRBTree)).
+  showDiscards (quickCheck (insert_is_redblack_checker genRBTree)).
 
 Extract Constant defSize => "10".
+Extract Constant Test.defNumTests => "10000".
 QuickCheck testInsert.

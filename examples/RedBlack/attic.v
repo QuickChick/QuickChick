@@ -1,11 +1,4 @@
 
-Definition showDiscards (r : Result) :=
-  match r with
-  | Success ns nd _ _ => "Success: number of successes " ++ show ns ++ newline ++
-                         "         number of discards "  ++ show nd ++ newline
-  | _ => showResult r
-  end.
-
 Definition testInsertNaiveShowDiscards :=
   showDiscards (quickCheck (insert_is_redblack_checker genAnyTree)).
 

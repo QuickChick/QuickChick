@@ -60,9 +60,9 @@ Inductive is_redblack' : tree -> color -> nat -> Prop :=
 
 Definition is_redblack t := exists h, is_redblack' t Red h.
 
-Definition insert_preserves_redblack :=
+Definition insert_preserves_redblack : Prop :=
   forall x s, is_redblack s -> is_redblack (insert x s).
 
-(* Declarative Property *)
+(* Declarative Proposition *)
 Lemma insert_preserves_redblack_correct : insert_preserves_redblack.
 Abort. (* if this wasn't about testing, we would just prove this *)

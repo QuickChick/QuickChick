@@ -10,8 +10,7 @@ Require Import testing.
 
 Lemma is_redblackP :
   forall (t : tree),
-    reflect (is_redblack t)
-            (is_redblack_bool t).
+    reflect (is_redblack t) (is_redblack_bool t).
 Proof.
   move => t. induction t.
   - constructor. rewrite /is_redblack. exists 0. by constructor.
