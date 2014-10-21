@@ -28,7 +28,9 @@ QuickChick
 
 ### Documentation
 Yes, we need some! Until then here are some reasonable surrogates:
-  - A Coq Framework For Verified Property-Based Testing
+  - Catalin's presentation at LPR meeting (2014-10-20)
+    (http://prosecco.gforge.inria.fr/personal/hritcu/talks/QuickChick-LTP-GPL.pdf)
+  - Zoe's internship report: A Coq Framework For Verified Property-Based Testing
     (http://prosecco.gforge.inria.fr/personal/hritcu/publications/verified-testing-report.pdf)
   - Zoe's thesis defense at NTU Athens (2014-09-08)
     (http://prosecco.gforge.inria.fr/personal/hritcu/talks/zoe-defense.pdf)
