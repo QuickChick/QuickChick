@@ -12,12 +12,8 @@ Class OrdType (A: Type) :=
 
 Program Instance OrdBool : OrdType bool :=
   { 
-    leq b1 b2 := 
-      match b1, b2 with
-        | true, false => false
-        | _, _ => true
-      end
-    }.
+    leq b1 b2 := implb b1 b2
+  }.
 Next Obligation.
   by destruct a.
 Qed.
@@ -49,22 +45,28 @@ Program Instance OrdZ : OrdType Z :=
 Class Random (A : Type)  :=
   {
     super :> OrdType A;
-    randomR : A * A -> RandomGen -> A * RandomGen
+    randomR : A * A -> RandomGen -> A * RandomGen;
+    randomRSound :
+      forall s (a1 a2: A), leq a1 (fst (randomR (a1, a2) s)) /\
+                           leq (fst (randomR (a1, a2) s)) a2   
   }.
 
 
-Instance Randombool : Random bool :=
+Program Instance Randombool : Random bool :=
   {
-    randomR := randomRBool
+    randomR := randomRBool;
+    randomRSound := randomRBoolSound
   }.
- 
+
 Instance Randomnat : Random nat :=
   {
-    randomR := randomRNat
+    randomR := randomRNat;
+    randomRSound := ramdomRNatSound
   }.
 
 
 Instance RandomZ : Random Z :=
   {
-    randomR := randomRInt
+    randomR := randomRInt;
+    randomRSound := ramdomRIntSound
   }.
