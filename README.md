@@ -7,9 +7,7 @@ QuickChick
 
 ### Known to work with
 
-  - Coq 8.4pl4
-  - OCaml 4.01.0
-    - [CH 2014-09-13: Please note that OCaml 4.02.0 does not yet seem to work with Coq 8.4pl4 or with SSReflect 1.5.]
+  - (Coq 8.4plX and OCaml 4.01.0) or (Coq 8.4pl5 and OCaml 4.02.x)
   - SSReflect 1.5
 
 ### Compilation and Installation
@@ -28,6 +26,8 @@ QuickChick
 
 ### Documentation
 Yes, we need some! Until then here are some reasonable surrogates:
+  - Catalin's topic proposal
+    (http://prosecco.gforge.inria.fr/personal/hritcu/students/topics/2015/quick-chick.pdf)
   - Catalin's presentation at LPR meeting (2014-10-20)
     (http://prosecco.gforge.inria.fr/personal/hritcu/talks/QuickChick-LTP-GPL.pdf)
   - Zoe's internship report: A Coq Framework For Verified Property-Based Testing
