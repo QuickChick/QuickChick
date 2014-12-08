@@ -132,17 +132,22 @@ Qed.
 (*               end) in *)
 (*   sized (fun x => t 0 (max 1 x)). *)
 
+
+(* ZP: Split suchThatMaybe into two different functions 
+        to make a proof easier *) 
+Definition suchThatMaybeAux {A : Type} (g : Gen A) (p : A -> bool) :=
+  fix aux (k : nat) (n : nat) : Gen (option A) :=
+  match n with
+    | O => returnG None
+    | S n' =>
+      bindG (resize (2 * k + n) g) (fun x =>
+                                      if p x then returnG (Some x)
+                                      else aux (S k) n')
+  end.
+  
 Definition suchThatMaybeG {A : Type} (g : Gen A) (p : A -> bool)
 : Gen (option A) :=
-  let t := (fix t (k : nat) (n : nat) : Gen (option A) :=
-              match n with
-                | O => returnG None
-                | S n' =>
-                  bindG (resize (2 * k + n) g) (fun x =>
-                  if p x then returnG (Some x)
-                  else t (S k) n')
-              end) in
-  sizedG (fun x => t 0 (max 1 x)).
+  sizedG (fun x => suchThatMaybeAux g p 0 (max 1 x)).
 
 Definition chooseG {A : Type} `{Random A} (range : A * A) : Gen A := 
   MkGen (fun r _ => fst (randomR range r)).

@@ -220,18 +220,12 @@ Proof.
     do 2 eexists. rewrite H2. rewrite <- H1. reflexivity.
 Qed.
 
-(* This seems like a reasonable thing to assume of randomR,
-   why not add it directly to the Random type class? *)
-Axiom randomRAssumption : forall A `{Random A} (a1 a2 a : A),
-  (exists seed, fst (randomR (a1, a2) seed) = a) <->
-  leq a1 a /\ leq a a2.
-
 Lemma semChoose : forall A `{Random A} a1 a2,
   semGen (chooseG (a1,a2)) <--> (fun a => Random.leq a1 a /\ Random.leq a a2).
 Proof.
   move => A R a1 a2 a. rewrite /semGen /semSize. simpl. split.
-  - move => [_ [seed H]]. rewrite <- randomRAssumption. by eauto.
-  - move => H. exists 0. by rewrite randomRAssumption.
+  - by move => [_ /randomRCorrect H].
+  - move => /randomRCorrect H. by exists 0.
 Qed.  
 
 (* This has the nice abstract conclusion we want, but a super gory premise *)
@@ -278,14 +272,40 @@ Proof.
   - move => [seed H]. exists 0. by eauto.
 Qed.
 
+Lemma semGenSuchThatMaybeAux:
+  forall {A} g p k n (a : A) seed size,
+    unGen (suchThatMaybeAux g p k n) seed size = Some a ->
+    (exists size seed, (unGen g) seed size = a) /\ p a.
+Proof.
+  move=> /= A g p k n. elim : n k =>  [//=| n IHn] k a seed size H.
+  simpl in *. unfold unGen, bindG in H.
+  remember (resize (2 * k + n.+1) g) as g'.
+  case: g' H Heqg'=> /= g' H Heqg'.
+  case: (rndSplit seed) H Heqg'=> /= r1 r2 H Heqg'. 
+  remember (p (g' r1 size)) as b.
+  case: b H Heqb => /= H Heqb. inversion H; subst.
+  rewrite /resize in Heqg'.
+  destruct g as [g]. inversion Heqg'; subst.
+  split =>  //=. by eexists; eexists.
+  eapply (IHn k.+1 a r2 size). rewrite -H.
+  by destruct (suchThatMaybeAux g p k.+1 n).
+Qed.
+  
 Lemma semSuchThatMaybe : forall A (g : Gen A) (f : A -> bool),
   semGen (suchThatMaybeG g f) <-->
   (fun o => (o = None) \/ (exists y, o = Some y /\ semGen g y /\ f y)).
-Proof.
-  move => A g f a. rewrite /suchThatMaybeG.
-  admit. (* looks a bit scarry *)
-Admitted.
-
+Proof.  
+  move => A g f a. rewrite /semGen /semSize. split. 
+  - case : a => [a|] [n [s H]]; last by left. right.
+    eexists; split=> //=.
+    remember (match n with
+                 | 0 => 1
+                 | m'.+1 => m'.+1
+               end) as n'.  
+    apply (semGenSuchThatMaybeAux g f 0 n' s n). rewrite -H /= -Heqn'.
+    by destruct (suchThatMaybeAux g f 0 n').
+  - Abort. 
+     
 Definition roseRoot {A : Type} (ra : Rose A) : A :=
   match ra with
     | MkRose r _ => r
@@ -296,5 +316,5 @@ Lemma semPromote : forall A (m : Rose (Gen A)),
   fun b => exists a, semGen (roseRoot m) a /\ b = (MkRose a (lazy nil)).
 Proof.
   move => A m a. rewrite /promoteG /fmapRose.
-  admit. (* looks a bit scarry *)
+  admit. (* looks a bit scary *)
 Admitted.
