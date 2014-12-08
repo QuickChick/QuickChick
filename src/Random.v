@@ -46,27 +46,27 @@ Class Random (A : Type)  :=
   {
     super :> OrdType A;
     randomR : A * A -> RandomGen -> A * RandomGen;
-    randomRSound :
-      forall s (a1 a2: A), leq a1 (fst (randomR (a1, a2) s)) /\
-                           leq (fst (randomR (a1, a2) s)) a2   
+    randomRCorrect :
+      forall (a a1 a2 : A), leq a1 a /\ leq a a2 <->
+                            exists seed, fst (randomR (a1, a2) seed) = a
   }.
 
 
 Program Instance Randombool : Random bool :=
   {
     randomR := randomRBool;
-    randomRSound := randomRBoolSound
+    randomRCorrect := randomRBoolCorrect
   }.
 
 Instance Randomnat : Random nat :=
   {
     randomR := randomRNat;
-    randomRSound := ramdomRNatSound
+    randomRCorrect := ramdomRNatCorrect
   }.
 
 
 Instance RandomZ : Random Z :=
   {
     randomR := randomRInt;
-    randomRSound := ramdomRIntSound
+    randomRCorrect := ramdomRIntCorrect
   }.

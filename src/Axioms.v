@@ -10,19 +10,19 @@ Axiom mkRandomGen : Z           -> RandomGen.
 (* Primitive generator combinators and some basic soundness 
    assumptions about them *)
 Axiom randomRBool : bool * bool -> RandomGen -> bool * RandomGen.
-Axiom randomRBoolSound :
-  forall s b1 b2,
-    implb b1 (fst (randomRBool (b1, b2) s)) = true /\
-    implb (fst (randomRBool (b1, b2) s)) b2 = true.
+Axiom randomRBoolCorrect :
+  forall b b1 b2,
+    implb b1 b = true /\ implb b b2 = true <->
+    exists seed, (fst (randomRBool (b1, b2) seed)) = b.
 Axiom randomRNat  : nat  * nat  -> RandomGen -> nat * RandomGen.
-Axiom ramdomRNatSound:
-  forall s n1 n2,
-    n1 <= (fst (randomRNat (n1, n2) s)) = true /\
-    (fst (randomRNat (n1, n2) s)) <= n2.
+Axiom ramdomRNatCorrect:
+  forall n n1 n2,
+    n1 <= n /\ n <= n2 <->
+    exists seed, (fst (randomRNat (n1, n2) seed)) = n.  
 Axiom randomRInt  : Z * Z    -> RandomGen -> Z * RandomGen.
-Axiom ramdomRIntSound:
-  forall s n1 n2,
-    Z.leb n1 (fst (randomRInt (n1, n2) s)) = true /\
-    Z.leb (fst (randomRInt (n1, n2) s)) n2 = true.
+Axiom ramdomRIntCorrect:
+  forall z z1 z2,
+    Z.leb z1 z /\ Z.leb z z2 <->
+    exists seed, (fst (randomRInt (z1, z2) seed)) = z.
 
 Axiom newStdGen   : RandomGen.
