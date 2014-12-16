@@ -13,6 +13,9 @@ Inductive Gen (A : Type) : Type :=
   | MkGen : (ref RandomGen -> nat -> A) -> Gen A.
 *)
 
+Definition unGen {A : Type} (g : Gen A) : RandomGen -> nat -> A :=
+  match g with MkGen f => f end.
+
 Definition fmapG {A B : Type} (f : A -> B) (g : Gen A) : Gen B :=
   match g with
     | MkGen h => MkGen (fun r n => f (h r n))
@@ -79,7 +82,7 @@ Definition sizedG {A : Type} (f : nat -> Gen A) : Gen A :=
   MkGen (fun r n => match f n with MkGen m => m r n end).
 
 Definition promoteG {A : Type} (m : Rose (Gen A)) : Gen (Rose A) :=
-  MkGen (fun r n => fmapRose (fun g => match g with MkGen m' => m' r n end) m).
+  MkGen (fun r n => fmapRose (fun g => unGen g r n) m).
 
 Fixpoint rnds (rnd : RandomGen) (n' : nat) : list RandomGen :=
   match n' with
