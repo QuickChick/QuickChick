@@ -151,11 +151,11 @@ Proof.
   - move => [seed H]. exists 0. by eauto.
 Qed.
 
-Lemma semGenSuchThatMaybeAux:
+Lemma semGenSuchThatMaybeAux_sound:
   forall {A} g p k n (a : A) seed size,
     unGen (suchThatMaybeAux g p k n) seed size = Some a ->
     (exists size seed, (unGen g) seed size = a) /\ p a.
-Proof.
+Proof. 
   move=> /= A g p k n. elim : n k =>  [//=| n IHn] k a seed size H.
   simpl in *. unfold unGen, bindG in H.
   remember (resize (2 * k + n.+1) g) as g'.
@@ -169,31 +169,68 @@ Proof.
   eapply (IHn k.+1 a r2 size). rewrite -H.
   by destruct (suchThatMaybeAux g p k.+1 n).
 Qed.
-  
+ 
+(* Lemma semGenSuchThatMaybeAux_complete: *)
+(*   forall {A} g (p : A -> bool) (a : A) seed size, *)
+(*     (unGen g) seed size = a -> p a -> *)
+(*     exists seed size n k,  *)
+(*       unGen (suchThatMaybeAux g p k n) seed size = Some a. *)
+(* Proof.   *)
+(*   move=> A [g] /= p a seed size H pa.  *)
+(*   move/(_ seed seed): rndSplitAssumption => [s Hs]. *)
+(*   exists s. *)
+(*   exists 0. exists (size.+1). exists 0 => //=.  *)
+(*   rewrite Hs /=. by rewrite muln0 add0n H pa. *)
+(* Qed. *)
+   
 Lemma semSuchThatMaybe : forall A (g : Gen A) (f : A -> bool),
-  semGen (suchThatMaybeG g f) <-->
-  (fun o => (o = None) \/ (exists y, o = Some y /\ semGen g y /\ f y)).
+  semGen (suchThatMaybeG g f) --->
+         (fun o => o = None \/
+                   (exists y, o = Some y /\ semGen g y /\ f y)).
+(* Not an exact spec !!! *)
 Proof.  
-  move => A g f a. rewrite /semGen /semSize. split. 
+  move => A g f a. rewrite /semGen /semSize. 
   - case : a => [a|] [n [s H]]; last by left. right.
     eexists; split=> //=.
     remember (match n with
                  | 0 => 1
                  | m'.+1 => m'.+1
                end) as n'.  
-    apply (semGenSuchThatMaybeAux g f 0 n' s n). rewrite -H /= -Heqn'.
+    apply (semGenSuchThatMaybeAux_sound g f 0 n' s n). rewrite -H /= -Heqn'.
     by destruct (suchThatMaybeAux g f 0 n').
-  - Abort. 
-     
+Qed.
+      
 Definition roseRoot {A : Type} (ra : Rose A) : A :=
   match ra with
     | MkRose r _ => r
   end.
 
+
+Definition generates_Rose {A} (r : Rose (Gen A)) (seed: RandomGen) (size : nat) 
+           (t : Rose A) : Prop :=
+
+  t = (fmapRose (fun (g : Gen A) => unGen g seed size) r).  
+
+
 Lemma semPromote : forall A (m : Rose (Gen A)),
-  semGen (promoteG m) <-->
-  fun b => exists a, semGen (roseRoot m) a /\ b = (MkRose a (lazy nil)).
+  semGen (promoteG m) <--> 
+         fun (t : (Rose A)) => 
+           exists seed size, 
+             generates_Rose m seed size t.
 Proof.
-  move => A m a. rewrite /promoteG /fmapRose.
-  admit. (* looks a bit scary *)
-Admitted.
+  move => A m [a [l]]. split.
+  - move => [size [seed H]]. exists seed. exists size. 
+    rewrite -H {H} => /=. move: m. fix 1.
+    destruct m as [[g] [l']] => /=.
+    elim : l' => [//=|//= m' ls IHl].
+    unfold generates_Rose in *. simpl in *.
+    repeat (apply f_equal) => /=. apply f_equal2.
+    apply semPromote. by inversion IHl.
+  - move =>  [seed [size H]]. exists size. exists seed.
+    rewrite H {H}. move: m. fix 1 => [[g] [l']] => /=. 
+    elim : l' => [//=|//= m' ls IHl]. 
+    + apply f_equal2 => //=. by case: g.
+    + apply f_equal2 => //=. by case: g {IHl}.
+      apply f_equal. apply f_equal2 => //=. 
+      by rewrite -semPromote.  by inversion IHl.
+Qed.
