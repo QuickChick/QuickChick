@@ -7,9 +7,6 @@ Set Implicit Arguments.
 (* Set of outcomes semantics for generators *)
 Require Import Ensembles.
 
-Definition unGen {A : Type} (g : Gen A) : RandomGen -> nat -> A :=
-  match g with MkGen f => f end.
-
 Definition semSize {A : Type} (g : Gen A) (size : nat) : Ensemble A :=
   fun a => exists seed, (unGen g) seed size = a.
 
@@ -205,32 +202,12 @@ Definition roseRoot {A : Type} (ra : Rose A) : A :=
     | MkRose r _ => r
   end.
 
-
-Definition generates_Rose {A} (r : Rose (Gen A)) (seed: RandomGen) (size : nat) 
-           (t : Rose A) : Prop :=
-
-  t = (fmapRose (fun (g : Gen A) => unGen g seed size) r).  
-
-
 Lemma semPromote : forall A (m : Rose (Gen A)),
   semGen (promoteG m) <--> 
          fun (t : (Rose A)) => 
            exists seed size, 
-             generates_Rose m seed size t.
-Proof.
-  move => A m [a [l]]. split.
-  - move => [size [seed H]]. exists seed. exists size. 
-    rewrite -H {H} => /=. move: m. fix 1.
-    destruct m as [[g] [l']] => /=.
-    elim : l' => [//=|//= m' ls IHl].
-    unfold generates_Rose in *. simpl in *.
-    repeat (apply f_equal) => /=. apply f_equal2.
-    apply semPromote. by inversion IHl.
-  - move =>  [seed [size H]]. exists size. exists seed.
-    rewrite H {H}. move: m. fix 1 => [[g] [l']] => /=. 
-    elim : l' => [//=|//= m' ls IHl]. 
-    + apply f_equal2 => //=. by case: g.
-    + apply f_equal2 => //=. by case: g {IHl}.
-      apply f_equal. apply f_equal2 => //=. 
-      by rewrite -semPromote.  by inversion IHl.
+              (fmapRose (fun (g : Gen A) => unGen g seed size) m) = t.
+Proof.  
+  move => A rg r. split; 
+  move => [size [seed H]]; exists seed; exists size=> //=. 
 Qed.
