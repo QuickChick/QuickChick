@@ -1,4 +1,4 @@
-Require Import ZArith List ssreflect ssrbool ssrnat.
+Require Import ZArith List ssreflect ssrbool ssrnat eqtype.
 Require Import Axioms RoseTrees Random Gen.
 Import ListNotations.
 
@@ -16,10 +16,12 @@ Definition semGen {A : Type} (g : Gen A) : Ensemble A :=
 (* Equivalence on sets of outcomes *)
 Definition set_eq {A} (m1 m2 : Ensemble A) :=
   forall (a : A), m1 a <-> m2 a.
-
+ 
 (* CH: was trying to get rewriting of <--> to work,
    but so far I didn't manage; it would be nice to make this work;
    ask Maxime? *)
+(* ZP: There is a relevant conversation at CoqClub mailing list *)
+
 Section Rel.
 
 Variable A : Type.
@@ -85,7 +87,7 @@ Qed.
    this is just an abstraction of what's happening at the lower levels *)
 Axiom rndSplitAssumption :
   forall s1 s2 : RandomGen, exists s, rndSplit s = (s1,s2).
-
+ 
 Lemma semBindSize : forall A B (g : Gen A) (f : A -> Gen B) (size : nat),
   semSize (bindG g f) size <-->
   fun b => exists a, (semSize g size) a /\
@@ -106,8 +108,8 @@ Lemma semFMapSize : forall A B (f : A -> B) (g : Gen A) (size : nat),
     (fun b => exists a, (semSize g size) a /\ b = f a).
 Proof.
   move => A B f [g] size b. rewrite /semSize /fmapG => /=. split.
-  - move => [seed [H]]. exists (g seed size). by eauto.
-  - move => [a [[seed [H1]] H2]].
+  - move => [seed H]. exists (g seed size). by eauto.
+  - move => [a [[seed H1] H2]].
     eexists. rewrite H2. rewrite <- H1. reflexivity.
 Qed.
 
@@ -117,8 +119,8 @@ Lemma semFMap : forall A B (f : A -> B) (g : Gen A),
     (fun b => exists a, (semGen g) a /\ b = f a).
 Proof.
   move => A B f [g] b. rewrite /semGen /semSize /fmapG => /=. split.
-  - move => [size [seed [H]]]. exists (g seed size). by eauto.
-  - move => [a [[size [seed [H1]]] H2]].
+  - move => [size [seed H]]. exists (g seed size). by eauto.
+  - move => [a [[size [seed H1]] H2]].
     do 2 eexists. rewrite H2. rewrite <- H1. reflexivity.
 Qed.
 
@@ -210,4 +212,63 @@ Lemma semPromote : forall A (m : Rose (Gen A)),
 Proof.  
   move => A rg r. split; 
   move => [size [seed H]]; exists seed; exists size=> //=. 
+Qed.
+
+
+(* A proof that shrinking doesn't affect the semantics of testing *)
+(* This should move to the appropriate file, once we propagate the changes *)
+
+Require Import Checker.
+
+Definition shrinking {prop A : Type} {_: @Checkable Gen.Gen prop}
+           (shrinker : A -> list A) (x0 : A) (pf : A -> prop) : Checker Gen :=
+  fmapG (fun x => MkProp (joinRose (fmapRose unProp x)))
+        (promoteG (props pf shrinker x0)).
+
+Definition resultSuccessful (r : Result) : bool :=
+  match r with
+    | MkResult (Some res) expected _ _ _ _ =>
+      res == expected
+    | _ => true
+  end.
+
+Definition success qp :=
+  match qp with
+    | MkProp (MkRose res _) => resultSuccessful res
+  end.
+
+(* Maps a Checker to a Prop *)
+Definition semChecker (P : Checker Gen) : Prop :=
+  forall qp, semGen P qp -> success qp = true.
+
+(* Maps a Checkable to a Prop i.e. gives an equivalent proposition to the
+   property under test *)
+Definition semCheckable {A : Type} {_ : Checkable  A} (a : A) : Prop :=
+  semChecker (checker a).
+
+Lemma semShrinking_id:
+  forall {prop A : Type} {H : Checkable prop}
+         (shrinker : A -> list A) (x0 : A) (pf : A -> prop),
+    semChecker (shrinking shrinker x0 pf) <->
+    semCheckable (pf x0).
+Proof.
+  move => prop A HCheck sh x pf. unfold semCheckable, shrinking, semChecker.
+  split. 
+  - unfold props. generalize 1000. case => [| n] H qp [size [seed Hgen]]; subst.
+    + apply H. exists size. exists seed. simpl.
+      by destruct (checker (pf x)) as [[[res [l]]]] => /=.
+    + suff :
+        success
+          (unGen
+             (fmapG
+                (fun x0 => {| unProp := joinRose (fmapRose unProp x0) |})
+                (promoteG (@props' _ _ _ HCheck n.+1 pf sh x))) seed size) = true;
+      first by simpl; destruct (unGen (checker (pf x)) seed size) as [[? ?]].
+      by apply H; exists size; exists seed.
+  - unfold props. generalize 1000.  
+    move => n H qp /semFMap [rqp [/semPromote /= [seed [size H2]] H']]; subst.
+    case: n H => [| n] /(_  (unGen (checker (pf x)) seed size)) /= H;
+    suff : success (unGen (@checker _ _ HCheck (pf x)) seed size) = true;
+    try (by destruct (unGen (checker (pf x)) seed size) as [[res l]]);
+    apply H; by exists size; exists seed.
 Qed.
