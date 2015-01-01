@@ -3,10 +3,8 @@ src/Axioms.v
 src/Random.v
 src/Arbitrary.v
 src/RoseTrees.v
-src/AbstractGen.v
-src/SetOfOutcomes.v
-src/Gen.v
-src/SemGen.v
+src/ModuleGen.v
+src/GenCombinators.v
 src/MutateCheck.v
 src/Checker.v
 src/EndToEnd.v

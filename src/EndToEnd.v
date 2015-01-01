@@ -1,9 +1,8 @@
 Require Import Show RoseTrees.
-Require Import AbstractGen SetOfOutcomes Arbitrary Checker.
+Require Import ModuleGen GenCombinators Arbitrary Checker.
 Require Import ssreflect ssrbool eqtype.
 
- 
-Definition Checker := Checker Pred.
+Import Gen GenComb.
 
 Definition resultSuccessful (r : Result) : bool :=
   match r with
@@ -19,7 +18,7 @@ Definition success qp :=
 
 (* Maps a Checker to a Prop *)
 Definition semChecker (P : Checker) : Prop :=
-  forall qp, P qp -> success qp = true.
+  forall qp, semGen P qp -> success qp = true.
 
 (* Maps a Checkable to a Prop i.e. gives an equivalent proposition to the
    property under test *)
@@ -35,16 +34,15 @@ Proof.
   rewrite /semCheckable  /mapTotalResult /mapRoseResult /mapProp /semChecker.
   split.
   - move=> H1 qp Hprop.
-    rewrite fmapGen_def in H1.
     set qp' :=
       match qp with
         | {| unProp := t |} => {| unProp := fmapRose f t |}
       end.
+    specialize (H1 qp'). 
     have: success qp' = true.
-    { apply H1. exists qp; split => //. }
+    { apply H1.  apply semFmap. exists qp; split => //. }
     destruct qp as [[]]. simpl in *. by rewrite -Hyp.
-  - move => H1 qp [qp' [/H1 Hprop H2]].
-    rewrite /returnP in H2. subst. rewrite /success.
+  - move => H1 qp /semFmap [qp' [/H1 Hprop H2]]; subst.
     destruct qp' as [[]]. simpl in *. by rewrite -Hyp.
 Qed.
 
@@ -75,38 +73,63 @@ Proof.
   move => prop tp s p. by rewrite /printTestCase semCallback_id.
 Qed.
 
-Lemma semShrinking_id_aux:
-  forall {prop A : Type} {H : Checkable prop}
-         (shrinker : A -> list A) (x0 : A) (pf : A -> prop) n,
-    semChecker (fmapGen (fun x => MkProp (joinRose (fmapRose unProp x)))
-                         (promote ((props' n pf shrinker x0)))) <->
-    semCheckable (pf x0).
-Proof.
-  move=> prop A H shrinker x0 pf n. destruct n.
-  -  rewrite /semCheckable /semChecker !fmapGen_def. split.
-     + move => Hfail qp Hprop. apply Hfail. eexists.
-       split. rewrite /promote /PredMonad /promoteP /=.
-       exists qp. split => //. by destruct qp as [[[] []]].
-     + move=> Hfail qp [rqp  [[qp' [Hprop Heq']] Heq]].
-       rewrite /returnP in Heq'; subst. apply Hfail.
-       by destruct qp' as [[[] []]].
-  - rewrite /semCheckable fmapGen_def /semChecker /= /bindP /returnP /=.
-    split.
-    + move=> Hfail qp Hprop. apply Hfail. eexists.
-      split. exists qp. split => //. by destruct qp as [[[] []]].
-    + move=> Hfail qp [rqp [[qp' [Hprop eq]] eq']]; subst.
-      apply Hfail.  by destruct qp' as [[[] []]].
-Qed.
 
+
+
+(* TODO : This proof needs refactoring! *)
 Lemma semShrinking_id:
   forall {prop A : Type} {H : Checkable prop}
          (shrinker : A -> list A) (x0 : A) (pf : A -> prop),
     semChecker (shrinking shrinker x0 pf) <->
     semCheckable (pf x0).
 Proof.
-  move=> prop A H shrinker x0 pf.
-  rewrite /shrinking /props. apply semShrinking_id_aux.
+  move => prop A HCheck sh x pf. unfold semCheckable, shrinking, semChecker.
+  split. 
+  - unfold props. generalize 1000.  
+    case => [| n] H qp /semGenCorrect [size [seed Hgen]]; subst. 
+    + apply H. apply semFmap. eexists.
+      split. apply semPromote.  
+      exists seed. exists size. simpl. reflexivity.
+      simpl.
+      by destruct ((run (checker (pf x)) seed size)) as [[res [l]]] => /=.
+    + suff :
+        success
+          (run
+             (fmap
+                (fun x0 => {| unProp := joinRose (fmapRose unProp x0) |})
+                (promote (@props' _ _ HCheck (S n) pf sh x))) seed size) = true.
+      remember 
+        (run
+           (fmap
+              (fun x0 : Rose QProp =>
+                 {| unProp := joinRose (fmapRose unProp x0) |})
+              (promote (props' (S n) pf sh x))) seed size) as b.  
+      symmetry in Heqb. setoid_rewrite runFmap in Heqb.
+      move : Heqb => [rqp [Hrun Hb]]. simpl. rewrite Hb. 
+      apply runPromote in Hrun. rewrite -Hrun. 
+      simpl in *. by destruct ((run (checker (pf x)) seed size)) as [[res [l]]] => /=.
+      apply H; exists size. 
+      apply semFmapSize. eexists. split => /=.
+      apply semPromoteSize.  exists seed. reflexivity.
+      simpl. rewrite runFmap. eexists. split => //=.
+      remember ((run
+                     (promote
+                        (MkRose (checker (pf x))
+                           {| force := List.map (props' n pf sh) (sh x) |}))
+                     seed size)) as b.
+      symmetry in Heqb. setoid_rewrite runPromote in Heqb. by rewrite -Heqb.
+  - unfold props. generalize 1000.  
+    move => n H qp /semGenCorrect [size [seed /runFmap [rqp [H1 H2]]]].
+    suff : success (run (@checker _ HCheck (pf x)) seed size) = true.
+    + subst.
+      remember (run (promote (props' n pf sh x)) seed size) as b. symmetry in Heqb.
+      apply runPromote in Heqb; subst. simpl.
+      case: n => [| n] /=;
+      by destruct ((run (checker (pf x)) seed size)) as [[res [l]]] => //=.
+      subst. apply H. apply semGenCorrect.
+      by eexists; eexists.
 Qed.
+
 
 Lemma semCover_id:
   forall {prop : Type} {H : Checkable prop} (b: bool) (n: nat)
@@ -157,21 +180,11 @@ Proof.
   - split => /=; auto. apply. reflexivity.
   - split; try congruence. move => _.
     rewrite /implication.  rewrite /semChecker /checker /testResult.
-    move => qp. rewrite returnGen_def. by move => <-.
+    move => qp. by move=> /semReturn H'; subst. 
 Qed.
   
 
 (* equivalences for other combinators *)
-
-Lemma semBindGen:
-  forall {A } (gen : Pred A) (p : A -> Checker),
-    semChecker (bindGen gen p) <-> forall g, gen g -> semChecker (p g).
-Proof.
-  move=> A gen prop. rewrite /semChecker. split.
-  - move => H g Hgen qp Hprop. apply H.  
-    eexists. split; eassumption. 
-  - move => H qp [a [Hgen Hprop]]. eauto.
-Qed.
 
 Lemma semReturnGen:
   forall (p : QProp),
@@ -181,58 +194,73 @@ Proof.
   move => H qp Hprop; auto.
 Qed.
 
+(* Not provable *)
+(* Lemma semBindGen: *)
+(*   forall {A } (gen : G A) (p : A -> Checker), *)
+(*     semChecker (bindGen gen p) <->  *)
+(*     forall g, semGen gen g -> semChecker (p g). *)
+(* Proof.  *)
+(*   move => A gen p. unfold semChecker; split.  *)
+(* Abort. *)
+
+
 Lemma semPredQProp:
-  forall (p : Pred QProp), semCheckable p <-> (semChecker p).
+  forall (p : G QProp), semCheckable p <-> (semChecker p).
 Proof.
    move=> p.
-  rewrite /semCheckable /checker /testGenProp /checker /testProp semBindGen.
+  rewrite /semCheckable /checker /testGenProp /checker /testProp /semChecker.
   split.
-  - move => H pq /H Hgen. rewrite returnGen_def /semChecker in Hgen.
-    by apply Hgen.
-  - move => H pq Hgen. rewrite returnGen_def /semChecker.
-    move => qp Heq; subst. rewrite /semChecker in H. by auto.
+  - move => Hqp qp [s Hsize]. apply Hqp. exists s.
+    apply semBindSize. exists qp. split => //.
+    by apply semReturnSize.
+  - move => H pq [s /semBindSize [qp [H1 /semReturnSize H2]]]; subst.
+    apply H. by exists s.
 Qed.
 
 Lemma semForAll :
   forall {A prop : Type} {H : Checkable prop} `{Show A} 
-         (gen : Pred A) (f : A -> prop),
+         (gen : G A) (f : A -> prop),
     semChecker (forAll gen f) <->
-    forall a : A, gen a -> semCheckable (f a).
+    forall (a : A) s, semSize gen s a -> semCheckable (f a).
 Proof.
-  move => A prop Htest show gen pf. split => H'.
-  - rewrite /forAll in H'. move/semBindGen : H' => H' a /H' Hgen.
-    by apply semPrintTestCase_id in Hgen.
-  - rewrite /forAll in H' *. apply semBindGen => g Hgen.
-    rewrite semPrintTestCase_id. by apply H'.
-Qed.
+  (* move => A prop Htest show gen pf. split => H'. *)
+  (* - rewrite /forAll  /semCheckable /semChecker in H'.  *)
+  (*   move : H' => H' a S Hgen. *)
+  (*   rewrite /semCheckable /semChecker => qp [s' Hgen']. *)
+  (*   apply H'. eexists. apply semBindSize. eexists; split => //. *)
+  (*   apply Hgen. apply semPrintTestCase_id. *)
+  (*   apply semPrintTestCase_id in Hgen. *)
+  (* - rewrite /forAll in H' *. apply semBindGen => g Hgen. *)
+  (*   rewrite semPrintTestCase_id. by apply H'. *)
+Abort.
 
 Lemma semForAllShrink:
   forall {A prop : Type} {H : Checkable prop} `{Show A}
-         (gen : Pred A) (f : A -> prop) shrinker,
+         (gen : G A) (f : A -> prop) shrinker,
     semChecker (forAllShrink gen shrinker f) <->
-    forall a : A, gen a -> semCheckable (f a).
+    forall a : A, semGen gen a -> semCheckable (f a).
 Proof.
-  move => A prop H show gen pf shrink. split.
-  - rewrite /forAllShrink semBindGen.
-    move=> H' a /H' Hgen. setoid_rewrite semShrinking_id in Hgen.
-    setoid_rewrite semPredQProp in Hgen.
-    by apply semPrintTestCase_id in Hgen.
-  - move=> H'. rewrite /forAllShrink semBindGen. move => a g.
-    rewrite semShrinking_id. apply semPredQProp.
-    rewrite semPrintTestCase_id. by auto.
-Qed.
+  (* move => A prop H show gen pf shrink. split. *)
+  (* - rewrite /forAllShrink semBindGen. *)
+  (*   move=> H' a /H' Hgen. setoid_rewrite semShrinking_id in Hgen. *)
+  (*   setoid_rewrite semPredQProp in Hgen. *)
+  (*   by apply semPrintTestCase_id in Hgen. *)
+  (* - move=> H'. rewrite /forAllShrink semBindGen. move => a g. *)
+  (*   rewrite semShrinking_id. apply semPredQProp. *)
+  (*   rewrite semPrintTestCase_id. by auto. *)
+Abort.
 
 (* equivalent Props for Checkables *)
 
 Lemma semBool:
   forall (b : bool), semCheckable b <-> b = true.
 Proof.  
-  move => b. case: b.
-  - split => //. compute.
-    by move => _ qp Heq; subst.
-  - split => //. rewrite /semCheckable /semChecker. move => H.
-    simpl in H.  rewrite /returnP /= in H. 
-    by specialize (H _ Logic.eq_refl).
+  move => b. case: b. 
+  - split => //. rewrite /semCheckable /semChecker.
+    by move => _ qp [size /semReturnSize Heq]; subst.
+  - split => //. rewrite /semCheckable /semChecker. 
+    move => /(_ (MkProp (MkRose (liftBool false) (lazy nil)))) H.
+    apply H. by apply semReturn. 
 Qed.
 
 Lemma semResult:
@@ -241,52 +269,50 @@ Proof.
   rewrite /semCheckable /checker /testResult /semChecker.
   move => res. split.
   + move=> /(_ ({| unProp := returnRose res |})) /= H.
-    by apply H.
-  + move=> H [[res' l]] [Heq1 Heq2]; by subst.
+    apply H. by apply semReturn.
+  + by move=> H [[res' l]] [Heq1 /semReturnSize [Heq2 Heq3]]; subst. 
 Qed.
 
 Lemma semUnit:
   forall (t: unit), semCheckable t <-> True.
 Proof.
-  move => t. split => // _. compute.
-  by move => qp Heq; subst.
+  move => t. split => // _.
+  by move => qp /semReturn Heq; subst. 
 Qed.
 
 Lemma semQProp:
   forall (qp: QProp), semCheckable qp <-> success qp = true.
 Proof.
-  move => qp. rewrite /semCheckable /semChecker /checker
-                      /testProp returnGen_def.
-  split.
-  - auto.
-  - by move => H qp' Heq; subst.
+  move => qp. 
+  rewrite /semCheckable /semChecker /checker /testProp.
+  split. 
+  - apply. by apply semReturn.
+  - by move => H qp' /semReturn Heq; subst.
 Qed.
 
 Lemma semGen:
-  forall (P : Type) {H : Checkable P} (gen: Pred P),
-    (semCheckable gen) <-> (forall p, gen p -> semCheckable p).
+  forall (P : Type) {H : Checkable P} (gen: G P),
+    (semCheckable gen) <-> (forall p, semGen gen p -> semCheckable p).
 Proof.
   move=> P H gen. split.
-  - move=> Hsem qp Hgen. rewrite /semCheckable /semChecker in Hsem *.
-    move => qp' Hprop. apply Hsem. rewrite /checker /testGenProp bindGen_def.
-    exists qp. split => //.
-  - move => H'. rewrite /semCheckable /semChecker. move=> qp prop.
-    rewrite /checker /testGenProp in prop. move : prop => [p [/H' Hgen Hprop]].
-    rewrite /semCheckable /semChecker in Hgen. by auto.
-Qed.
+  - move=> Hsem qp [n1 Hgen]. rewrite /semCheckable /semChecker in Hsem *.
+    move => qp' [n2 Hprop]. simpl in *.
+    apply Hsem. exists n1. apply semBindSize. exists qp.
+    split => //.
+Abort.
 
 Lemma semFun:
   forall {A prop : Type} {H1 : Show A} {H2 : Arbitrary A} {H3 : Checkable prop}
          (f : A -> prop),
     semCheckable f <->
-    forall (a : A), (arbitrary : Pred A) a -> semCheckable (f a).
+    forall (a : A), semGen arbitrary a -> semCheckable (f a).
 Proof.
-  move=> A prop H1 H2 H3 f.
-  rewrite /semCheckable /checker /testFun.
-  split.
-  - move => /semForAllShrink H' a' /H' Gen. by auto.
-  - move => H'. apply semForAllShrink => a' /H' Hgen. by auto.
-Qed.
+  (* move=> A prop H1 H2 H3 f. *)
+  (* rewrite /semCheckable /checker /testFun. *)
+  (* split. *)
+  (* - move => /semForAllShrink H' a' /H' Gen. by auto. *)
+  (* - move => H'. apply semForAllShrink => a' /H' Hgen. by auto. *)
+Abort.
 
 (* I think this is the strongest checker we can get for polymorphic functions *)
 Lemma semPolyFun:
@@ -346,31 +372,31 @@ Next Obligation.
   by rewrite semBool.
 Qed.
 
-Program Instance proveGenProp {prop : Type} `{Provable prop} :
-  Provable (Pred prop) :=
-  {|
-    proposition g := (forall p, g p -> proposition p)
-  |}.
-Next Obligation.
-  destruct H0 as [semP proof]. rewrite /proposition. split.
-  - move => H'. apply semGen=> p Hgen. apply proof. by auto.
-  - move => /semGen H' p Hgen. apply proof. by auto.
-Qed.
+(* Program Instance proveGenProp {prop : Type} `{Provable prop} : *)
+(*   Provable (G prop) := *)
+(*   {| *)
+(*     proposition g := (forall p, semGen g p -> proposition p) *)
+(*   |}. *)
+(* Next Obligation. *)
+  (* destruct H0 as [semP proof]. rewrite /proposition. split. *)
+  (* - move => H'. apply semGen=> p Hgen. apply proof. by auto. *)
+  (* - move => /semGen H' p Hgen. apply proof. by auto. *)
+(* Abort. *)
 
-Program Instance proveFun {A prop: Type} `{Arbitrary A} `{Show A}
-        `{Provable prop}: Provable (A -> prop) :=
-  {|
-    proposition p :=
-      (forall a,
-         @arbitrary _ _ Pred _ a ->
-         proposition (p a))
-  |}.
-Next Obligation.
-  destruct H2 as [semP proof]. rewrite /proposition. split.
-  - move=> H'. apply semFun => a' /H' Hgen.
-    by apply proof.
-  - move=> H' a' Hgen. apply proof. by apply semFun.
-Qed.
+(* Program Instance proveFun {A prop: Type} `{Arbitrary A} `{Show A} *)
+(*         `{Provable prop}: Provable (A -> prop) := *)
+(*   {| *)
+(*     proposition p := *)
+(*       (forall a, *)
+(*          semGen arbitrary a -> *)
+(*          proposition (p a)) *)
+(*   |}. *)
+(* Next Obligation. *)
+(*   destruct H2 as [semP proof]. rewrite /proposition. split. *)
+(*   - move=> H'. apply semFun => a' /H' Hgen. *)
+(*     by apply proof. *)
+(*   - move=> H' a' Hgen. apply proof. by apply semFun. *)
+(* Qed. *)
 
 Program Instance provePolyFun {prop : Type -> Type} `{Provable (prop nat)} :
   Provable (forall T, prop T) :=

@@ -3,9 +3,8 @@ Declare ML Module "quickChick".
 Require Export Show.
 
 Require Export Axioms.
-Require Export AbstractGen.
-Require Import SetOfOutcomes.
-Require Import Gen.
+Require Export ModuleGen.
+Require Export GenCombinators.
 Require Export Arbitrary.
 Require Export State.
 Require Export Checker.

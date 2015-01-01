@@ -1,6 +1,6 @@
 Set Implicit Arguments.
 
-Require Import Gen.
+Require Import ModuleGen.
 Require Import Axioms.
 Require Import String.
 

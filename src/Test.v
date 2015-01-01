@@ -1,5 +1,5 @@
 Require Import Show RoseTrees.
-Require Import AbstractGen Gen.
+Require Import ModuleGen GenCombinators.
 Require Import Checker.
 Require Import State.
 Require Import Arbitrary.
@@ -13,8 +13,10 @@ Require Import List.
 
 Require Import Recdef.
 
-
 Require Import Arith.EqNat.
+ 
+Import Gen GenComb.
+
 Definition gte n m := leb m n.
 
 Set Implicit Arguments.
@@ -298,7 +300,7 @@ Definition quickCheckWith {prop : Type} {_ : Checkable prop}
                 rnd             (* randomSeed        *)
                 0               (* numSuccessShrinks *)
                 0               (* numTryShrinks     *)
-       ) (match checker p with MkGen g => g end).
+       ) (run (checker p)).
 
 Fixpoint showCollectStatistics (l : list (string * nat)) :=
   match l with

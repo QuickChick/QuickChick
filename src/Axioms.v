@@ -2,10 +2,15 @@ Require Import ZArith.
 Require Import ssreflect ssrbool ssrnat.
         
 Axiom RandomGen   : Type.
+Axiom randomSeedInhabitant : RandomGen.
+
 Axiom rndNext     : RandomGen   -> Z * RandomGen.
 Axiom rndGenRange : RandomGen   -> Z * Z.
 Axiom rndSplit    : RandomGen   -> RandomGen * RandomGen.
 Axiom mkRandomGen : Z           -> RandomGen.
+
+Axiom rndSplitAssumption :
+  forall s1 s2 : RandomGen, exists s, rndSplit s = (s1,s2).
 
 (* Primitive generator combinators and some basic soundness 
    assumptions about them *)

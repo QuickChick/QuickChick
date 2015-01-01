@@ -1,35 +1,29 @@
-Require Import AbstractGen.
+Require Import ModuleGen GenCombinators.
 Require Import ZArith ZArith.Znat Arith.
 Require Import Coq.Numbers.Natural.Peano.NPeano.
 Require Import Recdef.
 Require Import List.
-Require Import SetOfOutcomes.
 Require Import ssreflect.
 
+Import Gen GenComb.
 Class Arbitrary (A : Type) : Type :=
   {
-    arbitrary : forall {Gen : Type -> Type} {H : GenMonad Gen}, Gen A;
+    arbitrary : G A;
     shrink    : A -> list A
   }.
 
+Definition arbitraryBool := choose (false, true).
+Definition arbitraryNat :=
+  sized (fun x => choose (0, x)).
 
-Section ArbitrarySection.
-  Context {Gen : Type -> Type}
-          {H : GenMonad Gen}.
+Definition arbitraryZ :=
+  sized (fun x =>
+           let z := Z.of_nat x in
+           choose (-z, z)%Z).
 
-  Definition arbitraryBool := choose (false, true).
-  Definition arbitraryNat :=
-    sized (fun x => choose (0, x)).
-  (* Why we  are not using sized to generate Nats like QC?
-      Definition arbitraryNat :=  choose (0, 100). *)
-  Definition arbitraryZ :=
-    sized (fun x =>
-             let z := Z.of_nat x in
-             choose (-z, z)%Z).
-  (* Definition arbitraryZ := choose (-100, 100)%Z. *)
-  Definition arbitraryList {A : Type} {Arb : Arbitrary A} :=
-    listOf arbitrary.
-End ArbitrarySection.
+(* Definition arbitraryZ := choose (-100, 100)%Z. *)
+Definition arbitraryList {A : Type} {Arb : Arbitrary A} :=
+  listOf arbitrary.
 
 Function shrinkBool (x : bool) :=
   match x with
@@ -37,28 +31,16 @@ Function shrinkBool (x : bool) :=
     | true  => cons false nil
   end.
 
-Instance arbBool : Arbitrary bool :=
-  {|
-    arbitrary := @arbitraryBool;
-    shrink  := shrinkBool
-  |}.
-
-
 Function shrinkNat (x : nat) {measure (fun x => x) x}: list nat :=
   match x with
     | O => nil
     | _ => cons (div x 2) (shrinkNat (div x 2))
   end.
-intros; simpl; pose proof (divmod_spec n 1 0 0).
-assert (H01 : 0 <= 1) by omega; apply H in H01; subst; clear H.
-destruct (divmod n 1 0 0); destruct n1; simpl; omega.
+Proof.
+  intros; simpl; pose proof (divmod_spec n 1 0 0).
+  assert (H01 : 0 <= 1) by omega; apply H in H01; subst; clear H.
+  destruct (divmod n 1 0 0); destruct n1; simpl; omega.
 Qed.
-
-Instance arbNat : Arbitrary nat :=
-  {|
-    arbitrary := @arbitraryNat;
-    shrink := shrinkNat
-  |}.
 
 Function shrinkZ (x : Z) {measure (fun x => Z.abs_nat x) x}: list Z :=
   match x with
@@ -68,7 +50,6 @@ Function shrinkZ (x : Z) {measure (fun x => Z.abs_nat x) x}: list Z :=
   end.
 Admitted.
 
-
 Fixpoint shrinkList {A : Type} (shr : A -> list A) (l : list A) : list (list A) :=
   match l with
     | nil => nil
@@ -77,15 +58,28 @@ Fixpoint shrinkList {A : Type} (shr : A -> list A) (l : list A) : list (list A) 
            ++ (map (fun x'  => cons x' xs) (shr x ))
   end.
 
+
+Instance arbBool : Arbitrary bool :=
+  {|
+    arbitrary := @arbitraryBool;
+    shrink  := shrinkBool
+  |}.
+
+Instance arbNat : Arbitrary nat :=
+  {|
+    arbitrary := @arbitraryNat;
+    shrink := shrinkNat
+  |}.
+
 Instance arbList {A : Type} {Arb : Arbitrary A} : Arbitrary (list A) :=
   {|
-    arbitrary g H := @arbitraryList g H A Arb;
+    arbitrary:= arbitraryList;
     shrink := shrinkList shrink
   |}.
 
 Instance arbInt : Arbitrary Z :=
   {|
-    arbitrary := @arbitraryZ;
+    arbitrary := arbitraryZ;
     shrink := shrinkZ
   |}.
 
@@ -109,40 +103,39 @@ Instance arbType : Arbitrary Type :=
 (* Correctness proof about built-in generators *)
 
 Lemma arbBool_correct:
-  arbitrary <--> (fun (_ : bool) => True).
+  semGen arbitrary <--> (fun (_ : bool) => True).
 Proof.
   rewrite /arbitrary /arbBool /arbitraryBool. move => b.
-  split => // _. rewrite choose_def. 
+  split => // _. apply semChoose. 
   case: b; split => //. 
 Qed.
 
 Lemma arbNat_correct:
-  arbitrary <--> (fun (_ : nat) => True).
+  semGen arbitrary <--> (fun (_ : nat) => True).
 Proof.
   rewrite /arbitrary /arbNat /arbitraryNat. move => n.
   split => // _.
-  rewrite sized_def. exists n. rewrite choose_def.
+  apply semSizedSize. exists n. apply semChooseSize.
   split=> //.
 Qed.
 
 Lemma arbInt_correct:
-  arbitrary <--> (fun (_ : Z) => True).
+  semGen arbitrary <--> (fun (_ : Z) => True).
 Proof.
-  rewrite /arbitrary /arbInt /arbitraryZ.
-  rewrite sized_def. move => z. split => //= _.
-  exists (Z.abs_nat z).
+  rewrite /arbitrary /arbInt /arbitraryZ. move => n. split => // _.
+  apply semSizedSize.
+  exists (Z.abs_nat n). apply semChooseSize.
   by split => //=; rewrite Nat2Z.inj_abs_nat; 
-     case: z => //= p; apply Z.leb_refl.
+     case: n => //= p; apply Z.leb_refl.
 Qed.
 
+(* TODO : this need semListOf *)
 Lemma arbList_correct:
   forall {A} {H : Arbitrary A},
-    (arbitrary <--> (fun (_ : A) => True)) ->
-    (arbitrary <--> (fun (_ : list A) => True)).
+    (semGen arbitrary <--> (fun (_ : A) => True)) ->
+    (semGen arbitrary <--> (fun (_ : list A) => True)).
 Proof.
   move => A H Hcorrect. rewrite /arbitrary /arbList /arbitraryList.
   move=> l. split => // _.
-  apply listOf_equiv. move => x _. by apply Hcorrect.
-Qed.
-
-
+Abort.
+  (* apply semListOfSize.  *)

@@ -1,7 +1,7 @@
 Require Import ZArith.
 Require Import Coq.Strings.Ascii.
 Require Import Coq.Strings.String.
-Require Import Axioms RoseTrees AbstractGen Gen Test Show Checker.
+Require Import Axioms RoseTrees Test Show Checker.
 
 Require Import ExtrOcamlBasic.
 Require Import ExtrOcamlString.
