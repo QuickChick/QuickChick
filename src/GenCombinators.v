@@ -36,12 +36,12 @@ Module Type GenDerivedInterface.
       fun b =>
         exists a, semGen g a /\ f a = b.
   
-  (* Axiom semLiftGen2 : *)
-  (*   forall {A1 A2 B} (f: A1 -> A2 -> B) (g1 : G A1) (g2 : G A2), *)
-  (*     semGen (liftGen2 f g1 g2) <--> *)
-  (*     fun b => *)
-  (*       exists a1, *)
-  (*         exists a2, semGen g1 a1 /\ semGen g2 a2 /\ f a1 a2 = b. *)
+  Axiom semLiftGen2 :
+    forall {A1 A2 B} (f: A1 -> A2 -> B) (g1 : G A1) (g2 : G A2) s,
+      semSize (liftGen2 f g1 g2) s <-->
+      fun b =>
+        exists a1,
+          exists a2, semSize g1 s a1 /\ semSize g2 s a2 /\ f a1 a2 = b.
 
   (* Axiom semLiftGen3 : *)
   (* forall {A1 A2 A3 B} (f: A1 -> A2 -> A3 -> B) *)
@@ -232,6 +232,24 @@ Module GenComb : GenDerivedInterface.
      exists size. apply semBindSize.
      exists a. split => //. by apply semReturnSize.
   Qed.
+
+  Lemma semLiftGen2 :
+    forall {A1 A2 B} (f: A1 -> A2 -> B) (g1 : G A1) (g2 : G A2) s,
+      semSize (liftGen2 f g1 g2) s <-->
+      fun b =>
+        exists a1,
+          exists a2, semSize g1 s a1 /\ semSize g2 s a2 /\ f a1 a2 = b.
+  Proof.
+    rewrite /liftGen. move => A1 A2 B f g gb b. split.
+    - move => /semBindSize 
+               [a1 [H1 /semBindSize [a2 [H2 /semReturnSize H3]]]]; subst.
+      exists a1. exists a2. repeat split => //. 
+    - move => [a1 [a2 [H [H' Heq]]]]; subst.
+      apply semBindSize.
+      exists a1. split => //. 
+      apply semBindSize. exists a2. split => //. by apply semReturnSize.
+Qed.
+ 
 
   Lemma semSequenceGenSize :
     forall {A} (gs : list (G A)) n,
