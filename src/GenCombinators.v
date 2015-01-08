@@ -100,7 +100,7 @@ Module Type GenDerivedInterface.
       (fun e => (exists x, List.In x l /\ semGen x e) \/ 
                 (l = nil /\ semGen def e)).
 
-  (* Axiom frequency_equiv : *)
+  (* Axiom semFrequency: *)
   (*   forall {A} (l : list (nat * G A)) (def : G A), *)
   (*     semGen (frequency def l) <--> *)
   (*     (fun e => (exists n, exists g, (List.In (n, g) l /\ semGen g e /\ n <> 0)) \/ *)
@@ -365,5 +365,18 @@ Qed.
        split; last by apply semReturnSize. apply semChooseSize. split => //. 
   Qed.
 
+  Lemma semFrequency:
+    forall {A} (l : list (nat * G A)) (def : G A),
+      semGen (frequency def l) <--> 
+      (fun e => (exists n, exists g, (List.In (n, g) l /\ semGen g e /\ n <> 0)) \/
+                ((l = nil \/ (forall x, List.In x l -> fst x = 0)) /\ semGen def e)).
+  Proof.
+    move => A l def a. unfold frequency. split.
+    - move => [s /semBindSize [n [/semChooseSize /= [_ Hleq] Hsize]]].
+      case: l Hleq Hsize =>  [| [n1 a1] xs] //= Hleq Hsize. 
+      + right. split; auto. by exists s.
+      + left. rewrite add0n in Hleq. 
+        remember (n < n1) as b. destruct b. simpl in *.
+  Abort.
 
 End GenComb.
