@@ -77,13 +77,6 @@ Proof.
   destruct c; by [ constructor | constructor(constructor)].
 Qed.
 
-  Axiom semOneofSize:
-    forall {A} (l : list (G A)) (def : G A) s,
-      (semSize (oneof def l) s) <-->
-      (fun e => (exists x, List.In x l /\ semSize x s e) \/ 
-                (l = nil /\ semSize def s e)).
-
-
 (* Some helpful lemmas and definitions *)
 
 Inductive all_nodes_bellow (s : nat) : tree -> Prop :=

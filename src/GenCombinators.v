@@ -28,7 +28,7 @@ Module Type GenDerivedInterface.
   Parameter elements : forall {A : Type}, A -> list A -> G A.
 
   (* Correctness for derived generators *)
-  (* We should/(hope to) prove the Axioms in comments - 
+  (* We should prove the Axioms in comments - 
      In some of them we may need semSize instead of semGen *)
   
   Axiom semLiftGen :
@@ -102,6 +102,12 @@ Module Type GenDerivedInterface.
       (semGen (oneof def l)) <-->
       (fun e => (exists x, List.In x l /\ semGen x e) \/ 
                 (l = nil /\ semGen def e)).
+
+  Axiom semOneofSize:
+    forall {A} (l : list (G A)) (def : G A) s,
+      (semSize (oneof def l) s) <-->
+      (fun e => (exists x, List.In x l /\ semSize x s e) \/ 
+                (l = nil /\ semSize def s e)).
 
   (* XXX Admited *)
   Axiom semFrequency:
@@ -365,6 +371,33 @@ Module GenComb : GenDerivedInterface.
       + exists s. apply semBindSize. exists 0. split => //.
         apply semChooseSize. split => //.
   Qed.
+
+  Lemma semOneofSize:
+    forall {A} (l : list (G A)) (def : G A) s,
+      (semSize (oneof def l) s) <-->
+      (fun e => (exists x, List.In x l /\ semSize x s e) \/ 
+                (l = nil /\ semSize def s e)).
+  Proof.
+    move => A l def s a.  unfold oneof. split.
+    - move => /semBindSize [n [/semChooseSize [Hleq1 Hleq2] Hnth]]. 
+      case: l Hleq2 Hnth => [| g gs] //= /leP Hleq2 Hnth.
+      + rewrite sub0n in Hleq2. apply le_n_0_eq in Hleq2; subst. 
+        right. by split => //.
+      + left. rewrite subn1 NPeano.Nat.pred_succ in Hleq2.  
+        case: n Hleq1 Hleq2 Hnth => [_ _ | n Hleq1 Hleq2] Hnth.
+        * exists g. split => //; by auto.
+        * exists (nth n gs def). split; last by auto.
+          right. by apply nth_In.
+    - move => [[g [Hin Hsem]] | [Heq Hsem]]; subst.
+      +apply semBindSize.  
+        destruct (In_nth_exists _ _ def Hin) as [n [Hnth Hl]]; subst.
+        exists n. split => //. apply semChooseSize. split => //.
+        simpl. apply/leP.
+        rewrite subn1. apply NPeano.Nat.le_succ_le_pred. omega.
+      + apply semBindSize. exists 0. split => //.
+        apply semChooseSize. split => //.
+  Qed.
+      
 
   Lemma semElements :
     forall {A} (l: list A) (def : A),

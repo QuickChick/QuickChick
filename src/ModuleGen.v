@@ -115,7 +115,6 @@ Module Type GenPrimitiveInterface.
      forall A (g : G A) (x : A),
          semGen g x <-> exists size seed, run g seed size = x.
 
-
    (* Those are too concrete, but I need them to prove shrinking. 
       Does this reveal a weakness in our framework? 
       Should we try to get rid of this?  
