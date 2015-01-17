@@ -3,6 +3,9 @@ Require Import QuickChick.
 Require Import List seq ssreflect ssrbool ssrnat ZArith eqtype.
 Import ListNotations.
 
+(* Currenlty, these two have to be imported manually. Can we avoid this? *)
+Import Gen GenComb. 
+
 Set Implicit Arguments.
 Unset Strict Implicit.
 Unset Printing Implicit Defensive.
@@ -59,26 +62,22 @@ Canonical tree_eqMixin (A : eqType) := EqMixin (@eq_treeP A).
 Canonical tree_eqType (A : eqType) := Eval hnf in EqType (tree A) (tree_eqMixin A).
 
 (* Step one: Write custom generators *)
-Section CustomGen.
-  Context {M : Type -> Type}
-          `{AbstractGen.GenMonad M}.
 
-  Fixpoint gentreeS {A} (g : M A) (n : nat) : M (tree A) :=
-    match n with
-      | O => returnGen Leaf
-      | S n' =>
-        frequency' (returnGen Leaf)
-                   [(1, returnGen Leaf);
-                    (n, liftGen3 Node g (gentreeS g n') (gentreeS g n'))]
-    end.
+Fixpoint gentreeS {A} (g : G A) (n : nat) : G (tree A) :=
+  match n with
+    | O => returnGen Leaf
+    | S n' =>
+      frequency (returnGen Leaf)
+                 [(1, returnGen Leaf);
+                   (n, liftGen3 Node g (gentreeS g n') (gentreeS g n'))]
+  end.
 
-  Definition gentree {A : Type} (g : M A) : M (tree A) := sized (gentreeS g).
+Definition gentree {A : Type} (g : G A) : G (tree A) := sized (gentreeS g).
 
-End CustomGen.
 
 Instance arbtree {A} `{Arbitrary A} : Arbitrary (tree A) :=
 {|
-  arbitrary gen genM := @gentree gen genM A arbitrary;
+  arbitrary := gentree arbitrary;
   shrink t :=
       let fix shrinktree (t : tree A) :=
           match t with
@@ -127,8 +126,6 @@ QuickCheck testtree.
  
 (* Step 3 : .. or prove them correct   *)
 
-Require Import SetOfOutcomes.
-
 Fixpoint height {A} (t : tree A) :=
   match t with
     | Leaf => 0
@@ -137,50 +134,53 @@ Fixpoint height {A} (t : tree A) :=
   end.
 
 Lemma gentreeS_correct :
-  forall {A} (g : Pred A) n,
-    g <--> all ->
-    (gentreeS g n) <--> (fun t => (height t) <= n).
+  forall {A} (g : G A) n s,
+    semSize g s <--> (fun _ => True) ->
+    (semSize (gentreeS g n) s) <--> (fun t => (height t) <= n).
 Proof.
   move=> A g n.
-  Opaque frequency' liftGen3 returnGen bindGen.
-  elim : n => //= [| n IHn] Hg t.
+  elim : n => //= [| n IHn] s Hg t.
   * split.
-    + rewrite returnGen_def. by move => <-.
-    + case: t => //= a t1 t2. by rewrite addn1 ltn0.
+    + rewrite semReturnSize. by move => <-.
+    + case: t => [| t1 t2] //= a . by rewrite semReturnSize.
+      by rewrite addn1 ltn0.
   * move/IHn : (Hg)=> HgenT. split => [| Hheight].
-    + move/frequency_equiv. move =>
+    + move/semFrequencySize. move =>
       [[n' [gtree [[[Heq1 Heq2] | [[Heq1 Heq2] | //=]] [H2 _]]]] | [H1 H2]]; subst;
-      try (by rewrite returnGen_def in H2; rewrite -H2).
-      rewrite liftGen3_def in H2.
+      (try by apply semReturnSize in H2; subst). 
+      apply semLiftGen3 in H2.
       move : H2 => [a1 [ga1 [t1 [/HgenT Hgt1 [t2 [/HgenT Hgt2 Heq]]]]]]; subst.
       simpl. rewrite -[X in _ <= X]addn1 leq_add2r.
         by rewrite geq_max Hgt1 Hgt2.
-    + apply/frequency_equiv. left.
+    + apply/semFrequencySize. left.
       case: t Hheight => [| a t1 t2] //=.
       - move => _. exists 1. eexists. split. by constructor.
-        by split.
+        split => //. by apply semReturnSize.
       - rewrite -[X in _ <= X]addn1 leq_add2r.
         rewrite geq_max => /andP [leq1 le2].
         exists n.+1. exists (liftGen3 Node g (gentreeS g n) (gentreeS g n)).
         split => //=. by right; left.
-        split => //=. rewrite liftGen3_def.
+        split => //=. apply semLiftGen3.
         exists a; split; first exact/Hg.
         exists t1; split; first exact/IHn.
         by exists t2; split; first exact/IHn.
 Qed.
 
 Lemma gentree_correct :
-  forall {A} (g : Pred A),
-    g <--> all -> (gentree g) <--> all.
+  forall {A} (g : G A),
+    semGen g <--> (fun _ => True) -> 
+    semGen (gentree g) <--> (fun _ => True).
 Proof.
   move=> A g.
   rewrite /set_eq /gentree. move=> H tree; split => //= _.
-  exists (height tree). apply gentreeS_correct => //=.
+  apply semSized. 
+  exists 1000. 
+  apply gentreeS_correct => /=.
+  move => a. split => // _. apply H.
+
 Qed.
 
 (* Proving end-to-end equivalence *)
-
-Require Import EndToEnd.
 
 Goal (proposition removeP) <-> (forall (x : nat) l, ~ In x (remove x l)).
 Proof.

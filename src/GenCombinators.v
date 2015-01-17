@@ -1,4 +1,5 @@
 Require Import ZArith List ssreflect ssrbool ssrnat.
+
 Require Import Axioms Random ModuleGen.
 Require Import Ensembles.
 
@@ -43,14 +44,16 @@ Module Type GenDerivedInterface.
         exists a1,
           exists a2, semSize g1 s a1 /\ semSize g2 s a2 /\ f a1 a2 = b.
 
-  (* Axiom semLiftGen3 : *)
-  (* forall {A1 A2 A3 B} (f: A1 -> A2 -> A3 -> B) *)
-  (*        (g1: G A1) (g2: G A2) (g3: G A3), *)
-  (*   semGen (liftGen3 f g1 g2 g3) <--> *)
-  (*   fun b => *)
-  (*     exists a1, semGen g1 a1 /\ *)
-  (*                (exists a2, semGen g2 a2 /\ *)
-  (*                            (exists a3, semGen g3 a3 /\ (f a1 a2 a3) = b)). *)
+  (* XXX: Admited *)
+  Axiom semLiftGen3 :
+  forall {A1 A2 A3 B} (f: A1 -> A2 -> A3 -> B)
+         (g1: G A1) (g2: G A2) (g3: G A3) size,
+    semSize (liftGen3 f g1 g2 g3) size <-->
+    fun b =>
+      exists a1, semSize g1 size a1 /\
+                 (exists a2, semSize g2 size a2 /\
+                             (exists a3, semSize g3 size a3 /\ 
+                                         (f a1 a2 a3) = b)).
 
   (* Axiom liftGen4_def : *)
   (* forall {A1 A2 A3 A4 B} (f:A1 -> A2 -> A3 -> A4 -> B) *)
@@ -100,11 +103,18 @@ Module Type GenDerivedInterface.
       (fun e => (exists x, List.In x l /\ semGen x e) \/ 
                 (l = nil /\ semGen def e)).
 
-  (* Axiom semFrequency: *)
-  (*   forall {A} (l : list (nat * G A)) (def : G A), *)
-  (*     semGen (frequency def l) <--> *)
-  (*     (fun e => (exists n, exists g, (List.In (n, g) l /\ semGen g e /\ n <> 0)) \/ *)
-  (*               ((l = nil \/ (forall x, List.In x l -> fst x = 0)) /\ semGen def e)). *)
+  (* XXX Admited *)
+  Axiom semFrequency:
+    forall {A} (l : list (nat * G A)) (def : G A),
+      semGen (frequency def l) <-->
+      (fun e => (exists n, exists g, (List.In (n, g) l /\ semGen g e /\ n <> 0)) \/
+                ((l = nil \/ (forall x, List.In x l -> fst x = 0)) /\ semGen def e)).
+  (* XXX Admited *)
+  Axiom semFrequencySize:
+    forall {A} (l : list (nat * G A)) (def : G A) (size: nat),
+      semSize (frequency def l) size <-->
+      (fun e => (exists n, exists g, (List.In (n, g) l /\ semSize g size e /\ n <> 0)) \/
+                ((l = nil \/ (forall x, List.In x l -> fst x = 0)) /\ semSize def size e)).
 
   Axiom semVectorOfSize: 
     forall {A : Type} (k : nat) (g : G A) n,
@@ -119,6 +129,9 @@ Module Type GenDerivedInterface.
     forall {A} (l: list A) (def : A),
       (semGen (elements def l)) <--> (fun e => List.In e l \/ (l = nil /\ e = def)).
   
+  Axiom semElementsSize:
+    forall {A} (l: list A) (def : A) s,
+      (semSize (elements def l) s) <--> (fun e => List.In e l \/ (l = nil /\ e = def)).
   
 End GenDerivedInterface.
 
@@ -248,8 +261,18 @@ Module GenComb : GenDerivedInterface.
       apply semBindSize.
       exists a1. split => //. 
       apply semBindSize. exists a2. split => //. by apply semReturnSize.
-Qed.
+  Qed.
  
+  Lemma semLiftGen3 :
+  forall {A1 A2 A3 B} (f: A1 -> A2 -> A3 -> B)
+         (g1: G A1) (g2: G A2) (g3: G A3) size,
+    semSize (liftGen3 f g1 g2 g3) size <-->
+    fun b =>
+      exists a1, semSize g1 size a1 /\
+                 (exists a2, semSize g2 size a2 /\
+                             (exists a3, semSize g3 size a3 /\ 
+                                         (f a1 a2 a3) = b)).
+    Admitted.
 
   Lemma semSequenceGenSize :
     forall {A} (gs : list (G A)) n,
@@ -365,6 +388,23 @@ Qed.
        split; last by apply semReturnSize. apply semChooseSize. split => //. 
   Qed.
 
+  Lemma semElementsSize :
+    forall {A} (l: list A) (def : A) s,
+      (semSize (elements def l) s) <--> 
+      (fun e => List.In e l \/ (l = nil /\ e = def)).
+  Proof.
+    move => A l def a. split.
+    - move => Hsize. apply semElements. eexists; eassumption.
+    - move => [HIn | [Hemp Heq]]; unfold elements.
+      + apply semBindSize. 
+        destruct (In_nth_exists _ _ def HIn) as [n [Hnth Hlen]]; subst.
+        exists n. split; last by apply semReturnSize.
+        apply semChooseSize. split => //. apply/leP. 
+        unfold lt in *. rewrite subn1. omega.
+     + subst; apply semBindSize. exists 0.
+       split; last by apply semReturnSize. apply semChooseSize. split => //. 
+  Qed.
+
   Lemma semFrequency:
     forall {A} (l : list (nat * G A)) (def : G A),
       semGen (frequency def l) <--> 
@@ -377,6 +417,13 @@ Qed.
       + right. split; auto. by exists s.
       + left. rewrite add0n in Hleq. 
         remember (n < n1) as b. destruct b. simpl in *.
-  Abort.
+  Admitted.
+
+  Lemma semFrequencySize:
+    forall {A} (l : list (nat * G A)) (def : G A) (size: nat),
+      semSize (frequency def l) size <-->
+      (fun e => (exists n, exists g, (List.In (n, g) l /\ semSize g size e /\ n <> 0)) \/
+                ((l = nil \/ (forall x, List.In x l -> fst x = 0)) /\ semSize def size e)).
+Admitted.
 
 End GenComb.

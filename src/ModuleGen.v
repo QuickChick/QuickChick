@@ -73,10 +73,14 @@ Module Type GenPrimitiveInterface.
        (fun a => Random.leq a1 a /\ Random.leq a a2).
 
    
-   Axiom semSizedSize : 
+   Axiom semSized : 
      forall A (f : nat -> G A),
        semGen (sized f) <--> (fun a => exists n, semSize (f n) n a).
    
+   Axiom semSizedSize : 
+     forall A (f : nat -> G A) s,
+       semSize (sized f) s <--> (fun a => semSize (f s) s a).
+
    Axiom semResize : 
      forall A (n : nat) (g : G A),
        semGen (resize n g) <--> semSize g n .
@@ -288,7 +292,7 @@ Module Gen : GenPrimitiveInterface.
    Qed.  
 
    
-   Lemma semSizedSize : 
+   Lemma semSized : 
      forall A (f : nat -> G A),
        semGen (sized f) <--> (fun a => exists n, semSize (f n) n a).
    Proof.
@@ -299,6 +303,16 @@ Module Gen : GenPrimitiveInterface.
        move : H. case (f size) => g H. rewrite /semSize. by eauto.
    Qed.
 
+   Lemma semSizedSize : 
+     forall A (f : nat -> G A) s,
+       semSize (sized f) s <--> (fun a => semSize (f s) s a).
+   Proof.
+     move => A f s a. rewrite /semGen /semSize /sized => /=. split.
+     - move => [seed H]. exists seed. move : H.
+       case (f s) => g H. rewrite /semSize. by eauto.
+     - move => [seed H]. exists seed. 
+       move : H. case (f s) => g H. rewrite /semSize. by eauto.
+   Qed.
 
    Lemma semResize : 
      forall A (n : nat) (g : G A), semGen (resize n g) <--> semSize g n .

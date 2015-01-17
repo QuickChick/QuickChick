@@ -1,5 +1,5 @@
 Require Import Show RoseTrees.
-Require Import ModuleGen GenCombinators.
+Require Import ModuleGen GenCombinators SemChecker.
 Require Import Checker.
 Require Import State.
 Require Import Arbitrary.

@@ -4,10 +4,10 @@ src/Random.v
 src/Arbitrary.v
 src/RoseTrees.v
 src/ModuleGen.v
+src/SemChecker.v
 src/GenCombinators.v
 src/MutateCheck.v
 src/Checker.v
-src/EndToEnd.v
 src/Show.v
 src/State.v
 src/QuickChick.v
