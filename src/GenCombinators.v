@@ -37,15 +37,20 @@ Module Type GenDerivedInterface.
       fun b =>
         exists a, semGen g a /\ f a = b.
   
-  Axiom semLiftGen2 :
+  Axiom semLiftGenSize :
+    forall {A B} (f: A -> B) (g: G A) size,
+      semSize (liftGen f g) size <-->
+      fun b =>
+      exists a, semSize g size a /\ f a = b.
+  
+  Axiom semLiftGen2Size :
     forall {A1 A2 B} (f: A1 -> A2 -> B) (g1 : G A1) (g2 : G A2) s,
       semSize (liftGen2 f g1 g2) s <-->
       fun b =>
         exists a1,
-          exists a2, semSize g1 s a1 /\ semSize g2 s a2 /\ f a1 a2 = b.
-
-  (* XXX: Admited *)
-  Axiom semLiftGen3 :
+          semSize g1 s a1 /\ exists a2, semSize g2 s a2 /\ f a1 a2 = b.
+ 
+  Axiom semLiftGen3Size :
   forall {A1 A2 A3 B} (f: A1 -> A2 -> A3 -> B)
          (g1: G A1) (g2: G A2) (g3: G A3) size,
     semSize (liftGen3 f g1 g2 g3) size <-->
@@ -55,28 +60,28 @@ Module Type GenDerivedInterface.
                              (exists a3, semSize g3 size a3 /\ 
                                          (f a1 a2 a3) = b)).
 
-  (* Axiom liftGen4_def : *)
-  (* forall {A1 A2 A3 A4 B} (f:A1 -> A2 -> A3 -> A4 -> B) *)
-  (*        (g1: G A1) (g2: G A2) (g3: G A3) (g4: G A4), *)
-  (*   semGen (liftGen4 f g1 g2 g3 g4) <--> *)
-  (*   fun b => *)
-  (*     exists a1, semGen g1 a1 /\ *)
-  (*                (exists a2, semGen g2 a2 /\ *)
-  (*                            (exists a3, semGen g3 a3 /\ *)
-  (*                                        (exists a4, semGen g4 a4 /\ *)
-  (*                                                    (f a1 a2 a3 a4) = b))). *)
+  Axiom semLiftGen4Size :
+  forall {A1 A2 A3 A4 B} (f:A1 -> A2 -> A3 -> A4 -> B)
+         (g1: G A1) (g2: G A2) (g3: G A3) (g4: G A4) size,
+    semSize (liftGen4 f g1 g2 g3 g4) size <-->
+    fun b =>
+      exists a1, semSize g1 size a1 /\
+                 (exists a2, semSize g2 size a2 /\
+                             (exists a3, semSize g3 size a3 /\
+                                         (exists a4, semSize g4 size a4 /\
+                                                     (f a1 a2 a3 a4) = b))).
 
-  (* Axiom liftGen5_def : *)
-  (* forall {A1 A2 A3 A4 A5 B} (f: A1 -> A2 -> A3 -> A4 -> A5 -> B) *)
-  (*        (g1: G A1) (g2: G A2) (g3: G A3) (g4: G A4) (g5: G A5), *)
-  (*   semGen (liftGen5 f g1 g2 g3 g4 g5) = *)
-  (*   fun b => *)
-  (*     exists a1, semGen g1 a1 /\ *)
-  (*                (exists a2, semGen g2 a2 /\ *)
-  (*                            (exists a3, semGen g3 a3 /\ *)
-  (*                                        (exists a4, semGen g4 a4 /\ *)
-  (*                                                    (exists a5, semGen g5 a5 /\ *)
-  (*                                                                (f a1 a2 a3 a4 a5) = b)))). *)
+  Axiom semLiftGen5Size :
+  forall {A1 A2 A3 A4 A5 B} (f: A1 -> A2 -> A3 -> A4 -> A5 -> B)
+         (g1: G A1) (g2: G A2) (g3: G A3) (g4: G A4) (g5: G A5) size,
+    semSize (liftGen5 f g1 g2 g3 g4 g5) size <-->
+    fun b =>
+      exists a1, semSize g1 size a1 /\
+                 (exists a2, semSize g2 size a2 /\
+                             (exists a3, semSize g3 size a3 /\
+                                         (exists a4, semSize g4 size a4 /\
+                                                     (exists a5, semSize g5 size a5 /\
+                                                                 (f a1 a2 a3 a4 a5) = b)))).
 
   Axiom semSequenceGenSize:
     forall {A} (gs : list (G A)) n,
@@ -252,24 +257,35 @@ Module GenComb : GenDerivedInterface.
      exists a. split => //. by apply semReturnSize.
   Qed.
 
-  Lemma semLiftGen2 :
+Ltac solveLiftGenX :=
+  intros; split; intros;
+  repeat 
+    match goal with
+      | [ H : exists _, _ |- _ ] => destruct H as [? [? ?]]
+      | [ H : semSize _ _ _ |- _ ] => 
+        try (apply semBindSize in H; destruct H as [? [? ?]]);
+        try (apply semReturnSize in H; subst) 
+    end;
+    [ by repeat (eexists; split; [eassumption |])
+    | repeat (apply semBindSize; eexists; split; try eassumption);
+        by apply semReturnSize ].
+
+  Lemma semLiftGenSize :
+    forall {A B} (f: A -> B) (g: G A) size,
+      semSize (liftGen f g) size <-->
+      fun b =>
+      exists a, semSize g size a /\ f a = b.
+  Proof. solveLiftGenX. Qed.
+  
+  Lemma semLiftGen2Size :
     forall {A1 A2 B} (f: A1 -> A2 -> B) (g1 : G A1) (g2 : G A2) s,
       semSize (liftGen2 f g1 g2) s <-->
       fun b =>
         exists a1,
-          exists a2, semSize g1 s a1 /\ semSize g2 s a2 /\ f a1 a2 = b.
-  Proof.
-    rewrite /liftGen. move => A1 A2 B f g gb b. split.
-    - move => /semBindSize 
-               [a1 [H1 /semBindSize [a2 [H2 /semReturnSize H3]]]]; subst.
-      exists a1. exists a2. repeat split => //. 
-    - move => [a1 [a2 [H [H' Heq]]]]; subst.
-      apply semBindSize.
-      exists a1. split => //. 
-      apply semBindSize. exists a2. split => //. by apply semReturnSize.
-  Qed.
+          semSize g1 s a1 /\ exists a2, semSize g2 s a2 /\ f a1 a2 = b.
+  Proof. solveLiftGenX. Qed.
  
-  Lemma semLiftGen3 :
+  Lemma semLiftGen3Size :
   forall {A1 A2 A3 B} (f: A1 -> A2 -> A3 -> B)
          (g1: G A1) (g2: G A2) (g3: G A3) size,
     semSize (liftGen3 f g1 g2 g3) size <-->
@@ -278,7 +294,33 @@ Module GenComb : GenDerivedInterface.
                  (exists a2, semSize g2 size a2 /\
                              (exists a3, semSize g3 size a3 /\ 
                                          (f a1 a2 a3) = b)).
-    Admitted.
+  Proof. solveLiftGenX. Qed.
+
+  Lemma semLiftGen4Size  :
+  forall {A1 A2 A3 A4 B} (f:A1 -> A2 -> A3 -> A4 -> B)
+         (g1: G A1) (g2: G A2) (g3: G A3) (g4: G A4) size,
+    semSize (liftGen4 f g1 g2 g3 g4) size <-->
+    fun b =>
+      exists a1, semSize g1 size a1 /\
+                 (exists a2, semSize g2 size a2 /\
+                             (exists a3, semSize g3 size a3 /\
+                                         (exists a4, semSize g4 size a4 /\
+                                                     (f a1 a2 a3 a4) = b))).
+  Proof. solveLiftGenX. Qed.
+
+
+  Lemma semLiftGen5Size :
+  forall {A1 A2 A3 A4 A5 B} (f: A1 -> A2 -> A3 -> A4 -> A5 -> B)
+         (g1: G A1) (g2: G A2) (g3: G A3) (g4: G A4) (g5: G A5) size,
+    semSize (liftGen5 f g1 g2 g3 g4 g5) size <-->
+    fun b =>
+      exists a1, semSize g1 size a1 /\
+                 (exists a2, semSize g2 size a2 /\
+                             (exists a3, semSize g3 size a3 /\
+                                         (exists a4, semSize g4 size a4 /\
+                                                     (exists a5, semSize g5 size a5 /\
+                                                                 (f a1 a2 a3 a4 a5) = b)))).
+  Proof. solveLiftGenX. Qed.
 
   Lemma semSequenceGenSize :
     forall {A} (gs : list (G A)) n,
