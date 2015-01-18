@@ -72,7 +72,8 @@ Fixpoint gentreeS {A} (g : G A) (n : nat) : G (tree A) :=
                    (n, liftGen3 Node g (gentreeS g n') (gentreeS g n'))]
   end.
 
-Definition gentree {A : Type} (g : G A) : G (tree A) := sized (gentreeS g).
+Definition gentree {A : Type} (g : G A) : G (tree A) := 
+  bindGen arbitrary (gentreeS g).
 
 
 Instance arbtree {A} `{Arbitrary A} : Arbitrary (tree A) :=
@@ -148,7 +149,7 @@ Proof.
     + move/semFrequencySize. move =>
       [[n' [gtree [[[Heq1 Heq2] | [[Heq1 Heq2] | //=]] [H2 _]]]] | [H1 H2]]; subst;
       (try by apply semReturnSize in H2; subst). 
-      apply semLiftGen3 in H2.
+      apply semLiftGen3Size in H2.
       move : H2 => [a1 [ga1 [t1 [/HgenT Hgt1 [t2 [/HgenT Hgt2 Heq]]]]]]; subst.
       simpl. rewrite -[X in _ <= X]addn1 leq_add2r.
         by rewrite geq_max Hgt1 Hgt2.
@@ -160,42 +161,70 @@ Proof.
         rewrite geq_max => /andP [leq1 le2].
         exists n.+1. exists (liftGen3 Node g (gentreeS g n) (gentreeS g n)).
         split => //=. by right; left.
-        split => //=. apply semLiftGen3.
+        split => //=. apply semLiftGen3Size.
         exists a; split; first exact/Hg.
         exists t1; split; first exact/IHn.
         by exists t2; split; first exact/IHn.
 Qed.
 
-Lemma gentree_correct :
-  forall {A} (g : G A),
-    semGen g <--> (fun _ => True) -> 
-    semGen (gentree g) <--> (fun _ => True).
+Lemma gentree_correct:
+  forall {A} (g : G A) s,
+    semSize g s <--> (fun _ => True) -> 
+    semSize (gentree g) s <--> (fun t => height t <= s).
 Proof.
-  move=> A g.
-  rewrite /set_eq /gentree. move=> H tree; split => //= _.
-  apply semSized. 
-  exists 1000. 
-  apply gentreeS_correct => /=.
-  move => a. split => // _. apply H.
-
+  move=> A g s Hg t. rewrite /gentree. 
+  - split => //= [/semBindSize [n [/arbNat_correctSize/leP H1 /gentreeS_correct H2]] 
+                 | H]. 
+    eapply leq_trans; try eassumption. auto. 
+  - apply semBindSize. exists s.
+    split; first by apply arbNat_correctSize.
+    apply gentreeS_correct; auto.
 Qed.
 
 (* Proving end-to-end equivalence *)
 
-Goal (proposition removeP) <-> (forall (x : nat) l, ~ In x (remove x l)).
+Definition max_elem :=
+  fix f l :=
+  match l with 
+    | [] => 0
+    | x :: xs => (max x (f xs))
+  end.
+
+Lemma below_max_elem:
+  forall (l : list nat) x,
+    In x l -> x <= (max_elem l).
 Proof.
-  repeat rewrite /semProp /proveFun /semProp /proveBool.
-  split.
-  - move => H x l.
+  intros l. 
+  elim : l => //= [x1 xs IHxs] x2 [Heq | HIn]; subst.
+  - apply/leP. by apply Max.le_max_l. 
+  - apply IHxs in HIn. apply Max.max_case_strong => H; auto.
+    apply/leP. eapply le_trans; try eassumption. by apply/leP.
+Qed.
+
+Lemma removeP_correct: 
+  (forall size, proposition size removeP) <-> (forall (x : nat) l, ~ In x (remove x l)).
+Proof.
+  simpl. split.
+  - move => H x l. 
     have H': removeP x l.
-    { apply H. by apply arbNat_correct. apply arbList_correct => //.
-      exact arbNat_correct. }
-    rewrite /removeP in H'. move => HIn.
-    have contra : existsb (pred1 x) (remove x l).
-    { apply existsb_exists. exists x. split => //. by rewrite /= eq_refl. }
-    by rewrite contra //= in H'.
-  -  move => H a _ l _. rewrite /removeP. apply Bool.eq_true_not_negb.
+    { apply H with (size := max x (max (max_elem l) (List.length l))). 
+      apply arbNat_correctSize. by apply Max.le_max_l.
+      eapply arbList_correct with (P := fun x y => (y <= x)%coq_nat) . 
+      move => n. by rewrite arbNat_correctSize. 
+      split. apply Max.max_case_strong => H'; auto. apply/leP. 
+      eapply Max.max_lub_r; eassumption. by apply/leP; apply Max.le_max_r. 
+      move => x' /below_max_elem /leP Helem.  
+      apply Max.max_case_strong => H'; auto. 
+      eapply le_trans; try eassumption. eapply Max.max_lub_l. by eapply H'.
+      apply Max.max_case_strong => H''; auto. 
+      eapply le_trans; try eassumption. }
+      rewrite /removeP in H'. move => HIn.
+      have contra : existsb (pred1 x) (remove x l).
+      { apply existsb_exists. exists x. split => //. by rewrite /= eq_refl. }
+        by rewrite contra //= in H'.
+  -  move => H a HIn Hsize l Hsize'. 
+     rewrite /removeP. apply Bool.eq_true_not_negb.
      move => /existsb_exists contra.
-     move : contra => [n [HIn /=/eqP Hpred]]; subst. eapply H.
+     move : contra => [n [HIn' /=/eqP Hpred]]; subst. eapply H.
      eassumption. 
 Qed.
