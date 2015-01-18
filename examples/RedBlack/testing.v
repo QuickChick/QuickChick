@@ -49,17 +49,6 @@ Fixpoint has_no_red_red (c : color) (t : tree) : bool :=
       has_no_red_red Black t1 && has_no_red_red Black t2
   end.
 
-Definition has_parent (c : color) (t: tree) : bool :=
-  match t with
-    | Leaf => true
-    | Node Black _ _ _ => true
-    | Node Red _ _ _ => 
-      match c with 
-        | Black => true 
-        | _ => false
-      end
-  end.
-
 Definition is_redblack_bool (t : tree) : bool := 
   is_black_balanced t && has_no_red_red Red t.
 
@@ -85,9 +74,9 @@ Instance showTree {A : Type} `{_ : Show A} : Show tree :=
 
 Definition insert_is_redblack_checker (genTree : G tree) : Checker :=
   forAll arbitraryNat (fun n =>
-  (forAll genTree (fun t =>
-  (is_redblack_bool t ==>
-   is_redblack_bool (insert n t))))).
+  forAll genTree (fun t =>
+  is_redblack_bool t ==>
+  is_redblack_bool (insert n t))).
 
 Definition genColor := elements Red [Red; Black].
 
@@ -133,23 +122,22 @@ Fixpoint genRBTree_height (h : nat) (c : color) :=
             bindGen genColor (fun c' =>
             match c' with
               | Red =>
-                bindGen (genRBTree_height h Black) (fun tl1 =>
-                bindGen (genRBTree_height h Black) (fun tl2 =>
-                bindGen (genRBTree_height h Black) (fun tr1 =>
-                bindGen (genRBTree_height h Black) (fun tr2 =>
-                bindGen arbitraryNat (fun n =>
-                bindGen arbitraryNat (fun nl =>
-                bindGen arbitraryNat (fun nr =>
-                returnGen (Node Red (Node Black tl1 nl tr1) n
-                                (Node Black tl2 nr tr2)))))))))
-              | Black =>
-                bindGen (genRBTree_height h Black) (fun t1 =>
-                bindGen (genRBTree_height h Black) (fun t2 =>
-                bindGen arbitraryNat (fun n =>
-                returnGen (Node Black t1 n t2))))
-            end)
-        end
-    end.
+                (* ZP : here we have unrolled a recursive call for
+                   which h was not decreasing. If we want the 
+                   generator to look shorter we can roll it back
+                   but it would be a bit harder to prove termination *)
+                   bindGen (genRBTree_height h Black) (fun tl1 =>
+                   bindGen (genRBTree_height h Black) (fun tl2 =>
+                   bindGen (genRBTree_height h Black) (fun tr1 =>
+                   bindGen (genRBTree_height h Black) (fun tr2 =>
+                   bindGen arbitraryNat (fun n => bindGen arbitraryNat
+                   (fun nl => bindGen arbitraryNat (fun nr =>
+                   returnGen (Node Red (Node Black tl1 nl tr1) n (Node
+                   Black tl2 nr tr2))))))))) | Black => bindGen
+                   (genRBTree_height h Black) (fun t1 => bindGen
+                   (genRBTree_height h Black) (fun t2 => bindGen
+                   arbitraryNat (fun n => returnGen (Node Black t1 n
+                   t2)))) end) end end.
 
 Definition genRBTree := 
   bindGen arbitrary (fun h => genRBTree_height h Red).

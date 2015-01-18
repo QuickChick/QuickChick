@@ -6,6 +6,7 @@ Import Gen GenComb.
 Require Import redblack.
 Require Import testing.
 
+(* correspondence between the inductive and the executable definitions *) 
 Lemma has_black_height :
   forall t h c, is_redblack' t c h -> black_height_bool t = Some h.
 Proof.
@@ -29,10 +30,9 @@ Proof.
   - apply (@iffP ((black_height_bool (Node c t1 n t2) == Some n') &&
                    has_no_red_red c' (Node c t1 n t2)));
     first by apply/idP.
-    + move => /andP [/eqP H1 H2]; subst. simpl in H1, H2.
-      remember (black_height_bool t1) as h1.
-      remember (black_height_bool t2) as h2. 
-      destruct h1, h2; (try discriminate).
+    + move => /andP [/eqP /= H1 H2]; subst.
+      destruct (black_height_bool t1) eqn:Heqh1, 
+               (black_height_bool t2) eqn:Heqh2; (try discriminate).
       have Heq : (n0 = n1) by apply/eqP; destruct (n0 == n1). subst.
       rewrite eq_refl in H1. 
       destruct c; inversion H1; subst; clear H1;
@@ -79,9 +79,10 @@ Qed.
 
 (* Some helpful lemmas and definitions *)
 
+(* upper bound on the element of each node *)
 Inductive all_nodes_bellow (s : nat) : tree -> Prop :=
 | Bellow_l : all_nodes_bellow s Leaf
-| Bellow_N : 
+| Bellow_N :
     forall c t1 n t2, 
       all_nodes_bellow s t1 ->
       all_nodes_bellow s t2 ->
@@ -114,13 +115,11 @@ Lemma max_node_less:
     (n <= max_node t n)%coq_nat.
 Proof.
     elim => [| /= c tl IHtl nd tr IHtr] n; auto. 
-    apply Max.max_case_strong =>  Hcmp; auto;
-    apply Max.max_case_strong =>  Hcmp'; auto;
+    apply Max.max_case_strong => Hcmp; auto;
+    apply Max.max_case_strong => Hcmp'; auto;
     eapply Le.le_trans; try eassumption;
     [apply IHtl | apply IHtr].
 Qed.
-
-(* ugly proof, needs refactoring at some point *)
 
 Lemma genRBTree_height_correct:
   forall c h s,
@@ -146,62 +145,29 @@ Proof.
         apply semBindSize. simpl in *.
         inversion H; inversion H0; inversion Hbellow; subst.
         exists n; split; first by apply arbNat_correctSize; auto.
-        by apply semReturnSize. }
+        by apply semReturnSize. } 
   { split.
-    - move => /= Hsize.  destruct c'.
-      + move: Hsize => /semBindSize [t' [Hsize 
-                       /semBindSize [t1 [Hsize1
-                       /semBindSize [t2 [/arbNat_correctSize Hnat 
-                                         /semReturnSize Heq]]]]]]; subst.
-        move : Hsize Hsize1 => /IHh [Hrb Hbellow] /IHh [Hrb1 Hbellow1].
-        split; constructor; eassumption.
-      + move : Hsize => /semBindSize [c [_ Hsize]]. 
-        destruct c.
-        * move : Hsize => /semBindSize [tl1 [/IHh [Hrbl1 Hbl1] 
-                          /semBindSize [tl2 [/IHh [Hrbl2 Hbl2]
-                          /semBindSize [tr1 [/IHh [Hrbr1 Hbr1]
-                         /semBindSize [tr2 [/IHh [Hrbr2 Hbr2]
-                         /semBindSize [n [/arbNat_correctSize Hn
-                         /semBindSize [nl [/arbNat_correctSize Hnl
-                         /semBindSize [nr [/arbNat_correctSize Hnr 
-                                           /semReturnSize Heq]]]]]]]]]]]]]];
-            subst; split; constructor; try constructor; try eassumption.
-        * move : Hsize => /semBindSize [t' [/IHh [Hrb Hb] 
-                          /semBindSize [t1 [/IHh [Hrb1 Hb1] 
-                          /semBindSize [t2 [/arbNat_correctSize Hn
-                                            /semReturnSize Heq]]]]]]; subst.
-          constructor; constructor; try eassumption.
-     - move => H. inversion H as [Hsize Hb]; clear H;
-       inversion Hsize as [| n tl tr h' Hrbl Hrbr |
-                           c n tl tr h' Hrbl Hrbr]; subst;
-       inversion Hb as [ |c t1 ? t2 Hbt1 Hbt2]; subst; clear Hb.
-       + inversion Hrbl as [| |c n1 tl1 tr1 h1 Hrbl1 Hrbr1]; subst.
-         inversion Hrbr as [| |c n2 tl2 tr2 h2 Hrbl2 Hrbr2]; subst.
-         inversion Hbt1 as [ | c t1 ? t2 Hbt11 Hbt12]; subst; clear Hbt1.
-         inversion Hbt2 as [ | c t1 ? t2 Hbt21 Hbt22]; subst; clear Hbt2.
-         simpl. apply semBindSize.
-         exists Red. split; first (by apply genColor_correctSize);
-         apply semBindSize. exists tl1. split; first by apply IHh.
-         apply semBindSize. exists tl2. split; first by apply IHh.
-         apply semBindSize. exists tr1. split; first by apply IHh.
-         apply semBindSize. exists tr2. split; first by apply IHh.
-         apply semBindSize. exists n. split; first by apply arbNat_correctSize.
-         apply semBindSize. exists n1. split; first by apply arbNat_correctSize.
-         apply semBindSize. exists n2. split; first by apply arbNat_correctSize.
-         apply semReturnSize; reflexivity.
-       + destruct c'. simpl.
-        * apply semBindSize. exists tl. split; first by apply IHh.
-          apply semBindSize. exists tr. split; first by apply IHh.
-          apply semBindSize. exists n. split; first by apply arbNat_correctSize.
-          apply semReturnSize; reflexivity.
-        * simpl. apply semBindSize. exists Black. 
-          split; first by apply genColor_correctSize.
-          apply semBindSize. exists tl. split; first by apply IHh.
-          apply semBindSize. exists tr. split; first by apply IHh.
-          apply semBindSize. exists n. split; first by apply arbNat_correctSize.
-          apply semReturnSize; reflexivity. }
+    - move => /= Hsize.  destruct c';
+      [| move : Hsize => /semBindSize [c [_ Hsize]]; destruct c];
+      repeat (move : Hsize => /semBindSize [? [/IHh [? ?] Hsize]]);
+      repeat (move : Hsize => /semBindSize [? [/arbNat_correctSize ? Hsize]]);
+      move : Hsize  => /semReturnSize Heq; subst;
+      split; constructor; try constructor; eassumption.
+    - move => H. inversion H as [Hsize Hb]; clear H;
+      inversion Hsize as [| ? ? ? ? Hrbl Hrbr |
+                           ? ? ? ? ? Hrbl Hrbr]; subst;
+      inversion Hb as [ |? ? ? ? Hbt1 Hbt2]; subst; clear Hb;
+      [ inversion Hrbl; inversion Hrbr; subst;
+        inversion Hbt1; inversion Hbt2; subst;
+        simpl; apply semBindSize; exists Red; split; 
+        first (by apply genColor_correctSize)
+      | destruct c';
+        [| simpl; apply semBindSize; exists Black; split; 
+           first (by apply genColor_correctSize) ]]; 
+      repeat (eapply semBindSize; eexists; split); 
+      try (by eapply semReturnSize; reflexivity);
+      try (by apply IHh); try (by apply arbNat_correctSize). }
 Qed.
-
  
 Lemma genRBTreeSize_correct:
   forall s,
