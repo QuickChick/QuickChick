@@ -168,11 +168,15 @@ Qed.
 
 (* TODO : this need semListOf *)
 Lemma arbList_correct:
-  forall {A} {H : Arbitrary A},
-    (semGen arbitrary <--> (fun (_ : A) => True)) ->
-    (semGen arbitrary <--> (fun (_ : list A) => True)).
+  forall {A} {H : Arbitrary A} (P : nat -> A -> Prop) s,
+    (semSize arbitrary s <--> P s) ->
+    (semSize arbitrary s <--> 
+     (fun (l : list A) => length l <= s /\ (forall x, List.In x l -> P s x))).
 Proof.
-  move => A H Hcorrect. rewrite /arbitrary /arbList /arbitraryList.
-  move=> l. split => // _.
-Abort.
-  (* apply semListOfSize.  *)
+  move => A H P s Hgen l. rewrite /arbitrary /arbList /arbitraryList.
+  split. 
+  - move => /semListOfSize [Hl Hsize]. split => // x HIn. apply Hgen.
+    auto.
+  - move => [Hl HP]. apply semListOfSize. split => // x HIn.
+    apply Hgen. auto.
+Qed.
