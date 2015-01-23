@@ -181,16 +181,20 @@ Proof.
   move => H qp Hprop; auto.
 Qed.
 
+(* TODO: Zoe, I changed this proof to make it go through. I'm not sure WHY this changed by adding an extra instance, it's still true though :) *)
 Lemma semPredQProp:
   forall (p : Pred QProp), semCheckable p <-> (semChecker p).
 Proof.
-   move=> p.
-  rewrite /semCheckable /checker /testGenProp /checker /testProp semBindGen.
+  move=> p.
+  rewrite /semCheckable /checker /testGenProp /checker /testProp.  (*semBindGen.*)
   split.
-  - move => H pq /H Hgen. rewrite returnGen_def /semChecker in Hgen.
-    by apply Hgen.
-  - move => H pq Hgen. rewrite returnGen_def /semChecker.
-    move => qp Heq; subst. rewrite /semChecker in H. by auto.
+  - move => H pq /H Hgen. by apply Hgen. (*rewrite returnGen_def /semChecker in Hgen.
+    by apply Hgen.*)
+  - move => H pq Hgen. unfold testCheckerGen in *. 
+    rewrite /semChecker in H. 
+    by auto. 
+(*rewrite returnGen_def /semChecker.
+    move => qp Heq; subst. rewrite /semChecker in H. by auto.*)
 Qed.
 
 Lemma semForAll :

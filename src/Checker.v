@@ -19,7 +19,7 @@ Inductive CallbackKind :=
 
 Inductive SmallResult :=
   MkSmallResult : option bool -> bool -> string -> bool ->
-                  list (string * nat) -> SmallResult.
+                  list string -> SmallResult.
 
 Inductive Callback : Type :=
 | PostTest :
@@ -29,12 +29,12 @@ Inductive Callback : Type :=
 
 Record Result :=
   MkResult {
-      ok : option bool;
-      expect : bool;
-      reason : string;
-      interrupted : bool;
-      stamp : list (string * nat);
-      callbacks : list Callback
+      ok          : option bool; (* Test case result - maybe == discard *)
+      expect      : bool;        (* If false, property should fail *)
+      reason      : string;      (* Error message *)
+      interrupted : bool;        (* ? *)
+      stamp       : list string; (* Collected values for this test case *)
+      callbacks   : list Callback
     }.
 
 (* I WANT RECORD UPDATES :'( *)
@@ -105,6 +105,11 @@ Section Checkers.
       checker := fun _ => checker rejected
     |}.
 
+  Global Instance testCheckerGen : Checkable (Checker Gen) :=
+    {| 
+      checker x := x 
+    |}.
+
   Global Instance testProp : Checkable QProp :=
     {|
       checker p := returnGen p
@@ -155,19 +160,19 @@ Section Checkers.
              (str : string) : prop -> Checker Gen :=
     callback (PostFinalFailure Counterexample (fun _st _sr => trace str 0)).
 
-
   Definition expectFailure {prop: Type} `{Checkable prop} (p: prop) := 
     mapTotalResult (fun res =>
                       MkResult (ok res) false (reason res) 
                              (interrupted res) (stamp res) (callbacks res))
                    p.
 
+  (* NOTE: Ignoring the nat argument. Use label or collect ONLY *)
   Definition cover {prop : Type} {_ : Checkable prop}
              (b : bool) (n : nat) (s : string) : prop -> Checker Gen :=
-    if b then
+    if b then 
       mapTotalResult (fun res =>
-                        let '(MkResult o e r i st c) := res in
-                        MkResult o e r i ((s,n)::st) c)
+                      let '(MkResult o e r i st c) := res in
+                      MkResult o e r i (s :: st) c)
     else checker.
 
   Definition classify {prop : Type} {_ : Checkable prop}

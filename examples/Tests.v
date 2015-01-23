@@ -16,7 +16,8 @@ Fixpoint remove (x : nat) (l : list nat) : list nat :=
   end.
 
 Definition removeP (x : nat) (l : list nat) :=
-  ~~ (existsb (pred1 x) (remove x l)).
+  collect x 
+  (~~ (existsb (pred1 x) (remove x l))).
 
 Definition test0 :=
   showResult (quickCheck removeP).
