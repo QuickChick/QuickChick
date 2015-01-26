@@ -107,8 +107,8 @@ Extract Constant newStdGen   => "(Random.State.make_self_init ())".
 Extract Inductive Lazy => "Lazy.t" [lazy].
 Extract Constant force => "Lazy.force".
 
-Extract Constant Test.ltAscii => "(<=)".
-Extract Constant Test.strEq   => "(=)".
+(* Extract Constant Test.ltAscii => "(<=)". *)
+(* Extract Constant Test.strEq   => "(=)". *)
 Extract Constant Coq.Numbers.Natural.Peano.NPeano.div => "(/)".
 Extract Constant Coq.Numbers.Natural.Peano.NPeano.modulo => "(fun x y -> x mod y)".
 Extract Constant Test.gte => "(>=)".

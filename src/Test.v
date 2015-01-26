@@ -87,82 +87,29 @@ Definition notNull (ls : list string) : bool :=
     | _ => true
   end.
 
+Fixpoint insertBy A (compare : A -> A -> bool) (x : A) (l : list A) : list A :=
+  match l with
+    | nil => x :: nil
+    | h :: t => if compare x h then x :: l else h :: insertBy compare x t
+  end.
+
+Fixpoint insSortBy A (compare : A -> A -> bool) (l : list A) : list A :=
+  match l with
+    | nil => nil
+    | h :: t => insertBy compare h (insSortBy compare t)
+  end.
+
 Local Open Scope string.
 Fixpoint concatStr (l : list string) : string :=
   match l with
     | nil => ""
     | (h :: t) => h ++ concatStr t
   end.
-
-Definition ltAscii (a1 a2 : ascii) :=
-  nat_of_ascii a1 <=? nat_of_ascii a2.
-
-Fixpoint ltStr (s1 s2 : string) : bool :=
-  match s1, s2 with
-    | EmptyString, _ => true
-    | _, EmptyString => false
-    | String a1 s1, String a2 s2 =>
-       andb (ltAscii a1 a2) (ltStr s1 s2)
-  end.
-
-Fixpoint insertStr (s : string) (l : list string) : list string :=
-  match l with
-    | nil => s :: nil
-    | h :: t => if ltStr s h then s :: l else h :: insertStr s t
-  end.
-
-Fixpoint insSortStr (l : list string) : list string :=
-  match l with
-    | nil => nil
-    | h :: t => insertStr h (insSortStr t)
-  end.
-
-Fixpoint span {A : Type} (p : A -> bool) (l : list A) : (list A * list A) :=
-  match l with
-    | nil => (nil, nil)
-    | x :: xs =>
-      if p x then let (ys, zs) := span p xs in (x::ys, zs)
-      else (nil, xs)
-  end.
-
-Function groupBy {A : Type} (eq : A -> A -> bool) (l : list A)
-         {measure length l} : list (list A) :=
-  match l with
-    | nil => nil
-    | x :: xs =>
-      let (ys, zs) := span (eq x) xs in
-      (x :: ys) :: groupBy eq zs
-  end.
-Admitted.
-
-Definition strEq (s1 s2 : string) : bool :=
-  if string_dec s1 s2 then true else false.
-
+ 
 Definition summary (st : State) : list (string * nat) :=
-  let ls := filter (notNull) (map (map (fun p => fst p)) (collected st)) in
-  let toSort := map (fun s' => concatStr (intersperse ", "%string s')) ls in
-  let sorted := insSortStr toSort in
-  let grouped := groupBy strEq sorted in
-  let maped := map (fun ss => (hd "ERROR" ss,
-(* CH: displaying absolute, not relative numbers
-                               div (length ss * 100) (numSuccessTests st)
-*)
-                               length ss
-                   )) grouped in
-  maped.
-(*
-summary st = reverse
-           . sort
-           . map (\ss -> (head ss, (length ss * 100) `div` numSuccessTests st))
-           . group
-           . sort
-           $ [ concat (intersperse ", " s')
-             | s <- collected st
-             , let s' = [ t | (t,_) <- s ]
-             , not (null s')
-             ]
-nil.
-*)
+  let res := 
+      Map.fold (fun key elem acc => (key,elem) :: acc) (labels st) nil
+  in insSortBy (fun x y => snd y <=? snd x) res .
 
 Definition doneTesting (st : State) (f : RandomGen -> nat -> QProp) : Result :=
  if expectedFailure st then
@@ -239,15 +186,21 @@ Function runATest (st : State) (f : RandomGen -> nat -> QProp)
         else runATest st f
  in
   match st with
-    | MkState mst mdt ms cs nst ndt c e r nss nts =>
+    | MkState mst mdt ms cs nst ndt ls e r nss nts =>
     match f rnd1 size with
     | MkProp (MkRose res ts) =>
       (* TODO: CallbackPostTest *)
       match res with
         | MkResult (Some x) e reas _ s _ =>
           if x then (* Success *)
-            (* Todo stamps! *)
-            test (MkState mst mdt ms cs (nst + 1) ndt (s :: c) e rnd2 nss nts) f
+            let ls' := fold_left (fun stamps stamp => 
+                                     let oldBind := Map.find stamp stamps in
+                                     match oldBind with
+                                       | None   => Map.add stamp 1 stamps 
+                                       | Some k => Map.add stamp (k+1) stamps
+                                     end
+                                  ) s ls in
+            test (MkState mst mdt ms cs (nst + 1) ndt ls' e rnd2 nss nts) f
           else (* Failure *)
             let pre : string := (if expect res then "*** Failed! "
                        else "+++ OK, failed as expected. ")%string in
@@ -260,7 +213,8 @@ Function runATest (st : State) (f : RandomGen -> nat -> QProp)
             else
               Failure (nst + 1) numShrinks ndt r size (pre ++ suf) (summary st) reas
         | MkResult None e reas _ s _ =>
-          test (MkState mst mdt ms cs nst (ndt + 1) c e rnd2 nss nts) f
+          (* Ignore labels of discarded tests? *)
+          test (MkState mst mdt ms cs nst (ndt + 1) ls e rnd2 nss nts) f
       end
     end
   end.
@@ -295,7 +249,7 @@ Definition quickCheckWith {prop : Type} {_ : Checkable prop}
                 computeFun      (* computeSize       *)
                 0               (* numSuccessTests   *)
                 0               (* numDiscardTests   *)
-                nil             (* collected         *)
+                (Map.empty nat) (* labels            *)
                 false           (* expectedFailure   *)
                 rnd             (* randomSeed        *)
                 0               (* numSuccessShrinks *)

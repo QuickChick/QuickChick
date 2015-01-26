@@ -225,13 +225,8 @@ Lemma semPredQProp:
 Proof.
   move=> p.
   rewrite /semCheckableSize /checker 
-          /testGenProp /checker /testProp /semCheckerSize.
-  split.
-  - move => Hqp qp Hsize. apply Hqp. 
-    apply semBindSize. exists qp. split => //.
-    by apply semReturnSize.
-  - move => H pq /semBindSize [qp [H1 /semReturnSize H2]]; subst.
-    by apply H.
+          /testChecker /checker /testProp /semCheckerSize.
+  split; move => Hqp qp Hsize; auto.  
 Qed.
 
 Lemma semForAll :
@@ -402,6 +397,13 @@ Next Obligation.
   - move => /semGen H' p Hgen. eapply proof. apply H'. by auto.
 Qed.
 
+Program Instance proveChecker : Provable Checker :=
+  {|
+    proposition s g := semCheckerSize g s
+  |}.
+Next Obligation.
+  split; intros H; by apply semPredQProp.
+Qed.
 
 Program Instance proveFun {A prop: Type} `{Arbitrary A} `{Show A}
         `{Provable prop}: Provable (A -> prop) :=

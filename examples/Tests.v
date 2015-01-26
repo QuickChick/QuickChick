@@ -19,7 +19,7 @@ Fixpoint remove (x : nat) (l : list nat) : list nat :=
   end.
 
 Definition removeP (x : nat) (l : list nat) :=
-  ~~ (existsb (pred1 x) (remove x l)).
+  collect x (~~ (existsb (pred1 x) (remove x l))).
 
 Definition test0 :=
   showResult (quickCheck removeP).
@@ -201,15 +201,17 @@ Proof.
     apply/leP. eapply le_trans; try eassumption. by apply/leP.
 Qed.
 
+
 Lemma removeP_correct: 
   (forall size, proposition size removeP) <-> (forall (x : nat) l, ~ In x (remove x l)).
 Proof.
-  simpl. split.
-  - move => H x l. 
-    have H': removeP x l.
-    { apply H with (size := max x (max (max_elem l) (List.length l))). 
-      apply arbNat_correctSize. by apply Max.le_max_l.
-      eapply arbList_correct with (P := fun x y => (y <= x)%coq_nat) . 
+  simpl; split. unfold removeP.
+  - move => H x l cont.  
+    set size := max x (max (max_elem l) (List.length l)).
+    have Hnat : semSize arbitraryNat size x 
+      by apply arbNat_correctSize; apply Max.le_max_l.
+    have Hlist: semSize arbitraryList size l.
+    { eapply arbList_correct with (P := fun x y => (y <= x)%coq_nat) . 
       move => n. by rewrite arbNat_correctSize. 
       split. apply Max.max_case_strong => H'; auto. apply/leP. 
       eapply Max.max_lub_r; eassumption. by apply/leP; apply Max.le_max_r. 
@@ -218,12 +220,13 @@ Proof.
       eapply le_trans; try eassumption. eapply Max.max_lub_l. by eapply H'.
       apply Max.max_case_strong => H''; auto. 
       eapply le_trans; try eassumption. }
-      rewrite /removeP in H'. move => HIn.
-      have contra : existsb (pred1 x) (remove x l).
+    specialize (H size x Hnat l Hlist).
+    setoid_rewrite semCollect_id in H. apply semBool in H.
+    have contra : existsb (pred1 x) (remove x l).
       { apply existsb_exists. exists x. split => //. by rewrite /= eq_refl. }
-        by rewrite contra //= in H'.
+    rewrite contra in H. discriminate.
   -  move => H a HIn Hsize l Hsize'. 
-     rewrite /removeP. apply Bool.eq_true_not_negb.
+     rewrite /removeP. rewrite semCollect_id semBool. apply Bool.eq_true_not_negb.
      move => /existsb_exists contra.
      move : contra => [n [HIn' /=/eqP Hpred]]; subst. eapply H.
      eassumption. 
