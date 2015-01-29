@@ -1,10 +1,12 @@
-Require Import QuickChick Gen.
+Require Import QuickChick ModuleGen GenCombinators.
 
 Require Import ZArith.
 Require Import NPeano.
 Require Import List.
 Import ListNotations.
 Require Import Machine.
+
+Import Gen GenComb.
 
 (* Overriding default instance to generate "in-bounds" things *)
 Definition gen_Z := choose (0,1).
@@ -23,7 +25,7 @@ Definition is_atom_low (a : Atom) :=
 
 Local Open Scope nat.
 
-Definition ainstr (st : State) : Gen Instruction :=
+Definition ainstr (st : State) : G Instruction :=
   let '(St im m stk pc ) := st in
   let fix stack_length s :=
       match s with
@@ -55,7 +57,7 @@ Definition ainstr (st : State) : Gen Instruction :=
               (onLength 2 10, returnGen Store)].
 *)
 
-Fixpoint gen_stack (n : nat) (onlyLow : bool) : Gen Stack :=
+Fixpoint gen_stack (n : nat) (onlyLow : bool) : G Stack :=
   let gen_atom :=
       if onlyLow then liftGen2 Atm gen_Z (returnGen L)
       else gen_atom
@@ -69,7 +71,7 @@ Fixpoint gen_stack (n : nat) (onlyLow : bool) : Gen Stack :=
                        liftGen (RetCons pc) (gen_stack n' (is_atom_low pc))))]
   end.
 
-Definition gen_state : Gen State :=
+Definition gen_state : G State :=
   let imem0 := [Nop; Nop] in
   bindGen gen_atom (fun pc =>
   bindGen gen_memory (fun mem =>
@@ -81,7 +83,7 @@ Definition gen_state : Gen State :=
 Inductive Variation {A : Type} := V : A -> A -> @Variation A.
 
 Class Vary (A : Type) := {
-  vary : A -> Gen A
+  vary : A -> G A
 }.
 
 Instance vary_atom : Vary Atom :=
@@ -99,7 +101,7 @@ Instance vary_mem : Vary Mem :=
   vary m := sequenceGen (map vary m)
 |}.
 
-Fixpoint vary_stack (s : Stack) (isLow : bool) : Gen Stack :=
+Fixpoint vary_stack (s : Stack) (isLow : bool) : G Stack :=
   match s with
     | a :: s'  => if isLow then liftGen2 Cons (vary a) (vary_stack s' isLow)
                   else liftGen2 Cons gen_atom (vary_stack s' isLow)
@@ -130,7 +132,7 @@ Instance vary_state : Vary State :=
       returnGen (St imem mem' (extra_elem :: stk') pc')))))
 |}.
 
-Definition gen_variation_state : Gen (@Variation State) :=
+Definition gen_variation_state : G (@Variation State) :=
   bindGen gen_state (fun st =>
   bindGen (vary st) (fun st' =>
   returnGen (V st st'))).

@@ -9,7 +9,7 @@ Require Import Indist.
 
 Require Import String.
 Local Open Scope string.
-Definition SSNI (t : table) (v : @Variation State) : Checker Gen.Gen :=
+Definition SSNI (t : table) (v : @Variation State) : Checker  :=
   let '(V st1 st2) := v in
   let '(St _ _ _ (_@l1)) := st1 in
   let '(St _ _ _ (_@l2)) := st2 in
