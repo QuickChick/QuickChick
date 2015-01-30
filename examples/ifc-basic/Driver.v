@@ -1,4 +1,5 @@
 Require Import QuickChick.
+Import Gen GenComb.
 
 Require Import List. Import ListNotations.
 
@@ -62,15 +63,15 @@ Definition SSNI (t : table) (v : @Variation State) : Checker  :=
     | _ => checker rejected
   end*).
 
-Definition prop_SSNI t : Checker Gen.Gen :=
+Definition prop_SSNI t : Checker :=
   forAllShrink gen_variation_state (fun _ => nil)
-   (SSNI t : Variation -> Gen.Gen QProp).
+   (SSNI t : Variation -> G QProp).
 
 Definition prop_gen_indist :=
   forAllShrink gen_variation_state (fun _ => nil)
                (fun v => let '(V st1 st2) := v in indist st1 st2).
 
-Definition runSSNIdefaultTable := showResult (quickCheck (prop_SSNI default_table : Gen.Gen QProp)).
+Definition runSSNIdefaultTable := showResult (quickCheck (prop_SSNI default_table)).
 
 QuickCheck runSSNIdefaultTable.
 
@@ -96,7 +97,7 @@ Eval lazy -[labelCount helper] in
 
 Definition testMutantX n :=
   match nth (mutate_table default_table) n with
-    | Some t => showResult (quickCheckWith myArgs (prop_SSNI t : Gen.Gen QProp))
+    | Some t => showResult (quickCheckWith myArgs (prop_SSNI t))
     | _ => ""
   end.
 
@@ -104,7 +105,7 @@ Definition testMutants :=
   mutateCheckArgs myArgs default_table
     (fun t => (forAllShrinkShow
       gen_variation_state (fun _ => nil) (fun _ => "")
-      (SSNI t : Variation -> Gen.Gen QProp)) : Gen.Gen QProp).
+      (SSNI t ))).
 
 Definition runTestMutants := show testMutants.
 
@@ -118,7 +119,7 @@ Definition ex_indist : indist st1 st2 = true. auto. Qed.
 
 Definition ex_test :=
   match nth (mutate_table default_table) 18 with
-    | Some t => showResult (quickCheck (SSNI t (V st1 st2) : Gen.Gen QProp))
+    | Some t => showResult (quickCheck (SSNI t (V st1 st2)))
     | _ => ""
   end.
 

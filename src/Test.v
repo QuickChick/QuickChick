@@ -105,10 +105,9 @@ Fixpoint concatStr (l : list string) : string :=
     | nil => ""
     | (h :: t) => h ++ concatStr t
   end.
- 
+
 Definition summary (st : State) : list (string * nat) :=
-  let res := 
-      Map.fold (fun key elem acc => (key,elem) :: acc) (labels st) nil
+  let res := Map.fold (fun key elem acc => (key,elem) :: acc) (labels st) nil
   in insSortBy (fun x y => snd y <=? snd x) res .
 
 Definition doneTesting (st : State) (f : RandomGen -> nat -> QProp) : Result :=
