@@ -17,10 +17,10 @@ Definition success qp :=
 
 (* Maps a Checker to a Prop *)
 Definition semChecker (P : Checker) : Prop :=
-  forall s qp, semSize P s qp -> success qp = true.
+  forall s qp, semGenSize P s qp -> success qp = true.
 
 Definition semCheckerSize (P : Checker) (s : nat): Prop :=
-  forall qp, semSize P s qp -> success qp = true.
+  forall qp, semGenSize P s qp -> success qp = true.
 
 (* Maps a Checkable to a Prop i.e. gives an equivalent proposition to the
    property under test *)
@@ -83,9 +83,9 @@ Proof.
 Qed.
 
 
-Axiom semSizeCorrect :
+Axiom semGenSizeCorrect :
   forall A (g : G A) (x : A) size,
-    semSize g size x <-> exists seed, run g seed size = x.
+    semGenSize g size x <-> exists seed, run g seed size = x.
 
 
 (* TODO : This proof needs refactoring! *)
@@ -99,7 +99,7 @@ Proof.
   unfold semCheckableSize, shrinking, semCheckerSize.
   split.
   - unfold props. generalize 1000.
-    case => [| n] H qp /semSizeCorrect [seed Hgen]; subst.
+    case => [| n] H qp /semGenSizeCorrect [seed Hgen]; subst.
     + apply H. apply semFmapSize. eexists.
       split. apply semPromoteSize.
       exists seed. simpl. reflexivity.
@@ -132,14 +132,14 @@ Proof.
                      seed s)) as b.
       symmetry in Heqb. setoid_rewrite runPromote in Heqb. by rewrite -Heqb.
   - unfold props. generalize 1000.
-    move => n H qp /semSizeCorrect [seed /runFmap [rqp [H1 H2]]].
+    move => n H qp /semGenSizeCorrect [seed /runFmap [rqp [H1 H2]]].
     suff : success (run (@checker _ HCheck (pf x)) seed s) = true.
     + subst.
       remember (run (promote (props' n pf sh x)) seed s) as b. symmetry in Heqb.
       apply runPromote in Heqb; subst. simpl.
       case: n => [| n] /=;
       by destruct ((run (checker (pf x)) seed s)) as [[res [l]]] => //=.
-      subst. apply H. apply semSizeCorrect.
+      subst. apply H. apply semGenSizeCorrect.
       by eexists; eexists.
 Qed.
 
@@ -211,7 +211,7 @@ Qed.
 Lemma semBindGen:
   forall {A } (gen : G A) (p : A -> Checker) (size: nat),
     semCheckerSize (bindGen gen p) size <->
-    forall g, semSize gen size g -> semCheckerSize (p g) size.
+    forall g, semGenSize gen size g -> semCheckerSize (p g) size.
 Proof.
   move => A gen p. unfold semCheckerSize. split.
   - move => H g Hsize qp Hsize'. eapply H.
@@ -233,7 +233,7 @@ Lemma semForAll :
   forall {A prop : Type} {H : Checkable prop} `{Show A}
          (gen : G A) (f : A -> prop) (size: nat),
     semCheckerSize (forAll gen f) size <->
-    forall (a : A), semSize gen size a -> semCheckableSize (f a) size.
+    forall (a : A), semGenSize gen size a -> semCheckableSize (f a) size.
 Proof.
   move => A prop Htest show gen pf. split => H'.
   - rewrite /forAll in H'. move/semBindGen : H' => H' a /H' Hgen.
@@ -246,7 +246,7 @@ Lemma semForAllShrink:
   forall {A prop : Type} {H : Checkable prop} `{Show A}
          (gen : G A) (f : A -> prop) shrinker (size: nat),
     semCheckerSize (forAllShrink gen shrinker f) size <->
-    forall a : A, semSize gen size a -> semCheckableSize (f a) size.
+    forall a : A, semGenSize gen size a -> semCheckableSize (f a) size.
 Proof.
   move => A prop H show gen pf shrink. split.
   - rewrite /forAllShrink semBindGen.
@@ -304,7 +304,7 @@ Qed.
 Lemma semGen:
   forall (P : Type) {H : Checkable P} (gen: G P) (size : nat),
     (semCheckableSize gen size) <->
-    (forall p, semSize gen size p -> semCheckableSize p size).
+    (forall p, semGenSize gen size p -> semCheckableSize p size).
 Proof.
   move=> P H gen. unfold semCheckableSize, semCheckerSize in *. split.
   - move=> Hsem qp Hsize.
@@ -319,7 +319,7 @@ Lemma semFun:
   forall {A prop : Type} {H1 : Show A} {H2 : Arbitrary A} {H3 : Checkable prop}
          (f : A -> prop) (size: nat),
     semCheckableSize f size <->
-    forall (a : A), semSize arbitrary size a -> semCheckableSize (f a) size.
+    forall (a : A), semGenSize arbitrary size a -> semCheckableSize (f a) size.
 Proof.
   move=> A prop H1 H2 H3 f.
   rewrite /semCheckable /checker /testFun.
@@ -389,7 +389,7 @@ Qed.
 Program Instance proveGenProp {prop : Type} `{Provable prop} :
   Provable (G prop) :=
   {|
-    proposition s g := (forall p, semSize g s p -> proposition s p)
+    proposition s g := (forall p, semGenSize g s p -> proposition s p)
   |}.
 Next Obligation.
   destruct H0 as [semP proof]. rewrite /proposition. split.
@@ -410,7 +410,7 @@ Program Instance proveFun {A prop: Type} `{Arbitrary A} `{Show A}
   {|
     proposition s p :=
       (forall a,
-         semSize arbitrary s a ->
+         semGenSize arbitrary s a ->
          proposition s (p a))
   |}.
 Next Obligation.

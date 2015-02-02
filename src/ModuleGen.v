@@ -6,8 +6,9 @@ Set Implicit Arguments.
 
 Import ListNotations.
 
-(* Do we want to keep seq_eq, set_incl? There are similar definitions
-      at Ensembles library *)
+(* There are similar definitions in the Ensembles library (Included
+   and Same_set); set_eq is not exactly the same as Same_set (only
+   logically equivalent). *)
 Definition set_eq {A} (m1 m2 : Ensemble A) :=
   forall (a : A), m1 a <-> m2 a.
 
@@ -38,21 +39,21 @@ Module Type GenPrimitiveInterface.
 
 
    (* Set of outcomes definitions *)
-   Parameter semSize : forall {A : Type}, G A -> nat -> Ensemble A.
+   Parameter semGenSize : forall {A : Type}, G A -> nat -> Ensemble A.
 
    Definition semGen {A : Type} (g : G A) : Ensemble A :=
-     fun a => exists size, semSize g size a.
+     fun a => exists size, semGenSize g size a.
 
    Hypothesis semReturn :
      forall A (x : A), semGen (returnGen x) <--> eq x.
    Hypothesis semReturnSize :
-     forall A (x : A) (size : nat), semSize (returnGen x) size <--> eq x.
+     forall A (x : A) (size : nat), semGenSize (returnGen x) size <--> eq x.
 
    Hypothesis semBindSize :
      forall A B (g : G A) (f : A -> G B) (size : nat),
-       semSize (bindGen g f) size <-->
-       fun b => exists a, (semSize g size) a /\
-                          (semSize (f a) size) b.
+       semGenSize (bindGen g f) size <-->
+       fun b => exists a, (semGenSize g size) a /\
+                          (semGenSize (f a) size) b.
 
    Hypothesis semFmap :
      forall A B (f : A -> B) (g : G A),
@@ -60,8 +61,8 @@ Module Type GenPrimitiveInterface.
        (fun b => exists a, (semGen g) a /\ b = f a).
    Hypothesis semFmapSize :
      forall A B (f : A -> B) (g : G A) (size : nat),
-       semSize (fmap f g) size <-->
-       (fun b => exists a, (semSize g size) a /\ b = f a).
+       semGenSize (fmap f g) size <-->
+       (fun b => exists a, (semGenSize g size) a /\ b = f a).
 
    Hypothesis semChoose :
      forall A `{Random A} a1 a2,
@@ -69,21 +70,21 @@ Module Type GenPrimitiveInterface.
        (fun a => Random.leq a1 a /\ Random.leq a a2).
    Hypothesis semChooseSize :
      forall A `{Random A} a1 a2 (size : nat),
-       semSize (choose (a1,a2)) size <-->
+       semGenSize (choose (a1,a2)) size <-->
        (fun a => Random.leq a1 a /\ Random.leq a a2).
 
 
    Hypothesis semSized :
      forall A (f : nat -> G A),
-       semGen (sized f) <--> (fun a => exists n, semSize (f n) n a).
+       semGen (sized f) <--> (fun a => exists n, semGenSize (f n) n a).
 
    Hypothesis semSizedSize :
      forall A (f : nat -> G A) s,
-       semSize (sized f) s <--> (fun a => semSize (f s) s a).
+       semGenSize (sized f) s <--> (fun a => semGenSize (f s) s a).
 
    Hypothesis semResize :
      forall A (n : nat) (g : G A),
-       semGen (resize n g) <--> semSize g n .
+       semGen (resize n g) <--> semGenSize g n .
 
    (* We need an completeness as well - this is not exact *)
    Hypothesis semSuchThatMaybe_sound:
@@ -92,10 +93,7 @@ Module Type GenPrimitiveInterface.
        (fun o => o = None \/
                  (exists y, o = Some y /\ semGen g y /\ f y)).
 
-   (* This is too concrete, but I need it to prove shrinking.
-      Does this reveal a weakness in our framework?
-      Should we try to get rid of this?  *)
-
+   (* This (very concrete) spec is needed to prove shrinking *)
    Hypothesis semPromote :
      forall A (m : Rose (G A)),
        semGen (promote m) <-->
@@ -104,7 +102,7 @@ Module Type GenPrimitiveInterface.
           (fmapRose (fun (g : G A) => run g seed size) m) = t.
    Hypothesis semPromoteSize :
      forall (A : Type) (m : Rose (G A)) n,
-       semSize (promote m) n <-->
+       semGenSize (promote m) n <-->
        (fun t : Rose A =>
           exists (seed : RandomSeed),
             fmapRose (fun g : G A => run g seed n) m = t).
@@ -204,17 +202,17 @@ Module Gen : GenPrimitiveInterface.
          List.map (fun (p : RandomSeed * nat) => let (r,n) := p in m r n) l
      end.
 
-   Definition semSize {A : Type} (g : G A) (size : nat) : Ensemble A :=
+   Definition semGenSize {A : Type} (g : G A) (size : nat) : Ensemble A :=
      fun a => exists seed, run g seed size = a.
 
    Definition semGen {A : Type} (g : G A) : Ensemble A :=
-     fun a => exists size, semSize g size a.
+     fun a => exists size, semGenSize g size a.
 
    Lemma semReturnSize :
      forall A (x : A) (size : nat),
-       semSize (returnGen x) size <--> eq x.
+       semGenSize (returnGen x) size <--> eq x.
    Proof.
-     move => A x a. rewrite /semSize. split.
+     move => A x a. rewrite /semGenSize. split.
      - move => [seed H]. by [].
      - move => H /=. rewrite H.
        exists randomSeedInhabitant. reflexivity.
@@ -235,11 +233,11 @@ Module Gen : GenPrimitiveInterface.
    Qed.
 
    Lemma semBindSize : forall A B (g : G A) (f : A -> G B) (size : nat),
-                         semSize (bindGen g f) size <-->
-                                 fun b => exists a, (semSize g size) a /\
-                                                    (semSize (f a) size) b.
+                         semGenSize (bindGen g f) size <-->
+                                 fun b => exists a, (semGenSize g size) a /\
+                                                    (semGenSize (f a) size) b.
    Proof.
-     move => A B [g] f size b. rewrite /semSize /bindGen => /=. split.
+     move => A B [g] f size b. rewrite /semGenSize /bindGen => /=. split.
      - case => [seed H]. move : H.
        case (randomSplit seed) => [seed1 seed2] H.
        exists (g seed1 size). split; eexists. reflexivity.
@@ -250,10 +248,10 @@ Module Gen : GenPrimitiveInterface.
    Qed.
 
    Lemma semFmapSize : forall A B (f : A -> B) (g : G A) (size : nat),
-                         semSize (fmap f g) size <-->
-                                 (fun b => exists a, (semSize g size) a /\ b = f a).
+                         semGenSize (fmap f g) size <-->
+                                 (fun b => exists a, (semGenSize g size) a /\ b = f a).
    Proof.
-     move => A B f [g] size b. rewrite /semSize /fmap => /=. split.
+     move => A B f [g] size b. rewrite /semGenSize /fmap => /=. split.
      - move => [seed H]. exists (g seed size). by eauto.
      - move => [a [[seed H1] H2]].
        eexists. rewrite H2. rewrite <- H1. reflexivity.
@@ -264,7 +262,7 @@ Module Gen : GenPrimitiveInterface.
                      semGen (fmap f g) <-->
                             (fun b => exists a, (semGen g) a /\ b = f a).
    Proof.
-     move => A B f [g] b. rewrite /semGen /semSize /fmap => /=. split.
+     move => A B f [g] b. rewrite /semGen /semGenSize /fmap => /=. split.
      - move => [size [seed H]]. exists (g seed size). by eauto.
      - move => [a [[size [seed H1]] H2]].
        do 2 eexists. rewrite H2. rewrite <- H1. reflexivity.
@@ -272,10 +270,10 @@ Module Gen : GenPrimitiveInterface.
 
    Lemma semChooseSize :
      forall A `{Random A} a1 a2 s,
-       semSize (choose (a1,a2)) s <-->
+       semGenSize (choose (a1,a2)) s <-->
        (fun a => Random.leq a1 a /\ Random.leq a a2).
    Proof.
-     move => A R a1 a2 a. rewrite /semGen /semSize. simpl. split.
+     move => A R a1 a2 a. rewrite /semGen /semGenSize. simpl. split.
      - move => [seed H]. apply randomRCorrect. by exists seed.
      - by move => /randomRCorrect H.
    Qed.
@@ -285,7 +283,7 @@ Module Gen : GenPrimitiveInterface.
        semGen (choose (a1,a2)) <-->
        (fun a => Random.leq a1 a /\ Random.leq a a2).
    Proof.
-     move => A R a1 a2 a. rewrite /semGen /semSize. simpl. split.
+     move => A R a1 a2 a. rewrite /semGen /semGenSize. simpl. split.
      - by move => [_ /randomRCorrect H].
      - move => /randomRCorrect H. by exists 0.
    Qed.
@@ -293,30 +291,30 @@ Module Gen : GenPrimitiveInterface.
 
    Lemma semSized :
      forall A (f : nat -> G A),
-       semGen (sized f) <--> (fun a => exists n, semSize (f n) n a).
+       semGen (sized f) <--> (fun a => exists n, semGenSize (f n) n a).
    Proof.
-     move => A f a. rewrite /semGen /semSize /sized => /=. split.
+     move => A f a. rewrite /semGen /semGenSize /sized => /=. split.
      - move => [size [seed H]]. exists size. move : H.
-       case (f size) => g H. rewrite /semSize. by eauto.
+       case (f size) => g H. rewrite /semGenSize. by eauto.
      - move => [size [seed H]]. exists size. exists seed.
-       move : H. case (f size) => g H. rewrite /semSize. by eauto.
+       move : H. case (f size) => g H. rewrite /semGenSize. by eauto.
    Qed.
 
    Lemma semSizedSize :
      forall A (f : nat -> G A) s,
-       semSize (sized f) s <--> (fun a => semSize (f s) s a).
+       semGenSize (sized f) s <--> (fun a => semGenSize (f s) s a).
    Proof.
-     move => A f s a. rewrite /semGen /semSize /sized => /=. split.
+     move => A f s a. rewrite /semGen /semGenSize /sized => /=. split.
      - move => [seed H]. exists seed. move : H.
-       case (f s) => g H. rewrite /semSize. by eauto.
+       case (f s) => g H. rewrite /semGenSize. by eauto.
      - move => [seed H]. exists seed.
-       move : H. case (f s) => g H. rewrite /semSize. by eauto.
+       move : H. case (f s) => g H. rewrite /semGenSize. by eauto.
    Qed.
 
    Lemma semResize :
-     forall A (n : nat) (g : G A), semGen (resize n g) <--> semSize g n .
+     forall A (n : nat) (g : G A), semGen (resize n g) <--> semGenSize g n .
    Proof.
-     move => A n [g] a. rewrite /semGen /semSize /resize => /=. split.
+     move => A n [g] a. rewrite /semGen /semGenSize /resize => /=. split.
      - move => [_ [seed H]]. by eauto.
      - move => [seed H]. exists 0. by eauto.
    Qed.
@@ -348,7 +346,7 @@ Module Gen : GenPrimitiveInterface.
                  (exists y, o = Some y /\ semGen g y /\ f y)).
    (* Not an exact spec !!! *)
    Proof.
-     move => A g f a. rewrite /semGen /semSize.
+     move => A g f a. rewrite /semGen /semGenSize.
      - case : a => [a|] [n [s H]]; last by left. right.
        eexists; split=> //=.
                           remember (match n with
@@ -372,7 +370,7 @@ Module Gen : GenPrimitiveInterface.
 
    Lemma semPromoteSize
    : forall (A : Type) (m : Rose (G A)) n,
-       semSize (promote m) n <-->
+       semGenSize (promote m) n <-->
                (fun t : Rose A =>
                   exists (seed : RandomSeed),
                     fmapRose (fun g : G A => run g seed n) m = t).

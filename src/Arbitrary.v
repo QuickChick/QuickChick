@@ -122,7 +122,7 @@ Qed.
 
 Lemma arbInt_correct:
   forall s,
-    semSize arbitrary s <-->
+    semGenSize arbitrary s <-->
     (fun (z : Z) =>  (- Z.of_nat s <= z <= Z.of_nat s)%Z).
 Proof.
   rewrite /arbitrary /arbInt /arbitraryZ. move => n. split.
@@ -136,7 +136,7 @@ Qed.
 
 Lemma arbBool_correctSize:
   forall s,
-    semSize arbitrary s <--> (fun (_ : bool) => True).
+    semGenSize arbitrary s <--> (fun (_ : bool) => True).
 Proof.
   rewrite /arbitrary /arbBool /arbitraryBool. move => b.
   split => // _. apply semChooseSize.
@@ -145,7 +145,7 @@ Qed.
 
 Lemma arbNat_correctSize:
   forall s,
-    semSize arbitrary s <--> (fun (n : nat) => (n <= s)%coq_nat).
+    semGenSize arbitrary s <--> (fun (n : nat) => (n <= s)%coq_nat).
 Proof.
   rewrite /arbitrary /arbNat /arbitraryNat. move => n.
   split.
@@ -169,8 +169,8 @@ Qed.
 (* TODO : this need semListOf *)
 Lemma arbList_correct:
   forall {A} {H : Arbitrary A} (P : nat -> A -> Prop) s,
-    (semSize arbitrary s <--> P s) ->
-    (semSize arbitrary s <-->
+    (semGenSize arbitrary s <--> P s) ->
+    (semGenSize arbitrary s <-->
      (fun (l : list A) => length l <= s /\ (forall x, List.In x l -> P s x))).
 Proof.
   move => A H P s Hgen l. rewrite /arbitrary /arbList /arbitraryList.
