@@ -7,8 +7,8 @@ Set Implicit Arguments.
 Import ListNotations.
 
 (* There are similar definitions in the Ensembles library (Included
-   and Same_set); set_eq is not exactly the same as Same_set (only
-   logically equivalent). *)
+   and Same_set); set_eq is not exactly the same as Same_set though
+   (only logically equivalent). *)
 Definition set_eq {A} (m1 m2 : Ensemble A) :=
   forall (a : A), m1 a <-> m2 a.
 
@@ -21,6 +21,11 @@ Infix "--->" := set_incl (at level 70, no associativity) : sem_gen_scope.
 
 Open Scope sem_gen_scope.
 
+(* We hide the implementation a generators behind this interface. The
+   rest of the framework and user code are agnostic to the internal
+   representation of generators. The proof organization/abstraction
+   tries to follow this code organization/abstraction. We need to
+   expose quite a bit on the proof side for this to work though. *)
 Module Type GenPrimitiveInterface.
    Parameter G : Type -> Type.
 
@@ -39,8 +44,12 @@ Module Type GenPrimitiveInterface.
 
 
    (* Set of outcomes definitions *)
+   (* CH: What's the point in making this abstract, if it's definition
+      is fixed by semGenCorrect? *)
    Parameter semGenSize : forall {A : Type}, G A -> nat -> Ensemble A.
 
+   (* CH: Why is this concrete and semGenSize abstract?
+          The definition is repeated in the Module definition, is that normal? *)
    Definition semGen {A : Type} (g : G A) : Ensemble A :=
      fun a => exists size, semGenSize g size a.
 
@@ -73,11 +82,9 @@ Module Type GenPrimitiveInterface.
        semGenSize (choose (a1,a2)) size <-->
        (fun a => Random.leq a1 a /\ Random.leq a a2).
 
-
    Hypothesis semSized :
      forall A (f : nat -> G A),
-       semGen (sized f) <--> (fun a => exists n, semGenSize (f n) n a).
-
+       semGen (sized f) <--> (fun a => exists s, semGenSize (f s) s a).
    Hypothesis semSizedSize :
      forall A (f : nat -> G A) s,
        semGenSize (sized f) s <--> (fun a => semGenSize (f s) s a).
@@ -86,7 +93,7 @@ Module Type GenPrimitiveInterface.
      forall A (n : nat) (g : G A),
        semGen (resize n g) <--> semGenSize g n .
 
-   (* We need an completeness as well - this is not exact *)
+   (* TODO: We need completeness as well - this is not exact *)
    Hypothesis semSuchThatMaybe_sound:
      forall A (g : G A) (f : A -> bool),
        semGen (suchThatMaybe g f) --->
@@ -107,8 +114,8 @@ Module Type GenPrimitiveInterface.
           exists (seed : RandomSeed),
             fmapRose (fun g : G A => run g seed n) m = t).
 
-
-   (* These are the two statements we prove about generators *)
+   (* These are the two statements we prove about generators
+      CH: ha? *)
    Hypothesis semGenCorrect :
      forall A (g : G A) (x : A),
          semGen g x <-> exists size seed, run g seed size = x.
@@ -132,7 +139,7 @@ End GenPrimitiveInterface.
 Module Gen : GenPrimitiveInterface.
 
    Inductive GenType (A : Type) : Type :=
-   | MkGen : (RandomSeed -> nat -> A (** RandomSeed*)) -> GenType A.
+   | MkGen : (RandomSeed -> nat -> A) -> GenType A.
 
    Definition G := GenType.
 
@@ -202,11 +209,13 @@ Module Gen : GenPrimitiveInterface.
          List.map (fun (p : RandomSeed * nat) => let (r,n) := p in m r n) l
      end.
 
+
    Definition semGenSize {A : Type} (g : G A) (size : nat) : Ensemble A :=
      fun a => exists seed, run g seed size = a.
 
    Definition semGen {A : Type} (g : G A) : Ensemble A :=
      fun a => exists size, semGenSize g size a.
+
 
    Lemma semReturnSize :
      forall A (x : A) (size : nat),
@@ -257,7 +266,7 @@ Module Gen : GenPrimitiveInterface.
        eexists. rewrite H2. rewrite <- H1. reflexivity.
    Qed.
 
-   (* This should just use semFMapSize *)
+   (* TODO: This should just use semFMapSize *)
    Lemma semFmap : forall A B (f : A -> B) (g : G A),
                      semGen (fmap f g) <-->
                             (fun b => exists a, (semGen g) a /\ b = f a).
@@ -338,13 +347,12 @@ Module Gen : GenPrimitiveInterface.
        by destruct (suchThatMaybeAux g p k.+1 n).
    Qed.
 
-
+   (* Not an exact spec !!! *)
    Lemma semSuchThatMaybe_sound :
      forall A (g : G A) (f : A -> bool),
        semGen (suchThatMaybe g f) --->
        (fun o => o = None \/
                  (exists y, o = Some y /\ semGen g y /\ f y)).
-   (* Not an exact spec !!! *)
    Proof.
      move => A g f a. rewrite /semGen /semGenSize.
      - case : a => [a|] [n [s H]]; last by left. right.
