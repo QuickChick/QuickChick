@@ -6,6 +6,7 @@ Require Import List.
 Require Import ssreflect ssrbool ssrnat.
 
 Import GenHigh GenLow.
+
 Class Arbitrary (A : Type) : Type :=
   {
     arbitrary : G A;
@@ -13,6 +14,7 @@ Class Arbitrary (A : Type) : Type :=
   }.
 
 Definition arbitraryBool := choose (false, true).
+
 Definition arbitraryNat :=
   sized (fun x => choose (0, x)).
 
@@ -21,7 +23,6 @@ Definition arbitraryZ :=
            let z := Z.of_nat x in
            choose (-z, z)%Z).
 
-(* Definition arbitraryZ := choose (-100, 100)%Z. *)
 Definition arbitraryList {A : Type} {Arb : Arbitrary A} :=
   listOf arbitrary.
 
@@ -42,13 +43,73 @@ Proof.
   destruct (divmod n 1 0 0); destruct n1; simpl; omega.
 Qed.
 
+Lemma abs_div2_pos : forall p, Z.abs_nat (Z.div (Z.pos p) 2) = div (Pos.to_nat p) 2.
+Proof.
+  intros. destruct p.
+    rewrite <- Zdiv2_div. rewrite /Z.div2 /Pos.div2.
+      rewrite /Z.abs_nat. rewrite Pos2Nat.inj_xI.
+      rewrite <- Nat.add_1_r. rewrite mult_comm.
+      rewrite Nat.div_add_l; simpl; omega.
+    rewrite <- Zdiv2_div. rewrite /Z.div2 /Pos.div2.
+      rewrite /Z.abs_nat. rewrite Pos2Nat.inj_xO.
+      rewrite mult_comm. rewrite Nat.div_mul. reflexivity. omega.
+  reflexivity.
+Qed.
+
+Lemma neg_succ : forall p,
+  Z.neg (Pos.succ p) = Z.pred (Z.neg p).
+Proof.
+  move => p. rewrite <- Pos.add_1_r.
+  rewrite <- Pos2Z.add_neg_neg.
+  rewrite <- Z.sub_1_r.
+  reflexivity.
+Qed.
+
+Lemma neg_pred : forall p, (p > 1)%positive ->
+  Z.neg (Pos.pred p) = Z.succ (Z.neg p).
+Proof.
+  move => p Hp. rewrite <- Pos.sub_1_r.
+Admitted.
+
+Lemma abs_succ_neg : forall p,
+  Z.abs_nat (Z.succ (Z.neg p)) = Nat.pred (Pos.to_nat p).
+Proof.
+  intros. destruct (Pos.eq_dec p (1%positive)).
+  - subst; reflexivity.
+  - rewrite -neg_pred /Z.abs_nat. rewrite Pos2Nat.inj_pred. reflexivity.
+    admit. admit.
+Admitted.
+
+Lemma abs_succ_div2_neg : forall p,
+  Z.abs_nat (Z.succ (Z.div (Z.neg p) 2)) = div (Pos.to_nat p) 2 \/
+  Z.abs_nat (Z.succ (Z.div (Z.neg p) 2)) = Nat.pred (div (Pos.to_nat p) 2).
+Proof.
+  intros. destruct p.
+    left. rewrite <- Zdiv2_div. rewrite /Z.div2 /Pos.div2.
+      rewrite neg_succ. rewrite <- Zsucc_pred. rewrite /Z.abs_nat. rewrite Pos2Nat.inj_xI.
+      rewrite <- Nat.add_1_r. rewrite mult_comm.
+      rewrite Nat.div_add_l; simpl; omega.
+    right. rewrite <- Zdiv2_div. rewrite /Z.div2 /Pos.div2.
+      rewrite Pos2Nat.inj_xO. rewrite mult_comm. rewrite Nat.div_mul. simpl.
+      apply abs_succ_neg. omega.
+  left. simpl. reflexivity.
+Qed.
+
 Function shrinkZ (x : Z) {measure (fun x => Z.abs_nat x) x}: list Z :=
   match x with
     | Z0 => nil
     | Zpos _ => rev (cons (Z.pred x) (cons (Z.div x 2) (shrinkZ (Z.div x 2))))
-    | Zneg _ => rev (cons (Z.succ x) (cons (Z.div x 2) (shrinkZ (Z.div x 2))))
+    | Zneg _ => rev (cons (Z.succ x) (cons (Z.succ (Z.div x 2)) (shrinkZ (Z.succ (Z.div x 2)))))
   end.
-Admitted.
+Proof.
+  move => ? p ?. subst. rewrite abs_div2_pos. rewrite Zabs2Nat.inj_pos.
+    apply Nat.div_lt. apply Pos2Nat.is_pos. omega.
+  move => ? p ?. subst. destruct (abs_succ_div2_neg p) as [H | H].
+    rewrite {}H /Z.abs_nat.
+      apply Nat.div_lt. apply Pos2Nat.is_pos. omega.
+    rewrite {}H /Z.abs_nat. eapply le_lt_trans. apply le_pred_n.
+      apply Nat.div_lt. apply Pos2Nat.is_pos. omega.
+Qed.
 
 Fixpoint shrinkList {A : Type} (shr : A -> list A) (l : list A) : list (list A) :=
   match l with
@@ -57,7 +118,6 @@ Fixpoint shrinkList {A : Type} (shr : A -> list A) (l : list A) : list (list A) 
       cons xs (map (fun xs' => cons x xs') (shrinkList shr xs))
            ++ (map (fun x'  => cons x' xs) (shr x ))
   end.
-
 
 Instance arbBool : Arbitrary bool :=
   {|

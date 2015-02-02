@@ -3,10 +3,10 @@ src/Random.v
 src/RoseTrees.v
 src/GenLow.v
 src/GenHigh.v
-src/StringOT.v
-src/State.v
 src/Arbitrary.v
+src/StringOT.v
 src/Show.v
+src/State.v
 src/Checker.v
 src/SemChecker.v
 src/Test.v
