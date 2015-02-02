@@ -1,7 +1,7 @@
 Set Implicit Arguments.
 
 Require Import ModuleGen.
-Require Import Axioms.
+Require Import Random.
 Require Import String.
 
 Require Import StringOT.

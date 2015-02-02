@@ -1,5 +1,5 @@
 Require Import ZArith List ssreflect ssrbool ssrnat.
-Require Import Axioms RoseTrees Random.
+Require Import Random RoseTrees.
 Require Import Ensembles.
 
 Set Implicit Arguments.
@@ -106,7 +106,7 @@ Module Type GenPrimitiveInterface.
      forall (A : Type) (m : Rose (G A)) n,
        semSize (promote m) n <-->
        (fun t : Rose A =>
-          exists (seed : Axioms.RandomSeed),
+          exists (seed : RandomSeed),
             fmapRose (fun g : G A => run g seed n) m = t).
 
 
@@ -374,7 +374,7 @@ Module Gen : GenPrimitiveInterface.
    : forall (A : Type) (m : Rose (G A)) n,
        semSize (promote m) n <-->
                (fun t : Rose A =>
-                  exists (seed : Axioms.RandomSeed),
+                  exists (seed : RandomSeed),
                     fmapRose (fun g : G A => run g seed n) m = t).
    Proof.
      move => A rg r. split;

@@ -1,5 +1,4 @@
 -R src QuickChick
-src/Axioms.v
 src/Random.v
 src/Arbitrary.v
 src/RoseTrees.v
