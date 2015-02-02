@@ -70,7 +70,7 @@ Qed.
 
 Lemma genColor_correctSize:
   forall s,
-    semSize genColor s <--> fun _ => True.
+    semGenSize genColor s <--> fun _ => True.
 Proof.
   rewrite /genColor. intros s c.
   split => // _. apply semElementsSize. left.
@@ -123,7 +123,7 @@ Qed.
 
 Lemma genRBTree_height_correct:
   forall c h s,
-    semSize (genRBTree_height h c) s <--> 
+    semGenSize (genRBTree_height h c) s <--> 
     (fun t => is_redblack' t c h /\ all_nodes_bellow s t).
 Proof.
   move => c h s. move : c s. induction h as [| h IHh]; intros c' s t.
@@ -171,7 +171,7 @@ Qed.
  
 Lemma genRBTreeSize_correct:
   forall s,
-    semSize genRBTree s <--> 
+    semGenSize genRBTree s <--> 
     (fun t => 
        (exists n, n <= s /\ is_redblack' t Red n) /\ 
        all_nodes_bellow s t).
@@ -208,11 +208,11 @@ Proof.
   split.
   - move => H x t [n' Hrb]. set s := max (max_node t x) n'.
     move : H => /(_ s) /semForAll H.
-    have /H/semPredQProp/semForAll Hx : semSize arbitraryNat s x.
+    have /H/semPredQProp/semForAll Hx : semGenSize arbitraryNat s x.
     { apply arbNat_correctSize. 
       apply Le.le_trans with (m := (max_node t x)). 
       apply max_node_less. rewrite /s. apply Max.le_max_l. }
-    have /Hx/semPredQProp/semImplication Ht : semSize genRBTree s t.
+    have /Hx/semPredQProp/semImplication Ht : semGenSize genRBTree s t.
     { apply genRBTreeSize_correct. split. 
       - exists n'. split => //. rewrite /s. apply/leP. apply Max.le_max_r.
       - rewrite /s. apply Max.max_case_strong => Hcmp; eauto;

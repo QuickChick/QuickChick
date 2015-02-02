@@ -136,8 +136,8 @@ Fixpoint height {A} (t : tree A) :=
 
 Lemma gentreeS_correct :
   forall {A} (g : G A) n s,
-    semSize g s <--> (fun _ => True) ->
-    (semSize (gentreeS g n) s) <--> (fun t => (height t) <= n).
+    semGenSize g s <--> (fun _ => True) ->
+    (semGenSize (gentreeS g n) s) <--> (fun t => (height t) <= n).
 Proof.
   move=> A g n.
   elim : n => //= [| n IHn] s Hg t.
@@ -169,8 +169,8 @@ Qed.
 
 Lemma gentree_correct:
   forall {A} (g : G A) s,
-    semSize g s <--> (fun _ => True) -> 
-    semSize (gentree g) s <--> (fun t => height t <= s).
+    semGenSize g s <--> (fun _ => True) -> 
+    semGenSize (gentree g) s <--> (fun t => height t <= s).
 Proof.
   move=> A g s Hg t. rewrite /gentree. 
   - split => //= [/semBindSize [n [/arbNat_correctSize/leP H1 /gentreeS_correct H2]] 
@@ -208,9 +208,9 @@ Proof.
   simpl; split. unfold removeP.
   - move => H x l cont.  
     set size := max x (max (max_elem l) (List.length l)).
-    have Hnat : semSize arbitraryNat size x 
+    have Hnat : semGenSize arbitraryNat size x 
       by apply arbNat_correctSize; apply Max.le_max_l.
-    have Hlist: semSize arbitraryList size l.
+    have Hlist: semGenSize arbitraryList size l.
     { eapply arbList_correct with (P := fun x y => (y <= x)%coq_nat) . 
       move => n. by rewrite arbNat_correctSize. 
       split. apply Max.max_case_strong => H'; auto. apply/leP. 
