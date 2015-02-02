@@ -92,17 +92,17 @@ Extract Constant show_bool =>
 Extract Constant show_int =>
   "(fun i -> QuickChickLib.coqstring_of_string (string_of_int i))".
 
-Extract Constant RandomGen   => "Random.State.t".
-Extract Constant rndNext     => "(fun r -> Random.State.bits r, r)".
+Extract Constant RandomSeed   => "Random.State.t".
+Extract Constant randomNext   => "(fun r -> Random.State.bits r, r)".
 (* Extract Constant rndGenRange => "SR.genRange".*)
-Extract Constant rndSplit    => "(fun x -> (x,x))".
-Extract Constant mkRandomGen => "(fun x -> Random.init x; Random.get_state())".
+Extract Constant randomSplit  => "(fun x -> (x,x))".
+Extract Constant mkRandomSeed => "(fun x -> Random.init x; Random.get_state())".
 Extract Constant randomRNat  =>
   "(fun (x,y) r -> (x + (Random.State.int r (y - x + 1)), r))".
 Extract Constant randomRBool => "(fun _ r -> Random.State.bool r, r)".
 Extract Constant randomRInt  =>
   "(fun (x,y) r -> (x + (Random.State.int r (y - x + 1)), r))".
-Extract Constant newStdGen   => "(Random.State.make_self_init ())".
+Extract Constant newRandomSeed => "(Random.State.make_self_init ())".
 
 Extract Inductive Lazy => "Lazy.t" [lazy].
 Extract Constant force => "Lazy.force".

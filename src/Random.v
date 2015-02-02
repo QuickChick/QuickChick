@@ -45,7 +45,7 @@ Program Instance OrdZ : OrdType Z :=
 Class Random (A : Type)  :=
   {
     super :> OrdType A;
-    randomR : A * A -> RandomGen -> A * RandomGen;
+    randomR : A * A -> RandomSeed -> A * RandomSeed;
     randomRCorrect :
       forall (a a1 a2 : A), leq a1 a /\ leq a a2 <->
                             exists seed, fst (randomR (a1, a2) seed) = a

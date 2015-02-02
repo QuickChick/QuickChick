@@ -22,7 +22,7 @@ Definition gte n m := leb m n.
 Set Implicit Arguments.
 
 Record Args := MkArgs {
-  replay     : option (RandomGen * nat);
+  replay     : option (RandomSeed * nat);
   maxSuccess : nat;
   maxDiscard : nat;
   maxShrinks : nat;
@@ -33,7 +33,7 @@ Record Args := MkArgs {
 Inductive Result :=
   | Success : nat -> nat -> list (string * nat) -> string -> Result
   | GaveUp  : nat -> list (string * nat) -> string -> Result
-  | Failure : nat -> nat -> nat -> RandomGen -> nat -> string ->
+  | Failure : nat -> nat -> nat -> RandomSeed -> nat -> string ->
               list (string * nat) -> string -> Result
   | NoExpectedFailure : nat -> list (string * nat) -> string -> Result.
 
@@ -110,7 +110,7 @@ Definition summary (st : State) : list (string * nat) :=
   let res := Map.fold (fun key elem acc => (key,elem) :: acc) (labels st) nil
   in insSortBy (fun x y => snd y <=? snd x) res .
 
-Definition doneTesting (st : State) (f : RandomGen -> nat -> QProp) : Result :=
+Definition doneTesting (st : State) (f : RandomSeed -> nat -> QProp) : Result :=
  if expectedFailure st then
     Success (numSuccessTests st + 1) (numDiscardedTests st) (summary st)
             ("+++ OK, passed " ++ (show (numSuccessTests st)) ++ " tests"
@@ -122,7 +122,7 @@ Definition doneTesting (st : State) (f : RandomGen -> nat -> QProp) : Result :=
                                              ++ newline).
   (* TODO: success st - labels *)
 
-Definition giveUp (st : State) (_ : RandomGen -> nat -> QProp) : Result :=
+Definition giveUp (st : State) (_ : RandomSeed -> nat -> QProp) : Result :=
   GaveUp (numSuccessTests st) (summary st)
          ("*** Gave up! Passed only " ++ (show (numSuccessTests st)) ++ " tests"
           ++  newline ++ "Discarded: " ++ (show (numDiscardedTests st)) ++ newline).
@@ -173,11 +173,11 @@ Definition decr (st : State) : nat :=
   ((maxSuccessTests st) + (maxDiscardedTests st))
   - ((numSuccessTests st) + (numDiscardedTests st)).
 
-Function runATest (st : State) (f : RandomGen -> nat -> QProp)
+Function runATest (st : State) (f : RandomSeed -> nat -> QProp)
          {measure decr st} : Result :=
   let size := (computeSize st) (numSuccessTests st) (numDiscardedTests st) in
-  let (rnd1, rnd2) := rndSplit (randomSeed st) in
-  let test (st : State) (f : RandomGen -> nat -> QProp) :=
+  let (rnd1, rnd2) := randomSplit (randomSeed st) in
+  let test (st : State) (f : RandomSeed -> nat -> QProp) :=
         if (gte (numSuccessTests st) (maxSuccessTests st)) then
           doneTesting st f
         else if (gte (numDiscardedTests st) (maxDiscardedTests st)) then
@@ -219,7 +219,7 @@ Function runATest (st : State) (f : RandomGen -> nat -> QProp)
   end.
 Admitted. (* I think I *could* actually prove this *)
 
-Definition test (st : State) (f : RandomGen -> nat -> QProp) : Result :=
+Definition test (st : State) (f : RandomSeed -> nat -> QProp) : Result :=
   if (gte (numSuccessTests st) (maxSuccessTests st)) then
     doneTesting st f
   else if (gte (numDiscardedTests st) (maxDiscardedTests st)) then
@@ -228,8 +228,6 @@ Definition test (st : State) (f : RandomGen -> nat -> QProp) : Result :=
 
 Require Import ZArith.
 (* Axiom unsafeRandomSeed : Z. *)
-Axiom newStdGen : RandomGen.
-
 
 (* ZP: This was quickCheckResult before but since we always return result
        return result there is no reason for such distinction *)
@@ -239,7 +237,7 @@ Definition quickCheckWith {prop : Type} {_ : Checkable prop}
   let (rnd, computeFun) :=
       match replay a with
         | Some (rnd, s) => (rnd, at0 (computeSize' a) s)
-        | None          => (newStdGen, computeSize' a)
+        | None          => (newRandomSeed, computeSize' a)
         (* make it more random...? need IO action *)
       end in
   test (MkState (maxSuccess a)  (* maxSuccessTests   *)

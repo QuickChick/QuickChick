@@ -26,7 +26,7 @@ Module Type GenPrimitiveInterface.
    (* Standard (primitive) generator interface *)
    Parameter returnGen  : forall {A : Type}, A -> G A.
    Parameter bindGen :  forall {A B : Type}, G A -> (A -> G B) -> G B.
-   Parameter run  : forall {A : Type}, G A -> RandomGen -> nat -> A.
+   Parameter run  : forall {A : Type}, G A -> RandomSeed -> nat -> A.
    Parameter fmap : forall {A B : Type}, (A -> B) -> G A -> G B.
    Parameter sized : forall {A: Type}, (nat -> G A) -> G A.
    Parameter resize : forall {A: Type}, nat -> G A -> G A.
@@ -106,7 +106,7 @@ Module Type GenPrimitiveInterface.
      forall (A : Type) (m : Rose (G A)) n,
        semSize (promote m) n <-->
        (fun t : Rose A =>
-          exists (seed : Axioms.RandomGen),
+          exists (seed : Axioms.RandomSeed),
             fmapRose (fun g : G A => run g seed n) m = t).
 
 
@@ -134,11 +134,11 @@ End GenPrimitiveInterface.
 Module Gen : GenPrimitiveInterface.
 
    Inductive GenType (A : Type) : Type :=
-   | MkGen : (RandomGen -> nat -> A (** RandomGen*)) -> GenType A.
+   | MkGen : (RandomSeed -> nat -> A (** RandomSeed*)) -> GenType A.
 
    Definition G := GenType.
 
-   Definition run {A : Type} (g : G A) : RandomGen -> nat -> A :=
+   Definition run {A : Type} (g : G A) : RandomSeed -> nat -> A :=
      match g with MkGen f => f end.
 
    Definition returnGen {A : Type} (x : A) : G A :=
@@ -146,7 +146,7 @@ Module Gen : GenPrimitiveInterface.
 
    Definition bindGen {A B : Type} (g : G A) (k : A -> G B) : G B :=
      MkGen (fun r n =>
-              let (r1,r2) := rndSplit r in
+              let (r1,r2) := randomSplit r in
                run (k (run g r1 n)) r2 n).
 
    Definition fmap {A B : Type} (f : A -> B) (g : G A) : G B :=
@@ -179,11 +179,11 @@ Module Gen : GenPrimitiveInterface.
    : G (option A) :=
      sized (fun x => suchThatMaybeAux g p 0 (max 1 x)).
 
-   Fixpoint rnds (rnd : RandomGen) (n' : nat) : list RandomGen :=
+   Fixpoint rnds (rnd : RandomSeed) (n' : nat) : list RandomSeed :=
      match n' with
        | O => nil
        | S n'' =>
-         let (rnd1, rnd2) := rndSplit rnd in
+         let (rnd1, rnd2) := randomSplit rnd in
          cons rnd1 (rnds rnd2 n'')
      end.
 
@@ -199,9 +199,9 @@ Module Gen : GenPrimitiveInterface.
    Definition sample (A : Type) (g : G A) : list A :=
      match g with
        | MkGen m =>
-         let rnd := mkRandomGen 0 in
+         let rnd := mkRandomSeed 0 in
          let l := List.combine (rnds rnd 20) (createRange 20 nil) in
-         List.map (fun (p : RandomGen * nat) => let (r,n) := p in m r n) l
+         List.map (fun (p : RandomSeed * nat) => let (r,n) := p in m r n) l
      end.
 
    Definition semSize {A : Type} (g : G A) (size : nat) : Ensemble A :=
@@ -241,11 +241,11 @@ Module Gen : GenPrimitiveInterface.
    Proof.
      move => A B [g] f size b. rewrite /semSize /bindGen => /=. split.
      - case => [seed H]. move : H.
-       case (rndSplit seed) => [seed1 seed2] H.
+       case (randomSplit seed) => [seed1 seed2] H.
        exists (g seed1 size). split; eexists. reflexivity.
        rewrite <- H. case (f (g seed1 size)). reflexivity.
      - move => [a [[seed1 H1] [seed2 H2]]].
-       case (rndSplitAssumption seed1 seed2) => [seed Hseed].
+       case (randomSplitAssumption seed1 seed2) => [seed Hseed].
        exists seed. rewrite Hseed. rewrite H1. move : H2. by case (f a).
    Qed.
 
@@ -330,7 +330,7 @@ Module Gen : GenPrimitiveInterface.
      simpl in *. unfold run, bindGen in H.
      remember (resize (2 * k + n.+1) g) as g'.
      case: g' H Heqg'=> /= g' H Heqg'.
-     case: (rndSplit seed) H Heqg'=> /= r1 r2 H Heqg'.
+     case: (randomSplit seed) H Heqg'=> /= r1 r2 H Heqg'.
      remember (p (g' r1 size)) as b.
      case: b H Heqb => /= H Heqb. inversion H; subst.
      rewrite /resize in Heqg'.
@@ -374,7 +374,7 @@ Module Gen : GenPrimitiveInterface.
    : forall (A : Type) (m : Rose (G A)) n,
        semSize (promote m) n <-->
                (fun t : Rose A =>
-                  exists (seed : Axioms.RandomGen),
+                  exists (seed : Axioms.RandomSeed),
                     fmapRose (fun g : G A => run g seed n) m = t).
    Proof.
      move => A rg r. split;

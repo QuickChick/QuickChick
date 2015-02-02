@@ -21,7 +21,7 @@ Record State := MkState
   ; labels            : Map.t nat
 
   ; expectedFailure   : bool
-  ; randomSeed        : RandomGen
+  ; randomSeed        : RandomSeed
 
   ; numSuccessShrinks : nat
   ; numTryShrinks     : nat
