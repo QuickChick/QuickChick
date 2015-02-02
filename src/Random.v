@@ -33,6 +33,7 @@ Axiom ramdomRIntCorrect:
     Z.leb z1 z /\ Z.leb z z2 <->
     exists seed, (fst (randomRInt (z1, z2) seed)) = z.
 
+
 Class OrdType (A: Type) :=
   {
     leq     : A -> A -> bool;
@@ -82,14 +83,13 @@ Class Random (A : Type)  :=
                             exists seed, fst (randomR (a1, a2) seed) = a
   }.
 
-
-Program Instance Randombool : Random bool :=
+Program Instance RandomBool : Random bool :=
   {
     randomR := randomRBool;
     randomRCorrect := randomRBoolCorrect
   }.
 
-Instance Randomnat : Random nat :=
+Instance RandomNat : Random nat :=
   {
     randomR := randomRNat;
     randomRCorrect := ramdomRNatCorrect

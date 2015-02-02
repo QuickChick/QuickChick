@@ -24,8 +24,8 @@ Fixpoint fmapRose {A B : Type} (f : A -> B) (r : Rose A) : Rose B :=
 Definition bindRose {A B : Type} (m : Rose A) (k : A -> Rose B) : Rose B :=
   joinRose (fmapRose k m).
 
-
-Lemma joinRose_fmapRose :
+(* CH: these seem unused now *)
+Lemma joinRoseFmapRose :
   forall {A B} (f: A -> B) x,
     fmapRose f x = joinRose (fmapRose (fun x0 : A => returnRose (f x0)) x).
 Proof.
@@ -35,10 +35,10 @@ Proof.
   - reflexivity.
   - inversion IHlst as [Heq]. simpl.
     rewrite Heq. repeat apply f_equal. apply f_equal2.
-    apply joinRose_fmapRose. reflexivity.
+    apply joinRoseFmapRose. reflexivity.
 Qed.
 
-Lemma MonadFunctor_law :
+Lemma monadFunctorLaw :
   (forall A B (f : A -> B) a,
      fmapRose f a = bindRose a (fun x => returnRose (f x))).
 Proof.
@@ -48,5 +48,5 @@ Proof.
   + simpl in Hlst. rewrite /bindRose /= in Hlst.
     inversion Hlst as [Heq].
     simpl. rewrite Heq /bindRose /= app_nil_r.
-    repeat apply f_equal. apply f_equal2. apply joinRose_fmapRose. reflexivity.
+    repeat apply f_equal. apply f_equal2. apply joinRoseFmapRose. reflexivity.
 Qed.
