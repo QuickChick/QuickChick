@@ -1,6 +1,6 @@
 Set Implicit Arguments.
 
-Require Import ModuleGen.
+Require Import GenLow.
 Require Import Random.
 Require Import String.
 

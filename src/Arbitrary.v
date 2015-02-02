@@ -1,11 +1,11 @@
-Require Import ModuleGen GenCombinators.
+Require Import GenLow GenHigh.
 Require Import ZArith ZArith.Znat Arith.
 Require Import Coq.Numbers.Natural.Peano.NPeano.
 Require Import Recdef.
 Require Import List.
 Require Import ssreflect ssrbool ssrnat.
 
-Import Gen GenComb.
+Import GenHigh GenLow.
 Class Arbitrary (A : Type) : Type :=
   {
     arbitrary : G A;

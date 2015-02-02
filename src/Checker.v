@@ -6,10 +6,10 @@ Require Import String.
 Require Import RoseTrees.
 Require Import Show.
 Require Import State.
-Require Import ModuleGen GenCombinators.
+Require Import GenLow GenHigh.
 Require Import Arbitrary.
 
-Import Gen GenComb.
+Import GenLow GenHigh.
 
 (* Extraction will map this to something that additionally prints stuff *)
 Definition trace (A : Type) (s : string) (a : A) : A := a.

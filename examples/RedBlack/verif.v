@@ -1,7 +1,7 @@
 Require Import ssreflect ssrnat ssrbool eqtype.
 Require Import List String.
 Require Import QuickChick.
-Import Gen GenComb.
+Import GenLow GenHigh.
 
 Require Import redblack.
 Require Import testing.

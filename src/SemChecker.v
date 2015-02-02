@@ -1,6 +1,6 @@
 Require Import ssreflect ssrbool eqtype.
-Require Import Show ModuleGen GenCombinators RoseTrees Checker Arbitrary.
-Import Gen GenComb.
+Require Import Show GenLow GenHigh RoseTrees Checker Arbitrary.
+Import GenLow GenHigh.
 
 
 Definition resultSuccessful (r : Result) : bool :=

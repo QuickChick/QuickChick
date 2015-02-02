@@ -6,6 +6,8 @@ Set Implicit Arguments.
 
 Import ListNotations.
 
+(* Low-level Generators *)
+
 (* There are similar definitions in the Ensembles library (Included
    and Same_set); set_eq is not exactly the same as Same_set though
    (only logically equivalent). *)
@@ -26,7 +28,7 @@ Open Scope sem_gen_scope.
    representation of generators. The proof organization/abstraction
    tries to follow this code organization/abstraction. We need to
    expose quite a bit on the proof side for this to work though. *)
-Module Type GenPrimitiveInterface.
+Module Type GenLowInterface.
    Parameter G : Type -> Type.
 
    (* Standard (primitive) generator interface *)
@@ -134,9 +136,9 @@ Module Type GenPrimitiveInterface.
        run (promote m) seed size = o <->
        (fmapRose (fun (g : G A) => run g seed size) m) = o.
 
-End GenPrimitiveInterface.
+End GenLowInterface.
 
-Module Gen : GenPrimitiveInterface.
+Module GenLow : GenLowInterface.
 
    Inductive GenType (A : Type) : Type :=
    | MkGen : (RandomSeed -> nat -> A) -> GenType A.
@@ -417,4 +419,4 @@ Module Gen : GenPrimitiveInterface.
      move => A g x. split => //=.
    Qed.
 
-End Gen.
+End GenLow.

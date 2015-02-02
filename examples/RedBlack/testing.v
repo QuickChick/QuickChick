@@ -1,6 +1,6 @@
 Require Import QuickChick.
-Require Import ModuleGen GenCombinators.
-Import Gen GenComb.
+Require Import GenLow GenHigh.
+Import GenLow GenHigh.
 Require Import NPeano.
 
 Require Import ssreflect ssrnat ssrbool eqtype.

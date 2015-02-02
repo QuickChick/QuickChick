@@ -1,4 +1,4 @@
-Require Import QuickChick ModuleGen GenCombinators.
+Require Import QuickChick.
 
 Require Import ZArith.
 Require Import NPeano.
@@ -6,7 +6,7 @@ Require Import List.
 Import ListNotations.
 Require Import Machine.
 
-Import Gen GenComb.
+Import GenLow GenHigh.
 
 (* Overriding default instance to generate "in-bounds" things *)
 Definition gen_Z := choose (0,1).

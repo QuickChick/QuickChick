@@ -1,11 +1,13 @@
 Require Import ZArith List ssreflect ssrbool ssrnat.
 
-Require Import Axioms Random ModuleGen.
+Require Import Random GenLow.
 Require Import Ensembles.
 
-Import Gen ListNotations.
+Import GenLow ListNotations.
 
-Module Type GenDerivedInterface.
+(* High-level Generators *)
+
+Module Type GenHighInterface.
 
   Parameter liftGen : forall {A B : Type}, (A -> B) -> G A -> G B.
   Parameter liftGen2 : forall {A1 A2 B : Type},
@@ -142,9 +144,9 @@ Module Type GenDerivedInterface.
     forall {A} (l: list A) (def : A) s,
       (semGenSize (elements def l) s) <--> (fun e => List.In e l \/ (l = nil /\ e = def)).
 
-End GenDerivedInterface.
+End GenHighInterface.
 
-Module GenComb : GenDerivedInterface.
+Module GenHigh : GenHighInterface.
 
 
   Definition liftGen {A B} (f: A -> B) (a : G A)
@@ -647,4 +649,4 @@ Ltac solveLiftGenX :=
       + right. split => //. by right.
 Qed.
 
-End GenComb.
+End GenHigh.

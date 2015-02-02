@@ -1,6 +1,6 @@
 Require Import Show RoseTrees.
 Require Import Random.
-Require Import ModuleGen GenCombinators SemChecker.
+Require Import GenLow GenHigh SemChecker.
 Require Import Checker.
 Require Import State.
 Require Import Arbitrary.
@@ -15,7 +15,7 @@ Require Import Recdef.
 
 Require Import Arith.EqNat.
 
-Import Gen GenComb.
+Import GenLow GenHigh.
 
 Definition gte n m := leb m n.
 

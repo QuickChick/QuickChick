@@ -3,8 +3,8 @@ Require Import QuickChick.
 Require Import List seq ssreflect ssrbool ssrnat ZArith eqtype.
 Import ListNotations.
 
-(* Currenlty, these two have to be imported manually. Can we avoid this? *)
-Import Gen GenComb. 
+(* Currently, these two have to be imported manually. Can we avoid this? *)
+Import GenLow GenHigh. 
 
 Set Implicit Arguments.
 Unset Strict Implicit.
