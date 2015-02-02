@@ -43,50 +43,50 @@ Module Type GenPrimitiveInterface.
    Definition semGen {A : Type} (g : G A) : Ensemble A :=
      fun a => exists size, semSize g size a.
    
-   Axiom semReturn : 
+   Hypothesis semReturn : 
      forall A (x : A), semGen (returnGen x) <--> eq x.
-   Axiom semReturnSize : 
+   Hypothesis semReturnSize : 
      forall A (x : A) (size : nat), semSize (returnGen x) size <--> eq x.
 
-   Axiom semBindSize : 
+   Hypothesis semBindSize : 
      forall A B (g : G A) (f : A -> G B) (size : nat),
        semSize (bindGen g f) size <-->
        fun b => exists a, (semSize g size) a /\
                           (semSize (f a) size) b.
 
-   Axiom semFmap :
+   Hypothesis semFmap :
      forall A B (f : A -> B) (g : G A),
        semGen (fmap f g) <-->
        (fun b => exists a, (semGen g) a /\ b = f a).
-   Axiom semFmapSize : 
+   Hypothesis semFmapSize : 
      forall A B (f : A -> B) (g : G A) (size : nat),
        semSize (fmap f g) size <-->
        (fun b => exists a, (semSize g size) a /\ b = f a).
 
-   Axiom semChoose : 
+   Hypothesis semChoose : 
      forall A `{Random A} a1 a2,
        semGen (choose (a1,a2)) <--> 
        (fun a => Random.leq a1 a /\ Random.leq a a2).
-   Axiom semChooseSize : 
+   Hypothesis semChooseSize : 
      forall A `{Random A} a1 a2 (size : nat),
        semSize (choose (a1,a2)) size <--> 
        (fun a => Random.leq a1 a /\ Random.leq a a2).
 
    
-   Axiom semSized : 
+   Hypothesis semSized : 
      forall A (f : nat -> G A),
        semGen (sized f) <--> (fun a => exists n, semSize (f n) n a).
    
-   Axiom semSizedSize : 
+   Hypothesis semSizedSize : 
      forall A (f : nat -> G A) s,
        semSize (sized f) s <--> (fun a => semSize (f s) s a).
 
-   Axiom semResize : 
+   Hypothesis semResize : 
      forall A (n : nat) (g : G A),
        semGen (resize n g) <--> semSize g n .
 
    (* We need an completeness as well - this is not exact *)
-   Axiom semSuchThatMaybe_sound:
+   Hypothesis semSuchThatMaybe_sound:
      forall A (g : G A) (f : A -> bool),
        semGen (suchThatMaybe g f) --->
        (fun o => o = None \/
@@ -96,13 +96,13 @@ Module Type GenPrimitiveInterface.
       Does this reveal a weakness in our framework? 
       Should we try to get rid of this?  *)
 
-   Axiom semPromote : 
+   Hypothesis semPromote : 
      forall A (m : Rose (G A)),
        semGen (promote m) <--> 
        fun (t : (Rose A)) => 
          exists seed size, 
           (fmapRose (fun (g : G A) => run g seed size) m) = t.
-   Axiom semPromoteSize : 
+   Hypothesis semPromoteSize : 
      forall (A : Type) (m : Rose (G A)) n,
        semSize (promote m) n <-->
        (fun t : Rose A =>
@@ -111,7 +111,7 @@ Module Type GenPrimitiveInterface.
    
 
    (* These are the two statements we prove about generators *) 
-   Axiom semGenCorrect :
+   Hypothesis semGenCorrect :
      forall A (g : G A) (x : A),
          semGen g x <-> exists size seed, run g seed size = x.
 
@@ -120,11 +120,11 @@ Module Type GenPrimitiveInterface.
       Should we try to get rid of this?  
       This is expected since the spec of promote is too concrete. *)
 
-   Axiom runFmap :
+   Hypothesis runFmap :
      forall (A B : Type) (f : A -> B) (g : G A) seed size b,
        run (fmap f g) seed size = b  <->
        (exists a : A, run g seed size = a /\ b = f a).
-   Axiom runPromote : 
+   Hypothesis runPromote : 
      forall A (m : Rose (G A)) seed size o,
        run (promote m) seed size = o <->   
        (fmapRose (fun (g : G A) => run g seed size) m) = o.

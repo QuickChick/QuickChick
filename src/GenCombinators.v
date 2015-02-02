@@ -28,29 +28,29 @@ Module Type GenDerivedInterface.
   Parameter elements : forall {A : Type}, A -> list A -> G A.
 
   (* Correctness for derived generators *)
-  (* We should prove the Axioms in comments - 
+  (* We should prove the Hypotheses in comments - 
      In some of them we may need semSize instead of semGen *)
   
-  Axiom semLiftGen :
+  Hypothesis semLiftGen :
     forall {A B} (f: A -> B) (g: G A),
       semGen (liftGen f g) <-->
       fun b =>
         exists a, semGen g a /\ f a = b.
   
-  Axiom semLiftGenSize :
+  Hypothesis semLiftGenSize :
     forall {A B} (f: A -> B) (g: G A) size,
       semSize (liftGen f g) size <-->
       fun b =>
       exists a, semSize g size a /\ f a = b.
   
-  Axiom semLiftGen2Size :
+  Hypothesis semLiftGen2Size :
     forall {A1 A2 B} (f: A1 -> A2 -> B) (g1 : G A1) (g2 : G A2) s,
       semSize (liftGen2 f g1 g2) s <-->
       fun b =>
         exists a1,
           semSize g1 s a1 /\ exists a2, semSize g2 s a2 /\ f a1 a2 = b.
  
-  Axiom semLiftGen3Size :
+  Hypothesis semLiftGen3Size :
   forall {A1 A2 A3 B} (f: A1 -> A2 -> A3 -> B)
          (g1: G A1) (g2: G A2) (g3: G A3) size,
     semSize (liftGen3 f g1 g2 g3) size <-->
@@ -60,7 +60,7 @@ Module Type GenDerivedInterface.
                              (exists a3, semSize g3 size a3 /\ 
                                          (f a1 a2 a3) = b)).
 
-  Axiom semLiftGen4Size :
+  Hypothesis semLiftGen4Size :
   forall {A1 A2 A3 A4 B} (f:A1 -> A2 -> A3 -> A4 -> B)
          (g1: G A1) (g2: G A2) (g3: G A3) (g4: G A4) size,
     semSize (liftGen4 f g1 g2 g3 g4) size <-->
@@ -71,7 +71,7 @@ Module Type GenDerivedInterface.
                                          (exists a4, semSize g4 size a4 /\
                                                      (f a1 a2 a3 a4) = b))).
 
-  Axiom semLiftGen5Size :
+  Hypothesis semLiftGen5Size :
   forall {A1 A2 A3 A4 A5 B} (f: A1 -> A2 -> A3 -> A4 -> A5 -> B)
          (g1: G A1) (g2: G A2) (g3: G A3) (g4: G A4) (g5: G A5) size,
     semSize (liftGen5 f g1 g2 g3 g4 g5) size <-->
@@ -83,62 +83,62 @@ Module Type GenDerivedInterface.
                                                      (exists a5, semSize g5 size a5 /\
                                                                  (f a1 a2 a3 a4 a5) = b)))).
 
-  Axiom semSequenceGenSize:
+  Hypothesis semSequenceGenSize:
     forall {A} (gs : list (G A)) n,
       semSize (sequenceGen gs) n <--> 
       fun l => length l = length gs /\
                forall x, List.In x (combine l gs) -> 
                          semSize (snd x) n (fst x).
 
-  (* Axiom semFoldGen_left : *)
+  (* Hypothesis semFoldGen_left : *)
   (*   forall {A B : Type} (f : A -> B -> G A) (bs : list B) (a0 : A), *)
   (*     semGen (foldGen f bs a0) <--> *)
   (*     fold_left (fun g b => fun x => exists a, g a /\ semGen (f a b) x) bs (eq a0). *)
   
-  (* Axiom semFoldGen_right : *)
+  (* Hypothesis semFoldGen_right : *)
   (*       forall {A B : Type} (f : A -> B -> G A) (bs : list B) (a0 : A), *)
   (*         semGen (foldGen f bs a0) <--> *)
   (*         fun an =>  *)
   (*           fold_right (fun b p => fun a_prev => exists a, semGen (f a_prev b) a /\ p a)  *)
   (*                      (eq an) bs a0. *)
 
-  Axiom semOneof:
+  Hypothesis semOneof:
     forall {A} (l : list (G A)) (def : G A),
       (semGen (oneof def l)) <-->
       (fun e => (exists x, List.In x l /\ semGen x e) \/ 
                 (l = nil /\ semGen def e)).
-  Axiom semOneofSize:
+  Hypothesis semOneofSize:
     forall {A} (l : list (G A)) (def : G A) s,
       (semSize (oneof def l) s) <-->
       (fun e => (exists x, List.In x l /\ semSize x s e) \/ 
                 (l = nil /\ semSize def s e)).
 
-  Axiom semFrequency:
+  Hypothesis semFrequency:
     forall {A} (l : list (nat * G A)) (def : G A),
       semGen (frequency def l) <-->
       (fun e => (exists n, exists g, (List.In (n, g) l /\ semGen g e /\ n <> 0)) \/
                 ((l = nil \/ (forall x, List.In x l -> fst x = 0)) /\ semGen def e)).
-  Axiom semFrequencySize:
+  Hypothesis semFrequencySize:
     forall {A} (l : list (nat * G A)) (def : G A) (size: nat),
       semSize (frequency def l) size <-->
       (fun e => (exists n, exists g, (List.In (n, g) l /\ semSize g size e /\ n <> 0)) \/
                 ((l = nil \/ (forall x, List.In x l -> fst x = 0)) /\ semSize def size e)).
 
-  Axiom semVectorOfSize: 
+  Hypothesis semVectorOfSize: 
     forall {A : Type} (k : nat) (g : G A) size,
       semSize (vectorOf k g) size <--> 
       fun l => (length l = k /\ forall x, List.In x l -> semSize g size x).
   
-  Axiom semListOfSize:
+  Hypothesis semListOfSize:
     forall (A : Type) (g : G A) (size : nat),
       semSize (listOf g) size <-->
       (fun l : list A =>
          length l <= size /\ (forall x : A, List.In x l -> semSize g size x)).
 
-  Axiom semElements:
+  Hypothesis semElements:
     forall {A} (l: list A) (def : A),
       (semGen (elements def l)) <--> (fun e => List.In e l \/ (l = nil /\ e = def)).
-  Axiom semElementsSize:
+  Hypothesis semElementsSize:
     forall {A} (l: list A) (def : A) s,
       (semSize (elements def l) s) <--> (fun e => List.In e l \/ (l = nil /\ e = def)).
   
