@@ -27,12 +27,12 @@ Definition semCheckerSize (P : Checker) (s : nat): Prop :=
 Definition semCheckable {A : Type} {_ : Checkable  A} (a : A) : Prop :=
   semChecker (checker a).
 
-Definition semCheckableSize {A : Type} {_ : Checkable  A} 
+Definition semCheckableSize {A : Type} {_ : Checkable  A}
            (a : A) (s : nat) : Prop :=
   semCheckerSize (checker a) s.
 
 Lemma mapTotalResult_id:
-  forall {prop : Type} {H : Checkable prop} (f : Result -> Result) 
+  forall {prop : Type} {H : Checkable prop} (f : Result -> Result)
          (p : prop) (s : nat),
     (forall res, resultSuccessful res = resultSuccessful (f res)) ->
     (semCheckerSize (mapTotalResult f p) s <-> semCheckableSize p s).
@@ -45,7 +45,7 @@ Proof.
       match qp with
         | {| unProp := t |} => {| unProp := fmapRose f t |}
       end.
-    specialize (H1 qp'). 
+    specialize (H1 qp').
     have: success qp' = true.
     { apply H1.  apply semFmapSize. exists qp; split => //. }
     destruct qp as [[]]. simpl in *. by rewrite -Hyp.
@@ -66,7 +66,7 @@ Proof.
 Qed.
 
 Lemma semWhenFail_id:
-  forall {prop : Type} {H : Checkable prop} (s : String.string) (p : prop) 
+  forall {prop : Type} {H : Checkable prop} (s : String.string) (p : prop)
          (size : nat),
     semCheckerSize (whenFail s p) size <-> semCheckableSize p size.
 Proof.
@@ -75,7 +75,7 @@ Qed.
 
 
 Lemma semPrintTestCase_id:
-  forall {prop: Type} {tp : Checkable prop} (s: String.string) 
+  forall {prop: Type} {tp : Checkable prop} (s: String.string)
          (p: prop) (size : nat),
     semCheckerSize (printTestCase s p) size <-> semCheckableSize p size.
 Proof.
@@ -95,13 +95,13 @@ Lemma semShrinking_id:
     semCheckerSize (shrinking shrinker x0 pf) s <->
     semCheckableSize (pf x0) s.
 Proof.
-  move => prop A HCheck sh x pf. 
+  move => prop A HCheck sh x pf.
   unfold semCheckableSize, shrinking, semCheckerSize.
-  split. 
-  - unfold props. generalize 1000.  
-    case => [| n] H qp /semSizeCorrect [seed Hgen]; subst. 
+  split.
+  - unfold props. generalize 1000.
+    case => [| n] H qp /semSizeCorrect [seed Hgen]; subst.
     + apply H. apply semFmapSize. eexists.
-      split. apply semPromoteSize.  
+      split. apply semPromoteSize.
       exists seed. simpl. reflexivity.
       simpl.
       by destruct ((run (checker (pf x)) seed s)) as [[res [l]]] => /=.
@@ -111,15 +111,15 @@ Proof.
              (fmap
                 (fun x0 => {| unProp := joinRose (fmapRose unProp x0) |})
                 (promote (@props' _ _ HCheck (S n) pf sh x))) seed s) = true.
-      remember 
+      remember
         (run
            (fmap
               (fun x0 : Rose QProp =>
                  {| unProp := joinRose (fmapRose unProp x0) |})
-              (promote (props' (S n) pf sh x))) seed s) as b.  
+              (promote (props' (S n) pf sh x))) seed s) as b.
       symmetry in Heqb. setoid_rewrite runFmap in Heqb.
-      move : Heqb => [rqp [Hrun Hb]]. simpl. rewrite Hb. 
-      apply runPromote in Hrun. rewrite -Hrun. 
+      move : Heqb => [rqp [Hrun Hb]]. simpl. rewrite Hb.
+      apply runPromote in Hrun. rewrite -Hrun.
       simpl in *. by destruct ((run (checker (pf x)) seed s)) as [[res [l]]] => /=.
       apply H.
       apply semFmapSize. eexists. split => /=.
@@ -131,7 +131,7 @@ Proof.
                            {| force := List.map (props' n pf sh) (sh x) |}))
                      seed s)) as b.
       symmetry in Heqb. setoid_rewrite runPromote in Heqb. by rewrite -Heqb.
-  - unfold props. generalize 1000.  
+  - unfold props. generalize 1000.
     move => n H qp /semSizeCorrect [seed /runFmap [rqp [H1 H2]]].
     suff : success (run (@checker _ HCheck (pf x)) seed s) = true.
     + subst.
@@ -193,9 +193,9 @@ Proof.
   - split => /=; auto. apply. reflexivity.
   - split; try congruence. move => _.
     rewrite /implication.  rewrite /semChecker /checker /testResult.
-    move => qp . by move=> /semReturnSize H'; subst. 
+    move => qp . by move=> /semReturnSize H'; subst.
 Qed.
-  
+
 
 (* equivalences for other combinators *)
 
@@ -205,7 +205,7 @@ Lemma semReturnGen:
 Proof.
   move=> qp s. rewrite /semChecker. split;
   move => H qp' /semReturnSize Hprop; subst;
-  apply H; by apply semReturnSize. 
+  apply H; by apply semReturnSize.
 Qed.
 
 Lemma semBindGen:
@@ -220,17 +220,17 @@ Proof.
 Qed.
 
 Lemma semPredQProp:
-  forall (p : G QProp) (s : nat), 
+  forall (p : G QProp) (s : nat),
     semCheckableSize p s <-> (semCheckerSize p s).
 Proof.
   move=> p.
-  rewrite /semCheckableSize /checker 
+  rewrite /semCheckableSize /checker
           /testChecker /checker /testProp /semCheckerSize.
-  split; move => Hqp qp Hsize; auto.  
+  split; move => Hqp qp Hsize; auto.
 Qed.
 
 Lemma semForAll :
-  forall {A prop : Type} {H : Checkable prop} `{Show A} 
+  forall {A prop : Type} {H : Checkable prop} `{Show A}
          (gen : G A) (f : A -> prop) (size: nat),
     semCheckerSize (forAll gen f) size <->
     forall (a : A), semSize gen size a -> semCheckableSize (f a) size.
@@ -263,56 +263,56 @@ Qed.
 
 Lemma semBool:
   forall (b : bool) (size: nat), semCheckableSize b size <-> b = true.
-Proof.  
-  move => b. case: b. 
-  - split => // _. rewrite /semCheckableSize /semCheckerSize. 
+Proof.
+  move => b. case: b.
+  - split => // _. rewrite /semCheckableSize /semCheckerSize.
     by move => qp /semReturnSize Heq; subst.
-  - split => //. rewrite /semCheckableSize /semCheckerSize. 
+  - split => //. rewrite /semCheckableSize /semCheckerSize.
     move => /(_ (MkProp (MkRose (liftBool false) (lazy nil)))) H.
     apply H. by apply semReturnSize.
 Qed.
 
 Lemma semResult:
-  forall (res: Result) (size: nat), 
+  forall (res: Result) (size: nat),
     semCheckableSize res size <-> resultSuccessful res = true.
 Proof.
   rewrite /semCheckableSize /checker /testResult /semCheckerSize.
   move => res. split.
   + move=> /(_ ({| unProp := returnRose res |})) /= H.
     apply H. by apply semReturnSize.
-  + by move=> H [[res' l]] /semReturnSize [Heq2 Heq3]; subst. 
+  + by move=> H [[res' l]] /semReturnSize [Heq2 Heq3]; subst.
 Qed.
 
 Lemma semUnit:
   forall (t: unit) (size: nat), semCheckableSize t size <-> True.
 Proof.
   move => t. split => // _.
-  by move => qp /semReturnSize Heq; subst. 
+  by move => qp /semReturnSize Heq; subst.
 Qed.
 
 Lemma semQProp:
-  forall (qp: QProp) (size: nat), 
+  forall (qp: QProp) (size: nat),
     semCheckableSize qp size <-> success qp = true.
 Proof.
-  move => qp. 
+  move => qp.
   rewrite /semCheckableSize /semCheckerSize /checker /testProp.
-  split. 
+  split.
   - apply. by apply semReturnSize.
   - by move => H qp' /semReturnSize Heq; subst.
 Qed.
 
 Lemma semGen:
   forall (P : Type) {H : Checkable P} (gen: G P) (size : nat),
-    (semCheckableSize gen size) <-> 
+    (semCheckableSize gen size) <->
     (forall p, semSize gen size p -> semCheckableSize p size).
 Proof.
   move=> P H gen. unfold semCheckableSize, semCheckerSize in *. split.
-  - move=> Hsem qp Hsize. 
+  - move=> Hsem qp Hsize.
     move => qp' Hprop. simpl in *.
     apply Hsem. apply semBindSize. exists qp.
     by split => //.
-  - move => Hsem qp /semBindSize [p [Hsize Hsize']]. 
-    eapply Hsem; eassumption. 
+  - move => Hsem qp /semBindSize [p [Hsize Hsize']].
+    eapply Hsem; eassumption.
 Qed.
 
 Lemma semFun:
@@ -393,7 +393,7 @@ Program Instance proveGenProp {prop : Type} `{Provable prop} :
   |}.
 Next Obligation.
   destruct H0 as [semP proof]. rewrite /proposition. split.
-  - move => H'. apply semGen=> p Hgen. apply proof. eapply H'. eassumption. 
+  - move => H'. apply semGen=> p Hgen. apply proof. eapply H'. eassumption.
   - move => /semGen H' p Hgen. eapply proof. apply H'. by auto.
 Qed.
 

@@ -1,6 +1,6 @@
 Require Import ZArith.
 Require Import ssreflect ssrbool ssrnat.
-        
+
 Axiom RandomGen   : Type.
 Axiom randomSeedInhabitant : RandomGen.
 
@@ -12,7 +12,7 @@ Axiom mkRandomGen : Z           -> RandomGen.
 Axiom rndSplitAssumption :
   forall s1 s2 : RandomGen, exists s, rndSplit s = (s1,s2).
 
-(* Primitive generator combinators and some basic soundness 
+(* Primitive generator combinators and some basic soundness
    assumptions about them *)
 Axiom randomRBool : bool * bool -> RandomGen -> bool * RandomGen.
 Axiom randomRBoolCorrect :
@@ -23,7 +23,7 @@ Axiom randomRNat  : nat  * nat  -> RandomGen -> nat * RandomGen.
 Axiom ramdomRNatCorrect:
   forall n n1 n2,
     n1 <= n /\ n <= n2 <->
-    exists seed, (fst (randomRNat (n1, n2) seed)) = n.  
+    exists seed, (fst (randomRNat (n1, n2) seed)) = n.
 Axiom randomRInt  : Z * Z    -> RandomGen -> Z * RandomGen.
 Axiom ramdomRIntCorrect:
   forall z z1 z2,

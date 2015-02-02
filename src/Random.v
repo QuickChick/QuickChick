@@ -6,12 +6,12 @@ Class OrdType (A: Type) :=
   {
     leq     : A -> A -> bool;
     refl    : forall a, leq a a;
-    trans   : forall  a b c, leq b a -> leq a c -> leq b c;  
+    trans   : forall  a b c, leq b a -> leq a c -> leq b c;
     antisym : forall a b, leq a b -> leq b a -> a = b
   }.
 
 Program Instance OrdBool : OrdType bool :=
-  { 
+  {
     leq b1 b2 := implb b1 b2
   }.
 Next Obligation.

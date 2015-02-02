@@ -6,20 +6,20 @@ Require Import Ensembles.
 Import Gen ListNotations.
 
 Module Type GenDerivedInterface.
-  
+
   Parameter liftGen : forall {A B : Type}, (A -> B) -> G A -> G B.
-  Parameter liftGen2 : forall {A1 A2 B : Type}, 
+  Parameter liftGen2 : forall {A1 A2 B : Type},
                          (A1 -> A2 -> B) -> G A1 -> G A2 -> G B.
-  Parameter liftGen3 : forall {A1 A2 A3 B : Type}, 
+  Parameter liftGen3 : forall {A1 A2 A3 B : Type},
                          (A1 -> A2 -> A3 -> B) -> G A1 -> G A2 -> G A3 -> G B.
-  Parameter liftGen4 : forall {A1 A2 A3 A4 B : Type}, 
-                         (A1 -> A2 -> A3 -> A4 -> B) -> 
+  Parameter liftGen4 : forall {A1 A2 A3 A4 B : Type},
+                         (A1 -> A2 -> A3 -> A4 -> B) ->
                          G A1 -> G A2 -> G A3 -> G A4 -> G B.
-  Parameter liftGen5 : forall {A1 A2 A3 A4 A5 B : Type}, 
-                         (A1 -> A2 -> A3 -> A4 -> A5 -> B) -> 
+  Parameter liftGen5 : forall {A1 A2 A3 A4 A5 B : Type},
+                         (A1 -> A2 -> A3 -> A4 -> A5 -> B) ->
                          G A1 -> G A2 -> G A3 -> G A4-> G A5 -> G B.
   Parameter sequenceGen: forall {A : Type}, list (G A) -> G (list A).
-  Parameter foldGen : 
+  Parameter foldGen :
     forall {A B : Type}, (A -> B -> G A) -> list B -> A -> G A.
   Parameter oneof : forall {A : Type}, G A -> list (G A) -> G A.
   Parameter frequency : forall {A : Type}, G A -> list (nat * G A) -> G A.
@@ -28,28 +28,28 @@ Module Type GenDerivedInterface.
   Parameter elements : forall {A : Type}, A -> list A -> G A.
 
   (* Correctness for derived generators *)
-  (* We should prove the Hypotheses in comments - 
+  (* We should prove the Hypotheses in comments -
      In some of them we may need semSize instead of semGen *)
-  
+
   Hypothesis semLiftGen :
     forall {A B} (f: A -> B) (g: G A),
       semGen (liftGen f g) <-->
       fun b =>
         exists a, semGen g a /\ f a = b.
-  
+
   Hypothesis semLiftGenSize :
     forall {A B} (f: A -> B) (g: G A) size,
       semSize (liftGen f g) size <-->
       fun b =>
       exists a, semSize g size a /\ f a = b.
-  
+
   Hypothesis semLiftGen2Size :
     forall {A1 A2 B} (f: A1 -> A2 -> B) (g1 : G A1) (g2 : G A2) s,
       semSize (liftGen2 f g1 g2) s <-->
       fun b =>
         exists a1,
           semSize g1 s a1 /\ exists a2, semSize g2 s a2 /\ f a1 a2 = b.
- 
+
   Hypothesis semLiftGen3Size :
   forall {A1 A2 A3 B} (f: A1 -> A2 -> A3 -> B)
          (g1: G A1) (g2: G A2) (g3: G A3) size,
@@ -57,7 +57,7 @@ Module Type GenDerivedInterface.
     fun b =>
       exists a1, semSize g1 size a1 /\
                  (exists a2, semSize g2 size a2 /\
-                             (exists a3, semSize g3 size a3 /\ 
+                             (exists a3, semSize g3 size a3 /\
                                          (f a1 a2 a3) = b)).
 
   Hypothesis semLiftGen4Size :
@@ -85,16 +85,16 @@ Module Type GenDerivedInterface.
 
   Hypothesis semSequenceGenSize:
     forall {A} (gs : list (G A)) n,
-      semSize (sequenceGen gs) n <--> 
+      semSize (sequenceGen gs) n <-->
       fun l => length l = length gs /\
-               forall x, List.In x (combine l gs) -> 
+               forall x, List.In x (combine l gs) ->
                          semSize (snd x) n (fst x).
 
   (* Hypothesis semFoldGen_left : *)
   (*   forall {A B : Type} (f : A -> B -> G A) (bs : list B) (a0 : A), *)
   (*     semGen (foldGen f bs a0) <--> *)
   (*     fold_left (fun g b => fun x => exists a, g a /\ semGen (f a b) x) bs (eq a0). *)
-  
+
   (* Hypothesis semFoldGen_right : *)
   (*       forall {A B : Type} (f : A -> B -> G A) (bs : list B) (a0 : A), *)
   (*         semGen (foldGen f bs a0) <--> *)
@@ -105,12 +105,12 @@ Module Type GenDerivedInterface.
   Hypothesis semOneof:
     forall {A} (l : list (G A)) (def : G A),
       (semGen (oneof def l)) <-->
-      (fun e => (exists x, List.In x l /\ semGen x e) \/ 
+      (fun e => (exists x, List.In x l /\ semGen x e) \/
                 (l = nil /\ semGen def e)).
   Hypothesis semOneofSize:
     forall {A} (l : list (G A)) (def : G A) s,
       (semSize (oneof def l) s) <-->
-      (fun e => (exists x, List.In x l /\ semSize x s e) \/ 
+      (fun e => (exists x, List.In x l /\ semSize x s e) \/
                 (l = nil /\ semSize def s e)).
 
   Hypothesis semFrequency:
@@ -124,11 +124,11 @@ Module Type GenDerivedInterface.
       (fun e => (exists n, exists g, (List.In (n, g) l /\ semSize g size e /\ n <> 0)) \/
                 ((l = nil \/ (forall x, List.In x l -> fst x = 0)) /\ semSize def size e)).
 
-  Hypothesis semVectorOfSize: 
+  Hypothesis semVectorOfSize:
     forall {A : Type} (k : nat) (g : G A) size,
-      semSize (vectorOf k g) size <--> 
+      semSize (vectorOf k g) size <-->
       fun l => (length l = k /\ forall x, List.In x l -> semSize g size x).
-  
+
   Hypothesis semListOfSize:
     forall (A : Type) (g : G A) (size : nat),
       semSize (listOf g) size <-->
@@ -141,7 +141,7 @@ Module Type GenDerivedInterface.
   Hypothesis semElementsSize:
     forall {A} (l: list A) (def : A) s,
       (semSize (elements def l) s) <--> (fun e => List.In e l \/ (l = nil /\ e = def)).
-  
+
 End GenDerivedInterface.
 
 Module GenComb : GenDerivedInterface.
@@ -217,8 +217,8 @@ Module GenComb : GenDerivedInterface.
       | (k, x) :: xs =>
         if (n < k) then (k, x)
         else pick def (n - k) xs
-    end. 
-  
+    end.
+
   Definition sum_fst {A : Type} (gs : list (nat * A)) : nat :=
     fold_left (fun t p => t + (fst p)) gs 0.
 
@@ -248,10 +248,10 @@ Module GenComb : GenDerivedInterface.
       semGen (liftGen f g) <-->
       fun b =>
       exists a, semGen g a /\ f a = b.
-  Proof. 
+  Proof.
     rewrite /liftGen. move => A B f g b. split.
     - move => [size /semBindSize [a [H1 H2]]]; subst.
-      exists a. apply semReturnSize in H2. 
+      exists a. apply semReturnSize in H2.
       split => //. by exists size.
    - move => [a [[size H] Heq]]; subst.
      exists size. apply semBindSize.
@@ -260,12 +260,12 @@ Module GenComb : GenDerivedInterface.
 
 Ltac solveLiftGenX :=
   intros; split; intros;
-  repeat 
+  repeat
     match goal with
       | [ H : exists _, _ |- _ ] => destruct H as [? [? ?]]
-      | [ H : semSize _ _ _ |- _ ] => 
+      | [ H : semSize _ _ _ |- _ ] =>
         try (apply semBindSize in H; destruct H as [? [? ?]]);
-        try (apply semReturnSize in H; subst) 
+        try (apply semReturnSize in H; subst)
     end;
     [ by repeat (eexists; split; [eassumption |])
     | repeat (apply semBindSize; eexists; split; try eassumption);
@@ -277,7 +277,7 @@ Ltac solveLiftGenX :=
       fun b =>
       exists a, semSize g size a /\ f a = b.
   Proof. solveLiftGenX. Qed.
-  
+
   Lemma semLiftGen2Size :
     forall {A1 A2 B} (f: A1 -> A2 -> B) (g1 : G A1) (g2 : G A2) s,
       semSize (liftGen2 f g1 g2) s <-->
@@ -285,7 +285,7 @@ Ltac solveLiftGenX :=
         exists a1,
           semSize g1 s a1 /\ exists a2, semSize g2 s a2 /\ f a1 a2 = b.
   Proof. solveLiftGenX. Qed.
- 
+
   Lemma semLiftGen3Size :
   forall {A1 A2 A3 B} (f: A1 -> A2 -> A3 -> B)
          (g1: G A1) (g2: G A2) (g3: G A3) size,
@@ -293,7 +293,7 @@ Ltac solveLiftGenX :=
     fun b =>
       exists a1, semSize g1 size a1 /\
                  (exists a2, semSize g2 size a2 /\
-                             (exists a3, semSize g3 size a3 /\ 
+                             (exists a3, semSize g3 size a3 /\
                                          (f a1 a2 a3) = b)).
   Proof. solveLiftGenX. Qed.
 
@@ -325,47 +325,47 @@ Ltac solveLiftGenX :=
 
   Lemma semSequenceGenSize :
     forall {A} (gs : list (G A)) n,
-      semSize (sequenceGen gs) n <--> 
+      semSize (sequenceGen gs) n <-->
            fun l => length l = length gs /\
-                    forall x, List.In x (combine l gs) -> 
+                    forall x, List.In x (combine l gs) ->
                               semSize (snd x) n (fst x).
   Proof.
     move=> A gs n la. rewrite /sequenceGen. split.
     - elim : gs la => /= [| g gs IHgs] la.
-      + by move/semReturnSize => H; subst. 
-      + move => /semBindSize [a [H1 /semBindSize 
+      + by move/semReturnSize => H; subst.
+      + move => /semBindSize [a [H1 /semBindSize
                                   [la' [H2 /semReturnSize H3]]]]; subst.
         move: IHgs => /(_ la' H2) [<- HIn].
         split=> //= x [H | H]; subst => //=. by apply HIn => /=.
     - elim : gs la => /= [| g gs IHgs].
-      + move => [|a la] [//= Heq H]. 
-          by apply semReturnSize. 
+      + move => [|a la] [//= Heq H].
+          by apply semReturnSize.
       + move => [|a la] [//= [Heq] HIn]; subst.
-        apply semBindSize. 
-        exists a. split. 
+        apply semBindSize.
+        exists a. split.
         * apply (HIn (a, g)). by left.
-        * apply semBindSize. exists la. 
+        * apply semBindSize. exists la.
           split => //=.
           apply IHgs. split => // x H. apply HIn; by right.
             by apply semReturnSize.
-  Qed.  
+  Qed.
 
-  Lemma semVectorOfSize: 
+  Lemma semVectorOfSize:
     forall {A : Type} (k : nat) (g : G A) n,
-      semSize (vectorOf k g) n <--> 
+      semSize (vectorOf k g) n <-->
               fun l => (length l = k /\ forall x, List.In x l -> semSize g n x).
   Proof.
     move => A k g n la; unfold vectorOf; split.
-    - elim : k la => /= [|k IHk] la.  
+    - elim : k la => /= [|k IHk] la.
       + move=> /semReturnSize H; subst. by split.
       + move=> /semBindSize [a [H1 /semBindSize [la' [H2 /semReturnSize H3]]]].
-        subst => /=. 
-        have [<- HIn]: length la' = k /\ 
+        subst => /=.
+        have [<- HIn]: length la' = k /\
                        (forall x : A, List.In x la' -> semSize g n x)
-          by apply IHk. 
-      split => // x [H | H]; subst => //. 
+          by apply IHk.
+      split => // x [H | H]; subst => //.
       by apply HIn.
-   - elim : k la => /= [|k IHk] la [Heq Hgen]. 
+   - elim : k la => /= [|k IHk] la [Heq Hgen].
      + destruct la => //. by apply semReturnSize.
      + destruct la=> //. simpl in *.
        move: Heq => [Heq]; subst.
@@ -373,22 +373,22 @@ Ltac solveLiftGenX :=
        exists a. split.
        * apply Hgen => //; by left.
        * apply semBindSize.
-         exists la =>//. split => //; last by apply semReturnSize.  
+         exists la =>//. split => //; last by apply semReturnSize.
          apply IHk. split => //.
          move => x HIn. apply Hgen. by right.
   Qed.
 
   Lemma semListOfSize:
     forall {A : Type} (g : G A) size,
-      semSize (listOf g) size <--> 
+      semSize (listOf g) size <-->
       fun l => length l <= size /\ (forall x, List.In x l -> semSize g size x).
   Proof.
     move => A g size la; unfold listOf; split.
-    - move => /semSizedSize /semBindSize 
+    - move => /semSizedSize /semBindSize
                [n' [/semChooseSize [/= H1 H2] /semVectorOfSize [Heq H3]]]; subst.
       by intros; split; auto.
     - move => [H1 H2]. apply semSizedSize. apply semBindSize.
-      exists (length la). 
+      exists (length la).
       split; first by apply semChooseSize => //=.
       apply semVectorOfSize. split => //.
   Qed.
@@ -397,30 +397,30 @@ Ltac solveLiftGenX :=
     forall {A} (l: list A) x def,
       List.In x l -> exists n, nth n l def = x /\ (n < length l)%coq_nat.
   Proof.
-    move => A l x def. elim : l => [| a l IHl] //=. 
+    move => A l x def. elim : l => [| a l IHl] //=.
     move => [H | /IHl [n [H1 H2]]]; subst.
     - exists 0. split => //. omega.
     - exists n.+1. split => //. omega.
   Qed.
-  
+
   Lemma semOneof:
     forall {A} (l : list (G A)) (def : G A),
       (semGen (oneof def l)) <-->
-      (fun e => (exists x, List.In x l /\ semGen x e) \/ 
+      (fun e => (exists x, List.In x l /\ semGen x e) \/
                 (l = nil /\ semGen def e)).
   Proof.
     move=> A l def a. unfold oneof. split.
-    - move => [s /semBindSize [n [/semChooseSize [Hleq1 Hleq2] Hnth]]]. 
+    - move => [s /semBindSize [n [/semChooseSize [Hleq1 Hleq2] Hnth]]].
       case: l Hleq2 Hnth => [| g gs] //= /leP Hleq2 Hnth.
-      + rewrite sub0n in Hleq2. apply le_n_0_eq in Hleq2; subst. 
+      + rewrite sub0n in Hleq2. apply le_n_0_eq in Hleq2; subst.
         right. split => //. by exists s.
-      + left. rewrite subn1 NPeano.Nat.pred_succ in Hleq2.  
+      + left. rewrite subn1 NPeano.Nat.pred_succ in Hleq2.
         case: n Hleq1 Hleq2 Hnth => [_ _ | n Hleq1 Hleq2] Hnth.
         * exists g. split; auto. by exists s.
         * exists (nth n gs def). split; last by exists s.
           right. by apply nth_In.
     - move => [[g [Hin [s Hsem]]] | [Heq [s Hsem]]]; subst.
-      + exists s. apply semBindSize.  
+      + exists s. apply semBindSize.
         destruct (In_nth_exists _ _ def Hin) as [n [Hnth Hl]]; subst.
         exists n. split => //. apply semChooseSize. split => //.
         simpl. apply/leP.
@@ -432,21 +432,21 @@ Ltac solveLiftGenX :=
   Lemma semOneofSize:
     forall {A} (l : list (G A)) (def : G A) s,
       (semSize (oneof def l) s) <-->
-      (fun e => (exists x, List.In x l /\ semSize x s e) \/ 
+      (fun e => (exists x, List.In x l /\ semSize x s e) \/
                 (l = nil /\ semSize def s e)).
   Proof.
     move => A l def s a.  unfold oneof. split.
-    - move => /semBindSize [n [/semChooseSize [Hleq1 Hleq2] Hnth]]. 
+    - move => /semBindSize [n [/semChooseSize [Hleq1 Hleq2] Hnth]].
       case: l Hleq2 Hnth => [| g gs] //= /leP Hleq2 Hnth.
-      + rewrite sub0n in Hleq2. apply le_n_0_eq in Hleq2; subst. 
+      + rewrite sub0n in Hleq2. apply le_n_0_eq in Hleq2; subst.
         right. by split => //.
-      + left. rewrite subn1 NPeano.Nat.pred_succ in Hleq2.  
+      + left. rewrite subn1 NPeano.Nat.pred_succ in Hleq2.
         case: n Hleq1 Hleq2 Hnth => [_ _ | n Hleq1 Hleq2] Hnth.
         * exists g. split => //; by auto.
         * exists (nth n gs def). split; last by auto.
           right. by apply nth_In.
     - move => [[g [Hin Hsem]] | [Heq Hsem]]; subst.
-      +apply semBindSize.  
+      +apply semBindSize.
         destruct (In_nth_exists _ _ def Hin) as [n [Hnth Hl]]; subst.
         exists n. split => //. apply semChooseSize. split => //.
         simpl. apply/leP.
@@ -454,45 +454,45 @@ Ltac solveLiftGenX :=
       + apply semBindSize. exists 0. split => //.
         apply semChooseSize. split => //.
   Qed.
-      
+
 
   Lemma semElements :
     forall {A} (l: list A) (def : A),
-      (semGen (elements def l)) <--> 
+      (semGen (elements def l)) <-->
       (fun e => List.In e l \/ (l = nil /\ e = def)).
   Proof.
     unfold elements. move => A l def a. split.
-    - move => [s /semBindSize [n [/semChooseSize [/= Hleq1 Hleq2] 
+    - move => [s /semBindSize [n [/semChooseSize [/= Hleq1 Hleq2]
                                    /semReturnSize H2]]]; subst.
-      case: l Hleq1 Hleq2 => [_ _ | a l /= Hleq1 Hleq2]. 
+      case: l Hleq1 Hleq2 => [_ _ | a l /= Hleq1 Hleq2].
       + right. split => //. by case: n.
       + left. case: n Hleq1 Hleq2 => [|n] _ /leP Hleq2; auto.
         right. apply nth_In. rewrite subn1 in Hleq2. omega.
     - move => [H | [H1 H2]]; subst.
-      + exists 0. apply semBindSize. 
+      + exists 0. apply semBindSize.
         destruct (In_nth_exists _ _ def H) as [n [Hnth Hlen]]; subst.
         exists n. split; last by apply semReturnSize.
-        apply semChooseSize. split => //. apply/leP. 
+        apply semChooseSize. split => //. apply/leP.
         unfold lt in *. rewrite subn1. omega.
      + exists 0. apply semBindSize. exists 0.
-       split; last by apply semReturnSize. apply semChooseSize. split => //. 
+       split; last by apply semReturnSize. apply semChooseSize. split => //.
   Qed.
 
   Lemma semElementsSize :
     forall {A} (l: list A) (def : A) s,
-      (semSize (elements def l) s) <--> 
+      (semSize (elements def l) s) <-->
       (fun e => List.In e l \/ (l = nil /\ e = def)).
   Proof.
     move => A l def a. split.
     - move => Hsize. apply semElements. eexists; eassumption.
     - move => [HIn | [Hemp Heq]]; unfold elements.
-      + apply semBindSize. 
+      + apply semBindSize.
         destruct (In_nth_exists _ _ def HIn) as [n [Hnth Hlen]]; subst.
         exists n. split; last by apply semReturnSize.
-        apply semChooseSize. split => //. apply/leP. 
+        apply semChooseSize. split => //. apply/leP.
         unfold lt in *. rewrite subn1. omega.
      + subst; apply semBindSize. exists 0.
-       split; last by apply semReturnSize. apply semChooseSize. split => //. 
+       split; last by apply semReturnSize. apply semChooseSize. split => //.
   Qed.
 
 
@@ -508,22 +508,22 @@ Ltac solveLiftGenX :=
       sum_fst ((x, a) :: l) = x + sum_fst l.
   Proof.
     unfold sum_fst. generalize 0.
-    move=> n A x a l. 
+    move=> n A x a l.
     elim : l n x a =>  [|y ys IHxs] n x a.
     - by rewrite addnC.
     - simpl. specialize (IHxs (n + fst y) x a). simpl in IHxs.
-        by rewrite -IHxs addnAC. 
+        by rewrite -IHxs addnAC.
   Qed.
 
   Lemma sum_fst_zero:
     forall {A} (l: list (nat * A)),
-      sum_fst l = 0 <-> 
+      sum_fst l = 0 <->
       (forall x, List.In x l -> fst x = 0).
   Proof.
     move=> A l.
-    split. 
+    split.
     { elim : l => //= x xs IHxs Heq. destruct x as [a n].
-      rewrite sum_fst_unfold in Heq. 
+      rewrite sum_fst_unfold in Heq.
       move/plus_is_O : Heq => [H1 /IHxs H2]; subst.
       move => x [Heq | HIn]; subst => //; auto. }
     { elim l => // x xs IHxs H. destruct x as [a n].
@@ -543,10 +543,10 @@ Ltac solveLiftGenX :=
     remember (n < i). case: b Heqb => Heqb; symmetry in Heqb.
     - have : (i + sum_fst l) < i by eapply (leq_ltn_trans); eassumption.
       rewrite -ltn_subRL. by have -> : forall i, (i - i) = 0 by elim.
-    - apply IHl. rewrite -(leq_add2r i) subnK. 
+    - apply IHl. rewrite -(leq_add2r i) subnK.
         by rewrite addnC. by apply/not_lt.
   Qed.
- 
+
 
   Lemma pick_exists :
     forall {A} (l: list (nat * G A)) n def,
@@ -569,7 +569,7 @@ Ltac solveLiftGenX :=
       case: b  Heqb => //= /not_lt/pick_def H.
       rewrite H in Hpick. rewrite -Hpick //= in Hneq.
   Qed.
- 
+
   Lemma pick_In :
     forall {A} (l: list (nat * G A)) x def,
       List.In x l /\ fst x <> 0 ->
@@ -584,38 +584,38 @@ Ltac solveLiftGenX :=
     + move/(_ H2) : IHxs => [n Hpick].
       exists (n + i). rewrite -[X in _ < X]add0n ltn_add2r ltn0.
         by rewrite  -[X in _ - X]add0n subnDr subn0.
-  Qed. 
+  Qed.
 
-  Lemma semFrequencySize: 
+  Lemma semFrequencySize:
     forall {A} (l : list (nat * G A)) (def : G A) (size: nat),
       semSize (frequency def l) size <-->
-      (fun e => 
-         (exists n, exists g, 
+      (fun e =>
+         (exists n, exists g,
                       (List.In (n, g) l /\ semSize g size e /\ n <> 0)) \/
-         ((l = nil \/ (forall x, List.In x l -> fst x = 0)) /\ 
+         ((l = nil \/ (forall x, List.In x l -> fst x = 0)) /\
           semSize def size e)).
   Proof.
-    move=> A l def s a. 
+    move=> A l def s a.
     rewrite /frequency //=.
-    split => 
-    [ /semBindSize [n [/semChooseSize /= [_ Hleq] Hsize]] 
+    split =>
+    [ /semBindSize [n [/semChooseSize /= [_ Hleq] Hsize]]
     | H ].
-    { destruct (sum_fst l) eqn:Heq. 
-      - right.  
+    { destruct (sum_fst l) eqn:Heq.
+      - right.
         have Heq2: (pick def n l) = (0, def) by apply pick_def; rewrite Heq.
-        rewrite Heq2 /= in Hsize. move/sum_fst_zero : Heq => HIn. 
+        rewrite Heq2 /= in Hsize. move/sum_fst_zero : Heq => HIn.
         destruct n as [| n]; try discriminate; clear Hleq.
-        split => //. by right.  
-      - rewrite subn1 -pred_Sn in Hleq. 
-        have /(pick_exists _ _ def) [[n' g] [H1 [H2 H3]]] : n < sum_fst l 
-          by rewrite Heq; move: Hleq => /leP Hleq; apply/ltP; omega. 
+        split => //. by right.
+      - rewrite subn1 -pred_Sn in Hleq.
+        have /(pick_exists _ _ def) [[n' g] [H1 [H2 H3]]] : n < sum_fst l
+          by rewrite Heq; move: Hleq => /leP Hleq; apply/ltP; omega.
         left. exists n'. exists g. repeat split => //. by rewrite H2 in Hsize. }
-    { move : H => [[n [g [H1 [H2 H3]]]] | [[H1 | H1] H2]]. 
+    { move : H => [[n [g [H1 [H2 H3]]]] | [[H1 | H1] H2]].
       - apply semBindSize.
-        have [m H] : exists m : nat, pick def m l = (n, g) 
+        have [m H] : exists m : nat, pick def m l = (n, g)
                        by apply pick_In; split => //.
-        exists m. rewrite H. split => //. 
-        apply semChooseSize; split => //=. 
+        exists m. rewrite H. split => //.
+        apply semChooseSize; split => //=.
         have Hlt: m < sum_fst l
         by apply/(pick_exists _ _ def)=> //=; exists (n, g).
         rewrite -(leq_add2r 1) addn1 subnK. by auto.
@@ -626,18 +626,18 @@ Ltac solveLiftGenX :=
         elim: l H1 => //=. case => n p l IHl H1.
         move/(_ (n, p)): (H1) => //= H. rewrite H => //=.
         rewrite subn0; auto. by left. }
-  Qed.    
+  Qed.
 
   Lemma semFrequency:
     forall {A} (l : list (nat * G A)) (def : G A),
-      semGen (frequency def l) <--> 
-      (fun e => (exists n, exists g, 
+      semGen (frequency def l) <-->
+      (fun e => (exists n, exists g,
                              (List.In (n, g) l /\ semGen g e /\ n <> 0)) \/
-                ((l = nil \/ (forall x, List.In x l -> fst x = 0)) /\ 
+                ((l = nil \/ (forall x, List.In x l -> fst x = 0)) /\
                  semGen def e)).
   Proof.
     move => A l def a. split.
-    - move => [s /semFrequencySize [[n [g [H1 [H2 H3]]]] | [H1 H2]]].  
+    - move => [s /semFrequencySize [[n [g [H1 [H2 H3]]]] | [H1 H2]]].
       + left. exists n. exists g. repeat split => //. eexists; eassumption.
       + right. split => //. eexists; eassumption.
     - move => [[n [g [H1 [[s H2] H3]]]] | [[H1 | H1] [s H2]]]; subst;

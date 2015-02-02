@@ -106,8 +106,8 @@ Lemma arbBool_correct:
   semGen arbitrary <--> (fun (_ : bool) => True).
 Proof.
   rewrite /arbitrary /arbBool /arbitraryBool. move => b.
-  split => // _. apply semChoose. 
-  case: b; split => //. 
+  split => // _. apply semChoose.
+  case: b; split => //.
 Qed.
 
 Lemma arbNat_correct:
@@ -122,7 +122,7 @@ Qed.
 
 Lemma arbInt_correct:
   forall s,
-    semSize arbitrary s <--> 
+    semSize arbitrary s <-->
     (fun (z : Z) =>  (- Z.of_nat s <= z <= Z.of_nat s)%Z).
 Proof.
   rewrite /arbitrary /arbInt /arbitraryZ. move => n. split.
@@ -130,7 +130,7 @@ Proof.
     split; by apply Zle_bool_imp_le.
   - move => [H1 H2].
     apply semSizedSize. apply semChooseSize.
-    split; by apply Zle_imp_le_bool. 
+    split; by apply Zle_imp_le_bool.
 Qed.
 
 
@@ -139,20 +139,20 @@ Lemma arbBool_correctSize:
     semSize arbitrary s <--> (fun (_ : bool) => True).
 Proof.
   rewrite /arbitrary /arbBool /arbitraryBool. move => b.
-  split => // _. apply semChooseSize. 
-  case: b; case: a; split => //=. 
+  split => // _. apply semChooseSize.
+  case: b; case: a; split => //=.
 Qed.
 
 Lemma arbNat_correctSize:
-  forall s, 
+  forall s,
     semSize arbitrary s <--> (fun (n : nat) => (n <= s)%coq_nat).
 Proof.
   rewrite /arbitrary /arbNat /arbitraryNat. move => n.
   split.
-  - by move/semSizedSize/semChooseSize => /= [H1 /leP H2]. 
+  - by move/semSizedSize/semChooseSize => /= [H1 /leP H2].
   - move => /leP H.
     apply semSizedSize. apply semChooseSize.
-    split; auto. 
+    split; auto.
 Qed.
 
 Lemma arbInt_correctSize:
@@ -161,7 +161,7 @@ Proof.
   rewrite /arbitrary /arbInt /arbitraryZ. move => n. split => // _.
   apply semSized.
   exists (Z.abs_nat n). apply semChooseSize.
-  by split => //=; rewrite Nat2Z.inj_abs_nat; 
+  by split => //=; rewrite Nat2Z.inj_abs_nat;
      case: n => //= p; apply Z.leb_refl.
 Qed.
 
@@ -170,11 +170,11 @@ Qed.
 Lemma arbList_correct:
   forall {A} {H : Arbitrary A} (P : nat -> A -> Prop) s,
     (semSize arbitrary s <--> P s) ->
-    (semSize arbitrary s <--> 
+    (semSize arbitrary s <-->
      (fun (l : list A) => length l <= s /\ (forall x, List.In x l -> P s x))).
 Proof.
   move => A H P s Hgen l. rewrite /arbitrary /arbList /arbitraryList.
-  split. 
+  split.
   - move => /semListOfSize [Hl Hsize]. split => // x HIn. apply Hgen.
     auto.
   - move => [Hl HP]. apply semListOfSize. split => // x HIn.

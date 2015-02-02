@@ -54,7 +54,7 @@ Definition addCallback (res : Result) (c : Callback) : Result :=
     | MkResult o e r i s cs => MkResult o e r i s (cons c cs)
   end.
 
-Record QProp : Type := 
+Record QProp : Type :=
   MkProp
     {
       unProp : Rose Result
@@ -113,8 +113,8 @@ Global Instance testGenProp (P : Type) : Checkable P -> Checkable (G P) :=
   |}.
 
 Global Instance testChecker : Checkable Checker :=
-  {| 
-      checker x := x 
+  {|
+      checker x := x
   |}.
 
 (* Checker Combinators *)
@@ -157,9 +157,9 @@ Definition whenFail {prop : Type} `{Checkable prop}
   callback (PostFinalFailure Counterexample (fun _st _sr => trace str 0)).
 
 
-Definition expectFailure {prop: Type} `{Checkable prop} (p: prop) := 
+Definition expectFailure {prop: Type} `{Checkable prop} (p: prop) :=
   mapTotalResult (fun res =>
-                    MkResult (ok res) false (reason res) 
+                    MkResult (ok res) false (reason res)
                              (interrupted res) (stamp res) (callbacks res))
                  p.
 
@@ -223,5 +223,5 @@ Global Instance testPolyFunSet {prop : Set -> Type} {_ : Checkable (prop nat)} :
     checker f := printTestCase "" (f nat)
   }.
 
-Notation "x ==> y" := (implication x y) (at level 55, right associativity) 
+Notation "x ==> y" := (implication x y) (at level 55, right associativity)
                       : Checker_scope.

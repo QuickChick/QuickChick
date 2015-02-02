@@ -93,7 +93,7 @@ Fixpoint strcmp (s1 s2 : string) : SOrdering :=
           | GT _ => SGT
         end
   end.
-  
+
 Definition lt (s1 s2 : string) := strcmp s1 s2 = SLT.
 
 Local Ltac do_ascii_lt_trans :=
@@ -175,6 +175,3 @@ Proof.
 Qed.
 
 End StringOT.
-
-
-

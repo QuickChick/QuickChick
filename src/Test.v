@@ -14,7 +14,7 @@ Require Import List.
 Require Import Recdef.
 
 Require Import Arith.EqNat.
- 
+
 Import Gen GenComb.
 
 Definition gte n m := leb m n.
@@ -192,10 +192,10 @@ Function runATest (st : State) (f : RandomGen -> nat -> QProp)
       match res with
         | MkResult (Some x) e reas _ s _ =>
           if x then (* Success *)
-            let ls' := fold_left (fun stamps stamp => 
+            let ls' := fold_left (fun stamps stamp =>
                                      let oldBind := Map.find stamp stamps in
                                      match oldBind with
-                                       | None   => Map.add stamp 1 stamps 
+                                       | None   => Map.add stamp 1 stamps
                                        | Some k => Map.add stamp (k+1) stamps
                                      end
                                   ) s ls in
@@ -231,7 +231,7 @@ Require Import ZArith.
 Axiom newStdGen : RandomGen.
 
 
-(* ZP: This was quickCheckResult before but since we always return result 
+(* ZP: This was quickCheckResult before but since we always return result
        return result there is no reason for such distinction *)
 Definition quickCheckWith {prop : Type} {_ : Checkable prop}
            (a : Args) (p : prop) : Result :=

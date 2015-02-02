@@ -2,7 +2,7 @@ Require Import Show RoseTrees.
 Require Import AbstractGen SetOfOutcomes Arbitrary Checker.
 Require Import ssreflect ssrbool eqtype.
 
- 
+
 Definition Checker := Checker Pred.
 
 Definition resultSuccessful (r : Result) : bool :=
@@ -159,7 +159,7 @@ Proof.
     rewrite /implication.  rewrite /semChecker /checker /testResult.
     move => qp. rewrite returnGen_def. by move => <-.
 Qed.
-  
+
 
 (* equivalences for other combinators *)
 
@@ -168,8 +168,8 @@ Lemma semBindGen:
     semChecker (bindGen gen p) <-> forall g, gen g -> semChecker (p g).
 Proof.
   move=> A gen prop. rewrite /semChecker. split.
-  - move => H g Hgen qp Hprop. apply H.  
-    eexists. split; eassumption. 
+  - move => H g Hgen qp Hprop. apply H.
+    eexists. split; eassumption.
   - move => H qp [a [Hgen Hprop]]. eauto.
 Qed.
 
@@ -190,15 +190,15 @@ Proof.
   split.
   - move => H pq /H Hgen. by apply Hgen. (*rewrite returnGen_def /semChecker in Hgen.
     by apply Hgen.*)
-  - move => H pq Hgen. unfold testCheckerGen in *. 
-    rewrite /semChecker in H. 
-    by auto. 
+  - move => H pq Hgen. unfold testCheckerGen in *.
+    rewrite /semChecker in H.
+    by auto.
 (*rewrite returnGen_def /semChecker.
     move => qp Heq; subst. rewrite /semChecker in H. by auto.*)
 Qed.
 
 Lemma semForAll :
-  forall {A prop : Type} {H : Checkable prop} `{Show A} 
+  forall {A prop : Type} {H : Checkable prop} `{Show A}
          (gen : Pred A) (f : A -> prop),
     semChecker (forAll gen f) <->
     forall a : A, gen a -> semCheckable (f a).
@@ -230,12 +230,12 @@ Qed.
 
 Lemma semBool:
   forall (b : bool), semCheckable b <-> b = true.
-Proof.  
+Proof.
   move => b. case: b.
   - split => //. compute.
     by move => _ qp Heq; subst.
   - split => //. rewrite /semCheckable /semChecker. move => H.
-    simpl in H.  rewrite /returnP /= in H. 
+    simpl in H.  rewrite /returnP /= in H.
     by specialize (H _ Logic.eq_refl).
 Qed.
 
