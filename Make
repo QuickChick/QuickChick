@@ -1,17 +1,17 @@
 -R src QuickChick
 src/Random.v
-src/Arbitrary.v
 src/RoseTrees.v
 src/ModuleGen.v
-src/SemChecker.v
 src/GenCombinators.v
-src/MutateCheck.v
 src/StringOT.v
-src/Checker.v
-src/Show.v
 src/State.v
-src/QuickChick.v
-src/quickChick.ml4
+src/Arbitrary.v
+src/Show.v
+src/Checker.v
+src/SemChecker.v
 src/Test.v
 src/Extraction.v
+src/QuickChick.v
+src/MutateCheck.v
+src/quickChick.ml4
 src/quickChickLib.ml
