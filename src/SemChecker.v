@@ -83,11 +83,6 @@ Proof.
 Qed.
 
 
-Axiom semGenSizeCorrect :
-  forall A (g : G A) (x : A) size,
-    semGenSize g size x <-> exists seed, run g seed size = x.
-
-
 (* TODO : This proof needs refactoring! *)
 Lemma semShrinking_id:
   forall {prop A : Type} {H : Checkable prop}
@@ -96,10 +91,10 @@ Lemma semShrinking_id:
     semCheckableSize (pf x0) s.
 Proof.
   move => prop A HCheck sh x pf.
-  unfold semCheckableSize, shrinking, semCheckerSize.
+  unfold semCheckableSize, shrinking, semCheckerSize, semGenSize.
   split.
   - unfold props. generalize 1000.
-    case => [| n] H qp /semGenSizeCorrect [seed Hgen]; subst.
+    case => [| n] H qp [seed Hgen]; subst.
     + apply H. apply semFmapSize. eexists.
       split. apply semPromoteSize.
       exists seed. simpl. reflexivity.
@@ -131,15 +126,15 @@ Proof.
                            {| force := List.map (props' n pf sh) (sh x) |}))
                      seed s)) as b.
       symmetry in Heqb. setoid_rewrite runPromote in Heqb. by rewrite -Heqb.
-  - unfold props. generalize 1000.
-    move => n H qp /semGenSizeCorrect [seed /runFmap [rqp [H1 H2]]].
+  - unfold props, semGenSize. generalize 1000.
+    move => n H qp [seed /runFmap [rqp [H1 H2]]].
     suff : success (run (@checker _ HCheck (pf x)) seed s) = true.
     + subst.
       remember (run (promote (props' n pf sh x)) seed s) as b. symmetry in Heqb.
       apply runPromote in Heqb; subst. simpl.
       case: n => [| n] /=;
       by destruct ((run (checker (pf x)) seed s)) as [[res [l]]] => //=.
-      subst. apply H. apply semGenSizeCorrect.
+      subst. apply H.
       by eexists; eexists.
 Qed.
 

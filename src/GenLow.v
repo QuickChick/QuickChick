@@ -23,7 +23,7 @@ Infix "--->" := set_incl (at level 70, no associativity) : sem_gen_scope.
 
 Open Scope sem_gen_scope.
 
-(* We hide the implementation a generators behind this interface. The
+(* We hide the implementation of generators behind this interface. The
    rest of the framework and user code are agnostic to the internal
    representation of generators. The proof organization/abstraction
    tries to follow this code organization/abstraction. We need to
@@ -45,15 +45,12 @@ Module Type GenLowInterface.
    Parameter sample : forall {A : Type}, G A -> list A.
 
 
-   (* Set of outcomes definitions *)
-   (* CH: What's the point in making this abstract, if it's definition
-      is fixed by semGenCorrect? *)
-   Parameter semGenSize : forall {A : Type}, G A -> nat -> Ensemble A.
-
-   (* CH: Why is this concrete and semGenSize abstract?
-          The definition is repeated in the Module definition, is that normal? *)
+   (* Set of outcomes semantics definitions (repeated below) *)
+   Definition semGenSize {A : Type} (g : G A) (size : nat) : Ensemble A :=
+     fun a => exists seed, run g seed size = a.
    Definition semGen {A : Type} (g : G A) : Ensemble A :=
      fun a => exists size, semGenSize g size a.
+
 
    Hypothesis semReturn :
      forall A (x : A), semGen (returnGen x) <--> eq x.
@@ -115,12 +112,6 @@ Module Type GenLowInterface.
        (fun t : Rose A =>
           exists (seed : RandomSeed),
             fmapRose (fun g : G A => run g seed n) m = t).
-
-   (* These are the two statements we prove about generators
-      CH: ha? *)
-   Hypothesis semGenCorrect :
-     forall A (g : G A) (x : A),
-         semGen g x <-> exists size seed, run g seed size = x.
 
    (* Those are too concrete, but I need them to prove shrinking.
       Does this reveal a weakness in our framework?
@@ -212,9 +203,9 @@ Module GenLow : GenLowInterface.
      end.
 
 
+   (* Set of outcomes semantics definitions (repeated above) *)
    Definition semGenSize {A : Type} (g : G A) (size : nat) : Ensemble A :=
      fun a => exists seed, run g seed size = a.
-
    Definition semGen {A : Type} (g : G A) : Ensemble A :=
      fun a => exists size, semGenSize g size a.
 
@@ -408,13 +399,6 @@ Module GenLow : GenLowInterface.
      forall A (m : Rose (G A)) seed size o,
        run (promote m) seed size = o <->
        (fmapRose (fun (g : G A) => run g seed size) m) = o.
-   Proof.
-     move => A g x. split => //=.
-   Qed.
-
-   Lemma semGenCorrect :
-     forall A (g : G A) (x : A),
-       semGen g x <-> exists size seed, run g seed size = x.
    Proof.
      move => A g x. split => //=.
    Qed.
