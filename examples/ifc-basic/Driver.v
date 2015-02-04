@@ -71,9 +71,7 @@ Definition prop_gen_indist :=
   forAllShrink gen_variation_state (fun _ => nil)
                (fun v => let '(V st1 st2) := v in indist st1 st2).
 
-Definition runSSNIdefaultTable := showResult (quickCheck (prop_SSNI default_table)).
-
-QuickCheck runSSNIdefaultTable.
+QuickCheck (prop_SSNI default_table).
 
 Axiom numTests : nat.
 Extract Constant numTests => "20000".
