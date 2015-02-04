@@ -43,16 +43,16 @@ Proof.
   destruct (divmod n 1 0 0); destruct n1; simpl; omega.
 Qed.
 
-Lemma abs_div2_pos : forall p, Z.abs_nat (Z.div (Z.pos p) 2) = div (Pos.to_nat p) 2.
+Lemma abs_div2_pos : forall p, Z.abs_nat (Z.div2 (Z.pos p)) = Div2.div2 (Pos.to_nat p).
 Proof.
   intros. destruct p.
-    rewrite <- Zdiv2_div. rewrite /Z.div2 /Pos.div2.
+    rewrite /Z.div2 /Pos.div2.
       rewrite /Z.abs_nat. rewrite Pos2Nat.inj_xI.
       rewrite <- Nat.add_1_r. rewrite mult_comm.
-      rewrite Nat.div_add_l; simpl; omega.
-    rewrite <- Zdiv2_div. rewrite /Z.div2 /Pos.div2.
+      rewrite Nat.div2_div. rewrite Nat.div_add_l; simpl; omega.
+    rewrite /Z.div2 /Pos.div2.
       rewrite /Z.abs_nat. rewrite Pos2Nat.inj_xO.
-      rewrite mult_comm. rewrite Nat.div_mul. reflexivity. omega.
+      rewrite mult_comm. rewrite Nat.div2_div. rewrite Nat.div_mul. reflexivity. omega.
   reflexivity.
 Qed.
 
@@ -82,16 +82,17 @@ Proof.
 Qed.
 
 Lemma abs_succ_div2_neg : forall p,
-  Z.abs_nat (Z.succ (Z.div (Z.neg p) 2)) = div (Pos.to_nat p) 2 \/
-  Z.abs_nat (Z.succ (Z.div (Z.neg p) 2)) = Nat.pred (div (Pos.to_nat p) 2).
+  Z.abs_nat (Z.succ (Z.div2 (Z.neg p))) = Div2.div2 (Pos.to_nat p) \/
+  Z.abs_nat (Z.succ (Z.div2 (Z.neg p))) = Nat.pred (Div2.div2 (Pos.to_nat p)).
 Proof.
   intros. destruct p.
-    left. rewrite <- Zdiv2_div. rewrite /Z.div2 /Pos.div2.
+    left. rewrite /Z.div2 /Pos.div2.
       rewrite neg_succ. rewrite <- Zsucc_pred. rewrite /Z.abs_nat. rewrite Pos2Nat.inj_xI.
       rewrite <- Nat.add_1_r. rewrite mult_comm.
-      rewrite Nat.div_add_l; simpl; omega.
-    right. rewrite <- Zdiv2_div. rewrite /Z.div2 /Pos.div2.
-      rewrite Pos2Nat.inj_xO. rewrite mult_comm. rewrite Nat.div_mul. simpl.
+      rewrite Nat.div2_div. rewrite Nat.div_add_l; simpl; omega.
+    right. rewrite /Z.div2 /Pos.div2.
+      rewrite Pos2Nat.inj_xO. rewrite mult_comm.
+      rewrite Nat.div2_div. rewrite Nat.div_mul. simpl.
       apply abs_succ_neg. omega.
   left. simpl. reflexivity.
 Qed.
@@ -99,16 +100,16 @@ Qed.
 Function shrinkZ (x : Z) {measure (fun x => Z.abs_nat x) x}: list Z :=
   match x with
     | Z0 => nil
-    | Zpos _ => rev (cons (Z.pred x) (cons (Z.div x 2) (shrinkZ (Z.div x 2))))
-    | Zneg _ => rev (cons (Z.succ x) (cons (Z.succ (Z.div x 2)) (shrinkZ (Z.succ (Z.div x 2)))))
+    | Zpos _ => rev (cons (Z.pred x) (cons (Z.div2 x) (shrinkZ (Z.div2 x))))
+    | Zneg _ => rev (cons (Z.succ x) (cons (Z.succ (Z.div2 x)) (shrinkZ (Z.succ (Z.div2 x)))))
   end.
 Proof.
   move => ? p ?. subst. rewrite abs_div2_pos. rewrite Zabs2Nat.inj_pos.
-    apply Nat.div_lt. apply Pos2Nat.is_pos. omega.
+    rewrite Nat.div2_div. apply Nat.div_lt. apply Pos2Nat.is_pos. omega.
   move => ? p ?. subst. destruct (abs_succ_div2_neg p) as [H | H].
-    rewrite {}H /Z.abs_nat.
+    rewrite {}H /Z.abs_nat. rewrite Nat.div2_div.
       apply Nat.div_lt. apply Pos2Nat.is_pos. omega.
-    rewrite {}H /Z.abs_nat. eapply le_lt_trans. apply le_pred_n.
+    rewrite {}H /Z.abs_nat. eapply le_lt_trans. apply le_pred_n. rewrite Nat.div2_div.
       apply Nat.div_lt. apply Pos2Nat.is_pos. omega.
 Qed.
 
