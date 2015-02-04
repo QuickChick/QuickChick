@@ -43,11 +43,11 @@ Definition isSuccess (r : Result) : bool :=
     | _         => false
   end.
 
-(* Representing large constants in CoQ is not a good idea... :) *)
+(* Representing large constants in Coq is not a good idea... :) *)
 Axiom defNumTests    : nat.
-Extract Constant defNumTests    => "1000".
+Extract Constant defNumTests    => "10000".
 Axiom defNumDiscards : nat.
-Extract Constant defNumDiscards => "50000".
+Extract Constant defNumDiscards => "(2 * defNumTests)".
 Axiom defNumShrinks  : nat.
 Extract Constant defNumShrinks  => "1000".
 Axiom defSize        : nat.
@@ -227,7 +227,6 @@ Definition test (st : State) (f : RandomSeed -> nat -> QProp) : Result :=
   else runATest st f.
 
 Require Import ZArith.
-(* Axiom unsafeRandomSeed : Z. *)
 
 (* ZP: This was quickCheckResult before but since we always return result
        return result there is no reason for such distinction *)
