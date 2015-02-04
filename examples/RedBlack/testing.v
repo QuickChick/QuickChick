@@ -93,12 +93,9 @@ Fixpoint genAnyTree_max_height (h : nat) : G tree :=
 
 Definition genAnyTree : G tree := sized genAnyTree_max_height.
 
-Definition testInsertNaive :=
-  showResult (quickCheck (insert_is_redblack_checker genAnyTree)).
-
 Extract Constant defSize => "5".
 Extract Constant Test.defNumTests => "10".
-QuickCheck testInsertNaive.
+QuickCheck (insert_is_redblack_checker genAnyTree).
 Extract Constant Test.defNumTests => "10000".
 
 Fixpoint genRBTree_height (h : nat) (c : color) :=
@@ -154,4 +151,4 @@ Definition testInsert :=
 
 Extract Constant defSize => "10".
 Extract Constant Test.defNumTests => "10000".
-QuickCheck testInsert.
+QuickCheck (insert_is_redblack_checker genRBTree).

@@ -21,18 +21,12 @@ Fixpoint remove (x : nat) (l : list nat) : list nat :=
 Definition removeP (x : nat) (l : list nat) :=
   collect x (~~ (existsb (pred1 x) (remove x l))).
 
-Definition test0 :=
-  showResult (quickCheck removeP).
-
-QuickCheck test0.
+QuickCheck removeP.
 
 Definition prop_length (A : Type) (l : list A) :=
   (List.length l) <= 20.
 
-Definition testLength :=
-  showResult (quickCheck prop_length).
-
-QuickCheck testLength.
+QuickCheck prop_length.
 
 (* Tree example showing custom datatypes *)
 
@@ -121,9 +115,7 @@ Fixpoint mirror {A : Type} (t : tree A) : tree A :=
   
 Definition mirrorK (t : tree nat) := mirror (mirror t) == t.
  
-Definition testtree := showResult (quickCheck mirrorK).
- 
-QuickCheck testtree.
+QuickCheck mirrorK.
  
 (* Step 3 : .. or prove them correct   *)
 
