@@ -34,6 +34,28 @@ Axiom ramdomRIntCorrect:
     exists seed, (fst (randomRInt (z1, z2) seed)) = z.
 
 
+(* A small experiment showing that infinite random trees
+   are a potential model of the randomSplitAssumption *)
+
+Module InfiniteTrees.
+  CoInductive RandomSeed : Type :=
+  | Node : bool -> RandomSeed -> RandomSeed -> RandomSeed.
+
+  Definition randomSplit (s : RandomSeed) :=
+    match s with
+    | Node b s1 s2 => (s1,s2)
+    end.
+
+  Lemma randomSplitAssumption :
+    forall s1 s2 : RandomSeed, exists s, randomSplit s = (s1,s2).
+  Proof.
+    move => s1 s2. by exists (Node true s1 s2).
+  Qed.
+End InfiniteTrees.
+
+
+(* Type class machinery for generating things in intervals *)
+
 Class OrdType (A: Type) :=
   {
     leq     : A -> A -> bool;
