@@ -68,17 +68,18 @@ Qed.
 Lemma neg_pred : forall p, (p > 1)%positive ->
   Z.neg (Pos.pred p) = Z.succ (Z.neg p).
 Proof.
-  move => p Hp. rewrite <- Pos.sub_1_r.
-Admitted.
+  move => p Hp. destruct p using Pos.peano_ind. by inversion Hp.
+  rewrite Pos.pred_succ. rewrite neg_succ. rewrite Z.succ_pred.
+  reflexivity.
+Qed.
 
 Lemma abs_succ_neg : forall p,
   Z.abs_nat (Z.succ (Z.neg p)) = Nat.pred (Pos.to_nat p).
 Proof.
-  intros. destruct (Pos.eq_dec p (1%positive)).
-  - subst; reflexivity.
-  - rewrite -neg_pred /Z.abs_nat. rewrite Pos2Nat.inj_pred. reflexivity.
-    admit. admit.
-Admitted.
+  move => p. destruct p using Pos.peano_ind. reflexivity.
+  rewrite -neg_pred /Z.abs_nat. rewrite Pos2Nat.inj_pred. reflexivity.
+  apply Pos.lt_1_succ. apply Pos.lt_gt; apply Pos.lt_1_succ.
+Qed.
 
 Lemma abs_succ_div2_neg : forall p,
   Z.abs_nat (Z.succ (Z.div (Z.neg p) 2)) = div (Pos.to_nat p) 2 \/
