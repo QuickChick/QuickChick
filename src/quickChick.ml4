@@ -16,6 +16,7 @@ let mk_ref s = CRef (Qualid (dummy_loc, qualid_of_string s))
 (* Names corresponding to QuickChick's .v files *)
 let showResult = mk_ref "QuickChick.Test.showResult"
 let quickCheck = mk_ref "QuickChick.Test.quickCheck"
+let quickCheckWith = mk_ref "QuickChick.Test.quickCheckWith"
 
 (* Locate QuickChick's files *)
 (* The computation is delayed because QuickChick's libraries are not available
@@ -76,11 +77,10 @@ let define c =
   fresh_name
 
 (* TODO: clean leftover files *)
-let quickcheck c =
-  (** [c] is a constr_expr representing the property to test,
+let runTest c =
+  (** [c] is a constr_expr representing the test to run,
       so we first build a new constr_expr representing
-      showResult (quickCheck c) **)
-  let c = CApp(dummy_loc,(None,quickCheck), [(c,None)]) in
+      showResult c **)
   let c = CApp(dummy_loc,(None,showResult), [(c,None)]) in
   (** Build the kernel term from the const_expr *)
   let env = Global.env () in
@@ -91,7 +91,6 @@ let quickcheck c =
   let mlf = Filename.temp_file "QuickChick" ".ml" in
   let execn = Filename.chop_extension mlf in
   let mlif = execn ^ ".mli" in
-  let modn = Filename.basename execn in
   Flags.silently (full_extraction (Some mlf)) [Ident (dummy_loc, main)];
   (** Add a main function to get some output *)
   let oc = open_out_gen [Open_append;Open_text] 0o666 mlf in
@@ -108,6 +107,15 @@ let quickcheck c =
   else if Sys.command execn <> 0 then
     msgerr (str "Could not run test" ++ fnl ())
 
+let quickcheck p =
+  let c = CApp(dummy_loc, (None,quickCheck), [(p,None)]) in
+  runTest c
+
+let quickcheckwith args p =
+  let c = CApp(dummy_loc, (None,quickCheckWith), [(args,None);(p,None)]) in
+  runTest c
+
 VERNAC COMMAND EXTEND QuickCheck
   | ["QuickCheck" constr(c)] ->     [quickcheck c]
+  | ["QuickCheckWith" constr(c1) constr(c2)] ->     [quickcheckwith c1 c2]
 END;;
