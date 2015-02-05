@@ -347,7 +347,7 @@ Qed.
 Class Provable (A : Type) {H: Checkable A} : Type :=
  {
     proposition : nat -> A -> Prop;
-    _ : forall a s, proposition s a <-> semCheckableSize a s
+    proposition_equiv : forall a s, proposition s a <-> semCheckableSize a s
   }.
 
 Program Instance proveResult : Provable Result :=

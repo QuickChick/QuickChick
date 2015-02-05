@@ -197,43 +197,39 @@ Qed.
 
 (* CH: Why is this so complicated?
    CH: Would it help if we split out a reflect lemma about
-       `(~~ (existsb (pred1 x) (remove x l)))`? *)
-Lemma removeP_aux: 
-  (forall size, proposition size removeP) <-> (forall (x : nat) l, ~ In x (remove x l)).
+       `(~~ (existsb (pred1 x) (remove x l)))`?
+   CH: also split out proof about generator for lists
+   CH: TODO: try to understand how the sizes appear here
+   CH: TODO: try to see whether going via `proposition` really helps or not *)
+Theorem removeP_correct:
+  semCheckable removeP <-> (forall (x : nat) l, ~ In x (remove x l)).
 Proof.
+  unfold semCheckable, semChecker. setoid_rewrite <- proposition_equiv.
   simpl; split. unfold removeP.
-  - move => H x l cont.  
+  - move => H x l cont.
     set size := max x (max (max_elem l) (List.length l)).
-    have Hnat : semGenSize arbitraryNat size x 
+    have Hnat : semGenSize arbitraryNat size x
       by apply arbNat_correctSize; apply Max.le_max_l.
     have Hlist: semGenSize arbitraryList size l.
-    { eapply arbList_correct with (P := fun x y => (y <= x)%coq_nat) . 
-      move => n. by rewrite arbNat_correctSize. 
-      split. apply Max.max_case_strong => H'; auto. apply/leP. 
-      eapply Max.max_lub_r; eassumption. by apply/leP; apply Max.le_max_r. 
-      move => x' /below_max_elem /leP Helem.  
-      apply Max.max_case_strong => H'; auto. 
+    { eapply arbList_correct with (P := fun x y => (y <= x)%coq_nat).
+      move => n. by rewrite arbNat_correctSize.
+      split. apply Max.max_case_strong => H'; auto. apply/leP.
+      eapply Max.max_lub_r; eassumption. by apply/leP; apply Max.le_max_r.
+      move => x' /below_max_elem /leP Helem.
+      apply Max.max_case_strong => H'; auto.
       eapply le_trans; try eassumption. eapply Max.max_lub_l. by eapply H'.
-      apply Max.max_case_strong => H''; auto. 
+      apply Max.max_case_strong => H''; auto.
       eapply le_trans; try eassumption. }
     specialize (H size x Hnat l Hlist).
     setoid_rewrite semCollect_id in H. apply semBool in H.
     have contra : existsb (pred1 x) (remove x l).
       { apply existsb_exists. exists x. split => //. by rewrite /= eq_refl. }
     rewrite contra in H. discriminate.
-  -  move => H a HIn Hsize l Hsize'. 
+  -  move => H a HIn Hsize l Hsize'.
      rewrite /removeP. rewrite semCollect_id semBool. apply Bool.eq_true_not_negb.
      move => /existsb_exists contra.
      move : contra => [n [HIn' /=/eqP Hpred]]; subst. eapply H.
-     eassumption. 
+     eassumption.
 Qed.
-
-(* TODO: CH: The final theorem I was expecting about removeP is this.
-         CH: Does it follow from what we have above? *)
-Theorem removeP_correct: forall a `{Arbitrary (tree a)},
-  (* CH: We need this additional assumption, right? *)
-  semGen (arbitrary : G (tree a))  <--> (fun _ => True) ->
-  semCheckable removeP <-> (forall (x : nat) l, ~ In x (remove x l)).
-Admitted.
 
 (* TODO: Also prove mirrorK, it should be trivial, right *)
