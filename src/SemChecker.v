@@ -16,11 +16,12 @@ Definition success qp :=
   end.
 
 (* Maps a Checker to a Prop *)
-Definition semChecker (P : Checker) : Prop :=
-  forall s qp, semGenSize P s qp -> success qp = true.
+Definition semCheckerSize (c : Checker) (s : nat): Prop :=
+  forall qp, semGenSize c s qp -> success qp = true.
 
-Definition semCheckerSize (P : Checker) (s : nat): Prop :=
-  forall qp, semGenSize P s qp -> success qp = true.
+Definition semChecker (c : Checker) : Prop :=
+  forall s, semCheckerSize c s.
+
 
 (* Maps a Checkable to a Prop i.e. gives an equivalent proposition to the
    property under test *)
