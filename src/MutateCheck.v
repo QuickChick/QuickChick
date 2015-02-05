@@ -43,7 +43,7 @@ Definition message (kill : bool) (n1 n2 : nat) :=
 
 Open Scope nat.
 
-Definition mutateCheckManyArgs {A P : Type} {_: Checker.Checkable P}
+Definition mutateCheckManyWith {A P : Type} {_: Checker.Checkable P}
            {mutA: Mutateable A} (args : Args)
            (a : A) (ps : A -> list P) :=
   let mutants := mutate a in
@@ -60,15 +60,14 @@ Definition mutateCheckManyArgs {A P : Type} {_: Checker.Checkable P}
 Definition mutateCheckMany {A P : Type} {_: Checkable P}
            `{mutA: Mutateable A}
            (a : A) (ps : A -> list P) :=
-  mutateCheckManyArgs stdArgs a ps.
+  mutateCheckManyWith stdArgs a ps.
 
-Definition mutateCheckArgs {A P: Type}
+Definition mutateCheckWith {A P: Type}
            {_: Checkable P} {mutA: Mutateable A} (args : Args)
            (a : A) (p : A -> P):=
-  mutateCheckManyArgs args a (fun a => cons (p a) nil).
+  mutateCheckManyWith args a (fun a => cons (p a) nil).
 
 Definition mutateCheck {A P: Type}
            {_: Checkable P} {mutA: Mutateable A}
            (a : A) (p : A -> P):=
-  mutateCheckManyArgs stdArgs a (fun a => cons (p a) nil).
-
+  mutateCheckManyWith stdArgs a (fun a => cons (p a) nil).

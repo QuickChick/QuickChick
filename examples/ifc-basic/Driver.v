@@ -100,7 +100,7 @@ Definition testMutantX n :=
   end.
 
 Definition testMutants :=
-  mutateCheckArgs myArgs default_table
+  mutateCheckWith myArgs default_table
     (fun t => (forAllShrinkShow
       gen_variation_state (fun _ => nil) (fun _ => "")
       (SSNI t ))).
