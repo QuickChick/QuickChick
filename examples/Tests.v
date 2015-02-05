@@ -230,7 +230,9 @@ Qed.
 
 (* TODO: CH: The final theorem I was expecting about removeP is this.
          CH: Does it follow from what we have above? *)
-Theorem removeP_correct:
+Theorem removeP_correct: forall a `{Arbitrary (tree a)},
+  (* CH: We need this additional assumption, right? *)
+  semGen (arbitrary : G (tree a))  <--> (fun _ => True) ->
   semCheckable removeP <-> (forall (x : nat) l, ~ In x (remove x l)).
 Admitted.
 
