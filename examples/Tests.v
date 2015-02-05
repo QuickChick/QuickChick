@@ -4,7 +4,7 @@ Require Import List seq ssreflect ssrbool ssrnat ZArith eqtype.
 Import ListNotations.
 
 (* Currently, these two have to be imported manually. Can we avoid this?? *)
-Import GenLow GenHigh. 
+Import GenLow GenHigh.
 
 Set Implicit Arguments.
 Unset Strict Implicit.
@@ -23,10 +23,10 @@ Definition removeP (x : nat) (l : list nat) :=
 
 QuickCheck removeP.
 
-Definition prop_length (A : Type) (l : list A) :=
+Definition propLength (A : Type) (l : list A) :=
   (List.length l) <= 20.
 
-QuickCheck prop_length.
+QuickCheck propLength.
 
 (* Tree example showing custom datatypes *)
 
@@ -57,54 +57,56 @@ Canonical tree_eqType (A : eqType) := Eval hnf in EqType (tree A) (tree_eqMixin 
 
 (* Step one: Write custom generators *)
 
-Fixpoint gentreeS {A} (g : G A) (n : nat) : G (tree A) :=
+Fixpoint genTreeS {A} (g : G A) (n : nat) : G (tree A) :=
   match n with
     | O => returnGen Leaf
     | S n' =>
       frequency (returnGen Leaf)
                  [(1, returnGen Leaf);
-                   (n, liftGen3 Node g (gentreeS g n') (gentreeS g n'))]
+                  (n, liftGen3 Node g (genTreeS g n') (genTreeS g n'))]
   end.
 
-Definition gentree {A : Type} (g : G A) : G (tree A) := 
-  bindGen arbitrary (gentreeS g).
+(* CH: I'm a bit surprised that we don't use sized here,
+       that seems equivalent anyway, right? *)
+Definition genTree {A : Type} (g : G A) : G (tree A) :=
+  bindGen arbitrary (genTreeS g).
 
 
-Instance arbtree {A} `{Arbitrary A} : Arbitrary (tree A) :=
+Instance arbTree {A} `{Arbitrary A} : Arbitrary (tree A) :=
 {|
-  arbitrary := gentree arbitrary;
+  arbitrary := genTree arbitrary;
   shrink t :=
-      let fix shrinktree (t : tree A) :=
+      let fix shrinkTree (t : tree A) :=
           match t with
             | Leaf => []
             | Node x l r => [l] ++ [r] ++
               map (fun x' => Node x' l r) (shrink x) ++
-              map (fun l' => Node x l' r) (shrinktree l) ++
-              map (fun r' => Node x l r') (shrinktree r)
+              map (fun l' => Node x l' r) (shrinkTree l) ++
+              map (fun r' => Node x l r') (shrinkTree r)
           end
-      in shrinktree t
+      in shrinkTree t
 |}.
 
 
 Require Import String.
 Open Scope string.
 
-Instance showtree {A : Type} `{_ : Show A} : Show (tree A) :=
+Instance showTree {A : Type} `{_ : Show A} : Show (tree A) :=
 {|
   show t :=
-    let fix showtree (t : tree A) :=
+    let fix showTree (t : tree A) :=
         match t with
           | Leaf => "Leaf"
           | Node x l r => "Node " ++ show x
-                                  ++ " ( " ++ showtree l ++ " ) "
-                                  ++ " ( " ++ showtree r ++ " ) "
+                                  ++ " ( " ++ showTree l ++ " ) "
+                                  ++ " ( " ++ showTree r ++ " ) "
         end
-    in showtree t
+    in showTree t
 |}.
 
 Open Scope list.
 
-(* Step 2: Use them for generation .. *)
+(* Step 2: Test a simple property about mirroring trees *)
 
 (* Faulty mirror function *)
 Fixpoint mirror {A : Type} (t : tree A) : tree A :=
@@ -112,12 +114,12 @@ Fixpoint mirror {A : Type} (t : tree A) : tree A :=
     | Leaf => Leaf
     | Node x l r => Node x (mirror l) (mirror l)
   end.
-  
+
 Definition mirrorK (t : tree nat) := mirror (mirror t) == t.
- 
+
 QuickCheck mirrorK.
- 
-(* Step 3 : .. or prove them correct   *)
+
+(* Step 3 : Prove generators correct   *)
 
 Fixpoint height {A} (t : tree A) :=
   match t with
@@ -126,10 +128,10 @@ Fixpoint height {A} (t : tree A) :=
       (maxn (height t1) (height t2)) + 1
   end.
 
-Lemma gentreeS_correct :
+Lemma genTreeS_correct :
   forall {A} (g : G A) n s,
     semGenSize g s <--> (fun _ => True) ->
-    (semGenSize (gentreeS g n) s) <--> (fun t => (height t) <= n).
+    (semGenSize (genTreeS g n) s) <--> (fun t => (height t) <= n).
 Proof.
   move=> A g n.
   elim : n => //= [| n IHn] s Hg t.
@@ -140,7 +142,7 @@ Proof.
   * move/IHn : (Hg)=> HgenT. split => [| Hheight].
     + move/semFrequencySize. move =>
       [[n' [gtree [[[Heq1 Heq2] | [[Heq1 Heq2] | //=]] [H2 _]]]] | [H1 H2]]; subst;
-      (try by apply semReturnSize in H2; subst). 
+      (try by apply semReturnSize in H2; subst).
       apply semLiftGen3Size in H2.
       move : H2 => [a1 [ga1 [t1 [/HgenT Hgt1 [t2 [/HgenT Hgt2 Heq]]]]]]; subst.
       simpl. rewrite -[X in _ <= X]addn1 leq_add2r.
@@ -151,7 +153,7 @@ Proof.
         split => //. by apply semReturnSize.
       - rewrite -[X in _ <= X]addn1 leq_add2r.
         rewrite geq_max => /andP [leq1 le2].
-        exists n.+1. exists (liftGen3 Node g (gentreeS g n) (gentreeS g n)).
+        exists n.+1. exists (liftGen3 Node g (genTreeS g n) (genTreeS g n)).
         split => //=. by right; left.
         split => //=. apply semLiftGen3Size.
         exists a; split; first exact/Hg.
@@ -159,25 +161,25 @@ Proof.
         by exists t2; split; first exact/IHn.
 Qed.
 
-Lemma gentree_correct:
+Lemma genTree_correct:
   forall {A} (g : G A) s,
-    semGenSize g s <--> (fun _ => True) -> 
-    semGenSize (gentree g) s <--> (fun t => height t <= s).
+    semGenSize g s <--> (fun _ => True) ->
+    semGenSize (genTree g) s <--> (fun t => height t <= s).
 Proof.
-  move=> A g s Hg t. rewrite /gentree. 
-  - split => //= [/semBindSize [n [/arbNat_correctSize/leP H1 /gentreeS_correct H2]] 
-                 | H]. 
-    eapply leq_trans; try eassumption. auto. 
+  move=> A g s Hg t. rewrite /genTree.
+  - split => //= [/semBindSize [n [/arbNat_correctSize/leP H1 /genTreeS_correct H2]]
+                 | H].
+    eapply leq_trans; try eassumption. auto.
   - apply semBindSize. exists s.
     split; first by apply arbNat_correctSize.
-    apply gentreeS_correct; auto.
+    apply genTreeS_correct; auto.
 Qed.
 
-(* Proving end-to-end equivalence *)
+(* Step 4: Proving correctness of checkers *)
 
 Definition max_elem :=
   fix f l :=
-  match l with 
+  match l with
     | [] => 0
     | x :: xs => (max x (f xs))
   end.
@@ -186,15 +188,14 @@ Lemma below_max_elem:
   forall (l : list nat) x,
     In x l -> x <= (max_elem l).
 Proof.
-  intros l. 
+  intros l.
   elim : l => //= [x1 xs IHxs] x2 [Heq | HIn]; subst.
-  - apply/leP. by apply Max.le_max_l. 
+  - apply/leP. by apply Max.le_max_l.
   - apply IHxs in HIn. apply Max.max_case_strong => H; auto.
     apply/leP. eapply le_trans; try eassumption. by apply/leP.
 Qed.
 
-
-Lemma removeP_correct: 
+Lemma removeP_aux: 
   (forall size, proposition size removeP) <-> (forall (x : nat) l, ~ In x (remove x l)).
 Proof.
   simpl; split. unfold removeP.
@@ -223,3 +224,11 @@ Proof.
      move : contra => [n [HIn' /=/eqP Hpred]]; subst. eapply H.
      eassumption. 
 Qed.
+
+(* TODO: CH: The final theorem I was expecting about removeP is this.
+         CH: Does it follow from what we have above? *)
+Theorem removeP_correct:
+  semCheckable removeP <-> (forall (x : nat) l, ~ In x (remove x l)).
+Admitted.
+
+(* TODO: Also prove mirrorK, it should be trivial, right *)
