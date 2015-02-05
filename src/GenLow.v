@@ -63,6 +63,17 @@ Module Type GenLowInterface.
        fun b => exists a, (semGenSize g size) a /\
                           (semGenSize (f a) size) b.
 
+   Hypothesis monad_leftid : 
+     forall {A B : Type} (a: A) (f : A -> G B),
+       semGen (bindGen (returnGen a) f) <--> semGen (f a).
+   Hypothesis monad_rightid : 
+     forall {A : Type} (g : G A),
+       semGen (bindGen g (fun a => returnGen a)) <--> semGen g.
+   Hypothesis monad_assoc: 
+     forall {A B C : Type} (ga : G A) (fb : A -> G B) (fc : B -> G C),
+       semGen (bindGen (bindGen ga fb) fc) <--> 
+       semGen (bindGen ga (fun a =>  bindGen (fb a) fc)).
+
    Hypothesis semFmap :
      forall A B (f : A -> B) (g : G A),
        semGen (fmap f g) <-->
@@ -259,10 +270,40 @@ Module GenLow : GenLowInterface.
        eexists. rewrite H2. rewrite <- H1. reflexivity.
    Qed.
 
+   Lemma monad_leftid : 
+     forall {A B : Type} (a: A) (f : A -> G B),
+       semGen (bindGen (returnGen a) f) <--> semGen (f a).
+   Proof. 
+     move => A B a f b. split => [[s /semBindSize [a' [/semReturnSize H1 H2]]] | [s H]]; subst.
+     - by exists s.
+     - exists s. apply semBindSize. exists a. split => //. by apply semReturnSize.
+   Qed.
+
+   Lemma monad_rightid : 
+     forall {A : Type} (g : G A),
+       semGen (bindGen g (fun a => returnGen a)) <--> semGen g.
+     Proof.
+       move => A g a. split => [[s /semBindSize [a' [H1 /semReturnSize H2]]] 
+                               | [s H]]; subst.
+       - by exists s.
+       - exists s. apply semBindSize. exists a. split => //. by apply semReturnSize.
+     Qed.
+   
+   Lemma monad_assoc: 
+     forall {A B C : Type} (ga : G A) (fb : A -> G B) (fc : B -> G C),
+       semGen (bindGen (bindGen ga fb) fc) <--> 
+       semGen (bindGen ga (fun a =>  bindGen (fb a) fc)).
+   Proof.
+     move => A B C ga fb fc c. split => [[s /semBindSize [b [/semBindSize [a' [H1 H2]] H3]]] 
+                                        |[s /semBindSize [a' [H1 /semBindSize [b [H2 H3]]]]]];
+     exists s; by repeat (apply semBindSize; eexists; split; try eassumption).
+   Qed.
+
    (* TODO: This should just use semFMapSize *)
    Lemma semFmap : forall A B (f : A -> B) (g : G A),
                      semGen (fmap f g) <-->
                             (fun b => exists a, (semGen g) a /\ b = f a).
+
    Proof.
      move => A B f [g] b. rewrite /semGen /semGenSize /fmap => /=. split.
      - move => [size [seed H]]. exists (g seed size). by eauto.
