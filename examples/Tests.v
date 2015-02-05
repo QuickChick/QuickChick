@@ -195,6 +195,9 @@ Proof.
     apply/leP. eapply le_trans; try eassumption. by apply/leP.
 Qed.
 
+(* CH: Why is this so complicated?
+   CH: Would it help if we split out a reflect lemma about
+       `(~~ (existsb (pred1 x) (remove x l)))`? *)
 Lemma removeP_aux: 
   (forall size, proposition size removeP) <-> (forall (x : nat) l, ~ In x (remove x l)).
 Proof.
