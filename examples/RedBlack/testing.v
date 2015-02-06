@@ -143,7 +143,7 @@ Definition showDiscards (r : Result) :=
   match r with
   | Success ns nd _ _ => "Success: number of successes " ++ show (ns-1) ++ newline ++
                          "         number of discards "  ++ show nd ++ newline
-  | _ => showResult r
+  | _ => show r
   end.
 
 Definition testInsert :=
