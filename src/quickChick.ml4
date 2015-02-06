@@ -14,7 +14,7 @@ let message = "QuickChick"
 let mk_ref s = CRef (Qualid (dummy_loc, qualid_of_string s))
 
 (* Names corresponding to QuickChick's .v files *)
-let showResult = mk_ref "QuickChick.Test.showResult"
+let show = mk_ref "QuickChick.Show.show"
 let quickCheck = mk_ref "QuickChick.Test.quickCheck"
 let quickCheckWith = mk_ref "QuickChick.Test.quickCheckWith"
 
@@ -80,8 +80,8 @@ let define c =
 let runTest c =
   (** [c] is a constr_expr representing the test to run,
       so we first build a new constr_expr representing
-      showResult c **)
-  let c = CApp(dummy_loc,(None,showResult), [(c,None)]) in
+      show c **)
+  let c = CApp(dummy_loc,(None,show), [(c,None)]) in
   (** Build the kernel term from the const_expr *)
   let env = Global.env () in
   let evd = Evd.empty in

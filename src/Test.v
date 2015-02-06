@@ -259,13 +259,13 @@ Fixpoint showCollectStatistics (l : list (string * nat)) :=
       show n ++ " : " ++ s ++ newline ++ showCollectStatistics l'
   end.
 
-Definition showResult (r : Result) :=
+Instance showResult : Show Result := Build_Show _ (fun r =>
   match r with
   | Success _ _ l s => showCollectStatistics l ++ s
   | GaveUp _ l s => showCollectStatistics l ++ s
   | Failure _ _ _ _ _ s l _ => showCollectStatistics l ++ s
   | NoExpectedFailure _ l s => showCollectStatistics l ++ s
-  end ++ newline.
+  end ++ newline).
 
 Definition quickCheck {prop : Type} {_ : Checkable prop}
            (p : prop) : Result :=
