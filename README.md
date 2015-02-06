@@ -8,7 +8,7 @@ QuickChick
 ### Known to work with
 
   - (Coq 8.4plX and OCaml 4.01.0) or (Coq 8.4pl5 and OCaml 4.02.x)
-  - SSReflect 1.5
+  - SSReflect 1.5 (http://ssr.msr-inria.inria.fr/FTP/)
 
 ### Compilation and Installation
 
@@ -24,7 +24,7 @@ Running `make tests` in the top-level QuickChick folder will check and execute a
 
 ### Larger Case Study
 
-  - See https://github.com/QuickChick/IFC repository
+  - See the https://github.com/QuickChick/IFC repository
 
 ### Top-level Commands
 
