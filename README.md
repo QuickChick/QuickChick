@@ -20,6 +20,15 @@ QuickChick
   - `examples/RedBlack`
   - `examples/ifc-basic` (not quite finished)
 
+### Top-level Commands
+
+- `QuickCheck c`
+- `QuickCheckWith args c`
+- `MutateCheck c p`
+- `MutateCheckWith args c p`
+- `MutateCheckMany c ps`
+- `MutateCheckManyWith args c ps`
+
 ### Larger Case Study
 
   - See https://github.com/QuickChick/IFC
