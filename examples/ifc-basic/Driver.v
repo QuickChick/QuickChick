@@ -95,19 +95,14 @@ Eval lazy -[labelCount helper] in
 
 Definition testMutantX n :=
   match nth (mutate_table default_table) n with
-    | Some t => showResult (quickCheckWith myArgs (prop_SSNI t))
-    | _ => ""
+    | Some t => prop_SSNI t
+    | _ => prop_SSNI default_table
   end.
 
-Definition testMutants :=
-  mutateCheckWith myArgs default_table
+MutateCheckWith myArgs default_table
     (fun t => (forAllShrinkShow
       gen_variation_state (fun _ => nil) (fun _ => "")
       (SSNI t ))).
-
-Definition runTestMutants := show testMutants.
-
-QuickCheck runTestMutants.
 
 Definition st1 :=
   St [Store; Store] [0 @ L] (0 @ L :: 0 @ H :: Mty) (0 @ L).
@@ -117,14 +112,9 @@ Definition ex_indist : indist st1 st2 = true. auto. Qed.
 
 Definition ex_test :=
   match nth (mutate_table default_table) 18 with
-    | Some t => showResult (quickCheck (SSNI t (V st1 st2)))
-    | _ => ""
+    | Some t => SSNI t (V st1 st2)
+    | _ => SSNI default_table (V st1 st2)
   end.
 
-Definition main :=
-  (* ex_test.*)
-  testMutantX 18.
-(* show testMutants. *)
-  (* showResult (quickCheck (prop_SSNI default_table)). *)
-
-(* QuickCheck main. *)
+QuickCheck ex_test.
+QuickCheck (testMutantX 18).

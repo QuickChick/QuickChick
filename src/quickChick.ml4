@@ -17,6 +17,10 @@ let mk_ref s = CRef (Qualid (dummy_loc, qualid_of_string s))
 let show = mk_ref "QuickChick.Show.show"
 let quickCheck = mk_ref "QuickChick.Test.quickCheck"
 let quickCheckWith = mk_ref "QuickChick.Test.quickCheckWith"
+let mutateCheck = mk_ref "QuickChick.MutateCheck.mutateCheck"
+let mutateCheckWith = mk_ref "QuickChick.MutateCheck.mutateCheckWith"
+let mutateCheckMany = mk_ref "QuickChick.MutateCheck.mutateCheckMany"
+let mutateCheckManyWith = mk_ref "QuickChick.MutateCheck.mutateCheckManyWith"
 
 (* Locate QuickChick's files *)
 (* The computation is delayed because QuickChick's libraries are not available
@@ -107,15 +111,28 @@ let runTest c =
   else if Sys.command execn <> 0 then
     msgerr (str "Could not run test" ++ fnl ())
 
-let quickcheck p =
-  let c = CApp(dummy_loc, (None,quickCheck), [(p,None)]) in
+let run f args =
+  let args = List.map (fun x -> (x,None)) args in
+  let c = CApp(dummy_loc, (None,f), args) in
   runTest c
 
-let quickcheckwith args p =
-  let c = CApp(dummy_loc, (None,quickCheckWith), [(args,None);(p,None)]) in
+	  (*
+let run_with f args p =
+  let c = CApp(dummy_loc, (None,f), [(args,None);(p,None)]) in
   runTest c
+	   *)
 
 VERNAC COMMAND EXTEND QuickCheck
-  | ["QuickCheck" constr(c)] ->     [quickcheck c]
-  | ["QuickCheckWith" constr(c1) constr(c2)] ->     [quickcheckwith c1 c2]
+  | ["QuickCheck" constr(c)] ->     [run quickCheck [c]]
+  | ["QuickCheckWith" constr(c1) constr(c2)] ->     [run quickCheck [c1;c2]]
+END;;
+
+VERNAC COMMAND EXTEND MutateCheck
+  | ["MutateCheck" constr(c1) constr(c2)] ->     [run mutateCheck [c1;c2]]
+  | ["MutateCheckWith" constr(c1) constr(c2) constr(c3)] ->     [run mutateCheckWith [c1;c2;c3]]
+END;;
+
+VERNAC COMMAND EXTEND MutateCheckMany
+  | ["MutateCheckMany" constr(c1) constr(c2)] ->     [run mutateCheckMany [c1;c2]]
+  | ["MutateCheckManyWith" constr(c1) constr(c2) constr(c3)] ->     [run mutateCheckMany [c1;c2;c3]]
 END;;
