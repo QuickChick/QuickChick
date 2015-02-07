@@ -1,6 +1,7 @@
 Require Import ZArith List ssreflect ssrbool ssrnat.
 Require Import Random RoseTrees.
 Require Import Ensembles.
+Require Import Numbers.BinNums.
 
 Set Implicit Arguments.
 
@@ -44,6 +45,9 @@ Module Type GenLowInterface.
    Parameter choose : forall {A : Type} `{Random A}, (A * A) -> G A.
    Parameter sample : forall {A : Type}, G A -> list A.
 
+(* LL: The abstraction barrier is annoying :D *)
+   Parameter variant : forall {A : Type}, SplitPath -> G A -> G A.
+   Parameter reallyUnsafePromote : forall {r A:Type}, (r -> G A) -> G (r -> A).
 
    (* Set of outcomes semantics definitions (repeated below) *)
    Definition semGenSize {A : Type} (g : G A) (size : nat) : Ensemble A :=
@@ -213,6 +217,20 @@ Module GenLow : GenLowInterface.
          List.map (fun (p : RandomSeed * nat) => let (r,n) := p in m r n) l
      end.
 
+(* LL : Things that need to be in GenLow because of MkGen *)
+
+   Definition variant {A : Type} (p : SplitPath) (g : G A) : G A := 
+     match g with 
+       | MkGen f => MkGen (fun r n => f (varySeed p r) n)
+     end.
+
+   Definition reallyUnsafeDelay {A : Type} : G (G A -> A) :=
+     MkGen (fun r n g => (match g with MkGen f => f r n end)).
+   
+   Definition reallyUnsafePromote {r A : Type} (m : r -> G A) : G (r -> A) :=
+       (bindGen reallyUnsafeDelay (fun eval => 
+        returnGen (fun r => eval (m r)))).
+(* End Things *)
 
    (* Set of outcomes semantics definitions (repeated above) *)
    Definition semGenSize {A : Type} (g : G A) (size : nat) : Ensemble A :=
