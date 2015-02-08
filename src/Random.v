@@ -124,6 +124,17 @@ apply FreeCons.
 + intros. inversion H.
 Qed.
 
+Lemma prefixFreeEmpty : forall l, PrefixFree ([] :: l) -> l = [].
+intros.
+destruct l; auto.
+inversion H.
+subst.
+pose proof H3 l.
+assert (In l (l :: l0)) by (left; auto).
+eapply H0 in H1. inversion H1.
+instantiate (2 := []). rewrite app_nil_r; simpl; eauto.
+Qed.
+
 Inductive correspondingSeedTree (l : list SplitPath) (st : SeedTree) : Prop :=
 | Corresponding : (forall (p : SplitPath), In p l <-> exists s, varySeed' st p = Some s) ->
                   PrefixFree l ->
@@ -194,23 +205,85 @@ Definition eq_dir_b (d1 d2 : SplitDirection) : bool :=
     | _, _ => false
   end.
 
-Program Fixpoint refineList (d : SplitDirection) (l : list SplitPath) 
-           (Hyp : forall p, In p l -> p <> []) : list SplitPath := 
-  match l with 
-    | [] => []
-    | p :: l' => 
-      match p with 
-        | [] => _ (* Contradiction! *)
-        | d' :: p' => 
-          if eq_dir_b d d' then p' :: refineList d l' _
-          else refineList d l' _
-      end
-  end.
-Next Obligation.           
-  apply Hyp. right. auto.
+Lemma eq_dir_b_eq : forall d1 d2, eq_dir_b d1 d2 = true <-> d1 = d2.
+intros.
+unfold eq_dir_b.
+destruct d1; destruct d2; split; auto; intro Contra; inversion Contra.
 Qed.
-Next Obligation.
-  apply Hyp. right. auto.
+
+Definition refineList (d : SplitDirection) (l : list SplitPath) : list SplitPath := 
+  map (@tl SplitDirection) (filter (fun p => match hd_error p with 
+                             | Some d' => eq_dir_b d d'
+                             | _       => false
+                           end) l).
+
+Lemma refineCorrect : forall d l p, In p (refineList d l) -> In (d :: p) l.
+intros d l p.
+unfold refineList.
+rewrite in_map_iff.
+intros.
+inversion H; clear H.
+inversion H0; clear H0.
+generalize H1; clear H1.
+rewrite filter_In.
+intros.
+inversion H0; clear H0.
+unfold tl in H.
+destruct x eqn:X.
++ simpl in H2. inversion H2.
++ simpl in H2. apply eq_dir_b_eq in H2. subst. auto.
+Qed.
+
+Lemma refineCorrect' : forall d l p, In (d :: p) l -> In p (refineList d l).
+intros.
+unfold refineList.
+apply in_map_iff.
+exists (d :: p).
+split; auto.
+apply filter_In.
+split; simpl; auto.
+unfold eq_dir_b; destruct d; auto.
+Qed.
+
+Lemma refinePreservesPrefixFree : forall d l, PrefixFree l -> PrefixFree (refineList d l).
+  intros.
+  induction l.
+  - unfold refineList; constructor.
+  - destruct a eqn:A; subst.
+    * apply prefixFreeEmpty in H. subst. unfold refineList. simpl. constructor.
+    * destruct s eqn:S; destruct d; subst.
+      + unfold refineList; simpl.
+        eapply FreeCons.
+        - apply IHl. inversion H; auto.
+        - intros. inversion H; subst; clear H.
+          apply in_map_iff in H0.
+          inversion H0; subst; clear H0.
+          inversion H; subst; clear H.
+          apply filter_In in H2. inversion H2; subst; clear H2.
+          destruct x eqn:X; simpl in *. inversion H0.
+          destruct s eqn:S; simpl in *. 
+          pose proof H5 (Left :: l0).
+          eapply H2 in H; auto.
+          simpl. instantiate (1 := p2). instantiate (1:= p1). rewrite H1. auto.
+          inversion H0.
+      + unfold refineList; simpl. apply IHl.
+        inversion H. auto.
+      + unfold refineList; simpl. apply IHl.
+        inversion H. auto.
+      + unfold refineList; simpl.
+        eapply FreeCons.
+        - apply IHl. inversion H; auto.
+        - intros. inversion H; subst; clear H.
+          apply in_map_iff in H0.
+          inversion H0; subst; clear H0.
+          inversion H; subst; clear H.
+          apply filter_In in H2. inversion H2; subst; clear H2.
+          destruct x eqn:X; simpl in *. inversion H0.
+          destruct s eqn:S; simpl in *. 
+          inversion H0.
+          pose proof H5 (Right :: l0).
+          eapply H2 in H; auto.
+          simpl. instantiate (1 := p2). instantiate (1:= p1). rewrite H1. auto.
 Qed.
 
 Program Fixpoint addToTree (st : SeedTree) (p : SplitPath) (s : RandomSeed)
@@ -229,8 +302,8 @@ Program Fixpoint addToTree (st : SeedTree) (p : SplitPath) (s : RandomSeed)
     | SeedTreeNode st1 st2 =>
       match p with 
         | [] => _ (* Contradiction! *)
-        | Left  :: p' => SeedTreeNode (addToTree st1 p' s (refineList Left l _) _ _) st2
-        | Right :: p' => SeedTreeNode st1 (addToTree st2 p' s (refineList Right l _) _ _)
+        | Left  :: p' => SeedTreeNode (addToTree st1 p' s (refineList Left l) _ _) st2
+        | Right :: p' => SeedTreeNode st1 (addToTree st2 p' s (refineList Right l) _ _)
       end
   end.
 Next Obligation.
@@ -241,23 +314,59 @@ eapply H.
 + left; auto.
 + instantiate (2 := []). rewrite app_nil_r. simpl. eauto.
 Qed.
-Next Obligation.
-eapply corrNodeNonEmpty; eauto.
-Qed.
 Next Obligation.  
-admit.
+eapply Corresponding.
++ split; intros.
+  - apply refineCorrect in H.
+    inversion Corr.
+    pose proof (H0 (Left :: p)).
+    apply H2 in H.
+    inversion H.
+    simpl in H3.
+    exists x.
+    auto.
+  - inversion H.
+    inversion Corr.
+    assert (exists seed, varySeed' (SeedTreeNode st1 st2) (Left :: p) = Some seed)
+      by (exists x; auto).
+    apply H1 in H3.
+    apply refineCorrect'; auto.
++ inversion Corr.
+  apply refinePreservesPrefixFree.
+  auto.
 Qed.
 Next Obligation.
-admit.
+eapply Pref.
+instantiate (1:= Left :: p'0).
+apply refineCorrect; auto.
+instantiate (1:= p2). instantiate (1:=p1). simpl. rewrite H0. auto.
 Qed.
 Next Obligation.
-admit.
+eapply Corresponding.
++ split; intros.
+  - apply refineCorrect in H.
+    inversion Corr.
+    pose proof (H0 (Right :: p)).
+    apply H2 in H.
+    inversion H.
+    simpl in H3.
+    exists x.
+    auto.
+  - inversion H.
+    inversion Corr.
+    assert (exists seed, varySeed' (SeedTreeNode st1 st2) (Right :: p) = Some seed)
+      by (exists x; auto).
+    apply H1 in H3.
+    apply refineCorrect'; auto.
++ inversion Corr.
+  apply refinePreservesPrefixFree.
+  auto.
 Qed.
 Next Obligation.
-admit.
-Qed.
-Next Obligation.
-admit.
+eapply Pref.
+instantiate (1:= Right :: p'0).
+apply refineCorrect; auto.
+instantiate (1:= p2). instantiate (1:=p1). simpl. rewrite H0. auto.
 Qed.
 
 Theorem topLevelSeedTheorem : (* Need a better name :P *)
