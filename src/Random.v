@@ -18,9 +18,36 @@ Axiom randomSplitAssumption :
 CoInductive RandomSeedTree :=
 | RstNode : RandomSeed -> RandomSeedTree -> RandomSeedTree -> RandomSeedTree.
 
-CoFixpoint mkSeedTree (s : RandomSeed) := 
+Definition root_rst (rst : RandomSeedTree) : RandomSeed :=
+  match rst with
+  | RstNode root _ _ => root
+  end.
+
+Definition left_rst (rst : RandomSeedTree) : RandomSeedTree :=
+  match rst with
+  | RstNode _ t1 _ => t1
+  end.
+
+Definition right_rst (rst : RandomSeedTree) : RandomSeedTree :=
+  match rst with
+  | RstNode _ _ t2 => t2
+  end.
+
+Lemma rst_eta : forall rst : RandomSeedTree,
+  rst = RstNode (root_rst rst) (left_rst rst) (right_rst rst).
+Proof. destruct rst. reflexivity. Qed.
+
+CoFixpoint mkSeedTree (s : RandomSeed) : RandomSeedTree :=
   let (s1, s2) := randomSplit s in
   RstNode s (mkSeedTree s1) (mkSeedTree s2).
+
+Lemma mkSeedTreeHelper : forall (r r1 r2 : RandomSeed),
+                           randomSplit r = (r1, r2) ->
+                           mkSeedTree r = RstNode r (mkSeedTree r1) (mkSeedTree r2).
+Proof.
+  move => r r1 r2 H. pattern (mkSeedTree r). rewrite -> rst_eta.
+  simpl. rewrite H. reflexivity.
+Qed.
 
 Inductive SplitDirection := Left | Right.
 
@@ -88,11 +115,6 @@ induction st.
     * simpl. apply IHst1; auto.
     * simpl. apply IHst2; auto.
 Qed.
-
-Lemma mkSeedTreeHelper : forall (r r1 r2 : RandomSeed),
-                           randomSplit r = (r1, r2) ->
-                           mkSeedTree r = RstNode r (mkSeedTree r1) (mkSeedTree r2).
-Admitted. (* How do you prove this? *)
 
 Lemma splitExpand : forall (st : SeedTree), exists (s : RandomSeed), SubSeedTree st (mkSeedTree s).
   induction st.
