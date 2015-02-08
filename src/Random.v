@@ -157,29 +157,36 @@ eapply H0 in H1. inversion H1.
 instantiate (2 := []). rewrite app_nil_r; simpl; eauto.
 Qed.
 
-Inductive correspondingSeedTree (l : list SplitPath) (st : SeedTree) : Prop :=
-| Corresponding : (forall (p : SplitPath), In p l <-> exists s, varySeed' st p = Some s) ->
+Inductive correspondingSeedTree (l : list SplitPath) (f : SplitPath -> RandomSeed)
+          (st : SeedTree) : Prop :=
+| Corresponding : (forall (p : SplitPath) s, varySeed' st p = Some s -> In p l) ->
+                  (forall (p : SplitPath), In p l -> varySeed' st p = Some (f p)) ->
                   PrefixFree l ->
-                  correspondingSeedTree l st.
+                  correspondingSeedTree l f st.
 
-Lemma corrEmptyUndef : correspondingSeedTree [] SeedTreeUndef.
+Lemma corrEmptyUndef : forall f, correspondingSeedTree [] f SeedTreeUndef.
+  intro f.
   apply Corresponding. 
-  + split.
-    - intro Contra; inversion Contra.
-    - intro Hyp. inversion Hyp as [x Contra]. inversion Contra.
+  + intros p s Contra.
+    inversion Contra.
+  + intros p InNil. inversion InNil.
   + apply FreeNil.
 Qed.
 
-Lemma corrUndefEmpty : forall l, correspondingSeedTree l SeedTreeUndef -> l = [].
-intros.
-inversion H.
-destruct l; auto.
-pose proof H0 s.
-assert (In s (s :: l)) by (left; auto).
-apply H2 in H3.
-inversion H3.
-simpl in H4.
-inversion H4.
+Ltac fireInLeft name := 
+  match goal with 
+    | [H : In ?X (?X :: ?XS) -> _ |- _ ] => 
+      assert (In X (X :: XS)) as name by (left; auto); apply H in name; clear H
+  end.
+
+Lemma corrUndefEmpty : forall l f, correspondingSeedTree l f SeedTreeUndef -> l = [].
+intros l f Corr.
+inversion Corr as [Vary_In In_Vary Pref]; clear Corr.
+destruct l as [ | p ps]; auto.
+clear Vary_In Pref.
+pose proof (In_Vary p) as Contra; clear In_Vary.
+fireInLeft Hyp.
+inversion Hyp.
 Qed.
 
 Lemma PrefixFreeWithNil : forall l, PrefixFree ([] :: l) -> l = [].
@@ -193,36 +200,38 @@ Lemma PrefixFreeWithNil : forall l, PrefixFree ([] :: l) -> l = [].
   + instantiate (1 := l0). instantiate (1 := []). rewrite app_nil_r. auto.
 Qed.
 
-Lemma corrEmptyLeaf : forall s l, correspondingSeedTree l (SeedTreeLeaf s) -> l = [[]].
-  intros. 
-  inversion H as [P H'].
-  pose proof (P []).
-  inversion_clear H0.
-  assert (In [] l) by (apply H2; exists s; auto).
-  destruct l eqn:L.
-  + inversion H0.
-  + destruct s0 eqn:S0.
-    - apply PrefixFreeWithNil in H'. subst. auto.
-    - pose proof (P (s1 :: s2)).
-      assert (In (s1 :: s2) ((s1 :: s2) :: l0)) by (left; auto).
-      apply H3 in H4.
-      inversion H4.
-      simpl in H5.
-      inversion H5.
-Qed.
+Lemma corrEmptyLeaf : forall s l f, correspondingSeedTree l f (SeedTreeLeaf s) -> 
+                                    l = [[]] /\ s = f [].
+  intros s l f Corr.
+  inversion Corr as [Vary_In In_Vary Pref]; clear Corr.
+  pose proof (Vary_In [] s) as Hyp; clear Vary_In.
+  simpl in Hyp.
+  assert (InNilL : In [] l) by (apply Hyp; auto); clear Hyp.
+  split.
+  + destruct l eqn:L.
+    - inversion InNilL.
+    - destruct s0 eqn : S0.
+      * apply PrefixFreeWithNil in Pref; subst; auto.
+      * pose proof (In_Vary (s1 :: s2)) as Hyp; clear In_Vary.
+        
+  + inversion Pref.
+    fireInLeft Hyp'. simpl in Hyp'. inversion Hyp'.
 
+  + pose proof In_Vary [] as Hyp; clear In_Vary.
+    apply Hyp in InNilL; clear Hyp.
+    simpl in *.
+    congruence.
+Qed.    
 
-Lemma corrNodeNonEmpty : forall st1 st2 l p, 
-                           correspondingSeedTree l (SeedTreeNode st1 st2) ->
+Lemma corrNodeNonEmpty : forall st1 st2 l p f, 
+                           correspondingSeedTree l f (SeedTreeNode st1 st2) ->
                            In p l -> p <> [].
-unfold not; intros.
-inversion H.
-pose proof H2 p.
-apply H4 in H0.
-inversion H0.
-subst.
-simpl in H5.
-inversion H5.
+unfold not; intros st1 st2 l p f Corr InPL PNil; subst.
+inversion Corr as [_ In_Vary _]; clear Corr.
+pose proof (In_Vary []) as Hyp; clear In_Vary.
+apply Hyp in InPL; clear Hyp.
+simpl in InPL.
+inversion InPL.
 Qed.
 
 Hint Resolve corrEmptyUndef.
@@ -320,29 +329,38 @@ Lemma refinePreservesPrefixFree : forall d l, PrefixFree l -> PrefixFree (refine
           simpl. instantiate (1 := p2). instantiate (1:= p1). rewrite H1. auto.
 Qed.
 
-Program Fixpoint addToTree (st : SeedTree) (p : SplitPath) (s : RandomSeed)
+Definition refineFunction (f : SplitPath -> RandomSeed) (d : SplitDirection) (arg : SplitPath) : 
+RandomSeed :=
+  f (d :: arg).
+
+Lemma refineFunCorrect : forall f d p, f (d :: p) = (refineFunction f d) p.
+auto.
+Qed.           
+
+Hint Rewrite refineFunCorrect.
+Hint Unfold refineFunction.
+Program Fixpoint addToTree (st : SeedTree) (p : SplitPath) (f : SplitPath -> RandomSeed)
         (l : list SplitPath)
-        (Corr : correspondingSeedTree l st)
+        (Corr : correspondingSeedTree l f st)
         (Pref : forall p', In p' l -> (forall p1 p2, p ++ p1 = p' ++ p2 -> False))
 : SeedTree :=
   match st with 
     | SeedTreeUndef => 
       match p with 
-        | [] => SeedTreeLeaf s
-        | Left  :: p' => SeedTreeNode (addToTree SeedTreeUndef p' s [] _ _) SeedTreeUndef
-        | Right :: p' => SeedTreeNode SeedTreeUndef (addToTree SeedTreeUndef p' s [] _ _) 
+        | [] => SeedTreeLeaf (f p)
+        | Left  :: p' => SeedTreeNode (addToTree SeedTreeUndef p' (refineFunction f Left) [] _ _) SeedTreeUndef
+        | Right :: p' => SeedTreeNode SeedTreeUndef (addToTree SeedTreeUndef p' (refineFunction f Right) [] _ _) 
       end
     | SeedTreeLeaf s => _  (* Contradiction! *)
     | SeedTreeNode st1 st2 =>
       match p with 
-        | [] => SeedTreeLeaf s
-        | Left  :: p' => SeedTreeNode (addToTree st1 p' s (refineList Left l) _ _) st2
-        | Right :: p' => SeedTreeNode st1 (addToTree st2 p' s (refineList Right l) _ _)
+        | [] => SeedTreeLeaf (f p)
+        | Left  :: p' => SeedTreeNode (addToTree st1 p' (refineFunction f Left) (refineList Left l) _ _) st2
+        | Right :: p' => SeedTreeNode st1 (addToTree st2 p' (refineFunction f Right) (refineList Right l) _ _)
       end
   end.
-
 Next Obligation.
-apply corrEmptyLeaf in Corr. subst.
+apply corrEmptyLeaf in Corr. inversion Corr; clear Corr; subst.
 pose proof (Pref []).
 exfalso.
 eapply H.
@@ -350,22 +368,17 @@ eapply H.
 + instantiate (2 := []). rewrite app_nil_r. simpl. eauto.
 Qed.
 Next Obligation.  
-eapply Corresponding.
-+ split; intros.
-  - apply refineCorrect in H.
-    inversion Corr.
-    pose proof (H0 (Left :: p)).
-    apply H2 in H.
-    inversion H.
-    simpl in H3.
-    exists x.
-    auto.
-  - inversion H.
-    inversion Corr.
-    assert (exists seed, varySeed' (SeedTreeNode st1 st2) (Left :: p) = Some seed)
-      by (exists x; auto).
-    apply H1 in H3.
-    apply refineCorrect'; auto.
+eapply Corresponding; intros.
++ apply refineCorrect'.
+  inversion Corr as [Vary_In _ _ ]; clear Corr.
+  pose proof (Vary_In (Left :: p) s) as Hyp; clear Vary_In.
+  auto.
++ apply refineCorrect in H.
+  inversion Corr as [_ In_Vary _]; clear Corr.
+  pose proof (In_Vary (Left :: p)) as Hyp; clear In_Vary.
+  apply Hyp in H; clear Hyp.
+  simpl in H.
+  unfold refineFunction; auto.
 + inversion Corr.
   apply refinePreservesPrefixFree.
   auto.
@@ -377,22 +390,17 @@ apply refineCorrect; auto.
 instantiate (1:= p2). instantiate (1:=p1). simpl. rewrite H0. auto.
 Qed.
 Next Obligation.
-eapply Corresponding.
-+ split; intros.
-  - apply refineCorrect in H.
-    inversion Corr.
-    pose proof (H0 (Right :: p)).
-    apply H2 in H.
-    inversion H.
-    simpl in H3.
-    exists x.
-    auto.
-  - inversion H.
-    inversion Corr.
-    assert (exists seed, varySeed' (SeedTreeNode st1 st2) (Right :: p) = Some seed)
-      by (exists x; auto).
-    apply H1 in H3.
-    apply refineCorrect'; auto.
+eapply Corresponding; intros.
++ apply refineCorrect'.
+  inversion Corr as [Vary_In _ _ ]; clear Corr.
+  pose proof (Vary_In (Right :: p) s) as Hyp; clear Vary_In.
+  auto.
++ apply refineCorrect in H.
+  inversion Corr as [_ In_Vary _]; clear Corr.
+  pose proof (In_Vary (Right :: p)) as Hyp; clear In_Vary.
+  apply Hyp in H; clear Hyp.
+  simpl in H.
+  unfold refineFunction; auto.
 + inversion Corr.
   apply refinePreservesPrefixFree.
   auto.
@@ -404,86 +412,92 @@ apply refineCorrect; auto.
 instantiate (1:= p2). instantiate (1:=p1). simpl. rewrite H0. auto.
 Qed.
 
-Lemma addToTreeCorrect1 : forall (st : SeedTree) (p : SplitPath) (s : RandomSeed) 
-  (l : list SplitPath) (Corr : correspondingSeedTree l st)
+Lemma addToTreeCorrect1 : forall (st : SeedTree) (p : SplitPath)
+  (f : SplitPath -> RandomSeed)                                 
+  (l : list SplitPath) (Corr : correspondingSeedTree l f st)
   (Pref : forall p', In p' l -> (forall p1 p2, p ++ p1 = p' ++ p2 -> False)),
-  varySeed' (addToTree st p s l Corr Pref) p = Some s.
+  varySeed' (addToTree st p f l Corr Pref) p = Some (f p).
 intros st p.
 generalize dependent st.
 induction p.
-+ intros.
++ intros st f l Corr Pref.
   unfold addToTree.
   destruct st.
   - auto.
   - exfalso.
     apply corrEmptyLeaf in Corr.
-    pose proof Pref [].
+    inversion Corr; clear Corr.
     subst.
-    eapply H.
-    left; auto.
-    instantiate (1 := []). instantiate (1 := []). auto.
+    pose proof Pref [] as Contra; clear Pref.
+    eapply Contra; clear Contra.
+    * left; auto.
+    * instantiate (1 := []). instantiate (1 := []). auto.
   - simpl. auto.
 + intros.
-  unfold addToTree; destruct st; destruct a; simpl; auto.
-  * exfalso. eapply corrEmptyLeaf in Corr.
+  destruct st; destruct a; simpl; auto.
+  - rewrite refineFunCorrect.
+    apply IHp.
+  - rewrite refineFunCorrect; apply IHp.
+  - exfalso. eapply corrEmptyLeaf in Corr; inversion Corr; subst; clear Corr.
     pose proof (Pref []).
     eapply H.
     - subst; left; auto.
     - simpl. instantiate (2:= []); rewrite app_nil_r. instantiate (1 := Left ::p); auto.
-  * exfalso. eapply corrEmptyLeaf in Corr; eauto.
+  - exfalso. eapply corrEmptyLeaf in Corr; inversion Corr; subst; clear Corr.
     pose proof (Pref []).
     eapply H.
     - subst; left; auto.
-    - simpl; instantiate (2:= []); rewrite app_nil_r. instantiate (1 := Right :: p). auto.
+    - simpl. instantiate (2:= []); rewrite app_nil_r. instantiate (1 := Right ::p); auto.
+  - rewrite refineFunCorrect; apply IHp.
+  - rewrite refineFunCorrect; apply IHp.
 Qed.
 
-Lemma addToTreeCorrect2 : forall (st : SeedTree) (p : SplitPath) (s : RandomSeed) 
-  (l : list SplitPath) (Corr : correspondingSeedTree l st) (seed : RandomSeed)
+Lemma addToTreeCorrect2 : forall (st : SeedTree) (p : SplitPath) 
+  (f : SplitPath -> RandomSeed)
+  (l : list SplitPath) (Corr : correspondingSeedTree l f st)
   (Pref : forall p', In p' l -> (forall p1 p2, p ++ p1 = p' ++ p2 -> False)),
-  forall p', varySeed' st p' = Some seed -> 
-             varySeed' (addToTree st p s l Corr Pref) p' = Some seed.
+  forall p' seed, varySeed' st p' = Some seed ->
+             varySeed' (addToTree st p f l Corr Pref) p' = Some seed.
 intros st p.
 generalize dependent st.
-induction p.
+induction p as [ | d ds].
 + intros.
   exfalso.
   eapply Pref.
-  inversion Corr.
-  pose proof H0 p'.
-  inversion H2.
-  apply H4; eauto.
-  instantiate (1 := []). instantiate (1 := p'); rewrite app_nil_r; auto.
-+ intros.
-  destruct st; destruct a; simpl; auto.
-  * exfalso. apply corrUndefEmpty in Corr. subst. inversion H.
-  * exfalso. apply corrUndefEmpty in Corr. subst. inversion H.
+  - inversion Corr as [Vary_In In_Vary Pref']; clear Corr.
+    eapply Vary_In; eassumption.
+  - instantiate (1 := []); instantiate (1 := p'); rewrite app_nil_r; auto.
++ intros st f l Corr Pref p' seed VarySome.
+  destruct st; destruct d; simpl; auto.
+  * exfalso. apply corrUndefEmpty in Corr. subst. inversion VarySome.
+  * exfalso. apply corrUndefEmpty in Corr. subst. inversion VarySome.
   * exfalso.
-    apply corrEmptyLeaf in Corr.
+    apply corrEmptyLeaf in Corr; inversion Corr; subst; clear Corr.
     eapply Pref.
-    instantiate (1 := []); rewrite Corr; left; auto.
-    instantiate (1:= Left ::p). instantiate (1 := []). rewrite app_nil_r; simpl; auto.
+    instantiate (1 := []); left; auto.
+    instantiate (1:= Left :: ds). instantiate (1 := []). rewrite app_nil_r; simpl; auto.
   * exfalso.
-    apply corrEmptyLeaf in Corr.
+    apply corrEmptyLeaf in Corr; inversion Corr; subst; clear Corr.
     eapply Pref.
-    instantiate (1 := []); rewrite Corr; left; auto.
-    instantiate (1:= Right ::p). instantiate (1 := []). rewrite app_nil_r; simpl; auto.
+    instantiate (1 := []); left; auto.
+    instantiate (1:= Right :: ds). instantiate (1 := []). rewrite app_nil_r; simpl; auto.
   * destruct p'.
-    - simpl in H. inversion H.
-    - destruct s0.
-      + apply IHp.
-        simpl in H; auto.
-      + simpl in H. auto.
+    - simpl in VarySome. inversion VarySome.
+    - destruct s.
+      + apply IHds; auto. 
+      + auto.
   * destruct p'.
-    - simpl in H; inversion H.
-    - destruct s0.
-      + simpl in H; auto.
-      + apply IHp; simpl in H; auto.
+    - simpl in VarySome; inversion VarySome.
+    - destruct s.
+      + auto.
+      + apply IHds; auto.
 Qed.
 
-Lemma addToTreeCorrect3 : forall (st : SeedTree) (p : SplitPath) (s : RandomSeed) 
-  (l : list SplitPath) (Corr : correspondingSeedTree l st) (seed : RandomSeed)
+Lemma addToTreeCorrect3 : forall (st : SeedTree) (p : SplitPath) 
+  (f : SplitPath -> RandomSeed)
+  (l : list SplitPath) (Corr : correspondingSeedTree l f st)
   (Pref : forall p', In p' l -> (forall p1 p2, p ++ p1 = p' ++ p2 -> False)),
-  forall p', varySeed' (addToTree st p s l Corr Pref) p' = Some seed ->
+  forall p' seed, varySeed' (addToTree st p f l Corr Pref) p' = Some seed ->
              p = p' \/ varySeed' st p' = Some seed.
 intros st p. generalize dependent st.
 induction p.
@@ -495,7 +509,7 @@ induction p.
     unfold addToTree in H; simpl in H.
     destruct st; simpl in H.
     * inversion H.
-    * clear H. apply corrEmptyLeaf in Corr.
+    * clear H. apply corrEmptyLeaf in Corr; inversion Corr; subst; clear Corr.
       subst.
       eapply Pref.
       instantiate (1 := []). left; auto.
@@ -504,31 +518,33 @@ induction p.
 + intros.
   destruct p'; destruct st; destruct a; simpl in *; 
   try solve [match goal with [ H : None = Some _ |- _ ] => inversion H end].
-  + exfalso. clear H. apply corrEmptyLeaf in Corr.
+  + exfalso. clear H. apply corrEmptyLeaf in Corr; inversion Corr; subst; clear Corr.
     eapply Pref.
     subst.
     instantiate (1 := []) ; left; auto.
     instantiate (1 := (Left :: p)); instantiate (1 := []); rewrite app_nil_r; auto.
-  + exfalso. clear H. apply corrEmptyLeaf in Corr.
+  + exfalso. clear H. apply corrEmptyLeaf in Corr; inversion Corr; subst; clear Corr.
     eapply Pref.
     subst.
     instantiate (1 := []) ; left; auto.
     instantiate (1 := (Right :: p)); instantiate (1 := []); rewrite app_nil_r; auto.
-  + destruct s0; simpl in *.
-    - assert (p = p' \/ varySeed' SeedTreeUndef p' = Some seed) by (eapply IHp; eauto).
+  + destruct s; simpl in *.
+    - assert (p = p' \/ varySeed' SeedTreeUndef p' = Some seed)
+             by (eapply IHp; eauto).
       inversion H0.
       * left; subst; auto.
       * simpl in H1. inversion H1.
     - inversion H.
-  + destruct s0; simpl in *.
+  + destruct s; simpl in *.
     - inversion H.
-    - assert (p = p' \/ varySeed' SeedTreeUndef p' = Some seed) by (eapply IHp; eauto).
+    - assert (p = p' \/ varySeed' SeedTreeUndef p' = Some seed)
+        by (eapply IHp; eauto).
       inversion H0.
       * left; subst; auto.
       * simpl in H1. inversion H1.
   + exfalso.
     clear H.
-    apply corrEmptyLeaf in Corr. 
+    apply corrEmptyLeaf in Corr; inversion Corr; subst; clear Corr.
     subst.
     eapply Pref.
     instantiate (1 := []).
@@ -536,51 +552,47 @@ induction p.
     - instantiate (1 := Left :: p); instantiate (1 := []); rewrite app_nil_r; auto.
   + exfalso.
     clear H.
-    apply corrEmptyLeaf in Corr. 
+    apply corrEmptyLeaf in Corr; inversion Corr; subst; clear Corr.
     subst.
     eapply Pref.
     instantiate (1 := []).
     - left; auto.
     - instantiate (1 := Right :: p); instantiate (1 := []); rewrite app_nil_r; auto.
-  + destruct s0 eqn:S0; simpl in *.
-    - assert (p = p' \/ varySeed' st1 p' = Some seed) by (eapply IHp; eauto).
+  + destruct s eqn:S; simpl in *.
+    - assert (p = p' \/ varySeed' st1 p' = Some seed)
+        by (eapply IHp; eauto).
       inversion H0.
       * left; subst; auto.
       * right; auto.
     - right; auto.
-  + destruct s0; simpl in *.
+  + destruct s eqn:S; simpl in *.
     - right; auto.
-    - assert (p = p' \/ varySeed' st2 p' = Some seed) by (eapply IHp; eauto).
+    - assert (p = p' \/ varySeed' st2 p' = Some seed)
+        by (eapply IHp; eauto).
       inversion H0.
       * left; subst; auto.
       * right; auto.
 Qed.
 
-Lemma addToTreeCorrect : forall (st : SeedTree) (p : SplitPath) (s : RandomSeed) 
-  (l : list SplitPath) (Corr : correspondingSeedTree l st)
+Lemma addToTreeCorrect : forall (st : SeedTree) (p : SplitPath) 
+  (f : SplitPath -> RandomSeed) 
+  (l : list SplitPath) (Corr : correspondingSeedTree l f st)
   (Pref : forall p', In p' l -> (forall p1 p2, p ++ p1 = p' ++ p2 -> False)),
-  correspondingSeedTree (p :: l) (addToTree st p s l Corr Pref).
+  correspondingSeedTree (p :: l) f (addToTree st p f l Corr Pref).
 intros.
 apply Corresponding.
-+ split; intros.
-  - inversion H.
-    * exists s. subst. apply addToTreeCorrect1.
-    * inversion Corr.
-      pose proof H1 p0.
-      apply H3 in H0.
-      inversion H0.
-      exists x.
-      apply addToTreeCorrect2; auto.
-  - inversion H.
-    apply addToTreeCorrect3 in H0.
-    inversion H0.
-    * left; auto.
-    * inversion Corr.
-      pose proof H2 p0.
-      inversion H4.
-      assert (exists s0, varySeed' st p0 = Some s0) by (exists x; auto).
-      apply H6 in H7.
-      right; auto.
++ intros p' s VarySome. 
+  inversion Corr as [Vary_In In_Vary Pref'].
+  apply addToTreeCorrect3 in VarySome.
+  inversion VarySome.
+  - left; auto.
+  - right. eapply Vary_In; eassumption.
++ intros p' InP'.
+  inversion Corr as [Vary_In In_Vary Pref'].
+  inversion InP'.  
+  - subst.
+    apply addToTreeCorrect1.
+  - apply addToTreeCorrect2. apply In_Vary. auto.
 + apply FreeCons.
   - inversion Corr; auto.
   - intros.
@@ -588,8 +600,6 @@ apply Corresponding.
     eassumption.
     instantiate (1 := p1); instantiate (1:= p2); subst; auto.
 Qed.
-
-Lemma addToTreeCorrect' : forall 
 
 Lemma PrefixFreeTail : forall a l, PrefixFree (a :: l) -> PrefixFree l.
 intros.
@@ -599,7 +609,7 @@ Qed.
 
 (* LL: Why was it easier to do it like this? :P *) 
 Fixpoint listToTree (l : list SplitPath) (f : SplitPath -> RandomSeed)
-        ( Pref : PrefixFree l) : {s : SeedTree | correspondingSeedTree l s}.
+        ( Pref : PrefixFree l) : {s : SeedTree | correspondingSeedTree l f s}.
 Proof.
 induction l.
 + exists SeedTreeUndef. apply corrEmptyUndef.
@@ -609,7 +619,7 @@ induction l.
   assert (forall p', In p' l -> forall p1 p2, a ++ p1 = p' ++ p2 -> False) by 
       (inversion Pref; intros; subst; eapply H3; [eassumption | 
     instantiate (1 := p1); instantiate (1 := p2); subst; auto]).
-  exists (addToTree x a (f a) l H H0).
+  exists (addToTree x a f l H H0).
   apply addToTreeCorrect.
 Qed.
 
@@ -617,117 +627,17 @@ Theorem topLevelSeedTheorem : (* Need a better name :P *)
   forall (l : list SplitPath) (f : SplitPath -> RandomSeed),
     PrefixFree l -> exists (s : RandomSeed), 
                       forall p, In p l -> varySeed p s = f p.
-intros.
-pose proof (listToTree l f H).
-inversion X; clear X.
-inversion H0; clear H0.
-pose proof (splitExpand x).
-inversion H0; clear H0.
-exists x0.
-intros.
-pose proof (pathAgreesOnSubTree x (mkSeedTree x0) p (f p)).
-apply H4 in H3; auto.
-pose proof H1 p.
-apply H5 in H0.
-inversion H0.
-
-
-apply pathAgreesOnSubTree.
-
-
-induction l.
-+ intros.
-  exists randomSeedInhabitant.
-  intros.
-  inversion H0.
-+ intros.
-  
-(*
-
-Fixpoint addToTree (p : SplitPath) (s : RandomSeed) (acc : SeedTree) : SeedTree :=
-  match p with 
-    | [] -> 
-
-Fixpoint mkPathTree (acc : SeedTree) (l : list SplitPath) (f : SplitPath -> RandomSeed) 
-: SeedTree := 
-  match l with  
-    | [] => acc 
-    | p :: ps => mkPathTree (addToTree p (f p) acc) ps f 
-  end.
-      match p with 
-        | 
-      
-
-
-Inductive Prefix : SplitPath -> SplitPath -> Prop :=
-| PreNil  : forall (p : SplitPath), Prefix [] p
-| PreCons : forall (d : SplitDirection) (p1 p2 : SplitPath),
-              Prefix p1 p2 -> Prefix (d :: p1) (d :: p2).
-
-
-
-Program Fixpoint prefixFreePathTree (l : list SplitPath) (NonEmpty : l = [] -> False) 
-        (Hyp : PrefixFreePaths l) : SeedTree :=
-  match l with 
-    | [] => _
-    | 
-  end.
-
-
-
-Inductive ExpandsTo (s : RandomSeed) (t : SeedTree): Prop := 
-  | ExpandsLeaf : t = SeedTreeLeaf s -> ExpandsTo s t
-  | ExpandsNode : forall s1 s2 t1 t2, 
-                    (s1, s2) = randomSplit s -> 
-                    ExpandsTo s1 t1 -> 
-                    ExpandsTo s2 t2 -> 
-                    t = SeedTreeNode t1 t2 -> 
-                    ExpandsTo s t.
-
-Lemma splitExpand : forall (t : SeedTree), exists (s : RandomSeed), ExpandsTo s t.
-  induction t.
-  + inversion IHt1 as [s1 H1].
-    inversion IHt2 as [s2 H2].
-    pose proof (randomSplitAssumption s1 s2) as [seed Hyp].
-    exists seed.
-    eapply ExpandsNode; eauto.
-  + exists r. by apply ExpandsLeaf.
+intros l f Pref.
+pose proof (listToTree l f Pref) as ExSeedTree.
+inversion ExSeedTree as [st Corr]; clear ExSeedTree.
+inversion Corr as [Vary_In In_Vary Pref']; clear Corr.
+pose proof (splitExpand st) as ExRst.
+inversion ExRst as [rst Sub]; clear ExRst.
+exists rst.
+intros p InPL.
+pose proof (pathAgreesOnSubTree st (mkSeedTree rst) p (f p)) as Hyp.
+auto.
 Qed.
-
-(* Vary a random seed based on a path *) 
-(* left <-> false, right <-> true *)
-Definition boolVary (b : bool) (s : RandomSeed) : RandomSeed :=
-  let (s1, s2) := randomSplit s in
-  if b then s2 else s1.
-
-(* 
-Fixpoint varySeed (p : list bool) (s : RandomSeed) : RandomSeed :=
-  match p with 
-    | [] => boolVary true s 
-    | b :: bs => varySeed bs (boolVary b (boolVary false s))
-  end.
-*)
-
-Require Import Recdef.
-Require Import Numbers.Natural.Peano.NPeano.
-
-Function varySeed (n : nat) (s : RandomSeed) {measure (fun n => n) n} : RandomSeed := 
-  match n with 
-    | O => boolVary true s
-    | _ => boolVary (beq_nat (modulo n 2) 0) (boolVary false (varySeed (n / 2) s))
-  end.
-Proof.
-intros; subst; apply Nat.div_lt; [apply lt_0_Sn | ]; auto.
-Defined. 
-
-Lemma natSetGivesLeafTree : forall (max : nat) (f : nat -> RandomSeed), 
-                              exists (lt : LeafTree), 
-                                forall (n : nat), n <= max -> 
-                                  varySeed n .
-                              
-*)                              
-
-
 
 (* Primitive generator combinators and some basic soundness
    assumptions about them *)
