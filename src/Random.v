@@ -38,12 +38,227 @@ Fixpoint varySeedAux (p : SplitPath) (rst : RandomSeedTree) : RandomSeed :=
 Definition varySeed (p : SplitPath) (s : RandomSeed) : RandomSeed :=
   varySeedAux p (mkSeedTree s).
 
+Inductive SeedTree := 
+| SeedTreeUndef : SeedTree
+| SeedTreeLeaf : RandomSeed -> SeedTree
+| SeedTreeNode : SeedTree -> SeedTree -> SeedTree.
+
+Inductive SubSeedTree : SeedTree -> RandomSeedTree -> Prop :=
+| SubUndef : forall (rst : RandomSeedTree), SubSeedTree SeedTreeUndef rst
+| SubLeaf  : forall (s : RandomSeed) (rst1 rst2 : RandomSeedTree),
+               SubSeedTree (SeedTreeLeaf s) (RstNode s rst1 rst2)
+| SubNode  : forall (st1 st2 : SeedTree) (rst1 rst2 : RandomSeedTree) (s : RandomSeed),
+               SubSeedTree st1 rst1 -> 
+               SubSeedTree st2 rst2 ->
+               SubSeedTree (SeedTreeNode st1 st2) (RstNode s rst1 rst2).
+
+Fixpoint varySeed' (st : SeedTree) (p : SplitPath) : option RandomSeed :=
+  match st with 
+    | SeedTreeUndef => None
+    | SeedTreeLeaf s => 
+      match p with 
+        | [] => Some s 
+        | _  => None 
+      end
+    | SeedTreeNode st1 st2 => 
+      match p with 
+        | [] => None 
+        | Left  :: p' => varySeed' st1 p'
+        | Right :: p' => varySeed' st2 p'
+      end
+  end.
+
+Lemma pathAgreesOnSubTree : forall (st : SeedTree) (rst : RandomSeedTree) (p : SplitPath)
+                                   (s : RandomSeed), 
+                              SubSeedTree st rst -> 
+                              varySeed' st p = Some s ->
+                              varySeedAux p rst = s.
+Proof.
+induction st.
++ intros. simpl in H0. congruence.
++ intros. simpl in H0.
+  destruct p eqn:P.
+  - inversion H. simpl. inversion H0. reflexivity.
+  - inversion H0.
++ intros. simpl in H0.
+  destruct p eqn:P.
+  - inversion H0.
+  - inversion H; subst. 
+    destruct s0 eqn:S0.
+    * simpl. apply IHst1; auto.
+    * simpl. apply IHst2; auto.
+Qed.
+
+Lemma mkSeedTreeHelper : forall (r r1 r2 : RandomSeed),
+                           randomSplit r = (r1, r2) ->
+                           mkSeedTree r = RstNode r (mkSeedTree r1) (mkSeedTree r2).
+Admitted. (* How do you prove this? *)
+
+Lemma splitExpand : forall (st : SeedTree), exists (s : RandomSeed), SubSeedTree st (mkSeedTree s).
+  induction st.
+  + exists randomSeedInhabitant. apply SubUndef.
+  + exists r. 
+    destruct (randomSplit r) eqn:Split.
+    rewrite (mkSeedTreeHelper r r0 r1); auto.
+    apply SubLeaf.
+  + inversion IHst1 as [s1 H1].
+    inversion IHst2 as [s2 H2].
+    pose proof (randomSplitAssumption s1 s2) as [seed Hyp].
+    exists seed.
+    rewrite (mkSeedTreeHelper seed s1 s2); auto.
+    apply SubNode; auto.
+Qed.    
+
 Inductive PrefixFree : list SplitPath -> Prop :=
-| FreeSingle : forall (p : SplitPath), PrefixFree [p]
+| FreeNil : PrefixFree []
 | FreeCons : forall (p : SplitPath) (l : list SplitPath), 
                PrefixFree l ->
-               forall (p' p'': SplitPath), In p' l -> (p' ++ p'' = p -> False) -> 
-                                           PrefixFree (p :: l).
+               (forall (p' : SplitPath), In p' l -> 
+                                        (forall p1 p2, p' ++ p1 = p ++ p2-> False)) ->
+                                        PrefixFree (p :: l).
+
+Lemma prefixFreeSingleton : forall p, PrefixFree [p].
+intro.
+apply FreeCons.
++ apply FreeNil.
++ intros. inversion H.
+Qed.
+
+Inductive correspondingSeedTree (l : list SplitPath) (st : SeedTree) : Prop :=
+| Corresponding : (forall (p : SplitPath), In p l <-> exists s, varySeed' st p = Some s) ->
+                  PrefixFree l ->
+                  correspondingSeedTree l st.
+
+Lemma corrEmptyUndef : correspondingSeedTree [] SeedTreeUndef.
+  apply Corresponding. 
+  + split.
+    - intro Contra; inversion Contra.
+    - intro Hyp. inversion Hyp as [x Contra]. inversion Contra.
+  + apply FreeNil.
+Qed.
+
+Lemma PrefixFreeWithNil : forall l, PrefixFree ([] :: l) -> l = [].
+  intros.
+  inversion H; subst.
+  destruct l eqn:L; auto.
+  pose proof (H3 l0).
+  assert (In l0 (l0 :: l1)) by (left; auto).
+  eapply H0 in H1.
+  + inversion H1.
+  + instantiate (1 := l0). instantiate (1 := []). rewrite app_nil_r. auto.
+Qed.
+
+Lemma corrEmptyLeaf : forall s l, correspondingSeedTree l (SeedTreeLeaf s) -> l = [[]].
+  intros. 
+  inversion H as [P H'].
+  pose proof (P []).
+  inversion_clear H0.
+  assert (In [] l) by (apply H2; exists s; auto).
+  destruct l eqn:L.
+  + inversion H0.
+  + destruct s0 eqn:S0.
+    - apply PrefixFreeWithNil in H'. subst. auto.
+    - pose proof (P (s1 :: s2)).
+      assert (In (s1 :: s2) ((s1 :: s2) :: l0)) by (left; auto).
+      apply H3 in H4.
+      inversion H4.
+      simpl in H5.
+      inversion H5.
+Qed.
+
+
+Lemma corrNodeNonEmpty : forall st1 st2 l p, 
+                           correspondingSeedTree l (SeedTreeNode st1 st2) ->
+                           In p l -> p <> [].
+unfold not; intros.
+inversion H.
+pose proof H2 p.
+apply H4 in H0.
+inversion H0.
+subst.
+simpl in H5.
+inversion H5.
+Qed.
+
+Hint Resolve corrEmptyUndef.
+Hint Resolve corrNodeNonEmpty.
+Definition Direction_eq_dec : forall (d1 d2 : SplitDirection), 
+                                d1 = d2 \/ d1 <> d2.
+decide equality.
+Qed.
+
+Definition eq_dir_b (d1 d2 : SplitDirection) : bool :=
+  match d1,d2 with
+    | Left, Left => true
+    | Right, Right => true
+    | _, _ => false
+  end.
+
+Program Fixpoint refineList (d : SplitDirection) (l : list SplitPath) 
+           (Hyp : forall p, In p l -> p <> []) : list SplitPath := 
+  match l with 
+    | [] => []
+    | p :: l' => 
+      match p with 
+        | [] => _ (* Contradiction! *)
+        | d' :: p' => 
+          if eq_dir_b d d' then p' :: refineList d l' _
+          else refineList d l' _
+      end
+  end.
+Next Obligation.           
+  apply Hyp. right. auto.
+Qed.
+Next Obligation.
+  apply Hyp. right. auto.
+Qed.
+
+Program Fixpoint addToTree (st : SeedTree) (p : SplitPath) (s : RandomSeed)
+        (l : list SplitPath)
+        (Corr : correspondingSeedTree l st)
+        (Pref : forall p', In p' l -> (forall p1 p2, p ++ p1 = p' ++ p2 -> False))
+: SeedTree :=
+  match st with 
+    | SeedTreeUndef => 
+      match p with 
+        | [] => SeedTreeLeaf s
+        | Left  :: p' => SeedTreeNode (addToTree SeedTreeUndef p' s [] _ _) SeedTreeUndef
+        | Right :: p' => SeedTreeNode SeedTreeUndef (addToTree SeedTreeUndef p' s [] _ _) 
+      end
+    | SeedTreeLeaf s => _  (* Contradiction! *)
+    | SeedTreeNode st1 st2 =>
+      match p with 
+        | [] => _ (* Contradiction! *)
+        | Left  :: p' => SeedTreeNode (addToTree st1 p' s (refineList Left l _) _ _) st2
+        | Right :: p' => SeedTreeNode st1 (addToTree st2 p' s (refineList Right l _) _ _)
+      end
+  end.
+Next Obligation.
+apply corrEmptyLeaf in Corr. subst.
+pose proof (Pref []).
+exfalso.
+eapply H.
++ left; auto.
++ instantiate (2 := []). rewrite app_nil_r. simpl. eauto.
+Qed.
+Next Obligation.
+eapply corrNodeNonEmpty; eauto.
+Qed.
+Next Obligation.  
+admit.
+Qed.
+Next Obligation.
+admit.
+Qed.
+Next Obligation.
+admit.
+Qed.
+Next Obligation.
+admit.
+Qed.
+Next Obligation.
+admit.
+Qed.
 
 Theorem topLevelSeedTheorem : (* Need a better name :P *)
   forall (l : list SplitPath) (f : SplitPath -> RandomSeed),
@@ -51,10 +266,6 @@ Theorem topLevelSeedTheorem : (* Need a better name :P *)
                       forall p, In p l -> varySeed p s = f p.
 Admitted.
 (*
-Inductive SeedTree := 
-| SeedTreeUndef : SeedTree
-| SeedTreeLeaf : RandomSeed -> SeedTree
-| SeedTreeNode : SeedTree -> SeedTree -> SeedTree.
 
 Fixpoint addToTree (p : SplitPath) (s : RandomSeed) (acc : SeedTree) : SeedTree :=
   match p with 
