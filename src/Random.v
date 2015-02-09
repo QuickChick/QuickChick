@@ -1,10 +1,10 @@
-Require Import ssreflect ssrbool ssrnat eqtype.
+Require Import ssreflect ssrfun ssrbool ssrnat eqtype.
 Require Import ZArith.
 
 (* We axiomatize a random number generator
    (currently written in OCaml only) *)
 Axiom RandomSeed : Type.
-Axiom randomSeedInhabitant : RandomSeed.
+Axiom randomSeed_inhabited : inhabited RandomSeed.
 
 Axiom randomNext     : RandomSeed -> Z * RandomSeed.
 Axiom randomGenRange : RandomSeed -> Z * Z.
@@ -41,13 +41,9 @@ CoFixpoint mkSeedTree (s : RandomSeed) : RandomSeedTree :=
   let (s1, s2) := randomSplit s in
   RstNode s (mkSeedTree s1) (mkSeedTree s2).
 
-Lemma mkSeedTreeHelper : forall (r r1 r2 : RandomSeed),
-                           randomSplit r = (r1, r2) ->
-                           mkSeedTree r = RstNode r (mkSeedTree r1) (mkSeedTree r2).
-Proof.
-  move => r r1 r2 H. pattern (mkSeedTree r). rewrite -> rst_eta.
-  simpl. rewrite H. reflexivity.
-Qed.
+Lemma mkSeedTreeHelper r :
+  mkSeedTree r = RstNode r (mkSeedTree (randomSplit r).1) (mkSeedTree (randomSplit r).2).
+Proof. by rewrite [mkSeedTree _]rst_eta /=; case: (randomSplit r). Qed.
 
 Inductive SplitDirection := Left | Right.
 
@@ -116,19 +112,13 @@ induction st.
     * simpl. apply IHst2; auto.
 Qed.
 
-Lemma splitExpand : forall (st : SeedTree), exists (s : RandomSeed), SubSeedTree st (mkSeedTree s).
-  induction st.
-  + exists randomSeedInhabitant. apply SubUndef.
-  + exists r. 
-    destruct (randomSplit r) eqn:Split.
-    rewrite (mkSeedTreeHelper r r0 r1); auto.
-    apply SubLeaf.
-  + inversion IHst1 as [s1 H1].
-    inversion IHst2 as [s2 H2].
-    pose proof (randomSplitAssumption s1 s2) as [seed Hyp].
-    exists seed.
-    rewrite (mkSeedTreeHelper seed s1 s2); auto.
-    apply SubNode; auto.
+Lemma splitExpand st : exists s, SubSeedTree st (mkSeedTree s).
+Proof.
+elim: st => [|r|st1 [s1 st_s1] st2 [s2 st_s2]].
++ by case: randomSeed_inhabited=> seed; exists seed; apply: SubUndef.
++ by exists r; rewrite mkSeedTreeHelper; constructor.
+have [s eq_s] := randomSplitAssumption s1 s2.
+by exists s; rewrite mkSeedTreeHelper eq_s; constructor.
 Qed.    
 
 Inductive PrefixFree : list SplitPath -> Prop :=

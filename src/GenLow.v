@@ -2,6 +2,7 @@ Require Import ZArith List ssreflect ssrbool ssrnat.
 Require Import Random RoseTrees.
 Require Import Ensembles.
 Require Import Numbers.BinNums.
+Require Import Classes.RelationClasses.
 
 Set Implicit Arguments.
 
@@ -14,6 +15,11 @@ Import ListNotations.
    (only logically equivalent). *)
 Definition set_eq {A} (m1 m2 : Ensemble A) :=
   forall (a : A), m1 a <-> m2 a.
+
+Global Instance : forall A, Equivalence (@set_eq A).
+Proof.
+admit.
+Qed.
 
 Infix "<-->" := set_eq (at level 70, no associativity) : sem_gen_scope.
 
@@ -166,7 +172,7 @@ Module GenLow : GenLowInterface.
      MkGen (fun r n => f ((run g) r n)).
 
    Definition sized {A : Type} (f : nat -> G A) : G A :=
-     MkGen (fun r n => match f n with MkGen m => m r n end).
+     MkGen (fun r n => run (f n) r n).
 
    Definition resize {A : Type} (n : nat) (g : G A) : G A :=
      match g with
@@ -238,29 +244,20 @@ Module GenLow : GenLowInterface.
    Definition semGen {A : Type} (g : G A) : Ensemble A :=
      fun a => exists size, semGenSize g size a.
 
+   Lemma exists_const A P : inhabited A -> ((exists _ : A, P) <-> P).
+   Proof. by case=> ?; split=> //; case. Qed.
 
-   Lemma semReturnSize :
-     forall A (x : A) (size : nat),
-       semGenSize (returnGen x) size <--> eq x.
+   Lemma semReturnSize A (x : A) size : semGenSize (returnGen x) size <--> eq x.
    Proof.
-     move => A x a. rewrite /semGenSize. split.
-     - move => [seed H]. by [].
-     - move => H /=. rewrite H.
-       exists randomSeedInhabitant. reflexivity.
+   rewrite /semGenSize /= /set_eq => ?; rewrite exists_const //.
+   exact: randomSeed_inhabited.
    Qed.
 
-   Lemma semReturn : forall A (x : A),
-                       semGen (returnGen x) <--> eq x.
-   Proof. (* this kind of proof should be "trivial by rewriting",
-          but this doesn't quite work as easy at it should *)
-     move => A x. rewrite /semGen.
-     (* was hoping to do the rest by rewriting: setoid_rewrite semReturnSize. *)
-     pose proof (semReturnSize x) as G. unfold set_eq in G.
-     (* setoid_rewrite G. -- failed constraints *)
-     move => a /=. split.
-     - move => [size H]. (* or rewrite -> G in H. exact H. *)
-       rewrite <- G. exact H.
-     - move => H. exists 0. by rewrite G.
+   Lemma semReturn A (x : A) : semGen (returnGen x) <--> eq x.
+   Proof.
+   rewrite /semGen /semGenSize /= => ?; rewrite !exists_const //.
+     exact: randomSeed_inhabited.
+   by do 2! constructor.
    Qed.
 
    Lemma semBindSize : forall A B (g : G A) (f : A -> G B) (size : nat),
@@ -350,27 +347,13 @@ Module GenLow : GenLowInterface.
    Qed.
 
 
-   Lemma semSized :
-     forall A (f : nat -> G A),
+   Lemma semSized A (f : nat -> G A) :
        semGen (sized f) <--> (fun a => exists n, semGenSize (f n) n a).
-   Proof.
-     move => A f a. rewrite /semGen /semGenSize /sized => /=. split.
-     - move => [size [seed H]]. exists size. move : H.
-       case (f size) => g H. rewrite /semGenSize. by eauto.
-     - move => [size [seed H]]. exists size. exists seed.
-       move : H. case (f size) => g H. rewrite /semGenSize. by eauto.
-   Qed.
+   Proof. by []. Qed.
 
-   Lemma semSizedSize :
-     forall A (f : nat -> G A) s,
-       semGenSize (sized f) s <--> (fun a => semGenSize (f s) s a).
-   Proof.
-     move => A f s a. rewrite /semGen /semGenSize /sized => /=. split.
-     - move => [seed H]. exists seed. move : H.
-       case (f s) => g H. rewrite /semGenSize. by eauto.
-     - move => [seed H]. exists seed.
-       move : H. case (f s) => g H. rewrite /semGenSize. by eauto.
-   Qed.
+   Lemma semSizedSize A (f : nat -> G A) s :
+       semGenSize (sized f) s <--> semGenSize (f s) s.
+   Proof. by []. Qed.
 
    Lemma semResize :
      forall A (n : nat) (g : G A), semGen (resize n g) <--> semGenSize g n .
