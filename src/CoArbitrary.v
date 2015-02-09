@@ -10,7 +10,9 @@ Class CoArbitrary (A : Type) : Type :=
   {
     coarbitrary : A -> SplitPath;
     coarbitraryCorrect : forall (x y : A), ~ (x = y) -> PrefixFree [coarbitrary x;
-                                                                    coarbitrary y]
+                                                                    coarbitrary y];
+    coarbReverse : SplitPath -> option A;
+    coarbReverseCorrect : forall a, coarbReverse (coarbitrary a) = Some a
   }.
 
 Local Open Scope positive.
@@ -23,25 +25,63 @@ Fixpoint posToPathAux (p : positive) : SplitPath :=
 
 Definition posToPath (p : positive) : SplitPath := posToPathAux p ++ [Right].
 
+Fixpoint pathToPos (p : SplitPath) : option positive := 
+  match p with 
+    | [Right] => Some xH
+    | Left :: Right :: p' => 
+      option_map xI (pathToPos p')
+    | Left :: Left  :: p' =>
+      option_map xO (pathToPos p')
+    | _ => None
+  end.
+
 Instance coArbPos : CoArbitrary positive := 
   {|
-    coarbitrary := posToPath
+    coarbitrary := posToPath;
+    coarbReverse := pathToPos
   |}.
 Proof.
++ admit.
++ admit.
 Admitted.
+
+Eval compute in (pathToPos (posToPath 1)).
+Eval compute in (pathToPos (posToPath 2)).
+Eval compute in (pathToPos (posToPath 3)).
+Eval compute in (pathToPos (posToPath 4)).
+Eval compute in (pathToPos (posToPath 5)).
 
 Function rangeNat (p : nat) : list nat :=
   match p with 
-    | O => [] 
+    | O => []
     | S n' => p :: (rangeNat n')
   end.
 
 Definition rangePos (p : positive) : list positive := 
   map Pos.of_nat (rangeNat (Pos.to_nat p)).
 
+Lemma ltInRange : forall m n, le n m -> n <> O -> In n (rangeNat m).
+  induction m; intros.
+  + inversion H. simpl. auto.
+  + simpl. inversion H.
+    - left; auto.
+    - right; subst. apply IHm; auto.
+Qed.
+
+Lemma posLtInRange : forall max pos, Pos.le pos max -> In pos (rangePos max).
+  intros.
+  apply in_map_iff.
+  exists (Pos.to_nat pos).
+  split.
+  - apply Pos2Nat.id.
+  - apply ltInRange.
+    + admit.
+    + admit.
+Qed.
+
 Lemma rangeNatLt : forall n m, In m (rangeNat n) -> lt m (S n).
   induction n; intros.
-  + inversion H.
+  + simpl in H. inversion H. 
   + inversion H.
     - subst. unfold lt. apply le_n.
     - apply IHn in H0.
@@ -76,20 +116,33 @@ Lemma rangePosPrefixFree : forall p, PrefixFree (map coarbitrary (rangePos p)).
     + eauto.
 Qed.    
 
-Theorem coArbComplete : forall (max : positive) (f : positive -> RandomSeed) ,
+Definition A_R_to_P_R {A : Type} `{_ : CoArbitrary A} (f : A -> RandomSeed) (p : SplitPath) 
+: RandomSeed :=
+  match coarbReverse p with 
+    | Some a => f a 
+    | None   => randomSeedInhabitant
+  end.
+
+Theorem coArbComplete' : forall (max : positive) (f : positive -> RandomSeed) ,
                           exists seed, forall p, p <= max -> 
                             varySeed (coarbitrary p) seed = f p.
 intros.
-pose proof (topLevelSeedTheorem (map coarbitrary (rangePos max)) (fun p => f (rangePosPrefixFree _)).
-
-topLevelSeedTheorem
-     : forall (l : list SplitPath) (f : SplitPath -> RandomSeed),
-       PrefixFree l ->
-       exists s : RandomSeed,
-         forall p : SplitPath, In p l -> varySeed p s = f p
-
-                          
-                          p <= max -> exists seed, fora
+pose proof (topLevelSeedTheorem (map coarbitrary (rangePos max)) 
+                                (A_R_to_P_R f) (rangePosPrefixFree max)).
+inversion H; clear H.
+exists x.
+intros.
+pose proof H0 (coarbitrary p).
+rewrite H1.
++ unfold A_R_to_P_R.
+  rewrite coarbReverseCorrect.
+  reflexivity.
++ apply in_map_iff.
+  exists p.
+  split; auto.
+  apply posLtInRange.
+  auto.
+Qed.
 
 Instance arbFun {A B : Type} `{_ : CoArbitrary A} `{_ : Arbitrary B} : Arbitrary (A -> B) :=
   {|
