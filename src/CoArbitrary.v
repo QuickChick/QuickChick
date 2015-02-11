@@ -58,11 +58,13 @@ induction x; intros.
       + unfold posToPath in *; simpl in *.
 Admitted.
         
+(*
 Eval compute in (pathToPos (posToPath 1)).
 Eval compute in (pathToPos (posToPath 2)).
 Eval compute in (pathToPos (posToPath 3)).
 Eval compute in (pathToPos (posToPath 4)).
 Eval compute in (pathToPos (posToPath 5)).
+*)
 
 Function rangeNat (p : nat) : list nat :=
   match p with 
@@ -88,8 +90,8 @@ Lemma posLtInRange : forall max pos, Pos.le pos max -> In pos (rangePos max).
   split.
   - apply Pos2Nat.id.
   - apply ltInRange.
-    + admit.
-    + admit.
+    + apply Pos2Nat.inj_le; auto.
+    + pose proof (Pos2Nat.is_succ pos) as Contra; inversion_clear Contra; congruence.
 Qed.
 
 Lemma rangeNatLt : forall n m, In m (rangeNat n) -> lt m (S n).
@@ -136,7 +138,7 @@ Definition posFunToPathFun (f : positive -> RandomSeed) (p : SplitPath)
     | None   => newRandomSeed
   end.
 
-Theorem coArbComplete' : forall (max : positive) (f : positive -> RandomSeed) ,
+Theorem coarbComplete' : forall (max : positive) (f : positive -> RandomSeed) ,
                           exists seed, forall p, p <= max -> 
                             varySeed (posToPath p) seed = f p.
 intros.
@@ -157,56 +159,45 @@ rewrite H1.
   auto.
 Qed.
 
+Definition funToPosFun {A : Type} `{_ : CoArbitrary A} (f : A -> RandomSeed) (p : positive)
+: RandomSeed :=
+  match coarbReverse p with 
+    | Some a => f a
+    | None   => newRandomSeed
+  end.
+
+Definition coarbLe {A : Type} `{_ : CoArbitrary A} (x y : A) : Prop :=
+  Pos.le (coarbitrary x) (coarbitrary y).
+
+Lemma coarbLePreservesLe : forall {A : Type} `{_ : CoArbitrary A} (x y : A),
+  coarbLe x y -> Pos.le (coarbitrary x) (coarbitrary y).
+by [].
+Qed.
+
+Theorem coarbComplete : forall {A : Type} `{_ : CoArbitrary A} (max : A)
+                               (f : A -> RandomSeed),
+                          exists seed, forall a, coarbLe a max ->
+                                          varySeed (posToPath (coarbitrary a)) seed = f a.
+intros.
+pose proof (coarbComplete' (coarbitrary max) (funToPosFun f)) as Hyp.
+inversion Hyp as [seed HSeed]; clear Hyp.
+exists seed.
+intros a HLe.
+pose proof (HSeed (coarbitrary a)) as HCo; clear HSeed.
+apply coarbLePreservesLe in HLe.
+apply HCo in HLe; clear HCo.
+rewrite HLe; clear HLe.
+unfold funToPosFun.
+rewrite coarbCorrect.
+reflexivity.
+Qed.
+
 Instance arbFun {A B : Type} `{_ : CoArbitrary A} `{_ : Arbitrary B} : Arbitrary (A -> B) :=
   {|
     arbitrary := 
       reallyUnsafePromote (fun a => variant (posToPath (coarbitrary a)) arbitrary);
     shrink x := []
   |}.
-
-
-(*
-Definition varyComplete : forall (max : nat) (f : nat -> RandomSeed),
-                          exists (seed : RandomSeed), 
-                            forall (n : nat),
-                              n <= max -> varySeed n seed = f n.
-
-
-induction max; intros.
-+ pose proof (randomSplitAssumption (f O) (f O)) as Seed; inversion Seed as [seed Hyp].
-  exists seed; intros p H.
-  inversion_clear H.
-  unfold varySeed, varySeed_terminate, boolVary; simpl.
-  rewrite Hyp.
-  reflexivity.
-+ pose proof (IHmax f) as Seed.
-  inversion Seed as [seed Hyp]; clear Seed.
-*)
-(*  
-exists randomSeedInhabitant; intros.
-  inversion H. 
-  - admit.
-  - 
-
-pose proof IHmax f as IH.
-    inversion IH as [seed' Hyp'].
-    
-unfold varySeed, varySeed_terminate, boolVary. simpl.
+                            
   
-
-  inversion 
-admit.
-+ admit.
-+ pose proof (randomSplitAssumption (f xH) (f xH)) as Seed; inversion Seed as [seed Hyp].
-  exists seed; intros p H.
-  apply Pos.le_lteq in H.
-  inversion H as [Contra | ].
-  - apply Pos.nlt_1_r in Contra; inversion Contra.
-  - subst. unfold varySeed. unfold boolVary. rewrite Hyp. reflexivity.
-Qed.
-
-Axiom randomSplitAssumption :
-  forall s1 s2 : RandomSeed, exists s, randomSplit s = (s1,s2).
-*)
-
 
