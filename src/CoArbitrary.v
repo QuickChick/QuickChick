@@ -8,12 +8,17 @@ Import ListNotations.
 (* LL: TODO: Add proof obligation that the result paths be prefix free? *)
 Class CoArbitrary (A : Type) : Type :=
   {
-    coarbitrary : A -> SplitPath;
-    coarbitraryCorrect : forall (x y : A), ~ (x = y) -> PrefixFree [coarbitrary x;
-                                                                    coarbitrary y];
-    coarbReverse : SplitPath -> option A;
-    coarbReverseCorrect : forall a, coarbReverse (coarbitrary a) = Some a
+    coarbitrary : A -> positive;
+    coarbReverse : positive -> option A;
+    coarbCorrect : forall a, coarbReverse (coarbitrary a) = Some a
   }.
+
+Instance coArbPos : CoArbitrary positive := 
+  {|
+    coarbitrary x := x;
+    coarbReverse x := Some x
+  |}.
+Proof. auto. Qed.
 
 Local Open Scope positive.
 Fixpoint posToPathAux (p : positive) : SplitPath := 
@@ -35,16 +40,24 @@ Fixpoint pathToPos (p : SplitPath) : option positive :=
     | _ => None
   end.
 
-Instance coArbPos : CoArbitrary positive := 
-  {|
-    coarbitrary := posToPath;
-    coarbReverse := pathToPos
-  |}.
-Proof.
-+ admit.
-+ admit.
+Lemma posPathInj : forall p, pathToPos (posToPath p) = Some p.
 Admitted.
 
+Lemma PosToPathPrefixFree : forall (x y : positive), ~ (x = y) -> 
+                              PrefixFree [posToPath x;
+                                          posToPath y].
+intros.
+apply FreeCons; [ apply FreeCons ; [ constructor | intros p Contra; inversion Contra] | ].
+generalize dependent y.
+induction x; intros.
++ destruct y eqn:Y.
+  - eapply (IHx p).
+    * congruence.
+    * instantiate (1 := posToPath p); left; auto.
+    * inversion H0.
+      + unfold posToPath in *; simpl in *.
+Admitted.
+        
 Eval compute in (pathToPos (posToPath 1)).
 Eval compute in (pathToPos (posToPath 2)).
 Eval compute in (pathToPos (posToPath 3)).
@@ -90,7 +103,7 @@ Lemma rangeNatLt : forall n m, In m (rangeNat n) -> lt m (S n).
       auto.
 Qed.    
 
-Lemma rangePosPrefixFree : forall p, PrefixFree (map coarbitrary (rangePos p)).
+Lemma rangePosPrefixFree : forall p, PrefixFree (map posToPath (rangePos p)).
   intros.
   unfold rangePos.
   induction (Pos.to_nat p).
@@ -108,7 +121,7 @@ Lemma rangePosPrefixFree : forall p, PrefixFree (map coarbitrary (rangePos p)).
     apply rangeNatLt in H2.
     remember (match n with | O => 1 | S _ => Pos.succ (Pos.of_nat n) end) as m.
     assert (x <> m). admit.
-    pose proof coarbitraryCorrect x m.
+    pose proof PosToPathPrefixFree x m.
     apply H3 in H.
     inversion H.
     eapply H7.
@@ -116,26 +129,26 @@ Lemma rangePosPrefixFree : forall p, PrefixFree (map coarbitrary (rangePos p)).
     + eauto.
 Qed.    
 
-Definition A_R_to_P_R {A : Type} `{_ : CoArbitrary A} (f : A -> RandomSeed) (p : SplitPath) 
+Definition posFunToPathFun (f : positive -> RandomSeed) (p : SplitPath) 
 : RandomSeed :=
-  match coarbReverse p with 
-    | Some a => f a 
-    | None   => randomSeedInhabitant
+  match pathToPos p with 
+    | Some a => f a
+    | None   => newRandomSeed
   end.
 
 Theorem coArbComplete' : forall (max : positive) (f : positive -> RandomSeed) ,
                           exists seed, forall p, p <= max -> 
-                            varySeed (coarbitrary p) seed = f p.
+                            varySeed (posToPath p) seed = f p.
 intros.
-pose proof (topLevelSeedTheorem (map coarbitrary (rangePos max)) 
-                                (A_R_to_P_R f) (rangePosPrefixFree max)).
+pose proof (topLevelSeedTheorem (map posToPath (rangePos max)) 
+                                (posFunToPathFun f) (rangePosPrefixFree max)).
 inversion H; clear H.
 exists x.
 intros.
-pose proof H0 (coarbitrary p).
+pose proof H0 (posToPath p).
 rewrite H1.
-+ unfold A_R_to_P_R.
-  rewrite coarbReverseCorrect.
++ unfold posFunToPathFun.
+  rewrite posPathInj.
   reflexivity.
 + apply in_map_iff.
   exists p.
@@ -147,9 +160,10 @@ Qed.
 Instance arbFun {A B : Type} `{_ : CoArbitrary A} `{_ : Arbitrary B} : Arbitrary (A -> B) :=
   {|
     arbitrary := 
-      reallyUnsafePromote (fun a => variant (coarbitrary a) arbitrary);
+      reallyUnsafePromote (fun a => variant (posToPath (coarbitrary a)) arbitrary);
     shrink x := []
   |}.
+
 
 (*
 Definition varyComplete : forall (max : nat) (f : nat -> RandomSeed),

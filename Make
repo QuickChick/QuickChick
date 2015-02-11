@@ -4,6 +4,7 @@ src/RoseTrees.v
 src/GenLow.v
 src/GenHigh.v
 src/Arbitrary.v
+src/CoArbitrary.v
 src/StringOT.v
 src/Show.v
 src/State.v
