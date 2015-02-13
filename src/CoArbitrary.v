@@ -30,41 +30,116 @@ Fixpoint posToPathAux (p : positive) : SplitPath :=
 
 Definition posToPath (p : positive) : SplitPath := posToPathAux p ++ [Right].
 
-Fixpoint pathToPos (p : SplitPath) : option positive := 
-  match p with 
-    | [Right] => Some xH
-    | Left :: Right :: p' => 
-      option_map xI (pathToPos p')
-    | Left :: Left  :: p' =>
-      option_map xO (pathToPos p')
-    | _ => None
-  end.
+Fixpoint pathToPosAux (p : SplitPath) (f : positive -> positive) 
+: option positive :=
+match p with 
+  | [Right] => Some (f xH)
+  | Left :: Right :: p' => pathToPosAux p' (fun p => xI (f p))
+  | Left :: Left  :: p' => pathToPosAux p' (fun p => xO (f p))     
+  | _ => None
+end.
 
-Lemma posPathInj : forall p, pathToPos (posToPath p) = Some p.
-Admitted.
+Definition pathToPos p := pathToPosAux p (fun x => x).
 
-Lemma PosToPathPrefixFree : forall (x y : positive), ~ (x = y) -> 
-                              PrefixFree [posToPath x;
-                                          posToPath y].
-intros.
-apply FreeCons; [ apply FreeCons ; [ constructor | intros p Contra; inversion Contra] | ].
-generalize dependent y.
-induction x; intros.
-+ destruct y eqn:Y.
-  - eapply (IHx p).
-    * congruence.
-    * instantiate (1 := posToPath p); left; auto.
-    * inversion H0.
-      + unfold posToPath in *; simpl in *.
-Admitted.
-        
 (*
 Eval compute in (pathToPos (posToPath 1)).
 Eval compute in (pathToPos (posToPath 2)).
 Eval compute in (pathToPos (posToPath 3)).
 Eval compute in (pathToPos (posToPath 4)).
 Eval compute in (pathToPos (posToPath 5)).
+Eval compute in (pathToPos (posToPath 6)).
+Eval compute in (pathToPos (posToPath 7)).
+Eval compute in (pathToPos (posToPath 8)).
+Eval compute in (pathToPos (posToPath 9)).
 *)
+
+Definition list_ind' (A : Type) (P : list A -> Prop) : 
+                    P [] -> (forall (a : A), P [a]) -> 
+                    (forall (a b : A) (l : list A), P l -> P (a :: b :: l)) ->
+                    forall (l : list A), P l :=
+  fun H0 H1 H2 => 
+    fix aux (l : list A) : P l := 
+      match l with 
+        | []  => H0
+        | [x] => H1 x
+        | a :: b :: l' => H2 a b l' (aux l')
+      end.
+
+Lemma aux1 : forall l p f, pathToPosAux (l ++ [Right]) f = Some p ->
+               exists f', forall l', pathToPosAux (l ++ l') f =
+                                    pathToPosAux l' f' /\ f' xH = p.
+induction l using list_ind'; intros.
++ simpl in *; inversion H; subst.
+  exists f; intros.
+  split; auto.
++ simpl in H; destruct a; inversion H.
++ pose proof IHl p; clear IHl.
+  destruct a; destruct b; simpl in *.
+  -  pose proof (H0 (fun p0 => xO (f p0))); clear H0.
+     apply H1 in H; clear H1.
+     assumption.
+  -  pose proof (H0 (fun p0 => xI (f p0))); clear H0.
+     apply H1 in H; clear H1.
+     assumption.
+  - inversion H.
+  - inversion H.
+Qed.
+
+Lemma posPathInj : forall p, pathToPos (posToPath p) = Some p.
+induction p; unfold posToPath, pathToPos in *; simpl in *.
+- apply aux1 in IHp. 
+  inversion IHp as [f' Hyp]; clear IHp.
+  rewrite <- app_assoc; simpl.
+  pose proof Hyp [Left; Right; Right] as H; clear Hyp.
+  inversion H as [H0 H1]; clear H.
+  rewrite H0; clear H0.
+  simpl; subst; auto.
+- apply aux1 in IHp. 
+  inversion IHp as [f' Hyp]; clear IHp.
+  rewrite <- app_assoc; simpl.
+  pose proof Hyp [Left; Left; Right] as H; clear Hyp.
+  inversion H as [H0 H1]; clear H.
+  rewrite H0; clear H0.
+  simpl; subst; auto.
+- auto.
+Qed.
+
+Lemma PosToPathPrefixFree : forall (x y : positive), ~ (x = y) -> 
+                              PrefixFree [posToPath x;
+                                          posToPath y].
+(* 
+intros.
+apply FreeCons; [ apply FreeCons ; [ constructor | intros p Contra; inversion Contra] | ].
+intros.
+inversion H0; subst; clear H0; [ | inversion H2].
+
+unfold posToPath in *; simpl in *.
+repeat rewrite <- app_assoc in H1.  
+
+
+generalize dependent y.
+generalize dependent p1.
+generalize dependent p2.
+induction x; intros.
++ unfold posToPath in H1; simpl in H1.
+  repeat rewrite <- app_assoc in H1.  
+  destruct (Pos.eq_dec x y) eqn:EqDec.
+  - subst. apply app_inv_head in H1. inversion H1.
+  - eapply IHx. 
+    * eassumption.
+    * unfold posToPath.
+      
+    eapply IHx.
+    - 
+ destruct y eqn:Y.
+  - eapply (IHx p).
+    * congruence.
+    * instantiate (1 := posToPath p); left; auto.
+    * inversion H0.
+      + unfold posToPath in *; simpl in *.
+*)
+Admitted.
+        
 
 Function rangeNat (p : nat) : list nat :=
   match p with 
