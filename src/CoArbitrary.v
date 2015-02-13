@@ -104,22 +104,74 @@ induction p; unfold posToPath, pathToPos in *; simpl in *.
 - auto.
 Qed.
 
+Fixpoint lengthSplit {A : Type} (l l' : list A) : option (list A * list A) :=
+  match l, l' with
+    | [], x => Some ([], x)
+    | _::xs, y::ys => 
+      option_map (fun (p : list A * list A) => 
+                    let (l1,l2) := p in (y::l1, l2)) (lengthSplit xs ys)
+    | _, _ => None
+  end.
+
+Lemma lengthSplit1 : forall (A : Type) (l l' : list A), 
+                       le (length l) (length l') -> 
+                       exists p, lengthSplit l l' = Some p.
+induction l as [ | x xs IHxs].
++ intros; exists ([], l'); auto.
++ intros l' LE; destruct l' as [ | b bs] eqn:LEq.
+  - inversion LE.
+  - pose proof IHxs bs as IH; clear IHxs.
+    assert (LE' : le (length xs) (length bs))
+           by (simpl in *; omega). (* Overkill? :) *)
+    clear LE.
+    apply IH in LE'; clear IH.
+    inversion LE' as [pair Split]; clear LE'.
+    destruct pair as [l1 l2] eqn:Pair.
+    simpl.
+    rewrite Split.
+    exists (b :: l1, l2).
+    simpl.
+    auto.
+Qed.
+
+Lemma lengthSplit2 : forall (A : Type) (l l' l1 l2 : list A), 
+                       lengthSplit l l' = Some (l1, l2) -> l1 ++ l2 = l'.
+induction l.
++ intros l' l1 l2 Hyp; simpl in Hyp; inversion_clear Hyp; auto.
++ intros l' l1 l2 Hyp. 
+  simpl in Hyp.
+  destruct l' as [ | y ys] eqn:L'.
+  - inversion Hyp.
+  - destruct l1 eqn:L1.
+    * destruct (lengthSplit l ys); simpl in *.
+      + destruct p; congruence.
+      + congruence.
+    * pose proof IHl ys l0 l2; clear IHl.
+      destruct (lengthSplit l ys) eqn:LenSplit; simpl in *.
+      + inversion Hyp. destruct p. inversion H1. subst.
+        rewrite H; auto.
+      + inversion Hyp.
+Qed.      
+
 Lemma PosToPathPrefixFree : forall (x y : positive), ~ (x = y) -> 
                               PrefixFree [posToPath x;
                                           posToPath y].
-(* 
 intros.
 apply FreeCons; [ apply FreeCons ; [ constructor | intros p Contra; inversion Contra] | ].
 intros.
 inversion H0; subst; clear H0; [ | inversion H2].
 
+
+(*
+generalize dependent y.
+generalize dependent p1.
+generalize dependent p2.
+induction x; intros.
++ 
 unfold posToPath in *; simpl in *.
 repeat rewrite <- app_assoc in H1.  
 
 
-generalize dependent y.
-generalize dependent p1.
-generalize dependent p2.
 induction x; intros.
 + unfold posToPath in H1; simpl in H1.
   repeat rewrite <- app_assoc in H1.  
