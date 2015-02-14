@@ -227,7 +227,7 @@ Qed.
 Hint Resolve corrEmptyUndef.
 Hint Resolve corrNodeNonEmpty.
 Definition Direction_eq_dec : forall (d1 d2 : SplitDirection), 
-                                d1 = d2 \/ d1 <> d2.
+                                {d1 = d2} + {d1 <> d2}.
 decide equality.
 Qed.
 

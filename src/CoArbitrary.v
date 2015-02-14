@@ -113,7 +113,7 @@ Fixpoint lengthSplit {A : Type} (l l' : list A) : option (list A * list A) :=
     | _, _ => None
   end.
 
-Lemma lengthSplit1 : forall (A : Type) (l l' : list A), 
+Lemma lengthSplit1 : forall {A : Type} (l l' : list A), 
                        le (length l) (length l') -> 
                        exists p, lengthSplit l l' = Some p.
 induction l as [ | x xs IHxs].
@@ -134,7 +134,7 @@ induction l as [ | x xs IHxs].
     auto.
 Qed.
 
-Lemma lengthSplit2 : forall (A : Type) (l l' l1 l2 : list A), 
+Lemma lengthSplit2 : forall {A : Type} (l l' l1 l2 : list A), 
                        lengthSplit l l' = Some (l1, l2) -> l1 ++ l2 = l'.
 induction l.
 + intros l' l1 l2 Hyp; simpl in Hyp; inversion_clear Hyp; auto.
@@ -153,6 +153,130 @@ induction l.
       + inversion Hyp.
 Qed.      
 
+Lemma lengthSplit3 : forall {A : Type} (l l' l1 l2 : list A), 
+                       lengthSplit l l' = Some (l1, l2) -> length l1 = length l.
+induction l as [ | x xs IHxs].
++ intros; simpl in H; inversion H; auto.
++ intros l' l1 l2 Split.
+  simpl in Split.
+  destruct l'.
+  - inversion Split.
+  - destruct l1.
+    * destruct (lengthSplit xs l').
+      + simpl in *. destruct p. inversion Split.
+      + simpl in *. inversion Split.
+    * simpl in *. 
+      destruct (lengthSplit xs l') eqn:LenSplit.
+      + simpl in *. destruct p. inversion Split; subst; clear Split.
+        pose proof (IHxs l' l1 l2 LenSplit) as Hyp; clear IHxs.
+        auto.
+      + simpl in *. inversion Split.
+Qed.        
+
+Lemma lengthPathEven : forall p, exists n, length (posToPathAux p) = (2 * n)%nat.
+induction p.
++ inversion IHp as [n Hyp]; clear IHp.
+  simpl.
+  exists (S n).
+  rewrite app_length. 
+  rewrite Hyp.
+  simpl.
+  omega.
++ inversion IHp as [n Hyp]; clear IHp.
+  simpl.
+  exists (S n).
+  rewrite app_length. 
+  rewrite Hyp.
+  simpl.
+  omega.
++ exists (O).
+  simpl.
+  auto.
+Qed.
+
+Lemma evenPathAux : forall l l' l'' f n p, length l = (2 * n)%nat -> 
+                      pathToPosAux (l ++ l'') f = Some p ->
+                      exists f', pathToPosAux (l ++ l') f = pathToPosAux l' f'.
+induction l using list_ind'.
++ intros. exists f. auto.
++ intros. simpl in *. omega.
++ intros l' l'' f n p Len Valid.
+  destruct n.
+  - simpl in Len. congruence.
+  - simpl in Len; assert (length l = (2 * n)%nat) by omega.
+    destruct a eqn:A; destruct b eqn:B; simpl in *.
+    * unfold pathToPos in Valid. simpl in Valid.
+      pose proof (IHl l' l'' (fun p => xO (f p)) n p H Valid) as Hyp; clear IHl H.
+      inversion Hyp as [f' HF]; clear Hyp.
+      exists f'.
+      auto.
+    * unfold pathToPos in Valid. simpl in Valid.
+      pose proof (IHl l' l'' (fun p => xI (f p)) n p H Valid) as Hyp; clear IHl H.
+      inversion Hyp as [f' HF]; clear Hyp.
+      exists f'.
+      auto.
+    * inversion Valid.
+    * inversion Valid.
+Qed.
+
+Lemma posToPathBeginsLeft : forall p, p <> xH ->
+                              head (posToPathAux p) = Some Left.
+intros.
+induction p.
++ destruct (Pos.eq_dec p 1).
+  - subst.
+    unfold posToPath.
+    auto.
+  - unfold posToPath in *.
+  - apply IHp in n.                                  
+    simpl.
+    destruct (posToPathAux p).
+    * simpl in n. inversion n.
+    * simpl in n. inversion n. subst. auto.
++ destruct (Pos.eq_dec p 1).
+  - subst.
+    unfold posToPath.
+    auto.
+  - unfold posToPath in *.
+  - apply IHp in n.                                  
+    simpl.
+    destruct (posToPathAux p).
+    * simpl in n. inversion n.
+    * simpl in n. inversion n. subst. auto.
++ unfold not in H. 
+  exfalso. apply H. auto.
+Qed.
+
+Lemma listAppNeq : forall (A : Type) (l1 l2 l3 l4 : list A), 
+                     (forall (x y : A), {x = y} + {x <> y}) ->
+                     length l1 = length l2 -> 
+                     l1 <> l2 ->
+                     l1 ++ l3 <> l2 ++ l4.
+induction l1.
++ intros.
+  destruct l2.
+  - unfold not in H0. exfalso; apply H0; auto.
+  - simpl in H; inversion H.
++ intros l2 l3 l4 EqDec Len Neq.
+  destruct l2 as [ | b l2 ].
+  - simpl in Len. congruence.
+  - destruct (EqDec a b).
+    * subst. simpl in Len. 
+      inversion Len as [ Len']; clear Len.
+      simpl.
+      pose proof (IHl1 l2 l3 l4 EqDec Len') as Contra; clear IHl1.
+      assert (l1 <> l2) by (unfold not; intros; congruence).
+      apply Contra in H.
+      unfold not in *.
+      intros.
+      apply H.
+      inversion H0.
+      auto.
+    * unfold not; intros.
+      inversion H.
+      congruence.
+Qed.
+
 Lemma PosToPathPrefixFree : forall (x y : positive), ~ (x = y) -> 
                               PrefixFree [posToPath x;
                                           posToPath y].
@@ -160,38 +284,37 @@ intros.
 apply FreeCons; [ apply FreeCons ; [ constructor | intros p Contra; inversion Contra] | ].
 intros.
 inversion H0; subst; clear H0; [ | inversion H2].
+unfold posToPath in *; simpl in *; repeat rewrite <- app_assoc in *.
 
 
-(*
-generalize dependent y.
-generalize dependent p1.
-generalize dependent p2.
-induction x; intros.
-+ 
-unfold posToPath in *; simpl in *.
-repeat rewrite <- app_assoc in H1.  
-
-
-induction x; intros.
-+ unfold posToPath in H1; simpl in H1.
-  repeat rewrite <- app_assoc in H1.  
-  destruct (Pos.eq_dec x y) eqn:EqDec.
-  - subst. apply app_inv_head in H1. inversion H1.
-  - eapply IHx. 
+destruct (Compare_dec.le_ge_dec (length (posToPathAux y)) 
+                                (length (posToPathAux x))).
++ pose proof (lengthSplit1 (posToPathAux y) (posToPathAux x) l) as Hyp.
+  inversion Hyp as [pair Split]; clear Hyp.
+  destruct pair.
+  pose proof (lengthSplit2 (posToPathAux y) (posToPathAux x) l0 l1 Split) as AppHyp.
+  pose proof (lengthSplit3 (posToPathAux y) (posToPathAux x) l0 l1 Split) as LenHyp.
+  pose proof (lengthPathEven y) as Hyp; inversion Hyp as [n LenN]; subst; clear Hyp.
+  assert (Even : exists f', pathToPosAux (l0 ++ l1) (fun x => x) = pathToPosAux l1 f') 
+    by (eapply evenPathAux; [ rewrite LenHyp; eassumption 
+                            | instantiate (2 := (l1 ++ [Right])); 
+                              instantiate (1 := x);
+                              rewrite app_assoc;
+                              rewrite AppHyp;
+                              apply posPathInj ] ).
+  inversion Even as [f' HF]; clear Even.
+  rewrite <- AppHyp in H1.
+  rewrite <- app_assoc in H1.
+  destruct (list_eq_dec Direction_eq_dec (posToPathAux y) l0).
+  - subst. apply app_inv_head in H1.
+    admit.
+  - eapply listAppNeq.
+    * apply Direction_eq_dec.
+    * instantiate (1 := l0). instantiate (1 := posToPathAux y). eauto.
     * eassumption.
-    * unfold posToPath.
-      
-    eapply IHx.
-    - 
- destruct y eqn:Y.
-  - eapply (IHx p).
-    * congruence.
-    * instantiate (1 := posToPath p); left; auto.
-    * inversion H0.
-      + unfold posToPath in *; simpl in *.
-*)
-Admitted.
-        
+    * eapply H1.
++ admit.
+Qed.
 
 Function rangeNat (p : nat) : list nat :=
   match p with 
