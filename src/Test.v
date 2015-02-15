@@ -110,7 +110,7 @@ Definition summary (st : State) : list (string * nat) :=
   let res := Map.fold (fun key elem acc => (key,elem) :: acc) (labels st) nil
   in insSortBy (fun x y => snd y <=? snd x) res .
 
-Definition doneTesting (st : State) (f : RandomSeed -> nat -> QProp) : Result :=
+Definition doneTesting (st : State) (f : nat -> RandomSeed -> QProp) : Result :=
  if expectedFailure st then
     Success (numSuccessTests st + 1) (numDiscardedTests st) (summary st)
             ("+++ OK, passed " ++ (show (numSuccessTests st)) ++ " tests"
@@ -122,7 +122,7 @@ Definition doneTesting (st : State) (f : RandomSeed -> nat -> QProp) : Result :=
                                              ++ newline).
   (* TODO: success st - labels *)
 
-Definition giveUp (st : State) (_ : RandomSeed -> nat -> QProp) : Result :=
+Definition giveUp (st : State) (_ : nat -> RandomSeed -> QProp) : Result :=
   GaveUp (numSuccessTests st) (summary st)
          ("*** Gave up! Passed only " ++ (show (numSuccessTests st)) ++ " tests"
           ++  newline ++ "Discarded: " ++ (show (numDiscardedTests st)) ++ newline).
@@ -173,11 +173,11 @@ Definition decr (st : State) : nat :=
   ((maxSuccessTests st) + (maxDiscardedTests st))
   - ((numSuccessTests st) + (numDiscardedTests st)).
 
-Function runATest (st : State) (f : RandomSeed -> nat -> QProp)
+Function runATest (st : State) (f : nat -> RandomSeed -> QProp)
          {measure decr st} : Result :=
   let size := (computeSize st) (numSuccessTests st) (numDiscardedTests st) in
   let (rnd1, rnd2) := randomSplit (randomSeed st) in
-  let test (st : State) (f : RandomSeed -> nat -> QProp) :=
+  let test (st : State) (f : nat -> RandomSeed -> QProp) :=
         if (gte (numSuccessTests st) (maxSuccessTests st)) then
           doneTesting st f
         else if (gte (numDiscardedTests st) (maxDiscardedTests st)) then
@@ -186,7 +186,7 @@ Function runATest (st : State) (f : RandomSeed -> nat -> QProp)
  in
   match st with
     | MkState mst mdt ms cs nst ndt ls e r nss nts =>
-    match f rnd1 size with
+    match f size rnd1 with
     | MkProp (MkRose res ts) =>
       (* TODO: CallbackPostTest *)
       match res with
@@ -219,7 +219,7 @@ Function runATest (st : State) (f : RandomSeed -> nat -> QProp)
   end.
 Admitted. (* I think I *could* actually prove this *)
 
-Definition test (st : State) (f : RandomSeed -> nat -> QProp) : Result :=
+Definition test (st : State) (f : nat -> RandomSeed -> QProp) : Result :=
   if (gte (numSuccessTests st) (maxSuccessTests st)) then
     doneTesting st f
   else if (gte (numDiscardedTests st) (maxDiscardedTests st)) then

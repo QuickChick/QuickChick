@@ -1,11 +1,11 @@
-Require Import GenLow GenHigh.
-Require Import ZArith ZArith.Znat Arith.
+Require Import GenLow GenHigh Sets.
 Require Import Coq.Numbers.Natural.Peano.NPeano.
 Require Import Recdef.
 Require Import List.
 Require Import ssreflect ssrbool ssrnat.
 
-Import GenHigh GenLow.
+Require Import ZArith ZArith.Znat Arith.
+Import GenLow GenHigh.
 
 Class Arbitrary (A : Type) : Type :=
   {
@@ -165,7 +165,7 @@ Instance arbType : Arbitrary Type :=
 (* Correctness proof about built-in generators *)
 
 Lemma arbBool_correct:
-  semGen arbitrary <--> (fun (_ : bool) => True).
+  semGen arbitrary <--> [set: bool].
 Proof.
   rewrite /arbitrary /arbBool /arbitraryBool. move => b.
   split => // _. apply semChoose.
@@ -173,14 +173,11 @@ Proof.
 Qed.
 
 Lemma arbNat_correct:
-  semGen arbitrary <--> (fun (_ : nat) => True).
+  semGen arbitrary <--> [set: nat].
 Proof.
-  rewrite /arbitrary /arbNat /arbitraryNat. move => n.
-  split => // _.
-  apply semSized. exists n. apply semChooseSize.
-  split=> //.
+rewrite semSized => n; split=> // _; exists n; split=> //.
+by rewrite (semChooseSize 0 n n n).
 Qed.
-
 
 Lemma arbInt_correct:
   forall s,
@@ -217,16 +214,12 @@ Proof.
     split; auto.
 Qed.
 
-Lemma arbInt_correctSize:
-  semGen arbitrary <--> (fun (_ : Z) => True).
+Lemma arbInt_correctSize : semGen arbitrary <--> [set: Z].
 Proof.
-  rewrite /arbitrary /arbInt /arbitraryZ. move => n. split => // _.
-  apply semSized.
-  exists (Z.abs_nat n). apply semChooseSize.
-  by split => //=; rewrite Nat2Z.inj_abs_nat;
-     case: n => //= p; apply Z.leb_refl.
+rewrite semSized => n; split=> // _; exists (Z.abs_nat n); split=> //.
+rewrite Nat2Z.inj_abs_nat (semChooseSize _ _ _ _).
+by case: n => //= p; rewrite !Z.leb_refl.
 Qed.
-
 
 (* TODO : this need semListOf *)
 Lemma arbList_correct:
