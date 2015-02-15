@@ -1,4 +1,5 @@
 -R src QuickChick
+src/Sets.v
 src/Random.v
 src/RoseTrees.v
 src/GenLow.v
