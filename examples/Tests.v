@@ -136,8 +136,8 @@ Proof.
   move=> A g n.
   elim : n => //= [| n IHn] s Hg t.
   * split.
-    + rewrite semReturnSize. by move => <-.
-    + case: t => [| t1 t2] //= a . by rewrite semReturnSize.
+    + rewrite (semReturnSize _ _ _). by move => <-.
+    + case: t => [| t1 t2] //= a . by rewrite (semReturnSize _ _ _).
       by rewrite addn1 ltn0.
   * move/IHn : (Hg)=> HgenT. split => [| Hheight].
     + move/semFrequencySize. move =>
@@ -212,7 +212,7 @@ Proof.
       by apply arbNat_correctSize; apply Max.le_max_l.
     have Hlist: semGenSize arbitraryList size l.
     { eapply arbList_correct with (P := fun x y => (y <= x)%coq_nat).
-      move => n. by rewrite arbNat_correctSize.
+      move => n. by rewrite (arbNat_correctSize _ _).
       split. apply Max.max_case_strong => H'; auto. apply/leP.
       eapply Max.max_lub_r; eassumption. by apply/leP; apply Max.le_max_r.
       move => x' /below_max_elem /leP Helem.

@@ -63,7 +63,7 @@ Qed.
 Lemma genColor_correct:
   semGen genColor <--> fun _ => True.
 Proof.
-  rewrite /genColor. intros c. rewrite semElements.
+  rewrite /genColor. intros c. rewrite (semElements _ _ _).
   split => // _. left.
   destruct c;  by [ constructor | constructor(constructor)].
 Qed.
@@ -129,8 +129,8 @@ Proof.
   move => c h s. move : c s. induction h as [| h IHh]; intros c' s t.
   { rewrite /genRBTree_height. split.
     - destruct c'.
-      + rewrite semReturnSize. by move => <-; split; constructor.
-      + rewrite semOneofSize.  move => [[gen [H Hgen]] | [// H Hret]].
+      + rewrite (semReturnSize _ _ _). by move => <-; split; constructor.
+      + rewrite (semOneofSize _ _ _ _).  move => [[gen [H Hgen]] | [// H Hret]].
         inversion H as [HIn | HIn]; subst.
         * apply semReturnSize in Hgen; subst. split; by constructor.
         * inversion HIn as [HIn' |  HIn'] => //; subst.
@@ -138,9 +138,9 @@ Proof.
           split; try by constructor(constructor). 
           constructor; try by constructor. by apply arbNat_correctSize.
     - move=> [Hsize Hbellow]. inversion Hsize; subst.
-      + destruct c'; first by apply semReturnSize. rewrite semOneofSize. left.
+      + destruct c'; first by apply semReturnSize. rewrite (semOneofSize _ _ _ _). left.
         eexists. split; [by apply in_eq | by apply semReturnSize].
-      + rewrite semOneofSize. left. eexists.
+      + rewrite (semOneofSize _ _ _ _). left. eexists.
         split. by constructor(apply in_eq).
         apply semBindSize. simpl in *.
         inversion H; inversion H0; inversion Hbellow; subst.
