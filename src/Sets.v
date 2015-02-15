@@ -1,20 +1,9 @@
 Require Import ssreflect ssrfun ssrbool ssrnat.
 Require Import Classes.RelationClasses Classes.Morphisms.
-(*
-Require Import Random RoseTrees.
-Require Import Ensembles.
-Require Import Numbers.BinNums.
-*)
 
 Set Implicit Arguments.
 Unset Strict Implicit.
 Unset Printing Implicit Defensive.
-
-(*
-Import ListNotations.
-*)
-
-(* Low-level Generators *)
 
 (* There are similar definitions in the Ensembles library (Included
    and Same_set); set_eq is not exactly the same as Same_set though
@@ -28,7 +17,11 @@ Definition set_eq {A} (m1 m2 : set A) :=
   forall (a : A), m1 a <-> m2 a.
 
 Global Instance : forall T, Equivalence (@set_eq T).
-Proof. admit. Qed.
+Proof.
+move=> T; constructor=> // [A B eqAB | A B C eqAB eqBC] x.
+  by split=> /eqAB.
+by split=> [/eqAB/eqBC|/eqBC/eqAB].
+Qed.
 
 Infix "<-->" := set_eq (at level 70, no associativity) : set_scope.
 
@@ -111,6 +104,9 @@ Proof.
 move=> y; split; first by case=> x [_ fx]; exists x.
 by case=> x fx; exists x.
 Qed.
+
+Lemma setXT T U : setX [set: T] [set: U] <--> [set: T * U].
+Proof. by case. Qed.
 
 Instance set_incl_Proper T U :
   Proper (@eq (T -> U) ==> set_incl ==> set_incl) imset.
@@ -207,7 +203,8 @@ Proof. by rewrite curry_imset2l bigcupC. Qed.
 Lemma curry_codom2l T U V (f : T -> U -> V) :
   codom (prod_curry f) <--> \bigcup_x1 codom (f x1).
 Proof.
-admit.
+rewrite -imsetT -setXT -/(imset2 f _ _) curry_imset2l.
+by apply: eq_bigcupr => x; rewrite imsetT.
 Qed.
 
 Lemma imset_bigcup T U V (f : U -> V) A (F : T -> set U) :
@@ -222,9 +219,7 @@ Qed.
 
 Lemma bigcup_codom T U V (f : T -> U) (F : U -> set V) :
   \bigcup_(y in codom f) (F y) <--> \bigcup_x F (f x).
-Proof.
-admit.
-Qed.
+Proof. by rewrite -imsetT bigcup_imset. Qed.
 
 Lemma coverE T : \bigcup_x [set x] <--> [set: T].
 Proof. by rewrite -codomE codom_id. Qed.
