@@ -673,9 +673,9 @@ End InfiniteTrees.
 Class OrdType (A: Type) :=
   {
     leq     : A -> A -> bool;
-    refl    : forall a, leq a a;
-    trans   : forall  a b c, leq b a -> leq a c -> leq b c;
-    antisym : forall a b, leq a b -> leq b a -> a = b
+    refl    : reflexive leq;
+    trans   : transitive leq;
+    antisym : antisymmetric leq
   }.
 
 Program Instance OrdBool : OrdType bool :=
@@ -683,32 +683,36 @@ Program Instance OrdBool : OrdType bool :=
     leq b1 b2 := implb b1 b2
   }.
 Next Obligation.
-  by destruct a.
+  by case.
 Qed.
 Next Obligation.
-  by destruct a; destruct b; destruct c.
+  by do 3! case.
 Qed.
 Next Obligation.
-  by destruct a; destruct b.
+  by do 2! case.
 Qed.
 
 Program Instance OrdNat : OrdType nat :=
   {
     leq := ssrnat.leq;
-    trans := leq_trans
+    refl := leqnn;
+    trans := leq_trans;
+    antisym := anti_leq
   }.
-Next Obligation.
-  apply/eqP. by rewrite eqn_leq; apply/andP; split.
-Qed.
 
 Program Instance OrdZ : OrdType Z :=
   {
     leq := Z.leb;
-    refl := Z.leb_refl;
-    antisym := Zle_bool_antisym;
-    trans := fun a b => Zle_bool_trans b a
+    refl := Z.leb_refl
   }.
-
+Next Obligation.
+move=> x y z le_yx le_xz.
+exact: (Zle_bool_trans y x z).
+Qed.
+Next Obligation.
+move=> x y /andP[].
+exact: Zle_bool_antisym.
+Qed.
 
 Class Random (A : Type)  :=
   {
@@ -730,7 +734,6 @@ Instance RandomNat : Random nat :=
     randomR := randomRNat;
     randomRCorrect := ramdomRNatCorrect
   }.
-
 
 Instance RandomZ : Random Z :=
   {

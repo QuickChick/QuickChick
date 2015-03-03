@@ -1,4 +1,4 @@
-Require Import ssreflect ssrfun ssrbool ssrnat.
+Require Import ssreflect ssrfun ssrbool ssrnat seq.
 Require Import Classes.RelationClasses Classes.Morphisms.
 
 Set Implicit Arguments.
@@ -16,26 +16,33 @@ Notation "x \in A" := (A x) (at level 70, only parsing) : set_scope.
 Definition set_eq {A} (m1 m2 : set A) :=
   forall (a : A), m1 a <-> m2 a.
 
-Global Instance : forall T, Equivalence (@set_eq T).
+Infix "<-->" := set_eq (at level 70, no associativity) : set_scope.
+
+Open Scope set_scope.
+
+Lemma set_eq_trans T B (A C : set T) : A <--> B -> B <--> C -> A <--> C.
 Proof.
-move=> T; constructor=> // [A B eqAB | A B C eqAB eqBC] x.
-  by split=> /eqAB.
-by split=> [/eqAB/eqBC|/eqBC/eqAB].
+by move=> eqAB eqBC; split=> [/eqAB/eqBC|/eqBC/eqAB].
 Qed.
 
-Infix "<-->" := set_eq (at level 70, no associativity) : set_scope.
+Global Instance : forall T, Equivalence (@set_eq T).
+Proof.
+move=> T; constructor=> // [A B eqAB | A B C] x; first by split=> /eqAB.
+exact: set_eq_trans.
+Qed.
 
 Definition set_incl {A} (m1 m2 : set A) :=
   forall (a : A), m1 a -> m2 a.
 
 Infix "\subset" := set_incl (at level 70, no associativity) : set_scope.
 
-Open Scope set_scope.
 
 Notation "[ 'set' x : T | P ]" := (fun x : T => P)
   (at level 0, x at level 99, only parsing) : set_scope.
 Notation "[ 'set' x | P ]" := [set x : _ | P]
   (at level 0, x, P at level 99, format "[ 'set'  x  |  P ]", only parsing) : set_scope.
+
+Definition set0 {T} := [set _ : T | False].
 
 Definition setT {T} := [set _ : T | True].
 
@@ -119,6 +126,9 @@ Proof.
 by move=> f ? <- A B /subset_eqP[subAB subBA] y; split; apply: set_incl_Proper.
 Qed.
 
+Lemma sub0set T (A : set T) : set0 \subset A.
+Proof. by []. Qed.
+
 Lemma bigcup_set1 T U (F : T -> set U) y :
   \bigcup_(x in [set y]) F x <--> F y.
 Proof. by move=> t; split=> [[y' [<-]] | Fyt] //; exists y. Qed.
@@ -154,9 +164,17 @@ Proof.
 by move=> subAB t [x [Ax Fxt]]; exists x; split=> //; apply: subAB.
 Qed.
 
-Global Instance eq_bigcupl T U : Proper (set_eq ==> @eq (T -> set U) ==> set_eq) bigcup.
+Lemma eq_bigcupl T U A B (F : T -> set U) : A <--> B ->
+  \bigcup_(x in A) F x <--> \bigcup_(x in B) F x.
 Proof.
-by move=> A B /subset_eqP[? ?] F G <- {G}; split; apply: incl_bigcupl.
+by move=> /subset_eqP[? ?]; split; apply: incl_bigcupl.
+Qed.
+
+Global Instance eq_bigcup T U : Proper (set_eq ==> pointwise_relation T (@set_eq U) ==> set_eq) bigcup.
+Proof.
+move=> A B eqAB F G eqFG a; apply: (@set_eq_trans _ (\bigcup_(i in A) G i)).
+  exact: eq_bigcupr.
+exact: eq_bigcupl.
 Qed.
 
 Lemma bigcup_flatten T U V A (F : T -> set U) (G : U -> set V) :
@@ -223,3 +241,29 @@ Proof. by rewrite -imsetT bigcup_imset. Qed.
 
 Lemma coverE T : \bigcup_x [set x] <--> [set: T].
 Proof. by rewrite -codomE codom_id. Qed.
+
+Coercion seq_In T : seq T -> set T := fun s x => List.In x s.
+Coercion list_In T : list T -> set T := fun s x => List.In x s.
+
+Lemma subnilset T (A : set T) : [::] \subset A.
+Proof. by []. Qed.
+
+Lemma subconsset T (A : set T) x s :
+  x :: s \subset A <-> x \in A /\ s \subset A.
+Proof.
+split=> [sub|[Ax sub] a [<-|?]] //; last by apply: sub.
+split=> [|a sa]; apply: sub; first by left.
+by right.
+Qed.
+
+Lemma reindex_bigcup I J K (h : J -> I) (F : I -> set K) A B :
+  h @: B <--> A ->
+  \bigcup_(x in A) F x <--> \bigcup_(y in B) F (h y).
+Proof.
+move=> surj t; split.
+  case=> x [Ax Fxt]; case: (surj x) => [?].
+  by case=> // y [By eq_hyx]; exists y; rewrite eq_hyx.
+case=> y [By Fhyt]; exists (h y); split=> //.
+by case: (surj (h y)) => Ahy _; apply: Ahy; exists y.
+Qed.
+Arguments reindex_bigcup [I J K] h [F A] B _ _.

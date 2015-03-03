@@ -1,9 +1,10 @@
-Require Import ZArith List ssreflect ssrbool ssrnat.
+Require Import ZArith.
+Require Import ssreflect ssrfun ssrbool ssrnat eqtype seq bigop.
 
 Require Import Random GenLow.
 Require Import Sets.
 
-Import GenLow ListNotations.
+Import GenLow.
 
 (* High-level Generators *)
 
@@ -35,22 +36,16 @@ Parameter elements : forall {A : Type}, A -> list A -> G A.
 
 Hypothesis semLiftGen :
   forall {A B} (f: A -> B) (g: G A),
-    semGen (liftGen f g) <-->
-    fun b =>
-      exists a, semGen g a /\ f a = b.
+    semGen (liftGen f g) <--> f @: semGen g.
 
 Hypothesis semLiftGenSize :
   forall {A B} (f: A -> B) (g: G A) size,
-    semGenSize (liftGen f g) size <-->
-    fun b =>
-    exists a, semGenSize g size a /\ f a = b.
+    semGenSize (liftGen f g) size <--> f @: semGenSize g size.
 
 Hypothesis semLiftGen2Size :
   forall {A1 A2 B} (f: A1 -> A2 -> B) (g1 : G A1) (g2 : G A2) s,
     semGenSize (liftGen2 f g1 g2) s <-->
-    fun b =>
-      exists a1,
-        semGenSize g1 s a1 /\ exists a2, semGenSize g2 s a2 /\ f a1 a2 = b.
+    f @2: (semGenSize g1 s, semGenSize g2 s).
 
 Hypothesis semLiftGen3Size :
 forall {A1 A2 A3 B} (f: A1 -> A2 -> A3 -> B)
@@ -88,9 +83,8 @@ forall {A1 A2 A3 A4 A5 B} (f: A1 -> A2 -> A3 -> A4 -> A5 -> B)
 Hypothesis semSequenceGenSize:
   forall {A} (gs : list (G A)) n,
     semGenSize (sequenceGen gs) n <-->
-    fun l => length l = length gs /\
-             forall x, List.In x (combine l gs) ->
-                       semGenSize (snd x) n (fst x).
+    [set l | length l = length gs /\
+      List.Forall2 (fun y => semGenSize y n) gs l].
 
 (* Hypothesis semFoldGen_left : *)
 (*   forall {A B : Type} (f : A -> B -> G A) (bs : list B) (a0 : A), *)
@@ -107,42 +101,44 @@ Hypothesis semSequenceGenSize:
 Hypothesis semOneof:
   forall {A} (l : list (G A)) (def : G A),
     (semGen (oneof def l)) <-->
-    (fun e => (exists x, List.In x l /\ semGen x e) \/
-              (l = nil /\ semGen def e)).
+      if l is nil then semGen def else \bigcup_(x in l) semGen x.
+
 Hypothesis semOneofSize:
   forall {A} (l : list (G A)) (def : G A) s,
     (semGenSize (oneof def l) s) <-->
-    (fun e => (exists x, List.In x l /\ semGenSize x s e) \/
-              (l = nil /\ semGenSize def s e)).
+      if l is nil then semGenSize def s else \bigcup_(x in l) semGenSize x s.
 
 Hypothesis semFrequency:
   forall {A} (l : list (nat * G A)) (def : G A),
     semGen (frequency def l) <-->
-    (fun e => (exists n, exists g, (List.In (n, g) l /\ semGen g e /\ n <> 0)) \/
-              ((l = nil \/ (forall x, List.In x l -> fst x = 0)) /\ semGen def e)).
+      let l' := [seq x <- l | x.1 != 0] in
+      if l' is nil then semGen def else
+      \bigcup_(x in l') semGen x.2.
+
 Hypothesis semFrequencySize:
   forall {A} (l : list (nat * G A)) (def : G A) (size: nat),
     semGenSize (frequency def l) size <-->
-    (fun e => (exists n, exists g, (List.In (n, g) l /\ semGenSize g size e /\ n <> 0)) \/
-              ((l = nil \/ (forall x, List.In x l -> fst x = 0)) /\ semGenSize def size e)).
+      let l' := [seq x <- l | x.1 != 0] in
+      if l' is nil then semGenSize def size else
+      \bigcup_(x in l') semGenSize x.2 size.
 
 Hypothesis semVectorOfSize:
   forall {A : Type} (k : nat) (g : G A) size,
     semGenSize (vectorOf k g) size <-->
-    fun l => (length l = k /\ forall x, List.In x l -> semGenSize g size x).
+    [set l | length l = k /\ l \subset semGenSize g size].
 
 Hypothesis semListOfSize:
   forall (A : Type) (g : G A) (size : nat),
     semGenSize (listOf g) size <-->
-    (fun l : list A =>
-       length l <= size /\ (forall x : A, List.In x l -> semGenSize g size x)).
+    [set l | length l <= size /\ l \subset semGenSize g size].
 
 Hypothesis semElements:
   forall {A} (l: list A) (def : A),
-    (semGen (elements def l)) <--> (fun e => List.In e l \/ (l = nil /\ e = def)).
+    (semGen (elements def l)) <--> if l is nil then [set def] else l.
+
 Hypothesis semElementsSize:
   forall {A} (l: list A) (def : A) s,
-    (semGenSize (elements def l) s) <--> (fun e => List.In e l \/ (l = nil /\ e = def)).
+    (semGenSize (elements def l) s) <--> if l is nil then [set def] else l.
 
 End GenHighInterface.
 
@@ -191,51 +187,43 @@ Definition liftGen5 {A1 A2 A3 A4 A5 R}
 
 
 Definition sequenceGen {A : Type} (ms : list (G A)) : G (list A) :=
-  fold_right (fun m m' => bindGen m  (fun x =>
+  foldr (fun m m' => bindGen m  (fun x =>
                           bindGen m' (fun xs =>
-                          returnGen (x :: xs)))) (returnGen []) ms.
+                          returnGen (x :: xs)))) (returnGen [::]) ms.
 
 Fixpoint foldGen {A B : Type} (f : A -> B -> G A) (l : list B) (a : A)
 : G A := nosimpl(
   match l with
-    | [] => returnGen a
+    | [::] => returnGen a
     | (x :: xs) => bindGen (f a x) (foldGen f xs)
   end).
 
 Definition oneof {A : Type} (def: G A) (gs : list (G A)) : G A :=
-  bindGen (choose (0, length gs - 1))
-          (fun n => nth n gs def).
+  bindGen (choose (0, length gs - 1)) (nth def gs).
 
-Fixpoint replicate {A : Type} (n : nat) (x : A) : list A :=
-  match n with
-    | O    => nil
-    | S n' => cons x (replicate n' x)
-  end.
-
-Fixpoint pick {A : Type} (def : G A) (n : nat) (xs : list (nat * G A))
-: nat * G A :=
+Fixpoint pick {A : Type} (def : G A) (xs : list (nat * G A)) n : nat * G A :=
   match xs with
     | nil => (0, def)
     | (k, x) :: xs =>
       if (n < k) then (k, x)
-      else pick def (n - k) xs
+      else pick def xs (n - k)
   end.
 
 Definition sum_fst {A : Type} (gs : list (nat * A)) : nat :=
-  fold_left (fun t p => t + (fst p)) gs 0.
+  foldl (fun t p => t + (fst p)) 0 gs.
 
 Definition frequency {A : Type} (def : G A) (gs : list (nat * G A))
 : G A :=
   let tot := sum_fst gs in
   bindGen (choose (0, tot-1)) (fun n =>
-  @snd _ _ (pick def n gs)).
+  @snd _ _ (pick def gs n)).
 
 Definition vectorOf {A : Type} (k : nat) (g : G A)
 : G (list A) :=
-  fold_right (fun m m' =>
+  foldr (fun m m' =>
                 bindGen m (fun x =>
                 bindGen m' (fun xs => returnGen (cons x xs)))
-             ) (returnGen nil) (replicate k g).
+             ) (returnGen nil) (nseq k g).
 
 Definition listOf {A : Type} (g : G A) : G (list A) :=
   sized (fun n => bindGen (choose (0, n)) (fun k => vectorOf k g)).
@@ -272,13 +260,10 @@ Lemma semLiftGenSize :
     exists a, semGenSize g size a /\ f a = b.
 Proof. solveLiftGenX. Qed.
 
-Lemma semLiftGen2Size :
-  forall {A1 A2 B} (f: A1 -> A2 -> B) (g1 : G A1) (g2 : G A2) s,
-    semGenSize (liftGen2 f g1 g2) s <-->
-    fun b =>
-      exists a1,
-        semGenSize g1 s a1 /\ exists a2, semGenSize g2 s a2 /\ f a1 a2 = b.
-Proof. solveLiftGenX. Qed.
+Lemma semLiftGen2Size {A1 A2 B} (f: A1 -> A2 -> B) (g1 : G A1) (g2 : G A2) s :
+  semGenSize (liftGen2 f g1 g2) s <-->
+  f @2: (semGenSize g1 s, semGenSize g2 s).
+Proof. admit. Qed.
 
 Lemma semLiftGen3Size :
 forall {A1 A2 A3 B} (f: A1 -> A2 -> A3 -> B)
@@ -317,152 +302,97 @@ forall {A1 A2 A3 A4 A5 B} (f: A1 -> A2 -> A3 -> A4 -> A5 -> B)
                                                                (f a1 a2 a3 a4 a5) = b)))).
 Proof. solveLiftGenX. Qed.
 
-Lemma semSequenceGenSize :
-  forall {A} (gs : list (G A)) n,
-    semGenSize (sequenceGen gs) n <-->
-         fun l => length l = length gs /\
-                  forall x, List.In x (combine l gs) ->
-                            semGenSize (snd x) n (fst x).
+Lemma Forall2_cons T U (P : T -> U -> Prop) x1 s1 x2 s2 : List.Forall2 P (x1 :: s1) (x2 :: s2) <-> P x1 x2 /\ List.Forall2 P s1 s2.
+Proof. admit. Qed.
+
+Lemma semSequenceGenSize A (gs : list (G A)) n :
+  semGenSize (sequenceGen gs) n <-->
+  [set l | length l = length gs /\
+    List.Forall2 (fun y => semGenSize y n) gs l].
+  (*
+  semGenSize (sequenceGen gs) n <-->
+  [set l | List.Forall2 (fun x s => x \in s) l [seq semGenSize g n | g <- gs]].
+*)
 Proof.
+elim: gs => [|g gs IHgs].
+  by rewrite semReturnSize /set1; case=> // a l; split=> // [[]].
+rewrite /= semBindSize; setoid_rewrite semBindSize; setoid_rewrite semReturnSize.
+setoid_rewrite IHgs; case=> [| x l].
+  split; first by case=> ? [? [? [?]]].
+  by move=> H; inversion H.
+rewrite Forall2_cons; split; first by case=> y [gen_y [s [[<- ?]]]] [<- <-].
+by case=> [[<-] [? ?]]; exists x; split => //; exists l; split.
+Qed.
+  (*
+elim: gs => [|g gs IHgs] /=.
+  by rewrite semReturnSize /set1 => l; split=> [<-|] // meml; inversion meml.
+rewrite semBindSize; setoid_rewrite semBindSize; setoid_rewrite semReturnSize.
+setoid_rewrite IHgs; case=> [| x l].
+  split; first by case=> ? [? [? [?]]].
+  by move=> H; inversion H.
+rewrite Forall2_cons; split; first by case=> y [gen_y [s []]] ? [<- <-].
+by case=> ? ?; exists x; split => //; exists l; split.
+*)
+
+Lemma semVectorOfSize {A : Type} (k : nat) (g : G A) n :
+  semGenSize (vectorOf k g) n <-->
+  [set l | length l = k /\ l \subset (semGenSize g n)].
+Proof.
+elim: k => [|k IHk].
+  rewrite /vectorOf /= semReturnSize.
+  by move=> s; split=> [<-|[] /size0nil ->] //; split.
+rewrite /vectorOf /= semBindSize; setoid_rewrite semBindSize.
+setoid_rewrite semReturnSize; setoid_rewrite IHk.
+case=> [|x l]; first by split=> [[? [? [? [?]]]] | []].
+split=> [[y [gen_y [l' [[length_l' ?] [<- <-]]]]]|] /=.
+  split; first by rewrite length_l'.
+  exact/subconsset.
+by case=> [[?]] /subconsset [? ?]; exists x; split => //; exists l.
+Qed.
+
+Lemma semListOfSize {A : Type} (g : G A) size :
+  semGenSize (listOf g) size <-->
+  [set l | length l <= size /\ l \subset (semGenSize g size)].
+Proof.
+rewrite /listOf semSizedSize semBindSize; setoid_rewrite semVectorOfSize.
+rewrite semChooseSize => l; split=> [[n [[_ ?] [-> ?]]] | [? ?]] //.
+by exists (length l).
+Qed.
+
+Lemma In_nth_exists {A} (l: list A) x def :
+  List.In x l -> exists n, nth def l n = x /\ (n < length l)%coq_nat.
+Proof.
+elim : l => [| a l IHl] //=.
+move => [H | /IHl [n [H1 H2]]]; subst.
+  exists 0; split => //; omega.
+exists n.+1; split => //; omega.
+Qed.
+
+Lemma semOneofSize {A} (l : list (G A)) (def : G A) s :
+  semGenSize (oneof def l) s <-->
+  if l is nil then semGenSize def s else \bigcup_(x in l) semGenSize x s.
+Proof.
+case: l => [|g l].
+  rewrite semBindSize semChooseSize.
+  rewrite (@eq_bigcupl _ _ _ [set 0]) ?bigcup_set1 // => a; split=> [[? ?]|<-] //.
+  by apply/antisym/andP.
+rewrite semBindSize semChooseSize.
+set X := (fun a : nat => _ /\ _).
+rewrite (reindex_bigcup (nth def (g :: l)) X) // => i; split.
 admit.
-(*
-  move=> A gs n la. rewrite /sequenceGen. split.
-  - elim : gs la => /= [| g gs IHgs] la.
-    + by move/semReturnSize => H; subst.
-    + move => /semBindSize [a [H1 /semBindSize
-                                [la' [H2 /semReturnSize H3]]]]; subst.
-      move: IHgs => /(_ la' H2) [<- HIn].
-      split=> //= x [H | H]; subst => //=. by apply HIn => /=.
-  - elim : gs la => /= [| g gs IHgs].
-    + move => [|a la] [//= Heq H].
-        by apply semReturnSize.
-    + move => [|a la] [//= [Heq] HIn]; subst.
-      apply semBindSize.
-      exists a. split.
-      * apply (HIn (a, g)). by left.
-      * apply semBindSize. exists la.
-        split => //=.
-        apply IHgs. split => // x H. apply HIn; by right.
-          by apply semReturnSize.
-*)
+admit.
 Qed.
 
-Lemma semVectorOfSize:
-  forall {A : Type} (k : nat) (g : G A) n,
-    semGenSize (vectorOf k g) n <-->
-            fun l => (length l = k /\ forall x, List.In x l -> semGenSize g n x).
+Lemma semOneof {A} (l : list (G A)) (def : G A) :
+  semGen (oneof def l) <-->
+  if l is nil then semGen def else \bigcup_(x in l) semGen x.
 Proof.
-  admit.
-(*
-  move => A k g n la; unfold vectorOf; split.
-  - elim : k la => /= [|k IHk] la.
-    + move=> /semReturnSize H; subst. by split.
-    + move=> /semBindSize [a [H1 /semBindSize [la' [H2 /semReturnSize H3]]]].
-      subst => /=.
-      have [<- HIn]: length la' = k /\
-                     (forall x : A, List.In x la' -> semGenSize g n x)
-        by apply IHk.
-    split => // x [H | H]; subst => //.
-    by apply HIn.
- - elim : k la => /= [|k IHk] la [Heq Hgen].
-   + destruct la => //. by apply semReturnSize.
-   + destruct la=> //. simpl in *.
-     move: Heq => [Heq]; subst.
-     apply semBindSize.
-     exists a. split.
-     * apply Hgen => //; by left.
-     * apply semBindSize.
-       exists la =>//. split => //; last by apply semReturnSize.
-       apply IHk. split => //.
-       move => x HIn. apply Hgen. by right.
-*)
+by case: l => [|g l]; rewrite 1?bigcupC; apply: eq_bigcupr => sz;
+  apply: semOneofSize.
 Qed.
 
-Lemma semListOfSize:
-  forall {A : Type} (g : G A) size,
-    semGenSize (listOf g) size <-->
-    fun l => length l <= size /\ (forall x, List.In x l -> semGenSize g size x).
-Proof.
-  move => A g size la; unfold listOf; split.
-  - move => /semSizedSize /semBindSize
-             [n' [/semChooseSize [/= H1 H2] /semVectorOfSize [Heq H3]]]; subst.
-    by intros; split; auto.
-  - move => [H1 H2]. apply semSizedSize. apply semBindSize.
-    exists (length la).
-    split; first by apply semChooseSize => //=.
-    apply semVectorOfSize. split => //.
-Qed.
-
-Lemma In_nth_exists:
-  forall {A} (l: list A) x def,
-    List.In x l -> exists n, nth n l def = x /\ (n < length l)%coq_nat.
-Proof.
-  move => A l x def. elim : l => [| a l IHl] //=.
-  move => [H | /IHl [n [H1 H2]]]; subst.
-  - exists 0. split => //. omega.
-  - exists n.+1. split => //. omega.
-Qed.
-
-Lemma semOneof:
-  forall {A} (l : list (G A)) (def : G A),
-    (semGen (oneof def l)) <-->
-    (fun e => (exists x, List.In x l /\ semGen x e) \/
-              (l = nil /\ semGen def e)).
-Proof.
-  admit.
-(*
-  move=> A l def a. unfold oneof. split.
-  - move => [s /semBindSize [n [/semChooseSize [Hleq1 Hleq2] Hnth]]].
-    case: l Hleq2 Hnth => [| g gs] //= /leP Hleq2 Hnth.
-    + rewrite sub0n in Hleq2. apply le_n_0_eq in Hleq2; subst.
-      right. split => //. by exists s.
-    + left. rewrite subn1 NPeano.Nat.pred_succ in Hleq2.
-      case: n Hleq1 Hleq2 Hnth => [_ _ | n Hleq1 Hleq2] Hnth.
-      * exists g. split; auto. by exists s.
-      * exists (nth n gs def). split; last by exists s.
-        right. by apply nth_In.
-  - move => [[g [Hin [s Hsem]]] | [Heq [s Hsem]]]; subst.
-    + exists s. apply semBindSize.
-      destruct (In_nth_exists _ _ def Hin) as [n [Hnth Hl]]; subst.
-      exists n. split => //. apply semChooseSize. split => //.
-      simpl. apply/leP.
-      rewrite subn1. apply NPeano.Nat.le_succ_le_pred. omega.
-    + exists s. apply semBindSize. exists 0. split => //.
-      apply semChooseSize. split => //.
-*)
-Qed.
-
-Lemma semOneofSize:
-  forall {A} (l : list (G A)) (def : G A) s,
-    (semGenSize (oneof def l) s) <-->
-    (fun e => (exists x, List.In x l /\ semGenSize x s e) \/
-              (l = nil /\ semGenSize def s e)).
-Proof.
-  move => A l def s a.  unfold oneof. split.
-  - move => /semBindSize [n [/semChooseSize [Hleq1 Hleq2] Hnth]].
-    case: l Hleq2 Hnth => [| g gs] //= /leP Hleq2 Hnth.
-    + rewrite sub0n in Hleq2. apply le_n_0_eq in Hleq2; subst.
-      right. by split => //.
-    + left. rewrite subn1 NPeano.Nat.pred_succ in Hleq2.
-      case: n Hleq1 Hleq2 Hnth => [_ _ | n Hleq1 Hleq2] Hnth.
-      * exists g. split => //; by auto.
-      * exists (nth n gs def). split; last by auto.
-        right. by apply nth_In.
-  - move => [[g [Hin Hsem]] | [Heq Hsem]]; subst.
-    +apply semBindSize.
-      destruct (In_nth_exists _ _ def Hin) as [n [Hnth Hl]]; subst.
-      exists n. split => //. apply semChooseSize. split => //.
-      simpl. apply/leP.
-      rewrite subn1. apply NPeano.Nat.le_succ_le_pred. omega.
-    + apply semBindSize. exists 0. split => //.
-      apply semChooseSize. split => //.
-Qed.
-
-
-Lemma semElements :
-  forall {A} (l: list A) (def : A),
-    (semGen (elements def l)) <-->
-    (fun e => List.In e l \/ (l = nil /\ e = def)).
+Lemma semElements {A} (l: list A) (def : A) :
+  (semGen (elements def l)) <--> if l is nil then [set def] else l.
 Proof.
   admit.
 (*
@@ -484,10 +414,8 @@ Proof.
 *)
 Qed.
 
-Lemma semElementsSize :
-  forall {A} (l: list A) (def : A) s,
-    (semGenSize (elements def l) s) <-->
-    (fun e => List.In e l \/ (l = nil /\ e = def)).
+Lemma semElementsSize {A} (l: list A) (def : A) s :
+  (semGenSize (elements def l) s) <--> if l is nil then [set def] else l.
 Proof.
   admit.
 (*
@@ -524,27 +452,16 @@ Proof.
       by rewrite -IHxs addnAC.
 Qed.
 
-Lemma sum_fst_zero:
-  forall {A} (l: list (nat * A)),
-    sum_fst l = 0 <->
-    (forall x, List.In x l -> fst x = 0).
+Lemma sum_fst_eq0P {A} (l : list (nat * A)) :
+  sum_fst l = 0 <-> [seq x <- l | x.1 != 0] = [::].
 Proof.
-  move=> A l.
-  split.
-  { elim : l => //= x xs IHxs Heq. destruct x as [a n].
-    rewrite sum_fst_unfold in Heq.
-    move/plus_is_O : Heq => [H1 /IHxs H2]; subst.
-    move => x [Heq | HIn]; subst => //; auto. }
-  { elim l => // x xs IHxs H. destruct x as [a n].
-    rewrite sum_fst_unfold. apply NPeano.Nat.eq_add_0. split.
-    - apply (H (a, n)). by constructor.
-    - apply IHxs. move=> x' HIn. apply H. constructor(exact HIn). }
+admit.
 Qed.
 
 Lemma pick_def :
   forall {A} (l: list (nat * G A)) n def,
     sum_fst l <= n ->
-    pick def n l = (0, def).
+    pick def l n = (0, def).
 Proof.
   move=> A l n def Hleq.
   elim : l n Hleq => //=. case=> //= i p l IHl n Hleq.
@@ -560,7 +477,7 @@ Qed.
 Lemma pick_exists :
   forall {A} (l: list (nat * G A)) n def,
     n <  sum_fst l <->
-    exists x, List.In x l /\ pick def n l = x /\ fst x <> 0.
+    exists x, List.In x l /\ pick def l n = x /\ fst x <> 0.
 Proof.
   move => A l n def. split.
   - move => Hlt.
@@ -582,7 +499,7 @@ Qed.
 Lemma pick_In :
   forall {A} (l: list (nat * G A)) x def,
     List.In x l /\ fst x <> 0 ->
-    exists n, pick def n l = x.
+    exists n, pick def l n = x.
 Proof.
   move => A l x def [HIn Hfst].
   elim : l HIn => //=. case => //= i g xs IHxs [H1 | H2]; subst.
@@ -595,68 +512,47 @@ Proof.
       by rewrite  -[X in _ - X]add0n subnDr subn0.
 Qed.
 
-Lemma semFrequencySize:
-  forall {A} (l : list (nat * G A)) (def : G A) (size: nat),
-    semGenSize (frequency def l) size <-->
-    (fun e =>
-       (exists n, exists g,
-                    (List.In (n, g) l /\ semGenSize g size e /\ n <> 0)) \/
-       ((l = nil \/ (forall x, List.In x l -> fst x = 0)) /\
-        semGenSize def size e)).
+Lemma set0mE m : [set n | 0 <= n /\ n <= m] <--> [set n | n <= m].
 Proof.
-  move=> A l def s a.
-  rewrite /frequency //=.
-  split =>
-  [ /semBindSize [n [/semChooseSize /= [_ Hleq] Hsize]]
-  | H ].
-  { destruct (sum_fst l) eqn:Heq.
-    - right.
-      have Heq2: (pick def n l) = (0, def) by apply pick_def; rewrite Heq.
-      rewrite Heq2 /= in Hsize. move/sum_fst_zero : Heq => HIn.
-      destruct n as [| n]; try discriminate; clear Hleq.
-      split => //. by right.
-    - rewrite subn1 -pred_Sn in Hleq.
-      have /(pick_exists _ _ def) [[n' g] [H1 [H2 H3]]] : n < sum_fst l
-        by rewrite Heq; move: Hleq => /leP Hleq; apply/ltP; omega.
-      left. exists n'. exists g. repeat split => //. by rewrite H2 in Hsize. }
-  { move : H => [[n [g [H1 [H2 H3]]]] | [[H1 | H1] H2]].
-    - apply semBindSize.
-      have [m H] : exists m : nat, pick def m l = (n, g)
-                     by apply pick_In; split => //.
-      exists m. rewrite H. split => //.
-      apply semChooseSize; split => //=.
-      have Hlt: m < sum_fst l
-      by apply/(pick_exists _ _ def)=> //=; exists (n, g).
-      rewrite -(leq_add2r 1) addn1 subnK. by auto.
-      by case: (sum_fst l) Hlt => //=.
-   - subst. rewrite sub0n. apply semBindSize; exists 0. split => //=.
-     apply semChooseSize => //.
-   - apply semBindSize. exists 0. split; first by apply semChooseSize.
-      elim: l H1 => //=. case => n p l IHl H1.
-      move/(_ (n, p)): (H1) => //= H. rewrite H => //=.
-      rewrite subn0; auto. by left. }
+admit.
 Qed.
 
-Lemma semFrequency:
-  forall {A} (l : list (nat * G A)) (def : G A),
-    semGen (frequency def l) <-->
-    (fun e => (exists n, exists g,
-                           (List.In (n, g) l /\ semGen g e /\ n <> 0)) \/
-              ((l = nil \/ (forall x, List.In x l -> fst x = 0)) /\
-               semGen def e)).
+Lemma pick_imset A (def : G A) l :
+  pick def l @: [set m | m < sum_fst l] <--> [seq x <- l | x.1 != 0].
 Proof.
-  admit.
-(*
-  move => A l def a. split.
-  - move => [s /semFrequencySize [[n [g [H1 [H2 H3]]]] | [H1 H2]]].
-    + left. exists n. exists g. repeat split => //. eexists; eassumption.
-    + right. split => //. eexists; eassumption.
-  - move => [[n [g [H1 [[s H2] H3]]]] | [[H1 | H1] [s H2]]]; subst;
-            exists s; apply semFrequencySize.
-    + left. exists n; exists g. split => //.
-    + right. split => //. by left.
-    + right. split => //. by right.
-*)
+admit.
+Qed.
+
+Lemma semFrequencySize {A} (l : list (nat * G A)) (def : G A) (size: nat) :
+  semGenSize (frequency def l) size <-->
+    let l' := [seq x <- l | x.1 != 0] in
+    if l' is nil then semGenSize def size else
+    \bigcup_(x in l') semGenSize x.2 size.
+Proof.
+rewrite semBindSize semChooseSize /=.
+case lsupp: {1}[seq x <- l | x.1 != 0] => [|[n g] gs].
+move/sum_fst_eq0P: lsupp => suml; rewrite suml.
+  rewrite (@eq_bigcupl _ _ _ [set 0]) ?bigcup_set1 ?pick_def // ?leqn0 ?suml //.
+  by move=> n; split=> [[_]|<-] //; rewrite leqn0; move/eqP.
+symmetry; apply: reindex_bigcup.
+have pos_suml: 0 < sum_fst l.
+  have [] := sum_fst_eq0P l.
+  by rewrite lsupp; case: (sum_fst l) => // /(_ erefl).
+have->: (fun a : nat => 0 <= a /\ a <= sum_fst l - 1) <--> [set m | m < sum_fst l].
+  move=> m /=; split=> [[_]|]; first by rewrite -ltnS subn1 prednK.
+  by rewrite -{1}(prednK pos_suml) ltnS subn1.
+exact: pick_imset.
+Qed.
+
+Lemma semFrequency {A} (l : list (nat * G A)) (def : G A) :
+  semGen (frequency def l) <-->
+    let l' := [seq x <- l | x.1 != 0] in
+    if l' is nil then semGen def else
+    \bigcup_(x in l') semGen x.2.
+Proof.
+by case lsupp: {1}[seq x <- l | x.1 != 0] => [|[n g] gs] /=;
+rewrite 1?bigcupC; apply: eq_bigcupr => sz;
+have := (semFrequencySize l def sz); rewrite lsupp.
 Qed.
 
 End GenHigh.
