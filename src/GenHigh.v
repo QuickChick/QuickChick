@@ -91,12 +91,12 @@ Hypothesis semSequenceGenSize:
 (*     semGen (foldGen f bs a0) <--> *)
 (*     fold_left (fun g b => fun x => exists a, g a /\ semGen (f a b) x) bs (eq a0). *)
 
-(* Hypothesis semFoldGen_right : *)
-(*       forall {A B : Type} (f : A -> B -> G A) (bs : list B) (a0 : A), *)
-(*         semGen (foldGen f bs a0) <--> *)
-(*         fun an =>  *)
-(*           fold_right (fun b p => fun a_prev => exists a, semGen (f a_prev b) a /\ p a)  *)
-(*                      (eq an) bs a0. *)
+Hypothesis semFoldGen_right :
+  forall {A B : Type} (f : A -> B -> G A) (bs : list B) (a0 : A) (s : nat),
+    semGenSize (foldGen f bs a0) s <-->
+    [ set an |
+      foldr (fun b p => [set a_prev | exists a, a \in (semGenSize (f a_prev b) s :&: p)]) 
+            [set an] bs a0 ].
 
 Hypothesis semOneof:
   forall {A} (l : list (G A)) (def : G A),
@@ -553,6 +553,25 @@ Proof.
 by case lsupp: {1}[seq x <- l | x.1 != 0] => [|[n g] gs] /=;
 rewrite 1?bigcupC; apply: eq_bigcupr => sz;
 have := (semFrequencySize l def sz); rewrite lsupp.
+Qed.
+
+Lemma semFoldGen_right :
+  forall {A B : Type} (f : A -> B -> G A) (bs : list B) (a0 : A) (s : nat),
+    semGenSize (foldGen f bs a0) s <-->
+    [ set an |
+      foldr (fun b p => [set a_prev | exists a, a \in (semGenSize (f a_prev b) s :&: p)]) 
+            [set an] bs a0].
+Proof.
+  move => A B f bs a0 s. rewrite /foldGen. 
+   elim : bs a0 => [| b bs IHbs] a0 an. 
+  - split. 
+    + move/semReturnSize => ->. reflexivity. 
+     + move => ->. now apply semReturnSize.
+  - split. 
+    + move/semBindSize => [a [H1 H2]]. 
+       exists a. split => //. now apply IHbs.
+    + move => [a [H1 H2]]. apply semBindSize. exists a. split => //.
+       now apply IHbs. 
 Qed.
 
 End GenHigh.
