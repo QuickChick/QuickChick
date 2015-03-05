@@ -167,58 +167,48 @@ Instance arbType : Arbitrary Type :=
 Lemma arbBool_correct:
   semGen arbitrary <--> [set: bool].
 Proof.
-  rewrite /arbitrary /arbBool /arbitraryBool. move => b.
-  split => // _. apply semChoose.
-  case: b; split => //.
+by rewrite semChoose //; case.
 Qed.
 
 Lemma arbNat_correct:
   semGen arbitrary <--> [set: nat].
 Proof.
+rewrite /arbitrary /= /arbitraryNat /=.
 rewrite semSized => n; split=> // _; exists n; split=> //.
-by rewrite (semChooseSize 0 n n n).
+by rewrite (semChooseSize _ _ _) /Random.leq /=.
 Qed.
 
-Lemma arbInt_correct:
-  forall s,
-    semGenSize arbitrary s <-->
-    (fun (z : Z) =>  (- Z.of_nat s <= z <= Z.of_nat s)%Z).
+Lemma arbInt_correct s :
+  semGenSize arbitrary s <-->
+  [set z | (- Z.of_nat s <= z <= Z.of_nat s)%Z].
 Proof.
-  rewrite /arbitrary /arbInt /arbitraryZ. move => n. split.
-  - move/semSizedSize/semChooseSize => /= [H1 H2].
-    split; by apply Zle_bool_imp_le.
-  - move => [H1 H2].
-    apply semSizedSize. apply semChooseSize.
-    split; by apply Zle_imp_le_bool.
+rewrite semSizedSize semChooseSize.
+  by move=> n; split=> [/andP|] [? ?]; [|apply/andP]; split; apply/Zle_is_le_bool.
+apply/(Zle_bool_trans _ 0%Z); apply/Zle_is_le_bool.
+  exact/Z.opp_nonpos_nonneg/Zle_0_nat.
+exact/Zle_0_nat.
 Qed.
 
-
-Lemma arbBool_correctSize:
-  forall s,
-    semGenSize arbitrary s <--> (fun (_ : bool) => True).
+Lemma arbBool_correctSize s :
+  semGenSize arbitrary s <--> [set: bool].
 Proof.
-  rewrite /arbitrary /arbBool /arbitraryBool. move => b.
-  split => // _. apply semChooseSize.
-  case: b; case: a; split => //=.
+by rewrite semChooseSize //; case.
 Qed.
 
-Lemma arbNat_correctSize:
-  forall s,
-    semGenSize arbitrary s <--> (fun (n : nat) => (n <= s)%coq_nat).
+Lemma arbNat_correctSize s :
+  semGenSize arbitrary s <--> [set n : nat | (n <= s)%coq_nat].
 Proof.
-  rewrite /arbitrary /arbNat /arbitraryNat. move => n.
-  split.
-  - by move/semSizedSize/semChooseSize => /= [H1 /leP H2].
-  - move => /leP H.
-    apply semSizedSize. apply semChooseSize.
-    split; auto.
+by rewrite semSizedSize semChooseSize // => n /=; case: leP.
 Qed.
 
 Lemma arbInt_correctSize : semGen arbitrary <--> [set: Z].
 Proof.
 rewrite semSized => n; split=> // _; exists (Z.abs_nat n); split=> //.
-rewrite Nat2Z.inj_abs_nat (semChooseSize _ _ _ _).
-by case: n => //= p; rewrite !Z.leb_refl.
+rewrite Nat2Z.inj_abs_nat (semChooseSize _ _ _).
+  by case: n => //= p; rewrite !Z.leb_refl.
+apply/(Zle_bool_trans _ 0%Z); apply/Zle_is_le_bool.
+  exact/Z.opp_nonpos_nonneg/Z.abs_nonneg.
+exact/Z.abs_nonneg.
 Qed.
 
 (* TODO : this need semListOf *)

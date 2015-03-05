@@ -355,7 +355,7 @@ Lemma semListOfSize {A : Type} (g : G A) size :
   [set l | length l <= size /\ l \subset (semGenSize g size)].
 Proof.
 rewrite /listOf semSizedSize semBindSize; setoid_rewrite semVectorOfSize.
-rewrite semChooseSize => l; split=> [[n [[_ ?] [-> ?]]] | [? ?]] //.
+rewrite semChooseSize // => l; split=> [[n [/andP [_ ?] [-> ?]]]| [? ?]] //.
 by exists (length l).
 Qed.
 
@@ -373,11 +373,11 @@ Lemma semOneofSize {A} (l : list (G A)) (def : G A) s :
   if l is nil then semGenSize def s else \bigcup_(x in l) semGenSize x s.
 Proof.
 case: l => [|g l].
-  rewrite semBindSize semChooseSize.
-  rewrite (@eq_bigcupl _ _ _ [set 0]) ?bigcup_set1 // => a; split=> [[? ?]|<-] //.
+  rewrite semBindSize semChooseSize //.
+  rewrite (@eq_bigcupl _ _ _ [set 0]) ?bigcup_set1 // => a; split=> [/andP [? ?]|<-] //.
   by apply/antisym/andP.
-rewrite semBindSize semChooseSize.
-set X := (fun a : nat => _ /\ _).
+rewrite semBindSize semChooseSize //.
+set X := (fun a : nat => is_true (_ && _)).
 rewrite (reindex_bigcup (nth def (g :: l)) X) // => i; split.
 admit.
 admit.
@@ -512,11 +512,6 @@ Proof.
       by rewrite  -[X in _ - X]add0n subnDr subn0.
 Qed.
 
-Lemma set0mE m : [set n | 0 <= n /\ n <= m] <--> [set n | n <= m].
-Proof.
-admit.
-Qed.
-
 Lemma pick_imset A (def : G A) l :
   pick def l @: [set m | m < sum_fst l] <--> [seq x <- l | x.1 != 0].
 Proof.
@@ -529,18 +524,17 @@ Lemma semFrequencySize {A} (l : list (nat * G A)) (def : G A) (size: nat) :
     if l' is nil then semGenSize def size else
     \bigcup_(x in l') semGenSize x.2 size.
 Proof.
-rewrite semBindSize semChooseSize /=.
+rewrite semBindSize semChooseSize //=.
 case lsupp: {1}[seq x <- l | x.1 != 0] => [|[n g] gs].
 move/sum_fst_eq0P: lsupp => suml; rewrite suml.
   rewrite (@eq_bigcupl _ _ _ [set 0]) ?bigcup_set1 ?pick_def // ?leqn0 ?suml //.
-  by move=> n; split=> [[_]|<-] //; rewrite leqn0; move/eqP.
+  by move=> n; split; rewrite leqn0; [move/eqP|] => ->.
 symmetry; apply: reindex_bigcup.
 have pos_suml: 0 < sum_fst l.
   have [] := sum_fst_eq0P l.
   by rewrite lsupp; case: (sum_fst l) => // /(_ erefl).
-have->: (fun a : nat => 0 <= a /\ a <= sum_fst l - 1) <--> [set m | m < sum_fst l].
-  move=> m /=; split=> [[_]|]; first by rewrite -ltnS subn1 prednK.
-  by rewrite -{1}(prednK pos_suml) ltnS subn1.
+have->: (fun a : nat => a <= sum_fst l - 1) <--> [set m | m < sum_fst l].
+  by move=> m /=; rewrite -ltnS subn1 prednK.
 exact: pick_imset.
 Qed.
 
