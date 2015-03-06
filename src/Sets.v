@@ -112,6 +112,12 @@ move=> y; split; first by case=> x [_ fx]; exists x.
 by case=> x fx; exists x.
 Qed.
 
+Lemma imset_id T (A : set T) : id @: A <--> A.
+Proof. admit. Qed.
+
+Lemma coverE T (A : set T) : \bigcup_(x in A) [set x] <--> A.
+Proof. exact: imset_id. Qed.
+
 Lemma setXT T U : setX [set: T] [set: U] <--> [set: T * U].
 Proof. by case. Qed.
 
@@ -169,6 +175,8 @@ Lemma eq_bigcupl T U A B (F : T -> set U) : A <--> B ->
 Proof.
 by move=> /subset_eqP[? ?]; split; apply: incl_bigcupl.
 Qed.
+
+Arguments eq_bigcupl [T U A] B F _ _.
 
 Global Instance eq_bigcup T U : Proper (set_eq ==> pointwise_relation T (@set_eq U) ==> set_eq) bigcup.
 Proof.
@@ -238,9 +246,6 @@ Qed.
 Lemma bigcup_codom T U V (f : T -> U) (F : U -> set V) :
   \bigcup_(y in codom f) (F y) <--> \bigcup_x F (f x).
 Proof. by rewrite -imsetT bigcup_imset. Qed.
-
-Lemma coverE T : \bigcup_x [set x] <--> [set: T].
-Proof. by rewrite -codomE codom_id. Qed.
 
 Coercion seq_In T : seq T -> set T := fun s x => List.In x s.
 Coercion list_In T : list T -> set T := fun s x => List.In x s.

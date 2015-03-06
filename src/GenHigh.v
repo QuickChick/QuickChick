@@ -6,6 +6,12 @@ Require Import Sets.
 
 Import GenLow.
 
+Lemma nthE T (def : T) s i : List.nth i s def = nth def s i.
+Proof.
+elim: s i => [|x s IHs i]; first by case.
+by case: i.
+Qed.
+
 (* High-level Generators *)
 
 Module Type GenHighInterface.
@@ -263,7 +269,10 @@ Proof. solveLiftGenX. Qed.
 Lemma semLiftGen2Size {A1 A2 B} (f: A1 -> A2 -> B) (g1 : G A1) (g2 : G A2) s :
   semGenSize (liftGen2 f g1 g2) s <-->
   f @2: (semGenSize g1 s, semGenSize g2 s).
-Proof. admit. Qed.
+Proof.
+rewrite semBindSize curry_imset2l; apply: eq_bigcupr => x.
+by rewrite semBindSize; apply: eq_bigcupr => y; rewrite semReturnSize.
+Qed.
 
 Lemma semLiftGen3Size :
 forall {A1 A2 A3 B} (f: A1 -> A2 -> A3 -> B)
@@ -302,17 +311,17 @@ forall {A1 A2 A3 A4 A5 B} (f: A1 -> A2 -> A3 -> A4 -> A5 -> B)
                                                                (f a1 a2 a3 a4 a5) = b)))).
 Proof. solveLiftGenX. Qed.
 
-Lemma Forall2_cons T U (P : T -> U -> Prop) x1 s1 x2 s2 : List.Forall2 P (x1 :: s1) (x2 :: s2) <-> P x1 x2 /\ List.Forall2 P s1 s2.
-Proof. admit. Qed.
+Lemma Forall2_cons T U (P : T -> U -> Prop) x1 s1 x2 s2 :
+  List.Forall2 P (x1 :: s1) (x2 :: s2) <-> P x1 x2 /\ List.Forall2 P s1 s2.
+Proof.
+split=> [H|[? ?]]; last by constructor.
+by inversion H.
+Qed.
 
 Lemma semSequenceGenSize A (gs : list (G A)) n :
   semGenSize (sequenceGen gs) n <-->
   [set l | length l = length gs /\
     List.Forall2 (fun y => semGenSize y n) gs l].
-  (*
-  semGenSize (sequenceGen gs) n <-->
-  [set l | List.Forall2 (fun x s => x \in s) l [seq semGenSize g n | g <- gs]].
-*)
 Proof.
 elim: gs => [|g gs IHgs].
   by rewrite semReturnSize /set1; case=> // a l; split=> // [[]].
@@ -323,16 +332,6 @@ setoid_rewrite IHgs; case=> [| x l].
 rewrite Forall2_cons; split; first by case=> y [gen_y [s [[<- ?]]]] [<- <-].
 by case=> [[<-] [? ?]]; exists x; split => //; exists l; split.
 Qed.
-  (*
-elim: gs => [|g gs IHgs] /=.
-  by rewrite semReturnSize /set1 => l; split=> [<-|] // meml; inversion meml.
-rewrite semBindSize; setoid_rewrite semBindSize; setoid_rewrite semReturnSize.
-setoid_rewrite IHgs; case=> [| x l].
-  split; first by case=> ? [? [? [?]]].
-  by move=> H; inversion H.
-rewrite Forall2_cons; split; first by case=> y [gen_y [s []]] ? [<- <-].
-by case=> ? ?; exists x; split => //; exists l; split.
-*)
 
 Lemma semVectorOfSize {A : Type} (k : nat) (g : G A) n :
   semGenSize (vectorOf k g) n <-->
@@ -368,19 +367,24 @@ move => [H | /IHl [n [H1 H2]]]; subst.
 exists n.+1; split => //; omega.
 Qed.
 
+Lemma nth_imset T (def : T) l : nth def l @: [set n | n < length l] <--> l.
+Proof.
+case: l => [|x l] t; first by split=> //; case=> ?; rewrite ltn0; case.
+split; first by case=> n [? <-]; rewrite -nthE; apply/List.nth_In/ltP.
+by case/(In_nth_exists _ _ def) => n [? ?]; exists n; split=> //; apply/ltP.
+Qed.
+
 Lemma semOneofSize {A} (l : list (G A)) (def : G A) s :
   semGenSize (oneof def l) s <-->
   if l is nil then semGenSize def s else \bigcup_(x in l) semGenSize x s.
 Proof.
 case: l => [|g l].
   rewrite semBindSize semChooseSize //.
-  rewrite (@eq_bigcupl _ _ _ [set 0]) ?bigcup_set1 // => a; split=> [/andP [? ?]|<-] //.
+  rewrite (eq_bigcupl [set 0]) ?bigcup_set1 // => a; split=> [/andP [? ?]|<-] //.
   by apply/antisym/andP.
 rewrite semBindSize semChooseSize //.
 set X := (fun a : nat => is_true (_ && _)).
-rewrite (reindex_bigcup (nth def (g :: l)) X) // => i; split.
-admit.
-admit.
+by rewrite (reindex_bigcup (nth def (g :: l)) X) // /X subn1 nth_imset.
 Qed.
 
 Lemma semOneof {A} (l : list (G A)) (def : G A) :
@@ -391,47 +395,26 @@ by case: l => [|g l]; rewrite 1?bigcupC; apply: eq_bigcupr => sz;
   apply: semOneofSize.
 Qed.
 
-Lemma semElements {A} (l: list A) (def : A) :
-  (semGen (elements def l)) <--> if l is nil then [set def] else l.
-Proof.
-  admit.
-(*
-  unfold elements. move => A l def a. split.
-  - move => [s /semBindSize [n [/semChooseSize [/= Hleq1 Hleq2]
-                                 /semReturnSize H2]]]; subst.
-    case: l Hleq1 Hleq2 => [_ _ | a l /= Hleq1 Hleq2].
-    + right. split => //. by case: n.
-    + left. case: n Hleq1 Hleq2 => [|n] _ /leP Hleq2; auto.
-      right. apply nth_In. rewrite subn1 in Hleq2. omega.
-  - move => [H | [H1 H2]]; subst.
-    + exists 0. apply semBindSize.
-      destruct (In_nth_exists _ _ def H) as [n [Hnth Hlen]]; subst.
-      exists n. split; last by apply semReturnSize.
-      apply semChooseSize. split => //. apply/leP.
-      unfold lt in *. rewrite subn1. omega.
-   + exists 0. apply semBindSize. exists 0.
-     split; last by apply semReturnSize. apply semChooseSize. split => //.
-*)
-Qed.
-
 Lemma semElementsSize {A} (l: list A) (def : A) s :
   (semGenSize (elements def l) s) <--> if l is nil then [set def] else l.
 Proof.
-  admit.
-(*
-  move => A l def a. split.
-  - move => Hsize. apply semElements. eexists; eassumption.
-  - move => [HIn | [Hemp Heq]]; unfold elements.
-    + apply semBindSize.
-      destruct (In_nth_exists _ _ def HIn) as [n [Hnth Hlen]]; subst.
-      exists n. split; last by apply semReturnSize.
-      apply semChooseSize. split => //. apply/leP.
-      unfold lt in *. rewrite subn1. omega.
-   + subst; apply semBindSize. exists 0.
-     split; last by apply semReturnSize. apply semChooseSize. split => //.
-*)
+rewrite semBindSize.
+setoid_rewrite semReturnSize.
+rewrite semChooseSize //=.
+setoid_rewrite nthE.
+case: l => [|x l] /=.
+  rewrite (eq_bigcupl [set 0]) ?bigcup_set1 // => n.
+  by rewrite leqn0; split=> [/eqP|->].
+rewrite -(@reindex_bigcup _ _ _ (nth def (x :: l)) _ (x :: l)) ?coverE //.
+by rewrite subn1 /= nth_imset.
 Qed.
 
+Lemma semElements {A} (l: list A) (def : A) :
+  (semGen (elements def l)) <--> if l is nil then [set def] else l.
+Proof.
+rewrite /semGen; setoid_rewrite semElementsSize; rewrite bigcup_const //.
+by do 2! constructor.
+Qed.
 
 (* A rather long frequency proof, probably we can do better *)
 

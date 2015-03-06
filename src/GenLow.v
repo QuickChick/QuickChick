@@ -85,8 +85,8 @@ Hypothesis semChoose :
     [set a | Random.leq a1 a && Random.leq a a2]).
 
 Hypothesis semChooseSize :
-  forall A `{Random A} (a1 a2 : A) (size : nat), Random.leq a1 a2 ->
-    (semGenSize (choose (a1,a2)) size <-->
+  forall A `{Random A} (a1 a2 : A), Random.leq a1 a2 ->
+    forall size, (semGenSize (choose (a1,a2)) size <-->
     [set a | Random.leq a1 a && Random.leq a a2]).
 
 Hypothesis semSized :
@@ -276,18 +276,18 @@ Proof.
 by rewrite imset_bigcup /semGen (eq_bigcupr _ (semFmapSize _ _)).
 Qed.
 
-Lemma semChooseSize A `{Random A} (a1 a2 : A) size :
+Lemma semChooseSize A `{Random A} (a1 a2 : A) :
   Random.leq a1 a2 ->
-    semGenSize (choose (a1,a2)) size <-->
+    forall size, semGenSize (choose (a1,a2)) size <-->
     [set a | Random.leq a1 a && Random.leq a a2].
-Proof. by move=> x /= le_a1a2; rewrite randomRCorrect. Qed.
+Proof. by move=> /= le_a1a2 m n; rewrite (randomRCorrect n a1 a2). Qed.
 
 Lemma semChoose A `{Random A} (a1 a2 : A) : Random.leq a1 a2 ->
   (semGen (choose (a1,a2)) <-->
   [set a | Random.leq a1 a && Random.leq a a2]).
 Proof.
 move=> leq_a1a2.
-rewrite /semGen (eq_bigcupr _ (fun sz => semChooseSize sz leq_a1a2)) bigcup_const //.
+rewrite /semGen (eq_bigcupr _ (semChooseSize leq_a1a2)) bigcup_const //.
 by do 2! constructor.
 Qed.
 
