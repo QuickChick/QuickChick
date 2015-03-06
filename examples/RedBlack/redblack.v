@@ -5,11 +5,10 @@ Require Import ssreflect ssrnat ssrbool eqtype.
 
 (* An implementation of Red-Black Trees (insert only) *)
 
+(* begin tree *)
 Inductive color := Red | Black.
-
-Inductive tree :=
-  | Leaf : tree
-  | Node : color -> tree -> nat -> tree -> tree.
+Inductive tree := Leaf : tree | Node : color -> tree -> nat -> tree -> tree.
+(* end tree *)
 
 (* insertion *)
 
@@ -32,6 +31,7 @@ Definition balance rb t1 k t2 :=
       end
   end.
 
+(* begin ins *)
 Fixpoint ins x s :=
   match s with
     | Leaf => Node Red Leaf x Leaf
@@ -39,14 +39,20 @@ Fixpoint ins x s :=
                       else if y < x then balance c a y (ins x b)
                            else Node c a x b
   end.
+(* end ins *)
 
+(* begin makeBlack *)
 Definition makeBlack t :=
   match t with
     | Leaf => Leaf
     | Node _ a x b => Node Black a x b
   end.
+(* end makeBlack *)
 
+(* begin insert *)
 Definition insert x s := makeBlack (ins x s).
+(* end insert *)
+
 
 (* Red-Black Tree invariant: declarative definition *)
 Inductive is_redblack' : tree -> color -> nat -> Prop :=
