@@ -49,8 +49,10 @@ Fixpoint has_no_red_red (c : color) (t : tree) : bool :=
       has_no_red_red Black t1 && has_no_red_red Black t2
   end.
 
+(* begin is_redblack_bool *)
 Definition is_redblack_bool (t : tree) : bool := 
   is_black_balanced t && has_no_red_red Red t.
+(* end is_redblack_bool *)
 
 Fixpoint showColor (c : color) :=
   match c with
@@ -72,30 +74,28 @@ Instance showTree {A : Type} `{_ : Show A} : Show tree :=
     show t := "" (* CH: tree_to_string t causes a 9x increase in runtime *)
   |}.
 
+(* begin insert_preserves_redblack_checker *)
 Definition insert_is_redblack_checker (genTree : G tree) : Checker :=
-  forAll arbitraryNat (fun n =>
-  forAll genTree (fun t =>
-  is_redblack_bool t ==>
-  is_redblack_bool (insert n t))).
+  forAll arbitrary (fun n => forAll genTree (fun t =>
+    is_redblack_bool t ==> is_redblack_bool (insert n t))).
+(* end insert_preserves_redblack_checker *)
 
+(* begin genAnyTree *)
 Definition genColor := elements Red [Red; Black].
-
-Fixpoint genAnyTree_max_height (h : nat) : G tree :=
+Fixpoint genAnyTree_height (h : nat) : G tree :=
   match h with 
     | 0 => returnGen Leaf
-    | S h' =>
-        bindGen genColor (fun c =>
-        bindGen (genAnyTree_max_height h') (fun t1 =>
-        bindGen (genAnyTree_max_height h') (fun t2 =>
-        bindGen arbitraryNat (fun n =>
-        returnGen (Node c t1 n t2)))))
-    end.
-
-Definition genAnyTree : G tree := sized genAnyTree_max_height.
+    | S h' => liftGen4 Node genColor (genAnyTree_height h')
+                           arbitrary (genAnyTree_height h')
+  end.
+Definition genAnyTree : G tree := sized genAnyTree_height.
+(* end genAnyTree *)
 
 Extract Constant defSize => "5".
 Extract Constant Test.defNumTests => "10".
+(* begin QC_naive *)
 QuickCheck (insert_is_redblack_checker genAnyTree).
+(* end QC_naive *)
 Extract Constant Test.defNumTests => "10000".
 
 Fixpoint genRBTree_height (h : nat) (c : color) :=
