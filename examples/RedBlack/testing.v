@@ -172,4 +172,6 @@ Definition testInsert :=
 
 Extract Constant defSize => "10".
 Extract Constant Test.defNumTests => "10000".
+(* begin QC_good *)
 QuickCheck (insert_is_redblack_checker genRBTree).
+(* end QC_good *)
