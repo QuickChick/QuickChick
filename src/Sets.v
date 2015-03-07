@@ -113,7 +113,9 @@ by case=> x fx; exists x.
 Qed.
 
 Lemma imset_id T (A : set T) : id @: A <--> A.
-Proof. admit. Qed.
+Proof.
+by move=> t; split=> [[x [Ax <-]]|At] //; exists t.
+Qed.
 
 Lemma coverE T (A : set T) : \bigcup_(x in A) [set x] <--> A.
 Proof. exact: imset_id. Qed.

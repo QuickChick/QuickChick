@@ -423,22 +423,18 @@ Proof.
   move => n m. by elim: n m=> [| n IHn]; case.
 Qed.
 
-Lemma sum_fst_unfold:
-  forall A x (a : A) l,
-    sum_fst ((x, a) :: l) = x + sum_fst l.
+Lemma sum_fstE A x (a : A) l:
+  sum_fst ((x, a) :: l) = x + sum_fst l.
 Proof.
-  unfold sum_fst. generalize 0.
-  move=> n A x a l.
-  elim : l n x a =>  [|y ys IHxs] n x a.
-  - by rewrite addnC.
-  - simpl. specialize (IHxs (n + fst y) x a). simpl in IHxs.
-      by rewrite -IHxs addnAC.
+rewrite /sum_fst /=.
+elim: l 0 x => [n x|[n1 x1] l IHl p q] /=; first by rewrite addnC.
+by rewrite -IHl; congr foldl; rewrite addnAC.
 Qed.
 
 Lemma sum_fst_eq0P {A} (l : list (nat * A)) :
   sum_fst l = 0 <-> [seq x <- l | x.1 != 0] = [::].
 Proof.
-admit.
+by elim: l => [|[[|n] x] l IHl] //=; split=> //; rewrite sum_fstE.
 Qed.
 
 Lemma pick_def :
@@ -448,7 +444,7 @@ Lemma pick_def :
 Proof.
   move=> A l n def Hleq.
   elim : l n Hleq => //=. case=> //= i p l IHl n Hleq.
-  rewrite sum_fst_unfold in Hleq.
+  rewrite sum_fstE in Hleq.
   remember (n < i). case: b Heqb => Heqb; symmetry in Heqb.
   - have : (i + sum_fst l) < i by eapply (leq_ltn_trans); eassumption.
     rewrite -ltn_subRL. by have -> : forall i, (i - i) = 0 by elim.
@@ -465,7 +461,7 @@ Proof.
   move => A l n def. split.
   - move => Hlt.
     elim : l n Hlt => //. case => i p xs IHxs n Hlt.
-    rewrite sum_fst_unfold in Hlt.
+    rewrite sum_fstE in Hlt.
     move/(_ (n-i)) : IHxs => IHxs. simpl.
     remember (n < i). case: b Heqb => [Heqb | /not_lt Heqb].
     + exists (i, p). split => //=. by left.  split => //=.
