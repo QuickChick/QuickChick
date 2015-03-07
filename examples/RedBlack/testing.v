@@ -147,11 +147,14 @@ Fixpoint genRBTree_height (h : nat) (c : color) : G tree :=
                  bindGen arbitraryNat (fun nr =>
                  returnGen (Node Red (Node Black tl1 nl tr1) n
                                  (Node Black tl2 nr tr2)))))))))
-            | Black => bindGen
-                 (genRBTree_height h Black) (fun t1 => bindGen
-                 (genRBTree_height h Black) (fun t2 => bindGen
-                 arbitraryNat (fun n => returnGen (Node Black t1 n
-                 t2)))) end) end end.
+            | Black =>
+                 bindGen (genRBTree_height h Black) (fun t1 =>
+                 bindGen (genRBTree_height h Black) (fun t2 =>
+                 bindGen arbitraryNat (fun n =>
+                 returnGen (Node Black t1 n t2))))
+          end)
+      end
+   end.
 
 (* begin genRBTree *)
 Definition genRBTree := bindGen arbitrary (fun h => genRBTree_height h Red).
