@@ -80,7 +80,8 @@ Definition insert_is_redblack_checker (genTree : G tree) : Checker :=
     is_redblack_bool t ==> is_redblack_bool (insert n t))).
 (* end insert_preserves_redblack_checker *)
 
-
+(* CH: Would this still work if we renamed elems to elements
+       and choose to oneof? *)
 Module DefaultNotation.
 
 Notation " 'elems' [ x ] " := (elements x (cons x nil)) : qc_scope.
@@ -98,11 +99,11 @@ Import DefaultNotation. Open Scope qc_scope.
 
 (* begin genAnyTree *)
 Definition genColor := elems [Red; Black].
-Fixpoint genAnyTree_height (h : nat) : G tree :=
-  match h with 0    => returnGen Leaf
-             | S h' => liftGen4 Node genColor (genAnyTree_height h')
-                                    arbitrary (genAnyTree_height h') end.
-Definition genAnyTree : G tree := sized genAnyTree_height.
+Fixpoint genAnyTree_depth (d : nat) : G tree :=
+  match d with 0    => returnGen Leaf
+             | S d' => liftGen4 Node genColor (genAnyTree_depth d')
+                                    arbitrary (genAnyTree_depth d') end.
+Definition genAnyTree : G tree := sized genAnyTree_depth.
 (* end genAnyTree *)
 
 Extract Constant defSize => "5".
@@ -175,15 +176,15 @@ Require Import Program.Wf.
 (* begin genRBTree_height *)
 Program Fixpoint genRBTree_height (hc : nat*color) {wf wf_hc hc} : G tree :=
   match hc with
-    | (0, Red) => returnGen Leaf
-    | (0, Black) => choose [returnGen Leaf;
-                      (do! n <- arbitrary; returnGen (Node Red Leaf n Leaf))]
-    | (S h, Red) => liftGen4 Node (returnGen Black) (genRBTree_height (h, Black))
-                                          arbitrary (genRBTree_height (h, Black))
-    | (S h, Black) => do! c' <- genColor;
-                      let h' := match c' with Red => S h | Black => h end in
-                      liftGen4 Node (returnGen c') (genRBTree_height (h', c'))
-                                         arbitrary (genRBTree_height (h', c')) end.
+  | (0, Red) => returnGen Leaf
+  | (0, Black) => choose [returnGen Leaf;
+                    (do! n <- arbitrary; returnGen (Node Red Leaf n Leaf))]
+  | (S h, Red) => liftGen4 Node (returnGen Black) (genRBTree_height (h, Black))
+                                        arbitrary (genRBTree_height (h, Black))
+  | (S h, Black) => do! c' <- genColor;
+                    let h' := match c' with Red => S h | Black => h end in
+                    liftGen4 Node (returnGen c') (genRBTree_height (h', c'))
+                                       arbitrary (genRBTree_height (h', c')) end.
 (* end genRBTree_height *)
 Next Obligation. unfold wf_hc. simpl. left. omega. Qed.
 Next Obligation. unfold wf_hc. simpl. left. omega. Qed.
