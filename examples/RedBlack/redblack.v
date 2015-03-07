@@ -31,7 +31,6 @@ Definition balance rb t1 k t2 :=
       end
   end.
 
-(* begin ins *)
 Fixpoint ins x s :=
   match s with
     | Leaf => Node Red Leaf x Leaf
@@ -39,22 +38,18 @@ Fixpoint ins x s :=
                       else if y < x then balance c a y (ins x b)
                            else Node c a x b
   end.
-(* end ins *)
 
-(* begin makeBlack *)
 Definition makeBlack t :=
   match t with
     | Leaf => Leaf
     | Node _ a x b => Node Black a x b
   end.
-(* end makeBlack *)
 
-(* begin insert *)
 Definition insert x s := makeBlack (ins x s).
-(* end insert *)
 
 
 (* Red-Black Tree invariant: declarative definition *)
+(* begin is_redblack *)
 Inductive is_redblack' : tree -> color -> nat -> Prop :=
   | IsRB_leaf: forall c, is_redblack' Leaf c 0
   | IsRB_r: forall n tl tr h,
@@ -65,9 +60,12 @@ Inductive is_redblack' : tree -> color -> nat -> Prop :=
               is_redblack' (Node Black tl n tr) c (S h).
 
 Definition is_redblack t := exists h, is_redblack' t Red h.
+(* end is_redblack *)
 
+(* begin insert_preserves_redblack *)
 Definition insert_preserves_redblack : Prop :=
   forall x s, is_redblack s -> is_redblack (insert x s).
+(* end insert_preserves_redblack *)
 
 (* Declarative Proposition *)
 Lemma insert_preserves_redblack_correct : insert_preserves_redblack.
