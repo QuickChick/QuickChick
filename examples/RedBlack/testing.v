@@ -99,11 +99,9 @@ Import DefaultNotation. Open Scope qc_scope.
 (* begin genAnyTree *)
 Definition genColor := elems [Red; Black].
 Fixpoint genAnyTree_height (h : nat) : G tree :=
-  match h with 
-    | 0 => returnGen Leaf
-    | S h' => liftGen4 Node genColor (genAnyTree_height h')
-                           arbitrary (genAnyTree_height h')
-  end.
+  match h with 0    => returnGen Leaf
+             | S h' => liftGen4 Node genColor (genAnyTree_height h')
+                                    arbitrary (genAnyTree_height h') end.
 Definition genAnyTree : G tree := sized genAnyTree_height.
 (* end genAnyTree *)
 
@@ -144,12 +142,10 @@ Program Fixpoint genRBTree_height (hc : nat*color) {wf wf_hc hc} : G tree :=
                       (do! n <- arbitrary; returnGen (Node Red Leaf n Leaf))]
     | (S h, Red) => liftGen4 Node (returnGen Black) (genRBTree_height (h, Black))
                                           arbitrary (genRBTree_height (h, Black))
-    | (S h, Black) =>
-          do! c' <- genColor;
-          let h' := match c' with Red => S h | Black => h end in
-          liftGen4 Node (returnGen c') (genRBTree_height (h', c'))
-                             arbitrary (genRBTree_height (h', c'))
-   end.
+    | (S h, Black) => do! c' <- genColor;
+                      let h' := match c' with Red => S h | Black => h end in
+                      liftGen4 Node (returnGen c') (genRBTree_height (h', c'))
+                                         arbitrary (genRBTree_height (h', c')) end.
 (* end genRBTree_height *)
 Next Obligation. unfold wf_hc. simpl. left; apply/ltP; omega. Qed.
 Next Obligation. unfold wf_hc. simpl. left; apply/ltP; omega. Qed.
@@ -161,7 +157,7 @@ Next Obligation. apply well_founded_hc. Defined.
 
 
 (* begin genRBTree *)
-Definition genRBTree := bindGen arbitrary (fun h => genRBTree_height (h, Red)).
+Definition genRBTree := sized (fun h => genRBTree_height (h, Red)).
 (* end genRBTree *)
 
 Definition showDiscards (r : Result) :=

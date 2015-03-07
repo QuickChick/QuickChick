@@ -51,13 +51,11 @@ Definition insert x s := makeBlack (ins x s).
 (* Red-Black Tree invariant: declarative definition *)
 (* begin is_redblack *)
 Inductive is_redblack' : tree -> color -> nat -> Prop :=
-  | IsRB_leaf: forall c, is_redblack' Leaf c 0
-  | IsRB_r: forall n tl tr h,
-              is_redblack' tl Red h -> is_redblack' tr Red h ->
-              is_redblack' (Node Red tl n tr) Black h
-  | IsRB_b: forall c n tl tr h,
-              is_redblack' tl Black h -> is_redblack' tr Black h ->
-              is_redblack' (Node Black tl n tr) c (S h).
+| IsRB_leaf: forall c, is_redblack' Leaf c 0
+| IsRB_r: forall n tl tr h, is_redblack' tl Red h -> is_redblack' tr Red h ->
+                            is_redblack' (Node Red tl n tr) Black h
+| IsRB_b: forall c n tl tr h, is_redblack' tl Black h -> is_redblack' tr Black h ->
+                              is_redblack' (Node Black tl n tr) c (S h).
 Definition is_redblack t := exists h, is_redblack' t Red h.
 (* end is_redblack *)
 
