@@ -115,17 +115,55 @@ Notation "'do!' X <- A ; B" :=
 End DoNotation.
 Import DoNotation.
 
-Require Import Relations.
+Require Import Relations Lexicographic_Product.
 
-Definition wf_hc (hc1:nat*color) (hc2:nat*color) : Prop :=
-  fst hc1 < fst hc2 \/ (fst hc1 = fst hc2 /\
-  match snd hc1, snd hc2 with
-  | Red, Black => True
-  | _, _ => False
-  end).
+Definition ltColor (c1 c2: color) : Prop :=
+  match c1, c2 with 
+    | Red, Black => True
+    | _, _ => False
+  end.
 
-Lemma well_founded_hc : well_founded wf_hc.
-Admitted.
+Lemma well_foulded_ltColor : well_founded ltColor.
+Proof.
+  unfold well_founded. 
+  intros c; destruct c; 
+  repeat (constructor; intros c ?; destruct c; try now (exfalso; auto)). 
+Qed.
+
+Definition sigT_of_prod {A B : Type} (p : A * B) : {_ : A & B} :=
+  let (a, b) := p in existT (fun _ : A => B) a b.
+
+Definition prod_of_sigT {A B : Type} (p : {_ : A & B}) : A * B :=
+  let (a, b) := p in (a, b).
+
+Lemma left_inverse {A B} (p : (A * B)) : prod_of_sigT (sigT_of_prod p) = p. 
+Proof. now destruct p. Qed.
+
+Lemma right_inverse {A B} (p : {_ :A & B}) : sigT_of_prod (prod_of_sigT p)  = p. 
+Proof. now destruct p. Qed.
+
+Lemma well_founded_nondep: 
+  forall (A B : Type) (R: { _ : A & B } -> { _ : A & B} -> Prop),
+    well_founded R ->
+    well_founded (fun (x1 x2 : A * B) => R (sigT_of_prod x1) (sigT_of_prod x2)).
+Proof.
+  intros A B R Hwf c. 
+  assert (Heq := left_inverse c).
+  rewrite <- Heq. generalize (sigT_of_prod c). clear Heq c.
+  apply well_founded_ind with (R := R); auto. 
+  intros x H. constructor. intros y HR. 
+  specialize (H (sigT_of_prod y)). rewrite left_inverse in H. apply H.
+  now rewrite right_inverse in HR.
+Qed.
+
+Definition wf_hc (c1 c2 : (nat * color)) : Prop :=
+  lexprod nat (fun _ => color) lt (fun _ => ltColor) (sigT_of_prod c1) (sigT_of_prod c2). 
+
+Lemma well_founded_hc : well_founded wf_hc. 
+Proof.
+  apply well_founded_nondep. 
+  apply wf_lexprod. now apply Wf_nat.lt_wf. intros _; now apply well_foulded_ltColor.
+Qed.
 
 Require Import Program.Wf.
 
@@ -146,12 +184,12 @@ Program Fixpoint genRBTree_height (hc : nat*color) {wf wf_hc hc} : G tree :=
                              arbitrary (genRBTree_height (h', c'))
    end.
 (* end genRBTree_height *)
-Next Obligation. unfold wf_hc. simpl. left; apply/ltP; omega. Qed.
-Next Obligation. unfold wf_hc. simpl. left; apply/ltP; omega. Qed.
+Next Obligation. unfold wf_hc. simpl. left. omega. Qed.
+Next Obligation. unfold wf_hc. simpl. left. omega. Qed.
 Next Obligation. unfold wf_hc. simpl.
-                 destruct c'. right. tauto. left; apply/ltP; omega. Qed.
+                 destruct c'. right. apply I. left; omega. Qed.
 Next Obligation. unfold wf_hc. simpl.
-                 destruct c'. right. tauto. left; apply/ltP; omega. Qed.
+                 destruct c'. right. apply I. left; omega. Qed.
 Next Obligation. apply well_founded_hc. Defined.
 
 
