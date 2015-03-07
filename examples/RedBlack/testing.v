@@ -81,16 +81,23 @@ Definition insert_is_redblack_checker (genTree : G tree) : Checker :=
 (* end insert_preserves_redblack_checker *)
 
 
-(*
-Module Notations.
+Module DefaultNotation.
+
 Notation " 'elems' [ x ] " := (elements x (cons x nil)) : qc_scope.
-Notation " 'elems' [ x ; .. ; y ] " :=
-  (elements x (cons x .. (cons y nil) ..)) : qc_scope.
-End Notations.
-*)
+Notation " 'elems' [ x ; y ] " := (elements x (cons x (cons y nil))) : qc_scope.
+Notation " 'elems' [ x ; y ; .. ; z ] " :=
+  (elements x (cons x (cons y .. (cons z nil) ..))) : qc_scope.
+
+Notation " 'choose' [ x ] " := (oneof x (cons x nil)) : qc_scope.
+Notation " 'choose' [ x ; y ] " := (oneof x (cons x (cons y nil))) : qc_scope.
+Notation " 'choose' [ x ; y ; .. ; z ] " :=
+  (oneof x (cons x (cons y .. (cons z nil) ..))) : qc_scope.
+
+End DefaultNotation.
+Import DefaultNotation. Open Scope qc_scope.
 
 (* begin genAnyTree *)
-Definition genColor := elements Red [Red; Black].
+Definition genColor := elems [Red; Black].
 Fixpoint genAnyTree_height (h : nat) : G tree :=
   match h with 
     | 0 => returnGen Leaf
@@ -133,10 +140,8 @@ Require Import Program.Wf.
 Program Fixpoint genRBTree_height (hc : nat*color) {wf wf_hc hc} : G tree :=
   match hc with
     | (0, Red) => returnGen Leaf
-    | (0, Black) => oneof (returnGen Leaf)
-                            [returnGen Leaf;
-                              (do! n <- arbitrary;
-                               returnGen (Node Red Leaf n Leaf))]
+    | (0, Black) => choose [returnGen Leaf;
+                      (do! n <- arbitrary; returnGen (Node Red Leaf n Leaf))]
     | (S h, Red) => liftGen4 Node (returnGen Black) (genRBTree_height (h, Black))
                                           arbitrary (genRBTree_height (h, Black))
     | (S h, Black) =>
