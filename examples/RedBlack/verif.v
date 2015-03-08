@@ -257,13 +257,20 @@ Proof.
     rewrite /semCheckable in H. simpl in H. rewrite -> semImplicationNew in H.
     rewrite -> semCheckableBool in H.
     apply /is_redblackP. apply H. clear H.
-    unfold semGen. eexists. split. by [].
+    destruct irt as [h irt]. 
+    unfold semGen. 
+    set s := (max (max_node t n) h). exists s. split. by [].
     erewrite (semLiftGen2Size _ _ _ _ (n, t)).
     unfold imset2, prod_curry, imset, setX. exists (n,t). split; [| by []].
     split; simpl.
-    pose proof arbNat_correctSize as H. unfold arbitrary in H. simpl in H.
-    skip. skip.
-      (* CH: got stuck here, still need to find a witness for the exvar *)
+    { apply arbNat_correctSize. 
+      apply Le.le_trans with (m := (max_node t n)). 
+      apply max_node_less. rewrite /s. apply Max.le_max_l. }
+    { apply genRBTreeSize_correct. split. 
+      - exists h. split => //. rewrite /s. apply/leP. apply Max.le_max_r.
+      - rewrite /s. apply Max.max_case_strong => Hcmp; eauto;
+        [| apply all_nodes_bellow_greater with (n := max_node t n); 
+           try by apply/leP]; apply all_nodes_bellow_max_node. }
     by apply /is_redblackP.
   - move => H [a t] Hg. unfold semGen in Hg. destruct Hg as [s [_ Hg]].
     simpl. rewrite -> semImplicationNew. rewrite semCheckableBool.
