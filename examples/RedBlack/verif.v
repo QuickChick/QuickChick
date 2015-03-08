@@ -85,7 +85,7 @@ Admitted.
 
 Corollary genColor_correctSize': forall s, semGenSize genColor s <--> setT.
 Proof.
-  move => s. rewrite genColor_unsized. by apply genColor_correct.
+  move => s. rewrite (unsized_def2 (genColor_unsized)). by apply genColor_correct.
 Qed.
 
 (* Some helpful lemmas and definitions *)
@@ -216,12 +216,65 @@ Proof.
   apply (Max.max_case_strong) => Hcmp'; apply max_node_less.
 Qed.
 
+(* This doesn't hold in general, does it? Drat!
+Lemma semLiftGen2 {A1 A2 B} (f: A1 -> A2 -> B) (g1 : G A1) (g2 : G A2) :
+  semGen (liftGen2 f g1 g2) <-->
+  f @2: (semGen g1, semGen g2).
+*)
+
+Lemma semImplicationNew {prop : Type} {H : Checkable prop} p b :
+  semChecker (b ==> p) <-> (b -> semCheckable p).
+Admitted.
+
+Lemma semPredQPropNew:
+  forall (p : G QProp) (s : nat),
+    semCheckable p <-> (semChecker p).
+Admitted.
+
+Lemma semCheckableBool : forall (b:bool),
+  semCheckable b <-> b.
+Admitted.
+
+Ltac skip_with_existential :=
+  match goal with |- ?G => 
+    let H := fresh in evar(H:G); eexact H end.
+
+Variable skip_axiom : False. 
+Ltac skip_with_axiom :=
+  elimtype False; apply skip_axiom.
+Tactic Notation "skip" := 
+   skip_with_axiom. 
+
 (* begin insert_is_redblack_checker_correct *)
 Lemma insert_is_redblack_checker_correct:
   semChecker (insert_is_redblack_checker genRBTree) <-> insert_preserves_redblack.
 (* end insert_is_redblack_checker_correct *)
 Proof.
-  rewrite /insert_is_redblack_checker /insert_preserves_redblack. 
+  rewrite /insert_is_redblack_checker /insert_preserves_redblack.
+  rewrite (mergeForAlls arbitraryNat genRBTree).
+  rewrite semForAllNew. rewrite /genPair. split.
+  - move => H n t irt. specialize (H (n,t)). simpl in H.
+    rewrite /semCheckable in H. simpl in H. rewrite -> semImplicationNew in H.
+    rewrite -> semCheckableBool in H.
+    apply /is_redblackP. apply H. clear H.
+    unfold semGen. eexists. split. by [].
+    erewrite (semLiftGen2Size _ _ _ _ (n, t)).
+    unfold imset2, prod_curry, imset, setX. exists (n,t). split; [| by []].
+    split; simpl.
+    pose proof arbNat_correctSize as H. unfold arbitrary in H. simpl in H.
+    skip. skip.
+      (* CH: got stuck here, still need to find a witness for the exvar *)
+    by apply /is_redblackP.
+  - move => H [a t] Hg. unfold semGen in Hg. destruct Hg as [s [_ Hg]].
+    simpl. rewrite -> semImplicationNew. rewrite semCheckableBool.
+    intro irb. apply /is_redblackP. apply H. by apply /is_redblackP.
+  - intros. unfold unsizedChecker, semCheckerSize. simpl. intros. 
+    unfold semGenSize, codom.
+      (* CH: still need to show that a boolean doesn't use the size *)
+    admit.
+Grab Existential Variables. exact 42. (* CH: where does this come from? *)
+Abort.
+(* old proof
   split.
   - move => H x t [n' Hrb]. set s := max (max_node t x) n'.
     move : H => /(_ s) /semForAll H.
@@ -242,4 +295,4 @@ Proof.
     apply semForAll => t /genRBTreeSize_correct [[n' [Hle' Hrb]] Hb].
     apply semPredQProp. apply semImplication => /is_redblackP Hbool.
     apply semBool. apply/is_redblackP. by eapply H.
-Qed.
+*)

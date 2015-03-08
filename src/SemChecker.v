@@ -322,7 +322,8 @@ Lemma aux : forall {A prop : Type} {H : Checkable prop} `{Show A}
 Admitted.
 
 (* CH: We could create a super class UCheckable that includes the
-       unsized assumption. *)
+       unsized assumption. And we could use sections to hide all the
+       type class stuff from the paper. *)
 (* begin semForAll *)
 Lemma semForAllNew :
   forall {A prop : Type} {H : Checkable prop} `{Show A} (g : G A) (f : A -> prop),
@@ -343,6 +344,15 @@ Proof.
     intros [a [H1 H2]]. eapply H'. eassumption.
     move : H2. by rewrite (semPrintTestCase_id' _ _ qp).
 Qed.
+
+Lemma mergeForAlls :
+  forall {A B prop : Type} {H : Checkable prop} `{Show A} `{Show B}
+         (ga : G A) (gb : G B) (f : A -> B -> prop),
+     semChecker (forAll ga (fun a => forAll gb (f a))) <->
+     semChecker (forAll (genPair ga gb) (curry f)).
+Proof.
+  pose proof mergeBinds as mb.
+Admitted.
 
 Lemma semForAllShrink:
   forall {A prop : Type} {H : Checkable prop} `{Show A}
