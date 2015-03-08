@@ -39,13 +39,56 @@ Lemma mapTotalResult_id {prop : Type} {H : Checkable prop} (f : Result -> Result
     (semCheckerSize (mapTotalResult f p) s <-> semCheckableSize p s).
 Proof.
 move=> eq_res.
+rewrite /mapTotalResult /mapRoseResult /mapProp.
+split=> [check_map [[res l]] sem_checker|] /=.
+  rewrite eq_res.
+  pose qp := {| unProp := MkRose res l |}.
+  pose qp' := {| unProp := fmapRose f (MkRose res l) |}.
+  by apply/(check_map qp')/semFmapSize; exists qp.
+move=> sem_p qp /semFmapSize [[[res l]] [? <-]] /=; rewrite -eq_res.
+by pose qp' := {| unProp := MkRose res l |}; apply: (sem_p qp').
+
+
+
+move: H1.
+rewrite /semCheckableSize.
+rewrite /semCheckerSize.
+
+apply: H2.
+
+
+rewrite /= in H2.
+exact: H1.
+
+
+  move/(_ qp'): check_map.
+  apply/check_map/semFmapSize; exists qp; split=> //.
+  case: {sem_checker} qp => [[]].
+
+    specialize (H1 qp').
+    have: success qp' = true.
+    { apply H1.  apply semFmapSize. exists qp; split => //. }
+    destruct qp as [[]]. simpl in *. by rewrite -Hyp.
+  - move => H1 qp /semFmapSize [qp' [/H1 Hprop H2]]; subst.
+
+    destruct qp' as [[]]. simpl in *.
+by rewrite -Hyp.*)
+
+
+
+
 split.
 move=> check_map qp sem_checker.
 apply: check_map.
-rewrite /mapTotalResult /mapRoseResult /mapProp.
 rewrite (semFmapSize _ _ _ _).
-admit.
-admit.
+exists qp; split => //.
+case: {sem_checker} qp => ?.
+congr MkProp.
+rewrite monadFunctorLaw.
+
+by case: qp.
+
+
 
 (*
   move => prop H f p s Hyp.
