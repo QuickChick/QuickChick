@@ -494,7 +494,23 @@ Qed.
 Lemma pick_imset A (def : G A) l :
   pick def l @: [set m | m < sum_fst l] <--> [seq x <- l | x.1 != 0].
 Proof.
-admit.
+elim: l => [|[n x] l IHl] /=.
+  rewrite /sum_fst /=.
+  have->: (fun m => m < 0) <--> set0 by [].
+  by rewrite imset0.
+case: n => /= [|n].
+  rewrite -IHl => t; split=> [[y []]|].
+    by rewrite sum_fstE add0n subn0 => lt_y <-; exists y.
+  by case=> y [lt_y <-]; exists y; split=> //; rewrite subn0.
+move=> t; split=> /= [[p [lt_p]]|].
+  case: ifP => [_ <-|lt_pn ?]; first by left.
+    right; rewrite -(IHl t); exists (p - n.+1); split=> //.
+  rewrite sum_fstE in lt_p.
+  by rewrite -(ltn_add2r n.+1) subnK 1?addnC // leqNgt lt_pn.
+case=> [<-|]; first by exists 0; split => //; rewrite sum_fstE.
+rewrite -(IHl t); case=> p [lt_p <-]; exists (n.+1 + p); split.
+  by rewrite sum_fstE ltn_add2l.
+by rewrite ltnNge leq_addr addKn.
 Qed.
 
 Lemma semFrequencySize {A} (l : list (nat * G A)) (def : G A) (size: nat) :

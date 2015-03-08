@@ -137,6 +137,13 @@ Qed.
 Lemma sub0set T (A : set T) : set0 \subset A.
 Proof. by []. Qed.
 
+Lemma bigcup_set0 T U (F : T -> set U) :
+  \bigcup_(x in set0) F x <--> set0.
+Proof. by move=> t; split=> // [[? []]]. Qed.
+
+Lemma imset0 T U (f : T -> U) : f @: set0 <--> set0.
+Proof. exact: bigcup_set0. Qed.
+
 Lemma bigcup_set1 T U (F : T -> set U) y :
   \bigcup_(x in [set y]) F x <--> F y.
 Proof. by move=> t; split=> [[y' [<-]] | Fyt] //; exists y. Qed.
