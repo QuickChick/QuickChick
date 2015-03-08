@@ -563,4 +563,29 @@ Proof.
        now apply IHbs. 
 Qed.
 
+Definition genPair {A B : Type} (ga : G A) (gb : G B) : G (A * B) :=
+  liftGen2 pair ga gb.
+
+Definition curry {A B C : Type} (f : A -> B -> C) (ab : A * B) :=
+  match ab with
+  | (a,b) => f a b
+  end.
+
+Lemma mergeBinds :
+  forall A B C (ga : G A) (gb : G B) (f : A -> B -> G C),
+    semGen (bindGen ga (fun x => bindGen gb (f x))) <-->
+    semGen (bindGen (genPair ga gb) (curry f)).
+Proof.
+  intros. unfold semGen. repeat setoid_rewrite semBindSize.
+                                setoid_rewrite semReturnSize.
+  intro c. split; intros [s [_ H]]; exists s; split; try by [].
+  - destruct H as [a [Ha [b [Hb Hc]]]].
+    exists (a,b). split. exists a. split; first by [].
+                         exists b. split; first by [].
+    reflexivity. by [].
+  - destruct H as [[a b] [[a' [Ha [b' [Hb H]]]] Hc]].
+    inversion H; subst; clear H.
+    exists a. split. by []. exists b. split; by [].
+Qed.    
+
 End GenHigh.

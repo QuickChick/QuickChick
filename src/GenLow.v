@@ -345,4 +345,43 @@ Lemma runPromote A (m : Rose (G A)) seed size :
   run (promote m) seed size = fmapRose (fun (g : G A) => run g seed size) m.
 Proof. by []. Qed.
 
+Definition unsized {A : Type} (g : G A) : Prop :=
+  forall s1 s2, (semGenSize g s1 <--> semGenSize g s2).
+
+Lemma unsized_same {A : Type} : forall (g : G A),
+  unsized g ->
+  forall s, semGenSize g s <--> semGen g.
+Proof.
+Admitted.
+
+Lemma semBindUnsized1 :
+  forall A B (g : G A) (f : A -> G B),
+    unsized g ->
+    semGen (bindGen g f) <--> \bigcup_(a in semGen g) semGen (f a).
+Proof.
+  intros.
+  rewrite /semGen. setoid_rewrite semBindSize.
+  intro b. split.
+  - intros [s [_ [a [H1 H2]]]].
+    exists a. split; exists s; (split; first (compute; by []); first by[]).
+  - intros [a [[s1 [_ H1]] [s2 [_ H2]]]]. exists s2. split; first (compute; by []).
+    exists a. split; [| by []].
+    rewrite /unsized /set_eq in H. rewrite -> H. eassumption.
+Qed.  
+
+Lemma semBindUnsized2 :
+  forall A B (g : G A) (f : A -> G B),
+    (forall a, unsized (f a)) ->
+    semGen (bindGen g f) <--> \bigcup_(a in semGen g) semGen (f a).
+Proof.
+  intros.
+  rewrite /semGen. setoid_rewrite semBindSize.
+  intro b. split.
+  - intros [s [_ [a [H1 H2]]]].
+    exists a. split; exists s; (split; first (compute; by []); first by[]).
+  - intros [a [[s1 [_ H1]] [s2 [_ H2]]]]. exists s1. split; first (compute; by []).
+    exists a. split. by []. specialize (H a).
+    rewrite /unsized /set_eq in H. rewrite -> H. eassumption.
+Qed.
+
 End GenLow.

@@ -67,11 +67,25 @@ Proof.
 Qed.
 
 (* This just says that genColor works the same irrespective of size;
-   I'm still currious why we needed this, just for being called by a sized generator? *)
+   I'm still currious why we needed this,
+   Just for being called from a sized generator?
+   Q: Can't we move from semGenSize back to semGen for a generator
+      that doesn't use the size at all?
+   A (partial): See below how this would look for genColor. *)
 Lemma genColor_correctSize: forall s, semGenSize genColor s <--> setT.
 Proof.
   rewrite /genColor. intro s. rewrite semElementsSize.
   intros c. destruct c; simpl; unfold setT; tauto.
+Qed.
+
+Lemma genColor_unsized : unsized genColor.
+Proof.
+  rewrite /unsized /semGen. move => s.
+Admitted.
+
+Corollary genColor_correctSize': forall s, semGenSize genColor s <--> setT.
+Proof.
+  move => s. rewrite genColor_unsized. by apply genColor_correct.
 Qed.
 
 (* Some helpful lemmas and definitions *)
