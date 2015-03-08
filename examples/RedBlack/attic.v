@@ -6,7 +6,7 @@ Definition testInsertNaiveShowDiscards :=
 
 (* replacing bind with liftGen4 doesn't help *)
   Fixpoint genAnyTree_max_height' (h : nat) : Gen tree :=
-    match h with 
+    match h with
     | 0 => returnGen Leaf
     | S h' => liftGen4 Node genColor
                             (genAnyTree_max_height h')

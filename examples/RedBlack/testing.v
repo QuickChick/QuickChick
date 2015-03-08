@@ -40,17 +40,17 @@ Definition is_black_balanced (t : tree) : bool :=
 Fixpoint has_no_red_red (c : color) (t : tree) : bool :=
   match t with
     | Leaf => true
-    | Node Red t1 _ t2 => 
-      match c with 
-        | Red => false 
+    | Node Red t1 _ t2 =>
+      match c with
+        | Red => false
         | Black => has_no_red_red Red t1 && has_no_red_red Red t2
       end
-    | Node Black t1 _ t2 => 
+    | Node Black t1 _ t2 =>
       has_no_red_red Black t1 && has_no_red_red Black t2
   end.
 
 (* begin is_redblack_bool *)
-Definition is_redblack_bool (t : tree) : bool := 
+Definition is_redblack_bool (t : tree) : bool :=
   is_black_balanced t && has_no_red_red Red t.
 (* end is_redblack_bool *)
 
@@ -124,16 +124,16 @@ Import DoNotation.
 Require Import Relations Wellfounded Lexicographic_Product.
 
 Definition ltColor (c1 c2: color) : Prop :=
-  match c1, c2 with 
+  match c1, c2 with
     | Red, Black => True
     | _, _ => False
   end.
 
 Lemma well_foulded_ltColor : well_founded ltColor.
 Proof.
-  unfold well_founded. 
-  intros c; destruct c; 
-  repeat (constructor; intros c ?; destruct c; try now (exfalso; auto)). 
+  unfold well_founded.
+  intros c; destruct c;
+  repeat (constructor; intros c ?; destruct c; try now (exfalso; auto)).
 Qed.
 
 Definition sigT_of_prod {A B : Type} (p : A * B) : {_ : A & B} :=
@@ -144,11 +144,11 @@ Definition prod_of_sigT {A B : Type} (p : {_ : A & B}) : A * B :=
 
 
 Definition wf_hc (c1 c2 : (nat * color)) : Prop :=
-  lexprod nat (fun _ => color) lt (fun _ => ltColor) (sigT_of_prod c1) (sigT_of_prod c2). 
+  lexprod nat (fun _ => color) lt (fun _ => ltColor) (sigT_of_prod c1) (sigT_of_prod c2).
 
-Lemma well_founded_hc : well_founded wf_hc. 
+Lemma well_founded_hc : well_founded wf_hc.
 Proof.
-  unfold wf_hc. apply wf_inverse_image. 
+  unfold wf_hc. apply wf_inverse_image.
   apply wf_lexprod. now apply Wf_nat.lt_wf. intros _; now apply well_foulded_ltColor.
 Qed.
 
