@@ -199,10 +199,10 @@ Proof.
   apply (Max.max_case_strong) => Hcmp'; apply max_node_less.
 Qed.
 
+(* begin insert_is_redblack_checker_correct *)
 Lemma insert_is_redblack_checker_correct:
-  (forall s, 
-     semCheckerSize (insert_is_redblack_checker genRBTree) s) <-> 
-  insert_preserves_redblack.
+  semChecker (insert_is_redblack_checker genRBTree) <-> insert_preserves_redblack.
+(* end insert_is_redblack_checker_correct *)
 Proof.
   rewrite /insert_is_redblack_checker /insert_preserves_redblack. 
   split.
