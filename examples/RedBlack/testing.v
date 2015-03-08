@@ -121,7 +121,7 @@ Notation "'do!' X <- A ; B" :=
 End DoNotation.
 Import DoNotation.
 
-Require Import Relations Lexicographic_Product.
+Require Import Relations Wellfounded Lexicographic_Product.
 
 Definition ltColor (c1 c2: color) : Prop :=
   match c1, c2 with 
@@ -142,32 +142,13 @@ Definition sigT_of_prod {A B : Type} (p : A * B) : {_ : A & B} :=
 Definition prod_of_sigT {A B : Type} (p : {_ : A & B}) : A * B :=
   let (a, b) := p in (a, b).
 
-Lemma left_inverse {A B} (p : (A * B)) : prod_of_sigT (sigT_of_prod p) = p. 
-Proof. now destruct p. Qed.
-
-Lemma right_inverse {A B} (p : {_ :A & B}) : sigT_of_prod (prod_of_sigT p)  = p. 
-Proof. now destruct p. Qed.
-
-Lemma well_founded_nondep: 
-  forall (A B : Type) (R: { _ : A & B } -> { _ : A & B} -> Prop),
-    well_founded R ->
-    well_founded (fun (x1 x2 : A * B) => R (sigT_of_prod x1) (sigT_of_prod x2)).
-Proof.
-  intros A B R Hwf c. 
-  assert (Heq := left_inverse c).
-  rewrite <- Heq. generalize (sigT_of_prod c). clear Heq c.
-  apply well_founded_ind with (R := R); auto. 
-  intros x H. constructor. intros y HR. 
-  specialize (H (sigT_of_prod y)). rewrite left_inverse in H. apply H.
-  now rewrite right_inverse in HR.
-Qed.
 
 Definition wf_hc (c1 c2 : (nat * color)) : Prop :=
   lexprod nat (fun _ => color) lt (fun _ => ltColor) (sigT_of_prod c1) (sigT_of_prod c2). 
 
 Lemma well_founded_hc : well_founded wf_hc. 
 Proof.
-  apply well_founded_nondep. 
+  unfold wf_hc. apply wf_inverse_image. 
   apply wf_lexprod. now apply Wf_nat.lt_wf. intros _; now apply well_foulded_ltColor.
 Qed.
 
