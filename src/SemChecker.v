@@ -195,21 +195,12 @@ Qed.
 
 Open Scope Checker_scope.
 
-Lemma semImplication:
-      forall {prop : Type} {H : Checkable prop}
-             (p : prop) (b : bool) (s : nat),
-        semCheckerSize (b ==> p) s <-> b = true -> semCheckableSize p s.
+Lemma semImplication {prop : Type} {H : Checkable prop} p b s :
+  semCheckerSize (b ==> p) s <-> (b -> semCheckableSize p s).
 Proof.
-  admit.
-(*
-  move => prop H p b. case: b.
-  - split => /=; auto. apply. reflexivity.
-  - split; try congruence. move => _.
-    rewrite /implication.  rewrite /semChecker /checker /testResult.
-    move => qp . by move=> /semReturnSize H'; subst.
-*)
+case: b; split=> //=; first by move/(_ refl_equal).
+by move=> ? ?; rewrite (semReturnSize _ _ _) => <-.
 Qed.
-
 
 (* equivalences for other combinators *)
 
@@ -275,23 +266,17 @@ Qed.
 
 (* equivalent Props for Checkables *)
 
-Lemma semBool:
-  forall (b : bool) (size: nat), semCheckableSize b size <-> b = true.
+Lemma semBool (b : bool) size : semCheckableSize b size <-> b.
 Proof.
-admit.
-(*
-  move => b. case: b.
-  - split => // _. rewrite /semCheckableSize /semCheckerSize.
-    by move => qp /semReturnSize Heq; subst.
-  - split => //. rewrite /semCheckableSize /semCheckerSize.
-    move => /(_ (MkProp (MkRose (liftBool false) (lazy nil)))) H.
-    apply H. by apply semReturnSize.
-*)
+case: b; split=> //.
+  by move=> _ ?; rewrite (semReturnSize _ _ _)  => <-.
+move=> /(_ (MkProp (MkRose (liftBool false) (lazy nil)))).
+by apply; rewrite (semReturnSize _ _ _).
 Qed.
 
 Lemma semResult:
   forall (res: Result) (size: nat),
-    semCheckableSize res size <-> resultSuccessful res = true.
+    semCheckableSize res size <-> resultSuccessful res.
 Proof.
   rewrite /semCheckableSize /checker /testResult /semCheckerSize.
   move => res. split.
@@ -300,28 +285,15 @@ Proof.
   + by move=> H [[res' l]] /semReturnSize [Heq2 Heq3]; subst.
 Qed.
 
-Lemma semUnit:
-  forall (t: unit) (size: nat), semCheckableSize t size <-> True.
+Lemma semUnit (t : unit) size : semCheckableSize t size <-> True.
 Proof.
-admit.
-(*
-  move => t. split => // _.
-  by move => qp /semReturnSize Heq; subst.
-*)
+by split=> // _ qp /semReturnSize <-.
 Qed.
 
-Lemma semQProp:
-  forall (qp: QProp) (size: nat),
-    semCheckableSize qp size <-> success qp = true.
+Lemma semQProp (qp : QProp) size :
+  semCheckableSize qp size <-> success qp.
 Proof.
-admit.
-(*
-  move => qp.
-  rewrite /semCheckableSize /semCheckerSize /checker /testProp.
-  split.
-  - apply. by apply semReturnSize.
-  - by move => H qp' /semReturnSize Heq; subst.
-*)
+by split=> [|? qp' /semReturnSize <-] //; apply; apply/semReturnSize.
 Qed.
 
 Lemma semGen:
