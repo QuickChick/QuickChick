@@ -2,6 +2,7 @@ Declare ML Module "quickChick".
 
 Require Export Show.
 Require Export Random.
+Require Export Sets.
 Require Export GenLow.
 Require Export GenHigh.
 Require Export Arbitrary.
