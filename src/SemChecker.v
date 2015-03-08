@@ -16,6 +16,10 @@ Definition success qp :=
     | MkProp (MkRose res _) => resultSuccessful res
   end.
 
+(* CH: The forall+implications in semCheckerSize and semChecker_def2
+   are just set inclusions ... wouldn't it be more convenient to treat
+   them that way? *)
+
 (* Maps a Checker to a Prop *)
 Definition semCheckerSize (c : Checker) (s : nat): Prop :=
   forall qp, semGenSize c s qp -> success qp = true.
@@ -23,6 +27,14 @@ Definition semCheckerSize (c : Checker) (s : nat): Prop :=
 Definition semChecker (c : Checker) : Prop :=
   forall s, semCheckerSize c s.
 
+(* another characterization of semChecker *)
+Lemma semChecker_def2 : forall c,
+  semChecker c <-> (forall qp, semGen c qp -> success qp = true).
+Proof.
+  intro c. rewrite /semChecker /semCheckerSize /semGen. split; intro H.
+  - intros. destruct H0 as [s H0]. eapply (H s). tauto.
+  - intros. apply H. exists s. by split.
+Qed.
 
 (* Maps a Checkable to a Prop i.e. gives an equivalent proposition to the
    property under test *)
@@ -48,8 +60,7 @@ split=> [check_map [[res l]] sem_checker|] /=.
 move=> sem_p qp /semFmapSize [[[res l]] [? <-]] /=; rewrite -eq_res.
 by pose qp' := {| unProp := MkRose res l |}; apply: (sem_p qp').
 
-
-
+(* CH: What's with this junk? can we remove it?
 move: H1.
 rewrite /semCheckableSize.
 rewrite /semCheckerSize.
@@ -72,7 +83,7 @@ exact: H1.
   - move => H1 qp /semFmapSize [qp' [/H1 Hprop H2]]; subst.
 
     destruct qp' as [[]]. simpl in *.
-by rewrite -Hyp.*)
+by rewrite -Hyp.
 
 
 
@@ -87,7 +98,7 @@ congr MkProp.
 rewrite monadFunctorLaw.
 
 by case: qp.
-
+*)
 
 
 (*
@@ -288,6 +299,49 @@ Proof.
     by apply semPrintTestCase_id in Hgen.
   - rewrite /forAll in H' *. apply semBindGen => g Hgen.
     rewrite semPrintTestCase_id. by apply H'.
+Qed.
+
+Definition unsizedChecker (c : Checker) : Prop :=
+  forall s1 s2, semCheckerSize c s1 <-> semCheckerSize c s2.
+
+(* another characterization of unsizedChecker *)
+Lemma unsizedChecker_def2 {A : Type} : forall (c : Checker),
+  unsizedChecker c ->
+  forall s, semCheckerSize c s <-> semChecker c.
+Admitted.
+
+Lemma semPrintTestCase_id':
+  forall {prop: Type} {tp : Checkable prop} (s: String.string) (p: prop),
+    semGen (printTestCase s p) <--> semGen (checker p).
+Admitted.
+
+Lemma aux : forall {A prop : Type} {H : Checkable prop} `{Show A}
+    (c : A -> prop),
+  (forall a, unsizedChecker (checker (c a))) ->
+  (forall a, unsized (printTestCase (String.append (Show.show a) newline) (c a))).
+Admitted.
+
+(* CH: We could create a super class UCheckable that includes the
+       unsized assumption. *)
+(* begin semForAll *)
+Lemma semForAllNew :
+  forall {A prop : Type} {H : Checkable prop} `{Show A} (g : G A) (f : A -> prop),
+    (forall a, unsizedChecker (checker (f a))) ->
+    (semChecker (forAll g f) <-> forall (a : A), semGen g a -> semCheckable (f a)).
+(* end semForAll *)
+Proof.
+  move => A prop Htest show gen pf uc.
+  rewrite /semCheckable semChecker_def2. setoid_rewrite semChecker_def2.
+  split => H'.
+  - rewrite /forAll in H'.
+    intros.  specialize (H' qp). apply H'. clear H'.
+    pose proof (semBindUnsized2 gen (aux pf uc) qp) as H1. rewrite H1. clear H1.
+    exists a. split. by [].
+    by rewrite (semPrintTestCase_id' _ _ qp).
+  - rewrite /forAll in H' *. intro qp.
+    pose proof (semBindUnsized2 gen (aux pf uc) qp) as H1. rewrite H1. clear H1.
+    intros [a [H1 H2]]. eapply H'. eassumption.
+    move : H2. by rewrite (semPrintTestCase_id' _ _ qp).
 Qed.
 
 Lemma semForAllShrink:

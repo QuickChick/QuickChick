@@ -129,6 +129,23 @@ Hypothesis runFmap : forall (A B : Type) (f : A -> B) (g : G A) seed size,
 Hypothesis runPromote : forall A (m : Rose (G A)) seed size,
   run (promote m) seed size = fmapRose (fun (g : G A) => run g seed size) m.
 
+Definition unsized {A : Type} (g : G A) : Prop :=
+  forall s1 s2, (semGenSize g s1 <--> semGenSize g s2).
+
+Hypothesis unsized_def2 : forall A (g : G A),
+  unsized g ->
+  forall s, semGenSize g s <--> semGen g.
+
+Hypothesis semBindUnsized1 :
+  forall A B (g : G A) (f : A -> G B),
+    unsized g ->
+    semGen (bindGen g f) <--> \bigcup_(a in semGen g) semGen (f a).
+
+Hypothesis semBindUnsized2 :
+  forall A B (g : G A) (f : A -> G B),
+    (forall a, unsized (f a)) ->
+    semGen (bindGen g f) <--> \bigcup_(a in semGen g) semGen (f a).
+
 End GenLowInterface.
 
 Module GenLow : GenLowInterface.
@@ -348,11 +365,16 @@ Proof. by []. Qed.
 Definition unsized {A : Type} (g : G A) : Prop :=
   forall s1 s2, (semGenSize g s1 <--> semGenSize g s2).
 
-Lemma unsized_same {A : Type} : forall (g : G A),
+(* another characterization of unsized *)
+Lemma unsized_def2 : forall A (g : G A),
   unsized g ->
   forall s, semGenSize g s <--> semGen g.
 Proof.
-Admitted.
+  intros. unfold semGen. intro a.
+  split; intro H'.
+  - exists s. split; by [].
+  - destruct H' as [s' [_ H']]. by rewrite (H s s' a).
+Qed.
 
 Lemma semBindUnsized1 :
   forall A B (g : G A) (f : A -> G B),
