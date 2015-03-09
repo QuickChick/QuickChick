@@ -60,7 +60,7 @@ Proof.
     rewrite /is_redblack_bool /is_black_balanced H1. apply/andP; split => //.
 Qed.
 
-Lemma genColor_correct: semGen genColor <--> [set : color].
+Lemma semColor : semGen genColor <--> [set : color].
 Proof.
   rewrite /genColor. rewrite semElements.
   intros c. destruct c; simpl; unfold setT; tauto.
@@ -72,11 +72,11 @@ Qed.
    Q: Can't we move from semGenSize back to semGen for a generator
       that doesn't use the size at all?
    A (partial): See below how this would look for genColor. *)
-(* begin genColor_correctSize *)
-Lemma genColor_correctSize s : semGenSize genColor s <--> [set : color].
-(* end genColor_correctSize *)
+(* begin semColorSize *)
+Lemma semColorSize s : semGenSize genColor s <--> [set : color].
+(* end semColorSize *)
 Proof.
-  rewrite /genColor. intro s. rewrite semElementsSize.
+  rewrite /genColor. rewrite semElementsSize.
   intros c. destruct c; simpl; unfold setT; tauto.
 Qed.
 
@@ -87,7 +87,7 @@ Admitted.
 
 Corollary genColor_correctSize': forall s, semGenSize genColor s <--> setT.
 Proof.
-  move => s. rewrite (unsized_def2 (genColor_unsized)). by apply genColor_correct.
+  move => s. rewrite (unsized_def2 (genColor_unsized)). by apply semColor.
 Qed.
 
 (* Some helpful lemmas and definitions *)
@@ -134,10 +134,10 @@ Proof.
     [apply IHtl | apply IHtr].
 Qed.
 
-(* begin genRBTree_height_correct *)
-Lemma genRBTree_height_correct h c s : semGenSize (genRBTree_height (h, c)) s
+(* begin semGenRBTreeHeightSize *)
+Lemma semGenRBTreeHeightSize h c s : semGenSize (genRBTree_height (h, c)) s
   <--> [set t | is_redblack' t c h /\ all_nodes_bellow s t].
-(* end genRBTree_height_correct *)
+(* end semGenRBTreeHeightSize *)
 Proof.
 Admitted.
 (*
@@ -185,10 +185,10 @@ Admitted.
 Qed.
 *)
 
-(* begin genRBTreeSize_correct *)
-Lemma genRBTreeSize_correct s : semGenSize genRBTree s
+(* begin semRBTreeSize *)
+Lemma semRBTreeSize s : semGenSize genRBTree s
   <--> [set t | (exists h, h<=s /\ is_redblack' t Red h) /\ all_nodes_bellow s t].
-(* end genRBTreeSize_correct *)
+(* end semRBTreeSize *)
 Proof.
 Admitted.
 (*
@@ -225,9 +225,9 @@ Proof.
 (* *)
   rewrite /insert_preserves_redblack_checker /insert_preserves_redblack.
   rewrite (mergeForAlls arbitraryNat genRBTree).
-  rewrite semForAllNew. rewrite /genPair. split.
+  rewrite semForAll. rewrite /genPair. split.
   - move => H n t irt. specialize (H (n,t)). simpl in H.
-    rewrite /semCheckable in H. simpl in H. rewrite -> semImplicationNew in H.
+    rewrite /semCheckable in H. simpl in H. rewrite -> semImplication in H.
     rewrite -> semCheckableBool in H.
     apply /is_redblackP. apply H. clear H.
     destruct irt as [h irt].
@@ -239,14 +239,14 @@ Proof.
     { apply arbNat_correctSize.
       apply Le.le_trans with (m := (max_node t n)).
       apply max_node_less. rewrite /s. apply Max.le_max_l. }
-    { apply genRBTreeSize_correct. split.
+    { apply semRBTreeSize. split.
       - exists h. split => //. rewrite /s. apply/leP. apply Max.le_max_r.
       - rewrite /s. apply Max.max_case_strong => Hcmp; eauto;
         [| apply all_nodes_bellow_greater with (n := max_node t n);
            try by apply/leP]; apply all_nodes_bellow_max_node. }
     by apply /is_redblackP.
   - move => H [a t] Hg. unfold semGen in Hg. destruct Hg as [s [_ Hg]].
-    simpl. rewrite -> semImplicationNew. rewrite semCheckableBool.
+    simpl. rewrite -> semImplication. rewrite semCheckableBool.
     intro irb. apply /is_redblackP. apply H. by apply /is_redblackP.
   - intros. unfold unsizedChecker, semCheckerSize. simpl. intros.
     unfold semGenSize, codom.
@@ -254,25 +254,26 @@ Proof.
     admit.
 Admitted.
 (* old proof -- still works, but requires checker lemmas with sizes,
-   and it's very hard to explain those that early in the paper
+   and it's very hard to explain those that early in the paper;
+   should still bring back the views and stuff into the new proof
   split.
   - move => H x t [n' Hrb]. set s := max (max_node t x) n'.
-    move : H => /(_ s) /semForAll H.
-    have /H/semPredQProp/semForAll Hx : semGenSize arbitraryNat s x.
+    move : H => /(_ s) /semForAllSize H.
+    have /H/semPredQPropSize/semForAllSize Hx : semGenSize arbitraryNat s x.
     { apply arbNat_correctSize.
       apply Le.le_trans with (m := (max_node t x)).
       apply max_node_less. rewrite /s. apply Max.le_max_l. }
-    have /Hx/semPredQProp/semImplication Ht : semGenSize genRBTree s t.
-    { apply genRBTreeSize_correct. split.
+    have /Hx/semPredQPropSize/semImplicationSize Ht : semGenSize genRBTree s t.
+    { apply semRBTreeSize. split.
       - exists n'. split => //. rewrite /s. apply/leP. apply Max.le_max_r.
       - rewrite /s. apply Max.max_case_strong => Hcmp; eauto;
         [| apply all_nodes_bellow_greater with (n := max_node t x);
            try by apply/leP]; apply all_nodes_bellow_max_node. }
     have /is_redblackP/Ht/semBool Hins : is_redblack t by exists n'.
     by apply/is_redblackP.
-  - move => H s. apply semForAll => n /arbNat_correctSize Hle.
-    apply semPredQProp.
-    apply semForAll => t /genRBTreeSize_correct [[n' [Hle' Hrb]] Hb].
-    apply semPredQProp. apply semImplication => /is_redblackP Hbool.
+  - move => H s. apply semForAllSize => n /arbNat_correctSize Hle.
+    apply semPredQPropSize.
+    apply semForAllSize => t /semRBTreeSize [[n' [Hle' Hrb]] Hb].
+    apply semPredQPropSize. apply semImplicationSize => /is_redblackP Hbool.
     apply semBool. apply/is_redblackP. by eapply H.
 *)

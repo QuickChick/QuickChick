@@ -172,6 +172,14 @@ Notation " 'choose' ( x ;; l ) " :=
 
 End QcDefaultNotation.
 
+Import QcDefaultNotation. Open Scope qc_scope.
+
+Hypothesis semElemsSize : forall A (x : A) xs s,
+  semGenSize (elems (x ;; xs)) s <--> x :: xs.
+
+Hypothesis semChooseSize : forall A (g0 : G A) (gs : list (G A)) s,
+  semGenSize (choose (g0 ;; gs)) s  <--> \bigcup_(g in (g0 :: gs)) semGenSize g s.
+
 End GenHighInterface.
 
 Module GenHigh : GenHighInterface.

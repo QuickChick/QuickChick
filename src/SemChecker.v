@@ -249,7 +249,7 @@ Qed.
 
 Open Scope Checker_scope.
 
-Lemma semImplication {prop : Type} {H : Checkable prop} p b s :
+Lemma semImplicationSize {prop : Type} {H : Checkable prop} p b s :
   semCheckerSize (b ==> p) s <-> (b -> semCheckableSize p s).
 Proof.
 case: b; split=> //=; first by move/(_ refl_equal).
@@ -278,7 +278,7 @@ Proof.
   - move => H qp /semBindSize [a [H1 H2]]. eapply H; eassumption.
 Qed.
 
-Lemma semPredQProp:
+Lemma semPredQPropSize :
   forall (p : G QProp) (s : nat),
     semCheckableSize p s <-> (semCheckerSize p s).
 Proof.
@@ -288,7 +288,7 @@ Proof.
   split; move => Hqp qp Hsize; auto.
 Qed.
 
-Lemma semForAll :
+Lemma semForAllSize :
   forall {A prop : Type} {H : Checkable prop} `{Show A}
          (gen : G A) (f : A -> prop) (size: nat),
     semCheckerSize (forAll gen f) size <->
@@ -325,7 +325,7 @@ Admitted.
        unsized assumption. And we could use sections to hide all the
        type class stuff from the paper. *)
 (* begin semForAll *)
-Lemma semForAllNew : forall {A C:Type} `{Show A, Checkable C} (g : G A) (f : A->C),
+Lemma semForAll : forall {A C:Type} `{Show A, Checkable C} (g : G A) (f : A->C),
     (forall a, unsizedChecker (checker (f a))) ->
     (semChecker (forAll g f) <-> forall (a : A), semGen g a -> semCheckable (f a)).
 (* end semForAll *)
@@ -344,9 +344,8 @@ Proof.
     move : H2. by rewrite (semPrintTestCase_id' _ _ qp).
 Qed.
 
-(* CH: Should remove the New and rename the add a Size prefix to the old ones *)
 (* begin semImplication *)
-Lemma semImplicationNew : forall {C : Type} `{Checkable C} (b : bool) (c : C),
+Lemma semImplication : forall {C : Type} `{Checkable C} (b : bool) (c : C),
   semChecker (b ==> c) <-> (b -> semCheckable c).
 (* end semImplication *)
 Admitted.
@@ -379,10 +378,10 @@ Proof.
   move => A prop H show gen pf shrink. split.
   - rewrite /forAllShrink semBindGen.
     move=> H' a /H' Hgen. setoid_rewrite semShrinking_id in Hgen.
-    setoid_rewrite semPredQProp in Hgen.
+    setoid_rewrite semPredQPropSize in Hgen.
     by apply semPrintTestCase_id in Hgen.
   - move=> H'. rewrite /forAllShrink semBindGen. move => a g.
-    rewrite semShrinking_id. apply semPredQProp.
+    rewrite semShrinking_id. apply semPredQPropSize.
     rewrite semPrintTestCase_id. by auto.
 Qed.
 
@@ -520,7 +519,7 @@ Program Instance proveChecker : Provable Checker :=
     proposition s g := semCheckerSize g s
   |}.
 Next Obligation.
-  split; intros H; by apply semPredQProp.
+  split; intros H; by apply semPredQPropSize.
 Qed.
 
 Program Instance proveFun {A prop: Type} `{Arbitrary A} `{Show A}
