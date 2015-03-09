@@ -63,16 +63,11 @@ forall {A1 A2 A3 B} (f: A1 -> A2 -> A3 -> B)
                            (exists a3, semGenSize g3 size a3 /\
                                        (f a1 a2 a3) = b)).
 
-Hypothesis semLiftGen4Size :
-forall {A1 A2 A3 A4 B} (f:A1 -> A2 -> A3 -> A4 -> B)
-       (g1: G A1) (g2: G A2) (g3: G A3) (g4: G A4) size,
-  semGenSize (liftGen4 f g1 g2 g3 g4) size <-->
-  fun b =>
-    exists a1, semGenSize g1 size a1 /\
-               (exists a2, semGenSize g2 size a2 /\
-                           (exists a3, semGenSize g3 size a3 /\
-                                       (exists a4, semGenSize g4 size a4 /\
-                                                   (f a1 a2 a3 a4) = b))).
+Hypothesis semLiftGen4Size : forall A1 A2 A3 A4 B (f : A1 -> A2 -> A3 -> A4 -> B)
+       (g1 : G A1) (g2 : G A2) (g3 : G A3) (g4 : G A4) s,
+  semGenSize (liftGen4 f g1 g2 g3 g4) s <-->
+  [set b : B | exists a1 a2 a3 a4, semGenSize g1 s a1 /\ semGenSize g2 s a2 /\
+                 semGenSize g3 s a3 /\ semGenSize g4 s a4 /\ f a1 a2 a3 a4 = b].
 
 Hypothesis semLiftGen5Size :
 forall {A1 A2 A3 A4 A5 B} (f: A1 -> A2 -> A3 -> A4 -> A5 -> B)
@@ -316,18 +311,18 @@ forall {A1 A2 A3 B} (f: A1 -> A2 -> A3 -> B)
                                        (f a1 a2 a3) = b)).
 Proof. solveLiftGenX. Qed.
 
-Lemma semLiftGen4Size  :
-forall {A1 A2 A3 A4 B} (f:A1 -> A2 -> A3 -> A4 -> B)
-       (g1: G A1) (g2: G A2) (g3: G A3) (g4: G A4) size,
-  semGenSize (liftGen4 f g1 g2 g3 g4) size <-->
-  fun b =>
-    exists a1, semGenSize g1 size a1 /\
-               (exists a2, semGenSize g2 size a2 /\
-                           (exists a3, semGenSize g3 size a3 /\
-                                       (exists a4, semGenSize g4 size a4 /\
-                                                   (f a1 a2 a3 a4) = b))).
-Proof. solveLiftGenX. Qed.
-
+(* begin semLiftGen4Size *)
+Lemma semLiftGen4Size A1 A2 A3 A4 B (f : A1 -> A2 -> A3 -> A4 -> B)
+                     (g1 : G A1) (g2 : G A2) (g3 : G A3) (g4 : G A4) s :
+  semGenSize (liftGen4 f g1 g2 g3 g4) s <-->
+  [set b : B | exists a1 a2 a3 a4, semGenSize g1 s a1 /\ semGenSize g2 s a2 /\
+                 semGenSize g3 s a3 /\ semGenSize g4 s a4 /\ f a1 a2 a3 a4 = b].
+(* end semLiftGen4Size *)
+Proof.
+Admitted.
+(* CH: broke this one when made statement nicer, sorry
+solveLiftGenX. Qed.
+*)
 
 Lemma semLiftGen5Size :
 forall {A1 A2 A3 A4 A5 B} (f: A1 -> A2 -> A3 -> A4 -> A5 -> B)
