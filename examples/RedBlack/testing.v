@@ -75,7 +75,7 @@ Instance showTree {A : Type} `{_ : Show A} : Show tree :=
   |}.
 
 (* begin insert_preserves_redblack_checker *)
-Definition insert_is_redblack_checker (genTree : G tree) : Checker :=
+Definition insert_preserves_redblack_checker (genTree : G tree) : Checker :=
   forAll arbitrary (fun n => forAll genTree (fun t =>
     is_redblack_bool t ==> is_redblack_bool (insert n t))).
 (* end insert_preserves_redblack_checker *)
@@ -109,7 +109,7 @@ Definition genAnyTree : G tree := sized genAnyTree_depth.
 Extract Constant defSize => "5".
 Extract Constant Test.defNumTests => "10".
 (* begin QC_naive *)
-QuickCheck (insert_is_redblack_checker genAnyTree).
+QuickCheck (insert_preserves_redblack_checker genAnyTree).
 (* end QC_naive *)
 Extract Constant Test.defNumTests => "10000".
 
@@ -188,10 +188,10 @@ Definition showDiscards (r : Result) :=
   end.
 
 Definition testInsert :=
-  showDiscards (quickCheck (insert_is_redblack_checker genRBTree)).
+  showDiscards (quickCheck (insert_preserves_redblack_checker genRBTree)).
 
 Extract Constant defSize => "10".
 Extract Constant Test.defNumTests => "10000".
 (* begin QC_good *)
-QuickCheck (insert_is_redblack_checker genRBTree).
+QuickCheck (insert_preserves_redblack_checker genRBTree).
 (* end QC_good *)

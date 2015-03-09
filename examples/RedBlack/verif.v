@@ -234,13 +234,14 @@ Lemma semCheckableBool : forall (b:bool), semCheckable b <-> b.
 (* end semCheckableBool *)
 Admitted.
 
-(* begin insert_is_redblack_checker_correct *)
-Lemma insert_is_redblack_checker_correct:
-  semChecker (insert_is_redblack_checker genRBTree) <-> insert_preserves_redblack.
-(* end insert_is_redblack_checker_correct *)
+(* begin insert_preserves_redblack_checker_correct *)
+Lemma insert_preserves_redblack_checker_correct:
+  semChecker (insert_preserves_redblack_checker genRBTree)
+  <-> insert_preserves_redblack.
+(* end insert_preserves_redblack_checker_correct *)
 Proof.
 (* *)
-  rewrite /insert_is_redblack_checker /insert_preserves_redblack.
+  rewrite /insert_preserves_redblack_checker /insert_preserves_redblack.
   rewrite (mergeForAlls arbitraryNat genRBTree).
   rewrite semForAllNew. rewrite /genPair. split.
   - move => H n t irt. specialize (H (n,t)). simpl in H.
