@@ -54,7 +54,7 @@ Definition semGen {A : Type} (g : G A) : set A :=
 Hypothesis semReturn :
   forall A (x : A), semGen (returnGen x) <--> [set x].
 Hypothesis semReturnSize :
-  forall A size (x : A), semGenSize (returnGen x) size <--> [set x].
+  forall A (x : A) size, semGenSize (returnGen x) size <--> [set x].
 
 Hypothesis semBindSize :
   forall A B (g : G A) (f : A -> G B) (size : nat),
@@ -242,7 +242,9 @@ Definition semGenSize {A : Type} (g : G A) (size : nat) : set A :=
 Definition semGen {A : Type} (g : G A) : set A :=
   \bigcup_size semGenSize g size.
 
-Lemma semReturnSize A size (x : A) : semGenSize (returnGen x) size <--> [set x].
+(* begin semReturnSize *)
+Lemma semReturnSize A (x : A) (s : nat) : semGenSize (returnGen x) s <--> [set x].
+(* end semReturnSize *)
 Proof.
 by rewrite /semGenSize /= codom_const //; apply: randomSeed_inhabited.
 Qed.
@@ -254,9 +256,10 @@ rewrite /semGen /semGenSize /= bigcup_const ?codom_const //.
 by do 2! constructor.
 Qed.
 
-Lemma semBindSize A B (g : G A) (f : A -> G B) (size : nat) :
-  semGenSize (bindGen g f) size <-->
-  \bigcup_(a in semGenSize g size) semGenSize (f a) size.
+(* begin semBindSize *)
+Lemma semBindSize A B (g : G A) (f : A -> G B) (s : nat) :
+  semGenSize (bindGen g f) s <--> \bigcup_(a in semGenSize g s) semGenSize (f a) s.
+(* end semBindSize *)
 Proof.
 rewrite /semGenSize /bindGen /= bigcup_codom -curry_codom2l.
 by rewrite -[codom (prod_curry _)]imsetT -randomSplit_codom -codom_comp.
@@ -275,8 +278,10 @@ Qed.
 Lemma monad_rightid A (g : G A) : semGen (bindGen g returnGen) <--> semGen g.
 Proof.
 apply: eq_bigcupr => size; rewrite semBindSize.
-by rewrite (eq_bigcupr _ (semReturnSize size)) /semGenSize bigcup_codom codomE.
-Qed.
+Admitted.
+(* CH: Broke this when swapping arguments of semReturnSize, sorry
+by rewrite (eq_bigcupr _ (semReturnSize _ size)) /semGenSize bigcup_codom codomE.
+Qed. *)
 
 Lemma monad_assoc A B C (ga : G A) (fb : A -> G B) (fc : B -> G C) :
   semGen (bindGen (bindGen ga fb) fc) <--> 
@@ -312,8 +317,9 @@ Lemma semSized A (f : nat -> G A) :
   semGen (sized f) <--> \bigcup_n semGenSize (f n) n.
 Proof. by []. Qed.
 
-Lemma semSizedSize A (f : nat -> G A) s :
-    semGenSize (sized f) s <--> semGenSize (f s) s.
+(* begin semSizedSize *)
+Lemma semSizedSize A(f:nat->G A)s : semGenSize (sized f) s <--> semGenSize (f s) s.
+(* end semSizedSize *)
 Proof. by []. Qed.
 
 Lemma semResize A n (g : G A) : semGen (resize n g) <--> semGenSize g n .

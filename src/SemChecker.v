@@ -38,7 +38,7 @@ Qed.
 
 (* Maps a Checkable to a Prop i.e. gives an equivalent proposition to the
    property under test *)
-Definition semCheckable {A : Type} {_ : Checkable  A} (a : A) : Prop :=
+Definition semCheckable {A : Type} `{Checkable A} (a : A) : Prop :=
   semChecker (checker a).
 
 Definition semCheckableSize {A : Type} {_ : Checkable  A}
@@ -325,13 +325,12 @@ Admitted.
        unsized assumption. And we could use sections to hide all the
        type class stuff from the paper. *)
 (* begin semForAll *)
-Lemma semForAllNew :
-  forall {A prop : Type} {H : Checkable prop} `{Show A} (g : G A) (f : A -> prop),
+Lemma semForAllNew : forall {A C:Type} `{Show A, Checkable C} (g : G A) (f : A->C),
     (forall a, unsizedChecker (checker (f a))) ->
     (semChecker (forAll g f) <-> forall (a : A), semGen g a -> semCheckable (f a)).
 (* end semForAll *)
 Proof.
-  move => A prop Htest show gen pf uc.
+  move => A C Htest show gen pf uc.
   rewrite /semCheckable semChecker_def2. setoid_rewrite semChecker_def2.
   split => H'.
   - rewrite /forAll in H'.
@@ -344,6 +343,23 @@ Proof.
     intros [a [H1 H2]]. eapply H'. eassumption.
     move : H2. by rewrite (semPrintTestCase_id' _ _ qp).
 Qed.
+
+(* CH: Should remove the New and rename the add a Size prefix to the old ones *)
+(* begin semImplication *)
+Lemma semImplicationNew : forall {C : Type} `{Checkable C} (b : bool) (c : C),
+  semChecker (b ==> c) <-> (b -> semCheckable c).
+(* end semImplication *)
+Admitted.
+
+Lemma semPredQPropNew:
+  forall (p : G QProp),
+    semCheckable p <-> (semChecker p).
+Admitted.
+
+(* begin semCheckableBool *)
+Lemma semCheckableBool : forall (b:bool), semCheckable b <-> b.
+(* end semCheckableBool *)
+Admitted.
 
 Lemma mergeForAlls :
   forall {A B prop : Type} {H : Checkable prop} `{Show A} `{Show B}

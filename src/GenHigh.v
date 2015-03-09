@@ -256,7 +256,7 @@ Lemma semLiftGen {A B} (f: A -> B) (g: G A) :
   semGen (liftGen f g) <--> f @: semGen g.
 Proof.
 rewrite imset_bigcup; apply: eq_bigcupr => size.
-by rewrite semBindSize (eq_bigcupr _ (fun a => semReturnSize size (f a))).
+by rewrite semBindSize (eq_bigcupr _ (fun a => semReturnSize (f a) size)).
 Qed.
 
 Ltac solveLiftGenX :=
@@ -387,9 +387,10 @@ split; first by case=> n [? <-]; rewrite -nthE; apply/List.nth_In/ltP.
 by case/(In_nth_exists _ _ def) => n [? ?]; exists n; split=> //; apply/ltP.
 Qed.
 
-Lemma semOneofSize {A} (l : list (G A)) (def : G A) s :
-  semGenSize (oneof def l) s <-->
-  if l is nil then semGenSize def s else \bigcup_(x in l) semGenSize x s.
+(* begin semOneofSize *)
+Lemma semOneofSize {A} (l : list (G A)) (def : G A) s : semGenSize (oneof def l) s
+  <--> if l is nil then semGenSize def s else \bigcup_(x in l) semGenSize x s.
+(* end semOneofSize *)
 Proof.
 case: l => [|g l].
   rewrite semBindSize semChooseSize //.
@@ -408,8 +409,10 @@ by case: l => [|g l]; rewrite 1?bigcupC; apply: eq_bigcupr => sz;
   apply: semOneofSize.
 Qed.
 
+(* begin semElementsSize *)
 Lemma semElementsSize {A} (l: list A) (def : A) s :
-  (semGenSize (elements def l) s) <--> if l is nil then [set def] else l.
+  semGenSize (elements def l) s <--> if l is nil then [set def] else l.
+(* end semElementsSize *)
 Proof.
 rewrite semBindSize.
 setoid_rewrite semReturnSize.

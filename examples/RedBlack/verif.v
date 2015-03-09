@@ -45,9 +45,9 @@ Proof.
       by (apply/andP; split => //).
 Qed.
 
-Lemma is_redblackP :
-  forall (t : tree),
-    reflect (is_redblack t) (is_redblack_bool t).
+(* begin is_redblackP *)
+Lemma is_redblackP : forall t, reflect (is_redblack t) (is_redblack_bool t).
+(* end is_redblackP *)
 Proof.
   move => t.
   apply (@iffP (is_redblack_bool t)); first by apply/idP.
@@ -60,7 +60,7 @@ Proof.
     rewrite /is_redblack_bool /is_black_balanced H1. apply/andP; split => //.
 Qed.
 
-Lemma genColor_correct: semGen genColor <--> setT.
+Lemma genColor_correct: semGen genColor <--> [set : color].
 Proof.
   rewrite /genColor. rewrite semElements.
   intros c. destruct c; simpl; unfold setT; tauto.
@@ -72,7 +72,9 @@ Qed.
    Q: Can't we move from semGenSize back to semGen for a generator
       that doesn't use the size at all?
    A (partial): See below how this would look for genColor. *)
-Lemma genColor_correctSize: forall s, semGenSize genColor s <--> setT.
+(* begin genColor_correctSize *)
+Lemma genColor_correctSize s : semGenSize genColor s <--> [set : color].
+(* end genColor_correctSize *)
 Proof.
   rewrite /genColor. intro s. rewrite semElementsSize.
   intros c. destruct c; simpl; unfold setT; tauto.
@@ -132,10 +134,10 @@ Proof.
     [apply IHtl | apply IHtr].
 Qed.
 
-Lemma genRBTree_height_correct:
-  forall c h s,
-    semGenSize (genRBTree_height (h, c)) s <-->
-    (fun t => is_redblack' t c h /\ all_nodes_bellow s t).
+(* begin genRBTree_height_correct *)
+Lemma genRBTree_height_correct h c s : semGenSize (genRBTree_height (h, c)) s
+  <--> [set t | is_redblack' t c h /\ all_nodes_bellow s t].
+(* end genRBTree_height_correct *)
 Proof.
 Admitted.
 (*
@@ -183,12 +185,10 @@ Admitted.
 Qed.
 *)
 
-Lemma genRBTreeSize_correct:
-  forall s,
-    semGenSize genRBTree s <-->
-    (fun t =>
-       (exists n, n <= s /\ is_redblack' t Red n) /\
-       all_nodes_bellow s t).
+(* begin genRBTreeSize_correct *)
+Lemma genRBTreeSize_correct s : semGenSize genRBTree s
+  <--> [set t | (exists h, h<=s /\ is_redblack' t Red h) /\ all_nodes_bellow s t].
+(* end genRBTreeSize_correct *)
 Proof.
 Admitted.
 (*
@@ -215,24 +215,6 @@ Proof.
   [ eapply Le.le_trans; try eassumption |];
   apply (Max.max_case_strong) => Hcmp'; apply max_node_less.
 Qed.
-
-(* CH: Should move these to SemChecker.v; should also remove the New
-       and rename the add a Size prefix to the old ones *)
-(* begin semImplication *)
-Lemma semImplicationNew {prop : Type} {H : Checkable prop} p b :
-  semChecker (b ==> p) <-> (b -> semCheckable p).
-(* end semImplication *)
-Admitted.
-
-Lemma semPredQPropNew:
-  forall (p : G QProp),
-    semCheckable p <-> (semChecker p).
-Admitted.
-
-(* begin semCheckableBool *)
-Lemma semCheckableBool : forall (b:bool), semCheckable b <-> b.
-(* end semCheckableBool *)
-Admitted.
 
 (* begin insert_preserves_redblack_checker_correct *)
 Lemma insert_preserves_redblack_checker_correct:
