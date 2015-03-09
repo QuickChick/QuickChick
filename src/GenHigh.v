@@ -159,6 +159,24 @@ Hypothesis mergeBinds :
     semGen (bindGen ga (fun x => bindGen gb (f x))) <-->
     semGen (bindGen (genPair ga gb) (curry f)).
 
+Module QcDefaultNotation.
+
+Notation " 'elems' [ x ] " := (elements x (cons x nil)) : qc_scope.
+Notation " 'elems' [ x ; y ] " := (elements x (cons x (cons y nil))) : qc_scope.
+Notation " 'elems' [ x ; y ; .. ; z ] " :=
+  (elements x (cons x (cons y .. (cons z nil) ..))) : qc_scope.
+Notation " 'elems' ( x ;; l ) " :=
+  (elements x (cons x l)) (at level 1, no associativity) : qc_scope.
+
+Notation " 'choose' [ x ] " := (oneof x (cons x nil)) : qc_scope.
+Notation " 'choose' [ x ; y ] " := (oneof x (cons x (cons y nil))) : qc_scope.
+Notation " 'choose' [ x ; y ; .. ; z ] " :=
+  (oneof x (cons x (cons y .. (cons z nil) ..))) : qc_scope.
+Notation " 'choose' ( x ;; l ) " :=
+  (oneof x (cons x l))  (at level 1, no associativity) : qc_scope.
+
+End QcDefaultNotation.
+
 End GenHighInterface.
 
 Module GenHigh : GenHighInterface.
@@ -603,5 +621,38 @@ Proof.
     inversion H; subst; clear H.
     exists a. split. by []. exists b. split; by [].
 Qed.    
+
+Module QcDefaultNotation.
+
+Notation " 'elems' [ x ] " := (elements x (cons x nil)) : qc_scope.
+Notation " 'elems' [ x ; y ] " := (elements x (cons x (cons y nil))) : qc_scope.
+Notation " 'elems' [ x ; y ; .. ; z ] " :=
+  (elements x (cons x (cons y .. (cons z nil) ..))) : qc_scope.
+Notation " 'elems' ( x ;; l ) " :=
+  (elements x (cons x l)) (at level 1, no associativity) : qc_scope.
+
+Notation " 'choose' [ x ] " := (oneof x (cons x nil)) : qc_scope.
+Notation " 'choose' [ x ; y ] " := (oneof x (cons x (cons y nil))) : qc_scope.
+Notation " 'choose' [ x ; y ; .. ; z ] " :=
+  (oneof x (cons x (cons y .. (cons z nil) ..))) : qc_scope.
+Notation " 'choose' ( x ;; l ) " :=
+  (oneof x (cons x l))  (at level 1, no associativity) : qc_scope.
+
+End QcDefaultNotation.
+
+Import QcDefaultNotation. Open Scope qc_scope.
+
+(* CH: Reusing :: instead of ;; would have been nice, but I didn't manage *)
+
+(* begin semElemsSize *)
+Lemma semElemsSize A (x : A) xs s : semGenSize (elems (x ;; xs)) s <--> x :: xs.
+(* end semElemsSize *)
+Proof. rewrite semElementsSize. reflexivity. Qed.
+
+(* begin semChooseSize *)
+Lemma semChooseSize A (g0 : G A) (gs : list (G A)) s :
+  semGenSize (choose (g0 ;; gs)) s  <--> \bigcup_(g in (g0 :: gs)) semGenSize g s.
+(* end semChooseSize *)
+Proof. rewrite semOneofSize. reflexivity. Qed.
 
 End GenHigh.

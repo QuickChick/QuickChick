@@ -80,22 +80,7 @@ Definition insert_preserves_redblack_checker (genTree : G tree) : Checker :=
     is_redblack_bool t ==> is_redblack_bool (insert n t))).
 (* end insert_preserves_redblack_checker *)
 
-(* CH: Would this still work if we renamed elems to elements
-       and choose to oneof? *)
-Module DefaultNotation.
-
-Notation " 'elems' [ x ] " := (elements x (cons x nil)) : qc_scope.
-Notation " 'elems' [ x ; y ] " := (elements x (cons x (cons y nil))) : qc_scope.
-Notation " 'elems' [ x ; y ; .. ; z ] " :=
-  (elements x (cons x (cons y .. (cons z nil) ..))) : qc_scope.
-
-Notation " 'choose' [ x ] " := (oneof x (cons x nil)) : qc_scope.
-Notation " 'choose' [ x ; y ] " := (oneof x (cons x (cons y nil))) : qc_scope.
-Notation " 'choose' [ x ; y ; .. ; z ] " :=
-  (oneof x (cons x (cons y .. (cons z nil) ..))) : qc_scope.
-
-End DefaultNotation.
-Import DefaultNotation. Open Scope qc_scope.
+Import QcDefaultNotation. Open Scope qc_scope.
 
 (* begin genAnyTree *)
 Definition genColor := elems [Red; Black].
