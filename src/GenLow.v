@@ -150,13 +150,15 @@ End GenLowInterface.
 
 Module GenLow : GenLowInterface.
 
-Inductive GenType (A : Type) : Type :=
-| MkGen : (nat -> RandomSeed  -> A) -> GenType A.
+(* begin GenType *)
+Inductive GenType (A:Type) : Type := MkGen : (nat -> RandomSeed -> A) -> GenType A.
+(* end GenType *)
 
 Definition G := GenType.
 
-Definition run {A : Type} (g : G A) : nat -> RandomSeed -> A :=
-  match g with MkGen f => f end.
+(* begin run *)
+Definition run {A : Type} (g : G A) := match g with MkGen f => f end.
+(* end run *)
 
 Definition returnGen {A : Type} (x : A) : G A :=
   MkGen (fun _ _ => x).
@@ -237,10 +239,10 @@ Definition reallyUnsafePromote {r A : Type} (m : r -> G A) : G (r -> A) :=
 (* End Things *)
 
 (* Set of outcomes semantics definitions (repeated above) *)
-Definition semGenSize {A : Type} (g : G A) (size : nat) : set A :=
-  codom (run g size).
-Definition semGen {A : Type} (g : G A) : set A :=
-  \bigcup_size semGenSize g size.
+(* begin semGen *)
+Definition semGenSize {A : Type} (g : G A) (s : nat) : set A := codom (run g s).
+Definition semGen {A : Type} (g : G A) : set A := \bigcup_s semGenSize g s.
+(* end semGen *)
 
 (* begin semReturnSize *)
 Lemma semReturnSize A (x : A) (s : nat) : semGenSize (returnGen x) s <--> [set x].

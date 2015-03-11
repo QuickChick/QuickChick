@@ -11,9 +11,11 @@ Axiom randomGenRange : RandomSeed -> Z * Z.
 Axiom mkRandomSeed   : Z          -> RandomSeed.
 Axiom newRandomSeed  : RandomSeed.
 
-Axiom randomSplit    : RandomSeed   -> RandomSeed * RandomSeed.
+(* begin randomSplitAssumption *)
+Axiom randomSplit : RandomSeed -> RandomSeed * RandomSeed.
 Axiom randomSplitAssumption :
   forall s1 s2 : RandomSeed, exists s, randomSplit s = (s1,s2).
+(* end randomSplitAssumption *)
 
 CoInductive RandomSeedTree :=
 | RstNode : RandomSeed -> RandomSeedTree -> RandomSeedTree -> RandomSeedTree.
