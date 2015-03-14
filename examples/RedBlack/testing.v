@@ -143,7 +143,7 @@ Require Import Program.Wf.
 Program Fixpoint genRBTree_height (hc : nat*color) {wf wf_hc hc} : G tree :=
   match hc with
   | (0, Red) => returnGen Leaf
-  | (0, Black) => choose [returnGen Leaf;
+  | (0, Black) => oneOf [returnGen Leaf;
                     (do! n <- arbitrary; returnGen (Node Red Leaf n Leaf))]
   | (S h, Red) => liftGen4 Node (returnGen Black) (genRBTree_height (h, Black))
                                         arbitrary (genRBTree_height (h, Black))

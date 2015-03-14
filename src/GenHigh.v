@@ -163,11 +163,11 @@ Notation " 'elems' [ x ; y ; .. ; z ] " :=
 Notation " 'elems' ( x ;; l ) " :=
   (elements x (cons x l)) (at level 1, no associativity) : qc_scope.
 
-Notation " 'choose' [ x ] " := (oneof x (cons x nil)) : qc_scope.
-Notation " 'choose' [ x ; y ] " := (oneof x (cons x (cons y nil))) : qc_scope.
-Notation " 'choose' [ x ; y ; .. ; z ] " :=
+Notation " 'oneOf' [ x ] " := (oneof x (cons x nil)) : qc_scope.
+Notation " 'oneOf' [ x ; y ] " := (oneof x (cons x (cons y nil))) : qc_scope.
+Notation " 'oneOf' [ x ; y ; .. ; z ] " :=
   (oneof x (cons x (cons y .. (cons z nil) ..))) : qc_scope.
-Notation " 'choose' ( x ;; l ) " :=
+Notation " 'oneOf' ( x ;; l ) " :=
   (oneof x (cons x l))  (at level 1, no associativity) : qc_scope.
 
 End QcDefaultNotation.
@@ -177,8 +177,8 @@ Import QcDefaultNotation. Open Scope qc_scope.
 Hypothesis semElemsSize : forall A (x : A) xs s,
   semGenSize (elems (x ;; xs)) s <--> x :: xs.
 
-Hypothesis semChooseSize : forall A (g0 : G A) (gs : list (G A)) s,
-  semGenSize (choose (g0 ;; gs)) s  <--> \bigcup_(g in (g0 :: gs)) semGenSize g s.
+Hypothesis semOneOfSize : forall A (g0 : G A) (gs : list (G A)) s,
+  semGenSize (oneOf (g0 ;; gs)) s  <--> \bigcup_(g in (g0 :: gs)) semGenSize g s.
 
 End GenHighInterface.
 
@@ -634,11 +634,11 @@ Notation " 'elems' [ x ; y ; .. ; z ] " :=
 Notation " 'elems' ( x ;; l ) " :=
   (elements x (cons x l)) (at level 1, no associativity) : qc_scope.
 
-Notation " 'choose' [ x ] " := (oneof x (cons x nil)) : qc_scope.
-Notation " 'choose' [ x ; y ] " := (oneof x (cons x (cons y nil))) : qc_scope.
-Notation " 'choose' [ x ; y ; .. ; z ] " :=
+Notation " 'oneOf' [ x ] " := (oneof x (cons x nil)) : qc_scope.
+Notation " 'oneOf' [ x ; y ] " := (oneof x (cons x (cons y nil))) : qc_scope.
+Notation " 'oneOf' [ x ; y ; .. ; z ] " :=
   (oneof x (cons x (cons y .. (cons z nil) ..))) : qc_scope.
-Notation " 'choose' ( x ;; l ) " :=
+Notation " 'oneOf' ( x ;; l ) " :=
   (oneof x (cons x l))  (at level 1, no associativity) : qc_scope.
 
 End QcDefaultNotation.
@@ -652,10 +652,10 @@ Lemma semElemsSize A (x : A) xs s : semGenSize (elems (x ;; xs)) s <--> x :: xs.
 (* end semElemsSize *)
 Proof. rewrite semElementsSize. reflexivity. Qed.
 
-(* begin semChooseSize *)
-Lemma semChooseSize A (g0 : G A) (gs : list (G A)) s :
-  semGenSize (choose (g0 ;; gs)) s  <--> \bigcup_(g in (g0 :: gs)) semGenSize g s.
-(* end semChooseSize *)
+(* begin semOneOfSize *)
+Lemma semOneOfSize A (g0 : G A) (gs : list (G A)) s :
+  semGenSize (oneOf (g0 ;; gs)) s  <--> \bigcup_(g in (g0 :: gs)) semGenSize g s.
+(* end semOneOfSize *)
 Proof. rewrite semOneofSize. reflexivity. Qed.
 
 End GenHigh.
