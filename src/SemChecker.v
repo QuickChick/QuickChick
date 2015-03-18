@@ -21,12 +21,14 @@ Definition successful qp :=
    them that way? *)
 
 (* Maps a Checker to a Prop *)
+(* begin semCheckerSize *)
 Definition semCheckerSize (c : Checker) (s : nat): Prop :=
   forall res, res \in semGenSize c s -> successful res = true.
-
+(* end semCheckerSize *)
+(* begin semChecker *) 
 Definition semChecker (c : Checker) : Prop :=
   forall s, semCheckerSize c s.
-
+(* end semChecker *)
 (* another characterization of semChecker *)
 Lemma semChecker_def2 : forall c,
   semChecker c <-> (forall qp, semGen c qp -> successful qp = true).
@@ -38,12 +40,15 @@ Qed.
 
 (* Maps a Checkable to a Prop i.e. gives an equivalent proposition to the
    property under test *)
+(* begin semCheckable *)
 Definition semCheckable {A : Type} `{Checkable A} (a : A) : Prop :=
   semChecker (checker a).
-
+(* end semCheckable *)
+(* begin semCheckableSize *)
 Definition semCheckableSize {A : Type} {_ : Checkable  A}
            (a : A) (s : nat) : Prop :=
   semCheckerSize (checker a) s.
+(* end semCheckableSize *)
 
 Lemma mapTotalResult_id {prop : Type} {H : Checkable prop} (f : Result -> Result)
          (p : prop) (s : nat) :
@@ -288,11 +293,13 @@ Proof.
   split; move => Hqp qp Hsize; auto.
 Qed.
 
+(* begin semForAllSize *)
 Lemma semForAllSize :
   forall {A prop : Type} {H : Checkable prop} `{Show A}
          (gen : G A) (f : A -> prop) (size: nat),
     semCheckerSize (forAll gen f) size <->
-    forall (a : A), semGenSize gen size a -> semCheckableSize (f a) size.
+    forall (a : A), a \in semGenSize gen size -> semCheckableSize (f a) size.
+(* end semForAllSize *)
 Proof.
   move => A prop Htest show gen pf. split => H'.
   - rewrite /forAll in H'. move/semBindGen : H' => H' a /H' Hgen.
