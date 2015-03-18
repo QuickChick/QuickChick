@@ -11,7 +11,7 @@ Definition resultSuccessful (r : Result) : bool :=
     | _ => true
   end.
 
-Definition success qp :=
+Definition successful qp :=
   match qp with
     | MkProp (MkRose res _) => resultSuccessful res
   end.
@@ -22,14 +22,14 @@ Definition success qp :=
 
 (* Maps a Checker to a Prop *)
 Definition semCheckerSize (c : Checker) (s : nat): Prop :=
-  forall qp, semGenSize c s qp -> success qp = true.
+  forall res, res \in semGenSize c s -> successful res = true.
 
 Definition semChecker (c : Checker) : Prop :=
   forall s, semCheckerSize c s.
 
 (* another characterization of semChecker *)
 Lemma semChecker_def2 : forall c,
-  semChecker c <-> (forall qp, semGen c qp -> success qp = true).
+  semChecker c <-> (forall qp, semGen c qp -> successful qp = true).
 Proof.
   intro c. rewrite /semChecker /semCheckerSize /semGen. split; intro H.
   - intros. destruct H0 as [s H0]. eapply (H s). tauto.
@@ -413,7 +413,7 @@ by split=> // _ qp /semReturnSize <-.
 Qed.
 
 Lemma semQProp (qp : QProp) size :
-  semCheckableSize qp size <-> success qp.
+  semCheckableSize qp size <-> successful qp.
 Proof.
 by split=> [|? qp' /semReturnSize <-] //; apply; apply/semReturnSize.
 Qed.
@@ -489,7 +489,7 @@ Qed.
 
 Program Instance proveQProp : Provable QProp :=
   {|
-    proposition s qp := success qp = true
+    proposition s qp := successful qp = true
   |}.
 Next Obligation.
   by rewrite semQProp.
