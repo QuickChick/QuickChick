@@ -1,3 +1,5 @@
+Require Import ssreflect ssrnat ssrbool eqtype div.
+
 Require Import Show RoseTrees.
 Require Import Random.
 Require Import GenLow GenHigh SemChecker.
@@ -20,6 +22,8 @@ Import GenLow GenHigh.
 Definition gte n m := leb m n.
 
 Set Implicit Arguments.
+Unset Strict Implicit.
+Unset Printing Implicit Defensive.
 
 Record Args := MkArgs {
   replay     : option (RandomSeed * nat);
@@ -57,15 +61,17 @@ Definition stdArgs := MkArgs None defNumTests defNumDiscards
                              defNumShrinks defSize true.
 
 Definition roundTo n m := mult (div n m) m.
-Definition computeSize' (a : Args) (n : nat) (d : nat) : nat :=
-  if (orb (gte n (maxSuccess a))
-          (gte (maxSuccess a) (roundTo n (maxSize a) + (maxSize a)))) then
-    (modulo n (maxSize a)) + (div d 10)
-  else
-    (div (mult (modulo n (maxSize a)) (maxSize a)) (modulo (maxSuccess a) (maxSize a)))
-    + (div d 10).
 
-Definition at0 f (s : nat) n d :=
+Definition computeSize' (a : Args) (n : nat) (d : nat) : nat :=
+  if (roundTo n (maxSize a) <= maxSuccess a) || (n >= maxSuccess a)
+     || (maxSuccess a %% (maxSize a) == 0)
+  then
+    minn (n %% (maxSize a) + d %/ 10) (maxSize a)
+  else
+    minn ((n %% (maxSize a)) * maxSize a %/
+      (maxSuccess a mod (maxSize a) + d %/ 10)) (maxSize a).
+
+Definition at0 (f : nat -> nat -> nat) (s : nat) (n d : nat) :=
   if andb (beq_nat n 0) (beq_nat d 0) then s
   else f n d.
 

@@ -91,8 +91,8 @@ Fixpoint genAnyTree_depth (d : nat) : G tree :=
 Definition genAnyTree : G tree := sized genAnyTree_depth.
 (* end genAnyTree *)
 
-Extract Constant defSize => "5".
-Extract Constant Test.defNumTests => "10".
+Extract Constant defSize => "10".
+Extract Constant Test.defNumTests => "10000".
 (* begin QC_naive *)
 QuickCheck (insert_preserves_redblack_checker genAnyTree).
 (* end QC_naive *)
