@@ -26,8 +26,7 @@ Definition semCheckerSize (c : Checker) (s : nat): Prop :=
   forall res, res \in semGenSize c s -> successful res = true.
 (* end semCheckerSize *)
 (* begin semChecker *) 
-Definition semChecker (c : Checker) : Prop :=
-  forall s, semCheckerSize c s.
+Definition semChecker (c : Checker) : Prop := forall s, semCheckerSize c s.
 (* end semChecker *)
 (* another characterization of semChecker *)
 Lemma semChecker_def2 : forall c,
@@ -41,8 +40,7 @@ Qed.
 (* Maps a Checkable to a Prop i.e. gives an equivalent proposition to the
    property under test *)
 (* begin semCheckable *)
-Definition semCheckable {A : Type} `{Checkable A} (a : A) : Prop :=
-  semChecker (checker a).
+Definition semCheckable A `{Checkable A} (a : A) : Prop := semChecker (checker a).
 (* end semCheckable *)
 (* begin semCheckableSize *)
 Definition semCheckableSize {A : Type} {_ : Checkable  A}
