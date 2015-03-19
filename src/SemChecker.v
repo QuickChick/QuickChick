@@ -40,7 +40,7 @@ Qed.
 (* Maps a Checkable to a Prop i.e. gives an equivalent proposition to the
    property under test *)
 (* begin semCheckable *)
-Definition semCheckable A `{Checkable A} (a : A) : Prop := semChecker (checker a).
+Definition semCheckable {A} `{Checkable A} (a : A) : Prop := semChecker (checker a).
 (* end semCheckable *)
 (* begin semCheckableSize *)
 Definition semCheckableSize {A : Type} {_ : Checkable  A}
