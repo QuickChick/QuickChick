@@ -615,10 +615,12 @@ induction l.
   apply addToTreeCorrect.
 Qed.
 
-Theorem topLevelSeedTheorem : (* Need a better name :P *)
+(* begin SplitPathCompleteness *)
+Theorem SplitPathCompleteness : 
   forall (l : list SplitPath) (f : SplitPath -> RandomSeed),
     PrefixFree l -> exists (s : RandomSeed), 
                       forall p, In p l -> varySeed p s = f p.
+(* end SplitPathCompleteness *)
 intros l f Pref.
 pose proof (listToTree l f Pref) as ExSeedTree.
 inversion ExSeedTree as [st Corr]; clear ExSeedTree.
@@ -630,6 +632,7 @@ intros p InPL.
 pose proof (pathAgreesOnSubTree st (mkSeedTree rst) p (f p)) as Hyp.
 auto.
 Qed.
+
 
 (* Primitive generator combinators and some basic soundness
    assumptions about them *)

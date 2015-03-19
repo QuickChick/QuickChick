@@ -1,4 +1,4 @@
-Require Import Arbitrary Random GenLow.
+Require Import Arbitrary Random GenLow Sets.
 Import GenLow.
 
 Require Import PArith.
@@ -443,7 +443,7 @@ Theorem coarbComplete' : forall (max : positive) (f : positive -> RandomSeed) ,
                           exists seed, forall p, p <= max -> 
                             varySeed (posToPath p) seed = f p.
 intros.
-pose proof (topLevelSeedTheorem (map posToPath (rangePos max)) 
+pose proof (SplitPathCompleteness (map posToPath (rangePos max)) 
                                 (posFunToPathFun f) (rangePosPrefixFree max)).
 inversion H; clear H.
 exists x.
@@ -499,6 +499,54 @@ Instance arbFun {A B : Type} `{_ : CoArbitrary A} `{_ : Arbitrary B} : Arbitrary
       reallyUnsafePromote (fun a => variant (posToPath (coarbitrary a)) arbitrary);
     shrink x := []
   |}.
-                            
+
+
+(*
+(* begin arbFunCorrect *)
+Theorem arbFunCorrect : forall {A B : Type} `{_ : CoArbitrary A} `{_ : Arbitrary B}
+                          (max : A) (f : A -> B) (size : nat),
+                          size = Pos.to_nat (coarbitrary max) ->
+                          (semGenSize arbitrary size <--> fun (_ : B) => True) -> 
+                          exists seed, forall a, coarbLe a max ->
+                                      run arbitrary size seed a = f a.
+(* end arbFunCorrect *)
+
+move => A B CoarbA ArbB max f size Eq SemB.
+have: ((a : A) -> {seed : RandomSeed | run arbitrary size seed = f a}).
+{
+  move => a.
+  rewrite /semGenSize /codom /set_eq in SemB.
+  move : (f a) => b.
+  pose proof (SemB b) as H.
+  inversion H.
+  assert True by auto.
+  apply H1 in H2.
+  inversion H2.
+  clear Complete S H0 H1.
   
+
+
+rewrite   
+Definition B_to_random {A B : Type} `{_ : Arbitrary B} (f : A -> B) (size : nat)
+           (Complete : semGenSize arbitrary size <--> fun (_ : B) => True) (a : A) : 
+  {seed : RandomSeed | run arbitrary size seed = f a}.
+  rewrite /semGenSize /codom /set_eq in Complete.
+  move : (f a) => b.
+  pose proof (Complete b) as S.
+  inversion S.
+  assert True by auto.
+  apply H1 in H2.
+  clear Complete S H0 H1.
+
+
+
+  
+apply SemB in b.
+  
+
+pose proof (coarbComplete max f).
+
+intros.
+unfold set_eq in Hyp.
+*)
 
