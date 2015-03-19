@@ -175,43 +175,39 @@ Function localMin (st : State) (r : Rose Checker.Result)
   end.
 Admitted.
 
-Definition decr (st : State) : nat :=
-  ((maxSuccessTests st) + (maxDiscardedTests st))
-  - ((numSuccessTests st) + (numDiscardedTests st)).
-
-Function runATest (st : State) (f : nat -> RandomSeed -> QProp)
-         {measure decr st} : Result :=
-  let size := (computeSize st) (numSuccessTests st) (numDiscardedTests st) in
-  let (rnd1, rnd2) := randomSplit (randomSeed st) in
-  let test (st : State) (f : nat -> RandomSeed -> QProp) :=
+Fixpoint runATest (st : State) (f : nat -> RandomSeed -> QProp) (maxSteps : nat) :=
+  if maxSteps is maxSteps'.+1 then
+    let size := (computeSize st) (numSuccessTests st) (numDiscardedTests st) in
+    let (rnd1, rnd2) := randomSplit (randomSeed st) in
+    let test (st : State) :=
         if (gte (numSuccessTests st) (maxSuccessTests st)) then
           doneTesting st f
         else if (gte (numDiscardedTests st) (maxDiscardedTests st)) then
                giveUp st f
-        else runATest st f
- in
-  match st with
+             else runATest st f maxSteps'
+    in
+    match st with
     | MkState mst mdt ms cs nst ndt ls e r nss nts =>
-    match f size rnd1 with
-    | MkProp (MkRose res ts) =>
-      (* TODO: CallbackPostTest *)
-      match res with
+      match f size rnd1 with
+      | MkProp (MkRose res ts) =>
+        (* TODO: CallbackPostTest *)
+        match res with
         | MkResult (Some x) e reas _ s _ =>
           if x then (* Success *)
             let ls' := fold_left (fun stamps stamp =>
-                                     let oldBind := Map.find stamp stamps in
-                                     match oldBind with
-                                       | None   => Map.add stamp 1 stamps
-                                       | Some k => Map.add stamp (k+1) stamps
-                                     end
-                                  ) s ls in
-            test (MkState mst mdt ms cs (nst + 1) ndt ls' e rnd2 nss nts) f
+                                    let oldBind := Map.find stamp stamps in
+                                    match oldBind with
+                                    | None   => Map.add stamp 1 stamps
+                                    | Some k => Map.add stamp (k+1) stamps
+                                    end
+                                 ) s ls in
+            test (MkState mst mdt ms cs (nst + 1) ndt ls' e rnd2 nss nts)
           else (* Failure *)
             let pre : string := (if expect res then "*** Failed! "
-                       else "+++ OK, failed as expected. ")%string in
+                                 else "+++ OK, failed as expected. ")%string in
             let (numShrinks, res') := localMin st (MkRose res ts) in
             let suf := ("After " ++ (show (S nst)) ++ " tests and "
-                                ++ (show numShrinks) ++ " shrinks")%string in
+                                 ++ (show numShrinks) ++ " shrinks")%string in
             (* TODO: Output *)
             if (negb (expect res)) then
               Success (nst + 1) ndt (summary st) (pre ++ suf)
@@ -219,18 +215,20 @@ Function runATest (st : State) (f : nat -> RandomSeed -> QProp)
               Failure (nst + 1) numShrinks ndt r size (pre ++ suf) (summary st) reas
         | MkResult None e reas _ s _ =>
           (* Ignore labels of discarded tests? *)
-          test (MkState mst mdt ms cs nst (ndt + 1) ls e rnd2 nss nts) f
+          test (MkState mst mdt ms cs nst ndt.+1 ls e rnd2 nss nts)
+        end
       end
     end
-  end.
-Admitted. (* I think I *could* actually prove this *)
+  else giveUp st f.
 
 Definition test (st : State) (f : nat -> RandomSeed -> QProp) : Result :=
   if (gte (numSuccessTests st) (maxSuccessTests st)) then
     doneTesting st f
   else if (gte (numDiscardedTests st) (maxDiscardedTests st)) then
          giveUp st f
-  else runATest st f.
+  else
+    let maxSteps := maxSuccessTests st + maxDiscardedTests st in
+    runATest st f maxSteps.
 
 Require Import ZArith.
 
