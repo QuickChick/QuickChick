@@ -511,7 +511,7 @@ Variables A B : Type.
 Hypothesis choice : FunctionalChoice_on A RandomSeed.
 
 (* begin arbFunCorrect *)
-Theorem arbFunCorrect `{CoArbitrary A} `{Arbitrary B} (max : A)
+Theorem arbFunComplete `{CoArbitrary A} `{Arbitrary B} (max : A)
         (f : A -> B) (size : nat) :
   size = Pos.to_nat (coarbitrary max) ->
   (semGenSize arbitrary size <--> setT) -> 
@@ -523,8 +523,11 @@ move=> eqsize semB.
 have/choice [fseed fseedP]: forall a, exists seed : RandomSeed, run arbitrary size seed = f a.
   by move => a; case: (semB (f a))=> _ /(_ I) [seed ?]; exists seed.
 case: (coarbComplete max fseed) => seed Hseed.
-exists seed => a le_a; rewrite -fseedP -Hseed //=.
-admit.
+pose proof (randomSplitAssumption seed seed) as Hyp.
+move : Hyp => [seed' Hsplit].
+exists seed' => a le_a; rewrite -fseedP -Hseed //=.
+apply (@promoteVariant A B a (fun a => posToPath (coarbitrary a)) arbitrary 
+                       size seed' seed seed Hsplit).
 Qed.
 
 End arbFun_completeness.

@@ -45,6 +45,12 @@ Parameter sample : forall {A : Type}, G A -> list A.
 Parameter variant : forall {A : Type}, SplitPath -> G A -> G A.
 Parameter reallyUnsafePromote : forall {r A:Type}, (r -> G A) -> G (r -> A).
 
+Hypothesis promoteVariant : forall {A B : Type} (a : A) (f : A -> SplitPath) (g : G B) size 
+                            (r r1 r2 : RandomSeed),
+  randomSplit r = (r1,r2) ->                              
+  run (reallyUnsafePromote (fun a => variant (f a) g)) size r a = 
+  run g size (varySeed (f a) r1).
+
 (* Set of outcomes semantics definitions (repeated below) *)
 Definition semGenSize {A : Type} (g : G A) (size : nat) : set A :=
   codom (run g size).
@@ -236,6 +242,7 @@ Definition reallyUnsafeDelay {A : Type} : G (G A -> A) :=
 Definition reallyUnsafePromote {r A : Type} (m : r -> G A) : G (r -> A) :=
     (bindGen reallyUnsafeDelay (fun eval => 
      returnGen (fun r => eval (m r)))).
+
 (* End Things *)
 
 (* Set of outcomes semantics definitions (repeated above) *)
@@ -257,6 +264,7 @@ rewrite /semGen /semGenSize /= bigcup_const ?codom_const //.
   exact: randomSeed_inhabited.
 by do 2! constructor.
 Qed.
+
 
 (* begin semBindSize *)
 Lemma semBindSize A B (g : G A) (f : A -> G B) (s : nat) :
@@ -345,6 +353,19 @@ Lemma semSuchThatMaybe_sound A (g : G A) (f : A -> bool) :
 Proof.
 case=> [a [size [_ [x run_x]]] | ]; last by left.
 by right; exists a; split=> //; apply: (semGenSuchThatMaybeAux_sound run_x).
+Qed.
+
+Lemma promoteVariant : forall {A B : Type} (a : A) (f : A -> SplitPath) (g : G B) size
+  (r r1 r2 : RandomSeed), randomSplit r = (r1, r2) ->
+  run (reallyUnsafePromote (fun a => variant (f a) g)) size r a = 
+  run g size (varySeed (f a) r1).
+move => A B a p g size r r1 r2 H.
+rewrite /reallyUnsafePromote /variant.
+simpl.
+destruct g.
+simpl.
+rewrite H.
+by [].
 Qed.
 
 Lemma semPromote A (m : Rose (G A)) :
