@@ -1,9 +1,14 @@
+Require Import PArith List ChoiceFacts.
+Require Import ssreflect ssrfun ssrbool.
+
 Require Import Arbitrary Random GenLow Sets.
 Import GenLow.
 
-Require Import PArith.
-Require Import List.
 Import ListNotations.
+
+Set Implicit Arguments.
+Unset Strict Implicit.
+Unset Printing Implicit Defensive.
 
 (* LL: TODO: Add proof obligation that the result paths be prefix free? *)
 Class CoArbitrary (A : Type) : Type :=
@@ -276,18 +281,18 @@ intros.
 inversion H0; subst; clear H0; [ | inversion H2].
 unfold posToPath in *; simpl in *; repeat rewrite <- app_assoc in *.
 
-pose proof (lengthSplit1 (posToPathAux y) (posToPathAux x) Leq) as Hyp.
+pose proof (lengthSplit1 Leq) as Hyp.
 inversion Hyp as [pair Split]; clear Hyp.
 destruct pair as [l0 l1].
-pose proof (lengthSplit2 (posToPathAux y) (posToPathAux x) l0 l1 Split) as AppHyp.
-pose proof (lengthSplit3 (posToPathAux y) (posToPathAux x) l0 l1 Split) as LenHyp.
+pose proof (lengthSplit2 Split) as AppHyp.
+pose proof (lengthSplit3 Split) as LenHyp.
 pose proof (lengthPathEven y) as Hyp; inversion Hyp as [n LenN]; subst; clear Hyp.
 assert (XHyp : pathToPosAux (l0 ++ l1 ++ [Right]) (fun x => x) = Some x); 
   [ rewrite app_assoc; rewrite AppHyp; apply posPathInj | ].
 
 rewrite <- LenHyp in LenN.
 
-pose proof (evenPathAux l0 l1 [Right] [Right] (fun x => x) n x LenN XHyp) as Even.
+pose proof (evenPathAux [Right] LenN XHyp) as Even.
 inversion Even as [f' HF]; clear Even.
 inversion HF as [HF1 HF2]; clear HF.
 rewrite <- AppHyp in H1.
@@ -342,9 +347,9 @@ Lemma PosToPathPrefixFree : forall (x y : positive), (x <> y) ->
 intros. 
 destruct (Compare_dec.le_ge_dec (length (posToPathAux y)) 
                                 (length (posToPathAux x))).
-+ apply (PosToPathPrefixFreeAux x y H l).
++ apply (PosToPathPrefixFreeAux H l).
 + apply prefixFreeCommutative.
-  apply (PosToPathPrefixFreeAux y x).
+  apply (@PosToPathPrefixFreeAux y x).
   - unfold not in *; intros; exfalso; auto.
   - auto.
 Qed.
@@ -424,7 +429,7 @@ Lemma rangePosPrefixFree : forall p, PrefixFree (map posToPath (rangePos p)).
           + subst; omega.
           + congruence.
           + congruence.
-    pose proof (PosToPathPrefixFree x m) as Hyp.
+    pose proof (@PosToPathPrefixFree x m) as Hyp.
     apply Hyp in Neq; clear Hyp.
     inversion Neq.
     eapply H2.
@@ -500,53 +505,26 @@ Instance arbFun {A B : Type} `{_ : CoArbitrary A} `{_ : Arbitrary B} : Arbitrary
     shrink x := []
   |}.
 
+Section arbFun_completeness.
 
-(*
+Variables A B : Type.
+Hypothesis choice : FunctionalChoice_on A RandomSeed.
+
 (* begin arbFunCorrect *)
-Theorem arbFunCorrect : forall {A B : Type} `{_ : CoArbitrary A} `{_ : Arbitrary B}
-                          (max : A) (f : A -> B) (size : nat),
-                          size = Pos.to_nat (coarbitrary max) ->
-                          (semGenSize arbitrary size <--> fun (_ : B) => True) -> 
-                          exists seed, forall a, coarbLe a max ->
-                                      run arbitrary size seed a = f a.
+Theorem arbFunCorrect `{CoArbitrary A} `{Arbitrary B} (max : A)
+        (f : A -> B) (size : nat) :
+  size = Pos.to_nat (coarbitrary max) ->
+  (semGenSize arbitrary size <--> setT) -> 
+  exists seed, forall a, coarbLe a max ->
+                         run arbitrary size seed a = f a.
 (* end arbFunCorrect *)
+Proof.
+move=> eqsize semB.
+have/choice [fseed fseedP]: forall a, exists seed : RandomSeed, run arbitrary size seed = f a.
+  by move => a; case: (semB (f a))=> _ /(_ I) [seed ?]; exists seed.
+case: (coarbComplete max fseed) => seed Hseed.
+exists seed => a le_a; rewrite -fseedP -Hseed //=.
+admit.
+Qed.
 
-move => A B CoarbA ArbB max f size Eq SemB.
-have: ((a : A) -> {seed : RandomSeed | run arbitrary size seed = f a}).
-{
-  move => a.
-  rewrite /semGenSize /codom /set_eq in SemB.
-  move : (f a) => b.
-  pose proof (SemB b) as H.
-  inversion H.
-  assert True by auto.
-  apply H1 in H2.
-  inversion H2.
-  clear Complete S H0 H1.
-  
-
-
-rewrite   
-Definition B_to_random {A B : Type} `{_ : Arbitrary B} (f : A -> B) (size : nat)
-           (Complete : semGenSize arbitrary size <--> fun (_ : B) => True) (a : A) : 
-  {seed : RandomSeed | run arbitrary size seed = f a}.
-  rewrite /semGenSize /codom /set_eq in Complete.
-  move : (f a) => b.
-  pose proof (Complete b) as S.
-  inversion S.
-  assert True by auto.
-  apply H1 in H2.
-  clear Complete S H0 H1.
-
-
-
-  
-apply SemB in b.
-  
-
-pose proof (coarbComplete max f).
-
-intros.
-unfold set_eq in Hyp.
-*)
-
+End arbFun_completeness.

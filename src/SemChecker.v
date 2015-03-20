@@ -233,18 +233,17 @@ Proof.
 Qed.
 
 (* begin semForAllSize *)
-Lemma semForAllSize :
-  forall {A prop : Type} {H : Checkable prop} `{Show A}
-         (gen : G A) (f : A -> prop) (size: nat),
-    semCheckerSize (forAll gen f) size <->
-    forall (a : A), a \in semGenSize gen size -> semCheckableSize (f a) size.
+Lemma semForAllSize {A prop : Type} `{Checkable prop} `{Show A}
+      (gen : G A) (f : A -> prop) (size: nat) :
+  semCheckerSize (forAll gen f) size <->
+  forall (a : A), a \in semGenSize gen size -> semCheckableSize (f a) size.
 (* end semForAllSize *)
 Proof.
-  move => A prop Htest show gen pf. split => H'.
-  - rewrite /forAll in H'. move/semBindGen : H' => H' a /H' Hgen.
-    by apply semPrintTestCase_id in Hgen.
-  - rewrite /forAll in H' *. apply semBindGen => g Hgen.
-    rewrite semPrintTestCase_id. by apply H'.
+split=> H'.
+- rewrite /forAll in H'. move/semBindGen : H' => H' a /H' Hgen.
+  by apply semPrintTestCase_id in Hgen.
+- rewrite /forAll in H' *. apply semBindGen => g Hgen.
+  rewrite semPrintTestCase_id. by apply H'.
 Qed.
 
 Definition unsizedChecker (c : Checker) : Prop :=

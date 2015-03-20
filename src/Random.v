@@ -616,10 +616,9 @@ induction l.
 Qed.
 
 (* begin SplitPathCompleteness *)
-Theorem SplitPathCompleteness : 
-  forall (l : list SplitPath) (f : SplitPath -> RandomSeed),
-    PrefixFree l -> exists (s : RandomSeed), 
-                      forall p, In p l -> varySeed p s = f p.
+Theorem SplitPathCompleteness (l : list SplitPath) (f : SplitPath -> RandomSeed) :
+  PrefixFree l -> exists (s : RandomSeed),
+    forall p, In p l -> varySeed p s = f p.
 (* end SplitPathCompleteness *)
 intros l f Pref.
 pose proof (listToTree l f Pref) as ExSeedTree.
