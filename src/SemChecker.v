@@ -44,8 +44,7 @@ Definition semCheckable {A} `{Checkable A} (a : A) : Prop := semChecker (checker
 (* end semCheckable *)
 (* begin semCheckableSize *)
 Definition semCheckableSize {A : Type} {_ : Checkable  A}
-           (a : A) (s : nat) : Prop :=
-  semCheckerSize (checker a) s.
+           (a : A) (s : nat) : Prop := semCheckerSize (checker a) s.
 (* end semCheckableSize *)
 
 Lemma mapTotalResult_id {prop : Type} {H : Checkable prop} (f : Result -> Result)
