@@ -46,10 +46,9 @@ Proof.
 Qed.
 
 (* begin is_redblackP *)
-Lemma is_redblackP : forall t, reflect (is_redblack t) (is_redblack_bool t).
+Lemma is_redblackP t : reflect (is_redblack t) (is_redblack_bool t).
 (* end is_redblackP *)
 Proof.
-  move => t.
   apply (@iffP (is_redblack_bool t)); first by apply/idP.
   rewrite /is_redblack_bool.
   + move => /andP [Hb Hrr]. rewrite /is_black_balanced in Hb.

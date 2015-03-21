@@ -268,27 +268,27 @@ Admitted.
        unsized assumption. And we could use sections to hide all the
        type class stuff from the paper. *)
 (* begin semForAll *)
-Lemma semForAll : forall {A C:Type} `{Show A, Checkable C} (g : G A) (f : A->C),
+Lemma semForAll {A C:Type} `{Show A, Checkable C} (g : G A) (f : A->C) :
     (forall a, unsizedChecker (checker (f a))) ->
     (semChecker (forAll g f) <-> forall (a : A), semGen g a -> semCheckable (f a)).
 (* end semForAll *)
 Proof.
-  move => A C Htest show gen pf uc.
+  move=> uc.
   rewrite /semCheckable semChecker_def2. setoid_rewrite semChecker_def2.
   split => H'.
   - rewrite /forAll in H'.
     intros.  specialize (H' qp). apply H'. clear H'.
-    pose proof (semBindUnsized2 gen (aux pf uc) qp) as H1. rewrite H1. clear H1.
+    pose proof (semBindUnsized2 g (aux f uc) qp) as H3. rewrite H3. clear H3.
     exists a. split. by [].
     by rewrite (semPrintTestCase_id' _ _ qp).
   - rewrite /forAll in H' *. intro qp.
-    pose proof (semBindUnsized2 gen (aux pf uc) qp) as H1. rewrite H1. clear H1.
+    pose proof (semBindUnsized2 g (aux f uc) qp) as H1. rewrite H1. clear H1.
     intros [a [H1 H2]]. eapply H'. eassumption.
     move : H2. by rewrite (semPrintTestCase_id' _ _ qp).
 Qed.
 
 (* begin semImplication *)
-Lemma semImplication : forall {C : Type} `{Checkable C} (b : bool) (c : C),
+Lemma semImplication {C : Type} `{Checkable C} (b : bool) (c : C) :
   semChecker (b ==> c) <-> (b -> semCheckable c).
 (* end semImplication *)
 Admitted.
@@ -299,7 +299,7 @@ Lemma semPredQPropNew:
 Admitted.
 
 (* begin semCheckableBool *)
-Lemma semCheckableBool : forall (b:bool), semCheckable b <-> b.
+Lemma semCheckableBool (b : bool) : semCheckable b <-> b.
 (* end semCheckableBool *)
 Admitted.
 
