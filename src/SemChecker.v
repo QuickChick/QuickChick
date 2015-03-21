@@ -43,8 +43,8 @@ Qed.
 Definition semCheckable {A} `{Checkable A} (a : A) : Prop := semChecker (checker a).
 (* end semCheckable *)
 (* begin semCheckableSize *)
-Definition semCheckableSize {A : Type} {_ : Checkable  A}
-           (a : A) (s : nat) : Prop := semCheckerSize (checker a) s.
+Definition semCheckableSize {A} `{Checkable A} (a : A) (s : nat) : Prop :=
+  semCheckerSize (checker a) s.
 (* end semCheckableSize *)
 
 Lemma mapTotalResult_id {prop : Type} {H : Checkable prop} (f : Result -> Result)
@@ -232,18 +232,16 @@ Proof.
 Qed.
 
 (* begin semForAllSize *)
-Lemma semForAllSize :
-  forall {A prop : Type} {H : Checkable prop} `{Show A}
-         (gen : G A) (f : A -> prop) (size: nat),
-    semCheckerSize (forAll gen f) size <->
-    forall (a : A), a \in semGenSize gen size -> semCheckableSize (f a) size.
+Lemma semForAllSize {A C} `{Show A, Checkable C} (g : G A) (f : A -> C) (s:nat) :
+  semCheckerSize (forAll g f) s <->
+  forall (a : A), a \in semGenSize g s -> semCheckableSize (f a) s.
 (* end semForAllSize *)
 Proof.
-  move => A prop Htest show gen pf. split => H'.
-  - rewrite /forAll in H'. move/semBindGen : H' => H' a /H' Hgen.
-    by apply semPrintTestCase_id in Hgen.
-  - rewrite /forAll in H' *. apply semBindGen => g Hgen.
-    rewrite semPrintTestCase_id. by apply H'.
+split=> H'.
+- rewrite /forAll in H'. move/semBindGen : H' => H' a /H' Hgen.
+  by apply semPrintTestCase_id in Hgen.
+- rewrite /forAll in H' *. apply semBindGen => g' Hgen.
+  rewrite semPrintTestCase_id. by apply H'.
 Qed.
 
 Definition unsizedChecker (c : Checker) : Prop :=

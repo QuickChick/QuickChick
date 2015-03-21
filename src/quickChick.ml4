@@ -108,8 +108,11 @@ let runTest c =
   else if Sys.command (comp_ml_cmd mlf execn) <> 0 then
     msgerr (str "Could not compile test program" ++ fnl ())
   (** Run the test *)
-  else if Sys.command execn <> 0 then
-    msgerr (str "Could not run test" ++ fnl ())
+  else
+    (** If we want to print the time spent in tests *)
+    let execn = "time " ^ execn in
+    if Sys.command execn <> 0 then
+      msgerr (str "Could not run test" ++ fnl ())
 
 let run f args =
   let args = List.map (fun x -> (x,None)) args in
