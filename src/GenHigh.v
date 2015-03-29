@@ -141,6 +141,10 @@ Hypothesis semElementsSize:
   forall {A} (l: list A) (def : A) s,
     (semGenSize (elements def l) s) <--> if l is nil then [set def] else l.
 
+Hypothesis elements_unsized : 
+  forall {A} (def : A) (l : list A),
+    unsized (elements def l).
+
 Definition genPair {A B : Type} (ga : G A) (gb : G B) : G (A * B) :=
   liftGen2 pair ga gb.
 
@@ -268,11 +272,21 @@ Definition vectorOf {A : Type} (k : nat) (g : G A)
 Definition listOf {A : Type} (g : G A) : G (list A) :=
   sized (fun n => bindGen (choose (0, n)) (fun k => vectorOf k g)).
 
-Definition elements {A : Type} (def : A) (l : list A) := nosimpl(
+Definition elements {A : Type} (def : A) (l : list A) :=
   let n := length l in
   bindGen (choose (0, n - 1)) (fun n' =>
-  returnGen (List.nth n' l def))).
+  returnGen (List.nth n' l def)).
 
+Lemma elements_unsized : 
+  forall {A} (def : A) (l : list A),
+    unsized (elements def l).
+Proof.
+  intros. unfold unsized, elements. intros s1 s2; split;
+  move/semBindSize => [n [/semChooseSize H1 /semReturnSize H2]];  
+  apply semBindSize; exists n; split; auto;
+  try apply /semChooseSize; auto; apply semReturnSize; auto.
+Qed.
+  
 Lemma semLiftGen {A B} (f: A -> B) (g: G A) :
   semGen (liftGen f g) <--> f @: semGen g.
 Proof.

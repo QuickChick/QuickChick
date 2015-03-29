@@ -166,7 +166,7 @@ Next Obligation. apply well_founded_hc. Defined.
 
 
 (* begin genRBTree *)
-Definition genRBTree := sized (fun h => genRBTree_height (h, Red)).
+Definition genRBTree := bindGen arbitrary (fun h => genRBTree_height (h, Red)).
 (* end genRBTree *)
 
 Definition showDiscards (r : Result) :=

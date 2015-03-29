@@ -81,8 +81,8 @@ Qed.
 
 Lemma genColor_unsized : unsized genColor.
 Proof.
-  rewrite /unsized /semGen. move => s.
-Admitted.
+  rewrite /genColor. apply unsized_elements.
+Qed.
 
 Corollary genColor_correctSize': forall s, semGenSize genColor s <--> setT.
 Proof.
@@ -189,18 +189,15 @@ Lemma semRBTreeSize s : semGenSize genRBTree s
   <--> [set t | (exists h, h<=s /\ is_redblack' t Red h) /\ all_nodes_bellow s t].
 (* end semRBTreeSize *)
 Proof.
-Admitted.
-(*
-  move => s t. rewrite /genRBTree /is_redblack. split.
-  - move => /semBindSize [n [/arbNat_correctSize /leP Hle
-                             /genRBTree_height_correct [Hrb Hb]]].
+  move => t. rewrite /genRBTree /is_redblack. split.
+  - move => /semBindSize [n [/arbNat_correctSize /leP Hle 
+                             /semGenRBTreeHeightSize [Hrb Hb]]].
     split => //. exists n; split => //.
   - move => [[n [Hle Hrb]] Hb].
-    apply semBindSize. exists n.
+    apply semBindSize. exists n. 
     split; first by apply arbNat_correctSize; apply/leP.
-    apply genRBTree_height_correct. split => //.
+    apply semGenRBTreeHeightSize. split => //.
 Qed.
-*)
 
 Lemma all_nodes_bellow_max_node :
   forall t n,
@@ -247,10 +244,15 @@ Proof.
   - move => H [a t] Hg. unfold semGen in Hg. destruct Hg as [s [_ Hg]].
     simpl. rewrite -> semImplication. rewrite semCheckableBool.
     intro irb. apply /is_redblackP. apply H. by apply /is_redblackP.
-  - intros. unfold unsizedChecker, semCheckerSize. simpl. intros.
-    unfold semGenSize, codom.
-      (* CH: still need to show that a boolean doesn't use the size *)
-    admit.
+  - intros. unfold unsizedChecker, semCheckerSize, curry. simpl. intros.
+    destruct a as [n t]. split; intros H res H'.
+    + apply H. unfold implication in *. 
+      destruct (is_redblack_bool t); simpl in *;
+      apply semReturnSize; apply semReturnSize in H'; auto.
+    + apply H.  unfold implication in *. 
+      destruct (is_redblack_bool t); simpl in *;
+      apply semReturnSize; apply semReturnSize in H'; auto.
+Qed.
 Admitted.
 (* old proof -- still works, but requires checker lemmas with sizes,
    and it's very hard to explain those that early in the paper;
