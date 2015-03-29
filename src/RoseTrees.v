@@ -26,7 +26,7 @@ Definition bindRose {A B : Type} (m : Rose A) (k : A -> Rose B) : Rose B :=
 
 (* CH: these seem unused now *)
 Lemma joinRoseFmapRose :
-  forall {A B} (f: A -> B) x,
+  forall {A B} (f: A -> B) (x : Rose A),
     fmapRose f x = joinRose (fmapRose (fun x0 : A => returnRose (f x0)) x).
 Proof.
   fix 4.

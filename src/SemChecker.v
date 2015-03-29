@@ -279,15 +279,26 @@ Proof.
 Qed.
 
 Lemma imset_id' T (A : set T) f : (forall x, f x = x) -> f @: A <--> A.
-Admitted.
+Proof.
+  rewrite /imset /bigcup => H x. split.
+  - move => [y [H1 H2]]. rewrite H in H2. inversion H2. subst. assumption.
+  - move => H1. eexists. split. eassumption. by rewrite H.
+Qed.
 
-Lemma fmapRose_id f rose :
+(* CH: TODO: need a proper induction principle for rose trees *)
+Lemma fmapRose_id : forall (rose : Rose Result) f,
   (forall res : Result, f res = res) ->
   fmapRose f rose = rose.
-Admitted.
+Proof.
+  fix 1. (* <-- nasty *)
+  move => [r [xs]] f H. induction xs as [|x xs]; simpl in *.
+  - by rewrite H.
+  - inversion IHxs. f_equal. by repeat apply H1. f_equal. f_equal.
+    + by apply fmapRose_id.
+    + by do 2 rewrite H2.
+Qed.
 
-Lemma semMapTotalResult_id {prop : Type} {H : Checkable prop} (f : Result -> Result)
-         (p : prop) :
+Lemma semMapTotalResult_id {prop : Type} {H : Checkable prop} f (p : prop) :
     (forall r, f r = r) ->
     (semGen (mapTotalResult f p) <--> semGen (checker p)).
 Proof.
