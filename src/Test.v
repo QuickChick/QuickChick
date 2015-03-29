@@ -151,6 +151,47 @@ Fixpoint roseSize (r : Rose Checker.Result) : nat :=
       1 + fold_left (fun acc rose => acc + (roseSize rose)) (force ts) 0
   end.
 
+Lemma roseSizeN (ts : list (Rose Checker.Result)) : forall (n:nat),
+  fold_left (fun acc rose => acc + (roseSize rose)) ts n =
+  n + (fold_left (fun acc rose => acc + (roseSize rose)) ts 0).
+Proof.
+  induction ts; intro n.
+  - simpl. apply plus_n_O.
+  - simpl. rewrite -> plus_O_n. rewrite IHts. rewrite -> (IHts (roseSize a)).
+    rewrite <- Plus.plus_assoc.
+    do 2 rewrite Nat.add_cancel_l. reflexivity.
+Qed.
+
+Lemma auxRose : forall ts res res' ts' t (H : force ts = MkRose res' ts' :: t),
+  (roseSize (MkRose res' ts') < roseSize (MkRose res ts))%coq_nat.
+Proof.
+  intros. simpl. rewrite H. clear. simpl.
+  rewrite -> plus_O_n.
+  rewrite -> roseSizeN with (n:= (1 +
+       fold_left
+         (fun (acc : nat) (rose : Rose Checker.Result) => acc + roseSize rose)
+         (force ts') 0)).
+  rewrite <- Plus.plus_assoc.
+  setoid_rewrite Plus.plus_assoc.
+  rewrite <- Plus.plus_assoc.
+  eapply Plus.plus_lt_compat_l. omega.
+Qed.
+
+Lemma auxRose2 : forall ts res res' ts' t (H : force ts = MkRose res' ts' :: t),
+  (roseSize (MkRose res (lazy t)) < roseSize (MkRose res ts))%coq_nat.
+Proof.
+  intros. simpl. rewrite H. clear. simpl.
+  rewrite -> plus_O_n.
+  rewrite -> roseSizeN with (n:= (1 +
+       fold_left
+         (fun (acc : nat) (rose : Rose Checker.Result) => acc + roseSize rose)
+         (force ts') 0)).
+  rewrite <- Plus.plus_assoc.
+  setoid_rewrite Plus.plus_assoc.
+  rewrite <- Plus.plus_assoc.
+  eapply Plus.plus_lt_compat_l. omega.
+Qed.
+
 Function localMin (st : State) (r : Rose Checker.Result)
           {measure roseSize r}
 : (nat * Checker.Result) :=
@@ -170,10 +211,13 @@ Function localMin (st : State) (r : Rose Checker.Result)
                 localMin (updTryShrinks st (fun x => x + 1)) (MkRose res (lazy t))
             | None =>
               localMin (updTryShrinks st (fun x => x + 1)) (MkRose res (lazy t))
-          end
+         end
       end
   end.
-Admitted.
+- intros. eapply auxRose; eassumption.
+- intros. eapply auxRose2; eassumption.
+- intros. eapply auxRose2; eassumption.
+Qed. (* Warning: Cannot define graph(s) for localMin *)
 
 Fixpoint runATest (st : State) (f : nat -> RandomSeed -> QProp) (maxSteps : nat) :=
   if maxSteps is maxSteps'.+1 then
