@@ -319,6 +319,8 @@ forall {A1 A2 A3 B} (f: A1 -> A2 -> A3 -> B)
                                        (f a1 a2 a3) = b)).
 Proof. solveLiftGenX. Qed.
 
+(* CH: Made this more beautiful than the rest *)
+(* CH: Should anyway use dependent types for a generic liftGenN *)
 (* begin semLiftGen4Size *)
 Lemma semLiftGen4Size A1 A2 A3 A4 B (f : A1 -> A2 -> A3 -> A4 -> B)
                      (g1 : G A1) (g2 : G A2) (g3 : G A3) (g4 : G A4) s :
@@ -327,10 +329,20 @@ Lemma semLiftGen4Size A1 A2 A3 A4 B (f : A1 -> A2 -> A3 -> A4 -> B)
                  semGenSize g3 s a3 /\ semGenSize g4 s a4 /\ f a1 a2 a3 a4 = b].
 (* end semLiftGen4Size *)
 Proof.
-Admitted.
-(* CH: broke this one when made statement nicer, sorry
-solveLiftGenX. Qed.
-*)
+  split; unfold liftGen4; intros.
+  - repeat match goal with
+    | [ H : semGenSize _ _ _ |- _ ] =>
+      try (apply semBindSize in H; destruct H as [? [? ?]]);
+      try (apply semReturnSize in H; subst)
+    end.
+    do 4 eexists. repeat (split; [eassumption|]). assumption.
+  - repeat match goal with
+    | [ H : exists _, _ |- _ ] => destruct H as [? [? ?]]
+    | [ H : and _ _ |- _ ] => destruct H as [? ?]
+    end.
+    repeat (apply semBindSize; eexists; split; [eassumption|]).
+    apply semReturnSize. assumption.
+Qed.
 
 Lemma semLiftGen5Size :
 forall {A1 A2 A3 A4 A5 B} (f: A1 -> A2 -> A3 -> A4 -> A5 -> B)

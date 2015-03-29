@@ -288,10 +288,9 @@ Qed.
 Lemma monad_rightid A (g : G A) : semGen (bindGen g returnGen) <--> semGen g.
 Proof.
 apply: eq_bigcupr => size; rewrite semBindSize.
-Admitted.
-(* CH: Broke this when swapping arguments of semReturnSize, sorry
-by rewrite (eq_bigcupr _ (semReturnSize _ size)) /semGenSize bigcup_codom codomE.
-Qed. *)
+by rewrite (eq_bigcupr _ (fun x => semReturnSize x size))
+           /semGenSize bigcup_codom codomE.
+Qed.
 
 Lemma monad_assoc A B C (ga : G A) (fb : A -> G B) (fc : B -> G C) :
   semGen (bindGen (bindGen ga fb) fc) <--> 
