@@ -54,6 +54,7 @@ Definition addCallback (res : Result) (c : Callback) : Result :=
     | MkResult o e r i s cs => MkResult o e r i s (cons c cs)
   end.
 
+(* CH: The name of this should change; we no longer call checkers props *)
 Record QProp : Type :=
   MkProp
     {

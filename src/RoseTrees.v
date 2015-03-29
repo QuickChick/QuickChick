@@ -50,3 +50,16 @@ Proof.
     simpl. rewrite Heq /bindRose /= app_nil_r.
     repeat apply f_equal. apply f_equal2. apply joinRoseFmapRose. reflexivity.
 Qed.
+
+(* CH: TODO: need a proper induction principle for rose trees *)
+Lemma fmapRose_id : forall a (rose : Rose a) f,
+  (forall x : a, f x = x) ->
+  fmapRose f rose = rose.
+Proof.
+  fix 2. (* <-- nasty *)
+  move => a [r [xs]] f H. induction xs as [|x xs]; simpl in *.
+  - by rewrite H.
+  - inversion IHxs. f_equal. by repeat apply H1. f_equal. f_equal.
+    + by apply fmapRose_id.
+    + by do 2 rewrite H2.
+Qed.
