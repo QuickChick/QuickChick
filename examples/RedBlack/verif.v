@@ -81,7 +81,7 @@ Qed.
 
 Lemma genColor_unsized : unsized genColor.
 Proof.
-  rewrite /genColor. apply unsized_elements.
+  rewrite /genColor. apply elements_unsized.
 Qed.
 
 Corollary genColor_correctSize': forall s, semGenSize genColor s <--> setT.
@@ -253,7 +253,6 @@ Proof.
       destruct (is_redblack_bool t); simpl in *;
       apply semReturnSize; apply semReturnSize in H'; auto.
 Qed.
-Admitted.
 (* old proof -- still works, but requires checker lemmas with sizes,
    and it's very hard to explain those that early in the paper;
    should still bring back the views and stuff into the new proof
