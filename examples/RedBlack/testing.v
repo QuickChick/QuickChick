@@ -141,7 +141,8 @@ Proof.
   apply wf_lexprod. now apply Wf_nat.lt_wf. intros _; now apply well_foulded_ltColor.
 Qed.
 
-Require Import Program.Wf.
+Require Import Program.Wf. Import WfExtensionality.
+Require Import FunctionalExtensionality.
 
 (* begin genRBTree_height *)
 Program Fixpoint genRBTree_height (hc : nat*color) {wf wf_hc hc} : G tree :=
@@ -156,13 +157,42 @@ Program Fixpoint genRBTree_height (hc : nat*color) {wf wf_hc hc} : G tree :=
                     liftGen4 Node (returnGen c') (genRBTree_height (h', c'))
                                        arbitrary (genRBTree_height (h', c')) end.
 (* end genRBTree_height *)
-Next Obligation. unfold wf_hc. simpl. left. omega. Qed.
-Next Obligation. unfold wf_hc. simpl. left. omega. Qed.
-Next Obligation. unfold wf_hc. simpl.
-                 destruct c'. right. apply I. left; omega. Qed.
-Next Obligation. unfold wf_hc. simpl.
-                 destruct c'. right. apply I. left; omega. Qed.
-Next Obligation. apply well_founded_hc. Defined.
+Next Obligation.
+  abstract (unfold wf_hc; simpl; left; omega).
+Qed.
+Next Obligation.
+  abstract (unfold wf_hc; simpl; left; omega).
+Qed.
+Next Obligation.
+  abstract (unfold wf_hc; simpl; destruct c'; [right; apply I | left; omega]).
+Qed.
+Next Obligation.
+  abstract (unfold wf_hc; simpl; destruct c'; [right; apply I | left; omega]).
+Qed.
+Next Obligation.
+  abstract (apply well_founded_hc).
+Defined.
+
+Lemma genRBTree_height_eq (hc : nat*color) :
+  genRBTree_height hc =
+  match hc with
+  | (0, Red) => returnGen Leaf
+  | (0, Black) => oneOf [returnGen Leaf;
+                    (do! n <- arbitrary; returnGen (Node Red Leaf n Leaf))]
+  | (S h, Red) => liftGen4 Node (returnGen Black) (genRBTree_height (h, Black))
+                                        arbitrary (genRBTree_height (h, Black))
+  | (S h, Black) => do! c' <- genColor;
+                    let h' := match c' with Red => S h | Black => h end in
+                    liftGen4 Node (returnGen c') (genRBTree_height (h', c'))
+                                       arbitrary (genRBTree_height (h', c')) end.
+Proof.
+  unfold_sub genRBTree_height (genRBTree_height hc).
+  f_equal. destruct hc as [[|h] [|]]; try reflexivity.
+  f_equal. apply functional_extensionality => [[|]]; reflexivity.
+Qed.
+
+(* Hope that this is enough for preventing unfolding genRBTree_height *)
+Global Opaque genRBTree_height.
 
 
 (* begin genRBTree *)

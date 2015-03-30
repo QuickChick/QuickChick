@@ -21,7 +21,7 @@ Definition successful qp :=
    them that way? *)
 
 (* Maps a Checker to a Prop *)
-(* Begin semCheckerSize *)
+(* begin semCheckerSize *)
 Definition semCheckerSize (c : Checker) (s : nat): Prop :=
   forall res, res \in semGenSize c s -> successful res = true.
 (* end semCheckerSize *)
