@@ -152,6 +152,11 @@ Hypothesis semBindUnsized2 :
     (forall a, unsized (f a)) ->
     semGen (bindGen g f) <--> \bigcup_(a in semGen g) semGen (f a).
 
+Hypothesis semFmapBind :
+  forall A B C (g : G A) (f1 : B -> C) (f2 : A -> G B),
+    semGen (fmap f1 (bindGen g f2)) <-->
+    semGen (bindGen g (fun x => fmap f1 (f2 x))).
+
 End GenLowInterface.
 
 Module GenLow : GenLowInterface.
@@ -432,6 +437,17 @@ Proof.
   - intros [a [[s1 [_ H1]] [s2 [_ H2]]]]. exists s1. split; first (compute; by []).
     exists a. split. by []. specialize (H a).
     rewrite /unsized /set_eq in H. rewrite -> H. eassumption.
+Qed.
+
+Lemma semFmapBind :
+  forall A B C (g : G A) (f1 : B -> C) (f2 : A -> G B),
+    semGen (fmap f1 (bindGen g f2)) <-->
+    semGen (bindGen g (fun x => fmap f1 (f2 x))).
+Proof.
+  intros. rewrite /semGen. setoid_rewrite semFmapSize.
+  setoid_rewrite semBindSize.
+  apply eq_bigcupr => s. setoid_rewrite semFmapSize.
+  rewrite imset_bigcup. reflexivity.
 Qed.
 
 End GenLow.

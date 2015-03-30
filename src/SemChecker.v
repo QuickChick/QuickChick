@@ -44,10 +44,8 @@ Proof.
 Qed.
 
 (* CH: This is the definition of Checker I would like to use *)
-Definition semChecker' c := ((successful @: semGen c) \subset [set true]).
-
 Lemma semChecker_def3 c :
-  semChecker c <-> semChecker' c.
+  semChecker c <-> (successful @: semGen c \subset [set true]).
 Proof.
   rewrite semChecker_def2. split; intro H.
 (*  CH: why can't I rewrite with semFmap directly? See tentative instances below *)
@@ -245,6 +243,12 @@ Qed.
 
 (* CH: any way to relate this to generators and unsizedness of generators?
    Yes, unsizedChecker should be defined in terms of unsized and semChecker' *)
+
+Definition genChecker c := fmap successful c.
+
+Definition unsizedChecker (c : Checker) : Prop := unsized (genChecker c).
+
+(* alternative definitions
 Definition unsizedChecker (c : Checker) : Prop :=
   forall s1 s2, semCheckerSize c s1 <-> semCheckerSize c s2.
 
@@ -257,6 +261,7 @@ Proof.
   - intro s'. rewrite H. eassumption.
   - by apply H'.
 Qed.
+*)
 
 Lemma imset_id' T (A : set T) f : (forall x, f x = x) -> f @: A <--> A.
 Proof.
@@ -277,7 +282,11 @@ Qed.
 Lemma another_one_for_maxime a b (f g : a -> b) (A : set a) :
   (forall x, f x = g x) ->
   f @: A <--> g @: A.
-Admitted.
+Proof.
+  rewrite /imset /bigcup /set1. move => H x.
+  split => [[i [H1 H2]] | [i [H1 H2]]]; eexists; split;
+           try eassumption. congruence. congruence.
+Qed.  
 
 Lemma semPrintTestCase_id' {C} `{Checkable C} (s: String.string) (c : C) :
     successful @: semGen (printTestCase s c) <--> successful @: semGen (checker c).
@@ -288,10 +297,26 @@ Proof.
   simpl. move => [[[? ? ? ? ? ?] ?]]. reflexivity.
 Qed.
 
-Lemma aux {A C} `{Checkable C} `{Show A} (c : A -> C) :
+(* CH: almost the same as before, should refactor at some point *)
+Lemma semPrintTestCase_id'' {C} `{Checkable C} (str : String.string) (c : C) s :
+    successful @: semGenSize (printTestCase str c) s <-->
+    successful @: semGenSize (checker c) s.
+Proof.
+  intros. unfold printTestCase, callback.
+  rewrite /mapTotalResult /mapRoseResult /mapProp.
+  rewrite semFmapSize. rewrite -imset_comp. apply another_one_for_maxime.
+  simpl. move => [[[? ? ? ? ? ?] ?]]. reflexivity.
+Qed.
+
+Lemma unsized_printTestCase {A C} `{Checkable C} `{Show A} (c : A -> C) :
   (forall a, unsizedChecker (checker (c a))) ->
-  (forall a, unsized (printTestCase (String.append (Show.show a) newline) (c a))).
-Admitted.
+  (forall a, unsizedChecker
+               (printTestCase (String.append (Show.show a) newline) (c a))).
+Proof.
+  rewrite /unsizedChecker /unsized /genChecker. setoid_rewrite semFmapSize.
+  move => H' a s1 s2. specialize (H' a s1 s2).
+  by do 2 rewrite semPrintTestCase_id''.
+Qed.
 
 (* This seems like a better way to prove semForAll *)
 Lemma semForAll_aux {A C} `{Show A, Checkable C} (g : G A) (f : A->C):
@@ -300,18 +325,21 @@ Lemma semForAll_aux {A C} `{Show A, Checkable C} (g : G A) (f : A->C):
   (\bigcup_(a in semGen g) successful @: (semGen (checker (f a)))).
 Proof.
   intros. rewrite /forAll.
+  rewrite -semFmap. rewrite semFmapBind.
   rewrite semBindUnsized2.
-  rewrite imset_bigcup.
   apply eq_bigcupr => a.
+  rewrite semFmap.
   apply semPrintTestCase_id'.
-  by apply aux.
+  by apply unsized_printTestCase.
 Qed.
 
-Lemma subset_trans : forall a (A1 A2 A3 : set a),
+Lemma subset_trans a (A1 A2 A3 : set a) :
   A1 \subset A2 ->
   A2 \subset A3 ->
   A1 \subset A3.
-Admitted.
+Proof.
+  rewrite /set_incl. move => H12 H23. by eauto 3.
+Qed.
 
 Instance xxx a (x:set a) : Morphisms.Proper (Morphisms.respectful set_eq
                                      (Basics.flip Basics.impl))
@@ -325,10 +353,12 @@ Instance yyy a (x: relation (set a)) : Morphisms.Proper
                set_incl.
 Admitted.
 
-Lemma here_is_one_more : forall a b (x:a) (A : set a) (f:a->set b),
+Lemma here_is_one_more a b (x:a) (A : set a) (f:a->set b) :
   x \in A ->
   f x \subset \bigcup_(x in A) f x.
-Admitted.
+Proof.
+  rewrite /set_incl /bigcup. by eauto 3.
+Qed.
 
 (* CH: We could create a super class UCheckable that includes the
        unsized assumption. And we could use sections to hide all the
@@ -343,39 +373,67 @@ Lemma semForAll {A C:Type} `{Show A, Checkable C} (g : G A) (f : A->C) :
 Proof.
   move=> uc.
   rewrite /semCheckable semChecker_def3. setoid_rewrite semChecker_def3.
-  rewrite /semChecker'.
+  rewrite /genChecker.
   split => H'.
   - intros. move : H'. apply subset_trans.
     rewrite semForAll_aux; [| by []].
-    by apply here_is_one_more with (f:= fun x => successful @: semGen (checker (f x))).
+    by apply here_is_one_more with
+       (f:= fun x => successful @: semGen (checker (f x))).
   - rewrite semForAll_aux; [| by []].
     unfold set_incl in *. intros b [x [H1 H2]].
     eapply H'; eassumption.
 Qed.
 
+Lemma subset_refl T (A : set T) : A \subset A.
+Proof. by rewrite /set_incl. Qed.
+
 (* begin semImplication *)
 Lemma semImplication {C} `{Checkable C} (b : bool) (c : C) :
   semChecker (b ==> c) <-> (b -> semCheckable c).
 (* end semImplication *)
-Admitted.
+Proof.
+  rewrite /semCheckable !semChecker_def3.
+  split => [H' b'|].
+  - by rewrite b' in H'.
+  - case b; simpl => H'. by apply H'.
+    rewrite semReturn /imset bigcup_set1. by apply subset_refl.
+Qed.
 
 Lemma semPredQPropNew:
   forall (p : G QProp),
     semCheckable p <-> (semChecker p).
-Admitted.
+Proof. by rewrite /semCheckable /checker. Qed.
 
 (* begin semCheckableBool *)
 Lemma semCheckableBool (b : bool) : semCheckable b <-> b.
 (* end semCheckableBool *)
-Admitted.
+Proof. (* CH: brute-force, please fix *)
+  rewrite /semCheckable /checker semChecker_def3 /checker. simpl.
+  split; setoid_rewrite semReturn.
+    rewrite /imset bigcup_set1. simpl.
+    destruct b. by []. simpl; move => H. unfold set_incl in H.
+      unfold set1 in H. specialize (H false Coq.Init.Logic.eq_refl).
+      inversion H.
+    intro Hb. rewrite Hb. simpl. rewrite /imset bigcup_set1.
+      by apply subset_refl.
+Qed.
 
-Lemma mergeForAlls :
-  forall {A B C : Type} `{Checkable C} `{Show A} `{Show B}
-         (ga : G A) (gb : G B) (f : A -> B -> C),
+Definition uncurry {A B C : Type} (f : A * B -> C) (a : A) (b : B) := f (a,b).
+
+Lemma mergeBinds' :
+  forall A B C (ga : G A) (gb : G B) (f : A * B -> G C),
+    semGen (bindGen ga (fun x => bindGen gb ((uncurry f) x))) <-->
+    semGen (bindGen (genPair ga gb) f).
+Admitted. (* should be immediate from mergeBinds and curry-uncurry iso *)
+
+Lemma mergeForAlls {A B C : Type} `{Checkable C} `{Show A} `{Show B}
+         (ga : G A) (gb : G B) (f : A -> B -> C) :
      semChecker (forAll ga (fun a => forAll gb (f a))) <->
      semChecker (forAll (genPair ga gb) (curry f)).
 Proof.
-  pose proof mergeBinds as mb.
+  rewrite /forAll.
+  do 2 rewrite semChecker_def3.
+  split; rewrite -mergeBinds'. (* would like to rewrite before split though *)
 Admitted.
 
 Lemma semForAllShrink:
