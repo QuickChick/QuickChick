@@ -196,7 +196,7 @@ Global Opaque genRBTree_height.
 
 
 (* begin genRBTree *)
-Definition genRBTree := bindGen arbitrary (fun h => genRBTree_height (h, Red)).
+Definition genRBTree := sized (fun h => genRBTree_height (h, Red)).
 (* end genRBTree *)
 
 Definition showDiscards (r : Result) :=
