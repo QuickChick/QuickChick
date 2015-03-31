@@ -684,4 +684,52 @@ Lemma semOneOfSize A (g0 : G A) (gs : list (G A)) s :
 (* end semOneOfSize *)
 Proof. rewrite semOneofSize. reflexivity. Qed.
 
+(* Another important property of generators is size-monotonicity;
+   sized-monotonic generators compose better *)
+
+Definition sizeMonotonic {A : Type} (g : G A) : Prop :=
+  forall s1 s2, s1 <= s2 -> semGenSize g s1 \subset semGenSize g s2.
+
+(* Here is an example of good composition;
+   this lemma does not hold for generators that are not size-monotonic *)
+
+Lemma semLiftGen2SizeMonotonic {A1 A2 B} (f: A1 -> A2 -> B)
+                               (g1 : G A1) (g2 : G A2) :
+  sizeMonotonic g1 -> sizeMonotonic g2 ->
+  semGen (liftGen2 f g1 g2) <--> f @2: (semGen g1, semGen g2).
+Proof.
+  rewrite /sizeMonotonic /semGen => H1 H2. setoid_rewrite semLiftGen2Size.
+  move => b. split.
+  - move => [sb [_ Hb]]. (* point-free reasoning would be nice here *)
+    destruct Hb as [a [[Hb11 Hb12] Hb2]]. exists a. split; [| by apply Hb2].
+    split; eexists; by split; [| eassumption].
+  - move => [[a1 a2] [[[s1 [_ G1]] [s2 [_ G2]]] Hf]]. compute in Hf.
+    exists (max s1 s2). split; first by [].
+    exists (a1,a2). split; last by []. split; simpl in *.
+    eapply H1; last eassumption. by apply/leP; apply Max.le_max_l.
+    eapply H2; last eassumption. by apply/leP; apply Max.le_max_r.
+Qed.
+
+(* Operators like betterSized (better name pending) are guaranteed to
+   produce size-monotonic generators ...  for now under some strong assumptions *)
+
+Definition betterSized {A} (f : nat -> G A) :=
+  sized (fun x => bindGen (choose (0, x)) f).
+
+Instance zzz A : Morphisms.Proper (Morphisms.respectful set_eq
+                                     (Morphisms.respectful set_eq
+                                        (Basics.flip Basics.impl))) (@set_incl A).
+Admitted.
+
+Lemma betterSizedIndeedBetter {A} (f : nat -> G A) :
+  (forall s, unsized (f s)) -> (* <-- can we weaken this assumption? *)
+  sizeMonotonic (betterSized f).
+Proof.
+  rewrite /betterSized /sizeMonotonic => Hu s1 s2 H.
+  rewrite !semSizedSize !semBindSize !semChooseSize; last by []; last by [].
+  move => a [s1' [H11 H12]].
+  eexists. split. Focus 2. rewrite -> (Hu s1' s1 s2 a) in H12. eassumption.
+  apply /andP. split. by []. eapply leq_trans; last eassumption. by [].
+Qed.
+
 End GenHigh.
