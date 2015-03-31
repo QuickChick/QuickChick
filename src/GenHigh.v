@@ -710,8 +710,19 @@ Proof.
     eapply H2; last eassumption. by apply/leP; apply Max.le_max_r.
 Qed.
 
+(* Q: Can we prove any such lemma for bind? Maybe stronger variants of
+      semBindUnsized1 and semBindUnsized2? *)
+
+Lemma unsizedSizeMonotonic A (g : G A) :
+  unsized g -> sizeMonotonic g.
+Proof.
+  rewrite /unsized /sizeMonotonic => H s1 s2 H12 a.
+    by destruct (H s1 s2 a) as [H1 H2].
+Qed.
+
 (* Operators like betterSized (better name pending) are guaranteed to
-   produce size-monotonic generators ...  for now under some strong assumptions *)
+   produce size-monotonic generators (provided the body has this
+   property). Note: this doesn't hold for sized! *)
 
 Definition betterSized {A} (f : nat -> G A) :=
   sized (fun x => bindGen (choose (0, x)) f).
@@ -722,13 +733,13 @@ Instance zzz A : Morphisms.Proper (Morphisms.respectful set_eq
 Admitted.
 
 Lemma betterSizedIndeedBetter {A} (f : nat -> G A) :
-  (forall s, unsized (f s)) -> (* <-- can we weaken this assumption? *)
+  (forall s, sizeMonotonic (f s)) ->
   sizeMonotonic (betterSized f).
 Proof.
   rewrite /betterSized /sizeMonotonic => Hu s1 s2 H.
   rewrite !semSizedSize !semBindSize !semChooseSize; last by []; last by [].
   move => a [s1' [H11 H12]].
-  eexists. split. Focus 2. rewrite -> (Hu s1' s1 s2 a) in H12. eassumption.
+  eexists. split; last by (apply (Hu s1' s1 s2 H a) in H12; eassumption).
   apply /andP. split. by []. eapply leq_trans; last eassumption. by [].
 Qed.
 
