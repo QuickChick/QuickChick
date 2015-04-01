@@ -729,7 +729,7 @@ Proof.
     eapply H2; last eassumption. by apply/leP; apply Max.le_max_r.
 Qed.
 
-(* unsizedness implies sizeMonotonicity *)
+(* unsizedness trivially implies size-monotonicity *)
 
 Lemma unsizedSizeMonotonic A (g : G A) :
   unsized g -> sizeMonotonic g.

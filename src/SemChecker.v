@@ -408,12 +408,26 @@ Qed.
 
 Definition uncurry {A B C : Type} (f : A * B -> C) (a : A) (b : B) := f (a,b).
 
+Require Import FunctionalExtensionality.
+
+Lemma curry_uncurry {A B C : Type} (f : A * B -> C) :
+  curry (uncurry f) = f.
+Proof. apply functional_extensionality. by intros [a b]. Qed.
+
 Lemma mergeBinds' :
   forall A B C (ga : G A) (gb : G B) (f : A * B -> G C),
     semGen (bindGen ga (fun x => bindGen gb ((uncurry f) x))) <-->
     semGen (bindGen (genPair ga gb) f).
-Admitted. (* should be immediate from mergeBinds and curry-uncurry iso *)
+Proof. setoid_rewrite mergeBinds. by setoid_rewrite curry_uncurry. Qed.
 
+Lemma eq_to_impl : forall (a b : Prop), a = b -> a -> b.
+Proof. move => a b H. by rewrite H. Qed.
+
+(* CH: could we get rid of this in the RBTree example if we used
+   semBindSizeMonotonic instead of semBindUnsized2?  *)
+(* CH: The problem with proving this is the silly print in the middle of things.
+   There are also some technical problems with setoid_rewriting taking ages,
+   and requiring an useless split beforehand. *)
 Lemma mergeForAlls {A B C : Type} `{Checkable C} `{Show A} `{Show B}
          (ga : G A) (gb : G B) (f : A -> B -> C) :
      semChecker (forAll ga (fun a => forAll gb (f a))) <->
@@ -421,8 +435,44 @@ Lemma mergeForAlls {A B C : Type} `{Checkable C} `{Show A} `{Show B}
 Proof.
   rewrite /forAll.
   do 2 rewrite semChecker_def3.
-  split; rewrite -mergeBinds'. (* would like to rewrite before split though *)
-Admitted.
+  rewrite /semGen.
+  split. (* this is a very silly split only to make rewriting work *)
+  - setoid_rewrite semBindSize.
+    repeat setoid_rewrite imset_bigcup.
+    setoid_rewrite semPrintTestCase_id''. simpl.
+    setoid_rewrite semBindSize.
+    setoid_rewrite imset_bigcup.
+    setoid_rewrite semPrintTestCase_id''.
+    repeat setoid_rewrite <- imset_bigcup.
+    repeat setoid_rewrite <- semBindSize.
+(* for some reason this match doesn't work
+    match goal with
+    | [ |- context[ (\bigcup_(x in [set: nat]) semGenSize ?G x) ]] =>
+      fold (bindGen G x)
+    end.
+*)
+    fold (semGen (bindGen ga
+            (fun a : A => bindGen gb (fun a0 : B => checker (f a a0))))).
+    fold (semGen
+         (bindGen (genPair ga gb) (fun a : A * B => checker (curry f a)))).
+    rewrite mergeBinds. apply eq_to_impl. repeat f_equal.
+    apply functional_extensionality. move => [a b]. reflexivity.
+  - (* copy paste from above, we clearly shouldn't split here! *)
+  - setoid_rewrite semBindSize.
+    repeat setoid_rewrite imset_bigcup.
+    setoid_rewrite semPrintTestCase_id''. simpl.
+    setoid_rewrite semBindSize.
+    setoid_rewrite imset_bigcup.
+    setoid_rewrite semPrintTestCase_id''.
+    repeat setoid_rewrite <- imset_bigcup.
+    repeat setoid_rewrite <- semBindSize.
+    fold (semGen (bindGen ga
+            (fun a : A => bindGen gb (fun a0 : B => checker (f a a0))))).
+    fold (semGen
+         (bindGen (genPair ga gb) (fun a : A * B => checker (curry f a)))).
+    rewrite mergeBinds. apply eq_to_impl. repeat f_equal.
+    apply functional_extensionality. move => [a b]. reflexivity.
+Qed.
 
 Lemma semForAllShrink:
   forall {A C} `{Checkable C} `{Show A}
