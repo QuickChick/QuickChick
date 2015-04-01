@@ -690,8 +690,27 @@ Proof. rewrite semOneofSize. reflexivity. Qed.
 Definition sizeMonotonic {A : Type} (g : G A) : Prop :=
   forall s1 s2, s1 <= s2 -> semGenSize g s1 \subset semGenSize g s2.
 
-(* Here is an example of good composition;
-   this lemma does not hold for generators that are not size-monotonic *)
+(* Here are two examples of good composition;
+   these lemmas do not hold for arbitrary generators.
+   Size-monotonicity is a sufficient but not a necessary-condition
+   (see semBindUnsized1 and semBindUnsized2 for similar properties). *)
+
+Lemma semBindSizeMonotonic {A B} (g : G A) (f : A -> G B) :
+    sizeMonotonic g ->
+    (forall a, sizeMonotonic (f a)) ->
+    semGen (bindGen g f) <--> \bigcup_(a in semGen g) semGen (f a).
+Proof.
+  move => Hg Hf.
+  rewrite /semGen. setoid_rewrite semBindSize.
+  intro b. split.
+  - intros [s [_ [a [H1 H2]]]].
+    exists a. split; exists s; (split; first (compute; by []); first by[]).
+  - intros [a [[s1 [_ H1]] [s2 [_ H2]]]]. exists (max s1 s2).
+    split; first (compute; by []).
+    exists a. split.
+    eapply Hg; last eassumption. by apply/leP; apply Max.le_max_l.
+    eapply Hf; last eassumption. by apply/leP; apply Max.le_max_r.
+Qed.
 
 Lemma semLiftGen2SizeMonotonic {A1 A2 B} (f: A1 -> A2 -> B)
                                (g1 : G A1) (g2 : G A2) :
@@ -710,8 +729,7 @@ Proof.
     eapply H2; last eassumption. by apply/leP; apply Max.le_max_r.
 Qed.
 
-(* Q: Can we prove any such lemma for bind? Maybe stronger variants of
-      semBindUnsized1 and semBindUnsized2? *)
+(* unsizedness implies sizeMonotonicity *)
 
 Lemma unsizedSizeMonotonic A (g : G A) :
   unsized g -> sizeMonotonic g.
