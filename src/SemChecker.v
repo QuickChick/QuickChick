@@ -341,18 +341,6 @@ Proof.
   rewrite /set_incl. move => H12 H23. by eauto 3.
 Qed.
 
-Instance xxx a (x:set a) : Morphisms.Proper (Morphisms.respectful set_eq
-                                     (Basics.flip Basics.impl))
-                                  (set_incl x).
-Admitted.
-
-Require Import Relations.
-Instance yyy a (x: relation (set a)) : Morphisms.Proper
-               (Morphisms.respectful set_eq
-                  (Morphisms.respectful x (Basics.flip Basics.impl)))
-               set_incl.
-Admitted.
-
 Lemma here_is_one_more a b (x:a) (A : set a) (f:a->set b) :
   x \in A ->
   f x \subset \bigcup_(x in A) f x.

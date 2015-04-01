@@ -727,11 +727,6 @@ Qed.
 Definition betterSized {A} (f : nat -> G A) :=
   sized (fun x => bindGen (choose (0, x)) f).
 
-Instance zzz A : Morphisms.Proper (Morphisms.respectful set_eq
-                                     (Morphisms.respectful set_eq
-                                        (Basics.flip Basics.impl))) (@set_incl A).
-Admitted.
-
 Lemma betterSizedIndeedBetter {A} (f : nat -> G A) :
   (forall s, sizeMonotonic (f s)) ->
   sizeMonotonic (betterSized f).

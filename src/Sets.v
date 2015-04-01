@@ -281,3 +281,7 @@ case=> y [By Fhyt]; exists (h y); split=> //.
 by case: (surj (h y)) => Ahy _; apply: Ahy; exists y.
 Qed.
 Arguments reindex_bigcup [I J K] h [F A] B _ _.
+
+Instance proper_set_incl A : Morphisms.Proper (Morphisms.respectful set_eq
+  (Morphisms.respectful set_eq (Basics.flip Basics.impl))) (@set_incl A).
+Proof. firstorder. Qed.
