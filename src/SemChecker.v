@@ -105,13 +105,14 @@ Proof.
 Qed.
 
 (* TODO : This proof needs refactoring! *)
+(* Broken by this commit:
+   https://github.com/QuickChick/QuickChick/commit/2ea5884e
+   Last working revision: 7cda72a *)
 Lemma semShrinking_id {C A} {HCheck : Checkable C}
          (sh : A -> list A) (x : A) (pf : A -> C) (s : nat) :
     semCheckerSize (shrinking sh x pf) s <->
     semCheckableSize (pf x) s.
 Proof.
-Admitted.
-(*
   unfold semCheckableSize, shrinking, semCheckerSize, semGenSize.
   split.
   - unfold props. generalize 1000.
@@ -122,11 +123,11 @@ Admitted.
       simpl.
       by destruct ((run (checker (pf x)) s seed)) as [[res [l]]] => /=.
     + suff :
-        success
+        successful
           (run
              (fmap
                 (fun x0 => {| unProp := joinRose (fmapRose unProp x0) |})
-                (promote (@props' _ _ HCheck (S n) pf sh x))) s seed) = true.
+                (promote (@props' _ _ HCheck (S n) pf sh x))) s seed).
       remember
         (run
            (fmap
@@ -134,7 +135,8 @@ Admitted.
                  {| unProp := joinRose (fmapRose unProp x0) |})
               (promote (props' (S n) pf sh x))) s seed) as b.
       symmetry in Heqb. setoid_rewrite runFmap in Heqb.
-      move : Heqb => [rqp [Hrun Hb]]. simpl. rewrite Hb.
+      admit. (*  -- the rest is now broken
+      move : Heq => [rqp [Hrun Hb]]. simpl. rewrite Hb.
       apply runPromote in Hrun. rewrite -Hrun.
       simpl in *. by destruct ((run (checker (pf x)) seed s)) as [[res [l]]] => /=.
       apply H.
@@ -147,17 +149,19 @@ Admitted.
                            {| force := List.map (props' n pf sh) (sh x) |}))
                      seed s)) as b.
       symmetry in Heqb. setoid_rewrite runPromote in Heqb. by rewrite -Heqb.
+*)
   - unfold props, semGenSize. generalize 1000.
+    admit. (*  -- the rest is now broken
     move => n H qp [seed /runFmap [rqp [H1 H2]]].
-    suff : success (run (@checker _ HCheck (pf x)) seed s) = true.
+    suff : successful (run (@checker _ HCheck (pf x)) seed s) = true.
     + subst.
       remember (run (promote (props' n pf sh x)) seed s) as b. symmetry in Heqb.
       apply runPromote in Heqb; subst. simpl.
       case: n => [| n] /=;
       by destruct ((run (checker (pf x)) seed s)) as [[res [l]]] => //=.
       subst. apply H.
-      by eexists; eexists.
-*)
+      by eexists; eexists. *)
+Admitted.
 
 Lemma semCover_id {C} `{Checkable C} (b: bool) (n: nat)
                        (str : String.string) (c : C) (s : nat) :
