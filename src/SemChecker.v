@@ -70,15 +70,15 @@ Lemma mapTotalResult_id {C} `{Checkable C} (f : Result -> Result) (c : C) s :
     (forall res, resultSuccessful res = resultSuccessful (f res)) ->
     (semCheckerSize (mapTotalResult f c) s <-> semCheckableSize c s).
 Proof.
-move=> eq_res.
-rewrite /mapTotalResult /mapRoseResult /mapProp.
-split=> [check_map [[res l]] sem_checker|] /=.
+  move=> eq_res.
+  rewrite /mapTotalResult /mapRoseResult /mapProp.
+  split=> [check_map [[res l]] sem_checker|] /=.
   rewrite eq_res.
   pose qp := {| unProp := MkRose res l |}.
   pose qp' := {| unProp := fmapRose f (MkRose res l) |}.
   by apply/(check_map qp')/semFmapSize; exists qp.
-move=> sem_p qp /semFmapSize [[[res l]] [? <-]] /=; rewrite -eq_res.
-by pose qp' := {| unProp := MkRose res l |}; apply: (sem_p qp').
+  move=> sem_p qp /semFmapSize [[[res l]] [? <-]] /=; rewrite -eq_res.
+    by pose qp' := {| unProp := MkRose res l |}; apply: (sem_p qp').
 Qed.
 
 Lemma semCallback_id {C} `{Checkable C} (cb : Callback) (c : C) (s : nat) :
@@ -231,11 +231,11 @@ Lemma semForAllSize {A C} `{Show A, Checkable C} (g : G A) (f : A -> C) (s:nat) 
   forall (a : A), a \in semGenSize g s -> semCheckableSize (f a) s.
 (* end semForAllSize *)
 Proof.
-split=> H'.
-- rewrite /forAll in H'. move/semBindGen : H' => H' a /H' Hgen.
-  by apply semPrintTestCase_id in Hgen.
-- rewrite /forAll in H' *. apply semBindGen => g' Hgen.
-  rewrite semPrintTestCase_id. by apply H'.
+  split=> H'.
+  - rewrite /forAll in H'. move/semBindGen : H' => H' a /H' Hgen.
+      by apply semPrintTestCase_id in Hgen.
+  - rewrite /forAll in H' *. apply semBindGen => g' Hgen.
+    rewrite semPrintTestCase_id. by apply H'.
 Qed.
 
 (* CH: any way to relate this to generators and unsizedness of generators?
@@ -317,7 +317,7 @@ Qed.
 
 (* This seems like a better way to prove semForAll *)
 Lemma semForAll_aux {A C} `{Show A, Checkable C} (g : G A) (f : A->C):
-    (forall a, unsizedChecker (checker (f a))) ->
+  (forall a, unsizedChecker (checker (f a))) ->
   successful @: semGen (forAll g f) <-->
   (\bigcup_(a in semGen g) successful @: (semGen (checker (f a)))).
 Proof.
@@ -389,18 +389,31 @@ Lemma semPredQPropNew:
     semCheckable p <-> (semChecker p).
 Proof. by rewrite /semCheckable /checker. Qed.
 
+
+Lemma bool_successful :  
+  forall b, resultSuccessful (liftBool b) = b.
+Proof.
+  intros. destruct b; auto.
+Qed.
+
+Lemma subset_singl : 
+  forall {A} (x y : A), [set x] \subset [set y] <-> y = x. 
+Proof.
+  intros. split; intros H; subst; auto.  
+  - apply H; reflexivity.
+  - apply subset_refl.
+Qed.
+
 (* begin semCheckableBool *)
 Lemma semCheckableBool (b : bool) : semCheckable b <-> b.
 (* end semCheckableBool *)
-Proof. (* CH: brute-force, please fix *)
+Proof. 
+  (* CH: brute-force, please fix 
+     ZP : better now? We do case analysis on b bun in a lemma; 
+          I don't think we can avoid it *)
   rewrite /semCheckable /checker semChecker_def3 /checker. simpl.
-  split; setoid_rewrite semReturn.
-    rewrite /imset bigcup_set1. simpl.
-    destruct b. by []. simpl; move => H. unfold set_incl in H.
-      unfold set1 in H. specialize (H false Coq.Init.Logic.eq_refl).
-      inversion H.
-    intro Hb. rewrite Hb. simpl. rewrite /imset bigcup_set1.
-      by apply subset_refl.
+  split; rewrite semReturn /imset bigcup_set1 /= bool_successful subset_singl;
+  now symmetry; auto. 
 Qed.
 
 Definition uncurry {A B C : Type} (f : A * B -> C) (a : A) (b : B) := f (a,b).
