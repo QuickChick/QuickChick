@@ -191,12 +191,18 @@ Qed.
 
 (* begin semRBTreeSize *)
 Lemma semRBTreeSize s : semGenSize genRBTree s
-  <--> [set t | is_redblack' t Red s /\ all_nodes_bellow s t].
+  <--> [set t | (exists h, h<=s /\ is_redblack' t Red h) /\ all_nodes_bellow s t].
 (* end semRBTreeSize *)
 Proof.
   move => t. rewrite /genRBTree /is_redblack. split.
-  - by move => /semSizedSize/semGenRBTreeHeightSize H.
-  - move => H. by apply semSizedSize; apply semGenRBTreeHeightSize.
+  - move => /semBindSize [n [/arbNat_correctSize/leP H1 
+                             /semGenRBTreeHeightSize [H2 H3]]]. 
+    split; auto. exists n; split; auto.
+  - move => [[h [/leP H1 H2]] H3]. 
+    apply semBindSize. exists h. 
+    split;  
+      [ apply arbNat_correctSize | 
+        apply semGenRBTreeHeightSize ]; by auto.
 Qed.
 
 Lemma all_nodes_bellow_max_node :
@@ -218,7 +224,6 @@ Lemma insert_preserves_redblack_checker_correct:
   <-> insert_preserves_redblack.
 (* end insert_preserves_redblack_checker_correct *)
 Proof.
-(* *)
   rewrite /insert_preserves_redblack_checker /insert_preserves_redblack.
   rewrite (mergeForAlls arbitraryNat genRBTree).
   rewrite semForAll. rewrite /genPair. split.
@@ -236,51 +241,22 @@ Proof.
       apply Le.le_trans with (m := (max_node t n)).
       apply max_node_less. rewrite /s. apply Max.le_max_l. }
     { apply semRBTreeSize. split.
-      Abort. (* Previous proof breaks here *)
- (*      - exists h. split => //. rewrite /s. apply/leP. apply Max.le_max_r. *)
- (*      - rewrite /s. apply Max.max_case_strong => Hcmp; eauto; *)
- (*        [| apply all_nodes_bellow_greater with (n := max_node t n); *)
- (*           try by apply/leP]; apply all_nodes_bellow_max_node. } *)
- (*    by apply /is_redblackP. *)
-
- (*  rewrite /insert_preserves_redblack_checker /insert_preserves_redblack. *)
- (*  rewrite (mergeForAlls arbitraryNat genRBTree). *)
- (*  rewrite semForAll. rewrite /genPair. split. *)
- (*  - move => H nd t [h irt].  *)
- (*    specialize (H (nd,t)). simpl in H. *)
- (*    rewrite /semCheckable in H. simpl in H. rewrite -> semImplication in H. *)
- (*    rewrite -> semCheckableBool in H. *)
- (*    apply /is_redblackP. apply H. clear H.  *)
- (*    exists h. split; try reflexivity. apply semLiftGen2Size. *)
- (*    exists (h, t). split. split. simpl. admit. admit. simpl. *)
- (* left. *)
-
- (*    set s := (max (max_node t n) h). exists s. split. by []. *)
- (*    erewrite (semLiftGen2Size _ _ _ _ (n, t)). *)
- (*    unfold imset2, prod_curry, imset, setX. exists (n,t). split; [| by []]. *)
- (*    split; simpl. *)
- (*    { apply arbNat_correctSize.  *)
- (*      apply Le.le_trans with (m := (max_node t n)). *)
- (*      apply max_node_less. rewrite /s. apply Max.le_max_l. } *)
- (*    { apply semRBTreeSize. split. Abort.  *)
-
-(*       - exists h. split => //. rewrite /s. apply/leP. apply Max.le_max_r. *)
-(*       - rewrite /s. apply Max.max_case_strong => Hcmp; eauto; *)
-(*         [| apply all_nodes_bellow_greater with (n := max_node t n); *)
-(*            try by apply/leP]; apply all_nodes_bellow_max_node. } *)
-(*     by apply /is_redblackP. *)
-(*   - move => H [a t] Hg. unfold semGen in Hg. destruct Hg as [s [_ Hg]]. *)
-(*     simpl. rewrite -> semImplication. rewrite semCheckableBool. *)
-(*     intro irb. apply /is_redblackP. apply H. by apply /is_redblackP. *)
-(*   - intros. unfold unsizedChecker, semCheckerSize, curry. simpl. intros. *)
-(*     destruct a as [n t]. split; intros H res H'. *)
-(*     + apply H. unfold implication in *.  *)
-(*       destruct (is_redblack_bool t); simpl in *; *)
-(*       apply semReturnSize; apply semReturnSize in H'; auto. *)
-(*     + apply H.  unfold implication in *.  *)
-(*       destruct (is_redblack_bool t); simpl in *; *)
-(*       apply semReturnSize; apply semReturnSize in H'; auto. *)
-(* Qed. *)
+      - exists h. split => //. rewrite /s. apply/leP. apply Max.le_max_r.
+      - rewrite /s. apply Max.max_case_strong => Hcmp; eauto;
+        [| apply all_nodes_bellow_greater with (n := max_node t n);
+           try by apply/leP]; apply all_nodes_bellow_max_node. }
+    by apply /is_redblackP.
+  - move => H [a t] Hg. unfold semGen in Hg. destruct Hg as [s [_ Hg]].
+    simpl. rewrite -> semImplication. rewrite semCheckableBool.
+    intro irb. apply /is_redblackP. apply H. by apply /is_redblackP.
+  - intros. unfold unsizedChecker, semCheckerSize, curry, genChecker. simpl. 
+    destruct a as [n t]. split;
+    move => /semFmapSize [h [H1 H2]]; apply semFmapSize;
+    exists h; split => //;
+    unfold implication in *;
+    destruct (is_redblack_bool t); simpl in *;
+    apply semReturnSize; apply semReturnSize in H1; auto.
+Qed.  
 (* old proof -- still works, but requires checker lemmas with sizes,
    and it's very hard to explain those that early in the paper;
    should still bring back the views and stuff into the new proof
