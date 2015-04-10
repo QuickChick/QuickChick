@@ -258,7 +258,9 @@ Definition gen_term_size_unfold (p : nat * type) (e : env) : G term :=
       end
   end.  
 
-Import WfExtensionality.
+Require Import Program.Wf. Import WfExtensionality.
+Require Import FunctionalExtensionality.
+
 
 Lemma gen_term_size_eq (e : env) (p : nat * type) :
   gen_term_size p e =
