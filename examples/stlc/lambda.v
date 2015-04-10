@@ -1,7 +1,6 @@
 Require Import Arith List QuickChick.
 Require Import ssreflect ssrbool eqtype.
 Require Import Program Relations Wellfounded Lexicographic_Product.
-Require Import aux.
 
 Import ListNotations.
 
