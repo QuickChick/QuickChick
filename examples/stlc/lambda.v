@@ -1,14 +1,16 @@
-Require Import Arith List QuickChick.
+Require Import Arith List QuickChick String.
 Require Import ssreflect ssrbool eqtype.
 Require Import Program Relations Wellfounded Lexicographic_Product.
+Require Import monad.
 
 Import ListNotations.
 
+Definition tvar := nat.
 Definition var := nat.
 
 Inductive type : Type := 
 | N : type
-| Arrow : type -> type -> type. 
+| Arrow : type -> type -> type.
 
 Definition type_eq_dec (t1 t2 : type) : {t1 = t2} + {t1 <> t2}. 
 Proof. do 2 decide equality. Defined.
@@ -119,11 +121,47 @@ Proof.
   induction H; intros e tau H1; inversion H1; subst; constructor; auto.
 Qed.
 
+(* Small step CBV semantics *)
+Fixpoint is_value (t : term) : bool :=
+  match t with
+    | Const _ | Abs _ => true
+    | _ => false
+  end.
 
+Fixpoint subst (y : var) (t1 : term) (t2 : term) : term :=
+  match t2 with
+    | Const n => Const n
+    | Id x =>
+      if eq_nat_dec x y then t1 else t2
+    | App t t' =>
+      App (subst y t1 t) (subst y t1 t') 
+    | Abs t =>
+      subst (S y) t1 t
+  end.
+
+Fixpoint step (t : term) : option term :=
+  match t with
+    | Const _ | Id _ => None | Abs x => None
+    | App t1 t2 =>
+      if is_value t1 then 
+        match t1 with 
+          | Abs t => 
+            if is_value t2 then ret (subst 0 t1 t)
+            else 
+              t2' <- step t2;;
+              ret (App t1 t2')
+          | _ => None 
+        end
+      else
+        t1' <- step t1;;
+        ret (App t1' t2)
+  end.
+
+(* Generators *)
 Module DoNotation.
 Notation "'do!' X <- A ; B" :=
   (bindGen A (fun X => B))
-  (at level 200, X ident, A at level 100, B at level 200).
+    (at level 200, X ident, A at level 100, B at level 200).
 End DoNotation.
 Import DoNotation.
 
@@ -133,9 +171,9 @@ Fixpoint gen_type_size (n : nat) : G type :=
     | 0 => returnGen N
     | S n' =>
       oneof (returnGen N) 
-            [ do! m <- choose (0, n');
-              do! m' <- choose (n' -  m, n');
-               liftGen2 Arrow (gen_type_size (n' - m)) (gen_type_size (n' - m'));
+            [ (do! m <- choose (0, n');
+               do! m' <- choose (n' -  m, n');
+               liftGen2 Arrow (gen_type_size (n' - m)) (gen_type_size (n' - m')));
                returnGen N ]
   end.
 
@@ -146,7 +184,7 @@ Definition gen_type : G type := sized gen_type_size.
 Definition vars_with_type (e : env) (tau : type) : list term :=
   map (fun p => Id (snd p))
       (filter (fun p => projT1 (Sumbool.bool_of_sumbool (type_eq_dec tau (fst p))))
-      (combine e (seq 0 (length e)))).
+              (combine e (seq 0 (List.length e)))).
 
 
 
@@ -274,3 +312,27 @@ Global Opaque gen_term_size.
 
 Definition gen_term (tau : type) :=
   sized (fun s => gen_term_size (s, tau) []).
+ 
+
+Open Scope string.
+
+Fixpoint show_type (tau : type) :=
+  match tau with
+    | N => "Nat"
+    | Arrow tau1 tau2 => 
+      "(" ++ show_type tau1 ++ " -> " ++ show_type tau2 ++ ")"
+  end.
+
+Instance showType : Show type := { show := show_type }.
+
+Fixpoint show_term (t : term) :=
+  match t with
+    | Const n => show n
+    | Id x => "Id" ++ show x
+    | App t1 t2 => "(" ++ show_term t1 ++ " " ++ show_term t2 ++ ")"
+    | Abs t => "λ.(" ++ show_term t ++ ")" 
+  end.
+    
+Close Scope string.
+
+Instance showTerm : Show term := { show := show_term }.
