@@ -3,7 +3,14 @@ QuickChick
 
 ### Description
  
-  - Randomized Property-Based Testing Plugin for Coq
+  - Randomized property-based testing plugin for Coq; a clone of [Haskell QuickCheck]
+  - Includes a [foundational verification framework for testing code]
+
+[Haskell QuickCheck]:
+https://hackage.haskell.org/package/QuickCheck
+
+[foundational verification framework for testing code]:
+http://prosecco.gforge.inria.fr/personal/hritcu/publications/foundational-pbt.pdf
 
 ### Known to work with
 

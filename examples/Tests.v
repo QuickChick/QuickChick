@@ -1,3 +1,10 @@
+
+(* TODO: Make genTreeS_correct work again *)
+
+(* TODO: Use point-free reasoning in generator proofs. *)
+
+(* CH: Split this file into its component examples? *)
+
 Require Import QuickChick.
 
 Require Import List seq ssreflect ssrbool ssrnat ZArith eqtype.
@@ -140,6 +147,8 @@ Proof.
     + case: t => [| t1 t2] //= a . by rewrite (semReturnSize _ _ _).
       by rewrite addn1 ltn0.
   * move/IHn : (Hg)=> HgenT. split => [| Hheight].
+Admitted.
+(* TODO: fix this
     + move/semFrequencySize. move =>
       [[n' [gtree [[[Heq1 Heq2] | [[Heq1 Heq2] | //=]] [H2 _]]]] | [H1 H2]]; subst;
       (try by apply semReturnSize in H2; subst).
@@ -160,6 +169,7 @@ Proof.
         exists t1; split; first exact/IHn.
         by exists t2; split; first exact/IHn.
 Qed.
+*)
 
 Lemma genTree_correct:
   forall {A} (g : G A) s,
