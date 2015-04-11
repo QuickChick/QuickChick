@@ -25,6 +25,7 @@ http://prosecco.gforge.inria.fr/personal/hritcu/publications/foundational-pbt.pd
 
   - `examples/Tests.v`
   - `examples/RedBlack`
+  - `examples/stlc`
   - `examples/ifc-basic` (not quite finished)
 
 Running `make tests` in the top-level QuickChick folder will check and execute all of these.

@@ -36,7 +36,7 @@ Inductive term : Type :=
 | App : term -> term -> term
 | Abs : term -> term.
 
-(* Terms that do have applications *)
+(* Terms that don't have applications *)
 Inductive app_free : term -> Prop :=
 | ConsNoApp : forall n, app_free (Const n)
 | IdNoApp : forall x, app_free (Id x)
