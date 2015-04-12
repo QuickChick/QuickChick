@@ -18,11 +18,12 @@ Definition has_progress (t : term) := is_value t || (is_some (step t)).
 
 Fixpoint term_size (t : term) : nat :=
   match t with
-    | Const _ | Id _ => 0
+    | Const _ | Id _ => 1
     | Abs t => 1 + (term_size t)
     | App t1 t2 => 1 + (term_size t1 + term_size t2)
   end.
 
+(* Extract Constant Test.defNumTests => "1000000". *)
 QuickCheck (forAll gen_type (fun tau => forAll (gen_term tau) (fun t
   => (collect (append "size " (show (term_size t))) (has_progress t))))).
 
