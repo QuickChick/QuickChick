@@ -96,11 +96,26 @@ Definition genAnyTree : G tree := sized genAnyTree_depth.
 (* end genAnyTree *)
 
 Extract Constant defSize => "10".
-Extract Constant Test.defNumTests => "10000".
 (* begin QC_naive *)
 QuickCheck (insert_preserves_redblack_checker genAnyTree).
 (* end QC_naive *)
-Extract Constant Test.defNumTests => "10000".
+
+(* gathering some size statistics *)
+Fixpoint tree_size (t : tree) : nat :=
+  match t with
+    | Leaf => 1
+    | Node c tl _ tr => 1 + (tree_size tl) + (tree_size tr)
+  end.
+
+Definition insert_preserves_redblack_checker_size (genTree : G tree) : Checker :=
+  forAll arbitrary (fun n => forAll genTree (fun t =>
+    collect (append "size " (show (tree_size t)))
+    (is_redblack_bool t ==> is_redblack_bool (insert n t)))).
+
+(*
+Extract Constant Test.defNumTests => "100000".
+QuickCheck (insert_preserves_redblack_checker_size genAnyTree).
+*)
 
 Module DoNotation.
 Import ssrfun.
@@ -210,7 +225,11 @@ Definition testInsert :=
   showDiscards (quickCheck (insert_preserves_redblack_checker genRBTree)).
 
 Extract Constant defSize => "10".
-Extract Constant Test.defNumTests => "10000".
 (* begin QC_good *)
 QuickCheck (insert_preserves_redblack_checker genRBTree).
 (* end QC_good *)
+
+(* gathering some size statistics
+Extract Constant Test.defNumTests => "100000".
+QuickCheck (insert_preserves_redblack_checker_size genRBTree).
+*)
