@@ -154,60 +154,48 @@ Qed.
 
 Lemma gen_type_size_correctSize :
   forall (n s : nat),
-    semGenSize (gen_type_size n) s <--> [set tau | type_size tau <= n]. 
+    semGenSize (gen_type_size n) s <--> [set tau | type_size tau = n]. 
 Proof.
-  change (forall (n : nat), 
-            (fun n => 
-               forall (s : nat) (a : type),
-                 semGenSize (gen_type_size n) s a <-> type_size a <= n) n).
-    apply well_founded_induction with (R := lt); first by apply lt_wf.
-    intros n IH a tau. split.
-    { destruct n as [| n].
-      - move => /semReturnSize <-. auto.
-      - move => /semOneofSize [gen [[H1 | [H1 | //]] H2]]; subst.
-        move : H2 => /semBindSize 
-                      [m1 [/semChooseSize H1 
-                            /semBindSize [m2 
-                                            [/semChooseSize H2 H3]]]].
-        move : H3 => /semLiftGen2Size [[tau1 tau2] [[/= /IH H3 /IH H4] <-]].
-        simpl. subst.
-        have Hle1 : type_size tau1 <= (n - m1)%coq_nat 
+  move => n s tau. elim : tau n s => [| tau1 IH1 tau2 IH2] n s.
+  { split. 
+    - destruct n as [| n]; move => H //=.
+      move : H => /semBindSize 
+                   [m1 [/semChooseSize H1 H2]].
+      move : H2 => /semLiftGen2Size [[tau1 tau2] [[/=  H3  H4] H]]. discriminate. 
+    - move => H. destruct n as [| n]; simpl.
+      apply semReturnSize. reflexivity. discriminate. }
+  { split. 
+    - destruct n as [| n].
+      + move => /semReturnSize <-. auto.
+      + move  => /semBindSize 
+                      [m1 [/semChooseSize H1 H2]]. fold gen_type_size in H2. 
+        move : H2 => /semLiftGen2Size [[tau1' tau2'] [[/=  H3  H4] Heq]].
+        rewrite /set1 in Heq. inversion Heq; subst.
+        apply IH1 in H3. apply IH2 in H4.
+        have Hle1 : type_size tau1 = (n - m1)%coq_nat 
           by apply H3; omega.
-        have Hle2 : type_size tau2 <= (n - m2)%coq_nat
-          by apply H4; omega. 
-        unfold leq, super, RandomNat, OrdNat in *.
-        have /andP  [_ /leP Hle3] : 0 <= m1 <= n
-          by apply H1; auto.
-        have /andP  [/leP Hle4 /leP Hle5] : (n - m1)%coq_nat <= m2 <= n
-          by apply H2; auto; apply/leP; omega.
-        omega.
-        move : H2 => /semReturnSize <-. simpl; omega. }
-    { move => H. destruct n as [| n]; simpl.
-      - apply semReturnSize. 
-        destruct tau; try reflexivity. simpl in *. omega.
-      - apply semOneofSize. destruct tau.
-        + eexists. split. right; left; reflexivity.
-          apply semReturnSize. reflexivity.
-        + eexists. split. left; reflexivity.
-          simpl in H.
-          apply semBindSize. exists (n - type_size tau1). split.
-          apply semChooseSize; unfold leq, super, RandomNat, OrdNat in *.
-          apply/leP. omega. apply/andP; split; apply /leP; omega.
-          apply semBindSize. eexists (n - type_size tau2). split. 
-          apply semChooseSize; unfold leq, super, RandomNat, OrdNat in *.
-          apply/leP. omega. apply/andP; split; apply /leP; omega.
-          apply semLiftGen2Size. exists (tau1, tau2). 
-          split; last by reflexivity.
-          split; apply IH; simpl; omega. }
+        have Hle2 : type_size tau2 = (n - (n - m1)%coq_nat)%coq_nat
+          by apply H4; omega. omega. 
+    - move => /= H. destruct n as [| n]; first by discriminate.
+      apply semBindSize. exists (n - type_size tau1). split.
+      apply semChooseSize; unfold leq, super, RandomNat, OrdNat in *.
+      apply/leP. omega. apply/andP; split; apply /leP; omega.
+      apply semLiftGen2Size. exists (tau1, tau2). 
+      split; last by reflexivity.
+      split; fold gen_type_size; [ apply IH1 | apply IH2]; 
+      simpl; simpl in H; omega. }
 Qed.
 
 Lemma gen_type_correctSize :
   forall (s : nat),
     semGenSize gen_type s <--> [set tau | type_size tau <= s]. 
 Proof.
-  intros. unfold gen_type. 
-  rewrite semSizedSize gen_type_size_correctSize. 
-  split; auto.
+  intros s. unfold gen_type. rewrite semBindSize => tau. 
+  split => H. 
+  - move : H => [n  [/arbNat_correctSize H1 /gen_type_size_correctSize H2]]. 
+    omega.
+  - exists (type_size tau). split. apply arbNat_correctSize; auto.
+    apply gen_type_size_correctSize; auto.
 Qed.
 
 Lemma gen_term_no_app_correctSize :
@@ -235,11 +223,11 @@ Proof.
         apply type_var in H2. repeat split; auto; constructor.
       * move => [H1  [H2 H3]]. inversion H1; subst.
         eexists. split.
-        right; left; reflexivity. apply semElementsSize. 
+        right; left; reflexivity. apply semElementsSize.
         rewrite /seq_In -Hvars. apply type_var; auto.
         eexists. split. left; reflexivity.
         apply semLiftGenSize. exists n; split; try reflexivity.
-        apply arbNat_correctSize. inversion H3; auto.         
+        apply arbNat_correctSize. inversion H3; auto.
         inversion H2.
   - destruct (vars_with_type e (Arrow tau1 tau2)) as [| x e'] eqn:Hvars.
     + rewrite semLiftGenSize. intros t'. split.
@@ -248,7 +236,7 @@ Proof.
       * move => [H1 [H2 H3]]. 
         destruct t'; try now inversion H2. 
         apply type_var in H1. rewrite Hvars in H1. inversion H1.
-        eexists. split; last by reflexivity. 
+        eexists. split; last by reflexivity.
         apply IHtau2. inversion H1; subst. inversion H2; subst.
         repeat split; auto. inversion H3; auto.
     + rewrite semOneofSize. intros t. split.
@@ -259,7 +247,7 @@ Proof.
         destruct (vars_with_type_Id _ _ _ H) as [x' Heq]; subst.
         apply type_var in H. repeat split; auto; constructor.
       * intros [H1 [H2 H3]]. inversion H1; subst.
-        eexists. split. right. left. reflexivity. 
+        eexists. split. right. left. reflexivity.
         apply semElementsSize. rewrite /seq_In -Hvars. apply type_var; auto.
         eexists. split. left; reflexivity. 
         apply semLiftGenSize. eexists. split; last by reflexivity. 

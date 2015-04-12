@@ -36,7 +36,7 @@ Inductive term : Type :=
 | App : term -> term -> term
 | Abs : term -> term.
 
-(* Terms that do have applications *)
+(* Terms that do not have applications *)
 Inductive app_free : term -> Prop :=
 | ConsNoApp : forall n, app_free (Const n)
 | IdNoApp : forall x, app_free (Id x)
@@ -170,15 +170,12 @@ Fixpoint gen_type_size (n : nat) : G type :=
   match n with 
     | 0 => returnGen N
     | S n' =>
-      oneof (returnGen N) 
-            [ (do! m <- choose (0, n');
-               do! m' <- choose (n' -  m, n');
-               liftGen2 Arrow (gen_type_size (n' - m)) (gen_type_size (n' - m')));
-               returnGen N ]
+      do! m <- choose (0, n');
+          liftGen2 Arrow (gen_type_size (n' - m)) (gen_type_size (n' - (n' - m)))
   end.
 
 (* Generator of simple types *)
-Definition gen_type : G type := sized gen_type_size.
+Definition gen_type : G type := bindGen arbitrary gen_type_size.
 
 (* Returns the list of bindings that have type tau in e *)
 Definition vars_with_type (e : env) (tau : type) : list term :=
