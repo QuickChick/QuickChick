@@ -87,10 +87,9 @@ Definition genColor := elems [Red; Black].
 Fixpoint genAnyTree_depth (d : nat) : G tree :=
   match d with 
     | 0 => returnGen Leaf
-    | S d' => frequency (returnGen Leaf) 
-                     [(1,returnGen Leaf); 
-                      (9,liftGen4 Node genColor (genAnyTree_depth d')
-                                      arbitrary (genAnyTree_depth d'))]
+    | S d' => freq [(1, returnGen Leaf);
+                    (9, liftGen4 Node genColor (genAnyTree_depth d')
+                                     arbitrary (genAnyTree_depth d'))]
   end.
 Definition genAnyTree : G tree := sized genAnyTree_depth.
 (* end genAnyTree *)
