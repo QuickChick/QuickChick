@@ -56,6 +56,11 @@ Proof.
     by apply one_more_for_maximes_library.
 Qed.
 
+(*
+Lemma semCheckerSized_def3 c :
+  semCheckerSized c s <-> (successful @: semGenSized c s \subset [set true]).
+*)
+
 (* Maps a Checkable to a Prop i.e. gives an equivalent proposition to the
    property under test *)
 (* begin semCheckable *)

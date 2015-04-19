@@ -711,6 +711,7 @@ Definition sizeMonotonic {A : Type} (g : G A) : Prop :=
    Size-monotonicity is a sufficient but not a necessary-condition
    (see semBindUnsized1 and semBindUnsized2 for similar properties). *)
 
+(* TODO: move this to genLow (together with sizeMonotonic) *)
 Lemma semBindSizeMonotonic {A B} (g : G A) (f : A -> G B) :
     sizeMonotonic g ->
     (forall a, sizeMonotonic (f a)) ->

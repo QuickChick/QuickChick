@@ -249,7 +249,8 @@ Proof.
   - move => H [a t] Hg. unfold semGen in Hg. destruct Hg as [s [_ Hg]].
     simpl. rewrite -> semImplication. rewrite semCheckableBool.
     intro irb. apply /is_redblackP. apply H. by apply /is_redblackP.
-  - intros. unfold unsizedChecker, semCheckerSize, curry, genChecker. simpl. 
+  - (* unsizedChecker proof *)
+    intros. unfold unsizedChecker, semCheckerSize, curry, genChecker. simpl.
     destruct a as [n t]. split;
     move => /semFmapSize [h [H1 H2]]; apply semFmapSize;
     exists h; split => //;
