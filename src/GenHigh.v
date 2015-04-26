@@ -37,9 +37,6 @@ Parameter listOf : forall {A : Type}, G A -> G (list A).
 Parameter elements : forall {A : Type}, A -> list A -> G A.
 
 (* Correctness for derived generators *)
-(* We should prove the Hypotheses in comments -
-   In some of them we may need semSize instead of semGen *)
-
 Hypothesis semLiftGen :
   forall {A B} (f: A -> B) (g: G A),
     semGen (liftGen f g) <--> f @: semGen g.
@@ -52,6 +49,12 @@ Hypothesis semLiftGen2Size :
   forall {A1 A2 B} (f: A1 -> A2 -> B) (g1 : G A1) (g2 : G A2) s,
     semGenSize (liftGen2 f g1 g2) s <-->
     f @2: (semGenSize g1 s, semGenSize g2 s).
+
+Hypothesis semLiftGen2SizeMonotonic :
+  forall {A1 A2 B} (f: A1 -> A2 -> B)
+         (g1 : G A1) (g2 : G A2),
+  sizeMonotonic g1 -> sizeMonotonic g2 ->
+  semGen (liftGen2 f g1 g2) <--> f @2: (semGen g1, semGen g2).
 
 Hypothesis semLiftGen3Size :
 forall {A1 A2 A3 B} (f: A1 -> A2 -> A3 -> B)
@@ -128,10 +131,21 @@ Hypothesis semVectorOfSize:
     semGenSize (vectorOf k g) size <-->
     [set l | length l = k /\ l \subset semGenSize g size].
 
+Hypothesis semVectorOfUnsized : 
+  forall {A} (g : G A) (k : nat),
+    unsized g -> 
+    semGen (vectorOf k g) <--> [set l | length l = k /\ l \subset semGen g ]. 
+
 Hypothesis semListOfSize:
   forall (A : Type) (g : G A) (size : nat),
     semGenSize (listOf g) size <-->
     [set l | length l <= size /\ l \subset semGenSize g size].
+
+Hypothesis semListOfUnsized: 
+  forall {A} (g : G A) (k : nat),
+    unsized g -> 
+    semGen (listOf g) <--> [set l | l \subset semGen g ]. 
+
 
 Hypothesis semElements:
   forall {A} (l: list A) (def : A),
@@ -195,7 +209,6 @@ Hypothesis semOneOfSize : forall A (g0 : G A) (gs : list (G A)) s,
 End GenHighInterface.
 
 Module GenHigh : GenHighInterface.
-
 
 Definition liftGen {A B} (f: A -> B) (a : G A)
 : G B := nosimpl
@@ -325,9 +338,26 @@ Proof. solveLiftGenX. Qed.
 Lemma semLiftGen2Size {A1 A2 B} (f: A1 -> A2 -> B) (g1 : G A1) (g2 : G A2) s :
   semGenSize (liftGen2 f g1 g2) s <-->
   f @2: (semGenSize g1 s, semGenSize g2 s).
+Proof. 
+  rewrite semBindSize curry_imset2l; apply: eq_bigcupr => x.
+    by rewrite semBindSize; apply: eq_bigcupr => y; rewrite semReturnSize.
+Qed.
+
+Lemma semLiftGen2SizeMonotonic {A1 A2 B} (f: A1 -> A2 -> B)
+                               (g1 : G A1) (g2 : G A2) :
+  sizeMonotonic g1 -> sizeMonotonic g2 ->
+  semGen (liftGen2 f g1 g2) <--> f @2: (semGen g1, semGen g2).
 Proof.
-rewrite semBindSize curry_imset2l; apply: eq_bigcupr => x.
-by rewrite semBindSize; apply: eq_bigcupr => y; rewrite semReturnSize.
+  rewrite /sizeMonotonic /semGen => H1 H2. setoid_rewrite semLiftGen2Size.
+  move => b. split. 
+  - move => [sb [_ Hb]]. (* point-free reasoning would be nice here *)
+    destruct Hb as [a [[Hb11 Hb12] Hb2]]. exists a. split; [| by apply Hb2].
+    split; eexists; by split; [| eassumption].
+  - move => [[a1 a2] [[[s1 [_ G1]] [s2 [_ G2]]] Hf]]. compute in Hf.
+    exists (max s1 s2). split; first by [].
+    exists (a1,a2). split; last by []. split; simpl in *.
+    eapply H1; last eassumption. by apply/leP; apply Max.le_max_l.
+    eapply H2; last eassumption. by apply/leP; apply Max.le_max_r.
 Qed.
 
 Lemma semLiftGen3Size :
@@ -416,6 +446,21 @@ split=> [[y [gen_y [l' [[length_l' ?] [<- <-]]]]]|] /=.
   exact/subconsset.
 by case=> [[?]] /subconsset [? ?]; exists x; split => //; exists l.
 Qed.
+Lemma semVectorOfUnsized {A} (g : G A) (k : nat) :
+  unsized g -> 
+  semGen (vectorOf k g) <--> [set l | length l = k /\ l \subset semGen g ]. 
+Proof.
+  rewrite /sizeMonotonic /semGen => H.
+  setoid_rewrite semVectorOfSize. 
+  move => l; split.
+  - move => [k' [_ [H1 H2]]]. split; auto. exists k'. split; auto.
+    reflexivity.
+  - move => [H1 H2]. 
+    setoid_rewrite (unsized_def2 H) in H2.
+    rewrite -> bigcup_const in H2; eauto.
+    exists k. split; first by reflexivity.
+    split; auto. rewrite unsized_def2; auto.
+Qed.
 
 Lemma semListOfSize {A : Type} (g : G A) size :
   semGenSize (listOf g) size <-->
@@ -425,6 +470,23 @@ rewrite /listOf semSizedSize semBindSize; setoid_rewrite semVectorOfSize.
 rewrite semChooseSize // => l; split=> [[n [/andP [_ ?] [-> ?]]]| [? ?]] //.
 by exists (length l).
 Qed.
+
+Lemma semListOfUnsized {A} (g : G A) (k : nat) :
+  unsized g -> 
+  semGen (listOf g) <--> [set l | l \subset semGen g ]. 
+Proof.
+  rewrite /sizeMonotonic /semGen => H.
+  setoid_rewrite semListOfSize. 
+  move => l; split.
+  - move => [k' [_ [H1 H2]]]. exists k'. split; auto.
+    reflexivity.
+  - move => H1.
+    setoid_rewrite (unsized_def2 H) in H1.
+    rewrite -> bigcup_const in H1; eauto.
+    exists (length l). split; first by reflexivity.
+    split; auto. rewrite unsized_def2; auto.
+Qed.
+
 
 Lemma In_nth_exists {A} (l: list A) x def :
   List.In x l -> exists n, nth def l n = x /\ (n < length l)%coq_nat.
@@ -699,61 +761,6 @@ Lemma semOneOfSize A (g0 : G A) (gs : list (G A)) s :
   semGenSize (oneOf (g0 ;; gs)) s  <--> \bigcup_(g in (g0 :: gs)) semGenSize g s.
 (* end semOneOfSize *)
 Proof. rewrite semOneofSize. reflexivity. Qed.
-
-(* Another important property of generators is size-monotonicity;
-   sized-monotonic generators compose better *)
-
-Definition sizeMonotonic {A : Type} (g : G A) : Prop :=
-  forall s1 s2, s1 <= s2 -> semGenSize g s1 \subset semGenSize g s2.
-
-(* Here are two examples of good composition;
-   these lemmas do not hold for arbitrary generators.
-   Size-monotonicity is a sufficient but not a necessary-condition
-   (see semBindUnsized1 and semBindUnsized2 for similar properties). *)
-
-(* TODO: move this to genLow (together with sizeMonotonic) *)
-Lemma semBindSizeMonotonic {A B} (g : G A) (f : A -> G B) :
-    sizeMonotonic g ->
-    (forall a, sizeMonotonic (f a)) ->
-    semGen (bindGen g f) <--> \bigcup_(a in semGen g) semGen (f a).
-Proof.
-  move => Hg Hf.
-  rewrite /semGen. setoid_rewrite semBindSize.
-  intro b. split.
-  - intros [s [_ [a [H1 H2]]]].
-    exists a. split; exists s; (split; first (compute; by []); first by[]).
-  - intros [a [[s1 [_ H1]] [s2 [_ H2]]]]. exists (max s1 s2).
-    split; first (compute; by []).
-    exists a. split.
-    eapply Hg; last eassumption. by apply/leP; apply Max.le_max_l.
-    eapply Hf; last eassumption. by apply/leP; apply Max.le_max_r.
-Qed.
-
-Lemma semLiftGen2SizeMonotonic {A1 A2 B} (f: A1 -> A2 -> B)
-                               (g1 : G A1) (g2 : G A2) :
-  sizeMonotonic g1 -> sizeMonotonic g2 ->
-  semGen (liftGen2 f g1 g2) <--> f @2: (semGen g1, semGen g2).
-Proof.
-  rewrite /sizeMonotonic /semGen => H1 H2. setoid_rewrite semLiftGen2Size.
-  move => b. split.
-  - move => [sb [_ Hb]]. (* point-free reasoning would be nice here *)
-    destruct Hb as [a [[Hb11 Hb12] Hb2]]. exists a. split; [| by apply Hb2].
-    split; eexists; by split; [| eassumption].
-  - move => [[a1 a2] [[[s1 [_ G1]] [s2 [_ G2]]] Hf]]. compute in Hf.
-    exists (max s1 s2). split; first by [].
-    exists (a1,a2). split; last by []. split; simpl in *.
-    eapply H1; last eassumption. by apply/leP; apply Max.le_max_l.
-    eapply H2; last eassumption. by apply/leP; apply Max.le_max_r.
-Qed.
-
-(* unsizedness trivially implies size-monotonicity *)
-
-Lemma unsizedSizeMonotonic A (g : G A) :
-  unsized g -> sizeMonotonic g.
-Proof.
-  rewrite /unsized /sizeMonotonic => H s1 s2 H12 a.
-    by destruct (H s1 s2 a) as [H1 H2].
-Qed.
 
 (* Operators like betterSized (better name pending) are guaranteed to
    produce size-monotonic generators (provided the body has this

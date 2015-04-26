@@ -41,6 +41,7 @@ Parameter suchThatMaybe : forall {A : Type}, G A -> (A -> bool) ->
 Parameter choose : forall {A : Type} `{Random A}, (A * A) -> G A.
 Parameter sample : forall {A : Type}, G A -> list A.
 
+
 (* LL: The abstraction barrier is annoying :D *)
 Parameter variant : forall {A : Type}, SplitPath -> G A -> G A.
 Parameter reallyUnsafePromote : forall {r A:Type}, (r -> G A) -> G (r -> A).
@@ -57,6 +58,22 @@ Definition semGenSize {A : Type} (g : G A) (size : nat) : set A :=
 Definition semGen {A : Type} (g : G A) : set A :=
   \bigcup_size semGenSize g size.
 
+(* Definitions for size characterization of generators *)
+Definition sizeMonotonic {A : Type} (g : G A) : Prop :=
+  forall s1 s2, s1 <= s2 -> semGenSize g s1 \subset semGenSize g s2.
+
+Definition unsized {A : Type} (g : G A) : Prop :=
+  forall s1 s2, (semGenSize g s1 <--> semGenSize g s2).
+
+Hypothesis unsizedSizeMonotonic : 
+  forall {A} (g : G A), unsized g -> sizeMonotonic g.
+
+Hypothesis unsized_def2 : 
+  forall A (g : G A),
+    unsized g ->
+    forall s, semGenSize g s <--> semGen g.
+
+(* Set of outcomes characterization of generators *)
 Hypothesis semReturn :
   forall A (x : A), semGen (returnGen x) <--> [set x].
 Hypothesis semReturnSize :
@@ -65,7 +82,7 @@ Hypothesis semReturnSize :
 Hypothesis semBindSize :
   forall A B (g : G A) (f : A -> G B) (size : nat),
     semGenSize (bindGen g f) size <-->
-    \bigcup_(a in semGenSize g size) semGenSize (f a) size.
+               \bigcup_(a in semGenSize g size) semGenSize (f a) size.
 
 Hypothesis monad_leftid : 
   forall {A B : Type} (a: A) (f : A -> G B),
@@ -77,6 +94,23 @@ Hypothesis monad_assoc:
   forall {A B C : Type} (ga : G A) (fb : A -> G B) (fc : B -> G C),
     semGen (bindGen (bindGen ga fb) fc) <--> 
     semGen (bindGen ga (fun a => bindGen (fb a) fc)).
+
+
+Hypothesis semBindUnsized1 :
+  forall A B (g : G A) (f : A -> G B),
+    unsized g ->
+    semGen (bindGen g f) <--> \bigcup_(a in semGen g) semGen (f a).
+
+Hypothesis semBindUnsized2 :
+  forall A B (g : G A) (f : A -> G B),
+    (forall a, unsized (f a)) ->
+    semGen (bindGen g f) <--> \bigcup_(a in semGen g) semGen (f a).
+
+Hypothesis semBindSizeMonotonic :
+  forall {A B} (g : G A) (f : A -> G B),
+    sizeMonotonic g ->
+    (forall a, sizeMonotonic (f a)) ->
+    semGen (bindGen g f) <--> \bigcup_(a in semGen g) semGen (f a).
 
 Hypothesis semFmap :
   forall A B (f : A -> B) (g : G A),
@@ -98,6 +132,7 @@ Hypothesis semChooseSize :
 Hypothesis semSized :
   forall A (f : nat -> G A),
     semGen (sized f) <--> \bigcup_s semGenSize (f s) s.
+
 Hypothesis semSizedSize :
   forall A (f : nat -> G A) s,
     semGenSize (sized f) s <--> semGenSize (f s) s.
@@ -134,23 +169,6 @@ Hypothesis runFmap : forall (A B : Type) (f : A -> B) (g : G A) seed size,
   
 Hypothesis runPromote : forall A (m : Rose (G A)) seed size,
   run (promote m) seed size = fmapRose (fun (g : G A) => run g seed size) m.
-
-Definition unsized {A : Type} (g : G A) : Prop :=
-  forall s1 s2, (semGenSize g s1 <--> semGenSize g s2).
-
-Hypothesis unsized_def2 : forall A (g : G A),
-  unsized g ->
-  forall s, semGenSize g s <--> semGen g.
-
-Hypothesis semBindUnsized1 :
-  forall A B (g : G A) (f : A -> G B),
-    unsized g ->
-    semGen (bindGen g f) <--> \bigcup_(a in semGen g) semGen (f a).
-
-Hypothesis semBindUnsized2 :
-  forall A B (g : G A) (f : A -> G B),
-    (forall a, unsized (f a)) ->
-    semGen (bindGen g f) <--> \bigcup_(a in semGen g) semGen (f a).
 
 Hypothesis semFmapBind :
   forall A B C (g : G A) (f1 : B -> C) (f2 : A -> G B),
@@ -256,6 +274,34 @@ Definition semGenSize {A : Type} (g : G A) (s : nat) : set A := codom (run g s).
 Definition semGen {A : Type} (g : G A) : set A := \bigcup_s semGenSize g s.
 (* end semGen *)
 
+ 
+(* An important property of generators is size-monotonicity;
+   sized-monotonic generators compose better *)
+Definition sizeMonotonic {A : Type} (g : G A) : Prop :=
+  forall s1 s2, s1 <= s2 -> semGenSize g s1 \subset semGenSize g s2.
+
+Definition unsized {A : Type} (g : G A) : Prop :=
+  forall s1 s2, (semGenSize g s1 <--> semGenSize g s2).
+
+(* unsizedness trivially implies size-monotonicity *)
+Lemma unsizedSizeMonotonic A (g : G A) :
+  unsized g -> sizeMonotonic g.
+Proof.
+  rewrite /unsized /sizeMonotonic => H s1 s2 H12 a.
+    by destruct (H s1 s2 a) as [H1 H2].
+Qed.
+
+(* another characterization of unsized *)
+Lemma unsized_def2 : forall A (g : G A),
+  unsized g ->
+  forall s, semGenSize g s <--> semGen g.
+Proof.
+  intros. unfold semGen. intro a.
+  split; intro H'.
+  - exists s. split; by [].
+  - destruct H' as [s' [_ H']]. by rewrite (H s s' a).
+Qed.
+
 (* begin semReturnSize *)
 Lemma semReturnSize A (x : A) (s : nat) : semGenSize (returnGen x) s <--> [set x].
 (* end semReturnSize *)
@@ -305,6 +351,53 @@ Proof.
 apply eq_bigcupr => ?; rewrite !semBindSize ?bigcup_flatten.
 by apply eq_bigcupr => ?; rewrite !semBindSize ?bigcup_flatten.
 Qed.
+
+Lemma semBindUnsized1 :
+  forall A B (g : G A) (f : A -> G B),
+    unsized g ->
+    semGen (bindGen g f) <--> \bigcup_(a in semGen g) semGen (f a).
+Proof.
+  move => A B g f H.
+  rewrite /semGen. setoid_rewrite semBindSize. move => b; split.
+  - intros [s [_ [a [H1 H2]]]].
+    exists a. split; exists s; (split; first (compute; by []); first by[]).
+  - intros [a [[s1 [_ H1]] [s2 [_ H2]]]]. exists s2. split; first (compute; by []).
+    exists a. split; [| by []].
+    rewrite /unsized /set_eq in H. rewrite -> H. eassumption.
+Qed.  
+
+Lemma semBindUnsized2 :
+  forall A B (g : G A) (f : A -> G B),
+    (forall a, unsized (f a)) ->
+    semGen (bindGen g f) <--> \bigcup_(a in semGen g) semGen (f a).
+Proof.
+  move=> A B g f H.
+  rewrite /semGen. setoid_rewrite semBindSize.
+  intro b. split.
+  - intros [s [_ [a [H1 H2]]]].
+    exists a. split; exists s; (split; first (compute; by []); first by[]).
+  - intros [a [[s1 [_ H1]] [s2 [_ H2]]]]. exists s1. split; first (compute; by []).
+    exists a. split. by []. specialize (H a).
+    rewrite /unsized /set_eq in H. rewrite -> H. eassumption.
+Qed.
+
+Lemma semBindSizeMonotonic {A B} (g : G A) (f : A -> G B) :
+    sizeMonotonic g ->
+    (forall a, sizeMonotonic (f a)) ->
+    semGen (bindGen g f) <--> \bigcup_(a in semGen g) semGen (f a).
+Proof.
+  move => Hg Hf.
+  rewrite /semGen. setoid_rewrite semBindSize.
+  intro b. split.
+  - intros [s [_ [a [H1 H2]]]].
+    exists a. split; exists s; (split; first (compute; by []); first by[]).
+  - intros [a [[s1 [_ H1]] [s2 [_ H2]]]]. exists (max s1 s2).
+    split; first (compute; by []).
+    exists a. split.
+    eapply Hg; last eassumption. by apply/leP; apply Max.le_max_l.
+    eapply Hf; last eassumption. by apply/leP; apply Max.le_max_r.
+Qed.
+
 
 Lemma semFmap A B (f : A -> B) (g : G A) :
   semGen (fmap f g) <--> f @: semGen g.
@@ -363,13 +456,10 @@ Lemma promoteVariant : forall {A B : Type} (a : A) (f : A -> SplitPath) (g : G B
   (r r1 r2 : RandomSeed), randomSplit r = (r1, r2) ->
   run (reallyUnsafePromote (fun a => variant (f a) g)) size r a = 
   run g size (varySeed (f a) r1).
-move => A B a p g size r r1 r2 H.
-rewrite /reallyUnsafePromote /variant.
-simpl.
-destruct g.
-simpl.
-rewrite H.
-by [].
+Proof. 
+  move => A B a p g size r r1 r2 H.
+  rewrite /reallyUnsafePromote /variant.
+  destruct g. rewrite /= H. by [].
 Qed.
 
 Lemma semPromote A (m : Rose (G A)) :
@@ -382,7 +472,7 @@ Lemma semPromoteSize (A : Type) (m : Rose (G A)) n :
   codom (fun seed => fmapRose (fun g => run g n seed) m).
 Proof. by []. Qed.
 
-(* Those are too concrete, but I need them to prove shrinking.
+(* These are too concrete, but I need them to prove shrinking.
    Does this reveal a weakness in our framework?
    Should we try to get rid of this?
    This is expected since the spec of promote is too concrete.
@@ -394,50 +484,6 @@ Proof. by []. Qed.
 Lemma runPromote A (m : Rose (G A)) seed size :
   run (promote m) seed size = fmapRose (fun (g : G A) => run g seed size) m.
 Proof. by []. Qed.
-
-Definition unsized {A : Type} (g : G A) : Prop :=
-  forall s1 s2, (semGenSize g s1 <--> semGenSize g s2).
-
-(* another characterization of unsized *)
-Lemma unsized_def2 : forall A (g : G A),
-  unsized g ->
-  forall s, semGenSize g s <--> semGen g.
-Proof.
-  intros. unfold semGen. intro a.
-  split; intro H'.
-  - exists s. split; by [].
-  - destruct H' as [s' [_ H']]. by rewrite (H s s' a).
-Qed.
-
-Lemma semBindUnsized1 :
-  forall A B (g : G A) (f : A -> G B),
-    unsized g ->
-    semGen (bindGen g f) <--> \bigcup_(a in semGen g) semGen (f a).
-Proof.
-  intros.
-  rewrite /semGen. setoid_rewrite semBindSize.
-  intro b. split.
-  - intros [s [_ [a [H1 H2]]]].
-    exists a. split; exists s; (split; first (compute; by []); first by[]).
-  - intros [a [[s1 [_ H1]] [s2 [_ H2]]]]. exists s2. split; first (compute; by []).
-    exists a. split; [| by []].
-    rewrite /unsized /set_eq in H. rewrite -> H. eassumption.
-Qed.  
-
-Lemma semBindUnsized2 :
-  forall A B (g : G A) (f : A -> G B),
-    (forall a, unsized (f a)) ->
-    semGen (bindGen g f) <--> \bigcup_(a in semGen g) semGen (f a).
-Proof.
-  intros.
-  rewrite /semGen. setoid_rewrite semBindSize.
-  intro b. split.
-  - intros [s [_ [a [H1 H2]]]].
-    exists a. split; exists s; (split; first (compute; by []); first by[]).
-  - intros [a [[s1 [_ H1]] [s2 [_ H2]]]]. exists s1. split; first (compute; by []).
-    exists a. split. by []. specialize (H a).
-    rewrite /unsized /set_eq in H. rewrite -> H. eassumption.
-Qed.
 
 Lemma semFmapBind :
   forall A B C (g : G A) (f1 : B -> C) (f2 : A -> G B),
