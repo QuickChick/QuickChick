@@ -50,6 +50,16 @@ Hypothesis semLiftGen2Size :
     semGenSize (liftGen2 f g1 g2) s <-->
     f @2: (semGenSize g1 s, semGenSize g2 s).
 
+Hypothesis semLiftGen2Unsized1 :
+  forall {A1 A2 B} (f: A1 -> A2 -> B) (g1 : G A1) (g2 : G A2),
+    unsized g1 ->
+    semGen (liftGen2 f g1 g2) <--> f @2: (semGen g1, semGen g2).
+
+Hypothesis semLiftGen2Unsized2 :
+  forall {A1 A2 B} (f: A1 -> A2 -> B) (g1 : G A1) (g2 : G A2),
+    unsized g2 ->
+    semGen (liftGen2 f g1 g2) <--> f @2: (semGen g1, semGen g2).
+
 Hypothesis semLiftGen2SizeMonotonic :
   forall {A1 A2 B} (f: A1 -> A2 -> B)
          (g1 : G A1) (g2 : G A2),
@@ -60,11 +70,10 @@ Hypothesis semLiftGen3Size :
 forall {A1 A2 A3 B} (f: A1 -> A2 -> A3 -> B)
        (g1: G A1) (g2: G A2) (g3: G A3) size,
   semGenSize (liftGen3 f g1 g2 g3) size <-->
-  fun b =>
-    exists a1, semGenSize g1 size a1 /\
-               (exists a2, semGenSize g2 size a2 /\
-                           (exists a3, semGenSize g3 size a3 /\
-                                       (f a1 a2 a3) = b)).
+  [set b : B | exists a1, semGenSize g1 size a1 /\
+                          (exists a2, semGenSize g2 size a2 /\
+                                      (exists a3, semGenSize g3 size a3 /\
+                                                  (f a1 a2 a3) = b))].
 
 Hypothesis semLiftGen4Size : forall A1 A2 A3 A4 B (f : A1 -> A2 -> A3 -> A4 -> B)
        (g1 : G A1) (g2 : G A2) (g3 : G A3) (g4 : G A4) s,
@@ -76,19 +85,26 @@ Hypothesis semLiftGen5Size :
 forall {A1 A2 A3 A4 A5 B} (f: A1 -> A2 -> A3 -> A4 -> A5 -> B)
        (g1: G A1) (g2: G A2) (g3: G A3) (g4: G A4) (g5: G A5) size,
   semGenSize (liftGen5 f g1 g2 g3 g4 g5) size <-->
-  fun b =>
-    exists a1, semGenSize g1 size a1 /\
-               (exists a2, semGenSize g2 size a2 /\
-                           (exists a3, semGenSize g3 size a3 /\
-                                       (exists a4, semGenSize g4 size a4 /\
-                                                   (exists a5, semGenSize g5 size a5 /\
-                                                               (f a1 a2 a3 a4 a5) = b)))).
+  [set b : B |
+   exists a1, semGenSize g1 size a1 /\
+              (exists a2, semGenSize g2 size a2 /\
+                          (exists a3, semGenSize g3 size a3 /\
+                                      (exists a4, semGenSize g4 size a4 /\
+                                                  (exists a5, semGenSize g5 size a5 /\
+                                                              (f a1 a2 a3 a4 a5) = b))))].
 
 Hypothesis semSequenceGenSize:
   forall {A} (gs : list (G A)) n,
     semGenSize (sequenceGen gs) n <-->
     [set l | length l = length gs /\
       List.Forall2 (fun y => semGenSize y n) gs l].
+
+Hypothesis semSequenceGenSizeMonotonic : 
+  forall A (gs : list (G A)),
+    (gs \subset sizeMonotonic) ->
+    semGen (sequenceGen gs) <-->
+           [set l | length l = length gs /\
+                    List.Forall2 semGen gs l].
 
 (* Hypothesis semFoldGen_left : *)
 (*   forall {A B : Type} (f : A -> B -> G A) (bs : list B) (a0 : A), *)
@@ -101,6 +117,7 @@ Hypothesis semFoldGen_right :
     [ set an |
       foldr (fun b p => [set a_prev | exists a, a \in (semGenSize (f a_prev b) s :&: p)]) 
             [set an] bs a0 ].
+
 
 Hypothesis semOneof:
   forall {A} (l : list (G A)) (def : G A),
@@ -360,6 +377,38 @@ Proof.
     eapply H2; last eassumption. by apply/leP; apply Max.le_max_r.
 Qed.
 
+Lemma semLiftGen2Unsized1 {A1 A2 B} (f: A1 -> A2 -> B)
+      (g1 : G A1) (g2 : G A2) :
+  unsized g1 ->
+  semGen (liftGen2 f g1 g2) <--> f @2: (semGen g1, semGen g2).
+Proof.
+  move=> H. rewrite /semGen. setoid_rewrite semLiftGen2Size.
+  move=> b. split.
+  - move => [n [_ [[a1 a2] [[/= H2 H3] H4]]]]. exists (a1, a2).
+    split; auto; split; eexists; split; eauto; reflexivity.
+  - move => [[a1 a2] [[[s1 /= [H2 H2']] [s2 [H3 H3']]] H4]].
+    eexists. split; first by eauto. 
+    exists (a1, a2); split; eauto.
+    split; last by eauto. simpl. 
+    apply (unsized_def2 H) in H2'; eauto; apply (unsized_def2 H); eauto.
+Qed.
+  
+Lemma semLiftGen2Unsized2 {A1 A2 B} (f: A1 -> A2 -> B)
+      (g1 : G A1) (g2 : G A2) :
+  unsized g2 ->
+  semGen (liftGen2 f g1 g2) <--> f @2: (semGen g1, semGen g2).
+Proof.
+  move=> H. rewrite /semGen. setoid_rewrite semLiftGen2Size.
+  move=> b. split. 
+  - move => [n [_ [[a1 a2] [[/= H2 H3] H4]]]]. exists (a1, a2).
+    split; auto; split; eexists; split; eauto; reflexivity.
+  - move => [[a1 a2] [[[s1 /= [H2 H2']] [s2 [H3 H3']]] H4]].
+    eexists. split; first by auto.
+    exists (a1, a2). split; eauto.
+    split; first by eauto. simpl. 
+    apply (unsized_def2 H) in H3'; eauto; apply (unsized_def2 H); eauto.
+Qed.
+
 Lemma semLiftGen3Size :
 forall {A1 A2 A3 B} (f: A1 -> A2 -> A3 -> B)
        (g1: G A1) (g2: G A2) (g3: G A3) size,
@@ -431,6 +480,45 @@ rewrite Forall2_cons; split; first by case=> y [gen_y [s [[<- ?]]]] [<- <-].
 by case=> [[<-] [? ?]]; exists x; split => //; exists l; split.
 Qed.
 
+Lemma Forall2_SizeMonotonic {A} x n (gs : list (G A)) l :
+  x <= n -> gs \subset sizeMonotonic -> 
+  List.Forall2 (semGenSize^~ x) gs l ->
+  List.Forall2 (semGenSize^~ n) gs l.
+Proof. 
+  intros. induction H1; auto.
+  apply subconsset in H0. destruct H0; auto. 
+  constructor; auto. eapply H0; eauto.
+Qed.
+
+Lemma semSequenceGenSizeMonotonic A (gs : list (G A)) :
+  (gs \subset sizeMonotonic) ->
+  semGen (sequenceGen gs) <-->
+  [set l | length l = length gs /\
+    List.Forall2 semGen gs l].
+Proof.
+  intros. rewrite /semGen. setoid_rewrite semSequenceGenSize.
+  move => l. split.
+  - move => [n [ _ [H1 H2]]]. split; auto.
+    induction H2; subst; simpl; constructor.
+    + exists n. split; auto. reflexivity. 
+    + apply IHForall2; eauto. 
+      apply subconsset in H. destruct H; auto. 
+  - move => [H1 H2]. revert gs H H1 H2. induction l; intros gs H H1 H2.
+    - destruct gs; try discriminate. exists 0. 
+      split; auto. reflexivity.
+    - destruct gs; try discriminate.
+      apply subconsset in H. move : H => [H3 H4].  
+      inversion H2; subst. destruct H6 as [n [ _ H5]].
+      eapply IHl in H8; auto. destruct H8 as [x [_ [H7 H8]]].
+      destruct (x <= n) eqn:Hle. 
+      { exists n. split; eauto; first by reflexivity. split; auto. 
+        constructor; auto. eapply Forall2_SizeMonotonic; eauto. }
+      { exists x.  split; first by reflexivity. split; auto.
+        constructor; auto. eapply H3; last by eassumption. 
+        rewrite -> leq_eqVlt, -> Bool.orb_false_iff in Hle. 
+        destruct Hle; auto. rewrite leqNgt H0 //. }
+Qed.
+ 
 Lemma semVectorOfSize {A : Type} (k : nat) (g : G A) n :
   semGenSize (vectorOf k g) n <-->
   [set l | length l = k /\ l \subset (semGenSize g n)].

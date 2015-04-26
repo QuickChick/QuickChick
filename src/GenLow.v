@@ -78,6 +78,8 @@ Hypothesis semReturn :
   forall A (x : A), semGen (returnGen x) <--> [set x].
 Hypothesis semReturnSize :
   forall A (x : A) size, semGenSize (returnGen x) size <--> [set x].
+Hypothesis unsizedReturn :
+  forall A (x : A) , unsized (returnGen x).
 
 Hypothesis semBindSize :
   forall A B (g : G A) (f : A -> G B) (size : nat),
@@ -119,6 +121,7 @@ Hypothesis semFmapSize :
   forall A B (f : A -> B) (g : G A) (size : nat),
     semGenSize (fmap f g) size <--> f @: semGenSize g size.
 
+
 Hypothesis semChoose :
   forall A `{Random A} (a1 a2 : A), Random.leq a1 a2 ->
     (semGen (choose (a1,a2)) <-->
@@ -140,6 +143,8 @@ Hypothesis semSizedSize :
 Hypothesis semResize :
   forall A (n : nat) (g : G A),
     semGen (resize n g) <--> semGenSize g n.
+Hypothesis unsizedResize :
+  forall A n (g : G A) , unsized (resize n g).
 
 (* TODO: We need completeness as well - this is not exact *)
 Hypothesis semSuchThatMaybe_sound:
@@ -296,8 +301,8 @@ Lemma unsized_def2 : forall A (g : G A),
   unsized g ->
   forall s, semGenSize g s <--> semGen g.
 Proof.
-  intros. unfold semGen. intro a.
-  split; intro H'.
+  intros. unfold semGen. intros a.
+  split; intros H'.
   - exists s. split; by [].
   - destruct H' as [s' [_ H']]. by rewrite (H s s' a).
 Qed.
@@ -314,6 +319,11 @@ Proof.
 rewrite /semGen /semGenSize /= bigcup_const ?codom_const //.
   exact: randomSeed_inhabited.
 by do 2! constructor.
+Qed.
+
+Lemma unsizedReturn A (x : A) : unsized (returnGen x).
+Proof. 
+  unfold unsized. intros s1 s2 x'. by split.
 Qed.
 
 
@@ -432,6 +442,13 @@ Proof. by []. Qed.
 Lemma semResize A n (g : G A) : semGen (resize n g) <--> semGenSize g n .
 Proof.
 by case: g => g; rewrite /semGen /semGenSize /= bigcup_const.
+Qed.
+
+Lemma unsizedResize :
+  forall A n (g : G A) , unsized (resize n g).
+Proof.
+  move=> A n g. rewrite /unsized /resize /semGenSize => s1 s2.
+  destruct g; split; auto.
 Qed.
 
 Lemma semGenSuchThatMaybeAux_sound {A} : forall g p k n (a : A) size seed,
