@@ -164,6 +164,10 @@ Hypothesis semListOfUnsized:
     semGen (listOf g) <--> [set l | l \subset semGen g ]. 
 
 
+Hypothesis unsizedElements : 
+  forall {A} (def : A) (l : list A),
+    unsized (elements def l).
+
 Hypothesis semElements:
   forall {A} (l: list A) (def : A),
     (semGen (elements def l)) <--> if l is nil then [set def] else l.
@@ -172,9 +176,6 @@ Hypothesis semElementsSize:
   forall {A} (l: list A) (def : A) s,
     (semGenSize (elements def l) s) <--> if l is nil then [set def] else l.
 
-Hypothesis elements_unsized : 
-  forall {A} (def : A) (l : list A),
-    unsized (elements def l).
 
 Definition genPair {A B : Type} (ga : G A) (gb : G B) : G (A * B) :=
   liftGen2 pair ga gb.
@@ -315,15 +316,6 @@ Definition elements {A : Type} (def : A) (l : list A) :=
   bindGen (choose (0, n - 1)) (fun n' =>
   returnGen (List.nth n' l def)).
 
-Lemma elements_unsized : 
-  forall {A} (def : A) (l : list A),
-    unsized (elements def l).
-Proof.
-  intros. unfold unsized, elements. intros s1 s2; split;
-  move/semBindSize => [n [/semChooseSize H1 /semReturnSize H2]];  
-  apply semBindSize; exists n; split; auto;
-  try apply /semChooseSize; auto; apply semReturnSize; auto.
-Qed.
   
 Lemma semLiftGen {A B} (f: A -> B) (g: G A) :
   semGen (liftGen f g) <--> f @: semGen g.
@@ -612,6 +604,16 @@ Lemma semOneof {A} (l : list (G A)) (def : G A) :
 Proof.
 by case: l => [|g l]; rewrite 1?bigcupC; apply: eq_bigcupr => sz;
   apply: semOneofSize.
+Qed.
+
+Lemma unsizedElements : 
+  forall {A} (def : A) (l : list A),
+    unsized (elements def l).
+Proof.
+  intros. unfold unsized, elements. intros s1 s2; split;
+  move/semBindSize => [n [/semChooseSize H1 /semReturnSize H2]];  
+  apply semBindSize; exists n; split; auto;
+  try apply /semChooseSize; auto; apply semReturnSize; auto.
 Qed.
 
 (* begin semElementsSize *)

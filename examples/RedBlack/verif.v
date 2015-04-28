@@ -81,7 +81,7 @@ Qed.
 
 Lemma genColor_unsized : unsized genColor.
 Proof.
-  rewrite /genColor. apply elements_unsized.
+  rewrite /genColor. apply unsizedElements.
 Qed.
 
 Corollary genColor_correctSize': forall s, semGenSize genColor s <--> setT.

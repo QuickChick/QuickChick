@@ -122,6 +122,10 @@ Hypothesis semFmapSize :
     semGenSize (fmap f g) size <--> f @: semGenSize g size.
 
 
+Hypothesis unsizedChoose : 
+  forall  A `{Random A} (a1 a2 : A),
+    unsized (choose (a1, a2)).
+
 Hypothesis semChoose :
   forall A `{Random A} (a1 a2 : A), Random.leq a1 a2 ->
     (semGen (choose (a1,a2)) <-->
@@ -140,11 +144,11 @@ Hypothesis semSizedSize :
   forall A (f : nat -> G A) s,
     semGenSize (sized f) s <--> semGenSize (f s) s.
 
+Hypothesis unsizedResize :
+  forall A n (g : G A) , unsized (resize n g).
 Hypothesis semResize :
   forall A (n : nat) (g : G A),
     semGen (resize n g) <--> semGenSize g n.
-Hypothesis unsizedResize :
-  forall A n (g : G A) , unsized (resize n g).
 
 (* TODO: We need completeness as well - this is not exact *)
 Hypothesis semSuchThatMaybe_sound:
@@ -368,13 +372,14 @@ Lemma semBindUnsized1 :
     semGen (bindGen g f) <--> \bigcup_(a in semGen g) semGen (f a).
 Proof.
   move => A B g f H.
-  rewrite /semGen. setoid_rewrite semBindSize. move => b; split.
+  rewrite /semGen. setoid_rewrite semBindSize.
+  setoid_rewrite (unsized_def2 H). move => b. split.
   - intros [s [_ [a [H1 H2]]]].
-    exists a. split; exists s; (split; first (compute; by []); first by[]).
-  - intros [a [[s1 [_ H1]] [s2 [_ H2]]]]. exists s2. split; first (compute; by []).
-    exists a. split; [| by []].
-    rewrite /unsized /set_eq in H. rewrite -> H. eassumption.
-Qed.  
+    exists a. split; exists s; split; by [].
+  - intros [a [[s1 [_ H1]] [s2 [_ H2]]]]. 
+    exists s2. split; first by [].
+    exists a. split; by [].
+Qed.
 
 Lemma semBindUnsized2 :
   forall A B (g : G A) (f : A -> G B),
@@ -385,10 +390,11 @@ Proof.
   rewrite /semGen. setoid_rewrite semBindSize.
   intro b. split.
   - intros [s [_ [a [H1 H2]]]].
-    exists a. split; exists s; (split; first (compute; by []); first by[]).
-  - intros [a [[s1 [_ H1]] [s2 [_ H2]]]]. exists s1. split; first (compute; by []).
-    exists a. split. by []. specialize (H a).
-    rewrite /unsized /set_eq in H. rewrite -> H. eassumption.
+    exists a. split; exists s; split => //. 
+  - intros [a [[s1 [_ H1]] [s2 [_  H2]]]].
+    exists s1. split; first by []. exists a. 
+    split; first by []. apply (unsized_def2 (H a)).
+    now apply (unsized_def2 (H a)) in H2.
 Qed.
 
 Lemma semBindSizeMonotonic {A B} (g : G A) (f : A -> G B) :
@@ -412,7 +418,13 @@ Qed.
 Lemma semFmap A B (f : A -> B) (g : G A) :
   semGen (fmap f g) <--> f @: semGen g.
 Proof.
-by rewrite imset_bigcup /semGen (eq_bigcupr _ (semFmapSize _ _)).
+  by rewrite imset_bigcup /semGen (eq_bigcupr _ (semFmapSize _ _)).
+Qed.
+
+Lemma unsizedChoose  A `{Random A} (a1 a2 : A) :
+  unsized (choose (a1, a2)).
+Proof.
+  rewrite /unsized /semGenSize. reflexivity.
 Qed.
 
 Lemma semChooseSize A `{Random A} (a1 a2 : A) :
@@ -424,10 +436,9 @@ Proof. by move=> /= le_a1a2 m n; rewrite (randomRCorrect n a1 a2). Qed.
 Lemma semChoose A `{Random A} (a1 a2 : A) : Random.leq a1 a2 ->
   (semGen (choose (a1,a2)) <-->
   [set a | Random.leq a1 a && Random.leq a a2]).
-Proof.
-move=> leq_a1a2.
-rewrite /semGen (eq_bigcupr _ (semChooseSize leq_a1a2)) bigcup_const //.
-by do 2! constructor.
+Proof. 
+  move=> /= le_a1a2. rewrite <- (unsized_def2 (unsizedChoose a1 a2) 0).  
+  move => m /=. rewrite (randomRCorrect m a1 a2) //. 
 Qed.
 
 Lemma semSized A (f : nat -> G A) :
