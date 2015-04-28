@@ -1,5 +1,5 @@
 Require Import ZArith.
-Require Import ssreflect ssrfun ssrbool ssrnat eqtype seq bigop.
+Require Import ssreflect ssrfun ssrbool ssrnat eqtype seq.
 
 Require Import Random GenLow.
 Require Import Sets.

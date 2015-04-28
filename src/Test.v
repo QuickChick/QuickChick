@@ -1,4 +1,4 @@
-Require Import ssreflect ssrnat ssrbool eqtype div.
+Require Import ssreflect ssrnat ssrbool eqtype.
 
 Require Import Show RoseTrees.
 Require Import Random.
@@ -60,16 +60,16 @@ Extract Constant defSize        => "100".
 Definition stdArgs := MkArgs None defNumTests defNumDiscards
                              defNumShrinks defSize true.
 
-Definition roundTo n m := mult (div n m) m.
+Definition roundTo n m := mult (n / m) m.
 
 Definition computeSize' (a : Args) (n : nat) (d : nat) : nat :=
   if (roundTo n (maxSize a) <= maxSuccess a) || (n >= maxSuccess a)
-     || (maxSuccess a %% (maxSize a) == 0)
+     || (maxSuccess a mod (maxSize a) == 0)
   then
-    minn (n %% (maxSize a) + d %/ 10) (maxSize a)
+    minn (n mod (maxSize a) + d / 10) (maxSize a)
   else
-    minn ((n %% (maxSize a)) * maxSize a %/
-      (maxSuccess a mod (maxSize a) + d %/ 10)) (maxSize a).
+    minn ((n mod (maxSize a)) * maxSize a /
+      (maxSuccess a mod (maxSize a) + d / 10)) (maxSize a).
 
 Definition at0 (f : nat -> nat -> nat) (s : nat) (n d : nat) :=
   if andb (beq_nat n 0) (beq_nat d 0) then s
