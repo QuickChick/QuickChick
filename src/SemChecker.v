@@ -15,11 +15,6 @@ Definition successful qp :=
     | MkProp (MkRose res _) => resultSuccessful res
   end.
 
-(* CH: The forall+implications in semCheckerSize and semChecker_def2
-   are just set inclusions ... wouldn't it be more convenient to treat
-   them that way? *)
-(* ZP: Yes, they are now *) 
-
 (* Maps a Checker to a Prop *)
 
 (* begin semCheckerSize *)
@@ -106,7 +101,7 @@ Proof.
   move => H1 b H2. apply H1. eauto.
 Qed.
 
-Program Instance unsizedMonotonicChecker (c : Checker) { _ : unsizedChecker c } : 
+Program Instance unsizedMonotonicChecker (c : Checker) `{unsizedChecker c} : 
   sizeMonotonicChecker c.
 Next Obligation. 
     rewrite unsizedChecker_def. move => b Hb. by eauto. 
@@ -747,7 +742,7 @@ Program Instance uncurryUsized {A B} (f : A -> B -> Checker) p
 Next Obligation. by apply unsizedChecker_def. Qed.
 
 (* A typeclass so we can automate the application of the previous theorems
-  and get a readable Prop *)
+   and get a readable Prop *)
 
 Class Provable (A : Type) {H: Checkable A} : Type :=
  {

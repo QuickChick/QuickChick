@@ -56,7 +56,7 @@ Inductive is_redblack' : tree -> color -> nat -> Prop :=
                             is_redblack' (Node Red tl n tr) Black h
 | IsRB_b: forall c n tl tr h, is_redblack' tl Black h -> is_redblack' tr Black h ->
                               is_redblack' (Node Black tl n tr) c (S h).
-Definition is_redblack t := exists h, is_redblack' t Red h.
+Definition is_redblack (t:tree) : Prop := exists h, is_redblack' t Red h.
 (* end is_redblack *)
 
 (* begin insert_preserves_redblack *)
