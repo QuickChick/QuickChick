@@ -231,12 +231,12 @@ Proof.
       apply Max.max_case_strong => H''; auto.
       eapply le_trans; try eassumption. }
     specialize (H size x Hnat l Hlist).
-    setoid_rewrite semCollect_id in H. apply semBool in H.
+    setoid_rewrite semCollect_idSize in H. apply semCheckableBoolSize in H.
     have contra : existsb (pred1 x) (remove x l).
       { apply existsb_exists. exists x. split => //. by rewrite /= eq_refl. }
     rewrite contra in H. discriminate.
   -  move => H a HIn Hsize l Hsize'.
-     rewrite /removeP. rewrite semCollect_id semBool. apply Bool.eq_true_not_negb.
+     rewrite /removeP. rewrite semCollect_idSize semCheckableBoolSize. apply Bool.eq_true_not_negb.
      move => /existsb_exists contra.
      move : contra => [n [HIn' /=/eqP Hpred]]; subst. eapply H.
      eassumption.

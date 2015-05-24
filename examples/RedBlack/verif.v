@@ -226,7 +226,7 @@ Lemma insert_preserves_redblack_checker_correct:
 Proof.
   rewrite /insert_preserves_redblack_checker /insert_preserves_redblack.
   rewrite (mergeForAlls arbitraryNat genRBTree).
-  rewrite semForAll. rewrite /genPair. split.
+  rewrite semForAllUnsized2. rewrite /genPair. split.
   - move => H n t irt. specialize (H (n,t)). simpl in H.
     rewrite /semCheckable in H. simpl in H. rewrite -> semImplication in H.
     rewrite -> semCheckableBool in H.
@@ -257,7 +257,8 @@ Proof.
     unfold implication in *;
     destruct (is_redblack_bool t); simpl in *;
     apply semReturnSize; apply semReturnSize in H1; auto.
-Qed.  
+
+Qed.
 (* old proof -- still works, but requires checker lemmas with sizes,
    and it's very hard to explain those that early in the paper;
    should still bring back the views and stuff into the new proof
