@@ -117,6 +117,20 @@ Proof.
 by move=> t; split=> [[x [Ax <-]]|At] //; exists t.
 Qed.
 
+Lemma imset_incl {T U} (A B : set T) (f : T -> U):
+  A \subset B -> 
+  f @: A \subset f @: B.
+Proof.
+  move => H u [x [H1 H2]]. eexists; split; eauto.
+Qed.
+
+Lemma imset_eq {T U} (A B : set T) (f : T -> U):
+  A <--> B -> 
+  f @: A <--> f @: B.
+Proof.
+  move => H u. split; apply imset_incl => t Ht; by apply H.
+Qed.
+
 Lemma coverE T (A : set T) : \bigcup_(x in A) [set x] <--> A.
 Proof. exact: imset_id. Qed.
 
