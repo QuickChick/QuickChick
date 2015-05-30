@@ -105,6 +105,25 @@ Proof.
 split; first by move=> eqAB; split=> a; rewrite (eqAB a).
 by case=> subAB subBA a; split; [apply: subAB | apply:subBA].
 Qed.
+Lemma subset_trans T (A1 A2 A3 : set T) :
+  A1 \subset A2 ->
+  A2 \subset A3 ->
+  A1 \subset A3.
+Proof.
+  rewrite /set_incl. move => H12 H23. by eauto 3.
+Qed.
+
+Lemma subset_refl T (A : set T) : A \subset A.
+Proof. by rewrite /set_incl. Qed.
+
+Lemma subset_singl : 
+  forall {T} (x y : T), [set x] \subset [set y] <-> y = x. 
+Proof.
+  intros. split; intros H; subst; auto.  
+  - apply H; reflexivity.
+  - apply subset_refl.
+Qed.
+
 
 Lemma imsetT T U (f : T -> U) : f @: setT <--> codom f.
 Proof.
@@ -129,6 +148,28 @@ Lemma imset_eq {T U} (A B : set T) (f : T -> U):
   f @: A <--> f @: B.
 Proof.
   move => H u. split; apply imset_incl => t Ht; by apply H.
+Qed.
+
+Lemma imset_in a b x (f : a -> b) (A : set a) :
+  x \in A -> f x \in (f @: A).
+Proof.
+  intros. unfold imset. exists x. split; by [].
+Qed.
+
+Lemma imset_id_ext T (A : set T) f : (forall x, f x = x) -> f @: A <--> A.
+Proof.
+  rewrite /imset /bigcup => H x. split.
+  - move => [y [H1 H2]]. rewrite H in H2. inversion H2. subst. assumption.
+  - move => H1. eexists. split. eassumption. by rewrite H.
+Qed.
+
+Lemma imset_eq_ext a b (f g : a -> b) (A : set a) :
+  (forall x, f x = g x) ->
+  f @: A <--> g @: A.
+Proof.
+  rewrite /imset /bigcup /set1. move => H x.
+  split => [[i [H1 H2]] | [i [H1 H2]]]; eexists; split;
+           try eassumption. congruence. congruence.
 Qed.
 
 Lemma coverE T (A : set T) : \bigcup_(x in A) [set x] <--> A.
@@ -198,6 +239,14 @@ Lemma eq_bigcupl T U A B (F : T -> set U) : A <--> B ->
 Proof.
 by move=> /subset_eqP[? ?]; split; apply: incl_bigcupl.
 Qed.
+
+Lemma incl_bigcup a b (x:a) (A : set a) (f:a->set b) :
+  x \in A -> 
+  f x \subset \bigcup_(x in A) f x.
+Proof.
+  rewrite /set_incl /bigcup. by eauto 3.
+Qed.
+
 
 Arguments eq_bigcupl [T U A] B F _ _.
 
