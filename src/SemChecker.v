@@ -45,61 +45,6 @@ Definition semCheckableSize {A} `{Checkable A} (a : A) (s : nat) : Prop :=
 Definition semCheckable {A} `{Checkable A} (a : A) : Prop := semChecker (checker a).
 (* end semCheckable *)
 
-(* TODO : Move these to the set library *)
-
-(* Begin Lemmas for Maxime's library *)
-
-Lemma one_more_for_maximes_library a b x (f : a -> b) (A : set a) :
-  x \in A -> f x \in (f @: A).
-Proof.
-  intros. unfold imset. exists x. split; by [].
-Qed.
-
-Lemma imset_id' T (A : set T) f : (forall x, f x = x) -> f @: A <--> A.
-Proof.
-  rewrite /imset /bigcup => H x. split.
-  - move => [y [H1 H2]]. rewrite H in H2. inversion H2. subst. assumption.
-  - move => H1. eexists. split. eassumption. by rewrite H.
-Qed.
-
-Lemma another_one_for_maxime a b (f g : a -> b) (A : set a) :
-  (forall x, f x = g x) ->
-  f @: A <--> g @: A.
-Proof.
-  rewrite /imset /bigcup /set1. move => H x.
-  split => [[i [H1 H2]] | [i [H1 H2]]]; eexists; split;
-           try eassumption. congruence. congruence.
-Qed.
-
-Lemma subset_trans a (A1 A2 A3 : set a) :
-  A1 \subset A2 ->
-  A2 \subset A3 ->
-  A1 \subset A3.
-Proof.
-  rewrite /set_incl. move => H12 H23. by eauto 3.
-Qed.
-
-Lemma here_is_one_more a b (x:a) (A : set a) (f:a->set b) :
-  x \in A ->
-  f x \subset \bigcup_(x in A) f x.
-Proof.
-  rewrite /set_incl /bigcup. by eauto 3.
-Qed.
-
-Lemma subset_refl T (A : set T) : A \subset A.
-Proof. by rewrite /set_incl. Qed.
-
-Lemma subset_singl : 
-  forall {A} (x y : A), [set x] \subset [set y] <-> y = x. 
-Proof.
-  intros. split; intros H; subst; auto.  
-  - apply H; reflexivity.
-  - apply subset_refl.
-Qed.
-
-(* End Lemmas for Maxime's library *) 
-
-
 (* another characterization of semChecker *)
 Lemma semChecker_def2 c :
   semChecker c <-> (forall qp, semGen c qp -> successful qp = true).
@@ -122,61 +67,49 @@ Proof.
 (*  CH: why can't I rewrite with semFmap directly? See tentative instances below *)
   - intros b H'. unfold imset, bigcup in H'.
     destruct H' as [qp [H1 H2]]. apply H in H1. by rewrite H1 in H2.
-  - intros. unfold set_incl in H. specialize (H (successful qp)).
-    unfold set1 in H. symmetry. apply H. clear H.
-    by apply one_more_for_maximes_library.
+  - intros. specialize (H (successful qp)).
+    unfold set1 in H. symmetry. apply: H.
+    by eapply imset_in. 
 Qed.
-
-
-(* What does it mean for checkers to be unsized/monotonic? *)
-
-(* CH: any way to relate this to generators and unsizedness of generators?
-   Yes, unsizedChecker should be defined in terms of unsized and semChecker' *)
 
 Definition genChecker c := fmap successful c.
 
-Definition unsizedChecker (c : Checker) : Prop := unsized (genChecker c).
+Class unsizedChecker (c : Checker) :=
+  {
+    unsizedChecker_def : 
+      forall s1 s2 : nat, semGenSize (genChecker c) s1 <--> semGenSize (genChecker c) s2
+  }.
 
-Definition sizeMonotonicChecker (c : Checker) : Prop := sizeMonotonic (genChecker c).
+Class sizeMonotonicChecker (c : Checker) :=
+  {
+    monotonicChecker_def : 
+      forall s1 s2, s1 <= s2 -> 
+                    semGenSize (genChecker c) s1 \subset semGenSize (genChecker c) s2
+                                           
+  }.
 
-Lemma unsizedCheckerDef (c : Checker) :
-  unsizedChecker c ->
+Lemma unsizedChecker_alt_def (c : Checker) `{unsizedChecker c} :
   forall s1 s2, semCheckerSize c s1 <-> semCheckerSize c s2.
 Proof.
-  rewrite /unsizedChecker /genChecker /unsized;
-  move => Hunsized s1 s2; rewrite /semCheckerSize; split;
-  move => H b [s [H1 <-]]; specialize (Hunsized s1 s2);
-  rewrite -> !semFmapSize in Hunsized;
-  apply H; apply Hunsized; exists s; split => //.
+  rewrite /semCheckerSize => s1 s2; split;
+  move : H => [/(_ s1 s2) H];
+  rewrite /genChecker in H; setoid_rewrite semFmapSize in H;
+  by rewrite H.
 Qed.
 
-Lemma sizeMonotonicCheckerDef (c : Checker) :
-  sizeMonotonicChecker c ->
+Lemma monotonicChecker_alt_def (c : Checker) `{sizeMonotonicChecker c} :
   forall s1 s2, s1 <= s2 -> semCheckerSize c s2 -> semCheckerSize c s1.
 Proof.
-  rewrite /sizeMonotonicChecker /sizeMonotonicChecker /sizeMonotonic /genChecker ;
-  move => Hmon s1 s2 Hle.
-  move => H b [s [H1 <-]]. specialize (Hmon s1 s2 Hle).
-  rewrite -> !semFmapSize in Hmon;
-  apply H; apply Hmon; exists s; split => //.
+  rewrite /semCheckerSize => s1 s2 Hle.
+  move : H => [/(_ s1 s2 Hle) /= H]. 
+  rewrite /genChecker in H; setoid_rewrite semFmapSize in H.
+  move => H1 b H2. apply H1. eauto.
 Qed.
 
-Lemma unsizedCheckerWeak (c : Checker) :
-  unsized c ->
-  forall s1 s2, semCheckerSize c s1 <-> semCheckerSize c s2.
-Proof.
-  move => Hunsized s1 s2; rewrite /semCheckerSize; split;
-  move => H b [s [H1 <-]]; apply H; exists s; split => //;
-  eapply Hunsized; eauto. 
-Qed.
-
-Lemma sizeMonotonicCheckerWeak (c : Checker) :
-  sizeMonotonic c ->
-  forall s1 s2, s1 <= s2 -> semCheckerSize c s2 -> semCheckerSize c s1.
-Proof.
-  move => Hmon s1 s2 Hleq; rewrite /semCheckerSize.
-  move => H b [s [H1 <-]]. apply H; exists s; split => //.
-  eapply Hmon; eauto.
+Program Instance unsizedMonotonicChecker (c : Checker) { _ : unsizedChecker c } : 
+  sizeMonotonicChecker c.
+Next Obligation. 
+    rewrite unsizedChecker_def. move => b Hb. by eauto. 
 Qed.
 
 Lemma mapTotalResult_idSize {C} `{Checkable C} (f : Result -> Result) (c : C) s :
@@ -194,6 +127,7 @@ Proof.
     eexists. split; eauto. reflexivity.
 Qed.
 
+
 Lemma mapTotalResult_id {C} `{Checkable C} (f : Result -> Result) (c : C) :
     (forall res, resultSuccessful res = resultSuccessful (f res)) ->
     (semChecker (mapTotalResult f c) <-> semCheckable c).
@@ -201,6 +135,7 @@ Proof.
   move=> eq_res; split => H' s; eapply mapTotalResult_idSize; eauto.
   by apply H'.
 Qed.
+
 
 Lemma semCallback_idSize {C} `{Checkable C} (cb : Callback) (c : C) (s : nat) :
     semCheckerSize (callback cb c) s <-> semCheckableSize c s.
@@ -357,6 +292,28 @@ Proof.
   move => b''. by apply H1.
 Qed.
 
+Program Instance usizedImplication
+        {C} `{Checkable C} b (c : C) `{unsizedChecker (checker c)} : 
+  unsizedChecker (b ==> c).
+Next Obligation.
+  move : H0 => [/(_ s1 s2) H0].
+  rewrite /genChecker in H0 *. rewrite -> !semFmapSize in H0. 
+  rewrite !semFmapSize.
+  rewrite /implication. case : b; eauto.
+  apply imset_eq. rewrite !semReturnSize. reflexivity.
+Qed.
+
+Program Instance sizeMonotonicImplication
+        {C} `{Checkable C} b (c : C) `{sizeMonotonicChecker (checker c)} : 
+  sizeMonotonicChecker (b ==> c).
+Next Obligation.
+  move : H0 => [/(_ s1 s2 H1) H0].
+  rewrite /genChecker in H0 *. rewrite -> !semFmapSize in H0. 
+  rewrite !semFmapSize.
+  rewrite /implication. case : b; eauto.
+  apply imset_incl. rewrite !semReturnSize. by move => ? ?; eauto.
+Qed.
+  
 (* equivalences for other combinators *)
 
 Lemma semReturnGenSize (qp : QProp) (s: nat) :
@@ -386,45 +343,44 @@ Proof.
     eexists; split => //; eauto.
 Qed.
 
-Lemma semBindGenUsinzed1 {A} (gen : G A) (f : A -> Checker) :
-    unsized gen ->
+Lemma semBindGenUsinzed1 {A} (gen : G A) (f : A -> Checker) `{unsized _ gen} :
     (semChecker (bindGen gen f) <->
      forall a, semGen gen a -> semChecker (f a)).
 Proof.
-  move => Hunsized. split; move => H a.
-  - move => [s [_ H']] s'. eapply Hunsized in H'.
-    by eapply semBindGenSize in H; eauto.
-  - by eapply semBindGenSize; intros; apply H; eexists; split => //; eauto.
+  split; move => Hgen a.
+  - move => [s [_ H']] s'. eapply unsized_def in H'.
+    by eapply semBindGenSize in Hgen; eauto.
+  - by eapply semBindGenSize; intros; apply Hgen; eexists; split => //; eauto.
 Qed.
 
-Lemma semBindGenUsinzed2 {A} (gen : G A) (f : A -> Checker) :
-    (forall a, unsizedChecker (f a)) ->
+Lemma semBindGenUsinzed2 {A} (gen : G A) (f : A -> Checker) 
+      `(forall a, unsizedChecker (f a)) :
     (semChecker (bindGen gen f) <->
      forall a, semGen gen a -> semChecker (f a)).
 Proof.
-  move => Hunsized. split; move => H a.
+  split; move => Hgen a.
   - move => [s [_ H']] s'.
-    eapply semBindGenSize in H; last by eauto.
-    eapply unsizedCheckerDef; eauto.
-  - by eapply semBindGenSize; intros; apply H; eexists; split => //; eauto.
+    eapply semBindGenSize in Hgen; last by eauto.
+    eapply unsizedChecker_alt_def; eauto.
+  - by eapply semBindGenSize; intros; apply Hgen; eexists; split => //; eauto.
 Qed.
 
-Lemma semBindGenSizeMonotonic {A} (gen : G A) (f : A -> Checker) :
-  sizeMonotonic gen ->  
-  (forall a, sizeMonotonicChecker (f a)) ->
+Lemma semBindGenSizeMonotonic {A} (gen : G A) (f : A -> Checker)
+  `{sizeMonotonic _ gen}  
+  `(forall a, sizeMonotonicChecker (f a)) :
   (semChecker (bindGen gen f) <->
    forall a, semGen gen a -> semChecker (f a)).
 Proof.
-  move => Hmon1 Hmon2. split; move => H a.
+  split; move => Hgen a.
   - move => [s [_ H']] s'. case_eq (s <= s') => [Hleq |  
                                                  /leP/Compare_dec.not_le/ltP/ltnW Hleq].
-    + specialize (H s').
-      eapply semBindGenSize in H; eauto. eapply Hmon1; eauto.
-    + specialize (H s). eapply semBindGenSize in H; eauto. 
-      eapply sizeMonotonicCheckerDef; eauto. 
-  - by eapply semBindGenSize; intros; apply H; eexists; split => //; eauto.
+    + specialize (Hgen s').
+      eapply semBindGenSize in Hgen; eauto. 
+      eapply monotonic_def; eauto.
+    + specialize (Hgen s). eapply semBindGenSize in Hgen; eauto. 
+      eapply monotonicChecker_alt_def; eauto.
+  - by eapply semBindGenSize; intros; apply Hgen; eexists; split => //; eauto.
 Qed.
-
 
 Lemma semPredQPropSize (c : Checker) (s : nat) :
     semCheckableSize c s <-> (semCheckerSize c s).
@@ -453,22 +409,22 @@ Proof.
     rewrite semPrintTestCase_idSize. by apply H'.
 Qed.
 
-Lemma semForAllUnsized1 {A C} `{Show A, Checkable C} (g : G A) (f : A -> C) :
-  unsized g ->
+Lemma semForAllUnsized1 {A C} `{Show A, Checkable C} (g : G A) (f : A -> C)
+      `{unsized _ g} :
   (semChecker (forAll g f) <->
    forall (a : A), a \in semGen g -> semCheckable (f a)).
 Proof.
   split=> H'.
   - move => a [s' [_ Hgen]] s. specialize (H' s).
     eapply semForAllSize in H'; first by eauto.
-    eapply H1; eauto.
-  - move => s; eapply semForAllSize; move => a Hgen. 
+    eapply unsized_def; eauto.
+  - move => s; eapply semForAllSize; move => a Hgen.
     apply H'; eexists; split => //; eauto. 
 Qed.
 
 (* begin semForAll *)
-Lemma semForAllUnsized2 {A C} `{Show A, Checkable C} (g : G A) (f : A -> C) :
-  (forall a, unsizedChecker (checker (f a))) ->
+Lemma semForAllUnsized2 {A C} `{Show A, Checkable C} (g : G A) (f : A -> C)
+  `(forall a, unsizedChecker (checker (f a))) :
   (semChecker (forAll g f) <->
    forall (a : A), a \in semGen g -> semCheckable (f a)).
 (* end semForAll *)
@@ -476,28 +432,27 @@ Proof.
   split=> H'.
   - move => a [s' [_ Hgen]] s. specialize (H' s').
     eapply semForAllSize in H'; last by eauto.
-    eapply unsizedCheckerDef; eauto.
+    by eapply unsizedChecker_alt_def; eauto.
   - move => s; eapply semForAllSize; move => a Hgen. 
     apply H'; eexists; split => //; eauto. 
 Qed.
 
-Lemma semForAllSizeMonotonic {A C} `{Show A, Checkable C} (g : G A) (f : A -> C) :
-  sizeMonotonic g ->
-  (forall a, sizeMonotonicChecker (checker (f a))) ->
+Lemma semForAllSizeMonotonic {A C} `{Show A, Checkable C} (g : G A) (f : A -> C)
+  `{sizeMonotonic _ g} 
+  `(forall a, sizeMonotonicChecker (checker (f a))) :
   (semChecker (forAll g f) <->
    forall (a : A), a \in semGen g -> semCheckable (f a)).
 Proof.
-  move => Hmon1 Hmon2. split; move => Hcheck a.
+  split; move => Hcheck a.
   - move => [s [_ H']] s'. case_eq (s <= s') => [Hleq |  
                                                  /leP/Compare_dec.not_le/ltP/ltnW Hleq].
     + specialize (Hcheck s').
       rewrite -> semForAllSize in Hcheck. apply Hcheck. 
-      by eapply Hmon1; eauto.
+      eapply monotonic_def; eauto.
     + specialize (Hcheck s). eapply semForAllSize in Hcheck; eauto. 
-      by eapply sizeMonotonicCheckerDef; eauto. 
+      by eapply monotonicChecker_alt_def; eauto. 
   - by eapply semForAllSize; intros; apply Hcheck; eexists; split => //; eauto.
 Qed.
-
 
 Lemma unsized_printTestCase {A C} `{Checkable C} `{Show A} (c : A -> C) :
   (forall a, unsized (checker (c a))) ->
@@ -508,8 +463,6 @@ Proof.
 (*   by do 2 rewrite semPrintTestCase_idSize. *)
 (* Qed. *)
 Abort.
-
-
 
 
 (* alternative definitions
@@ -611,28 +564,27 @@ Qed.
 
 Lemma semForAllShrinkUnsized2 :
   forall {A C} `{Checkable C} `{Show A}
-         (gen : G A) (f : A -> C) shrinker,
-  (forall a, unsizedChecker (checker (f a))) ->
+         (gen : G A) (f : A -> C) shrinker
+  `(forall a, unsizedChecker (checker (f a))),
   (semChecker (forAllShrink gen shrinker f) <->
      forall a : A, semGen gen a -> semCheckable (f a)).
 Proof.
   split=> H'.
   - move => a [s' [_ Hgen]] s. specialize (H' s').
     eapply semForAllShrinkSize in H'; last by eauto.
-    eapply unsizedCheckerDef; eauto.
+    eapply unsizedChecker_alt_def; eauto.
   - move => s; eapply semForAllShrinkSize; move => a Hgen. 
     apply H'; eexists; split => //; eauto. 
 Qed.
 
 Lemma semForAllShrinkMonotonic :
   forall {A C} `{Checkable C} `{Show A}
-         (gen : G A) (f : A -> C) shrinker,
-  sizeMonotonic gen ->
+         (gen : G A) (f : A -> C) shrinker `{sizeMonotonic _ gen}, 
   (forall a, sizeMonotonicChecker (checker (f a))) ->
   (semChecker (forAllShrink gen shrinker f) <->
      forall a : A, semGen gen a -> semCheckable (f a)).
 Proof.
-  move => A C H1 H2 gen f sh Hmon1 Hmon2. 
+  move => A C H1 H2 gen f sh Hmon1 Hmon2.
   split; move => Hcheck a.
   - move => [s [_ H']] s'. case_eq (s <= s') => [Hleq |  
                                                  /leP/Compare_dec.not_le/ltP/ltnW Hleq].
@@ -640,7 +592,7 @@ Proof.
       rewrite -> semForAllShrinkSize in Hcheck. apply Hcheck. 
       by eapply Hmon1; eauto.
     + specialize (Hcheck s). eapply semForAllShrinkSize in Hcheck; eauto. 
-      by eapply sizeMonotonicCheckerDef; eauto. 
+      by eapply monotonicChecker_alt_def; eauto. 
   - by eapply semForAllShrinkSize; intros; apply Hcheck; eexists; split => //; eauto.
 Qed.
 
@@ -672,6 +624,11 @@ Proof.
   split; [move => /(_ 0) H | move => H s]; eapply semCheckableBoolSize; eauto.
 Qed.
  
+Program Instance boolUnsized (b : bool) : unsizedChecker (checker b).
+Next Obligation.
+  rewrite !semFmapSize !semReturnSize. apply imset_eq. reflexivity.
+Qed.
+
 Lemma semCheckableResultSize:
   forall (res: Result) (size: nat),
     semCheckableSize res size <-> resultSuccessful res.
@@ -692,6 +649,11 @@ Proof.
   split; [move => /(_ 0) H | move => H s]; eapply semCheckableResultSize; eauto.
 Qed.
 
+Program Instance resultUnsized (r : Result) : unsizedChecker (checker r).
+Next Obligation.
+  rewrite !semFmapSize !semReturnSize. apply imset_eq. reflexivity.
+Qed.
+
 Lemma semCheckableUnitSize (t : unit) size : semCheckableSize t size <-> True.
 Proof.
   split => // _ qp [qp' [/semReturnSize <- <-]] //.
@@ -700,6 +662,11 @@ Qed.
 Lemma semCheckableUnit (t : unit) : semCheckable t <-> True.
 Proof.
   split; [move => /(_ 0) H | move => H s]; eapply semCheckableUnitSize; eauto.
+Qed.
+
+Program Instance unitUnsized : unsizedChecker (checker tt).
+Next Obligation.
+  rewrite !semFmapSize !semReturnSize. apply imset_eq. reflexivity.
 Qed.
 
 Lemma semCheckableQPropSize (qp : QProp) size :
@@ -720,6 +687,11 @@ Proof.
   split; [move => /(_ 0) H | move => H s]; eapply semCheckableQPropSize; eauto.
 Qed.
 
+Program Instance qpUnsized (qp : QProp) : unsizedChecker (checker qp).
+Next Obligation.
+  rewrite !semFmapSize !semReturnSize. apply imset_eq. reflexivity.
+Qed.
+
 Lemma semCheckableGenSize:
   forall (P : Type) {H : Checkable P} (gen: G P) (size : nat),
     (semCheckableSize gen size) <->
@@ -729,6 +701,7 @@ Proof.
   - move => /semBindGenSize Hcheck p Hgen //=; eauto.
   - move => Hcheck. apply semBindGenSize => a Hgen; eauto.
 Qed.
+
 
 Lemma semCheckableFunSize:
   forall {A C} {H1 : Show A} {H2 : Arbitrary A} {H3 : Checkable C}
