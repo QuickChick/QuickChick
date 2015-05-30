@@ -205,7 +205,7 @@ Proof.
     simpl in *. move : H1 => [H1 H2]; subst.
     eexists. eexists. exists seed. reflexivity. rewrite Heq. reflexivity.
 Qed.
-    
+
 Lemma semShrinking_id {C A} {HCheck : Checkable C}
          (sh : A -> list A) (x : A) (pf : A -> C)  :
     semChecker (shrinking sh x pf) <->
@@ -214,6 +214,12 @@ Proof.
   split; move => H s; eapply semShrinking_idSize; first by eauto.
   by apply H.
 Qed.
+
+(* Program Instance shrinkingUnsized {C A} `{Checkable C} *)
+(*         (sh : A -> list A) (x : A) (pf : A -> C)  *)
+(*         `{unsizedChecker (checker (pf x))} : unsizedChecker (shrinking sh x pf). *)
+(* Next Obligation.  *)
+(* Abort. *)
 
 Lemma semCover_idSize {C} `{Checkable C} (b: bool) (n: nat)
       (str : String.string) (c : C) (s : nat) :
@@ -490,17 +496,20 @@ Qed.
 
 Require Import FunctionalExtensionality.
 
-Definition uncurry {A B C : Type} (f : A * B -> C) (a : A) (b : B) := f (a,b).
-
-Lemma curry_uncurry {A B C : Type} (f : A * B -> C) :
+Lemma curry_uncurry {A B C : Type} (f : A -> B -> C) :
   curry (uncurry f) = f.
+Proof. apply functional_extensionality => x. reflexivity. Qed.
+
+Lemma uncurry_curry {A B C : Type} (f : A * B -> C) :
+  uncurry (curry f) = f.
 Proof. apply functional_extensionality. by intros [a b]. Qed.
+
 
 Lemma mergeBinds' :
   forall A B C (ga : G A) (gb : G B) (f : A * B -> G C),
-    semGen (bindGen ga (fun x => bindGen gb ((uncurry f) x))) <-->
+    semGen (bindGen ga (fun x => bindGen gb ((curry f) x))) <-->
     semGen (bindGen (genPair ga gb) f).
-Proof. setoid_rewrite mergeBinds. by setoid_rewrite curry_uncurry. Qed.
+Proof. setoid_rewrite mergeBinds. by setoid_rewrite uncurry_curry. Qed.
 
 Lemma eq_to_impl : forall (a b : Prop), a = b -> a -> b.
 Proof. move => a b H. by rewrite H. Qed.
@@ -515,7 +524,7 @@ Proof. move => a b H. by rewrite H. Qed.
 Lemma mergeForAlls {A B C : Type} `{Checkable C} `{Show A} `{Show B}
          (ga : G A) (gb : G B) (f : A -> B -> C) :
      semChecker (forAll ga (fun a => forAll gb (f a))) <->
-     semChecker (forAll (genPair ga gb) (curry f)).
+     semChecker (forAll (genPair ga gb) (uncurry f)).
 Proof.
   (* ZP : I know that this proof lacks nice point-free reasoning, but it is 
           significantly smaller and typechecks much faster that the previous one *)

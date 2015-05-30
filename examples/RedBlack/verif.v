@@ -75,18 +75,12 @@ Qed.
 Lemma semColorSize s : semGenSize genColor s <--> [set : color].
 (* end semColorSize *)
 Proof.
-  rewrite /genColor. rewrite semElementsSize.
-  intros c. destruct c; simpl; unfold setT; tauto.
-Qed.
-
-Lemma genColor_unsized : unsized genColor.
-Proof.
-  rewrite /genColor. apply unsizedElements.
+  rewrite unsized_alt_def. by apply semColor.
 Qed.
 
 Corollary genColor_correctSize': forall s, semGenSize genColor s <--> setT.
 Proof.
-  move => s. rewrite (unsized_def2 (genColor_unsized)). by apply semColor.
+  move => s. rewrite unsized_alt_def. by apply semColor.
 Qed.
 
 (* Some helpful lemmas and definitions *)
@@ -226,7 +220,7 @@ Lemma insert_preserves_redblack_checker_correct:
 Proof.
   rewrite /insert_preserves_redblack_checker /insert_preserves_redblack.
   rewrite (mergeForAlls arbitraryNat genRBTree).
-  rewrite semForAllUnsized2. rewrite /genPair. split.
+  rewrite -> semForAllUnsized2. rewrite /genPair. split.
   - move => H n t irt. specialize (H (n,t)). simpl in H.
     rewrite /semCheckable in H. simpl in H. rewrite -> semImplication in H.
     rewrite -> semCheckableBool in H.
@@ -249,16 +243,14 @@ Proof.
   - move => H [a t] Hg. unfold semGen in Hg. destruct Hg as [s [_ Hg]].
     simpl. rewrite -> semImplication. rewrite semCheckableBool.
     intro irb. apply /is_redblackP. apply H. by apply /is_redblackP.
-  - (* unsizedChecker proof *)
-    intros. unfold unsizedChecker, semCheckerSize, curry, genChecker. simpl.
-    destruct a as [n t]. split;
-    move => /semFmapSize [h [H1 H2]]; apply semFmapSize;
-    exists h; split => //;
-    unfold implication in *;
-    destruct (is_redblack_bool t); simpl in *;
-    apply semReturnSize; apply semReturnSize in H1; auto.
-
+  - (* TODO : fix instances so that this is automatically inferred *) 
+    simpl. move=> [n t]. constructor. move => s1 s2.
+    rewrite /genChecker !semFmapSize. apply imset_eq.
+    simpl. destruct (is_redblack_bool t); simpl in *;
+    by rewrite ! semReturnSize. 
 Qed.
+
+(* unsizedChecker proof *)
 (* old proof -- still works, but requires checker lemmas with sizes,
    and it's very hard to explain those that early in the paper;
    should still bring back the views and stuff into the new proof

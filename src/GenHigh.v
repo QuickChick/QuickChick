@@ -188,15 +188,17 @@ Declare Instance elementsUnsized {A} {def : A} (l : list A)  : unsized (elements
 Definition genPair {A B : Type} (ga : G A) (gb : G B) : G (A * B) :=
   liftGen2 pair ga gb.
 
-Definition curry {A B C : Type} (f : A -> B -> C) (ab : A * B) :=
+Definition uncurry {A B C : Type} (f : A -> B -> C) (ab : A * B) :=
   match ab with
   | (a,b) => f a b
   end.
 
+Definition curry {A B C : Type} (f : A * B -> C) (a : A) (b : B) := f (a,b).
+
 Hypothesis mergeBinds :
   forall A B C (ga : G A) (gb : G B) (f : A -> B -> G C),
     semGen (bindGen ga (fun x => bindGen gb (f x))) <-->
-    semGen (bindGen (genPair ga gb) (curry f)).
+    semGen (bindGen (genPair ga gb) (uncurry f)).
 
 Module QcDefaultNotation.
 
@@ -845,7 +847,9 @@ Qed.
 Definition genPair {A B : Type} (ga : G A) (gb : G B) : G (A * B) :=
   liftGen2 pair ga gb.
 
-Definition curry {A B C : Type} (f : A -> B -> C) (ab : A * B) :=
+Definition curry {A B C : Type} (f : A * B -> C) (a : A) (b : B) := f (a,b).
+
+Definition uncurry {A B C : Type} (f : A -> B -> C) (ab : A * B) :=
   match ab with
   | (a,b) => f a b
   end.
@@ -853,7 +857,7 @@ Definition curry {A B C : Type} (f : A -> B -> C) (ab : A * B) :=
 Lemma mergeBinds :
   forall A B C (ga : G A) (gb : G B) (f : A -> B -> G C),
     semGen (bindGen ga (fun x => bindGen gb (f x))) <-->
-    semGen (bindGen (genPair ga gb) (curry f)).
+    semGen (bindGen (genPair ga gb) (uncurry f)).
 Proof.
   intros. unfold semGen. repeat setoid_rewrite semBindSize.
                                 setoid_rewrite semReturnSize.

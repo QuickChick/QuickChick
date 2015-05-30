@@ -26,6 +26,9 @@ Definition arbitraryZ :=
 Definition arbitraryList {A : Type} {Arb : Arbitrary A} :=
   listOf arbitrary.
 
+Definition arbitraryPair {A B : Type} `{Arbitrary A} `{Arbitrary B} : G (A*B) :=
+  liftGen2 pair arbitrary arbitrary.
+
 Function shrinkBool (x : bool) :=
   match x with
     | false => nil
@@ -145,6 +148,11 @@ Instance arbInt : Arbitrary Z :=
     shrink := shrinkZ
   |}.
 
+Instance arbPair {A B} `{Arbitrary A} `{Arbitrary B} : Arbitrary (A * B) :=
+  {| 
+    arbitrary := arbitraryPair;
+    shrink p := List.combine (shrink (fst p)) (shrink (snd p))
+  |}.
 
 (* For these instances to be useful, we would need to support dependent types *)
 
@@ -211,7 +219,6 @@ apply/(Zle_bool_trans _ 0%Z); apply/Zle_is_le_bool.
 exact/Z.abs_nonneg.
 Qed.
 
-(* TODO : this need semListOf *)
 Lemma arbList_correct:
   forall {A} {H : Arbitrary A} (P : nat -> A -> Prop) s,
     (semGenSize arbitrary s <--> P s) ->
@@ -224,4 +231,18 @@ Proof.
     auto.
   - move => [Hl HP]. apply semListOfSize. split => // x HIn.
     apply Hgen. auto.
+Qed.
+
+Lemma arbPair_correctSize 
+      {A B} `{Arbitrary A} `{Arbitrary B} (Sa : nat -> set A) 
+      (Sb : nat -> set B) s:
+    (semGenSize arbitrary s <--> Sa s) -> 
+    (semGenSize arbitrary s <--> Sb s) ->
+    (semGenSize arbitrary s <--> setX (Sa s) (Sb s)).
+Proof.
+  move => H1 H2 . rewrite semLiftGen2Size; move => [a b].
+  split. 
+  by move => [[a' b'] [[/= /H1 Ha /H2 Hb] [Heq1 Heq2]]]; subst; split.
+  move => [/H1 Ha /H2 Hb]. eexists; split; first by split; eauto.
+  reflexivity.
 Qed.
