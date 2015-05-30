@@ -45,6 +45,9 @@ Hypothesis semLiftGenSize :
   forall {A B} (f: A -> B) (g: G A) size,
     semGenSize (liftGen f g) size <--> f @: semGenSize g size.
 
+Declare Instance liftGenUnsized {A B} (f : A -> B) (g : G A) 
+        `{unsized _ g} : unsized (liftGen f g).
+
 Hypothesis semLiftGen2Size :
   forall {A1 A2 B} (f: A1 -> A2 -> B) (g1 : G A1) (g2 : G A2) s,
     semGenSize (liftGen2 f g1 g2) s <-->
@@ -56,15 +59,20 @@ Hypothesis semLiftGen2Unsized1 :
     semGen (liftGen2 f g1 g2) <--> f @2: (semGen g1, semGen g2).
 
 Hypothesis semLiftGen2Unsized2 :
-  forall {A1 A2 B} (f: A1 -> A2 -> B) (g1 : G A1) (g2 : G A2),
-    unsized g2 ->
+  forall {A1 A2 B} (f: A1 -> A2 -> B) (g1 : G A1) (g2 : G A2) `{unsized _ g2},
     semGen (liftGen2 f g1 g2) <--> f @2: (semGen g1, semGen g2).
 
 Hypothesis semLiftGen2SizeMonotonic :
   forall {A1 A2 B} (f: A1 -> A2 -> B)
-         (g1 : G A1) (g2 : G A2),
-  sizeMonotonic g1 -> sizeMonotonic g2 ->
+         (g1 : G A1) (g2 : G A2) `{sizeMonotonic _ g1} `{sizeMonotonic _ g2},
   semGen (liftGen2 f g1 g2) <--> f @2: (semGen g1, semGen g2).
+
+Declare Instance liftGen2Unsized {A1 A2 B} (f : A1 -> A2 -> B) (g1 : G A1)
+        `{unsized _ g1} (g2 : G A2) `{unsized _ g2} : unsized (liftGen2 f g1 g2).
+
+Declare Instance liftGen2Monotonic {A1 A2 B} (f : A1 -> A2 -> B) (g1 : G A1)
+        `{sizeMonotonic _ g1} (g2 : G A2) `{sizeMonotonic _ g2} : sizeMonotonic (liftGen2 f g1 g2).
+
 
 Hypothesis semLiftGen3Size :
 forall {A1 A2 A3 B} (f: A1 -> A2 -> A3 -> B)
@@ -106,10 +114,6 @@ Hypothesis semSequenceGenSizeMonotonic :
            [set l | length l = length gs /\
                     List.Forall2 semGen gs l].
 
-(* Hypothesis semFoldGen_left : *)
-(*   forall {A B : Type} (f : A -> B -> G A) (bs : list B) (a0 : A), *)
-(*     semGen (foldGen f bs a0) <--> *)
-(*     fold_left (fun g b => fun x => exists a, g a /\ semGen (f a b) x) bs (eq a0). *)
 
 Hypothesis semFoldGen_right :
   forall {A B : Type} (f : A -> B -> G A) (bs : list B) (a0 : A) (s : nat),
@@ -128,6 +132,7 @@ Hypothesis semOneofSize:
   forall {A} (l : list (G A)) (def : G A) s,
     (semGenSize (oneof def l) s) <-->
       if l is nil then semGenSize def s else \bigcup_(x in l) semGenSize x s.
+
 
 Hypothesis semFrequency:
   forall {A} (l : list (nat * G A)) (def : G A),
@@ -149,9 +154,14 @@ Hypothesis semVectorOfSize:
     [set l | length l = k /\ l \subset semGenSize g size].
 
 Hypothesis semVectorOfUnsized : 
-  forall {A} (g : G A) (k : nat),
-    unsized g -> 
+  forall {A} (g : G A) (k : nat) `{unsized _ g}, 
     semGen (vectorOf k g) <--> [set l | length l = k /\ l \subset semGen g ]. 
+
+Declare Instance vectorOfUnsized {A} (k : nat) (g : G A) 
+        `{unsized _ g } : unsized (vectorOf k g).
+
+Declare Instance vectorOfMonotonic {A} (k : nat) (g : G A) 
+        `{sizeMonotonic _ g } : sizeMonotonic (vectorOf k g).
 
 Hypothesis semListOfSize:
   forall (A : Type) (g : G A) (size : nat),
@@ -159,14 +169,11 @@ Hypothesis semListOfSize:
     [set l | length l <= size /\ l \subset semGenSize g size].
 
 Hypothesis semListOfUnsized: 
-  forall {A} (g : G A) (k : nat),
-    unsized g -> 
+  forall {A} (g : G A) (k : nat) `{unsized _ g}, 
     semGen (listOf g) <--> [set l | l \subset semGen g ]. 
 
-
-Hypothesis unsizedElements : 
-  forall {A} (def : A) (l : list A),
-    unsized (elements def l).
+Declare Instance listOfMonotonic {A} (g : G A) 
+        `{sizeMonotonic _ g } : sizeMonotonic (listOf g).
 
 Hypothesis semElements:
   forall {A} (l: list A) (def : A),
@@ -176,6 +183,7 @@ Hypothesis semElementsSize:
   forall {A} (l: list A) (def : A) s,
     (semGenSize (elements def l) s) <--> if l is nil then [set def] else l.
 
+Declare Instance elementsUnsized {A} {def : A} (l : list A)  : unsized (elements def l).
 
 Definition genPair {A B : Type} (ga : G A) (gb : G B) : G (A * B) :=
   liftGen2 pair ga gb.
@@ -221,8 +229,14 @@ Import QcDefaultNotation. Open Scope qc_scope.
 Hypothesis semElemsSize : forall A (x : A) xs s,
   semGenSize (elems (x ;; xs)) s <--> x :: xs.
 
+Hypothesis semElems : forall A (x : A) xs,
+  semGen (elems (x ;; xs)) <--> x :: xs.
+
 Hypothesis semOneOfSize : forall A (g0 : G A) (gs : list (G A)) s,
   semGenSize (oneOf (g0 ;; gs)) s  <--> \bigcup_(g in (g0 :: gs)) semGenSize g s.
+
+Hypothesis semOneOf : forall A (g0 : G A) (gs : list (G A)),
+  semGen (oneOf (g0 ;; gs))  <--> \bigcup_(g in (g0 :: gs)) semGen g.
 
 End GenHighInterface.
 
@@ -320,8 +334,8 @@ Definition elements {A : Type} (def : A) (l : list A) :=
 Lemma semLiftGen {A B} (f: A -> B) (g: G A) :
   semGen (liftGen f g) <--> f @: semGen g.
 Proof.
-rewrite imset_bigcup; apply: eq_bigcupr => size.
-by rewrite semBindSize (eq_bigcupr _ (fun a => semReturnSize (f a) size)).
+  rewrite imset_bigcup. apply: eq_bigcupr => size.
+    by rewrite semBindSize (eq_bigcupr _ (fun a => semReturnSize (f a) size)).
 Qed.
 
 Ltac solveLiftGenX :=
@@ -337,12 +351,23 @@ repeat
   | repeat (apply semBindSize; eexists; split; try eassumption);
       by apply semReturnSize ].
 
-Lemma semLiftGenSize :
-  forall {A B} (f: A -> B) (g: G A) size,
-    semGenSize (liftGen f g) size <-->
-    fun b =>
-    exists a, semGenSize g size a /\ f a = b.
-Proof. solveLiftGenX. Qed.
+Lemma semLiftGenSize {A B} (f: A -> B) (g: G A) size :
+  semGenSize (liftGen f g) size <--> f @: (semGenSize g size).
+Proof. 
+    by rewrite semBindSize (eq_bigcupr _ (fun a => semReturnSize (f a) size)).
+ Qed.
+
+Program Instance liftGenUnsized {A B} (f : A -> B) (g : G A) 
+        `{unsized _ g} : unsized (liftGen f g).
+Next Obligation.
+  by rewrite ! semLiftGenSize (unsized_def s1 s2).
+Qed.
+
+Program Instance liftGenMonotonic {A B} (f : A -> B) (g : G A) 
+        `{sizeMonotonic _ g} : sizeMonotonic (liftGen f g).
+Next Obligation.
+  rewrite ! semLiftGenSize. apply imset_incl. by apply monotonic_def.
+Qed.
 
 Lemma semLiftGen2Size {A1 A2 B} (f: A1 -> A2 -> B) (g1 : G A1) (g2 : G A2) s :
   semGenSize (liftGen2 f g1 g2) s <-->
@@ -352,29 +377,30 @@ Proof.
     by rewrite semBindSize; apply: eq_bigcupr => y; rewrite semReturnSize.
 Qed.
 
+
+
 Lemma semLiftGen2SizeMonotonic {A1 A2 B} (f: A1 -> A2 -> B)
-                               (g1 : G A1) (g2 : G A2) :
-  sizeMonotonic g1 -> sizeMonotonic g2 ->
+                               (g1 : G A1) (g2 : G A2) 
+                               `{sizeMonotonic _ g1} `{sizeMonotonic _ g2} :
   semGen (liftGen2 f g1 g2) <--> f @2: (semGen g1, semGen g2).
 Proof.
-  rewrite /sizeMonotonic /semGen => H1 H2. setoid_rewrite semLiftGen2Size.
+  rewrite /semGen. setoid_rewrite semLiftGen2Size.
   move => b. split. 
   - move => [sb [_ Hb]]. (* point-free reasoning would be nice here *)
     destruct Hb as [a [[Hb11 Hb12] Hb2]]. exists a. split; [| by apply Hb2].
     split; eexists; by split; [| eassumption].
   - move => [[a1 a2] [[[s1 [_ G1]] [s2 [_ G2]]] Hf]]. compute in Hf.
     exists (max s1 s2). split; first by [].
-    exists (a1,a2). split; last by []. split; simpl in *.
-    eapply H1; last eassumption. by apply/leP; apply Max.le_max_l.
-    eapply H2; last eassumption. by apply/leP; apply Max.le_max_r.
+    exists (a1,a2). split; last by []. split => /=;
+    (eapply monotonic_def; last eassumption); 
+    apply/leP; solve [ apply Max.le_max_l | apply Max.le_max_r ].
 Qed.
 
 Lemma semLiftGen2Unsized1 {A1 A2 B} (f: A1 -> A2 -> B)
-      (g1 : G A1) (g2 : G A2) :
-  unsized g1 ->
+      (g1 : G A1) (g2 : G A2) `{unsized _ g1}:
   semGen (liftGen2 f g1 g2) <--> f @2: (semGen g1, semGen g2).
 Proof.
-  move=> H. rewrite /semGen. setoid_rewrite semLiftGen2Size.
+  rewrite /semGen. setoid_rewrite semLiftGen2Size.
   move=> b. split.
   - move => [n [_ [[a1 a2] [[/= H2 H3] H4]]]]. exists (a1, a2).
     split; auto; split; eexists; split; eauto; reflexivity.
@@ -382,15 +408,14 @@ Proof.
     eexists. split; first by eauto. 
     exists (a1, a2); split; eauto.
     split; last by eauto. simpl. 
-    apply (unsized_def2 H) in H2'; eauto; apply (unsized_def2 H); eauto.
+    eapply unsized_def; eauto; apply (unsized_def2 H); eauto.
 Qed.
   
 Lemma semLiftGen2Unsized2 {A1 A2 B} (f: A1 -> A2 -> B)
-      (g1 : G A1) (g2 : G A2) :
-  unsized g2 ->
+      (g1 : G A1) (g2 : G A2) `{unsized _ g2}:
   semGen (liftGen2 f g1 g2) <--> f @2: (semGen g1, semGen g2).
 Proof.
-  move=> H. rewrite /semGen. setoid_rewrite semLiftGen2Size.
+  rewrite /semGen. setoid_rewrite semLiftGen2Size.
   move=> b. split. 
   - move => [n [_ [[a1 a2] [[/= H2 H3] H4]]]]. exists (a1, a2).
     split; auto; split; eexists; split; eauto; reflexivity.
@@ -398,7 +423,7 @@ Proof.
     eexists. split; first by auto.
     exists (a1, a2). split; eauto.
     split; first by eauto. simpl. 
-    apply (unsized_def2 H) in H3'; eauto; apply (unsized_def2 H); eauto.
+    eapply unsized_def; eauto.
 Qed.
 
 Lemma semLiftGen3Size :
@@ -411,6 +436,23 @@ forall {A1 A2 A3 B} (f: A1 -> A2 -> A3 -> B)
                            (exists a3, semGenSize g3 size a3 /\
                                        (f a1 a2 a3) = b)).
 Proof. solveLiftGenX. Qed.
+
+Program Instance liftGen2Unsized {A1 A2 B} (f : A1 -> A2 -> B) (g1 : G A1)
+        `{unsized _ g1} (g2 : G A2) `{unsized _ g2} : unsized (liftGen2 f g1 g2).
+Next Obligation.
+  rewrite ! semLiftGen2Size. 
+  rewrite ! curry_imset2l. by setoid_rewrite (unsized_def s1 s2).
+Qed.
+
+Program Instance liftGen2Monotonic {A1 A2 B} (f : A1 -> A2 -> B) (g1 : G A1)
+        `{sizeMonotonic _ g1} (g2 : G A2) `{sizeMonotonic _ g2} : 
+  sizeMonotonic (liftGen2 f g1 g2).
+Next Obligation.
+  rewrite ! semLiftGen2Size. rewrite ! curry_imset2l. 
+  move => b [a1 [Ha1 [a2 [Ha2 <-]]]].
+  do 2 (eexists; split; first by eapply (monotonic_def H1); eauto).
+  reflexivity.
+Qed.
 
 (* CH: Made this more beautiful than the rest *)
 (* CH: Should anyway use dependent types for a generic liftGenN *)
@@ -526,21 +568,35 @@ split=> [[y [gen_y [l' [[length_l' ?] [<- <-]]]]]|] /=.
   exact/subconsset.
 by case=> [[?]] /subconsset [? ?]; exists x; split => //; exists l.
 Qed.
-Lemma semVectorOfUnsized {A} (g : G A) (k : nat) :
-  unsized g -> 
+
+Lemma semVectorOfUnsized {A} (g : G A) (k : nat) `{unsized _ g}: 
   semGen (vectorOf k g) <--> [set l | length l = k /\ l \subset semGen g ]. 
 Proof.
-  rewrite /sizeMonotonic /semGen => H.
-  setoid_rewrite semVectorOfSize. 
+  rewrite /semGen.
+  setoid_rewrite semVectorOfSize.
   move => l; split.
   - move => [k' [_ [H1 H2]]]. split; auto. exists k'. split; auto.
     reflexivity.
   - move => [H1 H2]. 
-    setoid_rewrite (unsized_def2 H) in H2.
-    rewrite -> bigcup_const in H2; eauto.
     exists k. split; first by reflexivity.
-    split; auto. rewrite unsized_def2; auto.
+    split; auto. move => a /H2 [x [_ Hx]]. 
+    by eapply unsized_def; eauto.
 Qed.
+
+Program Instance vectorOfUnsized {A} (k : nat) (g : G A) 
+        `{unsized _ g } : unsized (vectorOf k g).
+Next Obligation.
+  rewrite ! semVectorOfSize. 
+  split; move => [H1 H2]; split => //; by rewrite unsized_def; eauto.
+Qed.
+
+Program Instance vectorOfMonotonic {A} (k : nat) (g : G A) 
+        `{sizeMonotonic _ g } : sizeMonotonic (vectorOf k g).
+Next Obligation.
+  rewrite ! semVectorOfSize. 
+  move => l [H1 H2]; split => // a Ha. by eapply (monotonic_def H0); eauto.
+Qed.
+
 
 Lemma semListOfSize {A : Type} (g : G A) size :
   semGenSize (listOf g) size <-->
@@ -551,20 +607,24 @@ rewrite semChooseSize // => l; split=> [[n [/andP [_ ?] [-> ?]]]| [? ?]] //.
 by exists (length l).
 Qed.
 
-Lemma semListOfUnsized {A} (g : G A) (k : nat) :
-  unsized g -> 
+Lemma semListOfUnsized {A} (g : G A) (k : nat) `{unsized _ g} : 
   semGen (listOf g) <--> [set l | l \subset semGen g ]. 
 Proof.
-  rewrite /sizeMonotonic /semGen => H.
+  rewrite /semGen.
   setoid_rewrite semListOfSize. 
   move => l; split.
   - move => [k' [_ [H1 H2]]]. exists k'. split; auto.
     reflexivity.
-  - move => H1.
-    setoid_rewrite (unsized_def2 H) in H1.
-    rewrite -> bigcup_const in H1; eauto.
-    exists (length l). split; first by reflexivity.
-    split; auto. rewrite unsized_def2; auto.
+  - move => Hl. exists (length l). repeat split => //.
+    move => a /Hl [s [_ Ha]]. by eapply unsized_def; eauto.
+Qed.
+
+Program Instance listOfMonotonic {A} (g : G A) 
+        `{sizeMonotonic _ g } : sizeMonotonic (listOf g).
+Next Obligation.
+  rewrite ! semListOfSize.
+  move => l [H1 H2]; split => //. by eapply leq_trans; eauto.
+  move => a /H2 Ha. by eapply monotonic_def; eauto.
 Qed.
 
 
@@ -606,16 +666,6 @@ by case: l => [|g l]; rewrite 1?bigcupC; apply: eq_bigcupr => sz;
   apply: semOneofSize.
 Qed.
 
-Lemma unsizedElements : 
-  forall {A} (def : A) (l : list A),
-    unsized (elements def l).
-Proof.
-  intros. unfold unsized, elements. intros s1 s2; split;
-  move/semBindSize => [n [/semChooseSize H1 /semReturnSize H2]];  
-  apply semBindSize; exists n; split; auto;
-  try apply /semChooseSize; auto; apply semReturnSize; auto.
-Qed.
-
 (* begin semElementsSize *)
 Lemma semElementsSize {A} (l: list A) (def : A) s :
   semGenSize (elements def l) s <--> if l is nil then [set def] else l.
@@ -637,6 +687,12 @@ Lemma semElements {A} (l: list A) (def : A) :
 Proof.
 rewrite /semGen; setoid_rewrite semElementsSize; rewrite bigcup_const //.
 by do 2! constructor.
+Qed.
+
+Program Instance elementsUnsized {A} {def : A} (l : list A) : 
+  unsized (elements def l).
+Next Obligation.
+  rewrite ! semElementsSize. by case: l.
 Qed.
 
 (* A rather long frequency proof, probably we can do better *)
@@ -852,6 +908,15 @@ Lemma semOneOfSize A (g0 : G A) (gs : list (G A)) s :
 (* end semOneOfSize *)
 Proof. rewrite semOneofSize. reflexivity. Qed.
 
+Lemma semElems A (x : A) xs :
+  semGen (elems (x ;; xs)) <--> x :: xs.
+Proof. by rewrite semElements. Qed.
+
+Lemma semOneOf A (g0 : G A) (gs : list (G A)) :
+  semGen (oneOf (g0 ;; gs))  <--> \bigcup_(g in (g0 :: gs)) semGen g.
+Proof. by rewrite semOneof. Qed.
+
+
 (* Operators like betterSized (better name pending) are guaranteed to
    produce size-monotonic generators (provided the body has this
    property). Note: this doesn't hold for sized! *)
@@ -859,15 +924,15 @@ Proof. rewrite semOneofSize. reflexivity. Qed.
 Definition betterSized {A} (f : nat -> G A) :=
   sized (fun x => bindGen (choose (0, x)) f).
 
-Lemma betterSizedIndeedBetter {A} (f : nat -> G A) :
-  (forall s, sizeMonotonic (f s)) ->
+Program Instance betterSizedIndeedBetter {A} (f : nat -> G A) 
+        (H: forall s, sizeMonotonic (f s)) :
   sizeMonotonic (betterSized f).
-Proof.
-  rewrite /betterSized /sizeMonotonic => Hu s1 s2 H.
+Next Obligation.
+  rewrite /betterSized . 
   rewrite !semSizedSize !semBindSize !semChooseSize; last by []; last by [].
-  move => a [s1' [H11 H12]].
-  eexists. split; last by (apply (Hu s1' s1 s2 H a) in H12; eassumption).
-  apply /andP. split. by []. eapply leq_trans; last eassumption. by [].
+  move => a [s1' [/andP [_ H11] H12]].
+  eexists. split; last by eapply monotonic_def; eauto. 
+  apply/andP; split => //. by eapply leq_trans; eauto. 
 Qed.
 
 End GenHigh.

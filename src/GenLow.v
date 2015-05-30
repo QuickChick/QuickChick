@@ -58,28 +58,33 @@ Definition semGenSize {A : Type} (g : G A) (size : nat) : set A :=
 Definition semGen {A : Type} (g : G A) : set A :=
   \bigcup_size semGenSize g size.
 
-(* Definitions for size characterization of generators *)
-Definition sizeMonotonic {A : Type} (g : G A) : Prop :=
-  forall s1 s2, s1 <= s2 -> semGenSize g s1 \subset semGenSize g s2.
+(* Size characterization of generators *)
+Class unsized {A} (g : G A) :=
+  { 
+    unsized_def : 
+      forall s1 s2, (semGenSize g s1 <--> semGenSize g s2)
+  }.
 
-Definition unsized {A : Type} (g : G A) : Prop :=
-  forall s1 s2, (semGenSize g s1 <--> semGenSize g s2).
+Class sizeMonotonic {A} (g : G A) :=
+  { 
+    monotonic_def : 
+      forall s1 s2, s1 <= s2 -> semGenSize g s1 \subset semGenSize g s2
+  }.
 
-Hypothesis unsizedSizeMonotonic : 
-  forall {A} (g : G A), unsized g -> sizeMonotonic g.
+Declare Instance unsizedMonotonic {A} (g : G A) { _ : unsized  g } : sizeMonotonic g.
 
-Hypothesis unsized_def2 : 
-  forall A (g : G A),
-    unsized g ->
-    forall s, semGenSize g s <--> semGen g.
+Hypothesis unsized_alt_def : 
+  forall A (g : G A) `{unsized _ g},
+  forall s, semGenSize g s <--> semGen g.
 
 (* Set of outcomes characterization of generators *)
 Hypothesis semReturn :
   forall A (x : A), semGen (returnGen x) <--> [set x].
 Hypothesis semReturnSize :
   forall A (x : A) size, semGenSize (returnGen x) size <--> [set x].
-Hypothesis unsizedReturn :
-  forall A (x : A) , unsized (returnGen x).
+
+Declare Instance unsizedReturn {A} (x : A) : unsized (returnGen x).
+
 
 Hypothesis semBindSize :
   forall A B (g : G A) (f : A -> G B) (size : nat),
@@ -97,21 +102,26 @@ Hypothesis monad_assoc:
     semGen (bindGen (bindGen ga fb) fc) <--> 
     semGen (bindGen ga (fun a => bindGen (fb a) fc)).
 
+(* I'm not sure how this universal quantifier will behave *)
+Declare Instance bindUnsized
+        {A B} (g : G A) (f : A -> G B) `{unsized _ g} `{forall x, unsized (f x)} : 
+  unsized (bindGen g f).
+
+Declare Instance bindMonotonic
+        {A B} (g : G A) (f : A -> G B) `{sizeMonotonic _ g} `{forall x, sizeMonotonic (f x)} : 
+  sizeMonotonic (bindGen g f).
 
 Hypothesis semBindUnsized1 :
-  forall A B (g : G A) (f : A -> G B),
-    unsized g ->
+  forall A B (g : G A) (f : A -> G B) `{unsized _ g},
     semGen (bindGen g f) <--> \bigcup_(a in semGen g) semGen (f a).
 
 Hypothesis semBindUnsized2 :
-  forall A B (g : G A) (f : A -> G B),
-    (forall a, unsized (f a)) ->
+  forall A B (g : G A) (f : A -> G B) `{forall a, unsized (f a)},
     semGen (bindGen g f) <--> \bigcup_(a in semGen g) semGen (f a).
 
 Hypothesis semBindSizeMonotonic :
-  forall {A B} (g : G A) (f : A -> G B),
-    sizeMonotonic g ->
-    (forall a, sizeMonotonic (f a)) ->
+  forall {A B} (g : G A) (f : A -> G B)
+         `{sizeMonotonic _ g} `{forall a, sizeMonotonic (f a)},
     semGen (bindGen g f) <--> \bigcup_(a in semGen g) semGen (f a).
 
 Hypothesis semFmap :
@@ -121,10 +131,12 @@ Hypothesis semFmapSize :
   forall A B (f : A -> B) (g : G A) (size : nat),
     semGenSize (fmap f g) size <--> f @: semGenSize g size.
 
+Declare Instance fmapUnsized {A B} (f : A -> B) (g : G A) `{unsized _ g} : 
+  unsized (fmap f g).
 
-Hypothesis unsizedChoose : 
-  forall  A `{Random A} (a1 a2 : A),
-    unsized (choose (a1, a2)).
+Declare Instance fmapMonotonic
+        {A B} (f : A -> B) (g : G A) `{sizeMonotonic _ g} : 
+  sizeMonotonic (fmap f g).
 
 Hypothesis semChoose :
   forall A `{Random A} (a1 a2 : A), Random.leq a1 a2 ->
@@ -136,6 +148,9 @@ Hypothesis semChooseSize :
     forall size, (semGenSize (choose (a1,a2)) size <-->
     [set a | Random.leq a1 a && Random.leq a a2]).
 
+Declare Instance chooseUnsized A `{Random A} (a1 a2 : A) : 
+  unsized (choose (a1, a2)).
+
 Hypothesis semSized :
   forall A (f : nat -> G A),
     semGen (sized f) <--> \bigcup_s semGenSize (f s) s.
@@ -144,11 +159,13 @@ Hypothesis semSizedSize :
   forall A (f : nat -> G A) s,
     semGenSize (sized f) s <--> semGenSize (f s) s.
 
-Hypothesis unsizedResize :
-  forall A n (g : G A) , unsized (resize n g).
 Hypothesis semResize :
   forall A (n : nat) (g : G A),
     semGen (resize n g) <--> semGenSize g n.
+
+Declare Instance unsizedResize {A} (g : G A) n : 
+  unsized (resize n g).
+
 
 (* TODO: We need completeness as well - this is not exact *)
 Hypothesis semSuchThatMaybe_sound:
@@ -283,32 +300,43 @@ Definition semGenSize {A : Type} (g : G A) (s : nat) : set A := codom (run g s).
 Definition semGen {A : Type} (g : G A) : set A := \bigcup_s semGenSize g s.
 (* end semGen *)
 
- 
+  
 (* An important property of generators is size-monotonicity;
    sized-monotonic generators compose better *)
-Definition sizeMonotonic {A : Type} (g : G A) : Prop :=
-  forall s1 s2, s1 <= s2 -> semGenSize g s1 \subset semGenSize g s2.
 
-Definition unsized {A : Type} (g : G A) : Prop :=
-  forall s1 s2, (semGenSize g s1 <--> semGenSize g s2).
+Class unsized {A} (g : G A) :=
+  { 
+    unsized_def : 
+      forall s1 s2, (semGenSize g s1 <--> semGenSize g s2)
+  }.
+
+Class sizeMonotonic {A} (g : G A) :=
+  { 
+    monotonic_def : 
+      forall s1 s2, s1 <= s2 -> semGenSize g s1 \subset semGenSize g s2
+  }.
 
 (* unsizedness trivially implies size-monotonicity *)
-Lemma unsizedSizeMonotonic A (g : G A) :
-  unsized g -> sizeMonotonic g.
-Proof.
-  rewrite /unsized /sizeMonotonic => H s1 s2 H12 a.
-    by destruct (H s1 s2 a) as [H1 H2].
+Program Instance unsizedMonotonic {A} (g : G A) { _ : unsized  g } : sizeMonotonic g. 
+Next Obligation.
+  rewrite /unsized_def /monotonic_def => a H12.
+    by destruct (unsized_def s1 s2 a) as [H1 H2]; eauto.
 Qed.
 
-(* another characterization of unsized *)
-Lemma unsized_def2 : forall A (g : G A),
-  unsized g ->
-  forall s, semGenSize g s <--> semGen g.
+Lemma unsized_alt_def :
+  forall A (g : G A) `{unsized _ g},
+    forall s, semGenSize g s <--> semGen g.
 Proof.
-  intros. unfold semGen. intros a.
-  split; intros H'.
-  - exists s. split; by [].
-  - destruct H' as [s' [_ H']]. by rewrite (H s s' a).
+  move => A f H s a. split.
+  move => H'. exists s. split; auto => //.
+  move => [s' [_ H']]. eapply unsized_def; eauto.
+Qed.
+
+Lemma semReturn A (x : A) : semGen (returnGen x) <--> [set x].
+Proof.
+  rewrite /semGen /semGenSize /= bigcup_const ?codom_const //.
+          exact: randomSeed_inhabited.
+    by do 2! constructor.
 Qed.
 
 (* begin semReturnSize *)
@@ -318,16 +346,9 @@ Proof.
 by rewrite /semGenSize /= codom_const //; apply: randomSeed_inhabited.
 Qed.
 
-Lemma semReturn A (x : A) : semGen (returnGen x) <--> [set x].
-Proof.
-rewrite /semGen /semGenSize /= bigcup_const ?codom_const //.
-  exact: randomSeed_inhabited.
-by do 2! constructor.
-Qed.
-
-Lemma unsizedReturn A (x : A) : unsized (returnGen x).
-Proof. 
-  unfold unsized. intros s1 s2 x'. by split.
+Program Instance unsizedReturn {A} (x : A) : unsized (returnGen x).
+Next Obligation.
+  by rewrite ! semReturnSize; split; auto.
 Qed.
 
 
@@ -339,10 +360,6 @@ Proof.
 rewrite /semGenSize /bindGen /= bigcup_codom -curry_codom2l.
 by rewrite -[codom (prod_curry _)]imsetT -randomSplit_codom -codom_comp.
 Qed.
-
-Lemma semFmapSize A B (f : A -> B) (g : G A) (size : nat) :
-  semGenSize (fmap f g) size <--> f @: semGenSize g size.
-Proof. by rewrite /fmap /semGenSize /= codom_comp. Qed.
 
 Lemma monad_leftid A B (a : A) (f : A -> G B) :
   semGen (bindGen (returnGen a) f) <--> semGen (f a).
@@ -361,9 +378,24 @@ Lemma monad_assoc A B C (ga : G A) (fb : A -> G B) (fc : B -> G C) :
   semGen (bindGen (bindGen ga fb) fc) <--> 
   semGen (bindGen ga (fun a => bindGen (fb a) fc)).
 Proof.
-(* Why can't we iterate here? *)
-apply eq_bigcupr => ?; rewrite !semBindSize ?bigcup_flatten.
-by apply eq_bigcupr => ?; rewrite !semBindSize ?bigcup_flatten.
+  apply eq_bigcupr => ?; rewrite !semBindSize ?bigcup_flatten.
+    by apply eq_bigcupr => ?; rewrite !semBindSize ?bigcup_flatten.
+Qed.
+
+Program Instance bindUnsized
+        {A B} (g : G A) (f : A -> G B) `{unsized _ g} `{forall x, unsized (f x)} : 
+  unsized (bindGen g f).
+Next Obligation.
+  rewrite !semBindSize !unsized_alt_def. move => b. 
+  split; move => [a [H1 H2]]; exists a; split => //; by eapply unsized_def; eauto.
+Qed.
+
+Program Instance bindMonotonic
+        {A B} (g : G A) (f : A -> G B) `{sizeMonotonic _ g} `{forall x, sizeMonotonic (f x)} : 
+  sizeMonotonic (bindGen g f).
+Next Obligation.
+  rewrite !semBindSize. move => b.
+  move => [a [H3 H4]]; exists a; split => //; eapply monotonic_def; eauto.
 Qed.
 
 Lemma semBindUnsized1 :
@@ -373,7 +405,7 @@ Lemma semBindUnsized1 :
 Proof.
   move => A B g f H.
   rewrite /semGen. setoid_rewrite semBindSize.
-  setoid_rewrite (unsized_def2 H). move => b. split.
+  setoid_rewrite (@unsized_alt_def A g H). move => b. split.
   - intros [s [_ [a [H1 H2]]]].
     exists a. split; exists s; split; by [].
   - intros [a [[s1 [_ H1]] [s2 [_ H2]]]]. 
@@ -393,8 +425,8 @@ Proof.
     exists a. split; exists s; split => //. 
   - intros [a [[s1 [_ H1]] [s2 [_  H2]]]].
     exists s1. split; first by []. exists a. 
-    split; first by []. apply (unsized_def2 (H a)).
-    now apply (unsized_def2 (H a)) in H2.
+    split; first by []; apply unsized_alt_def; eauto.
+    by eapply unsized_alt_def; eauto.
 Qed.
 
 Lemma semBindSizeMonotonic {A B} (g : G A) (f : A -> G B) :
@@ -415,17 +447,31 @@ Proof.
 Qed.
 
 
+Lemma semFmapSize A B (f : A -> B) (g : G A) (size : nat) :
+  semGenSize (fmap f g) size <--> f @: semGenSize g size.
+Proof. by rewrite /fmap /semGenSize /= codom_comp. Qed.
+
 Lemma semFmap A B (f : A -> B) (g : G A) :
   semGen (fmap f g) <--> f @: semGen g.
 Proof.
   by rewrite imset_bigcup /semGen (eq_bigcupr _ (semFmapSize _ _)).
 Qed.
 
-Lemma unsizedChoose  A `{Random A} (a1 a2 : A) :
-  unsized (choose (a1, a2)).
-Proof.
-  rewrite /unsized /semGenSize. reflexivity.
+Program Instance fmapUnsized {A B} (f : A -> B) (g : G A) `{unsized _ g} : 
+  unsized (fmap f g).
+Next Obligation.
+  rewrite !semFmapSize. move => b.
+  by split; move => [a [H1 <-]]; eexists; split; eauto => //; eapply unsized_def; eauto.
 Qed.
+
+Program Instance fmapMonotonic
+        {A B} (f : A -> B) (g : G A) `{sizeMonotonic _ g} : 
+  sizeMonotonic (fmap f g).
+Next Obligation.
+  rewrite !semFmapSize. move => b.
+  move => [a [H1 <-]]; eexists; split; eauto => //; eapply monotonic_def; eauto.
+Qed.
+
 
 Lemma semChooseSize A `{Random A} (a1 a2 : A) :
   Random.leq a1 a2 ->
@@ -433,12 +479,16 @@ Lemma semChooseSize A `{Random A} (a1 a2 : A) :
     [set a | Random.leq a1 a && Random.leq a a2].
 Proof. by move=> /= le_a1a2 m n; rewrite (randomRCorrect n a1 a2). Qed.
 
+Program Instance chooseUnsized {A} `{Random A} (a1 a2 : A) : 
+  unsized (choose (a1, a2)).
+Next Obligation. by []. Qed.
+
 Lemma semChoose A `{Random A} (a1 a2 : A) : Random.leq a1 a2 ->
   (semGen (choose (a1,a2)) <-->
   [set a | Random.leq a1 a && Random.leq a a2]).
 Proof. 
-  move=> /= le_a1a2. rewrite <- (unsized_def2 (unsizedChoose a1 a2) 0).  
-  move => m /=. rewrite (randomRCorrect m a1 a2) //. 
+  move=> /= le_a1a2. rewrite <- (unsized_alt_def 1).
+  move => m /=. rewrite (randomRCorrect m a1 a2) //.
 Qed.
 
 Lemma semSized A (f : nat -> G A) :
@@ -455,10 +505,10 @@ Proof.
 by case: g => g; rewrite /semGen /semGenSize /= bigcup_const.
 Qed.
 
-Lemma unsizedResize :
-  forall A n (g : G A) , unsized (resize n g).
-Proof.
-  move=> A n g. rewrite /unsized /resize /semGenSize => s1 s2.
+Program Instance unsizedResize {A} (g : G A) n : 
+  unsized (resize n g).
+Next Obligation.
+  rewrite /unsized /resize /semGenSize.
   destruct g; split; auto.
 Qed.
 
