@@ -33,3 +33,6 @@ clean:
          # This might not work on macs, but then not my problem
 	find . -regex ".*\.vo\|.*\.d\|.*\.glob\|.*\.o\|.*\.cmi\|.*\.cmx\|.*\.cmxs\|.*\.cmo\|.*\.bak\|.*~" -type f -delete
 	rm -f Makefile.coq
+
+bc:
+	coqwc src/*.v
