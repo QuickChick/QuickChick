@@ -48,11 +48,11 @@ Require Import Gen.
 Definition test0 :=
   showResult (quickCheck ((@silly_checker Gen _) : Gen QProp)).
 
-QuickCheck test0.
+QuickChick test0.
 
 (* Automatically deriving the checker *)
 
 Definition test1 :=
   showResult (quickCheck (silly_prop)).
 
-QuickCheck test1.
+QuickChick test1.
