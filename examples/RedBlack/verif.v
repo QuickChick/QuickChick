@@ -244,10 +244,8 @@ Proof.
     simpl. rewrite -> semImplication. rewrite semCheckableBool.
     intro irb. apply /is_redblackP. apply H. by apply /is_redblackP.
   - (* TODO : fix instances so that this is automatically inferred *) 
-    simpl. move=> [n t]. constructor. move => s1 s2.
-    rewrite /genChecker !semFmapSize. apply imset_eq.
-    simpl. destruct (is_redblack_bool t); simpl in *;
-    by rewrite ! semReturnSize. 
+    move=> [n t]. simpl. apply usizedImplication.
+    apply boolUnsized.
 Qed.
 
 (* unsizedChecker proof *)
