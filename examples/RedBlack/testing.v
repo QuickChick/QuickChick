@@ -96,7 +96,7 @@ Definition genAnyTree : G tree := sized genAnyTree_depth.
 
 Extract Constant defSize => "10".
 (* begin QC_naive *)
-QuickCheck (insert_preserves_redblack_checker genAnyTree).
+QuickChick (insert_preserves_redblack_checker genAnyTree).
 (* end QC_naive *)
 
 (* gathering some size statistics *)
@@ -113,7 +113,7 @@ Definition insert_preserves_redblack_checker_size (genTree : G tree) : Checker :
 
 (*
 Extract Constant Test.defNumTests => "100000".
-QuickCheck (insert_preserves_redblack_checker_size genAnyTree).
+QuickChick (insert_preserves_redblack_checker_size genAnyTree).
 *)
 
 Module DoNotation.
@@ -225,10 +225,10 @@ Definition testInsert :=
 
 Extract Constant defSize => "10".
 (* begin QC_good *)
-QuickCheck (insert_preserves_redblack_checker genRBTree).
+QuickChick (insert_preserves_redblack_checker genRBTree).
 (* end QC_good *)
 
 (* gathering some size statistics
 Extract Constant Test.defNumTests => "100000".
-QuickCheck (insert_preserves_redblack_checker_size genRBTree).
+QuickChick (insert_preserves_redblack_checker_size genRBTree).
 *)

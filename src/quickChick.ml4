@@ -130,12 +130,27 @@ VERNAC COMMAND EXTEND QuickCheck
   | ["QuickCheckWith" constr(c1) constr(c2)] ->     [run quickCheck [c1;c2]]
 END;;
 
+VERNAC COMMAND EXTEND QuickChick
+  | ["QuickChick" constr(c)] ->     [run quickCheck [c]]
+  | ["QuickChickWith" constr(c1) constr(c2)] ->     [run quickCheck [c1;c2]]
+END;;
+
 VERNAC COMMAND EXTEND MutateCheck
   | ["MutateCheck" constr(c1) constr(c2)] ->     [run mutateCheck [c1;c2]]
   | ["MutateCheckWith" constr(c1) constr(c2) constr(c3)] ->     [run mutateCheckWith [c1;c2;c3]]
 END;;
 
+VERNAC COMMAND EXTEND MutateChick
+  | ["MutateChick" constr(c1) constr(c2)] ->     [run mutateCheck [c1;c2]]
+  | ["MutateChickWith" constr(c1) constr(c2) constr(c3)] ->     [run mutateCheckWith [c1;c2;c3]]
+END;;
+
 VERNAC COMMAND EXTEND MutateCheckMany
   | ["MutateCheckMany" constr(c1) constr(c2)] ->     [run mutateCheckMany [c1;c2]]
   | ["MutateCheckManyWith" constr(c1) constr(c2) constr(c3)] ->     [run mutateCheckMany [c1;c2;c3]]
+END;;
+
+VERNAC COMMAND EXTEND MutateChickMany
+  | ["MutateChickMany" constr(c1) constr(c2)] ->     [run mutateCheckMany [c1;c2]]
+  | ["MutateChickManyWith" constr(c1) constr(c2) constr(c3)] ->     [run mutateCheckMany [c1;c2;c3]]
 END;;
