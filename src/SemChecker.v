@@ -360,7 +360,7 @@ Proof.
 Qed.
 
 Lemma semBindGenUsinzed2 {A} (gen : G A) (f : A -> Checker) 
-      `(forall a, unsizedChecker (f a)) :
+      `{forall a, unsizedChecker (f a)} :
     (semChecker (bindGen gen f) <->
      forall a, semGen gen a -> semChecker (f a)).
 Proof.
@@ -373,7 +373,7 @@ Qed.
 
 Lemma semBindGenSizeMonotonic {A} (gen : G A) (f : A -> Checker)
   `{sizeMonotonic _ gen}  
-  `(forall a, sizeMonotonicChecker (f a)) :
+  `{forall a, sizeMonotonicChecker (f a)} :
   (semChecker (bindGen gen f) <->
    forall a, semGen gen a -> semChecker (f a)).
 Proof.
@@ -430,7 +430,7 @@ Qed.
 
 (* begin semForAll *)
 Lemma semForAllUnsized2 {A C} `{Show A, Checkable C} (g : G A) (f : A -> C)
-  `(forall a, unsizedChecker (checker (f a))) :
+      `{forall a, unsizedChecker (checker (f a))} :
   (semChecker (forAll g f) <->
    forall (a : A), a \in semGen g -> semCheckable (f a)).
 (* end semForAll *)
@@ -445,7 +445,7 @@ Qed.
 
 Lemma semForAllSizeMonotonic {A C} `{Show A, Checkable C} (g : G A) (f : A -> C)
   `{sizeMonotonic _ g} 
-  `(forall a, sizeMonotonicChecker (checker (f a))) :
+  `{forall a, sizeMonotonicChecker (checker (f a))} :
   (semChecker (forAll g f) <->
    forall (a : A), a \in semGen g -> semCheckable (f a)).
 Proof.
@@ -574,7 +574,7 @@ Qed.
 Lemma semForAllShrinkUnsized2 :
   forall {A C} `{Checkable C} `{Show A}
          (gen : G A) (f : A -> C) shrinker
-  `(forall a, unsizedChecker (checker (f a))),
+  `{forall a, unsizedChecker (checker (f a))},
   (semChecker (forAllShrink gen shrinker f) <->
      forall a : A, semGen gen a -> semCheckable (f a)).
 Proof.
@@ -741,6 +741,10 @@ Proof.
   move => C H f s. rewrite /semCheckableSize {2}/checker /testPolyFun.
   by rewrite semPrintTestCase_idSize.
 Qed.
+
+Program Instance uncurryUsized {A B} (f : A -> B -> Checker) p
+        `{unsizedChecker (f (fst p) (snd p))} : unsizedChecker (uncurry f p).
+Next Obligation. by apply unsizedChecker_def. Qed.
 
 (* A typeclass so we can automate the application of the previous theorems
   and get a readable Prop *)

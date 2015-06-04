@@ -1,4 +1,4 @@
-Require Import ssreflect ssrnat ssrbool eqtype.
+Require Import ssreflect ssrnat ssrbool eqtype. 
 Require Import List String.
 Require Import QuickChick.
 Import GenLow GenHigh.
@@ -220,11 +220,12 @@ Lemma insert_preserves_redblack_checker_correct:
 Proof.
   rewrite /insert_preserves_redblack_checker /insert_preserves_redblack.
   rewrite (mergeForAlls arbitraryNat genRBTree).
-  rewrite -> semForAllUnsized2. rewrite /genPair. split.
+  rewrite -> semForAllUnsized2. 
+  rewrite /genPair. split.
   - move => H n t irt. specialize (H (n,t)). simpl in H.
     rewrite /semCheckable in H. simpl in H. rewrite -> semImplication in H.
     rewrite -> semCheckableBool in H.
-    apply /is_redblackP. apply H. clear H.
+    apply /is_redblackP. apply : H.
     destruct irt as [h irt].
     unfold semGen.
     set s := (max (max_node t n) h). exists s. split. by [].
@@ -243,9 +244,7 @@ Proof.
   - move => H [a t] Hg. unfold semGen in Hg. destruct Hg as [s [_ Hg]].
     simpl. rewrite -> semImplication. rewrite semCheckableBool.
     intro irb. apply /is_redblackP. apply H. by apply /is_redblackP.
-  - (* TODO : fix instances so that this is automatically inferred *) 
-    move=> [n t]. simpl. apply usizedImplication.
-    apply boolUnsized.
+  - simpl. eauto with typeclass_instances.
 Qed.
 
 (* unsizedChecker proof *)
