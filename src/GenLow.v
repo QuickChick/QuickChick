@@ -38,7 +38,7 @@ Parameter resize : forall {A: Type}, nat -> G A -> G A.
 Parameter promote : forall {A : Type}, Rose (G A) -> G (Rose A).
 Parameter suchThatMaybe : forall {A : Type}, G A -> (A -> bool) ->
                                              G (option A).
-Parameter choose : forall {A : Type} `{Random A}, (A * A) -> G A.
+Parameter choose : forall {A : Type} `{ChoosableFromInterval A}, (A * A) -> G A.
 Parameter sample : forall {A : Type}, G A -> list A.
 
 
@@ -143,16 +143,16 @@ Declare Instance fmapMonotonic
   SizeMonotonic (fmap f g).
 
 Hypothesis semChoose :
-  forall A `{Random A} (a1 a2 : A), Random.leq a1 a2 ->
+  forall A `{ChoosableFromInterval A} (a1 a2 : A), Random.leq a1 a2 ->
     (semGen (choose (a1,a2)) <-->
     [set a | Random.leq a1 a && Random.leq a a2]).
 
 Hypothesis semChooseSize :
-  forall A `{Random A} (a1 a2 : A), Random.leq a1 a2 ->
+  forall A `{ChoosableFromInterval A} (a1 a2 : A), Random.leq a1 a2 ->
     forall size, (semGenSize (choose (a1,a2)) size <-->
     [set a | Random.leq a1 a && Random.leq a a2]).
 
-Declare Instance chooseUnsized A `{Random A} (a1 a2 : A) : 
+Declare Instance chooseUnsized A `{ChoosableFromInterval A} (a1 a2 : A) : 
   Unsized (choose (a1, a2)).
 
 Hypothesis semSized :
@@ -271,7 +271,7 @@ Fixpoint createRange (n : nat) (acc : list nat) : list nat :=
     | S n' => createRange n' (cons n acc)
   end.
 
-Definition choose {A : Type} `{Random A} (range : A * A) : G A :=
+Definition choose {A : Type} `{ChoosableFromInterval A} (range : A * A) : G A :=
   MkGen (fun _ r => fst (randomR range r)).
 
 Definition sample (A : Type) (g : G A) : list A :=
@@ -468,17 +468,17 @@ Next Obligation.
 Qed.
 
 
-Lemma semChooseSize A `{Random A} (a1 a2 : A) :
+Lemma semChooseSize A `{ChoosableFromInterval A} (a1 a2 : A) :
   Random.leq a1 a2 ->
     forall size, semGenSize (choose (a1,a2)) size <-->
     [set a | Random.leq a1 a && Random.leq a a2].
 Proof. by move=> /= le_a1a2 m n; rewrite (randomRCorrect n a1 a2). Qed.
 
-Program Instance chooseUnsized {A} `{Random A} (a1 a2 : A) : 
+Program Instance chooseUnsized {A} `{ChoosableFromInterval A} (a1 a2 : A) : 
   Unsized (choose (a1, a2)).
 Next Obligation. by []. Qed.
 
-Lemma semChoose A `{Random A} (a1 a2 : A) : Random.leq a1 a2 ->
+Lemma semChoose A `{ChoosableFromInterval A} (a1 a2 : A) : Random.leq a1 a2 ->
   (semGen (choose (a1,a2)) <-->
   [set a | Random.leq a1 a && Random.leq a a2]).
 Proof. 

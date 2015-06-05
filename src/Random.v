@@ -717,7 +717,7 @@ move=> x y /andP[].
 exact: Zle_bool_antisym.
 Qed.
 
-Class Random (A : Type)  :=
+Class ChoosableFromInterval (A : Type)  :=
   {
     super :> OrdType A;
     randomR : A * A -> RandomSeed -> A * RandomSeed;
@@ -727,19 +727,19 @@ Class Random (A : Type)  :=
        exists seed, fst (randomR (a1, a2) seed) = a)
   }.
 
-Program Instance RandomBool : Random bool :=
+Program Instance ChooseBool : ChoosableFromInterval bool :=
   {
     randomR := randomRBool;
     randomRCorrect := randomRBoolCorrect
   }.
 
-Instance RandomNat : Random nat :=
+Instance ChooseNat : ChoosableFromInterval nat :=
   {
     randomR := randomRNat;
     randomRCorrect := ramdomRNatCorrect
   }.
 
-Instance RandomZ : Random Z :=
+Instance ChooseZ : ChoosableFromInterval Z :=
   {
     randomR := randomRInt;
     randomRCorrect := ramdomRIntCorrect
