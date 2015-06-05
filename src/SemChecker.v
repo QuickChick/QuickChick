@@ -71,13 +71,13 @@ Definition genChecker c := fmap successful c.
 
 Class UnsizedChecker (c : Checker) :=
   {
-    unsizedChecker_def : 
+    unsizedChecker : 
       forall s1 s2 : nat, semGenSize (genChecker c) s1 <--> semGenSize (genChecker c) s2
   }.
 
 Class SizeMonotonicChecker (c : Checker) :=
   {
-    monotonicChecker_def : 
+    monotonicChecker : 
       forall s1 s2, s1 <= s2 -> 
                     semGenSize (genChecker c) s1 \subset semGenSize (genChecker c) s2
                                            
@@ -104,7 +104,7 @@ Qed.
 Program Instance unsizedMonotonicChecker (c : Checker) `{UnsizedChecker c} : 
   SizeMonotonicChecker c.
 Next Obligation. 
-    rewrite unsizedChecker_def. move => b Hb. by eauto. 
+    rewrite unsizedChecker. move => b Hb. by eauto. 
 Qed.
 
 Lemma mapTotalResult_idSize {C} `{Checkable C} (f : Result -> Result) (c : C) s :
@@ -349,7 +349,7 @@ Lemma semBindGenUsinzed1 {A} (gen : G A) (f : A -> Checker) `{Unsized _ gen} :
      forall a, semGen gen a -> semChecker (f a)).
 Proof.
   split; move => Hgen a.
-  - move => [s [_ H']] s'. eapply unsized_def in H'.
+  - move => [s [_ H']] s'. eapply unsized in H'.
     by eapply semBindGenSize in Hgen; eauto.
   - by eapply semBindGenSize; intros; apply Hgen; eexists; split => //; eauto.
 Qed.
@@ -377,7 +377,7 @@ Proof.
                                                  /leP/Compare_dec.not_le/ltP/ltnW Hleq].
     + specialize (Hgen s').
       eapply semBindGenSize in Hgen; eauto. 
-      eapply monotonic_def; eauto.
+      eapply monotonic; eauto.
     + specialize (Hgen s). eapply semBindGenSize in Hgen; eauto. 
       eapply monotonicChecker_alt_def; eauto.
   - by eapply semBindGenSize; intros; apply Hgen; eexists; split => //; eauto.
@@ -421,7 +421,7 @@ Proof.
   split=> H'.
   - move => a [s' [_ Hgen]] s. specialize (H' s).
     eapply semForAllSize in H'; first by eauto.
-    eapply unsized_def; eauto.
+    eapply unsized; eauto.
   - move => s; eapply semForAllSize; move => a Hgen.
     apply H'; eexists; split => //; eauto. 
 Qed.
@@ -450,7 +450,7 @@ Proof.
                                                  /leP/Compare_dec.not_le/ltP/ltnW Hleq].
     + specialize (Hcheck s').
       rewrite -> semForAllSize in Hcheck. apply Hcheck. 
-      eapply monotonic_def; eauto.
+      eapply monotonic; eauto.
     + specialize (Hcheck s). eapply semForAllSize in Hcheck; eauto. 
       by eapply monotonicChecker_alt_def; eauto. 
   - by eapply semForAllSize; intros; apply Hcheck; eexists; split => //; eauto.
@@ -739,7 +739,7 @@ Qed.
 
 Program Instance uncurryUsized {A B} (f : A -> B -> Checker) p
         `{UnsizedChecker (f (fst p) (snd p))} : UnsizedChecker (uncurry f p).
-Next Obligation. by apply unsizedChecker_def. Qed.
+Next Obligation. by apply unsizedChecker. Qed.
 
 (* A typeclass so we can automate the application of the previous theorems
    and get a readable Prop *)
