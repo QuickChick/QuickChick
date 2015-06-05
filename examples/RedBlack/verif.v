@@ -194,22 +194,22 @@ Lemma insert_preserves_redblack_checker_correct' :
   <-> insert_preserves_redblack.
 Proof.
   rewrite /insert_preserves_redblack_checker /insert_preserves_redblack.
-  rewrite -> semForAllSizeMonotonic.
-  split.
-  - move => H n t irt. specialize (H n).
-    rewrite -> semForAllSizeMonotonic in H.
-    + rewrite /semCheckable in H. simpl in H.
-      assert (HH : semGen arbitraryNat n) by admit. specialize (H HH t).
+  rewrite -> semForAllSizeMonotonic; try by eauto with typeclass_instances.
+  - split. 
+    + move => H n t irt.
+      have HH : semGen arbitraryNat n by (apply arbNat_correct; reflexivity).
+      specialize (H n HH).
+      rewrite -> semForAllSizeMonotonic in H; 
+        try by (try move => ? /=); auto with typeclass_instances.
+      specialize (H t).
       rewrite -> (semRBTree t) in H. simpl in H. specialize (H irt).
       rewrite -> semImplication in H. apply /is_redblackP.
       rewrite -> semCheckableBool in H. apply H. by apply /is_redblackP.
-    + eauto with typeclass_instances.
-    + simpl. eauto with typeclass_instances.
-  - intros. rewrite /semCheckable. simpl. rewrite semForAllSizeMonotonic.
-    intros. rewrite /semCheckable. simpl. rewrite semImplication.
-    intro. rewrite semCheckableBool. apply /is_redblackP. apply H.
-    by apply /is_redblackP.
-  - eauto with typeclass_instances.
-  - simpl. intros. apply forAllMonotonic. eauto with typeclass_instances.
-    simpl. eauto with typeclass_instances.
+    + move => H a _ /=. rewrite -> semForAllSizeMonotonic;
+        try by (try move => ? /=); auto with typeclass_instances.
+      move => t Hg. rewrite -> semImplication => Hrb. 
+      rewrite semCheckableBool. apply /is_redblackP; apply H.
+        by apply /is_redblackP.
+  - move => n /=. apply forAllMonotonic; 
+      try by (try move => ? /=); auto with typeclass_instances.
 Qed.
