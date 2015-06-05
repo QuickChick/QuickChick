@@ -89,6 +89,23 @@ Hypothesis semLiftGen4Size : forall A1 A2 A3 A4 B (f : A1 -> A2 -> A3 -> A4 -> B
   [set b : B | exists a1 a2 a3 a4, semGenSize g1 s a1 /\ semGenSize g2 s a2 /\
                  semGenSize g3 s a3 /\ semGenSize g4 s a4 /\ f a1 a2 a3 a4 = b].
 
+Hypothesis semLiftGen4SizeMonotonic :
+  forall A1 A2 A3 A4 B (f : A1 -> A2 -> A3 -> A4 -> B)
+         (g1 : G A1) (g2 : G A2) (g3 : G A3) (g4 : G A4) 
+  `{SizeMonotonic _ g1} `{SizeMonotonic _ g2}
+  `{SizeMonotonic _ g3} `{SizeMonotonic _ g4},
+  semGen (liftGen4 f g1 g2 g3 g4) <-->
+  [set b : B | exists a1 a2 a3 a4, semGen g1 a1 /\ semGen g2 a2 /\
+                 semGen g3 a3 /\ semGen g4 a4 /\ f a1 a2 a3 a4 = b].
+
+Declare Instance liftGen4Monotonic {A B C D E} 
+        (f : A -> B -> C -> D -> E)
+        (g1 : G A) (g2 : G B) (g3 : G C) (g4 : G D) 
+        `{ SizeMonotonic _ g1} `{ SizeMonotonic _ g2}
+        `{ SizeMonotonic _ g3} `{ SizeMonotonic _ g4} 
+: SizeMonotonic (liftGen4 f g1 g2 g3 g4). 
+
+
 Hypothesis semLiftGen5Size :
 forall {A1 A2 A3 A4 A5 B} (f: A1 -> A2 -> A3 -> A4 -> A5 -> B)
        (g1: G A1) (g2: G A2) (g3: G A3) (g4: G A4) (g5: G A5) size,
@@ -133,6 +150,8 @@ Hypothesis semOneofSize:
     (semGenSize (oneof def l) s) <-->
       if l is nil then semGenSize def s else \bigcup_(x in l) semGenSize x s.
 
+Declare Instance oneofMonotonic {A} (x : G A) (l : list (G A))
+        `{ SizeMonotonic _ x} `(l \subset SizeMonotonic) : SizeMonotonic (oneof x l). 
 
 Hypothesis semFrequency:
   forall {A} (l : list (nat * G A)) (def : G A),
@@ -379,8 +398,7 @@ Proof.
     by rewrite semBindSize; apply: eq_bigcupr => y; rewrite semReturnSize.
 Qed.
 
-
-
+     
 Lemma semLiftGen2SizeMonotonic {A1 A2 B} (f: A1 -> A2 -> B)
                                (g1 : G A1) (g2 : G A2) 
                                `{SizeMonotonic _ g1} `{SizeMonotonic _ g2} :
@@ -456,6 +474,7 @@ Next Obligation.
   reflexivity.
 Qed.
 
+
 (* CH: Made this more beautiful than the rest *)
 (* CH: Should anyway use dependent types for a generic liftGenN *)
 (* begin semLiftGen4Size *)
@@ -479,6 +498,29 @@ Proof.
     end.
     repeat (apply semBindSize; eexists; split; [eassumption|]).
     apply semReturnSize. assumption.
+Qed.
+
+Lemma semLiftGen4SizeMonotonic 
+      A1 A2 A3 A4 B (f : A1 -> A2 -> A3 -> A4 -> B)
+      (g1 : G A1) (g2 : G A2) (g3 : G A3) (g4 : G A4) 
+  `{SizeMonotonic _ g1} `{SizeMonotonic _ g2}
+  `{SizeMonotonic _ g3} `{SizeMonotonic _ g4} :
+  semGen (liftGen4 f g1 g2 g3 g4) <-->
+  [set b : B | exists a1 a2 a3 a4, semGen g1 a1 /\ semGen g2 a2 /\
+                 semGen g3 a3 /\ semGen g4 a4 /\ f a1 a2 a3 a4 = b].
+Admitted.
+
+Program Instance liftGen4Monotonic {A B C D E} 
+        (f : A -> B -> C -> D -> E)
+        (g1 : G A) (g2 : G B) (g3 : G C) (g4 : G D) 
+        `{ SizeMonotonic _ g1} `{ SizeMonotonic _ g2}
+        `{ SizeMonotonic _ g3} `{ SizeMonotonic _ g4} 
+: SizeMonotonic (liftGen4 f g1 g2 g3 g4). 
+Next Obligation.
+  rewrite ! semLiftGen4Size.
+  move => t /= [a1 [a2 [a3 [a4 [Ha1 [Ha2 [Ha3 [Ha4 H5]]]]]]]]; subst.
+  eexists. eexists. eexists. eexists. 
+  repeat (split; try reflexivity); by eapply monotonic_def; eauto. 
 Qed.
 
 Lemma semLiftGen5Size :
@@ -666,6 +708,19 @@ Lemma semOneof {A} (l : list (G A)) (def : G A) :
 Proof.
 by case: l => [|g l]; rewrite 1?bigcupC; apply: eq_bigcupr => sz;
   apply: semOneofSize.
+Qed.
+
+Program Instance oneofMonotonic {A} (x : G A) (l : list (G A))
+        `{ SizeMonotonic _ x} `(l \subset SizeMonotonic) 
+: SizeMonotonic (oneof x l). 
+Next Obligation.
+  rewrite !semOneofSize. elim : l H0 => [_ | g gs IH /subconsset [H2 H3]] /=.
+  - by apply monotonic_def.
+  - specialize (IH H3). move => a [ga [[Hga | Hga] Hgen]]; subst.
+    exists ga. split => //. left => //.
+    eapply monotonic_def; eauto. exists ga.
+    split. right => //.
+    apply H3 in Hga. by apply (monotonic_def H1). 
 Qed.
 
 (* begin semElementsSize *)

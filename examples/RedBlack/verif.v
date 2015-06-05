@@ -83,55 +83,6 @@ Proof.
   move => s. rewrite unsized_alt_def. by apply semColor.
 Qed.
 
-(* TODO : move to GenHigh *)
-Program Instance oneofMonotonic {A} (x : G A) (l : list (G A))
-        `{ SizeMonotonic _ x} `(l \subset SizeMonotonic) 
-: SizeMonotonic (oneof x l). 
-Next Obligation.
-  rewrite !semOneofSize. elim : l H0 => [_ | g gs IH /subconsset [H2 H3]] /=.
-  - by apply monotonic_def.
-  - specialize (IH H3). move => a [ga [[Hga | Hga] Hgen]]; subst.
-    exists ga. split => //. left => //.
-    eapply monotonic_def; eauto. exists ga.
-    split. right => //.
-    apply H3 in Hga. by apply (monotonic_def H1). 
-Qed.
-
-Program Instance liftGen4Monotonic {A B C D E} 
-        (f : A -> B -> C -> D -> E)
-        (g1 : G A) (g2 : G B) (g3 : G C) (g4 : G D) 
-        `{ SizeMonotonic _ g1} `{ SizeMonotonic _ g2}
-        `{ SizeMonotonic _ g3} `{ SizeMonotonic _ g4} 
-: SizeMonotonic (liftGen4 f g1 g2 g3 g4). 
-Next Obligation.
-  rewrite ! semLiftGen4Size.
-  move => t /= [a1 [a2 [a3 [a4 [Ha1 [Ha2 [Ha3 [Ha4 H5]]]]]]]]; subst.
-  eexists. eexists. eexists. eexists. 
-  repeat (split; try reflexivity); by eapply monotonic_def; eauto. 
-Qed.
-
-Lemma semLiftGen4SizeMonotonic 
-      A1 A2 A3 A4 B (f : A1 -> A2 -> A3 -> A4 -> B)
-      (g1 : G A1) (g2 : G A2) (g3 : G A3) (g4 : G A4) 
-  `{SizeMonotonic _ g1} `{SizeMonotonic _ g2}
-  `{SizeMonotonic _ g3} `{SizeMonotonic _ g4} :
-  semGen (liftGen4 f g1 g2 g3 g4) <-->
-  [set b : B | exists a1 a2 a3 a4, semGen g1 a1 /\ semGen g2 a2 /\
-                 semGen g3 a3 /\ semGen g4 a4 /\ f a1 a2 a3 a4 = b].
-Proof. 
-Admitted.
-
-
-Lemma semLiftGen2SizeMonotonic 
-      A1 A2 B (f : A1 -> A2 -> B)
-      (g1 : G A1) (g2 : G A2) 
-  `{SizeMonotonic _ g1} `{SizeMonotonic _ g2} :
-  semGen (liftGen2 f g1 g2) <-->
-  [set b : B | exists a1 a2, semGen g1 a1 /\ semGen g2 a2 /\
-                                   f a1 a2 = b].
-Proof. 
-Admitted.
-
 Instance genRBTree_heightMonotonic p : 
   SizeMonotonic (genRBTree_height p).
 Proof.
@@ -141,9 +92,8 @@ Proof.
   - case : c {IH}; eauto with typeclass_instances. 
     apply oneofMonotonic; eauto with typeclass_instances.
     move => t [H1 | [H2 | //]]; subst; eauto with typeclass_instances. 
-  - case : c IH => IH. apply liftGen4Monotonic; eauto with typeclass_instances.
-    eapply IH; eauto. by constructor; omega.
-    eapply IH; eauto. by constructor; omega.
+  - case : c IH => IH. apply liftGen4Monotonic; eauto with typeclass_instances;
+    eapply IH; eauto; by constructor; omega.
     apply bindMonotonic; eauto with typeclass_instances. 
     move => x /=. apply liftGen4Monotonic; eauto with typeclass_instances;
     eapply IH; eauto; (case : x; [ by right | by left; omega]).
@@ -155,7 +105,7 @@ Proof.
 Qed.
 
 (* begin semGenRBTreeHeightSize *)
-Lemma semGenRBTreeHeightSize h c : 
+Lemma semGenRBTreeHeight h c : 
   semGen (genRBTree_height (h, c)) <--> [set t | is_redblack' t c h ].
 (* end semGenRBTreeHeightSize *)
 Proof.
@@ -221,7 +171,7 @@ Lemma semRBTree : semGen genRBTree <--> [set t | is_redblack t ].
 (* end semRBTreeSize *)
 Proof.
   rewrite /genRBTree /is_redblack. 
-  rewrite semBindSizeMonotonic. setoid_rewrite semGenRBTreeHeightSize. 
+  rewrite semBindSizeMonotonic. setoid_rewrite semGenRBTreeHeight. 
   move => t. split.
   - move => [n [_ H2]].  eexists; eauto.
   - move => [n H3].  eexists. split; eauto. 
@@ -243,9 +193,9 @@ Proof.
     rewrite -> semCheckableBool in H.
     apply /is_redblackP. apply : H. 
     apply semLiftGen2SizeMonotonic; eauto with typeclass_instances.
-    exists n. exists t. split. by apply arbNat_correct.
-    split => //. by apply semRBTree. by apply/is_redblackP.
-  - move => H [a t] /semLiftGen2SizeMonotonic [n [t' [_ [Hg [<- <-]]]]]. 
+    exists (n, t). split => //. split => //. by apply arbNat_correct.
+    by apply semRBTree. by apply/is_redblackP.
+  - move => H [a t] /semLiftGen2SizeMonotonic [[n t'] [[_ Hg] [<- <-]]]. 
     simpl. rewrite -> semImplication. move => Hb. rewrite semCheckableBool.
     apply /is_redblackP. apply H. by apply /is_redblackP.
   - simpl. eauto with typeclass_instances.
