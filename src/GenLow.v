@@ -331,16 +331,16 @@ Proof.
   move => [s' [_ H']]. eapply unsized_def; eauto.
 Qed.
 
-Lemma semReturn A (x : A) : semGen (returnGen x) <--> [set x].
+(* begin semReturn *)
+Lemma semReturn {A} (x : A) : semGen (returnGen x) <--> [set x].
+(* end semReturn *)
 Proof.
   rewrite /semGen /semGenSize /= bigcup_const ?codom_const //.
           exact: randomSeed_inhabited.
     by do 2! constructor.
 Qed.
 
-(* begin semReturnSize *)
 Lemma semReturnSize A (x : A) (s : nat) : semGenSize (returnGen x) s <--> [set x].
-(* end semReturnSize *)
 Proof.
 by rewrite /semGenSize /= codom_const //; apply: randomSeed_inhabited.
 Qed.
@@ -350,11 +350,8 @@ Next Obligation.
   by rewrite ! semReturnSize; split; auto.
 Qed.
 
-
-(* begin semBindSize *)
 Lemma semBindSize A B (g : G A) (f : A -> G B) (s : nat) :
   semGenSize (bindGen g f) s <--> \bigcup_(a in semGenSize g s) semGenSize (f a) s.
-(* end semBindSize *)
 Proof.
 rewrite /semGenSize /bindGen /= bigcup_codom -curry_codom2l.
 by rewrite -[codom (prod_curry _)]imsetT -randomSplit_codom -codom_comp.
@@ -493,9 +490,7 @@ Lemma semSized A (f : nat -> G A) :
   semGen (sized f) <--> \bigcup_n semGenSize (f n) n.
 Proof. by []. Qed.
 
-(* begin semSizedSize *)
 Lemma semSizedSize A(f:nat->G A)s : semGenSize (sized f) s <--> semGenSize (f s) s.
-(* end semSizedSize *)
 Proof. by []. Qed.
 
 Lemma semResize A n (g : G A) : semGen (resize n g) <--> semGenSize g n .

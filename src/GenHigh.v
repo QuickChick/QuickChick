@@ -477,13 +477,11 @@ Qed.
 
 (* CH: Made this more beautiful than the rest *)
 (* CH: Should anyway use dependent types for a generic liftGenN *)
-(* begin semLiftGen4Size *)
 Lemma semLiftGen4Size A1 A2 A3 A4 B (f : A1 -> A2 -> A3 -> A4 -> B)
                      (g1 : G A1) (g2 : G A2) (g3 : G A3) (g4 : G A4) s :
   semGenSize (liftGen4 f g1 g2 g3 g4) s <-->
   [set b : B | exists a1 a2 a3 a4, semGenSize g1 s a1 /\ semGenSize g2 s a2 /\
                  semGenSize g3 s a3 /\ semGenSize g4 s a4 /\ f a1 a2 a3 a4 = b].
-(* end semLiftGen4Size *)
 Proof.
   split; unfold liftGen4; intros.
   - repeat match goal with
@@ -500,7 +498,8 @@ Proof.
     apply semReturnSize. assumption.
 Qed.
 
-Lemma semLiftGen4SizeMonotonic 
+(* begin semLiftGen4SizeMonotonic *)
+Lemma semLiftGen4SizeMonotonic
       A1 A2 A3 A4 B (f : A1 -> A2 -> A3 -> A4 -> B)
       (g1 : G A1) (g2 : G A2) (g3 : G A3) (g4 : G A4) 
   `{SizeMonotonic _ g1} `{SizeMonotonic _ g2}
@@ -508,6 +507,7 @@ Lemma semLiftGen4SizeMonotonic
   semGen (liftGen4 f g1 g2 g3 g4) <-->
   [set b : B | exists a1 a2 a3 a4, semGen g1 a1 /\ semGen g2 a2 /\
                  semGen g3 a3 /\ semGen g4 a4 /\ f a1 a2 a3 a4 = b].
+(* end semLiftGen4SizeMonotonic *)
 Admitted.
 
 Program Instance liftGen4Monotonic {A B C D E} 
@@ -688,10 +688,8 @@ split; first by case=> n [? <-]; rewrite -nthE; apply/List.nth_In/ltP.
 by case/(In_nth_exists _ _ def) => n [? ?]; exists n; split=> //; apply/ltP.
 Qed.
 
-(* begin semOneofSize *)
 Lemma semOneofSize {A} (l : list (G A)) (def : G A) s : semGenSize (oneof def l) s
   <--> if l is nil then semGenSize def s else \bigcup_(x in l) semGenSize x s.
-(* end semOneofSize *)
 Proof.
 case: l => [|g l].
   rewrite semBindSize semChooseSize //.
@@ -723,10 +721,8 @@ Next Obligation.
     apply H3 in Hga. by apply (monotonic_def H1). 
 Qed.
 
-(* begin semElementsSize *)
 Lemma semElementsSize {A} (l: list A) (def : A) s :
   semGenSize (elements def l) s <--> if l is nil then [set def] else l.
-(* end semElementsSize *)
 Proof.
 rewrite semBindSize.
 setoid_rewrite semReturnSize.
@@ -956,25 +952,23 @@ Import QcDefaultNotation. Open Scope qc_scope.
 
 (* CH: Reusing :: instead of ;; would have been nice, but I didn't manage *)
 
-(* begin semElemsSize *)
 Lemma semElemsSize A (x : A) xs s : semGenSize (elems (x ;; xs)) s <--> x :: xs.
-(* end semElemsSize *)
 Proof. rewrite semElementsSize. reflexivity. Qed.
 
-(* begin semOneOfSize *)
 Lemma semOneOfSize A (g0 : G A) (gs : list (G A)) s :
   semGenSize (oneOf (g0 ;; gs)) s  <--> \bigcup_(g in (g0 :: gs)) semGenSize g s.
-(* end semOneOfSize *)
 Proof. rewrite semOneofSize. reflexivity. Qed.
 
-Lemma semElems A (x : A) xs :
-  semGen (elems (x ;; xs)) <--> x :: xs.
+(* begin semElems *)
+Lemma semElems A (x : A) xs : semGen (elems (x ;; xs)) <--> x :: xs.
+(* end semElems *)
 Proof. by rewrite semElements. Qed.
 
+(* begin semOneOf *)
 Lemma semOneOf A (g0 : G A) (gs : list (G A)) :
   semGen (oneOf (g0 ;; gs))  <--> \bigcup_(g in (g0 :: gs)) semGen g.
+(* end semOneOf *)
 Proof. by rewrite semOneof. Qed.
-
 
 (* Operators like betterSized (better name pending) are guaranteed to
    produce size-monotonic generators (provided the body has this
