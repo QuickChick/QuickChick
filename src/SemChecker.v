@@ -344,7 +344,7 @@ Proof.
     eexists; split => //; eauto.
 Qed.
 
-Lemma semBindGenUsinzed1 {A} (gen : G A) (f : A -> Checker) `{unsized _ gen} :
+Lemma semBindGenUsinzed1 {A} (gen : G A) (f : A -> Checker) `{Unsized _ gen} :
     (semChecker (bindGen gen f) <->
      forall a, semGen gen a -> semChecker (f a)).
 Proof.
@@ -367,7 +367,7 @@ Proof.
 Qed.
 
 Lemma semBindGenSizeMonotonic {A} (gen : G A) (f : A -> Checker)
-  `{sizeMonotonic _ gen}  
+  `{SizeMonotonic _ gen}  
   `{forall a, sizeMonotonicChecker (f a)} :
   (semChecker (bindGen gen f) <->
    forall a, semGen gen a -> semChecker (f a)).
@@ -411,7 +411,7 @@ Proof.
 Qed.
 
 Lemma semForAllUnsized1 {A C} `{Show A, Checkable C} (g : G A) (f : A -> C)
-      `{unsized _ g} :
+      `{Unsized _ g} :
   (semChecker (forAll g f) <->
    forall (a : A), a \in semGen g -> semCheckable (f a)).
 Proof.
@@ -439,7 +439,7 @@ Proof.
 Qed.
 
 Lemma semForAllSizeMonotonic {A C} `{Show A, Checkable C} (g : G A) (f : A -> C)
-  `{sizeMonotonic _ g} 
+  `{SizeMonotonic _ g} 
   `{forall a, sizeMonotonicChecker (checker (f a))} :
   (semChecker (forAll g f) <->
    forall (a : A), a \in semGen g -> semCheckable (f a)).
@@ -456,8 +456,8 @@ Proof.
 Qed.
 
 Lemma unsized_printTestCase {A C} `{Checkable C} `{Show A} (c : A -> C) :
-  (forall a, unsized (checker (c a))) ->
-  (forall a, unsized (printTestCase (String.append (Show.show a) newline) (c a))).
+  (forall a, Unsized (checker (c a))) ->
+  (forall a, Unsized (printTestCase (String.append (Show.show a) newline) (c a))).
 Proof.
 (*   rewrite /unsizedChecker /unsized. setoid_rewrite semFmapSize. *)
 (*   move => H' a s1 s2. specialize (H' a s1 s2). *)
@@ -553,8 +553,7 @@ Qed.
 
 Lemma semForAllShrinkUnsized1 :
   forall {A C} `{Checkable C} `{Show A}
-         (gen : G A) (f : A -> C) shrinker,
-    unsized gen ->
+         (gen : G A) (f : A -> C) shrinker `{Unsized _ gen},
     (semChecker (forAllShrink gen shrinker f) <->
      forall a : A, semGen gen a -> semCheckable (f a)).
 Proof.
@@ -583,7 +582,7 @@ Qed.
 
 Lemma semForAllShrinkMonotonic :
   forall {A C} `{Checkable C} `{Show A}
-         (gen : G A) (f : A -> C) shrinker `{sizeMonotonic _ gen}, 
+         (gen : G A) (f : A -> C) shrinker `{SizeMonotonic _ gen}, 
   (forall a, sizeMonotonicChecker (checker (f a))) ->
   (semChecker (forAllShrink gen shrinker f) <->
      forall a : A, semGen gen a -> semCheckable (f a)).

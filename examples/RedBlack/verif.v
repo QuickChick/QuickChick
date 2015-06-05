@@ -220,7 +220,7 @@ Lemma insert_preserves_redblack_checker_correct:
 Proof.
   rewrite /insert_preserves_redblack_checker /insert_preserves_redblack.
   rewrite (mergeForAlls arbitraryNat genRBTree).
-  rewrite -> semForAllUnsized2. 
+  rewrite -> semForAllUnsized2.
   rewrite /genPair. split.
   - move => H n t irt. specialize (H (n,t)). simpl in H.
     rewrite /semCheckable in H. simpl in H. rewrite -> semImplication in H.
