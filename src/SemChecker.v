@@ -69,13 +69,13 @@ Qed.
 
 Definition genChecker c := fmap successful c.
 
-Class unsizedChecker (c : Checker) :=
+Class UnsizedChecker (c : Checker) :=
   {
     unsizedChecker_def : 
       forall s1 s2 : nat, semGenSize (genChecker c) s1 <--> semGenSize (genChecker c) s2
   }.
 
-Class sizeMonotonicChecker (c : Checker) :=
+Class SizeMonotonicChecker (c : Checker) :=
   {
     monotonicChecker_def : 
       forall s1 s2, s1 <= s2 -> 
@@ -83,7 +83,7 @@ Class sizeMonotonicChecker (c : Checker) :=
                                            
   }.
 
-Lemma unsizedChecker_alt_def (c : Checker) `{unsizedChecker c} :
+Lemma unsizedChecker_alt_def (c : Checker) `{UnsizedChecker c} :
   forall s1 s2, semCheckerSize c s1 <-> semCheckerSize c s2.
 Proof.
   rewrite /semCheckerSize => s1 s2; split;
@@ -92,7 +92,7 @@ Proof.
   by rewrite H.
 Qed.
 
-Lemma monotonicChecker_alt_def (c : Checker) `{sizeMonotonicChecker c} :
+Lemma monotonicChecker_alt_def (c : Checker) `{SizeMonotonicChecker c} :
   forall s1 s2, s1 <= s2 -> semCheckerSize c s2 -> semCheckerSize c s1.
 Proof.
   rewrite /semCheckerSize => s1 s2 Hle.
@@ -101,8 +101,8 @@ Proof.
   move => H1 b H2. apply H1. eauto.
 Qed.
 
-Program Instance unsizedMonotonicChecker (c : Checker) `{unsizedChecker c} : 
-  sizeMonotonicChecker c.
+Program Instance unsizedMonotonicChecker (c : Checker) `{UnsizedChecker c} : 
+  SizeMonotonicChecker c.
 Next Obligation. 
     rewrite unsizedChecker_def. move => b Hb. by eauto. 
 Qed.
@@ -212,7 +212,7 @@ Qed.
 
 (* Program Instance shrinkingUnsized {C A} `{Checkable C} *)
 (*         (sh : A -> list A) (x : A) (pf : A -> C)  *)
-(*         `{unsizedChecker (checker (pf x))} : unsizedChecker (shrinking sh x pf). *)
+(*         `{UnsizedChecker (checker (pf x))} : UnsizedChecker (shrinking sh x pf). *)
 (* Next Obligation.  *)
 (* Abort. *)
 
@@ -294,8 +294,8 @@ Proof.
 Qed.
 
 Program Instance usizedImplication
-        {C} `{Checkable C} b (c : C) `{unsizedChecker (checker c)} : 
-  unsizedChecker (b ==> c).
+        {C} `{Checkable C} b (c : C) `{UnsizedChecker (checker c)} : 
+  UnsizedChecker (b ==> c).
 Next Obligation.
   move : H0 => [/(_ s1 s2) H0].
   rewrite /genChecker in H0 *. rewrite -> !semFmapSize in H0. 
@@ -305,8 +305,8 @@ Next Obligation.
 Qed.
 
 Program Instance sizeMonotonicImplication
-        {C} `{Checkable C} b (c : C) `{sizeMonotonicChecker (checker c)} : 
-  sizeMonotonicChecker (b ==> c).
+        {C} `{Checkable C} b (c : C) `{SizeMonotonicChecker (checker c)} : 
+  SizeMonotonicChecker (b ==> c).
 Next Obligation.
   move : H0 => [/(_ s1 s2 H1) H0].
   rewrite /genChecker in H0 *. rewrite -> !semFmapSize in H0. 
@@ -355,7 +355,7 @@ Proof.
 Qed.
 
 Lemma semBindGenUsinzed2 {A} (gen : G A) (f : A -> Checker) 
-      `{forall a, unsizedChecker (f a)} :
+      `{forall a, UnsizedChecker (f a)} :
     (semChecker (bindGen gen f) <->
      forall a, semGen gen a -> semChecker (f a)).
 Proof.
@@ -368,7 +368,7 @@ Qed.
 
 Lemma semBindGenSizeMonotonic {A} (gen : G A) (f : A -> Checker)
   `{SizeMonotonic _ gen}  
-  `{forall a, sizeMonotonicChecker (f a)} :
+  `{forall a, SizeMonotonicChecker (f a)} :
   (semChecker (bindGen gen f) <->
    forall a, semGen gen a -> semChecker (f a)).
 Proof.
@@ -425,7 +425,7 @@ Qed.
 
 (* begin semForAll *)
 Lemma semForAllUnsized2 {A C} `{Show A, Checkable C} (g : G A) (f : A -> C)
-      `{forall a, unsizedChecker (checker (f a))} :
+      `{forall a, UnsizedChecker (checker (f a))} :
   (semChecker (forAll g f) <->
    forall (a : A), a \in semGen g -> semCheckable (f a)).
 (* end semForAll *)
@@ -440,7 +440,7 @@ Qed.
 
 Lemma semForAllSizeMonotonic {A C} `{Show A, Checkable C} (g : G A) (f : A -> C)
   `{SizeMonotonic _ g} 
-  `{forall a, sizeMonotonicChecker (checker (f a))} :
+  `{forall a, SizeMonotonicChecker (checker (f a))} :
   (semChecker (forAll g f) <->
    forall (a : A), a \in semGen g -> semCheckable (f a)).
 Proof.
@@ -459,7 +459,7 @@ Lemma unsized_printTestCase {A C} `{Checkable C} `{Show A} (c : A -> C) :
   (forall a, Unsized (checker (c a))) ->
   (forall a, Unsized (printTestCase (String.append (Show.show a) newline) (c a))).
 Proof.
-(*   rewrite /unsizedChecker /unsized. setoid_rewrite semFmapSize. *)
+(*   rewrite /UnsizedChecker /unsized. setoid_rewrite semFmapSize. *)
 (*   move => H' a s1 s2. specialize (H' a s1 s2). *)
 (*   by do 2 rewrite semPrintTestCase_idSize. *)
 (* Qed. *)
@@ -568,7 +568,7 @@ Qed.
 Lemma semForAllShrinkUnsized2 :
   forall {A C} `{Checkable C} `{Show A}
          (gen : G A) (f : A -> C) shrinker
-  `{forall a, unsizedChecker (checker (f a))},
+  `{forall a, UnsizedChecker (checker (f a))},
   (semChecker (forAllShrink gen shrinker f) <->
      forall a : A, semGen gen a -> semCheckable (f a)).
 Proof.
@@ -583,7 +583,7 @@ Qed.
 Lemma semForAllShrinkMonotonic :
   forall {A C} `{Checkable C} `{Show A}
          (gen : G A) (f : A -> C) shrinker `{SizeMonotonic _ gen}, 
-  (forall a, sizeMonotonicChecker (checker (f a))) ->
+  (forall a, SizeMonotonicChecker (checker (f a))) ->
   (semChecker (forAllShrink gen shrinker f) <->
      forall a : A, semGen gen a -> semCheckable (f a)).
 Proof.
@@ -627,7 +627,7 @@ Proof.
   split; [move => /(_ 0) H | move => H s]; eapply semCheckableBoolSize; eauto.
 Qed.
  
-Program Instance boolUnsized (b : bool) : unsizedChecker (checker b).
+Program Instance boolUnsized (b : bool) : UnsizedChecker (checker b).
 Next Obligation.
   rewrite !semFmapSize !semReturnSize. apply imset_eq. reflexivity.
 Qed.
@@ -652,7 +652,7 @@ Proof.
   split; [move => /(_ 0) H | move => H s]; eapply semCheckableResultSize; eauto.
 Qed.
 
-Program Instance resultUnsized (r : Result) : unsizedChecker (checker r).
+Program Instance resultUnsized (r : Result) : UnsizedChecker (checker r).
 Next Obligation.
   rewrite !semFmapSize !semReturnSize. apply imset_eq. reflexivity.
 Qed.
@@ -667,7 +667,7 @@ Proof.
   split; [move => /(_ 0) H | move => H s]; eapply semCheckableUnitSize; eauto.
 Qed.
 
-Program Instance unitUnsized : unsizedChecker (checker tt).
+Program Instance unitUnsized : UnsizedChecker (checker tt).
 Next Obligation.
   rewrite !semFmapSize !semReturnSize. apply imset_eq. reflexivity.
 Qed.
@@ -690,7 +690,7 @@ Proof.
   split; [move => /(_ 0) H | move => H s]; eapply semCheckableQPropSize; eauto.
 Qed.
 
-Program Instance qpUnsized (qp : QProp) : unsizedChecker (checker qp).
+Program Instance qpUnsized (qp : QProp) : UnsizedChecker (checker qp).
 Next Obligation.
   rewrite !semFmapSize !semReturnSize. apply imset_eq. reflexivity.
 Qed.
@@ -737,7 +737,7 @@ Proof.
 Qed.
 
 Program Instance uncurryUsized {A B} (f : A -> B -> Checker) p
-        `{unsizedChecker (f (fst p) (snd p))} : unsizedChecker (uncurry f p).
+        `{UnsizedChecker (f (fst p) (snd p))} : UnsizedChecker (uncurry f p).
 Next Obligation. by apply unsizedChecker_def. Qed.
 
 (* A typeclass so we can automate the application of the previous theorems
