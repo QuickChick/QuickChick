@@ -381,13 +381,13 @@ Proof.
 Program Instance liftGenUnsized {A B} (f : A -> B) (g : G A) 
         `{Unsized _ g} : Unsized (liftGen f g).
 Next Obligation.
-  by rewrite ! semLiftGenSize (unsized_def s1 s2).
+  by rewrite ! semLiftGenSize (unsized s1 s2).
 Qed.
 
 Program Instance liftGenMonotonic {A B} (f : A -> B) (g : G A) 
         `{SizeMonotonic _ g} : SizeMonotonic (liftGen f g).
 Next Obligation.
-  rewrite ! semLiftGenSize. apply imset_incl. by apply monotonic_def.
+  rewrite ! semLiftGenSize. apply imset_incl. by apply monotonic.
 Qed.
 
 Lemma semLiftGen2Size {A1 A2 B} (f: A1 -> A2 -> B) (g1 : G A1) (g2 : G A2) s :
@@ -412,7 +412,7 @@ Proof.
   - move => [[a1 a2] [[[s1 [_ G1]] [s2 [_ G2]]] Hf]]. compute in Hf.
     exists (max s1 s2). split; first by [].
     exists (a1,a2). split; last by []. split => /=;
-    (eapply monotonic_def; last eassumption); 
+    (eapply monotonic; last eassumption); 
     apply/leP; solve [ apply Max.le_max_l | apply Max.le_max_r ].
 Qed.
 
@@ -428,7 +428,7 @@ Proof.
     eexists. split; first by eauto. 
     exists (a1, a2); split; eauto.
     split; last by eauto. simpl. 
-    eapply unsized_def; eauto; apply (unsized_def2 H); eauto.
+    eapply unsized; eauto; apply (unsized2 H); eauto.
 Qed.
   
 Lemma semLiftGen2Unsized2 {A1 A2 B} (f: A1 -> A2 -> B)
@@ -443,7 +443,7 @@ Proof.
     eexists. split; first by auto.
     exists (a1, a2). split; eauto.
     split; first by eauto. simpl. 
-    eapply unsized_def; eauto.
+    eapply unsized; eauto.
 Qed.
 
 Lemma semLiftGen3Size :
@@ -461,7 +461,7 @@ Program Instance liftGen2Unsized {A1 A2 B} (f : A1 -> A2 -> B) (g1 : G A1)
         `{Unsized _ g1} (g2 : G A2) `{Unsized _ g2} : Unsized (liftGen2 f g1 g2).
 Next Obligation.
   rewrite ! semLiftGen2Size. 
-  rewrite ! curry_imset2l. by setoid_rewrite (unsized_def s1 s2).
+  rewrite ! curry_imset2l. by setoid_rewrite (unsized s1 s2).
 Qed.
 
 Program Instance liftGen2Monotonic {A1 A2 B} (f : A1 -> A2 -> B) (g1 : G A1)
@@ -470,7 +470,7 @@ Program Instance liftGen2Monotonic {A1 A2 B} (f : A1 -> A2 -> B) (g1 : G A1)
 Next Obligation.
   rewrite ! semLiftGen2Size. rewrite ! curry_imset2l. 
   move => b [a1 [Ha1 [a2 [Ha2 <-]]]].
-  do 2 (eexists; split; first by eapply (monotonic_def H1); eauto).
+  do 2 (eexists; split; first by eapply (monotonic H1); eauto).
   reflexivity.
 Qed.
 
@@ -520,7 +520,7 @@ Proof.
     exists (max s1 (max s2 (max s3 s4))). 
     split; first by [].
     exists a1. exists a2. exists a3. exists a4. 
-    repeat split; (eapply monotonic_def; [ apply/leP | ]; last eassumption).
+    repeat split; (eapply monotonic; [ apply/leP | ]; last eassumption).
     by eapply Max.le_max_l.
     eapply NPeano.Nat.max_le_iff. right. by eapply Max.le_max_l.
     eapply NPeano.Nat.max_le_iff. right.
@@ -540,7 +540,7 @@ Next Obligation.
   rewrite ! semLiftGen4Size.
   move => t /= [a1 [a2 [a3 [a4 [Ha1 [Ha2 [Ha3 [Ha4 H5]]]]]]]]; subst.
   eexists. eexists. eexists. eexists. 
-  repeat (split; try reflexivity); by eapply monotonic_def; eauto. 
+  repeat (split; try reflexivity); by eapply monotonic; eauto. 
 Qed.
 
 Lemma semLiftGen5Size :
@@ -644,21 +644,21 @@ Proof.
   - move => [H1 H2]. 
     exists k. split; first by reflexivity.
     split; auto. move => a /H2 [x [_ Hx]]. 
-    by eapply unsized_def; eauto.
+    by eapply unsized; eauto.
 Qed.
 
 Program Instance vectorOfUnsized {A} (k : nat) (g : G A) 
         `{Unsized _ g } : Unsized (vectorOf k g).
 Next Obligation.
   rewrite ! semVectorOfSize. 
-  split; move => [H1 H2]; split => //; by rewrite unsized_def; eauto.
+  split; move => [H1 H2]; split => //; by rewrite unsized; eauto.
 Qed.
 
 Program Instance vectorOfMonotonic {A} (k : nat) (g : G A) 
         `{SizeMonotonic _ g } : SizeMonotonic (vectorOf k g).
 Next Obligation.
   rewrite ! semVectorOfSize. 
-  move => l [H1 H2]; split => // a Ha. by eapply (monotonic_def H0); eauto.
+  move => l [H1 H2]; split => // a Ha. by eapply (monotonic H0); eauto.
 Qed.
 
 
@@ -680,7 +680,7 @@ Proof.
   - move => [k' [_ [H1 H2]]]. exists k'. split; auto.
     reflexivity.
   - move => Hl. exists (length l). repeat split => //.
-    move => a /Hl [s [_ Ha]]. by eapply unsized_def; eauto.
+    move => a /Hl [s [_ Ha]]. by eapply unsized; eauto.
 Qed.
 
 Program Instance listOfMonotonic {A} (g : G A) 
@@ -688,7 +688,7 @@ Program Instance listOfMonotonic {A} (g : G A)
 Next Obligation.
   rewrite ! semListOfSize.
   move => l [H1 H2]; split => //. by eapply leq_trans; eauto.
-  move => a /H2 Ha. by eapply monotonic_def; eauto.
+  move => a /H2 Ha. by eapply monotonic; eauto.
 Qed.
 
 
@@ -733,12 +733,12 @@ Program Instance oneofMonotonic {A} (x : G A) (l : list (G A))
 : SizeMonotonic (oneof x l). 
 Next Obligation.
   rewrite !semOneofSize. elim : l H0 => [_ | g gs IH /subconsset [H2 H3]] /=.
-  - by apply monotonic_def.
+  - by apply monotonic.
   - specialize (IH H3). move => a [ga [[Hga | Hga] Hgen]]; subst.
     exists ga. split => //. left => //.
-    eapply monotonic_def; eauto. exists ga.
+    eapply monotonic; eauto. exists ga.
     split. right => //.
-    apply H3 in Hga. by apply (monotonic_def H1). 
+    apply H3 in Hga. by apply (monotonic H1). 
 Qed.
 
 Lemma semElementsSize {A} (l: list A) (def : A) s :
@@ -1004,7 +1004,7 @@ Next Obligation.
   rewrite /betterSized . 
   rewrite !semSizedSize !semBindSize !semChooseSize; last by []; last by [].
   move => a [s1' [/andP [_ H11] H12]].
-  eexists. split; last by eapply monotonic_def; eauto. 
+  eexists. split; last by eapply monotonic; eauto. 
   apply/andP; split => //. by eapply leq_trans; eauto. 
 Qed.
 
