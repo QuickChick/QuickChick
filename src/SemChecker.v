@@ -402,11 +402,9 @@ Instance forAllMonotonic {A C} {_ : Checkable C} `{Show A} (g : G A) (f : A -> C
   SizeMonotonicChecker (forAll g f).
 Admitted.
 
-(* begin semForAllSize *)
 Lemma semForAllSize {A C} `{Show A, Checkable C} (g : G A) (f : A -> C) (s:nat) :
   semCheckerSize (forAll g f) s <->
   forall (a : A), a \in semGenSize g s -> semCheckableSize (f a) s.
-(* end semForAllSize *)
 Proof.
   split=> H'.
   - rewrite /forAll in H'. move/semBindGenSize : H' => H' a /H' Hgen.
@@ -428,12 +426,10 @@ Proof.
     apply H'; eexists; split => //; eauto. 
 Qed.
 
-(* begin semForAll *)
 Lemma semForAllUnsized2 {A C} `{Show A, Checkable C} (g : G A) (f : A -> C)
       `{forall a, UnsizedChecker (checker (f a))} :
   (semChecker (forAll g f) <->
    forall (a : A), a \in semGen g -> semCheckable (f a)).
-(* end semForAll *)
 Proof.
   split=> H'.
   - move => a [s' [_ Hgen]] s. specialize (H' s').
@@ -445,9 +441,8 @@ Qed.
 
 (* begin semForAllSizeMonotonic *)
 Lemma semForAllSizeMonotonic {A C} `{Show A, Checkable C} (g : G A) (f : A -> C)
-  `{SizeMonotonic _ g} `{forall a, SizeMonotonicChecker (checker (f a))} :
-  (semChecker (forAll g f) <->
-   forall (a : A), a \in semGen g -> semCheckable (f a)).
+    `{SizeMonotonic _ g} `{forall a, SizeMonotonicChecker (checker (f a))} :
+  (semChecker (forAll g f) <-> forall (a:A), a \in semGen g -> semCheckable (f a)).
 (* end semForAllSizeMonotonic *)
 Proof.
   split; move => Hcheck a.

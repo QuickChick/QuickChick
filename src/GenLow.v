@@ -350,8 +350,10 @@ Next Obligation.
   by rewrite ! semReturnSize; split; auto.
 Qed.
 
+(* begin semBindSize *)
 Lemma semBindSize A B (g : G A) (f : A -> G B) (s : nat) :
   semGenSize (bindGen g f) s <--> \bigcup_(a in semGenSize g s) semGenSize (f a) s.
+(* end semBindSize *)
 Proof.
 rewrite /semGenSize /bindGen /= bigcup_codom -curry_codom2l.
 by rewrite -[codom (prod_curry _)]imsetT -randomSplit_codom -codom_comp.
