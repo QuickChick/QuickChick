@@ -508,7 +508,28 @@ Lemma semLiftGen4SizeMonotonic
   semGen (liftGen4 f g1 g2 g3 g4) <-->
   [set b : B | exists a1 a2 a3 a4, semGen g1 a1 /\ semGen g2 a2 /\
                  semGen g3 a3 /\ semGen g4 a4 /\ f a1 a2 a3 a4 = b].
-Admitted.
+Proof.
+  rewrite /semGen. setoid_rewrite semLiftGen4Size.
+  move => b. split. 
+  - move => [s [_ [a1 [a2 [a3 [a4 [Ha1 [Ha2 [Ha3 [Ha4 Hb]]]]]]]]]]; subst.
+    exists a1. exists a2. exists a3. exists a4. 
+    repeat split; exists s; (split; [reflexivity | eassumption ]). 
+  -  move => [a1 [a2 [a3 [a4 [[s1 [_ Ha1]] 
+                                [[s2 [_ Ha2]] 
+                                   [[s3 [_ Ha3]] 
+                                      [[s4 [_ Ha4]] Hb]]]]]]]]; subst.
+    exists (max s1 (max s2 (max s3 s4))). 
+    split; first by [].
+    exists a1. exists a2. exists a3. exists a4. 
+    repeat split; (eapply monotonic_def; [ apply/leP | ]; last eassumption).
+    by eapply Max.le_max_l.
+    eapply NPeano.Nat.max_le_iff. right. by eapply Max.le_max_l.
+    eapply NPeano.Nat.max_le_iff. right.
+    eapply NPeano.Nat.max_le_iff. right. by eapply Max.le_max_l.
+    eapply NPeano.Nat.max_le_iff. right.
+    eapply NPeano.Nat.max_le_iff. right.
+    eapply NPeano.Nat.max_le_iff. by right. 
+Qed.
 
 Program Instance liftGen4Monotonic {A B C D E} 
         (f : A -> B -> C -> D -> E)
