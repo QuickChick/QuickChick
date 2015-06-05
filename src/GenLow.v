@@ -61,17 +61,19 @@ Definition semGen {A : Type} (g : G A) : set A :=
 (* Size characterization of generators *)
 (* begin Unsized *)
 Class Unsized {A} (g : G A) := {
-    unsized_def : forall s1 s2, (semGenSize g s1 <--> semGenSize g s2) }.
-(* end unsized *)
+    unsized_def : forall s1 s2, semGenSize g s1 <--> semGenSize g s2 }.
+(* end Unsized *)
 
 (* begin SizeMonotonic *)
 Class SizeMonotonic {A} (g : G A) := { 
-    monotonic_def : 
+    monotonic_def :
       forall s1 s2, s1 <= s2 -> semGenSize g s1 \subset semGenSize g s2 }.
 (* end SizeMonotonic *)
 
 (* CH: Why does Unsized need a _ when A is marked as implict! *)
+(* begin unsizedMonotonic *)
 Declare Instance unsizedMonotonic {A} (g : G A) `{Unsized _ g} : SizeMonotonic g.
+(* end unsizedMonotonic *)
 
 Hypothesis unsized_alt_def : 
   forall A (g : G A) `{Unsized _ g},
@@ -103,9 +105,10 @@ Hypothesis monad_assoc:
     semGen (bindGen ga (fun a => bindGen (fb a) fc)).
 
 (* I'm not sure how this universal quantifier will behave *)
-Declare Instance bindUnsized
-        {A B} (g : G A) (f : A -> G B) `{Unsized _ g} `{forall x, Unsized (f x)} : 
-  Unsized (bindGen g f).
+(* begin bindUnsized *)
+Declare Instance bindUnsized {A B} (g : G A) (f : A -> G B)
+    `{Unsized _ g} `{forall x, Unsized (f x)} : Unsized (bindGen g f).
+(* end bindUnsized *)
 
 Declare Instance bindMonotonic
         {A B} (g : G A) (f : A -> G B)
@@ -395,7 +398,7 @@ Next Obligation.
 Qed.
 
 (* begin semBindUnsized1 *)
-Lemma semBindUnsized1 A B (g : G A) (f : A -> G B) `{H : Unsized _ g}:
+Lemma semBindUnsized1 {A B} (g : G A) (f : A -> G B) `{H : Unsized _ g}:
     semGen (bindGen g f) <--> \bigcup_(a in semGen g) semGen (f a).
 (* end semBindUnsized1 *)
 Proof.
@@ -426,7 +429,7 @@ Qed.
 
 (* begin semBindSizeMonotonic *)
 Lemma semBindSizeMonotonic {A B} (g : G A) (f : A -> G B)
-    `{Hg : SizeMonotonic _ g} `{Hf : forall a, SizeMonotonic (f a)} :
+      `{Hg : SizeMonotonic _ g} `{Hf : forall a, SizeMonotonic (f a)} :
     semGen (bindGen g f) <--> \bigcup_(a in semGen g) semGen (f a).
 (* end semBindSizeMonotonic *)
 Proof.

@@ -438,11 +438,12 @@ Proof.
     apply H'; eexists; split => //; eauto. 
 Qed.
 
+(* begin semForAllSizeMonotonic *)
 Lemma semForAllSizeMonotonic {A C} `{Show A, Checkable C} (g : G A) (f : A -> C)
-  `{SizeMonotonic _ g} 
-  `{forall a, SizeMonotonicChecker (checker (f a))} :
+  `{SizeMonotonic _ g} `{forall a, SizeMonotonicChecker (checker (f a))} :
   (semChecker (forAll g f) <->
    forall (a : A), a \in semGen g -> semCheckable (f a)).
+(* end semForAllSizeMonotonic *)
 Proof.
   split; move => Hcheck a.
   - move => [s [_ H']] s'. case_eq (s <= s') => [Hleq |  
@@ -560,8 +561,8 @@ Proof.
   split=> H'.
   - move => a [s' [_ Hgen]] s. specialize (H' s).
     eapply semForAllShrinkSize in H'; first by eauto.
-    eapply H1; eauto.
-  - move => s; eapply semForAllShrinkSize; move => a Hgen. 
+    eapply H1; eauto. 
+ - move => s; eapply semForAllShrinkSize; move => a Hgen. 
     apply H'; eexists; split => //; eauto. 
 Qed.
 
