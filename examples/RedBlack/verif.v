@@ -83,133 +83,149 @@ Proof.
   move => s. rewrite unsized_alt_def. by apply semColor.
 Qed.
 
-(* Some helpful lemmas and definitions *)
-
-(* upper bound on the element of each node *)
-Inductive all_nodes_bellow (s : nat) : tree -> Prop :=
-| Bellow_l : all_nodes_bellow s Leaf
-| Bellow_N :
-    forall c t1 n t2,
-      all_nodes_bellow s t1 ->
-      all_nodes_bellow s t2 ->
-      (n <= s)%coq_nat ->
-      all_nodes_bellow s (Node c t1 n t2).
-
-Definition max_node : tree -> nat -> nat :=
-  fix f t m :=
-  match t with
-    | Leaf => m
-    | Node _ t1 n t2 =>
-      max (f t1 (max m n)) (f t2 (max m n))
-  end.
-
-
-Lemma all_nodes_bellow_greater :
-  forall m n t,
-    n <= m ->
-    all_nodes_bellow n t ->
-    all_nodes_bellow m t.
-Proof.
-  move => m n t.
-  elim : t m n => [| c tl IHtl nd tr IHtr] m n Hleq Hb; try by constructor.
-  inversion Hb; subst; constructor; eauto.
-  eapply Le.le_trans; eauto. by apply/leP.
+(* TODO : move to GenHigh *)
+Program Instance oneofMonotonic {A} (x : G A) (l : list (G A))
+        `{ SizeMonotonic _ x} `(l \subset SizeMonotonic) 
+: SizeMonotonic (oneof x l). 
+Next Obligation.
+  rewrite !semOneofSize. elim : l H0 => [_ | g gs IH /subconsset [H2 H3]] /=.
+  - by apply monotonic_def.
+  - specialize (IH H3). move => a [ga [[Hga | Hga] Hgen]]; subst.
+    exists ga. split => //. left => //.
+    eapply monotonic_def; eauto. exists ga.
+    split. right => //.
+    apply H3 in Hga. by apply (monotonic_def H1). 
 Qed.
 
-Lemma max_node_less:
-  forall t n,
-    (n <= max_node t n)%coq_nat.
+Program Instance liftGen4Monotonic {A B C D E} 
+        (f : A -> B -> C -> D -> E)
+        (g1 : G A) (g2 : G B) (g3 : G C) (g4 : G D) 
+        `{ SizeMonotonic _ g1} `{ SizeMonotonic _ g2}
+        `{ SizeMonotonic _ g3} `{ SizeMonotonic _ g4} 
+: SizeMonotonic (liftGen4 f g1 g2 g3 g4). 
+Next Obligation.
+  rewrite ! semLiftGen4Size.
+  move => t /= [a1 [a2 [a3 [a4 [Ha1 [Ha2 [Ha3 [Ha4 H5]]]]]]]]; subst.
+  eexists. eexists. eexists. eexists. 
+  repeat (split; try reflexivity); by eapply monotonic_def; eauto. 
+Qed.
+
+Lemma semLiftGen4SizeMonotonic 
+      A1 A2 A3 A4 B (f : A1 -> A2 -> A3 -> A4 -> B)
+      (g1 : G A1) (g2 : G A2) (g3 : G A3) (g4 : G A4) 
+  `{SizeMonotonic _ g1} `{SizeMonotonic _ g2}
+  `{SizeMonotonic _ g3} `{SizeMonotonic _ g4} :
+  semGen (liftGen4 f g1 g2 g3 g4) <-->
+  [set b : B | exists a1 a2 a3 a4, semGen g1 a1 /\ semGen g2 a2 /\
+                 semGen g3 a3 /\ semGen g4 a4 /\ f a1 a2 a3 a4 = b].
+Proof. 
+Admitted.
+
+
+Lemma semLiftGen2SizeMonotonic 
+      A1 A2 B (f : A1 -> A2 -> B)
+      (g1 : G A1) (g2 : G A2) 
+  `{SizeMonotonic _ g1} `{SizeMonotonic _ g2} :
+  semGen (liftGen2 f g1 g2) <-->
+  [set b : B | exists a1 a2, semGen g1 a1 /\ semGen g2 a2 /\
+                                   f a1 a2 = b].
+Proof. 
+Admitted.
+
+Instance genRBTree_heightMonotonic p : 
+  SizeMonotonic (genRBTree_height p).
 Proof.
-    elim => [| /= c tl IHtl nd tr IHtr] n; auto.
-    apply Max.max_case_strong => Hcmp; auto;
-    apply Max.max_case_strong => Hcmp'; auto;
-    eapply Le.le_trans; try eassumption;
-    [apply IHtl | apply IHtr].
+  move : p.  
+  eapply (well_founded_induction well_founded_hc).
+  move => [[|n] c] IH; rewrite genRBTree_height_eq.
+  - case : c {IH}; eauto with typeclass_instances. 
+    apply oneofMonotonic; eauto with typeclass_instances.
+    move => t [H1 | [H2 | //]]; subst; eauto with typeclass_instances. 
+  - case : c IH => IH. apply liftGen4Monotonic; eauto with typeclass_instances.
+    eapply IH; eauto. by constructor; omega.
+    eapply IH; eauto. by constructor; omega.
+    apply bindMonotonic; eauto with typeclass_instances. 
+    move => x /=. apply liftGen4Monotonic; eauto with typeclass_instances;
+    eapply IH; eauto; (case : x; [ by right | by left; omega]).
+Qed.
+     
+Instance genRBTreeMonotonic : SizeMonotonic genRBTree.
+Proof.
+  apply bindMonotonic; eauto with typeclass_instances.
 Qed.
 
 (* begin semGenRBTreeHeightSize *)
-Lemma semGenRBTreeHeightSize h c s : semGenSize (genRBTree_height (h, c)) s
-  <--> [set t | is_redblack' t c h /\ all_nodes_bellow s t].
+Lemma semGenRBTreeHeightSize h c : 
+  semGen (genRBTree_height (h, c)) <--> [set t | is_redblack' t c h ].
 (* end semGenRBTreeHeightSize *)
-Proof. 
-  move : c s. induction h as [| h IHh]; intros c' s t.
-  { rewrite genRBTree_height_eq. split.
-    - destruct c'.
-      + rewrite (semReturnSize _ _ _). by move => <-; split; constructor.
-      + move => /semOneofSize [gen [[H1 | [H1 | // _]]  H2]]; subst. 
-        * apply semReturnSize in H2. rewrite - H2. split; 
-          by constructor.
-        * move : H2 => /semBindSize 
-                        [n [/arbNat_correctSize H1 /semReturnSize <-]].
-          split; try by constructor(constructor).
-          constructor; auto; by constructor.
-    - move => [H1 H2]. destruct c'; inversion H1; subst.
-      * by apply semReturnSize.  
-      * apply semOneofSize. exists (returnGen Leaf).
-        split; first by left. by apply semReturnSize. 
-      * inversion H; inversion H0; subst. 
-        apply semOneofSize. eexists. split.
-        right. left. reflexivity. 
-        apply semBindSize. exists n; split; last by apply semReturnSize. 
-        inversion H2; subst. by apply arbNat_correctSize. }
-  { rewrite genRBTree_height_eq. split.
-    - move => /= H. destruct c'; [ | move: H => / semBindSize [[ | ] [/semColorSize ?]] ?];
-      repeat 
-        (match goal with 
-           | [ H : semGenSize (genRBTree_height _) _ _ |- _ ] => 
-             rewrite genRBTree_height_eq in H
-           | [ H : semGenSize (liftGen4 _ _ _ _ _) _ _ |- _] =>  
-             move: H => 
-             /semLiftGen4Size [? [? [? [? [/semReturnSize <- 
-                                            [/IHh [? ?] [? [/IHh [? ?] ?]]]]]]]]; subst
-            | [ H : semGenSize (liftGen4 _ _ _ _ _) _ _ |- _] =>
-              move : H => /semLiftGen4Size 
-                           [? [? [? [? [/semReturnSize <- [? [? [? ?]]]]]]]]; subst
-         end); by split; repeat constructor; auto ; apply arbNat_correctSize.
-    - move => H. inversion H as [Hsize Hb]; clear H;
-      inversion Hsize as [| ? ? ? ? Hrbl Hrbr |
-                           ? ? ? ? ? Hrbl Hrbr]; subst;
-      inversion Hb as [ |? ? ? ? Hbt1 Hbt2]; subst; clear Hb;
-      [ inversion Hrbl; inversion Hrbr; subst;
-        inversion Hbt1; inversion Hbt2; subst;
-        simpl; apply semBindSize; exists Red; split;
-        first (by apply genColor_correctSize')
-      | destruct c';
-        [| simpl; apply semBindSize; exists Black; split;
-           first (by apply genColor_correctSize') ]];
-      repeat (apply semLiftGen4Size; do 4 (eexists);
-              (repeat split); try reflexivity; try (by apply arbNat_correctSize);
-              try (by eapply semReturnSize); try (by apply IHh; split);
-              rewrite genRBTree_height_eq). }
+Proof.
+  replace c with (snd (h, c)); replace h with (fst (h, c)); try reflexivity.
+  move : (h, c). clear h c.
+  eapply (well_founded_induction well_founded_hc).
+  move => [[|h] []] IH /=; rewrite genRBTree_height_eq.
+  - rewrite semReturn. split. move => <-. constructor.
+    move => H. inversion H; subst; reflexivity.
+  - rewrite semOneof. move => t. split.
+    move => [gen [[H1 | [H1 | // _]] H2]]; subst. 
+    apply semReturn in H2. rewrite - H2. constructor.
+    move : H2 => /semBindSizeMonotonic. move => [n [_ /semReturn <-]].
+    constructor. constructor. constructor.
+    move => H. inversion H; subst.
+    { eexists. split. left. reflexivity. inversion H; subst.
+        by apply semReturn. }
+    { inversion H0; subst. inversion H1; subst.
+      eexists. split. right. left. reflexivity.
+      apply semBindSizeMonotonic; eauto with typeclass_instances.
+      eexists. split; last by apply semReturn; reflexivity.  
+      by apply arbNat_correct. }
+  - rewrite semLiftGen4SizeMonotonic. split.
+    + move => /= [c [t1 [n [t2 [/semReturn H1 [H2 [H3 [H4 H5]]]]]]]]. 
+      rewrite <- H1 in *. clear H1. subst.
+      apply IH in H2; last by left; omega. 
+      apply IH in H4; last by left; omega. constructor; eauto.
+    + move => H. inversion H; subst. 
+      apply (IH (h, Black)) in H1; last by left; omega. 
+      apply (IH (h, Black)) in H4; last by left; omega. 
+      eexists. eexists. eexists. eexists. repeat (split; auto; try reflexivity).
+      by apply semReturn. by auto.
+      by apply arbNat_correct. by auto.
+  - rewrite semBindSizeMonotonic /=. split.
+    + move => [c [_ /= /semLiftGen4SizeMonotonic 
+                    [c' [t1 [n [t2 [/semReturn H1 [H2 [_ [H4 H5]]]]]]]]]]. 
+      rewrite <- H1 in *. clear H1. subst. destruct c.
+      apply IH in H2; last by right.
+      apply IH in H4; last by right. simpl in *.
+      constructor; eauto.
+      apply IH in H2; last by left; omega. 
+      apply IH in H4; last by left; omega. constructor; eauto.
+    + move => H. inversion H; subst. 
+      apply (IH (h.+1, Red)) in H0; last by right. 
+      apply (IH (h.+1, Red)) in H1; last by right. 
+      eexists Red. split; first by apply semColor.
+      apply semLiftGen4SizeMonotonic; eauto with typeclass_instances.
+      eexists. eexists. eexists. eexists. repeat (split; auto; try reflexivity).
+      by apply semReturn. by auto.
+      by apply arbNat_correct. by auto.
+      apply (IH (h, Black)) in H1; last by left; omega. 
+      apply (IH (h, Black)) in H4; last by left; omega. 
+      eexists Black. split; first by apply semColor.
+      apply semLiftGen4SizeMonotonic; eauto with typeclass_instances.
+      eexists. eexists. eexists. eexists. repeat (split; auto; try reflexivity).
+      by apply semReturn. by auto.
+      by apply arbNat_correct. by auto.
 Qed.
+
 
 (* begin semRBTreeSize *)
-Lemma semRBTreeSize s : semGenSize genRBTree s
-  <--> [set t | (exists h, h<=s /\ is_redblack' t Red h) /\ all_nodes_bellow s t].
+Lemma semRBTree : semGen genRBTree <--> [set t | is_redblack t ].
 (* end semRBTreeSize *)
 Proof.
-  move => t. rewrite /genRBTree /is_redblack. split.
-  - move => /semBindSize [n [/arbNat_correctSize/leP H1 
-                             /semGenRBTreeHeightSize [H2 H3]]]. 
-    split; auto. exists n; split; auto.
-  - move => [[h [/leP H1 H2]] H3]. 
-    apply semBindSize. exists h. 
-    split;  
-      [ apply arbNat_correctSize | 
-        apply semGenRBTreeHeightSize ]; by auto.
-Qed.
-
-Lemma all_nodes_bellow_max_node :
-  forall t n,
-    all_nodes_bellow (max_node t n) t.
-Proof.
-  elim => [| c tl IHtl nd tr IHtr] n; try by constructor.
-  constructor; simpl;
-  try (apply Max.max_case_strong => /leP Hcmp; auto;
-       eapply all_nodes_bellow_greater; try eassumption; auto).
-  apply (Max.max_case_strong n nd) => Hcmp; eauto;
-  [ eapply Le.le_trans; try eassumption |];
-  apply (Max.max_case_strong) => Hcmp'; apply max_node_less.
+  rewrite /genRBTree /is_redblack. 
+  rewrite semBindSizeMonotonic. setoid_rewrite semGenRBTreeHeightSize. 
+  move => t. split.
+  - move => [n [_ H2]].  eexists; eauto.
+  - move => [n H3].  eexists. split; eauto. 
+    by apply arbNat_correct.
 Qed.
 
 (* begin insert_preserves_redblack_checker_correct *)
@@ -225,50 +241,12 @@ Proof.
   - move => H n t irt. specialize (H (n,t)). simpl in H.
     rewrite /semCheckable in H. simpl in H. rewrite -> semImplication in H.
     rewrite -> semCheckableBool in H.
-    apply /is_redblackP. apply : H.
-    destruct irt as [h irt].
-    unfold semGen.
-    set s := (max (max_node t n) h). exists s. split. by [].
-    erewrite (semLiftGen2Size _ _ _ _ (n, t)).
-    unfold imset2, prod_curry, imset, setX. exists (n,t). split; [| by []].
-    split; simpl.
-    { apply arbNat_correctSize.
-      apply Le.le_trans with (m := (max_node t n)).
-      apply max_node_less. rewrite /s. apply Max.le_max_l. }
-    { apply semRBTreeSize. split.
-      - exists h. split => //. rewrite /s. apply/leP. apply Max.le_max_r.
-      - rewrite /s. apply Max.max_case_strong => Hcmp; eauto;
-        [| apply all_nodes_bellow_greater with (n := max_node t n);
-           try by apply/leP]; apply all_nodes_bellow_max_node. }
-    by apply /is_redblackP.
-  - move => H [a t] Hg. unfold semGen in Hg. destruct Hg as [s [_ Hg]].
-    simpl. rewrite -> semImplication. rewrite semCheckableBool.
-    intro irb. apply /is_redblackP. apply H. by apply /is_redblackP.
+    apply /is_redblackP. apply : H. 
+    apply semLiftGen2SizeMonotonic; eauto with typeclass_instances.
+    exists n. exists t. split. by apply arbNat_correct.
+    split => //. by apply semRBTree. by apply/is_redblackP.
+  - move => H [a t] /semLiftGen2SizeMonotonic [n [t' [_ [Hg [<- <-]]]]]. 
+    simpl. rewrite -> semImplication. move => Hb. rewrite semCheckableBool.
+    apply /is_redblackP. apply H. by apply /is_redblackP.
   - simpl. eauto with typeclass_instances.
 Qed.
-
-(* unsizedChecker proof *)
-(* old proof -- still works, but requires checker lemmas with sizes,
-   and it's very hard to explain those that early in the paper;
-   should still bring back the views and stuff into the new proof
-  split.
-  - move => H x t [n' Hrb]. set s := max (max_node t x) n'.
-    move : H => /(_ s) /semForAllSize H.
-    have /H/semPredQPropSize/semForAllSize Hx : semGenSize arbitraryNat s x.
-    { apply arbNat_correctSize.
-      apply Le.le_trans with (m := (max_node t x)).
-      apply max_node_less. rewrite /s. apply Max.le_max_l. }
-    have /Hx/semPredQPropSize/semImplicationSize Ht : semGenSize genRBTree s t.
-    { apply semRBTreeSize. split.
-      - exists n'. split => //. rewrite /s. apply/leP. apply Max.le_max_r.
-      - rewrite /s. apply Max.max_case_strong => Hcmp; eauto;
-        [| apply all_nodes_bellow_greater with (n := max_node t x);
-           try by apply/leP]; apply all_nodes_bellow_max_node. }
-    have /is_redblackP/Ht/semBool Hins : is_redblack t by exists n'.
-    by apply/is_redblackP.
-  - move => H s. apply semForAllSize => n /arbNat_correctSize Hle.
-    apply semPredQPropSize.
-    apply semForAllSize => t /semRBTreeSize [[n' [Hle' Hrb]] Hb].
-    apply semPredQPropSize. apply semImplicationSize => /is_redblackP Hbool.
-    apply semBool. apply/is_redblackP. by eapply H.
-*)

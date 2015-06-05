@@ -7,6 +7,7 @@ Require Import ssreflect ssrbool ssrnat.
 Require Import ZArith ZArith.Znat Arith.
 Import GenLow GenHigh.
 
+(* ZP: We could make arbitrary - or a variation of it - subclass of sizeMonotonic *)
 Class Arbitrary (A : Type) : Type :=
   {
     arbitrary : G A;
@@ -17,6 +18,14 @@ Definition arbitraryBool := choose (false, true).
 
 Definition arbitraryNat :=
   sized (fun x => choose (0, x)).
+
+
+Program Instance arbNatMon : SizeMonotonic arbitraryNat.
+Next Obligation.
+  rewrite /arbitraryNat.
+  rewrite !semSizedSize !semChooseSize // => n /andP [/leP H1 /leP H2].
+  move : H => /leP => Hle. apply/andP. split; apply/leP; omega.
+Qed.
 
 Definition arbitraryZ :=
   sized (fun x =>
