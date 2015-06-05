@@ -59,23 +59,12 @@ Proof.
     rewrite /is_redblack_bool /is_black_balanced H1. apply/andP; split => //.
 Qed.
 
+(* begin semColor *)
 Lemma semColor : semGen genColor <--> [set : color].
+(* end semColor *)
 Proof.
   rewrite /genColor. rewrite semElements.
   intros c. destruct c; simpl; unfold setT; tauto.
-Qed.
-
-(* This just says that genColor works the same irrespective of size;
-   I'm still currious why we needed this,
-   Just for being called from a sized generator?
-   Q: Can't we move from semGenSize back to semGen for a generator
-      that doesn't use the size at all?
-   A (partial): See below how this would look for genColor. *)
-(* begin semColorSize *)
-Lemma semColorSize s : semGenSize genColor s <--> [set : color].
-(* end semColorSize *)
-Proof.
-  rewrite unsized_alt_def. by apply semColor.
 Qed.
 
 Corollary genColor_correctSize': forall s, semGenSize genColor s <--> setT.
@@ -104,10 +93,10 @@ Proof.
   apply bindMonotonic; eauto with typeclass_instances.
 Qed.
 
-(* begin semGenRBTreeHeightSize *)
+(* begin semGenRBTreeHeight *)
 Lemma semGenRBTreeHeight h c : 
   semGen (genRBTree_height (h, c)) <--> [set t | is_redblack' t c h ].
-(* end semGenRBTreeHeightSize *)
+(* end semGenRBTreeHeight *)
 Proof.
   replace c with (snd (h, c)); replace h with (fst (h, c)); try reflexivity.
   move : (h, c). clear h c.
@@ -166,12 +155,12 @@ Proof.
 Qed.
 
 
-(* begin semRBTreeSize *)
+(* begin semRBTree *)
 Lemma semRBTree : semGen genRBTree <--> [set t | is_redblack t ].
-(* end semRBTreeSize *)
+(* end semRBTree *)
 Proof.
   rewrite /genRBTree /is_redblack. 
-  rewrite semBindSizeMonotonic. setoid_rewrite semGenRBTreeHeight. 
+  rewrite semBindSizeMonotonic. setoid_rewrite semGenRBTreeHeight.
   move => t. split.
   - move => [n [_ H2]].  eexists; eauto.
   - move => [n H3].  eexists. split; eauto. 
