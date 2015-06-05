@@ -156,7 +156,7 @@ Qed.
 
 
 (* begin semRBTree *)
-Lemma semRBTree : semGen genRBTree <--> [set t | is_redblack t ].
+Lemma semRBTree : semGen genRBTree <--> [set t | is_redblack t].
 (* end semRBTree *)
 Proof.
   rewrite /genRBTree /is_redblack. 
@@ -173,7 +173,6 @@ Lemma insert_preserves_redblack_checker_correct:
   <-> insert_preserves_redblack.
 (* end insert_preserves_redblack_checker_correct *)
 Proof.
-  rewrite /insert_preserves_redblack_checker /insert_preserves_redblack.
   rewrite (mergeForAlls arbitraryNat genRBTree).
   rewrite -> semForAllUnsized2.
   rewrite /genPair. split.
@@ -188,4 +187,29 @@ Proof.
     simpl. rewrite -> semImplication. move => Hb. rewrite semCheckableBool.
     apply /is_redblackP. apply H. by apply /is_redblackP.
   - simpl. eauto with typeclass_instances.
+Qed.
+
+Lemma insert_preserves_redblack_checker_correct' :
+  semChecker (insert_preserves_redblack_checker genRBTree)
+  <-> insert_preserves_redblack.
+Proof.
+  rewrite /insert_preserves_redblack_checker /insert_preserves_redblack.
+  rewrite -> semForAllSizeMonotonic.
+  split.
+  - move => H n t irt. specialize (H n).
+    rewrite -> semForAllSizeMonotonic in H.
+    + rewrite /semCheckable in H. simpl in H.
+      assert (HH : semGen arbitraryNat n) by admit. specialize (H HH t).
+      rewrite -> (semRBTree t) in H. simpl in H. specialize (H irt).
+      rewrite -> semImplication in H. apply /is_redblackP.
+      rewrite -> semCheckableBool in H. apply H. by apply /is_redblackP.
+    + eauto with typeclass_instances.
+    + simpl. eauto with typeclass_instances.
+  - intros. rewrite /semCheckable. simpl. rewrite semForAllSizeMonotonic.
+    intros. rewrite /semCheckable. simpl. rewrite semImplication.
+    intro. rewrite semCheckableBool. apply /is_redblackP. apply H.
+    by apply /is_redblackP.
+  - eauto with typeclass_instances.
+  - simpl. intros. apply forAllMonotonic. eauto with typeclass_instances.
+    simpl. eauto with typeclass_instances.
 Qed.

@@ -499,11 +499,10 @@ Proof.
 Qed.
 
 (* begin semLiftGen4SizeMonotonic *)
-Lemma semLiftGen4SizeMonotonic
-      A1 A2 A3 A4 B (f : A1 -> A2 -> A3 -> A4 -> B)
-      (g1 : G A1) (g2 : G A2) (g3 : G A3) (g4 : G A4) 
-  `{SizeMonotonic _ g1} `{SizeMonotonic _ g2}
-  `{SizeMonotonic _ g3} `{SizeMonotonic _ g4} :
+Lemma semLiftGen4SizeMonotonic A1 A2 A3 A4 B (f : A1 -> A2 -> A3 -> A4 -> B)
+                               (g1 : G A1) (g2 : G A2) (g3 : G A3) (g4 : G A4)
+                               `{SizeMonotonic _ g1} `{SizeMonotonic _ g2}
+                               `{SizeMonotonic _ g3} `{SizeMonotonic _ g4} :
   semGen (liftGen4 f g1 g2 g3 g4) <-->
   [set b : B | exists a1 a2 a3 a4, semGen g1 a1 /\ semGen g2 a2 /\
                  semGen g3 a3 /\ semGen g4 a4 /\ f a1 a2 a3 a4 = b].

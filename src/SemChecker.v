@@ -293,7 +293,7 @@ Proof.
   move => b''. by apply H1.
 Qed.
 
-Program Instance usizedImplication
+Program Instance implicationUnsized
         {C} `{Checkable C} b (c : C) `{UnsizedChecker (checker c)} : 
   UnsizedChecker (b ==> c).
 Next Obligation.
@@ -304,7 +304,7 @@ Next Obligation.
   apply imset_eq. rewrite !semReturnSize. reflexivity.
 Qed.
 
-Program Instance sizeMonotonicImplication
+Program Instance implicationMonotonic
         {C} `{Checkable C} b (c : C) `{SizeMonotonicChecker (checker c)} : 
   SizeMonotonicChecker (b ==> c).
 Next Obligation.
@@ -396,6 +396,11 @@ Lemma semPredQProp (c : Checker) :
 Proof.
   split => H s; eapply semPredQPropSize; eauto.
 Qed.
+
+Instance forAllMonotonic {A C} {_ : Checkable C} `{Show A} (g : G A) (f : A -> C)
+        `{SizeMonotonic _ g} `{forall x, SizeMonotonicChecker (checker (f x))} :
+  SizeMonotonicChecker (forAll g f).
+Admitted.
 
 (* begin semForAllSize *)
 Lemma semForAllSize {A C} `{Show A, Checkable C} (g : G A) (f : A -> C) (s:nat) :

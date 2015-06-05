@@ -36,3 +36,5 @@ clean:
 
 bc:
 	coqwc src/*.v
+	coqwc examples/RedBlack/*.v
+	coqwc ../ifc/*.v
