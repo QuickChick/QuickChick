@@ -50,7 +50,7 @@ Definition liftGenN_aux : forall {n :nat} {As : vec Type n} {B : Type}
                                  (n':nat) (As': vec Type n') (vs : tvec_to_prod As')
              (F : tvec_to_fun (vapp As As') B id), tvec_to_fun As (G B) G.
 induction As as [| n AH AsT]; intros; simpl in *. exact (returnGen (applyN F vs)).
-intro m1. (* need to get to type G B before I can apply B, need to curry? *)
+intro m1. (* need to get to type G B before I can apply bindGen, need to curry? *)
 
 (* eapply IHAsT. exact (cons vs) *)
 (* eapply bindGen in m1. *)
