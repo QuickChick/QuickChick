@@ -127,12 +127,12 @@ let run_with f args p =
 
 VERNAC COMMAND EXTEND QuickCheck
   | ["QuickCheck" constr(c)] ->     [run quickCheck [c]]
-  | ["QuickCheckWith" constr(c1) constr(c2)] ->     [run quickCheck [c1;c2]]
+  | ["QuickCheckWith" constr(c1) constr(c2)] ->     [run quickCheckWith [c1;c2]]
 END;;
 
 VERNAC COMMAND EXTEND QuickChick
   | ["QuickChick" constr(c)] ->     [run quickCheck [c]]
-  | ["QuickChickWith" constr(c1) constr(c2)] ->     [run quickCheck [c1;c2]]
+  | ["QuickChickWith" constr(c1) constr(c2)] ->     [run quickCheckWith [c1;c2]]
 END;;
 
 VERNAC COMMAND EXTEND MutateCheck
