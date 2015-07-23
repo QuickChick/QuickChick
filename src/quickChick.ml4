@@ -70,21 +70,13 @@ let define c =
     (** Safe fresh name generation. *)
     Namegen.next_ident_away_from base is_visible_name
   in
-  let proof_output = Future.from_val ((c,Univ.ContextSet.empty),Declareops.no_seff) in
-  ignore (
-    declare_constant ~internal:KernelVerbose fresh_name
-      (DefinitionEntry {
-        const_entry_body = proof_output;
-        const_entry_secctx = None;
-        const_entry_type = None;
-        const_entry_opaque = false;
-	const_entry_feedback = None;
-         const_entry_polymorphic = false;
-	 const_entry_universes = Univ.UContext.empty;
-	 const_entry_inline_code = false
-       },
-       Decl_kinds.IsDefinition Decl_kinds.Definition)
-  );
+  let env = Global.env () in
+  let evd = Evd.from_env env in
+  let (evd,_) = Typing.type_of env evd c in
+  let uctxt = Evd.evar_context_universe_context (Evd.evar_universe_context evd) in
+  ignore (declare_constant ~internal:KernelVerbose fresh_name
+      (DefinitionEntry (definition_entry ~univs:uctxt c),
+       Decl_kinds.IsDefinition Decl_kinds.Definition));
   fresh_name
 
 (* TODO: clean leftover files *)
