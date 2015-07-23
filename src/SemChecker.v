@@ -1,4 +1,5 @@
-Require Import ssreflect ssrbool ssrnat eqtype.
+Require Import mathcomp.ssreflect.ssreflect.
+From mathcomp Require Import ssrbool ssrnat eqtype.
 Require Import Show Sets GenLow GenHigh RoseTrees Checker Arbitrary.
 
 Import GenLow GenHigh.

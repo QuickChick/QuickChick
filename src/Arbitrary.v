@@ -1,8 +1,9 @@
-Require Import GenLow GenHigh Sets.
 Require Import Coq.Numbers.Natural.Peano.NPeano.
+Require Import mathcomp.ssreflect.ssreflect.
+From mathcomp Require Import ssrbool ssrnat.
+Require Import GenLow GenHigh Sets.
 Require Import Recdef.
 Require Import List.
-Require Import ssreflect ssrbool ssrnat.
 
 Require Import ZArith ZArith.Znat Arith.
 Import GenLow GenHigh.

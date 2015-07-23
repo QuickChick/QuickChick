@@ -5,9 +5,11 @@
 
 (* CH: Split this file into its component examples? *)
 
-Require Import QuickChick.
 
-Require Import List seq ssreflect ssrbool ssrnat ZArith eqtype.
+Require Import List ZArith.
+Require Import mathcomp.ssreflect.ssreflect.
+From QuickChick Require Import QuickChick.
+From mathcomp Require Import seq ssreflect ssrbool ssrnat eqtype.
 Import ListNotations.
 
 (* Currently, these two have to be imported manually. Can we avoid this?? *)

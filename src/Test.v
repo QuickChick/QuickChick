@@ -1,4 +1,6 @@
-Require Import ssreflect ssrnat ssrbool eqtype.
+Require Import Omega.
+Require Import mathcomp.ssreflect.ssreflect.
+From mathcomp Require Import ssrnat ssrbool eqtype div.
 
 Require Import Show RoseTrees.
 Require Import Random.

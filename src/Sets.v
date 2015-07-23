@@ -1,4 +1,5 @@
-Require Import ssreflect ssrfun ssrbool ssrnat seq.
+Require Import mathcomp.ssreflect.ssreflect.
+From mathcomp Require Import ssrfun ssrbool ssrnat seq.
 Require Import Classes.RelationClasses Classes.Morphisms.
 
 Set Implicit Arguments.

@@ -1,5 +1,6 @@
 Require Import ZArith.
-Require Import ssreflect ssrfun ssrbool ssrnat eqtype seq.
+Require Import mathcomp.ssreflect.ssreflect.
+From mathcomp Require Import ssrfun ssrbool ssrnat eqtype seq.
 
 Require Import Random GenLow.
 Require Import Sets.

@@ -1,5 +1,6 @@
-Require Import PArith List ChoiceFacts.
-Require Import ssreflect ssrfun ssrbool.
+Require Import PArith List ChoiceFacts Omega.
+Require Import mathcomp.ssreflect.ssreflect.
+From mathcomp Require Import ssrfun ssrbool.
 
 Require Import Arbitrary Random GenLow Sets.
 Import GenLow.

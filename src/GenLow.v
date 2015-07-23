@@ -1,4 +1,6 @@
-Require Import ZArith List ssreflect ssrfun ssrbool ssrnat.
+Require Import ZArith List.
+Require Import mathcomp.ssreflect.ssreflect.
+From mathcomp Require Import ssrfun ssrbool ssrnat.
 Require Import Random RoseTrees.
 Require Import Sets.
 Require Import Numbers.BinNums.

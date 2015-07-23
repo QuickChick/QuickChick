@@ -1,6 +1,6 @@
 (* Lazy Rose Trees *)
 
-Require Import List ssreflect.
+Require Import List mathcomp.ssreflect.ssreflect.
 Set Implicit Arguments.
 
 Record Lazy (T : Type) := lazy { force : T }.

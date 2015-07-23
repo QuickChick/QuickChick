@@ -1,4 +1,5 @@
-Require Import ssreflect ssrfun ssrbool ssrnat eqtype.
+Require Import mathcomp.ssreflect.ssreflect.
+From mathcomp Require Import ssrfun ssrbool ssrnat eqtype.
 Require Import ZArith.
 
 (* We axiomatize a random number generator

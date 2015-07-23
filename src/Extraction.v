@@ -44,5 +44,8 @@ Set Extraction AccessOpaque.
 
 Extract Constant Show.nl => "['\n']".
 
-Require Import ssreflect ssrnat ssrbool eqtype.
+Require Import mathcomp.ssreflect.ssreflect.
+From mathcomp Require Import ssreflect ssrnat ssrbool div eqtype.
+Extract Constant divn => "(/)".
+Extract Constant modn => "(fun x y -> x mod y)".
 Extract Constant eqn => "(==)".
