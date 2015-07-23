@@ -523,12 +523,12 @@ Proof.
     exists a1. exists a2. exists a3. exists a4. 
     repeat split; (eapply monotonic; [ apply/leP | ]; last eassumption).
     by eapply Max.le_max_l.
-    eapply NPeano.Nat.max_le_iff. right. by eapply Max.le_max_l.
-    eapply NPeano.Nat.max_le_iff. right.
-    eapply NPeano.Nat.max_le_iff. right. by eapply Max.le_max_l.
-    eapply NPeano.Nat.max_le_iff. right.
-    eapply NPeano.Nat.max_le_iff. right.
-    eapply NPeano.Nat.max_le_iff. by right. 
+    eapply Nat.max_le_iff. right. by eapply Max.le_max_l.
+    eapply Nat.max_le_iff. right.
+    eapply Nat.max_le_iff. right. by eapply Max.le_max_l.
+    eapply Nat.max_le_iff. right.
+    eapply Nat.max_le_iff. right.
+    eapply Nat.max_le_iff. by right. 
 Qed.
 
 Program Instance liftGen4Monotonic {A B C D E} 

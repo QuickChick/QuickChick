@@ -108,7 +108,7 @@ Global Instance testProp : Checkable QProp :=
     checker p := returnGen p
   |}.
 
-Global Instance testGenProp (P : Type) : Checkable P -> Checkable (G P) :=
+Global Instance testGenProp (P : Type) `{Checkable P} : Checkable (G P) :=
   {|
     checker p := bindGen p checker
   |}.

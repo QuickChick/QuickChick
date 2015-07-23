@@ -21,7 +21,7 @@ Require Import Arith.EqNat.
 
 Import GenLow GenHigh.
 
-Definition gte n m := leb m n.
+Definition gte n m := Nat.leb m n.
 
 Set Implicit Arguments.
 Unset Strict Implicit.
@@ -62,16 +62,16 @@ Extract Constant defSize        => "100".
 Definition stdArgs := MkArgs None defNumTests defNumDiscards
                              defNumShrinks defSize true.
 
-Definition roundTo n m := mult (n / m) m.
+Definition roundTo n m := mult (Nat.div n m) m.
 
 Definition computeSize' (a : Args) (n : nat) (d : nat) : nat :=
   if (roundTo n (maxSize a) <= maxSuccess a) || (n >= maxSuccess a)
-     || (maxSuccess a mod (maxSize a) == 0)
+     || (maxSuccess a %| (maxSize a))
   then
-    minn (n mod (maxSize a) + d / 10) (maxSize a)
+    minn (n %% (maxSize a) + d %/ 10) (maxSize a)
   else
-    minn ((n mod (maxSize a)) * maxSize a /
-      (maxSuccess a mod (maxSize a) + d / 10)) (maxSize a).
+    minn ((n %% (maxSize a)) * maxSize a %/
+      ((maxSuccess a) %% (maxSize a) + d %/ 10)) (maxSize a).
 
 Definition at0 (f : nat -> nat -> nat) (s : nat) (n d : nat) :=
   if andb (beq_nat n 0) (beq_nat d 0) then s
@@ -116,7 +116,7 @@ Fixpoint concatStr (l : list string) : string :=
 
 Definition summary (st : State) : list (string * nat) :=
   let res := Map.fold (fun key elem acc => (key,elem) :: acc) (labels st) nil
-  in insSortBy (fun x y => snd y <=? snd x) res .
+  in insSortBy (fun x y => snd y <= snd x) res .
 
 Definition doneTesting (st : State) (f : nat -> RandomSeed -> QProp) : Result :=
  if expectedFailure st then

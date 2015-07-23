@@ -34,8 +34,7 @@ Extract Constant force => "Lazy.force".
 
 (* Extract Constant Test.ltAscii => "(<=)". *)
 (* Extract Constant Test.strEq   => "(=)". *)
-Extract Constant Coq.Numbers.Natural.Peano.NPeano.div => "(/)".
-Extract Constant Coq.Numbers.Natural.Peano.NPeano.modulo => "(fun x y -> x mod y)".
+Extract Constant Nat.div => "(/)".
 Extract Constant Test.gte => "(>=)".
 Extract Constant le_gt_dec => "(<=)".
 Extract Constant trace => "(fun x -> print_string (QuickChickLib.string_of_coqstring x); flush stdout; fun y -> y)".

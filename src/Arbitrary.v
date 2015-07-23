@@ -48,15 +48,15 @@ Function shrinkBool (x : bool) :=
 Function shrinkNat (x : nat) {measure (fun x => x) x}: list nat :=
   match x with
     | O => nil
-    | _ => cons (div x 2) (shrinkNat (div x 2))
+    | _ => cons (Nat.div x 2) (shrinkNat (Nat.div x 2))
   end.
 Proof.
-  intros; simpl; pose proof (divmod_spec n 1 0 0).
+  intros; simpl; pose proof (Nat.divmod_spec n 1 0 0).
   assert (H01 : (0 <= 1)%coq_nat) by omega; apply H in H01; subst; clear H.
-  destruct (divmod n 1 0 0); destruct n1; simpl; omega.
+  destruct (Nat.divmod n 1 0 0); destruct n1; simpl; omega.
 Qed.
 
-Lemma abs_div2_pos : forall p, Z.abs_nat (Z.div2 (Z.pos p)) = Div2.div2 (Pos.to_nat p).
+Lemma abs_div2_pos : forall p, Z.abs_nat (Z.div2 (Z.pos p)) = Nat.div2 (Pos.to_nat p).
 Proof.
   intros. destruct p.
     rewrite /Z.div2 /Pos.div2.
@@ -95,8 +95,8 @@ Proof.
 Qed.
 
 Lemma abs_succ_div2_neg : forall p,
-  Z.abs_nat (Z.succ (Z.div2 (Z.neg p))) = Div2.div2 (Pos.to_nat p) \/
-  Z.abs_nat (Z.succ (Z.div2 (Z.neg p))) = Nat.pred (Div2.div2 (Pos.to_nat p)).
+  Z.abs_nat (Z.succ (Z.div2 (Z.neg p))) = Nat.div2 (Pos.to_nat p) \/
+  Z.abs_nat (Z.succ (Z.div2 (Z.neg p))) = Nat.pred (Nat.div2 (Pos.to_nat p)).
 Proof.
   intros. destruct p.
     left. rewrite /Z.div2 /Pos.div2.
