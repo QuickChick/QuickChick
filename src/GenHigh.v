@@ -38,32 +38,32 @@ Parameter listOf : forall {A : Type}, G A -> G (list A).
 Parameter elements : forall {A : Type}, A -> list A -> G A.
 
 (* Correctness for derived generators *)
-Hypothesis semLiftGen :
+Parameter semLiftGen :
   forall {A B} (f: A -> B) (g: G A),
     semGen (liftGen f g) <--> f @: semGen g.
 
-Hypothesis semLiftGenSize :
+Parameter semLiftGenSize :
   forall {A B} (f: A -> B) (g: G A) size,
     semGenSize (liftGen f g) size <--> f @: semGenSize g size.
 
 Declare Instance liftGenUnsized {A B} (f : A -> B) (g : G A) 
         `{Unsized _ g} : Unsized (liftGen f g).
 
-Hypothesis semLiftGen2Size :
+Parameter semLiftGen2Size :
   forall {A1 A2 B} (f: A1 -> A2 -> B) (g1 : G A1) (g2 : G A2) s,
     semGenSize (liftGen2 f g1 g2) s <-->
     f @2: (semGenSize g1 s, semGenSize g2 s).
 
-Hypothesis semLiftGen2Unsized1 :
+Parameter semLiftGen2Unsized1 :
   forall {A1 A2 B} (f: A1 -> A2 -> B) (g1 : G A1) (g2 : G A2),
     Unsized g1 ->
     semGen (liftGen2 f g1 g2) <--> f @2: (semGen g1, semGen g2).
 
-Hypothesis semLiftGen2Unsized2 :
+Parameter semLiftGen2Unsized2 :
   forall {A1 A2 B} (f: A1 -> A2 -> B) (g1 : G A1) (g2 : G A2) `{Unsized _ g2},
     semGen (liftGen2 f g1 g2) <--> f @2: (semGen g1, semGen g2).
 
-Hypothesis semLiftGen2SizeMonotonic :
+Parameter semLiftGen2SizeMonotonic :
   forall {A1 A2 B} (f: A1 -> A2 -> B)
          (g1 : G A1) (g2 : G A2) `{SizeMonotonic _ g1} `{SizeMonotonic _ g2},
   semGen (liftGen2 f g1 g2) <--> f @2: (semGen g1, semGen g2).
@@ -75,7 +75,7 @@ Declare Instance liftGen2Monotonic {A1 A2 B} (f : A1 -> A2 -> B) (g1 : G A1)
         `{SizeMonotonic _ g1} (g2 : G A2) `{SizeMonotonic _ g2} : SizeMonotonic (liftGen2 f g1 g2).
 
 
-Hypothesis semLiftGen3Size :
+Parameter semLiftGen3Size :
 forall {A1 A2 A3 B} (f: A1 -> A2 -> A3 -> B)
        (g1: G A1) (g2: G A2) (g3: G A3) size,
   semGenSize (liftGen3 f g1 g2 g3) size <-->
@@ -84,13 +84,13 @@ forall {A1 A2 A3 B} (f: A1 -> A2 -> A3 -> B)
                                       (exists a3, semGenSize g3 size a3 /\
                                                   (f a1 a2 a3) = b))].
 
-Hypothesis semLiftGen4Size : forall A1 A2 A3 A4 B (f : A1 -> A2 -> A3 -> A4 -> B)
+Parameter semLiftGen4Size : forall A1 A2 A3 A4 B (f : A1 -> A2 -> A3 -> A4 -> B)
        (g1 : G A1) (g2 : G A2) (g3 : G A3) (g4 : G A4) s,
   semGenSize (liftGen4 f g1 g2 g3 g4) s <-->
   [set b : B | exists a1 a2 a3 a4, semGenSize g1 s a1 /\ semGenSize g2 s a2 /\
                  semGenSize g3 s a3 /\ semGenSize g4 s a4 /\ f a1 a2 a3 a4 = b].
 
-Hypothesis semLiftGen4SizeMonotonic :
+Parameter semLiftGen4SizeMonotonic :
   forall A1 A2 A3 A4 B (f : A1 -> A2 -> A3 -> A4 -> B)
          (g1 : G A1) (g2 : G A2) (g3 : G A3) (g4 : G A4) 
   `{SizeMonotonic _ g1} `{SizeMonotonic _ g2}
@@ -107,7 +107,7 @@ Declare Instance liftGen4Monotonic {A B C D E}
 : SizeMonotonic (liftGen4 f g1 g2 g3 g4). 
 
 
-Hypothesis semLiftGen5Size :
+Parameter semLiftGen5Size :
 forall {A1 A2 A3 A4 A5 B} (f: A1 -> A2 -> A3 -> A4 -> A5 -> B)
        (g1: G A1) (g2: G A2) (g3: G A3) (g4: G A4) (g5: G A5) size,
   semGenSize (liftGen5 f g1 g2 g3 g4 g5) size <-->
@@ -119,13 +119,13 @@ forall {A1 A2 A3 A4 A5 B} (f: A1 -> A2 -> A3 -> A4 -> A5 -> B)
                                                   (exists a5, semGenSize g5 size a5 /\
                                                               (f a1 a2 a3 a4 a5) = b))))].
 
-Hypothesis semSequenceGenSize:
+Parameter semSequenceGenSize:
   forall {A} (gs : list (G A)) n,
     semGenSize (sequenceGen gs) n <-->
     [set l | length l = length gs /\
       List.Forall2 (fun y => semGenSize y n) gs l].
 
-Hypothesis semSequenceGenSizeMonotonic : 
+Parameter semSequenceGenSizeMonotonic : 
   forall A (gs : list (G A)),
     (gs \subset SizeMonotonic) ->
     semGen (sequenceGen gs) <-->
@@ -133,7 +133,7 @@ Hypothesis semSequenceGenSizeMonotonic :
                     List.Forall2 semGen gs l].
 
 
-Hypothesis semFoldGen_right :
+Parameter semFoldGen_right :
   forall {A B : Type} (f : A -> B -> G A) (bs : list B) (a0 : A) (s : nat),
     semGenSize (foldGen f bs a0) s <-->
     [ set an |
@@ -141,12 +141,12 @@ Hypothesis semFoldGen_right :
             [set an] bs a0 ].
 
 
-Hypothesis semOneof:
+Parameter semOneof:
   forall {A} (l : list (G A)) (def : G A),
     (semGen (oneof def l)) <-->
       if l is nil then semGen def else \bigcup_(x in l) semGen x.
 
-Hypothesis semOneofSize:
+Parameter semOneofSize:
   forall {A} (l : list (G A)) (def : G A) s,
     (semGenSize (oneof def l) s) <-->
       if l is nil then semGenSize def s else \bigcup_(x in l) semGenSize x s.
@@ -154,26 +154,26 @@ Hypothesis semOneofSize:
 Declare Instance oneofMonotonic {A} (x : G A) (l : list (G A))
         `{ SizeMonotonic _ x} `(l \subset SizeMonotonic) : SizeMonotonic (oneof x l). 
 
-Hypothesis semFrequency:
+Parameter semFrequency:
   forall {A} (l : list (nat * G A)) (def : G A),
     semGen (frequency def l) <-->
       let l' := [seq x <- l | x.1 != 0] in
       if l' is nil then semGen def else
       \bigcup_(x in l') semGen x.2.
 
-Hypothesis semFrequencySize:
+Parameter semFrequencySize:
   forall {A} (l : list (nat * G A)) (def : G A) (size: nat),
     semGenSize (frequency def l) size <-->
       let l' := [seq x <- l | x.1 != 0] in
       if l' is nil then semGenSize def size else
       \bigcup_(x in l') semGenSize x.2 size.
 
-Hypothesis semVectorOfSize:
+Parameter semVectorOfSize:
   forall {A : Type} (k : nat) (g : G A) size,
     semGenSize (vectorOf k g) size <-->
     [set l | length l = k /\ l \subset semGenSize g size].
 
-Hypothesis semVectorOfUnsized : 
+Parameter semVectorOfUnsized : 
   forall {A} (g : G A) (k : nat) `{Unsized _ g}, 
     semGen (vectorOf k g) <--> [set l | length l = k /\ l \subset semGen g ]. 
 
@@ -183,23 +183,23 @@ Declare Instance vectorOfUnsized {A} (k : nat) (g : G A)
 Declare Instance vectorOfMonotonic {A} (k : nat) (g : G A) 
         `{SizeMonotonic _ g } : SizeMonotonic (vectorOf k g).
 
-Hypothesis semListOfSize:
+Parameter semListOfSize:
   forall (A : Type) (g : G A) (size : nat),
     semGenSize (listOf g) size <-->
     [set l | length l <= size /\ l \subset semGenSize g size].
 
-Hypothesis semListOfUnsized: 
+Parameter semListOfUnsized: 
   forall {A} (g : G A) (k : nat) `{Unsized _ g}, 
     semGen (listOf g) <--> [set l | l \subset semGen g ]. 
 
 Declare Instance listOfMonotonic {A} (g : G A) 
         `{SizeMonotonic _ g } : SizeMonotonic (listOf g).
 
-Hypothesis semElements:
+Parameter semElements:
   forall {A} (l: list A) (def : A),
     (semGen (elements def l)) <--> if l is nil then [set def] else l.
 
-Hypothesis semElementsSize:
+Parameter semElementsSize:
   forall {A} (l: list A) (def : A) s,
     (semGenSize (elements def l) s) <--> if l is nil then [set def] else l.
 
@@ -215,7 +215,7 @@ Definition uncurry {A B C : Type} (f : A -> B -> C) (ab : A * B) :=
 
 Definition curry {A B C : Type} (f : A * B -> C) (a : A) (b : B) := f (a,b).
 
-Hypothesis mergeBinds :
+Parameter mergeBinds :
   forall A B C (ga : G A) (gb : G B) (f : A -> B -> G C),
     semGen (bindGen ga (fun x => bindGen gb (f x))) <-->
     semGen (bindGen (genPair ga gb) (uncurry f)).
@@ -248,16 +248,16 @@ End QcDefaultNotation.
 
 Import QcDefaultNotation. Open Scope qc_scope.
 
-Hypothesis semElemsSize : forall A (x : A) xs s,
+Parameter semElemsSize : forall A (x : A) xs s,
   semGenSize (elems (x ;; xs)) s <--> x :: xs.
 
-Hypothesis semElems : forall A (x : A) xs,
+Parameter semElems : forall A (x : A) xs,
   semGen (elems (x ;; xs)) <--> x :: xs.
 
-Hypothesis semOneOfSize : forall A (g0 : G A) (gs : list (G A)) s,
+Parameter semOneOfSize : forall A (g0 : G A) (gs : list (G A)) s,
   semGenSize (oneOf (g0 ;; gs)) s  <--> \bigcup_(g in (g0 :: gs)) semGenSize g s.
 
-Hypothesis semOneOf : forall A (g0 : G A) (gs : list (G A)),
+Parameter semOneOf : forall A (g0 : G A) (gs : list (G A)),
   semGen (oneOf (g0 ;; gs))  <--> \bigcup_(g in (g0 :: gs)) semGen g.
 
 End GenHighInterface.

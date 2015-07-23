@@ -48,7 +48,7 @@ Parameter sample : forall {A : Type}, G A -> list A.
 Parameter variant : forall {A : Type}, SplitPath -> G A -> G A.
 Parameter reallyUnsafePromote : forall {r A:Type}, (r -> G A) -> G (r -> A).
 
-Hypothesis promoteVariant : forall {A B : Type} (a : A) (f : A -> SplitPath) (g : G B) size 
+Parameter promoteVariant : forall {A B : Type} (a : A) (f : A -> SplitPath) (g : G B) size 
                             (r r1 r2 : RandomSeed),
   randomSplit r = (r1,r2) ->                              
   run (reallyUnsafePromote (fun a => variant (f a) g)) size r a = 
@@ -76,31 +76,31 @@ Class SizeMonotonic {A} (g : G A) := {
 Declare Instance unsizedMonotonic {A} (g : G A) `{Unsized _ g} : SizeMonotonic g.
 (* end unsizedMonotonic *)
 
-Hypothesis unsized_alt_def : 
+Parameter unsized_alt_def : 
   forall A (g : G A) `{Unsized _ g},
   forall s, semGenSize g s <--> semGen g.
 
 (* Set of outcomes characterization of generators *)
-Hypothesis semReturn :
+Parameter semReturn :
   forall A (x : A), semGen (returnGen x) <--> [set x].
-Hypothesis semReturnSize :
+Parameter semReturnSize :
   forall A (x : A) size, semGenSize (returnGen x) size <--> [set x].
 
 Declare Instance unsizedReturn {A} (x : A) : Unsized (returnGen x).
 
 
-Hypothesis semBindSize :
+Parameter semBindSize :
   forall A B (g : G A) (f : A -> G B) (size : nat),
     semGenSize (bindGen g f) size <-->
                \bigcup_(a in semGenSize g size) semGenSize (f a) size.
 
-Hypothesis monad_leftid : 
+Parameter monad_leftid : 
   forall {A B : Type} (a: A) (f : A -> G B),
     semGen (bindGen (returnGen a) f) <--> semGen (f a).
-Hypothesis monad_rightid : 
+Parameter monad_rightid : 
   forall {A : Type} (g : G A),
     semGen (bindGen g returnGen) <--> semGen g.
-Hypothesis monad_assoc: 
+Parameter monad_assoc: 
   forall {A B C : Type} (ga : G A) (fb : A -> G B) (fc : B -> G C),
     semGen (bindGen (bindGen ga fb) fc) <--> 
     semGen (bindGen ga (fun a => bindGen (fb a) fc)).
@@ -116,23 +116,23 @@ Declare Instance bindMonotonic
         `{SizeMonotonic _ g} `{forall x, SizeMonotonic (f x)} : 
   SizeMonotonic (bindGen g f).
 
-Hypothesis semBindUnsized1 :
+Parameter semBindUnsized1 :
   forall A B (g : G A) (f : A -> G B) `{Unsized _ g},
     semGen (bindGen g f) <--> \bigcup_(a in semGen g) semGen (f a).
 
-Hypothesis semBindUnsized2 :
+Parameter semBindUnsized2 :
   forall A B (g : G A) (f : A -> G B) `{forall a, Unsized (f a)},
     semGen (bindGen g f) <--> \bigcup_(a in semGen g) semGen (f a).
 
-Hypothesis semBindSizeMonotonic :
+Parameter semBindSizeMonotonic :
   forall {A B} (g : G A) (f : A -> G B)
          `{SizeMonotonic _ g} `{forall a, SizeMonotonic (f a)},
     semGen (bindGen g f) <--> \bigcup_(a in semGen g) semGen (f a).
 
-Hypothesis semFmap :
+Parameter semFmap :
   forall A B (f : A -> B) (g : G A),
     semGen (fmap f g) <--> f @: semGen g.
-Hypothesis semFmapSize :
+Parameter semFmapSize :
   forall A B (f : A -> B) (g : G A) (size : nat),
     semGenSize (fmap f g) size <--> f @: semGenSize g size.
 
@@ -143,12 +143,12 @@ Declare Instance fmapMonotonic
         {A B} (f : A -> B) (g : G A) `{SizeMonotonic _ g} : 
   SizeMonotonic (fmap f g).
 
-Hypothesis semChoose :
+Parameter semChoose :
   forall A `{ChoosableFromInterval A} (a1 a2 : A), Random.leq a1 a2 ->
     (semGen (choose (a1,a2)) <-->
     [set a | Random.leq a1 a && Random.leq a a2]).
 
-Hypothesis semChooseSize :
+Parameter semChooseSize :
   forall A `{ChoosableFromInterval A} (a1 a2 : A), Random.leq a1 a2 ->
     forall size, (semGenSize (choose (a1,a2)) size <-->
     [set a | Random.leq a1 a && Random.leq a a2]).
@@ -156,15 +156,15 @@ Hypothesis semChooseSize :
 Declare Instance chooseUnsized A `{ChoosableFromInterval A} (a1 a2 : A) : 
   Unsized (choose (a1, a2)).
 
-Hypothesis semSized :
+Parameter semSized :
   forall A (f : nat -> G A),
     semGen (sized f) <--> \bigcup_s semGenSize (f s) s.
 
-Hypothesis semSizedSize :
+Parameter semSizedSize :
   forall A (f : nat -> G A) s,
     semGenSize (sized f) s <--> semGenSize (f s) s.
 
-Hypothesis semResize :
+Parameter semResize :
   forall A (n : nat) (g : G A),
     semGen (resize n g) <--> semGenSize g n.
 
@@ -173,17 +173,17 @@ Declare Instance unsizedResize {A} (g : G A) n :
 
 
 (* TODO: We need completeness as well - this is not exact *)
-Hypothesis semSuchThatMaybe_sound:
+Parameter semSuchThatMaybe_sound:
   forall A (g : G A) (f : A -> bool),
     semGen (suchThatMaybe g f) \subset
     None |: some @: (semGen g :&: f).
 
 (* This (very concrete) spec is needed to prove shrinking *)
-Hypothesis semPromote : forall A (m : Rose (G A)),
+Parameter semPromote : forall A (m : Rose (G A)),
   semGen (promote m) <-->
   codom2 (fun size seed => fmapRose (fun g => run g size seed) m).
 
-Hypothesis semPromoteSize :
+Parameter semPromoteSize :
   forall (A : Type) (m : Rose (G A)) n,
     semGenSize (promote m) n <-->
     (fun t : Rose A =>
@@ -195,13 +195,13 @@ Hypothesis semPromoteSize :
    Should we try to get rid of this?
    This is expected since the spec of promote is too concrete. *)
 
-Hypothesis runFmap : forall (A B : Type) (f : A -> B) (g : G A) seed size,
+Parameter runFmap : forall (A B : Type) (f : A -> B) (g : G A) seed size,
   run (fmap f g) seed size = f (run g seed size).
   
-Hypothesis runPromote : forall A (m : Rose (G A)) seed size,
+Parameter runPromote : forall A (m : Rose (G A)) seed size,
   run (promote m) seed size = fmapRose (fun (g : G A) => run g seed size) m.
 
-Hypothesis semFmapBind :
+Parameter semFmapBind :
   forall A B C (g : G A) (f1 : B -> C) (f2 : A -> G B),
     semGen (fmap f1 (bindGen g f2)) <-->
     semGen (bindGen g (fun x => fmap f1 (f2 x))).
