@@ -9,9 +9,10 @@ open Topconstr
 open Libnames
 open Util
 open Constrintern
+open Constrexpr
 
 let message = "QuickChick"
-let mk_ref s = CRef (Qualid (dummy_loc, qualid_of_string s))
+let mk_ref s = CRef (Qualid (Loc.ghost, qualid_of_string s), None)
 
 (* Names corresponding to QuickChick's .v files *)
 let show = mk_ref "QuickChick.Show.show"
@@ -25,12 +26,13 @@ let mutateCheckManyWith = mk_ref "QuickChick.MutateCheck.mutateCheckManyWith"
 (* Locate QuickChick's files *)
 (* The computation is delayed because QuickChick's libraries are not available
 when the plugin is first loaded. *)
-(* For trunk and forthcoming Coq 8.5:
+(* For trunk and forthcoming Coq 8.5: *)
 let qid = Libnames.make_qualid (DirPath.make [Id.of_string "QuickChick"]) (Id.of_string "QuickChick")
-*)
+			       (*
 let qid = qualid_of_string "QuickChick.QuickChick"
+				*)
 let path =
-  lazy (let (_,_,path) = Library.locate_qualified_library false qid in path)
+  lazy (let (_,_,path) = Library.locate_qualified_library ~warn:false qid in path)
 let path = lazy (Filename.dirname (Lazy.force path))
 
 (* Interface with OCaml compiler *)
@@ -68,13 +70,18 @@ let define c =
     (** Safe fresh name generation. *)
     Namegen.next_ident_away_from base is_visible_name
   in
+  let proof_output = Future.from_val ((c,Univ.ContextSet.empty),Declareops.no_seff) in
   ignore (
     declare_constant ~internal:KernelVerbose fresh_name
       (DefinitionEntry {
-        const_entry_body = c;
+        const_entry_body = proof_output;
         const_entry_secctx = None;
         const_entry_type = None;
-        const_entry_opaque = false
+        const_entry_opaque = false;
+	const_entry_feedback = None;
+         const_entry_polymorphic = false;
+	 const_entry_universes = Univ.UContext.empty;
+	 const_entry_inline_code = false
        },
        Decl_kinds.IsDefinition Decl_kinds.Definition)
   );
@@ -85,17 +92,17 @@ let runTest c =
   (** [c] is a constr_expr representing the test to run,
       so we first build a new constr_expr representing
       show c **)
-  let c = CApp(dummy_loc,(None,show), [(c,None)]) in
+  let c = CApp(Loc.ghost,(None,show), [(c,None)]) in
   (** Build the kernel term from the const_expr *)
   let env = Global.env () in
   let evd = Evd.empty in
-  let c = interp_constr evd env c in
+  let (c,evd) = interp_constr env evd c in
   (** Extract the term and its dependencies *)
   let main = define c in
   let mlf = Filename.temp_file "QuickChick" ".ml" in
   let execn = Filename.chop_extension mlf in
   let mlif = execn ^ ".mli" in
-  Flags.silently (full_extraction (Some mlf)) [Ident (dummy_loc, main)];
+  Flags.silently (full_extraction (Some mlf)) [Ident (Loc.ghost, main)];
   (** Add a main function to get some output *)
   let oc = open_out_gen [Open_append;Open_text] 0o666 mlf in
   Printf.fprintf oc
@@ -116,7 +123,7 @@ let runTest c =
 
 let run f args =
   let args = List.map (fun x -> (x,None)) args in
-  let c = CApp(dummy_loc, (None,f), args) in
+  let c = CApp(Loc.ghost, (None,f), args) in
   runTest c
 
 	  (*
