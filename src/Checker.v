@@ -1,7 +1,7 @@
 Set Implicit Arguments.
 
 Require Import List.
-Require Import String.
+Require Import Coq.Strings.String.
 
 Require Import RoseTrees.
 Require Import Show.

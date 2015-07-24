@@ -7,7 +7,7 @@ Require Import ZArith.
 Require Import Machine.
 Require Import Generation.
 
-Require Import String.
+Require Import Coq.Strings.String.
 
 Local Open Scope string.
 

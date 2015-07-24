@@ -8,7 +8,7 @@ Require Import Printing.
 Require Import Generation.
 Require Import Indist.
 
-Require Import String.
+Require Import Coq.Strings.String.
 Local Open Scope string.
 Definition SSNI (t : table) (v : @Variation State) : Checker  :=
   let '(V st1 st2) := v in

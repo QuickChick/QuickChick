@@ -7,7 +7,7 @@ Require Import Checker.
 Require Import State.
 Require Import Arbitrary.
 
-Require Import String.
+Require Import Coq.Strings.String.
 Require Import Coq.Strings.Ascii.
 Require Import Coq.Strings.String.
 Require Import Coq.Numbers.Natural.Peano.NPeano.

@@ -1,6 +1,6 @@
 Require Import QuickChick.
 Require Import ssreflect ssrbool.
-Require Import String. (* ?? *)
+Require Import Coq.Strings.String. (* ?? *)
 Require Import monad lambda.
 
 
