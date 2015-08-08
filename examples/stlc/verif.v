@@ -178,7 +178,7 @@ Proof.
           by apply H4; omega. omega. 
     - move => /= H. destruct n as [| n]; first by discriminate.
       apply semBindSize. exists (n - type_size tau1). split.
-      apply semChooseSize; unfold leq, super, RandomNat, OrdNat in *.
+      apply semChooseSize; unfold leq, super, ChooseNat, OrdNat in *.
       apply/leP. omega. apply/andP; split; apply /leP; omega.
       apply semLiftGen2Size. exists (tau1, tau2). 
       split; last by reflexivity.
@@ -307,7 +307,7 @@ Proof.
             (split; try econstructor; eauto);
             repeat (apply Max.max_lub; auto) | 
           eexists; (split; first by reflexivity);
-          unfold leq, super, RandomNat, OrdNat in H3, H4;
+          unfold leq, super, ChooseNat, OrdNat in H3, H4;
           (have /andP [_ /leP Hle] : 0 <= m <= n by auto); 
           (have /andP [/leP Hle3 /leP Hle4]  : (n - m)%coq_nat <= m' <= n
             by apply H4; apply/leP; omega); omega ]); 
@@ -361,12 +361,12 @@ Proof.
           exists (n - (app_no t1)); 
           (split; first by
               apply semChooseSize; auto;
-              unfold leq, super, randomR, RandomNat, OrdNat;
+              unfold leq, super, randomR, ChooseNat, OrdNat;
               apply/andP; split; apply/leP; omega);
           apply semBindSize;
           exists (n - (app_no t2));
           (split; first by apply semChooseSize; auto;
-           unfold leq, super, randomR, RandomNat, OrdNat;
+           unfold leq, super, randomR, ChooseNat, OrdNat;
            try (apply/leP; omega);
              apply/andP; split; apply/leP; omega);
           apply semLiftGen2Size;
