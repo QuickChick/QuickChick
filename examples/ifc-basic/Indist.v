@@ -1,8 +1,8 @@
-Require Import QuickChick.
+From QuickChick Require Import QuickChick.
 Require Import ZArith.
 Require Import List.
 
-Require Import Machine.
+From QuickChick.ifcbasic Require Import Machine.
 
 Fixpoint forallb2 {A : Type} (f : A -> A -> bool) (l1 l2 :list A) : bool :=
   match l1, l2 with

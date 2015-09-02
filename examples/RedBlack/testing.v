@@ -1,11 +1,9 @@
-Require Import QuickChick.
-Require Import GenLow GenHigh.
-Import GenLow GenHigh.
-Require Import NPeano.
+From QuickChick Require Import QuickChick GenLow GenHigh.
+Require Import NPeano Omega.
 
-Require Import ssreflect ssrnat ssrbool eqtype.
+From mathcomp Require Import ssreflect ssrnat ssrbool eqtype.
 
-Require Import redblack.
+From QuickChick.RedBlack Require Import redblack.
 
 Require Import List String.
 Import ListNotations.

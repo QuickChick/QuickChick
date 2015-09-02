@@ -1,7 +1,8 @@
-Require Import Arith List QuickChick String.
-Require Import ssreflect ssrbool eqtype.
+From mathcomp Require Import ssreflect ssrbool eqtype.
+Require Import Arith List String Omega.
 Require Import Program Relations Wellfounded Lexicographic_Product.
-Require Import monad.
+From QuickChick Require Import QuickChick.
+From QuickChick.stlc Require Import monad.
 
 Import ListNotations.
 
@@ -180,10 +181,8 @@ Definition gen_type : G type := bindGen arbitrary gen_type_size.
 (* Returns the list of bindings that have type tau in e *)
 Definition vars_with_type (e : env) (tau : type) : list term :=
   map (fun p => Id (snd p))
-      (filter (fun p => projT1 (Sumbool.bool_of_sumbool (type_eq_dec tau (fst p))))
+      (filter (fun p => proj1_sig (Sumbool.bool_of_sumbool (type_eq_dec tau (fst p))))
               (combine e (seq 0 (List.length e)))).
-
-
 
 Definition sigT_of_prod {A B : Type} (p : A * B) : {_ : A & B} :=
   let (a, b) := p in existT (fun _ : A => B) a b.
@@ -250,13 +249,13 @@ Program Fixpoint gen_term_size (p : nat * type) {wf lt_pair p} : env -> G term :
                end);
               elements def (def :: vars) ] 
       end
-  end.  
-Solve Obligations using
+  end.
+Solve Obligations with
   program_simpl; unfold lt_pair; apply left_lex; omega.
-Solve Obligations using 
+Solve Obligations with
   program_simpl; unfold lt_pair; apply right_lex; unfold lt_type; simpl; omega.
 Next Obligation.
-  unfold MR; apply wf_inverse_image; apply wf_lt_pair.
+  unfold MR. apply wf_inverse_image. apply wf_lt_pair.
 Defined.
 
 
@@ -299,7 +298,7 @@ Lemma gen_term_size_eq (e : env) (p : nat * type) :
   gen_term_size p e =
   gen_term_size_unfold p e.
 Proof.
-  unfold_sub gen_term_size (gen_term_size p e).
+  unfold_sub gen_term_size (gen_term_size p e); simpl.
   destruct p as [[|n] [|]]; try reflexivity;
   destruct (vars_with_type e _) eqn:Heq; simpl; 
   repeat (rewrite !Heq /=; apply f_equal; try reflexivity).

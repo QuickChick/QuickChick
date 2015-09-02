@@ -102,9 +102,10 @@ let runTest c =
     (string_of_id main);
   close_out oc;
   (** Compile the extracted code *)
-  if Sys.command (comp_mli_cmd mlif) <> 0 then
-    msgerr (str "Could not compile test program interface" ++ fnl ())
-  else if Sys.command (comp_ml_cmd mlf execn) <> 0 then
+  (** Extraction sometimes produces ML code that does not implement its interface.
+      We circumvent this problem by erasing the interface. **)
+  Sys.remove mlif;
+  if Sys.command (comp_ml_cmd mlf execn) <> 0 then
     msgerr (str "Could not compile test program" ++ fnl ())
   (** Run the test *)
   else

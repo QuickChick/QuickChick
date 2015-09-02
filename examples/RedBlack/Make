@@ -1,3 +1,4 @@
+-Q . QuickChick.RedBlack
 redblack.v
 testing.v
 verif.v

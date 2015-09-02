@@ -1,3 +1,4 @@
+-Q . QuickChick.stlc
 monad.v
 lambda.v
 test_progress.v

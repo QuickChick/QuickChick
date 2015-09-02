@@ -1,7 +1,8 @@
-Require Import ssreflect ssrbool ssrnat eqtype.
+From mathcomp Require Import ssreflect ssrbool ssrnat eqtype.
 Require Import String. (* I don't know why we need this.. Probably I am forgetting something *)
-Require Import Arith List Omega QuickChick.
-Require Import lambda.
+Require Import Arith List Omega.
+From QuickChick Require Import QuickChick.
+From QuickChick.stlc Require Import lambda.
 Require Import Wellfounded.
 
 Open Scope coq_nat.
@@ -15,13 +16,13 @@ Lemma vars_with_type_shift:
        (map (fun p : type * var => Id (snd p))
             (filter
                (fun p : type * nat =>
-                  projT1 (Sumbool.bool_of_sumbool (type_eq_dec tau (fst p))))
+                  proj1_sig (Sumbool.bool_of_sumbool (type_eq_dec tau (fst p))))
                (combine e (seq (S n) (length e))))) <-> 
     In (Id x)
        (map (fun p : type * var => Id (snd p))
             (filter
                (fun p : type * nat =>
-                  projT1 (Sumbool.bool_of_sumbool (type_eq_dec tau (fst p))))
+                  proj1_sig (Sumbool.bool_of_sumbool (type_eq_dec tau (fst p))))
                (combine e (seq n (length e))))).
 Proof.
   move => e. induction e; intros x tau; simpl in *; split; auto; 
@@ -36,7 +37,7 @@ Lemma vars_with_type_le:
        (map (fun p : type * var => Id (snd p))
             (filter
                (fun p : type * nat =>
-                  projT1 (Sumbool.bool_of_sumbool (type_eq_dec tau (fst p))))
+                  proj1_sig (Sumbool.bool_of_sumbool (type_eq_dec tau (fst p))))
                (combine e (seq n (length e))))) -> n <= x. 
 Proof.
   move => e. induction e; intros x tau n H; simpl in *.
@@ -52,7 +53,7 @@ Lemma vars_with_type_le_length_aux:
        (map (fun p : type * var => Id (snd p))
             (filter
                (fun p : type * nat =>
-                  projT1 (Sumbool.bool_of_sumbool (type_eq_dec tau (fst p))))
+                  proj1_sig (Sumbool.bool_of_sumbool (type_eq_dec tau (fst p))))
                (combine e (seq n (length e))))) -> x < n + (length e).
 Proof.
   move => e. induction e; intros x tau n H; simpl in *. 
@@ -178,7 +179,7 @@ Proof.
           by apply H4; omega. omega. 
     - move => /= H. destruct n as [| n]; first by discriminate.
       apply semBindSize. exists (n - type_size tau1). split.
-      apply semChooseSize; unfold leq, super, RandomNat, OrdNat in *.
+      apply semChooseSize; unfold leq, super, OrdNat in *.
       apply/leP. omega. apply/andP; split; apply /leP; omega.
       apply semLiftGen2Size. exists (tau1, tau2). 
       split; last by reflexivity.
@@ -307,7 +308,7 @@ Proof.
             (split; try econstructor; eauto);
             repeat (apply Max.max_lub; auto) | 
           eexists; (split; first by reflexivity);
-          unfold leq, super, RandomNat, OrdNat in H3, H4;
+          unfold leq, super, OrdNat in H3, H4;
           (have /andP [_ /leP Hle] : 0 <= m <= n by auto); 
           (have /andP [/leP Hle3 /leP Hle4]  : (n - m)%coq_nat <= m' <= n
             by apply H4; apply/leP; omega); omega ]); 
@@ -361,12 +362,12 @@ Proof.
           exists (n - (app_no t1)); 
           (split; first by
               apply semChooseSize; auto;
-              unfold leq, super, randomR, RandomNat, OrdNat;
+              unfold leq, super, randomR, OrdNat;
               apply/andP; split; apply/leP; omega);
           apply semBindSize;
           exists (n - (app_no t2));
           (split; first by apply semChooseSize; auto;
-           unfold leq, super, randomR, RandomNat, OrdNat;
+           unfold leq, super, randomR, OrdNat;
            try (apply/leP; omega);
              apply/andP; split; apply/leP; omega);
           apply semLiftGen2Size;

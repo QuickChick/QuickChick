@@ -113,12 +113,12 @@ fun lv =>
      | lab1 p => nth_order vs p
      | lab2 p => nth_order vs p
      | lab3 p => nth_order vs p
-     | labpc => pc
+     | labpc _ => pc
     end.
 
 Fixpoint eval_expr {n:nat} (eval_var:LAB n -> Label) (e: rule_expr n) : Label :=
 match e with
-  | L_Bot => L
+  | L_Bot _ => L
   | L_Var labv => eval_var labv
   | L_Join e1 e2 => (eval_expr eval_var e1) ∪ (eval_expr eval_var e2)
 end.
@@ -126,7 +126,7 @@ end.
 (** eval_cond : evaluates a side_condition with given values for the argument *)
 Fixpoint eval_cond {n:nat} (eval_var:LAB n -> Label) (c: rule_scond n) : bool :=
 match c with
-  | A_True => true
+  | A_True _ => true
   | A_And c1 c2 => andb (eval_cond eval_var c1) (eval_cond eval_var c2)
   | A_Or  c1 c2 => orb (eval_cond eval_var c1) (eval_cond eval_var c2)
   | A_LE  e1 e2 => (eval_expr eval_var e1) ≼ (eval_expr eval_var e2)
@@ -175,4 +175,3 @@ Notation "'OR'" := A_Or.
 Notation "'LE'" := A_LE.
 Notation "<||>" := (Vector.nil _).
 Notation " <| x ; .. ; y |> " := (Vector.cons _ x _ .. (Vector.cons _ y _ (Vector.nil _)) ..).
-

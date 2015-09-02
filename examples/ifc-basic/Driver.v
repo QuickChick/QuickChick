@@ -1,12 +1,9 @@
-Require Import QuickChick.
+From QuickChick Require Import QuickChick.
 Import GenLow GenHigh.
 
 Require Import List. Import ListNotations.
 
-Require Import Machine.
-Require Import Printing.
-Require Import Generation.
-Require Import Indist.
+From QuickChick.ifcbasic Require Import Machine Printing Generation Indist.
 
 Require Import String.
 Local Open Scope string.
@@ -79,8 +76,7 @@ Definition myArgs : Args :=
   let '(MkArgs rp mSuc md mSh mSz c) := stdArgs in
   MkArgs rp numTests md mSh mSz c.
 
-Require Import Mutate.
-Require Import MutateCheck.
+From QuickChick Require Import Mutate MutateCheck.
 
 Instance mutateable_table : Mutateable table :=
 {|

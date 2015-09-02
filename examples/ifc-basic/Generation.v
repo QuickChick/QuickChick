@@ -1,10 +1,10 @@
-Require Import QuickChick.
+From QuickChick Require Import QuickChick.
 
 Require Import ZArith.
 Require Import NPeano.
 Require Import List.
 Import ListNotations.
-Require Import Machine.
+From QuickChick.ifcbasic Require Import Machine.
 
 Import GenLow GenHigh.
 

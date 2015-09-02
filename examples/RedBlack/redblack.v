@@ -1,4 +1,4 @@
-Require Import ssreflect ssrnat ssrbool eqtype.
+From mathcomp Require Import ssreflect ssrnat ssrbool eqtype.
 
 (* Formalization inspired from
    https://www.cs.princeton.edu/~appel/papers/redblack.pdf *)

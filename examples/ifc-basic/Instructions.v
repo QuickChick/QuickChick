@@ -1,4 +1,5 @@
 Require Import ZArith.
+Require Import List. Import ListNotations.
 
 Inductive Instruction : Type :=
   | Nop
@@ -18,7 +19,6 @@ Inductive OpCode : Type :=
   | OpLoad
   | OpStore.
 
-Require Import List. Import ListNotations.
 Definition opCodes := [
   OpBCall;
   OpBRet;

@@ -1,12 +1,11 @@
-Require Import Rules.
-Require Import Machine.
+From QuickChick.ifcbasic Require Import Rules Machine.
 Require Import List. Import ListNotations.
 
 Set Implicit Arguments.
 
 Fixpoint break_expr n (e : rule_expr n) : list (rule_expr n) :=
   match e with
-  | L_Bot => []
+  | L_Bot _ => []
   | L_Var m => [L_Var m]
   | L_Join e1 e2 => break_expr e1 ++ break_expr e2
   end.
@@ -20,7 +19,7 @@ Fixpoint join_exprs n (es : list (rule_expr n)) : rule_expr n :=
 
 Fixpoint break_scond n (c : rule_scond n) : list (rule_scond n) :=
   match c with
-  | A_True => []
+  | A_True _ => []
   | A_LE e1 e2 => List.map (fun e1' => A_LE e1' e2) (break_expr e1)
   | A_And c1 c2 => break_scond c1 ++ break_scond c2
   | A_Or c1 c2 => [c]

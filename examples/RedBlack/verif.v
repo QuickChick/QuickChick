@@ -1,10 +1,9 @@
-Require Import ssreflect ssrnat ssrbool eqtype.
-Require Import List String.
-Require Import QuickChick.
+From mathcomp Require Import ssreflect ssrnat ssrbool eqtype.
+Require Import List String Omega.
+From QuickChick Require Import QuickChick.
 Import GenLow GenHigh.
 
-Require Import redblack.
-Require Import testing.
+From QuickChick.RedBlack Require Import redblack testing.
 
 (* correspondence between the inductive and the executable definitions *)
 Lemma has_black_height :

@@ -1,11 +1,10 @@
-Require Import QuickChick.
+From QuickChick Require Import QuickChick.
 
 Require Import List.
 Require Import NPeano.
 Require Import ZArith.
 
-Require Import Machine.
-Require Import Generation.
+From QuickChick.ifcbasic Require Import Machine Generation.
 
 Require Import String.
 
@@ -133,10 +132,10 @@ Instance show_stack_pair : ShowPair Stack :=
             end
         end in
     let '(prefix,(s1,s2)) :=
-        if ltb len1 len2 then
+        if Nat.ltb len1 len2 then
           let (show_pre, s2') := show_until s2 (len2 - len1)%nat in
           ("Bigger part of 2: " ++ nl ++ show_pre ++ nl, (s1, s2'))
-        else if ltb len2 len1 then
+        else if Nat.ltb len2 len1 then
           let (show_pre, s1') := show_until s1 (len1 - len2)%nat in
           ("Bigger part of 1: " ++ nl ++ show_pre ++ nl, (s1', s2))
         else ("", (s1,s2))

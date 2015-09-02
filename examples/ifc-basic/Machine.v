@@ -2,8 +2,7 @@ Require Import ZArith.
 Require Import List. Import ListNotations.
 Require Import MSetPositive.
 
-Require Export Rules.
-Require Export Instructions.
+From QuickChick.ifcbasic Require Export Rules Instructions.
 
 Open Scope Z_scope.
 Open Scope bool_scope.

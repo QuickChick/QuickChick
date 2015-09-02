@@ -1,7 +1,7 @@
-Require Import QuickChick.
-Require Import ssreflect ssrbool.
+From QuickChick Require Import QuickChick.
+From mathcomp Require Import ssreflect ssrbool.
 Require Import String. (* ?? *)
-Require Import monad lambda.
+From QuickChick.stlc Require Import monad lambda.
 
 
 (* Note : In general we would need a type checking/inferring function for this.
