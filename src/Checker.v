@@ -151,11 +151,11 @@ Definition callback {prop : Type} `{Checkable prop}
 
 Definition printTestCase {prop : Type} `{Checkable prop}
            (s : string) (p : prop) : Checker :=
-  callback (PostFinalFailure Counterexample (fun _st _res => trace s 0)) p.
+  callback (PostFinalFailure Counterexample (fun _st _res => trace (s ++ nl) 0)) p.
 
 Definition whenFail {prop : Type} `{Checkable prop}
            (str : string) : prop -> Checker :=
-  callback (PostFinalFailure Counterexample (fun _st _sr => trace str 0)).
+  callback (PostFinalFailure Counterexample (fun _st _sr => trace (str ++ nl) 0)).
 
 
 Definition expectFailure {prop: Type} `{Checkable prop} (p: prop) :=
