@@ -5,10 +5,10 @@ open Tacmach
 open Entries
 open Declarations
 open Declare
-open Topconstr
 open Libnames
 open Util
 open Constrintern
+open Topconstr
 open Constrexpr
 
 let message = "QuickChick"
@@ -74,7 +74,8 @@ let define c =
   let evd = Evd.from_env env in
   let (evd,_) = Typing.type_of env evd c in
   let uctxt = Evd.evar_context_universe_context (Evd.evar_universe_context evd) in
-  ignore (declare_constant ~internal:KernelVerbose fresh_name
+  (* TODO: Maxime - which of the new internal flags should be used here? The names aren't as clear :) *)
+  ignore (declare_constant ~internal:InternalTacticRequest fresh_name
       (DefinitionEntry (definition_entry ~univs:uctxt c),
        Decl_kinds.IsDefinition Decl_kinds.Definition));
   fresh_name
@@ -87,7 +88,7 @@ let runTest c =
   let c = CApp(Loc.ghost,(None,show), [(c,None)]) in
   (** Build the kernel term from the const_expr *)
   let env = Global.env () in
-  let evd = Evd.empty in
+  let evd = Evd.from_env env in
   let (c,evd) = interp_constr env evd c in
   (** Extract the term and its dependencies *)
   let main = define c in
