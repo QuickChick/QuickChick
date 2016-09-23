@@ -6,7 +6,7 @@ Require Import ZArith.
 
 From QuickChick.ifcbasic Require Import Machine Generation.
 
-Require Import String.
+Require Import Coq.Strings.String.
 
 Local Open Scope string.
 

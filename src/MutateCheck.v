@@ -25,7 +25,7 @@ Instance MutateableList (A : Type) : Mutateable (list A) | 1 :=
 Example mutate_example : mutate [1;2;3] = [[2;3];[1;3];[1;2]].
 Proof. reflexivity. Qed.
 
-Require Import String. Open Scope string_scope.
+Require Import Coq.Strings.String. Open Scope string_scope.
 
 Definition force {X} (x : X) := x.
 

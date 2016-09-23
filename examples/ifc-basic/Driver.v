@@ -5,7 +5,7 @@ Require Import List. Import ListNotations.
 
 From QuickChick.ifcbasic Require Import Machine Printing Generation Indist.
 
-Require Import String.
+Require Import Coq.Strings.String.
 Local Open Scope string.
 Definition SSNI (t : table) (v : @Variation State) : Checker  :=
   let '(V st1 st2) := v in

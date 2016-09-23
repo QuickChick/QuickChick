@@ -70,7 +70,7 @@ Qed.
 
 End AsciiOT.
 
-Require Import String.
+Require Import Coq.Strings.String.
 Module StringOT <: OrderedType.
 
 Definition t := string.

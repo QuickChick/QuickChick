@@ -2,7 +2,7 @@ Set Implicit Arguments.
 
 Require Import GenLow.
 Require Import Random.
-Require Import String.
+Require Import Coq.Strings.String.
 
 Require Import StringOT.
 Require Import FSets.FMapAVL.

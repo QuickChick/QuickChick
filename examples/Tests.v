@@ -97,7 +97,7 @@ Instance arbTree {A} `{Arbitrary A} : Arbitrary (tree A) :=
 |}.
 
 
-Require Import String.
+Require Import Coq.Strings.String.
 Open Scope string.
 
 Instance showTree {A : Type} `{_ : Show A} : Show (tree A) :=

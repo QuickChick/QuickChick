@@ -14,7 +14,7 @@ http://prosecco.gforge.inria.fr/personal/hritcu/publications/foundational-pbt.pd
 
 ### Known to work with
 
-  - (Coq 8.4plX and OCaml 4.01.0) or (Coq 8.4pl5 and OCaml 4.02.x)
+  - (Coq 8.4plX and OCaml 4.01.0) or (Coq 8.4pl5 and OCaml 4.02.x) and (Coq 8.4pl6 and OCaml 4.02.1)
   - SSReflect 1.5 (http://ssr.msr-inria.inria.fr/FTP/)
 
 ### Compilation and Installation

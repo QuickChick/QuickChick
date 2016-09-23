@@ -1,7 +1,7 @@
 Set Implicit Arguments.
 
 Require Import List.
-Require Import String.
+Require Import Coq.Strings.String.
 
 Require Import RoseTrees.
 Require Import Show.
@@ -49,9 +49,24 @@ Definition updReason (r : Result) (s' : string) : Result :=
     | MkResult o e _ i s c => MkResult o e s' i s c
   end.
 
+Definition updOk (r : Result) o' : Result :=
+  match r with
+    | MkResult _ e r i s c => MkResult o' e r i s c
+  end.
+
 Definition addCallback (res : Result) (c : Callback) : Result :=
   match res with
     | MkResult o e r i s cs => MkResult o e r i s (cons c cs)
+  end.
+
+Definition addCallbacks (res : Result) (cs : list Callback) : Result :=
+  match res with
+    | MkResult o e r i s cs' => MkResult o e r i s (cs ++ cs')
+  end.
+
+Definition addStamps res ss :=
+  match res with
+    | MkResult o e r i s cs => MkResult o e r i (ss ++ s) cs
   end.
 
 (* CH: The name of this should change; we no longer call checkers props *)
@@ -151,11 +166,11 @@ Definition callback {prop : Type} `{Checkable prop}
 
 Definition printTestCase {prop : Type} `{Checkable prop}
            (s : string) (p : prop) : Checker :=
-  callback (PostFinalFailure Counterexample (fun _st _res => trace s 0)) p.
+  callback (PostFinalFailure Counterexample (fun _st _res => trace (s ++ nl) 0)) p.
 
 Definition whenFail {prop : Type} `{Checkable prop}
            (str : string) : prop -> Checker :=
-  callback (PostFinalFailure Counterexample (fun _st _sr => trace str 0)).
+  callback (PostFinalFailure Counterexample (fun _st _sr => trace (str ++ nl) 0)).
 
 
 Definition expectFailure {prop: Type} `{Checkable prop} (p: prop) :=
@@ -223,6 +238,44 @@ Global Instance testPolyFunSet {prop : Set -> Type} {_ : Checkable (prop nat)} :
   {
     checker f := printTestCase "" (f nat)
   }.
+
+(* LEO: TODO: Prove conjoin checker *)
+Definition addCallbacks' result r := 
+  addCallbacks result (callbacks r).
+Definition addStamps' result r := 
+  addStamps result (stamp r).
+
+Fixpoint conjAux (f : Result -> Result) 
+         l := 
+  match l with 
+    | nil => MkRose (f succeeded) (lazy nil)
+    | cons res rs => 
+      let '(MkRose r _) := res in
+      match ok r with 
+        | Some true =>
+           (conjAux (fun r' => addStamps' r 
+                             (addCallbacks' r (f r'))
+                    ) rs)
+        | Some false => res
+        | None =>
+          let res' := conjAux (fun r' => addCallbacks' r (f r')) rs in
+          let '(MkRose r' _) := res' in
+          match ok r' with 
+            | Some true => MkRose (updOk r' None) (lazy nil)
+            | Some false => res'
+            | None => res'
+          end
+      end
+  end.
+
+Definition mapGen {A B} (f : A -> G B) (l : list A) : G (list B) :=
+  foldGen (fun acc a => 
+             bindGen (f a) (fun b => returnGen (cons b acc)))
+          l nil.
+
+Fixpoint conjoin {prop : Type} `{_ : Checkable prop} (l : list Checker) : Checker :=
+  bindGen (mapGen (liftGen unProp) l) (fun rs =>
+          (returnGen (MkProp (conjAux (fun x => x) rs)))).
 
 Notation "x ==> y" := (implication x y) (at level 55, right associativity)
                       : Checker_scope.
