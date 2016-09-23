@@ -14,8 +14,15 @@ http://prosecco.gforge.inria.fr/personal/hritcu/publications/foundational-pbt.pd
 
 ### Known to work with
 
-  - (Coq 8.4plX and OCaml 4.01.0) or (Coq 8.4pl5 and OCaml 4.02.x) and (Coq 8.4pl6 and OCaml 4.02.1)
-  - SSReflect 1.5 (http://ssr.msr-inria.inria.fr/FTP/)
+  - Branch 8.4pl6 known to work with
+    * OCaml 4.01.0 and Coq 8.4pl3 or OCaml 4.02.1 and Coq 8.4pl6
+    * SSReflect 1.5 (http://ssr.msr-inria.inria.fr/FTP/)
+  - Branch coq 8.5 known to work with
+    * Coq 8.5pl2 
+    * OCaml 4.03.0
+    * mathcomp-ssreflect v1.5 
+
+  - master currently on 8.5pl2 / 4.03.0
 
 ### Compilation and Installation
 
