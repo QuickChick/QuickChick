@@ -24,5 +24,8 @@ DeriveArbitrary Bar as "arbBar".
 Print arbBar.
 
 Definition testGen : G (Bar nat) := arbitrary.
-
 Sample testGen.
+
+Arguments Bar3 {A} _ _ _.
+DeriveArbitrary Bar as "arbBar2".
+Print arbBar2.

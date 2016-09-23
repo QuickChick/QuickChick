@@ -318,6 +318,8 @@ let rec mk_concat = function
   | [] -> mk_ref "nil"
   | x::xs -> mkAppC (mk_ref "app", [x; mk_concat xs])
 
+let mkAppExplC (f,l) =
+  CAppExpl (dummy_loc, (None, f, None), l)
 
 (* Qualify a name with a number *)
 let mk_ni s i = Printf.sprintf "%s%d" s i
@@ -493,7 +495,7 @@ let derive (cn : derivable) (c : constr_expr) (instance_name : string) =
               let arbitraries = List.mapi create_for_type pat_types in
 
               let rec aux = function
-                | [] -> (true , mkAppC (mk_ref "returnGen", [mkAppC (mk_c ctr_id, 
+                | [] -> (true , mkAppC (mk_ref "returnGen", [mkAppExplC (Ident (dl ctr_id),
                                                                      (List.map (fun n -> mk_c n) param_names) @
                                                                      (List.mapi (fun i _ ->  mk_c (fresh_name (mk_ni "p" i))) pats))]
                                        ))
@@ -571,10 +573,10 @@ let derive (cn : derivable) (c : constr_expr) (instance_name : string) =
               let shrunk = fresh_name "shrunk" in
               let liftN i = 
                 mkCLambdaN dummy_loc [LocalRawAssum ([dummy_loc, Name shrunk],Default Explicit, hole)] 
-                           (CApp (dummy_loc, (None, mk_c ctr_id),
-                                  (List.map (fun n -> (mk_c n, None)) param_names) @
-                                  (List.mapi (fun j pid -> if i == j then (mk_c shrunk, None) else (mk_c pid, None)) pat_ids)
-                                 ))
+                           (mkAppExplC (Ident (dl ctr_id),
+                                        (List.map (fun n -> (mk_c n)) param_names) @
+                                          (List.mapi (fun j pid -> if i == j then (mk_c shrunk) else (mk_c pid)) pat_ids)
+                                       ))
               in
 
               let shrinks = 
