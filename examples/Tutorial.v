@@ -80,12 +80,12 @@ Eval compute in (show Green).
 
 Check bindGen.
 (* bindGen
-     : G ?20 -> (?20 -> G ?21) -> G ?21
+     : G ?A -> (?A -> G ?B) -> G ?B
 *)
 
 Check returnGen.
 (* returnGen
-     : ?22 -> G ?22
+     : ?A -> G ?A
 *)
 
 (* QuickChick also provides "liftM" functions (1-5), "sequence" and "foldM" *)
@@ -101,7 +101,7 @@ Sample (choose(0, 10)).
 
 Check listOf.
 (* listOf
-     : G ?25 -> G (list ?25)
+     : G ?A -> G (list ?A)
 
    Takes as input a generator for the elements and returns a generator for lists 
  *)
@@ -109,7 +109,7 @@ Sample (listOf (choose (0,4))).
 
 Check vectorOf.
 (* listOf
-     : nat -> G ?26 -> G (list ?26)
+     : nat -> G ?A -> G (list ?A)
 
    Takes as input a number n, a generator for the elements and returns a generator for lists
    of length n.
@@ -132,7 +132,7 @@ Definition genColor : G Color :=
 
 (* elems is notation for "elements", which takes an additional "default" *)
 Check elements.
-(* elements : ?33 -> list ?33 -> G ?33 *)
+(* elements : ?A -> list ?A -> G ?A *)
 
 Sample genColor.
 
@@ -140,6 +140,9 @@ Sample genColor.
 Inductive Tree A :=
 | Leaf : Tree A
 | Node : A -> Tree A -> Tree A -> Tree A.
+
+Arguments Leaf {A}.
+Arguments Node {A} _ _ _.
 
 Instance showTree {A} `{_ : Show A} : Show (Tree A) :=
   {| show := 
@@ -161,9 +164,9 @@ Fixpoint genTree {A} (g : G A) : G (Tree A) :=
 
 Fixpoint genTreeSized {A} (sz : nat) (g : G A) : G (Tree A) :=
   match sz with
-    | O => returnGen (Leaf A)
-    | S sz' => oneOf [ returnGen (Leaf A) ;
-                       liftGen3  (Node A) g (genTreeSized sz' g) (genTreeSized sz' g)
+    | O => returnGen Leaf
+    | S sz' => oneOf [ returnGen Leaf ;
+                       liftGen3  Node g (genTreeSized sz' g) (genTreeSized sz' g)
                      ]
   end.
 
@@ -175,9 +178,9 @@ Sample (genTreeSized 3 (choose(0,3))).
 
 Fixpoint genTreeSized' {A} (sz : nat) (g : G A) : G (Tree A) :=
   match sz with
-    | O => returnGen (Leaf A)
-    | S sz' => freq [ (1,  returnGen (Leaf A)) ;
-                      (sz, liftGen3  (Node A) g (genTreeSized' sz' g) (genTreeSized' sz' g))
+    | O => returnGen Leaf 
+    | S sz' => freq [ (1,  returnGen Leaf) ;
+                      (sz, liftGen3  Node g (genTreeSized' sz' g) (genTreeSized' sz' g))
                     ]
   end.
 
@@ -186,8 +189,8 @@ Sample (genTreeSized' 3 (choose(0,3))).
 (* Bugs are not only in the implementation, they can be in the specification as well! *)
 Fixpoint mirror {A : Type} (t : Tree A) : Tree A :=
   match t with
-    | Leaf => Leaf A
-    | Node x l r => Node A x (mirror r) (mirror l)
+    | Leaf => Leaf
+    | Node x l r => Node x (mirror r) (mirror l)
   end.
 
 Fixpoint eq_tree (t1 t2 : Tree nat) : bool :=
@@ -221,9 +224,9 @@ Fixpoint shrinkTree {A} (s : A -> list A) (t : Tree A) : seq (Tree A) :=
   match t with
     | Leaf => []
     | Node x l r => [l] ++ [r] ++
-                    map (fun x' => Node A x' l r) (s x) ++
-                    map (fun l' => Node A x l' r) (shrinkTree s l) ++
-                    map (fun r' => Node A x l r') (shrinkTree s r)
+                    map (fun x' => Node x' l r) (s x) ++
+                    map (fun l' => Node x l' r) (shrinkTree s l) ++
+                    map (fun r' => Node x l r') (shrinkTree s r)
   end.
 
 QuickChick (forAllShrink (genTreeSized' 5 (choose (0,5))) (shrinkTree shrink) faultyMirrorP).
