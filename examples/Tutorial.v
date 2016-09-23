@@ -8,13 +8,14 @@ Import ListNotations.
 Require Import mathcomp.ssreflect.ssreflect.
 From mathcomp Require Import seq ssreflect ssrbool ssrnat eqtype.
 
-(* Find a bug in the following definition *)
+(* Find a bug in the following definition... *)
 Fixpoint remove (x : nat) (l : list nat) : list nat :=
   match l with
     | []   => []
     | h::t => if beq_nat h x then t else h :: remove x t
   end.
 
+(* ... with this specification :) *)
 Definition removeP (x : nat) (l : list nat) :=
   (~~ (existsb (fun y => beq_nat y x) (remove x l))).
 
@@ -63,6 +64,8 @@ Instance show_color : Show Color :=
        end
   |}.
 
+Eval compute in (show Green).
+
 (** Generators *)
 
 (* A Generator for elements of some type A is a monadic object of type G A 
@@ -102,6 +105,7 @@ Check listOf.
 
    Takes as input a generator for the elements and returns a generator for lists 
  *)
+Sample (listOf (choose (0,4))).
 
 Check vectorOf.
 (* listOf
@@ -179,8 +183,6 @@ Fixpoint genTreeSized' {A} (sz : nat) (g : G A) : G (Tree A) :=
 
 Sample (genTreeSized' 3 (choose(0,3))).
 
-(* Note: Setting 1 -> 0 forces exact size *)
-
 (* Bugs are not only in the implementation, they can be in the specification as well! *)
 Fixpoint mirror {A : Type} (t : Tree A) : Tree A :=
   match t with
@@ -211,7 +213,8 @@ QuickChick (forAll (genTreeSized' 5 (choose (0,5))) faultyMirrorP).
 (** Shrinking *)
 (*  There is another variant of "forAll", called "forAllShrink" that takes 
     an additional argument of type "A -> list A". 
-*)
+ *)
+Print shrinkList.
 
 Open Scope list.
 Fixpoint shrinkTree {A} (s : A -> list A) (t : Tree A) : seq (Tree A) :=
@@ -226,6 +229,7 @@ Fixpoint shrinkTree {A} (s : A -> list A) (t : Tree A) : seq (Tree A) :=
 QuickChick (forAllShrink (genTreeSized' 5 (choose (0,5))) (shrinkTree shrink) faultyMirrorP).
 
 (* Putting it all together: Typeclass magic! *)
+Print sized.
 
 Instance arbTree {A} `{_ : Arbitrary A} : Arbitrary (Tree A) :=
   {| arbitrary := sized (fun n => genTreeSized' n arbitrary) ;
@@ -242,6 +246,21 @@ QuickCheck faultyMirrorP.
    Magic - functions!
  *)
 Print testFun.
+
+(* collect : Show B => B -> prop -> prop *)
+
+Fixpoint size {A} (t : Tree A) : nat :=
+  match t with
+    | Leaf => O
+    | Node _ l r => 1 + size l + size r
+  end.
+
+Definition treeProp (g : nat -> G nat -> G (Tree nat)) n :=
+  forAll (g n (choose (0,n))) (fun t => 
+  collect (size t) true).
+
+QuickChick (treeProp genTreeSized  5).
+QuickChick (treeProp genTreeSized' 5).
 
 (* New! Experimental! Deriving magic! *)
 DeriveShow Tree as "showTree'".
