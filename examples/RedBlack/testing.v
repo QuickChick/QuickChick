@@ -170,16 +170,16 @@ Program Fixpoint genRBTree_height (hc : nat*color) {wf wf_hc hc} : G tree :=
                                        arbitrary (genRBTree_height (h', c')) end.
 (* end genRBTree_height *)
 Next Obligation.
-  abstract (unfold wf_hc; simpl; left; omega).
+  unfold wf_hc; simpl; left; omega.
 Qed.
 Next Obligation.
-  abstract (unfold wf_hc; simpl; left; omega).
+  unfold wf_hc; simpl; left; omega.
 Qed.
 Next Obligation.
-  abstract (unfold wf_hc; simpl; destruct c'; [right; apply I | left; omega]).
+  unfold wf_hc; simpl; destruct c'; [right; apply I | left; omega].
 Qed.
 Next Obligation.
-  abstract (unfold wf_hc; simpl; destruct c'; [right; apply I | left; omega]).
+  unfold wf_hc; simpl; destruct c'; [right; apply I | left; omega].
 Qed.
 Next Obligation.
   abstract (apply well_founded_hc).
