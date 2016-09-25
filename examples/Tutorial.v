@@ -1,3 +1,12 @@
+(** * Tutorial for QuickChick *)
+
+(** QuickChick is a clone of Haskell's QuickCheck, slightly on steroids.  This
+    tutorial explores basic aspects of random property-based testing and details
+    the majority of features of QuickChick.
+
+*)
+
+(* begin hide *)
 From QuickChick Require Import QuickChick.
 Import QcDefaultNotation. Open Scope qc_scope.
 Import GenLow GenHigh.
@@ -8,50 +17,120 @@ Import ListNotations.
 Require Import mathcomp.ssreflect.ssreflect.
 From mathcomp Require Import seq ssreflect ssrbool ssrnat eqtype.
 
-(* Find a bug in the following definition... *)
+(* end hide *)
+
+(** ** Introduction *)
+     
+(** It is not uncommon during a verification effort to spend many hours
+    attempting to prove a slightly false theorem, only to result in frustration
+    when the mistake is realized and one needs to start over. Other theorem
+    provers have testing tools to quickly raise one's confidence before
+    embarking on the body of the proof; Isabelle has its own QuickCheck clone,
+    as well as Nitpick, Sledgehammer and a variety of other tools; ACL2 has gone
+    a step further using random testing to facilitate its automation. QuickChick
+    is meant to fill this void for Coq. 
+
+
+    Consider the following short function [remove] that takes a natural number
+    [x] and a list of nats [l] and proceeds to remove [x] from the list. While
+    one might be tempted to pose the question "Is there a bug in this
+    definition?", such a question has little meaning without an explicit
+    specification. Here, [removeP] requires that after removing [x] from [l],
+    the resulting list does not contain any occurences of [x].
+
+ *)
+
 Fixpoint remove (x : nat) (l : list nat) : list nat :=
   match l with
     | []   => []
     | h::t => if beq_nat h x then t else h :: remove x t
   end.
 
-(* ... with this specification :) *)
 Definition removeP (x : nat) (l : list nat) :=
   (~~ (existsb (fun y => beq_nat y x) (remove x l))).
 
+(** For this simple example, it is not hard to "spot" the bug by inspection. We
+    will use QuickChick to find out what is wrong.
+
+    QuickChick provides a toplevel command [QuickChick] that receives as input
+    an executable property and attempts to falsify it.  
+
+*)
+
 QuickChick removeP.
 
-(** First limitation: removeP must be executable. Can't QuickCheck the following! *)
+(** Internally, the code is extracted to OCaml, compiled and ran to obtain the output: 
+
+<<
+    0
+
+    [ 0, 0 ]
+
+    Failed! After 17 tests and 12 shrinks
+>>
+    
+    The output signifies that if we use an input where [x] is [0] and [l] is the
+    two element list containing two zeros, then our property fails. Indeed, we
+    can now identify that the [then] branch of [remove] fails to make a
+    recursive call, which means that only one occurence of each element will be
+    deleted. The last line of the output states that it took 17 tests to
+    identify some fault inducing input and 12 shrinks to reduce it to a minimal
+    counterexample. 
+
+    Before we begin to explain exactly how QuickChick magically comes up with
+    this result, it is important to point out the first (and arguably most
+    important) limitation of this tool: it requires an *executable*
+    specification. QuickChick needs to be able to "run" a property and decide
+    whether it is true or not; a definition like [remove_spec] can't be
+    QuickChecked! 
+
+*)
 
 Definition remove_spec :=
   forall x l, ~ In x (remove x l).
 
-(** Ingredients: 
-
-  - Executable property   
-
-  - Printer
-  - Generator 
-  - Shrinker
+(** QuickChick requires either a functional spec (like [removeP]) or a
+    decidability procedure for an inductive spec. 
 
  *)
 
-(** Printing *)
+(** ** Property Based Random Testing Ingredients 
 
-(* For printing QuickChick uses a "Show" typeclass, like Haskell *)
-(* Provides function "show" *)
+    There are four basic ingredients in property based random testing:
 
-Print Show. 
+    - An executable property, as discussed above
+    - A printer, to report counterexamples found
+    - A generator, to produce random inputs 
+    - A shrinker, to reduce counterexamples.
 
-(* Built-in instances for 
-   
-   - string :)
-   - nat, bool, Z : via Extraction to "Prelude.show"
-   - list, pair, option 
+    We will now review the latter three in order. 
+
 *)
 
-(* Writing your own show instance is easy! *)
+(** *** Printing 
+
+    For printing, QuickChick uses a [Show] typeclass, like Haskell. 
+
+ *)
+
+Print Show.
+(* ==> Record Show (A : Type) : Type := Build_Show { show : A -> String.string } *)
+
+(** The [Show] typeclass contains a single function [show] from some type [A] to
+    Coq's [string]. QuickChick provides default instances for [string]s (the
+    identity function), [nat], [bool], [Z], etc. (via extraction to appropriate
+    OCaml functions for efficiency), as well as some common compound datatypes:
+    lists, pairs and options. 
+
+    Writing your own show instance is easy! Let's define a simple [Color]
+    datatype.
+ *)
+
 Inductive Color := Red | Green | Blue | Yellow.
+
+(** After ensuring we have opened the [string] scope, we can declare an instance
+    of [Show Color] by encoding [show] as a simple pattern matching on colors.
+*)
 
 Require Import String. Open Scope string.
 Instance show_color : Show Color :=
@@ -65,8 +144,16 @@ Instance show_color : Show Color :=
   |}.
 
 Eval compute in (show Green).
+(* ==> "Green" : string *)
 
-(** Generators *)
+(** While writing show instances is relatively straightforward, it can get tedious. 
+    The QuickChick provides a lot of automation, which will be discussed at the end 
+    of this Tutorial. 
+*)
+
+(** *** Generators *)
+
+(** The heart of property based random testing is the random generation of inputs *)
 
 (* A Generator for elements of some type A is a monadic object of type G A 
 
