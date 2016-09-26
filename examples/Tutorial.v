@@ -114,7 +114,8 @@ Definition remove_spec :=
  *)
 
 Print Show.
-(* ==> Record Show (A : Type) : Type := Build_Show { show : A -> String.string } *)
+(**  ==> Record Show (A : Type) : Type := Build_Show { show : A -> String.string }
+*)
 
 (** The [Show] typeclass contains a single function [show] from some type [A] to
     Coq's [string]. QuickChick provides default instances for [string]s (the
@@ -144,7 +145,7 @@ Instance show_color : Show Color :=
   |}.
 
 Eval compute in (show Green).
-(* ==> "Green" : string *)
+(** ==> "Green" : string *)
 
 (** While writing show instances is relatively straightforward, it can get tedious. 
     The QuickChick provides a lot of automation, which will be discussed at the end 
@@ -153,83 +154,182 @@ Eval compute in (show Green).
 
 (** *** Generators *)
 
-(** The heart of property based random testing is the random generation of inputs *)
+(** **** The [G] Monad *)
 
-(* A Generator for elements of some type A is a monadic object of type G A 
+(** The heart of property based random testing is the random generation of
+    inputs.  In QuickChick, a generator for elements of some type [A] is a
+    monadic object with type [G A]. The monad [G] serves as an abstraction over
+    random seed plumbing. Consider writing a program that given a random seed
+    generates many integers: one needs to use the given seed to produce an
+    integer while at the same time obtain a new, altered seed to use for future
+    draws. This [State]-monad like behavior is hidden behind [G].
 
-   G is a monad that serves as an abstraction over 
-
-   - random seeds
-   - size information
-
-   Standard monadic functions have the "Gen" suffix
+    Standard monadic functions have the [Gen] suffix.    
  *)
 
 Check bindGen.
-(* bindGen
-     : G ?A -> (?A -> G ?B) -> G ?B
-*)
+(** ==> bindGen : G ?A -> (?A -> G ?B) -> G ?B *) 
 
 Check returnGen.
-(* returnGen
-     : ?A -> G ?A
-*)
+(** ==> returnGen : ?A -> G ?A *)
 
-(* QuickChick also provides "liftM" functions (1-5), "sequence" and "foldM" *)
+(** For those familiar with Haskell's monadic interface, QuickChick also
+    provides variants of [liftM] (as [liftGen]) with arities 1 to 5, [sequence]
+    (as [sequenceGen]) and [foldM] (as [foldGen]).
+ *)
 
-(* Primitive generators (for bool, nat, Z) are provided via extraction *)
+(** **** Primitive generators *)
+
+(** 
+    Primitive generators for booleans, natural numbers and integers are provided
+    via extraction to OCaml. They can be accessed via the [choose] combinator.
+ *)
 
 Check choose.
+(** ==> choose : Z * Z -> G Z *)
 
-(* Sample is a command that runs a generator a bunch of times *)
+(** While here [choose] is monomorphised to [Z], it actually takes an interval
+    of any type [A] that satisfies a [ChoosableFromInterval] typeclass (with
+    default standard numeric instances) and produces an object of type [A]
+    within that interval. 
+
+    We can see that in action using [Sample]. This is another toplevel command
+    by QuickChick that runs a generator a number of times and prints whatever 
+    was generated in the form of a list 
+ *)
+
 Sample (choose(0, 10)).
+(** ==> [ 1, 2, 1, 9, 8, 1, 3, 6, 2, 1, 8, 0, 1, 1, 3, 5, 4, 10, 4, 6 ] *)
 
-(* For lists, there are two combinators *)
+
+(** **** Lists *)
+
+(** Due to being the most commonly used compound datatype, lists have special
+    combinators in Haskell's QuickCheck. The same is true in QuickChick; there
+    are two combinators, [listOf] and [vectorOf]. 
+ *)
 
 Check listOf.
-(* listOf
-     : G ?A -> G (list ?A)
+(** ==> listOf : G ?A -> G (list ?A) *)
 
-   Takes as input a generator for the elements and returns a generator for lists 
+(** [listOf] takes as input a generator for elements of type [A] and returns a
+    generator for lists of the same type.
  *)
+
 Sample (listOf (choose (0,4))).
+(** ==> [ [ 0, 3, 2, 0 ], 
+         [ 1, 3, 4, 1, 0, 3, 0, 2, 2, 3, 2, 2, 2, 0, 4, 2, 3, 0, 1 ], 
+         [ 3, 4, 3, 1, 2, 4, 4, 1, 0, 3, 4, 3, 2, 2, 4, 4, 1 ], 
+         [ 0 ], 
+         [ 4, 2, 3 ], 
+         [ 3, 3, 4, 0, 1, 4, 3, 2, 4, 1 ], 
+         [ 0, 4 ], 
+         [  ], 
+         [ 1, 0, 1, 3, 1 ], 
+         [ 0, 0 ], 
+         [ 1, 4 ], 
+         [ 4, 3, 2, 0, 2, 2, 4, 0 ], 
+         [ 1, 1, 0, 0, 1, 4 ], 
+         [ 2, 0, 2, 1, 3, 3 ], 
+         [ 4, 3, 3, 0, 1 ], 
+         [ 3, 3, 3 ], 
+         [ 3, 2, 4 ], 
+         [ 1, 2 ], 
+         [  ], 
+         [  ] 
+       ]
+*)
+
+(** The second combinator, [vectorOf], receives an additional numeric argument
+    [n], the length of the list to be generated. 
+ *)
 
 Check vectorOf.
-(* listOf
-     : nat -> G ?A -> G (list ?A)
+(** ==> vectorOf : nat -> G ?A -> G (list ?A) *)
 
-   Takes as input a number n, a generator for the elements and returns a generator for lists
-   of length n.
+(** This raises a question: how does [listOf] decide how big of a list to
+    generate? The answer is hidden inside the [G] monad. 
+  
+    In addition to handling random seed plumbing, the [G] monad also provides a
+    [Reader]-like environment with size information: a natural number [n] that
+    nominally serves as the upper bound on the depth of the generated objects.
+    QuickChick progressively tries larger and larger values for [n], in order to
+    explore larger and deeper part of the search space. Note that each generator
+    can choose to interpret this input size however it wants and there is no
+    guarantee that all generators comply to this standard - it is more of a
+    "good practice" when writing one to respect this bound. 
+ *)
+
+(** **** Custom Datatypes *)
+
+(** Naturally, a lot of the time one needs to write generators involving
+    user-defined datatypes. Let's revisit our color datatype; to generate a
+    color, we only need to pick one of its four constructors, [Red], [Green],
+    [Blue] and [Yellow]. This is done using [elements].
+
 *)
 
-(** Sizes 
+Check elements.
+(** ==> elements : ?A -> list ?A -> G ?A *)
 
-    How does "listOf" decide how big of a list to generate?
+(** This is the first place where the totality checker of Coq raises a design
+    question. While Haskell's QuickCheck can simply fail raising an [error]
+    whenever the input list is empty, Coq does not allow that behavior. Instead
+    of increasing the burden to the user by requiring a proof that the list is
+    not empty or by making the return type an option, QuickChick requires an
+    additional element of type [A] as input to serve as a "default" object.  If
+    the list is not empty, [elements] returns a generator that picks an element
+    of that list; otherwise the generator always returns the default object.
 
-    Answer: G hides size information!
-      
-      - QC progressively tries larger and larger sizes
-      - Every generator can choose to interpret input size however it wants
+    Moreover, QuickChick provides convenient notation to hide this default if 
+    it is apparent from the structure. 
+ *)
+
+(*
+Notation            Scope     
+" 'elems' [ x ] " := elements x (cons x nil)
+                      : qc_scope
+                      (default interpretation)
+" 'elems' [ x ; y ] " := elements x (cons x (cons y nil))
+                      : qc_scope
+                      (default interpretation)
+" 'elems' [ x ; y ; .. ; z ] " := elements x
+                                    (cons x (cons y .. (cons z nil) ..))
+                      : qc_scope
+                      (default interpretation)
+" 'elems' ( x ;; l ) " := elements x (cons x l)
+                      : qc_scope
+                      (default interpretation)
 *)
 
-(** More combinators *)
+(** Armed with [elems], we can write the following simple [Color] generator. *)
 
 Definition genColor : G Color :=
   elems [ Red ; Green ; Blue ; Yellow ].
 
-(* elems is notation for "elements", which takes an additional "default" *)
-Check elements.
-(* elements : ?A -> list ?A -> G ?A *)
-
 Sample genColor.
+(** ==> [ Blue, Red, Yellow, Red, Blue, Yellow, Yellow, Blue, Green, Red, Green,
+         Blue, Blue, Red, Yellow, Blue, Red, Blue, Blue, Red ] *)
 
-(** A More Comprehensive Example: Trees! *)
+(** For more complicated ADTs, QuickChick provides more combinators. We will 
+    showcase them using everyone's favorite datatype: Trees! 
+
+    Our trees are standard binary trees; either [Leaf]s or [Node]s containing 
+    some payload of type [A] and two subtrees. 
+*)
+
 Inductive Tree A :=
 | Leaf : Tree A
 | Node : A -> Tree A -> Tree A -> Tree A.
 
 Arguments Leaf {A}.
 Arguments Node {A} _ _ _.
+
+(** Before getting to generators for trees, we give a simple [Show] instance. 
+    The rather inconvenient need for a local [let fix] declaration stems from
+    the fact that Coq's typeclasses (unlike Haskell's) are not automatically 
+    recursive. 
+*) 
 
 Instance showTree {A} `{_ : Show A} : Show (Tree A) :=
   {| show := 
@@ -241,13 +341,42 @@ Instance showTree {A} `{_ : Show A} : Show (Tree A) :=
        in aux
   |}.
 
-(* New combinators: oneof, frequency *)
+(** The first combinator that actually combines different generators is [oneof]. *)
+
+Check oneof.
+(** ==> oneof : G ?A -> list (G ?A) -> G ?A *)
+
+(** [oneof] takes a default generator and a list of generators, and picks one of
+    the generators from the list uniformly at random, as long as the list is not
+    empty.  Just like before, QuickChick introduces the notation [oneOf] to hide
+    this default element. 
+
+    At this point, Coq's termination checker saves us from shooting ourselves in
+    the foot. The "obvious" first generator that one might write is the
+    following [genTree]: either generate a [Leaf] or a [Node] whose subtrees are 
+    generated recursively and whose payload is produced by a generator for 
+    elements of type [A].
+
+*)
 
 (*
 Fixpoint genTree {A} (g : G A) : G (Tree A) :=
-  oneOf [ returnGen (Leaf A) ;
-          liftGen3 (Node A)  g (genTree g) (genTree g) ].
+  oneOf [ returnGen Leaf ;
+          liftGen3 Node  g (genTree g) (genTree g) ].
 *)
+
+(** Of course, this fixpoint will not pass Coq's termination check. Attempting
+    to justify this fixpoint to oneself, one might say that at some point the
+    random generation will pick a [Leaf] so it will eventually terminate. Sadly, 
+    in this case the expected size of the generated Tree is infinite...
+
+    The solution is the standard "fuel" solution Coq users are so familiar with:
+    we add an additional natural number [sz] as a parameter; when that parameter
+    is [O] we only generate non-recursive branches, while we decrease this size
+    in each recursive call. Thus, [sz] serves as a bound on the depth of the
+    tree. 
+
+ *)
 
 Fixpoint genTreeSized {A} (sz : nat) (g : G A) : G (Tree A) :=
   match sz with
@@ -258,10 +387,42 @@ Fixpoint genTreeSized {A} (sz : nat) (g : G A) : G (Tree A) :=
   end.
 
 Sample (genTreeSized 3 (choose(0,3))).
+(** ==> [ Leaf,
+         Leaf,
+         Node (3) (Node (0) (Leaf) (Leaf)) (Node (2) (Leaf) (Node (3) (Leaf) (Leaf))),
+         Leaf,
+         Leaf,
+         Leaf,
+         Node (1) (Leaf) (Node (1) (Leaf) (Node (0) (Leaf) (Leaf))),
+         Leaf,
+         Node (3) (Leaf) (Leaf),
+         Node (1) (Leaf) (Leaf),
+         Leaf,
+         Leaf,
+         Node (0) (Leaf) (Node (0) (Leaf) (Node (2) (Leaf) (Leaf))),
+         Node (0) (Node (2) (Node (3) (Leaf) (Leaf)) (Leaf)) (Leaf),
+         Node (0) (Leaf) (Leaf),
+         Leaf,
+         Leaf,
+         Leaf,
+         Leaf,
+         Leaf ]
+*)
 
-(* Problem: way too many Leafs! 
-   Solution: frequency 
+(** While this generator succesfully generated trees, just by observing [Sample]
+    above there is a problem: [genTreeSized] produces way too many [Leaf]s! That
+    is to be expected, 50% of the time we generate a [Leaf]. The solution is to
+    skew the distribution towards [Node]s, using the most expressive QuickChick
+    combinator, [frequency] and its associated default-lifting notation [freq].
  *)
+Check frequency.
+(** ==> frequency : G ?A -> seq (nat * G ?A) -> G ?A *)
+
+(** [freq] takes a list of generators, each one tagged with a natural number
+    that serves as the weight of that generator. In the following example, a
+    [Leaf] will be generated 1 / (sz + 1) of the time, while a [Node] the
+    remaining sz / (sz + 1) of the time.
+*)
 
 Fixpoint genTreeSized' {A} (sz : nat) (g : G A) : G (Tree A) :=
   match sz with
@@ -272,14 +433,39 @@ Fixpoint genTreeSized' {A} (sz : nat) (g : G A) : G (Tree A) :=
   end.
 
 Sample (genTreeSized' 3 (choose(0,3))).
+(** ==> [ Node (3) (Node (1) (Node (3) (Leaf) (Leaf)) (Leaf)) (Node (0) (Leaf) (Node (3) (Leaf) (Leaf))),
+         Leaf,
+         Node (2) (Node (1) (Leaf) (Leaf)) (Leaf),
+         Node (0) (Leaf) (Node (0) (Node (2) (Leaf) (Leaf)) (Node (0) (Leaf) (Leaf))),
+         Node (1) (Node (2) (Leaf) (Node (0) (Leaf) (Leaf))) (Leaf),
+         Node (0) (Node (0) (Leaf) (Node (3) (Leaf) (Leaf))) (Node (2) (Leaf) (Leaf)),
+         Node (1) (Node (3) (Node (2) (Leaf) (Leaf)) (Node (3) (Leaf) (Leaf))) (Node (1) (Leaf) (Node (2) (Leaf) (Leaf))),
+         Node (0) (Node (0) (Node (0) (Leaf) (Leaf)) (Node (1) (Leaf) (Leaf))) (Node (2) (Node (3) (Leaf) (Leaf)) (Node (0) (Leaf) (Leaf))),
+         Node (2) (Node (2) (Leaf) (Leaf)) (Node (1) (Node (2) (Leaf) (Leaf)) (Node (2) (Leaf) (Leaf))),
+         Node (2) (Node (3) (Node (2) (Leaf) (Leaf)) (Leaf)) (Node (0) (Node (2) (Leaf) (Leaf)) (Leaf)),
+         Leaf,
+         Node (2) (Node (3) (Node (3) (Leaf) (Leaf)) (Leaf)) (Leaf),
+         Leaf,
+         Node (1) (Leaf) (Leaf),
+         Leaf,
+         Node (1) (Node (2) (Leaf) (Node (3) (Leaf) (Leaf))) (Node (0) (Leaf) (Node (1) (Leaf) (Leaf))),
+         Leaf,
+         Node (3) (Node (0) (Node (0) (Leaf) (Leaf)) (Leaf)) (Node (0) (Leaf) (Node (2) (Leaf) (Leaf))),
+         Node (2) (Node (2) (Node (0) (Leaf) (Leaf)) (Leaf)) (Node (1) (Leaf) (Node (2) (Leaf) (Leaf))),
+         Leaf ]
+ *)
 
-(* Bugs are not only in the implementation, they can be in the specification as well! *)
+(** To show case this generator, we will use the notion of mirroring a tree: swapping 
+    its left and right subtrees recursively. 
+*)
+   
 Fixpoint mirror {A : Type} (t : Tree A) : Tree A :=
   match t with
     | Leaf => Leaf
     | Node x l r => Node x (mirror r) (mirror l)
   end.
 
+(** We also need a simple structural equality on trees *)
 Fixpoint eq_tree (t1 t2 : Tree nat) : bool :=
   match t1, t2 with
     | Leaf, Leaf => true
@@ -288,23 +474,78 @@ Fixpoint eq_tree (t1 t2 : Tree nat) : bool :=
     | _, _ => false
   end.
 
-(* mirror should be unipotent *)
+(** One expects that [mirror] should be unipotent; mirroring a tree twice yields 
+    the original tree.  
+*)
 Definition mirrorP (t : Tree nat) := eq_tree (mirror (mirror t)) t.
 
+(** To test this assumption, we can use the [forAll] property combinator that
+    receives a generator [g] for elements of type [A] and an executable property
+    with argument [A] and tests the property on random inputs of [g]. 
+ *)
 QuickChick (forAll (genTreeSized' 5 (choose (0,5))) mirrorP).
 
-(* Let's try a wrong property *)
+(** QuickChick quickly responds that this property passed 10000 tests, so we 
+    gain some confidence in its truth. But what would happend if we had the 
+    *wrong* property? 
+*)
 Definition faultyMirrorP (t : Tree nat) := eq_tree (mirror t) t.
 
 QuickChick (forAll (genTreeSized' 5 (choose (0,5))) faultyMirrorP).
+(** ==> Node (3) (Node (0) (Leaf) (Node (0) (Node (1) (Leaf) (Leaf)) (Leaf)))
+(Node (5) (Node (0) (Node (1) (Leaf) (Node (4) (Leaf) (Leaf))) (Node (4) (Leaf)
+(Node (0) (Leaf) (Leaf)))) (Node (5) (Node (4) (Node (0) (Leaf) (Leaf)) (Leaf))
+(Node (3) (Leaf) (Leaf))))
 
-(* Is this really helpful though? What's the bug? Are the numbers relevant? *)
+*** Failed! After 1 tests and 0 shrinks
+*)
 
-(** Shrinking *)
-(*  There is another variant of "forAll", called "forAllShrink" that takes 
-    an additional argument of type "A -> list A". 
- *)
+(** The bug is found immediately and reported. However, is this counterexample
+    really helpful? What is the important part of it? The reported bug is too
+    big and noisy to identify the root cause of the problem. That is where
+    shrinking comes in. 
+
+*)
+
+(** **** Shrinking *)
+
+(** Shrinking, also known as delta debugging, is a greedy process by which we
+    can find a smaller counterexample given a relatively large one. Given a
+    shrinking function [s] of type [A -> list A] and a counterexample [x] of
+    type [A] that is known to falsify some property [p], QuickChick (lazily)
+    tries [p] on all members of [s x] until it finds another counterexample;
+    then it repeats this process.
+
+    This greedy algorithm can only work if all elements of [s x] are strictly 
+    "smaller" that [x] for all [x]. Most of the time, a shrinking function for 
+    some type only returns elements that are "one step" smaller. For example,  
+    consider the default shrinking function for lists provided by QuickChick. 
+*)
+
 Print shrinkList.
+(** ==> shrinkList = 
+     fix shrinkList (A : Type) (shr : A -> seq A) (l : seq A) {struct l} :
+       seq (seq A) :=
+       match l with
+       | [::] => [::]
+       | x :: xs =>
+           ((xs :: List.map (fun xs' : seq A => x :: xs') (shrinkList A shr xs))%SEQ ++
+            List.map (fun x' : A => (x' :: xs)%SEQ) (shr x))%list
+       end
+          : forall A : Type, (A -> seq A) -> seq A -> seq (seq A)
+*)
+
+(** An empty list can not be shrunk - there is no smaller list. 
+    A cons cell can be shrunk in three ways: by returning the tail of the list,
+    by shrinking the tail of the list and consing the head, or by shrinking the 
+    head and consing its tail. By induction, this process can generate all smaller
+    lists.
+
+    Writing a shrinking instance for trees is equally straightforward: we don't
+    shrink [Leaf]s while for [Node]s we can return the left or right subtrees,
+    shrink the payload or one of the subtrees.
+
+*)
 
 Open Scope list.
 Fixpoint shrinkTree {A} (s : A -> list A) (t : Tree A) : seq (Tree A) :=
@@ -316,7 +557,19 @@ Fixpoint shrinkTree {A} (s : A -> list A) (t : Tree A) : seq (Tree A) :=
                     map (fun r' => Node x l r') (shrinkTree s r)
   end.
 
+(** Armed with [shrinkTree], we use the [forAllShrink] property combinator that 
+    takes an additional argument, a shrinker *)
+
 QuickChick (forAllShrink (genTreeSized' 5 (choose (0,5))) (shrinkTree shrink) faultyMirrorP).
+
+(** ==> Node (0) (Leaf) (Node (0) (Leaf) (Leaf))
+
+*** Failed! After 1 tests and 8 shrinks *)
+
+(** We now got a much simpler counterexample (in fact, this is one of the two
+    minimal ones) and can tell that the real problem occurs when the subtrees of 
+    a [Node] are different.
+ *)
 
 (* Putting it all together: Typeclass magic! *)
 Print sized.
