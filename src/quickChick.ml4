@@ -326,22 +326,34 @@ let mk_ni s i = Printf.sprintf "%s%d" s i
 
 type derivable = Show | Arbitrary 
 
+let debug_environ () =
+  let env = Global.env () in
+  let preEnv = Environ.pre_env env in
+  let minds = preEnv.env_globals.env_inductives in
+  Mindmap_env.iter (fun k _ -> msgerr (str (MutInd.debug_to_string k) ++ fnl())) minds
+                          
 (* Generic derivation function *)
 let derive (cn : derivable) (c : constr_expr) (instance_name : string) =
-  if cn == Show then msgerr (str "Whyyyy" ++ fnl ());
   match c with 
   | CRef (r,_) -> 
      (* Extract id/string representation - which to use? :/ *)
      let qidl = qualid_of_reference r in
-     let id   = id_of_string (string_of_reference r) in
+
+     let env = Global.env () in
+     
+     let glob_ref = Nametab.global r in
+     let ind = Globnames.destIndRef glob_ref in 
+     let (mind, _) = ind in
+     
+(*      let id   = id_of_string (string_of_reference r) in
 
      (* Grab the current global environment *)
-     let env = Global.env () in
 
      (* Create appropriate kernel name ("Top.c") *)
      let modpath = MPfile (DirPath.make [id_of_string "Top"]) in
      let lab     = Label.of_id id in
      let mind = MutInd.make2 modpath lab in
+ *)
 
      let mib = Environ.lookup_mind mind env in
      let oib = mib.mind_packets.(0) in
