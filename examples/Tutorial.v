@@ -571,26 +571,70 @@ QuickChick (forAllShrink (genTreeSized' 5 (choose (0,5))) (shrinkTree shrink) fa
     a [Node] are different.
  *)
 
-(* Putting it all together: Typeclass magic! *)
-Print sized.
+(** **** Putting it all Together *)
+
+(** QuickChick, just like QuickCheck, provides an [Arbitrary] typeclass
+    parameterized over some type [A] with two objects: [arbitrary] and
+    [shrink]. 
+
+    The [arbitrary] object is a generator for elements of type [A]. If we were
+    to encode an [Arbitrary] instance for trees we would like to use
+    [genTreeSized']; however that generator takes an additional size argument. 
+    The [G] monad will provide that argument through the combinator [sized].
+
+*)
+    
+Check sized.
+(** ==> sized : (nat -> G ?A) -> G ?A *)
+
+(** [sized] receives a function that given a number produces a generator, just
+    like [genTreeSized'], and returns a generator that uses the size information inside the [G] monad.
+
+    The [shrink] function is simply a shrinker like [shrinkTree]. 
+*)
 
 Instance arbTree {A} `{_ : Arbitrary A} : Arbitrary (Tree A) :=
   {| arbitrary := sized (fun n => genTreeSized' n arbitrary) ;
      shrink := shrinkTree shrink
   |}.
 
-QuickCheck faultyMirrorP.
+(** With this [Arbitrary] instance we can once again use the toplevel
+    [QuickChick] command with just the property.  
 
-(* quickCheck : forall prop. Checkable prop => prop -> Result 
-   But what *is* Checkable? 
+*)
 
-   Easy - booleans: We can always tell if a boolean is true or not :)
+QuickChick faultyMirrorP.
 
-   Magic - functions!
- *)
+(** [QuickChick] internally calls the function [quickCheck] with type [forall
+    prop. Checkable prop => prop -> Result]. But what _is_ [Checkable]? It is
+    easy to see how a boolean is [Checkable]; we can always tell if it is true
+    or not and then return a [Result], [Success]/[Failure] as appropriate.
+    
+    To see how executable properties are [Checkable], consider a single argument
+    function [p : A -> Bool] that returns a boolean. If we know that [A] has
+    [Show] and [Arbitrary] instances, we can just call [forAllShrink] with
+    [arbitrary] and [shrink]. Going a step further, the result type doesn't
+    really need to be [Bool], it can be a [Checkable]! Thus, we can provide a
+    [Checkable] instance for arbitrary functions.
+
+*)
+
 Print testFun.
 
-(* collect : Show B => B -> prop -> prop *)
+(** **** Collecting Statistics *)
+
+(** Earlier in this tutorial we claimed that [genTreeSized] produced "too many"
+    [Leaf]s. But how can we justify that? Just looking at the result of [Sample]
+    gives us an idea that something is going wrong but just observing a handful
+    of samples cannot realistically provide statistical guarantees. That is
+    where [collect], another property combinator, comes in. In Haskell notation,
+    [collect] would have the type [collect : Show A, Checkable prop => A -> prop
+    -> prop]; it takes some value of type [A] that can be shown and a property,
+    and returns the property itselft. Whenever the resulting property is
+    exercised, the [A] object is captured and statistics are collected. 
+
+    For example, consider a [size] function on [Tree]s.
+ *)
 
 Fixpoint size {A} (t : Tree A) : nat :=
   match t with
@@ -598,60 +642,92 @@ Fixpoint size {A} (t : Tree A) : nat :=
     | Node _ l r => 1 + size l + size r
   end.
 
+(** If we were to write a dummy property to check our generators and measure the
+    size of generated trees, we could use [treeProp] below. 
+*)
+
 Definition treeProp (g : nat -> G nat -> G (Tree nat)) n :=
   forAll (g n (choose (0,n))) (fun t => 
   collect (size t) true).
 
 QuickChick (treeProp genTreeSized  5).
-QuickChick (treeProp genTreeSized' 5).
 
-(* New! Experimental! Deriving magic! *)
+(** ==> 
+4947 : 0
+1258 : 1
+673 : 2
+464 : 6
+427 : 5
+393 : 3
+361 : 7
+302 : 4
+296 : 8
+220 : 9
+181 : 10
+127 : 11
+104 : 12
+83 : 13
+64 : 14
+32 : 15
+25 : 16
+16 : 17
+13 : 18
+6 : 19
+5 : 20
+2 : 21
+1 : 23
++++ OK, passed 10000 tests
+
+We see that 62.5% of the tests are either [Leaf]s or empty [Nodes], while too
+few tests have larger sizes. Compare that with [genTreeSized'] below.  *)
+
+QuickChick (treeProp genTreeSized' 5).
+(** ==> 
+1624 : 0
+571 : 10
+564 : 12
+562 : 11
+559 : 9
+545 : 8
+539 : 14
+534 : 13
+487 : 7
+487 : 15
+437 : 16
+413 : 6
+390 : 17
+337 : 5
+334 : 1
+332 : 18
+286 : 19
+185 : 4
+179 : 20
+179 : 2
+138 : 21
+132 : 3
+87 : 22
+62 : 23
+19 : 24
+10 : 25
+6 : 26
+2 : 27
++++ OK, passed 10000 tests
+
+A lot fewer terms have small sizes, allowing us to explore larger terms
+*)
+
+(** ** Avoiding Work  :) *)
+
+(** While a lot of time putting a bit of time and effort in a generator and a
+shrinker, the examples shown here are fairly straightforward. After writing a
+couple of [Show] and [Arbitrary] instances, it can get tedious and boring. That
+is precisely why [QuickChick] provides some automation in deriving such instances for _plain_ datatypes automatically. 
+
+*)
+
 DeriveShow Tree as "showTree'".
 Print showTree'.
 
 DeriveArbitrary Tree as "arbTree'".
 Print arbTree'.
 
-(* TALK END POINT - Probably end here... *)
-
-(* Future directions: dependent inductives! *)
-Inductive Foo :=
-| Foo1 : Foo
-| Foo2 : Foo -> Foo
-| Foo3 : nat -> Foo -> Foo -> Foo.
-
-(* Good Foos! *)
-Inductive goodFoo : nat -> Foo -> Prop :=
-    Good1 : forall n : nat, goodFoo n Foo1
-  | Good2 : forall (n : nat) (foo : Foo),
-            goodFoo 0 foo -> goodFoo n (Foo2 foo)
-  | Good3 : forall (n : nat) (foo2 : Foo),
-            goodFoo n foo2 -> goodFoo n (Foo3 n Foo1 foo2).
-
-Fixpoint genGoodFooS (sz : nat) (n : nat) : G {foo | goodFoo n foo} :=
-  match sz with
-    | O => returnGen (exist (goodFoo n) Foo1 (Good1 n))
-    | S sz' =>
-      freq [ (1, returnGen (exist (goodFoo n) Foo1 (Good1 n)))
-           ; (4, bindGen (genGoodFooS sz' 0) (fun foo => 
-                 let (f, bf) := foo in 
-                 returnGen (exist (goodFoo n) (Foo2 f) (Good2 n f bf))))
-           ; (sz,let f1 := Foo1 in
-                 bindGen (genGoodFooS sz' n) (fun foo2 =>
-                 let (f2, bf2) := foo2 in
-                 returnGen (exist (goodFoo n) (Foo3 n f1 f2) 
-                                  (Good3 n f2 bf2))))
-           ]
-  end.
-
-(*
-Inductive goodFoo' (n : nat) : Foo -> Prop :=
-| Good1'' : _W 1  -> goodFoo' n Foo1
-| Good2'' : _W 4  -> forall foo, goodFoo' 0 foo -> goodFoo' n (Foo2 foo)
-| Good3'' : _Size -> forall foo2,
-            goodFoo' n foo2 ->
-            goodFoo' n (Foo3 n Foo1 foo2).
-
-DeriveGenerators goodFoo' as "goodFooDerived" and "g".
-Print goodFooDerived.
-*)
