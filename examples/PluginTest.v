@@ -57,7 +57,6 @@ Fixpoint genGoodFooS (sz : nat) (n : nat) : G {foo | goodFoo n foo} :=
            ]
   end.
 
-(*
 Inductive goodFoo' (n : nat) : Foo -> Prop :=
 | Good1'' : _W 1  -> goodFoo' n Foo1
 | Good2'' : _W 4  -> forall foo, goodFoo' 0 foo -> goodFoo' n (Foo2 foo)
@@ -67,7 +66,6 @@ Inductive goodFoo' (n : nat) : Foo -> Prop :=
 
 DeriveGenerators goodFoo' as "goodFooDerived" and "g".
 Print goodFooDerived.
-*)
 
 From mathcomp.ssreflect Require Import ssreflect ssrnat ssrbool.
 Set Bullet Behavior "Strict Subproofs".

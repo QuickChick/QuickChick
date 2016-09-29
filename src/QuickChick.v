@@ -1,5 +1,8 @@
 Declare ML Module "quickChick".
 
+Axiom _W : nat -> Prop.
+Axiom _Size : Prop.
+
 Require Export Show.
 Require Export Random.
 Require Export Sets.

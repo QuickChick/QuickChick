@@ -226,90 +226,6 @@ let rec is_current_inductive c i =
 
 let mkInt n = CPrim (dummy_loc, Numeral (Bigint.of_int n))
 
-(*
-let deriveGenerators c si sg = 
-  match c with
-  | CRef (r,_) ->
-     let ql = Libnames.qualid_of_reference r in
-     let s = string_of_id ident in
-     let env = Global.env () in
-     let mp  = Names.MPfile (Names.make_dirpath [id_of_string "Top"]) in
-     let dp  = Names.empty_dirpath in
-     let lab = Names.label_of_id ident in
-     let kn  = Names.make_kn mp dp lab in
-     let mind = Names.mind_of_kn kn in
-     let mib = Environ.lookup_mind mind env in
-     let oib = mib.mind_packets.(0) in
-     msgerr (str (string_of_id oib.mind_typename) ++ fnl());
-     msgerr (str si ++ fnl ());
-     
-     let strippedPair = List.map strip_prod (Array.to_list oib.mind_nf_lc) in
-     
-     (* Create the new inductive entries *)
-     let oie = { mind_entry_typename  = id_of_string si ;
-                 mind_entry_arity     = get_user_arity oib.mind_arity ; 
-                 mind_entry_consnames = List.map (fun i -> id_of_string (strip_last_char (string_of_id i))) (Array.to_list oib.mind_consnames) ;
-                 mind_entry_lc = List.map snd strippedPair ;
-               } in
-     let mie = { mind_entry_record = mib.mind_record ;
-                 mind_entry_finite = mib.mind_finite ;
-                 mind_entry_params = [] ;
-                 mind_entry_inds   = [oie]             (* TODO: This currently works for non mutually recursive! *)
-               } in
-
-     (* Declare the mutual inductive *)
-     ignore (declare_mind KernelVerbose mie);
-
-     (* Construct kernel term closure *)
-     let env = Global.env () in
-     let evd = Evd.empty in
-     let mk_kernel c = interp_constr evd env c in
-
-     (* Helpers for return/bind in the Gen monad *)
-     let returnGen c = 
-       (* Not clear why this doesn't want a "QuickChick" qualifier... *)
-       CApp (dummy_loc, (None, mk_ref "GenLow.returnGen"), [(c, None)]) in
-     let mkEx p x pf = 
-       CApp (dummy_loc, (None, mk_ref "exist"), [(p, None); (x, None); (pf, None)]) in
-
-     ()
-(*
-     (* Start creating the generator *) 
-     let const_body = mk_kernel (
-       (* For the fixpoint "aux", structural recursion on "size" *)
-       let aux  = fresh_name "aux" in 
-       let size = fresh_name "size" in 
-       let binderList = [LocalRawAssum ([(dummy_loc, Name size)], Default Explicit, mk_ref "nat")] in 
-
-       let base = returnGen (mkEx (mk_ref "goodFoo") (mk_ref "Foo1") (mk_ref "Good1")) in
-
-       let fix_body = 
-         CCases (dummy_loc, Term.RegularStyle, None,
-                 [(mk_c size, (None, None))],
-                 [(dummy_loc, [dl [CPatCstr (dummy_loc, Ident (dl (id_of_string "O")), [])]], base);
-                  (dummy_loc, [dl [CPatCstr (dummy_loc, Ident (dl (id_of_string "S")), [CPatAtom (dummy_loc, None)])]], base)]) in
-
-       let fix_dcl = (dl aux, binderList, (None, CStructRec), fix_body, (dl None)) in
-
-       G_constr.mk_fix (dummy_loc, true, dl aux, [fix_dcl]) 
-     ) in
-
-     (* Define the new constant *)
-     ignore (
-         declare_constant ~internal:KernelVerbose (id_of_string sg)
-         (DefinitionEntry {
-              const_entry_body = const_body;
-              const_entry_secctx = None;
-              const_entry_type = None;
-              const_entry_opaque = false
-            },
-          Decl_kinds.IsDefinition Decl_kinds.Definition)
-       )
- *)
-  | _ -> msgerr (str "Not a valid identifier" ++ fnl ())
-
- *)
-
 let rec mk_list = function 
   | [] -> mk_ref "nil"
   | x::xs -> mkAppC (mk_ref "cons", [x; mk_list xs])
@@ -344,16 +260,6 @@ let derive (cn : derivable) (c : constr_expr) (instance_name : string) =
      let glob_ref = Nametab.global r in
      let ind = Globnames.destIndRef glob_ref in 
      let (mind, _) = ind in
-     
-(*      let id   = id_of_string (string_of_reference r) in
-
-     (* Grab the current global environment *)
-
-     (* Create appropriate kernel name ("Top.c") *)
-     let modpath = MPfile (DirPath.make [id_of_string "Top"]) in
-     let lab     = Label.of_id id in
-     let mind = MutInd.make2 modpath lab in
- *)
 
      let mib = Environ.lookup_mind mind env in
      let oib = mib.mind_packets.(0) in
@@ -644,12 +550,6 @@ let derive (cn : derivable) (c : constr_expr) (instance_name : string) =
             )
   | _ -> msgerr (str "Not an Inductive identifier" ++ fnl ())
 
-(*
-VERNAC COMMAND EXTEND DeriveGenerators
-  | ["DeriveGenerators" constr(c) "as" string(s1) "and" string(s2)] -> [deriveGenerators c s1 s2]
-END;;                                       
- *)
-
 VERNAC COMMAND EXTEND DeriveShow
   | ["DeriveShow" constr(c) "as" string(s)] -> [derive Show c s]
 END;;
@@ -657,3 +557,91 @@ END;;
 VERNAC COMMAND EXTEND DeriveArbitrary
   | ["DeriveArbitrary" constr(c) "as" string(s)] -> [derive Arbitrary c s]
 END;;
+
+let deriveGenerators c mind_name gen_name = 
+  match c with
+  | CRef (r,_) ->
+
+     let env = Global.env () in
+     
+     let glob_ref = Nametab.global r in
+     let ind = Globnames.destIndRef glob_ref in 
+     let (mind, _) = ind in
+
+     let mib = Environ.lookup_mind mind env in
+     let oib = mib.mind_packets.(0) in
+     
+     let strippedPair = List.map strip_prod (Array.to_list oib.mind_nf_lc) in
+     
+     (* Create the new inductive entries *)
+     let oie = { mind_entry_typename  = id_of_string mind_name ;
+                 mind_entry_arity     = get_user_arity oib.mind_arity ; 
+                 mind_entry_template  = false; (* LEO: not sure about this *)
+                 mind_entry_consnames = List.map (fun i -> id_of_string (strip_last_char (string_of_id i))) (Array.to_list oib.mind_consnames) ;
+                 mind_entry_lc = List.map snd strippedPair ;
+               } in
+     let mie = { mind_entry_record = None ; (* LEO: not a record *)
+                 mind_entry_finite = mib.mind_finite ;
+                 mind_entry_params = [] ;
+                 mind_entry_inds   = [oie] ;             (* TODO: This currently works for non mutually recursive! *)
+                 mind_entry_polymorphic = mib.mind_polymorphic ;
+                 mind_entry_universes = mib.mind_universes ;
+                 mind_entry_private = mib.mind_private ;
+               } in
+
+     (* Declare the mutual inductive *)
+     ignore (declare_mind mie);
+
+(*
+     (* Construct kernel term closure *)
+     let env = Global.env () in
+     let evd = Evd.empty in
+     let mk_kernel c = interp_constr evd env c in
+
+     (* Helpers for return/bind in the Gen monad *)
+     let returnGen c = 
+       (* Not clear why this doesn't want a "QuickChick" qualifier... *)
+       CApp (dummy_loc, (None, mk_ref "GenLow.returnGen"), [(c, None)]) in
+     let mkEx p x pf = 
+       CApp (dummy_loc, (None, mk_ref "exist"), [(p, None); (x, None); (pf, None)]) in
+
+     ()
+ *)
+(*
+     (* Start creating the generator *) 
+     let const_body = mk_kernel (
+       (* For the fixpoint "aux", structural recursion on "size" *)
+       let aux  = fresh_name "aux" in 
+       let size = fresh_name "size" in 
+       let binderList = [LocalRawAssum ([(dummy_loc, Name size)], Default Explicit, mk_ref "nat")] in 
+
+       let base = returnGen (mkEx (mk_ref "goodFoo") (mk_ref "Foo1") (mk_ref "Good1")) in
+
+       let fix_body = 
+         CCases (dummy_loc, Term.RegularStyle, None,
+                 [(mk_c size, (None, None))],
+                 [(dummy_loc, [dl [CPatCstr (dummy_loc, Ident (dl (id_of_string "O")), [])]], base);
+                  (dummy_loc, [dl [CPatCstr (dummy_loc, Ident (dl (id_of_string "S")), [CPatAtom (dummy_loc, None)])]], base)]) in
+
+       let fix_dcl = (dl aux, binderList, (None, CStructRec), fix_body, (dl None)) in
+
+       G_constr.mk_fix (dummy_loc, true, dl aux, [fix_dcl]) 
+     ) in
+
+     (* Define the new constant *)
+     ignore (
+         declare_constant ~internal:KernelVerbose (id_of_string sg)
+         (DefinitionEntry {
+              const_entry_body = const_body;
+              const_entry_secctx = None;
+              const_entry_type = None;
+              const_entry_opaque = false
+            },
+          Decl_kinds.IsDefinition Decl_kinds.Definition)
+       )
+ *)
+  | _ -> msgerr (str "Not a valid identifier" ++ fnl ())
+
+VERNAC COMMAND EXTEND DeriveGenerators
+  | ["DeriveGenerators" constr(c) "as" string(s1) "and" string(s2)] -> [deriveGenerators c s1 s2]
+END;;                                       
