@@ -33,6 +33,7 @@ Parameter foldGen :
   forall {A B : Type}, (A -> B -> G A) -> list B -> A -> G A.
 Parameter oneof : forall {A : Type}, G A -> list (G A) -> G A.
 Parameter frequency : forall {A : Type}, G A -> list (nat * G A) -> G A.
+Parameter backtrack : forall {A : Type}, list (nat * G (option A)) -> G (option A).
 Parameter vectorOf : forall {A : Type}, nat -> G A -> G (list A).
 Parameter listOf : forall {A : Type}, G A -> G (list A).
 Parameter elements : forall {A : Type}, A -> list A -> G A.
@@ -328,6 +329,17 @@ Fixpoint pick {A : Type} (def : G A) (xs : list (nat * G A)) n : nat * G A :=
       else pick def xs (n - k)
   end.
 
+(* This should use urns! *)
+Fixpoint pickDrop {A : Type} (xs : list (nat * G (option A))) n : G (nat * G (option A) * list (nat * G (option A))) :=
+  match xs with
+    | nil => returnGen (0, returnGen None, nil)
+    | (k, x) :: xs =>
+      if (n < k) then returnGen (k, x, xs)
+      else bindGen (pickDrop xs (n - k)) (fun res =>
+           let '(k', x', xs') := res in 
+           returnGen (k', x', (k,x)::xs'))
+  end. 
+
 Definition sum_fst {A : Type} (gs : list (nat * A)) : nat :=
   foldl (fun t p => t + (fst p)) 0 gs.
 
@@ -336,6 +348,22 @@ Definition frequency {A : Type} (def : G A) (gs : list (nat * G A))
   let tot := sum_fst gs in
   bindGen (choose (0, tot-1)) (fun n =>
   @snd _ _ (pick def gs n)).
+
+Fixpoint backtrackFuel {A : Type} (tot : nat) (fuel : nat) (gs : list (nat * G (option A))) : G (option A) :=
+  match fuel with 
+    | O => returnGen None
+    | S fuel' => bindGen (choose (0, tot-1)) (fun n => 
+                 bindGen (pickDrop gs n) (fun res => 
+                 let '(k, g, gs') := res in 
+                 bindGen g (fun ma =>
+                 match ma with 
+                   | Some a => returnGen (Some a)
+                   | None => backtrackFuel (tot - k) fuel' gs'
+                 end )))
+  end.
+
+Definition backtrack {A : Type} (gs : list (nat * G (option A))) : G (option A) :=
+  backtrackFuel (sum_fst gs) (length gs) gs.
 
 Definition vectorOf {A : Type} (k : nat) (g : G A)
 : G (list A) :=
