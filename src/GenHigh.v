@@ -7,6 +7,8 @@ Require Import Sets.
 
 Import GenLow.
 
+Set Bullet Behavior "Strict Subproofs".
+
 Lemma nthE T (def : T) s i : List.nth i s def = nth def s i.
 Proof.
 elim: s i => [|x s IHs i]; first by case.
@@ -169,6 +171,15 @@ Parameter semFrequencySize:
       if l' is nil then semGenSize def size else
       \bigcup_(x in l') semGenSize x.2 size.
 
+(* TODO: prove something like this. 
+Parameter semBacktrackSize:
+  forall {A} (l : list (nat * G (option A))) (size: nat),
+    semGenSize (backtrack l) size <-->
+      let l' := [seq x <- l | x.1 != 0] in
+      if l' is nil then semGenSize (returnGen None) size else
+      \bigcup_(x in l') semGenSize x.2 size.
+*)
+
 Parameter semVectorOfSize:
   forall {A : Type} (k : nat) (g : G A) size,
     semGenSize (vectorOf k g) size <-->
@@ -330,14 +341,13 @@ Fixpoint pick {A : Type} (def : G A) (xs : list (nat * G A)) n : nat * G A :=
   end.
 
 (* This should use urns! *)
-Fixpoint pickDrop {A : Type} (xs : list (nat * G (option A))) n : G (nat * G (option A) * list (nat * G (option A))) :=
+Fixpoint pickDrop {A : Type} (xs : list (nat * G (option A))) n : nat * G (option A) * list (nat * G (option A)) :=
   match xs with
-    | nil => returnGen (0, returnGen None, nil)
+    | nil => (0, returnGen None, nil)
     | (k, x) :: xs =>
-      if (n < k) then returnGen (k, x, xs)
-      else bindGen (pickDrop xs (n - k)) (fun res =>
-           let '(k', x', xs') := res in 
-           returnGen (k', x', (k,x)::xs'))
+      if (n < k) then  (k, x, xs)
+      else let '(k', x', xs') := pickDrop xs (n - k)
+           in (k', x', (k,x)::xs')
   end. 
 
 Definition sum_fst {A : Type} (gs : list (nat * A)) : nat :=
@@ -349,21 +359,20 @@ Definition frequency {A : Type} (def : G A) (gs : list (nat * G A))
   bindGen (choose (0, tot-1)) (fun n =>
   @snd _ _ (pick def gs n)).
 
-Fixpoint backtrackFuel {A : Type} (tot : nat) (fuel : nat) (gs : list (nat * G (option A))) : G (option A) :=
+Fixpoint backtrackFuel {A : Type} (fuel : nat) (tot : nat) (gs : list (nat * G (option A))) : G (option A) :=
   match fuel with 
     | O => returnGen None
     | S fuel' => bindGen (choose (0, tot-1)) (fun n => 
-                 bindGen (pickDrop gs n) (fun res => 
-                 let '(k, g, gs') := res in 
+                 let '(k, g, gs') := pickDrop gs n in
                  bindGen g (fun ma =>
                  match ma with 
                    | Some a => returnGen (Some a)
-                   | None => backtrackFuel (tot - k) fuel' gs'
-                 end )))
+                   | None => backtrackFuel fuel' (tot - k) gs'
+                 end ))
   end.
 
 Definition backtrack {A : Type} (gs : list (nat * G (option A))) : G (option A) :=
-  backtrackFuel (sum_fst gs) (length gs) gs.
+  backtrackFuel (length gs) (sum_fst gs) gs.
 
 Definition vectorOf {A : Type} (k : nat) (g : G A)
 : G (list A) :=
@@ -631,9 +640,9 @@ Proof.
     + apply IHForall2; eauto. 
       apply subconsset in H. destruct H; auto. 
   - move => [H1 H2]. revert gs H H1 H2. induction l; intros gs H H1 H2.
-    - destruct gs; try discriminate. exists 0. 
+    + destruct gs; try discriminate. exists 0. 
       split; auto. reflexivity.
-    - destruct gs; try discriminate.
+    + destruct gs; try discriminate.
       apply subconsset in H. move : H => [H3 H4].  
       inversion H2; subst. destruct H6 as [n [ _ H5]].
       eapply IHl in H8; auto. destruct H8 as [x [_ [H7 H8]]].
@@ -833,7 +842,6 @@ Proof.
       by rewrite addnC. by apply/not_lt.
 Qed.
 
-
 Lemma pick_exists :
   forall {A} (l: list (nat * G A)) n def,
     n <  sum_fst l <->
@@ -894,6 +902,65 @@ rewrite -(IHl t); case=> p [lt_p <-]; exists (n.+1 + p); split.
 by rewrite ltnNge leq_addr addKn.
 Qed.
 
+Lemma pickDrop_def :
+  forall {A} (l: list (nat * G (option A))) n,
+    sum_fst l <= n ->
+    pickDrop l n = (0, returnGen None, l).
+Proof.
+  move=> A l n Hleq.
+  elim : l n Hleq => //=. case=> //= i p l IHl n Hleq.
+  rewrite sum_fstE in Hleq.
+  remember (n < i). case: b Heqb => Heqb; symmetry in Heqb.
+  - have : (i + sum_fst l) < i by eapply (leq_ltn_trans); eassumption.
+    rewrite -ltn_subRL. by have -> : forall i, (i - i) = 0 by elim.
+  - rewrite IHl; eauto. rewrite -(leq_add2r i) subnK.
+      by rewrite addnC. by apply/not_lt.
+Qed.
+
+(* Probably needs something about l' and l. *)
+Lemma pickDrop_exists :
+  forall {A} (l: list (nat * G (option A))) n,
+    n <  sum_fst l <->
+    exists k g l', List.In (k,g) l /\ pickDrop l n = (k,g,l') /\ k <> 0.
+Proof.
+  move => A l n. split.
+  - move => Hlt.
+    elim : l n Hlt => //. case => i p xs IHxs n Hlt.
+    rewrite sum_fstE in Hlt.
+    move/(_ (n-i)) : IHxs => IHxs. simpl.
+    remember (n < i). case: b Heqb => [Heqb | /not_lt Heqb].
+    + exists i. exists p. exists xs. split => //=. by left.  split => //=.
+      move => contra; subst. by rewrite ltn0 in Heqb.
+    + rewrite -(ltn_add2r i) [X in _  < X]addnC subnK // in IHxs.
+      move/(_ Hlt) : IHxs => [k [g [gs [H1 [H2 H3]]]]].
+      exists k. exists g. exists ((i,p)::gs).
+      split; [right | split]; simpl; eauto; by rewrite H2.
+  - move => [k [g [gs [HIn [Hpick Hneq]]]]].
+    remember (n < sum_fst l).
+    case: b  Heqb => //= /not_lt/pickDrop_def H.
+    rewrite H in Hpick. 
+    inversion Hpick; subst; eauto.
+Qed.
+
+Lemma pickDrop_In :
+  forall {A} (l: list (nat * G (option A))) k x,
+    List.In (k,x) l /\ k <> 0 ->
+    exists n l', pickDrop l n = (k,x,l').
+Proof.
+  move => A l k x [HIn Hfst].
+  elim : l HIn => //=. case => //= i g xs IHxs [H1 | H2]; subst.
+  + exists 0.  exists xs. simpl in *.
+    inversion H1; subst; clear H1.
+    have H : 0 < k by  elim : k Hfst IHxs => //=.
+    rewrite H.
+      by split => //=.
+  + move/(_ H2) : IHxs => [n [l' Hpick]].
+    exists (n + i). exists ((i,g)::l'). 
+    rewrite -[X in _ < X]add0n ltn_add2r ltn0.
+    rewrite  -[X in _ - X]add0n subnDr subn0.
+    by rewrite Hpick.
+Qed.
+
 Lemma semFrequencySize {A} (l : list (nat * G A)) (def : G A) (size: nat) :
   semGenSize (frequency def l) size <-->
     let l' := [seq x <- l | x.1 != 0] in
@@ -924,6 +991,64 @@ by case lsupp: {1}[seq x <- l | x.1 != 0] => [|[n g] gs] /=;
 rewrite 1?bigcupC; apply: eq_bigcupr => sz;
 have := (semFrequencySize l def sz); rewrite lsupp.
 Qed.
+
+Lemma eq_lt_0 : (fun x => x <= 0) <--> [set 0].
+Proof. 
+  move => x; split => H; auto.
+  - destruct x; auto. 
+    + unfold set1; auto.
+    + inversion H.
+  - inversion H; auto.
+Qed.
+
+Lemma semBacktrackFuelDef {A} fuel (l : list (nat * G (option A))) size :
+  sum_fst l = 0 -> 
+  semGenSize (backtrackFuel fuel 0 l) size <--> [set None].
+Proof.
+  move: l size. 
+  induction fuel => l size HSum //=.
+  - by rewrite semReturnSize.
+  - rewrite semBindSize semChooseSize //=.
+    rewrite (@eq_bigcupl _ _ _ [set 0]) ?bigcup_set1 ?pickDrop_def // ?sub0n ?leqn0 ?HSum //=.
+    + rewrite semBindSize semReturnSize bigcup_set1; eauto.
+    + by apply eq_lt_0.
+Qed.
+
+Lemma semBacktrackFuel {A} tot fuel (l : list (nat * G (option A))) size :
+  sum_fst l = tot -> length l = fuel -> 
+  semGenSize (backtrackFuel fuel tot l) size <--> 
+    let l' := [seq x <- l | x.1 != 0] in 
+    if l' is nil then semGen (returnGen None)
+    else \bigcup_(x in l') semGenSize x.2 size.
+Proof.
+  move: tot l size.
+  induction fuel => tot l size.
+- move => HSum /List.length_zero_iff_nil HLen; subst; simpl.
+  by rewrite semReturn semReturnSize.
+- move => HSum HLen.
+  rewrite semBindSize semChooseSize //=.
+  case lsupp: {1}[seq x <- l | x.1 != 0] => [|[n g] gs].
+  + move/sum_fst_eq0P: lsupp => suml. subst. rewrite suml.
+    rewrite (@eq_bigcupl _ _ _ [set 0]) ?bigcup_set1 ?pick_def // ?leqn0 ?suml //.
+    * rewrite pickDrop_def ?semBindSize ?semReturnSize ?bigcup_set1 ?sub0n //= ?semReturn; eauto.
+      by apply semBacktrackFuelDef.
+    * rewrite sub0n; by apply eq_lt_0.
+  + have pos_suml: 0 < sum_fst l.
+      have [] := sum_fst_eq0P l.
+      by rewrite lsupp; case: (sum_fst l) => // /(_ erefl).
+    have->: (fun a : nat => a <= tot - 1) <--> [set m | m < sum_fst l].
+      by subst; move => m /=; rewrite -ltnS subn1 prednK.
+    {
+      move => ma; split.
+      - move => [a [HA H]].
+        move: (pickDrop_exists l a) => [H1 H2]; apply H1 in HA; clear H1.
+        move: HA => [k' [g' [gs' [HIn [HPD HNZ]]]]].
+        exists (k', g'); split.
+        + admit. (* This is obviously true. Stupid ssr *)
+        + rewrite HPD in H.          simpl.
+          apply semBindSize in H.
+          unfold seq_In.
+Admitted.
 
 Lemma semFoldGen_right :
   forall {A B : Type} (f : A -> B -> G A) (bs : list B) (a0 : A) (s : nat),

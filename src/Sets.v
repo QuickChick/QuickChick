@@ -207,6 +207,9 @@ Proof. by move=> t; split=> [[y' [<-]] | Fyt] //; exists y. Qed.
 Lemma bigcup_const A B (P : set B) : inhabited A -> (\bigcup_(_ : A) P) <--> P.
 Proof. by case=> a x; split=> [[?] []|Px] //; exists a. Qed.
 
+Lemma bigcup_const_2 A (x :A) B (P : set B) : (\bigcup_(_ in [set x]) P) <--> P.
+Proof. by split=> [[?] []|Px] //; exists x; split => //=. Qed.
+
 Lemma bigcupC T U V A B (F : T -> U -> set V) :
   \bigcup_(i in A) \bigcup_(j in B) F i j <-->
   \bigcup_(j in B) \bigcup_(i in A) F i j.
