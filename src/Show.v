@@ -65,5 +65,11 @@ Instance showType : Show Type :=
   show x := "nat :)"
 |}.
 
+Instance showEx {A} `{_ : Show A} P : Show ({x : A | P x}) :=
+  {|
+    show ex := let '(exist _ x _) := ex in show x 
+  |}.
+
+
 Require Import Ascii.
 Definition nl : string := String (ascii_of_nat 10) EmptyString.

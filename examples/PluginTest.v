@@ -1,6 +1,22 @@
 From QuickChick Require Import QuickChick.
 Require Import String. Open Scope string.
 
+Import GenLow GenHigh.
+Require Import List.
+Import ListNotations.
+Import QcDefaultNotation. Open Scope qc_scope.
+
+Definition backGen :=
+  backtrack [ (1, returnGen None) 
+            ; (4, returnGen (Some 42))
+            ; (4, bindGen (arbitrary : G bool) (fun b => returnGen (if b then Some 0 else None))) ].
+
+Definition prop :=
+  forAll backGen (fun x => collect x true).
+
+(* Should be 3-1 ratio *)
+(* QuickChick prop. *)
+
 Inductive Foo :=
 | Foo1 : Foo
 | Foo2 : Foo -> Foo
@@ -30,16 +46,17 @@ Arguments Bar3 {A} _ _ _.
 DeriveArbitrary Bar as "arbBar2".
 Print arbBar2.
 
-Inductive goodFoo : nat -> Foo -> Prop :=
-    Good1 : forall n : nat, goodFoo n Foo1
-  | Good2 : forall (n : nat) (foo : Foo),
-            goodFoo 0 foo -> goodFoo n (Foo2 foo)
-  | Good3 : forall (n : nat) (foo2 : Foo),
-            goodFoo n foo2 -> goodFoo n (Foo3 n Foo1 foo2).
 
-Require Import List.
-Import ListNotations.
-Import QcDefaultNotation. Open Scope qc_scope.
+Inductive goodFoo' (n : nat) : Foo -> Prop :=
+| Good1' : _W 1  -> goodFoo' n Foo1
+| Good2' : _W 4  -> forall foo, goodFoo' 0 foo -> goodFoo' n (Foo2 foo)
+| Good3' : _Size -> forall foo2,
+            goodFoo' n foo2 ->
+            goodFoo' n (Foo3 n Foo1 foo2).
+
+DeriveGenerators goodFoo' as "goodFoo" and "g".
+Print goodFoo.
+
 
 Fixpoint genGoodFooS (sz : nat) (n : nat) : G {foo | goodFoo n foo} :=
   match sz with
@@ -57,15 +74,76 @@ Fixpoint genGoodFooS (sz : nat) (n : nat) : G {foo | goodFoo n foo} :=
            ]
   end.
 
-Inductive goodFoo' (n : nat) : Foo -> Prop :=
-| Good1'' : _W 1  -> goodFoo' n Foo1
-| Good2'' : _W 4  -> forall foo, goodFoo' 0 foo -> goodFoo' n (Foo2 foo)
-| Good3'' : _Size -> forall foo2,
-            goodFoo' n foo2 ->
-            goodFoo' n (Foo3 n Foo1 foo2).
+(*
+Inductive goodFoo : nat -> Foo -> Prop :=
+    Good1 : forall n : nat, goodFoo n Foo1
+  | Good2 : forall (n : nat) (foo : Foo),
+            goodFoo 0 foo -> goodFoo n (Foo2 foo)
+  | Good3 : forall (n : nat) (foo2 : Foo),
+            goodFoo n foo2 -> goodFoo n (Foo3 n Foo1 foo2)
+Go
 
-DeriveGenerators goodFoo' as "goodFooDerived" and "g".
-Print goodFooDerived.
+Algorithm: to generate forall m, {foo | goodFoo m foo}
+
+  * Keep _compile time_ map var -> unknown/fixed
+  * Need to identify basic/non-basic type
+    -> Non-basic = type contains non-Type arguments
+
+  (- means compile time, + means runtime)
+
+  + Pick a constructor (e.g. Good3) with frequency
+  - Match arguments of result type (m <-> n, foo <-> Foo3 n Foo1 foo2)
+    -> we only get equality constraints, maybe fail (need option)
+  + For each non-basic precondition:
+    * if all arguments fixed -> call decidable instance
+    * if not, require 1 non-fixed. call arbitrary for { a | P a}
+
+    For example, at goodFoo n foo2, n is fixed (equal to m) and foo2 
+    is not. That means we call arbitrary {foo2 | goodFoo n foo2}
+  
+
+*)
+Fixpoint genGoodFooTarget (sz : nat) (m : nat) : G (option {foo | goodFoo m foo}) :=
+  match sz with
+    | O => backtrack [] (* base cases *)
+    | S sz' =>
+      (* Internally m -> fixed *)
+      (* Backtracking choice *)
+      backtrack
+        [ (* Good1 *)
+          (* Match m <-> n, foo <-> Foo1.  *)
+          (* Result: n fixed (= m), foo fixed (=Foo1) *)
+          (* No non basic types, everything fixed *)
+          (1, returnGen (Some (exist (goodFoo m) Foo1 (Good1 m))))
+        ; (* Good2 *)
+          (* Match m <-> n, foo <-> Foo2 foo' *)
+          (* Result n fixed =m, foo tbg based on foo' *)
+          (4, 
+          (* Generate goodFoo 0 foo *)
+           bindGen (genGoodFooTarget sz' 0) (fun res0 =>
+           match res0 with 
+             | Some (exist foo2 goodFoo2) =>
+               (* Done *)
+               returnGen (Some (exist (goodFoo m) (Foo2 foo2) (Good2 m foo2 goodFoo2)))
+             | None => returnGen None
+           end)
+          )
+        ; (sz, (* Good3 *)
+          (* Match m <-> n, foo <-> Foo3 n Foo1 foo2 *)
+          (* Generate goodFoo n foo2 *)
+          bindGen (genGoodFooTarget sz' m) (fun res0 =>
+          match res0 with 
+            | Some (exist foo2 goodFoo2) =>
+              (* Done *)
+              returnGen (Some (exist (goodFoo m) (Foo3 m Foo1 foo2)
+                                     (Good3 m foo2 goodFoo2)))
+            | None => returnGen None
+          end)
+          )
+        ]
+  end.
+
+Sample (genGoodFooTarget 3 3).
 
 From mathcomp.ssreflect Require Import ssreflect ssrnat ssrbool.
 Set Bullet Behavior "Strict Subproofs".
