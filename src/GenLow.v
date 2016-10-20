@@ -279,7 +279,7 @@ Definition sample (A : Type) (g : G A) : list A :=
   match g with
     | MkGen m =>
       let rnd := mkRandomSeed 0 in
-      let l := List.combine (rnds rnd 20) (createRange 20 nil) in
+      let l := List.combine (rnds rnd 20) (createRange 10 nil) in
       List.map (fun (p : RandomSeed * nat) => let (r,n) := p in m n r) l
   end.
 

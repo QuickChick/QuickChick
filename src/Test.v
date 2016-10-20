@@ -57,7 +57,7 @@ Extract Constant defNumDiscards => "(2 * defNumTests)".
 Axiom defNumShrinks  : nat.
 Extract Constant defNumShrinks  => "1000".
 Axiom defSize        : nat.
-Extract Constant defSize        => "100".
+Extract Constant defSize        => "7".
 
 Definition stdArgs := MkArgs None defNumTests defNumDiscards
                              defNumShrinks defSize true.
