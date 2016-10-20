@@ -26,6 +26,10 @@ http://prosecco.gforge.inria.fr/personal/hritcu/publications/foundational-pbt.pd
 
 ### Compilation and Installation
 
+    # If necessary (and if you installed Coq via opam):
+    opam install coq-mathcomp-ssreflect.1.6
+
+    # Then:
     make && make install
 
 ### Simple Examples

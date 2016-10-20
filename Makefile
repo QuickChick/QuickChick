@@ -31,7 +31,16 @@ Makefile.coq: Make
 
 clean:
          # This might not work on macs, but then not my problem
-	find . -regex ".*\.vo\|.*\.d\|.*\.glob\|.*\.o\|.*\.cmi\|.*\.cmx\|.*\.cmxs\|.*\.cmo\|.*\.bak\|.*~" -type f -delete
+	find . -name *.vo -print -delete
+	find . -name *.glob -print -delete
+	find . -name *.d -print -delete
+	find . -name *.o -print -delete
+	find . -name *.cmi -print -delete
+	find . -name *.cmx -print -delete
+	find . -name *.cmxs -print -delete
+	find . -name *.cmo -print -delete
+	find . -name *.bak -print -delete
+	find . -name *~ -print -delete
 	rm -f Makefile.coq
 
 bc:
