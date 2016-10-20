@@ -499,14 +499,20 @@ let derive (cn : derivable) (c : constr_expr) (instance_name : string) =
 
               let shrinks = 
                 List.mapi (fun i pit -> 
-                           let (pid, pt) = pit in 
-                              CApp (dummy_loc, (None, mk_ref "List.map"),
+                           let (pid, pt) = pit in
+                           if is_current_inductive pt (i+num) then
+                             CApp (dummy_loc, (None, mk_ref "cons"),
+                                   [(mk_c pid, None);  
+                                    (CApp (dummy_loc, (None, mk_ref "List.map"),
+                                           [(liftN i, None);
+                                            (CApp (dummy_loc, (None, mk_c aux_shrink), [(mk_c pid, None)]), None)]
+                                          ), None)
+                                   ]) 
+                           else
+                             (CApp (dummy_loc, (None, mk_ref "List.map"),
                                     [(liftN i, None);
-                                     ((if is_current_inductive pt (i + num) then
-                                        (CApp (dummy_loc, (None, mk_c aux_shrink), [(mk_c pid, None)]))
-                                      else 
-                                        (CApp (dummy_loc, (None, mk_ref "shrink"), [(mk_c pid, None)]))
-                                      ), None)])
+                                     (CApp (dummy_loc, (None, mk_ref "shrink"), [(mk_c pid, None)]), None)]
+                                   ))
                           ) (List.combine pat_ids pat_types) in
 
               (* TODO: empty list - params..? *)
