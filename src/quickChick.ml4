@@ -265,12 +265,8 @@ let derive (cn : derivable) (c : constr_expr) (instance_name : string) =
      let mib = Environ.lookup_mind mind env in
      let oib = mib.mind_packets.(0) in
      
-     let (Some (x, params, _)) = dt_rep_from_mib mib in
-     msgerr (str (ty_ctr_to_string x) ++ fnl ());
-     msgerr (str "List length=" ++ int (List.length params) ++ fnl ());
-     List.iter (fun p -> msgerr (str (ty_param_to_string p) ++ fnl ())) params;
-     
-     msgerr (str "Success" ++ fnl ());
+     let Some dt_rep = dt_rep_from_mib mib in
+     msgerr (str (dt_rep_to_string dt_rep) ++ fnl ());
 
      (* Add all the parameters - assumed Prop/Type *)
      let param_names = List.mapi (fun i r -> let (n,_,_) = r in fresh_name (mk_ni "A" i)) mib.mind_params_ctxt in

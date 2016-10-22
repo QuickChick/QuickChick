@@ -1,4 +1,5 @@
 open Pp
+open Term
 open Loc
 open Names
 open Tacmach
@@ -26,16 +27,33 @@ let ty_param_to_string (x : Id.t) = Id.to_string x
 type ty_ctr   = Id.t (* Opaque *)
 let ty_ctr_to_string (x : ty_ctr) = Id.to_string x
 
+let str_lst_to_string sep (ss : string list) = 
+  List.fold_left (fun acc s -> acc ^ sep ^ s) "" ss
+
 type coq_type = 
   | Arrow of coq_type * coq_type
   | TyCtr of ty_ctr * coq_type list
   | TyParam of ty_param
 
-type constructor = string (* Opaque *)
+let rec coq_type_to_string ct = 
+  match ct with
+  | Arrow (c1, c2) -> Printf.sprintf "%s -> %s" (coq_type_to_string c1) (coq_type_to_string c2)
+  | TyCtr (ty_ctr, cs) -> ty_ctr_to_string ty_ctr ^ " " ^ str_lst_to_string " " (List.map coq_type_to_string cs)
+  | TyParam tp -> ty_param_to_string tp
+
+type constructor = Id.t (* Opaque *)
+let constructor_to_string (x : constructor) = Id.to_string x
 
 type ctr_rep = constructor * coq_type 
+let ctr_rep_to_string (ctr, ct) = 
+  Printf.sprintf "%s : %s" (constructor_to_string ctr) (coq_type_to_string ct)
 
 type dt_rep = ty_ctr * ty_param list * ctr_rep list
+let dt_rep_to_string (ty_ctr, ty_params, ctrs) = 
+  Printf.sprintf "%s %s :=\n%s" (ty_ctr_to_string ty_ctr) 
+                                (str_lst_to_string " "  (List.map ty_param_to_string ty_params))
+                                (str_lst_to_string "\n" (List.map ctr_rep_to_string  ctrs))
+                                 
 
 let (>>=) m f = 
   match m with
@@ -52,14 +70,20 @@ let rec cat_maybes = function
   | (Some x :: mxs) -> x :: cat_maybes mxs
   | None :: mxs -> cat_maybes mxs
 
+let foldM f b l = List.fold_left (fun accm x -> 
+                                  accm >>= fun acc ->
+                                  f acc x
+                                 ) b l
+let sequenceM f l = 
+  (foldM (fun acc x -> f x >>= fun x' -> Some (x' :: acc)) (Some []) l) >>= fun l -> Some (List.rev l)
+
 let parse_type_params arity_ctxt =
   let param_names =
-    List.fold_left (fun accm (n, _, c) ->
-                      accm >>= fun acc ->
-                      match n with
-                      | Name id   -> Some (id  :: acc)
-                      | Anonymous -> msgerr (str "Unnamed type parameter?" ++ fnl ()); None
-                   ) (Some []) arity_ctxt in
+    foldM (fun acc (n, _, _) -> 
+           match n with
+           | Name id   -> Some (id  :: acc)
+           | Anonymous -> msgerr (str "Unnamed type parameter?" ++ fnl ()); None
+          ) (Some []) arity_ctxt in
   param_names
 (* For /trunk 
     Rel.fold_inside
@@ -72,11 +96,16 @@ let parse_type_params arity_ctxt =
   param_names
 *)
 
+let rec arrowify terminal l = 
+  match l with
+  | [] -> terminal
+  | x::xs -> Arrow (x, arrowify terminal xs)
+
 (* Receives number of type parameters and one_inductive_body.
    -> Possibly ty_param list as well? 
    Returns list of constructor representations 
  *)                               
-let parse_constructors nparams oib =
+let parse_constructors nparams param_names result_ty oib : ctr_rep list option =
   
   let parse_constructor branch =
     let (ctr_id, ty_ctr) = branch in
@@ -85,12 +114,41 @@ let parse_constructors nparams oib =
     
     let ctr_pats = if Term.isConst ty then [] else fst (Term.decompose_prod ty) in
 
-    let _, pat_types = List.split (List.rev ctr_pats)
-    in 42 
-  in Some []
-(*        (List.combine (Array.to_list oib.mind_consnames)
-                      (Array.to_list oib.mind_nf_lc))) in
- *)                                                     
+    let _, pat_types = List.split (List.rev ctr_pats) in
+
+    msgerr (str (Id.to_string ctr_id) ++ fnl ());
+    let rec aux i ty = 
+      if isRel ty then begin 
+        msgerr (int (i + nparams) ++ str " Rel " ++ int (destRel ty) ++ fnl ());
+        let db = destRel ty in
+        if i + nparams = db then (* Current inductive, no params *)
+          Some (TyCtr (oib.mind_typename, []))
+        else (* [i + nparams - db]th parameter *)
+          try Some (TyParam (List.nth param_names (i + nparams - db - 1)))
+          with _ -> msgerr (str "nth failed: " ++ int (i + nparams - db - 1) ++ fnl ()); None
+      end 
+      else if isApp ty then begin
+        let (ctr, tms) = decompose_app ty in 
+        foldM (fun acc ty -> 
+               aux i ty >>= fun ty' -> Some (ty' :: acc)
+              ) (Some []) tms >>= fun tms' ->
+        match aux i ctr with
+        | Some (TyCtr (c, _)) -> Some (TyCtr (c, List.rev tms'))
+(*        | Some (TyParam p) -> Some (TyCtr (p, tms')) *)
+        | None -> msgerr (str "Aux failed?" ++ fnl ()); None
+      end
+      else if isInd ty then begin
+        let ((mind,_),_) = destInd ty in
+        Some (TyCtr (Label.to_id (MutInd.label mind), []))
+      end
+      else (msgerr (str "Case Not Handled" ++ fnl()); None)
+
+    in sequenceM (fun x -> x) (List.mapi aux (List.map (Vars.lift (-1)) pat_types)) >>= fun types ->
+       Some (ctr_id, arrowify result_ty types)
+  in
+
+  sequenceM parse_constructor (List.combine (Array.to_list oib.mind_consnames)
+                                            (Array.to_list oib.mind_nf_lc))
                             
 (* Convert mutual_inductive_body to this representation, if possible *)
 let dt_rep_from_mib mib = 
@@ -100,9 +158,9 @@ let dt_rep_from_mib mib =
   end else 
     let oib = mib.mind_packets.(0) in
     let ty_ctr = oib.mind_typename in 
-    (* TODO: Parse parameters *)
     parse_type_params oib.mind_arity_ctxt >>= fun ty_params ->
-    parse_constructors mib.mind_nparams oib >>= fun ctr_reps ->
+    let result_ctr = TyCtr (ty_ctr, List.map (fun x -> TyParam x) ty_params) in
+    parse_constructors mib.mind_nparams ty_params result_ctr oib >>= fun ctr_reps ->
     Some (ty_ctr, ty_params, ctr_reps)
                   
 let fresh_name n =
