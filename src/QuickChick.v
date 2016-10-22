@@ -1,3 +1,4 @@
+Declare ML Module "genericLib".
 Declare ML Module "quickChick".
 
 Axiom _W : nat -> Prop.

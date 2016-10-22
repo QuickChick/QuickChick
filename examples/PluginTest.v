@@ -28,10 +28,10 @@ Print showFoo.
 DeriveArbitrary Foo as "arbFoo".
 Print arbFoo.
 
-Inductive Bar A :=
-| Bar1 : Bar A
-| Bar2 : Bar A -> Bar A
-| Bar3 : A -> A -> Bar A -> Bar A.
+Inductive Bar A B :=
+| Bar1 : Bar A B
+| Bar2 : Bar A B -> Bar A B
+| Bar3 : A -> B -> Bar A B -> Bar A B.
 
 DeriveShow Bar as "showBar".
 Print showBar.
