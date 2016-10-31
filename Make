@@ -1,5 +1,6 @@
 -R src QuickChick
 -I src
+src/Tactics.v
 src/Sets.v
 src/Random.v
 src/RoseTrees.v

@@ -3,7 +3,7 @@ Require Import mathcomp.ssreflect.ssreflect.
 From mathcomp Require Import ssrfun ssrbool ssrnat eqtype seq.
 
 Require Import Random GenLow.
-Require Import Sets.
+Require Import Tactics Sets.
 
 Import GenLow.
 
@@ -918,10 +918,15 @@ Proof.
 Qed.
 
 (* Probably needs something about l' and l. *)
+(* ZP : added a few things *)
 Lemma pickDrop_exists :
   forall {A} (l: list (nat * G (option A))) n,
     n <  sum_fst l <->
-    exists k g l', List.In (k,g) l /\ pickDrop l n = (k,g,l') /\ k <> 0.
+    exists k g l',
+      List.In (k,g) l /\ pickDrop l n = (k,g,l') /\ k <> 0 /\
+      l <--> [set (k, g)] :|: l' /\
+      length l' + 1 = length l /\
+      sum_fst l' + k = sum_fst l.
 Proof.
   move => A l n. split.
   - move => Hlt.
@@ -930,12 +935,21 @@ Proof.
     move/(_ (n-i)) : IHxs => IHxs. simpl.
     remember (n < i). case: b Heqb => [Heqb | /not_lt Heqb].
     + exists i. exists p. exists xs. split => //=. by left.  split => //=.
-      move => contra; subst. by rewrite ltn0 in Heqb.
+      split. move => contra; subst. by rewrite ltn0 in Heqb.
+      split. by rewrite cons_set_eq.
+      split. by ssromega.
+      rewrite sum_fstE. by ssromega.
     + rewrite -(ltn_add2r i) [X in _  < X]addnC subnK // in IHxs.
-      move/(_ Hlt) : IHxs => [k [g [gs [H1 [H2 H3]]]]].
+      move/(_ Hlt) : IHxs => [k [g [gs [H1 [H2 [H3 [H4 [H5 H6]]]]]]]].
       exists k. exists g. exists ((i,p)::gs).
-      split; [right | split]; simpl; eauto; by rewrite H2.
-  - move => [k [g [gs [HIn [Hpick Hneq]]]]].
+      split; [right | split; [| split; [| split; [| split]]]];
+      try (simpl; eauto; by rewrite H2).
+      rewrite !cons_set_eq H4.
+      rewrite setU_assoc (setU_comm [set (i, p)]) -setU_assoc.
+      reflexivity.
+      simpl. by ssromega.
+      simpl. rewrite !sum_fstE. by ssromega.
+  - move => [k [g [gs [HIn [Hpick [Hneq _]]]]]].
     remember (n < sum_fst l).
     case: b  Heqb => //= /not_lt/pickDrop_def H.
     rewrite H in Hpick. 
@@ -1014,41 +1028,124 @@ Proof.
     + by apply eq_lt_0.
 Qed.
 
-Lemma semBacktrackFuel {A} tot fuel (l : list (nat * G (option A))) size :
+Lemma in_memP {A : eqType} x (l : seq A) :
+  reflect (List.In x l) (x \in l)%bool.
+Proof.
+  induction l; simpl.
+  - constructor; eauto.
+  - rewrite in_cons.
+    destruct (x == a) eqn:Heq; move : Heq => /eqP Heq; subst; simpl.
+    + constructor; eauto.
+    + eapply equivP; try eassumption.
+      split; firstorder. congruence.
+Qed.  
+
+Lemma forall_leq_sum_fst {A} (l : list (nat * A)) :
+  forall a n, seq_In l (n, a) -> n <= sum_fst l.
+Proof.
+  elim : l => [| [n a] l IH]; eauto.
+  rewrite sum_fstE.
+  move => n' a' /= [[H1 H2] | H2]; subst.
+  by ssromega.
+  apply IH in H2. by ssromega.
+Qed.
+
+Lemma pickDrop_leq_top {A} (l : seq (nat * G (option A))) (n : nat) k g l' size s :
+  pickDrop l n = (k, g, l') ->
+  semGenSize g size (Some s) ->
+  n < sum_fst l.
+Proof.
+  revert n l'.
+  elim : l => [|[m a] l IH] n l' /= Hpd Hgen.
+  - move : Hpd => [H1 H2 H3]; subst.
+    apply semReturnSize in Hgen. discriminate.
+  - rewrite sum_fstE.
+    destruct (n < m) eqn:H. by ssromega.
+    destruct (pickDrop l (n - m)) as [[k' x'] xs'] eqn:Heq. 
+    move : Hpd => [H1 H2 H3]; subst.
+    eapply IH in Heq. by ssromega.
+    eassumption.
+Qed.
+
+Lemma semBacktrackFuel {A : eqType} tot fuel (l : list (nat * G (option A))) size :
   sum_fst l = tot -> length l = fuel -> 
   semGenSize (backtrackFuel fuel tot l) size <--> 
-    let l' := [seq x <- l | x.1 != 0] in 
-    if l' is nil then semGen (returnGen None)
-    else \bigcup_(x in l') semGenSize x.2 size.
+  (\bigcup_(x in (l :&: (fun x => x.1 <> 0))) (isSome :&: (semGenSize x.2 size))) :|:
+  ([set None] :&: (\bigcap_(x in l :&: (fun x => x.1 <> 0)) (semGenSize x.2 size))).
 Proof.
   move: tot l size.
   induction fuel => tot l size.
-- move => HSum /List.length_zero_iff_nil HLen; subst; simpl.
-  by rewrite semReturn semReturnSize.
-- move => HSum HLen.
-  rewrite semBindSize semChooseSize //=.
-  case lsupp: {1}[seq x <- l | x.1 != 0] => [|[n g] gs].
-  + move/sum_fst_eq0P: lsupp => suml. subst. rewrite suml.
-    rewrite (@eq_bigcupl _ _ _ [set 0]) ?bigcup_set1 ?pick_def // ?leqn0 ?suml //.
-    * rewrite pickDrop_def ?semBindSize ?semReturnSize ?bigcup_set1 ?sub0n //= ?semReturn; eauto.
-      by apply semBacktrackFuelDef.
-    * rewrite sub0n; by apply eq_lt_0.
-  + have pos_suml: 0 < sum_fst l.
-      have [] := sum_fst_eq0P l.
-      by rewrite lsupp; case: (sum_fst l) => // /(_ erefl).
-    have->: (fun a : nat => a <= tot - 1) <--> [set m | m < sum_fst l].
-      by subst; move => m /=; rewrite -ltnS subn1 prednK.
-    {
-      move => ma; split.
-      - move => [a [HA H]].
-        move: (pickDrop_exists l a) => [H1 H2]; apply H1 in HA; clear H1.
-        move: HA => [k' [g' [gs' [HIn [HPD HNZ]]]]].
-        exists (k', g'); split.
-        + admit. (* This is obviously true. Stupid ssr *)
-        + rewrite HPD in H.          simpl.
-          apply semBindSize in H.
-          unfold seq_In.
-Admitted.
+  - move => HSum /List.length_zero_iff_nil HLen; subst; simpl.
+    by rewrite setI_comm !nil_set_eq setI_set0_abs bigcup_set0 bigcap_set0
+               setU_comm setU_set0_neut setI_setT_neut semReturnSize.
+  - move => HSum HLen.
+    rewrite semBindSize semChooseSize //=. 
+    split.
+    { destruct (sum_fst l) eqn:Hsum; subst.
+      - move => [n [Hleq H]].
+        rewrite pickDrop_def in H; eauto.
+        move : H =>  /semBindSize [[b |] [H1 H2]].
+        + eapply semReturnSize in H1. inversion H1.
+        + apply semBacktrackFuelDef in H2; eauto.
+          inversion H2; subst.
+          right. split; eauto.
+          move => [n' a] [H3 H4]. eapply forall_leq_sum_fst in H3.
+          subst. simpl in *. ssromega. 
+      - move => [m [Hleq H]].
+        move: (pickDrop_exists l m) => [H1 H2].
+        edestruct H1 as [k [g [l' [HIn [Hpd [Hkneq [Hsub [Hlen Hfst]]]]]]]].
+        rewrite Hsum; eauto. ssromega.
+        rewrite Hpd in H. eapply semBindSize in H.
+        move : H => [a' [Hg Hb]]. 
+        destruct a'. 
+        + left. exists (k, g).
+          apply semReturnSize in Hb. inversion Hb; subst.
+            by firstorder.
+        + eapply IHfuel in Hb; eauto.
+          * move : Hb => [Hsome | [Hnone Hcap]].
+            left. eapply incl_bigcupl; [| eassumption ].
+            apply setI_subset_compat.
+            rewrite Hsub. apply setU_subset_r. by apply subset_refl.
+            by apply subset_refl.   
+            right. split; eauto.
+            eapply eq_bigcapl. rewrite Hsub.
+            rewrite setI_setU_distr. reflexivity.
+            apply bigcap_setI_l. split; eauto.
+            apply bigcap_setU_l. apply bigcap_set1.
+            inversion Hnone; subst. eassumption.
+          * rewrite Hsum in Hfst. rewrite <- Hfst. ssromega.
+          * ssromega. }
+    { move => [[[k g] [[Hg1 Hg2] [Ha1 Ha2]]] | [Hnone Hcap]]; simpl in *.
+      - edestruct (pickDrop_In l) as [n [gs' Heq]]; eauto.
+        destruct a; try discriminate.        
+        exists n. split. rewrite <- HSum.
+        eapply pickDrop_leq_top in Heq; eauto. by ssromega.
+        rewrite Heq.
+        eapply semBindSize. exists (Some s). split; eauto.
+        apply semReturnSize. reflexivity.
+      - destruct a; try discriminate.
+        destruct (sum_fst l) eqn:Hsum.
+        + eexists 0. split; eauto.
+          rewrite pickDrop_def; eauto.
+          eapply semBindSize. exists None. split.
+          apply semReturnSize. reflexivity.
+          subst. apply semBacktrackFuelDef; eauto.
+        + subst.
+          move: (pickDrop_exists l 0) => [Hex _].
+          edestruct Hex as [k [g [gs' [Hin [Hpd [Hneq [Hsub [Hlen Hfst]]]]]]]]; eauto.
+          exists 0. split; eauto. rewrite Hpd.
+          eapply semBindSize. exists None. split.
+          specialize (Hcap (k, g)). eapply Hcap.
+          split; eauto.
+          eapply IHfuel.
+          rewrite Hsum in Hfst. rewrite <- Hfst. by ssromega.
+          by ssromega.
+          right. split. reflexivity.
+          eapply incl_bigcapl; [| eassumption ].
+          rewrite Hsub. apply setI_subset_compat.
+          apply setU_subset_r. by apply subset_refl.
+          by apply subset_refl. }
+Qed.
 
 Lemma semFoldGen_right :
   forall {A B : Type} (f : A -> B -> G A) (bs : list B) (a0 : A) (s : nat),

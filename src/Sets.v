@@ -65,6 +65,9 @@ Definition codom (f : T -> U) := [set y | exists x, f x = y].
 
 Definition bigcup A (F : T -> set U) := [set x | exists i, i \in A /\ x \in F i].
 
+Definition bigcap (A : set T) (F : T -> set U) :=
+  [set x | forall (i : T), i \in A -> x \in F i].
+
 End setOpsDef.
 
 Definition imset {T U} (f : T -> U) A := bigcup A (fun x => set1 (f x)).
@@ -100,6 +103,11 @@ Notation "\bigcup_ ( i : t ) F" := (bigcup (@setT t) (fun i => F))
 Notation "\bigcup_ ( i 'in' A ) F" := (bigcup A (fun i => F))
   (at level 41, F at level 41, i, A at level 50,
            format "'[' \bigcup_ ( i  'in'  A ) '/  '  F ']'") : set_scope.
+
+Notation "\bigcap_ ( i 'in' A ) F" := (bigcap A (fun i => F))
+  (at level 41, F at level 41, i, A at level 50,
+           format "'[' \bigcap_ ( i  'in'  A ) '/  '  F ']'") : set_scope.
+
 
 Lemma subset_eqP T (A B : set T) : (A <--> B) <-> (A \subset B /\ B \subset A).
 Proof.
@@ -256,9 +264,9 @@ Arguments eq_bigcupl [T U A] B F _ _.
 
 Global Instance eq_bigcup T U : Proper (set_eq ==> pointwise_relation T (@set_eq U) ==> set_eq) bigcup.
 Proof.
-move=> A B eqAB F G eqFG a; apply: (@set_eq_trans _ (\bigcup_(i in A) G i)).
+  move=> A B eqAB F G eqFG a; apply: (@set_eq_trans _ (\bigcup_(i in A) G i)).
   exact: eq_bigcupr.
-exact: eq_bigcupl.
+  exact: eq_bigcupl.
 Qed.
 
 Lemma bigcup_flatten T U V A (F : T -> set U) (G : U -> set V) :
@@ -352,3 +360,172 @@ Arguments reindex_bigcup [I J K] h [F A] B _ _.
 Instance proper_set_incl A : Morphisms.Proper (Morphisms.respectful set_eq
   (Morphisms.respectful set_eq (Basics.flip Basics.impl))) (@set_incl A).
 Proof. firstorder. Qed.
+
+
+(** Lemmas about [setU] and [setI] *)
+
+Instance eq_setU U : Proper (set_eq ==> set_eq ==> set_eq) (@setU U).
+Proof.
+  move=> A B eqAB F G eqFG a.
+  split; by move => [H1 | H2]; firstorder.
+Qed.
+
+Instance eq_setI U : Proper (set_eq ==> set_eq ==> set_eq) (@setI U).
+Proof.
+  move=> A B eqAB F G eqFG a.
+  by split; move => [H1 H2]; firstorder.
+Qed.
+
+Lemma setI_comm {U} (s1 s2 : set U) : 
+   s1 :&: s2 <--> s2 :&: s1.
+Proof.
+  firstorder.
+Qed.
+
+Lemma setU_comm {U} (s1 s2 : set U) : 
+   s1 :|: s2 <--> s2 :|: s1.
+Proof.
+  firstorder.
+Qed.
+
+Lemma setI_set0_abs {U} (s : set U) :
+  (s :&: set0) <--> set0.
+Proof.
+  firstorder.
+Qed.
+
+Lemma setU_set0_neut {U} (s : set U) :
+  (s :|: set0) <--> s.
+Proof.
+  firstorder.
+Qed.
+
+Lemma setI_setT_neut {U} (s : set U) :
+  (s :&: setT) <--> s.
+Proof.
+  firstorder.
+Qed.
+
+Lemma setU_setT_abs {U} (s : set U) :
+  (s :|: setT) <--> setT.
+Proof.
+  firstorder.
+Qed.
+
+Lemma setU_assoc {U} (s1 s2 s3 : set U) :
+  (s1 :|: (s2 :|: s3)) <--> ((s1 :|: s2) :|: s3).
+Proof.
+  firstorder.
+Qed.
+
+Lemma setI_assoc {U} (s1 s2 s3 : set U) :
+  (s1 :&: (s2 :&: s3)) <--> ((s1 :&: s2) :&: s3).
+Proof.
+  firstorder.
+Qed.
+
+Lemma setI_set0 {U} (s1 s2 : set U) : 
+  (forall x, s1 x -> ~ s2 x) ->
+  (s1 :&: s2) <--> set0.
+Proof.
+  intros; split; firstorder. 
+Qed.
+
+Lemma setI_subset_compat {U} (s1 s2 s1' s2' : set U) : 
+  s1 \subset s1' ->
+  s2 \subset s2' ->
+  (s1 :&: s2) \subset (s1' :&: s2').
+Proof.
+  firstorder.
+Qed.
+
+Lemma setU_subset_r {U} (s1 s2 s3 : set U) : 
+  s1 \subset s3 ->
+  s1 \subset (s2 :|: s3).
+Proof.
+  firstorder.
+Qed.
+
+Lemma setU_subset_l {U} (s1 s2 s3 : set U) : 
+  s1 \subset s2 ->
+  s1 \subset (s2 :|: s3).
+Proof.
+  firstorder.
+Qed.
+
+Lemma setI_setU_distr {U} (s1 s2 s3 : set U) : 
+  ((s1 :|: s2) :&: s3) <--> ((s1 :&: s3) :|: (s2 :&: s3)).
+Proof.
+  firstorder.
+Qed.
+
+(** Lemmas about [bigcap] *)
+
+Lemma bigcap_set0 (T U : Type) (F : T -> set U) :
+  \bigcap_(x in set0) F x <--> setT.
+Proof.
+  split.
+  - move => _. constructor.
+  - move => _ x H. inversion H.
+Qed.
+
+
+Lemma incl_bigcapl T U A B (F : T -> set U) : B \subset A ->
+  \bigcap_(x in A) F x \subset \bigcap_(x in B) F x.
+Proof.
+  by move => Hsub t Hcap x HB; eauto.
+Qed.
+
+
+Lemma eq_bigcapr (T U : Type) (A : set T) (F G : T -> set U) :
+  (forall x : T, F x <--> G x) ->
+  \bigcap_(x in A) F x <--> \bigcap_(x in A) G x.
+Proof.
+  by move => H a; split; move => Ha b Hb; eapply H; eauto.
+Qed.
+
+Lemma eq_bigcapl T U A B (F : T -> set U) : A <--> B ->
+  \bigcap_(x in A) F x <--> \bigcap_(x in B) F x.
+Proof.
+  by move => H a; split; move => Ha b Hb; eapply Ha; eapply H; eauto.
+Qed.
+
+Instance eq_bigcap T U : Proper (set_eq ==> pointwise_relation T (@set_eq U) ==> set_eq) bigcap.
+Proof.
+  move=> A B eqAB F G eqFG a. apply: (@set_eq_trans _ (\bigcap_(i in A) G i)).
+  exact: eq_bigcapr.
+  exact: eq_bigcapl.
+Qed.
+
+Lemma bigcap_setI_l {U T} (s1 s2 : set U) (f : U -> set T) :
+  bigcap (s1 :|: s2) f <-->
+  bigcap s1 f :&: bigcap s2 f.
+Proof.
+  firstorder.
+Qed.
+
+Lemma bigcap_setU_l {U T} (s1 s2 : set U) (f : U -> set T) :
+  bigcap s1 f \subset bigcap (s1 :&: s2) f.
+Proof.
+  firstorder.
+Qed.
+
+Lemma bigcap_set1 {U T} (x : U) (f : U -> set T) :
+  bigcap [set x] f <--> f x.
+Proof.
+  split; move => H.
+  eapply H. reflexivity.
+  intros y Hy. inversion Hy. subst.
+  assumption.
+Qed.
+
+(** Lemmas about lists *)
+Lemma nil_set_eq {A : Type} :
+  [::] <--> (@set0 A).
+Proof.
+  split; move => H; eauto.
+Qed.
+
+Lemma cons_set_eq {A} (x : A) l :
+  (x :: l) <--> [set x] :|: l.
+Proof. by []. Qed.

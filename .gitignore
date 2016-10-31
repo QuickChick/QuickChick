@@ -15,3 +15,4 @@
 *~
 *.bak
 Makefile.coq
+.DS_Store
