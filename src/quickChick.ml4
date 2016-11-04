@@ -264,10 +264,19 @@ let derive (cn : derivable) (c : constr_expr) (instance_name : string) =
 
      let mib = Environ.lookup_mind mind env in
      let oib = mib.mind_packets.(0) in
-     
-     let Some dt_rep = dt_rep_from_mib mib in
-     msgerr (str (dt_rep_to_string dt_rep) ++ fnl ());
 
+     let (ty_ctr, ty_params, ctrs) =
+       match dt_rep_from_mib mib with
+       | Some dt -> dt
+       | None -> failwith "Not supported type"
+     in
+
+     let coqTyCtr = gTyCtr ty_ctr in
+     let coqTyParams = List.map gTyParam ty_params in
+
+     let full_dt = gApp coqTyCtr coqTyParams in
+
+(*     
      (* Add all the parameters - assumed Prop/Type *)
      let param_names = List.mapi (fun i r -> let (n,_,_) = r in fresh_name (mk_ni "A" i)) mib.mind_params_ctxt in
 
@@ -282,25 +291,26 @@ let derive (cn : derivable) (c : constr_expr) (instance_name : string) =
          in 
          gen_rec_append (fun c' -> mkAppC (c, [c'])) param_names
      in
-
+ *)
      let class_ref = match cn with 
        | Show -> mk_ref "QuickChick.Show.Show"
        | Arbitrary -> mk_ref "QuickChick.Arbitrary.Arbitrary" in
+
+     let class_name = match cn with 
+       | Show -> "QuickChick.Show.Show"
+       | Arbitrary -> "QuickChick.Arbitrary.Arbitrary" in
      
      let hole = CHole (dummy_loc, None, Misctypes.IntroAnonymous, None) in
 
      (* Generate typeclass constraints. For each type parameter "A" we need `{_ : <Class Name> A} *)
-     let instance_arguments = 
-       List.concat (List.mapi (fun i pn -> 
-                                 let id = id_of_string (mk_ni "A" i) in
-                                 [ LocalRawAssum([dl (Name id)], Default Implicit, hole)
-                                 ; LocalRawAssum ([dl Anonymous], Generalized (Implicit, Implicit, false), 
-                                                  CApp (dummy_loc, (None, class_ref), [(mk_c id, None)]))
-                                 ]
-                              ) param_names) in
+     let instance_arguments =
+       List.concat (List.map (fun tp ->
+                              [ gArg ~assumName:tp ~assumImplicit:true ();
+                                gArg ~assumType:(gApp (gInject class_name) [tp]) ~assumGeneralized:true ()]
+                   ) coqTyParams) in
 
      (* The instance type *)
-     let instance_type = CApp (dummy_loc, (None, class_ref), [(c', None)]) in
+     let instance_type = gApp (gInject class_name) [full_dt] in
 
      (* Given a branch (constructor * types) and the number of type parameters, get constructor information *)
      let extract_branch_info num br = 
@@ -326,68 +336,35 @@ let derive (cn : derivable) (c : constr_expr) (instance_name : string) =
      let instance_record = 
          
        match cn with 
-       | Show -> 
+       | Show ->
 
-         (* Generate a fresh variable name "x" *) 
-         let x = fresh_name "x" in
-     
          (* Create the function body by recursing on the structure of x *)
-         let show_body = 
-           let aux = fresh_name "aux"  in 
-           let x'  = fresh_name "x'" in 
-           let binderList = [LocalRawAssum ([(dummy_loc, Name x')], Default Explicit, c')] in
+         let show_body x =
 
-           (* Create a branch based on type information and number of parameters (to be ignored) *)
-           let create_branch num br = 
+           let branch rec_name (ctr,ty) = 
+             let rec branch_aux i = function
+               | Arrow (ty1, ty2) -> 
+                  let (params, f) = branch_aux (i+1) ty2 in
+                  let useRec = match ty1 with 
+                    | TyCtr (ty_ctr', _) -> ty_ctr = ty_ctr'
+                    | _ -> false in
+                  (("p" ^ string_of_int i) :: params,
+                   fun (v :: vs) -> str_appends [ gStr "( "
+                                                ; gApp (if useRec then gVar rec_name else gInject "show") [gVar v]
+                                                ; gStr " )"
+                                                ; f vs])
+               | _ -> ([], fun _ -> emptyString) in
+             let (params, f) = branch_aux 0 ty in 
+             (ctr, params, fun vs -> str_appends [gStr (constructor_to_string ctr ^ " "); f vs])
+           in 
+            
+           gRecFunIn "aux" ["x'"] 
+                     (fun (aux, [x']) -> gMatch (gVar x') (List.map (branch aux) ctrs))
+                     (fun aux -> gApp (gVar aux) [gVar x])
+         in 
 
-             let (ctr_id, pat_ids, pats, pat_types) = extract_branch_info num br in 
-
-             (* Shorthands for append and injecting a primitive string *)
-             let emptyString = mk_ref "Coq.Strings.String.EmptyString" in
-             let cappend c1 c2 = mkAppC (mk_ref "Coq.Strings.String.append", [c1; c2]) in
-             let cstr s = CPrim (dummy_loc, String s) in
-     
-             (* Generate Topconstr code for each constructor argument *)
-             let strings = [ cstr (string_of_id ctr_id) ]
-                           @ (List.mapi (fun i pt -> 
-                                           let pi = fresh_name ("p" ^ string_of_int i) in
-                                           cappend (cstr "( ") 
-                                                   (cappend (mkAppC ((if is_current_inductive pt (i+num) then mk_c aux else show), [mk_c pi]))
-                                                            (cstr " )"))
-                                        ) pat_types) in
-
-             (* Create branch bodies *)
-             let rec format_strings strs = 
-               match strs with 
-               | []  -> emptyString 
-               | [cs] -> cs
-               | (cs::css) -> cappend cs (cappend (cstr " ") (format_strings css))
-             in
-             (dummy_loc, [dl [CPatCstr (dummy_loc, Ident (dl ctr_id), [], pats)]], format_strings strings) in
-
-           (* Create the match on x' *)
-           let fix_body = 
-              CCases (dummy_loc, Term.RegularStyle, None (* return *), 
-                     [(mk_c x', (None, None))] (* single discriminee - no as/in*),
-                     List.map (create_branch mib.mind_nparams)
-                              (List.combine (Array.to_list oib.mind_consnames)
-                                            (Array.to_list oib.mind_nf_lc))) in
-     
-           let fix_dcl = (dl aux, binderList, (None, CStructRec), fix_body, (dl None)) in
-           
-           (* Package as a let_fix *)
-           CLetIn (dummy_loc, dl (Name aux), 
-                   G_constr.mk_fix (dummy_loc, true, dl aux, [fix_dcl]),
-                   CApp (dummy_loc, (None, mk_c aux), [(mk_c x, None)]))
-     
-         in
-     
-         (* Package the body to a function *)
-         let show_fun = 
-           mkCLambdaN dummy_loc [LocalRawAssum ([dummy_loc, Name x],Default Explicit, hole)] show_body in
-     
-         (* Package the function in a record *)
-         CRecord (dummy_loc, None, [(Ident (dummy_loc, id_of_string "show"), show_fun)])
+         let show_fun = gFun ["x"] (fun [x] -> show_body x) in
+         gRecord [("show", show_fun)]
 
        | Arbitrary -> 
           (* Create the function body by recursing on the structure of x *)
@@ -416,7 +393,7 @@ let derive (cn : derivable) (c : constr_expr) (instance_name : string) =
 
               let rec aux = function
                 | [] -> (true , mkAppC (mk_ref "returnGen", [mkAppExplC (Ident (dl ctr_id),
-                                                                     (List.map (fun n -> mk_c n) param_names) @
+                                                                     coqTyParams @
                                                                      (List.mapi (fun i _ ->  mk_c (fresh_name (mk_ni "p" i))) pats))]
                                        ))
                 | (b, n, c)::arbs -> 
@@ -480,7 +457,7 @@ let derive (cn : derivable) (c : constr_expr) (instance_name : string) =
 
             (* Generate a fresh variable name "aux","x" *) 
             let aux_shrink   = fresh_name "aux_shrink" in 
-            let binderList = [LocalRawAssum ([(dummy_loc, Name x)], Default Explicit, c')] in
+            let binderList = [LocalRawAssum ([(dummy_loc, Name x)], Default Explicit, full_dt)] in
 
             let create_branch num br = 
        
@@ -494,7 +471,7 @@ let derive (cn : derivable) (c : constr_expr) (instance_name : string) =
               let liftN i = 
                 mkCLambdaN dummy_loc [LocalRawAssum ([dummy_loc, Name shrunk],Default Explicit, hole)] 
                            (mkAppExplC (Ident (dl ctr_id),
-                                        (List.map (fun n -> (mk_c n)) param_names) @
+                                        coqTyParams @
                                           (List.mapi (fun j pid -> if i == j then (mk_c shrunk) else (mk_c pid)) pat_ids)
                                        ))
               in
@@ -546,7 +523,9 @@ let derive (cn : derivable) (c : constr_expr) (instance_name : string) =
           CRecord (dummy_loc, None, [ (Ident (dummy_loc, id_of_string "arbitrary"), arbitrary_decl)
                                     ; (Ident (dummy_loc, id_of_string "shrink"), shrink_decl) 
                                     ])
+
      in 
+
 
      (* Declare the instance *)
      ignore (Classes.new_instance true 

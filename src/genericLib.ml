@@ -14,19 +14,37 @@ open Constrexpr
 open Constrexpr_ops
 open Context
 
+let dl x = (dummy_loc, x) 
+let hole = CHole (dummy_loc, None, Misctypes.IntroAnonymous, None)
+
 (* Everything marked "Opaque" should have its implementation be hidden in the .mli *)
 
 (* Non-dependent version *)
-type var = reference (* Opaque *)
+type var = Id.t (* Opaque *)
+
+let gVar x = CRef (Ident (dl x),None)
 
 type coq_expr = constr_expr (* Opaque *)
 
+(* Maybe this should do checks? *)
+let gInject s = CRef (Qualid (Loc.ghost, qualid_of_string s), None)
+
 type ty_param = Id.t (* Opaque *)
 let ty_param_to_string (x : Id.t) = Id.to_string x
-                  
+
+let gTyParam = mkIdentC
+
 type ty_ctr   = Id.t (* Opaque *)
 let ty_ctr_to_string (x : ty_ctr) = Id.to_string x
 
+let gTyCtr = mkIdentC
+
+let gArg ?assumName:(an=hole) ?assumType:(at=hole) ?assumImplicit:(ai=false) ?assumGeneralized:(ag=false) _ =
+  LocalRawAssum ( [coerce_to_name an],
+                  (if ag then Generalized (Implicit, Implicit, false)                       
+                   else if ai then Default Implicit else Default Explicit),
+                  at )
+               
 let str_lst_to_string sep (ss : string list) = 
   List.fold_left (fun acc s -> acc ^ sep ^ s) "" ss
 
@@ -177,9 +195,20 @@ let fresh_name n =
     (** Safe fresh name generation. *)
     Namegen.next_ident_away_from base is_visible_name
 
-let dl x = (dummy_loc, x) 
-let hole = CHole (dummy_loc, None, Misctypes.IntroAnonymous, None)
+let gApp ?explicit:(expl=false) c cs =
+  if expl then
+    match c with
+    | CRef (r,_) -> CAppExpl (dummy_loc, (None, r, None), cs)
+    | _ -> failwith "invalid argument to gApp"
+  else mkAppC (c, cs)
 
+let gFun xss f_body =
+  let xvs = List.map (fun x -> fresh_name x) xss in
+  (* TODO: optional argument types for xss *)
+  let binder_list = List.map (fun x -> LocalRawAssum ([(dummy_loc, Name x)], Default Explicit, hole)) xvs in
+  let fun_body = f_body xvs in
+  mkCLambdaN dummy_loc binder_list fun_body 
+                  
 let gRecFunIn fs xss f_body let_body = 
   let fv  = fresh_name fs in
   let xvs = List.map fresh_name xss in
@@ -191,8 +220,7 @@ let gRecFunIn fs xss f_body let_body =
           G_constr.mk_fix (dummy_loc, true, dl fv, [(dl fv, binder_list, (None, CStructRec), fix_body, (dl None))]),
           let_body fv)
 
-let gMatch discr branches = (* val gMatch : coq_expr -> (string * string list * (var list -> coq_expr)) list -> coq_expr *)
-  (* Extract the constructors of coq_expr *)
+let gMatch discr branches = (* val gMatch : coq_expr -> (constructor * string list * (var list -> coq_expr)) list -> coq_expr *)
   CCases (dummy_loc,
           Term.RegularStyle,
           None (* return *), 
@@ -201,7 +229,7 @@ let gMatch discr branches = (* val gMatch : coq_expr -> (string * string list * 
                       let cvs = List.map fresh_name cs in
                       (dummy_loc,
                        [dl [CPatCstr (dummy_loc,
-                                      Ident (dl (id_of_string c)), (* constructor name *)
+                                      Ident (dl c), (* constructor  *)
                                       [],
                                       List.map (fun s -> CPatAtom (dummy_loc, Some (Ident (dl s)))) cvs (* Constructor applied to patterns *)
                                      )
@@ -210,4 +238,18 @@ let gMatch discr branches = (* val gMatch : coq_expr -> (string * string list * 
                        bf cvs
                       )
                    ) branches)
+
+let gRecord names_and_bodies =
+  CRecord (dummy_loc, None, List.map (fun (n,b) -> (Ident (dummy_loc, id_of_string n), b)) names_and_bodies)
+
+
+(* Generic String Manipulations *)
+let gStr s = CPrim (dummy_loc, String s)
+let emptyString = gInject "Coq.Strings.String.EmptyString"
+let str_append c1 c2 = gApp (gInject "Coq.Strings.String.append") [c1; c2]
+let rec str_appends cs = 
+  match cs with 
+  | []  -> emptyString
+  | [c] -> c
+  | c1::cs' -> str_append c1 (str_appends cs')
 
