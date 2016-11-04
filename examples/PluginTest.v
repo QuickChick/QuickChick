@@ -39,13 +39,12 @@ Print showBar.
 DeriveArbitrary Bar as "arbBar".
 Print arbBar.
 
-Definition testGen : G (Bar nat) := arbitrary.
+Definition testGen : G (Bar nat nat) := arbitrary.
 Sample testGen.
 
-Arguments Bar3 {A} _ _ _.
+Arguments Bar3 {A} {B}  _ _ _.
 DeriveArbitrary Bar as "arbBar2".
 Print arbBar2.
-
 
 Inductive goodFoo' (n : nat) : Foo -> Prop :=
 | Good1' : _W 1  -> goodFoo' n Foo1
@@ -105,7 +104,7 @@ Algorithm: to generate forall m, {foo | goodFoo m foo}
 *)
 Fixpoint genGoodFooTarget (sz : nat) (m : nat) : G (option {foo | goodFoo m foo}) :=
   match sz with
-    | O => backtrack [] (* base cases *)
+    | O => backtrack [(1, returnGen (Some (exist (goodFoo m) Foo1 (Good1 m))))] (* base case *)
     | S sz' =>
       (* Internally m -> fixed *)
       (* Backtracking choice *)
@@ -147,6 +146,23 @@ Sample (genGoodFooTarget 3 3).
 
 From mathcomp.ssreflect Require Import ssreflect ssrnat ssrbool.
 Set Bullet Behavior "Strict Subproofs".
+
+Fixpoint goodFooSize foo := 
+  match foo with
+    | Foo1 => 1
+    | Foo2 x => 1 + goodFooSize x
+    | Foo3 x x0 x1 => 1 + goodFooSize x0 + goodFooSize x1
+  end.
+
+(* Manual completeness proof *)
+Theorem genFooComplete (size m : nat) : 
+  semGenSize (genGoodFooTarget size m) size <--> 
+             fun (x : option {foo | goodFoo m foo}) => 
+               match x with 
+                 | Some (exist foo _) => goodFooSize foo <= size
+                 | _ => false
+               end.
+Admitted.
 
 Definition dec_good_foo n f : decidable (goodFoo n f).
   move: n.
