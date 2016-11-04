@@ -28,6 +28,115 @@ Print showFoo.
 DeriveArbitrary Foo as "arbFoo".
 Print arbFoo.
 
+Lemma setI_impl_l {T} (s1 s2 : set T) : s1 \subset s2 -> s1 :&: s2 <--> s1.
+Proof.      
+  firstorder.
+Qed.      
+
+Lemma bigcup_setU_l:
+  forall (U T : Type) (s1 s2 : set U) (f : U -> set T),
+  \bigcup_(i in (s1 :|: s2)) f i <-->
+  \bigcup_(i in s1) f i :|: \bigcup_(i in s2) f i.
+Proof.
+  firstorder.
+Qed.
+
+(* Derived *)
+Fixpoint aux_arb (size : nat) : G Foo :=
+  match size with
+    | 0 => returnGen Foo1
+    | S size' =>
+      freq ( (1, returnGen Foo1);;
+            [(size,
+              bindGen (aux_arb size')
+                      (fun p0 : Foo => returnGen (Foo2 p0)));
+              (size,
+               bindGen arbitrary
+                       (fun p0 : nat =>
+                          bindGen (aux_arb size')
+                                  (fun p1 : Foo =>
+                                     bindGen (aux_arb size')
+                                             (fun p2 : Foo => returnGen (Foo3 p0 p1 p2)))))])
+  end.
+           
+Fixpoint sizedFoo (foo : Foo) := 
+  match foo with 
+    | Foo1 => 0
+    | Foo2 foo => 1 + sizedFoo foo
+    | Foo3 _ foo1 foo2 => 1 + max (sizedFoo foo1) (sizedFoo foo2)
+  end.
+
+
+From mathcomp.ssreflect Require Import ssreflect ssrnat ssrbool.
+Import Tactics.
+Set Bullet Behavior "Strict Subproofs".
+
+Theorem arbFooComplete size : 
+  semGen (aux_arb size) <--> [set foo : Foo | sizedFoo foo <= size].
+Proof.
+  induction size; simpl.
+  + rewrite semReturn.
+    admit. (* easy *)
+  + rewrite semFrequency. simpl in *.
+    rewrite !cons_set_eq nil_set_eq setU_set0_neut.
+    rewrite !bigcup_setU_l !bigcup_set1.
+    simpl.
+    rewrite semReturn.
+    rewrite -> !semBindSizeMonotonic.
+    rewrite arbNat_correct.
+    rewrite !IHsize.
+    
+    { move => foo; split.
+      - move => [H1 | [[f [H21 H22]] | [f [_ Hf]]]].
+        + inversion H1; subst; simpl; ssromega.
+        + apply semReturn in H22. inversion H22; subst; simpl in *.
+          ssromega.
+        + apply semBindSizeMonotonic in Hf.
+          * move : Hf => [a [Ha Ha']].
+            apply IHsize in Ha.
+            { apply semBindSizeMonotonic in Ha'.
+              - move : Ha' => [a' [Ha' Ha'']].
+                apply IHsize in Ha'.
+                apply semReturn in Ha''.
+                inversion Ha''; subst; simpl in *.
+                admit.
+              - admit.
+              - intros; eauto with typeclass_instances.
+            } 
+          * admit.
+          * admit.
+      - move => Hsize.
+        destruct foo; simpl in *.
+        + left; reflexivity.
+        + right; left.
+          exists foo; split; try ssromega.
+          apply semReturn. reflexivity.
+        + right; right.
+          exists n.
+          split; try reflexivity.
+          apply semBindSizeMonotonic.
+            admit.
+            admit.
+          exists foo1.
+          split.
+          apply IHsize.
+            admit.
+          apply semBindSizeMonotonic.
+            admit.
+            admit.
+          exists foo2.
+          split.
+          apply IHsize.
+            admit.
+          apply semReturn.
+          reflexivity.
+    }
+  - admit.
+  - admit.
+  - admit.
+  - admit.
+Admitted.
+
 Inductive Bar A B :=
 | Bar1 : Bar A B
 | Bar2 : Bar A B -> Bar A B
@@ -186,21 +295,13 @@ Fixpoint genGoodFooTarget (sz : nat) (m : nat) : G (option {foo | goodFoo m foo}
 
 Sample (genGoodFooTarget 3 3).
 
-From mathcomp.ssreflect Require Import ssreflect ssrnat ssrbool.
-Import Tactics.
-Set Bullet Behavior "Strict Subproofs".
-
 Fixpoint goodFooSize foo := 
   match foo with
     | Foo1 => 0
     | Foo2 x => 1 + goodFooSize x
-    | Foo3 x x0 x1 => 1 + goodFooSize x0 + goodFooSize x1
+    | Foo3 x x0 x1 => 1 + max (goodFooSize x0) (goodFooSize x1)
   end.
 
-Lemma setI_impl_l {T} (s1 s2 : set T) : s1 \subset s2 -> s1 :&: s2 <--> s1.
-Proof.      
-  firstorder.
-Qed.      
 
 (* Manual completeness proof *)
 Theorem genFooComplete (size m : nat) : 
@@ -231,8 +332,32 @@ Theorem genFooComplete (size m : nat) :
         } 
       * reflexivity.
     + move => x H; inversion H; subst; simpl in *; eauto.
-  - 
+  - rewrite semBacktrackSize.
+    rewrite cons_set_eq setI_setU_distr bigcap_setI_l.
+    rewrite (@setI_set0 _ [set None]).
+    + rewrite !bigcup_setU_l !cons_set_eq nil_set_eq setI_setU_distr bigcup_setU_l !setU_set0_neut.
+      rewrite !setI_impl_l;
+        try solve [move => x H; inversion H; subst; simpl in *; eauto].
+      rewrite !bigcup_set1.
+      simpl in *.
+
+      rewrite semReturnSize.
+      rewrite setI_impl_r; 
+        try solve [move => x H; inversion H; subst; simpl in *; eauto].
+      rewrite !semBindSize.
+      
+
+      { move => x; split.
+        - move => [H1 | [[H21 H22] | H3]].
+          + inversion H1; subst; simpl in*; eauto.
+            split; [ssromega | constructor].
+          + destruct x; simpl in *; try discriminate; simpl in *.
+            move: H22 => [y [Hy1 Hy2]].
+            destruct y; simpl in *;
+            apply semReturnSize in Hy2; inversion Hy2; subst; simpl in *.
+            
 Admitted.
+
 
 Definition dec_good_foo n f : decidable (goodFoo n f).
   move: n.
