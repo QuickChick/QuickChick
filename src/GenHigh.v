@@ -171,14 +171,11 @@ Parameter semFrequencySize:
       if l' is nil then semGenSize def size else
       \bigcup_(x in l') semGenSize x.2 size.
 
-(* TODO: prove something like this. 
 Parameter semBacktrackSize:
-  forall {A} (l : list (nat * G (option A))) (size: nat),
-    semGenSize (backtrack l) size <-->
-      let l' := [seq x <- l | x.1 != 0] in
-      if l' is nil then semGenSize (returnGen None) size else
-      \bigcup_(x in l') semGenSize x.2 size.
-*)
+  forall {A} (l : list (nat * G (option A))) size,
+  semGenSize (backtrack l) size <--> 
+  (\bigcup_(x in (l :&: (fun x => x.1 <> 0))) (isSome :&: (semGenSize x.2 size))) :|:
+  ([set None] :&: (\bigcap_(x in l :&: (fun x => x.1 <> 0)) (semGenSize x.2 size))).
 
 Parameter semVectorOfSize:
   forall {A : Type} (k : nat) (g : G A) size,
@@ -1067,7 +1064,7 @@ Proof.
     eassumption.
 Qed.
 
-Lemma semBacktrackFuel {A : eqType} tot fuel (l : list (nat * G (option A))) size :
+Lemma semBacktrackFuel {A} tot fuel (l : list (nat * G (option A))) size :
   sum_fst l = tot -> length l = fuel -> 
   semGenSize (backtrackFuel fuel tot l) size <--> 
   (\bigcup_(x in (l :&: (fun x => x.1 <> 0))) (isSome :&: (semGenSize x.2 size))) :|:
@@ -1121,7 +1118,7 @@ Proof.
         exists n. split. rewrite <- HSum.
         eapply pickDrop_leq_top in Heq; eauto. by ssromega.
         rewrite Heq.
-        eapply semBindSize. exists (Some s). split; eauto.
+        eapply semBindSize. exists (Some a). split; eauto.
         apply semReturnSize. reflexivity.
       - destruct a; try discriminate.
         destruct (sum_fst l) eqn:Hsum.
@@ -1145,6 +1142,14 @@ Proof.
           rewrite Hsub. apply setI_subset_compat.
           apply setU_subset_r. by apply subset_refl.
           by apply subset_refl. }
+Qed.
+
+Lemma semBacktrackSize {A} (l : list (nat * G (option A))) size :
+  semGenSize (backtrack l) size <--> 
+  (\bigcup_(x in (l :&: (fun x => x.1 <> 0))) (isSome :&: (semGenSize x.2 size))) :|:
+  ([set None] :&: (\bigcap_(x in l :&: (fun x => x.1 <> 0)) (semGenSize x.2 size))).
+Proof.
+  eauto using semBacktrackFuel.
 Qed.
 
 Lemma semFoldGen_right :

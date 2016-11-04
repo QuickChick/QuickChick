@@ -102,6 +102,47 @@ Algorithm: to generate forall m, {foo | goodFoo m foo}
   
 
 *)
+
+Fixpoint genGoodFooTarget (sz : nat) (m : nat) : G (option Foo) :=
+  match sz with
+    | O => backtrack [(1, returnGen (Some Foo1))]
+    | S sz' =>
+      (* Internally m -> fixed *)
+      (* Backtracking choice *)
+      backtrack
+        [ (* Good1 *)
+          (* Match m <-> n, foo <-> Foo1.  *)
+          (* Result: n fixed (= m), foo fixed (=Foo1) *)
+          (* No non basic types, everything fixed *)
+          (1, returnGen (Some Foo1))
+        ; (* Good2 *)
+          (* Match m <-> n, foo <-> Foo2 foo' *)
+          (* Result n fixed =m, foo tbg based on foo' *)
+          (4, 
+          (* Generate goodFoo 0 foo *)
+           bindGen (genGoodFooTarget sz' 0) (fun res0 =>
+           match res0 with 
+             | Some foo2 =>
+               (* Done *)
+               returnGen (Some (Foo2 foo2))
+             | None => returnGen None
+           end)
+          )
+        ; (sz, (* Good3 *)
+          (* Match m <-> n, foo <-> Foo3 n Foo1 foo2 *)
+          (* Generate goodFoo n foo2 *)
+          bindGen (genGoodFooTarget sz' m) (fun res0 =>
+          match res0 with 
+            | Some foo2 =>
+              (* Done *)
+              returnGen (Some (Foo3 m Foo1 foo2))
+            | None => returnGen None
+          end)
+          )
+        ]
+  end.
+
+(*
 Fixpoint genGoodFooTarget (sz : nat) (m : nat) : G (option {foo | goodFoo m foo}) :=
   match sz with
     | O => backtrack [(1, returnGen (Some (exist (goodFoo m) Foo1 (Good1 m))))] (* base case *)
@@ -141,27 +182,56 @@ Fixpoint genGoodFooTarget (sz : nat) (m : nat) : G (option {foo | goodFoo m foo}
           )
         ]
   end.
+*)
 
 Sample (genGoodFooTarget 3 3).
 
 From mathcomp.ssreflect Require Import ssreflect ssrnat ssrbool.
+Import Tactics.
 Set Bullet Behavior "Strict Subproofs".
 
 Fixpoint goodFooSize foo := 
   match foo with
-    | Foo1 => 1
+    | Foo1 => 0
     | Foo2 x => 1 + goodFooSize x
     | Foo3 x x0 x1 => 1 + goodFooSize x0 + goodFooSize x1
   end.
 
+Lemma setI_impl_l {T} (s1 s2 : set T) : s1 \subset s2 -> s1 :&: s2 <--> s1.
+Proof.      
+  firstorder.
+Qed.      
+
 (* Manual completeness proof *)
 Theorem genFooComplete (size m : nat) : 
   semGenSize (genGoodFooTarget size m) size <--> 
-             fun (x : option {foo | goodFoo m foo}) => 
+             fun (x : option Foo) =>
                match x with 
-                 | Some (exist foo _) => goodFooSize foo <= size
+                 | Some foo => goodFooSize foo <= size /\ goodFoo m foo
                  | _ => false
                end.
+  move: m; induction size => m //=. 
+  - rewrite semBacktrackSize.
+    rewrite setI_impl_l.
+    + rewrite cons_set_eq nil_set_eq setU_set0_neut bigcup_set1; simpl.
+      rewrite semReturnSize.
+      rewrite -> eq_bigcapl with (B := [set (1, returnGen (Some Foo1))]).
+      * { rewrite bigcap_set1; simpl.
+          rewrite semReturnSize (@setI_set0 _ [set None]). 
+          - rewrite setU_set0_neut.
+            rewrite setI_impl_r.
+            + move => [a | ]; split; try by firstorder.
+              * move => H; inversion H; subst; simpl; split; eauto.
+                by constructor.
+              * move => [H1 H2]. inversion H2; subst; simpl in *; try ssromega. 
+                by reflexivity.
+            + move => x H; inversion H; subst; simpl in *; eauto.
+          - move => x H; inversion H; subst; simpl in *; eauto.
+            move => Contra; inversion Contra.
+        } 
+      * reflexivity.
+    + move => x H; inversion H; subst; simpl in *; eauto.
+  - 
 Admitted.
 
 Definition dec_good_foo n f : decidable (goodFoo n f).

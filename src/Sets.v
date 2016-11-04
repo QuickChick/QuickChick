@@ -424,6 +424,11 @@ Proof.
   firstorder.
 Qed.
 
+Lemma setI_impl_r {T} (s1 s2 : set T) : s2 \subset s1 -> s1 :&: s2 <--> s2.
+Proof.      
+  firstorder.
+Qed.      
+
 Lemma setI_set0 {U} (s1 s2 : set U) : 
   (forall x, s1 x -> ~ s2 x) ->
   (s1 :&: s2) <--> set0.
@@ -468,7 +473,6 @@ Proof.
   - move => _. constructor.
   - move => _ x H. inversion H.
 Qed.
-
 
 Lemma incl_bigcapl T U A B (F : T -> set U) : B \subset A ->
   \bigcap_(x in A) F x \subset \bigcap_(x in B) F x.
