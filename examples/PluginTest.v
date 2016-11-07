@@ -71,71 +71,105 @@ From mathcomp.ssreflect Require Import ssreflect ssrnat ssrbool.
 Import Tactics.
 Set Bullet Behavior "Strict Subproofs".
 
+(* Zoe : Probably a good idea to generate size equations automatically. *)
+
+Lemma sizedFoo_eq s :
+  [set Foo1] :|:
+  (\bigcup_(f in fun f => sizedFoo f < s) ([set Foo2 f]) :|:
+    \bigcup_n ( 
+      \bigcup_(f1 in fun f => sizedFoo f < s) (
+         \bigcup_(f2 in fun f => sizedFoo f < s) (
+            [set Foo3 n f1 f2]))))  <-->
+  [set foo : Foo | sizedFoo foo <= s ].
+Proof.
+  move => [| f | n f1 f2].
+  + simpl; split => _; eauto. by repeat constructor.
+  + simpl. split.
+    * move => [H | [[f' [H1 [H2]]] | [n' [Hn [f1' [Hf1 [f2' [Hf2 Heq]]]]]]]];
+        subst; try discriminate.
+      eassumption.
+    * right; left. eexists; split; eauto. reflexivity.
+  + split.
+    * move => [H | [[f [H1 H2]] | [n' [Hn [f1' [Hf1 [f2' [Hf2 [Heq1 Heq2 Heq3]]]]]]]]];
+        subst; try discriminate.
+      apply/leP/NPeano.Nat.le_succ_l/NPeano.Nat.max_lub_lt; ssromega.
+    * move => H.
+      right; right; repeat eexists;
+      move : H => /leP/NPeano.Nat.le_succ_l/NPeano.Nat.max_lub_lt_iff H; ssromega.
+Qed.
+  
+
+Lemma sizedFoo_zero :
+  [set Foo1] <--> [set foo : Foo | sizedFoo foo <= 0 ].
+Proof.
+  move => [ | f | n f1 f2]; split; simpl; move => H; by firstorder.
+Qed.
+
+Lemma sizedFoo_succ s :
+  [set Foo1] :|:
+  (\bigcup_(f in fun f => sizedFoo f <= s) ([set Foo2 f]) :|:
+    \bigcup_n ( 
+      \bigcup_(f1 in fun f => sizedFoo f <= s) (
+         \bigcup_(f2 in fun f => sizedFoo f <= s) (
+            [set Foo3 n f1 f2]))))  <-->
+  [set foo : Foo | sizedFoo foo <= s.+1 ].
+Proof.
+  setoid_rewrite <- sizedFoo_eq at 4. reflexivity.
+Qed.
+
+(* TODO : move to set lib *)
+Lemma setU_set_eq_compat {T} (s1 s2 s1' s2' : set T) :
+  s1 <--> s1' ->
+  s2 <--> s2' ->
+  s1 :|: s2 <--> s1' :|: s2'.
+Proof.
+  by firstorder.
+Qed.
+
+(* TODO move to gen lib *)
+Lemma frequencySizeMonotonic {A} (g0 : G A) lg :
+  SizeMonotonic g0 ->
+  Forall (fun p => SizeMonotonic (snd p)) lg ->
+  SizeMonotonic (frequency g0 lg).
+Admitted.  
+
+Instance arbFooSizeMonotonic s : SizeMonotonic (aux_arb s).
+Proof.
+  induction s; try eauto with typeclass_instances.
+  apply frequencySizeMonotonic; try eauto with typeclass_instances.
+  repeat apply Forall_cons; eauto with typeclass_instances.
+Qed.
+
 Theorem arbFooComplete size : 
   semGen (aux_arb size) <--> [set foo : Foo | sizedFoo foo <= size].
 Proof.
   induction size; simpl.
-  + rewrite semReturn.
-    admit. (* easy *)
-  + rewrite semFrequency. simpl in *.
+  - rewrite -sizedFoo_zero semReturn. reflexivity.
+  - (* rewrite with the size lemmas *)
+    rewrite -sizedFoo_succ.
+    (* then rewrite with the semantics of the outermost combinators *)
+    (* Frequency and some normalization of the sets *)
+    rewrite semFrequency /=.
     rewrite !cons_set_eq nil_set_eq setU_set0_neut.
-    rewrite !bigcup_setU_l !bigcup_set1.
-    simpl.
-    rewrite semReturn.
-    rewrite -> !semBindSizeMonotonic.
-    rewrite arbNat_correct.
-    rewrite !IHsize.
-    
-    { move => foo; split.
-      - move => [H1 | [[f [H21 H22]] | [f [_ Hf]]]].
-        + inversion H1; subst; simpl; ssromega.
-        + apply semReturn in H22. inversion H22; subst; simpl in *.
-          ssromega.
-        + apply semBindSizeMonotonic in Hf.
-          * move : Hf => [a [Ha Ha']].
-            apply IHsize in Ha.
-            { apply semBindSizeMonotonic in Ha'.
-              - move : Ha' => [a' [Ha' Ha'']].
-                apply IHsize in Ha'.
-                apply semReturn in Ha''.
-                inversion Ha''; subst; simpl in *.
-                admit.
-              - admit.
-              - intros; eauto with typeclass_instances.
-            } 
-          * admit.
-          * admit.
-      - move => Hsize.
-        destruct foo; simpl in *.
-        + left; reflexivity.
-        + right; left.
-          exists foo; split; try ssromega.
-          apply semReturn. reflexivity.
-        + right; right.
-          exists n.
-          split; try reflexivity.
-          apply semBindSizeMonotonic.
-            admit.
-            admit.
-          exists foo1.
-          split.
-          apply IHsize.
-            admit.
-          apply semBindSizeMonotonic.
-            admit.
-            admit.
-          exists foo2.
-          split.
-          apply IHsize.
-            admit.
-          apply semReturn.
-          reflexivity.
-    }
-  - admit.
-  - admit.
-  - admit.
-  - admit.
-Admitted.
+    rewrite !bigcup_setU_l !bigcup_set1 /=.
+    (* compare the sets pairwise *)
+    apply setU_set_eq_compat; [| apply setU_set_eq_compat]; try reflexivity.
+    + rewrite semReturn. reflexivity.
+    + rewrite -> semBindSizeMonotonic; eauto with typeclass_instances.
+      rewrite IHsize.
+      apply eq_bigcupr => x.
+      rewrite -> semReturn. reflexivity.
+    + rewrite -> semBindSizeMonotonic; eauto with typeclass_instances.
+      rewrite arbNat_correct.
+      apply eq_bigcupr => x.
+      rewrite -> semBindSizeMonotonic; eauto with typeclass_instances.
+      rewrite IHsize.
+      apply eq_bigcupr => y.
+      rewrite -> semBindSizeMonotonic; eauto with typeclass_instances.
+      rewrite IHsize.
+      apply eq_bigcupr => z.
+      rewrite -> semReturn. reflexivity.
+Qed.
 
 Inductive Bar A B :=
 | Bar1 : Bar A B
