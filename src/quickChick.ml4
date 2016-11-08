@@ -452,8 +452,7 @@ let derive (cn : derivable) (c : constr_expr) (instance_name : string) =
            
           (* Shrinking function *)
 
-          let x = fresh_name "x" in
-          let shrink_body =  
+          let shrink_body x =  
 
             (* Generate a fresh variable name "aux","x" *) 
             let aux_shrink   = fresh_name "aux_shrink" in 
@@ -500,29 +499,21 @@ let derive (cn : derivable) (c : constr_expr) (instance_name : string) =
             in
 
             (* Create the match on x' *)
-            let fix_body = 
+            let aux_shrink_body rec_fun x' =
               CCases (dummy_loc, Term.RegularStyle, None (* return *), 
-                      [(mk_c x, (None, None))] (* single discriminee - no as/in*),
+                      [(gVar x', (None, None))] (* single discriminee - no as/in*),
                       List.map (create_branch mib.mind_nparams)
                                (List.combine (Array.to_list oib.mind_consnames)
                                              (Array.to_list oib.mind_nf_lc))) in
      
-            let fix_dcl = (dl aux_shrink, binderList, (None, CStructRec), fix_body, (dl None)) in
-
-            (* Package as a let_fix *)
-            (* let fix size = ... in sized fix *)
-            CLetIn (dummy_loc, dl (Name aux_shrink), 
-                    G_constr.mk_fix (dummy_loc, true, dl aux_shrink, [fix_dcl]),
-                    CApp (dummy_loc, (None, mk_c aux_shrink), [(mk_c x, None)]))
+            gRecFunIn "aux_shrink" ["x'"]
+                      (fun (aux_shrink, [x']) -> aux_shrink_body aux_shrink x')
+                      (fun aux_shrink -> gApp (gVar aux_shrink) [gVar x])
           in
 
-          let shrink_decl = 
-            mkCLambdaN dummy_loc [LocalRawAssum ([dummy_loc, Name x],Default Explicit, hole)] shrink_body in
-                             
-          (* Package the function in a record *)
-          CRecord (dummy_loc, None, [ (Ident (dummy_loc, id_of_string "arbitrary"), arbitrary_decl)
-                                    ; (Ident (dummy_loc, id_of_string "shrink"), shrink_decl) 
-                                    ])
+         let shrink_decl = gFun ["x"] (fun [x] -> shrink_body x) in
+
+         gRecord [("arbitrary", arbitrary_decl); ("shrink", shrink_decl)]
 
      in 
 
