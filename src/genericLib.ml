@@ -61,6 +61,7 @@ let rec coq_type_to_string ct =
 
 type constructor = Id.t (* Opaque *)
 let constructor_to_string (x : constructor) = Id.to_string x
+let gCtr = mkIdentC
 
 type ctr_rep = constructor * coq_type 
 let ctr_rep_to_string (ctr, ct) = 
@@ -242,6 +243,13 @@ let gMatch discr branches = (* val gMatch : coq_expr -> (constructor * string li
 let gRecord names_and_bodies =
   CRecord (dummy_loc, None, List.map (fun (n,b) -> (Ident (dummy_loc, id_of_string n), b)) names_and_bodies)
 
+(* Generic List Manipulations *)
+let list_nil = gInject "nil"
+let lst_append c1 c2 = gApp (gInject "app") [c1; c2]
+let rec lst_appends = function
+  | [] -> list_nil
+  | c::cs -> lst_append c (lst_appends cs)
+let gLst c = gApp (gInject "cons") [c; list_nil]
 
 (* Generic String Manipulations *)
 let gStr s = CPrim (dummy_loc, String s)

@@ -248,6 +248,10 @@ let debug_environ () =
   let preEnv = Environ.pre_env env in
   let minds = preEnv.env_globals.env_inductives in
   Mindmap_env.iter (fun k _ -> msgerr (str (MutInd.debug_to_string k) ++ fnl())) minds
+
+let rec replaceNth i x = function
+  | [] -> []
+  | y::ys -> if i = 0 then x::ys else y::(replaceNth (i-1) x ys)
                           
 (* Generic derivation function *)
 let derive (cn : derivable) (c : constr_expr) (instance_name : string) =
@@ -276,22 +280,6 @@ let derive (cn : derivable) (c : constr_expr) (instance_name : string) =
 
      let full_dt = gApp coqTyCtr coqTyParams in
 
-(*     
-     (* Add all the parameters - assumed Prop/Type *)
-     let param_names = List.mapi (fun i r -> let (n,_,_) = r in fresh_name (mk_ni "A" i)) mib.mind_params_ctxt in
-
-     (* Generate "C / (C params)" *)
-     let c' = 
-       match param_names with 
-       | [] -> c
-       | _ -> 
-         let rec gen_rec_append f = function
-           | [pn] -> f (mk_c pn)
-           | (pn::pns) -> gen_rec_append (fun c' -> mkAppC (f (mk_c pn) , [c'])) pns 
-         in 
-         gen_rec_append (fun c' -> mkAppC (c, [c'])) param_names
-     in
- *)
      let class_ref = match cn with 
        | Show -> mk_ref "QuickChick.Show.Show"
        | Arbitrary -> mk_ref "QuickChick.Arbitrary.Arbitrary" in
@@ -451,60 +439,35 @@ let derive (cn : derivable) (c : constr_expr) (instance_name : string) =
           let arbitrary_decl = arb_body in
            
           (* Shrinking function *)
-
           let shrink_body x =  
 
-            (* Generate a fresh variable name "aux","x" *) 
-            let aux_shrink   = fresh_name "aux_shrink" in 
-            let binderList = [LocalRawAssum ([(dummy_loc, Name x)], Default Explicit, full_dt)] in
-
-            let create_branch num br = 
+            let create_branch aux_shrink (ctr, ty) = 
        
-              let (ctr_id, pat_ids, pats, pat_types) = extract_branch_info num br in 
-
-              (* Shorthand for appending two lists *)
-              let lappend c1 c2 = CApp (dummy_loc, (None, mk_ref "app"), [(c1, None); (c2, None)]) in
-              
-              (* fun x => Foo p0 ... (pN-1) x (pN+1) ... *)
-              let shrunk = fresh_name "shrunk" in
-              let liftN i = 
-                mkCLambdaN dummy_loc [LocalRawAssum ([dummy_loc, Name shrunk],Default Explicit, hole)] 
-                           (mkAppExplC (Ident (dl ctr_id),
-                                        coqTyParams @
-                                          (List.mapi (fun j pid -> if i == j then (mk_c shrunk) else (mk_c pid)) pat_ids)
-                                       ))
-              in
-
-              let shrinks = 
-                List.mapi (fun i pit -> 
-                           let (pid, pt) = pit in
-                           if is_current_inductive pt (i+num) then
-                             CApp (dummy_loc, (None, mk_ref "cons"),
-                                   [(mk_c pid, None);  
-                                    (CApp (dummy_loc, (None, mk_ref "List.map"),
-                                           [(liftN i, None);
-                                            (CApp (dummy_loc, (None, mk_c aux_shrink), [(mk_c pid, None)]), None)]
-                                          ), None)
-                                   ]) 
-                           else
-                             (CApp (dummy_loc, (None, mk_ref "List.map"),
-                                    [(liftN i, None);
-                                     (CApp (dummy_loc, (None, mk_ref "shrink"), [(mk_c pid, None)]), None)]
-                                   ))
-                          ) (List.combine pat_ids pat_types) in
-
-              (* TODO: empty list - params..? *)
-              (dummy_loc, [dl [CPatCstr (dummy_loc, Ident (dl ctr_id), [], pats)]], mk_concat shrinks) 
-
+              let rec branch_aux i = function
+                 | Arrow (ty1, ty2) -> 
+                    let (params, f) = branch_aux (i+1) ty2 in
+                    let isCurrent = match ty1 with 
+                      | TyCtr (ty_ctr', _) -> ty_ctr = ty_ctr'
+                      | _ -> false in
+                    (("p" ^ string_of_int i) :: params,
+                     fun allParams (v :: vs) -> 
+                       let liftNth = gFun ["shrunk"] 
+                                          (fun [shrunk] -> gApp ~explicit:true (gCtr ctr)
+                                                                (coqTyParams @ (replaceNth i (gVar shrunk) (List.map gVar allParams)))) in
+                       lst_appends ((if isCurrent then
+                                      [ gLst (gVar v)
+                                      ; gApp (gInject "List.map") [liftNth; gApp (gVar aux_shrink) [gVar v]]
+                                      ]
+                                    else
+                                      [ gApp (gInject "List.map") [liftNth; gApp (gInject "shrink") [gVar v]]]
+                                   ) @ [f allParams vs]))
+                    
+                 | _ -> ([], fun _ _ -> list_nil) in
+               let (params, f) = branch_aux 0 ty in 
+               (ctr, params, fun vs -> f vs vs)
             in
-
-            (* Create the match on x' *)
-            let aux_shrink_body rec_fun x' =
-              CCases (dummy_loc, Term.RegularStyle, None (* return *), 
-                      [(gVar x', (None, None))] (* single discriminee - no as/in*),
-                      List.map (create_branch mib.mind_nparams)
-                               (List.combine (Array.to_list oib.mind_consnames)
-                                             (Array.to_list oib.mind_nf_lc))) in
+  
+            let aux_shrink_body rec_fun x' = gMatch (gVar x') (List.map (create_branch rec_fun) ctrs) in
      
             gRecFunIn "aux_shrink" ["x'"]
                       (fun (aux_shrink, [x']) -> aux_shrink_body aux_shrink x')
