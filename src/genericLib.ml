@@ -62,6 +62,7 @@ let rec coq_type_to_string ct =
 type constructor = Id.t (* Opaque *)
 let constructor_to_string (x : constructor) = Id.to_string x
 let gCtr = mkIdentC
+let injectCtr s = Id.of_string s
 
 type ctr_rep = constructor * coq_type 
 let ctr_rep_to_string (ctr, ct) = 
@@ -261,3 +262,24 @@ let rec str_appends cs =
   | [c] -> c
   | c1::cs' -> str_append c1 (str_appends cs')
 
+
+(* Recursion combinators / fold *)
+(* fold_ty : ( a -> coq_type -> a ) -> ( ty_ctr * coq_type list -> a ) -> ( ty_param -> a ) -> coq_type -> a *)
+let rec fold_ty arrow_f ty_ctr_f ty_param_f ty = 
+  match ty with
+  | Arrow (ty1, ty2) -> 
+     let acc = fold_ty arrow_f ty_ctr_f ty_param_f ty2 in 
+     arrow_f acc ty1 
+  | TyCtr (ctr, tys) -> ty_ctr_f (ctr, tys)
+  | TyParam tp -> ty_param_f tp
+
+let fold_ty' arrow_f base ty = 
+  fold_ty arrow_f (fun _ -> base) (fun _ -> base) ty
+
+(* Generate Type Names *)
+let generate_names_from_type base_name ty =
+  snd (fold_ty' (fun (i, names) _ -> (i+1, (Printf.sprintf "%s%d" base_name i) :: names)) (0, []) ty)
+
+(* a := var list -> var -> a *)
+let fold_ty_vars (f : var list -> var -> coq_type -> 'a) (mappend : 'a -> 'a -> 'a) (base : 'a) ty : var list -> 'a =
+  fun allVars -> fold_ty' (fun acc ty -> fun allVars (v::vs) -> mappend (f allVars v ty) (acc allVars vs)) (fun _ _ -> base) ty allVars allVars

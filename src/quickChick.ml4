@@ -249,9 +249,9 @@ let debug_environ () =
   let minds = preEnv.env_globals.env_inductives in
   Mindmap_env.iter (fun k _ -> msgerr (str (MutInd.debug_to_string k) ++ fnl())) minds
 
-let rec replaceNth i x = function
+let rec replace v x = function
   | [] -> []
-  | y::ys -> if i = 0 then x::ys else y::(replaceNth (i-1) x ys)
+  | y::ys -> if y = v then x::ys else y::(replace v x ys)
                           
 (* Generic derivation function *)
 let derive (cn : derivable) (c : constr_expr) (instance_name : string) =
@@ -320,6 +320,10 @@ let derive (cn : derivable) (c : constr_expr) (instance_name : string) =
 
      msgerr (str "Success!" ++ fnl ());
 
+     let isCurrentTyCtr = function 
+       | TyCtr (ty_ctr', _) -> ty_ctr = ty_ctr'
+       | _ -> false in
+
      (* Create the instance record. Only need to extend this for extra instances *)
      let instance_record = 
          
@@ -330,22 +334,16 @@ let derive (cn : derivable) (c : constr_expr) (instance_name : string) =
          let show_body x =
 
            let branch rec_name (ctr,ty) = 
-             let rec branch_aux i = function
-               | Arrow (ty1, ty2) -> 
-                  let (params, f) = branch_aux (i+1) ty2 in
-                  let useRec = match ty1 with 
-                    | TyCtr (ty_ctr', _) -> ty_ctr = ty_ctr'
-                    | _ -> false in
-                  (("p" ^ string_of_int i) :: params,
-                   fun (v :: vs) -> str_appends [ gStr "( "
-                                                ; gApp (if useRec then gVar rec_name else gInject "show") [gVar v]
-                                                ; gStr " )"
-                                                ; f vs])
-               | _ -> ([], fun _ -> emptyString) in
-             let (params, f) = branch_aux 0 ty in 
-             (ctr, params, fun vs -> str_appends [gStr (constructor_to_string ctr ^ " "); f vs])
+             
+             (ctr, generate_names_from_type "p" ty, 
+              fun vs -> str_append (gStr (constructor_to_string ctr ^ "  "))
+                                   (fold_ty_vars (fun _ v ty' -> str_appends [ gStr "( " 
+                                                                             ; gApp (if isCurrentTyCtr ty' then gVar rec_name else gInject "show") [gVar v]
+                                                                             ; gStr " )"
+                                                                             ])
+                                                 (fun s1 s2 -> str_appends [s1; gStr " "; s2]) emptyString ty vs))
            in 
-            
+
            gRecFunIn "aux" ["x'"] 
                      (fun (aux, [x']) -> gMatch (gVar x') (List.map (branch aux) ctrs))
                      (fun aux -> gApp (gVar aux) [gVar x])
@@ -440,33 +438,18 @@ let derive (cn : derivable) (c : constr_expr) (instance_name : string) =
            
           (* Shrinking function *)
           let shrink_body x =  
-
             let create_branch aux_shrink (ctr, ty) = 
-       
-              let rec branch_aux i = function
-                 | Arrow (ty1, ty2) -> 
-                    let (params, f) = branch_aux (i+1) ty2 in
-                    let isCurrent = match ty1 with 
-                      | TyCtr (ty_ctr', _) -> ty_ctr = ty_ctr'
-                      | _ -> false in
-                    (("p" ^ string_of_int i) :: params,
-                     fun allParams (v :: vs) -> 
-                       let liftNth = gFun ["shrunk"] 
-                                          (fun [shrunk] -> gApp ~explicit:true (gCtr ctr)
-                                                                (coqTyParams @ (replaceNth i (gVar shrunk) (List.map gVar allParams)))) in
-                       lst_appends ((if isCurrent then
-                                      [ gLst (gVar v)
-                                      ; gApp (gInject "List.map") [liftNth; gApp (gVar aux_shrink) [gVar v]]
-                                      ]
-                                    else
-                                      [ gApp (gInject "List.map") [liftNth; gApp (gInject "shrink") [gVar v]]]
-                                   ) @ [f allParams vs]))
-                    
-                 | _ -> ([], fun _ _ -> list_nil) in
-               let (params, f) = branch_aux 0 ty in 
-               (ctr, params, fun vs -> f vs vs)
-            in
-  
+              (ctr, generate_names_from_type "p" ty,
+               fold_ty_vars (fun allParams v ty' -> 
+                             let liftNth = gFun ["shrunk"] 
+                                                (fun [shrunk] -> gApp ~explicit:true (gCtr ctr)
+                                                                      (coqTyParams @ (replace (gVar v) (gVar shrunk) (List.map gVar allParams)))) in
+                             lst_appends (if isCurrentTyCtr ty' then
+                                            [ gLst (gVar v) ; gApp (gInject "List.map") [liftNth; gApp (gVar aux_shrink) [gVar v]]]
+                                          else
+                                            [ gApp (gInject "List.map") [liftNth; gApp (gInject "shrink") [gVar v]]]))
+                            lst_append list_nil ty) in
+
             let aux_shrink_body rec_fun x' = gMatch (gVar x') (List.map (create_branch rec_fun) ctrs) in
      
             gRecFunIn "aux_shrink" ["x'"]
@@ -477,9 +460,7 @@ let derive (cn : derivable) (c : constr_expr) (instance_name : string) =
          let shrink_decl = gFun ["x"] (fun [x] -> shrink_body x) in
 
          gRecord [("arbitrary", arbitrary_decl); ("shrink", shrink_decl)]
-
      in 
-
 
      (* Declare the instance *)
      ignore (Classes.new_instance true 
