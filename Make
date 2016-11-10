@@ -19,4 +19,5 @@ src/QuickChick.v
 src/MutateCheck.v
 src/genericLib.ml
 src/quickChick.ml4
+src/derive.ml4
 src/quickChickLib.ml
