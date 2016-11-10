@@ -252,7 +252,7 @@ let debug_environ () =
 let rec replace v x = function
   | [] -> []
   | y::ys -> if y = v then x::ys else y::(replace v x ys)
-                          
+
 (* Generic derivation function *)
 let derive (cn : derivable) (c : constr_expr) (instance_name : string) =
   match c with 
@@ -324,6 +324,8 @@ let derive (cn : derivable) (c : constr_expr) (instance_name : string) =
        | TyCtr (ty_ctr', _) -> ty_ctr = ty_ctr'
        | _ -> false in
 
+     let isBaseBranch (_,ty) = fold_ty' (fun b ty' -> b && not (isCurrentTyCtr ty')) true ty in
+                      
      (* Create the instance record. Only need to extend this for extra instances *)
      let instance_record = 
          
@@ -355,85 +357,34 @@ let derive (cn : derivable) (c : constr_expr) (instance_name : string) =
        | Arbitrary -> 
           (* Create the function body by recursing on the structure of x *)
           let arb_body = 
-            let aux_arb   = fresh_name "aux_arb" in 
-            let size  = fresh_name "size" in 
-            let size' = fresh_name "size'" in 
-            
-            let binderList = [LocalRawAssum ([(dummy_loc, Name size)], Default Explicit, mk_ref "nat")] 
-            in
-       
+
             let is_base_branch num types = 
               not (List.mem true (List.mapi (fun i t -> is_current_inductive t (i+num)) types)) in
 
-            (* Create a branch based on type information and number of parameters (to be ignored) *)
-            let create_for_constructor num br = 
-       
-              let (ctr_id, pat_ids, pats, pat_types) = extract_branch_info num br in 
-              
-              let create_for_type i t = 
-                if is_current_inductive t (i+num) then
-                  (false, fresh_name (mk_ni "p" i), mkAppC (mk_c aux_arb, [mk_c size']))
-                else (true, fresh_name (mk_ni "p" i), mk_ref "arbitrary") in
+            (* Need reverse fold for this *)
+            let create_for_branch rec_name size (ctr, ty) =
+              let rec aux i acc ty : coq_expr =
+                match ty with
+                | Arrow (ty1, ty2) -> 
+                   bindGen (if isCurrentTyCtr ty1 then gApp (gVar rec_name) [gVar size] else gInject "arbitrary")
+                           (Printf.sprintf "p%d" i)
+                           (fun [pi] -> aux (i+1) ((gVar pi) :: acc) ty2)
+                | _ -> returnGen (gApp ~explicit:true (gCtr ctr) (coqTyParams @ List.rev acc))
+              in aux 0 [] ty in
 
-              let arbitraries = List.mapi create_for_type pat_types in
-
-              let rec aux = function
-                | [] -> (true , mkAppC (mk_ref "returnGen", [mkAppExplC (Ident (dl ctr_id),
-                                                                     coqTyParams @
-                                                                     (List.mapi (fun i _ ->  mk_c (fresh_name (mk_ni "p" i))) pats))]
-                                       ))
-                | (b, n, c)::arbs -> 
-                   let (b', crec) = aux arbs in
-                   (b && b', mkAppC (mk_ref "bindGen", [c; mkCLambdaN dummy_loc 
-                                                                      [LocalRawAssum ([dummy_loc, Name n], Default Explicit, hole)] 
-                                                                      crec]))
-              in 
-
-              aux arbitraries
-            in
-            
-            let constructor_bodies = List.map (create_for_constructor mib.mind_nparams)
-                                              (List.combine (Array.to_list oib.mind_consnames) (Array.to_list oib.mind_nf_lc)) in
-
-            let bases = List.filter (fun x -> let (b, _) = x in b) constructor_bodies in
-
-            msgerr (str (string_of_int (List.length bases)) ++ fnl ());
-                      
-            let mk_weighted bg = 
-              let (b,g) = bg in 
-              if b then mkAppC (mk_ref "pair", [mkInt 1; g])
-              else mkAppC (mk_ref "pair", [mk_c size; g]) in
-
-            let frequencify lst lst_weighted = 
-              match lst with 
-              | [] -> failwith "No base case" 
-              | [(_, g)] -> g
-              | ((_,g)::_) -> mkAppC (mk_ref "frequency", [g; mk_list lst_weighted])
-            in 
-
-            let base = frequencify bases (List.map mk_weighted bases) in
-            let all  = frequencify constructor_bodies (List.map mk_weighted constructor_bodies) in
-       
-            (* Create the match on x' *)
-            let fix_body = 
-               CCases (dummy_loc, Term.RegularStyle, None (* return *), 
-                      [(mk_c size, (None, None))] (* single discriminee - no as/in*),
-                       [(dummy_loc, [dl [CPatCstr (dummy_loc, Ident (dl (id_of_string "O")), [], [])]], base);
-                        (dummy_loc, [dl [CPatCstr (dummy_loc, Ident (dl (id_of_string "S")), [], 
-                                                   [CPatAtom (dummy_loc, Some (Ident (dl size')))]
-                                                  )]], all)]) in
-       
-            let fix_dcl = (dl aux_arb, binderList, (None, CStructRec), fix_body, (dl None)) in
-            
-            (* Package as a let_fix *)
-            (* let fix size = ... in sized fix *)
-            CLetIn (dummy_loc, dl (Name aux_arb), 
-                    G_constr.mk_fix (dummy_loc, true, dl aux_arb, [fix_dcl]),
-                    CApp (dummy_loc, (None, mk_c (id_of_string "sized")), [(mk_c aux_arb, None)]))
-(*                           [(CApp (dummy_loc, (None, mk_c aux_arb), List.map (fun n -> (mk_c n, None)) param_names), None)]))*)
-          in 
-
-          (* Package the body to a function *)
+            let bases = List.filter isBaseBranch ctrs in
+            gRecFunIn "aux_arb" ["size"]
+                      (fun (aux_arb, [size]) ->
+                       gMatch (gVar size)
+                              [(injectCtr "O", [],
+                                fun _ -> oneof (List.map (create_for_branch aux_arb size) bases))
+                              ;(injectCtr "S", ["size'"], 
+                                fun [size'] -> frequency (List.map (fun ctr ->
+                                                                    ((if isBaseBranch ctr then gInt 1 else gVar size'),
+                                                                     create_for_branch aux_arb size' ctr)) ctrs))
+                              ])
+                      (fun aux_arb -> gApp (gInject "sized") [gVar aux_arb])
+          in                                                                            
           let arbitrary_decl = arb_body in
            
           (* Shrinking function *)
@@ -445,7 +396,7 @@ let derive (cn : derivable) (c : constr_expr) (instance_name : string) =
                                                 (fun [shrunk] -> gApp ~explicit:true (gCtr ctr)
                                                                       (coqTyParams @ (replace (gVar v) (gVar shrunk) (List.map gVar allParams)))) in
                              lst_appends (if isCurrentTyCtr ty' then
-                                            [ gLst (gVar v) ; gApp (gInject "List.map") [liftNth; gApp (gVar aux_shrink) [gVar v]]]
+                                            [ gList [gVar v] ; gApp (gInject "List.map") [liftNth; gApp (gVar aux_shrink) [gVar v]]]
                                           else
                                             [ gApp (gInject "List.map") [liftNth; gApp (gInject "shrink") [gVar v]]]))
                             lst_append list_nil ty) in

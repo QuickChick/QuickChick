@@ -250,7 +250,10 @@ let lst_append c1 c2 = gApp (gInject "app") [c1; c2]
 let rec lst_appends = function
   | [] -> list_nil
   | c::cs -> lst_append c (lst_appends cs)
-let gLst c = gApp (gInject "cons") [c; list_nil]
+let gCons x xs = gApp (gInject "cons") [x; xs]                        
+let rec gList = function 
+  | [] -> gInject "nil"
+  | x::xs -> gCons x (gList xs)
 
 (* Generic String Manipulations *)
 let gStr s = CPrim (dummy_loc, String s)
@@ -262,7 +265,29 @@ let rec str_appends cs =
   | [c] -> c
   | c1::cs' -> str_append c1 (str_appends cs')
 
+(* Pair *)
+let gPair (c1, c2) = gApp (gInject "pair") [c1;c2]
 
+(* Int *)
+let gInt n = CPrim (dummy_loc, Numeral (Bigint.of_int n))
+                          
+(* Gen combinators *)
+let returnGen c = gApp (gInject "returnGen") [c]
+let bindGen cg xn cf = 
+  gApp (gInject "bindGen") [cg; gFun [xn] cf]
+
+let oneof l =
+  match l with
+  | [] -> failwith "oneof used with empty list"
+  | [c] -> c
+  | c::cs -> gApp (gInject "oneof") [c; gList l]
+       
+let frequency l =
+  match l with
+  | [] -> failwith "frequency used with empty list"
+  | [(_,c)] -> c
+  | (_,c)::cs -> gApp (gInject "frequency") [c; gList (List.map gPair l)]
+       
 (* Recursion combinators / fold *)
 (* fold_ty : ( a -> coq_type -> a ) -> ( ty_ctr * coq_type list -> a ) -> ( ty_param -> a ) -> coq_type -> a *)
 let rec fold_ty arrow_f ty_ctr_f ty_param_f ty = 
@@ -283,3 +308,5 @@ let generate_names_from_type base_name ty =
 (* a := var list -> var -> a *)
 let fold_ty_vars (f : var list -> var -> coq_type -> 'a) (mappend : 'a -> 'a -> 'a) (base : 'a) ty : var list -> 'a =
   fun allVars -> fold_ty' (fun acc ty -> fun allVars (v::vs) -> mappend (f allVars v ty) (acc allVars vs)) (fun _ _ -> base) ty allVars allVars
+
+                          
