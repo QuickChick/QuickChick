@@ -32,6 +32,7 @@ Print showFoo.
 
 DeriveArbitrary Foo as "arbFoo".
 Print arbFoo.
+Print arbFooSized.
 
 DeriveSize Foo as "sizeFoo".
 Print sizeFoo.

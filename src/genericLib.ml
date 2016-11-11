@@ -313,4 +313,14 @@ let generate_names_from_type base_name ty =
 let fold_ty_vars (f : var list -> var -> coq_type -> 'a) (mappend : 'a -> 'a -> 'a) (base : 'a) ty : var list -> 'a =
   fun allVars -> fold_ty' (fun acc ty -> fun allVars (v::vs) -> mappend (f allVars v ty) (acc allVars vs)) (fun _ _ -> base) ty allVars allVars
 
-                          
+let define c s =
+  let env = Global.env () in
+  let evd = Evd.from_env env in
+  let (c,_) = interp_constr env evd c in
+  let (evd,_) = Typing.type_of env evd c in
+  let uctxt = Evd.evar_context_universe_context (Evd.evar_universe_context evd) in
+  let fn = fresh_name s in
+  ignore (declare_constant ~internal:InternalTacticRequest fn
+      (DefinitionEntry (definition_entry ~univs:uctxt c),
+       Decl_kinds.IsDefinition Decl_kinds.Definition));
+  fn

@@ -16,6 +16,11 @@ open GenericLib
 
 type derivable = Show | Arbitrary | Size
 
+let print_der = function
+  | Show -> "Show"
+  | Arbitrary -> "Arbitrary"
+  | Size -> "Size"
+
 let debug_environ () =
   let env = Global.env () in
   let preEnv = Environ.pre_env env in
@@ -28,6 +33,7 @@ let rec replace v x = function
 
 (* Generic derivation function *)
 let derive (cn : derivable) (c : constr_expr) (instance_name : string) =
+  msgerr (str (print_der cn) ++ fnl ());
   let r = match c with
     | CRef (r,_) -> r
     | _ -> failwith "Argument must be typeclass name" in
@@ -101,8 +107,9 @@ let derive (cn : derivable) (c : constr_expr) (instance_name : string) =
        gRecord [("show", show_fun)]
 
     | Arbitrary -> 
+       msgerr (str "Here" ++ fnl ());
        (* Create the function body by recursing on the structure of x *)
-       let arb_body = 
+       let arbitrary_decl = 
 
          (* Need reverse fold for this *)
          let create_for_branch rec_name size (ctr, ty) =
@@ -116,7 +123,8 @@ let derive (cn : derivable) (c : constr_expr) (instance_name : string) =
            in aux 0 [] ty in
 
          let bases = List.filter (fun (_, ty) -> isBaseBranch ty) ctrs in
-         gRecFunIn "aux_arb" ["size"]
+         let aux_arb = 
+           gRecFunIn "aux_arb" ["size"]
                    (fun (aux_arb, [size]) ->
                     gMatch (gVar size)
                            [(injectCtr "O", [],
@@ -126,9 +134,11 @@ let derive (cn : derivable) (c : constr_expr) (instance_name : string) =
                                                                  ((if isBaseBranch ty' then gInt 1 else gVar size'),
                                                                   create_for_branch aux_arb size' (ctr,ty'))) ctrs))
                            ])
-                   (fun aux_arb -> gApp (gInject "sized") [gVar aux_arb])
+                   (fun x -> gVar x) in
+
+         let fn = define aux_arb (instance_name ^ "Sized") in
+         gApp (gInject "sized") [gVar fn]
        in                                                                            
-       let arbitrary_decl = arb_body in
        
        (* Shrinking function *)
        let shrink_body x =  
@@ -189,7 +199,7 @@ VERNAC COMMAND EXTEND DeriveArbitrary
   | ["DeriveArbitrary" constr(c) "as" string(s)] -> [derive Arbitrary c s]
 END;;
 
-VERNAC COMMAND EXTEND DeriveArbitrary
+VERNAC COMMAND EXTEND DeriveSize
   | ["DeriveSize" constr(c) "as" string(s)] -> [derive Size c s]
 END;;
 
