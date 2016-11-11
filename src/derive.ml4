@@ -14,7 +14,7 @@ open Constrexpr
 open Constrexpr_ops
 open GenericLib
 
-type derivable = Show | Arbitrary 
+type derivable = Show | Arbitrary | Size
 
 let debug_environ () =
   let env = Global.env () in
@@ -28,141 +28,158 @@ let rec replace v x = function
 
 (* Generic derivation function *)
 let derive (cn : derivable) (c : constr_expr) (instance_name : string) =
-  match c with 
-  | CRef (r,_) -> 
-     (* Extract id/string representation - which to use? :/ *)
-     let qidl = qualid_of_reference r in
+  let r = match c with
+    | CRef (r,_) -> r
+    | _ -> failwith "Argument must be typeclass name" in
 
-     let env = Global.env () in
-     
-     let glob_ref = Nametab.global r in
-     let (mind,_) = Globnames.destIndRef glob_ref in
-     let mib = Environ.lookup_mind mind env in
+  (* Extract id/string representation - which to use? :/ *)
+  let qidl = qualid_of_reference r in
 
-     let (ty_ctr, ty_params, ctrs) =
-       match dt_rep_from_mib mib with
-       | Some dt -> dt
-       | None -> failwith "Not supported type"
-     in
+  let env = Global.env () in
+  
+  let glob_ref = Nametab.global r in
+  let (mind,_) = Globnames.destIndRef glob_ref in
+  let mib = Environ.lookup_mind mind env in
 
-     let coqTyCtr = gTyCtr ty_ctr in
-     let coqTyParams = List.map gTyParam ty_params in
+  let (ty_ctr, ty_params, ctrs) =
+    match dt_rep_from_mib mib with
+    | Some dt -> dt
+    | None -> failwith "Not supported type"  in
 
-     let full_dt = gApp coqTyCtr coqTyParams in
+  let coqTyCtr = gTyCtr ty_ctr in
+  let coqTyParams = List.map gTyParam ty_params in
 
-     let class_name = match cn with 
-       | Show -> "QuickChick.Show.Show"
-       | Arbitrary -> "QuickChick.Arbitrary.Arbitrary" in
-     
-     (* Generate typeclass constraints. For each type parameter "A" we need `{_ : <Class Name> A} *)
-     let instance_arguments =
-       List.concat (List.map (fun tp ->
-                              [ gArg ~assumName:tp ~assumImplicit:true ();
-                                gArg ~assumType:(gApp (gInject class_name) [tp]) ~assumGeneralized:true ()]
-                   ) coqTyParams) in
+  let full_dt = gApp coqTyCtr coqTyParams in
 
-     (* The instance type *)
-     let instance_type = gApp (gInject class_name) [full_dt] in
+  let class_name = match cn with 
+    | Show -> "QuickChick.Show.Show"
+    | Size -> "QuickChick.GenLow.GenLow.CanonicalSize"
+    | Arbitrary -> "QuickChick.Arbitrary.Arbitrary" in
+  
+  (* Generate typeclass constraints. For each type parameter "A" we need `{_ : <Class Name> A} *)
+  let instance_arguments =
+    List.concat (List.map (fun tp ->
+                           [ gArg ~assumName:tp ~assumImplicit:true ();
+                             gArg ~assumType:(gApp (gInject class_name) [tp]) ~assumGeneralized:true ()]
+                          ) coqTyParams) in
 
-     let isCurrentTyCtr = function 
-       | TyCtr (ty_ctr', _) -> ty_ctr = ty_ctr'
-       | _ -> false in
+  (* The instance type *)
+  let instance_type = gApp (gInject class_name) [full_dt] in
 
-     let isBaseBranch (_,ty) = fold_ty' (fun b ty' -> b && not (isCurrentTyCtr ty')) true ty in
-                      
-     (* Create the instance record. Only need to extend this for extra instances *)
-     let instance_record = 
-         
-       match cn with 
-       | Show ->
+  let isCurrentTyCtr = function 
+    | TyCtr (ty_ctr', _) -> ty_ctr = ty_ctr'
+    | _ -> false in
 
-         (* Create the function body by recursing on the structure of x *)
-         let show_body x =
+  let isBaseBranch ty = fold_ty' (fun b ty' -> b && not (isCurrentTyCtr ty')) true ty in
+  
+  (* Create the instance record. Only need to extend this for extra instances *)
+  let instance_record = 
+    
+    match cn with 
+    | Show ->
 
-           let branch rec_name (ctr,ty) = 
-             
-             (ctr, generate_names_from_type "p" ty, 
-              fun vs -> str_append (gStr (constructor_to_string ctr ^ "  "))
-                                   (fold_ty_vars (fun _ v ty' -> str_appends [ gStr "( " 
-                                                                             ; gApp (if isCurrentTyCtr ty' then gVar rec_name else gInject "show") [gVar v]
-                                                                             ; gStr " )"
-                                                                             ])
-                                                 (fun s1 s2 -> str_appends [s1; gStr " "; s2]) emptyString ty vs))
-           in 
+       (* Create the function body by recursing on the structure of x *)
+       let show_body x =
 
-           gRecFunIn "aux" ["x'"] 
-                     (fun (aux, [x']) -> gMatch (gVar x') (List.map (branch aux) ctrs))
-                     (fun aux -> gApp (gVar aux) [gVar x])
+         let branch rec_name (ctr,ty) = 
+           
+           (ctr, generate_names_from_type "p" ty, 
+            fun vs -> str_append (gStr (constructor_to_string ctr ^ "  "))
+                                 (fold_ty_vars (fun _ v ty' -> str_appends [ gStr "( " 
+                                                                           ; gApp (if isCurrentTyCtr ty' then gVar rec_name else gInject "show") [gVar v]
+                                                                           ; gStr " )"
+                                                                           ])
+                                               (fun s1 s2 -> str_appends [s1; gStr " "; s2]) emptyString ty vs))
          in 
 
-         let show_fun = gFun ["x"] (fun [x] -> show_body x) in
-         gRecord [("show", show_fun)]
+         gRecFunIn "aux" ["x'"] 
+                   (fun (aux, [x']) -> gMatch (gVar x') (List.map (branch aux) ctrs))
+                   (fun aux -> gApp (gVar aux) [gVar x])
+       in 
 
-       | Arbitrary -> 
-          (* Create the function body by recursing on the structure of x *)
-          let arb_body = 
+       let show_fun = gFun ["x"] (fun [x] -> show_body x) in
+       gRecord [("show", show_fun)]
 
-            (* Need reverse fold for this *)
-            let create_for_branch rec_name size (ctr, ty) =
-              let rec aux i acc ty : coq_expr =
-                match ty with
-                | Arrow (ty1, ty2) -> 
-                   bindGen (if isCurrentTyCtr ty1 then gApp (gVar rec_name) [gVar size] else gInject "arbitrary")
-                           (Printf.sprintf "p%d" i)
-                           (fun [pi] -> aux (i+1) ((gVar pi) :: acc) ty2)
-                | _ -> returnGen (gApp ~explicit:true (gCtr ctr) (coqTyParams @ List.rev acc))
-              in aux 0 [] ty in
+    | Arbitrary -> 
+       (* Create the function body by recursing on the structure of x *)
+       let arb_body = 
 
-            let bases = List.filter isBaseBranch ctrs in
-            gRecFunIn "aux_arb" ["size"]
-                      (fun (aux_arb, [size]) ->
-                       gMatch (gVar size)
-                              [(injectCtr "O", [],
-                                fun _ -> oneof (List.map (create_for_branch aux_arb size) bases))
-                              ;(injectCtr "S", ["size'"], 
-                                fun [size'] -> frequency (List.map (fun ctr ->
-                                                                    ((if isBaseBranch ctr then gInt 1 else gVar size'),
-                                                                     create_for_branch aux_arb size' ctr)) ctrs))
-                              ])
-                      (fun aux_arb -> gApp (gInject "sized") [gVar aux_arb])
-          in                                                                            
-          let arbitrary_decl = arb_body in
-           
-          (* Shrinking function *)
-          let shrink_body x =  
-            let create_branch aux_shrink (ctr, ty) = 
-              (ctr, generate_names_from_type "p" ty,
-               fold_ty_vars (fun allParams v ty' -> 
-                             let liftNth = gFun ["shrunk"] 
-                                                (fun [shrunk] -> gApp ~explicit:true (gCtr ctr)
-                                                                      (coqTyParams @ (replace (gVar v) (gVar shrunk) (List.map gVar allParams)))) in
-                             lst_appends (if isCurrentTyCtr ty' then
-                                            [ gList [gVar v] ; gApp (gInject "List.map") [liftNth; gApp (gVar aux_shrink) [gVar v]]]
-                                          else
-                                            [ gApp (gInject "List.map") [liftNth; gApp (gInject "shrink") [gVar v]]]))
-                            lst_append list_nil ty) in
+         (* Need reverse fold for this *)
+         let create_for_branch rec_name size (ctr, ty) =
+           let rec aux i acc ty : coq_expr =
+             match ty with
+             | Arrow (ty1, ty2) -> 
+                bindGen (if isCurrentTyCtr ty1 then gApp (gVar rec_name) [gVar size] else gInject "arbitrary")
+                        (Printf.sprintf "p%d" i)
+                        (fun [pi] -> aux (i+1) ((gVar pi) :: acc) ty2)
+             | _ -> returnGen (gApp ~explicit:true (gCtr ctr) (coqTyParams @ List.rev acc))
+           in aux 0 [] ty in
 
-            let aux_shrink_body rec_fun x' = gMatch (gVar x') (List.map (create_branch rec_fun) ctrs) in
-     
-            gRecFunIn "aux_shrink" ["x'"]
-                      (fun (aux_shrink, [x']) -> aux_shrink_body aux_shrink x')
-                      (fun aux_shrink -> gApp (gVar aux_shrink) [gVar x])
-          in
+         let bases = List.filter (fun (_, ty) -> isBaseBranch ty) ctrs in
+         gRecFunIn "aux_arb" ["size"]
+                   (fun (aux_arb, [size]) ->
+                    gMatch (gVar size)
+                           [(injectCtr "O", [],
+                             fun _ -> oneof (List.map (create_for_branch aux_arb size) bases))
+                           ;(injectCtr "S", ["size'"], 
+                             fun [size'] -> frequency (List.map (fun (ctr,ty') ->
+                                                                 ((if isBaseBranch ty' then gInt 1 else gVar size'),
+                                                                  create_for_branch aux_arb size' (ctr,ty'))) ctrs))
+                           ])
+                   (fun aux_arb -> gApp (gInject "sized") [gVar aux_arb])
+       in                                                                            
+       let arbitrary_decl = arb_body in
+       
+       (* Shrinking function *)
+       let shrink_body x =  
+         let create_branch aux_shrink (ctr, ty) = 
+           (ctr, generate_names_from_type "p" ty,
+            fold_ty_vars (fun allParams v ty' -> 
+                          let liftNth = gFun ["shrunk"] 
+                                             (fun [shrunk] -> gApp ~explicit:true (gCtr ctr)
+                                                                   (coqTyParams @ (replace (gVar v) (gVar shrunk) (List.map gVar allParams)))) in
+                          lst_appends (if isCurrentTyCtr ty' then
+                                         [ gList [gVar v] ; gApp (gInject "List.map") [liftNth; gApp (gVar aux_shrink) [gVar v]]]
+                                       else
+                                         [ gApp (gInject "List.map") [liftNth; gApp (gInject "shrink") [gVar v]]]))
+                         lst_append list_nil ty) in
 
-         let shrink_decl = gFun ["x"] (fun [x] -> shrink_body x) in
+         let aux_shrink_body rec_fun x' = gMatch (gVar x') (List.map (create_branch rec_fun) ctrs) in
+         
+         gRecFunIn "aux_shrink" ["x'"]
+                   (fun (aux_shrink, [x']) -> aux_shrink_body aux_shrink x')
+                   (fun aux_shrink -> gApp (gVar aux_shrink) [gVar x])
+       in
 
-         gRecord [("arbitrary", arbitrary_decl); ("shrink", shrink_decl)]
-     in 
+       let shrink_decl = gFun ["x"] (fun [x] -> shrink_body x) in
 
-     (* Declare the instance *)
-     ignore (Classes.new_instance true 
-                                  instance_arguments 
-                                  (( (dummy_loc, (Name (id_of_string instance_name))), None)
-                                    , Decl_kinds.Explicit, instance_type) 
-                                  (Some (true, instance_record)) (* TODO: true or false? *)
-                                  None
-            )
-  | _ -> msgerr (str "Not an Inductive identifier" ++ fnl ())
+       gRecord [("arbitrary", arbitrary_decl); ("shrink", shrink_decl)]
+    | Size ->
+       let sizeOf_body x = 
+         let create_branch rec_name (ctr, ty) =
+           (ctr, generate_names_from_type "p" ty,
+            if isBaseBranch ty then fun _ -> gInt 0 
+            else fun vs -> 
+                 let opts = fold_ty_vars (fun _ v ty' ->
+                                          if isCurrentTyCtr ty' then [Some (gApp (gVar rec_name) [gVar v])]
+                                          else [None]) (fun l1 l2 -> l1 @ l2) [] ty vs in
+                 gApp (gInject "S") [maximum (cat_maybes opts)]) in
+         
+         gRecFunIn "aux_size" ["x'"] 
+                   (fun (aux_size, [x']) -> gMatch (gVar x') (List.map (create_branch aux_size) ctrs))
+                   (fun aux_size -> gApp (gVar aux_size) [gVar x]) in
+       let sizeOf_decl = gFun ["x"] (fun [x] -> sizeOf_body x) in
+       gRecord [("sizeOf", sizeOf_decl)]
+  in 
+
+  (* Declare the instance *)
+  ignore (Classes.new_instance true 
+                               instance_arguments 
+                               (( (dummy_loc, (Name (id_of_string instance_name))), None)
+                               , Decl_kinds.Explicit, instance_type) 
+                               (Some (true, instance_record)) (* TODO: true or false? *)
+                               None
+         )
 
 VERNAC COMMAND EXTEND DeriveShow
   | ["DeriveShow" constr(c) "as" string(s)] -> [derive Show c s]
@@ -171,6 +188,11 @@ END;;
 VERNAC COMMAND EXTEND DeriveArbitrary
   | ["DeriveArbitrary" constr(c) "as" string(s)] -> [derive Arbitrary c s]
 END;;
+
+VERNAC COMMAND EXTEND DeriveArbitrary
+  | ["DeriveSize" constr(c) "as" string(s)] -> [derive Size c s]
+END;;
+
 
 (* Advanced Generators *)
 

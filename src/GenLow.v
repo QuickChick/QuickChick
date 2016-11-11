@@ -71,6 +71,10 @@ Class SizeMonotonic {A} (g : G A) := {
   monotonic : forall s1 s2, s1 <= s2 -> semGenSize g s1 \subset semGenSize g s2 }.
 (* end SizeMonotonic *)
 
+(* TODO: Enhance with properties? *)
+Class CanonicalSize A := 
+  { sizeOf : A -> nat }.
+
 (* CH: Why does Unsized need a _ when A is marked as implict! *)
 (* begin unsizedMonotonic *)
 Declare Instance unsizedMonotonic {A} (g : G A) `{Unsized _ g} : SizeMonotonic g.
@@ -315,6 +319,10 @@ Class Unsized {A} (g : G A) := {
 Class SizeMonotonic {A} (g : G A) := { 
     monotonic : 
       forall s1 s2, s1 <= s2 -> semGenSize g s1 \subset semGenSize g s2 }.
+
+(* TODO: Enhance with properties? *)
+Class CanonicalSize A := 
+  { sizeOf : A -> nat }.
 
 (* Unsizedness trivially implies size-monotonicity *)
 Program Instance unsizedMonotonic {A} (g : G A) { _ : Unsized  g } : SizeMonotonic g. 

@@ -270,6 +270,10 @@ let gPair (c1, c2) = gApp (gInject "pair") [c1;c2]
 
 (* Int *)
 let gInt n = CPrim (dummy_loc, Numeral (Bigint.of_int n))
+let rec maximum = function
+  | [] -> failwith "maximum called with empty list"
+  | [c] -> c
+  | (c::cs) -> gApp (gInject "max") [c; maximum cs]
                           
 (* Gen combinators *)
 let returnGen c = gApp (gInject "returnGen") [c]

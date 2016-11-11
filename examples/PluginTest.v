@@ -28,6 +28,9 @@ Print showFoo.
 DeriveArbitrary Foo as "arbFoo".
 Print arbFoo.
 
+DeriveSize Foo as "sizeFoo".
+Print sizeFoo.
+
 Lemma setI_impl_l {T} (s1 s2 : set T) : s1 \subset s2 -> s1 :&: s2 <--> s1.
 Proof.      
   firstorder.
@@ -59,14 +62,6 @@ Fixpoint aux_arb (size : nat) : G Foo :=
                                              (fun p2 : Foo => returnGen (Foo3 p0 p1 p2)))))])
   end.
            
-Fixpoint sizedFoo (foo : Foo) := 
-  match foo with 
-    | Foo1 => 0
-    | Foo2 foo => 1 + sizedFoo foo
-    | Foo3 _ foo1 foo2 => 1 + max (sizedFoo foo1) (sizedFoo foo2)
-  end.
-
-
 From mathcomp.ssreflect Require Import ssreflect ssrnat ssrbool.
 Import Tactics.
 Set Bullet Behavior "Strict Subproofs".
@@ -75,12 +70,12 @@ Set Bullet Behavior "Strict Subproofs".
 
 Lemma sizedFoo_eq s :
   [set Foo1] :|:
-  (\bigcup_(f in fun f => sizedFoo f < s) ([set Foo2 f]) :|:
+  (\bigcup_(f in fun f => sizeOf f < s) ([set Foo2 f]) :|:
     \bigcup_n ( 
-      \bigcup_(f1 in fun f => sizedFoo f < s) (
-         \bigcup_(f2 in fun f => sizedFoo f < s) (
+      \bigcup_(f1 in fun f => sizeOf f < s) (
+         \bigcup_(f2 in fun f => sizeOf f < s) (
             [set Foo3 n f1 f2]))))  <-->
-  [set foo : Foo | sizedFoo foo <= s ].
+  [set foo : Foo | sizeOf foo <= s ].
 Proof.
   move => [| f | n f1 f2].
   + simpl; split => _; eauto. by repeat constructor.
@@ -92,27 +87,27 @@ Proof.
   + split.
     * move => [H | [[f [H1 H2]] | [n' [Hn [f1' [Hf1 [f2' [Hf2 [Heq1 Heq2 Heq3]]]]]]]]];
         subst; try discriminate.
+      simpl in *.
       apply/leP/NPeano.Nat.le_succ_l/NPeano.Nat.max_lub_lt; ssromega.
     * move => H.
       right; right; repeat eexists;
       move : H => /leP/NPeano.Nat.le_succ_l/NPeano.Nat.max_lub_lt_iff H; ssromega.
 Qed.
-  
 
 Lemma sizedFoo_zero :
-  [set Foo1] <--> [set foo : Foo | sizedFoo foo <= 0 ].
+  [set Foo1] <--> [set foo : Foo | sizeOf foo <= 0 ].
 Proof.
   move => [ | f | n f1 f2]; split; simpl; move => H; by firstorder.
 Qed.
 
 Lemma sizedFoo_succ s :
   [set Foo1] :|:
-  (\bigcup_(f in fun f => sizedFoo f <= s) ([set Foo2 f]) :|:
+  (\bigcup_(f in fun f => sizeOf f <= s) ([set Foo2 f]) :|:
     \bigcup_n ( 
-      \bigcup_(f1 in fun f => sizedFoo f <= s) (
-         \bigcup_(f2 in fun f => sizedFoo f <= s) (
+      \bigcup_(f1 in fun f => sizeOf f <= s) (
+         \bigcup_(f2 in fun f => sizeOf f <= s) (
             [set Foo3 n f1 f2]))))  <-->
-  [set foo : Foo | sizedFoo foo <= s.+1 ].
+  [set foo : Foo | sizeOf foo <= s.+1 ].
 Proof.
   setoid_rewrite <- sizedFoo_eq at 4. reflexivity.
 Qed.
@@ -141,7 +136,7 @@ Proof.
 Qed.
 
 Theorem arbFooComplete size : 
-  semGen (aux_arb size) <--> [set foo : Foo | sizedFoo foo <= size].
+  semGen (aux_arb size) <--> [set foo : Foo | sizeOf foo <= size].
 Proof.
   induction size; simpl.
   - rewrite -sizedFoo_zero semReturn. reflexivity.
