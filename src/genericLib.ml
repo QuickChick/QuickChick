@@ -1,3 +1,4 @@
+open Decl_kinds
 open Pp
 open Term
 open Loc
@@ -14,17 +15,20 @@ open Constrexpr
 open Constrexpr_ops
 open Context
 
-let dl x = (dummy_loc, x) 
+let cnt = ref 0 
+       
+let dl x = (dummy_loc, x)
 let hole = CHole (dummy_loc, None, Misctypes.IntroAnonymous, None)
 
 (* Everything marked "Opaque" should have its implementation be hidden in the .mli *)
 
+type coq_expr = constr_expr (* Opaque *)
+                 
 (* Non-dependent version *)
 type var = Id.t (* Opaque *)
 
-let gVar x = CRef (Ident (dl x),None)
-
-type coq_expr = constr_expr (* Opaque *)
+let gVar (x : var) : coq_expr =
+  CRef (Ident (dl x),None)
 
 (* Maybe this should do checks? *)
 let gInject s = CRef (Qualid (Loc.ghost, qualid_of_string s), None)
@@ -39,8 +43,14 @@ let ty_ctr_to_string (x : ty_ctr) = Id.to_string x
 
 let gTyCtr = mkIdentC
 
+type arg = local_binder
 let gArg ?assumName:(an=hole) ?assumType:(at=hole) ?assumImplicit:(ai=false) ?assumGeneralized:(ag=false) _ =
-  LocalRawAssum ( [coerce_to_name an],
+  let n = match an with
+    | CRef (Ident (loc,id),_) -> (loc,Name id)
+    | CRef (Qualid (loc, q), _) -> let (_,id) = repr_qualid q in (loc, Name id)
+    | CHole (loc,_,_,_) -> (loc,Anonymous)
+    | a -> failwith "This expression should be a name" in
+  LocalRawAssum ( [n],
                   (if ag then Generalized (Implicit, Implicit, false)                       
                    else if ai then Default Implicit else Default Explicit),
                   at )
@@ -124,7 +134,7 @@ let rec arrowify terminal l =
 (* Receives number of type parameters and one_inductive_body.
    -> Possibly ty_param list as well? 
    Returns list of constructor representations 
- *)                               
+ *)
 let parse_constructors nparams param_names result_ty oib : ctr_rep list option =
   
   let parse_constructor branch =
@@ -169,7 +179,7 @@ let parse_constructors nparams param_names result_ty oib : ctr_rep list option =
 
   sequenceM parse_constructor (List.combine (Array.to_list oib.mind_consnames)
                                             (Array.to_list oib.mind_nf_lc))
-                            
+
 (* Convert mutual_inductive_body to this representation, if possible *)
 let dt_rep_from_mib mib = 
   if Array.length mib.mind_packets > 1 then begin
@@ -183,7 +193,7 @@ let dt_rep_from_mib mib =
     parse_constructors mib.mind_nparams ty_params result_ctr oib >>= fun ctr_reps ->
     Some (ty_ctr, ty_params, ctr_reps)
                   
-let fresh_name n =
+let fresh_name n : Id.t =
     let base = Names.id_of_string n in
 
   (** [is_visible_name id] returns [true] if [id] is already
@@ -197,6 +207,11 @@ let fresh_name n =
     (** Safe fresh name generation. *)
     Namegen.next_ident_away_from base is_visible_name
 
+let make_up_name () : Id.t =
+  let id = fresh_name (Printf.sprintf "mu%d" (!cnt)) in
+  cnt := !cnt + 1;
+  id
+
 let gApp ?explicit:(expl=false) c cs =
   if expl then
     match c with
@@ -204,31 +219,37 @@ let gApp ?explicit:(expl=false) c cs =
     | _ -> failwith "invalid argument to gApp"
   else mkAppC (c, cs)
 
-let gFun xss f_body =
+let gFun xss (f_body : var list -> coq_expr) =
   let xvs = List.map (fun x -> fresh_name x) xss in
   (* TODO: optional argument types for xss *)
   let binder_list = List.map (fun x -> LocalRawAssum ([(dummy_loc, Name x)], Default Explicit, hole)) xvs in
   let fun_body = f_body xvs in
   mkCLambdaN dummy_loc binder_list fun_body 
-                  
-let gRecFunIn fs xss f_body let_body = 
-  let fv  = fresh_name fs in
-  let xvs = List.map fresh_name xss in
-  (* TODO: optional argument types for xss *)
-  let binder_list = List.map (fun x -> LocalRawAssum ([(dummy_loc, Name x)], Default Explicit, hole)) xvs in
 
+(* with Explicit/Implicit annotations *)  
+let gRecFunInWithArgs (fs : string) args (f_body : (var * var list) -> coq_expr) (let_body : var -> coq_expr) = 
+  let fv  = fresh_name fs in
+  let xvs = List.map (fun (LocalRawAssum ([_, n], _, _)) ->
+                      match n with
+                      | Name x -> x
+                      | _ -> make_up_name ()
+                     ) args in
   let fix_body = f_body (fv, xvs) in
   CLetIn (dummy_loc, dl (Name fv), 
-          G_constr.mk_fix (dummy_loc, true, dl fv, [(dl fv, binder_list, (None, CStructRec), fix_body, (dl None))]),
+          G_constr.mk_fix (dummy_loc, true, dl fv, [(dl fv, args, (None, CStructRec), fix_body, (dl None))]),
           let_body fv)
+             
+let gRecFunIn (fs : string) (xss : string list) (f_body : (var * var list) -> coq_expr) (let_body : var -> coq_expr) =
+  let xss' = List.map (fun s -> fresh_name s) xss in
+  gRecFunInWithArgs fs (List.map (fun x -> gArg ~assumName:(gVar x) ()) xss') f_body let_body 
 
-let gMatch discr branches = (* val gMatch : coq_expr -> (constructor * string list * (var list -> coq_expr)) list -> coq_expr *)
+let gMatch discr (branches : (constructor * string list * (var list -> coq_expr)) list) : coq_expr =
   CCases (dummy_loc,
           Term.RegularStyle,
           None (* return *), 
           [(discr, (None, None))], (* single discriminee, no as/in *)
           List.map (fun (c, cs, bf) -> 
-                      let cvs = List.map fresh_name cs in
+                      let cvs : Id.t list = List.map fresh_name cs in
                       (dummy_loc,
                        [dl [CPatCstr (dummy_loc,
                                       Ident (dl c), (* constructor  *)
@@ -237,7 +258,7 @@ let gMatch discr branches = (* val gMatch : coq_expr -> (constructor * string li
                                      )
                            ]
                        ],
-                       bf cvs
+                       bf cvs 
                       )
                    ) branches)
 
@@ -278,7 +299,7 @@ let rec maximum = function
 (* Gen combinators *)
 let returnGen c = gApp (gInject "returnGen") [c]
 let bindGen cg xn cf = 
-  gApp (gInject "bindGen") [cg; gFun [xn] cf]
+  gApp (gInject "bindGen") [cg; gFun [xn] (fun [x] -> cf x)]
 
 let oneof l =
   match l with
@@ -313,14 +334,30 @@ let generate_names_from_type base_name ty =
 let fold_ty_vars (f : var list -> var -> coq_type -> 'a) (mappend : 'a -> 'a -> 'a) (base : 'a) ty : var list -> 'a =
   fun allVars -> fold_ty' (fun acc ty -> fun allVars (v::vs) -> mappend (f allVars v ty) (acc allVars vs)) (fun _ _ -> base) ty allVars allVars
 
-let define c s =
-  let env = Global.env () in
-  let evd = Evd.from_env env in
-  let (c,_) = interp_constr env evd c in
-  let (evd,_) = Typing.type_of env evd c in
-  let uctxt = Evd.evar_context_universe_context (Evd.evar_universe_context evd) in
-  let fn = fresh_name s in
-  ignore (declare_constant ~internal:InternalTacticRequest fn
-      (DefinitionEntry (definition_entry ~univs:uctxt c),
-       Decl_kinds.IsDefinition Decl_kinds.Definition));
-  fn
+(* Declarations *)
+
+let defineConstant s c = 
+  let id = fresh_name s in 
+  Vernacentries.interp (dummy_loc,  Vernacexpr.VernacDefinition ((None, Definition), (dl id, None), DefineBody ([], None, c, None)));
+  id 
+                          
+(* Declare an instance *)
+let create_names_for_anon a =
+  match a with 
+  | LocalRawAssum ([(loc, n)], x, y) ->
+     begin match n with
+           | Name x -> (x, a)
+           | Anonymous -> let n = make_up_name () in
+                          (n, LocalRawAssum ([(loc, Name n)], x, y))
+     end
+  | _ -> failwith "Non RawAssum in create_names"
+    
+let declare_class_instance instance_arguments instance_name instance_type instance_record =
+  let (vars,iargs) = List.split (List.map create_names_for_anon instance_arguments) in
+  ignore (Classes.new_instance true 
+                               iargs
+                       (((dummy_loc, (Name (id_of_string instance_name))), None)
+                       , Decl_kinds.Explicit, instance_type) 
+                       (Some (true, instance_record vars)) (* TODO: true or false? *)
+                       None
+         )

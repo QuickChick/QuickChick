@@ -17,6 +17,7 @@ src/Test.v
 src/Extraction.v
 src/QuickChick.v
 src/MutateCheck.v
+src/genericLib.mli
 src/genericLib.ml
 src/quickChick.ml4
 src/derive.ml4

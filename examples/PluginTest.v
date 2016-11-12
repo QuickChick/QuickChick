@@ -131,7 +131,7 @@ Lemma frequencySizeMonotonic {A} (g0 : G A) lg :
   SizeMonotonic (frequency g0 lg).
 Admitted.  
 
-Instance arbFooSizeMonotonic s : SizeMonotonic (aux_arb s).
+Instance arbFooSizeMonotonic s : SizeMonotonic (arbFooSized s).
 Proof.
   induction s; try eauto with typeclass_instances.
   apply frequencySizeMonotonic; try eauto with typeclass_instances.
@@ -139,7 +139,7 @@ Proof.
 Qed.
 
 Theorem arbFooComplete size : 
-  semGen (aux_arb size) <--> [set foo : Foo | sizeOf foo <= size].
+  semGen (arbFooSized size) <--> [set foo : Foo | sizeOf foo <= size].
 Proof.
   induction size; simpl.
   - rewrite -sizedFoo_zero semReturn. reflexivity.
@@ -169,7 +169,7 @@ Proof.
       rewrite -> semReturn. reflexivity.
 Qed.
 
-Inductive Bar A B :=
+Inductive Bar (A B : Type) :=
 | Bar1 : Bar A B
 | Bar2 : Bar A B -> Bar A B
 | Bar3 : A -> B -> Bar A B -> Bar A B.
@@ -177,8 +177,29 @@ Inductive Bar A B :=
 DeriveShow Bar as "showBar".
 Print showBar.
 
+Definition s :=
+  fix aux_arb0 (size : nat) (A : Type) (H : Arbitrary A) 
+            (B : Type) (H0 : Arbitrary B) {struct size} : 
+   G (Bar A B) :=
+     match size with
+     | 0 => returnGen (Bar1 A B)
+     | size'.+1 =>
+         freq ( (1, returnGen (Bar1 A B));;
+         [(size,
+          bindGen (aux_arb0 size' A H B H0)
+            (fun p0 : Bar A B => returnGen (Bar2 A B p0)));
+         (size,
+         bindGen arbitrary
+           (fun p0 : A =>
+            bindGen arbitrary
+              (fun p1 : B =>
+               bindGen (aux_arb0 size' A H B H0)
+                 (fun p2 : Bar A B => returnGen (Bar3 A B p0 p1 p2)))))])
+     end.
+
 DeriveArbitrary Bar as "arbBar".
 Print arbBar.
+Print arbBarSized.
 
 Definition testGen : G (Bar nat nat) := arbitrary.
 Sample testGen.

@@ -12,10 +12,19 @@ open Constrintern
 open Topconstr
 open Constrexpr
 open Constrexpr_ops
+open Decl_kinds
 open GenericLib
 
 type derivable = Show | Arbitrary | Size
 
+let list_last l = List.nth l (List.length l - 1)
+let list_init l = List.rev (List.tl (List.rev l))
+let list_drop_every n l = 
+  let rec aux i = function
+    | [] -> []
+    | x::xs -> if i == n then aux 1 xs else x::aux (i+1) xs
+  in aux 1 l
+                                      
 let print_der = function
   | Show -> "Show"
   | Arbitrary -> "Arbitrary"
@@ -79,7 +88,7 @@ let derive (cn : derivable) (c : constr_expr) (instance_name : string) =
   let isBaseBranch ty = fold_ty' (fun b ty' -> b && not (isCurrentTyCtr ty')) true ty in
   
   (* Create the instance record. Only need to extend this for extra instances *)
-  let instance_record = 
+  let instance_record iargs = 
     
     match cn with 
     | Show ->
@@ -112,32 +121,42 @@ let derive (cn : derivable) (c : constr_expr) (instance_name : string) =
        let arbitrary_decl = 
 
          (* Need reverse fold for this *)
-         let create_for_branch rec_name size (ctr, ty) =
+         let create_for_branch tyParams ps rec_name size (ctr, ty) =
            let rec aux i acc ty : coq_expr =
              match ty with
              | Arrow (ty1, ty2) -> 
-                bindGen (if isCurrentTyCtr ty1 then gApp (gVar rec_name) [gVar size] else gInject "arbitrary")
+                bindGen (if isCurrentTyCtr ty1 then gApp (gVar rec_name) (gVar size :: List.map gVar ps) else gInject "arbitrary")
                         (Printf.sprintf "p%d" i)
-                        (fun [pi] -> aux (i+1) ((gVar pi) :: acc) ty2)
-             | _ -> returnGen (gApp ~explicit:true (gCtr ctr) (coqTyParams @ List.rev acc))
+                        (fun pi -> aux (i+1) ((gVar pi) :: acc) ty2)
+             | _ -> returnGen (gApp ~explicit:true (gCtr ctr) (tyParams @ List.rev acc))
            in aux 0 [] ty in
 
          let bases = List.filter (fun (_, ty) -> isBaseBranch ty) ctrs in
-         let aux_arb = 
-           gRecFunIn "aux_arb" ["size"]
-                   (fun (aux_arb, [size]) ->
-                    gMatch (gVar size)
-                           [(injectCtr "O", [],
-                             fun _ -> oneof (List.map (create_for_branch aux_arb size) bases))
-                           ;(injectCtr "S", ["size'"], 
-                             fun [size'] -> frequency (List.map (fun (ctr,ty') ->
-                                                                 ((if isBaseBranch ty' then gInt 1 else gVar size'),
-                                                                  create_for_branch aux_arb size' (ctr,ty'))) ctrs))
-                           ])
-                   (fun x -> gVar x) in
+         let aux_arb =
+             let explicitly_typed_arguments =
+               List.concat (List.map (fun tp ->
+                           [ gArg ~assumName:tp ();
+                             gArg ~assumName:(gVar (make_up_name())) ~assumType:(gApp (gInject class_name) [tp]) ()]
+                          ) coqTyParams) in
 
-         let fn = define aux_arb (instance_name ^ "Sized") in
-         gApp (gInject "sized") [gVar fn]
+             gRecFunInWithArgs
+               "aux_arb" (gArg ~assumName:(gInject "size") () :: explicitly_typed_arguments)
+               (fun (aux_arb, size::ps) ->
+                let tyParams = List.map gVar (list_drop_every 2 ps) in
+                gMatch (gVar size)
+                       [(injectCtr "O", [],
+                         fun _ -> oneof (List.map (create_for_branch tyParams ps aux_arb size) bases))
+                       ;(injectCtr "S", ["size'"], 
+                         fun [size'] -> frequency (List.map (fun (ctr,ty') ->
+                                                             ((if isBaseBranch ty' then gInt 1 else gVar size),
+                                                              create_for_branch tyParams ps aux_arb size' (ctr,ty'))) ctrs))
+                       ])
+               (fun x -> gVar x) in 
+
+         let fn = defineConstant (instance_name ^ "Sized") aux_arb in
+         msgerr (str "Defined" ++ fnl ());
+
+         gApp (gInject "sized") [gFun ["s"] (fun [s] -> gApp (gVar fn) ((gVar s) :: List.map gVar iargs))]
        in                                                                            
        
        (* Shrinking function *)
@@ -182,14 +201,7 @@ let derive (cn : derivable) (c : constr_expr) (instance_name : string) =
        gRecord [("sizeOf", sizeOf_decl)]
   in 
 
-  (* Declare the instance *)
-  ignore (Classes.new_instance true 
-                               instance_arguments 
-                               (( (dummy_loc, (Name (id_of_string instance_name))), None)
-                               , Decl_kinds.Explicit, instance_type) 
-                               (Some (true, instance_record)) (* TODO: true or false? *)
-                               None
-         )
+  declare_class_instance instance_arguments instance_name instance_type instance_record
 
 VERNAC COMMAND EXTEND DeriveShow
   | ["DeriveShow" constr(c) "as" string(s)] -> [derive Show c s]
