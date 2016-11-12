@@ -41,7 +41,7 @@ let rec replace v x = function
   | y::ys -> if y = v then x::ys else y::(replace v x ys)
 
 (* Generic derivation function *)
-let derive (cn : derivable) (c : constr_expr) (instance_name : string) =
+let derive (cn : derivable) (c : constr_expr) (instance_name : string) (extra_name : string) =
   msgerr (str (print_der cn) ++ fnl ());
   let r = match c with
     | CRef (r,_) -> r
@@ -153,7 +153,7 @@ let derive (cn : derivable) (c : constr_expr) (instance_name : string) =
                        ])
                (fun x -> gVar x) in 
 
-         let fn = defineConstant (instance_name ^ "Sized") aux_arb in
+         let fn = defineConstant extra_name aux_arb in
          msgerr (str "Defined" ++ fnl ());
 
          gApp (gInject "sized") [gFun ["s"] (fun [s] -> gApp (gVar fn) ((gVar s) :: List.map gVar iargs))]
@@ -204,15 +204,15 @@ let derive (cn : derivable) (c : constr_expr) (instance_name : string) =
   declare_class_instance instance_arguments instance_name instance_type instance_record
 
 VERNAC COMMAND EXTEND DeriveShow
-  | ["DeriveShow" constr(c) "as" string(s)] -> [derive Show c s]
+  | ["DeriveShow" constr(c) "as" string(s)] -> [derive Show c s ""]
 END;;
 
 VERNAC COMMAND EXTEND DeriveArbitrary
-  | ["DeriveArbitrary" constr(c) "as" string(s)] -> [derive Arbitrary c s]
+  | ["DeriveArbitrary" constr(c) "as" string(s1) string(s2)] -> [derive Arbitrary c s1 s2]
 END;;
 
 VERNAC COMMAND EXTEND DeriveSize
-  | ["DeriveSize" constr(c) "as" string(s)] -> [derive Size c s]
+  | ["DeriveSize" constr(c) "as" string(s)] -> [derive Size c s ""]
 END;;
 
 

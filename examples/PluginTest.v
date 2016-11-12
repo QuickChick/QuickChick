@@ -30,44 +30,12 @@ Inductive Foo :=
 DeriveShow Foo as "showFoo".
 Print showFoo.
 
-DeriveArbitrary Foo as "arbFoo".
+DeriveArbitrary Foo as "arbFoo" "arbFooSized".
 Print arbFoo.
 Print arbFooSized.
 
 DeriveSize Foo as "sizeFoo".
 Print sizeFoo.
-
-Lemma setI_impl_l {T} (s1 s2 : set T) : s1 \subset s2 -> s1 :&: s2 <--> s1.
-Proof.      
-  firstorder.
-Qed.      
-
-Lemma bigcup_setU_l:
-  forall (U T : Type) (s1 s2 : set U) (f : U -> set T),
-  \bigcup_(i in (s1 :|: s2)) f i <-->
-  \bigcup_(i in s1) f i :|: \bigcup_(i in s2) f i.
-Proof.
-  firstorder.
-Qed.
-
-(* Derived *)
-Fixpoint aux_arb (size : nat) : G Foo :=
-  match size with
-    | 0 => returnGen Foo1
-    | S size' =>
-      freq ( (1, returnGen Foo1);;
-            [(size,
-              bindGen (aux_arb size')
-                      (fun p0 : Foo => returnGen (Foo2 p0)));
-              (size,
-               bindGen arbitrary
-                       (fun p0 : nat =>
-                          bindGen (aux_arb size')
-                                  (fun p1 : Foo =>
-                                     bindGen (aux_arb size')
-                                             (fun p2 : Foo => returnGen (Foo3 p0 p1 p2)))))])
-  end.
-           
 
 (* Zoe : Probably a good idea to generate size equations automatically. *)
 
@@ -115,22 +83,6 @@ Proof.
   setoid_rewrite <- sizedFoo_eq at 4. reflexivity.
 Qed.
 
-(* TODO : move to set lib *)
-Lemma setU_set_eq_compat {T} (s1 s2 s1' s2' : set T) :
-  s1 <--> s1' ->
-  s2 <--> s2' ->
-  s1 :|: s2 <--> s1' :|: s2'.
-Proof.
-  by firstorder.
-Qed.
-
-(* TODO move to gen lib *)
-Lemma frequencySizeMonotonic {A} (g0 : G A) lg :
-  SizeMonotonic g0 ->
-  Forall (fun p => SizeMonotonic (snd p)) lg ->
-  SizeMonotonic (frequency g0 lg).
-Admitted.  
-
 Instance arbFooSizeMonotonic s : SizeMonotonic (arbFooSized s).
 Proof.
   induction s; try eauto with typeclass_instances.
@@ -177,27 +129,7 @@ Inductive Bar (A B : Type) :=
 DeriveShow Bar as "showBar".
 Print showBar.
 
-Definition s :=
-  fix aux_arb0 (size : nat) (A : Type) (H : Arbitrary A) 
-            (B : Type) (H0 : Arbitrary B) {struct size} : 
-   G (Bar A B) :=
-     match size with
-     | 0 => returnGen (Bar1 A B)
-     | size'.+1 =>
-         freq ( (1, returnGen (Bar1 A B));;
-         [(size,
-          bindGen (aux_arb0 size' A H B H0)
-            (fun p0 : Bar A B => returnGen (Bar2 A B p0)));
-         (size,
-         bindGen arbitrary
-           (fun p0 : A =>
-            bindGen arbitrary
-              (fun p1 : B =>
-               bindGen (aux_arb0 size' A H B H0)
-                 (fun p2 : Bar A B => returnGen (Bar3 A B p0 p1 p2)))))])
-     end.
-
-DeriveArbitrary Bar as "arbBar".
+DeriveArbitrary Bar as "arbBar" "arbBarSized".
 Print arbBar.
 Print arbBarSized.
 
@@ -205,7 +137,7 @@ Definition testGen : G (Bar nat nat) := arbitrary.
 Sample testGen.
 
 Arguments Bar3 {A} {B}  _ _ _.
-DeriveArbitrary Bar as "arbBar2".
+DeriveArbitrary Bar as "arbBar2" "arbBarSized2".
 Print arbBar2.
 
 Inductive goodFoo' (n : nat) : Foo -> Prop :=

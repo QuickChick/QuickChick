@@ -212,6 +212,14 @@ Lemma bigcup_set1 T U (F : T -> set U) y :
   \bigcup_(x in [set y]) F x <--> F y.
 Proof. by move=> t; split=> [[y' [<-]] | Fyt] //; exists y. Qed.
 
+Lemma bigcup_setU_l:
+  forall (U T : Type) (s1 s2 : set U) (f : U -> set T),
+  \bigcup_(i in (s1 :|: s2)) f i <-->
+  \bigcup_(i in s1) f i :|: \bigcup_(i in s2) f i.
+Proof.
+  firstorder.
+Qed.
+
 Lemma bigcup_const A B (P : set B) : inhabited A -> (\bigcup_(_ : A) P) <--> P.
 Proof. by case=> a x; split=> [[?] []|Px] //; exists a. Qed.
 
@@ -412,6 +420,14 @@ Proof.
   firstorder.
 Qed.
 
+Lemma setU_set_eq_compat {T} (s1 s2 s1' s2' : set T) :
+  s1 <--> s1' ->
+  s2 <--> s2' ->
+  s1 :|: s2 <--> s1' :|: s2'.
+Proof.
+  by firstorder.
+Qed.
+
 Lemma setU_assoc {U} (s1 s2 s3 : set U) :
   (s1 :|: (s2 :|: s3)) <--> ((s1 :|: s2) :|: s3).
 Proof.
@@ -423,6 +439,11 @@ Lemma setI_assoc {U} (s1 s2 s3 : set U) :
 Proof.
   firstorder.
 Qed.
+
+Lemma setI_impl_l {T} (s1 s2 : set T) : s1 \subset s2 -> s1 :&: s2 <--> s1.
+Proof.      
+  firstorder.
+Qed.      
 
 Lemma setI_impl_r {T} (s1 s2 : set T) : s2 \subset s1 -> s1 :&: s2 <--> s2.
 Proof.      
@@ -533,3 +554,5 @@ Qed.
 Lemma cons_set_eq {A} (x : A) l :
   (x :: l) <--> [set x] :|: l.
 Proof. by []. Qed.
+
+

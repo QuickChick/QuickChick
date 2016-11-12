@@ -162,7 +162,13 @@ Parameter semFrequency:
     semGen (frequency def l) <-->
       let l' := [seq x <- l | x.1 != 0] in
       if l' is nil then semGen def else
-      \bigcup_(x in l') semGen x.2.
+        \bigcup_(x in l') semGen x.2.
+
+Parameter frequencySizeMonotonic:
+  forall {A} (g0 : G A) lg,
+  SizeMonotonic g0 ->
+  List.Forall (fun p => SizeMonotonic (snd p)) lg ->
+  SizeMonotonic (frequency g0 lg).
 
 Parameter semFrequencySize:
   forall {A} (l : list (nat * G A)) (def : G A) (size: nat),
@@ -1002,6 +1008,12 @@ by case lsupp: {1}[seq x <- l | x.1 != 0] => [|[n g] gs] /=;
 rewrite 1?bigcupC; apply: eq_bigcupr => sz;
 have := (semFrequencySize l def sz); rewrite lsupp.
 Qed.
+
+Lemma frequencySizeMonotonic {A} (g0 : G A) lg :
+  SizeMonotonic g0 ->
+  List.Forall (fun p => SizeMonotonic (snd p)) lg ->
+  SizeMonotonic (frequency g0 lg).
+Admitted.
 
 Lemma eq_lt_0 : (fun x => x <= 0) <--> [set 0].
 Proof. 
