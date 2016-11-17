@@ -37,6 +37,21 @@ Print arbFooSized.
 DeriveSize Foo as "sizeFoo".
 Print sizeFoo.
 
+
+Lemma max_lub_l_ssr n m p:
+  max n m < p -> n < p.
+Proof.
+  intros. move /ltP/NPeano.Nat.max_lub_lt_iff :H => [/ltP H1 _].
+  assumption.
+Qed.
+
+Lemma max_lub_r_ssr n m p:
+  max n m < p -> m < p.
+Proof.
+  intros. move /ltP/NPeano.Nat.max_lub_lt_iff :H => [_ /ltP H1].
+  assumption.
+Qed.
+
 DeriveSizeEqs Foo as "sizedFoo".
 (* Zoe : Probably a good idea to generate size equations automatically. *)
 (* Leo : One size equation generated :) *)
@@ -49,28 +64,56 @@ Lemma sizedFoo_eq s : sizedFoo_eqT s.
             [set Foo3 n f1 f2]))))  <-->
   [set foo : Foo | sizeOf foo <= s ].*)
 Proof.
-  move => [| f | n f1 f2].
-  + simpl; split => _; eauto. by repeat constructor.
-  + simpl. split.
-    * move => [H | [[f' [H1 [H2]]] | [n' [Hn [f1' [Hf1 [f2' [Hf2 Heq]]]]]]]];
-        subst; try discriminate.
-      eassumption.
-    * right; left. eexists; split; eauto. reflexivity.
-  + split.
-    * move => [H | [[f [H1 H2]] | [n' [Hn [f1' [Hf1 [f2' [Hf2 [Heq1 Heq2 Heq3]]]]]]]]];
-        subst; try discriminate.
-      simpl in *.
-      apply/leP/NPeano.Nat.le_succ_l/NPeano.Nat.max_lub_lt; ssromega.
-    * move => H.
-      right; right; repeat eexists;
-      move : H => /leP/NPeano.Nat.le_succ_l/NPeano.Nat.max_lub_lt_iff H; ssromega.
-Qed.
+  refine (Foo_rect _ (conj (fun _ => leq0n s) (fun _ => or_introl (Logic.eq_refl Foo1)))
+                   (fun f Hf => conj (fun Hu => _)
+                                  (fun Hleq => or_intror (or_introl
+                                                         (ex_intro _
+                                                                   f (conj Hleq (erefl (Foo2 f)))))))
+                   (fun n f1 Hf1 f2 Hf2 => conj (fun Hu => _) (fun Hleq => or_intror (or_intror _)))).
+  - refine (match Hu with
+              | or_introl Hc =>
+                match Hc in (_ = f') return
+                      match f' with
+                        | Foo1 => True
+                        | Foo2 f1 => sizeOf (Foo2 f1) <= s
+                        | Foo3 _ _ _ => True
+                      end
+                with
+                  | erefl => I
+                end
+              | or_intror Hu' => 
+                match Hu' with
+                  | or_introl H =>
+                    match H with
+                      | ex_intro x (conj H1 H2) =>
+                        match H2 with
+                          | erefl => H1
+                        end
+                    end
+                  | or_intror Hc =>
+                    match Hc with
+                      | ex_intro n (conj H1 (ex_intro f1 (conj H2 (ex_intro f2 (conj H3 H4))))) =>
+                        match H4 in (_ = f') return
+                              match f' with
+                                | Foo1 => True
+                                | Foo2 f1 => sizeOf (Foo2 f1) <= s
+                                | Foo3 _ _ _ => True
+                              end
+                        with
+                          | erefl => I
+                        end
+                    end
+                end
+            end).
+  - admit. 
+Admitted.
 
 Lemma sizedFoo_zero : sizedFoo_zeroT.
 (*   [set Foo1] <--> [set foo : Foo | sizeOf foo <= 0 ].*)
 Proof.
   move => [ | f | n f1 f2]; split; simpl; move => H; by firstorder.
 Qed.
+
 
 Lemma sizedFoo_succ s : sizedFoo_succT s.
 (*   [set Foo1] :|:
@@ -82,9 +125,8 @@ Lemma sizedFoo_succ s : sizedFoo_succT s.
   [set foo : Foo | sizeOf foo <= s.+1 ].
 *)
 Proof.
-  unfold sizedFoo_succT.
-  
-  setoid_rewrite <- sizedFoo_eq at 4. reflexivity.
+  unfold sizedFoo_succT. Set Printing All. 
+  eapply (sizedFoo_eq (s.+1)).
 Qed.
 
 Instance arbFooSizeMonotonic s : SizeMonotonic (arbFooSized s).
