@@ -42,22 +42,9 @@ let rec replace v x = function
 
 (* Generic derivation function *)
 let derive (cn : derivable) (c : constr_expr) (instance_name : string) (extra_name : string) =
-  msgerr (str (print_der cn) ++ fnl ());
-  let r = match c with
-    | CRef (r,_) -> r
-    | _ -> failwith "Argument must be typeclass name" in
-
-  (* Extract id/string representation - which to use? :/ *)
-  let qidl = qualid_of_reference r in
-
-  let env = Global.env () in
-  
-  let glob_ref = Nametab.global r in
-  let (mind,_) = Globnames.destIndRef glob_ref in
-  let mib = Environ.lookup_mind mind env in
 
   let (ty_ctr, ty_params, ctrs) =
-    match dt_rep_from_mib mib with
+    match coerce_reference_to_dt_rep c with
     | Some dt -> dt
     | None -> failwith "Not supported type"  in
 
@@ -203,6 +190,56 @@ let derive (cn : derivable) (c : constr_expr) (instance_name : string) (extra_na
 
   declare_class_instance instance_arguments instance_name instance_type instance_record
 
+(* Set library generics *)
+let set_singleton (c : coq_expr) : coq_expr = gApp (gInject "set1") [c]
+let set_bigcup (x : string) (p : coq_expr) (c : var -> coq_expr) : coq_expr = 
+  gApp (gInject "bigcup") [p; gFun [x] (fun [x] -> c x)]
+let set_suchThat (x : string) (t : coq_expr) (p : var -> coq_expr) : coq_expr = 
+  gFunTyped [("x", t)] (fun [x] -> p x)
+let set_eq c1 c2 = gApp (gInject "set_eq") [c1;c2]        
+let set_union c1 c2 = gApp (gInject "setU") [c1;c2]
+let rec set_unions = function
+  | [] -> failwith "empty set unions"
+  | [x] -> x
+  | x::xs -> set_union x (set_unions xs)
+         
+let sizeEqType (ty_ctr, ty_params, ctrs) = 
+
+  (* Common helpers, refactor? *)
+  let coqTyCtr = gTyCtr ty_ctr in
+  let coqTyParams = List.map gTyParam ty_params in
+  let full_dt = gApp coqTyCtr coqTyParams in
+
+  let isCurrentTyCtr = function 
+    | TyCtr (ty_ctr', _) -> ty_ctr = ty_ctr'
+    | _ -> false in
+  let isBaseBranch ty = fold_ty' (fun b ty' -> b && not (isCurrentTyCtr ty')) true ty in
+
+  (* Second reverse fold necessary *)
+  let create_branch size (ctr,ty) = 
+    let rec aux i acc ty : coq_expr = 
+      match ty with 
+      | Arrow (ty1, ty2) -> 
+         let fi = Printf.sprintf "f%d" i in
+         set_bigcup fi (if isCurrentTyCtr ty1 then gFun [fi] (fun [f] -> glt (gApp (gInject "sizeOf") [gVar f]) (gVar size))
+                        else gFun [fi] (fun _ -> gInject "true"))
+                    (fun f -> aux (i+1) (f::acc) ty2)
+      | _ -> set_singleton (gApp ~explicit:true (gCtr ctr) (coqTyParams @ (List.map gVar (List.rev acc)))) in
+    aux 0 [] ty in
+
+  gFun ["size"]
+       (fun [size] -> 
+        set_eq (set_unions (List.map (create_branch size) ctrs))
+               (set_suchThat "x" full_dt (fun x -> gle (gApp (gInject "sizeOf") [gVar x]) (gVar size)))
+       )
+
+let deriveSizeEqs c s = 
+  let dt = match coerce_reference_to_dt_rep c with
+    | Some dt -> dt
+    | None -> failwith "Not supported type"  in
+  let c = sizeEqType dt in
+  ignore(defineConstant s c)
+
 VERNAC COMMAND EXTEND DeriveShow
   | ["DeriveShow" constr(c) "as" string(s)] -> [derive Show c s ""]
 END;;
@@ -215,6 +252,9 @@ VERNAC COMMAND EXTEND DeriveSize
   | ["DeriveSize" constr(c) "as" string(s)] -> [derive Size c s ""]
 END;;
 
+VERNAC COMMAND EXTEND DeriveSizeEqs
+  | ["DeriveSizeEqs" constr(c) "as" string(s)] -> [deriveSizeEqs c s]
+END;;
 
 (* Advanced Generators *)
 

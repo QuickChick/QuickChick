@@ -66,6 +66,7 @@ val foldM : ('b -> 'a -> 'b option) -> 'b option -> 'a list -> 'b option
 val sequenceM : ('a -> 'b option) -> 'a list -> 'b list option
 
 val dt_rep_from_mib : mutual_inductive_body -> dt_rep option
+val coerce_reference_to_dt_rep : constr_expr -> dt_rep option
 
 val fresh_name : string -> var 
 val make_up_name : unit -> var
@@ -73,6 +74,7 @@ val make_up_name : unit -> var
 (* Generic Combinators *)
 val gApp : ?explicit:bool -> coq_expr -> coq_expr list -> coq_expr 
 val gFun : string list -> (var list -> coq_expr) -> coq_expr
+val gFunTyped : (string * coq_expr) list -> (var list -> coq_expr) -> coq_expr
 
 val gRecFunInWithArgs : string -> arg list -> ((var * var list) -> coq_expr) -> (var -> coq_expr) -> coq_expr
 val gRecFunIn : string -> string list -> ((var * var list) -> coq_expr) -> (var -> coq_expr) -> coq_expr
@@ -100,6 +102,8 @@ val gPair : coq_expr * coq_expr -> coq_expr
 (* Int *)
 val gInt : int -> coq_expr 
 val maximum : coq_expr list -> coq_expr
+val glt : coq_expr -> coq_expr -> coq_expr
+val gle : coq_expr -> coq_expr -> coq_expr
                           
 (* Gen combinators *)
 val returnGen : coq_expr -> coq_expr 

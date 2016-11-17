@@ -192,6 +192,22 @@ let dt_rep_from_mib mib =
     let result_ctr = TyCtr (ty_ctr, List.map (fun x -> TyParam x) ty_params) in
     parse_constructors mib.mind_nparams ty_params result_ctr oib >>= fun ctr_reps ->
     Some (ty_ctr, ty_params, ctr_reps)
+
+let coerce_reference_to_dt_rep c = 
+  let r = match c with
+    | CRef (r,_) -> r
+    | _ -> failwith "Not a reference" in
+
+  (* Extract id/string representation - which to use? :/ *)
+  let qidl = qualid_of_reference r in
+
+  let env = Global.env () in
+  
+  let glob_ref = Nametab.global r in
+  let (mind,_) = Globnames.destIndRef glob_ref in
+  let mib = Environ.lookup_mind mind env in
+  
+  dt_rep_from_mib mib
                   
 let fresh_name n : Id.t =
     let base = Names.id_of_string n in
@@ -224,6 +240,13 @@ let gFun xss (f_body : var list -> coq_expr) =
   (* TODO: optional argument types for xss *)
   let binder_list = List.map (fun x -> LocalRawAssum ([(dummy_loc, Name x)], Default Explicit, hole)) xvs in
   let fun_body = f_body xvs in
+  mkCLambdaN dummy_loc binder_list fun_body 
+
+let gFunTyped xts (f_body : var list -> coq_expr) =
+  let xvs = List.map (fun (x,t) -> (fresh_name x,t)) xts in
+  (* TODO: optional argument types for xss *)
+  let binder_list = List.map (fun (x,t) -> LocalRawAssum ([(dummy_loc, Name x)], Default Explicit, t)) xvs in
+  let fun_body = f_body (List.map fst xvs) in
   mkCLambdaN dummy_loc binder_list fun_body 
 
 (* with Explicit/Implicit annotations *)  
@@ -295,6 +318,8 @@ let rec maximum = function
   | [] -> failwith "maximum called with empty list"
   | [c] -> c
   | (c::cs) -> gApp (gInject "max") [c; maximum cs]
+let gle x y = gApp (gInject "leq") [x; y]
+let glt x y = gle (gApp (gInject "S") [x]) y
                           
 (* Gen combinators *)
 let returnGen c = gApp (gInject "returnGen") [c]

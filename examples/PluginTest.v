@@ -37,16 +37,19 @@ Print arbFooSized.
 DeriveSize Foo as "sizeFoo".
 Print sizeFoo.
 
-(* Zoe : Probably a good idea to generate size equations automatically. *)
+DeriveSizeEqs Foo as "sizedFoo_eq_type".
+Print sizedFoo_eq_type.
 
-Lemma sizedFoo_eq s :
-  [set Foo1] :|:
+(* Zoe : Probably a good idea to generate size equations automatically. *)
+(* Leo : One size equation generated :) *)
+Lemma sizedFoo_eq s : sizedFoo_eq_type s.
+(*  [set Foo1] :|:
   (\bigcup_(f in fun f => sizeOf f < s) ([set Foo2 f]) :|:
     \bigcup_n ( 
       \bigcup_(f1 in fun f => sizeOf f < s) (
          \bigcup_(f2 in fun f => sizeOf f < s) (
             [set Foo3 n f1 f2]))))  <-->
-  [set foo : Foo | sizeOf foo <= s ].
+  [set foo : Foo | sizeOf foo <= s ].*)
 Proof.
   move => [| f | n f1 f2].
   + simpl; split => _; eauto. by repeat constructor.
