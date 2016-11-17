@@ -215,30 +215,48 @@ let sizeEqType (ty_ctr, ty_params, ctrs) =
     | _ -> false in
   let isBaseBranch ty = fold_ty' (fun b ty' -> b && not (isCurrentTyCtr ty')) true ty in
 
+  let bases = List.filter (fun (_, ty) -> isBaseBranch ty) ctrs in
+
   (* Second reverse fold necessary *)
-  let create_branch size (ctr,ty) = 
+  let create_branch ltf size (ctr,ty) = 
     let rec aux i acc ty : coq_expr = 
       match ty with 
       | Arrow (ty1, ty2) -> 
          let fi = Printf.sprintf "f%d" i in
-         set_bigcup fi (if isCurrentTyCtr ty1 then gFun [fi] (fun [f] -> glt (gApp (gInject "sizeOf") [gVar f]) (gVar size))
+         set_bigcup fi (if isCurrentTyCtr ty1 then gFun [fi] (fun [f] -> ltf (gApp (gInject "sizeOf") [gVar f]) size)
                         else gFun [fi] (fun _ -> gInject "true"))
                     (fun f -> aux (i+1) (f::acc) ty2)
       | _ -> set_singleton (gApp ~explicit:true (gCtr ctr) (coqTyParams @ (List.map gVar (List.rev acc)))) in
     aux 0 [] ty in
+  
+  let size_zero =
+    set_eq (set_unions (List.map (create_branch glt hole) bases))
+           (set_suchThat "x" full_dt (fun x -> gle (gApp (gInject "sizeOf") [gVar x]) (gInt 0))) in
 
-  gFun ["size"]
-       (fun [size] -> 
-        set_eq (set_unions (List.map (create_branch size) ctrs))
-               (set_suchThat "x" full_dt (fun x -> gle (gApp (gInject "sizeOf") [gVar x]) (gVar size)))
-       )
+  let size_eq =
+    gFun ["size"]
+         (fun [size] -> 
+          set_eq (set_unions (List.map (create_branch glt (gVar size)) ctrs))
+                 (set_suchThat "x" full_dt (fun x -> gle (gApp (gInject "sizeOf") [gVar x]) (gVar size)))
+         ) in
 
+  let size_succ =
+    gFun ["size"]
+         (fun [size] -> 
+          set_eq (set_unions (List.map (create_branch gle (gVar size)) ctrs))
+                 (set_suchThat "x" full_dt (fun x -> gle (gApp (gInject "sizeOf") [gVar x]) (gSucc (gVar size))))
+         ) in
+
+  (size_eq, size_zero, size_succ)
+         
 let deriveSizeEqs c s = 
   let dt = match coerce_reference_to_dt_rep c with
     | Some dt -> dt
     | None -> failwith "Not supported type"  in
-  let c = sizeEqType dt in
-  ignore(defineConstant s c)
+  let (eq, zero, succ) = sizeEqType dt in
+  ignore (defineConstant (s ^ "_eqT") eq);
+  ignore (defineConstant (s ^ "_zeroT") zero);
+  ignore (defineConstant (s ^ "_succT") succ)
 
 VERNAC COMMAND EXTEND DeriveShow
   | ["DeriveShow" constr(c) "as" string(s)] -> [derive Show c s ""]

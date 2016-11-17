@@ -16,7 +16,9 @@ open Constrexpr_ops
 open Context
 
 type coq_expr
-                 
+
+val hole : coq_expr
+       
 type var 
 
 val gVar : var -> coq_expr
@@ -100,7 +102,8 @@ val str_appends : coq_expr list -> coq_expr
 val gPair : coq_expr * coq_expr -> coq_expr 
 
 (* Int *)
-val gInt : int -> coq_expr 
+val gInt : int -> coq_expr
+val gSucc : coq_expr -> coq_expr
 val maximum : coq_expr list -> coq_expr
 val glt : coq_expr -> coq_expr -> coq_expr
 val gle : coq_expr -> coq_expr -> coq_expr

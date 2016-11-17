@@ -37,12 +37,10 @@ Print arbFooSized.
 DeriveSize Foo as "sizeFoo".
 Print sizeFoo.
 
-DeriveSizeEqs Foo as "sizedFoo_eq_type".
-Print sizedFoo_eq_type.
-
+DeriveSizeEqs Foo as "sizedFoo".
 (* Zoe : Probably a good idea to generate size equations automatically. *)
 (* Leo : One size equation generated :) *)
-Lemma sizedFoo_eq s : sizedFoo_eq_type s.
+Lemma sizedFoo_eq s : sizedFoo_eqT s.
 (*  [set Foo1] :|:
   (\bigcup_(f in fun f => sizeOf f < s) ([set Foo2 f]) :|:
     \bigcup_n ( 
@@ -68,21 +66,24 @@ Proof.
       move : H => /leP/NPeano.Nat.le_succ_l/NPeano.Nat.max_lub_lt_iff H; ssromega.
 Qed.
 
-Lemma sizedFoo_zero :
-  [set Foo1] <--> [set foo : Foo | sizeOf foo <= 0 ].
+Lemma sizedFoo_zero : sizedFoo_zeroT.
+(*   [set Foo1] <--> [set foo : Foo | sizeOf foo <= 0 ].*)
 Proof.
   move => [ | f | n f1 f2]; split; simpl; move => H; by firstorder.
 Qed.
 
-Lemma sizedFoo_succ s :
-  [set Foo1] :|:
+Lemma sizedFoo_succ s : sizedFoo_succT s.
+(*   [set Foo1] :|:
   (\bigcup_(f in fun f => sizeOf f <= s) ([set Foo2 f]) :|:
     \bigcup_n ( 
       \bigcup_(f1 in fun f => sizeOf f <= s) (
          \bigcup_(f2 in fun f => sizeOf f <= s) (
             [set Foo3 n f1 f2]))))  <-->
   [set foo : Foo | sizeOf foo <= s.+1 ].
+*)
 Proof.
+  unfold sizedFoo_succT.
+  
   setoid_rewrite <- sizedFoo_eq at 4. reflexivity.
 Qed.
 

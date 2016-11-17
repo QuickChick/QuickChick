@@ -314,6 +314,7 @@ let gPair (c1, c2) = gApp (gInject "pair") [c1;c2]
 
 (* Int *)
 let gInt n = CPrim (dummy_loc, Numeral (Bigint.of_int n))
+let gSucc x = gApp (gInject "S") [x]
 let rec maximum = function
   | [] -> failwith "maximum called with empty list"
   | [c] -> c
