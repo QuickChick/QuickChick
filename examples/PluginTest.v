@@ -41,72 +41,139 @@ Print sizeFoo.
 Lemma max_lub_l_ssr n m p:
   max n m < p -> n < p.
 Proof.
-  intros. move /ltP/NPeano.Nat.max_lub_lt_iff :H => [/ltP H1 _].
+  move /ltP/NPeano.Nat.max_lub_lt_iff => [/ltP H1 _].
   assumption.
 Qed.
 
 Lemma max_lub_r_ssr n m p:
   max n m < p -> m < p.
 Proof.
-  intros. move /ltP/NPeano.Nat.max_lub_lt_iff :H => [_ /ltP H1].
+  move /ltP/NPeano.Nat.max_lub_lt_iff => [_ /ltP H1].
   assumption.
 Qed.
 
+Lemma max_lub_ssr n m p :
+  n < p -> m < p -> max n m < p.
+Proof.
+  move => /ltP H1 /ltP H2.
+  apply/ltP/NPeano.Nat.max_lub_lt; eassumption.
+Qed.
+
 DeriveSizeEqs Foo as "sizedFoo".
+
 (* Zoe : Probably a good idea to generate size equations automatically. *)
 (* Leo : One size equation generated :) *)
 Lemma sizedFoo_eq s : sizedFoo_eqT s.
-(*  [set Foo1] :|:
-  (\bigcup_(f in fun f => sizeOf f < s) ([set Foo2 f]) :|:
-    \bigcup_n ( 
-      \bigcup_(f1 in fun f => sizeOf f < s) (
-         \bigcup_(f2 in fun f => sizeOf f < s) (
-            [set Foo3 n f1 f2]))))  <-->
-  [set foo : Foo | sizeOf foo <= s ].*)
 Proof.
-  refine (Foo_rect _ (conj (fun _ => leq0n s) (fun _ => or_introl (Logic.eq_refl Foo1)))
-                   (fun f Hf => conj (fun Hu => _)
-                                  (fun Hleq => or_intror (or_introl
-                                                         (ex_intro _
-                                                                   f (conj Hleq (erefl (Foo2 f)))))))
-                   (fun n f1 Hf1 f2 Hf2 => conj (fun Hu => _) (fun Hleq => or_intror (or_intror _)))).
-  - refine (match Hu with
-              | or_introl Hc =>
-                match Hc in (_ = f') return
-                      match f' with
-                        | Foo1 => True
-                        | Foo2 f1 => sizeOf (Foo2 f1) <= s
-                        | Foo3 _ _ _ => True
-                      end
-                with
-                  | erefl => I
-                end
-              | or_intror Hu' => 
-                match Hu' with
-                  | or_introl H =>
-                    match H with
-                      | ex_intro x (conj H1 H2) =>
-                        match H2 with
-                          | erefl => H1
-                        end
-                    end
-                  | or_intror Hc =>
-                    match Hc with
-                      | ex_intro n (conj H1 (ex_intro f1 (conj H2 (ex_intro f2 (conj H3 H4))))) =>
-                        match H4 in (_ = f') return
-                              match f' with
-                                | Foo1 => True
-                                | Foo2 f1 => sizeOf (Foo2 f1) <= s
-                                | Foo3 _ _ _ => True
-                              end
-                        with
-                          | erefl => I
-                        end
-                    end
-                end
-            end).
-  - admit. 
-Admitted.
+  exact (Foo_rect _ (conj (fun _ => leq0n s) (fun _ => or_introl (Logic.eq_refl Foo1)))
+                  (fun f Hf => conj (fun (Hu : [set Foo1] (Foo2 f) \/
+                                          (\bigcup_(f0 in (fun f0 : Foo => sizeOf f0 < s)) [set Foo2 f0])
+                                            (Foo2 f) \/
+                                          (\bigcup_(f0 in (fun _ : nat => true))
+                                            \bigcup_(f1 in (fun f1 : Foo => sizeOf f1 < s))
+                                            \bigcup_(f2 in (fun f2 : Foo => sizeOf f2 < s))
+                                            [set Foo3 f0 f1 f2]) (Foo2 f))  => (* doesn't work without the annotation :/ *)
+                                    match Hu with
+                                      | or_introl Hc =>
+                                        match Hc in (_ = f') return
+                                              match f' with
+                                                | Foo1 => True
+                                                | Foo2 f1 => sizeOf (Foo2 f1) <= s
+                                                | Foo3 _ _ _ => True
+                                              end
+                                        with
+                                          | erefl => I
+                                        end
+                                      | or_intror Hu' => 
+                                        match Hu' with
+                                          | or_introl H =>
+                                            match H with
+                                              | ex_intro x (conj H1 H2) =>
+                                                match H2 in (_ = f') return
+                                                      match f' with
+                                                        | Foo1 => True
+                                                        | Foo2 f1 => sizeOf (Foo2 f1) <= s
+                                                        | Foo3 _ _ _ => True
+                                                      end
+                                                with
+                                                  | erefl => H1
+                                                end
+                                            end
+                                          | or_intror Hc =>
+                                            match Hc with
+                                              | ex_intro n (conj H1 (ex_intro f1 (conj H2 (ex_intro f2 (conj H3 H4))))) =>
+                                                match H4 in (_ = f') return
+                                                      match f' with
+                                                        | Foo1 => True
+                                                        | Foo2 f1 => sizeOf (Foo2 f1) <= s
+                                                        | Foo3 _ _ _ => True
+                                                      end
+                                                with
+                                                  | erefl => I
+                                                end
+                                            end
+                                        end
+                                    end)
+                                 (fun Hleq => or_intror (or_introl
+                                                        (ex_intro _
+                                                                  f (conj Hleq (erefl (Foo2 f)))))))
+                  (fun n f1 Hf1 f2 Hf2 => conj (fun (Hu : (Foo1
+                                                        |: (\bigcup_(f0 in (fun f0 : Foo => sizeOf f0 < s)) [set Foo2 f0]
+                                                             :|: \bigcup_(f0 in (fun _ : nat => true))
+                                                             \bigcup_(f1 in (fun f1 : Foo => sizeOf f1 < s))
+                                                             \bigcup_(f2 in (fun f2 : Foo => sizeOf f2 < s))
+                                                             [set Foo3 f0 f1 f2])) (Foo3 n f1 f2)) => (* doesn't work without the annotation :/ *)
+                                               match Hu with
+                                                 | or_introl Hc =>
+                                                   match Hc in (_ = f') return
+                                                         match f' with
+                                                           | Foo1 => True
+                                                           | Foo2 f1 => True
+                                                           | Foo3 _ _ _ => sizeOf (Foo3 n f1 f2) <= s
+                                                         end
+                                                   with
+                                                     | erefl => I
+                                                   end
+                                                 | or_intror Hu' => 
+                                                   match Hu' with
+                                                     | or_introl H =>
+                                                       match H with
+                                                         | ex_intro x (conj H1 H2) =>
+                                                           match H2 in (_ = f') return
+                                                                 match f' with
+                                                                   | Foo1 => True
+                                                                   | Foo2 f1 => True
+                                                                   | Foo3 _ _ _ => sizeOf (Foo3 n f1 f2) <= s
+                                                                 end
+                                                           with
+                                                             | erefl => I
+                                                           end
+                                                       end
+                                                     | or_intror Hu =>
+                                                       match Hu with
+                                                         | ex_intro n (conj H1 (ex_intro f1 (conj H2 (ex_intro f2 (conj H3 H4))))) =>
+                                                           match H4 in (_ = f') return
+                                                                 match f' with
+                                                                   | Foo1 => True
+                                                                   | Foo2 f1 => True
+                                                                   | Foo3 n' f1' f2' => sizeOf (Foo3 n' f1' f2') <= s
+                                                                 end
+                                                           with
+                                                             | erefl =>  max_lub_ssr _ _ _ H2 H3
+                                                           end
+                                                       end
+                                                   end
+                                               end
+                                            )
+                                            (fun Hleq => or_intror (or_intror
+                                                                   (ex_intro _ n
+                                                                             (conj isT
+                                                                                   (ex_intro _ f1
+                                                                                             (conj (max_lub_l_ssr _ _ _ Hleq)
+                                                                                                   (ex_intro _ f2
+                                                                                                             (conj (max_lub_r_ssr _ _ _ Hleq)
+                                                                                                                   erefl)))))))))).
+Qed.
 
 Lemma sizedFoo_zero : sizedFoo_zeroT.
 (*   [set Foo1] <--> [set foo : Foo | sizeOf foo <= 0 ].*)
