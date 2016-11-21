@@ -288,6 +288,9 @@ let gMatch discr (branches : (constructor * string list * (var list -> coq_expr)
 let gRecord names_and_bodies =
   CRecord (dummy_loc, None, List.map (fun (n,b) -> (Ident (dummy_loc, id_of_string n), b)) names_and_bodies)
 
+let gAnnot (p : coq_expr) (tau : coq_expr) =
+  CCast (dummy_loc, p, CastConv tau)
+
 (* Generic List Manipulations *)
 let list_nil = gInject "nil"
 let lst_append c1 c2 = gApp (gInject "app") [c1; c2]

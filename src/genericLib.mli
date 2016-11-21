@@ -85,6 +85,8 @@ val gMatch : coq_expr -> ((constructor * string list * (var list -> coq_expr)) l
 
 val gRecord : (string * coq_expr) list -> coq_expr 
 
+val gAnnot : coq_expr -> coq_expr -> coq_expr
+
 (* Generic List Manipulations *)
 val list_nil : coq_expr
 val lst_append : coq_expr -> coq_expr -> coq_expr
