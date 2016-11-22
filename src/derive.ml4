@@ -293,10 +293,14 @@ let gI = gInject "I"
 
 let gIsT = gInject "isT"
 
+let gIff p1 p2 =
+  gApp (gInject "iff") [p1; p2]
+
 let gIsTrueTrue =
   gApp (gInject "is_true") [gInject "true"]
 
-let deriveEqProof (ty_ctr, ty_params, ctrs) (lhs : var -> coq_expr) (rhs : var -> coq_expr) =
+let deriveEqProof (ty_ctr, ty_params, ctrs) (lhs : var -> coq_expr)
+    (rhs : var -> coq_expr) (ind_scheme : coq_expr) =
   (* copy paste from above -- refactor! *)
   let coqTyCtr = gTyCtr ty_ctr in
   let coqTyParams = List.map gTyParam ty_params in
@@ -338,42 +342,172 @@ let deriveEqProof (ty_ctr, ty_params, ctrs) (lhs : var -> coq_expr) (rhs : var -
     let args = gen_args ty 0 in
     let lhs_type l = gApp (lhs size) [gApp_empty ctr (List.map gVar l)] in
     let rhs_type l = gApp (rhs size) [gApp_empty ctr (List.map gVar l)] in
-    gConjIntro
-      (gFun args
-         (fun l -> gFunTyped [("z", lhs_type l)]
-                             (fun [x1] -> gAnnot (c_left (l @ [x1])) (rhs_type l))))
-      (gFun args
-         (fun l -> gFunTyped [("z", rhs_type l)]
-                             (fun [x1] -> gAnnot (inj (fst (c_right ty l l [] 0))) (lhs_type l))))
+    (gFun args
+       (fun l ->
+          gConjIntro
+            (gFunTyped [("z", lhs_type l)]
+               (fun [x1] -> gAnnot (c_left (l @ [x1])) (rhs_type l)))
+            (gFunTyped [("z", rhs_type l)]
+               (fun [x1] -> gAnnot (inj (fst (c_right ty l l [] 0))) (lhs_type l)))))
   in
-  let rec deriveCases (inj : coq_expr -> coq_expr) : ctr_rep list -> coq_expr list = function
+  let deriveIndCase inj (ctr, ty) (size : var) =
+    let c_left h_un =
+      let discriminate (h : var) : coq_expr =
+        (* non-dependent pattern matching here, Coq should be able to infer
+           the return type. TODO : change it to dep. pattern matching *)
+        gMatch (gVar h) [(injectCtr "erefl", [], fun [] -> gI)]
+      in
+      let rec proof (h : var) ty leq flag n : coq_expr =
+        match ty with
+        | Arrow (ty1, ty2) ->
+          let w' = Printf.sprintf "w%d" n in
+          let hw' = Printf.sprintf "Hw%d" n in
+          let hc1 = Printf.sprintf "Hc1_%d" n in
+          let hc2 = Printf.sprintf "Hc2_%d" n in
+          gMatch (gVar h)
+            [(injectCtr "ex_intro", [w'; hw'],
+              fun [w'; hw'] ->
+                gMatch (gVar hw')
+                  [(injectCtr "conj", [hc1; hc2],
+                    fun [hc1; hc2] ->
+                      let leq' =
+                        if isCurrentTyCtr ty1 then
+                          (gVar hc1) :: leq
+                        else leq
+                      in
+                      proof hc2 ty2 leq' flag (n+1) 
+                   )]
+             )]
+        | _ ->
+          if flag then 
+            let rec leq_proof = function
+              | [h] -> h
+              | h :: hs ->
+                gApp (gInject "max_lub_ssr") [hole; hole; hole; h; leq_proof hs]
+            in
+            gMatch (gVar h) [(injectCtr "erefl", [], fun [] -> leq_proof (List.rev leq))]
+          else discriminate h
+      in
+      let rec elim_union (ctrs : ctr_rep list) (h : var) n : coq_expr =
+        match ctrs with
+        (* type with no constructors, isomorphic to False *)
+        | [] -> gMatch (gVar h) []
+        (* Last contructor, no further case analysis *)
+        | [(ctr', ty)] ->  proof h ty [] (ctr = ctr') 0
+        | (ctr', ty) :: ctrs' ->
+          let h' = Printf.sprintf "H%d" n in
+          gMatch (gVar h)
+            [(injectCtr "or_introl", [h'],
+              fun [h'] -> proof h' ty [] (ctr = ctr') 0);
+             (injectCtr "or_intror", [h'],
+              fun [h'] -> elim_union ctrs' h' (n+1))
+            ]
+      in elim_union ctrs h_un 0
+    in
+    let rec c_right cty (args : var list) (fargs : var list) (cargs : var list)
+        (leq : coq_expr) (n : int)
+      : coq_expr * (var list -> coq_expr) =
+      match cty with
+      | Arrow (ty1, TyCtr _) | Arrow (ty1, TyParam _) ->
+        (match args with
+         | [arg] ->
+           let x = Printf.sprintf "y%d" n in
+           let hw =
+             if isCurrentTyCtr ty1
+             then leq
+             else gIsT
+           in
+           let (term, typ) =
+             (gEqRefl (gApp (gCtr ctr) (List.map gVar fargs)),
+              fun l -> gEqType (gApp (gCtr ctr) (List.rev (List.map gVar l)))
+                  (gApp (gCtr ctr) (List.map gVar fargs)))
+           in
+           let typ' = fun i -> gConj hole (typ (i :: cargs)) in
+           (gExIntro_impl (gVar arg) (gConjIntro hw term),
+            fun l -> gEx x (fun i -> gConj hole (typ (i :: l)))))
+      | Arrow (ty1, ty2) ->
+        (match args with
+         | [] -> failwith "Internal: Wrong number of arguments"
+         | arg :: args ->
+           let x = Printf.sprintf "y%d" n in
+           let (hw, leq') =
+             if isCurrentTyCtr ty1
+             then (gApp (gInject "max_lub_l_ssr") [hole; hole; hole; leq],
+                   gApp (gInject "max_lub_r_ssr") [hole; hole; hole; leq])
+             else (gIsT, leq)
+           in
+           let (term, typ) = c_right ty2 args fargs (arg :: cargs) leq' (n+1) in
+           let typ' = fun i -> gConj hole (typ (i :: cargs)) in
+           (gExIntro_impl (gVar arg) (gConjIntro hw term),
+            fun l -> gEx x (fun i -> gConj hole (typ (i :: l)))))
+    in
+    let rec gen_args cty n =
+      match cty with
+      | Arrow (ty1, ty2) ->
+        if isCurrentTyCtr ty1
+        then
+          let x  = Printf.sprintf "x%d" n in
+          let ih = Printf.sprintf "IHx%d" n in
+          x :: ih :: (gen_args ty2 (n+1))
+        else
+          let x  = Printf.sprintf "x%d" n in
+          x :: (gen_args ty2 (n+1))
+      | _ -> []
+    in
+    let rec disposeIH cty l =
+      match cty with
+      | Arrow (ty1, ty2) ->
+        (if isCurrentTyCtr ty1
+         then
+           match l with
+           | x :: ihx :: l -> x :: (disposeIH ty2 l)
+           | _ -> failwith "Internal: Wrong number of arguments" 
+         else
+           match l with
+           | x :: l -> x :: (disposeIH ty2 l)
+           | _ -> failwith "Internal: Wrong number of arguments")
+      | _ -> []
+    in
+    let args = gen_args ty 0 in
+    let lhs_type l = gApp (lhs size) [gApp (gCtr ctr) (List.map gVar l)] in
+    let rhs_type l = gApp (rhs size) [gApp (gCtr ctr) (List.map gVar l)] in
+    (gFun args
+       (fun l ->
+          let l' = disposeIH ty l in
+          gConjIntro
+            (gFunTyped [("Hun", lhs_type l')]
+               (fun [x1] -> gAnnot (c_left x1) (rhs_type l')))
+            (gFunTyped [("Hleq", rhs_type l')]
+               (fun [x1] -> gAnnot (inj (fst (c_right ty l' l' [] (gVar x1) 0))) (lhs_type l')))))
+  in
+  let rec deriveCases (inj : coq_expr -> coq_expr) size : ctr_rep list -> coq_expr list = function
     (* consider last constructor separately so we do not generate left injection *)
     | [(ctr, ty)] ->
-      [if isBaseBranch ty then
-          gFun ["size"]
-            (fun [size] -> deriveBaseCase inj (gCtr ctr, ty) size)
-       else (gInt 1)]
+      [if isBaseBranch ty then deriveBaseCase inj (gCtr ctr, ty) size
+       else deriveIndCase inj (ctr, ty) size]
     | (ctr, ty) :: ctrs ->
       let inj_l (e : coq_expr) : coq_expr = inj (gOrIntroL e) in
       let inj_r (e : coq_expr) : coq_expr = inj (gOrIntroR e) in
-      (if isBaseBranch ty then
-         gFun ["size"]
-           (fun [size] -> deriveBaseCase inj_l (gCtr ctr, ty) size)
-       else (gInt 1)) :: (deriveCases inj_r ctrs)
+      (if isBaseBranch ty then deriveBaseCase inj_l (gCtr ctr, ty) size
+       else  deriveIndCase inj_l (ctr, ty) size) :: (deriveCases inj_r size ctrs)
   in
-  deriveCases (fun x -> x) ctrs
+  let expr_lst size = deriveCases (fun x -> x) size ctrs in
+  let typ size =
+    gFun ["f"] (fun [f] -> gIff (gApp (lhs size) [gVar f]) (gApp (rhs size) [gVar f]))
+  in
+  gFun ["size"]
+    (fun [size] -> gApp ind_scheme (typ size :: expr_lst size))
 
 let deriveSizeEqsProof c s =
   let dt = match coerce_reference_to_dt_rep c with
     | Some dt -> dt
     | None -> failwith "Not supported type"  in
   let (_, _, _, lhs, rhs) = sizeEqType dt in
-  (* smarter way to find the induction schemes for the inductive types *)
-  (* let ind = s ^ "_rect" in *)
-  let eqs = deriveEqProof dt lhs rhs in
-  List.iteri
-    (fun n e ->
-       ignore (defineConstant (s ^ "_eq_proof" ^ (string_of_int n)) e)) eqs
+  (* smarter way to find the induction schemes for the inductive types? *)
+  let (ty_ctr, _, _) = dt in
+  let ind = gInject ((ty_ctr_to_string ty_ctr) ^ "_rect") in
+  let eqproof = deriveEqProof dt lhs rhs ind in
+  ignore (defineConstant (s ^ "_eq_proof") eqproof)
 
 VERNAC COMMAND EXTEND DeriveShow
   | ["DeriveShow" constr(c) "as" string(s)] -> [derive Show c s ""]
