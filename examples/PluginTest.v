@@ -64,18 +64,9 @@ Qed.
 
 DeriveSizeEqsProof Foo as "sizedFoo".
 
-
-(* This breaks CanonicalSize *)
-Inductive test' (m : nat) : Type :=
-| A : test' m
-| B : test' m -> test' m.
-(* | C : test -> test *)
-
-(* DeriveSize test' as "sizeTest". *)
-
 Inductive test : Type :=
 | C : nat -> bool -> test
-| D : test -> test.
+| D : test -> nat -> test -> bool -> test -> unit -> test.
 (* | C : test -> test *)
 
 DeriveSize test as "sizeTest".
@@ -84,7 +75,19 @@ DeriveSizeEqs test as "sizedTest".
 Print sizedTest_eqT.
 DeriveSizeEqsProof test as "sizedTest".
 
- 
+DeriveSize list as "sizeList".
+(* This is broken *)
+(* DeriveSizeEqs list as "sizeList". *)
+DeriveSizeEqsProof list as "sizedList".
+
+Inductive list' (a : Type) : Type :=
+| Nil : list' a
+| Cons1 : a -> list' nat -> list' a.
+
+(* This breaks CanonicalSize (and also size equation proofs) :
+DeriveSize list' as "sizeList". *)
+
+
 (* Zoe : Probably a good idea to generate size equations automatically. *)
 (* Leo : One size equation generated :) *)
 Lemma sizedFoo_eq s : sizedFoo_eqT s.

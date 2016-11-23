@@ -234,7 +234,9 @@ let sizeEqType (ty_ctr, ty_params, ctrs) =
            (set_suchThat "x" full_dt (fun x -> gle (gApp (gInject "sizeOf") [gVar x]) (gInt 0))) in
   let lhs size = set_unions (List.map (create_branch glt (gVar size)) ctrs) in
   let rhs size = set_suchThat "x" full_dt (fun x -> gle (gApp (gInject "sizeOf") [gVar x]) (gVar size)) in
-  let size_eq = 
+
+  (* TODO : Should abstract over the type parameters *)
+  let size_eq =
     gFun ["size"]
          (fun [size] -> set_eq (lhs size) (rhs size)) in
   
@@ -256,10 +258,6 @@ let deriveSizeEqs c s =
   ignore (defineConstant (s ^ "_zeroT") zero);
   ignore (defineConstant (s ^ "_succT") succ)
 
-
-(* Application hat handles empty arguments list. Is this needed?? *)
-let gApp_empty ?explicit:(expl=false) c cs =
-  gApp ~explicit:expl c cs
 
 let gExIntro_impl (witness : coq_expr) (proof : coq_expr) : coq_expr =
   gApp (gInject "ex_intro") [hole; witness; proof]
@@ -302,10 +300,6 @@ let gIsTrueTrue =
 let deriveEqProof (ty_ctr, ty_params, ctrs) (lhs : var -> coq_expr)
     (rhs : var -> coq_expr) (ind_scheme : coq_expr) =
   (* copy paste from above -- refactor! *)
-  let coqTyCtr = gTyCtr ty_ctr in
-  let coqTyParams = List.map gTyParam ty_params in
-  let full_dt = gApp coqTyCtr coqTyParams in
-
   let isCurrentTyCtr = function
     | TyCtr (ty_ctr', _) -> ty_ctr = ty_ctr'
     | _ -> false in
@@ -313,7 +307,7 @@ let deriveEqProof (ty_ctr, ty_params, ctrs) (lhs : var -> coq_expr)
   let isBaseBranch ty = fold_ty' (fun b ty' -> b && not (isCurrentTyCtr ty')) true ty in
   (* copy paste ends *)
 
-  let deriveBaseCase inj (ctr, ty) (size : var) =
+  let deriveBaseCase inj (ctr, ty) (size : var) (params : coq_expr list) =
     let c_left = fun l -> gApp (gInject "leq0n") [gVar size] in
     let rec c_right cty (args : var list) (fargs : var list) (cargs : var list) (n : int)
       : coq_expr * (var list -> coq_expr) =
@@ -328,9 +322,9 @@ let deriveEqProof (ty_ctr, ty_params, ctrs) (lhs : var -> coq_expr)
            (gExIntro_impl (gVar arg) (gConjIntro gIsT term),
             fun l -> gEx x (fun i -> gConj gIsTrueTrue (typ (i :: l)))))
       | _ ->
-        (gEqRefl (gApp_empty ctr (List.map gVar fargs)),
-         fun l -> gEqType (gApp_empty ctr (List.rev (List.map gVar l)))
-             (gApp_empty ctr (List.map gVar fargs)))
+        (gEqRefl (gApp ctr (params @ (List.map gVar fargs))),
+         fun l -> gEqType (gApp ctr (params @ (List.rev (List.map gVar l))))
+             (gApp ctr (params @ (List.map gVar fargs))))
     in
     let rec gen_args cty n =
       match cty with
@@ -340,8 +334,8 @@ let deriveEqProof (ty_ctr, ty_params, ctrs) (lhs : var -> coq_expr)
       | _ -> []
     in
     let args = gen_args ty 0 in
-    let lhs_type l = gApp (lhs size) [gApp_empty ctr (List.map gVar l)] in
-    let rhs_type l = gApp (rhs size) [gApp_empty ctr (List.map gVar l)] in
+    let lhs_type l = gApp (lhs size) [gApp ctr (params @ (List.map gVar l))] in
+    let rhs_type l = gApp (rhs size) [gApp ctr (params @ (List.map gVar l))] in
     (gFun args
        (fun l ->
           gConjIntro
@@ -350,7 +344,7 @@ let deriveEqProof (ty_ctr, ty_params, ctrs) (lhs : var -> coq_expr)
             (gFunTyped [("z", rhs_type l)]
                (fun [x1] -> gAnnot (inj (fst (c_right ty l l [] 0))) (lhs_type l)))))
   in
-  let deriveIndCase inj (ctr, ty) (size : var) =
+  let deriveIndCase inj (ctr, ty) (size : var) (params : coq_expr list) =
     let c_left h_un =
       let discriminate (h : var) : coq_expr =
         (* non-dependent pattern matching here, Coq should be able to infer
@@ -404,42 +398,35 @@ let deriveEqProof (ty_ctr, ty_params, ctrs) (lhs : var -> coq_expr)
             ]
       in elim_union ctrs h_un 0
     in
-    let rec c_right cty (args : var list) (fargs : var list) (cargs : var list)
+    let rec c_right cty (args : var list) (fargs : var list) (cargs : var list) (iargs : var list)
         (leq : coq_expr) (n : int)
       : coq_expr * (var list -> coq_expr) =
       match cty with
-      | Arrow (ty1, TyCtr _) | Arrow (ty1, TyParam _) ->
-        (match args with
-         | [arg] ->
-           let x = Printf.sprintf "y%d" n in
-           let hw =
-             if isCurrentTyCtr ty1
-             then leq
-             else gIsT
-           in
-           let (term, typ) =
-             (gEqRefl (gApp (gCtr ctr) (List.map gVar fargs)),
-              fun l -> gEqType (gApp (gCtr ctr) (List.rev (List.map gVar l)))
-                  (gApp (gCtr ctr) (List.map gVar fargs)))
-           in
-           let typ' = fun i -> gConj hole (typ (i :: cargs)) in
-           (gExIntro_impl (gVar arg) (gConjIntro hw term),
-            fun l -> gEx x (fun i -> gConj hole (typ (i :: l)))))
       | Arrow (ty1, ty2) ->
         (match args with
          | [] -> failwith "Internal: Wrong number of arguments"
          | arg :: args ->
            let x = Printf.sprintf "y%d" n in
-           let (hw, leq') =
+           let (leq_l, leq_r, iargs') =
              if isCurrentTyCtr ty1
-             then (gApp (gInject "max_lub_l_ssr") [hole; hole; hole; leq],
-                   gApp (gInject "max_lub_r_ssr") [hole; hole; hole; leq])
-             else (gIsT, leq)
+             then
+               (match iargs with
+                | [arg] ->
+                  (leq, leq, [])
+                | arg :: args ->
+                  (gApp (gInject "max_lub_l_ssr") [hole; hole; hole; leq],
+                   gApp (gInject "max_lub_r_ssr") [hole; hole; hole; leq],
+                   args))
+             else (gIsT, leq, iargs)
            in
-           let (term, typ) = c_right ty2 args fargs (arg :: cargs) leq' (n+1) in
+           let (term, typ) = c_right ty2 args fargs (arg :: cargs) iargs' leq_r (n+1) in
            let typ' = fun i -> gConj hole (typ (i :: cargs)) in
-           (gExIntro_impl (gVar arg) (gConjIntro hw term),
+           (gExIntro_impl (gVar arg) (gConjIntro leq_l term),
             fun l -> gEx x (fun i -> gConj hole (typ (i :: l)))))
+      | _ ->
+        (gEqRefl (gApp (gCtr ctr) (params @ (List.map gVar fargs))),
+         fun l -> gEqType (gApp (gCtr ctr) (params @ (List.rev (List.map gVar l))))
+             (gApp (gCtr ctr) (params @ (List.map gVar fargs))))
     in
     let rec gen_args cty n =
       match cty with
@@ -460,43 +447,51 @@ let deriveEqProof (ty_ctr, ty_params, ctrs) (lhs : var -> coq_expr)
         (if isCurrentTyCtr ty1
          then
            match l with
-           | x :: ihx :: l -> x :: (disposeIH ty2 l)
+           | x :: ihx :: l ->
+             let (l', iargs) = disposeIH ty2 l in 
+             (x :: l', (x :: iargs))
            | _ -> failwith "Internal: Wrong number of arguments" 
          else
            match l with
-           | x :: l -> x :: (disposeIH ty2 l)
+           | x :: l ->
+             let (l', iargs) = disposeIH ty2 l in 
+             (x :: l', iargs)
            | _ -> failwith "Internal: Wrong number of arguments")
-      | _ -> []
+      | _ -> ([], [])
     in
     let args = gen_args ty 0 in
     let lhs_type l = gApp (lhs size) [gApp (gCtr ctr) (List.map gVar l)] in
     let rhs_type l = gApp (rhs size) [gApp (gCtr ctr) (List.map gVar l)] in
     (gFun args
        (fun l ->
-          let l' = disposeIH ty l in
+          let (l', iargs) = disposeIH ty l in
           gConjIntro
             (gFunTyped [("Hun", lhs_type l')]
                (fun [x1] -> gAnnot (c_left x1) (rhs_type l')))
             (gFunTyped [("Hleq", rhs_type l')]
-               (fun [x1] -> gAnnot (inj (fst (c_right ty l' l' [] (gVar x1) 0))) (lhs_type l')))))
+               (fun [x1] -> gAnnot (inj (fst (c_right ty l' l' [] iargs (gVar x1) 0))) (lhs_type l')))))
   in
-  let rec deriveCases (inj : coq_expr -> coq_expr) size : ctr_rep list -> coq_expr list = function
+  let rec deriveCases (inj : coq_expr -> coq_expr) size params : ctr_rep list -> coq_expr list = function
     (* consider last constructor separately so we do not generate left injection *)
     | [(ctr, ty)] ->
-      [if isBaseBranch ty then deriveBaseCase inj (gCtr ctr, ty) size
-       else deriveIndCase inj (ctr, ty) size]
+      [if isBaseBranch ty then deriveBaseCase inj (gCtr ctr, ty) size params
+       else deriveIndCase inj (ctr, ty) size params]
     | (ctr, ty) :: ctrs ->
       let inj_l (e : coq_expr) : coq_expr = inj (gOrIntroL e) in
       let inj_r (e : coq_expr) : coq_expr = inj (gOrIntroR e) in
-      (if isBaseBranch ty then deriveBaseCase inj_l (gCtr ctr, ty) size
-       else  deriveIndCase inj_l (ctr, ty) size) :: (deriveCases inj_r size ctrs)
+      (if isBaseBranch ty then deriveBaseCase inj_l (gCtr ctr, ty) size params
+       else  deriveIndCase inj_l (ctr, ty) size params) :: (deriveCases inj_r size params ctrs)
   in
-  let expr_lst size = deriveCases (fun x -> x) size ctrs in
+  let expr_lst size params = deriveCases (fun x -> x) size params ctrs in
   let typ size =
     gFun ["f"] (fun [f] -> gIff (gApp (lhs size) [gVar f]) (gApp (rhs size) [gVar f]))
   in
-  gFun ["size"]
-    (fun [size] -> gApp ind_scheme (typ size :: expr_lst size))
+  let rec gen_params params = List.mapi (fun i x -> Printf.sprintf "p%d" i) params in
+  gFun (gen_params ty_params)
+    (fun params ->
+       let params = List.map gVar params in
+       gFun ["size"]
+         (fun [size] -> gApp ind_scheme (params @ (typ size :: (expr_lst size params)))))
 
 let deriveSizeEqsProof c s =
   let dt = match coerce_reference_to_dt_rep c with
@@ -507,6 +502,7 @@ let deriveSizeEqsProof c s =
   let (ty_ctr, _, _) = dt in
   let ind = gInject ((ty_ctr_to_string ty_ctr) ^ "_rect") in
   let eqproof = deriveEqProof dt lhs rhs ind in
+  msgerr (str () ++ fnl ());
   ignore (defineConstant (s ^ "_eq_proof") eqproof)
 
 VERNAC COMMAND EXTEND DeriveShow
@@ -529,17 +525,6 @@ END;;
 VERNAC COMMAND EXTEND DeriveSizeEqsProof
   | ["DeriveSizeEqsProof" constr(c) "as" string(s)] -> [deriveSizeEqsProof c s]
     END;;
-
-(* let myTest () = *)
-(*   let term = *)
-(*     gAnnot (gExIntro (gInt 3) (gI)) *)
-(*       (gApp (gInject "ex") [gFun ["x"] (fun x -> gInject "True")]) in *)
-(*   ignore (defineConstant "mytest" term) *)
-
-(* VERNAC COMMAND EXTEND Extest *)
-(*   | ["Extest"] -> [myTest ()] *)
-(* END;; *)
-
 
 (* Advanced Generators *)
 
