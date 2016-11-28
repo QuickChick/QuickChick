@@ -502,7 +502,6 @@ let deriveSizeEqsProof c s =
   let (ty_ctr, _, _) = dt in
   let ind = gInject ((ty_ctr_to_string ty_ctr) ^ "_rect") in
   let eqproof = deriveEqProof dt lhs rhs ind in
-  msgerr (str () ++ fnl ());
   ignore (defineConstant (s ^ "_eq_proof") eqproof)
 
 VERNAC COMMAND EXTEND DeriveShow
