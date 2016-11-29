@@ -310,7 +310,7 @@ let gIff p1 p2 =
 let gIsTrueTrue =
   gApp (gInject "is_true") [gInject "true"]
 
-let deriveEqProof (ty_ctr, ty_params, ctrs) (lhs : var -> coq_expr)
+let deriveEqProof (ty_ctr, ty_params, ctrs) (lhs : var -> var list -> coq_expr)
     (rhs : var -> coq_expr) (ind_scheme : coq_expr) =
   (* copy paste from above -- refactor! *)
   let isCurrentTyCtr = function
@@ -320,7 +320,7 @@ let deriveEqProof (ty_ctr, ty_params, ctrs) (lhs : var -> coq_expr)
   let isBaseBranch ty = fold_ty' (fun b ty' -> b && not (isCurrentTyCtr ty')) true ty in
   (* copy paste ends *)
 
-  let deriveBaseCase inj (ctr, ty) (size : var) (params : coq_expr list) =
+  let deriveBaseCase inj (ctr, ty) (size : var) (params : var list) =
     let c_left = fun l -> gApp (gInject "leq0n") [gVar size] in
     let rec c_right cty (args : var list) (fargs : var list) (cargs : var list) (n : int)
       : coq_expr * (var list -> coq_expr) =
@@ -335,9 +335,9 @@ let deriveEqProof (ty_ctr, ty_params, ctrs) (lhs : var -> coq_expr)
            (gExIntro_impl (gVar arg) (gConjIntro gIsT term),
             fun l -> gEx x (fun i -> gConj gIsTrueTrue (typ (i :: l)))))
       | _ ->
-        (gEqRefl (gApp ctr (params @ (List.map gVar fargs))),
-         fun l -> gEqType (gApp ctr (params @ (List.rev (List.map gVar l))))
-             (gApp ctr (params @ (List.map gVar fargs))))
+        (gEqRefl (gApp ctr (List.map gVar (params @ fargs))),
+         fun l -> gEqType (gApp ctr ((List.map gVar params) @ (List.rev (List.map gVar l))))
+             (gApp ctr (List.map gVar (params @ fargs))))
     in
     let rec gen_args cty n =
       match cty with
@@ -347,8 +347,8 @@ let deriveEqProof (ty_ctr, ty_params, ctrs) (lhs : var -> coq_expr)
       | _ -> []
     in
     let args = gen_args ty 0 in
-    let lhs_type l = gApp (lhs size) [gApp ctr (params @ (List.map gVar l))] in
-    let rhs_type l = gApp (rhs size) [gApp ctr (params @ (List.map gVar l))] in
+    let lhs_type l = gApp (lhs size params) [gApp ctr ((List.map gVar params) @ (List.map gVar l))] in
+    let rhs_type l = gApp (rhs size) [gApp ctr ((List.map gVar params) @ (List.map gVar l))] in
     (gFun args
        (fun l ->
           gConjIntro
@@ -357,7 +357,7 @@ let deriveEqProof (ty_ctr, ty_params, ctrs) (lhs : var -> coq_expr)
             (gFunTyped [("z", rhs_type l)]
                (fun [x1] -> gAnnot (inj (fst (c_right ty l l [] 0))) (lhs_type l)))))
   in
-  let deriveIndCase inj (ctr, ty) (size : var) (params : coq_expr list) =
+  let deriveIndCase inj (ctr, ty) (size : var) (params : var list) =
     let c_left h_un =
       let discriminate (h : var) : coq_expr =
         (* non-dependent pattern matching here, Coq should be able to infer
@@ -437,9 +437,9 @@ let deriveEqProof (ty_ctr, ty_params, ctrs) (lhs : var -> coq_expr)
            (gExIntro_impl (gVar arg) (gConjIntro leq_l term),
             fun l -> gEx x (fun i -> gConj hole (typ (i :: l)))))
       | _ ->
-        (gEqRefl (gApp (gCtr ctr) (params @ (List.map gVar fargs))),
-         fun l -> gEqType (gApp (gCtr ctr) (params @ (List.rev (List.map gVar l))))
-             (gApp (gCtr ctr) (params @ (List.map gVar fargs))))
+        (gEqRefl (gApp (gCtr ctr) ((List.map gVar params) @ (List.map gVar fargs))),
+         fun l -> gEqType (gApp (gCtr ctr) ((List.map gVar params) @ (List.rev (List.map gVar l))))
+             (gApp (gCtr ctr) ((List.map gVar params) @ (List.map gVar fargs))))
     in
     let rec gen_args cty n =
       match cty with
@@ -473,7 +473,7 @@ let deriveEqProof (ty_ctr, ty_params, ctrs) (lhs : var -> coq_expr)
       | _ -> ([], [])
     in
     let args = gen_args ty 0 in
-    let lhs_type l = gApp (lhs size) [gApp (gCtr ctr) (List.map gVar l)] in
+    let lhs_type l = gApp (lhs size params) [gApp (gCtr ctr) (List.map gVar l)] in
     let rhs_type l = gApp (rhs size) [gApp (gCtr ctr) (List.map gVar l)] in
     (gFun args
        (fun l ->
@@ -496,28 +496,32 @@ let deriveEqProof (ty_ctr, ty_params, ctrs) (lhs : var -> coq_expr)
        else  deriveIndCase inj_l (ctr, ty) size params) :: (deriveCases inj_r size params ctrs)
   in
   let expr_lst size params = deriveCases (fun x -> x) size params ctrs in
-  let typ size =
-    gFun ["f"] (fun [f] -> gIff (gApp (lhs size) [gVar f]) (gApp (rhs size) [gVar f]))
+  let typ size params =
+    gFun ["f"] (fun [f] -> gIff (gApp (lhs size params) [gVar f]) (gApp (rhs size) [gVar f]))
   in
-  let rec gen_params params = List.mapi (fun i x -> Printf.sprintf "p%d" i) params in
-  gFun (gen_params ty_params)
-    (fun params ->
-       let params = List.map gVar params in
+
+  let coqTyParams = List.map gTyParam ty_params in
+  let tp_args =
+    List.concat (List.map (fun tp ->
+                           [ gArg ~assumName:tp ~assumImplicit:true ();
+                             gArg (* ~assumName:(gVar (make_up_name())) *)
+                                  ~assumType:(gApp (gInject "QuickChick.GenLow.GenLow.CanonicalSize") [tp]) ~assumGeneralized:true ()]
+                          ) coqTyParams) in
+  gFunWithArgs tp_args
+    (fun tps ->
        gFun ["size"]
-         (fun [size] -> gApp ind_scheme (params @ (typ size :: (expr_lst size params)))))
+         (fun [size] -> gApp ind_scheme ((List.map gVar tps) @ ((typ size tps) :: (expr_lst size tps)))))
 
 let deriveSizeEqsProof c s =
   let dt = match coerce_reference_to_dt_rep c with
     | Some dt -> dt
     | None -> failwith "Not supported type"  in
-  () (*
   let (_, _, _, lhs, rhs) = sizeEqType dt in
   (* smarter way to find the induction schemes for the inductive types? *)
   let (ty_ctr, _, _) = dt in
   let ind = gInject ((ty_ctr_to_string ty_ctr) ^ "_rect") in
   let eqproof = deriveEqProof dt lhs rhs ind in
   ignore (defineConstant (s ^ "_eq_proof") eqproof)
-      *)
 
 VERNAC COMMAND EXTEND DeriveShow
   | ["DeriveShow" constr(c) "as" string(s)] -> [derive Show c s ""]
