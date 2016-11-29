@@ -63,7 +63,7 @@ Proof.
 Qed.
 
 DeriveSizeEqsProof Foo as "sizedFoo".
-Check sizedFoo_eq_proof.
+(* Check sizedFoo_eq_proof. *)
 
 Inductive test : Type :=
 | C : nat -> bool -> test
@@ -73,12 +73,12 @@ Inductive test : Type :=
 DeriveSize test as "sizeTest".
 Print sizeTest. 
 DeriveSizeEqs test as "sizedTest".
-Print sizedTest_eqT.
+(* Print sizedTest_eqT.*)
 DeriveSizeEqsProof test as "sizedTest".
 
 DeriveSize list as "sizeList".
 (* This is broken *)
-(* DeriveSizeEqs list as "sizeList". *)
+DeriveSizeEqs list as "sizeList".
 DeriveSizeEqsProof list as "sizedList".
 
 Inductive list' (a : Type) : Type :=

@@ -218,7 +218,8 @@ let sizeEqType (ty_ctr, ty_params, ctrs) =
   let bases = List.filter (fun (_, ty) -> isBaseBranch ty) ctrs in
 
   (* Second reverse fold necessary *)
-  let create_branch ltf size (ctr,ty) =
+  let create_branch ltf size tps (ctr,ty) =
+    let non_class_tps = List.map gVar (list_drop_every 2 tps) in
     let rec aux i acc ty : coq_expr =
       match ty with
       | Arrow (ty1, ty2) ->
@@ -226,24 +227,37 @@ let sizeEqType (ty_ctr, ty_params, ctrs) =
          set_bigcup fi (if isCurrentTyCtr ty1 then gFun [fi] (fun [f] -> ltf (gApp (gInject "sizeOf") [gVar f]) size)
                         else gFun [fi] (fun _ -> gInject "true"))
                     (fun f -> aux (i+1) (f::acc) ty2)
-      | _ -> set_singleton (gApp ~explicit:true (gCtr ctr) (coqTyParams @ (List.map gVar (List.rev acc)))) in
+      | _ -> set_singleton (gApp ~explicit:true (gCtr ctr) (non_class_tps @ (List.map gVar (List.rev acc)))) in
     aux 0 [] ty in
 
+  let tp_args =
+    List.concat (List.map (fun tp ->
+                           [ gArg ~assumName:tp ~assumImplicit:true ();
+                             gArg (* ~assumName:(gVar (make_up_name())) *)
+                                  ~assumType:(gApp (gInject "QuickChick.GenLow.GenLow.CanonicalSize") [tp]) ~assumGeneralized:true ()]
+                          ) coqTyParams) in
+
   let size_zero =
-    set_eq (set_unions (List.map (create_branch glt hole) bases))
-           (set_suchThat "x" full_dt (fun x -> gle (gApp (gInject "sizeOf") [gVar x]) (gInt 0))) in
-  let lhs size = set_unions (List.map (create_branch glt (gVar size)) ctrs) in
+    match tp_args with
+    | [] -> set_eq (set_unions (List.map (create_branch glt hole []) bases))
+                   (set_suchThat "x" full_dt (fun x -> gle (gApp (gInject "sizeOf") [gVar x]) (gInt 0))) 
+    | _ -> 
+       gFunWithArgs tp_args
+                    (fun tps -> set_eq (set_unions (List.map (create_branch glt hole tps) bases))
+                                       (set_suchThat "x" full_dt (fun x -> gle (gApp (gInject "sizeOf") [gVar x]) (gInt 0))))
+  in
+
+  let lhs size tps = set_unions (List.map (create_branch glt (gVar size) tps) ctrs) in
   let rhs size = set_suchThat "x" full_dt (fun x -> gle (gApp (gInject "sizeOf") [gVar x]) (gVar size)) in
 
-  (* TODO : Should abstract over the type parameters *)
   let size_eq =
-    gFun ["size"]
-         (fun [size] -> set_eq (lhs size) (rhs size)) in
+    gFunWithArgs (gArg ~assumName:(gInject "size") () :: tp_args)
+                 (fun (size::tps) -> set_eq (lhs size tps) (rhs size)) in
   
   let size_succ =
-    gFun ["size"]
-         (fun [size] ->
-          set_eq (set_unions (List.map (create_branch gle (gVar size)) ctrs))
+    gFunWithArgs (gArg ~assumName:(gInject "size") () :: tp_args)
+         (fun (size::tps) ->
+          set_eq (set_unions (List.map (create_branch gle (gVar size) tps) ctrs))
                  (set_suchThat "x" full_dt (fun x -> gle (gApp (gInject "sizeOf") [gVar x]) (gSucc (gVar size))))
          ) in
 
@@ -254,10 +268,9 @@ let deriveSizeEqs c s =
     | Some dt -> dt
     | None -> failwith "Not supported type"  in
   let (eq, zero, succ, _, _) = sizeEqType dt in
-  ignore (defineConstant (s ^ "_eqT") eq);
+  ignore (defineConstant (s ^ "_eqT") eq); 
   ignore (defineConstant (s ^ "_zeroT") zero);
   ignore (defineConstant (s ^ "_succT") succ)
-
 
 let gExIntro_impl (witness : coq_expr) (proof : coq_expr) : coq_expr =
   gApp (gInject "ex_intro") [hole; witness; proof]
@@ -497,12 +510,14 @@ let deriveSizeEqsProof c s =
   let dt = match coerce_reference_to_dt_rep c with
     | Some dt -> dt
     | None -> failwith "Not supported type"  in
+  () (*
   let (_, _, _, lhs, rhs) = sizeEqType dt in
   (* smarter way to find the induction schemes for the inductive types? *)
   let (ty_ctr, _, _) = dt in
   let ind = gInject ((ty_ctr_to_string ty_ctr) ^ "_rect") in
   let eqproof = deriveEqProof dt lhs rhs ind in
   ignore (defineConstant (s ^ "_eq_proof") eqproof)
+      *)
 
 VERNAC COMMAND EXTEND DeriveShow
   | ["DeriveShow" constr(c) "as" string(s)] -> [derive Show c s ""]

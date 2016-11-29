@@ -235,6 +235,15 @@ let gApp ?explicit:(expl=false) c cs =
     | _ -> failwith "invalid argument to gApp"
   else mkAppC (c, cs)
 
+let gFunWithArgs args f_body =
+  let xvs = List.map (fun (LocalRawAssum ([_, n], _, _)) ->
+                      match n with
+                      | Name x -> x
+                      | _ -> make_up_name ()
+                     ) args in
+  let fun_body = f_body xvs in
+  mkCLambdaN dummy_loc args fun_body
+
 let gFun xss (f_body : var list -> coq_expr) =
   let xvs = List.map (fun x -> fresh_name x) xss in
   (* TODO: optional argument types for xss *)

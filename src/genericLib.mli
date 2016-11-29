@@ -77,6 +77,7 @@ val make_up_name : unit -> var
 val gApp : ?explicit:bool -> coq_expr -> coq_expr list -> coq_expr 
 val gFun : string list -> (var list -> coq_expr) -> coq_expr
 val gFunTyped : (string * coq_expr) list -> (var list -> coq_expr) -> coq_expr
+val gFunWithArgs : arg list -> ((var list) -> coq_expr) -> coq_expr
 
 val gRecFunInWithArgs : string -> arg list -> ((var * var list) -> coq_expr) -> (var -> coq_expr) -> coq_expr
 val gRecFunIn : string -> string list -> ((var * var list) -> coq_expr) -> (var -> coq_expr) -> coq_expr
