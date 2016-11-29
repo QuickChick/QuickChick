@@ -73,7 +73,7 @@ Inductive test : Type :=
 DeriveSize test as "sizeTest".
 Print sizeTest. 
 DeriveSizeEqs test as "sizedTest".
-(* Print sizedTest_eqT.*)
+Print sizedTest_eqT.
 DeriveSizeEqsProof test as "sizedTest".
 
 DeriveSize list as "sizeList".

@@ -321,6 +321,7 @@ let deriveEqProof (ty_ctr, ty_params, ctrs) (lhs : var -> var list -> coq_expr)
   (* copy paste ends *)
 
   let deriveBaseCase inj (ctr, ty) (size : var) (params : var list) =
+    let non_class_tps = List.map gVar (list_drop_every 2 params) in
     let c_left = fun l -> gApp (gInject "leq0n") [gVar size] in
     let rec c_right cty (args : var list) (fargs : var list) (cargs : var list) (n : int)
       : coq_expr * (var list -> coq_expr) =
@@ -335,9 +336,9 @@ let deriveEqProof (ty_ctr, ty_params, ctrs) (lhs : var -> var list -> coq_expr)
            (gExIntro_impl (gVar arg) (gConjIntro gIsT term),
             fun l -> gEx x (fun i -> gConj gIsTrueTrue (typ (i :: l)))))
       | _ ->
-        (gEqRefl (gApp ctr (List.map gVar (params @ fargs))),
-         fun l -> gEqType (gApp ctr ((List.map gVar params) @ (List.rev (List.map gVar l))))
-             (gApp ctr (List.map gVar (params @ fargs))))
+        (gEqRefl (gApp ctr (non_class_tps @ List.map gVar fargs)),
+         fun l -> gEqType (gApp ctr (non_class_tps @ (List.rev (List.map gVar l))))
+             (gApp ctr (non_class_tps @ List.map gVar fargs)))
     in
     let rec gen_args cty n =
       match cty with
@@ -347,8 +348,8 @@ let deriveEqProof (ty_ctr, ty_params, ctrs) (lhs : var -> var list -> coq_expr)
       | _ -> []
     in
     let args = gen_args ty 0 in
-    let lhs_type l = gApp (lhs size params) [gApp ctr ((List.map gVar params) @ (List.map gVar l))] in
-    let rhs_type l = gApp (rhs size) [gApp ctr ((List.map gVar params) @ (List.map gVar l))] in
+    let lhs_type l = gApp (lhs size params) [gApp ctr (non_class_tps @ (List.map gVar l))] in
+    let rhs_type l = gApp (rhs size) [gApp ctr (non_class_tps @ (List.map gVar l))] in
     (gFun args
        (fun l ->
           gConjIntro
@@ -358,6 +359,7 @@ let deriveEqProof (ty_ctr, ty_params, ctrs) (lhs : var -> var list -> coq_expr)
                (fun [x1] -> gAnnot (inj (fst (c_right ty l l [] 0))) (lhs_type l)))))
   in
   let deriveIndCase inj (ctr, ty) (size : var) (params : var list) =
+    let non_class_tps = List.map gVar (list_drop_every 2 params) in
     let c_left h_un =
       let discriminate (h : var) : coq_expr =
         (* non-dependent pattern matching here, Coq should be able to infer
@@ -437,9 +439,9 @@ let deriveEqProof (ty_ctr, ty_params, ctrs) (lhs : var -> var list -> coq_expr)
            (gExIntro_impl (gVar arg) (gConjIntro leq_l term),
             fun l -> gEx x (fun i -> gConj hole (typ (i :: l)))))
       | _ ->
-        (gEqRefl (gApp (gCtr ctr) ((List.map gVar params) @ (List.map gVar fargs))),
-         fun l -> gEqType (gApp (gCtr ctr) ((List.map gVar params) @ (List.rev (List.map gVar l))))
-             (gApp (gCtr ctr) ((List.map gVar params) @ (List.map gVar fargs))))
+        (gEqRefl (gApp (gCtr ctr) (non_class_tps @ (List.map gVar fargs))),
+         fun l -> gEqType (gApp (gCtr ctr) (non_class_tps @ (List.rev (List.map gVar l))))
+             (gApp (gCtr ctr) (non_class_tps @ (List.map gVar fargs))))
     in
     let rec gen_args cty n =
       match cty with
@@ -473,7 +475,7 @@ let deriveEqProof (ty_ctr, ty_params, ctrs) (lhs : var -> var list -> coq_expr)
       | _ -> ([], [])
     in
     let args = gen_args ty 0 in
-    let lhs_type l = gApp (lhs size params) [gApp (gCtr ctr) (List.map gVar l)] in
+    let lhs_type l = gApp (lhs size params) [gApp (gCtr ctr) (non_class_tps @ List.map gVar l)] in
     let rhs_type l = gApp (rhs size) [gApp (gCtr ctr) (List.map gVar l)] in
     (gFun args
        (fun l ->
@@ -509,8 +511,10 @@ let deriveEqProof (ty_ctr, ty_params, ctrs) (lhs : var -> var list -> coq_expr)
                           ) coqTyParams) in
   gFunWithArgs tp_args
     (fun tps ->
-       gFun ["size"]
-         (fun [size] -> gApp ind_scheme ((List.map gVar tps) @ ((typ size tps) :: (expr_lst size tps)))))
+     gFun ["size"]
+          (fun [size] ->
+               let non_class_tps = List.map gVar (list_drop_every 2 tps) in
+               gApp ind_scheme (non_class_tps @ ((typ size tps) :: (expr_lst size tps)))))
 
 let deriveSizeEqsProof c s =
   let dt = match coerce_reference_to_dt_rep c with
