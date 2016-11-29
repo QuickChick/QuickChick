@@ -63,6 +63,7 @@ Proof.
 Qed.
 
 DeriveSizeEqsProof Foo as "sizedFoo".
+Check sizedFoo_eq_proof.
 
 Inductive test : Type :=
 | C : nat -> bool -> test
