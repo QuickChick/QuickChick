@@ -77,9 +77,7 @@ Print sizedTest_eqT.
 DeriveSizeEqsProof test as "sizedTest".
 
 DeriveSize list as "sizeList".
-
 DeriveSizeEqs list as "sizeList".
-(* This is broken *)
 DeriveSizeEqsProof list as "sizedList".
 
 (* Same as list but the parameter is not implicit *)
@@ -89,13 +87,8 @@ Inductive list' (a : Type) : Type :=
 
 
 DeriveSize list' as "sizeList'".
-
 DeriveSizeEqs list' as "sizeList'".
-(* This is broken *)
 DeriveSizeEqsProof list' as "sizedList'".
-
-(* This breaks CanonicalSize (and also size equation proofs) :
-DeriveSize list' as "sizeList". *)
 
 
 (* Zoe : Probably a good idea to generate size equations automatically. *)
