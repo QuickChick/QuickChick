@@ -94,6 +94,7 @@ Theorem genTreeCorrect {A} `{_ : Arbitrary A} (size : nat) :
   semGen (@genTreeSized size A _) <--> [set tree | sizeOf tree <= size].
 *)
 
+Print CanonicalSize.
 DeriveSize Tree as "sizeTree".
 Print sizeTree.
 
@@ -104,7 +105,6 @@ Admitted.
 
 DeriveSizeEqs Tree as "sizeTree".
 Print sizeTree_eqT.
-
 
 Lemma max_lub_l_ssr n m p:
   max n m < p -> n < p.
