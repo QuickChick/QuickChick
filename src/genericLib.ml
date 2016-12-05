@@ -366,7 +366,7 @@ let fold_ty' arrow_f base ty =
 
 (* Generate Type Names *)
 let generate_names_from_type base_name ty =
-  snd (fold_ty' (fun (i, names) _ -> (i+1, (Printf.sprintf "%s%d" base_name i) :: names)) (0, []) ty)
+  List.rev (snd (fold_ty' (fun (i, names) _ -> (i+1, (Printf.sprintf "%s%d" base_name i) :: names)) (0, []) ty))
 
 (* a := var list -> var -> a *)
 let fold_ty_vars (f : var list -> var -> coq_type -> 'a) (mappend : 'a -> 'a -> 'a) (base : 'a) ty : var list -> 'a =
