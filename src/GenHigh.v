@@ -982,7 +982,7 @@ Lemma semFrequencySize {A} (l : list (nat * G A)) (def : G A) (size: nat) :
   semGenSize (frequency def l) size <-->
     let l' := [seq x <- l | x.1 != 0] in
     if l' is nil then semGenSize def size else
-    \bigcup_(x in l') semGenSize x.2 size.
+      \bigcup_(x in l') semGenSize x.2 size.
 Proof.
 rewrite semBindSize semChooseSize //=.
 case lsupp: {1}[seq x <- l | x.1 != 0] => [|[n g] gs].
@@ -998,11 +998,13 @@ have->: (fun a : nat => a <= sum_fst l - 1) <--> [set m | m < sum_fst l].
 exact: pick_imset.
 Qed.
 
+(* begin semFrequency *)
 Lemma semFrequency {A} (l : list (nat * G A)) (def : G A) :
   semGen (frequency def l) <-->
     let l' := [seq x <- l | x.1 != 0] in
     if l' is nil then semGen def else
-    \bigcup_(x in l') semGen x.2.
+      \bigcup_(x in l') semGen x.2.
+(* end semFrequency *)
 Proof.
 by case lsupp: {1}[seq x <- l | x.1 != 0] => [|[n g] gs] /=;
 rewrite 1?bigcupC; apply: eq_bigcupr => sz;

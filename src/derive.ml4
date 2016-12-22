@@ -41,6 +41,12 @@ let rec replace v x = function
   | y::ys -> if y = v then x::ys else y::(replace v x ys)
 
 (* Generic derivation function *)
+let debugDerive (c : constr_expr) =
+  match coerce_reference_to_dt_rep c with
+  | Some dt -> msgerr (str (dt_rep_to_string dt) ++ fnl ())
+  | None -> failwith "Not supported type"  
+
+(* Generic derivation function *)
 let derive (cn : derivable) (c : constr_expr) (instance_name : string) (extra_name : string) =
 
   let (ty_ctr, ty_params, ctrs) =
@@ -83,12 +89,12 @@ let derive (cn : derivable) (c : constr_expr) (instance_name : string) (extra_na
        (* Create the function body by recursing on the structure of x *)
        let show_body x =
 
-         let branch rec_name (ctr,ty) =
+         let branch aux (ctr,ty) =
 
            (ctr, generate_names_from_type "p" ty,
             fun vs -> str_append (gStr (constructor_to_string ctr ^ "  "))
                                  (fold_ty_vars (fun _ v ty' -> str_appends [ gStr "( "
-                                                                           ; gApp (if isCurrentTyCtr ty' then gVar rec_name else gInject "show") [gVar v]
+                                                                           ; gApp (if isCurrentTyCtr ty' then gVar aux else gInject "show") [gVar v]
                                                                            ; gStr " )"
                                                                            ])
                                                (fun s1 s2 -> str_appends [s1; gStr " "; s2]) emptyString ty vs))
@@ -177,9 +183,9 @@ let derive (cn : derivable) (c : constr_expr) (instance_name : string) (extra_na
             if isBaseBranch ty then fun _ -> gInt 0
             else fun vs ->
                  let opts = fold_ty_vars (fun _ v ty' ->
-                                          if isCurrentTyCtr ty' then [Some (gApp (gVar rec_name) [gVar v])]
-                                          else [None]) (fun l1 l2 -> l1 @ l2) [] ty vs in
-                 gApp (gInject "S") [maximum (cat_maybes opts)]) in
+                                          if isCurrentTyCtr ty' then [(gApp (gVar rec_name) [gVar v])]
+                                          else []) (fun l1 l2 -> l1 @ l2) [] ty vs in
+                 gApp (gInject "S") [maximum opts]) in
 
          gRecFunIn "aux_size" ["x'"]
                    (fun (aux_size, [x']) -> gMatch (gVar x') (List.map (create_branch aux_size) ctrs))
@@ -549,6 +555,9 @@ VERNAC COMMAND EXTEND DeriveSizeEqs
   | ["DeriveSizeEqs" constr(c) "as" string(s)] -> [deriveSizeEqs c s]
 END;;
 
+VERNAC COMMAND EXTEND DebugDerive
+  | ["DebugDerive" constr(c)] -> [debugDerive c]
+END;;
 
 VERNAC COMMAND EXTEND DeriveSizeEqsProof
   | ["DeriveSizeEqsProof" constr(c) "as" string(s)] -> [deriveSizeEqProof c s]
