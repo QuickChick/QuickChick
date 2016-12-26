@@ -8,7 +8,6 @@ Require Import List.
 Import ListNotations.
 Import QcDefaultNotation. Open Scope qc_scope.
 
-
 Set Bullet Behavior "Strict Subproofs".
 
 Definition backGen :=
@@ -38,8 +37,8 @@ DeriveSize Foo as "sizeFoo".
 Print sizeFoo.
 DeriveSizeEqs Foo as "sizedFoo".
 
-Check (fun (x : 2 = 3) => match x with Logic.eq_refl => I end).
 
+(* Lemmas useful for the proof terms. TODO: move them to the appropriate file *)
 
 Lemma max_lub_l_ssr n m p:
   max n m < p -> n < p.
@@ -62,12 +61,114 @@ Proof.
   apply/ltP/NPeano.Nat.max_lub_lt; eassumption.
 Qed.
 
+Set Implicit Arguments.
+Unset Strict Implicit.
+
+Lemma setU_set0_neut_eq {A} (s s1 : set A) :
+  s1 <--> set0 ->
+  s <--> s :|: s1.
+Proof.
+  firstorder.
+Qed.
+
+Lemma set_eq_symm {A} (s1 s2 : set A) :
+  s1 <--> s2 -> s2 <--> s1.
+Proof.
+  firstorder.
+Qed.
+
+Lemma set_eq_refl {A} (s : set A) :
+  s <--> s.
+Proof.
+  firstorder.
+Qed.
+
+Lemma bigcup_set0_r (T U : Type) (s : set T) (F : T -> set U) :
+  (forall x, F x <--> set0) ->
+  \bigcup_(x in s) F x <--> set0.
+Proof.
+  firstorder.
+Qed.
+
+Lemma bigcup_set0_l_eq (T U : Type) (s : set T) (F : T -> set U) :
+  s <--> set0 ->
+  \bigcup_(x in s) F x <--> set0.
+Proof.
+  firstorder.
+Qed.
+
+Lemma lt0_False :
+  forall n, ~ n < 0.
+Proof.
+  firstorder.
+Qed.
+
+Lemma leq_ltS n m :
+  n <= m -> n < m.+1.
+Proof.
+  eauto.
+Qed.
+
+Lemma ltS_leq n m :
+  n <= m -> n < m.+1.
+Proof.
+  eauto.
+Qed.
+
+Lemma setU_set0_l {A} (s1 s2 s3 : set A) :
+  s1 <--> set0 ->
+  s2 <--> s3 ->
+  (s1 :|: s2) <--> s3. 
+Proof.
+  firstorder.
+Qed.
+
+Lemma setU_set0_r {A} (s1 s2 s3 : set A) :
+  s1 <--> set0 ->
+  s3 <--> s2 ->
+  s3 <--> (s1 :|: s2). 
+Proof.
+  firstorder.
+Qed.
+
+Lemma eq_bigcup' :
+  forall (T U : Type) (A B : set T) (F G : T -> set U),
+    A <--> B ->
+    (forall x, F x <--> G x) ->
+    \bigcup_(x in A) F x <--> \bigcup_(x in B) G x.
+Proof.
+  intros.
+  eapply eq_bigcup; eauto.
+Qed.
+
 DeriveSizeEqsProof Foo as "sizedFoo".
+
+DeriveSize list as "sizeList".
+DeriveSizeEqs list as "sizeList".
+DeriveSizeEqsProof list as "sizedList".
+
+DeriveSizeEqsProof Foo as "sizedFoo".
+
+Lemma sizedFoo_succ s :
+  [set Foo1] :|:
+  (\bigcup_(f in fun f => sizeOf f <= s) ([set Foo2 f]) :|:
+    \bigcup_n ( 
+      \bigcup_(f1 in fun f => sizeOf f <= s) (
+         \bigcup_(f2 in fun f => sizeOf f <= s) (
+            [set Foo3 n f1 f2]))))  <-->
+  [set foo : Foo | sizeOf foo <= s.+1 ].
+Proof.
+  eapply sizedFoo_eq_proof_S.
+Qed.
+
 (* Check sizedFoo_eq_proof. *)
 
 Inductive test : Type :=
 | C : nat -> bool -> test
-| D : test -> nat -> test -> bool -> test -> unit -> test.
+| D' : test -> test -> bool -> test -> unit -> test
+| A : test
+| D : test -> nat -> test -> bool -> test -> unit -> test
+| A' : test.
 (* | C : test -> test *)
 
 DeriveSize test as "sizeTest".
@@ -76,48 +177,22 @@ DeriveSizeEqs test as "sizedTest".
 Print sizedTest_eqT.
 DeriveSizeEqsProof test as "sizedTest".
 
-DeriveSize list as "sizeList".
-DeriveSizeEqs list as "sizeList".
-DeriveSizeEqsProof list as "sizedList".
-
 (* Same as list but the parameter is not implicit *)
 Inductive list' (a : Type) : Type :=
 | Nil : list' a
 | Cons1 : a -> list' a -> list' a.
-
 
 DeriveSize list' as "sizeList'".
 DeriveSizeEqs list' as "sizeList'".
 DeriveSizeEqsProof list' as "sizedList'".
 
 
-(* Zoe : Probably a good idea to generate size equations automatically. *)
-(* Leo : One size equation generated :) *)
-Lemma sizedFoo_eq s : sizedFoo_eqT s.
+Lemma sizedFoo_zero :
+  [set Foo1] <--> [set foo : Foo | sizeOf foo <= 0 ].
 Proof.
-  exact (sizedFoo_eq_proof s).
-Qed.
-                                             
-Lemma sizedFoo_zero : sizedFoo_zeroT.
-(*   [set Foo1] <--> [set foo : Foo | sizeOf foo <= 0 ].*)
-Proof.
-  move => [ | f | n f1 f2]; split; simpl; move => H; by firstorder.
+  eapply sizedFoo_eq_proof_O.
 Qed.
 
-
-Lemma sizedFoo_succ s : sizedFoo_succT s.
-(*   [set Foo1] :|:
-  (\bigcup_(f in fun f => sizeOf f <= s) ([set Foo2 f]) :|:
-    \bigcup_n ( 
-      \bigcup_(f1 in fun f => sizeOf f <= s) (
-         \bigcup_(f2 in fun f => sizeOf f <= s) (
-            [set Foo3 n f1 f2]))))  <-->
-  [set foo : Foo | sizeOf foo <= s.+1 ].
-*)
-Proof.
-  unfold sizedFoo_succT. Set Printing All. 
-  eapply (sizedFoo_eq (s.+1)).
-Qed.
 
 Instance arbFooSizeMonotonic s : SizeMonotonic (arbFooSized s).
 Proof.
@@ -130,9 +205,9 @@ Theorem arbFooComplete size :
   semGen (arbFooSized size) <--> [set foo : Foo | sizeOf foo <= size].
 Proof.
   induction size; simpl.
-  - rewrite -sizedFoo_zero semReturn. reflexivity.
+  - rewrite -sizedFoo_eq_proof_O semReturn . reflexivity.
   - (* rewrite with the size lemmas *)
-    rewrite -sizedFoo_succ.
+    rewrite -sizedFoo_eq_proof_S.
     (* then rewrite with the semantics of the outermost combinators *)
     (* Frequency and some normalization of the sets *)
     rewrite semFrequency /=.
@@ -157,18 +232,60 @@ Proof.
       rewrite -> semReturn. reflexivity.
 Qed.
 
+Theorem arbFooComplete' size : 
+  semGen (arbFooSized size) <--> [set foo : Foo | sizeOf foo <= size].
+Proof.
+  induction size; simpl.
+  - refine (set_eq_trans (semReturn Foo1) sizedFoo_eq_proof_O). 
+  - (* rewrite with the size lemmas *)
+    refine (set_eq_trans _ (sizedFoo_eq_proof_S size)). 
+    (* Frequency and some normalization of the sets *)
+    refine (set_eq_trans (semFrequency _ _) _). simpl.
+    eapply set_eq_trans.
+    + refine (set_eq_trans (eq_bigcupl _ _ (set_eq_trans (cons_set_eq _ _)
+                                                         (setU_set_eq_compat (set_eq_refl [set (1, returnGen Foo1)])
+                                                                             (set_eq_trans (cons_set_eq _ _)
+                                                                                           (setU_set_eq_compat (set_eq_refl _)
+                                                                                                               (set_eq_trans
+                                                                                                                  (cons_set_eq _ [])
+                                                                                                                  (setU_set0_neut _)))))))
+                           (set_eq_trans (bigcup_setU_l _ _ _) (setU_set_eq_compat (bigcup_set1 _ _)
+                                                                                   (set_eq_trans (bigcup_setU_l _ _ _) (setU_set_eq_compat (bigcup_set1 _ _) 
+                                                                                                                                           (bigcup_set1 _ _)))))).
+    + refine (setU_set_eq_compat (semReturn Foo1) (setU_set_eq_compat _ _)).
+      * refine
+          (set_eq_trans (@semBindSizeMonotonic _ _ _ _ _ _) (set_eq_trans (eq_bigcupl _ _ IHsize) (eq_bigcupr _ (fun x => semReturn _)))).
+      * simpl.
+        refine
+          (set_eq_trans (@semBindSizeMonotonic _ _ _ _ _ _) _).
+        refine (set_eq_trans
+                  (eq_bigcupl _ _ arbNat_correct)
+                  (eq_bigcupr _
+                              (fun n =>
+                                 set_eq_trans (@semBindSizeMonotonic _ _ _ _ _ _)
+                                              (set_eq_trans
+                                                 (eq_bigcupl _ _ IHsize)
+                                                 (eq_bigcupr _
+                                                             (fun x => set_eq_trans (@semBindSizeMonotonic _ _ _ _ _ _)
+                                                                                 (set_eq_trans
+                                                                                    (eq_bigcupl _ _ IHsize)
+                                                                                    (eq_bigcupr _ (fun x => semReturn _))))))))).
+Qed.
+
 Inductive Bar (A B : Type) :=
 | Bar1 : Bar A B
-| Bar2 : Bar A B -> Bar A B
+| Bar2 : Bar A B
 | Bar3 : A -> B -> Bar A B -> Bar A B.
 
 DeriveShow Bar as "showBar".
 Print showBar.
-
 DeriveArbitrary Bar as "arbBar" "arbBarSized".
 Print arbBar.
 Print arbBarSized.
+DeriveSize Bar as "arbBarSize" .
+DeriveSizeEqs Bar as "sizedBar".
 
+Print arbBarSized_eqs.
 Definition testGen : G (Bar nat nat) := arbitrary.
 Sample testGen.
 
@@ -451,7 +568,7 @@ Proof.
     reflexivity.
     move => x H; inv H; constructor.
   - rewrite -sizedFoo_goodFoo_succ semBacktrack /=;
-    last by repeat apply Forall_cons; try now eauto with typeclass_instances.
+    last by repeat apply Forall_cons; try now eauto with typeclass_instances.and
     rewrite !cons_set_eq nil_set_eq. rewrite -> bigcap_setI_l, bigcap_set1.
     rewrite setI_set0.
     + rewrite setU_set0_neut. rewrite !bigcup_setU_l /=.

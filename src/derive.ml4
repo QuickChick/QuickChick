@@ -231,7 +231,7 @@ let sizeEqType (ty_ctr, ty_params, ctrs) =
       | Arrow (ty1, ty2) ->
          let fi = Printf.sprintf "f%d" i in
          set_bigcup fi (if isCurrentTyCtr ty1 then gFun [fi] (fun [f] -> ltf (gApp (gInject "sizeOf") [gVar f]) size)
-                        else gFun [fi] (fun _ -> gInject "true"))
+                        else gFun [fi] (fun _ -> gInject "True"))
                     (fun f -> aux (i+1) (f::acc) ty2)
       | _ -> set_singleton (gApp ~explicit:true (gCtr ctr) (non_class_tps @ (List.map gVar (List.rev acc)))) in
     aux 0 [] ty in
@@ -308,13 +308,34 @@ let gEqRefl p =
 
 let gI = gInject "I"
 
-let gIsT = gInject "isT"
+let gT = gInject "True"
 
 let gIff p1 p2 =
   gApp (gInject "iff") [p1; p2]
 
 let gIsTrueTrue =
   gApp (gInject "is_true") [gInject "true"]
+
+let set_eq_refl x =
+  gApp (gInject "set_eq_refl") [x]
+
+let setU_set_eq_compat x1 x2 =
+  gApp (gInject "setU_set_eq_compat") [x1; x2]
+
+let setU_set0_r x1 x2 =
+  gApp (gInject "setU_set0_r") [x1; x2]
+
+let set_eq_trans x1 x2 =
+  gApp (gInject "set_eq_trans") [x1; x2]
+
+let setU_set0_l x1 x2 =
+  gApp (gInject "setU_set0_l") [x1; x2]
+
+let setU_set0_neut_eq x1 x2 =
+  gApp (gInject "setU_set0_neut_eq") [x1; x2]
+
+let false_ind x1 x2 =
+  gApp (gInject "False_ind") [x1; x2]
 
 let deriveEqProof (ty_ctr, ty_params, ctrs) (lhs : var -> var list -> coq_expr)
     (rhs : var -> coq_expr) (ind_scheme : coq_expr) =
@@ -342,9 +363,9 @@ let deriveEqProof (ty_ctr, ty_params, ctrs) (lhs : var -> var list -> coq_expr)
          | arg :: args ->
            let x = Printf.sprintf "y%d" n in
            let (term, typ) = c_right ty2 args fargs (arg :: cargs) (n+1) in
-           let typ' = fun i -> gConj gIsTrueTrue (typ (i :: cargs)) in
-           (gExIntro_impl (gVar arg) (gConjIntro gIsT term),
-            fun l -> gEx x (fun i -> gConj gIsTrueTrue (typ (i :: l)))))
+           let typ' = fun i -> gConj gT (typ (i :: cargs)) in
+           (gExIntro_impl (gVar arg) (gConjIntro gI term),
+            fun l -> gEx x (fun i -> gConj gI (typ (i :: l)))))
       | _ ->
         (gEqRefl (gApp ctr_params (List.map gVar fargs)),
          fun l -> gEqType (gApp ctr_params (List.rev (List.map gVar l)))
@@ -444,7 +465,7 @@ let deriveEqProof (ty_ctr, ty_params, ctrs) (lhs : var -> var list -> coq_expr)
                   (gApp (gInject "max_lub_l_ssr") [hole; hole; hole; leq],
                    gApp (gInject "max_lub_r_ssr") [hole; hole; hole; leq],
                    args))
-             else (gIsT, leq, iargs)
+             else (gI, leq, iargs)
            in
            let (term, typ) = c_right ty2 args fargs (arg :: cargs) iargs' leq_r (n+1) in
            let typ' = fun i -> gConj hole (typ (i :: cargs)) in
@@ -528,16 +549,149 @@ let deriveEqProof (ty_ctr, ty_params, ctrs) (lhs : var -> var list -> coq_expr)
                let non_class_tps = List.map gVar (list_drop_every 2 tps) in
                gApp ind_scheme ~explicit:true (non_class_tps @ ((typ size tps) :: (expr_lst size tps)))))
 
+let deriveEqProofZero (ty_ctr, ty_params, ctrs) (zero_eq_typ : coq_expr)
+    (eq_proof : coq_expr) : coq_expr =
+  (* copy paste from above -- refactor! *)
+  let isCurrentTyCtr = function
+    | TyCtr (ty_ctr', _) -> ty_ctr = ty_ctr'
+    | _ -> false in
+
+  let isBaseBranch ty = fold_ty' (fun b ty' -> b && not (isCurrentTyCtr ty')) true ty in
+  (* copy paste ends *)
+
+  (* Proof that (set for inductive case) <--> set0*)
+  let rec elim_ind_case ty : coq_expr =
+    match ty with
+    | Arrow (t1, t2) ->
+      if isCurrentTyCtr t1 then
+        gApp (gInject "bigcup_set0_l_eq")
+          [hole; gFun ["f"] (fun [f] -> gConjIntro (gFun ["H"] (fun [h] -> false_ind hole (gApp (gInject "lt0_False") [gVar h])))
+                                              (gFun ["H"] (fun [h]-> false_ind hole (gVar h))))]
+      else
+        gApp (gInject "bigcup_set0_r")
+          [hole; gFun ["f"] (fun [f] -> elim_ind_case t2)]
+    | _ -> failwith "Internal error: The inductive case must have at least an application of the type "
+  in
+  let rec deriveCases base_ctrs ctrs : coq_expr =
+    match base_ctrs with
+    | [] ->
+      (match ctrs with
+       | [(ctr', ty')] -> elim_ind_case ty'
+       | (ctr', ty') :: ctrs' ->
+         setU_set0_l (elim_ind_case ty') (deriveCases base_ctrs ctrs'))
+    | [(ctr, ty)] ->
+      (match ctrs with
+       | [(ctr', ty')] ->
+         if ctr = ctr'
+         then
+           set_eq_refl hole
+         else
+           failwith "Internal error"
+       | (ctr', ty') :: ctrs' ->
+         if ctr = ctr'
+         then
+           setU_set0_neut_eq hole (deriveCases [] ctrs')
+         else
+           setU_set0_r (elim_ind_case ty') (deriveCases base_ctrs ctrs'))
+    | (ctr, ty) :: base_ctrs' ->
+      (match ctrs with
+       | [(ctr', ty')] ->
+         if ctr = ctr'
+         then
+           set_eq_refl hole
+         else
+           failwith "Internal error"
+       | (ctr', ty') :: ctrs' ->
+         if ctr = ctr'
+         then
+           setU_set_eq_compat (set_eq_refl hole) (deriveCases base_ctrs' ctrs')
+         else
+           setU_set0_r (elim_ind_case ty') (deriveCases base_ctrs ctrs'))
+  in
+  let (base_ctrs : ctr_rep list) = List.filter (fun x -> isBaseBranch (snd x)) ctrs in 
+  let coqTyParams = List.map gTyParam ty_params in
+  let tp_args =
+    List.concat (List.map (fun tp ->
+                           [ gArg ~assumName:tp ~assumImplicit:true ();
+                             gArg ~assumName:(gVar (make_up_name()))
+                                  ~assumType:(gApp (gInject "QuickChick.GenLow.GenLow.CanonicalSize") [tp]) ~assumGeneralized:true ()]
+                          ) coqTyParams) in
+  let term =
+    gFunWithArgs tp_args
+      (fun tps ->
+         gAnnot (set_eq_trans (deriveCases base_ctrs ctrs) (gApp eq_proof ((List.map gVar tps) @ [gInject "O"])))
+                (gApp zero_eq_typ (List.map gVar tps)))
+  in term
+
+let deriveEqProofSucc (ty_ctr, ty_params, ctrs) (succ_eq_typ : coq_expr)
+    (eq_proof : coq_expr) : coq_expr =
+  (* copy paste from above -- refactor! *)
+  let isCurrentTyCtr = function
+    | TyCtr (ty_ctr', _) -> ty_ctr = ty_ctr'
+    | _ -> false in
+
+  let isBaseBranch ty = fold_ty' (fun b ty' -> b && not (isCurrentTyCtr ty')) true ty in
+  (* copy paste ends *)
+
+  let rec elim_case ty : coq_expr =
+    let same_index ty : coq_expr =
+      if isCurrentTyCtr ty then
+        gConjIntro (gFun ["H"] (fun [h] -> gApp (gInject "leq_ltS") [gVar h]))
+          (gFun ["H"] (fun [h] -> gApp (gInject "ltS_leq") [gVar h]))
+      else
+        gConjIntro (gFun ["H"] (fun [h] -> gVar h))
+          (gFun ["H"] (fun [h]-> gVar h))
+    in
+    match ty with
+    (* no big union, just singleton *)
+    | TyCtr _ | TyParam _ -> set_eq_refl hole
+    (* The last big union *)
+    | Arrow (t1, TyCtr _) | Arrow (t1, TyParam _) ->
+      gApp (gInject "eq_bigcupl")
+        [hole; hole;
+         gFun ["f"] (fun [f] -> same_index t1)]
+    | Arrow (t1, t2) ->
+        gApp (gInject "eq_bigcup'")
+          [gFun ["f"] (fun [f] -> same_index t1); gFun ["x"] (fun x -> elim_case t2)]
+  in
+  let rec deriveCases ctrs : coq_expr =
+    match ctrs with
+    | [(ctr, ty)] -> elim_case ty
+    | (ctr, ty) :: ctrs' ->
+      setU_set_eq_compat (elim_case ty) (deriveCases ctrs')
+  in
+  let coqTyParams = List.map gTyParam ty_params in
+  let tp_args =
+    List.concat (List.map (fun tp ->
+                           [ gArg ~assumName:tp ~assumImplicit:true ();
+                             gArg ~assumName:(gVar (make_up_name()))
+                                  ~assumType:(gApp (gInject "QuickChick.GenLow.GenLow.CanonicalSize") [tp]) ~assumGeneralized:true ()]
+                          ) coqTyParams) in
+  let term =
+    gFunWithArgs tp_args
+      (fun tps ->
+         gFun ["size"]
+           (fun [size] ->
+              gAnnot (set_eq_trans (deriveCases ctrs) (gApp eq_proof ((List.map gVar tps) @ [gSucc (gVar size)])))
+                (gApp succ_eq_typ ((gVar size) :: (List.map gVar tps)))))
+  in term
+
 let deriveSizeEqProof c s =
   let dt = match coerce_reference_to_dt_rep c with
     | Some dt -> dt
     | None -> failwith "Not supported type"  in
-  let (_, _, _, lhs, rhs) = sizeEqType dt in
+  let (_, zero_typ, succ_typ, lhs, rhs) = sizeEqType dt in
   let (ty_ctr, _, _) = dt in
-  (* smarter way to find the induction schemes for the inductive types? *)
   let ind = gInject ((ty_ctr_to_string ty_ctr) ^ "_rect") in
   let eqproof = deriveEqProof dt lhs rhs ind in
-  ignore (defineConstant (s ^ "_eq_proof") eqproof)
+  let zeroproof = deriveEqProofZero dt zero_typ eqproof in
+  let succproof = deriveEqProofSucc dt succ_typ eqproof in
+  ignore (defineConstant (s ^ "_eq_proof") eqproof);
+  (* debug_coq_expr eqproof; *)
+  ignore (defineConstant (s ^ "_eq_proof_O") zeroproof);
+  ignore (defineConstant (s ^ "_eq_proof_S") succproof);
+  (* debug_coq_expr succproof; *)
+
 
 VERNAC COMMAND EXTEND DeriveShow
   | ["DeriveShow" constr(c) "as" string(s)] -> [derive Show c s ""]

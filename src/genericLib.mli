@@ -18,7 +18,9 @@ open Context
 type coq_expr
 
 val hole : coq_expr
-       
+
+val debug_coq_expr : coq_expr -> unit
+
 type var 
 
 val gVar : var -> coq_expr

@@ -13,6 +13,7 @@ open Constrintern
 open Topconstr
 open Constrexpr
 open Constrexpr_ops
+open Ppconstr
 open Context
 
 let cnt = ref 0 
@@ -23,7 +24,10 @@ let hole = CHole (dummy_loc, None, Misctypes.IntroAnonymous, None)
 (* Everything marked "Opaque" should have its implementation be hidden in the .mli *)
 
 type coq_expr = constr_expr (* Opaque *)
-                 
+
+let debug_coq_expr (c : coq_expr) : unit =
+  msg (pr_constr_expr c)
+
 (* Non-dependent version *)
 type var = Id.t (* Opaque *)
 
