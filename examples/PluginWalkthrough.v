@@ -7,10 +7,11 @@ Import ListNotations.
 
 Require Import mathcomp.ssreflect.ssreflect.
 From mathcomp Require Import ssreflect ssrfun ssrbool ssrnat eqtype seq.
+Require Import Lemmas.
 
 Require Import String.
 
-(* Standard Binary Trees *)
+(* Standard Binary Trees in Gallina *)
 
 Inductive Tree A :=
 | Leaf : Tree A
@@ -32,12 +33,14 @@ Instance showTree {A} `{_ : Show A} : Show (Tree A) :=
        in aux
   |}.
 
-(* Sized Generator *)
+(* Sized Generator - generate trees up to a given depth *)
 Fixpoint genTreeSized' {A} (sz : nat) (g : G A) : G (Tree A) :=
   match sz with
     | O => returnGen Leaf 
     | S sz' => freq [ (1,  returnGen Leaf) ;
-                      (sz, liftGen3  Node g (genTreeSized' sz' g) (genTreeSized' sz' g))
+                      (sz, liftGen3  Node g
+                               (genTreeSized' sz' g)
+                               (genTreeSized' sz' g))
                     ]
   end.
 
@@ -48,16 +51,24 @@ Fixpoint shrinkTree {A} (s : A -> list A) (t : Tree A) : seq (Tree A) :=
   match t with
     | Leaf => []
     | Node x l r => [l] ++ [r] ++
-                    map (fun x' => Node x' l r) (s x) ++
-                    map (fun l' => Node x l' r) (shrinkTree s l) ++
-                    map (fun r' => Node x l r') (shrinkTree s r)
+       map (fun x' => Node x' l r) (s x) ++
+       map (fun l' => Node x l' r) (shrinkTree s l) ++
+       map (fun r' => Node x l r') (shrinkTree s r)
   end.
 
 (* Grouping in a typeclass *)
 Instance arbTree {A} `{_ : Arbitrary A} : Arbitrary (Tree A) :=
-  {| arbitrary := sized (fun n => genTreeSized' n arbitrary) ;
+  {| arbitrary := sized (fun n => 
+                    genTreeSized' n arbitrary) ;
      shrink := shrinkTree shrink
   |}.
+
+(* Faulty mirroring function *)
+Fixpoint mirror {A : Type} (t : Tree A) : Tree A :=
+  match t with
+    | Leaf => Leaf
+    | Node x l r => Node x (mirror l) (mirror l)
+  end.
 
 (* Simple equality on Trees *)
 Fixpoint eq_tree (t1 t2 : Tree nat) : bool :=
@@ -69,17 +80,13 @@ Fixpoint eq_tree (t1 t2 : Tree nat) : bool :=
   end.
 
 
-(* Faulty mirroring function *)
-Fixpoint mirror {A : Type} (t : Tree A) : Tree A :=
-  match t with
-    | Leaf => Leaf
-    | Node x l r => Node x (mirror l) (mirror l)
-  end.
-
 (* Mirroring twice yields the original tree *)
-Definition mirrorP (t : Tree nat) := eq_tree (mirror (mirror t)) t.
+Definition mirrorP (t : Tree nat) := 
+  eq_tree (mirror (mirror t)) t.
 
 QuickCheck mirrorP.
+
+(* Derive printers and generators automatically *)
 
 DeriveShow Tree as "showTree'".
 Print showTree'.
@@ -87,11 +94,13 @@ DeriveArbitrary Tree as "arbTree'" "genTreeSized".
 Print genTreeSized.
 Print arbTree'.
 
-DebugDerive Tree.
+(* How do you know your generators are correct? *)
+(* Well, the comment said generate everything up to a depth... *)
 
 (*
 Theorem genTreeCorrect {A} `{_ : Arbitrary A} (size : nat) :
-  semGen (@genTreeSized size A _) <--> [set tree | sizeOf tree <= size].
+  semGen (@genTreeSized size A _) <--> 
+  [set tree | sizeOf tree <= size].
 *)
 
 Print CanonicalSize.
@@ -106,26 +115,42 @@ Admitted.
 DeriveSizeEqs Tree as "sizeTree".
 Print sizeTree_eqT.
 
-Lemma max_lub_l_ssr n m p:
-  max n m < p -> n < p.
-Proof.
-  move /ltP/NPeano.Nat.max_lub_lt_iff => [/ltP H1 _].
-  assumption.
-Qed.
+(* 
+sizeTree_eqT = fun (size : nat) (A : Type) (H : CanonicalSize A) =>
+Leaf
+|: \bigcup_(f0 in (fun _ : A => True))
+   \bigcup_(f1 in (fun f1 : Tree A => sizeOf f1 < size))
+   \bigcup_(f2 in (fun f2 : Tree A => sizeOf f2 < size))
+        [set Node f0 f1 f2] 
 
-Lemma max_lub_r_ssr n m p:
-  max n m < p -> m < p.
-Proof.
-  move /ltP/NPeano.Nat.max_lub_lt_iff => [_ /ltP H1].
-  assumption.
-Qed.
+<--> 
 
-Lemma max_lub_ssr n m p :
-  n < p -> m < p -> max n m < p.
-Proof.
-  move => /ltP H1 /ltP H2.
-  apply/ltP/NPeano.Nat.max_lub_lt; eassumption.
-Qed.
+(fun x : Tree A => sizeOf x <= size)
+
+: nat -> forall A : Type, CanonicalSize A -> Prop
+*) 
 
 DeriveSizeEqsProof Tree as "sizeTree".
 Print sizeTree_eq_proof.
+
+Definition bindGenOpt {A B} (g : G (option A)) (f : A -> G (option B)) : G (option B) :=
+  bindGen g (fun ma => 
+  match ma with
+    | None => returnGen None
+    | Some a => f a
+  end).
+
+Fixpoint genBST (size low high : nat)
+  (glt : nat -> G (option nat)) (clt : forall (x y : nat), {x < y} + {~ (x < y)})
+: G (option (Tree nat)) :=
+  match size with
+    | O => backtrack [(1, returnGen (Some Leaf))]
+    | S size' => 
+      backtrack [ (1,    returnGen (Some Leaf))
+                ; (size, bindGenOpt (glt low) (fun x => 
+                         if (clt x high) then returnGen None
+                         else bindGenOpt (genBST size' low  x glt clt) (fun l =>
+                              bindGenOpt (genBST size' x high glt clt) (fun r =>
+                              returnGen (Some (Node x l r))))))
+                ]
+  end.
