@@ -978,11 +978,14 @@ Proof.
     by rewrite Hpick.
 Qed.
 
-Lemma semFrequencySize {A} (l : list (nat * G A)) (def : G A) (size: nat) :
+(* begin semFrequencySize *)
+Lemma semFrequencySize {A}
+      (l : list (nat * G A)) (def : G A) (size: nat) :
   semGenSize (frequency def l) size <-->
     let l' := [seq x <- l | x.1 != 0] in
     if l' is nil then semGenSize def size else
       \bigcup_(x in l') semGenSize x.2 size.
+(* end semFrequencySize *)
 Proof.
 rewrite semBindSize semChooseSize //=.
 case lsupp: {1}[seq x <- l | x.1 != 0] => [|[n g] gs].

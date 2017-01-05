@@ -349,7 +349,10 @@ Proof.
     by do 2! constructor.
 Qed.
 
-Lemma semReturnSize A (x : A) (s : nat) : semGenSize (returnGen x) s <--> [set x].
+(* begin semReturnSize *)
+Lemma semReturnSize A (x : A) (s : nat) :
+  semGenSize (returnGen x) s <--> [set x].
+(* end semReturnSize *)
 Proof.
 by rewrite /semGenSize /= codom_const //; apply: randomSeed_inhabited.
 Qed.
@@ -361,7 +364,8 @@ Qed.
 
 (* begin semBindSize *)
 Lemma semBindSize A B (g : G A) (f : A -> G B) (s : nat) :
-  semGenSize (bindGen g f) s <--> \bigcup_(a in semGenSize g s) semGenSize (f a) s.
+  semGenSize (bindGen g f) s <-->
+  \bigcup_(a in semGenSize g s) semGenSize (f a) s.
 (* end semBindSize *)
 Proof.
 rewrite /semGenSize /bindGen /= bigcup_codom -curry_codom2l.
