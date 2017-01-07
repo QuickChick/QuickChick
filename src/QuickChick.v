@@ -8,6 +8,7 @@ Axiom _Size : Prop.
 Require Export Show.
 Require Export Random.
 Require Export Sets.
+Require Export Nat_util.
 Require Export GenLow.
 Require Export GenHigh.
 Require Export Arbitrary.

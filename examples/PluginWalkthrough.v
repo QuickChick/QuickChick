@@ -7,7 +7,6 @@ Import ListNotations.
 
 Require Import mathcomp.ssreflect.ssreflect.
 From mathcomp Require Import ssreflect ssrfun ssrbool ssrnat eqtype seq.
-Require Import Lemmas.
 
 Require Import String.
 

@@ -26,6 +26,19 @@ Proof.
 by move=> eqAB eqBC; split=> [/eqAB/eqBC|/eqBC/eqAB].
 Qed.
 
+Lemma set_eq_symm {A} (s1 s2 : set A) :
+  s1 <--> s2 -> s2 <--> s1.
+Proof.
+  firstorder.
+Qed.
+
+Lemma set_eq_refl {A} (s : set A) :
+  s <--> s.
+Proof.
+  firstorder.
+Qed.
+
+
 Global Instance : forall T, Equivalence (@set_eq T).
 Proof.
 move=> T; constructor=> // [A B eqAB | A B C] x; first by split=> /eqAB.
@@ -408,6 +421,29 @@ Proof.
   firstorder.
 Qed.
 
+Lemma setU_set0_neut_eq {A} (s s1 : set A) :
+  s1 <--> set0 ->
+  s <--> s :|: s1.
+Proof.
+  firstorder.
+Qed.
+
+Lemma setU_set0_l {A} (s1 s2 s3 : set A) :
+  s1 <--> set0 ->
+  s2 <--> s3 ->
+  (s1 :|: s2) <--> s3. 
+Proof.
+  firstorder.
+Qed.
+
+Lemma setU_set0_r {A} (s1 s2 s3 : set A) :
+  s1 <--> set0 ->
+  s3 <--> s2 ->
+  s3 <--> (s1 :|: s2). 
+Proof.
+  firstorder.
+Qed.
+
 Lemma setI_setT_neut {U} (s : set U) :
   (s :&: setT) <--> s.
 Proof.
@@ -456,6 +492,8 @@ Lemma setI_set0 {U} (s1 s2 : set U) :
 Proof.
   intros; split; firstorder. 
 Qed.
+
+
 
 Lemma setI_subset_compat {U} (s1 s2 s1' s2' : set U) : 
   s1 \subset s1' ->
@@ -522,6 +560,16 @@ Proof.
   exact: eq_bigcapl.
 Qed.
 
+Lemma eq_bigcup' :
+  forall (T U : Type) (A B : set T) (F G : T -> set U),
+    A <--> B ->
+    (forall x, F x <--> G x) ->
+    \bigcup_(x in A) F x <--> \bigcup_(x in B) G x.
+Proof.
+  intros.
+  eapply eq_bigcup; eauto.
+Qed.
+
 Lemma bigcap_setI_l {U T} (s1 s2 : set U) (f : U -> set T) :
   bigcap (s1 :|: s2) f <-->
   bigcap s1 f :&: bigcap s2 f.
@@ -542,6 +590,20 @@ Proof.
   eapply H. reflexivity.
   intros y Hy. inversion Hy. subst.
   assumption.
+Qed.
+
+Lemma bigcup_set0_r (T U : Type) (s : set T) (F : T -> set U) :
+  (forall x, F x <--> set0) ->
+  \bigcup_(x in s) F x <--> set0.
+Proof.
+  firstorder.
+Qed.
+
+Lemma bigcup_set0_l_eq (T U : Type) (s : set T) (F : T -> set U) :
+  s <--> set0 ->
+  \bigcup_(x in s) F x <--> set0.
+Proof.
+  firstorder.
 Qed.
 
 (** Lemmas about lists *)

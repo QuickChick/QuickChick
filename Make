@@ -2,6 +2,7 @@
 -I src
 src/Tactics.v
 src/Sets.v
+src/Nat_util.v
 src/Random.v
 src/RoseTrees.v
 src/GenLow.v
