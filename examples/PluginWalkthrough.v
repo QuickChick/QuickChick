@@ -10,6 +10,24 @@ From mathcomp Require Import ssreflect ssrfun ssrbool ssrnat eqtype seq.
 
 Require Import String.
 
+(* Out-of-the-box QuickChick : basic types *)
+
+(* Simple function to remove an element from a list *)
+
+Fixpoint remove (x : nat) (l : list nat) : list nat :=
+  match l with
+    | []   => []
+    | h::t => if beq_nat h x then t else h :: remove x t
+  end.
+
+(* Executable specification *)
+Definition removeP (x : nat) (l : list nat) :=
+  (~~ (existsb (fun y => beq_nat y x) (remove x l))).
+
+QuickChick removeP.
+
+(* Now-out-of-the-box : ADTs *)
+
 (* Standard Binary Trees in Gallina *)
 
 Inductive Tree A :=
@@ -78,7 +96,6 @@ Fixpoint eq_tree (t1 t2 : Tree nat) : bool :=
     | _, _ => false
   end.
 
-
 (* Mirroring twice yields the original tree *)
 Definition mirrorP (t : Tree nat) := 
   eq_tree (mirror (mirror t)) t.
@@ -132,6 +149,17 @@ Leaf
 DeriveSizeEqsProof Tree as "sizeTree".
 Print sizeTree_eq_proof.
 
+(* Next in line : restricted predicates *)
+
+(* Binary search tree specification *)
+Inductive isBST (low high : nat) : Tree nat -> Prop :=
+| BST_Leaf : isBST low high Leaf
+| BST_Node : forall x l r,
+               low < x -> x < high ->
+               isBST low x l -> isBST x high r ->
+               isBST low high (Node x l r).
+
+(* Manual GenT *)
 Definition bindGenOpt {A B} (g : G (option A)) (f : A -> G (option B)) : G (option B) :=
   bindGen g (fun ma => 
   match ma with
@@ -139,6 +167,7 @@ Definition bindGenOpt {A B} (g : G (option A)) (f : A -> G (option B)) : G (opti
     | Some a => f a
   end).
 
+(* Generator for search trees *)
 Fixpoint genBST (size low high : nat)
   (glt : nat -> G (option nat)) (clt : forall (x y : nat), {x < y} + {~ (x < y)})
 : G (option (Tree nat)) :=
