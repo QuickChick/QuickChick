@@ -51,15 +51,17 @@ Instance showTree {A} `{_ : Show A} : Show (Tree A) :=
   |}.
 
 (* Sized Generator - generate trees up to a given depth *)
-Fixpoint genTreeSized' {A} (sz : nat) (g : G A) : G (Tree A) :=
+Fixpoint genTreeSized {A} (sz : nat) (g : G A) : G (Tree A) :=
   match sz with
     | O => returnGen Leaf 
     | S sz' => freq [ (1,  returnGen Leaf) ;
                       (sz, liftGen3  Node g
-                               (genTreeSized' sz' g)
-                               (genTreeSized' sz' g))
+                               (genTreeSized sz' g)
+                               (genTreeSized sz' g))
                     ]
   end.
+
+Sample (@genTreeSized nat 3 arbitrary).
 
 Open Scope list.
 
@@ -76,7 +78,7 @@ Fixpoint shrinkTree {A} (s : A -> list A) (t : Tree A) : seq (Tree A) :=
 (* Grouping in a typeclass *)
 Instance arbTree {A} `{_ : Arbitrary A} : Arbitrary (Tree A) :=
   {| arbitrary := sized (fun n => 
-                    genTreeSized' n arbitrary) ;
+                    genTreeSized n arbitrary) ;
      shrink := shrinkTree shrink
   |}.
 
@@ -106,8 +108,8 @@ QuickCheck mirrorP.
 
 DeriveShow Tree as "showTree'".
 Print showTree'.
-DeriveArbitrary Tree as "arbTree'" "genTreeSized".
-Print genTreeSized.
+DeriveArbitrary Tree as "arbTree'" "genTreeSized'".
+Print genTreeSized'.
 Print arbTree'.
 
 (* How do you know your generators are correct? *)
@@ -125,7 +127,7 @@ Print sizeTree.
 
 Theorem genTreeCorrect {A} `{_ : Arbitrary A} `{_ : CanonicalSize A}
         (size : nat) :
-  semGen (@genTreeSized size A _) <--> [set tree | sizeOf tree <= size].
+  semGen (@genTreeSized' size A _) <--> [set tree | sizeOf tree <= size].
 Admitted.
 
 DeriveSizeEqs Tree as "sizeTree".
@@ -176,9 +178,10 @@ Fixpoint genBST (size low high : nat)
     | S size' => 
       backtrack [ (1,    returnGen (Some Leaf))
                 ; (size, bindGenOpt (glt low) (fun x => 
-                         if (clt x high) then returnGen None
-                         else bindGenOpt (genBST size' low  x glt clt) (fun l =>
+                         if (clt x high) 
+                         then bindGenOpt (genBST size' low  x glt clt) (fun l =>
                               bindGenOpt (genBST size' x high glt clt) (fun r =>
-                              returnGen (Some (Node x l r))))))
+                              returnGen (Some (Node x l r))))
+                         else returnGen None))
                 ]
   end.
