@@ -26,7 +26,7 @@ let hole = CHole (dummy_loc, None, Misctypes.IntroAnonymous, None)
 type coq_expr = constr_expr (* Opaque *)
 
 let debug_coq_expr (c : coq_expr) : unit =
-  msg (pr_constr_expr c)
+  msgerr (pr_constr_expr c)
 
 (* Non-dependent version *)
 type var = Id.t (* Opaque *)
@@ -337,6 +337,9 @@ let rec maximum = function
   | (c::cs) -> gApp (gInject "max") [c; maximum cs]
 let gle x y = gApp (gInject "leq") [x; y]
 let glt x y = gle (gApp (gInject "S") [x]) y
+
+
+let gEq x y = gApp (gInject "eq") [x; y]
                           
 (* Gen combinators *)
 let returnGen c = gApp (gInject "returnGen") [c]

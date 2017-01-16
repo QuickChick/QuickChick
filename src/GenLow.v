@@ -2,7 +2,7 @@ Require Import ZArith List.
 Require Import mathcomp.ssreflect.ssreflect.
 From mathcomp Require Import ssrfun ssrbool ssrnat.
 Require Import Random RoseTrees.
-Require Import Sets.
+Require Import Sets Tactics.
 Require Import Numbers.BinNums.
 Require Import Classes.RelationClasses.
 
@@ -167,6 +167,17 @@ Parameter semSized :
 Parameter semSizedSize :
   forall A (f : nat -> G A) s,
     semGenSize (sized f) s <--> semGenSize (f s) s.
+
+(* TODO change name *)
+Parameter semSized_alt :
+  forall A (f : nat -> G A) `{forall n, SizeMonotonic (f n)},
+    (forall n m s,  n <= m -> semGenSize (f n) s \subset semGenSize (f m) s) ->
+    semGen (sized f) <--> \bigcup_n (semGen (f n)).
+
+Parameter sizedMonotonic :
+  forall A (f : nat -> G A) `{forall n, SizeMonotonic (f n)},
+    (forall n m s,  n <= m -> semGenSize (f n) s \subset semGenSize (f m) s) ->
+    SizeMonotonic (sized f).
 
 Parameter semResize :
   forall A (n : nat) (g : G A),
@@ -507,6 +518,31 @@ Proof. by []. Qed.
 
 Lemma semSizedSize A(f:nat->G A)s : semGenSize (sized f) s <--> semGenSize (f s) s.
 Proof. by []. Qed.
+
+Lemma semSized_alt A (f : nat -> G A) (H : forall n, SizeMonotonic (f n))
+      (H' : forall n m s,  n <= m -> semGenSize (f n) s \subset semGenSize (f m) s) :
+  semGen (sized f) <--> \bigcup_n (semGen (f n)).
+Proof.
+  rewrite semSized.
+  move => x; split.
+  - move => [n [HT Hs]].
+    eexists. split; eauto. eexists; eauto.
+  - move => [n [HT [m [_ Hs]]]].
+    eapply semSized. eexists (m + n).
+    split. constructor. 
+    eapply (H' n). ssromega.
+    eapply (H n); try eassumption. ssromega.
+Qed.
+
+Lemma sizedMonotonic A (f : nat -> G A) (H : forall n, SizeMonotonic (f n))
+      (H' : forall n m s,  n <= m -> semGenSize (f n) s \subset semGenSize (f m) s) :
+  SizeMonotonic (sized f).
+Proof.
+  constructor. move => s1 s2 Hleq a /semSizedSize H1.
+  eapply semSizedSize.
+  eapply H. eassumption.
+  eapply H'; eassumption.
+Qed.
 
 Lemma semResize A n (g : G A) : semGen (resize n g) <--> semGenSize g n .
 Proof.

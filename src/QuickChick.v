@@ -1,6 +1,11 @@
 Declare ML Module "genericLib".
+Declare ML Module "coqLib".
+Declare ML Module "setLib".
 Declare ML Module "quickChick".
 Declare ML Module "derive".
+Declare ML Module "Sized".
+Declare ML Module "ArbitrarySized".
+Declare ML Module "driver".
 
 Axiom _W : nat -> Prop.
 Axiom _Size : Prop.

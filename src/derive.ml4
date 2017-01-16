@@ -14,7 +14,8 @@ open Constrexpr
 open Constrexpr_ops
 open Decl_kinds
 open GenericLib
-
+open SetLib
+open CoqLib
 type derivable = Show | Arbitrary | Size
 
 let list_last l = List.nth l (List.length l - 1)
@@ -197,18 +198,6 @@ let derive (cn : derivable) (c : constr_expr) (instance_name : string) (extra_na
   declare_class_instance instance_arguments instance_name instance_type instance_record
 
 (* Set library generics *)
-let set_singleton (c : coq_expr) : coq_expr = gApp (gInject "set1") [c]
-let set_bigcup (x : string) (p : coq_expr) (c : var -> coq_expr) : coq_expr =
-  gApp (gInject "bigcup") [p; gFun [x] (fun [x] -> c x)]
-let set_suchThat (x : string) (t : coq_expr) (p : var -> coq_expr) : coq_expr =
-  gFunTyped [("x", t)] (fun [x] -> p x)
-let set_eq c1 c2 = gApp (gInject "set_eq") [c1;c2]
-let set_union c1 c2 = gApp (gInject "setU") [c1;c2]
-let rec set_unions = function
-  | [] -> failwith "empty set unions"
-  | [x] -> x
-  | x::xs -> set_union x (set_unions xs)
-
 let sizeEqType (ty_ctr, ty_params, ctrs) =
 
   (* Common helpers, refactor? *)
@@ -278,64 +267,6 @@ let deriveSizeEqs c s =
   ignore (defineConstant (s ^ "_zeroT") zero);
   ignore (defineConstant (s ^ "_succT") succ)
 
-let gExIntro_impl (witness : coq_expr) (proof : coq_expr) : coq_expr =
-  gApp (gInject "ex_intro") [hole; witness; proof]
-
-let gExIntro (x : string) (pred : var -> coq_expr) (witness : coq_expr) (proof : coq_expr) : coq_expr =
-  gApp (gInject "ex_intro") [(gFun [x] (fun [x] -> pred x)); witness; proof]
-
-let gEx (x : string) (pred : var -> coq_expr) : coq_expr =
-  gApp (gInject "ex") [(gFun [x] (fun [x] -> pred x))]
-
-let gConjIntro p1 p2 =
-  gApp (gInject "conj") [p1; p2]
-
-let gEqType e1 e2 =
-  gApp (gInject "eq") [e1; e2]
-
-let gConj p1 p2 =
-  gApp (gInject "and") [p1; p2]
-
-
-let gOrIntroL p =
-  gApp (gInject "or_introl") [p]
-
-let gOrIntroR p =
-  gApp (gInject "or_intror") [p]
-
-let gEqRefl p =
-  gApp (gInject "Logic.eq_refl") [p]
-
-let gI = gInject "I"
-
-let gT = gInject "True"
-
-let gIff p1 p2 =
-  gApp (gInject "iff") [p1; p2]
-
-let gIsTrueTrue =
-  gApp (gInject "is_true") [gInject "true"]
-
-let set_eq_refl x =
-  gApp (gInject "set_eq_refl") [x]
-
-let setU_set_eq_compat x1 x2 =
-  gApp (gInject "setU_set_eq_compat") [x1; x2]
-
-let setU_set0_r x1 x2 =
-  gApp (gInject "setU_set0_r") [x1; x2]
-
-let set_eq_trans x1 x2 =
-  gApp (gInject "set_eq_trans") [x1; x2]
-
-let setU_set0_l x1 x2 =
-  gApp (gInject "setU_set0_l") [x1; x2]
-
-let setU_set0_neut_eq x1 x2 =
-  gApp (gInject "setU_set0_neut_eq") [x1; x2]
-
-let false_ind x1 x2 =
-  gApp (gInject "False_ind") [x1; x2]
 
 let deriveEqProof (ty_ctr, ty_params, ctrs) (lhs : var -> var list -> coq_expr)
     (rhs : var -> coq_expr) (ind_scheme : coq_expr) =

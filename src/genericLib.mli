@@ -111,7 +111,10 @@ val gSucc : coq_expr -> coq_expr
 val maximum : coq_expr list -> coq_expr
 val glt : coq_expr -> coq_expr -> coq_expr
 val gle : coq_expr -> coq_expr -> coq_expr
-                          
+
+(* Eq *)
+val gEq : coq_expr -> coq_expr -> coq_expr
+
 (* Gen combinators *)
 val returnGen : coq_expr -> coq_expr 
 val bindGen : coq_expr -> string -> (var -> coq_expr) -> coq_expr 
