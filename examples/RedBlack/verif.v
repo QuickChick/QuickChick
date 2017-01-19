@@ -3,6 +3,7 @@ Require Import List String Omega.
 From QuickChick Require Import QuickChick.
 Import GenLow GenHigh.
 
+Add LoadPath "./" as QuickChick.RedBlack.
 From QuickChick.RedBlack Require Import redblack testing.
 
 (* correspondence between the inductive and the executable definitions *)
@@ -83,6 +84,7 @@ Proof.
   - case : c IH => IH. apply liftGen4Monotonic; eauto with typeclass_instances;
     eapply IH; eauto; by constructor; omega.
     apply bindMonotonic; eauto with typeclass_instances.
+    unfold genColor.
     move => x /=. apply liftGen4Monotonic; eauto with typeclass_instances;
     eapply IH; eauto; (case : x; [ by right | by left; omega]).
 Qed.

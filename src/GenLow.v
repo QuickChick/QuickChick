@@ -75,11 +75,11 @@ Class SizeMonotonic {A} (g : G A) := {
 Class CanonicalSize A := 
   { sizeOf : A -> nat }.
 
-(* Zoe: We do not need that when we do automatic resolution. Probably add it as a lemma ?*)
-(* (* CH: Why does Unsized need a _ when A is marked as implict! *) *)
-(* (* begin unsizedMonotonic *) *)
-(* Declare Instance unsizedMonotonic {A} (g : G A) `{Unsized _ g} : SizeMonotonic g. *)
-(* (* end unsizedMonotonic *) *)
+(* Zoe: We do not need that when we do automatic resolution. Changing it to a lemma ? *)
+(* CH: Why does Unsized need a _ when A is marked as implict! *)
+(* begin unsizedMonotonic *)
+Parameter unsizedMonotonic : forall {A} (g : G A) `{Unsized _ g}, SizeMonotonic g.
+(* end unsizedMonotonic *)
 
 
 Parameter unsized_alt_def : 
@@ -93,7 +93,7 @@ Parameter semReturnSize :
   forall A (x : A) size, semGenSize (returnGen x) size <--> [set x].
 
 Declare Instance unsizedReturn {A} (x : A) : Unsized (returnGen x).
-
+Declare Instance returnGenSizeMonotonic {A} (x : A) : SizeMonotonic (returnGen x).
 
 Parameter semBindSize :
   forall A B (g : G A) (f : A -> G B) (size : nat),
@@ -338,8 +338,9 @@ Class CanonicalSize A :=
   { sizeOf : A -> nat }.
 
 (* Unsizedness trivially implies size-monotonicity *)
-Program Instance unsizedMonotonic {A} (g : G A) { _ : Unsized  g } : SizeMonotonic g. 
-Next Obligation.
+Lemma unsizedMonotonic {A} (g : G A) { _ : Unsized  g } : SizeMonotonic g. 
+Proof.
+  constructor. intros s1 s2 Hleq.
   rewrite /unsized /monotonic => a H12.
     by destruct (unsized s1 s2 a) as [H1 H2]; eauto.
 Qed.
@@ -373,6 +374,11 @@ Qed.
 Program Instance unsizedReturn {A} (x : A) : Unsized (returnGen x).
 Next Obligation.
   by rewrite ! semReturnSize; split; auto.
+Qed.
+
+Instance returnGenSizeMonotonic {A} (x : A) : SizeMonotonic (returnGen x).
+Proof.
+  firstorder.
 Qed.
 
 (* begin semBindSize *)

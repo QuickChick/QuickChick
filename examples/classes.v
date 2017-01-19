@@ -108,9 +108,6 @@ Instance frequencySizeMonotonic_alt
     SizeMonotonic (frequency g0 lg).
 Admitted.
 
-Instance returnGenSizeMonotonic {A} (x : A) : SizeMonotonic (returnGen x).
-Admitted.
-
 
 Definition monotonicGen {A} (gen : G A) :=
   forall s1 s2 : nat,
