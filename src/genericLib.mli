@@ -131,4 +131,4 @@ val generate_names_from_type : string -> coq_type -> string list
 val fold_ty_vars : (var list -> var -> coq_type -> 'a) -> ('a -> 'a -> 'a) -> 'a -> coq_type -> var list -> 'a
 
 val defineConstant : string -> coq_expr -> var
-val declare_class_instance : arg list -> string -> coq_expr -> (var list -> coq_expr) -> unit 
+val declare_class_instance : arg list -> string -> (var list -> coq_expr) -> (var list -> coq_expr) -> unit 

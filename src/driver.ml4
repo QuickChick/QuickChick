@@ -17,9 +17,10 @@ open GenericLib
 open SetLib
 open CoqLib
 open Sized
+open SizeMon
 open ArbitrarySized
 
-type derivable = ArbitrarySized | Sized | CanonicalSized
+type derivable = ArbitrarySized | Sized | CanonicalSized | SizeMonotonic
 
 (* Contains the generic derivation function from derive.ml4, but the code that generates the instances
  * is in separate files *)
@@ -33,10 +34,16 @@ let list_drop_every n l =
     | x::xs -> if i == n then aux 1 xs else x::aux (i+1) xs
   in aux 1 l
 
+let rec take_last l acc =
+  match l with
+  | [x] -> (List.rev acc, x)
+  | x :: l' -> take_last l' (x :: acc)
+
 let print_der = function
   | ArbitrarySized -> "ArbitrarySized"
   | Sized -> "Sized"
   | CanonicalSized -> "CanonicalSized"
+  | SizeMonotonic -> "SizeMonotonic"
 
 let debug_environ () =
   let env = Global.env () in
@@ -67,22 +74,41 @@ let derive (cn : derivable) (c : constr_expr) (instance_name : string) (extra_na
     | Sized -> "Sized"
     | ArbitrarySized -> "ArbitrarySized"
     | CanonicalSized -> "CanonicalSized"
+    | SizeMonotonic -> "QuickChick.GenLow.GenLow.SizeMonotonic"
   in
 
   let param_class_names = match cn with
     | Sized -> ["Sized"]
     | ArbitrarySized -> ["Arbitrary"]
     | CanonicalSized -> ["CanonicalSized"]
+    | SizeMonotonic -> ["ArbitraryMonotonic"]
+  in
+
+  let extra_arguments = match cn with
+    | Sized -> []
+    | ArbitrarySized -> []
+    | CanonicalSized -> []
+    | SizeMonotonic -> [(gInject "s", gInject "nat")]
   in
   (* Generate typeclass constraints. For each type parameter "A" we need `{_ : <Class Name> A} *)
   let instance_arguments =
-    List.concat (List.map (fun tp ->
-                           ((gArg ~assumName:tp ~assumImplicit:true ()) ::
-                            (List.map (fun name -> gArg ~assumType:(gApp (gInject name) [tp]) ~assumGeneralized:true ()) param_class_names))
-                          ) coqTyParams) in
+    (List.concat (List.map (fun tp ->
+                            ((gArg ~assumName:tp ~assumImplicit:true ()) ::
+                             (List.map (fun name -> gArg ~assumType:(gApp (gInject name) [tp]) ~assumGeneralized:true ()) param_class_names))
+                           ) coqTyParams)) @
+    (* Add extra instance arguments *)
+    (List.map (fun (name, typ) -> gArg ~assumName:name ~assumType:typ ()) extra_arguments)
+  in
 
   (* The instance type *)
-  let instance_type = gApp (gInject class_name) [full_dt] in
+  let instance_type iargs =
+    match cn with
+    | SizeMonotonic ->
+      let (_, size) = take_last iargs [] in
+      gApp (gInject class_name)
+           [(gApp ~explicit:true (gInject ("arbitrarySize")) [full_dt; (gInject extra_name); (gVar size)])]
+    | _ -> gApp (gInject class_name) [full_dt]
+  in
   (* Create the instance record. Only need to extend this for extra instances *)
   let instance_record iargs =
     (* Copying code for Arbitrary, Sized from derive.ml *)
@@ -92,6 +118,9 @@ let derive (cn : derivable) (c : constr_expr) (instance_name : string) (extra_na
     | CanonicalSized ->
       let ind_scheme =  gInject ((ty_ctr_to_string ty_ctr) ^ "_ind") in
       sizeEqType ty_ctr ctrs ind_scheme iargs
+    | SizeMonotonic ->
+      let (iargs', size) = take_last iargs [] in
+      sizeMon ty_ctr ctrs (gVar size) iargs' (gInject extra_name)
   in
   declare_class_instance instance_arguments instance_name instance_type instance_record
 
@@ -107,4 +136,10 @@ END;;
 
 VERNAC COMMAND EXTEND DeriveCanonicalSized
   | ["DeriveCanonicalSized" constr(c) "as" string(s1)] -> [derive CanonicalSized c s1 "aux"]
+END;;
+
+VERNAC COMMAND EXTEND DeriveArbitrarySizedMonotonic
+  | ["DeriveArbitrarySizedMonotonic" constr(c) "as" string(s1) "using" string(s2)] ->
+  (* s2 is the instance name for ArbitrarySized *)
+    [derive SizeMonotonic c s1 s2]
 END;;

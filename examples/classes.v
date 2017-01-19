@@ -66,26 +66,17 @@ Class ArbitrarySized (A : Type) :=
     shrinkSize : A -> list A
   }.
 
-(** Monotonicity of size parametric generators *)
-Class ArbitrarySizedGenMonotonic (A : Type) `{ArbitrarySized A} :=
-  {
-    monotonic2 : forall s, SizeMonotonic (arbitrarySize s)
-  }.
+Class ArbitrarySizedMonotonic (A : Type) `{H1 : ArbitrarySized A}
+      `{H2 : forall s, SizeMonotonic (arbitrarySize s)}.
 
-Instance SizeMonotonicArbitrarySized (A : Type) `{ArbitrarySizedGenMonotonic A} (s : nat)
-: @SizeMonotonic A (arbitrarySize s).
-Proof.
-  constructor. eapply monotonic2.
-Qed.
-
-(** Monotonicity of size parametric generators *)
-Class ArbitrarySizedMotonic (A : Type) `{ArbitrarySized A} :=
-  {
-    monotonic :
-      forall s s1 s2,
-        s1 <= s2 ->
-        semGenSize (arbitrarySize s1) s \subset semGenSize (arbitrarySize s2) s
-  }.
+(* (** Monotonicity of size parametric generators *) *)
+(* Class ArbitrarySizedMotonic (A : Type) `{ArbitrarySized A} := *)
+(*   { *)
+(*     monotonic : *)
+(*       forall s s1 s2, *)
+(*         s1 <= s2 -> *)
+(*         semGenSize (arbitrarySize s1) s \subset semGenSize (arbitrarySize s2) s *)
+(*   }. *)
 
  
 (** Correctness of size parametric generators *)
@@ -95,11 +86,10 @@ Class ArbitrarySizedCorrect (A : Type) `{Sized A} `{ArbitrarySized A} :=
       forall s, semGen (arbitrarySize s) <--> [ set x : A | size x <= s ] 
   }.
 
-(** Monotonicity of generators *)
-Class ArbitraryMotonic (A : Type) `{Arbitrary A} :=
-  {
-    monotonic1 : SizeMonotonic arbitrary
-  }.
+
+Class ArbitraryMonotonic (A : Type) `{H1 : Arbitrary A}
+      `{H2 : @SizeMonotonic _ arbitrary}.
+
 
 (** Correctness of generators *)
 Class ArbitraryCorrect (A : Type) `{Arbitrary A}  :=
@@ -109,6 +99,23 @@ Class ArbitraryCorrect (A : Type) `{Arbitrary A}  :=
 
 
 (** Foo example *)
+
+(* TODO : prove and move to the appropriate file *)
+Instance frequencySizeMonotonic_alt 
+: forall {A : Type} (g0 : G A) (lg : seq (nat * G A)),
+    SizeMonotonic g0 ->
+    lg \subset [set x | SizeMonotonic x.2 ] ->
+    SizeMonotonic (frequency g0 lg).
+Admitted.
+
+Instance returnGenSizeMonotonic {A} (x : A) : SizeMonotonic (returnGen x).
+Admitted.
+
+
+Definition monotonicGen {A} (gen : G A) :=
+  forall s1 s2 : nat,
+    s1 <= s2 ->
+    semGenSize gen s1 \subset semGenSize gen s2.
 
 Inductive Foo (A : Type) {B : Type}: Type :=
 | Foo1 : A -> Foo A
@@ -120,16 +127,22 @@ DeriveArbitrarySized Foo as "arbSizedFoo".
 DeriveSized Foo as "SizedFoo".
 DeriveCanonicalSized Foo as "CanonSizedFoo".
 
-Instance arbFooArbitrarySizedGenMonotonic {A B : Type} `{H1 : ArbitraryMotonic A} `{H2 : ArbitraryMotonic B}  : @ArbitrarySizedGenMonotonic (@Foo A B) _.
-Proof.
-  constructor. simpl. inv H1; inv H2.
-  induction s; simpl; intros; try eauto with typeclass_instancoes.
-  eapply oneofMonotonic; try eauto with typeclass_instances.
-  intros g Hl. inv Hl. eauto with typeclass_instances.
-  inv H3. eauto with typeclass_instances. inv H4. 
-  apply frequencySizeMonotonic; try eauto with typeclass_instances.
-  repeat apply Forall_cons; eauto with typeclass_instances.
-Admitted.
+Typeclasses eauto := debug.
+
+(* Derives :
+
+Instance arbFooArbitrarySizedGenMonotonic {A B : Type}
+         `{H1 : ArbitraryMonotonic A}
+         `{H2 : ArbitraryMonotonic B}
+         (s : nat)
+        : SizeMonotonic (@arbitrarySize (@Foo A B) arbSizedFoo s).
+
+Needs the arbitrarySized instance to be specified.
+
+*)
+
+DeriveArbitrarySizedMonotonic Foo as "ArbSizedMonFoo" using "arbSizedFoo".
+
 
 Lemma arbFooCorrectSized {A B : Type} `{H1 : Arbitrary A} `{H2 : Arbitrary B}
       `{H1' : Sized A} `{H2' : Sized B} s :
@@ -191,43 +204,43 @@ Proof.
   exact (shrinkSize).
 Defined.
 
-Instance ArbitraryMonotonicFromSized (A : Type)
-         {H1 : ArbitrarySized A}
-         {H2 : @ArbitrarySizedGenMonotonic A H1}
-         {H3 : @ArbitrarySizedMotonic A H1} : @ArbitraryMotonic A _.
-Proof.
-  constructor. eapply sizedMonotonic.
-  intros n; eauto with typeclass_instances.
-  edestruct H3. eauto.
-Qed.
+(* Instance ArbitraryMonotonicFromSized (A : Type) *)
+(*          {H1 : ArbitrarySized A} *)
+(*          {H2 : @ArbitrarySizedGenMonotonic A H1} *)
+(*          {H3 : @ArbitrarySizedMotonic A H1} : @ArbitraryMotonic A _. *)
+(* Proof. *)
+(*   constructor. eapply sizedMonotonic. *)
+(*   intros n; eauto with typeclass_instances. *)
+(*   edestruct H3. eauto. *)
+(* Qed. *)
 
-Instance FooArbitrarySizedM {A B : Type} `{H1 : Arbitrary A} `{H2 : Arbitrary B}
-         `{H1' : Sized A} `{H2' : Sized B} : @ArbitrarySizedMotonic (@Foo A B) _.
-Proof.
-  constructor. intros.
-  (* we need proof for that *)
-Admitted.
+(* Instance FooArbitrarySizedM {A B : Type} `{H1 : Arbitrary A} `{H2 : Arbitrary B} *)
+(*          `{H1' : Sized A} `{H2' : Sized B} : @ArbitrarySizedMotonic (@Foo A B) _. *)
+(* Proof. *)
+(*   constructor. intros. *)
+(*   (* we need proof for that *) *)
+(* Admitted. *)
 
-Instance ArbitraryCorrectFromSized (A : Type)
-         {H1 : ArbitrarySized A}
-         {Hs : Sized A}
-         {H2 : @ArbitrarySizedMotonic A H1}
-         {H3 : @ArbitrarySizedGenMonotonic A H1}
-         {H4 : @ArbitrarySizedCorrect A Hs H1} : @ArbitraryCorrect A _.
-Proof.
-  constructor. unfold arbitrary, ArbitraryFromSized.
-  eapply set_eq_trans.
-  - eapply semSized_alt; eauto with typeclass_instances.
-    destruct H2. eauto.
-  - setoid_rewrite arbitrarySizeCorrect.
-    split. intros [n H]. constructor; eauto.
-    intros H. eexists; split; eauto.
-Qed.
+(* Instance ArbitraryCorrectFromSized (A : Type) *)
+(*          {H1 : ArbitrarySized A} *)
+(*          {Hs : Sized A} *)
+(*          {H2 : @ArbitrarySizedMotonic A H1} *)
+(*          {H3 : @ArbitrarySizedGenMonotonic A H1} *)
+(*          {H4 : @ArbitrarySizedCorrect A Hs H1} : @ArbitraryCorrect A _. *)
+(* Proof. *)
+(*   constructor. unfold arbitrary, ArbitraryFromSized. *)
+(*   eapply set_eq_trans. *)
+(*   - eapply semSized_alt; eauto with typeclass_instances. *)
+(*     destruct H2. eauto. *)
+(*   - setoid_rewrite arbitrarySizeCorrect. *)
+(*     split. intros [n H]. constructor; eauto. *)
+(*     intros H. eexists; split; eauto. *)
+(* Qed. *)
 
-Typeclasses eauto := debug.
+(* Typeclasses eauto := debug. *)
 
-Definition goodArbFoo {A B} `{H1 : Arbitrary A} `{H2 : Arbitrary B}
-         `{H1' : Sized A} `{H2' : Sized B} : Arbitrary (@Foo A B) := @ArbitraryFromSized (@Foo A B) _.
+(* Definition goodArbFoo {A B} `{H1 : Arbitrary A} `{H2 : Arbitrary B} *)
+(*          `{H1' : Sized A} `{H2' : Sized B} : Arbitrary (@Foo A B) := @ArbitraryFromSized (@Foo A B) _. *)
 
 (* Definition correct {A B} `{H1 : Arbitrary A} `{H2 : Arbitrary B} *)
 (*            `{H1' : Sized A} `{H2' : Sized B} := *)

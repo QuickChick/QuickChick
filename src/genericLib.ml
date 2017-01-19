@@ -402,7 +402,7 @@ let declare_class_instance instance_arguments instance_name instance_type instan
   ignore (Classes.new_instance true 
                                iargs
                        (((dummy_loc, (Name (id_of_string instance_name))), None)
-                       , Decl_kinds.Explicit, instance_type) 
+                       , Decl_kinds.Explicit, instance_type vars) 
                        (Some (true, instance_record vars)) (* TODO: true or false? *)
                        None
          )

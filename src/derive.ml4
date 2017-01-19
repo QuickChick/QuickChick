@@ -73,7 +73,7 @@ let derive (cn : derivable) (c : constr_expr) (instance_name : string) (extra_na
                           ) coqTyParams) in
 
   (* The instance type *)
-  let instance_type = gApp (gInject class_name) [full_dt] in
+  let instance_type iargs = gApp (gInject class_name) [full_dt] in
 
   let isCurrentTyCtr = function
     | TyCtr (ty_ctr', _) -> ty_ctr = ty_ctr'

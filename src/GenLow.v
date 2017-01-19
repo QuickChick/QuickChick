@@ -75,10 +75,12 @@ Class SizeMonotonic {A} (g : G A) := {
 Class CanonicalSize A := 
   { sizeOf : A -> nat }.
 
-(* CH: Why does Unsized need a _ when A is marked as implict! *)
-(* begin unsizedMonotonic *)
-Declare Instance unsizedMonotonic {A} (g : G A) `{Unsized _ g} : SizeMonotonic g.
-(* end unsizedMonotonic *)
+(* Zoe: We do not need that when we do automatic resolution. Probably add it as a lemma ?*)
+(* (* CH: Why does Unsized need a _ when A is marked as implict! *) *)
+(* (* begin unsizedMonotonic *) *)
+(* Declare Instance unsizedMonotonic {A} (g : G A) `{Unsized _ g} : SizeMonotonic g. *)
+(* (* end unsizedMonotonic *) *)
+
 
 Parameter unsized_alt_def : 
   forall A (g : G A) `{Unsized _ g},

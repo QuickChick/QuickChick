@@ -5,6 +5,7 @@ Declare ML Module "quickChick".
 Declare ML Module "derive".
 Declare ML Module "Sized".
 Declare ML Module "ArbitrarySized".
+Declare ML Module "SizeMon".
 Declare ML Module "driver".
 
 Axiom _W : nat -> Prop.
