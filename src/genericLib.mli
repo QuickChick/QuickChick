@@ -62,6 +62,26 @@ val ctr_rep_to_string : ctr_rep -> string
 type dt_rep = ty_ctr * ty_param list * ctr_rep list
 val dt_rep_to_string : dt_rep -> string
 
+type ty_var 
+val ty_var_to_string : ty_var -> string
+val gTyVar : ty_var -> coq_expr
+
+(* Supertype of coq_type handling potentially dependent stuff - TODO : merge *)
+type dep_type = 
+  | DArrow of dep_type * dep_type (* Unnamed arrows *)
+  | DProd  of (ty_var * dep_type) * dep_type (* Binding arrows *)
+  | DTyParam of ty_param (* Type parameters - for simplicity *)
+  | DTyCtr of ty_ctr * dep_type list (* Type Constructor *)
+  | DTyVar of ty_var (* Use of a previously captured type variable *)
+
+val dep_type_to_string : dep_type -> string
+
+type dep_ctr = constructor * dep_type
+val dep_ctr_to_string : dep_ctr -> string
+
+type dep_dt = ty_ctr * ty_param list * dep_ctr list
+val dep_dt_to_string : dep_dt -> string
+
 (* option type helpers *)
 val (>>=) : 'a option -> ('a -> 'b option) -> 'b option                                   
 val isSome : 'a option -> bool
@@ -71,6 +91,9 @@ val sequenceM : ('a -> 'b option) -> 'a list -> 'b list option
 
 val dt_rep_from_mib : mutual_inductive_body -> dt_rep option
 val coerce_reference_to_dt_rep : constr_expr -> dt_rep option
+
+val dep_dt_from_mib : mutual_inductive_body -> dep_dt option
+val coerce_reference_to_dep_dt : constr_expr -> dep_dt option
 
 val fresh_name : string -> var 
 val make_up_name : unit -> var

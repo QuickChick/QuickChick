@@ -88,7 +88,37 @@ let dt_rep_to_string (ty_ctr, ty_params, ctrs) =
                                 (str_lst_to_string " "  (List.map ty_param_to_string ty_params))
                                 (str_lst_to_string "\n" (List.map ctr_rep_to_string  ctrs))
                                  
+type ty_var = Id.t (* Opaque *)
+let ty_var_to_string x = Id.to_string x
+let gTyVar = mkIdentC
 
+(* Supertype of coq_type handling potentially dependent stuff - TODO : merge *)
+type dep_type = 
+  | DArrow of dep_type * dep_type (* Unnamed arrows *)
+  | DProd  of (ty_var * dep_type) * dep_type (* Binding arrows *)
+  | DTyParam of ty_param (* Type parameters - for simplicity *)
+  | DTyCtr of ty_ctr * dep_type list (* Type Constructor *)
+  | DTyVar of ty_var (* Use of a previously captured type variable *)
+
+let rec dep_type_to_string dt = 
+  match dt with 
+  | DArrow (d1, d2) -> Printf.sprintf "%s -> %s" (dep_type_to_string d1) (dep_type_to_string d2)
+  | DProd  ((x,d1), d2) -> Printf.sprintf "(%s : %s) -> %s" (ty_var_to_string x) (dep_type_to_string d1) (dep_type_to_string d2)
+  | DTyCtr (ty_ctr, ds) -> ty_ctr_to_string ty_ctr ^ " " ^ str_lst_to_string " " (List.map dep_type_to_string ds)
+  | DTyParam tp -> ty_param_to_string tp
+  | DTyVar tv -> ty_var_to_string tv
+
+type dep_ctr = constructor * dep_type
+let dep_ctr_to_string (ctr, dt) = 
+  Printf.sprintf "%s : %s" (constructor_to_string ctr) (dep_type_to_string dt)
+
+type dep_dt = ty_ctr * ty_param list * dep_ctr list
+let dep_dt_to_string (ty_ctr, ty_params, ctrs) = 
+  Printf.sprintf "%s %s :=\n%s" (ty_ctr_to_string ty_ctr) 
+                                (str_lst_to_string " "  (List.map ty_param_to_string ty_params))
+                                (str_lst_to_string "\n" (List.map dep_ctr_to_string  ctrs))
+
+(* Option monad *)
 let (>>=) m f = 
   match m with
   | Some x -> f x 
@@ -212,6 +242,52 @@ let coerce_reference_to_dt_rep c =
   let mib = Environ.lookup_mind mind env in
   
   dt_rep_from_mib mib
+
+(* Dependent derivations - lots of code reuse *)
+
+(* Input : arity_ctxt [Name, Body (option) {expected None}, Type] 
+   In reverse order.
+   Output: all type parameters (named arguments of type : Type)
+           in correct order *)
+let dep_parse_type_params arity_ctxt =
+  let param_names =
+    foldM (fun acc (n, _, t) -> 
+           match n with
+           | Name id -> (* Actual parameters are named of type Type with some universe *)
+              if is_Type t then Some (id :: acc) else Some acc
+           | _ -> (* Ignore *) Some acc
+          ) (Some []) arity_ctxt in
+  param_names
+
+let dep_dt_from_mib mib = 
+  if Array.length mib.mind_packets > 1 then begin
+    msgerr (str "Mutual inductive types not supported yet." ++ fnl());
+    None
+  end else 
+    let oib = mib.mind_packets.(0) in
+    let ty_ctr = oib.mind_typename in 
+    dep_parse_type_params oib.mind_arity_ctxt >>= fun ty_params ->
+    List.iter (fun tp -> msgerr (str (ty_param_to_string tp) ++ fnl ())) ty_params;
+    None
+(*    let result_ctr = TyCtr (ty_ctr, List.map (fun x -> TyParam x) ty_params) in
+    parse_constructors mib.mind_nparams ty_params result_ctr oib >>= fun ctr_reps ->
+    Some (ty_ctr, ty_params, ctr_reps)
+ *)
+let coerce_reference_to_dep_dt c = 
+  let r = match c with
+    | CRef (r,_) -> r
+    | _ -> failwith "Not a reference" in
+
+  (* Extract id/string representation - which to use? :/ *)
+  let qidl = qualid_of_reference r in
+
+  let env = Global.env () in
+  
+  let glob_ref = Nametab.global r in
+  let (mind,_) = Globnames.destIndRef glob_ref in
+  let mib = Environ.lookup_mind mind env in
+  
+  dep_dt_from_mib mib
                   
 let fresh_name n : Id.t =
     let base = Names.id_of_string n in

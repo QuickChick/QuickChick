@@ -620,8 +620,14 @@ let deriveSizeEqProof c s =
   ignore (defineConstant (s ^ "_eq_proof") eqproof);
   (* debug_coq_expr eqproof; *)
   ignore (defineConstant (s ^ "_eq_proof_O") zeroproof);
-  ignore (defineConstant (s ^ "_eq_proof_S") succproof);
+  ignore (defineConstant (s ^ "_eq_proof_S") succproof)
   (* debug_coq_expr succproof; *)
+
+let deriveDependent c = 
+  let dt = match coerce_reference_to_dep_dt c with
+    | Some dt -> dt 
+    | None -> failwith "Not supported type" in 
+  msgerr (str (dep_dt_to_string dt) ++ fnl())
 
 
 VERNAC COMMAND EXTEND DeriveShow
@@ -646,7 +652,11 @@ END;;
 
 VERNAC COMMAND EXTEND DeriveSizeEqsProof
   | ["DeriveSizeEqsProof" constr(c) "as" string(s)] -> [deriveSizeEqProof c s]
-    END;;
+END;;
+
+VERNAC COMMAND EXTEND DependentDerive
+  | ["DeriveDependent" constr(c)] -> [deriveDependent c]
+END;;
 
 (* Advanced Generators *)
 
