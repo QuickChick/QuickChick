@@ -17,6 +17,25 @@ open Ppconstr
 open Context
 
 let cnt = ref 0 
+
+let fresh_name n : Id.t =
+    let base = Names.id_of_string n in
+
+  (** [is_visible_name id] returns [true] if [id] is already
+      used on the Coq side. *)
+    let is_visible_name id =
+      try
+        ignore (Nametab.locate (Libnames.qualid_of_ident id));
+        true
+      with Not_found -> false
+    in
+    (** Safe fresh name generation. *)
+    Namegen.next_ident_away_from base is_visible_name
+
+let make_up_name () : Id.t =
+  let id = fresh_name (Printf.sprintf "mu%d" (!cnt)) in
+  cnt := !cnt + 1;
+  id
        
 let dl x = (dummy_loc, x)
 let hole = CHole (dummy_loc, None, Misctypes.IntroAnonymous, None)
@@ -27,6 +46,9 @@ type coq_expr = constr_expr (* Opaque *)
 
 let debug_coq_expr (c : coq_expr) : unit =
   msgerr (pr_constr_expr c)
+
+let debug_constr (c : constr) : unit = 
+  msgerr (Printer.pr_constr c ++ fnl ())
 
 (* Non-dependent version *)
 type var = Id.t (* Opaque *)
@@ -259,6 +281,79 @@ let dep_parse_type_params arity_ctxt =
           ) (Some []) arity_ctxt in
   param_names
 
+let rec dep_arrowify terminal names types = 
+  match names, types with
+  | [], [] -> terminal
+  | (Name x)::ns , t::ts -> DProd ((x,t), dep_arrowify terminal ns ts)
+  | Anonymous::ns, t::ts -> DArrow (t, dep_arrowify terminal ns ts)
+  | _, _ -> failwith "Invalid argument to dep_arrowify"
+
+
+(* Dependent version: 
+   nparams is numver of Type parameters 
+   param_names are type parameters (length = nparams)
+
+   Returns list of constructor representations 
+ *)
+let dep_parse_constructors nparams param_names oib : dep_ctr list option =
+  
+  let parse_constructor branch : dep_ctr option =
+    let (ctr_id, ty_ctr) = branch in
+
+    let (_, ty) = Term.decompose_prod_n nparams ty_ctr in
+    
+    let (ctr_pats, result) = if Term.isConst ty then ([],ty) else Term.decompose_prod ty in
+
+    let pat_names, pat_types = List.split (List.rev ctr_pats) in
+
+    let arg_names = 
+      List.map (fun x -> DTyParam x) param_names @ 
+      List.map (fun n -> match n with
+                         | Name x -> DTyVar x 
+                         | Anonymous -> DTyVar (make_up_name ()) (* Make up a name, but probably can't be used *)
+               ) pat_names in 
+
+    msgerr (str (Id.to_string ctr_id) ++ fnl ());
+    let rec aux i ty = 
+      if isRel ty then begin 
+        msgerr (int (i + nparams) ++ str " Rel " ++ int (destRel ty) ++ fnl ());
+        let db = destRel ty in
+        if i + nparams = db then (* Current inductive, no params, almost impossible to happend in dependent I guess *)
+          Some (DTyCtr (oib.mind_typename, []))
+        else (* [i + nparams - db]th parameter *)
+          try Some (List.nth arg_names (i + nparams - db - 1))
+          with _ -> msgerr (str "nth failed: " ++ int (i + nparams - db - 1) ++ fnl ()); None
+      end 
+      else if isApp ty then begin
+        let (ctr, tms) = decompose_app ty in 
+        foldM (fun acc ty -> 
+               aux i ty >>= fun ty' -> Some (ty' :: acc)
+              ) (Some []) tms >>= fun tms' ->
+        match aux i ctr with
+        | Some (DTyCtr (c, _)) -> Some (DTyCtr (c, List.rev tms'))
+        | None -> msgerr (str "Aux failed?" ++ fnl ()); None
+      end
+      else if isInd ty then begin
+        let ((mind,_),_) = destInd ty in
+        Some (DTyCtr (Label.to_id (MutInd.label mind), []))
+      end
+      else if isConstruct ty then begin
+        let (((mind, _), _),_) = destConstruct ty in
+        Some (DTyCtr (Label.to_id (MutInd.label mind), []))
+      end
+      else (msgerr (str "Dep Case Not Handled" ++ fnl()); 
+            debug_constr ty;
+            None) in
+    
+    aux (List.length ctr_pats) result >>= fun result_ty ->
+
+    sequenceM (fun x -> x) (List.mapi aux (List.map (Vars.lift (-1)) pat_types)) >>= fun types ->
+    Some (ctr_id, dep_arrowify result_ty pat_names types)
+  in
+
+  sequenceM parse_constructor (List.combine (Array.to_list oib.mind_consnames)
+                                            (Array.to_list oib.mind_nf_lc))
+
 let dep_dt_from_mib mib = 
   if Array.length mib.mind_packets > 1 then begin
     msgerr (str "Mutual inductive types not supported yet." ++ fnl());
@@ -268,11 +363,9 @@ let dep_dt_from_mib mib =
     let ty_ctr = oib.mind_typename in 
     dep_parse_type_params oib.mind_arity_ctxt >>= fun ty_params ->
     List.iter (fun tp -> msgerr (str (ty_param_to_string tp) ++ fnl ())) ty_params;
-    None
-(*    let result_ctr = TyCtr (ty_ctr, List.map (fun x -> TyParam x) ty_params) in
-    parse_constructors mib.mind_nparams ty_params result_ctr oib >>= fun ctr_reps ->
+    dep_parse_constructors (List.length ty_params) ty_params oib >>= fun ctr_reps ->
     Some (ty_ctr, ty_params, ctr_reps)
- *)
+
 let coerce_reference_to_dep_dt c = 
   let r = match c with
     | CRef (r,_) -> r
@@ -289,25 +382,6 @@ let coerce_reference_to_dep_dt c =
   
   dep_dt_from_mib mib
                   
-let fresh_name n : Id.t =
-    let base = Names.id_of_string n in
-
-  (** [is_visible_name id] returns [true] if [id] is already
-      used on the Coq side. *)
-    let is_visible_name id =
-      try
-        ignore (Nametab.locate (Libnames.qualid_of_ident id));
-        true
-      with Not_found -> false
-    in
-    (** Safe fresh name generation. *)
-    Namegen.next_ident_away_from base is_visible_name
-
-let make_up_name () : Id.t =
-  let id = fresh_name (Printf.sprintf "mu%d" (!cnt)) in
-  cnt := !cnt + 1;
-  id
-
 let gApp ?explicit:(expl=false) c cs =
   if expl then
     match c with
