@@ -315,6 +315,7 @@ let dep_parse_constructors nparams param_names oib : dep_ctr list option =
 
     msgerr (str (Id.to_string ctr_id) ++ fnl ());
     let rec aux i ty = 
+      msgerr (str "Calling aux with: " ++ int i ++ str " " ++ Printer.pr_constr ty ++ fnl());
       if isRel ty then begin 
         msgerr (int (i + nparams) ++ str " Rel " ++ int (destRel ty) ++ fnl ());
         let db = destRel ty in
@@ -322,7 +323,7 @@ let dep_parse_constructors nparams param_names oib : dep_ctr list option =
           Some (DTyCtr (oib.mind_typename, []))
         else (* [i + nparams - db]th parameter *)
           try Some (List.nth arg_names (i + nparams - db - 1))
-          with _ -> msgerr (str "nth failed: " ++ int (i + nparams - db - 1) ++ fnl ()); None
+          with _ -> msgerr (str "nth failed: " ++ int i ++ str " " ++ int nparams ++ str " " ++ int db ++ str " " ++ int (i + nparams - db - 1) ++ fnl ()); None
       end 
       else if isApp ty then begin
         let (ctr, tms) = decompose_app ty in 
@@ -338,15 +339,18 @@ let dep_parse_constructors nparams param_names oib : dep_ctr list option =
         Some (DTyCtr (Label.to_id (MutInd.label mind), []))
       end
       else if isConstruct ty then begin
-        let (((mind, _), _),_) = destConstruct ty in
-        Some (DTyCtr (Label.to_id (MutInd.label mind), []))
+        let ((ind, idx),_) = destConstruct ty in
+        let cname = oib.mind_consnames.(idx - 1) in
+        Some (DTyCtr (cname, []))
       end
       else (msgerr (str "Dep Case Not Handled" ++ fnl()); 
             debug_constr ty;
             None) in
     
-    aux (List.length ctr_pats) result >>= fun result_ty ->
+    msgerr (str "Calculating result type" ++ fnl ()); 
+    aux (1 + nparams + (List.length ctr_pats)) result >>= fun result_ty ->
 
+    msgerr (str "Calculating types" ++ fnl ()); 
     sequenceM (fun x -> x) (List.mapi aux (List.map (Vars.lift (-1)) pat_types)) >>= fun types ->
     Some (ctr_id, dep_arrowify result_ty pat_names types)
   in

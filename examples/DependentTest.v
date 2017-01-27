@@ -31,14 +31,12 @@ Arguments Bar1 {A} {B} _.
 Arguments Bar2 {A} {B} _.
 Arguments Bar3 {A} {B} _ _ _ _.
 
-Inductive goodBar (A B : Type) (n : nat) : Bar A B -> Prop :=
-| Bar1 : forall a, goodBar n (Bar1a)
-| Bar2 : forall bar, goodBar 0 bar -> goodBar n (Bar2 bar)
-| Bar3 : forall a b bar,
+Inductive goodBar {A B : Type} (n : nat) : Bar A B -> Prop :=
+| goodBar1 : forall a, goodBar n (Bar1 a)
+| goodBar2 : forall bar, goodBar 0 bar -> goodBar n (Bar2 bar)
+| goodBar3 : forall a b bar,
             goodBar n bar ->
-            goodFoo n (Bar3 a b (Bar1 a) bar).
+            goodBar n (Bar3 a b (Bar1 a) bar).
 
-
-
-DeriveDependent goodFoo.
+DeriveDependent goodBar.
 
