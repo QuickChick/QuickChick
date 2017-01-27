@@ -319,7 +319,7 @@ let dep_parse_constructors nparams param_names oib : dep_ctr list option =
       if isRel ty then begin 
         msgerr (int (i + nparams) ++ str " Rel " ++ int (destRel ty) ++ fnl ());
         let db = destRel ty in
-        if i + nparams = db then (* Current inductive, no params, almost impossible to happend in dependent I guess *)
+        if i + nparams = db then (* Current inductive, no params *)
           Some (DTyCtr (oib.mind_typename, []))
         else (* [i + nparams - db]th parameter *)
           try Some (List.nth arg_names (i + nparams - db - 1))
@@ -348,7 +348,7 @@ let dep_parse_constructors nparams param_names oib : dep_ctr list option =
             None) in
     
     msgerr (str "Calculating result type" ++ fnl ()); 
-    aux (1 + nparams + (List.length ctr_pats)) result >>= fun result_ty ->
+    aux (1 + (List.length ctr_pats)) result >>= fun result_ty ->
 
     msgerr (str "Calculating types" ++ fnl ()); 
     sequenceM (fun x -> x) (List.mapi aux (List.map (Vars.lift (-1)) pat_types)) >>= fun types ->
