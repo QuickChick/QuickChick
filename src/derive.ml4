@@ -623,13 +623,6 @@ let deriveSizeEqProof c s =
   ignore (defineConstant (s ^ "_eq_proof_S") succproof)
   (* debug_coq_expr succproof; *)
 
-let deriveDependent c = 
-  let dt = match coerce_reference_to_dep_dt c with
-    | Some dt -> dt 
-    | None -> failwith "Not supported type" in 
-  msgerr (str (dep_dt_to_string dt) ++ fnl())
-
-
 VERNAC COMMAND EXTEND DeriveShow
   | ["DeriveShow" constr(c) "as" string(s)] -> [derive Show c s ""]
 END;;
@@ -654,10 +647,6 @@ VERNAC COMMAND EXTEND DeriveSizeEqsProof
   | ["DeriveSizeEqsProof" constr(c) "as" string(s)] -> [deriveSizeEqProof c s]
 END;;
 
-VERNAC COMMAND EXTEND DependentDerive
-  | ["DeriveDependent" constr(c)] -> [deriveDependent c]
-END;;
-
 (* Advanced Generators *)
 
 (* Unknowns are strings *)
@@ -672,26 +661,14 @@ type umap = range UM.t
 
 let lookup k m = try Some (UM.find k m) with Not_found -> None
 
-let (>>=) (m : 'a option) (f : 'a -> 'b option) : 'b option =
-  match m with
-  | Some a -> f a
-  | None -> None
-
-let fold_opt (f : 'b -> 'a -> 'b option) (b : 'b) (xs : 'a list) : 'b option =
-  let f' x k z = f z x >>= k in
-  List.fold_right f' xs (fun x -> Some x) b
-
-(* I NEED AN OPTION MONAD *)
 let rec unify (k : umap) (r1 : range) (r2 : range) : (umap * range) option =
   match r1, r2 with
   | Unknown u, FixedInput
   | FixedInput, Unknown u ->
      begin match lookup u k with
      | Some r ->
-        begin match unify k r FixedInput with
-        | Some (k', r') -> Some (UM.add u r' k', Unknown u)
-        | None -> None
-        end
+        unify k r FixedInput >>= fun (k', r') ->
+        Some (UM.add u r' k', Unknown u)
      | None -> Some (UM.add u FixedInput k, Unknown u)
      end
   | Unknown u1, Unknown u2 ->
@@ -709,17 +686,104 @@ let rec unify (k : umap) (r1 : range) (r2 : range) : (umap * range) option =
           end
   | Ctr (c1, rs1), Ctr (c2, rs2) ->
      if c1 == c2 then
-       begin match fold_opt (fun b a -> let (r1, r2) = a in
+       begin match foldM (fun b a -> let (r1, r2) = a in
                                let (k, l) = b in
                                unify k r1 r2 >>= fun b' ->
                                let (k', r') = b' in
                                Some (k', r'::l)
-                            ) (k , []) (List.combine rs1 rs2) with
+                            ) (Some (k , [])) (List.combine rs1 rs2) with
        | Some (k', rs) -> Some (k', Ctr (c1, List.rev rs))
        | None -> None
        end
      else None
   | _, _ -> None
+
+type name_provider = { next_name : unit -> string }
+
+let mk_name_provider s = 
+  let cnt = ref 0 in
+  { next_name = fun () -> 
+      let res = s ^ string_of_int !cnt in
+      incr cnt;
+      res 
+  }
+
+let deriveDependent c nc gen_name = 
+  let n = parse_integer nc in
+  let (ty_ctr, ty_params, ctrs, dep_type) = 
+    match coerce_reference_to_dep_dt c with
+    | Some dt -> msgerr (str (dep_dt_to_string dt) ++ fnl()); dt 
+    | None -> failwith "Not supported type" in 
+
+  msgerr (str (string_of_int n) ++ fnl ());
+  let gen_type = gGen (gOption (gType ty_params (nthType n dep_type))) in
+  debug_coq_expr gen_type;
+
+  let gen = mk_name_provider "gen" in
+  let dec = mk_name_provider "dec" in 
+
+  let aux_arb rec_name size vars = 
+    gMatch (gVar size) 
+           [ (injectCtr "O", [], 
+              fun _ -> returnGen gNone) (* Base cases *)
+           ; (injectCtr "S", ["size'"],
+              fun [size'] -> returnGen gNone) (* Non-base cases *)
+           ] in
+  let generator = gRecFunIn 
+                    ~assumType:(gen_type)
+                    "aux_arb" ["size"] (fun (rec_name, size::vars) -> aux_arb rec_name size vars) 
+                                               (fun rec_name -> gVar rec_name)
+  in
+
+  let fn = defineTypedConstant gen_name generator hole in
+  ()
+
+(*
+       let arbitrary_decl =
+
+         (* Need reverse fold for this *)
+         let create_for_branch tyParams ps rec_name size (ctr, ty) =
+           let rec aux i acc ty : coq_expr =
+             match ty with
+             | Arrow (ty1, ty2) ->
+                bindGen (if isCurrentTyCtr ty1 then gApp (gVar rec_name) (gVar size :: List.map gVar ps) else gInject "arbitrary")
+                        (Printf.sprintf "p%d" i)
+                        (fun pi -> aux (i+1) ((gVar pi) :: acc) ty2)
+             | _ -> returnGen (gApp ~explicit:true (gCtr ctr) (tyParams @ List.rev acc))
+           in aux 0 [] ty in
+
+         let bases = List.filter (fun (_, ty) -> isBaseBranch ty) ctrs in
+         let aux_arb =
+             let explicitly_typed_arguments =
+               List.concat (List.map (fun tp ->
+                           [ gArg ~assumName:tp ();
+                             gArg ~assumName:(gVar (make_up_name())) ~assumType:(gApp (gInject class_name) [tp]) ()]
+                          ) coqTyParams) in
+
+             gRecFunInWithArgs
+               "aux_arb" (gArg ~assumName:(gInject "size") () :: explicitly_typed_arguments)
+               (fun (aux_arb, size::ps) ->
+                let tyParams = List.map gVar (list_drop_every 2 ps) in
+                gMatch (gVar size)
+                       [(injectCtr "O", [],
+                         fun _ -> oneof (List.map (create_for_branch tyParams ps aux_arb size) bases))
+                       ;(injectCtr "S", ["size'"],
+                         fun [size'] -> frequency (List.map (fun (ctr,ty') ->
+                                                             ((if isBaseBranch ty' then gInt 1 else gVar size),
+                                                              create_for_branch tyParams ps aux_arb size' (ctr,ty'))) ctrs))
+                       ])
+               (fun x -> gVar x) in
+
+         let fn = defineConstant extra_name aux_arb in
+         msgerr (str "Defined" ++ fnl ());
+
+         gApp (gInject "sized") [gFun ["s"] (fun [s] -> gApp (gVar fn) ((gVar s) :: List.map gVar iargs))]
+           in
+           *)
+
+VERNAC COMMAND EXTEND DependentDerive
+  | ["DeriveDependent" constr(c) "for" constr(n) "as" string(s)] -> [deriveDependent c n s]
+END;;
 
 (*
 type annotation = Size | Weight of int

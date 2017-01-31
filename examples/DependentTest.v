@@ -22,6 +22,8 @@ Inductive goodFoo (n : nat) : Foo -> Prop :=
             goodFoo n foo2 ->
             goodFoo n (Foo3 n Foo1 foo2).
 
+DeriveDependent goodFoo for 2 as "genGoodFoo". 
+
 Inductive Bar A B :=
 | Bar1 : A -> Bar A B
 | Bar2 : Bar A B -> Bar A B
@@ -38,5 +40,4 @@ Inductive goodBar {A B : Type} (n : nat) : Bar A B -> Prop :=
             goodBar n bar ->
             goodBar n (Bar3 a b (Bar1 a) bar).
 
-DeriveDependent goodBar.
-
+DeriveDependent goodBar for 2 as "genGoodBar".
