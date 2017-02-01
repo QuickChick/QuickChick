@@ -729,13 +729,21 @@ let deriveDependent c nc gen_name =
            ; (injectCtr "S", ["size'"],
               fun [size'] -> returnGen gNone) (* Non-base cases *)
            ] in
-  let generator = gRecFunIn 
+
+  
+  let generator_body = gRecFunIn 
                     ~assumType:(gen_type)
                     "aux_arb" ["size"] (fun (rec_name, size::vars) -> aux_arb rec_name size vars) 
                                                (fun rec_name -> gVar rec_name)
   in
 
-  let fn = defineTypedConstant gen_name generator hole in
+  let with_args = 
+    match ty_params with
+    | [] -> generator_body
+    | _  -> gFunWithArgs (List.map (fun tp -> gArg ~assumName:(gTyParam tp) ()) ty_params) (fun _ -> generator_body)
+  in 
+
+  let fn = defineTypedConstant gen_name with_args hole in
   ()
 
 (*
