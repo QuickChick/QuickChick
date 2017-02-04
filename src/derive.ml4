@@ -717,7 +717,7 @@ let deriveDependent c nc gen_name =
 
   msgerr (str (string_of_int n) ++ fnl ());
   let gen_type = gGen (gOption (gType ty_params (nthType n dep_type))) in
-  debug_coq_expr gen_type;
+  debug_coq_expr (gType ty_params dep_type);
 
   let gen = mk_name_provider "gen" in
   let dec = mk_name_provider "dec" in 
@@ -737,10 +737,33 @@ let deriveDependent c nc gen_name =
                                                (fun rec_name -> gVar rec_name)
   in
 
+  let input_arguments = 
+    let rec aux acc i = function
+      | DArrow (dt1, dt2) -> aux acc (i+1) dt2 
+      | DProd ((x,dt1), dt2) -> 
+         if i == n then (* i == n means this is what we generate for - ignore *)
+           aux acc (i+1) dt2
+         else (* otherwise this needs to be an input argument *)
+           aux ((x, gType ty_params dt1) :: acc) (i+1) dt2 
+      | DTyParam tp -> acc
+      | DTyCtr (c,dts) -> acc
+      | DTyVar _ -> acc
+    in aux [] 1 dep_type (* 1 because of using 1-indexed counting for the arguments *)       
+  in 
+
+  (* TODO: These should be generated through some writer monad *)
+  let gen_needed = [] in
+  let dec_needed = [] in
+
+  let args = List.map (fun tp -> gArg ~assumName:(gTyParam tp) ()) ty_params
+           @ List.map (fun (x,t) -> gArg ~assumName:(gTyVar x) ~assumType:t ()) input_arguments 
+           @ gen_needed
+           @ dec_needed in
+
   let with_args = 
-    match ty_params with
+    match args with
     | [] -> generator_body
-    | _  -> gFunWithArgs (List.map (fun tp -> gArg ~assumName:(gTyParam tp) ()) ty_params) (fun _ -> generator_body)
+    | _  -> gFunWithArgs args (fun _ -> generator_body)
   in 
 
   let fn = defineTypedConstant gen_name with_args hole in

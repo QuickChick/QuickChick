@@ -508,8 +508,12 @@ let gAnnot (p : coq_expr) (tau : coq_expr) =
 let gType ty_params dep_type = 
   let rec aux dt : coq_expr = 
     match dt with
-    | DArrow (dt1, dt2) -> failwith "arrows?"
-    | DProd ((_,dt1), dt2) -> failwith "arrows?"
+    | DArrow (dt1, dt2) -> let t1 = aux dt1 in
+                           let t2 = aux dt2 in 
+                           gFunWithArgs [gArg ~assumType:t1 ()] (fun _ -> t2)
+    | DProd ((x,dt1), dt2) -> let t1 = aux dt1 in
+                              let t2 = aux dt2 in 
+                              gProdWithArgs [gArg ~assumName:(gVar x) ~assumType:t1 ()] (fun _ -> t2)
     | DTyParam tp -> gTyParam tp
     | DTyCtr (c,dts) -> gApp (gTyCtr c) (List.map aux dts)
     | DTyVar _ -> failwith "dependent?" in
