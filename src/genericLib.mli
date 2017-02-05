@@ -72,6 +72,7 @@ type dep_type =
   | DProd  of (ty_var * dep_type) * dep_type (* Binding arrows *)
   | DTyParam of ty_param (* Type parameters - for simplicity *)
   | DTyCtr of ty_ctr * dep_type list (* Type Constructor *)
+  | DCtr of constructor * dep_type list (* Type Constructor *)
   | DTyVar of ty_var (* Use of a previously captured type variable *)
 
 val dep_type_to_string : dep_type -> string
@@ -162,6 +163,10 @@ val frequency : (coq_expr * coq_expr) list -> coq_expr
 (* Recursion combinators / fold *)
 val fold_ty  : ('a -> coq_type -> 'a) -> (ty_ctr * coq_type list -> 'a) -> (ty_param -> 'a) -> coq_type -> 'a
 val fold_ty' : ('a -> coq_type -> 'a) -> 'a -> coq_type -> 'a 
+
+val dep_fold_ty  : ('a -> dep_type -> 'a) -> ('a -> ty_var -> dep_type -> 'a) ->
+                   (ty_ctr * dep_type list -> 'a) -> (constructor * dep_type list -> 'a) -> 
+                   (ty_param -> 'a) -> (ty_var -> 'a) -> dep_type -> 'a
 
 (* Generate Type Names *)
 val generate_names_from_type : string -> coq_type -> string list 

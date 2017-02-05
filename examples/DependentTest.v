@@ -15,12 +15,12 @@ Inductive Foo :=
 | Foo2 : Foo -> Foo
 | Foo3 : nat -> Foo -> Foo -> Foo.
 
-Inductive goodFoo (n : nat) : Foo -> Prop :=
-| Good1 : goodFoo n Foo1
-| Good2 : forall foo, goodFoo 0 foo -> goodFoo n (Foo2 foo)
-| Good3 : forall foo2,
+Inductive goodFoo : nat -> Foo -> Prop :=
+| Good1 : forall n, goodFoo n Foo1
+| Good2 : forall n foo, goodFoo 0 foo -> goodFoo n (Foo2 foo)
+| Good3 : forall n foo2,
             goodFoo n foo2 ->
-            goodFoo n (Foo3 n Foo1 foo2).
+            goodFoo (S n) (Foo3 n Foo1 foo2).
 
 DeriveDependent goodFoo for 2 as "genGoodFoo". 
 

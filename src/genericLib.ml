@@ -120,6 +120,7 @@ type dep_type =
   | DProd  of (ty_var * dep_type) * dep_type (* Binding arrows *)
   | DTyParam of ty_param (* Type parameters - for simplicity *)
   | DTyCtr of ty_ctr * dep_type list (* Type Constructor *)
+  | DCtr of constructor * dep_type list (* Regular Constructor (for dependencies) *)
   | DTyVar of ty_var (* Use of a previously captured type variable *)
 
 let rec dep_type_to_string dt = 
@@ -127,6 +128,7 @@ let rec dep_type_to_string dt =
   | DArrow (d1, d2) -> Printf.sprintf "%s -> %s" (dep_type_to_string d1) (dep_type_to_string d2)
   | DProd  ((x,d1), d2) -> Printf.sprintf "(%s : %s) -> %s" (ty_var_to_string x) (dep_type_to_string d1) (dep_type_to_string d2)
   | DTyCtr (ty_ctr, ds) -> ty_ctr_to_string ty_ctr ^ " " ^ str_lst_to_string " " (List.map dep_type_to_string ds)
+  | DCtr (ctr, ds) -> constructor_to_string ctr ^ " " ^ str_lst_to_string " " (List.map dep_type_to_string ds)
   | DTyParam tp -> ty_param_to_string tp
   | DTyVar tv -> ty_var_to_string tv
 
@@ -328,6 +330,7 @@ let parse_dependent_type i nparams ty oib arg_names =
             ) (Some []) tms >>= fun tms' ->
       match aux i ctr with
       | Some (DTyCtr (c, _)) -> Some (DTyCtr (c, List.rev tms'))
+      | Some (DCtr (c, _)) -> Some (DCtr (c, List.rev tms'))
       | None -> msgerr (str "Aux failed?" ++ fnl ()); None
     end
     else if isInd ty then begin
@@ -335,9 +338,15 @@ let parse_dependent_type i nparams ty oib arg_names =
       Some (DTyCtr (Label.to_id (MutInd.label mind), []))
     end
     else if isConstruct ty then begin
-      let ((ind, idx),_) = destConstruct ty in
-      let cname = oib.mind_consnames.(idx - 1) in
-      Some (DTyCtr (cname, []))
+      let (((mind, midx), idx),_) = destConstruct ty in                               
+
+      (* Lookup the inductive *)
+      let env = Global.env () in
+      let mib = Environ.lookup_mind mind env in
+
+      (* Constructor name *)
+      let cname = mib.mind_packets.(midx).mind_consnames.(idx - 1) in
+      Some (DCtr (cname, []))
     end
     else (msgerr (str "Dep Case Not Handled" ++ fnl()); 
           debug_constr ty;
@@ -607,6 +616,19 @@ let rec fold_ty arrow_f ty_ctr_f ty_param_f ty =
 
 let fold_ty' arrow_f base ty = 
   fold_ty arrow_f (fun _ -> base) (fun _ -> base) ty
+
+let rec dep_fold_ty arrow_f prod_f ty_ctr_f ctr_f ty_param_f var_f ty = 
+  match ty with
+  | DArrow (ty1, ty2) -> 
+     let acc = dep_fold_ty arrow_f prod_f ty_ctr_f ctr_f ty_param_f var_f ty2 in
+     arrow_f acc ty1 
+  | DProd ((x,ty1), ty2) -> 
+     let acc = dep_fold_ty arrow_f prod_f ty_ctr_f ctr_f ty_param_f var_f ty2 in
+     prod_f acc x ty1 
+  | DTyCtr (ctr, tys) -> ty_ctr_f (ctr, tys)
+  | DCtr (ctr, tys) -> ctr_f (ctr, tys)
+  | DTyParam tp -> ty_param_f tp
+  | DTyVar tp -> var_f tp
 
 (* Generate Type Names *)
 let generate_names_from_type base_name ty =

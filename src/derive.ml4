@@ -650,9 +650,15 @@ END;;
 (* Advanced Generators *)
 
 (* Unknowns are strings *)
-type unknown = string
+module OrdId = struct 
+  type t = Id.t
+  let compare x y = compare (Id.to_string x) (Id.to_string y)
+end
+
 
 (* Ranges are undefined, unknowns or constructors applied to ranges *)
+type unknown = string
+
 type range = Ctr of constructor * range list | Unknown of unknown | Undef | FixedInput
 
 module UM = Map.Make(String)
@@ -661,6 +667,7 @@ type umap = range UM.t
 
 let lookup k m = try Some (UM.find k m) with Not_found -> None
 
+(* Needs rework *)
 let rec unify (k : umap) (r1 : range) (r2 : range) : (umap * range) option =
   match r1, r2 with
   | Unknown u, FixedInput
@@ -715,12 +722,61 @@ let deriveDependent c nc gen_name =
     | Some dt -> msgerr (str (dep_dt_to_string dt) ++ fnl()); dt 
     | None -> failwith "Not supported type" in 
 
+  let rec is_dep_type = function
+    | DArrow (dt1, dt2) -> is_dep_type dt1 || is_dep_type dt2 
+    | DProd ((_, dt1), dt2) -> is_dep_type dt1 || is_dep_type dt2 
+    | DTyParam _ -> false
+    | DTyVar _ -> true
+    | DCtr _ -> true
+    | DTyCtr (_, dts) -> List.exists is_dep_type dts
+  in 
+
   msgerr (str (string_of_int n) ++ fnl ());
   let gen_type = gGen (gOption (gType ty_params (nthType n dep_type))) in
   debug_coq_expr (gType ty_params dep_type);
 
   let gen = mk_name_provider "gen" in
   let dec = mk_name_provider "dec" in 
+
+  (* Handling a branch: returns the generator and a boolean (true if base branch) *)
+  let handle_branch (c : dep_ctr) : (coq_expr * bool) = 
+    let (ctr, typ) = c in
+    let b = ref true in 
+
+    let register_unknowns map = 
+      let rec aux map = function
+        | DArrow (dt1, dt2) -> aux map dt2
+        | DProd ((x, dt1), dt2) -> aux (UM.add (ty_var_to_string x) Undef map) dt2
+        | _ -> map in
+      aux map typ
+    in 
+    
+    let init_map = register_unknowns UM.empty in
+
+    msgerr (str ("Handling branch: " ^ dep_type_to_string typ) ++ fnl ());
+    UM.iter (fun x _ -> msgerr (str ("Bound: " ^ x) ++ fnl ())) init_map;
+    
+    dep_fold_ty (fun _ dt1 -> msgerr (str (Printf.sprintf "%s : %b\n" (dep_type_to_string dt1) (is_dep_type dt1)) ++ fnl()))
+                (fun _ _ dt1 -> msgerr (str (Printf.sprintf "%s : %b\n" (dep_type_to_string dt1) (is_dep_type dt1)) ++ fnl()))
+                (fun _ -> ()) (fun _ -> ()) (fun _ -> ()) (fun _ -> ()) typ;
+                  
+
+(*    let rec aux acc i = function
+      | DArrow (dt1, dt2) -> aux acc (i+1) dt2 
+      | DProd ((x,dt1), dt2) -> 
+         if i == n then (* i == n means this is what we generate for - ignore *)
+           aux acc (i+1) dt2
+         else (* otherwise this needs to be an input argument *)
+           aux ((x, gType ty_params dt1) :: acc) (i+1) dt2 
+      | DTyParam tp -> acc
+      | DTyCtr (c,dts) -> acc
+      | DTyVar _ -> acc
+    in 
+ *)
+    (hole ,!b)
+  in
+
+  List.iter (fun x -> ignore (handle_branch x)) ctrs;
 
   let aux_arb rec_name size vars = 
     gMatch (gVar size) 
