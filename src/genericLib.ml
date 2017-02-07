@@ -152,6 +152,11 @@ let rec nthType i dt =
   | _, DProd  (_, dt) -> nthType (i-1) dt
   | _, _ -> failwith "Insufficient arrows"
 
+let rec dep_result_type dt = 
+  match dt with 
+  | DArrow (_, dt') -> dep_result_type dt'
+  | DProd  (_, dt') -> dep_result_type dt'
+  | _ -> dt
 
 (* Option monad *)
 let (>>=) m f = 

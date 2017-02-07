@@ -87,6 +87,8 @@ val gType : ty_param list -> dep_type -> coq_expr
 
 val nthType : int -> dep_type -> dep_type
 
+val dep_result_type : dep_type -> dep_type
+
 (* option type helpers *)
 val (>>=) : 'a option -> ('a -> 'b option) -> 'b option                                   
 val isSome : 'a option -> bool

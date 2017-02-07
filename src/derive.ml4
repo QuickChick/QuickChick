@@ -664,6 +664,12 @@ type unknown = string
 
 type range = Ctr of constructor * range list | Unknown of unknown | Undef | FixedInput
 
+let rec range_to_string = function
+  | Ctr (c, rs) -> constructor_to_string c ^ " " ^ str_lst_to_string " " (List.map range_to_string rs)
+  | Unknown u -> u
+  | Undef -> "Undef"
+  | FixedInput -> "FixedInput"
+  
 module UM = Map.Make(String)
 
 type umap = range UM.t
@@ -686,7 +692,14 @@ type matcher_pat =
   | MatchCtr of constructor * matcher_pat list
   | MatchU of unknown
 
+let rec matcher_pat_to_string = function
+  | MatchU u -> u
+  | MatchCtr (c, ms) -> constructor_to_string c ^ " " ^ str_lst_to_string " " (List.map matcher_pat_to_string ms)
+
 type matcher = unknown * matcher_pat
+
+let rec matcher_to_string = function
+  | (u, m) -> Printf.sprintf "Match %s With %s\n" u (matcher_pat_to_string m)
 
 let unk_provider = mk_name_provider "unkn"
 
@@ -724,6 +737,7 @@ let rec raiseMatch (k : umap) (c : constructor) (rs : range list) (eqs: EqSet.t)
  *) 
 let rec unify (k : umap) (r1 : range) (r2 : range) (eqs : EqSet.t)
         : (umap * range * EqSet.t * matcher list) option =
+  msgerr (str (Printf.sprintf "Calling unify with %s %s" (range_to_string r1) (range_to_string r2)) ++ fnl ());
   match r1, r2 with
   | Unknown u1, Unknown u2 ->
      if u1 == u2 then Some (k, Unknown u1, eqs, []) else
@@ -813,51 +827,11 @@ let rec unify (k : umap) (r1 : range) (r2 : range) (eqs : EqSet.t)
          Some (k', Unknown u, eqs', m')
       end
 
-
-(*          
-
-
-  | Unknown u, FixedInput -> 
-     lookup u k >>= fun r -> (* EVERYTHING should have a binding, even if just Undef *)
-     match r with 
-     | 
-     
-  | FixedInput, Unknown u ->
-     begin match lookup u k with
-     | Some r ->
-        unify k r FixedInput >>= fun (k', r') ->
-        Some (UM.add u r' k', Unknown u)
-     | None -> Some (UM.add u FixedInput k, Unknown u)
-     end
-  | Unknown u1, Unknown u2 ->
-     if u1 == u2 then Some (k, Unknown u1)
-     else let (u1', u2') = if u1 < u2 then (u1, u2) else (u2, u1) in
-          begin match lookup u1 k, lookup u2 k with
-          | Some r1, Some r2 ->
-             begin match unify k r1 r2 with
-             | Some (k', r') -> Some (UM.add u1' (Unknown u2') (UM.add u2' r' k'), Unknown u1')
-             | None -> None
-             end
-          | Some r, None
-          | None, Some r -> Some (UM.add u1' (Unknown u2') (UM.add u2' r k), Unknown u1')
-(*           | None, None -> None - LEO: Should be an error case - commenting out to see if it happens *)
-          end
-
-  | Ctr (c1, rs1), Ctr (c2, rs2) ->
-     if c1 == c2 then
-       begin match foldM (fun b a -> let (r1, r2) = a in
-                               let (k, l) = b in
-                               unify k r1 r2 >>= fun b' ->
-                               let (k', r') = b' in
-                               Some (k', r'::l)
-                            ) (Some (k , [])) (List.combine rs1 rs2) with
-       | Some (k', rs) -> Some (k', Ctr (c1, List.rev rs))
-       | None -> None
-       end
-     else None
-  | _, _ -> None
-
- *)
+let rec convert_to_range dt = 
+  match dt with 
+  | DTyVar x -> Unknown (ty_var_to_string x)
+  | DCtr (c,dts) -> Ctr (c, List.map convert_to_range dts)
+  | _ -> failwith ("Unsupported range: " ^ (dep_type_to_string dt))
 
 let deriveDependent c nc gen_name = 
   let n = parse_integer nc in
@@ -882,10 +856,36 @@ let deriveDependent c nc gen_name =
   let gen = mk_name_provider "gen" in
   let dec = mk_name_provider "dec" in 
 
+  let input_types = 
+    let rec aux acc i = function
+      | DArrow (dt1, dt2) 
+      | DProd ((_,dt1), dt2) -> 
+         if i == n then (* i == n means this is what we generate for - ignore *)
+           aux acc (i+1) dt2
+         else (* otherwise this needs to be an input argument *)
+           aux (dt1 :: acc) (i+1) dt2 
+      | DTyParam tp -> acc
+      | DTyCtr (c,dts) -> acc
+      | DTyVar _ -> acc
+    in List.rev (aux [] 1 dep_type) (* 1 because of using 1-indexed counting for the arguments *)       
+  in 
+
+  let input_names = List.mapi (fun i _ -> Printf.sprintf "input%d" i) input_types in
+
+  let params = List.map (fun tp -> gArg ~assumName:(gTyParam tp) ()) ty_params in
+  let inputs = List.map (fun (n,t) -> gArg ~assumName:(gVar (fresh_name n)) ~assumType:(gType ty_params t) ()) (List.combine input_names input_types) in
+
+  let forGen = "forGen" in
+  let rec inputWithGen i l = 
+    if i <= 1 then forGen :: l
+    else let (h::t) = l in h :: (inputWithGen (i-1) t) in
+
   (* Handling a branch: returns the generator and a boolean (true if base branch) *)
   let handle_branch (c : dep_ctr) : (coq_expr * bool) = 
     let (ctr, typ) = c in
     let b = ref true in 
+
+    msgerr (str "Debug branch" ++ fnl ());
 
     let register_unknowns map = 
       let rec aux map = function
@@ -894,22 +894,39 @@ let deriveDependent c nc gen_name =
         | _ -> map in
       aux map typ
     in 
-    
-    let init_map = register_unknowns UM.empty in
 
-    (* Debugging *)
+    let init_map = UM.add forGen Undef (List.fold_left (fun m n -> UM.add n FixedInput m) (register_unknowns UM.empty) input_names) in
+
+    let ranges = match dep_result_type typ with
+      | DTyCtr (_, dts) -> List.map convert_to_range dts
+      | _ -> failwith "Not the expected result type" in
+
+    let inputsWithGen = inputWithGen n input_names in
+
+    (* Debugging init map *)
     msgerr (str ("Handling branch: " ^ dep_type_to_string typ) ++ fnl ());
-    UM.iter (fun x _ -> msgerr (str ("Bound: " ^ x) ++ fnl ())) init_map;
-
+    UM.iter (fun x r -> msgerr (str ("Bound: " ^ x ^ " to Range: " ^ (range_to_string r)) ++ fnl ())) init_map;
     dep_fold_ty (fun _ dt1 -> msgerr (str (Printf.sprintf "%s : %b\n" (dep_type_to_string dt1) (is_dep_type dt1)) ++ fnl()))
                 (fun _ _ dt1 -> msgerr (str (Printf.sprintf "%s : %b\n" (dep_type_to_string dt1) (is_dep_type dt1)) ++ fnl()))
                 (fun _ -> ()) (fun _ -> ()) (fun _ -> ()) (fun _ -> ()) typ;
     (* End debugging *)
 
+    match foldM (fun (k, eqs, ms) (r, n) -> unify k (Unknown n) r eqs >>= fun (k', _, eqs', ms') ->
+                                      Some (k', eqs', ms @ ms')
+          ) (Some (init_map, EqSet.empty, [])) (List.combine ranges inputsWithGen) with
+    | None -> failwith "Matching result type error" 
+    | Some (map, eqs, matches) -> 
+    
+    (* Debugging resulting match *)
+    UM.iter (fun x r -> msgerr (str ("Bound: " ^ x ^ " to Range: " ^ (range_to_string r)) ++ fnl ())) map;
+    EqSet.iter (fun (u,u') -> msgerr (str (Printf.sprintf "Eq: %s = %s\n" u u') ++ fnl())) eqs;
+    List.iter (fun m -> msgerr (str (matcher_to_string m) ++ fnl ())) matches;
+    (* End debugging *)
+
     (hole ,!b)
   in
 
-  List.iter (fun x -> ignore (handle_branch x)) ctrs;
+  List.iter (fun x -> ignore (handle_branch x)) ctrs; 
 
   let aux_arb rec_name size vars = 
     gMatch (gVar size) 
@@ -926,23 +943,7 @@ let deriveDependent c nc gen_name =
                                                (fun rec_name -> gVar rec_name)
   in
 
-  let input_arguments = 
-    let rec aux acc i = function
-      | DArrow (dt1, dt2) 
-      | DProd ((_,dt1), dt2) -> 
-         if i == n then (* i == n means this is what we generate for - ignore *)
-           aux acc (i+1) dt2
-         else (* otherwise this needs to be an input argument *)
-           aux ((gType ty_params dt1) :: acc) (i+1) dt2 
-      | DTyParam tp -> acc
-      | DTyCtr (c,dts) -> acc
-      | DTyVar _ -> acc
-    in aux [] 1 dep_type (* 1 because of using 1-indexed counting for the arguments *)       
-  in 
-
   (* TODO: These should be generated through some writer monad *)
-  let params = List.map (fun tp -> gArg ~assumName:(gTyParam tp) ()) ty_params in
-  let inputs = List.mapi (fun i t -> gArg ~assumName:(gVar (fresh_name (Printf.sprintf "input%d" i))) ~assumType:t ()) (List.rev input_arguments) in
   let gen_needed = [] in
   let dec_needed = [] in
 
