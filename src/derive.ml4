@@ -649,12 +649,15 @@ END;;
 
 (* Advanced Generators *)
 
-(* Unknowns are strings *)
-module OrdId = struct 
-  type t = Id.t
-  let compare x y = compare (Id.to_string x) (Id.to_string y)
-end
+type name_provider = { next_name : unit -> string }
 
+let mk_name_provider s = 
+  let cnt = ref 0 in
+  { next_name = fun () -> 
+      let res = s ^ string_of_int !cnt in
+      incr cnt;
+      res 
+  }
 
 (* Ranges are undefined, unknowns or constructors applied to ranges *)
 type unknown = string
@@ -667,10 +670,116 @@ type umap = range UM.t
 
 let lookup k m = try Some (UM.find k m) with Not_found -> None
 
-(* Needs rework *)
-let rec unify (k : umap) (r1 : range) (r2 : range) : (umap * range) option =
+(* For equality handling: require ordered (String, String) *)
+module OrdTSS = struct 
+  type t = unknown * unknown
+  let compare x y = compare x y
+end
+
+module EqSet = Set.Make(OrdTSS)
+
+let eq_set_add u1 u2 eqs = 
+  let (u1', u2') = if u1 < u2 then (u1, u2) else (u2, u1) in
+  EqSet.add (u1', u2') eqs
+
+type matcher_pat = 
+  | MatchCtr of constructor * matcher_pat list
+  | MatchU of unknown
+
+type matcher = unknown * matcher_pat
+
+let unk_provider = mk_name_provider "unkn"
+
+(* Match a constructor/ranges list to a fixed input *)
+(* Range list is toplevel, so it's mostly unifications.
+   If any of the unknowns in rs is "FixedInput", then 
+   we need to create a fresh unknown, bind it to the other unknown and 
+   raise an equality check *)
+let rec raiseMatch (k : umap) (c : constructor) (rs : range list) (eqs: EqSet.t) 
+        : (umap * matcher_pat * EqSet.t) option = 
+  foldM (fun (k, l, eqs) r ->
+         match r with 
+         | Ctr (c', rs') ->
+            raiseMatch k c' rs' eqs >>= fun (k', m, eqs') ->
+            Some (k', m::l, eqs')
+         | Unknown u ->
+            lookup u k >>= fun r' ->
+            begin match r' with 
+            | Undef -> (* The unknown should now be fixed *)
+               Some (UM.add u FixedInput k, (MatchU u)::l, eqs)
+            | FixedInput -> (* The unknown is already fixed, raise an eq check *)
+               let u' = unk_provider.next_name () in
+               Some (UM.add u' (Unknown u) k, (MatchU u')::l, eq_set_add u' u eqs)
+            | _ -> failwith "Not supported yet"
+            end
+        ) (Some (k, [], eqs)) rs >>= fun (k', l, eqs') ->
+  Some (k', MatchCtr (c, List.rev l), eqs')
+
+(* Invariants: 
+   -- Everything has a binding, even if just Undef 
+   -- r1, r2 are never FixedInput, Undef (handled inline)
+   -- TopLevel ranges can be unknowns or constructors applied to toplevel ranges
+   -- Constructor bindings in umaps are also toplevel. 
+   -- Only unknowns can be bound to Undef/FixedInput
+ *) 
+let rec unify (k : umap) (r1 : range) (r2 : range) (eqs : EqSet.t)
+        : (umap * range * EqSet.t * matcher list) option =
   match r1, r2 with
-  | Unknown u, FixedInput
+  | Unknown u1, Unknown u2 ->
+     if u1 == u2 then Some (k, Unknown u1, eqs, []) else
+     lookup u1 k >>= fun r1 -> 
+     lookup u2 k >>= fun r2 ->
+     begin match r1, r2 with 
+     (* "Hard" case: both are fixed. Need to raise an equality check on the inputs *)
+     | FixedInput, FixedInput -> 
+        let (u1', u2') = if u1 < u2 then (u1, u2) else (u2, u1) in
+        (* Need to insert an equality between u1 and u2 *)
+        let eqs' = EqSet.add (u1, u2) eqs in 
+        (* Unify them in k *)
+        Some (UM.add u1' (Unknown u2') k, Unknown u1', eqs', [])
+
+     (* Easy cases: When at least one is undefined, it binds to the other *)
+     (* Can probably replace fixed input with _ *)
+     | Undef, Undef ->
+        let (u1', u2') = if u1 < u2 then (u1, u2) else (u2, u1) in
+        Some (UM.add u1' (Unknown u2') k, Unknown u1', eqs, [])
+     | _, Undef ->
+        Some (UM.add u2 (Unknown u1) k, Unknown u2, eqs, [])
+     | Undef, _ ->
+        Some (UM.add u1 (Unknown u2) k, Unknown u1, eqs, [])
+
+     (* Constructor bindings *) 
+     | Ctr (c1, rs1), Ctr (c2, rs2) ->
+        if c1 == c2 then 
+          foldM (fun b a -> let (r1, r2) = a in 
+                            let (k, l, eqs, ms) = b in 
+                            unify k r1 r2 eqs >>= fun res ->
+                            let (k', r', eqs', ms') = res in 
+                            Some (k', r'::l, eqs', ms @ ms')
+                ) (Some (k, [], eqs, [])) (List.combine rs1 rs2) >>= fun (k', rs', eqs', ms) ->
+          Some (k', Ctr (c1, List.rev rs'), eqs', ms)
+        else None
+
+     (* Last hard cases: Constructors vs fixed *) 
+     | FixedInput, Ctr (c, rs) ->
+        (* Raises a match and potential equalities *)
+        raiseMatch k c rs eqs >>= fun (k', m, eqs') ->
+        Some (UM.add u1 (Unknown u2) k', Unknown u1, eqs', [(u1, m)])
+     | Ctr (c, rs), FixedInput ->
+        (* Raises a match and potential equalities *)
+        raiseMatch k c rs eqs >>= fun (k', m, eqs') ->
+        Some (UM.add u2 (Unknown u1) k', Unknown u2, eqs', [(u2, m)])
+     end
+
+
+(*          
+
+
+  | Unknown u, FixedInput -> 
+     lookup u k >>= fun r -> (* EVERYTHING should have a binding, even if just Undef *)
+     match r with 
+     | 
+     
   | FixedInput, Unknown u ->
      begin match lookup u k with
      | Some r ->
@@ -691,6 +800,7 @@ let rec unify (k : umap) (r1 : range) (r2 : range) : (umap * range) option =
           | None, Some r -> Some (UM.add u1' (Unknown u2') (UM.add u2' r k), Unknown u1')
 (*           | None, None -> None - LEO: Should be an error case - commenting out to see if it happens *)
           end
+
   | Ctr (c1, rs1), Ctr (c2, rs2) ->
      if c1 == c2 then
        begin match foldM (fun b a -> let (r1, r2) = a in
@@ -705,15 +815,7 @@ let rec unify (k : umap) (r1 : range) (r2 : range) : (umap * range) option =
      else None
   | _, _ -> None
 
-type name_provider = { next_name : unit -> string }
-
-let mk_name_provider s = 
-  let cnt = ref 0 in
-  { next_name = fun () -> 
-      let res = s ^ string_of_int !cnt in
-      incr cnt;
-      res 
-  }
+ *)
 
 let deriveDependent c nc gen_name = 
   let n = parse_integer nc in
@@ -753,26 +855,15 @@ let deriveDependent c nc gen_name =
     
     let init_map = register_unknowns UM.empty in
 
+    (* Debugging *)
     msgerr (str ("Handling branch: " ^ dep_type_to_string typ) ++ fnl ());
     UM.iter (fun x _ -> msgerr (str ("Bound: " ^ x) ++ fnl ())) init_map;
-    
+
     dep_fold_ty (fun _ dt1 -> msgerr (str (Printf.sprintf "%s : %b\n" (dep_type_to_string dt1) (is_dep_type dt1)) ++ fnl()))
                 (fun _ _ dt1 -> msgerr (str (Printf.sprintf "%s : %b\n" (dep_type_to_string dt1) (is_dep_type dt1)) ++ fnl()))
                 (fun _ -> ()) (fun _ -> ()) (fun _ -> ()) (fun _ -> ()) typ;
-                  
+    (* End debugging *)
 
-(*    let rec aux acc i = function
-      | DArrow (dt1, dt2) -> aux acc (i+1) dt2 
-      | DProd ((x,dt1), dt2) -> 
-         if i == n then (* i == n means this is what we generate for - ignore *)
-           aux acc (i+1) dt2
-         else (* otherwise this needs to be an input argument *)
-           aux ((x, gType ty_params dt1) :: acc) (i+1) dt2 
-      | DTyParam tp -> acc
-      | DTyCtr (c,dts) -> acc
-      | DTyVar _ -> acc
-    in 
- *)
     (hole ,!b)
   in
 
@@ -795,12 +886,12 @@ let deriveDependent c nc gen_name =
 
   let input_arguments = 
     let rec aux acc i = function
-      | DArrow (dt1, dt2) -> aux acc (i+1) dt2 
-      | DProd ((x,dt1), dt2) -> 
+      | DArrow (dt1, dt2) 
+      | DProd ((_,dt1), dt2) -> 
          if i == n then (* i == n means this is what we generate for - ignore *)
            aux acc (i+1) dt2
          else (* otherwise this needs to be an input argument *)
-           aux ((x, gType ty_params dt1) :: acc) (i+1) dt2 
+           aux ((gType ty_params dt1) :: acc) (i+1) dt2 
       | DTyParam tp -> acc
       | DTyCtr (c,dts) -> acc
       | DTyVar _ -> acc
@@ -808,11 +899,14 @@ let deriveDependent c nc gen_name =
   in 
 
   (* TODO: These should be generated through some writer monad *)
+  let params = List.map (fun tp -> gArg ~assumName:(gTyParam tp) ()) ty_params in
+  let inputs = List.mapi (fun i t -> gArg ~assumName:(gVar (fresh_name (Printf.sprintf "input%d" i))) ~assumType:t ()) (List.rev input_arguments) in
   let gen_needed = [] in
   let dec_needed = [] in
 
-  let args = List.map (fun tp -> gArg ~assumName:(gTyParam tp) ()) ty_params
-           @ List.map (fun (x,t) -> gArg ~assumName:(gTyVar x) ~assumType:t ()) input_arguments 
+  
+  let args = params
+           @ inputs
            @ gen_needed
            @ dec_needed in
 
