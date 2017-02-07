@@ -730,6 +730,15 @@ let rec unify (k : umap) (r1 : range) (r2 : range) (eqs : EqSet.t)
      lookup u1 k >>= fun r1 -> 
      lookup u2 k >>= fun r2 ->
      begin match r1, r2 with 
+     (* "Delay" cases - unknowns call unify again *)
+     (* TODO: rething return value *)
+     | Unknown u1', _ -> 
+        unify k (Unknown u1') r2 eqs >>= fun (k', r', eqs', ms') ->
+        Some (k', Unknown u1, eqs', ms')
+     | _, Unknown u2' ->
+        unify k r1 (Unknown u2') eqs >>= fun (k', r', eqs', ms') ->
+        Some (k', Unknown u2, eqs', ms')
+
      (* "Hard" case: both are fixed. Need to raise an equality check on the inputs *)
      | FixedInput, FixedInput -> 
         let (u1', u2') = if u1 < u2 then (u1, u2) else (u2, u1) in
@@ -770,6 +779,39 @@ let rec unify (k : umap) (r1 : range) (r2 : range) (eqs : EqSet.t)
         raiseMatch k c rs eqs >>= fun (k', m, eqs') ->
         Some (UM.add u2 (Unknown u1) k', Unknown u2, eqs', [(u2, m)])
      end
+   | Ctr (c1, rs1), Ctr (c2, rs2) ->
+      if c1 == c2 then 
+        foldM (fun b a -> let (r1, r2) = a in 
+                          let (k, l, eqs, ms) = b in 
+                          unify k r1 r2 eqs >>= fun res ->
+                          let (k', r', eqs', ms') = res in 
+                          Some (k', r'::l, eqs', ms @ ms')
+              ) (Some (k, [], eqs, [])) (List.combine rs1 rs2) >>= fun (k', rs', eqs', ms) ->
+        Some (k', Ctr (c1, List.rev rs'), eqs', ms)
+      else None
+   | Unknown u, Ctr (c, rs) 
+   | Ctr (c, rs), Unknown u ->
+      lookup u k >>= fun r ->
+      begin match r with 
+      | FixedInput -> 
+        (* Raises a match and potential equalities *)
+        raiseMatch k c rs eqs >>= fun (k', m, eqs') ->
+        Some (UM.add u (Ctr (c,rs)) k', Unknown u, eqs', [(u, m)])
+      | Undef -> Some (UM.add u (Ctr (c,rs)) k, Unknown u, eqs, [])
+      | Ctr (c', rs') -> 
+        if c == c' then 
+          foldM (fun b a -> let (r1, r2) = a in 
+                            let (k, l, eqs, ms) = b in 
+                            unify k r1 r2 eqs >>= fun res ->
+                            let (k', r', eqs', ms') = res in 
+                            Some (k', r'::l, eqs', ms @ ms')
+                ) (Some (k, [], eqs, [])) (List.combine rs rs') >>= fun (k', rs', eqs', ms) ->
+          Some (k', Unknown u, eqs', ms)
+        else None
+      | Unknown u' -> 
+         unify k (Ctr (c,rs)) (Unknown u') eqs >>= fun (k', r', eqs', m') ->
+         Some (k', Unknown u, eqs', m')
+      end
 
 
 (*          
