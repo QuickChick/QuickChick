@@ -662,12 +662,12 @@ let mk_name_provider s =
 (* Ranges are undefined, unknowns or constructors applied to ranges *)
 type unknown = string
 
-type range = Ctr of constructor * range list | Unknown of unknown | Undef | FixedInput
+type range = Ctr of constructor * range list | Unknown of unknown | Undef of dep_type | FixedInput
 
 let rec range_to_string = function
   | Ctr (c, rs) -> constructor_to_string c ^ " " ^ str_lst_to_string " " (List.map range_to_string rs)
   | Unknown u -> u
-  | Undef -> "Undef"
+  | Undef dt -> Printf.sprintf "Undef (%s)" (dep_type_to_string dt)
   | FixedInput -> "FixedInput"
   
 module UM = Map.Make(String)
@@ -687,6 +687,13 @@ module EqSet = Set.Make(OrdTSS)
 let eq_set_add u1 u2 eqs = 
   let (u1', u2') = if u1 < u2 then (u1, u2) else (u2, u1) in
   EqSet.add (u1', u2') eqs
+
+module OrdTyp = struct 
+  type t = dep_type
+  let compare = compare
+end
+
+module ArbSet = Set.Make(OrdTyp)             
 
 type matcher_pat = 
   | MatchCtr of constructor * matcher_pat list
@@ -718,7 +725,7 @@ let rec raiseMatch (k : umap) (c : constructor) (rs : range list) (eqs: EqSet.t)
          | Unknown u ->
             lookup u k >>= fun r' ->
             begin match r' with 
-            | Undef -> (* The unknown should now be fixed *)
+            | Undef _ -> (* The unknown should now be fixed *)
                Some (UM.add u FixedInput k, (MatchU u)::l, eqs)
             | FixedInput -> (* The unknown is already fixed, raise an eq check *)
                let u' = unk_provider.next_name () in
@@ -763,12 +770,12 @@ let rec unify (k : umap) (r1 : range) (r2 : range) (eqs : EqSet.t)
 
      (* Easy cases: When at least one is undefined, it binds to the other *)
      (* Can probably replace fixed input with _ *)
-     | Undef, Undef ->
+     | Undef _ , Undef _ ->
         let (u1', u2') = if u1 < u2 then (u1, u2) else (u2, u1) in
         Some (UM.add u1' (Unknown u2') k, Unknown u1', eqs, [])
-     | _, Undef ->
+     | _, Undef _ ->
         Some (UM.add u2 (Unknown u1) k, Unknown u2, eqs, [])
-     | Undef, _ ->
+     | Undef _, _ ->
         Some (UM.add u1 (Unknown u2) k, Unknown u1, eqs, [])
 
      (* Constructor bindings *) 
@@ -811,7 +818,7 @@ let rec unify (k : umap) (r1 : range) (r2 : range) (eqs : EqSet.t)
         (* Raises a match and potential equalities *)
         raiseMatch k c rs eqs >>= fun (k', m, eqs') ->
         Some (UM.add u (Ctr (c,rs)) k', Unknown u, eqs', [(u, m)])
-      | Undef -> Some (UM.add u (Ctr (c,rs)) k, Unknown u, eqs, [])
+      | Undef _ -> Some (UM.add u (Ctr (c,rs)) k, Unknown u, eqs, [])
       | Ctr (c', rs') -> 
         if c == c' then 
           foldM (fun b a -> let (r1, r2) = a in 
@@ -856,6 +863,13 @@ let deriveDependent c nc gen_name =
   let gen = mk_name_provider "gen" in
   let dec = mk_name_provider "dec" in 
 
+  let arb = mk_name_provider "arb" in 
+
+  let arbitraries = ref ArbSet.empty in
+  let register_arbitrary dt = 
+    arbitraries := ArbSet.add dt !arbitraries
+  in 
+
   let input_types = 
     let rec aux acc i = function
       | DArrow (dt1, dt2) 
@@ -890,12 +904,12 @@ let deriveDependent c nc gen_name =
     let register_unknowns map = 
       let rec aux map = function
         | DArrow (dt1, dt2) -> aux map dt2
-        | DProd ((x, dt1), dt2) -> aux (UM.add (ty_var_to_string x) Undef map) dt2
+        | DProd ((x, dt1), dt2) -> aux (UM.add (ty_var_to_string x) (Undef dt1) map) dt2
         | _ -> map in
       aux map typ
     in 
 
-    let init_map = UM.add forGen Undef (List.fold_left (fun m n -> UM.add n FixedInput m) (register_unknowns UM.empty) input_names) in
+    let init_map = UM.add forGen (Undef (nthType n dep_type)) (List.fold_left (fun m n -> UM.add n FixedInput m) (register_unknowns UM.empty) input_names) in
 
     let ranges = match dep_result_type typ with
       | DTyCtr (_, dts) -> List.map convert_to_range dts
@@ -926,10 +940,20 @@ let deriveDependent c nc gen_name =
       match lookup u k with
       | None -> failwith ("Internal error: No binding for " ^ u)
       | Some r -> 
-         let rec aux = function
-           | Ctr (c,dts) -> returnGen (gSome (gApp ~explicit:true (gCtr c) (List.map aux dts)))
+         let rec aux (cont : coq_expr -> coq_expr) = function
+           | Ctr (c,dts) -> 
+              let rec aux2 acc = function 
+                | [] -> cont (returnGen (gSome (gApp ~explicit:true (gCtr c) (List.rev acc)))) (* Something about type parameters? *)
+                | h::t -> aux (fun hg -> aux2 (hg::acc) t) h 
+              in aux2 [] dts
+           | Undef dt -> 
+              register_arbitrary dt;
+              let arb = arb.next_name () in
+              bindGen (gInject "arbitrary") arb (fun arb -> cont (gVar arb))
+           | Unknown u' -> 
+              aux cont (UM.find u' k)
            | r -> failwith ("TODO: implement me! " ^ range_to_string r)
-         in aux r
+         in aux (fun c -> c) r
     in 
 (*
            let rec aux i acc ty : coq_expr =
@@ -988,11 +1012,18 @@ let deriveDependent c nc gen_name =
   let gen_needed = [] in
   let dec_needed = [] in
 
-  
+  let arb_needed = 
+    ArbSet.fold (fun dt acc -> 
+                 (gArg ~assumType:(gApp (gInject "Arbitrary") [gType ty_params dt]) ~assumGeneralized:true ()) :: acc
+                ) (!arbitraries) [] 
+  in
+
   let args = params
-           @ inputs
            @ gen_needed
-           @ dec_needed in
+           @ dec_needed 
+           @ arb_needed 
+           @ inputs
+  in
 
   let with_args = 
     match args with
@@ -1000,6 +1031,7 @@ let deriveDependent c nc gen_name =
     | _  -> gFunWithArgs args (fun _ -> generator_body)
   in 
 
+  (* Might require the type *)
   let fn = defineTypedConstant gen_name with_args hole in
   ()
 

@@ -11,12 +11,14 @@ Import QcDefaultNotation. Open Scope qc_scope.
 Set Bullet Behavior "Strict Subproofs".
 
 Inductive Foo :=
-| Foo1 : Foo
+| Foo0 : Foo -> Foo
+| Foo1 : Foo 
 | Foo2 : Foo -> Foo
 | Foo3 : nat -> Foo -> Foo -> Foo.
 
 Inductive goodFoo : nat -> Foo -> Prop :=
-| Good1 : forall n, goodFoo n Foo1
+| Good0 : forall n foo, goodFoo n (Foo0 foo) (* Need call to arbitrary *)
+| Good1 : forall n, goodFoo n Foo1 (* Basic unification *)
 | Good2 : forall n foo, goodFoo 0 foo -> goodFoo n (Foo2 foo)
 | Good3 : forall n foo2,
             goodFoo n foo2 ->
