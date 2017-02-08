@@ -916,22 +916,63 @@ let deriveDependent c nc gen_name =
           ) (Some (init_map, EqSet.empty, [])) (List.combine ranges inputsWithGen) with
     | None -> failwith "Matching result type error" 
     | Some (map, eqs, matches) -> 
+
+    (* Construct matches *)
+
+    (* Construct equalities *)
+
+    (* Function to instantiate a single unknown *)
+    let instantiate_unknown k u = 
+      match lookup u k with
+      | None -> failwith ("Internal error: No binding for " ^ u)
+      | Some r -> 
+         let rec aux = function
+           | Ctr (c,dts) -> returnGen (gSome (gApp ~explicit:true (gCtr c) (List.map aux dts)))
+           | r -> failwith ("TODO: implement me! " ^ range_to_string r)
+         in aux r
+    in 
+(*
+           let rec aux i acc ty : coq_expr =
+             match ty with
+             | Arrow (ty1, ty2) ->
+                bindGen (if isCurrentTyCtr ty1 then gApp (gVar rec_name) (gVar size :: List.map gVar ps) else gInject "arbitrary")
+                        (Printf.sprintf "p%d" i)
+                        (fun pi -> aux (i+1) ((gVar pi) :: acc) ty2)
+             | _ -> returnGen (gApp ~explicit:true (gCtr ctr) (tyParams @ List.rev acc))
+           in aux 0 [] ty in
+  *)
+
+    (* Iterate through constraints *)
+    let rec recurse_type k = function
+      | DProd (_, dt) -> recurse_type k dt (* Only introduces variables, doesn't constrain them *)
+      | DArrow (dt1, dt2) -> failwith ("Do something here! " ^ dep_type_to_string dt1)
+      | DTyCtr _ -> instantiate_unknown k forGen (* result *)
+      | _ -> failwith "Wrong type" in
+
+    let branch_gen = 
+      recurse_type map typ
+    in 
     
     (* Debugging resulting match *)
     UM.iter (fun x r -> msgerr (str ("Bound: " ^ x ^ " to Range: " ^ (range_to_string r)) ++ fnl ())) map;
     EqSet.iter (fun (u,u') -> msgerr (str (Printf.sprintf "Eq: %s = %s\n" u u') ++ fnl())) eqs;
     List.iter (fun m -> msgerr (str (matcher_to_string m) ++ fnl ())) matches;
+
+    msgerr (str "Generated..." ++ fnl ());
+    debug_coq_expr branch_gen;
     (* End debugging *)
 
-    (hole ,!b)
+    (branch_gen ,!b)
   in
 
-  List.iter (fun x -> ignore (handle_branch x)) ctrs; 
+  (*  List.iter (fun x -> ignore (handle_branch x)) ctrs;  *)
 
   let aux_arb rec_name size vars = 
     gMatch (gVar size) 
            [ (injectCtr "O", [], 
-              fun _ -> returnGen gNone) (* Base cases *)
+              fun _ -> (* Base cases *) 
+              fst (handle_branch (List.hd ctrs))
+             )
            ; (injectCtr "S", ["size'"],
               fun [size'] -> returnGen gNone) (* Non-base cases *)
            ] in
