@@ -15,7 +15,7 @@ open Constrexpr
 open Constrexpr_ops
 open Context
 
-type coq_expr
+type coq_expr = constr_expr (* Remove after debug match *)
 
 val hole : coq_expr
 
@@ -109,7 +109,7 @@ val make_up_name : unit -> var
 val gApp : ?explicit:bool -> coq_expr -> coq_expr list -> coq_expr 
 val gFun : string list -> (var list -> coq_expr) -> coq_expr
 val gRecFunIn : ?assumType:coq_expr -> string -> string list -> ((var * var list) -> coq_expr) -> (var -> coq_expr) -> coq_expr
-val gMatch : coq_expr -> ((constructor * string list * (var list -> coq_expr)) list) -> coq_expr
+val gMatch : coq_expr -> ?catchAll:(coq_expr option) -> ((constructor * string list * (var list -> coq_expr)) list) -> coq_expr
 
 val gRecord : (string * coq_expr) list -> coq_expr 
 

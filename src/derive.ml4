@@ -931,8 +931,24 @@ let deriveDependent c nc gen_name =
     | None -> failwith "Matching result type error" 
     | Some (map, eqs, matches) -> 
 
-    (* Construct matches *)
-
+    (* Construct matches - TODO: move to generic lib *)
+    let construct_match (u, m) body = 
+      let rec aux = function 
+        | MatchU u' -> CPatAtom (dummy_loc, Some (Ident (dummy_loc, Id.of_string u')))
+        | MatchCtr (c, ms) -> 
+           CPatCstr (dummy_loc, 
+                     Ident (dummy_loc, Id.of_string (constructor_to_string c)),
+                     [],
+                     List.map (fun m -> aux m) ms) in
+      CCases (dummy_loc,
+              Term.RegularStyle,
+              None (* return *), 
+              [(CRef (Ident (dummy_loc, Id.of_string u),None), (None, None))], (* single discriminee, no as/in *)
+              [ (dummy_loc, [dummy_loc, [aux m]], body)
+              ; (dummy_loc, [dummy_loc, [CPatAtom (dummy_loc, None)]], returnGen gNone)
+              ]
+             )
+    in
     (* Construct equalities *)
 
     (* Function to instantiate a single unknown *)
@@ -940,8 +956,10 @@ let deriveDependent c nc gen_name =
       match lookup u k with
       | None -> failwith ("Internal error: No binding for " ^ u)
       | Some r -> 
+         (* Aux applies the continuation to the "return value" of the current dt *)
          let rec aux (cont : coq_expr -> coq_expr) = function
            | Ctr (c,dts) -> 
+              (* aux2 goes through the dts, enhancing the continuation to include the result of the head to the acc *)
               let rec aux2 acc = function 
                 | [] -> cont (returnGen (gSome (gApp ~explicit:true (gCtr c) (List.rev acc)))) (* Something about type parameters? *)
                 | h::t -> aux (fun hg -> aux2 (hg::acc) t) h 
@@ -955,16 +973,6 @@ let deriveDependent c nc gen_name =
            | r -> failwith ("TODO: implement me! " ^ range_to_string r)
          in aux (fun c -> c) r
     in 
-(*
-           let rec aux i acc ty : coq_expr =
-             match ty with
-             | Arrow (ty1, ty2) ->
-                bindGen (if isCurrentTyCtr ty1 then gApp (gVar rec_name) (gVar size :: List.map gVar ps) else gInject "arbitrary")
-                        (Printf.sprintf "p%d" i)
-                        (fun pi -> aux (i+1) ((gVar pi) :: acc) ty2)
-             | _ -> returnGen (gApp ~explicit:true (gCtr ctr) (tyParams @ List.rev acc))
-           in aux 0 [] ty in
-  *)
 
     (* Iterate through constraints *)
     let rec recurse_type k = function
@@ -974,7 +982,10 @@ let deriveDependent c nc gen_name =
       | _ -> failwith "Wrong type" in
 
     let branch_gen = 
-      recurse_type map typ
+      let rec walk_matches = function
+        | [] -> recurse_type map typ
+        | m::ms -> construct_match m (walk_matches ms) in
+      walk_matches matches
     in 
     
     (* Debugging resulting match *)

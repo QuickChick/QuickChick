@@ -493,12 +493,12 @@ let gRecFunIn ?assumType:(typ = hole) (fs : string) (xss : string list) (f_body 
   let xss' = List.map (fun s -> fresh_name s) xss in
   gRecFunInWithArgs ~assumType:typ fs (List.map (fun x -> gArg ~assumName:(gVar x) ()) xss') f_body let_body 
 
-let gMatch discr (branches : (constructor * string list * (var list -> coq_expr)) list) : coq_expr =
+let gMatch discr ?catchAll:(body=None) (branches : (constructor * string list * (var list -> coq_expr)) list) : coq_expr =
   CCases (dummy_loc,
           Term.RegularStyle,
           None (* return *), 
           [(discr, (None, None))], (* single discriminee, no as/in *)
-          List.map (fun (c, cs, bf) -> 
+          (List.map (fun (c, cs, bf) -> 
                       let cvs : Id.t list = List.map fresh_name cs in
                       (dummy_loc,
                        [dl [CPatCstr (dummy_loc,
@@ -510,7 +510,10 @@ let gMatch discr (branches : (constructor * string list * (var list -> coq_expr)
                        ],
                        bf cvs 
                       )
-                   ) branches)
+                   ) branches) @ (match body with 
+                                  | None -> [] 
+                                  | Some c' -> [(dummy_loc, [dl [CPatAtom (dummy_loc, None)]], c')])
+         )
 
 let gRecord names_and_bodies =
   CRecord (dummy_loc, None, List.map (fun (n,b) -> (Ident (dummy_loc, id_of_string n), b)) names_and_bodies)
