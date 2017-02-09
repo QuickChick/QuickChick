@@ -66,6 +66,7 @@ let gTyParam = mkIdentC
 
 type ty_ctr   = Id.t (* Opaque *)
 let ty_ctr_to_string (x : ty_ctr) = Id.to_string x
+let gInjectTyCtr s = Id.of_string s
 
 let gTyCtr = mkIdentC
 

@@ -33,6 +33,7 @@ val gTyParam : ty_param -> coq_expr
 
 type ty_ctr
 val ty_ctr_to_string : ty_ctr -> string
+val gInjectTyCtr : string -> ty_ctr
 val gTyCtr : ty_ctr -> coq_expr
 
 type arg

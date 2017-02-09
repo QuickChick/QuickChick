@@ -44,10 +44,10 @@ Inductive Foo :=
 | Foo3 : nat -> Foo -> Foo -> Foo.
 
 Inductive goodFoo : nat -> Foo -> Prop :=
+| Good2 : forall n foo, goodFoo 0 foo -> goodFoo n (Foo2 foo)
 | Good4 : goodFoo 0 Foo1 (* Requires matching the input nat with 0 *)
 | Good0 : forall n foo, goodFoo n (Foo0 foo) (* Need call to arbitrary *)
 | Good1 : forall n, goodFoo n Foo1 (* Basic unification *)
-| Good2 : forall n foo, goodFoo 0 foo -> goodFoo n (Foo2 foo)
 | Good3 : forall n foo2,
             goodFoo n foo2 ->
             goodFoo (S n) (Foo3 n Foo1 foo2).

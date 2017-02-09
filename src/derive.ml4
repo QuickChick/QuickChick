@@ -840,6 +840,20 @@ let rec convert_to_range dt =
   | DCtr (c,dts) -> Ctr (c, List.map convert_to_range dts)
   | _ -> failwith ("Unsupported range: " ^ (dep_type_to_string dt))
 
+let is_fixed k dt = 
+  let rec aux = function
+    | Undef _ -> false
+    | FixedInput -> true
+    | Unknown u' -> aux (UM.find u' k)
+    | Ctr (_, rs) -> List.for_all aux rs
+  in aux (convert_to_range dt)
+
+let rec dt_to_coq_expr dt = 
+  match dt with 
+  | DTyVar x -> gTyVar x
+  | DCtr (c,dts) -> gApp (gCtr c) (List.map dt_to_coq_expr dts)
+  | _ -> failwith ("Unsupported dt to coq_expr: " ^ (dep_type_to_string dt)) 
+
 let deriveDependent c nc gen_name = 
   let n = parse_integer nc in
   let (ty_ctr, ty_params, ctrs, dep_type) = 
@@ -859,6 +873,8 @@ let deriveDependent c nc gen_name =
   msgerr (str (string_of_int n) ++ fnl ());
   let gen_type = gGen (gOption (gType ty_params (nthType n dep_type))) in
   debug_coq_expr (gType ty_params dep_type);
+
+  let gen_ctr = ty_ctr in
 
   let gen = mk_name_provider "gen" in
   let dec = mk_name_provider "dec" in 
@@ -895,7 +911,7 @@ let deriveDependent c nc gen_name =
     else let (h::t) = l in h :: (inputWithGen (i-1) t) in
 
   (* Handling a branch: returns the generator and a boolean (true if base branch) *)
-  let handle_branch (c : dep_ctr) : (coq_expr * bool) = 
+  let handle_branch size rec_name (c : dep_ctr) : (coq_expr * bool) = 
     let (ctr, typ) = c in
     let b = ref true in 
 
@@ -977,7 +993,27 @@ let deriveDependent c nc gen_name =
     (* Iterate through constraints *)
     let rec recurse_type k = function
       | DProd (_, dt) -> recurse_type k dt (* Only introduces variables, doesn't constrain them *)
-      | DArrow (dt1, dt2) -> failwith ("Do something here! " ^ dep_type_to_string dt1)
+      | DArrow (dt1, dt2) -> 
+         begin match dt1 with 
+         | DTyCtr (c, dts) -> 
+            if c == gen_ctr then 
+            begin (* Recursively called constructor *)
+              b := false;
+              match List.filter (fun (i, dt) -> not (is_fixed k dt)) (List.mapi (fun i dt -> (i+1, dt)) dts) with (* +1 because of nth being 1-indexed *)
+              | [] -> failwith "Implement asking for decidability"
+              | [(i,DTyVar x)] -> 
+                 if i == n then (* Recursive call *)
+                   let args = List.map snd (List.filter (fun (i, _) -> not (i == n)) (List.mapi (fun i dt -> (i+1, dt_to_coq_expr dt)) dts)) in
+                   bindGen (gApp (gVar rec_name) (gVar size :: args)) (ty_var_to_string x) 
+                           (fun _ -> recurse_type (UM.add (ty_var_to_string x) FixedInput k) dt2)
+                 else failwith "Implement other generator modes for recursive call"
+              | [(i, dt) ] -> failwith ("Internal error: not a variable to be generated for" ^ (dep_type_to_string dt)) 
+              | _ -> failwith "Mode analysis failure: More than one arguments need generation"    
+            end 
+            else (* Random constructor *)
+              failwith ("Do me!: " ^ (dep_type_to_string dt1) ^ " vs " ^ (ty_ctr_to_string gen_ctr))
+         | _ -> failwith ("Constraints should only be type constructors. Found: " ^ (dep_type_to_string dt1))
+         end
       | DTyCtr _ -> instantiate_unknown k forGen (* result *)
       | _ -> failwith "Wrong type" in
 
@@ -1006,17 +1042,19 @@ let deriveDependent c nc gen_name =
     gMatch (gVar size) 
            [ (injectCtr "O", [], 
               fun _ -> (* Base cases *) 
-              fst (handle_branch (List.hd ctrs))
+              returnGen gNone
              )
-           ; (injectCtr "S", ["size'"],
-              fun [size'] -> returnGen gNone) (* Non-base cases *)
+           ; (injectCtr "S", ["size'"], (* non-base cases *)
+              fun [size'] -> fst (handle_branch size' rec_name (List.hd ctrs))
+             )
            ] in
 
   
-  let generator_body = gRecFunIn 
+  let generator_body = gRecFunInWithArgs
                     ~assumType:(gen_type)
-                    "aux_arb" ["size"] (fun (rec_name, size::vars) -> aux_arb rec_name size vars) 
-                                               (fun rec_name -> gVar rec_name)
+                    "aux_arb" (gArg ~assumName:(gVar (fresh_name "size")) () :: inputs) 
+                    (fun (rec_name, size::vars) -> aux_arb rec_name size vars) 
+                    (fun rec_name -> gVar rec_name)
   in
 
   (* TODO: These should be generated through some writer monad *)
