@@ -10,6 +10,12 @@ Import QcDefaultNotation. Open Scope qc_scope.
 
 Set Bullet Behavior "Strict Subproofs".
 
+(* Probably also add a logic programming execution mode? *)
+Class DepGen (A : Type) (P : A -> Prop) :=
+  {
+    depGen : G (option A)
+  }. 
+
 Inductive Foo :=
 | Foo0 : Foo -> Foo
 | Foo1 : Foo 
@@ -25,7 +31,15 @@ Inductive goodFoo : nat -> Foo -> Prop :=
             goodFoo n foo2 ->
             goodFoo (S n) (Foo3 n Foo1 foo2).
 
+(* DepGen seems to be the correct way to use typeclasses *)
+(*
+Axiom genGoodFooTarget : forall (sz : nat) (n : nat), G (option Foo).
+Instance depGenGoodFoo (n : nat) : DepGen Foo (goodFoo n) := 
+  {| depGen := sized (fun sz => genGoodFooTarget sz n) |}.
+*)
+
 DeriveDependent goodFoo for 2 as "genGoodFoo". 
+
 
 Inductive Bar A B :=
 | Bar1 : A -> Bar A B
@@ -44,3 +58,4 @@ Inductive goodBar {A B : Type} (n : nat) : Bar A B -> Prop :=
             goodBar n (Bar3 a b (Bar1 a) bar).
 
 DeriveDependent goodBar for 2 as "genGoodBar".
+
