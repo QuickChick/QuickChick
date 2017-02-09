@@ -33,6 +33,7 @@ Parameter G : Type -> Type.
 (* Standard (primitive) generator interface *)
 Parameter returnGen  : forall {A : Type}, A -> G A.
 Parameter bindGen :  forall {A B : Type}, G A -> (A -> G B) -> G B.
+Parameter bindGenOpt : forall {A B : Type}, G (option A) -> (A -> G (option B)) -> G (option B).
 Parameter run  : forall {A : Type}, G A -> nat -> RandomSeed -> A.
 Parameter fmap : forall {A B : Type}, (A -> B) -> G A -> G B.
 Parameter sized : forall {A: Type}, (nat -> G A) -> G A.
@@ -244,6 +245,13 @@ Definition bindGen {A B : Type} (g : G A) (k : A -> G B) : G B :=
   MkGen (fun n r =>
            let (r1,r2) := randomSplit r in
             run (k (run g n r1)) n r2).
+
+Definition bindGenOpt {A B} (g : G (option A)) (f : A -> G (option B)) : G (option B) :=
+  bindGen g (fun ma => 
+  match ma with
+    | None => returnGen None
+    | Some a => f a
+  end).
 
 Definition fmap {A B : Type} (f : A -> B) (g : G A) : G B :=
   MkGen (fun n r => f (run g n r)).

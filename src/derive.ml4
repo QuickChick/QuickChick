@@ -973,21 +973,21 @@ let deriveDependent c nc gen_name =
       | None -> failwith ("Internal error: No binding for " ^ u)
       | Some r -> 
          (* Aux applies the continuation to the "return value" of the current dt *)
-         let rec aux (cont : coq_expr -> coq_expr) = function
+         let rec aux u (cont : coq_expr -> coq_expr) = function
            | Ctr (c,dts) -> 
               (* aux2 goes through the dts, enhancing the continuation to include the result of the head to the acc *)
               let rec aux2 acc = function 
-                | [] -> cont (returnGen (gSome (gApp ~explicit:true (gCtr c) (List.rev acc)))) (* Something about type parameters? *)
-                | h::t -> aux (fun hg -> aux2 (hg::acc) t) h 
+                | [] -> cont (gApp ~explicit:true (gCtr c) (List.rev acc)) (* Something about type parameters? *)
+                | h::t -> aux "" (fun hg -> aux2 (hg::acc) t) h 
               in aux2 [] dts
            | Undef dt -> 
               register_arbitrary dt;
               let arb = arb.next_name () in
               bindGen (gInject "arbitrary") arb (fun arb -> cont (gVar arb))
            | Unknown u' -> 
-              aux cont (UM.find u' k)
-           | r -> failwith ("TODO: implement me! " ^ range_to_string r)
-         in aux (fun c -> c) r
+              aux u' cont (UM.find u' k)
+           | FixedInput -> cont (gVar (fresh_name u))
+         in aux u (fun c -> returnGen (gSome c)) r
     in 
 
     (* Iterate through constraints *)
@@ -1004,7 +1004,7 @@ let deriveDependent c nc gen_name =
               | [(i,DTyVar x)] -> 
                  if i == n then (* Recursive call *)
                    let args = List.map snd (List.filter (fun (i, _) -> not (i == n)) (List.mapi (fun i dt -> (i+1, dt_to_coq_expr dt)) dts)) in
-                   bindGen (gApp (gVar rec_name) (gVar size :: args)) (ty_var_to_string x) 
+                   bindGenOpt (gApp (gVar rec_name) (gVar size :: args)) (ty_var_to_string x) 
                            (fun _ -> recurse_type (UM.add (ty_var_to_string x) FixedInput k) dt2)
                  else failwith "Implement other generator modes for recursive call"
               | [(i, dt) ] -> failwith ("Internal error: not a variable to be generated for" ^ (dep_type_to_string dt)) 
@@ -1042,10 +1042,13 @@ let deriveDependent c nc gen_name =
     gMatch (gVar size) 
            [ (injectCtr "O", [], 
               fun _ -> (* Base cases *) 
-              returnGen gNone
+              let base_branches = List.map fst (List.filter (fun (_, b) -> b) (List.map (handle_branch size rec_name) ctrs)) in
+              uniform_backtracking base_branches
              )
-           ; (injectCtr "S", ["size'"], (* non-base cases *)
-              fun [size'] -> fst (handle_branch size' rec_name (List.hd ctrs))
+           ; (injectCtr "S", ["size'"], 
+              fun [size'] -> 
+              let all_branches = List.map (fun x -> fst (handle_branch size' rec_name x)) ctrs in
+              uniform_backtracking all_branches
              )
            ] in
 
@@ -1054,7 +1057,10 @@ let deriveDependent c nc gen_name =
                     ~assumType:(gen_type)
                     "aux_arb" (gArg ~assumName:(gVar (fresh_name "size")) () :: inputs) 
                     (fun (rec_name, size::vars) -> aux_arb rec_name size vars) 
-                    (fun rec_name -> gVar rec_name)
+                    (fun rec_name -> gFun ["size"] 
+                                    (fun [size] -> gApp (gVar rec_name) 
+                                                        (gVar size :: List.map (fun n -> gVar (fresh_name n)) input_names)
+                                    ))
   in
 
   (* TODO: These should be generated through some writer monad *)
@@ -1079,6 +1085,9 @@ let deriveDependent c nc gen_name =
     | [] -> generator_body
     | _  -> gFunWithArgs args (fun _ -> generator_body)
   in 
+
+  msgerr (str "Result..." ++ fnl());
+  debug_coq_expr with_args;
 
   (* Might require the type *)
   let fn = defineTypedConstant gen_name with_args hole in

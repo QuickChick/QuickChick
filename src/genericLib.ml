@@ -612,7 +612,10 @@ let frequency l =
   | [] -> failwith "frequency used with empty list"
   | [(_,c)] -> c
   | (_,c)::cs -> gApp (gInject "frequency") [c; gList (List.map gPair l)]
-       
+
+let backtracking l = gApp (gInject "backtrack") [gList (List.map gPair l)]
+let uniform_backtracking l = backtracking (List.combine (List.map (fun _ -> gInt 1) l) l)
+
 (* Recursion combinators / fold *)
 (* fold_ty : ( a -> coq_type -> a ) -> ( ty_ctr * coq_type list -> a ) -> ( ty_param -> a ) -> coq_type -> a *)
 let rec fold_ty arrow_f ty_ctr_f ty_param_f ty = 
