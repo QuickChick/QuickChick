@@ -16,6 +16,27 @@ Class DepGen (A : Type) (P : A -> Prop) :=
     depGen : G (option A)
   }. 
 
+(* TODO (maybe): Find a way to unify these? *)
+Class DepDec1 (A : Type) (P : A -> Prop) :=
+  {
+    depDec1 : forall (x : A), {P x} + {~ (P x)}
+  }.
+
+Class DepDec2 (A B : Type) (P : A -> B -> Prop) :=
+  {
+    depDec2 : forall (x : A) (y : B), {P x y} + {~ (P x y)}
+  }.
+
+Class DepDec3 (A B C : Type) (P : A -> B -> C -> Prop) :=
+  {
+    depDec3 : forall (x : A) (y : B) (z : C), {P x y z} + {~ (P x y z)}
+  }.
+
+(* I can't seem to get this to work 
+Class DepDec (P : Prop) := { depDec : {P} + {~ P} }.
+Instance DepDecFun {A} (x : A) (P : A -> Type) `{_ : DepDec (P} : DepDec (P x).
+*)
+
 Inductive Foo :=
 | Foo0 : Foo -> Foo
 | Foo1 : Foo 
