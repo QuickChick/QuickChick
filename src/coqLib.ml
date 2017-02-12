@@ -35,6 +35,9 @@ let gEqType e1 e2 =
 let gConj p1 p2 =
   gApp (gInject "and") [p1; p2]
 
+let gProd e1 e2 =
+  gApp (gInject "prod") [e1; e2]
+
 
 let gOrIntroL p =
   gApp (gInject "or_introl") [p]

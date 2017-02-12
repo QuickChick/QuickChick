@@ -18,9 +18,10 @@ open SetLib
 open CoqLib
 open Sized
 open SizeMon
+open SizeCorr
 open ArbitrarySized
 
-type derivable = ArbitrarySized | Sized | CanonicalSized | SizeMonotonic
+type derivable = ArbitrarySized | Sized | CanonicalSized | SizeMonotonic | GenSizeCorrect
 
 (* Contains the generic derivation function from derive.ml4, but the code that generates the instances
  * is in separate files *)
@@ -44,6 +45,7 @@ let print_der = function
   | Sized -> "Sized"
   | CanonicalSized -> "CanonicalSized"
   | SizeMonotonic -> "SizeMonotonic"
+  | GenSizeCorrect ->  "GenSizeCorrect"
 
 let debug_environ () =
   let env = Global.env () in
@@ -58,7 +60,7 @@ let debugDerive (c : constr_expr) =
   | None -> failwith "Not supported type"  
 
 (* Generic derivation function *)
-let derive (cn : derivable) (c : constr_expr) (instance_name : string) (extra_name : string) =
+let derive (cn : derivable) (c : constr_expr) (instance_name : string) (extra_name : string) (extra_name2 : string) =
 
   let (ty_ctr, ty_params, ctrs) =
     match coerce_reference_to_dt_rep c with
@@ -75,6 +77,7 @@ let derive (cn : derivable) (c : constr_expr) (instance_name : string) (extra_na
     | ArbitrarySized -> "ArbitrarySized"
     | CanonicalSized -> "CanonicalSized"
     | SizeMonotonic -> "QuickChick.GenLow.GenLow.SizeMonotonic"
+    | GenSizeCorrect ->  "GenSizeCorrect"
   in
 
   let param_class_names = match cn with
@@ -82,6 +85,7 @@ let derive (cn : derivable) (c : constr_expr) (instance_name : string) (extra_na
     | ArbitrarySized -> ["Arbitrary"]
     | CanonicalSized -> ["CanonicalSized"]
     | SizeMonotonic -> ["ArbitraryMonotonic"]
+    | GenSizeCorrect ->  ["ArbitraryMonotonicCorrect"; "CanonicalSized"]
   in
 
   let extra_arguments = match cn with
@@ -89,6 +93,7 @@ let derive (cn : derivable) (c : constr_expr) (instance_name : string) (extra_na
     | ArbitrarySized -> []
     | CanonicalSized -> []
     | SizeMonotonic -> [(gInject "s", gInject "nat")]
+    | GenSizeCorrect -> []
   in
   (* Generate typeclass constraints. For each type parameter "A" we need `{_ : <Class Name> A} *)
   let instance_arguments =
@@ -106,7 +111,10 @@ let derive (cn : derivable) (c : constr_expr) (instance_name : string) (extra_na
     | SizeMonotonic ->
       let (_, size) = take_last iargs [] in
       gApp (gInject class_name)
-           [(gApp ~explicit:true (gInject ("arbitrarySize")) [full_dt; (gInject extra_name); (gVar size)])]
+        [(gApp ~explicit:true (gInject ("arbitrarySize")) [full_dt; (gInject extra_name); (gVar size)])]
+    | GenSizeCorrect ->
+      gApp (gInject class_name)
+        [(gApp ~explicit:true (gInject ("arbitrarySize")) [full_dt; (gInject extra_name)])]
     | _ -> gApp (gInject class_name) [full_dt]
   in
   (* Create the instance record. Only need to extend this for extra instances *)
@@ -121,25 +129,33 @@ let derive (cn : derivable) (c : constr_expr) (instance_name : string) (extra_na
     | SizeMonotonic ->
       let (iargs', size) = take_last iargs [] in
       sizeMon ty_ctr ctrs (gVar size) iargs' (gInject extra_name)
+    | GenSizeCorrect ->
+      genCorr ty_ctr ctrs iargs (gInject extra_name) (gInject extra_name2)
+
   in
   declare_class_instance instance_arguments instance_name instance_type instance_record
 
 
 
 VERNAC COMMAND EXTEND DeriveArbitrarySized
-  | ["DeriveArbitrarySized" constr(c) "as" string(s1)] -> [derive ArbitrarySized c s1 "aux"]
+  | ["DeriveArbitrarySized" constr(c) "as" string(s1)] -> [derive ArbitrarySized c s1 "aux" ""]
 END;;
 
 VERNAC COMMAND EXTEND DeriveSized
-  | ["DeriveSized" constr(c) "as" string(s1)] -> [derive Sized c s1 "aux"]
+  | ["DeriveSized" constr(c) "as" string(s1)] -> [derive Sized c s1 "aux" ""]
 END;;
 
 VERNAC COMMAND EXTEND DeriveCanonicalSized
-  | ["DeriveCanonicalSized" constr(c) "as" string(s1)] -> [derive CanonicalSized c s1 "aux"]
+  | ["DeriveCanonicalSized" constr(c) "as" string(s1)] -> [derive CanonicalSized c s1 "aux" ""]
 END;;
 
 VERNAC COMMAND EXTEND DeriveArbitrarySizedMonotonic
   | ["DeriveArbitrarySizedMonotonic" constr(c) "as" string(s1) "using" string(s2)] ->
   (* s2 is the instance name for ArbitrarySized *)
-    [derive SizeMonotonic c s1 s2]
+    [derive SizeMonotonic c s1 s2 ""]
+END;;
+
+VERNAC COMMAND EXTEND DeriveArbitrarySizedCorrect
+  | ["DeriveArbitrarySizedCorrect" constr(c) "as" string(s1) "using" string(s2) "and" string(s3)] ->
+    [derive GenSizeCorrect c s1 s2 s3]
 END;;

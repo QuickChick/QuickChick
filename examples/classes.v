@@ -66,6 +66,13 @@ Class ArbitrarySized (A : Type) :=
     shrinkSize : A -> list A
   }.
 
+(** Correctness of sized generators *)
+Class GenSizeCorrect {A : Type} `{Sized A} (g : nat -> G A) :=
+  {
+    genSizeCorrect : forall s, semGen (g s) <--> [set x : A | size x <= s ]
+  }.
+
+(* Not used so far *)
 Class ArbitrarySizedMonotonic (A : Type) `{H1 : ArbitrarySized A}
       `{H2 : forall s, SizeMonotonic (arbitrarySize s)}.
 
@@ -78,26 +85,25 @@ Class ArbitrarySizedMonotonic (A : Type) `{H1 : ArbitrarySized A}
 (*         semGenSize (arbitrarySize s1) s \subset semGenSize (arbitrarySize s2) s *)
 (*   }. *)
 
- 
-(** Correctness of size parametric generators *)
-Class ArbitrarySizedCorrect (A : Type) `{Sized A} `{ArbitrarySized A} :=
-  {
-    arbitrarySizeCorrect :
-      forall s, semGen (arbitrarySize s) <--> [ set x : A | size x <= s ] 
-  }.
+
+(* Correctness of size parametric generators *)
+Class ArbitrarySizedCorrect (A : Type) `{Sized A} `{H1 : ArbitrarySized A}
+      `{@GenSizeCorrect _ _ arbitrarySize}.
 
 
-Class ArbitraryMonotonic (A : Type) `{H1 : Arbitrary A}
+Class ArbitraryMonotonic (A : Type) `{Arbitrary A}
       `{H2 : @SizeMonotonic _ arbitrary}.
 
-
 (** Correctness of generators *)
-Class ArbitraryCorrect (A : Type) `{Arbitrary A}  :=
+Class GenCorrect (A : Type) (g : G A)  :=
   {
-    arbitraryCorrect : semGen arbitrary <--> [set : A]
+    arbitraryCorrect : semGen g <--> [set : A]
   }.
 
-
+Class ArbitraryMonotonicCorrect (A : Type)
+      `{H1 : Arbitrary A} `{ArbitraryMonotonic A}
+      `{@GenCorrect _ arbitrary}.
+  
 (** Foo example *)
 
 (* TODO : prove and move to the appropriate file *)
@@ -120,11 +126,9 @@ Inductive Foo (A : Type) {B : Type}: Type :=
 | Foo3 : nat -> A -> B -> Foo A -> Foo A -> Foo A
 | Foo4 : Foo A.
 
-DeriveArbitrarySized Foo as "arbSizedFoo".
-DeriveSized Foo as "SizedFoo".
-DeriveCanonicalSized Foo as "CanonSizedFoo".
-
-Typeclasses eauto := debug.
+DeriveArbitrarySized Foo as "ArbSizedFoo".
+DeriveSized Foo as "SizedFoo". (* Drop params maybe??? *)
+DeriveCanonicalSized Foo as "CanonSizedFoo". (* Drop params maybe??? *)
 
 (* Derives :
 
@@ -138,56 +142,40 @@ Needs the arbitrarySized instance to be specified.
 
 *)
 
-DeriveArbitrarySizedMonotonic Foo as "ArbSizedMonFoo" using "arbSizedFoo".
+DeriveArbitrarySizedMonotonic Foo as "ArbSizedMonFoo" using "ArbSizedFoo".
 
 
-Lemma arbFooCorrectSized {A B : Type} `{H1 : Arbitrary A} `{H2 : Arbitrary B}
-      `{H1' : Sized A} `{H2' : Sized B} s :
-  semGen (arbitrarySize s) <--> [set foo : @Foo A B | size foo <= s].
+Lemma nat_set_ind (A : Type) `{Hyp : CanonicalSized A} :
+  forall (P : nat -> set A -> Prop),
+    (P 0 zeroSized) ->
+    (forall (n : nat) s, P n s -> P (n.+1) (succSized s)) ->
+    (forall (n : nat), P n [ set x | size x <= n ]).
 Proof.
 Admitted.
-(*   revert size. *)
-(*   specialize (@size_ind Foo _ (fun n s => semGen (arbFooSized n) <--> s)). *)
-(*   intros Hyp. eapply Hyp; clear Hyp. *)
-(*   - eapply (semReturn Foo1). *)
-(*   - intros n s IH. *)
-(*     (* Frequency and some normalization of the sets *) *)
-(*     simpl. refine (set_eq_trans (semFrequency _ _) _). simpl. *)
-(*     eapply set_eq_trans. *)
-(*     + refine (set_eq_trans (eq_bigcupl _ _ (set_eq_trans (cons_set_eq _ _) *)
-(*                                                          (setU_set_eq_compat (set_eq_refl [set (1, returnGen Foo1)]) *)
-(*                                                                              (set_eq_trans (cons_set_eq _ _) *)
-(*                                                                                            (setU_set_eq_compat (set_eq_refl _) *)
-(*                                                                                                                (set_eq_trans *)
-(*                                                                                                                   (cons_set_eq _ []) *)
-(*                                                                                                                   (setU_set0_neut _))))))) *)
-(*                            (set_eq_trans (bigcup_setU_l _ _ _) (setU_set_eq_compat (bigcup_set1 _ _) *)
-(*                                                                                    (set_eq_trans (bigcup_setU_l _ _ _) (setU_set_eq_compat (bigcup_set1 _ _)  *)
-(*                                                                                                                                            (bigcup_set1 _ _)))))). *)
-(*     + refine (setU_set_eq_compat (semReturn Foo1) (setU_set_eq_compat _ _)). *)
-(*       * refine *)
-(*          (set_eq_trans (@semBindSizeMonotonic _ _ _ _ _ _) (set_eq_trans (eq_bigcupl _ _ IH) (eq_bigcupr _ (fun x => semReturn _)))). *)
-(*         admit. (* It should be able to infer it *) *)
-(*       * simpl. *)
-(*         refine *)
-(*           (set_eq_trans (@semBindSizeMonotonic _ _ _ _ _ _) _); eauto with typeclass_instances. *)
-(*         admit. *)
-(*         refine (set_eq_trans *)
-(*                   (eq_bigcupl _ _ arbNat_correct) *)
-(*                   (eq_bigcupr _ *)
-(*                               (fun n => *)
-(*                                  set_eq_trans (@semBindSizeMonotonic _ _ _ _ _ _) *)
-(*                                               (set_eq_trans *)
-(*                                                  (eq_bigcupl _ _ IH) *)
-(*                                                  (eq_bigcupr _ *)
-(*                                                              (fun x => set_eq_trans (@semBindSizeMonotonic _ _ _ _ _ _) *)
-(*                                                                                  (set_eq_trans *)
-(*                                                                                     (eq_bigcupl _ _ IH) *)
-(*                                                                                     (eq_bigcupr _ (fun x => semReturn _))))))))). *)
-(*         admit. *)
-(*         admit. *)
-(*         admit. *)
-(* Admitted. *)
+
+Lemma singl_set_eq: forall (A : Type) (x : A), [ x ] <--> [ set x ].
+Proof.
+  intros A x x'; split; intros H.
+  - inv H. reflexivity. now inv H0.
+  - inv H. now constructor.
+Qed.
+
+Lemma semFreq :
+  forall (A : Type) (ng : nat * G A) (l : seq (nat * G A)),
+    semGen (freq ((fst ng, snd ng) ;; l)) <-->
+    \bigcup_(x in (ng :: l)) semGen x.2.
+Admitted.
+
+Instance ArbNatGenCorrect : GenCorrect nat arbitrary.
+Proof.
+  constructor. now apply arbNat_correct.
+Qed.
+
+Typeclasses eauto := debug.
+
+
+DeriveArbitrarySizedCorrect Foo as "ArbCorrMonFoo" using "ArbSizedFoo" and "ArbSizedMonFoo".
+
 
 Instance FooArbitrarySizedCorrect {A B : Type} `{H1 : Arbitrary A} `{H2 : Arbitrary B}
          `{H1' : Sized A} `{H2' : Sized B} : (@ArbitrarySizedCorrect (@Foo A B) _ _). 

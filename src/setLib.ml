@@ -51,3 +51,13 @@ let setU_set0_l x1 x2 =
 
 let setU_set0_neut_eq x1 x2 =
   gApp (gInject "setU_set0_neut_eq") [x1; x2]
+
+let eq_bigcupl x1 x2 p = gApp (gInject "eq_bigcupl") [x1; x2; p]
+
+let cons_set_eq x l = gApp (gInject "cons_set_eq") [x; l]
+
+let singl_set_eq x l = gApp (gInject "singl_set_eq") [x; l]
+
+let bigcup_setU_l x1 x2 x3 = gApp (gInject "bigcup_setU_l") [x1; x2; x3]
+
+let bigcup_set1 x1 x2 = gApp (gInject "bigcup_set1") [x1 ; x2]

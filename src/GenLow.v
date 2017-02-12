@@ -78,7 +78,7 @@ Class CanonicalSize A :=
 (* Zoe: We do not need that when we do automatic resolution. Changing it to a lemma ? *)
 (* CH: Why does Unsized need a _ when A is marked as implict! *)
 (* begin unsizedMonotonic *)
-Parameter unsizedMonotonic : forall {A} (g : G A) `{Unsized _ g}, SizeMonotonic g.
+Parameter unsizedMonotonic : forall {A} (g : G A), Unsized g -> SizeMonotonic g.
 (* end unsizedMonotonic *)
 
 
@@ -338,7 +338,7 @@ Class CanonicalSize A :=
   { sizeOf : A -> nat }.
 
 (* Unsizedness trivially implies size-monotonicity *)
-Lemma unsizedMonotonic {A} (g : G A) { _ : Unsized  g } : SizeMonotonic g. 
+Lemma unsizedMonotonic {A} (g : G A) : Unsized g -> SizeMonotonic g. 
 Proof.
   constructor. intros s1 s2 Hleq.
   rewrite /unsized /monotonic => a H12.
