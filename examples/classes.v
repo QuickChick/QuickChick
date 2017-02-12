@@ -171,9 +171,7 @@ Proof.
   constructor. now apply arbNat_correct.
 Qed.
 
-Typeclasses eauto := debug.
-
-
+(* kinda slow *)
 DeriveArbitrarySizedCorrect Foo as "ArbCorrMonFoo" using "ArbSizedFoo" and "ArbSizedMonFoo".
 
 
