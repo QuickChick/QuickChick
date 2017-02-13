@@ -216,6 +216,13 @@ Proof.
   now firstorder.
 Qed.
 
+Lemma setU_set_incl_r :
+  forall (T : Type) (s1 s2 s2' : set T),
+     s1 \subset s2' -> s1 \subset s2 :|: s2'.
+Proof.
+  now firstorder.
+Qed.
+
 Lemma incl_bigcupl :
   forall (T U : Type) (A B : set T) (F : T -> set U),
     A \subset B -> \bigcup_(x in A) F x \subset \bigcup_(x in B) F x.
@@ -240,6 +247,10 @@ Proof.
   now firstorder. 
 Qed.
 
+Lemma oneOf_freq {A} (g : G A) (gs : list (G A)) size :
+  semGenSize (oneOf (g ;; gs)) size <--> semGenSize (freq ((1, g) ;; map (fun x => (1, x)) gs)) size.  
+Admitted.
+
 Instance ArbSizedSizeMotonicFoo {A B} `{Arbitrary A} `{Arbitrary B} : ArbitrarySizedSizeMotonic (@Foo A B).
 Proof.
   constructor. intros s s1 s2.
@@ -247,7 +258,17 @@ Proof.
   - simpl. firstorder. (* reflexivity for set_incl *)
   - unfold arbitrarySize, ArbSizedFoo.
     rewrite (semFreqSize _ ((1, bindGen arbitrary (fun p0 : A => returnGen (Foo1 A p0))))).
-    admit. 
+    rewrite oneOf_freq. simpl.
+    rewrite (semFreqSize _ (1, bindGen arbitrary (fun p0 : A => returnGen (Foo1 A p0)))).
+    eapply incl_bigcupl. rewrite !cons_set_eq.
+
+    eapply setU_set_incl_compat. now firstorder.
+
+    eapply setU_set_incl_r.
+    eapply setU_set_incl_r.
+
+    eapply setU_set_incl_compat; now firstorder.
+    
   - unfold arbitrarySize, ArbSizedFoo.
     rewrite !(semFreqSize _ ((1, bindGen arbitrary (fun p0 : A => returnGen (Foo1 A p0))))).
     rewrite !cons_set_eq.
@@ -277,7 +298,7 @@ Proof.
     eapply setU_set_incl_compat.
     now firstorder.
     now firstorder.
-Admitted. 
+Qed. 
 
 Typeclasses eauto := debug.
 
