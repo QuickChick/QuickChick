@@ -7,6 +7,7 @@ Import GenLow GenHigh.
 Require Import List.
 Import ListNotations.
 Import QcDefaultNotation. Open Scope qc_scope.
+Import QcDoNotation.
 
 Set Bullet Behavior "Strict Subproofs".
 
@@ -41,6 +42,54 @@ Inductive Foo :=
 | Foo1 : Foo 
 | Foo2 : Foo -> Foo
 | Foo3 : nat -> Foo -> Foo.
+
+DeriveArbitrary Foo as "arbFoo" "genFooSized'".
+DeriveShow Foo as "showFoo'".
+
+(* Use custom formatting of generated code, and prove them equal (by reflexivity) *)
+
+(* begin show_foo *)
+Fixpoint showFoo (x : Foo) := 
+  match x with 
+  | Foo1 => "Foo1  " ++ ""
+  | Foo2 f => "Foo2  " ++ ("( " ++ showFoo f ++ " )") ++ " " ++ ""
+  | Foo3 n f => "Foo3  " ++ ("( " ++ show     n ++ " )") ++
+                     " " ++ ("( " ++ showFoo f ++ " )") ++ " " ++ ""
+  end%string.
+(* end show_foo *)
+
+Lemma show_foo_equality : showFoo = (@show Foo _).
+Proof. reflexivity. Qed.
+
+(* begin genFooSized *)
+Fixpoint genFooSized (size : nat) := 
+  match size with 
+  | O => returnGen Foo1
+  | S size' => freq [ (1, returnGen Foo1) 
+                    ; (size, do! f <- genFooSized size'; 
+                             returnGen (Foo2 f))
+                    ; (size, do! n <- arbitrary; 
+                             do! f <- genFooSized size';
+                             returnGen (Foo3 n f)) 
+                    ]
+  end.                 
+(* end genFooSized *)                                           
+
+(* begin shrink_foo *)
+Fixpoint shrink_foo x := 
+  match x with
+  | Foo1 => []
+  | Foo2 f => ([f] ++ map (fun f' => Foo2 f') (shrink_foo f) ++ []) ++ []
+  | Foo3 n f => (map (fun n' => Foo3 n' f) (shrink n) ++ []) ++
+                ([f] ++ map (fun f' => Foo3 n f') (shrink_foo f) ++ []) ++ []
+  end.
+(* end shrink_foo *)
+
+Lemma genFooSizedNotation : genFooSized = genFooSized'.
+Proof. reflexivity. Qed.
+
+Lemma shrinkFoo_equality : shrink_foo = @shrink Foo _.
+Proof. reflexivity. Qed.
 
 (* Completely unrestricted case *)
 Inductive goodFoo : nat -> Foo -> Prop :=
