@@ -21,7 +21,7 @@ open SizeMon
 open SizeCorr
 open ArbitrarySized
 
-type derivable = ArbitrarySized | Sized | CanonicalSized | SizeMonotonic | GenSizeCorrect
+type derivable = ArbitrarySized | Sized | CanonicalSized | SizeMonotonic | SizeSMonotonic | GenSizeCorrect
 
 (* Contains the generic derivation function from derive.ml4, but the code that generates the instances
  * is in separate files *)
@@ -77,6 +77,7 @@ let derive (cn : derivable) (c : constr_expr) (instance_name : string) (extra_na
     | ArbitrarySized -> "ArbitrarySized"
     | CanonicalSized -> "CanonicalSized"
     | SizeMonotonic -> "QuickChick.GenLow.GenLow.SizeMonotonic"
+    | SizeSMonotonic -> "SizeSMonotonic"
     | GenSizeCorrect ->  "GenSizeCorrect"
   in
 
@@ -85,6 +86,7 @@ let derive (cn : derivable) (c : constr_expr) (instance_name : string) (extra_na
     | ArbitrarySized -> ["Arbitrary"]
     | CanonicalSized -> ["CanonicalSized"]
     | SizeMonotonic -> ["ArbitraryMonotonic"]
+    | SizeSMonotonic -> ["Arbitrary"]
     | GenSizeCorrect ->  ["ArbitraryMonotonicCorrect"; "CanonicalSized"]
   in
 
@@ -93,8 +95,10 @@ let derive (cn : derivable) (c : constr_expr) (instance_name : string) (extra_na
     | ArbitrarySized -> []
     | CanonicalSized -> []
     | SizeMonotonic -> [(gInject "s", gInject "nat")]
+    | SizeSMonotonic -> []
     | GenSizeCorrect -> []
   in
+
   (* Generate typeclass constraints. For each type parameter "A" we need `{_ : <Class Name> A} *)
   let instance_arguments =
     (List.concat (List.map (fun tp ->
@@ -129,6 +133,9 @@ let derive (cn : derivable) (c : constr_expr) (instance_name : string) (extra_na
     | SizeMonotonic ->
       let (iargs', size) = take_last iargs [] in
       sizeMon ty_ctr ctrs (gVar size) iargs' (gInject extra_name)
+    | SizeSMonotonic ->
+      failwith "Unimplemented"
+      (* sizeMon ty_ctr ctrs iargs *)
     | GenSizeCorrect ->
       genCorr ty_ctr ctrs iargs (gInject extra_name) (gInject extra_name2)
 
@@ -154,6 +161,12 @@ VERNAC COMMAND EXTEND DeriveArbitrarySizedMonotonic
   (* s2 is the instance name for ArbitrarySized *)
     [derive SizeMonotonic c s1 s2 ""]
 END;;
+
+VERNAC COMMAND EXTEND DeriveArbitrarySizedSizeMonotonic
+  | ["DeriveArbitrarySizedMonotonic" constr(c) "as" string(s1)] ->
+    [derive SizeSMonotonic c s1 "" ""]
+END;;
+
 
 VERNAC COMMAND EXTEND DeriveArbitrarySizedCorrect
   | ["DeriveArbitrarySizedCorrect" constr(c) "as" string(s1) "using" string(s2) "and" string(s3)] ->

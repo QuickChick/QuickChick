@@ -27,6 +27,8 @@ let set_suchThat (x : string) (t : coq_expr) (p : var -> coq_expr) : coq_expr =
 
 let set_eq c1 c2 = gApp (gInject "set_eq") [c1;c2]
 
+let set_eq c1 c2 = gApp (gInject "set_incl") [c1;c2]
+
 let set_union c1 c2 = gApp (gInject "setU") [c1;c2]
 
 let rec set_unions = function
@@ -36,6 +38,8 @@ let rec set_unions = function
 
 let set_eq_refl x =
   gApp (gInject "set_eq_refl") [x]
+
+let set_incl_refl = gApp ~explicit:true (gInject "subset_refl") [hole; hole] in
 
 let setU_set_eq_compat x1 x2 =
   gApp (gInject "setU_set_eq_compat") [x1; x2]
@@ -61,3 +65,19 @@ let singl_set_eq x l = gApp (gInject "singl_set_eq") [x; l]
 let bigcup_setU_l x1 x2 x3 = gApp (gInject "bigcup_setU_l") [x1; x2; x3]
 
 let bigcup_set1 x1 x2 = gApp (gInject "bigcup_set1") [x1 ; x2]
+
+let subset_respects_set_eq_l p1 p2 =
+  gApp (gInject "subset_respects_set_eq_l") [p1; p2]
+
+let subset_respects_set_eq_r p1 p2 =
+  gApp (gInject "subset_respects_set_eq_r") [p1; p2]
+
+(* maybe add a new lemma? *)
+let subset_set_eq_compat p1 p2 p3 =
+  subset_respects_set_eq_l p1 (subset_respects_set_eq_r p2 p3)
+
+let incl_bigcupl p =
+  gApp (gInject "incl_bigcup") [p]
+
+let incl_subset l1 l2 p =
+  gApp (gInject "incl_subset") [l1; l2; p]

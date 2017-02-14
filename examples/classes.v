@@ -203,101 +203,169 @@ DeriveArbitrarySizedCorrect Foo as "ArbCorrMonFoo" using "ArbSizedFoo" and "ArbS
 
 Require Import Omega.
 
-Lemma set_incl_trans {A} (s1 s2 s3 : set A) :
-  s1 \subset s2 -> s2 \subset s3 -> s1 \subset s3.
-Proof.
-  now firstorder.
-Qed.
-
-Lemma setU_set_incl_compat :
-  forall (T : Type) (s1 s2 s1' s2' : set T),
-    s1 \subset s1' -> s2 \subset s2' -> s1 :|: s2 \subset s1' :|: s2'.
-Proof.
-  now firstorder.
-Qed.
-
-Lemma setU_set_incl_r :
-  forall (T : Type) (s1 s2 s2' : set T),
-     s1 \subset s2' -> s1 \subset s2 :|: s2'.
-Proof.
-  now firstorder.
-Qed.
-
-Lemma incl_bigcupl :
-  forall (T U : Type) (A B : set T) (F : T -> set U),
-    A \subset B -> \bigcup_(x in A) F x \subset \bigcup_(x in B) F x.
-Proof.
-  now firstorder.
-Qed.
-
-Lemma incl_bigcupr :
-  forall (T U : Type) (A : set T) (F G : T -> set U),
-    (forall x : T, F x \subset G x) ->
-    \bigcup_(x in A) F x \subset \bigcup_(x in A) G x.
-Proof. 
-  now firstorder. 
-Qed.
-
-Lemma incl_bigcup :
-  forall (T U : Type) (A B : set T) (F G : T -> set U),
-    A \subset B ->
-    (forall x : T, F x \subset G x) ->
-    \bigcup_(x in A) F x \subset \bigcup_(x in B) G x.
-Proof. 
-  now firstorder. 
-Qed.
-
 Lemma oneOf_freq {A} (g : G A) (gs : list (G A)) size :
-  semGenSize (oneOf (g ;; gs)) size <--> semGenSize (freq ((1, g) ;; map (fun x => (1, x)) gs)) size.  
+  semGenSize (oneOf (g ;; gs)) size <-->
+  semGenSize (freq ((1, g) ;; map (fun x => (1, x)) gs)) size.  
 Admitted.
+
+Lemma incl_subset {A : Type} (l1 l2 : seq A) :
+  incl l1 l2 -> l1 \subset l2.
+Proof.
+  intros Hi x; eapply Hi.
+Qed.
+
+Lemma incl_hd_same {A : Type} (a : A) (l1 l2 : seq A) :
+  incl l1 l2 -> incl (a :: l1) (a :: l2).
+Proof.
+  intros Hin. firstorder.
+Qed.
 
 Instance ArbSizedSizeMotonicFoo {A B} `{Arbitrary A} `{Arbitrary B} : ArbitrarySizedSizeMotonic (@Foo A B).
 Proof.
-  constructor. intros s s1 s2.
-  revert s1; induction s2; intros s1 Hleq; destruct s1; try ssromega.
-  - simpl. firstorder. (* reflexivity for set_incl *)
-  - unfold arbitrarySize, ArbSizedFoo.
-    rewrite (semFreqSize _ ((1, bindGen arbitrary (fun p0 : A => returnGen (Foo1 A p0))))).
-    rewrite oneOf_freq. simpl.
-    rewrite (semFreqSize _ (1, bindGen arbitrary (fun p0 : A => returnGen (Foo1 A p0)))).
-    eapply incl_bigcupl. rewrite !cons_set_eq.
+  constructor.
+  refine
+    (fun s =>
+       nat_ind
+         _
+         (nat_ind
+            _
+            (fun Hleq => @subset_refl _ _)
+            (fun s2 IHs2 Hleq => _))
+         (fun s1 IHs2 =>
+            (nat_ind
+               _
+               (fun Hleq =>
+                  (False_ind _ (lt0_False Hleq)))
+               (fun s2 IHs2 Hleq =>
+                  _)
+            )
+         )
+    ).
+  - refine (subset_respects_set_eq_l
+              (oneOf_freq _ _ _) _).
+    refine (subset_respects_set_eq_l
+                 (semFreqSize _ ((1, bindGen arbitrary (fun p0 : A => returnGen (Foo1 A p0)))) _ _)
+                 (subset_respects_set_eq_r
+                    (semFreqSize _ ((1, bindGen arbitrary (fun p0 : A => returnGen (Foo1 A p0)))) _ _)
+                    (incl_bigcupl
+                       (incl_subset
+                          _ _ (incl_hd_same
+                                 _ _ _ (incl_tl
+                                          _ (incl_tl
+                                               _ (incl_hd_same
+                                                    _ _ _ (incl_refl _))))))))).
+  - refine (subset_respects_set_eq_l
+                 (semFreqSize _ ((1, bindGen arbitrary (fun p0 : A => returnGen (Foo1 A p0)))) _ _)
+                 (subset_respects_set_eq_r
+                    (semFreqSize _ ((1, bindGen arbitrary (fun p0 : A => returnGen (Foo1 A p0)))) _ _) _)).
+    refine (subset_respects_set_eq_l
+              (eq_bigcupl _ _ (cons_set_eq _ _))
+              (subset_respects_set_eq_r
+                 (eq_bigcupl _ _ (cons_set_eq _ _))
+                 _)
+           ).
+    refine (subset_respects_set_eq_l
+              (bigcup_setU_l _ _ _)
+              (subset_respects_set_eq_r
+                 (bigcup_setU_l _ _ _)
+                 _)
+           ).
 
-    eapply setU_set_incl_compat. now firstorder.
+    refine (setU_set_subset_compat (@subset_refl _ _) _).
 
-    eapply setU_set_incl_r.
-    eapply setU_set_incl_r.
+    refine (subset_respects_set_eq_l
+              (eq_bigcupl _ _ (cons_set_eq _ _))
+              (subset_respects_set_eq_r
+                 (eq_bigcupl _ _ (cons_set_eq _ _))
+                 _)
+           ).
+    refine (subset_respects_set_eq_l
+              (bigcup_setU_l _ _ _)
+              (subset_respects_set_eq_r
+                 (bigcup_setU_l _ _ _)
+                 _)
+           ).
+    refine (setU_set_subset_compat _ _).
 
-    eapply setU_set_incl_compat; now firstorder.
+
+    refine (subset_respects_set_eq_l
+              (bigcup_set1 _ _)
+              (subset_respects_set_eq_r
+                 (bigcup_set1 _ _) _)).
+    refine (subset_respects_set_eq_l
+              (semBindSize _ _ _)
+              (subset_respects_set_eq_r
+                 (semBindSize _ _ _) _)).
+
+    refine (incl_bigcup_compat (IHs0 _ Hleq) (fun x => @subset_refl _ _)).
+
+
+refine (subset_respects_set_eq_l
+              (eq_bigcupl _ _ (cons_set_eq _ _))
+              (subset_respects_set_eq_r
+                 (eq_bigcupl _ _ (cons_set_eq _ _))
+                 _)
+           ).
+    refine (subset_respects_set_eq_l
+              (bigcup_setU_l _ _ _)
+              (subset_respects_set_eq_r
+                 (bigcup_setU_l _ _ _)
+                 _)
+           ).
+    refine (setU_set_subset_compat _ _).
+
+
+    refine (subset_respects_set_eq_l
+              (bigcup_set1 _ _)
+              (subset_respects_set_eq_r
+                 (bigcup_set1 _ _) _)).
+    refine (subset_respects_set_eq_l
+              (semBindSize _ _ _)
+              (subset_respects_set_eq_r
+                 (semBindSize _ _ _) _)).
+
+    refine (incl_bigcup_compat
+              (@subset_refl _ _)
+              (fun x1 => _)).
+
+    refine (subset_respects_set_eq_l
+              (semBindSize _ _ _)
+              (subset_respects_set_eq_r
+                 (semBindSize _ _ _) _)).
+
+    refine (incl_bigcup_compat
+              (@subset_refl _ _)
+              (fun x2 => _)).
+
+    refine (subset_respects_set_eq_l
+              (semBindSize _ _ _)
+              (subset_respects_set_eq_r
+                 (semBindSize _ _ _) _)).
     
-  - unfold arbitrarySize, ArbSizedFoo.
-    rewrite !(semFreqSize _ ((1, bindGen arbitrary (fun p0 : A => returnGen (Foo1 A p0))))).
-    rewrite !cons_set_eq.
-    rewrite !bigcup_setU_l.
-    rewrite !bigcup_set1.
-    eapply setU_set_incl_compat.
-    now firstorder.
+    refine (incl_bigcup_compat
+              (@subset_refl _ _)
+              (fun x2 => _)).
 
-    eapply setU_set_incl_compat.
-    rewrite !semBindSize.
-    eapply incl_bigcupl.
-    now eauto.
+    refine (subset_respects_set_eq_l
+              (semBindSize _ _ _)
+              (subset_respects_set_eq_r
+                 (semBindSize _ _ _) _)).
+    
+    refine (incl_bigcup_compat
+              (IHs0 _ Hleq)
+              (fun x3 => _)).
 
-    eapply setU_set_incl_compat.
-    rewrite !semBindSize.
-    eapply incl_bigcupr.
-    intros x. rewrite !semBindSize.
-    eapply incl_bigcupr.
-    intros x1. rewrite !semBindSize.
-    eapply incl_bigcupr.
-    intros x2. rewrite !semBindSize.
-    eapply incl_bigcup. eapply IHs2. eassumption.
-    intros x3. rewrite !semBindSize.
-    eapply incl_bigcup. eapply IHs2. eassumption.
-    intros x4. firstorder. (* refl *)
+    refine (subset_respects_set_eq_l
+              (semBindSize _ _ _)
+              (subset_respects_set_eq_r
+                 (semBindSize _ _ _) _)).
+    
+    refine (incl_bigcup_compat
+              (IHs0 _ Hleq)
+              (fun x4 => (@subset_refl _ _))).
 
-    eapply setU_set_incl_compat.
-    now firstorder.
-    now firstorder.
+
+    refine (@subset_refl _ _).
 Qed. 
 
 Typeclasses eauto := debug.

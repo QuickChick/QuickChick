@@ -127,16 +127,19 @@ Proof.
 split; first by move=> eqAB; split=> a; rewrite (eqAB a).
 by case=> subAB subBA a; split; [apply: subAB | apply:subBA].
 Qed.
+
 Lemma subset_trans T (A1 A2 A3 : set T) :
   A1 \subset A2 ->
   A2 \subset A3 ->
   A1 \subset A3.
 Proof.
-  rewrite /set_incl. move => H12 H23. by eauto 3.
+  now firstorder.
 Qed.
 
 Lemma subset_refl T (A : set T) : A \subset A.
-Proof. by rewrite /set_incl. Qed.
+Proof.
+    by rewrite /set_incl.
+Qed.
 
 Lemma subset_singl : 
   forall {T} (x y : T), [set x] \subset [set y] <-> y = x. 
@@ -146,16 +149,29 @@ Proof.
   - apply subset_refl.
 Qed.
 
+Lemma subset_respects_set_eq_l :
+  forall (T : Type) (s1 s2 s3 : set T),
+    s1 <--> s3 -> s3 \subset s2 -> s1 \subset s2.
+Proof.
+  now firstorder.
+Qed.
+
+Lemma subset_respects_set_eq_r :
+  forall (T : Type) (s1 s2 s3 : set T),
+    s3 <--> s2 -> s1 \subset s2 -> s1 \subset s3.
+Proof.
+  now firstorder.
+Qed.
 
 Lemma imsetT T U (f : T -> U) : f @: setT <--> codom f.
 Proof.
-move=> y; split; first by case=> x [_ fx]; exists x.
-by case=> x fx; exists x.
+  move=> y; split; first by case=> x [_ fx]; exists x.
+    by case=> x fx; exists x.
 Qed.
 
 Lemma imset_id T (A : set T) : id @: A <--> A.
 Proof.
-by move=> t; split=> [[x [Ax <-]]|At] //; exists t.
+    by move=> t; split=> [[x [Ax <-]]|At] //; exists t.
 Qed.
 
 Lemma imset_incl {T U} (A B : set T) (f : T -> U):
@@ -243,34 +259,34 @@ Lemma bigcupC T U V A B (F : T -> U -> set V) :
   \bigcup_(i in A) \bigcup_(j in B) F i j <-->
   \bigcup_(j in B) \bigcup_(i in A) F i j.
 Proof.
-wlog suff: T U A B F / \bigcup_(i in A) \bigcup_(j in B) F i j \subset
+  wlog suff: T U A B F / \bigcup_(i in A) \bigcup_(j in B) F i j \subset
    \bigcup_(j in B) \bigcup_(i in A) F i j.
   by move=> sub; apply/subset_eqP; split; apply: sub.
-by move=> x [i [Ai [j [Bj ?]]]]; exists j; split=> //; exists i.
+    by move=> x [i [Ai [j [Bj ?]]]]; exists j; split=> //; exists i.
 Qed.
 
 Lemma incl_bigcupr T U A (F : T -> set U) G : (forall x, F x \subset G x) ->
   \bigcup_(x in A) F x \subset \bigcup_(x in A) G x.
 Proof.
-by move=> subFG t [x [Ax Fxt]]; exists x; split=> //; apply: subFG.
+  by move=> subFG t [x [Ax Fxt]]; exists x; split=> //; apply: subFG.
 Qed.
 
 Lemma eq_bigcupr T U A (F : T -> set U) G : (forall x, F x <--> G x) ->
   \bigcup_(x in A) F x <--> \bigcup_(x in A) G x.
 Proof.
-by move=> eq_FG t; split; apply: incl_bigcupr => {t} x t; rewrite (eq_FG x t).
+  by move=> eq_FG t; split; apply: incl_bigcupr => {t} x t; rewrite (eq_FG x t).
 Qed.
 
 Lemma incl_bigcupl T U A B (F : T -> set U) : A \subset B ->
   \bigcup_(x in A) F x \subset \bigcup_(x in B) F x.
 Proof.
-by move=> subAB t [x [Ax Fxt]]; exists x; split=> //; apply: subAB.
+    by move=> subAB t [x [Ax Fxt]]; exists x; split=> //; apply: subAB.
 Qed.
 
 Lemma eq_bigcupl T U A B (F : T -> set U) : A <--> B ->
   \bigcup_(x in A) F x <--> \bigcup_(x in B) F x.
 Proof.
-by move=> /subset_eqP[? ?]; split; apply: incl_bigcupl.
+  by move=> /subset_eqP[? ?]; split; apply: incl_bigcupl.
 Qed.
 
 Lemma incl_bigcup a b (x:a) (A : set a) (f:a->set b) :
@@ -464,6 +480,20 @@ Proof.
   by firstorder.
 Qed.
 
+Lemma setU_set_subset_compat :
+  forall (T : Type) (s1 s2 s1' s2' : set T),
+    s1 \subset s1' -> s2 \subset s2' -> s1 :|: s2 \subset s1' :|: s2'.
+Proof.
+  now firstorder.
+Qed.
+
+Lemma setU_set_incl_r :
+  forall (T : Type) (s1 s2 s2' : set T),
+    s1 \subset s2' -> s1 \subset s2 :|: s2'.
+Proof.
+  now firstorder.
+Qed.
+
 Lemma setU_assoc {U} (s1 s2 s3 : set U) :
   (s1 :|: (s2 :|: s3)) <--> ((s1 :|: s2) :|: s3).
 Proof.
@@ -553,12 +583,14 @@ Proof.
   by move => H a; split; move => Ha b Hb; eapply Ha; eapply H; eauto.
 Qed.
 
+
 Instance eq_bigcap T U : Proper (set_eq ==> pointwise_relation T (@set_eq U) ==> set_eq) bigcap.
 Proof.
   move=> A B eqAB F G eqFG a. apply: (@set_eq_trans _ (\bigcap_(i in A) G i)).
   exact: eq_bigcapr.
   exact: eq_bigcapl.
 Qed.
+
 
 Lemma eq_bigcup' :
   forall (T U : Type) (A B : set T) (F G : T -> set U),
@@ -568,6 +600,15 @@ Lemma eq_bigcup' :
 Proof.
   intros.
   eapply eq_bigcup; eauto.
+Qed.
+
+Lemma incl_bigcup_compat :
+  forall (T U : Type) (A B : set T) (F G : T -> set U),
+    A \subset B ->
+    (forall x : T, F x \subset G x) ->
+    \bigcup_(x in A) F x \subset \bigcup_(x in B) G x.
+Proof. 
+  now firstorder. 
 Qed.
 
 Lemma bigcap_setI_l {U T} (s1 s2 : set U) (f : U -> set T) :
