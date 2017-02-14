@@ -39,7 +39,7 @@ let rec set_unions = function
 let set_eq_refl x =
   gApp (gInject "set_eq_refl") [x]
 
-let set_incl_refl = gApp ~explicit:true (gInject "subset_refl") [hole; hole] in
+let set_incl_refl = gApp ~explicit:true (gInject "subset_refl") [hole; hole]
 
 let setU_set_eq_compat x1 x2 =
   gApp (gInject "setU_set_eq_compat") [x1; x2]

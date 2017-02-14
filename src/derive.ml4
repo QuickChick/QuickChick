@@ -1089,8 +1089,7 @@ let deriveDependent c nc gen_name =
   msgerr (str "Result..." ++ fnl());
   debug_coq_expr with_args;
 
-  (* Might require the type *)
-  let fn = defineTypedConstant gen_name with_args hole in
+  let fn = defineConstant gen_name with_args in
   ()
 
 (*
