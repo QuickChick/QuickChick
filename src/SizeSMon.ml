@@ -16,6 +16,8 @@ open Decl_kinds
 open GenericLib
 open SetLib
 open CoqLib
+open SemLib
+
 
 let list_keep_every n l =
   let rec aux i = function
@@ -35,69 +37,55 @@ let isBaseBranch ty_ctr ty = fold_ty' (fun b ty' -> b && not (sameTypeCtr ty_ctr
 
 let base_ctrs ty_ctr ctrs = List.filter (fun (_, ty) -> isBaseBranch ty_ctr ty) ctrs
 
-let sizeSMon ty_ctr ctrs iargs ty_ctr  =
+let sizeSMon ty_ctr ctrs iargs  =
 
   (* Common helpers, refactor? *)
   let coqTyCtr = gTyCtr ty_ctr in
-  let coqTyParams = List.map gVar (list_keep_every 1 iargs) in
+  let coqTyParams = List.map gVar (list_keep_every 2 iargs) in
   let full_dt = gApp ~explicit:true coqTyCtr coqTyParams in
   let isCurrentTyCtr = sameTypeCtr ty_ctr in
   let bases = base_ctrs ty_ctr ctrs in
 
-  (*  Could reuse code from SizeMon.ml here *)
-  let rec mon_proof hmon ty n =
-    let x = Printf.sprintf "m%d" n in
-    match ty with
-    | Arrow (ty1, ty2) ->
-      let h = if isCurrentTyCtr ty1 then hmon else hole in
-      gApp ~explicit:true (gInject "bindMonotonic")
-           [hole; hole; hole; hole; h; gFun [x] (fun [x] -> mon_proof hmon ty2 (n+1))]
-    | _ -> hole
-  in
-
-  let rec proof ih hmon ty n =
+  let rec proof ih hleq ty n =
     let x = Printf.sprintf "x%d" n in
     match ty with
     | Arrow (ty1, ty2) ->
       let h =
         if isCurrentTyCtr ty1
-        then ih
-        else gInject "arbitraryCorrect"
+        then gApp ih [hole; hleq]
+        else set_incl_refl
       in
-      let mon_proof_l = if isCurrentTyCtr ty1 then hmon else hole in
-      let mon_proof_r = gFun ["m"] (fun [m] -> mon_proof hmon ty2 0) in
-      set_eq_trans
-        (gApp (gInject "semBindSizeMonotonic") ~explicit:true
-              [hole; hole; hole; hole; mon_proof_l; mon_proof_r])
-        (gApp (gInject "eq_bigcup'")
-              [h; gFun [x] (fun [x] -> proof ih hmon ty2 (n+1))])
-    | _ -> gApp (gInject "semReturn") [hole]
+      subset_set_eq_compat
+        (semBindSize hole hole hole)
+        (semBindSize hole hole hole)
+        (incl_bigcup_compat h (gFun [x] (fun [x] -> proof ih hleq ty2 (n+1))))
+    | _ -> set_incl_refl
   in
 
-  let rec genCase ih hmon list_typ ctrs =
+  let rec genCase ih hleq ctrs =
     match ctrs with
-    | [] -> failwith "Invalid type"
-    | [(ctr, ty)] ->
-      set_eq_trans
-        (eq_bigcupl hole hole (singl_set_eq hole hole))
-        (set_eq_trans (bigcup_set1 hole list_typ) (proof ih hmon ty 0))
+    | [] -> set_incl_refl
     | (ctr, ty) :: ctrs' ->
-      set_eq_trans
+      let gproof =
+        if isBaseBranch ty_ctr ty then set_incl_refl
+        else
+          subset_set_eq_compat
+            (bigcup_set1 hole (gPair (hole, hole)))
+            (bigcup_set1 hole (gPair (hole, hole)))
+            (proof ih hleq ty 0)
+      in
+      subset_set_eq_compat
         (eq_bigcupl hole hole (cons_set_eq hole hole))
-        (set_eq_trans
+        (eq_bigcupl hole hole (cons_set_eq hole hole))
+        (subset_set_eq_compat
            (bigcup_setU_l hole hole hole)
-           (* Take the first sets of the union *)
-           (setU_set_eq_compat
-              (set_eq_trans (bigcup_set1 hole list_typ) (proof ih hmon ty 0))
-              (genCase ih hmon list_typ ctrs')))
+           (bigcup_setU_l hole hole hole)
+           (setU_set_subset_compat
+              gproof
+              (genCase ih hleq ctrs')))
   in
 
-  let mon_proof size =
-    let args = (List.flatten (List.map (fun x -> [x; hole; hole; hole]) coqTyParams)) @ [size] in
-    gApp ~explicit:true mon_inst_name args
-  in
-
-  (* Code that generates the generators. Copy-pasted for the third time. XXX factor it out *)
+  (* Code that generates the generators. Copy-pasted for the fourth time. XXX factor it out *)
 
   (* Code from ArbitrarySize.v. Regenerate generators for type annotations *)
   let create_for_branch tyParams rec_name size (ctr, ty) =
@@ -150,7 +138,7 @@ let sizeSMon ty_ctr ctrs iargs ty_ctr  =
     let lst =
       (List.map
          (fun (ctr,ty') ->
-           gPair (gInt 1, (gen_list (gVar size) (ctr,ty'))))
+           gPair (gInt 1, (gen_list hole (ctr,ty'))))
          bases)
     in
     (List.hd lst, gList (List.tl lst))
@@ -160,19 +148,34 @@ let sizeSMon ty_ctr ctrs iargs ty_ctr  =
     let lst =
       (List.map
          (fun (ctr,ty') ->
-           gPair ((if isBaseBranch ty_ctr ty' then gInt 1 else gSucc (gVar size)),
-             (gen_list (gVar size) (ctr,ty')))) ctrs)
+           gPair
+             ((if isBaseBranch ty_ctr ty' then gInt 1 else gSucc size),
+              (gen_list size (ctr,ty')))) ctrs)
     in
     (List.hd lst, gList (List.tl lst))
   in
 
-  let ind_case s s1 s2 ihs1 =
-    gFun ["n"; "s"; "IHs"]
-      (fun [n; s; ihs] ->
-        let (gen, gens) = ind_gens n in
-         set_eq_trans
-           (gApp ~explicit:true (gInject "semFreq") [hole; gen; gens])
-           (genCase (gVar ihs) hmon (gPair (hole, hole)) ctrs))
+  let arb_aux s =
+    gApp arb_body [s]
+  in
+
+  let ind_case s s1 s2 ihs1 hleq =
+    let (lg, lgs) = ind_gens s1 in
+    let (rg, rgs) = ind_gens s2 in
+    (subset_set_eq_compat
+       (semFreqSize lg lgs s)
+       (semFreqSize rg rgs s)
+       (genCase ihs1 hleq ctrs))
+  in
+
+  let rec seq_incl_proof ctrs =
+    match ctrs with
+    | [] -> incl_refl
+    | (ctr, ty') :: ctrs' ->
+      (if isBaseBranch ty_ctr ty' then
+         incl_hd_same
+       else
+         incl_tl) (seq_incl_proof ctrs')
   in
 
   let base_case s s2 =
@@ -187,12 +190,12 @@ let sizeSMon ty_ctr ctrs iargs ty_ctr  =
       (subset_set_eq_compat
          (semFreqSize fg fgs s)
          (semFreqSize ig igs s)
-         (incl_bigcup (incl_subset hole hole seq_incl_proof)))
+         (incl_bigcupl (incl_subset hole hole (seq_incl_proof ctrs))))
   in
 
   let ret_type s s1 s2 =
     let sem s' s =
-      semGenSize (arbitrarySize s') s
+      semGenSize (arb_aux s') s
     in
     gImpl
       (gIsTrueLeq s1 s2)
@@ -200,37 +203,41 @@ let sizeSMon ty_ctr ctrs iargs ty_ctr  =
   in
 
   let ret_type1 s =
-    gFun ["s1"; "s2"]
-      (fun s1 s2 -> ret_type s s1 s2)
+    gFun ["s1"]
+      (fun [s1] ->
+        gForall
+          (gInject "nat")
+          (gFun ["s2"] (fun [s2] -> ret_type s (gVar s1) (gVar s2))))
   in
 
   let ret_type2 s s1 =
     gFun ["s2"]
-      (fun s2 -> ret_type s s1 s2)
+      (fun [s2] -> ret_type s s1 (gVar s2))
   in
 
   let smon_proof =
     gFun ["s"]
       (fun [s] ->
          gApp ~explicit:true (gInject "nat_ind")
-           [ret_type1;
+           [ret_type1 (gVar s);
             (gApp ~explicit:true (gInject "nat_ind")
-               [ret_type1 s;
-                gFun ["Hleq"] (fun [h] -> incl_refl);
+               [ret_type2 (gVar s) (gInt 0);
+                gFun ["Hleq"] (fun [h] -> set_incl_refl);
                 gFun
                   ["s2"; "IHs2"; "Hleq"]
-                  (fun s2 ihs2 hleq -> base_case s s2)
+                  (fun [s2; ihs2; hleq] -> base_case (gVar s) (gVar s2))
                ]
             );
             (gFun
                ["s1"; "IHs1"]
-               (fun s1 ihs1 ->
+               (fun [s1; ihs1] ->
                  gApp ~explicit:true (gInject "nat_ind")
-                   [ret_type2 s s1;
-                    gFun ["Hleq"] (fun [leq] -> false_ind hole (lt0_False hleq));
+                   [ret_type2 (gVar s) (gSucc (gVar s1));
+                    gFun ["Hleq"] (fun [hleq] -> false_ind hole (lt0_False (gVar hleq)));
                     gFun
                       ["s2"; "IHs2"; "Hleq"]
-                      (fun s2 ihs2 hleq -> ind_case s s1 s2 ihs1)
+                        (fun [s2; ihs2; hleq] ->
+                          ind_case (gVar s) (gVar s1) (gVar s2) (gVar ihs1) (gVar hleq))
                    ]
                )
             )])

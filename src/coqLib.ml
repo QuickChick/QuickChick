@@ -38,6 +38,9 @@ let gConj p1 p2 =
 let gImpl p1 p2 =
   gApp (gInject "impl") [p1; p2]
 
+let gForall typ f =
+  gApp (gInject "all") [typ; f]
+
 let gProd e1 e2 =
   gApp (gInject "prod") [e1; e2]
 
@@ -47,7 +50,7 @@ let gLeq e1 e2 =
 let gIsTrueLeq e1 e2 =
   gApp
     (gInject "is_true")
-    (gApp (gInject "leq") [e1; e2])
+    [(gApp (gInject "leq") [e1; e2])]
 
 let gOrIntroL p =
   gApp (gInject "or_introl") [p]
