@@ -50,7 +50,7 @@ let gLeq e1 e2 =
 let gIsTrueLeq e1 e2 =
   gApp
     (gInject "is_true")
-    [(gApp (gInject "leq") [e1; e2])]
+    [gApp (gInject "leq") [e1; e2]]
 
 let gOrIntroL p =
   gApp (gInject "or_introl") [p]

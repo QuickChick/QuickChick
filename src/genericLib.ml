@@ -159,6 +159,11 @@ let rec dep_result_type dt =
   | DProd  (_, dt') -> dep_result_type dt'
   | _ -> dt
 
+let rec dep_type_len = function
+  | DArrow (_, dt') 
+  | DProd (_, dt') -> 1 + dep_type_len dt'
+  | _ -> 0
+
 (* Option monad *)
 let (>>=) m f = 
   match m with

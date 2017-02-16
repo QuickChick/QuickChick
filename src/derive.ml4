@@ -834,6 +834,15 @@ let rec unify (k : umap) (r1 : range) (r2 : range) (eqs : EqSet.t)
          Some (k', Unknown u, eqs', m')
       end
 
+let fixVariable x k = 
+  let rec fixRange u r k = 
+    match r with 
+    | FixedInput -> k
+    | Undef _ -> UM.add u FixedInput k 
+    | Unknown u' -> fixRange u' (UM.find u' k) k
+    | Ctr (_, rs) -> List.fold_left (fun k r -> fixRange "internalerror" r k) k rs 
+  in fixRange x (UM.find x k) k
+
 let rec convert_to_range dt = 
   match dt with 
   | DTyVar x -> Unknown (ty_var_to_string x)
@@ -874,18 +883,6 @@ let deriveDependent c nc gen_name =
   let gen_type = gGen (gOption (gType ty_params (nthType n dep_type))) in
   debug_coq_expr (gType ty_params dep_type);
 
-  let gen_ctr = ty_ctr in
-
-  let gen = mk_name_provider "gen" in
-  let dec = mk_name_provider "dec" in 
-
-  let arb = mk_name_provider "arb" in 
-
-  let arbitraries = ref ArbSet.empty in
-  let register_arbitrary dt = 
-    arbitraries := ArbSet.add dt !arbitraries
-  in 
-
   let input_types = 
     let rec aux acc i = function
       | DArrow (dt1, dt2) 
@@ -902,10 +899,25 @@ let deriveDependent c nc gen_name =
 
   let input_names = List.mapi (fun i _ -> Printf.sprintf "input%d" i) input_types in
 
+  let gen_ctr = ty_ctr in
+
+  let need_dec = ref false in
+  let rec_dec_name = gInject (Printf.sprintf "depDec%n" (dep_type_len dep_type)) in
+
+  let gen = mk_name_provider "gen" in
+  let dec = mk_name_provider "dec" in 
+
+  let arb = mk_name_provider "arb" in 
+
+  let arbitraries = ref ArbSet.empty in
+  let register_arbitrary dt = 
+    arbitraries := ArbSet.add dt !arbitraries
+  in 
+
   let params = List.map (fun tp -> gArg ~assumName:(gTyParam tp) ()) ty_params in
   let inputs = List.map (fun (n,t) -> gArg ~assumName:(gVar (fresh_name n)) ~assumType:(gType ty_params t) ()) (List.combine input_names input_types) in
 
-  let forGen = "forGen" in
+  let forGen = "_forGen" in
   let rec inputWithGen i l = 
     if i <= 1 then forGen :: l
     else let (h::t) = l in h :: (inputWithGen (i-1) t) in
@@ -994,18 +1006,25 @@ let deriveDependent c nc gen_name =
     let rec recurse_type k = function
       | DProd (_, dt) -> recurse_type k dt (* Only introduces variables, doesn't constrain them *)
       | DArrow (dt1, dt2) -> 
+         msgerr (str ("Darrowing: " ^ range_to_string (UM.find forGen k)) ++ fnl ());
          begin match dt1 with 
          | DTyCtr (c, dts) -> 
             if c == gen_ctr then 
             begin (* Recursively called constructor *)
               b := false;
               match List.filter (fun (i, dt) -> not (is_fixed k dt)) (List.mapi (fun i dt -> (i+1, dt)) dts) with (* +1 because of nth being 1-indexed *)
-              | [] -> failwith "Implement asking for decidability"
+              | [] -> 
+                 need_dec := true;
+                 gMatch (gApp rec_dec_name (List.map (fun dt -> dt_to_coq_expr dt) dts))
+                        [ (injectCtr "left", ["eq" ], fun _ -> recurse_type k dt2) 
+                        ; (injectCtr "right", ["neq"], fun _ -> returnGen gNone) ]
               | [(i,DTyVar x)] -> 
-                 if i == n then (* Recursive call *)
+                 if i == n then (* Recursive call *) begin
+                   msgerr (str ("Variable is: " ^ ty_var_to_string x) ++ fnl ());
                    let args = List.map snd (List.filter (fun (i, _) -> not (i == n)) (List.mapi (fun i dt -> (i+1, dt_to_coq_expr dt)) dts)) in
                    bindGenOpt (gApp (gVar rec_name) (gVar size :: args)) (ty_var_to_string x) 
-                           (fun _ -> recurse_type (UM.add (ty_var_to_string x) FixedInput k) dt2)
+                           (fun _ -> recurse_type (fixVariable (ty_var_to_string x) k) dt2)
+                             end
                  else failwith "Implement other generator modes for recursive call"
               | [(i, dt) ] -> failwith ("Internal error: not a variable to be generated for" ^ (dep_type_to_string dt)) 
               | _ -> failwith "Mode analysis failure: More than one arguments need generation"    
@@ -1067,6 +1086,12 @@ let deriveDependent c nc gen_name =
   let gen_needed = [] in
   let dec_needed = [] in
 
+  let self_dec = [] in 
+(*     (* Maybe somethign about type paramters here *)
+    if !need_dec then [gArg ~assumType:(gApp (gInject (Printf.sprintf "DepDec%n" (dep_type_len dep_type))) [gTyCtr ty_ctr]) 
+                            ~assumGeneralized:true ()] 
+    else [] in*)
+
   let arb_needed = 
     ArbSet.fold (fun dt acc -> 
                  (gArg ~assumType:(gApp (gInject "Arbitrary") [gType ty_params dt]) ~assumGeneralized:true ()) :: acc
@@ -1076,6 +1101,7 @@ let deriveDependent c nc gen_name =
   let args = params
            @ gen_needed
            @ dec_needed 
+           @ self_dec
            @ arb_needed 
            @ inputs
   in
@@ -1089,8 +1115,7 @@ let deriveDependent c nc gen_name =
   msgerr (str "Result..." ++ fnl());
   debug_coq_expr with_args;
 
-  (* Might require the type *)
-  let fn = defineTypedConstant gen_name with_args hole in
+  let fn = defineConstant gen_name with_args in
   ()
 
 (*

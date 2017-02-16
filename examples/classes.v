@@ -231,7 +231,7 @@ DeriveCanonicalSized Foo as "CanonSizedFoo". (* Drop params maybe??? *)
 DeriveArbitrarySizedMonotonic Foo as "ArbSizedMonFoo" using "ArbSizedFoo".
 (* kinda slow *)
 DeriveArbitrarySizedCorrect Foo as "ArbCorrMonFoo" using "ArbSizedFoo" and "ArbSizedMonFoo".
-
+(* even more slow *)
 DeriveArbitrarySizedSizeMonotonic Foo as "ArbSizedSMonFoo".
 
 Definition genFoo {A B : Type } `{H1 : Arbitrary A} `{H2 : Arbitrary B}
