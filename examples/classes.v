@@ -175,11 +175,11 @@ Definition monotonicGen {A} (gen : G A) :=
     s1 <= s2 ->
     semGenSize gen s1 \subset semGenSize gen s2.
 
-Inductive Foo (A : Type) {B : Type}: Type :=
-| Foo1 : A -> Foo A
-| Foo2 : Foo A -> Foo A
-| Foo3 : nat -> A -> B -> Foo A -> Foo A -> Foo A
-| Foo4 : Foo A.
+Inductive Zoo (A : Type) {B : Type}: Type :=
+| Zoo1 : A -> Zoo A
+| Zoo2 : Zoo A -> Zoo A
+| Zoo3 : nat -> A -> B -> Zoo A -> Zoo A -> Zoo A
+| Zoo4 : Zoo A.
 
 (* kinda slow *)
 Lemma singl_set_eq: forall (A : Type) (x : A), [ x ] <--> [ set x ].
@@ -225,17 +225,17 @@ Qed.
 Definition impl (A B : Prop) : Prop := A -> B.
 Definition all (A : Type) (f : A -> Prop) : Prop := forall (x : A), f x.
 
-DeriveArbitrarySized Foo as "ArbSizedFoo".
-DeriveSized Foo as "SizedFoo".
-DeriveCanonicalSized Foo as "CanonSizedFoo". (* Drop params maybe??? *)
-DeriveArbitrarySizedMonotonic Foo as "ArbSizedMonFoo" using "ArbSizedFoo".
-(* kinda slow *)
-DeriveArbitrarySizedCorrect Foo as "ArbCorrMonFoo" using "ArbSizedFoo" and "ArbSizedMonFoo".
+DeriveArbitrarySized Zoo as "ArbSizedZoo".
+DeriveSized Zoo as "SizedZoo".
+DeriveCanonicalSized Zoo as "CanonSizedZoo". (* Drop params maybe??? *)
+DeriveArbitrarySizedMonotonic Zoo as "ArbSizedMonZoo" using "ArbSizedZoo".
+(* kinda slow - Note that it's the type checking that takes time not the term generation *)
+DeriveArbitrarySizedCorrect Zoo as "ArbCorrMonZoo" using "ArbSizedZoo" and "ArbSizedMonZoo".
 (* even more slow *)
-DeriveArbitrarySizedSizeMonotonic Foo as "ArbSizedSMonFoo".
+DeriveArbitrarySizedSizeMonotonic Zoo as "ArbSizedSMonZoo".
 
-Definition genFoo {A B : Type } `{H1 : Arbitrary A} `{H2 : Arbitrary B}
-           `{H1' : Sized A} `{H2' : Sized B} : G (@Foo A B) := @arbitrary (@Foo A B) _.
+Definition genZoo {A B : Type} `{H1 : Arbitrary A} `{H2 : Arbitrary B}
+           `{H1' : Sized A} `{H2' : Sized B} : G (@Zoo A B) := @arbitrary (@Zoo A B) _.
 
-Definition corrFoo {A B : Type } `{H1 : ArbitraryMonotonicCorrect A} `{H2 : ArbitraryMonotonicCorrect B}
-  := @arbitraryCorrect (@Foo A B) arbitrary.
+Definition corrZoo {A B : Type} `{H1 : ArbitraryMonotonicCorrect A} `{H2 : ArbitraryMonotonicCorrect B}
+  := @arbitraryCorrect (@Zoo A B) arbitrary.
