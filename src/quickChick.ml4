@@ -106,6 +106,10 @@ let runTest c =
     "\nlet _ = print_string (QuickChickLib.string_of_coqstring (%s))\n"
     (string_of_id main);
   close_out oc;
+  (* Before compiling, remove stupid cyclic dependencies like "type int = int".
+     TODO: Generalize (.) \g1\b or something *)
+  let perl_cmd = "perl -i -p0e 's/type int =\\s*int/type tmptmptmp = int\\ntype int = tmptmptmp/s' " ^ mlf in
+  if Sys.command perl_cmd <> 0 then msgerr (str ("perl script hack failed. Report: " ^ perl_cmd)  ++ fnl ());
   (** Compile the extracted code *)
   (** Extraction sometimes produces ML code that does not implement its interface.
       We circumvent this problem by erasing the interface. **)
