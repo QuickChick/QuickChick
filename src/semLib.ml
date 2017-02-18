@@ -29,3 +29,6 @@ let oneOf_freq p1 p2 p3 =
 
 let semFreqSize g gs size =
   gApp (gInject "semFreqSize") [g; gs; size]
+
+let semBindSize g f size =
+  gApp (gInject "semBindSize") [g; f; size]

@@ -38,6 +38,9 @@ let gConj p1 p2 =
 let gImpl p1 p2 =
   gApp (gInject "impl") [p1; p2]
 
+let gForall typ f =
+  gApp (gInject "all") [typ; f]
+
 let gProd e1 e2 =
   gApp (gInject "prod") [e1; e2]
 

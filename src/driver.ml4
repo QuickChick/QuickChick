@@ -18,6 +18,7 @@ open SetLib
 open CoqLib
 open Sized
 open SizeMon
+open SizeSMon
 open SizeCorr
 open ArbitrarySized
 
@@ -45,6 +46,7 @@ let print_der = function
   | Sized -> "Sized"
   | CanonicalSized -> "CanonicalSized"
   | SizeMonotonic -> "SizeMonotonic"
+  | SizeSMonotonic -> "ArbitrarySizedSizeMotonic"
   | GenSizeCorrect ->  "GenSizeCorrect"
 
 let debug_environ () =
@@ -77,7 +79,7 @@ let derive (cn : derivable) (c : constr_expr) (instance_name : string) (extra_na
     | ArbitrarySized -> "ArbitrarySized"
     | CanonicalSized -> "CanonicalSized"
     | SizeMonotonic -> "QuickChick.GenLow.GenLow.SizeMonotonic"
-    | SizeSMonotonic -> "SizeSMonotonic"
+    | SizeSMonotonic -> "ArbitrarySizedSizeMotonic"
     | GenSizeCorrect ->  "GenSizeCorrect"
   in
 
@@ -134,8 +136,7 @@ let derive (cn : derivable) (c : constr_expr) (instance_name : string) (extra_na
       let (iargs', size) = take_last iargs [] in
       sizeMon ty_ctr ctrs (gVar size) iargs' (gInject extra_name)
     | SizeSMonotonic ->
-      failwith "Unimplemented"
-      (* sizeMon ty_ctr ctrs iargs *)
+      sizeSMon ty_ctr ctrs iargs
     | GenSizeCorrect ->
       genCorr ty_ctr ctrs iargs (gInject extra_name) (gInject extra_name2)
 
@@ -163,7 +164,7 @@ VERNAC COMMAND EXTEND DeriveArbitrarySizedMonotonic
 END;;
 
 VERNAC COMMAND EXTEND DeriveArbitrarySizedSizeMonotonic
-  | ["DeriveArbitrarySizedMonotonic" constr(c) "as" string(s1)] ->
+  | ["DeriveArbitrarySizedSizeMonotonic" constr(c) "as" string(s1)] ->
     [derive SizeSMonotonic c s1 "" ""]
 END;;
 
