@@ -1,10 +1,9 @@
 
-From QuickChick Require Import QuickChick Tactics.
-
 Require Import String List.
 
 From mathcomp Require Import ssreflect ssrfun ssrbool ssrnat eqtype seq.
 
+Require Import GenLow GenHigh Tactics Sets Arbitrary.
 Import GenLow GenHigh.
 Import ListNotations.
 Import QcDefaultNotation.
@@ -175,11 +174,6 @@ Definition monotonicGen {A} (gen : G A) :=
     s1 <= s2 ->
     semGenSize gen s1 \subset semGenSize gen s2.
 
-Inductive Zoo (A : Type) {B : Type}: Type :=
-| Zoo1 : A -> Zoo A
-| Zoo2 : Zoo A -> Zoo A
-| Zoo3 : nat -> A -> B -> Zoo A -> Zoo A -> Zoo A
-| Zoo4 : Zoo A.
 
 (* kinda slow *)
 Lemma singl_set_eq: forall (A : Type) (x : A), [ x ] <--> [ set x ].
@@ -225,6 +219,15 @@ Qed.
 Definition impl (A B : Prop) : Prop := A -> B.
 Definition all (A : Type) (f : A -> Prop) : Prop := forall (x : A), f x.
 
+(* TODO: Move this to examples? *)
+(* 
+(* Example *)
+Inductive Zoo (A : Type) {B : Type}: Type :=
+| Zoo1 : A -> Zoo A
+| Zoo2 : Zoo A -> Zoo A
+| Zoo3 : nat -> A -> B -> Zoo A -> Zoo A -> Zoo A
+| Zoo4 : Zoo A.
+
 DeriveArbitrarySized Zoo as "ArbSizedZoo".
 DeriveSized Zoo as "SizedZoo".
 DeriveCanonicalSized Zoo as "CanonSizedZoo". (* Drop params maybe??? *)
@@ -239,3 +242,4 @@ Definition genZoo {A B : Type} `{H1 : Arbitrary A} `{H2 : Arbitrary B}
 
 Definition corrZoo {A B : Type} `{H1 : ArbitraryMonotonicCorrect A} `{H2 : ArbitraryMonotonicCorrect B}
   := @arbitraryCorrect (@Zoo A B) arbitrary.
+*)

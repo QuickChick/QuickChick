@@ -32,3 +32,5 @@ src/Sized.ml
 src/SizeMon.ml
 src/SizeSMon.ml
 src/SizeCorr.ml
+src/classes.v
+src/dependentClasses.v

@@ -1,12 +1,10 @@
-
-From QuickChick Require Import QuickChick Tactics.
-
 Require Import String List.
 
-Require Import classes DependentTest. (* We need to compile this manually for now! *)
+Require Import classes (* DependentTest *) . (* We need to compile this manually for now! *)
 
 From mathcomp Require Import ssreflect ssrfun ssrbool ssrnat eqtype seq.
 
+Require Import GenLow GenHigh Tactics Sets Arbitrary.
 Import GenLow GenHigh.
 Import ListNotations.
 Import QcDefaultNotation.
@@ -24,7 +22,7 @@ Class ArbitrarySizedSuchThat (A : Type) (P : A -> Prop) :=
     (* Generation should be allowed to fail *)
     arbitrarySizeST : nat -> G (option A);
     (* Shrinking as before *)
-    shrinkSizeST : A -> list A
+(*     shrinkSizeST : A -> list A *)
   }.
 
 (** Monotonicity of ArbitrarySizedSuchThat *)
@@ -57,6 +55,8 @@ Class ArbitrarySizedSuchThatCorrect (A : Type) (P : A -> Prop)
       `{GenSizeSuchThatCorrect A P arbitrarySizeST}. 
 
 
+(* TODO: Move in another file *)
+(*
 (** Leo's example from DependentTest.v *)
 
 Print Foo.
@@ -98,13 +98,14 @@ Abort.
 Instance genGoodNarrowCorr (n : nat) :
   GenSizeSuchThatCorrect (goodFooNarrow n) (@arbitrarySizeST Foo (goodFooNarrow n) _).
 Abort.
+*)
 
 (** We can now abstract away from sizes and get the generator and the proofs for free *)
 
 Class ArbitrarySuchThat (A : Type) (P : A -> Prop) :=
   {
     arbitraryST : G (option A);
-    shrinkST : A -> list A;
+(*    shrinkST : A -> list A; *)
   }.
 
 
@@ -129,7 +130,6 @@ Instance ArbitrarySTFromSize (A : Type) (P : A -> Prop)
 : ArbitrarySuchThat A P :=
   {
     arbitraryST := sized arbitrarySizeST;
-    shrinkST := shrinkSizeST
   }.
 
 Instance ArbitraryMonotonicSTFromSized (A : Type) (P : A -> Prop)

@@ -26,4 +26,6 @@ Require Export Checker.
 Require Export SemChecker.
 Require Export Test.
 Require Export Extraction.
+Require Export classes. 
+Require Export dependentClasses.
 Export GenLow GenHigh.
