@@ -10,6 +10,7 @@ Declare ML Module "SizeMon".
 Declare ML Module "SizeSMon".
 Declare ML Module "SizeCorr".
 Declare ML Module "driver".
+Declare ML Module "depDriver".
 
 Axiom _W : nat -> Prop.
 Axiom _Size : Prop.

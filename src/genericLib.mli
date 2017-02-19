@@ -15,6 +15,8 @@ open Constrexpr
 open Constrexpr_ops
 open Context
 
+val debug_environ : unit -> unit 
+
 type coq_expr = constr_expr (* Remove after debug match *)
 
 val hole : coq_expr
@@ -182,3 +184,9 @@ val fold_ty_vars : (var list -> var -> coq_type -> 'a) -> ('a -> 'a -> 'a) -> 'a
 val defineConstant : string -> coq_expr -> var
 val defineTypedConstant : string -> coq_expr -> coq_expr -> var
 val declare_class_instance : arg list -> string -> (var list -> coq_expr) -> (var list -> coq_expr) -> unit 
+
+(* List utils *)
+val list_last : 'a list -> 'a 
+val list_init : 'a list -> 'a list 
+val list_drop_every : int -> 'a list -> 'a list
+val take_last : 'a list -> 'a list -> ('a list * 'a)

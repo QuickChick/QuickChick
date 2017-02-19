@@ -23,6 +23,7 @@ src/genericLib.ml
 src/quickChick.ml4
 src/derive.ml4
 src/driver.ml4
+src/depDriver.ml4
 src/quickChickLib.ml
 src/setLib.ml
 src/semLib.ml

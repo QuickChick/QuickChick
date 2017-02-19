@@ -11,12 +11,6 @@ Import QcDoNotation.
 
 Set Bullet Behavior "Strict Subproofs".
 
-(* Probably also add a logic programming execution mode? *)
-Class DepGen (A : Type) (P : A -> Prop) :=
-  {
-    depGen : G (option A)
-  }. 
-
 (* TODO (maybe): Find a way to unify these? *)
 Class DepDec1 {A : Type} (P : A -> Prop) :=
   {
@@ -97,7 +91,7 @@ Inductive goodFoo : nat -> Foo -> Prop :=
 | GoodFoo : forall n foo, goodFoo n foo.
 (* end good_foo *)
 
-DeriveDependent goodFoo for 2 as "genGoodFoo'".
+DeriveArbitrarySizedSuchThat goodFoo for 2 as "genGoodFoo'".
 
 (* Simple generator for goodFoos *)
 (* begin gen_good_foo_simple *)
@@ -139,7 +133,7 @@ Inductive goodFooUnif : nat -> Foo -> Prop :=
 | GoodUnif : forall n, goodFooUnif n Foo1.
 (* end good_unif *)
 
-DeriveDependent goodFooUnif for 2 as "genGoodUnif'".
+DeriveArbitrarySizedSuchThat goodFooUnif for 2 as "genGoodUnif'".
 
 Definition genGoodUnif (n : nat) :=
   let fix aux_arb size n := 
@@ -162,7 +156,7 @@ Inductive goodFooCombo : nat -> Foo -> Prop :=
 | GoodCombo : forall n foo, goodFooCombo n (Foo2 foo).
 (* end good_foo_combo *)
 
-DeriveDependent goodFooCombo for 2 as "genGoodCombo'".
+DeriveArbitrarySizedSuchThat goodFooCombo for 2 as "genGoodCombo'".
 
 Definition genGoodCombo `{_ : Arbitrary Foo} (n : nat) :=
   let fix aux_arb size n := 
@@ -185,7 +179,7 @@ Inductive goodFooMatch : nat -> Foo -> Prop :=
 | GoodMatch : goodFooMatch 0 Foo1.
 (* end good_input_match *)
 
-DeriveDependent goodFooMatch for 2 as "genGoodMatch'".
+DeriveArbitrarySizedSuchThat goodFooMatch for 2 as "genGoodMatch'".
 
 Definition genGoodMatch (n : nat) :=
   let fix aux_arb size n := 
@@ -216,7 +210,7 @@ Inductive goodFooRec : nat -> Foo -> Prop :=
 | GoodRec : forall n foo, goodFooRec 0 foo -> goodFooRec n (Foo2 foo).
 (* end good_foo_rec *)
 
-DeriveDependent goodFooRec for 2 as "genGoodRec'".
+DeriveArbitrarySizedSuchThat goodFooRec for 2 as "genGoodRec'".
 
 (* begin gen_good_rec *)
 Definition genGoodRec (n : nat) :=
@@ -244,7 +238,7 @@ Proof.
   move => n foo; left; apply GoodPrec; constructor.
 Defined.
 
-DeriveDependent goodFooPrec for 2 as "genGoodPrec'".
+DeriveArbitrarySizedSuchThat goodFooPrec for 2 as "genGoodPrec'".
 
 Definition genGoodPrec (n : nat) :=
  let
@@ -270,7 +264,7 @@ Inductive goodFooNarrow : nat -> Foo -> Prop :=
                         goodFooNarrow 1 foo -> 
                         goodFooNarrow n foo.
 
-DeriveDependent goodFooNarrow for 2 as "genGoodNarrow'".
+DeriveArbitrarySizedSuchThat goodFooNarrow for 2 as "genGoodNarrow'".
 
 Definition genGoodNarrow (n : nat) :=
  let
@@ -298,7 +292,7 @@ Axiom genGoodFooTarget : forall (sz : nat) (n : nat), G (option Foo).
 Instance depGenGoodFoo (n : nat) : DepGen Foo (goodFoo n) := 
   {| depGen := sized (fun sz => genGoodFooTarget sz n) |}.
 *)
-DeriveDependent goodFoo for 2 as "genGoodFoo". 
+DeriveArbitrarySizedSuchThat goodFoo for 2 as "genGoodFoo". 
 
 Inductive Bar A B :=
 | Bar1 : A -> Bar A B
@@ -317,4 +311,4 @@ Inductive goodBar {A B : Type} (n : nat) : Bar A B -> Prop :=
             goodBar n (Bar3 a b (Bar1 a) bar).
 
 (* Zoe : Commenting out so that the file compiles *)
-(* DeriveDependent goodBar for 2 as "genGoodBar". *)
+(* DeriveArbitrarySizedSuchThat goodBar for 2 as "genGoodBar". *)

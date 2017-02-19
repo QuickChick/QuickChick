@@ -27,20 +27,6 @@ type derivable = ArbitrarySized | Sized | CanonicalSized | SizeMonotonic | SizeS
 (* Contains the generic derivation function from derive.ml4, but the code that generates the instances
  * is in separate files *)
 
-
-let list_last l = List.nth l (List.length l - 1)
-let list_init l = List.rev (List.tl (List.rev l))
-let list_drop_every n l =
-  let rec aux i = function
-    | [] -> []
-    | x::xs -> if i == n then aux 1 xs else x::aux (i+1) xs
-  in aux 1 l
-
-let rec take_last l acc =
-  match l with
-  | [x] -> (List.rev acc, x)
-  | x :: l' -> take_last l' (x :: acc)
-
 let print_der = function
   | ArbitrarySized -> "ArbitrarySized"
   | Sized -> "Sized"
@@ -48,12 +34,6 @@ let print_der = function
   | SizeMonotonic -> "SizeMonotonic"
   | SizeSMonotonic -> "ArbitrarySizedSizeMotonic"
   | GenSizeCorrect ->  "GenSizeCorrect"
-
-let debug_environ () =
-  let env = Global.env () in
-  let preEnv = Environ.pre_env env in
-  let minds = preEnv.env_globals.env_inductives in
-  Mindmap_env.iter (fun k _ -> msgerr (str (MutInd.debug_to_string k) ++ fnl())) minds
 
 (* Generic derivation function *)
 let debugDerive (c : constr_expr) =

@@ -16,6 +16,12 @@ open Constrexpr_ops
 open Ppconstr
 open Context
 
+let debug_environ () =
+  let env = Global.env () in
+  let preEnv = Environ.pre_env env in
+  let minds = preEnv.env_globals.env_inductives in
+  Mindmap_env.iter (fun k _ -> msgerr (str (MutInd.debug_to_string k) ++ fnl())) minds
+
 let cnt = ref 0 
 
 let fresh_name n : Id.t =
@@ -687,3 +693,18 @@ let declare_class_instance instance_arguments instance_name instance_type instan
                        (Some (true, instance_record vars)) (* TODO: true or false? *)
                        None
          )
+
+(* List Utils. Probably should move to a util file instead *)
+let list_last l = List.nth l (List.length l - 1)
+let list_init l = List.rev (List.tl (List.rev l))
+let list_drop_every n l =
+  let rec aux i = function
+    | [] -> []
+    | x::xs -> if i == n then aux 1 xs else x::aux (i+1) xs
+  in aux 1 l
+
+let rec take_last l acc =
+  match l with
+  | [x] -> (List.rev acc, x)
+  | x :: l' -> take_last l' (x :: acc)
+
