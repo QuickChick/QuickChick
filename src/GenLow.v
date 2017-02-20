@@ -34,6 +34,7 @@ Parameter G : Type -> Type.
 Parameter returnGen  : forall {A : Type}, A -> G A.
 (* TODO: Add dependent combinator *)
 Parameter bindGen :  forall {A B : Type}, G A -> (A -> G B) -> G B.
+(* Parameter bindGen :  forall {A B : Type}, (g : G A) -> ((a : A) -> (_ : a \in semGen g) -> G B) -> G B. *)
 Parameter bindGenOpt : forall {A B : Type}, G (option A) -> (A -> G (option B)) -> G (option B).
 Parameter run  : forall {A : Type}, G A -> nat -> RandomSeed -> A.
 Parameter fmap : forall {A B : Type}, (A -> B) -> G A -> G B.
