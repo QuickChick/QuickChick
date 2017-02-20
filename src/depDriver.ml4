@@ -338,7 +338,7 @@ let rec dt_to_coq_expr dt =
   | DCtr (c,dts) -> gApp (gCtr c) (List.map dt_to_coq_expr dts)
   | _ -> failwith ("Unsupported dt to coq_expr: " ^ (dep_type_to_string dt)) 
 
-let deriveDependent cn c nc gen_name = 
+let deriveDependent cn c nc instance_name = 
   let n = parse_integer nc in
   let (ty_ctr, ty_params, ctrs, dep_type) = 
     match coerce_reference_to_dep_dt c with
@@ -590,8 +590,32 @@ let deriveDependent cn c nc gen_name =
   msgerr (str "Result..." ++ fnl());
   debug_coq_expr with_args;
 
-  let fn = defineConstant gen_name with_args in
-  ()
+(*  let fn = defineConstant gen_name with_args in *)
+
+  let class_name = match cn with
+    | ArbitrarySizedSuchThat -> "ArbitrarySizedSuchThat"
+(* 
+    | CanonicalSized -> "CanonicalSized"
+    | SizeMonotonic -> "QuickChick.GenLow.GenLow.SizeMonotonic"
+    | SizeSMonotonic -> "ArbitrarySizedSizeMotonic"
+    | GenSizeCorrect ->  "GenSizeCorrect"
+ *)
+  in
+
+  let full_dt = gApp ~explicit:true (gTyCtr ty_ctr) (List.map gTyParam ty_params) in
+
+  (* Zoe: What are iargs supposed to be? *)
+  let instance_type iargs = 
+    (* match cn with *)
+    gApp (gInject class_name) [gType ty_params (nthType n dep_type); 
+                               gFun [forGen] (fun [fg] -> gApp (full_dt) (list_insert_nth (gVar fg) (List.map (fun n -> gVar (fresh_name n)) input_names) (n-1)))] 
+  in 
+
+  let instance_record iargs = 
+    gRecord [("arbitrarySizeST", generator_body)] in
+
+  declare_class_instance args instance_name instance_type instance_record
+
 
 VERNAC COMMAND EXTEND DeriveArbitrarySizedSuchThat
   | ["DeriveArbitrarySizedSuchThat" constr(c) "for" constr(n) "as" string(s1)] -> [deriveDependent ArbitrarySizedSuchThat c n s1]

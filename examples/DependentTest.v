@@ -93,6 +93,10 @@ Inductive goodFoo : nat -> Foo -> Prop :=
 
 DeriveArbitrarySizedSuchThat goodFoo for 2 as "genGoodFoo'".
 
+(* Need to write it as 'fun x => goodFoo 0 x'. Sadly, 'goodFoo 0' doesn't work *)
+Definition g : G (option Foo) := @arbitrarySizeST _ (fun x => goodFoo 0 x) _ 4.
+Sample g.
+
 (* Simple generator for goodFoos *)
 (* begin gen_good_foo_simple *)
 (* Definition genGoodFoo {_ : Arbitrary Foo} (n : nat) : G Foo := arbitrary.*)

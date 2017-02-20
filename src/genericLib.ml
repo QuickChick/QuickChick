@@ -708,3 +708,8 @@ let rec take_last l acc =
   | [x] -> (List.rev acc, x)
   | x :: l' -> take_last l' (x :: acc)
 
+let rec list_insert_nth x l n = 
+  match n, l with 
+  | 0, _ -> x :: l
+  | _, h::t -> h :: list_insert_nth x t (n-1)
+  

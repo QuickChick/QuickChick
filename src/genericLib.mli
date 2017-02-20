@@ -190,3 +190,4 @@ val list_last : 'a list -> 'a
 val list_init : 'a list -> 'a list 
 val list_drop_every : int -> 'a list -> 'a list
 val take_last : 'a list -> 'a list -> ('a list * 'a)
+val list_insert_nth : 'a -> 'a list -> int -> 'a list
