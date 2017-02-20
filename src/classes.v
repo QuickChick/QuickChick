@@ -218,28 +218,3 @@ Qed.
 
 Definition impl (A B : Prop) : Prop := A -> B.
 Definition all (A : Type) (f : A -> Prop) : Prop := forall (x : A), f x.
-
-(* TODO: Move this to examples? *)
-(* 
-(* Example *)
-Inductive Zoo (A : Type) {B : Type}: Type :=
-| Zoo1 : A -> Zoo A
-| Zoo2 : Zoo A -> Zoo A
-| Zoo3 : nat -> A -> B -> Zoo A -> Zoo A -> Zoo A
-| Zoo4 : Zoo A.
-
-DeriveArbitrarySized Zoo as "ArbSizedZoo".
-DeriveSized Zoo as "SizedZoo".
-DeriveCanonicalSized Zoo as "CanonSizedZoo". (* Drop params maybe??? *)
-DeriveArbitrarySizedMonotonic Zoo as "ArbSizedMonZoo" using "ArbSizedZoo".
-(* kinda slow - Note that it's the type checking that takes time not the term generation *)
-DeriveArbitrarySizedCorrect Zoo as "ArbCorrMonZoo" using "ArbSizedZoo" and "ArbSizedMonZoo".
-(* even more slow *)
-DeriveArbitrarySizedSizeMonotonic Zoo as "ArbSizedSMonZoo".
-
-Definition genZoo {A B : Type} `{H1 : Arbitrary A} `{H2 : Arbitrary B}
-           `{H1' : Sized A} `{H2' : Sized B} : G (@Zoo A B) := @arbitrary (@Zoo A B) _.
-
-Definition corrZoo {A B : Type} `{H1 : ArbitraryMonotonicCorrect A} `{H2 : ArbitraryMonotonicCorrect B}
-  := @arbitraryCorrect (@Zoo A B) arbitrary.
-*)
