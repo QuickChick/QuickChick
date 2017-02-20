@@ -59,9 +59,11 @@ Proof.
 Qed.
 
 (** Size parametric generators *)
+(* BCP: Rename: ArbitraryOfSize? Sth else? *)
 Class ArbitrarySized (A : Type) :=
   {
     arbitrarySize : nat -> G A;
+    (* BCP: You might not want the same notion of size for generation and srhinking Load -> Noop *)
     shrinkSize : A -> list A
   }.
 
