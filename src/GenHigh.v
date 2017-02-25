@@ -177,6 +177,7 @@ Parameter semFrequencySize:
       if l' is nil then semGenSize def size else
       \bigcup_(x in l') semGenSize x.2 size.
 
+(** [backtrack] generates Some's unless all of the input generators are empty *)
 Parameter semBacktrackSize:
   forall {A} (l : list (nat * G (option A))) size,
   semGenSize (backtrack l) size <--> 
