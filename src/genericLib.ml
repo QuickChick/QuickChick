@@ -46,6 +46,11 @@ let make_up_name () : Id.t =
 let dl x = (dummy_loc, x)
 let hole = CHole (dummy_loc, None, Misctypes.IntroAnonymous, None)
 
+let id_of_name n = 
+  match n with 
+  | Name x -> x 
+  | Anonymous -> failwith "id_of_name called with anonymous"
+
 (* Everything marked "Opaque" should have its implementation be hidden in the .mli *)
 
 type coq_expr = constr_expr (* Opaque *)
@@ -129,6 +134,7 @@ type dep_type =
   | DTyCtr of ty_ctr * dep_type list (* Type Constructor *)
   | DCtr of constructor * dep_type list (* Regular Constructor (for dependencies) *)
   | DTyVar of ty_var (* Use of a previously captured type variable *)
+  | DApp of dep_type * dep_type list (* Type-level function applications *)
 
 let rec dep_type_to_string dt = 
   match dt with 
@@ -138,6 +144,7 @@ let rec dep_type_to_string dt =
   | DCtr (ctr, ds) -> constructor_to_string ctr ^ " " ^ str_lst_to_string " " (List.map dep_type_to_string ds)
   | DTyParam tp -> ty_param_to_string tp
   | DTyVar tv -> ty_var_to_string tv
+  | DApp (d, ds) -> Printf.sprintf "(%s $ %s)" (dep_type_to_string d) (str_lst_to_string " " (List.map dep_type_to_string ds))
 
 type dep_ctr = constructor * dep_type
 let dep_ctr_to_string (ctr, dt) = 
@@ -348,6 +355,8 @@ let parse_dependent_type i nparams ty oib arg_names =
       match aux i ctr with
       | Some (DTyCtr (c, _)) -> Some (DTyCtr (c, List.rev tms'))
       | Some (DCtr (c, _)) -> Some (DCtr (c, List.rev tms'))
+      | Some (DTyVar x) -> Some (DApp (DTyVar x, List.rev tms'))
+      | Some wat -> msgerr (str ("WAT: " ^ dep_type_to_string wat) ++ fnl ()); None 
       | None -> msgerr (str "Aux failed?" ++ fnl ()); None
     end
     else if isInd ty then begin
@@ -364,6 +373,18 @@ let parse_dependent_type i nparams ty oib arg_names =
       (* Constructor name *)
       let cname = mib.mind_packets.(midx).mind_consnames.(idx - 1) in
       Some (DCtr (cname, []))
+    end
+    else if isProd ty then begin
+      let (n, t1, t2) = destProd ty in
+      (* Are the 'i's correct? *)
+      aux i t1 >>= fun t1' -> 
+      aux i t2 >>= fun t2' ->
+      Some (DProd ((id_of_name n, t1'), t2'))
+    end
+    (* Rel, App, Ind, Construct, Prod *)
+    else if isConst ty then begin 
+      let (x,_) = destConst ty in 
+      Some (DTyVar (id_of_string (Constant.to_string x)))
     end
     else (msgerr (str "Dep Case Not Handled" ++ fnl()); 
           debug_constr ty;
