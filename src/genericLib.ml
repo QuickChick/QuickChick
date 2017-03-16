@@ -588,6 +588,24 @@ let gType ty_params dep_type =
                         (fun _ -> aux dep_type)
  *)
 
+(* Lookup the type of an identifier *)
+let get_type (id : Id.t) = 
+  let env = Global.env () in
+  msgerr (str ("Trying to global:" ^ Id.to_string id) ++ fnl ());
+  let glob_ref = Nametab.global (Ident (dummy_loc, id)) in
+  match glob_ref with 
+  | VarRef _ -> msgerr (str "Var" ++ fnl ())
+  | ConstRef _ -> msgerr (str "Constant" ++ fnl ())
+  | IndRef _ -> msgerr (str "Inductive" ++ fnl ())
+  | ConstructRef _ -> msgerr (str "Constructor" ++ fnl ())
+
+let is_inductive c = 
+  let env = Global.env () in
+  let glob_ref = Nametab.global (Ident (dummy_loc, c)) in
+  match glob_ref with
+  | IndRef _ -> true
+  | _        -> false
+
 (* Generic List Manipulations *)
 let list_nil = gInject "nil"
 let lst_append c1 c2 = gApp (gInject "app") [c1; c2]

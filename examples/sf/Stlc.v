@@ -187,46 +187,6 @@ Qed.
 Instance ty_dep_dec : DepDec2 (fun (x y : ty) => x = y) :=
   { depDec2 := ty_eq_dec }.
 
-Definition foo input0 input1 := 
-let
-   fix aux_arb size0 (input0 : context) (input1 : ty) : 
-   G (option (ident)) :=
-     match size0 with
-     | O =>
-         backtrack
-           (cons
-              (pair 1
-                 match input0 with
-                 | cons (pair x T) Gamma' =>
-                     match @depDec2 _ _ (fun x y => eq x y) _ input1 T with
-                     | left eq0 => returnGen (Some x)
-                     | right neq => returnGen None
-                     end
-                 | _ => returnGen None
-                 end) nil)
-     | S size' =>
-         backtrack
-           (cons
-              (pair 1
-                 match input0 with
-                 | cons (pair  x T) Gamma' =>
-                     match @depDec2 _ _ (fun x y => eq x y) _ input1 T with
-                     | left eq0 => returnGen (Some x)
-                     | right neq => returnGen None
-                     end
-                 | _ => returnGen None
-                 end)
-              (cons
-                 (pair 1
-                    match input0 with
-                    | cons (pair x' T') Gamma' =>
-                        bindGenOpt (aux_arb size' Gamma' input1)
-                          (fun x => returnGen (Some x))
-                    | _ => returnGen None
-                    end) nil))
-     end in
- fun size0 => aux_arb size0 input0 input1.
-
 DeriveArbitrarySizedSuchThat bind for 2 as "findInMap".
 
 DeriveArbitrarySizedSuchThat has_type for 2 as "genTyped".

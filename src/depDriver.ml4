@@ -130,7 +130,11 @@ let deriveDependent (cn : derivable) (c : constr_expr) nc (instance_name : strin
     | ArbitrarySizedSuchThat -> gen
     | _ -> failwith "Unimplemented"
   in
+
+  msgerr (str "Instance Type: " ++ fnl ());
+  debug_coq_expr (instance_type [gInject "input0"; gInject "input1"]);
   declare_class_instance instance_arguments instance_name instance_type instance_record
+;;
 
 
 VERNAC COMMAND EXTEND DeriveArbitrarySizedSuchThat

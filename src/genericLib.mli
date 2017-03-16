@@ -54,7 +54,7 @@ type coq_type =
 
 val coq_type_to_string : coq_type -> string
 
-type constructor 
+type constructor = Id.t
 val constructor_to_string : constructor -> string
 val gCtr : constructor -> coq_expr
 val injectCtr : string -> constructor
@@ -89,6 +89,8 @@ type dep_dt = ty_ctr * ty_param list * dep_ctr list * dep_type
 val dep_dt_to_string : dep_dt -> string
 
 val gType : ty_param list -> dep_type -> coq_expr
+val get_type : Id.t -> unit
+val is_inductive : constructor -> bool
 
 val nthType : int -> dep_type -> dep_type
 

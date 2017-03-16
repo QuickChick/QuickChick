@@ -229,11 +229,21 @@ let is_fixed k dt =
     | Ctr (_, rs) -> List.for_all aux rs
   in aux (convert_to_range dt)
 
-let rec dt_to_coq_expr dt = 
-  match dt with 
-  | DTyVar x -> gTyVar x
-  | DCtr (c,dts) -> gApp (gCtr c) (List.map dt_to_coq_expr dts)
-  | _ -> failwith ("Unsupported dt to coq_expr: " ^ (dep_type_to_string dt)) 
+(* convert a range to a coq expression *)
+let rec range_to_coq_expr k r = 
+  match r with 
+  | Ctr (c, rs) -> 
+     gApp (gCtr c) (List.map (range_to_coq_expr k) rs)
+  | Unknown u -> 
+     begin match UM.find u k with
+     | FixedInput -> gInject u
+     | Undef _ -> (msgerr (str "It's stupid that this is called" ++ fnl ()); gInject u)
+     | Unknown u' -> range_to_coq_expr k (Unknown u')
+     | Ctr (c, rs) -> gApp (gCtr c) (List.map (range_to_coq_expr k) rs)
+     end
+
+let rec dt_to_coq_expr k dt = 
+  range_to_coq_expr k (convert_to_range dt)
 
 let rec is_dep_type = function
   | DArrow (dt1, dt2) -> is_dep_type dt1 || is_dep_type dt2 
@@ -300,12 +310,16 @@ let arbitrarySizedST gen_ctr dep_type gen_type ctrs input_names inputs n registe
     (* Construct matches - TODO: move to generic lib *)
     let construct_match (u, m) body = 
       let rec aux = function 
-        | MatchU u' -> CPatAtom (dummy_loc, Some (Ident (dummy_loc, Id.of_string u')))
+        | MatchU u' -> begin 
+            CPatAtom (dummy_loc, Some (Ident (dummy_loc, Id.of_string u')))
+          end
         | MatchCtr (c, ms) -> 
-           CPatCstr (dummy_loc, 
-                     Ident (dummy_loc, Id.of_string (constructor_to_string c)),
-                     [],
-                     List.map (fun m -> aux m) ms) in
+           if is_inductive c then CPatAtom (dummy_loc, None)
+           else 
+              CPatCstr (dummy_loc, 
+                        Ident (dummy_loc, Id.of_string (constructor_to_string c)),
+                        List.map (fun m -> aux m) ms,
+                        []) in
       CCases (dummy_loc,
               Term.RegularStyle,
               None (* return *), 
@@ -354,13 +368,13 @@ let arbitrarySizedST gen_ctr dep_type gen_type ctrs input_names inputs n registe
               match List.filter (fun (i, dt) -> not (is_fixed k dt)) (List.mapi (fun i dt -> (i+1, dt)) dts) with (* +1 because of nth being 1-indexed *)
               | [] -> 
                  need_dec := true;
-                 gMatch (gApp rec_dec_name (List.map (fun dt -> dt_to_coq_expr dt) dts))
+                 gMatch (gApp rec_dec_name (List.map (fun dt -> dt_to_coq_expr k dt) dts))
                         [ (injectCtr "left", ["eq" ], fun _ -> recurse_type k dt2) 
                         ; (injectCtr "right", ["neq"], fun _ -> returnGen gNone) ]
               | [(i,DTyVar x)] -> 
                  if i == n then (* Recursive call *) begin
                    msgerr (str ("Variable is: " ^ ty_var_to_string x) ++ fnl ());
-                   let args = List.map snd (List.filter (fun (i, _) -> not (i == n)) (List.mapi (fun i dt -> (i+1, dt_to_coq_expr dt)) dts)) in
+                   let args = List.map snd (List.filter (fun (i, _) -> not (i == n)) (List.mapi (fun i dt -> (i+1, dt_to_coq_expr k dt)) dts)) in
                    bindGenOpt (gApp (gVar rec_name) (gVar size :: args)) (ty_var_to_string x) 
                            (fun _ -> recurse_type (fixVariable (ty_var_to_string x) k) dt2)
                              end
@@ -383,6 +397,7 @@ let arbitrarySizedST gen_ctr dep_type gen_type ctrs input_names inputs n registe
       EqSet.fold (fun (u1,u2) c -> 
                   let check = gApp ~explicit:true (gInject "depDec2") [hole; hole; 
                                                                        gFun ["x"; "y"] (fun [x;y] -> gApp (gInject "eq") [gVar x; gVar y]);
+                                                                       hole;
                                                                        gInject u1; gInject u2] in
                  gMatch check 
                         [ (injectCtr "left" , ["eq" ], fun _ -> c)
@@ -392,7 +407,10 @@ let arbitrarySizedST gen_ctr dep_type gen_type ctrs input_names inputs n registe
     let branch_gen = 
       let rec walk_matches = function
         | [] -> handle_equalities eqs (recurse_type map typ)
-        | m::ms -> construct_match m (walk_matches ms) in
+        | m::ms -> begin 
+            msgerr (str (Printf.sprintf "Processing Match: %s" (matcher_to_string m)) ++ fnl ());
+            construct_match m (walk_matches ms) 
+          end in
       walk_matches matches
     in 
     
