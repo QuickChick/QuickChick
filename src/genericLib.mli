@@ -78,6 +78,7 @@ type dep_type =
   | DCtr of constructor * dep_type list (* Type Constructor *)
   | DTyVar of ty_var (* Use of a previously captured type variable *)
   | DApp of dep_type * dep_type list (* Type-level function applications *)
+  | DNot of dep_type (* Negation as a toplevel *)
 
 val dep_type_to_string : dep_type -> string
 

@@ -1,10 +1,11 @@
 Require Export Arith.
 Require Export Arith.EqNat.  (* Contains [beq_nat], among other things *)
 
-Inductive id : Type :=
-  Id : nat -> id.
+(* id clashes with id function... *)
+Inductive ident : Type :=
+  Id : nat -> ident.
 
-Theorem eq_id_dec : forall id1 id2 : id, {id1 = id2} + {id1 <> id2}.
+Theorem eq_id_dec : forall id1 id2 : ident, {id1 = id2} + {id1 <> id2}.
 Proof.
    intros id1 id2.
    destruct id1 as [n1]. destruct id2 as [n2].
@@ -30,9 +31,9 @@ Inductive ty : Type :=
   | TArrow : ty -> ty -> ty.
 
 Inductive tm : Type :=
-  | tvar : id -> tm
+  | tvar : ident -> tm
   | tapp : tm -> tm -> tm
-  | tabs : id -> ty -> tm -> tm
+  | tabs : ident -> ty -> tm -> tm
   | ttrue : tm
   | tfalse : tm
   | tif : tm -> tm -> tm -> tm.
@@ -49,7 +50,7 @@ Hint Constructors value.
 
 Reserved Notation "'[' x ':=' s ']' t" (at level 20).
 
-Fixpoint subst (x:id) (s:tm) (t:tm) : tm :=
+Fixpoint subst (x:ident) (s:tm) (t:tm) : tm :=
   match t with
   | tvar x' => 
       if eq_id_dec x x' then s else t
@@ -94,21 +95,23 @@ where "t1 '==>' t2" := (step t1 t2).
 Hint Constructors step.
 *)
 
+(* This can't work *)
+(*
 Module PartialMap.
-
+ 
 Definition partial_map (A:Type) := id -> option A.
-
+ 
 Definition empty {A:Type} : partial_map A := (fun _ => None). 
-
+ 
 Definition extend {A:Type} (Gamma : partial_map A) (x:id) (T : A) :=
   fun x' => if eq_id_dec x x' then Some T else Gamma x'.
-
+ 
 Lemma extend_eq : forall A (ctxt: partial_map A) x T,
   (extend ctxt x T) x = Some T.
 Proof.
   intros. unfold extend. rewrite eq_id. auto.
 Qed.
-
+ 
 Lemma extend_neq : forall A (ctxt: partial_map A) x1 T x2,
   x2 <> x1 ->                       
   (extend ctxt x2 T) x1 = ctxt x1.
@@ -117,15 +120,26 @@ Proof.
 Qed.
 
 End PartialMap.
+*)
 
-Import PartialMap.
-Definition context := partial_map ty.
+Definition context := list (ident * ty).
+
+Definition empty : context := nil.
+
+Definition extend (Gamma : context) (x:ident) (T : ty) := cons (x, T) Gamma.
+
+Inductive bind : context -> ident -> ty -> Prop :=
+  | BindNow   : forall x T Gamma', bind (cons (x, T) Gamma') x T
+  | BindLater : forall x x' T T' Gamma', 
+                  (* ~ (x = x') -> *) (* TODO: Handle negation *)
+                  bind Gamma' x T -> 
+                  bind (cons (x',T') Gamma') x T.
 
 Reserved Notation "Gamma '|-' t '\in' T" (at level 40).
-    
-Inductive has_type : context -> tm -> ty -> Prop :=
+
+Inductive has_type : list (ident * ty) (* context *) -> tm -> ty -> Prop :=
   | T_Var : forall Gamma x T,
-      Gamma x = Some T ->
+      bind Gamma x T ->
       Gamma |- tvar x \in T
   | T_Abs : forall Gamma x T11 T12 t12,
       extend Gamma x T11 |- t12 \in T12 -> 
@@ -162,6 +176,58 @@ Import QcDefaultNotation. Open Scope qc_scope.
 Import QcDoNotation.
 
 Set Bullet Behavior "Strict Subproofs".
+
+Instance ident_dep_dec : DepDec2 (fun (x y : ident) => x = y) := 
+  { depDec2 := eq_id_dec }.
+
+Definition ty_eq_dec : forall (ty1 ty2 : ty), {ty1 = ty2} + {~ (ty1 = ty2)}.
+  decide equality.
+Qed.
+
+Instance ty_dep_dec : DepDec2 (fun (x y : ty) => x = y) :=
+  { depDec2 := ty_eq_dec }.
+
+Definition foo input0 input1 := 
+let
+   fix aux_arb size0 (input0 : context) (input1 : ty) : 
+   G (option (ident)) :=
+     match size0 with
+     | O =>
+         backtrack
+           (cons
+              (pair 1
+                 match input0 with
+                 | cons (pair x T) Gamma' =>
+                     match @depDec2 _ _ (fun x y => eq x y) _ input1 T with
+                     | left eq0 => returnGen (Some x)
+                     | right neq => returnGen None
+                     end
+                 | _ => returnGen None
+                 end) nil)
+     | S size' =>
+         backtrack
+           (cons
+              (pair 1
+                 match input0 with
+                 | cons (pair  x T) Gamma' =>
+                     match @depDec2 _ _ (fun x y => eq x y) _ input1 T with
+                     | left eq0 => returnGen (Some x)
+                     | right neq => returnGen None
+                     end
+                 | _ => returnGen None
+                 end)
+              (cons
+                 (pair 1
+                    match input0 with
+                    | cons (pair x' T') Gamma' =>
+                        bindGenOpt (aux_arb size' Gamma' input1)
+                          (fun x => returnGen (Some x))
+                    | _ => returnGen None
+                    end) nil))
+     end in
+ fun size0 => aux_arb size0 input0 input1.
+
+DeriveArbitrarySizedSuchThat bind for 2 as "findInMap".
 
 DeriveArbitrarySizedSuchThat has_type for 2 as "genTyped".
 

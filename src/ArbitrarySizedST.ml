@@ -218,6 +218,7 @@ let rec convert_to_range dt =
   match dt with 
   | DTyVar x -> Unknown (ty_var_to_string x)
   | DCtr (c,dts) -> Ctr (c, List.map convert_to_range dts)
+  | DTyCtr (c, dts) -> Ctr (injectCtr (ty_ctr_to_string c), List.map convert_to_range dts)
   | _ -> failwith ("Unsupported range: " ^ (dep_type_to_string dt))
 
 let is_fixed k dt = 
@@ -234,7 +235,6 @@ let rec dt_to_coq_expr dt =
   | DCtr (c,dts) -> gApp (gCtr c) (List.map dt_to_coq_expr dts)
   | _ -> failwith ("Unsupported dt to coq_expr: " ^ (dep_type_to_string dt)) 
 
-
 let rec is_dep_type = function
   | DArrow (dt1, dt2) -> is_dep_type dt1 || is_dep_type dt2 
   | DProd ((_, dt1), dt2) -> is_dep_type dt1 || is_dep_type dt2 
@@ -242,6 +242,7 @@ let rec is_dep_type = function
   | DTyVar _ -> true
   | DCtr _ -> true
   | DTyCtr (_, dts) -> List.exists is_dep_type dts
+  | DApp (dt, dts) -> List.exists is_dep_type (dt::dts)
 
 let need_dec = ref false
 
@@ -275,6 +276,7 @@ let arbitrarySizedST gen_ctr dep_type gen_type ctrs input_names inputs n registe
 
     let init_map = UM.add forGen (Undef (nthType n dep_type)) (List.fold_left (fun m n -> UM.add n FixedInput m) (register_unknowns UM.empty) input_names) in
 
+    msgerr (str ("Calculating ranges: " ^ dep_type_to_string (dep_result_type typ)) ++ fnl ());
     let ranges = match dep_result_type typ with
       | DTyCtr (_, dts) -> List.map convert_to_range dts
       | _ -> failwith "Not the expected result type" in
@@ -368,14 +370,28 @@ let arbitrarySizedST gen_ctr dep_type gen_type ctrs input_names inputs n registe
             end 
             else (* Random constructor *)
               failwith ("Do me!: " ^ (dep_type_to_string dt1) ^ " vs " ^ (ty_ctr_to_string gen_ctr))
+         | DApp (f, xs) -> failwith "Negation/application"
+            (* What are we doing in functions *)
+            (*  Coq.Init.Logic.not *)
          | _ -> failwith ("Constraints should only be type constructors. Found: " ^ (dep_type_to_string dt1))
          end
       | DTyCtr _ -> instantiate_unknown k forGen (* result *)
       | _ -> failwith "Wrong type" in
 
+    (* TODO: Whenn handling parameters, this might need to add additional arguments *)
+    let handle_equalities eqs c = 
+      EqSet.fold (fun (u1,u2) c -> 
+                  let check = gApp ~explicit:true (gInject "depDec2") [hole; hole; 
+                                                                       gFun ["x"; "y"] (fun [x;y] -> gApp (gInject "eq") [gVar x; gVar y]);
+                                                                       gInject u1; gInject u2] in
+                 gMatch check 
+                        [ (injectCtr "left" , ["eq" ], fun _ -> c)
+                        ; (injectCtr "right", ["neq"], fun _ -> returnGen gNone) ]
+                 ) eqs c in
+
     let branch_gen = 
       let rec walk_matches = function
-        | [] -> recurse_type map typ
+        | [] -> handle_equalities eqs (recurse_type map typ)
         | m::ms -> construct_match m (walk_matches ms) in
       walk_matches matches
     in 
@@ -411,10 +427,13 @@ let arbitrarySizedST gen_ctr dep_type gen_type ctrs input_names inputs n registe
   let generator_body = gRecFunInWithArgs
                     ~assumType:(gen_type)
                     "aux_arb" (gArg ~assumName:(gVar (fresh_name "size")) () :: inputs) 
-                    (fun (rec_name, size::vars) -> aux_arb rec_name size vars) 
+                    (fun (rec_name, size::vars) -> aux_arb rec_name size vars)
                     (fun rec_name -> gFun ["size"] 
                                     (fun [size] -> gApp (gVar rec_name) 
                                                         (gVar size :: List.map (fun n -> gVar (fresh_name n)) input_names)
                                     ))
   in
+
+  msgerr (fnl () ++ fnl () ++ str "`Final body produced:" ++ fnl ());
+  debug_coq_expr generator_body;                       
   gRecord [("arbitrarySizeST", generator_body)]

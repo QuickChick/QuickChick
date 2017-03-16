@@ -135,6 +135,7 @@ type dep_type =
   | DCtr of constructor * dep_type list (* Regular Constructor (for dependencies) *)
   | DTyVar of ty_var (* Use of a previously captured type variable *)
   | DApp of dep_type * dep_type list (* Type-level function applications *)
+  | DNot of dep_type (* Negation pushed up a level *)
 
 let rec dep_type_to_string dt = 
   match dt with 
@@ -145,6 +146,7 @@ let rec dep_type_to_string dt =
   | DTyParam tp -> ty_param_to_string tp
   | DTyVar tv -> ty_var_to_string tv
   | DApp (d, ds) -> Printf.sprintf "(%s $ %s)" (dep_type_to_string d) (str_lst_to_string " " (List.map dep_type_to_string ds))
+  | DNot d -> Printf.sprintf "~ ( %s )" (dep_type_to_string d)
 
 type dep_ctr = constructor * dep_type
 let dep_ctr_to_string (ctr, dt) = 
@@ -343,9 +345,11 @@ let parse_dependent_type i nparams ty oib arg_names =
       let db = destRel ty in
       if i + nparams = db then (* Current inductive, no params *)
         Some (DTyCtr (oib.mind_typename, []))
-      else (* [i + nparams - db]th parameter *)
+      else begin (* [i + nparams - db]th parameter *) 
+        msgerr (str (Printf.sprintf "Non-self-rel: %s" (dep_type_to_string (List.nth arg_names (i + nparams - db - 1)))) ++ fnl ());
         try Some (List.nth arg_names (i + nparams - db - 1))
         with _ -> msgerr (str "nth failed: " ++ int i ++ str " " ++ int nparams ++ str " " ++ int db ++ str " " ++ int (i + nparams - db - 1) ++ fnl ()); None
+        end
     end 
     else if isApp ty then begin
       let (ctr, tms) = decompose_app ty in 
@@ -355,12 +359,20 @@ let parse_dependent_type i nparams ty oib arg_names =
       match aux i ctr with
       | Some (DTyCtr (c, _)) -> Some (DTyCtr (c, List.rev tms'))
       | Some (DCtr (c, _)) -> Some (DCtr (c, List.rev tms'))
-      | Some (DTyVar x) -> Some (DApp (DTyVar x, List.rev tms'))
+      | Some (DTyVar x) -> 
+         let xs = ty_var_to_string x in 
+         if xs = "Coq.Init.Logic.not" || xs = "not" then 
+           match tms' with 
+           | [c] -> Some (DNot c)
+           | _   -> failwith "Not a valid negation"
+         else Some (DApp (DTyVar x, List.rev tms'))
       | Some wat -> msgerr (str ("WAT: " ^ dep_type_to_string wat) ++ fnl ()); None 
       | None -> msgerr (str "Aux failed?" ++ fnl ()); None
     end
     else if isInd ty then begin
       let ((mind,_),_) = destInd ty in
+      msgerr (str (Printf.sprintf "LOOK HERE: %s - %s - %s" (MutInd.to_string mind) (Label.to_string (MutInd.label mind)) 
+                                                            (Id.to_string (Label.to_id (MutInd.label mind)))) ++ fnl ());
       Some (DTyCtr (Label.to_id (MutInd.label mind), []))
     end
     else if isConstruct ty then begin
@@ -384,7 +396,7 @@ let parse_dependent_type i nparams ty oib arg_names =
     (* Rel, App, Ind, Construct, Prod *)
     else if isConst ty then begin 
       let (x,_) = destConst ty in 
-      Some (DTyVar (id_of_string (Constant.to_string x)))
+      Some (DTyVar (Label.to_id (Constant.label x)))
     end
     else (msgerr (str "Dep Case Not Handled" ++ fnl()); 
           debug_constr ty;
@@ -566,7 +578,8 @@ let gType ty_params dep_type =
                               gProdWithArgs [gArg ~assumName:(gVar x) ~assumType:t1 ()] (fun _ -> t2)
     | DTyParam tp -> gTyParam tp
     | DTyCtr (c,dts) -> gApp (gTyCtr c) (List.map aux dts)
-    | DTyVar _ -> failwith "dependent?" in
+    | DTyVar x -> gTyVar x 
+    | DApp (c, dts) -> gApp (aux c) (List.map aux dts) in
   aux dep_type
 (*    
   match ty_params with 
