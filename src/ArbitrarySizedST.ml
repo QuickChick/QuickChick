@@ -321,27 +321,24 @@ let arbitrarySizedST gen_ctr dep_type gen_type ctrs input_names inputs n registe
 
     (* Construct equalities *)
 
-    (* Function to instantiate a single unknown *)
-    let instantiate_unknown k u = 
-      match lookup u k with
-      | None -> failwith ("Internal error: No binding for " ^ Unknown.to_string u)
-      | Some r -> 
-         (* Aux applies the continuation to the "return value" of the current dt *)
-         let rec aux (u : unknown) (cont : coq_expr -> coq_expr) = function
-           | Ctr (c,dts) -> 
-              (* aux2 goes through the dts, enhancing the continuation to include the result of the head to the acc *)
-              let rec aux2 acc = function 
-                | [] -> cont (gApp ~explicit:true (gCtr c) (List.rev acc)) (* Something about type parameters? *)
-                | h::t -> aux Unknown.undefined (fun hg -> aux2 (hg::acc) t) h 
-              in aux2 [] dts
-           | Undef dt -> 
-              register_arbitrary dt;
-              let arb = arb.next_name () in
-              bindGen (gInject "arbitrary") arb (fun arb -> cont (gVar arb))
-           | Unknown u' -> 
-              aux u' cont (UM.find u' k)
-           | FixedInput -> cont (gVar u)
-         in aux u (fun c -> returnGen (gSome c)) r
+    (* Function to instantiate a single range *)
+    let instantiate_range k r = 
+       (* Aux applies the continuation to the "return value" of the current dt *)
+       let rec aux (u : unknown) (cont : coq_expr -> coq_expr) = function
+         | Ctr (c,dts) -> 
+            (* aux2 goes through the dts, enhancing the continuation to include the result of the head to the acc *)
+            let rec aux2 acc = function 
+              | [] -> cont (gApp ~explicit:true (gCtr c) (List.rev acc)) (* Something about type parameters? *)
+              | h::t -> aux Unknown.undefined (fun hg -> aux2 (hg::acc) t) h 
+            in aux2 [] dts
+         | Undef dt -> 
+            register_arbitrary dt;
+            let arb = arb.next_name () in
+            bindGen (gInject "arbitrary") arb (fun arb -> cont (gVar arb))
+         | Unknown u' -> 
+            aux u' cont (UM.find u' k)
+         | FixedInput -> cont (gVar u)
+       in aux Unknown.undefined (fun c -> returnGen (gSome c)) r
     in
 
     (* Iterate through constraints *)
@@ -369,16 +366,51 @@ let arbitrarySizedST gen_ctr dep_type gen_type ctrs input_names inputs n registe
                  end
                  else failwith "Implement other generator modes for recursive call"
               | [(i, dt) ] -> failwith ("Internal error: not a variable to be generated for" ^ (dep_type_to_string dt)) 
-              | _ -> failwith "Mode analysis failure: More than one arguments need generation"    
+              | filtered -> begin 
+                 match List.filter (fun (i,dt) -> i == n) filtered with 
+                 | [(_, DTyVar x)] ->  
+                   let rec build_arbs acc = function
+                      | [] -> bindGenOpt (gApp (gVar rec_name) (gVar size :: List.rev acc))
+                                         (var_to_string x)
+                                         (fun _ -> recurse_type (fixVariable x k) dt2)
+                      | (i,dt)::rest -> 
+                         if i == n then build_arbs acc rest
+                         else let arb = arb.next_name () in
+                              bindGenOpt (instantiate_range k (convert_to_range dt)) arb 
+                                         (fun arb -> build_arbs (gVar arb :: acc) rest)
+                   in build_arbs [] (List.mapi (fun i dt -> (i+1, dt)) dts)
+                 | _ ->
+                   failwith ("Mode analysis failure: More than one arguments need generation : " 
+                             ^ (str_lst_to_string " - " (List.map (fun (i,dt) -> dep_type_to_string dt) filtered)))
+                 end
             end 
-            else (* Random constructor *)
-              failwith ("Do me!: " ^ (dep_type_to_string dt1) ^ " vs " ^ (ty_ctr_to_string gen_ctr))
+            else begin (* Random constructor *)
+              let num_dts = List.mapi (fun i dt -> (i+1, dt)) dts in
+              match List.filter (fun (i,dt) -> not (is_fixed k dt)) num_dts with 
+              | [] -> (* Decidability! *)
+                 failwith "Implement decidability for random constructors" 
+              | [(i,DTyVar x)] -> 
+                 (* @arbitrarySizeST {A} (P : A -> Prop) {Instance} (size : nat) -> G (option A) *)
+                 bindGenOpt (gApp ~explicit:true (gInject "arbitrarySizeST")
+                                  [ hole (* Implicit argument - type A *)
+                                  ; gFun [var_to_string x] (fun [x] -> 
+                                      gApp (gTyCtr c) 
+                                           (List.map (fun (j, dt) -> if i == j then gVar x else dt_to_coq_expr k dt) num_dts))
+                                  ; hole (* Implicit instance *)
+                                  ; gVar size ]
+                            ) 
+                            (var_to_string x)
+                            (fun x -> (* [x] should be the same as the previous x - var_to_string *)
+                               recurse_type (fixVariable x k) dt2
+                            )
+              | _ -> failwith "Use case not implemented"
+            end 
          | DApp (f, xs) -> failwith "Negation/application"
             (* What are we doing in functions *)
             (*  Coq.Init.Logic.not *)
          | _ -> failwith ("Constraints should only be type constructors. Found: " ^ (dep_type_to_string dt1))
          end
-      | DTyCtr _ -> instantiate_unknown k forGen (* result *)
+      | DTyCtr _ -> instantiate_range k (Unknown forGen) (* result *)
       | _ -> failwith "Wrong type" in
 
     (* TODO: Whenn handling parameters, this might need to add additional arguments *)

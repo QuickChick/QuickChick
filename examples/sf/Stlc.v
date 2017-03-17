@@ -142,7 +142,7 @@ Inductive has_type : list (ident * ty) (* context *) -> tm -> ty -> Prop :=
       bind Gamma x T ->
       Gamma |- tvar x \in T
   | T_Abs : forall Gamma x T11 T12 t12,
-      extend Gamma x T11 |- t12 \in T12 -> 
+      cons (x, T11) Gamma |- t12 \in T12 -> 
       Gamma |- tabs x T11 t12 \in TArrow T11 T12
   | T_App : forall T11 T12 Gamma t1 t2,
       Gamma |- t1 \in TArrow T11 T12 -> 
@@ -187,10 +187,18 @@ Qed.
 Instance ty_dep_dec : DepDec2 (fun (x y : ty) => x = y) :=
   { depDec2 := ty_eq_dec }.
 
-Set Printing All.
-
 DeriveArbitrarySizedSuchThat bind for 2 as "findInMap".
 
 DeriveArbitrarySizedSuchThat has_type for 2 as "genTyped".
 
+DeriveArbitrary ty as "arbTy" "genTy".
+DeriveArbitrary ident as "arbIdent" "genIdent".
+DeriveShow ident as "showIdent".
+DeriveShow ty as "showTy".
+DeriveShow tm as "showTm".
 
+Definition genBool2Bool : G (option tm) :=
+  @arbitrarySizeST _ (fun tm => has_type nil tm (TArrow TBool TBool))
+                   _ 4.
+
+Sample genBool2Bool.
