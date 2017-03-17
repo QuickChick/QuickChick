@@ -17,14 +17,14 @@ open Context
 
 val debug_environ : unit -> unit 
 
-type coq_expr = constr_expr (* Remove after debug match *)
+type coq_expr
 
 val hole : coq_expr
 
 val debug_coq_expr : coq_expr -> unit
 
 type var 
-
+val var_to_string : var -> string
 val gVar : var -> coq_expr
 
 val gInject : string -> coq_expr 
@@ -54,7 +54,7 @@ type coq_type =
 
 val coq_type_to_string : coq_type -> string
 
-type constructor = Id.t
+type constructor 
 val constructor_to_string : constructor -> string
 val gCtr : constructor -> coq_expr
 val injectCtr : string -> constructor
@@ -65,18 +65,14 @@ val ctr_rep_to_string : ctr_rep -> string
 type dt_rep = ty_ctr * ty_param list * ctr_rep list
 val dt_rep_to_string : dt_rep -> string
 
-type ty_var 
-val ty_var_to_string : ty_var -> string
-val gTyVar : ty_var -> coq_expr
-
 (* Supertype of coq_type handling potentially dependent stuff - TODO : merge *)
 type dep_type = 
   | DArrow of dep_type * dep_type (* Unnamed arrows *)
-  | DProd  of (ty_var * dep_type) * dep_type (* Binding arrows *)
+  | DProd  of (var * dep_type) * dep_type (* Binding arrows *)
   | DTyParam of ty_param (* Type parameters - for simplicity *)
   | DTyCtr of ty_ctr * dep_type list (* Type Constructor *)
   | DCtr of constructor * dep_type list (* Type Constructor *)
-  | DTyVar of ty_var (* Use of a previously captured type variable *)
+  | DTyVar of var (* Use of a previously captured type variable *)
   | DApp of dep_type * dep_type list (* Type-level function applications *)
   | DNot of dep_type (* Negation as a toplevel *)
 
@@ -129,6 +125,16 @@ val gRecFunInWithArgs : ?assumType:coq_expr -> string -> arg list -> ((var * var
 
 val gProdWithArgs : arg list -> ((var list) -> coq_expr) -> coq_expr
 
+(* Specialized Pattern Matching *)
+
+type matcher_pat = 
+  | MatchCtr of constructor * matcher_pat list
+  | MatchU of var
+
+val matcher_pat_to_string : matcher_pat -> string 
+
+val construct_match : coq_expr -> ?catch_all:(coq_expr option) -> (matcher_pat * coq_expr) list -> coq_expr 
+
 (* Generic List Manipulations *)
 val list_nil : coq_expr
 val lst_append : coq_expr -> coq_expr -> coq_expr
@@ -177,9 +183,9 @@ val uniform_backtracking : coq_expr list -> coq_expr
 val fold_ty  : ('a -> coq_type -> 'a) -> (ty_ctr * coq_type list -> 'a) -> (ty_param -> 'a) -> coq_type -> 'a
 val fold_ty' : ('a -> coq_type -> 'a) -> 'a -> coq_type -> 'a 
 
-val dep_fold_ty  : ('a -> dep_type -> 'a) -> ('a -> ty_var -> dep_type -> 'a) ->
+val dep_fold_ty  : ('a -> dep_type -> 'a) -> ('a -> var -> dep_type -> 'a) ->
                    (ty_ctr * dep_type list -> 'a) -> (constructor * dep_type list -> 'a) -> 
-                   (ty_param -> 'a) -> (ty_var -> 'a) -> dep_type -> 'a
+                   (ty_param -> 'a) -> (var -> 'a) -> dep_type -> 'a
 
 (* Generate Type Names *)
 val generate_names_from_type : string -> coq_type -> string list 

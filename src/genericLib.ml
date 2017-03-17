@@ -59,11 +59,11 @@ let debug_coq_expr (c : coq_expr) : unit =
   msgerr (pr_constr_expr c)
 
 let debug_constr (c : constr) : unit = 
-  msgerr (Printer.pr_constr c ++ fnl ())
+  msgerr (Printer.safe_pr_constr c ++ fnl ())
 
 (* Non-dependent version *)
 type var = Id.t (* Opaque *)
-
+let var_to_string = Id.to_string
 let gVar (x : var) : coq_expr =
   CRef (Ident (dl x),None)
 
@@ -122,29 +122,25 @@ let dt_rep_to_string (ty_ctr, ty_params, ctrs) =
                                 (str_lst_to_string " "  (List.map ty_param_to_string ty_params))
                                 (str_lst_to_string "\n" (List.map ctr_rep_to_string  ctrs))
                                  
-type ty_var = Id.t (* Opaque *)
-let ty_var_to_string x = Id.to_string x
-let gTyVar = mkIdentC
-
 (* Supertype of coq_type handling potentially dependent stuff - TODO : merge *)
 type dep_type = 
   | DArrow of dep_type * dep_type (* Unnamed arrows *)
-  | DProd  of (ty_var * dep_type) * dep_type (* Binding arrows *)
+  | DProd  of (var * dep_type) * dep_type (* Binding arrows *)
   | DTyParam of ty_param (* Type parameters - for simplicity *)
   | DTyCtr of ty_ctr * dep_type list (* Type Constructor *)
   | DCtr of constructor * dep_type list (* Regular Constructor (for dependencies) *)
-  | DTyVar of ty_var (* Use of a previously captured type variable *)
+  | DTyVar of var (* Use of a previously captured type variable *)
   | DApp of dep_type * dep_type list (* Type-level function applications *)
   | DNot of dep_type (* Negation pushed up a level *)
 
 let rec dep_type_to_string dt = 
   match dt with 
   | DArrow (d1, d2) -> Printf.sprintf "%s -> %s" (dep_type_to_string d1) (dep_type_to_string d2)
-  | DProd  ((x,d1), d2) -> Printf.sprintf "(%s : %s) -> %s" (ty_var_to_string x) (dep_type_to_string d1) (dep_type_to_string d2)
+  | DProd  ((x,d1), d2) -> Printf.sprintf "(%s : %s) -> %s" (var_to_string x) (dep_type_to_string d1) (dep_type_to_string d2)
   | DTyCtr (ty_ctr, ds) -> ty_ctr_to_string ty_ctr ^ " " ^ str_lst_to_string " " (List.map dep_type_to_string ds)
   | DCtr (ctr, ds) -> constructor_to_string ctr ^ " " ^ str_lst_to_string " " (List.map dep_type_to_string ds)
   | DTyParam tp -> ty_param_to_string tp
-  | DTyVar tv -> ty_var_to_string tv
+  | DTyVar tv -> var_to_string tv
   | DApp (d, ds) -> Printf.sprintf "(%s $ %s)" (dep_type_to_string d) (str_lst_to_string " " (List.map dep_type_to_string ds))
   | DNot d -> Printf.sprintf "~ ( %s )" (dep_type_to_string d)
 
@@ -360,7 +356,7 @@ let parse_dependent_type i nparams ty oib arg_names =
       | Some (DTyCtr (c, _)) -> Some (DTyCtr (c, List.rev tms'))
       | Some (DCtr (c, _)) -> Some (DCtr (c, List.rev tms'))
       | Some (DTyVar x) -> 
-         let xs = ty_var_to_string x in 
+         let xs = var_to_string x in 
          if xs = "Coq.Init.Logic.not" || xs = "not" then 
            match tms' with 
            | [c] -> Some (DNot c)
@@ -578,7 +574,7 @@ let gType ty_params dep_type =
                               gProdWithArgs [gArg ~assumName:(gVar x) ~assumType:t1 ()] (fun _ -> t2)
     | DTyParam tp -> gTyParam tp
     | DTyCtr (c,dts) -> gApp (gTyCtr c) (List.map aux dts)
-    | DTyVar x -> gTyVar x 
+    | DTyVar x -> gVar x 
     | DApp (c, dts) -> gApp (aux c) (List.map aux dts) in
   aux dep_type
 (*    
@@ -605,6 +601,37 @@ let is_inductive c =
   match glob_ref with
   | IndRef _ -> true
   | _        -> false
+
+(* Specialized match *)
+type matcher_pat = 
+  | MatchCtr of constructor * matcher_pat list
+  | MatchU of var
+
+let rec matcher_pat_to_string = function
+  | MatchU u -> var_to_string u
+  | MatchCtr (c, ms) -> constructor_to_string c ^ " " ^ str_lst_to_string " " (List.map matcher_pat_to_string ms)
+
+let construct_match c ?catch_all:(mdef=None) alts = 
+  let rec aux = function 
+    | MatchU u' -> begin 
+        CPatAtom (dummy_loc, Some (Ident (dummy_loc, u')))
+      end
+    | MatchCtr (c, ms) -> 
+       if is_inductive c then CPatAtom (dummy_loc, None)
+       else CPatCstr (dummy_loc, 
+                   Ident (dummy_loc, c),
+                   List.map (fun m -> aux m) ms,
+                   []) 
+  in CCases (dummy_loc,
+             Term.RegularStyle,
+             None (* return *), 
+              [ (c, (None, None))], (* single discriminee, no as/in *)
+              List.map (fun (m, body) -> (dummy_loc, [dummy_loc, [aux m]], body)) alts 
+              @ (match mdef with 
+                 | Some body -> [(dummy_loc, [dummy_loc, [CPatAtom (dummy_loc, None)]], body)]
+                 | _ -> []
+                )
+            )
 
 (* Generic List Manipulations *)
 let list_nil = gInject "nil"

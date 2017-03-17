@@ -23,25 +23,41 @@ type name_provider = { next_name : unit -> string }
 let mk_name_provider s = 
   let cnt = ref 0 in
   { next_name = fun () -> 
-      let res = s ^ string_of_int !cnt in
+      let res = Printf.sprintf "%s_%d_" s !cnt in
       incr cnt;
-      res 
+      res
   }
 
 (* Advanced Generators *)
 
 (* Ranges are undefined, unknowns or constructors applied to ranges *)
-type unknown = string
+module Unknown = struct 
+  type t = var 
+  
+  let to_string = var_to_string
+  let from_string x = fresh_name x
+  let from_var x = x
+
+  let undefined = fresh_name "Ireallywantundefinedherebutwedonthavelaziness"
+
+end
+
+module UnknownOrd = struct
+  type t = Unknown.t
+  let compare x y = compare (Unknown.to_string x) (Unknown.to_string y)
+end
+
+type unknown = Unknown.t
 
 type range = Ctr of constructor * range list | Unknown of unknown | Undef of dep_type | FixedInput
 
 let rec range_to_string = function
   | Ctr (c, rs) -> constructor_to_string c ^ " " ^ str_lst_to_string " " (List.map range_to_string rs)
-  | Unknown u -> u
+  | Unknown u -> Unknown.to_string u
   | Undef dt -> Printf.sprintf "Undef (%s)" (dep_type_to_string dt)
   | FixedInput -> "FixedInput"
   
-module UM = Map.Make(String)
+module UM = Map.Make(UnknownOrd)
 
 type umap = range UM.t
 
@@ -66,20 +82,12 @@ end
 
 module ArbSet = Set.Make(OrdTyp)             
 
-type matcher_pat = 
-  | MatchCtr of constructor * matcher_pat list
-  | MatchU of unknown
 
-let rec matcher_pat_to_string = function
-  | MatchU u -> u
-  | MatchCtr (c, ms) -> constructor_to_string c ^ " " ^ str_lst_to_string " " (List.map matcher_pat_to_string ms)
+type unknown_provider = { next_unknown : unit -> Unknown.t }
 
-type matcher = unknown * matcher_pat
-
-let rec matcher_to_string = function
-  | (u, m) -> Printf.sprintf "Match %s With %s\n" u (matcher_pat_to_string m)
-
-let unk_provider = mk_name_provider "unkn"
+let unk_provider = 
+  let np = mk_name_provider "unkn" in
+  { next_unknown = fun () -> Unknown.from_string (np.next_name ()) }
 
 (* Match a constructor/ranges list to a fixed input *)
 (* Range list is toplevel, so it's mostly unifications.
@@ -99,7 +107,7 @@ let rec raiseMatch (k : umap) (c : constructor) (rs : range list) (eqs: EqSet.t)
             | Undef _ -> (* The unknown should now be fixed *)
                Some (UM.add u FixedInput k, (MatchU u)::l, eqs)
             | FixedInput -> (* The unknown is already fixed, raise an eq check *)
-               let u' = unk_provider.next_name () in
+               let u' = unk_provider.next_unknown () in
                Some (UM.add u' (Unknown u) k, (MatchU u')::l, eq_set_add u' u eqs)
             | _ -> failwith "Not supported yet"
             end
@@ -114,7 +122,7 @@ let rec raiseMatch (k : umap) (c : constructor) (rs : range list) (eqs: EqSet.t)
    -- Only unknowns can be bound to Undef/FixedInput
 *)
 let rec unify (k : umap) (r1 : range) (r2 : range) (eqs : EqSet.t)
-        : (umap * range * EqSet.t * matcher list) option =
+        : (umap * range * EqSet.t * (unknown * matcher_pat) list) option =
   msgerr (str (Printf.sprintf "Calling unify with %s %s" (range_to_string r1) (range_to_string r2)) ++ fnl ());
   match r1, r2 with
   | Unknown u1, Unknown u2 ->
@@ -211,12 +219,12 @@ let fixVariable x k =
     | FixedInput -> k
     | Undef _ -> UM.add u FixedInput k 
     | Unknown u' -> fixRange u' (UM.find u' k) k
-    | Ctr (_, rs) -> List.fold_left (fun k r -> fixRange "internalerror" r k) k rs 
+    | Ctr (_, rs) -> List.fold_left (fun k r -> fixRange Unknown.undefined r k) k rs 
   in fixRange x (UM.find x k) k
 
 let rec convert_to_range dt = 
   match dt with 
-  | DTyVar x -> Unknown (ty_var_to_string x)
+  | DTyVar x -> Unknown x
   | DCtr (c,dts) -> Ctr (c, List.map convert_to_range dts)
   | DTyCtr (c, dts) -> Ctr (injectCtr (ty_ctr_to_string c), List.map convert_to_range dts)
   | _ -> failwith ("Unsupported range: " ^ (dep_type_to_string dt))
@@ -236,8 +244,8 @@ let rec range_to_coq_expr k r =
      gApp (gCtr c) (List.map (range_to_coq_expr k) rs)
   | Unknown u -> 
      begin match UM.find u k with
-     | FixedInput -> gInject u
-     | Undef _ -> (msgerr (str "It's stupid that this is called" ++ fnl ()); gInject u)
+     | FixedInput -> gVar u
+     | Undef _ -> (msgerr (str "It's stupid that this is called" ++ fnl ()); gVar u)
      | Unknown u' -> range_to_coq_expr k (Unknown u')
      | Ctr (c, rs) -> gApp (gCtr c) (List.map (range_to_coq_expr k) rs)
      end
@@ -260,10 +268,11 @@ let arbitrarySizedST gen_ctr dep_type gen_type ctrs input_names inputs n registe
   let gen = mk_name_provider "gen" in
   let dec = mk_name_provider "dec" in
   let arb = mk_name_provider "arb" in
+  let input_names = List.map fresh_name input_names in
 
   let rec_dec_name = gInject (Printf.sprintf "depDec%n" (dep_type_len dep_type)) in
 
-  let forGen = "_forGen" in
+  let forGen = Unknown.from_string "_forGen" in
 
   let rec inputWithGen i l = 
     if i <= 1 then forGen :: l
@@ -279,12 +288,15 @@ let arbitrarySizedST gen_ctr dep_type gen_type ctrs input_names inputs n registe
     let register_unknowns map = 
       let rec aux map = function
         | DArrow (dt1, dt2) -> aux map dt2
-        | DProd ((x, dt1), dt2) -> aux (UM.add (ty_var_to_string x) (Undef dt1) map) dt2
+        | DProd ((x, dt1), dt2) -> aux (UM.add x (Undef dt1) map) dt2
         | _ -> map in
       aux map typ
     in
 
-    let init_map = UM.add forGen (Undef (nthType n dep_type)) (List.fold_left (fun m n -> UM.add n FixedInput m) (register_unknowns UM.empty) input_names) in
+    let init_map = UM.add forGen (Undef (nthType n dep_type)) 
+                                 (List.fold_left (fun m n -> UM.add n FixedInput m) 
+                                                 (register_unknowns UM.empty) input_names) 
+    in
 
     msgerr (str ("Calculating ranges: " ^ dep_type_to_string (dep_result_type typ)) ++ fnl ());
     let ranges = match dep_result_type typ with
@@ -295,7 +307,7 @@ let arbitrarySizedST gen_ctr dep_type gen_type ctrs input_names inputs n registe
 
     (* Debugging init map *)
     msgerr (str ("Handling branch: " ^ dep_type_to_string typ) ++ fnl ());
-    UM.iter (fun x r -> msgerr (str ("Bound: " ^ x ^ " to Range: " ^ (range_to_string r)) ++ fnl ())) init_map;
+    UM.iter (fun x r -> msgerr (str ("Bound: " ^ (var_to_string x) ^ " to Range: " ^ (range_to_string r)) ++ fnl ())) init_map;
     dep_fold_ty (fun _ dt1 -> msgerr (str (Printf.sprintf "%s : %b\n" (dep_type_to_string dt1) (is_dep_type dt1)) ++ fnl()))
                 (fun _ _ dt1 -> msgerr (str (Printf.sprintf "%s : %b\n" (dep_type_to_string dt1) (is_dep_type dt1)) ++ fnl()))
                 (fun _ -> ()) (fun _ -> ()) (fun _ -> ()) (fun _ -> ()) typ;
@@ -307,43 +319,20 @@ let arbitrarySizedST gen_ctr dep_type gen_type ctrs input_names inputs n registe
     | None -> failwith "Matching result type error" 
     | Some (map, eqs, matches) -> 
 
-    (* Construct matches - TODO: move to generic lib *)
-    let construct_match (u, m) body = 
-      let rec aux = function 
-        | MatchU u' -> begin 
-            CPatAtom (dummy_loc, Some (Ident (dummy_loc, Id.of_string u')))
-          end
-        | MatchCtr (c, ms) -> 
-           if is_inductive c then CPatAtom (dummy_loc, None)
-           else 
-              CPatCstr (dummy_loc, 
-                        Ident (dummy_loc, Id.of_string (constructor_to_string c)),
-                        List.map (fun m -> aux m) ms,
-                        []) in
-      CCases (dummy_loc,
-              Term.RegularStyle,
-              None (* return *), 
-              [(CRef (Ident (dummy_loc, Id.of_string u),None), (None, None))], (* single discriminee, no as/in *)
-              [ (dummy_loc, [dummy_loc, [aux m]], body)
-              ; (dummy_loc, [dummy_loc, [CPatAtom (dummy_loc, None)]], returnGen gNone)
-              ]
-             )
-    in
-
     (* Construct equalities *)
 
     (* Function to instantiate a single unknown *)
     let instantiate_unknown k u = 
       match lookup u k with
-      | None -> failwith ("Internal error: No binding for " ^ u)
+      | None -> failwith ("Internal error: No binding for " ^ Unknown.to_string u)
       | Some r -> 
          (* Aux applies the continuation to the "return value" of the current dt *)
-         let rec aux u (cont : coq_expr -> coq_expr) = function
+         let rec aux (u : unknown) (cont : coq_expr -> coq_expr) = function
            | Ctr (c,dts) -> 
               (* aux2 goes through the dts, enhancing the continuation to include the result of the head to the acc *)
               let rec aux2 acc = function 
                 | [] -> cont (gApp ~explicit:true (gCtr c) (List.rev acc)) (* Something about type parameters? *)
-                | h::t -> aux "" (fun hg -> aux2 (hg::acc) t) h 
+                | h::t -> aux Unknown.undefined (fun hg -> aux2 (hg::acc) t) h 
               in aux2 [] dts
            | Undef dt -> 
               register_arbitrary dt;
@@ -351,7 +340,7 @@ let arbitrarySizedST gen_ctr dep_type gen_type ctrs input_names inputs n registe
               bindGen (gInject "arbitrary") arb (fun arb -> cont (gVar arb))
            | Unknown u' -> 
               aux u' cont (UM.find u' k)
-           | FixedInput -> cont (gVar (fresh_name u))
+           | FixedInput -> cont (gVar u)
          in aux u (fun c -> returnGen (gSome c)) r
     in
 
@@ -373,11 +362,11 @@ let arbitrarySizedST gen_ctr dep_type gen_type ctrs input_names inputs n registe
                         ; (injectCtr "right", ["neq"], fun _ -> returnGen gNone) ]
               | [(i,DTyVar x)] -> 
                  if i == n then (* Recursive call *) begin
-                   msgerr (str ("Variable is: " ^ ty_var_to_string x) ++ fnl ());
+                   msgerr (str ("Variable is: " ^ var_to_string x) ++ fnl ());
                    let args = List.map snd (List.filter (fun (i, _) -> not (i == n)) (List.mapi (fun i dt -> (i+1, dt_to_coq_expr k dt)) dts)) in
-                   bindGenOpt (gApp (gVar rec_name) (gVar size :: args)) (ty_var_to_string x) 
-                           (fun _ -> recurse_type (fixVariable (ty_var_to_string x) k) dt2)
-                             end
+                   bindGenOpt (gApp (gVar rec_name) (gVar size :: args)) (var_to_string x) 
+                              (fun _ -> recurse_type (fixVariable x k) dt2)
+                 end
                  else failwith "Implement other generator modes for recursive call"
               | [(i, dt) ] -> failwith ("Internal error: not a variable to be generated for" ^ (dep_type_to_string dt)) 
               | _ -> failwith "Mode analysis failure: More than one arguments need generation"    
@@ -398,7 +387,7 @@ let arbitrarySizedST gen_ctr dep_type gen_type ctrs input_names inputs n registe
                   let check = gApp ~explicit:true (gInject "depDec2") [hole; hole; 
                                                                        gFun ["x"; "y"] (fun [x;y] -> gApp (gInject "eq") [gVar x; gVar y]);
                                                                        hole;
-                                                                       gInject u1; gInject u2] in
+                                                                       gVar u1; gVar u2] in
                  gMatch check 
                         [ (injectCtr "left" , ["eq" ], fun _ -> c)
                         ; (injectCtr "right", ["neq"], fun _ -> returnGen gNone) ]
@@ -407,17 +396,17 @@ let arbitrarySizedST gen_ctr dep_type gen_type ctrs input_names inputs n registe
     let branch_gen = 
       let rec walk_matches = function
         | [] -> handle_equalities eqs (recurse_type map typ)
-        | m::ms -> begin 
-            msgerr (str (Printf.sprintf "Processing Match: %s" (matcher_to_string m)) ++ fnl ());
-            construct_match m (walk_matches ms) 
+        | (u,m)::ms -> begin 
+            msgerr (str (Printf.sprintf "Processing Match: %s @ %s" (Unknown.to_string u) (matcher_pat_to_string m)) ++ fnl ());
+            construct_match (gVar u) ~catch_all:(Some (returnGen gNone)) [(m,walk_matches ms)]
           end in
       walk_matches matches
     in 
     
     (* Debugging resulting match *)
-    UM.iter (fun x r -> msgerr (str ("Bound: " ^ x ^ " to Range: " ^ (range_to_string r)) ++ fnl ())) map;
-    EqSet.iter (fun (u,u') -> msgerr (str (Printf.sprintf "Eq: %s = %s\n" u u') ++ fnl())) eqs;
-    List.iter (fun m -> msgerr (str (matcher_to_string m) ++ fnl ())) matches;
+    UM.iter (fun x r -> msgerr (str ("Bound: " ^ var_to_string x ^ " to Range: " ^ (range_to_string r)) ++ fnl ())) map;
+    EqSet.iter (fun (u,u') -> msgerr (str (Printf.sprintf "Eq: %s = %s\n" (Unknown.to_string u) (Unknown.to_string u')) ++ fnl())) eqs;
+    List.iter (fun (u,m) -> msgerr (str ((Unknown.to_string u) ^ (matcher_pat_to_string m)) ++ fnl ())) matches;
 
     msgerr (str "Generated..." ++ fnl ());
     debug_coq_expr branch_gen;
@@ -448,7 +437,7 @@ let arbitrarySizedST gen_ctr dep_type gen_type ctrs input_names inputs n registe
                     (fun (rec_name, size::vars) -> aux_arb rec_name size vars)
                     (fun rec_name -> gFun ["size"] 
                                     (fun [size] -> gApp (gVar rec_name) 
-                                                        (gVar size :: List.map (fun n -> gVar (fresh_name n)) input_names)
+                                                        (gVar size :: List.map gVar input_names)
                                     ))
   in
 

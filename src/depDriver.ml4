@@ -60,7 +60,7 @@ let deriveDependent (cn : derivable) (c : constr_expr) nc (instance_name : strin
 
   let full_dt = gApp ~explicit:true coqTyCtr coqTyParams in
 
-  let input_names = List.mapi (fun i _ -> Printf.sprintf "input%d" i) input_types in
+  let input_names = List.mapi (fun i _ -> Printf.sprintf "input%d_" i) input_types in
 
   let forGen = "_forGen" in
 

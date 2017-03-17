@@ -187,6 +187,8 @@ Qed.
 Instance ty_dep_dec : DepDec2 (fun (x y : ty) => x = y) :=
   { depDec2 := ty_eq_dec }.
 
+Set Printing All.
+
 DeriveArbitrarySizedSuchThat bind for 2 as "findInMap".
 
 DeriveArbitrarySizedSuchThat has_type for 2 as "genTyped".
