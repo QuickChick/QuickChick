@@ -197,8 +197,16 @@ DeriveShow ident as "showIdent".
 DeriveShow ty as "showTy".
 DeriveShow tm as "showTm".
 
-Definition genBool2Bool : G (option tm) :=
-  @arbitrarySizeST _ (fun tm => has_type nil tm (TArrow TBool TBool))
-                   _ 4.
+Definition genBool : G (option tm) :=
+  @arbitrarySizeST _ (fun tm => has_type 
+                                  (cons (Id 0, TBool) 
+                                   (cons (Id 1, TArrow TBool TBool) nil))
+                                  tm TBool)
+                   _ 1.
 
+Sample genBool.
+
+Definition genBool2Bool : G (option tm) := 
+  @arbitrarySizeST _ (fun tm => has_type nil tm (TArrow TBool TBool))
+                   _ 1.
 Sample genBool2Bool.

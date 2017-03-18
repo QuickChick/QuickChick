@@ -213,14 +213,14 @@ let rec unify (k : umap) (r1 : range) (r2 : range) (eqs : EqSet.t)
          Some (k', Unknown u, eqs', m')
       end
 
-let fixVariable x k = 
-  let rec fixRange u r k = 
+let rec fixRange u r k = 
     match r with 
     | FixedInput -> k
     | Undef _ -> UM.add u FixedInput k 
     | Unknown u' -> fixRange u' (UM.find u' k) k
     | Ctr (_, rs) -> List.fold_left (fun k r -> fixRange Unknown.undefined r k) k rs 
-  in fixRange x (UM.find x k) k
+
+let fixVariable x k = fixRange x (UM.find x k) k
 
 let rec convert_to_range dt = 
   match dt with 
@@ -322,23 +322,24 @@ let arbitrarySizedST gen_ctr dep_type gen_type ctrs input_names inputs n registe
     (* Construct equalities *)
 
     (* Function to instantiate a single range *)
+    let rec instantiate_range_cont (k : umap) (parent : unknown) (cont : umap -> coq_expr -> coq_expr) = function
+      | Ctr (c,rs) -> 
+         (* aux2 goes through the dts, enhancing the continuation to include the result of the head to the acc *)
+         let rec traverse_ranges k acc = function 
+           | [] -> cont k (gApp ~explicit:true (gCtr c) (List.rev acc)) (* Something about type parameters? *)
+           | r::rest -> instantiate_range_cont k Unknown.undefined (fun k hg -> traverse_ranges k (hg::acc) rest) r
+         in traverse_ranges k [] rs
+      | Undef dt -> 
+         register_arbitrary dt; 
+         let arb = arb.next_name () in
+         let k' = UM.add parent (Unknown (fresh_name arb)) (UM.add (fresh_name arb) FixedInput k) in
+         bindGen (gInject "arbitrary") arb (fun arb -> cont k' (gVar arb))
+      | Unknown u -> instantiate_range_cont k u cont (UM.find u k)
+      | FixedInput -> cont k (gVar parent)
+    in 
+
     let instantiate_range k r = 
-       (* Aux applies the continuation to the "return value" of the current dt *)
-       let rec aux (u : unknown) (cont : coq_expr -> coq_expr) = function
-         | Ctr (c,dts) -> 
-            (* aux2 goes through the dts, enhancing the continuation to include the result of the head to the acc *)
-            let rec aux2 acc = function 
-              | [] -> cont (gApp ~explicit:true (gCtr c) (List.rev acc)) (* Something about type parameters? *)
-              | h::t -> aux Unknown.undefined (fun hg -> aux2 (hg::acc) t) h 
-            in aux2 [] dts
-         | Undef dt -> 
-            register_arbitrary dt;
-            let arb = arb.next_name () in
-            bindGen (gInject "arbitrary") arb (fun arb -> cont (gVar arb))
-         | Unknown u' -> 
-            aux u' cont (UM.find u' k)
-         | FixedInput -> cont (gVar u)
-       in aux Unknown.undefined (fun c -> returnGen (gSome c)) r
+      instantiate_range_cont k Unknown.undefined (fun k c -> returnGen (gSome c)) r
     in
 
     (* Iterate through constraints *)
@@ -366,22 +367,26 @@ let arbitrarySizedST gen_ctr dep_type gen_type ctrs input_names inputs n registe
                  end
                  else failwith "Implement other generator modes for recursive call"
               | [(i, dt) ] -> failwith ("Internal error: not a variable to be generated for" ^ (dep_type_to_string dt)) 
-              | filtered -> begin 
+              | filtered -> begin
                  match List.filter (fun (i,dt) -> i == n) filtered with 
-                 | [(_, DTyVar x)] ->  
-                   let rec build_arbs acc = function
+                 | [(_, DTyVar x)] -> 
+                    let rec build_arbs k acc = function 
                       | [] -> bindGenOpt (gApp (gVar rec_name) (gVar size :: List.rev acc))
                                          (var_to_string x)
                                          (fun _ -> recurse_type (fixVariable x k) dt2)
                       | (i,dt)::rest -> 
-                         if i == n then build_arbs acc rest
-                         else let arb = arb.next_name () in
-                              bindGenOpt (instantiate_range k (convert_to_range dt)) arb 
-                                         (fun arb -> build_arbs (gVar arb :: acc) rest)
-                   in build_arbs [] (List.mapi (fun i dt -> (i+1, dt)) dts)
-                 | _ ->
-                   failwith ("Mode analysis failure: More than one arguments need generation : " 
-                             ^ (str_lst_to_string " - " (List.map (fun (i,dt) -> dep_type_to_string dt) filtered)))
+                         if i == n then build_arbs k acc rest
+                         else if is_fixed k dt then 
+                           build_arbs k (dt_to_coq_expr k dt :: acc) rest 
+                         else 
+                           let arb = arb.next_name () in
+                           let rdt = convert_to_range dt in
+                           instantiate_range_cont k Unknown.undefined 
+                                                  (fun k c ->  
+                                                    build_arbs k (c :: acc) rest
+                                                  ) rdt
+                    in build_arbs k [] (List.mapi (fun i dt -> (i+1, dt)) dts) 
+                 | _ -> failwith ("Mode analysis failure: More than one arguments need generation : " ^ (str_lst_to_string " - " (List.map (fun (i,dt) -> dep_type_to_string dt) filtered)))
                  end
             end 
             else begin (* Random constructor *)
