@@ -261,6 +261,7 @@ let rec is_dep_type = function
   | DCtr _ -> true
   | DTyCtr (_, dts) -> List.exists is_dep_type dts
   | DApp (dt, dts) -> List.exists is_dep_type (dt::dts)
+  | DNot dt -> is_dep_type dt
 
 let need_dec = ref false
 
@@ -342,80 +343,105 @@ let arbitrarySizedST gen_ctr dep_type gen_type ctrs input_names inputs n registe
       instantiate_range_cont k Unknown.undefined (fun k c -> returnGen (gSome c)) r
     in
 
+    let rec handle_TyCtr pos c dts k dt2 rec_name = 
+      let numbered_dts = List.mapi (fun i dt -> (i+1, dt)) dts in (* +1 because of nth being 1-indexed *)
+      match List.filter (fun (i, dt) -> not (is_fixed k dt)) numbered_dts with
+      | [] -> (* Every argument to the constructor is fixed - perform a check *)
+
+         (* Check if we are handling the current constructor. If yes, mark the need for decidability of current constructor *)
+         (* need_dec is a ref in scope *)
+         if c == gen_ctr then (need_dec := true; b := false) else ();
+
+         (* Continuation handling dt2 : recurse one dt2 / None based on positivity *)
+         let body_cont = recurse_type k dt2 in
+         let body_fail = returnGen gNone in
+
+         (* checker to be called - rec_dec_name is in scope *)
+         let checker = if c == gen_ctr then rec_dec_name
+                       else gInject (Printf.sprintf "depDec%n" (List.length numbered_dts)) in
+
+         (* Perform the check - rec_dec_name is in scope *)
+         gMatch (gApp checker (List.map (fun dt -> dt_to_coq_expr k dt) dts))
+                [ (injectCtr "left", ["eq" ] , fun _ -> if pos then body_cont else body_fail)
+                ; (injectCtr "right", ["neq"], fun _ -> if pos then body_fail else body_cont) 
+                ]
+
+      | [(i, DTyVar x)] -> (* Single variable to be generated for *)
+         if i == n && c == gen_ctr && pos then begin (* Recursive call *)
+           b := false;
+           let args = List.map snd (List.filter (fun (i, _) -> not (i == n)) (List.mapi (fun i dt -> (i+1, dt_to_coq_expr k dt)) dts)) in
+           bindGenOpt (gApp (gVar rec_name) (gVar size :: args)) (var_to_string x) 
+                      (fun _ -> recurse_type (fixVariable x k) dt2)
+         end
+         else if pos then begin (* Generate using "arbitrarySizeST" and annotations for type *)
+           if c = gen_ctr then b := false;
+           (* @arbitrarySizeST {A} (P : A -> Prop) {Instance} (size : nat) -> G (option A) *)
+           bindGenOpt (gApp ~explicit:true (gInject "arbitrarySizeST")
+                            [ hole (* Implicit argument - type A *)
+                            ; gFun [var_to_string x] (fun [x] -> 
+                                gApp (gTyCtr c) (List.map (fun (j, dt) -> 
+                                  (* Replace the i-th variable with x - we're creating fun x => c dt_1 dt_2 ... x dt_{i+1} ... *)
+                                  if i == j then gVar x else dt_to_coq_expr k dt
+                                ) numbered_dts))
+                            ; hole (* Implicit instance *)
+                            ; gVar size ]
+                      ) 
+                      (var_to_string x)
+                      (fun x -> (* [x] should be the same as the previous x - var_to_string *)
+                        recurse_type (fixVariable x k) dt2
+                      )
+         end
+         else failwith "Negation for constructor generation"
+      | [(i, dt) ] -> failwith ("Internal error: not a variable to be generated for" ^ (dep_type_to_string dt)) 
+         
+      (* Multiple arguments to be generated for. Generalized arbitrarySizeST? *)
+      | filtered -> begin
+         (* For now, check if n is in the filtered list *)
+         match List.filter (fun (i,dt) -> i == n) filtered with 
+         | [(_, DTyVar x)] -> 
+            b := false; 
+            (* Every other variable generated using "arbitrary" *)
+            let rec build_arbs k acc = function 
+              | [] -> 
+                 (* base case - recursive call *)
+                 if pos then 
+                   bindGenOpt (gApp (gVar rec_name) (gVar size :: List.rev acc))
+                                   (var_to_string x)
+                                   (fun _ -> recurse_type (fixVariable x k) dt2)
+                 else failwith "Negation / build_arbs"
+              | (i,dt)::rest -> 
+                 if i == n then build_arbs k acc rest (* Recursive argument - handle at the end *)
+                 else if is_fixed k dt then (* Fixed argument - do nothing *)
+                   build_arbs k (dt_to_coq_expr k dt :: acc) rest 
+                 else (* Call arbitrary and bind it to a new name *)
+                   let arb = arb.next_name () in
+                   let rdt = convert_to_range dt in
+                   instantiate_range_cont k Unknown.undefined 
+                     (fun k c -> (* Continuation: call build_arbs on the rest *)
+                        build_arbs k (c :: acc) rest
+                     ) rdt
+            in build_arbs k [] numbered_dts
+         | _ -> failwith "Mode analysis failure"
+      end
+
+    (* Dispatcher for constraints *)
+    and handle_dt pos dt1 dt2 k rec_name = 
+      match dt1 with 
+      | DTyCtr (c,dts) -> 
+         handle_TyCtr pos c dts k dt2 rec_name 
+      | DNot dt -> 
+         handle_dt (not pos) dt dt2 k rec_name
+      | _ -> failwith "Constraints should be type constructors/negations"
+
     (* Iterate through constraints *)
-    let rec recurse_type k = function
-      | DProd (_, dt) -> recurse_type k dt (* Only introduces variables, doesn't constrain them *)
+    and recurse_type k = function
+      | DProd (_, dt) -> (* Only introduces variables, doesn't constrain them *)
+         recurse_type k dt 
       | DArrow (dt1, dt2) -> 
          msgerr (str ("Darrowing: " ^ range_to_string (UM.find forGen k)) ++ fnl ());
-         begin match dt1 with 
-         | DTyCtr (c, dts) -> 
-            if c == gen_ctr then 
-            begin (* Recursively called constructor *)
-              b := false;
-              match List.filter (fun (i, dt) -> not (is_fixed k dt)) (List.mapi (fun i dt -> (i+1, dt)) dts) with (* +1 because of nth being 1-indexed *)
-              | [] -> 
-                 need_dec := true;
-                 gMatch (gApp rec_dec_name (List.map (fun dt -> dt_to_coq_expr k dt) dts))
-                        [ (injectCtr "left", ["eq" ], fun _ -> recurse_type k dt2) 
-                        ; (injectCtr "right", ["neq"], fun _ -> returnGen gNone) ]
-              | [(i,DTyVar x)] -> 
-                 if i == n then (* Recursive call *) begin
-                   msgerr (str ("Variable is: " ^ var_to_string x) ++ fnl ());
-                   let args = List.map snd (List.filter (fun (i, _) -> not (i == n)) (List.mapi (fun i dt -> (i+1, dt_to_coq_expr k dt)) dts)) in
-                   bindGenOpt (gApp (gVar rec_name) (gVar size :: args)) (var_to_string x) 
-                              (fun _ -> recurse_type (fixVariable x k) dt2)
-                 end
-                 else failwith "Implement other generator modes for recursive call"
-              | [(i, dt) ] -> failwith ("Internal error: not a variable to be generated for" ^ (dep_type_to_string dt)) 
-              | filtered -> begin
-                 match List.filter (fun (i,dt) -> i == n) filtered with 
-                 | [(_, DTyVar x)] -> 
-                    let rec build_arbs k acc = function 
-                      | [] -> bindGenOpt (gApp (gVar rec_name) (gVar size :: List.rev acc))
-                                         (var_to_string x)
-                                         (fun _ -> recurse_type (fixVariable x k) dt2)
-                      | (i,dt)::rest -> 
-                         if i == n then build_arbs k acc rest
-                         else if is_fixed k dt then 
-                           build_arbs k (dt_to_coq_expr k dt :: acc) rest 
-                         else 
-                           let arb = arb.next_name () in
-                           let rdt = convert_to_range dt in
-                           instantiate_range_cont k Unknown.undefined 
-                                                  (fun k c ->  
-                                                    build_arbs k (c :: acc) rest
-                                                  ) rdt
-                    in build_arbs k [] (List.mapi (fun i dt -> (i+1, dt)) dts) 
-                 | _ -> failwith ("Mode analysis failure: More than one arguments need generation : " ^ (str_lst_to_string " - " (List.map (fun (i,dt) -> dep_type_to_string dt) filtered)))
-                 end
-            end 
-            else begin (* Random constructor *)
-              let num_dts = List.mapi (fun i dt -> (i+1, dt)) dts in
-              match List.filter (fun (i,dt) -> not (is_fixed k dt)) num_dts with 
-              | [] -> (* Decidability! *)
-                 failwith "Implement decidability for random constructors" 
-              | [(i,DTyVar x)] -> 
-                 (* @arbitrarySizeST {A} (P : A -> Prop) {Instance} (size : nat) -> G (option A) *)
-                 bindGenOpt (gApp ~explicit:true (gInject "arbitrarySizeST")
-                                  [ hole (* Implicit argument - type A *)
-                                  ; gFun [var_to_string x] (fun [x] -> 
-                                      gApp (gTyCtr c) 
-                                           (List.map (fun (j, dt) -> if i == j then gVar x else dt_to_coq_expr k dt) num_dts))
-                                  ; hole (* Implicit instance *)
-                                  ; gVar size ]
-                            ) 
-                            (var_to_string x)
-                            (fun x -> (* [x] should be the same as the previous x - var_to_string *)
-                               recurse_type (fixVariable x k) dt2
-                            )
-              | _ -> failwith "Use case not implemented"
-            end 
-         | DApp (f, xs) -> failwith "Negation/application"
-            (* What are we doing in functions *)
-            (*  Coq.Init.Logic.not *)
-         | _ -> failwith ("Constraints should only be type constructors. Found: " ^ (dep_type_to_string dt1))
-         end
-      | DTyCtr _ -> instantiate_range k (Unknown forGen) (* result *)
+         handle_dt true dt1 dt2 k rec_name
+      | DTyCtr _ -> (* result *) 
+         instantiate_range k (Unknown forGen) (* result *)
       | _ -> failwith "Wrong type" in
 
     (* TODO: Whenn handling parameters, this might need to add additional arguments *)

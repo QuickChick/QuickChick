@@ -131,7 +131,7 @@ Definition extend (Gamma : context) (x:ident) (T : ty) := cons (x, T) Gamma.
 Inductive bind : context -> ident -> ty -> Prop :=
   | BindNow   : forall x T Gamma', bind (cons (x, T) Gamma') x T
   | BindLater : forall x x' T T' Gamma', 
-                  (* ~ (x = x') -> *) (* TODO: Handle negation *)
+                  (* ~ (x = x') -> *)
                   bind Gamma' x T -> 
                   bind (cons (x',T') Gamma') x T.
 
@@ -208,5 +208,5 @@ Sample genBool.
 
 Definition genBool2Bool : G (option tm) := 
   @arbitrarySizeST _ (fun tm => has_type nil tm (TArrow TBool TBool))
-                   _ 1.
+                   _ 2.
 Sample genBool2Bool.
