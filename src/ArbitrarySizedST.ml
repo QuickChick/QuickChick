@@ -343,8 +343,36 @@ let arbitrarySizedST gen_ctr dep_type gen_type ctrs input_names inputs n registe
       instantiate_range_cont k Unknown.undefined (fun k c -> returnGen (gSome c)) r
     in
 
+    let rec combine_inductives k num_dts args = 
+      match num_dts, args with 
+      | [], _ -> []
+      | (_,dt)::dts', arg::args' -> 
+         if is_inductive_dt dt then dt_to_coq_expr k dt :: combine_inductives k dts' args
+         else gVar arg :: combine_inductives k dts' args'
+    in 
+
     let rec handle_TyCtr pos c dts k dt2 rec_name = 
       let numbered_dts = List.mapi (fun i dt -> (i+1, dt)) dts in (* +1 because of nth being 1-indexed *)
+
+      (* Construct the checker for the current type constructor *)
+      let checker args = 
+        gApp ~explicit:true (gInject (Printf.sprintf "depDec%n" (List.length numbered_dts))) (
+             (* A, B, ...: Type *)
+             List.map (fun _ -> hole) args @ 
+
+             (* P : forall A B : Prop *)
+             [ gFun (List.flatten (List.map (fun (j,dt) -> if is_inductive_dt dt then [] 
+                                                           else [var_to_string (make_up_name ())]) numbered_dts))
+                    (fun args -> gApp ~explicit:true (gTyCtr c) (combine_inductives k numbered_dts args))
+
+             (* Instance *)
+             ; hole 
+
+             (* Actual arguments to checker *)
+             ] 
+             @ args)
+      in 
+
       match List.filter (fun (i, dt) -> not (is_fixed k dt)) numbered_dts with
       | [] -> (* Every argument to the constructor is fixed - perform a check *)
 
@@ -356,12 +384,8 @@ let arbitrarySizedST gen_ctr dep_type gen_type ctrs input_names inputs n registe
          let body_cont = recurse_type k dt2 in
          let body_fail = returnGen gNone in
 
-         (* checker to be called - rec_dec_name is in scope *)
-         let checker = if c == gen_ctr then rec_dec_name
-                       else gInject (Printf.sprintf "depDec%n" (List.length numbered_dts)) in
-
          (* Perform the check - rec_dec_name is in scope *)
-         gMatch (gApp checker (List.map (fun dt -> dt_to_coq_expr k dt) dts))
+         gMatch (checker (List.map (fun dt -> dt_to_coq_expr k dt) dts))
                 [ (injectCtr "left", ["eq" ] , fun _ -> if pos then body_cont else body_fail)
                 ; (injectCtr "right", ["neq"], fun _ -> if pos then body_fail else body_cont) 
                 ]
@@ -391,7 +415,17 @@ let arbitrarySizedST gen_ctr dep_type gen_type ctrs input_names inputs n registe
                         recurse_type (fixVariable x k) dt2
                       )
          end
-         else failwith "Negation for constructor generation"
+         else (* Negation. Since we expect the *positive* versions to be sparse, we can use suchThatMaybe for negative *)
+           (* TODO: something about size? *)
+           bindGenOpt (gApp (gInject "suchThatMaybe") 
+                            [ gInject "arbitrary" (* generate using "arbitrary" *)
+                            ; gFun [var_to_string x] (fun [x] -> 
+                                checker (List.map (fun (j,dt) -> if i == j then gVar x else dt_to_coq_expr k dt) numbered_dts)
+                              )
+                            ])
+                      (var_to_string x)
+                      (fun x -> recurse_type (fixVariable x k) dt2)
+
       | [(i, dt) ] -> failwith ("Internal error: not a variable to be generated for" ^ (dep_type_to_string dt)) 
          
       (* Multiple arguments to be generated for. Generalized arbitrarySizeST? *)
@@ -506,4 +540,5 @@ let arbitrarySizedST gen_ctr dep_type gen_type ctrs input_names inputs n registe
 
   msgerr (fnl () ++ fnl () ++ str "`Final body produced:" ++ fnl ());
   debug_coq_expr generator_body;                       
+  msgerr (fnl ());
   gRecord [("arbitrarySizeST", generator_body)]

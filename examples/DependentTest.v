@@ -225,7 +225,7 @@ Inductive goodFooPrec : nat -> Foo -> Prop :=
 | GoodPrecBase : forall n, goodFooPrec n Foo1
 | GoodPrec : forall n foo, goodFooPrec 0 Foo1 -> goodFooPrec n foo.
 
-Instance goodFooPrec_dec : DepDec2 goodFooPrec := 
+Instance goodFooPrec_dec : DepDec2 (fun n foo => goodFooPrec n foo) := 
   { depDec2 := _ }.
 Proof.  
   move => n foo; left; apply GoodPrec; constructor.
@@ -240,7 +240,7 @@ Definition genGoodPrec (n : nat) :=
      | O => backtrack [(1, returnGen (Some Foo1))]
      | S size' =>
          backtrack [ (1, returnGen (Some Foo1))
-                   ; (1, if depDec2 O Foo1 then 
+                   ; (1, if @depDec2 _ _ (fun n foo => goodFooPrec n foo) _ O Foo1 then 
                            do! foo <- arbitrary;
                            returnGen (Some foo)
                          else returnGen None 
@@ -258,6 +258,11 @@ Inductive goodFooNarrow : nat -> Foo -> Prop :=
                         goodFooNarrow 1 foo -> 
                         goodFooNarrow n foo.
 
+Instance goodFooNarrow_dec : DepDec2 (fun n foo => goodFooNarrow n foo) := 
+  { depDec2 := _ }.
+Proof.  
+Admitted.
+
 DeriveArbitrarySizedSuchThat goodFooNarrow for 2 as "genGoodNarrow'".
 
 Definition genGoodNarrow (n : nat) :=
@@ -268,8 +273,10 @@ Definition genGoodNarrow (n : nat) :=
      | S size' =>
          backtrack [ (1, returnGen (Some Foo1))
                    ; (1, doM! foo <- aux_arb size' 0; 
-                         if depDec2 1 foo then returnGen (Some foo)
-                         else returnGen None 
+                         match @depDec2 _ _ (fun n foo => goodFooNarrow n foo) _ 1 foo with
+                         | left  _ => returnGen (Some foo)
+                         | right _ => returnGen None 
+                         end
                      )]
      end in fun sz => aux_arb sz n.
 

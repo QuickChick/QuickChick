@@ -39,7 +39,7 @@ let fresh_name n : Id.t =
     Namegen.next_ident_away_from base is_visible_name
 
 let make_up_name () : Id.t =
-  let id = fresh_name (Printf.sprintf "mu%d" (!cnt)) in
+  let id = fresh_name (Printf.sprintf "mu%d_" (!cnt)) in
   cnt := !cnt + 1;
   id
        
@@ -601,6 +601,11 @@ let is_inductive c =
   match glob_ref with
   | IndRef _ -> true
   | _        -> false
+
+let is_inductive_dt dt = 
+  match dt with
+  | DTyCtr (c, dts) -> is_inductive c
+  | _ -> false
 
 (* Specialized match *)
 type matcher_pat = 

@@ -131,7 +131,6 @@ Definition extend (Gamma : context) (x:ident) (T : ty) := cons (x, T) Gamma.
 Inductive bind : context -> ident -> ty -> Prop :=
   | BindNow   : forall x T Gamma', bind (cons (x, T) Gamma') x T
   | BindLater : forall x x' T T' Gamma', 
-                  (* ~ (x = x') -> *)
                   bind Gamma' x T -> 
                   bind (cons (x',T') Gamma') x T.
 
@@ -187,12 +186,66 @@ Qed.
 Instance ty_dep_dec : DepDec2 (fun (x y : ty) => x = y) :=
   { depDec2 := ty_eq_dec }.
 
+DeriveArbitrary ident as "arbIdent" "genIdent".
+
+Definition foo input0_ input1_ := 
+(let
+   fix aux_arb size0 (input0_ : context) (input1_ : ty) :
+     G (option (ident)) :=
+     match size0 with
+     | O =>
+         backtrack
+           (cons
+              (pair 1
+                 match input0_ with
+                 | @cons _ (@pair _ _ x T) Gamma' =>
+                     match @depDec2 _ _ (fun x y => eq x y) _ input1_ T with
+                     | left eq0 => returnGen (Some x)
+                     | right neq => returnGen None
+                     end
+                 | _ => returnGen None
+                 end) nil)
+     | S size' =>
+         backtrack
+           (cons
+              (pair 1
+                 match input0_ with
+                 | @cons _ (@pair _ _ x T) Gamma' =>
+                     match @depDec2 _ _ (fun x y => eq x y) _ input1_ T with
+                     | left eq0 => returnGen (Some x)
+                     | right neq => returnGen None
+                     end
+                 | _ => returnGen None
+                 end)
+              (cons
+                 (pair 1
+                    match input0_ with
+                    | @cons _ (@pair _ _ x' T') Gamma' =>
+                        bindGenOpt
+                          (suchThatMaybe arbitrary
+                             (fun x =>
+                              @depDec2  _ _
+                                (fun mu10_ mu11_ => eq mu10_ mu11_)
+                                _ x x'))
+                          (fun x =>
+                           match
+                             @depDec3 _ _ _
+                               (fun mu12_ mu13_ mu14_ =>
+                                @bind mu12_ mu13_ mu14_) _ Gamma' x input1_
+                           with
+                           | left eq0 => returnGen (Some x)
+                           | right neq => returnGen None
+                           end)
+                    | _ => returnGen None
+                    end) nil))
+     end in
+ fun size0 => aux_arb size0 input0_ input1_).
+
 DeriveArbitrarySizedSuchThat bind for 2 as "findInMap".
 
 DeriveArbitrarySizedSuchThat has_type for 2 as "genTyped".
 
 DeriveArbitrary ty as "arbTy" "genTy".
-DeriveArbitrary ident as "arbIdent" "genIdent".
 DeriveShow ident as "showIdent".
 DeriveShow ty as "showTy".
 DeriveShow tm as "showTm".

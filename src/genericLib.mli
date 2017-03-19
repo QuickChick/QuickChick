@@ -87,6 +87,7 @@ val dep_dt_to_string : dep_dt -> string
 val gType : ty_param list -> dep_type -> coq_expr
 val get_type : Id.t -> unit
 val is_inductive : constructor -> bool
+val is_inductive_dt : dep_type -> bool
 
 val nthType : int -> dep_type -> dep_type
 
