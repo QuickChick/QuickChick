@@ -113,7 +113,7 @@ let rec raiseMatch (k : umap) (c : constructor) (rs : range list) (eqs: EqSet.t)
             end
         ) (Some (k, [], eqs)) rs >>= fun (k', l, eqs') ->
   Some (k', MatchCtr (c, List.rev l), eqs')
-
+       
 (* Invariants: 
    -- Everything has a binding, even if just Undef 
    -- r1, r2 are never FixedInput, Undef (handled inline)
@@ -271,8 +271,6 @@ let arbitrarySizedST gen_ctr dep_type gen_type ctrs input_names inputs n registe
   let arb = mk_name_provider "arb" in
   let input_names = List.map fresh_name input_names in
 
-  let rec_dec_name = gInject (Printf.sprintf "depDec%n" (dep_type_len dep_type)) in
-
   let forGen = Unknown.from_string "_forGen" in
 
   let rec inputWithGen i l = 
@@ -356,21 +354,14 @@ let arbitrarySizedST gen_ctr dep_type gen_type ctrs input_names inputs n registe
 
       (* Construct the checker for the current type constructor *)
       let checker args = 
-        gApp ~explicit:true (gInject (Printf.sprintf "depDec%n" (List.length numbered_dts))) (
-             (* A, B, ...: Type *)
-             List.map (fun _ -> hole) args @ 
-
-             (* P : forall A B : Prop *)
-             [ gFun (List.flatten (List.map (fun (j,dt) -> if is_inductive_dt dt then [] 
-                                                           else [var_to_string (make_up_name ())]) numbered_dts))
-                    (fun args -> gApp ~explicit:true (gTyCtr c) (combine_inductives k numbered_dts args))
+        gApp ~explicit:true (gInject "dec") 
+             (* P : Prop := c dts*)
+             [ gApp ~explicit:true (gTyCtr c) args
 
              (* Instance *)
              ; hole 
 
-             (* Actual arguments to checker *)
              ] 
-             @ args)
       in 
 
       match List.filter (fun (i, dt) -> not (is_fixed k dt)) numbered_dts with
@@ -481,10 +472,8 @@ let arbitrarySizedST gen_ctr dep_type gen_type ctrs input_names inputs n registe
     (* TODO: Whenn handling parameters, this might need to add additional arguments *)
     let handle_equalities eqs c = 
       EqSet.fold (fun (u1,u2) c -> 
-                  let check = gApp ~explicit:true (gInject "depDec2") [hole; hole; 
-                                                                       gFun ["x"; "y"] (fun [x;y] -> gApp (gInject "eq") [gVar x; gVar y]);
-                                                                       hole;
-                                                                       gVar u1; gVar u2] in
+                  let check = gApp ~explicit:true (gInject "dec") [ gApp (gInject "eq") [gVar u1; gVar u2] 
+                                                                  ; hole ] in
                  gMatch check 
                         [ (injectCtr "left" , ["eq" ], fun _ -> c)
                         ; (injectCtr "right", ["neq"], fun _ -> returnGen gNone) ]

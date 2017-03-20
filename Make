@@ -36,3 +36,4 @@ src/SizeCorr.ml
 src/classes.v
 src/ArbitrarySizedST.ml
 src/dependentClasses.v
+src/Decidability.v

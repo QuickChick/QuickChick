@@ -176,70 +176,17 @@ Import QcDoNotation.
 
 Set Bullet Behavior "Strict Subproofs".
 
-Instance ident_dep_dec : DepDec2 (fun (x y : ident) => x = y) := 
-  { depDec2 := eq_id_dec }.
+Instance ident_dep_dec (x y : ident) : Dec (x = y) :=
+  { dec := eq_id_dec x y }.
 
 Definition ty_eq_dec : forall (ty1 ty2 : ty), {ty1 = ty2} + {~ (ty1 = ty2)}.
   decide equality.
 Qed.
 
-Instance ty_dep_dec : DepDec2 (fun (x y : ty) => x = y) :=
-  { depDec2 := ty_eq_dec }.
+Instance ty_dep_dec (x y : ty) : Dec (x = y) :=
+  { dec := ty_eq_dec x y}.
 
 DeriveArbitrary ident as "arbIdent" "genIdent".
-
-Definition foo input0_ input1_ := 
-(let
-   fix aux_arb size0 (input0_ : context) (input1_ : ty) :
-     G (option (ident)) :=
-     match size0 with
-     | O =>
-         backtrack
-           (cons
-              (pair 1
-                 match input0_ with
-                 | @cons _ (@pair _ _ x T) Gamma' =>
-                     match @depDec2 _ _ (fun x y => eq x y) _ input1_ T with
-                     | left eq0 => returnGen (Some x)
-                     | right neq => returnGen None
-                     end
-                 | _ => returnGen None
-                 end) nil)
-     | S size' =>
-         backtrack
-           (cons
-              (pair 1
-                 match input0_ with
-                 | @cons _ (@pair _ _ x T) Gamma' =>
-                     match @depDec2 _ _ (fun x y => eq x y) _ input1_ T with
-                     | left eq0 => returnGen (Some x)
-                     | right neq => returnGen None
-                     end
-                 | _ => returnGen None
-                 end)
-              (cons
-                 (pair 1
-                    match input0_ with
-                    | @cons _ (@pair _ _ x' T') Gamma' =>
-                        bindGenOpt
-                          (suchThatMaybe arbitrary
-                             (fun x =>
-                              @depDec2  _ _
-                                (fun mu10_ mu11_ => eq mu10_ mu11_)
-                                _ x x'))
-                          (fun x =>
-                           match
-                             @depDec3 _ _ _
-                               (fun mu12_ mu13_ mu14_ =>
-                                @bind mu12_ mu13_ mu14_) _ Gamma' x input1_
-                           with
-                           | left eq0 => returnGen (Some x)
-                           | right neq => returnGen None
-                           end)
-                    | _ => returnGen None
-                    end) nil))
-     end in
- fun size0 => aux_arb size0 input0_ input1_).
 
 DeriveArbitrarySizedSuchThat bind for 2 as "findInMap".
 
@@ -263,3 +210,5 @@ Definition genBool2Bool : G (option tm) :=
   @arbitrarySizeST _ (fun tm => has_type nil tm (TArrow TBool TBool))
                    _ 2.
 Sample genBool2Bool.
+
+Set Printing All.

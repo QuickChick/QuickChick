@@ -44,6 +44,14 @@ Defined.
 Definition foo (m n : nat) := 
   if @depDec (m = n) _ then 0 else 1.
 
+Eval compute in foo 0 1.
+
+Notation " 'dec' P " := (@depDec P _) (at level 70).
+
+Definition bar (m n : nat) := if dec (m = n) then 0 else 1.
+
+Eval compute in bar 0 1.
+
 Instance DepDec_Fun {A} (x : A) (P : A -> Prop) `{_ : DepDec (P x)} : DepDec (forall x, P x) := 
   {| depDec := _ |}.
 Proof.

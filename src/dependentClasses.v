@@ -14,25 +14,6 @@ Open Scope string.
 
 Set Bullet Behavior "Strict Subproofs".
 
-(* Decidability classes *)
-(* TODO (maybe): Find a way to unify these? *)
-Class DepDec1 {A : Type} (P : A -> Prop) :=
-  {
-    depDec1 : forall (x : A), {P x} + {~ (P x)}
-  }.
-
-Class DepDec2 {A B : Type} (P : A -> B -> Prop) :=
-  {
-    depDec2 : forall (x : A) (y : B), {P x y} + {~ (P x y)}
-  }.
-
-Class DepDec3 {A B C : Type} (P : A -> B -> C -> Prop) :=
-  {
-    depDec3 : forall (x : A) (y : B) (z : C), {P x y z} + {~ (P x y z)}
-  }.
-
-
-
 (** Precondition parametric size indexed generators *)
 (* Should type indices should become parameters of the instance?
  * Cannot think of an other way to treat the uniformly *)

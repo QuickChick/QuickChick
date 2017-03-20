@@ -11,11 +11,6 @@ Import QcDoNotation.
 
 Set Bullet Behavior "Strict Subproofs".
 
-(* I can't seem to get this to work 
-Class DepDec (P : Prop) := { depDec : {P} + {~ P} }.
-Instance DepDecFun {A} (x : A) (P : A -> Type) `{_ : DepDec (P} : DepDec (P x).
-*)
-
 Inductive Foo :=
 | Foo1 : Foo 
 | Foo2 : Foo -> Foo
@@ -225,10 +220,10 @@ Inductive goodFooPrec : nat -> Foo -> Prop :=
 | GoodPrecBase : forall n, goodFooPrec n Foo1
 | GoodPrec : forall n foo, goodFooPrec 0 Foo1 -> goodFooPrec n foo.
 
-Instance goodFooPrec_dec : DepDec2 (fun n foo => goodFooPrec n foo) := 
-  { depDec2 := _ }.
+Instance goodFooPrec_dec n foo : Dec (goodFooPrec n foo) := 
+  { dec := _ }.
 Proof.  
-  move => n foo; left; apply GoodPrec; constructor.
+  left; apply GoodPrec; constructor.
 Defined.
 
 DeriveArbitrarySizedSuchThat goodFooPrec for 2 as "genGoodPrec'".
@@ -240,7 +235,7 @@ Definition genGoodPrec (n : nat) :=
      | O => backtrack [(1, returnGen (Some Foo1))]
      | S size' =>
          backtrack [ (1, returnGen (Some Foo1))
-                   ; (1, if @depDec2 _ _ (fun n foo => goodFooPrec n foo) _ O Foo1 then 
+                   ; (1, if (goodFooPrec O Foo1)? then 
                            do! foo <- arbitrary;
                            returnGen (Some foo)
                          else returnGen None 
@@ -258,8 +253,8 @@ Inductive goodFooNarrow : nat -> Foo -> Prop :=
                         goodFooNarrow 1 foo -> 
                         goodFooNarrow n foo.
 
-Instance goodFooNarrow_dec : DepDec2 (fun n foo => goodFooNarrow n foo) := 
-  { depDec2 := _ }.
+Instance goodFooNarrow_dec n foo : Dec (goodFooNarrow n foo) := 
+  { dec := _ }.
 Proof.  
 Admitted.
 
@@ -273,7 +268,7 @@ Definition genGoodNarrow (n : nat) :=
      | S size' =>
          backtrack [ (1, returnGen (Some Foo1))
                    ; (1, doM! foo <- aux_arb size' 0; 
-                         match @depDec2 _ _ (fun n foo => goodFooNarrow n foo) _ 1 foo with
+                         match (goodFooNarrow 1 foo)? with
                          | left  _ => returnGen (Some foo)
                          | right _ => returnGen None 
                          end
