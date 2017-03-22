@@ -175,6 +175,7 @@ val gNone : coq_expr
 val gSome : coq_expr -> coq_expr              
 
 (* boolean *)
+val gNot   : coq_expr -> coq_expr
 val gTrue  : coq_expr
 val gFalse : coq_expr               
 val decToBool : coq_expr -> coq_expr

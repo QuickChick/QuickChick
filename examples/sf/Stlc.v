@@ -200,8 +200,8 @@ DeriveShow tm as "showTm".
 
 Definition genBool : G (option tm) :=
   @arbitrarySizeST _ (fun tm => has_type 
-                                  (cons (Id 0, TBool) 
-                                   (cons (Id 1, TArrow TBool TBool) nil))
+                                   (cons (Id 0, TBool) 
+                                    (cons (Id 1, TArrow TBool TBool) nil))
                                   tm TBool)
                    _ 1.
 

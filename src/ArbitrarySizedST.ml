@@ -335,7 +335,7 @@ let arbitrarySizedST gen_ctr dep_type gen_type ctrs input_names inputs n registe
                           [ g (* Use the generator provided for base generator *)
                           ; gFun [var_to_string x] (fun [x] -> 
                                  gApp (gInject ("List.forallb"))
-                                      [ gFun ["b"] (fun [b] -> gVar b)
+                                      [ gFun ["b"] (fun [b] -> gNot (decToBool (gVar b)))
                                       ; gList (List.map (fun chk -> chk (gVar x)) checks)
                                       ]
                                  )

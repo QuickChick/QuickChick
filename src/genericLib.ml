@@ -696,6 +696,8 @@ let gOption c = gApp (gInject "option") [c]
 let gTrue  = gInject "true"
 let gFalse = gInject "false"
 
+let gNot c = gApp (gInject "negb") [c]
+
 let decToBool c = 
   gMatch c [ (injectCtr "left" , ["eq" ], fun _ -> gTrue )
            ; (injectCtr "right", ["neq"], fun _ -> gFalse)
