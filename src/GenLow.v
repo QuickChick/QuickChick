@@ -43,6 +43,8 @@ Parameter resize : forall {A: Type}, nat -> G A -> G A.
 Parameter promote : forall {A : Type}, Rose (G A) -> G (Rose A).
 Parameter suchThatMaybe : forall {A : Type}, G A -> (A -> bool) ->
                                              G (option A).
+Parameter suchThatMaybeOpt : forall {A : Type}, G (option A) -> (A -> bool) ->
+                                                G (option A).
 Parameter choose : forall {A : Type} `{ChoosableFromInterval A}, (A * A) -> G A.
 Parameter sample : forall {A : Type}, G A -> list A.
 
@@ -284,6 +286,23 @@ Definition suchThatMaybeAux {A : Type} (g : G A) (p : A -> bool) :=
 Definition suchThatMaybe {A : Type} (g : G A) (p : A -> bool)
 : G (option A) :=
   sized (fun x => suchThatMaybeAux g p 0 (max 1 x)).
+
+Definition suchThatMaybeOptAux {A : Type} (g : G (option A)) (p : A -> bool) :=
+  fix aux (k : nat) (n : nat) : G (option A) :=
+  match n with
+    | O => returnGen None
+    | S n' =>
+      (* What is this 2 * k + n ? *)
+      bindGen (resize (2 * k + n) g) 
+              (fun mx => match mx with 
+                          | Some x => if p x then returnGen (Some x) else (aux (S k) n')
+                          | _ => aux (S k) n'
+                         end)
+  end.
+
+Definition suchThatMaybeOpt {A : Type} (g : G (option A)) (p : A -> bool)
+: G (option A) := 
+  sized (fun x => suchThatMaybeOptAux g p 0 (max 1 x)).
 
 Fixpoint rnds (rnd : RandomSeed) (n' : nat) : list RandomSeed :=
   match n' with

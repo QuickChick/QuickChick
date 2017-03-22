@@ -76,6 +76,11 @@ type dep_type =
   | DApp of dep_type * dep_type list (* Type-level function applications *)
   | DNot of dep_type (* Negation as a toplevel *)
 
+module OrdDepType : sig
+    type t = dep_type
+    val compare : t -> t -> int
+end
+
 val dep_type_to_string : dep_type -> string
 
 type dep_ctr = constructor * dep_type
@@ -168,6 +173,11 @@ val gEq : coq_expr -> coq_expr -> coq_expr
 val gOption : coq_expr -> coq_expr
 val gNone : coq_expr
 val gSome : coq_expr -> coq_expr              
+
+(* boolean *)
+val gTrue  : coq_expr
+val gFalse : coq_expr               
+val decToBool : coq_expr -> coq_expr
 
 (* Gen combinators *)
 val gGen : coq_expr -> coq_expr

@@ -265,6 +265,13 @@ let rec is_dep_type = function
 
 let need_dec = ref false
 
+type check = coq_expr -> coq_expr
+
+module CMap = Map.Make(OrdDepType)
+type cmap = (check list) CMap.t
+
+let lookup_checks k m = try Some (CMap.find k m) with Not_found -> None
+
 let arbitrarySizedST gen_ctr dep_type gen_type ctrs input_names inputs n register_arbitrary =
   let gen = mk_name_provider "gen" in
   let dec = mk_name_provider "dec" in
@@ -318,27 +325,49 @@ let arbitrarySizedST gen_ctr dep_type gen_type ctrs input_names inputs n registe
     | None -> failwith "Matching result type error" 
     | Some (map, eqs, matches) -> 
 
-    (* Construct equalities *)
+    (* Process check map *)
+    let process_checks k cmap x opt g cont = 
+      match lookup_checks (DTyVar x) cmap with
+      | Some checks -> 
+         (* Remove checks from cmap *)
+         let cmap' = CMap.remove (DTyVar x) cmap in
+         bindGenOpt (gApp (gInject (if opt then "suchThatMaybeOpt" else "suchThatMaybe"))
+                          [ g (* Use the generator provided for base generator *)
+                          ; gFun [var_to_string x] (fun [x] -> 
+                                 gApp (gInject ("List.forallb"))
+                                      [ gFun ["b"] (fun [b] -> gVar b)
+                                      ; gList (List.map (fun chk -> chk (gVar x)) checks)
+                                      ]
+                                 )
+                             ])
+                       (var_to_string x)
+                       (fun x -> cont (fixVariable x k) cmap' x)
+         | None -> 
+            (if opt then bindGenOpt else bindGen) g (var_to_string x) 
+                                                  (fun x -> cont (fixVariable x k) cmap x)
+    in        
 
     (* Function to instantiate a single range *)
-    let rec instantiate_range_cont (k : umap) (parent : unknown) (cont : umap -> coq_expr -> coq_expr) = function
+    (* It also uses any checks present in the check-map *)
+    let rec instantiate_range_cont (k : umap) (cmap : cmap) (parent : unknown) (cont : umap -> cmap -> coq_expr -> coq_expr) = function
       | Ctr (c,rs) -> 
          (* aux2 goes through the dts, enhancing the continuation to include the result of the head to the acc *)
-         let rec traverse_ranges k acc = function 
-           | [] -> cont k (gApp ~explicit:true (gCtr c) (List.rev acc)) (* Something about type parameters? *)
-           | r::rest -> instantiate_range_cont k Unknown.undefined (fun k hg -> traverse_ranges k (hg::acc) rest) r
-         in traverse_ranges k [] rs
-      | Undef dt -> 
+         let rec traverse_ranges k cmap acc = function 
+           | [] -> cont k cmap (gApp ~explicit:true (gCtr c) (List.rev acc)) (* Something about type parameters? *)
+           | r::rest -> instantiate_range_cont k cmap Unknown.undefined (fun k cmap hg -> traverse_ranges k cmap (hg::acc) rest) r
+         in traverse_ranges k cmap [] rs
+      | Undef dt -> begin
          register_arbitrary dt; 
-         let arb = arb.next_name () in
-         let k' = UM.add parent (Unknown (fresh_name arb)) (UM.add (fresh_name arb) FixedInput k) in
-         bindGen (gInject "arbitrary") arb (fun arb -> cont k' (gVar arb))
-      | Unknown u -> instantiate_range_cont k u cont (UM.find u k)
-      | FixedInput -> cont k (gVar parent)
+         process_checks k cmap parent false (gInject "arbitrary")
+                        (fun k' cmap' x -> cont k' cmap' (gVar x))
+        end
+      | Unknown u -> instantiate_range_cont k cmap u cont (UM.find u k)
+      | FixedInput -> cont k cmap (gVar parent)
     in 
 
-    let instantiate_range k r = 
-      instantiate_range_cont k Unknown.undefined (fun k c -> returnGen (gSome c)) r
+    (* Only used as a finalizer - discards k/cmap *)
+    let instantiate_range k cmap r = 
+      instantiate_range_cont k cmap Unknown.undefined (fun k cmap c -> returnGen (gSome c)) r
     in
 
     let rec combine_inductives k num_dts args = 
@@ -349,7 +378,11 @@ let arbitrarySizedST gen_ctr dep_type gen_type ctrs input_names inputs n registe
          else gVar arg :: combine_inductives k dts' args'
     in 
 
-    let rec handle_TyCtr pos c dts k dt2 rec_name = 
+    (* Begin multiple mutually recursive functions *)
+    
+    (* Handle a single type constructor and recurse in dt2 *)
+    (* Handle only *updates* the check map. The checks are implemented at the beginning of recurse *)
+    let rec handle_TyCtr pos c dts k cmap dt2 rec_name = 
       let numbered_dts = List.mapi (fun i dt -> (i+1, dt)) dts in (* +1 because of nth being 1-indexed *)
 
       (* Construct the checker for the current type constructor *)
@@ -372,7 +405,7 @@ let arbitrarySizedST gen_ctr dep_type gen_type ctrs input_names inputs n registe
          if c == gen_ctr then (need_dec := true; b := false) else ();
 
          (* Continuation handling dt2 : recurse one dt2 / None based on positivity *)
-         let body_cont = recurse_type k dt2 in
+         let body_cont = recurse_type k cmap dt2 in
          let body_fail = returnGen gNone in
 
          (* Perform the check - rec_dec_name is in scope *)
@@ -385,92 +418,91 @@ let arbitrarySizedST gen_ctr dep_type gen_type ctrs input_names inputs n registe
          if i == n && c == gen_ctr && pos then begin (* Recursive call *)
            b := false;
            let args = List.map snd (List.filter (fun (i, _) -> not (i == n)) (List.mapi (fun i dt -> (i+1, dt_to_coq_expr k dt)) dts)) in
-           bindGenOpt (gApp (gVar rec_name) (gVar size :: args)) (var_to_string x) 
-                      (fun _ -> recurse_type (fixVariable x k) dt2)
+           process_checks k cmap x 
+                          (* Generate using recursive function *)
+                          true
+                          (gApp (gVar rec_name) (gVar size :: args))
+                          (fun k' cmap' x -> recurse_type k' cmap' dt2)
          end
          else if pos then begin (* Generate using "arbitrarySizeST" and annotations for type *)
            if c = gen_ctr then b := false;
            (* @arbitrarySizeST {A} (P : A -> Prop) {Instance} (size : nat) -> G (option A) *)
-           bindGenOpt (gApp ~explicit:true (gInject "arbitrarySizeST")
-                            [ hole (* Implicit argument - type A *)
-                            ; gFun [var_to_string x] (fun [x] -> 
-                                gApp (gTyCtr c) (List.map (fun (j, dt) -> 
-                                  (* Replace the i-th variable with x - we're creating fun x => c dt_1 dt_2 ... x dt_{i+1} ... *)
-                                  if i == j then gVar x else dt_to_coq_expr k dt
-                                ) numbered_dts))
-                            ; hole (* Implicit instance *)
-                            ; gVar size ]
-                      ) 
-                      (var_to_string x)
-                      (fun x -> (* [x] should be the same as the previous x - var_to_string *)
-                        recurse_type (fixVariable x k) dt2
-                      )
+           let generator = 
+             gApp ~explicit:true (gInject "arbitrarySizeST")
+                  [ hole (* Implicit argument - type A *)
+                  ; gFun [var_to_string x] (fun [x] -> 
+                         gApp (gTyCtr c) (List.map (fun (j, dt) -> 
+                              (* Replace the i-th variable with x - we're creating fun x => c dt_1 dt_2 ... x dt_{i+1} ... *)
+                              if i == j then gVar x else dt_to_coq_expr k dt
+                         ) numbered_dts))
+                  ; hole (* Implicit instance *)
+                  ; gVar size ]
+           in 
+           process_checks k cmap x true generator 
+                          (fun k' cmap' x' -> recurse_type k' cmap' dt2)
          end
          else (* Negation. Since we expect the *positive* versions to be sparse, we can use suchThatMaybe for negative *)
-           (* TODO: something about size? *)
-           bindGenOpt (gApp (gInject "suchThatMaybe") 
-                            [ gInject "arbitrary" (* generate using "arbitrary" *)
-                            ; gFun [var_to_string x] (fun [x] -> 
-                                checker (List.map (fun (j,dt) -> if i == j then gVar x else dt_to_coq_expr k dt) numbered_dts)
-                              )
-                            ])
-                      (var_to_string x)
-                      (fun x -> recurse_type (fixVariable x k) dt2)
-
+           (* TODO: something about size for backtracking? *)
+           let new_check = fun x -> checker (List.map (fun (j,dt) -> if i == j then x else dt_to_coq_expr k dt) numbered_dts) in
+           let cmap' = match lookup_checks (DTyVar x) cmap with 
+             | Some checks -> CMap.add (DTyVar x) (new_check :: checks) cmap
+             | _ -> CMap.add (DTyVar x) [new_check] cmap in
+           recurse_type k cmap' dt2
       | [(i, dt) ] -> failwith ("Internal error: not a variable to be generated for" ^ (dep_type_to_string dt)) 
          
       (* Multiple arguments to be generated for. Generalized arbitrarySizeST? *)
-      | filtered -> begin
+      | filtered -> if pos then begin
          (* For now, check if n is in the filtered list *)
          match List.filter (fun (i,dt) -> i == n) filtered with 
          | [(_, DTyVar x)] -> 
             b := false; 
             (* Every other variable generated using "arbitrary" *)
-            let rec build_arbs k acc = function 
+            let rec build_arbs k cmap acc = function 
               | [] -> 
                  (* base case - recursive call *)
                  if pos then 
-                   bindGenOpt (gApp (gVar rec_name) (gVar size :: List.rev acc))
-                                   (var_to_string x)
-                                   (fun _ -> recurse_type (fixVariable x k) dt2)
+                   let generator = gApp (gVar rec_name) (gVar size :: List.rev acc) in
+                   process_checks k cmap x true generator 
+                                  (fun k' cmap' x' -> recurse_type k' cmap' dt2)
                  else failwith "Negation / build_arbs"
               | (i,dt)::rest -> 
-                 if i == n then build_arbs k acc rest (* Recursive argument - handle at the end *)
+                 if i == n then build_arbs k cmap acc rest (* Recursive argument - handle at the end *)
                  else if is_fixed k dt then (* Fixed argument - do nothing *)
-                   build_arbs k (dt_to_coq_expr k dt :: acc) rest 
+                   build_arbs k cmap (dt_to_coq_expr k dt :: acc) rest 
                  else (* Call arbitrary and bind it to a new name *)
                    let arb = arb.next_name () in
                    let rdt = convert_to_range dt in
-                   instantiate_range_cont k Unknown.undefined 
-                     (fun k c -> (* Continuation: call build_arbs on the rest *)
-                        build_arbs k (c :: acc) rest
+                   instantiate_range_cont k cmap Unknown.undefined 
+                     (fun k cmap c -> (* Continuation: call build_arbs on the rest *)
+                        build_arbs k cmap (c :: acc) rest
                      ) rdt
-            in build_arbs k [] numbered_dts
+            in build_arbs k cmap [] numbered_dts
          | _ -> failwith "Mode analysis failure"
-      end
+         end
+         else failwith "TODO: Negation with many things to be generated"
 
     (* Dispatcher for constraints *)
-    and handle_dt pos dt1 dt2 k rec_name = 
+    and handle_dt pos dt1 dt2 k cmap rec_name = 
       match dt1 with 
       | DTyCtr (c,dts) -> 
-         handle_TyCtr pos c dts k dt2 rec_name 
+         handle_TyCtr pos c dts k cmap dt2 rec_name 
       | DNot dt -> 
-         handle_dt (not pos) dt dt2 k rec_name
+         handle_dt (not pos) dt dt2 k cmap rec_name
       | _ -> failwith "Constraints should be type constructors/negations"
 
     (* Iterate through constraints *)
-    and recurse_type k = function
+    and recurse_type k cmap = function
       | DProd (_, dt) -> (* Only introduces variables, doesn't constrain them *)
-         recurse_type k dt 
+         recurse_type k cmap dt 
       | DArrow (dt1, dt2) -> 
          msgerr (str ("Darrowing: " ^ range_to_string (UM.find forGen k)) ++ fnl ());
-         handle_dt true dt1 dt2 k rec_name
+         handle_dt true dt1 dt2 k cmap rec_name
       | DTyCtr _ -> (* result *) 
-         instantiate_range k (Unknown forGen) (* result *)
+         instantiate_range k cmap (Unknown forGen) (* result *)
       | _ -> failwith "Wrong type" in
 
     (* TODO: Whenn handling parameters, this might need to add additional arguments *)
-    let handle_equalities eqs c = 
+    let handle_equalities eqs (c : coq_expr) = 
       EqSet.fold (fun (u1,u2) c -> 
                   let check = gApp ~explicit:true (gInject "dec") [ gApp (gInject "eq") [gVar u1; gVar u2] 
                                                                   ; hole ] in
@@ -481,7 +513,7 @@ let arbitrarySizedST gen_ctr dep_type gen_type ctrs input_names inputs n registe
 
     let branch_gen = 
       let rec walk_matches = function
-        | [] -> handle_equalities eqs (recurse_type map typ)
+        | [] -> handle_equalities eqs (recurse_type map CMap.empty typ)
         | (u,m)::ms -> begin 
             msgerr (str (Printf.sprintf "Processing Match: %s @ %s" (Unknown.to_string u) (matcher_pat_to_string m)) ++ fnl ());
             construct_match (gVar u) ~catch_all:(Some (returnGen gNone)) [(m,walk_matches ms)]

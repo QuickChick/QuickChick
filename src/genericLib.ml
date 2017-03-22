@@ -133,6 +133,11 @@ type dep_type =
   | DApp of dep_type * dep_type list (* Type-level function applications *)
   | DNot of dep_type (* Negation pushed up a level *)
 
+module OrdDepType = struct
+    type t = dep_type
+    let compare = compare
+end
+
 let rec dep_type_to_string dt = 
   match dt with 
   | DArrow (d1, d2) -> Printf.sprintf "%s -> %s" (dep_type_to_string d1) (dep_type_to_string d2)
@@ -685,6 +690,16 @@ let gNone = gInject "None"
 let gSome c = gApp (gInject "Some") [c]
               
 let gOption c = gApp (gInject "option") [c]
+
+(* Boolean *)
+
+let gTrue  = gInject "true"
+let gFalse = gInject "false"
+
+let decToBool c = 
+  gMatch c [ (injectCtr "left" , ["eq" ], fun _ -> gTrue )
+           ; (injectCtr "right", ["neq"], fun _ -> gFalse)
+           ]
 
 (* Gen combinators *)
 let gGen c = gApp (gInject "G") [c]
