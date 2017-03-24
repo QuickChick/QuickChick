@@ -136,7 +136,8 @@ let deriveDependent (cn : derivable) (c : constr_expr) nc (instance_name : strin
   declare_class_instance instance_arguments instance_name instance_type instance_record
 ;;
 
-
+(*
 VERNAC COMMAND EXTEND DeriveArbitrarySizedSuchThat
   | ["DeriveArbitrarySizedSuchThat" constr(c) "for" constr(n) "as" string(s1)] -> [deriveDependent ArbitrarySizedSuchThat c n s1]
 END;;
+  *)

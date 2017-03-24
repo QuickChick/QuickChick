@@ -2,60 +2,63 @@ Require Import Coq.Numbers.Natural.Peano.NPeano.
 Require Import mathcomp.ssreflect.ssreflect.
 From mathcomp Require Import ssrbool ssrnat.
 Require Import GenLow GenHigh Sets.
+Require Import Classes.
 Require Import Recdef.
 Require Import List.
 
 Require Import ZArith ZArith.Znat Arith.
 Import GenLow GenHigh.
 
-(* ZP: We could make arbitrary - or a variation of it - subclass of sizeMonotonic *)
-Class Arbitrary (A : Type) : Type :=
-  {
-    arbitrary : G A;
-    shrink    : A -> list A
-  }.
+(** Basic generator instances *)
+Instance genBoolSized : GenSized bool := 
+  {| arbitrarySized x := choose (false, true) |}.
 
-Definition arbitraryBool := choose (false, true).
+Instance genNatSized : GenSized nat := 
+  {| arbitrarySized x := choose (0,x) |}.
 
-Definition arbitraryNat :=
-  sized (fun x => choose (0, x)).
+Instance genZSized : GenSized Z :=
+  {| arbitrarySized x := let z := Z.of_nat x in
+                         choose (-z, z)%Z |}.
 
+Instance genListSized {A : Type} `{GenSized A} : GenSized (list A) := 
+  {| arbitrarySized x := vectorOf x (arbitrarySized x) |}.
 
-Program Instance arbNatMon : SizeMonotonic arbitraryNat.
-Next Obligation.
-  rewrite /arbitraryNat.
-  rewrite !semSizedSize !semChooseSize // => n /andP [/leP H1 /leP H2].
-  move : H => /leP => Hle. apply/andP. split; apply/leP; omega.
-Qed.
+Instance genPairSized {A B : Type} `{GenSized A} `{GenSized B} 
+: GenSized (A*B) :=
+  {| arbitrarySized x := 
+       liftGen2 pair (arbitrarySized x) 
+                     (arbitrarySized x)
+  |}. 
 
-Definition arbitraryZ :=
-  sized (fun x =>
-           let z := Z.of_nat x in
-           choose (-z, z)%Z).
+(** Shrink Instances *)
+Instance shrinkBool : Shrink bool := 
+  {| shrink x := 
+       match x with
+         | false => nil
+         | true  => cons false nil
+       end
+  |}.
 
-Definition arbitraryList {A : Type} {Arb : Arbitrary A} :=
-  listOf arbitrary.
-
-Definition arbitraryPair {A B : Type} `{Arbitrary A} `{Arbitrary B} : G (A*B) :=
-  liftGen2 pair arbitrary arbitrary.
-
-Function shrinkBool (x : bool) :=
-  match x with
-    | false => nil
-    | true  => cons false nil
-  end.
-
-Function shrinkNat (x : nat) {measure (fun x => x) x}: list nat :=
-  match x with
+(** Shrinking of nat starts to become annoying *)
+Function shrinkNatAux (x : nat) {measure (fun x => x) x} : list nat :=
+  match x with 
     | O => nil
-    | _ => cons (Nat.div x 2) (shrinkNat (Nat.div x 2))
+    | S n => 
+      let x' := Nat.div x 2 in 
+      x' :: shrinkNatAux x'
   end.
 Proof.
-  intros; simpl; pose proof (Nat.divmod_spec n 1 0 0).
-  assert (H01 : (0 <= 1)%coq_nat) by omega; apply H in H01; subst; clear H.
-  destruct (Nat.divmod n 1 0 0); destruct n1; simpl; omega.
-Qed.
+  move => x n Eq; 
+  pose proof (Nat.divmod_spec n 1 0 0) as H.
+  assert (H' : (0 <= 1)%coq_nat) by omega; apply H in H'; 
+  subst; simpl in *; clear H. 
+  destruct (Nat.divmod n 1 0 0) as [q u];  destruct u; simpl in *; omega.
+Defined.
 
+Instance shrinkNat : Shrink nat := 
+  {| shrink := shrinkNatAux |}.
+
+(** Shrinking of Z is even more so *)
 Lemma abs_div2_pos : forall p, Z.abs_nat (Z.div2 (Z.pos p)) = Nat.div2 (Pos.to_nat p).
 Proof.
   intros. destruct p.
@@ -110,11 +113,11 @@ Proof.
   left. simpl. reflexivity.
 Qed.
 
-Function shrinkZ (x : Z) {measure (fun x => Z.abs_nat x) x}: list Z :=
+Function shrinkZAux (x : Z) {measure (fun x => Z.abs_nat x) x}: list Z :=
   match x with
     | Z0 => nil
-    | Zpos _ => rev (cons (Z.pred x) (cons (Z.div2 x) (shrinkZ (Z.div2 x))))
-    | Zneg _ => rev (cons (Z.succ x) (cons (Z.succ (Z.div2 x)) (shrinkZ (Z.succ (Z.div2 x)))))
+    | Zpos _ => rev (cons (Z.pred x) (cons (Z.div2 x) (shrinkZAux (Z.div2 x))))
+    | Zneg _ => rev (cons (Z.succ x) (cons (Z.succ (Z.div2 x)) (shrinkZAux (Z.succ (Z.div2 x)))))
   end.
 Proof.
   move => ? p ?. subst. rewrite abs_div2_pos. rewrite Zabs2Nat.inj_pos.
@@ -126,66 +129,46 @@ Proof.
       apply Nat.div_lt. apply Pos2Nat.is_pos. omega.
 Qed.
 
-Fixpoint shrinkList {A : Type} (shr : A -> list A) (l : list A) : list (list A) :=
+Instance shrinkZ : Shrink Z := 
+  {| shrink := shrinkZAux |}.
+
+Fixpoint shrinkListAux {A : Type} (shr : A -> list A) (l : list A) : list (list A) :=
   match l with
     | nil => nil
     | cons x xs =>
-      cons xs (map (fun xs' => cons x xs') (shrinkList shr xs))
+      cons xs (map (fun xs' => cons x xs') (shrinkListAux shr xs))
            ++ (map (fun x'  => cons x' xs) (shr x ))
   end.
 
-Instance arbBool : Arbitrary bool :=
-  {|
-    arbitrary := @arbitraryBool;
-    shrink  := shrinkBool
-  |}.
+Instance shrinkList {A : Type} `{Shrink A} : Shrink (list A) :=
+  {| shrink := shrinkListAux shrink |}.
 
-Instance arbNat : Arbitrary nat :=
-  {|
-    arbitrary := @arbitraryNat;
-    shrink := shrinkNat
-  |}.
-
-Instance arbList {A : Type} {Arb : Arbitrary A} : Arbitrary (list A) :=
-  {|
-    arbitrary:= arbitraryList;
-    shrink := shrinkList shrink
-  |}.
-
-Instance arbInt : Arbitrary Z :=
-  {|
-    arbitrary := arbitraryZ;
-    shrink := shrinkZ
-  |}.
-
-Instance arbPair {A B} `{Arbitrary A} `{Arbitrary B} : Arbitrary (A * B) :=
+Instance shrinkPair {A B} `{Shrink A} `{Shrink B} : Shrink (A * B) :=
   {| 
-    arbitrary := arbitraryPair;
     shrink p := List.combine (shrink (fst p)) (shrink (snd p))
   |}.
 
-(* For these instances to be useful, we would need to support dependent types *)
+(** Arbitraries are derived automatically! *)
 
+
+(** Instance correctness *)
+
+Program Instance arbNatMon : SizeMonotonic (@arbitrary nat _).
+Next Obligation.
+  rewrite !semSizedSize !semChooseSize // => n /andP [/leP H1 /leP H2].
+  move : H => /leP => Hle. apply/andP. split; apply/leP; omega.
+Qed.
+
+(** Correctness proof about built-in generators *)
+(** Zoe: Take a look at these :) *)
 (*
-Instance arbSet : Arbitrary Set :=
-{|
-  arbitrary := returnGen nat;
-  shrink x := nil
-|}.
-
-Instance arbType : Arbitrary Type :=
-{|
-  arbitrary := returnGen (nat : Type);
-  shrink x := nil
-|}.
- *)
-
-(* Correctness proof about built-in generators *)
-
 Lemma arbBool_correct:
   semGen arbitrary <--> [set: bool].
 Proof.
-by rewrite semChoose //; case.
+rewrite semSized => n; split=> // _.
+rewrite /arbitrarySized /genBoolSized.
+exists n; split=> //.
+by rewrite semChooseSize //.
 Qed.
 
 Lemma arbNat_correct:
@@ -256,3 +239,4 @@ Proof.
   move => [/H1 Ha /H2 Hb]. eexists; split; first by split; eauto.
   reflexivity.
 Qed.
+*)

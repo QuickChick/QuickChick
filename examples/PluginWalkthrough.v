@@ -10,6 +10,8 @@ From mathcomp Require Import ssreflect ssrfun ssrbool ssrnat eqtype seq.
 
 Require Import String.
 
+(* Tech demo / Tutorial *)
+
 (* Property-based testing requires 4 elements :
    - Executable properties
    - Generators 
@@ -191,14 +193,6 @@ Inductive isBST (low high : nat) : Tree nat -> Prop :=
                low < x -> x < high ->
                isBST low x l -> isBST x high r ->
                isBST low high (Node x l r).
-
-(* Manual GenT *)
-Definition bindGenOpt {A B} (g : G (option A)) (f : A -> G (option B)) : G (option B) :=
-  bindGen g (fun ma => 
-  match ma with
-    | None => returnGen None
-    | Some a => f a
-  end).
 
 (* Generator for search trees *)
 Fixpoint genBST (size low high : nat)

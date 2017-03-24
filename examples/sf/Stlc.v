@@ -139,7 +139,7 @@ Reserved Notation "Gamma '|-' t '\in' T" (at level 40).
 
 Inductive has_type : list (ident * ty) (* context *) -> tm -> ty -> Prop :=
   | T_Var : forall Gamma x T,
-      bind Gamma x T ->
+      bind Gamma x T -> 
       Gamma |- tvar x \in T
   | T_Abs : forall Gamma x T11 T12 t12,
       cons (x, T11) Gamma |- t12 \in T12 -> 
@@ -187,14 +187,26 @@ Qed.
 Instance ty_dep_dec (x y : ty) : Dec (x = y) :=
   { dec := ty_eq_dec x y}.
 
+Derive Show for ident.
+DeriveShow ident as "showIdent".
+
+DeriveArbitrary ty as "arbTy" "genTy".
+Derive Arbitrary for ty.
+Derive Arbitrary for ty as "arbTy" "genTy".
+
+Derive ArbitrarySizedSuchThat 
+       (forall Gamma ty, fun tm => 
+                           let (x1,x2,x3) := tm in 
+                           has_type Gamme tm ty).
+
+
 DeriveArbitrary ident as "arbIdent" "genIdent".
 
 DeriveArbitrarySizedSuchThat bind for 2 as "findInMap".
 
 DeriveArbitrarySizedSuchThat has_type for 2 as "genTyped".
 
-DeriveArbitrary ty as "arbTy" "genTy".
-DeriveShow ident as "showIdent".
+
 DeriveShow ty as "showTy".
 DeriveShow tm as "showTm".
 

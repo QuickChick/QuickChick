@@ -22,108 +22,29 @@ open SizeSMon
 open SizeCorr
 open ArbitrarySized
 
+(*
 type derivable = ArbitrarySized | Sized | CanonicalSized | SizeMonotonic | SizeSMonotonic | GenSizeCorrect
+ *)
 
-(* Contains the generic derivation function from derive.ml4, but the code that generates the instances
- * is in separate files *)
+let dispatch cn ind ms1 ms2 = 
+  let s = match cn with 
+    | CRef (r, _) -> string_of_qualid (snd (qualid_of_reference r))
+    | _ -> failwith "Usage: Derive <class_name> for <inductive_name>"
+  in 
+  let class_name = match s with 
+    | "Arbitrary" -> ArbitrarySized
+    | "Show" -> Show 
 
-let print_der = function
-  | ArbitrarySized -> "ArbitrarySized"
-  | Sized -> "Sized"
-  | CanonicalSized -> "CanonicalSized"
-  | SizeMonotonic -> "SizeMonotonic"
-  | SizeSMonotonic -> "ArbitrarySizedSizeMotonic"
-  | GenSizeCorrect ->  "GenSizeCorrect"
+VERNAC COMMAND EXTEND Derive 
+   | ["Derive" constr(class_name) "for" constr(inductive)] -> 
+      [dispatch class_name inductive None None]
+   | ["Derive" constr(class_name) "for" constr(inductive) "as" string(s1)] -> 
+      [dispatch class_name inductive (Some s1) None]
+   | ["Derive" constr(class_name) "for" constr(inductive) "as" string(s1) "and" string(s2)] -> 
+      [dispatch class_name inductive (Some s1) (Some s2)]
+END;;
 
-(* Generic derivation function *)
-let debugDerive (c : constr_expr) =
-  match coerce_reference_to_dt_rep c with
-  | Some dt -> msgerr (str (dt_rep_to_string dt) ++ fnl ())
-  | None -> failwith "Not supported type"  
-
-(* Generic derivation function *)
-let derive (cn : derivable) (c : constr_expr) (instance_name : string) (extra_name : string) (extra_name2 : string) =
-
-  let (ty_ctr, ty_params, ctrs) =
-    match coerce_reference_to_dt_rep c with
-    | Some dt -> dt
-    | None -> failwith "Not supported type"  in
-
-  let coqTyCtr = gTyCtr ty_ctr in
-  let coqTyParams = List.map gTyParam ty_params in
-
-  let full_dt = gApp ~explicit:true coqTyCtr coqTyParams in
-
-  let class_name = match cn with
-    | Sized -> "Sized"
-    | ArbitrarySized -> "ArbitrarySized"
-    | CanonicalSized -> "CanonicalSized"
-    | SizeMonotonic -> "QuickChick.GenLow.GenLow.SizeMonotonic"
-    | SizeSMonotonic -> "ArbitrarySizedSizeMotonic"
-    | GenSizeCorrect ->  "GenSizeCorrect"
-  in
-
-  let param_class_names = match cn with
-    | Sized -> ["Sized"]
-    | ArbitrarySized -> ["Arbitrary"]
-    | CanonicalSized -> ["CanonicalSized"]
-    | SizeMonotonic -> ["ArbitraryMonotonic"]
-    | SizeSMonotonic -> ["Arbitrary"]
-    | GenSizeCorrect ->  ["ArbitraryMonotonicCorrect"; "CanonicalSized"]
-  in
-
-  let extra_arguments = match cn with
-    | Sized -> []
-    | ArbitrarySized -> []
-    | CanonicalSized -> []
-    | SizeMonotonic -> [(gInject "s", gInject "nat")]
-    | SizeSMonotonic -> []
-    | GenSizeCorrect -> []
-  in
-
-  (* Generate typeclass constraints. For each type parameter "A" we need `{_ : <Class Name> A} *)
-  let instance_arguments =
-    (List.concat (List.map (fun tp ->
-                            ((gArg ~assumName:tp ~assumImplicit:true ()) ::
-                             (List.map (fun name -> gArg ~assumType:(gApp (gInject name) [tp]) ~assumGeneralized:true ()) param_class_names))
-                           ) coqTyParams)) @
-    (* Add extra instance arguments *)
-    (List.map (fun (name, typ) -> gArg ~assumName:name ~assumType:typ ()) extra_arguments)
-  in
-
-  (* The instance type *)
-  let instance_type iargs =
-    match cn with
-    | SizeMonotonic ->
-      let (_, size) = take_last iargs [] in
-      gApp (gInject class_name)
-        [(gApp ~explicit:true (gInject ("arbitrarySize")) [full_dt; (gInject extra_name); (gVar size)])]
-    | GenSizeCorrect ->
-      gApp (gInject class_name)
-        [(gApp ~explicit:true (gInject ("arbitrarySize")) [full_dt; (gInject extra_name)])]
-    | _ -> gApp (gInject class_name) [full_dt]
-  in
-  (* Create the instance record. Only need to extend this for extra instances *)
-  let instance_record iargs =
-    (* Copying code for Arbitrary, Sized from derive.ml *)
-    match cn with
-    | ArbitrarySized -> arbitrarySized_decl ty_ctr ctrs iargs
-    | Sized -> sized_decl ty_ctr ctrs
-    | CanonicalSized ->
-      let ind_scheme =  gInject ((ty_ctr_to_string ty_ctr) ^ "_ind") in
-      sizeEqType ty_ctr ctrs ind_scheme iargs
-    | SizeMonotonic ->
-      let (iargs', size) = take_last iargs [] in
-      sizeMon ty_ctr ctrs (gVar size) iargs' (gInject extra_name)
-    | SizeSMonotonic ->
-      sizeSMon ty_ctr ctrs iargs
-    | GenSizeCorrect ->
-      genCorr ty_ctr ctrs iargs (gInject extra_name) (gInject extra_name2)
-
-  in
-  declare_class_instance instance_arguments instance_name instance_type instance_record
-
-
+(*
 
 VERNAC COMMAND EXTEND DeriveArbitrarySized
   | ["DeriveArbitrarySized" constr(c) "as" string(s1)] -> [derive ArbitrarySized c s1 "aux" ""]
@@ -153,3 +74,4 @@ VERNAC COMMAND EXTEND DeriveArbitrarySizedCorrect
   | ["DeriveArbitrarySizedCorrect" constr(c) "as" string(s1) "using" string(s2) "and" string(s3)] ->
     [derive GenSizeCorrect c s1 s2 s3]
 END;;
+ *)

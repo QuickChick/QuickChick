@@ -7,7 +7,8 @@ src/Random.v
 src/RoseTrees.v
 src/GenLow.v
 src/GenHigh.v
-src/Arbitrary.v
+src/Classes.v
+src/Instances.v
 src/CoArbitrary.v
 src/StringOT.v
 src/Show.v
@@ -23,7 +24,8 @@ src/genericLib.ml
 src/quickChick.ml4
 src/derive.ml4
 src/driver.ml4
-src/depDriver.ml4
+src/simplDriver.ml
+src/depDriver.ml
 src/quickChickLib.ml
 src/setLib.ml
 src/semLib.ml

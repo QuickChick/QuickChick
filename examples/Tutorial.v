@@ -725,6 +725,9 @@ is precisely why [QuickChick] provides some automation in deriving such instance
 
 *)
 
+Derive Show for Tree.
+
+Derive Arbitrary for Tree.
 DeriveShow Tree as "showTree'".
 Print showTree'.
 
