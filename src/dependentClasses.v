@@ -1,10 +1,8 @@
 Require Import String List.
 
-Require Import classes (* DependentTest *) . (* We need to compile this manually for now! *)
-
 From mathcomp Require Import ssreflect ssrfun ssrbool ssrnat eqtype seq.
 
-Require Import GenLow GenHigh Tactics Sets Arbitrary.
+Require Import GenLow GenHigh Tactics Sets Classes.
 Import GenLow GenHigh.
 Import ListNotations.
 Import QcDefaultNotation.
@@ -44,7 +42,7 @@ Class GenSizeSuchThatCorrect {A : Type} `{Sized A} (P : A -> Prop) (g : nat -> G
     genSizeSTCorrect :
       forall s,
         semGen (g s) <-->
-        ((@Some A) @: [set x : A | classes.size x <= s /\ P x ]) :|:
+        ((@Some A) @: [set x : A | Classes.size x <= s /\ P x ]) :|:
         ([set x : option A | x = None /\ forall y, ~ P y])
   }.
 

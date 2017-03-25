@@ -7,7 +7,7 @@ Require Import RoseTrees.
 Require Import Show.
 Require Import State.
 Require Import GenLow GenHigh.
-Require Import Arbitrary.
+Require Import Classes.
 
 Import GenLow GenHigh.
 
@@ -224,7 +224,7 @@ Definition forAllShrinkShow {A prop : Type} {_ : Checkable prop}
                                          printTestCase (show' x' ++ newline) (pf x'))).
 
 Global Instance testFun {A prop : Type} `{Show A}
-       {_ : Arbitrary A} {_ : Checkable prop} : Checkable (A -> prop) :=
+       `{Arbitrary A} `{_ : Checkable prop} : Checkable (A -> prop) :=
   {
     checker f := forAllShrink arbitrary shrink f
   }.

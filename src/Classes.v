@@ -27,7 +27,7 @@ Class Gen (A : Type) :=
   { arbitrary : G A }.
 
 (** Coercion from Sized to plain version *)
-Instance GenSized__Gen {A} `{GenSized A} : Gen A :=
+Global Instance GenSized__Gen {A} `{GenSized A} : Gen A :=
   {| arbitrary := sized arbitrarySized |}.
 
 (** Shrink class *)
@@ -36,6 +36,8 @@ Class Shrink (A : Type) :=
 
 (** Arbitrary Class *)
 Class Arbitrary (A : Type) `{Gen A} `{Shrink A}.
+
+Global Instance arb_gen {A} `{Gen A} `{Shrink A} : Arbitrary A.
 
 (** Sizes of types *)
 Class Sized (A : Type) :=

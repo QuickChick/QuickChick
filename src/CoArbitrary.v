@@ -2,7 +2,7 @@ Require Import PArith List ChoiceFacts Omega.
 Require Import mathcomp.ssreflect.ssreflect.
 From mathcomp Require Import ssrfun ssrbool.
 
-Require Import Arbitrary Random GenLow Sets.
+Require Import Classes Random GenLow Sets.
 Import GenLow.
 
 Import ListNotations.
@@ -499,12 +499,14 @@ rewrite coarbCorrect.
 reflexivity.
 Qed.
 
-Instance arbFun {A B : Type} `{_ : CoArbitrary A} `{_ : Arbitrary B} : Arbitrary (A -> B) :=
+Instance genFun {A B : Type} `{_ : CoArbitrary A} `{_ : Gen B} : Gen (A -> B) :=
   {|
     arbitrary := 
       reallyUnsafePromote (fun a => variant (posToPath (coarbitrary a)) arbitrary);
-    shrink x := []
   |}.
+
+Instance shrinkFunNil {A B : Type} : Shrink (A -> B) :=
+  {| shrink x := nil |}.
 
 Section arbFun_completeness.
 

@@ -46,7 +46,7 @@ Fixpoint remove (x : nat) (l : list nat) : list nat :=
     | h::t => if beq_nat h x then t else h :: remove x t
   end.
 
-Definition removeP (x : nat) (l : list nat) :=
+Definition removeP (x : nat) (l : list nat) := 
   (~~ (existsb (fun y => beq_nat y x) (remove x l))).
 
 (** For this simple example, it is not hard to "spot" the bug by inspection. We
@@ -593,10 +593,11 @@ Check sized.
     The [shrink] function is simply a shrinker like [shrinkTree]. 
 *)
 
-Instance arbTree {A} `{_ : Arbitrary A} : Arbitrary (Tree A) :=
-  {| arbitrary := sized (fun n => genTreeSized' n arbitrary) ;
-     shrink := shrinkTree shrink
-  |}.
+Instance genTree {A} `{Gen A} : GenSized (Tree A) := 
+  {| arbitrarySized n := genTreeSized n arbitrary |}.
+
+Instance shrTree {A} `{Shrink A} : Shrink (Tree A) := 
+  {| shrink x := shrinkTree shrink x |}.
 
 (** With this [Arbitrary] instance we can once again use the toplevel
     [QuickChick] command with just the property.  

@@ -73,8 +73,21 @@ let arbitrarySized_decl ty_ctr ctrs iargs =
     gFun ["s"] (fun [s] -> gApp arb_body [gVar s])
   in
 
-  (* Derive shrinking *)
-  let shrink_decl = 
+  gRecord [("arbitrarySized", arbitrary_decl)]
+
+
+(** Shrinking Derivation *)
+let shrink_decl ty_ctr ctrs iargs =
+
+  let isCurrentTyCtr = function
+    | TyCtr (ty_ctr', _) -> ty_ctr = ty_ctr'
+    | _ -> false in
+  let isBaseBranch ty = fold_ty' (fun b ty' -> b && not (isCurrentTyCtr ty')) true ty in
+  let base_ctrs = List.filter (fun (_, ty) -> isBaseBranch ty) ctrs in
+
+  let tyParams = List.map gVar (list_drop_every 2 iargs) in
+
+  let shrink_fun = 
     let shrink_body x =
       let create_branch aux_shrink (ctr, ty) =
         (ctr, generate_names_from_type "p" ty,
@@ -97,5 +110,37 @@ let arbitrarySized_decl ty_ctr ctrs iargs =
     (* Create the function body by recursing on the structure of x *)
     gFun ["x"] (fun [x] -> shrink_body x)
   in
+  gRecord [("shrink", shrink_fun)]
 
-  gRecord [("arbitrarySize", arbitrary_decl); ("shrinkSize", shrink_decl)]
+let show_decl ty_ctr ctrs iargs =
+
+  let isCurrentTyCtr = function
+    | TyCtr (ty_ctr', _) -> ty_ctr = ty_ctr'
+    | _ -> false in
+  let isBaseBranch ty = fold_ty' (fun b ty' -> b && not (isCurrentTyCtr ty')) true ty in
+  let base_ctrs = List.filter (fun (_, ty) -> isBaseBranch ty) ctrs in
+
+  let tyParams = List.map gVar (list_drop_every 2 iargs) in
+
+  (* Create the function body by recursing on the structure of x *)
+  let show_body x =
+    
+    let branch aux (ctr,ty) =
+      
+      (ctr, generate_names_from_type "p" ty,
+       fun vs -> str_append (gStr (constructor_to_string ctr ^ "  "))
+                            (fold_ty_vars (fun _ v ty' -> str_appends [ gStr "( "
+                                                                      ; gApp (if isCurrentTyCtr ty' then gVar aux else gInject "show") [gVar v]
+                                                                      ; gStr " )"
+                                                                      ])
+                                          (fun s1 s2 -> str_appends [s1; gStr " "; s2]) emptyString ty vs))
+    in
+    
+    gRecFunIn "aux" ["x'"]
+              (fun (aux, [x']) -> gMatch (gVar x') (List.map (branch aux) ctrs))
+              (fun aux -> gApp (gVar aux) [gVar x])
+  in
+  
+  let show_fun = gFun ["x"] (fun [x] -> show_body x) in
+  gRecord [("show", show_fun)]
+          

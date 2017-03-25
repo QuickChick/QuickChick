@@ -1,6 +1,6 @@
 Require Import mathcomp.ssreflect.ssreflect.
 From mathcomp Require Import ssrbool ssrnat eqtype.
-Require Import Show Sets GenLow GenHigh RoseTrees Checker Arbitrary.
+Require Import Show Sets GenLow GenHigh RoseTrees Checker Classes.
 
 Import GenLow GenHigh.
 
@@ -709,7 +709,7 @@ Qed.
 
 
 Lemma semCheckableFunSize:
-  forall {A C} {H1 : Show A} {H2 : Arbitrary A} {H3 : Checkable C}
+  forall {A C} {H1 : Show A} `{H2 : Arbitrary A} {H3 : Checkable C}
          (f : A -> C) (size: nat),
     semCheckableSize f size <->
     forall (a : A), semGenSize arbitrary size a -> semCheckableSize (f a) size.
@@ -811,7 +811,9 @@ Program Instance proveFun {A C: Type} `{Arbitrary A} `{Show A}
          proposition s (p a))
   |}.
 Next Obligation.
-  destruct H2 as [semP proof]. rewrite /proposition. split.
+  match goal with 
+    | [ Hyp : Provable _ |- _ ] => destruct Hyp as [semP proof]
+  end. rewrite /proposition. split.
   - move=> H'. apply semCheckableFunSize => a' /H' Hgen.
     by apply proof.
   - move=> H' a' Hgen. apply proof. by apply semCheckableFunSize.

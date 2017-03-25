@@ -22,7 +22,6 @@ src/MutateCheck.v
 src/genericLib.mli
 src/genericLib.ml
 src/quickChick.ml4
-src/derive.ml4
 src/driver.ml4
 src/simplDriver.ml
 src/depDriver.ml
@@ -35,7 +34,6 @@ src/Sized.ml
 src/SizeMon.ml
 src/SizeSMon.ml
 src/SizeCorr.ml
-src/classes.v
 src/ArbitrarySizedST.ml
 src/dependentClasses.v
 src/Decidability.v

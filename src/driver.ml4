@@ -20,20 +20,31 @@ open Sized
 open SizeMon
 open SizeSMon
 open SizeCorr
-open ArbitrarySized
 
 (*
 type derivable = ArbitrarySized | Sized | CanonicalSized | SizeMonotonic | SizeSMonotonic | GenSizeCorrect
  *)
+
+type derivation_sort = SortSimple | SortDependent
 
 let dispatch cn ind ms1 ms2 = 
   let s = match cn with 
     | CRef (r, _) -> string_of_qualid (snd (qualid_of_reference r))
     | _ -> failwith "Usage: Derive <class_name> for <inductive_name>"
   in 
-  let class_name = match s with 
-    | "Arbitrary" -> ArbitrarySized
-    | "Show" -> Show 
+  let class_names = match s with 
+    | "Arbitrary" -> (SortSimple, [SimplDriver.ArbitrarySized; SimplDriver.Shrink])
+    | "Show" -> (SortSimple, [SimplDriver.Show])
+  in 
+  
+  let s1 = "test1" in
+  let s2 = "test2" in
+  let s3 = "test3" in
+
+  match class_names with 
+  | (SortSimple, classes) -> 
+     List.iter (fun cn -> SimplDriver.derive cn ind s1 s2 s3) classes
+  | _ -> failwith "Do this"
 
 VERNAC COMMAND EXTEND Derive 
    | ["Derive" constr(class_name) "for" constr(inductive)] -> 

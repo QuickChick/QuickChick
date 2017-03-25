@@ -7,7 +7,7 @@ Require Import Random.
 Require Import GenLow GenHigh SemChecker.
 Require Import Checker.
 Require Import State.
-Require Import Arbitrary.
+Require Import Classes.
 
 Require Import Coq.Strings.String.
 Require Import Coq.Strings.Ascii.

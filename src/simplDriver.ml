@@ -22,12 +22,11 @@ open SizeSMon
 open SizeCorr
 open ArbitrarySized
 
-type derivable = ArbitrarySized | Sized | CanonicalSized | SizeMonotonic | SizeSMonotonic | GenSizeCorrect
-
-(* Contains the generic derivation function from derive.ml4, but the code that generates the instances
- * is in separate files *)
+type derivable = Shrink | Show | ArbitrarySized | Sized | CanonicalSized | SizeMonotonic | SizeSMonotonic | GenSizeCorrect
 
 let print_der = function
+  | Shrink -> "Shrink"
+  | Show   -> "Show"
   | ArbitrarySized -> "ArbitrarySized"
   | Sized -> "Sized"
   | CanonicalSized -> "CanonicalSized"
@@ -65,6 +64,8 @@ let derive (cn : derivable) (c : constr_expr) (instance_name : string) (extra_na
 
   let param_class_names = match cn with
     | Sized -> ["Sized"]
+    | Shrink -> ["Shrink"]
+    | Show -> ["Show"]
     | ArbitrarySized -> ["Arbitrary"]
     | CanonicalSized -> ["CanonicalSized"]
     | SizeMonotonic -> ["ArbitraryMonotonic"]
@@ -73,6 +74,8 @@ let derive (cn : derivable) (c : constr_expr) (instance_name : string) (extra_na
   in
 
   let extra_arguments = match cn with
+    | Show -> []
+    | Shrink -> []
     | Sized -> []
     | ArbitrarySized -> []
     | CanonicalSized -> []
@@ -107,6 +110,8 @@ let derive (cn : derivable) (c : constr_expr) (instance_name : string) (extra_na
   let instance_record iargs =
     (* Copying code for Arbitrary, Sized from derive.ml *)
     match cn with
+    | Show -> show_decl ty_ctr ctrs iargs 
+    | Shrink -> shrink_decl ty_ctr ctrs iargs
     | ArbitrarySized -> arbitrarySized_decl ty_ctr ctrs iargs
     | Sized -> sized_decl ty_ctr ctrs
     | CanonicalSized ->

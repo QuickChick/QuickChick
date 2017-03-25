@@ -10,20 +10,20 @@ Require Import ZArith ZArith.Znat Arith.
 Import GenLow GenHigh.
 
 (** Basic generator instances *)
-Instance genBoolSized : GenSized bool := 
+Global Instance genBoolSized : GenSized bool := 
   {| arbitrarySized x := choose (false, true) |}.
 
 Instance genNatSized : GenSized nat := 
   {| arbitrarySized x := choose (0,x) |}.
 
-Instance genZSized : GenSized Z :=
+Global Instance genZSized : GenSized Z :=
   {| arbitrarySized x := let z := Z.of_nat x in
                          choose (-z, z)%Z |}.
 
-Instance genListSized {A : Type} `{GenSized A} : GenSized (list A) := 
+Global Instance genListSized {A : Type} `{GenSized A} : GenSized (list A) := 
   {| arbitrarySized x := vectorOf x (arbitrarySized x) |}.
 
-Instance genPairSized {A B : Type} `{GenSized A} `{GenSized B} 
+Global Instance genPairSized {A B : Type} `{GenSized A} `{GenSized B} 
 : GenSized (A*B) :=
   {| arbitrarySized x := 
        liftGen2 pair (arbitrarySized x) 
@@ -31,7 +31,7 @@ Instance genPairSized {A B : Type} `{GenSized A} `{GenSized B}
   |}. 
 
 (** Shrink Instances *)
-Instance shrinkBool : Shrink bool := 
+Global Instance shrinkBool : Shrink bool := 
   {| shrink x := 
        match x with
          | false => nil
@@ -55,7 +55,7 @@ Proof.
   destruct (Nat.divmod n 1 0 0) as [q u];  destruct u; simpl in *; omega.
 Defined.
 
-Instance shrinkNat : Shrink nat := 
+Global Instance shrinkNat : Shrink nat := 
   {| shrink := shrinkNatAux |}.
 
 (** Shrinking of Z is even more so *)
@@ -129,7 +129,7 @@ Proof.
       apply Nat.div_lt. apply Pos2Nat.is_pos. omega.
 Qed.
 
-Instance shrinkZ : Shrink Z := 
+Global Instance shrinkZ : Shrink Z := 
   {| shrink := shrinkZAux |}.
 
 Fixpoint shrinkListAux {A : Type} (shr : A -> list A) (l : list A) : list (list A) :=
@@ -140,10 +140,10 @@ Fixpoint shrinkListAux {A : Type} (shr : A -> list A) (l : list A) : list (list 
            ++ (map (fun x'  => cons x' xs) (shr x ))
   end.
 
-Instance shrinkList {A : Type} `{Shrink A} : Shrink (list A) :=
+Global Instance shrinkList {A : Type} `{Shrink A} : Shrink (list A) :=
   {| shrink := shrinkListAux shrink |}.
 
-Instance shrinkPair {A B} `{Shrink A} `{Shrink B} : Shrink (A * B) :=
+Global Instance shrinkPair {A B} `{Shrink A} `{Shrink B} : Shrink (A * B) :=
   {| 
     shrink p := List.combine (shrink (fst p)) (shrink (snd p))
   |}.
