@@ -726,12 +726,13 @@ is precisely why [QuickChick] provides some automation in deriving such instance
 
 *)
 
-Derive Show for Tree.
-
 Derive Arbitrary for Tree.
-DeriveShow Tree as "showTree'".
-Print showTree'.
+(* genSTree is defined *)
+(* shrTree0 is defined *)
+Print genSTree.
+Print shrTree0.
 
-DeriveArbitrary Tree as "arbTree'".
-Print arbTree'.
+Derive Show for Tree.
+(* showTree0 is defined *)
+Print showTree0.
 

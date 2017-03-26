@@ -21,38 +21,38 @@ open SizeMon
 open SizeSMon
 open SizeCorr
 
-(*
-type derivable = ArbitrarySized | Sized | CanonicalSized | SizeMonotonic | SizeSMonotonic | GenSizeCorrect
- *)
+type derivation = SimpleDer of SimplDriver.derivable list
+                | DepDer of DepDriver.derivable list
 
-type derivation_sort = SortSimple | SortDependent
-
-let dispatch cn ind ms1 ms2 = 
+let dispatch cn ind = 
   let s = match cn with 
     | CRef (r, _) -> string_of_qualid (snd (qualid_of_reference r))
     | _ -> failwith "Usage: Derive <class_name> for <inductive_name>"
   in 
-  let class_names = match s with 
-    | "Arbitrary" -> (SortSimple, [SimplDriver.ArbitrarySized; SimplDriver.Shrink])
-    | "Show" -> (SortSimple, [SimplDriver.Show])
+
+  let ind_name = match ind with 
+    | CRef (r, _) -> string_of_qualid (snd (qualid_of_reference r))
+    | _ -> failwith "Implement me for functions" 
   in 
   
-  let s1 = "test1" in
-  let s2 = "test2" in
-  let s3 = "test3" in
+  let class_names = match s with 
+    | "Arbitrary" -> SimpleDer [SimplDriver.ArbitrarySized; SimplDriver.Shrink]
+    | "Show" -> SimpleDer [SimplDriver.Show]
+  in 
 
   match class_names with 
-  | (SortSimple, classes) -> 
-     List.iter (fun cn -> SimplDriver.derive cn ind s1 s2 s3) classes
+  | SimpleDer classes -> 
+     List.iter (fun cn -> SimplDriver.derive cn ind (SimplDriver.mk_instance_name cn ind_name) "" "") classes
   | _ -> failwith "Do this"
 
 VERNAC COMMAND EXTEND Derive 
    | ["Derive" constr(class_name) "for" constr(inductive)] -> 
-      [dispatch class_name inductive None None]
-   | ["Derive" constr(class_name) "for" constr(inductive) "as" string(s1)] -> 
+      [dispatch class_name inductive]
+(*   | ["Derive" constr(class_name) "for" constr(inductive) "as" string(s1)] -> 
       [dispatch class_name inductive (Some s1) None]
    | ["Derive" constr(class_name) "for" constr(inductive) "as" string(s1) "and" string(s2)] -> 
       [dispatch class_name inductive (Some s1) (Some s2)]
+ *)
 END;;
 
 (*

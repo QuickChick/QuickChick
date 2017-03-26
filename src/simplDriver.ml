@@ -24,6 +24,13 @@ open ArbitrarySized
 
 type derivable = Shrink | Show | ArbitrarySized | Sized | CanonicalSized | SizeMonotonic | SizeSMonotonic | GenSizeCorrect
 
+let mk_instance_name der tn = 
+  let prefix = match der with 
+    | Shrink -> "shr" 
+    | Show   -> "show"
+    | ArbitrarySized -> "genS"
+  in var_to_string (fresh_name (prefix ^ tn))
+
 let print_der = function
   | Shrink -> "Shrink"
   | Show   -> "Show"
@@ -54,8 +61,10 @@ let derive (cn : derivable) (c : constr_expr) (instance_name : string) (extra_na
   let full_dt = gApp ~explicit:true coqTyCtr coqTyParams in
 
   let class_name = match cn with
+    | Show -> "Show"
+    | Shrink -> "Shrink"
     | Sized -> "Sized"
-    | ArbitrarySized -> "ArbitrarySized"
+    | ArbitrarySized -> "GenSized"
     | CanonicalSized -> "CanonicalSized"
     | SizeMonotonic -> "QuickChick.GenLow.GenLow.SizeMonotonic"
     | SizeSMonotonic -> "ArbitrarySizedSizeMotonic"
@@ -66,7 +75,7 @@ let derive (cn : derivable) (c : constr_expr) (instance_name : string) (extra_na
     | Sized -> ["Sized"]
     | Shrink -> ["Shrink"]
     | Show -> ["Show"]
-    | ArbitrarySized -> ["Arbitrary"]
+    | ArbitrarySized -> ["Gen"]
     | CanonicalSized -> ["CanonicalSized"]
     | SizeMonotonic -> ["ArbitraryMonotonic"]
     | SizeSMonotonic -> ["Arbitrary"]
