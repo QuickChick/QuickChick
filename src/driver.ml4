@@ -22,7 +22,27 @@ open SizeSMon
 open SizeCorr
 
 type derivation = SimpleDer of SimplDriver.derivable list
-                | DepDer of DepDriver.derivable list
+                | DepDer of DepDriver.derivable 
+
+let simpl_dispatch ind classes = 
+  let ind_name = match ind with 
+    | CRef (r, _) -> string_of_qualid (snd (qualid_of_reference r))
+    | _ -> failwith "Implement me for functions" 
+  in 
+  List.iter (fun cn -> SimplDriver.derive cn ind (SimplDriver.mk_instance_name cn ind_name) "" "") classes
+  
+let dep_dispatch ind class_name = 
+  (* TODO: turn this into a much once Zoe figures out what she wants *)
+  let DepDriver.ArbitrarySizedSuchThat = class_name in 
+  match ind with 
+  | CLambdaN (_loc1, [([(_loc2, Name id)], _kind, _type)], CApp (_loc3, (_flag, constructor), args)) ->
+     let n = fst (List.find (fun (_,(CRef (r,_), _)) -> Id.to_string id = string_of_reference r) (List.mapi (fun i x -> (i+1,x)) args)) in
+     let ctr_name = 
+       match constructor with 
+       | CRef (r,_) -> string_of_reference r
+     in 
+     DepDriver.deriveDependent class_name constructor n (DepDriver.mk_instance_name class_name ctr_name)
+  | _ -> failwith "wrongformat"
 
 let dispatch cn ind = 
   let s = match cn with 
@@ -30,20 +50,15 @@ let dispatch cn ind =
     | _ -> failwith "Usage: Derive <class_name> for <inductive_name>"
   in 
 
-  let ind_name = match ind with 
-    | CRef (r, _) -> string_of_qualid (snd (qualid_of_reference r))
-    | _ -> failwith "Implement me for functions" 
-  in 
-  
   let class_names = match s with 
     | "Arbitrary" -> SimpleDer [SimplDriver.ArbitrarySized; SimplDriver.Shrink]
     | "Show" -> SimpleDer [SimplDriver.Show]
+    | "ArbitrarySizedSuchThat" -> DepDer DepDriver.ArbitrarySizedSuchThat
   in 
 
   match class_names with 
-  | SimpleDer classes -> 
-     List.iter (fun cn -> SimplDriver.derive cn ind (SimplDriver.mk_instance_name cn ind_name) "" "") classes
-  | _ -> failwith "Do this"
+  | SimpleDer classes -> simpl_dispatch ind classes
+  | DepDer classes -> dep_dispatch ind classes 
 
 VERNAC COMMAND EXTEND Derive 
    | ["Derive" constr(class_name) "for" constr(inductive)] -> 

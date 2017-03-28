@@ -30,10 +30,13 @@ let print_der = function
   | ArbSizeSTSizeMonotonic -> ""
   | ArbSizeCorrect -> ""
 
+let mk_instance_name der tn = 
+  let prefix = match der with 
+    | ArbitrarySizedSuchThat -> "arbSizedST"
+  in var_to_string (fresh_name (prefix ^ tn))
 
 (* Generic derivation function *)
-let deriveDependent (cn : derivable) (c : constr_expr) nc (instance_name : string) =
-  let n = parse_integer nc in
+let deriveDependent (cn : derivable) (c : constr_expr) n (instance_name : string) =
   let (ty_ctr, ty_params, ctrs, dep_type) = 
     match coerce_reference_to_dep_dt c with
     | Some dt -> msgerr (str (dep_dt_to_string dt) ++ fnl()); dt 
