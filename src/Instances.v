@@ -23,12 +23,18 @@ Global Instance genZSized : GenSized Z :=
 Global Instance genListSized {A : Type} `{GenSized A} : GenSized (list A) := 
   {| arbitrarySized x := vectorOf x (arbitrarySized x) |}.
 
+Global Instance genList {A : Type} `{Gen A} : Gen (list A) := 
+  {| arbitrary := listOf arbitrary |}.
+
 Global Instance genPairSized {A B : Type} `{GenSized A} `{GenSized B} 
 : GenSized (A*B) :=
   {| arbitrarySized x := 
        liftGen2 pair (arbitrarySized x) 
                      (arbitrarySized x)
   |}. 
+
+Global Instance genPair {A B : Type} `{Gen A} `{Gen B} : Gen (A * B) :=
+  {| arbitrary := liftGen2 pair arbitrary arbitrary |}.
 
 (** Shrink Instances *)
 Global Instance shrinkBool : Shrink bool := 
@@ -161,20 +167,20 @@ Qed.
 
 (** Correctness proof about built-in generators *)
 (** Zoe: Take a look at these :) *)
-(*
+
 Lemma arbBool_correct:
   semGen arbitrary <--> [set: bool].
 Proof.
+rewrite /arbitrary /arbitrarySized /genBoolSized /=.
 rewrite semSized => n; split=> // _.
-rewrite /arbitrarySized /genBoolSized.
 exists n; split=> //.
-by rewrite semChooseSize //.
+apply semChooseSize => //=; case n => //.
 Qed.
 
 Lemma arbNat_correct:
   semGen arbitrary <--> [set: nat].
 Proof.
-rewrite /arbitrary /= /arbitraryNat /=.
+rewrite /arbitrary /=.
 rewrite semSized => n; split=> // _; exists n; split=> //.
 by rewrite (semChooseSize _ _ _) /Random.leq /=.
 Qed.
@@ -193,7 +199,8 @@ Qed.
 Lemma arbBool_correctSize s :
   semGenSize arbitrary s <--> [set: bool].
 Proof.
-by rewrite semChooseSize //; case.
+rewrite /arbitrary //=.
+rewrite semSizedSize semChooseSize //; split=> /Random.leq _ //=; case a=> //=.
 Qed.
 
 Lemma arbNat_correctSize s :
@@ -204,7 +211,8 @@ Qed.
 
 Lemma arbInt_correctSize : semGen arbitrary <--> [set: Z].
 Proof.
-rewrite semSized => n; split=> // _; exists (Z.abs_nat n); split=> //.
+rewrite /arbitrarySized semSized => n; split=> // _; exists (Z.abs_nat n); split=> //.
+simpl.
 rewrite Nat2Z.inj_abs_nat (semChooseSize _ _ _).
   by case: n => //= p; rewrite !Z.leb_refl.
 apply/(Zle_bool_trans _ 0%Z); apply/Zle_is_le_bool.
@@ -212,16 +220,17 @@ apply/(Zle_bool_trans _ 0%Z); apply/Zle_is_le_bool.
 exact/Z.abs_nonneg.
 Qed.
 
+Definition foo {A} `{Arbitrary A} : Gen (list A).
+  
 Lemma arbList_correct:
-  forall {A} {H : Arbitrary A} (P : nat -> A -> Prop) s,
+  forall {A} `{H : Arbitrary A} (P : nat -> A -> Prop) s,
     (semGenSize arbitrary s <--> P s) ->
     (semGenSize arbitrary s <-->
      (fun (l : list A) => length l <= s /\ (forall x, List.In x l -> P s x))).
 Proof.
-  move => A H P s Hgen l. rewrite /arbitrary /arbList /arbitraryList.
+  move => A G S H P s Hgen l. rewrite !/arbitrary //=.
   split.
-  - move => /semListOfSize [Hl Hsize]. split => // x HIn. apply Hgen.
-    auto.
+  - move => /semListOfSize [Hl Hsize]. split => // x HIn //=. apply Hgen. auto.
   - move => [Hl HP]. apply semListOfSize. split => // x HIn.
     apply Hgen. auto.
 Qed.
@@ -233,10 +242,9 @@ Lemma arbPair_correctSize
     (semGenSize arbitrary s <--> Sb s) ->
     (semGenSize arbitrary s <--> setX (Sa s) (Sb s)).
 Proof.
-  move => H1 H2 . rewrite semLiftGen2Size; move => [a b].
+  move => Hyp1 Hyp2 . rewrite semLiftGen2Size; move => [a b].
   split. 
-  by move => [[a' b'] [[/= /H1 Ha /H2 Hb] [Heq1 Heq2]]]; subst; split.
-  move => [/H1 Ha /H2 Hb]. eexists; split; first by split; eauto.
+  by move => [[a' b'] [[/= /Hyp1 Ha /Hyp2 Hb] [Heq1 Heq2]]]; subst; split.
+  move => [/Hyp1 Ha /Hyp2 Hb]. eexists; split; first by split; eauto.
   reflexivity.
 Qed.
-*)
