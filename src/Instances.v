@@ -220,8 +220,6 @@ apply/(Zle_bool_trans _ 0%Z); apply/Zle_is_le_bool.
 exact/Z.abs_nonneg.
 Qed.
 
-Definition foo {A} `{Arbitrary A} : Gen (list A).
-  
 Lemma arbList_correct:
   forall {A} `{H : Arbitrary A} (P : nat -> A -> Prop) s,
     (semGenSize arbitrary s <--> P s) ->
