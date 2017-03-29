@@ -174,7 +174,7 @@ Lemma insert_preserves_redblack_checker_correct:
   <-> insert_preserves_redblack.
 (* end insert_preserves_redblack_checker_correct *)
 Proof.
-  rewrite (mergeForAlls arbitraryNat genRBTree).
+  rewrite (mergeForAlls arbitrary genRBTree).
   rewrite -> semForAllUnsized2.
   rewrite /genPair. split.
   - move => H n t irt. specialize (H (n,t)). simpl in H.
@@ -198,7 +198,7 @@ Proof.
   rewrite -> semForAllSizeMonotonic; try by eauto with typeclass_instances.
   - split.
     + move => H n t irt.
-      have HH : semGen arbitraryNat n by (apply arbNat_correct; reflexivity).
+      have HH : semGen arbitrary n by (apply arbNat_correct; reflexivity).
       specialize (H n HH).
       rewrite -> semForAllSizeMonotonic in H;
         try by (try move => ? /=); auto with typeclass_instances.
