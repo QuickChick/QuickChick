@@ -188,27 +188,13 @@ Instance ty_dep_dec (x y : ty) : Dec (x = y) :=
   { dec := ty_eq_dec x y}.
 
 Derive Show for ident.
-DeriveShow ident as "showIdent".
-
-DeriveArbitrary ty as "arbTy" "genTy".
+Derive Show for ty.
+Derive Show for tm.
 Derive Arbitrary for ty.
-Derive Arbitrary for ty as "arbTy" "genTy".
+Derive Arbitrary for ident.
 
-Derive ArbitrarySizedSuchThat 
-       (forall Gamma ty, fun tm => 
-                           let (x1,x2,x3) := tm in 
-                           has_type Gamme tm ty).
-
-
-DeriveArbitrary ident as "arbIdent" "genIdent".
-
-DeriveArbitrarySizedSuchThat bind for 2 as "findInMap".
-
-DeriveArbitrarySizedSuchThat has_type for 2 as "genTyped".
-
-
-DeriveShow ty as "showTy".
-DeriveShow tm as "showTm".
+Derive ArbitrarySizedSuchThat for (fun x => bind Gamma x ty).
+Derive ArbitrarySizedSuchThat for (fun tm => has_type Gamme tm ty).
 
 Definition genBool : G (option tm) :=
   @arbitrarySizeST _ (fun tm => has_type 
