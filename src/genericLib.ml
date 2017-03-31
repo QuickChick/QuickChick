@@ -15,12 +15,13 @@ open Constrexpr
 open Constrexpr_ops
 open Ppconstr
 open Context
+open Feedback
 
 let debug_environ () =
   let env = Global.env () in
   let preEnv = Environ.pre_env env in
   let minds = preEnv.env_globals.env_inductives in
-  Mindmap_env.iter (fun k _ -> msgerr (str (MutInd.debug_to_string k) ++ fnl())) minds
+  Mindmap_env.iter (fun k _ -> Feedback.msg_debug (str (MutInd.debug_to_string k) ++ fnl())) minds
 
 let cnt = ref 0 
 
@@ -56,10 +57,10 @@ let id_of_name n =
 type coq_expr = constr_expr (* Opaque *)
 
 let debug_coq_expr (c : coq_expr) : unit =
-  msgerr (pr_constr_expr c)
+  msg_debug (pr_constr_expr c)
 
 let debug_constr (c : constr) : unit = 
-  msgerr (Printer.safe_pr_constr c ++ fnl ())
+  msg_debug (Printer.safe_pr_constr c ++ fnl ())
 
 (* Non-dependent version *)
 type var = Id.t (* Opaque *)
@@ -205,10 +206,10 @@ let sequenceM f l =
 
 let parse_type_params arity_ctxt =
   let param_names =
-    foldM (fun acc (n, _, _) -> 
-           match n with
-           | Name id   -> Some (id  :: acc)
-           | Anonymous -> msgerr (str "Unnamed type parameter?" ++ fnl ()); None
+    foldM (fun acc decl ->
+           match Rel.Declaration.get_name decl with 
+           | Name id -> Some (id :: acc)
+           | _ -> msg_error (str "Unnamed type parameter?" ++ fnl ()); None
           ) (Some []) arity_ctxt in
   param_names
 (* For /trunk 
@@ -242,16 +243,16 @@ let parse_constructors nparams param_names result_ty oib : ctr_rep list option =
 
     let _, pat_types = List.split (List.rev ctr_pats) in
 
-    msgerr (str (Id.to_string ctr_id) ++ fnl ());
+    msg_debug (str (Id.to_string ctr_id) ++ fnl ());
     let rec aux i ty = 
       if isRel ty then begin 
-        msgerr (int (i + nparams) ++ str " Rel " ++ int (destRel ty) ++ fnl ());
+        msg_debug (int (i + nparams) ++ str " Rel " ++ int (destRel ty) ++ fnl ());
         let db = destRel ty in
         if i + nparams = db then (* Current inductive, no params *)
           Some (TyCtr (oib.mind_typename, []))
         else (* [i + nparams - db]th parameter *)
           try Some (TyParam (List.nth param_names (i + nparams - db - 1)))
-          with _ -> msgerr (str "nth failed: " ++ int (i + nparams - db - 1) ++ fnl ()); None
+          with _ -> msg_error (str "nth failed: " ++ int (i + nparams - db - 1) ++ fnl ()); None
       end 
       else if isApp ty then begin
         let (ctr, tms) = decompose_app ty in 
@@ -261,13 +262,13 @@ let parse_constructors nparams param_names result_ty oib : ctr_rep list option =
         match aux i ctr with
         | Some (TyCtr (c, _)) -> Some (TyCtr (c, List.rev tms'))
 (*        | Some (TyParam p) -> Some (TyCtr (p, tms')) *)
-        | None -> msgerr (str "Aux failed?" ++ fnl ()); None
+        | None -> msg_error (str "Aux failed?" ++ fnl ()); None
       end
       else if isInd ty then begin
         let ((mind,_),_) = destInd ty in
         Some (TyCtr (Label.to_id (MutInd.label mind), []))
       end
-      else (msgerr (str "Case Not Handled" ++ fnl()); None)
+      else (msg_error (str "Case Not Handled" ++ fnl()); None)
 
     in sequenceM (fun x -> x) (List.mapi aux (List.map (Vars.lift (-1)) pat_types)) >>= fun types ->
        Some (ctr_id, arrowify result_ty types)
@@ -279,7 +280,7 @@ let parse_constructors nparams param_names result_ty oib : ctr_rep list option =
 (* Convert mutual_inductive_body to this representation, if possible *)
 let dt_rep_from_mib mib = 
   if Array.length mib.mind_packets > 1 then begin
-    msgerr (str "Mutual inductive types not supported yet." ++ fnl());
+    msg_error (str "Mutual inductive types not supported yet." ++ fnl());
     None
   end else 
     let oib = mib.mind_packets.(0) in
@@ -317,11 +318,11 @@ let dummy_dep_type = DTyCtr (injectCtr "Prop", [])
            in correct order *)
 let dep_parse_type_params arity_ctxt =
   let param_names =
-    foldM (fun acc (n, _, t) -> 
-           match n with
+    foldM (fun acc decl -> 
+           match Rel.Declaration.get_name decl with
            | Name id -> 
               (* Actual parameters are named of type Type with some universe *)
-              if is_Type t then Some (id :: acc) else Some acc
+              if is_Type (Rel.Declaration.get_type decl) then Some (id :: acc) else Some acc
            | _ -> (* Ignore *) Some acc
           ) (Some []) arity_ctxt in
   param_names
@@ -340,16 +341,16 @@ let rec dep_arrowify terminal names types =
  *)
 let parse_dependent_type i nparams ty oib arg_names = 
   let rec aux i ty =
-    msgerr (str "Calling aux with: " ++ int i ++ str " " ++ Printer.pr_constr ty ++ fnl()); 
+    msg_debug (str "Calling aux with: " ++ int i ++ str " " ++ Printer.pr_constr ty ++ fnl()); 
     if isRel ty then begin 
   (*        msgerr (int (i + nparams) ++ str " Rel " ++ int (destRel ty) ++ fnl ()); *)
       let db = destRel ty in
       if i + nparams = db then (* Current inductive, no params *)
         Some (DTyCtr (oib.mind_typename, []))
       else begin (* [i + nparams - db]th parameter *) 
-        msgerr (str (Printf.sprintf "Non-self-rel: %s" (dep_type_to_string (List.nth arg_names (i + nparams - db - 1)))) ++ fnl ());
+        msg_debug (str (Printf.sprintf "Non-self-rel: %s" (dep_type_to_string (List.nth arg_names (i + nparams - db - 1)))) ++ fnl ());
         try Some (List.nth arg_names (i + nparams - db - 1))
-        with _ -> msgerr (str "nth failed: " ++ int i ++ str " " ++ int nparams ++ str " " ++ int db ++ str " " ++ int (i + nparams - db - 1) ++ fnl ()); None
+        with _ -> msg_error (str "nth failed: " ++ int i ++ str " " ++ int nparams ++ str " " ++ int db ++ str " " ++ int (i + nparams - db - 1) ++ fnl ()); None
         end
     end 
     else if isApp ty then begin
@@ -367,12 +368,12 @@ let parse_dependent_type i nparams ty oib arg_names =
            | [c] -> Some (DNot c)
            | _   -> failwith "Not a valid negation"
          else Some (DApp (DTyVar x, List.rev tms'))
-      | Some wat -> msgerr (str ("WAT: " ^ dep_type_to_string wat) ++ fnl ()); None 
-      | None -> msgerr (str "Aux failed?" ++ fnl ()); None
+      | Some wat -> msg_error (str ("WAT: " ^ dep_type_to_string wat) ++ fnl ()); None 
+      | None -> msg_error (str "Aux failed?" ++ fnl ()); None
     end
     else if isInd ty then begin
       let ((mind,_),_) = destInd ty in
-      msgerr (str (Printf.sprintf "LOOK HERE: %s - %s - %s" (MutInd.to_string mind) (Label.to_string (MutInd.label mind)) 
+      msg_debug (str (Printf.sprintf "LOOK HERE: %s - %s - %s" (MutInd.to_string mind) (Label.to_string (MutInd.label mind)) 
                                                             (Id.to_string (Label.to_id (MutInd.label mind)))) ++ fnl ());
       Some (DTyCtr (Label.to_id (MutInd.label mind), []))
     end
@@ -399,7 +400,7 @@ let parse_dependent_type i nparams ty oib arg_names =
       let (x,_) = destConst ty in 
       Some (DTyVar (Label.to_id (Constant.label x)))
     end
-    else (msgerr (str "Dep Case Not Handled" ++ fnl()); 
+    else (msg_error (str "Dep Case Not Handled" ++ fnl()); 
           debug_constr ty;
           None) in
   aux i ty
@@ -408,7 +409,9 @@ let dep_parse_type nparams param_names arity_ctxt oib =
   let len = List.length arity_ctxt in
   (* Only type parameters can be used - no dependencies on the types *)
   let arg_names = List.map (fun x -> DTyParam x) param_names in
-  foldM (fun acc (i, (n, _, t)) -> 
+  foldM (fun acc (i, decl) -> 
+           let n = Rel.Declaration.get_name decl in
+           let t = Rel.Declaration.get_type decl in
            debug_constr t;
            match n with
            | Name id -> (* Check if it is a parameter to add its type / name *)
@@ -456,13 +459,13 @@ let dep_parse_constructors nparams param_names oib : dep_ctr list option =
 
 let dep_dt_from_mib mib = 
   if Array.length mib.mind_packets > 1 then begin
-    msgerr (str "Mutual inductive types not supported yet." ++ fnl());
+    msg_error (str "Mutual inductive types not supported yet." ++ fnl());
     None
   end else 
     let oib = mib.mind_packets.(0) in
     let ty_ctr = oib.mind_typename in 
     dep_parse_type_params oib.mind_arity_ctxt >>= fun ty_params ->
-    List.iter (fun tp -> msgerr (str (ty_param_to_string tp) ++ fnl ())) ty_params;
+    List.iter (fun tp -> msg_debug (str (ty_param_to_string tp) ++ fnl ())) ty_params;
     dep_parse_constructors (List.length ty_params) ty_params oib >>= fun ctr_reps ->
     dep_parse_type (List.length ty_params) ty_params oib.mind_arity_ctxt oib >>= fun result_ty -> 
     Some (ty_ctr, ty_params, ctr_reps, result_ty)
@@ -543,13 +546,13 @@ let gMatch discr ?catchAll:(body=None) (branches : (constructor * string list * 
   CCases (dummy_loc,
           Term.RegularStyle,
           None (* return *), 
-          [(discr, (None, None))], (* single discriminee, no as/in *)
+          [(discr, None, None)], (* single discriminee, no as/in *)
           (List.map (fun (c, cs, bf) -> 
                       let cvs : Id.t list = List.map fresh_name cs in
                       (dummy_loc,
                        [dl [CPatCstr (dummy_loc,
                                       Ident (dl c), (* constructor  *)
-                                      [],
+                                      None,
                                       List.map (fun s -> CPatAtom (dummy_loc, Some (Ident (dl s)))) cvs (* Constructor applied to patterns *)
                                      )
                            ]
@@ -562,7 +565,7 @@ let gMatch discr ?catchAll:(body=None) (branches : (constructor * string list * 
          )
 
 let gRecord names_and_bodies =
-  CRecord (dummy_loc, None, List.map (fun (n,b) -> (Ident (dummy_loc, id_of_string n), b)) names_and_bodies)
+  CRecord (dummy_loc, List.map (fun (n,b) -> (Ident (dummy_loc, id_of_string n), b)) names_and_bodies)
 
 let gAnnot (p : coq_expr) (tau : coq_expr) =
   CCast (dummy_loc, p, CastConv tau)
@@ -592,13 +595,13 @@ let gType ty_params dep_type =
 (* Lookup the type of an identifier *)
 let get_type (id : Id.t) = 
   let env = Global.env () in
-  msgerr (str ("Trying to global:" ^ Id.to_string id) ++ fnl ());
+  msg_debug (str ("Trying to global:" ^ Id.to_string id) ++ fnl ());
   let glob_ref = Nametab.global (Ident (dummy_loc, id)) in
   match glob_ref with 
-  | VarRef _ -> msgerr (str "Var" ++ fnl ())
-  | ConstRef _ -> msgerr (str "Constant" ++ fnl ())
-  | IndRef _ -> msgerr (str "Inductive" ++ fnl ())
-  | ConstructRef _ -> msgerr (str "Constructor" ++ fnl ())
+  | VarRef _ -> msg_debug  (str "Var" ++ fnl ())
+  | ConstRef _ -> msg_debug (str "Constant" ++ fnl ())
+  | IndRef _ -> msg_debug (str "Inductive" ++ fnl ())
+  | ConstructRef _ -> msg_debug (str "Constructor" ++ fnl ())
 
 let is_inductive c = 
   let env = Global.env () in
@@ -630,12 +633,12 @@ let construct_match c ?catch_all:(mdef=None) alts =
        if is_inductive c then CPatAtom (dummy_loc, None)
        else CPatCstr (dummy_loc, 
                    Ident (dummy_loc, c),
-                   List.map (fun m -> aux m) ms,
+                   Some (List.map (fun m -> aux m) ms),
                    []) 
   in CCases (dummy_loc,
              Term.RegularStyle,
              None (* return *), 
-              [ (c, (None, None))], (* single discriminee, no as/in *)
+              [ (c, None, None)], (* single discriminee, no as/in *)
               List.map (fun (m, body) -> (dummy_loc, [dummy_loc, [aux m]], body)) alts 
               @ (match mdef with 
                  | Some body -> [(dummy_loc, [dummy_loc, [CPatAtom (dummy_loc, None)]], body)]
@@ -792,7 +795,7 @@ let declare_class_instance instance_arguments instance_name instance_type instan
                        (((dummy_loc, (Name (id_of_string instance_name))), None)
                        , Decl_kinds.Explicit, instance_type vars) 
                        (Some (true, instance_record vars)) (* TODO: true or false? *)
-                       None
+                       { hint_priority = None; hint_pattern = None }
          )
 
 (* List Utils. Probably should move to a util file instead *)
