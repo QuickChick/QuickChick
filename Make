@@ -35,5 +35,5 @@ src/SizeMon.ml
 src/SizeSMon.ml
 src/SizeCorr.ml
 src/ArbitrarySizedST.ml
-src/dependentClasses.v
+src/DependentClasses.v
 src/Decidability.v

@@ -1,12 +1,15 @@
 Require Import Coq.Numbers.Natural.Peano.NPeano.
 Require Import mathcomp.ssreflect.ssreflect.
 From mathcomp Require Import ssrbool ssrnat.
-Require Import GenLow GenHigh Sets.
+Require Import Sets GenLow.
 Require Import Recdef.
 Require Import List.
 
 Require Import ZArith ZArith.Znat Arith.
-Import GenLow GenHigh.
+
+Import GenLow.
+
+Set Bullet Behavior "Strict Subproofs".
 
 (** Instance Hierarchy  
 
@@ -19,16 +22,13 @@ Import GenLow GenHigh.
       Arbitrary
 *)
 
-(** Generator-related classes *)
+(** * Generator-related classes *)
+
 Class GenSized (A : Type) :=
   { arbitrarySized : nat -> G A }.
 
 Class Gen (A : Type) := 
   { arbitrary : G A }.
-
-(** Coercion from Sized to plain version *)
-Global Instance GenSized__Gen {A} `{GenSized A} : Gen A :=
-  {| arbitrary := sized arbitrarySized |}.
 
 (** Shrink class *)
 Class Shrink (A : Type) :=
@@ -37,9 +37,8 @@ Class Shrink (A : Type) :=
 (** Arbitrary Class *)
 Class Arbitrary (A : Type) `{Gen A} `{Shrink A}.
 
-Global Instance arb_gen {A} `{Gen A} `{Shrink A} : Arbitrary A.
-
-(** Sizes of types *)
+(** * Sizes of types *)
+  
 Class Sized (A : Type) :=
   {
     size : A -> nat
@@ -56,18 +55,29 @@ Class CanonicalSized (A : Type) `{Sized A} :=
  
   }.
 
+(** * Correctness classes *)
+
 (** Correctness of sized generators *)
-Class GenSizeCorrect {A : Type} `{Sized A} (g : nat -> G A) :=
+Class SizedCorrect {A : Type} `{Sized A} (g : nat -> G A) :=
   {
     genSizeCorrect : forall s, semGen (g s) <--> [set x : A | size x <= s ]
   }.
 
+(** Correctness of generators *)
+Class Correct (A : Type) (g : G A)  :=
+  {
+    arbitraryCorrect : semGen g <--> [set : A]
+  }.
+
+(** * Monotonic generators *)
+
 (** Monotonicity of size parametric generators *)
-Class GenSizedMonotonic (A : Type) `{H1 : GenSized A}
-      `{H2 : forall s, SizeMonotonic (arbitrarySized s)}.
+Class GenSizedMonotonic (A : Type) `{GenSized A}
+      `{forall s, SizeMonotonic (arbitrarySized s)}.
 
 (** Monotonicity of size parametric generators v2 *)
-Class GenSizedSizeMotonic (A : Type) `{GenSized A} :=
+(* TODO use SizedMonotonic instead *)
+Class GenSizedSizeMonotonic (A : Type) `{GenSized A} :=
   {
     sizeMonotonic :
       forall s s1 s2,
@@ -76,47 +86,50 @@ Class GenSizedSizeMotonic (A : Type) `{GenSized A} :=
         \subset semGenSize (arbitrarySized s2) s
   }.
 
-(* Correctness of size parametric generators *)
-Class GenSizedCorrect (A : Type) `{Sized A} `{H1 : GenSized A}
-      `{@GenSizeCorrect _ _ arbitrarySized}.
+Class GenMonotonic (A : Type) `{Gen A} `{SizeMonotonic A arbitrary}.
 
-Class GenMonotonic (A : Type) `{Arbitrary A}
-      `{H2 : @SizeMonotonic _ arbitrary}.
+(** * Correct generators *)
 
-(** Correctness of generators *)
-Class GenCorrect (A : Type) (g : G A)  :=
-  {
-    arbitraryCorrect : semGen g <--> [set : A]
-  }.
+Class GenSizedCorrect (A : Type) `{GenSized A} `{SizedCorrect A arbitrarySized}.
 
+Class GenCorrect (A : Type) `{Gen A} `{Correct A arbitrary}.
+ 
 (* Monotonic and Correct generators *)
 Class GenMonotonicCorrect (A : Type)
-      `{H1 : Gen A}
-      `{GenMonotonic A} `{@GenCorrect A arbitrary}.
+      `{Gen A} `{SizeMonotonic A arbitrary} `{Correct A arbitrary}.
 
-Instance GenMonotonicFromSized (A : Type)
-         {H1 : GenSized A}
-         {H2 : (forall s : nat, SizeMonotonic (arbitrarySized s)) }
-         {H3 : @GenSizedSizeMotonic A H1} : @SizeMonotonic A arbitrary.
+(** Coercions *)
+
+Global Instance GenOfGenSized {A} `{GenSized A} : Gen A :=
+  {| arbitrary := sized arbitrarySized |}.
+
+Global Instance ArbitraryOfGenShrink {A} `{Gen A} `{Shrink A} : Arbitrary A.
+
+Generalizable Variables PSized PMon PSMon PCorr.
+
+Instance GenMonotonicOfSized (A : Type)
+         {H : GenSized A}
+         `{@GenSizedMonotonic A H PMon}
+         `{@GenSizedSizeMonotonic A H}
+: SizeMonotonic arbitrary.
 Proof.
-  constructor. eapply sizedMonotonic.
+  constructor. eapply sizedSizeMonotonic.
   now intros n; eauto with typeclass_instances.
-  intros. edestruct H3. eauto.
+  edestruct H1. constructor. eauto.
 Qed.
 
-Instance GenCorrectFromSized (A : Type)
-         {H1 : GenSized A}
-         {Hs : Sized A}
-         {H2 : (forall s : nat, SizeMonotonic (arbitrarySized s)) }
-         {H3 : @GenSizedSizeMotonic A H1}
-         {H4 : GenSizeCorrect arbitrarySized} : GenCorrect A arbitrary.
+Instance GenCorrectOfSized (A : Type)
+         {H : GenSized A}
+         `{@GenSizedMonotonic A H PMon}
+         `{@GenSizedSizeMonotonic A H}
+         `{@GenSizedCorrect A H PSized PCorr} : Correct A arbitrary.
 Proof.
-  constructor. unfold arbitrary. 
+  constructor. unfold arbitrary, GenOfGenSized. 
   eapply set_eq_trans.
   - eapply semSized_alt; eauto with typeclass_instances.
-    destruct H3. eauto.
+    destruct H1. eauto.
   - setoid_rewrite genSizeCorrect.
-    split. intros [n H]. constructor; eauto.
-    intros H. eexists; split; eauto.
+    split. intros [n H3]. constructor; eauto.
+    intros H4. eexists; split; eauto.
 Qed.
 

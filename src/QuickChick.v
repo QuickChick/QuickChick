@@ -33,5 +33,5 @@ Require Export Extraction.
 Require Export Decidability.
 Require Export Classes. 
 Require Export Instances.
-Require Export dependentClasses.
+Require Export DependentClasses.
 Export GenLow GenHigh.

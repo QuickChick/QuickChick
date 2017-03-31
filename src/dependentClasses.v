@@ -12,47 +12,113 @@ Open Scope string.
 
 Set Bullet Behavior "Strict Subproofs".
 
-(** Precondition parametric size indexed generators *)
-(* Should type indices should become parameters of the instance?
- * Cannot think of an other way to treat the uniformly *)
-Class ArbitrarySizedSuchThat (A : Type) (P : A -> Prop) :=
-  {
-    (* Generation should be allowed to fail *)
-    arbitrarySizeST : nat -> G (option A);
-    (* Shrinking as before *)
-(*     shrinkSizeST : A -> list A *)
-  }.
+(** * Correctness of dependent generators *)
 
-(** Monotonicity of ArbitrarySizedSuchThat *)
-Class ArbitrarySizedSuchThatMonotonic (A : Type)
-      `{ArbitrarySizedSuchThat A} `{forall s, SizeMonotonic (arbitrarySizeST s)}.
-
-(** Monotonicity v2 *)
-Class ArbitrarySTSizedSizeMotonic (A : Type) `{ArbitrarySizedSuchThat A} :=
+Class SizedSuchThatCorrect {A : Type} `{Sized A} (P : A -> Prop) (g : nat -> G (option A)) :=
   {
-    sizeMonotonicST :
-      forall s s1 s2,
-        s1 <= s2 ->
-        semGenSize (arbitrarySizeST s1) s \subset semGenSize (arbitrarySizeST s2) s
-  }.
-
-(** Correctness of parametric gens *)
-Class GenSizeSuchThatCorrect {A : Type} `{Sized A} (P : A -> Prop) (g : nat -> G (option A)) :=
-  {
-    genSizeSTCorrect :
+    sizedSTCorrect :
       forall s,
         semGen (g s) <-->
         ((@Some A) @: [set x : A | Classes.size x <= s /\ P x ]) :|:
         ([set x : option A | x = None /\ forall y, ~ P y])
   }.
 
-(** Correctness of ArbitrarySizedSuchThat *)
-Class ArbitrarySizedSuchThatCorrect (A : Type) (P : A -> Prop)
-      `{Sized A}
-      `{ArbitrarySizedSuchThat A P}
-      `{GenSizeSuchThatCorrect A P arbitrarySizeST}. 
+Class SuchThatCorrect {A : Type} (P : A -> Prop) (g : G (option A)) :=
+  {
+    STCorrect :
+      semGen g <-->
+      ((@Some A) @: [set x : A | P x ]) :|:
+      ([set x : option A | x = None /\ forall y, ~ P y])
+  }.
 
+(** * Dependent sized generators *)
 
+Class GenSizedSuchThat (A : Type) (P : A -> Prop) :=
+  {
+    arbitrarySizeST : nat -> G (option A);
+  }.
+
+(** * Monotonicity of denendent sized generators *)
+
+Class GenSizedSuchThatMonotonic (A : Type)
+      `{GenSizedSuchThat A} `{forall s, SizeMonotonic (arbitrarySizeST s)}.
+
+Class GenSizedSuchThatSizeMonotonic (A : Type)
+      `{GenSizedSuchThat A} `{SizedMonotonic _ arbitrarySizeST}.
+
+(** * Correctness of denendent sized generators *)
+  
+Class GenSizedSuchThatCorrect (A : Type) (P : A -> Prop)
+      `{GenSizedSuchThat A P}
+      `{SizedSuchThatCorrect A P arbitrarySizeST}.
+
+(** * Dependent generators *)
+
+Class GenSuchThat (A : Type) (P : A -> Prop) :=
+  {
+    arbitraryST : G (option A);
+  }.
+
+(** * Monotonicity of denendent generators *)
+
+Class GenSuchThatMonotonic (A : Type) (P : A -> Prop) `{GenSuchThat A P}
+      `{@SizeMonotonic _ arbitraryST}.
+
+(** * Correctness of dependent generators *)  
+
+Class GenSuchThatCorrect {A : Type} (P : A -> Prop) 
+      `{GenSuchThat A P}
+      `{SuchThatCorrect A P arbitraryST}.
+
+Class GenSuchThatMonotonicCorrect (A : Type) (P : A -> Prop)
+      `{GenSuchThat A P}
+      `{@SizeMonotonic _ arbitraryST}
+      `{SuchThatCorrect A P arbitraryST}.
+
+(** * Coercions from sized to unsized generators *)
+  
+Instance GenSuchThatOfSized (A : Type) (P : A -> Prop)
+         `{GenSizedSuchThat A P} : GenSuchThat A P :=
+  {
+    arbitraryST := sized arbitrarySizeST;
+  }.
+
+Generalizable Variables PSized PMon PSMon PCorr.
+
+Instance GenSuchThatMonotonicOfSized (A : Type) (P : A -> Prop)
+         {H : GenSizedSuchThat A P}
+         `{@GenSizedSuchThatMonotonic A P H PMon}
+         `{@GenSizedSuchThatSizeMonotonic A P H PSMon}
+: GenSuchThatMonotonic A P.
+
+Instance ArbitraryCorrectFromSized (A : Type) (P : A -> Prop)
+         {H : GenSizedSuchThat A P}
+         `{@GenSizedSuchThatMonotonic A P H PMon}
+         `{@GenSizedSuchThatSizeMonotonic A P H PSMon}
+         `{@GenSizedSuchThatCorrect A P H PSized PCorr}
+: SuchThatCorrect P arbitraryST.
+Proof.
+  constructor. unfold arbitraryST, GenSuchThatOfSized.
+  eapply set_eq_trans.
+  - eapply semSized_alt; eauto with typeclass_instances.
+    (* TODO chanfe semSized_alt *)
+    destruct PSMon. eauto.
+  - setoid_rewrite sizedSTCorrect.
+    split.
+    + intros [n [Hinn Hun]].
+      inv Hun.
+      * left. inv H3. inv H4. inv H5. inv H6.
+        econstructor; eauto.
+      * right. eassumption.
+    + intros Hyp. inv Hyp.
+      * inv H0. inv H3. inv H4.
+        eexists; split; eauto. constructor; eauto.
+        left. econstructor; eauto.
+      * inv H3.
+        exists 0; split; eauto. constructor; eauto.
+        right. econstructor; eauto.
+Qed.
+  
 (* TODO: Move in another file *)
 (*
 (** Leo's example from DependentTest.v *)
@@ -99,70 +165,3 @@ Abort.
 *)
 
 (** We can now abstract away from sizes and get the generator and the proofs for free *)
-
-Class ArbitrarySuchThat (A : Type) (P : A -> Prop) :=
-  {
-    arbitraryST : G (option A);
-(*    shrinkST : A -> list A; *)
-  }.
-
-
-Class ArbitrarySuchThatMonotonic (A : Type) (P : A -> Prop) `{ArbitrarySuchThat A P}
-      `{H2 : @SizeMonotonic _ arbitraryST}.
-  
-Class GenSuchThatCorrect {A : Type} (P : A -> Prop) (g : G (option A)) :=
-  {
-    genSTCorrect :
-      semGen g <-->
-      ((@Some A) @: [set x : A | P x ]) :|:
-      ([set x : option A | x = None /\ forall y, ~ P y])
-  }.
-
-(* Monotonic and Correct generators *)
-Class ArbitrarySTMonotonicCorrect (A : Type) (P : A -> Prop)
-      `{H1 : ArbitrarySuchThat A P}
-      `{ArbitrarySuchThatMonotonic A} `{@GenSuchThatCorrect A P arbitraryST}.
-
-Instance ArbitrarySTFromSize (A : Type) (P : A -> Prop)
-         `{ArbitrarySizedSuchThat A P}
-: ArbitrarySuchThat A P :=
-  {
-    arbitraryST := sized arbitrarySizeST;
-  }.
-
-Instance ArbitraryMonotonicSTFromSized (A : Type) (P : A -> Prop)
-         {H1 : ArbitrarySizedSuchThat A P}
-         {H2 : (forall s : nat, SizeMonotonic (arbitrarySizeST s)) }
-         {H3 : @ArbitrarySTSizedSizeMotonic A P H1} :
-  @SizeMonotonic (option A) arbitraryST.
-Proof.
-  constructor. eapply sizedMonotonic.
-  now intros n; eauto with typeclass_instances.
-  intros. edestruct H3. eauto.
-Qed.
-
-Instance ArbitraryCorrectFromSized (A : Type) (P : A -> Prop)
-         {H1 : ArbitrarySizedSuchThat A P}
-         {H2 : (forall s : nat, SizeMonotonic (arbitrarySizeST s)) }
-         {H3 : @ArbitrarySTSizedSizeMotonic A P H1}
-         `{H4 : GenSizeSuchThatCorrect A P arbitrarySizeST} : GenSuchThatCorrect P arbitraryST.
-Proof.
-  constructor. unfold arbitraryST, ArbitrarySTFromSize.
-  eapply set_eq_trans.
-  - eapply semSized_alt; eauto with typeclass_instances.
-    destruct H3. eauto.
-  - setoid_rewrite genSizeSTCorrect.
-    split.
-    + intros [n [Hinn Hun]].
-      inv Hun.
-      * left. inv H0. inv H5. inv H6.
-        econstructor; eauto.
-      * right. eassumption.
-    + intros Hyp. inv Hyp.
-      * inv H0. inv H5.
-        eexists; split; eauto. constructor; eauto.
-        left. econstructor; eauto.
-      * inv H0.
-        exists 0; split; eauto. constructor; eauto.
-        right. econstructor; eauto.
-Qed.
