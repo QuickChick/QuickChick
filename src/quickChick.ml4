@@ -1,7 +1,6 @@
 open Pp
 open Loc
 open Names
-open Extract_env
 open Tacmach
 open Entries
 open Declarations
@@ -12,6 +11,8 @@ open Constrintern
 open Topconstr
 open Constrexpr
 open Constrexpr_ops
+open Feedback
+open Constrarg
 
 let message = "QuickChick"
 let mk_ref s = CRef (Qualid (Loc.ghost, qualid_of_string s), None)
@@ -99,7 +100,7 @@ let runTest c =
   let mlf = Filename.temp_file "QuickChick" ".ml" in
   let execn = Filename.chop_extension mlf in
   let mlif = execn ^ ".mli" in
-  Flags.silently (full_extraction (Some mlf)) [Ident (Loc.ghost, main)];
+  Flags.silently (Extraction_plugin.Extract_env.full_extraction (Some mlf)) [Ident (Loc.ghost, main)]; 
   (** Add a main function to get some output *)
   let oc = open_out_gen [Open_append;Open_text] 0o666 mlf in
   Printf.fprintf oc
@@ -109,19 +110,19 @@ let runTest c =
   (* Before compiling, remove stupid cyclic dependencies like "type int = int".
      TODO: Generalize (.) \g1\b or something *)
   let perl_cmd = "perl -i -p0e 's/type int =\\s*int/type tmptmptmp = int\\ntype int = tmptmptmp/s' " ^ mlf in
-  if Sys.command perl_cmd <> 0 then msgerr (str ("perl script hack failed. Report: " ^ perl_cmd)  ++ fnl ());
+  if Sys.command perl_cmd <> 0 then msg_error (str ("perl script hack failed. Report: " ^ perl_cmd)  ++ fnl ());
   (** Compile the extracted code *)
   (** Extraction sometimes produces ML code that does not implement its interface.
       We circumvent this problem by erasing the interface. **)
   Sys.remove mlif;
   if Sys.command (comp_ml_cmd mlf execn) <> 0 then
-    msgerr (str "Could not compile test program" ++ fnl ())
+    msg_error (str "Could not compile test program" ++ fnl ())
   (** Run the test *)
   else
     (** If we want to print the time spent in tests *)
     let execn = "time " ^ execn in
     if Sys.command execn <> 0 then
-      msgerr (str "Could not run test" ++ fnl ())
+      msg_error (str "Could not run test" ++ fnl ())
 
 let run f args =
   let args = List.map (fun x -> (x,None)) args in
@@ -134,37 +135,37 @@ let run_with f args p =
   runTest c
 	   *)
 
-VERNAC COMMAND EXTEND QuickCheck
+VERNAC COMMAND EXTEND QuickCheck CLASSIFIED AS SIDEFF
   | ["QuickCheck" constr(c)] ->     [run quickCheck [c]]
   | ["QuickCheckWith" constr(c1) constr(c2)] ->     [run quickCheckWith [c1;c2]]
 END;;
 
-VERNAC COMMAND EXTEND QuickChick
+VERNAC COMMAND EXTEND QuickChick CLASSIFIED AS SIDEFF
   | ["QuickChick" constr(c)] ->     [run quickCheck [c]]
   | ["QuickChickWith" constr(c1) constr(c2)] ->     [run quickCheckWith [c1;c2]]
 END;;
 
-VERNAC COMMAND EXTEND MutateCheck
+VERNAC COMMAND EXTEND MutateCheck CLASSIFIED AS SIDEFF
   | ["MutateCheck" constr(c1) constr(c2)] ->     [run mutateCheck [c1;c2]]
   | ["MutateCheckWith" constr(c1) constr(c2) constr(c3)] ->     [run mutateCheckWith [c1;c2;c3]]
 END;;
 
-VERNAC COMMAND EXTEND MutateChick
+VERNAC COMMAND EXTEND MutateChick CLASSIFIED AS SIDEFF
   | ["MutateChick" constr(c1) constr(c2)] ->     [run mutateCheck [c1;c2]]
   | ["MutateChickWith" constr(c1) constr(c2) constr(c3)] ->     [run mutateCheckWith [c1;c2;c3]]
 END;;
 
-VERNAC COMMAND EXTEND MutateCheckMany
+VERNAC COMMAND EXTEND MutateCheckMany CLASSIFIED AS SIDEFF
   | ["MutateCheckMany" constr(c1) constr(c2)] ->     [run mutateCheckMany [c1;c2]]
   | ["MutateCheckManyWith" constr(c1) constr(c2) constr(c3)] ->     [run mutateCheckMany [c1;c2;c3]]
 END;;
 
-VERNAC COMMAND EXTEND MutateChickMany
+VERNAC COMMAND EXTEND MutateChickMany CLASSIFIED AS SIDEFF
   | ["MutateChickMany" constr(c1) constr(c2)] ->     [run mutateCheckMany [c1;c2]]
   | ["MutateChickManyWith" constr(c1) constr(c2) constr(c3)] ->     [run mutateCheckMany [c1;c2;c3]]
 END;;
 
-VERNAC COMMAND EXTEND Sample
+VERNAC COMMAND EXTEND Sample CLASSIFIED AS SIDEFF
   | ["Sample" constr(c)] -> [run sample [c]]
 END;;
 

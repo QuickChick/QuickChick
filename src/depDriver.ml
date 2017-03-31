@@ -17,6 +17,7 @@ open GenericLib
 open SetLib
 open CoqLib
 open ArbitrarySizedST
+open Feedback
 
 type derivable =
     ArbitrarySizedSuchThat
@@ -39,9 +40,9 @@ let mk_instance_name der tn =
 let deriveDependent (cn : derivable) (c : constr_expr) n (instance_name : string) =
   let (ty_ctr, ty_params, ctrs, dep_type) = 
     match coerce_reference_to_dep_dt c with
-    | Some dt -> msgerr (str (dep_dt_to_string dt) ++ fnl()); dt 
+    | Some dt -> msg_debug (str (dep_dt_to_string dt) ++ fnl()); dt 
     | None -> failwith "Not supported type" in
-  msgerr (str (string_of_int n) ++ fnl ());
+  msg_debug (str (string_of_int n) ++ fnl ());
   debug_coq_expr (gType ty_params dep_type);
 
   let input_types =
@@ -134,7 +135,7 @@ let deriveDependent (cn : derivable) (c : constr_expr) n (instance_name : string
     | _ -> failwith "Unimplemented"
   in
 
-  msgerr (str "Instance Type: " ++ fnl ());
+  msg_debug (str "Instance Type: " ++ fnl ());
   debug_coq_expr (instance_type [gInject "input0"; gInject "input1"]);
   declare_class_instance instance_arguments instance_name instance_type instance_record
 ;;

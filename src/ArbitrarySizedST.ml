@@ -16,6 +16,7 @@ open Decl_kinds
 open GenericLib
 open SetLib
 open CoqLib
+open Feedback
 
 (* TODO : move to utils or smth *)
 type name_provider = { next_name : unit -> string }
@@ -123,7 +124,7 @@ let rec raiseMatch (k : umap) (c : constructor) (rs : range list) (eqs: EqSet.t)
 *)
 let rec unify (k : umap) (r1 : range) (r2 : range) (eqs : EqSet.t)
         : (umap * range * EqSet.t * (unknown * matcher_pat) list) option =
-  msgerr (str (Printf.sprintf "Calling unify with %s %s" (range_to_string r1) (range_to_string r2)) ++ fnl ());
+  msg_debug (str (Printf.sprintf "Calling unify with %s %s" (range_to_string r1) (range_to_string r2)) ++ fnl ());
   match r1, r2 with
   | Unknown u1, Unknown u2 ->
      if u1 == u2 then Some (k, Unknown u1, eqs, []) else
@@ -245,7 +246,7 @@ let rec range_to_coq_expr k r =
   | Unknown u -> 
      begin match UM.find u k with
      | FixedInput -> gVar u
-     | Undef _ -> (msgerr (str "It's stupid that this is called" ++ fnl ()); gVar u)
+     | Undef _ -> (msg_warning (str "It's stupid that this is called" ++ fnl ()); gVar u)
      | Unknown u' -> range_to_coq_expr k (Unknown u')
      | Ctr (c, rs) -> gApp (gCtr c) (List.map (range_to_coq_expr k) rs)
      end
@@ -289,7 +290,7 @@ let arbitrarySizedST gen_ctr dep_type gen_type ctrs input_names inputs n registe
     let (ctr, typ) = c in
     let b = ref true in 
 
-    msgerr (str "Debug branch" ++ fnl ());
+    msg_debug (str "Debug branch" ++ fnl ());
 
     let register_unknowns map = 
       let rec aux map = function
@@ -304,7 +305,7 @@ let arbitrarySizedST gen_ctr dep_type gen_type ctrs input_names inputs n registe
                                                  (register_unknowns UM.empty) input_names) 
     in
 
-    msgerr (str ("Calculating ranges: " ^ dep_type_to_string (dep_result_type typ)) ++ fnl ());
+    msg_debug (str ("Calculating ranges: " ^ dep_type_to_string (dep_result_type typ)) ++ fnl ());
     let ranges = match dep_result_type typ with
       | DTyCtr (_, dts) -> List.map convert_to_range dts
       | _ -> failwith "Not the expected result type" in
@@ -312,10 +313,10 @@ let arbitrarySizedST gen_ctr dep_type gen_type ctrs input_names inputs n registe
     let inputsWithGen = inputWithGen n input_names in
 
     (* Debugging init map *)
-    msgerr (str ("Handling branch: " ^ dep_type_to_string typ) ++ fnl ());
-    UM.iter (fun x r -> msgerr (str ("Bound: " ^ (var_to_string x) ^ " to Range: " ^ (range_to_string r)) ++ fnl ())) init_map;
-    dep_fold_ty (fun _ dt1 -> msgerr (str (Printf.sprintf "%s : %b\n" (dep_type_to_string dt1) (is_dep_type dt1)) ++ fnl()))
-                (fun _ _ dt1 -> msgerr (str (Printf.sprintf "%s : %b\n" (dep_type_to_string dt1) (is_dep_type dt1)) ++ fnl()))
+    msg_debug (str ("Handling branch: " ^ dep_type_to_string typ) ++ fnl ());
+    UM.iter (fun x r -> msg_debug (str ("Bound: " ^ (var_to_string x) ^ " to Range: " ^ (range_to_string r)) ++ fnl ())) init_map;
+    dep_fold_ty (fun _ dt1 -> msg_debug (str (Printf.sprintf "%s : %b\n" (dep_type_to_string dt1) (is_dep_type dt1)) ++ fnl()))
+                (fun _ _ dt1 -> msg_debug (str (Printf.sprintf "%s : %b\n" (dep_type_to_string dt1) (is_dep_type dt1)) ++ fnl()))
                 (fun _ -> ()) (fun _ -> ()) (fun _ -> ()) (fun _ -> ()) typ;
     (* End debugging *)
 
@@ -495,7 +496,7 @@ let arbitrarySizedST gen_ctr dep_type gen_type ctrs input_names inputs n registe
       | DProd (_, dt) -> (* Only introduces variables, doesn't constrain them *)
          recurse_type k cmap dt 
       | DArrow (dt1, dt2) -> 
-         msgerr (str ("Darrowing: " ^ range_to_string (UM.find forGen k)) ++ fnl ());
+         msg_debug (str ("Darrowing: " ^ range_to_string (UM.find forGen k)) ++ fnl ());
          handle_dt true dt1 dt2 k cmap rec_name
       | DTyCtr _ -> (* result *) 
          instantiate_range k cmap (Unknown forGen) (* result *)
@@ -515,18 +516,18 @@ let arbitrarySizedST gen_ctr dep_type gen_type ctrs input_names inputs n registe
       let rec walk_matches = function
         | [] -> handle_equalities eqs (recurse_type map CMap.empty typ)
         | (u,m)::ms -> begin 
-            msgerr (str (Printf.sprintf "Processing Match: %s @ %s" (Unknown.to_string u) (matcher_pat_to_string m)) ++ fnl ());
+            msg_debug (str (Printf.sprintf "Processing Match: %s @ %s" (Unknown.to_string u) (matcher_pat_to_string m)) ++ fnl ());
             construct_match (gVar u) ~catch_all:(Some (returnGen gNone)) [(m,walk_matches ms)]
           end in
       walk_matches matches
     in 
     
     (* Debugging resulting match *)
-    UM.iter (fun x r -> msgerr (str ("Bound: " ^ var_to_string x ^ " to Range: " ^ (range_to_string r)) ++ fnl ())) map;
-    EqSet.iter (fun (u,u') -> msgerr (str (Printf.sprintf "Eq: %s = %s\n" (Unknown.to_string u) (Unknown.to_string u')) ++ fnl())) eqs;
-    List.iter (fun (u,m) -> msgerr (str ((Unknown.to_string u) ^ (matcher_pat_to_string m)) ++ fnl ())) matches;
+    UM.iter (fun x r -> msg_debug (str ("Bound: " ^ var_to_string x ^ " to Range: " ^ (range_to_string r)) ++ fnl ())) map;
+    EqSet.iter (fun (u,u') -> msg_debug (str (Printf.sprintf "Eq: %s = %s\n" (Unknown.to_string u) (Unknown.to_string u')) ++ fnl())) eqs;
+    List.iter (fun (u,m) -> msg_debug (str ((Unknown.to_string u) ^ (matcher_pat_to_string m)) ++ fnl ())) matches;
 
-    msgerr (str "Generated..." ++ fnl ());
+    msg_debug (str "Generated..." ++ fnl ());
     debug_coq_expr branch_gen;
     (* End debugging *)
 
@@ -559,7 +560,7 @@ let arbitrarySizedST gen_ctr dep_type gen_type ctrs input_names inputs n registe
                                     ))
   in
 
-  msgerr (fnl () ++ fnl () ++ str "`Final body produced:" ++ fnl ());
+  msg_debug (fnl () ++ fnl () ++ str "`Final body produced:" ++ fnl ());
   debug_coq_expr generator_body;                       
-  msgerr (fnl ());
+  msg_debug (fnl ());
   gRecord [("arbitrarySizeST", generator_body)]

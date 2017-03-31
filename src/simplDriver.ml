@@ -21,6 +21,7 @@ open SizeMon
 open SizeSMon
 open SizeCorr
 open ArbitrarySized
+open Feedback
 
 type derivable =
     Shrink
@@ -52,7 +53,7 @@ let print_der = function
 (* Generic derivation function *)
 let debugDerive (c : constr_expr) =
   match coerce_reference_to_dt_rep c with
-  | Some dt -> msgerr (str (dt_rep_to_string dt) ++ fnl ())
+  | Some dt -> msg_debug (str (dt_rep_to_string dt) ++ fnl ())
   | None -> failwith "Not supported type"  
 
 (* Generic derivation function *)

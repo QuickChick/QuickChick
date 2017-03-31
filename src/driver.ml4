@@ -20,6 +20,7 @@ open Sized
 open SizeMon
 open SizeSMon
 open SizeCorr
+open Constrarg
 
 type derivation = SimpleDer of SimplDriver.derivable list
                 | DepDer of DepDriver.derivable 
@@ -60,7 +61,7 @@ let dispatch cn ind =
   | SimpleDer classes -> simpl_dispatch ind classes
   | DepDer classes -> dep_dispatch ind classes 
 
-VERNAC COMMAND EXTEND Derive 
+VERNAC COMMAND EXTEND Derive CLASSIFIED AS SIDEFF
    | ["Derive" constr(class_name) "for" constr(inductive)] -> 
       [dispatch class_name inductive]
 (*   | ["Derive" constr(class_name) "for" constr(inductive) "as" string(s1)] -> 
