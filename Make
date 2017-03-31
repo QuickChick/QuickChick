@@ -17,6 +17,8 @@ src/Checker.v
 src/SemChecker.v
 src/Test.v
 src/Extraction.v
+src/tactic_quickchick.ml4
+src/quickchick_plugin.mlpack
 src/QuickChick.v
 src/MutateCheck.v
 src/genericLib.mli

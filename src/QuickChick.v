@@ -15,6 +15,7 @@ Declare ML Module "simplDriver".
 Declare ML Module "depDriver".
 Declare ML Module "driver".
 
+Declare ML Module "quickchick_plugin".
 
 Axiom _W : nat -> Prop.
 Axiom _Size : Prop.
