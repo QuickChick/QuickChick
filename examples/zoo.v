@@ -3,7 +3,7 @@ Require Import String List. Open Scope string.
 
 From mathcomp Require Import ssreflect ssrfun ssrbool ssrnat eqtype seq.
 
-Import classes.
+Import Classes.
 (* XXX this is required because there is a name clash with
  * size (seq A -> nat) and size of types *)
 

@@ -51,10 +51,10 @@ let dispatch cn ind =
   in 
 
   let class_names = match s with 
-    | "Arbitrary" -> SimpleDer [SimplDriver.ArbitrarySized; SimplDriver.Shrink]
+    | "Arbitrary" -> SimpleDer [SimplDriver.GenSized; SimplDriver.Shrink]
     | "Show" -> SimpleDer [SimplDriver.Show]
     | "ArbitrarySizedSuchThat" -> DepDer DepDriver.ArbitrarySizedSuchThat
-  in 
+  in
 
   match class_names with 
   | SimpleDer classes -> simpl_dispatch ind classes

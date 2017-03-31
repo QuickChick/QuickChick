@@ -22,24 +22,32 @@ open SizeSMon
 open SizeCorr
 open ArbitrarySized
 
-type derivable = Shrink | Show | ArbitrarySized | Sized | CanonicalSized | SizeMonotonic | SizeSMonotonic | GenSizeCorrect
+type derivable =
+    Shrink
+  | Show
+  | GenSized
+  | Sized
+  | CanonicalSized
+  | SizeMonotonic
+  | SizedMonotonic
+  | SizedCorrect
 
 let mk_instance_name der tn = 
   let prefix = match der with 
     | Shrink -> "shr" 
     | Show   -> "show"
-    | ArbitrarySized -> "genS"
+    | GenSized -> "genS"
   in var_to_string (fresh_name (prefix ^ tn))
 
 let print_der = function
   | Shrink -> "Shrink"
   | Show   -> "Show"
-  | ArbitrarySized -> "ArbitrarySized"
+  | GenSized -> "GenSized"
   | Sized -> "Sized"
   | CanonicalSized -> "CanonicalSized"
   | SizeMonotonic -> "SizeMonotonic"
-  | SizeSMonotonic -> "ArbitrarySizedSizeMotonic"
-  | GenSizeCorrect ->  "GenSizeCorrect"
+  | SizedMonotonic -> "SizedMotonic"
+  | SizedCorrect ->  "SizedCorrect"
 
 (* Generic derivation function *)
 let debugDerive (c : constr_expr) =
@@ -61,36 +69,36 @@ let derive (cn : derivable) (c : constr_expr) (instance_name : string) (extra_na
   let full_dt = gApp ~explicit:true coqTyCtr coqTyParams in
 
   let class_name = match cn with
-    | Show -> "Show"
     | Shrink -> "Shrink"
+    | Show   -> "Show"
+    | GenSized -> "GenSized"
     | Sized -> "Sized"
-    | ArbitrarySized -> "GenSized"
     | CanonicalSized -> "CanonicalSized"
-    | SizeMonotonic -> "QuickChick.GenLow.GenLow.SizeMonotonic"
-    | SizeSMonotonic -> "ArbitrarySizedSizeMotonic"
-    | GenSizeCorrect ->  "GenSizeCorrect"
+    | SizeMonotonic -> "SizeMonotonic"
+    | SizedMonotonic -> "SizedMotonic"
+    | SizedCorrect ->  "SizedCorrect"
   in
 
   let param_class_names = match cn with
     | Sized -> ["Sized"]
     | Shrink -> ["Shrink"]
     | Show -> ["Show"]
-    | ArbitrarySized -> ["Gen"]
+    | GenSized -> ["Gen"]
     | CanonicalSized -> ["CanonicalSized"]
-    | SizeMonotonic -> ["ArbitraryMonotonic"]
-    | SizeSMonotonic -> ["Arbitrary"]
-    | GenSizeCorrect ->  ["ArbitraryMonotonicCorrect"; "CanonicalSized"]
+    | SizeMonotonic -> ["GenMonotonic"]
+    | SizedMonotonic -> ["Gen"]
+    | SizedCorrect ->  ["GenMonotonicCorrect"; "CanonicalSized"]
   in
 
   let extra_arguments = match cn with
     | Show -> []
     | Shrink -> []
     | Sized -> []
-    | ArbitrarySized -> []
+    | GenSized -> []
     | CanonicalSized -> []
     | SizeMonotonic -> [(gInject "s", gInject "nat")]
-    | SizeSMonotonic -> []
-    | GenSizeCorrect -> []
+    | SizedMonotonic -> []
+    | SizedCorrect -> []
   in
 
   (* Generate typeclass constraints. For each type parameter "A" we need `{_ : <Class Name> A} *)
@@ -110,7 +118,7 @@ let derive (cn : derivable) (c : constr_expr) (instance_name : string) (extra_na
       let (_, size) = take_last iargs [] in
       gApp (gInject class_name)
         [(gApp ~explicit:true (gInject ("arbitrarySize")) [full_dt; (gInject extra_name); (gVar size)])]
-    | GenSizeCorrect ->
+    | SizedCorrect ->
       gApp (gInject class_name)
         [(gApp ~explicit:true (gInject ("arbitrarySize")) [full_dt; (gInject extra_name)])]
     | _ -> gApp (gInject class_name) [full_dt]
@@ -121,7 +129,7 @@ let derive (cn : derivable) (c : constr_expr) (instance_name : string) (extra_na
     match cn with
     | Show -> show_decl ty_ctr ctrs iargs 
     | Shrink -> shrink_decl ty_ctr ctrs iargs
-    | ArbitrarySized -> arbitrarySized_decl ty_ctr ctrs iargs
+    | GenSized -> arbitrarySized_decl ty_ctr ctrs iargs
     | Sized -> sized_decl ty_ctr ctrs
     | CanonicalSized ->
       let ind_scheme =  gInject ((ty_ctr_to_string ty_ctr) ^ "_ind") in
@@ -129,11 +137,10 @@ let derive (cn : derivable) (c : constr_expr) (instance_name : string) (extra_na
     | SizeMonotonic ->
       let (iargs', size) = take_last iargs [] in
       sizeMon ty_ctr ctrs (gVar size) iargs' (gInject extra_name)
-    | SizeSMonotonic ->
+    | SizedMonotonic ->
       sizeSMon ty_ctr ctrs iargs
-    | GenSizeCorrect ->
+    | SizedCorrect ->
       genCorr ty_ctr ctrs iargs (gInject extra_name) (gInject extra_name2)
-
   in
   declare_class_instance instance_arguments instance_name instance_type instance_record
 
