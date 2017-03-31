@@ -100,7 +100,7 @@ let runTest c =
   let mlf = Filename.temp_file "QuickChick" ".ml" in
   let execn = Filename.chop_extension mlf in
   let mlif = execn ^ ".mli" in
-  Flags.silently (Extract_env.full_extraction (Some mlf)) [Ident (Loc.ghost, main)]; 
+  Flags.silently (Extraction_plugin.Extract_env.full_extraction (Some mlf)) [Ident (Loc.ghost, main)]; 
   (** Add a main function to get some output *)
   let oc = open_out_gen [Open_append;Open_text] 0o666 mlf in
   Printf.fprintf oc
