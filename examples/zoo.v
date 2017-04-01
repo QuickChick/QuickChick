@@ -16,13 +16,27 @@ Inductive Zoo (A : Type) {B : Type}: Type :=
 
 
 (** Generators for type  *)
-DeriveArbitrarySized Zoo as "ArbSizedZoo".
+Derive Arbitrary for Zoo.
+(* 
+genSZoo is defined
+shrZoo is defined
+*)
+
 (** Size of type *)
-DeriveSized Zoo as "SizedZoo".
+Derive Sized for Zoo.
+(*
+SizedZoo is defined
+*)
+
 (** Size equations *)
-DeriveCanonicalSized Zoo as "CanonSizedZoo". (* Drop params maybe??? *)
-(** Monotonicity proof *)
-DeriveArbitrarySizedMonotonic Zoo as "ArbSizedMonZoo" using "ArbSizedZoo".
+Derive CanonicalSized for Zoo.
+(*
+CanonicalSizedZoo is defined
+ *)
+
+Derive SizeMonotonic for Zoo.
+
+  as "ArbSizedMonZoo" using "ArbSizedZoo".
 (** ArbitrarySize correct *)
 (* kinda slow - Note that it's the type checking that takes time not the term generation *)
 DeriveArbitrarySizedCorrect Zoo as "ArbCorrMonZoo" using "ArbSizedZoo" and "ArbSizedMonZoo".

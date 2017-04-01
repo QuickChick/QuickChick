@@ -327,6 +327,6 @@ let sizeEqType ty_ctr ctrs ind_scheme iargs =
   let zeroSized_spec = zeroEqProof ty_ctr ctrs ind_scheme (gInject "size") zeroType zeroSized iargs in
   let succSized_spec = succEqProof ty_ctr ctrs ind_scheme succType succSized iargs in
 
-  debug_coq_expr succSized_spec;
+  (* debug_coq_expr succSized_spec; *)
   gRecord [("zeroSized", zeroSized); ("succSized", succSized);
            ("zeroSized_spec", zeroSized_spec); ("succSized_spec", succSized_spec)]

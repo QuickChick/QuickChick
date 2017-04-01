@@ -135,7 +135,7 @@ let sizeMon ty_ctr ctrs size iargs inst_name =
     gFun ["s"]
          (fun [s] -> 
           gApp (gInject "monotonicGen")
-               [(gApp ~explicit:true (gInject ("arbitrarySize")) [full_dt; inst_name; (gVar s)])])
+               [(gApp ~explicit:true (gInject ("arbitrarySize")) [full_dt; hole; (gVar s)])])
   in 
   let mon_proof =
     gApp (gInject "nat_ind") [ret_type; base_case; ind_case; size]

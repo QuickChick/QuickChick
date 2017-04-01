@@ -21,6 +21,7 @@ open SizeMon
 open SizeSMon
 open SizeCorr
 open Constrarg
+open Feedback
 
 type derivation = SimpleDer of SimplDriver.derivable list
                 | DepDer of DepDriver.derivable 
@@ -31,7 +32,7 @@ let simpl_dispatch ind classes =
     | _ -> failwith "Implement me for functions" 
   in 
   List.iter (fun cn -> SimplDriver.derive cn ind (SimplDriver.mk_instance_name cn ind_name) "" "") classes
-  
+
 let dep_dispatch ind class_name = 
   (* TODO: turn this into a much once Zoe figures out what she wants *)
   let DepDriver.ArbitrarySizedSuchThat = class_name in 
@@ -54,6 +55,11 @@ let dispatch cn ind =
   let class_names = match s with 
     | "Arbitrary" -> SimpleDer [SimplDriver.GenSized; SimplDriver.Shrink]
     | "Show" -> SimpleDer [SimplDriver.Show]
+    | "Sized" -> SimpleDer [SimplDriver.Sized]
+    | "CanonicalSized" -> SimpleDer [SimplDriver.CanonicalSized]
+    | "SizeMonotonic" -> SimpleDer [SimplDriver.SizeMonotonic]
+    | "SizedMonotonic" -> SimpleDer [SimplDriver.SizedMonotonic]
+    | "SizedCorrect" -> SimpleDer [SimplDriver.SizedCorrect]
     | "ArbitrarySizedSuchThat" -> DepDer DepDriver.ArbitrarySizedSuchThat
   in
 
