@@ -69,7 +69,10 @@ let gVar (x : var) : coq_expr =
   CRef (Ident (dl x),None)
 
 (* Maybe this should do checks? *)
-let gInject s = CRef (Qualid (Loc.ghost, qualid_of_string s), None)
+let gInject s = 
+  if s = "" then failwith "Called gInject with empty string";
+  msg_error (str ("Calling qualid with " ^ s)  ++ fnl ());
+  CRef (Qualid (Loc.ghost, qualid_of_string s), None)
 
 type ty_param = Id.t (* Opaque *)
 let ty_param_to_string (x : Id.t) = Id.to_string x
