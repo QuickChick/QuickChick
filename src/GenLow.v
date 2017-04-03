@@ -84,8 +84,7 @@ Module Type GenLowInterface.
   (** Sized generators monotonic in the size parameter *)
   Class SizedMonotonic {A} (g : nat -> G A) :=
     {
-      (* TODO remove prime when GenSizedSizeMotonic is modified *)
-      sizeMonotonic' :
+      sizeMonotonic :
         forall s s1 s2,
           s1 <= s2 ->
           semGenSize (g s1) s \subset semGenSize (g s2) s
@@ -389,7 +388,7 @@ Module GenLow : GenLowInterface.
   Class SizedMonotonic {A} (g : nat -> G A) :=
     {
       (* TODO remove prime when GenSizedSizeMotonic is modified *)
-      sizeMonotonic' :
+      sizeMonotonic :
         forall s s1 s2,
           s1 <= s2 ->
           semGenSize (g s1) s \subset semGenSize (g s2) s

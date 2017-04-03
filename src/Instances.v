@@ -185,6 +185,11 @@ rewrite semSized => n; split=> // _; exists n; split=> //.
 by rewrite (semChooseSize _ _ _) /Random.leq /=.
 Qed.
 
+Instance ArbNatGenCorrect : Correct nat arbitrary.
+Proof.
+  constructor. now apply arbNat_correct.
+Qed.
+
 Lemma arbInt_correct s :
   semGenSize arbitrary s <-->
   [set z | (- Z.of_nat s <= z <= Z.of_nat s)%Z].

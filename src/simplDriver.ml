@@ -41,7 +41,7 @@ let mk_instance_name der tn =
     | Sized -> "Sized"
     | CanonicalSized -> "CanonicalSized"
     | SizeMonotonic -> "SizeMonotonic"
-    | SizedMonotonic -> "SizedMotonic"
+    | SizedMonotonic -> "SizedMonotonic"
     | SizedCorrect ->  "SizedCorrect"
   in var_to_string (fresh_name (prefix ^ tn))
 
@@ -52,7 +52,7 @@ let print_der = function
   | Sized -> "Sized"
   | CanonicalSized -> "CanonicalSized"
   | SizeMonotonic -> "SizeMonotonic"
-  | SizedMonotonic -> "SizedMotonic"
+  | SizedMonotonic -> "SizedMonotonic"
   | SizedCorrect ->  "SizedCorrect"
 
 (* Generic derivation function *)
@@ -62,7 +62,7 @@ let debugDerive (c : constr_expr) =
   | None -> failwith "Not supported type"
 
 (* Generic derivation function *)
-let derive (cn : derivable) (c : constr_expr) (instance_name : string) (extra_name : string) (extra_name2 : string) =
+let derive (cn : derivable) (c : constr_expr) (instance_name : string) (name1 : string) (name2 : string) =
 
   let (ty_ctr, ty_params, ctrs) =
     match coerce_reference_to_dt_rep c with
@@ -81,7 +81,7 @@ let derive (cn : derivable) (c : constr_expr) (instance_name : string) (extra_na
     | Sized -> "Sized"
     | CanonicalSized -> "CanonicalSized"
     | SizeMonotonic -> "SizeMonotonic"
-    | SizedMonotonic -> "SizedMotonic"
+    | SizedMonotonic -> "SizedMonotonic"
     | SizedCorrect ->  "SizedCorrect"
   in
 
@@ -125,11 +125,14 @@ let derive (cn : derivable) (c : constr_expr) (instance_name : string) (extra_na
     match cn with
     | SizeMonotonic ->
       let (_, size) = take_last iargs [] in
-      gApp (gInject class_name)
-        [(gApp ~explicit:true (gInject ("arbitrarySize")) [full_dt; hole; (gVar size)])]
+      let (_, size) = take_last iargs [] in
+      gApp ~explicit:true (gInject class_name) [full_dt; gApp (gInject ("arbitrarySized")) [gVar size]]
+    | SizedMonotonic ->
+      gApp ~explicit:true (gInject class_name) [full_dt; gInject ("arbitrarySized")]
+
     | SizedCorrect ->
-      gApp (gInject class_name)
-        [(gApp ~explicit:true (gInject ("arbitrarySize")) [full_dt; (gInject extra_name)])]
+      gApp ~explicit:true (gInject class_name)
+        [full_dt; hole; gInject ("arbitrarySized")]
     | _ -> gApp (gInject class_name) [full_dt]
   in
   (* Create the instance record. Only need to extend this for extra instances *)
@@ -145,12 +148,11 @@ let derive (cn : derivable) (c : constr_expr) (instance_name : string) (extra_na
       sizeEqType ty_ctr ctrs ind_scheme iargs
     | SizeMonotonic ->
       let (iargs', size) = take_last iargs [] in
-      sizeMon ty_ctr ctrs (gVar size) iargs' (gInject extra_name)
+      sizeMon ty_ctr ctrs (gVar size) iargs' (gInject name1)
     | SizedMonotonic ->
-      hole
-      (* sizeSMon ty_ctr ctrs iargs *)
+      sizeSMon ty_ctr ctrs iargs
     | SizedCorrect ->
-      genCorr ty_ctr ctrs iargs (gInject extra_name) (gInject extra_name2)
+      genCorr ty_ctr ctrs iargs (gInject name1) (gInject name2)
   in
   declare_class_instance instance_arguments instance_name instance_type instance_record
 

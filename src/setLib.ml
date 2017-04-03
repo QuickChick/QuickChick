@@ -49,7 +49,7 @@ let incl_refl =
   gApp (gInject "incl_refl") [hole]
 
 let incl_hd_same p =
-  gApp (gInject "incl_hd_same") [hole; hole; hole; p]
+  gApp ~explicit:true (gInject "incl_hd_same") [hole; hole; hole; hole; p]
 
 let incl_tl p =
   gApp (gInject "incl_tl") [hole; p]
@@ -73,7 +73,7 @@ let eq_bigcupl x1 x2 p = gApp (gInject "eq_bigcupl") [x1; x2; p]
 
 let cons_set_eq x l = gApp (gInject "cons_set_eq") [x; l]
 
-let singl_set_eq x l = gApp (gInject "singl_set_eq") [x; l]
+let singl_set_eq a x = gApp ~explicit:true (gInject "singl_set_eq") [a; x]
 
 let bigcup_setU_l x1 x2 x3 = gApp (gInject "bigcup_setU_l") [x1; x2; x3]
 
@@ -96,7 +96,7 @@ let incl_bigcup_compat p1 p2 =
   gApp (gInject "incl_bigcup_compat") [p1; p2]
 
 let incl_subset l1 l2 p =
-  gApp (gInject "incl_subset") [l1; l2; p]
+  gApp ~explicit:true (gInject "incl_subset") [hole; l1; l2; p]
 
 let setU_set_subset_compat p1 p2 =
   gApp (gInject "setU_set_subset_compat") [p1; p2]

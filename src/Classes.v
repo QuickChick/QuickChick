@@ -60,7 +60,7 @@ Class CanonicalSized (A : Type) `{Sized A} :=
 (** Correctness of sized generators *)
 Class SizedCorrect {A : Type} `{Sized A} (g : nat -> G A) :=
   {
-    genSizeCorrect : forall s, semGen (g s) <--> [set x : A | size x <= s ]
+    arbitrarySizedCorrect : forall s, semGen (g s) <--> [set x : A | size x <= s ]
   }.
 
 (** Correctness of generators *)
@@ -76,15 +76,7 @@ Class GenSizedMonotonic (A : Type) `{GenSized A}
       `{forall s, SizeMonotonic (arbitrarySized s)}.
 
 (** Monotonicity of size parametric generators v2 *)
-(* TODO use SizedMonotonic instead *)
-Class GenSizedSizeMonotonic (A : Type) `{GenSized A} :=
-  {
-    sizeMonotonic :
-      forall s s1 s2,
-        s1 <= s2 ->
-        semGenSize (arbitrarySized s1) s 
-        \subset semGenSize (arbitrarySized s2) s
-  }.
+Class GenSizedSizeMonotonic (A : Type) `{GenSized A} `{SizedMonotonic A arbitrarySized}.
 
 Class GenMonotonic (A : Type) `{Gen A} `{SizeMonotonic A arbitrary}.
 
@@ -99,7 +91,28 @@ Class GenMonotonicCorrect (A : Type)
       `{Gen A} `{SizeMonotonic A arbitrary} `{Correct A arbitrary}.
 
 (** Coercions *)
+  
+Instance GenSizedMonotonicOfSizeMonotonic
+         (A : Type) (Hgen : GenSized A) (Hmon : forall s, @SizeMonotonic A (arbitrarySized s))
+: @GenSizedMonotonic A Hgen Hmon.
+  
+Instance GenMonotonicOfSizeMonotonic
+         (A : Type) (Hgen : Gen A) (Hmon : @SizeMonotonic A arbitrary)
+: @GenMonotonic A Hgen Hmon.
 
+Instance GenSizedCorrectOfSizedCorrect
+         (A : Type) (Hgen : GenSized A) `{Hcor : SizedCorrect A arbitrarySized}
+: @GenSizedCorrect A Hgen _ Hcor.
+
+Instance GenCorrectOfCorrect
+         (A : Type) (Hgen : Gen A) `{Hcor : Correct A arbitrary}
+: @GenCorrect A Hgen Hcor.
+
+Instance GenSizedSizeMonotonicOfSizedMonotonic
+         (A : Type) (Hgen : GenSized A) (Hmon : @SizedMonotonic A arbitrarySized)
+: @GenSizedSizeMonotonic A Hgen Hmon.
+
+(* Zoe : Is global really needed here? *)
 Global Instance GenOfGenSized {A} `{GenSized A} : Gen A :=
   {| arbitrary := sized arbitrarySized |}.
 
@@ -110,26 +123,20 @@ Generalizable Variables PSized PMon PSMon PCorr.
 Instance GenMonotonicOfSized (A : Type)
          {H : GenSized A}
          `{@GenSizedMonotonic A H PMon}
-         `{@GenSizedSizeMonotonic A H}
-: SizeMonotonic arbitrary.
-Proof.
-  constructor. eapply sizedSizeMonotonic.
-  now intros n; eauto with typeclass_instances.
-  edestruct H1. constructor. eauto.
-Qed.
+         `{@GenSizedSizeMonotonic A H PSMon}
+: GenMonotonic A.
 
 Instance GenCorrectOfSized (A : Type)
          {H : GenSized A}
          `{@GenSizedMonotonic A H PMon}
-         `{@GenSizedSizeMonotonic A H}
+         `{@GenSizedSizeMonotonic A H PSMon}
          `{@GenSizedCorrect A H PSized PCorr} : Correct A arbitrary.
 Proof.
   constructor. unfold arbitrary, GenOfGenSized. 
   eapply set_eq_trans.
   - eapply semSized_alt; eauto with typeclass_instances.
-    destruct H1. eauto.
-  - setoid_rewrite genSizeCorrect.
+    destruct PSMon. eauto.
+  - setoid_rewrite arbitrarySizedCorrect.
     split. intros [n H3]. constructor; eauto.
     intros H4. eexists; split; eauto.
 Qed.
-

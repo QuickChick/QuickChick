@@ -1,6 +1,8 @@
 Require Import mathcomp.ssreflect.ssreflect.
+Require Import Classes.RelationClasses Classes.Morphisms List Tactics.
 From mathcomp Require Import ssrfun ssrbool ssrnat seq.
-Require Import Classes.RelationClasses Classes.Morphisms.
+
+Import ListNotations.
 
 Set Implicit Arguments.
 Unset Strict Implicit.
@@ -161,6 +163,16 @@ Lemma subset_respects_set_eq_r :
     s3 <--> s2 -> s1 \subset s2 -> s1 \subset s3.
 Proof.
   now firstorder.
+Qed.
+
+Lemma subset_respects_set_eq :
+  forall {T : Type} {s1 s2 s1' s2' : set T},
+    s1 <--> s1' ->
+    s2 <--> s2' ->
+    s1' \subset s2' ->
+    s1 \subset s2.
+Proof.
+  firstorder.
 Qed.
 
 Lemma imsetT T U (f : T -> U) : f @: setT <--> codom f.
@@ -658,4 +670,21 @@ Lemma cons_set_eq {A} (x : A) l :
   (x :: l) <--> [set x] :|: l.
 Proof. by []. Qed.
 
+Lemma singl_set_eq: forall (A : Type) (x : A), [ x ] <--> [ set x ].
+Proof.
+  intros A x x'; split; intros H.
+  - inv H. reflexivity. now inv H0.
+  - inv H. now constructor.
+Qed.
 
+Lemma incl_subset {A : Type} (l1 l2 : seq A) :
+  incl l1 l2 -> l1 \subset l2.
+Proof.
+  intros Hi x; eapply Hi.
+Qed.
+
+Lemma incl_hd_same {A : Type} (a : A) (l1 l2 : seq A) :
+  incl l1 l2 -> incl (a :: l1) (a :: l2).
+Proof.
+  intros Hin. firstorder.
+Qed.

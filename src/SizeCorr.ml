@@ -175,7 +175,7 @@ let genCorr ty_ctr ctrs iargs inst_name mon_inst_name =
     gFun ["n"; "s"]
       (fun [n; s] ->
         set_eq
-          (gApp (gInject ("semGen")) [gApp (gInject "arbitrarySize") [gVar n]])
+          (gApp (gInject ("semGen")) [gApp (gInject "arbitrarySized") [gVar n]])
           (gVar s))
   in
 
@@ -187,4 +187,4 @@ let genCorr ty_ctr ctrs iargs inst_name mon_inst_name =
             base_case; ind_case (mon_proof (gVar n)); (gVar n)])
   in
   debug_coq_expr gen_proof;
-  gRecord [("genSizeCorrect", gen_proof)]
+  gRecord [("arbitrarySizedCorrect", gen_proof)]

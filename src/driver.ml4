@@ -13,6 +13,7 @@ open Topconstr
 open Constrexpr
 open Constrexpr_ops
 open Decl_kinds
+open Names
 open GenericLib
 open SetLib
 open CoqLib
@@ -26,12 +27,12 @@ open Feedback
 type derivation = SimpleDer of SimplDriver.derivable list
                 | DepDer of DepDriver.derivable 
 
-let simpl_dispatch ind classes = 
+let simpl_dispatch ind classes name1 name2 = 
   let ind_name = match ind with 
     | CRef (r, _) -> string_of_qualid (snd (qualid_of_reference r))
     | _ -> failwith "Implement me for functions" 
-  in 
-  List.iter (fun cn -> SimplDriver.derive cn ind (SimplDriver.mk_instance_name cn ind_name) "" "") classes
+  in
+  List.iter (fun cn -> SimplDriver.derive cn ind (SimplDriver.mk_instance_name cn ind_name) name1 name2) classes
 
 let dep_dispatch ind class_name = 
   (* TODO: turn this into a much once Zoe figures out what she wants *)
@@ -46,7 +47,7 @@ let dep_dispatch ind class_name =
      DepDriver.deriveDependent class_name constructor n (DepDriver.mk_instance_name class_name ctr_name)
   | _ -> failwith "wrongformat"
 
-let dispatch cn ind = 
+let dispatch cn ind name1 name2 = 
   let s = match cn with 
     | CRef (r, _) -> string_of_qualid (snd (qualid_of_reference r))
     | _ -> failwith "Usage: Derive <class_name> for <inductive_name>"
@@ -64,17 +65,16 @@ let dispatch cn ind =
   in
 
   match class_names with 
-  | SimpleDer classes -> simpl_dispatch ind classes
+  | SimpleDer classes -> simpl_dispatch ind classes name1 name2
   | DepDer classes -> dep_dispatch ind classes 
 
 VERNAC COMMAND EXTEND Derive CLASSIFIED AS SIDEFF
    | ["Derive" constr(class_name) "for" constr(inductive)] -> 
-      [dispatch class_name inductive]
-(*   | ["Derive" constr(class_name) "for" constr(inductive) "as" string(s1)] -> 
-      [dispatch class_name inductive (Some s1) None]
-   | ["Derive" constr(class_name) "for" constr(inductive) "as" string(s1) "and" string(s2)] -> 
-      [dispatch class_name inductive (Some s1) (Some s2)]
- *)
+      [dispatch class_name inductive "" ""]
+   | ["Derive" constr(class_name) "for" constr(inductive) "using" ident(genInst)] -> 
+     [dispatch class_name inductive (Names.string_of_id genInst) ""]
+   | ["Derive" constr(class_name) "for" constr(inductive) "using" ident(genInst) "and" ident(monInst) ] -> 
+     [dispatch class_name inductive (Names.string_of_id genInst) (Names.string_of_id monInst)]
 END;;
 
 (*
