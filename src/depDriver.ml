@@ -74,7 +74,7 @@ let deriveDependent (cn : derivable) (c : constr_expr) n (instance_name : string
 
 
   let class_name = match cn with
-    | ArbitrarySizedSuchThat -> "ArbitrarySizedSuchThat"
+    | ArbitrarySizedSuchThat -> "GenSizedSuchThat"
     | ArbSizeSTMonotonic -> ""
     | ArbSizeSTSizeMonotonic -> ""
     | ArbSizeCorrect -> ""
