@@ -95,7 +95,7 @@ let gArg ?assumName:(an=hole) ?assumType:(at=hole) ?assumImplicit:(ai=false) ?as
                   (if ag then Generalized (Implicit, Implicit, false)                       
                    else if ai then Default Implicit else Default Explicit),
                   at )
-               
+
 let str_lst_to_string sep (ss : string list) = 
   List.fold_left (fun acc s -> acc ^ sep ^ s) "" ss
 

@@ -19,33 +19,45 @@ open CoqLib
 open ArbitrarySizedST
 open Feedback
 
+(** Derivable classes *)
 type derivable =
     ArbitrarySizedSuchThat
-  | ArbSizeSTMonotonic
-  | ArbSizeSTSizeMonotonic
-  | ArbSizeCorrect
+  | GenSizeSuchThatMonotonic
+  | GenSizedSuchThatSizeMonotonic
+  | GenSizedSuchThatCorrect
 
 let print_der = function
   | ArbitrarySizedSuchThat -> "ArbitrarySizedSuchThat"
-  | ArbSizeSTMonotonic -> ""
-  | ArbSizeSTSizeMonotonic -> ""
-  | ArbSizeCorrect -> ""
+  | GenSizeSuchThatMonotonic
+  | GenSizedSuchThatSizeMonotonic
+  | GenSizedSuchThatCorrect -> ""
 
-let mk_instance_name der tn = 
-  let prefix = match der with 
+
+let class_name cn =
+  match cn with
+  | ArbitrarySizedSuchThat -> "GenSizedSuchThat"
+  | GenSizeSuchThatMonotonic
+  | GenSizedSuchThatSizeMonotonic
+  | GenSizedSuchThatCorrect -> ""
+
+(** Name of the instance to be generated *)
+let mk_instance_name der tn =
+  let prefix = match der with
     | ArbitrarySizedSuchThat -> "arbSizedST"
   in var_to_string (fresh_name (prefix ^ tn))
 
-(* Generic derivation function *)
-let deriveDependent (cn : derivable) (c : constr_expr) n (instance_name : string) =
-  let (ty_ctr, ty_params, ctrs, dep_type) = 
+(** Generic derivation function *)
+let deriveDependent (cn : derivable) (c : constr_expr) (n : int) (instance_name : string) =
+
+  let (ty_ctr, ty_params, ctrs, dep_type) : (ty_ctr * (ty_param list) * (dep_ctr list) * dep_type) =
     match coerce_reference_to_dep_dt c with
     | Some dt -> msg_debug (str (dep_dt_to_string dt) ++ fnl()); dt 
     | None -> failwith "Not supported type" in
+
   msg_debug (str (string_of_int n) ++ fnl ());
   debug_coq_expr (gType ty_params dep_type);
 
-  let input_types =
+  let (input_types : dep_type list) =
     let rec aux acc i = function
       | DArrow (dt1, dt2) 
       | DProd ((_,dt1), dt2) ->
@@ -59,26 +71,23 @@ let deriveDependent (cn : derivable) (c : constr_expr) n (instance_name : string
     in List.rev (aux [] 1 dep_type) (* 1 because of using 1-indexed counting for the arguments *)       
   in
 
+  (* type constructor *)
   let coqTyCtr = gTyCtr ty_ctr in
+  (* parameters of the type constructor *)
   let coqTyParams = List.map gTyParam ty_params in
 
+  (* Fully applied type constructor *)
   let full_dt = gApp ~explicit:true coqTyCtr coqTyParams in
 
+  (* Name for type indices *)
   let input_names = List.mapi (fun i _ -> Printf.sprintf "input%d_" i) input_types in
-
+  
   let forGen = "_forGen" in
 
+
   let params = List.map (fun tp -> gArg ~assumName:(gTyParam tp) ()) ty_params in
+  
   let inputs = List.map (fun (n,t) -> gArg ~assumName:(gVar (fresh_name n)) ~assumType:(gType ty_params t) ()) (List.combine input_names input_types) in
-
-
-
-  let class_name = match cn with
-    | ArbitrarySizedSuchThat -> "GenSizedSuchThat"
-    | ArbSizeSTMonotonic -> ""
-    | ArbSizeSTSizeMonotonic -> ""
-    | ArbSizeCorrect -> ""
-  in
 
   (* TODO: These should be generated through some writer monad *)
   (* XXX Put dec_needed in ArbitrarySizedSuchThat *)
@@ -91,7 +100,6 @@ let deriveDependent (cn : derivable) (c : constr_expr) n (instance_name : string
                             ~assumGeneralized:true ()] 
      else [] in*)
 
-
   let arbitraries = ref ArbSet.empty in
 
   (* this is passed as an arg to arbitrarySizedST. Yikes! *)
@@ -99,10 +107,13 @@ let deriveDependent (cn : derivable) (c : constr_expr) n (instance_name : string
     arbitraries := ArbSet.add dt !arbitraries
   in
 
-  (* Leo, I hate myself for doing this.... *)
+  (* The type of the dependent generator *)
   let gen_type = gGen (gOption (gType ty_params (nthType n dep_type))) in
-  let gen = arbitrarySizedST ty_ctr dep_type gen_type ctrs input_names inputs n register_arbitrary (* XXX *) in 
+  
+  (* The dependent generator  *)
+  let gen = arbitrarySizedST ty_ctr dep_type gen_type ctrs input_names inputs n register_arbitrary (* XXX *) in
 
+  (* Generate arbitrary parameters *)
   let arb_needed = 
     ArbSet.fold
       (fun dt acc ->
@@ -122,14 +133,13 @@ let deriveDependent (cn : derivable) (c : constr_expr) n (instance_name : string
   (* The instance type *)
   let instance_type iargs = match cn with
     | ArbitrarySizedSuchThat ->
-      gApp (gInject class_name)
+      gApp (gInject (class_name cn))
         [gType ty_params (nthType n dep_type);
          gFun [forGen] (fun [fg] -> gApp (full_dt) (list_insert_nth (gVar fg) (List.map (fun n -> gVar (fresh_name n)) input_names) (n-1)))]
     | _ -> failwith "Unimplemented"
   in
   
   let instance_record iargs =
-    (* Copying code for Arbitrary, Sized from derive.ml *)
     match cn with
     | ArbitrarySizedSuchThat -> gen
     | _ -> failwith "Unimplemented"
@@ -137,6 +147,7 @@ let deriveDependent (cn : derivable) (c : constr_expr) n (instance_name : string
 
   msg_debug (str "Instance Type: " ++ fnl ());
   debug_coq_expr (instance_type [gInject "input0"; gInject "input1"]);
+
   declare_class_instance instance_arguments instance_name instance_type instance_record
 ;;
 

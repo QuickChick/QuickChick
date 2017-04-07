@@ -61,7 +61,7 @@ let dispatch cn ind name1 name2 =
     | "SizeMonotonic" -> SimpleDer [SimplDriver.SizeMonotonic]
     | "SizedMonotonic" -> SimpleDer [SimplDriver.SizedMonotonic]
     | "SizedCorrect" -> SimpleDer [SimplDriver.SizedCorrect]
-    | "ArbitrarySizedSuchThat" -> DepDer DepDriver.ArbitrarySizedSuchThat
+    | "SizedSuchThat" -> DepDer DepDriver.ArbitrarySizedSuchThat
   in
 
   match class_names with 
