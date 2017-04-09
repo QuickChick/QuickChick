@@ -2,6 +2,8 @@ Declare ML Module "genericLib".
 Declare ML Module "coqLib".
 Declare ML Module "setLib".
 Declare ML Module "semLib".
+Declare ML Module "genLib".
+
 Declare ML Module "quickChick".
 
 Declare ML Module "Sized".
@@ -10,6 +12,7 @@ Declare ML Module "SizeMon".
 Declare ML Module "SizeSMon".
 Declare ML Module "SizeCorr".
 Declare ML Module "ArbitrarySizedST".
+Declare ML Module "GenSizedSTMonotonic".
 
 Declare ML Module "simplDriver".
 Declare ML Module "depDriver".

@@ -708,31 +708,6 @@ let decToBool c =
            ; (injectCtr "right", ["neq"], fun _ -> gFalse)
            ]
 
-(* Gen combinators *)
-let gGen c = gApp (gInject "G") [c]
-
-let returnGen c = gApp (gInject "returnGen") [c]
-let bindGen cg xn cf = 
-  gApp (gInject "bindGen") [cg; gFun [xn] (fun [x] -> cf x)]
-
-let bindGenOpt cg xn cf = 
-  gApp (gInject "bindGenOpt") [cg; gFun [xn] (fun [x] -> cf x)]
-
-let oneof l =
-  match l with
-  | [] -> failwith "oneof used with empty list"
-  | [c] -> c
-  | c::cs -> gApp (gInject "oneof") [c; gList l]
-       
-let frequency l =
-  match l with
-  | [] -> failwith "frequency used with empty list"
-  | [(_,c)] -> c
-  | (_,c)::cs -> gApp (gInject "frequency") [c; gList (List.map gPair l)]
-
-let backtracking l = gApp (gInject "backtrack") [gList (List.map gPair l)]
-let uniform_backtracking l = backtracking (List.combine (List.map (fun _ -> gInt 1) l) l)
-
 (* Recursion combinators / fold *)
 (* fold_ty : ( a -> coq_type -> a ) -> ( ty_ctr * coq_type list -> a ) -> ( ty_param -> a ) -> coq_type -> a *)
 let rec fold_ty arrow_f ty_ctr_f ty_param_f ty = 

@@ -26,12 +26,12 @@ Instance backtrackSizeMonotonic :
     SizeMonotonic (backtrack lg).
 Admitted.
 
-Print genGoodNarrow'.
+Print arbSizedSTgoodFooNarrow.
 
 Typeclasses eauto := debug.
 
 (* Interesting. Do we need Global instance?? *) 
-Existing Instance genGoodNarrow'.  (* ???? *)
+Existing Instance arbSizedSTgoodFooNarrow.  (* Why???? *)
 
 Lemma cons_subset {A : Type} (x : A) (l : seq A) (P : set A) :
   P x ->
@@ -53,25 +53,35 @@ Instance bindOptMonotonic
   SizeMonotonic (bindGenOpt g f).
 Admitted.
 
-Instance genGoodNarrowMon (s : nat) (input : nat) :
-  SizeMonotonic (@arbitrarySizeST _ (fun (x : Foo) => goodFooNarrow input x) _ s).
+Typeclasses eauto := debug.
+
+
+Instance genGoodNarrowMon :
+  (forall (size : nat) (input0_ : nat),
+     SizeMonotonic
+       (@arbitrarySizeST Foo (fun _forGen => (@goodFooNarrow) input0_ _forGen) _ size)).
 Proof.
-  revert input.
-  refine (nat_ind (fun s => forall input, SizeMonotonic (arbitrarySizeST s)) (fun input => _) (fun s IHs input => _) s).
-  -
-    (* Experience shows that we will an annotation for the generators list.
-       However current implementation uses references with a non transparent way
-       so we should NOT run the code twice *)
-    refine (backtrackSizeMonotonic _ _).
+  Set Printing All.
+  refine
+    (nat_ind (fun s =>
+                forall input,
+                  SizeMonotonic
+                    (@arbitrarySizeST Foo (fun _forGen => (@goodFooNarrow) input _forGen) _ s))
+                    (fun input => _) (fun s IHs input => _)).
+  - simpl.
+    eapply backtrackSizeMonotonic.
     refine (cons_subset _ _ _ _ (nil_subset _)).
     now eauto with typeclass_instances.
   - refine (backtrackSizeMonotonic _ _).
     refine (cons_subset _ _ _ _ _).
     now eauto with typeclass_instances.
     refine (cons_subset _ _ _ _ _).
-    simpl. (* dep_dec gets simplified *)
     refine (@bindOptMonotonic _ _ _ _ (IHs 0) _).
-    eapply nil_subset.
+    intros x.
+    destruct (goodFooNarrow 1 x ?).
+    now eauto with typeclass_instances.
+    now eauto with typeclass_instances.
+    eapply nil_subset.    
 Qed.
 
 Existing Instance genGoodUnif'.  (* ???? *)

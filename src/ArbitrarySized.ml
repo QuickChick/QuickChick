@@ -16,7 +16,7 @@ open Decl_kinds
 open GenericLib
 open SetLib
 open CoqLib
-
+open GenLib
 
 (* Derivation of ArbitrarySized. Contains mostly code from derive.ml *)
 

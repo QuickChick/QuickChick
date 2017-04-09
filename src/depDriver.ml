@@ -16,19 +16,20 @@ open Decl_kinds
 open GenericLib
 open SetLib
 open CoqLib
+open GenLib
 open ArbitrarySizedST
 open Feedback
 
 (** Derivable classes *)
 type derivable =
     ArbitrarySizedSuchThat
-  | GenSizeSuchThatMonotonic
+  | GenSizedSuchThatMonotonic
   | GenSizedSuchThatSizeMonotonic
   | GenSizedSuchThatCorrect
 
 let print_der = function
   | ArbitrarySizedSuchThat -> "ArbitrarySizedSuchThat"
-  | GenSizeSuchThatMonotonic
+  | GenSizedSuchThatMonotonic -> "SizeMonotonic"
   | GenSizedSuchThatSizeMonotonic
   | GenSizedSuchThatCorrect -> ""
 
@@ -36,7 +37,7 @@ let print_der = function
 let class_name cn =
   match cn with
   | ArbitrarySizedSuchThat -> "GenSizedSuchThat"
-  | GenSizeSuchThatMonotonic
+  | GenSizedSuchThatMonotonic -> "SizeMonotonic"
   | GenSizedSuchThatSizeMonotonic
   | GenSizedSuchThatCorrect -> ""
 
@@ -44,6 +45,8 @@ let class_name cn =
 let mk_instance_name der tn =
   let prefix = match der with
     | ArbitrarySizedSuchThat -> "arbSizedST"
+    | GenSizedSuchThatMonotonic -> "SizeMonotonic"
+    | _ -> failwith "Not implemented"
   in var_to_string (fresh_name (prefix ^ tn))
 
 (** Generic derivation function *)
@@ -107,9 +110,17 @@ let deriveDependent (cn : derivable) (c : constr_expr) (n : int) (instance_name 
     arbitraries := ArbSet.add dt !arbitraries
   in
 
+  (* The type we are generating for -- not the predicate! *)
+  let full_gtyp = (gType ty_params (nthType n dep_type)) in
+
   (* The type of the dependent generator *)
-  let gen_type = gGen (gOption (gType ty_params (nthType n dep_type))) in
-  
+  let gen_type = gGen (gOption full_gtyp) in
+
+  (* Fully applied predicate (parameters and constructors) *)
+  let full_pred inputs =
+    gFun [forGen] (fun [fg] -> gApp (full_dt) (list_insert_nth (gVar fg) inputs (n-1)))
+  in
+
   (* The dependent generator  *)
   let gen = arbitrarySizedST ty_ctr dep_type gen_type ctrs input_names inputs n register_arbitrary (* XXX *) in
 
@@ -122,12 +133,16 @@ let deriveDependent (cn : derivable) (c : constr_expr) (n : int) (instance_name 
   in
 
   (* Generate typeclass constraints. For each type parameter "A" we need `{_ : <Class Name> A} *)
-  let instance_arguments = params
-                         @ gen_needed
-                         @ dec_needed
-                         @ self_dec
-                         @ arb_needed
-                         @ inputs
+  let instance_arguments = match cn with
+    | ArbitrarySizedSuchThat ->
+      params
+      @ gen_needed
+      @ dec_needed
+      @ self_dec
+      @ arb_needed
+      @ inputs
+    | GenSizedSuchThatMonotonic -> []
+    | _ -> []
   in
 
   (* The instance type *)
@@ -135,13 +150,24 @@ let deriveDependent (cn : derivable) (c : constr_expr) (n : int) (instance_name 
     | ArbitrarySizedSuchThat ->
       gApp (gInject (class_name cn))
         [gType ty_params (nthType n dep_type);
-         gFun [forGen] (fun [fg] -> gApp (full_dt) (list_insert_nth (gVar fg) (List.map (fun n -> gVar (fresh_name n)) input_names) (n-1)))]
+         full_pred (List.map (fun n -> gVar (fresh_name n)) input_names)]
+    | GenSizedSuchThatMonotonic ->
+      gProdWithArgs
+        ((gArg ~assumType:(gInject "nat") ~assumName:(gInject "size") ()) :: inputs)
+        (fun (size :: inputs) ->
+           gApp (gInject (class_name cn))
+             [gApp ~explicit:true (gInject "arbitrarySizeST")
+                [full_gtyp; full_pred (List.map gVar inputs); hole; gVar size]])
     | _ -> failwith "Unimplemented"
   in
-  
+
   let instance_record iargs =
     match cn with
     | ArbitrarySizedSuchThat -> gen
+    | GenSizedSuchThatMonotonic ->
+      msg_debug (str "mon type");
+      debug_coq_expr (instance_type []);
+      hole
     | _ -> failwith "Unimplemented"
   in
 

@@ -32,3 +32,6 @@ let semFreqSize g gs size =
 
 let semBindSize g f size =
   gApp (gInject "semBindSize") [g; f; size]
+
+let backtrackSizeMonotonic lst proof =
+  gApp (gInject "backtrackSizeMonotonic") [lst; proof]

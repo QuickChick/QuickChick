@@ -36,7 +36,7 @@ let simpl_dispatch ind classes name1 name2 =
 
 let dep_dispatch ind class_name = 
   (* TODO: turn this into a much once Zoe figures out what she wants *)
-  let DepDriver.ArbitrarySizedSuchThat = class_name in 
+  (* let DepDriver.ArbitrarySizedSuchThat = class_name in  *)
   match ind with 
   | CLambdaN (_loc1, [([(_loc2, Name id)], _kind, _type)], CApp (_loc3, (_flag, constructor), args)) ->
      let n = fst (List.find (fun (_,(CRef (r,_), _)) -> Id.to_string id = string_of_reference r) (List.mapi (fun i x -> (i+1,x)) args)) in
@@ -53,7 +53,7 @@ let dispatch cn ind name1 name2 =
     | _ -> failwith "Usage: Derive <class_name> for <inductive_name>"
   in 
 
-  let class_names = match s with 
+  let class_names = match s with
     | "Arbitrary" -> SimpleDer [SimplDriver.GenSized; SimplDriver.Shrink]
     | "Show" -> SimpleDer [SimplDriver.Show]
     | "Sized" -> SimpleDer [SimplDriver.Sized]
@@ -62,6 +62,7 @@ let dispatch cn ind name1 name2 =
     | "SizedMonotonic" -> SimpleDer [SimplDriver.SizedMonotonic]
     | "SizedCorrect" -> SimpleDer [SimplDriver.SizedCorrect]
     | "SizedSuchThat" -> DepDer DepDriver.ArbitrarySizedSuchThat
+    | "SizeMonotonicSuchThat" -> DepDer DepDriver.GenSizedSuchThatMonotonic
   in
 
   match class_names with 

@@ -16,6 +16,7 @@ open Decl_kinds
 open GenericLib
 open SetLib
 open CoqLib
+open GenLib
 
 let list_drop_every n l =
   let rec aux i = function

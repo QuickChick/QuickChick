@@ -129,7 +129,6 @@ let derive (cn : derivable) (c : constr_expr) (instance_name : string) (name1 : 
       gApp ~explicit:true (gInject class_name) [full_dt; gApp (gInject ("arbitrarySized")) [gVar size]]
     | SizedMonotonic ->
       gApp ~explicit:true (gInject class_name) [full_dt; gInject ("arbitrarySized")]
-
     | SizedCorrect ->
       gApp ~explicit:true (gInject class_name)
         [full_dt; hole; gInject ("arbitrarySized")]

@@ -16,6 +16,7 @@ open Decl_kinds
 open GenericLib
 open SetLib
 open CoqLib
+open GenLib
 open Feedback
 
 (* TODO : move to utils or smth *)
@@ -97,7 +98,7 @@ let unk_provider =
    raise an equality check *)
 let rec raiseMatch (k : umap) (c : constructor) (rs : range list) (eqs: EqSet.t) 
         : (umap * matcher_pat * EqSet.t) option = 
-  foldM (fun (k, l, eqs) r ->
+  (foldM (fun (k, l, eqs) r ->
          match r with 
          | Ctr (c', rs') ->
             raiseMatch k c' rs' eqs >>= fun (k', m, eqs') ->
@@ -112,9 +113,9 @@ let rec raiseMatch (k : umap) (c : constructor) (rs : range list) (eqs: EqSet.t)
                Some (UM.add u' (Unknown u) k, (MatchU u')::l, eq_set_add u' u eqs)
             | _ -> failwith "Not supported yet"
             end
-        ) (Some (k, [], eqs)) rs >>= fun (k', l, eqs') ->
+        ) (Some (k, [], eqs)) rs) >>= fun (k', l, eqs') ->
   Some (k', MatchCtr (c, List.rev l), eqs')
-       
+
 (* Invariants: 
    -- Everything has a binding, even if just Undef 
    -- r1, r2 are never FixedInput, Undef (handled inline)
@@ -301,18 +302,16 @@ let arbitrarySizedST gen_ctr dep_type gen_type ctrs input_names inputs n registe
       aux map typ
     in
 
-
     let init_map = UM.add forGen (Undef (nthType n dep_type)) 
                                  (List.fold_left (fun m n -> UM.add n FixedInput m) 
-                                                 (register_unknowns UM.empty) input_names) 
+                                    (register_unknowns UM.empty) input_names) 
     in
 
     msg_debug (str ("Calculating ranges: " ^ dep_type_to_string (dep_result_type typ)) ++ fnl ());
-
+    
     let ranges = match dep_result_type typ with
       | DTyCtr (_, dts) -> List.map convert_to_range dts
       | _ -> failwith "Not the expected result type" in
-
     let inputsWithGen = inputWithGen n input_names in
 
     (* Debugging init map *)
@@ -323,9 +322,10 @@ let arbitrarySizedST gen_ctr dep_type gen_type ctrs input_names inputs n registe
                 (fun _ -> ()) (fun _ -> ()) (fun _ -> ()) (fun _ -> ()) typ;
     (* End debugging *)
 
+    (* unify inputs and gen with result type *)
     match foldM (fun (k, eqs, ms) (r, n) -> unify k (Unknown n) r eqs >>= fun (k', _, eqs', ms') ->
-                                      Some (k', eqs', ms @ ms')
-          ) (Some (init_map, EqSet.empty, [])) (List.combine ranges inputsWithGen) with
+                  Some (k', eqs', ms @ ms')
+                ) (Some (init_map, EqSet.empty, [])) (List.combine ranges inputsWithGen) with
     | None -> failwith "Matching result type error" 
     | Some (map, eqs, matches) -> 
 
@@ -349,7 +349,7 @@ let arbitrarySizedST gen_ctr dep_type gen_type ctrs input_names inputs n registe
         | None -> 
           (if opt then bindGenOpt else bindGen) g (var_to_string x) 
             (fun x -> cont (fixVariable x k) cmap x)
-      in        
+      in
 
       (* Function to instantiate a single range *)
       (* It also uses any checks present in the check-map *)
@@ -386,7 +386,8 @@ let arbitrarySizedST gen_ctr dep_type gen_type ctrs input_names inputs n registe
 
       (* Handle a single type constructor and recurse in dt2 *)
       (* Handle only *updates* the check map. The checks are implemented at the beginning of recurse *)
-      let rec handle_TyCtr pos c dts k cmap dt2 rec_name = 
+      let rec handle_TyCtr (pos : bool) (c : ty_ctr) (dts : dep_type list)
+                (k : umap) (cmap : cmap) (dt2 : dep_type) (rec_name : var) =
         let numbered_dts = List.mapi (fun i dt -> (i+1, dt)) dts in (* +1 because of nth being 1-indexed *)
 
         (* Construct the checker for the current type constructor *)
@@ -522,6 +523,7 @@ let arbitrarySizedST gen_ctr dep_type gen_type ctrs input_names inputs n registe
               msg_debug (str (Printf.sprintf "Processing Match: %s @ %s" (Unknown.to_string u) (matcher_pat_to_string m)) ++ fnl ());
               construct_match (gVar u) ~catch_all:(Some (returnGen gNone)) [(m,walk_matches ms)]
             end in
+        (* matches are the matches returned by unification with the result type *)
         walk_matches matches
       in 
 
@@ -539,7 +541,7 @@ let arbitrarySizedST gen_ctr dep_type gen_type ctrs input_names inputs n registe
 
   (*  List.iter (fun x -> ignore (handle_branch x)) ctrs;  *)
 
-  let aux_arb rec_name size vars = 
+  let aux_arb rec_name size vars =
     gMatch (gVar size) 
            [ (injectCtr "O", [], 
               fun _ -> (* Base cases *) 

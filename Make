@@ -39,3 +39,5 @@ src/SizeCorr.ml
 src/ArbitrarySizedST.ml
 src/DependentClasses.v
 src/Decidability.v
+src/GenSizedSTMonotonic.ml
+src/genLib.ml

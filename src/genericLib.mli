@@ -180,16 +180,16 @@ val gTrue  : coq_expr
 val gFalse : coq_expr               
 val decToBool : coq_expr -> coq_expr
 
-(* Gen combinators *)
-val gGen : coq_expr -> coq_expr
-val returnGen  : coq_expr -> coq_expr 
-val bindGen    : coq_expr -> string -> (var -> coq_expr) -> coq_expr 
-val bindGenOpt : coq_expr -> string -> (var -> coq_expr) -> coq_expr 
+(* (\* Gen combinators *\) *)
+(* val gGen : coq_expr -> coq_expr *)
+(* val returnGen  : coq_expr -> coq_expr  *)
+(* val bindGen    : coq_expr -> string -> (var -> coq_expr) -> coq_expr  *)
+(* val bindGenOpt : coq_expr -> string -> (var -> coq_expr) -> coq_expr  *)
 
-val oneof : coq_expr list -> coq_expr
-val frequency : (coq_expr * coq_expr) list -> coq_expr
-val backtracking : (coq_expr * coq_expr) list -> coq_expr
-val uniform_backtracking : coq_expr list -> coq_expr
+(* val oneof : coq_expr list -> coq_expr *)
+(* val frequency : (coq_expr * coq_expr) list -> coq_expr *)
+(* val backtracking : (coq_expr * coq_expr) list -> coq_expr *)
+(* val uniform_backtracking : coq_expr list -> coq_expr *)
 
 (* Recursion combinators / fold *)
 val fold_ty  : ('a -> coq_type -> 'a) -> (ty_ctr * coq_type list -> 'a) -> (ty_param -> 'a) -> coq_type -> 'a
