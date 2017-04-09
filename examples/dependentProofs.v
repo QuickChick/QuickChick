@@ -61,7 +61,6 @@ Instance genGoodNarrowMon :
      SizeMonotonic
        (@arbitrarySizeST Foo (fun _forGen => (@goodFooNarrow) input0_ _forGen) _ size)).
 Proof.
-  Set Printing All.
   refine
     (nat_ind (fun s =>
                 forall input,

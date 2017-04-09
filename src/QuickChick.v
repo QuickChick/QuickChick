@@ -3,6 +3,7 @@ Declare ML Module "coqLib".
 Declare ML Module "setLib".
 Declare ML Module "semLib".
 Declare ML Module "genLib".
+Declare ML Module "unify".
 
 Declare ML Module "quickChick".
 

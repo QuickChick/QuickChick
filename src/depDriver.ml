@@ -19,6 +19,7 @@ open CoqLib
 open GenLib
 open ArbitrarySizedST
 open Feedback
+open Unify
 
 (** Derivable classes *)
 type derivable =

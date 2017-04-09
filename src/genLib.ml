@@ -33,7 +33,7 @@ let oneof l =
   | [] -> failwith "oneof used with empty list"
   | [c] -> c
   | c::cs -> gApp (gInject "oneof") [c; gList l]
-       
+
 let frequency l =
   match l with
   | [] -> failwith "frequency used with empty list"
