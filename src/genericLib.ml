@@ -566,6 +566,34 @@ let gMatch discr ?catchAll:(body=None) (branches : (constructor * string list * 
                                   | Some c' -> [(dummy_loc, [dl [CPatAtom (dummy_loc, None)]], c')])
          )
 
+let gMatchReturn (discr : coq_expr)
+      ?catchAll:(body=None)
+      (as_id : string)
+      (ret : var -> coq_expr)
+      (branches : (constructor * string list * (var list -> coq_expr)) list) : coq_expr =
+  let as_id' = fresh_name as_id in
+  CCases (dummy_loc,
+          Term.RegularStyle,
+          Some (ret as_id'), (* return *)
+          [(discr, Some (dl (Name as_id')), None)], (* single discriminee, no in *)
+          (List.map (fun (c, cs, bf) -> 
+                      let cvs : Id.t list = List.map fresh_name cs in
+                      (dummy_loc,
+                       [dl [CPatCstr (dummy_loc,
+                                      Ident (dl c), (* constructor  *)
+                                      None,
+                                      List.map (fun s -> CPatAtom (dummy_loc, Some (Ident (dl s)))) cvs (* Constructor applied to patterns *)
+                                     )
+                           ]
+                       ],
+                       bf cvs 
+                      )
+                   ) branches) @ (match body with 
+                                  | None -> [] 
+                                  | Some c' -> [(dummy_loc, [dl [CPatAtom (dummy_loc, None)]], c')])
+         )
+
+
 let gRecord names_and_bodies =
   CRecord (dummy_loc, List.map (fun (n,b) -> (Ident (dummy_loc, id_of_string n), b)) names_and_bodies)
 
