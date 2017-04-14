@@ -100,3 +100,9 @@ let incl_subset l1 l2 p =
 
 let setU_set_subset_compat p1 p2 =
   gApp (gInject "setU_set_subset_compat") [p1; p2]
+
+let nil_subset p =
+  gApp (gInject "nil_subset") [p]
+
+let cons_subset hd tl p phd ptl =
+  gApp (gInject "cons_subset") [hd; tl; p; phd; ptl]

@@ -18,6 +18,7 @@ open SetLib
 open CoqLib
 open GenLib
 open ArbitrarySizedST
+open GenSizedSTMonotonic
 open Feedback
 open Unify
 
@@ -91,8 +92,11 @@ let deriveDependent (cn : derivable) (c : constr_expr) (n : int) (instance_name 
 
   let params = List.map (fun tp -> gArg ~assumName:(gTyParam tp) ()) ty_params in
   
-  let inputs = List.map (fun (n,t) -> gArg ~assumName:(gVar (fresh_name n)) ~assumType:(gType ty_params t) ()) (List.combine input_names input_types) in
-
+  let inputs =
+    List.map (fun (n,t) -> gArg ~assumName:(gVar (fresh_name n)) ~assumType:(gType ty_params t) ())
+      (List.combine input_names input_types)
+  in
+  
   (* TODO: These should be generated through some writer monad *)
   (* XXX Put dec_needed in ArbitrarySizedSuchThat *)
   let gen_needed = [] in
@@ -123,7 +127,10 @@ let deriveDependent (cn : derivable) (c : constr_expr) (n : int) (instance_name 
   in
 
   (* The dependent generator  *)
-  let gen = arbitrarySizedST ty_ctr dep_type gen_type ctrs input_names inputs n register_arbitrary (* XXX *) in
+  let gen =
+    arbitrarySizedST
+      ty_ctr ty_params ctrs dep_type input_names inputs n register_arbitrary
+  in
 
   (* Generate arbitrary parameters *)
   let arb_needed = 
@@ -168,7 +175,7 @@ let deriveDependent (cn : derivable) (c : constr_expr) (n : int) (instance_name 
     | GenSizedSuchThatMonotonic ->
       msg_debug (str "mon type");
       debug_coq_expr (instance_type []);
-      hole
+      genSizedSTMon_body (class_name cn) ty_ctr ty_params ctrs dep_type input_names inputs n register_arbitrary
     | _ -> failwith "Unimplemented"
   in
 

@@ -35,3 +35,22 @@ let semBindSize g f size =
 
 let backtrackSizeMonotonic lst proof =
   gApp (gInject "backtrackSizeMonotonic") [lst; proof]
+
+let returnGenSizeMonotonic x =
+  gApp (gInject "returnGenSizeMonotonic") [x]
+
+let bindMonotonic p s fp =
+  gApp ~explicit:true
+    (gInject "bindMonotonic") [hole; hole; hole; hole; p; gFun [s] (fun [x] -> fp x)]
+
+let bindOptMonotonic p s fp =
+  gApp ~explicit:true
+    (gInject "bindOptMonotonic") [hole; hole; hole; hole; p; gFun [s] (fun [x] -> fp x)]
+
+let suchThatMaybeMonotonic p pred =
+  gApp ~explicit:true
+    (gInject "suchThatMaybeMonotonic") [hole; hole; pred; p]
+
+let suchThatMaybeOptMonotonic p pred =
+  gApp ~explicit:true
+    (gInject "suchThatMaybeOptMonotonic") [hole; hole; pred; p]

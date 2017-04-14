@@ -10,15 +10,7 @@ Import ListNotations.
 Import QcDefaultNotation. Open Scope qc_scope.
 Import QcDoNotation.
 
-Require Import DependentTest zoo.
-
 Set Bullet Behavior "Strict Subproofs".
-
-
-(* Notes :
-   Monotonicity should be easy and we should be able to derive
-   it just from the shape of the generator.
- *)
 
 Instance backtrackSizeMonotonic :
   forall {A : Type} (lg : seq (nat * G (option A))),
@@ -26,12 +18,18 @@ Instance backtrackSizeMonotonic :
     SizeMonotonic (backtrack lg).
 Admitted.
 
-Print arbSizedSTgoodFooNarrow.
-
-Typeclasses eauto := debug.
-
-(* Interesting. Do we need Global instance?? *) 
-Existing Instance arbSizedSTgoodFooNarrow.  (* Why???? *)
+Instance matchSizeMonotonic 
+         {A : Type} (g1 g2 : G A) (P : Prop) {H : Dec P}
+         {H1 : SizeMonotonic g1} {H2 : SizeMonotonic g2} :
+  SizeMonotonic 
+    (match @dec P H
+     with
+       | left eq => g1
+       | right neq => g2
+     end).
+Proof.
+  destruct (P ?); eauto.
+  Show Proof.
 
 Lemma cons_subset {A : Type} (x : A) (l : seq A) (P : set A) :
   P x ->
@@ -53,84 +51,95 @@ Instance bindOptMonotonic
   SizeMonotonic (bindGenOpt g f).
 Admitted.
 
+Instance suchThatMaybeMonotonic
+         {A : Type} (g : G A) (f : A -> bool) `{SizeMonotonic _ g} : 
+  SizeMonotonic (suchThatMaybe g f).
+Admitted.
+
+Instance suchThatMaybeOptMonotonic
+         {A : Type} (g : G (option A)) (f : A -> bool) `{SizeMonotonic _ g} : 
+  SizeMonotonic (suchThatMaybeOpt g f).
+Admitted.
+
 Typeclasses eauto := debug.
 
+Require Import DependentTest zoo.
 
-Instance genGoodNarrowMon :
-  (forall (size : nat) (input0_ : nat),
-     SizeMonotonic
-       (@arbitrarySizeST Foo (fun _forGen => (@goodFooNarrow) input0_ _forGen) _ size)).
-Proof.
-  refine
-    (nat_ind (fun s =>
-                forall input,
-                  SizeMonotonic
-                    (@arbitrarySizeST Foo (fun _forGen => (@goodFooNarrow) input _forGen) _ s))
-                    (fun input => _) (fun s IHs input => _)).
-  - simpl.
-    eapply backtrackSizeMonotonic.
-    refine (cons_subset _ _ _ _ (nil_subset _)).
-    now eauto with typeclass_instances.
-  - refine (backtrackSizeMonotonic _ _).
-    refine (cons_subset _ _ _ _ _).
-    now eauto with typeclass_instances.
-    refine (cons_subset _ _ _ _ _).
-    refine (@bindOptMonotonic _ _ _ _ (IHs 0) _).
-    intros x.
-    destruct (goodFooNarrow 1 x ?).
-    now eauto with typeclass_instances.
-    now eauto with typeclass_instances.
-    eapply nil_subset.    
-Qed.
 
-Existing Instance genGoodUnif'.  (* ???? *)
+Derive Arbitrary for Foo.
+Derive Show for Foo.
 
-(* ArbitrarySizedSuchThat Foo [eta goodFooNarrow input] *)
-Instance genGoodUnifMon (s : nat) (input : nat) :
-  SizeMonotonic (@arbitrarySizeST _ (fun (x : Foo) => goodFooUnif input x) _ s).
-Proof.
-  revert input.
-  refine (nat_ind (fun s => forall input, SizeMonotonic (arbitrarySizeST s)) (fun input => _) (fun s IHs input => _) s).
-  - (* Experience shows that we will an annotation for the generators list.
-       However current implementation uses references with a non transparent way
-       so we should NOT run the code twice *)
-    refine (backtrackSizeMonotonic _ (cons_subset _ _ _ _ (nil_subset _))).
-    now eauto with typeclass_instances.
-  - refine (backtrackSizeMonotonic _ _).
-    refine (cons_subset _ _ _ _ (nil_subset _)).
-    now eauto with typeclass_instances.
-Qed.
+Typeclasses eauto := debug.
 
-Existing Instance genGoodMatch'.
+(* Interesting. Do we need Global instance?? *) 
+Existing Instance arbSizedSTgoodFooNarrow.  (* Why???? *)
 
-(* ArbitrarySizedSuchThat Foo [eta goodFooNarrow input] *)
-Instance genGoodMatchMon (s : nat) :
-  forall input, SizeMonotonic (@arbitrarySizeST _ (fun (x : Foo) => goodFooMatch input x) _ s).
-Proof.
+Derive SizeMonotonicSuchThat for (fun foo => goodFooNarrow n foo).
+
+Existing Instance arbSizedSTgoodFooUnif. (* ???? *)
+
+Derive SizeMonotonicSuchThat for (fun (x : Foo) => goodFooUnif input x).
+
+Existing Instance arbSizedSTgoodFoo.
+
+Derive SizeMonotonicSuchThat for (fun (x : Foo) => goodFoo input x).
+
+Existing Instance arbSizedSTgoodFooCombo.
+
+Derive SizeMonotonicSuchThat for (fun foo => goodFooCombo n foo).
+
+Existing Instance arbSizedSTgoodFooMatch.  (* ???? *)
+
+Derive SizeMonotonicSuchThat for (fun foo => goodFooMatch n foo).
+
+Lemma lala :
+forall s input0_ : nat,
+  SizeMonotonic
+    (@arbitrarySizeST (Foo)
+                      (fun _forGen => (@goodFooMatch) input0_ _forGen) _ s).
   refine
     (nat_ind
-       (fun s => forall input, SizeMonotonic (arbitrarySizeST s))
-       (fun input =>
-          (backtrackSizeMonotonic
-             [(1,
-               match input with
-                 | 0 => returnGen (Some Foo1)
-                 | _.+1 => returnGen None
-               end)]
-             (match input with
-                | 0 => (cons_subset _ _ _ (returnGenSizeMonotonic _) (nil_subset _))
-                | S i => (cons_subset _ _ _ (returnGenSizeMonotonic _) (nil_subset _))
-              end)))
-       (fun s IHs input =>
-          (backtrackSizeMonotonic
-             [(1,
-               match input with
-                 | 0 => returnGen (Some Foo1)
-                 | _.+1 => returnGen None
-               end)]
-             (match input with
-                | 0 => (cons_subset _ _ _ (returnGenSizeMonotonic _) (nil_subset _))
-                | S i => (cons_subset _ _ _ (returnGenSizeMonotonic _) (nil_subset _))
-              end))
-       ) s).
-Qed.
+       (fun s =>
+          forall input0_ : nat,
+            SizeMonotonic
+              (@arbitrarySizeST (Foo)
+                                (fun _forGen => (@goodFooMatch) input0_ _forGen) _ s))
+       _ _).
+  refine (fun input0_ : nat =>
+     backtrackSizeMonotonic
+       (cons
+          (pair 1
+                match input0_ with
+                  | @O => returnGen (@Some (Foo) (@Foo1))
+                  | _ => returnGen (@None (Foo))
+                end) nil) _).
+
+  refine (cons_subset _ _ _ _ (nil_subset _)).
+  simpl.
+  refine (match input0_ with
+            | @O => returnGenSizeMonotonic (Some (@Foo1))
+            | _ => yreturnGenSizeMonotonic None
+          end (nil_subset _)). ).
+       (fun size0 IHs (input0_ : nat) =>
+          backtrackSizeMonotonic
+            (cons
+               (pair 1
+                     match input0_ with
+                       | @O => returnGen (@Some (Foo) (@Foo1))
+                       | _ => returnGen (@None (Foo))
+                     end) nil)
+            (cons_subset _ _ _
+                         match input0_ with
+                           | @O => returnGenSizeMonotonic (Some (@Foo1))
+                           | _ => returnGenSizeMonotonic None
+                         end (nil_subset _)))).
+
+Derive SizeMonotonicSuchThat for (fun foo => goodFooMatch n foo).
+
+Existing Instance arbSizedSTgoodFooRec.  (* ???? *)
+
+Derive SizeMonotonicSuchThat for (fun (x : Foo) => goodFooRec input x).
+
+Existing Instance arbSizedSTgoodFooPrec.  (* ???? *)
+
+Derive SizeMonotonicSuchThat for (fun (x : Foo) => goodFooPrec input x).

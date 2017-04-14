@@ -271,15 +271,25 @@ type cmap = (check list) CMap.t
 
 let lookup_checks k m = try Some (CMap.find k m) with Not_found -> None
 
+let ret_type_dec (s : var) (left : coq_expr) (right : coq_expr) =
+      gMatch (gVar s)
+      [ (injectCtr "left", ["eq"], fun _ -> left)
+      ; (injectCtr "right", ["neq"], fun _ -> right) ]
+
 (* TODO: Whenn handling parameters, this might need to add additional arguments *)
 (** Takes an equality map and two coq expressions [cleft] and [cright]. [cleft]
     is returned if all of the equalities hold, otherwise [cright] is
     returned. *)
-let handle_equalities eqs (cleft : coq_expr) (cright : coq_expr) = 
+let handle_equalities eqs (ret_type : var -> (var -> coq_expr -> coq_expr -> coq_expr) -> coq_expr)
+      (cleft : coq_expr) (cright : coq_expr) = 
   EqSet.fold (fun (u1,u2) c -> 
                let check = gApp ~explicit:true (gInject "dec") [ gApp (gInject "eq") [gVar u1; gVar u2] 
                                                                ; hole ] in
-               gMatch check 
+               gMatchReturn
+                 check
+                 "s" (* as clause *)
+                 (* return clause with minimal type information *)
+                 (fun v -> ret_type v ret_type_dec)
                  [ (injectCtr "left" , ["eq" ], fun _ -> c)
                  ; (injectCtr "right", ["neq"], fun _ -> cright) ]
              ) eqs cleft
@@ -315,15 +325,16 @@ let handle_branch
       (n : int)
       (dep_type : dep_type)
       (input_names : var list)
-      (size : var)
+      (size : coq_expr)
       (fail_exp : coq_expr)
       (ret_exp : coq_expr -> coq_expr)
+      (ret_type : var -> (var -> coq_expr -> coq_expr -> coq_expr) -> coq_expr)
       (class_method : coq_expr)
       (class_methodST : coq_expr (* pred *) -> coq_expr (* size *) -> coq_expr)
       (rec_method : coq_expr list -> coq_expr)
       (bind : bool (* opt *) -> coq_expr -> string -> (var -> coq_expr) -> coq_expr)
       (stMaybe : bool (* opt *) -> coq_expr -> coq_expr -> coq_expr)
-      gen_ctr
+      (gen_ctr : ty_ctr)
       register_arbitrary
       (c : dep_ctr)
   : (coq_expr * bool) =
@@ -428,7 +439,6 @@ let handle_branch
     in 
 
     (* Begin multiple mutually recursive functions *)
-    (* XXX generator specific *)
 
     (* Handle a single type constructor and recurse in dt2 *)
     (* Handle only *updates* the check map. The checks are implemented at the beginning of recurse *)
@@ -459,7 +469,9 @@ let handle_branch
         let body_fail = fail_exp in
 
         (* Perform the check - rec_dec_name is in scope *)
-        gMatch (checker (List.map (fun dt -> dt_to_coq_expr k dt) dts))
+        gMatchReturn (checker (List.map (fun dt -> dt_to_coq_expr k dt) dts))
+          "s" (* as clause *)
+          (fun v -> ret_type v ret_type_dec)
           [ (injectCtr "left", ["eq" ] , fun _ -> if pos then body_cont else body_fail)
           ; (injectCtr "right", ["neq"], fun _ -> if pos then body_fail else body_cont) 
           ]
@@ -471,7 +483,7 @@ let handle_branch
           process_checks k cmap x 
             (* Generate using recursive function *)
             true
-            (rec_method (gVar size :: args))
+            (rec_method (size :: args))
             (fun k' cmap' x -> recurse_type k' cmap' dt2)
         end
         else if pos then begin (* Generate using "arbitrarySizeST" and annotations for type *)
@@ -485,7 +497,7 @@ let handle_branch
                                              if i == j then gVar x else dt_to_coq_expr k dt
                                            ) numbered_dts))
           in
-          process_checks k cmap x true (class_methodST pred (gVar size)) 
+          process_checks k cmap x true (class_methodST pred size) 
             (fun k' cmap' x' -> recurse_type k' cmap' dt2)
         end
         else (* Negation. Since we expect the *positive* versions to be sparse, we can use suchThatMaybe for negative *)
@@ -508,7 +520,7 @@ let handle_branch
               | [] -> 
                 (* base case - recursive call *)
                 if pos then 
-                  let generator = rec_method (gVar size :: List.rev acc) in
+                  let generator = rec_method (size :: List.rev acc) in
                   process_checks k cmap x true generator 
                     (fun k' cmap' x' -> recurse_type k' cmap' dt2)
                 else failwith "Negation / build_arbs"
@@ -551,10 +563,15 @@ let handle_branch
     (* XXX generator specific *)
     let branch_gen =
       let rec walk_matches = function
-        | [] -> handle_equalities eqs (recurse_type map CMap.empty typ) (fail_exp)
+        | [] -> handle_equalities eqs ret_type (recurse_type map CMap.empty typ) (fail_exp)
         | (u,m)::ms -> begin
             msg_debug (str (Printf.sprintf "Processing Match: %s @ %s" (Unknown.to_string u) (matcher_pat_to_string m)) ++ fnl ());
-            construct_match (gVar u) ~catch_all:(Some fail_exp) [(m,walk_matches ms)]
+            let ret v left right =
+              construct_match (gVar v) ~catch_all:(Some right) [(m, left)]
+            in
+            construct_match_with_return
+              (gVar u) ~catch_all:(Some fail_exp) "s" (fun v -> ret_type v ret)
+              [(m,walk_matches ms)]
           end in
       (* matches are the matches returned by unification with the result type *)
       walk_matches matches

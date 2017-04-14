@@ -676,6 +676,29 @@ let construct_match c ?catch_all:(mdef=None) alts =
                 )
             )
 
+let construct_match_with_return c ?catch_all:(mdef=None) (as_id : string) (ret : var -> coq_expr) (alts : (matcher_pat * coq_expr) list) =
+  let as_id' = fresh_name as_id in
+  let rec aux = function
+    | MatchU u' -> begin
+        CPatAtom (dummy_loc, Some (Ident (dummy_loc, u')))
+      end
+    | MatchCtr (c, ms) -> 
+       if is_inductive c then CPatAtom (dummy_loc, None)
+       else CPatCstr (dummy_loc, 
+                   Ident (dummy_loc, c),
+                   Some (List.map (fun m -> aux m) ms),
+                   []) 
+  in CCases (dummy_loc,
+             Term.RegularStyle,
+             Some (ret as_id') (* return *), 
+             [ (c, Some (dl (Name as_id')), None)], (* single discriminee, no as/in *)
+             List.map (fun (m, body) -> (dummy_loc, [dummy_loc, [aux m]], body)) alts 
+             @ (match mdef with 
+                 | Some body -> [(dummy_loc, [dummy_loc, [CPatAtom (dummy_loc, None)]], body)]
+                 | _ -> []
+               )
+            )
+
 (* Generic List Manipulations *)
 let list_nil = gInject "nil"
 let lst_append c1 c2 = gApp (gInject "app") [c1; c2]

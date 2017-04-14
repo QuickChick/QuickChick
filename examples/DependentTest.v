@@ -228,7 +228,7 @@ Defined.
 
 Derive ArbitrarySizedSuchThat for (fun foo => goodFooPrec n foo).
 
-Definition genGoodPrec (n : nat) :=
+Definition genGoodPrec (n : nat) : nat -> G (option (Foo)):=
  let
    fix aux_arb size (n : nat) : G (option (Foo)) :=
      match size with
@@ -260,7 +260,7 @@ Admitted.
 
 Derive ArbitrarySizedSuchThat for (fun foo => goodFooNarrow n foo).
 
-Definition genGoodNarrow (n : nat) :=
+Definition genGoodNarrow (n : nat) : nat -> G (option (Foo)) :=
  let
    fix aux_arb size (n : nat) : G (option (Foo)) :=
      match size with
