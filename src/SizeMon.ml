@@ -15,6 +15,7 @@ open Constrexpr_ops
 open Decl_kinds
 open GenericLib
 open SetLib
+open SemLib
 open CoqLib
 open GenLib
 
@@ -48,7 +49,7 @@ let sizeMon ty_ctr ctrs size iargs genName =
     | Arrow (ty1, ty2) ->
       let h = if isCurrentTyCtr ty1 then ih else hole in
       gApp ~explicit:true (gInject "bindMonotonic") [hole; hole; hole; hole; h; gFun [x] (fun [x] -> proof ih ty2 (n+1))]
-    | _ -> hole
+    | _ -> returnGenSizeMonotonic hole
   in
 
   let rec elim_cases h ih ctrs n =
@@ -115,17 +116,28 @@ let sizeMon ty_ctr ctrs size iargs genName =
                    (gen_list (gVar size) (ctr,ty')))) ctrs)
   in
   let base_case =
-    (gApp
-       (gInject "oneofMonotonic")
-       [hole; hole; gFun [("x")] (fun [x] -> gFunTyped [("H", gApp (gInject "seq_In") [base_gens; gVar x])] (fun [h] -> elim_cases (gVar h) hole bases 0))])
+    match bases with
+    | [] -> failwith "Must have base cases"
+    | [(ctr, ty)] -> proof hole ty 0
+    | _ :: _ ->
+      (gApp
+         (gInject "oneofMonotonic")
+         [hole; hole; gFun [("x")] (fun [x] -> gFunTyped [("H", gApp (gInject "seq_In") [base_gens; gVar x])] (fun [h] -> elim_cases (gVar h) hole bases 0))])
   in
 
   let ind_case =
     gFun ["size"; "IHs"]
       (fun [size; ihs] ->
-         gApp
-           (gInject "frequencySizeMonotonic_alt")
-           [hole; hole; hole; gFun [("x")] (fun [x] -> gFunTyped [("H", gApp (gInject "seq_In") [ind_gens size; gVar x])] (fun [h] -> elim_cases (gVar h) (gVar ihs) ctrs 0))])
+         match ctrs with
+         | [] -> failwith "Must have base cases"
+         | [(ctr, ty)] -> proof (gVar ihs) ty 0
+         | _ :: _ ->
+           gApp
+             (gInject "frequencySizeMonotonic_alt")
+             [hole; hole; hole; gFun [("x")]
+                                  (fun [x] ->
+                                     gFunTyped [("H", gApp (gInject "seq_In") [ind_gens size; gVar x])]
+                                       (fun [h] -> elim_cases (gVar h) (gVar ihs) ctrs 0))])
   in
 
   let ret_type =
@@ -136,7 +148,7 @@ let sizeMon ty_ctr ctrs size iargs genName =
             [gApp ~explicit:true (gInject "arbitrarySized") [full_dt; genName; gVar s]])
   in 
   let mon_proof =
-    gApp ~explicit:true (gInject "monotonic") [hole; hole; (gApp (gInject "nat_ind") [ret_type; base_case; ind_case; size])]
+    gApp (gInject "nat_ind") [ret_type; base_case; ind_case; size]
   in
   debug_coq_expr mon_proof;
-  gRecord [("monotonic", mon_proof)]
+  mon_proof

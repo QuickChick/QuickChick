@@ -106,3 +106,9 @@ let nil_subset p =
 
 let cons_subset hd tl p phd ptl =
   gApp (gInject "cons_subset") [hd; tl; p; phd; ptl]
+
+let setU_subset_r s2 p =
+  gApp (gInject "setU_subset_r") [s2; p]
+
+let setU_subset_l s2 p =
+  gApp (gInject "setU_subset_l") [s2; p]

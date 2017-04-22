@@ -65,9 +65,11 @@ Typeclasses eauto := debug.
 
 Require Import DependentTest zoo.
 
-
-Derive Arbitrary for Foo.
-Derive Show for Foo.
+Existing Instance genSFoo.
+Existing Instance shrFoo.
+(* XXX these instances should be present *)
+Derive SizeMonotonic for Foo using genSFoo.
+Derive SizedMonotonic for Foo using genSFoo.
 
 Typeclasses eauto := debug.
 
@@ -89,50 +91,6 @@ Existing Instance arbSizedSTgoodFooCombo.
 Derive SizeMonotonicSuchThat for (fun foo => goodFooCombo n foo).
 
 Existing Instance arbSizedSTgoodFooMatch.  (* ???? *)
-
-Derive SizeMonotonicSuchThat for (fun foo => goodFooMatch n foo).
-
-Lemma lala :
-forall s input0_ : nat,
-  SizeMonotonic
-    (@arbitrarySizeST (Foo)
-                      (fun _forGen => (@goodFooMatch) input0_ _forGen) _ s).
-  refine
-    (nat_ind
-       (fun s =>
-          forall input0_ : nat,
-            SizeMonotonic
-              (@arbitrarySizeST (Foo)
-                                (fun _forGen => (@goodFooMatch) input0_ _forGen) _ s))
-       _ _).
-  refine (fun input0_ : nat =>
-     backtrackSizeMonotonic
-       (cons
-          (pair 1
-                match input0_ with
-                  | @O => returnGen (@Some (Foo) (@Foo1))
-                  | _ => returnGen (@None (Foo))
-                end) nil) _).
-
-  refine (cons_subset _ _ _ _ (nil_subset _)).
-  simpl.
-  refine (match input0_ with
-            | @O => returnGenSizeMonotonic (Some (@Foo1))
-            | _ => yreturnGenSizeMonotonic None
-          end (nil_subset _)). ).
-       (fun size0 IHs (input0_ : nat) =>
-          backtrackSizeMonotonic
-            (cons
-               (pair 1
-                     match input0_ with
-                       | @O => returnGen (@Some (Foo) (@Foo1))
-                       | _ => returnGen (@None (Foo))
-                     end) nil)
-            (cons_subset _ _ _
-                         match input0_ with
-                           | @O => returnGenSizeMonotonic (Some (@Foo1))
-                           | _ => returnGenSizeMonotonic None
-                         end (nil_subset _)))).
 
 Derive SizeMonotonicSuchThat for (fun foo => goodFooMatch n foo).
 

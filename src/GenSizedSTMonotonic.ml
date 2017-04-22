@@ -125,8 +125,8 @@ let genSizedSTMon_body
               )
               ctrs (nil_subset hole)))
   in
-      (* gen_ctr dep_type gen_type ctrs input_names inputs n register_arbitrary *)
-      (* class_name full_gtyp full_pred inputs base_gen ind_gen = *)
+  (* gen_ctr dep_type gen_type ctrs input_names inputs n register_arbitrary *)
+  (* class_name full_gtyp full_pred inputs base_gen ind_gen = *)
 
   let ind_case =
     let handle_branch' (ih : var) (size : var) (inputs : var list) =
