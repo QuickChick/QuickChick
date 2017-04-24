@@ -13,9 +13,11 @@ rule lexer = parse
   (* Skip initial whitespace *)
   | white+ as s  { T_White s }
     
-  | "(*!"        { T_StartQC }
-  | "Section"    { T_Section }
-  | "QuickChick" { T_QuickChick}
+  | "(*! Section"     { T_StartSec }
+  | "(*! QuickChick"  { T_StartQC  }
+  | "(*!\nQuickChick" { T_StartQC  }
+  | "(*! *)"          { T_StartMutant }
+  | "(*!"             { T_StartMutantVariant }
 
   (* Regular comments need to be handled to play with termination specials *)
   | "(*"         { nested_comment 0 lexbuf }
