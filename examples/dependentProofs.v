@@ -12,25 +12,6 @@ Import QcDoNotation.
 
 Set Bullet Behavior "Strict Subproofs".
 
-Instance backtrackSizeMonotonic :
-  forall {A : Type} (lg : seq (nat * G (option A))),
-    lg \subset [set x | SizeMonotonic x.2 ] ->
-    SizeMonotonic (backtrack lg).
-Admitted.
-
-Instance matchSizeMonotonic 
-         {A : Type} (g1 g2 : G A) (P : Prop) {H : Dec P}
-         {H1 : SizeMonotonic g1} {H2 : SizeMonotonic g2} :
-  SizeMonotonic 
-    (match @dec P H
-     with
-       | left eq => g1
-       | right neq => g2
-     end).
-Proof.
-  destruct (P ?); eauto.
-  Show Proof.
-
 Lemma cons_subset {A : Type} (x : A) (l : seq A) (P : set A) :
   P x ->
   l \subset P ->

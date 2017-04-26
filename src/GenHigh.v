@@ -184,6 +184,11 @@ Parameter semBacktrackSize:
   (\bigcup_(x in (l :&: (fun x => x.1 <> 0))) (isSome :&: (semGenSize x.2 size))) :|:
   ([set None] :&: (\bigcap_(x in l :&: (fun x => x.1 <> 0)) (semGenSize x.2 size))).
 
+Parameter backtrackSizeMonotonic: 
+  forall {A : Type} (lg : seq (nat * G (option A))),
+    lg \subset [set x | SizeMonotonic x.2 ] ->
+    SizeMonotonic (backtrack lg).
+
 Parameter semVectorOfSize:
   forall {A : Type} (k : nat) (g : G A) size,
     semGenSize (vectorOf k g) size <-->
@@ -1091,6 +1096,52 @@ Proof.
     move : Hpd => [H1 H2 H3]; subst.
     eapply IH in Heq. by ssromega.
     eassumption.
+Qed.
+
+Lemma backtrackFuelSizeMonotonic {A : Type} tot fuel (lg : seq (nat * G (option A))) :
+    sum_fst lg = tot -> length lg = fuel -> 
+    lg \subset [set x | SizeMonotonic x.2 ] ->
+    SizeMonotonic (backtrackFuel fuel tot lg).
+Proof.
+  move: tot lg.
+  induction fuel => tot lg.
+  - move => HSum /List.length_zero_iff_nil HLen; subst; simpl.
+    eauto with typeclass_instances.
+  - move => HSum HLen Hsub.
+    simpl. 
+    refine (@bindMonotonicStrong _ _ _ _ _ _).
+    move => x /semChoose Hin.
+    unfold leq, super, ChooseNat, OrdNat in Hin.
+    specialize (Hin (leq0n (tot-1))).
+    destruct (sum_fst lg) eqn:Hsum; subst.
+    + rewrite pickDrop_def.
+      refine (@bindMonotonicStrong _ _ _ _ _ _).
+      * intros [ y | ].
+        now eauto with typeclass_instances.
+        move => _.
+        constructor. intros. rewrite !semBacktrackFuelDef; eauto.
+        eapply subset_refl.
+      * rewrite Hsum. ssromega.
+    + edestruct (pickDrop_exists lg x) as [[k [g' [lg' [Hin' [Hdrop [Hneq [Heq [Heq' Hlen]]]]]]]] _].
+      ssromega. rewrite Hdrop.
+      refine (@bindMonotonicStrong _ _ _ _ _ _).
+      eapply Hsub in Hin'. eassumption.
+      intros [ a | ].
+      now eauto with typeclass_instances.
+      intros _. eapply IHfuel.
+      * rewrite Hsum in Hlen. rewrite <- Hlen. ssromega.
+      * rewrite HLen in Heq'. ssromega.
+      * eapply subset_trans; [| eassumption ].
+        rewrite Heq. eapply setU_subset_r.
+        eapply subset_refl.
+Qed.
+
+Corollary backtrackSizeMonotonic {A : Type} (lg : seq (nat * G (option A))) :
+  lg \subset [set x | SizeMonotonic x.2 ] ->
+  SizeMonotonic (backtrack lg).
+Proof.
+  intros Hin. unfold backtrack.
+  eapply backtrackFuelSizeMonotonic; eauto.
 Qed.
   
 Lemma semBacktrackFuel {A} tot fuel (l : list (nat * G (option A))) size :

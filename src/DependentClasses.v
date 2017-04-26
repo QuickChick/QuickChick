@@ -25,6 +25,7 @@ Fixpoint app {A} (f : A -> A) (n : nat) : A ->  A :=
 Infix "^" := app (at level 30, right associativity) : fun_scope.
 
 
+
 Class SizedProofEqs {A : Type} (P : A -> Prop) :=
   {
     zero : set A;
@@ -32,21 +33,36 @@ Class SizedProofEqs {A : Type} (P : A -> Prop) :=
     spec : \bigcup_(n : nat) ((succ ^ n) zero) <--> P
   }.
 
+(* Looks like Scott induction, although we have not proved that
+   succ is continuous *)
+Lemma fixed_point_ind {A} (Q P : A -> Prop) `{SizedProofEqs A P}:
+  zero \subset Q ->
+  (forall (s : set A), s \subset Q -> succ s \subset Q) ->
+  P \subset Q.
+Proof.
+  intros Hz IH. rewrite <- spec. intros x [n [_ HP]].
+  revert x HP. 
+  induction n.
+  - eauto.
+  - intros x. eapply IH. eauto.
+Qed.
+
+Definition lift {A} (S : set A) : set (option A) :=
+  Some @: S :|: [set None].
+
 Class SizedSuchThatCorrect {A : Type} (P : A -> Prop) `{SizedProofEqs A P} (g : nat -> G (option A)) :=
   {
     sizedSTCorrect :
       forall s,
-        semGen (g s) <-->
-        ((@Some A) @: ((succ ^ s) zero)) :|:
-        ([set x : option A | x = None /\ forall y, ~ P y])
+        Some @: ((succ ^ s) zero) \subset semGen (g s) /\
+        semGen (g s) \subset lift ((succ ^ s) zero)
   }.
 
 Class SuchThatCorrect {A : Type} (P : A -> Prop) (g : G (option A)) :=
   {
     STCorrect :
-      semGen g <-->
-      ((@Some A) @: [set x : A | P x ]) :|:
-      ([set x : option A | x = None /\ forall y, ~ P y])
+      Some @: [set x : A | P x ] \subset semGen g /\
+      semGen g \subset lift [set x : A | P x ]
   }.
 
 (** * Dependent sized generators *)
@@ -111,6 +127,18 @@ Proof.
   firstorder.
 Qed.
 
+Lemma lift_bigcup_comm :
+  forall (U T : Type) (s : set U) (f : U -> set T),
+    inhabited U ->
+    lift (\bigcup_(i in [set : U]) (f i)) <-->
+    \bigcup_(i in [set : U]) (lift (f i)).
+Proof.
+  intros U T s f Hin. unfold lift.
+  rewrite !bigcup_setU_r -!imset_bigcup.
+  rewrite bigcup_const; eauto.
+  reflexivity.
+Qed.
+    
 Instance GenSuchThatMonotonicOfSized (A : Type) (P : A -> Prop)
          {H : GenSizedSuchThat A P}
          `{@GenSizedSuchThatMonotonic A P H PMon}
@@ -125,15 +153,19 @@ Instance ArbitraryCorrectFromSized (A : Type) (P : A -> Prop)
 : SuchThatCorrect P arbitraryST.
 Proof.
   constructor. unfold arbitraryST, GenSuchThatOfSized.
-  eapply set_eq_trans.
-  - eapply semSized_alt; eauto with typeclass_instances.
-    (* TODO change semSized_alt *)
-    destruct PSMon. eauto.
-  - setoid_rewrite sizedSTCorrect.
-    rewrite bigcup_setU_r. eapply setU_set_eq_compat.
-    rewrite <- imset_bigcup, spec. reflexivity.
-    rewrite bigcup_const. reflexivity.
+  rewrite semSized_alt.
+  split.
+  - eapply subset_trans;
+    [ | eapply incl_bigcupr; now eapply sizedSTCorrect ].
+    rewrite <-imset_bigcup, spec. eapply subset_refl.
+  - eapply subset_trans. eapply incl_bigcupr.
+    intros x. now eapply sizedSTCorrect.
+    unfold lift.
+    rewrite bigcup_setU_r.
+    rewrite <-imset_bigcup, spec.
+    rewrite bigcup_const. eapply subset_refl.
     constructor. exact 0.
+  - destruct PSMon. eauto.
 Qed.
   
 (* TODO: Move to another file *)

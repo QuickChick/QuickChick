@@ -138,11 +138,17 @@ Module Type GenLowInterface.
   Declare Instance bindUnsized {A B} (g : G A) (f : A -> G B)
           `{Unsized _ g} `{forall x, Unsized (f x)} : Unsized (bindGen g f).
   (* end bindUnsized *)
-  
+
+  (* XXX these will always succeed together and they have the same priority *)
   Declare Instance bindMonotonic
           {A B} (g : G A) (f : A -> G B)
           `{SizeMonotonic _ g} `{forall x, SizeMonotonic (f x)} : 
     SizeMonotonic (bindGen g f).
+
+  Declare Instance bindMonotonicStrong :
+    forall {A B} (g : G A) (f : A -> G B)
+      `{SizeMonotonic _ g} `{forall x, semGen g x -> SizeMonotonic (f x)},
+      SizeMonotonic (bindGen g f).
   
   Parameter semBindUnsized1 :
     forall A B (g : G A) (f : A -> G B) `{Unsized _ g},
@@ -491,6 +497,20 @@ Module GenLow : GenLowInterface.
   Next Obligation.
     rewrite !semBindSize. move => b.
     move => [a [H3 H4]]; exists a; split => //; eapply monotonic; eauto.
+  Qed.
+  
+  Program Instance bindMonotonicStrong
+          {A B} (g : G A) (f : A -> G B) `{SizeMonotonic _ g}
+          `{forall x, semGen g x -> SizeMonotonic (f x)} :
+    SizeMonotonic (bindGen g f).
+  Next Obligation.
+    rewrite !semBindSize. move => b.
+    move => [a [H3 H4]]; exists a; split => //.
+    now eapply monotonic; eauto.
+    eapply H0.
+    eexists. split; eauto. now constructor.
+    eassumption.
+    eassumption.
   Qed.
   
   (* begin semBindUnsized1 *)

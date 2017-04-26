@@ -52,7 +52,6 @@ Definition set_incl {A} (m1 m2 : set A) :=
 
 Infix "\subset" := set_incl (at level 70, no associativity) : set_scope.
 
-
 Notation "[ 'set' x : T | P ]" := (fun x : T => P)
   (at level 0, x at level 99, only parsing) : set_scope.
 Notation "[ 'set' x | P ]" := [set x : _ | P]
@@ -534,8 +533,6 @@ Lemma setI_set0 {U} (s1 s2 : set U) :
 Proof.
   intros; split; firstorder. 
 Qed.
-
-
 
 Lemma setI_subset_compat {U} (s1 s2 s1' s2' : set U) : 
   s1 \subset s1' ->
