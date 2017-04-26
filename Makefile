@@ -11,14 +11,25 @@ endef
 includecmdwithout@ = $(eval $(subst @,$(donewline),$(shell { $(1) | tr -d '\r' | tr '\n' '@'; })))
 $(call includecmdwithout@,$(COQBIN)coqtop -config)
 
-plugin: Makefile.coq
+plugin: Makefile.coq 
 	$(MAKE) -f Makefile.coq
 
-install: Makefile.coq src/quickChickLib.cmx src/quickChickLib.o
+install: Makefile.coq src/quickChickLib.cmx src/quickChickLib.o quickChickTool
 	$(MAKE) -f Makefile.coq install
         # Manually copying the remaining files
 	cp src/quickChickLib.cmx $(COQLIB)/user-contrib/QuickChick
 	cp src/quickChickLib.o $(COQLIB)/user-contrib/QuickChick
+	cp src/quickChickTool $(shell echo $(PATH) | tr ':' "\n" | grep opam)/quickChick
+
+quickChickTool: 
+	ocamllex  src/quickChickToolLexer.mll
+	ocamlyacc -v src/quickChickToolParser.mly
+	ocamlc -I src -c src/quickChickToolTypes.ml
+	ocamlc -I src -c src/quickChickToolParser.mli
+	ocamlc -I src -c src/quickChickToolLexer.ml
+	ocamlc -I src -c src/quickChickToolParser.ml
+	ocamlc -I src -c src/quickChickTool.ml 
+	ocamlc -o src/quickChickTool src/quickChickToolTypes.cmo src/quickChickToolLexer.cmo src/quickChickToolParser.cmo src/quickChickTool.cmo
 
 tests:
 	coqc examples/Tests.v
