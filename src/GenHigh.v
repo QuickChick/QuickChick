@@ -1092,7 +1092,7 @@ Proof.
     eapply IH in Heq. by ssromega.
     eassumption.
 Qed.
-
+  
 Lemma semBacktrackFuel {A} tot fuel (l : list (nat * G (option A))) size :
   sum_fst l = tot -> length l = fuel -> 
   semGenSize (backtrackFuel fuel tot l) size <--> 

@@ -14,12 +14,29 @@ Set Bullet Behavior "Strict Subproofs".
 
 (** * Correctness of dependent generators *)
 
-Class SizedSuchThatCorrect {A : Type} `{Sized A} (P : A -> Prop) (g : nat -> G (option A)) :=
+
+Class SizedProof {A : Type} (P : A -> Type) :=
+  {
+    sizeProof : forall x, P x -> nat
+  }.
+        
+Class SizedProofEqs {A : Type} (P : A -> Prop) `{SizedProof A P} :=
+  {
+    zero : set A;
+    succ : set A -> set A;
+    zero_spec : zero <--> [ set x | exists H : P x, sizeProof x H = 0 ];
+    succ_spec :
+      forall n,
+        succ [ set x | exists H : P x, sizeProof x H <= n ] <--> [ set x | exists H : P x, sizeProof x H <= n.+1  ]
+                     
+  }.
+
+Class SizedSuchThatCorrect {A : Type} (P : A -> Prop) `{SizedProof A P} (g : nat -> G (option A)) :=
   {
     sizedSTCorrect :
       forall s,
         semGen (g s) <-->
-        ((@Some A) @: [set x : A | Classes.size x <= s /\ P x ]) :|:
+        ((@Some A) @: [set x : A | exists H : P x, sizeProof x H <= s ]) :|:
         ([set x : option A | x = None /\ forall y, ~ P y])
   }.
 
@@ -101,7 +118,7 @@ Proof.
   constructor. unfold arbitraryST, GenSuchThatOfSized.
   eapply set_eq_trans.
   - eapply semSized_alt; eauto with typeclass_instances.
-    (* TODO chanfe semSized_alt *)
+    (* TODO change semSized_alt *)
     destruct PSMon. eauto.
   - setoid_rewrite sizedSTCorrect.
     split.
@@ -112,14 +129,14 @@ Proof.
       * right. eassumption.
     + intros Hyp. inv Hyp.
       * inv H0. inv H3. inv H4.
-        eexists; split; eauto. constructor; eauto.
+        exists (sizeProof x H5). split. eauto. constructor; eauto.
         left. econstructor; eauto.
       * inv H3.
         exists 0; split; eauto. constructor; eauto.
         right. econstructor; eauto.
 Qed.
   
-(* TODO: Move in another file *)
+(* TODO: Move to another file *)
 (*
 (** Leo's example from DependentTest.v *)
 
