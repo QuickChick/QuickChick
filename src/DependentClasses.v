@@ -14,29 +14,30 @@ Set Bullet Behavior "Strict Subproofs".
 
 (** * Correctness of dependent generators *)
 
+(** Apply a function n times *)
+Fixpoint app {A} (f : A -> A) (n : nat) : A ->  A :=
+  fun x =>
+    match n with
+      | 0%nat => x
+      | S n' => f (app f n' x)
+    end.
 
-Class SizedProof {A : Type} (P : A -> Type) :=
-  {
-    sizeProof : forall x, P x -> nat
-  }.
-        
-Class SizedProofEqs {A : Type} (P : A -> Prop) `{SizedProof A P} :=
+Infix "^" := app (at level 30, right associativity) : fun_scope.
+
+
+Class SizedProofEqs {A : Type} (P : A -> Prop) :=
   {
     zero : set A;
     succ : set A -> set A;
-    zero_spec : zero <--> [ set x | exists H : P x, sizeProof x H = 0 ];
-    succ_spec :
-      forall n,
-        succ [ set x | exists H : P x, sizeProof x H <= n ] <--> [ set x | exists H : P x, sizeProof x H <= n.+1  ]
-                     
+    spec : \bigcup_(n : nat) ((succ ^ n) zero) <--> P
   }.
 
-Class SizedSuchThatCorrect {A : Type} (P : A -> Prop) `{SizedProof A P} (g : nat -> G (option A)) :=
+Class SizedSuchThatCorrect {A : Type} (P : A -> Prop) `{SizedProofEqs A P} (g : nat -> G (option A)) :=
   {
     sizedSTCorrect :
       forall s,
         semGen (g s) <-->
-        ((@Some A) @: [set x : A | exists H : P x, sizeProof x H <= s ]) :|:
+        ((@Some A) @: ((succ ^ s) zero)) :|:
         ([set x : option A | x = None /\ forall y, ~ P y])
   }.
 
@@ -102,6 +103,14 @@ Instance GenSuchThatOfSized (A : Type) (P : A -> Prop)
 
 Generalizable Variables PSized PMon PSMon PCorr.
 
+Lemma bigcup_setU_r:
+  forall (U T : Type) (s : set U) (f g : U -> set T),
+    \bigcup_(i in s) (f i :|: g i) <-->
+    \bigcup_(i in s) f i :|: \bigcup_(i in s) g i.
+Proof.
+  firstorder.
+Qed.
+
 Instance GenSuchThatMonotonicOfSized (A : Type) (P : A -> Prop)
          {H : GenSizedSuchThat A P}
          `{@GenSizedSuchThatMonotonic A P H PMon}
@@ -121,19 +130,10 @@ Proof.
     (* TODO change semSized_alt *)
     destruct PSMon. eauto.
   - setoid_rewrite sizedSTCorrect.
-    split.
-    + intros [n [Hinn Hun]].
-      inv Hun.
-      * left. inv H3. inv H4. inv H5. inv H6.
-        econstructor; eauto.
-      * right. eassumption.
-    + intros Hyp. inv Hyp.
-      * inv H0. inv H3. inv H4.
-        exists (sizeProof x H5). split. eauto. constructor; eauto.
-        left. econstructor; eauto.
-      * inv H3.
-        exists 0; split; eauto. constructor; eauto.
-        right. econstructor; eauto.
+    rewrite bigcup_setU_r. eapply setU_set_eq_compat.
+    rewrite <- imset_bigcup, spec. reflexivity.
+    rewrite bigcup_const. reflexivity.
+    constructor. exact 0.
 Qed.
   
 (* TODO: Move to another file *)
