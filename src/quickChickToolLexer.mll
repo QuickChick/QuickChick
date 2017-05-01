@@ -24,7 +24,7 @@ rule lexer = parse
   | "*)"         { T_EndComment }
 
   | nonwhite+ as word 
-                 { print_endline ("Read Word: "^ word); T_Word(word) }
+                 { T_Word(word) }
   | eof          { T_Eof }
 
 and nested_comment n = parse
