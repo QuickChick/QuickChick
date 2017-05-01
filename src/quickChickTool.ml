@@ -64,7 +64,7 @@ let main =
   let lexbuf = Lexing.from_channel !input_channel in
   let result = program lexer lexbuf in
 
-  let coqc_cmd vf = Printf.sprintf "coqc %s" vf in
+  let coqc_cmd vf = Printf.sprintf "coqc -w none %s" vf in
 
   match !mode with
   | Test ->
