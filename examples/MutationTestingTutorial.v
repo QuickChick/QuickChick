@@ -13,7 +13,6 @@ Import QcDoNotation.
 Set Bullet Behavior "Strict Subproofs".
 
 (*! Section Prop12 *)
-
 Require Import Arith.
 
 Definition testProp1 (x : nat) := beq_nat x 0.
@@ -38,4 +37,13 @@ Definition testProp4 (x y : nat) := beq_nat x y.
 
 (*!
 QuickChick testProp4.
+*)
+
+(*! Section Mutant *)
+Definition plus1 (x : nat) := (*! *) x + 1 (*! x *) .
+
+Definition propPlus x := x <? plus1 x.
+
+(*!
+QuickChick propPlus.
 *)

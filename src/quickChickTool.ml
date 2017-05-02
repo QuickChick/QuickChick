@@ -15,7 +15,7 @@ type node =
 *)
 
 type mode = Test | Mutate
-     
+
 let rec cartesian (lists : 'a list list) : 'a list list = 
   match lists with
   | [ x ] -> List.map (fun y -> [y]) x
@@ -41,18 +41,38 @@ let test_out handle_section input =
     | _ -> failwith "Toplevel QuickChick/Mutant" in
   String.concat "\n" (List.map go input)
 
+let mutate_outs handle_section input = 
+  let rec go = function
+    | Text s -> [s] 
+    | Section (sn, nodes, _) ->
+       if handle_section sn then 
+         let handle_node = function
+           | Text s -> [s]
+           | Mutant (opts, base, muts) ->
+               base :: muts (* Base followed by mutants *)
+           | QuickChick s -> ["QuickChick " ^ s] (* Add all tests *) in
+         List.map (String.concat "\n") (cartesian (List.map handle_node nodes))
+       else [String.concat "\n" (List.map output_plain nodes)]
+  in List.map (String.concat "\n") (cartesian (List.map go input))
+
 module SS = Set.Make(String)
 
 let main = 
+(*  Parsing.set_trace true; *)
+
   let mode = ref Test in
   let input_channel = ref stdin in
   let set_mode = function 
     | "test"   -> mode := Test
     | "mutate" -> mode := Mutate in
   let sec_name = ref None in
+
+  let verbose = ref true in
   let speclist = 
     [ ("-m", (Arg.Symbol (["test"; "mutate"], set_mode)), "Sets the mode of operation") 
     ; ("-s", Arg.String (fun name -> sec_name := Some name), "Which section's properties to test")
+    ; ("-v", Arg.Unit (fun _ -> verbose := false), "Silent mode")
+    ; ("+v", Arg.Unit (fun _ -> verbose := true), "Verbose mode")
     ]
   in
   let usage_msg = "quickChick <input_file> options\nTest a file or evaluate your testing using mutants." in
@@ -78,16 +98,33 @@ let main =
     | None    -> fun _ -> true in
 
   let coqc_cmd vf = Printf.sprintf "coqc -w none %s" vf in
-  List.iter (fun n -> print_endline (node_to_string n)) result;
+
+  let write_tmp_file data = 
+    let vf = Filename.temp_file "QuickChick" ".v" in
+    if !verbose then (Printf.printf "Writing to file: %s\n" vf; flush_all()) else ();
+    let out_channel = open_out vf in
+    output_string out_channel data;
+    close_out out_channel;
+    vf
+  in
+
+  let compile_and_run vf =
+    (* TODO: Capture/parse output *)
+    if Sys.command (coqc_cmd vf) <> 0 then
+      failwith "Could not compile mutated program"
+    else () in
 
   match !mode with
   | Test ->
      let out_data = test_out handle_section result in
-     let vf = Filename.temp_file "QuickChick" ".v" in
-     let out_channel = open_out vf in
-     output_string out_channel out_data;
-     close_out out_channel;
-     if Sys.command (coqc_cmd vf) <> 0 then
-       failwith "Could not compile mutated program"
-     else ()
-  | Mutate -> failwith "Mutate not implemented yet"
+     let vf = write_tmp_file out_data in
+     compile_and_run vf
+  | Mutate -> 
+     let (base :: muts) = mutate_outs handle_section result in
+     if !verbose then print_endline "Testing original (no mutants)..." else ();
+     let base_file = write_tmp_file base in 
+     compile_and_run base_file;
+     List.iteri (fun i m ->
+       Printf.printf "Handling Mutant %d.\n" i; flush_all ();
+       compile_and_run (write_tmp_file m)
+                ) muts
