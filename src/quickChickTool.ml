@@ -41,6 +41,8 @@ let test_out handle_section input =
     | _ -> failwith "Toplevel QuickChick/Mutant" in
   String.concat "\n" (List.map go input)
 
+module SS = Set.Make(String)
+
 let main = 
   let mode = ref Test in
   let input_channel = ref stdin in
@@ -56,15 +58,27 @@ let main =
   let usage_msg = "quickChick <input_file> options\nTest a file or evaluate your testing using mutants." in
   Arg.parse speclist (fun anon -> input_channel := open_in anon) usage_msg;
 
-  let handle_section = 
-    match !sec_name with
-    | Some sn -> fun sn' -> sn = sn'
-    | None    -> fun _ -> true in
-
   let lexbuf = Lexing.from_channel !input_channel in
   let result = program lexer lexbuf in
 
+  let sec_graph = Hashtbl.create (List.length result) in 
+  let sec_find s = try Hashtbl.find sec_graph s 
+                   with Not_found -> failwith (Printf.sprintf "Didn't find: %s\n" s) in
+  let rec populate_hashtbl = function 
+    | [] -> ()
+    | Text _ :: rest -> populate_hashtbl rest 
+    | Section (sn, _, extends) :: rest -> 
+       Hashtbl.add sec_graph sn (List.fold_left (fun acc sec_name -> SS.union acc (sec_find sec_name)) (SS.of_list (sn :: extends)) extends);
+       populate_hashtbl rest  in
+
+  populate_hashtbl result;
+  let handle_section = 
+    match !sec_name with
+    | Some sn -> fun sn' -> SS.mem sn' (sec_find sn)
+    | None    -> fun _ -> true in
+
   let coqc_cmd vf = Printf.sprintf "coqc -w none %s" vf in
+  List.iter (fun n -> print_endline (node_to_string n)) result;
 
   match !mode with
   | Test ->

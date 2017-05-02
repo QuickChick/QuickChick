@@ -42,6 +42,8 @@ type node =
 %type <string> mutant
 %type <string list> code
 %type <string> word
+%type <string list> sec_names
+%type <string list> extends
 
 %% 
 program:              code sections T_Eof { Text (String.concat "" $1) :: $2 }
@@ -49,7 +51,13 @@ program:              code sections T_Eof { Text (String.concat "" $1) :: $2 }
 sections:             section sections { $1 :: $2 }
                       | { [ (* Empty on purpose *) ] }
 
-section:              T_StartSec T_White T_Word T_White T_EndComment contents { Section ($3, $6, None) }
+section:              T_StartSec T_White T_Word T_White extends T_EndComment contents { Section ($3, $7, $5) }
+
+extends:              { [] }
+                      | T_Word T_White sec_names { if $1 = "extends" then $3 else failwith "Section should be followed by 'extends'" }
+
+sec_names:            T_Word T_White { [$1] }
+                      | T_Word T_White sec_names { $1 :: $3 }
 
 contents:             content { [$1] }
                       | content contents { $1 :: $2 }

@@ -9,6 +9,7 @@ Import ListNotations.
 Import QcDefaultNotation. Open Scope qc_scope.
 Import QcDoNotation.
 
+
 Set Bullet Behavior "Strict Subproofs".
 
 (*! Section Prop12 *)
@@ -25,9 +26,16 @@ QuickChick testProp1.
 
 (*! QuickChick testProp2. *)
 
-(*! Section Prop3 *)
+(*! Section Prop3 extends Prop12 *)
 Definition testProp3 (x y : nat) := beq_nat x y.
 
 (*!
 QuickChick testProp3.
+*)
+
+(*! Section Prop4 *)
+Definition testProp4 (x y : nat) := beq_nat x y.
+
+(*!
+QuickChick testProp4.
 *)
