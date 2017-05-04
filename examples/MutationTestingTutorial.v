@@ -42,6 +42,7 @@ QuickChick testProp4.
 (*! Section Mutant *)
 Definition plus1 (x : nat) := (*! *) x + 1 (*! x *) .
 
+(*! Section PropPlus extends Mutant *)
 Definition propPlus x := x <? plus1 x.
 
 (*!

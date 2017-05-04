@@ -2,18 +2,6 @@ open QuickChickToolLexer
 open QuickChickToolParser
 open QuickChickToolTypes
 
-(*
-type node =
-  (* Base chunk of text *)
-  | Text of string 
-  (* Sections: identifier + a bunch of nodes + extend? *)
-  | Section of string * node list * string option
-  (* Commented out QuickChick call *)
-  | QuickChick of string
-  (* Mutant: list of +/- idents, base, list of mutants *)
-  | Mutant of (bool * string) list * string * (string list)
-*)
-
 type mode = Test | Mutate
 
 let rec cartesian (lists : 'a list list) : 'a list list = 
@@ -92,6 +80,7 @@ let main =
        populate_hashtbl rest  in
 
   populate_hashtbl result;
+(*  Hashtbl.iter (fun a b -> Printf.printf "%s -> %s\n" a (String.concat ", " (SS.elements b))) sec_graph; *)
   let handle_section = 
     match !sec_name with
     | Some sn -> fun sn' -> SS.mem sn' (sec_find sn)
