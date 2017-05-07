@@ -63,6 +63,7 @@ let dispatch cn ind name1 name2 =
     | "SizedCorrect" -> SimpleDer [SimplDriver.SizedCorrect]
     | "ArbitrarySizedSuchThat" -> DepDer DepDriver.ArbitrarySizedSuchThat
     | "SizeMonotonicSuchThat" -> DepDer DepDriver.GenSizedSuchThatMonotonic
+    | "SizedProofEqs" -> DepDer DepDriver.SizedProofEqs
   in
 
   match class_names with 
@@ -71,7 +72,7 @@ let dispatch cn ind name1 name2 =
 
 VERNAC COMMAND EXTEND Derive CLASSIFIED AS SIDEFF
    | ["Derive" constr(class_name) "for" constr(inductive)] -> 
-      [dispatch class_name inductive "" ""]
+     [dispatch class_name inductive "" ""]
    | ["Derive" constr(class_name) "for" constr(inductive) "using" ident(genInst)] -> 
      [dispatch class_name inductive (Names.string_of_id genInst) ""]
    | ["Derive" constr(class_name) "for" constr(inductive) "using" ident(genInst) "and" ident(monInst) ] -> 

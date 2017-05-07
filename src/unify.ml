@@ -324,7 +324,9 @@ let need_dec = ref false
 let handle_branch
       (n : int)
       (dep_type : dep_type)
+      (* Inputs should not escape to unification engine *)
       (input_names : var list)
+      (* XXX size should not escape to unification engine *)
       (size : coq_expr)
       (fail_exp : coq_expr)
       (ret_exp : coq_expr -> coq_expr)

@@ -21,6 +21,7 @@ open ArbitrarySizedST
 open GenSizedSTMonotonic
 open Feedback
 open Unify
+open SizedProofs
 
 (** Derivable classes *)
 type derivable =
@@ -28,10 +29,12 @@ type derivable =
   | GenSizedSuchThatMonotonic
   | GenSizedSuchThatSizeMonotonic
   | GenSizedSuchThatCorrect
+  | SizedProofEqs
 
 let print_der = function
   | ArbitrarySizedSuchThat -> "ArbitrarySizedSuchThat"
   | GenSizedSuchThatMonotonic -> "SizeMonotonic"
+  | SizedProofEqs -> "SizedProofEqs"
   | GenSizedSuchThatSizeMonotonic
   | GenSizedSuchThatCorrect -> ""
 
@@ -40,6 +43,7 @@ let class_name cn =
   match cn with
   | ArbitrarySizedSuchThat -> "GenSizedSuchThat"
   | GenSizedSuchThatMonotonic -> "SizeMonotonic"
+  | SizedProofEqs -> "SizedProofEqs"
   | GenSizedSuchThatSizeMonotonic
   | GenSizedSuchThatCorrect -> ""
 
@@ -48,6 +52,7 @@ let mk_instance_name der tn =
   let prefix = match der with
     | ArbitrarySizedSuchThat -> "arbSizedST"
     | GenSizedSuchThatMonotonic -> "SizeMonotonic"
+    | SizedProofEqs -> "SizedProofEqs"
     | _ -> failwith "Not implemented"
   in var_to_string (fresh_name (prefix ^ tn))
 
@@ -150,6 +155,7 @@ let deriveDependent (cn : derivable) (c : constr_expr) (n : int) (instance_name 
       @ arb_needed
       @ inputs
     | GenSizedSuchThatMonotonic -> []
+    | SizedProofEqs -> params @ inputs
     | _ -> []
   in
 
@@ -166,6 +172,7 @@ let deriveDependent (cn : derivable) (c : constr_expr) (n : int) (instance_name 
            gApp (gInject (class_name cn))
              [gApp ~explicit:true (gInject "arbitrarySizeST")
                 [full_gtyp; full_pred (List.map gVar inputs); hole; gVar size]])
+    | SizedProofEqs -> gApp (gInject (class_name cn)) [full_pred (List.map (fun n -> gVar (fresh_name n)) input_names)] 
     | _ -> failwith "Unimplemented"
   in
 
@@ -176,6 +183,8 @@ let deriveDependent (cn : derivable) (c : constr_expr) (n : int) (instance_name 
       msg_debug (str "mon type");
       debug_coq_expr (instance_type []);
       genSizedSTMon_body (class_name cn) ty_ctr ty_params ctrs dep_type input_names inputs n register_arbitrary
+    | SizedProofEqs ->
+      sizedEqProofs_body (class_name cn) ty_ctr ty_params ctrs dep_type input_names inputs n register_arbitrary
     | _ -> failwith "Unimplemented"
   in
 

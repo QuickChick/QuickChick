@@ -110,6 +110,7 @@ let shrink_decl ty_ctr ctrs iargs =
     (* Create the function body by recursing on the structure of x *)
     gFun ["x"] (fun [x] -> shrink_body x)
   in
+  debug_coq_expr shrink_fun;
   gRecord [("shrink", shrink_fun)]
 
 let show_decl ty_ctr ctrs iargs =

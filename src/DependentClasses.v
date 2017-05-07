@@ -14,38 +14,36 @@ Set Bullet Behavior "Strict Subproofs".
 
 (** * Correctness of dependent generators *)
 
-(** Apply a function n times *)
-Fixpoint app {A} (f : A -> A) (n : nat) : A ->  A :=
-  fun x =>
-    match n with
-      | 0%nat => x
-      | S n' => f (app f n' x)
-    end.
-
-Infix "^" := app (at level 30, right associativity) : fun_scope.
-
-
-
 Class SizedProofEqs {A : Type} (P : A -> Prop) :=
   {
     zero : set A;
     succ : set A -> set A;
-    spec : \bigcup_(n : nat) ((succ ^ n) zero) <--> P
+    (* spec : \bigcup_(n : nat) ((succ ^ n) zero) <--> P *)
   }.
+
+
+(* Class SizedProofEqs' {A : Type} (P : A -> Prop) := *)
+(*   { *)
+(*     zero' : set (option A); *)
+(*     succ' : set (option A) -> set (option A); *)
+(*     spec1 : Some @: P \subset \bigcup_(n : nat) ((succ' ^ n) zero'); *)
+(*     spec2 : \bigcup_(n : nat) ((succ' ^ n) zero') \subset  Some @: P :|: [ None ]; *)
+(*   }. *)
+
 
 (* Looks like Scott induction, although we have not proved that
    succ is continuous *)
-Lemma fixed_point_ind {A} (Q P : A -> Prop) `{SizedProofEqs A P}:
-  zero \subset Q ->
-  (forall (s : set A), s \subset Q -> succ s \subset Q) ->
-  P \subset Q.
-Proof.
-  intros Hz IH. rewrite <- spec. intros x [n [_ HP]].
-  revert x HP. 
-  induction n.
-  - eauto.
-  - intros x. eapply IH. eauto.
-Qed.
+(* Lemma fixed_point_ind {A} (Q P : A -> Prop) `{SizedProofEqs A P}: *)
+(*   zero \subset Q -> *)
+(*   (forall (s : set A), s \subset Q -> succ s \subset Q) -> *)
+(*   P \subset Q. *)
+(* Proof. *)
+(*   intros Hz IH. rewrite <- spec. intros x [n [_ HP]]. *)
+(*   revert x HP.  *)
+(*   induction n. *)
+(*   - eauto. *)
+(*   - intros x. eapply IH. eauto. *)
+(* Qed. *)
 
 Definition lift {A} (S : set A) : set (option A) :=
   Some @: S :|: [set None].
@@ -157,16 +155,18 @@ Proof.
   split.
   - eapply subset_trans;
     [ | eapply incl_bigcupr; now eapply sizedSTCorrect ].
-    rewrite <-imset_bigcup, spec. eapply subset_refl.
+    admit.
+  (* rewrite <-imset_bigcup, spec. eapply subset_refl. *)
   - eapply subset_trans. eapply incl_bigcupr.
     intros x. now eapply sizedSTCorrect.
     unfold lift.
     rewrite bigcup_setU_r.
-    rewrite <-imset_bigcup, spec.
-    rewrite bigcup_const. eapply subset_refl.
-    constructor. exact 0.
-  - destruct PSMon. eauto.
-Qed.
+    admit.
+  (*   rewrite <-imset_bigcup, spec. *)
+  (*   rewrite bigcup_const. eapply subset_refl. *)
+  (*   constructor. exact 0. *)
+  (* - destruct PSMon. eauto. *)
+Admitted.
   
 (* TODO: Move to another file *)
 (*

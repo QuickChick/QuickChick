@@ -42,6 +42,19 @@ Instance suchThatMaybeOptMonotonic
   SizeMonotonic (suchThatMaybeOpt g f).
 Admitted.
 
+(* Instance frequencySizeMonotonic_alt  *)
+(* : forall {A : Type} (g0 : G A) (lg : seq (nat * G A)), *)
+(*     SizeMonotonic g0 -> *)
+(*     lg \subset [set x | SizeMonotonic x.2 ] -> *)
+(*     SizeMonotonic (frequency g0 lg). *)
+(* Admitted. *)
+
+(* Lemma semFreqSize : *)
+(*   forall {A : Type} (ng : nat * G A) (l : seq (nat * G A)) (size : nat), *)
+(*     semGenSize (freq ((fst ng, snd ng) ;; l)) size <--> *)
+(*     \bigcup_(x in (ng :: l)) semGenSize x.2 size. *)
+(* Admitted. *)
+
 Typeclasses eauto := debug.
 
 Require Import DependentTest zoo.
@@ -59,36 +72,50 @@ Existing Instance arbSizedSTgoodFooNarrow.  (* Why???? *)
 
 Derive SizeMonotonicSuchThat for (fun foo => goodFooNarrow n foo).
 
+Derive SizedProofEqs for (fun foo => goodFooNarrow n foo).
+
 Existing Instance arbSizedSTgoodFooUnif. (* ???? *)
 
 Derive SizeMonotonicSuchThat for (fun (x : Foo) => goodFooUnif input x).
+
+Derive SizedProofEqs for (fun foo => goodFooUnif n foo).
 
 Existing Instance arbSizedSTgoodFoo.
 
 Derive SizeMonotonicSuchThat for (fun (x : Foo) => goodFoo input x).
 
+Derive SizedProofEqs for (fun (x : Foo) => goodFoo input x).
+
 Existing Instance arbSizedSTgoodFooCombo.
 
 Derive SizeMonotonicSuchThat for (fun foo => goodFooCombo n foo).
+
+Derive SizedProofEqs for (fun foo => goodFooCombo n foo).
 
 Existing Instance arbSizedSTgoodFooMatch.  (* ???? *)
 
 Derive SizeMonotonicSuchThat for (fun foo => goodFooMatch n foo).
 
+Derive SizedProofEqs for (fun foo => goodFooMatch n foo).
+
 Existing Instance arbSizedSTgoodFooRec.  (* ???? *)
 
 Derive SizeMonotonicSuchThat for (fun (x : Foo) => goodFooRec input x).
 
+Derive SizedProofEqs for (fun (x : Foo) => goodFooRec input x).
+
 Existing Instance arbSizedSTgoodFooPrec.  (* ???? *)
 
 Derive SizeMonotonicSuchThat for (fun (x : Foo) => goodFooPrec input x).
+
+Derive SizedProofEqs for (fun (x : Foo) => goodFooPrec input x).
 
 Inductive goodFooB : nat -> Foo -> Prop := 
 | GF1 : goodFooB 2 (Foo2 Foo1)
 | GF2 : goodFooB 3 (Foo2 (Foo2 Foo1)).
 
 Derive ArbitrarySizedSuchThat for (fun (x : Foo) => goodFooB input x).
-
+Derive SizedProofEqs for (fun (x : Foo) => goodFooB input x).
 
 Lemma test {A} (gs1 gs2 : nat -> list (nat * G (option A))) s s1 s2 : 
       \bigcup_(g in gs1 s1) (semGenSize (snd g) s) \subset  \bigcup_(g in gs2 s2) (semGenSize (snd g) s) ->

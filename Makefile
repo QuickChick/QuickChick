@@ -19,7 +19,7 @@ install: Makefile.coq src/quickChickLib.cmx src/quickChickLib.o quickChickTool
   # Manually copying the remaining files
 	 cp src/quickChickLib.cmx $(COQLIB)/user-contrib/QuickChick
 	 cp src/quickChickLib.o $(COQLIB)/user-contrib/QuickChick
-	 cp src/quickChickTool $(shell echo $(PATH) | tr ':' "\n" | grep opam)/quickChick
+	 # cp src/quickChickTool $(shell echo $(PATH) | tr ':' "\n" | grep opam)/quickChick
 
 quickChickTool: 
 	ocamllex  src/quickChickToolLexer.mll

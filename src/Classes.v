@@ -1,7 +1,8 @@
-Require Import Coq.Numbers.Natural.Peano.NPeano.
+Require Import Coq.Numbers.Natural.Peano.NPeano
+        Coq.Classes.Morphisms.
 Require Import mathcomp.ssreflect.ssreflect.
 From mathcomp Require Import ssrbool ssrnat.
-Require Import Sets GenLow.
+Require Import Sets GenLow Tactics.
 Require Import Recdef.
 Require Import List.
 
@@ -10,6 +11,17 @@ Require Import ZArith ZArith.Znat Arith.
 Import GenLow.
 
 Set Bullet Behavior "Strict Subproofs".
+
+(** Apply a function n times *)
+Fixpoint appn {A} (f : A -> A) (n : nat) : A ->  A :=
+  fun x =>
+    match n with
+      | 0%nat => x
+      | S n' => f (appn f n' x)
+    end.
+
+Infix "^" := appn (at level 30, right associativity) : fun_scope.
+
 
 (** Instance Hierarchy  
 
@@ -54,6 +66,66 @@ Class CanonicalSized (A : Type) `{Sized A} :=
       forall n, succSized [ set x : A | size x <= n ] <--> [ set x : A | size x <= S n ]
  
   }.
+
+Lemma size_ind (A : Type) `{Hyp : Sized A} :
+  forall (P : A -> Prop), (forall y, (forall x, size x < size y -> P x) -> P y) -> (forall x, P x).
+Proof.
+  intros P H1.
+  intros x.
+  assert (Hin : [ set y :  A | size y <= size x] x); eauto.
+  revert Hin.
+  generalize (size x). intros n.
+  revert x. induction n.
+  - intros x Hl. apply H1. intros x1 Hlt. ssromega.
+  - intros x Hleq. eapply H1. intros x1 Hlt.
+    eapply IHn. ssromega.
+Qed.
+
+Lemma size_lfp (A : Type) `{Hyp : CanonicalSized A} :
+  [set x : A | True ] <--> \bigcup_(s : nat) [set x : A | size x <= s ].
+Proof.
+  intros a; split; eauto. intros _.
+  exists (size a). split; eauto. constructor.
+Qed.
+
+Lemma succ_lfp (A : Type) `{Hyp : CanonicalSized A}
+      `{Proper _ (respectful set_eq set_eq) succSized} s :
+  [set x : A | size x <= s ] <-->  (succSized ^ s) zeroSized.
+Proof.
+  induction s.
+  simpl.
+  - rewrite zeroSized_spec.
+    split; intros; ssromega.
+  - simpl. rewrite <- succSized_spec.
+    rewrite IHs. reflexivity.
+Qed.
+
+(* Lemma succ_lfp' (A : Type) `{Hyp : CanonicalSized A} : *)
+(*   \bigcup_(s : nat)  (succSized ^ s) zeroSized <--> [ set x : A | True ]. *)
+(* Proof. *)
+(*   intros. split; eauto. *)
+(*   intros _. *)
+(*   eapply set_eq_trans. *)
+(*   Focus 2. symmetry. *)
+(*   eapply succ_lfp. *)
+(*   simpl.  *)
+(*   rewrite succ_lfp at 2. *)
+(* split. *)
+(*     split. rewrite IHs. firstorder. *)
+(*     IHs. *)
+(*   firstorder. reflexivity. split; intros; eauto. *)
+(*   exists (size a). *)
+(*   remember (size a) as s. *)
+(*   revert a Heqs. induction s; intros. *)
+(*   - split. constructor. *)
+(*     simpl. eapply zeroSized_spec. now eauto. *)
+(*   - split. constructor. *)
+(*     simpl. *)
+(*     eapply (succSized_spec. *)
+(*     eassumption. *)
+(*   eapply size_ind. *)
+  
+(*   [set x : A | True ] <-->  . *)
 
 (** * Correctness classes *)
 

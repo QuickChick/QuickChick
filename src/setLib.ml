@@ -18,6 +18,8 @@ open Context
 open GenericLib
 
 let set_singleton (c : coq_expr) : coq_expr = gApp (gInject "set1") [c]
+let set_empty : coq_expr = gInject "set0"
+let set_full : coq_expr = gInject "setT"
 
 let set_bigcup (x : string) (p : coq_expr) (c : var -> coq_expr) : coq_expr =
   gApp (gInject "bigcup") [p; gFun [x] (fun [x] -> c x)]

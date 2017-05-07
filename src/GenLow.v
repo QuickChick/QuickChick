@@ -145,10 +145,10 @@ Module Type GenLowInterface.
           `{SizeMonotonic _ g} `{forall x, SizeMonotonic (f x)} : 
     SizeMonotonic (bindGen g f).
 
-  Declare Instance bindMonotonicStrong :
-    forall {A B} (g : G A) (f : A -> G B)
-      `{SizeMonotonic _ g} `{forall x, semGen g x -> SizeMonotonic (f x)},
-      SizeMonotonic (bindGen g f).
+  Declare Instance bindMonotonicStrong
+          {A B} (g : G A) (f : A -> G B)
+          `{SizeMonotonic _ g} `{forall x, semGen g x -> SizeMonotonic (f x)} : 
+    SizeMonotonic (bindGen g f).
   
   Parameter semBindUnsized1 :
     forall A B (g : G A) (f : A -> G B) `{Unsized _ g},
