@@ -31,15 +31,14 @@ let ret_type (s : var) f = hole
 
 let class_method = (gInject "arbitrary")
 
-let class_methodST (pred : coq_expr) (size : coq_expr) = 
-  gApp ~explicit:true (gInject "arbitrarySizeST")
+let class_methodST (pred : coq_expr) = 
+  gApp ~explicit:true (gInject "arbitraryST")
     [ hole (* Implicit argument - type A *)
     ; pred
-    ; hole (* Implicit instance *)
-    ; size ]
+    ; hole (* Implicit instance *)]
 
-let rec_method (rec_name : coq_expr) (l : coq_expr list) =
-  gApp rec_name l
+let rec_method (rec_name : coq_expr) (size : coq_expr) (l : coq_expr list) =
+  gApp rec_name (size :: l)
 
 let bind (opt : bool) (m : coq_expr) (x : string) (f : var -> coq_expr) =
   (if opt then bindGenOpt else bindGen) m x f
@@ -65,8 +64,8 @@ let base_gens
       (rec_name : coq_expr) =
   (* partially applied handle_branch *)
   let handle_branch' size =
-    handle_branch n dep_type input_names size (fail_exp full_gtyp) (ret_exp full_gtyp) ret_type
-      class_method class_methodST (rec_method rec_name) bind stMaybe gen_ctr register_arbitrary
+    handle_branch n dep_type input_names (fail_exp full_gtyp) (ret_exp full_gtyp) ret_type
+      class_method class_methodST (rec_method rec_name size) bind stMaybe gen_ctr register_arbitrary
   in
   let base_branches =
     List.map
@@ -86,8 +85,8 @@ let ind_gens
       (rec_name : coq_expr) =
   (* partially applied handle_branch *)
   let handle_branch' c =
-    handle_branch n dep_type input_names size (fail_exp full_gtyp) (ret_exp full_gtyp) ret_type
-      class_method class_methodST (rec_method rec_name) bind stMaybe gen_ctr register_arbitrary
+    handle_branch n dep_type input_names (fail_exp full_gtyp) (ret_exp full_gtyp) ret_type
+      class_method class_methodST (rec_method rec_name size) bind stMaybe gen_ctr register_arbitrary
   in
   let all_branches = List.map (fun x -> fst (handle_branch' size x)) ctrs in
   all_branches

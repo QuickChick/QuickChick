@@ -324,15 +324,12 @@ let need_dec = ref false
 let handle_branch
       (n : int)
       (dep_type : dep_type)
-      (* Inputs should not escape to unification engine *)
       (input_names : var list)
-      (* XXX size should not escape to unification engine *)
-      (size : coq_expr)
       (fail_exp : coq_expr)
       (ret_exp : coq_expr -> coq_expr)
       (ret_type : var -> (var -> coq_expr -> coq_expr -> coq_expr) -> coq_expr)
       (class_method : coq_expr)
-      (class_methodST : coq_expr (* pred *) -> coq_expr (* size *) -> coq_expr)
+      (class_methodST : coq_expr (* pred *) -> coq_expr)
       (rec_method : coq_expr list -> coq_expr)
       (bind : bool (* opt *) -> coq_expr -> string -> (var -> coq_expr) -> coq_expr)
       (stMaybe : bool (* opt *) -> coq_expr -> coq_expr -> coq_expr)
@@ -485,7 +482,7 @@ let handle_branch
           process_checks k cmap x 
             (* Generate using recursive function *)
             true
-            (rec_method (size :: args))
+            (rec_method args)
             (fun k' cmap' x -> recurse_type k' cmap' dt2)
         end
         else if pos then begin (* Generate using "arbitrarySizeST" and annotations for type *)
@@ -499,7 +496,7 @@ let handle_branch
                                              if i == j then gVar x else dt_to_coq_expr k dt
                                            ) numbered_dts))
           in
-          process_checks k cmap x true (class_methodST pred size) 
+          process_checks k cmap x true (class_methodST pred) 
             (fun k' cmap' x' -> recurse_type k' cmap' dt2)
         end
         else (* Negation. Since we expect the *positive* versions to be sparse, we can use suchThatMaybe for negative *)
@@ -522,7 +519,7 @@ let handle_branch
               | [] -> 
                 (* base case - recursive call *)
                 if pos then 
-                  let generator = rec_method (size :: List.rev acc) in
+                  let generator = rec_method (List.rev acc) in
                   process_checks k cmap x true generator 
                     (fun k' cmap' x' -> recurse_type k' cmap' dt2)
                 else failwith "Negation / build_arbs"

@@ -35,10 +35,10 @@ let ret_type (s : var) (match_expr : var -> coq_expr -> coq_expr -> coq_expr)  =
 
 (* These should be inferred automatically  *)
 let class_method = hole
-let class_methodST (pred : coq_expr) (size : coq_expr) = hole
+let class_methodST (pred : coq_expr) = hole
 
 let rec_method (ih : var) (l : coq_expr list) =
-  gApp (gVar ih) (List.tl l) (* tail because we do not want the size *)
+  gApp (gVar ih) l
 
 let bind (opt : bool) (m : coq_expr) (x : string) (f : var -> coq_expr) =
   (if opt then bindOptMonotonic else bindMonotonic) m x f
@@ -107,7 +107,7 @@ let genSizedSTMon_body
 
   let base_case =
     let handle_branch' (inputs : var list) =
-      handle_branch n dep_type inputs (gInt 0)
+      handle_branch n dep_type inputs
         fail_exp ret_exp ret_type class_method class_methodST
         (rec_method (make_up_name ())) bind stMaybe gen_ctr (fun _ -> ())
     in
@@ -130,7 +130,7 @@ let genSizedSTMon_body
 
   let ind_case =
     let handle_branch' (ih : var) (size : var) (inputs : var list) =
-      handle_branch n dep_type inputs (gVar size)
+      handle_branch n dep_type inputs
         fail_exp ret_exp ret_type class_method class_methodST
         (rec_method ih) bind stMaybe gen_ctr (fun _ -> ())
     in
