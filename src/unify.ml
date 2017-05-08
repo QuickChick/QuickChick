@@ -407,7 +407,7 @@ let handle_branch
     in
     
     (* Function to instantiate a single range *)
-    (* It also uses any checks present in the check-map XXX generator specific *)
+    (* It also uses any checks present in the check-map *)
     let rec instantiate_range_cont (k : umap) (cmap : cmap) (parent : unknown) (cont : umap -> cmap -> coq_expr -> coq_expr) = function
       | Ctr (c,rs) -> 
         (* aux2 goes through the dts, enhancing the continuation to include the result of the head to the acc *)

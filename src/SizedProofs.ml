@@ -125,22 +125,22 @@ let sizedEqProofs_body
           ))
   in
 
-  let full_prop gtyp inputs =
-    gApp (full_dt) (list_insert_nth gtyp inputs (n-1))
-  in
+  (* let full_prop gtyp inputs = *)
+  (*   gApp (full_dt) (list_insert_nth gtyp inputs (n-1)) *)
+  (* in *)
 
-  let left_ret_type x =
-    gFun ["n"]
-      (fun [n] ->
-         gProdWithArgs
-           inputs
-           (fun inputs ->
-              gImpl
-                (gApp (appn succ_set n zero_set) [x])
-                (full_prop (gVar x) (List.map gVar inputs))
-           )
-      )
-  in
+  (* let left_ret_type x = *)
+  (*   gFun ["n"] *)
+  (*     (fun [n] -> *)
+  (*        gProdWithArgs *)
+  (*          inputs *)
+  (*          (fun inputs -> *)
+  (*             gImpl *)
+  (*               (gApp (appn succ_set n zero_set) [x]) *)
+  (*               (full_prop (gVar x) (List.map gVar inputs)) *)
+  (*          ) *)
+  (*     ) *)
+  (* in *)
 
   (* let rec elim_base_cases hin ih ctrs n = *)
   (*   let hr = Printf.sprintf "Hl%d" n in *)
