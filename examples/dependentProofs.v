@@ -206,6 +206,43 @@ Inductive goodFooB : nat -> Foo -> Prop :=
 Derive ArbitrarySizedSuchThat for (fun (x : Foo) => goodFooB input x).
 Derive SizedProofEqs for (fun (x : Foo) => goodFooB input x).
 
+
+Inductive tree : Type :=
+| Leaf : tree
+| Node : nat -> tree -> tree -> tree.
+
+Inductive HeightTree : nat -> tree -> Prop :=
+| HLeaf : forall n, HeightTree n Leaf
+| HNode :
+    forall t1 t2 n m,
+      HeightTree n t1 ->
+      HeightTree n t2 ->
+      HeightTree (S n) (Node m t1 t2).
+
+(* ΧΧΧ this breaks gens *)
+Inductive LRTree : tree -> Prop :=
+| PLeaf : LRTree Leaf
+| PNode :
+    forall m t1 t2,
+      t1 = t2 ->
+      LRTree t1 ->
+      LRTree t2 ->
+      LRTree (Node m t1 t2).
+
+Derive ArbitrarySizedSuchThat for (fun (x : tree) => HeightTree input x).
+Derive SizedProofEqs for (fun (x : tree) => HeightTree input x).
+
+
+(* XXX breaks gen *)
+(* Inductive HeightTree : nat -> tree -> Prop := *)
+(* | HLeaf : forall n, HeightTree n Leaf *)
+(* | HNode : *)
+(*     forall t1 t2 n k m, *)
+(*       k = 3 -> *)
+(*       HeightTree k t2 -> *)
+(*       HeightTree k t1 -> *)
+(*       HeightTree n (Node m t1 t2). *)
+
 (* Lemma test2 {A} (gs1 gs2 : nat -> list (nat * G (option A))) s s1 s2 :  *)
 (*       \bigcup_(g in gs1 s1) (semGenSize (snd g) s) \subset  \bigcup_(g in gs2 s2) (semGenSize (snd g) s) -> *)
 (*       semGenSize (backtrack (gs1 s1)) s \subset semGenSize (backtrack (gs2 s2)) s. *)
