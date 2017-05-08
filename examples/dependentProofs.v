@@ -232,6 +232,7 @@ Inductive LRTree : tree -> Prop :=
 Derive ArbitrarySizedSuchThat for (fun (x : tree) => HeightTree input x).
 Derive SizedProofEqs for (fun (x : tree) => HeightTree input x).
 
+Derive ArbitrarySizedSuchThat for (fun (x : tree) => LRTree x).
 
 (* XXX breaks gen *)
 (* Inductive HeightTree : nat -> tree -> Prop := *)
