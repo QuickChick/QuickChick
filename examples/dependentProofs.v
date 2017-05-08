@@ -224,17 +224,37 @@ Inductive LRTree : tree -> Prop :=
 | PLeaf : LRTree Leaf
 | PNode :
     forall m t1 t2,
-      t1 = t2 ->
+      ~ t1 = Node 2 Leaf Leaf ->
       LRTree t1 ->
       LRTree t2 ->
       LRTree (Node m t1 t2).
 
-Derive ArbitrarySizedSuchThat for (fun (x : tree) => HeightTree input x).
-Derive SizedProofEqs for (fun (x : tree) => HeightTree input x).
+Instance ArbitrarySuchThatEql {A} (x : A) : GenSuchThat A (fun y => eq x y) :=
+  {| arbitraryST := returnGen (Some x) |}.
+
+Instance DecidableLRTree t : Dec (LRTree t).
+Proof.
+Admitted.
+
+Instance DecEqLRTree (t1 t2 : tree): Dec (t1 = t2).
+Proof.
+Admitted.
 
 Derive ArbitrarySizedSuchThat for (fun (x : tree) => LRTree x).
 
+Derive SizedProofEqs for (fun (x : tree) => LRTree x).
+
+
 (* XXX breaks gen *)
+Inductive LRTree : tree -> Prop :=
+| PLeaf : LRTree Leaf
+| PNode :
+    forall m t1 t2,
+      Node 2 Leaf Leaf = t1 ->
+      t1 = Node 2 Leaf Leaf ->
+      LRTree t1 ->
+      LRTree t2 ->
+      LRTree (Node m t1 t2).
 (* Inductive HeightTree : nat -> tree -> Prop := *)
 (* | HLeaf : forall n, HeightTree n Leaf *)
 (* | HNode : *)

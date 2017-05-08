@@ -65,6 +65,10 @@ let gI = gInject "I"
 
 let gT = gInject "True"
 
+let gTrueb = gInject "true"
+
+let gFalseb = gInject "false"
+
 let gIff p1 p2 =
   gApp (gInject "iff") [p1; p2]
 
@@ -89,3 +93,8 @@ let nat_ind ret_type base_case ind_case =
 
 let appn fn n arg =
   gApp (gInject "appn") [fn; n; arg]
+
+let matchDec c left right =
+  gMatch c [ (injectCtr "left" , ["eq" ], left)
+           ; (injectCtr "right", ["neq"], right)
+           ]

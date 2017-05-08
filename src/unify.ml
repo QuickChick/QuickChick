@@ -389,13 +389,19 @@ let handle_branch
       | Some checks -> 
         (* Remove checks from cmap *)
         let cmap' = CMap.remove (DTyVar x) cmap in
+        let rec sumbools_to_bool lst =
+          match lst with
+          | [] -> gTrueb
+          | dec :: lst' ->
+            matchDec dec (fun heq -> gFalseb) (fun hneq -> sumbools_to_bool lst')
+        in
         let bool_pred =
-          gFun [var_to_string x] (fun [x] -> 
-                                   gApp (gInject ("List.forallb"))
-                                     [ gFun ["b"] (fun [b] -> gNot (decToBool (gVar b)))
-                                     ; gList (List.map (fun chk -> chk (gVar x)) checks)
-                                     ]
-                                 )
+          gFun [var_to_string x]
+            (fun [x] -> sumbools_to_bool (List.map (fun chk -> chk (gVar x)) checks))
+                                 (*   gApp (gInject ("List.forallb")) *)
+                                 (*     [ gFun ["b"] (fun [b] -> gNot (decToBool (gVar b))) *)
+                                 (*     ; gList (List.map (fun chk -> chk (gVar x)) checks) *)
+                                 (*     ] *)
         in
         bind true
           (stMaybe opt g bool_pred)
