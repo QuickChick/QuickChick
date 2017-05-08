@@ -16,9 +16,11 @@ Set Bullet Behavior "Strict Subproofs".
 
 Class SizedProofEqs {A : Type} (P : A -> Prop) :=
   {
-    zero : set A;
-    succ : set A -> set A;
-    (* spec : \bigcup_(n : nat) ((succ ^ n) zero) <--> P *)
+    (* inhabitants for P whose derivation height is less or equal to n *)
+    iter : nat -> set A; 
+    (* zero : set A; *)
+    (* succ : set A -> set A; *)
+    (* spec : \bigcup_(n : nat) iter n <--> P *)
   }.
 
 
@@ -52,8 +54,8 @@ Class SizedSuchThatCorrect {A : Type} (P : A -> Prop) `{SizedProofEqs A P} (g : 
   {
     sizedSTCorrect :
       forall s,
-        Some @: ((succ ^ s) zero) \subset semGen (g s) /\
-        semGen (g s) \subset lift ((succ ^ s) zero)
+        Some @: (iter s) \subset semGen (g s) /\
+        semGen (g s) \subset lift (iter s)
   }.
 
 Class SuchThatCorrect {A : Type} (P : A -> Prop) (g : G (option A)) :=
@@ -156,16 +158,16 @@ Proof.
   - eapply subset_trans;
     [ | eapply incl_bigcupr; now eapply sizedSTCorrect ].
     admit.
-  (* rewrite <-imset_bigcup, spec. eapply subset_refl. *)
+    (* rewrite <-imset_bigcup, spec. eapply subset_refl. *)
   - eapply subset_trans. eapply incl_bigcupr.
     intros x. now eapply sizedSTCorrect.
     unfold lift.
     rewrite bigcup_setU_r.
     admit.
-  (*   rewrite <-imset_bigcup, spec. *)
-  (*   rewrite bigcup_const. eapply subset_refl. *)
-  (*   constructor. exact 0. *)
-  (* - destruct PSMon. eauto. *)
+    (* rewrite <-imset_bigcup, spec. *)
+    (* rewrite bigcup_const. eapply subset_refl. *)
+    (* constructor. exact 0. *)
+  - destruct PSMon. eauto.
 Admitted.
   
 (* TODO: Move to another file *)

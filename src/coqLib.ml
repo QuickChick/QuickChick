@@ -79,6 +79,13 @@ let gfalse = gInject "False"
 (* TODO extend gMatch to write the return type? *)
 let discriminate h =
   false_ind hole
-            (gMatch h [(injectCtr "erefl", [], fun [] -> gI)])
+    (gMatch h [(injectCtr "erefl", [], fun [] -> gI)])
+
 let lt0_False hlt =
   gApp (gInject "lt0_False") [hlt]
+
+let nat_ind ret_type base_case ind_case =
+  gApp (gInject "nat_ind") [ret_type; base_case; ind_case]
+
+let appn fn n arg =
+  gApp (gInject "appn") [fn; n; arg]
