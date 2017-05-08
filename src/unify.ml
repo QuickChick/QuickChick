@@ -503,34 +503,35 @@ let handle_branch
       (* Multiple arguments to be generated for. Generalized arbitrarySizeST? *)
       | filtered -> if pos then begin
           (* For now, check if n is in the filtered list *)
-          match List.filter (fun (i,dt) -> i == n) filtered with 
-          | [(_, DTyVar x)] -> 
-            if c = gen_ctr then begin 
-              b := false; 
-              (* Every other variable generated using "arbitrary" *)
-              let rec build_arbs k cmap acc = function 
-                | [] -> 
-                  (* base case - recursive call *)
-                  if pos then 
-                    let generator = rec_method (List.rev acc) in
-                    process_checks k cmap x true generator 
-                      (fun k' cmap' x' -> recurse_type k' cmap' dt2)
-                  else failwith "Negation / build_arbs"
-                | (i,dt)::rest -> 
-                  if i == n then build_arbs k cmap acc rest (* Recursive argument - handle at the end *)
-                  else if is_fixed k dt then (* Fixed argument - do nothing *)
-                    build_arbs k cmap (dt_to_coq_expr k dt :: acc) rest 
-                  else (* Call arbitrary and bind it to a new name *)
-                    let arb = arb.next_name () in
-                    let rdt = convert_to_range dt in
-                    instantiate_range_cont k cmap Unknown.undefined 
-                      (fun k cmap c -> (* Continuation: call build_arbs on the rest *)
-                         build_arbs k cmap (c :: acc) rest
-                      ) rdt
-              in build_arbs k cmap [] numbered_dts
-            end 
-            else failwith "TODO: Non-rec constructor"
-          | [] -> 
+          if c = gen_ctr then begin 
+            match List.filter (fun (i,dt) -> i == n) filtered with 
+            | [(_, DTyVar x)] -> begin
+                b := false; 
+                (* Every other variable generated using "arbitrary" *)
+                let rec build_arbs k cmap acc = function 
+                  | [] -> 
+                    (* base case - recursive call *)
+                    if pos then 
+                      let generator = rec_method (List.rev acc) in
+                      process_checks k cmap x true generator 
+                        (fun k' cmap' x' -> recurse_type k' cmap' dt2)
+                    else failwith "Negation / build_arbs"
+                  | (i,dt)::rest -> 
+                    if i == n then build_arbs k cmap acc rest (* Recursive argument - handle at the end *)
+                    else if is_fixed k dt then (* Fixed argument - do nothing *)
+                      build_arbs k cmap (dt_to_coq_expr k dt :: acc) rest 
+                    else (* Call arbitrary and bind it to a new name *)
+                      let arb = arb.next_name () in
+                      let rdt = convert_to_range dt in
+                      instantiate_range_cont k cmap Unknown.undefined 
+                        (fun k cmap c -> (* Continuation: call build_arbs on the rest *)
+                           build_arbs k cmap (c :: acc) rest
+                        ) rdt
+                in build_arbs k cmap [] numbered_dts
+              end 
+            | _ -> failwith "non-recursive call with multiple arguments"
+          end 
+          else 
              (* TODO: factor out *)
               let rec build_arbs k cmap acc = function 
                 (* TODO: Hacky: should try and find out which one is a variable *)
@@ -564,7 +565,7 @@ let handle_branch
 
              (* TODO: Special handling for equality? *)
              
-          | _ -> failwith (Printf.sprintf "Mode failure: %s\n" (String.concat " " (List.map (fun (i,d) -> Printf.sprintf "(%d, %s)" i (dep_type_to_string d)) filtered)))
+(*          | _ -> failwith (Printf.sprintf "Mode failure: %s\n" (String.concat " " (List.map (fun (i,d) -> Printf.sprintf "(%d, %s)" i (dep_type_to_string d)) filtered))) *)
         end
         else failwith "TODO: Negation with many things to be generated"
 
