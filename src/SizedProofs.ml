@@ -39,9 +39,16 @@ let rec_method (rec_name : coq_expr) (size : coq_expr) (l : coq_expr list) =
 let bind (opt : bool) (m : coq_expr) (x : string) (f : var -> coq_expr) =
   set_bigcup x m f
 
-let stMaybe (opt : bool) (g : coq_expr) (bool_pred : coq_expr) =
-  set_bigcup "x" g (fun x -> gEqType (gApp bool_pred [gVar x]) (gInject "true"))
-
+let stMaybe (opt : bool) (g : coq_expr) (x : string) (checks : (coq_expr -> coq_expr) list) =
+  let rec sumbools_to_bool lst =
+    match lst with
+    | [] -> gTrue
+    | dec :: lst' ->
+      matchDec dec (fun heq -> gFalse) (fun hneq -> sumbools_to_bool lst')
+  in
+  gFun [x]
+    (fun [x] -> sumbools_to_bool (List.map (fun chk -> chk (gVar x)) checks))
+ 
 let sizedEqProofs_body
       (class_name : string)
       (gen_ctr : ty_ctr)

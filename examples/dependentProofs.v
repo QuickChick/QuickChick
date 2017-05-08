@@ -225,6 +225,7 @@ Inductive LRTree : tree -> Prop :=
 | PNode :
     forall m t1 t2,
       ~ t1 = Node 2 Leaf Leaf ->
+      ~ Node 4 Leaf Leaf = t1 ->
       LRTree t1 ->
       LRTree t2 ->
       LRTree (Node m t1 t2).
@@ -243,7 +244,6 @@ Admitted.
 Derive ArbitrarySizedSuchThat for (fun (x : tree) => LRTree x).
 
 Derive SizedProofEqs for (fun (x : tree) => LRTree x).
-
 
 (* XXX breaks gen *)
 Inductive LRTree : tree -> Prop :=

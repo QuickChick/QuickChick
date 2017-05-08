@@ -332,7 +332,7 @@ let handle_branch
       (class_methodST : coq_expr (* pred *) -> coq_expr)
       (rec_method : coq_expr list -> coq_expr)
       (bind : bool (* opt *) -> coq_expr -> string -> (var -> coq_expr) -> coq_expr)
-      (stMaybe : bool (* opt *) -> coq_expr -> coq_expr -> coq_expr)
+      (stMaybe : bool (* opt *) -> coq_expr -> string -> (coq_expr -> coq_expr) list -> coq_expr)
       (gen_ctr : ty_ctr)
       register_arbitrary
       (c : dep_ctr)
@@ -389,22 +389,8 @@ let handle_branch
       | Some checks -> 
         (* Remove checks from cmap *)
         let cmap' = CMap.remove (DTyVar x) cmap in
-        let rec sumbools_to_bool lst =
-          match lst with
-          | [] -> gTrueb
-          | dec :: lst' ->
-            matchDec dec (fun heq -> gFalseb) (fun hneq -> sumbools_to_bool lst')
-        in
-        let bool_pred =
-          gFun [var_to_string x]
-            (fun [x] -> sumbools_to_bool (List.map (fun chk -> chk (gVar x)) checks))
-                                 (*   gApp (gInject ("List.forallb")) *)
-                                 (*     [ gFun ["b"] (fun [b] -> gNot (decToBool (gVar b))) *)
-                                 (*     ; gList (List.map (fun chk -> chk (gVar x)) checks) *)
-                                 (*     ] *)
-        in
         bind true
-          (stMaybe opt g bool_pred)
+          (stMaybe opt g (var_to_string x) checks)
           (var_to_string x)
           (fun x -> cont (fixVariable x k) cmap' x)
       | None -> 

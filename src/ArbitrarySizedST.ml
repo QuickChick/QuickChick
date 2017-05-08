@@ -43,7 +43,17 @@ let rec_method (rec_name : coq_expr) (size : coq_expr) (l : coq_expr list) =
 let bind (opt : bool) (m : coq_expr) (x : string) (f : var -> coq_expr) =
   (if opt then bindGenOpt else bindGen) m x f
 
-let stMaybe (opt : bool) (g : coq_expr) (bool_pred : coq_expr) =
+let stMaybe (opt : bool) (g : coq_expr) (x : string) (checks : (coq_expr -> coq_expr) list) =
+  let rec sumbools_to_bool lst =
+    match lst with
+    | [] -> gTrueb
+    | dec :: lst' ->
+      matchDec dec (fun heq -> gFalseb) (fun hneq -> sumbools_to_bool lst')
+  in
+  let bool_pred =
+    gFun [x]
+      (fun [x] -> sumbools_to_bool (List.map (fun chk -> chk (gVar x)) checks))
+  in
   (gApp (gInject (if opt then "suchThatMaybeOpt" else "suchThatMaybe"))
      [ g (* Use the generator provided for base generator *)
      ; bool_pred

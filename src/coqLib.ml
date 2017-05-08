@@ -69,6 +69,10 @@ let gTrueb = gInject "true"
 
 let gFalseb = gInject "false"
 
+let gTrue = gInject "True"
+
+let gFalse = gInject "False"
+
 let gIff p1 p2 =
   gApp (gInject "iff") [p1; p2]
 
