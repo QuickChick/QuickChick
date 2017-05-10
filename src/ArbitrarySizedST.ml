@@ -59,9 +59,30 @@ let stMaybe (opt : bool) (g : coq_expr) (x : string) (checks : (coq_expr -> coq_
      ; bool_pred
      ])
 
+let ret_type_dec (s : var) (left : coq_expr) (right : coq_expr) =
+      gMatch (gVar s)
+      [ (injectCtr "left", ["eq"], fun _ -> left)
+      ; (injectCtr "right", ["neq"], fun _ -> right) ]
+
+let check_expr (scrut : coq_expr) (left : coq_expr) (right : coq_expr) =
+  gMatchReturn scrut
+    "s" (* as clause *)
+    (fun v -> ret_type v ret_type_dec)
+    [ (injectCtr "left", ["eq" ] , fun _ -> left)
+    ; (injectCtr "right", ["neq"], fun _ -> right) 
+    ]
+
+let match_inp (inp : var) (pat : matcher_pat) (left : coq_expr) (right  : coq_expr) =
+  let ret v left right =
+    construct_match (gVar v) ~catch_all:(Some right) [(pat, left)]
+  in
+  construct_match_with_return
+    (gVar inp) ~catch_all:(Some right) "s" (fun v -> ret_type v ret)
+    [(pat,left)]
+
+
+
 (* hoisting out base and ind gen to be able to call them from proof generation *)
-
-
 let base_gens
       (size : coq_expr)
       (full_gtyp : coq_expr)
@@ -74,8 +95,9 @@ let base_gens
       (rec_name : coq_expr) =
   (* partially applied handle_branch *)
   let handle_branch' size =
-    handle_branch n dep_type input_names (fail_exp full_gtyp) (ret_exp full_gtyp) ret_type
-      class_method class_methodST (rec_method rec_name size) bind stMaybe gen_ctr register_arbitrary
+    handle_branch n dep_type input_names (fail_exp full_gtyp) (ret_exp full_gtyp)
+      class_method class_methodST (rec_method rec_name size) bind stMaybe check_expr match_inp
+      gen_ctr register_arbitrary
   in
   let base_branches =
     List.map
@@ -95,8 +117,9 @@ let ind_gens
       (rec_name : coq_expr) =
   (* partially applied handle_branch *)
   let handle_branch' c =
-    handle_branch n dep_type input_names (fail_exp full_gtyp) (ret_exp full_gtyp) ret_type
-      class_method class_methodST (rec_method rec_name size) bind stMaybe gen_ctr register_arbitrary
+    handle_branch n dep_type input_names (fail_exp full_gtyp) (ret_exp full_gtyp)
+      class_method class_methodST (rec_method rec_name size) bind stMaybe check_expr match_inp
+      gen_ctr register_arbitrary
   in
   let all_branches = List.map (fun x -> fst (handle_branch' size x)) ctrs in
   all_branches

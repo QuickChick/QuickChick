@@ -271,27 +271,18 @@ type cmap = (check list) CMap.t
 
 let lookup_checks k m = try Some (CMap.find k m) with Not_found -> None
 
-let ret_type_dec (s : var) (left : coq_expr) (right : coq_expr) =
-      gMatch (gVar s)
-      [ (injectCtr "left", ["eq"], fun _ -> left)
-      ; (injectCtr "right", ["neq"], fun _ -> right) ]
-
 (* TODO: Whenn handling parameters, this might need to add additional arguments *)
 (** Takes an equality map and two coq expressions [cleft] and [cright]. [cleft]
     is returned if all of the equalities hold, otherwise [cright] is
     returned. *)
-let handle_equalities eqs (ret_type : var -> (var -> coq_expr -> coq_expr -> coq_expr) -> coq_expr)
-      (cleft : coq_expr) (cright : coq_expr) = 
+let handle_equalities eqs (check_expr : coq_expr -> 'a -> 'a -> 'a)
+      (cleft : 'a) (cright : 'a) = 
   EqSet.fold (fun (u1,u2) c -> 
-               let check = gApp ~explicit:true (gInject "dec") [ gApp (gInject "eq") [gVar u1; gVar u2] 
-                                                               ; hole ] in
-               gMatchReturn
-                 check
-                 "s" (* as clause *)
-                 (* return clause with minimal type information *)
-                 (fun v -> ret_type v ret_type_dec)
-                 [ (injectCtr "left" , ["eq" ], fun _ -> c)
-                 ; (injectCtr "right", ["neq"], fun _ -> cright) ]
+               let checker =
+                 gApp ~explicit:true (gInject "dec") [ gApp (gInject "eq") [gVar u1; gVar u2]
+                                                     ; hole ]
+               in
+               check_expr checker c cright
              ) eqs cleft
 
 let forGen = Unknown.from_string "_forGen"
@@ -325,14 +316,15 @@ let handle_branch
       (n : int)
       (dep_type : dep_type)
       (input_names : var list)
-      (fail_exp : coq_expr)
-      (ret_exp : coq_expr -> coq_expr)
-      (ret_type : var -> (var -> coq_expr -> coq_expr -> coq_expr) -> coq_expr)
-      (class_method : coq_expr)
-      (class_methodST : coq_expr (* pred *) -> coq_expr)
-      (rec_method : coq_expr list -> coq_expr)
-      (bind : bool (* opt *) -> coq_expr -> string -> (var -> coq_expr) -> coq_expr)
-      (stMaybe : bool (* opt *) -> coq_expr -> string -> (coq_expr -> coq_expr) list -> coq_expr)
+      (fail_exp : 'a)
+      (ret_exp : coq_expr -> 'a)
+      (class_method : 'a)
+      (class_methodST : coq_expr (* pred *) -> 'a)
+      (rec_method : coq_expr list -> 'a)
+      (bind : bool (* opt *) -> 'a -> string -> (var -> 'a) -> 'a)
+      (stMaybe : bool (* opt *) -> 'a -> string -> (coq_expr -> coq_expr) list -> 'a)
+      (check_expr : coq_expr -> 'a -> 'a -> 'a)
+      (match_inp : var -> matcher_pat -> 'a -> 'a -> 'a)
       (gen_ctr : ty_ctr)
       register_arbitrary
       (c : dep_ctr)
@@ -400,7 +392,7 @@ let handle_branch
     
     (* Function to instantiate a single range *)
     (* It also uses any checks present in the check-map *)
-    let rec instantiate_range_cont (k : umap) (cmap : cmap) (parent : unknown) (cont : umap -> cmap -> coq_expr -> coq_expr) = function
+    let rec instantiate_range_cont (k : umap) (cmap : cmap) (parent : unknown) (cont : umap -> cmap -> coq_expr -> 'a) = function
       | Ctr (c,rs) -> 
         (* aux2 goes through the dts, enhancing the continuation to include the result of the head to the acc *)
         let rec traverse_ranges k cmap acc = function 
@@ -459,13 +451,8 @@ let handle_branch
         let body_cont = recurse_type k cmap dt2 in
         let body_fail = fail_exp in
 
-        (* Perform the check - rec_dec_name is in scope *)
-        gMatchReturn (checker (List.map (fun dt -> dt_to_coq_expr k dt) dts))
-          "s" (* as clause *)
-          (fun v -> ret_type v ret_type_dec)
-          [ (injectCtr "left", ["eq" ] , fun _ -> if pos then body_cont else body_fail)
-          ; (injectCtr "right", ["neq"], fun _ -> if pos then body_fail else body_cont) 
-          ]
+        if pos then check_expr (checker (List.map (fun dt -> dt_to_coq_expr k dt) dts)) body_cont body_fail
+        else check_expr (checker (List.map (fun dt -> dt_to_coq_expr k dt) dts)) body_fail body_cont
 
       | [(i, DTyVar x)] -> (* Single variable to be generated for *)
         if i == n && c == gen_ctr && pos then begin (* Recursive call *)
@@ -592,15 +579,10 @@ let handle_branch
     (* XXX generator specific *)
     let branch_gen =
       let rec walk_matches = function
-        | [] -> handle_equalities eqs ret_type (recurse_type map CMap.empty typ) (fail_exp)
+        | [] -> handle_equalities eqs check_expr (recurse_type map CMap.empty typ) (fail_exp)
         | (u,m)::ms -> begin
             msg_debug (str (Printf.sprintf "Processing Match: %s @ %s" (Unknown.to_string u) (matcher_pat_to_string m)) ++ fnl ());
-            let ret v left right =
-              construct_match (gVar v) ~catch_all:(Some right) [(m, left)]
-            in
-            construct_match_with_return
-              (gVar u) ~catch_all:(Some fail_exp) "s" (fun v -> ret_type v ret)
-              [(m,walk_matches ms)]
+            match_inp u m (walk_matches ms) fail_exp
           end in
       (* matches are the matches returned by unification with the result type *)
       walk_matches matches

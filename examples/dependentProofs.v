@@ -114,7 +114,7 @@ Proof.
                          (match
                              @dec (goodFooNarrow (S O) x) (goodFooNarrow_dec (S O) x) as s3
                              return
-                             ((match s3 with | left _ => [set x] | right _ => set0 end) foo ->
+                             ((match s3 with | left _ => [set _] | right _ => set0 end) foo ->
                               goodFooNarrow n foo)
                            with
                              | left H3 =>
@@ -126,7 +126,7 @@ Proof.
                                              (match hin with
                                                 | erefl => H3
                                               end))
-                             | right H4 => fun Hin => False_ind _ Hin
+                             | right H4 => fun hin => False_ind _ hin
                            end) Hs2    
                      end
                    | or_intror H2 => False_ind _ H2
@@ -183,9 +183,9 @@ Derive SizedProofEqs for (fun foo => goodFooCombo n foo).
 
 Existing Instance arbSizedSTgoodFooMatch.  (* ???? *)
 
-Derive SizeMonotonicSuchThat for (fun foo => goodFooMatch n foo).
-
 Derive SizedProofEqs for (fun foo => goodFooMatch n foo).
+
+Derive SizeMonotonicSuchThat for (fun foo => goodFooMatch n foo).
 
 Existing Instance arbSizedSTgoodFooRec.  (* ???? *)
 
@@ -245,6 +245,17 @@ Derive ArbitrarySizedSuchThat for (fun (x : tree) => LRTree x).
 
 Derive SizedProofEqs for (fun (x : tree) => LRTree x).
 
+Inductive ex_test : tree -> Prop :=
+| B : ex_test Leaf 
+| Ind :
+    forall (list  y12  : nat) t,
+      list = y12 ->
+      ex_test (Node 4 t t).
+
+Derive ArbitrarySizedSuchThat for (fun (x : tree) => ex_test x).
+
+Set Printing All. 
+
 (* XXX breaks gen *)
 Inductive LRTree : tree -> Prop :=
 | PLeaf : LRTree Leaf
@@ -255,6 +266,10 @@ Inductive LRTree : tree -> Prop :=
       LRTree t1 ->
       LRTree t2 ->
       LRTree (Node m t1 t2).
+
+(* XXX weid bug when naming binders with name of already existing ids,
+   e.g. nat, list*)
+
 (* Inductive HeightTree : nat -> tree -> Prop := *)
 (* | HLeaf : forall n, HeightTree n Leaf *)
 (* | HNode : *)

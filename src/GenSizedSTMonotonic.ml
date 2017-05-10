@@ -56,6 +56,28 @@ let stMaybe (opt : bool) (g : coq_expr) (x : string) (checks : (coq_expr -> coq_
   in
   (if opt then suchThatMaybeMonotonic else suchThatMaybeOptMonotonic) g bool_pred
 
+let ret_type_dec (s : var) (left : coq_expr) (right : coq_expr) =
+      gMatch (gVar s)
+      [ (injectCtr "left", ["eq"], fun _ -> left)
+      ; (injectCtr "right", ["neq"], fun _ -> right) ]
+
+let check_expr (scrut : coq_expr) (left : coq_expr) (right : coq_expr) =
+  gMatchReturn scrut
+    "s" (* as clause *)
+    (fun v -> ret_type v ret_type_dec)
+    [ (injectCtr "left", ["eq" ] , fun _ -> left)
+    ; (injectCtr "right", ["neq"], fun _ -> right) 
+    ]
+
+let match_inp (inp : var) (pat : matcher_pat) (left : coq_expr) (right  : coq_expr) =
+  let ret v left right =
+    construct_match (gVar v) ~catch_all:(Some right) [(pat, left)]
+  in
+  construct_match_with_return
+    (gVar inp) ~catch_all:(Some right) "s" (fun v -> ret_type v ret)
+    [(pat,left)]
+
+
 let genSizedSTMon_body
       (class_name : string)
       (gen_ctr : ty_ctr)
@@ -118,8 +140,9 @@ let genSizedSTMon_body
   let base_case =
     let handle_branch' (inputs : var list) =
       handle_branch n dep_type inputs
-        fail_exp ret_exp ret_type class_method class_methodST
-        (rec_method (make_up_name ())) bind stMaybe gen_ctr (fun _ -> ())
+        fail_exp ret_exp class_method class_methodST
+        (rec_method (make_up_name ())) bind stMaybe check_expr match_inp
+        gen_ctr (fun _ -> ())
     in
     gFunWithArgs
       inputs
@@ -141,8 +164,9 @@ let genSizedSTMon_body
   let ind_case =
     let handle_branch' (ih : var) (size : var) (inputs : var list) =
       handle_branch n dep_type inputs
-        fail_exp ret_exp ret_type class_method class_methodST
-        (rec_method ih) bind stMaybe gen_ctr (fun _ -> ())
+        fail_exp ret_exp class_method class_methodST
+        (rec_method ih) bind stMaybe check_expr match_inp
+        gen_ctr (fun _ -> ())
     in
     gFun ["size"; "IHs"]
       (fun [size; ihs] ->

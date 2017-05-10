@@ -48,7 +48,29 @@ let stMaybe (opt : bool) (g : coq_expr) (x : string) (checks : (coq_expr -> coq_
   in
   gFun [x]
     (fun [x] -> sumbools_to_bool (List.map (fun chk -> chk (gVar x)) checks))
- 
+
+let ret_type_dec (s : var) (left : coq_expr) (right : coq_expr) =
+      gMatch (gVar s)
+      [ (injectCtr "left", ["eq"], fun _ -> left)
+      ; (injectCtr "right", ["neq"], fun _ -> right) ]
+
+
+let check_expr (scrut : coq_expr) (left : coq_expr) (right : coq_expr) =
+  gMatchReturn scrut
+    "s" (* as clause *)
+    (fun v -> ret_type v ret_type_dec)
+    [ (injectCtr "left", ["eq" ] , fun _ -> left)
+    ; (injectCtr "right", ["neq"], fun _ -> right) 
+    ]
+
+let match_inp (inp : var) (pat : matcher_pat) (left : coq_expr) (right  : coq_expr) =
+  let ret v left right =
+    construct_match (gVar v) ~catch_all:(Some right) [(pat, left)]
+  in
+  construct_match_with_return
+    (gVar inp) ~catch_all:(Some right) "s" (fun v -> ret_type v ret)
+    [(pat,left)]
+
 let sizedEqProofs_body
       (class_name : string)
       (gen_ctr : ty_ctr)
@@ -87,8 +109,9 @@ let sizedEqProofs_body
   let zero_set inputs =
     let handle_branch'  =
       handle_branch n dep_type inputs
-        fail_exp ret_exp ret_type class_method class_methodST
-        (rec_method (gVar (make_up_name ())) (gVar (make_up_name ()))) bind stMaybe gen_ctr (fun _ -> ())
+        fail_exp ret_exp class_method class_methodST
+        (rec_method (gVar (make_up_name ())) (gVar (make_up_name ()))) bind stMaybe check_expr match_inp
+        gen_ctr (fun _ -> ())
     in
     (List.fold_right
        (fun c exp ->
@@ -103,8 +126,9 @@ let sizedEqProofs_body
   let succ_set rec_name size inputs =
     let handle_branch'  =
       handle_branch n dep_type inputs
-        fail_exp ret_exp ret_type class_method class_methodST
-        (rec_method (gVar rec_name) (gVar size)) bind stMaybe gen_ctr (fun _ -> ())
+        fail_exp ret_exp class_method class_methodST
+        (rec_method (gVar rec_name) (gVar size)) bind stMaybe check_expr match_inp
+        gen_ctr (fun _ -> ())
     in
     (List.fold_right
        (fun c exp ->
@@ -131,6 +155,38 @@ let sizedEqProofs_body
               (gVar size :: List.map gVar input_vars)
           ))
   in
+
+(*   (\* arguments to handle_branch *\) *)
+(*   let fail_exp = ?? in *)
+
+(*   let ret_exp (x : coq_expr) (\* the generated element *\) *)
+(*         (c : coq_expr list) (\* *\) *)
+(*     = *)
+(*     set_singleton c *)
+
+(* let ret_type (s : var) (match_expr : var -> coq_expr -> coq_expr -> coq_expr) = hole *)
+
+(* let class_method = set_full *)
+
+(* let class_methodST (pred : coq_expr) = *)
+(*   pred *)
+
+(* let rec_method (rec_name : coq_expr) (size : coq_expr) (l : coq_expr list) = *)
+(*   gApp rec_name (size :: l) *)
+
+(* let bind (opt : bool) (m : coq_expr) (x : string) (f : var -> coq_expr) = *)
+(*   set_bigcup x m f *)
+
+(* let stMaybe (opt : bool) (g : coq_expr) (x : string) (checks : (coq_expr -> coq_expr) list) = *)
+(*   let rec sumbools_to_bool lst = *)
+(*     match lst with *)
+(*     | [] -> gTrue *)
+(*     | dec :: lst' -> *)
+(*       matchDec dec (fun heq -> gFalse) (fun hneq -> sumbools_to_bool lst') *)
+(*   in *)
+(*   gFun [x] *)
+(*     (fun [x] -> sumbools_to_bool (List.map (fun chk -> chk (gVar x)) checks)) *)
+
 
   (* let full_prop gtyp inputs = *)
   (*   gApp (full_dt) (list_insert_nth gtyp inputs (n-1)) *)
