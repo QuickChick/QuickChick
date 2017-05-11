@@ -76,4 +76,5 @@ code:                 word { [ $1 ] }
 
 word:                 T_White  { $1 }
                       | T_Word { $1 }
+                      | T_EndComment { "*)" }
 
