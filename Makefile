@@ -29,7 +29,7 @@ quickChickTool:
 	ocamlc -I src -c src/quickChickToolLexer.ml
 	ocamlc -I src -c src/quickChickToolParser.ml
 	ocamlc -I src -c src/quickChickTool.ml 
-	ocamlc -o src/quickChickTool src/quickChickToolTypes.cmo src/quickChickToolLexer.cmo src/quickChickToolParser.cmo src/quickChickTool.cmo
+	ocamlc -o src/quickChickTool str.cma src/quickChickToolTypes.cmo src/quickChickToolLexer.cmo src/quickChickToolParser.cmo src/quickChickTool.cmo
 
 tests:
 	coqc examples/Tests.v

@@ -47,7 +47,12 @@ type node =
 %type <string list> extends
 
 %% 
-program:              code sections T_Eof { Text (String.concat "" $1) :: $2 }
+program:              content sections T_Eof { $1 :: $2 }
+                      | error T_Eof { 
+                        let pos = Parsing.symbol_start_pos () in
+                        failwith (Printf.sprintf "Error in line %d, position %d" 
+                                                 pos.pos_lnum (pos.pos_cnum - pos.pos_bol)) }
+
 
 sections:             section sections { $1 :: $2 }
                       | { [ (* Empty on purpose *) ] }
@@ -74,7 +79,7 @@ contents:             content { [$1] }
 content:              code {  Text (String.concat "" $1)  }
                       | T_StartQCComment white T_QuickChick code T_EndComment { QuickChick (String.concat "" $4) }
                       | T_StartQCComment white T_EndComment code mutants { Mutant ([], String.concat "" $4, $5) }
-                      | T_StartComment content T_EndComment { Text "(*" :: $2 :: Text "*)" }
+                      | T_StartComment content T_EndComment { Text (Printf.sprintf "(* %s *)" (output_plain $2)) }
 
 mutants:              | { [] }
                       | mutant white mutants { $1 :: $3 }
@@ -82,6 +87,7 @@ mutants:              | { [] }
 mutant:               | T_StartQCComment code T_EndComment { String.concat "" $2 }
 
 code:                 word { [ $1 ] }
+                      | white { [ $1 ] }
                       | word white code { $1 :: $2 :: $3 }
 
 word:                 word  { $1 }
