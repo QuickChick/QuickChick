@@ -2,7 +2,6 @@
 open Lexing
 open QuickChickToolParser
 open QuickChickToolTypes
-
 }
 
 let white    = [' ' '\t' '\r' '\n']
@@ -28,7 +27,7 @@ rule lexer = parse
   | eof          { T_Eof }
 
 and nested_comment n = parse
-  |"*)"       {if n==0 then lexer lexbuf else nested_comment (n-1) lexbuf}
-  |"(*"       {nested_comment (n+1) lexbuf}
-  |_          {nested_comment n lexbuf}
+  | "*)"       { if n==0 then lexer lexbuf else nested_comment (n-1) lexbuf }
+  | "(*"       { nested_comment (n+1) lexbuf }
+  | _          { nested_comment n lexbuf }
 

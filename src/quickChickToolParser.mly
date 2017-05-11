@@ -6,13 +6,13 @@ open QuickChickToolTypes
 
 (*
 type node =
-  (* Base chunk of text *)
+    (* Base chunk of text *)
   | Text of string 
-  (* Sections: identifier + a bunch of nodes + extend? *)
+    (* Sections: identifier + a bunch of nodes + extend? *)
   | Section of string * node list * string option
-  (* Commented out QuickChick call *)
+    (* Commented out QuickChick call *)
   | QuickChick of string
-  (* Mutant: list of +/- idents, base, list of mutants *)
+    (* Mutant: list of +/- idents, base, list of mutants *)
   | Mutant of (bool * string) list * string * string list 
 *)
 
