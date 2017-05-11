@@ -10,21 +10,16 @@ let nonwhite = [^ ' ' '\t' '\r' '\n']
 (* Main Parsing match *)
 rule lexer = parse
     
-  | "(*! Section"     { T_StartSec }
-  | "(*! QuickChick"  { T_StartQC  }
-  | "(*!\nQuickChick" { T_StartQC  }
-  | "(*! *)"          { T_StartMutant }
-  | "(*!"             { T_StartMutantVariant }
+  | "Section"         { T_Section }
+  | "extends"         { T_Extends }
+  | "QuickChick"      { T_QuickChick  }
+  | "(*"              { T_StartComment  }
+  | "(*!"             { T_StartQCComment  }
+  | "*)"              { T_EndComment }
 
-  (* Regular comments need to be handled to play with termination specials *)
-  | "*)"         { T_EndComment }
-
-  (* Skip initial whitespace *)
-  | white+ as s  { T_White s }
-
-  | nonwhite+ as word 
-                 { print_endline ("Nonwhite: " ^ word); T_Word(word) }
-  | eof          { T_Eof }
+  | white+ as s       { T_White s }
+  | nonwhite as c     { T_Char (String.make 1 c) }
+  | eof               { T_Eof }
 
 
 
