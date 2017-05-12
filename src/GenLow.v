@@ -60,6 +60,12 @@ Definition semGenSize {A : Type} (g : G A) (size : nat) : set A :=
 Definition semGen {A : Type} (g : G A) : set A :=
   \bigcup_size semGenSize g size.
 
+Parameter bindGen' : forall {A B : Type} (g : G A), 
+                       (forall (a : A), (a \in semGen g) -> G B) -> G B. 
+
+Arguments bindGen' [A] [B] _ _.
+
+
 (* Size characterization of generators *)
 (* begin Unsized *)
 Class Unsized {A} (g : G A) := {
@@ -308,6 +314,19 @@ Definition reallyUnsafePromote {r A : Type} (m : r -> G A) : G (r -> A) :=
 Definition semGenSize {A : Type} (g : G A) (s : nat) : set A := codom (run g s).
 Definition semGen {A : Type} (g : G A) : set A := \bigcup_s semGenSize g s.
 (* end semGen *)
+
+
+  (* More things *)
+  Definition bindGen_aux {A : Type} (g : G A) (n : nat) (r : RandomSeed) : semGen g (run g n r).
+    unfold semGen, semGenSize, codom, bigcup.
+    exists n; split => //=.
+    exists r; auto.
+  Qed.
+
+  Definition bindGen' {A B : Type} (g : G A) (k : forall (a : A), (a \in semGen g) -> G B) : G B :=
+    MkGen (fun n r =>
+             let (r1,r2) := randomSplit r in
+             run (k (run g n r1) (bindGen_aux g n r1)) n r2).
 
   
 (* An important property of generators is size-monotonicity;
