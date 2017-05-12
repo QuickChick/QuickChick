@@ -23,11 +23,12 @@ type node =
 %token<string> T_Char 
 %token<string> T_White
 
-%token T_Section
-%token T_Extends
-%token T_QuickChick
+%token<string> T_Section
+%token<string> T_Extends
+%token<string> T_QuickChick
 
 %token T_StartQCComment
+%token T_StartMutant
 %token T_StartComment
 %token T_EndComment
 
@@ -37,8 +38,8 @@ type node =
 %type <QuickChickToolTypes.node list> program
 %type <QuickChickToolTypes.node> section
 %type <QuickChickToolTypes.node list> sections
-%type <QuickChickToolTypes.node list> contents
-%type <QuickChickToolTypes.node> content
+%type <QuickChickToolTypes.node list> section_contents
+%type <QuickChickToolTypes.node> section_content
 %type <string list> mutants
 %type <string> mutant
 %type <string list> code
@@ -47,51 +48,49 @@ type node =
 %type <string list> extends
 
 %% 
-program:              content sections T_Eof { $1 :: $2 }
-                      | error T_Eof { 
+/* INVARIANT: All trailing whitespace is handled by the environment */
+w:                    T_White { $1 }
+                      | { "" } 
+
+program:              default_section w sections w T_Eof { $1 :: $3 }
+/*                       | error T_Eof { 
                         let pos = Parsing.symbol_start_pos () in
                         failwith (Printf.sprintf "Error in line %d, position %d" 
-                                                 pos.pos_lnum (pos.pos_cnum - pos.pos_bol)) }
+                                                 pos.pos_lnum (pos.pos_cnum - pos.pos_bol)) } */
 
+default_section:      section_contents { Section ("default", $1, []) }
 
-sections:             section sections { $1 :: $2 }
-                      | { [ (* Empty on purpose *) ] }
+section_contents:     { [ (* Intentionally empty *) ] }
+                      | section_content w section_contents { $1 :: $3 }
 
-white:                T_White { $1 }
-                      | { "" } 
+section_content:      code {  Text (String.concat "" $1)  }
+                      | T_StartQCComment w T_QuickChick w code w T_EndComment { QuickChick (String.concat "" $5) }
+                      | T_StartQCComment w T_EndComment w code w mutants { Mutant ([], String.concat "" $5, $7) }
+                      | T_StartComment w section_contents w T_EndComment { Text (Printf.sprintf "(* %s *)" (String.concat "" (List.map output_plain $3))) }
+
+code:                 word { [ $1 ] }
+                      | word T_White code { $1 :: $2 :: $3 }
+
+word:                 chars { String.concat "" $1 }
+                      | T_QuickChick { "QuickChick " }
+                      | T_Section { "Section " }
+                      | T_Extends { "extends " }
 
 chars:                T_Char { [$1] }
                       | T_Char chars { $1 :: $2 } 
 
-word:                 chars { String.concat "" $1 }
+mutants:              mutant { [$1] }
+                      | mutant w mutants { $1 :: $3 }
+
+mutant:               T_StartMutant w code w T_EndComment { String.concat "" $3 }
+
+sections:             section w sections { $1 :: $3 }
+                      | { [ (* Empty on purpose *) ] }
                       
-section:              T_StartQCComment white T_Section white word white extends white T_EndComment contents { Section ($5, $10, $7) }
+section:              T_StartQCComment w T_Section w word w extends w T_EndComment section_contents { Section ($5, $10, $7) }
 
 extends:              { [] }
-                      | T_Extends white sec_names { $3 }
+                      | T_Extends w sec_names { $3 }
 
 sec_names:            word { [$1] }
-                      | word white sec_names { $1 :: $3 }
-
-contents:             content { [$1] }
-                      | content contents { $1 :: $2 }
-
-content:              code {  Text (String.concat "" $1)  }
-                      | T_StartQCComment white T_QuickChick code T_EndComment { QuickChick (String.concat "" $4) }
-                      | T_StartQCComment white T_EndComment code mutants { Mutant ([], String.concat "" $4, $5) }
-                      | T_StartComment content T_EndComment { Text (Printf.sprintf "(* %s *)" (output_plain $2)) }
-
-mutants:              | { [] }
-                      | mutant white mutants { $1 :: $3 }
-
-mutant:               | T_StartQCComment code T_EndComment { String.concat "" $2 }
-
-code:                 word { [ $1 ] }
-                      | white { [ $1 ] }
-                      | word white code { $1 :: $2 :: $3 }
-
-word:                 word  { $1 }
-                      | T_QuickChick { "QuickChick" }
-                      | T_Section { "Section" }
-                      | T_Extends { "extends" }
-
+                      | word w sec_names { $1 :: $3 }
