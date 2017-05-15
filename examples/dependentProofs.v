@@ -70,99 +70,32 @@ Typeclasses eauto := debug.
 (* Interesting. Do we need Global instance?? *) 
 Existing Instance arbSizedSTgoodFooNarrow.  (* Why???? *)
 
-Derive SizeMonotonicSuchThat for (fun foo => goodFooNarrow n foo).
-
-Derive SizedProofEqs for (fun foo => goodFooNarrow n foo).
-
-Lemma test (n : nat) :
-  \bigcup_(s : nat) (@DependentClasses.iter _ _ (SizedProofEqsgoodFooNarrow n) s) <--> (fun foo => goodFooNarrow n foo).
+Lemma eq_symm {A : Type} (x y : A) :
+  x = y -> y = x.
 Proof.
-  refine
-    (fun foo =>
-       conj
-         (fun H =>
-            match H with
-              | ex_intro s (conj Hs Hi) => _
-            end
-         )
-         _).
-  - refine
-      (nat_ind
-          (fun s : nat =>
-             forall n : nat,
-               (DependentClasses.iter s foo -> goodFooNarrow n foo))
-          (fun n Hs =>
-             match Hs with
-               | or_introl H1 =>
-                 match H1 with
-                   | erefl => GoodNarrowBase n
-                 end
-               | or_intror H2 =>
-                 False_ind _ H2
-             end)
-          (fun s IHs n Hs =>
-             match Hs with
-               | or_introl H1 =>
-                 match H1 with
-                   | erefl => GoodNarrowBase n
-                 end
-               | or_intror H2 =>
-                 match H2 with
-                   | or_introl H1 =>
-                     match H1 with
-                       | ex_intro x (conj s2 Hs2) =>
-                         (match
-                             @dec (goodFooNarrow (S O) x) (goodFooNarrow_dec (S O) x) as s3
-                             return
-                             ((match s3 with | left _ => [set _] | right _ => set0 end) foo ->
-                              goodFooNarrow n foo)
-                           with
-                             | left H3 =>
-                               fun hin =>
-                                 (GoodNarrow n foo
-                                             (IHs 0 (match hin with
-                                                       | erefl => s2
-                                                     end))
-                                             (match hin with
-                                                | erefl => H3
-                                              end))
-                             | right H4 => fun hin => False_ind _ hin
-                           end) Hs2    
-                     end
-                   | or_intror H2 => False_ind _ H2
-                 end
-             end)
-          s n Hi
-      ).
-  - refine
-      (goodFooNarrow_ind
-         (fun n foo => (\bigcup_(s : nat) (@DependentClasses.iter _ _ (SizedProofEqsgoodFooNarrow n) s)) foo)
-         (fun n => ex_intro _ 0 (conj I (or_introl erefl)))
-         (fun n foo Hf IHf Hf' IHf' =>
-            match IHf with
-              | ex_intro x (conj Hn Hs) =>
-                ex_intro
-                  _ (S x)
-                  (conj
-                     I
-                     (or_intror
-                        (or_introl
-                           (ex_intro
-                              _ foo (conj
-                                       Hs
-                                       (match
-                                           @dec (goodFooNarrow (S O) foo) (goodFooNarrow_dec (S O) foo)
-                                           as s3
-                                           return match s3 with | left _ => [set foo] | right _ => set0 end foo
-                                         with
-                                           | left H3 => erefl
-                                           | right H4 => False_ind _ (H4 Hf')
-                                         end)
-                           )))))
-            end)         
-         n foo).    
+  firstorder.
 Qed.
 
+
+Derive SizeMonotonicSuchThat for (fun foo => goodFooNarrow n foo).
+Derive SizedProofEqs for (fun foo => goodFooNarrow n foo).
+
+
+(* Inductive test : nat -> Foo -> Prop := *)
+(* | T : forall (x : False), test 1 Foo1. *)
+
+(* Derive ArbitrarySizedSuchThat for (fun foo => test n foo). *)
+
+(* Inductive test1 : bool -> Foo -> Prop := *)
+(* | T1 : forall (x1 x2 x3 : bool), x1 = x3 -> test1 x2 Foo1. *)
+
+(* Derive ArbitrarySizedSuchThat for (fun foo => test1 n foo). *)
+
+(* Inductive test2 : nat -> Foo -> Prop := *)
+(* | T2 : forall (x1 x2 : bool), x1 = x2 ->  test2 1 Foo1. *)
+ 
+(* Derive ArbitrarySizedSuchThat for (fun foo => test2 n foo). *)
+ 
 Existing Instance arbSizedSTgoodFooUnif. (* ???? *)
 
 Derive SizeMonotonicSuchThat for (fun (x : Foo) => goodFooUnif input x).
@@ -181,11 +114,17 @@ Derive SizeMonotonicSuchThat for (fun foo => goodFooCombo n foo).
 
 Derive SizedProofEqs for (fun foo => goodFooCombo n foo).
 
+Existing Instance arbSizedSTgoodFooPrec.  (* ???? *)
+
+Derive SizeMonotonicSuchThat for (fun (x : Foo) => goodFooPrec input x).
+
+Derive SizedProofEqs for (fun (x : Foo) => goodFooPrec input x).
+
 Existing Instance arbSizedSTgoodFooMatch.  (* ???? *)
 
-Derive SizedProofEqs for (fun foo => goodFooMatch n foo).
-
 Derive SizeMonotonicSuchThat for (fun foo => goodFooMatch n foo).
+
+Derive SizedProofEqs for (fun foo => goodFooMatch n foo).
 
 Existing Instance arbSizedSTgoodFooRec.  (* ???? *)
 
@@ -193,19 +132,13 @@ Derive SizeMonotonicSuchThat for (fun (x : Foo) => goodFooRec input x).
 
 Derive SizedProofEqs for (fun (x : Foo) => goodFooRec input x).
 
-Existing Instance arbSizedSTgoodFooPrec.  (* ???? *)
-
-Derive SizeMonotonicSuchThat for (fun (x : Foo) => goodFooPrec input x).
-
-Derive SizedProofEqs for (fun (x : Foo) => goodFooPrec input x).
-
 Inductive goodFooB : nat -> Foo -> Prop := 
 | GF1 : goodFooB 2 (Foo2 Foo1)
 | GF2 : goodFooB 3 (Foo2 (Foo2 Foo1)).
 
 Derive ArbitrarySizedSuchThat for (fun (x : Foo) => goodFooB input x).
-Derive SizedProofEqs for (fun (x : Foo) => goodFooB input x).
 
+Derive SizedProofEqs for (fun (x : Foo) => goodFooB input x).
 
 Inductive tree : Type :=
 | Leaf : tree
@@ -244,6 +177,7 @@ Admitted.
 Derive ArbitrarySizedSuchThat for (fun (x : tree) => LRTree x).
 
 Derive SizedProofEqs for (fun (x : tree) => LRTree x).
+
 
 Inductive ex_test : tree -> Prop :=
 | B : ex_test Leaf 

@@ -264,7 +264,7 @@ let rec is_dep_type = function
   | DApp (dt, dts) -> List.exists is_dep_type (dt::dts)
   | DNot dt -> is_dep_type dt
 
-type check = coq_expr -> coq_expr
+type check = (coq_expr -> coq_expr) * int
 
 module CMap = Map.Make(OrdDepType)
 type cmap = (check list) CMap.t
@@ -313,22 +313,22 @@ let need_dec = ref false
            ])
 *)
 let handle_branch
+      (type a) (type b) (* I've started to love ocaml again because of this *)
       (n : int)
       (dep_type : dep_type)
       (input_names : var list)
-      (fail_exp : 'a)
-      (ret_exp : coq_expr -> 'a)
-      (class_method : 'a)
-      (class_methodST : coq_expr (* pred *) -> 'a)
-      (rec_method : coq_expr list -> 'a)
-      (bind : bool (* opt *) -> 'a -> string -> (var -> 'a) -> 'a)
-      (stMaybe : bool (* opt *) -> 'a -> string -> (coq_expr -> coq_expr) list -> 'a)
-      (check_expr : coq_expr -> 'a -> 'a -> 'a)
-      (match_inp : var -> matcher_pat -> 'a -> 'a -> 'a)
+      (fail_exp : b)
+      (ret_exp : coq_expr -> b)
+      (class_method : a)
+      (class_methodST : int -> coq_expr (* pred *) -> a)
+      (rec_method : int -> coq_expr list -> a)
+      (bind : bool (* opt *) -> a -> string -> (var -> b) -> b)
+      (stMaybe : bool (* opt *) -> a -> string -> ((coq_expr -> coq_expr) * int) list -> a)
+      (check_expr : int -> coq_expr -> b -> b -> b)
+      (match_inp : var -> matcher_pat -> b -> b -> b)
       (gen_ctr : ty_ctr)
       register_arbitrary
-      (c : dep_ctr)
-  : (coq_expr * bool) =
+      (c : dep_ctr) : (b * bool) =
   let (ctr, typ) = c in
   let b = ref true in
   let gen = mk_name_provider "gen" in
@@ -376,7 +376,7 @@ let handle_branch
   | Some (map, eqs, matches) -> 
 
     (* Process check map. XXX generator specific *)
-    let process_checks k cmap x opt g cont = 
+    let process_checks k cmap x opt g (cont : umap -> cmap -> var -> b) : b = 
       match lookup_checks (DTyVar x) cmap with
       | Some checks -> 
         (* Remove checks from cmap *)
@@ -392,7 +392,7 @@ let handle_branch
     
     (* Function to instantiate a single range *)
     (* It also uses any checks present in the check-map *)
-    let rec instantiate_range_cont (k : umap) (cmap : cmap) (parent : unknown) (cont : umap -> cmap -> coq_expr -> 'a) = function
+    let rec instantiate_range_cont (k : umap) (cmap : cmap) (parent : unknown) (cont : umap -> cmap -> coq_expr -> b) = function
       | Ctr (c,rs) -> 
         (* aux2 goes through the dts, enhancing the continuation to include the result of the head to the acc *)
         let rec traverse_ranges k cmap acc = function 
@@ -425,7 +425,7 @@ let handle_branch
 
     (* Handle a single type constructor and recurse in dt2 *)
     (* Handle only *updates* the check map. The checks are implemented at the beginning of recurse *)
-    let rec handle_TyCtr (pos : bool) (c : ty_ctr) (dts : dep_type list)
+    let rec handle_TyCtr (m : int) (pos : bool) (c : ty_ctr) (dts : dep_type list)
               (k : umap) (cmap : cmap) (dt2 : dep_type) =
       let numbered_dts = List.mapi (fun i dt -> (i+1, dt)) dts in (* +1 because of nth being 1-indexed *)
 
@@ -448,11 +448,11 @@ let handle_branch
         if c == gen_ctr then (need_dec := true; b := false) else ();
 
         (* Continuation handling dt2 : recurse one dt2 / None based on positivity *)
-        let body_cont = recurse_type k cmap dt2 in
+        let body_cont = recurse_type (m + 1) k cmap dt2 in
         let body_fail = fail_exp in
 
-        if pos then check_expr (checker (List.map (fun dt -> dt_to_coq_expr k dt) dts)) body_cont body_fail
-        else check_expr (checker (List.map (fun dt -> dt_to_coq_expr k dt) dts)) body_fail body_cont
+        if pos then check_expr m (checker (List.map (fun dt -> dt_to_coq_expr k dt) dts)) body_cont body_fail
+        else check_expr m (checker (List.map (fun dt -> dt_to_coq_expr k dt) dts)) body_fail body_cont
 
       | [(i, DTyVar x)] -> (* Single variable to be generated for *)
         if i == n && c == gen_ctr && pos then begin (* Recursive call *)
@@ -461,8 +461,8 @@ let handle_branch
           process_checks k cmap x 
             (* Generate using recursive function *)
             true
-            (rec_method args)
-            (fun k' cmap' x -> recurse_type k' cmap' dt2)
+            (rec_method m args)
+            (fun k' cmap' x -> recurse_type (m + 1) k' cmap' dt2)
         end
         else if pos then begin (* Generate using "arbitrarySizeST" and annotations for type *)
           if c = gen_ctr then b := false;
@@ -475,16 +475,16 @@ let handle_branch
                                              if i == j then gVar x else dt_to_coq_expr k dt
                                            ) numbered_dts))
           in
-          process_checks k cmap x true (class_methodST pred) 
-            (fun k' cmap' x' -> recurse_type k' cmap' dt2)
+          process_checks k cmap x true (class_methodST m pred) 
+            (fun k' cmap' x' -> recurse_type (m + 1) k' cmap' dt2)
         end
         else (* Negation. Since we expect the *positive* versions to be sparse, we can use suchThatMaybe for negative *)
           (* TODO: something about size for backtracking? *)
           let new_check = fun x -> checker (List.map (fun (j,dt) -> if i == j then x else dt_to_coq_expr k dt) numbered_dts) in
           let cmap' = match lookup_checks (DTyVar x) cmap with 
-            | Some checks -> CMap.add (DTyVar x) (new_check :: checks) cmap
-            | _ -> CMap.add (DTyVar x) [new_check] cmap in
-          recurse_type k cmap' dt2
+            | Some checks -> CMap.add (DTyVar x) ((new_check, m) :: checks) cmap
+            | _ -> CMap.add (DTyVar x) [(new_check, m)] cmap in
+          recurse_type (m + 1) k cmap' dt2
       | [(i, dt) ] -> failwith ("Internal error: not a variable to be generated for" ^ (dep_type_to_string dt)) 
 
       (* Multiple arguments to be generated for. Generalized arbitrarySizeST? *)
@@ -499,9 +499,9 @@ let handle_branch
                   | [] -> 
                     (* base case - recursive call *)
                     if pos then 
-                      let generator = rec_method (List.rev acc) in
+                      let generator = rec_method m (List.rev acc) in
                       process_checks k cmap x true generator 
-                        (fun k' cmap' x' -> recurse_type k' cmap' dt2)
+                        (fun k' cmap' x' -> recurse_type (m + 1) k' cmap' dt2)
                     else failwith "Negation / build_arbs"
                   | (i,dt)::rest -> 
                     if i == n then build_arbs k cmap acc rest (* Recursive argument - handle at the end *)
@@ -534,8 +534,8 @@ let handle_branch
                                                          if i == j then gVar x else dt_to_coq_expr k dt
                                                        ) numbered_dts))
                       in
-                      process_checks k cmap x true (class_methodST pred) 
-                        (fun k' cmap' x' -> recurse_type k' cmap' dt2)
+                      process_checks k cmap x true (class_methodST m pred) 
+                        (fun k' cmap' x' -> recurse_type (m + 1) k' cmap' dt2)
                   end
                   else failwith "Negation / build_arbs"
                 | (i,dt)::rest -> 
@@ -557,29 +557,28 @@ let handle_branch
         else failwith "TODO: Negation with many things to be generated"
 
     (* Dispatcher for constraints *)
-    and handle_dt pos dt1 dt2 k cmap = 
+    and handle_dt (n : int) pos dt1 dt2 k cmap = 
       match dt1 with 
       | DTyCtr (c,dts) -> 
-        handle_TyCtr pos c dts k cmap dt2
+        handle_TyCtr n pos c dts k cmap dt2
       | DNot dt -> 
-        handle_dt (not pos) dt dt2 k cmap
+        handle_dt n (not pos) dt dt2 k cmap
       | _ -> failwith "Constraints should be type constructors/negations"
 
     (* Iterate through constraints *)
-    and recurse_type k cmap = function
+    and recurse_type (n : int) k cmap = function
       | DProd (_, dt) -> (* Only introduces variables, doesn't constrain them *)
-        recurse_type k cmap dt
+        recurse_type n k cmap dt
       | DArrow (dt1, dt2) ->
         msg_debug (str ("Darrowing: " ^ range_to_string (UM.find forGen k)) ++ fnl ());
-        handle_dt true dt1 dt2 k cmap
+        handle_dt n true dt1 dt2 k cmap
       | DTyCtr _ -> (* result *) 
         instantiate_range k cmap (Unknown forGen) (* result *)
       | _ -> failwith "Wrong type" in
 
-    (* XXX generator specific *)
     let branch_gen =
       let rec walk_matches = function
-        | [] -> handle_equalities eqs check_expr (recurse_type map CMap.empty typ) (fail_exp)
+        | [] -> handle_equalities eqs (check_expr (-1)) (recurse_type 0 map CMap.empty typ) (fail_exp)
         | (u,m)::ms -> begin
             msg_debug (str (Printf.sprintf "Processing Match: %s @ %s" (Unknown.to_string u) (matcher_pat_to_string m)) ++ fnl ());
             match_inp u m (walk_matches ms) fail_exp
@@ -589,12 +588,12 @@ let handle_branch
     in 
 
     (* Debugging resulting match *)
-    UM.iter (fun x r -> msg_debug (str ("Bound: " ^ var_to_string x ^ " to Range: " ^ (range_to_string r)) ++ fnl ())) map;
-    EqSet.iter (fun (u,u') -> msg_debug (str (Printf.sprintf "Eq: %s = %s\n" (Unknown.to_string u) (Unknown.to_string u')) ++ fnl())) eqs;
-    List.iter (fun (u,m) -> msg_debug (str ((Unknown.to_string u) ^ (matcher_pat_to_string m)) ++ fnl ())) matches;
+    (* UM.iter (fun x r -> msg_debug (str ("Bound: " ^ var_to_string x ^ " to Range: " ^ (range_to_string r)) ++ fnl ())) map; *)
+    (* EqSet.iter (fun (u,u') -> msg_debug (str (Printf.sprintf "Eq: %s = %s\n" (Unknown.to_string u) (Unknown.to_string u')) ++ fnl())) eqs; *)
+    (* List.iter (fun (u,m) -> msg_debug (str ((Unknown.to_string u) ^ (matcher_pat_to_string m)) ++ fnl ())) matches; *)
 
-    msg_debug (str "Generated..." ++ fnl ());
-    debug_coq_expr branch_gen;
+    (* msg_debug (str "Generated..." ++ fnl ()); *)
+    (* debug_coq_expr branch_gen; *)
     (* End debugging *)
 
     (branch_gen ,!b)

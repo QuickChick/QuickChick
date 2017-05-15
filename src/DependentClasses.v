@@ -18,9 +18,7 @@ Class SizedProofEqs {A : Type} (P : A -> Prop) :=
   {
     (* inhabitants for P whose derivation height is less or equal to n *)
     iter : nat -> set A; 
-    (* zero : set A; *)
-    (* succ : set A -> set A; *)
-    (* spec : \bigcup_(n : nat) iter n <--> P *)
+    spec : \bigcup_(n : nat) iter n \subset P
   }.
 
 

@@ -89,6 +89,15 @@ let discriminate h =
   false_ind hole
     (gMatch h [(injectCtr "erefl", [], fun [] -> gI)])
 
+let rewrite h hin =
+  gMatch h [(injectCtr "erefl", [], fun [] -> hin)]
+
+let eq_symm p =
+  gApp (gInject "eq_symm") [hole; hole; p]
+
+let rewrite_symm h hin =
+  gMatch (eq_symm h) [(injectCtr "erefl", [], fun [] -> hin)]
+
 let lt0_False hlt =
   gApp (gInject "lt0_False") [hlt]
 

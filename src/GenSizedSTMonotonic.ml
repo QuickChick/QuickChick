@@ -29,30 +29,27 @@ let ret_exp (c : coq_expr) = returnGenSizeMonotonic (gSome c)
 
 let ret_type (s : var) (match_expr : var -> coq_expr -> coq_expr -> coq_expr)  =
   gApp (gInject "SizeMonotonic") [match_expr s hole hole]
-    (* [(gMatch (gVar s) *)
-    (*     [ (injectCtr "left", ["eq"], fun _ -> hole) *)
-    (*     ; (injectCtr "right", ["neq"], fun _ -> hole)])] *)
 
 (* These should be inferred automatically  *)
 let class_method = hole
-let class_methodST (pred : coq_expr) = hole
+let class_methodST (n : int) (pred : coq_expr) = hole
 
-let rec_method (ih : var) (l : coq_expr list) =
+let rec_method (ih : var) (n : int) (l : coq_expr list) =
   gApp (gVar ih) l
 
 let bind (opt : bool) (m : coq_expr) (x : string) (f : var -> coq_expr) =
   (if opt then bindOptMonotonic else bindMonotonic) m x f
 
-let stMaybe (opt : bool) (g : coq_expr) (x : string) (checks : (coq_expr -> coq_expr) list) =
-  let rec sumbools_to_bool lst =
+let stMaybe (opt : bool) (g : coq_expr) (x : string) (checks : ((coq_expr -> coq_expr) * int) list) =
+  let rec sumbools_to_bool x lst =
     match lst with
     | [] -> gTrueb
-    | dec :: lst' ->
-      matchDec dec (fun heq -> gFalseb) (fun hneq -> sumbools_to_bool lst')
+    | (chk, _) :: lst' ->
+      matchDec (chk (gVar x)) (fun heq -> gFalseb) (fun hneq -> sumbools_to_bool x lst')
   in
   let bool_pred =
     gFun [x]
-      (fun [x] -> sumbools_to_bool (List.map (fun chk -> chk (gVar x)) checks))
+      (fun [x] -> sumbools_to_bool x checks)
   in
   (if opt then suchThatMaybeMonotonic else suchThatMaybeOptMonotonic) g bool_pred
 
@@ -61,7 +58,7 @@ let ret_type_dec (s : var) (left : coq_expr) (right : coq_expr) =
       [ (injectCtr "left", ["eq"], fun _ -> left)
       ; (injectCtr "right", ["neq"], fun _ -> right) ]
 
-let check_expr (scrut : coq_expr) (left : coq_expr) (right : coq_expr) =
+let check_expr (n : int) (scrut : coq_expr) (left : coq_expr) (right : coq_expr) =
   gMatchReturn scrut
     "s" (* as clause *)
     (fun v -> ret_type v ret_type_dec)
@@ -150,8 +147,8 @@ let genSizedSTMon_body
          backtrackSizeMonotonic
            (gList (add_freq (base_gens inputs (generator_body inputs))))
            (List.fold_right
-              (fun c exp ->
-                 let (p, b) = handle_branch' inputs c in
+              (fun (c : dep_ctr) (exp : coq_expr) ->
+                 let (p, b) : coq_expr * bool = handle_branch' inputs c in
                  if b then
                    cons_subset hole hole hole p exp
                  else exp

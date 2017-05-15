@@ -31,28 +31,28 @@ let ret_type (s : var) f = hole
 
 let class_method = (gInject "arbitrary")
 
-let class_methodST (pred : coq_expr) = 
+let class_methodST (n : int) (pred : coq_expr) = 
   gApp ~explicit:true (gInject "arbitraryST")
     [ hole (* Implicit argument - type A *)
     ; pred
     ; hole (* Implicit instance *)]
 
-let rec_method (rec_name : coq_expr) (size : coq_expr) (l : coq_expr list) =
+let rec_method (rec_name : coq_expr) (size : coq_expr) (n : int) (l : coq_expr list) =
   gApp rec_name (size :: l)
 
 let bind (opt : bool) (m : coq_expr) (x : string) (f : var -> coq_expr) =
   (if opt then bindGenOpt else bindGen) m x f
 
-let stMaybe (opt : bool) (g : coq_expr) (x : string) (checks : (coq_expr -> coq_expr) list) =
-  let rec sumbools_to_bool lst =
+let stMaybe (opt : bool) (g : coq_expr) (x : string) (checks : ((coq_expr -> coq_expr) * int) list) =
+  let rec sumbools_to_bool x lst =
     match lst with
     | [] -> gTrueb
-    | dec :: lst' ->
-      matchDec dec (fun heq -> gFalseb) (fun hneq -> sumbools_to_bool lst')
+    | (chk, _) :: lst' ->
+      matchDec (chk (gVar x)) (fun heq -> gFalseb) (fun hneq -> sumbools_to_bool x lst')
   in
   let bool_pred =
     gFun [x]
-      (fun [x] -> sumbools_to_bool (List.map (fun chk -> chk (gVar x)) checks))
+      (fun [x] -> sumbools_to_bool x checks)
   in
   (gApp (gInject (if opt then "suchThatMaybeOpt" else "suchThatMaybe"))
      [ g (* Use the generator provided for base generator *)
@@ -64,7 +64,7 @@ let ret_type_dec (s : var) (left : coq_expr) (right : coq_expr) =
       [ (injectCtr "left", ["eq"], fun _ -> left)
       ; (injectCtr "right", ["neq"], fun _ -> right) ]
 
-let check_expr (scrut : coq_expr) (left : coq_expr) (right : coq_expr) =
+let check_expr (n : int) (scrut : coq_expr) (left : coq_expr) (right : coq_expr) =
   gMatchReturn scrut
     "s" (* as clause *)
     (fun v -> ret_type v ret_type_dec)
@@ -94,7 +94,7 @@ let base_gens
       (register_arbitrary : dep_type -> unit)
       (rec_name : coq_expr) =
   (* partially applied handle_branch *)
-  let handle_branch' size =
+  let handle_branch' =
     handle_branch n dep_type input_names (fail_exp full_gtyp) (ret_exp full_gtyp)
       class_method class_methodST (rec_method rec_name size) bind stMaybe check_expr match_inp
       gen_ctr register_arbitrary
@@ -102,7 +102,7 @@ let base_gens
   let base_branches =
     List.map
       fst
-      (List.filter (fun (_, b) -> b) (List.map (handle_branch' size) ctrs)) in
+      (List.filter (fun (_, b) -> b) (List.map handle_branch' ctrs)) in
   base_branches
 
 let ind_gens
@@ -116,12 +116,12 @@ let ind_gens
       (register_arbitrary : dep_type -> unit)
       (rec_name : coq_expr) =
   (* partially applied handle_branch *)
-  let handle_branch' c =
+  let handle_branch' =
     handle_branch n dep_type input_names (fail_exp full_gtyp) (ret_exp full_gtyp)
       class_method class_methodST (rec_method rec_name size) bind stMaybe check_expr match_inp
       gen_ctr register_arbitrary
   in
-  let all_branches = List.map (fun x -> fst (handle_branch' size x)) ctrs in
+  let all_branches = List.map (fun x -> fst (handle_branch' x)) ctrs in
   all_branches
 
 (* Advanced Generators *)
