@@ -3,6 +3,15 @@ open Lexing
 open QuickChickToolParser
 open QuickChickToolTypes
 
+(* Function to increase line count in lexbuf *)
+let line_incs s lexbuf =
+  let splits = Str.split_delim (Str.regexp "\n") s in 
+  let pos = lexbuf.Lexing.lex_curr_p in
+  lexbuf.Lexing.lex_curr_p <- {
+    pos with 
+      Lexing.pos_lnum = pos.Lexing.pos_lnum + (List.length splits - 1);
+      Lexing.pos_bol = if List.length splits > 1 then pos.Lexing.pos_cnum - (String.length (List.hd (List.rev splits))) else pos.Lexing.pos_bol
+  }
 }
 
 let white    = [' ' '\t' '\r' '\n']
@@ -10,25 +19,20 @@ let nonwhite = [^ ' ' '\t' '\r' '\n']
 
 (* Main Parsing match *)
 rule lexer = parse
-  (* Skip initial whitespace *)
-  | white+ as s  { T_White s }
     
-  | "(*! Section"     { T_StartSec }
-  | "(*! QuickChick"  { T_StartQC  }
-  | "(*!\nQuickChick" { T_StartQC  }
-  | "(*! *)"          { T_StartMutant }
-  | "(*!"             { T_StartMutantVariant }
+  | "Section" white as s    { line_incs s lexbuf; T_Section s }
+  | "extends" white as s    { line_incs s lexbuf; T_Extends s }
+  | "QuickChick" white as s { line_incs s lexbuf; T_QuickChick s }
 
-  (* Regular comments need to be handled to play with termination specials *)
-  | "(*"         { nested_comment 0 lexbuf }
-  | "*)"         { T_EndComment }
+  | "(*!"             { T_StartQCComment  }
+  | "(*?"             { T_StartMutant }
+  | "(*"              { T_StartComment  }
 
-  | nonwhite+ as word 
-                 { T_Word(word) }
-  | eof          { T_Eof }
+  | "*)"              { T_EndComment }
 
-and nested_comment n = parse
-  |"*)"       {if n==0 then lexer lexbuf else nested_comment (n-1) lexbuf}
-  |"(*"       {nested_comment (n+1) lexbuf}
-  |_          {nested_comment n lexbuf}
+  | white+ as s       { line_incs s lexbuf; T_White s }
+  | nonwhite as c     { T_Char (String.make 1 c) }
+  | eof               { T_Eof }
+
+
 

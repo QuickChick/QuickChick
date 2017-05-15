@@ -17,3 +17,7 @@
 *.d
 Makefile.coq
 .DS_Store
+src/quickChickToolLexer.ml
+src/quickChickToolParser.ml
+src/quickChickToolParser.mli
+src/quickChickToolParser.output

@@ -6,13 +6,13 @@ open QuickChickToolTypes
 
 (*
 type node =
-  (* Base chunk of text *)
+    (* Base chunk of text *)
   | Text of string 
-  (* Sections: identifier + a bunch of nodes + extend? *)
+    (* Sections: identifier + a bunch of nodes + extend? *)
   | Section of string * node list * string option
-  (* Commented out QuickChick call *)
+    (* Commented out QuickChick call *)
   | QuickChick of string
-  (* Mutant: list of +/- idents, base, list of mutants *)
+    (* Mutant: list of +/- idents, base, list of mutants *)
   | Mutant of (bool * string) list * string * string list 
 *)
 
@@ -20,14 +20,16 @@ type node =
 
 %}
 
-%token<string> T_Word
-
+%token<string> T_Char 
 %token<string> T_White
-%token T_NLine
-%token T_StartSec
-%token T_StartQC
+
+%token<string> T_Section
+%token<string> T_Extends
+%token<string> T_QuickChick
+
+%token T_StartQCComment
 %token T_StartMutant
-%token T_StartMutantVariant
+%token T_StartComment
 %token T_EndComment
 
 %token T_Eof
@@ -36,8 +38,8 @@ type node =
 %type <QuickChickToolTypes.node list> program
 %type <QuickChickToolTypes.node> section
 %type <QuickChickToolTypes.node list> sections
-%type <QuickChickToolTypes.node list> contents
-%type <QuickChickToolTypes.node> content
+%type <QuickChickToolTypes.node list> section_contents
+%type <QuickChickToolTypes.node> section_content
 %type <string list> mutants
 %type <string> mutant
 %type <string list> code
@@ -46,34 +48,49 @@ type node =
 %type <string list> extends
 
 %% 
-program:              code sections T_Eof { Text (String.concat "" $1) :: $2 }
+/* INVARIANT: All trailing whitespace is handled by the environment */
+w:                    T_White { $1 }
+                      | { "" } 
 
-sections:             section sections { $1 :: $2 }
-                      | { [ (* Empty on purpose *) ] }
+program:              default_section w sections w T_Eof { $1 :: $3 }
+/*                       | error T_Eof { 
+                        let pos = Parsing.symbol_start_pos () in
+                        failwith (Printf.sprintf "Error in line %d, position %d" 
+                                                 pos.pos_lnum (pos.pos_cnum - pos.pos_bol)) } */
 
-section:              T_StartSec T_White T_Word T_White extends T_EndComment contents { Section ($3, $7, $5) }
+default_section:      section_contents { Section ("default", $1, []) }
 
-extends:              { [] }
-                      | T_Word T_White sec_names { if $1 = "extends" then $3 else failwith "Section should be followed by 'extends'" }
+section_contents:     { [ (* Intentionally empty *) ] }
+                      | section_content w section_contents { $1 :: $3 }
 
-sec_names:            T_Word T_White { [$1] }
-                      | T_Word T_White sec_names { $1 :: $3 }
-
-contents:             content { [$1] }
-                      | content contents { $1 :: $2 }
-
-content:              code {  Text (String.concat "" $1)  }
-                      | T_StartQC code T_EndComment { QuickChick (String.concat "" $2) }
-                      | T_StartMutant code mutants { Mutant ([], String.concat "" $2, $3) }
-
-mutants:              | { [] }
-                      | mutant T_White mutants { $1 :: $3 }
-
-mutant:               | T_StartMutantVariant code T_EndComment { String.concat "" $2 }
+section_content:      code {  Text (String.concat "" $1)  }
+                      | T_StartQCComment w T_QuickChick w code w T_EndComment { QuickChick (String.concat "" $5) }
+                      | T_StartQCComment w T_EndComment w code w mutants { Mutant ([], String.concat "" $5, $7) }
+                      | T_StartComment w section_contents w T_EndComment { Text (Printf.sprintf "(* %s *)" (String.concat "" (List.map output_plain $3))) }
 
 code:                 word { [ $1 ] }
-                      | word code { $1 :: $2 }
+                      | word T_White code { $1 :: $2 :: $3 }
 
-word:                 T_White  { $1 }
-                      | T_Word { $1 }
+word:                 chars { String.concat "" $1 }
+                      | T_QuickChick { "QuickChick " }
+                      | T_Section { "Section " }
+                      | T_Extends { "extends " }
 
+chars:                T_Char { [$1] }
+                      | T_Char chars { $1 :: $2 } 
+
+mutants:              mutant { [$1] }
+                      | mutant w mutants { $1 :: $3 }
+
+mutant:               T_StartMutant w code w T_EndComment { String.concat "" $3 }
+
+sections:             section w sections { $1 :: $3 }
+                      | { [ (* Empty on purpose *) ] }
+                      
+section:              T_StartQCComment w T_Section w word w extends w T_EndComment section_contents { Section ($5, $10, $7) }
+
+extends:              { [] }
+                      | T_Extends w sec_names { $3 }
+
+sec_names:            word { [$1] }
+                      | word w sec_names { $1 :: $3 }
