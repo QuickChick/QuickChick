@@ -20,19 +20,18 @@ let nonwhite = [^ ' ' '\t' '\r' '\n']
 (* Main Parsing match *)
 rule lexer = parse
     
-  | "Section" white as s    { line_incs s lexbuf; T_Section s }
-  | "extends" white as s    { line_incs s lexbuf; T_Extends s }
-  | "QuickChick" white as s { line_incs s lexbuf; T_QuickChick s }
+  | (white* as s) "Section"         { line_incs s lexbuf; T_Section s }
+  | (white* as s) "extends"         { line_incs s lexbuf; T_Extends s }
+  | (white* as s) "QuickChick"      { line_incs s lexbuf; T_QuickChick s }
 
-  | "(*!"             { T_StartQCComment  }
-  | "(*?"             { T_StartMutant }
-  | "(*"              { T_StartComment  }
+  | (white* as s) "(*!"             { line_incs s lexbuf; T_StartQCComment s }
+  | (white* as s) "(*?"             { line_incs s lexbuf; T_StartMutant s }
+  | (white* as s) "(*"              { line_incs s lexbuf; T_StartComment s }
 
-  | "*)"              { T_EndComment }
+  | (white* as s) "*)"              { line_incs s lexbuf; T_EndComment s }
 
-  | white+ as s       { line_incs s lexbuf; T_White s }
-  | nonwhite as c     { T_Char (String.make 1 c) }
-  | eof               { T_Eof }
+  | (white* as s) (nonwhite as c)   { line_incs s lexbuf; T_Char ((String.make 1 c)^s) }
+  | (white* as s) eof               { line_incs s lexbuf; T_Eof s }
 
 
 
