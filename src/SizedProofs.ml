@@ -42,7 +42,7 @@ let bind (opt : bool) (m : coq_expr) (x : string) (f : var -> coq_expr) =
 let stMaybe (opt : bool) (g : coq_expr) (x : string) (checks : ((coq_expr -> coq_expr) * int) list) =
   let rec sumbools_to_bool x lst =
     match lst with
-    | [] -> g
+    | [] -> gApp g [gVar x]
     | (chk, _) :: lst' ->
       matchDec (chk (gVar x)) (fun heq -> gFalse) (fun hneq -> sumbools_to_bool x lst')
   in
@@ -203,7 +203,7 @@ let sizedEqProofs_body
   let class_method_left : coq_expr * (var -> (var -> coq_expr) -> coq_expr) =
     (set_full,
      fun (hc : var) (cont : var -> coq_expr) ->
-       let name = "HT%d" in
+       let name = "HT" in
        gMatch (gVar hc)
          [(injectCtr "conj", [name; "Hcur"],
            fun [ht; hcur] -> cont hcur)])
@@ -265,7 +265,7 @@ let sizedEqProofs_body
       (full_prop (gVar x) (List.map gVar inputs))
   in
 
-    let ret_type_left_hole set x =
+  let ret_type_left_hole set x =
     gImpl
       (gApp set [(gVar x)]) hole
   in
@@ -327,42 +327,53 @@ let sizedEqProofs_body
             [(pat, gFun [namecur] (fun [hcur] ->lproof hcur))]) [gVar hcur])
   in
 
-  let stMaybe_left (x : var) (opt : bool) (exp : coq_expr * (var -> (var -> coq_expr) -> coq_expr))
+  let stMaybe_left (y : var) (opt : bool) (exp : coq_expr * (var -> (var -> coq_expr) -> coq_expr))
         (x : string) (checks : ((coq_expr -> coq_expr) * int) list)
     : coq_expr * (var -> (var -> coq_expr) -> coq_expr) =
-    let rec sumbools_to_bool x lst : coq_expr * (var -> (var -> coq_expr) -> coq_expr) =
-      match lst with
-      | [] -> exp
-      | (chk, n) :: lst' ->
-        let (set, proof) = sumbools_to_bool x lst' in
-        let name = Printf.sprintf "Hp%d" n in
-        let namecur = Printf.sprintf "Hcur%d" n in
-        (matchDec (chk (gVar x)) (fun heq -> gFalse) (fun hneq -> set),
-         (fun hcur cont ->
-            gApp
-              (gMatchReturn (chk (gVar x))
-                 "s" (* as clause *)
-                 (fun v -> ret_type_left_hole (ret_type_dec v gFalse set) x)
-                 [ (injectCtr "left", ["heq"],
-                    fun [hn] ->
-                      gFun [namecur]
-                        (fun [hcur] ->
-                           gMatch (gVar hcur)
-                             [(injectCtr "conj", ["Hl"; "Hr"],
-                               fun [hl; _] ->
-                                 false_ind hole (gVar hl))]))
-                 ; (injectCtr "right", [name],
-                    fun [hn] ->
-                      gFun [namecur]
-                        (fun [hcur] ->
-                           proof_map :=
-                             IntMap.add n (fun e -> gVar hn) !proof_map;
-                           proof hcur cont
-                        ))
-                 ]) [gVar hcur]))
+    let ret_type set =
+      gImpl set hole
     in
-    (gFun [x] (fun [x] -> fst (sumbools_to_bool x checks)),
-     snd (sumbools_to_bool (fresh_name x) checks))
+    let rec sumbools_to_bool x lst =
+      match lst with
+      | [] ->
+        let (set, proof) = exp in
+        gApp set [gVar x]
+      | (chk, _) :: lst' ->
+        matchDec (chk (gVar x)) (fun heq -> gFalse) (fun hneq -> sumbools_to_bool x lst')
+    in
+    let rec sumbools_to_bool_proof x hl hr cont lst : coq_expr =
+      match lst with
+      | [] ->
+        let (set, proof) = exp in
+        gApp (gFun ["Hcur"] (fun [hcur] -> proof hcur cont)) [(gConjIntro (gVar hl) (gVar hr))]
+      | (chk, n) :: lst' ->
+        let set = sumbools_to_bool x lst' in
+        let name = Printf.sprintf "Hp%d" n in
+        let namecur = Printf.sprintf "Hl%d" n in
+        gApp
+          (gMatchReturn (chk (gVar x))
+             "s" (* as clause *)
+             (fun v -> ret_type (ret_type_dec v gFalse set))
+             [ (injectCtr "left", ["heq"],
+                fun [hn] ->
+                  gFun [namecur]
+                    (fun [hcur] -> false_ind hole (gVar hcur)))
+             ; (injectCtr "right", [name],
+                fun [hn] ->
+                  gFun [namecur]
+                    (fun [hcur] ->
+                       proof_map :=
+                         IntMap.add n (fun e -> gVar hn) !proof_map;
+                       sumbools_to_bool_proof x hcur hr cont lst'))
+             ]) [gVar hl]
+    in 
+    (gFun [x] (fun [x] -> sumbools_to_bool x checks),
+     fun hcur cont ->
+       gMatch (gVar hcur)
+         [(injectCtr "conj", ["Hl"; "Hr"],
+           fun [hl; hr] ->
+             sumbools_to_bool_proof (fresh_name x) hl hr cont checks)
+         ])
   in 
 
   let ret_type_left_ind  =

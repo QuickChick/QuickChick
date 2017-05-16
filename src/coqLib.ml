@@ -90,7 +90,8 @@ let discriminate h =
     (gMatch h [(injectCtr "erefl", [], fun [] -> gI)])
 
 let rewrite h hin =
-  gMatch h [(injectCtr "erefl", [], fun [] -> hin)]
+  gApp (gInject "eq_ind") [hole; hole; hin; hole; h]
+  (* gMatch h [(injectCtr "erefl", [], fun [] -> hin)] *)
 
 let eq_symm p =
   gApp (gInject "eq_symm") [hole; hole; p]

@@ -79,22 +79,6 @@ Qed.
 
 Derive SizeMonotonicSuchThat for (fun foo => goodFooNarrow n foo).
 Derive SizedProofEqs for (fun foo => goodFooNarrow n foo).
-
-
-(* Inductive test : nat -> Foo -> Prop := *)
-(* | T : forall (x : False), test 1 Foo1. *)
-
-(* Derive ArbitrarySizedSuchThat for (fun foo => test n foo). *)
-
-(* Inductive test1 : bool -> Foo -> Prop := *)
-(* | T1 : forall (x1 x2 x3 : bool), x1 = x3 -> test1 x2 Foo1. *)
-
-(* Derive ArbitrarySizedSuchThat for (fun foo => test1 n foo). *)
-
-(* Inductive test2 : nat -> Foo -> Prop := *)
-(* | T2 : forall (x1 x2 : bool), x1 = x2 ->  test2 1 Foo1. *)
- 
-(* Derive ArbitrarySizedSuchThat for (fun foo => test2 n foo). *)
  
 Existing Instance arbSizedSTgoodFooUnif. (* ???? *)
 
@@ -158,7 +142,7 @@ Inductive LRTree : tree -> Prop :=
 | PNode :
     forall m t1 t2,
       ~ t1 = Node 2 Leaf Leaf ->
-      ~ Node 4 Leaf Leaf = t1 ->
+      (* ~ Node 4 Leaf Leaf = t1 -> *)
       LRTree t1 ->
       LRTree t2 ->
       LRTree (Node m t1 t2).
@@ -175,31 +159,45 @@ Proof.
 Admitted.
 
 Derive ArbitrarySizedSuchThat for (fun (x : tree) => LRTree x).
-
 Derive SizedProofEqs for (fun (x : tree) => LRTree x).
 
-
-Inductive ex_test : tree -> Prop :=
-| B : ex_test Leaf 
-| Ind :
-    forall (list  y12  : nat) t,
-      list = y12 ->
-      ex_test (Node 4 t t).
-
-Derive ArbitrarySizedSuchThat for (fun (x : tree) => ex_test x).
-
-Set Printing All. 
-
 (* XXX breaks gen *)
-Inductive LRTree : tree -> Prop :=
-| PLeaf : LRTree Leaf
-| PNode :
-    forall m t1 t2,
-      Node 2 Leaf Leaf = t1 ->
-      t1 = Node 2 Leaf Leaf ->
-      LRTree t1 ->
-      LRTree t2 ->
-      LRTree (Node m t1 t2).
+
+(* Inductive ex_test : tree -> Prop := *)
+(* | B : ex_test Leaf  *)
+(* | Ind : *)
+(*     forall (list  y12  : nat) t, *)
+(*       list = y12 -> *)
+(*       ex_test (Node 4 t t). *)
+
+(* Derive ArbitrarySizedSuchThat for (fun (x : tree) => ex_test x). *)
+
+(* Set Printing All.  *)
+
+(* Inductive LRTree : tree -> Prop := *)
+(* | PLeaf : LRTree Leaf *)
+(* | PNode : *)
+(*     forall m t1 t2, *)
+(*       Node 2 Leaf Leaf = t1 -> *)
+(*       t1 = Node 2 Leaf Leaf -> *)
+(*       LRTree t1 -> *)
+(*       LRTree t2 -> *)
+(*       LRTree (Node m t1 t2). *)
+
+(* Inductive test : nat -> Foo -> Prop := *)
+(* | T : forall (x : False), test 1 Foo1. *)
+
+(* Derive ArbitrarySizedSuchThat for (fun foo => test n foo). *)
+
+(* Inductive test1 : bool -> Foo -> Prop := *)
+(* | T1 : forall (x1 x2 x3 : bool), x1 = x3 -> test1 x2 Foo1. *)
+
+(* Derive ArbitrarySizedSuchThat for (fun foo => test1 n foo). *)
+
+(* Inductive test2 : nat -> Foo -> Prop := *)
+(* | T2 : forall (x1 x2 : bool), x1 = x2 ->  test2 1 Foo1. *)
+ 
+(* Derive ArbitrarySizedSuchThat for (fun foo => test2 n foo). *)
 
 (* XXX weid bug when naming binders with name of already existing ids,
    e.g. nat, list*)
