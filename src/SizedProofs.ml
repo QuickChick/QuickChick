@@ -165,10 +165,210 @@ let sizedEqProofs_body
       (fun (rec_name, size::vars) -> aux_iter rec_name size vars)
       (fun rec_name -> gFun ["size"] 
           (fun [size] -> gApp (gVar rec_name) (gVar size :: List.map gVar input_vars)
-          )) 
+          ))
   in
 
-  (* arguments to handle_branch *)
+  let fail_exp_mon : coq_expr * coq_expr * coq_expr =
+    (set_empty, set_empty, set_incl_refl)
+  in
+
+  let ret_exp_mon (x : coq_expr) : coq_expr * coq_expr * coq_expr =
+    (set_singleton x, set_singleton x, set_incl_refl)
+  in
+
+  let class_method_mon : coq_expr * coq_expr * coq_expr =
+    (set_full, set_full, set_incl_refl)
+  in
+
+  let class_methodST_mon (n : int) (pred : coq_expr) : coq_expr * coq_expr * coq_expr =
+    (pred, pred, set_incl_refl)
+  in
+
+  let rec_method_mon (s1 : coq_expr) (s2 : coq_expr) (ih : coq_expr list -> coq_expr) (n : int) (l : coq_expr list)
+    : coq_expr * coq_expr * coq_expr =
+    let iter_body args : coq_expr =
+      gRecFunInWithArgs
+        "aux_iter" (gArg ~assumName:(gVar (fresh_name "size")) () :: inputs)
+        (fun (rec_name, size::vars) -> aux_iter rec_name size vars)
+        (fun rec_name -> gApp (gVar rec_name) args)
+    in
+    (iter_body (s1 :: l), iter_body (s2 :: l), ih l) (* ih should be already applied to the arguments, only the inputs should be missing *)
+  in
+
+  let bind_mon (opt : bool) (m : coq_expr * coq_expr * coq_expr) (x : string) (f : var -> coq_expr * coq_expr * coq_expr) =
+    let (s1, s2, p) = m in 
+    (set_bigcup x s1 (fun x -> let (s, _, _) =  f x in s),
+     set_bigcup x s2 (fun x -> let (_, s, _) =  f x in s),
+     incl_bigcup_compat p (gFun [x] (fun [x] -> let (_, _, s) = f x in s)))
+  in
+
+  let ret_type_dec (s : var) (left : coq_expr) (right : coq_expr) =
+    gMatch (gVar s)
+      [ (injectCtr "left", ["eq"], fun _ -> left)
+      ; (injectCtr "right", ["neq"], fun _ -> right) ]
+  in
+
+  let check_expr_mon (n : int) (scrut : coq_expr)
+        (left : coq_expr * coq_expr * coq_expr) (right : coq_expr * coq_expr * coq_expr)
+    : coq_expr * coq_expr * coq_expr =
+    let (sl1, sl2, pl) = left in
+    let (sr1, sr2, pr) = right in
+    (gMatchReturn scrut
+       "s" (* as clause *)
+       (fun v -> ret_type v ret_type_dec)
+       [ (injectCtr "left", ["eq" ] , fun _ -> sl1)
+       ; (injectCtr "right", ["neq"], fun _ -> sr1) 
+       ],
+     gMatchReturn scrut
+       "s" (* as clause *)
+       (fun v -> ret_type v ret_type_dec)
+       [ (injectCtr "left", ["eq" ] , fun _ -> sl2)
+       ; (injectCtr "right", ["neq"], fun _ -> sr2)
+       ],
+      gMatchReturn scrut
+        "s" (* as clause *)
+        (fun v -> set_incl (ret_type_dec v sl1 sr1) (ret_type_dec v sl2 sr2))
+        [ (injectCtr "left", ["eq" ] , fun _ -> pl)
+        ; (injectCtr "right", ["neq"], fun _ -> pr)
+        ])
+  in
+
+  let match_inp_mon (inp : var) (pat : matcher_pat)
+        (left : coq_expr * coq_expr * coq_expr ) (right : coq_expr * coq_expr * coq_expr )
+    : coq_expr * coq_expr * coq_expr =
+    let (sl1, sl2, pl) = left in
+    let (sr1, sr2, pr) = right in
+    let ret v left right =
+      construct_match (gVar v) ~catch_all:(Some right) [(pat, left)]
+    in
+    (construct_match_with_return
+       (gVar inp) ~catch_all:(Some sr1) "s" (fun v -> ret_type v ret)
+       [(pat,sl1)],
+     construct_match_with_return
+       (gVar inp) ~catch_all:(Some sr2) "s" (fun v -> ret_type v ret)
+       [(pat,sl2)],
+    construct_match_with_return
+      (gVar inp) ~catch_all:(Some pr)
+      "s" (fun v -> set_incl (ret v sl1 sr1) (ret v sl2 sr2))
+      [(pat, pl)])
+  in
+
+  let stMaybe_mon (opt : bool) (exp : coq_expr * coq_expr * coq_expr) (x : string) (checks : ((coq_expr -> coq_expr) * int) list)
+    : coq_expr * coq_expr * coq_expr =
+    let (g1, g2, p) = exp in 
+    let rec sumbools_to_bool x lst g =
+    match lst with
+      | [] -> gApp g [gVar x]
+      | (chk, _) :: lst' ->
+        matchDec (chk (gVar x)) (fun heq -> gFalse) (fun hneq -> sumbools_to_bool x lst' g)
+    in
+    let rec sumbools_to_bool_proof x lst : coq_expr =
+      match lst with
+      | [] -> gApp p [gVar x]
+      | (chk, n) :: lst' ->
+        let s1 = sumbools_to_bool x lst' g1 in
+        let s2 = sumbools_to_bool x lst' g2 in
+        gMatchReturn (chk (gVar x))
+          "s" (* as clause *)
+          (fun v -> gImpl (ret_type_dec v gFalse s1) (ret_type_dec v gFalse s2))
+          [ (injectCtr "left", ["heq"],
+             fun [hn] -> gApp set_incl_refl [gVar x])
+          ; (injectCtr "right", ["hneq"],
+             fun [hn] -> sumbools_to_bool_proof x lst')
+          ]
+    in
+    (gFun [x] (fun [x] -> sumbools_to_bool x checks g1),
+     gFun [x] (fun [x] -> sumbools_to_bool x checks g2),
+     gFun [x] (fun [x] -> sumbools_to_bool_proof x checks))
+  in
+
+  let rec elim_base_cases_mon s1 s2 (inputs : var list) ctrs =
+    let handle_branch' (c : dep_ctr) =
+      handle_branch n dep_type inputs
+        fail_exp_mon ret_exp_mon class_method_mon class_methodST_mon
+        (rec_method_mon s1 s2 (fun _ -> gVar (make_up_name ())))
+        bind_mon stMaybe_mon check_expr_mon match_inp_mon
+        gen_ctr (fun _ -> ()) c
+    in
+    match ctrs with
+    | [] -> set_incl_refl
+    | c :: ctrs' ->
+      let ((_, _, p), b) = handle_branch' c in
+      if b then
+        setU_set_subset_compat p (elim_base_cases_mon s1 s2 inputs ctrs')
+      else
+        setU_subset_r hole (elim_base_cases_mon s1 s2 inputs ctrs')
+  in
+
+  let rec elim_ind_cases_mon s1 s2 (ih : coq_expr list -> coq_expr) (inputs : var list) ctrs =
+    let handle_branch' (c : dep_ctr)  =
+      handle_branch n dep_type inputs
+        fail_exp_mon ret_exp_mon class_method_mon class_methodST_mon
+        (rec_method_mon s1 s2 ih)
+        bind_mon stMaybe_mon check_expr_mon match_inp_mon
+        gen_ctr (fun _ -> ()) c
+    in
+    match ctrs with
+    | [] -> set_incl_refl
+    | c :: ctrs' ->
+      let ((_, _, p), b) = handle_branch' c in
+      setU_set_subset_compat p (elim_ind_cases_mon s1 s2 ih inputs ctrs')
+  in
+
+  let mon_proof : coq_expr =
+    let iter_body args : coq_expr =
+      gRecFunInWithArgs
+        "aux_iter" (gArg ~assumName:(gVar (fresh_name "size")) () :: inputs) 
+        (fun (rec_name, size::vars) -> aux_iter rec_name size vars)
+        (fun rec_name -> gApp (gVar rec_name) args)
+    in
+    let inps = List.map gVar input_vars in
+    let ret_type n1 n2 inps = gImpl (gLeq n1 n2) (set_incl ((iter_body (n1 :: inps))) (iter_body (n2 :: inps))) in
+    let ind_ret_type = (* fun n1 => forall n2, forall inps, n1 <= n2 -> iter n1 inps \subset iter n2 inps *)
+      gFun ["n1"]
+        (fun [n1] ->
+           gProdWithArgs ((gArg ~assumName:(gVar (fresh_name "n2")) ()) :: inputs)
+             (fun (n2 :: inps) -> ret_type (gVar n1) (gVar n2) (List.map gVar inps)))
+    in
+    let nested_ind_type n1 inps =
+      gFun ["n2"] (fun [n2] -> ret_type n1 (gVar n2) inps)
+    in
+    gFun ["n1"; "n2"]
+      (fun [n1; n2] ->
+         gApp
+           (nat_ind
+              ind_ret_type
+              (gFun ["n2"]
+                 (fun [n2] ->
+                    gFunWithArgs inputs
+                      (fun inps ->
+                         let inps' = List.map gVar inps in
+                         gApp
+                           (nat_ind
+                              (nested_ind_type (gInt 0) inps')
+                              (gFun ["Hleq"] (fun [hleq] -> set_incl_refl))
+                              (gFun ["n2"; "IHn2"; "Hleq"] (fun [n2; _; hleq] ->
+                                                              elim_base_cases_mon (gInt 0) (gVar n2) inps ctrs
+                                                            )))
+                           [gVar n2])))
+              (gFun ["n1"; "IHn1"; "n2"]
+                 (fun [n1; ihn1; n2] ->
+                    gFunWithArgs inputs
+                      (fun inps ->
+                         let inps' = List.map gVar inps in
+                         gApp
+                           (nat_ind
+                              (nested_ind_type (gSucc (gVar n1)) inps')
+                              (gFun ["Hleq"] (fun [hleq] -> false_ind hole (lt0_False (gVar hleq))))
+                              (gFun ["n2"; "IHn2"; "Hleq"] (fun [n2; _; hleq]->
+                                                              let ih l = gApp (gApp (gVar ihn1) ((gVar n2) :: l)) [gVar hleq] in
+                                                              elim_ind_cases_mon (gVar n1) (gVar n2) ih inps ctrs
+                                                            )))
+                           [gVar n2]))))
+           ((gVar n1) :: (gVar n2) :: inps))
+  in
+
+  (* arguments to handle_branch for left to right direction of the proof *)
 
   let proof_map : proofMap ref = ref IntMap.empty in
 
@@ -376,6 +576,8 @@ let sizedEqProofs_body
          ])
   in 
 
+  (* Left to right direction *)
+
   let ret_type_left_ind  =
     let iter_body args : coq_expr =
       gRecFunInWithArgs
@@ -448,6 +650,7 @@ let sizedEqProofs_body
 
   let left_ind_case =
     gFun ["size"; "IHs"; "x"]
+      (* XXX need inputs with gen here!!!!!! *)
       (fun [size; ihs; x] ->
          gFunWithArgs
            inputs
@@ -474,8 +677,7 @@ let sizedEqProofs_body
             )])
   in
 
-  (* let rightp (x : var) : coq_exp = *)
-    
+  (* let rightp (x : var) : coq_exp = *)  
   (* in *)
 
   let spec =
@@ -488,5 +690,7 @@ let sizedEqProofs_body
   debug_coq_expr iter_body;
   msg_debug (str "spec");
   debug_coq_expr spec;
+  msg_debug (str "mon proof");
+  debug_coq_expr mon_proof;
 
-  gRecord [("iter", iter_body); ("spec", spec)]
+  gRecord [("iter", iter_body); ("mon", mon_proof); ("spec", spec)]
