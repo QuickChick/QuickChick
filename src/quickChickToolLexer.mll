@@ -26,6 +26,7 @@ rule lexer = parse
 
   | (white* as s) "(*!"             { line_incs s lexbuf; T_StartQCComment s }
   | (white* as s) "(*?"             { line_incs s lexbuf; T_StartMutant s }
+  | (white* as s) "(*#"             { line_incs s lexbuf; T_StartSection s }
   | (white* as s) "(*"              { line_incs s lexbuf; T_StartComment s }
 
   | (white* as s) "*)"              { line_incs s lexbuf; T_EndComment s }

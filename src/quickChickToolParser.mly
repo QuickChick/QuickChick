@@ -26,6 +26,7 @@ type node =
 %token<string> T_Extends
 %token<string> T_QuickChick
 
+%token<string> T_StartSection
 %token<string> T_StartQCComment
 %token<string> T_StartMutant
 %token<string> T_StartComment
@@ -84,7 +85,7 @@ mutant:               T_StartMutant code T_EndComment { $2 }
 sections:             section { [$1] }
                     | section sections { $1 :: $2 }
                       
-section:              T_StartQCComment T_Section code extends T_EndComment section_contents
+section:              T_StartSection T_Section code extends T_EndComment section_contents
                            { Section ($3, $6, $4) }
 
 extends:              { [] }
