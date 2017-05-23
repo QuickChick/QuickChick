@@ -14,7 +14,7 @@ $(call includecmdwithout@,$(COQBIN)coqtop -config)
 plugin: Makefile.coq 
 	$(MAKE) -f Makefile.coq
 
-install: Makefile.coq src/quickChickLib.cmx src/quickChickLib.o quickChickTool
+install: plugin Makefile.coq src/quickChickLib.cmx src/quickChickLib.o quickChickTool
 	$(MAKE) -f Makefile.coq install
   # Manually copying the remaining files
 	 cp src/quickChickLib.cmx $(COQLIB)/user-contrib/QuickChick
