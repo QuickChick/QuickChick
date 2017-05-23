@@ -28,8 +28,9 @@ let rec all_mutants' acc (muts : mutant list) : string list list =
   match muts with 
   | [] -> [List.rev acc]
   | (start, code, endc) :: rest -> 
-     all_mutants' (Printf.sprintf "%s%s%s" start code endc :: acc) rest @ 
-     non_mutants  (Printf.sprintf "%s *) %s (* %s" start code endc :: acc) rest
+     all_mutants' (Printf.sprintf "%s%s%s" start code endc :: acc) rest @
+     non_mutants  (Printf.sprintf "%s *) %s (* %s" start code endc :: acc) rest 
+
   
 let all_mutants muts = 
   List.map (String.concat "") (all_mutants' [] muts)
@@ -66,9 +67,9 @@ let mutate_outs handle_section input =
            | Mutants (start, base, muts) ->
               let (non_mutated, mutants) = 
                 match all_mutants muts with
-                | non_mutated :: mutants -> (non_mutated, mutants) 
+                | non_mutated :: mutants -> (non_mutated, List.rev mutants) 
                 | [] -> failwith "Internal error" in
-              Printf.printf "DEBUG:\nBASE: %s\nMUTS:\n%s\n" non_mutated (String.concat "\n\n\n" mutants);
+(*              Printf.printf "DEBUG:\nBASE: %s\nMUTS:\n%s\n" non_mutated (String.concat "\n\n\n" mutants); *)
               (Printf.sprintf "%s%s%s" start base non_mutated) ::
               (List.map (fun s -> Printf.sprintf "%s (* %s *) %s" start base s) mutants)
            | QuickChick (s1,s2,s3) -> [Printf.sprintf "%s*) QuickChick %s (*%s" s1 s2 s3] (* Add all tests *) in
@@ -137,7 +138,7 @@ let main =
 
   populate_hashtbl result;
 
-  Hashtbl.iter (fun a b -> Printf.printf "%s -> %s\n" a (String.concat ", " (SS.elements b))) sec_graph; 
+(*   Hashtbl.iter (fun a b -> Printf.printf "%s -> %s\n" a (String.concat ", " (SS.elements b))) sec_graph;  *)
 
   let handle_section = 
     match !sec_name with
