@@ -63,8 +63,7 @@ section_content:      T_Char
                       | T_StartMutants code mutants
                             { Mutants ($1, String.concat "" $2, $3) }
                       | T_StartComment section_contents T_EndComment
-                            { Text (Printf.sprintf "(* %s *)"
-                                      (String.concat "" (List.map output_node $2))) }
+                            { Text (Printf.sprintf "%s%s%s" $1 (String.concat "" (List.map output_node $2)) $3) }
 
 code:                 T_Char { [$1] } 
                       | T_Char code { $1 :: $2 }
