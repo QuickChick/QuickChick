@@ -19,6 +19,7 @@ Definition testProp1 (x : nat) := x =? 0.
 
 Definition testProp2 (x : nat) := x =? x.
 
+(* quickChick <filename> (-m test) -s Prop12 *)
 (*!
 QuickChick testProp1. 
 *)
@@ -44,6 +45,7 @@ Definition plus1 (x : nat) := (*! *) x + 1 (*! x *) (*! x + x *) .
 
 (*! Section PropPlus *)(*! extends Mutant *)
 
+(* quickChick <filename> -m mutate -s PropPlus *)
 Definition propPlus x := x <? plus1 x.
 
 (*!

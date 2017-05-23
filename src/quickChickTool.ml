@@ -82,7 +82,7 @@ module SS = Set.Make(String)
 let main = 
 (*  Parsing.set_trace true; *)
 
-  let mode = ref Test in
+  let mode = ref Mutate in
   let input_channel = ref stdin in
   let set_mode = function 
     | "test"   -> mode := Test
