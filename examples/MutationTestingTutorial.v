@@ -25,7 +25,7 @@ QuickChick testProp1.
 
 (*! QuickChick testProp2. *)
 
-(*! Section Prop3 extends Prop12 *)
+(*! Section Prop3 *)(*! extends Prop12 *)
 Definition testProp3 (x y : nat) := x =? y.
 
 (*!
@@ -42,7 +42,7 @@ QuickChick testProp4.
 (*! Section Mutant *)
 Definition plus1 (x : nat) := (*! *) x + 1 (*! x *) (*! x + x *) .
 
-(*! Section PropPlus extends Mutant *)
+(*! Section PropPlus *)(*! extends Mutant *)
 
 Definition propPlus x := x <? plus1 x.
 

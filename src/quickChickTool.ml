@@ -46,7 +46,7 @@ let mutate_outs handle_section input =
 module SS = Set.Make(String)
 
 let main = 
-(*  Parsing.set_trace true; *)
+  Parsing.set_trace true; 
 
   let mode = ref Test in
   let input_channel = ref stdin in
@@ -66,8 +66,12 @@ let main =
   let usage_msg = "quickChick <input_file> options\nTest a file or evaluate your testing using mutants." in
   Arg.parse speclist (fun anon -> input_channel := open_in anon) usage_msg;
 
+  print_endline "Starting lexing...";
+
   let lexbuf = Lexing.from_channel !input_channel in
   let result = program lexer lexbuf in
+
+  print_endline "Finished parsing...";
 
   let sec_graph = Hashtbl.create (List.length result) in 
   let sec_find s = try Hashtbl.find sec_graph s 

@@ -23,8 +23,8 @@ install: Makefile.coq src/quickChickLib.cmx src/quickChickLib.o quickChickTool
 
 quickChickTool: 
 	ocamllex  src/quickChickToolLexer.mll
-	menhir --explain src/quickChickToolParser.mly
-	# ocamlyacc -v src/quickChickToolParser.mly
+#	menhir --explain src/quickChickToolParser.mly
+	ocamlyacc -v src/quickChickToolParser.mly
 	ocamlc -I src -c src/quickChickToolTypes.ml
 	ocamlc -I src -c src/quickChickToolParser.mli
 	ocamlc -I src -c src/quickChickToolLexer.ml
