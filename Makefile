@@ -1,5 +1,5 @@
 
-.PHONY: plugin install clean
+.PHONY: plugin install install-plugin clean
 
 # Here is a hack to make $(eval $(shell work
 # (copied from coq_makefile generated stuff):
@@ -38,10 +38,9 @@ quickChickTool:
 	ocamlc -o src/quickChickTool str.cma src/quickChickToolTypes.cmo src/quickChickToolLexer.cmo src/quickChickToolParser.cmo src/quickChickTool.cmo
 
 tests:
-	coqc examples/Tests.v
-	cd examples/RedBlack; make clean && make
-	cd examples/stlc; make clean && make
-	cd examples/ifc-basic; make clean && make
+	+$(MAKE) -C examples/RedBlack clean all
+	+$(MAKE) -C examples/stlc clean all
+	+$(MAKE) -C examples/ifc-basic clean all
 
 Makefile.coq: Make
 	coq_makefile -f Make -o Makefile.coq
