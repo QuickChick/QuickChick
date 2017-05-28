@@ -7,10 +7,7 @@ dev-repo: "https://github.com/QuickChick/QuickChick.git"
 bug-reports: "https://github.com/QuickChick/QuickChick/issues"
 license: "BSD"
 
-build: [
-  [ make "-j%{jobs}%" "plugin" ]
-]
-build-test: [make "tests"]
+build: [ make "-j%{jobs}%" "plugin" ]
 install: [ make "install-plugin" ]
 remove: [ "sh" "-c" "rm -rf '%{lib}%/coq/user-contrib/QuickChick'" ]
 depends: [
