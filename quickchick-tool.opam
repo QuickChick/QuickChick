@@ -7,11 +7,9 @@ dev-repo: "https://github.com/QuickChick/QuickChick.git"
 bug-reports: "https://github.com/QuickChick/QuickChick/issues"
 license: "MIT"
 
-build: [
-  [ make "quickChickTool" ]
-]
-available: [ ocaml-version >= "4.02.3" ]
+build: [ make "quickChickTool" ]
 depends: [ ]
+available: [ ocaml-version >= "4.02.3" ]
 
 authors: [
   "Catalin Hritcu <>"
