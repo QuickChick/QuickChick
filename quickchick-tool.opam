@@ -5,7 +5,7 @@ maintainer: "palmskog@gmail.com"
 homepage: "https://github.com/QuickChick/QuickChick"
 dev-repo: "https://github.com/QuickChick/QuickChick.git"
 bug-reports: "https://github.com/QuickChick/QuickChick/issues"
-license: "BSD"
+license: "MIT"
 
 build: [
   [ make "quickChickTool" ]
