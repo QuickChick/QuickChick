@@ -23,6 +23,9 @@ install: plugin Makefile.coq src/quickChickLib.cmx src/quickChickLib.o quickChic
 	 cp src/quickChickLib.o $(COQLIB)/user-contrib/QuickChick
 	 cp src/quickChickTool $(shell echo $(PATH) | tr ':' "\n" | grep opam)/quickChick
 
+install-plugin:
+	$(MAKE) -f Makefile.coq install
+
 quickChickTool: 
 	ocamllex  src/quickChickToolLexer.mll
 #	menhir --explain src/quickChickToolParser.mly

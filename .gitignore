@@ -21,3 +21,4 @@ src/quickChickToolLexer.ml
 src/quickChickToolParser.ml
 src/quickChickToolParser.mli
 src/quickChickToolParser.output
+src/quickChickTool

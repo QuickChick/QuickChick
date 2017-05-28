@@ -1,0 +1,2 @@
+lib: ["src/quickChickLib.cmx" {"../coq/user-contrib/QuickChick/quickChickLib.cmx"}
+      "src/quickChickLib.o" {"../coq/user-contrib/QuickChick/quickChickLib.o"}]
