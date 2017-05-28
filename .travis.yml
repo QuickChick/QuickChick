@@ -7,6 +7,7 @@ addons:
       - ocaml
       - opam
       - aspcud
+      - time
 env:
   matrix:
     - MODE=quickchick-plugin
