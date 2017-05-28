@@ -10,6 +10,7 @@ license: "BSD"
 build: [
   [ make "-j%{jobs}%" "plugin" ]
 ]
+build-test: [make "tests"]
 install: [ make "install-plugin" ]
 remove: [ "sh" "-c" "rm -rf '%{lib}%/coq/user-contrib/QuickChick'" ]
 depends: [
