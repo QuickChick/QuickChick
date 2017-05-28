@@ -1,0 +1,17 @@
+language: c
+addons:
+  apt:
+    sources:
+      - avsm
+    packages:
+      - ocaml
+      - opam
+      - aspcud
+env:
+  matrix:
+    - MODE=quickchick-plugin OPAMBUILDTEST=1
+    - MODE=quickchick-tool
+script: bash -ex .travis-ci.sh
+sudo: false
+notifications:
+  email: false
