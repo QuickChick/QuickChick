@@ -160,7 +160,7 @@ Fixpoint leb (n m : nat) : bool :=
 
 Definition plus_O_n (n:nat) := 0 + n =? n.
 (*! QuickChick plus_O_n. *)
-
+ 
 Definition negb_involutive (b: bool) :=
   Bool.eqb (negb (negb b)) b.
 (*! QuickChick negb_involutive. *)
@@ -175,14 +175,10 @@ Theorem identity_fn_applied_twice :
   forall (b : bool), f (f b) = b.
 *)
 
-(* BCP: Needed(?) to state the following *)
-Definition implies (b c: bool) :=
-  orb (negb b) c.
-
 Definition andb_eq_orb :=
   fun (b c : bool) =>
-      implies
         (Bool.eqb (andb b c) (orb b c)) 
+        ==>
         (Bool.eqb b c).
 (*! QuickCheck andb_eq_orb. *)
 
