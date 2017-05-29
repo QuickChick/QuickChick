@@ -123,70 +123,22 @@ Definition nil_app := fun l:natlist =>
 Definition tl_length_pred := fun l:natlist =>
   pred (length l) =? length (tl l).
 
+(* Ugh -- temporary hack *)
 Definition tl_length_prop := 
   forAllShrink arbitrary shrink tl_length_pred.
+(*! QuickChick tl_length_prop. *)
 
-QuickChick tl_length_prop.
+Definition app_assoc := fun l1 l2 l3 : natlist =>
+  (l1 ++ l2) ++ l3 = l1 ++ (l2 ++ l3).
+
+(* BCP: How do I write this? 
+Definition app_assoc_prop := 
+  forAllShrink arbitrary shrink
+               (forAllShrink arbitrary shrink 
+                             (forAllShrink arbitrary shrink app_assoc)).
+*)
 
 (*
-(** Here, the [nil] case works because we've chosen to define
-    [tl nil = nil]. Notice that the [as] annotation on the [destruct]
-    tactic here introduces two names, [n] and [l'], corresponding to
-    the fact that the [cons] constructor for lists takes two
-    arguments (the head and tail of the list it is constructing). *)
-
-(** Usually, though, interesting theorems about lists require
-    induction for their proofs. *)
-
-(* ----------------------------------------------------------------- *)
-(** *** Micro-Sermon *)
-
-(** Simply reading example proof scripts will not get you very far!
-    It is important to work through the details of each one, using Coq
-    and thinking about what each step achieves.  Otherwise it is more
-    or less guaranteed that the exercises will make no sense when you
-    get to them.  'Nuff said. *)
-
-(* ================================================================= *)
-(** ** Induction on Lists *)
-
-(** Proofs by induction over datatypes like [natlist] are a
-    little less familiar than standard natural number induction, but
-    the idea is equally simple.  Each [Inductive] declaration defines
-    a set of data values that can be built up using the declared
-    constructors: a boolean can be either [true] or [false]; a number
-    can be either [O] or [S] applied to another number; a list can be
-    either [nil] or [cons] applied to a number and a list.
-
-    Moreover, applications of the declared constructors to one another
-    are the _only_ possible shapes that elements of an inductively
-    defined set can have, and this fact directly gives rise to a way
-    of reasoning about inductively defined sets: a number is either
-    [O] or else it is [S] applied to some _smaller_ number; a list is
-    either [nil] or else it is [cons] applied to some number and some
-    _smaller_ list; etc. So, if we have in mind some proposition [P]
-    that mentions a list [l] and we want to argue that [P] holds for
-    _all_ lists, we can reason as follows:
-
-      - First, show that [P] is true of [l] when [l] is [nil].
-
-      - Then show that [P] is true of [l] when [l] is [cons n l'] for
-        some number [n] and some smaller list [l'], assuming that [P]
-        is true for [l'].
-
-    Since larger lists can only be built up from smaller ones,
-    eventually reaching [nil], these two arguments together establish
-    the truth of [P] for all lists [l].  Here's a concrete example: *)
-
-Theorem app_assoc : forall l1 l2 l3 : natlist,
-  (l1 ++ l2) ++ l3 = l1 ++ (l2 ++ l3).
-Proof.
-  intros l1 l2 l3. induction l1 as [| n l1' IHl1'].
-  - (* l1 = nil *)
-    reflexivity.
-  - (* l1 = cons n l1' *)
-    simpl. rewrite -> IHl1'. reflexivity.  Qed.
-
 (** Notice that, as when doing induction on natural numbers, the
     [as...] clause provided to the [induction] tactic gives a name to
     the induction hypothesis corresponding to the smaller list [l1']
