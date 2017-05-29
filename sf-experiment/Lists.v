@@ -122,7 +122,11 @@ Definition nil_app := fun l:natlist =>
 
 Definition tl_length_pred := fun l:natlist =>
   pred (length l) =? length (tl l).
-QuickChick tl_length_pred.
+
+Definition tl_length_prop := 
+  forAllShrink arbitrary shrink tl_length_pred.
+
+QuickChick tl_length_prop.
 
 (*
 (** Here, the [nil] case works because we've chosen to define
