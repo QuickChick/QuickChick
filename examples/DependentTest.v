@@ -57,6 +57,8 @@ Fixpoint shrink_foo x :=
                 ([f] ++ map (fun f' => Foo3 n f') (shrink_foo f) ++ []) ++ []
   end.
 (* end shrink_foo *)
+(* JH: Foo2 -> Foo1, Foo3 n f -> Foo2 f *)
+(* Avoid exponential shrinking *)
 
 Lemma genFooSizedNotation : genFooSized = arbitrarySized.
 Proof. reflexivity. Qed.
@@ -82,7 +84,7 @@ Sample g.
 (* end gen_good_foo_simple *)
 
 (* begin gen_good_foo *)
-Definition genGoodFoo `{_ : Arbitrary Foo} (n : nat) :=
+Definition genGoodFoo `{_ : Arbitrary Foo} (n : nat)  :=
   let fix aux_arb size n := 
     match size with 
     | 0   => backtrack [(1, do! foo <- arbitrary; returnGen (Some foo))]
@@ -280,8 +282,10 @@ Lemma genGoodNarrow_equality n :
 Proof. reflexivity. Qed. 
 
 (* Non-linear constraint *)
+(*
 Inductive goodFooNL : nat -> nat -> Foo -> Prop :=
-| GoodNL : forall n foo, goodFooNL n n foo.
+| GoodNL : forall n foo, goodFooNL (Foo3 n foo) (Foo2 foo) foo.
+*)
 
 (* Derive ArbitrarySizedSuchThat for (fun foo => goodFooNL n m foo).*)
 

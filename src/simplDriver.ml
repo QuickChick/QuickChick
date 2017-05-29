@@ -153,6 +153,10 @@ let derive (cn : derivable) (c : constr_expr) (instance_name : string) (name1 : 
     | SizedCorrect ->
       genCorr ty_ctr ctrs iargs (gInject name1) (gInject name2)
   in
+
+  msg_debug (str "Defined record" ++ fnl ());
+  debug_coq_expr (instance_record []);
+
   declare_class_instance instance_arguments instance_name instance_type instance_record
 
 

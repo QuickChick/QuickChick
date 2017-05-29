@@ -700,14 +700,14 @@ let construct_match_with_return c ?catch_all:(mdef=None) (as_id : string) (ret :
             )
 
 (* Generic List Manipulations *)
-let list_nil = gInject "nil"
-let lst_append c1 c2 = gApp (gInject "app") [c1; c2]
+let list_nil = gInject "Coq.Lists.List.nil"
+let lst_append c1 c2 = gApp (gInject "Coq.Lists.List.app") [c1; c2]
 let rec lst_appends = function
   | [] -> list_nil
   | c::cs -> lst_append c (lst_appends cs)
-let gCons x xs = gApp (gInject "cons") [x; xs]                        
+let gCons x xs = gApp (gInject "Coq.Lists.List.cons") [x; xs]                        
 let rec gList = function 
-  | [] -> gInject "nil"
+  | [] -> gInject "Coq.Lists.List.nil"
   | x::xs -> gCons x (gList xs)
 
 (* Generic String Manipulations *)
@@ -721,7 +721,7 @@ let rec str_appends cs =
   | c1::cs' -> str_append c1 (str_appends cs')
 
 (* Pair *)
-let gPair (c1, c2) = gApp (gInject "pair") [c1;c2]
+let gPair (c1, c2) = gApp (gInject "Coq.Init.Datatypes.pair") [c1;c2]
 
 (* Int *)
 let parse_integer nc = 
@@ -730,33 +730,33 @@ let parse_integer nc =
   | _ -> debug_coq_expr nc; failwith "Expected an integer argument "
 
 let gInt n = CPrim (dummy_loc, Numeral (Bigint.of_int n))
-let gSucc x = gApp (gInject "S") [x]
+let gSucc x = gApp (gInject "Coq.Init.Datatypes.S") [x]
 let rec maximum = function
   | [] -> failwith "maximum called with empty list"
   | [c] -> c
-  | (c::cs) -> gApp (gInject "max") [c; maximum cs]
-let gle x y = gApp (gInject "leq") [x; y]
-let glt x y = gle (gApp (gInject "S") [x]) y
+  | (c::cs) -> gApp (gInject "Coq.Init.Peano.max") [c; maximum cs]
+let gle x y = gApp (gInject "Coq.Init.Peano.leq") [x; y]
+let glt x y = gle (gApp (gInject "Coq.Init.Datatypes.S") [x]) y
 
 
-let gEq x y = gApp (gInject "eq") [x; y]
+let gEq x y = gApp (gInject "Coq.Init.Logic.eq") [x; y]
             
 (* option type in Coq *)
-let gNone = gInject "None"
-let gSome c = gApp (gInject "Some") [c]
+let gNone = gInject "Coq.Init.Datatypes.None"
+let gSome c = gApp (gInject "Coq.Init.Datatypes.Some") [c]
               
-let gOption c = gApp (gInject "option") [c]
+let gOption c = gApp (gInject "Coq.Init.Datatypes.option") [c]
 
 (* Boolean *)
 
-let gTrue  = gInject "true"
-let gFalse = gInject "false"
+let gTrue  = gInject "Coq.Init.Datatypes.true"
+let gFalse = gInject "Coq.Init.Datatypes.false"
 
-let gNot c = gApp (gInject "negb") [c]
+let gNot c = gApp (gInject "Coq.Init.Datatypes.negb") [c]
 
 let decToBool c = 
-  gMatch c [ (injectCtr "left" , ["eq" ], fun _ -> gTrue )
-           ; (injectCtr "right", ["neq"], fun _ -> gFalse)
+  gMatch c [ (injectCtr "Coq.Init.Specif.left" , ["eq" ], fun _ -> gTrue )
+           ; (injectCtr "Coq.Init.Specif.right", ["neq"], fun _ -> gFalse)
            ]
 
 (* Recursion combinators / fold *)
@@ -818,13 +818,14 @@ let create_names_for_anon a =
     
 let declare_class_instance instance_arguments instance_name instance_type instance_record =
   let (vars,iargs) = List.split (List.map create_names_for_anon instance_arguments) in
-  ignore (Classes.new_instance true 
+  let cid = Classes.new_instance true 
                                iargs
                        (((dummy_loc, (Name (id_of_string instance_name))), None)
                        , Decl_kinds.Explicit, instance_type vars) 
                        (Some (true, instance_record vars)) (* TODO: true or false? *)
                        { hint_priority = None; hint_pattern = None }
-         )
+  in
+  msg_debug (str (Id.to_string cid) ++ fnl ())
 
 (* List Utils. Probably should move to a util file instead *)
 let list_last l = List.nth l (List.length l - 1)
