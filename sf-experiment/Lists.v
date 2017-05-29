@@ -52,7 +52,6 @@ Inductive natlist : Type :=
 Derive Arbitrary for natlist.
 Derive Show for natlist.
 
-(*
 Notation "x :: l" := (cons x l)
                      (at level 60, right associativity).
 Notation "[ ]" := nil.
@@ -113,53 +112,19 @@ Definition test_tl := equal_list (tl [1;2;3]) [2;3].
 (*! QuickChick test_tl. *)
 
 Fixpoint alternate (l1 l2 : natlist) : natlist
-  (* REPLACE THIS LINE WITH ":= _your_definition_ ." *). Admitted.
-
-Example test_alternate1:
-  alternate [1;2;3] [4;5;6] = [1;4;2;5;3;6].
-  (* FILL IN HERE *) Admitted.
-
-Example test_alternate2:
-  alternate [1] [4;5;6] = [1;4;5;6].
-  (* FILL IN HERE *) Admitted.
-
-Example test_alternate3:
-  alternate [1;2;3] [4] = [1;4;2;3].
-  (* FILL IN HERE *) Admitted.
-
-Example test_alternate4:
-  alternate [] [20;30] = [20;30].
-  (* FILL IN HERE *) Admitted.
-(** [] *)
+  (* REPLACE THIS LINE WITH ":= _your_definition_ ." *) := [].
 
 Definition bag := natlist.
-
-Definition sum : bag -> bag -> bag
-  (* REPLACE THIS LINE WITH ":= _your_definition_ ." *). Admitted.
-
 
 Definition nil_app := fun l:natlist =>
   equal_list ([] ++ l) l.
 (* QuickChick nil_app. *)
 
-(** ... because the [[]] is substituted into the
-    "scrutinee" (the value being "scrutinized" by the match) in the
-    definition of [app], allowing the match itself to be
-    simplified. *)
+Definition tl_length_pred := fun l:natlist =>
+  pred (length l) =? length (tl l).
+QuickChick tl_length_pred.
 
-(** Also, as with numbers, it is sometimes helpful to perform case
-    analysis on the possible shapes (empty or non-empty) of an unknown
-    list. *)
-
-Theorem tl_length_pred : forall l:natlist,
-  pred (length l) = length (tl l).
-Proof.
-  intros l. destruct l as [| n l'].
-  - (* l = nil *)
-    reflexivity.
-  - (* l = cons n l' *)
-    reflexivity.  Qed.
-
+(*
 (** Here, the [nil] case works because we've chosen to define
     [tl nil = nil]. Notice that the [as] annotation on the [destruct]
     tactic here introduces two names, [n] and [l'], corresponding to
