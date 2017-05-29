@@ -18,6 +18,8 @@ Inductive natprod : Type :=
 | pair : nat -> nat -> natprod.
 Derive Arbitrary for natprod.
 Derive Show for natprod.
+Instance natprod_eq (x y : natprod) : Dec (x = y).
+constructor. unfold ssrbool.decidable. repeat (decide equality). Defined.
 
 Definition fst (p : natprod) : nat :=
   match p with
@@ -51,6 +53,8 @@ Inductive natlist : Type :=
   | cons : nat -> natlist -> natlist.
 Derive Arbitrary for natlist.
 Derive Show for natlist.
+Instance natlist_eq (x y : natlist) : Dec (x = y).
+constructor. unfold ssrbool.decidable. repeat (decide equality). Defined.
 
 Notation "x :: l" := (cons x l)
                      (at level 60, right associativity).
@@ -131,61 +135,11 @@ Definition tl_length_prop :=
 Definition app_assoc := fun l1 l2 l3 : natlist =>
   (l1 ++ l2) ++ l3 = l1 ++ (l2 ++ l3).
 
-(* BCP: How do I write this? 
 Definition app_assoc_prop := 
   forAllShrink arbitrary shrink
-               (forAllShrink arbitrary shrink 
-                             (forAllShrink arbitrary shrink app_assoc)).
-*)
-
-(*
-(** Notice that, as when doing induction on natural numbers, the
-    [as...] clause provided to the [induction] tactic gives a name to
-    the induction hypothesis corresponding to the smaller list [l1']
-    in the [cons] case. Once again, this Coq proof is not especially
-    illuminating as a static written document -- it is easy to see
-    what's going on if you are reading the proof in an interactive Coq
-    session and you can see the current goal and context at each
-    point, but this state is not visible in the written-down parts of
-    the Coq proof.  So a natural-language proof -- one written for
-    human readers -- will need to include more explicit signposts; in
-    particular, it will help the reader stay oriented if we remind
-    them exactly what the induction hypothesis is in the second
-    case. *)
-
-(** For comparison, here is an informal proof of the same theorem. *)
-
-(** _Theorem_: For all lists [l1], [l2], and [l3],
-   [(l1 ++ l2) ++ l3 = l1 ++ (l2 ++ l3)].
-
-   _Proof_: By induction on [l1].
-
-   - First, suppose [l1 = []].  We must show
-
-       ([] ++ l2) ++ l3 = [] ++ (l2 ++ l3),
-
-     which follows directly from the definition of [++].
-
-   - Next, suppose [l1 = n::l1'], with
-
-       (l1' ++ l2) ++ l3 = l1' ++ (l2 ++ l3)
-
-     (the induction hypothesis). We must show
-
-       ((n :: l1') ++ l2) ++ l3 = (n :: l1') ++ (l2 ++ l3).
-
-     By the definition of [++], this follows from
-
-       n :: ((l1' ++ l2) ++ l3) = n :: (l1' ++ (l2 ++ l3)),
-
-     which is immediate from the induction hypothesis.  [] *)
-
-(* ----------------------------------------------------------------- *)
-(** *** Reversing a List *)
-
-(** For a slightly more involved example of inductive proof over
-    lists, suppose we use [app] to define a list-reversing function
-    [rev]: *)
+     (fun l1 => forAllShrink arbitrary shrink 
+         (fun l2 => forAllShrink arbitrary shrink
+             (fun l3 => (app_assoc l1 l2 l3)?))).
 
 Fixpoint rev (l:natlist) : natlist :=
   match l with
@@ -193,208 +147,11 @@ Fixpoint rev (l:natlist) : natlist :=
   | h :: t => rev t ++ [h]
   end.
 
-Example test_rev1:            rev [1;2;3] = [3;2;1].
-Proof. reflexivity.  Qed.
-Example test_rev2:            rev nil = nil.
-Proof. reflexivity.  Qed.
-
-(* ----------------------------------------------------------------- *)
-(** *** Properties of [rev] *)
-
-(** Now let's prove some theorems about our newly defined [rev].
-    For something a bit more challenging than what we've seen, let's
-    prove that reversing a list does not change its length.  Our first
-    attempt gets stuck in the successor case... *)
-
-Theorem rev_length_firsttry : forall l : natlist,
-  length (rev l) = length l.
-Proof.
-  intros l. induction l as [| n l' IHl'].
-  - (* l = [] *)
-    reflexivity.
-  - (* l = n :: l' *)
-    (* This is the tricky case.  Let's begin as usual
-       by simplifying. *)
-    simpl.
-    (* Now we seem to be stuck: the goal is an equality
-       involving [++], but we don't have any useful equations
-       in either the immediate context or in the global
-       environment!  We can make a little progress by using
-       the IH to rewrite the goal... *)
-    rewrite <- IHl'.
-    (* ... but now we can't go any further. *)
-Abort.
-
-(** So let's take the equation relating [++] and [length] that
-    would have enabled us to make progress and prove it as a separate
-    lemma. *)
-
-Theorem app_length : forall l1 l2 : natlist,
-  length (l1 ++ l2) = (length l1) + (length l2).
-Proof.
-  (* WORKED IN CLASS *)
-  intros l1 l2. induction l1 as [| n l1' IHl1'].
-  - (* l1 = nil *)
-    reflexivity.
-  - (* l1 = cons *)
-    simpl. rewrite -> IHl1'. reflexivity.  Qed.
-
-(** Note that, to make the lemma as general as possible, we
-    quantify over _all_ [natlist]s, not just those that result from an
-    application of [rev].  This should seem natural, because the truth
-    of the goal clearly doesn't depend on the list having been
-    reversed.  Moreover, it is easier to prove the more general
-    property. *)
-
-(** Now we can complete the original proof. *)
-
-Theorem rev_length : forall l : natlist,
-  length (rev l) = length l.
-Proof.
-  intros l. induction l as [| n l' IHl'].
-  - (* l = nil *)
-    reflexivity.
-  - (* l = cons *)
-    simpl. rewrite -> app_length, plus_comm.
-    simpl. rewrite -> IHl'. reflexivity.  Qed.
-
-(** For comparison, here are informal proofs of these two theorems:
-
-    _Theorem_: For all lists [l1] and [l2],
-       [length (l1 ++ l2) = length l1 + length l2].
-
-    _Proof_: By induction on [l1].
-
-    - First, suppose [l1 = []].  We must show
-
-        length ([] ++ l2) = length [] + length l2,
-
-      which follows directly from the definitions of
-      [length] and [++].
-
-    - Next, suppose [l1 = n::l1'], with
-
-        length (l1' ++ l2) = length l1' + length l2.
-
-      We must show
-
-        length ((n::l1') ++ l2) = length (n::l1') + length l2).
-
-      This follows directly from the definitions of [length] and [++]
-      together with the induction hypothesis. [] *)
-
-(** _Theorem_: For all lists [l], [length (rev l) = length l].
-
-    _Proof_: By induction on [l].
-
-      - First, suppose [l = []].  We must show
-
-          length (rev []) = length [],
-
-        which follows directly from the definitions of [length]
-        and [rev].
-
-      - Next, suppose [l = n::l'], with
-
-          length (rev l') = length l'.
-
-        We must show
-
-          length (rev (n :: l')) = length (n :: l').
-
-        By the definition of [rev], this follows from
-
-          length ((rev l') ++ [n]) = S (length l')
-
-        which, by the previous lemma, is the same as
-
-          length (rev l') + length [n] = S (length l').
-
-        This follows directly from the induction hypothesis and the
-        definition of [length]. [] *)
-
-(** The style of these proofs is rather longwinded and pedantic.
-    After the first few, we might find it easier to follow proofs that
-    give fewer details (which can easily work out in our own minds or
-    on scratch paper if necessary) and just highlight the non-obvious
-    steps.  In this more compressed style, the above proof might look
-    like this: *)
-
-(** _Theorem_:
-     For all lists [l], [length (rev l) = length l].
-
-    _Proof_: First, observe that [length (l ++ [n]) = S (length l)]
-     for any [l] (this follows by a straightforward induction on [l]).
-     The main property again follows by induction on [l], using the
-     observation together with the induction hypothesis in the case
-     where [l = n'::l']. [] *)
-
-(** Which style is preferable in a given situation depends on
-    the sophistication of the expected audience and how similar the
-    proof at hand is to ones that the audience will already be
-    familiar with.  The more pedantic style is a good default for our
-    present purposes. *)
-
-(* ================================================================= *)
-(** ** [Search] *)
-
-(** We've seen that proofs can make use of other theorems we've
-    already proved, e.g., using [rewrite].  But in order to refer to a
-    theorem, we need to know its name!  Indeed, it is often hard even
-    to remember what theorems have been proven, much less what they
-    are called.
-
-    Coq's [Search] command is quite helpful with this.  Typing
-    [Search foo] will cause Coq to display a list of all theorems
-    involving [foo].  For example, try uncommenting the following line
-    to see a list of theorems that we have proved about [rev]: *)
-
-(*  Search rev. *)
-
-(** Keep [Search] in mind as you do the following exercises and
-    throughout the rest of the book; it can save you a lot of time!
-
-    If you are using ProofGeneral, you can run [Search] with [C-c
-    C-a C-a]. Pasting its response into your buffer can be
-    accomplished with [C-c C-;]. *)
-
-(* ================================================================= *)
-(** ** List Exercises, Part 1 *)
-
-(** **** Exercise: 3 starsM (list_exercises)  *)
-(** More practice with lists: *)
-
-Theorem app_nil_r : forall l : natlist,
-  l ++ [] = l.
-Proof.
-  (* FILL IN HERE *) Admitted.
-
-Theorem rev_app_distr: forall l1 l2 : natlist,
-  rev (l1 ++ l2) = rev l2 ++ rev l1.
-Proof.
-  (* FILL IN HERE *) Admitted.
-
-Theorem rev_involutive : forall l : natlist,
-  rev (rev l) = l.
-Proof.
-  (* FILL IN HERE *) Admitted.
-
-(** There is a short solution to the next one.  If you find yourself
-    getting tangled up, step back and try to look for a simpler
-    way. *)
-
-Theorem app_assoc4 : forall l1 l2 l3 l4 : natlist,
-  l1 ++ (l2 ++ (l3 ++ l4)) = ((l1 ++ l2) ++ l3) ++ l4.
-Proof.
-  (* FILL IN HERE *) Admitted.
-
-(** An exercise about your implementation of [nonzeros]: *)
-
-Lemma nonzeros_app : forall l1 l2 : natlist,
-  nonzeros (l1 ++ l2) = (nonzeros l1) ++ (nonzeros l2).
-Proof.
-  (* FILL IN HERE *) Admitted.
-(** [] *)
+Definition rev_length := fun l : natlist =>
+  length (rev l) =? length l.
+Definition rev_length_hack := 
+  forAllShrink arbitrary shrink rev_length.
+QuickChick rev_length_hack.
 
 (** **** Exercise: 2 stars (beq_natlist)  *)
 (** Fill in the definition of [beq_natlist], which compares
@@ -402,72 +159,25 @@ Proof.
     yields [true] for every list [l]. *)
 
 Fixpoint beq_natlist (l1 l2 : natlist) : bool
-  (* REPLACE THIS LINE WITH ":= _your_definition_ ." *). Admitted.
+  (* REPLACE THIS LINE WITH ":= _your_definition_ ." *) := false.
 
-Example test_beq_natlist1 :
-  (beq_natlist nil nil = true).
- (* FILL IN HERE *) Admitted.
+Definition beq_natlist_refl := fun l:natlist =>
+  Bool.eqb true (beq_natlist l l).
 
-Example test_beq_natlist2 :
-  beq_natlist [1;2;3] [1;2;3] = true.
-(* FILL IN HERE *) Admitted.
+Definition beq_natlist_hack := 
+  forAllShrink arbitrary shrink beq_natlist_refl.
+QuickChick beq_natlist_hack.
 
-Example test_beq_natlist3 :
-  beq_natlist [1;2;3] [1;2;4] = false.
- (* FILL IN HERE *) Admitted.
 
-Theorem beq_natlist_refl : forall l:natlist,
-  true = beq_natlist l l.
-Proof.
-  (* FILL IN HERE *) Admitted.
-(** [] *)
-
-(* ================================================================= *)
-(** ** List Exercises, Part 2 *)
-
-(** **** Exercise: 3 stars, advanced (bag_proofs)  *)
-(** Here are a couple of little theorems to prove about your
-    definitions about bags above. *)
-
-Theorem count_member_nonzero : forall (s : bag),
-  leb 1 (count 1 (1 :: s)) = true.
-Proof.
-  (* FILL IN HERE *) Admitted.
-
-(** The following lemma about [leb] might help you in the next proof. *)
-
-Theorem ble_n_Sn : forall n,
-  leb n (S n) = true.
-Proof.
-  intros n. induction n as [| n' IHn'].
-  - (* 0 *)
-    simpl.  reflexivity.
-  - (* S n' *)
-    simpl.  rewrite IHn'.  reflexivity.  Qed.
-
-Theorem remove_decreases_count: forall (s : bag),
-  leb (count 0 (remove_one 0 s)) (count 0 s) = true.
-Proof.
-  (* FILL IN HERE *) Admitted.
-(** [] *)
-
-(** **** Exercise: 3 stars, optionalM (bag_count_sum)  *)
-(** Write down an interesting theorem [bag_count_sum] about bags
-    involving the functions [count] and [sum], and prove it.  (You may
-    find that the difficulty of the proof depends on how you defined
-    [count]!) *)
-(* FILL IN HERE *)
-(** [] *)
-
-(** **** Exercise: 4 stars, advancedM (rev_injective)  *)
+(* BCP: I wonder how best to do this...? *)
 (** Prove that the [rev] function is injective -- that is,
 
     forall (l1 l2 : natlist), rev l1 = rev l2 -> l1 = l2.
 
 (There is a hard way and an easy way to do this.) *)
+Definition rev_injective := fun (l1 l2 : natlist) =>
+  (equal_list (rev l1) (rev l2)) ==> equal_list l1 l2.
 
-(* FILL IN HERE *)
-(** [] *)
 
 (* ################################################################# *)
 (** * Options *)
