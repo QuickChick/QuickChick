@@ -161,9 +161,12 @@ Fixpoint leb (n m : nat) : bool :=
 Definition plus_O_n (n:nat) := 0 + n =? n.
 (*! QuickChick plus_O_n. *)
  
+Instance bool_eq (x y : bool) : Dec (x = y).
+constructor. unfold ssrbool.decidable. repeat (decide equality). Defined.
+
 Definition negb_involutive (b: bool) :=
-  Bool.eqb (negb (negb b)) b.
-(*! QuickChick negb_involutive. *)
+  (negb (negb b) = b)?.
+QuickChick negb_involutive.
 
 Definition andb_commutative := fun b c => Bool.eqb (andb b c) (andb c b).
 (*! QuickCheck andb_commutative. *)

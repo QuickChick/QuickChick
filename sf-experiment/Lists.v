@@ -134,6 +134,8 @@ Definition tl_length_prop :=
 
 Definition app_assoc := fun l1 l2 l3 : natlist =>
   (l1 ++ l2) ++ l3 = l1 ++ (l2 ++ l3).
+Instance app_assoc_dec (l1 l2 l3 : natlist) : Dec (app_assoc l1 l2 l3).
+unfold app_assoc. apply natlist_eq. Defined.
 
 Definition app_assoc_prop := 
   forAllShrink arbitrary shrink
