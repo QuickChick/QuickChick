@@ -818,7 +818,7 @@ let create_names_for_anon a =
     
 let declare_class_instance instance_arguments instance_name instance_type instance_record =
   let (vars,iargs) = List.split (List.map create_names_for_anon instance_arguments) in
-  let cid = Classes.new_instance true 
+  let cid = Classes.new_instance false 
                                iargs
                        (((dummy_loc, (Name (id_of_string instance_name))), None)
                        , Decl_kinds.Explicit, instance_type vars) 
