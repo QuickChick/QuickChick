@@ -137,11 +137,9 @@ Definition app_assoc := fun l1 l2 l3 : natlist =>
 Instance app_assoc_dec (l1 l2 l3 : natlist) : Dec (app_assoc l1 l2 l3).
 unfold app_assoc. apply natlist_eq. Defined.
 
-Definition app_assoc_prop := 
-  forAllShrink arbitrary shrink
-     (fun l1 => forAllShrink arbitrary shrink 
-         (fun l2 => forAllShrink arbitrary shrink
-             (fun l3 => (app_assoc l1 l2 l3)?))).
+(* BCP: What do I need to write here?
+QuickChick app_assoc.
+*)
 
 Fixpoint rev (l:natlist) : natlist :=
   match l with
@@ -151,36 +149,24 @@ Fixpoint rev (l:natlist) : natlist :=
 
 Definition rev_length := fun l : natlist =>
   length (rev l) =? length l.
-Definition rev_length_hack := 
-  forAllShrink arbitrary shrink rev_length.
-QuickChick rev_length_hack.
-
-(** **** Exercise: 2 stars (beq_natlist)  *)
-(** Fill in the definition of [beq_natlist], which compares
-    lists of numbers for equality.  Prove that [beq_natlist l l]
-    yields [true] for every list [l]. *)
+(*! QuickChick rev_length. *)
 
 Fixpoint beq_natlist (l1 l2 : natlist) : bool
   (* REPLACE THIS LINE WITH ":= _your_definition_ ." *) := false.
 
 Definition beq_natlist_refl := fun l:natlist =>
   Bool.eqb true (beq_natlist l l).
-
-Definition beq_natlist_hack := 
-  forAllShrink arbitrary shrink beq_natlist_refl.
-QuickChick beq_natlist_hack.
-
+(*! QuickChick beq_natlist. *)
 
 (* BCP: I wonder how best to do this...? *)
-(** Prove that the [rev] function is injective -- that is,
-
-    forall (l1 l2 : natlist), rev l1 = rev l2 -> l1 = l2.
-
-(There is a hard way and an easy way to do this.) *)
 Definition rev_injective := fun (l1 l2 : natlist) =>
   (equal_list (rev l1) (rev l2)) ==> equal_list l1 l2.
+(* BCP: Probably needs some mutations to be interesting... *)
+QuickChick beq_natlist.
 
+(* BCP: STOPPED HERE *)
 
+(*
 (* ################################################################# *)
 (** * Options *)
 

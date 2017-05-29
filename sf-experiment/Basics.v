@@ -164,9 +164,10 @@ Definition plus_O_n (n:nat) := 0 + n =? n.
 Instance bool_eq (x y : bool) : Dec (x = y).
 constructor. unfold ssrbool.decidable. repeat (decide equality). Defined.
 
+(* BCP: Should be able to use Dec, I guess... *)
 Definition negb_involutive (b: bool) :=
-  (negb (negb b) = b)?.
-QuickChick negb_involutive.
+  Bool.eqb (negb (negb b)) b.
+(*! QuickChick negb_involutive. *)
 
 Definition andb_commutative := fun b c => Bool.eqb (andb b c) (andb c b).
 (*! QuickCheck andb_commutative. *)
