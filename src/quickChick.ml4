@@ -120,7 +120,8 @@ let runTest c =
   (** Run the test *)
   else
     (** If we want to print the time spent in tests *)
-    let execn = "time " ^ execn in
+    (* BCP 5/29/17: Cutting this out for now *)
+    (* let execn = "time " ^ execn in *)
     if Sys.command execn <> 0 then
       msg_error (str "Could not run test" ++ fnl ())
 
