@@ -57,5 +57,5 @@ Example bar (m n : nat) :=
 
 
 (* Not sure about the level or binding, but good idea *)
-Notation "P '?'" := (@dec P _) (at level 100).
+Notation "P '?'" := (if (@dec P _) then true else false) (at level 100).
 
