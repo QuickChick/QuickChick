@@ -262,9 +262,6 @@ Admitted.
 
 Derive ArbitrarySizedSuchThat for (fun foo => goodFooNarrow n foo).
 
-Set Printing All.
-
-
 Definition genGoodNarrow (n : nat) : nat -> G (option (Foo)) :=
  let
    fix aux_arb size (n : nat) : G (option (Foo)) :=
