@@ -262,6 +262,9 @@ Admitted.
 
 Derive ArbitrarySizedSuchThat for (fun foo => goodFooNarrow n foo).
 
+Set Printing All.
+
+
 Definition genGoodNarrow (n : nat) : nat -> G (option (Foo)) :=
  let
    fix aux_arb size (n : nat) : G (option (Foo)) :=
@@ -270,9 +273,9 @@ Definition genGoodNarrow (n : nat) : nat -> G (option (Foo)) :=
      | S size' =>
          backtrack [ (1, returnGen (Some Foo1))
                    ; (1, doM! foo <- aux_arb size' 0; 
-                         match (goodFooNarrow 1 foo)? with
-                         | left  _ => returnGen (Some foo)
-                         | right _ => returnGen None 
+                         match @dec (goodFooNarrow 1 foo) _ with
+                             | left _ => returnGen (Some foo)
+                             | right _ => returnGen None
                          end
                      )]
      end in fun sz => aux_arb sz n.
