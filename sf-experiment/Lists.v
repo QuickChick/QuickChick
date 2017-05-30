@@ -61,7 +61,6 @@ Notation "x :: l" := (cons x l)
 Notation "[ ]" := nil.
 Notation "[ x ; .. ; y ]" := (cons x .. (cons y nil) ..).
 
-
 Fixpoint repeat (n count : nat) : natlist :=
   match count with
   | O => nil
@@ -162,18 +161,7 @@ Definition beq_natlist_refl := fun l:natlist =>
 Definition rev_injective := fun (l1 l2 : natlist) =>
   (equal_list (rev l1) (rev l2)) ==> equal_list l1 l2.
 (* BCP: Probably needs some mutations to be interesting... *)
-QuickChick beq_natlist.
-
-(* BCP: STOPPED HERE *)
-
-(*
-(* ################################################################# *)
-(** * Options *)
-
-(** Suppose we want to write a function that returns the [n]th
-    element of some list.  If we give it type [nat -> natlist -> nat],
-    then we'll have to choose some number to return when the list is
-    too short... *)
+(*! QuickChick beq_natlist. *)
 
 Fixpoint nth_bad (l:natlist) (n:nat) : nat :=
   match l with
@@ -184,21 +172,13 @@ Fixpoint nth_bad (l:natlist) (n:nat) : nat :=
                end
   end.
 
-(** This solution is not so good: If [nth_bad] returns [42], we
-    can't tell whether that value actually appears on the input
-    without further processing. A better alternative is to change the
-    return type of [nth_bad] to include an error value as a possible
-    outcome. We call this type [natoption]. *)
-
 Inductive natoption : Type :=
   | Some : nat -> natoption
   | None : natoption.
-
-(** We can then change the above definition of [nth_bad] to
-    return [None] when the list is too short and [Some a] when the
-    list has enough members and [a] appears at position [n]. We call
-    this new function [nth_error] to indicate that it may result in an
-    error. *)
+Derive Arbitrary for natoption.
+Derive Show for natoption.
+Instance natoption_eq (x y : natoption) : Dec (x = y).
+constructor. unfold ssrbool.decidable. repeat (decide equality). Defined.
 
 Fixpoint nth_error (l:natlist) (n:nat) : natoption :=
   match l with
@@ -209,106 +189,24 @@ Fixpoint nth_error (l:natlist) (n:nat) : natoption :=
                end
   end.
 
-Example test_nth_error1 : nth_error [4;5;6;7] 0 = Some 4.
-Proof. reflexivity. Qed.
-Example test_nth_error2 : nth_error [4;5;6;7] 3 = Some 7.
-Proof. reflexivity. Qed.
-Example test_nth_error3 : nth_error [4;5;6;7] 9 = None.
-Proof. reflexivity. Qed.
-
-(** (In the HTML version, the boilerplate proofs of these
-    examples are elided.  Click on a box if you want to see one.)
-
-    This example is also an opportunity to introduce one more small
-    feature of Coq's programming language: conditional
-    expressions... *)
-
-
-Fixpoint nth_error' (l:natlist) (n:nat) : natoption :=
-  match l with
-  | nil => None
-  | a :: l' => if beq_nat n O then Some a
-               else nth_error' l' (pred n)
-  end.
-
-(** Coq's conditionals are exactly like those found in any other
-    language, with one small generalization.  Since the boolean type
-    is not built in, Coq actually supports conditional expressions over
-    _any_ inductively defined type with exactly two constructors.  The
-    guard is considered true if it evaluates to the first constructor
-    in the [Inductive] definition and false if it evaluates to the
-    second. *)
-
-(** The function below pulls the [nat] out of a [natoption], returning
-    a supplied default in the [None] case. *)
-
-Definition option_elim (d : nat) (o : natoption) : nat :=
-  match o with
-  | Some n' => n'
-  | None => d
-  end.
-
-(** **** Exercise: 2 stars (hd_error)  *)
-(** Using the same idea, fix the [hd] function from earlier so we don't
-    have to pass a default element for the [nil] case.  *)
-
-Definition hd_error (l : natlist) : natoption
-  (* REPLACE THIS LINE WITH ":= _your_definition_ ." *). Admitted.
-
-Example test_hd_error1 : hd_error [] = None.
- (* FILL IN HERE *) Admitted.
-
-Example test_hd_error2 : hd_error [1] = Some 1.
- (* FILL IN HERE *) Admitted.
-
-Example test_hd_error3 : hd_error [5;6] = Some 5.
- (* FILL IN HERE *) Admitted.
-(** [] *)
-
-(** **** Exercise: 1 star, optional (option_elim_hd)  *)
-(** This exercise relates your new [hd_error] to the old [hd]. *)
-
-Theorem option_elim_hd : forall (l:natlist) (default:nat),
-  hd default l = option_elim default (hd_error l).
-Proof.
-  (* FILL IN HERE *) Admitted.
-(** [] *)
+(* BCP: Fix *)
+Definition test_nth_error1 :=
+  if (nth_error [4;5;6;7] 0) = (Some 4)? then true else false.
+(*! QuickChick test_nth_error1. *)
 
 End NatList.
 
-(* ################################################################# *)
-(** * Partial Maps *)
-
-(** As a final illustration of how data structures can be defined in
-    Coq, here is a simple _partial map_ data type, analogous to the
-    map or dictionary data structures found in most programming
-    languages. *)
-
-(** First, we define a new inductive datatype [id] to serve as the
-    "keys" of our partial maps. *)
-
 Inductive id : Type :=
   | Id : nat -> id.
-
-(** Internally, an [id] is just a number.  Introducing a separate type
-    by wrapping each nat with the tag [Id] makes definitions more
-    readable and gives us the flexibility to change representations
-    later if we wish.
-
-    We'll also need an equality test for [id]s: *)
+Derive Arbitrary for id.
+Derive Show for id.
+Instance id_eq (x y : id) : Dec (x = y).
+constructor. unfold ssrbool.decidable. repeat (decide equality). Defined.
 
 Definition beq_id (x1 x2 : id) :=
   match x1, x2 with
   | Id n1, Id n2 => beq_nat n1 n2
   end.
-
-(** **** Exercise: 1 star (beq_id_refl)  *)
-Theorem beq_id_refl : forall x, true = beq_id x x.
-Proof.
-  (* FILL IN HERE *) Admitted.
-(** [] *)
-
-(** Now we define the type of partial maps: *)
 
 Module PartialMap.
 Export NatList.
@@ -316,27 +214,15 @@ Export NatList.
 Inductive partial_map : Type :=
   | empty  : partial_map
   | record : id -> nat -> partial_map -> partial_map.
-
-(** This declaration can be read: "There are two ways to construct a
-    [partial_map]: either using the constructor [empty] to represent an
-    empty partial map, or by applying the constructor [record] to
-    a key, a value, and an existing [partial_map] to construct a
-    [partial_map] with an additional key-to-value mapping." *)
-
-(** The [update] function overrides the entry for a given key in a
-    partial map (or adds a new entry if the given key is not already
-    present). *)
+Derive Arbitrary for partial_map.
+Derive Show for partial_map.
+Instance partial_map_eq (x y : partial_map) : Dec (x = y).
+constructor. unfold ssrbool.decidable. repeat (decide equality). Defined.
 
 Definition update (d : partial_map)
                   (x : id) (value : nat)
                   : partial_map :=
   record x value d.
-
-(** Last, the [find] function searches a [partial_map] for a given
-    key.  It returns [None] if the key was not found and [Some val] if
-    the key was associated with [val]. If the same key is mapped to
-    multiple values, [find] will return the first one it
-    encounters. *)
 
 Fixpoint find (x : id) (d : partial_map) : natoption :=
   match d with
@@ -347,14 +233,12 @@ Fixpoint find (x : id) (d : partial_map) : natoption :=
   end.
 
 
-(** **** Exercise: 1 star (update_eq)  *)
-Theorem update_eq :
-  forall (d : partial_map) (x : id) (v: nat),
-    find x (update d x v) = Some v.
-Proof.
- (* FILL IN HERE *) Admitted.
-(** [] *)
+Definition update_eq :=
+  fun (d : partial_map) (x : id) (v: nat) =>
+    if (find x (update d x v) = Some v)? then true else false.
+QuickChick update_eq.
 
+(*
 (** **** Exercise: 1 star (update_neq)  *)
 Theorem update_neq :
   forall (d : partial_map) (x y : id) (o: nat),

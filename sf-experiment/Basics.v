@@ -161,13 +161,22 @@ Fixpoint leb (n m : nat) : bool :=
 Definition plus_O_n (n:nat) := 0 + n =? n.
 (*! QuickChick plus_O_n. *)
  
+(* BCP: This should be automatable, we guessed... *)
 Instance bool_eq (x y : bool) : Dec (x = y).
 constructor. unfold ssrbool.decidable. repeat (decide equality). Defined.
 
-(* BCP: Should be able to use Dec, I guess... *)
+(* BCP: LEO -- Should be able to use Dec, I guess, but it doesn't work... *)
 Definition negb_involutive (b: bool) :=
+  (negb (negb b) = b)?.
+(* 
+QuickChick negb_involutive.
+==> Unable to satisfy the following constraints:
+      "Checkable (forall b : bool, ssrbool.decidable (negb (negb b) = b))"
+*)
+
+Definition negb_involutive2 (b: bool) :=
   Bool.eqb (negb (negb b)) b.
-(*! QuickChick negb_involutive. *)
+(*! QuickChick negb_involutive2. *)
 
 Definition andb_commutative := fun b c => Bool.eqb (andb b c) (andb c b).
 (*! QuickCheck andb_commutative. *)
