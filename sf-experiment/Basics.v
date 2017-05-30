@@ -165,16 +165,11 @@ Definition plus_O_n (n:nat) := 0 + n =? n.
 Instance bool_eq (x y : bool) : Dec (x = y).
 constructor. unfold ssrbool.decidable. repeat (decide equality). Defined.
 
-(* BCP: LEO -- Should be able to use Dec, I guess, but it doesn't work... *)
+(* BCP: Should be able to use Dec everywhere now  :-)  *)
 Definition negb_involutive (b: bool) :=
   (negb (negb b) = b)?.
 Check negb_involutive.
 QuickChick negb_involutive.
-
-(* 
-==> Unable to satisfy the following constraints:
-      "Checkable (forall b : bool, ssrbool.decidable (negb (negb b) = b))"
-*)
 
 Definition negb_involutive2 (b: bool) :=
   Bool.eqb (negb (negb b)) b.

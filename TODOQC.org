@@ -1,12 +1,18 @@
 About decidability:
-  - How do I use (...)? ?
+  - List.v stuff
   - How do I create a Dec instance for options?  
-  - Why do we use Dec instead of EqDec?
   - Need better (infix) notations for boolean operations (andb, orb, negb,
     implies, etc.) 
   - How should we phrase specs like the one for filesystem operations in DW?
     Is there a way of using Dec to (semi?-)automatically calculate decision
     procedures for things like /\ and forall formulas?
+
+For leo:
+  - Dec seems not to be working as intended.  He hoped that the ? would not
+    be necessary to coerce a (decidable) Prop to a Checkable...
+  - Can we make every EqDec automatically be a Dec?
+
+
 
 Further questions and notes about things to do...
   - We need a 'QuickChick expect failure' command -- or is there a primitive
