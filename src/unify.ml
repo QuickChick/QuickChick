@@ -130,14 +130,15 @@ let rec unify (k : umap) (r1 : range) (r2 : range) (eqs : EqSet.t)
      if u1 == u2 then Some (k, Unknown u1, eqs, []) else
      lookup u1 k >>= fun r1 -> 
      lookup u2 k >>= fun r2 ->
+     msg_debug (str (Printf.sprintf "Unifying two unknowns with ranges: %s %s" (range_to_string r1) (range_to_string r2)) ++ fnl ());
      begin match r1, r2 with 
      (* "Delay" cases - unknowns call unify again *)
      (* TODO: rething return value *)
      | Unknown u1', _ -> 
-        unify k (Unknown u1') r2 eqs >>= fun (k', r', eqs', ms') ->
+        unify k (Unknown u1') (Unknown u2) eqs >>= fun (k', r', eqs', ms') ->
         Some (k', Unknown u1, eqs', ms')
      | _, Unknown u2' ->
-        unify k r1 (Unknown u2') eqs >>= fun (k', r', eqs', ms') ->
+        unify k (Unknown u1) (Unknown u2') eqs >>= fun (k', r', eqs', ms') ->
         Some (k', Unknown u2, eqs', ms')
 
      (* "Hard" case: both are fixed. Need to raise an equality check on the inputs *)
