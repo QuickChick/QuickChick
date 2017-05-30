@@ -168,8 +168,10 @@ constructor. unfold ssrbool.decidable. repeat (decide equality). Defined.
 (* BCP: LEO -- Should be able to use Dec, I guess, but it doesn't work... *)
 Definition negb_involutive (b: bool) :=
   (negb (negb b) = b)?.
-(* 
+Check negb_involutive.
 QuickChick negb_involutive.
+
+(* 
 ==> Unable to satisfy the following constraints:
       "Checkable (forall b : bool, ssrbool.decidable (negb (negb b) = b))"
 *)

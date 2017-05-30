@@ -1,0 +1,33 @@
+About decidability:
+  - How do I use (...)? ?
+  - How do I create a Dec instance for options?  
+  - Why do we use Dec instead of EqDec?
+  - Need better (infix) notations for boolean operations (andb, orb, negb,
+    implies, etc.) 
+  - How should we phrase specs like the one for filesystem operations in DW?
+    Is there a way of using Dec to (semi?-)automatically calculate decision
+    procedures for things like /\ and forall formulas?
+
+Further questions and notes about things to do...
+  - We need a 'QuickChick expect failure' command -- or is there a primitive
+    for that?
+  - Does the QC command actually fail if the testing fails??  Could it?
+  - Can we suppress the printing of elapsed time for checking?  (DONE)
+  - For faster unit testing, we could notice when the type of the property
+    being checked is simply bool and directly test whether it is true or
+    false, with no extraction.
+  - The QuickChick command should print which property it tested.
+  - Perhaps the normal (or at least a selectable) behavior of the QuickChick
+    command should be to print nothing at all if checking succeeds.
+  - Is there complete documentation somewhere for all the QCi commands?  We
+    really need some!!
+  - What is MutateCheck (README.md)?
+
+Things we've discussed but need to think about more:
+  - Can we avoid re-extracting and recompiling the whole file every time we
+    run QuickChick??  (Perhaps we do this already?)
+
+Random observations:
+  - Extraction doesn't work if any definitions are Admitted.  But in a
+    testing context, it might actually be better to give them wrong
+    definitions (and then discover that fact)!  
