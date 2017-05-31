@@ -28,6 +28,24 @@ Proof.
   decide equality.
 Defined.
 
+Global Instance Dec_eq_opt (A : Type) (m n : option A)
+  `{_ : forall (x y : A), Dec (x = y)} : Dec (m = n).
+Proof.
+  constructor.
+  unfold decidable.
+  decide equality.
+  apply H.
+Defined.
+
+Global Instance Dec_eq_list (A : Type) (m n : list A)
+  `{_ : forall (x y : A), Dec (x = y)} : Dec (m = n).
+Proof.
+  constructor.
+  unfold decidable.
+  decide equality.
+  apply H.
+Defined.
+
 (* Everything that uses the Decidable Class *)
 Require Import DecidableClass.
 

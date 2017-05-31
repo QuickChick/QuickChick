@@ -153,9 +153,10 @@ Definition rev_length := fun l : natlist =>
 Fixpoint beq_natlist (l1 l2 : natlist) : bool
   (* REPLACE THIS LINE WITH ":= _your_definition_ ." *) := false.
 
+(* BCP: Use this elsewhere *)
 Definition beq_natlist_refl := fun l:natlist =>
   Bool.eqb true (beq_natlist l l).
-(*! QuickChick beq_natlist. *)
+QuickChick (expectFailure beq_natlist).
 
 (* BCP: I wonder how best to do this...? *)
 Definition rev_injective := fun (l1 l2 : natlist) =>
@@ -208,7 +209,10 @@ Definition beq_id (x1 x2 : id) :=
   | Id n1, Id n2 => beq_nat n1 n2
   end.
 
+(* BCP: Extraction inside modules is broken! *)
+(*
 Module PartialMap.
+*)
 Export NatList.
   
 Inductive partial_map : Type :=
@@ -231,7 +235,6 @@ Fixpoint find (x : id) (d : partial_map) : natoption :=
                      then Some v
                      else find x d'
   end.
-
 
 Definition update_eq :=
   fun (d : partial_map) (x : id) (v: nat) =>
