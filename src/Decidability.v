@@ -28,6 +28,24 @@ Proof.
   decide equality.
 Defined.
 
+Global Instance Dec_eq_opt (A : Type) (m n : option A)
+  `{_ : forall (x y : A), Dec (x = y)} : Dec (m = n).
+Proof.
+  constructor.
+  unfold decidable.
+  decide equality.
+  apply H.
+Defined.
+
+Global Instance Dec_eq_list (A : Type) (m n : list A)
+  `{_ : forall (x y : A), Dec (x = y)} : Dec (m = n).
+Proof.
+  constructor.
+  unfold decidable.
+  decide equality.
+  apply H.
+Defined.
+
 (* Everything that uses the Decidable Class *)
 Require Import DecidableClass.
 
@@ -57,5 +75,8 @@ Example bar (m n : nat) :=
 
 
 (* Not sure about the level or binding, but good idea *)
-Notation "P '?'" := (@dec P _) (at level 100).
+Notation "P '?'" := (match (@dec P _) with 
+                       | left _ => true
+                       | right _ => false
+                     end) (at level 100).
 

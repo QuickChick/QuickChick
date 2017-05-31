@@ -11,10 +11,12 @@ endef
 includecmdwithout@ = $(eval $(subst @,$(donewline),$(shell { $(1) | tr -d '\r' | tr '\n' '@'; })))
 $(call includecmdwithout@,$(COQBIN)coqtop -config)
 
+all: plugin quickChickTool
+
 plugin: Makefile.coq 
 	$(MAKE) -f Makefile.coq
 
-install: Makefile.coq src/quickChickLib.cmx src/quickChickLib.o quickChickTool
+install: plugin Makefile.coq src/quickChickLib.cmx src/quickChickLib.o quickChickTool
 	$(MAKE) -f Makefile.coq install
   # Manually copying the remaining files
 	 cp src/quickChickLib.cmx $(COQLIB)/user-contrib/QuickChick
@@ -23,6 +25,7 @@ install: Makefile.coq src/quickChickLib.cmx src/quickChickLib.o quickChickTool
 
 quickChickTool: 
 	ocamllex  src/quickChickToolLexer.mll
+#	menhir --explain src/quickChickToolParser.mly
 	ocamlyacc -v src/quickChickToolParser.mly
 	ocamlc -I src -c src/quickChickToolTypes.ml
 	ocamlc -I src -c src/quickChickToolParser.mli
@@ -52,6 +55,8 @@ clean:
 	find . -name *.cmo -print -delete
 	find . -name *.bak -print -delete
 	find . -name *~ -print -delete
+	find . -name *.conflicts -print -delete
+	find . -name *.output -print -delete
 	rm -f Makefile.coq
 
 bc:

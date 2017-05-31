@@ -1,23 +1,33 @@
+type mutant = string * string * string
+
 type node =
   (* Base chunk of text *)
   | Text of string 
-  (* Sections: identifier + a bunch of nodes + extend? *)
-  | Section of string * node list * string list
   (* Commented out QuickChick call *)
-  | QuickChick of string
-  (* Mutant: list of +/- idents, base, list of mutants *)
-  | Mutant of (bool * string) list * string * (string list)
+  | QuickChick of (string * string * string)
+  (* Mutant: start of mutant, base, list of mutants *)
+  | Mutants of string * string * mutant list
 
-let rec node_to_string = function
-  | Text s -> s 
-  | Section (id, ns, m) -> Printf.sprintf "Section: %s extends %s\n%s" id (String.concat " " m) (String.concat "\n" (List.map node_to_string ns))
-  | QuickChick s -> Printf.sprintf "QC: QuickChick %s" s
-  | Mutant (_,base,vars) -> Printf.sprintf "Mutant:\nOriginal:%sVariants:%s" base (String.concat "\n" vars)
+type extend = (string * string list * string)
 
-let rec output_plain = function
+type section = 
+  (* Sections: Start comment, section name, end comment, extends, contents *)
+  | Section of string * string * string * extend option * node list 
+
+let rec output_mutant (a,b,c) = a ^ b ^ c
+
+let rec output_node = function
   | Text s -> s 
-  | Section (id, ns, m) -> Printf.sprintf "%s" (String.concat "\n" (List.map output_plain ns))
-  | QuickChick s -> "" (* Commented out *)
-  | Mutant (_,base,vars) -> Printf.sprintf "%s" base 
+  | QuickChick (s1,s2,s3) -> (s1 ^ s2 ^ s3)
+  | Mutants (start,base,variations) -> 
+     Printf.sprintf "%s%s%s" start base (String.concat "" (List.map output_mutant variations))
+
+let output_extends = function
+  | Some (st, exts, en) -> st ^ String.concat "" exts ^ en
+  | None -> ""
+
+let output_section = function
+  | Section (start, id, endc, extends, ns) -> 
+     Printf.sprintf "%s%s%s%s%s" start id endc (output_extends extends) (String.concat "" (List.map output_node ns))
 
 

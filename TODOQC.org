@@ -1,0 +1,37 @@
+For leo:
+  - Dec seems not to be working as intended.  He hoped that the ? would not
+    be necessary to coerce a (decidable) Prop to a Checkable...
+  - Can we make every EqDec automatically be a Dec?
+  - Does the QC command actually fail if the testing fails??  Could it?
+  - The QuickChick command should print which property it tested.
+  - Perhaps the normal (or at least a selectable) behavior of the QuickChick
+    command should be to print nothing at all if checking succeeds.
+  - Can we avoid re-extracting and recompiling the whole file every time we
+    run QuickChick?? 
+      - It's too slow, probably in large part because we're recompiling too
+        much.
+  * Make a simpler tactic for deriving equality.
+       Derive Arbitrary, Show, Eq for file_access_mode.
+  * play with precedence for ? -- should bind tigher than implication
+
+__________
+
+About decidability:
+  - How do I create a Dec instance for options?  
+  - Need better (infix) notations for boolean operations (andb, orb, negb,
+    implies, etc.) 
+  - How should we phrase specs like the one for filesystem operations in DW?
+    Is there a way of using Dec to (semi?-)automatically calculate decision
+    procedures for things like /\ and forall formulas?
+
+
+TASKS FOR THE SUMMER SCHOOL:
+  - documentation 
+  - test opam package
+
+___________
+
+Random observations:
+  - Extraction doesn't work if any definitions are Admitted.  But in a
+    testing context, it might actually be better to give them wrong
+    definitions (and then discover that fact)!  
