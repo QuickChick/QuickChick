@@ -59,6 +59,270 @@ Typeclasses eauto := debug.
 
 Require Import DependentTest zoo.
 
+
+Lemma eq_symm {A : Type} (x y : A) :
+  x = y -> y = x.
+Proof.
+  firstorder.
+Qed.
+
+Lemma plus_leq_compat_l n m k :
+  n <= m ->
+  n <= m + k.
+Proof. 
+  intros. ssromega.
+Qed.
+
+Lemma plus_leq_compat_r n m k :
+  n <= k ->
+  n <= m + k.
+Proof. 
+  intros. ssromega.
+Qed.
+
+Lemma leq_refl: forall n, n <= n.
+Proof.
+  intros. ssromega.
+Qed.
+
+Inductive tree : Type :=
+| Leaf : tree
+| Node : nat -> tree -> tree -> tree.
+
+Inductive LRTree : tree -> Prop :=
+| PLeaf : LRTree Leaf
+| PNode :
+    forall m t1 t2,
+      ~ t1 = Node 2 Leaf Leaf ->
+      ~ Node 4 Leaf Leaf = t1 ->
+      LRTree t1 ->
+      LRTree t2 ->
+      LRTree (Node m t1 t2).
+
+
+Derive ArbitrarySizedSuchThat for (fun (x : tree) => LRTree x).
+
+
+
+(* Derive SizedProofEqs for (fun (x : tree) => LRTree x). *)
+
+
+Instance DecidableLRTree t : Dec (LRTree t).
+Proof.
+Admitted.
+
+Instance DecEqLRTree (t1 t2 : tree): Dec (t1 = t2).
+Proof.
+Admitted.
+
+Let iter1 : nat ->  set tree :=
+  (let
+      fix aux_iter size0 :=
+      match size0 with
+        | O => setU (set1 (@Leaf)) set0
+        | S size' =>
+          setU (set1 (@Leaf))
+               (setU
+                  (bigcup
+                     (fun t1 =>
+                        match
+                          @dec
+                            (@eq (tree) (Node (S (S (S (S (O))))) (Leaf) (Leaf)) t1)
+                            _
+                        with
+                          | left eq0 => False
+                          | right neq =>
+                            match
+                              @dec (@eq (tree) t1 (Node (S (S (O))) (Leaf) (Leaf)))
+                                   _
+                            with
+                              | left eq0 => False
+                              | right neq => aux_iter size' t1
+                            end
+                        end)
+                     (fun t1 =>
+                        bigcup (aux_iter size')
+                               (fun t2 => bigcup setT (fun m => set1 (@Node m t1 t2)))))
+                  set0)
+      end in
+    fun size0 => aux_iter size0).
+
+Lemma pmon :
+  forall s1 s2, s1 <= s2 -> iter1 s1 \subset iter1 s2.
+Admitted.
+
+Lemma lala :
+  (fun z => LRTree z) \subset (\bigcup_(n : nat) (iter1 n)).
+Proof.
+  refine (fun x =>
+            LRTree_ind
+              (fun _gen =>
+                 bigcup setT
+                        (fun n =>
+                           iter1 n) _gen)
+              (ex_intro _ (S 0) (conj I (or_introl (Logic.eq_refl _))))
+              (fun m t1 t2 H0 H1 H2 IH2 H3 IH3 =>
+                 match IH2 with
+                   | ex_intro y2 Pc2 =>
+                     match Pc2 with
+                       | conj HT P2 =>
+                         match IH3 with
+                           | ex_intro y3 Pc3 =>
+                             match Pc3 with
+                               | conj HT P3 =>
+                                 ex_intro _ (S (Nat.add (Nat.add 0 y2) y3))
+                                          (conj I
+                                                (or_intror
+                                                   (or_introl
+                                                      (ex_intro _ _
+                                                                (conj _
+                                                                   (* match *)
+                                                                   (*   @dec *)
+                                                                   (*     (@eq (tree) *)
+                                                                   (*          (Node  *)
+                                                                   (*             (S (S (S (S (O)))))  *)
+                                                                   (*             (Leaf)  *)
+                                                                   (*             (Leaf)) t1) _ as s *)
+                                                                   (*   return *)
+                                                                   (*   match s with *)
+                                                                   (*     | left eq0 => False *)
+                                                                   (*     | right neq => *)
+                                                                   (*       match *)
+                                                                   (*         @dec *)
+                                                                   (*           (@eq  *)
+                                                                   (*              (tree) t1 *)
+                                                                   (*              (Node  *)
+                                                                   (*                 (S (S (O)))  *)
+                                                                   (*                 (Leaf)  *)
+                                                                   (*                 (Leaf))) _ *)
+                                                                   (*       with *)
+                                                                   (*         | left eq0 => False *)
+                                                                   (*         | right neq => *)
+                                                                   (*           (iter1 *)
+                                                                   (*              (Nat.add (Nat.add 0 y2) y3)) *)
+                                                                   (*             t1 *)
+                                                                   (*       end *)
+                                                                   (*   end *)
+                                                                   (* with *)
+                                                                   (*   | left Heq1 => False_ind _ (H1 Heq1) *)
+                                                                   (*   | right Hneq1 => *)
+                                                                   (*     match *)
+                                                                   (*       @dec *)
+                                                                   (*         (@eq  *)
+                                                                   (*            (tree) t1 *)
+                                                                   (*            (Node  *)
+                                                                   (*               (S (S (O)))  *)
+                                                                   (*               (Leaf)  *)
+                                                                   (*               (Leaf))) _ as s *)
+                                                                   (*       return *)
+                                                                   (*       match s with *)
+                                                                   (*         | left eq0 => False *)
+                                                                   (*         | right neq => *)
+                                                                   (*           (iter1 (Nat.add (Nat.add 0 y2) y3)) *)
+                                                                   (*             t1 *)
+                                                                   (*       end *)
+                                                                   (*     with *)
+                                                                   (*       | left Heq0 => False_ind _ (H0 Heq0) *)
+                                                                   (*       | right Hneq0 => *)
+                                                                   (*         pmon _ *)
+                                                                   (*              (Nat.add (Nat.add 0 y2) y3) *)
+                                                                   (*              (plus_leq_compat_l _ _ _ *)
+                                                                   (*                                 (leq_addl _ _)) _ P2 *)
+                                                                   (*     end *)
+                                                                   (* end *)
+                                                                   (ex_intro _ _
+                                                                             (conj
+                                                                                (pmon _
+                                                                                      (Nat.add (Nat.add 0 y2) y3)
+                                                                                      (leq_addl _ _) _ P3)
+                                                                                (ex_intro _ _
+                                                                                          (conj I (Logic.eq_refl _))))))))))
+                             end
+                         end
+                     end
+                 end) x).
+  destruct (@dec
+               (@eq (tree)
+                    (Node
+                       (S (S (S (S (O)))))
+                       (Leaf)
+                       (Leaf)) t1) _).
+  refine (False_ind _ (H1 e)).
+
+  destruct (@dec
+              (@eq
+                 (tree) t1
+                 (Node
+                    (S (S (O)))
+                    (Leaf)
+                    (Leaf))) _).
+
+  refine( False_ind _ (H0 e)).
+  refine (pmon _
+               (Nat.add (Nat.add 0 y2) y3)
+               _ _ P2).
+  Show Proof.
+  (plus_leq_compat_l _ _ _ (leq_addl _ _))
+
+
+
+  refine (match
+             @dec
+               (@eq (tree)
+                    (Node
+                       (S (S (S (S (O)))))
+                       (Leaf)
+                       (Leaf)) t1) _ as s
+             return
+             match s with
+               | left eq0 => False
+               | right neq => _
+                 (* match *)
+                 (*   @dec *)
+                 (*     (@eq *)
+                 (*        (tree) t1 *)
+                 (*        (Node *)
+                 (*           (S (S (O))) *)
+                 (*           (Leaf) *)
+                 (*           (Leaf))) _ *)
+                 (* with *)
+                 (*   | left eq0 => False *)
+                 (*   | right neq =>  *)
+                 (*     (iter1 *)
+                 (*        (Nat.add (Nat.add 0 y2) y3)) *)
+                 (*       t1 *)
+                 (* end *)
+             end
+           with
+             | left Heq1 => False_ind _ (H1 Heq1)
+             | right Hneq1 => _
+                               match
+                                 @dec
+                                   (@eq
+                                      (tree) t1
+                                      (Node
+                                         (S (S (O)))
+                                         (Leaf)
+                                         (Leaf))) _ as s
+                                 return
+             (*   match s with *)
+             (*     | left eq0 => False *)
+             (*     | right neq => *)
+             (*       (iter1 (Nat.add (Nat.add 0 y2) y3)) *)
+             (*         t1 *)
+             (*   end *)
+             (* with *)
+             (*   | left Heq0 => _ (* False_ind _ (H0 Heq0) *) *)
+             (*   | right Hneq0 => _ *)
+             (*     (* pmon _ *) *)
+             (*     (*      (Nat.add (Nat.add 0 y2) y3) *) *)
+             (*     (*      (plus_leq_compat_l _ _ _ *) *)
+             (*     (*                         (leq_addl _ _)) _ P2 *) *)
+             (* end *)
+         end).
+
+
+
 Existing Instance genSFoo.
 Existing Instance shrFoo.
 (* XXX these instances should be present *)
@@ -70,102 +334,40 @@ Typeclasses eauto := debug.
 (* Interesting. Do we need Global instance?? *) 
 Existing Instance arbSizedSTgoodFooNarrow.  (* Why???? *)
 
-Lemma eq_symm {A : Type} (x y : A) :
-  x = y -> y = x.
-Proof.
-  firstorder.
-Qed.
-
 
 Derive SizeMonotonicSuchThat for (fun foo => goodFooNarrow n foo).
 Derive SizedProofEqs for (fun foo => goodFooNarrow n foo).
 
 (* Example with two IH *)
-Inductive tree : Type :=
-| Leaf : tree
-| Node : nat -> tree -> tree -> tree.
 
 Inductive goodTree : nat -> tree -> Prop :=
 | GL : goodTree 0 Leaf
 | GN : forall k t1 t2 n m, goodTree n t1 ->
                       goodTree m t2 ->
+                      goodTree m t1 ->
                       goodTree (S n) (Node k t1 t2).
+
+Instance DecgoodTree (n : nat) (t : tree) : Dec (goodTree n t).
+Admitted.
+
+Instance DecTreeEq (t1 t2 : tree) : Dec (t1 = t2).
+Admitted.
+
 
 Derive ArbitrarySizedSuchThat for (fun foo => goodTree n foo).
 
-Derive SizeMonotonicSuchThat for (fun foo => goodTree n foo).
-
 Derive SizedProofEqs for (fun foo => goodTree n foo).
 
-(* Lemma iter_mon (input0_ : nat) : *)
-(*   forall n1 n2, n1 <= n2 ->  *)
-(*            (@DependentClasses.iter tree _ (SizedProofEqsgoodTree input0_)) n1 \subset (@DependentClasses.iter tree _ (SizedProofEqsgoodTree input0_)) n2. *)
 
-(* Lemma lala (input0_ : nat) : *)
-(*   (fun foo => goodTree input0_ foo) \subset *)
-(*   (\bigcup_(n in [set: nat]) (@DependentClasses.iter tree _ (SizedProofEqsgoodTree input0_)) n). *)
-(* Proof. *)
-(*   revert input0_. *)
-(*   unfold set_incl.  *)
-(*   refine (goodTree_ind (fun input0_ a => (\bigcup_(n in [set: nat]) DependentClasses.iter n) a) *)
-(*                        (ex_intro _ 0 (conj I (or_introl _))) *)
-(*                        (fun k t1 t2 n m H1 IH1 H2 IH2 => _)). *)
-(*   exact erefl. *)
-
-(*   refine (match IH1 with *)
-(*             | ex_intro n (conj _ IH1) => *)
-(*               match IH2 with *)
-(*                 | ex_intro m (conj _ IH2) => _ *)
-(*               end *)
-(*           end). *)
-(*   exists (S (n + m)).  *)
-(*   split. now constructor. *)
-(*   right. left. *)
-(*   simpl in *.  *)
-(*   eexists. split.  admit. (* needs monotonicity *) *)
-(*   eexists. split.  now constructor. *)
-(*   eexists. split.  admit. (* needs monotonicity *) *)
-(*   eexists. *)
-  
-(*   eauto. now constructor. *)
- 
-(*   eauto. *)
-(*   simpl. *)
-
-(*   left. reflexivity. *)
-(*   Show Proof. *)
-
-
-(* Lemma lala (input0_ : nat) : *)
-(*   (fun foo => goodFooNarrow input0_ foo) \subset (\bigcup_(n in [set: nat]) (@DependentClasses.iter Foo _ (SizedProofEqsgoodFooNarrow input0_)) n). *)
-(* Proof. *)
-(*   revert input0_. *)
-(*   refine (goodFooNarrow_ind _ (fun input0_ => ex_intro _ 0 (conj I (or_introl erefl)))  (fun input0_ x H1 IH1 H2 IH2 => _)). *)
-(*   refine *)
-(*     (match IH1 with *)
-(*        | ex_intro m (conj HT IH1) => *)
-(*          ex_intro *)
-(*            _ (S m) *)
-(*            (conj *)
-(*               HT *)
-(*               (or_intror *)
-(*                  (or_introl *)
-(*                     (ex_intro _ x (conj *)
-(*                                      IH1 *)
-(*                                      (match *)
-(*                                          @dec (goodFooNarrow (S O) x) (goodFooNarrow_dec (S O) x) *)
-(*                                          as s *)
-(*                                          return (match s with *)
-(*                                                    | left _ => @set1 Foo x *)
-(*                                                    | right _ => @set0 Foo *)
-(*                                                  end x *)
-(*                                                 ) *)
-(*                                        with *)
-(*                                          | left eq => erefl *)
-(*                                          | right neq => False_ind _ (neq H2) *)
-(*                                        end)))))) *)
-(*      end). *)
-  
+(* Derive SizeMonotonicSuchThat for (fun foo => goodTree n foo). *)
+(* XXX
+   bug for 
+| GL : goodTree 0 Leaf
+| GN : forall k t1 t2 n, goodTree n t1 ->
+                      ~ t1 =  t2 ->
+                      (* goodTree m t1 -> *)
+                      goodTree (S n) (Node k t1 t2).
+*)
 
 Existing Instance arbSizedSTgoodFooUnif. (* ???? *)
 
@@ -219,179 +421,10 @@ Inductive HeightTree : nat -> tree -> Prop :=
       HeightTree n t2 ->
       HeightTree (S n) (Node m t1 t2).
 
-(* ΧΧΧ this breaks gens *)
-Inductive LRTree : tree -> Prop :=
-| PLeaf : LRTree Leaf
-| PNode :
-    forall m t1 t2,
-      ~ t1 = Node 2 Leaf Leaf ->
-      ~ Node 4 Leaf Leaf = t1 ->
-      LRTree t1 ->
-      LRTree t2 ->
-      LRTree (Node m t1 t2).
 
 Instance ArbitrarySuchThatEql {A} (x : A) : GenSuchThat A (fun y => eq x y) :=
   {| arbitraryST := returnGen (Some x) |}.
 
-Instance DecidableLRTree t : Dec (LRTree t).
-Proof.
-Admitted.
-
-Instance DecEqLRTree (t1 t2 : tree): Dec (t1 = t2).
-Proof.
-Admitted.
-
-Derive ArbitrarySizedSuchThat for (fun (x : tree) => LRTree x).
-Derive SizedProofEqs for (fun (x : tree) => LRTree x).
-
-
-Definition iter :=
-  (let
-   fix aux_iter size0 :=
-     match size0 with
-     | O => setU (set1 (@Leaf)) set0
-     | S size' =>
-         setU (set1 (@Leaf))
-           (setU
-              (bigcup
-                 (fun t1 =>
-                  match
-                    @dec
-                      (@eq (tree) (Node (S (S (S (S (O))))) (Leaf) (Leaf)) t1)
-                      _
-                  with
-                  | left eq0 => False
-                  | right neq =>
-                      match
-                        @dec (@eq (tree) t1 (Node (S (S (O))) (Leaf) (Leaf)))
-                          _
-                      with
-                      | left eq0 => False
-                      | right neq => aux_iter size' t1
-                      end
-                  end)
-                 (fun t1 =>
-                  bigcup (aux_iter size')
-                    (fun t2 => bigcup setT (fun m => set1 (@Node m t1 t2)))))
-              set0)
-     end in
- fun size0 => aux_iter size0).
-
-Lemma lala :
-  forall n1 n2, n1 <= n2 -> iter n1 \subset iter n2.
-Proof.
-  refine (fun n1 n2 =>
- nat_ind
-   (fun n1 =>
-    forall n2,
-    Basics.impl (leq n1 n2)
-      (set_incl
-         (iter n1)
-         (iter n2)))
-   (fun n2 =>
-    nat_ind
-      (fun n2 =>
-       Basics.impl (leq 0 n2)
-         (set_incl
-            (iter 0)
-            (iter n2)))
-      (fun Hleq => @subset_refl _ _)
-      (fun n2 IHn2 Hleq =>
-       setU_set_subset_compat (@subset_refl _ _)
-         (setU_subset_r _ (@subset_refl _ _))) n2)
-   (fun n1 IHn1 n2 =>
-    nat_ind
-      (fun n2 =>
-       Basics.impl (leq (S n1) n2)
-         (set_incl
-            (iter (S n1))
-            (iter n2)))
-      (fun Hleq => False_ind _ (lt0_False Hleq))
-      (fun n2 IHn2 Hleq =>
-       setU_set_subset_compat (@subset_refl _ _)
-         (setU_set_subset_compat
-            (incl_bigcup_compat
-               ( _
-                (*  fun t1 => *)
-                (* match *)
-                (*   @dec *)
-                (*     (@eq (tree) (Node (S (S (S (S (O))))) (Leaf) (Leaf)) t1) *)
-                (*     _ as s *)
-                (*   return *)
-                (*     (Basics.impl *)
-                (*        match s with *)
-                (*        | left eq0 => _ *)
-                (*        | right neq => _ *)
-                (*        end match s with *)
-                (*            | left eq0 => _ *)
-                (*            | right neq => _ *)
-                (*            end) *)
-                (* with *)
-                (* | left heq => (@subset_refl _ _) t1 *)
-                (* | right hneq => *)
-                (*     match *)
-                (*       @dec (@eq (tree) t1 (Node (S (S (O))) (Leaf) (Leaf))) _ *)
-                (*       as s *)
-                (*       return *)
-                (*         (Basics.impl *)
-                (*            match s with *)
-                (*            | left eq0 => _ *)
-                (*            | right neq => _ *)
-                (*            end *)
-                (*            match s with *)
-                (*            | left eq0 => _ *)
-                (*            | right neq => _ *)
-                (*            end) *)
-                (*     with *)
-                (*     | left heq => (@subset_refl _ _) t1 *)
-                (*     | right hneq => IHn1 n2 Hleq t1 *)
-                (*     end *)
-                (* end *)
-               )
-               (fun t1 =>
-                incl_bigcup_compat (IHn1 n2 Hleq)
-                  (fun t2 =>
-                   incl_bigcup_compat (@subset_refl _ _)
-                     (fun m => @subset_refl _ _)))) 
-            (@subset_refl _ _))) n2) n1 n2).
-
-  refine
-    (
-      fun t1 =>
-        match
-          @dec
-            (@eq (tree) (Node (S (S (S (S (O))))) (Leaf) (Leaf)) t1)
-            _ as s
-          return
-          (Basics.impl
-             match s with
-               | left eq0 => set0 t1
-               | right neq => _
-             end match s with
-                   | left eq0 => set0 t1
-                   | right neq => _
-                 end)
-        with
-          | left heq => (@subset_refl _ _) t1 
-          | right hneq => _
-            (* match *)
-            (*   @dec (@eq (tree) t1 (Node (S (S (O))) (Leaf) (Leaf))) _ *)
-            (*   as s *)
-            (*   return *)
-            (*   (Basics.impl *)
-            (*      match s with *)
-            (*        | left eq0 => _ *)
-            (*        | right neq => _ *)
-            (*      end *)
-            (*      match s with *)
-            (*        | left eq0 => _ *)
-            (*        | right neq => _ *)
-            (*      end) *)
-            (* with *)
-            (*   | left heq => (@subset_refl _ _) t1 *)
-            (*   | right hneq => IHn1 n2 Hleq t1 *)
-            (* end *)
-        end).
 
 
 (* XXX breaks gen *)
@@ -432,7 +465,7 @@ Proof.
  
 (* Derive ArbitrarySizedSuchThat for (fun foo => test2 n foo). *)
 
-(* XXX weid bug when naming binders with name of already existing ids,
+(* XXX weird bug when naming binders with name of already existing ids,
    e.g. nat, list*)
 
 (* Inductive HeightTree : nat -> tree -> Prop := *)

@@ -271,7 +271,7 @@ type cmap = (check list) CMap.t
 
 let lookup_checks k m = try Some (CMap.find k m) with Not_found -> None
 
-(* TODO: Whenn handling parameters, this might need to add additional arguments *)
+(* TODO: When handling parameters, this might need to add additional arguments *)
 (** Takes an equality map and two coq expressions [cleft] and [cright]. [cleft]
     is returned if all of the equalities hold, otherwise [cright] is
     returned. *)
