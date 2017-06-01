@@ -119,5 +119,8 @@ let plus x y =
 let plus_leq_compat_l p =
   gApp (gInject "plus_leq_compat_l") [hole; hole; hole; p]
 
-let leq_addl =
-  gApp (gInject "leq_addl") [hole; hole]
+let leq_addl n1 n2 =
+  gApp (gInject "leq_addl") [n1; n2]
+
+(* Leo, can we have a real gProp? *)
+let gProp = gInject "prop"

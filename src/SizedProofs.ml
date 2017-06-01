@@ -20,8 +20,8 @@ open GenLib
 open Feedback
 open Unify
 
-type btyp = ((coq_expr -> coq_expr -> int -> coq_expr list -> (coq_expr -> coq_expr) -> coq_expr) *
-             ((coq_expr -> coq_expr list -> coq_expr) -> coq_expr -> coq_expr list -> coq_expr))
+type btyp = ((coq_expr -> coq_expr -> int -> (coq_expr * coq_expr) list -> (coq_expr -> coq_expr) -> coq_expr) *
+             ((coq_expr -> (coq_expr * coq_expr) list -> coq_expr) -> coq_expr -> (coq_expr * coq_expr) list -> coq_expr))
 
 type atyp = btyp -> btyp
 
@@ -781,12 +781,13 @@ let sizedEqProofs_body
         ((fun sum fail sproof lst dstr ->
             match lst with
             | [] -> failwith "Proof list is empty"
-            | p :: ps ->
+            | (p, s) :: ps ->
               let rec make_leq_proof n =
-                if n = 1 then leq_addl
+                if n = 1 then (leq_addl s hole)
                 else plus_leq_compat_l (make_leq_proof (n - 1))
               in
-              let mon_proof l = gApp (gInject "pmon") l in
+              (* just for debugging *)
+              (* let mon_proof l = gApp (gInject "pmon") l in *)
               let h =
                 gApp (mon_proof l) [hole; sum; make_leq_proof sproof; hole; p]
               in
@@ -802,7 +803,7 @@ let sizedEqProofs_body
                 fun [xn; pcn] ->
                   gMatch (gVar pcn)
                     [(injectCtr "conj", ["HT"; pn],
-                      fun [_; pn] -> ctx iproof (plus sum (gVar xn)) ((gVar pn) :: lst)
+                      fun [_; pn] -> ctx iproof (plus sum (gVar xn)) ((gVar pn, sum) :: lst)
                      )]
                )]
          ))))
@@ -882,6 +883,13 @@ let sizedEqProofs_body
         (x : string) (checks : ((coq_expr -> coq_expr) * int) list)
     : (coq_expr -> coq_expr) * atyp =
     let (set, k) = exp in
+    let ret_type_dec_prop (s : var) (left : coq_expr) (right : coq_expr) =
+      gMatchReturn (gVar s)
+        "s"
+        (fun v -> gProp)
+        [ (injectCtr "left", ["eq"], fun _ -> left)
+        ; (injectCtr "right", ["neq"], fun _ -> right) ]
+    in
     let rec sumbools_to_bool x s lst =
       match lst with
       | [] ->
@@ -902,7 +910,7 @@ let sizedEqProofs_body
         in
         gMatchReturn (chk (gVar x))
           "s" (* as clause *)
-          (fun v -> ret_type_dec v gFalse set)
+          (fun v -> ret_type_dec_prop v gFalse set)
           [ (injectCtr "left", [heq],
              fun [heq] -> false_ind hole (gApp h [gVar heq]))
           ; (injectCtr "right", [hneq],
