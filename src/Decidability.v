@@ -37,6 +37,17 @@ Proof.
   apply H.
 Defined.
 
+Global Instance Dec_eq_prod (A B : Type) (m n : A * B)
+  `{_ : forall (x y : A), Dec (x = y)} 
+  `{_ : forall (x y : B), Dec (x = y)} 
+  : Dec (m = n).
+Proof.
+  constructor.
+  unfold decidable.
+  decide equality.
+  apply H0. apply H.
+Defined.
+
 Global Instance Dec_eq_list (A : Type) (m n : list A)
   `{_ : forall (x y : A), Dec (x = y)} : Dec (m = n).
 Proof.

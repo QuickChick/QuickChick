@@ -112,3 +112,12 @@ let matchDec c left right =
   gMatch c [ (injectCtr "left" , ["eq" ], left)
            ; (injectCtr "right", ["neq"], right)
            ]
+
+let plus x y =
+  gApp (gInject "Nat.add") [x;y]
+
+let plus_leq_compat_l p =
+  gApp (gInject "plus_leq_compat_l") [hole; hole; hole; p]
+
+let leq_addl =
+  gApp (gInject "leq_addl") [hole; hole]
