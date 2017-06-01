@@ -14,6 +14,12 @@ For leo:
        Derive Arbitrary, Show, Eq for file_access_mode.
   * play with precedence for ? -- should bind tigher than implication
 
+MINOR:
+  - Add
+       Set Warnings "-notation-overridden,-parsing".
+    to .v files to get rid of compilation warnings.
+  - Suppress Debug messages
+
 __________
 
 About decidability:
