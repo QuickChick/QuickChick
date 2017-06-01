@@ -174,25 +174,25 @@ Inductive snoc_of : natlist -> nat -> natlist -> Prop :=
   | snoc_of_cons : forall x h t t',
       snoc_of t x t' -> snoc_of (h::t) x (h::t').
 
-Inductive reverse_of : natlist * natlist -> Prop :=
-  | reverse_of_nil : reverse_of (Coq.Init.Datatypes.pair [] [])
-  | reverse_of_cons : forall h t t' t'',
-      reverse_of (Coq.Init.Datatypes.pair t t') ->
-      snoc_of t' h t'' ->
-      reverse_of (Coq.Init.Datatypes.pair (h::t) t'').
+Derive ArbitrarySizedSuchThat for (fun h  => snoc_of t h t').
+Derive ArbitrarySizedSuchThat for (fun t' => snoc_of t h t').
 
-(* Derive ArbitrarySizedSuchThat *)
+Inductive reverse_of : natlist -> natlist -> Prop :=
+  | reverse_of_nil : reverse_of [] []
+  | reverse_of_cons : forall h t t' t'',
+      reverse_of t t' ->
+      snoc_of t' h t'' ->
+      reverse_of (h::t) t''.
+
+Derive ArbitrarySizedSuchThat for (fun l => reverse_of l l').
+Derive ArbitrarySizedSuchThat for (fun l => reverse_of l' l).
 
 Inductive equal_reverses : (natlist * natlist)%type -> Prop :=
   | eqrev : forall l1 l2 l,
-         reverse_of (Coq.Init.Datatypes.pair l1 l)
-      -> reverse_of (Coq.Init.Datatypes.pair l2 l)
-      -> equal_reverses (Coq.Init.Datatypes.pair l1 l2).
+      reverse_of l1 l -> reverse_of l2 l ->
+      equal_reverses (Coq.Init.Datatypes.pair l1 l2).
 
-(* LEO: Make this work... 
-Derive ArbitrarySizedSuchThat for
-       (fun l1l2 => equal_reverses l1l2).
-*)
+(* Derive ArbitrarySizedSuchThat for (fun l1l2 => equal_reverses l1l2). *)
 
 Fixpoint nth_bad (l:natlist) (n:nat) : nat :=
   match l with
