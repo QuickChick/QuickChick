@@ -125,7 +125,6 @@ let derive (cn : derivable) (c : constr_expr) (instance_name : string) (name1 : 
     match cn with
     | SizeMonotonic ->
       let (_, size) = take_last iargs [] in
-      let (_, size) = take_last iargs [] in
       gApp ~explicit:true (gInject class_name) [full_dt; gApp (gInject ("arbitrarySized")) [gVar size]]
     | SizedMonotonic ->
       gApp ~explicit:true (gInject class_name) [full_dt; gInject ("arbitrarySized")]
@@ -154,8 +153,8 @@ let derive (cn : derivable) (c : constr_expr) (instance_name : string) (name1 : 
       genCorr ty_ctr ctrs iargs (gInject name1) (gInject name2)
   in
 
-  msg_debug (str "Defined record" ++ fnl ());
-  debug_coq_expr (instance_record []);
+  (* msg_debug (str "Defined record" ++ fnl ()); *)
+  (* debug_coq_expr (instance_record []); *)
 
   declare_class_instance instance_arguments instance_name instance_type instance_record
 
