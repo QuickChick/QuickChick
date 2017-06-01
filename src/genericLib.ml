@@ -270,6 +270,11 @@ let parse_constructors nparams param_names result_ty oib : ctr_rep list option =
         let ((mind,_),_) = destInd ty in
         Some (TyCtr (Label.to_id (MutInd.label mind), []))
       end
+      else if isConst ty then begin
+        let (c,_) = destConst ty in 
+        (* TODO: Rethink this for constants? *)
+        Some (TyCtr (Label.to_id (Constant.label c), []))
+      end
       else (msg_error (str "Case Not Handled" ++ fnl()); None)
 
     in sequenceM (fun x -> x) (List.mapi aux (List.map (Vars.lift (-1)) pat_types)) >>= fun types ->
