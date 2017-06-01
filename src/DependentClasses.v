@@ -71,6 +71,8 @@ Class GenSizedSuchThat (A : Type) (P : A -> Prop) :=
     arbitrarySizeST : nat -> G (option A);
   }.
 
+Notation "'genSizedST' x" := (@arbitrarySizeST _ x _) (at level 70).
+
 (** * Monotonicity of denendent sized generators *)
 
 Class GenSizedSuchThatMonotonic (A : Type)
@@ -91,6 +93,8 @@ Class GenSuchThat (A : Type) (P : A -> Prop) :=
   {
     arbitraryST : G (option A);
   }.
+
+Notation "'genST' x" := (@arbitraryST _ x _) (at level 70).
 
 (** * Monotonicity of denendent generators *)
 

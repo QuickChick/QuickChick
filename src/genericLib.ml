@@ -68,6 +68,12 @@ let var_to_string = Id.to_string
 let gVar (x : var) : coq_expr =
   CRef (Ident (dl x),None)
 
+let id_to_reference id = 
+  let qualid = qualid_of_string (Id.to_string id) in
+  Qualid (Loc.ghost, qualid)
+let id_to_coq_expr id = 
+  mkRefC (id_to_reference id)
+
 (* Maybe this should do checks? *)
 let gInject s = 
   if s = "" then failwith "Called gInject with empty string";
@@ -82,7 +88,7 @@ type ty_ctr   = Id.t (* Opaque *)
 let ty_ctr_to_string (x : ty_ctr) = Id.to_string x
 let gInjectTyCtr s = Id.of_string s
 
-let gTyCtr = mkIdentC
+let gTyCtr = id_to_coq_expr
 
 type arg = local_binder
 let gArg ?assumName:(an=hole) ?assumType:(at=hole) ?assumImplicit:(ai=false) ?assumGeneralized:(ag=false) _ =
@@ -112,7 +118,7 @@ let rec coq_type_to_string ct =
 
 type constructor = Id.t (* Opaque *)
 let constructor_to_string (x : constructor) = Id.to_string x
-let gCtr = mkIdentC
+let gCtr id = id_to_coq_expr id
 let injectCtr s = Id.of_string s
 
 type ctr_rep = constructor * coq_type 
@@ -391,9 +397,19 @@ let parse_dependent_type i nparams ty oib arg_names =
       let env = Global.env () in
       let mib = Environ.lookup_mind mind env in
 
+      let (mp, dn, _) = MutInd.repr3 mind in
+
+      (* HACKY: figure out better way to qualify constructors *)
+      let names = Str.split (Str.regexp "[.]") (MutInd.to_string mind) in
+      let prefix = List.rev (List.tl (List.rev names)) in
+      let qual = String.concat "." prefix in
+      msg_debug (str (Printf.sprintf "CONSTR: %s %s" qual (DirPath.to_string (Lib.cwd ()))) ++ fnl ());
+
       (* Constructor name *)
-      let cname = mib.mind_packets.(midx).mind_consnames.(idx - 1) in
-      Some (DCtr (cname, []))
+      let cname = Id.to_string (mib.mind_packets.(midx).mind_consnames.(idx - 1)) in
+      let cid = Id.of_string (if (qual = "") || (qual = DirPath.to_string (Lib.cwd ()))
+                             then cname else qual ^ "." ^ cname) in
+      Some (DCtr (cid, []))
     end
     else if isProd ty then begin
       let (n, t1, t2) = destProd ty in
@@ -558,7 +574,7 @@ let gMatch discr ?catchAll:(body=None) (branches : (constructor * string list * 
                       let cvs : Id.t list = List.map fresh_name cs in
                       (dummy_loc,
                        [dl [CPatCstr (dummy_loc,
-                                      Ident (dl c), (* constructor  *)
+                                      id_to_reference c,
                                       None,
                                       List.map (fun s -> CPatAtom (dummy_loc, Some (Ident (dl s)))) cvs (* Constructor applied to patterns *)
                                      )
@@ -585,7 +601,7 @@ let gMatchReturn (discr : coq_expr)
                       let cvs : Id.t list = List.map fresh_name cs in
                       (dummy_loc,
                        [dl [CPatCstr (dummy_loc,
-                                      Ident (dl c), (* constructor  *)
+                                      id_to_reference c,
                                       None,
                                       List.map (fun s -> CPatAtom (dummy_loc, Some (Ident (dl s)))) cvs (* Constructor applied to patterns *)
                                      )
@@ -600,7 +616,7 @@ let gMatchReturn (discr : coq_expr)
 
 
 let gRecord names_and_bodies =
-  CRecord (dummy_loc, List.map (fun (n,b) -> (Ident (dummy_loc, id_of_string n), b)) names_and_bodies)
+  CRecord (dummy_loc, List.map (fun (n,b) -> (id_to_reference (id_of_string n), b)) names_and_bodies)
 
 let gAnnot (p : coq_expr) (tau : coq_expr) =
   CCast (dummy_loc, p, CastConv tau)
@@ -631,7 +647,7 @@ let gType ty_params dep_type =
 let get_type (id : Id.t) = 
   let env = Global.env () in
   msg_debug (str ("Trying to global:" ^ Id.to_string id) ++ fnl ());
-  let glob_ref = Nametab.global (Ident (dummy_loc, id)) in
+  let glob_ref = Nametab.global (id_to_reference id) in
   match glob_ref with 
   | VarRef _ -> msg_debug  (str "Var" ++ fnl ())
   | ConstRef _ -> msg_debug (str "Constant" ++ fnl ())
@@ -640,7 +656,7 @@ let get_type (id : Id.t) =
 
 let is_inductive c = 
   let env = Global.env () in
-  let glob_ref = Nametab.global (Ident (dummy_loc, c)) in
+  let glob_ref = Nametab.global (id_to_reference c) in
   match glob_ref with
   | IndRef _ -> true
   | _        -> false
@@ -664,12 +680,13 @@ let construct_match c ?catch_all:(mdef=None) alts =
     | MatchU u' -> begin 
         CPatAtom (dummy_loc, Some (Ident (dummy_loc, u')))
       end
-    | MatchCtr (c, ms) -> 
+    | MatchCtr (c, ms) -> begin
        if is_inductive c then CPatAtom (dummy_loc, None)
        else CPatCstr (dummy_loc, 
-                   Ident (dummy_loc, c),
+                   id_to_reference c,
                    Some (List.map (fun m -> aux m) ms),
                    []) 
+                        end 
   in CCases (dummy_loc,
              Term.RegularStyle,
              None (* return *), 
@@ -687,22 +704,29 @@ let construct_match_with_return c ?catch_all:(mdef=None) (as_id : string) (ret :
     | MatchU u' -> begin
         CPatAtom (dummy_loc, Some (Ident (dummy_loc, u')))
       end
-    | MatchCtr (c, ms) -> 
-       if is_inductive c then CPatAtom (dummy_loc, None)
-       else CPatCstr (dummy_loc, 
-                   Ident (dummy_loc, c),
+    | MatchCtr (c, ms) -> begin
+       if is_inductive c then begin 
+         CPatAtom (dummy_loc, None)
+       end
+       else begin 
+         CPatCstr (dummy_loc, 
+                   id_to_reference c,
                    Some (List.map (fun m -> aux m) ms),
                    []) 
-  in CCases (dummy_loc,
+         end
+       end in
+  let main_opts = 
+        List.map (fun (m, body) -> (dummy_loc, [dummy_loc, [aux m]], body)) alts in
+  let default = 
+    match mdef with 
+    | Some body -> [(dummy_loc, [dummy_loc, [CPatAtom (dummy_loc, None)]], body)]
+    | _ -> [] in
+  CCases (dummy_loc,
              Term.RegularStyle,
              Some (ret as_id') (* return *), 
              [ (c, Some (dl (Name as_id')), None)], (* single discriminee, no as/in *)
-             List.map (fun (m, body) -> (dummy_loc, [dummy_loc, [aux m]], body)) alts 
-             @ (match mdef with 
-                 | Some body -> [(dummy_loc, [dummy_loc, [CPatAtom (dummy_loc, None)]], body)]
-                 | _ -> []
-               )
-            )
+             main_opts @ default
+         )
 
 (* Generic List Manipulations *)
 let list_nil = gInject "Coq.Lists.List.nil"

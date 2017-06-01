@@ -192,7 +192,25 @@ Inductive equal_reverses : (natlist * natlist)%type -> Prop :=
       reverse_of l1 l -> reverse_of l2 l ->
       equal_reverses (Coq.Init.Datatypes.pair l1 l2).
 
-(* Derive ArbitrarySizedSuchThat for (fun l1l2 => equal_reverses l1l2). *)
+Derive ArbitrarySizedSuchThat for (fun l1l2 => equal_reverses l1l2). 
+
+(* Need to actual write decidability if we want to use it 
+Instance equal_reverses_dec l1l2 : Dec (equal_reverses l1l2).
+Proof. 
+  constructor; unfold ssrbool.decidable. 
+  destruct l1l2 as [l1 l2].
+  (* ... *)
+Admitted.
+*)
+
+Definition rev_injective_checker : Checker :=
+  forAll (genST (fun l1l2 => equal_reverses l1l2))
+         (fun l1l2 => match l1l2 with 
+                        | Some (Coq.Init.Datatypes.pair l1 l2) => ((l1 = l2)?)
+                        | None => true
+                      end).
+
+QuickChick rev_injective_checker.
 
 Fixpoint nth_bad (l:natlist) (n:nat) : nat :=
   match l with
