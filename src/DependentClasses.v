@@ -1,3 +1,6 @@
+Set Warnings "-extraction-opaque-accessed,-extraction".
+Set Warnings "-notation-overridden,-parsing".
+
 Require Import String List.
 
 From mathcomp Require Import ssreflect ssrfun ssrbool ssrnat eqtype seq.

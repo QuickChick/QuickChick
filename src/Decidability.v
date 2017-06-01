@@ -1,3 +1,6 @@
+Set Warnings "-extraction-opaque-accessed,-extraction".
+Set Warnings "-notation-overridden,-parsing".
+
 Require Import Checker.
 From mathcomp.ssreflect Require Import ssreflect ssrbool ssrnat.
 Set Bullet Behavior "Strict Subproofs".
