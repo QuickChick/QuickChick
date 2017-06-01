@@ -164,6 +164,54 @@ Definition rev_injective := fun (l1 l2 : natlist) =>
 (* BCP: Probably needs some mutations to be interesting... *)
 (*! QuickChick beq_natlist. *)
 
+(* Let's try with the dependent stuff... *)
+Inductive eq_list : natlist -> natlist -> Prop :=
+  | eq_nil : eq_list [] []
+  | eq_cons : forall h l1 l2, eq_list l1 l2 -> eq_list (h::l1) (h::l2).
+
+Inductive snoc_of : natlist -> nat -> natlist -> Prop :=
+  | snoc_of_nil : forall x, snoc_of [] x [x]
+  | snoc_of_cons : forall x h t t',
+      snoc_of t x t' -> snoc_of (h::t) x (h::t').
+
+Derive ArbitrarySizedSuchThat for (fun h  => snoc_of t h t').
+Derive ArbitrarySizedSuchThat for (fun t' => snoc_of t h t').
+
+Inductive reverse_of : natlist -> natlist -> Prop :=
+  | reverse_of_nil : reverse_of [] []
+  | reverse_of_cons : forall h t t' t'',
+      reverse_of t t' ->
+      snoc_of t' h t'' ->
+      reverse_of (h::t) t''.
+
+Derive ArbitrarySizedSuchThat for (fun l => reverse_of l l').
+Derive ArbitrarySizedSuchThat for (fun l => reverse_of l' l).
+
+Inductive equal_reverses : (natlist * natlist)%type -> Prop :=
+  | eqrev : forall l1 l2 l,
+      reverse_of l1 l -> reverse_of l2 l ->
+      equal_reverses (Coq.Init.Datatypes.pair l1 l2).
+
+Derive ArbitrarySizedSuchThat for (fun l1l2 => equal_reverses l1l2). 
+
+(* Need to actual write decidability if we want to use it 
+Instance equal_reverses_dec l1l2 : Dec (equal_reverses l1l2).
+Proof. 
+  constructor; unfold ssrbool.decidable. 
+  destruct l1l2 as [l1 l2].
+  (* ... *)
+Admitted.
+*)
+
+Definition rev_injective_checker : Checker :=
+  forAll (genST (fun l1l2 => equal_reverses l1l2))
+         (fun l1l2 => match l1l2 with 
+                        | Some (Coq.Init.Datatypes.pair l1 l2) => ((l1 = l2)?)
+                        | None => true
+                      end).
+
+QuickChick rev_injective_checker.
+
 Fixpoint nth_bad (l:natlist) (n:nat) : nat :=
   match l with
   | nil => 42  (* arbitrary! *)
@@ -192,7 +240,7 @@ Fixpoint nth_error (l:natlist) (n:nat) : natoption :=
 
 (* BCP: Fix *)
 Definition test_nth_error1 :=
-  if (nth_error [4;5;6;7] 0) = (Some 4)? then true else false.
+  (nth_error [4;5;6;7] 0) = (Some 4)?.
 (*! QuickChick test_nth_error1. *)
 
 End NatList.
@@ -238,33 +286,6 @@ Fixpoint find (x : id) (d : partial_map) : natoption :=
 
 Definition update_eq :=
   fun (d : partial_map) (x : id) (v: nat) =>
-    if (find x (update d x v) = Some v)? then true else false.
-QuickChick update_eq.
+    (find x (update d x v) = Some v)?.
+(*! QuickChick update_eq. *)
 
-(*
-(** **** Exercise: 1 star (update_neq)  *)
-Theorem update_neq :
-  forall (d : partial_map) (x y : id) (o: nat),
-    beq_id x y = false -> find x (update d y o) = find x d.
-Proof.
- (* FILL IN HERE *) Admitted.
-(** [] *)
-End PartialMap.
-
-(** **** Exercise: 2 starsM (baz_num_elts)  *)
-(** Consider the following inductive definition: *)
-
-Inductive baz : Type :=
-  | Baz1 : baz -> baz
-  | Baz2 : baz -> bool -> baz.
-
-(** How _many_ elements does the type [baz] have?  (Answer in English
-    or the natural language of your choice.)
-
-(* FILL IN HERE *)
-*)
-(** [] *)
-
-(** $Date: 2017-03-05 16:25:50 -0500 (Sun, 05 Mar 2017) $ *)
-
-*)

@@ -42,8 +42,9 @@ let mk_instance_name der tn =
     | CanonicalSized -> "CanonicalSized"
     | SizeMonotonic -> "SizeMonotonic"
     | SizedMonotonic -> "SizedMonotonic"
-    | SizedCorrect ->  "SizedCorrect"
-  in var_to_string (fresh_name (prefix ^ tn))
+    | SizedCorrect ->  "SizedCorrect" in
+  let strip_last s = List.hd (List.rev (Str.split (Str.regexp "[.]") s)) in
+  var_to_string (fresh_name (prefix ^ strip_last tn))
 
 let print_der = function
   | Shrink -> "Shrink"

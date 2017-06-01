@@ -1,3 +1,6 @@
+Set Warnings "-extraction-opaque-accessed,-extraction".
+Set Warnings "-notation-overridden,-parsing".
+
 Require Import mathcomp.ssreflect.ssreflect.
 From mathcomp Require Import ssrbool ssrnat eqtype.
 Require Import Show Sets GenLow GenHigh RoseTrees Checker Classes.

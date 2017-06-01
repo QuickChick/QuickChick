@@ -1,3 +1,5 @@
+Set Warnings "-extraction-opaque-accessed,-extraction".
+Set Warnings "-notation-overridden,-parsing".
 
 Require Import List ZArith.
 Import ListNotations.

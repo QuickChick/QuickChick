@@ -1,3 +1,6 @@
+Set Warnings "-extraction-opaque-accessed,-extraction".
+Set Warnings "-notation-overridden,-parsing".
+
 Require Import Coq.Numbers.Natural.Peano.NPeano.
 Require Import mathcomp.ssreflect.ssreflect.
 From mathcomp Require Import ssrbool ssrnat.
@@ -5,9 +8,13 @@ Require Import GenLow GenHigh Sets.
 Require Import Classes.
 Require Import Recdef.
 Require Import List.
+Import ListNotations.
 
 Require Import ZArith ZArith.Znat Arith.
 Import GenLow GenHigh.
+Import QcDefaultNotation.
+
+Set Bullet Behavior "Strict Subproofs".
 
 (** Basic generator instances *)
 Global Instance genBoolSized : GenSized bool := 
@@ -25,6 +32,10 @@ Global Instance genListSized {A : Type} `{GenSized A} : GenSized (list A) :=
 
 Global Instance genList {A : Type} `{Gen A} : Gen (list A) := 
   {| arbitrary := listOf arbitrary |}.
+
+Global Instance genOption {A : Type} `{Gen A} : Gen (option A) :=
+  {| arbitrary := freq [ (1, returnGen None) 
+                       ; (7, liftGen Some arbitrary)] |}.
 
 Global Instance genPairSized {A B : Type} `{GenSized A} `{GenSized B} 
 : GenSized (A*B) :=
@@ -154,6 +165,14 @@ Global Instance shrinkPair {A B} `{Shrink A} `{Shrink B} : Shrink (A * B) :=
     shrink p := List.combine (shrink (fst p)) (shrink (snd p))
   |}.
 
+Global Instance shrinkOption {A : Type} `{Shrink A} : Shrink (option A) :=
+  {| shrink m := 
+       match m with 
+         | None => []
+         | Some x => None :: (map Some (shrink x))
+       end
+  |}.
+
 (** Arbitraries are derived automatically! *)
 
 
@@ -237,6 +256,36 @@ Proof.
   - move => [Hl HP]. apply semListOfSize. split => // x HIn.
     apply Hgen. auto.
 Qed.
+
+Lemma arbOpt_correct: 
+  forall {A} `{H : Arbitrary A} (P : nat -> A -> Prop) s,
+    (semGenSize arbitrary s <--> P s) ->
+    (semGenSize arbitrary s <--> 
+     (fun (m : option A) => 
+        match m with 
+          | None => true
+          | Some x => P s x
+        end)).
+Proof.
+  move => A G S Arb P s Hgen m. rewrite !/arbitrary //=; split.
+  - move => /semFrequencySize [[w g] H2]; simpl in *.
+    move: H2 => [[H2 | [H2 | H2]] H3];
+    destruct m => //=; apply Hgen => //=;
+    inversion H2; subst; auto.                                      
+    + apply semReturnSize in H3; inversion H3.
+    + apply semLiftGenSize in H3; inversion H3 as [x [H0 H1]].
+      inversion H1; subst; auto.
+  - destruct m eqn:Hm; simpl in *; move => HP; subst.
+    + apply semFrequencySize; simpl.
+      exists (7, liftGen Some arbitrary); split; auto.
+      * right; left; auto.
+      * simpl. apply semLiftGenSize; simpl.
+        apply imset_in; apply Hgen; auto.
+    + apply semFrequencySize; simpl.
+      exists (1, returnGen None); split; auto.
+      * left; auto.
+      * simpl; apply semReturnSize. constructor.
+Qed.      
 
 Lemma arbPair_correctSize 
       {A B} `{Arbitrary A} `{Arbitrary B} (Sa : nat -> set A) 
