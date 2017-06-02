@@ -73,3 +73,61 @@ Instance showEx {A} `{_ : Show A} P : Show ({x : A | P x}) :=
 
 Require Import Ascii.
 Definition nl : string := String (ascii_of_nat 10) EmptyString.
+
+Module ShowFunctions.
+
+Import ListNotations.
+
+Class ReprSubset (A : Type) :=
+  { representatives : list A }.
+
+Instance repr_bool : ReprSubset bool :=
+  {| representatives := [ true; false ] |}.
+
+Instance repr_nat : ReprSubset nat :=
+  {| representatives := [ 0 ; 1 ; 2 ; 17 ; 42 ] |}.
+
+Instance repr_option {A} `{_ : ReprSubset A} : ReprSubset (option A) :=
+  {| representatives := None :: map Some representatives |}.
+
+Instance repr_list {A} `{_ : ReprSubset A} : ReprSubset (list A) :=
+  {| representatives := 
+       [] :: map (fun x => [x]) representatives 
+          ++ flat_map (fun x : A =>
+                         map (fun y : A => [x;y]) representatives
+                      ) representatives
+  |}%list.
+
+Instance repr_prod {A B} `{_ : ReprSubset A} `{_ : ReprSubset B} :
+  ReprSubset (A * B) :=
+  {| representatives :=
+       flat_map (fun x : A => 
+                   map (fun y : B => (x,y)) representatives
+                ) representatives 
+  |}.
+
+Fixpoint prepend {A : Type} (a : A) (l : list A) :=
+  match l with 
+    | [] => []
+    | h::t => a :: h :: prepend a t
+  end.
+
+Definition intersperse {A : Type} (a : A) (l : list A) :=
+  match l with 
+    | [] => []
+    | h::t => h :: prepend a t
+  end.
+
+Definition string_concat (l : list string) : string :=
+  fold_left (fun a b => a ++ b) l "".
+
+Instance show_fun {A B} `{_ : Show A} `{_ : ReprSubset A}
+         `{_ : Show B} : Show (A -> B) :=
+  {| show f := 
+       "{ " ++ string_concat (intersperse " , " 
+                            (map (fun x => show x ++ " |-> " ++ show (f x))
+                                 (@representatives A _)))
+           ++ " }"
+  |}.            
+
+End ShowFunctions.
