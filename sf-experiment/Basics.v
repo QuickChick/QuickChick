@@ -158,7 +158,9 @@ Fixpoint leb (n m : nat) : bool :=
       end
   end.
 
-Definition plus_O_n (n:nat) := 0 + n =? n.
+
+
+Definition plus_O_n := FORALL n:nat, 0 + n =? n.
 (*! QuickChick plus_O_n. *)
  
 (* BCP: This should be automatable, we guessed... *)
