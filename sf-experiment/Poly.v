@@ -96,6 +96,22 @@ Definition partition {X : Type}
 QuickCheck (fun {X:Type} (l: list X) => checker false).
 ==> Error: Conversion test raised an anomaly *)
 
+From QuickChick Require Import CoArbitrary.
+
+Require Import String.
+Open Scope string.
+
+Instance show_natfun : Show (nat -> bool) :=
+  {|
+    show f := "{"
+               ++ "0 |-> " ++ (show (f 0) )
+               ++ ", 1 |-> " ++ (show (f 1) )
+               ++ ", 2 |-> " ++ (show (f 2) )
+               ++ ", 3 |-> " ++ (show (f 3) )
+               ++ ", 4 |-> " ++ (show (f 4))
+               ++ "}"
+  |}.
+
 QuickCheck (fun (test: nat -> bool) (l: list nat) => checker false).
 
 
