@@ -92,13 +92,13 @@ Definition partition {X : Type}
                    : list X * list X
   (* REPLACE THIS LINE WITH ":= _your_definition_ ." *) := ([],[]).
 
-(* LEO: 
+(*
 QuickCheck (fun {X:Type} (l: list X) => checker false).
 ==> Error: Conversion test raised an anomaly *)
 
-(* LEO: Anything automatic we can do here? 
 QuickCheck (fun (test: nat -> bool) (l: list nat) => checker false).
-*)
+
+
 
 Fixpoint map {X Y:Type} (f:X->Y) (l:list X) : (list Y) :=
   match l with
