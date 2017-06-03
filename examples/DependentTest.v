@@ -21,8 +21,7 @@ Inductive Foo :=
 | Foo2 : Foo -> Foo
 | Foo3 : nat -> Foo -> Foo.
 
-Derive Arbitrary for Foo.
-Derive Show for Foo.
+Derive (Arbitrary, Show) for Foo.
 
 (* Use custom formatting of generated code, and prove them equal (by reflexivity) *)
 

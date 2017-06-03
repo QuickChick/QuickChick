@@ -48,23 +48,40 @@ let dep_dispatch ind class_name =
   | _ -> failwith "wrongformat"
 
 let dispatch cn ind name1 name2 = 
-  let s = match cn with 
+  let convert_reference_to_string c = 
+    match c with 
     | CRef (r, _) -> string_of_qualid (snd (qualid_of_reference r))
-    | _ -> failwith "Usage: Derive <class_name> for <inductive_name>"
+    | _ -> failwith "Usage: Derive <class_name> for <inductive_name> OR  Derive (<class_name>, ... , <class_name>) for <inductive_name>" in
+  let ss = match cn with 
+     | CNotation (_,_,([a],[b],_)) -> begin 
+         let c = convert_reference_to_string a in
+         let cs = List.map convert_reference_to_string b in
+         c :: cs
+       end
+     | _ -> [convert_reference_to_string cn]
   in 
 
-  let class_names = match s with
-    | "Arbitrary" -> SimpleDer [SimplDriver.GenSized; SimplDriver.Shrink]
-    | "Show" -> SimpleDer [SimplDriver.Show]
-    | "Sized" -> SimpleDer [SimplDriver.Sized]
-    | "CanonicalSized" -> SimpleDer [SimplDriver.CanonicalSized]
-    | "SizeMonotonic" -> SimpleDer [SimplDriver.SizeMonotonic]
-    | "SizedMonotonic" -> SimpleDer [SimplDriver.SizedMonotonic]
-    | "SizedCorrect" -> SimpleDer [SimplDriver.SizedCorrect]
-    | "ArbitrarySizedSuchThat" -> DepDer DepDriver.ArbitrarySizedSuchThat
-    | "SizeMonotonicSuchThat" -> DepDer DepDriver.GenSizedSuchThatMonotonic
-    | "SizedProofEqs" -> DepDer DepDriver.SizedProofEqs
-  in
+  let get_class_names = function
+      | "Arbitrary" -> SimpleDer [SimplDriver.GenSized; SimplDriver.Shrink]
+      | "Show" -> SimpleDer [SimplDriver.Show]
+      | "Sized" -> SimpleDer [SimplDriver.Sized]
+      | "CanonicalSized" -> SimpleDer [SimplDriver.CanonicalSized]
+      | "SizeMonotonic" -> SimpleDer [SimplDriver.SizeMonotonic]
+      | "SizedMonotonic" -> SimpleDer [SimplDriver.SizedMonotonic]
+      | "SizedCorrect" -> SimpleDer [SimplDriver.SizedCorrect]
+      | "ArbitrarySizedSuchThat" -> DepDer DepDriver.ArbitrarySizedSuchThat
+      | "SizeMonotonicSuchThat" -> DepDer DepDriver.GenSizedSuchThatMonotonic
+      | "SizedProofEqs" -> DepDer DepDriver.SizedProofEqs in
+      
+  let class_names = 
+    match ss with 
+    | s::ss -> List.fold_left (fun der s ->
+                               match der, get_class_names s with 
+                               | SimpleDer ds1, SimpleDer ds2 -> SimpleDer (ds1 @ ds2)
+                               | DepDer ds1, DepDer ds2 -> 
+                                  qcfail "Implement dependent derive for multiple classes"
+                              ) (get_class_names s) ss
+    | _ -> qcfail "At least one class name expected" in
 
   match class_names with 
   | SimpleDer classes -> simpl_dispatch ind classes name1 name2
