@@ -1,3 +1,4 @@
+Declare ML Module "Error".
 Declare ML Module "genericLib".
 Declare ML Module "coqLib".
 Declare ML Module "setLib".

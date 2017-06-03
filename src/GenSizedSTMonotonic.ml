@@ -20,7 +20,7 @@ open GenLib
 open SemLib
 open Unify
 open ArbitrarySizedST
-open Feedback
+open Error
 
 (* arguments to handle_branch *)
 let fail_exp = returnGenSizeMonotonic gNone

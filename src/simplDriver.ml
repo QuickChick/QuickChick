@@ -21,7 +21,7 @@ open SizeMon
 open SizeSMon
 open SizeCorr
 open ArbitrarySized
-open Feedback
+open Error
 
 type derivable =
     Shrink

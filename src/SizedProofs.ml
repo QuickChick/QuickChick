@@ -17,7 +17,7 @@ open GenericLib
 open SetLib
 open CoqLib
 open GenLib
-open Feedback
+open Error
 open Unify
 
 type btyp = ((coq_expr -> coq_expr -> int -> (coq_expr * coq_expr) list -> (coq_expr -> coq_expr) -> coq_expr) *

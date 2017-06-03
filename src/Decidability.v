@@ -23,6 +23,20 @@ Proof.
   - exact (checker false).
 Defined.
 
+Class Eq (A : Type) :=
+  { 
+    dec_eq : forall (x y : A), decidable (x = y)
+  }.
+
+Global Instance Eq__Dec {A} `{H : Eq A} (x y : A) : Dec (x = y) :=
+  {|
+    dec := _
+  |}.
+Proof.
+  unfold decidable.
+  apply H.
+Defined.
+
 (* Lifting common decidable instances *)
 Global Instance Dec_eq_nat (m n : nat) : Dec (m = n).
 Proof.

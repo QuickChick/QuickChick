@@ -22,7 +22,7 @@ open SizeMon
 open SizeSMon
 open SizeCorr
 open Constrarg
-open Feedback
+open Error
 
 type derivation = SimpleDer of SimplDriver.derivable list
                 | DepDer of DepDriver.derivable 

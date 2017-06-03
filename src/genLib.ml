@@ -15,7 +15,6 @@ open Constrexpr
 open Constrexpr_ops
 open Ppconstr
 open Context
-open Feedback
 open GenericLib
 
 (* Gen combinators *)

@@ -17,7 +17,7 @@ open GenericLib
 open SetLib
 open CoqLib
 open GenLib
-open Feedback
+open Error
 open Unify
 
 (* arguments to handle_branch *)

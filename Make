@@ -21,6 +21,7 @@ src/tactic_quickchick.ml4
 src/quickchick_plugin.mlpack
 src/QuickChick.v
 src/MutateCheck.v
+src/Error.ml
 src/genericLib.mli
 src/genericLib.ml
 src/quickChick.ml4
