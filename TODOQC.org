@@ -20,6 +20,11 @@ MINOR:
     to .v files to get rid of compilation warnings.
   - Suppress Debug messages
 
+  - Nice Show instance for string
+  - When displaying counterexamples, would it be easy to print the name of
+    each bound variable along with the failing value that's been found for
+    it? 
+
 __________
 
 About decidability:
