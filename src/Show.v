@@ -1,4 +1,5 @@
 Require Import Coq.Strings.String.
+Require Import Coq.Strings.Ascii.
 Require Import ZArith.
 Require Import List.
 
@@ -32,6 +33,22 @@ Instance showInt : Show Z :=
   show := show_int
 |}.
 
+(* Following Coq's weird conventions -- not certain that's a good idea *)
+Definition quotechar := ascii_of_nat 34.
+Fixpoint show_quoted_string (s:string) : string :=
+  match s with
+  | EmptyString => """"
+  | String c s' =>
+    if nat_of_ascii c =? nat_of_ascii quotechar then
+        String quotechar (String quotechar (show_quoted_string s'))
+    else String c (show_quoted_string s')  
+  end.
+
+Instance showString : Show string :=
+{|
+  show s := String quotechar (show_quoted_string s)
+|}.
+
 Fixpoint contents {A : Type} (s : A -> string) (l : list A) : string :=
   match l with
     | nil => ""%string
@@ -56,9 +73,6 @@ Instance showOpt {A : Type} `{_ : Show A} : Show (option A) :=
               | None => "None"
             end
 |}.
-
-Instance showStr : Show string :=
-{| show x := x |}.
 
 Instance showType : Show Type :=
 {|
