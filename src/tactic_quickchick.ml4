@@ -1,11 +1,12 @@
 DECLARE PLUGIN "quickchick_plugin"
 
 open Pp
+open Error
 
 let quickchick_current = 
   Proofview.Goal.enter { enter = begin fun gl ->
     let gl = Proofview.Goal.assume gl in
-    Feedback.msg_debug (str "Ran this!" ++ fnl ());
+    msg_debug (str "Ran this!" ++ fnl ());
     Tacticals.New.tclIDTAC
   end }
 

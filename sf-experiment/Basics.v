@@ -1,7 +1,7 @@
 (** * Basics: Functional Programming in Coq *)
 
 From QuickChick Require Import QuickChick.
-Import QcDefaultNotation. Open Scope qc_scope.
+Import QcNotation. Open Scope qc_scope.
 Import GenLow GenHigh.
 Set Warnings "-extraction-opaque-accessed,-extraction".
 Require Import List ZArith.
@@ -158,7 +158,13 @@ Fixpoint leb (n m : nat) : bool :=
       end
   end.
 
-Definition plus_O_n (n:nat) := 0 + n =? n.
+Notation "'FORALLX' x : T , c" :=
+  (forAllShrink (@arbitrary T _) shrink (fun x => c))
+  (at level 200, x ident, T at level 200, c at level 200, right associativity
+   (* , format "'[' 'exists' '/ ' x .. y , '/ ' p ']'" *) )
+  : type_scope.
+
+Definition plus_O_n := FORALL n:nat, 0 + n =? n.
 (*! QuickChick plus_O_n. *)
  
 (* BCP: This should be automatable, we guessed... *)

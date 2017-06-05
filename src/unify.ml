@@ -17,7 +17,7 @@ open GenericLib
 open SetLib
 open CoqLib
 open GenLib
-open Feedback
+open Error
 
 (* TODO : move to utils or smth *)
 type name_provider = { next_name : unit -> string }
@@ -247,7 +247,7 @@ let rec range_to_coq_expr k r =
   | Unknown u -> 
      begin match UM.find u k with
      | FixedInput -> gVar u
-     | Undef _ -> (msg_warning (str "It's stupid that this is called" ++ fnl ()); gVar u)
+     | Undef _ -> (msg_debug (str "It's stupid that this is called" ++ fnl ()); gVar u)
      | Unknown u' -> range_to_coq_expr k (Unknown u')
      | Ctr (c, rs) -> gApp (gCtr c) (List.map (range_to_coq_expr k) rs)
      end

@@ -1,0 +1,42 @@
+FLOW OF TOPICS
+
+Basic QC
+  - generator monad
+  - basic combinators (elements, oneOf, ...)
+  - shrinking
+
+small examples (lists and similar)
+
+Coq typeclasses (intro)
+
+QC typeclasses
+
+return to the small examples
+
+mutation testing
+
+----------
+
+Sized generators
+  - GenSized class
+
+Polymorphic generators (nat)
+
+custom shrinking
+
+generating dependent generators
+
+super-simple compiler
+
+?case study: IFC or lambda terms
+
+--------
+
+Case study: Vellvm
+
+-------- 
+
+?case study: DeepWeb
+
+Zoe-proofs  (typeclasses, mainly, plus just a hint of the proofs)
+  - 1-hour talk based on her section of popl submission

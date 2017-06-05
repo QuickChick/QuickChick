@@ -11,7 +11,7 @@ open Constrintern
 open Topconstr
 open Constrexpr
 open Constrexpr_ops
-open Feedback
+open Error
 open Constrarg
 
 let message = "QuickChick"
@@ -130,6 +130,17 @@ let run f args =
   let c = CApp(Loc.ghost, (None,f), args) in
   runTest c
 
+let setFlags s1 s2 = 
+  let toggle = 
+    match s2 with 
+    | "On"  -> true
+    | "Off" -> false in
+  begin match s1 with 
+  | "Debug" -> flag_debug := toggle
+  | "Warn"  -> flag_warn  := toggle
+  | "Error" -> flag_error := toggle    
+  end
+
 	  (*
 let run_with f args p =
   let c = CApp(dummy_loc, (None,f), [(args,None);(p,None)]) in
@@ -164,6 +175,10 @@ END;;
 VERNAC COMMAND EXTEND MutateChickMany CLASSIFIED AS SIDEFF
   | ["MutateChickMany" constr(c1) constr(c2)] ->     [run mutateCheckMany [c1;c2]]
   | ["MutateChickManyWith" constr(c1) constr(c2) constr(c3)] ->     [run mutateCheckMany [c1;c2;c3]]
+END;;
+
+VERNAC COMMAND EXTEND QuickChickDebug CLASSIFIED AS SIDEFF
+  | ["QuickChickDebug" ident(s1) ident(s2)] -> [setFlags (Names.string_of_id s1) (Names.string_of_id s2)]
 END;;
 
 VERNAC COMMAND EXTEND Sample CLASSIFIED AS SIDEFF

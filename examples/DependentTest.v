@@ -1,3 +1,6 @@
+Set Warnings "-extraction-opaque-accessed,-extraction".
+Set Warnings "-notation-overridden,-parsing".
+
 From QuickChick Require Import QuickChick Tactics.
 Require Import String. Open Scope string.
 
@@ -11,13 +14,14 @@ Import QcDoNotation.
 
 Set Bullet Behavior "Strict Subproofs".
 
+(* QuickChickDebug Debug On *)
+
 Inductive Foo :=
 | Foo1 : Foo 
 | Foo2 : Foo -> Foo
 | Foo3 : nat -> Foo -> Foo.
 
-Derive Arbitrary for Foo.
-Derive Show for Foo.
+Derive (Arbitrary, Show) for Foo.
 
 (* Use custom formatting of generated code, and prove them equal (by reflexivity) *)
 
@@ -76,7 +80,7 @@ Derive ArbitrarySizedSuchThat for (fun foo => goodFoo n foo).
 
 (* Need to write it as 'fun x => goodFoo 0 x'. Sadly, 'goodFoo 0' doesn't work *)
 Definition g : G (option Foo) := @arbitrarySizeST _ (fun x => goodFoo 0 x) _ 4.
-Sample g.
+(* Sample g. *)
 
 (* Simple generator for goodFoos *)
 (* begin gen_good_foo_simple *)

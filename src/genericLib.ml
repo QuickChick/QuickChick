@@ -15,13 +15,13 @@ open Constrexpr
 open Constrexpr_ops
 open Ppconstr
 open Context
-open Feedback
+open Error
 
 let debug_environ () =
   let env = Global.env () in
   let preEnv = Environ.pre_env env in
   let minds = preEnv.env_globals.env_inductives in
-  Mindmap_env.iter (fun k _ -> Feedback.msg_debug (str (MutInd.debug_to_string k) ++ fnl())) minds
+  Mindmap_env.iter (fun k _ -> msg_debug (str (MutInd.debug_to_string k) ++ fnl())) minds
 
 let cnt = ref 0 
 

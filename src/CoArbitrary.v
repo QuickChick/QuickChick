@@ -26,6 +26,19 @@ Instance coArbPos : CoArbitrary positive :=
   |}.
 Proof. auto. Qed.
 
+Lemma nat_lemma :   forall a : nat,
+  Some (Init.Nat.pred (Pos.to_nat (Pos.of_nat (S a)))) = Some a.
+Admitted.
+
+Instance coqArbNat : CoArbitrary nat := 
+  {|
+    coarbitrary x := Pos.of_nat (S x);
+    coarbReverse p := Some (Coq.Init.Peano.pred (Pos.to_nat p))
+  |}.
+Proof.
+  apply nat_lemma.
+Qed.
+
 Local Open Scope positive.
 Fixpoint posToPathAux (p : positive) : SplitPath := 
   match p with 
@@ -531,3 +544,4 @@ apply (@promoteVariant A B a (fun a => posToPath (coarbitrary a)) arbitrary
 Qed.
 
 End arbFun_completeness.
+

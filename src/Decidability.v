@@ -3,6 +3,9 @@ Set Warnings "-notation-overridden,-parsing".
 
 Require Import Checker.
 From mathcomp.ssreflect Require Import ssreflect ssrbool ssrnat.
+Require Import Coq.Strings.String.
+Require Import Coq.Strings.Ascii.
+
 Set Bullet Behavior "Strict Subproofs".
 
 (* Class wrapper around "decidable" *)
@@ -21,6 +24,20 @@ Proof.
   destruct dec0.
   - exact (checker true).
   - exact (checker false).
+Defined.
+
+Class Eq (A : Type) :=
+  { 
+    dec_eq : forall (x y : A), decidable (x = y)
+  }.
+
+Global Instance Eq__Dec {A} `{H : Eq A} (x y : A) : Dec (x = y) :=
+  {|
+    dec := _
+  |}.
+Proof.
+  unfold decidable.
+  apply H.
 Defined.
 
 (* Lifting common decidable instances *)
@@ -58,6 +75,20 @@ Proof.
   unfold decidable.
   decide equality.
   apply H.
+Defined.
+
+Global Instance Dec_ascii (m n : Ascii.ascii) : Dec (m = n).
+Proof.
+  constructor.
+  unfold ssrbool.decidable.
+  repeat (decide equality).
+Defined.
+
+Global Instance Dec_string (m n : string) : Dec (m = n).
+Proof.
+  constructor.
+  unfold ssrbool.decidable.
+  repeat (decide equality).
 Defined.
 
 (* Everything that uses the Decidable Class *)

@@ -277,5 +277,17 @@ Fixpoint conjoin {prop : Type} `{_ : Checkable prop} (l : list Checker) : Checke
   bindGen (mapGen (liftGen unProp) l) (fun rs =>
           (returnGen (MkProp (conjAux (fun x => x) rs)))).
 
-Notation "x ==> y" := (implication x y) (at level 55, right associativity)
-                      : Checker_scope.
+Module QcNotation.
+  Export QcDefaultNotation.
+
+  Notation "x ==> y" := (implication x y) (at level 55, right associativity)
+                           : Checker_scope.
+
+  (* TODO: Figure out pretty printing too *)
+  Notation "'FORALL' x : T , c" :=
+    (forAllShrink (@arbitrary T _) shrink (fun x => c))
+    (at level 200, x ident, T at level 200, c at level 200, right associativity
+     (* , format "'[' 'exists' '/ ' x .. y , '/ ' p ']'" *) )
+    : type_scope.
+End QcNotation.
+

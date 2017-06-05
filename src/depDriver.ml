@@ -19,7 +19,7 @@ open CoqLib
 open GenLib
 open ArbitrarySizedST
 open GenSizedSTMonotonic
-open Feedback
+open Error
 open Unify
 open SizedProofs
 open GenSTCorrect
