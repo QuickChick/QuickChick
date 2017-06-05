@@ -33,6 +33,9 @@ let set_incl c1 c2 = gApp (gInject "set_incl") [c1;c2]
 
 let set_union c1 c2 = gApp (gInject "setU") [c1;c2]
 
+let imset f s =
+  gApp (gInject "imset") [f; s]
+
 let rec set_unions = function
   | [] -> failwith "empty set unions"
   | [x] -> x
@@ -114,3 +117,26 @@ let setU_subset_r s2 p =
 
 let setU_subset_l s2 p =
   gApp (gInject "setU_subset_l") [s2; p]
+
+let imset_set0_incl f x h =
+  gApp (gInject "imset_set0_incl") [f; x; h]
+
+
+let imset_singl_incl x f y h =
+  gApp (gInject "imset_singl_incl") [x; f; y; h]
+
+let imset_union_incl s1 s2 f x hin =
+  gApp (gInject "imset_union_incl") [s1; s2; f; x; hin]
+
+let rewrite_set_r seq p =
+  gApp (gInject "rewrite_set_r") [hole; hole; hole; p; seq]
+ 
+
+let imset_bigcup_incl_l f a g x h =
+  gApp (gInject "imset_bigcup_incl_l") [f; a; g; x; h]
+
+let set_eq_set_incl_r heq =
+  gApp (gInject "set_eq_set_incl_r") [hole; hole; heq]
+
+let in_imset f s x hin =
+  gApp (gInject "in_imset") [f; s; x; hin]

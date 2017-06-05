@@ -54,17 +54,18 @@ Definition lift {A} (S : set A) : set (option A) :=
 
 Class SizedSuchThatCorrect {A : Type} (P : A -> Prop) `{SizedProofEqs A P} (g : nat -> G (option A)) :=
   {
-    sizedSTCorrect :
-      forall s,
-        Some @: (iter s) \subset semGen (g s) /\
-        semGen (g s) \subset lift (iter s)
+    sizedSTComplete :
+      forall s, Some @: (iter s) \subset semGen (g s);
+
+    (* sizedSTSound : *)
+    (*   forall s, semGen (g s) \subset lift (iter s) *)
   }.
 
 Class SuchThatCorrect {A : Type} (P : A -> Prop) (g : G (option A)) :=
   {
-    STCorrect :
-      Some @: [set x : A | P x ] \subset semGen g /\
-      semGen g \subset lift [set x : A | P x ]
+    STComplete : Some @: [set x : A | P x ] \subset semGen g;
+
+    (* STSound : semGen g \subset lift [set x : A | P x ] *)
   }.
 
 (** * Dependent sized generators *)
@@ -158,24 +159,25 @@ Instance ArbitraryCorrectFromSized (A : Type) (P : A -> Prop)
          `{@GenSizedSuchThatCorrect A P H PSized PCorr}
 : SuchThatCorrect P arbitraryST.
 Proof.
-  constructor. unfold arbitraryST, GenSuchThatOfSized.
+  constructor; unfold arbitraryST, GenSuchThatOfSized;
   rewrite semSized_alt.
-  split.
   - eapply subset_trans;
-    [ | eapply incl_bigcupr; now eapply sizedSTCorrect ].
-    admit.
-    (* rewrite <-imset_bigcup, spec. eapply subset_refl. *)
-  - eapply subset_trans. eapply incl_bigcupr.
-    intros x. now eapply sizedSTCorrect.
-    unfold lift.
-    rewrite bigcup_setU_r.
-    admit.
-    (* rewrite <-imset_bigcup, spec. *)
-    (* rewrite bigcup_const. eapply subset_refl. *)
-    (* constructor. exact 0. *)
-  - destruct PSMon. eauto.
-Admitted.
-  
+    [ | eapply incl_bigcupr; now eapply sizedSTComplete ].
+    rewrite <-imset_bigcup, spec. eapply subset_refl.
+  - intros. inv PSMon; eauto.
+  (* - eapply subset_trans. eapply incl_bigcupr. *)
+  (*   intros x. *)
+  (*   admit. *)
+  (*   (* now eapply sizedSTSound. *) *)
+  (*   (* unfold lift. *) *)
+  (*   (* rewrite bigcup_setU_r. *) *)
+  (*   (* rewrite <-imset_bigcup, spec. *) *)
+  (*   (* rewrite bigcup_const. eapply subset_refl. *) *)
+  (* (* constructor. exact 0. *) *)
+  (*   admit. *)
+    (* - destruct PSMon. eauto. *)
+Qed.
+
 (* TODO: Move to another file *)
 (*
 (** Leo's example from DependentTest.v *)

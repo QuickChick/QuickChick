@@ -55,9 +55,7 @@ Class Arbitrary (A : Type) `{Gen A} `{Shrink A}.
 (** * Sizes of types *)
   
 Class Sized (A : Type) :=
-  {
-    size : A -> nat
-  }.
+  { size : A -> nat }.
 
 Class CanonicalSized (A : Type) `{Sized A} :=
   {

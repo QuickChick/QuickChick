@@ -64,6 +64,8 @@ let dispatch cn ind name1 name2 =
     | "ArbitrarySizedSuchThat" -> DepDer DepDriver.ArbitrarySizedSuchThat
     | "SizeMonotonicSuchThat" -> DepDer DepDriver.GenSizedSuchThatMonotonic
     | "SizedProofEqs" -> DepDer DepDriver.SizedProofEqs
+    | "GenSizedSuchThatCorrect" -> DepDer DepDriver.GenSizedSuchThatCorrect
+
   in
 
   match class_names with 

@@ -93,9 +93,13 @@ let rewrite h hin =
   gApp (gInject "eq_ind") [hole; hole; hin; hole; h]
   (* gMatch h [(injectCtr "erefl", [], fun [] -> hin)] *)
 
+let rewrite_sym typ h hin =
+  gApp (gInject "eq_ind_r") [typ; hin; h]
+
 let eq_symm p =
   gApp (gInject "eq_symm") [hole; hole; p]
 
+(* TODO replace with the above *)
 let rewrite_symm h hin =
   gMatch (eq_symm h) [(injectCtr "erefl", [], fun [] -> hin)]
 
@@ -124,3 +128,12 @@ let leq_addl n1 n2 =
 
 (* Leo, can we have a real gProp? *)
 let gProp = gInject "prop"
+
+let succ_neq_zero x =
+  gApp (gInject "succ_neq_zero") [x]
+
+let isSome x =
+  gApp (gInject "isSome") [x]
+
+let isSomeSome x =
+  gApp (gInject "isSomeSome") [x]

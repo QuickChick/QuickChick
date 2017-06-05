@@ -21,6 +21,13 @@ open GenericLib
 let semGenSize gen size =
   gApp (gInject "semGenSize") [gen; size]
 
+let semGen gen =
+  gApp (gInject "semGen") [gen]
+
+let semReturn x =
+  gApp (gInject "semReturn") [x]
+
+
 let arbitrarySize size =
   gApp (gInject "arbitrarySize") [size]
 
@@ -33,8 +40,18 @@ let semFreqSize g gs size =
 let semBindSize g f size =
   gApp (gInject "semBindSize") [g; f; size]
 
+let semBindSizeMon g f gMon fMon =
+  gApp
+    ~explicit:true
+    (gInject "semBindSizeMonotonic")
+    [hole; hole; g; f; gMon; fMon]
+
+
 let backtrackSizeMonotonic lst proof =
   gApp (gInject "backtrackSizeMonotonic") [lst; proof]
+
+let semBacktrack g =
+  gApp (gInject "semBacktrack") [hole; g]
 
 let returnGenSizeMonotonic x =
   gApp (gInject "returnGenSizeMonotonic") [x]
@@ -54,3 +71,11 @@ let suchThatMaybeMonotonic p pred =
 let suchThatMaybeOptMonotonic p pred =
   gApp ~explicit:true
     (gInject "suchThatMaybeOptMonotonic") [hole; hole; pred; p]
+
+let semBindOptSizeMonotonic g gmon f fmon hsub x hin =
+  gApp ~explicit:true (gInject "semBindOptSizeMonotonicIncl")
+    [hole; hole; g; f; hole; gmon; fmon; hsub; x; hin]
+
+let semBindSizeMonotonic g gmon f fmon hsub x hin =
+  gApp ~explicit:true (gInject "semBindSizeMonotonicIncl")
+    [hole; hole; g; f; hole; gmon; fmon; hsub; x; hin]
