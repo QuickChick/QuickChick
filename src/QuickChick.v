@@ -43,3 +43,12 @@ Require Export Classes.
 Require Export Instances.
 Require Export DependentClasses.
 Export GenLow GenHigh.
+
+(* TODO: Where should these really go?  (Not working anyway - they
+   Derives are too local...) *)
+(*
+Require Import String.
+Require Import Ascii.
+Derive Arbitrary for Ascii.ascii.
+Derive Arbitrary for string.
+*)
