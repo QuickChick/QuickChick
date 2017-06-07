@@ -26,6 +26,28 @@ Proof.
   - exact (checker false).
 Defined.
 
+Global Instance Dec_neg {P} {H : Dec P} : Dec (~ P).
+Proof.
+  constructor. unfold decidable.
+  destruct H as [D]; destruct D; auto.
+Defined.
+
+Global Instance Dec_conj {P Q} {H : Dec P} {I : Dec Q} : Dec (P /\ Q).
+Proof.
+  constructor. unfold decidable.
+  destruct H as [D]; destruct D;
+    destruct I as [D]; destruct D; auto;
+      right; intro; destruct H; contradiction.
+Defined.
+
+Global Instance Dec_disj {P Q} {H : Dec P} {I : Dec Q} : Dec (P \/ Q).
+Proof.
+  constructor. unfold decidable.
+  destruct H as [D]; destruct D;
+    destruct I as [D]; destruct D; auto;
+      right; intro; destruct H; contradiction.
+Defined.
+
 Class Eq (A : Type) :=
   { 
     dec_eq : forall (x y : A), decidable (x = y)
