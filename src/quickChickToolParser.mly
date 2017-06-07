@@ -82,7 +82,7 @@ mutants:              mutant { [$1] }
                     | mutant mutants { $1 :: $2 }
 
 mutant:               T_StartMutant code T_EndComment { ($1, String.concat "" $2, $3) }
-                    | T_StartMutants { ($1, "", "") }
+                    | T_StartMutants { ("(*", "", "*)") }
 
 sections:             section { [$1] }
                     | section sections { $1 :: $2 }
