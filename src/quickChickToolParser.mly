@@ -26,6 +26,7 @@ type node =
 
 %token<string> T_StartSection
 %token<string> T_StartQuickChick
+%token<string> T_StartQuickCheck
 %token<string> T_StartMutant
 %token<string> T_StartMutants
 %token<string> T_StartComment
@@ -46,10 +47,10 @@ type node =
 %% 
 program:              default_section T_Eof { [$1] }
                     | default_section sections T_Eof { $1 :: $2 }
-/*                    | error T_Eof { 
+                    | error T_Eof { 
                         let pos = Parsing.symbol_start_pos () in
                         failwith (Printf.sprintf "Error in line %d, position %d" 
-                                                 pos.pos_lnum (pos.pos_cnum - pos.pos_bol)) }  */
+                                                 pos.pos_lnum (pos.pos_cnum - pos.pos_bol)) }  
 
 default_section:      section_contents { Section ("", "", "", None, $1) }
 
@@ -60,6 +61,10 @@ section_content:      T_Char
                             {  Text $1 }
                       | T_StartQuickChick code T_EndComment
                             { QuickChick ($1, String.concat "" $2, $3) }
+                      | T_StartQuickCheck code T_EndComment
+                            { QuickChick ($1, String.concat "" $2, $3) }
+                      | T_StartMutants mutants
+                            { Mutants ($1, "", $2) }
                       | T_StartMutants code mutants
                             { Mutants ($1, String.concat "" $2, $3) }
                       | T_StartComment section_contents T_EndComment
@@ -77,6 +82,7 @@ mutants:              mutant { [$1] }
                     | mutant mutants { $1 :: $2 }
 
 mutant:               T_StartMutant code T_EndComment { ($1, String.concat "" $2, $3) }
+                    | T_StartMutants { ($1, "", "") }
 
 sections:             section { [$1] }
                     | section sections { $1 :: $2 }
