@@ -90,7 +90,7 @@ let main =
     | _ -> failwith "Expected 'test' or 'mutate'" in
   let sec_name = ref None in
 
-  let verbose = ref true in
+  let verbose = ref false in
   let speclist = 
     [ ("-m", (Arg.Symbol (["test"; "mutate"], set_mode)), "Sets the mode of operation") 
     ; ("-s", Arg.String (fun name -> sec_name := Some name), "Which section's properties to test")
@@ -177,6 +177,7 @@ let main =
      let base_file = write_tmp_file base in 
      compile_and_run base_file; *)
      List.iteri (fun i m ->
+       (if i > 1 then Printf.printf "\n");
        Printf.printf "Handling Mutant %d.\n" i; flush_all ();
        compile_and_run (write_tmp_file m)
                 ) muts
