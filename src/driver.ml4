@@ -63,6 +63,7 @@ let dispatch cn ind name1 name2 =
 
   let get_class_names = function
     | "GenSized" -> SimpleDer [SimplDriver.GenSized]
+    | "Shrink" -> SimpleDer [SimplDriver.Shrink]
     | "Arbitrary" -> SimpleDer [SimplDriver.GenSized; SimplDriver.Shrink]
     | "Show" -> SimpleDer [SimplDriver.Show]
     | "Sized" -> SimpleDer [SimplDriver.Sized]
