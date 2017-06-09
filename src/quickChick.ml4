@@ -128,9 +128,10 @@ let runTest c =
       msg_error (str "Could not run test" ++ fnl ())
 
 let run f args =
-  match args with 
+  begin match args with 
   | qc_text :: _ -> Printf.printf "QuickChecking...: %s\n" (Pp.string_of_ppcmds (Ppconstr.pr_constr_expr qc_text))
-  | _ -> failwith "run called with no arguments";
+  | _ -> failwith "run called with no arguments"
+  end;
   let args = List.map (fun x -> (x,None)) args in
   let c = CApp(Loc.ghost, (None,f), args) in
   runTest c
