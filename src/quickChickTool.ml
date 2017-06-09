@@ -177,7 +177,7 @@ let main =
      let base_file = write_tmp_file base in 
      compile_and_run base_file; *)
      List.iteri (fun i m ->
-       (if i > 1 then Printf.printf "\n");
+       (if i > 0 then Printf.printf "\n");
        Printf.printf "Handling Mutant %d.\n" i; flush_all ();
        compile_and_run (write_tmp_file m)
                 ) muts
