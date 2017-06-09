@@ -131,7 +131,7 @@ let runTest c =
 
 let run f args =
   begin match args with 
-  | qc_text :: _ -> Printf.printf "QuickChecking %s\n" 
+  | qc_text :: _ -> Printf.printf "QuickChecking: %s\n" 
                       (Pp.string_of_ppcmds (Ppconstr.pr_constr_expr qc_text));
                       flush_all()
   | _ -> failwith "run called with no arguments"
