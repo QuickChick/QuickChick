@@ -115,9 +115,11 @@ let runTest c =
   (** Extraction sometimes produces ML code that does not implement its interface.
       We circumvent this problem by erasing the interface. **)
   Sys.remove mlif;
+  (*
   Printf.printf "Extracted ML file: %s\n" mlf;
   Printf.printf "Compile command: %s\n" (comp_ml_cmd mlf execn);
   flush_all ();
+  *)
   if Sys.command (comp_ml_cmd mlf execn) <> 0 then
     msg_error (str "Could not compile test program" ++ fnl ())
   (** Run the test *)
@@ -129,7 +131,9 @@ let runTest c =
 
 let run f args =
   begin match args with 
-  | qc_text :: _ -> Printf.printf "QuickChecking...: %s\n" (Pp.string_of_ppcmds (Ppconstr.pr_constr_expr qc_text))
+  | qc_text :: _ -> Printf.printf "QuickChecking %s\n" 
+                      (Pp.string_of_ppcmds (Ppconstr.pr_constr_expr qc_text));
+                      flush_all()
   | _ -> failwith "run called with no arguments"
   end;
   let args = List.map (fun x -> (x,None)) args in
