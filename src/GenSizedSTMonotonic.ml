@@ -51,7 +51,7 @@ let stMaybe (opt : bool) (g : coq_expr) (x : string) (checks : ((coq_expr -> coq
     gFun [x]
       (fun [x] -> sumbools_to_bool x checks)
   in
-  (if opt then suchThatMaybeMonotonic else suchThatMaybeOptMonotonic) g bool_pred
+  (if opt then suchThatMaybeOptMonotonic else suchThatMaybeMonotonic) g bool_pred
 
 let ret_type_dec (s : var) (left : coq_expr) (right : coq_expr) =
       gMatch (gVar s)

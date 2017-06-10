@@ -33,6 +33,8 @@ let set_incl c1 c2 = gApp (gInject "set_incl") [c1;c2]
 
 let set_union c1 c2 = gApp (gInject "setU") [c1;c2]
 
+let set_int c1 c2 = gApp (gInject "setI") [c1;c2]
+
 let imset f s =
   gApp (gInject "imset") [f; s]
 
@@ -67,6 +69,10 @@ let setU_set0_r x1 x2 =
 
 let set_eq_trans x1 x2 =
   gApp (gInject "set_eq_trans") [x1; x2]
+
+let set_incl_trans x1 x2 =
+  gApp (gInject "subset_trans") [x1; x2]
+
 
 let setU_set0_l x1 x2 =
   gApp (gInject "setU_set0_l") [x1; x2]

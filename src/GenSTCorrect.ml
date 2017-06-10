@@ -58,13 +58,13 @@ let class_methodST (n : int) (pred : coq_expr) : atyp =
   in
   (pred, gen, hole, proof)
 
-let rec_method (inputs : arg list) (setinst : coq_expr) (geninst : coq_expr) (moninst : coq_expr)
+let rec_method (inputs : arg list) (setinst : coq_expr) (generator_body : coq_expr) (moninst : coq_expr)
       (ih : var) (size : coq_expr) (n : int) (l : coq_expr list) : atyp =
   let iter_body args : coq_expr =
     appinst "DependentClasses.iter" setinst size args
   in
   let gen_body args : coq_expr =
-    appinst "arbitrarySizeST" geninst size args
+    gApp generator_body (size :: args)
   in
   let gmon = gApp moninst (size :: l) in
   let proof = gApp (gVar ih) l in
@@ -208,30 +208,35 @@ let stMaybe (y : var) (opt : bool) (exp : atyp)
     | (chk, _) :: lst' ->
       matchDec (chk (gVar x)) (fun heq -> fail) (fun hneq -> sumbools_to_bool x lst' e fail)
   in
-  let bool_pred =
+  let bool_pred checks =
     gFun [x]
       (fun [x] -> sumbools_to_bool x checks gTrueb gFalseb)
   in
   let hxs = "H_" ^ x in
-  let ret_type_dec_prop (s : var) (left1 : coq_expr) (right1 : coq_expr)
-    (left2 : coq_expr) (right2 : coq_expr)=
-    ret y
-      (gMatch (gVar s)
-         [ (injectCtr "left", ["eq"], fun _ -> left1)
-         ; (injectCtr "right", ["neq"], fun _ -> right1) ])
-      (gMatch (gVar s)
-         [ (injectCtr "left", ["eq"], fun _ -> left2)
-         ; (injectCtr "right", ["neq"], fun _ -> right2) ])
+  let ret matcher1 matcher2 =
+    gImpl matcher1 (gConj hole matcher2)
   in
   let rec sumbools_to_bool_proof (x : var) hx lst : coq_expr =
     match lst with
-    | [] -> gApp proof [gVar x; gVar hx]
+    | [] -> gConjIntro (gVar hx) hole
     | (chk, n) :: lst' ->
-      let set = sumbools_to_bool x lst' (gApp set [gVar x]) gFalse in
+      let set d =
+        gMatchReturn (gVar d)
+          "s"
+          (fun v -> gProp)
+          [ (injectCtr "left" , ["eq" ], fun _ -> gFalse)
+          ; (injectCtr "right", ["neq"], fun _ -> sumbools_to_bool x lst' (gApp set [gVar x]) gFalse)
+          ]
+      in
+      let pred d =
+        gIsTrue
+          (matchDec (gVar d) (fun heq -> gFalseb)
+             (fun hneq -> sumbools_to_bool x lst' gTrueb gFalseb))
+      in
       gApp
         (gMatchReturn (chk (gVar x))
            "v" (* as clause *)
-           (fun v -> ret_type_dec_prop v set_empty set hole hole)
+           (fun v -> ret (set v) (pred v))
            [ (injectCtr "left", ["heq"],
               fun [heq] -> gFun [hxs] (fun [hx] -> false_ind hole (gVar hx)))
            ; (injectCtr "right", ["hneq"],
@@ -242,9 +247,12 @@ let stMaybe (y : var) (opt : bool) (exp : atyp)
   (gFun [x] (fun [x] -> sumbools_to_bool x checks (gApp set [gVar x]) gFalse),
    gApp (gInject (if opt then "suchThatMaybeOpt" else "suchThatMaybe"))
      [ gen (* Use the generator provided for base generator *)
-     ; bool_pred ],
-   (if opt then suchThatMaybeMonotonic else suchThatMaybeOptMonotonic) mon bool_pred,
-   gFun [x; hxs] (fun [x; hx] -> sumbools_to_bool_proof x hx checks) 
+     ; bool_pred checks ],
+   (if opt then suchThatMaybeOptMonotonic else suchThatMaybeMonotonic) mon (bool_pred checks),
+   set_incl_trans
+     (imset_incl (gFun [x; hxs] (fun [x; hx] -> sumbools_to_bool_proof x hx checks)))
+     ((if opt then semSuchThatMaybeOpt_complete else semSuchThatMaybe_complete)
+        gen (bool_pred checks) hole proof)
   )
 
 
@@ -290,21 +298,21 @@ let genSizedSTCorr_body
     ind_gens (gVar size) full_gtyp gen_ctr dep_type ctrs input_names n register_arbitrary rec_name
   in
 
-  let aux_arb (input_names : var list) (rec_name : coq_expr) size vars =
+  let aux_arb (rec_name : coq_expr) size vars =
     gMatch (gVar size)
       [ (injectCtr "O", [], fun _ ->
-             uniform_backtracking (base_gens input_names rec_name))
+             uniform_backtracking (base_gens vars rec_name))
       ; (injectCtr "S", ["size'"], fun [size'] ->
-            uniform_backtracking (ind_gens input_names size' rec_name))
+            uniform_backtracking (ind_gens vars size' rec_name))
       ]
   in
 
-  let generator_body (input_names : var list) : coq_expr =
+  let generator_body : coq_expr =
     gRecFunInWithArgs
       ~assumType:(gen_type)
       "aux_arb" (gArg ~assumName:(gVar (fresh_name "size")) () :: inputs) 
-      (fun (rec_name, size::vars) -> aux_arb input_names (gVar rec_name) size vars)
-      (fun x -> gVar x)
+      (fun (rec_name, size::vars) -> aux_arb (gVar rec_name) size vars)
+      (fun rec_name -> gVar rec_name)
   in
 
   let add_freq gens =
@@ -313,7 +321,7 @@ let genSizedSTCorr_body
   let handle_branch' (y : var) (ih : var) (size : coq_expr) (ins : var list) =
     handle_branch n dep_type ins
       (fail_exp full_gtyp) (ret_exp full_gtyp) class_method class_methodST
-      (rec_method inputs setinst geninst moninst ih size) bind (stMaybe y) (check_expr y) (match_inp y)
+      (rec_method inputs setinst generator_body moninst ih size) bind (stMaybe y) (check_expr y) (match_inp y)
       gen_ctr (fun _ -> ())
   in
 
@@ -331,7 +339,7 @@ let genSizedSTCorr_body
       (fun inputs ->
          gFun ["x"; "Hin"]
            (fun [x; hin] ->
-              rewrite_set_r (semBacktrack (gList (add_freq (base_gens inputs (generator_body inputs)))))
+              rewrite_set_r (semBacktrack (gList (add_freq (base_gens inputs generator_body))))
                 (List.fold_right
                    (fun (c : dep_ctr) (exp : coq_expr -> coq_expr -> coq_expr) ->
                       fun hin hg ->
@@ -362,7 +370,7 @@ let genSizedSTCorr_body
            (fun inputs ->
               gFun ["x"; "Hin"]
                 (fun [x; hin] ->
-                   rewrite_set_r (semBacktrack (gList (add_freq (ind_gens inputs s (generator_body inputs)))))
+                   rewrite_set_r (semBacktrack (gList (add_freq (ind_gens inputs s generator_body))))
                      (List.fold_right
                         (fun (c : dep_ctr) (exp : coq_expr -> coq_expr -> coq_expr) ->
                            fun hin hg ->
@@ -392,8 +400,9 @@ let genSizedSTCorr_body
               let inps = List.map gVar inputs in
               set_incl
                 (imset (gInject "Some") (appinst "DependentClasses.iter" setinst (gVar s) inps))
-                (semGen (appinst "arbitrarySizeST" geninst (gVar s) inps)))
-      )
+                (* (semGen (appinst "arbitrarySizeST" geninst (gVar s) inps)) *)
+                (semGen (gApp generator_body ((gVar s) :: inps)))
+           ))
   in
 
   let input_vars = List.map fresh_name input_names in

@@ -206,13 +206,18 @@ Admitted.
 
 Derive GenSizedSuchThatCorrect for (fun foo => goodTree n foo).
 
+(* XXX these instances should be present *)
 Existing Instance genSFoo.
 Existing Instance shrFoo.
-(* XXX these instances should be present *)
 Derive SizeMonotonic for Foo using genSFoo.
 Derive SizedMonotonic for Foo using genSFoo.
+Derive Sized for Foo.
 
-Typeclasses eauto := debug.
+(* TODO fix oneof, admitting for now *)
+(* Derive SizedCorrect for Foo using genSFoo and SizeMonotonicFoo. *)
+
+Instance lala : SizedCorrect (@arbitrarySized Foo _).
+Admitted.
 
 Existing Instance GenSizedSuchThatgoodFooUnif. (* ???? *)
 
@@ -231,22 +236,22 @@ Derive SizedProofEqs for (fun foo => goodFooNarrow n foo).
 
 Derive GenSizedSuchThatCorrect for (fun foo => goodFooNarrow n foo).
 
-Existing Instance GenSizedSuchThatgoodFoo.
-
-Derive SizeMonotonicSuchThat for (fun (x : Foo) => goodFoo input x).
-
-Derive SizedProofEqs for (fun (x : Foo) => goodFoo input x).
-
-(* Derive GenSizedSuchThatCorrect for (fun foo => goodFoo n foo). *)
-
 Existing Instance GenSizedSuchThatgoodFooCombo.
 
 Derive SizeMonotonicSuchThat for (fun foo => goodFooCombo n foo).
 
 Derive SizedProofEqs for (fun foo => goodFooCombo n foo).
 
+Derive GenSizedSuchThatCorrect for (fun foo => goodFooCombo n foo).
 
-(* Derive GenSizedSuchThatCorrect for (fun foo => goodFooCombo n foo). *)
+Existing Instance GenSizedSuchThatgoodFoo.
+
+Derive SizeMonotonicSuchThat for (fun (x : Foo) => goodFoo input x).
+
+Derive SizedProofEqs for (fun (x : Foo) => goodFoo input x).
+
+Derive GenSizedSuchThatCorrect for (fun foo => goodFoo n foo).
+
 
 Existing Instance GenSizedSuchThatgoodFooPrec.  (* ???? *)
 
@@ -280,6 +285,8 @@ Derive ArbitrarySizedSuchThat for (fun (x : Foo) => goodFooB input x).
 
 Derive SizedProofEqs for (fun (x : Foo) => goodFooB input x).
 
+Derive SizeMonotonicSuchThat for (fun foo => goodFooB n foo).
+
 Derive GenSizedSuchThatCorrect for (fun foo => goodFooB n foo).
 
 Inductive LRTree : tree -> Prop :=
@@ -293,26 +300,44 @@ Inductive LRTree : tree -> Prop :=
       LRTree (Node m t1 t2).
 
 
+
 Derive ArbitrarySizedSuchThat for (fun (x : tree) => LRTree x).
 
+(* XXX sucThatMaybe case *)
 
 Instance DecidableLRTree t : Dec (LRTree t).
 Proof.
 Admitted.
 
-Instance DecEqLRTree (t1 t2 : tree): Dec (t1 = t2).
+(* Instance DecEqLRTree (t1 t2 : tree): Dec (t1 = t2). *)
+(* Proof. *)
+(* Admitted. *)
+
+Lemma semSuchThatMaybe_complete:
+  forall (A : Type) (g : G A) (f : A -> bool) (s : set A),
+    s \subset semGen g ->
+    (Some @: (s :&: (fun x : A => f x))) \subset
+    semGen (suchThatMaybe g f).
+Proof.
+Admitted.
+
+Lemma semSuchThatMaybeOpt_complete:
+  forall (A : Type) (g : G (option A)) (f : A -> bool) (s : set A),
+    (Some @: s) \subset semGen g ->
+    (Some @: (s :&: (fun x : A => f x))) \subset
+    semGen (suchThatMaybeOpt g f).
 Proof.
 Admitted.
 
 Derive SizedProofEqs for (fun (x : tree) => LRTree x).
 
 (* XXX bug *)
-(* Derive SizeMonotonicSuchThat for (fun foo => LRTree n foo). *)
-(* Derive GenSizedSuchThatCorrect for (fun foo => LRTree n foo). *)
-(* QuickChickDebug Debug Off. *)
+Derive SizeMonotonicSuchThat for (fun foo => LRTree foo).
+QuickChickDebug Debug On.
 
+Derive GenSizedSuchThatCorrect for (fun foo => LRTree foo).
 
-  (* Derive SizeMonotonicSuchThat for (fun foo => goodTree n foo). *)
+(* Derive SizeMonotonicSuchThat for (fun foo => goodTree n foo). *)
 (* XXX
    bug for 
 | GL : goodTree 0 Leaf

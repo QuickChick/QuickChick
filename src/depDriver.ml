@@ -182,8 +182,10 @@ let deriveDependent (cn : derivable) (c : constr_expr) (n : int) (instance_name 
                 [full_gtyp; full_pred (List.map gVar inputs); hole; gVar size]])
     | SizedProofEqs -> gApp (gInject (class_name cn)) [full_pred (List.map (fun n -> gVar (fresh_name n)) input_names)]
     | GenSizedSuchThatCorrect ->
+      let pred = full_pred (List.map (fun n -> gVar (fresh_name n)) input_names) in
       gApp (gInject (class_name cn))
-        [full_pred (List.map (fun n -> gVar (fresh_name n)) input_names); gInject "arbitrarySizeST"]
+        [ pred 
+        ; gApp ~explicit:true (gInject "arbitrarySizeST") [hole; pred; hole]]
     | _ -> failwith "Unimplemented"
   in
 
