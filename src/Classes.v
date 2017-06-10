@@ -39,11 +39,13 @@ Infix "^" := appn (at level 30, right associativity) : fun_scope.
 
 (** * Generator-related classes *)
 
-Class GenSized (A : Type) :=
-  { arbitrarySized : nat -> G A }.
+(* begin gen_sized_class *)
+Class GenSized (A : Type) := { arbitrarySized : nat -> G A }.
+(* end gen_sized_class *)
 
-Class Gen (A : Type) := 
-  { arbitrary : G A }.
+(* begin gen_class *)
+Class Gen (A : Type) := { arbitrary : G A }.
+(* end gen_class *)
 
 (** Shrink class *)
 Class Shrink (A : Type) :=
