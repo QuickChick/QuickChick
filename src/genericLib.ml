@@ -169,14 +169,22 @@ let dep_dt_to_string (ty_ctr, ty_params, ctrs, dep_type) =
                                     (str_lst_to_string "\n" (List.map dep_ctr_to_string  ctrs))
                                     (dep_type_to_string dep_type)
 
-let rec nthType i dt = 
+let rec nthType1 i dt = 
   match i, dt with
   | 1, DArrow (dt1, _) 
   | 1, DProd  ((_, dt1), _) -> dt1
   | 1, _ -> failwith "Insufficient arrows"
   | _, DArrow (_, dt) 
-  | _, DProd  (_, dt) -> nthType (i-1) dt
+  | _, DProd  (_, dt) -> nthType1 (i-1) dt
   | _, _ -> failwith "Insufficient arrows"
+
+let rec nthType i dt =
+  let msg =
+    "type: " ^ dep_type_to_string dt ^ "\n" ^
+    (Printf.sprintf "n: %n\n" i)
+  in
+  msg_debug (str msg);
+  nthType1 i dt
 
 let rec dep_result_type dt = 
   match dt with 

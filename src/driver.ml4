@@ -39,7 +39,7 @@ let dep_dispatch ind class_name =
   (* let DepDriver.ArbitrarySizedSuchThat = class_name in  *)
   match ind with 
   | CLambdaN (_loc1, [([(_loc2, Name id)], _kind, _type)], CApp (_loc3, (_flag, constructor), args)) ->
-     let n = fst (List.find (fun (_,(CRef (r,_), _)) -> Id.to_string id = string_of_reference r) (List.mapi (fun i x -> (i+1,x)) args)) in
+    let n = fst (List.find (fun (_,(CRef (r,_), _)) -> Id.to_string id = string_of_reference r) (List.mapi (fun i x -> (i+1,x)) args)) in
      let ctr_name = 
        match constructor with 
        | CRef (r,_) -> string_of_reference r

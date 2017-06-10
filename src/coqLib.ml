@@ -76,6 +76,9 @@ let gFalse = gInject "False"
 let gIff p1 p2 =
   gApp (gInject "iff") [p1; p2]
 
+let gIsTrue x =
+  gApp (gInject "is_true") [x]
+
 let gIsTrueTrue =
   gApp (gInject "is_true") [gInject "true"]
 

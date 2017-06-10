@@ -79,3 +79,12 @@ let semBindOptSizeMonotonic g gmon f fmon hsub x hin =
 let semBindSizeMonotonic g gmon f fmon hsub x hin =
   gApp ~explicit:true (gInject "semBindSizeMonotonicIncl")
     [hole; hole; g; f; hole; gmon; fmon; hsub; x; hin]
+
+let semSuchThatMaybe_complete g f s h =
+  gApp (gInject "semSuchThatMaybe_complete") [hole; g; f; s; h]
+
+let semSuchThatMaybeOpt_complete g f s h =
+  gApp (gInject "semSuchThatMaybeOpt_complete") [hole; g; f; s; h]
+
+let imset_incl h =
+  gApp (gInject "imset_incl") [h]
