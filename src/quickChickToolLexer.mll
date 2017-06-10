@@ -25,6 +25,7 @@ rule lexer = parse
   | (white* "(*!" white* "Section" as s)    { line_incs s lexbuf; T_StartSection s }
   | (white* "(*!" white* "extends" as s)    { line_incs s lexbuf; T_Extends s }
   | (white* "(*!" white* "QuickChick" as s) { line_incs s lexbuf; T_StartQuickChick s }
+  | (white* "(*!" white* "QuickCheck" as s) { line_incs s lexbuf; T_StartQuickCheck s }
 
   | (white* "(*!" white* "*)" as s)         { line_incs s lexbuf; T_StartMutants s }
   | (white* "(*!" as s)                     { line_incs s lexbuf; T_StartMutant s }

@@ -166,7 +166,8 @@ Definition callback {prop : Type} `{Checkable prop}
 
 Definition printTestCase {prop : Type} `{Checkable prop}
            (s : string) (p : prop) : Checker :=
-  callback (PostFinalFailure Counterexample (fun _st _res => trace (s ++ nl) 0)) p.
+  (* The following newline was causing an unwanted extra new line *)
+  callback (PostFinalFailure Counterexample (fun _st _res => trace (s (* ++ nl*)) 0)) p.
 
 Definition whenFail {prop : Type} `{Checkable prop}
            (str : string) : prop -> Checker :=

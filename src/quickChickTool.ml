@@ -90,7 +90,7 @@ let main =
     | _ -> failwith "Expected 'test' or 'mutate'" in
   let sec_name = ref None in
 
-  let verbose = ref true in
+  let verbose = ref false in
   let speclist = 
     [ ("-m", (Arg.Symbol (["test"; "mutate"], set_mode)), "Sets the mode of operation") 
     ; ("-s", Arg.String (fun name -> sec_name := Some name), "Which section's properties to test")
@@ -145,8 +145,6 @@ let main =
     | Some sn -> fun sn' -> SS.mem (trim sn') (sec_find sn)
     | None    -> fun _ -> true in
 
-  let coqc_cmd vf = Printf.sprintf "coqc -w none %s" vf in
-
   let write_tmp_file data = 
     let vf = Filename.temp_file "QuickChick" ".v" in
     if !verbose then (Printf.printf "Writing to file: %s\n" vf; flush_all()) else ();
@@ -156,8 +154,11 @@ let main =
     vf
   in
 
+  let coqc_cmd vf = Printf.sprintf "coqc -w none -Q . Top %s" vf in
+
   let compile_and_run vf =
     (* TODO: Capture/parse output *)
+    (* Printf.printf "coqc_cmd = %s\n" (coqc_cmd vf); *)
     if Sys.command (coqc_cmd vf) <> 0 then
       failwith "Could not compile mutated program"
     else () in
@@ -171,10 +172,12 @@ let main =
      let (base,muts) = match mutate_outs handle_section result with
        | base :: muts -> (base, muts)
        | _ -> failwith "empty mutants" in
+     (* BCP: I think we should not test the base when testing mutants 
      if !verbose then print_endline "Testing original (no mutants)..." else ();
      let base_file = write_tmp_file base in 
-     compile_and_run base_file;
+     compile_and_run base_file; *)
      List.iteri (fun i m ->
+       (if i > 0 then Printf.printf "\n");
        Printf.printf "Handling Mutant %d.\n" i; flush_all ();
        compile_and_run (write_tmp_file m)
                 ) muts

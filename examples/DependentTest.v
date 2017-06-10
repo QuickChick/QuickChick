@@ -314,5 +314,13 @@ Inductive goodBar {A B : Type} (n : nat) : Bar A B -> Prop :=
 
 *)
 
+(* Generation followed by check - backtracking necessary *)
+
+(* Untouched variables - ex soundness bug *)
+Inductive goodFooFalse : Foo -> Prop :=
+| GoodFalse : forall (x : False), goodFooFalse Foo1.
+
+Derive ArbitrarySizedSuchThat for (fun foo => goodFooFalse foo).
+
 Definition success := "success".
 Print success.

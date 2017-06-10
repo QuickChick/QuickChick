@@ -574,7 +574,25 @@ let handle_branch
         msg_debug (str ("Darrowing: " ^ range_to_string (UM.find forGen k)) ++ fnl ());
         handle_dt n true dt1 dt2 k cmap
       | DTyCtr _ -> (* result *) 
-        instantiate_range k cmap (Unknown forGen) (* result *)
+         (* Instantiate forGen *)
+         instantiate_range_cont k cmap Unknown.undefined (fun k' cmap' c -> 
+         (* Search if there is anything that is not fixed that requires instantiation *)
+         let allUnknowns = List.filter (fun u -> not (is_fixed k' (DTyVar u))) (List.map fst (UM.bindings k')) in
+         match allUnknowns with 
+         | [] -> ret_exp c 
+         | _ -> begin 
+             msg_warning (str ("After proccessing all constraints, there are still uninstantiated variables: " ^ 
+                            String.concat " , " (List.map var_to_string allUnknowns) ^ ". Proceeding with caution...") ++ fnl ());
+             let rec inst_unknowns k cmap = function
+               | [] -> ret_exp c
+               | h::t -> 
+                  instantiate_range_cont k cmap Unknown.undefined 
+                                         (fun k' cmap' _ ->
+                                          inst_unknowns k' cmap' t
+                                         ) (Unknown h)
+             in inst_unknowns k' cmap' allUnknowns
+           end
+         ) (Unknown forGen)
       | _ -> failwith "Wrong type" in
 
     let branch_gen =
