@@ -29,9 +29,9 @@ Derive (Arbitrary, Show) for Foo.
 Fixpoint showFoo' (x : Foo) := 
   match x with 
   | Foo1 => "Foo1  " ++ ""
-  | Foo2 f => "Foo2  " ++ ("( " ++ showFoo' f ++ " )") ++ " " ++ ""
-  | Foo3 n f => "Foo3  " ++ ("( " ++ show     n ++ " )") ++
-                     " " ++ ("( " ++ showFoo' f ++ " )") ++ " " ++ ""
+  | Foo2 f => "Foo2  " ++ ("(" ++ showFoo' f ++ ")") ++ " " ++ ""
+  | Foo3 n f => "Foo3  " ++ ("(" ++ show     n ++ ")") ++
+                     " " ++ ("(" ++ showFoo' f ++ ")") ++ " " ++ ""
   end%string.
 (* end show_foo *)
 
