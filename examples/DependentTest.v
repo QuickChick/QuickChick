@@ -28,15 +28,17 @@ Derive (Arbitrary, Show) for Foo.
 (* begin show_foo *)
 Fixpoint showFoo' (x : Foo) := 
   match x with 
-  | Foo1 => "Foo1  " ++ ""
-  | Foo2 f => "Foo2  " ++ ("(" ++ showFoo' f ++ ")") ++ " " ++ ""
-  | Foo3 n f => "Foo3  " ++ ("(" ++ show     n ++ ")") ++
-                     " " ++ ("(" ++ showFoo' f ++ ")") ++ " " ++ ""
+  | Foo1 => "Foo1"
+  | Foo2 f => "Foo2 " ++ ("(" ++ showFoo' f ++ ")") 
+  | Foo3 n f => "Foo3 " ++ ("(" ++ show     n ++ ")") ++
+                     " " ++ ("(" ++ showFoo' f ++ ")") 
   end%string.
 (* end show_foo *)
 
 Lemma show_foo_equality : showFoo' = (@show Foo _).
 Proof. reflexivity. Qed.
+
+Eval simpl in (show (Foo3 42 (Foo2 Foo1))).
 
 (* begin genFooSized *)
 Fixpoint genFooSized (size : nat) := 
