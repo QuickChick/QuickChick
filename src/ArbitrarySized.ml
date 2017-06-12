@@ -132,10 +132,7 @@ let show_decl ty_ctr ctrs iargs =
        fun vs -> match vs with 
                  | [] -> gStr (constructor_to_string ctr) 
                  |_ -> str_append (gStr (constructor_to_string ctr ^ " "))
-                                  (fold_ty_vars (fun _ v ty' -> str_appends [ gStr "("
-                                                                            ; gApp (if isCurrentTyCtr ty' then gVar aux else gInject "show") [gVar v]
-                                                                            ; gStr ")"
-                                                                            ])
+                                  (fold_ty_vars (fun _ v ty' -> smart_paren (gApp (if isCurrentTyCtr ty' then gVar aux else gInject "show") [gVar v]))
                                                 (fun s1 s2 -> if s2 = emptyString then s1 else str_appends [s1; gStr " "; s2]) emptyString ty vs))
     in
     

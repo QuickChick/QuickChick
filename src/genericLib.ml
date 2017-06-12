@@ -756,6 +756,7 @@ let rec str_appends cs =
   | []  -> emptyString
   | [c] -> c
   | c1::cs' -> str_append c1 (str_appends cs')
+let smart_paren c = gApp (gInject "QuickChick.Show.smart_paren") [c]
 
 (* Pair *)
 let gPair (c1, c2) = gApp (gInject "Coq.Init.Datatypes.pair") [c1;c2]
