@@ -147,6 +147,12 @@ Proof.
   firstorder.
 Qed.
 
+Lemma set_eq_set_incl_l {U : Type} (s1 s2 : set U) :
+  s1 <--> s2 -> s1 \subset s2.
+Proof.
+  firstorder.
+Qed.
+
 Lemma rewrite_set_l {U : Type} (s1 s2 : set U) x :
   s1 x ->
   s1 <--> s2 ->
@@ -188,21 +194,225 @@ Proof.
   exact isT.
 Qed.
 
-Lemma semBindOptSizeMonotonicIncl {A B} (g : G (option A)) (f : A -> G (option B)) (s1 : set A)
+Lemma semBindOptSizeMonotonicIncl_l {A B} (g : G (option A)) (f : A -> G (option B)) (s1 : set A)
       `{Hg : SizeMonotonic _ g}
       `{Hf : forall a, SizeMonotonic (f a)} :
   Some @: s1 \subset semGen g ->
   \bigcup_(a in s1) semGen (f a) \subset semGen (bindGenOpt g f).
 Admitted.
 
-Lemma semBindSizeMonotonicIncl {A B} (g : G A) (f : A -> G B) (s1 : set A)
+Lemma semBindSizeMonotonicIncl_l {A B} (g : G A) (f : A -> G B) (s1 : set A)
       `{Hg : SizeMonotonic _ g}
       `{Hf : forall a, SizeMonotonic (f a)} :
   s1 \subset semGen g ->
   \bigcup_(a in s1) semGen (f a) \subset semGen (bindGen g f).
 Admitted.
 
+Lemma semBindOptSizeMonotonicIncl_r {A B} (g : G (option A)) (f : A -> G (option B)) (s1 : set A) (s2 : A -> set B)
+      `{Hg : SizeMonotonic _ g}
+      `{Hf : forall a, SizeMonotonic (f a)} :
+  semGen g \subset (Some @: s1) :|: [set None] ->
+  (forall x, semGen (f x) \subset Some @: (s2 x) :|: [set None]) -> 
+  semGen (bindGenOpt g f) \subset Some @: (\bigcup_(a in s1) s2 a) :|: [set None].
+Admitted.
+
+Lemma semBindSizeMonotonicIncl_r {A B} (g : G A) (f : A -> G (option B)) (s1 : set A) (s2 : A -> set B)
+      `{Hg : SizeMonotonic _ g}
+      `{Hf : forall a, SizeMonotonic (f a)} :
+  semGen g \subset s1 ->
+  (forall x, semGen (f x) \subset Some @: (s2 x) :|: [set None]) -> 
+  semGen (bindGen g f) \subset Some @: (\bigcup_(a in s1) s2 a)  :|: [set None].
+Admitted.
+
+
+Lemma semSuchThatMaybe_complete:
+  forall (A : Type) (g : G A) (f : A -> bool) (s : set A),
+    s \subset semGen g ->
+    (Some @: (s :&: (fun x : A => f x))) \subset
+    semGen (suchThatMaybe g f).
+Proof.
+Admitted.
+
+Lemma semSuchThatMaybeOpt_complete:
+  forall (A : Type) (g : G (option A)) (f : A -> bool) (s : set A),
+    (Some @: s) \subset semGen g ->
+    (Some @: (s :&: (fun x : A => f x))) \subset
+    semGen (suchThatMaybeOpt g f).
+Proof.
+Admitted.
+
+Lemma semSuchThatMaybe_sound:
+  forall (A : Type) (g : G A) (f : A -> bool) (s : set A),
+    semGen g \subset s ->
+    semGen (suchThatMaybe g f) \subset ((Some @: (s :&: (fun x : A => f x))) :|: [set None]).
+Proof.
+Admitted.
+
+Lemma semSuchThatMaybeOpt_sound:
+  forall (A : Type) (g : G (option A)) (f : A -> bool) (s : set A),
+    semGen g \subset ((Some @: s) :|: [set None]) ->
+    semGen (suchThatMaybeOpt g f) \subset (Some @: (s :&: (fun x : A => f x)) :|: [set None]).
+Proof.
+Admitted.
+
+Lemma lift_union_compat {A} (s1 s2 : set (option A)) (s3 s4 : set A) :
+  s1 \subset lift s3 ->
+  s2 \subset lift s4 ->
+  (s1 :|: s2) \subset lift (s3 :|: s4).
+Proof.
+  firstorder.
+Qed.
+
+Lemma lift_subset_compat {A} (s1 s2 : set (option A)) (s3 s4 : set A) :
+  s1 \subset lift s3 ->
+  s2 \subset lift s4 ->
+  (s1 :|: s2) \subset lift (s3 :|: s4).
+Proof.
+  firstorder.
+Qed.
+
+Lemma lift_subset_pres_l {A} (s1 : set (option A)) (s2 s3 : set A) :
+  s1 \subset lift s2 ->
+  s1 \subset lift (s2 :|: s3).
+Proof.
+  firstorder.
+Qed.
+
+Lemma lift_subset_pres_r {A} (s1 : set (option A)) (s2 s3 : set A) :
+  s1 \subset lift s3 ->
+  s1 \subset lift (s2 :|: s3).
+Proof.
+  firstorder.
+Qed.
+
+
+Lemma set_incl_setI_l {A} (s1 s2 s3 : set A) :
+  s1 \subset s3 ->
+  (s1 :&: s2) \subset s3.
+Proof.
+  firstorder.
+Qed.
+
+Lemma set_incl_setI_r {A} (s1 s2 s3 : set A) :
+  s2 \subset s3 ->
+  (s1 :&: s2) \subset s3.
+Proof.
+  firstorder.
+Qed.
+
+Lemma set_incl_setU_l {A} (s1 s2 s3 : set A) :
+  s1 \subset s3 ->
+  s2 \subset s3 ->
+  (s1 :|: s2) \subset s3.
+Proof.
+  firstorder.
+Qed.
+
+Lemma bigcup_set_I_l {A B} (s1 s2 : set A) (s3 : set B) (f : A -> set B) :
+  \bigcup_(x in s1) (f x) \subset s3 ->
+  \bigcup_(x in (s1 :&: s2)) (f x) \subset s3.
+Proof.
+  firstorder.
+Qed.
+
+Lemma bigcup_set_U {A B} (s1 s2 : set A) (s3 : set B) (f : A -> set B) :
+  \bigcup_(x in s1) (f x) \subset s3 ->
+  \bigcup_(x in s2) (f x) \subset s3 ->
+  \bigcup_(x in (s1 :|: s2)) (f x) \subset s3.
+Proof.
+  firstorder.
+Qed.
+
+Lemma bigcup_set0_subset {A B} (s : set B) (f : A -> set B) :
+  \bigcup_(x in set0) (f x) \subset s.
+Proof.
+  firstorder.
+Qed.
+
 (* QuickChickDebug Debug On. *)
+
+Fixpoint aux_iter (size0 input0_0 : nat) {struct size0} : set tree :=
+  match size0 with
+    | 0 =>
+      match input0_0 with
+        | 0 => [set Leaf]
+        | _.+1 => set0
+      end :|: set0
+    | size'.+1 =>
+      match input0_0 with
+        | 0 => [set Leaf]
+        | _.+1 => set0
+      end
+        :|: (match input0_0 with
+               | 0 => set0
+               | n.+1 =>
+                 \bigcup_(t1 in aux_iter size' n)
+                  \bigcup_(m in [set: nat])
+                  \bigcup_(t2 in aux_iter size' m)
+                  (match
+                      @dec (goodTree m t1) (DecgoodTree m t1)
+                      return (forall _ : tree, Prop)
+                    with
+                      | left _ =>
+                        \bigcup_(k in [set: nat])
+                         [set 
+                            Node k t1 t2]
+                      | right _ =>  set0
+                    end)
+             end :|: set0)
+  end.
+
+Fixpoint arb_aux (size0 input0_0 : nat) {struct size0} : G (option tree) :=
+  match size0 with
+    | 0 =>
+      backtrack
+        [(1,
+          match input0_0 with
+            | 0 => returnGen (Some Leaf)
+            | _.+1 => returnGen None
+          end)]
+    | size'.+1 =>
+      backtrack
+        [(1,
+          match input0_0 with
+            | 0 => returnGen (Some Leaf)
+            | _.+1 => returnGen None
+          end);
+          (1,
+           match input0_0 with
+             | 0 => returnGen None
+             | n.+1 =>
+               doM! t1 <- arb_aux size' n;
+             do! m <- arbitrary;
+             doM! t2 <- arb_aux size' m;
+             match
+               @dec (goodTree m t1) (DecgoodTree m t1)
+               return (G (option tree))
+             with
+               | left _ =>  do! k <- arbitrary;
+               returnGen (Some (Node k t1 t2))
+               | right _ => returnGen None
+             end
+           end)]
+  end.
+
+
+Lemma bigcup_cons_subset {A B} l (ls : seq A) (f : A -> set B) s :
+  f l \subset s ->
+  \bigcup_(x in ls) (f x) \subset s ->
+  \bigcup_(x in l :: ls) (f x) \subset s. 
+Proof.
+  intros H1 H2 x [y [Hl Hr]].
+  inv Hl.
+  - eauto.
+  - eapply H2. eexists; split; eauto.
+Qed.
+
+Lemma bigcup_nil_subset {A B} (f : A -> set B) s :
+  \bigcup_(x in []) (f x) \subset s. 
+Proof.
+  intros x [y [H1 H2]]. inv H1.
+Qed.
 
 Derive GenSizedSuchThatCorrect for (fun foo => goodTree n foo).
 
@@ -313,21 +523,6 @@ Admitted.
 (* Proof. *)
 (* Admitted. *)
 
-Lemma semSuchThatMaybe_complete:
-  forall (A : Type) (g : G A) (f : A -> bool) (s : set A),
-    s \subset semGen g ->
-    (Some @: (s :&: (fun x : A => f x))) \subset
-    semGen (suchThatMaybe g f).
-Proof.
-Admitted.
-
-Lemma semSuchThatMaybeOpt_complete:
-  forall (A : Type) (g : G (option A)) (f : A -> bool) (s : set A),
-    (Some @: s) \subset semGen g ->
-    (Some @: (s :&: (fun x : A => f x))) \subset
-    semGen (suchThatMaybeOpt g f).
-Proof.
-Admitted.
 
 Derive SizedProofEqs for (fun (x : tree) => LRTree x).
 
@@ -342,7 +537,7 @@ Derive GenSizedSuchThatCorrect for (fun foo => LRTree foo).
    bug for 
 | GL : goodTree 0 Leaf
 | GN : forall k t1 t2 n, goodTree n t1 ->
-                      ~ t1 =  t2 ->
+                      ~ t1 =  t2 ->υ
                       (* goodTree m t1 -> *)
                       goodTree (S n) (Node k t1 t2).
 *)

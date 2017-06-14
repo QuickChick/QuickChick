@@ -92,6 +92,7 @@ let discriminate h =
   false_ind hole
     (gMatch h [(injectCtr "erefl", [], fun [] -> gI)])
 
+
 let rewrite h hin =
   gApp (gInject "eq_ind") [hole; hole; hin; hole; h]
   (* gMatch h [(injectCtr "erefl", [], fun [] -> hin)] *)
@@ -140,3 +141,6 @@ let isSome x =
 
 let isSomeSome x =
   gApp (gInject "isSomeSome") [x]
+
+let diff_false_true h =
+  gApp (gInject "Bool.diff_false_true") [h]
