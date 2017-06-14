@@ -39,6 +39,10 @@ Record Result :=
       callbacks   : list Callback
     }.
 
+Definition debug_stamps s {A : Type} (r : Result) (x : A) :=
+  trace (s ++ (ShowFunctions.string_concat (
+             (ShowFunctions.intersperse " @ "%string (stamp r)))) ++ nl) x.
+
 (* I WANT RECORD UPDATES :'( *)
 Definition succeeded := MkResult (Some true ) true "" false nil nil.
 Definition failed    := MkResult (Some false) true "" false nil nil.
@@ -241,26 +245,29 @@ Global Instance testPolyFunSet {prop : Set -> Type} {_ : Checkable (prop nat)} :
   }.
 
 (* LEO: TODO: Prove conjoin checker *)
-Definition addCallbacks' result r := 
+Definition addCallbacks' r result := 
   addCallbacks result (callbacks r).
-Definition addStamps' result r := 
-  addStamps result (stamp r).
+Definition addStamps' r result := 
+(*   debug_stamps "Before_adding: " result (
+  debug_stamps "Adding_stamps: " r ( *)
+  let res := addStamps result (stamp r) in
+(*   debug_stamps "After_adding: " res  *)
+  res.
 
 Fixpoint conjAux (f : Result -> Result) 
          l := 
   match l with 
-    | nil => MkRose (f succeeded) (lazy nil)
+    | nil => (MkRose (f succeeded) (lazy nil))
     | cons res rs => 
       let '(MkRose r _) := res in
       match ok r with 
         | Some true =>
-           (conjAux (fun r' => addStamps' r 
-                             (addCallbacks' r (f r'))
+           (conjAux (fun r' => addStamps' r (addCallbacks' r (f r'))
                     ) rs)
         | Some false => res
         | None =>
-          let res' := conjAux (fun r' => addCallbacks' r (f r')) rs in
-          let '(MkRose r' _) := res' in
+          let res' := conjAux (fun r' => (addCallbacks' r (f r'))) rs in
+          let '(MkRose r' rs) := res' in
           match ok r' with 
             | Some true => MkRose (updOk r' None) (lazy nil)
             | Some false => res'
@@ -275,8 +282,12 @@ Definition mapGen {A B} (f : A -> G B) (l : list A) : G (list B) :=
           l nil.
 
 Fixpoint conjoin {prop : Type} `{_ : Checkable prop} (l : list Checker) : Checker :=
+(*   trace ("Beginnning conjoin" ++ nl) ( *)
   bindGen (mapGen (liftGen unProp) l) (fun rs =>
-          (returnGen (MkProp (conjAux (fun x => x) rs)))).
+          (returnGen (MkProp (let res := conjAux (fun x => x) rs in
+                              let '(MkRose r _) := res in 
+                              (* debug_stamps "Conjoin result: " r *) res
+                             )))).
 
 Module QcNotation.
   Export QcDefaultNotation.

@@ -88,6 +88,17 @@ Instance showEx {A} `{_ : Show A} P : Show ({x : A | P x}) :=
 Require Import Ascii.
 Definition nl : string := String (ascii_of_nat 10) EmptyString.
 
+Definition smart_paren (s : string) : string :=
+  let fix aux s (b : bool) := 
+      match s with 
+        | EmptyString => (if b then ")" else "", b)
+        | String a s => 
+          let (s', b) := aux s (orb b (nat_of_ascii a =? 32)) in
+          (String a s', b)
+      end in
+  let (s', b) := aux s false in
+  if b then "(" ++ s' else s'.
+
 Module ShowFunctions.
 
 Import ListNotations.

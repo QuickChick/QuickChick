@@ -243,13 +243,21 @@ Fixpoint runATest (st : State) (f : nat -> RandomSeed -> QProp) (maxSteps : nat)
         match res with
         | MkResult (Some x) e reas _ s _ =>
           if x then (* Success *)
+            let s_to_add := 
+                ShowFunctions.string_concat 
+                  (ShowFunctions.intersperse " , "%string s) in
+            let ls' := match Map.find s_to_add ls with 
+              | None   => Map.add s_to_add 1 ls
+              | Some k => Map.add s_to_add (k+1) ls
+            end in
+(*                  
             let ls' := fold_left (fun stamps stamp =>
                                     let oldBind := Map.find stamp stamps in
                                     match oldBind with
                                     | None   => Map.add stamp 1 stamps
                                     | Some k => Map.add stamp (k+1) stamps
                                     end
-                                 ) s ls in
+                                 ) s ls in*)
             test (MkState mst mdt ms cs (nst + 1) ndt ls' e rnd2 nss nts)
           else (* Failure *)
             let pre : string := (if expect res then "*** Failed! "

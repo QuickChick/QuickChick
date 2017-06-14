@@ -28,10 +28,10 @@ Derive (Arbitrary, Show) for Foo.
 (* begin show_foo *)
 Fixpoint showFoo' (x : Foo) := 
   match x with 
-  | Foo1 => "Foo1  " ++ ""
-  | Foo2 f => "Foo2  " ++ ("( " ++ showFoo' f ++ " )") ++ " " ++ ""
-  | Foo3 n f => "Foo3  " ++ ("( " ++ show     n ++ " )") ++
-                     " " ++ ("( " ++ showFoo' f ++ " )") ++ " " ++ ""
+  | Foo1 => "Foo1"
+  | Foo2 f => "Foo2 " ++ smart_paren (showFoo' f)
+  | Foo3 n f => "Foo3 " ++ smart_paren (show n) ++
+                        " " ++ smart_paren (showFoo' f)
   end%string.
 (* end show_foo *)
 

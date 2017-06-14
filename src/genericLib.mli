@@ -158,6 +158,7 @@ val gStr : string -> coq_expr
 val emptyString : coq_expr 
 val str_append  : coq_expr -> coq_expr -> coq_expr 
 val str_appends : coq_expr list -> coq_expr
+val smart_paren : coq_expr -> coq_expr
 
 (* Pair *)
 val gPair : coq_expr * coq_expr -> coq_expr 
