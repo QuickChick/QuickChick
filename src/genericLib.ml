@@ -855,14 +855,14 @@ let create_names_for_anon a =
      end
   | _ -> failwith "Non RawAssum in create_names"
     
-let declare_class_instance ?(global=true) instance_arguments instance_name instance_type instance_record =
+let declare_class_instance ?(global=true) ?(priority=42) instance_arguments instance_name instance_type instance_record =
   let (vars,iargs) = List.split (List.map create_names_for_anon instance_arguments) in
   let cid = Classes.new_instance ~global:global false 
                                iargs
                        (((dummy_loc, (Name (id_of_string instance_name))), None)
                        , Decl_kinds.Explicit, instance_type vars) 
                        (Some (true, instance_record vars)) (* TODO: true or false? *)
-                       { hint_priority = None; hint_pattern = None }
+                       { hint_priority = Some priority; hint_pattern = None }
   in
   msg_debug (str (Id.to_string cid) ++ fnl ())
 
