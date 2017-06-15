@@ -1,21 +1,33 @@
-(*
-  see Learn You A Haskell, or 
-  Simon PJ, Classes, Jim, But Not as We Know Them — Type Classes in Haskell:
-    What, Why, and Whither (video from OPLSS?)
+(* see Learn You A Haskell, or Simon PJ, Classes, Jim, But Not as We
+  Know Them — Type Classes in Haskell: What, Why, and Whither (video
+  from OPLSS?)
 
-  good background
-    http://learnyouahaskell.com/types-and-typeclasses
-  and 
-    Simon PJ, Classes, Jim, But Not as We Know Them — Type Classes in Haskell:
-      What, Why, and Whither (video from OPLSS?)
+  good background http://learnyouahaskell.com/types-and-typeclasses
+    and Simon PJ, Classes, Jim, But Not as We Know Them — Type Classes
+    in Haskell: What, Why, and Whither (video from OPLSS?)
+
+  By "tutorial on basic Haskell type classes" I am assuming that you
+  mean something which explains what a type class is, how to create
+  and use them, and so on? (As opposed to, say, something which
+  introduces some of the particular type classes in the standard
+  library?)  I suppose you might be able to use my lecture notes as a
+  starting point:
+  http://www.seas.upenn.edu/~cis194/spring13/lectures/05-type-classes.html
+  .  I don't know if it's good but it's certainly short.  The Haskell
+  wikibook is also usually pretty good:
+  https://en.wikibooks.org/wiki/Haskell/Classes_and_types , though on
+  skimming it now I think it probably spends too much time on
+  incidental details with not enough examples.  All the other basic
+  type class tutorials that I know of are in textbooks that I haven't
+  read so I can't vouch for them.
 
 Reference manual chapter:
-  https://coq.inria.fr/refman/Reference-Manual023.html
-"Gentle" Introduction:
+  https://coq.inria.fr/refman/Reference-Manual023.html "Gentle"
+  Introduction:
   http://www.labri.fr/perso/casteran/CoqArt/TypeClassesTut/typeclassestut.pdf
-StackOverflow:
+  StackOverflow:
   https://stackoverflow.com/questions/29872260/coq-typeclasses-vs-dependent-records
-Sozeau slides: 
+  Sozeau slides:
   https://www.cis.upenn.edu/~bcpierce/courses/670Fall12/slides.pdf
 
   an example or two of how what are compiled into (dictionary passing)

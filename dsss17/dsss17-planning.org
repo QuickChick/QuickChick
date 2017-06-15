@@ -21,12 +21,33 @@ core QC typeclasses
            - might generate the same example
            - might generate larger examples
 
+(talk about the fact that longer test cases often find examples better --
+see John's talk, and perhaps even use the "1-2-3-4-5 in order" example in
+detail) 
+
 return to the small examples
 
 more QC typeclasses
   sized?
 
+ways of measuring distributions
+   "Tuning random distributions is 
+      - a creative process
+      - based on observations
+      - highly effective"
+   (and see other observations in John's talk)
+
+code coverage is a very bad success metric, but a rather good heuristic for
+when your tests are not good enough
+
 mutation testing
+  
+final comments about testing
+  - simple properties: very high payoff
+      - round trip properties
+      - regression testing
+  - invariants that are going to be used for proof
+  - complete specs may have smaller payoff
 
 ----------
 

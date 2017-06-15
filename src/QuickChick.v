@@ -44,7 +44,7 @@ Require Export Instances.
 Require Export DependentClasses.
 Export GenLow GenHigh.
 
-(* TODO: Where should these really go?  (Not working anyway - they
+(* TODO: Where should these really go?  (Not working anyway - the
    Derives are too local...) *)
 (*
 Require Import String.
