@@ -106,3 +106,50 @@ Instance showPair {A B : Type} `{_ : Show A} `{_ : Show B} : Show (A * B) :=
 (* now show a parameterized type class (what's the simplest example?) *)
 
 (* now show the definition of Dep *)
+
+
+
+
+(** Pragmatics *)
+
+(* A potential gotcha:
+ 
+The problem appears to be when using the (universe-polymorphic) inject
+function in conjunction with a typeclass method, when the necessary
+instance doesn't exist.
+
+Inductive Foo := MkFoo : Foo.
+  Set Typeclasses Debug.
+
+  Instance gen : Gen (list Foo) := {| arbitrary := liftGen inject
+    arbitrary |}.
+
+Leo: My goto debug method is to try to manually expand the
+typeclasses. Before that, I needed to understand what “inject”
+was. Since the result type was list of X, I assumed that inject is
+similar to using “pure” or “return” in Haskell instead of (fun x =>
+[x]). However, Coq is really bad usually at figuring out implicit
+stuff – so I just replaced it by the explicit anonymous function.
+ 
+After that it was just a “Gen (list X) instance does not exist”, so
+deriving Arbitrary (or Gen) for X should work (and it did). Now, why
+things work when moving back to “inject” after adding the instance I
+have no idea 😊
+
+
+Yao: I have discussed this with Leo. The problem is that I have
+defined the following instance:
+
+Polymorphic Instance Injection_trans {A B C : Type} {P : Injection A
+            B} {Q : Injection B C} : Injection A C := { inject e :=
+            inject (inject e) }.
+
+This would cause the type checker to go to an infinite loop if it
+recursively takes this branch before exploring other
+possibilities. Removing this instance would fix the problem.
+
+We don’t see other problems with this Injection type class for
+now. Therefore, I suggest we keep this type class, but be careful not
+to define something similar to what I did.
+
+*)
