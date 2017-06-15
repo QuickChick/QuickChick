@@ -48,15 +48,25 @@ let link_files = ["quickChickLib.cmx"]
 let ocamlopt = "ocamlopt"
 let ocamlc = "ocamlc"
 
-let comp_mli_cmd fn =
-  Printf.sprintf "%s -rectypes -I %s %s" ocamlc (Lazy.force path) fn
-
 let comp_ml_cmd fn out =
   let path = Lazy.force path in
   let link_files = List.map (Filename.concat path) link_files in
   let link_files = String.concat " " link_files in
   Printf.sprintf "%s -rectypes -w a -I %s -I %s %s %s -o %s" ocamlopt
     temp_dirname path link_files fn out
+
+(* 
+let comp_mli_cmd fn =
+  Printf.sprintf "%s -rectypes -I %s %s" ocamlc (Lazy.force path) fn
+ *)
+
+let comp_mli_cmd fn =
+  let path = Lazy.force path in
+  let link_files = List.map (Filename.concat path) link_files in
+  let link_files = String.concat " " link_files in
+  Printf.sprintf "%s -rectypes -w a -I %s -I %s %s %s" ocamlopt
+    temp_dirname path link_files fn
+
 
 let fresh_name n =
     let base = Names.id_of_string n in
@@ -115,11 +125,16 @@ let runTest c =
   (** Extraction sometimes produces ML code that does not implement its interface.
       We circumvent this problem by erasing the interface. **)
   Sys.remove mlif;
-  (*
+  (* TODO: Maxime, thoughts? *)
+  (** LEO: However, sometimes the inferred types are too abstract. So we touch the .mli to close the weak types. **)
+  Sys.command ("touch " ^ mlif);
+  (* 
   Printf.printf "Extracted ML file: %s\n" mlf;
   Printf.printf "Compile command: %s\n" (comp_ml_cmd mlf execn);
   flush_all ();
-  *)
+  *) 
+  (* Compile the (empty) .mli *)
+  if Sys.command (comp_mli_cmd mlif) <> 0 then msg_error (str "Could not compile mli file" ++ fnl ());
   if Sys.command (comp_ml_cmd mlf execn) <> 0 then
     msg_error (str "Could not compile test program" ++ fnl ())
   (** Run the test *)
