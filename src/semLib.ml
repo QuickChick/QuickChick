@@ -72,13 +72,22 @@ let suchThatMaybeOptMonotonic p pred =
   gApp ~explicit:true
     (gInject "suchThatMaybeOptMonotonic") [hole; hole; pred; p]
 
-let semBindOptSizeMonotonic g gmon f fmon hsub x hin =
-  gApp ~explicit:true (gInject "semBindOptSizeMonotonicIncl")
+let semBindOptSizeMonotonicIncl_l g gmon f fmon hsub x hin =
+  gApp ~explicit:true (gInject "semBindOptSizeMonotonicIncl_l")
     [hole; hole; g; f; hole; gmon; fmon; hsub; x; hin]
 
-let semBindSizeMonotonic g gmon f fmon hsub x hin =
-  gApp ~explicit:true (gInject "semBindSizeMonotonicIncl")
+let semBindSizeMonotonicIncl_l g gmon f fmon hsub x hin =
+  gApp ~explicit:true (gInject "semBindSizeMonotonicIncl_l")
     [hole; hole; g; f; hole; gmon; fmon; hsub; x; hin]
+
+
+let semBindOptSizeMonotonicIncl_r g f s sf gmon fmon hg hf =
+  gApp ~explicit:true (gInject "semBindOptSizeMonotonicIncl_r")
+    [hole; hole; g; f; s; sf; gmon; fmon; hg; hf]
+
+let semBindSizeMonotonicIncl_r g f s sf gmon fmon hg hf =
+  gApp ~explicit:true (gInject "semBindSizeMonotonicIncl_r")
+    [hole; hole; g; f; s; sf; gmon; fmon; hg; hf]
 
 let semSuchThatMaybe_complete g f s h =
   gApp (gInject "semSuchThatMaybe_complete") [hole; g; f; s; h]
@@ -86,5 +95,8 @@ let semSuchThatMaybe_complete g f s h =
 let semSuchThatMaybeOpt_complete g f s h =
   gApp (gInject "semSuchThatMaybeOpt_complete") [hole; g; f; s; h]
 
-let imset_incl h =
-  gApp (gInject "imset_incl") [h]
+let semSuchThatMaybe_sound g f s h =
+  gApp (gInject "semSuchThatMaybe_sound") [hole; g; f; s; h]
+
+let semSuchThatMaybeOpt_sound g f s h =
+  gApp (gInject "semSuchThatMaybeOpt_sound") [hole; g; f; s; h]

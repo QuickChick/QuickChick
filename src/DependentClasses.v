@@ -57,9 +57,11 @@ Class SizedSuchThatCorrect {A : Type} (P : A -> Prop) `{SizedProofEqs A P} (g : 
     sizedSTComplete :
       forall s, Some @: (iter s) \subset semGen (g s);
 
-    (* sizedSTSound : *)
-    (*   forall s, semGen (g s) \subset lift (iter s) *)
+    sizedSTSound :
+      forall s, semGen (g s) \subset lift (iter s)
   }.
+
+Set Printing All.
 
 Class SuchThatCorrect {A : Type} (P : A -> Prop) (g : G (option A)) :=
   {

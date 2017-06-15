@@ -781,8 +781,8 @@ let glt x y = gle (gApp (gInject "Coq.Init.Datatypes.S") [x]) y
 let gEq x y = gApp (gInject "Coq.Init.Logic.eq") [x; y]
             
 (* option type in Coq *)
-let gNone = gInject "Coq.Init.Datatypes.None"
-let gSome c = gApp (gInject "Coq.Init.Datatypes.Some") [c]
+let gNone typ = gApp ~explicit:true (gInject "Coq.Init.Datatypes.None") [typ]
+let gSome typ c = gApp ~explicit:true (gInject "Coq.Init.Datatypes.Some") [typ; c]
               
 let gOption c = gApp (gInject "Coq.Init.Datatypes.option") [c]
 

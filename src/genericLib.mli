@@ -177,8 +177,8 @@ val gEq : coq_expr -> coq_expr -> coq_expr
 
 (* Maybe *)
 val gOption : coq_expr -> coq_expr
-val gNone : coq_expr
-val gSome : coq_expr -> coq_expr              
+val gNone : coq_expr -> coq_expr
+val gSome : coq_expr -> coq_expr -> coq_expr
 
 (* boolean *)
 val gNot   : coq_expr -> coq_expr

@@ -38,6 +38,9 @@ let set_int c1 c2 = gApp (gInject "setI") [c1;c2]
 let imset f s =
   gApp (gInject "imset") [f; s]
 
+let sub0set =
+  gApp ~explicit:true (gInject "sub0set") [hole; hole]
+
 let rec set_unions = function
   | [] -> failwith "empty set unions"
   | [x] -> x
@@ -127,16 +130,21 @@ let setU_subset_l s2 p =
 let imset_set0_incl f x h =
   gApp (gInject "imset_set0_incl") [f; x; h]
 
-
 let imset_singl_incl x f y h =
   gApp (gInject "imset_singl_incl") [x; f; y; h]
 
 let imset_union_incl s1 s2 f x hin =
   gApp (gInject "imset_union_incl") [s1; s2; f; x; hin]
 
+let imset_incl h =
+  gApp (gInject "imset_incl") [h]
+
 let rewrite_set_r seq p =
   gApp (gInject "rewrite_set_r") [hole; hole; hole; p; seq]
- 
+
+let rewrite_set_l seq p =
+  gApp (gInject "rewrite_set_l") [hole; hole; hole; p; seq]
+
 
 let imset_bigcup_incl_l f a g x h =
   gApp (gInject "imset_bigcup_incl_l") [f; a; g; x; h]
@@ -144,5 +152,63 @@ let imset_bigcup_incl_l f a g x h =
 let set_eq_set_incl_r heq =
   gApp (gInject "set_eq_set_incl_r") [hole; hole; heq]
 
+let set_eq_set_incl_l heq =
+  gApp (gInject "set_eq_set_incl_l") [hole; hole; heq]
+
 let in_imset f s x hin =
   gApp (gInject "in_imset") [f; s; x; hin]
+
+let lift_union_compat h1 h2 =
+  gApp
+    ~explicit:true (gInject "lift_union_compat")
+    [hole; hole; hole; hole; hole; h1; h2]
+
+let lift_subset_pres_r h =
+  gApp
+    ~explicit:true (gInject "lift_subset_pres_r")
+    [hole; hole; hole; hole; h]
+
+let lift_subset_pres_l h =
+  gApp
+    ~explicit:true (gInject "lift_subset_pres_l")
+    [hole; hole; hole; hole; h]
+
+let bigcup_set0_subset f s =
+  gApp
+    ~explicit:true (gInject "bigcup_set0_subset")
+    [hole; hole; f; s]
+
+let bigcup_set_U h1 h2 =
+  gApp
+    ~explicit:true (gInject "bigcup_set_U")
+    [hole; hole; hole; hole; hole; hole; h1; h2]
+
+let bigcup_set_I_l h =
+  gApp
+    ~explicit:true (gInject "bigcup_set_I_l")
+    [hole; hole; hole; hole; hole; hole; h]
+
+let set_incl_setI_l h =
+  gApp
+    ~explicit:true (gInject "set_incl_setI_l")
+    [hole; hole; hole; hole; h]
+
+let set_incl_setI_r h =
+  gApp
+    ~explicit:true (gInject "set_incl_setI_r")
+    [hole; hole; hole; hole; h]
+
+let set_incl_setU_l h1 h2 =
+  gApp
+    ~explicit:true (gInject "set_incl_setU_l")
+    [hole; hole; hole; hole; h1; h2]
+
+let bigcup_cons_subset a b h1 h2 =
+  gApp
+    ~explicit:true (gInject "bigcup_cons_subset")
+    [a; b; hole; hole; hole; hole; h1; h2]
+
+let bigcup_nil_subset =
+  gApp
+    ~explicit:true (gInject "bigcup_nil_subset")
+    [hole; hole; hole; hole]
