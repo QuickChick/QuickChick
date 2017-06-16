@@ -109,6 +109,10 @@ Instance showPair {A B : Type} `{_ : Show A} `{_ : Show B} : Show (A * B) :=
 
 
 
+(* ----------------------------------------------------------------- *)
+(* More stuff... *)
+
+(* What does "Polymorphic Instance" mean? *)
 
 (** Pragmatics *)
 
