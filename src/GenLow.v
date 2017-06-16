@@ -258,10 +258,9 @@ Module Type GenLowInterface.
       (forall n m s,  n <= m -> semGenSize (f n) s \subset semGenSize (f m) s) ->
       semGen (sized f) <--> \bigcup_n (semGen (f n)).
 
-  Parameter semSize_opt :
-    forall A (f : nat -> G (option A)) (H : forall n, SizeMonotonic (f n))
-      (H' : forall n m s, n <= m -> isSome :&: semGenSize (f n) s \subset isSome :&: semGenSize (f m) s),
-    isSome :&: semGen (sized f) <--> isSome :&: \bigcup_n (semGen (f n)).
+  Parameter semSized_opt :
+    forall A (f : nat -> G (option A)) (H : forall n, SizeMonotonicOpt (f n)) (H' : SizedMonotonicOpt f),
+      isSome :&: semGen (sized f) <--> isSome :&: \bigcup_n (semGen (f n)).
 
   Declare Instance sizedSizeMonotonic
           A (gen : nat -> G A) `{forall n, SizeMonotonic (gen n)} `{SizedMonotonic A gen} :
@@ -801,8 +800,7 @@ Module GenLow : GenLowInterface.
   Lemma semSizedSize A(f:nat->G A)s : semGenSize (sized f) s <--> semGenSize (f s) s.
   Proof. by []. Qed.
 
-  Lemma semSize_opt A (f : nat -> G (option A)) (H : forall n, SizeMonotonic (f n))
-        (H' : forall n m s, n <= m -> isSome :&: semGenSize (f n) s \subset isSome :&: semGenSize (f m) s) :
+  Lemma semSized_opt A (f : nat -> G (option A)) (H : forall n, SizeMonotonicOpt (f n)) (H' : SizedMonotonicOpt f) :
     isSome :&: semGen (sized f) <--> isSome :&: \bigcup_n (semGen (f n)).
   Proof.
     rewrite semSized. rewrite !setI_bigcup_assoc.
@@ -812,9 +810,14 @@ Module GenLow : GenLowInterface.
     - move => [n [HT [Hs1 [m [HT' Hs2]]]]].
       eexists (m + n).
       split. now constructor. 
-      split; [ eassumption | ]. eapply (H' n). ssromega.
       split; [ eassumption | ].
-      eapply (H n); try eassumption. ssromega.
+      destruct x as [ x | ].
+      + assert (Hin: (isSome :&: semGenSize (f n) m) (Some x)).
+        { split; eauto. }
+        eapply (H n) with (s2 := m + n) in Hin; [| now ssromega ].
+        eapply H' with (s2 := m + n) in Hin; [| now ssromega ].
+        inv Hin. eassumption.
+      + inv Hs1.
   Qed.
 
   Lemma semSized_alt A (f : nat -> G A) (H : forall n, SizeMonotonic (f n))

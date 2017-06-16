@@ -14,7 +14,6 @@ Open Scope qc_scope.
 Open Scope string.
 
 Set Bullet Behavior "Strict Subproofs".
-
 (** * Correctness of dependent generators *)
 
 Class SizedProofEqs {A : Type} (P : A -> Prop) :=
@@ -81,8 +80,16 @@ Notation "'genSizedST' x" := (@arbitrarySizeST _ x _) (at level 70).
 Class GenSizedSuchThatMonotonic (A : Type)
       `{GenSizedSuchThat A} `{forall s, SizeMonotonic (arbitrarySizeST s)}.
 
+
+Class GenSizedSuchThatMonotonicOpt (A : Type)
+      `{GenSizedSuchThat A} `{forall s, SizeMonotonicOpt (arbitrarySizeST s)}.
+
 Class GenSizedSuchThatSizeMonotonic (A : Type)
       `{GenSizedSuchThat A} `{SizedMonotonic _ arbitrarySizeST}.
+
+Class GenSizedSuchThatSizeMonotonicOpt (A : Type)
+      `{GenSizedSuchThat A} `{SizedMonotonicOpt _ arbitrarySizeST}.
+
 
 (** * Correctness of denendent sized generators *)
   
@@ -151,15 +158,6 @@ Instance GenSuchThatMonotonicOfSized (A : Type) (P : A -> Prop)
          `{@GenSizedSuchThatSizeMonotonic A P H PSMon}
 : GenSuchThatMonotonic A P.
 
-Class GenSizedSuchThatSizeMonotonicOpt (A : Type)
-      `{GenSizedSuchThat A} :=
-  {
-    mon_opt :
-      forall s s1 s2,
-        isSome :&: semGenSize (arbitrarySizeST s1) s \subset
-        isSome :&: semGenSize (arbitrarySizeST s2) s
-  }.
-
 Lemma option_subset {A} (s1 : set (option A)) :
   s1 \subset (isSome :&: s1) :|: [set None]. 
 Proof.
@@ -199,25 +197,24 @@ Qed.
 
 Instance ArbitraryCorrectFromSized (A : Type) (P : A -> Prop)
          {H : GenSizedSuchThat A P}
-         `{@GenSizedSuchThatMonotonic A P H PMon}
-         `{@GenSizedSuchThatSizeMonotonicOpt A P H}
+         `{@GenSizedSuchThatMonotonicOpt A P H PMon}
+         `{@GenSizedSuchThatSizeMonotonicOpt A P H PSMon}
          `{@GenSizedSuchThatCorrect A P H PSized PCorr}
 : SuchThatCorrect P arbitraryST.
 Proof.
   constructor; unfold arbitraryST, GenSuchThatOfSized.
-  - eapply subset_trans.
-    eapply subset_respects_set_eq_r.
-    eapply semSize_opt; eauto.
-    intros. destruct H1. now eauto.
-    intros x [y [Py Pg]]. inv Pg.
-    eapply spec in Py. destruct Py as [n [H3 H4]].
-    split. now eauto.
-    eexists n. split; [now constructor |].
+  - rewrite <- spec.
+    eapply subset_trans;
+      [| eapply set_incl_setI_r with (s1 := isSome) ];
+      [| now apply subset_refl ].
+    rewrite semSized_opt; eauto.
+    intros x [y [[n [_ Hin]] Hs]]; inv Hs.
+    split; eauto. 
+    exists n. split. now constructor.
     eapply PCorr. eexists; split; eauto.
-    firstorder. (* ..... *)
   - eapply subset_trans; [ now eapply option_subset |].
     eapply setU_l_subset; [| eapply setU_set_incl_r; now eapply subset_refl ].
-    rewrite semSize_opt.
+    rewrite semSized_opt.
     eapply set_incl_setI_r.
     eapply subset_trans.
     eapply incl_bigcupr.
@@ -226,7 +223,6 @@ Proof.
     eapply subset_trans; [ now apply bigcup_lift_lift_bigcup |].
     eapply lift_subset_compat.
     rewrite spec. now apply subset_refl.
-    intros. destruct H1; eauto.
 Qed.
 
 (* TODO: Move to another file *)
