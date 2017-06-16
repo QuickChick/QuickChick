@@ -162,7 +162,9 @@ Global Instance shrinkList {A : Type} `{Shrink A} : Shrink (list A) :=
 
 Global Instance shrinkPair {A B} `{Shrink A} `{Shrink B} : Shrink (A * B) :=
   {| 
-    shrink p := List.combine (shrink (fst p)) (shrink (snd p))
+    shrink := fun (p : A * B) =>
+      let (a,b) := p in 
+      map (fun a' => (a',b)) (shrink a) ++ map (fun b' => (a,b')) (shrink b)
   |}.
 
 Global Instance shrinkOption {A : Type} `{Shrink A} : Shrink (option A) :=
