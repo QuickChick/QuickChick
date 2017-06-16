@@ -92,6 +92,7 @@ Instance showNat : Show nat :=
 
 Compute (show 42).
 
+(* Can eliminate _, right? *)
 Instance showPair {A B : Type} `{_ : Show A} `{_ : Show B} : Show (A * B) :=
 {|
   show p := match p with (a,b) => ("(" ++ show a ++ "," ++  show b ++ ")") end
@@ -155,5 +156,7 @@ possibilities. Removing this instance would fix the problem.
 We don’t see other problems with this Injection type class for
 now. Therefore, I suggest we keep this type class, but be careful not
 to define something similar to what I did.
+
+EXERCISE: Find a different way of making instance inference diverge.
 
 *)
