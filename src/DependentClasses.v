@@ -49,8 +49,7 @@ Class SizedProofEqs {A : Type} (P : A -> Prop) :=
 (*   - intros x. eapply IH. eauto. *)
 (* Qed. *)
 
-Definition lift {A} (S : set A) : set (option A) :=
-  Some @: S :|: [set None].
+
 
 Class SizedSuchThatCorrect {A : Type} (P : A -> Prop) `{SizedProofEqs A P} (g : nat -> G (option A)) :=
   {
@@ -61,13 +60,11 @@ Class SizedSuchThatCorrect {A : Type} (P : A -> Prop) `{SizedProofEqs A P} (g : 
       forall s, semGen (g s) \subset lift (iter s)
   }.
 
-Set Printing All.
-
 Class SuchThatCorrect {A : Type} (P : A -> Prop) (g : G (option A)) :=
   {
     STComplete : Some @: [set x : A | P x ] \subset semGen g;
 
-    (* STSound : semGen g \subset lift [set x : A | P x ] *)
+    STSound : semGen g \subset lift [set x : A | P x ]
   }.
 
 (** * Dependent sized generators *)
@@ -154,30 +151,82 @@ Instance GenSuchThatMonotonicOfSized (A : Type) (P : A -> Prop)
          `{@GenSizedSuchThatSizeMonotonic A P H PSMon}
 : GenSuchThatMonotonic A P.
 
+Class GenSizedSuchThatSizeMonotonicOpt (A : Type)
+      `{GenSizedSuchThat A} :=
+  {
+    mon_opt :
+      forall s s1 s2,
+        isSome :&: semGenSize (arbitrarySizeST s1) s \subset
+        isSome :&: semGenSize (arbitrarySizeST s2) s
+  }.
+
+Lemma option_subset {A} (s1 : set (option A)) :
+  s1 \subset (isSome :&: s1) :|: [set None]. 
+Proof.
+  intros [x |]; firstorder.
+Qed.
+
+Lemma setU_l_subset {U} (s1 s2 s3 : set U) :
+  s1 \subset s3 ->
+  s2 \subset s3 ->
+  (s1 :|: s2) \subset s3.
+Proof.
+  firstorder.
+Qed.
+
+Lemma bigcup_lift_lift_bigcup {T U} (s1 : set T) (f : T -> set U) :
+  \bigcup_(x in s1) (lift (f x)) \subset lift (\bigcup_(x in s1) (f x)).
+Proof.
+  intros x [y [H1 [[z [H2 H3]] | H2]]].
+  + inv H3. left; eexists; split; eauto.
+    eexists; split; eauto.
+  + inv H2; now right. 
+Qed.
+
+Lemma lift_subset_compat {U} (s1 s2 : set U) :
+  s1 \subset s2 ->
+  lift s1 \subset lift s2.
+Proof.
+  firstorder.
+Qed.
+
+Lemma lift_set_eq_compat {U} (s1 s2 : set U) :
+  s1 <--> s2 ->
+  lift s1 <--> lift s2.
+Proof.
+  firstorder.
+Qed.
+
 Instance ArbitraryCorrectFromSized (A : Type) (P : A -> Prop)
          {H : GenSizedSuchThat A P}
          `{@GenSizedSuchThatMonotonic A P H PMon}
-         `{@GenSizedSuchThatSizeMonotonic A P H PSMon}
+         `{@GenSizedSuchThatSizeMonotonicOpt A P H}
          `{@GenSizedSuchThatCorrect A P H PSized PCorr}
 : SuchThatCorrect P arbitraryST.
 Proof.
-  constructor; unfold arbitraryST, GenSuchThatOfSized;
-  rewrite semSized_alt.
-  - eapply subset_trans;
-    [ | eapply incl_bigcupr; now eapply sizedSTComplete ].
-    rewrite <-imset_bigcup, spec. eapply subset_refl.
-  - intros. inv PSMon; eauto.
-  (* - eapply subset_trans. eapply incl_bigcupr. *)
-  (*   intros x. *)
-  (*   admit. *)
-  (*   (* now eapply sizedSTSound. *) *)
-  (*   (* unfold lift. *) *)
-  (*   (* rewrite bigcup_setU_r. *) *)
-  (*   (* rewrite <-imset_bigcup, spec. *) *)
-  (*   (* rewrite bigcup_const. eapply subset_refl. *) *)
-  (* (* constructor. exact 0. *) *)
-  (*   admit. *)
-    (* - destruct PSMon. eauto. *)
+  constructor; unfold arbitraryST, GenSuchThatOfSized.
+  - eapply subset_trans.
+    eapply subset_respects_set_eq_r.
+    eapply semSize_opt; eauto.
+    intros. destruct H1. now eauto.
+    intros x [y [Py Pg]]. inv Pg.
+    eapply spec in Py. destruct Py as [n [H3 H4]].
+    split. now eauto.
+    eexists n. split; [now constructor |].
+    eapply PCorr. eexists; split; eauto.
+    firstorder. (* ..... *)
+  - eapply subset_trans; [ now eapply option_subset |].
+    eapply setU_l_subset; [| eapply setU_set_incl_r; now eapply subset_refl ].
+    rewrite semSize_opt.
+    eapply set_incl_setI_r.
+    eapply subset_trans.
+    eapply incl_bigcupr.
+    intros n x Hg.
+    eapply PCorr in Hg. exact Hg.
+    eapply subset_trans; [ now apply bigcup_lift_lift_bigcup |].
+    eapply lift_subset_compat.
+    rewrite spec. now apply subset_refl.
+    intros. destruct H1; eauto.
 Qed.
 
 (* TODO: Move to another file *)

@@ -12,20 +12,6 @@ Import QcDoNotation.
 
 Set Bullet Behavior "Strict Subproofs".
 
-Lemma cons_subset {A : Type} (x : A) (l : seq A) (P : set A) :
-  P x ->
-  l \subset P ->
-  (x :: l) \subset P.
-Proof.
-  intros Px Pl x' Hin. inv Hin; firstorder.
-Qed.
-
-Lemma nil_subset {A : Type} (P : set A) :
-  [] \subset P.
-Proof.
-  intros x H; inv H.
-Qed.
-
 Instance bindOptMonotonic
         {A B} (g : G (option A)) (f : A -> G (option B))
         `{SizeMonotonic _ g} `{forall x, SizeMonotonic (f x)} : 
@@ -41,6 +27,33 @@ Instance suchThatMaybeOptMonotonic
          {A : Type} (g : G (option A)) (f : A -> bool) `{SizeMonotonic _ g} : 
   SizeMonotonic (suchThatMaybeOpt g f).
 Admitted.
+
+Lemma bigcap_setU_l:
+  forall (U T : Type) (s1 s2 : set U) (f : U -> set T),
+    \bigcap_(i in s1) f i :&: \bigcap_(i in s2) f i <--> \bigcap_(i in s1 :|: s2) f i.
+Proof.
+  intros. split.
+  - intros [ H1 H2 ] x [ H3 | H3 ]; eauto.
+  - intros H. split; intros x H3; eapply H.
+    now left. now right.
+Qed.
+
+Lemma backtrackMonotonic {A} (g1 g2 : list (nat * G (option A))) (s : nat) :
+  g1 <> [] ->
+  g1 \subset g2 -> 
+  semGenSize (backtrack g1) s \subset semGenSize (backtrack g2) s.
+Proof. 
+  intros Hneq H.
+  rewrite !semBacktrackSize.
+  eapply setU_set_subset_compat.
+  - admit.
+  - eapply setI_subset_compat.
+    now apply subset_refl.
+    induction g1; simpl.
+    exfalso; eauto.
+    
+    inv Hneq. rewrite setI_comm setI_set0_abs bigcap_set0.
+    
 
 (* Instance frequencySizeMonotonic_alt  *)
 (* : forall {A : Type} (g0 : G A) (lg : seq (nat * G A)), *)
@@ -115,23 +128,17 @@ Derive SizedProofEqs for (fun foo => goodTree n foo).
 
 Derive SizeMonotonicSuchThat for (fun foo => goodTree n foo).
 
-Lemma imset_union_incl {U T : Type} (s1 s2 : set U) (f : U -> T) :
-  f @: (s1 :|: s2) \subset (f @: s1) :|: (f @: s2).
+
+Lemma succ_neq_zero :
+  forall x, S x <> 0.
 Proof.
   firstorder.
 Qed.
 
-Lemma imset_singl_incl {U T : Type} (x : U) (f : U -> T) :
-  f @: [set x] \subset [set (f x)].
+Lemma isSomeSome {A : Type} (y : A) :
+  Some y.
 Proof.
-  intros y Hin. destruct Hin as [y' [Hin1 Hin2]].
-  inv Hin1. inv Hin2. reflexivity.
-Qed.
-
-Lemma imset_set0_incl  {U T : Type} (f : U -> T) :
-  f @: set0 \subset set0.
-Proof.
-  firstorder.
+  exact isT.
 Qed.
 
 Lemma semBacktrack:
@@ -140,59 +147,6 @@ Lemma semBacktrack:
     (\bigcup_(x in (l :&: (fun x => x.1 <> 0))) (isSome :&: (semGen x.2))) :|:
     ([set None] :&: (\bigcap_(x in l :&: (fun x => x.1 <> 0)) (semGen x.2))).
 Admitted.
-
-Lemma set_eq_set_incl_r {U : Type} (s1 s2 : set U) :
-  s1 <--> s2 -> s2 \subset s1.
-Proof.
-  firstorder.
-Qed.
-
-Lemma set_eq_set_incl_l {U : Type} (s1 s2 : set U) :
-  s1 <--> s2 -> s1 \subset s2.
-Proof.
-  firstorder.
-Qed.
-
-Lemma rewrite_set_l {U : Type} (s1 s2 : set U) x :
-  s1 x ->
-  s1 <--> s2 ->
-  s2 x.
-Proof.
-  firstorder.
-Qed.
-
-Lemma rewrite_set_r {U : Type} (s1 s2 : set U) x :
-  s2 x ->
-  s1 <--> s2 ->
-  s1 x.
-Proof.
-  firstorder.
-Qed.
-
-Lemma succ_neq_zero :
-  forall x, S x <> 0.
-Proof.
-  firstorder.
-Qed.
-
-Lemma imset_bigcup_incl_l :
-  forall {T U V : Type} (f : U -> V) (A : set T) (F : T -> set U),
-  f @: (\bigcup_(x in A) F x) \subset \bigcup_(x in A) f @: F x.
-Proof.
-  firstorder.
-Qed.
-
-Lemma in_imset {U T} (f : U -> T) (S : set U) (x : T) :
-  (f @: S) x -> exists y, x = f y.
-Proof.
-  move => [y [H1 H2]]; eauto.
-Qed.
-
-Lemma isSomeSome {A : Type} (y : A) :
-  Some y.
-Proof.
-  exact isT.
-Qed.
 
 Lemma semBindOptSizeMonotonicIncl_l {A B} (g : G (option A)) (f : A -> G (option B)) (s1 : set A)
       `{Hg : SizeMonotonic _ g}
@@ -254,80 +208,6 @@ Lemma semSuchThatMaybeOpt_sound:
     semGen (suchThatMaybeOpt g f) \subset (Some @: (s :&: (fun x : A => f x)) :|: [set None]).
 Proof.
 Admitted.
-
-Lemma lift_union_compat {A} (s1 s2 : set (option A)) (s3 s4 : set A) :
-  s1 \subset lift s3 ->
-  s2 \subset lift s4 ->
-  (s1 :|: s2) \subset lift (s3 :|: s4).
-Proof.
-  firstorder.
-Qed.
-
-Lemma lift_subset_compat {A} (s1 s2 : set (option A)) (s3 s4 : set A) :
-  s1 \subset lift s3 ->
-  s2 \subset lift s4 ->
-  (s1 :|: s2) \subset lift (s3 :|: s4).
-Proof.
-  firstorder.
-Qed.
-
-Lemma lift_subset_pres_l {A} (s1 : set (option A)) (s2 s3 : set A) :
-  s1 \subset lift s2 ->
-  s1 \subset lift (s2 :|: s3).
-Proof.
-  firstorder.
-Qed.
-
-Lemma lift_subset_pres_r {A} (s1 : set (option A)) (s2 s3 : set A) :
-  s1 \subset lift s3 ->
-  s1 \subset lift (s2 :|: s3).
-Proof.
-  firstorder.
-Qed.
-
-
-Lemma set_incl_setI_l {A} (s1 s2 s3 : set A) :
-  s1 \subset s3 ->
-  (s1 :&: s2) \subset s3.
-Proof.
-  firstorder.
-Qed.
-
-Lemma set_incl_setI_r {A} (s1 s2 s3 : set A) :
-  s2 \subset s3 ->
-  (s1 :&: s2) \subset s3.
-Proof.
-  firstorder.
-Qed.
-
-Lemma set_incl_setU_l {A} (s1 s2 s3 : set A) :
-  s1 \subset s3 ->
-  s2 \subset s3 ->
-  (s1 :|: s2) \subset s3.
-Proof.
-  firstorder.
-Qed.
-
-Lemma bigcup_set_I_l {A B} (s1 s2 : set A) (s3 : set B) (f : A -> set B) :
-  \bigcup_(x in s1) (f x) \subset s3 ->
-  \bigcup_(x in (s1 :&: s2)) (f x) \subset s3.
-Proof.
-  firstorder.
-Qed.
-
-Lemma bigcup_set_U {A B} (s1 s2 : set A) (s3 : set B) (f : A -> set B) :
-  \bigcup_(x in s1) (f x) \subset s3 ->
-  \bigcup_(x in s2) (f x) \subset s3 ->
-  \bigcup_(x in (s1 :|: s2)) (f x) \subset s3.
-Proof.
-  firstorder.
-Qed.
-
-Lemma bigcup_set0_subset {A B} (s : set B) (f : A -> set B) :
-  \bigcup_(x in set0) (f x) \subset s.
-Proof.
-  firstorder.
-Qed.
 
 (* QuickChickDebug Debug On. *)
 
@@ -396,23 +276,6 @@ Fixpoint arb_aux (size0 input0_0 : nat) {struct size0} : G (option tree) :=
            end)]
   end.
 
-
-Lemma bigcup_cons_subset {A B} l (ls : seq A) (f : A -> set B) s :
-  f l \subset s ->
-  \bigcup_(x in ls) (f x) \subset s ->
-  \bigcup_(x in l :: ls) (f x) \subset s. 
-Proof.
-  intros H1 H2 x [y [Hl Hr]].
-  inv Hl.
-  - eauto.
-  - eapply H2. eexists; split; eauto.
-Qed.
-
-Lemma bigcup_nil_subset {A B} (f : A -> set B) s :
-  \bigcup_(x in []) (f x) \subset s. 
-Proof.
-  intros x [y [H1 H2]]. inv H1.
-Qed.
 
 Derive GenSizedSuchThatCorrect for (fun foo => goodTree n foo).
 
@@ -554,7 +417,6 @@ Inductive HeightTree : nat -> tree -> Prop :=
 
 Instance ArbitrarySuchThatEql {A} (x : A) : GenSuchThat A (fun y => eq x y) :=
   {| arbitraryST := returnGen (Some x) |}.
-
 
 
 

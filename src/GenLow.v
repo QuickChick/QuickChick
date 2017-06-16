@@ -96,6 +96,15 @@ Module Type GenLowInterface.
           s1 <= s2 ->
           semGenSize (g s1) s \subset semGenSize (g s2) s
     }.
+
+  (** Sized generators of option type monotonic in the size parameter *)
+  Class SizedMonotonicOpt {A} (g : nat -> G (option A)) :=
+    {
+      sizeMonotonicOpt :
+        forall s s1 s2,
+          s1 <= s2 ->
+          isSome :&: semGenSize (g s1) s \subset isSome :&: semGenSize (g s2) s
+    }.
   
   (** Generators monotonic in the runtime size parameter *)
   Class SizeMonotonic {A} (g : G A) :=
@@ -104,6 +113,13 @@ Module Type GenLowInterface.
         forall s1 s2, s1 <= s2 -> semGenSize g s1 \subset semGenSize g s2
     }.
 
+  (** Generators monotonic in the runtime size parameter *)
+  Class SizeMonotonicOpt {A} (g : G (option A)) :=
+    {
+      monotonic_opt :
+        forall s1 s2, s1 <= s2 -> isSome :&: semGenSize g s1 \subset isSome :&: semGenSize g s2
+    }.
+  
   (* CH: Why does Unsized need a _ when A is marked as implict! *)
   Parameter unsized_alt_def :
     forall A (g : G A) `{Unsized _ g},
@@ -170,6 +186,34 @@ Module Type GenLowInterface.
          `{SizeMonotonic _ g} `{forall a, SizeMonotonic (f a)},
     semGen (bindGen g f) <--> \bigcup_(a in semGen g) semGen (f a).
 
+  Parameter semBindOptSizeMonotonicIncl_r :
+    forall {A B} (g : G (option A)) (f : A -> G (option B)) (s1 : set A) (s2 : A -> set B),
+      semGen g \subset (Some @: s1) :|: [set None] ->
+      (forall x, semGen (f x) \subset Some @: (s2 x) :|: [set None]) -> 
+      semGen (bindGenOpt g f) \subset Some @: (\bigcup_(a in s1) s2 a) :|: [set None].
+
+  Parameter semBindSizeMonotonicIncl_r :
+    forall {A B} (g : G A) (f : A -> G (option B)) (s1 : set A) (s2 : A -> set B),
+      semGen g \subset s1 ->
+      (forall x, semGen (f x) \subset Some @: (s2 x) :|: [set None]) -> 
+      semGen (bindGen g f) \subset Some @: (\bigcup_(a in s1) s2 a)  :|: [set None].
+
+  Parameter semBindOptSizeMonotonicIncl_l :
+    forall {A B} (g : G (option A)) (f : A -> G (option B)) (s1 : set A)  (fs : A -> set B) 
+      `{Hg : SizeMonotonicOpt _ g} {Hf : forall a, SizeMonotonicOpt (f a)},
+      Some @: s1 \subset semGen g ->
+      (forall x, Some @: (fs x) \subset semGen (f x)) ->
+      (Some @: \bigcup_(a in s1) (fs a)) \subset semGen (bindGenOpt g f).
+
+
+  Parameter semBindSizeMonotonicIncl_l :
+    forall {A B} (g : G A) (f : A -> G (option B)) (s1 : set A) (fs : A -> set B) 
+      `{Hg : SizeMonotonic _ g}
+      `{Hf : forall a, SizeMonotonicOpt (f a)},
+    s1 \subset semGen g ->
+    (forall x, Some @: (fs x) \subset semGen (f x)) ->
+    (Some @: \bigcup_(a in s1) (fs a)) \subset semGen (bindGen g f).
+
   Parameter semFmap :
     forall A B (f : A -> B) (g : G A),
       semGen (fmap f g) <--> f @: semGen g.
@@ -213,6 +257,11 @@ Module Type GenLowInterface.
     forall A (f : nat -> G A) `{forall n, SizeMonotonic (f n)},
       (forall n m s,  n <= m -> semGenSize (f n) s \subset semGenSize (f m) s) ->
       semGen (sized f) <--> \bigcup_n (semGen (f n)).
+
+  Parameter semSize_opt :
+    forall A (f : nat -> G (option A)) (H : forall n, SizeMonotonic (f n))
+      (H' : forall n m s, n <= m -> isSome :&: semGenSize (f n) s \subset isSome :&: semGenSize (f m) s),
+    isSome :&: semGen (sized f) <--> isSome :&: \bigcup_n (semGen (f n)).
 
   Declare Instance sizedSizeMonotonic
           A (gen : nat -> G A) `{forall n, SizeMonotonic (gen n)} `{SizedMonotonic A gen} :
@@ -420,11 +469,28 @@ Module GenLow : GenLowInterface.
           s1 <= s2 ->
           semGenSize (g s1) s \subset semGenSize (g s2) s
     }.
+
+  (** Sized generators of option type monotonic in the size parameter *)
+  Class SizedMonotonicOpt {A} (g : nat -> G (option A)) :=
+    {
+      sizeMonotonicOpt :
+        forall s s1 s2,
+          s1 <= s2 ->
+          isSome :&: semGenSize (g s1) s \subset isSome :&: semGenSize (g s2) s
+    }.
   
+  (** Generators monotonic in the runtime size parameter *)
   Class SizeMonotonic {A} (g : G A) :=
     {
       monotonic :
         forall s1 s2, s1 <= s2 -> semGenSize g s1 \subset semGenSize g s2
+    }.
+
+  (** Generators monotonic in the runtime size parameter *)
+  Class SizeMonotonicOpt {A} (g : G (option A)) :=
+    {
+      monotonic_opt :
+        forall s1 s2, s1 <= s2 -> isSome :&: semGenSize g s1 \subset isSome :&: semGenSize g s2
     }.
   
   (* Unsizedness trivially implies size-monotonicity *)
@@ -476,7 +542,7 @@ Module GenLow : GenLowInterface.
   (* begin semBindSize *)
   Lemma semBindSize A B (g : G A) (f : A -> G B) (s : nat) :
     semGenSize (bindGen g f) s <-->
-               \bigcup_(a in semGenSize g s) semGenSize (f a) s.
+    \bigcup_(a in semGenSize g s) semGenSize (f a) s.
   (* end semBindSize *)
   Proof.
     rewrite /semGenSize /bindGen /= bigcup_codom -curry_codom2l.
@@ -581,6 +647,108 @@ Module GenLow : GenLowInterface.
       eapply Hf; last eassumption. by apply/leP; apply Max.le_max_r.
   Qed.
 
+  Lemma semBindOptSizeMonotonicIncl_r {A B} (g : G (option A)) (f : A -> G (option B)) (s1 : set A) (s2 : A -> set B) :
+    semGen g \subset (Some @: s1) :|: [set None] ->
+    (forall x, semGen (f x) \subset Some @: (s2 x) :|: [set None]) -> 
+    semGen (bindGenOpt g f) \subset Some @: (\bigcup_(a in s1) s2 a) :|: [set None].
+  Proof.
+    intros H1 H2 [x |] [s [_ [r H]]]; [| right; reflexivity ].
+    left.
+    eexists; split; [| reflexivity ].
+    simpl in H. destruct (randomSplit r) as [r1 r2] eqn:Heq.
+    destruct (run g s r1) eqn:Heq2; try discriminate.
+    eexists a. 
+    split.
+    + edestruct H1.
+      * eexists. split; [| eexists; eauto ]. now constructor.
+      * inv H0. inv H3. inv H5. eassumption.
+      * inv H0.
+    + edestruct H2.
+      * eexists. split; [| eexists; eauto ]. now constructor.
+      * inv H0. inv H3. inv H5. inv H3. eassumption.
+      * inv H0.
+  Qed.
+  
+  Lemma semBindSizeMonotonicIncl_r {A B} (g : G A) (f : A -> G (option B)) (s1 : set A) (s2 : A -> set B) :
+    semGen g \subset s1 ->
+    (forall x, semGen (f x) \subset Some @: (s2 x) :|: [set None]) -> 
+    semGen (bindGen g f) \subset Some @: (\bigcup_(a in s1) s2 a)  :|: [set None].
+  Proof.
+    intros H1 H2 [x |] [s [_ [r H]]]; [| right; reflexivity ].
+    left.
+    eexists; split; [| reflexivity ].
+    simpl in H. destruct (randomSplit r) as [r1 r2] eqn:Heq.
+    destruct (run (f (run g s r1)) s r2) eqn:Heq2; try discriminate.
+    inv H. eexists (run g s r1). split.
+    eapply H1. eexists; split; [| eexists; reflexivity ].
+    now constructor.
+    edestruct H2.
+    * eexists. split; [| eexists; eauto ]. now constructor.
+    * inv H0. inv H3. inv H5. eassumption.
+    * inv H0.
+  Qed.
+  
+  Lemma semBindOptSizeMonotonicIncl_l {A B} (g : G (option A)) (f : A -> G (option B)) (s1 : set A)
+        (fs : A -> set B) 
+        `{Hg : SizeMonotonicOpt _ g}
+        `{Hf : forall a, SizeMonotonicOpt (f a)} :
+    Some @: s1 \subset semGen g ->
+    (forall x, Some @: (fs x) \subset semGen (f x)) ->
+    (Some @: \bigcup_(a in s1) (fs a)) \subset semGen (bindGenOpt g f).
+  Proof.
+    intros H1 H2 y [y' [[x [Hs1 Hfs2]] Heq]]; inv Heq; clear Heq.
+    assert (Hin1 : (Some @: s1) (Some x)).
+    { eexists; split; eauto. now constructor. }
+    assert (Hin2 : (Some @: fs x) (Some y')).
+    { eexists; split; eauto. now constructor. }
+    eapply H1 in Hin1. eapply H2 in Hin2.
+    destruct Hg as [Hgmon].
+    destruct (Hf x) as [Hfgmon].
+    edestruct Hin1 as [s [_ Hgen]].
+    edestruct Hin2 as [s' [_ Hfgen]].
+    assert (Hin1' : ((fun u : option A => u) :&: semGenSize g s) (Some x)).
+    { split; eauto. }
+    assert (Hin2' : ((fun u : option B => u) :&: semGenSize (f x) s') (Some y')).
+    { split; eauto. }
+    eapply Hgmon with (s2 := s + s')  in Hin1'; [| now ssromega ].
+    eapply Hfgmon with (s2 := s + s')  in Hin2'; [| now ssromega ].
+    edestruct Hin1' as [_ [r1 Hr1]].
+    edestruct Hin2' as [_ [r2 Hr2]].
+    eexists (s + s'). split; [ now constructor |].
+    edestruct (randomSplitAssumption r1 r2) as [r'' Heq].
+    eexists r''. simpl. rewrite Heq.
+    rewrite Hr1 Hr2. reflexivity.
+  Qed.
+
+  Lemma semBindSizeMonotonicIncl_l {A B} (g : G A) (f : A -> G (option B)) (s1 : set A)
+        (fs : A -> set B) 
+        `{Hg : SizeMonotonic _ g}
+        `{Hf : forall a, SizeMonotonicOpt (f a)} :
+    s1 \subset semGen g ->
+    (forall x, Some @: (fs x) \subset semGen (f x)) ->
+    (Some @: \bigcup_(a in s1) (fs a)) \subset semGen (bindGen g f).
+  Proof.
+    intros H1 H2 y [y' [[x [Hs1 Hfs2]] Heq]]; inv Heq; clear Heq.
+    eapply H1 in Hs1.
+    assert (Hin2 : (Some @: fs x) (Some y')).
+    { eexists; split; eauto. now constructor. }
+    eapply H2 in Hin2.
+    destruct Hg as [Hgmon].
+    destruct (Hf x) as [Hfgmon].
+    edestruct Hs1 as [s [_ Hgen]].
+    edestruct Hin2 as [s' [_ Hfgen]].
+    assert (Hin2' : ((fun u : option B => u) :&: semGenSize (f x) s') (Some y')).
+    { split; eauto. }
+    eapply Hgmon with (s2 := s + s')  in Hgen; [| now ssromega ].
+    eapply Hfgmon with (s2 := s + s')  in Hin2'; [| now ssromega ].
+    edestruct Hgen as [r1 Hr1].
+    edestruct Hin2' as [_ [r2 Hr2]].
+    eexists (s + s'). split; [ now constructor |].
+    edestruct (randomSplitAssumption r1 r2) as [r'' Heq].
+    eexists r''. simpl. rewrite Heq.
+    rewrite Hr1 Hr2. reflexivity.
+  Qed.
+
   Lemma semFmapSize A B (f : A -> B) (g : G A) (size : nat) :
     semGenSize (fmap f g) size <--> f @: semGenSize g size.
   Proof.
@@ -632,7 +800,23 @@ Module GenLow : GenLowInterface.
 
   Lemma semSizedSize A(f:nat->G A)s : semGenSize (sized f) s <--> semGenSize (f s) s.
   Proof. by []. Qed.
-  
+
+  Lemma semSize_opt A (f : nat -> G (option A)) (H : forall n, SizeMonotonic (f n))
+        (H' : forall n m s, n <= m -> isSome :&: semGenSize (f n) s \subset isSome :&: semGenSize (f m) s) :
+    isSome :&: semGen (sized f) <--> isSome :&: \bigcup_n (semGen (f n)).
+  Proof.
+    rewrite semSized. rewrite !setI_bigcup_assoc.
+    move => x; split.
+    - move => [n [HT [Hs1 Hs2]]].
+      eexists. split; eauto. split; eauto. eexists; eauto.
+    - move => [n [HT [Hs1 [m [HT' Hs2]]]]].
+      eexists (m + n).
+      split. now constructor. 
+      split; [ eassumption | ]. eapply (H' n). ssromega.
+      split; [ eassumption | ].
+      eapply (H n); try eassumption. ssromega.
+  Qed.
+
   Lemma semSized_alt A (f : nat -> G A) (H : forall n, SizeMonotonic (f n))
         (H' : forall n m s,  n <= m -> semGenSize (f n) s \subset semGenSize (f m) s) :
     semGen (sized f) <--> \bigcup_n (semGen (f n)).

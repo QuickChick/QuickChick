@@ -125,6 +125,8 @@ Notation "\bigcap_ ( i 'in' A ) F" := (bigcap A (fun i => F))
   (at level 41, F at level 41, i, A at level 50,
            format "'[' \bigcap_ ( i  'in'  A ) '/  '  F ']'") : set_scope.
 
+Definition lift {T} (S : set T) : set (option T) :=
+  Some @: S :|: [set None].
 
 Lemma subset_eqP T (A B : set T) : (A <--> B) <-> (A \subset B /\ B \subset A).
 Proof.
@@ -687,4 +689,167 @@ Lemma incl_hd_same {A : Type} (a : A) (l1 l2 : seq A) :
   incl l1 l2 -> incl (a :: l1) (a :: l2).
 Proof.
   intros Hin. firstorder.
+Qed.
+     
+Lemma setI_bigcup_assoc {A B} (s1 : set B) (s2 : set A) (s3 : A -> set B) :
+  s1 :&: (\bigcup_(x in s2) s3 x) <--> \bigcup_(x in s2) (s1 :&: (s3 x)).
+Proof.
+  firstorder.
+Qed.
+
+Lemma cons_subset {A : Type} (x : A) (l : seq A) (P : set A) :
+  P x ->
+  l \subset P ->
+  (x :: l) \subset P.
+Proof.
+  intros Px Pl x' Hin. inv Hin; firstorder.
+Qed.
+
+Lemma nil_subset {A : Type} (P : set A) :
+  [] \subset P.
+Proof.
+  intros x H; inv H.
+Qed.
+
+Lemma imset_union_incl {U T : Type} (s1 s2 : set U) (f : U -> T) :
+  f @: (s1 :|: s2) \subset (f @: s1) :|: (f @: s2).
+Proof.
+  firstorder.
+Qed.
+
+Lemma imset_singl_incl {U T : Type} (x : U) (f : U -> T) :
+  f @: [set x] \subset [set (f x)].
+Proof.
+  intros y Hin. destruct Hin as [y' [Hin1 Hin2]].
+  inv Hin1. inv Hin2. reflexivity.
+Qed.
+
+Lemma imset_set0_incl  {U T : Type} (f : U -> T) :
+  f @: set0 \subset set0.
+Proof.
+  firstorder.
+Qed.
+
+Lemma set_eq_set_incl_r {U : Type} (s1 s2 : set U) :
+  s1 <--> s2 -> s2 \subset s1.
+Proof.
+  firstorder.
+Qed.
+
+Lemma set_eq_set_incl_l {U : Type} (s1 s2 : set U) :
+  s1 <--> s2 -> s1 \subset s2.
+Proof.
+  firstorder.
+Qed.
+
+Lemma rewrite_set_l {U : Type} (s1 s2 : set U) x :
+  s1 x ->
+  s1 <--> s2 ->
+  s2 x.
+Proof.
+  firstorder.
+Qed.
+
+Lemma rewrite_set_r {U : Type} (s1 s2 : set U) x :
+  s2 x ->
+  s1 <--> s2 ->
+  s1 x.
+Proof.
+  firstorder.
+Qed.
+
+Lemma imset_bigcup_incl_l :
+  forall {T U V : Type} (f : U -> V) (A : set T) (F : T -> set U),
+  f @: (\bigcup_(x in A) F x) \subset \bigcup_(x in A) f @: F x.
+Proof.
+  firstorder.
+Qed.
+
+Lemma in_imset {U T} (f : U -> T) (S : set U) (x : T) :
+  (f @: S) x -> exists y, x = f y.
+Proof.
+  move => [y [H1 H2]]; eauto.
+Qed.
+
+Lemma union_lift_subset_compat {A} (s1 s2 : set (option A)) (s3 s4 : set A) :
+  s1 \subset lift s3 ->
+  s2 \subset lift s4 ->
+  (s1 :|: s2) \subset lift (s3 :|: s4).
+Proof.
+  firstorder.
+Qed.
+
+Lemma lift_subset_pres_l {A} (s1 : set (option A)) (s2 s3 : set A) :
+  s1 \subset lift s2 ->
+  s1 \subset lift (s2 :|: s3).
+Proof.
+  firstorder.
+Qed.
+
+Lemma lift_subset_pres_r {A} (s1 : set (option A)) (s2 s3 : set A) :
+  s1 \subset lift s3 ->
+  s1 \subset lift (s2 :|: s3).
+Proof.
+  firstorder.
+Qed.
+
+
+Lemma set_incl_setI_l {A} (s1 s2 s3 : set A) :
+  s1 \subset s3 ->
+  (s1 :&: s2) \subset s3.
+Proof.
+  firstorder.
+Qed.
+
+Lemma set_incl_setI_r {A} (s1 s2 s3 : set A) :
+  s2 \subset s3 ->
+  (s1 :&: s2) \subset s3.
+Proof.
+  firstorder.
+Qed.
+
+Lemma set_incl_setU_l {A} (s1 s2 s3 : set A) :
+  s1 \subset s3 ->
+  s2 \subset s3 ->
+  (s1 :|: s2) \subset s3.
+Proof.
+  firstorder.
+Qed.
+
+Lemma bigcup_set_I_l {A B} (s1 s2 : set A) (s3 : set B) (f : A -> set B) :
+  \bigcup_(x in s1) (f x) \subset s3 ->
+  \bigcup_(x in (s1 :&: s2)) (f x) \subset s3.
+Proof.
+  firstorder.
+Qed.
+
+Lemma bigcup_set_U {A B} (s1 s2 : set A) (s3 : set B) (f : A -> set B) :
+  \bigcup_(x in s1) (f x) \subset s3 ->
+  \bigcup_(x in s2) (f x) \subset s3 ->
+  \bigcup_(x in (s1 :|: s2)) (f x) \subset s3.
+Proof.
+  firstorder.
+Qed.
+
+Lemma bigcup_set0_subset {A B} (s : set B) (f : A -> set B) :
+  \bigcup_(x in set0) (f x) \subset s.
+Proof.
+  firstorder.
+Qed.
+
+Lemma bigcup_cons_subset {A B} l (ls : seq A) (f : A -> set B) s :
+  f l \subset s ->
+  \bigcup_(x in ls) (f x) \subset s ->
+  \bigcup_(x in l :: ls) (f x) \subset s. 
+Proof.
+  intros H1 H2 x [y [Hl Hr]].
+  inv Hl.
+  - eauto.
+  - eapply H2. eexists; split; eauto.
+Qed.
+
+Lemma bigcup_nil_subset {A B} (f : A -> set B) s :
+  \bigcup_(x in []) (f x) \subset s. 
+Proof.
+  intros x [y [H1 H2]]. inv H1.
 Qed.

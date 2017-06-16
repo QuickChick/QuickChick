@@ -160,7 +160,7 @@ let in_imset f s x hin =
 
 let lift_union_compat h1 h2 =
   gApp
-    ~explicit:true (gInject "lift_union_compat")
+    ~explicit:true (gInject "union_lift_subset_compat")
     [hole; hole; hole; hole; hole; h1; h2]
 
 let lift_subset_pres_r h =
