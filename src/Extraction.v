@@ -4,7 +4,7 @@ Set Warnings "-notation-overridden,-parsing".
 Require Import ZArith.
 Require Import Coq.Strings.Ascii.
 Require Import Coq.Strings.String.
-Require Import Random RoseTrees Test Show Checker.
+Require Import RandomQC RoseTrees Test Show Checker.
 
 Require Import ExtrOcamlBasic.
 Require Import ExtrOcamlString.

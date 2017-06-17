@@ -6,7 +6,7 @@ Require Import mathcomp.ssreflect.ssreflect.
 From mathcomp Require Import ssrnat ssrbool eqtype div.
 
 Require Import Show RoseTrees.
-Require Import Random.
+Require Import RandomQC.
 Require Import GenLow GenHigh SemChecker.
 Require Import Checker.
 Require Import State.

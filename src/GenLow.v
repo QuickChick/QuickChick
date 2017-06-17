@@ -4,7 +4,7 @@ Set Warnings "-notation-overridden,-parsing".
 Require Import ZArith List.
 Require Import mathcomp.ssreflect.ssreflect.
 From mathcomp Require Import ssrfun ssrbool ssrnat.
-Require Import Random RoseTrees.
+Require Import RandomQC RoseTrees.
 Require Import Sets Tactics.
 Require Import Numbers.BinNums.
 Require Import Classes.RelationClasses.
@@ -231,14 +231,14 @@ Module Type GenLowInterface.
 
   Parameter semChoose :
     forall A `{ChoosableFromInterval A} (a1 a2 : A),
-      Random.leq a1 a2 ->
-      (semGen (choose (a1,a2)) <--> [set a | Random.leq a1 a && Random.leq a a2]).
+      RandomQC.leq a1 a2 ->
+      (semGen (choose (a1,a2)) <--> [set a | RandomQC.leq a1 a && RandomQC.leq a a2]).
 
   Parameter semChooseSize :
     forall A `{ChoosableFromInterval A} (a1 a2 : A),
-      Random.leq a1 a2 ->
+      RandomQC.leq a1 a2 ->
       forall size, (semGenSize (choose (a1,a2)) size <-->
-              [set a | Random.leq a1 a && Random.leq a a2]).
+              [set a | RandomQC.leq a1 a && RandomQC.leq a a2]).
 
   Declare Instance chooseUnsized A `{ChoosableFromInterval A} (a1 a2 : A) : 
     Unsized (choose (a1, a2)).
@@ -776,9 +776,9 @@ Module GenLow : GenLowInterface.
   Qed.
   
   Lemma semChooseSize A `{ChoosableFromInterval A} (a1 a2 : A) :
-    Random.leq a1 a2 ->
+    RandomQC.leq a1 a2 ->
     forall size, semGenSize (choose (a1,a2)) size <-->
-                       [set a | Random.leq a1 a && Random.leq a a2].
+                       [set a | RandomQC.leq a1 a && RandomQC.leq a a2].
   Proof. by move=> /= le_a1a2 m n; rewrite (randomRCorrect n a1 a2). Qed.
   
   Program Instance chooseUnsized {A} `{ChoosableFromInterval A} (a1 a2 : A) : 
@@ -786,8 +786,8 @@ Module GenLow : GenLowInterface.
   Next Obligation. by []. Qed.
   
   Lemma semChoose A `{ChoosableFromInterval A} (a1 a2 : A) :
-    Random.leq a1 a2 ->
-    (semGen (choose (a1,a2)) <--> [set a | Random.leq a1 a && Random.leq a a2]).
+    RandomQC.leq a1 a2 ->
+    (semGen (choose (a1,a2)) <--> [set a | RandomQC.leq a1 a && RandomQC.leq a a2]).
   Proof. 
     move=> /= le_a1a2. rewrite <- (unsized_alt_def 1).
     move => m /=. rewrite (randomRCorrect m a1 a2) //.

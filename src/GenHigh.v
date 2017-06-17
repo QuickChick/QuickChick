@@ -5,7 +5,7 @@ Require Import ZArith.
 Require Import mathcomp.ssreflect.ssreflect.
 From mathcomp Require Import ssrfun ssrbool ssrnat eqtype seq.
 
-Require Import Random GenLow.
+Require Import RandomQC GenLow.
 Require Import Tactics Sets.
 
 Import GenLow.

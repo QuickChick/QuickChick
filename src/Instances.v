@@ -203,7 +203,7 @@ Lemma arbNat_correct:
 Proof.
 rewrite /arbitrary /=.
 rewrite semSized => n; split=> // _; exists n; split=> //.
-by rewrite (semChooseSize _ _ _) /Random.leq /=.
+by rewrite (semChooseSize _ _ _) /RandomQC.leq /=.
 Qed.
 
 Instance ArbNatGenCorrect : Correct nat arbitrary.
@@ -226,7 +226,7 @@ Lemma arbBool_correctSize s :
   semGenSize arbitrary s <--> [set: bool].
 Proof.
 rewrite /arbitrary //=.
-rewrite semSizedSize semChooseSize //; split=> /Random.leq _ //=; case a=> //=.
+rewrite semSizedSize semChooseSize //; split=> /RandomQC.leq _ //=; case a=> //=.
 Qed.
 
 Lemma arbNat_correctSize s :
