@@ -3,7 +3,7 @@
 src/Tactics.v
 src/Sets.v
 src/Nat_util.v
-src/Random.v
+src/RandomQC.v
 src/RoseTrees.v
 src/GenLow.v
 src/GenHigh.v
