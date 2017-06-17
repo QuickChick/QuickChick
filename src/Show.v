@@ -58,7 +58,7 @@ Fixpoint contents {A : Type} (s : A -> string) (l : list A) : string :=
 
 Instance showList {A : Type} `{_ : Show A} : Show (list A) :=
 {|
-  show l := append "[ " (append (contents show l) " ]")
+  show l := append "[" (append (contents show l) "]")
 |}.
 
 Instance showPair {A B : Type} `{_ : Show A} `{_ : Show B} : Show (A * B) :=
