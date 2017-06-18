@@ -38,6 +38,83 @@ Proof.
     now left. now right.
 Qed.
 
+Lemma setI_set_incl :
+  forall (A : Type) (s1 s2 s3 : set A),
+    s1 \subset s2 ->
+    s1 \subset s3 ->
+    s1 \subset s2 :&: s3.
+Proof.
+  firstorder.
+Qed.
+
+Lemma imset_isSome {A} (s : set A) :
+  Some @: s \subset isSome.
+Proof.
+  intros y [x [Sx H]]. inv H. eauto.
+Qed.
+
+Lemma bigcup_cons_subset_r :
+  forall (A B : Type) (l : A) (ls : seq A) (f : A -> set B) (s1 s2 : set B),
+    s1 \subset f l ->
+    s2 \subset \bigcup_(x in ls) f x ->
+    s1 :|: s2 \subset \bigcup_(x in (l :: ls)) f x.
+Proof.
+  intros A B l ls f s1 s2 H1 H2.
+  apply setU_l_subset.
+  - rewrite bigcup_setU_l bigcup_set1.
+    eapply setU_subset_l. eassumption.
+  - rewrite bigcup_setU_l bigcup_set1.
+    eapply setU_subset_r. eassumption.
+Qed.
+
+Lemma bigcup_setI_cons_subset_r :
+  forall (A B : Type) (l : A) (ls : seq A) (f : A -> set B) (s1 s2 : set B) (s3 : set A),
+    s3 l ->
+    s1 \subset f l ->
+    s2 \subset \bigcup_(x in ls :&: s3) f x ->
+    s1 :|: s2 \subset \bigcup_(x in (l :: ls) :&: s3) f x.
+Proof.
+  intros A B l ls f s1 s2 s3 H1 H2 H3.
+  apply setU_l_subset.
+  - intros x Hs1. eexists l; split; eauto.
+    split; eauto. left; eauto.
+  - intros x Hs1. eapply H3 in Hs1.
+    edestruct Hs1 as [x' [[Hs3 Hls] Hin]].
+    eexists x'; split; eauto. split; eauto.
+    right; eauto.
+Qed.
+
+Lemma imset_union_set_eq:
+  forall (U T : Type) (s1 s2 : set U) (f : U -> T),
+    f @: (s1 :|: s2) <--> f @: s1 :|: f @: s2.
+Proof.
+  intros U T s1 s2 f.
+  firstorder.
+Qed.
+
+Lemma imset_bigcup_setI_cons_subset_r :
+  forall (A B : Type) (l : A) (ls : seq A) (f : A -> set (option B))
+    (s1 s2 : set B) (s3 : set A),
+    s3 l ->
+    Some @: s1 \subset f l ->
+    Some @: s2 \subset \bigcup_(x in ls :&: s3) f x ->
+    Some @: (s1 :|: s2) \subset \bigcup_(x in (l :: ls) :&: s3) f x.
+Proof.
+  intros A B l ls f s1 s2 s3 H1 H2 H3.
+  rewrite imset_union_set_eq. apply setU_l_subset.
+  - intros x Hs1. eexists l; split; eauto.
+    split; eauto. left; eauto.
+  - intros x Hs1. eapply H3 in Hs1.
+    edestruct Hs1 as [x' [[Hs3 Hls] Hin]].
+    eexists x'; split; eauto. split; eauto.
+    right; eauto.
+Qed.
+
+Lemma imset_set0_subset {A B} (f : A -> B) (s : set B) :
+  (f @: set0) \subset s.
+Proof.
+  firstorder.
+Qed.
 
 (* Instance frequencySizeMonotonic_alt  *)
 (* : forall {A : Type} (g0 : G A) (lg : seq (nat * G A)), *)
@@ -165,7 +242,45 @@ Admitted.
 
 (* QuickChickDebug Debug On. *)
 
-(* Derive GenSizedSuchThatCorrect for (fun foo => goodTree n foo). *)
+Definition aux_iter :=
+  fix
+    aux_iter (size0 input0_0 : nat) {struct size0} :
+    tree -> Prop :=
+  match size0 with
+    | 0 =>
+      match input0_0 with
+        | 0 => [set Leaf]
+        | _.+1 => set0
+      end :|: set0
+    | size'.+1 =>
+      match input0_0 with
+        | 0 => [set Leaf]
+        | _.+1 => set0
+      end
+        :|: (match input0_0 with
+               | 0 => set0
+               | n.+1 =>
+                 \bigcup_(t1 in 
+                             aux_iter size' n)
+                  \bigcup_(m in [set: nat])
+                  \bigcup_(t2 in 
+                              aux_iter size' m)
+                  
+                  (match
+                      @dec (goodTree m t1) (DecgoodTree m t1)
+                      return (forall _ : tree, Prop)
+                    with
+                      | left _ =>
+                        @bigcup nat tree 
+                                (@setT nat)
+                                (fun k : nat => @set1 tree (Node k t1 t2))
+                      | right _ => @set0 tree
+                    end)
+             end
+        :|: set0)
+  end.
+
+Derive GenSizedSuchThatCorrect for (fun foo => goodTree n foo).
 
 (* XXX these instances should be present *)
 Existing Instance genSFoo.

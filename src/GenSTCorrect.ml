@@ -22,11 +22,11 @@ open Unify
 open ArbitrarySizedST
 open Feedback
 
-let appinst meth inst s inps =
-  gApp ~explicit:true (gInject meth) [hole; hole; gApp inst inps; s]
+let appinst mthd inst s inps =
+  gApp ~explicit:true (gInject mthd) [hole; hole; gApp inst inps; s]
 
 (* arguments for completeness *)
-type btyp = (coq_expr * coq_expr * coq_expr * (coq_expr -> coq_expr) * coq_expr)
+type btyp = (coq_expr * coq_expr * coq_expr * coq_expr * coq_expr)
 
 type atyp = (coq_expr * coq_expr * coq_expr * coq_expr * coq_expr)
 
@@ -36,9 +36,9 @@ let fail_exp (dt : coq_expr) : btyp =
     (* gen *)
     returnGen (gNone dt),
     (* mon *)
-    returnGenSizeMonotonic (gNone dt),
+    returnGenSizeMonotonicOpt (gNone dt),
     (* comp *)
-    (fun hcur -> false_ind hole (imset_set0_incl hole hole hcur)),
+    gFun ["x"; "Hx"] (fun [x; hx] -> false_ind hole (imset_set0_incl hole hole (gVar hx))),
     (* sound *)
     gFun ["x"; "Hx"] (fun [x; hx] -> gOrIntroR (rewrite_set_l (semReturn hole) (gVar hx)))
   )
@@ -49,9 +49,10 @@ let ret_exp (dt : coq_expr) (c : coq_expr) : btyp =
     (* gen *)
     returnGen (gSome dt c),
     (* mon *)
-    returnGenSizeMonotonic (gSome dt c),
+    returnGenSizeMonotonicOpt (gSome dt c),
     (* comp *)
-    (fun hcur -> rewrite (imset_singl_incl hole hole hole hcur) (rewrite_set_r (semReturn hole) (gEqRefl hole))),
+    gFun ["x"; "Hx"]
+      (fun [x; hx] -> rewrite (imset_singl_incl hole hole hole (gVar hx)) (rewrite_set_r (semReturn hole) (gEqRefl hole))),
     (* sound *)
     gFun ["x"; "Hx"]
       (fun [x; hx] -> gOrIntroL (gExIntro_impl hole (gConjIntro (gEqRefl hole) (rewrite_set_l (semReturn hole) (gVar hx)))))
@@ -124,50 +125,40 @@ let bind (opt : bool) (m : atyp) (x : string) (f : var -> btyp) : btyp =
     (* gen *)
     (if opt then bindGenOpt else bindGen) gen x genf,
     (* mon *)
-    (if opt then bindOptMonotonic else bindMonotonic) mon x monf,
+    (if opt then bindOptMonotonicOpt else bindMonotonicOpt) mon x monf,
     (* comp *)
     (let bind =
        (if opt then semBindOptSizeMonotonicIncl_l else semBindSizeMonotonicIncl_l)
-         hole mon hole (gFun [x] (fun [x] -> monf x)) comp hole
+         gen (gFun [x] (fun [x] -> genf x))
+         set (gFun [x] (fun [x] -> setf x))
+         mon (gFun [x] (fun [x] -> monf x))
      in
-     (fun hcur ->
-        gMatch (imset_bigcup_incl_l hole hole hole hole hcur)
-          [(injectCtr "ex_intro", [x; hx],
-            fun [w; hcx] ->
-              gMatch (gVar hcx)
-                [(injectCtr "conj", [hx; hcur'],
-                  fun [hx; hcur] ->
-                    bind (gExIntro_impl (gVar w) (gConjIntro (gVar hx) (compf w (gVar hcur))))
-                 )])])),
+     bind comp (gFun [x] (fun [x] -> compf x))),
     (* sound *)
     (let bind =
        (if opt then semBindOptSizeMonotonicIncl_r else semBindSizeMonotonicIncl_r)
          gen (gFun [x] (fun [x] -> genf x))
          set (gFun [x] (fun [x] -> setf x))
-         mon (gFun [x] (fun [x] -> monf x))
+         (* mon (gFun [x] (fun [x] -> monf x)) *)
      in
      bind sound (gFun [x] (fun [x] -> soundf x)))
   )
 
-let ret_comp (x : var) matcher1 matcher2 =
-  gImpl
-    (gApp
-       (imset (gInject "Some") matcher1)
-       [gVar x])
-    (gApp
-      (semGen matcher2)
-      [gVar x])
-
-let ret_sound (x : var) matcher1 matcher2 =
+let ret_comp matcher1 matcher2 =
+   set_incl
+     (imset (gInject "Some") matcher1)
+     (semGen matcher2)
+     
+let ret_sound matcher1 matcher2 =
   set_incl
     (semGen matcher2)
     (set_union (imset (gInject "Some") matcher1) (set_singleton (gNone hole)))
 
-let ret_type_dec (ret : var -> coq_expr -> coq_expr -> coq_expr)
-      (x : var) (s : var)
+let ret_type_dec (ret : coq_expr -> coq_expr -> coq_expr)
+      (s : var)
       (left1 : coq_expr) (right1 : coq_expr)
       (left2 : coq_expr) (right2 : coq_expr) =
-  ret x
+  ret
     (gMatch (gVar s)
        [ (injectCtr "left", ["eq"], fun _ -> left1)
        ; (injectCtr "right", ["neq"], fun _ -> right1) ])
@@ -177,7 +168,7 @@ let ret_type_dec (ret : var -> coq_expr -> coq_expr -> coq_expr)
        ; (injectCtr "right", ["neq"], fun _ -> right2) ])
 
 let ret_mon matcher =
-  gApp (gInject "SizeMonotonic") [matcher]
+  gApp (gInject "SizeMonotonicOpt") [matcher]
 
 
 let ret_type_mon (s : var)  =
@@ -188,7 +179,7 @@ let ret_type_mon (s : var)  =
   in
   ret_mon matcher
 
-let check_expr (x : var) (n : int) (scrut : coq_expr) (left : btyp) (right : btyp) =
+let check_expr (n : int) (scrut : coq_expr) (left : btyp) (right : btyp) =
   let (lset, lgen, lmon, lcomp, lsound) = left in
   let (rset, rgen, rmon, rcomp, rsound) = right in
   let namecur = Printf.sprintf "Hc%d" n in
@@ -214,33 +205,29 @@ let check_expr (x : var) (n : int) (scrut : coq_expr) (left : btyp) (right : bty
       ; (injectCtr "right", ["neq"], fun _ -> rmon) 
       ],
     (* compl *)
-    (fun hcur ->
-       gApp
-         (gMatchReturn scrut
-            "v" (* as clause *)
-            (fun v -> ret_type_dec ret_comp x v lset rset lgen rgen)
-            [ (injectCtr "left", ["eq"] ,
-               fun _ -> gFun [namecur] (fun [hcur] -> lcomp (gVar hcur)))
-            ; (injectCtr "right", ["neq"],
-               fun _ -> gFun [namecur] (fun [hcur] -> rcomp (gVar hcur)))
-            ]) [hcur]),
+    gMatchReturn scrut
+      "v" (* as clause *)
+      (fun v -> ret_type_dec ret_comp v lset rset lgen rgen)
+      [ (injectCtr "left", ["eq"] , fun _ -> lcomp)
+      ; (injectCtr "right", ["neq"], fun _ -> rcomp)
+      ],
     (* sound *)
     gMatchReturn scrut
       "v" (* as clause *)
-      (fun v -> ret_type_dec ret_sound x v lset rset lgen rgen)
+      (fun v -> ret_type_dec ret_sound v lset rset lgen rgen)
       [ (injectCtr "left", ["eq"], fun _ -> lsound)
       ; (injectCtr "right", ["neq"], fun _ -> rsound)
       ])
 
 
-let match_inp (x : var) (inp : var) (pat : matcher_pat) (left : btyp) (right : btyp) =
+let match_inp (inp : var) (pat : matcher_pat) (left : btyp) (right : btyp) =
   let (lset, lgen, lmon, lcomp, lsound) = left in
   let (rset, rgen, rmon, rcomp, rsound) = right in
   let mon_typ v =
     ret_mon (construct_match (gVar v) ~catch_all:(Some hole) [(pat, hole)])
   in
   let proof_typ ret v =
-    ret x
+    ret
       (construct_match (gVar v) ~catch_all:(Some rset) [(pat, lset)])
       (construct_match (gVar v) ~catch_all:(Some rgen) [(pat, lgen)])
   in
@@ -257,19 +244,16 @@ let match_inp (x : var) (inp : var) (pat : matcher_pat) (left : btyp) (right : b
       (gVar inp) ~catch_all:(Some rmon) "v" mon_typ
       [(pat, lmon)],
     (* comp *)
-    (fun hcur ->
-       gApp
-         (construct_match_with_return
-            (gVar inp) ~catch_all:(Some (gFun ["hc"] (fun [hcur] -> rcomp (gVar hcur)))) "v" (proof_typ ret_comp)
-            [(pat, gFun ["hc"] (fun [hcur] -> lcomp (gVar hcur)))])
-         [hcur]),
+    construct_match_with_return
+      (gVar inp) ~catch_all:(Some rcomp) "v" (proof_typ ret_comp)
+      [(pat, lcomp)],
     (* sound *)
     construct_match_with_return
       (gVar inp) ~catch_all:(Some rsound) "v" (proof_typ ret_sound)
       [(pat, lsound)]
   )
 
-let stMaybe (y : var) (opt : bool) (exp : atyp)
+let stMaybe (opt : bool) (exp : atyp)
       (x : string) (checks : ((coq_expr -> coq_expr) * int) list) =
   let (set, gen, mon, comp, sound) = exp in
   let rec sumbools_to_bool x lst e fail =
@@ -354,11 +338,11 @@ let stMaybe (y : var) (opt : bool) (exp : atyp)
   ( (* set *)
     gFun [x] (fun [x] -> sumbools_to_bool x checks (gApp set [gVar x]) gFalse),
     (* gen *)
-    gApp (gInject (if opt then "suchThatMaybeOpt" else "suchTha tMaybe"))
+    gApp (gInject (if opt then "suchThatMaybeOpt" else "suchThatMaybe"))
      [ gen (* Use the generator provided for base generator *)
      ; bool_pred checks ],
     (* mon *)
-    (if opt then suchThatMaybeOptMonotonic else suchThatMaybeMonotonic) mon (bool_pred checks),
+    (if opt then suchThatMaybeOptMonotonicOpt else suchThatMaybeMonotonicOpt) mon (bool_pred checks),
     (* comp *)
     set_incl_trans
       (imset_incl (gFun [x; hxs] (fun [x; hx] -> sumbools_to_bool_comp x hx checks)))
@@ -437,10 +421,10 @@ let genSizedSTCorr_body
   let add_freq gens =
     List.map gPair (List.combine (List.map (fun _ -> gInt 1) gens) gens) in
 
-  let handle_branch' (y : var) (ih : var) (size : coq_expr) (ins : var list) =
+  let handle_branch' (ih : var) (size : coq_expr) (ins : var list) =
     handle_branch n dep_type ins
       (fail_exp full_gtyp) (ret_exp full_gtyp) class_method class_methodST
-      (rec_method inputs setinst generator_body moninst ih size) bind (stMaybe y) (check_expr y) (match_inp y)
+      (rec_method inputs setinst generator_body moninst ih size) bind stMaybe check_expr match_inp
       gen_ctr (fun _ -> ())
   in
 
@@ -456,29 +440,25 @@ let genSizedSTCorr_body
     gFunWithArgs
       inputs
       (fun inputs ->
-         gFun ["x"; "Hin"]
-           (fun [x; hin] ->
-              rewrite_set_r (semBacktrack (gList (add_freq (base_gens inputs generator_body))))
-                (List.fold_right
-                   (fun (c : dep_ctr) (exp : coq_expr -> coq_expr -> coq_expr) ->
-                      fun hin hg ->
-                        let ((_, _, _, p, _), b) =
-                          handle_branch' x (make_up_name ()) (gInt 0) inputs c in
-                        if b then
-                          gMatch (imset_union_incl hole hole hole hole hin)
-                            [ (injectCtr "or_introl", ["hin"],
-                               fun [hin] ->
-                                 gOrIntroL
-                                   (gExIntro_impl
-                                     hole
-                                     (gConjIntro
-                                        (gConjIntro hg (succ_neq_zero hole))
-                                        (gConjIntro (some_proof (gVar hin)) (p (gVar hin))))))
-                             ; (injectCtr "or_intror", ["hin"],
-                                fun [hin] -> exp (gVar hin) (gOrIntroR hg))]
-                        else exp hin hg)
-                   ctrs (fun hin hgen -> false_ind hole (imset_set0_incl hole hole hin))
-                   (gVar hin) (gOrIntroL (gEqRefl hole)))))
+         let (cases : coq_expr) =
+           List.fold_right
+             (fun (c : dep_ctr) (exp : coq_expr) ->
+                let ((_, _, _, p, _), b) =
+                  handle_branch' (make_up_name ()) (gInt 0) inputs c
+                in
+                if b then
+                  imset_bigcup_setI_cons_subset_r
+                    (gProd hole hole) hole
+                    (succ_neq_zero hole)
+                    (setI_set_incl (imset_isSome hole) p)
+                    exp
+                else
+                  exp
+             ) ctrs imset_set0_subset
+         in
+         subset_respects_set_eq_r
+           (semBacktrack (gList (add_freq (base_gens inputs generator_body))))
+           (setU_subset_l hole cases))
   in
 
   let ind_case =
@@ -487,27 +467,21 @@ let genSizedSTCorr_body
          gFunWithArgs
            inputs
            (fun inputs ->
-              gFun ["x"; "Hin"]
-                (fun [x; hin] ->
-                   rewrite_set_r (semBacktrack (gList (add_freq (ind_gens inputs s generator_body))))
-                     (List.fold_right
-                        (fun (c : dep_ctr) (exp : coq_expr -> coq_expr -> coq_expr) ->
-                           fun hin hg ->
-                             let ((_, _, _, p, _), b) =
-                               handle_branch' x ih (gVar s) inputs c in
-                             gMatch (imset_union_incl hole hole hole hole hin)
-                               [ (injectCtr "or_introl", ["hin"],
-                                  fun [hin] ->
-                                    gOrIntroL
-                                      (gExIntro_impl
-                                         hole
-                                         (gConjIntro
-                                            (gConjIntro hg (succ_neq_zero hole))
-                                            (gConjIntro (some_proof (gVar hin)) (p (gVar hin))))))
-                               ; (injectCtr "or_intror", ["hin"],
-                                  fun [hin] -> exp (gVar hin) (gOrIntroR hg))])
-                        ctrs (fun hin hgen -> false_ind hole (imset_set0_incl hole hole hin))
-                        (gVar hin) (gOrIntroL (gEqRefl hole))))))
+              let cases =
+                List.fold_right
+                  (fun (c : dep_ctr) (exp : coq_expr) ->
+                     let ((_, _, _, p, _), b) =
+                       handle_branch' ih (gVar s) inputs c
+                     in
+                     imset_bigcup_setI_cons_subset_r
+                       (gProd hole hole) hole
+                       (succ_neq_zero hole)
+                       (setI_set_incl (imset_isSome hole) p)
+                       exp) ctrs imset_set0_subset
+              in
+              subset_respects_set_eq_r
+                (semBacktrack (gList (add_freq (ind_gens inputs s generator_body))))
+                (setU_subset_l hole cases)))
   in
 
   let ret_type =
@@ -518,6 +492,7 @@ let genSizedSTCorr_body
            (fun inputs ->
               let inps = List.map gVar inputs in
               set_incl
+                (* (imset (gInject "Some") (gApp (gInject "aux_iter") ((gVar s) :: inps))) *)
                 (imset (gInject "Some") (appinst "DependentClasses.iter" setinst (gVar s) inps))
                 (* (semGen (appinst "arbitrarySizeST" geninst (gVar s) inps)) *)
                 (semGen (gApp generator_body ((gVar s) :: inps)))
@@ -543,7 +518,7 @@ let genSizedSTCorr_body
              (fun (c : dep_ctr) (exp :  (coq_expr  -> coq_expr) -> coq_expr) ->
                 fun proof ->
                   let ((_, _, _, _, p), b) =
-                    handle_branch' (make_up_name ()) (make_up_name ()) (gInt 0) inputs c
+                    handle_branch' (make_up_name ()) (gInt 0) inputs c
                   in
                   if b then
                     bigcup_cons_subset
@@ -573,7 +548,7 @@ let genSizedSTCorr_body
                 (fun (c : dep_ctr) (exp : (coq_expr  -> coq_expr) -> coq_expr) ->
                    fun proof ->
                      let ((_, _, _, _, p), b) =
-                       handle_branch' (make_up_name ()) ih (gVar s) inputs c
+                       handle_branch' ih (gVar s) inputs c
                      in
                      bigcup_cons_subset
                        (gProd hole hole) hole
