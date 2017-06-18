@@ -28,7 +28,7 @@ let fail_exp = returnGenSizeMonotonicOpt (gNone hole)
 let ret_exp (c : coq_expr) = returnGenSizeMonotonicOpt (gSome hole c)
 
 let ret_type (s : var) (match_expr : var -> coq_expr -> coq_expr -> coq_expr)  =
-  gApp (gInject "SizeMonotonic") [match_expr s hole hole]
+  gApp (gInject "SizeMonotonicOpt") [match_expr s hole hole]
 
 (* These should be inferred automatically  *)
 let class_method = hole
@@ -51,7 +51,7 @@ let stMaybe (opt : bool) (g : coq_expr) (x : string) (checks : ((coq_expr -> coq
     gFun [x]
       (fun [x] -> sumbools_to_bool x checks)
   in
-  (if opt then suchThatMaybeOptMonotonic else suchThatMaybeMonotonic) g bool_pred
+  (if opt then suchThatMaybeOptMonotonicOpt else suchThatMaybeMonotonicOpt) g bool_pred
 
 let ret_type_dec (s : var) (left : coq_expr) (right : coq_expr) =
       gMatch (gVar s)
@@ -144,7 +144,7 @@ let genSizedSTMon_body
     gFunWithArgs
       inputs
       (fun inputs ->
-         backtrackSizeMonotonic
+         backtrackSizeMonotonicOpt
            (gList (add_freq (base_gens inputs (generator_body inputs))))
            (List.fold_right
               (fun (c : dep_ctr) (exp : coq_expr) ->
@@ -170,7 +170,7 @@ let genSizedSTMon_body
          gFunWithArgs
            inputs
            (fun inputs ->
-              backtrackSizeMonotonic
+              backtrackSizeMonotonicOpt
                 (gList (add_freq (ind_gens inputs size (generator_body inputs))))
                 (List.fold_right
                    (fun c exp ->

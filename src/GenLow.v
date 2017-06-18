@@ -302,7 +302,7 @@ Module Type GenLowInterface.
   
   Declare Instance suchThatMaybeOptMonotonicOpt
            {A : Type} (g : G (option A)) (f : A -> bool) `{SizeMonotonicOpt _ g} : 
-    SizeMonotonic (suchThatMaybeOpt g f).
+    SizeMonotonicOpt (suchThatMaybeOpt g f).
   
 
   (* This (very concrete) spec is needed to prove shrinking *)
@@ -415,7 +415,7 @@ Module GenLow : GenLowInterface.
   Definition suchThatMaybeOpt {A : Type} (g : G (option A)) (p : A -> bool)
   : G (option A) := 
     sized (fun x => suchThatMaybeOptAux g p 0 (max 1 x)).
-  
+
   Fixpoint rnds (rnd : RandomSeed) (n' : nat) : list RandomSeed :=
     match n' with
       | O => nil
@@ -960,17 +960,6 @@ Module GenLow : GenLowInterface.
     by right; exists a; split=> //; apply: (semGenSuchThatMaybeAux_sound run_x).
   Qed.
 
-  Instance suchThatMaybeMonotonicOpt
-           {A : Type} (g : G A) (f : A -> bool) `{SizeMonotonic _ g} : 
-    SizeMonotonicOpt (suchThatMaybe g f).
-  Proof.
-  Admitted.
-  
-  Instance suchThatMaybeOptMonotonicOpt
-           {A : Type} (g : G (option A)) (f : A -> bool) `{SizeMonotonicOpt _ g} : 
-    SizeMonotonic (suchThatMaybeOpt g f).
-  Admitted.
-
   Lemma promoteVariant :
     forall {A B : Type} (a : A) (f : A -> SplitPath) (g : G B) size
       (r r1 r2 : RandomSeed),
@@ -1011,5 +1000,17 @@ Module GenLow : GenLowInterface.
     apply eq_bigcupr => s. setoid_rewrite semFmapSize.
     rewrite imset_bigcup. reflexivity.
   Qed.
+
+  Instance suchThatMaybeMonotonicOpt
+           {A : Type} (g : G A) (f : A -> bool) `{SizeMonotonic _ g} : 
+    SizeMonotonicOpt (suchThatMaybe g f).
+  Proof.
+  Admitted.
   
+  Instance suchThatMaybeOptMonotonicOpt
+           {A : Type} (g : G (option A)) (f : A -> bool) `{SizeMonotonicOpt _ g} : 
+    SizeMonotonicOpt (suchThatMaybeOpt g f).
+  Admitted.
+
+
 End GenLow.

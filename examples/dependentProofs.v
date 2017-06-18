@@ -38,22 +38,6 @@ Proof.
     now left. now right.
 Qed.
 
-Lemma backtrackMonotonic {A} (g1 g2 : list (nat * G (option A))) (s : nat) :
-  g1 <> [] ->
-  g1 \subset g2 -> 
-  semGenSize (backtrack g1) s \subset semGenSize (backtrack g2) s.
-Proof. 
-  intros Hneq H.
-  rewrite !semBacktrackSize.
-  eapply setU_set_subset_compat.
-  - admit.
-  - eapply setI_subset_compat.
-    now apply subset_refl.
-    induction g1; simpl.
-    exfalso; eauto.
-    
-    inv Hneq. rewrite setI_comm setI_set0_abs bigcap_set0.
-    
 
 (* Instance frequencySizeMonotonic_alt  *)
 (* : forall {A : Type} (g0 : G A) (lg : seq (nat * G A)), *)
@@ -126,7 +110,7 @@ Derive ArbitrarySizedSuchThat for (fun foo => goodTree n foo).
 
 Derive SizedProofEqs for (fun foo => goodTree n foo).
 
-Derive SizeMonotonicSuchThat for (fun foo => goodTree n foo).
+Derive SizeMonotonicSuchThatOpt for (fun foo => goodTree n foo).
 
 
 Lemma succ_neq_zero :
@@ -181,73 +165,7 @@ Admitted.
 
 (* QuickChickDebug Debug On. *)
 
-Fixpoint aux_iter (size0 input0_0 : nat) {struct size0} : set tree :=
-  match size0 with
-    | 0 =>
-      match input0_0 with
-        | 0 => [set Leaf]
-        | _.+1 => set0
-      end :|: set0
-    | size'.+1 =>
-      match input0_0 with
-        | 0 => [set Leaf]
-        | _.+1 => set0
-      end
-        :|: (match input0_0 with
-               | 0 => set0
-               | n.+1 =>
-                 \bigcup_(t1 in aux_iter size' n)
-                  \bigcup_(m in [set: nat])
-                  \bigcup_(t2 in aux_iter size' m)
-                  (match
-                      @dec (goodTree m t1) (DecgoodTree m t1)
-                      return (forall _ : tree, Prop)
-                    with
-                      | left _ =>
-                        \bigcup_(k in [set: nat])
-                         [set 
-                            Node k t1 t2]
-                      | right _ =>  set0
-                    end)
-             end :|: set0)
-  end.
-
-Fixpoint arb_aux (size0 input0_0 : nat) {struct size0} : G (option tree) :=
-  match size0 with
-    | 0 =>
-      backtrack
-        [(1,
-          match input0_0 with
-            | 0 => returnGen (Some Leaf)
-            | _.+1 => returnGen None
-          end)]
-    | size'.+1 =>
-      backtrack
-        [(1,
-          match input0_0 with
-            | 0 => returnGen (Some Leaf)
-            | _.+1 => returnGen None
-          end);
-          (1,
-           match input0_0 with
-             | 0 => returnGen None
-             | n.+1 =>
-               doM! t1 <- arb_aux size' n;
-             do! m <- arbitrary;
-             doM! t2 <- arb_aux size' m;
-             match
-               @dec (goodTree m t1) (DecgoodTree m t1)
-               return (G (option tree))
-             with
-               | left _ =>  do! k <- arbitrary;
-               returnGen (Some (Node k t1 t2))
-               | right _ => returnGen None
-             end
-           end)]
-  end.
-
-
-Derive GenSizedSuchThatCorrect for (fun foo => goodTree n foo).
+(* Derive GenSizedSuchThatCorrect for (fun foo => goodTree n foo). *)
 
 (* XXX these instances should be present *)
 Existing Instance genSFoo.
@@ -264,41 +182,41 @@ Admitted.
 
 Existing Instance GenSizedSuchThatgoodFooUnif. (* ???? *)
 
-Derive SizeMonotonicSuchThat for (fun (x : Foo) => goodFooUnif input x).
+Derive SizeMonotonicSuchThatOpt for (fun (x : Foo) => goodFooUnif input x).
 
 Derive SizedProofEqs for (fun foo => goodFooUnif n foo).
 
-Derive GenSizedSuchThatCorrect for (fun foo => goodFooUnif n foo).
+(* Derive GenSizedSuchThatCorrect for (fun foo => goodFooUnif n foo). *)
 
 (* Interesting. Do we need  Global instance?? *) 
 Existing Instance GenSizedSuchThatgoodFooNarrow.  (* Why???? *)
 
-Derive SizeMonotonicSuchThat for (fun foo => goodFooNarrow n foo).
+Derive SizeMonotonicSuchThatOpt for (fun foo => goodFooNarrow n foo).
 
 Derive SizedProofEqs for (fun foo => goodFooNarrow n foo).
 
-Derive GenSizedSuchThatCorrect for (fun foo => goodFooNarrow n foo).
+(* Derive GenSizedSuchThatCorrect for (fun foo => goodFooNarrow n foo). *)
 
 Existing Instance GenSizedSuchThatgoodFooCombo.
 
-Derive SizeMonotonicSuchThat for (fun foo => goodFooCombo n foo).
+Derive SizeMonotonicSuchThatOpt for (fun foo => goodFooCombo n foo).
 
 Derive SizedProofEqs for (fun foo => goodFooCombo n foo).
 
-Derive GenSizedSuchThatCorrect for (fun foo => goodFooCombo n foo).
+(* Derive GenSizedSuchThatCorrect for (fun foo => goodFooCombo n foo). *)
 
 Existing Instance GenSizedSuchThatgoodFoo.
 
-Derive SizeMonotonicSuchThat for (fun (x : Foo) => goodFoo input x).
+Derive SizeMonotonicSuchThatOpt for (fun (x : Foo) => goodFoo input x).
 
 Derive SizedProofEqs for (fun (x : Foo) => goodFoo input x).
 
-Derive GenSizedSuchThatCorrect for (fun foo => goodFoo n foo).
+(* Derive GenSizedSuchThatCorrect for (fun foo => goodFoo n foo). *)
 
 
 Existing Instance GenSizedSuchThatgoodFooPrec.  (* ???? *)
 
-Derive SizeMonotonicSuchThat for (fun (x : Foo) => goodFooPrec input x).
+Derive SizeMonotonicSuchThatOpt for (fun (x : Foo) => goodFooPrec input x).
 
 Derive SizedProofEqs for (fun (x : Foo) => goodFooPrec input x).
 
@@ -306,19 +224,19 @@ Derive SizedProofEqs for (fun (x : Foo) => goodFooPrec input x).
 
 Existing Instance GenSizedSuchThatgoodFooMatch.  (* ???? *)
 
-Derive SizeMonotonicSuchThat for (fun foo => goodFooMatch n foo).
+Derive SizeMonotonicSuchThatOpt for (fun foo => goodFooMatch n foo).
 
 Derive SizedProofEqs for (fun foo => goodFooMatch n foo).
 
-Derive GenSizedSuchThatCorrect for (fun foo => goodFooMatch n foo).
+(* Derive GenSizedSuchThatCorrect for (fun foo => goodFooMatch n foo). *)
 
 Existing Instance GenSizedSuchThatgoodFooRec.  (* ???? *)
 
-Derive SizeMonotonicSuchThat for (fun (x : Foo) => goodFooRec input x).
+Derive SizeMonotonicSuchThatOpt for (fun (x : Foo) => goodFooRec input x).
 
 Derive SizedProofEqs for (fun (x : Foo) => goodFooRec input x).
 
-Derive GenSizedSuchThatCorrect for (fun foo => goodFooRec n foo).
+(* Derive GenSizedSuchThatCorrect for (fun foo => goodFooRec n foo). *)
 
 Inductive goodFooB : nat -> Foo -> Prop := 
 | GF1 : goodFooB 2 (Foo2 Foo1)
@@ -328,9 +246,9 @@ Derive ArbitrarySizedSuchThat for (fun (x : Foo) => goodFooB input x).
 
 Derive SizedProofEqs for (fun (x : Foo) => goodFooB input x).
 
-Derive SizeMonotonicSuchThat for (fun foo => goodFooB n foo).
+Derive SizeMonotonicSuchThatOpt for (fun foo => goodFooB n foo).
 
-Derive GenSizedSuchThatCorrect for (fun foo => goodFooB n foo).
+(* Derive GenSizedSuchThatCorrect for (fun foo => goodFooB n foo). *)
 
 Inductive LRTree : tree -> Prop :=
 | PLeaf : LRTree Leaf
@@ -360,10 +278,9 @@ Admitted.
 Derive SizedProofEqs for (fun (x : tree) => LRTree x).
 
 (* XXX bug *)
-Derive SizeMonotonicSuchThat for (fun foo => LRTree foo).
-QuickChickDebug Debug On.
+Derive SizeMonotonicSuchThatOpt for (fun foo => LRTree foo).
 
-Derive GenSizedSuchThatCorrect for (fun foo => LRTree foo).
+(* Derive GenSizedSuchThatCorrect for (fun foo => LRTree foo). *)
 
 (* Derive SizeMonotonicSuchThat for (fun foo => goodTree n foo). *)
 (* XXX

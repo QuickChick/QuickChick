@@ -43,7 +43,7 @@ let print_der = function
 let class_name cn =
   match cn with
   | ArbitrarySizedSuchThat -> "GenSizedSuchThat"
-  | GenSizedSuchThatMonotonicOpt -> "SizeMonotonic"
+  | GenSizedSuchThatMonotonicOpt -> "SizeMonotonicOpt"
   | SizedProofEqs -> "SizedProofEqs"
   | GenSizedSuchThatSizeMonotonicOpt -> "SizedMonotonicOpt"
   | GenSizedSuchThatCorrect -> "SizedSuchThatCorrect"

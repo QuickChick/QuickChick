@@ -50,6 +50,10 @@ let semBindSizeMon g f gMon fMon =
 let backtrackSizeMonotonic lst proof =
   gApp (gInject "backtrackSizeMonotonic") [lst; proof]
 
+let backtrackSizeMonotonicOpt lst proof =
+  gApp (gInject "backtrackSizeMonotonicOpt") [lst; proof]
+
+
 let semBacktrack g =
   gApp (gInject "semBacktrack") [hole; g]
 

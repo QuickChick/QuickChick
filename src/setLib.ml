@@ -119,7 +119,7 @@ let nil_subset p =
   gApp (gInject "nil_subset") [p]
 
 let cons_subset (hd : coq_expr) (tl : coq_expr) (p : coq_expr) (phd : coq_expr) (ptl : coq_expr) =
-  gApp (gInject "cons_subset") [hd; tl; p; phd; ptl]
+  gApp ~explicit:true (gInject "cons_subset") [hole; hd; tl; p; phd; ptl]
 
 let setU_subset_r s2 p =
   gApp (gInject "setU_subset_r") [s2; p]
