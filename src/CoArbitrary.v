@@ -2,7 +2,7 @@ Require Import PArith List ChoiceFacts Omega.
 Require Import mathcomp.ssreflect.ssreflect.
 From mathcomp Require Import ssrfun ssrbool.
 
-Require Import Classes Random GenLow Sets.
+Require Import Classes RandomQC GenLow Sets.
 Import GenLow.
 
 Import ListNotations.

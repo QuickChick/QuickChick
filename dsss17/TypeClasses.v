@@ -159,4 +159,9 @@ to define something similar to what I did.
 
 EXERCISE: Find a different way of making instance inference diverge.
 
+ *)
+
+(* Hint: If confused, you can look at the *coq* buffer. That's where
+most debug messages appear if they don't appear in the *response*
+buffer.
 *)

@@ -28,7 +28,7 @@ Axiom _W : nat -> Prop.
 Axiom _Size : Prop.
 
 Require Export Show.
-Require Export Random.
+Require Export RandomQC.
 Require Export Sets.
 Require Export Nat_util.
 Require Export GenLow.
