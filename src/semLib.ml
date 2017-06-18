@@ -56,13 +56,24 @@ let semBacktrack g =
 let returnGenSizeMonotonic x =
   gApp (gInject "returnGenSizeMonotonic") [x]
 
+let returnGenSizeMonotonicOpt x =
+  gApp (gInject "returnGenSizeMonotonicOpt") [x]
+
 let bindMonotonic p s fp =
   gApp ~explicit:true
     (gInject "bindMonotonic") [hole; hole; hole; hole; p; gFun [s] (fun [x] -> fp x)]
 
+let bindMonotonicOpt p s fp =
+  gApp ~explicit:true
+    (gInject "bindMonotonicOpt") [hole; hole; hole; hole; p; gFun [s] (fun [x] -> fp x)]
+
 let bindOptMonotonic p s fp =
   gApp ~explicit:true
     (gInject "bindOptMonotonic") [hole; hole; hole; hole; p; gFun [s] (fun [x] -> fp x)]
+
+let bindOptMonotonicOpt p s fp =
+  gApp ~explicit:true
+    (gInject "bindOptMonotonicOpt") [hole; hole; hole; hole; p; gFun [s] (fun [x] -> fp x)]
 
 let suchThatMaybeMonotonic p pred =
   gApp ~explicit:true
@@ -71,6 +82,14 @@ let suchThatMaybeMonotonic p pred =
 let suchThatMaybeOptMonotonic p pred =
   gApp ~explicit:true
     (gInject "suchThatMaybeOptMonotonic") [hole; hole; pred; p]
+
+let suchThatMaybeMonotonicOpt p pred =
+  gApp ~explicit:true
+    (gInject "suchThatMaybeMonotonicOpt") [hole; hole; pred; p]
+
+let suchThatMaybeOptMonotonicOpt p pred =
+  gApp ~explicit:true
+    (gInject "suchThatMaybeOptMonotonicOpt") [hole; hole; pred; p]
 
 let semBindOptSizeMonotonicIncl_l g gmon f fmon hsub x hin =
   gApp ~explicit:true (gInject "semBindOptSizeMonotonicIncl_l")

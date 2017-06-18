@@ -192,6 +192,11 @@ Parameter backtrackSizeMonotonic:
     lg \subset [set x | SizeMonotonic x.2 ] ->
     SizeMonotonic (backtrack lg).
 
+Parameter backtrackSizeMonotonicOpt :
+  forall {A : Type} (lg : seq (nat * G (option A))),
+    lg \subset [set x | SizeMonotonicOpt x.2 ] ->
+    SizeMonotonicOpt (backtrack lg).
+
 Parameter semVectorOfSize:
   forall {A : Type} (k : nat) (g : G A) size,
     semGenSize (vectorOf k g) size <-->
@@ -1001,6 +1006,32 @@ Proof.
     by rewrite Hpick.
 Qed.
 
+Lemma pickDrop_In_strong :
+  forall {A} (l: list (nat * G (option A))) k x,
+    List.In (k,x) l /\ k <> 0 ->
+    exists n l',
+      pickDrop l n = (k,x,l') /\
+      n < sum_fst l /\
+      length l = length l' + 1.
+Proof.
+  move => A l k x [HIn Hfst].
+  elim : l HIn => //=. case => //= i g xs IHxs [H1 | H2]; subst.
+  + exists 0.  exists xs. simpl in *.
+    inversion H1; subst; clear H1.
+    have H : 0 < k by  elim : k Hfst IHxs => //=.
+    rewrite H. split ; [| split ]; simpl; eauto.
+    rewrite sum_fstE. now ssromega.
+    now ssromega.
+  + move/(_ H2) : IHxs => [n [l' [Hpick [Hlt Hlen]]]].
+    exists (n + i). exists ((i,g)::l'). 
+    rewrite -[X in _ < X]add0n ltn_add2r ltn0.
+    rewrite  -[X in _ - X]add0n subnDr subn0.
+    rewrite Hpick. simpl.
+    split ; [| split ]; simpl; eauto.
+    rewrite sum_fstE. now ssromega.
+    now ssromega.
+Qed.
+
 (* begin semFrequencySize *)
 Lemma semFrequencySize {A}
       (l : list (nat * G A)) (def : G A) (size: nat) :
@@ -1142,6 +1173,199 @@ Proof.
         eapply subset_refl.
 Qed.
 
+Lemma pickDrop_subset {A} (l1 l2 : seq (nat * G (option A))) (n m : nat) g :
+  pickDrop l1 n = (m, g, l2) ->
+  l2 \subset l1.
+Proof.
+  revert n l2. induction l1; simpl in *; intros n l2 H1.
+  - inv H1; eapply subset_refl. 
+  - destruct a as [k x].
+    destruct (n < k) eqn:heq.
+    + inv H1. intros x Hin. right; eauto.
+    + destruct (pickDrop l1 (n - k)) as [[k' x'] xs'] eqn:Heq. inv H1.
+      rewrite !cons_set_eq. eapply setU_set_subset_compat.
+      now apply subset_refl.
+      eauto.
+Qed.
+
+Lemma length_sum_lst {A} (l : list (nat * A)) :
+  length l = 0 ->
+  sum_fst l = 0.
+Proof.
+  destruct l; eauto; intros H; inv H.
+Qed.
+
+(* Lemma pickDrop_length_strong {A} (l1 l2 : seq (nat * G (option A))) (n m : nat) g : *)
+(*   pickDrop l1 n = (m, g, l2) -> *)
+(*   length l2 < length l1 \/ *)
+(*   (length l2 = 0 /\ length l1 = 0) \/ *)
+(*   (length l2 = 0 /\ (sum_fst l1 = 0 \/ sum_fst l1 <= n)). *)
+(* Proof. *)
+(*   revert l2 n m g. induction l1; simpl; intros l2 n m g H. *)
+(*   - inv H; eauto. *)
+(*   - destruct a as [k x]. *)
+(*     destruct (n < k) eqn:heq. *)
+(*     + inv H. left. now ssromega. *)
+(*     +  *)
+(*       destruct (pickDrop l1 (n - k)) as [[k' x'] xs'] eqn:Heq. *)
+(*       inv H. eapply IHl1 in Heq. *)
+(*       destruct Heq as [Hlt' | [[Heq1 Heq2] | [Heq1 [Heq2 | Heq2]]]]. *)
+(*       * left. ssromega. *)
+(*       * simpl. rewrite sum_fstE Heq1 Heq2. *)
+(*         destruct l1; try discriminate. right. right. rewrite sum_fst_eq0P simpl. Hlt.  *)
+(*         rewrite length_sum_lst in Hlt; eauto. ssromega. *)
+(*       * rewrite sum_fstE in Hlt. *)
+(*         rewrite Heq2 in Hlt. ssromega. *)
+(* Qed. *)
+
+(* Corollary pickDrop_length {A} (l1 l2 : seq (nat * G (option A))) (n m : nat) g : *)
+(*   pickDrop l1 n = (m, g, l2) -> *)
+(*   n < sum_fst l1 -> *)
+(*   length l2 < length l1 \/ length l2 = 0. *)
+(* Proof. *)
+(*   intros H1 H2.  *)
+(*   edestruct (@pickDrop_length_strong A); eauto. *)
+(*   inv H; inv H0; eauto. *)
+(* Qed. *)
+
+
+Lemma pickDrop_sum_fst {A} (lg  : seq (nat * G (option A))) n :
+  sum_fst lg = 0 -> exists l, pickDrop lg n = (0, returnGen None, l) /\ sum_fst l = 0.
+Proof.
+  induction lg; eauto.
+  intros H.
+  - eexists [::]. split; reflexivity.
+  - destruct a. intros H. rewrite sum_fstE in H.
+    assert (Heq : n0 = 0) by ssromega.
+    assert (Heq' : sum_fst lg = 0) by ssromega. subst.
+    simpl.  edestruct IHlg as [l [H1 H2]]. eassumption.
+    replace (n - 0) with n by ssromega. rewrite H1.
+    eexists. split. reflexivity. rewrite sum_fstE. ssromega.
+Qed.   
+
+Lemma backtrackFuel_sum_fst {A} fuel tot (lg  : seq (nat * G (option A))) s :
+  sum_fst lg = 0 ->
+  semGenSize (backtrackFuel fuel tot lg) s <--> [set None].
+Proof.
+  revert lg tot; induction fuel; simpl; intros lg tot Heq.
+  - now rewrite semReturnSize.
+  - rewrite semBindSize.
+    intros x; split.
+    + move => [n [H1 H2]].
+      eapply semChooseSize in H1; eauto.
+      edestruct (@pickDrop_sum_fst A) with (n := n) as [l' [H3 H4]]. eassumption.
+      rewrite H3 in H2. eapply semBindSize in H2.
+      move : H2 => [a [/semReturnSize Heq1 Hb]]. inv Heq1.
+      eapply IHfuel; eassumption.
+    + move => H; inv H. eexists 0.
+      split.
+      now eapply semChooseSize; eauto.
+      edestruct (@pickDrop_sum_fst A) with (n := 0) as [l' [H3 H4]].
+      eassumption.
+      rewrite H3.
+      eapply semBindSize.
+      eexists None. split. eapply semReturnSize; reflexivity.
+      eapply IHfuel; eauto.
+Qed.      
+
+Lemma backtrackFuel_list_mon {A : Type} tot1 tot2 fuel1 fuel2 (lg1 lg2 : seq (nat * G (option A))) s :
+  sum_fst lg1 = tot1 -> length lg1 = fuel1 ->
+  sum_fst lg2 = tot2 -> length lg2 = fuel2 ->
+  lg1 \subset lg2 ->
+  isSome :&: semGenSize (backtrackFuel fuel1 tot1 lg1) s \subset
+  isSome :&: semGenSize (backtrackFuel fuel2 tot2 lg2) s.
+Proof.
+  move : tot1 tot2 fuel2 lg1 lg2 s.
+  induction fuel1; intros tot1 tot2 fuel2 lg1 lg2 s Htot1 Hf1 Htot2 Hf2 Hsub x [Hs Hin];
+  destruct x; try discriminate; split; eauto.
+  - simpl in Hin. eapply semReturnSize in Hin; inv Hin.
+  - assert (Ha : tot1 > 0). 
+    { destruct tot1; eauto.
+      eapply backtrackFuel_sum_fst in Hin; eauto. inv Hin. }
+    simpl in Hin. eapply semBindSize in Hin.
+    destruct Hin as [n [Hgen Hgen']].
+    eapply semChooseSize in Hgen; eauto.
+    move : Hgen => /andP [Hleq1  Hleq2].
+    destruct (pickDrop lg1 n) as [[k g] gs'] eqn:Heq.
+    eapply semBindSize in Hgen'.
+    destruct Hgen' as [b [Hg1 Hg2]].
+    assert (Hlt : n < sum_fst lg1).
+    { unfold leq, super, ChooseNat, OrdNat in *. now ssromega. }
+    edestruct (pickDrop_exists lg1 n) as [[m [g' [lg' [Hin' [Hdrop [Hneq [Heq1 [Heq2 Hlen]]]]]]]] _];
+      subst; eauto.
+    rewrite Heq in Hdrop. inv Hdrop.
+    destruct b. 
+    + eapply semReturnSize in Hg2. inv Hg2.
+      edestruct (@pickDrop_In_strong A) as [b' [l' [Hpick [Hfst Hlen']]]].
+      split; [| eassumption ].
+      eapply Hsub.  eassumption.
+      rewrite Hlen'. simpl.
+      replace (length l' + 1) with ((length l').+1); [| now ssromega ].
+      simpl.
+      eapply semBindSize. eexists b'. split.
+      eapply semChooseSize. now eauto.
+      apply/andP. unfold leq, super, ChooseNat, OrdNat in *.
+      split; now ssromega.
+      rewrite Hpick.
+      eapply semBindSize. eexists. split.
+      eassumption. simpl. eapply semReturnSize. reflexivity.
+    + assert (Hin : ((fun u : option A => u) :&: semGenSize (backtrackFuel (length lg2) (sum_fst lg2) lg2) s) (Some a)).
+      { eapply IHfuel1; [| | | | | now split; eauto ]; try eassumption; eauto.
+        * ssromega.
+        * ssromega.
+        * eapply subset_trans.
+          eapply pickDrop_subset. eassumption. eassumption. }
+      now inv Hin.
+Qed.
+  
+Lemma backtrackFuelSizeMonotonicOpt {A : Type} tot fuel (lg : seq (nat * G (option A))) :
+    sum_fst lg = tot -> length lg = fuel -> 
+    lg \subset [set x | SizeMonotonicOpt x.2 ] ->
+    SizeMonotonicOpt (backtrackFuel fuel tot lg).
+Proof.
+  move: tot lg.
+  induction fuel => tot lg.
+  - move => HSum /List.length_zero_iff_nil HLen; subst; simpl.
+    eauto with typeclass_instances.
+  - move => HSum HLen Hsub.
+    constructor. intros s1 s2 Hleq x [H1 H2]. destruct x; try discriminate.
+    assert (Ha : tot > 0). 
+    { destruct tot; eauto.
+      eapply backtrackFuel_sum_fst in H2; eauto. inv H2. }
+    eapply semBindSize in H2. split; eauto.
+    destruct H2 as [n [Hn H2]]. 
+    eapply semChooseSize in Hn; eauto.
+    destruct (pickDrop lg n) as [[k g] gs'] eqn:Heqd.
+    eapply semBindSize in H2. 
+    destruct H2 as [b [Hgb Hf]].
+    assert (Hlt : n < sum_fst lg).
+    { unfold leq, super, ChooseNat, OrdNat in *. now ssromega. }
+    edestruct (pickDrop_exists lg n) as [[m [g' [lg' [Hin' [Hdrop [Hneq [Heq1 [Heq2 Hlen]]]]]]]] _];
+      subst; eauto.
+    rewrite Hdrop in Heqd; inv Heqd. subst.
+    destruct b as [b |].
+    + eapply semBindSize.
+      eexists n. split.
+      eapply semChooseSize; now eauto.
+      rewrite Hdrop. eapply semBindSize.
+      exists (Some a). split. eapply Hsub in Hin'.
+      have Hin: (isSome :&:  semGenSize g s2) (Some a).
+      { eapply Hin'. eassumption. split; eauto.
+        eapply semReturnSize in Hf; inv Hf. eassumption. }
+      inv Hin. eassumption.
+      eapply semReturnSize. reflexivity.
+    + have Hin :(isSome :&: semGenSize (backtrackFuel fuel (sum_fst lg - k) gs') s1) (Some a).
+      { split ; eauto. }
+      eapply IHfuel in Hin; try eassumption. destruct Hin as [_ Hin].
+      * eapply backtrackFuel_list_mon; [| | | | | split; [ eauto | eassumption ] ];
+        try eauto; try ssromega.
+        rewrite Heq1. eapply setU_set_incl_r. eapply subset_refl.
+      * ssromega.
+      * ssromega.
+      * eapply subset_trans; [| eassumption ].
+        eapply pickDrop_subset; eauto.
+Qed.
+
 Corollary backtrackSizeMonotonic {A : Type} (lg : seq (nat * G (option A))) :
   lg \subset [set x | SizeMonotonic x.2 ] ->
   SizeMonotonic (backtrack lg).
@@ -1149,7 +1373,15 @@ Proof.
   intros Hin. unfold backtrack.
   eapply backtrackFuelSizeMonotonic; eauto.
 Qed.
-  
+
+Corollary backtrackSizeMonotonicOpt {A : Type} (lg : seq (nat * G (option A))) :
+  lg \subset [set x | SizeMonotonicOpt x.2 ] ->
+  SizeMonotonicOpt (backtrack lg).
+Proof.
+  intros Hin. unfold backtrack.
+  eapply backtrackFuelSizeMonotonicOpt; eauto.
+Qed.
+
 Lemma semBacktrackFuel {A} tot fuel (l : list (nat * G (option A))) size :
   sum_fst l = tot -> length l = fuel -> 
   semGenSize (backtrackFuel fuel tot l) size <--> 

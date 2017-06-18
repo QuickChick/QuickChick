@@ -148,36 +148,6 @@ Lemma semBacktrack:
     ([set None] :&: (\bigcap_(x in l :&: (fun x => x.1 <> 0)) (semGen x.2))).
 Admitted.
 
-Lemma semBindOptSizeMonotonicIncl_l {A B} (g : G (option A)) (f : A -> G (option B)) (s1 : set A)
-      `{Hg : SizeMonotonic _ g}
-      `{Hf : forall a, SizeMonotonic (f a)} :
-  Some @: s1 \subset semGen g ->
-  \bigcup_(a in s1) semGen (f a) \subset semGen (bindGenOpt g f).
-Admitted.
-
-Lemma semBindSizeMonotonicIncl_l {A B} (g : G A) (f : A -> G B) (s1 : set A)
-      `{Hg : SizeMonotonic _ g}
-      `{Hf : forall a, SizeMonotonic (f a)} :
-  s1 \subset semGen g ->
-  \bigcup_(a in s1) semGen (f a) \subset semGen (bindGen g f).
-Admitted.
-
-Lemma semBindOptSizeMonotonicIncl_r {A B} (g : G (option A)) (f : A -> G (option B)) (s1 : set A) (s2 : A -> set B)
-      `{Hg : SizeMonotonic _ g}
-      `{Hf : forall a, SizeMonotonic (f a)} :
-  semGen g \subset (Some @: s1) :|: [set None] ->
-  (forall x, semGen (f x) \subset Some @: (s2 x) :|: [set None]) -> 
-  semGen (bindGenOpt g f) \subset Some @: (\bigcup_(a in s1) s2 a) :|: [set None].
-Admitted.
-
-Lemma semBindSizeMonotonicIncl_r {A B} (g : G A) (f : A -> G (option B)) (s1 : set A) (s2 : A -> set B)
-      `{Hg : SizeMonotonic _ g}
-      `{Hf : forall a, SizeMonotonic (f a)} :
-  semGen g \subset s1 ->
-  (forall x, semGen (f x) \subset Some @: (s2 x) :|: [set None]) -> 
-  semGen (bindGen g f) \subset Some @: (\bigcup_(a in s1) s2 a)  :|: [set None].
-Admitted.
-
 
 Lemma semSuchThatMaybe_complete:
   forall (A : Type) (g : G A) (f : A -> bool) (s : set A),

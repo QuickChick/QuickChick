@@ -27,35 +27,35 @@ open GenSTCorrect
 (** Derivable classes *)
 type derivable =
     ArbitrarySizedSuchThat
-  | GenSizedSuchThatMonotonic
-  | GenSizedSuchThatSizeMonotonic
+  | GenSizedSuchThatMonotonicOpt
+  | GenSizedSuchThatSizeMonotonicOpt
   | GenSizedSuchThatCorrect
   | SizedProofEqs
 
 let print_der = function
   | ArbitrarySizedSuchThat -> "GenSizedSuchThat"
-  | GenSizedSuchThatMonotonic -> "SizeMonotonic"
+  | GenSizedSuchThatMonotonicOpt -> "SizeMonotonicOpt"
   | SizedProofEqs -> "SizedProofEqs"
-  | GenSizedSuchThatSizeMonotonic -> ""
+  | GenSizedSuchThatSizeMonotonicOpt -> "SizedMonotonicOpt"
   | GenSizedSuchThatCorrect -> "SizedSuchThatCorrect"
 
 
 let class_name cn =
   match cn with
   | ArbitrarySizedSuchThat -> "GenSizedSuchThat"
-  | GenSizedSuchThatMonotonic -> "SizeMonotonic"
+  | GenSizedSuchThatMonotonicOpt -> "SizeMonotonic"
   | SizedProofEqs -> "SizedProofEqs"
-  | GenSizedSuchThatSizeMonotonic -> ""
+  | GenSizedSuchThatSizeMonotonicOpt -> "SizedMonotonicOpt"
   | GenSizedSuchThatCorrect -> "SizedSuchThatCorrect"
 
 (** Name of the instance to be generated *)
 let mk_instance_name der tn =
   let prefix = match der with
     | ArbitrarySizedSuchThat -> "GenSizedSuchThat"
-    | GenSizedSuchThatMonotonic -> "SizeMonotonic"
+    | GenSizedSuchThatMonotonicOpt -> "SizeMonotonicOpt"
     | SizedProofEqs -> "SizedProofEqs"
     | GenSizedSuchThatCorrect -> "SizedSuchThatCorrect"
-    | _ -> failwith "Not implemented"
+    | GenSizedSuchThatSizeMonotonicOpt -> "SizedMonotonicOpt"
   in var_to_string (fresh_name (prefix ^ tn))
 
 (** Generic derivation function *)
@@ -161,7 +161,7 @@ let deriveDependent (cn : derivable) (c : constr_expr) (n : int) (instance_name 
       @ self_dec
       @ arb_needed
       @ inputs
-    | GenSizedSuchThatMonotonic -> []
+    | GenSizedSuchThatMonotonicOpt -> []
     | SizedProofEqs -> params @ inputs
     | GenSizedSuchThatCorrect -> params @ inputs
     | _ -> []
@@ -173,7 +173,7 @@ let deriveDependent (cn : derivable) (c : constr_expr) (n : int) (instance_name 
       gApp (gInject (class_name cn))
         [gType ty_params (nthType n dep_type);
          full_pred (List.map (fun n -> gVar (fresh_name n)) input_names)]
-    | GenSizedSuchThatMonotonic ->
+    | GenSizedSuchThatMonotonicOpt ->
       gProdWithArgs
         ((gArg ~assumType:(gInject "nat") ~assumName:(gInject "size") ()) :: inputs)
         (fun (size :: inputs) ->
@@ -192,14 +192,14 @@ let deriveDependent (cn : derivable) (c : constr_expr) (n : int) (instance_name 
   let instance_record iargs =
     match cn with
     | ArbitrarySizedSuchThat -> gen
-    | GenSizedSuchThatMonotonic ->
+    | GenSizedSuchThatMonotonicOpt ->
       msg_debug (str "mon type");
       debug_coq_expr (instance_type []);
       genSizedSTMon_body (class_name cn) ty_ctr ty_params ctrs dep_type input_names inputs n register_arbitrary
     | SizedProofEqs ->
       sizedEqProofs_body (class_name cn) ty_ctr ty_params ctrs dep_type input_names inputs n register_arbitrary
     | GenSizedSuchThatCorrect ->
-      let moninst = (class_name GenSizedSuchThatMonotonic) ^ ctr_name in
+      let moninst = (class_name GenSizedSuchThatMonotonicOpt) ^ ctr_name in
       let ginst = (class_name ArbitrarySizedSuchThat) ^ ctr_name in
       let setinst = (class_name SizedProofEqs) ^ ctr_name in
       genSizedSTCorr_body (class_name cn) ty_ctr ty_params ctrs dep_type input_names inputs n register_arbitrary

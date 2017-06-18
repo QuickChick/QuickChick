@@ -139,6 +139,7 @@ Module Type GenLowInterface.
   
   Declare Instance unsizedReturn {A} (x : A) : Unsized (returnGen x).
   Declare Instance returnGenSizeMonotonic {A} (x : A) : SizeMonotonic (returnGen x).
+  Declare Instance returnGenSizeMonotonicOpt {A} (x : option A) : SizeMonotonicOpt (returnGen x).
 
   Parameter semBindSize :
     forall A B (g : G A) (f : A -> G B) (size : nat),
@@ -162,16 +163,32 @@ Module Type GenLowInterface.
           `{Unsized _ g} `{forall x, Unsized (f x)} : Unsized (bindGen g f).
   (* end bindUnsized *)
 
-  (* XXX these will always succeed together and they have the same priority *)
+  (* XXX these will always succeed and they have the same priority *)
   Declare Instance bindMonotonic
           {A B} (g : G A) (f : A -> G B)
           `{SizeMonotonic _ g} `{forall x, SizeMonotonic (f x)} : 
     SizeMonotonic (bindGen g f).
 
+  Declare Instance bindMonotonicOpt
+          {A B} (g : G A) (f : A -> G (option B))
+          `{SizeMonotonic _ g} `{forall x, SizeMonotonicOpt (f x)} : 
+    SizeMonotonicOpt (bindGen g f).
+  
+
   Declare Instance bindMonotonicStrong
           {A B} (g : G A) (f : A -> G B)
           `{SizeMonotonic _ g} `{forall x, semGen g x -> SizeMonotonic (f x)} : 
     SizeMonotonic (bindGen g f).
+
+  Declare Instance bindMonotonicOptStrong
+          {A B} (g : G A) (f : A -> G (option B)) `{SizeMonotonic _ g}
+          `{forall x, semGen g x -> SizeMonotonicOpt (f x)} :
+    SizeMonotonicOpt (bindGen g f).
+
+  Declare Instance bindOptMonotonicOpt
+          {A B} (g : G (option A)) (f : A -> G (option B))
+          `{SizeMonotonicOpt _ g} `{forall x, SizeMonotonicOpt (f x)} : 
+    SizeMonotonicOpt (bindGenOpt g f).
   
   Parameter semBindUnsized1 :
     forall A B (g : G A) (f : A -> G B) `{Unsized _ g},
@@ -278,6 +295,15 @@ Module Type GenLowInterface.
   Parameter semSuchThatMaybe_sound:
     forall A (g : G A) (f : A -> bool),
       semGen (suchThatMaybe g f) \subset None |: some @: (semGen g :&: f).
+
+  Declare Instance suchThatMaybeMonotonicOpt
+           {A : Type} (g : G A) (f : A -> bool) `{SizeMonotonic _ g} : 
+    SizeMonotonicOpt (suchThatMaybe g f).
+  
+  Declare Instance suchThatMaybeOptMonotonicOpt
+           {A : Type} (g : G (option A)) (f : A -> bool) `{SizeMonotonicOpt _ g} : 
+    SizeMonotonic (suchThatMaybeOpt g f).
+  
 
   (* This (very concrete) spec is needed to prove shrinking *)
   Parameter semPromote :
@@ -537,6 +563,12 @@ Module GenLow : GenLowInterface.
   Proof.
     firstorder.
   Qed.
+
+  Instance returnGenSizeMonotonicOpt {A} (x : option A) : SizeMonotonicOpt (returnGen x).
+  Proof.
+    firstorder.
+  Qed.
+  
   
   (* begin semBindSize *)
   Lemma semBindSize A B (g : G A) (f : A -> G B) (s : nat) :
@@ -584,7 +616,42 @@ Module GenLow : GenLowInterface.
     rewrite !semBindSize. move => b.
     move => [a [H3 H4]]; exists a; split => //; eapply monotonic; eauto.
   Qed.
-  
+
+  Program Instance bindMonotonicOpt
+          {A B} (g : G A) (f : A -> G (option B))
+          `{SizeMonotonic _ g} `{forall x, SizeMonotonicOpt (f x)} : 
+    SizeMonotonicOpt (bindGen g f).
+  Next Obligation.
+    rewrite !semBindSize. move => b.
+    move => [Hsome [a [H4 H5]]]. destruct b; try discriminate.
+    split; eauto.
+    eexists a; split => //. eapply monotonic; eauto.
+    assert (Hin : (isSome :&: semGenSize (f a) s1) (Some b)).
+    { split; eauto. }
+    eapply monotonic_opt in Hin; eauto. now inv Hin.
+  Qed.
+
+  Instance bindOptMonotonicOpt
+          {A B} (g : G (option A)) (f : A -> G (option B))
+          `{SizeMonotonicOpt _ g} `{forall x, SizeMonotonicOpt (f x)} : 
+    SizeMonotonicOpt (bindGenOpt g f).
+  Proof.
+    constructor. intros s1 s2 Hleq.
+    rewrite !semBindSize. move => b.
+    move => [Hsome [a [H4 H5]]]. destruct b; try discriminate.
+    split; eauto.
+    eexists a.
+    destruct a.
+    - split.
+      assert (Hin : (isSome :&: semGenSize g s1) (Some a)).
+      { split; eauto. }
+      eapply monotonic_opt; eauto.
+      assert (Hin : (isSome :&: semGenSize (f a) s1) (Some b)).
+      { split; eauto. }
+      eapply monotonic_opt; eauto.
+    - eapply semReturnSize in H5. inv H5.
+  Qed.
+
   Program Instance bindMonotonicStrong
           {A B} (g : G A) (f : A -> G B) `{SizeMonotonic _ g}
           `{forall x, semGen g x -> SizeMonotonic (f x)} :
@@ -597,6 +664,23 @@ Module GenLow : GenLowInterface.
     eexists. split; eauto. now constructor.
     eassumption.
     eassumption.
+  Qed.
+  
+  Program Instance bindMonotonicOptStrong
+          {A B} (g : G A) (f : A -> G (option B)) `{SizeMonotonic _ g}
+          `{forall x, semGen g x -> SizeMonotonicOpt (f x)} :
+    SizeMonotonicOpt (bindGen g f).
+  Next Obligation.
+    rewrite !semBindSize. move => b.
+    move => [Hsome [a [H4 H5]]]. destruct b; try discriminate.
+    split; eauto.
+    eexists a; split => //. eapply monotonic; eauto.
+    assert (Hin : (isSome :&: semGenSize (f a) s1) (Some b)).
+    { split; eauto. }
+    assert (Hmon : SizeMonotonicOpt (f a)).
+    { eapply H0. eexists; split; eauto. now constructor. }
+    eapply monotonic_opt in Hin; eauto.
+    inv Hin. eassumption.
   Qed.
   
   (* begin semBindUnsized1 *)
@@ -875,7 +959,18 @@ Module GenLow : GenLowInterface.
     case=> [a [size [_ [x run_x]]] | ]; last by left.
     by right; exists a; split=> //; apply: (semGenSuchThatMaybeAux_sound run_x).
   Qed.
+
+  Instance suchThatMaybeMonotonicOpt
+           {A : Type} (g : G A) (f : A -> bool) `{SizeMonotonic _ g} : 
+    SizeMonotonicOpt (suchThatMaybe g f).
+  Proof.
+  Admitted.
   
+  Instance suchThatMaybeOptMonotonicOpt
+           {A : Type} (g : G (option A)) (f : A -> bool) `{SizeMonotonicOpt _ g} : 
+    SizeMonotonic (suchThatMaybeOpt g f).
+  Admitted.
+
   Lemma promoteVariant :
     forall {A B : Type} (a : A) (f : A -> SplitPath) (g : G B) size
       (r r1 r2 : RandomSeed),

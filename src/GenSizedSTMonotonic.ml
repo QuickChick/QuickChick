@@ -23,9 +23,9 @@ open ArbitrarySizedST
 open Error
 
 (* arguments to handle_branch *)
-let fail_exp = returnGenSizeMonotonic (gNone hole)
+let fail_exp = returnGenSizeMonotonicOpt (gNone hole)
 
-let ret_exp (c : coq_expr) = returnGenSizeMonotonic (gSome hole c)
+let ret_exp (c : coq_expr) = returnGenSizeMonotonicOpt (gSome hole c)
 
 let ret_type (s : var) (match_expr : var -> coq_expr -> coq_expr -> coq_expr)  =
   gApp (gInject "SizeMonotonic") [match_expr s hole hole]
@@ -38,7 +38,7 @@ let rec_method (ih : var) (n : int) (l : coq_expr list) =
   gApp (gVar ih) l
 
 let bind (opt : bool) (m : coq_expr) (x : string) (f : var -> coq_expr) =
-  (if opt then bindOptMonotonic else bindMonotonic) m x f
+  (if opt then bindOptMonotonicOpt else bindMonotonicOpt) m x f
 
 let stMaybe (opt : bool) (g : coq_expr) (x : string) (checks : ((coq_expr -> coq_expr) * int) list) =
   let rec sumbools_to_bool x lst =

@@ -47,19 +47,19 @@ let dep_dispatch ind class_name =
      DepDriver.deriveDependent class_name constructor n (DepDriver.mk_instance_name class_name ctr_name)
   | _ -> failwith "wrongformat"
 
-let class_assoc_opts = [ ("GenSized"                , SimpleDer [SimplDriver.GenSized])
-                       ; ("Shrink"                  , SimpleDer [SimplDriver.Shrink])
-                       ; ("Arbitrary"               , SimpleDer [SimplDriver.GenSized; SimplDriver.Shrink])
-                       ; ("Show"                    , SimpleDer [SimplDriver.Show])
-                       ; ("Sized"                   , SimpleDer [SimplDriver.Sized])
-                       ; ("CanonicalSized"          , SimpleDer [SimplDriver.CanonicalSized])
-                       ; ("SizeMonotonic"           , SimpleDer [SimplDriver.SizeMonotonic])
-                       ; ("SizedMonotonic"          , SimpleDer [SimplDriver.SizedMonotonic])
-                       ; ("SizedCorrect"            , SimpleDer [SimplDriver.SizedCorrect])
-                       ; ("ArbitrarySizedSuchThat"  , DepDer DepDriver.ArbitrarySizedSuchThat)
-                       ; ("SizeMonotonicSuchThat"   , DepDer DepDriver.GenSizedSuchThatMonotonic)
-                       ; ("SizedProofEqs"           , DepDer DepDriver.SizedProofEqs)
-                       ; ("GenSizedSuchThatCorrect" , DepDer DepDriver.GenSizedSuchThatCorrect)
+let class_assoc_opts = [ ("GenSized"                 , SimpleDer [SimplDriver.GenSized])
+                       ; ("Shrink"                   , SimpleDer [SimplDriver.Shrink])
+                       ; ("Arbitrary"                , SimpleDer [SimplDriver.GenSized; SimplDriver.Shrink])
+                       ; ("Show"                     , SimpleDer [SimplDriver.Show])
+                       ; ("Sized"                    , SimpleDer [SimplDriver.Sized])
+                       ; ("CanonicalSized"           , SimpleDer [SimplDriver.CanonicalSized])
+                       ; ("SizeMonotonic"            , SimpleDer [SimplDriver.SizeMonotonic])
+                       ; ("SizedMonotonic"           , SimpleDer [SimplDriver.SizedMonotonic])
+                       ; ("SizedCorrect"             , SimpleDer [SimplDriver.SizedCorrect])
+                       ; ("ArbitrarySizedSuchThat"   , DepDer DepDriver.ArbitrarySizedSuchThat)
+                       ; ("SizeMonotonicSuchThatOpt" , DepDer DepDriver.GenSizedSuchThatMonotonicOpt)
+                       ; ("SizedProofEqs"            , DepDer DepDriver.SizedProofEqs)
+                       ; ("GenSizedSuchThatCorrect"  , DepDer DepDriver.GenSizedSuchThatCorrect)
                        ] 
 
 let class_assoc_table =
