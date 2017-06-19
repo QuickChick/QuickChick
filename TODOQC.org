@@ -1,11 +1,5 @@
 For leo:
-  - Dec seems not to be working as intended.  He hoped that the ? would not
-    be necessary to coerce a (decidable) Prop to a Checkable...
-  - Can we make every EqDec automatically be a Dec?
   - Does the QC command actually fail if the testing fails??  Could it?
-  - The QuickChick command should print which property it tested.
-  - Perhaps the normal (or at least a selectable) behavior of the QuickChick
-    command should be to print nothing at all if checking succeeds.
   - Can we avoid re-extracting and recompiling the whole file every time we
     run QuickChick?? 
       - It's too slow, probably in large part because we're recompiling too
@@ -13,6 +7,11 @@ For leo:
   * Make a simpler tactic for deriving equality.
        Derive Arbitrary, Show, Eq for file_access_mode.
   * play with precedence for ? -- should bind tigher than implication
+
+  - The top-level QC interface should expose as little as possible, so that
+    modules that Import QC do not have their namespaces too polluted.  (And
+    there should be a single file that most users import, rather than
+    several.)
 
 MINOR:
   - Add
@@ -22,10 +21,16 @@ MINOR:
   - When displaying counterexamples, would it be easy to print the name of
     each bound variable along with the failing value that's been found for
     it? 
+  - eliminate all compilation warnings (including nonexhaustive patterns!)
+  - Perhaps the normal (or at least a selectable) behavior of the QuickChick
+    command should be to print nothing at all if checking succeeds.
 
 __________
 
 About decidability:
+  - Can we make every EqDec automatically be a Dec?
+  - Dec seems not to be working as intended.  Leo hoped that the ? would not
+    be necessary to coerce a (decidable) Prop to a Checkable...
   - How do I create a Dec instance for options?  
   - Need better (infix) notations for boolean operations (andb, orb, negb,
     implies, etc.) 
@@ -35,7 +40,8 @@ About decidability:
 
 
 TASKS FOR THE SUMMER SCHOOL:
-  - documentation 
+  - documentation -- coqdoc comments, especially on the most user-visible
+    parts!
   - test opam package
 
 ___________

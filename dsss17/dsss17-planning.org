@@ -10,6 +10,8 @@ Coq typeclasses (intro)
   TypeClasses.v
 
 core QC typeclasses
+  - derived typeclasses (Show) -- maybe this will eventually be a general
+    feature of Coq, but for now it's part of QC
   - generator monad
      - basic combinators (elements, oneOf, ...)
      - exercises: build a generator for XX
@@ -39,6 +41,9 @@ ways of measuring distributions
 
 code coverage is a very bad success metric, but a rather good heuristic for
 when your tests are not good enough
+
+Defining new one-constructor types to obtain different Gen behaviors (for
+example).
 
 mutation testing
   
@@ -78,5 +83,6 @@ Case study: Vellvm
 
 ?case study: DeepWeb
 
-Zoe-proofs  (typeclasses, mainly, plus just a hint of the proofs)
+Zoe-proofs (the relevant typeclasses, mainly, plus just a hint of the
+proofs)
   - 1-hour talk based on her section of popl submission
