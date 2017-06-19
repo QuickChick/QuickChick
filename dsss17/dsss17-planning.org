@@ -59,6 +59,12 @@ Polymorphic generators (nat)
 custom shrinking
 
 generating dependent generators
+  - Using QuickChick to automatically derive generators satisfying 
+    preconditions in the form of inductive datatypes
+  - Notation
+  - Precise form required from predicates
+  - Narrowing caveats (too much backtracking if instantiating too early)
+  - Workarounds (group predicates together - commit b2e4ad922e20b87818cb6162d714fe498e4dc356 from DeepSpec demo for an example)
 
 super-simple compiler
 
