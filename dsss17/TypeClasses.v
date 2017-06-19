@@ -286,8 +286,22 @@ Instance eqPair {A B : Type} `{Eq A} `{Eq B} : Eq (A * B) :=
 
 (* Exercise: Write eq instances for options and lists *)
 
-(* Exercise?: Define a Ord typeclass, with instances for nat, bool,
-   pairs, and lists. *)
+(* ---------------------------------------------------------------- *)
+(** Typeclasses and Proofs *)
+
+Generalizable Variables A.  (* When is it needed / not needed? *)
+Class Ord `{Eq A} :=
+    { le : A -> A -> bool }.
+
+Definition le_eqb `{Ord A} (x y : A) := andb (le x y) (le y x).
+
+(* From 20.5.1 of reference manual, but it doesn't seem to work: 
+
+Definition lt `{eqa : Eq A, ! Ord eqa} (x y : A) := 
+        andb (le x y) (neqb x y).
+*)
+
+(* Exercise: define instances for nat, option, pair, and list *)
 
 (* ---------------------------------------------------------------- *)
 (** Typeclasses and Proofs *)
