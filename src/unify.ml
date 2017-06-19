@@ -62,6 +62,10 @@ module UM = Map.Make(UnknownOrd)
 (* Maps unknowns to range *)
 type umap = range UM.t
 
+let umfind k m = 
+  try UM.find k m 
+  with Not_found -> (msg_error (str (Printf.sprintf "Can't find: %s" (Unknown.to_string k)) ++ fnl()); failwith "Not found")
+
 let lookup (k : unknown) (m : umap) = try Some (UM.find k m) with Not_found -> None
 
 (* For equality handling: require ordered (String, String) *)
@@ -219,10 +223,10 @@ let rec fixRange u r k =
     match r with 
     | FixedInput -> k
     | Undef _ -> UM.add u FixedInput k 
-    | Unknown u' -> fixRange u' (UM.find u' k) k
+    | Unknown u' -> fixRange u' (umfind u' k) k
     | Ctr (_, rs) -> List.fold_left (fun k r -> fixRange Unknown.undefined r k) k rs 
 
-let fixVariable x k = fixRange x (UM.find x k) k
+let fixVariable x k = fixRange x (umfind x k) k
 
 let rec convert_to_range dt = 
   match dt with 
@@ -235,7 +239,7 @@ let is_fixed k dt =
   let rec aux = function
     | Undef _ -> false
     | FixedInput -> true
-    | Unknown u' -> aux (UM.find u' k)
+    | Unknown u' -> aux (umfind u' k)
     | Ctr (_, rs) -> List.for_all aux rs
   in aux (convert_to_range dt)
 
@@ -245,7 +249,7 @@ let rec range_to_coq_expr k r =
   | Ctr (c, rs) -> 
      gApp (gCtr c) (List.map (range_to_coq_expr k) rs)
   | Unknown u -> 
-     begin match UM.find u k with
+     begin match umfind u k with
      | FixedInput -> gVar u
      | Undef _ -> (msg_debug (str "It's stupid that this is called" ++ fnl ()); gVar u)
      | Unknown u' -> range_to_coq_expr k (Unknown u')
@@ -405,7 +409,7 @@ let handle_branch
           process_checks k cmap parent false class_method
             (fun k' cmap' x -> cont k' cmap' (gVar x))
         end
-      | Unknown u -> instantiate_range_cont k cmap u cont (UM.find u k)
+      | Unknown u -> instantiate_range_cont k cmap u cont (umfind u k)
       | FixedInput -> cont k cmap (gVar parent)
     in 
 
@@ -557,6 +561,59 @@ let handle_branch
         end
         else failwith "TODO: Negation with many things to be generated"
 
+    and handle_app m (pos : bool) (f : dep_type) (xs : dep_type list)
+                   (k : umap) (cmap : cmap) (dt2 : dep_type) =
+      (* Construct the checker for the current application *)
+      let checker args = 
+        gApp ~explicit:true (gInject "dec") 
+          (* P : Prop := c dts*)
+          [ gApp ~explicit:true (gType [] f) args
+
+          (* Instance *)
+          ; hole 
+
+          ] 
+      in
+      UM.iter (fun x r -> msg_debug (str ("Bound: " ^ var_to_string x ^ " to Range: " ^ (range_to_string r)) ++ fnl ())) k; 
+      let numbered_dts = List.mapi (fun i dt -> (i+1, dt)) xs in (* +1 because of nth being 1-indexed *)
+
+      match List.filter (fun (i, dt) -> not (is_fixed k dt)) numbered_dts with
+      | [] -> failwith "Check/app"
+      | [x] -> failwith "Gen/1"
+      | filtered -> 
+         if pos then begin
+           let rec build_arbs k cmap acc = function 
+             (* TODO: Hacky: should try and find out which one is a variable *)
+             | [(i,DTyVar x)] -> 
+                  (* base case - recursive call *)
+                  if pos then begin 
+                      (* @arbitrarySizeST {A} (P : A -> Prop) {Instance} (size : nat) -> G (option A) *)
+                      let pred = (* predicate we are generating for *)
+                        gFun [var_to_string x]
+                          (fun [x] ->
+                             gApp ~explicit:true (gType [] f) (List.map (fun (j, dt) -> 
+                                                         (* Replace the i-th variable with x - we're creating fun x => c dt_1 dt_2 ... x dt_{i+1} ... *)
+                                                         if i == j then gVar x else dt_to_coq_expr k dt
+                                                       ) numbered_dts))
+                      in
+                      process_checks k cmap x true (class_methodST m pred) 
+                        (fun k' cmap' x' -> recurse_type (m + 1) k' cmap' dt2)
+                  end
+                  else failwith "Negation / build_arbs / application "
+                | (i,dt)::rest -> 
+                   if is_fixed k dt then (* Fixed argument - do nothing *)
+                    build_arbs k cmap (dt_to_coq_expr k dt :: acc) rest 
+                  else (* Call arbitrary and bind it to a new name *)
+                    let arb = arb.next_name () in
+                    let rdt = convert_to_range dt in
+                    instantiate_range_cont k cmap Unknown.undefined 
+                      (fun k cmap c -> (* Continuation: call build_arbs on the rest *)
+                         build_arbs k cmap (c :: acc) rest
+                      ) rdt
+           in build_arbs k cmap [] numbered_dts
+         end
+         else failwith "Negation / application"
+
     (* Dispatcher for constraints *)
     and handle_dt (n : int) pos dt1 dt2 k cmap = 
       match dt1 with 
@@ -564,6 +621,8 @@ let handle_branch
         handle_TyCtr n pos c dts k cmap dt2
       | DNot dt -> 
         handle_dt n (not pos) dt dt2 k cmap
+      | DApp (dt, dts) -> 
+        handle_app n pos dt dts k cmap dt2
       | _ -> failwith "Constraints should be type constructors/negations"
 
     (* Iterate through constraints *)
@@ -571,7 +630,7 @@ let handle_branch
       | DProd (_, dt) -> (* Only introduces variables, doesn't constrain them *)
         recurse_type n k cmap dt
       | DArrow (dt1, dt2) ->
-        msg_debug (str ("Darrowing: " ^ range_to_string (UM.find forGen k)) ++ fnl ());
+        msg_debug (str ("Darrowing: " ^ range_to_string (umfind forGen k)) ++ fnl ());
         handle_dt n true dt1 dt2 k cmap
       | DTyCtr _ -> (* result *) 
          (* Instantiate forGen *)
