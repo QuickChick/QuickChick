@@ -1,7 +1,7 @@
 Require Import Coq.Strings.String.
 Require Import Coq.Arith.Arith.
+Require Import Omega.
 Local Open Scope string.
-
 
 (* ################################################################# *)
 (** * Basics *)
@@ -21,6 +21,12 @@ Local Open Scope string.
 
   Coq adopts (and adapts) Haskell's notion of _typeclasses_ for this.
 *)
+
+(* Remark for newcomers: the name "typeclasses" may sound a bit like
+   "classes" from OOP.  But this is misleading.  A better analogy is
+   actually with _interfaces_ from languages like Java.  But best of
+   all is to set aside OO preconceptions and try to approach the
+   situation with an open mind. *)
 
 (* Class declaration: *)
 Class Eq A :=
@@ -57,137 +63,256 @@ Instance eqBool : Eq bool :=
 
 (* What's the difference between {...} and {|...|} ?? *)
 
-(* --------- *)
-
-(* Class declaration: *)
-Class Show A : Type :=
+(* Another: *)
+Instance eqNat : Eq nat :=
   {
-    show : A -> string
+    eqb := beq_nat
   }.
 
-(* Instance declaration: *)
-Instance showBool : Show bool :=
-  {|
-    show := fun b:bool => if b then "true" else "false"
-  |}.
-
-Compute (show true).
-
-Definition natToDigit (n : nat) : string :=
-  match n with
-    | 0 => "0" | 1 => "1" | 2 => "2" | 3 => "3" | 4 => "4" | 5 => "5"
-    | 6 => "6" | 7 => "7" | 8 => "8" | _ => "9"
-  end.
-
-Fixpoint writeNatAux (time n : nat) (acc : string) : string :=
-  let acc' := (natToDigit (n mod 10)) ++ acc in
-  match time with
-    | 0 => acc'
-    | S time' =>
-      match n / 10 with
-        | 0 => acc'
-        | n' => writeNatAux time' n' acc'
-      end
-  end.
-
-Definition string_of_nat (n : nat) : string :=
-  writeNatAux n n "".
-
-Instance showNat : Show nat :=
-  {|
-    show := string_of_nat
-  |}.
-
-Compute (show 42).
-
-Instance showString : Show string :=
-  {|
-    show := fun s:string => """" ++ s ++ """"
-  |}.
-
-Compute (show true).
-
-(* Exercise: Write show instance for pairs of a nat and a bool. *)
+(* Exercise: Write eq instance for pairs of a nat and a bool. *)
 
 (* One downside of using typeclasses is that error messages get more
    puzzling (sometimes substantially so).  Here is a common one. *)
 (*
-Inductive foo :=
-  Foo : nat -> foo.
+Inductive bar :=
+  Bar : nat -> bar.
 
-Definition showMyList :=
-  show (Foo 43).
-
+Definition eqBar :=
+  eqb (Bar 42) (Bar 43).
 ===> 
       Error: Unable to satisfy the following constraints:
-      ?Show : "Show foo"
+      ?Eq : "Eq bar"
 
 To fix it, we just have to define a new instance... (do it, or ask them to)
 *)
 
-(* What if we *)
+(* We can define functions that use overloaded functions from 
+   instances like this: *)
+Definition oddManOut {X : Type} `{Eq X} (a b c : X) : X :=
+  if eqb a b then c
+  else if eqb a c then b
+  else a.                         
 
-Definition showFancy {A : Type} `{Show A} (a : A): string :=
-  "((((((((((( " ++ show a ++ " )))))))))))".
-
-Compute (showFancy true).
-
-
-(* Explain: What does the ` syntax mean?  Note that we can name the
-   parameter if we want -- i.e., `{Show A} is just the same as `{_ :
-   Show A}. Explain when you'd need to do this, or better yet explain
-   it below and put a pointer here. *)
+Compute (oddManOut 2 1 2).
 
 (* Recommended exercise: What happens if we forget the class
    constraint?  Try deleting it and see what happens.  Do you
    understand why? *)
 
-(* MAYBE: Show one more simple typeclass, perhaps equality *)
+(* ---------------------------------------------------------------- *)
+(** Implicit Generalization *)
 
-(* Remark for newcomers: the name "typeclasses" may sound a bit like
-   "classes" from OOP.  But this is misleading.  A better analogy is
-   actually with _interfaces_ from languages like Java.  But best of
-   all is to set aside OO preconceptions and try to approach the
-   situation with an open mind. *)
+(* Here, [`{Eq A}] essentially means the same as [{_ : Eq A}].  The
+   opening tick tells Coq to perform "implicit generalization."
+
+   Here's what the Coq reference manual says:
+
+      Implicit generalization is an automatic elaboration of a
+      statement with free variables into a closed statement where
+      these variables are quantified explicitly. Implicit
+      generalization is done inside binders starting with a ` and
+      terms delimited by `{ } and `( ), always introducing maximally
+      inserted implicit arguments for the generalized
+      variables. Inside implicit generalization delimiters, free
+      variables in the current context are automatically quantified
+      using a product or a lambda abstraction to generate a closed
+      term. *)
+
+(* For example: *)
+Generalizable Variables x y.
+(* (By default, ordinary variables don't behave this way, to avoid
+   puzzling behavior in case of typos.) *)
+
+Definition weird1 := `(x + y).
+Print weird1.
+
+Lemma weird2 : `(x + y = y + x).
+Proof. intros. omega. Qed.
+
+Print oddManOut.
+
+Definition oddManOut' {X : Type} {_ : Eq X} (a b c : X) : X :=
+  if eqb a b then c
+  else if eqb a c then b
+  else a.                         
+
+(* TODO: Now explain this:
+
+Definition oddManOut {X : Type} {Eq X} (a b c : X) : X :=
+  if eqb a b then c
+  else if eqb a c then b
+  else a.                         
+
+====>
+    Error: Unable to satisfy the following constraints:
+    UNDEFINED EVARS:
+     ?X12==[X |- Type] (type of Eq) {?T}
+     ?X15==[X0 Eq X a b c |- Eq X] (parameter Eq of @eqb) {?Eq}
+     ?X17==[X0 Eq X a b c |- Eq X] (parameter Eq of @eqb) {?Eq0}
+*)
+
+(* This may seem like a lot of trouble just to avoid writing a _!  Why
+   is it useful?
+
+   Matthieu makes the point that binding super-classes is supported by
+   implicit generalization using this example:
+
+    Program Definition div2 ‘{Frac α} (a : α) := div a (1 + 1). ⇒
+    Definition div2 {α} {N : Num α} {Frac α N} (a : α) := ...
+
+    ___
+
+    Also, substructures become subinstances: Class Monoid A := { monop
+    : A → A → A ; ... } ClassGroupA:={grp mon: MonoidA;...} Instance
+    grp mon ‘{Group A} : Monoid A. Definition foo ‘{Group A} (x : A) :
+    A := monop x x.  Similar to the existing Structures based on
+    coercive subtyping.
+
+From the reference manual:
+
+  However, the generalizing binders should be used instead as they
+  have particular support for type classes:
+      - They automatically set the maximally implicit status for type
+        class arguments, making derived functions as easy to use as
+        class methods. In the example above, A and eqa should be set
+        maximally implicit.
+      - They support implicit quantification on partially applied type
+        classes (§2.7.19). Any argument not given as part of a type
+        class binder will be automatically generalized.
+      - They also support implicit quantification on
+        superclasses (§20.5.1)
+*)
+
+(* Q: Does `(...) mean the same as `{...} ? *)
 
 (* ---------------------------------------------------------------- *)
 (** Internals *)
 
 (* Explain briefly what a typeclass actually translates into. *)
 
+Print Eq.
+(* ===>
+     Record Eq (A : Type) : Type := Build_Eq { eqb : A -> A -> bool }
+*)
+
+Print eqb.
+(* ==>
+     eqb = 
+     fun (A : Type) (Eq0 : Eq A) => let (eqb) := Eq0 in eqb
+          : forall A : Type, Eq A -> A -> A -> bool
+
+     Arguments A, Eq are implicit and maximally inserted
+     Argument scopes are [type_scope _ _ _]
+ *)
+
+Check eqb.
+(* ===>
+     eqb
+        : nat -> nat -> bool
+
+(!)  Because typeclass inference does "defaulting."
+
+This behavior can be puzzling.  (Maybe this belongs below in pragmatics.)
+*)
+Definition weird x y := eqb x y.
+Check weird.
+
+Check (@eqb).
+(* ==>
+    @eqb
+       : forall A : Type, Eq A -> A -> A -> bool
+*)
+
+(* Instance inference... 
+
+    fun (x y : bool) => eqb x y 
+    ===>   { Implicit arguments }
+    fun (x y : bool) => @eqb _ _ x y
+    ===>   { Typing }
+    fun (x y : bool) => @eqb (?A : Type) (?eq : Eq?A) x y 
+    ===>   { Unification }
+    fun (x y : bool) => @eqb bool (?eq : Eq bool) x y 
+    ===>   { Proof search for Eq bool returns Eq bool }
+    fun (x y : bool) => @eqb bool (eqBool : Eq bool) x y 
+*)
+
+(* For purposes of instance inference, it doesn't matter whether hypotheses are explicit or inferred.  So, for example, one could just as well write *)
+
+Definition oddManOut'' {X : Type} (_ : Eq X) (a b c : X) : X :=
+  if eqb a b then c
+  else if eqb a c then b
+  else a.                         
+
+(* However, if we define it this way, then applying the function is
+   going to be more clunky: *)
+
+(*
+Check (oddManOut'' 1 2 1).
+===>
+   Error: The term "1" has type "nat" while it is expected to have type "Eq ?X".
+*)
+
+Check (oddManOut'' eqNat 1 2 1).
+
+(*
+Proof-search tactic with instances as lemmas: 
+
+    A:Type, eqa: EqA |- ? : Eq (list A)
+
+  Simple depth-first search with higher-order unification
+
+– Returns the first solution only 
+     - not always what you want!!
++ Extensible through Ltac
+ *)
+
+(* WRITE MORE: Show how to turn on debugging and explain what it
+   prints.  Do some trickier examples.  (Maybe some of this needs to
+   go below, after parameterized instances are introduced.) *)
+
+(* Matthieu's slides have some stuff about "Instance Inference"
+   that is probably useful but I'm not sure I follow it... *)
+
 (* ---------------------------------------------------------------- *)
 (** Parameterized Instances: New Typeclasses from Old *)
 
-Instance showPair {A B : Type} `{Show A} `{Show B} : Show (A * B) :=
+Instance eqPair {A B : Type} `{Eq A} `{Eq B} : Eq (A * B) :=
   {|
-    show p :=
-      match p with (a,b) =>
-      | ("(" ++ show a ++ "," ++ show b ++ ")")
+    eqb p1 p2 :=
+      match p1,p2 with
+      | (a1,b1),(a2,b2) => andb (eqb a1 a2) (eqb b1 b2)
       end
   |}.
 
-(* Exercise: Write show instances for options and lists *)
+(* Exercise: Write eq instances for options and lists *)
 
 (* Exercise?: Define a Ord typeclass, with instances for nat, bool,
    pairs, and lists. *)
 
+(* ---------------------------------------------------------------- *)
 (** Typeclasses and Proofs *)
 
-(* E.g. maybe Matthieu's EqDec example.  (And then we could replace
-   Show above by Eq.) *)
+(* Class EqDec (A : Type) := { eqb : A -> A -> bool ; eqb_leibniz :
+forall x y, eqb x y = true -> x = y }.
 
-(*
-Coq < Class EqDec (A : Type) := {
-        eqb : A -> A -> bool ;
-        eqb_leibniz : forall x y, eqb x y = true -> x = y }.
+If one does not give all the members in the Instance declaration, Coq
+enters the proof-mode and the user is asked to build inhabitants of
+the remaining fields, e.g.:
 
-If one does not give all the members in the Instance declaration, Coq enters the proof-mode and the user is asked to build inhabitants of the remaining fields, e.g.:
-
-Instance eq_bool : EqDec bool :=
-      { eqb x y := if x then y else negb y }.
+Instance eq_bool : EqDec bool := 
+  { 
+    eqb x y := if x then y else negb y
+  }.
 
 etc.
 *)
+
+(* ---------------------------------------------------------------- *)
+(** Dependent Typeclasses *)
+
+(* Show Reflexive example from Matthieu.  Maybe also show
+   Monoid. (This motivates the real need for implicit
+   generalization!) *)
 
 (*
 ################################################################# *)
@@ -218,9 +343,55 @@ etc.
 (* Advice about how to use typeclasses in Coq.  How to avoid various
    pitfalls and gotchas.  How to debug. *)
 
+Set Typeclasses Debug.
+(* Find an interesting enough example... *)
+Definition pairThing := eqb (2,(3,true)) (2,(3,false)).
+(* ==>
+    Debug: 1: looking for (Eq X) without backtracking
+    Debug: 1.1: exact e on (Eq X), 0 subgoal(s)
+    Debug: 1: looking for (Eq X) without backtracking
+    Debug: 1.1: exact e on (Eq X), 0 subgoal(s)
+    Debug: 1: looking for (Eq A) without backtracking
+    Debug: 1.1: exact H on (Eq A), 0 subgoal(s)
+    Debug: 1: looking for (Eq B) without backtracking
+    Debug: 1.1: exact H0 on (Eq B), 0 subgoal(s)
+    Debug: 1: looking for (Eq (nat * (nat * bool))) without backtracking
+    Debug: 1.1: simple apply @eqPair on (Eq (nat * (nat * bool))), 2 subgoal(s)
+    Debug: 1.1.3 : (Eq nat)
+    Debug: 1.1.3: looking for (Eq nat) without backtracking
+    Debug: 1.1.3.1: exact eqNat on (Eq nat), 0 subgoal(s)
+    Debug: 1.1.3 : (Eq (nat * bool))
+    Debug: 1.1.3: looking for (Eq (nat * bool)) without backtracking
+    Debug: 1.1.3.1: simple apply @eqPair on (Eq (nat * bool)), 2 subgoal(s)
+    Debug: 1.1.3.1.3 : (Eq nat)
+    Debug: 1.1.3.1.3: looking for (Eq nat) without backtracking
+    Debug: 1.1.3.1.3.1: exact eqNat on (Eq nat), 0 subgoal(s)
+    Debug: 1.1.3.1.3 : (Eq bool)
+    Debug: 1.1.3.1.3: looking for (Eq bool) without backtracking
+    Debug: 1.1.3.1.3.1: exact eqBool on (Eq bool), 0 subgoal(s)
+    pairThing is defined
+*)
+
+(* How classes and instances interact with modules *)
+
+(* "Global Instance" redeclares Instance at end of Section. (Does it
+   do anything else??) *) 
+
+(* Show how to use Set Printing Implicit to see what's going on. *)
+
+(* Priorities *)
+
+(* ------------------------------------------------------------------------ *)
+(** ** Alternative Structuring Mechanisms *)
+
 (* Alternatives.  Choosing among typeclasses, modules, dependent
    records, canonical instances.  Pointers to where to read about all
    these. *)
+
+(* Mattheiu's Penn slides have a discussion of sharing by fields vs by
+   parameters that probably deserves to be incorporated here -- or at
+   least summarized with a pointer to somewhere people can read about
+   it... *)
 
 (*
 ################################################################# *)
@@ -229,6 +400,8 @@ etc.
 (* Origins: In Haskell, Wadler & Blott, POPL’89.  In Isabelle, Nipkow
 & Snelting, FPCA’91.  In Coq: Sozeau
 *)
+
+(* Acknowledge sources for this tutorial. *)
 
 (* Typeclasses in Haskell:
      - https://en.wikibooks.org/wiki/Haskell/Classes_and_types
@@ -304,11 +477,56 @@ to define something similar to what I did.
 
 EXERCISE: Find a different way of making instance inference diverge.
 
- *)
-
-(* Hint: If confused, you can look at the *coq* buffer. That's where
+Hint: If confused, you can look at the *coq* buffer. That's where
 most debug messages appear if they don't appear in the *response*
-buffer.  (What's a typical example of this? *)
+buffer.  (What's a typical example of this?)
 *)
+
+(* _____________________________________________________________________ *)
+    
+(* Another useful typeclass *)
+Class Show A : Type :=
+  {
+    show : A -> string
+  }.
+
+Instance showBool : Show bool :=
+  {|
+    show := fun b:bool => if b then "true" else "false"
+  |}.
+
+Definition natToDigit (n : nat) : string :=
+  match n with
+    | 0 => "0" | 1 => "1" | 2 => "2" | 3 => "3" | 4 => "4" | 5 => "5"
+    | 6 => "6" | 7 => "7" | 8 => "8" | _ => "9"
+  end.
+
+Fixpoint writeNatAux (time n : nat) (acc : string) : string :=
+  let acc' := (natToDigit (n mod 10)) ++ acc in
+  match time with
+    | 0 => acc'
+    | S time' =>
+      match n / 10 with
+        | 0 => acc'
+        | n' => writeNatAux time' n' acc'
+      end
+  end.
+
+Definition string_of_nat (n : nat) : string :=
+  writeNatAux n n "".
+
+Instance showNat : Show nat :=
+  {|
+    show := string_of_nat
+  |}.
+
+Compute (show 42).
+
+Instance showString : Show string :=
+  {|
+    show := fun s:string => """" ++ s ++ """"
+  |}.
+
+Compute (show true).
 
 (* /HIDE *)
