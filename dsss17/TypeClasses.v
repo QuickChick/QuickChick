@@ -2,17 +2,18 @@ Require Import Coq.Strings.String.
 Require Import Coq.Arith.Arith.
 Local Open Scope string.
 
+
 (* ################################################################# *)
 (** * Basics *)
 
 (** ** First Example: The [Show] Typeclass *)
 
 (* Motivation: Need to be able to convert lots of things to strings... 
-     - show : A -> String
+     - eqb : A -> A -> bool   
 
    Similar examples:
+     - show : A -> String
      - sort : list A -> list A
-     - eqb : A -> A -> bool      (is that the right name?)
      - + : A -> A -> A
      - serialize : A -> BitString
      - hash : A -> Int
@@ -22,13 +23,47 @@ Local Open Scope string.
 *)
 
 (* Class declaration: *)
-Class Show (A : Type) : Type :=
-{
-  show : A -> string
-}.
+Class Eq A :=
+  {
+    eqb: A -> A -> bool;
+  }.
 
-Check Show.  (* explain the output! *)
-Check show.  (* explain the output! *)
+Check Eq.  (* explain the output! *)
+Check eqb.  (* explain the output!!! *)
+(*
+==> 
+eqb
+     : ?A -> ?A -> bool
+where
+?A : [ |- Type] 
+?Eq : [ |- Eq ?A] 
+*)
+
+(* Recommended exercise: Reminder of how Coq displays implicit parameters... *)
+Definition foo {A : Type} (a : A) : A := a.
+Check foo.
+(* ===>
+     foo
+          : ?A -> ?A
+     where
+     ?A : [ |- Type] 
+*)
+
+(* Instance declaration: *)
+Instance eqBool : Eq bool :=
+  {
+    eqb := fun (b c : bool) => if b then c else negb c
+  }.
+
+(* What's the difference between {...} and {|...|} ?? *)
+
+(* --------- *)
+
+(* Class declaration: *)
+Class Show A : Type :=
+  {
+    show : A -> string
+  }.
 
 (* Instance declaration: *)
 Instance showBool : Show bool :=
@@ -140,6 +175,19 @@ Instance showPair {A B : Type} `{Show A} `{Show B} : Show (A * B) :=
 
 (* E.g. maybe Matthieu's EqDec example.  (And then we could replace
    Show above by Eq.) *)
+
+(*
+Coq < Class EqDec (A : Type) := {
+        eqb : A -> A -> bool ;
+        eqb_leibniz : forall x y, eqb x y = true -> x = y }.
+
+If one does not give all the members in the Instance declaration, Coq enters the proof-mode and the user is asked to build inhabitants of the remaining fields, e.g.:
+
+Instance eq_bool : EqDec bool :=
+      { eqb x y := if x then y else negb y }.
+
+etc.
+*)
 
 (*
 ################################################################# *)
