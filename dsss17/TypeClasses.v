@@ -287,7 +287,7 @@ Instance eqPair {A B : Type} `{Eq A} `{Eq B} : Eq (A * B) :=
 (* Exercise: Write eq instances for options and lists *)
 
 (* ---------------------------------------------------------------- *)
-(** Typeclasses and Proofs *)
+(** Classes with Superclasses *)
 
 Generalizable Variables A.  (* When is it needed / not needed? *)
 Class Ord `{Eq A} :=
@@ -295,13 +295,20 @@ Class Ord `{Eq A} :=
 
 Definition le_eqb `{Ord A} (x y : A) := andb (le x y) (le y x).
 
-(* From 20.5.1 of reference manual, but it doesn't seem to work: 
+(* From 20.5.1 of reference manual, but it doesn't seem to work:
 
 Definition lt `{eqa : Eq A, ! Ord eqa} (x y : A) := 
         andb (le x y) (neqb x y).
+
+(explain the ! notation...)
+  
+   "The ! modifier switches the way a binder is parsed back to the
+   regular interpretation of Coq. In particular, it uses the implicit
+   arguments mechanism if available, as shown in the example."
 *)
 
-(* Exercise: define instances for nat, option, pair, and list *)
+(* Exercise: define Ord instances for nat, option, pair, and list *)
+
 
 (* ---------------------------------------------------------------- *)
 (** Typeclasses and Proofs *)
@@ -329,7 +336,27 @@ etc.
    generalization!) *)
 
 (*
-################################################################# *)
+Substructures
+
+Substructures are components of a class which are instances of a class themselves. They often arise when using classes for logical properties, e.g.:
+
+Coq < Class Reflexive (A : Type) (R : relation A) :=
+        reflexivity : forall x, R x x.
+
+Coq < Class Transitive (A : Type) (R : relation A) :=
+        transitivity : forall x y z, R x y -> R y z -> R x z.
+This declares singleton classes for reflexive and transitive relations, (see 1 for an explanation). These may be used as part of other classes:
+
+Coq < Class PreOrder (A : Type) (R : relation A) :=
+      { PreOrder_Reflexive :> Reflexive A R ;
+        PreOrder_Transitive :> Transitive A R }.
+
+The syntax :> indicates that each PreOrder can be seen as a Reflexive relation. So each time a reflexive relation is needed, a preorder can be used instead. This is very similar to the coercion mechanism of Structure declarations. The implementation simply declares each projection as an instance.
+
+One can also declare existing objects or structure projections using the Existing Instance command to achieve the same effect.
+*)
+
+(* ################################################################# *)
 (** * Some Useful Typeclasses *)
 
 (* MORE: Equality or equivalence?  *)
@@ -386,6 +413,9 @@ Definition pairThing := eqb (2,(3,true)) (2,(3,false)).
     pairThing is defined
 *)
 
+(* Also... (default is 1) *)
+Set Typeclasses Debug Verbosity 2.
+
 (* How classes and instances interact with modules *)
 
 (* "Global Instance" redeclares Instance at end of Section. (Does it
@@ -394,6 +424,18 @@ Definition pairThing := eqb (2,(3,true)) (2,(3,false)).
 (* Show how to use Set Printing Implicit to see what's going on. *)
 
 (* Priorities *)
+
+(* "An optional priority can be declared, 0 being the highest priority
+   as for auto hints. If the priority is not specified, it defaults to
+   n, the number of binders of the instance." *)
+
+(* Existing Instance
+
+    "This commands adds an arbitrary constant whose type ends with an
+    applied type class to the instance database with an optional
+    priority. It can be used for redeclaring instances at the end of
+    sections, or declaring structure projections as instances. This is
+    almost equivalent to Hint Resolve ident : typeclass_instances." *)
 
 (* ------------------------------------------------------------------------ *)
 (** ** Alternative Structuring Mechanisms *)
