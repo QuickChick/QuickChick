@@ -293,6 +293,7 @@ Generalizable Variables A.  (* When is it needed / not needed? *)
 Class Ord `{Eq A} :=
     { le : A -> A -> bool }.
 
+(* This is kind of weird... -- choose a better example! *)
 Definition le_eqb `{Ord A} (x y : A) := andb (le x y) (le y x).
 
 (* From 20.5.1 of reference manual, but it doesn't seem to work:
@@ -313,16 +314,37 @@ Definition lt `{eqa : Eq A, ! Ord eqa} (x y : A) :=
 (* ---------------------------------------------------------------- *)
 (** Typeclasses and Proofs *)
 
-(* Class EqDec (A : Type) := { eqb : A -> A -> bool ; eqb_leibniz :
-forall x y, eqb x y = true -> x = y }.
+Class EqDec' (A : Type) := {
+        eqb' : A -> A -> bool ;
+        eqb_leibniz' : forall x y, eqb x y = true -> x = y }.
+Print EqDec'.
 
-If one does not give all the members in the Instance declaration, Coq
+Instance eq_bool : EqDec' bool := 
+  {
+    eqb' x y := if x then y else negb y
+  }.
+
+Class EqDec `{Eq A} : Type := 
+  { 
+    eqb_leibniz : forall x y, eqb x y = true -> x = y 
+  }.
+Print EqDec'.
+Print EqDec.
+Check (@eqb_leibniz).
+
+(* NOT WORKING -- WHY?
+Instance eq_bool : EqDec bool := 
+  {
+    eqb x y := if x then y else negb y
+  }.
+*)
+
+(* If one does not give all the members in the Instance declaration, Coq
 enters the proof-mode and the user is asked to build inhabitants of
 the remaining fields, e.g.:
 
 Instance eq_bool : EqDec bool := 
   { 
-    eqb x y := if x then y else negb y
   }.
 
 etc.
@@ -331,9 +353,11 @@ etc.
 (* ---------------------------------------------------------------- *)
 (** Dependent Typeclasses *)
 
-(* Show Reflexive example from Matthieu.  Maybe also show
-   Monoid. (This motivates the real need for implicit
-   generalization!) *)
+(* Build the Dep typeclass and some instances.
+
+   Probably also show Reflexive example from Matthieu.  Maybe also
+   show Monoid and AbelianMonoid from his tutorial. (This motivates
+   the real need for implicit generalization!) *)
 
 (*
 Substructures
