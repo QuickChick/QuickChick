@@ -34,8 +34,12 @@ Class Eq A :=
     eqb: A -> A -> bool;
   }.
 
-Check Eq.  (* explain the output! *)
-Check eqb.  (* explain the output!!! *)
+(* Explain the output!  Notice that it's basically just a record type. *)
+Check Eq.  
+Print Eq.  
+
+(* explain the output!!! *)
+Check eqb.  
 (*
 ==> 
 eqb
@@ -61,7 +65,7 @@ Instance eqBool : Eq bool :=
     eqb := fun (b c : bool) => if b then c else negb c
   }.
 
-(* What's the difference between {...} and {|...|} ?? *)
+(* Q: What's the difference between {...} and {|...|} ??  Both seem to work here. *)
 
 (* Another: *)
 Instance eqNat : Eq nat :=
@@ -204,18 +208,6 @@ Print eqb.
      Arguments A, Eq are implicit and maximally inserted
      Argument scopes are [type_scope _ _ _]
  *)
-
-Check eqb.
-(* ===>
-     eqb
-        : nat -> nat -> bool
-
-(!)  Because typeclass inference does "defaulting."
-
-This behavior can be puzzling.  (Maybe this belongs below in pragmatics.)
-*)
-Definition weird x y := eqb x y.
-Check weird.
 
 Check (@eqb).
 (* ==>
@@ -440,19 +432,40 @@ Definition pairThing := eqb (2,(3,true)) (2,(3,false)).
 (* Also... (default is 1) *)
 Set Typeclasses Debug Verbosity 2.
 
-(* How classes and instances interact with modules *)
+(** Defaulting *)
+
+Check @eqb.
+Check eqb.
+(* ===>
+     eqb
+        : nat -> nat -> bool
+
+(!)  Because typeclass inference does "defaulting."
+
+This behavior can be puzzling.  
+*)
+Definition weird x y := eqb x y.
+Check weird.
+
+(* ---------------------------------------------------------- *)
+(* Show how to use Set Printing Implicit to see what's going on. *)
+
+(* ---------------------------------------------------------- *)
+(** How classes and instances interact with modules *)
+
+(* ---------------------------------------------------------- *)
 
 (* "Global Instance" redeclares Instance at end of Section. (Does it
    do anything else??) *) 
 
-(* Show how to use Set Printing Implicit to see what's going on. *)
-
+(* ---------------------------------------------------------- *)
 (* Priorities *)
 
 (* "An optional priority can be declared, 0 being the highest priority
    as for auto hints. If the priority is not specified, it defaults to
    n, the number of binders of the instance." *)
 
+(* ---------------------------------------------------------- *)
 (* Existing Instance
 
     "This commands adds an arbitrary constant whose type ends with an
@@ -461,12 +474,30 @@ Set Typeclasses Debug Verbosity 2.
     sections, or declaring structure projections as instances. This is
     almost equivalent to Hint Resolve ident : typeclass_instances." *)
 
-(* ------------------------------------------------------------------------ *)
-(** ** Alternative Structuring Mechanisms *)
+(* Parametric Instance *)
 
-(* Alternatives.  Choosing among typeclasses, modules, dependent
-   records, canonical instances.  Pointers to where to read about all
-   these. *)
+(* ---------------------------------------------------------- *)
+(* Problems with imports...
+
+   I might try to explain this in more details later on, but this is a
+   brief summary: The mystery lies in the order of
+   imports/exports. There is another `get` function in Coq’s string
+   library, and if that is imported after ExtLib’s MonadState library,
+   Coq’s type checker will try to infer the types within a monadic
+   function (which contains a MonadState.get) using the type of
+   String.get. Somehow the definition of a monad transformer is too
+   generic that it allows Coq to try to match the type with it again
+   and again, instead of reporting an error.
+
+   I do not fully understand this problem because it seems that Coq
+   would still consider `get` as `String.get`, even if I export
+   MonadState after String in Common.v. *)
+
+(* ############################################################## *)
+(** * Alternative Structuring Mechanisms *)
+
+(* Choosing among typeclasses, modules, dependent records, canonical
+   instances.  Pointers to where to read about all these. *)
 
 (* Mattheiu's Penn slides have a discussion of sharing by fields vs by
    parameters that probably deserves to be incorporated here -- or at
