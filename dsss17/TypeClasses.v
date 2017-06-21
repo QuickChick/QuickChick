@@ -468,6 +468,8 @@ Set Typeclasses Debug Verbosity 2.
        in Haskell: What, Why, and Whither (video from OPLSS?)
 
   Typeclasses in Coq:
+     - The original ideas: Matthieu Sozeau and Nicolas
+       Oury. First-Class Type Classes. In TPHOLs’08, 2008.
      - Reference manual chapter:
            https://coq.inria.fr/refman/Reference-Manual023.html
      - "Gentle" Introduction:
