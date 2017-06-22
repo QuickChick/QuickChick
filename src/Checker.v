@@ -21,7 +21,7 @@ Inductive CallbackKind :=
 
 Inductive SmallResult :=
   MkSmallResult : option bool -> bool -> string -> bool ->
-                  list string -> SmallResult.
+                  list string -> option string -> SmallResult.
 
 Inductive Callback : Type :=
 | PostTest :
@@ -36,7 +36,8 @@ Record Result :=
       reason      : string;      (* Error message *)
       interrupted : bool;        (* ? *)
       stamp       : list string; (* Collected values for this test case *)
-      callbacks   : list Callback
+      callbacks   : list Callback; 
+      result_tag  : option string (* Tag - for better shrinking *)
     }.
 
 Definition debug_stamps s {A : Type} (r : Result) (x : A) :=
@@ -44,33 +45,44 @@ Definition debug_stamps s {A : Type} (r : Result) (x : A) :=
              (ShowFunctions.intersperse " @ "%string (stamp r)))) ++ nl) x.
 
 (* I WANT RECORD UPDATES :'( *)
-Definition succeeded := MkResult (Some true ) true "" false nil nil.
-Definition failed    := MkResult (Some false) true "" false nil nil.
-Definition rejected  := MkResult (   None   ) true "" false nil nil.
+Definition succeeded := MkResult (Some true ) true "" false nil nil None.
+Definition failed    := MkResult (Some false) true "" false nil nil None.
+Definition rejected  := MkResult (   None   ) true "" false nil nil None.
+
+Definition updExpect (res : Result) (e' : bool) : Result :=
+  match res with
+    | MkResult o e r i s c t => MkResult o e' r i s c t
+  end.
 
 Definition updReason (r : Result) (s' : string) : Result :=
   match r with
-    | MkResult o e _ i s c => MkResult o e s' i s c
+    | MkResult o e _ i s c t => MkResult o e s' i s c t
   end.
 
 Definition updOk (r : Result) o' : Result :=
   match r with
-    | MkResult _ e r i s c => MkResult o' e r i s c
+    | MkResult _ e r i s c t => MkResult o' e r i s c t
   end.
 
 Definition addCallback (res : Result) (c : Callback) : Result :=
   match res with
-    | MkResult o e r i s cs => MkResult o e r i s (cons c cs)
+    | MkResult o e r i s cs t => MkResult o e r i s (cons c cs) t
   end.
 
 Definition addCallbacks (res : Result) (cs : list Callback) : Result :=
   match res with
-    | MkResult o e r i s cs' => MkResult o e r i s (cs ++ cs')
+    | MkResult o e r i s cs' t => MkResult o e r i s (cs ++ cs') t
   end.
 
 Definition addStamps res ss :=
   match res with
-    | MkResult o e r i s cs => MkResult o e r i (ss ++ s) cs
+    | MkResult o e r i s cs t => MkResult o e r i (ss ++ s) cs t
+  end.
+
+(* LEO: Should we check if there already exists a tag? *)
+Definition setTag (r : Result) (t' : string) : Result :=
+  match r with 
+    | MkResult o e r i s cs _ => MkResult o e r i s cs (Some t')
   end.
 
 (* CH: The name of this should change; we no longer call checkers props *)
@@ -179,18 +191,15 @@ Definition whenFail {prop : Type} `{Checkable prop}
 
 
 Definition expectFailure {prop: Type} `{Checkable prop} (p: prop) :=
-  mapTotalResult (fun res =>
-                    MkResult (ok res) false (reason res)
-                             (interrupted res) (stamp res) (callbacks res))
-                 p.
+  mapTotalResult (fun res => updExpect res false) p.
 
 (* NOTE: Ignoring the nat argument. Use label or collect ONLY *)
 Definition cover {prop : Type} {_ : Checkable prop}
            (b : bool) (n : nat) (s : string) : prop -> Checker :=
   if b then
     mapTotalResult (fun res =>
-                      let '(MkResult o e r i st c) := res in
-                      MkResult o e r i (s :: st) c)
+                      let '(MkResult o e r i st c t) := res in
+                      MkResult o e r i (s :: st) c t)
   else checker.
 
 Definition classify {prop : Type} {_ : Checkable prop}
@@ -205,6 +214,8 @@ Definition collect {A prop : Type} `{_ : Show A} {_ : Checkable prop}
            (x : A) : prop -> Checker :=
   label (show x).
 
+Definition tag {prop : Type} {_ : Checkable prop} (t : string) : prop -> Checker :=
+  mapTotalResult (fun res => setTag res t).
 
 Definition implication {prop : Type} `{Checkable prop} (b : bool) (p : prop) : Checker :=
   if b then checker p else (returnGen (MkProp (returnRose rejected))).
