@@ -50,6 +50,11 @@ Defining new one-constructor types to obtain different Gen behaviors (for
 example).
 
 mutation testing
+
+mutation testing vs collect
+  - collect informs about statistics of the distribution
+  - mutation testing informs whether the distribution leads to good testing
+  - John's x<y example?
   
 final comments about testing
   - simple properties: very high payoff
