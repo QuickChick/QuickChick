@@ -42,6 +42,10 @@ ways of measuring distributions
 code coverage is a very bad success metric, but a rather good heuristic for
 when your tests are not good enough
 
+collect 
+  - small example
+  - forward pointer to third day?
+
 Defining new one-constructor types to obtain different Gen behaviors (for
 example).
 
