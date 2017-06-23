@@ -54,7 +54,12 @@ let test_out handle_section input =
               (Printf.sprintf "%s%s%s" start base (String.concat "" (List.map output_mutant muts))) :: walk_nodes rest 
            | (QuickChick (s1,s2,s3)) :: rest ->
               (Printf.sprintf "%s*) QuickChick %s (*%s" s1 s2 s3) :: walk_nodes rest
-         in Printf.sprintf "%s%s%s%s%s" startSec sn endSec (output_extends extends) (String.concat "" (walk_nodes nodes))
+         in Printf.sprintf "%s%s%s%s%s" 
+                           startSec 
+                           (if sn.[0] = '_' then "" else sn) (* __default... -> don't print it *)
+                           endSec 
+                           (output_extends extends) 
+                           (String.concat "" (walk_nodes nodes))
        else output_section s 
   in String.concat "" (List.map go input)
 
@@ -108,8 +113,15 @@ let main =
 
   let rec parse_file_or_dir file_name = 
     try if Sys.is_directory file_name 
-        then failwith "Implement directory"
+        then begin
+(*          Printf.printf "In directory: %s\nContents:\n" file_name; *)
+          let ls = Sys.readdir file_name in
+(*           Array.iter (fun s -> Printf.printf "  %s\n" s) ls;*)
+          let parsed = List.map (fun s -> parse_file_or_dir (file_name ^ "/" ^ s)) (Array.to_list ls) in
+          Dir (file_name, parsed)
+        end
         else begin
+(*           Printf.printf "In file: %s\n" file_name;*)
           let lexbuf = Lexing.from_channel (open_in file_name) in
           let result = program lexer lexbuf in
          
@@ -124,7 +136,13 @@ let main =
                                                | None -> None),
                                                e)
                                 ) result in                            
-          File (file_name, result)
+          let fixed_default = 
+            match result with 
+            | (Section (a,b,c,exts,e) :: ss ) ->
+               Section (a, "__default_" ^ file_name, c, exts, e) :: ss
+            | _ -> failwith "Empty section list?" in
+             
+          File (file_name, fixed_default)
         end
     with Sys_error _ -> failwith "Given file does not exist" in
 
@@ -146,15 +164,14 @@ let main =
                    with Not_found -> failwith (Printf.sprintf "Didn't find: %s\n" s) in
 
   (* Populate a based on a single list of sections *)
-  let rec populate_hashtbl_sections (sections : section list) = 
+  let rec populate_hashtbl_sections (sections : section list) =
     match sections with
     | [] -> ()
     | Section (_, sn, _, extopt, _) :: rest -> 
        let extends = match extopt with 
          | Some (_, x, _) -> x 
          | None -> [] in
-       let base = List.map trim (sn :: extends) in
-       Hashtbl.add sec_graph (trim sn) (List.fold_left (fun acc sec_name -> SS.union acc (sec_find sec_name)) (SS.of_list base) extends);
+       Hashtbl.add sec_graph (trim sn) extends;
        populate_hashtbl_sections rest in
 
   (* Populate based on an entire file structure *)
@@ -166,13 +183,14 @@ let main =
   (* Actually fill the hashtable *)
   populate_hashtbl fs;
 
-(*   Hashtbl.iter (fun a b -> Printf.printf "%s -> %s\n" a (String.concat ", " (SS.elements b))) sec_graph;  *)
+(*   Hashtbl.iter (fun a b -> Printf.printf "%s -> %s\n" a (String.concat ", " b)) sec_graph; *)
 
   (* Function that tells you whether to handle a section (mutate/uncomment quickChicks) or not *)
-  let handle_section = 
+  let rec handle_section sn' =
     match !sec_name with
-    | Some sn -> fun sn' -> SS.mem (trim sn') (sec_find sn)
-    | None    -> fun _ -> true in
+    | Some sn -> 
+       sn = sn' || List.exists handle_section (sec_find sn')
+    | None    -> true in
 
   let write_file out_file out_data = 
     if !verbose then (Printf.printf "Writing to file: %s\n" out_file; flush_all()) else ();
@@ -210,7 +228,26 @@ let main =
          let out_data = test_out handle_section ss in
          let vf = write_tmp_file out_data in
          compile_and_run vf
-     | Dir (s, fss) -> failwith "Implement dir"
+     | Dir (s, fss) -> begin
+         let tmp_dir = mk_tmp_dir () in
+         let rec output_test_dir fs =
+           match fs with 
+           | File (s, ss) -> 
+              let out_data = test_out handle_section ss in
+              ignore (write_file (tmp_dir ^ "/" ^ s) out_data)
+           | Dir (s, fss) -> begin 
+                let dir_name = tmp_dir ^ "/" ^ s in
+                if Sys.command (Printf.sprintf "mkdir -p %s" dir_name) <> 0 then
+                  failwith ("Could not create directory: " ^ dir_name)
+                else List.iter output_test_dir fss
+             end in
+         (* Entire file structure is copied *)
+         output_test_dir fs;
+         (* Execute make at tmp_dir *)
+         if Sys.command ("make -C " ^ tmp_dir ^ "/" ^ s) <> 0 then
+           failwith "Make failed"
+         else ()
+       end
     end 
   | Mutate -> begin
      match fs with 
