@@ -56,9 +56,9 @@ let test_out handle_section input =
            | (QuickChick (s1,s2,s3)) :: rest ->
               (Printf.sprintf "%s*) QuickChick %s (*%s" s1 s2 s3) :: walk_nodes rest
          in Printf.sprintf "%s%s%s%s%s" 
-                           (if sn.[0] = '_' then "" else startSec)
-                           (if sn.[0] = '_' then "" else sn) (* __default... -> don't print it *)
-                           (if sn.[0] = '_' then "" else endSec)
+                           (if sn = "" || sn.[0] = '_' then "" else startSec)
+                           (if sn = "" || sn.[0] = '_' then "" else sn) (* __default... -> don't print it *)
+                           (if sn = "" || sn.[0] = '_' then "" else endSec)
                            (output_extends extends) 
                            (String.concat "" (walk_nodes nodes))
        else output_section s 
@@ -126,6 +126,11 @@ let main =
   let usage_msg = "quickChick <input_file> options\nTest a file or evaluate your testing using mutants." in
   Arg.parse speclist (fun anon -> input_name := anon) usage_msg;
 
+  let rec catMaybes = function
+    | [] -> []
+    | Some x :: t -> x :: catMaybes t
+    | None :: t -> catMaybes t in
+
   let rec parse_file_or_dir file_name = 
     try if Sys.is_directory file_name 
         then begin
@@ -133,35 +138,42 @@ let main =
           let ls = Sys.readdir file_name in
 (*           Array.iter (fun s -> Printf.printf "  %s\n" s) ls;*)
           let parsed = List.map (fun s -> parse_file_or_dir (file_name ^ "/" ^ s)) (Array.to_list ls) in
-          Dir (file_name, parsed)
+          Some (Dir (file_name, catMaybes parsed))
         end
         else begin
-(*           Printf.printf "In file: %s\n" file_name;*)
-          let lexbuf = Lexing.from_channel (open_in file_name) in
-          let result = program lexer lexbuf in
-         
-          (* Step 1: fix extends *)
-          let fix_extends extends = 
-            Str.split (Str.regexp "[ \r\n\t]") (String.concat "" extends) in 
-         
-          let result = List.map (fun (Section (a,b,c,exts,e)) ->
-                                      Section (a,b,c,
-                                               (match exts with 
-                                               | Some (start, names, endc) -> Some (start, fix_extends names, endc)
-                                               | None -> None),
-                                               e)
-                                ) result in                            
-          let fixed_default = 
-            match result with 
-            | (Section (a,b,c,exts,e) :: ss ) ->
-               Section ("(*", "__default_" ^ file_name, "*)\n", exts, e) :: ss
-            | _ -> failwith "Empty section list?" in
-             
-          File (file_name, fixed_default)
+          let handle = (Filename.basename file_name = "_CoqProject"  || 
+                        Filename.basename file_name = "Makefile"     || 
+                        Filename.basename file_name = "Makefile.coq" || 
+                        Filename.check_suffix file_name "v") in
+          if handle then begin 
+  (*           Printf.printf "In file: %s\n" file_name;*)
+            let lexbuf = Lexing.from_channel (open_in file_name) in
+            let result = program lexer lexbuf in
+           
+            (* Step 1: fix extends *)
+            let fix_extends extends = 
+              Str.split (Str.regexp "[ \r\n\t]") (String.concat "" extends) in 
+           
+            let result = List.map (fun (Section (a,b,c,exts,e)) ->
+                                        Section (a,b,c,
+                                                 (match exts with 
+                                                 | Some (start, names, endc) -> Some (start, fix_extends names, endc)
+                                                 | None -> None),
+                                                 e)
+                                  ) result in                            
+            let fixed_default = 
+              match result with 
+              | (Section (a,b,c,exts,e) :: ss ) ->
+                 Section ("(*", "__default_" ^ file_name, "*)\n", exts, e) :: ss
+              | _ -> failwith "Empty section list?" in
+               
+            Some (File (file_name, fixed_default))
+                      end
+          else None
         end
     with Sys_error _ -> failwith "Given file does not exist" in
 
-  let fs = parse_file_or_dir !input_name in
+  let Some fs = parse_file_or_dir !input_name in
 
   let rec section_length_of_fs fs = 
     match fs with 
@@ -314,8 +326,10 @@ let main =
           | File (s, t) -> Printf.printf "@@%s:\n%s\n\n" s t
           | Dir (s, ts) -> Printf.printf "**%s:\n" s; List.iter debug_string_fs ts in
 
+(*
         Printf.printf "Base:\n"; debug_string_fs base;
         List.iteri (fun i fs -> Printf.printf "%d:\n" i; debug_string_fs fs) dir_mutants;
+ *)
 
         (* LEO: Again, nothing/something for base? *)
         let rec output_mut_dir tmp_dir fs =
@@ -346,7 +360,8 @@ let main =
          (* Entire file structure is copied *)
          output_mut_dir tmp_dir m;
          (* Execute make at tmp_dir *)
-         if Sys.command ("make -C " ^ tmp_dir ^ "/" ^ s) <> 0 then
+         let dir = tmp_dir ^ "/" ^ s in
+         if Sys.command ("make -C " ^ dir) <> 0 then
            failwith "Make failed"
          else ()
         ) dir_mutants

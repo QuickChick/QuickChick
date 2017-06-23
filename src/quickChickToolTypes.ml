@@ -28,7 +28,7 @@ let output_extends = function
 
 let output_section = function
   | Section (start, id, endc, extends, ns) -> 
-     let qual s = if id.[0] = '_' then "" else s in
+     let qual s = if id = "" || id.[0] = '_' then "" else s in
      Printf.sprintf "%s%s%s%s%s" (qual start) (qual id) (qual endc) (output_extends extends) (String.concat "" (List.map output_node ns))
 
 
