@@ -44,6 +44,7 @@ let rec cartesian (lists : 'a list list) : 'a list list =
 let test_out handle_section input = 
   let rec go = function 
     | Section (startSec, sn, endSec, extends, nodes) as s -> 
+(*       Printf.printf "Inside go for %s. Handle? %b\n" sn (handle_section sn); *)
        if handle_section sn then  
          let rec walk_nodes nodes = 
            match nodes with 
@@ -197,13 +198,13 @@ let main =
   (* Actually fill the hashtable *)
   populate_hashtbl fs;
 
-(*   Hashtbl.iter (fun a b -> Printf.printf "%s -> %s\n" a (String.concat ", " b)) sec_graph; *)
+  (* Hashtbl.iter (fun a b -> Printf.printf "%s -> %s\n" a (String.concat ", " b)) sec_graph;  *)
 
   (* Function that tells you whether to handle a section (mutate/uncomment quickChicks) or not *)
   let rec handle_section sn' =
     match !sec_name with
     | Some sn -> 
-       sn = sn' || List.exists handle_section (sec_find sn')
+       sn = (trim sn') || List.exists handle_section (sec_find sn')
     | None    -> true in
 
   let write_file out_file out_data = 
