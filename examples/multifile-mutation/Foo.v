@@ -1,3 +1,6 @@
+Set Warnings "-extraction-opaque-accessed,-extraction".
+Set Warnings "-notation-overridden,-parsing".
+
 From QuickChick Require Import QuickChick.
 Require Import Arith.
 
@@ -5,5 +8,6 @@ Require Import Arith.
 
 Definition plus_one (x : nat) := (*! *) x + 1 (*! x *) (*! x + x *) .  
 
+(*! Section plus_two *)
 
-
+Definition plus_two (x : nat) := (*! *) x + 2 (*! x *) .

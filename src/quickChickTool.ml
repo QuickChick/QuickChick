@@ -63,28 +63,42 @@ let test_out handle_section input =
        else output_section s 
   in String.concat "" (List.map go input)
 
+let combine_mutants (bms : ('a * 'a list) list) = 
+  let rec combine_aux bms =
+    match bms with 
+    | [] -> [[]]
+    | (b,ms)::bms' ->
+       let non_mutant_rest = List.map fst bms' in
+       let mutated_now = 
+         List.map (fun m -> m :: non_mutant_rest) ms in
+       let mutated_later = 
+         List.map (fun ms' -> b :: ms') (combine_aux bms') in 
+       mutated_now @ mutated_later in
+  List.rev (combine_aux bms)
+
 let mutate_outs handle_section input = 
   let rec go = function
     | Section (_, sn, _, _, nodes) ->
        if handle_section sn then 
          let handle_node = function
-           | Text s -> [s]
+           | Text s -> (s, [])
            | Mutants (start, base, muts) ->
               let (non_mutated, mutants) = 
                 match all_mutants muts with
                 | non_mutated :: mutants -> (non_mutated, List.rev mutants) 
                 | [] -> failwith "Internal error" in
 (*              Printf.printf "DEBUG:\nBASE: %s\nMUTS:\n%s\n" non_mutated (String.concat "\n\n\n" mutants); *)
-              (Printf.sprintf "%s%s%s" start base non_mutated) ::
-              (List.map (fun s -> Printf.sprintf "%s (* %s *) %s" start base s) mutants)
-           | QuickChick (s1,s2,s3) -> [Printf.sprintf "%s*) QuickChick %s (*%s" s1 s2 s3] (* Add all tests *) in
-         List.map (String.concat "") (cartesian (List.map handle_node nodes)) 
-       else [String.concat "" (List.map output_node nodes)]
-  in List.map (String.concat "") (cartesian (List.map go input))
+              (Printf.sprintf "%s%s%s" start base non_mutated, 
+               List.map (fun s -> Printf.sprintf "%s (* %s *) %s" start base s) mutants)
+           | QuickChick (s1,s2,s3) -> (Printf.sprintf "%s*) QuickChick %s (*%s" s1 s2 s3, []) (* Add all tests *) in
+         let (base :: muts) = List.map (String.concat "") (combine_mutants (List.map handle_node nodes)) in
+         (base, muts)
+       else (String.concat "" (List.map output_node nodes), [])
+  in List.map (String.concat "") (combine_mutants (List.map go input))
 
 module SS = Set.Make(String)
 
-type 'a file_structure = File of string * 'a list
+type 'a file_structure = File of string * 'a 
                        | Dir of string * 'a file_structure list
 
 let main = 
@@ -175,7 +189,7 @@ let main =
        populate_hashtbl_sections rest in
 
   (* Populate based on an entire file structure *)
-  let rec populate_hashtbl (fs : section file_structure) = 
+  let rec populate_hashtbl (fs : section list file_structure) = 
     match fs with 
     | File (_, ss) -> populate_hashtbl_sections ss
     | Dir (_, fss) -> List.iter populate_hashtbl fss in
@@ -265,7 +279,77 @@ let main =
        List.iteri (fun i m ->
          (if i > 0 then Printf.printf "\n");
          Printf.printf "Handling Mutant %d.\n" i; flush_all ();
+         Printf.printf "%s\n" m;
          compile_and_run (write_tmp_file m)
                   ) muts
-     | Dir (s, fss) -> failwith "Implement dir"
+     | Dir (s, fss) -> begin
+        let rec calc_dir_mutants fs : (string file_structure * string file_structure list) = 
+          match fs with 
+          | File (s, ss) ->
+             begin match mutate_outs handle_section ss with 
+             | base :: muts -> (File (s, base), List.map (fun m -> File (s, m)) muts)
+             | _ -> failwith "no base mutant"
+             end
+          | Dir (s, fss) -> begin 
+              let bmfs = List.map calc_dir_mutants fss in
+              let rec all_mutant_fs (bmfs : ('a * 'a list) list) = 
+                match bmfs with 
+                | [] -> [[]]
+                | (b,mfs)::bmfs' ->
+                   let non_mutant_rest = List.map fst bmfs' in
+                   let mutated_now = 
+                     List.map (fun mf -> mf :: non_mutant_rest) mfs in
+                   let mutated_later = 
+                     List.map (fun mfs' -> b :: mfs') (all_mutant_fs bmfs') in 
+                   mutated_now @ mutated_later in
+              begin match List.rev (all_mutant_fs bmfs) with 
+              | base :: muts -> (Dir (s, base), List.map (fun m -> Dir (s, m)) muts)
+              | [] -> failwith "no base dir mutant"
+              end
+            end in
+
+        let (base, dir_mutants) = calc_dir_mutants fs in
+
+        let rec debug_string_fs = function
+          | File (s, t) -> Printf.printf "@@%s:\n%s\n\n" s t
+          | Dir (s, ts) -> Printf.printf "**%s:\n" s; List.iter debug_string_fs ts in
+
+        Printf.printf "Base:\n"; debug_string_fs base;
+        List.iteri (fun i fs -> Printf.printf "%d:\n" i; debug_string_fs fs) dir_mutants;
+
+        (* LEO: Again, nothing/something for base? *)
+        let rec output_mut_dir tmp_dir fs =
+           match fs with 
+           | File (s, plaintext) -> 
+              ignore (write_file (tmp_dir ^ "/" ^ s) plaintext)
+           | Dir (s, fss) -> begin 
+                let dir_name = tmp_dir ^ "/" ^ s in
+                if Sys.command (Printf.sprintf "mkdir -p %s" dir_name) <> 0 then
+                  failwith ("Could not create directory: " ^ dir_name)
+                else List.iter (output_mut_dir tmp_dir) fss
+             end in
+        (* Base mutant *)
+        Printf.printf "Handling Base\n";
+        let tmp_dir = mk_tmp_dir () in
+        (* Entire file structure is copied *)
+        output_mut_dir tmp_dir base;
+        (* Execute make at tmp_dir *)
+        if Sys.command ("make -C " ^ tmp_dir ^ "/" ^ s) <> 0 then
+          failwith "Make failed"
+        else ();
+        
+        (* For each mutant structure *)
+        List.iteri (fun i m ->
+         (if i > 0 then Printf.printf "\n");
+         Printf.printf "Handling Mutant %d.\n" i; flush_all ();
+         let tmp_dir = mk_tmp_dir () in
+         (* Entire file structure is copied *)
+         output_mut_dir tmp_dir m;
+         (* Execute make at tmp_dir *)
+         if Sys.command ("make -C " ^ tmp_dir ^ "/" ^ s) <> 0 then
+           failwith "Make failed"
+         else ()
+        ) dir_mutants
+       end
      end
+
