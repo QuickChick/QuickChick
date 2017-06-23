@@ -41,6 +41,7 @@ src/ArbitrarySizedST.ml
 src/DependentClasses.v
 src/Decidability.v
 src/GenSizedSTMonotonic.ml
+src/GenSizedSTSizeMonotonic.ml
 src/genLib.ml
 src/unify.ml
 src/SizedProofs.ml

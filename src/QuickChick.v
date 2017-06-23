@@ -15,6 +15,7 @@ Declare ML Module "SizeSMon".
 Declare ML Module "SizeCorr".
 Declare ML Module "ArbitrarySizedST".
 Declare ML Module "GenSizedSTMonotonic".
+Declare ML Module "GenSizedSTSizeMonotonic".
 Declare ML Module "SizedProofs".
 Declare ML Module "GenSTCorrect".
 

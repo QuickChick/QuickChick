@@ -19,6 +19,7 @@ open CoqLib
 open GenLib
 open ArbitrarySizedST
 open GenSizedSTMonotonic
+open GenSizedSTSizeMonotonic
 open Error
 open Unify
 open SizedProofs
@@ -164,7 +165,7 @@ let deriveDependent (cn : derivable) (c : constr_expr) (n : int) (instance_name 
     | GenSizedSuchThatMonotonicOpt -> []
     | SizedProofEqs -> params @ inputs
     | GenSizedSuchThatCorrect -> params @ inputs
-    | _ -> []
+    | GenSizedSuchThatSizeMonotonicOpt -> params @ inputs
   in
 
   (* The instance type *)
@@ -186,7 +187,10 @@ let deriveDependent (cn : derivable) (c : constr_expr) (n : int) (instance_name 
       gApp (gInject (class_name cn))
         [ pred 
         ; gApp ~explicit:true (gInject "arbitrarySizeST") [hole; pred; hole]]
-    | _ -> failwith "Unimplemented"
+    | GenSizedSuchThatSizeMonotonicOpt ->
+      let pred = full_pred (List.map (fun n -> gVar (fresh_name n)) input_names) in
+      gApp (gInject (class_name cn))
+        [gApp ~explicit:true (gInject "arbitrarySizeST") [hole; pred; hole]]
   in
 
   let instance_record iargs =
@@ -204,7 +208,9 @@ let deriveDependent (cn : derivable) (c : constr_expr) (n : int) (instance_name 
       let setinst = (class_name SizedProofEqs) ^ ctr_name in
       genSizedSTCorr_body (class_name cn) ty_ctr ty_params ctrs dep_type input_names inputs n register_arbitrary
         (gInject moninst) (gInject ginst) (gInject setinst)
-    | _ -> failwith "Unimplemented"
+    | GenSizedSuchThatSizeMonotonicOpt ->
+      genSizedSTSMon_body (class_name cn) ty_ctr ty_params ctrs dep_type input_names inputs n register_arbitrary
+
   in
 
   msg_debug (str "Instance Type: " ++ fnl ());

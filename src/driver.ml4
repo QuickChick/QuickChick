@@ -60,7 +60,8 @@ let class_assoc_opts = [ ("GenSized"                 , SimpleDer [SimplDriver.Ge
                        ; ("SizeMonotonicSuchThatOpt" , DepDer DepDriver.GenSizedSuchThatMonotonicOpt)
                        ; ("SizedProofEqs"            , DepDer DepDriver.SizedProofEqs)
                        ; ("GenSizedSuchThatCorrect"  , DepDer DepDriver.GenSizedSuchThatCorrect)
-                       ] 
+                       ; ("GenSizedSuchThatSizeMonotonicOpt", DepDer DepDriver.GenSizedSuchThatSizeMonotonicOpt)
+                       ]
 
 let class_assoc_table =
   let h = Hashtbl.create (List.length class_assoc_opts) in

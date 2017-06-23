@@ -102,6 +102,10 @@ let subset_respects_set_eq_l p1 p2 =
 let subset_respects_set_eq_r p1 p2 =
   gApp (gInject "subset_respects_set_eq_r") [p1; p2]
 
+let subset_respects_set_eq p1 p2 p3 =
+  gApp ~explicit:true (gInject "subset_respects_set_eq")
+    [hole; hole; hole; hole; hole; p1; p2; p3]
+
 (* maybe add a new lemma? *)
 let subset_set_eq_compat p1 p2 p3 =
   gApp (gInject "subset_respects_set_eq") [p1; p2; p3]
@@ -115,11 +119,23 @@ let incl_bigcup_compat p1 p2 =
 let imset_isSome s =
   gApp ~explicit:true (gInject "imset_isSome") [hole; s]
 
+let isSomeSet a =
+  gFun ["x"]
+    (fun [x] ->
+       gApp (gInject "is_true")
+         [gApp ~explicit:true (gInject "isSome") [a; gVar x]]
+    )
+
 let incl_subset l1 l2 p =
   gApp ~explicit:true (gInject "incl_subset") [hole; l1; l2; p]
 
 let setU_set_subset_compat p1 p2 =
   gApp (gInject "setU_set_subset_compat") [p1; p2]
+
+let setI_subset_compat p1 p2 =
+  gApp ~explicit:true (gInject "setI_subset_compat")
+    [hole; hole; hole; hole; hole; p1; p2]
+
 
 let nil_subset p =
   gApp (gInject "nil_subset") [p]
@@ -129,6 +145,10 @@ let cons_subset (hd : coq_expr) (tl : coq_expr) (p : coq_expr) (phd : coq_expr) 
 
 let setI_set_incl hsub1 hsub2 =
   gApp ~explicit:true (gInject "setI_set_incl") [hole; hole; hole; hole; hsub1; hsub2]
+
+let setI_set_eq_r p =
+  gApp ~explicit:true (gInject "setI_set_eq_r") [hole; hole; hole; hole; p]
+
 let setU_subset_r s2 p =
   gApp ~explicit:true (gInject "setU_subset_r") [hole; hole; s2; hole; p]
 
@@ -238,3 +258,24 @@ let bigcup_nil_subset =
   gApp
     ~explicit:true (gInject "bigcup_nil_subset")
     [hole; hole; hole; hole]
+
+let isSome_subset p =
+  gApp
+    ~explicit:true (gInject "isSome_subset")
+    [hole; hole; hole; hole; hole; p]
+
+
+let bigcup_cons_setI_subset_compat a f h1 h2 =
+  gApp
+    ~explicit:true (gInject "bigcup_cons_setI_subset_compat")
+    [a; hole; f; hole; hole; hole; hole; hole; h1; h2]
+
+let bigcup_cons_setI_subset_pres a f h =
+  gApp
+    ~explicit:true (gInject "bigcup_cons_setI_subset_pres")
+    [a; hole; f; hole; hole; hole; hole; h]
+
+let bigcup_nil_setI f l s =
+  gApp
+    ~explicit:true (gInject "bigcup_nil_setI")
+    [hole; hole; f; l; s]

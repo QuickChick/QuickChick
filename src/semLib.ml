@@ -57,6 +57,9 @@ let backtrackSizeMonotonicOpt lst proof =
 let semBacktrack g =
   gApp (gInject "semBacktrack") [hole; g]
 
+let semBacktrackSize g s =
+  gApp ~explicit:true (gInject "semBacktrackSize") [hole; g; s]
+
 let returnGenSizeMonotonic x =
   gApp (gInject "returnGenSizeMonotonic") [x]
 
@@ -122,3 +125,19 @@ let semSuchThatMaybe_sound g f s h =
 
 let semSuchThatMaybeOpt_sound g f s h =
   gApp ~explicit:true (gInject "semSuchThatMaybeOpt_sound") [hole; g; f; s; h]
+
+let semBindSizeOpt_subset_compat h1 h2 =
+  gApp ~explicit:true (gInject "semBindSizeOpt_subset_compat")
+    [hole; hole; hole; hole; hole; hole; hole; h1; h2]
+
+let semBindOptSizeOpt_subset_compat h1 h2 =
+  gApp ~explicit:true (gInject "semBindOptSizeOpt_subset_compat")
+    [hole; hole; hole; hole; hole; hole; hole; h1; h2]
+
+let suchThatMaybe_subset_compat p h =
+  gApp ~explicit:true (gInject "suchThatMaybe_subset_compat")
+    [hole; p; hole; hole; hole; h]
+
+let suchThatMaybeOpt_subset_compat p h =
+  gApp ~explicit:true (gInject "suchThatMaybeOpt_subset_compat")
+    [hole; p; hole; hole; hole; h]
