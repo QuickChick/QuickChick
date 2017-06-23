@@ -280,7 +280,6 @@ let main =
        List.iteri (fun i m ->
          (if i > 0 then Printf.printf "\n");
          Printf.printf "Handling Mutant %d.\n" i; flush_all ();
-         Printf.printf "%s\n" m;
          compile_and_run (write_tmp_file m)
                   ) muts
      | Dir (s, fss) -> begin
