@@ -8,8 +8,10 @@ Local Open Scope string.
 
 (** ** First Example: The [Show] Typeclass *)
 
-(* Motivation: Need to be able to convert lots of things to strings... 
-     - eqb : A -> A -> bool   
+(* Motivation: Need to be able to test lots of different things for
+   equality...
+
+     - eqb : A -> A -> bool
 
    Similar examples:
      - show : A -> String
@@ -19,10 +21,9 @@ Local Open Scope string.
      - hash : A -> Int
      - etc., etc.
 
-  Coq adopts (and adapts) Haskell's notion of _typeclasses_ for this.
-*)
+   Coq adopts (and adapts) Haskell's notion of _typeclasses_ for this.
 
-(* Remark for newcomers: the name "typeclasses" may sound a bit like
+   Remark for newcomers: the name "typeclasses" may sound a bit like
    "classes" from OOP.  But this is misleading.  A better analogy is
    actually with _interfaces_ from languages like Java.  But best of
    all is to set aside OO preconceptions and try to approach the
@@ -34,61 +35,26 @@ Class Eq A :=
     eqb: A -> A -> bool;
   }.
 
-(* Explain the output!  Notice that it's basically just a record type. *)
 Check Eq.  
-Print Eq.  
-
-(* explain the output!!! *)
-Check eqb.  
-(*
-==> 
-eqb
-     : ?A -> ?A -> bool
-where
-?A : [ |- Type] 
-?Eq : [ |- Eq ?A] 
+(* 
+==>
+Eq
+     : Type -> Type
 *)
 
-(* Recommended exercise: Reminder of how Coq displays implicit parameters... *)
-Definition foo {A : Type} (a : A) : A := a.
-Check foo.
-(* ===>
-     foo
-          : ?A -> ?A
-     where
-     ?A : [ |- Type] 
-*)
-
-(* Instance declaration: *)
+(* An instance declaration: *)
 Instance eqBool : Eq bool :=
-  {
+  {|
     eqb := fun (b c : bool) => if b then c else negb c
-  }.
-
-(* Q: What's the difference between {...} and {|...|} ??  Both seem to work here. *)
+  |}.
 
 (* Another: *)
 Instance eqNat : Eq nat :=
-  {
+  {|
     eqb := beq_nat
-  }.
+  |}.
 
-(* Exercise: Write eq instance for pairs of a nat and a bool. *)
-
-(* One downside of using typeclasses is that error messages get more
-   puzzling (sometimes substantially so).  Here is a common one. *)
-(*
-Inductive bar :=
-  Bar : nat -> bar.
-
-Definition eqBar :=
-  eqb (Bar 42) (Bar 43).
-===> 
-      Error: Unable to satisfy the following constraints:
-      ?Eq : "Eq bar"
-
-To fix it, we just have to define a new instance... (do it, or ask them to)
-*)
+(* Exercise: Write an eq instance for pairs of a nat and a bool. *)
 
 (* We can define functions that use overloaded functions from 
    instances like this: *)
@@ -102,6 +68,51 @@ Compute (oddManOut 2 1 2).
 (* Recommended exercise: What happens if we forget the class
    constraint?  Try deleting it and see what happens.  Do you
    understand why? *)
+
+(* Another useful typeclass... *)
+Class Show A : Type :=
+  {
+    show : A -> string
+  }.
+
+Instance showBool : Show bool :=
+  {|
+    show := fun b:bool => if b then "true" else "false"
+  |}.
+
+Definition natToDigit (n : nat) : string :=
+  match n with
+    | 0 => "0" | 1 => "1" | 2 => "2" | 3 => "3" | 4 => "4" | 5 => "5"
+    | 6 => "6" | 7 => "7" | 8 => "8" | _ => "9"
+  end.
+
+Fixpoint writeNatAux (time n : nat) (acc : string) : string :=
+  let acc' := (natToDigit (n mod 10)) ++ acc in
+  match time with
+    | 0 => acc'
+    | S time' =>
+      match n / 10 with
+        | 0 => acc'
+        | n' => writeNatAux time' n' acc'
+      end
+  end.
+
+Definition string_of_nat (n : nat) : string :=
+  writeNatAux n n "".
+
+Instance showNat : Show nat :=
+  {|
+    show := string_of_nat
+  |}.
+
+Compute (show 42).
+
+Instance showString : Show string :=
+  {|
+    show := fun s:string => """" ++ s ++ """"
+  |}.
+
+Compute (show true).
 
 (* ---------------------------------------------------------------- *)
 (** Implicit Generalization *)
@@ -192,11 +203,288 @@ From the reference manual:
 (* ---------------------------------------------------------------- *)
 (** Internals *)
 
-(* Explain briefly what a typeclass actually translates into. *)
+(* Explain briefly what a typeclass actually translates
+   into.  (Explain Coq records en passant.) *)
 
+(* Explain the output!  Notice that it's basically just a record type. *)
 Print Eq.
 (* ===>
      Record Eq (A : Type) : Type := Build_Eq { eqb : A -> A -> bool }
+*)
+
+Check eqb.  
+(* EXPLAIN:
+==> 
+eqb
+     : ?A -> ?A -> bool
+where
+?A : [ |- Type] 
+?Eq : [ |- Eq ?A] 
+*)
+
+(* Recommended exercise: Reminder of how Coq displays implicit parameters... *)
+Definition foo {A : Type} (a : A) : A := a.
+Check foo.
+(* ===>
+     foo
+          : ?A -> ?A
+     where
+     ?A : [ |- Type] 
+*)
+
+Print eqBool.
+(* ==> 
+eqBool = {| eqb := fun b c : bool => if b then c else negb c |}
+     : Eq bool
+*)
+
+Print eqb.
+(* ==>
+     eqb = 
+     fun (A : Type) (Eq0 : Eq A) => let (eqb) := Eq0 in eqb
+          : forall A : Type, Eq A -> A -> A -> bool
+
+     Arguments A, Eq are implicit and maximally inserted
+     Argument scopes are [type_scope _ _ _]
+ *)
+
+Check (@eqb).
+(* ==>
+    @eqb
+       : forall A : Type, Eq A -> A -> A -> bool
+*)
+
+(* Instance inference... 
+
+    fun (x y : bool) => eqb x y 
+    ===>   { Implicit arguments }
+    fun (x y : bool) => @eqb _ _ x y
+    ===>   { Typing }
+    fun (x y : bool) => @eqb (?A : Type) (?eq : Eq?A) x y 
+    ===>   { Unification }
+    fun (x y : bool) => @eqb bool (?eq : Eq bool) x y 
+    ===>   { Proof search for Eq bool returns Eq bool }
+    fun (x y : bool) => @eqb bool (eqBool : Eq bool) x y 
+*)
+
+(* For purposes of instance inference, it doesn't matter whether
+   hypotheses are explicit or inferred.  So, for example, one could
+   just as well write this: *)
+
+Definition oddManOut'' {X : Type} (_ : Eq X) (a b c : X) : X :=
+  if eqb a b then c
+  else if eqb a c then b
+  else a.                         
+
+(* However, if we define it this way, then applying the function is
+   going to be clunky: 
+
+Check (oddManOut'' 1 2 1).
+===>
+   Error: The term "1" has type "nat" while it is expected to have type "Eq ?X".
+*)
+
+Check (oddManOut'' eqNat 1 2 1).
+
+(*
+Proof-search tactic with instances as lemmas: 
+
+    A:Type, eqa: EqA |- ? : Eq (list A)
+
+  Simple depth-first search with higher-order unification
+
+– Returns the first solution only 
+     - not always what you want!!
++ Extensible through Ltac
+ *)
+
+(* WRITE MORE: Show how to turn on debugging and explain what it
+   prints.  Do some trickier examples.  (Maybe some of this needs to
+   go below, after parameterized instances are introduced.) *)
+
+(* Matthieu's slides have some stuff about "Instance Inference"
+   that is probably useful but I'm not sure I follow it... *)
+
+(* ---------------------------------------------------------------- *)
+(** Parameterized Instances: New Typeclasses from Old *)
+
+Instance eqPair {A B : Type} `{Eq A} `{Eq B} : Eq (A * B) :=
+  {|
+    eqb p1 p2 :=
+      match p1,p2 with
+      | (a1,b1),(a2,b2) => andb (eqb a1 a2) (eqb b1 b2)
+      end
+  |}.
+
+(* Exercise: Write eq instances for options and lists *)
+
+ *)
+Class Show A : Type :=
+  {
+    show : A -> string
+  }.
+
+Instance showBool : Show bool :=
+  {|
+    show := fun b:bool => if b then "true" else "false"
+  |}.
+
+Definition natToDigit (n : nat) : string :=
+  match n with
+    | 0 => "0" | 1 => "1" | 2 => "2" | 3 => "3" | 4 => "4" | 5 => "5"
+    | 6 => "6" | 7 => "7" | 8 => "8" | _ => "9"
+  end.
+
+Fixpoint writeNatAux (time n : nat) (acc : string) : string :=
+  let acc' := (natToDigit (n mod 10)) ++ acc in
+  match time with
+    | 0 => acc'
+    | S time' =>
+      match n / 10 with
+        | 0 => acc'
+        | n' => writeNatAux time' n' acc'
+      end
+  end.
+
+Definition string_of_nat (n : nat) : string :=
+  writeNatAux n n "".
+
+Instance showNat : Show nat :=
+  {|
+    show := string_of_nat
+  |}.
+
+Compute (show 42).
+
+Instance showString : Show string :=
+  {|
+    show := fun s:string => """" ++ s ++ """"
+  |}.
+
+Compute (show true).
+
+(* ---------------------------------------------------------------- *)
+(** Implicit Generalization *)
+
+(* Here, [`{Eq A}] essentially means the same as [{_ : Eq A}].  The
+   opening tick tells Coq to perform "implicit generalization."
+
+   Here's what the Coq reference manual says:
+
+      Implicit generalization is an automatic elaboration of a
+      statement with free variables into a closed statement where
+      these variables are quantified explicitly. Implicit
+      generalization is done inside binders starting with a ` and
+      terms delimited by `{ } and `( ), always introducing maximally
+      inserted implicit arguments for the generalized
+      variables. Inside implicit generalization delimiters, free
+      variables in the current context are automatically quantified
+      using a product or a lambda abstraction to generate a closed
+      term. *)
+
+(* For example: *)
+Generalizable Variables x y.
+(* (By default, ordinary variables don't behave this way, to avoid
+   puzzling behavior in case of typos.) *)
+
+Definition weird1 := `(x + y).
+Print weird1.
+
+Lemma weird2 : `(x + y = y + x).
+Proof. intros. omega. Qed.
+
+Print oddManOut.
+
+Definition oddManOut' {X : Type} {_ : Eq X} (a b c : X) : X :=
+  if eqb a b then c
+  else if eqb a c then b
+  else a.                         
+
+(* TODO: Now explain this:
+
+Definition oddManOut {X : Type} {Eq X} (a b c : X) : X :=
+  if eqb a b then c
+  else if eqb a c then b
+  else a.                         
+
+====>
+    Error: Unable to satisfy the following constraints:
+    UNDEFINED EVARS:
+     ?X12==[X |- Type] (type of Eq) {?T}
+     ?X15==[X0 Eq X a b c |- Eq X] (parameter Eq of @eqb) {?Eq}
+     ?X17==[X0 Eq X a b c |- Eq X] (parameter Eq of @eqb) {?Eq0}
+*)
+
+(* This may seem like a lot of trouble just to avoid writing a _!  Why
+   is it useful?
+
+   Matthieu makes the point that binding super-classes is supported by
+   implicit generalization using this example:
+
+    Program Definition div2 ‘{Frac α} (a : α) := div a (1 + 1). ⇒
+    Definition div2 {α} {N : Num α} {Frac α N} (a : α) := ...
+
+    ___
+
+    Also, substructures become subinstances: Class Monoid A := { monop
+    : A → A → A ; ... } ClassGroupA:={grp mon: MonoidA;...} Instance
+    grp mon ‘{Group A} : Monoid A. Definition foo ‘{Group A} (x : A) :
+    A := monop x x.  Similar to the existing Structures based on
+    coercive subtyping.
+
+From the reference manual:
+
+  However, the generalizing binders should be used instead as they
+  have particular support for type classes:
+      - They automatically set the maximally implicit status for type
+        class arguments, making derived functions as easy to use as
+        class methods. In the example above, A and eqa should be set
+        maximally implicit.
+      - They support implicit quantification on partially applied type
+        classes (§2.7.19). Any argument not given as part of a type
+        class binder will be automatically generalized.
+      - They also support implicit quantification on
+        superclasses (§20.5.1)
+*)
+
+(* Q: Does `(...) mean the same as `{...} ? *)
+
+(* ---------------------------------------------------------------- *)
+(** Internals *)
+
+(* Explain briefly what a typeclass actually translates
+   into.  (Explain Coq records en passant.) *)
+
+(* Explain the output!  Notice that it's basically just a record type. *)
+Print Eq.
+(* ===>
+     Record Eq (A : Type) : Type := Build_Eq { eqb : A -> A -> bool }
+*)
+
+Check eqb.  
+(* EXPLAIN:
+==> 
+eqb
+     : ?A -> ?A -> bool
+where
+?A : [ |- Type] 
+?Eq : [ |- Eq ?A] 
+*)
+
+(* Recommended exercise: Reminder of how Coq displays implicit parameters... *)
+Definition foo {A : Type} (a : A) : A := a.
+Check foo.
+(* ===>
+     foo
+          : ?A -> ?A
+     where
+     ?A : [ |- Type] 
+*)
+
+Print eqBool.
+(* ==> 
+eqBool = {| eqb := fun b c : bool => if b then c else negb c |}
+     : Eq bool
 *)
 
 Print eqb.
@@ -276,14 +564,17 @@ Instance eqPair {A B : Type} `{Eq A} `{Eq B} : Eq (A * B) :=
       end
   |}.
 
-(* Exercise: Write eq instances for options and lists *)
+(* Exercise: Write Eq and Show instances for options and lists *)
 
 (* ---------------------------------------------------------------- *)
 (** Classes with Superclasses *)
 
-Generalizable Variables A.  (* When is it needed / not needed? *)
+Generalizable Variables A.  (* Explain *)
+
 Class Ord `{Eq A} :=
-    { le : A -> A -> bool }.
+  {
+    le : A -> A -> bool
+  }.
 
 (* This is kind of weird... -- choose a better example! *)
 Definition le_eqb `{Ord A} (x y : A) := andb (le x y) (le y x).
@@ -312,9 +603,9 @@ Class EqDec' (A : Type) := {
 Print EqDec'.
 
 Instance eq_bool : EqDec' bool := 
-  {
+  {|
     eqb' x y := if x then y else negb y
-  }.
+  |}.
 
 Class EqDec `{Eq A} : Type := 
   { 
@@ -326,9 +617,9 @@ Check (@eqb_leibniz).
 
 (* NOT WORKING -- WHY?
 Instance eq_bool : EqDec bool := 
-  {
+  {|
     eqb x y := if x then y else negb y
-  }.
+  |}.
 *)
 
 (* If one does not give all the members in the Instance declaration, Coq
@@ -336,8 +627,8 @@ enters the proof-mode and the user is asked to build inhabitants of
 the remaining fields, e.g.:
 
 Instance eq_bool : EqDec bool := 
-  { 
-  }.
+  {|
+  |}.
 
 etc.
 *)
@@ -398,7 +689,34 @@ One can also declare existing objects or structure projections using the Existin
 (** * Pragmatics *)
 
 (* Advice about how to use typeclasses in Coq.  How to avoid various
-   pitfalls and gotchas.  How to debug. *)
+   pitfalls and gotchas.  How to debug... *)
+
+(* ------------------------------------------------------------- *)
+(** ** Understanding error messages *)
+
+(* One downside of using typeclasses is that error messages get more
+   puzzling (sometimes substantially so).  Here is a common one. *)
+Inductive bar :=
+  Bar : nat -> bar.
+(*
+Definition eqBar :=
+  eqb (Bar 42) (Bar 43).
+===> 
+      Error: Unable to satisfy the following constraints:
+      ?Eq : "Eq bar"
+*)
+(* Here it's pretty easy to see what the problem is.  To fix it, we
+   just have to define a new instance... 
+*)
+
+(* TODO: Cook up a more complicated example where it's harder to see... *)
+
+(* ------------------------------------------------------------- *)
+(** ** Debugging *)
+
+(* TODO: Show how to use Set Printing Implicit *)
+
+(* Getting even more information... *)
 
 Set Typeclasses Debug.
 (* Find an interesting enough example... *)
@@ -432,7 +750,78 @@ Definition pairThing := eqb (2,(3,true)) (2,(3,false)).
 (* Also... (default is 1) *)
 Set Typeclasses Debug Verbosity 2.
 
-(** Defaulting *)
+(* ------------------------------------------------------------- *)
+(** ** Nontermination *)
+
+(* An example of a potential gotcha:
+ 
+The problem appears to be when using the (universe-polymorphic) inject
+function in conjunction with a typeclass method, when the necessary
+instance doesn't exist.
+
+Inductive Foo := MkFoo : Foo.
+  Set Typeclasses Debug.
+
+  Instance gen : Gen (list Foo) := {| arbitrary := liftGen inject
+    arbitrary |}.
+
+Leo: My goto debug method is to try to manually expand the
+typeclasses. Before that, I needed to understand what “inject”
+was. Since the result type was list of X, I assumed that inject is
+similar to using “pure” or “return” in Haskell instead of (fun x =>
+[x]). However, Coq is really bad usually at figuring out implicit
+stuff – so I just replaced it by the explicit anonymous function.
+ 
+After that it was just a “Gen (list X) instance does not exist”, so
+deriving Arbitrary (or Gen) for X should work (and it did). Now, why
+things work when moving back to “inject” after adding the instance I
+have no idea 😊
+
+Yao: I have discussed this with Leo. The problem is that I have
+defined the following instance:
+
+Polymorphic Instance Injection_trans {A B C : Type} {|P : Injection A
+            B} {Q : Injection B C} : Injection A C := { inject e :=
+            inject (inject e) |}.
+
+This would cause the type checker to go to an infinite loop if it
+recursively takes this branch before exploring other
+possibilities. Removing this instance would fix the problem.
+
+We don’t see other problems with this Injection type class for
+now. Therefore, I suggest we keep this type class, but be careful not
+to define something similar to what I did.
+
+EXERCISE: Find a different way of making instance inference diverge.
+
+Hint: If confused, you can look at the *coq* buffer. That's where
+most debug messages appear if they don't appear in the *response*
+buffer.  (What's a typical example of this?)
+*)
+
+(* ---------------------------------------------------------- *)
+(** ** Controlling instantiation *)
+
+(* Existing Instance *)
+
+(* "Global Instance" redeclares Instance at end of Section. (Does it
+   do anything else??) 
+
+    "This commands adds an arbitrary constant whose type ends with an
+    applied type class to the instance database with an optional
+    priority. It can be used for redeclaring instances at the end of
+    sections, or declaring structure projections as instances. This is
+    almost equivalent to Hint Resolve ident : typeclass_instances." *)
+
+(* Parametric Instance *)
+
+(* Priorities *)
+
+(* "An optional priority can be declared, 0 being the highest priority
+   as for auto hints. If the priority is not specified, it defaults to
+   n, the number of binders of the instance." *)
+
+(* Defaulting *)
 
 Check @eqb.
 Check eqb.
@@ -448,33 +837,7 @@ Definition weird x y := eqb x y.
 Check weird.
 
 (* ---------------------------------------------------------- *)
-(* Show how to use Set Printing Implicit to see what's going on. *)
-
-(* ---------------------------------------------------------- *)
-(** How classes and instances interact with modules *)
-
-(* ---------------------------------------------------------- *)
-
-(* "Global Instance" redeclares Instance at end of Section. (Does it
-   do anything else??) *) 
-
-(* ---------------------------------------------------------- *)
-(* Priorities *)
-
-(* "An optional priority can be declared, 0 being the highest priority
-   as for auto hints. If the priority is not specified, it defaults to
-   n, the number of binders of the instance." *)
-
-(* ---------------------------------------------------------- *)
-(* Existing Instance
-
-    "This commands adds an arbitrary constant whose type ends with an
-    applied type class to the instance database with an optional
-    priority. It can be used for redeclaring instances at the end of
-    sections, or declaring structure projections as instances. This is
-    almost equivalent to Hint Resolve ident : typeclass_instances." *)
-
-(* Parametric Instance *)
+(** ** Interactions with modules *)
 
 (* ---------------------------------------------------------- *)
 (* Problems with imports...
@@ -536,110 +899,13 @@ Check weird.
 *)
 
 (* HIDE *)
-(*
-################################################################# *)
-(*
-################################################################# *)
-(*
-################################################################# *)
-(* More Ideas...  *)
+(* ################################################################# *)
+(* ################################################################# *)
+(* ################################################################# *)
+(* More Ideas for material that could be included...  *)
 
-(* What does "Polymorphic Instance" mean? *)
-
-(** Pragmatics *)
-
-(* A potential gotcha:
- 
-The problem appears to be when using the (universe-polymorphic) inject
-function in conjunction with a typeclass method, when the necessary
-instance doesn't exist.
-
-Inductive Foo := MkFoo : Foo.
-  Set Typeclasses Debug.
-
-  Instance gen : Gen (list Foo) := {| arbitrary := liftGen inject
-    arbitrary |}.
-
-Leo: My goto debug method is to try to manually expand the
-typeclasses. Before that, I needed to understand what “inject”
-was. Since the result type was list of X, I assumed that inject is
-similar to using “pure” or “return” in Haskell instead of (fun x =>
-[x]). However, Coq is really bad usually at figuring out implicit
-stuff – so I just replaced it by the explicit anonymous function.
- 
-After that it was just a “Gen (list X) instance does not exist”, so
-deriving Arbitrary (or Gen) for X should work (and it did). Now, why
-things work when moving back to “inject” after adding the instance I
-have no idea 😊
-
-
-Yao: I have discussed this with Leo. The problem is that I have
-defined the following instance:
-
-Polymorphic Instance Injection_trans {A B C : Type} {P : Injection A
-            B} {Q : Injection B C} : Injection A C := { inject e :=
-            inject (inject e) }.
-
-This would cause the type checker to go to an infinite loop if it
-recursively takes this branch before exploring other
-possibilities. Removing this instance would fix the problem.
-
-We don’t see other problems with this Injection type class for
-now. Therefore, I suggest we keep this type class, but be careful not
-to define something similar to what I did.
-
-EXERCISE: Find a different way of making instance inference diverge.
-
-Hint: If confused, you can look at the *coq* buffer. That's where
-most debug messages appear if they don't appear in the *response*
-buffer.  (What's a typical example of this?)
-*)
+(* QUESTION: What does "Polymorphic Instance" mean? *)
 
 (* _____________________________________________________________________ *)
     
-(* Another useful typeclass *)
-Class Show A : Type :=
-  {
-    show : A -> string
-  }.
 
-Instance showBool : Show bool :=
-  {|
-    show := fun b:bool => if b then "true" else "false"
-  |}.
-
-Definition natToDigit (n : nat) : string :=
-  match n with
-    | 0 => "0" | 1 => "1" | 2 => "2" | 3 => "3" | 4 => "4" | 5 => "5"
-    | 6 => "6" | 7 => "7" | 8 => "8" | _ => "9"
-  end.
-
-Fixpoint writeNatAux (time n : nat) (acc : string) : string :=
-  let acc' := (natToDigit (n mod 10)) ++ acc in
-  match time with
-    | 0 => acc'
-    | S time' =>
-      match n / 10 with
-        | 0 => acc'
-        | n' => writeNatAux time' n' acc'
-      end
-  end.
-
-Definition string_of_nat (n : nat) : string :=
-  writeNatAux n n "".
-
-Instance showNat : Show nat :=
-  {|
-    show := string_of_nat
-  |}.
-
-Compute (show 42).
-
-Instance showString : Show string :=
-  {|
-    show := fun s:string => """" ++ s ++ """"
-  |}.
-
-Compute (show true).
-
-(* /HIDE *)
