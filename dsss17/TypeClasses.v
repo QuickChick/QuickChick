@@ -58,7 +58,7 @@ Instance eqNat : Eq nat :=
 
 (* We can define functions that use overloaded functions from 
    instances like this: *)
-Definition oddManOut {X : Type} `{Eq X} (a b c : X) : X :=
+Definition oddManOut {X : Type} {Eq X} (a b c : X) : X :=
   if eqb a b then c
   else if eqb a c then b
   else a.                         
@@ -197,8 +197,6 @@ From the reference manual:
       - They also support implicit quantification on
         superclasses (§20.5.1)
 *)
-
-(* Q: Does `(...) mean the same as `{...} ? *)
 
 (* ---------------------------------------------------------------- *)
 (** Internals *)
