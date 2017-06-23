@@ -10,6 +10,8 @@ Coq typeclasses (intro)
   TypeClasses.v
 
 core QC typeclasses
+  - derived typeclasses (Show) -- maybe this will eventually be a general
+    feature of Coq, but for now it's part of QC
   - generator monad
      - basic combinators (elements, oneOf, ...)
      - exercises: build a generator for XX
@@ -40,7 +42,19 @@ ways of measuring distributions
 code coverage is a very bad success metric, but a rather good heuristic for
 when your tests are not good enough
 
+collect 
+  - small example
+  - forward pointer to third day?
+
+Defining new one-constructor types to obtain different Gen behaviors (for
+example).
+
 mutation testing
+
+mutation testing vs collect
+  - collect informs about statistics of the distribution
+  - mutation testing informs whether the distribution leads to good testing
+  - John's x<y example?
   
 final comments about testing
   - simple properties: very high payoff
@@ -59,6 +73,12 @@ Polymorphic generators (nat)
 custom shrinking
 
 generating dependent generators
+  - Using QuickChick to automatically derive generators satisfying 
+    preconditions in the form of inductive datatypes
+  - Notation
+  - Precise form required from predicates
+  - Narrowing caveats (too much backtracking if instantiating too early)
+  - Workarounds (group predicates together - commit b2e4ad922e20b87818cb6162d714fe498e4dc356 from DeepSpec demo for an example)
 
 super-simple compiler
 
@@ -72,5 +92,6 @@ Case study: Vellvm
 
 ?case study: DeepWeb
 
-Zoe-proofs  (typeclasses, mainly, plus just a hint of the proofs)
+Zoe-proofs (the relevant typeclasses, mainly, plus just a hint of the
+proofs)
   - 1-hour talk based on her section of popl submission

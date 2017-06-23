@@ -9,7 +9,7 @@ Import GenLow GenHigh QcNotation.
 
 Definition resultSuccessful (r : Result) : bool :=
   match r with
-    | MkResult (Some res) expected _ _ _ _ =>
+    | MkResult (Some res) expected _ _ _ _ _ =>
       res == expected
     | _ => true
   end.
