@@ -56,9 +56,9 @@ let test_out handle_section input =
            | (QuickChick (s1,s2,s3)) :: rest ->
               (Printf.sprintf "%s*) QuickChick %s (*%s" s1 s2 s3) :: walk_nodes rest
          in Printf.sprintf "%s%s%s%s%s" 
-                           startSec 
-                           sn (* __default... -> don't print it *)
-                           endSec 
+                           (if sn.[0] = '_' then "" else startSec)
+                           (if sn.[0] = '_' then "" else sn) (* __default... -> don't print it *)
+                           (if sn.[0] = '_' then "" else endSec)
                            (output_extends extends) 
                            (String.concat "" (walk_nodes nodes))
        else output_section s 
