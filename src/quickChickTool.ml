@@ -134,11 +134,12 @@ let main =
   let rec parse_file_or_dir file_name = 
     try if Sys.is_directory file_name 
         then begin
-(*          Printf.printf "In directory: %s\nContents:\n" file_name; *)
+          if Filename.basename file_name = "_qc" then None else begin 
           let ls = Sys.readdir file_name in
 (*           Array.iter (fun s -> Printf.printf "  %s\n" s) ls;*)
           let parsed = List.map (fun s -> parse_file_or_dir (file_name ^ "/" ^ s)) (Array.to_list ls) in
           Some (Dir (file_name, catMaybes parsed))
+          end
         end
         else begin
           let handle = (Filename.basename file_name = "_CoqProject"  || 
@@ -248,6 +249,14 @@ let main =
       failwith "Could not compile mutated program"
     else () in
 
+  let load_file f =
+    let ic = open_in f in
+    let n = in_channel_length ic in
+    let s = String.create n in
+    really_input ic s 0 n;
+    close_in ic;
+    (s) in
+
   match !mode with
   | Test -> begin
      match fs with 
@@ -256,12 +265,16 @@ let main =
          let vf = write_tmp_file out_data in
          compile_and_run vf
      | Dir (s, fss) -> begin
-         let tmp_dir = mk_tmp_dir () in
+         let tmp_dir = 
+           ignore (Sys.command "mkdir -p _qc");
+           "_qc" in
          let rec output_test_dir fs =
            match fs with 
            | File (s, ss) -> 
               let out_data = test_out handle_section ss in
-              ignore (write_file (tmp_dir ^ "/" ^ s) out_data)
+              let out_file = tmp_dir ^ "/" ^ s in 
+              if Sys.file_exists out_file && load_file out_file = out_data then ()
+              else ignore (write_file (tmp_dir ^ "/" ^ s) out_data)
            | Dir (s, fss) -> begin 
                 let dir_name = tmp_dir ^ "/" ^ s in
                 if Sys.command (Printf.sprintf "mkdir -p %s" dir_name) <> 0 then
