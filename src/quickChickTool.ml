@@ -56,7 +56,7 @@ let test_out handle_section input =
               (Printf.sprintf "%s*) QuickChick %s (*%s" s1 s2 s3) :: walk_nodes rest
          in Printf.sprintf "%s%s%s%s%s" 
                            startSec 
-                           (if sn.[0] = '_' then "" else sn) (* __default... -> don't print it *)
+                           sn (* __default... -> don't print it *)
                            endSec 
                            (output_extends extends) 
                            (String.concat "" (walk_nodes nodes))
@@ -153,7 +153,7 @@ let main =
           let fixed_default = 
             match result with 
             | (Section (a,b,c,exts,e) :: ss ) ->
-               Section (a, "__default_" ^ file_name, c, exts, e) :: ss
+               Section ("(*", "__default_" ^ file_name, "*)\n", exts, e) :: ss
             | _ -> failwith "Empty section list?" in
              
           File (file_name, fixed_default)
