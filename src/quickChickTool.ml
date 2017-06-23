@@ -44,7 +44,7 @@ let rec cartesian (lists : 'a list list) : 'a list list =
 let test_out handle_section input = 
   let rec go = function 
     | Section (startSec, sn, endSec, extends, nodes) as s -> 
-(*       Printf.printf "Inside go for %s. Handle? %b\n" sn (handle_section sn); *)
+       Printf.printf "Inside go for %s. Handle? %b\n" sn (handle_section sn); 
        if handle_section sn then  
          let rec walk_nodes nodes = 
            match nodes with 
@@ -80,6 +80,7 @@ let combine_mutants (bms : ('a * 'a list) list) =
 let mutate_outs handle_section input = 
   let rec go = function
     | Section (_, sn, _, _, nodes) ->
+       Printf.printf "Handling section: %s. Handle? %b\n" sn (handle_section sn);
        if handle_section sn then 
          let handle_node = function
            | Text s -> (s, [])
@@ -211,13 +212,20 @@ let main =
   (* Actually fill the hashtable *)
   populate_hashtbl fs;
 
-  (* Hashtbl.iter (fun a b -> Printf.printf "%s -> %s\n" a (String.concat ", " b)) sec_graph;  *)
+  Hashtbl.iter (fun a b -> Printf.printf "%s -> %s\n" a (String.concat ", " b)) sec_graph; flush_all (); 
 
   (* Function that tells you whether to handle a section (mutate/uncomment quickChicks) or not *)
+  let rec handle_section' current_section starting_section = 
+    let current_section  = trim current_section in
+    let starting_section = trim starting_section in
+    current_section = starting_section || 
+      List.exists (fun starting_section' -> handle_section' current_section starting_section') (sec_find starting_section) in
+  
   let rec handle_section sn' =
+    Printf.printf "Asking for %s\n" sn'; flush_all ();
+    let sn' = trim sn' in
     match !sec_name with
-    | Some sn -> 
-       sn = (trim sn') || List.exists handle_section (sec_find sn')
+    | Some sn -> handle_section' sn' sn
     | None    -> true in
 
   let write_file out_file out_data = 
@@ -272,9 +280,9 @@ let main =
            match fs with 
            | File (s, ss) -> 
               let out_data = test_out handle_section ss in
-              let out_file = tmp_dir ^ "/" ^ s in 
+              (* let out_file = tmp_dir ^ "/" ^ s in 
               if Sys.file_exists out_file && load_file out_file = out_data then ()
-              else ignore (write_file (tmp_dir ^ "/" ^ s) out_data)
+              else *) ignore (write_file (tmp_dir ^ "/" ^ s) out_data)
            | Dir (s, fss) -> begin 
                 let dir_name = tmp_dir ^ "/" ^ s in
                 if Sys.command (Printf.sprintf "mkdir -p %s" dir_name) <> 0 then
@@ -311,11 +319,15 @@ let main =
         let rec calc_dir_mutants fs : (string file_structure * string file_structure list) = 
           match fs with 
           | File (s, ss) ->
+             Printf.printf "Calc mutants for file: %s\n" s; flush_all ();
              begin match mutate_outs handle_section ss with 
-             | base :: muts -> (File (s, base), List.map (fun m -> File (s, m)) muts)
+             | base :: muts -> 
+                Printf.printf "Number of mutants: %d\n" (List.length muts);
+                (File (s, base), List.map (fun m -> File (s, m)) muts)
              | _ -> failwith "no base mutant"
              end
           | Dir (s, fss) -> begin 
+              Printf.printf "Calc mutants for dir: %s\n" s; flush_all ();
               let bmfs = List.map calc_dir_mutants fss in
               let rec all_mutant_fs (bmfs : ('a * 'a list) list) = 
                 match bmfs with 
@@ -348,7 +360,10 @@ let main =
         let rec output_mut_dir tmp_dir fs =
            match fs with 
            | File (s, plaintext) -> 
-              ignore (write_file (tmp_dir ^ "/" ^ s) plaintext)
+              let out_data = plaintext in
+              (* let out_file = tmp_dir ^ "/" ^ s in 
+              if Sys.file_exists out_file && load_file out_file = out_data then ()
+              else *) ignore (write_file (tmp_dir ^ "/" ^ s) out_data)
            | Dir (s, fss) -> begin 
                 let dir_name = tmp_dir ^ "/" ^ s in
                 if Sys.command (Printf.sprintf "mkdir -p %s" dir_name) <> 0 then
@@ -356,8 +371,10 @@ let main =
                 else List.iter (output_mut_dir tmp_dir) fss
              end in
         (* Base mutant *)
-        Printf.printf "Handling Base\n";
-        let tmp_dir = mk_tmp_dir () in
+        Printf.printf "Handling Base\n"; flush_all ();
+        let tmp_dir = 
+           ignore (Sys.command "mkdir -p _qc");
+           "_qc" in
         (* Entire file structure is copied *)
         output_mut_dir tmp_dir base;
         (* Execute make at tmp_dir *)
@@ -369,7 +386,9 @@ let main =
         List.iteri (fun i m ->
          (if i > 0 then Printf.printf "\n");
          Printf.printf "Handling Mutant %d.\n" i; flush_all ();
-         let tmp_dir = mk_tmp_dir () in
+         let tmp_dir = 
+           ignore (Sys.command "mkdir -p _qc");
+           "_qc" in
          (* Entire file structure is copied *)
          output_mut_dir tmp_dir m;
          (* Execute make at tmp_dir *)
