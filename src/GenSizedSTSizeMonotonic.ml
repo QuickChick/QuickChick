@@ -94,7 +94,7 @@ let ret_mon (s : coq_expr) matcher1 matcher2 =
     (set_int (isSomeSet hole) (semGenSize matcher1 s))
     (set_int (isSomeSet hole) (semGenSize matcher2 s))
 
-let eta g = gSnd (gPair (hole, g))
+let eta g = gSnd (gPair (gInt 1, g))
 
 let ret_type_dec 
       (v : var) (s : coq_expr)
@@ -135,8 +135,8 @@ let match_inp (s : coq_expr) (s1 : coq_expr) (s2 : coq_expr)
   let (rgen, rmon) = right in
   let proof_typ v =
     ret_mon s
-      (eta (construct_match (gVar v) ~catch_all:(Some (rgen s1)) [(pat, lgen s1)]))
-      (eta (construct_match (gVar v) ~catch_all:(Some (rgen s2)) [(pat, lgen s2)]))
+      (construct_match (gVar v) ~catch_all:(Some (rgen s1)) [(pat, lgen s1)])
+      (construct_match (gVar v) ~catch_all:(Some (rgen s2)) [(pat, lgen s2)])
   in
   ( (* gen *)
     (fun s ->
@@ -174,7 +174,8 @@ let stMaybe (opt : bool) (exp : atyp)
   )
 
 let bigcupf s =
-  gFun ["x"]
+  gFun
+    ["x"]
     (fun [x] -> set_int (isSomeSet hole) (semGenSize (gSnd (gVar x)) s))
 
 let genSizedSTSMon_body
@@ -255,10 +256,10 @@ let genSizedSTSMon_body
              handle_branch' (gVar s) (gInt 0) (gVar s2) hleq (make_up_name ()) inputs c
            in
            if b then
-             bigcup_cons_setI_subset_compat (gProd hole hole) (bigcupf (gVar s)) p exp
+             bigcup_cons_setI_subset_compat_backtrack p exp
            else
-             bigcup_cons_setI_subset_pres (gProd hole hole) (bigcupf (gVar s)) exp
-        ) ctrs (bigcup_nil_setI (bigcupf (gVar s)) hole hole)
+             bigcup_cons_setI_subset_pres_backtrack exp
+        ) ctrs (bigcup_nil_setI hole hole hole)
     in
     subset_respects_set_eq
       (setI_set_eq_r (semBacktrackSize (gList (add_freq (base_gens inputs generator_body))) (gVar s)))
@@ -273,7 +274,7 @@ let genSizedSTSMon_body
            let ((_, p), b) =
              handle_branch' (gVar s) (gVar s1) (gVar s2) hleq ih inputs c
            in
-           bigcup_cons_setI_subset_compat (gProd hole hole) (bigcupf (gVar s)) p exp
+           bigcup_cons_setI_subset_compat_backtrack p exp
         ) ctrs (bigcup_nil_setI (bigcupf (gVar s)) hole hole)
     in
     subset_respects_set_eq

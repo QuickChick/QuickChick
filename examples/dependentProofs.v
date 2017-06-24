@@ -269,24 +269,34 @@ Lemma bigcup_cons_setI_subset_compat {A B} (f : A -> set B)
 Proof.
 Admitted.
 
-Lemma bigcup_cons_setI_subset_pres {A B} (f : A -> set B)
-      (x : A) (l l' : seq A) s :
-  \bigcup_(x in (l :&: s)) (f x) \subset
-   \bigcup_(x in (l' :&: s)) (f x) ->
-  \bigcup_(x in l :&: s) (f x) \subset
-   \bigcup_(x in ((x :: l') :&: s)) (f x).
+(* more specific lemmas to help type checking of the proof term *)
+Lemma bigcup_cons_setI_subset_compat_backtrack {A}
+      (n n' : nat) (g g' : G (option A)) (l l' : seq (nat * G (option A))) s :
+  isSome :&: semGenSize g s  \subset isSome :&: semGenSize g' s ->
+  \bigcup_(x in (l :&: (fun x => x.1 <> 0))) (isSome :&: semGenSize x.2 s) \subset
+  \bigcup_(x in (l' :&: (fun x => x.1 <> 0))) (isSome :&: semGenSize x.2 s) ->
+  \bigcup_(x in (((n, g) :: l) :&: (fun x => x.1 <> 0))) (isSome :&: semGenSize x.2 s) \subset
+  \bigcup_(x in (((n', g') :: l') :&: (fun x => x.1 <> 0))) (isSome :&: semGenSize x.2 s).
+Proof.
+Admitted.
+
+Lemma bigcup_cons_setI_subset_pres_backtrack {A}
+      (n : nat) (g : G (option A)) (l l' : seq (nat * G (option A))) s :
+  \bigcup_(x in (l :&: (fun x => x.1 <> 0))) (isSome :&: semGenSize x.2 s) \subset
+  \bigcup_(x in (l' :&: (fun x => x.1 <> 0))) (isSome :&: semGenSize x.2 s) ->
+  \bigcup_(x in (l :&: (fun x => x.1 <> 0))) (isSome :&: semGenSize x.2 s) \subset
+  \bigcup_(x in ((n, g) :: l') :&: (fun x => x.1 <> 0)) (isSome :&: semGenSize x.2 s).
 Proof.
 Admitted.
 
 Lemma bigcup_nil_setI {A B} (f : A -> set B)
       (l : seq A) s :
   \bigcup_(x in [] :&: s) (f x) \subset
-   \bigcup_(x in (l :&: s)) (f x).
+  \bigcup_(x in (l :&: s)) (f x).
 Proof.
 Admitted.
 
-
-(* Derive GenSizedSuchThatSizeMonotonicOpt for (fun foo => goodTree n foo). *)
+Derive GenSizedSuchThatSizeMonotonicOpt for (fun foo => goodTree n foo).
 
 Lemma succ_neq_zero :
   forall x, S x <> 0.
@@ -342,6 +352,10 @@ Admitted.
 
 Derive GenSizedSuchThatCorrect for (fun foo => goodTree n foo).
 
+(* Definition gen (n : nat) : G (option tree) := @arbitraryST _ (fun foo => goodTree n foo) _. *)
+
+(* Definition inst (n : nat) := @STComplete _ (fun foo => goodTree n foo) ( @arbitraryST _ (fun foo => goodTree n foo) _) _. *)
+
 (* XXX these instances should be present *)
 Existing Instance genSFoo.
 Existing Instance shrFoo.
@@ -374,7 +388,10 @@ Derive SizedProofEqs for (fun foo => goodFooNarrow n foo).
 
 Derive GenSizedSuchThatCorrect for (fun foo => goodFooNarrow n foo).
 
-(* Derive GenSizedSuchThatSizeMonotonicOpt for (fun foo => goodFooNarrow n foo). *)
+(* Definition x := (1, 2).2. *)
+(* bigcup_cons_setI_subset_compat *)
+
+Derive GenSizedSuchThatSizeMonotonicOpt for (fun foo => goodFooNarrow n foo).
 
 Existing Instance GenSizedSuchThatgoodFooCombo.
 
@@ -384,7 +401,7 @@ Derive SizedProofEqs for (fun foo => goodFooCombo n foo).
 
 Derive GenSizedSuchThatCorrect for (fun foo => goodFooCombo n foo).
 
-(* Derive GenSizedSuchThatSizeMonotonicOpt for (fun foo => goodFooCombo n foo). *)
+Derive GenSizedSuchThatSizeMonotonicOpt for (fun foo => goodFooCombo n foo).
 
 Existing Instance GenSizedSuchThatgoodFoo.
 
@@ -394,7 +411,7 @@ Derive SizedProofEqs for (fun (x : Foo) => goodFoo input x).
 
 Derive GenSizedSuchThatCorrect for (fun foo => goodFoo n foo).
 
-(* Derive GenSizedSuchThatSizeMonotonicOpt for (fun foo => goodFoo n foo). *)
+Derive GenSizedSuchThatSizeMonotonicOpt for (fun foo => goodFoo n foo).
 
 Existing Instance GenSizedSuchThatgoodFooPrec.  (* ???? *)
 
@@ -404,7 +421,7 @@ Derive SizedProofEqs for (fun (x : Foo) => goodFooPrec input x).
 
 Derive GenSizedSuchThatCorrect for (fun foo => goodFooPrec n foo).
 
-(* Derive GenSizedSuchThatSizeMonotonicOpt for (fun foo => goodFooPrec n foo). *)
+Derive GenSizedSuchThatSizeMonotonicOpt for (fun foo => goodFooPrec n foo).
 
 Existing Instance GenSizedSuchThatgoodFooMatch.  (* ???? *)
 
@@ -424,7 +441,7 @@ Derive SizedProofEqs for (fun (x : Foo) => goodFooRec input x).
 
 Derive GenSizedSuchThatCorrect for (fun foo => goodFooRec n foo).
 
-(* Derive GenSizedSuchThatSizeMonotonicOpt for (fun foo => goodFooRec n foo). *)
+Derive GenSizedSuchThatSizeMonotonicOpt for (fun foo => goodFooRec n foo).
 
 Inductive goodFooB : nat -> Foo -> Prop :=
 | GF1 : goodFooB 2 (Foo2 Foo1)
@@ -472,7 +489,7 @@ Derive SizeMonotonicSuchThatOpt for (fun foo => LRTree foo).
 
 Derive GenSizedSuchThatCorrect for (fun foo => LRTree foo).
 
-(* Derive GenSizedSuchThatSizeMonotonicOpt for (fun foo => LRTree foo). *)
+Derive GenSizedSuchThatSizeMonotonicOpt for (fun foo => LRTree foo).
 
 (* Derive SizeMonotonicSuchThat for (fun foo => goodTree n foo). *)
 (* XXX
