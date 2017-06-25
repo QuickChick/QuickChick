@@ -1,12 +1,11 @@
 Require Import Coq.Strings.String.
 Require Import Coq.Arith.Arith.
 Require Import Omega.
+Require Bool.
 Local Open Scope string.
 
 (* ################################################################# *)
-(** * Basics *)
-
-(** ** First Example: The [Show] Typeclass *)
+(** * Basics: Classes and Instances *)
 
 (* Motivation: Need to be able to test lots of different things for
    equality...
@@ -44,21 +43,27 @@ Eq
 
 (* An instance declaration: *)
 Instance eqBool : Eq bool :=
-  {|
-    eqb := fun (b c : bool) => if b then c else negb c
-  |}.
+  {
+    eqb := fun (b c : bool) => 
+       match b, c with
+         | true, true => true
+         | true, false => false
+         | false, true => false
+         | false, false => true
+       end
+  }.
 
 (* Another: *)
 Instance eqNat : Eq nat :=
-  {|
+  {
     eqb := beq_nat
-  |}.
+  }.
 
 (* Exercise: Write an eq instance for pairs of a nat and a bool. *)
 
 (* We can define functions that use overloaded functions from 
    instances like this: *)
-Definition oddManOut {X : Type} {Eq X} (a b c : X) : X :=
+Definition oddManOut {A : Type} `{Eq A} (a b c : A) : A :=
   if eqb a b then c
   else if eqb a c then b
   else a.                         
@@ -76,9 +81,11 @@ Class Show A : Type :=
   }.
 
 Instance showBool : Show bool :=
-  {|
+  {
     show := fun b:bool => if b then "true" else "false"
-  |}.
+  }.
+
+Compute (show true).
 
 Definition natToDigit (n : nat) : string :=
   match n with
@@ -101,273 +108,108 @@ Definition string_of_nat (n : nat) : string :=
   writeNatAux n n "".
 
 Instance showNat : Show nat :=
-  {|
+  {
     show := string_of_nat
-  |}.
+  }.
 
 Compute (show 42).
 
 Instance showString : Show string :=
-  {|
+  {
     show := fun s:string => """" ++ s ++ """"
-  |}.
+  }.
 
-Compute (show true).
-
-(* ---------------------------------------------------------------- *)
-(** Implicit Generalization *)
-
-(* Here, [`{Eq A}] essentially means the same as [{_ : Eq A}].  The
-   opening tick tells Coq to perform "implicit generalization."
-
-   Here's what the Coq reference manual says:
-
-      Implicit generalization is an automatic elaboration of a
-      statement with free variables into a closed statement where
-      these variables are quantified explicitly. Implicit
-      generalization is done inside binders starting with a ` and
-      terms delimited by `{ } and `( ), always introducing maximally
-      inserted implicit arguments for the generalized
-      variables. Inside implicit generalization delimiters, free
-      variables in the current context are automatically quantified
-      using a product or a lambda abstraction to generate a closed
-      term. *)
-
-(* For example: *)
-Generalizable Variables x y.
-(* (By default, ordinary variables don't behave this way, to avoid
-   puzzling behavior in case of typos.) *)
-
-Definition weird1 := `(x + y).
-Print weird1.
-
-Lemma weird2 : `(x + y = y + x).
-Proof. intros. omega. Qed.
-
-Print oddManOut.
-
-Definition oddManOut' {X : Type} {_ : Eq X} (a b c : X) : X :=
-  if eqb a b then c
-  else if eqb a c then b
-  else a.                         
-
-(* TODO: Now explain this:
-
-Definition oddManOut {X : Type} {Eq X} (a b c : X) : X :=
-  if eqb a b then c
-  else if eqb a c then b
-  else a.                         
-
-====>
-    Error: Unable to satisfy the following constraints:
-    UNDEFINED EVARS:
-     ?X12==[X |- Type] (type of Eq) {?T}
-     ?X15==[X0 Eq X a b c |- Eq X] (parameter Eq of @eqb) {?Eq}
-     ?X17==[X0 Eq X a b c |- Eq X] (parameter Eq of @eqb) {?Eq0}
-*)
-
-(* This may seem like a lot of trouble just to avoid writing a _!  Why
-   is it useful?
-
-   Matthieu makes the point that binding super-classes is supported by
-   implicit generalization using this example:
-
-    Program Definition div2 ‘{Frac α} (a : α) := div a (1 + 1). ⇒
-    Definition div2 {α} {N : Num α} {Frac α N} (a : α) := ...
-
-    ___
-
-    Also, substructures become subinstances: Class Monoid A := { monop
-    : A → A → A ; ... } ClassGroupA:={grp mon: MonoidA;...} Instance
-    grp mon ‘{Group A} : Monoid A. Definition foo ‘{Group A} (x : A) :
-    A := monop x x.  Similar to the existing Structures based on
-    coercive subtyping.
-
-From the reference manual:
-
-  However, the generalizing binders should be used instead as they
-  have particular support for type classes:
-      - They automatically set the maximally implicit status for type
-        class arguments, making derived functions as easy to use as
-        class methods. In the example above, A and eqa should be set
-        maximally implicit.
-      - They support implicit quantification on partially applied type
-        classes (§2.7.19). Any argument not given as part of a type
-        class binder will be automatically generalized.
-      - They also support implicit quantification on
-        superclasses (§20.5.1)
-*)
-
-(* ---------------------------------------------------------------- *)
-(** Internals *)
-
-(* Explain briefly what a typeclass actually translates
-   into.  (Explain Coq records en passant.) *)
-
-(* Explain the output!  Notice that it's basically just a record type. *)
-Print Eq.
-(* ===>
-     Record Eq (A : Type) : Type := Build_Eq { eqb : A -> A -> bool }
-*)
-
-Check eqb.  
-(* EXPLAIN:
-==> 
-eqb
-     : ?A -> ?A -> bool
-where
-?A : [ |- Type] 
-?Eq : [ |- Eq ?A] 
-*)
-
-(* Recommended exercise: Reminder of how Coq displays implicit parameters... *)
-Definition foo {A : Type} (a : A) : A := a.
-Check foo.
-(* ===>
-     foo
-          : ?A -> ?A
-     where
-     ?A : [ |- Type] 
-*)
-
-Print eqBool.
-(* ==> 
-eqBool = {| eqb := fun b c : bool => if b then c else negb c |}
-     : Eq bool
-*)
-
-Print eqb.
-(* ==>
-     eqb = 
-     fun (A : Type) (Eq0 : Eq A) => let (eqb) := Eq0 in eqb
-          : forall A : Type, Eq A -> A -> A -> bool
-
-     Arguments A, Eq are implicit and maximally inserted
-     Argument scopes are [type_scope _ _ _]
- *)
-
-Check (@eqb).
-(* ==>
-    @eqb
-       : forall A : Type, Eq A -> A -> A -> bool
-*)
-
-(* Instance inference... 
-
-    fun (x y : bool) => eqb x y 
-    ===>   { Implicit arguments }
-    fun (x y : bool) => @eqb _ _ x y
-    ===>   { Typing }
-    fun (x y : bool) => @eqb (?A : Type) (?eq : Eq?A) x y 
-    ===>   { Unification }
-    fun (x y : bool) => @eqb bool (?eq : Eq bool) x y 
-    ===>   { Proof search for Eq bool returns Eq bool }
-    fun (x y : bool) => @eqb bool (eqBool : Eq bool) x y 
-*)
-
-(* For purposes of instance inference, it doesn't matter whether
-   hypotheses are explicit or inferred.  So, for example, one could
-   just as well write this: *)
-
-Definition oddManOut'' {X : Type} (_ : Eq X) (a b c : X) : X :=
-  if eqb a b then c
-  else if eqb a c then b
-  else a.                         
-
-(* However, if we define it this way, then applying the function is
-   going to be clunky: 
-
-Check (oddManOut'' 1 2 1).
-===>
-   Error: The term "1" has type "nat" while it is expected to have type "Eq ?X".
-*)
-
-Check (oddManOut'' eqNat 1 2 1).
-
-(*
-Proof-search tactic with instances as lemmas: 
-
-    A:Type, eqa: EqA |- ? : Eq (list A)
-
-  Simple depth-first search with higher-order unification
-
-– Returns the first solution only 
-     - not always what you want!!
-+ Extensible through Ltac
- *)
-
-(* WRITE MORE: Show how to turn on debugging and explain what it
-   prints.  Do some trickier examples.  (Maybe some of this needs to
-   go below, after parameterized instances are introduced.) *)
-
-(* Matthieu's slides have some stuff about "Instance Inference"
-   that is probably useful but I'm not sure I follow it... *)
 
 (* ---------------------------------------------------------------- *)
 (** Parameterized Instances: New Typeclasses from Old *)
 
 Instance eqPair {A B : Type} `{Eq A} `{Eq B} : Eq (A * B) :=
-  {|
+  {
     eqb p1 p2 :=
       match p1,p2 with
       | (a1,b1),(a2,b2) => andb (eqb a1 a2) (eqb b1 b2)
       end
-  |}.
-
-(* Exercise: Write eq instances for options and lists *)
-
- *)
-Class Show A : Type :=
-  {
-    show : A -> string
   }.
 
-Instance showBool : Show bool :=
-  {|
-    show := fun b:bool => if b then "true" else "false"
-  |}.
-
-Definition natToDigit (n : nat) : string :=
-  match n with
-    | 0 => "0" | 1 => "1" | 2 => "2" | 3 => "3" | 4 => "4" | 5 => "5"
-    | 6 => "6" | 7 => "7" | 8 => "8" | _ => "9"
-  end.
-
-Fixpoint writeNatAux (time n : nat) (acc : string) : string :=
-  let acc' := (natToDigit (n mod 10)) ++ acc in
-  match time with
-    | 0 => acc'
-    | S time' =>
-      match n / 10 with
-        | 0 => acc'
-        | n' => writeNatAux time' n' acc'
-      end
-  end.
-
-Definition string_of_nat (n : nat) : string :=
-  writeNatAux n n "".
-
-Instance showNat : Show nat :=
-  {|
-    show := string_of_nat
-  |}.
-
-Compute (show 42).
-
-Instance showString : Show string :=
-  {|
-    show := fun s:string => """" ++ s ++ """"
-  |}.
-
-Compute (show true).
+(* Exercise: Write Eq and Show instances for options and lists *)
 
 (* ---------------------------------------------------------------- *)
-(** Implicit Generalization *)
+(** Classes with Superclasses *)
 
-(* Here, [`{Eq A}] essentially means the same as [{_ : Eq A}].  The
-   opening tick tells Coq to perform "implicit generalization."
+Class Ord {A : Type} `{Eq A} :=
+  {
+    le : A -> A -> bool
+  }.
 
-   Here's what the Coq reference manual says:
+(* This is kind of weird... -- choose a better example? *)
+Definition le_eqb {A: Type} `{Eq A} `{Ord A} (x y : A) :=
+  andb (le x y) (le y x).
+
+Check Ord.
+
+(* This example comes from 20.5.1 of the reference manual, but it
+   doesn't seem to work:
+
+Definition lt `{eqa : Eq A, ! Ord eqa} (x y : A) := 
+        andb (le x y) (neqb x y).
+
+   (explain the ! notation...?
+  
+   "The ! modifier switches the way a binder is parsed back to the
+   regular interpretation of Coq. In particular, it uses the implicit
+   arguments mechanism if available, as shown in the example."}
+
+   This doesn't work either:
+
+Definition lt {A: Type} `{eqa : Eq A} {_ : Ord A eqa} (x y : A) := 
+        andb (le x y) (neqb x y).
+*)
+
+(* Exercise: define Ord instances for nat, option, pair, and list *)
+
+(* ---------------------------------------------------------------- *)
+(** * Lifting the Lid  *)
+
+(* Typeclasses in Coq are a powerful tool, but the expressiveness of
+   the Coq logic makes it hard to implement sanity checks like
+   Haskell's "overlapping instances" detector.  As a result, using
+   Coq's typeclasses effectively -- and figuring out what is wrong
+   when things don't work -- requires a clear understanding of the
+   underlying mechanisms at work. *)
+
+(* ---------------------------------------------------------------- *)
+(** ** Implicit Generalization *)
+
+Generalizable Variables A.  
+(* (By default, ordinary variables don't behave this way, to avoid
+   puzzling behavior in case of typos.) *)
+
+Definition oddManOut' `{Eq A} (a b c : A) : A :=
+  if eqb a b then c
+  else if eqb a c then b
+  else a.                         
+(* The opening tick tells Coq to perform "implicit generalization." *)
+
+Print oddManOut'.
+(* ===>
+    oddManOut' = 
+      fun (A : Type) (H : Eq A) (a b c : A) =>
+        if eqb a b then c else if eqb a c then b else a
+             : forall A : Type, Eq A -> A -> A -> A -> A
+*)
+
+(* We can see that [`{Eq A}] essentially means the same as [{_ : Eq
+   A}], except that the unbound [A] automatically gets bound at the
+   front. *)
+
+(* Where it gets fancy (and useful) is with subclasses: *)
+
+Class Ord1 `{Eq A} :=
+  {
+    le1 : A -> A -> bool
+  }.
+
+(* HIDE: Here's what the Coq reference manual says:
 
       Implicit generalization is an automatic elaboration of a
       statement with free variables into a closed statement where
@@ -380,87 +222,35 @@ Compute (show true).
       using a product or a lambda abstraction to generate a closed
       term. *)
 
-(* For example: *)
+(* Implicit generalization can be used in other ways.  For example: *)
 Generalizable Variables x y.
-(* (By default, ordinary variables don't behave this way, to avoid
-   puzzling behavior in case of typos.) *)
-
-Definition weird1 := `(x + y).
-Print weird1.
 
 Lemma weird2 : `(x + y = y + x).
 Proof. intros. omega. Qed.
 
-Print oddManOut.
+(* This makes pretty good sense -- a lot of people like to write their
+   theorems this way on paper, so why not the formal versions too?
+   But it is also possible to use implicit generalization to get
+   effects that are not so easy to understand. *)
+Definition weird1 := `(x + y).
+Print weird1.
 
-Definition oddManOut' {X : Type} {_ : Eq X} (a b c : X) : X :=
-  if eqb a b then c
-  else if eqb a c then b
-  else a.                         
-
-(* TODO: Now explain this:
-
-Definition oddManOut {X : Type} {Eq X} (a b c : X) : X :=
-  if eqb a b then c
-  else if eqb a c then b
-  else a.                         
-
-====>
-    Error: Unable to satisfy the following constraints:
-    UNDEFINED EVARS:
-     ?X12==[X |- Type] (type of Eq) {?T}
-     ?X15==[X0 Eq X a b c |- Eq X] (parameter Eq of @eqb) {?Eq}
-     ?X17==[X0 Eq X a b c |- Eq X] (parameter Eq of @eqb) {?Eq0}
-*)
-
-(* This may seem like a lot of trouble just to avoid writing a _!  Why
-   is it useful?
-
-   Matthieu makes the point that binding super-classes is supported by
-   implicit generalization using this example:
-
-    Program Definition div2 ‘{Frac α} (a : α) := div a (1 + 1). ⇒
-    Definition div2 {α} {N : Num α} {Frac α N} (a : α) := ...
-
-    ___
-
-    Also, substructures become subinstances: Class Monoid A := { monop
-    : A → A → A ; ... } ClassGroupA:={grp mon: MonoidA;...} Instance
-    grp mon ‘{Group A} : Monoid A. Definition foo ‘{Group A} (x : A) :
-    A := monop x x.  Similar to the existing Structures based on
-    coercive subtyping.
-
-From the reference manual:
-
-  However, the generalizing binders should be used instead as they
-  have particular support for type classes:
-      - They automatically set the maximally implicit status for type
-        class arguments, making derived functions as easy to use as
-        class methods. In the example above, A and eqa should be set
-        maximally implicit.
-      - They support implicit quantification on partially applied type
-        classes (§2.7.19). Any argument not given as part of a type
-        class binder will be automatically generalized.
-      - They also support implicit quantification on
-        superclasses (§20.5.1)
-*)
-
-(* Q: Does `(...) mean the same as `{...} ? *)
 
 (* ---------------------------------------------------------------- *)
 (** Internals *)
 
 (* Explain briefly what a typeclass actually translates
-   into.  (Explain Coq records en passant.) *)
+   into.  (Explain Coq records en passant.  Note that the syntax for
+   record values is different from [Instance] declarations.) *)
 
-(* Explain the output!  Notice that it's basically just a record type. *)
+(* (Notice that it's basically just a record type.) *)
 Print Eq.
 (* ===>
      Record Eq (A : Type) : Type := Build_Eq { eqb : A -> A -> bool }
 *)
 
 Check eqb.  
-(* EXPLAIN:
+(* 
 ==> 
 eqb
      : ?A -> ?A -> bool
@@ -516,7 +306,7 @@ Check (@eqb).
 
 (* For purposes of instance inference, it doesn't matter whether hypotheses are explicit or inferred.  So, for example, one could just as well write *)
 
-Definition oddManOut'' {X : Type} (_ : Eq X) (a b c : X) : X :=
+Definition oddManOut'' {A : Type} (_ : Eq A) (a b c : A) : A :=
   if eqb a b then c
   else if eqb a c then b
   else a.                         
@@ -527,7 +317,7 @@ Definition oddManOut'' {X : Type} (_ : Eq X) (a b c : X) : X :=
 (*
 Check (oddManOut'' 1 2 1).
 ===>
-   Error: The term "1" has type "nat" while it is expected to have type "Eq ?X".
+   Error: The term "1" has type "nat" while it is expected to have type "Eq ?A".
 *)
 
 Check (oddManOut'' eqNat 1 2 1).
@@ -551,85 +341,39 @@ Proof-search tactic with instances as lemmas:
 (* Matthieu's slides have some stuff about "Instance Inference"
    that is probably useful but I'm not sure I follow it... *)
 
-(* ---------------------------------------------------------------- *)
-(** Parameterized Instances: New Typeclasses from Old *)
-
-Instance eqPair {A B : Type} `{Eq A} `{Eq B} : Eq (A * B) :=
-  {|
-    eqb p1 p2 :=
-      match p1,p2 with
-      | (a1,b1),(a2,b2) => andb (eqb a1 a2) (eqb b1 b2)
-      end
-  |}.
-
-(* Exercise: Write Eq and Show instances for options and lists *)
-
-(* ---------------------------------------------------------------- *)
-(** Classes with Superclasses *)
-
-Generalizable Variables A.  (* Explain *)
-
-Class Ord `{Eq A} :=
-  {
-    le : A -> A -> bool
-  }.
-
-(* This is kind of weird... -- choose a better example! *)
-Definition le_eqb `{Ord A} (x y : A) := andb (le x y) (le y x).
-
-(* From 20.5.1 of reference manual, but it doesn't seem to work:
-
-Definition lt `{eqa : Eq A, ! Ord eqa} (x y : A) := 
-        andb (le x y) (neqb x y).
-
-(explain the ! notation...)
-  
-   "The ! modifier switches the way a binder is parsed back to the
-   regular interpretation of Coq. In particular, it uses the implicit
-   arguments mechanism if available, as shown in the example."
-*)
-
-(* Exercise: define Ord instances for nat, option, pair, and list *)
-
 
 (* ---------------------------------------------------------------- *)
 (** Typeclasses and Proofs *)
 
-Class EqDec' (A : Type) := {
-        eqb' : A -> A -> bool ;
-        eqb_leibniz' : forall x y, eqb x y = true -> x = y }.
-Print EqDec'.
-
-Instance eq_bool : EqDec' bool := 
-  {|
-    eqb' x y := if x then y else negb y
-  |}.
-
-Class EqDec `{Eq A} : Type := 
+Class EqDec (A : Type) {H : Eq A} := 
   { 
     eqb_leibniz : forall x y, eqb x y = true -> x = y 
   }.
-Print EqDec'.
+
+Check (@EqDec).
 Print EqDec.
-Check (@eqb_leibniz).
 
-(* NOT WORKING -- WHY?
-Instance eq_bool : EqDec bool := 
-  {|
-    eqb x y := if x then y else negb y
-  |}.
-*)
+Instance eqdecBool : EqDec bool := 
+  {
+    eqb_leibniz := Bool.eqb_prop
+  }.
 
-(* If one does not give all the members in the Instance declaration, Coq
-enters the proof-mode and the user is asked to build inhabitants of
-the remaining fields, e.g.:
+(* If the Instance declaration does not give values for all the class
+   members, Coq enters proof-mode and the user is asked to build
+   inhabitants of the remaining fields. *)
+Instance eqdecBool' : EqDec bool := 
+  {
+  }.
+Proof. apply Bool.eqb_prop. Defined.
 
-Instance eq_bool : EqDec bool := 
-  {|
-  |}.
+Instance eqdecNat : EqDec nat := 
+  {
+    eqb_leibniz := EqNat.beq_nat_true
+  }.
 
-etc.
-*)
+(* Give a quick example of a proof that works for arbitrary things
+   from the EqDec class... *)
+
 
 (* ---------------------------------------------------------------- *)
 (** Dependent Typeclasses *)
@@ -670,6 +414,11 @@ One can also declare existing objects or structure projections using the Existin
 (** ** [Dep] *)
 
 (* ----------------------------------------------------------------- *)
+(** ** Coq's [EqDec] *)
+
+(* (a bit different from the one we saw here) *)
+
+(* ----------------------------------------------------------------- *)
 (** ** [Monad] *)
 
 (* Mention ext-lib, but not sure whether it's a good idea to actually
@@ -682,8 +431,7 @@ One can also declare existing objects or structure projections using the Existin
    library... E.g., Functor (is there one??)?  Monoid?  See what else
    Matthieu likes... *)
 
-(*
-################################################################# *)
+(* ################################################################# *)
 (** * Pragmatics *)
 
 (* Advice about how to use typeclasses in Coq.  How to avoid various
@@ -696,18 +444,35 @@ One can also declare existing objects or structure projections using the Existin
    puzzling (sometimes substantially so).  Here is a common one. *)
 Inductive bar :=
   Bar : nat -> bar.
+
 (*
 Definition eqBar :=
   eqb (Bar 42) (Bar 43).
 ===> 
       Error: Unable to satisfy the following constraints:
       ?Eq : "Eq bar"
-*)
-(* Here it's pretty easy to see what the problem is.  To fix it, we
-   just have to define a new instance... 
-*)
+
+   Here it's pretty easy to see what the problem is.  To fix it, we
+   just have to define a new instance. *)
 
 (* TODO: Cook up a more complicated example where it's harder to see... *)
+
+(* ---------------------- *)
+
+(* If you forget a `, you may see the following puzzling error message:
+
+Definition oddManOut'' {A : Type} {Eq A} (a b c : A) : A :=
+  if eqb a b then c
+  else if eqb a c then b
+  else a.                         
+
+====>
+    Error: Unable to satisfy the following constraints:
+    UNDEFINED EVARS:
+     ?X12==[A |- Type] (type of Eq) {?T}
+     ?X15==[X0 Eq A a b c |- Eq A] (parameter Eq of @eqb) {?Eq}
+     ?X17==[X0 Eq A a b c |- Eq A] (parameter Eq of @eqb) {?Eq0}
+*)
 
 (* ------------------------------------------------------------- *)
 (** ** Debugging *)
@@ -720,10 +485,10 @@ Set Typeclasses Debug.
 (* Find an interesting enough example... *)
 Definition pairThing := eqb (2,(3,true)) (2,(3,false)).
 (* ==>
-    Debug: 1: looking for (Eq X) without backtracking
-    Debug: 1.1: exact e on (Eq X), 0 subgoal(s)
-    Debug: 1: looking for (Eq X) without backtracking
-    Debug: 1.1: exact e on (Eq X), 0 subgoal(s)
+    Debug: 1: looking for (Eq A) without backtracking
+    Debug: 1.1: exact e on (Eq A), 0 subgoal(s)
+    Debug: 1: looking for (Eq A) without backtracking
+    Debug: 1.1: exact e on (Eq A), 0 subgoal(s)
     Debug: 1: looking for (Eq A) without backtracking
     Debug: 1.1: exact H on (Eq A), 0 subgoal(s)
     Debug: 1: looking for (Eq B) without backtracking
@@ -760,12 +525,12 @@ instance doesn't exist.
 Inductive Foo := MkFoo : Foo.
   Set Typeclasses Debug.
 
-  Instance gen : Gen (list Foo) := {| arbitrary := liftGen inject
-    arbitrary |}.
+  Instance gen : Gen (list Foo) := { arbitrary := liftGen inject
+    arbitrary }.
 
 Leo: My goto debug method is to try to manually expand the
 typeclasses. Before that, I needed to understand what “inject”
-was. Since the result type was list of X, I assumed that inject is
+was. Since the result type was list of A, I assumed that inject is
 similar to using “pure” or “return” in Haskell instead of (fun x =>
 [x]). However, Coq is really bad usually at figuring out implicit
 stuff – so I just replaced it by the explicit anonymous function.
@@ -778,9 +543,9 @@ have no idea 😊
 Yao: I have discussed this with Leo. The problem is that I have
 defined the following instance:
 
-Polymorphic Instance Injection_trans {A B C : Type} {|P : Injection A
+Polymorphic Instance Injection_trans {A B C : Type} {P : Injection A
             B} {Q : Injection B C} : Injection A C := { inject e :=
-            inject (inject e) |}.
+            inject (inject e) }.
 
 This would cause the type checker to go to an infinite loop if it
 recursively takes this branch before exploring other
@@ -854,6 +619,57 @@ Check weird.
    would still consider `get` as `String.get`, even if I export
    MonadState after String in Common.v. *)
 
+(* ------------------------------------------------------------- *)
+(** ** Syntax *)
+
+(* If you read Coq libraries involving typeclasses, you may see
+   [Instance] declarations written with [{|...|}] brackets instead of
+   [{...}].  The two notations mean _almost_ the same thing, and both
+   will work in most instances.  However, the Coq typechecker treats
+   them a little differently, which can cause the instance inference
+   process to fail sometimes for instances written with [{|...|}]
+   brackets when the same declaration written with [{...}] will
+   succeed. *)
+(* HIDE: coq-club email 24 June 2017 from Matthieu Sozeau
+
+   Indeed you're hitting a few confusing things. First the record notation:
+   Instance has a special syntax [{ foo := bar }] for giving the fields of
+   the class, while [{| foo := bar |}] was introduced after for introducing
+   values in general record types (parsing issues prevented to reuse simple
+   braces { }).
+
+   There is a discrepancy in how these are typechecked currently: in the
+   Instance : C args := { ... } case, the type information flows from the
+   arguments of the class type constraint to the parameters of the
+   constructor, hence you get a typing constraint for your method which
+   readily mentions bool and eqBool and typechecking succeeds.
+
+   In the case of {| |}, the record value is typechecked independently of
+   the typing constraint first, and in your example this involves a
+   unification problem
+
+     forall (x y : ?A) (_ : @eq bool (@eqb ?A ?H x y) true), @eq ?A x y ~= 
+     forall (a b : bool) (_ : @eq bool (Bool.eqb a b) true), @eq bool a b
+
+   which fails at first. We try to launch typeclass resolution to fill the
+   holes, finding ?A to be nat, ?H to be eqNat and then the unification
+   fails again as we chose the wrong instance.
+
+     Bidirectional typechecking making the typing constraint information
+   flow to the parameters, avoiding this unexpected behavior, is not on by
+   default (for compatibility reasons mainly), but activated in Program
+   mode, so this works too:
+
+   Program Instance eqdecBool : @EqDec bool eqBool := 
+     {|
+       eqb_leibniz := Bool.eqb_prop
+     |}.       
+
+   Sorry for the long explanation... it's definitely confusing.
+   -- Matthieu
+*)
+
+
 (* ############################################################## *)
 (** * Alternative Structuring Mechanisms *)
 
@@ -865,13 +681,11 @@ Check weird.
    least summarized with a pointer to somewhere people can read about
    it... *)
 
-(*
-################################################################# *)
+(* ################################################################# *)
 (** * Further Reading *)
 
-(* Origins: In Haskell, Wadler & Blott, POPL’89.  In Isabelle, Nipkow
-& Snelting, FPCA’91.  In Coq: Sozeau
-*)
+(* Origins: In Haskell, Wadler & Blott, POPL’89.  In Isabelle, Nipkow &
+   Snelting, FPCA’91.  In Coq: Sozeau and xx. *)
 
 (* Acknowledge sources for this tutorial. *)
 
@@ -904,6 +718,7 @@ Check weird.
 
 (* QUESTION: What does "Polymorphic Instance" mean? *)
 
-(* _____________________________________________________________________ *)
+(* /HIDE *)
+
     
 
