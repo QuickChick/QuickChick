@@ -1,0 +1,27 @@
+opam-version: "1.2"
+version: "dev"
+maintainer: "palmskog@gmail.com"
+
+homepage: "https://github.com/QuickChick/QuickChick"
+dev-repo: "https://github.com/QuickChick/QuickChick.git"
+bug-reports: "https://github.com/QuickChick/QuickChick/issues"
+license: "MIT"
+
+build: [ make "-j%{jobs}%" "plugin" ]
+install: [ make "install-plugin" ]
+remove: [ "sh" "-c" "rm -rf '%{lib}%/coq/user-contrib/QuickChick'" ]
+depends: [
+  "coq" {>= "8.6" & < "8.7~"}
+  "coq-mathcomp-ssreflect" {>= "1.6" & < "1.7~"}
+]
+available: [ ocaml-version >= "4.02.3" ]
+
+authors: [
+  "Catalin Hritcu <>"
+  "Leonidas Lampropoulos <>"
+  "Zoe Paraskevopoulou <>"
+  "Maxime Denes <>"
+  "Arthur Azevedo de Amorim <>"
+  "Antal Spector-Zabusky <>"
+  "Benjamin Pierce <>"
+]

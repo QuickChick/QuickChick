@@ -1,0 +1,22 @@
+opam-version: "1.2"
+version: "dev"
+maintainer: "palmskog@gmail.com"
+
+homepage: "https://github.com/QuickChick/QuickChick"
+dev-repo: "https://github.com/QuickChick/QuickChick.git"
+bug-reports: "https://github.com/QuickChick/QuickChick/issues"
+license: "MIT"
+
+build: [ make "quickChickTool" ]
+depends: [ ]
+available: [ ocaml-version >= "4.02.3" ]
+
+authors: [
+  "Catalin Hritcu <>"
+  "Leonidas Lampropoulos <>"
+  "Zoe Paraskevopoulou <>"
+  "Maxime Denes <>"
+  "Arthur Azevedo de Amorim <>"
+  "Antal Spector-Zabusky <>"
+  "Benjamin Pierce <>"
+]
