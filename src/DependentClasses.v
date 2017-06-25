@@ -25,31 +25,6 @@ Class SizedProofEqs {A : Type} (P : A -> Prop) :=
   }.
 
 
-(* Class SizedProofEqs' {A : Type} (P : A -> Prop) := *)
-(*   { *)
-(*     zero' : set (option A); *)
-(*     succ' : set (option A) -> set (option A); *)
-(*     spec1 : Some @: P \subset \bigcup_(n : nat) ((succ' ^ n) zero'); *)
-(*     spec2 : \bigcup_(n : nat) ((succ' ^ n) zero') \subset  Some @: P :|: [ None ]; *)
-(*   }. *)
-
-
-(* Looks like Scott induction, although we have not proved that
-   succ is continuous *)
-(* Lemma fixed_point_ind {A} (Q P : A -> Prop) `{SizedProofEqs A P}: *)
-(*   zero \subset Q -> *)
-(*   (forall (s : set A), s \subset Q -> succ s \subset Q) -> *)
-(*   P \subset Q. *)
-(* Proof. *)
-(*   intros Hz IH. rewrite <- spec. intros x [n [_ HP]]. *)
-(*   revert x HP.  *)
-(*   induction n. *)
-(*   - eauto. *)
-(*   - intros x. eapply IH. eauto. *)
-(* Qed. *)
-
-
-
 Class SizedSuchThatCorrect {A : Type} (P : A -> Prop) `{SizedProofEqs A P} (g : nat -> G (option A)) :=
   {
     sizedSTComplete :
@@ -111,6 +86,9 @@ Notation "'genST' x" := (@arbitraryST _ x _) (at level 70).
 Class GenSuchThatMonotonic (A : Type) (P : A -> Prop) `{GenSuchThat A P}
       `{@SizeMonotonic _ arbitraryST}.
 
+Class GenSuchThatMonotonicOpt (A : Type) (P : A -> Prop) `{GenSuchThat A P}
+      `{@SizeMonotonicOpt _ arbitraryST}.
+
 (** * Correctness of dependent generators *)  
 
 Class GenSuchThatCorrect {A : Type} (P : A -> Prop) 
@@ -119,81 +97,82 @@ Class GenSuchThatCorrect {A : Type} (P : A -> Prop)
 
 Class GenSuchThatMonotonicCorrect (A : Type) (P : A -> Prop)
       `{GenSuchThat A P}
-      `{@SizeMonotonic _ arbitraryST}
+      `{@SizeMonotonicOpt _ arbitraryST}
       `{SuchThatCorrect A P arbitraryST}.
 
+(** Coercions *)
+   
+Instance GenSizedSuchThatMonotonicOptOfSizeMonotonic
+         (A : Type) (P : A -> Prop) (Hgen : GenSizedSuchThat A P)
+         (Hmon : forall s : nat, SizeMonotonicOpt ((genSizedST P) s))
+: @GenSizedSuchThatMonotonicOpt A _ Hgen Hmon.
+
+Instance GenSizedSuchThatSizeMonotonicOptOfSizedMonotonic
+         (A : Type) (P : A -> Prop) (Hgen : GenSizedSuchThat A P)
+         (Hmon : SizedMonotonicOpt (genSizedST P))
+: @GenSizedSuchThatSizeMonotonicOpt A _ Hgen Hmon.
+
+Instance GenSizedSuchThatCorrectOptOfSizedSuchThatCorrect
+         (A : Type) (P : A -> Prop) (H : GenSizedSuchThat A P)
+         (Heqs : SizedProofEqs P)
+         (Hcorr : SizedSuchThatCorrect P (genSizedST P))
+: @GenSizedSuchThatCorrect A P H Heqs Hcorr.
+
+Instance GenSuchThatMonotonicOptOfSizeMonotonic
+         (A : Type) (P : A -> Prop) (Hgen : GenSuchThat A P)
+         (Hmon : SizeMonotonicOpt (genST P))
+: @GenSuchThatMonotonicOpt A _ Hgen Hmon.
+
+Instance GenSuchThatCorrectOptOfSuchThatCorrect
+         (A : Type) (P : A -> Prop) (H : GenSuchThat A P)
+         (Hcorr : SuchThatCorrect P (genST P))
+: @GenSuchThatCorrect A P H Hcorr.
+
+Instance SizeMonotonicOptofSizeMonotonic {A} (g : G (option A))
+         {H : SizeMonotonic g} : SizeMonotonicOpt g.
+Proof.
+  constructor. intros.
+  eapply setI_subset_compat.
+  now eapply subset_refl.
+  eapply H; eauto.
+Qed.
+
+
 (** * Coercions from sized to unsized generators *)
-  
+
+(* Generators *)
+
 Instance GenSuchThatOfSized (A : Type) (P : A -> Prop)
          `{GenSizedSuchThat A P} : GenSuchThat A P :=
-  {
-    arbitraryST := sized arbitrarySizeST;
-  }.
+  { arbitraryST := sized arbitrarySizeST }.
 
 Generalizable Variables PSized PMon PSMon PCorr.
 
-Lemma bigcup_setU_r:
-  forall (U T : Type) (s : set U) (f g : U -> set T),
-    \bigcup_(i in s) (f i :|: g i) <-->
-    \bigcup_(i in s) f i :|: \bigcup_(i in s) g i.
-Proof.
-  firstorder.
-Qed.
+(* Monotonicity *)
 
-Lemma lift_bigcup_comm :
-  forall (U T : Type) (s : set U) (f : U -> set T),
-    inhabited U ->
-    lift (\bigcup_(i in [set : U]) (f i)) <-->
-    \bigcup_(i in [set : U]) (lift (f i)).
-Proof.
-  intros U T s f Hin. unfold lift.
-  rewrite !bigcup_setU_r -!imset_bigcup.
-  rewrite bigcup_const; eauto.
-  reflexivity.
-Qed.
-    
 Instance GenSuchThatMonotonicOfSized (A : Type) (P : A -> Prop)
          {H : GenSizedSuchThat A P}
          `{@GenSizedSuchThatMonotonic A P H PMon}
          `{@GenSizedSuchThatSizeMonotonic A P H PSMon}
 : GenSuchThatMonotonic A P.
 
-Lemma option_subset {A} (s1 : set (option A)) :
-  s1 \subset (isSome :&: s1) :|: [set None]. 
-Proof.
-  intros [x |]; firstorder.
-Qed.
 
-Lemma setU_l_subset {U} (s1 s2 s3 : set U) :
-  s1 \subset s3 ->
-  s2 \subset s3 ->
-  (s1 :|: s2) \subset s3.
+Instance GenSuchThatMonotonicOptOfSized (A : Type) (P : A -> Prop)
+         {H : GenSizedSuchThat A P}
+         `{@GenSizedSuchThatMonotonicOpt A P H PMon}
+         `{@GenSizedSuchThatSizeMonotonicOpt A P H PSMon}
+: SizeMonotonicOpt (genST P).
 Proof.
-  firstorder.
-Qed.
+  unfold arbitraryST, GenSuchThatOfSized.
+Admitted. (* XXX lemma *)
 
-Lemma bigcup_lift_lift_bigcup {T U} (s1 : set T) (f : T -> set U) :
-  \bigcup_(x in s1) (lift (f x)) \subset lift (\bigcup_(x in s1) (f x)).
-Proof.
-  intros x [y [H1 [[z [H2 H3]] | H2]]].
-  + inv H3. left; eexists; split; eauto.
-    eexists; split; eauto.
-  + inv H2; now right. 
-Qed.
+Instance GenSuchThatMonotonicOptOfSized' (A : Type) (P : A -> Prop)
+         {H : GenSizedSuchThat A P}
+         `{@GenSizedSuchThatMonotonicOpt A P H PMon}
+         `{@GenSizedSuchThatSizeMonotonicOpt A P H PSMon}
+: GenSuchThatMonotonicOpt A P.
 
-Lemma lift_subset_compat {U} (s1 s2 : set U) :
-  s1 \subset s2 ->
-  lift s1 \subset lift s2.
-Proof.
-  firstorder.
-Qed.
-
-Lemma lift_set_eq_compat {U} (s1 s2 : set U) :
-  s1 <--> s2 ->
-  lift s1 <--> lift s2.
-Proof.
-  firstorder.
-Qed.
+(* Correctness *)
 
 Instance ArbitraryCorrectFromSized (A : Type) (P : A -> Prop)
          {H : GenSizedSuchThat A P}
@@ -209,7 +188,7 @@ Proof.
       [| now apply subset_refl ].
     rewrite semSized_opt; eauto.
     intros x [y [[n [_ Hin]] Hs]]; inv Hs.
-    split; eauto. 
+    split; eauto.
     exists n. split. now constructor.
     eapply PCorr. eexists; split; eauto.
   - eapply subset_trans; [ now eapply option_subset |].
@@ -271,3 +250,27 @@ Abort.
 *)
 
 (** We can now abstract away from sizes and get the generator and the proofs for free *)
+
+(* Class SizedProofEqs' {A : Type} (P : A -> Prop) := *)
+(*   { *)
+(*     zero' : set (option A); *)
+(*     succ' : set (option A) -> set (option A); *)
+(*     spec1 : Some @: P \subset \bigcup_(n : nat) ((succ' ^ n) zero'); *)
+(*     spec2 : \bigcup_(n : nat) ((succ' ^ n) zero') \subset  Some @: P :|: [ None ]; *)
+(*   }. *)
+
+
+(* Looks like Scott induction, although we have not proved that
+   succ is continuous *)
+(* Lemma fixed_point_ind {A} (Q P : A -> Prop) `{SizedProofEqs A P}: *)
+(*   zero \subset Q -> *)
+(*   (forall (s : set A), s \subset Q -> succ s \subset Q) -> *)
+(*   P \subset Q. *)
+(* Proof. *)
+(*   intros Hz IH. rewrite <- spec. intros x [n [_ HP]]. *)
+(*   revert x HP.  *)
+(*   induction n. *)
+(*   - eauto. *)
+(*   - intros x. eapply IH. eauto. *)
+(* Qed. *)
+

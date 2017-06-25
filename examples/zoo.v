@@ -88,6 +88,24 @@ SizedCorrectZoo is defined
 Definition genZoo {A B : Type} `{H1 : Arbitrary A} `{H2 : Arbitrary B}
            `{H1' : Sized A} `{H2' : Sized B} : G (@Zoo A B) := @arbitrary (@Zoo A B) _.
 
+(* Program Instance LalaG {A B} : Gen (@Zoo A B). *)
+
+(* Instance Lala  {A B : Type} `{H1 : Arbitrary A} `{H2 : Arbitrary B} *)
+(*          `{H1' : Sized A} `{H2' : Sized B} *)
+(*          `{H1 : GenMonotonicCorrect A} `{H2 : GenMonotonicCorrect B}: *)
+(*   Correct (@Zoo A B) arbitrary. *)
+(* Proof. *)
+(*   refine (@GenCorrectOfSized _ _ _ _ _ _ _ _ _). *)
+(*   eauto with typeclass_instances. *)
+(*   eauto with typeclass_instances. *)
+  
+(*   eauto with typeclass_instances. *)
+  
+(*   {A B : Type} `{H1 : Arbitrary A} `{H2 : Arbitrary B}.z *)
+(*   eapply  *)
+ 
+
 (** ... and correctness proof *)
-Definition corrZoo {A B : Type} `{H1 : GenMonotonicCorrect A} `{H2 : GenMonotonicCorrect B}
-  := @arbitraryCorrect (@Zoo A B) arbitrary.
+
+Definition corrZoo {A B : Type} `{GenMonotonicCorrect A} `{GenMonotonicCorrect B}
+            `{CanonicalSized A} `{CanonicalSized B} := @arbitraryCorrect (@Zoo A B) arbitrary _.

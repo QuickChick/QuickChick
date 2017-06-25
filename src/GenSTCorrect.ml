@@ -275,7 +275,7 @@ let stMaybe (opt : bool) (exp : atyp)
   in
   let rec sumbools_to_bool_comp (x : var) hx lst : coq_expr =
     match lst with
-    | [] -> gConjIntro (gVar hx) hole
+    | [] -> gConjIntro (gVar hx) (gEqRefl hole)
     | (chk, n) :: lst' ->
       let set d =
         gMatchReturn (gVar d)
@@ -410,7 +410,7 @@ let genSizedSTCorr_body
   in
 
   let generator_body : coq_expr =
-    (* gInject "arb_aux" *)
+    (* gInject "gen" *)
     gRecFunInWithArgs
       ~assumType:(gen_type)
       "aux_arb" (gArg ~assumName:(gVar (fresh_name "size")) () :: inputs)
@@ -587,10 +587,10 @@ let genSizedSTCorr_body
 
 
 
-  (* msg_debug (str "compl"); *)
-  (* debug_coq_expr com_proof; *)
-  msg_debug (str "sound");
-  debug_coq_expr sound_proof;
+  msg_debug (str "compl");
+  debug_coq_expr com_proof;
+  (* msg_debug (str "sound"); *)
+  (* debug_coq_expr sound_proof; *)
 
   gRecord [ ("sizedSTComplete", com_proof)
           ; ("sizedSTSound", sound_proof)

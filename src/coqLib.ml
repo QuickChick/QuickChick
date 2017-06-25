@@ -150,3 +150,6 @@ let gSnd x =
 
 let gFst x =
   gApp ~explicit:true (gInject "fst") [hole; hole; x]
+
+let is_true b =
+ gApp ~explicit:true (gInject "is_true") [b]

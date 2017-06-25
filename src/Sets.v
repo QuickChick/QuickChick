@@ -853,3 +853,60 @@ Lemma bigcup_nil_subset {A B} (f : A -> set B) s :
 Proof.
   intros x [y [H1 H2]]. inv H1.
 Qed.
+
+Lemma option_subset {A} (s1 : set (option A)) :
+  s1 \subset (isSome :&: s1) :|: [set None]. 
+Proof.
+  intros [x |]; firstorder.
+Qed.
+
+Lemma setU_l_subset {U} (s1 s2 s3 : set U) :
+  s1 \subset s3 ->
+  s2 \subset s3 ->
+  (s1 :|: s2) \subset s3.
+Proof.
+  firstorder.
+Qed.
+
+Lemma bigcup_lift_lift_bigcup {T U} (s1 : set T) (f : T -> set U) :
+  \bigcup_(x in s1) (lift (f x)) \subset lift (\bigcup_(x in s1) (f x)).
+Proof.
+  intros x [y [H1 [[z [H2 H3]] | H2]]].
+  + inv H3. left; eexists; split; eauto.
+    eexists; split; eauto.
+  + inv H2; now right. 
+Qed.
+
+Lemma lift_subset_compat {U} (s1 s2 : set U) :
+  s1 \subset s2 ->
+  lift s1 \subset lift s2.
+Proof.
+  firstorder.
+Qed.
+
+Lemma lift_set_eq_compat {U} (s1 s2 : set U) :
+  s1 <--> s2 ->
+  lift s1 <--> lift s2.
+Proof.
+  firstorder.
+Qed.
+
+Lemma bigcup_setU_r:
+  forall (U T : Type) (s : set U) (f g : U -> set T),
+    \bigcup_(i in s) (f i :|: g i) <-->
+    \bigcup_(i in s) f i :|: \bigcup_(i in s) g i.
+Proof.
+  firstorder.
+Qed.
+
+Lemma lift_bigcup_comm :
+  forall (U T : Type) (s : set U) (f : U -> set T),
+    inhabited U ->
+    lift (\bigcup_(i in [set : U]) (f i)) <-->
+    \bigcup_(i in [set : U]) (lift (f i)).
+Proof.
+  intros U T s f Hin. unfold lift.
+  rewrite !bigcup_setU_r -!imset_bigcup.
+  rewrite bigcup_const; eauto.
+  reflexivity.
+Qed.
