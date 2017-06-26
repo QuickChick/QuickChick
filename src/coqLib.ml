@@ -134,7 +134,7 @@ let leq_addl n1 n2 =
 let gProp = gInject "prop"
 
 let succ_neq_zero x =
-  gApp (gInject "succ_neq_zero") [x]
+  gApp ~explicit:true (gInject "succ_neq_zero") [hole; x]
 
 let isSome x =
   gApp (gInject "isSome") [x]

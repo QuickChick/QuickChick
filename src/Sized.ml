@@ -16,7 +16,13 @@ open Decl_kinds
 open GenericLib
 open SetLib
 open CoqLib
+open Feedback
 
+
+let sizeM = gInject "QuickChick.Classes.size"
+
+let succ_zero x = false_ind hole (succ_neq_zero x)
+  
 
 let list_drop_every n l =
   let rec aux i = function
@@ -166,7 +172,7 @@ let zeroEqProof ty_ctr ctrs (ind_scheme : coq_expr) size zeroType zeroSized iarg
         else
           gConjIntro
             (gFunTyped [("H1", lhs)] (fun [h1] -> elim_unions h1 base_ctrs))
-            (gFunTyped [("H1", rhs)] (fun [h1] -> discriminate (gVar h1))))
+            (gFunTyped [("H1", rhs)] (fun [h1] -> succ_zero (gVar h1))))
   in
   let proofs = List.map create_case ctrs in
   gApp ~explicit:true ind_scheme (coqTyParams @ (zeroType :: proofs))
@@ -267,7 +273,7 @@ let succEqProof ty_ctr ctrs (ind_scheme : coq_expr) succType succSized iargs =
     gFun iargs (fun iargs ->
         let (args, ihargs) = dropIH ty ty_ctr iargs in
         let elem = gApp ~explicit:true (gCtr ctr) (coqTyParams @ (List.map gVar args)) in
-        let leq_size size = set_suchThat "x" full_dt (fun x -> gle (gApp (gInject "size") [gVar x]) size) in
+        let leq_size size = set_suchThat "x" full_dt (fun x -> gle (gApp sizeM [gVar x]) size) in
         let lhs = gApp (gApp succSized [(leq_size (gVar size))]) [elem] in
         let rhs = gApp (leq_size (gSucc (gVar size))) [elem] in
         if isBaseBranch ty_ctr ty then
@@ -307,7 +313,7 @@ let sizeEqType ty_ctr ctrs ind_scheme iargs =
     aux 0 [] ty in
 
   let lhs set ctrs = set_unions (List.map (create_branch set coqTyParams) ctrs) in
-  let rhs size = set_suchThat "x" full_dt (fun x -> gEq (gApp (gInject "size") [gVar x]) size) in
+  let rhs size = set_suchThat "x" full_dt (fun x -> gEq (gApp sizeM [gVar x]) size) in
 
   let zeroSized = lhs hole bases in
   let succSized =
@@ -318,15 +324,21 @@ let sizeEqType ty_ctr ctrs ind_scheme iargs =
     gFun ["f"] (fun [f] -> gIff (gApp zeroSized [gVar f]) (gApp (rhs (gInt 0)) [gVar f]))
   in
 
-  let set_leq size = set_suchThat "x" full_dt (fun x -> gle (gApp (gInject "size") [gVar x]) size) in
+  let set_leq size = set_suchThat "x" full_dt (fun x -> gle (gApp sizeM [gVar x]) size) in
   let succType size =
     gFun ["f"] (fun [f] -> gIff (gApp (gApp succSized [set_leq (gVar size)]) [gVar f])
                                 (gApp (set_leq (gSucc (gVar size))) [gVar f]))
   in
 
-  let zeroSized_spec = zeroEqProof ty_ctr ctrs ind_scheme (gInject "size") zeroType zeroSized iargs in
+  let zeroSized_spec = zeroEqProof ty_ctr ctrs ind_scheme sizeM zeroType zeroSized iargs in
   let succSized_spec = succEqProof ty_ctr ctrs ind_scheme succType succSized iargs in
 
-  (* debug_coq_expr succSized_spec; *)
+  msg_debug (str "zeroSized");
+  debug_coq_expr zeroSized;
+  msg_debug (str "succSized");
+  debug_coq_expr succSized;
+  msg_debug (str "zeroSized_spec");
+  debug_coq_expr zeroSized_spec;
+  debug_coq_expr succSized_spec;
   gRecord [("zeroSized", zeroSized); ("succSized", succSized);
            ("zeroSized_spec", zeroSized_spec); ("succSized_spec", succSized_spec)]

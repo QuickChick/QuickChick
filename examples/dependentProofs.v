@@ -344,6 +344,13 @@ Existing Instance shrFoo.
 Derive Sized for Foo.
 Derive SizeMonotonic for Foo using genSFoo.
 Derive SizedMonotonic for Foo using genSFoo.
+
+(* QuickChickDebug Debug On. *)
+
+Derive CanonicalSized for Foo.
+
+
+(* Derive SizedCorrect for Foo using genSFoo and SizeMonotonicFoo. *)
 (* Derive SizedCorrect for Foo using genSFoo and SizeMonotonicFoo. *)
 (* genSFoo. *)
 (* Derive SizedCorrect for Foo. *)
