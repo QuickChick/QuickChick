@@ -80,7 +80,7 @@ let combine_mutants (bms : ('a * 'a list) list) =
 let mutate_outs handle_section input = 
   let rec go = function
     | Section (_, sn, _, _, nodes) ->
-       Printf.printf "Handling section: %s. Handle? %b\n" sn (handle_section sn);
+       (* Printf.printf "Handling section: %s. Handle? %b\n" sn (handle_section sn); *)
        if handle_section sn then 
          let handle_node = function
            | Text s -> (s, [])
@@ -318,15 +318,15 @@ let main =
         let rec calc_dir_mutants fs : (string file_structure * string file_structure list) = 
           match fs with 
           | File (s, ss) ->
-             Printf.printf "Calc mutants for file: %s\n" s; flush_all ();
+             (* Printf.printf "Calc mutants for file: %s\n" s; flush_all (); *)
              begin match mutate_outs handle_section ss with 
              | base :: muts -> 
-                Printf.printf "Number of mutants: %d\n" (List.length muts);
+                (* Printf.printf "Number of mutants: %d\n" (List.length muts); *)
                 (File (s, base), List.map (fun m -> File (s, m)) muts)
              | _ -> failwith "no base mutant"
              end
           | Dir (s, fss) -> begin 
-              Printf.printf "Calc mutants for dir: %s\n" s; flush_all ();
+              (* Printf.printf "Calc mutants for dir: %s\n" s; flush_all (); *)
               let bmfs = List.map calc_dir_mutants fss in
               let rec all_mutant_fs (bmfs : ('a * 'a list) list) = 
                 match bmfs with 

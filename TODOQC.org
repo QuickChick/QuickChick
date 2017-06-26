@@ -17,9 +17,10 @@ For leo:
     several.)
 
 MINOR:
+  - Figure out why 'make install' recompiles so many files all the time
   - Add
        Set Warnings "-notation-overridden,-parsing".
-    to .v files to get rid of compilation warnings.
+    to all .v files to get rid of compilation warnings.
   - Suppress Debug messages
   - When displaying counterexamples, would it be easy to print the name of
     each bound variable along with the failing value that's been found for
@@ -27,6 +28,22 @@ MINOR:
   - eliminate all compilation warnings (including nonexhaustive patterns!)
   - Perhaps the normal (or at least a selectable) behavior of the QuickChick
     command should be to print nothing at all if checking succeeds.
+
+Cosmetic:
+  - Colorizing the output would be REALLY helpful for readability.  We'll
+    want to make it switch-selectable so that people using emacs compilation
+    mode, for example, don't get messed up by it.  But in fact this can be
+    fixed: 
+  
+      (require 'ansi-color)
+      (defun endless/colorize-compilation ()
+        "Colorize from `compilation-filter-start' to `point'."
+        (let ((inhibit-read-only t))
+          (ansi-color-apply-on-region
+           compilation-filter-start (point))))
+
+      (add-hook 'compilation-filter-hook
+                #'endless/colorize-compilation)  
 
 __________
 
