@@ -8,6 +8,7 @@ Require Import Show.
 Require Import State.
 Require Import GenLow GenHigh.
 Require Import Classes.
+Require Import DependentClasses.
 
 Import GenLow GenHigh.
 
@@ -312,5 +313,13 @@ Module QcNotation.
     (at level 200, x ident, T at level 200, c at level 200, right associativity
      (* , format "'[' 'exists' '/ ' x .. y , '/ ' p ']'" *) )
     : type_scope.
+
+  Notation "'FORALL' x | P , c" :=
+    (forAllShrink (genST (fun x => P)) shrink (fun y => match y with
+                                                    | Some x => c
+                                                    | _ => checker tt
+                                                    end))
+      (at level 200, x ident, P at level 200, c at level 200, right associativity)
+     : type_scope.
 End QcNotation.
 
