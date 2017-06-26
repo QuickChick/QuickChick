@@ -1,5 +1,8 @@
 For leo:
-  - Does the QC command actually fail if the testing fails??  Could it?
+  - Re-make just the .vo files that have changed
+  - Make QC command fail if the testing fails
+  - Show diffs of mutants
+
   - Can we avoid re-extracting and recompiling the whole file every time we
     run QuickChick?? 
       - It's too slow, probably in large part because we're recompiling too
