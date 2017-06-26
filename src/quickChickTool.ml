@@ -44,7 +44,7 @@ let rec cartesian (lists : 'a list list) : 'a list list =
 let test_out handle_section input = 
   let rec go = function 
     | Section (startSec, sn, endSec, extends, nodes) as s -> 
-       Printf.printf "Inside go for %s. Handle? %b\n" sn (handle_section sn); 
+       (*Printf.printf "Inside go for %s. Handle? %b\n" sn (handle_section sn); *)
        if handle_section sn then  
          let rec walk_nodes nodes = 
            match nodes with 
@@ -145,7 +145,6 @@ let main =
         else begin
           let handle = (Filename.basename file_name = "_CoqProject"  || 
                         Filename.basename file_name = "Makefile"     || 
-                        Filename.basename file_name = "Makefile.coq" || 
                         Filename.check_suffix file_name "v") in
           if handle then begin 
   (*           Printf.printf "In file: %s\n" file_name;*)
@@ -212,7 +211,7 @@ let main =
   (* Actually fill the hashtable *)
   populate_hashtbl fs;
 
-  Hashtbl.iter (fun a b -> Printf.printf "%s -> %s\n" a (String.concat ", " b)) sec_graph; flush_all (); 
+(*  Hashtbl.iter (fun a b -> Printf.printf "%s -> %s\n" a (String.concat ", " b)) sec_graph; flush_all (); *)
 
   (* Function that tells you whether to handle a section (mutate/uncomment quickChicks) or not *)
   let rec handle_section' current_section starting_section = 
@@ -222,7 +221,7 @@ let main =
       List.exists (fun starting_section' -> handle_section' current_section starting_section') (sec_find starting_section) in
   
   let rec handle_section sn' =
-    Printf.printf "Asking for %s\n" sn'; flush_all ();
+    (* Printf.printf "Asking for %s\n" sn'; flush_all (); *)
     let sn' = trim sn' in
     match !sec_name with
     | Some sn -> handle_section' sn' sn
@@ -280,9 +279,9 @@ let main =
            match fs with 
            | File (s, ss) -> 
               let out_data = test_out handle_section ss in
-              (* let out_file = tmp_dir ^ "/" ^ s in 
+              let out_file = tmp_dir ^ "/" ^ s in 
               if Sys.file_exists out_file && load_file out_file = out_data then ()
-              else *) ignore (write_file (tmp_dir ^ "/" ^ s) out_data)
+              else ignore (write_file (tmp_dir ^ "/" ^ s) out_data)
            | Dir (s, fss) -> begin 
                 let dir_name = tmp_dir ^ "/" ^ s in
                 if Sys.command (Printf.sprintf "mkdir -p %s" dir_name) <> 0 then
@@ -361,9 +360,10 @@ let main =
            match fs with 
            | File (s, plaintext) -> 
               let out_data = plaintext in
-              (* let out_file = tmp_dir ^ "/" ^ s in 
-              if Sys.file_exists out_file && load_file out_file = out_data then ()
-              else *) ignore (write_file (tmp_dir ^ "/" ^ s) out_data)
+              let out_file = tmp_dir ^ "/" ^ s in 
+              if Sys.file_exists out_file && load_file out_file = out_data then
+                ()
+              else ignore (write_file (tmp_dir ^ "/" ^ s) out_data)
            | Dir (s, fss) -> begin 
                 let dir_name = tmp_dir ^ "/" ^ s in
                 if Sys.command (Printf.sprintf "mkdir -p %s" dir_name) <> 0 then
