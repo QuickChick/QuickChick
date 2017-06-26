@@ -344,29 +344,8 @@ Existing Instance shrFoo.
 Derive Sized for Foo.
 Derive SizeMonotonic for Foo using genSFoo.
 Derive SizedMonotonic for Foo using genSFoo.
-
-(* QuickChickDebug Debug On. *)
-
 Derive CanonicalSized for Foo.
-
-
-(* Derive SizedCorrect for Foo using genSFoo and SizeMonotonicFoo. *)
-(* Derive SizedCorrect for Foo using genSFoo and SizeMonotonicFoo. *)
-(* genSFoo. *)
-(* Derive SizedCorrect for Foo. *)
-
-(* TODO fix oneof, admitting for now *)
-(* Derive SizedCorrect for Foo using genSFoo and SizeMonotonicFoo. *)
-(* Derive CanonicalSized for Foo. *)
-Instance lala : SizedCorrect (@arbitrarySized Foo _).
-Admitted.
-
-(* Goal Correct Foo arbitrary. *)
-(* eauto with typeclass_instances. *)
-(* Unshelve. *)
-(* eauto with typeclass_instances. *)
-(* Set Printing All. *)
-(* eauto with typeclass_instances. *)
+Derive SizedCorrect for Foo using genSFoo and SizeMonotonicFoo.
 
 Definition corr := @arbitraryCorrect Foo arbitrary _.
 

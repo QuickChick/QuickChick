@@ -21,7 +21,7 @@ open Feedback
 
 let sizeM = gInject "QuickChick.Classes.size"
 
-let succ_zero x = false_ind hole (succ_neq_zero x)
+let succ_zero x = false_ind hole (succ_neq_zero_app hole x)
   
 
 let list_drop_every n l =
