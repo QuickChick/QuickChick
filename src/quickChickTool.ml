@@ -249,6 +249,23 @@ let main =
 
   let coqc_single_cmd vf = Printf.sprintf "coqc -w none -Q . Top %s" vf in
 
+  let collect_process_output = fun command -> 
+    let chan = Unix.open_process_in command in
+    let res = ref ([] : string list) in
+    let rec process_otl_aux () =  
+      let e = input_line chan in
+      res := e::!res;
+      process_otl_aux() in
+    try process_otl_aux ()
+    with End_of_file ->
+      let stat = Unix.close_process_in chan in
+      match stat with
+        WEXITED 0 -> List.rev !res
+      | WEXITED i -> List.rev (Printf.sprintf "Exited with status %d\n" i :: !res)
+      | WSIGNALED i -> List.rev (Printf.sprintf "Killed (%d)\n" i :: !res)
+      |	WSTOPPED i -> List.rev (Printf.sprintf "Stopped (%d)\n" i :: !res)
+    in
+
   let compile_and_run vf =
     (* TODO: Capture/parse output *)
     (* Printf.printf "coqc_cmd = %s\n" (coqc_cmd vf); *)
@@ -371,7 +388,7 @@ let main =
                 else List.iter (output_mut_dir tmp_dir) fss
              end in
         (* Base mutant *)
-        Printf.printf "Handling Base\n"; flush_all ();
+        (* Printf.printf "Handling Base\n"; flush_all (); *)
         let tmp_dir = 
            ignore (Sys.command "mkdir -p _qc");
            "_qc" in
