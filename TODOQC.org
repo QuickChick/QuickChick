@@ -1,11 +1,10 @@
 HIGH PRIORITY:
-  - Re-make just the .vo files that have changed
-  - Make the QC command fail if the testing fails
   - We need a way of naming mutants so that, for example, we can test just a
     single mutant (that we have just added) instead of all mutants.  I'm
     going to guess that this will be so common a usage mode that we are
     going to want to name ALL mutants.  This will also be a more convenient
     way of printing them than printing diffs.
+  - Re-make just the .vo files that have changed
 
   * Make a simpler tactic for deriving equality.
        Derive Arbitrary, Show, Eq for file_access_mode.
@@ -20,7 +19,11 @@ HIGH PRIORITY:
     there should be a single file that most users import, rather than
     several.)
 
+  - We seem to need a syntax for nested mutants!  :-|
+  - Can we try again to fix the "Section... extends..." parsing issue?
+
 MINOR:
+  - Catch C-c and terminate QC tool 
   - Add
        Set Warnings "-notation-overridden,-parsing".
     to all .v files to get rid of compilation warnings.
@@ -37,10 +40,10 @@ MINOR:
            Unset Refine Instance Mode.  (* Don't be too automatic! *)
 
 COSMETIC:
-  - Colorizing the output (using some ansi terminal package) might be
-    helpful for readability.  We'll want to make it switch-selectable so
+  - Colorizing the output (using the opam ANSITerminal package) might be
+    helpful for readability.  We will want to make it switch-selectable so
     that people using emacs compilation mode, for example, don't get messed
-    up by it.  But this may be fixable:
+    up by it.  Though this may be fixable...
   
       (require 'ansi-color)
       (defun endless/colorize-compilation ()

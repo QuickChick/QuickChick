@@ -4,6 +4,29 @@ open QuickChickToolTypes
 
 type mode = Test | Mutate
 
+let ansi = ref false
+
+type highlight_style = Header | Failure
+
+let highlight style s : unit =
+  if !ansi then begin
+    begin match style with
+    | Header ->
+      print_string "\027[31m"; (* red *)
+      print_string "\027[43m"; (* on yellow *)
+    | Failure ->
+      print_string "\027[37m"; (* white *)
+      print_string "\027[41m"; (* on red *)
+    end;
+    print_string "\027[1m"; (* bold *)
+    print_string s;
+    print_string "\027[m"
+  end else begin
+    print_string s;
+  end;
+  print_newline ();
+  flush_all ()
+
 let rec add_heads accs lists = 
   match lists with 
   | [] -> List.map List.rev accs
@@ -31,7 +54,6 @@ let rec all_mutants' acc (muts : mutant list) : string list list =
      all_mutants' (Printf.sprintf "%s%s%s" start code endc :: acc) rest @
      non_mutants  (Printf.sprintf "%s *) %s (* %s" start code endc :: acc) rest 
 
-  
 let all_mutants muts = 
   List.map (String.concat "") (all_mutants' [] muts)
 
@@ -146,13 +168,29 @@ let reset_test_results () =
   test_results.failed <- 0;
   test_results.inconclusive <- 0
 
-let display_test_results () =
-  Printf.printf "Summary: %d passed, %d failed, %d inconclusive"
-    test_results.passed
-    test_results.failed
-    test_results.inconclusive
+type expected_results = ExpectOnlySuccesses | ExpectSomeFailure
 
-let compile_and_run command : unit =
+let something_failed = ref false
+let fail_eagerly = ref false
+
+let confirm_results e =
+  let failed s =
+    highlight Failure (Printf.sprintf "Error: %s" s);
+    if !fail_eagerly then
+      exit 1
+    else
+      something_failed := true  in
+  if test_results.inconclusive > 0 then 
+    failed "Inconclusive test"
+  else match e with
+  | ExpectOnlySuccesses -> 
+    if test_results.failed > 0 then 
+      failed "Test failed"
+  | ExpectSomeFailure -> 
+    failed "No tests failed for this mutant"
+
+let compile_and_run command e : unit =
+  reset_test_results();
   let chan = Unix.open_process_in command in
   let rec process_otl_aux () =  
     (* BCP: If we ever have long-running tests that do things like printing
@@ -170,17 +208,20 @@ let compile_and_run command : unit =
   try process_otl_aux ()
   with End_of_file ->
     let stat = Unix.close_process_in chan in
-    match stat with
+    begin match stat with
     | Unix.WEXITED 0 ->
       ()
     | Unix.WEXITED i ->
-      Printf.printf "Exited with status %d\n" i;
+      highlight Failure (Printf.sprintf "Exited with status %d" i);
       test_results.inconclusive <- test_results.inconclusive + 1
     | Unix.WSIGNALED i ->
-      Printf.printf "Killed (%d)\n" i; 
+      highlight Failure (Printf.sprintf "Killed (%d)" i); 
       test_results.inconclusive <- test_results.inconclusive + 1
-    | Unix.WSTOPPED i -> Printf.printf "Stopped (%d)\n" i;
+    | Unix.WSTOPPED i ->
+      highlight Failure (Printf.sprintf "Stopped (%d)" i);
       test_results.inconclusive <- test_results.inconclusive + 1
+    end;
+  confirm_results e
 
 (* BCP: This function is too big! And there's too much duplication. *)
 let main = 
@@ -201,6 +242,8 @@ let main =
     ; ("-s", Arg.String (fun name -> sec_name := Some name), "Which section's properties to test")
     ; ("-v", Arg.Unit (fun _ -> verbose := false), "Silent mode")
     ; ("+v", Arg.Unit (fun _ -> verbose := true), "Verbose mode")
+    ; ("+faileagerly", Arg.Unit (fun _ -> fail_eagerly := true), "Stop as soon as a problem is detected")
+    ; ("+color", Arg.Unit (fun _ -> ansi := true), "Use colors on an ANSI-compatible terminal")
     ; ("-c", Arg.String (fun name -> compile_command := name), "Compile command for entire directory")
     ]
   in
@@ -252,7 +295,7 @@ let main =
                       end
           else None
         end
-    with Sys_error _ -> failwith "Given file does not exist" in
+    with Sys_error _ -> failwith (file_name ^ " does not exist?") in
 
   let fs = from_Some (parse_file_or_dir !input_name) in
 
@@ -335,9 +378,7 @@ let main =
      | File (s, ss) -> 
          let out_data = test_out handle_section ss in
          let vf = write_tmp_file out_data in
-         reset_test_results();
-         compile_and_run (coqc_single_cmd vf);
-         if test_results.failed > 0 then exit 1
+         compile_and_run (coqc_single_cmd vf) ExpectOnlySuccesses
      | Dir (s, fss) -> begin
          let tmp_dir = 
            ignore (Sys.command "mkdir -p _qc");
@@ -358,8 +399,7 @@ let main =
          (* Entire file structure is copied *)
          output_test_dir fs;
          (* Execute make at tmp_dir *)
-         compile_and_run ("make -C " ^ tmp_dir ^ "/" ^ s);
-         if test_results.failed > 0 then exit 1
+         compile_and_run ("make -C " ^ tmp_dir ^ "/" ^ s) ExpectOnlySuccesses
        end
     end 
   | Mutate -> begin
@@ -373,19 +413,14 @@ let main =
           in testing mutants... *)
        (* BCP: OK, doing it first is fine.  But we also want to be able to
           run a single mutant by name. *)
-       print_endline "Testing base version...";
+       highlight Header "Testing base version...";
        let base_file = write_tmp_file base in 
-       compile_and_run (coqc_single_cmd base_file); 
-       if test_results.failed > 0 then exit 1
+       compile_and_run (coqc_single_cmd base_file) ExpectOnlySuccesses;
        List.iteri (fun i m ->
          (if i > 0 then Printf.printf "\n");
-         Printf.printf "Testing mutant %d...\n" i; flush_all ();
+         highlight Header (Printf.sprintf "Testing mutant %d..." i); 
          reset_test_results();
-         compile_and_run (coqc_single_cmd (write_tmp_file m));
-         if test_results.failed = 0 then begin
-           Printf.printf "Error: No tests failed for this mutant!\n";
-           exit 1
-         end 
+         compile_and_run (coqc_single_cmd (write_tmp_file m)) ExpectSomeFailure
        ) muts
      | Dir (s, fss) -> begin
        let rec calc_dir_mutants fs
@@ -445,19 +480,19 @@ let main =
                 else List.iter (output_mut_dir tmp_dir) fss
              end in
         (* Base mutant *)
-        Printf.printf "Testing base version...\n"; flush_all ();
+        highlight Header "Testing base version..."; 
         let tmp_dir = 
            ignore (Sys.command "mkdir -p _qc");
            "_qc" in
         (* Entire file structure is copied *)
         output_mut_dir tmp_dir base;
         (* Execute make at tmp_dir *)
-        compile_and_run ("make -C " ^ tmp_dir ^ "/" ^ s);
+        compile_and_run ("make -C " ^ tmp_dir ^ "/" ^ s) ExpectOnlySuccesses;
         
         (* For each mutant structure *)
         List.iteri (fun i m ->
          (if i > 0 then Printf.printf "\n");
-         Printf.printf "Testing Mutant %d...\n" i; flush_all ();
+         highlight Header (Printf.sprintf "Testing mutant %d..." i);
          let tmp_dir = 
            ignore (Sys.command "mkdir -p _qc");
            "_qc" in
@@ -466,13 +501,12 @@ let main =
          (* Execute make at tmp_dir *)
          let dir = tmp_dir ^ "/" ^ s in
          reset_test_results();
-         compile_and_run ("make -C " ^ dir);
-         if test_results.failed = 0 then begin
-           Printf.printf "Error: No tests failed for this mutant!\n";
-             exit 1
-         end 
+         compile_and_run ("make -C " ^ dir) ExpectSomeFailure
         ) dir_mutants
 
        end
-     end
+  end;
+
+  if !something_failed then exit 1
+      
 
