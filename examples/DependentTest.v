@@ -320,6 +320,8 @@ Inductive goodBar {A B : Type} (n : nat) : Bar A B -> Prop :=
 Inductive goodFooFalse : Foo -> Prop :=
 | GoodFalse : forall (x : False), goodFooFalse Foo1.
 
+Instance arbFalse : Gen False. Admitted.
+
 Derive ArbitrarySizedSuchThat for (fun foo => goodFooFalse foo).
 
 Definition success := "success".
