@@ -23,6 +23,8 @@ HIGH PRIORITY:
   - Can we try again to fix the "Section... extends..." parsing issue?
 
 MINOR:
+  - fix:
+       Fatal error: exception Failure("./.#Makefile does not exist?")
   - Catch C-c and terminate QC tool 
   - Add
        Set Warnings "-notation-overridden,-parsing".

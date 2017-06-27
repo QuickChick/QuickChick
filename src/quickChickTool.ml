@@ -8,7 +8,7 @@ let ansi = ref false
 
 type highlight_style = Header | Failure
 
-let highlight style s : unit =
+let highlight style s =
   if !ansi then begin
     begin match style with
     | Header ->
@@ -240,11 +240,10 @@ let main =
   let speclist = 
     [ ("-m", (Arg.Symbol (["test"; "mutate"], set_mode)), "Sets the mode of operation") 
     ; ("-s", Arg.String (fun name -> sec_name := Some name), "Which section's properties to test")
-    ; ("-v", Arg.Unit (fun _ -> verbose := false), "Silent mode")
-    ; ("+v", Arg.Unit (fun _ -> verbose := true), "Verbose mode")
-    ; ("+faileagerly", Arg.Unit (fun _ -> fail_eagerly := true), "Stop as soon as a problem is detected")
-    ; ("+color", Arg.Unit (fun _ -> ansi := true), "Use colors on an ANSI-compatible terminal")
-    ; ("-c", Arg.String (fun name -> compile_command := name), "Compile command for entire directory")
+    ; ("-v", Arg.Unit (fun _ -> verbose := true), "Verbose mode")
+    ; ("-faileagerly", Arg.Unit (fun _ -> fail_eagerly := true), "Stop as soon as a problem is detected")
+    ; ("-color", Arg.Unit (fun _ -> ansi := true), "Use colors on an ANSI-compatible terminal")
+    ; ("-cmd", Arg.String (fun name -> compile_command := name), "Compile command for entire directory")
     ]
   in
   let usage_msg = "quickChick <input_file> options\nTest a file or evaluate your testing using mutants." in
