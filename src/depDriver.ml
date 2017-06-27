@@ -147,10 +147,16 @@ let deriveDependent (cn : derivable) (c : constr_expr) (n : int) (instance_name 
 
   (* Generate arbitrary parameters *)
   let arb_needed = 
+    let rec extract_params = function
+      | DTyParam tp -> ArbSet.singleton (DTyParam tp)
+      | DTyVar _ -> ArbSet.empty
+      | DTyCtr (_, dts) -> List.fold_left (fun acc dt -> ArbSet.union acc (extract_params dt)) ArbSet.empty dts
+      | _ -> failwith "Unhandled / arb_needed"  in
+    let tps = ArbSet.fold (fun dt acc -> ArbSet.union acc (extract_params dt)) !arbitraries ArbSet.empty in
     ArbSet.fold
       (fun dt acc ->
         (gArg ~assumType:(gApp (gInject "Arbitrary") [gType ty_params dt]) ~assumGeneralized:true ()) :: acc
-      ) (!arbitraries) []
+      ) tps []
   in
 
   (* Generate typeclass constraints. For each type parameter "A" we need `{_ : <Class Name> A} *)
