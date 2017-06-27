@@ -25,7 +25,7 @@ install: plugin Makefile.coq src/quickChickLib.cmx src/quickChickLib.o quickChic
 	 $(V)cp src/quickChickLib.o $(COQLIB)/user-contrib/QuickChick
 	 $(V)cp src/quickChickTool $(shell echo $(PATH) | tr ':' "\n" | grep opam | uniq)/quickChick
 
-src/quickChickToolLexer.cmo : src/quickChickToolLexer.mll
+src/quickChickToolLexer.cmo : src/quickChickToolLexer.mll 
 	ocamllex src/quickChickToolLexer.mll
 	ocamlc -I src -c src/quickChickToolLexer.ml
 
@@ -39,8 +39,8 @@ src/%.cmo : src/%.ml
 	ocamlc -I src -c $<
 
 quickChickTool: src/quickChickToolTypes.cmo \
-                src/quickChickToolLexer.cmo \
                 src/quickChickToolParser.cmo \
+                src/quickChickToolLexer.cmo \
                 src/quickChickTool.cmo
 	ocamlc -o src/quickChickTool unix.cma str.cma src/quickChickToolTypes.cmo src/quickChickToolLexer.cmo src/quickChickToolParser.cmo src/quickChickTool.cmo
 
