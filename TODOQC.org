@@ -1,15 +1,19 @@
-For leo:
+HIGH PRIORITY:
   - Re-make just the .vo files that have changed
-  - Make QC command fail if the testing fails
-  - Show diffs of mutants
+  - Make the QC command fail if the testing fails
+  - We need a way of naming mutants so that, for example, we can test just a
+    single mutant (that we have just added) instead of all mutants.  I'm
+    going to guess that this will be so common a usage mode that we are
+    going to want to name ALL mutants.  This will also be a more convenient
+    way of printing them than printing diffs.
 
-  - Can we avoid re-extracting and recompiling the whole file every time we
-    run QuickChick?? 
-      - It's too slow, probably in large part because we're recompiling too
-        much.
   * Make a simpler tactic for deriving equality.
        Derive Arbitrary, Show, Eq for file_access_mode.
   * play with precedence for ? -- should bind tigher than implication
+
+  - When displaying counterexamples, would it be easy to print the name of
+    each bound variable along with the failing value that's been found for
+    it? 
 
   - The top-level QC interface should expose as little as possible, so that
     modules that Import QC do not have their namespaces too polluted.  (And
@@ -21,19 +25,15 @@ MINOR:
   - Add
        Set Warnings "-notation-overridden,-parsing".
     to all .v files to get rid of compilation warnings.
-  - Suppress Debug messages
-  - When displaying counterexamples, would it be easy to print the name of
-    each bound variable along with the failing value that's been found for
-    it? 
   - eliminate all compilation warnings (including nonexhaustive patterns!)
   - Perhaps the normal (or at least a selectable) behavior of the QuickChick
     command should be to print nothing at all if checking succeeds.
 
-Cosmetic:
-  - Colorizing the output would be REALLY helpful for readability.  We'll
-    want to make it switch-selectable so that people using emacs compilation
-    mode, for example, don't get messed up by it.  But in fact this can be
-    fixed: 
+COSMETIC:
+  - Colorizing the output (using some ansi terminal package) might be
+    helpful for readability.  We'll want to make it switch-selectable so
+    that people using emacs compilation mode, for example, don't get messed
+    up by it.  But this may be fixable:
   
       (require 'ansi-color)
       (defun endless/colorize-compilation ()
@@ -45,15 +45,11 @@ Cosmetic:
       (add-hook 'compilation-filter-hook
                 #'endless/colorize-compilation)  
 
-__________
-
-About decidability:
+ABOUT DECIDABILITY:
   - Can we make every EqDec automatically be a Dec?
   - Dec seems not to be working as intended.  Leo hoped that the ? would not
     be necessary to coerce a (decidable) Prop to a Checkable...
   - How do I create a Dec instance for options?  
-  - Need better (infix) notations for boolean operations (andb, orb, negb,
-    implies, etc.) 
   - How should we phrase specs like the one for filesystem operations in DW?
     Is there a way of using Dec to (semi?-)automatically calculate decision
     procedures for things like /\ and forall formulas?

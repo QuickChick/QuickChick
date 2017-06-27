@@ -1,4 +1,4 @@
-
+V=@
 .PHONY: plugin install clean
 
 # Here is a hack to make $(eval $(shell work
@@ -14,24 +14,32 @@ $(call includecmdwithout@,$(COQBIN)coqtop -config)
 all: plugin quickChickTool
 
 plugin: Makefile.coq 
-	$(MAKE) -f Makefile.coq
+	$(V)$(MAKE) -f Makefile.coq
 
 install: plugin Makefile.coq src/quickChickLib.cmx src/quickChickLib.o quickChickTool
-	$(MAKE) -f Makefile.coq install
+	$(V)$(MAKE) -f Makefile.coq install
   # Manually copying the remaining files
-	 cp src/quickChickLib.cmx $(COQLIB)/user-contrib/QuickChick
-	 cp src/quickChickLib.o $(COQLIB)/user-contrib/QuickChick
-	 cp src/quickChickTool $(shell echo $(PATH) | tr ':' "\n" | grep opam | uniq)/quickChick
+	 $(V)cp src/quickChickLib.cmx $(COQLIB)/user-contrib/QuickChick
+	 $(V)cp src/quickChickLib.o $(COQLIB)/user-contrib/QuickChick
+	 $(V)cp src/quickChickTool $(shell echo $(PATH) | tr ':' "\n" | grep opam | uniq)/quickChick
 
-quickChickTool: 
-	ocamllex  src/quickChickToolLexer.mll
+src/quickChickToolLexer.cmo : src/quickChickToolLexer.mll
+	ocamllex src/quickChickToolLexer.mll
+	ocamlc -I src -c src/quickChickToolLexer.ml
+
+src/quickChickToolParser.cmo : src/quickChickToolParser.mly
 #	menhir --explain src/quickChickToolParser.mly
 	ocamlyacc -v src/quickChickToolParser.mly
-	ocamlc -I src -c src/quickChickToolTypes.ml
 	ocamlc -I src -c src/quickChickToolParser.mli
-	ocamlc -I src -c src/quickChickToolLexer.ml
 	ocamlc -I src -c src/quickChickToolParser.ml
-	ocamlc -I src -c src/quickChickTool.ml 
+
+src/%.cmo : src/%.ml
+	ocamlc -I src -c $<
+
+quickChickTool: src/quickChickToolTypes.cmo \
+                src/quickChickToolLexer.cmo \
+                src/quickChickToolParser.cmo \
+                src/quickChickTool.cmo
 	ocamlc -o src/quickChickTool unix.cma str.cma src/quickChickToolTypes.cmo src/quickChickToolLexer.cmo src/quickChickToolParser.cmo src/quickChickTool.cmo
 
 tests:
@@ -41,7 +49,7 @@ tests:
 	cd examples/ifc-basic; make clean && make
 
 Makefile.coq: Make
-	coq_makefile -f Make -o Makefile.coq
+	$(V)coq_makefile -f Make -o Makefile.coq
 
 clean:
          # This might not work on macs, but then not my problem

@@ -77,6 +77,16 @@ let combine_mutants (bms : ('a * 'a list) list) =
        mutated_now @ mutated_later in
   List.rev (combine_aux bms)
 
+let from_cons (l : 'a list) : 'a * 'a list =
+  match l with
+    [] -> failwith "Not expecting empty list!"
+  | h::t -> (h,t)
+
+let from_Some (o : 'a option) : 'a =
+  match o with
+    None -> failwith "Not expecting None!"
+  | Some x -> x
+
 let mutate_outs handle_section input = 
   let rec go = function
     | Section (_, sn, _, _, nodes) ->
@@ -93,8 +103,7 @@ let mutate_outs handle_section input =
               (Printf.sprintf "%s%s%s" start base non_mutated, 
                List.map (fun s -> Printf.sprintf "%s (* %s *) %s" start base s) mutants)
            | QuickChick (s1,s2,s3) -> (Printf.sprintf "%s*) QuickChick %s (*%s" s1 s2 s3, []) (* Add all tests *) in
-         let (base :: muts) = List.map (String.concat "") (combine_mutants (List.map handle_node nodes)) in
-         (base, muts)
+         from_cons (List.map (String.concat "") (combine_mutants (List.map handle_node nodes)))
        else (String.concat "" (List.map output_node nodes), [])
   in List.map (String.concat "") (combine_mutants (List.map go input))
 
@@ -103,6 +112,53 @@ module SS = Set.Make(String)
 type 'a file_structure = File of string * 'a 
                        | Dir of string * 'a file_structure list
 
+(* Not sure we need this one, but keeping the code for now, for reference 
+let collect_process_output' = fun command -> 
+  let chan = Unix.open_process_in command in
+  let res = ref ([] : string list) in
+  let rec process_otl_aux () =  
+    let e = input_line chan in
+    res := e::!res;
+    process_otl_aux() in
+  try process_otl_aux ()
+  with End_of_file ->
+    let stat = Unix.close_process_in chan in
+    match stat with
+      WEXITED 0 -> List.rev !res
+    | WEXITED i -> List.rev (Printf.sprintf "Exited with status %d\n" i :: !res)
+    | WSIGNALED i -> List.rev (Printf.sprintf "Killed (%d)\n" i :: !res)
+    | WSTOPPED i -> List.rev (Printf.sprintf "Stopped (%d)\n" i :: !res)
+*)
+
+let is_prefix pre s =
+  String.length s >= String.length pre
+  && String.sub s 0 (String.length pre) = pre
+
+type test_result = TestPassed | TestFailed | TestInconclusive 
+
+let compile_and_run_test command : test_result =
+  let chan = Unix.open_process_in command in
+  let res = ref TestInconclusive in
+  let rec process_otl_aux () =  
+    (* BCP: If we ever have long-running tests that do things like printing
+       a . every once in a while, we'll need to change this so that they don't
+       get buffered for too long: *)
+    let e = input_line chan in
+    print_string e;
+    if is_prefix "+++ Passed" e then res := TestPassed
+    else if is_prefix "+++ Failed (as expected)" e then res := TestPassed
+    else if is_prefix "*** Failed" e then res := TestFailed;
+    process_otl_aux() in
+  try process_otl_aux ()
+  with End_of_file ->
+    let stat = Unix.close_process_in chan in
+    match stat with
+      Unix.WEXITED 0 -> !res
+    | Unix.WEXITED i -> (Printf.printf "Exited with status %d\n" i; !res)
+    | Unix.WSIGNALED i -> Printf.printf "Killed (%d)\n" i; !res
+    | Unix.WSTOPPED i -> Printf.printf "Stopped (%d)\n" i; !res
+
+(* BCP: This function is too big! And there's too much duplication. *)
 let main = 
 (*  Parsing.set_trace true; *)
 
@@ -174,7 +230,7 @@ let main =
         end
     with Sys_error _ -> failwith "Given file does not exist" in
 
-  let Some fs = parse_file_or_dir !input_name in
+  let fs = from_Some (parse_file_or_dir !input_name) in
 
   let rec section_length_of_fs fs = 
     match fs with 
@@ -239,32 +295,7 @@ let main =
     let vf = Filename.temp_file "QuickChick" ".v" in 
     write_file vf out_data in
 
-
-  (* Creates a temporary directory at /tmp and returns its name *)
-  let mk_tmp_dir () = 
-    let s = Filename.temp_file "QuickChick" ""  in
-    Sys.remove s;
-    Unix.mkdir s 0o775;
-    s in
-
   let coqc_single_cmd vf = Printf.sprintf "coqc -w none -Q . Top %s" vf in
-
-  let collect_process_output = fun command -> 
-    let chan = Unix.open_process_in command in
-    let res = ref ([] : string list) in
-    let rec process_otl_aux () =  
-      let e = input_line chan in
-      res := e::!res;
-      process_otl_aux() in
-    try process_otl_aux ()
-    with End_of_file ->
-      let stat = Unix.close_process_in chan in
-      match stat with
-        WEXITED 0 -> List.rev !res
-      | WEXITED i -> List.rev (Printf.sprintf "Exited with status %d\n" i :: !res)
-      | WSIGNALED i -> List.rev (Printf.sprintf "Killed (%d)\n" i :: !res)
-      |	WSTOPPED i -> List.rev (Printf.sprintf "Stopped (%d)\n" i :: !res)
-    in
 
   let compile_and_run vf =
     (* TODO: Capture/parse output *)
@@ -276,7 +307,7 @@ let main =
   let load_file f =
     let ic = open_in f in
     let n = in_channel_length ic in
-    let s = String.create n in
+    let s = Bytes.create n in
     really_input ic s 0 n;
     close_in ic;
     (s) in
@@ -320,7 +351,10 @@ let main =
          | base :: muts -> (base, muts)
          | _ -> failwith "empty mutants" in
        (* BCP: I think we should not test the base when testing mutants *)
-       (* LEO: Really? I think it's a good baseline. Bug in base -> No point in testing mutants... *)
+       (* LEO: Really? I think it's a good baseline. Bug in base -> No point
+          in testing mutants... *)
+       (* BCP: OK, doing it first is fine.  But we also want to be able to
+          run a single mutant by name. *)
        (* 
        if !verbose then print_endline "Testing original (no mutants)..." else ();
        let base_file = write_tmp_file base in 
@@ -363,11 +397,11 @@ let main =
 
         let (base, dir_mutants) = calc_dir_mutants fs in
 
+(*
         let rec debug_string_fs = function
           | File (s, t) -> Printf.printf "@@%s:\n%s\n\n" s t
           | Dir (s, ts) -> Printf.printf "**%s:\n" s; List.iter debug_string_fs ts in
 
-(*
         Printf.printf "Base:\n"; debug_string_fs base;
         List.iteri (fun i fs -> Printf.printf "%d:\n" i; debug_string_fs fs) dir_mutants;
  *)

@@ -126,7 +126,7 @@ Definition summary (st : State) : list (string * nat) :=
 Definition doneTesting (st : State) (f : nat -> RandomSeed -> QProp) : Result :=
  if expectedFailure st then
     Success (numSuccessTests st + 1) (numDiscardedTests st) (summary st)
-            ("+++ OK, passed " ++ (show (numSuccessTests st)) ++ " tests"
+            ("+++ Passed " ++ (show (numSuccessTests st)) ++ " tests"
                                ++ newline)
   else
     NoExpectedFailure (numSuccessTests st) (summary st)
@@ -291,7 +291,7 @@ Fixpoint runATest (st : State) (f : nat -> RandomSeed -> QProp) (maxSteps : nat)
                 | _ => "" 
                 end in 
             let pre : string := (if expect res then "*** Failed! "
-                                 else "+++ OK, failed as expected. ")%string in
+                                 else "+++ Failed (as expected). ")%string in
             let (numShrinks, res') := localMin st (MkRose res ts) in
             let suf := ("After " ++ (show (S nst)) ++ " tests and "
                                  ++ (show numShrinks) ++ " shrinks")%string in
