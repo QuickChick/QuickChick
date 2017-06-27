@@ -14,10 +14,12 @@ $(call includecmdwithout@,$(COQBIN)coqtop -config)
 all: plugin quickChickTool
 
 plugin: Makefile.coq 
-	$(V)$(MAKE) -f Makefile.coq
+	$(MAKE) -f Makefile.coq 
+
+TEMPFILE := $(shell mktemp)
 
 install: plugin Makefile.coq src/quickChickLib.cmx src/quickChickLib.o quickChickTool
-	$(V)$(MAKE) -f Makefile.coq install
+	$(V)$(MAKE) -f Makefile.coq install > $(TEMPFILE) || cat $(TEMPFILE)
   # Manually copying the remaining files
 	 $(V)cp src/quickChickLib.cmx $(COQLIB)/user-contrib/QuickChick
 	 $(V)cp src/quickChickLib.o $(COQLIB)/user-contrib/QuickChick

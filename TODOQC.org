@@ -21,13 +21,20 @@ HIGH PRIORITY:
     several.)
 
 MINOR:
-  - Figure out why 'make install' recompiles so many files all the time
   - Add
        Set Warnings "-notation-overridden,-parsing".
     to all .v files to get rid of compilation warnings.
-  - eliminate all compilation warnings (including nonexhaustive patterns!)
-  - Perhaps the normal (or at least a selectable) behavior of the QuickChick
-    command should be to print nothing at all if checking succeeds.
+  - eliminate the rest of the compilation warnings (including nonexhaustive patterns!)
+  - At the moment, most files that use QC include this at the top -- how
+    much of it is really needed??
+           From QuickChick Require Export QuickChick.
+           Set Bullet Behavior "Strict Subproofs".
+           Import QcNotation. Open Scope qc_scope.
+           Import GenLow GenHigh.
+           Require Import List ZArith.
+           Import ListNotations.
+           Set Warnings "-extraction-opaque-accessed,-extraction".
+           Unset Refine Instance Mode.  (* Don't be too automatic! *)
 
 COSMETIC:
   - Colorizing the output (using some ansi terminal package) might be

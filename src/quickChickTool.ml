@@ -134,29 +134,53 @@ let is_prefix pre s =
   String.length s >= String.length pre
   && String.sub s 0 (String.length pre) = pre
 
-type test_result = TestPassed | TestFailed | TestInconclusive 
+type test_result =
+  { mutable passed: int;
+    mutable failed: int;
+    mutable inconclusive: int }
 
-let compile_and_run_test command : test_result =
+let test_results = {passed=0; failed=0; inconclusive=0}
+
+let reset_test_results () =
+  test_results.passed <- 0;
+  test_results.failed <- 0;
+  test_results.inconclusive <- 0
+
+let display_test_results () =
+  Printf.printf "Summary: %d passed, %d failed, %d inconclusive"
+    test_results.passed
+    test_results.failed
+    test_results.inconclusive
+
+let compile_and_run command : unit =
   let chan = Unix.open_process_in command in
-  let res = ref TestInconclusive in
   let rec process_otl_aux () =  
     (* BCP: If we ever have long-running tests that do things like printing
        a . every once in a while, we'll need to change this so that they don't
        get buffered for too long: *)
     let e = input_line chan in
-    print_string e;
-    if is_prefix "+++ Passed" e then res := TestPassed
-    else if is_prefix "+++ Failed (as expected)" e then res := TestPassed
-    else if is_prefix "*** Failed" e then res := TestFailed;
+    print_string e; print_newline();
+    if is_prefix "+++ Passed" e then
+      test_results.passed <- test_results.passed+1
+    else if is_prefix "+++ Failed (as expected)" e then
+      test_results.passed <- test_results.passed+1
+    else if is_prefix "*** Failed" e then
+      test_results.failed <- test_results.failed+1;
     process_otl_aux() in
   try process_otl_aux ()
   with End_of_file ->
     let stat = Unix.close_process_in chan in
     match stat with
-      Unix.WEXITED 0 -> !res
-    | Unix.WEXITED i -> (Printf.printf "Exited with status %d\n" i; !res)
-    | Unix.WSIGNALED i -> Printf.printf "Killed (%d)\n" i; !res
-    | Unix.WSTOPPED i -> Printf.printf "Stopped (%d)\n" i; !res
+    | Unix.WEXITED 0 ->
+      ()
+    | Unix.WEXITED i ->
+      Printf.printf "Exited with status %d\n" i;
+      test_results.inconclusive <- test_results.inconclusive + 1
+    | Unix.WSIGNALED i ->
+      Printf.printf "Killed (%d)\n" i; 
+      test_results.inconclusive <- test_results.inconclusive + 1
+    | Unix.WSTOPPED i -> Printf.printf "Stopped (%d)\n" i;
+      test_results.inconclusive <- test_results.inconclusive + 1
 
 (* BCP: This function is too big! And there's too much duplication. *)
 let main = 
@@ -297,13 +321,6 @@ let main =
 
   let coqc_single_cmd vf = Printf.sprintf "coqc -w none -Q . Top %s" vf in
 
-  let compile_and_run vf =
-    (* TODO: Capture/parse output *)
-    (* Printf.printf "coqc_cmd = %s\n" (coqc_cmd vf); *)
-    if Sys.command (coqc_single_cmd vf) <> 0 then
-      failwith "Could not compile mutated program"
-    else () in
-
   let load_file f =
     let ic = open_in f in
     let n = in_channel_length ic in
@@ -318,7 +335,9 @@ let main =
      | File (s, ss) -> 
          let out_data = test_out handle_section ss in
          let vf = write_tmp_file out_data in
-         compile_and_run vf
+         reset_test_results();
+         compile_and_run (coqc_single_cmd vf);
+         if test_results.failed > 0 then exit 1
      | Dir (s, fss) -> begin
          let tmp_dir = 
            ignore (Sys.command "mkdir -p _qc");
@@ -339,9 +358,8 @@ let main =
          (* Entire file structure is copied *)
          output_test_dir fs;
          (* Execute make at tmp_dir *)
-         if Sys.command ("make -C " ^ tmp_dir ^ "/" ^ s) <> 0 then
-           failwith "Make failed"
-         else ()
+         compile_and_run ("make -C " ^ tmp_dir ^ "/" ^ s);
+         if test_results.failed > 0 then exit 1
        end
     end 
   | Mutate -> begin
@@ -355,18 +373,23 @@ let main =
           in testing mutants... *)
        (* BCP: OK, doing it first is fine.  But we also want to be able to
           run a single mutant by name. *)
-       (* 
-       if !verbose then print_endline "Testing original (no mutants)..." else ();
+       print_endline "Testing base version...";
        let base_file = write_tmp_file base in 
-       compile_and_run base_file; 
-        *)
+       compile_and_run (coqc_single_cmd base_file); 
+       if test_results.failed > 0 then exit 1
        List.iteri (fun i m ->
          (if i > 0 then Printf.printf "\n");
-         Printf.printf "Handling Mutant %d.\n" i; flush_all ();
-         compile_and_run (write_tmp_file m)
-                  ) muts
+         Printf.printf "Testing mutant %d...\n" i; flush_all ();
+         reset_test_results();
+         compile_and_run (coqc_single_cmd (write_tmp_file m));
+         if test_results.failed = 0 then begin
+           Printf.printf "Error: No tests failed for this mutant!\n";
+           exit 1
+         end 
+       ) muts
      | Dir (s, fss) -> begin
-        let rec calc_dir_mutants fs : (string file_structure * string file_structure list) = 
+       let rec calc_dir_mutants fs
+           : (string file_structure * string file_structure list) = 
           match fs with 
           | File (s, ss) ->
              (* Printf.printf "Calc mutants for file: %s\n" s; flush_all (); *)
@@ -422,21 +445,19 @@ let main =
                 else List.iter (output_mut_dir tmp_dir) fss
              end in
         (* Base mutant *)
-        (* Printf.printf "Handling Base\n"; flush_all (); *)
+        Printf.printf "Testing base version...\n"; flush_all ();
         let tmp_dir = 
            ignore (Sys.command "mkdir -p _qc");
            "_qc" in
         (* Entire file structure is copied *)
         output_mut_dir tmp_dir base;
         (* Execute make at tmp_dir *)
-        if Sys.command ("make -C " ^ tmp_dir ^ "/" ^ s) <> 0 then
-          failwith "Make failed"
-        else ();
+        compile_and_run ("make -C " ^ tmp_dir ^ "/" ^ s);
         
         (* For each mutant structure *)
         List.iteri (fun i m ->
          (if i > 0 then Printf.printf "\n");
-         Printf.printf "Handling Mutant %d.\n" i; flush_all ();
+         Printf.printf "Testing Mutant %d...\n" i; flush_all ();
          let tmp_dir = 
            ignore (Sys.command "mkdir -p _qc");
            "_qc" in
@@ -444,10 +465,14 @@ let main =
          output_mut_dir tmp_dir m;
          (* Execute make at tmp_dir *)
          let dir = tmp_dir ^ "/" ^ s in
-         if Sys.command ("make -C " ^ dir) <> 0 then
-           failwith "Make failed"
-         else ()
+         reset_test_results();
+         compile_and_run ("make -C " ^ dir);
+         if test_results.failed = 0 then begin
+           Printf.printf "Error: No tests failed for this mutant!\n";
+             exit 1
+         end 
         ) dir_mutants
+
        end
      end
 
