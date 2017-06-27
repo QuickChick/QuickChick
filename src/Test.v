@@ -126,19 +126,17 @@ Definition summary (st : State) : list (string * nat) :=
 Definition doneTesting (st : State) (f : nat -> RandomSeed -> QProp) : Result :=
  if expectedFailure st then
     Success (numSuccessTests st + 1) (numDiscardedTests st) (summary st)
-            ("+++ Passed " ++ (show (numSuccessTests st)) ++ " tests"
-                               ++ newline)
+            ("+++ Passed " ++ (show (numSuccessTests st)) ++ " tests")
   else
     NoExpectedFailure (numSuccessTests st) (summary st)
                       ("*** Failed! Passed " ++ (show (numSuccessTests st))
-                                             ++ " tests (expected Failure)"
-                                             ++ newline).
+                                             ++ " tests (expected Failure)").
   (* TODO: success st - labels *)
 
 Definition giveUp (st : State) (_ : nat -> RandomSeed -> QProp) : Result :=
   GaveUp (numSuccessTests st) (summary st)
          ("*** Gave up! Passed only " ++ (show (numSuccessTests st)) ++ " tests"
-          ++  newline ++ "Discarded: " ++ (show (numDiscardedTests st)) ++ newline).
+          ++  newline ++ "Discarded: " ++ (show (numDiscardedTests st))).
 
 Definition callbackPostFinalFailure (st : State) (res : Checker.Result)
 : nat :=
@@ -290,10 +288,10 @@ Fixpoint runATest (st : State) (f : nat -> RandomSeed -> QProp) (maxSteps : nat)
                 | Some s => "Tag: " ++ s ++ nl
                 | _ => "" 
                 end in 
-            let pre : string := (if expect res then "*** Failed! "
-                                 else "+++ Failed (as expected). ")%string in
+            let pre : string := (if expect res then "*** Failed "
+                                 else "+++ Failed (as expected)o ")%string in
             let (numShrinks, res') := localMin st (MkRose res ts) in
-            let suf := ("After " ++ (show (S nst)) ++ " tests and "
+            let suf := ("after " ++ (show (S nst)) ++ " tests and "
                                  ++ (show numShrinks) ++ " shrinks")%string in
             (* TODO: Output *)
             if (negb (expect res)) then

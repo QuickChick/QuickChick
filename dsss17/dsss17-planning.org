@@ -29,6 +29,12 @@ detail)
 
 return to the small examples
 
+a typed version of Imp (ints and boolean)
+  dynamic failures
+  a little static type system
+    investigate: can we easily detect issues with progress / preservation?
+  maybe a little dynamic IFC analysis
+
 more QC typeclasses
   sized?
 
@@ -67,6 +73,7 @@ final comments about testing
 
 Sized generators
   - GenSized class
+    (there is a LOT to say about sized genreators!)
 
 Polymorphic generators (nat)
 
