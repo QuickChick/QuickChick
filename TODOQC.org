@@ -6,6 +6,8 @@ HIGH PRIORITY:
     way of printing them than printing diffs.
   - We probably also need a syntax for nested mutants
   - Re-make just the .vo files that have changed
+       - At the same time, make sure that any file with an active QuickCheck
+         command _is_ remade, so that the tests always get run
 
   * Make a simpler tactic for deriving equality.
        Derive Arbitrary, Show, Eq for file_access_mode.
