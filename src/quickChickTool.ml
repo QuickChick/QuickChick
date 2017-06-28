@@ -261,21 +261,26 @@ let main =
     | None :: t -> catMaybes t in
 
   let rec parse_file_or_dir file_name = 
-    try if Sys.is_directory file_name 
+    try
+      (if !verbose then Printf.printf "[parse_file_or_dir %s]\n" file_name;)
+      if Sys.is_directory file_name 
         then begin
           if Filename.basename file_name = "_qc" then None else begin 
           let ls = Sys.readdir file_name in
-(*           Array.iter (fun s -> Printf.printf "  %s\n" s) ls;*)
-          let parsed = List.map (fun s -> parse_file_or_dir (file_name ^ "/" ^ s)) (Array.to_list ls) in
+          (if !verbose then
+             Printf.printf "Directory contains: \n";
+             Array.iter (fun s -> Printf.printf "  %s\n" s) ls);
+          let parsed = List.map (fun s -> parse_file_or_dir
+                                   (file_name ^ "/" ^ s)) (Array.to_list ls) in
           Some (Dir (file_name, catMaybes parsed))
           end
         end
         else begin
-          let handle = (Filename.basename file_name = "_CoqProject"  || 
-                        Filename.basename file_name = "Makefile"     || 
-                        Filename.check_suffix file_name "v") in
+          let handle = Filename.basename file_name = "_CoqProject"  || 
+                       Filename.basename file_name = "Makefile"     || 
+                       Filename.check_suffix file_name "v" in
           if handle then begin 
-  (*           Printf.printf "In file: %s\n" file_name;*)
+            (if !verbose then Printf.printf "In file: %s\n" file_name;)
             let lexbuf = Lexing.from_channel (open_in file_name) in
             let result = program lexer lexbuf in
            
@@ -293,21 +298,23 @@ let main =
             let fixed_default = 
               match result with 
               | (Section (a,b,c,exts,e) :: ss ) ->
-                 Section ("(*", "__default_" ^ file_name, "*)\n", exts, e) :: ss
+                 Section ("(*", "__default__" ^ file_name, "*)", exts, e) :: ss
               | _ -> failwith "Empty section list?" in
                
             Some (File (file_name, fixed_default))
                       end
           else None
         end
-    with Sys_error _ -> failwith (file_name ^ " does not exist?") in
+    with Sys_error _ -> failwith ("Sys_error -- maybe "
+                           ^ file_name ^ " does not exist?") in
 
   let fs = from_Some (parse_file_or_dir !input_name) in
 
   let rec section_length_of_fs fs = 
     match fs with 
     | File (_, ss) -> List.length ss
-    | Dir (_, fss) -> List.fold_left (+) 0 (List.map section_length_of_fs fss) in
+    | Dir (_, fss) -> List.fold_left (+) 0
+                         (List.map section_length_of_fs fss) in
 
   let trim s = 
     match Str.split (Str.regexp "[ \r\n\t]") s with
@@ -316,8 +323,9 @@ let main =
 
   (* Create a table of sections *)
   let sec_graph = Hashtbl.create (section_length_of_fs fs) in 
-  let sec_find s = try Hashtbl.find sec_graph (trim s) 
-                   with Not_found -> failwith (Printf.sprintf "Didn't find: %s\n" s) in
+  let sec_find s =
+    try Hashtbl.find sec_graph (trim s) 
+    with Not_found -> failwith (Printf.sprintf "Didn't find: %s\n" s) in
 
   (* Populate a based on a single list of sections *)
   let rec populate_hashtbl_sections (sections : section list) =
@@ -339,7 +347,8 @@ let main =
   (* Actually fill the hashtable *)
   populate_hashtbl fs;
 
-(*  Hashtbl.iter (fun a b -> Printf.printf "%s -> %s\n" a (String.concat ", " b)) sec_graph; flush_all (); *)
+(*  Hashtbl.iter (fun a b -> Printf.printf "%s -> %s\n" a
+                     (String.concat ", " b)) sec_graph; flush_all (); *)
 
   (* Function that tells you whether to handle a section (mutate/uncomment quickChicks) or not *)
   let rec handle_section' current_section starting_section = 
