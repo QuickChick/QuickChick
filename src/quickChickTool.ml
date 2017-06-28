@@ -262,7 +262,7 @@ let main =
 
   let rec parse_file_or_dir file_name = 
     try
-      (if !verbose then Printf.printf "[parse_file_or_dir %s]\n" file_name;)
+      (if !verbose then Printf.printf "[parse_file_or_dir %s]\n" file_name);
       if Sys.is_directory file_name 
         then begin
           if Filename.basename file_name = "_qc" then None else begin 
@@ -280,7 +280,7 @@ let main =
                        Filename.basename file_name = "Makefile"     || 
                        Filename.check_suffix file_name "v" in
           if handle then begin 
-            (if !verbose then Printf.printf "In file: %s\n" file_name;)
+            (if !verbose then Printf.printf "In file: %s\n" file_name);
             let lexbuf = Lexing.from_channel (open_in file_name) in
             let result = program lexer lexbuf in
            
