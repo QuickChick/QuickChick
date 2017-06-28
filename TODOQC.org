@@ -23,6 +23,7 @@ HIGH PRIORITY:
   - Can we try again to fix the "Section... extends..." parsing issue?
 
 MINOR:
+  - Figure out how to check different mutants in parallel 
   - fix:
        Fatal error: exception Failure("./.#Makefile does not exist?")
   - Catch C-c and terminate QC tool 

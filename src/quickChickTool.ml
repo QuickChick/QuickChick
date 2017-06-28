@@ -171,12 +171,12 @@ let reset_test_results () =
 type expected_results = ExpectOnlySuccesses | ExpectSomeFailure
 
 let something_failed = ref false
-let fail_eagerly = ref false
+let fail_fast = ref false
 
 let confirm_results e =
   let failed s =
     highlight Failure (Printf.sprintf "Error: %s" s);
-    if !fail_eagerly then
+    if !fail_fast then
       exit 1
     else
       something_failed := true  in
@@ -187,26 +187,32 @@ let confirm_results e =
     if test_results.failed > 0 then 
       failed "Test failed"
   | ExpectSomeFailure -> 
-    failed "No tests failed for this mutant"
+    if test_results.failed = 0 then 
+      failed "No tests failed for this mutant"
 
 let compile_and_run command e : unit =
   reset_test_results();
   let chan = Unix.open_process_in command in
+  let found_result = ref false in
   let rec process_otl_aux () =  
     (* BCP: If we ever have long-running tests that do things like printing
        a . every once in a while, we'll need to change this so that they don't
        get buffered for too long: *)
     let e = input_line chan in
     print_string e; print_newline();
-    if is_prefix "+++ Passed" e then
-      test_results.passed <- test_results.passed+1
+    begin if is_prefix "+++ Passed" e then
+      (test_results.passed <- test_results.passed+1; found_result := true)
     else if is_prefix "+++ Failed (as expected)" e then
-      test_results.passed <- test_results.passed+1
+      (test_results.passed <- test_results.passed+1; found_result := true)
     else if is_prefix "*** Failed" e then
-      test_results.failed <- test_results.failed+1;
+      (test_results.failed <- test_results.failed+1; found_result := true) end;
     process_otl_aux() in
   try process_otl_aux ()
   with End_of_file ->
+    if not !found_result then begin
+      highlight Failure "Test neither 'Passed' nor 'Failed'";
+      test_results.inconclusive <- test_results.inconclusive + 1
+      end;
     let stat = Unix.close_process_in chan in
     begin match stat with
     | Unix.WEXITED 0 ->
@@ -241,7 +247,7 @@ let main =
     [ ("-m", (Arg.Symbol (["test"; "mutate"], set_mode)), "Sets the mode of operation") 
     ; ("-s", Arg.String (fun name -> sec_name := Some name), "Which section's properties to test")
     ; ("-v", Arg.Unit (fun _ -> verbose := true), "Verbose mode")
-    ; ("-faileagerly", Arg.Unit (fun _ -> fail_eagerly := true), "Stop as soon as a problem is detected")
+    ; ("-failfast", Arg.Unit (fun _ -> fail_fast := true), "Stop as soon as a problem is detected")
     ; ("-color", Arg.Unit (fun _ -> ansi := true), "Use colors on an ANSI-compatible terminal")
     ; ("-cmd", Arg.String (fun name -> compile_command := name), "Compile command for entire directory")
     ]
