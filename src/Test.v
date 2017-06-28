@@ -289,7 +289,7 @@ Fixpoint runATest (st : State) (f : nat -> RandomSeed -> QProp) (maxSteps : nat)
                 | _ => "" 
                 end in 
             let pre : string := (if expect res then "*** Failed "
-                                 else "+++ Failed (as expected)o ")%string in
+                                 else "+++ Failed (as expected) ")%string in
             let (numShrinks, res') := localMin st (MkRose res ts) in
             let suf := ("after " ++ (show (S nst)) ++ " tests and "
                                  ++ (show numShrinks) ++ " shrinks")%string in

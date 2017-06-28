@@ -2,6 +2,13 @@ open QuickChickToolLexer
 open QuickChickToolParser
 open QuickChickToolTypes
 
+let tmp_dir = "_qc"
+
+let ensure_dir_exists d = Sys.command ("mkdir -p " ^ d)
+
+let ensure_tmpdir_exists () =
+  ignore (ensure_dir_exists tmp_dir)
+
 type mode = Test | Mutate
 
 let ansi = ref false
@@ -265,7 +272,8 @@ let main =
       (if !verbose then Printf.printf "[parse_file_or_dir %s]\n" file_name);
       if Sys.is_directory file_name 
         then begin
-          if Filename.basename file_name = "_qc" then None else begin 
+          if is_prefix tmp_dir (Filename.basename file_name)
+            then None else begin 
           let ls = Sys.readdir file_name in
           (if !verbose then
              Printf.printf "Directory contains: \n";
@@ -394,9 +402,7 @@ let main =
          let vf = write_tmp_file out_data in
          compile_and_run (coqc_single_cmd vf) ExpectOnlySuccesses
      | Dir (s, fss) -> begin
-         let tmp_dir = 
-           ignore (Sys.command "mkdir -p _qc");
-           "_qc" in
+         ensure_tmpdir_exists();
          let rec output_test_dir fs =
            match fs with 
            | File (s, ss) -> 
@@ -406,7 +412,7 @@ let main =
               else ignore (write_file (tmp_dir ^ "/" ^ s) out_data)
            | Dir (s, fss) -> begin 
                 let dir_name = tmp_dir ^ "/" ^ s in
-                if Sys.command (Printf.sprintf "mkdir -p %s" dir_name) <> 0 then
+                if (ensure_dir_exists dir_name) <> 0 then
                   failwith ("Could not create directory: " ^ dir_name)
                 else List.iter output_test_dir fss
              end in
@@ -471,33 +477,34 @@ let main =
 
 (*
         let rec debug_string_fs = function
-          | File (s, t) -> Printf.printf "@@%s:\n%s\n\n" s t
-          | Dir (s, ts) -> Printf.printf "**%s:\n" s; List.iter debug_string_fs ts in
+          | File (s, t) -> 
+              Printf.printf "@@%s:\n%s\n\n" s t
+          | Dir (s, ts) -> 
+              Printf.printf "**%s:\n" s; List.iter debug_string_fs ts in
 
         Printf.printf "Base:\n"; debug_string_fs base;
-        List.iteri (fun i fs -> Printf.printf "%d:\n" i; debug_string_fs fs) dir_mutants;
+        List.iteri (fun i fs -> Printf.printf "%d:\n" i; 
+             debug_string_fs fs) dir_mutants;
  *)
 
         (* LEO: Again, nothing/something for base? *)
         let rec output_mut_dir tmp_dir fs =
            match fs with 
            | File (s, plaintext) -> 
-              let out_data = plaintext in
-              let out_file = tmp_dir ^ "/" ^ s in 
-              if Sys.file_exists out_file && load_file out_file = out_data then
-                ()
-              else ignore (write_file (tmp_dir ^ "/" ^ s) out_data)
+             let out_data = plaintext in
+             let out_file = tmp_dir ^ "/" ^ s in 
+             if Sys.file_exists out_file && load_file out_file = out_data then
+               ()
+             else ignore (write_file (tmp_dir ^ "/" ^ s) out_data)
            | Dir (s, fss) -> begin 
-                let dir_name = tmp_dir ^ "/" ^ s in
-                if Sys.command (Printf.sprintf "mkdir -p %s" dir_name) <> 0 then
-                  failwith ("Could not create directory: " ^ dir_name)
-                else List.iter (output_mut_dir tmp_dir) fss
-             end in
+             let dir_name = tmp_dir ^ "/" ^ s in
+             if (ensure_dir_exists dir_name) <> 0 then
+               failwith ("Could not create directory: " ^ dir_name)
+             else List.iter (output_mut_dir tmp_dir) fss
+           end in
         (* Base mutant *)
         highlight Header "Testing base version..."; 
-        let tmp_dir = 
-           ignore (Sys.command "mkdir -p _qc");
-           "_qc" in
+        ensure_tmpdir_exists();
         (* Entire file structure is copied *)
         output_mut_dir tmp_dir base;
         (* Execute make at tmp_dir *)
@@ -507,9 +514,7 @@ let main =
         List.iteri (fun i m ->
          (if i > 0 then Printf.printf "\n");
          highlight Header (Printf.sprintf "Testing mutant %d..." i);
-         let tmp_dir = 
-           ignore (Sys.command "mkdir -p _qc");
-           "_qc" in
+         ensure_tmpdir_exists();
          (* Entire file structure is copied *)
          output_mut_dir tmp_dir m;
          (* Execute make at tmp_dir *)

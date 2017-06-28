@@ -1,3 +1,5 @@
+(** * Typeclasses *)
+
 Require Import Coq.Strings.String.
 Require Import Coq.Arith.Arith.
 Require Import Omega.
@@ -20,7 +22,8 @@ Local Open Scope string.
      - hash : A -> Int
      - etc., etc.
 
-   Coq adopts (and adapts) Haskell's notion of _typeclasses_ for this.
+   Coq adopts (and significantly adapts) Haskell's notion of
+   _typeclasses_ for this.
 
    Remark for newcomers: the name "typeclasses" may sound a bit like
    "classes" from OOP.  But this is misleading.  A better analogy is
@@ -141,29 +144,10 @@ Class Ord {A : Type} `{Eq A} :=
     le : A -> A -> bool
   }.
 
-(* This is kind of weird... -- choose a better example? *)
-Definition le_eqb {A: Type} `{Eq A} `{Ord A} (x y : A) :=
-  andb (le x y) (le y x).
+Definition max {A: Type} `{Eq A} `{Ord A} (x y : A) : A :=
+  if le x y then y else x.
 
 Check Ord.
-
-(* This example comes from 20.5.1 of the reference manual, but it
-   doesn't seem to work:
-
-Definition lt `{eqa : Eq A, ! Ord eqa} (x y : A) := 
-        andb (le x y) (neqb x y).
-
-   (explain the ! notation...?
-  
-   "The ! modifier switches the way a binder is parsed back to the
-   regular interpretation of Coq. In particular, it uses the implicit
-   arguments mechanism if available, as shown in the example."}
-
-   This doesn't work either:
-
-Definition lt {A: Type} `{eqa : Eq A} {_ : Ord A eqa} (x y : A) := 
-        andb (le x y) (neqb x y).
-*)
 
 (* Exercise: define Ord instances for nat, option, pair, and list *)
 
@@ -209,6 +193,9 @@ Class Ord1 `{Eq A} :=
     le1 : A -> A -> bool
   }.
 
+Definition max1 `{Ord A} (x y : A) :=
+  if le x y then y else x.
+
 (* HIDE: Here's what the Coq reference manual says:
 
       Implicit generalization is an automatic elaboration of a
@@ -225,13 +212,15 @@ Class Ord1 `{Eq A} :=
 (* Implicit generalization can be used in other ways.  For example: *)
 Generalizable Variables x y.
 
-Lemma weird2 : `(x + y = y + x).
+Lemma commutativity_property : `(x + y = y + x).
 Proof. intros. omega. Qed.
+
+Check commutativity_property.
 
 (* This makes pretty good sense -- a lot of people like to write their
    theorems this way on paper, so why not the formal versions too?
    But it is also possible to use implicit generalization to get
-   effects that are not so easy to understand. *)
+   effects that are arguably not so natural. *)
 Definition weird1 := `(x + y).
 Print weird1.
 
@@ -304,7 +293,9 @@ Check (@eqb).
     fun (x y : bool) => @eqb bool (eqBool : Eq bool) x y 
 *)
 
-(* For purposes of instance inference, it doesn't matter whether hypotheses are explicit or inferred.  So, for example, one could just as well write *)
+(* For purposes of instance inference, it doesn't matter whether
+   hypotheses are explicit or inferred.  So, for example, one could
+   just as well write this: *)
 
 Definition oddManOut'' {A : Type} (_ : Eq A) (a b c : A) : A :=
   if eqb a b then c
@@ -347,7 +338,7 @@ Proof-search tactic with instances as lemmas:
 
 Class EqDec (A : Type) {H : Eq A} := 
   { 
-    eqb_leibniz : forall x y, eqb x y = true -> x = y 
+    eqb_eq : forall x y, eqb x y = true -> x = y 
   }.
 
 Check (@EqDec).
@@ -355,7 +346,7 @@ Print EqDec.
 
 Instance eqdecBool : EqDec bool := 
   {
-    eqb_leibniz := Bool.eqb_prop
+    eqb_eq := Bool.eqb_prop
   }.
 
 (* If the Instance declaration does not give values for all the class
@@ -368,12 +359,27 @@ Proof. apply Bool.eqb_prop. Defined.
 
 Instance eqdecNat : EqDec nat := 
   {
-    eqb_leibniz := EqNat.beq_nat_true
+    eqb_eq := EqNat.beq_nat_true
   }.
 
-(* Give a quick example of a proof that works for arbitrary things
-   from the EqDec class... *)
+(* A quick (and somewhat contrived) example of a proof that works for
+   arbitrary things from the EqDec class... *)
 
+Lemma eqb_fact `{EqDec A} : forall (x y z : A),
+  eqb x y = true -> eqb y z = true -> x = z.
+Proof.
+  intros x y z Exy Eyz. 
+  apply eqb_eq in Exy.
+  apply eqb_eq in Eyz.
+  subst. reflexivity. Qed.
+
+(* Exercise: When creating this example, I first wrote this:
+
+     Lemma odd_man_out_fact : `{oddManOut a b c = a -> b = c}.
+
+   Why didn't it work? *)
+(* Answer: The types of a, b, and c got instantiated to nat. (But
+   why??) *)
 
 (* ---------------------------------------------------------------- *)
 (** Dependent Typeclasses *)
@@ -381,8 +387,7 @@ Instance eqdecNat : EqDec nat :=
 (* Build the Dep typeclass and some instances.
 
    Probably also show Reflexive example from Matthieu.  Maybe also
-   show Monoid and AbelianMonoid from his tutorial. (This motivates
-   the real need for implicit generalization!) *)
+   show Monoid and AbelianMonoid from his tutorial. *)
 
 (*
 Substructures
@@ -410,6 +415,15 @@ One can also declare existing objects or structure projections using the Existin
 
 (* MORE: Equality or equivalence?  *)
 
+(* HIDE:
+
+John: I most use Equivalence (and it's related type classes) and Proper.
+
+Matthieu: Like John, I use mostly Equivalence and Proper, the
+standard library does not define many more than those. Usually I have
+a variant of EquivDec as well for decidable equality tests. *)
+
+
 (* ----------------------------------------------------------------- *)
 (** ** [Dep] *)
 
@@ -417,6 +431,31 @@ One can also declare existing objects or structure projections using the Existin
 (** ** Coq's [EqDec] *)
 
 (* (a bit different from the one we saw here) *)
+
+(* HIDE:
+
+Daniel Schepler:
+
+More generally than EquivDec, I often end up adding a "Decision" typeclass:
+
+Class Decision (P:Prop) : Type :=
+decide : {P} + {~P}.
+Arguments decide P [Decision].
+
+And then it's very easy to add instances like:
+
+Instance and_dec `{Decision P} `{Decision Q} : Decision (P /\ Q).
+Instance nat_lt_dec (m n:nat) : Decision (m < n).
+Instance Forall_dec `{!forall x:X, Decision (P x)} (l:list X) :
+Decision (Forall P l).
+
+etc.
+
+(Although sometimes, I've found if I also define e.g. nat_le_dec,
+nat_gt_dec, nat_ge_dec, it tends to resolve to nat_le_dec in every
+case.  Probably not much of an issue, though, unless you want close
+control over the extraction.)
+*)
 
 (* ----------------------------------------------------------------- *)
 (** ** [Monad] *)
@@ -436,6 +475,192 @@ One can also declare existing objects or structure projections using the Existin
 
 (* Advice about how to use typeclasses in Coq.  How to avoid various
    pitfalls and gotchas.  How to debug... *)
+
+(* HIDE: Sozeau...
+
+   The fact that typeclass resolution resorts to unrestricted proof
+   search is a blessing and a curse for sure. Errors tell you only
+   that proof search failed and the initial problem while in general
+   you need to look at the trace of resolution steps to figure out
+   what's missing or, in the worst case, making search diverge. If you
+   are writing obviously recursive instances, not mixing computation
+   with the search (e.g. Unfolding happening in the indices necessary
+   for instances to match), and not creating dependent subgoals then
+   you're basically writing Haskell 98-style instances and should get
+   the same "simplicity". I think for more elaborate use cases (terms
+   in indices, dependencies and computation), when encountering
+   unexpected failure the debug output (Set Typeclasses Debug) is
+   necessary. Testing the logic program, using Checks for example is a
+   good way to explore the proof search results. One can also debug
+   interactively by switching to the tactic mode and looking at the
+   [typeclasses eauto] behavior. We're facing the same issues as logic
+   programming and I don't know of a silver bullet to debug these
+   programs. For common issues a newcomer is likely to get, there are
+   missing instances which can be prevented/tested using some coverage
+   tests, divergence which can be understood by looking at the
+   trace (usually it's because of a dangerous instance like
+   transitivity or symmetry which has to be restricted or removed, and
+   sometimes because of a conversion which makes an instance always
+   applicable), and ambiguity when the user does not get the instance
+   he expected (due to overlapping mainly, priorities can help here).
+
+   One advantage of modules is that everything is explicit but the
+   abstraction cost a bit higher as you usually have to functorize
+   whole modules instead of individual functions, and often write down
+   signatures separate from the implementations. One rule of thumb is
+   that if there are potentially multiple instances of the same
+   interface for the same type/index then a module is preferable, but
+   adding more indexes to distinguish the instances is also
+   possible. *)
+
+(* HIDE: Wiegley...
+
+One thing that always gets me is that overlapping instances are easy to write
+with no warning from Coq (unlike Haskell, which ensures that resolution always
+pick a single instance). This requires me to often use:
+
+   Typeclasses eauto := debug.
+
+and switch to my *coq* buffer to see which lookup did not resolve to the
+instance I was expecting. This is usually fixed by one of two things:
+
+ 1. Change the "priority" of the overlapping instance (something we cannot do
+    in Haskell).
+
+ 2. Change the Instance to a Definition -- which I can still use it as an
+    explicitly passed dictionary, but this removes it from resolution.
+
+
+Another scenario that often bites me is when I define an instance for a type
+class, and then intend to write a function using the type class and forget to
+provide it as an argument. In Haskell this would be an error, but in Coq it
+just resolves to whatever the last globally defined instance was.
+
+For example, say I write a function that uses a functor, but forget to mention
+the functor:
+
+   Definition foo (C D : Category) (x y : C) (f : x ~> y) : fobj x ~> fobj y :=
+     fmap f.
+
+In Haskell this gives an error stating that no Functor is available. In Coq,
+it type checks using the highest priority C --> D functor instance in scope. I
+typically discover that this has happened when I try to use [foo] and find the
+Functor to be too specific, or by turning on Printing All and looking at the
+definition of `foo`. However, there are times when `foo` is deep down in an
+expression, and then it's not obvious *at all* why it's failing.
+
+The other way to solve this is to manually ensure there are no Instance
+definitions that might overlap, such as a generic Instance for C --> D, but
+only instances from specific categories to specific categories (though again,
+I might define several functors of that same type). It would be nice if I
+could make this situation into an error.
+
+
+Finally, there is the dreaded "diamond problem", when referring to type
+classes as record members rather than type indices:
+
+   Class Foo := {
+     method : Type -> Type
+   }.
+
+   Class Bar := {
+     bar_is_foo :> Foo
+   }.
+
+   Class Baz := {
+     baz_is_foo :> Foo
+   }.
+
+   Class Oops := {
+     oops_is_bar :> Bar
+     oops_is_baz :> Baz
+   }.
+
+Oops refers to two Foos, and I need explicit evidence to know when they are
+the same Foo. I work around this using indices:
+
+   Class Foo := {
+     method : Type -> Type
+   }.
+
+   Class Bar (F : Foo) := {
+   }.
+
+   Class Baz (F : Foo) := {
+   }.
+
+   Class Oops (F : Foo) := {
+     oops_is_bar :> Bar F
+     oops_is_baz :> Baz F
+   }.
+
+Only those classes which might be multiply-inherited need to be lifted like
+this. It forces me to use Sections to avoid repetition, but allows Coq to see
+that base classes sharing is plainly evident.
+
+The main gotcha here for the newcomer is that it is not obvious at all when
+the diamond problem is what you're facing, since when it hits the parameters
+are hidden indices, and you end up with goals like:
+
+   A, B : Type
+   F : Foo
+   O : Oops
+   H : @method (@bar_is_foo (@oops_is_bar O)) A = @method F B
+   --------------------
+   @method F A = @method F B
+
+You can't apply here without simplying in H. However, what you see at first
+is:
+
+   A, B : Type
+   F : Foo
+   O : Oops
+   H : method A = method B
+   --------------------
+   method A = method B
+
+As a newcomer, knowing to turn on Printing All is just not obvious here, but
+it quickly becomes something you learn to do whenever what looks obvious is
+not.
+
+
+Other than these things, I use type classes heavily in my own libraries, and
+very much enjoy the facility they provide. I have a category-theory library
+that is nearly all type classes, and I ran into every one of the problems
+described above, before learning how to "work with Coq" to make things happy.
+*)
+
+(* HIDE: Soegtrop... What I had most problems with initially is that
+   some type classes have implicit parameters. This works quite well
+   when the nesting level of these parameters is small, but when the
+   nesting of parameters gets deeper one can have the issue that
+   unification takes long, that error messages are hard to understand
+   and that later in a proof one might require certain relations
+   between different parameters of a type class which are not explicit
+   when the initial resolution was done and that an instance is chosen
+   which is not compatible with these requirements, although there is
+   one which would be compatible. The solution is typically to
+   explicitly specify some of the implicit parameters, especially
+   their relation to each other. Another advantage of stating certain
+   things explicitly is that it is easier to understand what actually
+   happens. Let me see if I can find a few examples. *)
+
+(* HIDE: Anand...
+
+Typeclasses are merely about inferring some implicit arguments using proof search. The underlying modularity mechanism, which is the ability to define "existential types" using induction, was ALWAYS there in Coq: typeclasses merely cuts down on verbosity because more arguments can now be implicit because they can be automatically inferred.
+Relying on proof search often brings predictability concerns. So, guidance on taming proof search would be very useful: Chapter 13 of CPDT might be a good background for using typeclasses.
+Also, it is good to keep in mind that if typeclass-resolution fails to instantiate an implicit argument, some/all of those arguments can be provided manually. Often, just providing one such implicit argument gives enough clues to the inference engine to infer all of them. I think it is important to emphasize that typeclass arguments are just implicit arguments.
+
+Also, another design decision in typeclasses/records is whether to unbundle.
+The following paper makes a great case for unbundling:
+Spitters, Bas, and Eelis Van Der Weegen. “Type Classes for Mathematics in Type Theory.” MSCS 21, no. Special Issue 04 (2011): 795–825. doi:10.1017/S0960129511000119.
+http://arxiv.org/pdf/1102.1323v1.pdf
+
+I think the above paper is missing one argument for unbundling:
+I've seen many libraries that begin by making an interface (say I) that bundles ALL the operations (and their correctness properties) they will EVER need and then ALL items in the library (say L) are parametrized by over I. 
+A problem with this bundled approach is impossible to use ANY part of D if you are missing ANY operation (or proof of a logical property of the operation) in the interface I, even if parts of D don't actually need that operation: I've run into situations where it is impossible to cook up an operation that 90% of L doesn't use anyway.
+When using the unbundled approach, one can use Coq's Section mechanism to ensure that definitions/proofs only depend on items of the interface they actually use, and not on a big bundle.
+*)
 
 (* ------------------------------------------------------------- *)
 (** ** Understanding error messages *)
@@ -662,7 +887,7 @@ Check weird.
 
    Program Instance eqdecBool : @EqDec bool eqBool := 
      {|
-       eqb_leibniz := Bool.eqb_prop
+       eqb_eq := Bool.eqb_prop
      |}.       
 
    Sorry for the long explanation... it's definitely confusing.
@@ -680,6 +905,33 @@ Check weird.
    parameters that probably deserves to be incorporated here -- or at
    least summarized with a pointer to somewhere people can read about
    it... *)
+
+(* HIDE:
+
+   From Bas...
+
+      Regarding the comparison between type classes and structures.
+
+      LEAN seems to have some nice support for Type Classes/Structures; see
+      https://leanprover.github.io/tutorial/
+
+      Chapter Structures.
+
+      They have a type class implementation, but provide some mechanisms for
+      extending and renaming structures. It seems light weight, but the
+      repackaging that is done behind the scenes looks really helpful and
+      natural.
+
+      It seems like it would be useful for Coq too, as it allows a nice
+      combination of the conveniences of both the unbundled approach (as in
+      math-classes) and package classes (as in ssreflect).
+
+  And:
+
+      Thanks for this. For bystanders, the corresponding library is here:
+      http://math-classes.github.io/
+
+*)
 
 (* ################################################################# *)
 (** * Further Reading *)
