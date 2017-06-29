@@ -2,16 +2,45 @@ open QuickChickToolLexer
 open QuickChickToolParser
 open QuickChickToolTypes
 
+(* ----------------------------------------------------------------- *)
+(* Command-line *)
+
+type mode = Test | Mutate
+let mode = ref Mutate 
+let compile_command = ref "make" 
+let input_name = ref "" 
+let set_mode = function 
+  | "test"   -> mode := Test
+  | "mutate" -> mode := Mutate 
+  | _ -> failwith "Expected 'test' or 'mutate'" 
+
+let sec_name = ref None 
+let verbose = ref false 
+let ansi = ref false
+let fail_fast = ref false
+
+let speclist = 
+  [ ("-m", (Arg.Symbol (["test"; "mutate"], set_mode)), "Sets the mode of operation") 
+  ; ("-s", Arg.String (fun name -> sec_name := Some name), "Which section's properties to test")
+  ; ("-v", Arg.Unit (fun _ -> verbose := true), "Verbose mode")
+  ; ("-failfast", Arg.Unit (fun _ -> fail_fast := true), "Stop as soon as a problem is detected")
+  ; ("-color", Arg.Unit (fun _ -> ansi := true), "Use colors on an ANSI-compatible terminal")
+  ; ("-cmd", Arg.String (fun name -> compile_command := name), "Compile command for entire directory")
+  ]
+
+let usage_msg = "quickChick <input_file> options\nTest a file or evaluate your testing using mutants." 
+
+;; Arg.parse speclist (fun anon -> input_name := anon) usage_msg
+
+(* ----------------------------------------------------------------- *)
+(* Infrastructure *)
+
 let tmp_dir = "_qc"
 
 let ensure_dir_exists d = Sys.command ("mkdir -p " ^ d)
 
 let ensure_tmpdir_exists () =
   ignore (ensure_dir_exists tmp_dir)
-
-type mode = Test | Mutate
-
-let ansi = ref false
 
 type highlight_style = Header | Failure
 
@@ -178,7 +207,6 @@ let reset_test_results () =
 type expected_results = ExpectOnlySuccesses | ExpectSomeFailure
 
 let something_failed = ref false
-let fail_fast = ref false
 
 let confirm_results e =
   let failed s =
@@ -236,93 +264,107 @@ let compile_and_run command e : unit =
     end;
   confirm_results e
 
+let remove_vo v =
+  if Filename.check_suffix v ".v" then 
+    let vo = Filename.chop_suffix v ".v" ^ ".vo" in
+    if Sys.file_exists vo then begin
+      if !verbose then Printf.printf "Removing %s\n" vo;
+      ignore (Sys.command ("rm " ^ vo))
+    end 
+
+let write_file out_file out_data = 
+  if !verbose then
+    (Printf.printf "Writing to file: %s\n" out_file; flush_all()) else ();
+  let out_channel = open_out out_file in
+  output_string out_channel out_data;
+  close_out out_channel;
+  remove_vo out_file;
+  out_file
+
+let write_tmp_file out_data = 
+  let vf = Filename.temp_file "QuickChick" ".v" in 
+  write_file vf out_data 
+
+let coqc_single_cmd vf = Printf.sprintf "coqc -w none -Q . Top %s" vf 
+
+let load_file f =
+  let ic = open_in f in
+  let n = in_channel_length ic in
+  let s = Bytes.create n in
+  really_input ic s 0 n;
+  close_in ic;
+  s
+
+let rec catMaybes = function
+  | [] -> []
+  | Some x :: t -> x :: catMaybes t
+  | None :: t -> catMaybes t 
+
+(* ----------------------------------------------------------------- *)
+(* Parsing *)
+
+let rec parse_file_or_dir file_name = 
+  try
+    if !verbose then Printf.printf "[parse_file_or_dir %s]\n" file_name;
+    if Sys.is_directory file_name 
+    then begin
+      if is_prefix tmp_dir (Filename.basename file_name)
+      then None else begin 
+        let ls = Sys.readdir file_name in
+        (if !verbose then
+            Printf.printf "Directory contains: \n";
+         Array.iter (fun s -> Printf.printf "  %s\n" s) ls);
+        let parsed = List.map (fun s -> parse_file_or_dir
+          (file_name ^ "/" ^ s)) (Array.to_list ls) in
+        Some (Dir (file_name, catMaybes parsed))
+      end
+    end
+    else begin
+      let handle = Filename.basename file_name = "_CoqProject"  || 
+        Filename.basename file_name = "Makefile"     || 
+        Filename.check_suffix file_name "v" in
+      if handle then begin 
+        if !verbose then Printf.printf "In file: %s\n" file_name;
+        let lexbuf = Lexing.from_channel (open_in file_name) in
+        let result = program lexer lexbuf in
+
+        let fix_extends extends = 
+          Str.split (Str.regexp "[ \r\n\t]") (String.concat "" extends) in 
+
+        let result = List.map
+          (fun (Section (a,b,c,exts,e)) ->
+            Section (a,b,c,
+                     (match exts with 
+                     | Some (start, names, endc) -> Some (start, fix_extends names, endc)
+                     | None -> None),
+                     e)
+          ) result in                            
+        let fixed_default = 
+          match result with 
+          | (Section (a,b,c,exts,e) :: ss) ->
+            Section ("(*", "__default__" ^ file_name, "*)", exts, e) :: ss
+          | _ -> failwith "Empty section list?" in
+
+        Some (File (file_name, fixed_default))
+      end
+      else None
+    end
+  with Sys_error _ -> failwith ("Sys_error -- maybe "
+                                ^ file_name ^ " does not exist?") 
+
+(* ----------------------------------------------------------------- *)
+(* Main function *)
+
 (* BCP: This function is too big! And there's too much duplication. *)
 let main = 
-(*  Parsing.set_trace true; *)
-
-  let mode = ref Mutate in
-  let compile_command = ref "make" in
-  let input_name = ref "" in
-  let set_mode = function 
-    | "test"   -> mode := Test
-    | "mutate" -> mode := Mutate 
-    | _ -> failwith "Expected 'test' or 'mutate'" in
-  let sec_name = ref None in
-
-  let verbose = ref false in
-  let speclist = 
-    [ ("-m", (Arg.Symbol (["test"; "mutate"], set_mode)), "Sets the mode of operation") 
-    ; ("-s", Arg.String (fun name -> sec_name := Some name), "Which section's properties to test")
-    ; ("-v", Arg.Unit (fun _ -> verbose := true), "Verbose mode")
-    ; ("-failfast", Arg.Unit (fun _ -> fail_fast := true), "Stop as soon as a problem is detected")
-    ; ("-color", Arg.Unit (fun _ -> ansi := true), "Use colors on an ANSI-compatible terminal")
-    ; ("-cmd", Arg.String (fun name -> compile_command := name), "Compile command for entire directory")
-    ]
-  in
-  let usage_msg = "quickChick <input_file> options\nTest a file or evaluate your testing using mutants." in
-  Arg.parse speclist (fun anon -> input_name := anon) usage_msg;
-
-  let rec catMaybes = function
-    | [] -> []
-    | Some x :: t -> x :: catMaybes t
-    | None :: t -> catMaybes t in
-
-  let rec parse_file_or_dir file_name = 
-    try
-      (if !verbose then Printf.printf "[parse_file_or_dir %s]\n" file_name);
-      if Sys.is_directory file_name 
-        then begin
-          if is_prefix tmp_dir (Filename.basename file_name)
-            then None else begin 
-          let ls = Sys.readdir file_name in
-          (if !verbose then
-             Printf.printf "Directory contains: \n";
-             Array.iter (fun s -> Printf.printf "  %s\n" s) ls);
-          let parsed = List.map (fun s -> parse_file_or_dir
-                                   (file_name ^ "/" ^ s)) (Array.to_list ls) in
-          Some (Dir (file_name, catMaybes parsed))
-          end
-        end
-        else begin
-          let handle = Filename.basename file_name = "_CoqProject"  || 
-                       Filename.basename file_name = "Makefile"     || 
-                       Filename.check_suffix file_name "v" in
-          if handle then begin 
-            (if !verbose then Printf.printf "In file: %s\n" file_name);
-            let lexbuf = Lexing.from_channel (open_in file_name) in
-            let result = program lexer lexbuf in
-           
-            (* Step 1: fix extends *)
-            let fix_extends extends = 
-              Str.split (Str.regexp "[ \r\n\t]") (String.concat "" extends) in 
-           
-            let result = List.map (fun (Section (a,b,c,exts,e)) ->
-                                        Section (a,b,c,
-                                                 (match exts with 
-                                                 | Some (start, names, endc) -> Some (start, fix_extends names, endc)
-                                                 | None -> None),
-                                                 e)
-                                  ) result in                            
-            let fixed_default = 
-              match result with 
-              | (Section (a,b,c,exts,e) :: ss ) ->
-                 Section ("(*", "__default__" ^ file_name, "*)", exts, e) :: ss
-              | _ -> failwith "Empty section list?" in
-               
-            Some (File (file_name, fixed_default))
-                      end
-          else None
-        end
-    with Sys_error _ -> failwith ("Sys_error -- maybe "
-                           ^ file_name ^ " does not exist?") in
-
+  (*  Parsing.set_trace true; *)
   let fs = from_Some (parse_file_or_dir !input_name) in
 
   let rec section_length_of_fs fs = 
     match fs with 
     | File (_, ss) -> List.length ss
     | Dir (_, fss) -> List.fold_left (+) 0
-                         (List.map section_length_of_fs fss) in
+      (List.map section_length_of_fs fss) in
 
   let trim s = 
     match Str.split (Str.regexp "[ \r\n\t]") s with
@@ -340,11 +382,11 @@ let main =
     match sections with
     | [] -> ()
     | Section (_, sn, _, extopt, _) :: rest -> 
-       let extends = match extopt with 
-         | Some (_, x, _) -> x 
-         | None -> [] in
-       Hashtbl.add sec_graph (trim sn) extends;
-       populate_hashtbl_sections rest in
+      let extends = match extopt with 
+        | Some (_, x, _) -> x 
+        | None -> [] in
+      Hashtbl.add sec_graph (trim sn) extends;
+      populate_hashtbl_sections rest in
 
   (* Populate based on an entire file structure *)
   let rec populate_hashtbl (fs : section list file_structure) = 
@@ -355,15 +397,18 @@ let main =
   (* Actually fill the hashtable *)
   populate_hashtbl fs;
 
-(*  Hashtbl.iter (fun a b -> Printf.printf "%s -> %s\n" a
-                     (String.concat ", " b)) sec_graph; flush_all (); *)
+  (*  Hashtbl.iter (fun a b -> Printf.printf "%s -> %s\n" a
+      (String.concat ", " b)) sec_graph; flush_all (); *)
 
-  (* Function that tells you whether to handle a section (mutate/uncomment quickChicks) or not *)
+  (* Decide whether to handle a section (mutate/uncomment quickChicks) *)
   let rec handle_section' current_section starting_section = 
     let current_section  = trim current_section in
     let starting_section = trim starting_section in
-    current_section = starting_section || 
-      List.exists (fun starting_section' -> handle_section' current_section starting_section') (sec_find starting_section) in
+    current_section = starting_section 
+    || List.exists
+      (fun starting_section' ->
+        handle_section' current_section starting_section')
+      (sec_find starting_section) in
   
   let rec handle_section sn' =
     (* Printf.printf "Asking for %s\n" sn'; flush_all (); *)
@@ -372,160 +417,133 @@ let main =
     | Some sn -> handle_section' sn' sn
     | None    -> true in
 
-  let write_file out_file out_data = 
-    if !verbose then (Printf.printf "Writing to file: %s\n" out_file; flush_all()) else ();
-    let out_channel = open_out out_file in
-    output_string out_channel out_data;
-    close_out out_channel;
-    out_file
-  in
-
-  let write_tmp_file out_data = 
-    let vf = Filename.temp_file "QuickChick" ".v" in 
-    write_file vf out_data in
-
-  let coqc_single_cmd vf = Printf.sprintf "coqc -w none -Q . Top %s" vf in
-
-  let load_file f =
-    let ic = open_in f in
-    let n = in_channel_length ic in
-    let s = Bytes.create n in
-    really_input ic s 0 n;
-    close_in ic;
-    (s) in
-
   match !mode with
-  | Test -> begin
-     match fs with 
-     | File (s, ss) -> 
-         let out_data = test_out handle_section ss in
-         let vf = write_tmp_file out_data in
-         compile_and_run (coqc_single_cmd vf) ExpectOnlySuccesses
-     | Dir (s, fss) -> begin
-         ensure_tmpdir_exists();
-         let rec output_test_dir fs =
-           match fs with 
-           | File (s, ss) -> 
-              let out_data = test_out handle_section ss in
-              let out_file = tmp_dir ^ "/" ^ s in 
-              if Sys.file_exists out_file && load_file out_file = out_data then ()
-              else ignore (write_file (tmp_dir ^ "/" ^ s) out_data)
-           | Dir (s, fss) -> begin 
-                let dir_name = tmp_dir ^ "/" ^ s in
-                if (ensure_dir_exists dir_name) <> 0 then
-                  failwith ("Could not create directory: " ^ dir_name)
-                else List.iter output_test_dir fss
-             end in
-         (* Entire file structure is copied *)
-         output_test_dir fs;
-         (* Execute make at tmp_dir *)
-         compile_and_run ("make -C " ^ tmp_dir ^ "/" ^ s) ExpectOnlySuccesses
-       end
-    end 
+  | Test ->
+    begin match fs with 
+    | File (s, ss) -> 
+      let out_data = test_out handle_section ss in
+      let vf = write_tmp_file out_data in
+      compile_and_run (coqc_single_cmd vf) ExpectOnlySuccesses
+    | Dir (s, fss) -> begin
+      ensure_tmpdir_exists();
+      let rec output_test_dir fs =
+        match fs with 
+        | File (s, ss) -> 
+          let out_data = test_out handle_section ss in
+          let out_file = tmp_dir ^ "/" ^ s in 
+          if Sys.file_exists out_file && load_file out_file = out_data then ()
+          else ignore (write_file (tmp_dir ^ "/" ^ s) out_data)
+        | Dir (s, fss) -> begin 
+          let dir_name = tmp_dir ^ "/" ^ s in
+          if (ensure_dir_exists dir_name) <> 0 then
+            failwith ("Could not create directory: " ^ dir_name)
+          else List.iter output_test_dir fss
+        end in
+      (* Entire file structure is copied *)
+      output_test_dir fs;
+      (* Execute make at tmp_dir *)
+      compile_and_run ("make -C " ^ tmp_dir ^ "/" ^ s) ExpectOnlySuccesses
+    end
+  end 
   | Mutate -> begin
-     match fs with 
-     | File (s, ss) ->
-       let (base,muts) = match mutate_outs handle_section ss with
-         | base :: muts -> (base, muts)
-         | _ -> failwith "empty mutants" in
-       (* BCP: I think we should not test the base when testing mutants *)
-       (* LEO: Really? I think it's a good baseline. Bug in base -> No point
-          in testing mutants... *)
-       (* BCP: OK, doing it first is fine.  But we also want to be able to
-          run a single mutant by name. *)
-       highlight Header "Testing base version...";
-       let base_file = write_tmp_file base in 
-       compile_and_run (coqc_single_cmd base_file) ExpectOnlySuccesses;
-       List.iteri (fun i m ->
-         (if i > 0 then Printf.printf "\n");
-         highlight Header (Printf.sprintf "Testing mutant %d..." i); 
-         reset_test_results();
-         compile_and_run (coqc_single_cmd (write_tmp_file m)) ExpectSomeFailure
-       ) muts
-     | Dir (s, fss) -> begin
-       let rec calc_dir_mutants fs
-           : (string file_structure * string file_structure list) = 
-          match fs with 
-          | File (s, ss) ->
-             (* Printf.printf "Calc mutants for file: %s\n" s; flush_all (); *)
-             begin match mutate_outs handle_section ss with 
-             | base :: muts -> 
-                (* Printf.printf "Number of mutants: %d\n" (List.length muts); *)
-                (File (s, base), List.map (fun m -> File (s, m)) muts)
-             | _ -> failwith "no base mutant"
-             end
-          | Dir (s, fss) -> begin 
-              (* Printf.printf "Calc mutants for dir: %s\n" s; flush_all (); *)
-              let bmfs = List.map calc_dir_mutants fss in
-              let rec all_mutant_fs (bmfs : ('a * 'a list) list) = 
-                match bmfs with 
-                | [] -> [[]]
-                | (b,mfs)::bmfs' ->
-                   let non_mutant_rest = List.map fst bmfs' in
-                   let mutated_now = 
-                     List.map (fun mf -> mf :: non_mutant_rest) mfs in
-                   let mutated_later = 
-                     List.map (fun mfs' -> b :: mfs') (all_mutant_fs bmfs') in 
-                   mutated_now @ mutated_later in
-              begin match List.rev (all_mutant_fs bmfs) with 
-              | base :: muts -> (Dir (s, base), List.map (fun m -> Dir (s, m)) muts)
-              | [] -> failwith "no base dir mutant"
-              end
-            end in
+    match fs with 
+    | File (s, ss) ->
+      let (base,muts) = match mutate_outs handle_section ss with
+        | base :: muts -> (base, muts)
+        | _ -> failwith "empty mutants" in
+      (* BCP: I think we should not test the base when testing mutants *)
+      (* LEO: Really? I think it's a good baseline. Bug in base -> No point
+         in testing mutants... *)
+      (* BCP: OK, doing it first is fine.  But we also want to be able to
+         run a single mutant by name. *)
+      highlight Header "Testing base...";
+      let base_file = write_tmp_file base in 
+      compile_and_run (coqc_single_cmd base_file) ExpectOnlySuccesses;
+      List.iteri (fun i m ->
+        (if i > 0 then Printf.printf "\n");
+        highlight Header (Printf.sprintf "Testing mutant %d..." i); 
+        reset_test_results();
+        compile_and_run (coqc_single_cmd (write_tmp_file m)) ExpectSomeFailure
+      ) muts
+    | Dir (s, fss) -> begin
+      let rec calc_dir_mutants fs
+          : (string file_structure * string file_structure list) = 
+        match fs with 
+        | File (s, ss) ->
+          (* Printf.printf "Calc mutants for file: %s\n" s; flush_all (); *)
+          begin match mutate_outs handle_section ss with 
+          | base :: muts -> 
+            (* Printf.printf "Number of mutants: %d\n" (List.length muts); *)
+            (File (s, base), List.map (fun m -> File (s, m)) muts)
+          | _ -> failwith "no base mutant"
+          end
+        | Dir (s, fss) -> begin 
+          (* Printf.printf "Calc mutants for dir: %s\n" s; flush_all (); *)
+          let bmfs = List.map calc_dir_mutants fss in
+          let rec all_mutant_fs (bmfs : ('a * 'a list) list) = 
+            match bmfs with 
+            | [] -> [[]]
+            | (b,mfs)::bmfs' ->
+              let non_mutant_rest = List.map fst bmfs' in
+              let mutated_now = 
+                List.map (fun mf -> mf :: non_mutant_rest) mfs in
+              let mutated_later = 
+                List.map (fun mfs' -> b :: mfs') (all_mutant_fs bmfs') in 
+              mutated_now @ mutated_later in
+          begin match List.rev (all_mutant_fs bmfs) with 
+          | base :: muts ->
+            (Dir (s, base), List.map (fun m -> Dir (s, m)) muts)
+          | [] ->
+            failwith "no base dir mutant"
+          end
+        end in
 
-        let (base, dir_mutants) = calc_dir_mutants fs in
+      let (base, dir_mutants) = calc_dir_mutants fs in
 
-(*
-        let rec debug_string_fs = function
-          | File (s, t) -> 
-              Printf.printf "@@%s:\n%s\n\n" s t
-          | Dir (s, ts) -> 
-              Printf.printf "**%s:\n" s; List.iter debug_string_fs ts in
+      let rec output_mut_dir tmp_dir fs =
+        match fs with 
+        | File (s, out_data) ->
+          let active = false in (* TODO: Fill this in with something real! *)
+          let out_file = tmp_dir ^ "/" ^ s in 
+          if not (Sys.file_exists out_file)
+            || load_file out_file != out_data
+            || active 
+          then
+            ignore (write_file out_file out_data)
+        | Dir (s, fss) -> begin 
+          let dir_name = tmp_dir ^ "/" ^ s in
+          if (ensure_dir_exists dir_name) <> 0 then
+            failwith ("Could not create directory: " ^ dir_name)
+          else List.iter (output_mut_dir tmp_dir) fss
+        end in
 
-        Printf.printf "Base:\n"; debug_string_fs base;
-        List.iteri (fun i fs -> Printf.printf "%d:\n" i; 
-             debug_string_fs fs) dir_mutants;
- *)
+      (* Base mutant *)
+      highlight Header "Testing base..."; 
+      ensure_tmpdir_exists();
+      (* Entire file structure is copied *)
+      output_mut_dir tmp_dir base;
+      (* Execute make at tmp_dir *)
+      compile_and_run ("make -C " ^ tmp_dir ^ "/" ^ s) ExpectOnlySuccesses;
+      
+      (* For each mutant structure *)
+      List.iteri
+        (fun i m ->
+          begin
+            Printf.printf "\n";
+            highlight Header (Printf.sprintf "Testing mutant %d..." i);
+            ensure_tmpdir_exists();
+            (* Entire file structure is copied *)
+            output_mut_dir tmp_dir m;
+            (* Execute make at tmp_dir *)
+            let dir = tmp_dir ^ "/" ^ s in
+            reset_test_results();
+            compile_and_run ("make -C " ^ dir) ExpectSomeFailure
+          end)
+        dir_mutants
 
-        (* LEO: Again, nothing/something for base? *)
-        let rec output_mut_dir tmp_dir fs =
-           match fs with 
-           | File (s, plaintext) -> 
-             let out_data = plaintext in
-             let out_file = tmp_dir ^ "/" ^ s in 
-             if Sys.file_exists out_file && load_file out_file = out_data then
-               ()
-             else ignore (write_file (tmp_dir ^ "/" ^ s) out_data)
-           | Dir (s, fss) -> begin 
-             let dir_name = tmp_dir ^ "/" ^ s in
-             if (ensure_dir_exists dir_name) <> 0 then
-               failwith ("Could not create directory: " ^ dir_name)
-             else List.iter (output_mut_dir tmp_dir) fss
-           end in
-        (* Base mutant *)
-        highlight Header "Testing base version..."; 
-        ensure_tmpdir_exists();
-        (* Entire file structure is copied *)
-        output_mut_dir tmp_dir base;
-        (* Execute make at tmp_dir *)
-        compile_and_run ("make -C " ^ tmp_dir ^ "/" ^ s) ExpectOnlySuccesses;
-        
-        (* For each mutant structure *)
-        List.iteri (fun i m ->
-         (if i > 0 then Printf.printf "\n");
-         highlight Header (Printf.sprintf "Testing mutant %d..." i);
-         ensure_tmpdir_exists();
-         (* Entire file structure is copied *)
-         output_mut_dir tmp_dir m;
-         (* Execute make at tmp_dir *)
-         let dir = tmp_dir ^ "/" ^ s in
-         reset_test_results();
-         compile_and_run ("make -C " ^ dir) ExpectSomeFailure
-        ) dir_mutants
-
-       end
+    end
   end;
 
-  if !something_failed then exit 1
+    if !something_failed then exit 1
       
 

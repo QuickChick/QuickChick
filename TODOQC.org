@@ -35,6 +35,11 @@ HIGH PRIORITY:
 
   - Can we try again to fix the "Section... extends..." parsing issue?
 
+  - "Test" mode should just go away.  Instead, we should have a general way
+    of selecting just one particular mutant by either name or number
+    (including the "null mutant," which we can take to be mutant 0 as a
+    special case).
+
 MINOR:
   - Figure out how to check different mutants in parallel 
   - fix:
