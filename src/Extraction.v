@@ -51,3 +51,6 @@ From mathcomp Require Import ssreflect ssrnat ssrbool div eqtype.
 Extract Constant divn => "(/)".
 Extract Constant modn => "(fun x y -> x mod y)".
 Extract Constant eqn => "(==)".
+
+Axiom print_extracted_coq_string : string -> unit.
+Extract Constant print_extracted_coq_string => "fun s -> print_string (QuickChickLib.string_of_coqstring s)".
