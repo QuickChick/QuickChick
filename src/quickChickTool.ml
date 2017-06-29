@@ -149,7 +149,8 @@ let mutate_outs handle_section input =
   let things_to_check = ref [] in
   let rec go = function
     | Section (_, sn, _, _, nodes) ->
-      if handle_section sn then 
+      if handle_section sn then begin
+(*         Printf.printf "Handling section: %s\n" sn; *)
         let handle_node = function
           | Text s -> (s, [])
           | Mutants (start, base, muts) ->
@@ -162,18 +163,34 @@ let mutate_outs handle_section input =
                (fun s -> Printf.sprintf "%s (* %s *) %s" start base s)
                mutants)
           | QuickChick (s1,s2,s3) ->
+(*              Printf.printf "Adding: %s\n" s2; *)
             things_to_check := s2 :: !things_to_check;
             (Printf.sprintf "%s QuickChick %s %s" s1 s2 s3, []) (* Add all tests *)
         in
         from_cons (List.map (String.concat "")
                      (combine_mutants (List.map handle_node nodes)))
+      end
       else (String.concat "" (List.map output_node nodes), [])
-  in (List.map (String.concat "") (combine_mutants (List.map go input)), !things_to_check)
+  in 
+  let result = List.map (String.concat "") (combine_mutants (List.map go input)) in
+  (result, !things_to_check)
 
 module SS = Set.Make(String)
 
 type 'a file_structure = File of string * 'a 
                        | Dir of string * 'a file_structure list
+
+let gather_all_vs fs = 
+  let all_vs = ref [] in
+  let rec loop fs = 
+    match fs with 
+    | File (s, _) -> 
+       if Filename.check_suffix s ".v" then 
+         all_vs := (Filename.chop_suffix s ".v") :: !all_vs
+    | Dir (s, fss) -> 
+       List.iter loop fss
+  in loop fs;
+  !all_vs
 
 let is_prefix pre s =
   String.length s >= String.length pre
@@ -211,6 +228,8 @@ let confirm_results e =
   | ExpectSomeFailure -> 
     if test_results.failed = 0 then 
       failed "No tests failed for this mutant"
+
+
 
 let compile_and_run where command e : unit =
   let here = Sys.getcwd() in
@@ -346,6 +365,7 @@ let rec parse_file_or_dir file_name =
 (* ----------------------------------------------------------------- *)
 (* Main function *)
 
+
 let rec section_length_of_fs fs = 
   match fs with 
   | File (_, ss) -> List.length ss
@@ -413,6 +433,7 @@ let calc_dir_mutants sec_graph fs =
         (* Printf.printf "Number of mutants: %d\n" (List.length muts); *)
         all_things_to_check := (List.map (fun x -> (s,x)) things_to_check)
                                @ !all_things_to_check;
+        Printf.printf "Number of tests: %d\n%s\n" (List.length things_to_check) (String.concat "\n" things_to_check);
         (File (s, base), List.map (fun m -> File (s, m)) muts)
       | _ -> failwith "no base mutant"
       end
@@ -436,7 +457,8 @@ let calc_dir_mutants sec_graph fs =
         failwith "no base dir mutant"
       end
     end in
-  (loop fs, !all_things_to_check)
+  let result = loop fs in 
+  (result, !all_things_to_check)
 
 (* BCP: This function is too big! And there's too much duplication. *)
 let main = 
@@ -446,8 +468,8 @@ let main =
   (* Fill the hashtable *)
   let sec_graph = build_sec_graph fs in
 
-  (*  Hashtbl.iter (fun a b -> Printf.printf "%s -> %s\n" a
-      (String.concat ", " b)) sec_graph; flush_all (); *)
+  (* Hashtbl.iter (fun a b -> Printf.printf "%s -> %s\n" a
+      (String.concat ", " b)) sec_graph; flush_all ();  *)
 
   match !mode with
 (*
@@ -501,12 +523,14 @@ let main =
       ) muts
     | Dir (s, fss) -> begin
       let ((base, dir_mutants), all_things_to_check) = calc_dir_mutants sec_graph fs in
+      List.iter (fun (s1,s2) -> Printf.printf "To test: %s - %s\n" s1 s2) all_things_to_check;
+      let temporary_file = "QuickChickTop.v" in
       let rec output_mut_dir tmp_dir fs =
         match fs with 
         | File (s, out_data) ->
           let out_data =
             if Filename.basename s = "_CoqProject" then
-              out_data ^ "\nQuickChickTop.v\n"
+              out_data ^ "\n" ^ temporary_file ^ "\n"
             else out_data in
           let out_file = tmp_dir ^ "/" ^ s in
           if not (Sys.file_exists out_file) || load_file out_file != out_data
@@ -519,14 +543,55 @@ let main =
           else List.iter (output_mut_dir tmp_dir) fss
         end in
 
+      let all_vs = gather_all_vs (Dir (s, fss)) in
+      let extractions = List.map (fun s -> Filename.basename s) all_vs in
+(*      let imports = List.map (fun s -> Str.global_replace (Str.regexp "/") "." s) all_vs in *)
+      let imports = extractions in
+
+      let (test_names, tests) = 
+        List.split (
+        List.mapi (fun i (f, s) ->
+                   let s =
+                     let s = trim s in String.sub s 0 (String.length s - 1)
+                   in 
+                   ( Printf.sprintf "test%d" i
+                   , Printf.sprintf "Definition test%d := print_extracted_coq_string (show (quickCheck %s.%s)).\n"
+                                  i
+                                  (trim (Filename.basename (Filename.chop_suffix f ".v")) (* Leo: better qualification *))
+                                  s)
+                  ) all_things_to_check) in
+      
+      let tmp_file_data = 
+        "Set Warnings \"-extraction-opaque-accessed,-extraction\".\n\n" ^ 
+        "From QuickChick Require Import QuickChick.\n\n"^
+        "Require " ^ (String.concat " " imports) ^ ".\n\n" ^
+        
+        (String.concat "\n" tests) ^ "\n" ^ 
+
+        "Separate Extraction " ^ (String.concat " " extractions) ^ " " ^ (String.concat " " test_names) ^  ".\n" in
+
+      ensure_tmpdir_exists();
+      ignore (write_file (tmp_dir ^ "/" ^ temporary_file) tmp_file_data);
+
       (* Base mutant *)
       highlight Header "Testing base..."; 
-      ensure_tmpdir_exists();
       (* Entire file structure is copied *)
       output_mut_dir tmp_dir base;
       let dir = tmp_dir ^ "/" ^ s in
       compile_and_run dir "make" ExpectOnlySuccesses;
-     
+
+      let ocamlbuild_and_run () = 
+   
+        let ocamlbuild_cmd = 
+          Printf.sprintf "ocamlbuild %s.native" (Filename.chop_suffix temporary_file ".v") in
+        let here = Sys.getcwd() in
+        Sys.chdir tmp_dir;
+        if (Sys.command ocamlbuild_cmd <> 0) then 
+          failwith "Ocamlbuild failure"
+        else Sys.command (Printf.sprintf "./%s.native" (Filename.chop_suffix temporary_file ".v"));
+        Sys.chdir here in
+      ocamlbuild_and_run (); 
+
       (* For each mutant structure *)
       List.iteri
         (fun i m ->
@@ -537,7 +602,8 @@ let main =
             (* Entire file structure is copied *)
             output_mut_dir tmp_dir m;
             reset_test_results();
-            compile_and_run dir "make" ExpectSomeFailure
+            compile_and_run dir "make" ExpectSomeFailure;
+            ocamlbuild_and_run ()
           end)
         dir_mutants
 
