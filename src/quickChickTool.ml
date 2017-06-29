@@ -145,48 +145,35 @@ let from_Some (o : 'a option) : 'a =
     None -> failwith "Not expecting None!"
   | Some x -> x
 
-let mutate_outs handle_section input = 
+let mutate_outs handle_section input =
+  let things_to_check = ref [] in
   let rec go = function
     | Section (_, sn, _, _, nodes) ->
-       (* Printf.printf "Handling section: %s. Handle? %b\n" sn (handle_section sn); *)
-       if handle_section sn then 
-         let handle_node = function
-           | Text s -> (s, [])
-           | Mutants (start, base, muts) ->
-              let (non_mutated, mutants) = 
-                match all_mutants muts with
-                | non_mutated :: mutants -> (non_mutated, List.rev mutants) 
-                | [] -> failwith "Internal error" in
-(*              Printf.printf "DEBUG:\nBASE: %s\nMUTS:\n%s\n" non_mutated (String.concat "\n\n\n" mutants); *)
-              (Printf.sprintf "%s%s%s" start base non_mutated, 
-               List.map (fun s -> Printf.sprintf "%s (* %s *) %s" start base s) mutants)
-           | QuickChick (s1,s2,s3) -> (Printf.sprintf "%s*) QuickChick %s (*%s" s1 s2 s3, []) (* Add all tests *) in
-         from_cons (List.map (String.concat "") (combine_mutants (List.map handle_node nodes)))
-       else (String.concat "" (List.map output_node nodes), [])
-  in List.map (String.concat "") (combine_mutants (List.map go input))
+      if handle_section sn then 
+        let handle_node = function
+          | Text s -> (s, [])
+          | Mutants (start, base, muts) ->
+            let (non_mutated, mutants) = 
+              match all_mutants muts with
+              | non_mutated :: mutants -> (non_mutated, List.rev mutants) 
+              | [] -> failwith "Internal error" in
+            (Printf.sprintf "%s%s%s" start base non_mutated, 
+             List.map
+               (fun s -> Printf.sprintf "%s (* %s *) %s" start base s)
+               mutants)
+          | QuickChick (s1,s2,s3) ->
+            things_to_check := s2 :: !things_to_check;
+            (Printf.sprintf "%s QuickChick %s %s" s1 s2 s3, []) (* Add all tests *)
+        in
+        from_cons (List.map (String.concat "")
+                     (combine_mutants (List.map handle_node nodes)))
+      else (String.concat "" (List.map output_node nodes), [])
+  in (List.map (String.concat "") (combine_mutants (List.map go input)), !things_to_check)
 
 module SS = Set.Make(String)
 
 type 'a file_structure = File of string * 'a 
                        | Dir of string * 'a file_structure list
-
-(* Not sure we need this one, but keeping the code for now, for reference 
-let collect_process_output' = fun command -> 
-  let chan = Unix.open_process_in command in
-  let res = ref ([] : string list) in
-  let rec process_otl_aux () =  
-    let e = input_line chan in
-    res := e::!res;
-    process_otl_aux() in
-  try process_otl_aux ()
-  with End_of_file ->
-    let stat = Unix.close_process_in chan in
-    match stat with
-      WEXITED 0 -> List.rev !res
-    | WEXITED i -> List.rev (Printf.sprintf "Exited with status %d\n" i :: !res)
-    | WSIGNALED i -> List.rev (Printf.sprintf "Killed (%d)\n" i :: !res)
-    | WSTOPPED i -> List.rev (Printf.sprintf "Stopped (%d)\n" i :: !res)
-*)
 
 let is_prefix pre s =
   String.length s >= String.length pre
@@ -225,7 +212,10 @@ let confirm_results e =
     if test_results.failed = 0 then 
       failed "No tests failed for this mutant"
 
-let compile_and_run command e : unit =
+let compile_and_run where command e : unit =
+  let here = Sys.getcwd() in
+  Sys.chdir where; 
+
   reset_test_results();
   let chan = Unix.open_process_in command in
   let found_result = ref false in
@@ -262,6 +252,7 @@ let compile_and_run command e : unit =
       highlight Failure (Printf.sprintf "Stopped (%d)" i);
       test_results.inconclusive <- test_results.inconclusive + 1
     end;
+  Sys.chdir here; 
   confirm_results e
 
 let remove_vo v =
@@ -355,29 +346,25 @@ let rec parse_file_or_dir file_name =
 (* ----------------------------------------------------------------- *)
 (* Main function *)
 
-(* BCP: This function is too big! And there's too much duplication. *)
-let main = 
-  (*  Parsing.set_trace true; *)
-  let fs = from_Some (parse_file_or_dir !input_name) in
+let rec section_length_of_fs fs = 
+  match fs with 
+  | File (_, ss) -> List.length ss
+  | Dir (_, fss) -> List.fold_left (+) 0
+    (List.map section_length_of_fs fss)
 
-  let rec section_length_of_fs fs = 
-    match fs with 
-    | File (_, ss) -> List.length ss
-    | Dir (_, fss) -> List.fold_left (+) 0
-      (List.map section_length_of_fs fss) in
+let trim s = 
+  match Str.split (Str.regexp "[ \r\n\t]") s with
+  | [] -> ""
+  | h :: _ -> h 
 
-  let trim s = 
-    match Str.split (Str.regexp "[ \r\n\t]") s with
-    | [] -> ""
-    | h :: _ -> h in
+(* Create a table of sections *)
+let sec_find sec_graph s =
+  try Hashtbl.find sec_graph (trim s) 
+  with Not_found -> failwith (Printf.sprintf "Didn't find: %s\n" s) 
 
-  (* Create a table of sections *)
+let build_sec_graph fs =
   let sec_graph = Hashtbl.create (section_length_of_fs fs) in 
-  let sec_find s =
-    try Hashtbl.find sec_graph (trim s) 
-    with Not_found -> failwith (Printf.sprintf "Didn't find: %s\n" s) in
 
-  (* Populate a based on a single list of sections *)
   let rec populate_hashtbl_sections (sections : section list) =
     match sections with
     | [] -> ()
@@ -388,36 +375,82 @@ let main =
       Hashtbl.add sec_graph (trim sn) extends;
       populate_hashtbl_sections rest in
 
-  (* Populate based on an entire file structure *)
   let rec populate_hashtbl (fs : section list file_structure) = 
-    match fs with 
-    | File (_, ss) -> populate_hashtbl_sections ss
-    | Dir (_, fss) -> List.iter populate_hashtbl fss in
+    (* Populate based on an entire file structure *)
+    begin match fs with 
+      | File (_, ss) -> populate_hashtbl_sections ss
+      | Dir (_, fss) -> List.iter populate_hashtbl fss
+    end in
 
-  (* Actually fill the hashtable *)
   populate_hashtbl fs;
+  sec_graph
+    
+(* Decide whether to handle a section (mutate/uncomment quickChicks) *)
+let rec handle_section' sec_graph current_section starting_section = 
+  let current_section  = trim current_section in
+  let starting_section = trim starting_section in
+  current_section = starting_section 
+  || List.exists
+    (fun starting_section' ->
+      handle_section' sec_graph current_section starting_section')
+    (sec_find sec_graph starting_section) 
+
+let rec handle_section sec_graph sn' =
+  (* Printf.printf "Asking for %s\n" sn'; flush_all (); *)
+  let sn' = trim sn' in
+  match !sec_name with
+  | Some sn -> handle_section' sec_graph sn' sn
+  | None    -> true 
+
+let calc_dir_mutants sec_graph fs = 
+  let all_things_to_check = ref [] in
+  let rec loop fs =
+    match fs with 
+    | File (s, ss) ->
+      (* Printf.printf "Calc mutants for file: %s\n" s; flush_all (); *)
+      begin match mutate_outs (handle_section sec_graph) ss with 
+      | base :: muts, things_to_check -> 
+        (* Printf.printf "Number of mutants: %d\n" (List.length muts); *)
+        all_things_to_check := (List.map (fun x -> (s,x)) things_to_check)
+                               @ !all_things_to_check;
+        (File (s, base), List.map (fun m -> File (s, m)) muts)
+      | _ -> failwith "no base mutant"
+      end
+    | Dir (s, fss) -> begin 
+      (* Printf.printf "Calc mutants for dir: %s\n" s; flush_all (); *)
+      let bmfs = List.map loop fss in
+      let rec all_mutant_fs (bmfs : ('a * 'a list) list) = 
+        match bmfs with 
+        | [] -> [[]]
+        | (b,mfs)::bmfs' ->
+          let non_mutant_rest = List.map fst bmfs' in
+          let mutated_now = 
+            List.map (fun mf -> mf :: non_mutant_rest) mfs in
+          let mutated_later = 
+            List.map (fun mfs' -> b :: mfs') (all_mutant_fs bmfs') in 
+          mutated_now @ mutated_later in
+      begin match List.rev (all_mutant_fs bmfs) with 
+      | base :: muts ->
+        (Dir (s, base), List.map (fun m -> Dir (s, m)) muts)
+      | [] ->
+        failwith "no base dir mutant"
+      end
+    end in
+  (loop fs, !all_things_to_check)
+
+(* BCP: This function is too big! And there's too much duplication. *)
+let main = 
+  (*  Parsing.set_trace true; *)
+  let fs = from_Some (parse_file_or_dir !input_name) in
+
+  (* Fill the hashtable *)
+  let sec_graph = build_sec_graph fs in
 
   (*  Hashtbl.iter (fun a b -> Printf.printf "%s -> %s\n" a
       (String.concat ", " b)) sec_graph; flush_all (); *)
 
-  (* Decide whether to handle a section (mutate/uncomment quickChicks) *)
-  let rec handle_section' current_section starting_section = 
-    let current_section  = trim current_section in
-    let starting_section = trim starting_section in
-    current_section = starting_section 
-    || List.exists
-      (fun starting_section' ->
-        handle_section' current_section starting_section')
-      (sec_find starting_section) in
-  
-  let rec handle_section sn' =
-    (* Printf.printf "Asking for %s\n" sn'; flush_all (); *)
-    let sn' = trim sn' in
-    match !sec_name with
-    | Some sn -> handle_section' sn' sn
-    | None    -> true in
-
   match !mode with
+(*
   | Test ->
     begin match fs with 
     | File (s, ss) -> 
@@ -445,11 +478,12 @@ let main =
       compile_and_run ("make -C " ^ tmp_dir ^ "/" ^ s) ExpectOnlySuccesses
     end
   end 
+*)
   | Mutate -> begin
     match fs with 
     | File (s, ss) ->
-      let (base,muts) = match mutate_outs handle_section ss with
-        | base :: muts -> (base, muts)
+      let (base,muts) = match mutate_outs (handle_section sec_graph) ss with
+        | (base :: muts), _ -> (base, muts)
         | _ -> failwith "empty mutants" in
       (* BCP: I think we should not test the base when testing mutants *)
       (* LEO: Really? I think it's a good baseline. Bug in base -> No point
@@ -458,56 +492,24 @@ let main =
          run a single mutant by name. *)
       highlight Header "Testing base...";
       let base_file = write_tmp_file base in 
-      compile_and_run (coqc_single_cmd base_file) ExpectOnlySuccesses;
+      compile_and_run "." (coqc_single_cmd base_file) ExpectOnlySuccesses;
       List.iteri (fun i m ->
         (if i > 0 then Printf.printf "\n");
         highlight Header (Printf.sprintf "Testing mutant %d..." i); 
         reset_test_results();
-        compile_and_run (coqc_single_cmd (write_tmp_file m)) ExpectSomeFailure
+        compile_and_run "." (coqc_single_cmd (write_tmp_file m)) ExpectSomeFailure
       ) muts
     | Dir (s, fss) -> begin
-      let rec calc_dir_mutants fs
-          : (string file_structure * string file_structure list) = 
-        match fs with 
-        | File (s, ss) ->
-          (* Printf.printf "Calc mutants for file: %s\n" s; flush_all (); *)
-          begin match mutate_outs handle_section ss with 
-          | base :: muts -> 
-            (* Printf.printf "Number of mutants: %d\n" (List.length muts); *)
-            (File (s, base), List.map (fun m -> File (s, m)) muts)
-          | _ -> failwith "no base mutant"
-          end
-        | Dir (s, fss) -> begin 
-          (* Printf.printf "Calc mutants for dir: %s\n" s; flush_all (); *)
-          let bmfs = List.map calc_dir_mutants fss in
-          let rec all_mutant_fs (bmfs : ('a * 'a list) list) = 
-            match bmfs with 
-            | [] -> [[]]
-            | (b,mfs)::bmfs' ->
-              let non_mutant_rest = List.map fst bmfs' in
-              let mutated_now = 
-                List.map (fun mf -> mf :: non_mutant_rest) mfs in
-              let mutated_later = 
-                List.map (fun mfs' -> b :: mfs') (all_mutant_fs bmfs') in 
-              mutated_now @ mutated_later in
-          begin match List.rev (all_mutant_fs bmfs) with 
-          | base :: muts ->
-            (Dir (s, base), List.map (fun m -> Dir (s, m)) muts)
-          | [] ->
-            failwith "no base dir mutant"
-          end
-        end in
-
-      let (base, dir_mutants) = calc_dir_mutants fs in
-
+      let ((base, dir_mutants), all_things_to_check) = calc_dir_mutants sec_graph fs in
       let rec output_mut_dir tmp_dir fs =
         match fs with 
         | File (s, out_data) ->
-          let active = false in (* TODO: Fill this in with something real! *)
-          let out_file = tmp_dir ^ "/" ^ s in 
-          if not (Sys.file_exists out_file)
-            || load_file out_file != out_data
-            || active 
+          let out_data =
+            if Filename.basename s = "_CoqProject" then
+              out_data ^ "\nQuickChickTop.v\n"
+            else out_data in
+          let out_file = tmp_dir ^ "/" ^ s in
+          if not (Sys.file_exists out_file) || load_file out_file != out_data
           then
             ignore (write_file out_file out_data)
         | Dir (s, fss) -> begin 
@@ -522,9 +524,9 @@ let main =
       ensure_tmpdir_exists();
       (* Entire file structure is copied *)
       output_mut_dir tmp_dir base;
-      (* Execute make at tmp_dir *)
-      compile_and_run ("make -C " ^ tmp_dir ^ "/" ^ s) ExpectOnlySuccesses;
-      
+      let dir = tmp_dir ^ "/" ^ s in
+      compile_and_run dir "make" ExpectOnlySuccesses;
+     
       (* For each mutant structure *)
       List.iteri
         (fun i m ->
@@ -534,10 +536,8 @@ let main =
             ensure_tmpdir_exists();
             (* Entire file structure is copied *)
             output_mut_dir tmp_dir m;
-            (* Execute make at tmp_dir *)
-            let dir = tmp_dir ^ "/" ^ s in
             reset_test_results();
-            compile_and_run ("make -C " ^ dir) ExpectSomeFailure
+            compile_and_run dir "make" ExpectSomeFailure
           end)
         dir_mutants
 
