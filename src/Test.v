@@ -5,17 +5,12 @@ Require Import Omega.
 Require Import mathcomp.ssreflect.ssreflect.
 From mathcomp Require Import ssrnat ssrbool eqtype div.
 
-Require Import Show RoseTrees.
-Require Import RandomQC.
-Require Import GenLow GenHigh SemChecker.
-Require Import Checker.
-Require Import State.
-Require Import Classes.
+From QuickChick Require Import RoseTrees RandomQC GenLow GenHigh SemChecker.
+From QuickChick Require Import Show Checker State Classes.
 
 Require Import Coq.Strings.String.
 Require Import Coq.Strings.Ascii.
 Require Import Coq.Strings.String.
-Require Import Coq.Numbers.Natural.Peano.NPeano.
 Require Import List.
 
 Require Import Recdef.

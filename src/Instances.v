@@ -1,7 +1,6 @@
 Set Warnings "-extraction-opaque-accessed,-extraction".
 Set Warnings "-notation-overridden,-parsing".
 
-Require Import Coq.Numbers.Natural.Peano.NPeano.
 Require Import mathcomp.ssreflect.ssreflect.
 From mathcomp Require Import ssrbool ssrnat.
 Require Import GenLow GenHigh Sets.

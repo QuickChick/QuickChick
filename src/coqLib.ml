@@ -134,10 +134,10 @@ let leq_addl n1 n2 =
 let gProp = gInject "prop"
 
 let succ_neq_zero x =
-  gApp ~explicit:true (gInject "NPeano.Nat.neq_succ_0") [x]
+  gApp ~explicit:true (gInject "PeanoNat.Nat.neq_succ_0") [x]
 
 let succ_neq_zero_app x h =
-  gApp ~explicit:true (gInject "NPeano.Nat.neq_succ_0") [x; h]
+  gApp ~explicit:true (gInject "PeanoNat.Nat.neq_succ_0") [x; h]
 
 let isSome x =
   gApp (gInject "isSome") [x]
