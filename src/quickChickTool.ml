@@ -547,3 +547,24 @@ let main =
     if !something_failed then exit 1
       
 
+(* 
+let path =
+  lazy (let (_,_,path) = Library.locate_qualified_library ~warn:false qid in path)
+let path = lazy (Filename.dirname (Lazy.force path))
+
+(* Interface with OCaml compiler *)
+let temp_dirname = Filename.get_temp_dir_name ()
+
+let link_files = ["quickChickLib.cmx"]
+
+(* TODO: in Coq 8.5, fetch OCaml's path from Coq's configure *)
+let ocamlopt = "ocamlopt"
+let ocamlc = "ocamlc"
+
+let comp_ml_cmd fn out =
+  let path = Lazy.force path in
+  let link_files = List.map (Filename.concat path) link_files in
+  let link_files = String.concat " " link_files in
+  Printf.sprintf "%s -rectypes -w a -I %s -I %s %s %s -o %s" ocamlopt
+    temp_dirname path link_files fn out
+ *)
