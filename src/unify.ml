@@ -165,6 +165,10 @@ let rec unify (k : umap) (r1 : range) (r2 : range) (eqs : EqSet.t)
 
      (* Constructor bindings *) 
      | Ctr (c1, rs1), Ctr (c2, rs2) ->
+        msg_debug (str (Printf.sprintf "Constructors: %s - %s\n"
+                                         (String.concat " " (List.map range_to_string rs1))
+                                         (String.concat " " (List.map range_to_string rs2)))
+                         ++ fnl ());
         if c1 == c2 then 
           foldM (fun b a -> let (r1, r2) = a in 
                             let (k, l, eqs, ms) = b in 
@@ -186,6 +190,10 @@ let rec unify (k : umap) (r1 : range) (r2 : range) (eqs : EqSet.t)
         Some (UM.add u2 (Unknown u1) k', Unknown u2, eqs', [(u2, m)])
      end
    | Ctr (c1, rs1), Ctr (c2, rs2) ->
+        msg_debug (str (Printf.sprintf "Constructors2: %s - %s\n"
+                                         (String.concat " " (List.map range_to_string rs1))
+                                         (String.concat " " (List.map range_to_string rs2)))
+                         ++ fnl ());
       if c1 == c2 then 
         foldM (fun b a -> let (r1, r2) = a in 
                           let (k, l, eqs, ms) = b in 
@@ -205,6 +213,9 @@ let rec unify (k : umap) (r1 : range) (r2 : range) (eqs : EqSet.t)
         Some (UM.add u (Ctr (c,rs)) k', Unknown u, eqs', [(u, m)])
       | Undef _ -> Some (UM.add u (Ctr (c,rs)) k, Unknown u, eqs, [])
       | Ctr (c', rs') -> 
+        msg_debug (str (Printf.sprintf "Constructors3: %s \n"
+                                         (String.concat " " (List.map range_to_string rs')))
+                         ++ fnl ());
         if c == c' then 
           foldM (fun b a -> let (r1, r2) = a in 
                             let (k, l, eqs, ms) = b in 
@@ -233,6 +244,7 @@ let rec convert_to_range dt =
   | DTyVar x -> Unknown x
   | DCtr (c,dts) -> Ctr (c, List.map convert_to_range dts)
   | DTyCtr (c, dts) -> Ctr (injectCtr (ty_ctr_to_string c), List.map convert_to_range dts)
+  | DTyParam tp -> Ctr (injectCtr (ty_param_to_string tp), [])
   | _ -> failwith ("Unsupported range: " ^ (dep_type_to_string dt))
 
 let is_fixed k dt = 
@@ -317,6 +329,11 @@ let need_dec = ref false
            ; bool_pred
            ])
 *)
+
+let isTyParam = function
+  | DTyParam _ -> true
+  | _ -> false 
+
 let handle_branch
       (type a) (type b) (* I've started to love ocaml again because of this *)
       (n : int)
@@ -360,7 +377,7 @@ let handle_branch
   msg_debug (str ("Calculating ranges: " ^ dep_type_to_string (dep_result_type typ)) ++ fnl ());
 
   let ranges = match dep_result_type typ with
-    | DTyCtr (_, dts) -> List.map convert_to_range dts
+    | DTyCtr (_, dts) -> List.map convert_to_range (List.filter (fun dt -> not (isTyParam dt)) dts)
     | _ -> failwith "Not the expected result type" in
 
   let inputsWithGen = inputWithGen n input_names in
