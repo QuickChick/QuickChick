@@ -575,20 +575,19 @@ let main =
     let imports = List.map (fun s -> (if !top = "" then "" else !top ^ ".") ^ (mk_import s)) all_vs in
 
     let (test_names, tests) = 
-      List.split (
-      List.mapi (fun i (f, s) ->
-                 let s =
-                   let s = trim s in String.sub s 0 (String.length s - 1)
-                 in 
-                 ( Printf.sprintf "test%d" i
-                 , Printf.sprintf "Definition test%d := print_extracted_coq_string (show (quickCheck %s.%s)).\n"
-                                i
-                                (trim (Filename.basename (Filename.chop_suffix f ".v")) (* Leo: better qualification *))
-                                s)
-                ) all_things_to_check) in
+      let make_test i (f, s) : string * string =
+        let s = let s = trim s in String.sub s 0 (String.length s - 1) in
+        let testname =
+          (* Leo: better qualification *)
+          trim (Filename.basename (Filename.chop_suffix f ".v")) ^ "." ^ s in
+        (Printf.sprintf "test%d" i,
+         Printf.sprintf "Definition test%d := print_extracted_coq_string (\"Checking %s...\" ++ newline ++ show (quickCheck %s))%%string.\n"
+           i testname testname) in
+      List.split (List.mapi make_test all_things_to_check) in
     
     let tmp_file_data = 
       "Set Warnings \"-extraction-opaque-accessed,-extraction\".\n\n" ^ 
+      "Require Import String.\n"^
       "From QuickChick Require Import QuickChick.\n\n"^
       "Require " ^ (String.concat " " imports) ^ ".\n\n" ^
       

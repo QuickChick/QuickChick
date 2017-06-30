@@ -307,62 +307,25 @@ End PartialMap.
 
 (* QuickChick PartialMap.update_eq. *)
 
-Instance genSuchThatNot {A} (P : A -> Prop) (prop : Type)
+Instance genSuchThatNot {A} (P : A -> Prop) 
          `{forall (a : A), Dec (P a)}
          `{Arbitrary A} `{Show A}
-         `{Checkable prop} : Checkable (forall a, ~ (P a) -> prop) :=
-  {| checker f := forAllProof (suchThatMaybe arbitrary (fun a => (~ (P a))?))
-                              (fun mx H => 
-                                 (* Leo: Is there a better way to do this? *)
-                                 let mx' := mx in 
-                                 let Heq := erefl mx' : mx' = mx in
-                                 match mx as mx'' return (mx' = mx'' -> Checker) with 
-                                 | Some x => fun _ => checker (f x _)
-                                 | None => fun _ => checker tt
-                                 end Heq) |}.
-Proof.
-  (* Annoying *)
-  assert (Eq : mx = mx') by auto.
-  rewrite -Eq in e.
-  clear Heq Eq mx'.
-  (* End annoying *)
-  apply semSuchThatMaybe_sound in H.
-  inversion H as [Contra | [x' [[Arb Dec] Hyp2]]]; subst.
-  - inversion Contra.
-  - inversion Hyp2; subst.
-    remember dec.
-    destruct d; auto.
-Defined.
+         : GenSuchThat A (fun a => ~ (P a)) :=
+  {| arbitraryST := suchThatMaybe arbitrary (fun a => (~ (P a))?) |}.
 
-Instance ex_c : Checkable
-            (forall (d : PartialMap.partial_map) (x y : id) (o : nat),
-             x <> y ->
-             PartialMap.find x (PartialMap.update d y o) =
-             PartialMap.find x d).
-Proof.
-  eapply testProd.
-  Unshelve.
-  intros; simpl.
-  
+Instance suchThatNotCorrect {A} (P : A -> Prop) 
+         `{Show A} `{Arbitrary A} `{forall (a : A), Dec (P a)}
+         : SuchThatCorrect (fun a => ~ (P a)) 
+                           (@arbitraryST _ (fun a => ~ (P a))
+                                         (genSuchThatNot _)) :=
+  {| STComplete := _ ;
+     STSound    := _ |}.
+Admitted.
 
-
-
-QuickChick PartialMap.update_neq'.    
-
-
-(** **** Exercise: 2 starsM (baz_num_elts)  *)
-(** Consider the following inductive definition: *)
+(* (* Inductivized : *) QuickChick PartialMap.update_neq'. *)
 
 Inductive baz : Type :=
   | Baz1 : baz -> baz
   | Baz2 : baz -> bool -> baz.
 
-(** How _many_ elements does the type [baz] have?  (Answer in English
-    or the natural language of your choice.)
-
-(* FILL IN HERE *)
-*)
-(** [] *)
-
-(** $Date: 2016-12-17 23:53:20 -0500 (Sat, 17 Dec 2016) $ *)
-
+(* Derive Arbitrary for baz. - Leo: better error message? *)
