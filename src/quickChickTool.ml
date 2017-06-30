@@ -227,18 +227,46 @@ let confirm_results e =
 
 let temporary_file = "QuickChickTop.v" 
 
-let compile_and_run where command e : unit =
+let run_and_show_output_on_failure command msg =
+  let chan = Unix.open_process_in command in
+  let res = ref ([] : string list) in
+  let rec process_otl_aux () =  
+    let e = input_line chan in
+    res := e::!res;
+    process_otl_aux() in
+  try process_otl_aux ()
+  with End_of_file ->
+    let stat = Unix.close_process_in chan in
+    let result = 
+      match stat with
+        Unix.WEXITED 0 -> List.rev !res
+      | Unix.WEXITED i -> List.rev (Printf.sprintf "Exited with status %d" i :: !res)
+      | Unix.WSIGNALED i -> List.rev (Printf.sprintf "Killed (%d)" i :: !res)
+      | Unix.WSTOPPED i -> List.rev (Printf.sprintf "Stopped (%d)" i :: !res) in 
+    if stat <> (Unix.WEXITED 0) || !verbose then 
+      List.iter (fun s -> (print_string s; print_newline())) result;
+    if stat = Unix.WEXITED 0 then
+      ()
+    else 
+      failwith msg
+
+let compile_and_run where e : unit =
   let here = Sys.getcwd() in
   Sys.chdir where; 
 
-  if Sys.command command <> 0 then failwith "Executing 'make' failed";
+  run_and_show_output_on_failure
+    (!compile_command)
+    (Printf.sprintf "Executing '%s' failed" (!compile_command));
   let ocamlbuild_cmd = 
-    Printf.sprintf "ocamlbuild %s.native" (Filename.chop_suffix temporary_file ".v") in
-  if (Sys.command ocamlbuild_cmd <> 0) then failwith "Ocamlbuild failure";
-
-  let run_command = Printf.sprintf "./%s.native" (Filename.chop_suffix temporary_file ".v") in
+    Printf.sprintf "ocamlbuild %s.native"
+      (Filename.chop_suffix temporary_file ".v") in
+  run_and_show_output_on_failure
+    ocamlbuild_cmd "Ocamlbuild failure";
 
   reset_test_results();
+
+  let run_command =
+    Printf.sprintf "./%s.native" (Filename.chop_suffix temporary_file ".v") in
   let chan = Unix.open_process_in run_command in
   let found_result = ref false in
   let rec process_otl_aux () =  
@@ -562,7 +590,7 @@ let main =
     (* Entire file structure is copied *)
     output_mut_dir tmp_dir base;
     let dir = tmp_dir ^ "/" ^ s in
-    compile_and_run dir "make" ExpectOnlySuccesses;
+    compile_and_run dir ExpectOnlySuccesses;
 
     (* For each mutant structure *)
     List.iteri
@@ -574,7 +602,7 @@ let main =
           (* Entire file structure is copied *)
           output_mut_dir tmp_dir m;
           reset_test_results();
-          compile_and_run dir "make" ExpectSomeFailure
+          compile_and_run dir ExpectSomeFailure
         end)
       dir_mutants
   end;
