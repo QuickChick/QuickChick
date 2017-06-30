@@ -435,7 +435,7 @@ let calc_dir_mutants sec_graph fs =
         (* Printf.printf "Number of mutants: %d\n" (List.length muts); *)
         all_things_to_check := (List.map (fun x -> (s,x)) things_to_check)
                                @ !all_things_to_check;
-        debug "Number of tests: %d\n%s\n" (List.length things_to_check) (String.concat "\n" things_to_check);
+        (* debug "Number of tests: %d\n%s\n" (List.length things_to_check) (String.concat "\n" things_to_check); *)
         (File (s, base), List.map (fun m -> File (s, m)) muts)
       | _ -> failwith "no base mutant"
       end
@@ -506,9 +506,10 @@ let main =
             out_data ^ "\n" ^ temporary_file ^ "\n"
           else out_data in
         let out_file = tmp_dir ^ "/" ^ s in
-        if not (Sys.file_exists out_file) || load_file out_file != out_data
-        then
+
+        if not (Sys.file_exists out_file) || load_file out_file <> out_data then
           ignore (write_file out_file out_data)
+
       | Dir (s, fss) -> begin 
         let dir_name = tmp_dir ^ "/" ^ s in
         if (ensure_dir_exists dir_name) <> 0 then
