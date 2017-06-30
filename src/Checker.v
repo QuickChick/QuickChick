@@ -221,7 +221,6 @@ Definition tag {prop : Type} {_ : Checkable prop} (t : string) : prop -> Checker
 Definition implication {prop : Type} `{Checkable prop} (b : bool) (p : prop) : Checker :=
   if b then checker p else (returnGen (MkProp (returnRose rejected))).
 
-
 Definition forAll {A prop : Type} {_ : Checkable prop} `{Show A}
            (gen : G A)  (pf : A -> prop) : Checker :=
   bindGen gen (fun x =>
@@ -245,6 +244,11 @@ Global Instance testFun {A prop : Type} `{Show A}
   {
     checker f := forAllShrink arbitrary shrink f
   }.
+
+Global Instance testProd {A : Type} {prop : A -> Type} `{Show A} `{Arbitrary A} 
+       `{forall x : A, Checkable (prop x)} :
+  Checkable (forall (x : A), prop x) := 
+  {| checker f := forAllShrink arbitrary shrink (fun x => checker (f x)) |}.
 
 Global Instance testPolyFun {prop : Type -> Type} {_ : Checkable (prop nat)} : Checkable (forall T, prop T) :=
   {
