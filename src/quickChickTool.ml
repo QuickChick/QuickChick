@@ -225,14 +225,21 @@ let confirm_results e =
     if test_results.failed = 0 then 
       failed "No tests failed for this mutant"
 
-
+let temporary_file = "QuickChickTop.v" 
 
 let compile_and_run where command e : unit =
   let here = Sys.getcwd() in
   Sys.chdir where; 
 
+  if Sys.command command <> 0 then failwith "Executing 'make' failed";
+  let ocamlbuild_cmd = 
+    Printf.sprintf "ocamlbuild %s.native" (Filename.chop_suffix temporary_file ".v") in
+  if (Sys.command ocamlbuild_cmd <> 0) then failwith "Ocamlbuild failure";
+
+  let run_command = Printf.sprintf "./%s.native" (Filename.chop_suffix temporary_file ".v") in
+
   reset_test_results();
-  let chan = Unix.open_process_in command in
+  let chan = Unix.open_process_in run_command in
   let found_result = ref false in
   let rec process_otl_aux () =  
     (* BCP: If we ever have long-running tests that do things like printing
@@ -491,7 +498,6 @@ let main =
   | Dir (s, fss) -> begin
     let ((base, dir_mutants), all_things_to_check) = calc_dir_mutants sec_graph fs in
     (* List.iter (fun (s1,s2) -> Printf.printf "To test: %s - %s\n" s1 s2) all_things_to_check;*)
-    let temporary_file = "QuickChickTop.v" in
     let rec output_mut_dir tmp_dir fs =
       match fs with 
       | File (s, out_data) ->
@@ -550,18 +556,6 @@ let main =
     let dir = tmp_dir ^ "/" ^ s in
     compile_and_run dir "make" ExpectOnlySuccesses;
 
-    let ocamlbuild_and_run () = 
- 
-      let ocamlbuild_cmd = 
-        Printf.sprintf "ocamlbuild %s.native" (Filename.chop_suffix temporary_file ".v") in
-      let here = Sys.getcwd() in
-      Sys.chdir tmp_dir;
-      if (Sys.command ocamlbuild_cmd <> 0) then 
-        failwith "Ocamlbuild failure"
-      else Sys.command (Printf.sprintf "./%s.native" (Filename.chop_suffix temporary_file ".v"));
-      Sys.chdir here in
-    ocamlbuild_and_run (); 
-
     (* For each mutant structure *)
     List.iteri
       (fun i m ->
@@ -572,8 +566,7 @@ let main =
           (* Entire file structure is copied *)
           output_mut_dir tmp_dir m;
           reset_test_results();
-          compile_and_run dir "make" ExpectSomeFailure;
-          ocamlbuild_and_run ()
+          compile_and_run dir "make" ExpectSomeFailure
         end)
       dir_mutants
 
