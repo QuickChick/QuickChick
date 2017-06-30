@@ -63,6 +63,9 @@ Proof.
 Defined.
 
 (* Lifting common decidable instances *)
+Global Instance Dec_eq_bool (x y : bool) : Dec (x = y).
+Proof. constructor; unfold decidable; decide equality. Defined.
+
 Global Instance Dec_eq_nat (m n : nat) : Dec (m = n).
 Proof.
   constructor.
