@@ -29,6 +29,10 @@ let usage_msg = "quickChick options\nMutation testing for current directory"
 (* ----------------------------------------------------------------- *)
 (* Infrastructure *)
 
+let debug fmt =
+  if !verbose then Printf.fprintf stdout (fmt ^^ "%!")
+  else Printf.ifprintf stdout fmt
+
 let tmp_dir = "_qc"
 
 let ensure_dir_exists d = Sys.command ("mkdir -p " ^ d)
@@ -96,7 +100,6 @@ let rec cartesian (lists : 'a list list) : 'a list list =
 let test_out handle_section input = 
   let rec go = function 
     | Section (startSec, sn, endSec, extends, nodes) as s -> 
-       (*Printf.printf "Inside go for %s. Handle? %b\n" sn (handle_section sn); *)
        if handle_section sn then  
          let rec walk_nodes nodes = 
            match nodes with 
@@ -144,7 +147,7 @@ let mutate_outs handle_section input =
   let rec go = function
     | Section (_, sn, _, _, nodes) ->
       if handle_section sn then begin
-(*         Printf.printf "Handling section: %s\n" sn; *)
+        debug "Handling section: %s\n" sn;
         let handle_node = function
           | Text s -> (s, [])
           | Mutants (start, base, muts) ->
@@ -157,7 +160,6 @@ let mutate_outs handle_section input =
                (fun s -> Printf.sprintf "%s (* %s *) %s" start base s)
                mutants)
           | QuickChick (s1,s2,s3) ->
-(*              Printf.printf "Adding: %s\n" s2; *)
             things_to_check := s2 :: !things_to_check;
             (Printf.sprintf "%s QuickChick %s %s" s1 s2 s3, []) (* Add all tests *)
         in
@@ -272,13 +274,12 @@ let remove_vo v =
   if Filename.check_suffix v ".v" then 
     let vo = Filename.chop_suffix v ".v" ^ ".vo" in
     if Sys.file_exists vo then begin
-      if !verbose then Printf.printf "Removing %s\n" vo;
+      debug "Removing %s\n" vo; 
       ignore (Sys.command ("rm " ^ vo))
     end 
 
 let write_file out_file out_data = 
-  if !verbose then
-    (Printf.printf "Writing to file: %s\n" out_file; flush_all()) else ();
+  debug "Writing to file: %s\n" out_file;
   let out_channel = open_out out_file in
   output_string out_channel out_data;
   close_out out_channel;
@@ -309,7 +310,7 @@ let rec catMaybes = function
 
 let rec parse_file_or_dir file_name = 
   try
-    if !verbose then Printf.printf "[parse_file_or_dir %s]\n" file_name;
+    debug "[parse_file_or_dir %s]\n" file_name;
     if Sys.is_directory file_name 
     then begin
       if is_prefix tmp_dir (Filename.basename file_name)
@@ -328,7 +329,7 @@ let rec parse_file_or_dir file_name =
         Filename.basename file_name = "Makefile"     || 
         Filename.check_suffix file_name "v" in
       if handle then begin 
-        if !verbose then Printf.printf "In file: %s\n" file_name;
+        debug "In file: %s\n" file_name;
         let lexbuf = Lexing.from_channel (open_in file_name) in
         let result = program lexer lexbuf in
 
@@ -427,7 +428,7 @@ let calc_dir_mutants sec_graph fs =
         (* Printf.printf "Number of mutants: %d\n" (List.length muts); *)
         all_things_to_check := (List.map (fun x -> (s,x)) things_to_check)
                                @ !all_things_to_check;
-        Printf.printf "Number of tests: %d\n%s\n" (List.length things_to_check) (String.concat "\n" things_to_check);
+        debug "Number of tests: %d\n%s\n" (List.length things_to_check) (String.concat "\n" things_to_check);
         (File (s, base), List.map (fun m -> File (s, m)) muts)
       | _ -> failwith "no base mutant"
       end
@@ -489,7 +490,7 @@ let main =
  *)
   | Dir (s, fss) -> begin
     let ((base, dir_mutants), all_things_to_check) = calc_dir_mutants sec_graph fs in
-    List.iter (fun (s1,s2) -> Printf.printf "To test: %s - %s\n" s1 s2) all_things_to_check;
+    (* List.iter (fun (s1,s2) -> Printf.printf "To test: %s - %s\n" s1 s2) all_things_to_check;*)
     let temporary_file = "QuickChickTop.v" in
     let rec output_mut_dir tmp_dir fs =
       match fs with 
