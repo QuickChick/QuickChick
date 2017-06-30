@@ -1,3 +1,4 @@
 -R . Top
 Foo.v
 Bar.v
+src/Zoo.v
