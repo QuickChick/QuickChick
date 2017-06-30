@@ -315,24 +315,33 @@ let rec catMaybes = function
 (* ----------------------------------------------------------------- *)
 (* Parsing *)
 
+let is_dir f =
+  (* This is just in case the file has disappeared between the time we
+     listed the outer directory and the time we need to test whether one
+     of its members is a subdirectory.  Surprisingly, this can happen
+     pretty often with emacs temp files... *)
+  try Sys.is_directory f
+  with Sys_error _ -> false
+
 let rec parse_file_or_dir file_name = 
   try
     debug "[parse_file_or_dir %s]\n" file_name;
-    if Sys.is_directory file_name 
-    then begin
+    if is_dir file_name then begin
       if is_prefix tmp_dir (Filename.basename file_name)
       then None else begin 
         let ls = Sys.readdir file_name in
-        (if !verbose then
-            Printf.printf "Directory contains: \n";
-         Array.iter (fun s -> Printf.printf "  %s\n" s) ls);
+        if !verbose then begin
+          Printf.printf "Directory contains: \n";
+          Array.iter (fun s -> Printf.printf "  %s\n" s) ls
+        end;
         let parsed = List.map (fun s -> parse_file_or_dir
           (file_name ^ "/" ^ s)) (Array.to_list ls) in
         Some (Dir (file_name, catMaybes parsed))
       end
     end
     else begin
-      let handle = Filename.basename file_name = "_CoqProject"  || 
+      let handle =
+        Filename.basename file_name = "_CoqProject"  || 
         Filename.basename file_name = "Makefile"     || 
         Filename.check_suffix file_name "v" in
       if handle then begin 
