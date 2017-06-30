@@ -168,12 +168,19 @@ let deriveDependent (cn : derivable) (c : constr_expr) (n : int) (instance_name 
       @ self_dec
       @ arb_needed
       @ inputs
-    | GenSizedSuchThatMonotonicOpt -> []
+    | GenSizedSuchThatMonotonicOpt -> params 
     | SizedProofEqs -> params @ inputs
     | GenSizedSuchThatCorrect -> params @ inputs
     | GenSizedSuchThatSizeMonotonicOpt -> params @ inputs
   in
 
+  let rec list_take_drop n l = 
+    if n <= 0 then ([], l)
+    else match l with 
+         | [] -> ([], [])
+         | h::t -> let (take,drop) = list_take_drop (n-1) t in (h::take, drop) 
+  in 
+  
   (* The instance type *)
   let instance_type iargs = match cn with
     | ArbitrarySizedSuchThat ->
@@ -184,9 +191,11 @@ let deriveDependent (cn : derivable) (c : constr_expr) (n : int) (instance_name 
       gProdWithArgs
         ((gArg ~assumType:(gInject "nat") ~assumName:(gInject "size") ()) :: inputs)
         (fun (size :: inputs) ->
+(*         let (params, inputs) = list_take_drop (List.length params) paramsandinputs in *)
            gApp (gInject (class_name cn))
-             [gApp ~explicit:true (gInject "arbitrarySizeST")
-                [full_gtyp; full_pred (List.map gVar inputs); hole; gVar size]])
+                (*              ((List.map gVar params) @  *)
+                ([gApp ~explicit:true (gInject "arbitrarySizeST")
+                  [full_gtyp; full_pred (List.map gVar inputs); hole; gVar size]]))
     | SizedProofEqs -> gApp (gInject (class_name cn)) [full_pred (List.map (fun n -> gVar (fresh_name n)) input_names)]
     | GenSizedSuchThatCorrect ->
       let pred = full_pred (List.map (fun n -> gVar (fresh_name n)) input_names) in

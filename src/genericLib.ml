@@ -866,7 +866,13 @@ let create_names_for_anon a =
   | _ -> failwith "Non RawAssum in create_names"
     
 let declare_class_instance ?(global=true) ?(priority=42) instance_arguments instance_name instance_type instance_record =
+  msg_debug (str "Declaring class instance..." ++ fnl ());
+  msg_debug (str (Printf.sprintf "Total arguments: %d" (List.length instance_arguments)) ++ fnl ());
   let (vars,iargs) = List.split (List.map create_names_for_anon instance_arguments) in
+  let instance_type_vars = instance_type vars in
+  msg_debug (str "Calculated instance_type_vars" ++ fnl ());
+  let instance_record_vars = instance_record vars in
+  msg_debug (str "Calculated instance_record_vars" ++ fnl ());
   let cid = Classes.new_instance ~global:global false 
                                iargs
                        (((dummy_loc, (Name (id_of_string instance_name))), None)

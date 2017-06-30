@@ -244,7 +244,7 @@ let rec convert_to_range dt =
   | DTyVar x -> Unknown x
   | DCtr (c,dts) -> Ctr (c, List.map convert_to_range dts)
   | DTyCtr (c, dts) -> Ctr (injectCtr (ty_ctr_to_string c), List.map convert_to_range dts)
-  | DTyParam tp -> Ctr (injectCtr (ty_param_to_string tp), [])
+(*   | DTyParam tp -> Ctr (injectCtr (ty_param_to_string tp), []) *)
   | _ -> failwith ("Unsupported range: " ^ (dep_type_to_string dt))
 
 let is_fixed k dt = 
