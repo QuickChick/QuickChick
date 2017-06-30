@@ -21,9 +21,10 @@ os:
     - osx
 
 before_install:
-    if [[ TRAVIS_OS_NAME -eq osx ]];
-    then brew install opam;
-    fi
+    case $TRAVIS_OS_NAME in
+    osx)
+    brew install opam ;;
+    esac
 
 install:
 - "[ -e .opam ] || opam init -j ${NJOBS} --compiler=${COMPILER} -n -y"
@@ -36,6 +37,6 @@ install:
 script:
 - set -e
 - echo 'Building QuickChick...' && echo -en 'travis_fold:start:QuickChick.build\\r'
-- make install -j
+- travis_retry make install -j
 - cd examples/multifile-mutation && make && quickChick -top Top
 - echo -en 'travis_fold:end:QuickChick.build\\r'
