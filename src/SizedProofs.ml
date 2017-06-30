@@ -1000,12 +1000,12 @@ let sizedEqProofs_body
   (* debug_coq_expr zero_set; *)
   msg_debug (str "iter");
   debug_coq_expr iter_body;
-  (* msg_debug (str "spec"); *)
-  (* debug_coq_expr spec; *)
+  msg_debug (str "spec"); 
+  debug_coq_expr spec; 
   msg_debug (str "mon proof");
   debug_coq_expr (mon_proof (List.map gVar input_vars));
   msg_debug (str "completeness");
   debug_coq_expr (gFun ["x"]
                     (fun [x] -> rightp x));
 
-  gRecord [("iter", iter_body); ("mon", mon_proof (List.map gVar input_vars)); ("spec", spec)]
+  gRecord [("iter", iter_body); ("mon", mon_proof (List.map gVar input_vars)); ("spec", spec)] (* spec *)

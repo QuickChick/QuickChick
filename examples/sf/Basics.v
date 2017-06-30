@@ -98,16 +98,18 @@ Derive SizeMonotonic for nat' using genSnat'.
 Derive SizedMonotonic for nat'.
 Derive SizedCorrect for nat' using genSnat' and SizeMonotonicnat'.
 
+
+(** The second branch can be read: "if [n] has the form [S n']
+    for some [n'], then return [n']."  *)
+
+End NatPlayground.
+
 Definition pred (n : nat) : nat :=
   match n with
     | O => O
     | S n' => n'
   end.
 
-(** The second branch can be read: "if [n] has the form [S n']
-    for some [n'], then return [n']."  *)
-
-End NatPlayground.
 
 Definition minustwo (n : nat) : nat :=
   match n with
@@ -158,6 +160,16 @@ Fixpoint beq_nat (n m : nat) : bool :=
             | O => false
             | S m' => beq_nat n' m'
             end
+  end.
+
+Fixpoint leb (n m : nat) : bool :=
+  match n with
+  | O => true
+  | S n' =>
+      match m with
+      | O => false
+      | S m' => leb n' m'
+      end
   end.
 
 Theorem plus_O_n : forall n : nat, 0 + n = n.
