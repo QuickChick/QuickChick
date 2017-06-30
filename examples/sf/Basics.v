@@ -221,7 +221,7 @@ Proof.
     firstorder.
 Defined.
 
-Theorem plus_0_example: forall n, n = 0 -> n = 42.
+Theorem plus_0_example: forall n, n = 17 -> n = 42.
 Admitted. QuickChick plus_0_example.
 
 Global Instance testSuchThat2_1 {A B : Type} {pre : A -> B -> Prop} {prop : A -> B -> Type}
@@ -256,8 +256,8 @@ Proof.
   - inversion Contra.
 Defined.     
 
-Theorem plus_id_example : forall n m : nat, n = m -> n + n = m + 0.
-Admitted. QuickChick plus_id_example.
+Conjecture plus_id_example : forall n m : nat, n = m -> n + n = m + 0.
+QuickChick plus_id_example.
 
 (*
 Derive ArbitrarySizedSuchThat for (fun x => eq x a).
