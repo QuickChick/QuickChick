@@ -16,6 +16,8 @@ Set Bullet Behavior "Strict Subproofs".
 
 (* QuickChickDebug Debug On *)
 
+Derive ArbitrarySizedSuchThat for (fun x => eq x y). 
+
 Inductive Foo :=
 | Foo1 : Foo 
 | Foo2 : Foo -> Foo
