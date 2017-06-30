@@ -26,8 +26,9 @@ install:
 - opam list
 
 script:
+- set -e
 - echo 'Building QuickChick...' && echo -en 'travis_fold:start:QuickChick.build\\r'
-- make -j ${NJOBS}
+- make # -j ${NJOBS} # parallel compilation fails for now
 - make install
 - cd examples/multifile-mutation && make && quickChick -top Top
 - echo -en 'travis_fold:end:QuickChick.build\\r'
