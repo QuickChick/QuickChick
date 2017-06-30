@@ -28,7 +28,6 @@ install:
 script:
 - set -e
 - echo 'Building QuickChick...' && echo -en 'travis_fold:start:QuickChick.build\\r'
-- make # -j ${NJOBS} # parallel compilation fails for now
-- make install
+- make install -j
 - cd examples/multifile-mutation && make && quickChick -top Top
 - echo -en 'travis_fold:end:QuickChick.build\\r'
