@@ -210,7 +210,7 @@ let something_failed = ref false
 
 let confirm_results e =
   let failed s =
-    highlight Failure (Printf.sprintf "Error: %s" s);
+    highlight Failure (Printf.sprintf "Unexpected result: %s" s);
     if !fail_fast then
       exit 1
     else
@@ -220,25 +220,53 @@ let confirm_results e =
   else match e with
   | ExpectOnlySuccesses -> 
     if test_results.failed > 0 then 
-      failed "Test failed"
+      failed "Test failed in base"
   | ExpectSomeFailure -> 
     if test_results.failed = 0 then 
       failed "No tests failed for this mutant"
 
 let temporary_file = "QuickChickTop.v" 
 
-let compile_and_run where command e : unit =
+let run_and_show_output_on_failure command msg =
+  let chan = Unix.open_process_in command in
+  let res = ref ([] : string list) in
+  let rec process_otl_aux () =  
+    let e = input_line chan in
+    res := e::!res;
+    process_otl_aux() in
+  try process_otl_aux ()
+  with End_of_file ->
+    let stat = Unix.close_process_in chan in
+    let result = 
+      match stat with
+        Unix.WEXITED 0 -> List.rev !res
+      | Unix.WEXITED i -> List.rev (Printf.sprintf "Exited with status %d" i :: !res)
+      | Unix.WSIGNALED i -> List.rev (Printf.sprintf "Killed (%d)" i :: !res)
+      | Unix.WSTOPPED i -> List.rev (Printf.sprintf "Stopped (%d)" i :: !res) in 
+    if stat <> (Unix.WEXITED 0) || !verbose then 
+      List.iter (fun s -> (print_string s; print_newline())) result;
+    if stat = Unix.WEXITED 0 then
+      ()
+    else 
+      failwith msg
+
+let compile_and_run where e : unit =
   let here = Sys.getcwd() in
   Sys.chdir where; 
 
-  if Sys.command command <> 0 then failwith "Executing 'make' failed";
+  run_and_show_output_on_failure
+    (!compile_command)
+    (Printf.sprintf "Executing '%s' failed" (!compile_command));
   let ocamlbuild_cmd = 
-    Printf.sprintf "ocamlbuild %s.native" (Filename.chop_suffix temporary_file ".v") in
-  if (Sys.command ocamlbuild_cmd <> 0) then failwith "Ocamlbuild failure";
-
-  let run_command = Printf.sprintf "./%s.native" (Filename.chop_suffix temporary_file ".v") in
+    Printf.sprintf "ocamlbuild %s.native"
+      (Filename.chop_suffix temporary_file ".v") in
+  run_and_show_output_on_failure
+    ocamlbuild_cmd "Ocamlbuild failure";
 
   reset_test_results();
+
+  let run_command =
+    Printf.sprintf "./%s.native" (Filename.chop_suffix temporary_file ".v") in
   let chan = Unix.open_process_in run_command in
   let found_result = ref false in
   let rec process_otl_aux () =  
@@ -370,12 +398,10 @@ let rec parse_file_or_dir file_name =
       end
       else None
     end
-  with Sys_error _ -> failwith ("Sys_error -- maybe "
-                                ^ file_name ^ " does not exist?") 
+  with Sys_error e -> failwith ("Sys_error " ^ e) 
 
 (* ----------------------------------------------------------------- *)
 (* Main function *)
-
 
 let rec section_length_of_fs fs = 
   match fs with 
@@ -535,20 +561,19 @@ let main =
     let imports = List.map (fun s -> (if !top = "" then "" else !top ^ ".") ^ (mk_import s)) all_vs in
 
     let (test_names, tests) = 
-      List.split (
-      List.mapi (fun i (f, s) ->
-                 let s =
-                   let s = trim s in String.sub s 0 (String.length s - 1)
-                 in 
-                 ( Printf.sprintf "test%d" i
-                 , Printf.sprintf "Definition test%d := print_extracted_coq_string (show (quickCheck %s.%s)).\n"
-                                i
-                                (trim (Filename.basename (Filename.chop_suffix f ".v")) (* Leo: better qualification *))
-                                s)
-                ) all_things_to_check) in
+      let make_test i (f, s) : string * string =
+        let s = let s = trim s in String.sub s 0 (String.length s - 1) in
+        let testname =
+          (* Leo: better qualification *)
+          trim (Filename.basename (Filename.chop_suffix f ".v")) ^ "." ^ s in
+        (Printf.sprintf "test%d" i,
+         Printf.sprintf "Definition test%d := print_extracted_coq_string (\"Checking %s...\" ++ newline ++ show (quickCheck %s))%%string.\n"
+           i testname testname) in
+      List.split (List.mapi make_test all_things_to_check) in
     
     let tmp_file_data = 
       "Set Warnings \"-extraction-opaque-accessed,-extraction\".\n\n" ^ 
+      "Require Import String.\n"^
       "From QuickChick Require Import QuickChick.\n\n"^
       "Require " ^ (String.concat " " imports) ^ ".\n\n" ^
       
@@ -564,7 +589,7 @@ let main =
     (* Entire file structure is copied *)
     output_mut_dir tmp_dir base;
     let dir = tmp_dir ^ "/" ^ s in
-    compile_and_run dir "make" ExpectOnlySuccesses;
+    compile_and_run dir ExpectOnlySuccesses;
 
     (* For each mutant structure *)
     List.iteri
@@ -576,33 +601,12 @@ let main =
           (* Entire file structure is copied *)
           output_mut_dir tmp_dir m;
           reset_test_results();
-          compile_and_run dir "make" ExpectSomeFailure
+          compile_and_run dir ExpectSomeFailure
         end)
       dir_mutants
-
   end;
 
-  if !something_failed then exit 1
-      
-
-(* 
-let path =
-  lazy (let (_,_,path) = Library.locate_qualified_library ~warn:false qid in path)
-let path = lazy (Filename.dirname (Lazy.force path))
-
-(* Interface with OCaml compiler *)
-let temp_dirname = Filename.get_temp_dir_name ()
-
-let link_files = ["quickChickLib.cmx"]
-
-(* TODO: in Coq 8.5, fetch OCaml's path from Coq's configure *)
-let ocamlopt = "ocamlopt"
-let ocamlc = "ocamlc"
-
-let comp_ml_cmd fn out =
-  let path = Lazy.force path in
-  let link_files = List.map (Filename.concat path) link_files in
-  let link_files = String.concat " " link_files in
-  Printf.sprintf "%s -rectypes -w a -I %s -I %s %s %s -o %s" ocamlopt
-    temp_dirname path link_files fn out
- *)
+  if !something_failed then begin
+    Printf.printf "\n[Unexpected result for at least one test. Exiting with status 1...]\n";
+    exit 1
+  end

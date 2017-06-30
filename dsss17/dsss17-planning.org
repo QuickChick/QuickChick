@@ -102,3 +102,10 @@ Case study: Vellvm
 Zoe-proofs (the relevant typeclasses, mainly, plus just a hint of the
 proofs)
   - 1-hour talk based on her section of popl submission
+
+_________
+
+Random observations:
+  - Extraction doesn't work if any definitions are Admitted.  But in a
+    testing context, it might actually be better to give them wrong
+    definitions (and then discover that fact)!  
