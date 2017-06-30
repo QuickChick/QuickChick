@@ -229,6 +229,38 @@ Defined.
 Theorem plus_0_example: forall n, n = 0 -> n = 42.
 Admitted. QuickChick plus_0_example.
 
+Global Instance testSuchThat2_1 {A B : Type} {pre : A -> B -> Prop} {prop : A -> B -> Type}
+       `{Show A} `{Show B} `{Arbitrary B}
+       `{forall (b : B), GenSuchThat A (fun x => pre x b)}
+       `{forall (b : B), SuchThatCorrect (fun x => pre x b) (genST (fun x => pre x b))}
+       `{forall (a : A) (b : B), Checkable (prop a b)} :
+  Checkable (forall a b , pre a b -> prop a b) :=
+  {| checker f := 
+       forAllShrink arbitrary shrink (fun b => 
+         forAllProof (genST (fun x => pre x b)) 
+                     (fun mx H => 
+                        (* Leo: Is there a better way to do this? *)
+                        let mx' := mx in 
+                        let Heq := erefl mx' : mx' = mx in
+                        match mx as mx'' return (mx' = mx'' -> Checker) with 
+                        | Some x => fun _ => checker (f x b _)
+                        | None => fun _ => checker tt
+                        end Heq)
+                                     ) |}.
+Proof.
+  (* Annoying *)
+  assert (Eq : mx = mx') by auto.
+  rewrite -Eq in e.
+  clear Heq Eq mx'.
+  (* End annoying *)
+  destruct (H5 b).
+  apply STSound in H; subst.
+  inversion H as [Hyp | Contra].
+  - inversion Hyp as [x' [Pre HIn]].
+    inversion HIn; subst; auto.
+  - inversion Contra.
+Defined.     
+
 Theorem plus_id_example : forall n m : nat, n = m -> n + n = m + m.
 Admitted. QuickChick plus_id_example.
 
