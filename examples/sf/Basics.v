@@ -233,8 +233,27 @@ Proof.
     firstorder.
 Defined.
 
+Instance arbST_eq' {A} (a : A) : GenSuchThat A (fun x => a = x) :=
+  {| arbitraryST := returnGen (Some a) |}.
+Instance arbST_Correct' {A} (a : A) 
+  : SuchThatCorrect (fun x => a = x ) (genST (fun x => a = x)) :=
+  {| STComplete := _ ;
+     STSound    := _ |}.
+Proof.
+  - simpl; rewrite semReturn.
+    unfold set_incl => ma Hma.
+    inversion Hma as [a' [Eq HIn]].
+    inversion HIn; subst; auto.
+  - simpl; rewrite semReturn.
+    unfold set_incl => ma Hma.
+    inversion Hma; subst.
+    left.
+    firstorder.
+Defined.
+
+
 Theorem plus_0_example: forall n, n = 17 -> n = 42.
-Admitted. QuickChick plus_0_example.
+Admitted. (* QuickChick plus_0_example. *)
 
 Global Instance testSuchThat2_1 {A B : Type} {pre : A -> B -> Prop} {prop : A -> B -> Type}
        `{Show A} `{Show B} `{Arbitrary B}
@@ -400,25 +419,16 @@ Derive GenSizedSuchThatSizeMonotonicOpt for (fun foo => goodFooUnif n foo).
 *)
 *)
 
-(*
-Global Instance testSuchThat_irrel {A B C : Type} {pre : A -> B -> Prop} {prop : A -> B -> C -> Type}
-       `{forall prop `{forall a b, Checkable (prop a b)}, Checkable (forall a b, pre a b -> prop a b)}
-       `{forall (a : A) (b : B), Checkable (forall (c : C), prop a b c)} :
+Global Instance testSuchThat_swap {A B C : Type} {pre : A -> B -> Prop} 
+       {prop : A -> B -> C -> Type}
+       `{Checkable (forall a b, pre a b -> forall c, prop a b c)} :
   Checkable (forall a b c, pre a b -> prop a b c) :=
   {| checker f := @checker (forall a b, pre a b -> forall c, prop a b c) _ _ |}. 
 Proof. intros; eauto. Defined.
 
-
-Instance id_ex_check : Checkable (forall n m o : nat, n = m -> m = o -> n + m = m + o).
-Proof.
-  eapply testSuchThat_irrel.
-  Unshelve.
-  move => a b.
-  *)
-
 Theorem plus_id_exercise : forall n m o : nat,
   n = m -> m = o -> n + m = m + o.
-Admitted. (* Leo: needs more typeclass magic *)
+Admitted.  QuickChick plus_id_exercise.
 
 Theorem mult_0_plus : forall n m : nat,
   (0 + n) * m = n * m. Admitted. (* QuickChick mult_0_plus. *)

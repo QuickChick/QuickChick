@@ -187,7 +187,7 @@ Inductive natoption : Type :=
   | Some : nat -> natoption
   | None : natoption.
 
-Instance dec_natoption (p q : natlist) : Dec (p = q).
+Instance dec_natoption (p q : natoption) : Dec (p = q).
 Proof. constructor; unfold decidable; repeat decide equality. Defined.
 
 Derive Arbitrary for natoption.
@@ -264,26 +264,21 @@ Inductive partial_map : Type :=
   | empty  : partial_map
   | record : id -> nat -> partial_map -> partial_map.
 
-(** This declaration can be read: "There are two ways to construct a
-    [partial_map]: either using the constructor [empty] to represent an
-    empty partial map, or by applying the constructor [record] to
-    a key, a value, and an existing [partial_map] to construct a
-    [partial_map] with an additional key-to-value mapping." *)
+Instance dec_partial_map (p q : partial_map) : Dec (p = q).
+Proof. constructor; unfold decidable; repeat decide equality. Defined.
 
-(** The [update] function overrides the entry for a given key in a
-    partial map (or adds a new entry if the given key is not already
-    present). *)
+Derive Arbitrary for partial_map.
+Derive Show for partial_map.
+Derive Sized for partial_map.
+Derive CanonicalSized for partial_map.
+Derive SizeMonotonic for partial_map using genSpartial_map.
+Derive SizedMonotonic for partial_map.
 
+(* update is uneccesary *)
 Definition update (d : partial_map)
                   (x : id) (value : nat)
                   : partial_map :=
   record x value d.
-
-(** Last, the [find] function searches a [partial_map] for a given
-    key.  It returns [None] if the key was not found and [Some val] if
-    the key was associated with [val]. If the same key is mapped to
-    multiple values, [find] will return the first one it
-    encounters. *)
 
 Fixpoint find (x : id) (d : partial_map) : natoption :=
   match d with
@@ -293,23 +288,67 @@ Fixpoint find (x : id) (d : partial_map) : natoption :=
                      else find x d'
   end.
 
-
-(** **** Exercise: 1 star (update_eq)  *)
 Theorem update_eq :
   forall (d : partial_map) (x : id) (v: nat),
     find x (update d x v) = Some v.
-Proof.
- (* FILL IN HERE *) Admitted.
-(** [] *)
+Admitted. 
 
-(** **** Exercise: 1 star (update_neq)  *)
 Theorem update_neq :
   forall (d : partial_map) (x y : id) (o: nat),
     beq_id x y = false -> find x (update d y o) = find x d.
-Proof.
- (* FILL IN HERE *) Admitted.
-(** [] *)
+Admitted.
+
+Theorem update_neq' :
+  forall (d : partial_map) (x y : id) (o: nat),
+    ~ (x = y) -> find x (update d y o) = find x d.
+Admitted.
+
 End PartialMap.
+
+(* QuickChick PartialMap.update_eq. *)
+
+Instance genSuchThatNot {A} (P : A -> Prop) (prop : Type)
+         `{forall (a : A), Dec (P a)}
+         `{Arbitrary A} `{Show A}
+         `{Checkable prop} : Checkable (forall a, ~ (P a) -> prop) :=
+  {| checker f := forAllProof (suchThatMaybe arbitrary (fun a => (~ (P a))?))
+                              (fun mx H => 
+                                 (* Leo: Is there a better way to do this? *)
+                                 let mx' := mx in 
+                                 let Heq := erefl mx' : mx' = mx in
+                                 match mx as mx'' return (mx' = mx'' -> Checker) with 
+                                 | Some x => fun _ => checker (f x _)
+                                 | None => fun _ => checker tt
+                                 end Heq) |}.
+Proof.
+  (* Annoying *)
+  assert (Eq : mx = mx') by auto.
+  rewrite -Eq in e.
+  clear Heq Eq mx'.
+  (* End annoying *)
+  apply semSuchThatMaybe_sound in H.
+  inversion H as [Contra | [x' [[Arb Dec] Hyp2]]]; subst.
+  - inversion Contra.
+  - inversion Hyp2; subst.
+    remember dec.
+    destruct d; auto.
+Defined.
+
+Instance ex_c : Checkable
+            (forall (d : PartialMap.partial_map) (x y : id) (o : nat),
+             x <> y ->
+             PartialMap.find x (PartialMap.update d y o) =
+             PartialMap.find x d).
+Proof.
+  eapply testProd.
+  Unshelve.
+  intros; simpl.
+  
+
+
+
+QuickChick PartialMap.update_neq'.    
+
 
 (** **** Exercise: 2 starsM (baz_num_elts)  *)
 (** Consider the following inductive definition: *)
