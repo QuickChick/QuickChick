@@ -126,7 +126,7 @@ let runTest c =
   close_out oc;
   (* Before compiling, remove stupid cyclic dependencies like "type int = int".
      TODO: Generalize (.) \g1\b or something *)
-  let perl_cmd = "perl -i -p0e 's/type int =\\s*int/type tmptmptmp = int\\ntype int = tmptmptmp/s' " ^ mlf in
+  let perl_cmd = "perl -i -p0e 's/type int =\\s*int/type tmptmptmp = int\\ntype int = tmptmptmp/sg' " ^ mlf in
   if Sys.command perl_cmd <> 0 then msg_error (str ("perl script hack failed. Report: " ^ perl_cmd)  ++ fnl ());
   (** Compile the extracted code *)
   (** Extraction sometimes produces ML code that does not implement its interface.
