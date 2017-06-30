@@ -18,11 +18,11 @@ plugin: Makefile.coq
 
 TEMPFILE := $(shell mktemp)
 
-install: plugin Makefile.coq src/quickChickLib.cmx src/quickChickLib.o quickChickTool
+install: plugin Makefile.coq quickChickTool
 	$(V)$(MAKE) -f Makefile.coq install > $(TEMPFILE) || cat $(TEMPFILE)
   # Manually copying the remaining files
-	 $(V)cp src/quickChickLib.cmx $(COQLIB)/user-contrib/QuickChick
-	 $(V)cp src/quickChickLib.o $(COQLIB)/user-contrib/QuickChick
+#	 $(V)cp src/quickChickLib.cmx $(COQLIB)/user-contrib/QuickChick
+#	 $(V)cp src/quickChickLib.o $(COQLIB)/user-contrib/QuickChick
 	 $(V)cp src/quickChickTool $(shell echo $(PATH) | tr ':' "\n" | grep opam | uniq)/quickChick
 
 src/quickChickToolLexer.cmo : src/quickChickToolLexer.mll 
@@ -50,8 +50,8 @@ tests:
 	cd examples/stlc; make clean && make
 	cd examples/ifc-basic; make clean && make
 
-Makefile.coq: Make
-	$(V)coq_makefile -f Make -o Makefile.coq
+Makefile.coq: _CoqProject
+	$(V)coq_makefile -f _CoqProject -o Makefile.coq
 
 clean:
          # This might not work on macs, but then not my problem

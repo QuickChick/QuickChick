@@ -42,7 +42,8 @@ let path = lazy (Filename.dirname (Lazy.force path))
 (* Interface with OCaml compiler *)
 let temp_dirname = Filename.get_temp_dir_name ()
 
-let link_files = ["quickChickLib.cmx"]
+(* let link_files = ["quickChickLib.cmx"]*)
+let link_files = []
 
 (* TODO: in Coq 8.5, fetch OCaml's path from Coq's configure *)
 let ocamlopt = "ocamlopt"
@@ -113,9 +114,15 @@ let runTest c =
   Flags.silently (Extraction_plugin.Extract_env.full_extraction (Some mlf)) [Ident (Loc.ghost, main)]; 
   (** Add a main function to get some output *)
   let oc = open_out_gen [Open_append;Open_text] 0o666 mlf in
-  Printf.fprintf oc
-    "\nlet _ = print_string (QuickChickLib.string_of_coqstring (%s))\n"
-    (string_of_id main);
+  let for_output = 
+    "\nlet _ = print_string (\n" ^ 
+    "let l = (" ^ (string_of_id main) ^ ") in\n"^ 
+    "let s = Bytes.create (List.length l) in\n" ^ 
+    "let rec copy i = function\n" ^ 
+    "| [] -> s\n" ^ 
+    "| c :: l -> s.[i] <- c; copy (i+1) l\n" ^ 
+    "in copy 0 l)" in
+  Printf.fprintf oc "%s" for_output;
   close_out oc;
   (* Before compiling, remove stupid cyclic dependencies like "type int = int".
      TODO: Generalize (.) \g1\b or something *)
