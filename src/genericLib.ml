@@ -121,6 +121,16 @@ let constructor_to_string (x : constructor) = Id.to_string x
 let gCtr id = id_to_coq_expr id
 let injectCtr s = Id.of_string s
 
+module Ord_ty_ctr = struct 
+  type t = ty_ctr 
+  let compare = compare 
+end
+
+module Ord_ctr = struct
+  type t = constructor
+  let compare = compare
+end
+
 type ctr_rep = constructor * coq_type 
 let ctr_rep_to_string (ctr, ct) = 
   Printf.sprintf "%s : %s" (constructor_to_string ctr) (coq_type_to_string ct)

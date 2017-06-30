@@ -38,6 +38,10 @@ val ty_ctr_to_string : ty_ctr -> string
 val gInjectTyCtr : string -> ty_ctr
 val gTyCtr : ty_ctr -> coq_expr
 
+module Ord_ty_ctr : Map.OrderedType
+
+module Ord_ctr : Map.OrderedType
+
 type arg
 val gArg : ?assumName:coq_expr ->
            ?assumType:coq_expr ->

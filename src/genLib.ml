@@ -41,3 +41,9 @@ let frequency l =
 
 let backtracking l = gApp (gInject "backtrack") [gList (List.map gPair l)]
 let uniform_backtracking l = backtracking (List.combine (List.map (fun _ -> gInt 1) l) l)
+
+(* Map from inductives to maps of constructor weights *)
+module TyCtrMap = Map.Make(Ord_ty_ctr)
+module CtrMap   = Map.Make(Ord_ctr)
+
+(* let weight_map : int CtrMap.t TyCtrMap.t = ref *)
