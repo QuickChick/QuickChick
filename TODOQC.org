@@ -5,14 +5,6 @@ HIGH PRIORITY:
     going to want to name ALL mutants.  This will also be a more convenient
     way of printing them than printing diffs.
   - We probably also need a syntax for nested mutants
-  - Re-make just the .vo files that have changed
-       - At the same time, make sure that any file with an active QuickCheck
-         command _is_ remade, so that the tests always get run
-
-  * Make a simpler tactic for deriving equality.
-       Derive Arbitrary, Show, Eq for file_access_mode.
-  * play with precedence for ? -- should bind tigher than implication
-       - and could we automatically make decidable props checkable, without ?
 
   - When displaying counterexamples, would it be easy to print the name of
     each bound variable along with the failing value that's been found for
@@ -35,15 +27,13 @@ HIGH PRIORITY:
 
   - Can we try again to fix the "Section... extends..." parsing issue?
 
-  - "Test" mode should just go away.  Instead, we should have a general way
-    of selecting just one particular mutant by either name or number
-    (including the "null mutant," which we can take to be mutant 0 as a
-    special case).
+  * Make a simpler tactic for deriving equality.
+       Derive Arbitrary, Show, Eq for file_access_mode.
+  * play with precedence for ? -- should bind tigher than implication
+       - and could we automatically make decidable props checkable, without ?
 
 MINOR:
   - Figure out how to check different mutants in parallel 
-  - fix:
-       Fatal error: exception Failure("./.#Makefile does not exist?")
   - Catch C-c and terminate QC tool 
   - Add
        Set Warnings "-notation-overridden,-parsing".
@@ -52,11 +42,7 @@ MINOR:
     patterns!) 
 
 COSMETIC:
-  - Colorizing the output (using the opam ANSITerminal package) might be
-    helpful for readability.  We will want to make it switch-selectable so
-    that people using emacs compilation mode, for example, don't get messed
-    up by it.  Though this may be fixable...
-  
+  - Document (for emacs compile users):
       (require 'ansi-color)
       (defun endless/colorize-compilation ()
         "Colorize from `compilation-filter-start' to `point'."
@@ -76,15 +62,7 @@ ABOUT DECIDABILITY:
     Is there a way of using Dec to (semi?-)automatically calculate decision
     procedures for things like /\ and forall formulas?
 
-
 TASKS FOR THE SUMMER SCHOOL:
   - documentation -- coqdoc comments, especially on the most user-visible
     parts!
-  - test opam package
-
-___________
-
-Random observations:
-  - Extraction doesn't work if any definitions are Admitted.  But in a
-    testing context, it might actually be better to give them wrong
-    definitions (and then discover that fact)!  
+  - update and test opam package

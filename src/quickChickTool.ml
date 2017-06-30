@@ -210,7 +210,7 @@ let something_failed = ref false
 
 let confirm_results e =
   let failed s =
-    highlight Failure (Printf.sprintf "Error: %s" s);
+    highlight Failure (Printf.sprintf "Unexpected result: %s" s);
     if !fail_fast then
       exit 1
     else
@@ -220,7 +220,7 @@ let confirm_results e =
   else match e with
   | ExpectOnlySuccesses -> 
     if test_results.failed > 0 then 
-      failed "Test failed"
+      failed "Test failed in base"
   | ExpectSomeFailure -> 
     if test_results.failed = 0 then 
       failed "No tests failed for this mutant"
@@ -370,12 +370,10 @@ let rec parse_file_or_dir file_name =
       end
       else None
     end
-  with Sys_error _ -> failwith ("Sys_error -- maybe "
-                                ^ file_name ^ " does not exist?") 
+  with Sys_error e -> failwith ("Sys_error " ^ e) 
 
 (* ----------------------------------------------------------------- *)
 (* Main function *)
-
 
 let rec section_length_of_fs fs = 
   match fs with 
@@ -579,30 +577,9 @@ let main =
           compile_and_run dir "make" ExpectSomeFailure
         end)
       dir_mutants
-
   end;
 
-  if !something_failed then exit 1
-      
-
-(* 
-let path =
-  lazy (let (_,_,path) = Library.locate_qualified_library ~warn:false qid in path)
-let path = lazy (Filename.dirname (Lazy.force path))
-
-(* Interface with OCaml compiler *)
-let temp_dirname = Filename.get_temp_dir_name ()
-
-let link_files = ["quickChickLib.cmx"]
-
-(* TODO: in Coq 8.5, fetch OCaml's path from Coq's configure *)
-let ocamlopt = "ocamlopt"
-let ocamlc = "ocamlc"
-
-let comp_ml_cmd fn out =
-  let path = Lazy.force path in
-  let link_files = List.map (Filename.concat path) link_files in
-  let link_files = String.concat " " link_files in
-  Printf.sprintf "%s -rectypes -w a -I %s -I %s %s %s -o %s" ocamlopt
-    temp_dirname path link_files fn out
- *)
+  if !something_failed then begin
+    Printf.printf "\n[Unexpected result for at least one test. Exiting with status 1...]\n";
+    exit 1
+  end
