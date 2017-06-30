@@ -28,10 +28,10 @@ before_install:
 
 install:
 - "[ -e .opam ] || opam init -j ${NJOBS} --compiler=${COMPILER} -n -y"
+- opam switch 4.04.1
 - eval $(opam config env)
 - opam config var root
 - opam repo add coq-released https://coq.inria.fr/opam/released || true
-- opam switch 4.04.1
 - travis_wait opam install -j ${NJOBS} -y coq=8.6 coq-mathcomp-ssreflect ${EXTRA_OPAM}
 - opam list
 
