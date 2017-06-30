@@ -16,6 +16,14 @@ env:
   global:
   - NJOBS=2
   - COMPILER="system"
+os:
+    - linux
+    - osx
+
+before_install:
+    if [[ TRAVIS_OS_NAME -eq osx ]];
+    then brew install opam;
+    fi
 
 install:
 - "[ -e .opam ] || opam init -j ${NJOBS} --compiler=${COMPILER} -n -y"
