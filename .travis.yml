@@ -31,6 +31,7 @@ install:
 - eval $(opam config env)
 - opam config var root
 - opam repo add coq-released https://coq.inria.fr/opam/released || true
+- opam switch 4.04.1
 - opam install -j ${NJOBS} -y coq=8.6 coq-mathcomp-ssreflect ${EXTRA_OPAM}
 - opam list
 
