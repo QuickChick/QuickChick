@@ -5,14 +5,8 @@ open QuickChickToolTypes
 (* ----------------------------------------------------------------- *)
 (* Command-line *)
 
-type mode = Test | Mutate
-let mode = ref Mutate 
 let compile_command = ref "make" 
-let input_name = ref "" 
-let set_mode = function 
-  | "test"   -> mode := Test
-  | "mutate" -> mode := Mutate 
-  | _ -> failwith "Expected 'test' or 'mutate'" 
+let top = ref "" (* Leo: or "Top"? *)
 
 let sec_name = ref None 
 let verbose = ref false 
@@ -20,17 +14,17 @@ let ansi = ref false
 let fail_fast = ref false
 
 let speclist = 
-  [ ("-m", (Arg.Symbol (["test"; "mutate"], set_mode)), "Sets the mode of operation") 
-  ; ("-s", Arg.String (fun name -> sec_name := Some name), "Which section's properties to test")
+  [ ("-s", Arg.String (fun name -> sec_name := Some name), "Which section's properties to test")
   ; ("-v", Arg.Unit (fun _ -> verbose := true), "Verbose mode")
   ; ("-failfast", Arg.Unit (fun _ -> fail_fast := true), "Stop as soon as a problem is detected")
   ; ("-color", Arg.Unit (fun _ -> ansi := true), "Use colors on an ANSI-compatible terminal")
   ; ("-cmd", Arg.String (fun name -> compile_command := name), "Compile command for entire directory")
+  ; ("-top", Arg.String (fun name -> top := name), "Name of top-level logical module")
   ]
 
-let usage_msg = "quickChick <input_file> options\nTest a file or evaluate your testing using mutants." 
+let usage_msg = "quickChick options\nMutation testing for current directory"
 
-;; Arg.parse speclist (fun anon -> input_name := anon) usage_msg
+;; Arg.parse speclist (fun anon -> Printf.fprintf stderr "Warning: Anonymous argument %s\n" anon) usage_msg
 
 (* ----------------------------------------------------------------- *)
 (* Infrastructure *)
@@ -463,7 +457,7 @@ let calc_dir_mutants sec_graph fs =
 (* BCP: This function is too big! And there's too much duplication. *)
 let main = 
   (*  Parsing.set_trace true; *)
-  let fs = from_Some (parse_file_or_dir !input_name) in
+  let fs = from_Some (parse_file_or_dir ".") in
 
   (* Fill the hashtable *)
   let sec_graph = build_sec_graph fs in
@@ -471,146 +465,120 @@ let main =
   (* Hashtbl.iter (fun a b -> Printf.printf "%s -> %s\n" a
       (String.concat ", " b)) sec_graph; flush_all ();  *)
 
-  match !mode with
+  match fs with 
+  | File (s, ss) ->
+     failwith ". can never be a file. Right?"
 (*
-  | Test ->
-    begin match fs with 
-    | File (s, ss) -> 
-      let out_data = test_out handle_section ss in
-      let vf = write_tmp_file out_data in
-      compile_and_run (coqc_single_cmd vf) ExpectOnlySuccesses
-    | Dir (s, fss) -> begin
-      ensure_tmpdir_exists();
-      let rec output_test_dir fs =
-        match fs with 
-        | File (s, ss) -> 
-          let out_data = test_out handle_section ss in
-          let out_file = tmp_dir ^ "/" ^ s in 
-          if Sys.file_exists out_file && load_file out_file = out_data then ()
-          else ignore (write_file (tmp_dir ^ "/" ^ s) out_data)
-        | Dir (s, fss) -> begin 
-          let dir_name = tmp_dir ^ "/" ^ s in
-          if (ensure_dir_exists dir_name) <> 0 then
-            failwith ("Could not create directory: " ^ dir_name)
-          else List.iter output_test_dir fss
-        end in
-      (* Entire file structure is copied *)
-      output_test_dir fs;
-      (* Execute make at tmp_dir *)
-      compile_and_run ("make -C " ^ tmp_dir ^ "/" ^ s) ExpectOnlySuccesses
-    end
-  end 
-*)
-  | Mutate -> begin
-    match fs with 
-    | File (s, ss) ->
-      let (base,muts) = match mutate_outs (handle_section sec_graph) ss with
-        | (base :: muts), _ -> (base, muts)
-        | _ -> failwith "empty mutants" in
-      (* BCP: I think we should not test the base when testing mutants *)
-      (* LEO: Really? I think it's a good baseline. Bug in base -> No point
-         in testing mutants... *)
-      (* BCP: OK, doing it first is fine.  But we also want to be able to
-         run a single mutant by name. *)
-      highlight Header "Testing base...";
-      let base_file = write_tmp_file base in 
-      compile_and_run "." (coqc_single_cmd base_file) ExpectOnlySuccesses;
-      List.iteri (fun i m ->
-        (if i > 0 then Printf.printf "\n");
-        highlight Header (Printf.sprintf "Testing mutant %d..." i); 
-        reset_test_results();
-        compile_and_run "." (coqc_single_cmd (write_tmp_file m)) ExpectSomeFailure
-      ) muts
-    | Dir (s, fss) -> begin
-      let ((base, dir_mutants), all_things_to_check) = calc_dir_mutants sec_graph fs in
-      List.iter (fun (s1,s2) -> Printf.printf "To test: %s - %s\n" s1 s2) all_things_to_check;
-      let temporary_file = "QuickChickTop.v" in
-      let rec output_mut_dir tmp_dir fs =
-        match fs with 
-        | File (s, out_data) ->
-          let out_data =
-            if Filename.basename s = "_CoqProject" then
-              out_data ^ "\n" ^ temporary_file ^ "\n"
-            else out_data in
-          let out_file = tmp_dir ^ "/" ^ s in
-          if not (Sys.file_exists out_file) || load_file out_file != out_data
-          then
-            ignore (write_file out_file out_data)
-        | Dir (s, fss) -> begin 
-          let dir_name = tmp_dir ^ "/" ^ s in
-          if (ensure_dir_exists dir_name) <> 0 then
-            failwith ("Could not create directory: " ^ dir_name)
-          else List.iter (output_mut_dir tmp_dir) fss
-        end in
+    let (base,muts) = match mutate_outs (handle_section sec_graph) ss with
+      | (base :: muts), _ -> (base, muts)
+      | _ -> failwith "empty mutants" in
+    (* BCP: I think we should not test the base when testing mutants *)
+    (* LEO: Really? I think it's a good baseline. Bug in base -> No point
+       in testing mutants... *)
+    (* BCP: OK, doing it first is fine.  But we also want to be able to
+       run a single mutant by name. *)
+    highlight Header "Testing base...";
+    let base_file = write_tmp_file base in 
+    compile_and_run "." (coqc_single_cmd base_file) ExpectOnlySuccesses;
+    List.iteri (fun i m ->
+      (if i > 0 then Printf.printf "\n");
+      highlight Header (Printf.sprintf "Testing mutant %d..." i); 
+      reset_test_results();
+      compile_and_run "." (coqc_single_cmd (write_tmp_file m)) ExpectSomeFailure
+    ) muts
+ *)
+  | Dir (s, fss) -> begin
+    let ((base, dir_mutants), all_things_to_check) = calc_dir_mutants sec_graph fs in
+    List.iter (fun (s1,s2) -> Printf.printf "To test: %s - %s\n" s1 s2) all_things_to_check;
+    let temporary_file = "QuickChickTop.v" in
+    let rec output_mut_dir tmp_dir fs =
+      match fs with 
+      | File (s, out_data) ->
+        let out_data =
+          if Filename.basename s = "_CoqProject" then
+            out_data ^ "\n" ^ temporary_file ^ "\n"
+          else out_data in
+        let out_file = tmp_dir ^ "/" ^ s in
+        if not (Sys.file_exists out_file) || load_file out_file != out_data
+        then
+          ignore (write_file out_file out_data)
+      | Dir (s, fss) -> begin 
+        let dir_name = tmp_dir ^ "/" ^ s in
+        if (ensure_dir_exists dir_name) <> 0 then
+          failwith ("Could not create directory: " ^ dir_name)
+        else List.iter (output_mut_dir tmp_dir) fss
+      end in
 
-      let all_vs = gather_all_vs (Dir (s, fss)) in
-      let extractions = List.map (fun s -> Filename.basename s) all_vs in
-(*      let imports = List.map (fun s -> Str.global_replace (Str.regexp "/") "." s) all_vs in *)
-      let imports = extractions in
-
-      let (test_names, tests) = 
-        List.split (
-        List.mapi (fun i (f, s) ->
-                   let s =
-                     let s = trim s in String.sub s 0 (String.length s - 1)
-                   in 
-                   ( Printf.sprintf "test%d" i
-                   , Printf.sprintf "Definition test%d := print_extracted_coq_string (show (quickCheck %s.%s)).\n"
-                                  i
-                                  (trim (Filename.basename (Filename.chop_suffix f ".v")) (* Leo: better qualification *))
-                                  s)
-                  ) all_things_to_check) in
+    let all_vs = gather_all_vs (Dir (s, fss)) in
+    let extractions = List.map (fun s -> Filename.basename s) all_vs in
+    let mk_import s = 
+      let splits = List.tl (Str.split (Str.regexp "/") s) in
+      String.concat "." splits in
       
-      let tmp_file_data = 
-        "Set Warnings \"-extraction-opaque-accessed,-extraction\".\n\n" ^ 
-        "From QuickChick Require Import QuickChick.\n\n"^
-        "Require " ^ (String.concat " " imports) ^ ".\n\n" ^
-        
-        (String.concat "\n" tests) ^ "\n" ^ 
+    let imports = List.map (fun s -> (if !top = "" then "" else !top ^ ".") ^ (mk_import s)) all_vs in
 
-        "Separate Extraction " ^ (String.concat " " extractions) ^ " " ^ (String.concat " " test_names) ^  ".\n" in
+    let (test_names, tests) = 
+      List.split (
+      List.mapi (fun i (f, s) ->
+                 let s =
+                   let s = trim s in String.sub s 0 (String.length s - 1)
+                 in 
+                 ( Printf.sprintf "test%d" i
+                 , Printf.sprintf "Definition test%d := print_extracted_coq_string (show (quickCheck %s.%s)).\n"
+                                i
+                                (trim (Filename.basename (Filename.chop_suffix f ".v")) (* Leo: better qualification *))
+                                s)
+                ) all_things_to_check) in
+    
+    let tmp_file_data = 
+      "Set Warnings \"-extraction-opaque-accessed,-extraction\".\n\n" ^ 
+      "From QuickChick Require Import QuickChick.\n\n"^
+      "Require " ^ (String.concat " " imports) ^ ".\n\n" ^
+      
+      (String.concat "\n" tests) ^ "\n" ^ 
 
-      ensure_tmpdir_exists();
-      ignore (write_file (tmp_dir ^ "/" ^ temporary_file) tmp_file_data);
+      "Separate Extraction " ^ (String.concat " " extractions) ^ " " ^ (String.concat " " test_names) ^  ".\n" in
 
-      (* Base mutant *)
-      highlight Header "Testing base..."; 
-      (* Entire file structure is copied *)
-      output_mut_dir tmp_dir base;
-      let dir = tmp_dir ^ "/" ^ s in
-      compile_and_run dir "make" ExpectOnlySuccesses;
+    ensure_tmpdir_exists();
+    ignore (write_file (tmp_dir ^ "/" ^ temporary_file) tmp_file_data);
 
-      let ocamlbuild_and_run () = 
-   
-        let ocamlbuild_cmd = 
-          Printf.sprintf "ocamlbuild %s.native" (Filename.chop_suffix temporary_file ".v") in
-        let here = Sys.getcwd() in
-        Sys.chdir tmp_dir;
-        if (Sys.command ocamlbuild_cmd <> 0) then 
-          failwith "Ocamlbuild failure"
-        else Sys.command (Printf.sprintf "./%s.native" (Filename.chop_suffix temporary_file ".v"));
-        Sys.chdir here in
-      ocamlbuild_and_run (); 
+    (* Base mutant *)
+    highlight Header "Testing base..."; 
+    (* Entire file structure is copied *)
+    output_mut_dir tmp_dir base;
+    let dir = tmp_dir ^ "/" ^ s in
+    compile_and_run dir "make" ExpectOnlySuccesses;
 
-      (* For each mutant structure *)
-      List.iteri
-        (fun i m ->
-          begin
-            Printf.printf "\n";
-            highlight Header (Printf.sprintf "Testing mutant %d..." i);
-            ensure_tmpdir_exists();
-            (* Entire file structure is copied *)
-            output_mut_dir tmp_dir m;
-            reset_test_results();
-            compile_and_run dir "make" ExpectSomeFailure;
-            ocamlbuild_and_run ()
-          end)
-        dir_mutants
+    let ocamlbuild_and_run () = 
+ 
+      let ocamlbuild_cmd = 
+        Printf.sprintf "ocamlbuild %s.native" (Filename.chop_suffix temporary_file ".v") in
+      let here = Sys.getcwd() in
+      Sys.chdir tmp_dir;
+      if (Sys.command ocamlbuild_cmd <> 0) then 
+        failwith "Ocamlbuild failure"
+      else Sys.command (Printf.sprintf "./%s.native" (Filename.chop_suffix temporary_file ".v"));
+      Sys.chdir here in
+    ocamlbuild_and_run (); 
 
-    end
+    (* For each mutant structure *)
+    List.iteri
+      (fun i m ->
+        begin
+          Printf.printf "\n";
+          highlight Header (Printf.sprintf "Testing mutant %d..." i);
+          ensure_tmpdir_exists();
+          (* Entire file structure is copied *)
+          output_mut_dir tmp_dir m;
+          reset_test_results();
+          compile_and_run dir "make" ExpectSomeFailure;
+          ocamlbuild_and_run ()
+        end)
+      dir_mutants
+
   end;
 
-    if !something_failed then exit 1
+  if !something_failed then exit 1
       
 
 (* 

@@ -4,7 +4,7 @@ Set Warnings "-notation-overridden,-parsing".
 From QuickChick Require Import QuickChick.
 Require Import Arith.
 
-Require Import Foo.
+Require Import Top.Foo.
 
 (*! Section prop_plus_one_again *)(*! extends plus_one *)
 Definition prop_plus_one_again x := 
