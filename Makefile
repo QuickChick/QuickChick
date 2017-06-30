@@ -11,14 +11,15 @@ endef
 includecmdwithout@ = $(eval $(subst @,$(donewline),$(shell { $(1) | tr -d '\r' | tr '\n' '@'; })))
 $(call includecmdwithout@,$(COQBIN)coqtop -config)
 
-all: plugin quickChickTool
+all: plugin
+	$(MAKE) quickChickTool
 
 plugin: Makefile.coq 
 	$(MAKE) -f Makefile.coq 
 
 TEMPFILE := $(shell mktemp)
 
-install: plugin Makefile.coq quickChickTool
+install: all
 	$(V)$(MAKE) -f Makefile.coq install > $(TEMPFILE) || cat $(TEMPFILE)
   # Manually copying the remaining files
 #	 $(V)cp src/quickChickLib.cmx $(COQLIB)/user-contrib/QuickChick
@@ -38,10 +39,10 @@ src/quickChickToolParser.cmo : src/quickChickToolParser.mly
 src/%.cmo : src/%.ml
 	ocamlc -I src -c $<
 
-quickChickTool: src/quickChickToolTypes.cmo \
-                src/quickChickToolParser.cmo \
-                src/quickChickToolLexer.cmo \
-                src/quickChickTool.cmo
+quickChickTool: src/quickChickToolTypes.cmo
+	$(MAKE) src/quickChickToolParser.cmo
+	$(MAKE) src/quickChickToolLexer.cmo
+	$(MAKE) src/quickChickTool.cmo
 	ocamlc -o src/quickChickTool unix.cma str.cma src/quickChickToolTypes.cmo src/quickChickToolLexer.cmo src/quickChickToolParser.cmo src/quickChickTool.cmo
 
 tests:
