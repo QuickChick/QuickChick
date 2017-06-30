@@ -476,6 +476,8 @@ control over the extraction.)
 (* Advice about how to use typeclasses in Coq.  How to avoid various
    pitfalls and gotchas.  How to debug... *)
 
+(* Manipulating the hint database... *)
+
 (* HIDE: Sozeau...
 
    The fact that typeclass resolution resorts to unrestricted proof
