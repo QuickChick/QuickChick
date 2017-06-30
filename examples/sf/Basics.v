@@ -39,6 +39,7 @@ Definition next_weekday (d:day) : day :=
   | sunday    => monday
   end.
 
+Module BoolPlayground.
 Inductive bool : Type :=
   | true : bool
   | false : bool.
@@ -66,13 +67,7 @@ Definition orb (b1:bool) (b2:bool) : bool :=
   | true => true
   | false => b2
   end.
-
-(* Not bothering with these *)
-Definition nandb (b1:bool) (b2:bool) : bool
-  (* REPLACE THIS LINE WITH ":= _your_definition_ ." *). Admitted.
-
-Definition andb3 (b1:bool) (b2:bool) (b3:bool) : bool
-  (* REPLACE THIS LINE WITH ":= _your_definition_ ." *). Admitted.
+End BoolPlayground.
 
 Module NatPlayground.
 
@@ -261,438 +256,193 @@ Proof.
   - inversion Contra.
 Defined.     
 
-Theorem plus_id_example : forall n m : nat, n = m -> n + n = m + m.
+Theorem plus_id_example : forall n m : nat, n = m -> n + n = m + 0.
 Admitted. QuickChick plus_id_example.
 
-(** The first line of the proof moves the universally quantified
-    variables [n] and [m] into the context.  The second moves the
-    hypothesis [n = m] into the context and gives it the name [H].
-    The third tells Coq to rewrite the current goal ([n + n = m + m])
-    by replacing the left side of the equality hypothesis [H] with the
-    right side.
+(*
+Derive ArbitrarySizedSuchThat for (fun x => eq x a).
 
-    (The arrow symbol in the [rewrite] has nothing to do with
-    implication: it tells Coq to apply the rewrite from left to right.
-    To rewrite from right to left, you can use [rewrite <-].  Try
-    making this change in the above proof and see what difference it
-    makes.) *)
+QuickChickDebug Debug On.
 
-(** **** Exercise: 1 star (plus_id_exercise)  *)
-(** Remove "[Admitted.]" and fill in the proof. *)
+Derive SizeMonotonicSuchThatOpt for (fun x => eq x a).
+
+Derive SizedProofEqs for (fun x => eq x a).
+Proof.
+refine (fun x => conj 
+   (fun Hin =>
+    match Hin with
+    | ex_intro s Hc =>
+        match Hc with
+        | conj Hl Hin =>
+            nat_ind
+              (fun n =>
+               forall x (input0_ : A),
+               Basics.impl
+                 ((let
+                     fix aux_iter size0 (input0_ : A) :=
+                       match size0 with
+                       | O => setU (set1 input0_) set0
+                       | S size' => setU (set1 input0_) set0
+                       end in
+                   aux_iter n input0_) x) ((@eq A) x input0_))
+              (fun x (input0_ : A) hin =>
+               match hin with
+               | or_introl Hr0 => _ (* eq_ind _ _ (eq_refl _) _ Hr0*)
+               | or_intror Hl0 => False_ind _ Hl0
+               end)
+              (fun size0 IHs x (input0_ : A) hin =>
+               match hin with
+               | or_introl Hr1 => _ (* eq_ind _ _ (eq_refl _) _ Hr1 *)
+               | or_intror Hl1 => False_ind _ Hl1
+               end)
+              s x input0_ Hin
+
+        end
+    end)
+   _).
+- inversion Hr0; auto.
+- inversion Hr1; auto.
+- intros H; symmetry in H; move: H.
+  apply eq_ind.
+  eapply (ex_intro input0_).
+Defined.
+Defined.
+  admit.
+Admitted.
+
+
+  refine ((fun x' => ex_intro _ _) _).
+  refine (ex_intro _).
+  refine (eq_ind
+      (fun _gen (input0_ : A) =>
+       bigcup setT
+         (fun n =>
+          let
+            fix aux_iter size0 (input0_ : A) :=
+              match size0 with
+              | O => setU (set1 input0_) set0
+              | S size' => setU (set1 input0_) set0
+              end in
+          aux_iter n input0_) _gen)
+      _ x input0_).
+      (fun x => ex_intro _ (Coq.Init.Datatypes.S 0) (conj I (or_introl (Logic.eq_refl _)))) x
+      input0_).
+
+
+Definition s A (input0_ : A) := 
+(fun x =>
+ conj
+   (fun Hin =>
+    match Hin with
+    | ex_intro s Hc =>
+        match Hc with
+        | conj Hl Hin =>
+            nat_ind
+              (fun n =>
+               forall x (input0_ : A),
+               Basics.impl
+                 ((let
+                     fix aux_iter size0 (input0_ : A) :=
+                       match size0 with
+                       | O => setU (set1 input0_) set0
+                       | S size' => setU (set1 input0_) set0
+                       end in
+                   aux_iter n input0_) x) ((@eq A) x input0_))
+              (fun x (input0_ : A) hin =>
+               match hin with
+               | or_introl Hr0 => eq_ind _ _ (eq_refl _) _ Hr0
+               | or_intror Hl0 => False_ind _ Hl0
+               end)
+              (fun size0 IHs x (input0_ : A) hin =>
+               match hin with
+               | or_introl Hr1 => eq_ind _ _ (eq_refl _) _ Hr1
+               | or_intror Hl1 => False_ind _ Hl1
+               end) s x input0_ Hin
+        end
+    end)
+   (eq_ind
+      (fun _gen (input0_ : A) =>
+       bigcup setT
+         (fun n =>
+          let
+            fix aux_iter size0 (input0_ : A) :=
+              match size0 with
+              | O => setU (set1 input0_) set0
+              | S size' => setU (set1 input0_) set0
+              end in
+          aux_iter n input0_) _gen)
+      (fun x => ex_intro _ (Coq.Init.Datatypes.S 0) (conj I (or_introl (Logic.eq_refl _)))) x
+      input0_)).
+
+
+(* TODO: Replace these with derived versions *)
+(*
+
+QuickChickDebug Debug On.
+
+
+
+Derive GenSizedSuchThatCorrect for (fun eq => eq x a).
+
+Derive GenSizedSuchThatSizeMonotonicOpt for (fun foo => goodFooUnif n foo).
+*)
+*)
+
+(*
+Global Instance testSuchThat_irrel {A B C : Type} {pre : A -> B -> Prop} {prop : A -> B -> C -> Type}
+       `{forall prop `{forall a b, Checkable (prop a b)}, Checkable (forall a b, pre a b -> prop a b)}
+       `{forall (a : A) (b : B), Checkable (forall (c : C), prop a b c)} :
+  Checkable (forall a b c, pre a b -> prop a b c) :=
+  {| checker f := @checker (forall a b, pre a b -> forall c, prop a b c) _ _ |}. 
+Proof. intros; eauto. Defined.
+
+
+Instance id_ex_check : Checkable (forall n m o : nat, n = m -> m = o -> n + m = m + o).
+Proof.
+  eapply testSuchThat_irrel.
+  Unshelve.
+  move => a b.
+  *)
 
 Theorem plus_id_exercise : forall n m o : nat,
   n = m -> m = o -> n + m = m + o.
-Proof.
-  (* FILL IN HERE *) Admitted.
-(** [] *)
-
-(** The [Admitted] command tells Coq that we want to skip trying
-    to prove this theorem and just accept it as a given.  This can be
-    useful for developing longer proofs, since we can state subsidiary
-    lemmas that we believe will be useful for making some larger
-    argument, use [Admitted] to accept them on faith for the moment,
-    and continue working on the main argument until we are sure it
-    makes sense; then we can go back and fill in the proofs we
-    skipped.  Be careful, though: every time you say [Admitted] you
-    are leaving a door open for total nonsense to enter Coq's nice,
-    rigorous, formally checked world! *)
-
-(** We can also use the [rewrite] tactic with a previously proved
-    theorem instead of a hypothesis from the context. If the statement
-    of the previously proved theorem involves quantified variables,
-    as in the example below, Coq tries to instantiate them
-    by matching with the current goal. *)
+Admitted. (* Leo: needs more typeclass magic *)
 
 Theorem mult_0_plus : forall n m : nat,
-  (0 + n) * m = n * m.
-Proof.
-  intros n m.
-  rewrite -> plus_O_n.
-  reflexivity.  Qed.
+  (0 + n) * m = n * m. Admitted. (* QuickChick mult_0_plus. *)
 
-(** **** Exercise: 2 stars (mult_S_1)  *)
 Theorem mult_S_1 : forall n m : nat,
   m = S n ->
   m * (1 + n) = m * m.
-Proof.
-  (* FILL IN HERE *) Admitted.
-
-(* (N.b. This proof can actually be completed without using [rewrite],
-   but please do use [rewrite] for the sake of the exercise.) *)
-(** [] *)
-
-(* ################################################################# *)
-(** * Proof by Case Analysis *)
-
-(** Of course, not everything can be proved by simple
-    calculation and rewriting: In general, unknown, hypothetical
-    values (arbitrary numbers, booleans, lists, etc.) can block
-    simplification.  For example, if we try to prove the following
-    fact using the [simpl] tactic as above, we get stuck. *)
-
+Admitted. (* QuickChick mult_S_1. *)
 
 Theorem plus_1_neq_0_firsttry : forall n : nat,
   beq_nat (n + 1) 0 = false.
-Admitted.
-Proof.
-  intros n.
-  simpl.  (* does nothing! *)
-Abort.
-
-(** The reason for this is that the definitions of both
-    [beq_nat] and [+] begin by performing a [match] on their first
-    argument.  But here, the first argument to [+] is the unknown
-    number [n] and the argument to [beq_nat] is the compound
-    expression [n + 1]; neither can be simplified.
-
-    To make progress, we need to consider the possible forms of [n]
-    separately.  If [n] is [O], then we can calculate the final result
-    of [beq_nat (n + 1) 0] and check that it is, indeed, [false].  And
-    if [n = S n'] for some [n'], then, although we don't know exactly
-    what number [n + 1] yields, we can calculate that, at least, it
-    will begin with one [S], and this is enough to calculate that,
-    again, [beq_nat (n + 1) 0] will yield [false].
-
-    The tactic that tells Coq to consider, separately, the cases where
-    [n = O] and where [n = S n'] is called [destruct]. *)
-
-Theorem plus_1_neq_0 : forall n : nat,
-  beq_nat (n + 1) 0 = false.
-Proof.
-  intros n. destruct n as [| n'].
-  - reflexivity.
-  - reflexivity.   Qed.
-
-(** The [destruct] generates _two_ subgoals, which we must then
-    prove, separately, in order to get Coq to accept the theorem. The
-    annotation "[as [| n']]" is called an _intro pattern_.  It tells
-    Coq what variable names to introduce in each subgoal.  In general,
-    what goes between the square brackets is a _list of lists_ of
-    names, separated by [|].  In this case, the first component is
-    empty, since the [O] constructor is nullary (it doesn't have any
-    arguments).  The second component gives a single name, [n'], since
-    [S] is a unary constructor.
-
-    The [-] signs on the second and third lines are called _bullets_,
-    and they mark the parts of the proof that correspond to each
-    generated subgoal.  The proof script that comes after a bullet is
-    the entire proof for a subgoal.  In this example, each of the
-    subgoals is easily proved by a single use of [reflexivity], which
-    itself performs some simplification -- e.g., the first one
-    simplifies [beq_nat (S n' + 1) 0] to [false] by first rewriting
-    [(S n' + 1)] to [S (n' + 1)], then unfolding [beq_nat], and then
-    simplifying the [match].
-
-    Marking cases with bullets is entirely optional: if bullets are
-    not present, Coq simply asks you to prove each subgoal in
-    sequence, one at a time. But it is a good idea to use bullets.
-    For one thing, they make the structure of a proof apparent, making
-    it more readable. Also, bullets instruct Coq to ensure that a
-    subgoal is complete before trying to verify the next one,
-    preventing proofs for different subgoals from getting mixed
-    up. These issues become especially important in large
-    developments, where fragile proofs lead to long debugging
-    sessions.
-
-    There are no hard and fast rules for how proofs should be
-    formatted in Coq -- in particular, where lines should be broken
-    and how sections of the proof should be indented to indicate their
-    nested structure.  However, if the places where multiple subgoals
-    are generated are marked with explicit bullets at the beginning of
-    lines, then the proof will be readable almost no matter what
-    choices are made about other aspects of layout.
-
-    This is also a good place to mention one other piece of somewhat
-    obvious advice about line lengths.  Beginning Coq users sometimes
-    tend to the extremes, either writing each tactic on its own line
-    or writing entire proofs on one line.  Good style lies somewhere
-    in the middle.  One reasonable convention is to limit yourself to
-    80-character lines.
-
-    The [destruct] tactic can be used with any inductively defined
-    datatype.  For example, we use it next to prove that boolean
-    negation is involutive -- i.e., that negation is its own
-    inverse. *)
+Admitted. (* QuickChick plus_1_neq_0_firsttry. *)
 
 Theorem negb_involutive : forall b : bool,
-  negb (negb b) = b.
-Proof.
-  intros b. destruct b.
-  - reflexivity.
-  - reflexivity.  Qed.
-
-(** Note that the [destruct] here has no [as] clause because
-    none of the subcases of the [destruct] need to bind any variables,
-    so there is no need to specify any names.  (We could also have
-    written [as [|]], or [as []].)  In fact, we can omit the [as]
-    clause from _any_ [destruct] and Coq will fill in variable names
-    automatically.  This is generally considered bad style, since Coq
-    often makes confusing choices of names when left to its own
-    devices.
-
-    It is sometimes useful to invoke [destruct] inside a subgoal,
-    generating yet more proof obligations. In this case, we use
-    different kinds of bullets to mark goals on different "levels."
-    For example: *)
+  negb (negb b) = b. Admitted. (* QuickChick negb_involutive. *)
 
 Theorem andb_commutative : forall b c, andb b c = andb c b.
-Proof.
-  intros b c. destruct b.
-  - destruct c.
-    + reflexivity.
-    + reflexivity.
-  - destruct c.
-    + reflexivity.
-    + reflexivity.
-Qed.
-
-(** Each pair of calls to [reflexivity] corresponds to the
-    subgoals that were generated after the execution of the [destruct c]
-    line right above it. *)
-
-(** Besides [-] and [+], we can use [*] (asterisk) as a third kind of
-    bullet.  We can also enclose sub-proofs in curly braces, which is
-    useful in case we ever encounter a proof that generates more than
-    three levels of subgoals: *)
-
-Theorem andb_commutative' : forall b c, andb b c = andb c b.
-Proof.
-  intros b c. destruct b.
-  { destruct c.
-    { reflexivity. }
-    { reflexivity. } }
-  { destruct c.
-    { reflexivity. }
-    { reflexivity. } }
-Qed.
-
-(** Since curly braces mark both the beginning and the end of a
-    proof, they can be used for multiple subgoal levels, as this
-    example shows. Furthermore, curly braces allow us to reuse the
-    same bullet shapes at multiple levels in a proof: *)
-
-Theorem andb3_exchange :
-  forall b c d, andb (andb b c) d = andb (andb b d) c.
-Proof.
-  intros b c d. destruct b.
-  - destruct c.
-    { destruct d.
-      - reflexivity.
-      - reflexivity. }
-    { destruct d.
-      - reflexivity.
-      - reflexivity. }
-  - destruct c.
-    { destruct d.
-      - reflexivity.
-      - reflexivity. }
-    { destruct d.
-      - reflexivity.
-      - reflexivity. }
-Qed.
-
-(** Before closing the chapter, let's mention one final
-    convenience.  As you may have noticed, many proofs perform case
-    analysis on a variable right after introducing it:
-
-       intros x y. destruct y as [|y].
-
-    This pattern is so common that Coq provides a shorthand for it: we
-    can perform case analysis on a variable when introducing it by
-    using an intro pattern instead of a variable name. For instance,
-    here is a shorter proof of the [plus_1_neq_0] theorem above. *)
-
-Theorem plus_1_neq_0' : forall n : nat,
-  beq_nat (n + 1) 0 = false.
-Proof.
-  intros [|n].
-  - reflexivity.
-  - reflexivity.  Qed.
-
-(** If there are no arguments to name, we can just write [[]]. *)
-
-Theorem andb_commutative'' :
-  forall b c, andb b c = andb c b.
-Proof.
-  intros [] [].
-  - reflexivity.
-  - reflexivity.
-  - reflexivity.
-  - reflexivity.
-Qed.
-
-(** **** Exercise: 2 stars (andb_true_elim2)  *)
-(** Prove the following claim, marking cases (and subcases) with
-    bullets when you use [destruct]. *)
+Admitted. (* QuickChick andb_commutative. *)
 
 Theorem andb_true_elim2 : forall b c : bool,
   andb b c = true -> c = true.
-Proof.
-  (* FILL IN HERE *) Admitted.
-(** [] *)
+Admitted. (* Leo: OUT-OF-SCOPE *)
 
-(** **** Exercise: 1 star (zero_nbeq_plus_1)  *)
 Theorem zero_nbeq_plus_1 : forall n : nat,
-  beq_nat 0 (n + 1) = false.
-Proof.
-  (* FILL IN HERE *) Admitted.
-(** [] *)
-
-(* ================================================================= *)
-(** ** More on Notation (Optional) *)
-
-(** (In general, sections marked Optional are not needed to follow the
-    rest of the book, except possibly other Optional sections.  On a
-    first reading, you might want to skim these sections so that you
-    know what's there for future reference.)
-
-    Recall the notation definitions for infix plus and times: *)
-
-Notation "x + y" := (plus x y)
-                       (at level 50, left associativity)
-                       : nat_scope.
-Notation "x * y" := (mult x y)
-                       (at level 40, left associativity)
-                       : nat_scope.
-
-(** For each notation symbol in Coq, we can specify its _precedence
-    level_ and its _associativity_.  The precedence level [n] is
-    specified by writing [at level n]; this helps Coq parse compound
-    expressions.  The associativity setting helps to disambiguate
-    expressions containing multiple occurrences of the same
-    symbol. For example, the parameters specified above for [+] and
-    [*] say that the expression [1+2*3*4] is shorthand for
-    [(1+((2*3)*4))]. Coq uses precedence levels from 0 to 100, and
-    _left_, _right_, or _no_ associativity.  We will see more examples
-    of this later, e.g., in the [Lists]
-    chapter.
-
-    Each notation symbol is also associated with a _notation scope_.
-    Coq tries to guess what scope is meant from context, so when it
-    sees [S(O*O)] it guesses [nat_scope], but when it sees the
-    cartesian product (tuple) type [bool*bool] (which we'll see in
-    later chapters) it guesses [type_scope].  Occasionally, it is
-    necessary to help it out with percent-notation by writing
-    [(x*y)%nat], and sometimes in what Coq prints it will use [%nat]
-    to indicate what scope a notation is in.
-
-    Notation scopes also apply to numeral notation ([3], [4], [5],
-    etc.), so you may sometimes see [0%nat], which means [O] (the
-    natural number [0] that we're using in this chapter), or [0%Z],
-    which means the Integer zero (which comes from a different part of
-    the standard library).
-
-    Pro tip: Coq's notation mechanism is not especially powerful.
-    Don't expect too much from it! *)
-
-(* ================================================================= *)
-(** ** Fixpoints and Structural Recursion (Optional) *)
-
-(** Here is a copy of the definition of addition: *)
-
-Fixpoint plus' (n : nat) (m : nat) : nat :=
-  match n with
-  | O => m
-  | S n' => S (plus' n' m)
-  end.
-
-(** When Coq checks this definition, it notes that [plus'] is
-    "decreasing on 1st argument."  What this means is that we are
-    performing a _structural recursion_ over the argument [n] -- i.e.,
-    that we make recursive calls only on strictly smaller values of
-    [n].  This implies that all calls to [plus'] will eventually
-    terminate.  Coq demands that some argument of _every_ [Fixpoint]
-    definition is "decreasing."
-
-    This requirement is a fundamental feature of Coq's design: In
-    particular, it guarantees that every function that can be defined
-    in Coq will terminate on all inputs.  However, because Coq's
-    "decreasing analysis" is not very sophisticated, it is sometimes
-    necessary to write functions in slightly unnatural ways. *)
-
-(** **** Exercise: 2 stars, optional (decreasing)  *)
-(** To get a concrete sense of this, find a way to write a sensible
-    [Fixpoint] definition (of a simple function on numbers, say) that
-    _does_ terminate on all inputs, but that Coq will reject because
-    of this restriction. *)
-
-(* FILL IN HERE *)
-(** [] *)
-
-(* ################################################################# *)
-(** * More Exercises *)
-
-(** **** Exercise: 2 starsM (boolean_functions)  *)
-(** Use the tactics you have learned so far to prove the following
-    theorem about boolean functions. *)
+  beq_nat 0 (n + 1) = false. 
+Admitted. (* QuickChick zero_nbeq_plus_1 *)
 
 Theorem identity_fn_applied_twice :
   forall (f : bool -> bool),
   (forall (x : bool), f x = x) ->
   forall (b : bool), f (f b) = b.
-Proof.
-  (* FILL IN HERE *) Admitted.
-
-(** Now state and prove a theorem [negation_fn_applied_twice] similar
-    to the previous one but where the second hypothesis says that the
-    function [f] has the property that [f x = negb x].*)
-
-(* FILL IN HERE *)
-(** [] *)
-
-(** **** Exercise: 2 stars (andb_eq_orb)  *)
-(** Prove the following theorem.  (You may want to first prove a
-    subsidiary lemma or two. Alternatively, remember that you do
-    not have to introduce all hypotheses at the same time.) *)
+Admitted. (* Leo: FUNCTION *)
 
 Theorem andb_eq_orb :
   forall (b c : bool),
   (andb b c = orb b c) ->
   b = c.
-Proof.
-  (* FILL IN HERE *) Admitted.
-(** [] *)
-
-(** **** Exercise: 3 starsM (binary)  *)
-(** Consider a different, more efficient representation of natural
-    numbers using a binary rather than unary system.  That is, instead
-    of saying that each natural number is either zero or the successor
-    of a natural number, we can say that each binary number is either
-
-      - zero,
-      - twice a binary number, or
-      - one more than twice a binary number.
-
-    (a) First, write an inductive definition of the type [bin]
-        corresponding to this description of binary numbers.
-
-    (Hint: Recall that the definition of [nat] above,
-
-         Inductive nat : Type := | O : nat | S : nat -> nat.
-
-    says nothing about what [O] and [S] "mean."  It just says "[O] is
-    in the set called [nat], and if [n] is in the set then so is [S
-    n]."  The interpretation of [O] as zero and [S] as successor/plus
-    one comes from the way that we _use_ [nat] values, by writing
-    functions to do things with them, proving things about them, and
-    so on.  Your definition of [bin] should be correspondingly simple;
-    it is the functions you will write next that will give it
-    mathematical meaning.)
-
-    (b) Next, write an increment function [incr] for binary numbers,
-        and a function [bin_to_nat] to convert binary numbers to unary
-        numbers.
-
-    (c) Write five unit tests [test_bin_incr1], [test_bin_incr2], etc.
-        for your increment and binary-to-unary functions.  (A "unit
-        test" in Coq is a specific [Example] that can be proved with
-        just [reflexivity], as we've done for several of our
-        definitions.)  Notice that incrementing a binary number and
-        then converting it to unary should yield the same result as
-        first converting it to unary and then incrementing. *)
-
-(* FILL IN HERE *)
-(** [] *)
-
-(** $Date: 2016-11-22 16:39:52 -0500 (Tue, 22 Nov 2016) $ *)
+Admitted. (* Leo: OUT-OF-SCOPE *)
 
