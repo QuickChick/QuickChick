@@ -349,9 +349,23 @@ let rec parse_file_or_dir file_name =
         let lexbuf = Lexing.from_channel (open_in file_name) in
         let result = program lexer lexbuf in
 
+        let collapse l =
+          let rec loop acc acc_text l =
+            match l with
+            | Text s :: l' -> loop acc (s :: acc_text) l'
+            | n :: l' ->
+               let text_acc_node = Text (String.concat "" (List.rev acc_text)) in
+               loop (n :: text_acc_node :: acc) [] l'
+            | [] ->
+               let text_acc_node = Text (String.concat "" (List.rev acc_text)) in
+               text_acc_node :: acc
+
+          in List.rev (loop [] [] l) in
+
+        let result = List.map (fun (Section (a,b,c,d,e)) -> Section (a,b,c,d,collapse e)) result in
+        
         let fix_extends extends = 
           Str.split (Str.regexp "[ \r\n\t]") (String.concat "" extends) in 
-
         let result = List.map
           (fun (Section (a,b,c,exts,e)) ->
             Section (a,b,c,
