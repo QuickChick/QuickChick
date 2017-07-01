@@ -184,108 +184,8 @@ Admitted. (* QuickChick plus_1_l. *)
 Theorem mult_0_l : forall n:nat, 0 * n = 0.
 Admitted. (* QuickChick mult_0_l. *)
 
-Definition forAllProof {A prop : Type} {_ : Checkable prop} `{Show A}
-           (gen : G A)  (pf : forall (x : A), semGen gen x -> prop) : Checker :=
-  bindGen' gen (fun x H => printTestCase (show x ++ newline) (pf x H)).
-
-Global Instance testSuchThat {A : Type} {pre : A -> Prop} {prop : A -> Type}
-       `{Show A} `{GenSuchThatCorrect A (fun x => pre x)}
-       `{forall (x : A), Checkable (prop x)} :
-  Checkable (forall x, pre x -> prop x) := 
-  {| checker f := forAllProof (genST (fun x => pre x)) 
-                              (fun mx H => 
-                                 (* Leo: Is there a better way to do this? *)
-                                 let mx' := mx in 
-                                 let Heq := erefl mx' : mx' = mx in
-                                 match mx as mx'' return (mx' = mx'' -> Checker) with 
-                                 | Some x => fun _ => checker (f x _)
-                                 | None => fun _ => checker tt
-                                 end Heq) |}.
-Proof.
-  (* Annoying *)
-  assert (Eq : mx = mx') by auto.
-  rewrite -Eq in e.
-  clear Heq Eq mx'.
-  (* End annoying *)
-  destruct H1.
-  apply STSound in H; subst.
-  inversion H as [Hyp | Contra].
-  - inversion Hyp as [x' [Pre HIn]].
-    inversion HIn; subst; auto.
-  - inversion Contra.
-Defined.     
-
-Instance arbST_eq {A} (a : A) : GenSuchThat A (fun x => x = a) :=
-  {| arbitraryST := returnGen (Some a) |}.
-Instance arbST_Correct {A} (a : A) 
-  : SuchThatCorrect (fun x => x = a) (genST (fun x => x = a)) :=
-  {| STComplete := _ ;
-     STSound    := _ |}.
-Proof.
-  - simpl; rewrite semReturn.
-    unfold set_incl => ma Hma.
-    inversion Hma as [a' [Eq HIn]].
-    inversion HIn; subst; auto.
-  - simpl; rewrite semReturn.
-    unfold set_incl => ma Hma.
-    inversion Hma; subst.
-    left.
-    firstorder.
-Defined.
-
-Instance arbST_eq' {A} (a : A) : GenSuchThat A (fun x => a = x) :=
-  {| arbitraryST := returnGen (Some a) |}.
-Instance arbST_Correct' {A} (a : A) 
-  : SuchThatCorrect (fun x => a = x ) (genST (fun x => a = x)) :=
-  {| STComplete := _ ;
-     STSound    := _ |}.
-Proof.
-  - simpl; rewrite semReturn.
-    unfold set_incl => ma Hma.
-    inversion Hma as [a' [Eq HIn]].
-    inversion HIn; subst; auto.
-  - simpl; rewrite semReturn.
-    unfold set_incl => ma Hma.
-    inversion Hma; subst.
-    left.
-    firstorder.
-Defined.
-
-
 Theorem plus_0_example: forall n, n = 17 -> n = 42.
 Admitted. (* QuickChick plus_0_example. *)
-
-Global Instance testSuchThat2_1 {A B : Type} {pre : A -> B -> Prop} {prop : A -> B -> Type}
-       `{Show A} `{Show B} `{Arbitrary B}
-       `{forall (b : B), GenSuchThat A (fun x => pre x b)}
-       `{forall (b : B), SuchThatCorrect (fun x => pre x b) (genST (fun x => pre x b))}
-       `{forall (a : A) (b : B), Checkable (prop a b)} :
-  Checkable (forall a b , pre a b -> prop a b) :=
-  {| checker f := 
-       forAllShrink arbitrary shrink (fun b => 
-         forAllProof (genST (fun x => pre x b)) 
-                     (fun mx H => 
-                        (* Leo: Is there a better way to do this? *)
-                        let mx' := mx in 
-                        let Heq := erefl mx' : mx' = mx in
-                        match mx as mx'' return (mx' = mx'' -> Checker) with 
-                        | Some x => fun _ => checker (f x b _)
-                        | None => fun _ => checker tt
-                        end Heq)
-                                     ) |}.
-Proof.
-  (* Annoying *)
-  assert (Eq : mx = mx') by auto.
-  rewrite -Eq in e.
-  clear Heq Eq mx'.
-  (* End annoying *)
-  destruct (H5 b).
-  apply STSound in H; subst.
-  inversion H as [Hyp | Contra].
-  - inversion Hyp as [x' [Pre HIn]].
-    inversion HIn; subst; auto.
-  - inversion Contra.
-Defined.     
 
 Conjecture plus_id_example : forall n m : nat, n = m -> n + n = m + 0.
 QuickChick plus_id_example.
@@ -419,12 +319,6 @@ Derive GenSizedSuchThatSizeMonotonicOpt for (fun foo => goodFooUnif n foo).
 *)
 *)
 
-Global Instance testSuchThat_swap {A B C : Type} {pre : A -> B -> Prop} 
-       {prop : A -> B -> C -> Type}
-       `{Checkable (forall a b, pre a b -> forall c, prop a b c)} :
-  Checkable (forall a b c, pre a b -> prop a b c) :=
-  {| checker f := @checker (forall a b, pre a b -> forall c, prop a b c) _ _ |}. 
-Proof. intros; eauto. Defined.
 
 Theorem plus_id_exercise : forall n m o : nat,
   n = m -> m = o -> n + m = m + o.

@@ -226,6 +226,11 @@ Definition forAll {A prop : Type} {_ : Checkable prop} `{Show A}
   bindGen gen (fun x =>
                  printTestCase (show x ++ newline) (pf x)).
 
+Definition forAllProof {A prop : Type} {C : Checkable prop} `{S : Show A}
+           (gen : G A)  (pf : forall (x : A), semGen gen x -> prop) : Checker :=
+  bindGen' gen (fun x H => printTestCase (show x ++ newline) (pf x H)).
+Arguments forAllProof {A} {prop} {C} {S} _ _.
+
 Definition forAllShrink {A prop : Type} {_ : Checkable prop} `{Show A}
            (gen : G A) (shrinker : A -> list A) (pf : A -> prop) : Checker :=
 
