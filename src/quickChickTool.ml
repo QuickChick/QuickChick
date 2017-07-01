@@ -250,6 +250,13 @@ let run_and_show_output_on_failure command msg =
     else 
       failwith msg
 
+let perl_hack () =
+  let perl_cmd = "perl -i -p0e 's/type int =\\s*int/type tmptmptmp = int\\ntype int = tmptmptmp/sg' " in
+  let hack_mli = perl_cmd ^ "*.mli" in
+  let hack_ml = perl_cmd ^ "*.ml" in
+  if Sys.command hack_mli <> 0 || Sys.command hack_ml <> 0 then
+    debug "perl script hack failed. Report: %s" perl_cmd
+               
 let compile_and_run where e : unit =
   let here = Sys.getcwd() in
   Sys.chdir where; 
@@ -257,6 +264,9 @@ let compile_and_run where e : unit =
   run_and_show_output_on_failure
     (!compile_command)
     (Printf.sprintf "Executing '%s' failed" (!compile_command));
+
+  perl_hack ();
+  
   let ocamlbuild_cmd = 
     Printf.sprintf "ocamlbuild %s.native"
       (Filename.chop_suffix temporary_file ".v") in
@@ -367,11 +377,12 @@ let rec parse_file_or_dir file_name =
         Some (Dir (file_name, catMaybes parsed))
       end
     end
-    else begin
-      let handle =
-        Filename.basename file_name = "_CoqProject"  || 
-        Filename.basename file_name = "Makefile"     || 
-        Filename.check_suffix file_name "v" in
+    else if Filename.basename file_name = "Makefile" then
+      let s = load_file file_name in
+      Some (File (file_name, [Section ("(*", "__default__" ^ file_name, "*)", None, [Text s])]))
+    else
+      let handle = Filename.basename file_name = "_CoqProject"  || 
+                   Filename.check_suffix file_name "v" in
       if handle then begin 
         debug "In file: %s\n" file_name;
         let lexbuf = Lexing.from_channel (open_in file_name) in
@@ -411,7 +422,6 @@ let rec parse_file_or_dir file_name =
         Some (File (file_name, fixed_default))
       end
       else None
-    end
   with Sys_error e -> failwith ("Sys_error " ^ e) 
 
 (* ----------------------------------------------------------------- *)
@@ -597,7 +607,7 @@ let main =
 
     ensure_tmpdir_exists();
     ignore (write_file (tmp_dir ^ "/" ^ temporary_file) tmp_file_data);
-
+    
     (* Base mutant *)
     highlight Header "Testing base..."; 
     (* Entire file structure is copied *)
