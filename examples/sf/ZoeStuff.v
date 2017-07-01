@@ -171,3 +171,153 @@ Qed.
 
 (* Yikes this is stupid, find a workaround *)
 Definition prop := Prop.
+
+Lemma succ_neq_zero :
+  forall x, S x <> 0.
+Proof.
+  firstorder.
+Qed.
+
+Lemma isSomeSome {A : Type} (y : A) :
+  Some y.
+Proof.
+  exact isT.
+Qed.
+
+Lemma semBacktrack:
+  forall (A : Type) (l : seq (nat * G (option A))),
+    semGen (backtrack l) <-->
+    (\bigcup_(x in (l :&: (fun x => x.1 <> 0))) (isSome :&: (semGen x.2))) :|:
+    ([set None] :&: (\bigcap_(x in l :&: (fun x => x.1 <> 0)) (semGen x.2))).
+Admitted.
+
+
+Lemma semSuchThatMaybe_complete:
+  forall (A : Type) (g : G A) (f : A -> bool) (s : set A),
+    s \subset semGen g ->
+    (Some @: (s :&: (fun x : A => f x))) \subset
+    semGen (suchThatMaybe g f).
+Proof.
+Admitted.
+
+Lemma semSuchThatMaybeOpt_complete:
+  forall (A : Type) (g : G (option A)) (f : A -> bool) (s : set A),
+    (Some @: s) \subset semGen g ->
+    (Some @: (s :&: (fun x : A => f x))) \subset
+    semGen (suchThatMaybeOpt g f).
+Proof.
+Admitted.
+
+Lemma semSuchThatMaybe_sound:
+  forall (A : Type) (g : G A) (f : A -> bool) (s : set A),
+    semGen g \subset s ->
+    semGen (suchThatMaybe g f) \subset ((Some @: (s :&: (fun x : A => f x))) :|: [set None]).
+Proof.
+Admitted.
+
+Lemma semSuchThatMaybeOpt_sound:
+  forall (A : Type) (g : G (option A)) (f : A -> bool) (s : set A),
+    semGen g \subset ((Some @: s) :|: [set None]) ->
+    semGen (suchThatMaybeOpt g f) \subset (Some @: (s :&: (fun x : A => f x)) :|: [set None]).
+Proof.
+Admitted.
+
+Lemma isSome_subset {A : Type} (s1 s2 s1' s2' : set (option A)) :
+  isSome :&: s1 \subset isSome :&: s2 ->
+  isSome :&: (s1 :|: ([set None] :&: s1')) \subset isSome :&: (s2 :|: ([set None] :&: s2')).
+Proof.
+  intros Hyp x [H1 H2]. destruct x as [ x | ]; try discriminate.
+  split; eauto.
+  inv H2. left; eauto.
+  eapply Hyp. now split; eauto.
+  inv H. now inv H0.
+Qed.
+
+Lemma setI_set_eq_r {A : Type} (s1 s2 s2' : set A) :
+  s2 <--> s2' ->
+  (s1 :&: s2) <--> (s1 :&: s2').
+Proof.
+  intros. rewrite H; reflexivity.
+Qed.
+
+Lemma semBindSize_subset_compat {A B : Type} (g g' : G A) (f f' : A -> G B) s :
+  semGenSize g s \subset semGenSize g' s ->
+  (forall x, semGenSize (f x) s \subset semGenSize (f' x) s) ->
+  semGenSize (bindGen g f) s \subset semGenSize (bindGen g' f') s.
+Proof.
+  intros H1 H2. rewrite !semBindSize.
+  eapply subset_trans.
+  eapply incl_bigcupl. eassumption.
+  eapply incl_bigcupr. eassumption.
+Qed.
+
+Lemma semBindSizeOpt_subset_compat {A B : Type} (g g' : G A) (f f' : A -> G (option B)) s :
+  semGenSize g s \subset semGenSize g' s ->
+  (forall x, isSome :&: semGenSize (f x) s \subset isSome :&: semGenSize (f' x) s) ->
+  isSome :&: semGenSize (bindGen g f) s \subset isSome :&: semGenSize (bindGen g' f') s.
+Proof.
+  intros H1 H2. rewrite !semBindSize.
+  eapply subset_trans.
+  eapply setI_subset_compat. eapply subset_refl.
+  eapply incl_bigcupl. eassumption.
+  rewrite !setI_bigcup_assoc. 
+  eapply incl_bigcupr. eassumption.
+Qed.
+
+Lemma semBindOptSizeOpt_subset_compat {A B : Type} (g g' : G (option A)) (f f' : A -> G (option B)) s :
+  isSome :&: semGenSize g s \subset isSome :&: semGenSize g' s ->
+  (forall x, isSome :&: semGenSize (f x) s \subset isSome :&: semGenSize (f' x) s) ->
+  isSome :&: semGenSize (bindGenOpt g f) s \subset isSome :&: semGenSize (bindGenOpt g' f') s.
+Proof.
+Admitted.
+
+Lemma suchThatMaybeOpt_subset_compat {A : Type} (p : A -> bool) (g1 g2 : G (option A)) s :
+  isSome :&: (semGenSize g1 s) \subset isSome :&: (semGenSize g2 s) ->
+  isSome :&: (semGenSize (suchThatMaybeOpt g1 p) s) \subset
+  isSome :&: (semGenSize (suchThatMaybeOpt g2 p) s).
+Proof.
+Admitted.
+
+Lemma suchThatMaybe_subset_compat {A : Type} (p : A -> bool) (g1 g2 : G A) s :
+  (semGenSize g1 s) \subset (semGenSize g2 s) ->
+  isSome :&: (semGenSize (suchThatMaybe g1 p) s) \subset
+  isSome :&: (semGenSize (suchThatMaybe g2 p) s).
+Proof.
+Admitted.
+
+Lemma bigcup_cons_setI_subset_compat {A B} (f : A -> set B)
+      (x x' : A) (l l' : seq A) s :
+  f x \subset f x' ->
+  \bigcup_(x in (l :&: s)) (f x) \subset
+   \bigcup_(x in (l' :&: s)) (f x) ->
+  \bigcup_(x in ((x :: l) :&: s)) (f x) \subset
+   \bigcup_(x in ((x' :: l') :&: s)) (f x).
+Proof.
+Admitted.
+
+(* more specific lemmas to help type checking of the proof term *)
+Lemma bigcup_cons_setI_subset_compat_backtrack {A}
+      (n n' : nat) (g g' : G (option A)) (l l' : seq (nat * G (option A))) s :
+  isSome :&: semGenSize g s  \subset isSome :&: semGenSize g' s ->
+  \bigcup_(x in (l :&: (fun x => x.1 <> 0))) (isSome :&: semGenSize x.2 s) \subset
+  \bigcup_(x in (l' :&: (fun x => x.1 <> 0))) (isSome :&: semGenSize x.2 s) ->
+  \bigcup_(x in (((n, g) :: l) :&: (fun x => x.1 <> 0))) (isSome :&: semGenSize x.2 s) \subset
+  \bigcup_(x in (((n', g') :: l') :&: (fun x => x.1 <> 0))) (isSome :&: semGenSize x.2 s).
+Proof.
+Admitted.
+
+Lemma bigcup_cons_setI_subset_pres_backtrack {A}
+      (n : nat) (g : G (option A)) (l l' : seq (nat * G (option A))) s :
+  \bigcup_(x in (l :&: (fun x => x.1 <> 0))) (isSome :&: semGenSize x.2 s) \subset
+  \bigcup_(x in (l' :&: (fun x => x.1 <> 0))) (isSome :&: semGenSize x.2 s) ->
+  \bigcup_(x in (l :&: (fun x => x.1 <> 0))) (isSome :&: semGenSize x.2 s) \subset
+  \bigcup_(x in ((n, g) :: l') :&: (fun x => x.1 <> 0)) (isSome :&: semGenSize x.2 s).
+Proof.
+Admitted.
+
+Lemma bigcup_nil_setI {A B} (f : A -> set B)
+      (l : seq A) s :
+  \bigcup_(x in nil :&: s) (f x) \subset
+  \bigcup_(x in (l :&: s)) (f x).
+Proof.
+Admitted.
