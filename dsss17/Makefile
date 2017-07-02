@@ -3,11 +3,9 @@ USERESOURCESFOR = plf
 VOLUMENAME = PBT in Coq
 VERSION = 1.0
 
+# This will only work for BCP:
 TOP = $(HOME)/s/new
 
-# (The order here determines the order of chapters in the
-# generated table of contents.)
-#
 # !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 # IMPORTANT!!!  If you add a file here, make sure to do
 #    svn add <new files>
@@ -15,6 +13,8 @@ TOP = $(HOME)/s/new
 # and fix up the dependencies in deps.dot
 # !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 EXPORTS = \
+	   Preface.v \
+	   Intro.v \
 	   Typeclasses.v \
 
 #	   Bib.v \

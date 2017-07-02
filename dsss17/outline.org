@@ -27,9 +27,146 @@ core QC typeclasses
 
 * ------------------------ DAY 2 -------------------------
 
-* Guiding QuickChick's Behavior (Guiding.v)
+* Basic QuickChick Programming (BasicQC.v)
 
-return to the small examples
+** Checkers
+
+the Dec typeclass
+
+   We've said that QuickChickable properties must be "executable."  What
+   this means precisely is "decidable," in the sense of the "Dec"
+   typeclass. 
+
+Explain Checkable -- a generalization of Dec that carries some extra
+structure.  
+
+Explain how simple boolean functions can also be Checkers -- this is the
+most low-level and flexible way to create checkers
+
+    (* EX2 (SortQC) *)
+    (** Here is an incorrect implementation of insertion sort: *)
+    (* NOW: This is a fine exercise for right here, but it could also be
+       useful below, where the insert function itself motivates the need
+       to test conditional properties, hence generators.  So maybe better
+       as _not_ an exercise, actually. *)
+
+    Fixpoint insert x l :=
+      match l with
+      | [] => [x]
+      | y::t => if y <? x then insert x t else x::y::t
+      end.
+
+    Fixpoint isort l :=
+      match l with
+      | [] => []
+      | x::t => insert x t
+      end.
+
+    (** Write a boolean property that characterizes correct sorting and
+        use QuickCheck to find a counterexample.  Fix the bug and use
+        QuickChick again to verify that there are no more
+        counterexamples.  (Or, if QuickChick notices another bug, keep
+        fixing things until it doesn't.) *)
+
+    (* QUIETSOLUTION *)
+    Fixpoint member x l :=
+      match l with
+      | [] => false
+      | y::t => orb (beq_nat x y) (member x t)
+      end.
+
+    Fixpoint sorted l :=
+      match l with
+      | [] => true
+      | h1::t => match t with
+                   | [] => true
+                   | h2::t2 => andb (h1 <=? h2) (sorted t)
+                 end
+      end.
+
+    Definition perm l1 l2 :=
+      andb (forallb (fun x => member x l2) l1)
+           (forallb (fun x => member x l1) l2).
+
+    (* /QUIETSOLUTION *)
+    Definition isortP : list nat -> bool
+      (* ADMITDEF *)
+      := fun l => andb (sorted (isort l)) (perm l (isort l))
+    .
+    (* /ADMITDEF *)
+    (* QUIETSOLUTION *)
+    QuickChick isortP.
+    (* Finds a bug! *)
+
+    Fixpoint insert2 x l :=
+      match l with
+      | [] => [x]
+      | y::t => if y <? x then insert2 x t else x::y::t
+      end.
+
+    Fixpoint isort2 l :=
+      match l with
+      | [] => []
+      | x::t => insert2 x (isort2 t)
+      end.
+
+    Definition insert2P
+      := fun x l => andb (sorted (insert2 x l)) (perm (x::l) (insert2 x l)).
+    QuickChick insert2P.
+
+    Definition isort2P : list nat -> bool
+      := fun l => andb (sorted (isort2 l)) (perm l (isort2 l)).
+    QuickChick isort2P.
+    (* Finds another! *)
+
+    Fixpoint insert3 x l :=
+      match l with
+      | [] => [x]
+      | y::t => if y <? x then y :: (insert3 x t) else x::y::t
+      end.
+
+    Fixpoint isort3 l :=
+      match l with
+      | [] => []
+      | x::t => insert3 x (isort3 t)
+      end.
+
+    Definition isort3P : list nat -> bool
+      := fun l => andb (sorted (isort3 l)) (perm l (isort3 l)).
+    QuickChick isort3P.
+    (* /QUIETSOLUTION *)
+
+
+** Generators
+
+explain the Gen, G, Arbitrary, and Shrink typeclasses
+
+return to the small examples and unpack them
+
+Global Instance testDec {P} `{H : Dec P} : Checkable P :=
+  {|
+    checker p := _
+  |}.
+
+** Shrinking
+
+** More combinators
+
+See the original QuickCheck paper for...
+  - generating functions (CoArbitrary, etc.)
+  - (what else?)
+
+Exercise: test that the filter function yields a list containing only
+elements that test true.
+
+** Implementation
+
+How it works internally.
+
+QuickChick commands must not be in (sections or?) submodules
+
+
+** Case Study
 
 a typed version of Imp (ints and boolean)
   dynamic failures
@@ -46,9 +183,6 @@ ways of measuring distributions
       - based on observations
       - highly effective"
    (and see other observations in John's talk)
-
-code coverage is a very bad success metric, but a rather good heuristic for
-when your tests are not good enough
 
 collect 
   - small example
@@ -109,7 +243,9 @@ final comments about testing
       - regression testing
   - invariants that are going to be used for proof
   - complete specs may have smaller payoff
-
+  - code coverage is a very bad success metric, but a rather good heuristic
+    for when your tests are not good enough  (is there a code coverage tool
+    for OCaml?  Yes: bisect_ppx seems to be under active development.)
 
 _________
 

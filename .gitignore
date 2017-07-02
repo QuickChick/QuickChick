@@ -1,3 +1,8 @@
+.depend
+dsss17/full
+dsss17/sol
+dsss17/terse
+.depend
 *.cmo
 *.cmi
 *.cmx

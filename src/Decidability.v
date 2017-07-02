@@ -5,6 +5,7 @@ Require Import Checker.
 From mathcomp.ssreflect Require Import ssreflect ssrbool ssrnat.
 Require Import Coq.Strings.String.
 Require Import Coq.Strings.Ascii.
+Require Import List.
 
 Set Bullet Behavior "Strict Subproofs".
 
@@ -13,6 +14,9 @@ Class Dec (P : Prop) : Type :=
   {
     dec : decidable P
   }.
+
+(* BCP: If I understand correctly, removing "Global" everywhere would
+   change nothing... Or? *)
 
 (* Additional Checkable instance *)
 Global Instance testDec {P} `{H : Dec P} : Checkable P :=
@@ -47,6 +51,18 @@ Proof.
     destruct I as [D]; destruct D; auto;
       right; intro; destruct H; contradiction.
 Defined.
+
+(* BCP: Not clear this is a good idea, but... *)
+Global Instance Dec_impl {P Q} {H : Dec P} {I : Dec Q} : Dec (P -> Q).
+Proof.
+  constructor. unfold decidable.
+  destruct H as [D]. destruct D; destruct I as [D]; destruct D; auto.
+  left. intros. contradiction. 
+Defined.
+
+Global Instance Dec_In {A} (Eq: forall (x y : A), Dec (x = y))
+         (x : A) (l : list A) : Dec (In x l) := 
+  {| dec := in_dec (fun x' y' => @dec _ (Eq x' y')) x l |}.
 
 Class Eq (A : Type) :=
   { 

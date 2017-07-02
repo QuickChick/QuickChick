@@ -425,7 +425,28 @@ a variant of EquivDec as well for decidable equality tests. *)
 
 
 (* ----------------------------------------------------------------- *)
-(** ** [Dep] *)
+(** ** [Dec] *)
+
+(* show decidable and explain what it means *)
+
+(*
+Class Dec (P : Prop) : Type :=
+  {
+    dec : decidable P
+  }.
+*)
+
+(* 
+Global Instance Eq__Dec {A} `{H : Eq A} (x y : A) : Dec (x = y) :=
+  {|
+    dec := _
+  |}.
+Proof.
+  unfold decidable.
+  apply H.
+Defined.
+*)
+
 
 (* ----------------------------------------------------------------- *)
 (** ** Coq's [EqDec] *)
