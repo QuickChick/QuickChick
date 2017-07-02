@@ -177,7 +177,6 @@ Compute (showOne 42).
 
     More interestingly, a single function can come with multiple class
     constraints: *)
-    
 
 Definition showTwo {A B : Type}
            `{Show A} `{Show B} (a : A) (b : B) : string :=
@@ -360,7 +359,7 @@ Compute (eqb (fun (b1 b2 : bool) => if b1 then 42 else 9)
     possible, but bad, way to do this is to define a new class with
     two associated functions: *)
 
-Class OrdBad {A : Type} :=
+Class OrdBad A :=
   {
     eqbad : A -> A -> bool;
     lebad : A -> A -> bool
@@ -373,13 +372,15 @@ Class OrdBad {A : Type} :=
 Definition lt {A: Type} `{Eq A} `{OrdBad A} (x y : A) : bool :=
   andb (lebad x y) (negb (eqbad x y)).
 
-(**  A much better way is to parameterize the definition of [Ord] on an
+(** A much better way is to parameterize the definition of [Ord] on an
     [Eq] class constraint: *)
 
-Class Ord {A : Type} `(Eq A) : Type :=
+Class Ord A `{Eq A} : Type :=
   {
     le : A -> A -> bool
   }.
+
+Check Ord.
 
 (** (The old class [Eq] is sometimes called a "superclass" of [Ord],
     but, again, this terminology is potentially confusing: Try to
@@ -397,54 +398,180 @@ Definition max {A: Type} `{Eq A} `{Ord A} (x y : A) : A :=
 (** What does Coq say if the [Ord] class constraint is left out of the
     definition of [max]?  What about the [Eq] class constraint? *)
 
-(* @LEO? 
 Instance natOrd : Ord nat :=
   {
-    le := leb_le
+    le := Nat.leb
   }.
-*)
 
 (* EX3 (ordMisc) *)
-(** Define [Ord] instances for options, pairs, and lists. *)
+(** Define [Ord] instances for options and pairs. *)
 
 (* SOLUTION *)
+Instance pairOrd {A B : Type} `{Eq A} `{Eq B} `{Ord A} `{Ord B} : Ord (A*B) :=
+  {
+    le p1 p2 := 
+      let (p1a,p1b) := p1 : A * B in
+      let (p2a,p2b) := p2 : A * B in
+      orb
+        (andb (le p1a p2a) (negb (eqb p1b p2b)))
+        (andb (eqb p1a p2a) (le p1b p2b))
+  }.
+
+Compute (le (1,0) (0,0)).
+Compute (le (1,0) (1,0)).
+Compute (le (1,0) (1,1)).
+
+Instance optionOrd {A : Type} `{Eq A} `{Ord A} : Ord (option A) :=
+  {
+    le xo yo := 
+      match xo,yo with
+      | Some x, Some y => le x y
+      | Some _, _ => false
+      | None, None => true
+      | None, Some _ => true
+      end
+  }.
 (* /SOLUTION *)
 (** [] *)
 
 (* ################################################################# *)
 (** * How It Works *)
 
-(* Typeclasses in Coq are a powerful tool, but the expressiveness of
-   the Coq logic makes it hard to implement sanity checks like
-   Haskell's "overlapping instances" detector.  As a result, using
-   Coq's typeclasses effectively -- and figuring out what is wrong
-   when things don't work -- requires a clear understanding of the
-   underlying mechanisms at work. *)
+(** Typeclasses in Coq are a powerful tool, but the expressiveness of
+    the Coq logic makes it hard to implement sanity checks like
+    Haskell's "overlapping instances" detector.  As a result, using
+    Coq's typeclasses effectively -- and figuring out what is wrong
+    when things don't work -- requires a clear understanding of the
+    underlying mechanisms at work. *)
 
 (* ################################################################# *)
 (** ** Implicit Generalization *)
 
-Generalizable Variables A.  
-(* (By default, ordinary variables don't behave this way, to avoid
-   puzzling behavior in case of typos.) *)
+(** The first thing to discuss is what the "backtick" notation means
+    in declarations of classes, instances, and functions using
+    typeclasses.  This is actually a quite generic mechanism, called
+    _implicit generalization_, that was added to Coq to support
+    typeclasses but that can also be used to good effect elsewhere.
 
-Definition oddManOut' `{Eq A} (a b c : A) : A :=
-  if eqb a b then c
-  else if eqb a c then b
-  else a.                         
-(* The opening tick tells Coq to perform "implicit generalization." *)
+    The basic idea is that unbound variables mentioned in bindings
+    marked with [`] are automatically bound in front of the binding
+    where they occur.
 
-Print oddManOut'.
-(* ===>
-    oddManOut' = 
-      fun (A : Type) (H : Eq A) (a b c : A) =>
-        if eqb a b then c else if eqb a c then b else a
-             : forall A : Type, Eq A -> A -> A -> A -> A
+    To enable this behavior for a particular unbound variable, say
+    [A], we first declare [A] to be implicitly generalizable:
 *)
 
-(* We can see that [`{Eq A}] essentially means the same as [{_ : Eq
-   A}], except that the unbound [A] automatically gets bound at the
-   front. *)
+Generalizable Variables A.  
+
+(** By default, Coq only implicitly generalizes variables declared in
+    this way, to avoid puzzling behavior in case of typos.  There is
+    also a [Generalize Variables All] command, but it's probably not a
+    good idea to use it! *)
+
+(** Now, for example, we can shorten the declaration of the [showOne]
+    function by omitting the binding for [A] at the front. *)
+
+Definition showOne' `{Show A} (a : A) : string :=
+  "The value is " ++ show a.
+
+(** Coq will notice that the occurrence of [A] inside the [`{...}] is
+    unbound and automatically insert the binding that we wrote
+    explicitly before. *)
+
+Print showOne'.
+(* ==>
+    showOne' = 
+      fun (A : Type) (H : Show A) (a : A) => "The value is " ++ show a
+           : forall A : Type, Show A -> A -> string
+
+    Arguments A, H are implicit and maximally inserted
+*)
+
+(** The "implicit and maximally generalized" annotation on the last
+    line means that the automatically inserted bindings are treated as
+    if they had been written with [{...}], rather than [(...)].  The
+    "implicit" part means that the type argument [A] and the [Show]
+    witness [H] are usually expected to be left implicit: whenever we
+    write [showOne'], Coq will automatically insert two unification
+    variables as the first two arguments.  This automatic insertion
+    can be disabled by writing [@], so a bare occurrence of [showOne']
+    means the same as [@showOne' _ _].  The "maximally inserted" part
+    says that these arguments should inserted automatically even when
+    there is no following explicit argument. *)
+
+(** In fact, even the [`{Show A}] form hides one bit of implicit
+    generalization: the bound name of the [Show] constraint itself.
+    You will sometimes see class constraints written more explicitly,
+    like this... *)
+
+Definition showOne'' `{_ : Show A} (a : A) : string :=
+  "The value is " ++ show a.
+
+(** ... or even like this: *)
+
+Definition showOne''' `{H : Show A} (a : A) : string :=
+  "The value is " ++ show a.
+
+(** The advantage of the latter form is that it gives a name that can
+    be used, in the body, to explicitly refer to the supplied evidence
+    for [Show A].  This can be extremely useful when things get
+    complicated and you want to make your code more explicit and less
+    automatic so you can better understand and control what's
+    happening. *)
+
+(** We can actually go one bit further and omit [A] altogether, with
+    no change in meaning (though, again, this may be more confusing
+    than helpful): *)
+
+Definition showOne'''' `{Show} a : string :=
+  "The value is " ++ show a.
+
+(* STOPPED HERE *)
+
+(*
+Set Printing All.
+Unset Printing Notations.
+Print showOne.
+
+showOne = 
+fun (A : Type) (H : Show A) (a : A) =>
+append
+  (String (Ascii.Ascii false false true false true false true false)
+     (String (Ascii.Ascii false false false true false true true false)
+        (String (Ascii.Ascii true false true false false true true false)
+           (String
+              (Ascii.Ascii false false false false false true false false)
+              (String (Ascii.Ascii false true true false true true true false)
+                 (String
+                    (Ascii.Ascii true false false false false true true false)
+                    (String
+                       (Ascii.Ascii false false true true false true true
+                          false)
+                       (String
+                          (Ascii.Ascii true false true false true true true
+                             false)
+                          (String
+                             (Ascii.Ascii true false true false false true
+                                true false)
+                             (String
+                                (Ascii.Ascii false false false false false
+                                   true false false)
+                                (String
+                                   (Ascii.Ascii true false false true false
+                                      true true false)
+                                   (String
+                                      (Ascii.Ascii true true false false true
+                                         true true false)
+                                      (String
+                                         (Ascii.Ascii false false false false
+                                            false true false false)
+                                         EmptyString)))))))))))))
+  (@show A H a)
+     : forall (A : Type) (_ : Show A) (_ : A), string
+
+*)
+
+
 
 (* Where it gets fancy (and useful) is with subclasses: *)
 
