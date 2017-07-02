@@ -1,50 +1,216 @@
-(** * Typeclasses *)
+(** * Typeclasses: A Tutorial on Typeclasses in Coq *)
 
+(* HIDEFROMHTML *)
 Require Import Coq.Strings.String.
 Require Import Coq.Arith.Arith.
 Require Import Omega.
 Require Bool.
+Require Import List. Import ListNotations.
 Local Open Scope string.
+(* /HIDEFROMHTML *)
+
+(** Motivation: In real-world programming, it is often necessary to
+    convert various kinds of data structures into strings so that they
+    can be printed out, written to files, marshalled for sending over
+    the network, or whatever.  This can be accomplished by writing
+    string converters for each basic type
+
+       - [showBool : bool -> string]
+       - [showNat : nat -> string]
+       - etc.
+    
+    plus combinators for structured types like [list] and pairs
+ 
+       - [showList : {A : Type} (A -> string) -> (list A) -> string]
+       - [showPair : {A B : Type} (A -> string) -> (B -> string) -> 
+         A * B -> string]
+
+    that take string converters for their element types as arguments.
+    Once we've done this, we can build string converters for more
+    complex structured types by assembling them from these pieces:
+
+       - [showListOfPairsOfNats = showList (showPair showNat showNat)]
+ *)
+
+(** While this idiom gets the job done, it feels a bit clunky in at
+    least two ways.  First, it demands that we give names to all these
+    string converters (which must then later be remembered!) whereas
+    it seems the names could really just be generated in a uniform way
+    from the types involved.  Moreover, even the _definitions_ of
+    converters like [showListOfPairsOfNats] are always derived in a
+    quite mechanical way from their types, together with a small
+    collection collection of primitive converters and converter
+    combinators.
+
+    The designers of Haskell addressed this clunkiness through
+    _typeclasses_, a mechanism by which the typechecker is instructed
+    to automatically construct "type-driven" functions \CITE{Wadler
+    and Blott 1989}.  (Readers not already familiar with typeclasses
+    should note that, although the word sounds a bit like "classes"
+    from object-oriented programming, this apparent connection is
+    rather misleading.  A better analogy is actually with _interfaces_
+    from languages like Java.  But best of all is to set aside
+    object-oriented preconceptions and try to approach typeclasses
+    with an empty mind!)
+
+    Many other modern language designs have followed Haskell's lead,
+    and Coq is no exception.  However, because Coq's type system is so
+    much richer than that of Haskell, and because typeclasses in Coq
+    are used to automatically construct not only programs but also
+    proofs, Coq's presentation of typeclasses is quite a bit less
+    "transparent": using typeclasses effectively requires a fairly
+    detailed understanding of how they are implemented.  Coq
+    typeclasses are a power tool: they can make complex developments
+    much more elegant and easy to manage when used properly, and they
+    can cause a great deal of trouble when things go wrong!
+
+    This tutorial introduces the core features of Coq's typeclasses,
+    explains how they are implemented, surveys some useful typeclasses
+    that can be found in Coq's standard library and other contributed
+    libraries, and collects some advice about the pragmatics of using
+    typeclasses. *)
 
 (* ################################################################# *)
-(** * Basics: Classes and Instances *)
+(** * Basics *)
 
-(* Motivation: Need to be able to test lots of different things for
-   equality...
+(** ** Classes and Instances *)
 
-     - eqb : A -> A -> bool
+(** To automate converting various kinds of data into strings, we
+    begin by defining a typeclass called [Show]. *)
 
-   Similar examples:
-     - show : A -> String
-     - sort : list A -> list A
-     - + : A -> A -> A
-     - serialize : A -> BitString
-     - hash : A -> Int
-     - etc., etc.
+Class Show A : Type :=
+  {
+    show : A -> string
+  }.
 
-   Coq adopts (and significantly adapts) Haskell's notion of
-   _typeclasses_ for this.
+(** The [Show] typeclass can be thought of as "classifying" types
+    whose values can be converted to strings -- that is, types [A]
+    such that we can define a function [show] of type [A -> string].
+    We can declare that [bool] is such a type by giving an [Instance]
+    declaration that witnesses this function: *)
 
-   Remark for newcomers: the name "typeclasses" may sound a bit like
-   "classes" from OOP.  But this is misleading.  A better analogy is
-   actually with _interfaces_ from languages like Java.  But best of
-   all is to set aside OO preconceptions and try to approach the
-   situation with an open mind. *)
+Instance showBool : Show bool :=
+  {
+    show := fun b:bool => if b then "true" else "false"
+  }.
 
-(* Class declaration: *)
+Compute (show true).
+
+(** Other types can similarly be equipped with [Show] instances --
+    including, of course, new types that we define. *)
+
+Inductive color := Red | Green | Blue.
+
+Instance showColor : Show color :=
+  {
+    show :=
+      fun c:color =>
+        match c with
+        | Red => "Red"
+        | Green => "Green"
+        | Blue => "Blue"
+        end
+  }.
+
+Compute (show Green).
+
+(** Converting natural numbers to strings is conceptually similar,
+    though it requires a tiny bit of programming: *)
+
+Fixpoint string_of_nat_aux (time n : nat) (acc : string) : string :=
+  let d := match n mod 10 with
+           | 0 => "0" | 1 => "1" | 2 => "2" | 3 => "3" | 4 => "4" | 5 => "5"
+           | 6 => "6" | 7 => "7" | 8 => "8" | _ => "9"
+           end in
+  let acc' := d ++ acc in
+  match time with
+    | 0 => acc'
+    | S time' =>
+      match n / 10 with
+        | 0 => acc'
+        | n' => string_of_nat_aux time' n' acc'
+      end
+  end.
+
+Definition string_of_nat (n : nat) : string :=
+  string_of_nat_aux n n "".
+
+Instance showNat : Show nat :=
+  {
+    show := string_of_nat
+  }.
+
+Compute (show 42).
+
+(* EX1 (showNatBool) *)
+(** Write a [Show] instance for pairs of a nat and a bool. *)
+
+(* SOLUTION *)
+Instance showNatBool : Show (nat * bool) :=
+  {
+    show :=
+      fun nb =>
+        let (n,b) := nb in
+        "(" ++ show n ++ "," ++ show b ++ ")"
+  }.
+
+Compute (show (42,true)).
+(* /SOLUTION *)
+(** [] *)
+
+(** Now, given the class [Show], we can define functions that use the
+    overloaded function [show] like this: *)
+
+Definition showOne {A : Type} `{Show A} (a : A) : string :=
+  "The value is " ++ show a.
+
+Compute (showOne true).
+Compute (showOne 42).
+
+(** The parameter [`{Show A}] is a _class constraint_, which states
+    that the function [showOne] is expected to be applied only to
+    types [A] that belong to the [Show] class. Concretely, this
+    constraint should be thought of as an extra parameter to [showOne]
+    supplying _evidence_ that [A] is an instance of [Show] -- i.e., it
+    is essentially just a [show] function for [A], which is implicitly
+    invoked by the expression [show a].
+
+    More interestingly, a single function can come with multiple class
+    constraints: *)
+    
+
+Definition showTwo {A B : Type}
+           `{Show A} `{Show B} (a : A) (b : B) : string :=
+  "First is " ++ show a ++ " and second is " ++ show b.
+
+Compute (showTwo true 42).
+Compute (showTwo Red Green).
+
+(** In the body of [showTwo], the type of the argument to each
+    instance of [show] determines which of the implicitly supplied
+    show functions (for [A] or [B]) gets invoked. *)
+
+(* EX1 (missingConstraint) *)
+(** What happens if we forget the class constraints in the definitions
+    of [showOne] or [showTwo]?  Try deleting them and see what
+    happens.  [] *)
+
+(** Of course, [Show] is not the only interesting typeclass.  There
+    are many other situations where it is useful to be able to
+    choose (and construct) specific functions depending on the type of
+    an argument that is supplied to a generic function like [show].
+    Another typical example is boolean equality checkers.
+
+    Here is a declaration for a class [Eq] describing types whose
+    elements can be tested for equality. *)
+
 Class Eq A :=
   {
     eqb: A -> A -> bool;
   }.
 
-Check Eq.  
-(* 
-==>
-Eq
-     : Type -> Type
-*)
+(** And here are some basic instances: *)
 
-(* An instance declaration: *)
 Instance eqBool : Eq bool :=
   {
     eqb := fun (b c : bool) => 
@@ -56,103 +222,197 @@ Instance eqBool : Eq bool :=
        end
   }.
 
-(* Another: *)
 Instance eqNat : Eq nat :=
   {
     eqb := beq_nat
   }.
 
-(* Exercise: Write an eq instance for pairs of a nat and a bool. *)
+(** One possible confusion should be addressed here: Why should we
+    need to define a typeclass for boolean equality when Coq's
+    _propositional_ equality ([x = y]) is completely generic?  The
+    answer is that, while it makes sense to _claim_ that two values
+    [x] and [y] are equal no matter what their type is, it is not
+    possible to write a decidable equality _checker_ for arbitrary
+    types.  In particular, equality at types like [nat->nat] is
+    undecidable. *)
 
-(* We can define functions that use overloaded functions from 
-   instances like this: *)
-Definition oddManOut {A : Type} `{Eq A} (a b c : A) : A :=
-  if eqb a b then c
-  else if eqb a c then b
-  else a.                         
+(* EX3? (boolArrowBool) *)
+(** There are some function types, like [bool->bool], for which
+    checking equality makes perfect sense.  Write an [Eq] instance for
+    this type. *)
 
-Compute (oddManOut 2 1 2).
-
-(* Recommended exercise: What happens if we forget the class
-   constraint?  Try deleting it and see what happens.  Do you
-   understand why? *)
-
-(* Another useful typeclass... *)
-Class Show A : Type :=
+(* SOLUTION *)
+Instance eqBoolBool : Eq (bool->bool) :=
   {
-    show : A -> string
+    eqb :=
+      fun f g =>
+        andb (Bool.eqb (f true) (g true))
+             (Bool.eqb (f false) (g false))
   }.
+(* /SOLUTION *)
 
-Instance showBool : Show bool :=
-  {
-    show := fun b:bool => if b then "true" else "false"
-  }.
+(** [] *)
 
-Compute (show true).
+(* ################################################################# *)
+(** ** Parameterized Instances: New Typeclasses from Old *)
 
-Definition natToDigit (n : nat) : string :=
-  match n with
-    | 0 => "0" | 1 => "1" | 2 => "2" | 3 => "3" | 4 => "4" | 5 => "5"
-    | 6 => "6" | 7 => "7" | 8 => "8" | _ => "9"
-  end.
+(** What about a [Show] instance for pairs?
 
-Fixpoint writeNatAux (time n : nat) (acc : string) : string :=
-  let acc' := (natToDigit (n mod 10)) ++ acc in
-  match time with
-    | 0 => acc'
-    | S time' =>
-      match n / 10 with
-        | 0 => acc'
-        | n' => writeNatAux time' n' acc'
-      end
-  end.
+    Since we can have pairs of any types, we'll want to parameterize
+    our [Show] instance by two types.  Moreover, we'll need to
+    constrain both of these types to be instances of [Show]. *)
 
-Definition string_of_nat (n : nat) : string :=
-  writeNatAux n n "".
+Instance showPair {A B : Type} `{Show A} `{Show B} : Show (A * B) :=
+  {|
+    show p :=
+      let (a,b) := (p : A * B) in 
+        "(" ++ show a ++ "," ++  show b ++ ")"
+  |}.
 
-Instance showNat : Show nat :=
-  {
-    show := string_of_nat
-  }.
+Compute (show (true,42)).
 
-Compute (show 42).
-
-Instance showString : Show string :=
-  {
-    show := fun s:string => """" ++ s ++ """"
-  }.
-
-
-(* ---------------------------------------------------------------- *)
-(** Parameterized Instances: New Typeclasses from Old *)
+(** Similarly, here is an [Eq] instance for pairs... *)
 
 Instance eqPair {A B : Type} `{Eq A} `{Eq B} : Eq (A * B) :=
-  {
+  {|
     eqb p1 p2 :=
-      match p1,p2 with
-      | (a1,b1),(a2,b2) => andb (eqb a1 a2) (eqb b1 b2)
-      end
+      let (p1a,p1b) := p1 : A * B in
+      let (p2a,p2b) := p2 : A * B in
+      andb (eqb p1a p2a) (eqb p1b p2b)
+  |}.
+
+(** ...and here is [Show] for lists: *)
+
+Fixpoint showListAux {A : Type} (s : A -> string) (l : list A) : string :=
+  match l with
+    | nil => ""
+    | cons h nil => s h
+    | cons h t => append (append (s h) ", ") (showListAux s t)
+  end.
+
+Instance showList {A : Type} `{Show A} : Show (list A) :=
+  {|
+    show l := append "[" (append (showListAux show l) "]")
+  |}.
+
+(* EX3 (eqEx) *)
+(** Write an [Eq] instance for lists and [Show] and [Eq] instances for
+    the [option] type constructor. *)
+
+(* SOLUTION *)
+Fixpoint eqListAux {A : Type} (e : A -> A -> bool) (l1 l2 : list A) : bool := 
+  match l1,l2 with
+  | [],[] => true
+  | h1::t1, h2::t2 => andb (e h1 h2) (eqListAux e t2 t2)
+  | _,_ => false
+  end.
+
+Instance eqList {A : Type} `{Eq A} : Eq (list A) :=
+  {|
+    eqb := eqListAux eqb 
+  |}.
+
+Instance showOpt {A : Type} `{Show A} : Show (option A) :=
+{|
+  show x := match x with
+              | Some x => "Some " ++ (show x)
+              | None => "None"
+            end
+|}.
+
+Instance showEq {A : Type} `{Eq A} : Eq (option A) :=
+{|
+  eqb xo yo :=
+    match xo,yo with
+    | Some x, Some y => eqb x y
+    | None, None => true
+    | _, _ => false
+    end
+|}.
+(* /SOLUTION *)
+(** [] *)
+
+(* EX3? (boolArrowA) *)
+(** Generalize your solution to the [boolArrowBool] exercise to build
+    an equality instance for any type of the form [bool->A], where [A]
+    itself is an [Eq] type.  Show that it works for [bool->bool->nat]. *)
+
+(* SOLUTION *)
+Instance eqBoolA {A : Type} `{Eq A} : Eq (bool->A) :=
+  {
+    eqb :=
+      fun f g =>
+        andb (eqb (f true) (g true))
+             (eqb (f false) (g false))
   }.
 
-(* Exercise: Write Eq and Show instances for options and lists *)
+Compute (eqb (fun (b1 b2 : bool) => if b1 then 42 else 9)
+             (fun (b1 b2 : bool) => if b2 then 42 else 9)).
+(* /SOLUTION *)
+(** [] *)
 
-(* ---------------------------------------------------------------- *)
-(** Classes with Superclasses *)
+(* ################################################################# *)
+(** ** Class Hierarchies *)
 
-Class Ord {A : Type} `{Eq A} :=
+(** We often want to organize typeclasses into hierarchies.  For
+    example, we might want a typeclass [Ord] for "ordered types" that
+    support both equality and a less-or-equal comparison operator.  A
+    possible, but bad, way to do this is to define a new class with
+    two associated functions: *)
+
+Class OrdBad {A : Type} :=
+  {
+    eqbad : A -> A -> bool;
+    lebad : A -> A -> bool
+  }.
+
+(** The reason this is bad is because we now need to use a new
+    equality operator ([eqbad]) if we want to test for equality on
+    ordered values. *)
+
+Definition lt {A: Type} `{Eq A} `{OrdBad A} (x y : A) : bool :=
+  andb (lebad x y) (negb (eqbad x y)).
+
+(**  A much better way is to parameterize the definition of [Ord] on an
+    [Eq] class constraint: *)
+
+Class Ord {A : Type} `(Eq A) : Type :=
   {
     le : A -> A -> bool
   }.
 
+(** (The old class [Eq] is sometimes called a "superclass" of [Ord],
+    but, again, this terminology is potentially confusing: Try to
+    avoid thinking about analogies with object-oriented
+    programming!) *) 
+
+(** Functions expecting to be instantiated with an instance of [Ord]
+    now have two class constraints, one witnessing that they have an
+    associated [eqb] operation, and one for [le]. *)
+
 Definition max {A: Type} `{Eq A} `{Ord A} (x y : A) : A :=
   if le x y then y else x.
 
-Check Ord.
+(* EX1 (missingConstraintAgain) *)
+(** What does Coq say if the [Ord] class constraint is left out of the
+    definition of [max]?  What about the [Eq] class constraint? *)
 
-(* Exercise: define Ord instances for nat, option, pair, and list *)
+(* @LEO? 
+Instance natOrd : Ord nat :=
+  {
+    le := leb_le
+  }.
+*)
 
-(* ---------------------------------------------------------------- *)
-(** * Lifting the Lid  *)
+(* EX3 (ordMisc) *)
+(** Define [Ord] instances for options, pairs, and lists. *)
+
+(* SOLUTION *)
+(* /SOLUTION *)
+(** [] *)
+
+(* ################################################################# *)
+(** * How It Works *)
 
 (* Typeclasses in Coq are a powerful tool, but the expressiveness of
    the Coq logic makes it hard to implement sanity checks like
@@ -161,7 +421,7 @@ Check Ord.
    when things don't work -- requires a clear understanding of the
    underlying mechanisms at work. *)
 
-(* ---------------------------------------------------------------- *)
+(* ################################################################# *)
 (** ** Implicit Generalization *)
 
 Generalizable Variables A.  
@@ -447,6 +707,48 @@ Proof.
 Defined.
 *)
 
+(* Show one or two of these and make the other(s) an exercise: *)
+
+(*
+Global Instance Dec_neg {P} {H : Dec P} : Dec (~ P).
+Proof.
+  constructor. unfold decidable.
+  destruct H as [D]; destruct D; auto.
+Defined.
+
+Global Instance Dec_conj {P Q} {H : Dec P} {I : Dec Q} : Dec (P /\ Q).
+Proof.
+  constructor. unfold decidable.
+  destruct H as [D]; destruct D;
+    destruct I as [D]; destruct D; auto;
+      right; intro; destruct H; contradiction.
+Defined.
+
+Global Instance Dec_disj {P Q} {H : Dec P} {I : Dec Q} : Dec (P \/ Q).
+Proof.
+  constructor. unfold decidable.
+  destruct H as [D]; destruct D;
+    destruct I as [D]; destruct D; auto;
+      right; intro; destruct H; contradiction.
+Defined.
+*)
+
+(* Possible exercise: 
+
+Fixpoint All {T : Type} (P : T -> Prop) (l : list T) : Prop :=
+  match l with
+  | [] => True
+  | x :: l' => P x /\ All P l'
+  end.
+
+Give a Dec instance for [All l]:
+
+Global Instance All__Dec {A} `{H : Eq A} (x y : A) : Dec (x = y) :=
+  {|
+    dec := _
+  |}.
+
+*)
 
 (* ----------------------------------------------------------------- *)
 (** ** Coq's [EqDec] *)
@@ -482,14 +784,33 @@ control over the extraction.)
 (** ** [Monad] *)
 
 (* Mention ext-lib, but not sure whether it's a good idea to actually
-   go into the details... Might be a good case study. *)
+   go into the details... YES, at least some details are important for
+   DSSS! *)
+
+(* 
+
+https://github.com/coq-ext-lib/coq-ext-lib/blob/v8.5/theories/Structures/Monad.v
+
+*)
 
 (* ----------------------------------------------------------------- *)
 (** ** Others *)
 
 (* Enumerate some of the interesting ones in the standard
-   library... E.g., Functor (is there one??)?  Monoid?  See what else
-   Matthieu likes... *)
+   library... E.g., Functor (is there one??)?  Monoid? *)
+
+(* Equivalence (and Reflexive, etc.) and Proper.  (Described in the second half of _A Gentle Introduction to Type Classes and Relations in Coq_, by Castéran and Sozeau.  
+
+http://www.labri.fr/perso/casteran/CoqArt/TypeClassesTut/typeclassestut.pdf
+
+Also:
+
+  https://arxiv.org/pdf/1102.1323.pdf
+
+*)
+
+
+
 
 (* ################################################################# *)
 (** * Pragmatics *)
@@ -985,6 +1306,11 @@ Check weird.
            https://www.cis.upenn.edu/~bcpierce/courses/670Fall12/slides.pdf
 *)
 
+(* HIDE:
+ - re-read Casteran and Sozeau
+ - read https://arxiv.org/pdf/1102.1323.pdf
+*)
+
 (* HIDE *)
 (* ################################################################# *)
 (* ################################################################# *)
@@ -994,6 +1320,3 @@ Check weird.
 (* QUESTION: What does "Polymorphic Instance" mean? *)
 
 (* /HIDE *)
-
-    
-

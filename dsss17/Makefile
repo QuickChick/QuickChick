@@ -14,10 +14,9 @@ TOP = $(HOME)/s/new
 # !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 EXPORTS = \
 	   Preface.v \
-	   Intro.v \
+	   Introduction.v \
 	   Typeclasses.v \
-
-#	   Bib.v \
+	   Bib.v \
 
 MORETAGS = TODO 
 

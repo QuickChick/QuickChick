@@ -1,4 +1,4 @@
-(** * Intro: Introduction *)
+(** * Introduction *)
 
 (* HIDEFROMHTML *)
 (* NOW: Can we trim the import list (perhaps adding some thing to
@@ -17,7 +17,7 @@ Import ListNotations.
 *)
 (* /HIDEFROMHTML *)
 
-(** * First Taste *)
+(** * A First Taste of Testing *)
 
 (** Consider the following definition of a function [remove], which
     takes a natural number [x] and a list of nats [l] and removes [x]
@@ -37,15 +37,16 @@ Conjecture removeP : forall x l,  ~ (In x (remove x l)).
     any [x] and [l].  Sadly, this property is false, as we would
     eventually discover if we were to try to prove it. *)
 
-(** A different way to discover the discrepancy between the definition
-    and specification is this: *)
+(** A different -- and often much more efficient -- way to discover
+    the discrepancy between the definition and specification is
+    to _test_ it: *)
 
 QuickChick removeP.
 
-(** The [QuickChick] command takes a property (which must be "executable" 
-    -- we'll see later exactly what this means) and attempts to falsify 
-    it by running it on many randomly generated inputs, resulting in 
-    output like this: 
+(** The [QuickChick] command takes a property (which must be 
+    "executable" -- we'll see later exactly what this means) and 
+    attempts to falsify it by running it on many randomly 
+    generated inputs, resulting in output like this: 
 <<
     0
     [0, 0]
@@ -101,8 +102,7 @@ Conjecture insertP2 : forall x l y,  In y l -> In y (insert x l).
 QuickCheck insertP2.
 (* /SOLUTION *)
 (** [] *)
-(* NOW: Try a different version with a "forallProp" combinator. Not
-   clear whether it belongs here or later. *)
+
 
 (** * Overview *)
 
@@ -113,9 +113,9 @@ QuickCheck insertP2.
       the property (here, numbers and lists of numbers),
     - _printers_ for converting data structures like numbers and lists
       to strings when reporting counterexamples, and
-    - _shrinkers_, which are used to minimize counterexamples.
+    - _shrinkers_, which are used to minimize counterexamples. *)
 
-    We will delve into each of these in detail later on, but first we
+(** We will delve into each of these in detail later on, but first we
     need to make a digression to explain Coq's support for
     _typeclasses_, which QuickChick uses extensively both internally
     and in its programmatic interface to users.  This is
