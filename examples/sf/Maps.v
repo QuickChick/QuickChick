@@ -61,75 +61,132 @@ Theorem false_beq_id : forall x y : id,
    -> beq_id x y = false.
 Admitted. (* Leo: TODO *) 
 
-(* Maps as functions are bad *)
-Definition total_map (A:Type) := id -> A. 
+(* Maps as functions are bad, explicit maps instead *)
 
-(** Intuitively, a total map over an element type [A] is just a
-    function that can be used to look up [id]s, yielding [A]s.
+Definition partial_map := list (id * nat).
 
-    The function [t_empty] yields an empty total map, given a default
-    element; this map always returns the default element when applied
-    to any id. *)
+Definition empty : partial_map := nil.
 
-Definition t_empty {A:Type} (v : A) : total_map A :=
-  (fun _ => v).
+Definition update := @cons (id * nat).
 
-(** More interesting is the [update] function, which (as before) takes
-    a map [m], a key [x], and a value [v] and returns a new map that
-    takes [x] to [v] and takes every other key to whatever [m] does. *)
+Inductive bind : partial_map -> id -> nat -> Prop :=
+  | BindNow   : forall x a m, bind (cons (x, a) m) x a
+  | BindLater : forall x x' a a' m',
+                  ~ (x = x') ->
+                  bind m' x a -> 
+                  bind (cons (x',a') m') x a.
 
-Definition t_update {A:Type} (m : total_map A)
-                    (x : id) (v : A) :=
-  fun x' => if beq_id x x' then v else m x'.
+Derive ArbitrarySizedSuchThat for (fun x => bind m x a).
+Derive SizeMonotonicSuchThatOpt for (fun x => bind m x a).
 
-(** This definition is a nice example of higher-order programming:
-    [t_update] takes a _function_ [m] and yields a new function 
-    [fun x' => ...] that behaves like the desired map.
+(* ZOE!
+Derive SizedProofEqs for (fun x => bind m x a).
+Derive GenSizedSuchThatCorrect for (fun x => bind m x a).
+Derive GenSizedSuchThatSizeMonotonicOpt for (fun x => bind m x a).
+*)
+Instance adm_st m a : SuchThatCorrect (fun x => bind m x a) (genST (fun x => bind m x a)).
+Admitted.
 
-    For example, we can build a map taking [id]s to [bool]s, where [Id
-    3] is mapped to [true] and every other key is mapped to [false],
-    like this: *)
+Instance checkFalse : Checkable False := {| checker := fun _ => checker false |}.
 
-Definition examplemap :=
-  t_update (t_update (t_empty false) (Id "foo") false)
-           (Id "bar") true.
-
-(** This completes the definition of total maps.  Note that we don't
-    need to define a [find] operation because it is just function
-    application! *)
-
-Example update_example1 : examplemap (Id "baz") = false.
-Proof. reflexivity. Qed.
-
-Example update_example2 : examplemap (Id "foo") = false.
-Proof. reflexivity. Qed.
-
-Example update_example3 : examplemap (Id "quux") = false.
-Proof. reflexivity. Qed.
-
-Example update_example4 : examplemap (Id "bar") = true.
-Proof. reflexivity. Qed.
-
-(** To use maps in later chapters, we'll need several fundamental
-    facts about how they behave.  Even if you don't work the following
-    exercises, make sure you thoroughly understand the statements of
-    the lemmas!  (Some of the proofs require the functional
-    extensionality axiom, which is discussed in the [Logic]
-    chapter.) *)
-
-(** **** Exercise: 1 star, optional (t_apply_empty)  *)
-(** First, the empty map returns its default element for all keys: *)
-
-Lemma t_apply_empty:  forall A x v, @t_empty A v x = v.
+Instance bind_dec m x v : Dec (bind m x v) :=
+  {| dec := _ |}.
 Proof.
-  (* FILL IN HERE *) Admitted.
-(** [] *)
+  move: x v.
+  induction m => x v.
+  - right => contra. inversion contra.
+  - destruct a as [x' v'].
+    destruct (eq_dec_id x x') as [[Eq | Neq]].
+    + destruct (Dec_eq_nat v v') as [[EqV | NeqV]].
+      * subst; left ; constructor; eauto.
+      * subst; right => Contra.
+        inversion Contra; subst; eauto.
+    + subst; specialize (IHm x v).
+      destruct IHm as [L | R].
+      * left; constructor; eauto.
+      * right => Contra; inversion Contra; subst; eauto.
+Defined.
 
-(** **** Exercise: 2 stars, optional (t_update_eq)  *)
-(** Next, if we update a map [m] at a key [x] with a new value [v]
-    and then look up [x] in the map resulting from the [update], we
-    get back [v]: *)
+Conjecture apply_empty : forall x a, ~ (bind empty x a).
+(* QuickChick apply_empty. *)
+(* Gave Up! - QuickChick apply_empty_unfolded. *)
 
+Conjecture update_eq : forall (m: partial_map) x v,
+    bind (update (x,v) m) x v.
+(* QuickChick update_eq. *)
+
+Theorem update_neq : forall v x1 x2
+                       (m : partial_map),
+  x2 <> x1 ->
+    forall v' v'', bind (cons (x2, v) m) x1 v' ->
+                   bind m x1 v'' ->
+                   v' = v''.
+Admitted. (* Leo: TODO QuickChick update_neq. *)
+
+(*
+Lemma update_shadow : forall A (m: partial_map A) v1 v2 x,
+  update (update m x v1) x v2 = update m x v2.
+Proof.
+  intros A m v1 v2 x1. unfold update. rewrite t_update_shadow.
+  reflexivity.
+Qed.
+
+Theorem update_same : forall X v x (m : partial_map X),
+  m x = Some v ->
+  update m x v = m.
+Proof.
+  intros X v x m H. unfold update. rewrite <- H.
+  apply t_update_same.
+Qed.
+
+Theorem update_permute : forall (X:Type) v1 v2 x1 x2
+                                (m : partial_map X),
+  x2 <> x1 ->
+    (update (update m x2 v2) x1 v1)
+  = (update (update m x1 v1) x2 v2).
+Proof.
+  intros X v1 v2 x1 x2 m. unfold update.
+  apply t_update_permute.
+Qed.
+*) 
+
+Definition total_map := (partial_map * nat)%type.
+
+Definition t_empty v : total_map := (empty, v).
+
+Definition t_update (m : partial_map) (d : nat) (x : id) (v : nat) :=
+  (update (x, v) m, d).
+
+Inductive t_bind : partial_map -> nat -> id -> nat -> Prop :=
+  | T_BindDef   : forall x v, t_bind nil v x v
+  | T_BindNow   : forall x a m d, t_bind (cons (x, a) m) d x a
+  | T_BindLater : forall x x' a a' m' d,
+                  ~ (x = x') ->
+                  t_bind m' d x a -> 
+                  t_bind (cons (x',a') m') d x a.
+
+Derive ArbitrarySizedSuchThat for (fun x => t_bind m d x a).
+Derive SizeMonotonicSuchThatOpt for (fun x => t_bind m d x a).
+
+Instance adm_st' d m a : SuchThatCorrect (fun x => t_bind m d x a) (genST (fun x => t_bind m d x a)).
+Admitted.
+
+Lemma t_apply_empty:  forall x v v', t_bind empty v x v' -> v = v'.
+Admitted. (* Leo TODO: suchtat4_2  QuickChick t_apply_empty. *)
+
+Fixpoint lookup m x : option nat :=
+  match m with 
+  | nil => None
+  | (x',v)::t => if (x = x') ? then Some v else lookup t x
+  end.
+
+Definition t_lookup (m : total_map) x := 
+  let (m, d) := m in
+  match lookup m x with
+  | Some v => v
+  | None => d
+  end.
+(*
 Lemma t_update_eq : forall A (m: total_map A) x v,
   (t_update m x v) x = v.
 Proof.
@@ -208,71 +265,4 @@ Proof.
   (* FILL IN HERE *) Admitted.
 (** [] *)
 
-(* ################################################################# *)
-(** * Partial maps *)
-
-(** Finally, we define _partial maps_ on top of total maps.  A partial
-    map with elements of type [A] is simply a total map with elements
-    of type [option A] and default element [None]. *)
-
-Definition partial_map (A:Type) := total_map (option A).
-
-Definition empty {A:Type} : partial_map A :=
-  t_empty None.
-
-Definition update {A:Type} (m : partial_map A)
-                  (x : id) (v : A) :=
-  t_update m x (Some v).
-
-(** We now straightforwardly lift all of the basic lemmas about total
-    maps to partial maps.  *)
-
-Lemma apply_empty : forall A x, @empty A x = None.
-Proof.
-  intros. unfold empty. rewrite t_apply_empty.
-  reflexivity.
-Qed.
-
-Lemma update_eq : forall A (m: partial_map A) x v,
-  (update m x v) x = Some v.
-Proof.
-  intros. unfold update. rewrite t_update_eq.
-  reflexivity.
-Qed.
-
-Theorem update_neq : forall (X:Type) v x1 x2
-                       (m : partial_map X),
-  x2 <> x1 ->
-  (update m x2 v) x1 = m x1.
-Proof.
-  intros X v x1 x2 m H.
-  unfold update. rewrite t_update_neq. reflexivity.
-  apply H. Qed.
-
-Lemma update_shadow : forall A (m: partial_map A) v1 v2 x,
-  update (update m x v1) x v2 = update m x v2.
-Proof.
-  intros A m v1 v2 x1. unfold update. rewrite t_update_shadow.
-  reflexivity.
-Qed.
-
-Theorem update_same : forall X v x (m : partial_map X),
-  m x = Some v ->
-  update m x v = m.
-Proof.
-  intros X v x m H. unfold update. rewrite <- H.
-  apply t_update_same.
-Qed.
-
-Theorem update_permute : forall (X:Type) v1 v2 x1 x2
-                                (m : partial_map X),
-  x2 <> x1 ->
-    (update (update m x2 v2) x1 v1)
-  = (update (update m x1 v1) x2 v2).
-Proof.
-  intros X v1 v2 x1 x2 m. unfold update.
-  apply t_update_permute.
-Qed.
-
-(** $Date: 2016-11-22 16:39:52 -0500 (Tue, 22 Nov 2016) $ *)
-
+*)

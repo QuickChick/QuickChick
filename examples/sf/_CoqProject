@@ -9,3 +9,5 @@ Logic.v
 IndProp.v
 Maps.v
 Imp.v
+Equiv.v
+Smallstep.v
