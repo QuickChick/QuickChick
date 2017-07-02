@@ -12,3 +12,5 @@ Imp.v
 Equiv.v
 Smallstep.v
 Types.v
+Stlc.v
+StlcProp.v
