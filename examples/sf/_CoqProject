@@ -11,3 +11,4 @@ Maps.v
 Imp.v
 Equiv.v
 Smallstep.v
+Types.v
