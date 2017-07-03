@@ -471,16 +471,16 @@ Generalizable Variables A.
 (** Now, for example, we can shorten the declaration of the [showOne]
     function by omitting the binding for [A] at the front. *)
 
-Definition showOne' `{Show A} (a : A) : string :=
+Definition showOne1 `{Show A} (a : A) : string :=
   "The value is " ++ show a.
 
 (** Coq will notice that the occurrence of [A] inside the [`{...}] is
     unbound and automatically insert the binding that we wrote
     explicitly before. *)
 
-Print showOne'.
+Print showOne1.
 (* ==>
-    showOne' = 
+    showOne1 = 
       fun (A : Type) (H : Show A) (a : A) => "The value is " ++ show a
            : forall A : Type, Show A -> A -> string
 
@@ -492,10 +492,10 @@ Print showOne'.
     if they had been written with [{...}], rather than [(...)].  The
     "implicit" part means that the type argument [A] and the [Show]
     witness [H] are usually expected to be left implicit: whenever we
-    write [showOne'], Coq will automatically insert two unification
+    write [showOne1], Coq will automatically insert two unification
     variables as the first two arguments.  This automatic insertion
-    can be disabled by writing [@], so a bare occurrence of [showOne']
-    means the same as [@showOne' _ _].  The "maximally inserted" part
+    can be disabled by writing [@], so a bare occurrence of [showOne1]
+    means the same as [@showOne1 _ _].  The "maximally inserted" part
     says that these arguments should inserted automatically even when
     there is no following explicit argument. *)
 
@@ -504,12 +504,12 @@ Print showOne'.
     You will sometimes see class constraints written more explicitly,
     like this... *)
 
-Definition showOne'' `{_ : Show A} (a : A) : string :=
+Definition showOne2 `{_ : Show A} (a : A) : string :=
   "The value is " ++ show a.
 
 (** ... or even like this: *)
 
-Definition showOne''' `{H : Show A} (a : A) : string :=
+Definition showOne3 `{H : Show A} (a : A) : string :=
   "The value is " ++ show a.
 
 (** The advantage of the latter form is that it gives a name that can
@@ -523,65 +523,38 @@ Definition showOne''' `{H : Show A} (a : A) : string :=
     no change in meaning (though, again, this may be more confusing
     than helpful): *)
 
-Definition showOne'''' `{Show} a : string :=
+Definition showOne4 `{Show} a : string :=
   "The value is " ++ show a.
 
-(* STOPPED HERE *)
+(** If we ask Coq to print the arguments that are normally implicit,
+    we see that all these definitions are exactly the same
+    internally. *)
 
-(*
-Set Printing All.
-Unset Printing Notations.
+Set Printing Implicit.
 Print showOne.
-
-showOne = 
-fun (A : Type) (H : Show A) (a : A) =>
-append
-  (String (Ascii.Ascii false false true false true false true false)
-     (String (Ascii.Ascii false false false true false true true false)
-        (String (Ascii.Ascii true false true false false true true false)
-           (String
-              (Ascii.Ascii false false false false false true false false)
-              (String (Ascii.Ascii false true true false true true true false)
-                 (String
-                    (Ascii.Ascii true false false false false true true false)
-                    (String
-                       (Ascii.Ascii false false true true false true true
-                          false)
-                       (String
-                          (Ascii.Ascii true false true false true true true
-                             false)
-                          (String
-                             (Ascii.Ascii true false true false false true
-                                true false)
-                             (String
-                                (Ascii.Ascii false false false false false
-                                   true false false)
-                                (String
-                                   (Ascii.Ascii true false false true false
-                                      true true false)
-                                   (String
-                                      (Ascii.Ascii true true false false true
-                                         true true false)
-                                      (String
-                                         (Ascii.Ascii false false false false
-                                            false true false false)
-                                         EmptyString)))))))))))))
-  (@show A H a)
-     : forall (A : Type) (_ : Show A) (_ : A), string
-
+Print showOne1.
+Print showOne2.
+Print showOne3.
+Print showOne4.
+(* ==> 
+    showOne = 
+        fun (A : Type) (H : Show A) (a : A) => 
+          "The value is " ++ @show A H a
+      : forall A : Type, Show A -> A -> string
 *)
+Unset Printing Implicit.
 
-
-
-(* Where it gets fancy (and useful) is with subclasses: *)
-
-Class Ord1 `{Eq A} :=
-  {
-    le1 : A -> A -> bool
-  }.
+(** The examples we've seen so far illustrate how implicit
+    generalization works, but you may not be convinced yet that it is
+    actually saving enough keystrokes to be worth the trouble of
+    adding such a fancy mechanism to Coq.  Where things become more
+    convincing is when classes are organized into hierarchies.  For
+    example, here is an alternate definition of the [max] function: *)
 
 Definition max1 `{Ord A} (x y : A) :=
   if le x y then y else x.
+
+(* HERE *)
 
 (* HIDE: Here's what the Coq reference manual says:
 
@@ -596,19 +569,23 @@ Definition max1 `{Ord A} (x y : A) :=
       using a product or a lambda abstraction to generate a closed
       term. *)
 
-(* Implicit generalization can be used in other ways.  For example: *)
+(** For completeness, we should mention one last feature of implicit
+    generalization: If we write a binder as [`(...)], with parentheses
+    instead of curly braces, then 
+XXXXXXXXXXXXXXXXXXXX
+     *)
 Generalizable Variables x y.
 
-Lemma commutativity_property : `(x + y = y + x).
+Lemma commutativity_property : `{x + y = y + x}.
 Proof. intros. omega. Qed.
 
 Check commutativity_property.
 
 (* This makes pretty good sense -- a lot of people like to write their
-   theorems this way on paper, so why not the formal versions too?
+   theorems this way on paper, so why not the formal versions too? 
    But it is also possible to use implicit generalization to get
    effects that are arguably not so natural. *)
-Definition weird1 := `(x + y).
+Definition weird1 := `{x + y}.
 Print weird1.
 
 
@@ -620,6 +597,11 @@ Print weird1.
    record values is different from [Instance] declarations.) *)
 
 (* (Notice that it's basically just a record type.) *)
+Print show.
+Print Show.
+
+
+
 Print Eq.
 (* ===>
      Record Eq (A : Type) : Type := Build_Eq { eqb : A -> A -> bool }
