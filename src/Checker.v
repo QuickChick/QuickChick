@@ -298,17 +298,65 @@ Fixpoint conjAux (f : Result -> Result)
   end.
 
 Definition mapGen {A B} (f : A -> G B) (l : list A) : G (list B) :=
-  foldGen (fun acc a => 
+  bindGen (foldGen (fun acc a => 
              bindGen (f a) (fun b => returnGen (cons b acc)))
-          l nil.
+          l nil) (fun l => returnGen (rev l)).
 
-Fixpoint conjoin {prop : Type} `{_ : Checkable prop} (l : list Checker) : Checker :=
+Fixpoint conjoin (l : list Checker) : Checker :=
 (*   trace ("Beginnning conjoin" ++ nl) ( *)
   bindGen (mapGen (liftGen unProp) l) (fun rs =>
           (returnGen (MkProp (let res := conjAux (fun x => x) rs in
                               let '(MkRose r _) := res in 
                               (* debug_stamps "Conjoin result: " r *) res
                              )))).
+
+Definition fmapRose' A B (r : Rose A) (f : A -> B) := fmapRose f r.
+
+Definition expectFailureError := 
+  updReason failed "Expect failure cannot occur inside a disjunction".
+
+Definition disjAux (p q : Rose Result) : Rose Result :=
+  joinRose (fmapRose' p (fun result1 =>
+  if expect result1 then
+    match ok result1 with 
+    | Some true => returnRose result1
+    | Some false => 
+      joinRose (fmapRose' q (fun result2 =>
+      if expect result2 then
+        match ok result2 with 
+        | Some true => returnRose result2
+        | Some false => 
+          returnRose (MkResult (ok result2)
+                               (expect result2)
+                               (if string_dec (reason result2) EmptyString 
+                                then reason result1
+                                else reason result2)
+                               (orb (interrupted result1) (interrupted result2))
+                               (stamp result1 ++ stamp result2)
+                               (callbacks result1 ++ 
+                                    cons (PostFinalFailure Counterexample
+                                                      (fun _ _ => trace newline 0)) nil ++
+                                    callbacks result2 )
+                               (result_tag result2))
+        | None => returnRose result2 (* Leo: What to do here? *)
+        end
+      else returnRose expectFailureError))
+    | None => 
+      joinRose (fmapRose' p (fun result2 => 
+      if expect result2 then 
+        match ok result2 with
+        | Some true => returnRose result2
+        | _ => returnRose result1 (* Not sure here as well *)
+        end
+      else returnRose expectFailureError))
+    end
+  else returnRose expectFailureError)).
+
+Definition disjoin (l : list Checker) : Checker := 
+  bindGen (mapGen (liftGen unProp) l) (fun rs =>
+          (returnGen (MkProp (
+                          fold_right disjAux (returnRose failed) rs
+                        )))).
 
 Module QcNotation.
   Export QcDefaultNotation.
