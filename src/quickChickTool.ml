@@ -33,7 +33,7 @@ let debug fmt =
   if !verbose then Printf.fprintf stdout (fmt ^^ "%!")
   else Printf.ifprintf stdout fmt
 
-let tmp_dir = "_qc"
+let tmp_dir = "../_qc_" ^ Filename.basename (Unix.getcwd ()) ^ ".tmp"
 
 let ensure_dir_exists d = Sys.command ("mkdir -p " ^ d)
 
