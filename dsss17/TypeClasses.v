@@ -447,6 +447,19 @@ Instance optionOrd {A : Type} `{Eq A} `{Ord A} : Ord (option A) :=
 (* ################################################################# *)
 (** ** Implicit Generalization *)
 
+(* HIDE: Here's what the Coq reference manual says:
+
+      Implicit generalization is an automatic elaboration of a
+      statement with free variables into a closed statement where
+      these variables are quantified explicitly. Implicit
+      generalization is done inside binders starting with a ` and
+      terms delimited by `{ } and `( ), always introducing maximally
+      inserted implicit arguments for the generalized
+      variables. Inside implicit generalization delimiters, free
+      variables in the current context are automatically quantified
+      using a product or a lambda abstraction to generate a closed
+      term. *)
+
 (** The first thing to discuss is what the "backtick" notation means
     in declarations of classes, instances, and functions using
     typeclasses.  This is actually a quite generic mechanism, called
@@ -554,26 +567,31 @@ Unset Printing Implicit.
 Definition max1 `{Ord A} (x y : A) :=
   if le x y then y else x.
 
+(** If we print out [max1] in full detail, we can see that the
+    implicit generalization around [`{Ord A}] led Coq to fill in not
+    only a binding for [A] but also a binding for [H], which it can
+    see must be of type [Eq A] because it appears as the second
+    argument to [Ord].  (And why is [Ord] applied here to two
+    arguments instead of just the one, [A], that we wrote?  Because
+    [Ord]'s arguments are maximally inserted!) *)
+
+Set Printing Implicit.
+Print max1.
+(* ==>
+     max1 = 
+       fun (A : Type) (H : Eq A) (H0 : @Ord A H) (x y : A) =>
+         if @le A H H0 x y then y else x
+     : forall (A : Type) (H : Eq A), @Ord A H -> A -> A -> A
+*)
+
+Check Ord.
+(* ==>
+    Ord : forall A : Type, Eq A -> Type *)
+
+Unset Printing Implicit.
+
 (* HERE *)
 
-(* HIDE: Here's what the Coq reference manual says:
-
-      Implicit generalization is an automatic elaboration of a
-      statement with free variables into a closed statement where
-      these variables are quantified explicitly. Implicit
-      generalization is done inside binders starting with a ` and
-      terms delimited by `{ } and `( ), always introducing maximally
-      inserted implicit arguments for the generalized
-      variables. Inside implicit generalization delimiters, free
-      variables in the current context are automatically quantified
-      using a product or a lambda abstraction to generate a closed
-      term. *)
-
-(** For completeness, we should mention one last feature of implicit
-    generalization: If we write a binder as [`(...)], with parentheses
-    instead of curly braces, then 
-XXXXXXXXXXXXXXXXXXXX
-     *)
 Generalizable Variables x y.
 
 Lemma commutativity_property : `{x + y = y + x}.
@@ -587,6 +605,12 @@ Check commutativity_property.
    effects that are arguably not so natural. *)
 Definition weird1 := `{x + y}.
 Print weird1.
+
+(** For completeness, we should mention one last feature of implicit
+    generalization: If we write a binder as [`(...)], with parentheses
+    instead of curly braces, then 
+XXXXXXXXXXXXXXXXXXXX
+     *)
 
 
 (* ---------------------------------------------------------------- *)
