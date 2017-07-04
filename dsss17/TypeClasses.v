@@ -86,6 +86,7 @@ Class Show A : Type :=
 (** The [Show] typeclass can be thought of as "classifying" types
     whose values can be converted to strings -- that is, types [A]
     such that we can define a function [show] of type [A -> string].
+    
     We can declare that [bool] is such a type by giving an [Instance]
     declaration that witnesses this function: *)
 
@@ -113,6 +114,11 @@ Instance showColor : Show color :=
   }.
 
 Compute (show Green).
+
+(** (The [show] function is sometimes said to be _overloaded_, since it
+    can be applied to arguments of many types, with potentially
+    radically different behavior depending on the type of its
+    argument.) *)
 
 (** Converting natural numbers to strings is conceptually similar,
     though it requires a tiny bit of programming: *)
@@ -638,198 +644,412 @@ Definition implicit_fun1 := `(x + y).
 Print implicit_fun1.
 Compute (implicit_fun1 2 3).
 
+(** ** Records in Coq *)
+
+(** Although records are not part of Coq's logical foundation, it does
+    provide some simple syntactic sugar for defining and using
+    records.  
+
+    Record types must be declared before they are used.  For example:*)
+
+Record Point :=
+  Build_Point
+    {
+      px : nat;
+      py : nat
+    }.
+
+(** Internally, this declaration is desugared into a single-field
+    inductive type, roughly like this: 
+[[
+    Inductive Point : Set := 
+      | Build_Point : nat -> nat -> Point.
+]]
+*)
+
+(** Elements of this type can be built, if we like, by applying the
+    [Build_Point] constructor directly.
+*)
+
+Check (Build_Point 2 4).
+
+(** Or we can use more familar record syntax, which allows us to name
+    the fields and write them in any order: *)
+
+Check {| px := 2; py := 4 |}.
+Check {| py := 4; px := 2 |}.
+
+(** We can also access fields of a record using conventional "dot notation" 
+    (with slightly clunky concrete syntax): *)
+
+Definition r : Point := {| px := 2; py := 4 |}.
+
+Compute (r.(px) + r.(py)).
+
+(** Record declarations can also be parameterized: *)
+
+Record LabeledPoint (A : Type) :=
+  Build_LabeledPoint
+    {
+      lx    : nat;
+      ly    : nat;
+      label : A
+    }.
+
+(** (Note that the field names have to be different.  Any given field
+    name can belong to only one record type.  This greatly simplifies
+    type inference!) *)
+
+Check {| lx:=2; ly:=4; label:="hello" |}.
+(* ==> 
+     {| lx := 2; ly := 4; label := "hello" |}
+        : LabeledPoint string
+*)
+
+(* EX1 (rcdParens) *)
+(** Note that the [A] parameter in the definition of [LabeledPoint] is
+    bound with parens, not curly braces. Why is this a better choice?
+    []*)
+
 (** ** Typeclasses are Records *)
 
-(* Explain briefly what a typeclass actually translates
-   into.  (Explain Coq records en passant.  Note that the syntax for
-   record values is different from [Instance] declarations.) *)
+(** Typeclasses and instances, in turn, are basically just syntactic
+    sugar for record types and values (together with a bit of magic
+    for using proof search to fill in appropriate instances during
+    typechecking, as described below).
 
-(* (Notice that it's basically just a record type.) *)
-Print show.
+    Internally, a typeclass declaration is elaborated into a parameterized
+    [Record] declaration: *)
+
+Set Printing All.
 Print Show.
-
-
-
-Print Eq.
-(* ===>
-     Record Eq (A : Type) : Type := Build_Eq { eqb : A -> A -> bool }
-*)
-
-Check eqb.  
-(* 
-==> 
-eqb
-     : ?A -> ?A -> bool
-where
-?A : [ |- Type] 
-?Eq : [ |- Eq ?A] 
-*)
-
-(* Recommended exercise: Reminder of how Coq displays implicit parameters... *)
-Definition foo {A : Type} (a : A) : A := a.
-Check foo.
-(* ===>
-     foo
-          : ?A -> ?A
-     where
-     ?A : [ |- Type] 
-*)
-
-Print eqBool.
 (* ==> 
-eqBool = {| eqb := fun b c : bool => if b then c else negb c |}
-     : Eq bool
+    Record Show (A : Type) : Type := 
+      Build_Show
+        { show : A -> string } 
 *)
+Unset Printing All.
 
-Print eqb.
+(** Analogously, [Instance] declarations become record values: *)
+
+Print showNat.
 (* ==>
-     eqb = 
-     fun (A : Type) (Eq0 : Eq A) => let (eqb) := Eq0 in eqb
-          : forall A : Type, Eq A -> A -> A -> bool
+    showNat = {| show := string_of_nat |}
+       : Show nat
+*)
 
-     Arguments A, Eq are implicit and maximally inserted
-     Argument scopes are [type_scope _ _ _]
- *)
+(** Note that the syntax for record values is slightly different from
+    [Instance] declarations.  Record values are written with
+    curly-brace-vertical-bar delimiters, while [Instance] declarations
+    are written here with just curly braces.  (To be precise, both
+    forms of braces are actually allowed for [Instance] declarations,
+    and either will work in most situations; however, type inference
+    sometimes works a bit better with simple curly braces.) *)
+(* HIDE *)
+(* If you read Coq libraries involving typeclasses, you may see
+   [Instance] declarations written with [{|...|}] brackets instead of
+   [{...}].  The two notations mean _almost_ the same thing, and both
+   will work in most instances.  However, the Coq typechecker treats
+   them a little differently, which can cause the instance inference
+   process to fail sometimes for instances written with [{|...|}]
+   brackets when the same declaration written with [{...}] will
+   succeed. *)
 
-Check (@eqb).
+(* From a coq-club email 24 June 2017 from Matthieu Sozeau
+
+   Indeed you're hitting a few confusing things. First the record notation:
+   Instance has a special syntax [{ foo := bar }] for giving the fields of
+   the class, while [{| foo := bar |}] was introduced after for introducing
+   values in general record types (parsing issues prevented to reuse simple
+   braces { }).
+
+   There is a discrepancy in how these are typechecked currently: in the
+   Instance : C args := { ... } case, the type information flows from the
+   arguments of the class type constraint to the parameters of the
+   constructor, hence you get a typing constraint for your method which
+   readily mentions bool and eqBool and typechecking succeeds.
+
+   In the case of {| |}, the record value is typechecked independently of
+   the typing constraint first, and in your example this involves a
+   unification problem
+
+     forall (x y : ?A) (_ : @eq bool (@eqb ?A ?H x y) true), @eq ?A x y ~= 
+     forall (a b : bool) (_ : @eq bool (Bool.eqb a b) true), @eq bool a b
+
+   which fails at first. We try to launch typeclass resolution to fill the
+   holes, finding ?A to be nat, ?H to be eqNat and then the unification
+   fails again as we chose the wrong instance.
+
+     Bidirectional typechecking making the typing constraint information
+   flow to the parameters, avoiding this unexpected behavior, is not on by
+   default (for compatibility reasons mainly), but activated in Program
+   mode, so this works too:
+
+   Program Instance eqdecBool : @EqDec bool eqBool := 
+     {|
+       eqb_eq := Bool.eqb_prop
+     |}.       
+
+   Sorry for the long explanation... it's definitely confusing.
+   -- Matthieu
+*)
+(* /HIDE *)
+
+(** Similarly, overloaded functions like [show] are really just record
+    projections, which in turn are just functions that select a
+    particular argument of a one-constructor [Inductive] type. *)
+
+Set Printing All.
+Print show.
 (* ==>
-    @eqb
-       : forall A : Type, Eq A -> A -> A -> bool
+    show = 
+      fun (A : Type) (Show0 : Show A) =>
+        match Show0 with
+          | Build_Show _ show => show
+        end
+   : forall (A : Type), Show A -> A -> string 
+
+   Arguments A, Show are implicit and maximally inserted  *)
+(* HIDE: I don't know why, but in 8.6 it actually says "Show" rather
+   than "Show0" on the last line.  Probably a bug. *)
+Unset Printing All.
+
+(** ** Inferring Instances *)
+
+(** So far, all the mechanisms we've seen have been pretty simple
+    syntactic sugar and binding munging.  The real "special sauce" of
+    typeclasses is the way appropriate instances are automatically
+    inferred (and constructed!) during typechecking.
+
+    For example, if we write [show 42], what we actually get is 
+    [@show nat showNat 42]: *)
+
+Definition eg42 := show 42.
+
+Set Printing Implicit.
+Print eg42.
+Unset Printing Implicit.
+
+(** How does this happen?
+
+    First, since the arguments to [show] are marked implicit, what we
+    typed is automatically expanded to [@show _ _ 42].  The first [_]
+    should obviously be replaced by [nat].  But what about the second?
+
+    By ordinary type inference, Coq knows that, to make the whole
+    expression well typed, the second argument to [@show] must be a
+    value of type [Show nat].  It now attempts to find or construct
+    such a value using a variant of the [eauto] proof search procedure
+    that refers to a "hint database" called [typeclass_instances]. *)
+
+(* EX1 (HintDb) *)
+(** Uncomment and execute the following command.  Search for "For
+    Show" in the output and have a look at the entries for [showNat]
+    and [showPair]. *)
+
+(* Print HintDb typeclass_instances. *)
+(** [] *)
+
+(** We can see what's happening during the instance inference process
+    if we issue the [Set Typeclasses Debug] command. *)
+
+Set Typeclasses Debug.
+Check (show 42).
+(* ==>
+     Debug: 1: looking for (Show nat) without backtracking
+     Debug: 1.1: exact showNat on (Show nat), 0 subgoal(s)
 *)
 
-(** ** Instance Inference *)
+(** In this simple example, the proof search succeeded immediately
+    because [showNat] was in the hint database.  In more interesting
+    cases, the proof search needs to try to assemble an _expression_
+    of appropriate type using both functions and constants from the
+    hint database.  (This is very like what happens when proof search
+    is used as a tactic to automatically assemble compound proofs by
+    assembling combinations of theorems from the environment.) *)
 
-(*
-    fun (x y : bool) => eqb x y 
-    ===>   { Implicit arguments }
-    fun (x y : bool) => @eqb _ _ x y
-    ===>   { Typing }
-    fun (x y : bool) => @eqb (?A : Type) (?eq : Eq?A) x y 
-    ===>   { Unification }
-    fun (x y : bool) => @eqb bool (?eq : Eq bool) x y 
-    ===>   { Proof search for Eq bool returns Eq bool }
-    fun (x y : bool) => @eqb bool (eqBool : Eq bool) x y 
+Check (show (true,42)).
+(* ==>
+     Debug: 1: looking for (Show (bool * nat)) without backtracking
+     Debug: 1.1: simple apply @showPair on (Show (bool * nat)), 2 subgoal(s)
+     Debug: 1.1.3 : (Show bool)
+     Debug: 1.1.3: looking for (Show bool) without backtracking
+     Debug: 1.1.3.1: exact showBool on (Show bool), 0 subgoal(s)
+     Debug: 1.1.3 : (Show nat)
+     Debug: 1.1.3: looking for (Show nat) without backtracking
+     Debug: 1.1.3.1: exact showNat on (Show nat), 0 subgoal(s)      *)
+
+Unset Typeclasses Debug.
+
+(** In the second line, the search procedure decides to try applying
+    [showPair], from which it follows (after a bit of unification)
+    that it needs to find an instance of [Show Nat] and an instance of
+    [Show Bool], each of which succeeds immediately as before. *)
+
+(** In summary, here are the steps again:
+[[
+    show 42
+       ===>   { Implicit arguments }
+    @show _ _ 42
+       ===>   { Typing }
+    @show (?A : Type) (?Show0 : Show ?A) 42
+       ===>   { Unification }
+    @show nat (?Show0 : Show nat) 42
+       ===>   { Proof search for Show Nat returns showNat }
+    @show nat showNat 42
+]]
 *)
-
-(* For purposes of instance inference, it doesn't matter whether
-   hypotheses are explicit or inferred.  So, for example, one could
-   just as well write this: *)
-
-Definition oddManOut'' {A : Type} (_ : Eq A) (a b c : A) : A :=
-  if eqb a b then c
-  else if eqb a c then b
-  else a.                         
-
-(* However, if we define it this way, then applying the function is
-   going to be more clunky: *)
-
-(*
-Check (oddManOut'' 1 2 1).
-===>
-   Error: The term "1" has type "nat" while it is expected to have type "Eq ?A".
-*)
-
-Check (oddManOut'' eqNat 1 2 1).
-
-(*
-Proof-search tactic with instances as lemmas: 
-
-    A:Type, eqa: EqA |- ? : Eq (list A)
-
-  Simple depth-first search with higher-order unification
-
-– Returns the first solution only 
-     - not always what you want!!
-+ Extensible through Ltac
- *)
-
-(* WRITE MORE: Show how to turn on debugging and explain what it
-   prints.  Do some trickier examples.  (Maybe some of this needs to
-   go below, after parameterized instances are introduced.) *)
-
-(* Matthieu's slides have some stuff about "Instance Inference"
+(* HIDE: Matthieu's slides have some stuff about "Instance Inference"
    that is probably useful but I'm not sure I follow it... *)
 
+(* NOW: Exercises needed. *)
 
 (** * Typeclasses and Proofs *)
 
+(** Since programs and proofs in Coq are fundamentally made from the
+    same stuff, the mechanisms of typeclasses extend smoothly to
+    situations where classes contain not only data and functions but
+    also proofs.  This is a big topic, but let's take a quick look at
+    a few things. *)
+
+(** ** Propositional Typeclass Members *)
+
+(** The [Eq] typeclass defines a single overloaded function that tests
+    for equality between two elements of some type.  We can extend
+    this to a subclass that also comes with a proof that the given
+    equality tester is correct, in the sense that, whenever it returns
+    [true], the two values are actully equal in the propositional
+    sense.
+*)
+
 Class EqDec (A : Type) {H : Eq A} := 
   { 
-    eqb_eq : forall x y, eqb x y = true -> x = y 
+    eqb_eq : forall x y, eqb x y = true <-> x = y 
   }.
 
-Check (@EqDec).
-Print EqDec.
-
-Instance eqdecBool : EqDec bool := 
-  {
-    eqb_eq := Bool.eqb_prop
-  }.
-
-(* If the Instance declaration does not give values for all the class
-   members, Coq enters proof-mode and the user is asked to build
-   inhabitants of the remaining fields. *)
-Instance eqdecBool' : EqDec bool := 
-  {
-  }.
-Proof. apply Bool.eqb_prop. Defined.
+(** To build an instance of [EqDec], we must now supply an appropriate
+    proof. *)
 
 Instance eqdecNat : EqDec nat := 
   {
-    eqb_eq := EqNat.beq_nat_true
+    eqb_eq := Nat.eqb_eq
   }.
 
-(* A quick (and somewhat contrived) example of a proof that works for
-   arbitrary things from the EqDec class... *)
+(** If we do not happen to have an appropriate proof already in the
+    environment, we can simply omit it.  Then, if the [Instance]
+    declaration does not give values for all the class members, Coq
+    will enter proof mode and ask the user to use tactics to construct
+    inhabitants for the remaining fields. *)
+
+Instance eqdecBool' : EqDec bool := 
+  {
+  }.
+Proof.
+  intros x y. destruct x; destruct y; simpl; unfold iff; auto.
+Defined.
+
+(** (If we are omitting _all_ the fields of an instance declaration,
+    we can also omit the [:= {}] if we like.  Note that the proof
+    needs one more line.) *)
+Instance eqdecBool'' : EqDec bool.
+Proof.
+  constructor.
+  intros x y. destruct x; destruct y; simpl; unfold iff; auto.
+Defined.
+
+(** Given a typeclass with propositional members, we can use these
+    members in proving things involving this typeclass.  Here, for
+    example, is a quick (and somewhat contrived) example of a proof of
+    a property that holds for arbitrary values from the [EqDec]
+    class... *)
 
 Lemma eqb_fact `{EqDec A} : forall (x y z : A),
   eqb x y = true -> eqb y z = true -> x = z.
 Proof.
   intros x y z Exy Eyz. 
-  apply eqb_eq in Exy.
-  apply eqb_eq in Eyz.
+  rewrite eqb_eq in Exy.
+  rewrite eqb_eq in Eyz.
   subst. reflexivity. Qed.
 
-(* Exercise: When creating this example, I first wrote this:
+(** There is much more to say about how typeclasses can be used (and
+    how they should not be used) to support large-scale proofs in Coq.
+    See the suggested readings below. *)
 
-     Lemma odd_man_out_fact : `{oddManOut a b c = a -> b = c}.
-
-   Why didn't it work? *)
-(* Answer: The types of a, b, and c got instantiated to nat. (But
-   why??) *)
-
+(* SOONER *)
 (** * Dependent Typeclasses *)
 
 (* Build the Dep typeclass and some instances.
 
    Probably also show Reflexive example from Matthieu.  Maybe also
    show Monoid and AbelianMonoid from his tutorial. *)
+(* /SOONER *)
 
-(*
-Substructures
+(** ** Substructures *)
 
-Substructures are components of a class which are instances of a class themselves. They often arise when using classes for logical properties, e.g.:
+(** Naturally, it is also possible to have typeclass instances as
+    members of other typeclasses: these are called _substructures_.
+    Here is an example adapted from the Coq Reference Manual. *)
 
-Coq < Class Reflexive (A : Type) (R : relation A) :=
-        reflexivity : forall x, R x x.
+Require Import Coq.Relations.Relation_Definitions.
 
-Coq < Class Transitive (A : Type) (R : relation A) :=
-        transitivity : forall x y z, R x y -> R y z -> R x z.
-This declares singleton classes for reflexive and transitive relations, (see 1 for an explanation). These may be used as part of other classes:
+Class Reflexive (A : Type) (R : relation A) :=
+  { 
+    reflexivity : forall x, R x x
+  }.
 
-Coq < Class PreOrder (A : Type) (R : relation A) :=
-      { PreOrder_Reflexive :> Reflexive A R ;
-        PreOrder_Transitive :> Transitive A R }.
+Class Transitive (A : Type) (R : relation A) :=
+  {
+    transitivity : forall x y z, R x y -> R y z -> R x z
+  }.
 
-The syntax :> indicates that each PreOrder can be seen as a Reflexive relation. So each time a reflexive relation is needed, a preorder can be used instead. This is very similar to the coercion mechanism of Structure declarations. The implementation simply declares each projection as an instance.
+Generalizable Variables z w R.
 
-One can also declare existing objects or structure projections using the Existing Instance command to achieve the same effect.
-*)
+Lemma trans3 : forall `{Transitive A R}, 
+    `{R x y -> R y z -> R z w -> R x w}.
+Proof.
+  intros.
+  apply (transitivity x z w). apply (transitivity x y z).
+  assumption. assumption. assumption. Defined.
+
+Class PreOrder (A : Type) (R : relation A) :=
+  { PreOrder_Reflexive :> Reflexive A R ;
+    PreOrder_Transitive :> Transitive A R }.
+
+(** The syntax [:>] indicates that each [PreOrder] can be seen as a
+    [Reflexive] and [Transitive] relation, so that, any time a
+    reflexive relation is needed, a preorder can be used instead. *)
+
+Lemma trans3_pre : forall `{PreOrder A R}, 
+    `{R x y -> R y z -> R z w -> R x w}.
+Proof. intros. eapply trans3; eassumption. Defined.
+
+(* SOONER *)
+(* Flesh this out... *)
+Definition silly_relation : bool -> bool -> Prop :=
+  fun b c => b = false \/ c = true.
+
+Instance reflSilly : Reflexive bool silly_relation :=
+  {
+  }.
+Proof. unfold silly_relation. intro x. destruct x; auto. Qed.
+
+Instance transSilly : Transitive bool silly_relation :=
+  {
+  }.
+Proof.
+  unfold silly_relation. intros x y z.
+  destruct x; destruct y; destruct z; auto. Defined.
+
+Instance preorderSilly : PreOrder bool silly_relation :=
+  { PreOrder_Reflexive := reflSilly;
+    PreOrder_Transitive := transSilly
+  }.
+
+(* Now can we prove something using all this? *)
+(* /SOONER *)
 
 (* ################################################################# *)
 (** * Some Useful Typeclasses *)
-
-(* MORE: Equality or equivalence?  *)
 
 (* HIDE:
 
@@ -839,56 +1059,80 @@ Matthieu: Like John, I use mostly Equivalence and Proper, the
 standard library does not define many more than those. Usually I have
 a variant of EquivDec as well for decidable equality tests. *)
 
-
 (** ** [Dec] *)
 
-(* show decidable and explain what it means *)
+(** The ssreflect library defines what it means for a proposition P to
+    be decidable like this... *)
 
-(*
+From mathcomp.ssreflect Require Import ssreflect ssrbool.
+
+Print decidable.
+(* ==>
+     decidable = fun P : Prop => {P} + {~ P}
+*)
+
+(** ... where [{P} + {~ P}] is an "informative disjunction" of [P] and
+    [~P].  *)
+
+(** It is easy to wrap this in a typeclass of "decidable
+    propositions": *)
+
 Class Dec (P : Prop) : Type :=
   {
     dec : decidable P
   }.
-*)
 
-(* 
-Global Instance Eq__Dec {A} `{H : Eq A} (x y : A) : Dec (x = y) :=
-  {|
-    dec := _
-  |}.
+(** We can now create instances encoding the information that
+    propositions of various forms are decidable.  For example, the
+    proposition [x = y] is decidable (for any specific [x] and [y]),
+    assuming that [x] and [y] belong to a type with an [EqDec]
+    instance. *)
+
+Instance EqDec__Dec {A} `{H : EqDec A} (x y : A) : Dec (x = y).
 Proof.
+  constructor.
   unfold decidable.
-  apply H.
+  destruct (eqb x y) eqn:E.
+  - left. rewrite <- eqb_eq. assumption.
+  - right. intros C. rewrite <- eqb_eq in C. rewrite E in C. inversion C.
 Defined.
-*)
 
-(* Show one or two of these and make the other(s) an exercise: *)
+(** Similarly, we can lift decidability through logical operators like
+    conjunction: *)
 
-(*
-Global Instance Dec_neg {P} {H : Dec P} : Dec (~ P).
+Instance Dec_conj {P Q} {H : Dec P} {I : Dec Q} : Dec (P /\ Q).
+Proof.
+  constructor. unfold decidable.
+  destruct H as [D]; destruct D;
+    destruct I as [D]; destruct D; auto;
+      right; intro; destruct H; contradiction.
+Defined.
+
+(* EX3 (dec_neg_disj) *)
+(** Give instance declarations showing that, if [P] and [Q] are
+    decidable propositions, then so are [~P] and [P\/Q]. *)
+
+(* SOLUTION *)
+Instance Dec_neg {P} {H : Dec P} : Dec (~ P).
 Proof.
   constructor. unfold decidable.
   destruct H as [D]; destruct D; auto.
 Defined.
 
-Global Instance Dec_conj {P Q} {H : Dec P} {I : Dec Q} : Dec (P /\ Q).
+Instance Dec_disj {P Q} {H : Dec P} {I : Dec Q} : Dec (P \/ Q).
 Proof.
   constructor. unfold decidable.
   destruct H as [D]; destruct D;
     destruct I as [D]; destruct D; auto;
       right; intro; destruct H; contradiction.
 Defined.
+(* /SOLUTION *)
+(** [] *)
 
-Global Instance Dec_disj {P Q} {H : Dec P} {I : Dec Q} : Dec (P \/ Q).
-Proof.
-  constructor. unfold decidable.
-  destruct H as [D]; destruct D;
-    destruct I as [D]; destruct D; auto;
-      right; intro; destruct H; contradiction.
-Defined.
-*)
-
-(* Possible exercise: 
+(* EX4: (Dec_All) *)
+(** The following function converts a list into a proposition claiming
+    that every element of that list satiesfies some proposition
+    [P]: *)
 
 Fixpoint All {T : Type} (P : T -> Prop) (l : list T) : Prop :=
   match l with
@@ -896,18 +1140,29 @@ Fixpoint All {T : Type} (P : T -> Prop) (l : list T) : Prop :=
   | x :: l' => P x /\ All P l'
   end.
 
-Give a Dec instance for [All l]:
+(** Create an instance of [Dec] for [All P l], given that [P a] is
+    decidable for every [a]. *)
 
-Global Instance All__Dec {A} `{H : Eq A} (x y : A) : Dec (x = y) :=
-  {|
-    dec := _
-  |}.
+(* SOLUTION *)
+Instance Dec_true : Dec True.
+Proof.
+  constructor. unfold decidable. left. constructor.
+Defined.
 
-*)
-
-(** ** Coq's [EqDec] *)
-
-(* (a bit different from the one we saw here) *)
+Generalizable Variable P.
+Instance All__Dec {A : Type} {P : A -> Prop} `{forall a, Dec (P a)}
+  : forall l, Dec (All P l).
+Proof.
+  induction l; simpl; constructor; unfold decidable. 
+  left. constructor.
+  inversion IHl.
+  destruct (H a).
+  unfold decidable in dec0.
+  unfold decidable in dec1.
+  destruct dec1; destruct dec0; tauto.
+Defined.
+(* /SOLUTION *)
+(** [] *)
 
 (* HIDE:
 
@@ -934,6 +1189,27 @@ case.  Probably not much of an issue, though, unless you want close
 control over the extraction.)
 *)
 
+(** One reason for doing all this is that it makes it easy to move
+    back and forth between the boolean and propositional worlds,
+    whenever we know we are dealing with decidable propositions.
+
+    In particular, we can define a notation [P?] that converts a
+    decidable proposition [P] into a boolean expression. *)
+
+Notation "P '?'" :=
+  (match (@dec P _) with 
+   | left _ => true
+   | right _ => false
+   end)
+  (at level 100).
+
+(** Now we don't need to remember that, for example, the test for
+    equality on numbers is called [beq_nat], because we can just write
+    it like this: *)
+
+Definition silly_fun (x y z : nat) :=
+  if (x = y /\ y = z /\ x = z)? then "all equal" else "not all equal".
+
 (** ** [Monad] *)
 
 (* Mention ext-lib, but not sure whether it's a good idea to actually
@@ -948,17 +1224,17 @@ https://github.com/coq-ext-lib/coq-ext-lib/blob/v8.5/theories/Structures/Monad.v
 
 (** ** Others *)
 
-(* Enumerate some of the interesting ones in the standard
-   library... E.g., Functor (is there one??)?  Monoid? *)
+(** Two popular typeclasses from the Coq standard library are
+    [Equivalence] (and the associated classes [Reflexive],
+    [Transitive], etc.) and [Proper].  They are described in the
+    second half of _A Gentle Introduction to Type Classes and
+    Relations in Coq_, by Castéran and Sozeau.
+    {http://www.labri.fr/perso/casteran/CoqArt/TypeClassesTut/typeclassestut.pdf}.
 
-(* Equivalence (and Reflexive, etc.) and Proper.  (Described in the second half of _A Gentle Introduction to Type Classes and Relations in Coq_, by Castéran and Sozeau.  
-
-http://www.labri.fr/perso/casteran/CoqArt/TypeClassesTut/typeclassestut.pdf
-
-Also:
-
-  https://arxiv.org/pdf/1102.1323.pdf
-
+    A much larger collection of typeclasses for formalizing
+    mathematics is described in _Type Classes for Mathematics in Type
+    Theory_, by Bas Spitters and Eelis van der
+    Weegen. {https://arxiv.org/pdf/1102.1323.pdf}
 *)
 
 
@@ -1064,10 +1340,10 @@ similar to using “pure” or “return” in Haskell instead of (fun x =>
 [x]). However, Coq is really bad usually at figuring out implicit
 stuff – so I just replaced it by the explicit anonymous function.
  
-After that it was just a “Gen (list X) instance does not exist”, so
-deriving Arbitrary (or Gen) for X should work (and it did). Now, why
+After that it was just a “[Gen (list X) instance does not exist]”, so
+deriving [Arbitrary] (or [Gen]) for [X] should work (and it did). Now, why
 things work when moving back to “inject” after adding the instance I
-have no idea 😊
+have no idea. :-)
 
 Yao: I have discussed this with Leo. The problem is that I have
 defined the following instance:
@@ -1145,54 +1421,7 @@ Check weird.
    would still consider `get` as `String.get`, even if I export
    MonadState after String in Common.v. *)
 
-(** ** Syntax *)
-
-(* If you read Coq libraries involving typeclasses, you may see
-   [Instance] declarations written with [{|...|}] brackets instead of
-   [{...}].  The two notations mean _almost_ the same thing, and both
-   will work in most instances.  However, the Coq typechecker treats
-   them a little differently, which can cause the instance inference
-   process to fail sometimes for instances written with [{|...|}]
-   brackets when the same declaration written with [{...}] will
-   succeed. *)
-(* HIDE: coq-club email 24 June 2017 from Matthieu Sozeau
-
-   Indeed you're hitting a few confusing things. First the record notation:
-   Instance has a special syntax [{ foo := bar }] for giving the fields of
-   the class, while [{| foo := bar |}] was introduced after for introducing
-   values in general record types (parsing issues prevented to reuse simple
-   braces { }).
-
-   There is a discrepancy in how these are typechecked currently: in the
-   Instance : C args := { ... } case, the type information flows from the
-   arguments of the class type constraint to the parameters of the
-   constructor, hence you get a typing constraint for your method which
-   readily mentions bool and eqBool and typechecking succeeds.
-
-   In the case of {| |}, the record value is typechecked independently of
-   the typing constraint first, and in your example this involves a
-   unification problem
-
-     forall (x y : ?A) (_ : @eq bool (@eqb ?A ?H x y) true), @eq ?A x y ~= 
-     forall (a b : bool) (_ : @eq bool (Bool.eqb a b) true), @eq bool a b
-
-   which fails at first. We try to launch typeclass resolution to fill the
-   holes, finding ?A to be nat, ?H to be eqNat and then the unification
-   fails again as we chose the wrong instance.
-
-     Bidirectional typechecking making the typing constraint information
-   flow to the parameters, avoiding this unexpected behavior, is not on by
-   default (for compatibility reasons mainly), but activated in Program
-   mode, so this works too:
-
-   Program Instance eqdecBool : @EqDec bool eqBool := 
-     {|
-       eqb_eq := Bool.eqb_prop
-     |}.       
-
-   Sorry for the long explanation... it's definitely confusing.
-   -- Matthieu
-*)
+(* Global Instance (for modules, or sections??) *)
 
 (* ################################################################# *)
 (** * Advice from Experts *)

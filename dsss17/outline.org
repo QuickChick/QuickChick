@@ -29,6 +29,9 @@ core QC typeclasses
 
 * Basic QuickChick Programming (BasicQC.v)
 
+Figure out whether P? notation is actually used here!  If not, can be
+skipped/skimmed in the Typeclass part.
+
 ** Checkers
 
 the Dec typeclass

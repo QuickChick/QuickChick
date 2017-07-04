@@ -166,3 +166,4 @@ Notation "P '?'" := (match (@dec P _) with
                        | right _ => false
                      end) (at level 100).
 
+Compute ((42 = 42)?).
