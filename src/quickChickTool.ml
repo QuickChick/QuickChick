@@ -377,12 +377,11 @@ let rec parse_file_or_dir file_name =
         Some (Dir (file_name, catMaybes parsed))
       end
     end
-    else if Filename.basename file_name = "Makefile" then
+    else if Filename.basename file_name = "Makefile" || Filename.basename file_name = "_CoqProject" then
       let s = load_file file_name in
       Some (File (file_name, [Section ("(*", "__default__" ^ file_name, "*)", None, [Text s])]))
     else
-      let handle = Filename.basename file_name = "_CoqProject"  || 
-                   Filename.check_suffix file_name "v" in
+      let handle = Filename.check_suffix file_name "v" in
       if handle then begin 
         debug "In file: %s\n" file_name;
         let lexbuf = Lexing.from_channel (open_in file_name) in
