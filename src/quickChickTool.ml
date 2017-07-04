@@ -385,8 +385,8 @@ let rec parse_file_or_dir file_name =
       if handle then begin 
         debug "In file: %s\n" file_name;
         let lexbuf = Lexing.from_channel (open_in file_name) in
-        let result = program lexer lexbuf in
-
+        let result = try program lexer lexbuf 
+                     with exn -> (Printf.printf "Parse error when reading file: %s\n" file_name; raise exn) in
         let collapse l =
           let rec loop acc acc_text l =
             match l with
