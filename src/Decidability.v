@@ -10,10 +10,9 @@ Require Import List.
 Set Bullet Behavior "Strict Subproofs".
 
 (* Class wrapper around "decidable" *)
-Class Dec (P : Prop) : Type :=
-  {
-    dec : decidable P
-  }.
+(* begin decidable_class *)
+    Class Dec (P : Prop) : Type := { dec : decidable P }.
+(* end decidable_class *)
 
 (* BCP: If I understand correctly, removing "Global" everywhere would
    change nothing... Or? *)
