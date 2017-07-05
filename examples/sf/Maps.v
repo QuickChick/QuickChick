@@ -59,7 +59,7 @@ Admitted. (* Prop *)
 Theorem false_beq_id : forall x y : id,
    x <> y
    -> beq_id x y = false.
-Admitted. (* Leo: TODO *) 
+Admitted. (* QuickChick false_beq_id. *)
 
 (* Maps as functions are bad, explicit maps instead *)
 
@@ -107,6 +107,10 @@ Proof.
       * right => Contra; inversion Contra; subst; eauto.
 Defined.
 
+(* TODO: Correct equivalence of maps *)
+Definition equiv_map m1 m2 :=
+  forall x v , bind m1 x v <-> bind m2 x v.
+
 Conjecture apply_empty : forall x a, ~ (bind empty x a).
 (* QuickChick apply_empty. *)
 (* Gave Up! - QuickChick apply_empty_unfolded. *)
@@ -123,39 +127,29 @@ Theorem update_neq : forall v x1 x2
                    v' = v''.
 Admitted. (* Leo: TODO QuickChick update_neq. *)
 
-(*
-Lemma update_shadow : forall A (m: partial_map A) v1 v2 x,
-  update (update m x v1) x v2 = update m x v2.
-Proof.
-  intros A m v1 v2 x1. unfold update. rewrite t_update_shadow.
-  reflexivity.
-Qed.
+Lemma update_shadow : forall (m: partial_map) v1 v2 x,
+  update (x, v2) (update (x, v1) m)  = update (x, v2) m.
+Admitted. (* QuickChick update_shadow. *)
 
-Theorem update_same : forall X v x (m : partial_map X),
-  m x = Some v ->
-  update m x v = m.
-Proof.
-  intros X v x m H. unfold update. rewrite <- H.
-  apply t_update_same.
-Qed.
+Theorem update_same : forall v x (m : partial_map),
+  bind m x v ->
+  update (x, v) m = m.
+Admitted. (* QuickChick update_same. *)
 
-Theorem update_permute : forall (X:Type) v1 v2 x1 x2
-                                (m : partial_map X),
+Theorem update_permute : forall v1 v2 x1 x2
+                                (m : partial_map),
   x2 <> x1 ->
-    (update (update m x2 v2) x1 v1)
-  = (update (update m x1 v1) x2 v2).
-Proof.
-  intros X v1 v2 x1 x2 m. unfold update.
-  apply t_update_permute.
-Qed.
-*) 
+    (update (x1,v1) (update (x2,v2) m))
+  = (update (x2,v2) (update (x1,v1) m)).
+Admitted. (* QuickChick update_permute. *)
 
 Definition total_map := (partial_map * nat)%type.
 
 Definition t_empty v : total_map := (empty, v).
 
-Definition t_update (m : partial_map) (d : nat) (x : id) (v : nat) :=
-  (update (x, v) m, d).
+Definition t_update (m : total_map) (x : id) (v : nat) :=
+  let (pm,d) := m in
+  (update (x, v) pm, d).
 
 Inductive t_bind : partial_map -> nat -> id -> nat -> Prop :=
   | T_BindDef   : forall x v, t_bind nil v x v
@@ -186,83 +180,32 @@ Definition t_lookup (m : total_map) x :=
   | Some v => v
   | None => d
   end.
-(*
-Lemma t_update_eq : forall A (m: total_map A) x v,
-  (t_update m x v) x = v.
-Proof.
-  (* FILL IN HERE *) Admitted.
-(** [] *)
 
-(** **** Exercise: 2 stars, optional (t_update_neq)  *)
-(** On the other hand, if we update a map [m] at a key [x1] and then
-    look up a _different_ key [x2] in the resulting map, we get the
-    same result that [m] would have given: *)
+Lemma t_update_eq : forall (m: total_map) x v,
+  t_lookup (t_update m x v) x = v.
+Admitted. (* QuickChick t_update_eq. *)
 
-Theorem t_update_neq : forall (X:Type) v x1 x2
-                         (m : total_map X),
+Theorem t_update_neq : forall v x1 x2
+                         (m : total_map),
   x1 <> x2 ->
-  (t_update m x1 v) x2 = m x2.
-Proof.
-  (* FILL IN HERE *) Admitted.
-(** [] *)
+  t_lookup (t_update m x1 v) x2 = t_lookup m x2.
+Admitted. (* QuickChick t_update_neq. *)
 
-(** **** Exercise: 2 stars, optional (t_update_shadow)  *)
-(** If we update a map [m] at a key [x] with a value [v1] and then
-    update again with the same key [x] and another value [v2], the
-    resulting map behaves the same (gives the same result when applied
-    to any key) as the simpler map obtained by performing just
-    the second [update] on [m]: *)
-
-Lemma t_update_shadow : forall A (m: total_map A) v1 v2 x,
+Lemma t_update_shadow : forall  (m: total_map) v1 v2 x,
     t_update (t_update m x v1) x v2
   = t_update m x v2.
-Proof.
-  (* FILL IN HERE *) Admitted.
-(** [] *)
-
-(** For the final two lemmas about total maps, it's convenient to use
-    the reflection idioms introduced in chapter [IndProp].  We begin
-    by proving a fundamental _reflection lemma_ relating the equality
-    proposition on [id]s with the boolean function [beq_id]. *)
-
-(** **** Exercise: 2 stars, optional (beq_idP)  *)
-(** Use the proof of [beq_natP] in chapter [IndProp] as a template to
-    prove the following: *)
+Admitted. (* QuickChick t_update_shadow. *)
 
 Lemma beq_idP : forall x y, reflect (x = y) (beq_id x y).
-Proof.
-  (* FILL IN HERE *) Admitted.
-(** [] *)
+Admitted. (* Undecidable *)
 
-(** Now, given [id]s [x1] and [x2], we can use the [destruct (beq_idP
-    x1 x2)] to simultaneously perform case analysis on the result of
-    [beq_id x1 x2] and generate hypotheses about the equality (in the
-    sense of [=]) of [x1] and [x2]. *)
+Theorem t_update_same : forall x (m : total_map),
+  t_update m x (t_lookup m x) = m.
+Admitted. (* QuickChick t_update_same *)
 
-(** **** Exercise: 2 stars (t_update_same)  *)
-(** With the example in chapter [IndProp] as a template, use
-    [beq_idP] to prove the following theorem, which states that if we
-    update a map to assign key [x] the same value as it already has in
-    [m], then the result is equal to [m]: *)
-
-Theorem t_update_same : forall X x (m : total_map X),
-  t_update m x (m x) = m.
-Proof.
-  (* FILL IN HERE *) Admitted.
-(** [] *)
-
-(** **** Exercise: 3 stars, recommended (t_update_permute)  *)
-(** Use [beq_idP] to prove one final property of the [update]
-    function: If we update a map [m] at two distinct keys, it doesn't
-    matter in which order we do the updates. *)
-
-Theorem t_update_permute : forall (X:Type) v1 v2 x1 x2
-                             (m : total_map X),
+Theorem t_update_permute : forall v1 v2 x1 x2
+                             (m : total_map),
   x2 <> x1 ->
     (t_update (t_update m x2 v2) x1 v1)
   = (t_update (t_update m x1 v1) x2 v2).
-Proof.
-  (* FILL IN HERE *) Admitted.
-(** [] *)
-
-*)
+Admitted. (* QuickChick t_update_permute *)

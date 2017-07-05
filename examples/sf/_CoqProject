@@ -9,6 +9,7 @@ Logic.v
 IndProp.v
 Maps.v
 Imp.v
+Hoare.v
 Equiv.v
 Smallstep.v
 Types.v
