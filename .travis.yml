@@ -28,7 +28,6 @@ before_install:
 
 install:
 - "[ -e .opam ] || opam init -j ${NJOBS} --compiler=${COMPILER} -n -y"
-- opam switch 4.04.1
 - eval $(opam config env)
 - opam config var root
 - opam repo add coq-released https://coq.inria.fr/opam/released || true
