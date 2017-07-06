@@ -196,6 +196,11 @@ Module Type GenLowInterface.
           `{forall x, semGen g x -> SizeMonotonicOpt (f x)} :
     SizeMonotonicOpt (bindGen g f).
 
+  Declare Instance bindOptMonotonic
+          {A B} (g : G (option A)) (f : A -> G (option B))
+          `{SizeMonotonic _ g} `{forall x, SizeMonotonic (f x)} : 
+    SizeMonotonic (bindGenOpt g f).
+
   Declare Instance bindOptMonotonicOpt
           {A B} (g : G (option A)) (f : A -> G (option B))
           `{SizeMonotonicOpt _ g} `{forall x, SizeMonotonicOpt (f x)} : 
@@ -306,6 +311,14 @@ Module Type GenLowInterface.
   Parameter semSuchThatMaybe_sound:
     forall A (g : G A) (f : A -> bool),
       semGen (suchThatMaybe g f) \subset None |: some @: (semGen g :&: f).
+
+  Declare Instance suchThatMaybeMonotonic
+         {A : Type} (g : G A) (f : A -> bool) `{SizeMonotonic _ g} : 
+    SizeMonotonic (suchThatMaybe g f).
+
+  Declare Instance suchThatMaybeOptMonotonic
+          {A : Type} (g : G (option A)) (f : A -> bool) `{SizeMonotonic _ g} : 
+    SizeMonotonic (suchThatMaybeOpt g f).
 
   Declare Instance suchThatMaybeMonotonicOpt
            {A : Type} (g : G A) (f : A -> bool) `{SizeMonotonic _ g} : 
@@ -717,6 +730,13 @@ Module GenLow : GenLowInterface.
     eapply monotonic_opt in Hin; eauto.
     inv Hin. eassumption.
   Qed.
+
+  Instance bindOptMonotonic
+           {A B} (g : G (option A)) (f : A -> G (option B))
+           `{SizeMonotonic _ g} `{forall x, SizeMonotonic (f x)} : 
+    SizeMonotonic (bindGenOpt g f).
+  Admitted.
+
   
   (* begin semBindUnsized1 *)
   Lemma semBindUnsized1 {A B} (g : G A) (f : A -> G B) `{H : Unsized _ g}:
@@ -1047,5 +1067,15 @@ Module GenLow : GenLowInterface.
     SizeMonotonicOpt (suchThatMaybeOpt g f).
   Admitted.
 
+
+  Instance suchThatMaybeMonotonic
+         {A : Type} (g : G A) (f : A -> bool) `{SizeMonotonic _ g} : 
+    SizeMonotonic (suchThatMaybe g f).
+  Admitted.
+
+  Instance suchThatMaybeOptMonotonic
+           {A : Type} (g : G (option A)) (f : A -> bool) `{SizeMonotonic _ g} : 
+    SizeMonotonic (suchThatMaybeOpt g f).
+  Admitted.
 
 End GenLow.

@@ -12,22 +12,6 @@ Import QcDoNotation.
 
 Set Bullet Behavior "Strict Subproofs".
 
-Instance bindOptMonotonic
-        {A B} (g : G (option A)) (f : A -> G (option B))
-        `{SizeMonotonic _ g} `{forall x, SizeMonotonic (f x)} : 
-  SizeMonotonic (bindGenOpt g f).
-Admitted.
-
-Instance suchThatMaybeMonotonic
-         {A : Type} (g : G A) (f : A -> bool) `{SizeMonotonic _ g} : 
-  SizeMonotonic (suchThatMaybe g f).
-Admitted.
-
-Instance suchThatMaybeOptMonotonic
-         {A : Type} (g : G (option A)) (f : A -> bool) `{SizeMonotonic _ g} : 
-  SizeMonotonic (suchThatMaybeOpt g f).
-Admitted.
-
 Typeclasses eauto := debug.
 
 Require Import zoo DependentTest.
