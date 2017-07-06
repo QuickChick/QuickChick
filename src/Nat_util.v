@@ -1,7 +1,7 @@
 Set Warnings "-extraction-opaque-accessed,-extraction".
 Set Warnings "-notation-overridden,-parsing".
 
-Require Import List ZArith.
+Require Import List ZArith Tactics.
 Import ListNotations.
 
 Require Import mathcomp.ssreflect.ssreflect.
@@ -51,4 +51,29 @@ Lemma ltS_leq n m :
   n <= m -> n < m.+1.
 Proof.
   eauto.
+Qed.
+
+Lemma plus_leq_compat_l n m k :
+  n <= m ->
+  n <= m + k.
+Proof. 
+  intros. ssromega.
+Qed.
+
+Lemma plus_leq_compat_r n m k :
+  n <= k ->
+  n <= m + k.
+Proof. 
+  intros. ssromega.
+Qed.
+
+Lemma leq_refl: forall n, n <= n.
+Proof.
+  intros. ssromega.
+Qed.
+
+Lemma succ_neq_zero :
+  forall x, S x <> 0.
+Proof.
+  firstorder.
 Qed.

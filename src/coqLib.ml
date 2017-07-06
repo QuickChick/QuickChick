@@ -125,7 +125,7 @@ let plus x y =
   gApp (gInject "Nat.add") [x;y]
 
 let plus_leq_compat_l p =
-  gApp (gInject "plus_leq_compat_l") [hole; hole; hole; p]
+  gApp ~explicit:true (gInject "plus_leq_compat_l") [hole; hole; hole; p]
 
 let leq_addl n1 n2 =
   gApp (gInject "leq_addl") [n1; n2]
