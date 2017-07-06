@@ -265,10 +265,10 @@ let isSome_subset p =
     [hole; hole; hole; hole; hole; p]
 
 
-let bigcup_cons_setI_subset_compat a f h1 h2 =
-  gApp
-    ~explicit:true (gInject "bigcup_cons_setI_subset_compat")
-    [a; hole; f; hole; hole; hole; hole; hole; h1; h2]
+(* let bigcup_cons_setI_subset_compat a f h1 h2 = *)
+(*   gApp *)
+(*     ~explicit:true (gInject "bigcup_cons_setI_subset_compat") *)
+(*     [a; hole; f; hole; hole; hole; hole; hole; h1; h2] *)
 
 let bigcup_cons_setI_subset_pres a f h =
   gApp

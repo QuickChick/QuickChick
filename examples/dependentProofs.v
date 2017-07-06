@@ -57,30 +57,6 @@ Existing Instance genNatSized.
 
 Definition a (n : nat) := @arbitraryST _ (fun foo => goodTree n foo) _.
 
-Lemma suchThatMaybeOpt_subset_compat {A : Type} (p : A -> bool) (g1 g2 : G (option A)) s :
-  isSome :&: (semGenSize g1 s) \subset isSome :&: (semGenSize g2 s) ->
-  isSome :&: (semGenSize (suchThatMaybeOpt g1 p) s) \subset
-  isSome :&: (semGenSize (suchThatMaybeOpt g2 p) s).
-Proof.
-Admitted.
-
-Lemma suchThatMaybe_subset_compat {A : Type} (p : A -> bool) (g1 g2 : G A) s :
-  (semGenSize g1 s) \subset (semGenSize g2 s) ->
-  isSome :&: (semGenSize (suchThatMaybe g1 p) s) \subset
-  isSome :&: (semGenSize (suchThatMaybe g2 p) s).
-Proof.
-Admitted.
-
-Lemma bigcup_cons_setI_subset_compat {A B} (f : A -> set B)
-      (x x' : A) (l l' : seq A) s :
-  f x \subset f x' ->
-  \bigcup_(x in (l :&: s)) (f x) \subset
-   \bigcup_(x in (l' :&: s)) (f x) ->
-  \bigcup_(x in ((x :: l) :&: s)) (f x) \subset
-   \bigcup_(x in ((x' :: l') :&: s)) (f x).
-Proof.
-Admitted.
-
 (* more specific lemmas to help type checking of the proof term *)
 Lemma bigcup_cons_setI_subset_compat_backtrack {A}
       (n n' : nat) (g g' : G (option A)) (l l' : seq (nat * G (option A))) s :
@@ -101,20 +77,7 @@ Lemma bigcup_cons_setI_subset_pres_backtrack {A}
 Proof.
 Admitted.
 
-Lemma bigcup_nil_setI {A B} (f : A -> set B)
-      (l : seq A) s :
-  \bigcup_(x in [] :&: s) (f x) \subset
-  \bigcup_(x in (l :&: s)) (f x).
-Proof.
-Admitted.
-
 Derive GenSizedSuchThatSizeMonotonicOpt for (fun foo => goodTree n foo).
-
-Lemma isSomeSome {A : Type} (y : A) :
-  Some y.
-Proof.
-  exact isT.
-Qed.
 
 Lemma semBacktrack:
   forall (A : Type) (l : seq (nat * G (option A))),

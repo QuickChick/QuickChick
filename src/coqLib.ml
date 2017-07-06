@@ -143,7 +143,7 @@ let isSome x =
   gApp (gInject "isSome") [x]
 
 let isSomeSome x =
-  gApp (gInject "isSomeSome") [x]
+  gApp ~explicit:true  (gInject "isSomeSome") [hole; x]
 
 let diff_false_true h =
   gApp (gInject "Bool.diff_false_true") [h]

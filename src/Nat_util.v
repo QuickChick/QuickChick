@@ -7,7 +7,8 @@ Import ListNotations.
 Require Import mathcomp.ssreflect.ssreflect.
 From mathcomp Require Import ssreflect ssrfun ssrbool ssrnat eqtype seq.
 
-(* These should be moved to /src *)
+(* TODO rename this file to util.v -- not only for nats *)
+
 Lemma max_lub_l_ssr n m p:
   max n m < p -> n < p.
 Proof.
@@ -76,4 +77,10 @@ Lemma succ_neq_zero :
   forall x, S x <> 0.
 Proof.
   firstorder.
+Qed.
+
+Lemma isSomeSome {A : Type} (y : A) :
+  Some y.
+Proof.
+  exact isT.
 Qed.

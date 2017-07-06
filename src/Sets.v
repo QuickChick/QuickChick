@@ -1016,3 +1016,12 @@ Proof.
   eapply Hyp. now split; eauto.
   inv H. now inv H0.
 Qed.
+
+Lemma bigcup_nil_setI {A B} (f : A -> set B)
+      (l : seq A) s :
+  \bigcup_(x in [] :&: s) (f x) \subset
+  \bigcup_(x in (l :&: s)) (f x).
+Proof.
+  intros z [y [[Hin1 _] Hin2]]. inv Hin1.
+Qed.
+
