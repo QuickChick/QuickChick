@@ -145,7 +145,19 @@ Module Type GenLowInterface.
     forall A B (g : G A) (f : A -> G B) (size : nat),
       semGenSize (bindGen g f) size <-->
                  \bigcup_(a in semGenSize g size) semGenSize (f a) size.
-  
+
+  Parameter semBindSize_subset_compat :
+    forall {A B : Type} (g g' : G A) (f f' : A -> G B) s,
+      semGenSize g s \subset semGenSize g' s ->
+      (forall x, semGenSize (f x) s \subset semGenSize (f' x) s) ->
+      semGenSize (bindGen g f) s \subset semGenSize (bindGen g' f') s.
+
+  Parameter semBindSizeOpt_subset_compat :
+    forall {A B : Type} (g g' : G A) (f f' : A -> G (option B)) s,
+      semGenSize g s \subset semGenSize g' s ->
+      (forall x, isSome :&: semGenSize (f x) s \subset isSome :&: semGenSize (f' x) s) ->
+      isSome :&: semGenSize (bindGen g f) s \subset isSome :&: semGenSize (bindGen g' f') s.
+
   Parameter monad_leftid : 
     forall {A B : Type} (a: A) (f : A -> G B),
       semGen (bindGen (returnGen a) f) <--> semGen (f a).
@@ -173,7 +185,6 @@ Module Type GenLowInterface.
           {A B} (g : G A) (f : A -> G (option B))
           `{SizeMonotonic _ g} `{forall x, SizeMonotonicOpt (f x)} : 
     SizeMonotonicOpt (bindGen g f).
-  
 
   Declare Instance bindMonotonicStrong
           {A B} (g : G A) (f : A -> G B)
@@ -578,6 +589,30 @@ Module GenLow : GenLowInterface.
   Proof.
     rewrite /semGenSize /bindGen /= bigcup_codom -curry_codom2l.
       by rewrite -[codom (prod_curry _)]imsetT -randomSplit_codom -codom_comp.
+  Qed.
+
+  Lemma semBindSize_subset_compat {A B : Type} (g g' : G A) (f f' : A -> G B) s :
+    semGenSize g s \subset semGenSize g' s ->
+    (forall x, semGenSize (f x) s \subset semGenSize (f' x) s) ->
+    semGenSize (bindGen g f) s \subset semGenSize (bindGen g' f') s.
+  Proof.
+    intros H1 H2. rewrite !semBindSize.
+    eapply subset_trans.
+    eapply incl_bigcupl. eassumption.
+    eapply incl_bigcupr. eassumption.
+  Qed.
+
+  Lemma semBindSizeOpt_subset_compat {A B : Type} (g g' : G A) (f f' : A -> G (option B)) s :
+    semGenSize g s \subset semGenSize g' s ->
+    (forall x, isSome :&: semGenSize (f x) s \subset isSome :&: semGenSize (f' x) s) ->
+    isSome :&: semGenSize (bindGen g f) s \subset isSome :&: semGenSize (bindGen g' f') s.
+  Proof.
+    intros H1 H2. rewrite !semBindSize.
+    eapply subset_trans.
+    eapply setI_subset_compat. eapply subset_refl.
+    eapply incl_bigcupl. eassumption.
+    rewrite !setI_bigcup_assoc. 
+    eapply incl_bigcupr. eassumption.
   Qed.
   
   Lemma monad_leftid A B (a : A) (f : A -> G B) :

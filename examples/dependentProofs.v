@@ -73,30 +73,6 @@ Existing Instance genNatSized.
 
 Definition a (n : nat) := @arbitraryST _ (fun foo => goodTree n foo) _.
 
-Lemma semBindSize_subset_compat {A B : Type} (g g' : G A) (f f' : A -> G B) s :
-  semGenSize g s \subset semGenSize g' s ->
-  (forall x, semGenSize (f x) s \subset semGenSize (f' x) s) ->
-  semGenSize (bindGen g f) s \subset semGenSize (bindGen g' f') s.
-Proof.
-  intros H1 H2. rewrite !semBindSize.
-  eapply subset_trans.
-  eapply incl_bigcupl. eassumption.
-  eapply incl_bigcupr. eassumption.
-Qed.
-
-Lemma semBindSizeOpt_subset_compat {A B : Type} (g g' : G A) (f f' : A -> G (option B)) s :
-  semGenSize g s \subset semGenSize g' s ->
-  (forall x, isSome :&: semGenSize (f x) s \subset isSome :&: semGenSize (f' x) s) ->
-  isSome :&: semGenSize (bindGen g f) s \subset isSome :&: semGenSize (bindGen g' f') s.
-Proof.
-  intros H1 H2. rewrite !semBindSize.
-  eapply subset_trans.
-  eapply setI_subset_compat. eapply subset_refl.
-  eapply incl_bigcupl. eassumption.
-  rewrite !setI_bigcup_assoc. 
-  eapply incl_bigcupr. eassumption.
-Qed.
-
 Lemma semBindOptSizeOpt_subset_compat {A B : Type} (g g' : G (option A)) (f f' : A -> G (option B)) s :
   isSome :&: semGenSize g s \subset isSome :&: semGenSize g' s ->
   (forall x, isSome :&: semGenSize (f x) s \subset isSome :&: semGenSize (f' x) s) ->
@@ -507,3 +483,6 @@ Instance ArbitrarySuchThatEql {A} (x : A) : GenSuchThat A (fun y => eq x y) :=
 (*                               end) s 0; returnGen (Some (Foo2 foo)))]) *)
 (*               s s1 s2 _). *)
 (*     admit. *)
+
+Definition success := "Proofs work!".
+Print success.
