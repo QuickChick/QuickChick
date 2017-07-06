@@ -59,13 +59,39 @@ Definition a (n : nat) := @arbitraryST _ (fun foo => goodTree n foo) _.
 
 Derive GenSizedSuchThatSizeMonotonicOpt for (fun foo => goodTree n foo).
 
-Lemma semBacktrack:
+Lemma semBacktrack_sound :
   forall (A : Type) (l : seq (nat * G (option A))),
-    semGen (backtrack l) <-->
+    semGen (backtrack l) \subset
     (\bigcup_(x in (l :&: (fun x => x.1 <> 0))) (isSome :&: (semGen x.2))) :|:
     ([set None] :&: (\bigcap_(x in l :&: (fun x => x.1 <> 0)) (semGen x.2))).
-Admitted.
+Proof.
+  intros A l x [s [_ H]].
+  eapply semBacktrackSize in H.
+  inv H.
+  + left. destruct H0 as [y [[Hin1 Hin2] [Hin3 Hin4]]].
+    eexists. split; split; eauto.
+    eexists.
+    now split; eauto.
+  + destruct H0 as [Hnone Hcap].
+    right. split; eauto.
+    intros y Hin.
+    eapply Hcap in Hin.
+    eexists.
+    now split; eauto.
+Qed.
 
+Lemma semBacktrack_complete :
+  forall (A : Type) (l : seq (nat * G (option A))),
+    \bigcup_(x in (l :&: (fun x => x.1 <> 0))) (isSome :&: (semGen x.2)) \subset
+    semGen (backtrack l).
+Proof.
+  intros A l x [y [[Hin1 Hin2] [Hin3 Hin4]]].
+  destruct Hin4 as [s [_ Hin]].
+  eexists s. split; [ now constructor | ].
+  eapply semBacktrackSize.
+  left. eexists.
+  split; split; eauto.
+Qed.
 
 Lemma semSuchThatMaybe_complete:
   forall (A : Type) (g : G A) (f : A -> bool) (s : set A),

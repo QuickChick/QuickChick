@@ -54,8 +54,11 @@ let backtrackSizeMonotonicOpt lst proof =
   gApp (gInject "backtrackSizeMonotonicOpt") [lst; proof]
 
 
-let semBacktrack g =
-  gApp (gInject "semBacktrack") [hole; g]
+let semBacktrack_sound g =
+  gApp ~explicit:true (gInject "semBacktrack_sound") [hole; g]
+
+let semBacktrack_complete g =
+  gApp ~explicit:true (gInject "semBacktrack_complete") [hole; g]
 
 let semBacktrackSize g s =
   gApp ~explicit:true (gInject "semBacktrackSize") [hole; g; s]

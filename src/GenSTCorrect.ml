@@ -456,9 +456,10 @@ let genSizedSTCorr_body
                   exp
              ) ctrs imset_set0_subset
          in
-         subset_respects_set_eq_r
-           (semBacktrack (gList (add_freq (base_gens inputs generator_body))))
-           (setU_subset_l hole cases))
+         set_incl_trans
+           cases
+           (* (setU_subset_l hole cases) *)
+           (semBacktrack_complete (gList (add_freq (base_gens inputs generator_body)))))
   in
 
   let ind_case =
@@ -479,9 +480,9 @@ let genSizedSTCorr_body
                        (setI_set_incl (imset_isSome hole) p)
                        exp) ctrs imset_set0_subset
               in
-              subset_respects_set_eq_r
-                (semBacktrack (gList (add_freq (ind_gens inputs s generator_body))))
-                (setU_subset_l hole cases)))
+              set_incl_trans
+                cases
+                (semBacktrack_complete (gList (add_freq (ind_gens inputs s generator_body))))))
   in
 
   let ret_type =
@@ -529,8 +530,8 @@ let genSizedSTCorr_body
                   exp proof)
              ctrs (fun e -> bigcup_nil_subset) lift_subset_pres_l
          in
-         subset_respects_set_eq_l
-           (semBacktrack (gList (add_freq (base_gens inputs generator_body))))
+         set_incl_trans
+           (semBacktrack_sound (gList (add_freq (base_gens inputs generator_body))))
            (set_incl_setU_l
               (bigcup_set_I_l cases)
               (set_incl_setI_l (setU_subset_r hole set_incl_refl))
@@ -556,8 +557,8 @@ let genSizedSTCorr_body
                        (exp (fun e -> lift_subset_pres_r (proof e))))
                 ctrs (fun e -> bigcup_nil_subset) lift_subset_pres_l
             in
-            subset_respects_set_eq_l
-              (semBacktrack (gList (add_freq (ind_gens inputs s generator_body))))
+            set_incl_trans
+              (semBacktrack_sound (gList (add_freq (ind_gens inputs s generator_body))))
               (set_incl_setU_l
                  (bigcup_set_I_l cases)
                  (set_incl_setI_l (setU_subset_r hole set_incl_refl))
