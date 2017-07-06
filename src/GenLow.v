@@ -313,7 +313,7 @@ Module Type GenLowInterface.
 
 
   (* TODO: We need completeness as well - this is not exact *)
-  Parameter semSuchThatMaybe_sound:
+  Parameter semSuchThatMaybe_sound':
     forall A (g : G A) (f : A -> bool),
       semGen (suchThatMaybe g f) \subset None |: some @: (semGen g :&: f).
 
@@ -1052,7 +1052,7 @@ Module GenLow : GenLowInterface.
   Qed.
 
   (* Not an exact spec !!! *)
-  Lemma semSuchThatMaybe_sound A (g : G A) (f : A -> bool) :
+  Lemma semSuchThatMaybe_sound' A (g : G A) (f : A -> bool) :
     semGen (suchThatMaybe g f) \subset
            None |: some @: (semGen g :&: f).
   Proof.
