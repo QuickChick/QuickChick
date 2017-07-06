@@ -57,26 +57,6 @@ Existing Instance genNatSized.
 
 Definition a (n : nat) := @arbitraryST _ (fun foo => goodTree n foo) _.
 
-(* more specific lemmas to help type checking of the proof term *)
-Lemma bigcup_cons_setI_subset_compat_backtrack {A}
-      (n n' : nat) (g g' : G (option A)) (l l' : seq (nat * G (option A))) s :
-  isSome :&: semGenSize g s  \subset isSome :&: semGenSize g' s ->
-  \bigcup_(x in (l :&: (fun x => x.1 <> 0))) (isSome :&: semGenSize x.2 s) \subset
-  \bigcup_(x in (l' :&: (fun x => x.1 <> 0))) (isSome :&: semGenSize x.2 s) ->
-  \bigcup_(x in (((n, g) :: l) :&: (fun x => x.1 <> 0))) (isSome :&: semGenSize x.2 s) \subset
-  \bigcup_(x in (((n', g') :: l') :&: (fun x => x.1 <> 0))) (isSome :&: semGenSize x.2 s).
-Proof.
-Admitted.
-
-Lemma bigcup_cons_setI_subset_pres_backtrack {A}
-      (n : nat) (g : G (option A)) (l l' : seq (nat * G (option A))) s :
-  \bigcup_(x in (l :&: (fun x => x.1 <> 0))) (isSome :&: semGenSize x.2 s) \subset
-  \bigcup_(x in (l' :&: (fun x => x.1 <> 0))) (isSome :&: semGenSize x.2 s) ->
-  \bigcup_(x in (l :&: (fun x => x.1 <> 0))) (isSome :&: semGenSize x.2 s) \subset
-  \bigcup_(x in ((n, g) :: l') :&: (fun x => x.1 <> 0)) (isSome :&: semGenSize x.2 s).
-Proof.
-Admitted.
-
 Derive GenSizedSuchThatSizeMonotonicOpt for (fun foo => goodTree n foo).
 
 Lemma semBacktrack:

@@ -197,6 +197,21 @@ Parameter backtrackSizeMonotonicOpt :
     lg \subset [set x | SizeMonotonicOpt x.2 ] ->
     SizeMonotonicOpt (backtrack lg).
 
+Parameter bigcup_cons_setI_subset_compat_backtrack :
+  forall {A} (n : nat) (g g' : G (option A)) (l l' : seq (nat * G (option A))) s,
+    isSome :&: semGenSize g s  \subset isSome :&: semGenSize g' s ->
+    \bigcup_(x in (l :&: (fun x => x.1 <> 0))) (isSome :&: semGenSize x.2 s) \subset
+    \bigcup_(x in (l' :&: (fun x => x.1 <> 0))) (isSome :&: semGenSize x.2 s) ->
+    \bigcup_(x in (((n, g) :: l) :&: (fun x => x.1 <> 0))) (isSome :&: semGenSize x.2 s) \subset
+    \bigcup_(x in (((n, g') :: l') :&: (fun x => x.1 <> 0))) (isSome :&: semGenSize x.2 s).
+
+Parameter bigcup_cons_setI_subset_pres_backtrack :
+  forall {A} (n : nat) (g : G (option A)) (l l' : seq (nat * G (option A))) s,
+    \bigcup_(x in (l :&: (fun x => x.1 <> 0))) (isSome :&: semGenSize x.2 s) \subset
+    \bigcup_(x in (l' :&: (fun x => x.1 <> 0))) (isSome :&: semGenSize x.2 s) ->
+    \bigcup_(x in (l :&: (fun x => x.1 <> 0))) (isSome :&: semGenSize x.2 s) \subset
+    \bigcup_(x in ((n, g) :: l') :&: (fun x => x.1 <> 0)) (isSome :&: semGenSize x.2 s).
+
 Parameter semVectorOfSize:
   forall {A : Type} (k : nat) (g : G A) size,
     semGenSize (vectorOf k g) size <-->
@@ -1468,6 +1483,45 @@ Lemma semBacktrackSize {A} (l : list (nat * G (option A))) size :
   ([set None] :&: (\bigcap_(x in l :&: (fun x => x.1 <> 0)) (semGenSize x.2 size))).
 Proof.
   eauto using semBacktrackFuel.
+Qed.
+
+Lemma bigcup_cons_setI_subset_compat_backtrack {A}
+      (n : nat) (g g' : G (option A)) (l l' : seq (nat * G (option A))) s :
+  isSome :&: semGenSize g s  \subset isSome :&: semGenSize g' s ->
+  \bigcup_(x in (l :&: (fun x => x.1 <> 0))) (isSome :&: semGenSize x.2 s) \subset
+  \bigcup_(x in (l' :&: (fun x => x.1 <> 0))) (isSome :&: semGenSize x.2 s) ->
+  \bigcup_(x in (((n, g) :: l) :&: (fun x => x.1 <> 0))) (isSome :&: semGenSize x.2 s) \subset
+  \bigcup_(x in (((n, g') :: l') :&: (fun x => x.1 <> 0))) (isSome :&: semGenSize x.2 s).
+Proof.
+  intros H1 H2 x [y [[Hin1 Hin2] [Hin3 Hin4]]].
+  inv Hin1; simpl in *.
+  - eexists. split. split.
+    now left; eauto.
+    now eassumption.
+    split; eauto.
+    simpl. eapply H1. split; eauto.
+  - edestruct H2 as [y' [[Hin1' Hin2'] [Hin3' Hin4']]].
+    { eexists. split; split; eassumption. }
+    eexists. split. split.
+    now right; eauto.
+    now eassumption.
+    split; eauto.
+Qed.
+
+Lemma bigcup_cons_setI_subset_pres_backtrack {A}
+      (n : nat) (g : G (option A)) (l l' : seq (nat * G (option A))) s :
+  \bigcup_(x in (l :&: (fun x => x.1 <> 0))) (isSome :&: semGenSize x.2 s) \subset
+  \bigcup_(x in (l' :&: (fun x => x.1 <> 0))) (isSome :&: semGenSize x.2 s) ->
+  \bigcup_(x in (l :&: (fun x => x.1 <> 0))) (isSome :&: semGenSize x.2 s) \subset
+  \bigcup_(x in ((n, g) :: l') :&: (fun x => x.1 <> 0)) (isSome :&: semGenSize x.2 s).
+Proof.
+  intros H1 x [y [[Hin1 Hin2] [Hin3 Hin4]]].
+  edestruct H1 as [y' [[Hin1' Hin2'] [Hin3' Hin4']]].
+  { eexists. split; split; eassumption. }
+  eexists. split. split.
+  now right; eauto.
+  now eassumption.
+  split; eauto.
 Qed.
 
 Lemma semFoldGen_right :
