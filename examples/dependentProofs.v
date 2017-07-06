@@ -25,6 +25,14 @@ Qed.
 (* Yikes this is stupid, find a workaround *)
 Definition prop := Prop.
 
+(* XXX these instances should be present *)
+Existing Instance genSFoo.
+Existing Instance shrFoo.
+Derive Sized for Foo.
+Derive SizeMonotonic for Foo using genSFoo.
+Derive SizedMonotonic for Foo using genSFoo.
+Derive CanonicalSized for Foo.
+Derive SizedCorrect for Foo using genSFoo and SizeMonotonicFoo.
 
 Inductive tree : Type :=
 | Leaf : tree
@@ -32,7 +40,6 @@ Inductive tree : Type :=
 
 
 (* Example with two IH *)
-
 Inductive goodTree : nat -> tree -> Prop :=
 | GL : goodTree 0 Leaf
 | GN : forall k t1 t2 n m, goodTree n t1 ->
@@ -46,98 +53,22 @@ Admitted.
 Instance DecTreeEq (t1 t2 : tree) : Dec (t1 = t2).
 Admitted.
 
+Existing Instance GenOfGenSized.
+Existing Instance genNatSized.
+
 Derive ArbitrarySizedSuchThat for (fun foo => goodTree n foo).
 
 Derive SizedProofEqs for (fun foo => goodTree n foo).
 
 Derive SizeMonotonicSuchThatOpt for (fun foo => goodTree n foo).
 
-Existing Instance GenOfGenSized.
-Existing Instance genNatSized.
-
-Definition a (n : nat) := @arbitraryST _ (fun foo => goodTree n foo) _.
+Derive GenSizedSuchThatCorrect for (fun foo => goodTree n foo).
 
 Derive GenSizedSuchThatSizeMonotonicOpt for (fun foo => goodTree n foo).
 
-Lemma semBacktrack_sound :
-  forall (A : Type) (l : seq (nat * G (option A))),
-    semGen (backtrack l) \subset
-    (\bigcup_(x in (l :&: (fun x => x.1 <> 0))) (isSome :&: (semGen x.2))) :|:
-    ([set None] :&: (\bigcap_(x in l :&: (fun x => x.1 <> 0)) (semGen x.2))).
-Proof.
-  intros A l x [s [_ H]].
-  eapply semBacktrackSize in H.
-  inv H.
-  + left. destruct H0 as [y [[Hin1 Hin2] [Hin3 Hin4]]].
-    eexists. split; split; eauto.
-    eexists.
-    now split; eauto.
-  + destruct H0 as [Hnone Hcap].
-    right. split; eauto.
-    intros y Hin.
-    eapply Hcap in Hin.
-    eexists.
-    now split; eauto.
-Qed.
+Definition genSTgooTree (n : nat) := @arbitraryST _ (fun foo => goodTree n foo) _.
 
-Lemma semBacktrack_complete :
-  forall (A : Type) (l : seq (nat * G (option A))),
-    \bigcup_(x in (l :&: (fun x => x.1 <> 0))) (isSome :&: (semGen x.2)) \subset
-    semGen (backtrack l).
-Proof.
-  intros A l x [y [[Hin1 Hin2] [Hin3 Hin4]]].
-  destruct Hin4 as [s [_ Hin]].
-  eexists s. split; [ now constructor | ].
-  eapply semBacktrackSize.
-  left. eexists.
-  split; split; eauto.
-Qed.
-
-Lemma semSuchThatMaybe_complete:
-  forall (A : Type) (g : G A) (f : A -> bool) (s : set A),
-    s \subset semGen g ->
-    (Some @: (s :&: (fun x : A => f x))) \subset
-    semGen (suchThatMaybe g f).
-Proof.
-Admitted.
-
-Lemma semSuchThatMaybeOpt_complete:
-  forall (A : Type) (g : G (option A)) (f : A -> bool) (s : set A),
-    (Some @: s) \subset semGen g ->
-    (Some @: (s :&: (fun x : A => f x))) \subset
-    semGen (suchThatMaybeOpt g f).
-Proof.
-Admitted.
-
-Lemma semSuchThatMaybe_sound:
-  forall (A : Type) (g : G A) (f : A -> bool) (s : set A),
-    semGen g \subset s ->
-    semGen (suchThatMaybe g f) \subset ((Some @: (s :&: (fun x : A => f x))) :|: [set None]).
-Proof.
-Admitted.
-
-Lemma semSuchThatMaybeOpt_sound:
-  forall (A : Type) (g : G (option A)) (f : A -> bool) (s : set A),
-    semGen g \subset ((Some @: s) :|: [set None]) ->
-    semGen (suchThatMaybeOpt g f) \subset (Some @: (s :&: (fun x : A => f x)) :|: [set None]).
-Proof.
-Admitted.
-
-
-(* Definition gen (n : nat) : G (option tree) := @arbitraryST _ (fun foo => goodTree n foo) _. *)
-
-(* Definition inst (n : nat) := @STComplete _ (fun foo => goodTree n foo) ( @arbitraryST _ (fun foo => goodTree n foo) _) _. *)
-
-(* XXX these instances should be present *)
-Existing Instance genSFoo.
-Existing Instance shrFoo.
-Derive Sized for Foo.
-Derive SizeMonotonic for Foo using genSFoo.
-Derive SizedMonotonic for Foo using genSFoo.
-Derive CanonicalSized for Foo.
-Derive SizedCorrect for Foo using genSFoo and SizeMonotonicFoo.
-
-Definition corr := @arbitraryCorrect Foo arbitrary _.
+Definition genSTgooTreeSound (n : nat) := @STSound _ _ (@arbitraryST _  (fun foo => goodTree n foo) _) _.
 
 Existing Instance GenSizedSuchThatgoodFooUnif. (* ???? *)
 

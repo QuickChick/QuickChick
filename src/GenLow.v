@@ -344,7 +344,28 @@ Module Type GenLowInterface.
   Declare Instance suchThatMaybeOptMonotonicOpt
            {A : Type} (g : G (option A)) (f : A -> bool) `{SizeMonotonicOpt _ g} : 
     SizeMonotonicOpt (suchThatMaybeOpt g f).
-  
+
+  Parameter semSuchThatMaybe_complete:
+    forall (A : Type) (g : G A) (f : A -> bool) (s : set A),
+      s \subset semGen g ->
+      (Some @: (s :&: (fun x : A => f x))) \subset
+                                        semGen (suchThatMaybe g f).
+
+  Parameter semSuchThatMaybeOpt_complete:
+    forall (A : Type) (g : G (option A)) (f : A -> bool) (s : set A),
+      (Some @: s) \subset semGen g ->
+      (Some @: (s :&: (fun x : A => f x))) \subset
+                                        semGen (suchThatMaybeOpt g f).
+
+  Parameter semSuchThatMaybe_sound:
+    forall (A : Type) (g : G A) (f : A -> bool) (s : set A),
+      semGen g \subset s ->
+      semGen (suchThatMaybe g f) \subset ((Some @: (s :&: (fun x : A => f x))) :|: [set None]).
+
+  Parameter semSuchThatMaybeOpt_sound:
+    forall (A : Type) (g : G (option A)) (f : A -> bool) (s : set A),
+      semGen g \subset ((Some @: s) :|: [set None]) ->
+      semGen (suchThatMaybeOpt g f) \subset (Some @: (s :&: (fun x : A => f x)) :|: [set None]).
 
   (* This (very concrete) spec is needed to prove shrinking *)
   Parameter semPromote :
@@ -1113,6 +1134,36 @@ Module GenLow : GenLowInterface.
     (semGenSize g1 s) \subset (semGenSize g2 s) ->
     isSome :&: (semGenSize (suchThatMaybe g1 p) s) \subset
            isSome :&: (semGenSize (suchThatMaybe g2 p) s).
+  Proof.
+  Admitted.
+
+  Lemma semSuchThatMaybe_complete:
+    forall (A : Type) (g : G A) (f : A -> bool) (s : set A),
+      s \subset semGen g ->
+      (Some @: (s :&: (fun x : A => f x))) \subset
+                                        semGen (suchThatMaybe g f).
+  Proof.
+  Admitted.
+
+  Lemma semSuchThatMaybeOpt_complete:
+    forall (A : Type) (g : G (option A)) (f : A -> bool) (s : set A),
+      (Some @: s) \subset semGen g ->
+      (Some @: (s :&: (fun x : A => f x))) \subset
+                                        semGen (suchThatMaybeOpt g f).
+  Proof.
+  Admitted.
+
+  Lemma semSuchThatMaybe_sound:
+    forall (A : Type) (g : G A) (f : A -> bool) (s : set A),
+      semGen g \subset s ->
+      semGen (suchThatMaybe g f) \subset ((Some @: (s :&: (fun x : A => f x))) :|: [set None]).
+  Proof.
+  Admitted.
+
+  Lemma semSuchThatMaybeOpt_sound:
+    forall (A : Type) (g : G (option A)) (f : A -> bool) (s : set A),
+      semGen g \subset ((Some @: s) :|: [set None]) ->
+      semGen (suchThatMaybeOpt g f) \subset (Some @: (s :&: (fun x : A => f x)) :|: [set None]).
   Proof.
   Admitted.
 
