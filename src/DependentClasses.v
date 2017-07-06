@@ -16,14 +16,12 @@ Open Scope string.
 Set Bullet Behavior "Strict Subproofs".
 (** * Correctness of dependent generators *)
 
+(* begin sizeEqs *)
 Class SizedProofEqs {A : Type} (P : A -> Prop) :=
-  {
-    (* inhabitants for P whose derivation height is less or equal to n *)
-    iter : nat -> set A;
+  { iter : nat -> set A;
     mon : forall n1 n2, n1 <= n2 -> iter n1 \subset iter n2;
-    spec : \bigcup_(n : nat) iter n <--> P
-  }.
-
+    spec : \bigcup_(n : nat) iter n <--> P}.
+(* end sizeEqs *)
 
 Class SizedSuchThatCorrect {A : Type} (P : A -> Prop) `{SizedProofEqs A P} (g : nat -> G (option A)) :=
   {
@@ -43,12 +41,11 @@ Class SuchThatCorrect {A : Type} (P : A -> Prop) (g : G (option A)) :=
 
 (** * Dependent sized generators *)
 
-Class GenSizedSuchThat (A : Type) (P : A -> Prop) :=
-  {
-    arbitrarySizeST : nat -> G (option A);
-  }.
+(* begin genSTSized_class *)
+Class GenSizedSuchThat (A : Type) (P : A -> Prop) := { arbitrarySizeST : nat -> G (option A) }.
+(* end genSTSized_class *)
 
-Notation "'genSizedST' x" := (@arbitrarySizeST _ x _) (at level 70).
+(* Notation "'genSizedST' x" := (@arbitrarySizeST _ x _) (at level 70). *)
 
 (** * Monotonicity of denendent sized generators *)
 
@@ -74,10 +71,9 @@ Class GenSizedSuchThatCorrect (A : Type) (P : A -> Prop)
 
 (** * Dependent generators *)
 
-Class GenSuchThat (A : Type) (P : A -> Prop) :=
-  {
-    arbitraryST : G (option A);
-  }.
+(* begin genST_class *)
+Class GenSuchThat (A : Type) (P : A -> Prop) := { arbitraryST : G (option A) }.
+(* end genST_class *)
 
 Notation "'genST' x" := (@arbitraryST _ x _) (at level 70).
 
@@ -104,23 +100,23 @@ Class GenSuchThatMonotonicCorrect (A : Type) (P : A -> Prop)
    
 Instance GenSizedSuchThatMonotonicOptOfSizeMonotonic
          (A : Type) (P : A -> Prop) (Hgen : GenSizedSuchThat A P)
-         (Hmon : forall s : nat, SizeMonotonicOpt ((genSizedST P) s))
+         (Hmon : forall s : nat, SizeMonotonicOpt (arbitrarySizeST s))
 : @GenSizedSuchThatMonotonicOpt A _ Hgen Hmon.
 
 Instance GenSizedSuchThatSizeMonotonicOptOfSizedMonotonic
          (A : Type) (P : A -> Prop) (Hgen : GenSizedSuchThat A P)
-         (Hmon : SizedMonotonicOpt (genSizedST P))
+         (Hmon : SizedMonotonicOpt arbitrarySizeST)
 : @GenSizedSuchThatSizeMonotonicOpt A _ Hgen Hmon.
 
 Instance GenSizedSuchThatCorrectOptOfSizedSuchThatCorrect
          (A : Type) (P : A -> Prop) (H : GenSizedSuchThat A P)
          (Heqs : SizedProofEqs P)
-         (Hcorr : SizedSuchThatCorrect P (genSizedST P))
+         (Hcorr : SizedSuchThatCorrect P arbitrarySizeST)
 : @GenSizedSuchThatCorrect A P H Heqs Hcorr.
 
 Instance GenSuchThatMonotonicOptOfSizeMonotonic
          (A : Type) (P : A -> Prop) (Hgen : GenSuchThat A P)
-         (Hmon : SizeMonotonicOpt (genST P))
+         (Hmon : SizeMonotonicOpt arbitraryST)
 : @GenSuchThatMonotonicOpt A _ Hgen Hmon.
 
 Instance GenSuchThatCorrectOptOfSuchThatCorrect
@@ -142,9 +138,10 @@ Qed.
 
 (* Generators *)
 
-Instance GenSuchThatOfSized (A : Type) (P : A -> Prop)
-         `{GenSizedSuchThat A P} : GenSuchThat A P :=
-  { arbitraryST := sized arbitrarySizeST }.
+(* begin GenSuchThatOfBounded *)
+Instance GenSuchThatOfBounded (A : Type) (P : A -> Prop) (H : GenSizedSuchThat A P)
+: GenSuchThat A P := { arbitraryST := sized arbitrarySizeST }.
+(* end GenSuchThatOfBounded *)
 
 Generalizable Variables PSized PMon PSMon PCorr.
 
@@ -157,14 +154,28 @@ Instance GenSuchThatMonotonicOfSized (A : Type) (P : A -> Prop)
 : GenSuchThatMonotonic A P.
 
 
-Instance GenSuchThatMonotonicOptOfSized (A : Type) (P : A -> Prop)
+Instance SizeMonotonicOptOfBounded' (A : Type) (P : A -> Prop)
          {H : GenSizedSuchThat A P}
          `{@GenSizedSuchThatMonotonicOpt A P H PMon}
          `{@GenSizedSuchThatSizeMonotonicOpt A P H PSMon}
 : SizeMonotonicOpt (genST P).
 Proof.
-  unfold arbitraryST, GenSuchThatOfSized.
+  unfold arbitraryST, GenSuchThatOfBounded.
 Admitted. (* XXX lemma *)
+
+(* begin SizeMonotonicOptOfBounded *)
+Instance SizeMonotonicOptOfBounded (A : Type) (P : A -> Prop)
+         (H1 : GenSizedSuchThat A P)
+         (H2 : SizedProofEqs P) (* XXX change name *)
+         (H2 : forall s : nat, SizeMonotonicOpt (arbitrarySizeST s))
+         (H3 : SizedMonotonicOpt arbitrarySizeST) (* XXX change name *)
+: SizeMonotonicOpt (genST P).
+(* end SizeMonotonicOptOfBounded *)
+Proof.
+  eapply SizeMonotonicOptOfBounded'.
+  constructor; eauto.
+  constructor; eauto.
+Qed.
 
 Instance GenSuchThatMonotonicOptOfSized' (A : Type) (P : A -> Prop)
          {H : GenSizedSuchThat A P}
@@ -173,15 +184,14 @@ Instance GenSuchThatMonotonicOptOfSized' (A : Type) (P : A -> Prop)
 : GenSuchThatMonotonicOpt A P.
 
 (* Correctness *)
-
-Instance ArbitraryCorrectFromSized (A : Type) (P : A -> Prop)
+Instance SuchThatCorrectOfBounded' (A : Type) (P : A -> Prop)
          {H : GenSizedSuchThat A P}
          `{@GenSizedSuchThatMonotonicOpt A P H PMon}
          `{@GenSizedSuchThatSizeMonotonicOpt A P H PSMon}
          `{@GenSizedSuchThatCorrect A P H PSized PCorr}
 : SuchThatCorrect P arbitraryST.
 Proof.
-  constructor; unfold arbitraryST, GenSuchThatOfSized.
+  constructor; unfold arbitraryST, GenSuchThatOfBounded.
   - rewrite <- spec.
     eapply subset_trans;
       [| eapply set_incl_setI_r with (s1 := isSome) ];
@@ -202,6 +212,23 @@ Proof.
     eapply subset_trans; [ now apply bigcup_lift_lift_bigcup |].
     eapply lift_subset_compat.
     rewrite spec. now apply subset_refl.
+Qed.
+
+(* begin SuchThatCorrectOfBounded *)
+Instance SuchThatCorrectOfBounded (A : Type) (P : A -> Prop)
+         (H1 : GenSizedSuchThat A P)
+         (H2 : SizedProofEqs P) (* XXX change name *)
+         (H3 : forall s : nat, SizeMonotonicOpt (arbitrarySizeST s))
+         (H4 : SizedMonotonicOpt arbitrarySizeST) (* XXX change name *)
+         (H5 : SizedSuchThatCorrect P arbitrarySizeST)
+: SuchThatCorrect P arbitraryST.
+(* end SuchThatCorrectOfBounded *)
+Proof.
+  eapply SuchThatCorrectOfBounded'; eauto.
+  constructor; eauto.
+  constructor; eauto.
+  constructor; eauto.
+
 Qed.
 
 (* TODO: Move to another file *)
