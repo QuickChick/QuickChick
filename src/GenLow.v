@@ -238,6 +238,11 @@ Module Type GenLowInterface.
       (forall x, Some @: (fs x) \subset semGen (f x)) ->
       (Some @: \bigcup_(a in s1) (fs a)) \subset semGen (bindGenOpt g f).
 
+  Parameter semBindOptSizeOpt_subset_compat :
+    forall {A B : Type} (g g' : G (option A)) (f f' : A -> G (option B)) s,
+      isSome :&: semGenSize g s \subset isSome :&: semGenSize g' s ->
+      (forall x, isSome :&: semGenSize (f x) s \subset isSome :&: semGenSize (f' x) s) ->
+      isSome :&: semGenSize (bindGenOpt g f) s \subset isSome :&: semGenSize (bindGenOpt g' f') s.
 
   Parameter semBindSizeMonotonicIncl_l :
     forall {A B} (g : G A) (f : A -> G (option B)) (s1 : set A) (fs : A -> set B) 
@@ -311,6 +316,18 @@ Module Type GenLowInterface.
   Parameter semSuchThatMaybe_sound:
     forall A (g : G A) (f : A -> bool),
       semGen (suchThatMaybe g f) \subset None |: some @: (semGen g :&: f).
+
+  Parameter suchThatMaybeOpt_subset_compat :
+    forall {A : Type} (p : A -> bool) (g1 g2 : G (option A)) s,
+      isSome :&: (semGenSize g1 s) \subset isSome :&: (semGenSize g2 s) ->
+      isSome :&: (semGenSize (suchThatMaybeOpt g1 p) s) \subset
+             isSome :&: (semGenSize (suchThatMaybeOpt g2 p) s).
+  
+  Parameter suchThatMaybe_subset_compat :
+    forall {A : Type} (p : A -> bool) (g1 g2 : G A) s,
+      (semGenSize g1 s) \subset (semGenSize g2 s) ->
+      isSome :&: (semGenSize (suchThatMaybe g1 p) s) \subset
+             isSome :&: (semGenSize (suchThatMaybe g2 p) s).
 
   Declare Instance suchThatMaybeMonotonic
          {A : Type} (g : G A) (f : A -> bool) `{SizeMonotonic _ g} : 
@@ -858,6 +875,13 @@ Module GenLow : GenLowInterface.
     rewrite Hr1 Hr2. reflexivity.
   Qed.
 
+  Lemma  semBindOptSizeOpt_subset_compat {A B : Type} (g g' : G (option A)) (f f' : A -> G (option B)) s :
+    isSome :&: semGenSize g s \subset isSome :&: semGenSize g' s ->
+    (forall x, isSome :&: semGenSize (f x) s \subset isSome :&: semGenSize (f' x) s) ->
+    isSome :&: semGenSize (bindGenOpt g f) s \subset isSome :&: semGenSize (bindGenOpt g' f') s.
+  Proof.
+  Admitted.
+
   Lemma semBindSizeMonotonicIncl_l {A B} (g : G A) (f : A -> G (option B)) (s1 : set A)
         (fs : A -> set B) 
         `{Hg : SizeMonotonic _ g}
@@ -1076,6 +1100,20 @@ Module GenLow : GenLowInterface.
   Instance suchThatMaybeOptMonotonic
            {A : Type} (g : G (option A)) (f : A -> bool) `{SizeMonotonic _ g} : 
     SizeMonotonic (suchThatMaybeOpt g f).
+  Admitted.
+
+  Lemma suchThatMaybeOpt_subset_compat {A : Type} (p : A -> bool) (g1 g2 : G (option A)) s :
+    isSome :&: (semGenSize g1 s) \subset isSome :&: (semGenSize g2 s) ->
+    isSome :&: (semGenSize (suchThatMaybeOpt g1 p) s) \subset
+           isSome :&: (semGenSize (suchThatMaybeOpt g2 p) s).
+  Proof.
+  Admitted.
+
+  Lemma suchThatMaybe_subset_compat {A : Type} (p : A -> bool) (g1 g2 : G A) s :
+    (semGenSize g1 s) \subset (semGenSize g2 s) ->
+    isSome :&: (semGenSize (suchThatMaybe g1 p) s) \subset
+           isSome :&: (semGenSize (suchThatMaybe g2 p) s).
+  Proof.
   Admitted.
 
 End GenLow.

@@ -57,13 +57,6 @@ Existing Instance genNatSized.
 
 Definition a (n : nat) := @arbitraryST _ (fun foo => goodTree n foo) _.
 
-Lemma semBindOptSizeOpt_subset_compat {A B : Type} (g g' : G (option A)) (f f' : A -> G (option B)) s :
-  isSome :&: semGenSize g s \subset isSome :&: semGenSize g' s ->
-  (forall x, isSome :&: semGenSize (f x) s \subset isSome :&: semGenSize (f' x) s) ->
-  isSome :&: semGenSize (bindGenOpt g f) s \subset isSome :&: semGenSize (bindGenOpt g' f') s.
-Proof.
-Admitted.
-
 Lemma suchThatMaybeOpt_subset_compat {A : Type} (p : A -> bool) (g1 g2 : G (option A)) s :
   isSome :&: (semGenSize g1 s) \subset isSome :&: (semGenSize g2 s) ->
   isSome :&: (semGenSize (suchThatMaybeOpt g1 p) s) \subset
