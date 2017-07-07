@@ -586,13 +586,13 @@ let genSizedSTCorr_body
            ([ret_type_sound; base_case_sound; ind_case_sound; gVar s] @ (List.map gVar input_vars)))
   in
 
-
+  let correct =
+    gFun ["s"] (fun [s] -> isSome_set_eq (gApp sound_proof [gVar s]) (gApp com_proof [gVar s]))
+  in
 
   msg_debug (str "compl");
   debug_coq_expr com_proof;
   (* msg_debug (str "sound"); *)
   (* debug_coq_expr sound_proof; *)
 
-  gRecord [ ("sizedSTComplete", com_proof)
-          ; ("sizedSTSound", sound_proof)
-          ]
+  gRecord [ ("sizedSTCorrect", correct) ]

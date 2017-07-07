@@ -68,7 +68,7 @@ Derive GenSizedSuchThatSizeMonotonicOpt for (fun foo => goodTree n foo).
 
 Definition genSTgooTree (n : nat) := @arbitraryST _ (fun foo => goodTree n foo) _.
 
-Definition genSTgooTreeSound (n : nat) := @STSound _ _ (@arbitraryST _  (fun foo => goodTree n foo) _) _.
+Definition genSTgooTreeSound (n : nat) := @STCorrect _ _ (@arbitraryST _  (fun foo => goodTree n foo) _) _.
 
 Existing Instance GenSizedSuchThatgoodFooUnif. (* ???? *)
 
@@ -82,7 +82,7 @@ Derive GenSizedSuchThatSizeMonotonicOpt for (fun foo => goodFooUnif n foo).
 
 Definition genSTgoodFooUnif (n : nat) := @arbitraryST _  (fun foo => goodFooUnif n foo) _.
 
-Definition genSTgoodFooUnifSound (n : nat) := @STSound _ _ (@arbitraryST _  (fun foo => goodFooUnif n foo) _) _.
+Definition genSTgoodFooUnifSound (n : nat) := @STCorrect _ _ (@arbitraryST _  (fun foo => goodFooUnif n foo) _) _.
 
 (* Interesting. Do we need  Global instance?? *) 
 Existing Instance GenSizedSuchThatgoodFooNarrow.  (* Why???? *)
@@ -97,7 +97,7 @@ Derive GenSizedSuchThatSizeMonotonicOpt for (fun foo => goodFooNarrow n foo).
 
 Definition genSTgoodFooNarrow (n : nat) := @arbitraryST _  (fun foo => goodFooNarrow n foo) _.
 
-Definition genSTgoodFooNarrowSound (n : nat) := @STSound _ _ (@arbitraryST _  (fun foo => goodFooNarrow n foo) _) _.
+Definition genSTgoodFooNarrowSound (n : nat) := @STCorrect _ _ (@arbitraryST _  (fun foo => goodFooNarrow n foo) _) _.
 
 Existing Instance GenSizedSuchThatgoodFooCombo.
 
@@ -111,7 +111,7 @@ Derive GenSizedSuchThatSizeMonotonicOpt for (fun foo => goodFooCombo n foo).
 
 Definition genSTgoodFooCombo (n : nat) := @arbitraryST _  (fun foo => goodFooCombo n foo) _.
 
-Definition genSTgoodFooComboSound (n : nat) := @STSound _ _ (@arbitraryST _  (fun foo => goodFooCombo n foo) _) _.
+Definition genSTgoodFooComboSound (n : nat) := @STCorrect _ _ (@arbitraryST _  (fun foo => goodFooCombo n foo) _) _.
 
 Existing Instance GenSizedSuchThatgoodFoo.
 
@@ -125,7 +125,7 @@ Derive GenSizedSuchThatSizeMonotonicOpt for (fun foo => goodFoo n foo).
 
 Definition genSTgoodFoo (n : nat) := @arbitraryST _  (fun foo => goodFoo n foo) _.
 
-Definition genSTgoodFooSound (n : nat) := @STSound _ _ (@arbitraryST _  (fun foo => goodFoo n foo) _) _.
+Definition genSTgoodFooSound (n : nat) := @STCorrect _ _ (@arbitraryST _  (fun foo => goodFoo n foo) _) _.
 
 Existing Instance GenSizedSuchThatgoodFooPrec.  (* ???? *)
 
@@ -139,7 +139,7 @@ Derive GenSizedSuchThatSizeMonotonicOpt for (fun foo => goodFooPrec n foo).
 
 Definition genSTgoodFooPrec (n : nat) := @arbitraryST _  (fun foo => goodFooPrec n foo) _.
 
-Definition genSTgoodFooPrecSound (n : nat) := @STSound _ _ (@arbitraryST _  (fun foo => goodFooPrec n foo) _) _.
+Definition genSTgoodFooPrecSound (n : nat) := @STCorrect _ _ (@arbitraryST _  (fun foo => goodFooPrec n foo) _) _.
 
 Existing Instance GenSizedSuchThatgoodFooMatch.  (* ???? *)
 
@@ -153,7 +153,7 @@ Derive GenSizedSuchThatSizeMonotonicOpt for (fun foo => goodFooMatch n foo).
 
 Definition genSTgoodFooMatch (n : nat) := @arbitraryST _  (fun foo => goodFooMatch n foo) _.
 
-Definition genSTgoodFooMatchSound (n : nat) := @STSound _ _ (@arbitraryST _  (fun foo => goodFooMatch n foo) _) _.
+Definition genSTgoodFooMatchSound (n : nat) := @STCorrect _ _ (@arbitraryST _  (fun foo => goodFooMatch n foo) _) _.
 
 Existing Instance GenSizedSuchThatgoodFooRec.  (* ???? *)
 
@@ -167,7 +167,7 @@ Derive GenSizedSuchThatSizeMonotonicOpt for (fun foo => goodFooRec n foo).
 
 Definition genSTgoodFooRec (n : nat) := @arbitraryST _  (fun foo => goodFooRec n foo) _.
 
-Definition genSTgoodFooRecSound (n : nat) := @STSound _ _ (@arbitraryST _  (fun foo => goodFooRec n foo) _) _.
+Definition genSTgoodFooRecSound (n : nat) := @STCorrect _ _ (@arbitraryST _  (fun foo => goodFooRec n foo) _) _.
 
 Inductive goodFooB : nat -> Foo -> Prop :=
 | GF1 : goodFooB 2 (Foo2 Foo1)
@@ -185,7 +185,7 @@ Derive GenSizedSuchThatSizeMonotonicOpt for  (fun foo => goodFooB n foo).
 
 Definition genSTgoodFooB (n : nat) := @arbitraryST _  (fun foo => goodFooB n foo) _.
 
-Definition genSTgoodFooBSound (n : nat) := @STSound _ _ (@arbitraryST _  (fun foo => goodFooB n foo) _) _.
+Definition genSTgoodFooBSound (n : nat) := @STCorrect _ _ (@arbitraryST _  (fun foo => goodFooB n foo) _) _.
 
 (* Derive SizeMonotonicSuchThat for (fun foo => goodTree n foo). *)
 (* XXX
@@ -217,7 +217,6 @@ Instance DecidableLRTree t : Dec (LRTree t).
 Proof.
 Admitted.
 
-
 Derive SizedProofEqs for (fun (x : tree) => LRTree x).
 
 Derive SizeMonotonicSuchThatOpt for (fun foo => LRTree foo).
@@ -228,7 +227,7 @@ Derive GenSizedSuchThatSizeMonotonicOpt for (fun foo => LRTree foo).
 
 Definition genSTLRTree (n : nat) := @arbitraryST _  (fun foo => LRTree foo) _.
 
-Definition genSTLRTreeSound (n : nat) := @STSound _ _ (@arbitraryST _  (fun foo => LRTree foo) _) _.
+Definition genSTLRTreeSound (n : nat) := @STCorrect _ _ (@arbitraryST _  (fun foo => LRTree foo) _) _.
 
 
 Inductive HeightTree : nat -> tree -> Prop :=

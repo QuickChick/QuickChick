@@ -1025,3 +1025,17 @@ Proof.
   intros z [y [[Hin1 _] Hin2]]. inv Hin1.
 Qed.
 
+Lemma isSome_set_eq {A} (s : set (option A)) (s' : set A) :
+  s \subset (Some @: s') :|: [set None] ->
+  Some @: s' \subset s ->
+  isSome :&: s <--> Some @: s'.
+Proof.
+  intros H1 H2 x; split.
+  - intros [H3 H4]. destruct x; try discriminate.
+    eapply H1 in H4. inv H4; try discriminate.
+    eassumption. 
+  - intros [y [H3 H4]].
+    inv H4. split. now eauto.
+    eapply H2.
+    eexists; split; eauto.
+Qed.

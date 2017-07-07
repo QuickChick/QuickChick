@@ -24,28 +24,16 @@ Class SizedProofEqs {A : Type} (P : A -> Prop) :=
 (* end sizeEqs *)
 
 Class SizedSuchThatCorrect {A : Type} (P : A -> Prop) `{SizedProofEqs A P} (g : nat -> G (option A)) :=
-  {
-    sizedSTComplete :
-      forall s, Some @: (iter s) \subset semGen (g s);
-
-    sizedSTSound :
-      forall s, semGen (g s) \subset lift (iter s)
-  }.
+  { sizedSTCorrect : forall s, isSome :&: semGen (g s) <--> Some @: (iter s) }.
 
 Class SuchThatCorrect {A : Type} (P : A -> Prop) (g : G (option A)) :=
-  {
-    STComplete : Some @: [set x : A | P x ] \subset semGen g;
-
-    STSound : semGen g \subset lift [set x : A | P x ]
-  }.
+  { STCorrect : isSome :&: semGen g <-->  Some @: [set x : A | P x ] }.
 
 (** * Dependent sized generators *)
 
 (* begin genSTSized_class *)
 Class GenSizedSuchThat (A : Type) (P : A -> Prop) := { arbitrarySizeST : nat -> G (option A) }.
 (* end genSTSized_class *)
-
-(* Notation "'genSizedST' x" := (@arbitrarySizeST _ x _) (at level 70). *)
 
 (** * Monotonicity of denendent sized generators *)
 
@@ -192,26 +180,20 @@ Instance SuchThatCorrectOfBounded' (A : Type) (P : A -> Prop)
 : SuchThatCorrect P arbitraryST.
 Proof.
   constructor; unfold arbitraryST, GenSuchThatOfBounded.
-  - rewrite <- spec.
-    eapply subset_trans;
-      [| eapply set_incl_setI_r with (s1 := isSome) ];
-      [| now apply subset_refl ].
-    rewrite semSized_opt; eauto.
-    intros x [y [[n [_ Hin]] Hs]]; inv Hs.
-    split; eauto.
+  rewrite semSized_opt; eauto.
+  split.
+  - intros [H3 H4]. destruct a; try discriminate.
+    eexists. split; [| reflexivity ].
+    eapply spec.
+    destruct H4 as [n [_ Hsem]]. 
     exists n. split. now constructor.
+    assert (Ha : (isSome :&: semGen (arbitrarySizeST n)) (Some a)).
+    { split; eauto. }
+    eapply PCorr in Ha. destruct Ha as [a' [Hit Heq]]. inv Heq. eassumption.
+  - intros [y [HP Heq]]. inv Heq.
+    eapply spec in HP. destruct HP as [n [_ Hit]].
+    split; eauto. exists n. split; [ now constructor |].
     eapply PCorr. eexists; split; eauto.
-  - eapply subset_trans; [ now eapply option_subset |].
-    eapply setU_l_subset; [| eapply setU_set_incl_r; now eapply subset_refl ].
-    rewrite semSized_opt.
-    eapply set_incl_setI_r.
-    eapply subset_trans.
-    eapply incl_bigcupr.
-    intros n x Hg.
-    eapply PCorr in Hg. exact Hg.
-    eapply subset_trans; [ now apply bigcup_lift_lift_bigcup |].
-    eapply lift_subset_compat.
-    rewrite spec. now apply subset_refl.
 Qed.
 
 (* begin SuchThatCorrectOfBounded *)
@@ -228,7 +210,6 @@ Proof.
   constructor; eauto.
   constructor; eauto.
   constructor; eauto.
-
 Qed.
 
 (* TODO: Move to another file *)

@@ -13,38 +13,25 @@ Instance arbST_eq {A} (a : A) : GenSuchThat A (fun x => x = a) :=
   {| arbitraryST := returnGen (Some a) |}.
 Instance arbST_Correct {A} (a : A) 
   : SuchThatCorrect (fun x => x = a) (genST (fun x => x = a)) :=
-  {| STComplete := _ ;
-     STSound    := _ |}.
+  {| STCorrect := _ |}.
 Proof.
-  - simpl; rewrite semReturn.
-    unfold set_incl => ma Hma.
-    inversion Hma as [a' [Eq HIn]].
-    inversion HIn; subst; auto.
-  - simpl; rewrite semReturn.
-    unfold set_incl => ma Hma.
-    inversion Hma; subst.
-    left.
-    firstorder.
+  simpl; rewrite semReturn.
+  split; intros H. now firstorder.
+  destruct H as [x [Heq H]]. subst. inversion H. subst.
+  split; eauto.
 Defined.
 
 Instance arbST_eq' {A} (a : A) : GenSuchThat A (fun x => a = x) :=
   {| arbitraryST := returnGen (Some a) |}.
 Instance arbST_Correct' {A} (a : A) 
   : SuchThatCorrect (fun x => a = x ) (genST (fun x => a = x)) :=
-  {| STComplete := _ ;
-     STSound    := _ |}.
+  {| STCorrect := _  |}.
 Proof.
-  - simpl; rewrite semReturn.
-    unfold set_incl => ma Hma.
-    inversion Hma as [a' [Eq HIn]].
-    inversion HIn; subst; auto.
-  - simpl; rewrite semReturn.
-    unfold set_incl => ma Hma.
-    inversion Hma; subst.
-    left.
-    firstorder.
+  simpl; rewrite semReturn.
+  split; intros H. now firstorder.
+  destruct H as [x [Heq H]]. subst. inversion H. subst.
+  split; eauto.
 Defined.
-
 
 (* Typeclass foo *)
 Global Instance testSuchThat {A : Type} {pre : A -> Prop} {prop : A -> Type}
@@ -66,12 +53,12 @@ Proof.
   rewrite -Eq in e.
   clear Heq Eq mx'.
   (* End annoying *)
-  destruct H1.
-  apply STSound in H; subst.
-  inversion H as [Hyp | Contra].
-  - inversion Hyp as [x' [Pre HIn]].
-    inversion HIn; subst; auto.
-  - inversion Contra.
+  destruct H1. subst.
+  (* Very annoying *)
+  assert (Ha : (isSome :&: (semGen (genST [eta pre]))) (Some x)).
+  { split; eauto. }
+  apply STCorrect in Ha. destruct Ha as [y [Hin Heq]].
+  inversion Heq. subst. eassumption.
 Defined.     
 
 Global Instance testSuchThat2_1 {A B : Type} {pre : A -> B -> Prop} {prop : A -> B -> Type}
@@ -99,11 +86,12 @@ Proof.
   clear Heq Eq mx'.
   (* End annoying *)
   destruct (H5 b).
-  apply STSound in H; subst.
-  inversion H as [Hyp | Contra].
-  - inversion Hyp as [x' [Pre HIn]].
-    inversion HIn; subst; auto.
-  - inversion Contra.
+  (* Very annoying *)
+  subst.
+  assert (Ha : (isSome :&: semGen (genST pre^~ b)) (Some x)).
+  { split; eauto. }
+  apply STCorrect in Ha. destruct Ha as [y [Hin Heq]].
+  inversion Heq. subst. eassumption.
 Defined.     
 
 Global Instance testSuchThat2_2 {A B : Type} {pre : A -> B -> Prop} {prop : A -> B -> Type}
@@ -131,11 +119,12 @@ Proof.
   clear Heq Eq mx'.
   (* End annoying *)
   destruct (H5 a).
-  apply STSound in H; subst.
-  inversion H as [Hyp | Contra].
-  - inversion Hyp as [x' [Pre HIn]].
-    inversion HIn; subst; auto.
-  - inversion Contra.
+  (* Very annoying *)
+  subst.
+  assert (Ha : (isSome :&: semGen (genST [eta pre a])) (Some x)).
+  { split; eauto. }
+  apply STCorrect in Ha. destruct Ha as [y [Hin Heq]].
+  inversion Heq. subst. eassumption.
 Defined.     
 
 Global Instance testSuchThat_swap {A B C : Type} {pre : A -> B -> Prop} 

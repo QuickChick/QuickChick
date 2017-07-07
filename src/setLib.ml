@@ -289,3 +289,8 @@ let bigcup_nil_setI f l s =
   gApp
     ~explicit:true (gInject "bigcup_nil_setI")
     [hole; hole; f; l; s]
+
+let isSome_set_eq h1 h2 =
+    gApp
+    ~explicit:true (gInject "isSome_set_eq")
+    [hole; hole; hole; h1; h2]
