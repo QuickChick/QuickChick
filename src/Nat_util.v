@@ -84,3 +84,13 @@ Lemma isSomeSome {A : Type} (y : A) :
 Proof.
   exact isT.
 Qed.
+
+Lemma eq_symm {A : Type} (x y : A) :
+  x = y -> y = x.
+Proof.
+  firstorder.
+Qed.
+
+(* Yikes this is stupid, find a workaround *)
+(* Leo, can you make me a real prop in the plugin?? *)
+Definition prop := Prop.

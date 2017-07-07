@@ -16,15 +16,6 @@ Typeclasses eauto := debug.
 
 Require Import zoo DependentTest.
 
-Lemma eq_symm {A : Type} (x y : A) :
-  x = y -> y = x.
-Proof.
-  firstorder.
-Qed.
-
-(* Yikes this is stupid, find a workaround *)
-Definition prop := Prop.
-
 (* XXX these instances should be present *)
 Existing Instance genSFoo.
 Existing Instance shrFoo.
