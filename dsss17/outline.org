@@ -11,19 +11,6 @@ small examples (lists and similar)
 
 * Coq typeclasses (TypeClasses.v)
 
-core QC typeclasses
-  - derived typeclasses (Show) -- maybe this will eventually be a general
-    feature of Coq, but for now it's part of QC
-  - generator monad
-     - basic combinators (elements, oneOf, ...)
-     - exercises: build a generator for XX
-     - CoArbitrary
-     - generators for polymorphic properties (nat, Li-Yao stuff, etc.)
-  - shrinking
-      - build a custom shrinker for XX
-      - question: what is wrong with this shrinker?  
-           - might generate the same example
-           - might generate larger examples
 
 * ------------------------ DAY 2 -------------------------
 
@@ -31,6 +18,7 @@ core QC typeclasses
 
 Figure out whether P? notation is actually used here!  If not, can be
 skipped/skimmed in the Typeclass part.
+
 
 ** Checkers
 
@@ -139,8 +127,13 @@ most low-level and flexible way to create checkers
     QuickChick isort3P.
     (* /QUIETSOLUTION *)
 
-
 ** Generators
+
+  - generator monad
+     - basic combinators (elements, oneOf, ...)
+     - exercises: build a generator for XX
+     - CoArbitrary
+     - generators for polymorphic properties (nat, Li-Yao stuff, etc.)
 
 explain the Gen, G, Arbitrary, and Shrink typeclasses
 
@@ -152,6 +145,17 @@ Global Instance testDec {P} `{H : Dec P} : Checkable P :=
   |}.
 
 ** Shrinking
+
+  - shrinking
+      - build a custom shrinker for XX
+      - question: what is wrong with this shrinker?  
+           - might generate the same example
+           - might generate larger examples
+
+** Derived typeclasses
+
+  - derived typeclasses (Show) -- maybe this will eventually be a general
+    feature of Coq, but for now it's part of QC
 
 ** More combinators
 

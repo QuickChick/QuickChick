@@ -644,7 +644,7 @@ Definition implicit_fun1 := `(x + y).
 Print implicit_fun1.
 Compute (implicit_fun1 2 3).
 
-(** ** Records in Coq *)
+(** ** Records are Products *)
 
 (** Although records are not part of Coq's logical foundation, it does
     provide some simple syntactic sugar for defining and using
@@ -1204,23 +1204,55 @@ Notation "P '?'" :=
   (at level 100).
 
 (** Now we don't need to remember that, for example, the test for
-    equality on numbers is called [beq_nat], because we can just write
-    it like this: *)
+    equality on numbers is called [beq_nat], because instead of this... *)
 
-Definition silly_fun (x y z : nat) :=
-  if (x = y /\ y = z /\ x = z)? then "all equal" else "not all equal".
+Definition silly_fun1 (x y z : nat) :=
+  if andb (beq_nat x y) (andb (beq_nat y z) (beq_nat x z))
+  then "all equal"
+  else "not all equal".
+
+(** ... we can just write this: *)
+
+Definition silly_fun2 (x y z : nat) :=
+  if (x = y /\ y = z /\ x = z)?
+  then "all equal"
+  else "not all equal".
 
 (** ** [Monad] *)
 
-(* Mention ext-lib, but not sure whether it's a good idea to actually
-   go into the details... YES, at least some details are important for
-   DSSS! *)
+(** In Haskell, one place typeclasses are used very heavily is with
+    the [Monad] typeclass, especially in conjunction with Haskell's
+    "[do] notation" for monadic actions.
 
-(* 
+    Monads are an extremely powerful tool for organizing and
+    streamlining code in a wide range of situations where computations
+    can be thought of as yielding a result along with some kind of
+    "effect."  Examples of possible effects include
+       - input / output
+       - state mutation
+       - failure
+       - nondeterminism
+       - randomness
+       - etc.
 
-https://github.com/coq-ext-lib/coq-ext-lib/blob/v8.5/theories/Structures/Monad.v
+    There are many good tutorials on the web about monadic programming
+    in Haskell. *)
 
+(** In Coq, monads are also heavily used, but the fact that
+    typeclasses are a relatively recent addition to Coq, together with
+    the fact that Coq's [Notation] extension mechanism allows users to
+    define their own variants of [do] notation for specific situations
+    where a monadic style is useful, have led to a proliferation of
+    definitions of monads: most older projects simply define their own
+    monads and monadic notations -- sometimes typeclass-based, often
+    not -- while newer projects use one of several generic libraries
+    for monads.  Our current favorite (as of Summer 2017) is the monad
+    typeclasses in in Gregory Malecha's [ext-lib] package:
+
+    {https://github.com/coq-ext-lib/coq-ext-lib/blob/v8.5/theories/Structures/Monad.v}
 *)
+
+(* SOONER: A better introduction, with examples, would be a fine thing. *)
 
 (** ** Others *)
 
