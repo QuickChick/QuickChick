@@ -180,7 +180,6 @@ How it works internally.
 
 QuickChick commands must not be in (sections or?) submodules
 
-
 ** Case Study
 
 a typed version of Imp (ints and boolean)
@@ -227,9 +226,11 @@ mutation testing vs collect
   - mutation testing informs whether the distribution leads to good testing
   - John's x<y example?
   
+
 * ------------------------ DAY 3 -------------------------
 
 * Case study: Vellvm (VellvmQC.v)
+
 
 * ------------------------ DAY 4 -------------------------
 
