@@ -13,6 +13,7 @@ let sec_name = ref None
 let verbose = ref false
 let ansi = ref false
 let fail_fast = ref false
+let excluded = ref []
 
 let speclist =
   [ ("-s", Arg.String (fun name -> sec_name := Some name), "Which section's properties to test")
@@ -22,6 +23,7 @@ let speclist =
   ; ("-cmd", Arg.String (fun name -> compile_command := name), "Compile command for entire directory")
   ; ("-top", Arg.String (fun name -> top := name), "Name of top-level logical module")
   ; ("-ocamlbuild", Arg.String (fun name -> ocamlbuild_args := name), "Arguments given to ocamlbuild")
+  ; ("-exclude", Arg.Rest (fun excl -> excluded := excl :: !excluded), "Files to be excluded. Must be the last argument")
   ]
 
 let usage_msg = "quickChick options\nMutation testing for current directory"
@@ -183,7 +185,8 @@ let gather_all_vs fs =
   let rec loop fs =
     match fs with
     | File (s, _) ->
-       if Filename.check_suffix s ".v" then
+       if Filename.check_suffix s ".v" 
+          && not (List.exists (fun x -> x = Filename.basename s) !excluded) then
          all_vs := (Filename.chop_suffix s ".v") :: !all_vs
     | Dir (s, fss) ->
        List.iter loop fss
@@ -384,7 +387,8 @@ let rec parse_file_or_dir file_name =
       let s = load_file file_name in
       Some (File (file_name, [Section ("(*", "__default__" ^ file_name, "*)", None, [Text s])]))
     else
-      let handle = Filename.check_suffix file_name "v" in
+      let handle = Filename.check_suffix file_name "v" 
+                   && not (List.exists (fun x -> x = Filename.basename file_name) !excluded) in
       if handle then begin
         debug "In file: %s\n" file_name;
         let lexbuf = Lexing.from_channel (open_in file_name) in
@@ -525,6 +529,8 @@ let calc_dir_mutants sec_graph fs =
 
 (* BCP: This function is too big! And there's too much duplication. *)
 let main =
+(*   List.iter (fun x -> print_endline x) !excluded;*)
+
   (*  Parsing.set_trace true; *)
   let fs = from_Some (parse_file_or_dir ".") in
 
