@@ -1693,6 +1693,8 @@ Check weird.
 (* Choosing among typeclasses, modules, dependent records, canonical
    instances.  Pointers to where to read about all these. *)
 
+(* Matthieu's paper on first-class typeclasses *)
+
 (* Mattheiu's Penn slides have a discussion of sharing by fields vs by
    parameters that probably deserves to be incorporated here -- or at
    least summarized with a pointer to somewhere people can read about
