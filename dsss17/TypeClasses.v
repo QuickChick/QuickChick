@@ -1272,6 +1272,8 @@ Definition silly_fun2 (x y z : nat) :=
 
 (* SOONER: A better introduction, with examples, would be a fine thing. *)
 
+(* NOW: Do we need more, for present purposes? *)
+
 (** ** Others *)
 
 (** Two popular typeclasses from the Coq standard library are
@@ -1288,16 +1290,181 @@ Definition silly_fun2 (x y z : nat) :=
 *)
 
 
+(* ################################################################# *)
+(** * Controlling Instantiation *)
+
+(** ** "Defaulting" *)
+
+(** The type of the overloaded [eqb] operator... *)
+
+Check @eqb.
+(* ==>
+     @eqb : forall A : Type, Eq A -> A -> A -> bool    *)
+
+(** ... says that it works for any [Eq] type.  Naturally, we can use
+    it in a definition like this... *)
+
+Definition foo x := if eqb x x then "Of course" else "Impossible".
+
+(** ... and then we can apply [foo] to arguments of any [Eq] type.
+
+    Right? *)
+
+Fail Check (foo bool).
+(* ==>
+     The command has indeed failed with message:
+     The term "42" has type "bool" while it is expected to have type
+      "bool -> bool".    *)
+
+(** Huh?!
+
+    Here's what happened:
+      - When we defined [foo], the type of [x] was not specified, so
+        Coq filled in a unification variable (an "evar") [?A].
+      - When typechecking the expression [eqb x], the typeclass
+        instance mechanism was asked to search for a type-correct
+        instance of [Eq], i.e., an expression of type [Eq ?A].
+      - This search immediately succeeded because the first thing it
+        tried, which happened to be the constant [eqBoolBool :
+        Eq (bool->bool)], worked.  In the process, [?A] got
+        instantiated to [bool->bool].
+      - The type calculated for [foo] was therefore
+        [(bool->bool)->(bool->bool)->bool].
+
+    The lesson is that it matters a great deal _exactly_ what problems
+    are posed to the instance search engine. *)
+
+(* EX1 (debugDefaulting) *)
+(** Do [Set Typeclasses Debug] and verify that this is what happened.  [] *)
+
+(** ** Manipulating the Hint Database *)
+
+(** One of the ways in which Coq's typeclasses differ most from
+    Haskell's is the lack, in Coq, of an automatic check for
+    "overlapping instances."  That is, it is completely legal to
+    define a given type to be an instance of a given class in two
+    different ways: *)
+
+Inductive baz := Baz : nat -> baz.
+
+Instance baz1 : Show baz :=
+  {
+    show b :=
+      match b with
+        Baz n => "Baz: " ++ show n
+      end
+  }.
+
+Instance baz2 : Show baz :=
+  {
+    show b :=
+      match b with
+        Baz n => "[" ++ show n ++ " is a Baz]"
+      end
+  }.
+
+Compute (show (Baz 42)).
+(* ==> 
+     = "[42 is a Baz]"
+     : string   *)
+
+(** When this happens, it is unpredictable which instance will be
+    found first by the instance search process; here it just happened
+    to be the second.  The problem is that, in more complex
+    situations, it may not be obvious when there are overlapping
+    instances.  (The reason Coq doesn't do the overlapping instances
+    check is because it's type system is much more complex, so much so
+    that it is very challenging in general to decide whether two given
+    instances overlap.) *)
+
+(** One way to deal with overlapping instances is to "curate" the hint
+    database by explicitly adding and removing specific instances.  To
+    remove things, use [Remove Hints]: *)
+
+Remove Hints baz1 baz2 : typeclass_instances.
+
+(** To add them back (or to add arbitrary constants that have the
+    right type to be intances (i.e., their type ends with an applied
+    typeclass) but that were not created by [Instance] declarations),
+    use [Existing Instance]: *)
+
+Existing Instance baz1.
+Compute (show (Baz 42)).
+(* ==> 
+     = "Baz: 42"
+     : string    *)
+
+(* Another way of controlling which instances are chosen by proof
+   search is to assign _priorities_ to overlapping instances: *)
+
+Instance baz3 : Show baz | 2 :=
+  {
+    show b :=
+      match b with
+        Baz n => "{{{ Use me first!  " ++ show n ++ "}}}"
+      end
+  }.
+
+Instance baz4 : Show baz | 3 :=
+  {
+    show b :=
+      match b with
+        Baz n => "{{{ Use me second!  " ++ show n ++ "}}}"
+      end
+  }.
+
+Compute (show (Baz 42)).
+(* ==> 
+     = "{{{ Use me first!  42}}}"
+     : string  *)
+
+(** 0 is the highest priority. If the priority is not specified, it
+    defaults to n, the number of binders of the instance. *)
+(* SOONER: ... whatever that means! *)
+
+(** [Existing Instance] declarations can also be given explicit
+    priorities. *)
+(* SOONER: Changing 0 to 1 changes the behavior.  Why?? *)
+
+Existing Instance baz1 | 0.
+Compute (show (Baz 42)).
+(* ==> 
+     = "Baz: 42"
+     : string    *)
+
+(* SOONER *)
+(** ** Interactions with modules *)
+
+(* Problems with imports...
+
+   I might try to explain this in more details later on, but this is a
+   brief summary: The mystery lies in the order of
+   imports/exports. There is another `get` function in Coq’s string
+   library, and if that is imported after ExtLib’s MonadState library,
+   Coq’s type checker will try to infer the types within a monadic
+   function (which contains a MonadState.get) using the type of
+   String.get. Somehow the definition of a monad transformer is too
+   generic that it allows Coq to try to match the type with it again
+   and again, instead of reporting an error.
+
+   I do not fully understand this problem because it seems that Coq
+   would still consider `get` as `String.get`, even if I export
+   MonadState after String in Common.v. *)
+
+(** Global Instance... *)
+
+(* /SOONER *)
 
 
 (* ################################################################# *)
-(** * Pragmatics *)
+(** * Debugging *)
 
-(** ** Debugging Instantiation Failures *)
+(** ** Instantiation Failures *)
 
 (** One downside of using typeclasses, especially many typeclasses at
     the same time, is that error messages can become puzzling.  Here
     is an easy one. *)
+
 Inductive bar :=
   Bar : nat -> bar.
 
@@ -1313,8 +1480,8 @@ Fail Definition eqBar :=
 Fail Definition ordBarList :=
   le [Bar 42] [Bar 43].
 
-(** Here it's pretty easy to see what the problem is.  To fix it, we
-    just have to define a new instance.  But in more complex
+(** In this case, it's pretty clear what the problem is.  To fix it,
+    we just have to define a new instance.  But in more complex
     situations it can be trickier.
 
     A few simple tricks can be very helpful:
@@ -1346,112 +1513,73 @@ Fail Definition max {A: Type} {Ord A} (x y : A) : A :=
       ?X357==[A0 Ord A x y |- Eq A] (parameter H of @le) {?H}
       ?X358==[A0 Ord A x y |- Ord A] (parameter Ord of @le) {?Ord}  *)
 
-(** The "UNDEFINED EVARS" here is because the binders that are
+(** The [UNDEFINED EVARS] here is because the binders that are
     automatically inserted by implicit generalization are missing.*)
 
 (** ** Nontermination *)
 
-(* An example of a potential gotcha:
- 
-The problem appears to be when using the (universe-polymorphic) inject
-function in conjunction with a typeclass method, when the necessary
-instance doesn't exist.
+(** One annoying way that typeclass instantiation can go wrong is by
+    simply diverging.  Here is a small example of how this can happen.
 
-Inductive Foo := MkFoo : Foo.
-  Set Typeclasses Debug.
+    Declare a typeclass involving two types parameters [A] and [B] --
+    say, a silly typeclass that can be inhabited by arbitrary
+    functions from [A] to [B]: *)
 
-  Instance gen : Gen (list Foo) := { arbitrary := liftGen inject
-    arbitrary }.
+Class MyMap (A B : Type) : Type :=
+  {
+    mymap : A -> B
+  }.
 
-Leo: My goto debug method is to try to manually expand the
-typeclasses. Before that, I needed to understand what “inject”
-was. Since the result type was list of A, I assumed that inject is
-similar to using “pure” or “return” in Haskell instead of (fun x =>
-[x]). However, Coq is really bad usually at figuring out implicit
-stuff – so I just replaced it by the explicit anonymous function.
- 
-After that it was just a “[Gen (list X) instance does not exist]”, so
-deriving [Arbitrary] (or [Gen]) for [X] should work (and it did). Now, why
-things work when moving back to “inject” after adding the instance I
-have no idea. :-)
+(** Declare instances for getting from [bool] to [nat]... *)
 
-Yao: I have discussed this with Leo. The problem is that I have
-defined the following instance:
+Instance MyMap1 : MyMap bool nat :=
+  {
+    mymap b := if b then 0 else 42
+  }.
 
-Polymorphic Instance Injection_trans {A B C : Type} {P : Injection A
-            B} {Q : Injection B C} : Injection A C := { inject e :=
-            inject (inject e) }.
+(** ... and from [nat] to [string]: *)
 
-This would cause the type checker to go to an infinite loop if it
-recursively takes this branch before exploring other
-possibilities. Removing this instance would fix the problem.
+Instance MyMap2 : MyMap nat string :=
+  {
+    mymap := fun n : nat => if le n 20 then "Pretty small" else "Pretty big"
+  }.
 
-We don’t see other problems with this Injection type class for
-now. Therefore, I suggest we keep this type class, but be careful not
-to define something similar to what I did.
+Definition e1 := mymap true.
+Compute e1.
 
-EXERCISE: Find a different way of making instance inference diverge.
+Definition e2 := mymap 42.
+Compute e2.
 
-Hint: If confused, you can look at the *coq* buffer. That's where
-most debug messages appear if they don't appear in the *response*
-buffer.  (What's a typical example of this?)
+(** Notice that these two instances don't automatically get us from
+    [bool] to [string]... *)
+
+Fail Definition e3 : string := mymap false.
+
+(** ... and try to define a generic instance that combines an instance
+    from [A] to [B] and an instance from [B] to [C]: *)
+
+Instance MyMap_trans {A B C : Type} `{MyMap A B} `{MyMap B C} : MyMap A C :=
+  { mymap a := mymap (mymap a) }.
+
+(** Check that it works: *)
+
+Definition e3 : string := mymap false.
+Compute e3.
+
+(** At this point we may think we are in a good state, but in fact we
+    are in a state of great peril: If we happen to ask for an instance
+    that doesn't exist, the search procedure will diverge. *)
+
+(* 
+Definition e4 : list nat := mymap false.
 *)
 
-(** ** Defaulting *)
+(* EX1 (nonterm) *)
+(** Why, exactly, did the search diverge?  Enable typeclass debugging,
+    uncomment the above [Definition], and see what gets printed.  (You
+    may want to do this from the command line rather than from inside
+    an IDE.) *)
 
-Check @eqb.
-Check eqb.
-(* ===>
-     eqb
-        : nat -> nat -> bool
-
-(!)  Because typeclass inference does "defaulting."
-
-This behavior can be puzzling.  
-*)
-Definition weird x y := eqb x y.
-Check weird.
-
-(** ** Controlling instantiation *)
-
-(** *** Manipulating the Hint Database *)
-
-(** *** Existing Instance *)
-
-(* "Global Instance" redeclares Instance at end of Section. (Does it
-   do anything else??) 
-
-    "This commands adds an arbitrary constant whose type ends with an
-    applied type class to the instance database with an optional
-    priority. It can be used for redeclaring instances at the end of
-    sections, or declaring structure projections as instances. This is
-    almost equivalent to Hint Resolve ident : typeclass_instances." *)
-
-(** *** Priorities *)
-
-(* "An optional priority can be declared, 0 being the highest priority
-   as for auto hints. If the priority is not specified, it defaults to
-   n, the number of binders of the instance." *)
-
-(** ** Interactions with modules *)
-
-(* Problems with imports...
-
-   I might try to explain this in more details later on, but this is a
-   brief summary: The mystery lies in the order of
-   imports/exports. There is another `get` function in Coq’s string
-   library, and if that is imported after ExtLib’s MonadState library,
-   Coq’s type checker will try to infer the types within a monadic
-   function (which contains a MonadState.get) using the type of
-   String.get. Somehow the definition of a monad transformer is too
-   generic that it allows Coq to try to match the type with it again
-   and again, instead of reporting an error.
-
-   I do not fully understand this problem because it seems that Coq
-   would still consider `get` as `String.get`, even if I export
-   MonadState after String in Common.v. *)
-
-(* Global Instance (for modules, or sections??) *)
 
 (* ################################################################# *)
 (** * Advice from Experts *)
@@ -1690,10 +1818,21 @@ Check weird.
 (* ############################################################## *)
 (** * Alternative Structuring Mechanisms *)
 
-(* Choosing among typeclasses, modules, dependent records, canonical
-   instances.  Pointers to where to read about all these. *)
+(** Typeclasses are just one of several mechanisms that can be used in
+    Coq for structuring large developments.  Others include:
+      - canonical structures
+      - bare dependent records
+      - modules and functors *)
 
-(* Matthieu's paper on first-class typeclasses *)
+(** Assia Mahboubi and Enrico Tassi. Canonical Structures for the
+    working Coq user. In Sandrine Blazy, Christine Paulin, and David
+    Pichardie, editors, ITP 2013, 4th Conference on Interactive
+    Theorem Proving, volume 7998 of LNCS, pages 19–34, Rennes, France,
+    2013. Springer.
+
+    Matthieu Sozeau and Nicolas Oury. First-Class Type Classes. In
+    TPHOLs’08, 2008.
+*)
 
 (* Mattheiu's Penn slides have a discussion of sharing by fields vs by
    parameters that probably deserves to be incorporated here -- or at
@@ -1771,5 +1910,9 @@ Check weird.
 
 (* QUESTION: I wrote a note to discuss "Parametric instance" at some
    point.  What did I mean?? *)
+
+(* QUESTION: "If confused, you can look at the *coq* buffer. That's
+   where most debug messages appear if they don't appear in the
+   *response* buffer."  (What's a typical example of this?) *)
 
 (* /HIDE *)
