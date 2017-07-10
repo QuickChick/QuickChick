@@ -30,6 +30,8 @@ examples?  Other examples?  I guess we need to write the examples!
 
 ** Checkers
 
+from bool to checker
+
 the Dec typeclass
 
    We've said that QuickChickable properties must be "executable."  What
