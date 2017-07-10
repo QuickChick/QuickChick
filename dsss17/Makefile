@@ -16,6 +16,7 @@ TOP = $(HOME)/s/new
 # !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 EXPORTS = \
 	   Typeclasses.v \
+	   TImp.v \
 
 #	   Bib.v \
 
