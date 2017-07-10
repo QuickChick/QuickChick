@@ -52,7 +52,8 @@ Proof.
 Defined.
 
 (* BCP: Not clear this is a good idea, but... *)
-Global Instance Dec_impl {P Q} {H : Dec P} {I : Dec Q} : Dec (P -> Q).
+(* Leo: Should be ok with really low priority *)
+Global Instance Dec_impl {P Q} {H : Dec P} {I : Dec Q} : Dec (P -> Q) | 100.
 Proof.
   constructor. unfold decidable.
   destruct H as [D]. destruct D; destruct I as [D]; destruct D; auto.

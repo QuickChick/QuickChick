@@ -22,16 +22,39 @@ Lemma canonical_forms_bool : forall t,
   (t = ttrue) \/ (t = tfalse).
 Admitted.  (* QuickChick canonical_forms_bool. *)
 
+Instance dec_ex_abs t T1 : Dec (exists x u, t = tabs x T1 u).
+constructor; unfold decidable.
+destruct t eqn:Eq;
+try solve [right => [[x [id contra]]]; congruence].
+destruct (eq_dec_ty t0 T1).
+destruct dec eqn:H; subst; eauto.
+right => [[x [id contra]]]; inversion contra; subst; congruence.
+Defined. 
+
 Lemma canonical_forms_fun : forall t T1 T2,
   empty |- t \typ (TArrow T1 T2) ->
   value t ->
   exists x u, t = tabs x T1 u.
-Admitted. (* Existential *)
+Admitted. (* QuickChick canonical_forms_fun. *)
+
+(* xistential rework - dummy step *)
+Definition step_fun (t : tm) : option tm := Some t.
+
+Axiom step_fun_correct : forall t t',
+    step_fun t = Some t' <-> step t t'.
+
+Instance dec_step (t : tm) : Dec (exists t', step t t') :=
+  {| dec := _ |}.
+Proof.
+  destruct (step_fun t) eqn:Step.
+  - left; exists t0; eapply step_fun_correct; eauto.
+  - right => [[t' contra]]. eapply step_fun_correct in contra; congruence.
+Defined.
 
 Theorem progress : forall t T,
      empty |- t \typ T ->
      value t \/ exists t', t ===> t'.
-Admitted. (* Existential *)
+Admitted. (* QuickChick progress. *)
 
 Inductive appears_free_in : id -> tm -> Prop :=
   | afi_var : forall i,
@@ -71,29 +94,33 @@ Definition closed (t:tm) :=
   forall x, ~ appears_free_in x t.
 
 Instance dec_closed t : Dec (closed t). Admitted.
+Instance dec_bind x Gamma : Dec (exists T, bind Gamma x T).
+Admitted.
 
-Lemma free_in_context : forall x t T Gamma,
+Lemma free_in_context : forall x t,
    appears_free_in x t ->
+   forall T Gamma,
    Gamma |- t \typ T ->
    exists T', bind Gamma x T'.
-Admitted. (* Existential *)
+Admitted. (* QuickChick free_in_context. *)
 
 Corollary typable_empty__closed : forall t T,
     empty |- t \typ T  ->
     closed t.
-Admitted. (* Todo dec: QuickChick typable_empty__closed. *)
+Admitted. (* QuickChick typable_empty__closed. *)
 
 Lemma substitution_preserves_typing : forall Gamma x U t v T,
      cons (x,U) Gamma |- t \typ T ->
      empty |- v \typ U   ->
      Gamma |- [x:=v]t \typ T.
-Admitted. (* Todo has_type_Dec QuickChick substitution_preserves_typing. *)
+Admitted. (* QuickChick substitution_preserves_typing. *)
 
-Theorem preservation : forall t t' T,
+Theorem preservation : forall t T,
      empty |- t \typ T  ->
+              forall t', 
      t ===> t'  ->
      empty |- t' \typ T.
-Admitted. (* Out of scope - step to a function *)
+Admitted. (* OUT-OF-SCOPE *)
 
 Definition stuck (t:tm) : Prop :=
   (normal_form step) t /\ ~ value t.
@@ -102,5 +129,5 @@ Corollary soundness : forall t t' T,
   empty |- t \typ T ->
   t ===>* t' ->
   ~(stuck t').
-Admitted. (* Existential *)
+Admitted. (* OUT-OF-SCOPE *)
 

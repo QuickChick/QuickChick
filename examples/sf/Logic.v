@@ -19,13 +19,21 @@ Example and_exercise :
   forall n m : nat, n + m = 0 -> n = 0 /\ m = 0.
 Admitted. (* OUT-OF-SCOPE *)
 
+Instance testSuchThat_Conj {A B : Type} (P : A -> Prop) (Q : B -> Prop)
+         (prop : A -> B -> Prop)
+         `{Checkable (forall a, P a -> forall b, Q b -> prop a b)} :
+  Checkable (forall a b, P a /\ Q b -> prop a b) :=
+  {| checker f := 
+       checker (fun a P b Q => f a b _ ) |}.
+Proof. split; auto. Defined.
+
 Lemma and_example2 :
   forall n m : nat, n = 0 /\ m = 0 -> n + m = 0.
-Admitted. (* Leo: TODO *)
+Admitted. (* QuickChick and_example2. *)
 
 Lemma and_example2'' :
   forall n m : nat, n = 0 -> m = 0 -> n + m = 0.
-Admitted. (* Leo: TODO *)
+Admitted. (* QuickChick and_example2''. *)
 
 Lemma proj1 : forall P Q : Prop,
   P /\ Q -> P.
@@ -39,9 +47,23 @@ Theorem and_assoc : forall P Q R : Prop,
   P /\ (Q /\ R) -> (P /\ Q) /\ R.
 Admitted. (* Higher Order *)
 
+Instance testSuchThat_Disj {A B : Type} (P : A -> Prop) (Q : B -> Prop)
+         (prop : A -> B -> Prop)
+         `{Checkable (forall a, P a -> forall b, prop a b)} 
+         `{Checkable (forall b, Q b -> forall a, prop a b)} :
+  Checkable (forall a b, P a \/ Q b -> prop a b) :=
+  {| checker f := 
+       disjoin (Datatypes.cons (checker (fun a P b => f a b _ ))
+               (Datatypes.cons (checker (fun b Q a => f a b _))
+                Datatypes.nil)) |}.
+Proof. 
+- left; auto. 
+- right; auto. 
+Defined. 
+
 Lemma or_example :
   forall n m : nat, n = 0 \/ m = 0 -> n * m = 0.
-Admitted. (* Leo: TODO *)
+Admitted. (* QuickChick or_example. *)
 
 Lemma or_intro : forall A B : Prop, A -> A \/ B.
 Admitted. (* Higher Order *)
@@ -115,21 +137,18 @@ Lemma mult_0_3 :
   forall n m p, n * m * p = 0 <-> n = 0 \/ m = 0 \/ p = 0.
 Admitted. (* OUT-OF-SCOPE *)
 
-Lemma four_is_even : exists n : nat, 4 = n + n.
-Admitted. (* Existential *)
-
 Theorem exists_example_2 : forall n,
   (exists m, n = 4 + m) ->
   (exists o, n = 2 + o).
-Admitted. (* Existential *)
+Admitted. (* OUT-OF-SCOPE *)
 
 Theorem dist_not_exists : forall (X:Type) (P : X -> Prop),
   (forall x, P x) -> ~ (exists x, ~ P x).
-Admitted. (* Existential *)
+Admitted. (* Higher-Order *)
 
 Theorem dist_exists_or : forall (X:Type) (P Q : X -> Prop),
   (exists x, P x \/ Q x) <-> (exists x, P x) \/ (exists x, Q x).
-Admitted. (* Existential *)
+Admitted. (* Higher-Order *)
 
 Fixpoint In {A : Type} (x : A) (l : list A) : Prop :=
   match l with
@@ -141,17 +160,17 @@ Lemma In_map :
   forall (A B : Type) (f : A -> B) (l : list A) (x : A),
     In x l ->
     In (f x) (map f l).
-Admitted. (* Leo: TODO *)
+Admitted. (* Higher Order *)
 
 Lemma In_map_iff :
   forall (A B : Type) (f : A -> B) (l : list A) (y : B),
     In y (map f l) <->
     exists x, f x = y /\ In x l.
-Admitted. (* Existential *)
+Admitted. (* Higher-Order *)
 
 Lemma in_app_iff : forall A l l' (a:A),
   In a (app l l') <-> In a l \/ In a l'.
-Admitted. (* Leo: TODO *)
+Admitted. (* WTF *)
 
 Lemma plus_comm3 :
   forall n m p, n + (m + p) = (p + m) + n.
@@ -226,4 +245,4 @@ Theorem not_exists_dist :
   excluded_middle ->
   forall (X:Type) (P : X -> Prop),
     ~ (exists x, ~ P x) -> (forall x, P x).
-Admitted. (* Existential *)
+Admitted. (* Higher Order *)

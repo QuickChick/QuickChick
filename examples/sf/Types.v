@@ -31,9 +31,12 @@ Inductive tm : Type :=
 
 Derive (Arbitrary, Show) for tm.
 Derive (Sized, CanonicalSized) for tm.
-Derive SizeMonotonic for tm using genStm.
+Derive SizeMonotonic for tm using genStm0.
 Derive SizedMonotonic for tm.
-Derive SizedCorrect for tm using genStm and SizeMonotonictm.
+Derive SizedCorrect for tm using genStm0 and SizeMonotonictm.
+
+Instance eq_dec_tm (t1 t2 : tm) : Dec (t1 = t2).
+constructor; unfold decidable; repeat decide equality. Defined.
 
 Inductive bvalue : tm -> Prop :=
   | bv_true : bvalue ttrue
@@ -128,13 +131,27 @@ Definition stuck (t:tm) : Prop :=
 
 Hint Unfold stuck.
 
+(* xistential rework - dummy step *)
+Definition step_fun (t : tm) : option tm := Some t.
+
+Axiom step_fun_correct : forall t t',
+    step_fun t = Some t' <-> step t t'.
+
+Instance dec_step (t : tm) : Dec (exists t', step t t') :=
+  {| dec := _ |}.
+Proof.
+  destruct (step_fun t) eqn:Step.
+  - left; exists t0; eapply step_fun_correct; eauto.
+  - right => [[t' contra]]. eapply step_fun_correct in contra; congruence.
+Defined.
+
 Lemma value_is_nf : forall t,
   value t -> step_normal_form t.
-Admitted. (* Existential *)
+Admitted. (* QuickCheck value_is_nf. (* Existential *) *)
 
 Theorem step_deterministic:
   deterministic step.
-Admitted. (* Higher Order *)
+Admitted. (* QuickChick step_deterministic. *)
 
 Inductive ty : Type :=
   | TBool : ty
@@ -185,7 +202,7 @@ Instance has_type_gen_correct T : SuchThatCorrect (fun t => has_type t T)
                                                   (@arbitraryST _ (fun t => has_type t T) _).
 Admitted.
 
-Instance dec_has_type t T : Dec (has_type t T).
+Instance dec_has_type (t : tm) (T : ty) : Dec (has_type t T).
 constructor; unfold decidable.
 move: T; induction t => T; destruct T; eauto;
 try solve [right => contra; inversion contra; eauto].
@@ -216,7 +233,7 @@ Admitted. (* QuickChick nat_canonical. *)
 Theorem progress : forall t T,
   |- t \typ T ->
   value t \/ exists t', t ===> t'.
-Admitted. (* Existential *)
+Admitted. (* QuickChick progress. (* Existential *) *)
 
 Global Instance testSuchThat_swap' {A B C : Type} {pre : A -> C -> Prop} 
        {prop : A -> B -> C -> Type}
@@ -241,8 +258,7 @@ Corollary soundness : forall t t' T,
   |- t \typ T ->
   t ===>* t' ->
   ~(stuck t').
-Admitted. (* Existential *)
-
+Admitted. (* OUT-OF-SCOPE *) (* Existential *)
 
 Tactic Notation "print_goal" :=
   match goal with |- ?x => idtac x end.

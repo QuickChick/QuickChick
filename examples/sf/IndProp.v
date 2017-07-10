@@ -66,31 +66,40 @@ Admitted. (* (*N*) QuickChick ev_minus2'. *)
 
 Theorem evSS_ev : forall n,
   ev (S (S n)) -> ev n.
-Admitted. (* Leo: TODO *)
+Admitted. (* OUT-OF-SCOPE *)
+
+(* existential dummy *)
+Definition double_reverse n : nat := n.
+
+Axiom double_reverse_correct : forall n, n = double (double_reverse n).
+
+Instance dec_ex_double n : Dec (exists k, n = double k).
+constructor; unfold decidable.
+left; exists (double_reverse n). 
+eapply double_reverse_correct.
+Defined.
 
 Lemma ev_even_firsttry : forall n,
   ev n -> exists k, n = double k.
-Admitted. (* Existential *)
+Admitted. (* QuickChick ev_even_firsttry. (* Existential *) *)
+
+Global Instance testSuchThat_swap_2 {A B : Type} {pre : A -> Prop} 
+       {prop : A -> B -> Type}
+       `{Checkable (forall a, pre a -> forall b, prop a b)} :
+  Checkable (forall a b, pre a -> prop a b ) :=
+  {| checker f := @checker (forall a, pre a -> forall b, prop a b) _ _ |}. 
+Proof. intros; eauto. Defined.
 
 Theorem ev_sum : forall n m, ev n -> ev m -> ev (n + m).
-Admitted. (* Leo : TODO *)
+Admitted. (* QuickChick ev_sum. *)
 
-(* Leo: TODO *)
-(*
 Inductive ev' : nat -> Prop :=
 | ev'_0 : ev' 0
 | ev'_2 : ev' 2
 | ev'_sum : forall n m, ev' n -> ev' m -> ev' (n + m).
 
-(** Prove that this definition is logically equivalent to the old
-    one.  (You may want to look at the previous theorem when you get
-    to the induction step.) *)
-
 Theorem ev'_ev : forall n, ev' n <-> ev n.
-Proof.
- (* FILL IN HERE *) Admitted.
-(** [] *)
-*)
+Admitted. (* OUT-OF-SCOPE *)
 
 Theorem ev_ev__ev : forall n m,
   ev (n+m) -> ev n -> ev m.
@@ -142,7 +151,7 @@ Derive GenSizedSuchThatSizeMonotonicOpt for (fun n => next_even n m).
 
 
 Lemma le_trans : forall m n o, m <= n -> n <= o -> m <= o.
-Admitted. (* Leo: TODO *)
+Admitted. (* OUT-OF-SCOPE *)
 
 Theorem O_le_n : forall n,
   0 <= n.
@@ -150,7 +159,7 @@ Admitted. (* QuickChick O_le_n. *)
 
 Theorem n_le_m__Sn_le_Sm : forall n m,
   n <= m -> S n <= S m.
-Admitted. (* Leo: TODO *)
+Admitted. (* OUT-OF-SCOPE *)
 
 Theorem Sn_le_Sm__n_le_m : forall n m,
   S n <= S m -> n <= m.
@@ -168,7 +177,7 @@ Admitted. (* OUT-OF-SCOPE *)
 Theorem lt_S : forall n m,
   n < m ->
   n < S m.
-Admitted. (* Leo: TODO *) 
+Admitted. (* OUT-OF-SCOPE *)
 
 Inductive reg_exp (T : Type) : Type :=
 | EmptySet : reg_exp T
