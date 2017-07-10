@@ -443,6 +443,24 @@ Instance optionOrd {A : Type} `{Eq A} `{Ord A} : Ord (option A) :=
 (* /SOLUTION *)
 (** [] *)
 
+(* EX3 (ordList) *)
+(** For a little more practice, define an [Ord] instance for lists. *)
+
+(* SOLUTION *)
+Fixpoint listOrdAux {A : Type} `{Eq A} `{Ord A} (l1 l2 : list A) :=
+  match l1, l2 with
+  | [], _ => true
+  | h1::t1, [] => false
+  | h1::t1, h2::t2 => andb (le h1 h2) (listOrdAux t1 t2)
+  end.
+
+Instance listOrd {A : Type} `{Eq A} `{Ord A} : Ord (list A) :=
+  {
+    le := listOrdAux
+  }.
+(* /SOLUTION *)
+(** [] *)
+
 (* ################################################################# *)
 (** * How It Works *)
 
@@ -1275,10 +1293,11 @@ Definition silly_fun2 (x y z : nat) :=
 (* ################################################################# *)
 (** * Pragmatics *)
 
-(** ** Understanding error messages *)
+(** ** Debugging Instantiation Failures *)
 
-(** One downside of using typeclasses is that error messages get more
-    puzzling, sometimes substantially so.  Here is an easy one. *)
+(** One downside of using typeclasses, especially many typeclasses at
+    the same time, is that error messages can become puzzling.  Here
+    is an easy one. *)
 Inductive bar :=
   Bar : nat -> bar.
 
@@ -1291,65 +1310,44 @@ Fail Definition eqBar :=
 
     ?Eq : "Eq bar"  *)
 
+Fail Definition ordBarList :=
+  le [Bar 42] [Bar 43].
+
 (** Here it's pretty easy to see what the problem is.  To fix it, we
-    just have to define a new instance. *)
+    just have to define a new instance.  But in more complex
+    situations it can be trickier.
 
-(* TODO: Cook up a more complicated example where it's harder to see... *)
+    A few simple tricks can be very helpful:
+      - Do [Set Printing Implicit] and then use [Check ...] and [Print
+        ...] to investigate the types of the things in the expression
+        where the error is being reported.
+      - Add some [@] annotations and explicitly fill in some of the
+        arguments that should be getting instantiated automatically,
+        to check your understanding of what they should be getting
+        instantiated with.
+      - Turn on tracing of instance search with [Set Typeclasses
+        Debug.]
 
-(* ---------------------- *)
+    The [Set Typeclasses Debug] command has a variant that causes it
+    to print even more information: [Set Typeclasses Debug Verbosity
+    2.]  Writing just [Set Typeclasses Debug] is equivalent to [Set
+    Typeclasses Debug Verbosity 1.] *)
 
-(* If you forget a `, you may see the following puzzling error message:
+(** Another potential source of confusion with error messages comes up
+if you forget a [`].  For example: *)
 
-Definition oddManOut'' {A : Type} {Eq A} (a b c : A) : A :=
-  if eqb a b then c
-  else if eqb a c then b
-  else a.                         
+Fail Definition max {A: Type} {Ord A} (x y : A) : A :=
+  if le x y then y else x.
+(* ===>
+     The command has indeed failed with message:
+     Unable to satisfy the following constraints:
+     UNDEFINED EVARS:
+      ?X354==[A |- Type] (type of Ord) {?T}
+      ?X357==[A0 Ord A x y |- Eq A] (parameter H of @le) {?H}
+      ?X358==[A0 Ord A x y |- Ord A] (parameter Ord of @le) {?Ord}  *)
 
-====>
-    Error: Unable to satisfy the following constraints:
-    UNDEFINED EVARS:
-     ?X12==[A |- Type] (type of Eq) {?T}
-     ?X15==[X0 Eq A a b c |- Eq A] (parameter Eq of @eqb) {?Eq}
-     ?X17==[X0 Eq A a b c |- Eq A] (parameter Eq of @eqb) {?Eq0}
-*)
-
-(** ** Debugging *)
-
-(* TODO: Show how to use Set Printing Implicit *)
-
-(* Getting even more information... *)
-
-Set Typeclasses Debug.
-(* Find an interesting enough example... *)
-Definition pairThing := eqb (2,(3,true)) (2,(3,false)).
-(* ==>
-    Debug: 1: looking for (Eq A) without backtracking
-    Debug: 1.1: exact e on (Eq A), 0 subgoal(s)
-    Debug: 1: looking for (Eq A) without backtracking
-    Debug: 1.1: exact e on (Eq A), 0 subgoal(s)
-    Debug: 1: looking for (Eq A) without backtracking
-    Debug: 1.1: exact H on (Eq A), 0 subgoal(s)
-    Debug: 1: looking for (Eq B) without backtracking
-    Debug: 1.1: exact H0 on (Eq B), 0 subgoal(s)
-    Debug: 1: looking for (Eq (nat * (nat * bool))) without backtracking
-    Debug: 1.1: simple apply @eqPair on (Eq (nat * (nat * bool))), 2 subgoal(s)
-    Debug: 1.1.3 : (Eq nat)
-    Debug: 1.1.3: looking for (Eq nat) without backtracking
-    Debug: 1.1.3.1: exact eqNat on (Eq nat), 0 subgoal(s)
-    Debug: 1.1.3 : (Eq (nat * bool))
-    Debug: 1.1.3: looking for (Eq (nat * bool)) without backtracking
-    Debug: 1.1.3.1: simple apply @eqPair on (Eq (nat * bool)), 2 subgoal(s)
-    Debug: 1.1.3.1.3 : (Eq nat)
-    Debug: 1.1.3.1.3: looking for (Eq nat) without backtracking
-    Debug: 1.1.3.1.3.1: exact eqNat on (Eq nat), 0 subgoal(s)
-    Debug: 1.1.3.1.3 : (Eq bool)
-    Debug: 1.1.3.1.3: looking for (Eq bool) without backtracking
-    Debug: 1.1.3.1.3.1: exact eqBool on (Eq bool), 0 subgoal(s)
-    pairThing is defined
-*)
-
-(* Also... (default is 1) *)
-Set Typeclasses Debug Verbosity 2.
+(** The "UNDEFINED EVARS" here is because the binders that are
+    automatically inserted by implicit generalization are missing.*)
 
 (** ** Nontermination *)
 
@@ -1399,9 +1397,24 @@ most debug messages appear if they don't appear in the *response*
 buffer.  (What's a typical example of this?)
 *)
 
-(** ** Manipulating the Hint Database *)
+(** ** Defaulting *)
+
+Check @eqb.
+Check eqb.
+(* ===>
+     eqb
+        : nat -> nat -> bool
+
+(!)  Because typeclass inference does "defaulting."
+
+This behavior can be puzzling.  
+*)
+Definition weird x y := eqb x y.
+Check weird.
 
 (** ** Controlling instantiation *)
+
+(** *** Manipulating the Hint Database *)
 
 (** *** Existing Instance *)
 
@@ -1419,21 +1432,6 @@ buffer.  (What's a typical example of this?)
 (* "An optional priority can be declared, 0 being the highest priority
    as for auto hints. If the priority is not specified, it defaults to
    n, the number of binders of the instance." *)
-
-(** *** Defaulting *)
-
-Check @eqb.
-Check eqb.
-(* ===>
-     eqb
-        : nat -> nat -> bool
-
-(!)  Because typeclass inference does "defaulting."
-
-This behavior can be puzzling.  
-*)
-Definition weird x y := eqb x y.
-Check weird.
 
 (** ** Interactions with modules *)
 
@@ -1510,7 +1508,7 @@ Check weird.
     preferable, but adding more indexes to distinguish the instances
     is also possible. *)
 
-(** ** John Wiegley...*)
+(** ** John Wiegley *)
 
 (** One thing that always gets me is that overlapping instances are 
     easy to write with no warning from Coq (unlike Haskell, which
