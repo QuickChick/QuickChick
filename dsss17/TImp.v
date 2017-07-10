@@ -17,12 +17,6 @@ Import QcDefaultNotation. Open Scope qc_scope.
 
 (* TODO: Put these back in QC? *)
 
-Require Import Ascii String.
-
-Derive (Arbitrary, Show) for ascii.
-
-Derive (Arbitrary, Show) for string.
-
 Inductive id : Type :=
   | Id : string -> id.
 
@@ -52,8 +46,6 @@ Theorem false_beq_id : forall x y : id,
    x <> y
    -> beq_id x y = false.
 Admitted. (* QuickChick false_beq_id. *)
-
-Inductive value := VNat : nat -> value | VBool : bool -> value.
 
 Definition partial_map := list (id * value).
 
@@ -138,6 +130,7 @@ Theorem update_permute : forall v1 v2 x1 x2
   = (update (x2,v2) (update (x1,v1) m)).
 Admitted. (* QuickChick update_permute. *)
 
+Inductive value := VNat : nat -> value | VBool : bool -> value.
 
 (* ################################################################# *)
 (** * Arithmetic and Boolean Expressions *)

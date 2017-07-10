@@ -46,3 +46,14 @@ Require Export DependentClasses.
 Require Export Typeclasses.
 Export GenLow GenHigh.
 
+(* TODO: Figure out better place for these *)
+(* String and Ascii Instances *)
+
+Require Import Ascii String.
+
+Derive (Arbitrary, Show) for ascii.
+
+Derive (Arbitrary, Show) for string.
+
+
+
