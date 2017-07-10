@@ -20,6 +20,14 @@ Figure out whether P? notation is actually used here!  If not, can be
 skipped/skimmed in the Typeclass part.
 
 
+What do we need to say about monadic notation?  Will it be used in Vellvm
+examples?  Other examples?  I guess we need to write the examples!  
+   - WHICH monadic notation will we use?  Would be very convenient to use a
+     typeclass one!  Then we should do Show, etc.
+   - A good example of Monad in Typeclasses would be making string a monad
+     instance.  Slightly degenerate, so I guess Option would be another good
+     one to do first. 
+
 ** Checkers
 
 the Dec typeclass

@@ -1275,24 +1275,24 @@ Definition silly_fun2 (x y z : nat) :=
 (* ################################################################# *)
 (** * Pragmatics *)
 
-(* Manipulating the hint database... *)
-
 (** ** Understanding error messages *)
 
-(* One downside of using typeclasses is that error messages get more
-   puzzling (sometimes substantially so).  Here is a common one. *)
+(** One downside of using typeclasses is that error messages get more
+    puzzling, sometimes substantially so.  Here is an easy one. *)
 Inductive bar :=
   Bar : nat -> bar.
 
-(*
-Definition eqBar :=
+Fail Definition eqBar :=
   eqb (Bar 42) (Bar 43).
-===> 
-      Error: Unable to satisfy the following constraints:
-      ?Eq : "Eq bar"
 
-   Here it's pretty easy to see what the problem is.  To fix it, we
-   just have to define a new instance. *)
+(* ===> 
+    The command has indeed failed with message:
+    Unable to satisfy the following constraints:
+
+    ?Eq : "Eq bar"  *)
+
+(** Here it's pretty easy to see what the problem is.  To fix it, we
+    just have to define a new instance. *)
 
 (* TODO: Cook up a more complicated example where it's harder to see... *)
 
@@ -1399,9 +1399,11 @@ most debug messages appear if they don't appear in the *response*
 buffer.  (What's a typical example of this?)
 *)
 
+(** ** Manipulating the Hint Database *)
+
 (** ** Controlling instantiation *)
 
-(* Existing Instance *)
+(** *** Existing Instance *)
 
 (* "Global Instance" redeclares Instance at end of Section. (Does it
    do anything else??) 
@@ -1412,15 +1414,13 @@ buffer.  (What's a typical example of this?)
     sections, or declaring structure projections as instances. This is
     almost equivalent to Hint Resolve ident : typeclass_instances." *)
 
-(* Parametric Instance *)
-
-(* Priorities *)
+(** *** Priorities *)
 
 (* "An optional priority can be declared, 0 being the highest priority
    as for auto hints. If the priority is not specified, it defaults to
    n, the number of binders of the instance." *)
 
-(* Defaulting *)
+(** *** Defaulting *)
 
 Check @eqb.
 Check eqb.
@@ -1768,5 +1768,8 @@ Check weird.
 (* More Ideas for material that could be included...  *)
 
 (* QUESTION: What does "Polymorphic Instance" mean? *)
+
+(* QUESTION: I wrote a note to discuss "Parametric instance" at some
+   point.  What did I mean?? *)
 
 (* /HIDE *)
