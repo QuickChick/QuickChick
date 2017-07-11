@@ -512,6 +512,11 @@ Inductive has_type_value : value -> ty -> Prop :=
   | TyVNat  : forall n, has_type_value (VNat  n) TNat
   | TyVBool : forall b, has_type_value (VBool b) TBool.
 
+Instance dec_has_type_value v T : Dec (has_type_value v T).
+Proof. constructor; unfold ssrbool.decidable.
+destruct v; destruct T; solve_sum.
+Defined.
+
 Definition gen_typed_value (T : ty) : G value :=
   match T with 
   | TNat  => do! n <- arbitrary; returnGen (VNat n)
@@ -520,13 +525,23 @@ Definition gen_typed_value (T : ty) : G value :=
 
 Definition state := @AtomMap.t value.
 
-(* For auto - change to inductive *)
+(* Similar structure *)
 Inductive typed_state : context -> state -> Prop :=
-| Typed_State : forall Gamma st x v T, 
-    bind_in Gamma x T ->
-    bind_in st x v ->
-    has_type_value v T ->
-    typed_state Gamma st.
+| TS_Empty : typed_state AtomMap.empty AtomMap.empty
+| TS_Elem  : forall x v T st Gamma, 
+    has_type_value v T -> typed_state Gamma st ->
+    typed_state ((x,T)::Gamma) ((x,v)::st).
+
+Instance dec_typed_state Gamma st : Dec (typed_state Gamma st).
+Proof. 
+constructor; unfold ssrbool.decidable.
+generalize dependent Gamma.
+induction st; intros; destruct Gamma; solve_sum.
+destruct a as [a v]; destruct p as [a' T].
+destruct (Atom.eq_dec a a'); solve_sum.
+subst; specialize (IHst Gamma); destruct IHst; solve_sum.
+destruct (dec_has_type_value v T); destruct dec; solve_sum.
+Defined.
 
 Definition gen_typed_state (Gamma : context) : G state := 
   sequenceGen (List.map (fun '(x, T) =>
