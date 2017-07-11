@@ -318,8 +318,7 @@ Instance suchThatNotCorrect {A} (P : A -> Prop)
          : SuchThatCorrect (fun a => ~ (P a)) 
                            (@arbitraryST _ (fun a => ~ (P a))
                                          (genSuchThatNot _)) :=
-  {| STComplete := _ ;
-     STSound    := _ |}.
+  {| STCorrect := _ |}.
 Admitted.
 
 (* (* Inductivized : *) QuickChick PartialMap.update_neq'. *)

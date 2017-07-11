@@ -492,7 +492,7 @@ let handle_branch
           let pred = (* predicate we are generating for *)
             gFun [var_to_string x]
               (fun [x] ->
-                 gApp (gTyCtr c) (List.map (fun (j, dt) -> 
+                 gApp ~explicit:true (gTyCtr c) (List.map (fun (j, dt) -> 
                                              (* Replace the i-th variable with x - we're creating fun x => c dt_1 dt_2 ... x dt_{i+1} ... *)
                                              if i == j then gVar x else dt_to_coq_expr k dt
                                            ) numbered_dts))

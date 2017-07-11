@@ -46,7 +46,7 @@ Derive ArbitrarySizedSuchThat for (fun tm => bvalue tm).
 Derive SizedProofEqs for (fun tm => bvalue tm).
 Derive SizeMonotonicSuchThatOpt for (fun tm => bvalue tm).
 Derive GenSizedSuchThatCorrect for (fun tm => bvalue tm).
-Derive GenSizedSuchThatSizeMonotonicOpt for (fun tm => bvalue tm).
+(* Zoe: Derive GenSizedSuchThatSizeMonotonicOpt for (fun tm => bvalue tm). *)
 
 Instance dec_bvalue t : Dec (bvalue t) :=
   {| dec := _ |}.
@@ -71,7 +71,7 @@ Derive ArbitrarySizedSuchThat for (fun tm => nvalue tm).
 Derive SizedProofEqs for (fun tm => nvalue tm).
 Derive SizeMonotonicSuchThatOpt for (fun tm => nvalue tm).
 Derive GenSizedSuchThatCorrect for (fun tm => nvalue tm).
-Derive GenSizedSuchThatSizeMonotonicOpt for (fun tm => nvalue tm).
+(* Zoe: Derive GenSizedSuchThatSizeMonotonicOpt for (fun tm => nvalue tm). *)
 
 Definition value (t:tm) := bvalue t \/ nvalue t.
 
