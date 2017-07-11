@@ -418,6 +418,45 @@ Fixpoint gen_exp_typed_sized (size : nat) (Gamma : context) (T : ty) : G (option
     freq ( (1, gen_typed_evar) ;; (base ++ recs size'))
   end.
 
+Fixpoint shrink_exp_typed (T : ty) (e : exp) : list exp :=
+  match e with 
+  | EVar _ => 
+    match T with 
+    | TNat => [ENum 0]
+    | TBool => [ETrue ; EFalse]
+    end
+  | ENum _ => []
+  | ETrue => []
+  | EFalse => [ETrue]
+  | EPlus e1 e2 => 
+    e1 :: e2 
+       :: (List.map (fun e1' => EPlus e1' e2) (shrink_exp_typed T e1))
+       ++ (List.map (fun e2' => EPlus e1 e2') (shrink_exp_typed T e2))
+  | EMinus e1 e2 => 
+    e1 :: e2 :: (EPlus e1 e2)
+       :: (List.map (fun e1' => EMinus e1' e2) (shrink_exp_typed T e1))
+       ++ (List.map (fun e2' => EMinus e1 e2') (shrink_exp_typed T e2))
+  | EMult e1 e2 => 
+    e1 :: e2 :: (EPlus e1 e2)
+       :: (List.map (fun e1' => EMult e1' e2) (shrink_exp_typed T e1))
+       ++ (List.map (fun e2' => EMult e1 e2') (shrink_exp_typed T e2))
+  | EEq e1 e2 => 
+    ETrue :: EFalse 
+       :: (List.map (fun e1' => EEq e1' e2) (shrink_exp_typed TNat e1))
+       ++ (List.map (fun e2' => EEq e1 e2') (shrink_exp_typed TNat e2))
+  | ELe e1 e2 => 
+    ETrue :: EFalse :: (EEq e1 e2)
+       :: (List.map (fun e1' => ELe e1' e2) (shrink_exp_typed TNat e1))
+       ++ (List.map (fun e2' => ELe e1 e2') (shrink_exp_typed TNat e2))
+  | ENot e => 
+    ETrue :: EFalse :: e :: (List.map ENot (shrink_exp_typed T e))
+  | EAnd e1 e2 => 
+    ETrue :: EFalse :: e1 :: e2 
+       :: (List.map (fun e1' => EAnd e1' e2) (shrink_exp_typed TBool e1))
+       ++ (List.map (fun e2' => EAnd e1 e2') (shrink_exp_typed TBool e2))
+
+  end.
+
 Inductive value := VNat : nat -> value | VBool : bool -> value.
 
 Derive Show for value.
@@ -552,10 +591,33 @@ Fixpoint gen_com_typed_sized (size : nat) (Gamma : context) : G (option com) :=
             returnGen (Some (CIf b c1 c2)))
       ] in
   match size with 
-  | O => freq ((1, skip) ;; assgn)
-  | S size' => freq ((1, skip) ;; (assgn ++ recs size'))
+  | O => backtrack ((1, skip) :: assgn)
+  | S size' => backtrack ((1, skip) :: (assgn ++ recs size'))
   end.
 
+Fixpoint shrink_com_typed (Gamma : context) (c : com) : list com := 
+  match c with 
+  | SKIP => []
+  | CAss x e => 
+    match AtomMap.get Gamma x with
+    | Some T => SKIP :: List.map (fun e' => CAss x e) (shrink_exp_typed T e)
+    | _ => []
+    end
+  | CSeq c1 c2 =>
+    c1 :: c2 
+       :: (List.map (fun c1' => CSeq c1' c2) (shrink_com_typed Gamma c1))
+       ++ (List.map (fun c2' => CSeq c1 c2') (shrink_com_typed Gamma c2))
+  | CIf b c1 c2 =>
+    c1 :: c2 
+       :: (List.map (fun c1' => CIf b c1' c2) (shrink_com_typed Gamma c1))
+       ++ (List.map (fun c2' => CIf b c1 c2') (shrink_com_typed Gamma c2))
+       ++ (List.map (fun b' => CIf b' c1 c2) (shrink_exp_typed TBool b))
+  | CWhile b c =>
+    c :: (CIf b c c) 
+      :: (List.map (fun b' => CWhile b' c) (shrink_exp_typed TBool b))
+      ++ (List.map (fun c' => CWhile b c') (shrink_com_typed Gamma c))
+  end.
+  
 Inductive result := 
 | Success : state -> result
 | Fail : result 
@@ -577,7 +639,10 @@ Fixpoint ceval (fuel : nat) (st : state) (c : com) : result :=
     | c1 ;; c2 =>
         match ceval fuel' st c1 with 
         | Success st' =>  ceval fuel' st' c2 
-        | _ => Fail
+        (* Bug : On OutOfGas should out of Gas :
+        | _ => Fail 
+        *)
+        | r => r
         end
     | IFB b THEN c1 ELSE c2 FI =>
       match eval st b with 
@@ -604,17 +669,42 @@ Conjecture well_typed_state_never_stuck :
   forall Gamma st, typed_state Gamma st ->
   forall fuel c, isFail (ceval fuel st c) = false.
 
-Definition well_typed_state_never_stuck := 
+Definition lift_shrink {A : Type} (shr : A -> list A) (m : option A) : list (option A) :=
+  match m with 
+  | Some x => List.map Some (shr x)
+  | _ => []
+  end.
+
+Definition well_typed_state_never_stuck_exec := 
   let num_vars := 4 in 
   let top_level_size := 5 in
   forAll (gen_context num_vars)  (fun Gamma =>
   forAll (gen_typed_state Gamma) (fun st =>
-  forAll arbitrary (fun fuel =>
-  forAll gen_com_typed_sized  (fun c => 
-  negb (isFail (ceval fuel st c)))))).                      
-                          
-  
+  forAllShrink arbitrary shrink (fun fuel =>
+  forAllShrink (gen_com_typed_sized 3 Gamma) (lift_shrink (shrink_com_typed Gamma)) (fun mc => 
+  match mc with 
+  | Some c => negb (isFail (ceval fuel st c))
+  | _ => false
+  end)))).                      
 
+QuickChick well_typed_state_never_stuck_exec.                          
+  
+(* Unreadable bug? 
+QuickChecking well_typed_state_never_stuck_exec
+[(1,TBool), (2,TBool), (3,TNat), (4,TBool)]
+[(1,VBool false), (2,VBool false), (3,VNat 5), (4,VBool true)]
+6
+Some CWhile (EAnd (EEq (EPlus (ENum 2) (ENum 3)) (ENum 5)) (ENot EFalse)) (CIf (ELe (EMinus (ENum 2) (EMinus (EVar 3) (EVar 3))) (ENum 1)) (CAss 1 (EVar 4)) (CAss 2 (EVar 1)))
+*** Failed after 7 tests and 0 shrinks
+*)
+
+(* Really motivates shrinking... 
+QuickChecking well_typed_state_never_stuck_exec
+[(1,TBool), (2,TBool), (3,TNat), (4,TBool)]
+[(1,VBool false), (2,VBool true), (3,VNat 0), (4,VBool false)]
+1
+Some CSeq CSkip CSkip
+*)
 
 (* LEO: Fix in SF: it should be c ;; WHILE ... (double ;) *)
 (** In a traditional functional programming language like OCaml or
