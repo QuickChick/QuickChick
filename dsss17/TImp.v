@@ -11,6 +11,7 @@ Import ListNotations.
 From QuickChick Require Import QuickChick Tactics.
 Import QcDefaultNotation. Open Scope qc_scope.
 
+Set Bullet Behavior "Strict Subproofs".
 (* /IMPORTS *)
 
 (* TODO: This should be imported *)
@@ -278,39 +279,6 @@ End withv.
 
 End ListMap.
 
-
-
-(*
-Module Atom_as_OT : UsualOrderedType.
-  Definition t := Atom.t.
-  Definition eq := @eq t.
-
-  Definition eq_refl  := @eq_refl t.
-  Definition eq_sym   := @eq_sym t.
-  Definition eq_trans := @eq_trans t.
-
-  Definition lt a1 a2 := lt (Atom.nat_of a1) (Atom.nat_of a2).
-
-  Theorem lt_trans (a1 a2 a3: t) : lt a1 a2 -> lt a2 a3 -> lt a1 a3. Admitted.
-  Theorem lt_not_eq : forall x y : t, lt x y -> ~ eq x y. Admitted.
-  Definition compare : forall x y : t, Compare lt eq x y. Admitted.
-  Definition eq_dec : forall x y : t, {eq x y} + {~ eq x y}. Admitted.
-End Atom_as_OT.
-
-(* Alias - needed? *)
-Definition id := Atom_as_OT.t.
-
-Instance eq_dec_id (x y : id) : Dec (x = y) := 
-  { dec := Atom_as_OT.eq_dec x y }.
-
-(* Generators for Coq Library Maps *)
-Module Map := FMapList.Make(Atom_as_OT).
-
-(* Restrict a valuation to a set of unknowns *)
-Module MapProp := FMapFacts.Properties Map.
-Module MapFacts := FMapFacts.Facts Map.
-*)
-
 (* Types *)
 
 Inductive ty := TBool | TNat. 
@@ -325,6 +293,33 @@ Module AtomMap := ListMap (Atom).
 
 Definition context := @AtomMap.t ty.
 
+Inductive bind_in {A} : @AtomMap.t A -> Atom.t -> A -> Prop :=
+  | Bind : forall x Gamma T, AtomMap.get Gamma x = Some T -> bind_in Gamma x T.
+
+Ltac solve_left  := try solve [left; constructor; eauto].
+Ltac solve_right := 
+  let Contra := fresh "Contra" in
+  try solve [right; intro Contra; inversion Contra; subst; clear Contra; eauto; congruence].
+Ltac solve_sum := solve_left; solve_right.
+
+Instance dec_bind_in {A : Type} Gamma x (T : A) `{D : forall (x y : A), Dec (x = y)}
+  : Dec (bind_in Gamma x T).
+Proof. 
+constructor; unfold ssrbool.decidable.
+destruct (AtomMap.get Gamma x) eqn:Get.       
+- destruct (D a T) eqn:Eq; destruct dec; simpl in *; subst;
+    solve_sum.
+- solve_sum.
+Defined.
+
+Definition gen_typed_atom_from_context (Gamma : context) (T : ty) : G (option Atom.t) :=
+  oneof (returnGen None) (List.map (fun aT' => returnGen (Some (fst aT'))) 
+                                   (List.filter (fun aT' => T = (snd aT')?) Gamma)).
+
+(* Hide for lecture? *)
+Instance genST_bind_in (Gamma : context) (T : ty) 
+  : GenSuchThat Atom.t (fun x => bind_in Gamma x T) :=
+  { arbitraryST := gen_typed_atom_from_context Gamma T }.
 
 (* Too many sigs *)
 Definition gen_context (n : nat) : G context := 
@@ -334,11 +329,6 @@ Definition gen_context (n : nat) : G context :=
                                let (k,v) := kv in 
                                AtomMap.set m k v) 
                             (List.combine domain range) AtomMap.empty)).
-
-
-Definition gen_typed_atom_from_context (Gamma : context) (T : ty) : G (option Atom.t) :=
-  oneof (returnGen None) (List.map (fun aT' => returnGen (Some (fst aT'))) 
-                                   (List.filter (fun aT' => T = (snd aT')?) Gamma)).
 
 (* Expressions *)
 
@@ -354,10 +344,10 @@ Inductive exp : Type :=
   | ELe : exp -> exp -> exp
   | ENot : exp -> exp
   | EAnd : exp -> exp -> exp.
+Derive Show for exp.
 
-(* For automatic, get must be inductive *)
 Inductive has_type : context -> exp -> ty -> Prop := 
-| Ty_Var : forall x T Gamma, AtomMap.get Gamma x = Some T -> has_type Gamma (EVar x) T
+| Ty_Var : forall x T Gamma, bind_in Gamma x T -> has_type Gamma (EVar x) T
 | Ty_Num : forall Gamma n, has_type Gamma (ENum n) TNat
 | Ty_Plus : forall Gamma e1 e2, has_type Gamma e1 TNat -> has_type Gamma e2 TNat ->
                                 has_type Gamma (EPlus e1 e2) TNat
@@ -413,9 +403,9 @@ Fixpoint gen_exp_typed_sized (size : nat) (Gamma : context) (T : ty) : G (option
       end in
   match size with 
   | O => 
-    freq ( (1, gen_typed_evar) ;; base )
+    backtrack ( (1, gen_typed_evar) :: base )
   | S size' => 
-    freq ( (1, gen_typed_evar) ;; (base ++ recs size'))
+    backtrack ( (1, gen_typed_evar) :: (base ++ recs size'))
   end.
 
 Fixpoint shrink_exp_typed (T : ty) (e : exp) : list exp :=
@@ -457,6 +447,63 @@ Fixpoint shrink_exp_typed (T : ty) (e : exp) : list exp :=
 
   end.
 
+
+Ltac solve_inductives Gamma :=
+  repeat (match goal with 
+      [ IH : forall _ _, _ |- _ ] =>
+      let H1 := fresh "H1" in 
+      pose proof (IH TNat Gamma) as H1;
+      let H2 := fresh "H2" in 
+      pose proof (IH TBool Gamma) as H2;
+      clear IH;
+      destruct H1; destruct H2; solve_sum
+    end).
+
+(* Too much automation? *)
+Instance dec_has_type (e : exp) (Gamma : context) (T : ty) : Dec (has_type Gamma e T) :=
+  { dec := _ }.
+Proof with solve_sum.
+  (* I need move: *)
+  generalize dependent Gamma.
+  generalize dependent T.
+  induction e; intros T Gamma; unfold ssrbool.decidable;
+    try solve [destruct T; solve_sum];
+    try solve [destruct T; solve_inductives Gamma].
+  (* bind_in case *)
+  destruct (dec_bind_in Gamma t T); destruct dec; solve_sum.
+Defined.
+
+(* Sanity checks *)
+(* Generation sanity check *)
+Definition gen_typed_has_type :=
+  let num_vars := 4 in
+  let top_level_size := 3 in 
+  forAll (gen_context num_vars) (fun Gamma =>
+  forAll arbitrary (fun T =>                                   
+  forAll (gen_exp_typed_sized top_level_size Gamma T) (fun me =>
+  match me with 
+  | Some e => (has_type Gamma e T)?
+  | _ => false (* this should NEVER fail *)
+  end))).
+
+QuickChick gen_typed_has_type.
+
+(* Shrinking sanity check *)
+Definition shrink_typed_has_type :=
+  let num_vars := 4 in
+  let top_level_size := 3 in 
+  forAll (gen_context num_vars) (fun Gamma =>
+  forAll arbitrary (fun T =>                                   
+  forAll (gen_exp_typed_sized top_level_size Gamma T) (fun me =>
+  match me with 
+  | Some e => 
+    List.forallb (fun e' => (has_type Gamma e' T)?) (shrink_exp_typed T e)
+  | _ => false (* this should NEVER fail *)
+  end))).
+
+QuickChick shrink_typed_has_type.
+
+
 Inductive value := VNat : nat -> value | VBool : bool -> value.
 
 Derive Show for value.
@@ -476,8 +523,8 @@ Definition state := @AtomMap.t value.
 (* For auto - change to inductive *)
 Inductive typed_state : context -> state -> Prop :=
 | Typed_State : forall Gamma st x v T, 
-    AtomMap.get Gamma x = Some T ->
-    AtomMap.get st x = Some v ->
+    bind_in Gamma x T ->
+    bind_in st x v ->
     has_type_value v T ->
     typed_state Gamma st.
 
@@ -541,6 +588,39 @@ Fixpoint eval (st : state) (e : exp) : option value :=
     end
   end.
 
+Definition isNone {A : Type} (m : option A) :=
+  match m with 
+  | None => true
+  | _ => false
+  end.
+
+(* Soundness for expressions *)
+Conjecture expression_soundness : 
+  forall Gamma st e T, typed_state Gamma st -> has_type Gamma e T -> isNone (eval st e) = false.
+
+Definition lift_shrink {A : Type} (shr : A -> list A) (m : option A) : list (option A) :=
+  match m with 
+  | Some x => List.map Some (shr x)
+  | _ => []
+  end.
+
+Definition expression_soundness_exec := 
+  let num_vars := 4 in 
+  let top_level_size := 3 in
+  forAll (gen_context num_vars)  (fun Gamma =>
+  forAll (gen_typed_state Gamma) (fun st =>
+  forAll arbitrary (fun T =>                                    
+  forAllShrink (gen_exp_typed_sized 3 Gamma T) (lift_shrink (shrink_exp_typed T)) (fun me => 
+  match me with 
+  | Some e => negb (isNone (eval st e))
+  | _ => false
+  end)))).   
+
+QuickChick expression_soundness_exec.
+
+(* Start exercise here *)
+
+
 Inductive com : Type :=
   | CSkip  : com
   | CAss   : Atom.t -> exp -> com
@@ -548,7 +628,6 @@ Inductive com : Type :=
   | CIf    : exp    -> com -> com -> com
   | CWhile : exp    -> com -> com.
 
-Derive Show for exp.
 Derive Show for com.
 
 (** As usual, we can use a few [Notation] declarations to make things
@@ -668,12 +747,6 @@ Definition isFail r :=
 Conjecture well_typed_state_never_stuck : 
   forall Gamma st, typed_state Gamma st ->
   forall fuel c, isFail (ceval fuel st c) = false.
-
-Definition lift_shrink {A : Type} (shr : A -> list A) (m : option A) : list (option A) :=
-  match m with 
-  | Some x => List.map Some (shr x)
-  | _ => []
-  end.
 
 Definition well_typed_state_never_stuck_exec := 
   let num_vars := 4 in 
