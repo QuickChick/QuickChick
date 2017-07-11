@@ -21,34 +21,49 @@ open SizeMon
 open SizeSMon
 open SizeCorr
 open ArbitrarySized
+open Error
 
-type derivable = Shrink | Show | ArbitrarySized | Sized | CanonicalSized | SizeMonotonic | SizeSMonotonic | GenSizeCorrect
+type derivable =
+    Shrink
+  | Show
+  | GenSized
+  | Sized
+  | CanonicalSized
+  | SizeMonotonic
+  | SizedMonotonic
+  | SizedCorrect
 
 let mk_instance_name der tn = 
   let prefix = match der with 
     | Shrink -> "shr" 
     | Show   -> "show"
-    | ArbitrarySized -> "genS"
-  in var_to_string (fresh_name (prefix ^ tn))
+    | GenSized -> "genS"
+    | Sized -> "Sized"
+    | CanonicalSized -> "CanonicalSized"
+    | SizeMonotonic -> "SizeMonotonic"
+    | SizedMonotonic -> "SizedMonotonic"
+    | SizedCorrect ->  "SizedCorrect" in
+  let strip_last s = List.hd (List.rev (Str.split (Str.regexp "[.]") s)) in
+  var_to_string (fresh_name (prefix ^ strip_last tn))
 
 let print_der = function
   | Shrink -> "Shrink"
   | Show   -> "Show"
-  | ArbitrarySized -> "ArbitrarySized"
+  | GenSized -> "GenSized"
   | Sized -> "Sized"
   | CanonicalSized -> "CanonicalSized"
   | SizeMonotonic -> "SizeMonotonic"
-  | SizeSMonotonic -> "ArbitrarySizedSizeMotonic"
-  | GenSizeCorrect ->  "GenSizeCorrect"
+  | SizedMonotonic -> "SizedMonotonic"
+  | SizedCorrect ->  "SizedCorrect"
 
 (* Generic derivation function *)
 let debugDerive (c : constr_expr) =
   match coerce_reference_to_dt_rep c with
-  | Some dt -> msgerr (str (dt_rep_to_string dt) ++ fnl ())
-  | None -> failwith "Not supported type"  
+  | Some dt -> msg_debug (str (dt_rep_to_string dt) ++ fnl ())
+  | None -> failwith "Not supported type"
 
 (* Generic derivation function *)
-let derive (cn : derivable) (c : constr_expr) (instance_name : string) (extra_name : string) (extra_name2 : string) =
+let derive (cn : derivable) (c : constr_expr) (instance_name : string) (name1 : string) (name2 : string) =
 
   let (ty_ctr, ty_params, ctrs) =
     match coerce_reference_to_dt_rep c with
@@ -61,46 +76,49 @@ let derive (cn : derivable) (c : constr_expr) (instance_name : string) (extra_na
   let full_dt = gApp ~explicit:true coqTyCtr coqTyParams in
 
   let class_name = match cn with
-    | Show -> "Show"
     | Shrink -> "Shrink"
+    | Show   -> "Show"
+    | GenSized -> "GenSized"
     | Sized -> "Sized"
-    | ArbitrarySized -> "GenSized"
     | CanonicalSized -> "CanonicalSized"
-    | SizeMonotonic -> "QuickChick.GenLow.GenLow.SizeMonotonic"
-    | SizeSMonotonic -> "ArbitrarySizedSizeMotonic"
-    | GenSizeCorrect ->  "GenSizeCorrect"
+    | SizeMonotonic -> "SizeMonotonic"
+    | SizedMonotonic -> "SizedMonotonic"
+    | SizedCorrect ->  "SizedCorrect"
   in
 
   let param_class_names = match cn with
     | Sized -> ["Sized"]
     | Shrink -> ["Shrink"]
     | Show -> ["Show"]
-    | ArbitrarySized -> ["Gen"]
+    | GenSized -> ["Gen"]
     | CanonicalSized -> ["CanonicalSized"]
-    | SizeMonotonic -> ["ArbitraryMonotonic"]
-    | SizeSMonotonic -> ["Arbitrary"]
-    | GenSizeCorrect ->  ["ArbitraryMonotonicCorrect"; "CanonicalSized"]
+    | SizeMonotonic -> ["GenMonotonic"]
+    | SizedMonotonic -> ["Gen"]
+    | SizedCorrect ->  ["GenMonotonicCorrect"; "CanonicalSized"]
   in
 
   let extra_arguments = match cn with
     | Show -> []
     | Shrink -> []
     | Sized -> []
-    | ArbitrarySized -> []
+    | GenSized -> []
     | CanonicalSized -> []
     | SizeMonotonic -> [(gInject "s", gInject "nat")]
-    | SizeSMonotonic -> []
-    | GenSizeCorrect -> []
+    | SizedMonotonic -> []
+    | SizedCorrect -> []
   in
 
   (* Generate typeclass constraints. For each type parameter "A" we need `{_ : <Class Name> A} *)
   let instance_arguments =
-    (List.concat (List.map (fun tp ->
-                            ((gArg ~assumName:tp ~assumImplicit:true ()) ::
-                             (List.map (fun name -> gArg ~assumType:(gApp (gInject name) [tp]) ~assumGeneralized:true ()) param_class_names))
-                           ) coqTyParams)) @
+    let params =
+      (List.concat (List.map (fun tp ->
+                                ((gArg ~assumName:tp ~assumImplicit:true ()) ::
+                                (List.map (fun name -> gArg ~assumType:(gApp (gInject name) [tp]) ~assumGeneralized:true ()) param_class_names))
+                             ) coqTyParams))
+    in
+    let args = (List.map (fun (name, typ) -> gArg ~assumName:name ~assumType:typ ()) extra_arguments) in
     (* Add extra instance arguments *)
-    (List.map (fun (name, typ) -> gArg ~assumName:name ~assumType:typ ()) extra_arguments)
+    params @ args
   in
 
   (* The instance type *)
@@ -108,11 +126,12 @@ let derive (cn : derivable) (c : constr_expr) (instance_name : string) (extra_na
     match cn with
     | SizeMonotonic ->
       let (_, size) = take_last iargs [] in
-      gApp (gInject class_name)
-        [(gApp ~explicit:true (gInject ("arbitrarySize")) [full_dt; (gInject extra_name); (gVar size)])]
-    | GenSizeCorrect ->
-      gApp (gInject class_name)
-        [(gApp ~explicit:true (gInject ("arbitrarySize")) [full_dt; (gInject extra_name)])]
+      gApp ~explicit:true (gInject class_name) [full_dt; gApp (gInject ("arbitrarySized")) [gVar size]]
+    | SizedMonotonic ->
+      gApp ~explicit:true (gInject class_name) [full_dt; gInject ("arbitrarySized")]
+    | SizedCorrect ->
+      gApp ~explicit:true (gInject class_name)
+        [full_dt; hole; gInject ("arbitrarySized")]
     | _ -> gApp (gInject class_name) [full_dt]
   in
   (* Create the instance record. Only need to extend this for extra instances *)
@@ -121,20 +140,23 @@ let derive (cn : derivable) (c : constr_expr) (instance_name : string) (extra_na
     match cn with
     | Show -> show_decl ty_ctr ctrs iargs 
     | Shrink -> shrink_decl ty_ctr ctrs iargs
-    | ArbitrarySized -> arbitrarySized_decl ty_ctr ctrs iargs
+    | GenSized -> arbitrarySized_decl ty_ctr ctrs iargs
     | Sized -> sized_decl ty_ctr ctrs
     | CanonicalSized ->
       let ind_scheme =  gInject ((ty_ctr_to_string ty_ctr) ^ "_ind") in
       sizeEqType ty_ctr ctrs ind_scheme iargs
     | SizeMonotonic ->
       let (iargs', size) = take_last iargs [] in
-      sizeMon ty_ctr ctrs (gVar size) iargs' (gInject extra_name)
-    | SizeSMonotonic ->
+      sizeMon ty_ctr ctrs (gVar size) iargs' (gInject name1)
+    | SizedMonotonic ->
       sizeSMon ty_ctr ctrs iargs
-    | GenSizeCorrect ->
-      genCorr ty_ctr ctrs iargs (gInject extra_name) (gInject extra_name2)
-
+    | SizedCorrect ->
+      genCorr ty_ctr ctrs iargs (gInject name1) (gInject name2)
   in
+
+  (* msg_debug (str "Defined record" ++ fnl ()); *)
+  (* debug_coq_expr (instance_record []); *)
+
   declare_class_instance instance_arguments instance_name instance_type instance_record
 
 

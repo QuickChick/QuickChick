@@ -15,12 +15,13 @@ open Constrexpr
 open Constrexpr_ops
 open Ppconstr
 open Context
+open Error
 
 let debug_environ () =
   let env = Global.env () in
   let preEnv = Environ.pre_env env in
   let minds = preEnv.env_globals.env_inductives in
-  Mindmap_env.iter (fun k _ -> msgerr (str (MutInd.debug_to_string k) ++ fnl())) minds
+  Mindmap_env.iter (fun k _ -> msg_debug (str (MutInd.debug_to_string k) ++ fnl())) minds
 
 let cnt = ref 0 
 
@@ -56,10 +57,10 @@ let id_of_name n =
 type coq_expr = constr_expr (* Opaque *)
 
 let debug_coq_expr (c : coq_expr) : unit =
-  msgerr (pr_constr_expr c)
+  msg_debug (pr_constr_expr c)
 
 let debug_constr (c : constr) : unit = 
-  msgerr (Printer.safe_pr_constr c ++ fnl ())
+  msg_debug (Printer.safe_pr_constr c ++ fnl ())
 
 (* Non-dependent version *)
 type var = Id.t (* Opaque *)
@@ -67,8 +68,16 @@ let var_to_string = Id.to_string
 let gVar (x : var) : coq_expr =
   CRef (Ident (dl x),None)
 
+let id_to_reference id = 
+  let qualid = qualid_of_string (Id.to_string id) in
+  Qualid (Loc.ghost, qualid)
+let id_to_coq_expr id = 
+  mkRefC (id_to_reference id)
+
 (* Maybe this should do checks? *)
-let gInject s = CRef (Qualid (Loc.ghost, qualid_of_string s), None)
+let gInject s = 
+  if s = "" then failwith "Called gInject with empty string";
+  CRef (Qualid (Loc.ghost, qualid_of_string s), None)
 
 type ty_param = Id.t (* Opaque *)
 let ty_param_to_string (x : Id.t) = Id.to_string x
@@ -79,7 +88,7 @@ type ty_ctr   = Id.t (* Opaque *)
 let ty_ctr_to_string (x : ty_ctr) = Id.to_string x
 let gInjectTyCtr s = Id.of_string s
 
-let gTyCtr = mkIdentC
+let gTyCtr = id_to_coq_expr
 
 type arg = local_binder
 let gArg ?assumName:(an=hole) ?assumType:(at=hole) ?assumImplicit:(ai=false) ?assumGeneralized:(ag=false) _ =
@@ -92,7 +101,7 @@ let gArg ?assumName:(an=hole) ?assumType:(at=hole) ?assumImplicit:(ai=false) ?as
                   (if ag then Generalized (Implicit, Implicit, false)                       
                    else if ai then Default Implicit else Default Explicit),
                   at )
-               
+
 let str_lst_to_string sep (ss : string list) = 
   List.fold_left (fun acc s -> acc ^ sep ^ s) "" ss
 
@@ -109,8 +118,18 @@ let rec coq_type_to_string ct =
 
 type constructor = Id.t (* Opaque *)
 let constructor_to_string (x : constructor) = Id.to_string x
-let gCtr = mkIdentC
+let gCtr id = id_to_coq_expr id
 let injectCtr s = Id.of_string s
+
+module Ord_ty_ctr = struct 
+  type t = ty_ctr 
+  let compare = compare 
+end
+
+module Ord_ctr = struct
+  type t = constructor
+  let compare = compare
+end
 
 type ctr_rep = constructor * coq_type 
 let ctr_rep_to_string (ctr, ct) = 
@@ -160,14 +179,22 @@ let dep_dt_to_string (ty_ctr, ty_params, ctrs, dep_type) =
                                     (str_lst_to_string "\n" (List.map dep_ctr_to_string  ctrs))
                                     (dep_type_to_string dep_type)
 
-let rec nthType i dt = 
+let rec nthType1 i dt = 
   match i, dt with
   | 1, DArrow (dt1, _) 
   | 1, DProd  ((_, dt1), _) -> dt1
   | 1, _ -> failwith "Insufficient arrows"
   | _, DArrow (_, dt) 
-  | _, DProd  (_, dt) -> nthType (i-1) dt
+  | _, DProd  (_, dt) -> nthType1 (i-1) dt
   | _, _ -> failwith "Insufficient arrows"
+
+let rec nthType i dt =
+  let msg =
+    "type: " ^ dep_type_to_string dt ^ "\n" ^
+    (Printf.sprintf "n: %n\n" i)
+  in
+  msg_debug (str msg);
+  nthType1 i dt
 
 let rec dep_result_type dt = 
   match dt with 
@@ -205,10 +232,10 @@ let sequenceM f l =
 
 let parse_type_params arity_ctxt =
   let param_names =
-    foldM (fun acc (n, _, _) -> 
-           match n with
-           | Name id   -> Some (id  :: acc)
-           | Anonymous -> msgerr (str "Unnamed type parameter?" ++ fnl ()); None
+    foldM (fun acc decl ->
+           match Rel.Declaration.get_name decl with 
+           | Name id -> Some (id :: acc)
+           | _ -> msg_error (str "Unnamed type parameter?" ++ fnl ()); None
           ) (Some []) arity_ctxt in
   param_names
 (* For /trunk 
@@ -242,16 +269,16 @@ let parse_constructors nparams param_names result_ty oib : ctr_rep list option =
 
     let _, pat_types = List.split (List.rev ctr_pats) in
 
-    msgerr (str (Id.to_string ctr_id) ++ fnl ());
+    msg_debug (str (Id.to_string ctr_id) ++ fnl ());
     let rec aux i ty = 
       if isRel ty then begin 
-        msgerr (int (i + nparams) ++ str " Rel " ++ int (destRel ty) ++ fnl ());
+        msg_debug (int (i + nparams) ++ str " Rel " ++ int (destRel ty) ++ fnl ());
         let db = destRel ty in
         if i + nparams = db then (* Current inductive, no params *)
           Some (TyCtr (oib.mind_typename, []))
         else (* [i + nparams - db]th parameter *)
           try Some (TyParam (List.nth param_names (i + nparams - db - 1)))
-          with _ -> msgerr (str "nth failed: " ++ int (i + nparams - db - 1) ++ fnl ()); None
+          with _ -> msg_error (str "nth failed: " ++ int (i + nparams - db - 1) ++ fnl ()); None
       end 
       else if isApp ty then begin
         let (ctr, tms) = decompose_app ty in 
@@ -261,13 +288,18 @@ let parse_constructors nparams param_names result_ty oib : ctr_rep list option =
         match aux i ctr with
         | Some (TyCtr (c, _)) -> Some (TyCtr (c, List.rev tms'))
 (*        | Some (TyParam p) -> Some (TyCtr (p, tms')) *)
-        | None -> msgerr (str "Aux failed?" ++ fnl ()); None
+        | None -> msg_error (str "Aux failed?" ++ fnl ()); None
       end
       else if isInd ty then begin
         let ((mind,_),_) = destInd ty in
         Some (TyCtr (Label.to_id (MutInd.label mind), []))
       end
-      else (msgerr (str "Case Not Handled" ++ fnl()); None)
+      else if isConst ty then begin
+        let (c,_) = destConst ty in 
+        (* TODO: Rethink this for constants? *)
+        Some (TyCtr (Label.to_id (Constant.label c), []))
+      end
+      else (msg_error (str "Case Not Handled" ++ fnl()); None)
 
     in sequenceM (fun x -> x) (List.mapi aux (List.map (Vars.lift (-1)) pat_types)) >>= fun types ->
        Some (ctr_id, arrowify result_ty types)
@@ -279,7 +311,7 @@ let parse_constructors nparams param_names result_ty oib : ctr_rep list option =
 (* Convert mutual_inductive_body to this representation, if possible *)
 let dt_rep_from_mib mib = 
   if Array.length mib.mind_packets > 1 then begin
-    msgerr (str "Mutual inductive types not supported yet." ++ fnl());
+    msg_error (str "Mutual inductive types not supported yet." ++ fnl());
     None
   end else 
     let oib = mib.mind_packets.(0) in
@@ -317,11 +349,11 @@ let dummy_dep_type = DTyCtr (injectCtr "Prop", [])
            in correct order *)
 let dep_parse_type_params arity_ctxt =
   let param_names =
-    foldM (fun acc (n, _, t) -> 
-           match n with
+    foldM (fun acc decl -> 
+           match Rel.Declaration.get_name decl with
            | Name id -> 
               (* Actual parameters are named of type Type with some universe *)
-              if is_Type t then Some (id :: acc) else Some acc
+              if is_Type (Rel.Declaration.get_type decl) then Some (id :: acc) else Some acc
            | _ -> (* Ignore *) Some acc
           ) (Some []) arity_ctxt in
   param_names
@@ -340,16 +372,16 @@ let rec dep_arrowify terminal names types =
  *)
 let parse_dependent_type i nparams ty oib arg_names = 
   let rec aux i ty =
-    msgerr (str "Calling aux with: " ++ int i ++ str " " ++ Printer.pr_constr ty ++ fnl()); 
+    msg_debug (str "Calling aux with: " ++ int i ++ str " " ++ Printer.pr_constr ty ++ fnl()); 
     if isRel ty then begin 
   (*        msgerr (int (i + nparams) ++ str " Rel " ++ int (destRel ty) ++ fnl ()); *)
       let db = destRel ty in
       if i + nparams = db then (* Current inductive, no params *)
         Some (DTyCtr (oib.mind_typename, []))
       else begin (* [i + nparams - db]th parameter *) 
-        msgerr (str (Printf.sprintf "Non-self-rel: %s" (dep_type_to_string (List.nth arg_names (i + nparams - db - 1)))) ++ fnl ());
+        msg_debug (str (Printf.sprintf "Non-self-rel: %s" (dep_type_to_string (List.nth arg_names (i + nparams - db - 1)))) ++ fnl ());
         try Some (List.nth arg_names (i + nparams - db - 1))
-        with _ -> msgerr (str "nth failed: " ++ int i ++ str " " ++ int nparams ++ str " " ++ int db ++ str " " ++ int (i + nparams - db - 1) ++ fnl ()); None
+        with _ -> msg_error (str "nth failed: " ++ int i ++ str " " ++ int nparams ++ str " " ++ int db ++ str " " ++ int (i + nparams - db - 1) ++ fnl ()); None
         end
     end 
     else if isApp ty then begin
@@ -367,12 +399,12 @@ let parse_dependent_type i nparams ty oib arg_names =
            | [c] -> Some (DNot c)
            | _   -> failwith "Not a valid negation"
          else Some (DApp (DTyVar x, List.rev tms'))
-      | Some wat -> msgerr (str ("WAT: " ^ dep_type_to_string wat) ++ fnl ()); None 
-      | None -> msgerr (str "Aux failed?" ++ fnl ()); None
+      | Some wat -> msg_error (str ("WAT: " ^ dep_type_to_string wat) ++ fnl ()); None 
+      | None -> msg_error (str "Aux failed?" ++ fnl ()); None
     end
     else if isInd ty then begin
       let ((mind,_),_) = destInd ty in
-      msgerr (str (Printf.sprintf "LOOK HERE: %s - %s - %s" (MutInd.to_string mind) (Label.to_string (MutInd.label mind)) 
+      msg_debug (str (Printf.sprintf "LOOK HERE: %s - %s - %s" (MutInd.to_string mind) (Label.to_string (MutInd.label mind)) 
                                                             (Id.to_string (Label.to_id (MutInd.label mind)))) ++ fnl ());
       Some (DTyCtr (Label.to_id (MutInd.label mind), []))
     end
@@ -383,9 +415,19 @@ let parse_dependent_type i nparams ty oib arg_names =
       let env = Global.env () in
       let mib = Environ.lookup_mind mind env in
 
+      let (mp, dn, _) = MutInd.repr3 mind in
+
+      (* HACKY: figure out better way to qualify constructors *)
+      let names = Str.split (Str.regexp "[.]") (MutInd.to_string mind) in
+      let prefix = List.rev (List.tl (List.rev names)) in
+      let qual = String.concat "." prefix in
+      msg_debug (str (Printf.sprintf "CONSTR: %s %s" qual (DirPath.to_string (Lib.cwd ()))) ++ fnl ());
+
       (* Constructor name *)
-      let cname = mib.mind_packets.(midx).mind_consnames.(idx - 1) in
-      Some (DCtr (cname, []))
+      let cname = Id.to_string (mib.mind_packets.(midx).mind_consnames.(idx - 1)) in
+      let cid = Id.of_string (if (qual = "") || (qual = DirPath.to_string (Lib.cwd ()))
+                             then cname else qual ^ "." ^ cname) in
+      Some (DCtr (cid, []))
     end
     else if isProd ty then begin
       let (n, t1, t2) = destProd ty in
@@ -399,7 +441,7 @@ let parse_dependent_type i nparams ty oib arg_names =
       let (x,_) = destConst ty in 
       Some (DTyVar (Label.to_id (Constant.label x)))
     end
-    else (msgerr (str "Dep Case Not Handled" ++ fnl()); 
+    else (msg_error (str "Dep Case Not Handled" ++ fnl()); 
           debug_constr ty;
           None) in
   aux i ty
@@ -408,7 +450,9 @@ let dep_parse_type nparams param_names arity_ctxt oib =
   let len = List.length arity_ctxt in
   (* Only type parameters can be used - no dependencies on the types *)
   let arg_names = List.map (fun x -> DTyParam x) param_names in
-  foldM (fun acc (i, (n, _, t)) -> 
+  foldM (fun acc (i, decl) -> 
+           let n = Rel.Declaration.get_name decl in
+           let t = Rel.Declaration.get_type decl in
            debug_constr t;
            match n with
            | Name id -> (* Check if it is a parameter to add its type / name *)
@@ -456,13 +500,13 @@ let dep_parse_constructors nparams param_names oib : dep_ctr list option =
 
 let dep_dt_from_mib mib = 
   if Array.length mib.mind_packets > 1 then begin
-    msgerr (str "Mutual inductive types not supported yet." ++ fnl());
+    msg_error (str "Mutual inductive types not supported yet." ++ fnl());
     None
   end else 
     let oib = mib.mind_packets.(0) in
     let ty_ctr = oib.mind_typename in 
     dep_parse_type_params oib.mind_arity_ctxt >>= fun ty_params ->
-    List.iter (fun tp -> msgerr (str (ty_param_to_string tp) ++ fnl ())) ty_params;
+    List.iter (fun tp -> msg_debug (str (ty_param_to_string tp) ++ fnl ())) ty_params;
     dep_parse_constructors (List.length ty_params) ty_params oib >>= fun ctr_reps ->
     dep_parse_type (List.length ty_params) ty_params oib.mind_arity_ctxt oib >>= fun result_ty -> 
     Some (ty_ctr, ty_params, ctr_reps, result_ty)
@@ -543,13 +587,13 @@ let gMatch discr ?catchAll:(body=None) (branches : (constructor * string list * 
   CCases (dummy_loc,
           Term.RegularStyle,
           None (* return *), 
-          [(discr, (None, None))], (* single discriminee, no as/in *)
+          [(discr, None, None)], (* single discriminee, no as/in *)
           (List.map (fun (c, cs, bf) -> 
                       let cvs : Id.t list = List.map fresh_name cs in
                       (dummy_loc,
                        [dl [CPatCstr (dummy_loc,
-                                      Ident (dl c), (* constructor  *)
-                                      [],
+                                      id_to_reference c,
+                                      None,
                                       List.map (fun s -> CPatAtom (dummy_loc, Some (Ident (dl s)))) cvs (* Constructor applied to patterns *)
                                      )
                            ]
@@ -561,8 +605,36 @@ let gMatch discr ?catchAll:(body=None) (branches : (constructor * string list * 
                                   | Some c' -> [(dummy_loc, [dl [CPatAtom (dummy_loc, None)]], c')])
          )
 
+let gMatchReturn (discr : coq_expr)
+      ?catchAll:(body=None)
+      (as_id : string)
+      (ret : var -> coq_expr)
+      (branches : (constructor * string list * (var list -> coq_expr)) list) : coq_expr =
+  let as_id' = fresh_name as_id in
+  CCases (dummy_loc,
+          Term.RegularStyle,
+          Some (ret as_id'), (* return *)
+          [(discr, Some (dl (Name as_id')), None)], (* single discriminee, no in *)
+          (List.map (fun (c, cs, bf) -> 
+                      let cvs : Id.t list = List.map fresh_name cs in
+                      (dummy_loc,
+                       [dl [CPatCstr (dummy_loc,
+                                      id_to_reference c,
+                                      None,
+                                      List.map (fun s -> CPatAtom (dummy_loc, Some (Ident (dl s)))) cvs (* Constructor applied to patterns *)
+                                     )
+                           ]
+                       ],
+                       bf cvs 
+                      )
+                   ) branches) @ (match body with 
+                                  | None -> [] 
+                                  | Some c' -> [(dummy_loc, [dl [CPatAtom (dummy_loc, None)]], c')])
+         )
+
+
 let gRecord names_and_bodies =
-  CRecord (dummy_loc, None, List.map (fun (n,b) -> (Ident (dummy_loc, id_of_string n), b)) names_and_bodies)
+  CRecord (dummy_loc, List.map (fun (n,b) -> (id_to_reference (id_of_string n), b)) names_and_bodies)
 
 let gAnnot (p : coq_expr) (tau : coq_expr) =
   CCast (dummy_loc, p, CastConv tau)
@@ -592,17 +664,17 @@ let gType ty_params dep_type =
 (* Lookup the type of an identifier *)
 let get_type (id : Id.t) = 
   let env = Global.env () in
-  msgerr (str ("Trying to global:" ^ Id.to_string id) ++ fnl ());
-  let glob_ref = Nametab.global (Ident (dummy_loc, id)) in
+  msg_debug (str ("Trying to global:" ^ Id.to_string id) ++ fnl ());
+  let glob_ref = Nametab.global (id_to_reference id) in
   match glob_ref with 
-  | VarRef _ -> msgerr (str "Var" ++ fnl ())
-  | ConstRef _ -> msgerr (str "Constant" ++ fnl ())
-  | IndRef _ -> msgerr (str "Inductive" ++ fnl ())
-  | ConstructRef _ -> msgerr (str "Constructor" ++ fnl ())
+  | VarRef _ -> msg_debug  (str "Var" ++ fnl ())
+  | ConstRef _ -> msg_debug (str "Constant" ++ fnl ())
+  | IndRef _ -> msg_debug (str "Inductive" ++ fnl ())
+  | ConstructRef _ -> msg_debug (str "Constructor" ++ fnl ())
 
 let is_inductive c = 
   let env = Global.env () in
-  let glob_ref = Nametab.global (Ident (dummy_loc, c)) in
+  let glob_ref = Nametab.global (id_to_reference c) in
   match glob_ref with
   | IndRef _ -> true
   | _        -> false
@@ -626,16 +698,17 @@ let construct_match c ?catch_all:(mdef=None) alts =
     | MatchU u' -> begin 
         CPatAtom (dummy_loc, Some (Ident (dummy_loc, u')))
       end
-    | MatchCtr (c, ms) -> 
+    | MatchCtr (c, ms) -> begin
        if is_inductive c then CPatAtom (dummy_loc, None)
        else CPatCstr (dummy_loc, 
-                   Ident (dummy_loc, c),
-                   List.map (fun m -> aux m) ms,
+                   id_to_reference c,
+                   Some (List.map (fun m -> aux m) ms),
                    []) 
+                        end 
   in CCases (dummy_loc,
              Term.RegularStyle,
              None (* return *), 
-              [ (c, (None, None))], (* single discriminee, no as/in *)
+              [ (c, None, None)], (* single discriminee, no as/in *)
               List.map (fun (m, body) -> (dummy_loc, [dummy_loc, [aux m]], body)) alts 
               @ (match mdef with 
                  | Some body -> [(dummy_loc, [dummy_loc, [CPatAtom (dummy_loc, None)]], body)]
@@ -643,15 +716,45 @@ let construct_match c ?catch_all:(mdef=None) alts =
                 )
             )
 
+let construct_match_with_return c ?catch_all:(mdef=None) (as_id : string) (ret : var -> coq_expr) (alts : (matcher_pat * coq_expr) list) =
+  let as_id' = fresh_name as_id in
+  let rec aux = function
+    | MatchU u' -> begin
+        CPatAtom (dummy_loc, Some (Ident (dummy_loc, u')))
+      end
+    | MatchCtr (c, ms) -> begin
+       if is_inductive c then begin 
+         CPatAtom (dummy_loc, None)
+       end
+       else begin 
+         CPatCstr (dummy_loc, 
+                   id_to_reference c,
+                   Some (List.map (fun m -> aux m) ms),
+                   []) 
+         end
+       end in
+  let main_opts = 
+        List.map (fun (m, body) -> (dummy_loc, [dummy_loc, [aux m]], body)) alts in
+  let default = 
+    match mdef with 
+    | Some body -> [(dummy_loc, [dummy_loc, [CPatAtom (dummy_loc, None)]], body)]
+    | _ -> [] in
+  CCases (dummy_loc,
+             Term.RegularStyle,
+             Some (ret as_id') (* return *), 
+             [ (c, Some (dl (Name as_id')), None)], (* single discriminee, no as/in *)
+             main_opts @ default
+         )
+
 (* Generic List Manipulations *)
-let list_nil = gInject "nil"
-let lst_append c1 c2 = gApp (gInject "app") [c1; c2]
+let list_nil = gInject "Coq.Lists.List.nil"
+let lst_append c1 c2 = gApp (gInject "Coq.Lists.List.app") [c1; c2]
 let rec lst_appends = function
   | [] -> list_nil
   | c::cs -> lst_append c (lst_appends cs)
-let gCons x xs = gApp (gInject "cons") [x; xs]                        
+let gCons x xs = gApp (gInject "Coq.Lists.List.cons") [x; xs]                        
 let rec gList = function 
-  | [] -> gInject "nil"
+  | [] -> gInject "Coq.Lists.List.nil"
   | x::xs -> gCons x (gList xs)
 
 (* Generic String Manipulations *)
@@ -663,9 +766,10 @@ let rec str_appends cs =
   | []  -> emptyString
   | [c] -> c
   | c1::cs' -> str_append c1 (str_appends cs')
+let smart_paren c = gApp (gInject "QuickChick.Show.smart_paren") [c]
 
 (* Pair *)
-let gPair (c1, c2) = gApp (gInject "pair") [c1;c2]
+let gPair (c1, c2) = gApp (gInject "Coq.Init.Datatypes.pair") [c1;c2]
 
 (* Int *)
 let parse_integer nc = 
@@ -674,59 +778,35 @@ let parse_integer nc =
   | _ -> debug_coq_expr nc; failwith "Expected an integer argument "
 
 let gInt n = CPrim (dummy_loc, Numeral (Bigint.of_int n))
-let gSucc x = gApp (gInject "S") [x]
+let gSucc x = gApp (gInject "Coq.Init.Datatypes.S") [x]
 let rec maximum = function
   | [] -> failwith "maximum called with empty list"
   | [c] -> c
-  | (c::cs) -> gApp (gInject "max") [c; maximum cs]
-let gle x y = gApp (gInject "leq") [x; y]
-let glt x y = gle (gApp (gInject "S") [x]) y
+  | (c::cs) -> gApp (gInject "Coq.Init.Peano.max") [c; maximum cs]
+
+let gle x y = gApp (gInject "mathcomp.ssreflect.ssrnat.leq") [x; y]
+let glt x y = gle (gApp (gInject "Coq.Init.Datatypes.S") [x]) y
 
 
-let gEq x y = gApp (gInject "eq") [x; y]
+let gEq x y = gApp (gInject "Coq.Init.Logic.eq") [x; y]
             
 (* option type in Coq *)
-let gNone = gInject "None"
-let gSome c = gApp (gInject "Some") [c]
+let gNone typ = gApp ~explicit:true (gInject "Coq.Init.Datatypes.None") [typ]
+let gSome typ c = gApp ~explicit:true (gInject "Coq.Init.Datatypes.Some") [typ; c]
               
-let gOption c = gApp (gInject "option") [c]
+let gOption c = gApp (gInject "Coq.Init.Datatypes.option") [c]
 
 (* Boolean *)
 
-let gTrue  = gInject "true"
-let gFalse = gInject "false"
+let gTrue  = gInject "Coq.Init.Datatypes.true"
+let gFalse = gInject "Coq.Init.Datatypes.false"
 
-let gNot c = gApp (gInject "negb") [c]
+let gNot c = gApp (gInject "Coq.Init.Datatypes.negb") [c]
 
 let decToBool c = 
-  gMatch c [ (injectCtr "left" , ["eq" ], fun _ -> gTrue )
-           ; (injectCtr "right", ["neq"], fun _ -> gFalse)
+  gMatch c [ (injectCtr "Coq.Init.Specif.left" , ["eq" ], fun _ -> gTrue )
+           ; (injectCtr "Coq.Init.Specif.right", ["neq"], fun _ -> gFalse)
            ]
-
-(* Gen combinators *)
-let gGen c = gApp (gInject "G") [c]
-
-let returnGen c = gApp (gInject "returnGen") [c]
-let bindGen cg xn cf = 
-  gApp (gInject "bindGen") [cg; gFun [xn] (fun [x] -> cf x)]
-
-let bindGenOpt cg xn cf = 
-  gApp (gInject "bindGenOpt") [cg; gFun [xn] (fun [x] -> cf x)]
-
-let oneof l =
-  match l with
-  | [] -> failwith "oneof used with empty list"
-  | [c] -> c
-  | c::cs -> gApp (gInject "oneof") [c; gList l]
-       
-let frequency l =
-  match l with
-  | [] -> failwith "frequency used with empty list"
-  | [(_,c)] -> c
-  | (_,c)::cs -> gApp (gInject "frequency") [c; gList (List.map gPair l)]
-
-let backtracking l = gApp (gInject "backtrack") [gList (List.map gPair l)]
-let uniform_backtracking l = backtracking (List.combine (List.map (fun _ -> gInt 1) l) l)
 
 (* Recursion combinators / fold *)
 (* fold_ty : ( a -> coq_type -> a ) -> ( ty_ctr * coq_type list -> a ) -> ( ty_param -> a ) -> coq_type -> a *)
@@ -785,15 +865,22 @@ let create_names_for_anon a =
      end
   | _ -> failwith "Non RawAssum in create_names"
     
-let declare_class_instance instance_arguments instance_name instance_type instance_record =
+let declare_class_instance ?(global=true) ?(priority=42) instance_arguments instance_name instance_type instance_record =
+  msg_debug (str "Declaring class instance..." ++ fnl ());
+  msg_debug (str (Printf.sprintf "Total arguments: %d" (List.length instance_arguments)) ++ fnl ());
   let (vars,iargs) = List.split (List.map create_names_for_anon instance_arguments) in
-  ignore (Classes.new_instance true 
+  let instance_type_vars = instance_type vars in
+  msg_debug (str "Calculated instance_type_vars" ++ fnl ());
+  let instance_record_vars = instance_record vars in
+  msg_debug (str "Calculated instance_record_vars" ++ fnl ());
+  let cid = Classes.new_instance ~global:global false 
                                iargs
                        (((dummy_loc, (Name (id_of_string instance_name))), None)
                        , Decl_kinds.Explicit, instance_type vars) 
                        (Some (true, instance_record vars)) (* TODO: true or false? *)
-                       None
-         )
+                       { hint_priority = Some priority; hint_pattern = None }
+  in
+  msg_debug (str (Id.to_string cid) ++ fnl ())
 
 (* List Utils. Probably should move to a util file instead *)
 let list_last l = List.nth l (List.length l - 1)

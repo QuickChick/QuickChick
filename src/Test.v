@@ -1,18 +1,16 @@
+Set Warnings "-extraction-opaque-accessed,-extraction".
+Set Warnings "-notation-overridden,-parsing".
+
 Require Import Omega.
 Require Import mathcomp.ssreflect.ssreflect.
 From mathcomp Require Import ssrnat ssrbool eqtype div.
 
-Require Import Show RoseTrees.
-Require Import Random.
-Require Import GenLow GenHigh SemChecker.
-Require Import Checker.
-Require Import State.
-Require Import Classes.
+From QuickChick Require Import RoseTrees RandomQC GenLow GenHigh SemChecker.
+From QuickChick Require Import Show Checker State Classes.
 
 Require Import Coq.Strings.String.
 Require Import Coq.Strings.Ascii.
 Require Import Coq.Strings.String.
-Require Import Coq.Numbers.Natural.Peano.NPeano.
 Require Import List.
 
 Require Import Recdef.
@@ -26,6 +24,8 @@ Definition gte n m := Nat.leb m n.
 Set Implicit Arguments.
 Unset Strict Implicit.
 Unset Printing Implicit Defensive.
+
+Set Bullet Behavior "Strict Subproofs".
 
 Record Args := MkArgs {
   replay     : option (RandomSeed * nat);
@@ -73,7 +73,7 @@ Definition computeSize' (a : Args) (n : nat) (d : nat) : nat :=
     minn ((n %% (maxSize a)) * maxSize a %/
       ((maxSuccess a) %% (maxSize a) + d %/ 10)) (maxSize a).
 
-Definition at0 (f : nat -> nat -> nat) (s : nat) (n d : nat) :=
+ Definition at0 (f : nat -> nat -> nat) (s : nat) (n d : nat) :=
   if andb (beq_nat n 0) (beq_nat d 0) then s
   else f n d.
 
@@ -121,28 +121,26 @@ Definition summary (st : State) : list (string * nat) :=
 Definition doneTesting (st : State) (f : nat -> RandomSeed -> QProp) : Result :=
  if expectedFailure st then
     Success (numSuccessTests st + 1) (numDiscardedTests st) (summary st)
-            ("+++ OK, passed " ++ (show (numSuccessTests st)) ++ " tests"
-                               ++ newline)
+            ("+++ Passed " ++ (show (numSuccessTests st)) ++ " tests")
   else
     NoExpectedFailure (numSuccessTests st) (summary st)
                       ("*** Failed! Passed " ++ (show (numSuccessTests st))
-                                             ++ " tests (expected Failure)"
-                                             ++ newline).
+                                             ++ " tests (expected Failure)").
   (* TODO: success st - labels *)
 
 Definition giveUp (st : State) (_ : nat -> RandomSeed -> QProp) : Result :=
   GaveUp (numSuccessTests st) (summary st)
          ("*** Gave up! Passed only " ++ (show (numSuccessTests st)) ++ " tests"
-          ++  newline ++ "Discarded: " ++ (show (numDiscardedTests st)) ++ newline).
+          ++  newline ++ "Discarded: " ++ (show (numDiscardedTests st))).
 
 Definition callbackPostFinalFailure (st : State) (res : Checker.Result)
 : nat :=
 match res with
-  | MkResult o e r i s c =>
+  | MkResult o e r i s c t =>
   fold_left (fun acc callback =>
                match callback with
                  | PostFinalFailure _ call =>
-                   (call st (MkSmallResult o e r i s)) + acc
+                   (call st (MkSmallResult o e r i s t)) + acc
                  | _ => acc
                end) c 0
 end.
@@ -194,6 +192,9 @@ Proof.
   eapply Plus.plus_lt_compat_l. omega.
 Qed.
 
+Hint Resolve auxRose.
+Hint Resolve auxRose2.
+
 Function localMin (st : State) (r : Rose Checker.Result)
           {measure roseSize r}
 : (nat * Checker.Result) :=
@@ -206,7 +207,13 @@ Function localMin (st : State) (r : Rose Checker.Result)
         | cons (MkRose res' ts') t =>
           match ok res' with
             | Some x =>
-              if (negb x) then
+              let consistent_tags := 
+                match result_tag res, result_tag res' with 
+                | Some t1, Some t2 => if string_dec t1 t2 then true else false
+                | None, None => true
+                | _, _ => false
+                end in
+              if andb (negb x) consistent_tags then
                   localMin (updSuccessShrinks st (fun x => x + 1))
                            (MkRose res' ts')
               else
@@ -216,9 +223,18 @@ Function localMin (st : State) (r : Rose Checker.Result)
          end
       end
   end.
-- intros. eapply auxRose; eassumption.
-- intros. eapply auxRose2; eassumption.
-- intros. eapply auxRose2; eassumption.
+(* Is there a way to apply a tactic to everything after a "Function"? *)
+- intros; eapply auxRose; eassumption.
+- intros; eapply auxRose2; eassumption.
+- intros; eapply auxRose; eassumption.
+- intros; eapply auxRose2; eassumption.
+- intros; eapply auxRose; eassumption.
+- intros; eapply auxRose2; eassumption.
+- intros; eapply auxRose; eassumption.
+- intros; eapply auxRose2; eassumption.
+- intros; eapply auxRose; eassumption.
+- intros; eapply auxRose2; eassumption.
+- intros; eapply auxRose2; eassumption.
 Qed. (* Warning: Cannot define graph(s) for localMin *)
 
 Fixpoint runATest (st : State) (f : nat -> RandomSeed -> QProp) (maxSteps : nat) :=
@@ -238,28 +254,46 @@ Fixpoint runATest (st : State) (f : nat -> RandomSeed -> QProp) (maxSteps : nat)
       | MkProp (MkRose res ts) =>
         (* TODO: CallbackPostTest *)
         match res with
-        | MkResult (Some x) e reas _ s _ =>
+        | MkResult (Some x) e reas _ s _ t =>
           if x then (* Success *)
+            let ls' := 
+                match s with 
+                | nil => ls 
+                | _ => 
+                  let s_to_add := 
+                      ShowFunctions.string_concat 
+                        (ShowFunctions.intersperse " , "%string s) in
+                  match Map.find s_to_add ls with 
+                    | None   => Map.add s_to_add 1 ls
+                    | Some k => Map.add s_to_add (k+1) ls
+                  end 
+                end in
+(*                  
             let ls' := fold_left (fun stamps stamp =>
                                     let oldBind := Map.find stamp stamps in
                                     match oldBind with
                                     | None   => Map.add stamp 1 stamps
                                     | Some k => Map.add stamp (k+1) stamps
                                     end
-                                 ) s ls in
+                                 ) s ls in*)
             test (MkState mst mdt ms cs (nst + 1) ndt ls' e rnd2 nss nts)
           else (* Failure *)
-            let pre : string := (if expect res then "*** Failed! "
-                                 else "+++ OK, failed as expected. ")%string in
+            let tag_text := 
+                match t with 
+                | Some s => "Tag: " ++ s ++ nl
+                | _ => "" 
+                end in 
+            let pre : string := (if expect res then "*** Failed "
+                                 else "+++ Failed (as expected) ")%string in
             let (numShrinks, res') := localMin st (MkRose res ts) in
-            let suf := ("After " ++ (show (S nst)) ++ " tests and "
+            let suf := ("after " ++ (show (S nst)) ++ " tests and "
                                  ++ (show numShrinks) ++ " shrinks")%string in
             (* TODO: Output *)
             if (negb (expect res)) then
-              Success (nst + 1) ndt (summary st) (pre ++ suf)
+              Success (nst + 1) ndt (summary st) (tag_text ++ pre ++ suf)
             else
-              Failure (nst + 1) numShrinks ndt r size (pre ++ suf) (summary st) reas
-        | MkResult None e reas _ s _ =>
+              Failure (nst + 1) numShrinks ndt r size (tag_text ++ pre ++ suf) (summary st) reas
+        | MkResult None e reas _ s _ t =>
           (* Ignore labels of discarded tests? *)
           test (MkState mst mdt ms cs nst ndt.+1 ls e rnd2 nss nts)
         end

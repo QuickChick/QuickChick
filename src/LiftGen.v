@@ -1,5 +1,5 @@
 
-Require Import Random GenLow.
+Require Import RandomQC GenLow.
 
 Import GenLow.
 

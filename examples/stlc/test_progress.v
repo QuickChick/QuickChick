@@ -46,4 +46,4 @@ Fixpoint step_bug (t : term) : option term :=
 Definition has_progress_bug (t : term) := is_value t || (is_some (step_bug t)).
 
 QuickCheck (forAll gen_type (fun tau => 
-                               forAll (gen_term tau) has_progress_bug)).
+            forAll (gen_term tau) has_progress_bug)).

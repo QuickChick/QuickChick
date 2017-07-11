@@ -8,6 +8,7 @@ Require Import Show.
 Require Import State.
 Require Import GenLow GenHigh.
 Require Import Classes.
+Require Import DependentClasses.
 
 Import GenLow GenHigh.
 
@@ -21,7 +22,7 @@ Inductive CallbackKind :=
 
 Inductive SmallResult :=
   MkSmallResult : option bool -> bool -> string -> bool ->
-                  list string -> SmallResult.
+                  list string -> option string -> SmallResult.
 
 Inductive Callback : Type :=
 | PostTest :
@@ -36,37 +37,53 @@ Record Result :=
       reason      : string;      (* Error message *)
       interrupted : bool;        (* ? *)
       stamp       : list string; (* Collected values for this test case *)
-      callbacks   : list Callback
+      callbacks   : list Callback; 
+      result_tag  : option string (* Tag - for better shrinking *)
     }.
 
+Definition debug_stamps s {A : Type} (r : Result) (x : A) :=
+  trace (s ++ (ShowFunctions.string_concat (
+             (ShowFunctions.intersperse " @ "%string (stamp r)))) ++ nl) x.
+
 (* I WANT RECORD UPDATES :'( *)
-Definition succeeded := MkResult (Some true ) true "" false nil nil.
-Definition failed    := MkResult (Some false) true "" false nil nil.
-Definition rejected  := MkResult (   None   ) true "" false nil nil.
+Definition succeeded := MkResult (Some true ) true "" false nil nil None.
+Definition failed    := MkResult (Some false) true "" false nil nil None.
+Definition rejected  := MkResult (   None   ) true "" false nil nil None.
+
+Definition updExpect (res : Result) (e' : bool) : Result :=
+  match res with
+    | MkResult o e r i s c t => MkResult o e' r i s c t
+  end.
 
 Definition updReason (r : Result) (s' : string) : Result :=
   match r with
-    | MkResult o e _ i s c => MkResult o e s' i s c
+    | MkResult o e _ i s c t => MkResult o e s' i s c t
   end.
 
 Definition updOk (r : Result) o' : Result :=
   match r with
-    | MkResult _ e r i s c => MkResult o' e r i s c
+    | MkResult _ e r i s c t => MkResult o' e r i s c t
   end.
 
 Definition addCallback (res : Result) (c : Callback) : Result :=
   match res with
-    | MkResult o e r i s cs => MkResult o e r i s (cons c cs)
+    | MkResult o e r i s cs t => MkResult o e r i s (cons c cs) t
   end.
 
 Definition addCallbacks (res : Result) (cs : list Callback) : Result :=
   match res with
-    | MkResult o e r i s cs' => MkResult o e r i s (cs ++ cs')
+    | MkResult o e r i s cs' t => MkResult o e r i s (cs ++ cs') t
   end.
 
 Definition addStamps res ss :=
   match res with
-    | MkResult o e r i s cs => MkResult o e r i (ss ++ s) cs
+    | MkResult o e r i s cs t => MkResult o e r i (ss ++ s) cs t
+  end.
+
+(* LEO: Should we check if there already exists a tag? *)
+Definition setTag (r : Result) (t' : string) : Result :=
+  match r with 
+    | MkResult o e r i s cs _ => MkResult o e r i s cs (Some t')
   end.
 
 (* CH: The name of this should change; we no longer call checkers props *)
@@ -166,7 +183,8 @@ Definition callback {prop : Type} `{Checkable prop}
 
 Definition printTestCase {prop : Type} `{Checkable prop}
            (s : string) (p : prop) : Checker :=
-  callback (PostFinalFailure Counterexample (fun _st _res => trace (s ++ nl) 0)) p.
+  (* The following newline was causing an unwanted extra new line *)
+  callback (PostFinalFailure Counterexample (fun _st _res => trace (s (* ++ nl*)) 0)) p.
 
 Definition whenFail {prop : Type} `{Checkable prop}
            (str : string) : prop -> Checker :=
@@ -174,18 +192,15 @@ Definition whenFail {prop : Type} `{Checkable prop}
 
 
 Definition expectFailure {prop: Type} `{Checkable prop} (p: prop) :=
-  mapTotalResult (fun res =>
-                    MkResult (ok res) false (reason res)
-                             (interrupted res) (stamp res) (callbacks res))
-                 p.
+  mapTotalResult (fun res => updExpect res false) p.
 
 (* NOTE: Ignoring the nat argument. Use label or collect ONLY *)
 Definition cover {prop : Type} {_ : Checkable prop}
            (b : bool) (n : nat) (s : string) : prop -> Checker :=
   if b then
     mapTotalResult (fun res =>
-                      let '(MkResult o e r i st c) := res in
-                      MkResult o e r i (s :: st) c)
+                      let '(MkResult o e r i st c t) := res in
+                      MkResult o e r i (s :: st) c t)
   else checker.
 
 Definition classify {prop : Type} {_ : Checkable prop}
@@ -200,15 +215,21 @@ Definition collect {A prop : Type} `{_ : Show A} {_ : Checkable prop}
            (x : A) : prop -> Checker :=
   label (show x).
 
+Definition tag {prop : Type} {_ : Checkable prop} (t : string) : prop -> Checker :=
+  mapTotalResult (fun res => setTag res t).
 
 Definition implication {prop : Type} `{Checkable prop} (b : bool) (p : prop) : Checker :=
   if b then checker p else (returnGen (MkProp (returnRose rejected))).
-
 
 Definition forAll {A prop : Type} {_ : Checkable prop} `{Show A}
            (gen : G A)  (pf : A -> prop) : Checker :=
   bindGen gen (fun x =>
                  printTestCase (show x ++ newline) (pf x)).
+
+Definition forAllProof {A prop : Type} {C : Checkable prop} `{S : Show A}
+           (gen : G A)  (pf : forall (x : A), semGen gen x -> prop) : Checker :=
+  bindGen' gen (fun x H => printTestCase (show x ++ newline) (pf x H)).
+Arguments forAllProof {A} {prop} {C} {S} _ _.
 
 Definition forAllShrink {A prop : Type} {_ : Checkable prop} `{Show A}
            (gen : G A) (shrinker : A -> list A) (pf : A -> prop) : Checker :=
@@ -229,6 +250,11 @@ Global Instance testFun {A prop : Type} `{Show A}
     checker f := forAllShrink arbitrary shrink f
   }.
 
+Global Instance testProd {A : Type} {prop : A -> Type} `{Show A} `{Arbitrary A} 
+       `{forall x : A, Checkable (prop x)} :
+  Checkable (forall (x : A), prop x) := 
+  {| checker f := forAllShrink arbitrary shrink (fun x => checker (f x)) |}.
+
 Global Instance testPolyFun {prop : Type -> Type} {_ : Checkable (prop nat)} : Checkable (forall T, prop T) :=
   {
     checker f := printTestCase "" (f nat)
@@ -240,26 +266,29 @@ Global Instance testPolyFunSet {prop : Set -> Type} {_ : Checkable (prop nat)} :
   }.
 
 (* LEO: TODO: Prove conjoin checker *)
-Definition addCallbacks' result r := 
+Definition addCallbacks' r result := 
   addCallbacks result (callbacks r).
-Definition addStamps' result r := 
-  addStamps result (stamp r).
+Definition addStamps' r result := 
+(*   debug_stamps "Before_adding: " result (
+  debug_stamps "Adding_stamps: " r ( *)
+  let res := addStamps result (stamp r) in
+(*   debug_stamps "After_adding: " res  *)
+  res.
 
 Fixpoint conjAux (f : Result -> Result) 
          l := 
   match l with 
-    | nil => MkRose (f succeeded) (lazy nil)
+    | nil => (MkRose (f succeeded) (lazy nil))
     | cons res rs => 
       let '(MkRose r _) := res in
       match ok r with 
         | Some true =>
-           (conjAux (fun r' => addStamps' r 
-                             (addCallbacks' r (f r'))
+           (conjAux (fun r' => addStamps' r (addCallbacks' r (f r'))
                     ) rs)
         | Some false => res
         | None =>
-          let res' := conjAux (fun r' => addCallbacks' r (f r')) rs in
-          let '(MkRose r' _) := res' in
+          let res' := conjAux (fun r' => (addCallbacks' r (f r'))) rs in
+          let '(MkRose r' rs) := res' in
           match ok r' with 
             | Some true => MkRose (updOk r' None) (lazy nil)
             | Some false => res'
@@ -269,13 +298,85 @@ Fixpoint conjAux (f : Result -> Result)
   end.
 
 Definition mapGen {A B} (f : A -> G B) (l : list A) : G (list B) :=
-  foldGen (fun acc a => 
+  bindGen (foldGen (fun acc a => 
              bindGen (f a) (fun b => returnGen (cons b acc)))
-          l nil.
+          l nil) (fun l => returnGen (rev l)).
 
-Fixpoint conjoin {prop : Type} `{_ : Checkable prop} (l : list Checker) : Checker :=
+Fixpoint conjoin (l : list Checker) : Checker :=
+(*   trace ("Beginnning conjoin" ++ nl) ( *)
   bindGen (mapGen (liftGen unProp) l) (fun rs =>
-          (returnGen (MkProp (conjAux (fun x => x) rs)))).
+          (returnGen (MkProp (let res := conjAux (fun x => x) rs in
+                              let '(MkRose r _) := res in 
+                              (* debug_stamps "Conjoin result: " r *) res
+                             )))).
 
-Notation "x ==> y" := (implication x y) (at level 55, right associativity)
-                      : Checker_scope.
+Definition fmapRose' A B (r : Rose A) (f : A -> B) := fmapRose f r.
+
+Definition expectFailureError := 
+  updReason failed "Expect failure cannot occur inside a disjunction".
+
+Definition disjAux (p q : Rose Result) : Rose Result :=
+  joinRose (fmapRose' p (fun result1 =>
+  if expect result1 then
+    match ok result1 with 
+    | Some true => returnRose result1
+    | Some false => 
+      joinRose (fmapRose' q (fun result2 =>
+      if expect result2 then
+        match ok result2 with 
+        | Some true => returnRose result2
+        | Some false => 
+          returnRose (MkResult (ok result2)
+                               (expect result2)
+                               (if string_dec (reason result2) EmptyString 
+                                then reason result1
+                                else reason result2)
+                               (orb (interrupted result1) (interrupted result2))
+                               (stamp result1 ++ stamp result2)
+                               (callbacks result1 ++ 
+                                    cons (PostFinalFailure Counterexample
+                                                      (fun _ _ => trace newline 0)) nil ++
+                                    callbacks result2 )
+                               (result_tag result2))
+        | None => returnRose result2 (* Leo: What to do here? *)
+        end
+      else returnRose expectFailureError))
+    | None => 
+      joinRose (fmapRose' p (fun result2 => 
+      if expect result2 then 
+        match ok result2 with
+        | Some true => returnRose result2
+        | _ => returnRose result1 (* Not sure here as well *)
+        end
+      else returnRose expectFailureError))
+    end
+  else returnRose expectFailureError)).
+
+Definition disjoin (l : list Checker) : Checker := 
+  bindGen (mapGen (liftGen unProp) l) (fun rs =>
+          (returnGen (MkProp (
+                          fold_right disjAux (returnRose failed) rs
+                        )))).
+
+Module QcNotation.
+  Export QcDefaultNotation.
+
+  Notation "x ==> y" := (implication x y) (at level 55, right associativity)
+                           : Checker_scope.
+
+  (* TODO: Figure out pretty printing too *)
+  Notation "'FORALL' x : T , c" :=
+    (forAllShrink (@arbitrary T _) shrink (fun x => c))
+    (at level 200, x ident, T at level 200, c at level 200, right associativity
+     (* , format "'[' 'exists' '/ ' x .. y , '/ ' p ']'" *) )
+    : type_scope.
+
+  Notation "'FORALL' x | P , c" :=
+    (forAllShrink (genST (fun x => P)) shrink (fun y => match y with
+                                                    | Some x => c
+                                                    | _ => checker tt
+                                                    end))
+      (at level 200, x ident, P at level 200, c at level 200, right associativity)
+     : type_scope.
+End QcNotation.
+

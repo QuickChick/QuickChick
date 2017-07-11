@@ -1,0 +1,42 @@
+dist: trusty
+sudo: required
+language: ocaml
+cache:
+  apt: true
+  directories:
+  - $HOME/.opam
+addons:
+  apt:
+    sources:
+    - avsm
+    packages:
+    - opam
+    - aspcud
+env:
+  global:
+  - NJOBS=2
+  - COMPILER="system"
+os:
+    - linux
+    - osx
+
+before_install:
+    case $TRAVIS_OS_NAME in
+    osx)
+    brew install opam ;;
+    esac
+
+install:
+- "[ -e .opam ] || opam init -j ${NJOBS} --compiler=${COMPILER} -n -y"
+- eval $(opam config env)
+- opam config var root
+- opam repo add coq-released https://coq.inria.fr/opam/released || true
+- travis_wait opam install -j ${NJOBS} -y coq=8.6 coq-mathcomp-ssreflect ${EXTRA_OPAM}
+- opam list
+
+script:
+- set -e
+- echo 'Building QuickChick...' && echo -en 'travis_fold:start:QuickChick.build\\r'
+- travis_retry make install -j
+- cd examples/multifile-mutation && make && quickChick -top Top
+- echo -en 'travis_fold:end:QuickChick.build\\r'

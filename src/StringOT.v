@@ -1,6 +1,6 @@
 (* Ordering code by Antal :) *)
 
-(* CH: We already have a similar class in Random.v, why not use that
+(* CH: We already have a similar class in RandomQC.v, why not use that
    one instead (maybe after moving it to separate file)? *)
 Require Import OrderedType.
 

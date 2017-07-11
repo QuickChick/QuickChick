@@ -2,7 +2,7 @@ Require Import PArith List ChoiceFacts Omega.
 Require Import mathcomp.ssreflect.ssreflect.
 From mathcomp Require Import ssrfun ssrbool.
 
-Require Import Classes Random GenLow Sets.
+Require Import Classes RandomQC GenLow Sets.
 Import GenLow.
 
 Import ListNotations.
@@ -25,6 +25,19 @@ Instance coArbPos : CoArbitrary positive :=
     coarbReverse x := Some x
   |}.
 Proof. auto. Qed.
+
+Lemma nat_lemma :   forall a : nat,
+  Some (Init.Nat.pred (Pos.to_nat (Pos.of_nat (S a)))) = Some a.
+Admitted.
+
+Instance coqArbNat : CoArbitrary nat := 
+  {|
+    coarbitrary x := Pos.of_nat (S x);
+    coarbReverse p := Some (Coq.Init.Peano.pred (Pos.to_nat p))
+  |}.
+Proof.
+  apply nat_lemma.
+Qed.
 
 Local Open Scope positive.
 Fixpoint posToPathAux (p : positive) : SplitPath := 
@@ -531,3 +544,4 @@ apply (@promoteVariant A B a (fun a => posToPath (coarbitrary a)) arbitrary
 Qed.
 
 End arbFun_completeness.
+

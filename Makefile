@@ -1,4 +1,4 @@
-
+V=@
 .PHONY: plugin install clean
 
 # Here is a hack to make $(eval $(shell work
@@ -11,14 +11,39 @@ endef
 includecmdwithout@ = $(eval $(subst @,$(donewline),$(shell { $(1) | tr -d '\r' | tr '\n' '@'; })))
 $(call includecmdwithout@,$(COQBIN)coqtop -config)
 
-plugin: Makefile.coq
-	$(MAKE) -f Makefile.coq
+all: plugin
+	$(MAKE) quickChickTool
 
-install: Makefile.coq src/quickChickLib.cmx src/quickChickLib.o
-	$(MAKE) -f Makefile.coq install
-        # Manually copying the remaining files
-	cp src/quickChickLib.cmx $(COQLIB)/user-contrib/QuickChick
-	cp src/quickChickLib.o $(COQLIB)/user-contrib/QuickChick
+plugin: Makefile.coq 
+	$(MAKE) -f Makefile.coq 
+
+TEMPFILE := $(shell mktemp)
+
+install: all
+	$(V)$(MAKE) -f Makefile.coq install > $(TEMPFILE) || cat $(TEMPFILE)
+  # Manually copying the remaining files
+#	 $(V)cp src/quickChickLib.cmx $(COQLIB)/user-contrib/QuickChick
+#	 $(V)cp src/quickChickLib.o $(COQLIB)/user-contrib/QuickChick
+	 $(V)cp src/quickChickTool $(shell echo $(PATH) | tr ':' "\n" | grep opam | uniq)/quickChick
+
+src/quickChickToolLexer.cmo : src/quickChickToolLexer.mll 
+	ocamllex src/quickChickToolLexer.mll
+	ocamlc -I src -c src/quickChickToolLexer.ml
+
+src/quickChickToolParser.cmo : src/quickChickToolParser.mly
+#	menhir --explain src/quickChickToolParser.mly
+	ocamlyacc -v src/quickChickToolParser.mly
+	ocamlc -I src -c src/quickChickToolParser.mli
+	ocamlc -I src -c src/quickChickToolParser.ml
+
+src/%.cmo : src/%.ml
+	ocamlc -I src -c $<
+
+quickChickTool: src/quickChickToolTypes.cmo
+	$(MAKE) src/quickChickToolParser.cmo
+	$(MAKE) src/quickChickToolLexer.cmo
+	$(MAKE) src/quickChickTool.cmo
+	ocamlc -o src/quickChickTool unix.cma str.cma src/quickChickToolTypes.cmo src/quickChickToolLexer.cmo src/quickChickToolParser.cmo src/quickChickTool.cmo
 
 tests:
 	coqc examples/Tests.v
@@ -26,8 +51,8 @@ tests:
 	cd examples/stlc; make clean && make
 	cd examples/ifc-basic; make clean && make
 
-Makefile.coq: Make
-	coq_makefile -f Make -o Makefile.coq
+Makefile.coq: _CoqProject
+	$(V)coq_makefile -f _CoqProject -o Makefile.coq
 
 clean:
          # This might not work on macs, but then not my problem
@@ -41,6 +66,8 @@ clean:
 	find . -name *.cmo -print -delete
 	find . -name *.bak -print -delete
 	find . -name *~ -print -delete
+	find . -name *.conflicts -print -delete
+	find . -name *.output -print -delete
 	rm -f Makefile.coq
 
 bc:

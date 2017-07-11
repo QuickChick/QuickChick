@@ -16,7 +16,8 @@ open Decl_kinds
 open GenericLib
 open SetLib
 open CoqLib
-
+open GenLib
+    
 let list_keep_every n l =
   let rec aux i = function
     | [] -> []
@@ -166,16 +167,20 @@ let genCorr ty_ctr ctrs iargs inst_name mon_inst_name =
   in
 
   let base_case =
-    set_eq_trans
-      (gApp ~explicit:true (gInject "semOneOf") [hole; fst base_gens; snd base_gens])
-      (genCase hole hole hole bases)
+    match bases with
+    | [] -> failwith "Must have base cases"
+    | [(ctr, ty)] -> proof hole hole ty 0
+    | _ :: _ ->
+      set_eq_trans
+        (gApp ~explicit:true (gInject "semOneOf") [hole; fst base_gens; snd base_gens])
+        (genCase hole hole hole bases)
   in
 
   let ret_type =
     gFun ["n"; "s"]
       (fun [n; s] ->
         set_eq
-          (gApp (gInject ("semGen")) [gApp (gInject "arbitrarySize") [gVar n]])
+          (gApp (gInject ("semGen")) [gApp (gInject "arbitrarySized") [gVar n]])
           (gVar s))
   in
 
@@ -187,4 +192,4 @@ let genCorr ty_ctr ctrs iargs inst_name mon_inst_name =
             base_case; ind_case (mon_proof (gVar n)); (gVar n)])
   in
   debug_coq_expr gen_proof;
-  gRecord [("genSizeCorrect", gen_proof)]
+  gRecord [("arbitrarySizedCorrect", gen_proof)]

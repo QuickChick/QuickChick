@@ -23,9 +23,13 @@ http://prosecco.gforge.inria.fr/personal/hritcu/publications/foundational-pbt.pd
     * mathcomp-ssreflect v1.5 
     + 8.5-legacy contains the old typeclass hierarchy
     + 8.5-automation contains the new one
+  - Branch coq.8.6 known to work with
+    * Coq 8.6
+    * OCaml 4.03.0
+    * mathcomp-ssreflect-1.6.1
 
   - master currently on 8.5pl2 / 4.03.0 - automation
-  - trunk is the experimental development branch, currently being ported to 8.6
+  - trunk is the experimental development branch, currently on 8.6
 
 ### Compilation and Installation
 

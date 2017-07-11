@@ -1,212 +1,298 @@
-Require Export Arith.
-Require Export Arith.EqNat.  (* Contains [beq_nat], among other things *)
+(* QuickChick Prelude *)
+Set Warnings "-extraction-opaque-accessed,-extraction".
+Set Warnings "-notation-overridden,-parsing".
 
-(* id clashes with id function... *)
-Inductive ident : Type :=
-  Id : nat -> ident.
+Require Import String List. Open Scope string.
 
-Theorem eq_id_dec : forall id1 id2 : ident, {id1 = id2} + {id1 <> id2}.
-Proof.
-   intros id1 id2.
-   destruct id1 as [n1]. destruct id2 as [n2].
-   destruct (eq_nat_dec n1 n2) as [Heq | Hneq].
-   - left. rewrite Heq. reflexivity.
-   - right. intros contra. inversion contra. apply Hneq. apply H0.
-Defined. 
+From QuickChick Require Import QuickChick Tactics.
+From mathcomp Require Import ssreflect ssrfun ssrbool ssrnat eqtype seq.
+Import QcDefaultNotation. Open Scope qc_scope.
 
-Lemma eq_id : forall (T:Type) x (p q:T), 
-              (if eq_id_dec x x then p else q) = p. 
-Proof.
-  intros. 
-  destruct (eq_id_dec x x); try reflexivity. 
-  exfalso; auto.
-Qed.
+Set Bullet Behavior "Strict Subproofs".
 
-Lemma neq_id : forall (T:Type) x y (p q:T), x <> y -> 
-               (if eq_id_dec x y then p else q) = q. 
-Proof. Admitted.
+Require Import ZoeStuff.
+(* End prelude *)
 
-Inductive ty : Type := 
-  | TBool  : ty 
+Require Import Smallstep.
+Require Import Types.
+
+Inductive ty : Type :=
+  | TBool  : ty
   | TArrow : ty -> ty -> ty.
 
+Derive (Arbitrary, Show) for ty.
+Derive (Sized, CanonicalSized) for ty.
+Derive SizeMonotonic for ty using genSty0.
+Derive SizedMonotonic for ty.
+Derive SizedCorrect for ty using genSty0 and SizeMonotonicty0.
+
+Instance eq_dec_ty (t1 t2 : ty) : Dec (t1 = t2).
+constructor; unfold decidable; decide equality; auto. Defined.
+
+Require Import Ascii String.
+
+Derive (Arbitrary, Show) for ascii.
+Derive (Sized, CanonicalSized) for ascii.
+Derive SizeMonotonic for ascii using genSascii.
+Derive SizedMonotonic for ascii.
+(* Zoe: Derive SizedCorrect for ascii using genSascii and SizeMonotonicascii. *)
+
+Derive (Arbitrary, Show) for string.
+Derive (Sized, CanonicalSized) for string.
+Derive SizeMonotonic for string using genSstring.
+Derive SizedMonotonic for string.
+
+
+Inductive id : Type :=
+  | Id : string -> id.
+
+Derive (Arbitrary, Show) for id.
+Derive (Sized, CanonicalSized) for id.
+Derive SizeMonotonic for id using genSid.
+Derive SizedMonotonic for id.
+(* ZOEEE : Derive SizedCorrect for id using genSid and SizeMonotonicid.*)
+
+Instance eq_dec_id (x y : id) : Dec (x = y).
+constructor; unfold decidable. repeat decide equality. Defined.
+
+Definition beq_id x y :=
+  match x,y with
+    | Id n1, Id n2 => if string_dec n1 n2 then true else false
+  end.
+
+
 Inductive tm : Type :=
-  | tvar : ident -> tm
+  | tvar : id -> tm
   | tapp : tm -> tm -> tm
-  | tabs : ident -> ty -> tm -> tm
+  | tabs : id -> ty -> tm -> tm
   | ttrue : tm
   | tfalse : tm
   | tif : tm -> tm -> tm -> tm.
 
+Derive (Arbitrary, Show) for tm.
+Derive (Sized, CanonicalSized) for tm.
+(* Requires SizeMonotonic for id *)
+(*
+Derive SizeMonotonic for tm using genStm0.
+Derive SizedMonotonic for tm.
+Derive SizedCorrect for tm using genStm0 and SizeMonotonictm0.
+*)
+
+Instance eq_dec_tm (t1 t2 : tm) : Dec (t1 = t2).
+constructor; unfold decidable; repeat decide equality. Defined.
+
+(* Leo: TODO: lowercase x - name clash *)
 Inductive value : tm -> Prop :=
-  | v_abs : forall x T t,
-      value (tabs x T t)
-  | v_true : 
+  | v_abs : forall X T t,
+      value (tabs X T t)
+  | v_true :
       value ttrue
-  | v_false : 
+  | v_false :
       value tfalse.
+
+Derive ArbitrarySizedSuchThat for (fun tm => value tm).
+Derive SizedProofEqs for (fun tm => value tm).
+(*
+Derive SizeMonotonicSuchThatOpt for (fun tm => value tm).
+Derive GenSizedSuchThatCorrect for (fun tm => value tm).
+Derive GenSizedSuchThatSizeMonotonicOpt for (fun tm => value tm).
+*)
+
+Instance dec_value t : Dec (value t).
+constructor; unfold decidable; induction t;
+try solve [left; constructor; auto];
+try solve [right => contra; inversion contra; eauto].
+Defined.
 
 Hint Constructors value.
 
 Reserved Notation "'[' x ':=' s ']' t" (at level 20).
 
-Fixpoint subst (x:ident) (s:tm) (t:tm) : tm :=
+Fixpoint subst (x:id) (s:tm) (t:tm) : tm :=
   match t with
-  | tvar x' => 
-      if eq_id_dec x x' then s else t
-  | tabs x' T t1 => 
-      tabs x' T (if eq_id_dec x x' then t1 else ([x:=s] t1)) 
-  | tapp t1 t2 => 
+  | tvar x' =>
+      if beq_id x x' then s else t
+  | tabs x' T t1 =>
+      tabs x' T (if beq_id x x' then t1 else ([x:=s] t1))
+  | tapp t1 t2 =>
       tapp ([x:=s] t1) ([x:=s] t2)
-  | ttrue => 
+  | ttrue =>
       ttrue
-  | tfalse => 
+  | tfalse =>
       tfalse
-  | tif t1 t2 t3 => 
+  | tif t1 t2 t3 =>
       tif ([x:=s] t1) ([x:=s] t2) ([x:=s] t3)
   end
 
 where "'[' x ':=' s ']' t" := (subst x s t).
 
 (*
-Reserved Notation "t1 '==>' t2" (at level 40).
+Inductive substi (s:tm) (x:id) : tm -> tm -> Prop :=
+  | s_var1 :
+      substi s x (tvar x) s
+  (* FILL IN HERE *)
+.
+
+Hint Constructors substi.
+
+Theorem substi_correct : forall s x t t',
+  [x:=s]t = t' <-> substi s x t t'.
+Proof.
+  (* FILL IN HERE *) Admitted.
+*)
+
+Reserved Notation "t1 '===>' t2" (at level 40).
 
 Inductive step : tm -> tm -> Prop :=
   | ST_AppAbs : forall x T t12 v2,
          value v2 ->
-         (tapp (tabs x T t12) v2) ==> [x:=v2]t12
+         (tapp (tabs x T t12) v2) ===> [x:=v2]t12
   | ST_App1 : forall t1 t1' t2,
-         t1 ==> t1' ->
-         tapp t1 t2 ==> tapp t1' t2
+         t1 ===> t1' ->
+         tapp t1 t2 ===> tapp t1' t2
   | ST_App2 : forall v1 t2 t2',
          value v1 ->
-         t2 ==> t2' -> 
-         tapp v1 t2 ==> tapp v1  t2'
+         t2 ===> t2' ->
+         tapp v1 t2 ===> tapp v1  t2'
   | ST_IfTrue : forall t1 t2,
-      (tif ttrue t1 t2) ==> t1
+      (tif ttrue t1 t2) ===> t1
   | ST_IfFalse : forall t1 t2,
-      (tif tfalse t1 t2) ==> t2
+      (tif tfalse t1 t2) ===> t2
   | ST_If : forall t1 t1' t2 t3,
-      t1 ==> t1' ->
-      (tif t1 t2 t3) ==> (tif t1' t2 t3)
+      t1 ===> t1' ->
+      (tif t1 t2 t3) ===> (tif t1' t2 t3)
 
-where "t1 '==>' t2" := (step t1 t2).
+where "t1 '===>' t2" := (step t1 t2).
 
 Hint Constructors step.
-*)
 
-(* This can't work *)
-(*
-Module PartialMap.
- 
-Definition partial_map (A:Type) := id -> option A.
- 
-Definition empty {A:Type} : partial_map A := (fun _ => None). 
- 
-Definition extend {A:Type} (Gamma : partial_map A) (x:id) (T : A) :=
-  fun x' => if eq_id_dec x x' then Some T else Gamma x'.
- 
-Lemma extend_eq : forall A (ctxt: partial_map A) x T,
-  (extend ctxt x T) x = Some T.
-Proof.
-  intros. unfold extend. rewrite eq_id. auto.
-Qed.
- 
-Lemma extend_neq : forall A (ctxt: partial_map A) x1 T x2,
-  x2 <> x1 ->                       
-  (extend ctxt x2 T) x1 = ctxt x1.
-Proof.
-  intros. unfold extend. rewrite neq_id; auto.
-Qed.
+Notation multistep := (multi step).
+Notation "t1 '===>*' t2" := (multistep t1 t2) (at level 40).
 
-End PartialMap.
-*)
-
-Definition context := list (ident * ty).
+Definition context := list (id * ty).
 
 Definition empty : context := nil.
 
-Definition extend (Gamma : context) (x:ident) (T : ty) := cons (x, T) Gamma.
+Inductive bind : context -> id -> ty -> Prop :=
+  | BindNow   : forall i a m, bind (cons (i, a) m) i a
+  | BindLater : forall i i' a a' m',
+                  ~ (i = i') ->
+                  bind m' i a -> 
+                  bind (cons (i',a') m') i a.
 
-Inductive bind : context -> ident -> ty -> Prop :=
-  | BindNow   : forall x T Gamma', bind (cons (x, T) Gamma') x T
-  | BindLater : forall x x' T T' Gamma', 
-                  ~ (x = x') ->
-                  bind Gamma' x T -> 
-                  bind (cons (x',T') Gamma') x T.
+Derive ArbitrarySizedSuchThat for (fun i => bind m i a).
+Derive SizeMonotonicSuchThatOpt for (fun i => bind m i a).
+(* ZOE! Proof not found 
+Derive SizedProofEqs for (fun x => bind m x a).
+Derive GenSizedSuchThatCorrect for (fun x => bind m x a).
+Derive GenSizedSuchThatSizeMonotonicOpt for (fun x => bind m x a).
+*)
+Instance adm_st m a : SuchThatCorrect (fun x => bind m x a) (genST (fun x => bind m x a)).
+Admitted.
 
-Reserved Notation "Gamma '|-' t '\in' T" (at level 40).
+Instance bind_dec m x v : Dec (bind m x v) :=
+  {| dec := _ |}.
+Proof.
+  move: x v.
+  induction m => x v.
+  - right => contra. inversion contra.
+  - destruct a as [x' v'].
+    destruct (eq_dec_id x x') as [[Eq | Neq]].
+    + destruct (eq_dec_ty v v') as [[EqV | NeqV]].
+      * subst; left ; constructor; eauto.
+      * subst; right => Contra.
+        inversion Contra; subst; eauto.
+    + subst; specialize (IHm x v).
+      destruct IHm as [L | R].
+      * left; constructor; eauto.
+      * right => Contra; inversion Contra; subst; eauto.
+Defined.
 
-Inductive has_type : list (ident * ty) (* context *) -> tm -> ty -> Prop :=
-  | T_Var : forall Gamma x T,
-      bind Gamma x T -> 
-      Gamma |- tvar x \in T
-  | T_Abs : forall Gamma x T11 T12 t12,
-      cons (x, T11) Gamma |- t12 \in T12 -> 
-      Gamma |- tabs x T11 t12 \in TArrow T11 T12
+Reserved Notation "Gamma '|-' t '\typ' T" (at level 40).
+
+Inductive has_type : context -> tm -> ty -> Prop :=
+  | T_Var : forall Gamma i T,
+      bind Gamma i T ->
+      Gamma |- tvar i \typ T
+  | T_Abs : forall Gamma i T11 T12 t12,
+      cons (i, T11) Gamma |- t12 \typ T12 ->
+      Gamma |- tabs i T11 t12 \typ TArrow T11 T12
   | T_App : forall T11 T12 Gamma t1 t2,
-      Gamma |- t1 \in TArrow T11 T12 -> 
-      Gamma |- t2 \in T11 -> 
-      Gamma |- tapp t1 t2 \in T12
+      Gamma |- t1 \typ TArrow T11 T12 ->
+      Gamma |- t2 \typ T11 ->
+      Gamma |- tapp t1 t2 \typ T12
   | T_True : forall Gamma,
-       Gamma |- ttrue \in TBool
+       Gamma |- ttrue \typ TBool
   | T_False : forall Gamma,
-       Gamma |- tfalse \in TBool
+       Gamma |- tfalse \typ TBool
   | T_If : forall t1 t2 t3 T Gamma,
-       Gamma |- t1 \in TBool ->
-       Gamma |- t2 \in T ->
-       Gamma |- t3 \in T ->
-       Gamma |- tif t1 t2 t3 \in T 
+       Gamma |- t1 \typ TBool ->
+       Gamma |- t2 \typ T ->
+       Gamma |- t3 \typ T ->
+       Gamma |- tif t1 t2 t3 \typ T
 
-where "Gamma '|-' t '\in' T" := (has_type Gamma t T).
+where "Gamma '|-' t '\typ' T" := (has_type Gamma t T).
 
 Hint Constructors has_type.
 
-(* Testing starts now *)
+Derive ArbitrarySizedSuchThat for (fun tm => has_type Gamma tm ty).
+(*
+Derive SizedProofEqs for (fun tm => value tm).
+Derive SizeMonotonicSuchThatOpt for (fun tm => value tm).
+Derive GenSizedSuchThatCorrect for (fun tm => value tm).
+Derive GenSizedSuchThatSizeMonotonicOpt for (fun tm => value tm).
+*)
 
-From QuickChick Require Import QuickChick Tactics.
-Require Import String. Open Scope string.
+Instance has_type_gen_correct0 Gamma T : SuchThatCorrect (fun t => has_type Gamma t T) 
+                                                         (@arbitraryST _ (fun t => has_type Gamma t T) _).
+Admitted.
 
-From mathcomp Require Import ssreflect ssrfun ssrbool ssrnat eqtype seq.
+Fixpoint lookup (Gamma : context) (i : id) : option ty :=
+  match Gamma with 
+  | nil => None
+  | cons (i',T) Gamma' => 
+    if beq_id i i' then Some T
+    else lookup Gamma' i
+  end.
 
-Import GenLow GenHigh.
-Require Import List.
-Import ListNotations.
-Import QcDefaultNotation. Open Scope qc_scope.
-Import QcDoNotation.
 
-Set Bullet Behavior "Strict Subproofs".
+Theorem beq_id_true_iff : forall x y : id,
+  beq_id x y = true <-> x = y.
+Admitted. (* Prop *)
 
-Instance ident_dep_dec (x y : ident) : Dec (x = y) :=
-  { dec := eq_id_dec x y }.
+Theorem beq_id_false_iff : forall x y : id,
+  beq_id x y = false
+  <-> x <> y.
+Admitted. (* Prop *)
 
-Definition ty_eq_dec : forall (ty1 ty2 : ty), {ty1 = ty2} + {~ (ty1 = ty2)}.
-  decide equality.
-Qed.
+Lemma lookup_bind : forall Gamma i T, lookup Gamma i = Some T <-> bind Gamma i T.
+induction Gamma => i T; split; intros; eauto.
+- inversion H.
+- inversion H.
+- destruct a; simpl in *.
+  destruct (beq_id i i0) eqn:HeqI; eauto.
+  + inversion H.
+    apply (beq_id_true_iff) in HeqI.
+    subst; constructor.
+  + apply beq_id_false_iff in HeqI; constructor; eauto.
+    eapply IHGamma in H; auto.
+- destruct a; inversion H; subst; eauto.
+  + simpl.
+    destruct (beq_id i i) eqn:B; auto.
+    apply beq_id_false_iff in B; congruence.
+  + simpl.
+    destruct (beq_id i i0) eqn:B; auto.
+    * eapply beq_id_true_iff in B; subst; congruence.
+    * eapply IHGamma in H6; auto.
+Qed.    
 
-Instance ty_dep_dec (x y : ty) : Dec (x = y) :=
-  { dec := ty_eq_dec x y}.
+Fixpoint get_type (Gamma : context) (t : tm) : option ty.
+Admitted.
 
-Derive Show for ident.
-Derive Show for ty.
-Derive Show for tm.
-Derive Arbitrary for ty.
-Derive Arbitrary for ident.
-
-Derive ArbitrarySizedSuchThat for (fun x => bind Gamma x ty).
-Derive ArbitrarySizedSuchThat for (fun tm => has_type Gamme tm ty).
-
-Definition genBool : G (option tm) :=
-  @arbitrarySizeST _ (fun tm => has_type 
-                                   (cons (Id 0, TBool) 
-                                    (cons (Id 1, TArrow TBool TBool) nil))
-                                  tm TBool)
-                   _ 1.
-
-Sample genBool.
-
-Definition genBool2Bool : G (option tm) := 
-  @arbitrarySizeST _ (fun tm => has_type nil tm (TArrow TBool TBool))
-                   _ 2.
-Sample genBool2Bool.
-
+Instance dec_has_type Gamma t T : Dec (has_type Gamma t T).
+constructor; unfold decidable.
+move: Gamma T; induction t => Gamma T.
+- destruct (bind_dec Gamma i T) as [[In | NotIn]].
+  + left; constructor; auto.
+  + right => contra; inversion contra; eauto.
+Admitted.

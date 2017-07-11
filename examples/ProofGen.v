@@ -8,6 +8,9 @@ Require Import List.
 Import ListNotations.
 Import QcDefaultNotation. Open Scope qc_scope.
 
+Import QcDoNotation.
+
+
 Set Bullet Behavior "Strict Subproofs".
 
 Inductive ty : nat -> Type :=
