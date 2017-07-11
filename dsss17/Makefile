@@ -15,6 +15,7 @@ TOP = $(HOME)/s/new
 # and fix up the dependencies in deps.dot
 # !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 EXPORTS = \
+	   Introduction.v \
 	   Typeclasses.v \
 
 #	   TImp.v \
