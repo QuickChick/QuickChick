@@ -1581,6 +1581,61 @@ Definition e4 : list nat := mymap false.
     an IDE.) *)
 
 
+(* ############################################################## *)
+(** * Alternative Structuring Mechanisms *)
+
+(** Typeclasses are just one of several mechanisms that can be used in
+    Coq for structuring large developments.  Others include:
+      - canonical structures
+      - bare dependent records
+      - modules and functors *)
+
+(** In particular, an introduction to canonical structures and a
+    comparison between canonical structures and typeclasses can be
+    found here:
+
+    Assia Mahboubi and Enrico Tassi. Canonical Structures for the
+    working Coq user. In Sandrine Blazy, Christine Paulin, and David
+    Pichardie, editors, ITP 2013, 4th Conference on Interactive
+    Theorem Proving, volume 7998 of LNCS, pages 19–34, Rennes, France,
+    2013. Springer.  {https://hal.inria.fr/hal-00816703v1/document}
+
+    A useful discussion of typeclasses vs. dependent records is:
+    {https://stackoverflow.com/questions/29872260/coq-typeclasses-vs-dependent-records}
+*)
+
+(* SOONER: Mattheiu's Penn slides have a discussion of sharing by
+   fields vs by parameters that probably deserves to be incorporated
+   here -- or at least summarized with a pointer to somewhere people
+   can read about it... *)
+
+(* HIDE:
+
+   From Bas...
+
+      Regarding the comparison between type classes and structures.
+
+      LEAN seems to have some nice support for Type Classes/Structures; see
+      https://leanprover.github.io/tutorial/
+
+      Chapter Structures.
+
+      They have a type class implementation, but provide some mechanisms for
+      extending and renaming structures. It seems light weight, but the
+      repackaging that is done behind the scenes looks really helpful and
+      natural.
+
+      It seems like it would be useful for Coq too, as it allows a nice
+      combination of the conveniences of both the unbundled approach (as in
+      math-classes) and package classes (as in ssreflect).
+
+  And:
+
+      Thanks for this. For bystanders, the corresponding library is here:
+      http://math-classes.github.io/
+
+*)
+
 (* ################################################################# *)
 (** * Advice from Experts *)
 
@@ -1815,84 +1870,32 @@ Definition e4 : list nat := mymap false.
     bundle. *)
 
 
-(* ############################################################## *)
-(** * Alternative Structuring Mechanisms *)
-
-(** Typeclasses are just one of several mechanisms that can be used in
-    Coq for structuring large developments.  Others include:
-      - canonical structures
-      - bare dependent records
-      - modules and functors *)
-
-(** Assia Mahboubi and Enrico Tassi. Canonical Structures for the
-    working Coq user. In Sandrine Blazy, Christine Paulin, and David
-    Pichardie, editors, ITP 2013, 4th Conference on Interactive
-    Theorem Proving, volume 7998 of LNCS, pages 19–34, Rennes, France,
-    2013. Springer.
-
-    Matthieu Sozeau and Nicolas Oury. First-Class Type Classes. In
-    TPHOLs’08, 2008.
-*)
-
-(* Mattheiu's Penn slides have a discussion of sharing by fields vs by
-   parameters that probably deserves to be incorporated here -- or at
-   least summarized with a pointer to somewhere people can read about
-   it... *)
-
-(* HIDE:
-
-   From Bas...
-
-      Regarding the comparison between type classes and structures.
-
-      LEAN seems to have some nice support for Type Classes/Structures; see
-      https://leanprover.github.io/tutorial/
-
-      Chapter Structures.
-
-      They have a type class implementation, but provide some mechanisms for
-      extending and renaming structures. It seems light weight, but the
-      repackaging that is done behind the scenes looks really helpful and
-      natural.
-
-      It seems like it would be useful for Coq too, as it allows a nice
-      combination of the conveniences of both the unbundled approach (as in
-      math-classes) and package classes (as in ssreflect).
-
-  And:
-
-      Thanks for this. For bystanders, the corresponding library is here:
-      http://math-classes.github.io/
-
-*)
-
 (* ################################################################# *)
 (** * Further Reading *)
 
-(* Origins: In Haskell, Wadler & Blott, POPL’89.  In Isabelle, Nipkow &
-   Snelting, FPCA’91.  In Coq: Sozeau and xx. *)
+(** On the origins of typeclasses in Haskell:
+      - How to make ad-hoc polymorphism less ad hoc Philip Wadler and
+        Stephen Blott. 16'th Symposium on Principles of Programming
+        Languages, ACM Press, Austin, Texas, January 1989.
+        {http://homepages.inf.ed.ac.uk/wadler/topics/type-classes.html}
 
-(* Acknowledge sources for this tutorial. *)
+    The original paper on typeclasses In Coq:
+      - Matthieu Sozeau and Nicolas Oury. First-Class Type
+        Classes. TPHOLs 2008.
+        {https://link.springer.com/chapter/10.1007%%2F978-3-540-71067-7_23} 
 
-(* Typeclasses in Haskell:
-     - https://en.wikibooks.org/wiki/Haskell/Classes_and_types
-          - maybe a bit too low-level, not enough examples
-     - http://learnyouahaskell.com/types-and-typeclasses and
-       http://learnyouahaskell.com/making-our-own-types-and-typeclasses
-     - Simon PJ, Classes, Jim, But Not as We Know Them — Type Classes
-       in Haskell: What, Why, and Whither (video from OPLSS?)
+    Sources for this tutorial:
+     - Coq Reference Manual:
+       {https://coq.inria.fr/refman/Reference-Manual023.html}
+     - Casteran and Sozeau's "Gentle Introduction":
+       {http://www.labri.fr/perso/casteran/CoqArt/TypeClassesTut/typeclassestut.pdf}
+     - Sozeau's slides from a talk at Penn:
+       {https://www.cis.upenn.edu/~bcpierce/courses/670Fall12/slides.pdf}
 
-  Typeclasses in Coq:
-     - The original ideas: Matthieu Sozeau and Nicolas
-       Oury. First-Class Type Classes. In TPHOLs’08, 2008.
-     - Reference manual chapter:
-           https://coq.inria.fr/refman/Reference-Manual023.html
-     - "Gentle" Introduction:
-           http://www.labri.fr/perso/casteran/CoqArt/TypeClassesTut/typeclassestut.pdf
-     - StackOverflow:
-           https://stackoverflow.com/questions/29872260/coq-typeclasses-vs-dependent-records
-     - Sozeau slides:
-           https://www.cis.upenn.edu/~bcpierce/courses/670Fall12/slides.pdf
+    Some tutorials on typeclasses in Haskell:
+     - {https://en.wikibooks.org/wiki/Haskell/Classes_and_types}
+     - {http://learnyouahaskell.com/types-and-typeclasses} and
+       {http://learnyouahaskell.com/making-our-own-types-and-typeclasses}
 *)
 
 (* HIDE:

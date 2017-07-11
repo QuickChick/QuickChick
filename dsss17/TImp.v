@@ -113,7 +113,6 @@ Parameter rem : t V -> K.t -> t V.
 Parameter dom : t V -> list K.t.
 Parameter forallb2 : (K.t -> V -> bool) -> t V -> bool.
 
-
 Axiom update_eq : forall v k1 k2 m, k2 = k1 -> get (set m k1 v) k2 = Some v.
 Axiom update_neq : forall v k1 k2 m, k2 <> k1 -> get (set m k1 v) k2 = get m k2.
 Axiom get_in_dom : forall m k v, get m k = Some v -> In k (dom m).
@@ -444,7 +443,6 @@ Fixpoint shrink_exp_typed (T : ty) (e : exp) : list exp :=
     ETrue :: EFalse :: e1 :: e2 
        :: (List.map (fun e1' => EAnd e1' e2) (shrink_exp_typed TBool e1))
        ++ (List.map (fun e2' => EAnd e1 e2') (shrink_exp_typed TBool e2))
-
   end.
 
 
