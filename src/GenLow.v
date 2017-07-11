@@ -516,7 +516,7 @@ Module GenLow : GenLowInterface.
   Definition reallyUnsafePromote {r A : Type} (m : r -> G A) : G (r -> A) :=
     (bindGen reallyUnsafeDelay (fun eval => 
                                   returnGen (fun r => eval (m r)))).
-  
+
   (* End Things *)
 
   (** * Semantics of generators *)

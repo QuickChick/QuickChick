@@ -7,7 +7,9 @@ Import GenLow GenHigh.
 Require Import List.
 Import ListNotations.
 Import QcDefaultNotation. Open Scope qc_scope.
+
 Import QcDoNotation.
+
 
 Set Bullet Behavior "Strict Subproofs".
 
