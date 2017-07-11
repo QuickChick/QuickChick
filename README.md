@@ -14,6 +14,11 @@ http://prosecco.gforge.inria.fr/personal/hritcu/publications/foundational-pbt.pd
 
 ### Known to work with
 
+  - Branch master: 
+    * Coq 8.6
+    * OCaml 4.03.0, 4.04
+    * mathcomp-ssreflect-1.6.1 
+
   - Branch 8.4pl6 known to work with
     * OCaml 4.01.0 and Coq 8.4pl3 or OCaml 4.02.1 and Coq 8.4pl6
     * SSReflect 1.5 (http://ssr.msr-inria.inria.fr/FTP/)
@@ -28,12 +33,13 @@ http://prosecco.gforge.inria.fr/personal/hritcu/publications/foundational-pbt.pd
     * OCaml 4.03.0
     * mathcomp-ssreflect-1.6.1
 
-  - master currently on 8.5pl2 / 4.03.0 - automation
   - trunk is the experimental development branch, currently on 8.6
 
 ### Compilation and Installation
 
-    # If necessary (and if you installed Coq via opam):
+    # To get ssreflect, you need to add the Coq opam repository (if you haven't already)
+    opam repo add coq-released https://coq.inria.fr/opam/released
+    opam update
     opam install coq-mathcomp-ssreflect
 
     # Then:
