@@ -36,6 +36,14 @@ Record Args := MkArgs {
   chatty     : bool
 }.
 
+Definition updMaxSize (a : Args) (x : nat) : Args := 
+  let '(MkArgs r msc md msh msz c) := a in 
+  MkArgs r msc md msh x c.
+
+Definition updMaxSuccess (a : Args) (x : nat) : Args := 
+  let '(MkArgs r msc md msh msz c) := a in 
+  MkArgs r x md msh msz c.
+
 Inductive Result :=
   | Success : nat -> nat -> list (string * nat) -> string -> Result
   | GaveUp  : nat -> list (string * nat) -> string -> Result
