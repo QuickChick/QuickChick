@@ -96,16 +96,7 @@ let define c =
        Decl_kinds.IsDefinition Decl_kinds.Definition));
   fn
 
-(* TODO: clean leftover files *)
-let runTest c =
-  (** [c] is a constr_expr representing the test to run,
-      so we first build a new constr_expr representing
-      show c **)
-  let c = CApp(Loc.ghost,(None,show), [(c,None)]) in
-  (** Build the kernel term from the const_expr *)
-  let env = Global.env () in
-  let evd = Evd.from_env env in
-  let (c,evd) = interp_constr env evd c in
+let define_and_run c = 
   (** Extract the term and its dependencies *)
   let main = define c in
   let mlf = Filename.temp_file "QuickChick" ".ml" in
@@ -150,6 +141,18 @@ let runTest c =
     (* let execn = "time " ^ execn in *)
     if Sys.command execn <> 0 then
       msg_error (str "Could not run test" ++ fnl ())
+
+(* TODO: clean leftover files *)
+let runTest c =
+  (** [c] is a constr_expr representing the test to run,
+      so we first build a new constr_expr representing
+      show c **)
+  let c = CApp(Loc.ghost,(None,show), [(c,None)]) in
+  (** Build the kernel term from the const_expr *)
+  let env = Global.env () in
+  let evd = Evd.from_env env in
+  let (c,evd) = interp_constr env evd c in
+  define_and_run c
 
 let run f args =
   begin match args with 
