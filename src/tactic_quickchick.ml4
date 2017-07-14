@@ -16,12 +16,12 @@ let quickchick_goal =
     let ct = Constrextern.extern_constr false e evd c in
 
     (* Admit a constant with that type *)
-    let tmpid = QuickChick.fresh_name "tmp_foo" in 
+    let tmpid = QuickChick.fresh_name "temporary_constant" in 
     Vernacentries.interp (Loc.dummy_loc,  
       VernacAssumption ((None, Decl_kinds.Conjectural), 
                         NoInline, 
                         [ 
-                          (true, 
+                          (false, 
                            (
                              [(Loc.dummy_loc, tmpid), None]
                            ,
@@ -32,8 +32,14 @@ let quickchick_goal =
                        ));
 
 
-    msg_warning (str "Ran this!" ++ fnl ());
-    QuickChick.run QuickChick.quickCheck [CRef (Ident (Loc.dummy_loc, tmpid),None)];
+    let s = QuickChick.runTest 
+            (CApp(Loc.ghost, (None,QuickChick.quickCheck), [CRef (Ident (Loc.dummy_loc, tmpid),None), None])) in
+
+    match s with 
+    | Some bytes -> 
+       Tacticals.New.tclZEROMSG (str ("\n" ^ bytes) ++ fnl ())
+    | None -> Tacticals.New.tclZEROMSG (str "Something went wrong. Report." ++ fnl ())
+    
 (*
 
     (* Refactor - needs to see internals... *)
@@ -57,8 +63,8 @@ let quickchick_goal =
 
     let actual_term = Constr.mkApp (cf, Array.of_list [c]) in
  *)
-    msg_warning (str "Completed!" ++ fnl ());
-    Tacticals.New.tclIDTAC
+
+
   end }
 
 (*

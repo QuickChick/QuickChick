@@ -134,13 +134,40 @@ let define_and_run c =
   (* Compile the (empty) .mli *)
   if Sys.command (comp_mli_cmd mlif) <> 0 then msg_error (str "Could not compile mli file" ++ fnl ());
   if Sys.command (comp_ml_cmd mlf execn) <> 0 then
-    msg_error (str "Could not compile test program" ++ fnl ())
+    (msg_error (str "Could not compile test program" ++ fnl ()); None)
+
   (** Run the test *)
   else
+    (* Should really be shared across this and the tool *)
+    let chan = Unix.open_process_in execn in
+    let builder = ref [] in
+    let rec process_otl_aux () =
+      let e = input_line chan in
+      print_endline e;
+      builder := e :: !builder;
+      process_otl_aux() in
+    try process_otl_aux ()
+    with End_of_file ->
+         let stat = Unix.close_process_in chan in
+         begin match stat with
+         | Unix.WEXITED 0 ->
+            ()
+         | Unix.WEXITED i ->
+            msg_error (str (Printf.sprintf "Exited with status %d" i) ++ fnl ())
+         | Unix.WSIGNALED i ->
+            msg_error (str (Printf.sprintf "Killed (%d)" i) ++ fnl ())
+         | Unix.WSTOPPED i ->
+            msg_error (str (Printf.sprintf "Stopped (%d)" i) ++ fnl ())
+         end;
+         let output = String.concat "\n" (List.rev !builder) in
+         Some output
+           
+(*
     (** If we want to print the time spent in tests *)
     (* let execn = "time " ^ execn in *)
     if Sys.command execn <> 0 then
       msg_error (str "Could not run test" ++ fnl ())
+ *)
 
 (* TODO: clean leftover files *)
 let runTest c =
@@ -163,7 +190,7 @@ let run f args =
   end;
   let args = List.map (fun x -> (x,None)) args in
   let c = CApp(Loc.ghost, (None,f), args) in
-  runTest c
+  ignore (runTest c)
 
 let setFlags s1 s2 = 
   let toggle = 
