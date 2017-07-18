@@ -123,7 +123,6 @@ Global Instance testResult : Checkable Result :=
     checker r := returnGen (MkProp (returnRose r))
   |}.
 
-
 Global Instance testBool : Checkable bool :=
   {|
     checker b := checker (liftBool b)
