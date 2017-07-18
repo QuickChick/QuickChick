@@ -27,7 +27,7 @@ before_install:
     esac
 
 install:
-- "[ -e .opam ] || opam init -j ${NJOBS} --compiler=${COMPILER} -n -y"
+- "[ -e .opam ] || travis_wait opam init -j ${NJOBS} --compiler=${COMPILER} -n -y"
 - eval $(opam config env)
 - opam config var root
 - opam repo add coq-released https://coq.inria.fr/opam/released || true
