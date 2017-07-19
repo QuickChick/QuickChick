@@ -1270,7 +1270,7 @@ Definition silly_fun2 (x y z : nat) :=
     {https://github.com/coq-ext-lib/coq-ext-lib/blob/v8.5/theories/Structures/Monad.v}
 *)
 
-(* SOONER: A better introduction, with examples, would be a fine thing. *)
+(* NOW: A better introduction, with examples -- option, list, ... *)
 
 (* NOW: Do we need more, for present purposes? *)
 
