@@ -118,17 +118,11 @@ Proof.
   apply H.
 Defined.
 
-Hint Resolve ascii_dec.
-
 Global Instance Dec_ascii (m n : Ascii.ascii) : Dec (m = n).
 Proof. constructor. unfold ssrbool.decidable. apply ascii_dec. Defined.
 
 Global Instance Dec_string (m n : string) : Dec (m = n).
-Proof.
-  constructor.
-  unfold ssrbool.decidable.
-  repeat decide equality. 
-Defined.
+Proof. constructor. unfold ssrbool.decidable. apply string_dec. Defined.
 
 (* Everything that uses the Decidable Class *)
 Require Import DecidableClass.
