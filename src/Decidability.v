@@ -118,18 +118,37 @@ Proof.
   apply H.
 Defined.
 
-Global Instance Dec_ascii (m n : Ascii.ascii) : Dec (m = n).
+Definition ascii_to_list (x : Ascii.ascii) : list bool.
 Proof.
-  constructor.
-  unfold ssrbool.decidable.
-  repeat (decide equality).
+  destruct x.
+  apply (cons b (cons b0 (cons b1 (cons b2 (cons b3 (cons b4 (cons b5 (cons b6 nil)))))))).
 Defined.
+
+Lemma list_eq_imp_ascii_eq (c1 c2 : Ascii.ascii) :
+  ascii_to_list c1 = ascii_to_list c2 -> c1 = c2.
+Proof.
+  intros. destruct c1; destruct c2. simpl in H.
+  inversion H; clear H; subst. reflexivity.
+Defined.
+
+Lemma dec_ascii (m n : Ascii.ascii) : {m = n} + {m <> n}.
+Proof.
+  assert ({ascii_to_list m = ascii_to_list n} + {ascii_to_list m <> ascii_to_list n}).
+  { apply Dec_eq_list. apply Dec_eq_bool. }
+  destruct H.
+  - left. apply list_eq_imp_ascii_eq. auto.
+  - right. intro. apply n0. subst. reflexivity.
+Defined.
+Hint Resolve dec_ascii.
+
+Global Instance Dec_ascii (m n : Ascii.ascii) : Dec (m = n).
+Proof. constructor. unfold ssrbool.decidable. apply dec_ascii. Defined.
 
 Global Instance Dec_string (m n : string) : Dec (m = n).
 Proof.
   constructor.
   unfold ssrbool.decidable.
-  repeat (decide equality).
+  repeat decide equality. 
 Defined.
 
 (* Everything that uses the Decidable Class *)
