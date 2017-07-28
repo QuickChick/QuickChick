@@ -69,60 +69,65 @@ Class Eq (A : Type) :=
     dec_eq : forall (x y : A), decidable (x = y)
   }.
 
+Theorem dec_if_dec_eq {A} (x y: A): Dec (x = y) -> {x = y} + {x <> y}.
+Proof.
+  intros. inversion H as [D].
+  unfold decidable in D. assumption.
+Defined.
+
+Hint Resolve dec_if_dec_eq: eq_dec.
+
+Ltac dec_eq :=
+  repeat match goal with
+         | [ |- _ ] => solve [auto with eq_dec]
+         | [ |- Dec _ ] => constructor
+         | [ |- context[decidable _] ] => unfold decidable
+
+         | [ H: context[decidable _] |- _ ] => unfold decidable in H
+
+         | [ |- {?x = ?y} + {?x <> ?y} ] =>
+           multimatch goal with
+             | [ H: forall x y, Dec _ |- _ ] => apply H
+             | [ H: Eq _ |- _ ] => apply H
+             | [ |- _ ] => decide equality
+           end
+         end.
+
 Global Instance Eq__Dec {A} `{H : Eq A} (x y : A) : Dec (x = y) :=
   {|
     dec := _
   |}.
-Proof.
-  unfold decidable.
-  apply H.
-Defined.
+Proof. dec_eq. Defined.
 
 (* Lifting common decidable instances *)
 Global Instance Dec_eq_bool (x y : bool) : Dec (x = y).
-Proof. constructor; unfold decidable; decide equality. Defined.
+Proof. dec_eq. Defined.
 
 Global Instance Dec_eq_nat (m n : nat) : Dec (m = n).
-Proof.
-  constructor.
-  unfold decidable.
-  decide equality.
-Defined.
+Proof. dec_eq. Defined.
 
 Global Instance Dec_eq_opt (A : Type) (m n : option A)
   `{_ : forall (x y : A), Dec (x = y)} : Dec (m = n).
-Proof.
-  constructor.
-  unfold decidable.
-  decide equality.
-  apply H.
-Defined.
+Proof. dec_eq. Defined.
 
 Global Instance Dec_eq_prod (A B : Type) (m n : A * B)
   `{_ : forall (x y : A), Dec (x = y)} 
   `{_ : forall (x y : B), Dec (x = y)} 
   : Dec (m = n).
-Proof.
-  constructor.
-  unfold decidable.
-  decide equality.
-  apply H0. apply H.
-Defined.
+Proof. dec_eq. Defined.
 
 Global Instance Dec_eq_list (A : Type) (m n : list A)
   `{_ : forall (x y : A), Dec (x = y)} : Dec (m = n).
-Proof.
-  constructor.
-  unfold decidable.
-  decide equality.
-  apply H.
-Defined.
+Proof. dec_eq. Defined.
+
+Hint Resolve ascii_dec: eq_dec.
+Hint Resolve string_dec: eq_dec.
 
 Global Instance Dec_ascii (m n : Ascii.ascii) : Dec (m = n).
-Proof. constructor. unfold ssrbool.decidable. apply ascii_dec. Defined.
+Proof. dec_eq. Defined.
 
 Global Instance Dec_string (m n : string) : Dec (m = n).
-Proof. constructor. unfold ssrbool.decidable. apply string_dec. Defined.
+Proof. dec_eq. Defined.
 
 (* Everything that uses the Decidable Class *)
 Require Import DecidableClass.
@@ -158,4 +163,9 @@ Notation "P '?'" := (match (@dec P _) with
                        | right _ => false
                      end) (at level 100).
 
-Compute ((42 = 42)?).
+Hint Resolve Dec_eq_bool : eq_dec.
+Hint Resolve Dec_eq_nat : eq_dec.
+Hint Resolve Dec_eq_opt : eq_dec.
+Hint Resolve Dec_eq_prod : eq_dec.
+Hint Resolve Dec_eq_list : eq_dec.
+Hint Resolve Dec_string : eq_dec.
