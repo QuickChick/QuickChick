@@ -1,5 +1,5 @@
 dist: trusty
-sudo: required
+sudo: false
 language: ocaml
 cache:
   apt: true
@@ -31,7 +31,7 @@ install:
 - eval $(opam config env)
 - opam config var root
 - opam repo add coq-released https://coq.inria.fr/opam/released || true
-- travis_wait opam install -j ${NJOBS} -y coq=8.6 coq-mathcomp-ssreflect ${EXTRA_OPAM}
+- travis_wait 30 opam install -j ${NJOBS} -y coq=8.6 coq-mathcomp-ssreflect ${EXTRA_OPAM}
 - opam list
 
 script:
