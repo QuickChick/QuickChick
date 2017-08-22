@@ -12,6 +12,10 @@ https://hackage.haskell.org/package/QuickCheck
 [foundational verification framework for testing code]:
 http://prosecco.gforge.inria.fr/personal/hritcu/publications/foundational-pbt.pdf
 
+For more information on QuickChick, look at the tutorial available under the qc folder 
+of the deep spec summer school:
+https://github.com/DeepSpec/dsss17
+
 ### Known to work with
 
   - Branch master: 
