@@ -93,8 +93,8 @@ let discriminate h =
     (gMatch h [(injectCtr "erefl", [], fun [] -> gI)])
 
 
-let rewrite h hin =
-  gApp (gInject "eq_ind") [hole; hole; hin; hole; h]
+let rewrite pred h hin =
+  gApp ~explicit:true (gInject "eq_ind") [hole; hole; pred; hin; hole; h]
   (* gMatch h [(injectCtr "erefl", [], fun [] -> hin)] *)
 
 let rewrite_sym typ h hin =

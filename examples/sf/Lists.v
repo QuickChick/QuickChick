@@ -27,7 +27,8 @@ Derive (Arbitrary, Show) for natprod.
 Derive (Sized, CanonicalSized) for natprod.
 Derive SizeMonotonic for natprod using genSnatprod.
 Derive SizedMonotonic for natprod.
-(* ZOE: Derive SizedCorrect for natprod using genSnatprod and SizeMonotonicnatprod. *)
+(* Zoe: Derive SizedCorrect : type error XXX : easy modify freq for singl *)
+(* Derive SizedCorrect for natprod using genSnatprod and SizeMonotonicnatprod. *)
 
 Definition fst (p : natprod) : nat :=
   match p with
@@ -246,7 +247,7 @@ Derive Sized for id.
 Derive CanonicalSized for id.
 Derive SizeMonotonic for id using genSid.
 Derive SizedMonotonic for id.
-(* ZOE : again? Derive SizedCorrect for id using genSid and SizeMonotonicid. *)
+(* Zoe: Derive SizedCorrect for id using genSid and SizeMonotonicid. XXX : easy modify freq for singl *)
 
 Definition beq_id (x1 x2 : id) :=
   match x1, x2 with
@@ -318,8 +319,7 @@ Instance suchThatNotCorrect {A} (P : A -> Prop)
          : SuchThatCorrect (fun a => ~ (P a)) 
                            (@arbitraryST _ (fun a => ~ (P a))
                                          (genSuchThatNot _)) :=
-  {| STComplete := _ ;
-     STSound    := _ |}.
+  {| STCorrect := _ |}.
 Admitted.
 
 (* (* Inductivized : *) QuickChick PartialMap.update_neq'. *)

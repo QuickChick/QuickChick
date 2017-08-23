@@ -26,7 +26,6 @@ Derive (Sized, CanonicalSized) for string.
 Derive SizeMonotonic for string using genSstring.
 Derive SizedMonotonic for string.
 
-
 Inductive id : Type :=
   | Id : string -> id.
 
@@ -34,7 +33,7 @@ Derive (Arbitrary, Show) for id.
 Derive (Sized, CanonicalSized) for id.
 Derive SizeMonotonic for id using genSid.
 Derive SizedMonotonic for id.
-(* ZOEEE : Derive SizedCorrect for id using genSid and SizeMonotonicid.*)
+(* Zoe: Derive SizedCorrect for id using genSid and SizeMonotonicid. *)
 
 Instance eq_dec_id (x y : id) : Dec (x = y).
 constructor; unfold decidable. repeat decide equality. Defined.
@@ -78,12 +77,11 @@ Inductive bind : partial_map -> id -> nat -> Prop :=
 
 Derive ArbitrarySizedSuchThat for (fun x => bind m x a).
 Derive SizeMonotonicSuchThatOpt for (fun x => bind m x a).
-
-(* ZOE!
-Derive SizedProofEqs for (fun x => bind m x a).
-Derive GenSizedSuchThatCorrect for (fun x => bind m x a).
 Derive GenSizedSuchThatSizeMonotonicOpt for (fun x => bind m x a).
-*)
+(* Zoe: SizedProofEqs, "Proof not found" ??? *)
+(* Derive SizedProofEqs for (fun x => bind m x a). *)
+(* Derive GenSizedSuchThatCorrect for (fun x => bind m x a). *)
+
 Instance adm_st m a : SuchThatCorrect (fun x => bind m x a) (genST (fun x => bind m x a)).
 Admitted.
 

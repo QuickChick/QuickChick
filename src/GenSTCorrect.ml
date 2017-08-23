@@ -52,7 +52,7 @@ let ret_exp (dt : coq_expr) (c : coq_expr) : btyp =
     returnGenSizeMonotonicOpt (gSome dt c),
     (* comp *)
     gFun ["x"; "Hx"]
-      (fun [x; hx] -> rewrite (imset_singl_incl hole hole hole (gVar hx)) (rewrite_set_r (semReturn hole) (gEqRefl hole))),
+      (fun [x; hx] -> rewrite hole (imset_singl_incl hole hole hole (gVar hx)) (rewrite_set_r (semReturn hole) (gEqRefl hole))),
     (* sound *)
     gFun ["x"; "Hx"]
       (fun [x; hx] -> gOrIntroL (gExIntro_impl hole (gConjIntro (gEqRefl hole) (rewrite_set_l (semReturn hole) (gVar hx)))))

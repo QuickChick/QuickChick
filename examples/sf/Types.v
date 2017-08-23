@@ -114,13 +114,18 @@ where "t1 '===>' t2" := (step t1 t2).
 Hint Constructors step.
 
 Derive ArbitrarySizedSuchThat for (fun tm => step tm0 tm).
-(* Zoe: Infinite loop 
-Derive SizedProofEqs for (fun tm => step tm0 tm).
 Derive SizeMonotonicSuchThatOpt for (fun tm => step tm0 tm).
-Derive GenSizedSuchThatCorrect for (fun tm => step tm0 tm).
 Derive GenSizedSuchThatSizeMonotonicOpt for (fun tm => step tm0 tm).
-*)
-Instance step_gen_correct t0 : SuchThatCorrect (fun t => step t0 t) 
+
+(* QuickChickDebug Debug On. *)
+Derive SizedProofEqs for (fun tm => step tm0 tm).
+(* Zoe: SizedProofEqs -- works but takes forever *)
+Derive GenSizedSuchThatCorrect for (fun tm => step tm0 tm).
+
+Definition success := "Proofs work!".
+Print success.
+
+Instance step_gen_correct t0 : SuchThatCorrect (fun t => step t0 t)
                                                   (@arbitraryST _ (fun t => step t0 t) _).
 Admitted.
 
@@ -192,11 +197,11 @@ where "'|-' t '\typ' T" := (has_type t T).
 Hint Constructors has_type.
 
 Derive ArbitrarySizedSuchThat for (fun t => has_type t T).
-(* Zoe: infinite loop?
-Derive SizedProofEqs for (fun t => has_type t T).
 Derive SizeMonotonicSuchThatOpt for (fun t => has_type t T).
-Derive GenSizedSuchThatCorrect for (fun t => has_type t T).
 Derive GenSizedSuchThatSizeMonotonicOpt for (fun t => has_type t T).
+(* Zoe: SizedProofEqs -- type error and takes forever *)
+(* Derive SizedProofEqs for (fun t => has_type t T).
+Derive GenSizedSuchThatCorrect for (fun t => has_type t T).
 *)
 Instance has_type_gen_correct T : SuchThatCorrect (fun t => has_type t T) 
                                                   (@arbitraryST _ (fun t => has_type t T) _).
@@ -266,5 +271,3 @@ Tactic Notation "normalize" :=
   repeat (print_goal; eapply multi_step ;
             [ (eauto 10; fail) | (instantiate; simpl)]);
   apply multi_refl.
-
-

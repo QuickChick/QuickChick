@@ -81,11 +81,10 @@ Hint Constructors appears_free_in.
 
 Derive ArbitrarySizedSuchThat for (fun i => appears_free_in i t).
 Derive SizeMonotonicSuchThatOpt for (fun i => appears_free_in i t).
-(* Zoe!
 Derive SizedProofEqs for (fun i => appears_free_in i t).
 Derive GenSizedSuchThatCorrect for (fun i => appears_free_in i t).
 Derive GenSizedSuchThatSizeMonotonicOpt for (fun i => appears_free_in i t).
-*)
+
 Instance appears_free_in_gen_correct t : SuchThatCorrect (fun i => appears_free_in i t) 
                                                          (@arbitraryST _ (fun i => appears_free_in i t) _).
 Admitted.

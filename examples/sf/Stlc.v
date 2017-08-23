@@ -50,7 +50,7 @@ Derive (Arbitrary, Show) for id.
 Derive (Sized, CanonicalSized) for id.
 Derive SizeMonotonic for id using genSid.
 Derive SizedMonotonic for id.
-(* ZOEEE : Derive SizedCorrect for id using genSid and SizeMonotonicid.*)
+(* Zoe: Derive SizedCorrect for id using genSid and SizeMonotonicid.*)
 
 Instance eq_dec_id (x y : id) : Dec (x = y).
 constructor; unfold decidable. repeat decide equality. Defined.
@@ -92,7 +92,7 @@ Inductive value : tm -> Prop :=
 
 Derive ArbitrarySizedSuchThat for (fun tm => value tm).
 Derive SizedProofEqs for (fun tm => value tm).
-(*
+(* OK. Just missing instances for id and tm.
 Derive SizeMonotonicSuchThatOpt for (fun tm => value tm).
 Derive GenSizedSuchThatCorrect for (fun tm => value tm).
 Derive GenSizedSuchThatSizeMonotonicOpt for (fun tm => value tm).
@@ -182,11 +182,11 @@ Inductive bind : context -> id -> ty -> Prop :=
 
 Derive ArbitrarySizedSuchThat for (fun i => bind m i a).
 Derive SizeMonotonicSuchThatOpt for (fun i => bind m i a).
-(* ZOE! Proof not found 
-Derive SizedProofEqs for (fun x => bind m x a).
-Derive GenSizedSuchThatCorrect for (fun x => bind m x a).
 Derive GenSizedSuchThatSizeMonotonicOpt for (fun x => bind m x a).
-*)
+(* Zoe: SizedProofEqs -- Proof not found  *)
+(* Derive SizedProofEqs for (fun x => bind m x a). *)
+(* Derive GenSizedSuchThatCorrect for (fun x => bind m x a). *)
+
 Instance adm_st m a : SuchThatCorrect (fun x => bind m x a) (genST (fun x => bind m x a)).
 Admitted.
 

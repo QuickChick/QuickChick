@@ -114,21 +114,15 @@ Inductive next_nat : nat -> nat -> Prop :=
 
 Derive ArbitrarySizedSuchThat for (fun n => next_nat n m).
 Derive SizeMonotonicSuchThatOpt for (fun n => next_nat n m).
-(* Zoe: SizedProofs are buggy! *)
-(*
+Derive GenSizedSuchThatSizeMonotonicOpt for (fun n => next_nat n m).
 Derive SizedProofEqs for (fun n => next_nat n m).
 Derive GenSizedSuchThatCorrect for (fun n => next_nat n m).
-Derive GenSizedSuchThatSizeMonotonicOpt for (fun n => next_nat n m).
-*)
 
 Derive ArbitrarySizedSuchThat for (fun n => next_nat m n).
 Derive SizeMonotonicSuchThatOpt for (fun n => next_nat m n).
-(* Zoe: SizedProofs are buggy! *)
-(*
+Derive GenSizedSuchThatSizeMonotonicOpt for (fun n => next_nat n m).
 Derive SizedProofEqs for (fun n => next_nat n m).
 Derive GenSizedSuchThatCorrect for (fun n => next_nat n m).
-Derive GenSizedSuchThatSizeMonotonicOpt for (fun n => next_nat n m).
-*)
 
 Inductive next_even : nat -> nat -> Prop :=
   | ne_1 : forall n, ev (S n) -> next_even n (S n)
@@ -136,18 +130,15 @@ Inductive next_even : nat -> nat -> Prop :=
 
 Derive ArbitrarySizedSuchThat for (fun n => next_even n m).
 Derive SizeMonotonicSuchThatOpt for (fun n => next_even n m).
-(* ZOEEE: 
+Derive GenSizedSuchThatSizeMonotonicOpt for (fun n => next_even n m).
 Derive SizedProofEqs for (fun n => next_even n m).
 Derive GenSizedSuchThatCorrect for (fun n => next_even n m).
-Derive GenSizedSuchThatSizeMonotonicOpt for (fun n => next_even n m).
-*)
+
 Derive ArbitrarySizedSuchThat for (fun n => next_even m n).
 Derive SizeMonotonicSuchThatOpt for (fun n => next_even m n).
-(* ZOEEE: 
+Derive GenSizedSuchThatSizeMonotonicOpt for (fun n => next_even n m).
 Derive SizedProofEqs for (fun n => next_even n m).
 Derive GenSizedSuchThatCorrect for (fun n => next_even n m).
-Derive GenSizedSuchThatSizeMonotonicOpt for (fun n => next_even n m).
-*)
 
 
 Lemma le_trans : forall m n o, m <= n -> n <= o -> m <= o.
