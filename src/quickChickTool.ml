@@ -185,7 +185,7 @@ let gather_all_vs fs =
   let rec loop fs =
     match fs with
     | File (s, _) ->
-       if Filename.check_suffix s ".v" 
+       if (Filename.check_suffix s ".v")
           && not (List.exists (fun x -> x = Filename.basename s) !excluded) then
          all_vs := (Filename.chop_suffix s ".v") :: !all_vs
     | Dir (s, fss) ->
@@ -387,7 +387,7 @@ let rec parse_file_or_dir file_name =
       let s = load_file file_name in
       Some (File (file_name, [Section ("(*", "__default__" ^ file_name, "*)", None, [Text s])]))
     else
-      let handle = Filename.check_suffix file_name "v" 
+      let handle = (Filename.check_suffix file_name "v" || Filename.check_suffix file_name "c")
                    && not (List.exists (fun x -> x = Filename.basename file_name) !excluded) in
       if handle then begin
         debug "In file: %s\n" file_name;
@@ -607,11 +607,11 @@ let main =
       "Set Warnings \"-extraction-opaque-accessed,-extraction\".\n\n" ^
       "Require Import String.\n"^
       "From QuickChick Require Import QuickChick.\n\n"^
-      "Require " ^ (String.concat " " imports) ^ ".\n\n" ^
+      (if imports <> [] then "Require " ^ (String.concat " " imports) ^ ".\n\n" else "")^
 
       (String.concat "\n" tests) ^ "\n" ^
 
-      "Separate Extraction " ^ (String.concat " " extractions) ^ " " ^ (String.concat " " test_names) ^  ".\n" in
+      (if (extractions @ test_names <> []) then "Separate Extraction " ^ (String.concat " " extractions) ^ " " ^ (String.concat " " test_names) ^  ".\n" else "") in
 
     ensure_tmpdir_exists();
     ignore (write_file (tmp_dir ^ "/" ^ temporary_file) tmp_file_data);
