@@ -1,5 +1,5 @@
 V=@
-.PHONY: plugin install clean
+.PHONY: plugin install install-plugin clean
 
 # Here is a hack to make $(eval $(shell work
 # (copied from coq_makefile generated stuff):
@@ -25,6 +25,9 @@ install: all
 #	 $(V)cp src/quickChickLib.cmx $(COQLIB)/user-contrib/QuickChick
 #	 $(V)cp src/quickChickLib.o $(COQLIB)/user-contrib/QuickChick
 	 $(V)cp src/quickChickTool $(shell echo $(PATH) | tr ':' "\n" | grep opam | uniq)/quickChick
+
+install-plugin:
+	$(V)$(MAKE) -f Makefile.coq install > $(TEMPFILE) || cat $(TEMPFILE)
 
 src/quickChickToolLexer.cmo : src/quickChickToolLexer.mll 
 	ocamllex src/quickChickToolLexer.mll
