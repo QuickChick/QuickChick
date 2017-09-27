@@ -39,10 +39,10 @@ Extract Constant randomNext   => "(fun r -> Random.State.bits r, r)".
 Extract Constant randomSplit  => "(fun x -> (x,x))".
 Extract Constant mkRandomSeed => "(fun x -> Random.init x; Random.get_state())".
 Extract Constant randomRNat  =>
-  "(fun (x,y) r -> (x + (Random.State.int r (y - x + 1)), r))".
+  "(fun (x,y) r -> if y < x then failwith ""choose called with unordered arguments"" else  (x + (Random.State.int r (y - x + 1)), r))".
 Extract Constant randomRBool => "(fun _ r -> Random.State.bool r, r)".
 Extract Constant randomRInt  =>
-  "(fun (x,y) r -> (x + (Random.State.int r (y - x + 1)), r))".
+  "(fun (x,y) r -> if y < x then failwith ""choose called with unordered arguments"" else  (x + (Random.State.int r (y - x + 1)), r))".
 Extract Constant newRandomSeed => "(Random.State.make_self_init ())".
 
 Extract Inductive Lazy => "Lazy.t" [lazy].

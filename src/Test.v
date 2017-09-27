@@ -36,6 +36,14 @@ Record Args := MkArgs {
   chatty     : bool
 }.
 
+Definition updMaxSize (a : Args) (x : nat) : Args := 
+  let '(MkArgs r msc md msh msz c) := a in 
+  MkArgs r msc md msh x c.
+
+Definition updMaxSuccess (a : Args) (x : nat) : Args := 
+  let '(MkArgs r msc md msh msz c) := a in 
+  MkArgs r x md msh msz c.
+
 Inductive Result :=
   | Success : nat -> nat -> list (string * nat) -> string -> Result
   | GaveUp  : nat -> list (string * nat) -> string -> Result
@@ -121,7 +129,7 @@ Definition summary (st : State) : list (string * nat) :=
 Definition doneTesting (st : State) (f : nat -> RandomSeed -> QProp) : Result :=
  if expectedFailure st then
     Success (numSuccessTests st + 1) (numDiscardedTests st) (summary st)
-            ("+++ Passed " ++ (show (numSuccessTests st)) ++ " tests")
+            ("+++ Passed " ++ (show (numSuccessTests st)) ++ " tests (" ++ (show (numDiscardedTests st)) ++ " discards)")
   else
     NoExpectedFailure (numSuccessTests st) (summary st)
                       ("*** Failed! Passed " ++ (show (numSuccessTests st))
@@ -287,7 +295,8 @@ Fixpoint runATest (st : State) (f : nat -> RandomSeed -> QProp) (maxSteps : nat)
                                  else "+++ Failed (as expected) ")%string in
             let (numShrinks, res') := localMin st (MkRose res ts) in
             let suf := ("after " ++ (show (S nst)) ++ " tests and "
-                                 ++ (show numShrinks) ++ " shrinks")%string in
+                                 ++ (show numShrinks) ++ " shrinks. ("
+                                 ++ (show ndt) ++ " discards)")%string in
             (* TODO: Output *)
             if (negb (expect res)) then
               Success (nst + 1) ndt (summary st) (tag_text ++ pre ++ suf)
