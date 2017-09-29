@@ -117,28 +117,32 @@ Module Type QuickChickSig.
   (** =================================================================== *)
 
   (* OrdType : reflexive, transitive, antisymmetric predicates. *)
-  Class OrdType (A: Type) :=
-    {
-      leq     : A -> A -> bool;
-      refl    : reflexive leq;
-      trans   : transitive leq;
-      antisym : antisymmetric leq
-    }.
+  (*
+    Class OrdType (A: Type) :=
+      {
+        leq     : A -> A -> bool;
+        refl    : reflexive leq;
+        trans   : transitive leq;
+        antisym : antisymmetric leq
+      }.
+   *)
 
   Declare Instance OrdBool : OrdType bool.
   Declare Instance OrdNat  : OrdType nat.
   Declare Instance OrdZ    : OrdType Z.
 
   (* OrdTypes that support choosing from an interval. *)
-  Class ChoosableFromInterval (A : Type)  :=
-  {
-    super :> OrdType A;
-    randomR : A * A -> RandomSeed -> A * RandomSeed;
-    randomRCorrect :
-      forall (a a1 a2 : A), leq a1 a2 ->
-      (leq a1 a && leq a a2 <->
-       exists seed, fst (randomR (a1, a2) seed) = a)
-  }.
+  (* 
+    Class ChoosableFromInterval (A : Type)  :=
+    {
+      super :> OrdType A;
+      randomR : A * A -> RandomSeed -> A * RandomSeed;
+      randomRCorrect :
+        forall (a a1 a2 : A), leq a1 a2 ->
+        (leq a1 a && leq a a2 <->
+         exists seed, fst (randomR (a1, a2) seed) = a)
+    }.
+  *)
 
   Declare Instance ChooseBool : ChoosableFromInterval bool.
   Declare Instance ChooseNat : ChoosableFromInterval nat. 
@@ -207,10 +211,12 @@ Module Type QuickChickSig.
   (** =================================================================== *)
 
   (* Show typeclass. *)
+  (*
   Class Show (A : Type) : Type :=
     {
       show : A -> string
     }.
+   *)
 
   (* Instances. *)
   Declare Instance showNat    : Show nat.
@@ -234,8 +240,10 @@ Module Type QuickChickSig.
   (** Generation typeclasses and instances.                               *)
   (** =================================================================== *)
 
+  (*
   Class GenSized (A : Type) := { arbitrarySized : nat -> G A }.
   Class Gen (A : Type) := { arbitrary : G A }.
+   *)
 
   (* Automatic conversion of GenSized instances to Gen using 'sized'. *)
   Declare Instance GenOfGenSized {A} `{GenSized A} : Gen A. 
@@ -263,10 +271,12 @@ Module Type QuickChickSig.
   (** =================================================================== *)
   
   (** Shrink class *)
+  (*
   Class Shrink (A : Type) :=
     { 
       shrink : A -> list A 
     }.
+   *)
 
   (** Shrink instances *)
   Declare Instance shrinkBool : Shrink bool.
@@ -282,7 +292,9 @@ Module Type QuickChickSig.
   (** =================================================================== *)
 
   (** Arbitrary Class *)
+  (*
   Class Arbitrary (A : Type) `{Gen A} `{Shrink A}.
+   *)
 
   (** 
                               GenSized 
@@ -307,10 +319,12 @@ Module Type QuickChickSig.
   Parameter Checker : Type.
 
   (* A Class that indicates we can check a type A. *)
+  (* 
   Class Checkable (A : Type) : Type :=
     {
       checker : A -> Checker
     }.
+   *)
 
   (* Bools signify pass/fail. *)
   Declare Instance testBool : Checkable bool.
@@ -393,8 +407,10 @@ Module Type QuickChickSig.
   (** =================================================================== *)
 
   (* Decidability typeclass using ssreflect's 'decidable'. *)
+  (* 
   Class Dec (P : Prop) : Type := { dec : decidable P }.
-  
+   *)
+
   (* Decidable properties are Checkable. *)
   Declare Instance testDec {P} `{H : Dec P} : Checkable P.
 
@@ -413,11 +429,13 @@ Module Type QuickChickSig.
   (** Decidable Equality.                                                 *)
   (** =================================================================== *)
 
+  (*
   Class Eq (A : Type) :=
     { 
       dec_eq : forall (x y : A), decidable (x = y)
     }.
-  
+  *)
+
   (* Automation and conversions for Dec. *)
   Parameter dec_if_dec_eq : 
     forall {A} (x y: A),  Dec (x = y) -> {x = y} + {x <> y}.
@@ -494,6 +512,7 @@ Module Type QuickChickSig.
   (** =================================================================== *)
 
   (* Sized and unsized version, plus convenient notation. *)
+  (*
   Class GenSizedSuchThat (A : Type) (P : A -> Prop) := 
     { 
       arbitrarySizeST : nat -> G (option A) 
@@ -503,7 +522,7 @@ Module Type QuickChickSig.
     { 
       arbitraryST : G (option A)
     }.
-
+   *)
   Notation "'genST' x" := (@arbitraryST _ x _) (at level 70).
 
   (** =================================================================== *)
