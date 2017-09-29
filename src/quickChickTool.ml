@@ -189,7 +189,9 @@ let gather_all_vs fs =
           && not (List.exists (fun x -> x = Filename.basename s) !excluded) then
          all_vs := (Filename.chop_suffix s ".v") :: !all_vs
     | Dir (s, fss) ->
-       List.iter loop fss
+       if not (List.exists (fun x -> x = s) !excluded) then 
+         List.iter loop fss
+       else ()
   in loop fs;
   !all_vs
 
@@ -372,6 +374,7 @@ let rec parse_file_or_dir file_name =
     debug "[parse_file_or_dir %s]\n" file_name;
     if is_dir file_name then begin
       if is_prefix tmp_dir (Filename.basename file_name)
+                   || (List.exists (fun x -> x = Filename.basename file_name) !excluded) 
       then None else begin
         let ls = Sys.readdir file_name in
         if !verbose then begin
