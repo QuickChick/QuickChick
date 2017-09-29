@@ -11,11 +11,15 @@ endef
 includecmdwithout@ = $(eval $(subst @,$(donewline),$(shell { $(1) | tr -d '\r' | tr '\n' '@'; })))
 $(call includecmdwithout@,$(COQBIN)coqtop -config)
 
-all: plugin
+all: plugin documentation-check
 	$(MAKE) quickChickTool
 
 plugin: Makefile.coq 
 	$(MAKE) -f Makefile.coq 
+
+documentation-check:
+	coqc -R src QuickChick BasicInterface.v
+	coqc -R src QuickChick DocumentationCheck.v
 
 TEMPFILE := $(shell mktemp)
 
@@ -58,8 +62,8 @@ Makefile.coq: _CoqProject
 
 clean:
          # This might not work on macs, but then not my problem
-	find . -name *.vo -print -delete
-	find . -name *.glob -print -delete
+	find . -name '*.vo' -print -delete
+	find . -name '*.glob' -print -delete
 	find . -name *.d -print -delete
 	find . -name *.o -print -delete
 	find . -name *.cmi -print -delete
