@@ -2,6 +2,26 @@ Require Import mathcomp.ssreflect.ssreflect.
 From mathcomp Require Import ssrbool.
 Require Import QuickChick ZArith Strings.Ascii Strings.String.
 
+(* ====================================================================== *)
+(* CONTENTS                                                               *)
+(* ====================================================================== *)
+(** Monadic operations.                                                   *)
+(** Combinators borrowed from Haskell's QuickCheck.                       *)
+(** Choosing from intervals (choose).                                     *)
+(** Notations.                                                            *)
+(** Printing.                                                             *)
+(** Generation typeclasses and instances.                                 *)
+(** Shrinking typeclass and instances.                                    *)
+(** Arbitrary and typeclass hierarchy.                                    *)
+(** Properties - Checkers                                                 *)
+(** Checker combinators.                                                  *)
+(** Decidability.                                                         *)
+(** Decidable Equality.                                                   *)
+(** QuickChick toplevel commands and arguments.                           *)
+(** Generators for data satisfying inductive invariants.                  *)
+(** Automatic instance derivation.                                        *)
+(* ====================================================================== *)
+
 Module Type QuickChickSig.
 
   Parameter RandomSeed : Type.
@@ -330,7 +350,7 @@ Module Type QuickChickSig.
       Checkable (forall T, prop T).
 
   (** =================================================================== *)
-  (** Checker combinators.                                               *)
+  (** Checker combinators.                                                *)
   (** =================================================================== *)
   
   (* Print a specific string if the property fails. *)
@@ -367,6 +387,157 @@ Module Type QuickChickSig.
       (implication x y) (at level 55, right associativity)
       : Checker_scope.
   End QcNotation.
+
+  (** =================================================================== *)
+  (** Decidability.                                                       *)
+  (** =================================================================== *)
+
+  (* Decidability typeclass using ssreflect's 'decidable'. *)
+  Class Dec (P : Prop) : Type := { dec : decidable P }.
+  
+  (* Decidable properties are Checkable. *)
+  Declare Instance testDec {P} `{H : Dec P} : Checkable P.
+
+  (* Logic Combinator instances. *)
+  Declare Instance Dec_neg {P} {H : Dec P} : Dec (~ P).
+  Declare Instance Dec_conj {P Q} {H : Dec P} {I : Dec Q} : Dec (P /\ Q).
+  Declare Instance Dec_disj {P Q} {H : Dec P} {I : Dec Q} : Dec (P \/ Q).
+
+  (* Convenient notation. *)
+  Notation "P '?'" := (match (@dec P _) with 
+                       | left _ => true
+                       | right _ => false
+                       end) (at level 100).
+
+  (** =================================================================== *)
+  (** Decidable Equality.                                                 *)
+  (** =================================================================== *)
+
+  Class Eq (A : Type) :=
+    { 
+      dec_eq : forall (x y : A), decidable (x = y)
+    }.
+  
+  (* Automation and conversions for Dec. *)
+  Parameter dec_if_dec_eq : 
+    forall {A} (x y: A),  Dec (x = y) -> {x = y} + {x <> y}.
+
+  (* TODO: How to include LTac here? *)
+  (* Tactic that decides equalities of the form Dec (x = y). *)
+  (* Ltac dec_eq. *)
+
+  Declare Instance Eq__Dec {A} `{H : Eq A} (x y : A) : Dec (x = y).
+  
+  (* Lifting common decidable instances *)
+  Declare Instance Dec_eq_bool (x y : bool) : Dec (x = y).
+  Declare Instance Dec_eq_nat (m n : nat) : Dec (m = n).
+  Declare Instance Dec_eq_opt (A : Type) (m n : option A)
+  `{_ : forall (x y : A), Dec (x = y)} : Dec (m = n).
+  Declare Instance Dec_eq_prod (A B : Type) (m n : A * B)
+  `{_ : forall (x y : A), Dec (x = y)} 
+  `{_ : forall (x y : B), Dec (x = y)} 
+  : Dec (m = n).
+  Declare Instance Dec_eq_list (A : Type) (m n : list A)
+  `{_ : forall (x y : A), Dec (x = y)} : Dec (m = n).
+
+  Declare Instance Dec_ascii (m n : Ascii.ascii) : Dec (m = n).
+  Declare Instance Dec_string (m n : string) : Dec (m = n).
+
+  (** =================================================================== *)
+  (** QuickChick toplevel commands and arguments.                         *)
+  (** =================================================================== *)
+
+  (* Samples a generator. 'g' is of type 'G A' for showable 'A'. *)
+  (** 
+      Sample g.
+   *)
+
+  (* Runs a test. 'prop' must be 'Checkable'. *)
+  (** 
+       QuickChick prop. 
+   *)
+
+  (* Arguments to customize execution. *)
+  Record Args := 
+    MkArgs
+      {
+        (* Re-execute a test. *)
+        (* Default: None *)
+        replay     : option (RandomSeed * nat); 
+        (* Maximum number of successful tests to run. *)
+        (* Default: 10000 *)
+        maxSuccess : nat;                       
+        (* Maximum number of discards to accept. *)
+        (* Default: 20000 *)
+        maxDiscard : nat;
+        (* Maximum number of shrinks to perform before terminating. *)
+        (* Default : 1000 *)
+        maxShrinks : nat;
+        (* Maximum size of terms to generate (depth). *)
+        (* Default : 7 *)
+        maxSize    : nat;
+        (* Verbosity. Note: Doesn't do much... *)
+        (* Default true. *)
+        chatty     : bool
+      }.
+
+  (* Instead of record updates, you can overwrite extraction constants. *)
+  (*
+     Extract Constant defNumTests    => "10000".
+     Extract Constant defNumDiscards => "(2 * defNumTests)".
+     Extract Constant defNumShrinks  => "1000".
+     Extract Constant defSize        => "7".
+   *)
+
+  (** =================================================================== *)
+  (** Generators for data satisfying inductive invariants.                *)
+  (** =================================================================== *)
+
+  (* Sized and unsized version, plus convenient notation. *)
+  Class GenSizedSuchThat (A : Type) (P : A -> Prop) := 
+    { 
+      arbitrarySizeST : nat -> G (option A) 
+    }.
+  
+  Class GenSuchThat (A : Type) (P : A -> Prop) := 
+    { 
+      arbitraryST : G (option A)
+    }.
+
+  Notation "'genST' x" := (@arbitraryST _ x _) (at level 70).
+
+  (** =================================================================== *)
+  (** Automatic instance derivation.                                      *)
+  (** =================================================================== *)
+
+  (* QuickChick allows the automatic derivation of typeclass instances 
+     for simple types: 
+
+       Derive <class> for <T>.
+
+     <class> must be one of: GenSized , Shrink , Arbitrary , Show
+     <T> must be an inductive defined datatype (think Haskell/OCaml).
+   *)
+
+  (* QuickChick also allows for the automatic derivation of generators 
+     satisfying preconditions in the form of inductive relations:
+
+       Derive ArbitrarySizedSuchThat for (fun x => P x1 ... x .... xn).
+
+     <P> must be an inductively defined relation.
+     <x> is the function to be generated.
+     <x1...xn> are (implicitly universally quantified) variable names. 
+   *)
+  
+   (* QuickChick also allows automatic derivations of proofs of 
+      correctness of its derived generators! For more, look 
+      at: 
+      
+      - our ITP paper 
+      - our POPL paper
+      - examples/dependentTest.v
+
+    *)
 
 End QuickChickSig.
 
