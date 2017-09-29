@@ -210,8 +210,163 @@ Module Type QuickChickSig.
   (* Newline *)
   Definition nl : string := String (ascii_of_nat 10) EmptyString.
   
+  (** =================================================================== *)
+  (** Generation typeclasses and instances.                               *)
+  (** =================================================================== *)
+
+  Class GenSized (A : Type) := { arbitrarySized : nat -> G A }.
+  Class Gen (A : Type) := { arbitrary : G A }.
+
+  (* Automatic conversion of GenSized instances to Gen using 'sized'. *)
+  Declare Instance GenOfGenSized {A} `{GenSized A} : Gen A. 
+
+  (* Basic generator instances *)
+  Declare Instance genBoolSized : GenSized bool.
+  Declare Instance genNatSized  : GenSized nat.
+  Declare Instance genZSized    : GenSized Z.
+
+  Declare Instance genListSized :
+    forall {A : Type} `{GenSized A}, GenSized (list A).
+  Declare Instance genList :
+    forall {A : Type} `{Gen A}, Gen (list A). 
+  Declare Instance genOption : 
+    forall {A : Type} `{Gen A}, Gen (option A).
+  Declare Instance genPairSized :
+    forall {A B : Type} `{GenSized A} `{GenSized B}, GenSized (A*B).
+  Declare Instance genPair : 
+    forall {A B : Type} `{Gen A} `{Gen B}, Gen (A * B).
+
+  (* TODO: Strings? *)
+
+  (** =================================================================== *)
+  (** Shrinking typeclass and instances.                                  *)
+  (** =================================================================== *)
+  
+  (** Shrink class *)
+  Class Shrink (A : Type) :=
+    { 
+      shrink : A -> list A 
+    }.
+
+  (** Shrink instances *)
+  Declare Instance shrinkBool : Shrink bool.
+  Declare Instance shrinkNat : Shrink nat.
+  Declare Instance shrinkZ : Shrink Z.
+
+  Declare Instance shrinkList {A : Type} `{Shrink A} : Shrink (list A).
+  Declare Instance shrinkPair {A B} `{Shrink A} `{Shrink B} : Shrink (A * B).
+  Declare Instance shrinkOption {A : Type} `{Shrink A} : Shrink (option A).
+
+  (** =================================================================== *)
+  (** Arbitrary and typeclass hierarchy.                                  *)
+  (** =================================================================== *)
+
+  (** Arbitrary Class *)
+  Class Arbitrary (A : Type) `{Gen A} `{Shrink A}.
+
+  (** 
+                              GenSized 
+                                 |
+                                 |
+                                Gen   Shrink
+                                  \    /
+                                   \  /
+                                 Arbitrary
+   *)
 
 
+  (* Automatic conversion *)
+  Declare Instance ArbitraryOfGenShrink : 
+    forall {A} `{Gen A} `{Shrink A}, Arbitrary A.
+
+  (** =================================================================== *)
+  (** Properties - Checkers                                               *)
+  (** =================================================================== *)
+
+  (* The opaque type of QuickChick properties that can be checked. *)
+  Parameter Checker : Type.
+
+  (* A Class that indicates we can check a type A. *)
+  Class Checkable (A : Type) : Type :=
+    {
+      checker : A -> Checker
+    }.
+
+  (* Bools signify pass/fail. *)
+  Declare Instance testBool : Checkable bool.
+  (* Units signify discarded tests. *)
+  Declare Instance testUnit : Checkable unit.
+
+  (* Given a generator for showable As, construct a Checker. *)
+  Parameter forAll : 
+    forall {A prop : Type} `{Checkable prop} `{Show A} 
+           (gen : G A)  (pf : A -> prop), Checker.
+  (* Variant of forAll that uses evidence for the generated value. *)
+  Parameter forAllProof : 
+    forall {A prop : Type} `{Checkable prop} `{Show A}
+           (gen : G A)  (pf : forall (x : A), semGen gen x -> prop), Checker.
+
+  (* Given a generator and a shrinker for showable As, construct a Checker *)
+  Parameter forAllShrink :
+    forall {A prop : Type} `{Checkable prop} `{Show A}
+           (gen : G A) (shrinker : A -> list A) (pf : A -> prop), Checker.
+  (* TODO: Do we need a forAllShrinkProof variant? *)
+
+  (* Typeclass magic: Lift (Show, Gen, Shrink) instances for A 
+     to a Checker for functions A -> prop. *)
+  Declare Instance testFun : 
+    forall {A prop : Type} `{Show A} `{Arbitrary A} `{Checkable prop},
+      Checkable (A -> prop).
+
+  (* Typeclass magic revisited: Similar thing for products. *)
+  Declare Instance testProd :
+    forall {A : Type} {prop : A -> Type} `{Show A} `{Arbitrary A} 
+           `{forall x : A, Checkable (prop x)},
+      Checkable (forall (x : A), prop x).
+
+  (* Test polymorphic functions by instantiating to 'nat'. :-) *)
+  Declare Instance testPolyFun :
+    forall {prop : Type -> Type} `{Checkable (prop nat)}, 
+      Checkable (forall T, prop T).
+
+  (** =================================================================== *)
+  (** Checker combinators.                                               *)
+  (** =================================================================== *)
+  
+  (* Print a specific string if the property fails. *)
+  Parameter whenFail : 
+    forall {prop : Type} `{Checkable prop} (str : string), prop -> Checker.
+
+  (* Signify that the property is expected to fail. *)
+  Parameter expectFailure :
+    forall {prop: Type} `{Checkable prop} (p: prop), Checker.
+
+  (* Collect statistics across all tests. *)
+  Parameter collect :
+    forall {A prop : Type} `{Show A} `{Checkable prop} (x : A),
+      prop -> Checker.
+
+  (* Set the reason for failure. 
+     Will only count shrinks as valid if they preserve the tag. *)
+  Parameter tag : 
+    forall {prop : Type} `{Checkable prop} (t : string), prop -> Checker.
+
+  (* Take the conjunction/disjunction of all the checkers. *)
+  Parameter conjoin : forall (l : list Checker), Checker.
+  Parameter disjoin : forall (l : list Checker), Checker.
+
+  (* Conditional properties. Invalid generated inputs are discarded. *)
+  Parameter implication :
+    forall {prop : Type} `{Checkable prop} (b : bool) (p : prop), Checker.
+
+  (* Notation for implication. Clashes a lot, so it gets its own module. *)
+  Module QcNotation.
+    Export QcDefaultNotation.
+
+    Notation "x ==> y" := 
+      (implication x y) (at level 55, right associativity)
+      : Checker_scope.
+  End QcNotation.
 
 End QuickChickSig.
 
