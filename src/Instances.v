@@ -186,7 +186,30 @@ Next Obligation.
 Qed.
 
 (** Correctness proof about built-in generators *)
-(** Zoe: Take a look at these :) *)
+
+Instance boolSizeMonotonic : SizeMonotonic (@arbitrary bool _).
+Proof.
+  unfold arbitrary, GenOfGenSized.
+  eapply sizedSizeMonotonic; unfold arbitrarySized, genBoolSized.
+  intros _. eauto with typeclass_instances.
+  constructor. intros. eapply subset_refl.
+Qed.
+
+Instance boolSizedMonotonic : SizedMonotonic (@arbitrarySized bool _).
+Proof.
+  constructor. intros. eapply subset_refl.
+Qed.
+
+Instance boolCorrect : Correct bool arbitrary.
+Proof.
+  constructor. unfold arbitrary, GenOfGenSized.
+  rewrite semSized.
+  unfold arbitrarySized, genBoolSized.
+  intros x. split; intros H; try now constructor.
+  exists 0. split. constructor.
+  eapply semChooseSize; eauto.
+  destruct x; eauto.
+Qed.  
 
 Lemma arbBool_correct:
   semGen arbitrary <--> [set: bool].

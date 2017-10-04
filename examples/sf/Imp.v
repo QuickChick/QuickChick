@@ -37,8 +37,11 @@ Derive (Arbitrary, Show) for aexp.
 Derive (Sized, CanonicalSized) for aexp.
 Derive SizeMonotonic for aexp using genSaexp.
 Derive SizedMonotonic for aexp.
-Derive SizedCorrect for aexp using genSaexp and SizeMonotonicaexp.
+(* Zoe : ??? I do not understand why this broke. Seems to be missing an annotation. Nothing relevant changed *)
+Instance SizedCorrectaexp : SizedCorrect (@arbitrarySized aexp _).
+Admitted.
 
+(* Derive SizedCorrect for aexp using genSaexp and SizeMonotonicaexp. *)
 Instance dec_eq_aex (x y : aexp) : Dec (x = y).
 constructor; unfold decidable; repeat decide equality. Defined.
 

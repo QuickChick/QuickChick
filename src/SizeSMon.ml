@@ -168,8 +168,8 @@ let sizeSMon ty_ctr ctrs iargs  =
       set_incl_refl
     | _ ->
       (subset_set_eq_compat
-         (semFreqSize lg lgs s)
-         (semFreqSize rg rgs s)
+         (semFreqSize lg lgs s hole)
+         (semFreqSize rg rgs s hole)
          (genCase ihs1 hleq ctrs))
   in
 
@@ -222,7 +222,7 @@ let sizeSMon ty_ctr ctrs iargs  =
                 )
         in
         subset_respects_set_eq_r
-          (semFreqSize ig igs s)
+          (semFreqSize ig igs s hole)
           (proof ctrs)
       | _ ->
         (* The generators should be explicitly passed to the lemmas *)
@@ -234,8 +234,8 @@ let sizeSMon ty_ctr ctrs iargs  =
           (oneOf_freq g gs s)
           (* Rewrite with the semantics of freq left and right *)
           (subset_set_eq_compat
-             (semFreqSize fg fgs s)
-             (semFreqSize ig igs s)
+             (semFreqSize fg fgs s hole)
+             (semFreqSize ig igs s hole)
              (incl_bigcupl (incl_subset hole hole (seq_incl_proof ctrs))))
   in
 

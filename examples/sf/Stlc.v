@@ -35,7 +35,7 @@ Derive (Arbitrary, Show) for ascii.
 Derive (Sized, CanonicalSized) for ascii.
 Derive SizeMonotonic for ascii using genSascii.
 Derive SizedMonotonic for ascii.
-(* Zoe: Derive SizedCorrect for ascii using genSascii and SizeMonotonicascii. *)
+Derive SizedCorrect for ascii using genSascii and SizeMonotonicascii.
 
 Derive (Arbitrary, Show) for string.
 Derive (Sized, CanonicalSized) for string.

@@ -347,7 +347,7 @@ let stMaybe (opt : bool) (exp : atyp)
     set_incl_trans
       (imset_incl (gFun [x; hxs] (fun [x; hx] -> sumbools_to_bool_comp x hx checks)))
       ((if opt then semSuchThatMaybeOpt_complete else semSuchThatMaybe_complete)
-         gen (bool_pred checks) hole comp),
+         gen (bool_pred checks) hole mon comp),
     (* sound *)
     set_incl_trans
       ((if opt then semSuchThatMaybeOpt_sound else semSuchThatMaybe_sound)

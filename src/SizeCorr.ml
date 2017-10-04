@@ -17,6 +17,8 @@ open GenericLib
 open SetLib
 open CoqLib
 open GenLib
+open SemLib
+open Error
     
 let list_keep_every n l =
   let rec aux i = function
@@ -161,9 +163,13 @@ let genCorr ty_ctr ctrs iargs inst_name mon_inst_name =
     gFun ["n"; "s"; "IHs"]
       (fun [n; s; ihs] ->
         let (gen, gens) = ind_gens n in
-         set_eq_trans
-           (gApp ~explicit:true (gInject "semFreq") [hole; gen; gens])
-           (genCase (gVar ihs) hmon (gPair (hole, hole)) ctrs))
+         match ctrs with
+         | [] -> failwith "Must have base cases"
+         | [(ctr, ty)] -> proof (gVar ihs) hmon ty 0
+         | _ :: _ ->
+           set_eq_trans
+             (semFreq gen gens hole)
+             (genCase (gVar ihs) hmon (gPair (hole, hole)) ctrs))
   in
 
   let base_case =
@@ -188,8 +194,9 @@ let genCorr ty_ctr ctrs iargs inst_name mon_inst_name =
     gFun ["n"]
       (fun [n] ->
          gApp ~explicit:true (gInject "nat_set_ind")
-           [full_dt; hole; hole; ret_type;
-            base_case; ind_case (mon_proof (gVar n)); (gVar n)])
+           [full_dt; hole; hole
+           ; base_case; ind_case (mon_proof (gVar n)); (gVar n)])
   in
+  msg_debug (str "Sized proof");
   debug_coq_expr gen_proof;
   gRecord [("arbitrarySizedCorrect", gen_proof)]

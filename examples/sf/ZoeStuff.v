@@ -4,13 +4,6 @@ From QuickChick Require Import QuickChick Tactics.
 
 Import QcNotation. 
 
-Instance frequencySizeMonotonic_alt 
-: forall {A : Type} (g0 : G A) (lg : seq (nat * G A)),
-    SizeMonotonic g0 ->
-    lg \subset [set x | SizeMonotonic x.2 ] ->
-    SizeMonotonic (frequency g0 lg).
-Admitted.
-
 Lemma semFreq :
   forall (A : Type) (ng : nat * G A) (l : seq (nat * G A)),
     semGen (freq ((fst ng, snd ng) ;; l)) <-->
