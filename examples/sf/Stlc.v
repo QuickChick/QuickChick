@@ -10,7 +10,6 @@ Import QcDefaultNotation. Open Scope qc_scope.
 
 Set Bullet Behavior "Strict Subproofs".
 
-Require Import ZoeStuff.
 (* End prelude *)
 
 Require Import Smallstep.
@@ -22,9 +21,9 @@ Inductive ty : Type :=
 
 Derive (Arbitrary, Show) for ty.
 Derive (Sized, CanonicalSized) for ty.
-Derive SizeMonotonic for ty using genSty0.
+Derive SizeMonotonic for ty using genSty.
 Derive SizedMonotonic for ty.
-Derive SizedCorrect for ty using genSty0 and SizeMonotonicty0.
+Derive SizedCorrect for ty using genSty and SizeMonotonicty.
 
 Instance eq_dec_ty (t1 t2 : ty) : Dec (t1 = t2).
 constructor; unfold decidable; decide equality; auto. Defined.
@@ -50,7 +49,7 @@ Derive (Arbitrary, Show) for id.
 Derive (Sized, CanonicalSized) for id.
 Derive SizeMonotonic for id using genSid.
 Derive SizedMonotonic for id.
-(* Zoe: Derive SizedCorrect for id using genSid and SizeMonotonicid.*)
+Derive SizedCorrect for id using genSid and SizeMonotonicid.
 
 Instance eq_dec_id (x y : id) : Dec (x = y).
 constructor; unfold decidable. repeat decide equality. Defined.
@@ -71,12 +70,16 @@ Inductive tm : Type :=
 
 Derive (Arbitrary, Show) for tm.
 Derive (Sized, CanonicalSized) for tm.
-(* Requires SizeMonotonic for id *)
-(*
-Derive SizeMonotonic for tm using genStm0.
+Derive SizeMonotonic for tm using genStm1.
 Derive SizedMonotonic for tm.
-Derive SizedCorrect for tm using genStm0 and SizeMonotonictm0.
-*)
+(*
+Zoe: Silly name clash. Would work if we rename tm to tm' or something.
+Admitting for the following work
+Derive SizedCorrect for tm using genStm1 and SizeMonotonictm0.
+ *)
+
+Instance SizedCorrecttm : (SizedCorrect (@arbitrarySized tm _)).
+Admitted.
 
 Instance eq_dec_tm (t1 t2 : tm) : Dec (t1 = t2).
 constructor; unfold decidable; repeat decide equality. Defined.
@@ -92,11 +95,9 @@ Inductive value : tm -> Prop :=
 
 Derive ArbitrarySizedSuchThat for (fun tm => value tm).
 Derive SizedProofEqs for (fun tm => value tm).
-(* OK. Just missing instances for id and tm.
 Derive SizeMonotonicSuchThatOpt for (fun tm => value tm).
 Derive GenSizedSuchThatCorrect for (fun tm => value tm).
 Derive GenSizedSuchThatSizeMonotonicOpt for (fun tm => value tm).
-*)
 
 Instance dec_value t : Dec (value t).
 constructor; unfold decidable; induction t;
@@ -236,12 +237,10 @@ where "Gamma '|-' t '\typ' T" := (has_type Gamma t T).
 Hint Constructors has_type.
 
 Derive ArbitrarySizedSuchThat for (fun tm => has_type Gamma tm ty).
-(*
 Derive SizedProofEqs for (fun tm => value tm).
 Derive SizeMonotonicSuchThatOpt for (fun tm => value tm).
 Derive GenSizedSuchThatCorrect for (fun tm => value tm).
 Derive GenSizedSuchThatSizeMonotonicOpt for (fun tm => value tm).
-*)
 
 Instance has_type_gen_correct0 Gamma T : SuchThatCorrect (fun t => has_type Gamma t T) 
                                                          (@arbitraryST _ (fun t => has_type Gamma t T) _).

@@ -10,7 +10,6 @@ Import QcDefaultNotation. Open Scope qc_scope.
 
 Set Bullet Behavior "Strict Subproofs".
 
-Require Import ZoeStuff.
 (* End prelude *)
 
 Require Import Ascii String.
@@ -35,23 +34,7 @@ Derive (Arbitrary, Show) for id.
 Derive (Sized, CanonicalSized) for id.
 Derive SizeMonotonic for id using genSid.
 Derive SizedMonotonic for id.
-
-QuickChickDebug Debug On.
-
-(* Derive SizedCorrect for id using genSid and SizeMonotonicid. *)
-
-(* Typeclasses eauto := debug.  *)
-
-(* Goal (SizedCorrect (@arbitrarySized id _)). *)
-(* Proof. *)
-(*   constructor. *)
-(*   refine (fun n => *)
-(*              @nat_set_ind id _ _ (fun n s => set_eq (semGen (arbitrarySized n)) s) *)
-(*                           (set_eq_trans (@semBindSizeMonotonic _ _ _ _ _ (fun m => _)) *)
-(*                                         (eq_bigcup' arbitraryCorrect (fun (x0 : string) => semReturn (Id x0)))) *)
-(*                           (fun n s IHs => *)
-(*                              set_eq_trans (@semBindSizeMonotonic _ _ _ _ _ (fun m => _)) *)
-(*                                           (eq_bigcup' arbitraryCorrect (fun (x0 : string) => semReturn (Id x0)))) n). *)
+Derive SizedCorrect for id using genSid and SizeMonotonicid.
 
 Instance eq_dec_id (x y : id) : Dec (x = y).
 constructor; unfold decidable. repeat decide equality. Defined.

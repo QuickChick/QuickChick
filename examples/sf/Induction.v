@@ -10,7 +10,6 @@ Import QcDefaultNotation. Open Scope qc_scope.
 
 Set Bullet Behavior "Strict Subproofs".
 
-Require Import ZoeStuff.
 (* End prelude *)
 
 Require Export Basics.
@@ -90,7 +89,6 @@ Derive GenSizedSuchThatSizeMonotonicOpt for (fun m => le n m).
 Derive SizedProofEqs for (fun m => le n m).
 Derive GenSizedSuchThatCorrect for (fun m => le n m).
 
-(* Leo TODO: In scope after Zoe fixes Spec *)
 Theorem plus_ble_compat_l : forall n m p : nat,
   leb n m = true -> leb (p + n) (p + m) = true.
 Admitted.

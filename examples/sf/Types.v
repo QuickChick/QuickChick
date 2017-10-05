@@ -10,7 +10,6 @@ Import QcDefaultNotation. Open Scope qc_scope.
 
 Set Bullet Behavior "Strict Subproofs".
 
-Require Import ZoeStuff.
 (* End prelude *)
 
 Require Import Coq.Arith.Arith.
@@ -46,7 +45,7 @@ Derive ArbitrarySizedSuchThat for (fun tm => bvalue tm).
 Derive SizedProofEqs for (fun tm => bvalue tm).
 Derive SizeMonotonicSuchThatOpt for (fun tm => bvalue tm).
 Derive GenSizedSuchThatCorrect for (fun tm => bvalue tm).
-(* Zoe: Derive GenSizedSuchThatSizeMonotonicOpt for (fun tm => bvalue tm). *)
+Derive GenSizedSuchThatSizeMonotonicOpt for (fun tm => bvalue tm).
 
 Instance dec_bvalue t : Dec (bvalue t) :=
   {| dec := _ |}.
@@ -71,7 +70,7 @@ Derive ArbitrarySizedSuchThat for (fun tm => nvalue tm).
 Derive SizedProofEqs for (fun tm => nvalue tm).
 Derive SizeMonotonicSuchThatOpt for (fun tm => nvalue tm).
 Derive GenSizedSuchThatCorrect for (fun tm => nvalue tm).
-(* Zoe: Derive GenSizedSuchThatSizeMonotonicOpt for (fun tm => nvalue tm). *)
+Derive GenSizedSuchThatSizeMonotonicOpt for (fun tm => nvalue tm).
 
 Definition value (t:tm) := bvalue t \/ nvalue t.
 
@@ -158,19 +157,19 @@ Theorem step_deterministic:
   deterministic step.
 Admitted. (* QuickChick step_deterministic. *)
 
-Inductive ty : Type :=
-  | TBool : ty
-  | TNat : ty.
+Inductive typ : Type :=
+  | TBool : typ
+  | TNat : typ.
 
-Derive (Arbitrary, Show) for ty.
-Derive (Sized, CanonicalSized) for ty.
-Derive SizeMonotonic for ty using genSty.
-Derive SizedMonotonic for ty.
-Derive SizedCorrect for ty using genSty and SizeMonotonicty.
+Derive (Arbitrary, Show) for typ.
+Derive (Sized, CanonicalSized) for typ.
+Derive SizeMonotonic for typ using genStyp.
+Derive SizedMonotonic for typ.
+Derive SizedCorrect for typ using genStyp and SizeMonotonictyp.
 
 Reserved Notation "'|-' t '\typ' T" (at level 40).
 
-Inductive has_type : tm -> ty -> Prop :=
+Inductive has_type : tm -> typ -> Prop :=
   | T_True :
        |- ttrue \typ TBool
   | T_False :
@@ -207,7 +206,7 @@ Instance has_type_gen_correct T : SuchThatCorrect (fun t => has_type t T)
                                                   (@arbitraryST _ (fun t => has_type t T) _).
 Admitted.
 
-Instance dec_has_type (t : tm) (T : ty) : Dec (has_type t T).
+Instance dec_has_type (t : tm) (T : typ) : Dec (has_type t T).
 constructor; unfold decidable.
 move: T; induction t => T; destruct T; eauto;
 try solve [right => contra; inversion contra; eauto].

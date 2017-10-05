@@ -46,6 +46,19 @@ let mk_instance_name der tn =
   let strip_last s = List.hd (List.rev (Str.split (Str.regexp "[.]") s)) in
   var_to_string (fresh_name (prefix ^ strip_last tn))
 
+let repeat_instance_name der tn = 
+  let prefix = match der with 
+    | Shrink -> "shr" 
+    | Show   -> "show"
+    | GenSized -> "genS"
+    | Sized -> "Sized"
+    | CanonicalSized -> "CanonicalSized"
+    | SizeMonotonic -> "SizeMonotonic"
+    | SizedMonotonic -> "SizedMonotonic"
+    | SizedCorrect ->  "SizedCorrect" in
+  let strip_last s = List.hd (List.rev (Str.split (Str.regexp "[.]") s)) in
+  (prefix ^ strip_last tn)
+
 let print_der = function
   | Shrink -> "Shrink"
   | Show   -> "Show"
@@ -74,6 +87,11 @@ let derive (cn : derivable) (c : constr_expr) (instance_name : string) (name1 : 
   let coqTyParams = List.map gTyParam ty_params in
 
   let full_dt = gApp ~explicit:true coqTyCtr coqTyParams in
+
+  let ind_name = match c with 
+    | CRef (r, _) -> string_of_qualid (snd (qualid_of_reference r))
+    | _ -> failwith "Implement me for functions" 
+  in
 
   let class_name = match cn with
     | Shrink -> "Shrink"
@@ -151,7 +169,10 @@ let derive (cn : derivable) (c : constr_expr) (instance_name : string) (name1 : 
     | SizedMonotonic ->
       sizeSMon ty_ctr ctrs iargs
     | SizedCorrect ->
-      genCorr ty_ctr ctrs iargs (gInject name1) (gInject name2)
+      let s_inst = gInject (repeat_instance_name Sized ind_name) in
+      let c_inst = gInject (repeat_instance_name CanonicalSized ind_name) in
+      (* TODO : use default names for gen and mon as well (?) *)
+      genCorr ty_ctr ctrs iargs (gInject name1) s_inst c_inst (gInject name2)
   in
 
   (* msg_debug (str "Defined record" ++ fnl ()); *)

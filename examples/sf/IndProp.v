@@ -10,7 +10,6 @@ Import QcDefaultNotation. Open Scope qc_scope.
 
 Set Bullet Behavior "Strict Subproofs".
 
-Require Import ZoeStuff.
 (* End prelude *)
 
 Inductive ev : nat -> Prop :=
@@ -21,7 +20,7 @@ Derive ArbitrarySizedSuchThat for (fun n => ev n).
 Derive SizedProofEqs for (fun n => ev n).
 Derive SizeMonotonicSuchThatOpt for (fun n => ev n).
 Derive GenSizedSuchThatCorrect for (fun n => ev n).
-(* ZOE: Derive GenSizedSuchThatSizeMonotonicOpt for (fun n => ev n). *)
+Derive GenSizedSuchThatSizeMonotonicOpt for (fun n => ev n).
 
 (* Future work: Before relevant software foundations testing book,
    this needs to be automated... *)

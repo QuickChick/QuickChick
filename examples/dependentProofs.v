@@ -14,7 +14,7 @@ Set Bullet Behavior "Strict Subproofs".
 
 Typeclasses eauto := debug.
 
-Require Import zoo DependentTest.
+Require Import DependentTest.
 
 (* XXX these instances should be present *)
 Existing Instance genSFoo.

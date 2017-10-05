@@ -32,13 +32,13 @@ let arbitrarySize size =
   gApp (gInject "arbitrarySize") [size]
 
 let oneOf_freq p1 p2 p3 =
-  gApp (gInject "oneOf_freq") [p1; p2; p3]
+  gApp ~explicit:true (gInject "oneOf_freq") [hole; p1; p2; p3]
 
 let semFreqSize g gs size hall =
-  gApp (gInject "semFreqSize") [g; gs; size; hall]
+  gApp ~explicit:true (gInject "semFreqSize") [hole; g; gs; size; hall]
 
 let semFreq g gs hall =
-  gApp (gInject "semFreqSize") [g; gs; hall]
+  gApp ~explicit:true (gInject "semFreq") [hole; g; gs; hall]
 
 let semBindSize g f size =
   gApp (gInject "semBindSize") [g; f; size]
@@ -147,3 +147,6 @@ let suchThatMaybe_subset_compat p h =
 let suchThatMaybeOpt_subset_compat p h =
   gApp ~explicit:true (gInject "suchThatMaybeOpt_subset_compat")
     [hole; p; hole; hole; hole; h]
+
+let nat_set_ind typ ginst sinst cinst hb hi x =
+ gApp ~explicit:true (gInject "nat_set_ind") [typ; ginst; sinst; cinst; hb; hi; x]

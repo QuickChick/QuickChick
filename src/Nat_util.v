@@ -91,6 +91,12 @@ Proof.
   firstorder.
 Qed.
 
+Lemma ltn0Sn_pair {A : Type} (n : nat) (g : A)  :
+  0 < (n.+1, g).1.
+Proof.
+  ssromega.
+Qed.
+
 (* Yikes this is stupid, find a workaround *)
 (* Leo, can you make me a real prop and a real forall in the plugin?? *)
 Definition prop := Prop.
