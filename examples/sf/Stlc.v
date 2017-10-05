@@ -178,7 +178,7 @@ Inductive bind : context -> id -> ty -> Prop :=
 Derive ArbitrarySizedSuchThat for (fun i => bind m i a).
 Derive SizeMonotonicSuchThatOpt for (fun i => bind m i a).
 Derive GenSizedSuchThatSizeMonotonicOpt for (fun x => bind m x a).
-(* Zoe: SizedProofEqs -- Proof not found  *)
+(* KNOWN DUG. The derivation of SizedProofEqs for bind fails. *)
 (* Derive SizedProofEqs for (fun x => bind m x a). *)
 (* Derive GenSizedSuchThatCorrect for (fun x => bind m x a). *)
 

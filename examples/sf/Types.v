@@ -198,7 +198,8 @@ Hint Constructors has_type.
 Derive ArbitrarySizedSuchThat for (fun t => has_type t T).
 Derive SizeMonotonicSuchThatOpt for (fun t => has_type t T).
 Derive GenSizedSuchThatSizeMonotonicOpt for (fun t => has_type t T).
-(* Zoe: SizedProofEqs -- type error and takes forever *)
+(* KNOWN DUG. The derivation of SizedProofEqs for has_type fails with type error. *)
+(* Probably needs a type annotation somewhere to convince the typechecker *)
 (* Derive SizedProofEqs for (fun t => has_type t T).
 Derive GenSizedSuchThatCorrect for (fun t => has_type t T).
 *)
