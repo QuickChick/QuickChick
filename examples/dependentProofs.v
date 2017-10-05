@@ -59,7 +59,7 @@ Derive GenSizedSuchThatSizeMonotonicOpt for (fun foo => goodTree n foo).
 
 Definition genSTgooTree (n : nat) := @arbitraryST _ (fun foo => goodTree n foo) _.
 
-Definition genSTgooTreeSound (n : nat) := @STCorrect _ _ (@arbitraryST _  (fun foo => goodTree n foo) _) _.
+(* Definition genSTgooTreeSound (n : nat) := @STCorrect _ _ (@arbitraryST _  (fun foo => goodTree n foo) _) _. *)
 
 Existing Instance GenSizedSuchThatgoodFooUnif. (* ???? *)
 

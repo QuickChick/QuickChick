@@ -60,32 +60,26 @@ Definition beq_id x y :=
   end.
 
 
-Inductive tm : Type :=
-  | tvar : id -> tm
-  | tapp : tm -> tm -> tm
-  | tabs : id -> ty -> tm -> tm
-  | ttrue : tm
-  | tfalse : tm
-  | tif : tm -> tm -> tm -> tm.
+Inductive trm : Type :=
+  | tvar : id -> trm
+  | tapp : trm -> trm -> trm
+  | tabs : id -> ty -> trm -> trm
+  | ttrue : trm
+  | tfalse : trm
+  | tif : trm -> trm -> trm -> trm.
 
-Derive (Arbitrary, Show) for tm.
-Derive (Sized, CanonicalSized) for tm.
-Derive SizeMonotonic for tm using genStm1.
-Derive SizedMonotonic for tm.
-(*
-Zoe: Silly name clash. Would work if we rename tm to tm' or something.
-Admitting for the following work
-Derive SizedCorrect for tm using genStm1 and SizeMonotonictm0.
- *)
+Derive (Arbitrary, Show) for trm.
+Derive (Sized, CanonicalSized) for trm.
+Derive SizeMonotonic for trm using genStrm.
+Derive SizedMonotonic for trm.
+Derive SizedCorrect for trm using genStrm and SizeMonotonictrm.
 
-Instance SizedCorrecttm : (SizedCorrect (@arbitrarySized tm _)).
-Admitted.
 
-Instance eq_dec_tm (t1 t2 : tm) : Dec (t1 = t2).
+Instance eq_dec_tm (t1 t2 : trm) : Dec (t1 = t2).
 constructor; unfold decidable; repeat decide equality. Defined.
 
 (* Leo: TODO: lowercase x - name clash *)
-Inductive value : tm -> Prop :=
+Inductive value : trm -> Prop :=
   | v_abs : forall X T t,
       value (tabs X T t)
   | v_true :
@@ -109,7 +103,7 @@ Hint Constructors value.
 
 Reserved Notation "'[' x ':=' s ']' t" (at level 20).
 
-Fixpoint subst (x:id) (s:tm) (t:tm) : tm :=
+Fixpoint subst (x:id) (s:trm) (t:trm) : trm :=
   match t with
   | tvar x' =>
       if beq_id x x' then s else t
@@ -128,7 +122,7 @@ Fixpoint subst (x:id) (s:tm) (t:tm) : tm :=
 where "'[' x ':=' s ']' t" := (subst x s t).
 
 (*
-Inductive substi (s:tm) (x:id) : tm -> tm -> Prop :=
+Inductive substi (s:trm) (x:id) : trm -> trm -> Prop :=
   | s_var1 :
       substi s x (tvar x) s
   (* FILL IN HERE *)
@@ -144,7 +138,7 @@ Proof.
 
 Reserved Notation "t1 '===>' t2" (at level 40).
 
-Inductive step : tm -> tm -> Prop :=
+Inductive step : trm -> trm -> Prop :=
   | ST_AppAbs : forall x T t12 v2,
          value v2 ->
          (tapp (tabs x T t12) v2) ===> [x:=v2]t12
@@ -211,7 +205,7 @@ Defined.
 
 Reserved Notation "Gamma '|-' t '\typ' T" (at level 40).
 
-Inductive has_type : context -> tm -> ty -> Prop :=
+Inductive has_type : context -> trm -> ty -> Prop :=
   | T_Var : forall Gamma i T,
       bind Gamma i T ->
       Gamma |- tvar i \typ T
@@ -285,7 +279,7 @@ induction Gamma => i T; split; intros; eauto.
     * eapply IHGamma in H6; auto.
 Qed.    
 
-Fixpoint get_type (Gamma : context) (t : tm) : option ty.
+Fixpoint get_type (Gamma : context) (t : trm) : option ty.
 Admitted.
 
 Instance dec_has_type Gamma t T : Dec (has_type Gamma t T).

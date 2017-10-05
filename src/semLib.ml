@@ -134,19 +134,19 @@ let semSuchThatMaybeOpt_sound g f s h =
 
 let semBindSizeOpt_subset_compat h1 h2 =
   gApp ~explicit:true (gInject "semBindSizeOpt_subset_compat")
-    [hole; hole; hole; hole; hole; hole; hole; h1; h2]
+    [hole; hole; hole; hole; hole; hole; h1; h2]
 
 let semBindOptSizeOpt_subset_compat h1 h2 =
   gApp ~explicit:true (gInject "semBindOptSizeOpt_subset_compat")
-    [hole; hole; hole; hole; hole; hole; hole; h1; h2]
+    [hole; hole; hole; hole; hole; hole; h1; h2]
 
 let suchThatMaybe_subset_compat p h =
   gApp ~explicit:true (gInject "suchThatMaybe_subset_compat")
-    [hole; p; hole; hole; hole; h]
+    [hole; p; hole; hole; h]
 
 let suchThatMaybeOpt_subset_compat p h =
   gApp ~explicit:true (gInject "suchThatMaybeOpt_subset_compat")
-    [hole; p; hole; hole; hole; h]
+    [hole; p; hole; hole; h]
 
 let nat_set_ind typ ginst sinst cinst hb hi x =
  gApp ~explicit:true (gInject "nat_set_ind") [typ; ginst; sinst; cinst; hb; hi; x]

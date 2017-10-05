@@ -280,10 +280,20 @@ let bigcup_cons_setI_subset_compat_backtrack h1 h2 =
     ~explicit:true (gInject "bigcup_cons_setI_subset_compat_backtrack")
     [hole; hole; hole; hole; hole; hole; hole; h1; h2]
 
+let bigcup_cons_setI_subset_compat_backtrack_weak h1 h2 =
+  gApp
+    ~explicit:true (gInject "bigcup_cons_setI_subset_compat_backtrack_weak")
+    [hole; hole; hole; hole; hole; hole; h1; h2]
+
 let bigcup_cons_setI_subset_pres_backtrack h =
   gApp
     ~explicit:true (gInject "bigcup_cons_setI_subset_pres_backtrack")
     [hole; hole; hole; hole; hole; hole; h]
+
+let bigcup_cons_setI_subset_pres_backtrack_weak h =
+  gApp
+    ~explicit:true (gInject "bigcup_cons_setI_subset_pres_backtrack_weak")
+    [hole; hole; hole; hole; hole; h]
 
 let bigcup_nil_setI f l s =
   gApp
