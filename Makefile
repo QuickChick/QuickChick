@@ -28,7 +28,7 @@ install: all
   # Manually copying the remaining files
 #	 $(V)cp src/quickChickLib.cmx $(COQLIB)/user-contrib/QuickChick
 #	 $(V)cp src/quickChickLib.o $(COQLIB)/user-contrib/QuickChick
-#	 $(V)cp src/quickChickTool $(shell echo $(PATH) | tr ':' "\n" | grep opam | uniq)/quickChick
+	 $(V)cp src/quickChickTool $(shell echo $(PATH) | tr ':' "\n" | grep opam | uniq)/quickChick
 
 install-plugin:
 	$(V)$(MAKE) -f Makefile.coq install > $(TEMPFILE) || cat $(TEMPFILE)
