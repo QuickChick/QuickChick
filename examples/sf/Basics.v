@@ -10,7 +10,6 @@ Import QcDefaultNotation. Open Scope qc_scope.
 
 Set Bullet Behavior "Strict Subproofs".
 
-Require Import ZoeStuff.
 (* End prelude *)
 
 Inductive day : Type :=

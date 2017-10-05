@@ -51,9 +51,9 @@ Export GenLow GenHigh.
 
 Require Import Ascii String.
 
-Derive (Arbitrary, Show) for ascii.
+(* Derive (Arbitrary, Show) for ascii. *)
 
-Derive (Arbitrary, Show) for string.
+(* Derive (Arbitrary, Show) for string. *)
 
 
 

@@ -14,7 +14,7 @@ Set Bullet Behavior "Strict Subproofs".
 
 Typeclasses eauto := debug.
 
-Require Import zoo DependentTest.
+Require Import DependentTest.
 
 (* XXX these instances should be present *)
 Existing Instance genSFoo.
@@ -59,7 +59,7 @@ Derive GenSizedSuchThatSizeMonotonicOpt for (fun foo => goodTree n foo).
 
 Definition genSTgooTree (n : nat) := @arbitraryST _ (fun foo => goodTree n foo) _.
 
-Definition genSTgooTreeSound (n : nat) := @STCorrect _ _ (@arbitraryST _  (fun foo => goodTree n foo) _) _.
+(* Definition genSTgooTreeSound (n : nat) := @STCorrect _ _ (@arbitraryST _  (fun foo => goodTree n foo) _) _. *)
 
 Existing Instance GenSizedSuchThatgoodFooUnif. (* ???? *)
 

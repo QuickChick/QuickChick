@@ -10,7 +10,6 @@ Import QcDefaultNotation. Open Scope qc_scope.
 
 Set Bullet Behavior "Strict Subproofs".
 
-Require Import ZoeStuff.
 (* End prelude *)
 
 Require Export Induction.
@@ -27,8 +26,7 @@ Derive (Arbitrary, Show) for natprod.
 Derive (Sized, CanonicalSized) for natprod.
 Derive SizeMonotonic for natprod using genSnatprod.
 Derive SizedMonotonic for natprod.
-(* Zoe: Derive SizedCorrect : type error XXX : easy modify freq for singl *)
-(* Derive SizedCorrect for natprod using genSnatprod and SizeMonotonicnatprod. *)
+Derive SizedCorrect for natprod using genSnatprod and SizeMonotonicnatprod.
 
 Definition fst (p : natprod) : nat :=
   match p with
@@ -247,7 +245,7 @@ Derive Sized for id.
 Derive CanonicalSized for id.
 Derive SizeMonotonic for id using genSid.
 Derive SizedMonotonic for id.
-(* Zoe: Derive SizedCorrect for id using genSid and SizeMonotonicid. XXX : easy modify freq for singl *)
+Derive SizedCorrect for id using genSid and SizeMonotonicid.
 
 Definition beq_id (x1 x2 : id) :=
   match x1, x2 with

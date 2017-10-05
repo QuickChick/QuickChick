@@ -214,3 +214,18 @@ Proof.
     split. intros [n H3]. constructor; eauto.
     intros H4. eexists; split; eauto.
 Qed.
+
+Lemma nat_set_ind (A : Type) `{GenSized A} `{Hyp : CanonicalSized A} :
+  (semGen (arbitrarySized 0) <--> zeroSized) ->
+  (forall (s : nat) (elems : set A),
+     semGen (arbitrarySized s) <--> elems ->
+     semGen (arbitrarySized (s.+1)) <--> succSized elems) ->
+  (forall s : nat, semGen (arbitrarySized s) <--> (fun x : A => size x <= s)).
+Proof.
+  intros HO IH. intros n; induction n.
+  - eapply set_eq_trans with (B := (fun x : A => size x = 0)).
+    rewrite -zeroSized_spec //=.
+    intros s. destruct (size s). now firstorder.
+    split; intros; ssromega.
+  - rewrite -succSized_spec. eauto.
+Qed.

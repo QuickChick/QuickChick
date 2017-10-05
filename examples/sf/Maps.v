@@ -10,7 +10,6 @@ Import QcDefaultNotation. Open Scope qc_scope.
 
 Set Bullet Behavior "Strict Subproofs".
 
-Require Import ZoeStuff.
 (* End prelude *)
 
 Require Import Ascii String.
@@ -18,13 +17,15 @@ Require Import Ascii String.
 Derive (Arbitrary, Show) for ascii.
 Derive (Sized, CanonicalSized) for ascii.
 Derive SizeMonotonic for ascii using genSascii.
-Derive SizedMonotonic for ascii.
-(* Zoe: Derive SizedCorrect for ascii using genSascii and SizeMonotonicascii. *)
+Derive SizedMonotonic for ascii using genSascii.
+Derive SizedCorrect for ascii using genSascii and SizeMonotonicascii.
 
 Derive (Arbitrary, Show) for string.
 Derive (Sized, CanonicalSized) for string.
 Derive SizeMonotonic for string using genSstring.
 Derive SizedMonotonic for string.
+Derive SizedCorrect for string using genSstring and SizeMonotonicstring.
+
 
 Inductive id : Type :=
   | Id : string -> id.
@@ -33,7 +34,7 @@ Derive (Arbitrary, Show) for id.
 Derive (Sized, CanonicalSized) for id.
 Derive SizeMonotonic for id using genSid.
 Derive SizedMonotonic for id.
-(* Zoe: Derive SizedCorrect for id using genSid and SizeMonotonicid. *)
+Derive SizedCorrect for id using genSid and SizeMonotonicid.
 
 Instance eq_dec_id (x y : id) : Dec (x = y).
 constructor; unfold decidable. repeat decide equality. Defined.
@@ -78,7 +79,7 @@ Inductive bind : partial_map -> id -> nat -> Prop :=
 Derive ArbitrarySizedSuchThat for (fun x => bind m x a).
 Derive SizeMonotonicSuchThatOpt for (fun x => bind m x a).
 Derive GenSizedSuchThatSizeMonotonicOpt for (fun x => bind m x a).
-(* Zoe: SizedProofEqs, "Proof not found" ??? *)
+(* KNOWN DUG. The derivation of SizedProofEqs for bind fails. *)
 (* Derive SizedProofEqs for (fun x => bind m x a). *)
 (* Derive GenSizedSuchThatCorrect for (fun x => bind m x a). *)
 

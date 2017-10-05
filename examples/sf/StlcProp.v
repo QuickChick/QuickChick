@@ -10,7 +10,6 @@ Import QcDefaultNotation. Open Scope qc_scope.
 
 Set Bullet Behavior "Strict Subproofs".
 
-Require Import ZoeStuff.
 (* End prelude *)
 
 Require Import Smallstep.
@@ -38,12 +37,12 @@ Lemma canonical_forms_fun : forall t T1 T2,
 Admitted. (* QuickChick canonical_forms_fun. *)
 
 (* xistential rework - dummy step *)
-Definition step_fun (t : tm) : option tm := Some t.
+Definition step_fun (t : trm) : option trm := Some t.
 
 Axiom step_fun_correct : forall t t',
     step_fun t = Some t' <-> step t t'.
 
-Instance dec_step (t : tm) : Dec (exists t', step t t') :=
+Instance dec_step (t : trm) : Dec (exists t', step t t') :=
   {| dec := _ |}.
 Proof.
   destruct (step_fun t) eqn:Step.
@@ -56,7 +55,7 @@ Theorem progress : forall t T,
      value t \/ exists t', t ===> t'.
 Admitted. (* QuickChick progress. *)
 
-Inductive appears_free_in : id -> tm -> Prop :=
+Inductive appears_free_in : id -> trm -> Prop :=
   | afi_var : forall i,
       appears_free_in i (tvar i)
   | afi_app1 : forall i t1 t2,
@@ -89,7 +88,7 @@ Instance appears_free_in_gen_correct t : SuchThatCorrect (fun i => appears_free_
                                                          (@arbitraryST _ (fun i => appears_free_in i t) _).
 Admitted.
 
-Definition closed (t:tm) :=
+Definition closed (t:trm) :=
   forall x, ~ appears_free_in x t.
 
 Instance dec_closed t : Dec (closed t). Admitted.
@@ -121,7 +120,7 @@ Theorem preservation : forall t T,
      empty |- t' \typ T.
 Admitted. (* OUT-OF-SCOPE *)
 
-Definition stuck (t:tm) : Prop :=
+Definition stuck (t:trm) : Prop :=
   (normal_form step) t /\ ~ value t.
 
 Corollary soundness : forall t t' T,
