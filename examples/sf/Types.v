@@ -203,7 +203,8 @@ Derive GenSizedSuchThatSizeMonotonicOpt for (fun t => has_type t T).
 (* Derive SizedProofEqs for (fun t => has_type t T).
 Derive GenSizedSuchThatCorrect for (fun t => has_type t T).
 *)
-Instance has_type_gen_correct T : SuchThatCorrect (fun t => has_type t T) 
+(* Admitting such that the following work *)
+Instance has_type_gen_correct T : SuchThatCorrect (fun t => has_type t T)
                                                   (@arbitraryST _ (fun t => has_type t T) _).
 Admitted.
 
