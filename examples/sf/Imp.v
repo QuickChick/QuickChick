@@ -38,6 +38,10 @@ Derive SizeMonotonic for aexp' using genSaexp'.
 Derive SizedMonotonic for aexp'.
 Derive SizedCorrect for aexp' using genSaexp' and SizeMonotonicaexp'.
 
+Instance dec_eq_aex (x y : aexp') : Dec (x = y).
+constructor; unfold decidable; repeat decide equality. Defined.
+
+(* AEC Reviewer example *)
 Inductive aexpEq : aexp' -> aexp' -> Prop := 
  | ANumEq : forall n1 n2, n1 = n2 -> aexpEq (ANum n1) (ANum n2).
 
@@ -58,9 +62,9 @@ Derive SizeMonotonicSuchThatOpt for (fun x => aexpEq x x').
 Derive GenSizedSuchThatSizeMonotonicOpt for (fun x => aexpEq x x').
 Derive GenSizedSuchThatCorrect for (fun x => aexpEq x x').
 
-
-Instance dec_eq_aex (x y : aexp') : Dec (x = y).
-constructor; unfold decidable; repeat decide equality. Defined.
+Conjecture aexpEq_eq : forall x x', aexpEq x x' -> x = x'.
+QuickChick aexpEq_eq.
+(* End Reviwer example *)
 
 Inductive bexp' : Type :=
   | BTrue : bexp'
