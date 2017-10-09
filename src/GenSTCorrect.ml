@@ -74,12 +74,9 @@ let class_method : atyp =
 
 
 let class_methodST (n : int) (pred : coq_expr) : atyp =
-  let comp =
-    gApp ~explicit:true (gInject "STComplete") [hole; pred; hole; hole]
-  in
-  let sound =
-    gApp ~explicit:true (gInject "STSound") [hole; pred; hole; hole]
-  in
+  let cproof = gApp ~explicit:true (gInject "STCorrect") [hole; pred; hole; hole] in
+  let comp = set_eq_isSome_complete cproof in
+  let sound = set_eq_isSome_sound cproof in
   let gen =
     gApp ~explicit:true (gInject "arbitraryST")
       [ hole (* Implicit argument - type A *)
@@ -592,7 +589,7 @@ let genSizedSTCorr_body
 
   msg_debug (str "compl");
   debug_coq_expr com_proof;
-  (* msg_debug (str "sound"); *)
-  (* debug_coq_expr sound_proof; *)
+  msg_debug (str "sound");
+  debug_coq_expr sound_proof;
 
   gRecord [ ("sizedSTCorrect", correct) ]

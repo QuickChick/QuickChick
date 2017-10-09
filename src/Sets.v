@@ -1039,3 +1039,20 @@ Proof.
     eapply H2.
     eexists; split; eauto.
 Qed.
+
+Lemma set_eq_isSome_sound {A} (s : set (option A)) (s' : set A) :
+  isSome :&: s <--> Some @: s' ->
+  s \subset (Some @: s') :|: [set None].
+Proof.
+  intros H [x| ] Hin.
+  - left. eapply H.
+    eexists; eauto.
+  - right; reflexivity.
+Qed.
+
+Lemma set_eq_isSome_complete {A} (s : set (option A)) (s' : set A) :
+  isSome :&: s <--> Some @: s' ->
+  Some @: s' \subset s.
+Proof.
+  intros H. rewrite <- H. firstorder.
+Qed.

@@ -304,3 +304,13 @@ let isSome_set_eq h1 h2 =
     gApp
     ~explicit:true (gInject "isSome_set_eq")
     [hole; hole; hole; h1; h2]
+
+let set_eq_isSome_sound h =
+    gApp
+    ~explicit:true (gInject "set_eq_isSome_sound")
+    [hole; hole; hole; h]
+
+let set_eq_isSome_complete h =
+    gApp
+    ~explicit:true (gInject "set_eq_isSome_complete")
+    [hole; hole; hole; h]

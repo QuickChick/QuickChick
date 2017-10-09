@@ -35,6 +35,12 @@ let gEqType e1 e2 =
 let gConj p1 p2 =
   gApp (gInject "and") [p1; p2]
 
+let gProjL p =
+  gApp ~explicit:true (gInject "Logic.proj1") [hole; hole; p]
+
+let gProjR p =
+  gApp ~explicit:true (gInject "Logic.proj2") [hole; hole; p]
+
 let gImpl p1 p2 =
   gApp (gInject "Basics.impl") [p1; p2]
 
