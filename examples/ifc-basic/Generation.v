@@ -6,8 +6,6 @@ Require Import List.
 Import ListNotations.
 From QuickChick.ifcbasic Require Import Machine.
 
-Import GenLow GenHigh.
-
 (* Overriding default instance to generate "in-bounds" things *)
 Definition gen_Z := choose (0,1).
 
@@ -58,10 +56,13 @@ Definition ainstr (st : State) : G Instruction :=
 *)
 
 Fixpoint gen_stack (n : nat) (onlyLow : bool) : G Stack :=
+  (* There is no invariant that says this. Why is this here? *)
+  (*
   let gen_atom :=
       if onlyLow then liftGen2 Atm gen_Z (returnGen L)
       else gen_atom
   in
+   *)
   match n with
     | O => returnGen Mty
     | S n' =>

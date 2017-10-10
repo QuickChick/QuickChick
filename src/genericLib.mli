@@ -63,6 +63,8 @@ val constructor_to_string : constructor -> string
 val gCtr : constructor -> coq_expr
 val injectCtr : string -> constructor
 
+val num_of_ctrs : constructor -> int
+
 type ctr_rep = constructor * coq_type 
 val ctr_rep_to_string : ctr_rep -> string
 

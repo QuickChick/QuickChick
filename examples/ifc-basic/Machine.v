@@ -191,6 +191,12 @@ Definition exec (t : table) (st:State) : option State :=
           Some (St μ m σ ((xpc+1)@rpcl))
         | _ => None
       end
+    | Add, St μ m ((x @ lx) :: (y @ ly) :: σ) (xpc@lpc) =>
+      match run_tmr t OpAdd <|lx ; ly|> lpc with 
+      | Some (Some rl, rpcl) =>
+        Some (St μ m (((x + y) @ rl) :: σ) ((xpc+1)@rpcl))
+      | _ => None
+      end
     | _,_ => None
   end.
 

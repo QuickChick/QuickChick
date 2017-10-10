@@ -76,8 +76,17 @@ let match_inp (inp : var) (pat : matcher_pat) (left : coq_expr) (right  : coq_ex
   let ret v left right =
     construct_match (gVar v) ~catch_all:(Some right) [(pat, left)]
   in
+  let catch_case = 
+    match pat with 
+    | MatchCtr (c, ls) -> 
+       (* Leo: This is a hack totality check for unary matches *)
+       if num_of_ctrs c = 1 && List.for_all (fun x -> match x with MatchU _ -> true | MatchCtr _ -> false) ls 
+       then None
+       else Some right
+    | _ -> failwith "Toplevel match not a constructor?"
+  in 
   construct_match_with_return
-    (gVar inp) ~catch_all:(Some right) "s" (fun v -> ret_type v ret)
+    (gVar inp) ~catch_all:(catch_case) "s" (fun v -> ret_type v ret)
     [(pat,left)]
 
 

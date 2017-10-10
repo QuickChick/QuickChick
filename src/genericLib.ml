@@ -121,6 +121,14 @@ let constructor_to_string (x : constructor) = Id.to_string x
 let gCtr id = id_to_coq_expr id
 let injectCtr s = Id.of_string s
 
+let num_of_ctrs (c : constructor) =
+  let r = id_to_reference c in 
+  let env = Global.env () in
+  let glob_ref = Nametab.global r in
+  let ((mind,n),_) = Globnames.destConstructRef glob_ref in
+  let mib = Environ.lookup_mind mind env in
+  Array.length (mib.mind_packets.(n).mind_consnames)
+
 module Ord_ty_ctr = struct 
   type t = ty_ctr 
   let compare = compare 

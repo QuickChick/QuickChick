@@ -3,7 +3,7 @@ Import GenLow GenHigh.
 
 Require Import List. Import ListNotations.
 
-From QuickChick.ifcbasic Require Import Machine Printing Generation Indist.
+From QuickChick.ifcbasic Require Import Machine Printing Generation Indist DerivedGen.
 
 Require Import Coq.Strings.String.
 Local Open Scope string.
@@ -11,8 +11,8 @@ Definition SSNI (t : table) (v : @Variation State) : Checker  :=
   let '(V st1 st2) := v in
   let '(St _ _ _ (_@l1)) := st1 in
   let '(St _ _ _ (_@l2)) := st2 in
-(*   match lookupInstr st1 with
-    | Some i =>     collect (show i) (  *)
+  match lookupInstr st1 with
+    | Some i =>     collect (show i) (  
   if indist st1 st2 then
     match l1, l2 with
       | L,L  =>
@@ -56,22 +56,41 @@ Definition SSNI (t : table) (v : @Variation State) : Checker  :=
         end
     end
   else (* collect "Not indist!" true*)  checker rejected
-              (* )
+               )
     | _ => checker rejected
-  end*).
+  end.
 
 Definition prop_SSNI t : Checker :=
   forAllShrink gen_variation_state (fun _ => nil)
    (SSNI t : Variation -> G QProp).
 
+Definition prop_SSNI_derived t : Checker :=
+  forAllShrink gen_variation_state_derived (fun _ => nil)
+               (fun mv => 
+                  match mv with 
+                  | Some v => SSNI t v
+                  | _ => checker tt
+                  end).
+
 Definition prop_gen_indist :=
   forAllShrink gen_variation_state (fun _ => nil)
                (fun v => let '(V st1 st2) := v in indist st1 st2).
 
+Definition prop_gen_indist_derived :=
+  forAllShrink (gen_variation_state_derived) (fun _ => nil)
+               (fun mv => 
+                  match mv with 
+                  | Some (V st1 st2) => indist st1 st2 
+                  | _ => true
+                  end).
+
+Extract Constant defNumDiscards => "30000".
 QuickCheck (prop_SSNI default_table).
+QuickCheck (prop_SSNI_derived default_table).
 
 Axiom numTests : nat.
-Extract Constant numTests => "20000".
+Extract Constant numTests => "10000".
+
 Definition myArgs : Args :=
   let '(MkArgs rp mSuc md mSh mSz c) := stdArgs in
   MkArgs rp numTests md mSh mSz c.
@@ -84,15 +103,12 @@ Instance mutateable_table : Mutateable table :=
 |}.
 
 Require Import ZArith.
-(*
-Eval lazy -[labelCount helper] in
-  nth (mutate_table default_table) 18.
-*)
+
 
 Definition testMutantX n :=
   match nth (mutate_table default_table) n with
     | Some t => prop_SSNI t
-    | _ => prop_SSNI default_table
+    | _ => checker tt 
   end.
 
 MutateCheckWith myArgs default_table
@@ -100,17 +116,40 @@ MutateCheckWith myArgs default_table
       gen_variation_state (fun _ => nil) (fun _ => "")
       (SSNI t ))).
 
+MutateCheckWith myArgs default_table
+    (fun t => (forAllShrinkShow
+      (gen_variation_state_derived) (fun _ => nil) (fun _ => "")
+      (fun mv => 
+         match mv with 
+         | Some v => SSNI t v 
+         | None => checker tt
+         end
+    ))).
+
+(*
+Eval lazy -[labelCount helper] in
+  nth (mutate_table default_table) 2. *)
+
+(*
 Definition st1 :=
   St [Store; Store] [0 @ L] (0 @ L :: 0 @ H :: Mty) (0 @ L).
 Definition st2 :=
   St [Store; Store] [0 @ L] (0 @ L :: 1 @ H :: Mty) (0 @ L).
 Definition ex_indist : indist st1 st2 = true. auto. Qed.
 
+Definition st1' :=
+  St [Add; Add] [0 @ L] (0 @ L :: 0 @ H :: Mty) (0 @ L).
+Definition st2' :=
+  St [Add; Add] [0 @ L] (0 @ L :: 1 @ H :: Mty) (0 @ L).
+Definition ex_indist' : indist st1' st2' = true. auto. Qed.
+
 Definition ex_test :=
-  match nth (mutate_table default_table) 18 with
-    | Some t => SSNI t (V st1 st2)
-    | _ => SSNI default_table (V st1 st2)
+  match nth (mutate_table default_table) 8 with
+    | Some t => SSNI t (V st1' st2')
+    | _ => checker tt
   end.
 
+Eval compute in exec default_table st1'.
 QuickCheck ex_test.
 QuickCheck (testMutantX 18).
+*)
