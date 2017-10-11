@@ -139,7 +139,6 @@ let define_and_run c =
   (** Run the test *)
   else
     (* Should really be shared across this and the tool *)
-    let execn = "time " ^ execn in 
     let chan = Unix.open_process_in execn in
     let builder = ref [] in
     let rec process_otl_aux () =
@@ -193,16 +192,22 @@ let run f args =
   let c = CApp(Loc.ghost, (None,f), args) in
   ignore (runTest c)
 
-let setFlags s1 s2 = 
-  let toggle = 
-    match s2 with 
+let set_debug_flag (flag_name : string) : (string * string) -> Libobject.obj =
+  let toggle s= 
+    match s with 
     | "On"  -> true
-    | "Off" -> false in
-  begin match s1 with 
-  | "Debug" -> flag_debug := toggle
-  | "Warn"  -> flag_warn  := toggle
-  | "Error" -> flag_error := toggle    
-  end
+    | "Off" -> false 
+  in 
+  let reference s = 
+    match s with 
+    | "Debug" -> flag_debug 
+    | "Warn"  -> flag_warn  
+    | "Error" -> flag_error 
+  in 
+  Libobject.declare_object
+    {(Libobject.default_object ("QC_debug_flag: " ^ flag_name)) with
+       cache_function = (fun (_,(flag_name, mode)) -> reference flag_name := toggle mode);
+       load_function = (fun _ (_,(flag_name, mode)) -> reference flag_name := toggle mode)}
 
 	  (*
 let run_with f args p =
@@ -241,7 +246,10 @@ VERNAC COMMAND EXTEND MutateChickMany CLASSIFIED AS SIDEFF
 END;;
 
 VERNAC COMMAND EXTEND QuickChickDebug CLASSIFIED AS SIDEFF
-  | ["QuickChickDebug" ident(s1) ident(s2)] -> [setFlags (Names.string_of_id s1) (Names.string_of_id s2)]
+  | ["QuickChickDebug" ident(s1) ident(s2)] -> 
+     [ let s1' = Names.string_of_id s1 in
+       let s2' = Names.string_of_id s2 in 
+       Lib.add_anonymous_leaf (set_debug_flag s1' (s1',s2')) ]
 END;;
 
 VERNAC COMMAND EXTEND Sample CLASSIFIED AS SIDEFF
