@@ -61,6 +61,7 @@ Inductive good_stack : nat -> Stack -> Prop :=
 | GoodStackCons : forall n a s , good_atom a  -> good_stack n s -> good_stack (S n) (a  :: s)
 | GoodStackRet  : forall n pc s, good_atom pc -> good_stack n s -> good_stack (S n) (RetCons pc s).
 
+QuickChickWeights [(GoodStackCons, 10); (GoodStackRet, 4)].
 Derive ArbitrarySizedSuchThat for (fun s => good_stack n s).
 
 (*
@@ -127,6 +128,14 @@ Inductive good_instr (stk : Stack) : Instruction -> Prop :=
   | GoodAdd   : good_instr stk Add 
   | GoodLoad  : good_instr stk Load
   | GoodStore : good_instr stk Store.
+
+QuickChickWeights [ (GoodNop, 1)
+                  ; (GoodPush, 10)
+                  ; (GoodCall, 10)
+                  ; (GoodRet, 10)
+                  ; (GoodAdd, 10)
+                  ; (GoodLoad, 10)
+                  ; (GoodStore, 100) ].
 Derive ArbitrarySizedSuchThat for (fun i => good_instr stk i). 
 
 (*

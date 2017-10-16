@@ -139,7 +139,7 @@ let define_and_run c =
   (** Run the test *)
   else
     (* Should really be shared across this and the tool *)
-    let chan = Unix.open_process_in execn in
+    let chan = Unix.open_process_in ("time " ^ execn) in
     let builder = ref [] in
     let rec process_otl_aux () =
       let e = input_line chan in
@@ -164,7 +164,7 @@ let define_and_run c =
            
 (*
     (** If we want to print the time spent in tests *)
-    (* let execn = "time " ^ execn in *)
+(*    let execn = "time " ^ execn in *)
     if Sys.command execn <> 0 then
       msg_error (str "Could not run test" ++ fnl ())
  *)

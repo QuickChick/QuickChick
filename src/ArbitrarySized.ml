@@ -66,7 +66,7 @@ let arbitrarySized_decl ty_ctr ctrs iargs =
                fun _ -> oneof (List.map (create_for_branch tyParams aux_arb size) bases))
              ;(injectCtr "S", ["size'"],
                fun [size'] -> frequency (List.map (fun (ctr,ty') ->
-                   ((if isBaseBranch ty' then gInt 1 else gVar size),
+                   (Weightmap.lookup_weight ctr size',
                     create_for_branch tyParams aux_arb size' (ctr,ty'))) ctrs))
              ])
         (fun x -> gVar x) in

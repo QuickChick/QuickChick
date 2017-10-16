@@ -57,6 +57,11 @@ let register_weights_object =
        cache_function = (fun (_,ws) -> register_weights ws);
        load_function = (fun _ (_,ws) -> register_weights ws)}
 
+let lookup_weight ctr size_var = 
+  try match CtrMap.find ctr !weight_env with
+      | WNum n -> gInt n
+      | WSize  -> gSucc (gVar (size_var))
+  with Not_found -> gInt 1
 
 VERNAC COMMAND EXTEND QuickChickWeights CLASSIFIED AS SIDEFF
   | ["QuickChickWeights" constr(c)] -> 

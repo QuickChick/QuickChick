@@ -108,6 +108,7 @@ let base_gens
       class_method class_methodST (rec_method rec_name size) bind stMaybe check_expr match_inp
       gen_ctr register_arbitrary
   in
+  (* TODO: Base Case weights? *)
   let base_branches =
     List.map
       fst
@@ -171,8 +172,9 @@ let arbitrarySizedST
              (base_gens (gVar size) full_gtyp gen_ctr dep_type ctrs input_names n register_arbitrary rec_name))
       ; (injectCtr "S", ["size'"],
          fun [size'] ->
-           uniform_backtracking
-             (ind_gens (gVar size') full_gtyp gen_ctr dep_type ctrs input_names n register_arbitrary rec_name))
+           let weights = List.map (fun (c,_) -> Weightmap.lookup_weight c size') ctrs in
+           backtracking (List.combine weights 
+             (ind_gens (gVar size') full_gtyp gen_ctr dep_type ctrs input_names n register_arbitrary rec_name)))
       ]
   in
 
