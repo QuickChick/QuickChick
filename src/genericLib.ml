@@ -129,6 +129,16 @@ let num_of_ctrs (c : constructor) =
   let mib = Environ.lookup_mind mind env in
   Array.length (mib.mind_packets.(n).mind_consnames)
 
+module type Ord_ty_ctr_type = sig
+  type t = ty_ctr 
+  val compare : t -> t -> int
+end
+
+module type Ord_ctr_type = sig
+  type t = constructor
+  val compare : t -> t -> int
+end
+
 module Ord_ty_ctr = struct 
   type t = ty_ctr 
   let compare = compare 

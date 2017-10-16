@@ -38,10 +38,6 @@ val ty_ctr_to_string : ty_ctr -> string
 val gInjectTyCtr : string -> ty_ctr
 val gTyCtr : ty_ctr -> coq_expr
 
-module Ord_ty_ctr : Map.OrderedType
-
-module Ord_ctr : Map.OrderedType
-
 type arg
 val gArg : ?assumName:coq_expr ->
            ?assumType:coq_expr ->
@@ -62,6 +58,18 @@ type constructor
 val constructor_to_string : constructor -> string
 val gCtr : constructor -> coq_expr
 val injectCtr : string -> constructor
+
+module type Ord_ty_ctr_type = sig
+  type t = ty_ctr 
+  val compare : t -> t -> int
+  end
+module Ord_ty_ctr : Ord_ty_ctr_type
+
+module type Ord_ctr_type = sig
+  type t = constructor
+  val compare : t -> t -> int
+  end
+module Ord_ctr : Ord_ctr_type
 
 val num_of_ctrs : constructor -> int
 
