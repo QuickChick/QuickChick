@@ -18,8 +18,8 @@ plugin: Makefile.coq
 	$(MAKE) -f Makefile.coq 
 
 documentation-check:
-	coqc -R src QuickChick BasicInterface.v
-	coqc -R src QuickChick DocumentationCheck.v
+	coqc -R src QuickChick -I src BasicInterface.v
+	coqc -R src QuickChick -I src DocumentationCheck.v
 
 TEMPFILE := $(shell mktemp)
 
