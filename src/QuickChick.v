@@ -6,6 +6,8 @@ Declare ML Module "semLib".
 Declare ML Module "genLib".
 Declare ML Module "unify".
 
+Declare ML Module "weightmap".
+
 Declare ML Module "quickChick".
 
 Declare ML Module "Sized".

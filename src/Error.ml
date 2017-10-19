@@ -1,6 +1,6 @@
-let flag_debug = ref false
-let flag_warn  = ref true
-let flag_error = ref true
+let flag_debug = Summary.ref ~name:"QC_flag_debug" false
+let flag_warn  = Summary.ref ~name:"QC_flag_warn"  true
+let flag_error = Summary.ref ~name:"QC_flag_error" true
 
 let qcfail s = failwith (Printf.sprintf "Internal QuickChick Error : %s" s)
 

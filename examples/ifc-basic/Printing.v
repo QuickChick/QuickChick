@@ -66,6 +66,16 @@ Instance show_stack : Show Stack :=
     in aux s
 |}.
 
+Instance show_state : Show State :=
+{|
+  show st :=
+    let '(St imem1 mem1 stk1 pc1) := st in
+    "Instructions: " ++ nl ++ show imem1 ++ nl ++
+    "Memory: " ++ nl ++ show mem1 ++ nl ++
+    "Stack: " ++ nl ++ show stk1  ++ nl ++
+    "PC: " ++ show pc1 ++ nl
+|}.
+
 
 Class ShowPair (A : Type) : Type :=
 {

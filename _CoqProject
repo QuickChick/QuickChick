@@ -32,6 +32,7 @@ src/depDriver.ml
 src/setLib.ml
 src/semLib.ml
 src/coqLib.ml
+src/weightmap.ml4
 src/ArbitrarySized.ml
 src/Sized.ml
 src/SizeMon.ml

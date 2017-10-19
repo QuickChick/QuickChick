@@ -23,6 +23,7 @@ Inductive Foo :=
 | Foo2 : Foo -> Foo
 | Foo3 : nat -> Foo -> Foo.
 
+QuickChickWeights [(Foo1, 1); (Foo2, size); (Foo3, size)].
 Derive (Arbitrary, Show) for Foo.
 
 (* Use custom formatting of generated code, and prove them equal (by reflexivity) *)
@@ -45,9 +46,9 @@ Fixpoint genFooSized (size : nat) :=
   match size with 
   | O => returnGen Foo1
   | S size' => freq [ (1, returnGen Foo1) 
-                    ; (size, do! f <- genFooSized size'; 
+                    ; (S size', do! f <- genFooSized size'; 
                              returnGen (Foo2 f))
-                    ; (size, do! n <- arbitrary; 
+                    ; (S size', do! n <- arbitrary; 
                              do! f <- genFooSized size';
                              returnGen (Foo3 n f)) 
                     ]
@@ -66,7 +67,7 @@ Fixpoint shrink_foo x :=
 (* JH: Foo2 -> Foo1, Foo3 n f -> Foo2 f *)
 (* Avoid exponential shrinking *)
 
-Lemma genFooSizedNotation : genFooSized = arbitrarySized.
+Lemma genFooSizedNotation : genFooSized = @arbitrarySized Foo _.
 Proof. reflexivity. Qed.
 
 Lemma shrinkFoo_equality : shrink_foo = @shrink Foo _.

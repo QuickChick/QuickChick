@@ -76,8 +76,17 @@ let match_inp (inp : var) (pat : matcher_pat) (left : coq_expr) (right  : coq_ex
   let ret v left right =
     construct_match (gVar v) ~catch_all:(Some right) [(pat, left)]
   in
+  let catch_case = 
+    match pat with 
+    | MatchCtr (c, ls) -> 
+       (* Leo: This is a hack totality check for unary matches *)
+       if num_of_ctrs c = 1 && List.for_all (fun x -> match x with MatchU _ -> true | MatchCtr _ -> false) ls 
+       then None
+       else Some right
+    | _ -> failwith "Toplevel match not a constructor?"
+  in 
   construct_match_with_return
-    (gVar inp) ~catch_all:(Some right) "s" (fun v -> ret_type v ret)
+    (gVar inp) ~catch_all:(catch_case) "s" (fun v -> ret_type v ret)
     [(pat,left)]
 
 
@@ -99,6 +108,7 @@ let base_gens
       class_method class_methodST (rec_method rec_name size) bind stMaybe check_expr match_inp
       gen_ctr register_arbitrary
   in
+  (* TODO: Base Case weights? *)
   let base_branches =
     List.map
       fst
@@ -162,8 +172,9 @@ let arbitrarySizedST
              (base_gens (gVar size) full_gtyp gen_ctr dep_type ctrs input_names n register_arbitrary rec_name))
       ; (injectCtr "S", ["size'"],
          fun [size'] ->
-           uniform_backtracking
-             (ind_gens (gVar size') full_gtyp gen_ctr dep_type ctrs input_names n register_arbitrary rec_name))
+           let weights = List.map (fun (c,_) -> Weightmap.lookup_weight c size') ctrs in
+           backtracking (List.combine weights 
+             (ind_gens (gVar size') full_gtyp gen_ctr dep_type ctrs input_names n register_arbitrary rec_name)))
       ]
   in
 
