@@ -115,11 +115,20 @@ let sizedEqProofs_body
 
   (* Fully applied predicate (parameters and constructors) *)
   let full_pred inputs =
-    gFun ["_forGen"] (fun [fg] -> gApp (full_dt) (list_insert_nth (gVar fg) inputs (n-1)))
+    gFun ["_forGen"] (fun [fg] -> gApp full_dt (list_insert_nth (gVar fg) inputs (n-1)))
+  in
+
+  (* Inputs as holes *)
+  let hole_inps =
+    List.map (fun _ -> hole) inputs
+  in
+
+  let make_prop (m : int) (x : coq_expr) (ls : coq_expr list) =
+    gApp full_dt (list_insert_nth x ls (m-1))
   in
 
   let full_prop gtyp inputs =
-    gApp (full_dt) (list_insert_nth gtyp inputs (n-1))
+    gApp full_dt (list_insert_nth gtyp inputs (n-1))
   in
 
   let input_vars = List.map fresh_name input_names in
@@ -389,22 +398,24 @@ let sizedEqProofs_body
     (set_singleton x,
      fun hcur ->
        let (c, typ) = c in
-       let rec construct_proof typ n acc =
+       let rec construct_proof typ m acc =
          match typ with
          | DTyCtr _ ->
            (* XXX currently not handling type parameters *)
-           rewrite (gVar hcur) (gApp (gCtr c) (List.rev acc))
+           let pred =
+             gFun ["g"] (fun [g] -> make_prop n (gVar g) hole_inps)
+           in
+           rewrite pred (gVar hcur) (gApp (gCtr c) (List.rev acc))
          | DProd ((x, dt1), dt2) ->
-           (* XXX ??? *)
-           construct_proof dt2 n (hole :: acc)
+           construct_proof dt2 m (hole :: acc)
          | DArrow (dt1, dt2) ->
            (* at this point the set should be a singleton and curr_set
               just and equality proof *)
            let p =
-             try IntMap.find n !proof_map 
+             try IntMap.find m !proof_map 
              with Not_found -> failwith "Proof not present in the environment"
            in
-           construct_proof dt2 (n + 1) ((p (gVar hcur)) :: acc) 
+           construct_proof dt2 (m + 1) ((p (gVar hcur)) :: acc) 
        in
        construct_proof typ 0 [])
   in
@@ -479,6 +490,12 @@ let sizedEqProofs_body
       (gApp set [(gVar x)]) hole
   in
 
+  let ret_type_left_inps s set x m =
+    let ret = make_prop m (gVar s) hole_inps in
+    gImpl
+      (gApp set [(gVar x)]) ret
+  in
+
   let ret_type_dec (s : var) (left : coq_expr) (right : coq_expr) =
     gMatch (gVar s)
       [ (injectCtr "left", ["eq"], fun _ -> left)
@@ -520,9 +537,21 @@ let sizedEqProofs_body
     : coq_expr * (var -> coq_expr) =
     let (lset, lproof) = left in
     let (rset, rproof) = right in
+    (* The position of the input. A bit of a hack *)
+    let pos =
+      let rec aux n l =
+        match l with
+        | [] -> failwith "input not found"
+        | x :: l -> if x = inp then n else aux (n+1) l
+      in
+      let p = aux 1 input_vars in
+      if p < n then p else p + 1
+    in
     let ret v left right =
-      ret_type_left_hole (construct_match (gVar v) ~catch_all:(Some rset) [(pat, lset)])
-        x
+      ret_type_left_inps
+        v
+        (construct_match (gVar v) ~catch_all:(Some rset) [(pat, lset)])
+        x pos
     in
     let namecur = Printf.sprintf "Hcur%d" n in
     (construct_match_with_return
@@ -695,9 +724,11 @@ let sizedEqProofs_body
     | _ -> false
   in
 
-  let rec make_context typ (orp : coq_expr -> coq_expr) (cont : btyp) : coq_expr =
-    let rec aux typ m n exp =
+  let rec make_context typ off (orp : coq_expr -> coq_expr) (cont : btyp) : coq_expr =
+    let rec aux typ off m n exp =
       match typ with
+      | DArrow (_, dt2) | DProd ((_, _), dt2) when off > 0 ->
+        make_context dt2 (off - 1) orp cont
       | DArrow (dt1, dt2) ->
         let hn = Printf.sprintf "H%d" n in
         if (is_rec_call dt1) then
@@ -707,18 +738,18 @@ let sizedEqProofs_body
                (* add to map *)
                ctx_map :=
                  IntMap.add n (gVar hn, gVar ihn) !ctx_map;
-               aux dt2 m (n + 1) exp)
+               aux dt2 off m (n + 1) exp)
         else
           gFun [hn]
             (fun [hn] ->
                (* add to map *)
                ctx_map :=
                  IntMap.add n (gVar hn, hole) !ctx_map;
-               aux dt2 m (n + 1) exp)
+               aux dt2 off m (n + 1) exp)
       | DProd ((x, dt1), dt2) ->
         (* the assumption is that this will be implicit when needed
            so we do not need to add them to a map *)
-        gFun [var_to_string x] (fun [x] -> aux dt2 (m + 1) n exp)
+        gFun [var_to_string x] (fun [x] -> aux dt2 off (m + 1) n exp)
       | DTyCtr (_, dts) ->
         let (proof, ctx) = cont in
         ctx
@@ -728,7 +759,7 @@ let sizedEqProofs_body
           (gInt 0) []
       | _ -> failwith "Wrong type"
     in
-    aux typ 0 0 cont
+    aux typ off 0 0 cont
   in
 
   (* XXX we might need to handle this locally *)
@@ -758,7 +789,7 @@ let sizedEqProofs_body
         ((fun sum fail sproof lst dstr ->
             let (h, _) =
               try IntMap.find n !ctx_map
-              with Not_found -> failwith "Proof not found"
+              with Not_found -> failwith "class_method: Proof not found"
             in
             gExIntro_impl hole (gConjIntro (dstr h) (iproof sum fail sproof lst (fun x -> x)))),
          ctx)))
@@ -796,7 +827,7 @@ let sizedEqProofs_body
          (fun iproof sum lst ->
             let (h, ih) =
               try IntMap.find n !ctx_map
-              with Not_found -> failwith "Proof not found"
+              with Not_found -> failwith "rec method : Proof not found"
             in
             gMatch ih
               [(injectCtr "ex_intro", [xn; pcn],
@@ -814,11 +845,6 @@ let sizedEqProofs_body
     let (m, cont) = m in
     ((fun s -> set_bigcup x (m s) (fun x -> fst (f x) s)),
      cont (snd (f (fresh_name x)))) (* XXX name hack *)
-  in
-
-  let ret_type_left_hole set x =
-    gImpl
-      (gApp set [(gVar x)]) hole
   in
 
   let ret_type_right (s : var) (left : coq_expr) (right : coq_expr) =
@@ -845,17 +871,25 @@ let sizedEqProofs_body
           ; (injectCtr "right", ["neq"], fun _ -> rset s) 
           ]),
      ((fun sum fail sproof lst dstr ->
-         let (h, _) =
-           try IntMap.find n !ctx_map
-           with Not_found -> failwith "Proof not found"
+         let proof cont =
+           match
+             (try
+                Some (IntMap.find n !ctx_map)
+              with Not_found -> None)
+           with
+           | Some (h, _) -> cont h
+           | None ->
+             cont (gEqRefl hole)
          in
+         let contl heq h = gApp h [(gVar heq)] in
+         let contr hneq h = gApp (gVar hneq) [h] in
          gMatchReturn scrut
            "s" (* as clause *)
            (fun v -> ret_type_right v (lset sum) (rset sum))
            [ (injectCtr "left", [heq],
-              fun [heq] -> lp sum (false_ind hole (gApp h [(gVar heq)])) sproof lst dstr)
+              fun [heq] -> lp sum (false_ind hole (proof (contl heq))) sproof lst dstr)
            ; (injectCtr "right", [hneq],
-              fun [hneq] -> rp sum (false_ind hole (gApp (gVar hneq) [h])) sproof lst dstr)
+              fun [hneq] -> rp sum (false_ind hole (proof (contr hneq))) sproof lst dstr)
            ]),
       (fun iproof sum lst -> lctx (fun sum lst -> rctx iproof sum lst) sum lst)
       (* This is OK because one of the two contexts will be empty *)
@@ -906,7 +940,7 @@ let sizedEqProofs_body
         let hneq = Printf.sprintf "Hneq%d" n in
         let (h, _) =
           try IntMap.find n !ctx_map
-          with Not_found -> failwith "Proof not found"
+          with Not_found -> failwith "stMaybe: Proof not found"
         in
         gMatchReturn (chk (gVar x))
           "s" (* as clause *)
@@ -935,18 +969,9 @@ let sizedEqProofs_body
         (fun rec_name -> gApp (gVar rec_name) args)
     in
     gApp
-      (set_bigcup "n" set_full (fun n -> iter_body ((gVar n) :: (List.map gVar inps))))
+      (set_bigcup "n" set_full (fun n -> iter_body ((gVar n) :: inps)))
       [gVar x]
   in
-
-  let forGen = "_forGen" in 
-
-  let rec inputWithGen i l = 
-    if i <= 1 then forGen :: l
-    else let (h::t) = l in h :: (inputWithGen (i-1) t)
-  in
-
-  let inputsWithGen = inputWithGen n input_names in
 
   let rec split_gen (i : int) (l : 'a list) acc : ('a * ('a list)) =
     if i <= 1 then
@@ -964,8 +989,28 @@ let sizedEqProofs_body
     else let (h::t) = l in h :: (inputsWithGen (i-1) t g)
   in
 
+
+  let rec split_params dt l acc pos =
+    match dt with 
+    | DProd  ((x,d1), d2) ->
+      begin
+        match l with
+        | [] -> failwith "Expecting parameter"
+        | inp :: inps ->
+          split_params d2 inps (inp :: acc) (pos+1)
+      end
+    | _ -> (List.rev acc, l, pos)
+  in
+
+  let (param_vars, index_vars, off) = split_params dep_type input_vars [] 0 in
+  let (_, indexes, _) =  split_params dep_type inputs [] 0 in
+  let params = List.map gVar param_vars in
+  (* take out params
+     calculate new position for the generator 
+  *)
+
   let rec rightp gen : coq_expr =
-    let ind = gInject ((ty_ctr_to_string gen_ctr) ^ "_ind") in
+    let ind = gApp (gInject ((ty_ctr_to_string gen_ctr) ^ "_ind")) params in
     let handle_branch' c : ((coq_expr -> coq_expr) * btyp) * bool =
       handle_branch n dep_type input_vars (* XXX name hack? *)
         fail_exp_right ret_exp_right class_method_right class_methodST_right
@@ -979,17 +1024,17 @@ let sizedEqProofs_body
       | c :: ctrs' ->
         let (_, typ) = c in
         let ((_, p), b) = handle_branch' c in
-        (make_context typ orp p) :: (cases ctrs' (fun x -> gOrIntroR (orp x)))
+        (make_context typ off orp p) :: (cases ctrs' (fun x -> gOrIntroR (orp x)))
     in
     gApp
       (gApp
          ind
          (gFunWithArgs
-            (inputsWithGen n inputs (gArg ~assumName:(gVar (fresh_name "_gen")) ()))
-            (fun inpg -> let (g, inps) = split_gen n inpg [] in
-              ret_type_right_ind inps g) ::
+            (inputsWithGen (n - off) indexes (gArg ~assumName:(gVar (fresh_name "_gen")) ()))
+            (fun inpg -> let (g, inps) = split_gen (n - off) inpg [] in
+              ret_type_right_ind (params @ (List.map gVar inps)) g) ::
           (cases ctrs (fun e -> gOrIntroL e))))
-      (List.map gVar (inputsWithGen n input_vars gen))
+      (List.map gVar (inputsWithGen (n - off) index_vars gen))
   in
 
   let spec =
@@ -1001,11 +1046,12 @@ let sizedEqProofs_body
   msg_debug (str "iter");
   debug_coq_expr iter_body;
   msg_debug (str "spec"); 
-  debug_coq_expr spec; 
-  msg_debug (str "mon proof");
-  debug_coq_expr (mon_proof (List.map gVar input_vars));
-  msg_debug (str "completeness");
-  debug_coq_expr (gFun ["x"]
-                    (fun [x] -> rightp x));
+  debug_coq_expr spec;
+  msg_debug (str ("dep type: " ^ (dep_type_to_string dep_type)));
+  (* msg_debug (str "mon proof"); *)
+  (* debug_coq_expr (mon_proof (List.map gVar input_vars)); *)
+  (* msg_debug (str "completeness"); *)
+  (* debug_coq_expr (gFun ["x"] *)
+  (*                   (fun [x] -> rightp x)); *)
 
-  gRecord [("iter", iter_body); ("mon", mon_proof (List.map gVar input_vars)); ("spec", spec)] (* spec *)
+  gRecord [("iter", iter_body); ("mon", mon_proof (List.map gVar input_vars)); ("spec", spec)]

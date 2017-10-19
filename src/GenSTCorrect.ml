@@ -52,7 +52,7 @@ let ret_exp (dt : coq_expr) (c : coq_expr) : btyp =
     returnGenSizeMonotonicOpt (gSome dt c),
     (* comp *)
     gFun ["x"; "Hx"]
-      (fun [x; hx] -> rewrite (imset_singl_incl hole hole hole (gVar hx)) (rewrite_set_r (semReturn hole) (gEqRefl hole))),
+      (fun [x; hx] -> rewrite hole (imset_singl_incl hole hole hole (gVar hx)) (rewrite_set_r (semReturn hole) (gEqRefl hole))),
     (* sound *)
     gFun ["x"; "Hx"]
       (fun [x; hx] -> gOrIntroL (gExIntro_impl hole (gConjIntro (gEqRefl hole) (rewrite_set_l (semReturn hole) (gVar hx)))))
@@ -74,12 +74,9 @@ let class_method : atyp =
 
 
 let class_methodST (n : int) (pred : coq_expr) : atyp =
-  let comp =
-    gApp ~explicit:true (gInject "STComplete") [hole; pred; hole; hole]
-  in
-  let sound =
-    gApp ~explicit:true (gInject "STSound") [hole; pred; hole; hole]
-  in
+  let cproof = gApp ~explicit:true (gInject "STCorrect") [hole; pred; hole; hole] in
+  let comp = set_eq_isSome_complete cproof in
+  let sound = set_eq_isSome_sound cproof in
   let gen =
     gApp ~explicit:true (gInject "arbitraryST")
       [ hole (* Implicit argument - type A *)
@@ -347,7 +344,7 @@ let stMaybe (opt : bool) (exp : atyp)
     set_incl_trans
       (imset_incl (gFun [x; hxs] (fun [x; hx] -> sumbools_to_bool_comp x hx checks)))
       ((if opt then semSuchThatMaybeOpt_complete else semSuchThatMaybe_complete)
-         gen (bool_pred checks) hole comp),
+         gen (bool_pred checks) hole mon comp),
     (* sound *)
     set_incl_trans
       ((if opt then semSuchThatMaybeOpt_sound else semSuchThatMaybe_sound)
@@ -592,7 +589,7 @@ let genSizedSTCorr_body
 
   msg_debug (str "compl");
   debug_coq_expr com_proof;
-  (* msg_debug (str "sound"); *)
-  (* debug_coq_expr sound_proof; *)
+  msg_debug (str "sound");
+  debug_coq_expr sound_proof;
 
   gRecord [ ("sizedSTCorrect", correct) ]

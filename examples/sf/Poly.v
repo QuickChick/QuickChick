@@ -10,7 +10,6 @@ Import QcDefaultNotation. Open Scope qc_scope.
 
 Set Bullet Behavior "Strict Subproofs".
 
-Require Import ZoeStuff.
 (* End prelude *)
 
 Require Export Lists.
@@ -29,6 +28,7 @@ Derive (Arbitrary, Show) for list.
 Derive (Sized, CanonicalSized) for list.
 Derive SizeMonotonic for list using genSlist.
 Derive SizedMonotonic for list.
+Derive SizedCorrect for list using genSlist and SizeMonotoniclist.
 
 Fixpoint repeat (X : Type) (x : X) (count : nat) : list X :=
   match count with
@@ -50,6 +50,7 @@ Derive (Arbitrary, Show) for mumble.
 Derive (Sized, CanonicalSized) for mumble.
 Derive SizeMonotonic for mumble using genSmumble.
 Derive SizedMonotonic for mumble.
+Derive SizedCorrect for mumble using genSmumble and SizeMonotonicmumble.
 
 Inductive grumble (X:Type) : Type :=
   | d : mumble -> grumble X
@@ -66,6 +67,7 @@ Derive (Arbitrary, Show) for grumble.
 Derive (Sized, CanonicalSized) for grumble.
 Derive SizeMonotonic for grumble using genSgrumble.
 Derive SizedMonotonic for grumble.
+Derive SizedCorrect for grumble using genSgrumble and SizeMonotonicgrumble.
 
 End MumbleGrumble.
 
@@ -106,6 +108,7 @@ Derive (Arbitrary, Show) for list'.
 Derive (Sized, CanonicalSized) for list'.
 Derive SizeMonotonic for list' using genSlist'.
 Derive SizedMonotonic for list'.
+Derive SizedCorrect for list' using genSlist' and SizeMonotoniclist'.
 
 Fixpoint app {X : Type} (l1 l2 : list X)
              : (list X) :=
@@ -221,6 +224,7 @@ Derive Sized for option.
 Derive CanonicalSized for option.
 Derive SizeMonotonic for option using genSoption.
 Derive SizedMonotonic for option.
+Derive SizedCorrect for option using genSoption and SizeMonotonicoption.
 
 Fixpoint nth_error {X : Type} (l : list X) (n : nat)
                    : option X :=

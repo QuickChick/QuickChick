@@ -10,7 +10,6 @@ Import QcDefaultNotation. Open Scope qc_scope.
 
 Set Bullet Behavior "Strict Subproofs".
 
-Require Import ZoeStuff.
 (* End prelude *)
 
 Inductive day : Type :=
@@ -80,7 +79,7 @@ Inductive nat : Type :=
 
 Derive (Arbitrary, Show) for nat.
 Derive (Sized, CanonicalSized) for nat.
-(* Zoe: Look here *)
+(* XXX these do not work because there's already an instance for nat. *)
 (*
 Derive SizeMonotonic for nat using genSnat.
 Derive SizedMonotonic for nat.
@@ -91,7 +90,8 @@ Inductive nat' : Type :=
   | stop : nat'
   | tick : nat' -> nat'.
 
-(* Zoe: Not sure why this works but the above doesn't. If it's nat-specific I don't really care *)
+(* Not sure why this works but the above doesn't. If it's nat-specific I don't really care *)
+(* Yes it was nat specific. It breaks because there are two instances for nat -- one of them handwritten. *)
 Derive (Arbitrary, Show) for nat'.
 Derive (Sized, CanonicalSized) for nat'.
 Derive SizeMonotonic for nat' using genSnat'.
@@ -361,4 +361,3 @@ Theorem andb_eq_orb :
   (andb b c = orb b c) ->
   b = c.
 Admitted. (* Leo: OUT-OF-SCOPE *)
-

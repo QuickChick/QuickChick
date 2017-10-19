@@ -163,7 +163,7 @@ let rec dep_type_to_string dt =
   | DProd  ((x,d1), d2) -> Printf.sprintf "(%s : %s) -> %s" (var_to_string x) (dep_type_to_string d1) (dep_type_to_string d2)
   | DTyCtr (ty_ctr, ds) -> ty_ctr_to_string ty_ctr ^ " " ^ str_lst_to_string " " (List.map dep_type_to_string ds)
   | DCtr (ctr, ds) -> constructor_to_string ctr ^ " " ^ str_lst_to_string " " (List.map dep_type_to_string ds)
-  | DTyParam tp -> ty_param_to_string tp
+  | DTyParam tp -> Printf.sprintf "(Param : %s)" (ty_param_to_string tp)
   | DTyVar tv -> var_to_string tv
   | DApp (d, ds) -> Printf.sprintf "(%s $ %s)" (dep_type_to_string d) (str_lst_to_string " " (List.map dep_type_to_string ds))
   | DNot d -> Printf.sprintf "~ ( %s )" (dep_type_to_string d)

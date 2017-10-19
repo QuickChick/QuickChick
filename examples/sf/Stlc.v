@@ -10,7 +10,6 @@ Import QcDefaultNotation. Open Scope qc_scope.
 
 Set Bullet Behavior "Strict Subproofs".
 
-Require Import ZoeStuff.
 (* End prelude *)
 
 Require Import Smallstep.
@@ -22,9 +21,9 @@ Inductive ty : Type :=
 
 Derive (Arbitrary, Show) for ty.
 Derive (Sized, CanonicalSized) for ty.
-Derive SizeMonotonic for ty using genSty0.
+Derive SizeMonotonic for ty using genSty.
 Derive SizedMonotonic for ty.
-Derive SizedCorrect for ty using genSty0 and SizeMonotonicty0.
+Derive SizedCorrect for ty using genSty and SizeMonotonicty.
 
 Instance eq_dec_ty (t1 t2 : ty) : Dec (t1 = t2).
 constructor; unfold decidable; decide equality; auto. Defined.
@@ -35,7 +34,7 @@ Derive (Arbitrary, Show) for ascii.
 Derive (Sized, CanonicalSized) for ascii.
 Derive SizeMonotonic for ascii using genSascii.
 Derive SizedMonotonic for ascii.
-(* Zoe: Derive SizedCorrect for ascii using genSascii and SizeMonotonicascii. *)
+Derive SizedCorrect for ascii using genSascii and SizeMonotonicascii.
 
 Derive (Arbitrary, Show) for string.
 Derive (Sized, CanonicalSized) for string.
@@ -50,7 +49,7 @@ Derive (Arbitrary, Show) for id.
 Derive (Sized, CanonicalSized) for id.
 Derive SizeMonotonic for id using genSid.
 Derive SizedMonotonic for id.
-(* ZOEEE : Derive SizedCorrect for id using genSid and SizeMonotonicid.*)
+Derive SizedCorrect for id using genSid and SizeMonotonicid.
 
 Instance eq_dec_id (x y : id) : Dec (x = y).
 constructor; unfold decidable. repeat decide equality. Defined.
@@ -61,28 +60,26 @@ Definition beq_id x y :=
   end.
 
 
-Inductive tm : Type :=
-  | tvar : id -> tm
-  | tapp : tm -> tm -> tm
-  | tabs : id -> ty -> tm -> tm
-  | ttrue : tm
-  | tfalse : tm
-  | tif : tm -> tm -> tm -> tm.
+Inductive trm : Type :=
+  | tvar : id -> trm
+  | tapp : trm -> trm -> trm
+  | tabs : id -> ty -> trm -> trm
+  | ttrue : trm
+  | tfalse : trm
+  | tif : trm -> trm -> trm -> trm.
 
-Derive (Arbitrary, Show) for tm.
-Derive (Sized, CanonicalSized) for tm.
-(* Requires SizeMonotonic for id *)
-(*
-Derive SizeMonotonic for tm using genStm0.
-Derive SizedMonotonic for tm.
-Derive SizedCorrect for tm using genStm0 and SizeMonotonictm0.
-*)
+Derive (Arbitrary, Show) for trm.
+Derive (Sized, CanonicalSized) for trm.
+Derive SizeMonotonic for trm using genStrm.
+Derive SizedMonotonic for trm.
+Derive SizedCorrect for trm using genStrm and SizeMonotonictrm.
 
-Instance eq_dec_tm (t1 t2 : tm) : Dec (t1 = t2).
+
+Instance eq_dec_tm (t1 t2 : trm) : Dec (t1 = t2).
 constructor; unfold decidable; repeat decide equality. Defined.
 
 (* Leo: TODO: lowercase x - name clash *)
-Inductive value : tm -> Prop :=
+Inductive value : trm -> Prop :=
   | v_abs : forall X T t,
       value (tabs X T t)
   | v_true :
@@ -92,11 +89,9 @@ Inductive value : tm -> Prop :=
 
 Derive ArbitrarySizedSuchThat for (fun tm => value tm).
 Derive SizedProofEqs for (fun tm => value tm).
-(*
 Derive SizeMonotonicSuchThatOpt for (fun tm => value tm).
 Derive GenSizedSuchThatCorrect for (fun tm => value tm).
 Derive GenSizedSuchThatSizeMonotonicOpt for (fun tm => value tm).
-*)
 
 Instance dec_value t : Dec (value t).
 constructor; unfold decidable; induction t;
@@ -108,7 +103,7 @@ Hint Constructors value.
 
 Reserved Notation "'[' x ':=' s ']' t" (at level 20).
 
-Fixpoint subst (x:id) (s:tm) (t:tm) : tm :=
+Fixpoint subst (x:id) (s:trm) (t:trm) : trm :=
   match t with
   | tvar x' =>
       if beq_id x x' then s else t
@@ -127,7 +122,7 @@ Fixpoint subst (x:id) (s:tm) (t:tm) : tm :=
 where "'[' x ':=' s ']' t" := (subst x s t).
 
 (*
-Inductive substi (s:tm) (x:id) : tm -> tm -> Prop :=
+Inductive substi (s:trm) (x:id) : trm -> trm -> Prop :=
   | s_var1 :
       substi s x (tvar x) s
   (* FILL IN HERE *)
@@ -143,7 +138,7 @@ Proof.
 
 Reserved Notation "t1 '===>' t2" (at level 40).
 
-Inductive step : tm -> tm -> Prop :=
+Inductive step : trm -> trm -> Prop :=
   | ST_AppAbs : forall x T t12 v2,
          value v2 ->
          (tapp (tabs x T t12) v2) ===> [x:=v2]t12
@@ -182,11 +177,11 @@ Inductive bind : context -> id -> ty -> Prop :=
 
 Derive ArbitrarySizedSuchThat for (fun i => bind m i a).
 Derive SizeMonotonicSuchThatOpt for (fun i => bind m i a).
-(* ZOE! Proof not found 
-Derive SizedProofEqs for (fun x => bind m x a).
-Derive GenSizedSuchThatCorrect for (fun x => bind m x a).
 Derive GenSizedSuchThatSizeMonotonicOpt for (fun x => bind m x a).
-*)
+(* KNOWN DUG. The derivation of SizedProofEqs for bind fails. *)
+(* Derive SizedProofEqs for (fun x => bind m x a). *)
+(* Derive GenSizedSuchThatCorrect for (fun x => bind m x a). *)
+
 Instance adm_st m a : SuchThatCorrect (fun x => bind m x a) (genST (fun x => bind m x a)).
 Admitted.
 
@@ -210,7 +205,7 @@ Defined.
 
 Reserved Notation "Gamma '|-' t '\typ' T" (at level 40).
 
-Inductive has_type : context -> tm -> ty -> Prop :=
+Inductive has_type : context -> trm -> ty -> Prop :=
   | T_Var : forall Gamma i T,
       bind Gamma i T ->
       Gamma |- tvar i \typ T
@@ -236,12 +231,10 @@ where "Gamma '|-' t '\typ' T" := (has_type Gamma t T).
 Hint Constructors has_type.
 
 Derive ArbitrarySizedSuchThat for (fun tm => has_type Gamma tm ty).
-(*
 Derive SizedProofEqs for (fun tm => value tm).
 Derive SizeMonotonicSuchThatOpt for (fun tm => value tm).
 Derive GenSizedSuchThatCorrect for (fun tm => value tm).
 Derive GenSizedSuchThatSizeMonotonicOpt for (fun tm => value tm).
-*)
 
 Instance has_type_gen_correct0 Gamma T : SuchThatCorrect (fun t => has_type Gamma t T) 
                                                          (@arbitraryST _ (fun t => has_type Gamma t T) _).
@@ -286,7 +279,7 @@ induction Gamma => i T; split; intros; eauto.
     * eapply IHGamma in H6; auto.
 Qed.    
 
-Fixpoint get_type (Gamma : context) (t : tm) : option ty.
+Fixpoint get_type (Gamma : context) (t : trm) : option ty.
 Admitted.
 
 Instance dec_has_type Gamma t T : Dec (has_type Gamma t T).

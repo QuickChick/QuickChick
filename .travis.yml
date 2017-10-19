@@ -5,6 +5,7 @@ cache:
   apt: true
   directories:
   - $HOME/.opam
+  - $HOME/Library/Caches/Homebrew
 addons:
   apt:
     sources:
@@ -16,27 +17,29 @@ env:
   global:
   - NJOBS=2
   - COMPILER="system"
+  - OPAMYES=true
+matrix:
+  fast_finish: true
 os:
     - linux
     - osx
 
 before_install:
-    case $TRAVIS_OS_NAME in
-    osx)
-    brew install opam ;;
-    esac
+    if [ $TRAVIS_OS_NAME = osx ]; then
+    brew update; brew install opam; fi
 
 install:
 - "[ -e .opam ] || travis_wait opam init -j ${NJOBS} --compiler=${COMPILER} -n -y"
 - eval $(opam config env)
 - opam config var root
 - opam repo add coq-released https://coq.inria.fr/opam/released || true
-- travis_wait 30 opam install -j ${NJOBS} -y coq=8.6 coq-mathcomp-ssreflect ${EXTRA_OPAM}
 - opam list
 
 script:
 - set -e
 - echo 'Building QuickChick...' && echo -en 'travis_fold:start:QuickChick.build\\r'
-- travis_retry make install -j
+- opam pin add .
+- opam update
+- travis_wait opam reinstall quickchick
 - cd examples/multifile-mutation && make && quickChick -top Top
 - echo -en 'travis_fold:end:QuickChick.build\\r'

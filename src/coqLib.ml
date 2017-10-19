@@ -35,14 +35,20 @@ let gEqType e1 e2 =
 let gConj p1 p2 =
   gApp (gInject "and") [p1; p2]
 
+let gProjL p =
+  gApp ~explicit:true (gInject "Logic.proj1") [hole; hole; p]
+
+let gProjR p =
+  gApp ~explicit:true (gInject "Logic.proj2") [hole; hole; p]
+
 let gImpl p1 p2 =
   gApp (gInject "Basics.impl") [p1; p2]
 
 let gForall typ f =
-  gApp (gInject "all") [typ; f]
+  gApp ~explicit:true (gInject "Nat_util.all") [typ; f]
 
 let gProd e1 e2 =
-  gApp (gInject "prod") [e1; e2]
+  gApp (gInject "Coq.Init.Datatypes.prod") [e1; e2]
 
 let gLeq e1 e2 =
   gApp (gInject "leq") [e1; e2]
@@ -93,8 +99,8 @@ let discriminate h =
     (gMatch h [(injectCtr "erefl", [], fun [] -> gI)])
 
 
-let rewrite h hin =
-  gApp (gInject "eq_ind") [hole; hole; hin; hole; h]
+let rewrite pred h hin =
+  gApp ~explicit:true (gInject "eq_ind") [hole; hole; pred; hin; hole; h]
   (* gMatch h [(injectCtr "erefl", [], fun [] -> hin)] *)
 
 let rewrite_sym typ h hin =
@@ -156,3 +162,15 @@ let gFst x =
 
 let is_true b =
  gApp ~explicit:true (gInject "is_true") [b]
+
+let forall_nil typ =
+  gApp ~explicit:true (gInject "List.Forall_nil") [typ; hole]
+
+let forall_cons typ pleq p  =
+  gApp ~explicit:true (gInject "List.Forall_cons") [typ; hole; hole; hole; pleq; p]
+
+let ltnOSn =
+  gApp ~explicit:true (gInject "ltn0Sn") [hole]
+
+let ltnOSn_pair =
+  gApp ~explicit:true (gInject "ltn0Sn_pair") [hole; hole; hole]

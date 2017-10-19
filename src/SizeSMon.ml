@@ -32,6 +32,11 @@ let sameTypeCtr c_ctr = function
   | TyCtr (ty_ctr', _) -> c_ctr = ty_ctr'
   | _ -> false
 
+let rec fst_leq_proof ctrs =
+  match ctrs with
+  | [] -> forall_nil (gProd hole hole)
+  | c :: ctrs ->
+     forall_cons (gProd hole hole) ltnOSn_pair (fst_leq_proof ctrs)
 
 let isBaseBranch ty_ctr ty = fold_ty' (fun b ty' -> b && not (sameTypeCtr ty_ctr ty')) true ty
 
@@ -168,8 +173,8 @@ let sizeSMon ty_ctr ctrs iargs  =
       set_incl_refl
     | _ ->
       (subset_set_eq_compat
-         (semFreqSize lg lgs s)
-         (semFreqSize rg rgs s)
+         (semFreqSize lg lgs s (fst_leq_proof ctrs))
+         (semFreqSize rg rgs s (fst_leq_proof ctrs))
          (genCase ihs1 hleq ctrs))
   in
 
@@ -222,7 +227,7 @@ let sizeSMon ty_ctr ctrs iargs  =
                 )
         in
         subset_respects_set_eq_r
-          (semFreqSize ig igs s)
+          (semFreqSize ig igs s (fst_leq_proof ctrs))
           (proof ctrs)
       | _ ->
         (* The generators should be explicitly passed to the lemmas *)
@@ -234,8 +239,8 @@ let sizeSMon ty_ctr ctrs iargs  =
           (oneOf_freq g gs s)
           (* Rewrite with the semantics of freq left and right *)
           (subset_set_eq_compat
-             (semFreqSize fg fgs s)
-             (semFreqSize ig igs s)
+             (semFreqSize fg fgs s (fst_leq_proof bases))
+             (semFreqSize ig igs s (fst_leq_proof ctrs))
              (incl_bigcupl (incl_subset hole hole (seq_incl_proof ctrs))))
   in
 

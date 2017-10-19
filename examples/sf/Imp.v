@@ -10,7 +10,6 @@ Import QcDefaultNotation. Open Scope qc_scope.
 
 Set Bullet Behavior "Strict Subproofs".
 
-Require Import ZoeStuff.
 (* End prelude *)
 
 (* IMPORTS *)
@@ -27,39 +26,64 @@ Require Import Maps.
 
 Module AExp.
 
-Inductive aexp : Type :=
-  | ANum : nat -> aexp
-  | APlus : aexp -> aexp -> aexp
-  | AMinus : aexp -> aexp -> aexp
-  | AMult : aexp -> aexp -> aexp.
+Inductive aexp' : Type :=
+  | ANum : nat -> aexp'
+  | APlus : aexp' -> aexp' -> aexp'
+  | AMinus : aexp' -> aexp' -> aexp'
+  | AMult : aexp' -> aexp' -> aexp'.
 
-Derive (Arbitrary, Show) for aexp.
-Derive (Sized, CanonicalSized) for aexp.
-Derive SizeMonotonic for aexp using genSaexp.
-Derive SizedMonotonic for aexp.
-Derive SizedCorrect for aexp using genSaexp and SizeMonotonicaexp.
+Derive (Arbitrary, Show) for aexp'.
+Derive (Sized, CanonicalSized) for aexp'.
+Derive SizeMonotonic for aexp' using genSaexp'.
+Derive SizedMonotonic for aexp'.
+Derive SizedCorrect for aexp' using genSaexp' and SizeMonotonicaexp'.
 
-Instance dec_eq_aex (x y : aexp) : Dec (x = y).
+Instance dec_eq_aex (x y : aexp') : Dec (x = y).
 constructor; unfold decidable; repeat decide equality. Defined.
 
-Inductive bexp : Type :=
-  | BTrue : bexp
-  | BFalse : bexp
-  | BEq : aexp -> aexp -> bexp
-  | BLe : aexp -> aexp -> bexp
-  | BNot : bexp -> bexp
-  | BAnd : bexp -> bexp -> bexp.
+(* AEC Reviewer example *)
+Inductive aexpEq : aexp' -> aexp' -> Prop := 
+ | ANumEq : forall n1 n2, n1 = n2 -> aexpEq (ANum n1) (ANum n2).
 
-Derive (Arbitrary, Show) for bexp.
-Derive (Sized, CanonicalSized) for bexp.
-Derive SizeMonotonic for bexp using genSbexp.
-Derive SizedMonotonic for bexp.
-Derive SizedCorrect for bexp using genSbexp and SizeMonotonicbexp.
+Instance dec_aexpEq (x y : aexp') : Dec (aexpEq x y).
+constructor; unfold decidable. destruct x; destruct y;
+try solve [right => H; inversion H; eauto].
+destruct ((n = n0)?) eqn:Eq; destruct dec; try solve [inversion Eq].
+- left; econstructor; eauto. 
+- right => H; inversion H; eauto.
+Defined. 
 
-Instance dec_eq_bexp (x y : bexp) : Dec (x = y).
+Conjecture aexpEq_refl : forall x, aexpEq x x.
+QuickChick aexpEq_refl.
+
+Derive ArbitrarySizedSuchThat for (fun x => aexpEq x x').
+Derive SizedProofEqs for (fun x => aexpEq x x').
+Derive SizeMonotonicSuchThatOpt for (fun x => aexpEq x x').
+Derive GenSizedSuchThatSizeMonotonicOpt for (fun x => aexpEq x x').
+Derive GenSizedSuchThatCorrect for (fun x => aexpEq x x').
+
+Conjecture aexpEq_eq : forall x x', aexpEq x x' -> x = x'.
+QuickChick aexpEq_eq.
+(* End Reviwer example *)
+
+Inductive bexp' : Type :=
+  | BTrue : bexp'
+  | BFalse : bexp'
+  | BEq : aexp' -> aexp' -> bexp'
+  | BLe : aexp' -> aexp' -> bexp'
+  | BNot : bexp' -> bexp'
+  | BAnd : bexp' -> bexp' -> bexp'.
+
+Derive (Arbitrary, Show) for bexp'.
+Derive (Sized, CanonicalSized) for bexp'.
+Derive SizeMonotonic for bexp' using genSbexp'.
+Derive SizedMonotonic for bexp'.
+Derive SizedCorrect for bexp' using genSbexp' and SizeMonotonicbexp'.
+
+Instance dec_eq_bexp (x y : bexp') : Dec (x = y).
 constructor; unfold decidable; repeat decide equality. Defined.
 
-Fixpoint aeval (a : aexp) : nat :=
+Fixpoint aeval (a : aexp') : nat :=
   match a with
   | ANum n => n
   | APlus a1 a2 => (aeval a1) + (aeval a2)
@@ -67,7 +91,7 @@ Fixpoint aeval (a : aexp) : nat :=
   | AMult a1 a2 => (aeval a1) * (aeval a2)
   end.
 
-Fixpoint beval (b : bexp) : bool :=
+Fixpoint beval (b : bexp') : bool :=
   match b with
   | BTrue       => true
   | BFalse      => false
@@ -77,7 +101,7 @@ Fixpoint beval (b : bexp) : bool :=
   | BAnd b1 b2  => andb (beval b1) (beval b2)
   end.
 
-Fixpoint optimize_0plus (a:aexp) : aexp :=
+Fixpoint optimize_0plus (a:aexp') : aexp' :=
   match a with
   | ANum n =>
       ANum n
@@ -115,18 +139,18 @@ Tactic Notation "simpl_and_try" tactic(c) :=
 
 Module aevalR_first_try.
 
-Inductive aevalR : aexp -> nat -> Prop :=
+Inductive aevalR : aexp' -> nat -> Prop :=
   | E_ANum  : forall (n: nat),
       aevalR (ANum n) n
-  | E_APlus : forall (e1 e2: aexp) (n1 n2: nat),
+  | E_APlus : forall (e1 e2: aexp') (n1 n2: nat),
       aevalR e1 n1 ->
       aevalR e2 n2 ->
       aevalR (APlus e1 e2) (n1 + n2)
-  | E_AMinus: forall (e1 e2: aexp) (n1 n2: nat),
+  | E_AMinus: forall (e1 e2: aexp') (n1 n2: nat),
       aevalR e1 n1 ->
       aevalR e2 n2 ->
       aevalR (AMinus e1 e2) (n1 - n2)
-  | E_AMult : forall (e1 e2: aexp) (n1 n2: nat),
+  | E_AMult : forall (e1 e2: aexp') (n1 n2: nat),
       aevalR e1 n1 ->
       aevalR e2 n2 ->
       aevalR (AMult e1 e2) (n1 * n2).
@@ -151,14 +175,14 @@ End aevalR_first_try.
 Module AExpR.
 Reserved Notation "e '\\' n" (at level 50, left associativity).
 
-Inductive aevalR : aexp -> nat -> Prop :=
+Inductive aevalR : aexp' -> nat -> Prop :=
   | E_ANum : forall (n:nat),
       (ANum n) \\ n
-  | E_APlus : forall (e1 e2: aexp) (n1 n2 : nat),
+  | E_APlus : forall (e1 e2: aexp') (n1 n2 : nat),
       (e1 \\ n1) -> (e2 \\ n2) -> (APlus e1 e2) \\ (n1 + n2)
-  | E_AMinus : forall (e1 e2: aexp) (n1 n2 : nat),
+  | E_AMinus : forall (e1 e2: aexp') (n1 n2 : nat),
       (e1 \\ n1) -> (e2 \\ n2) -> (AMinus e1 e2) \\ (n1 - n2)
-  | E_AMult :  forall (e1 e2: aexp) (n1 n2 : nat),
+  | E_AMult :  forall (e1 e2: aexp') (n1 n2 : nat),
       (e1 \\ n1) -> (e2 \\ n2) -> (AMult e1 e2) \\ (n1 * n2)
 
   where "e '\\' n" := (aevalR e n) : type_scope.
@@ -172,9 +196,11 @@ Definition state := total_map.
 
 Definition empty_state : state := t_empty 0.
 
+(* Zoe: Changing the name of this to aexp because the name clash breaks derivation*)
+(* TODO: Fix the above at some point *)
 Inductive aexp : Type :=
   | ANum : nat -> aexp
-  | AId : id -> aexp                (* <----- NEW *)
+  | AId : id -> aexp               (* <----- NEW *)
   | APlus : aexp -> aexp -> aexp
   | AMinus : aexp -> aexp -> aexp
   | AMult : aexp -> aexp -> aexp.
@@ -189,10 +215,9 @@ Definition Z : id := Id "Z".
 Derive (Arbitrary, Show) for aexp.
 Derive (Sized, CanonicalSized) for aexp.
 Derive SizedMonotonic for aexp.
-(*
-Derive SizeMonotonic for aexp using genSaexp0.
-Derive SizedCorrect for aexp using genSaexp0 and SizeMonotonicaexp0.
-*)
+Derive SizeMonotonic for aexp using genSaexp.
+Derive SizedCorrect for aexp using genSaexp and SizeMonotonicaexp.
+
 Instance dec_eq_aex (x y : aexp) : Dec (x = y).
 constructor; unfold decidable; repeat decide equality. Defined.
 
@@ -206,11 +231,10 @@ Inductive bexp : Type :=
 
 Derive (Arbitrary, Show) for bexp.
 Derive (Sized, CanonicalSized) for bexp.
-(*
-Derive SizeMonotonic for bexp using genSbexp0.
+Derive SizeMonotonic for bexp using genSbexp.
 Derive SizedMonotonic for bexp.
-Derive SizedCorrect for bexp using genSbexp and SizeMonotonicbexp0.
-*)
+Derive SizedCorrect for bexp using genSbexp and SizeMonotonicbexp.
+
 Instance dec_eq_bexp (x y : bexp) : Dec (x = y).
 constructor; unfold decidable; repeat decide equality. Defined.
 
@@ -242,11 +266,10 @@ Inductive com : Type :=
 
 Derive (Arbitrary, Show) for com.
 Derive (Sized, CanonicalSized) for com.
-(*
 Derive SizeMonotonic for com using genScom.
 Derive SizedMonotonic for com.
 Derive SizedCorrect for com using genScom and SizeMonotoniccom.
-*)
+
 Instance dec_eq_com (x y : com) : Dec (x = y).
 constructor; unfold decidable; repeat decide equality. Defined.
 
