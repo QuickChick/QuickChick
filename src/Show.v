@@ -5,6 +5,7 @@ Require Import List.
 
 Definition newline := String "010" ""%string.
 
+Require Extraction.
 Axiom show_nat  : nat -> string.
 Extract Constant show_nat => "Prelude.show".
 Axiom show_bool : bool -> string.

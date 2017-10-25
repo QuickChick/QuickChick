@@ -16,7 +16,7 @@ src/State.v
 src/Checker.v
 src/SemChecker.v
 src/Test.v
-src/Extraction.v
+src/ExtractionQC.v
 src/tactic_quickchick.ml4
 src/quickchick_plugin.mlpack
 src/Typeclasses.v
