@@ -17,7 +17,7 @@ all: plugin documentation-check
 plugin: Makefile.coq 
 	$(MAKE) -f Makefile.coq 
 
-documentation-check:
+documentation-check: plugin
 	coqc -R src QuickChick -I src BasicInterface.v
 	coqc -R src QuickChick -I src DocumentationCheck.v
 
