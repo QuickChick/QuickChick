@@ -1,3 +1,4 @@
+open Ltac_plugin
 open Pp
 open Loc
 open Names
@@ -12,10 +13,10 @@ open Topconstr
 open Constrexpr
 open Constrexpr_ops
 open Error
-open Constrarg
+open Stdarg
 
 let message = "QuickChick"
-let mk_ref s = CRef (Qualid (Loc.ghost, qualid_of_string s), None)
+let mk_ref s = CAst.make @@ CRef (Qualid (None, qualid_of_string s), None)
 
 (* Names corresponding to QuickChick's .v files *)
 let show = mk_ref "QuickChick.Show.show"
@@ -92,7 +93,7 @@ let define c =
   let fn = fresh_name "quickchick" in
   (* TODO: Maxime - which of the new internal flags should be used here? The names aren't as clear :) *)
   ignore (declare_constant ~internal:InternalTacticRequest fn
-      (DefinitionEntry (definition_entry ~univs:uctxt c),
+      (DefinitionEntry (definition_entry ~univs:uctxt (EConstr.to_constr evd c)),
        Decl_kinds.IsDefinition Decl_kinds.Definition));
   fn
 
@@ -102,7 +103,7 @@ let define_and_run c =
   let mlf = Filename.temp_file "QuickChick" ".ml" in
   let execn = Filename.chop_extension mlf in
   let mlif = execn ^ ".mli" in
-  Flags.silently (Extraction_plugin.Extract_env.full_extraction (Some mlf)) [Ident (Loc.ghost, main)]; 
+  Flags.silently (Extraction_plugin.Extract_env.full_extraction (Some mlf)) [Ident (None, main)]; 
   (** Add a main function to get some output *)
   let oc = open_out_gen [Open_append;Open_text] 0o666 mlf in
   let for_output = 
@@ -174,12 +175,12 @@ let runTest c =
   (** [c] is a constr_expr representing the test to run,
       so we first build a new constr_expr representing
       show c **)
-  let c = CApp(Loc.ghost,(None,show), [(c,None)]) in
+  let c = CAst.make @@ CApp((None,show), [(c,None)]) in
   (** Build the kernel term from the const_expr *)
   let env = Global.env () in
   let evd = Evd.from_env env in
   let (c,evd) = interp_constr env evd c in
-  define_and_run c
+  define_and_run (EConstr.of_constr c)
 
 let run f args =
   begin match args with 
@@ -189,7 +190,7 @@ let run f args =
   | _ -> failwith "run called with no arguments"
   end;
   let args = List.map (fun x -> (x,None)) args in
-  let c = CApp(Loc.ghost, (None,f), args) in
+  let c = CAst.make @@ CApp((None,f), args) in
   ignore (runTest c)
 
 let set_debug_flag (flag_name : string) : (string * string) -> Libobject.obj =

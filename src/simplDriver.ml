@@ -88,8 +88,8 @@ let derive (cn : derivable) (c : constr_expr) (instance_name : string) (name1 : 
 
   let full_dt = gApp ~explicit:true coqTyCtr coqTyParams in
 
-  let ind_name = match c with 
-    | CRef (r, _) -> string_of_qualid (snd (qualid_of_reference r))
+  let ind_name = match c with
+    | { CAst.v = CRef (r, _) } -> string_of_qualid (snd (qualid_of_reference r))
     | _ -> failwith "Implement me for functions" 
   in
 

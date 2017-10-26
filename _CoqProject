@@ -24,7 +24,7 @@ src/QuickChick.v
 src/MutateCheck.v
 src/genericLib.ml
 src/genericLib.mli
-src/Error.ml
+src/error.ml
 src/quickChick.ml4
 src/driver.ml4
 src/simplDriver.ml

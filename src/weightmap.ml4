@@ -1,5 +1,5 @@
 open GenericLib
-open Constrarg
+open Stdarg
 open Error
 open Pp
 open Constrexpr
@@ -30,20 +30,19 @@ let register_weights (l : (constructor * weight_ast) list) =
 
 let convert_constr_to_weight c = 
   match c with 
-  | CPrim (dummy_loc, Numeral b) -> 
-     let b' = Bigint.to_int b in
-     if b' > 0 then WNum b' 
+  | { CAst.v = CPrim (Numeral (i,s)) } -> 
+     if s then WNum (int_of_string i)
      else failwith "QC: Numeric weights should be greater than 0."
-  | CRef (r, _) -> 
+  | { CAst.v = CRef (r, _) } -> 
      if string_of_reference r = "size" then WSize
      else failwith "QC: Expected number or 'size'."
 
 let convert_constr_to_cw_pair c : (constructor * weight_ast) = 
   match c with 
-  | CNotation (_,_,([a],[[b]],_)) -> begin 
+  | {CAst.v = CNotation (_,([a],[[b]],_)) } -> begin 
       let ctr = 
         match a with 
-        | CRef (r, _) -> injectCtr (string_of_reference r)
+        | { CAst.v = CRef (r, _) } -> injectCtr (string_of_reference r)
         | _ -> failwith "First argument should be a constructor name"
       in 
       let w = convert_constr_to_weight b in
@@ -68,7 +67,7 @@ VERNAC COMMAND EXTEND QuickChickWeights CLASSIFIED AS SIDEFF
      [
        let weight_assocs = 
          match c with 
-         | CNotation (_,_,([a],[b],_)) -> begin 
+         | { CAst.v = CNotation (_,([a],[b],_)) } -> begin 
              let c = convert_constr_to_cw_pair a in
              let cs = List.map convert_constr_to_cw_pair b in
              c :: cs

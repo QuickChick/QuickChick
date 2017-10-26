@@ -21,7 +21,7 @@ open Sized
 open SizeMon
 open SizeSMon
 open SizeCorr
-open Constrarg
+open Stdarg
 open Error
 
 type derivation = SimpleDer of SimplDriver.derivable list
@@ -29,7 +29,7 @@ type derivation = SimpleDer of SimplDriver.derivable list
 
 let simpl_dispatch ind classes name1 name2 = 
   let ind_name = match ind with 
-    | CRef (r, _) -> string_of_qualid (snd (qualid_of_reference r))
+    | { CAst.v = CRef (r, _) } -> string_of_qualid (snd (qualid_of_reference r))
     | _ -> failwith "Implement me for functions" 
   in
   List.iter (fun cn -> SimplDriver.derive cn ind (SimplDriver.mk_instance_name cn ind_name) name1 name2) classes
@@ -38,11 +38,11 @@ let dep_dispatch ind class_name =
   (* TODO: turn this into a much once Zoe figures out what she wants *)
   (* let DepDriver.ArbitrarySizedSuchThat = class_name in  *)
   match ind with 
-  | CLambdaN (_loc1, [([(_loc2, Name id)], _kind, _type)], CApp (_loc3, (_flag, constructor), args)) ->
-    let n = fst (List.find (fun (_,(CRef (r,_), _)) -> Id.to_string id = string_of_reference r) (List.mapi (fun i x -> (i+1,x)) args)) in
+  | { CAst.v = CLambdaN ([([(_loc2, Name id)], _kind, _type)], {CAst.v = CApp ((_flag, constructor), args) }) } ->
+    let n = fst (List.find (fun (_,({CAst. v = CRef (r,_)}, _)) -> Id.to_string id = string_of_reference r) (List.mapi (fun i x -> (i+1,x)) args)) in
      let ctr_name = 
        match constructor with 
-       | CRef (r,_) -> string_of_reference r
+       | { CAst.v = CRef (r,_) } -> string_of_reference r
      in 
      DepDriver.deriveDependent class_name constructor n (DepDriver.mk_instance_name class_name ctr_name)
   | _ -> failwith "wrongformat"
@@ -71,10 +71,10 @@ let class_assoc_table =
 let dispatch cn ind name1 name2 = 
   let convert_reference_to_string c = 
     match c with 
-    | CRef (r, _) -> string_of_qualid (snd (qualid_of_reference r))
+    | {CAst.v = CRef (r, _)} -> string_of_qualid (snd (qualid_of_reference r))
     | _ -> failwith "Usage: Derive <class_name> for <inductive_name> OR  Derive (<class_name>, ... , <class_name>) for <inductive_name>" in
   let ss = match cn with 
-     | CNotation (_,_,([a],[b],_)) -> begin 
+     | { CAst.v = CNotation (_,([a],[b],_)) } -> begin 
          let c = convert_reference_to_string a in
          let cs = List.map convert_reference_to_string b in
          c :: cs

@@ -178,8 +178,6 @@ val smart_paren : coq_expr -> coq_expr
 val gPair : coq_expr * coq_expr -> coq_expr 
 
 (* Int *)
-val parse_integer : constr_expr -> int
-
 val gInt : int -> coq_expr
 val gSucc : coq_expr -> coq_expr
 val maximum : coq_expr list -> coq_expr

@@ -44,8 +44,8 @@ let make_up_name () : Id.t =
   cnt := !cnt + 1;
   id
        
-let dl x = (dummy_loc, x)
-let hole = CHole (dummy_loc, None, Misctypes.IntroAnonymous, None)
+let dl x = CAst.make x
+let hole = CAst.make @@ CHole (None, Misctypes.IntroAnonymous, None)
 
 let id_of_name n = 
   match n with 
@@ -66,18 +66,18 @@ let debug_constr (c : constr) : unit =
 type var = Id.t (* Opaque *)
 let var_to_string = Id.to_string
 let gVar (x : var) : coq_expr =
-  CRef (Ident (dl x),None)
+  CAst.make @@ CRef (Ident (None, x),None)
 
 let id_to_reference id = 
   let qualid = qualid_of_string (Id.to_string id) in
-  Qualid (Loc.ghost, qualid)
+  Qualid (None, qualid)
 let id_to_coq_expr id = 
   mkRefC (id_to_reference id)
 
 (* Maybe this should do checks? *)
 let gInject s = 
   if s = "" then failwith "Called gInject with empty string";
-  CRef (Qualid (Loc.ghost, qualid_of_string s), None)
+  CAst.make @@ CRef (Qualid (None, qualid_of_string s), None)
 
 type ty_param = Id.t (* Opaque *)
 let ty_param_to_string (x : Id.t) = Id.to_string x
@@ -90,14 +90,14 @@ let gInjectTyCtr s = Id.of_string s
 
 let gTyCtr = id_to_coq_expr
 
-type arg = local_binder
+type arg = local_binder_expr
 let gArg ?assumName:(an=hole) ?assumType:(at=hole) ?assumImplicit:(ai=false) ?assumGeneralized:(ag=false) _ =
   let n = match an with
-    | CRef (Ident (loc,id),_) -> (loc,Name id)
-    | CRef (Qualid (loc, q), _) -> let (_,id) = repr_qualid q in (loc, Name id)
-    | CHole (loc,_,_,_) -> (loc,Anonymous)
+    | { CAst.v = CRef (Ident (loc,id),_) } -> (loc,Name id)
+    | { CAst.v = CRef (Qualid (loc, q), _) } -> let (_,id) = repr_qualid q in (loc, Name id)
+    | { CAst.v = CHole (v,_,_); loc } -> (loc,Anonymous)
     | a -> failwith "This expression should be a name" in
-  LocalRawAssum ( [n],
+  CLocalAssum ( [n],
                   (if ag then Generalized (Implicit, Implicit, false)                       
                    else if ai then Default Implicit else Default Explicit),
                   at )
@@ -141,12 +141,12 @@ end
 
 module Ord_ty_ctr = struct 
   type t = ty_ctr 
-  let compare = compare 
+  let compare = Id.compare 
 end
 
 module Ord_ctr = struct
   type t = constructor
-  let compare = compare
+  let compare = Id.compare
 end
 
 type ctr_rep = constructor * coq_type 
@@ -172,7 +172,7 @@ type dep_type =
 
 module OrdDepType = struct
     type t = dep_type
-    let compare = compare
+    let compare = Pervasives.compare
 end
 
 let rec dep_type_to_string dt = 
@@ -341,8 +341,9 @@ let dt_rep_from_mib mib =
 
 let coerce_reference_to_dt_rep c = 
   let r = match c with
-    | CRef (r,_) -> r
-    | _ -> failwith "Not a reference" in
+    | { CAst.v = CRef (r,_) } -> r
+    | _ -> failwith "Not a reference"
+  in
 
   (* Extract id/string representation - which to use? :/ *)
   let qidl = qualid_of_reference r in
@@ -531,7 +532,7 @@ let dep_dt_from_mib mib =
 
 let coerce_reference_to_dep_dt c = 
   let r = match c with
-    | CRef (r,_) -> r
+    | { CAst.v = CRef (r,_) } -> r
     | _ -> failwith "Not a reference" in
 
   (* Extract id/string representation - which to use? :/ *)
@@ -547,80 +548,78 @@ let coerce_reference_to_dep_dt c =
                   
 let gApp ?explicit:(expl=false) c cs =
   if expl then
-    match c with
-    | CRef (r,_) -> CAppExpl (dummy_loc, (None, r, None), cs)
+    let f c = match c with
+    | CRef (r,_) -> CAppExpl ((None, r, None), cs)
     | _ -> failwith "invalid argument to gApp"
+    in CAst.map f c
   else mkAppC (c, cs)
 
 let gProdWithArgs args f_body =
-  let xvs = List.map (fun (LocalRawAssum ([_, n], _, _)) ->
+  let xvs = List.map (fun (CLocalAssum ([_, n], _, _)) ->
                       match n with
                       | Name x -> x
                       | _ -> make_up_name ()
                      ) args in
   let fun_body = f_body xvs in
-  mkCProdN dummy_loc args fun_body
+  mkCProdN args fun_body
 
 let gFunWithArgs args f_body =
-  let xvs = List.map (fun (LocalRawAssum ([_, n], _, _)) ->
+  let xvs = List.map (fun (CLocalAssum ([_, n], _, _)) ->
                       match n with
                       | Name x -> x
                       | _ -> make_up_name ()
                      ) args in
   let fun_body = f_body xvs in
-  mkCLambdaN dummy_loc args fun_body
+  mkCLambdaN args fun_body
 
 let gFun xss (f_body : var list -> coq_expr) =
   let xvs = List.map (fun x -> fresh_name x) xss in
   (* TODO: optional argument types for xss *)
-  let binder_list = List.map (fun x -> LocalRawAssum ([(dummy_loc, Name x)], Default Explicit, hole)) xvs in
+  let binder_list = List.map (fun x -> CLocalAssum ([(None, Name x)], Default Explicit, hole)) xvs in
   let fun_body = f_body xvs in
-  mkCLambdaN dummy_loc binder_list fun_body 
+  mkCLambdaN binder_list fun_body 
 
 let gFunTyped xts (f_body : var list -> coq_expr) =
   let xvs = List.map (fun (x,t) -> (fresh_name x,t)) xts in
   (* TODO: optional argument types for xss *)
-  let binder_list = List.map (fun (x,t) -> LocalRawAssum ([(dummy_loc, Name x)], Default Explicit, t)) xvs in
+  let binder_list = List.map (fun (x,t) -> CLocalAssum ([(None, Name x)], Default Explicit, t)) xvs in
   let fun_body = f_body (List.map fst xvs) in
-  mkCLambdaN dummy_loc binder_list fun_body 
+  mkCLambdaN binder_list fun_body 
 
 (* with Explicit/Implicit annotations *)  
 let gRecFunInWithArgs ?assumType:(typ=hole) (fs : string) args (f_body : (var * var list) -> coq_expr) (let_body : var -> coq_expr) = 
   let fv  = fresh_name fs in
-  let xvs = List.map (fun (LocalRawAssum ([_, n], _, _)) ->
+  let xvs = List.map (fun (CLocalAssum ([_, n], _, _)) ->
                       match n with
                       | Name x -> x
                       | _ -> make_up_name ()
                      ) args in
   let fix_body = f_body (fv, xvs) in
-  CLetIn (dummy_loc, dl (Name fv), 
-          G_constr.mk_fix (dummy_loc, true, dl fv, [(dl fv, args, (None, CStructRec), fix_body, (dl (Some typ)))]),
-          let_body fv)
+  CAst.make @@ CLetIn ((None, Name fv),
+    CAst.make @@ CFix((None,fv),[((None,fv), (None, CStructRec), args, typ, fix_body)]), None,
+    let_body fv)
              
 let gRecFunIn ?assumType:(typ = hole) (fs : string) (xss : string list) (f_body : (var * var list) -> coq_expr) (let_body : var -> coq_expr) =
   let xss' = List.map (fun s -> fresh_name s) xss in
   gRecFunInWithArgs ~assumType:typ fs (List.map (fun x -> gArg ~assumName:(gVar x) ()) xss') f_body let_body 
 
 let gMatch discr ?catchAll:(body=None) (branches : (constructor * string list * (var list -> coq_expr)) list) : coq_expr =
-  CCases (dummy_loc,
-          Term.RegularStyle,
+  CAst.make @@ CCases (Term.RegularStyle,
           None (* return *), 
           [(discr, None, None)], (* single discriminee, no as/in *)
           (List.map (fun (c, cs, bf) -> 
                       let cvs : Id.t list = List.map fresh_name cs in
-                      (dummy_loc,
-                       [dl [CPatCstr (dummy_loc,
-                                      id_to_reference c,
+                      (None, ([(None, [CAst.make @@ CPatCstr (id_to_reference c,
                                       None,
-                                      List.map (fun s -> CPatAtom (dummy_loc, Some (Ident (dl s)))) cvs (* Constructor applied to patterns *)
+                                      List.map (fun s -> CAst.make @@ CPatAtom (Some (Ident (None, s)))) cvs (* Constructor applied to patterns *)
                                      )
                            ]
-                       ],
-                       bf cvs 
+                       )],
+                       bf cvs)
                       )
                    ) branches) @ (match body with 
                                   | None -> [] 
-                                  | Some c' -> [(dummy_loc, [dl [CPatAtom (dummy_loc, None)]], c')])
+                                  | Some c' -> [(None, ([(None, [CAst.make @@ CPatAtom None])], c'))])
          )
 
 let gMatchReturn (discr : coq_expr)
@@ -629,33 +628,31 @@ let gMatchReturn (discr : coq_expr)
       (ret : var -> coq_expr)
       (branches : (constructor * string list * (var list -> coq_expr)) list) : coq_expr =
   let as_id' = fresh_name as_id in
-  CCases (dummy_loc,
-          Term.RegularStyle,
+  CAst.make @@ CCases (Term.RegularStyle,
           Some (ret as_id'), (* return *)
-          [(discr, Some (dl (Name as_id')), None)], (* single discriminee, no in *)
+          [(discr, Some (None,Name as_id'), None)], (* single discriminee, no in *)
           (List.map (fun (c, cs, bf) -> 
                       let cvs : Id.t list = List.map fresh_name cs in
-                      (dummy_loc,
-                       [dl [CPatCstr (dummy_loc,
-                                      id_to_reference c,
+                      (None,
+                       ([(None, [CAst.make @@ CPatCstr (id_to_reference c,
                                       None,
-                                      List.map (fun s -> CPatAtom (dummy_loc, Some (Ident (dl s)))) cvs (* Constructor applied to patterns *)
+                                      List.map (fun s -> CAst.make @@ CPatAtom (Some (Ident (None, s)))) cvs (* Constructor applied to patterns *)
                                      )
                            ]
-                       ],
-                       bf cvs 
+                       )],
+                       bf cvs)
                       )
                    ) branches) @ (match body with 
                                   | None -> [] 
-                                  | Some c' -> [(dummy_loc, [dl [CPatAtom (dummy_loc, None)]], c')])
+                                  | Some c' -> [(None, ([(None, [CAst.make @@ CPatAtom None])], c'))])
          )
 
 
 let gRecord names_and_bodies =
-  CRecord (dummy_loc, List.map (fun (n,b) -> (id_to_reference (id_of_string n), b)) names_and_bodies)
+  CAst.make @@ CRecord (List.map (fun (n,b) -> (id_to_reference (id_of_string n), b)) names_and_bodies)
 
 let gAnnot (p : coq_expr) (tau : coq_expr) =
-  CCast (dummy_loc, p, CastConv tau)
+  CAst.make @@ CCast (p, CastConv tau)
 
 (* Convert types back into coq *)
 let gType ty_params dep_type = 
@@ -714,22 +711,20 @@ let rec matcher_pat_to_string = function
 let construct_match c ?catch_all:(mdef=None) alts = 
   let rec aux = function 
     | MatchU u' -> begin 
-        CPatAtom (dummy_loc, Some (Ident (dummy_loc, u')))
+        CAst.make @@ CPatAtom (Some (Ident (None, u')))
       end
     | MatchCtr (c, ms) -> begin
-       if is_inductive c then CPatAtom (dummy_loc, None)
-       else CPatCstr (dummy_loc, 
-                   id_to_reference c,
+       if is_inductive c then CAst.make @@ CPatAtom None
+       else CAst.make @@ CPatCstr (id_to_reference c,
                    Some (List.map (fun m -> aux m) ms),
                    []) 
                         end 
-  in CCases (dummy_loc,
-             Term.RegularStyle,
+  in CAst.make @@ CCases (Term.RegularStyle,
              None (* return *), 
               [ (c, None, None)], (* single discriminee, no as/in *)
-              List.map (fun (m, body) -> (dummy_loc, [dummy_loc, [aux m]], body)) alts 
+              List.map (fun (m, body) -> (None, ([None, [aux m]], body))) alts 
               @ (match mdef with 
-                 | Some body -> [(dummy_loc, [dummy_loc, [CPatAtom (dummy_loc, None)]], body)]
+                 | Some body -> [(None, ([None, [CAst.make @@ CPatAtom None]], body))]
                  | _ -> []
                 )
             )
@@ -738,29 +733,27 @@ let construct_match_with_return c ?catch_all:(mdef=None) (as_id : string) (ret :
   let as_id' = fresh_name as_id in
   let rec aux = function
     | MatchU u' -> begin
-        CPatAtom (dummy_loc, Some (Ident (dummy_loc, u')))
+        CAst.make @@ CPatAtom (Some (Ident (None, u')))
       end
     | MatchCtr (c, ms) -> begin
        if is_inductive c then begin 
-         CPatAtom (dummy_loc, None)
+         CAst.make @@ CPatAtom None
        end
        else begin 
-         CPatCstr (dummy_loc, 
-                   id_to_reference c,
+         CAst.make @@ CPatCstr (id_to_reference c,
                    Some (List.map (fun m -> aux m) ms),
                    []) 
          end
        end in
   let main_opts = 
-        List.map (fun (m, body) -> (dummy_loc, [dummy_loc, [aux m]], body)) alts in
+        List.map (fun (m, body) -> (None, ([None, [aux m]], body))) alts in
   let default = 
     match mdef with 
-    | Some body -> [(dummy_loc, [dummy_loc, [CPatAtom (dummy_loc, None)]], body)]
+    | Some body -> [(None, ([None, [CAst.make @@ CPatAtom None]], body))]
     | _ -> [] in
-  CCases (dummy_loc,
-             Term.RegularStyle,
+  CAst.make @@ CCases (Term.RegularStyle,
              Some (ret as_id') (* return *), 
-             [ (c, Some (dl (Name as_id')), None)], (* single discriminee, no as/in *)
+             [ (c, Some (None, Name as_id'), None)], (* single discriminee, no as/in *)
              main_opts @ default
          )
 
@@ -776,7 +769,7 @@ let rec gList = function
   | x::xs -> gCons x (gList xs)
 
 (* Generic String Manipulations *)
-let gStr s = CPrim (dummy_loc, String s)
+let gStr s = CAst.make @@ CPrim (String s)
 let emptyString = gInject "Coq.Strings.String.EmptyString"
 let str_append c1 c2 = gApp (gInject "Coq.Strings.String.append") [c1; c2]
 let rec str_appends cs = 
@@ -790,12 +783,12 @@ let smart_paren c = gApp (gInject "QuickChick.Show.smart_paren") [c]
 let gPair (c1, c2) = gApp (gInject "Coq.Init.Datatypes.pair") [c1;c2]
 
 (* Int *)
-let parse_integer nc = 
-  match nc with 
-  | CPrim (dummy_loc, Numeral b) -> Bigint.to_int b
-  | _ -> debug_coq_expr nc; failwith "Expected an integer argument "
 
-let gInt n = CPrim (dummy_loc, Numeral (Bigint.of_int n))
+let mkNumeral n =
+  if n >= 0 then Numeral (string_of_int n, true)
+  else Numeral (string_of_int (-n), false)
+
+let gInt n = CAst.make @@ CPrim (mkNumeral n)
 let gSucc x = gApp (gInject "Coq.Init.Datatypes.S") [x]
 let rec maximum = function
   | [] -> failwith "maximum called with empty list"
@@ -864,22 +857,22 @@ let fold_ty_vars (f : var list -> var -> coq_type -> 'a) (mappend : 'a -> 'a -> 
 
 let defineTypedConstant s c typ =
   let id = fresh_name s in 
-  Vernacentries.interp (dummy_loc,  Vernacexpr.VernacDefinition ((None, Definition), (dl id, None), DefineBody ([], None, c, Some typ)));
+  Vernacentries.interp (None,  Vernacexpr.VernacDefinition ((None, Definition), ((None, id), None), DefineBody ([], None, c, Some typ)));
   id 
 
 let defineConstant s c =
   let id = fresh_name s in 
-  Vernacentries.interp (dummy_loc,  Vernacexpr.VernacDefinition ((None, Definition), (dl id, None), DefineBody ([], None, c, None)));
+  Vernacentries.interp (None, Vernacexpr.VernacDefinition ((None, Definition), ((None, id), None), DefineBody ([], None, c, None)));
   id 
                           
 (* Declare an instance *)
 let create_names_for_anon a =
   match a with 
-  | LocalRawAssum ([(loc, n)], x, y) ->
+  | CLocalAssum ([(loc, n)], x, y) ->
      begin match n with
            | Name x -> (x, a)
            | Anonymous -> let n = make_up_name () in
-                          (n, LocalRawAssum ([(loc, Name n)], x, y))
+                          (n, CLocalAssum ([(loc, Name n)], x, y))
      end
   | _ -> failwith "Non RawAssum in create_names"
     
@@ -893,7 +886,7 @@ let declare_class_instance ?(global=true) ?(priority=42) instance_arguments inst
   msg_debug (str "Calculated instance_record_vars" ++ fnl ());
   let cid = Classes.new_instance ~global:global false 
                                iargs
-                       (((dummy_loc, (Name (id_of_string instance_name))), None)
+                       (((None, (Name (id_of_string instance_name))), None)
                        , Decl_kinds.Explicit, instance_type vars) 
                        (Some (true, instance_record vars)) (* TODO: true or false? *)
                        { hint_priority = Some priority; hint_pattern = None }

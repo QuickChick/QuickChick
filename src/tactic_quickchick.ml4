@@ -1,3 +1,5 @@
+open Ltac_plugin
+
 DECLARE PLUGIN "quickchick_plugin"
 
 open Pp
@@ -6,7 +8,7 @@ open Constrexpr
 open Constrexpr_ops
 
 let quickchick_goal = 
-  Proofview.Goal.enter { enter = begin fun gl ->
+  Proofview.Goal.enter begin fun gl ->
     let gl = Proofview.Goal.assume gl in
 
     (* Convert goal to a constr_expr *)
@@ -17,13 +19,13 @@ let quickchick_goal =
 
     (* Admit a constant with that type *)
     let tmpid = QuickChick.fresh_name "temporary_constant" in 
-    Vernacentries.interp (Loc.dummy_loc,  
+    Vernacentries.interp (None,  
       VernacAssumption ((None, Decl_kinds.Conjectural), 
                         NoInline, 
                         [ 
                           (false, 
                            (
-                             [(Loc.dummy_loc, tmpid), None]
+                             [(None, tmpid), None]
                            ,
                              ct
                            )
@@ -33,7 +35,7 @@ let quickchick_goal =
 
 
     let s = QuickChick.runTest 
-            (CApp(Loc.ghost, (None,QuickChick.quickCheck), [CRef (Ident (Loc.dummy_loc, tmpid),None), None])) in
+            (CAst.make @@ CApp((None,QuickChick.quickCheck), [CAst.make @@ CRef (Ident (None, tmpid),None), None])) in
 
     match s with 
     | Some bytes -> 
@@ -65,7 +67,7 @@ let quickchick_goal =
  *)
 
 
-  end }
+  end
 
 (*
     let concl = Proofview.Goal.concl gl in

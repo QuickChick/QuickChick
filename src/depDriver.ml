@@ -86,7 +86,7 @@ let deriveDependent (cn : derivable) (c : constr_expr) (n : int) (instance_name 
 
   let ctr_name = 
     match c with 
-    | CRef (r,_) -> string_of_reference r
+    | { CAst.v = CRef (r,_) } -> string_of_reference r
   in
 
   (* type constructor *)
