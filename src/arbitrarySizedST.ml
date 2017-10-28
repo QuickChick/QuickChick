@@ -1,20 +1,6 @@
 open Pp
-open Loc
-open Names
-open Extract_env
-open Tacmach
-open Entries
-open Declarations
-open Declare
-open Libnames
 open Util
-open Constrintern
-open Topconstr
-open Constrexpr
-open Constrexpr_ops
-open Decl_kinds
 open GenericLib
-open SetLib
 open CoqLib
 open GenLib
 open Error
@@ -151,6 +137,7 @@ let arbitrarySizedST
   (* parameters of the type constructor *)
   let coqTyParams = List.map gTyParam ty_params in
 
+  (* Unused, not exported... *)
   (* Fully applied type constructor *)
   let full_dt = gApp ~explicit:true coqTyCtr coqTyParams in
 

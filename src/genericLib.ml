@@ -1,16 +1,10 @@
 open Decl_kinds
 open Pp
 open Term
-open Loc
 open Names
-open Tacmach
-open Entries
 open Declarations
-open Declare
 open Libnames
 open Util
-open Constrintern
-open Topconstr
 open Constrexpr
 open Constrexpr_ops
 open Ppconstr
@@ -20,7 +14,7 @@ open Error
 let debug_environ () =
   let env = Global.env () in
   let preEnv = Environ.pre_env env in
-  let minds = preEnv.env_globals.env_inductives in
+  let minds = preEnv.Pre_env.env_globals.Pre_env.env_inductives in
   Mindmap_env.iter (fun k _ -> msg_debug (str (MutInd.debug_to_string k) ++ fnl())) minds
 
 let cnt = ref 0 
@@ -214,7 +208,7 @@ let rec nthType1 i dt =
   | _, DProd  (_, dt) -> nthType1 (i-1) dt
   | _, _ -> failwith "Insufficient arrows"
 
-let rec nthType i dt =
+let nthType i dt =
   let msg =
     "type: " ^ dep_type_to_string dt ^ "\n" ^
     (Printf.sprintf "n: %n\n" i)
@@ -311,10 +305,12 @@ let parse_constructors nparams param_names result_ty oib : ctr_rep list option =
         foldM (fun acc ty -> 
                aux i ty >>= fun ty' -> Some (ty' :: acc)
               ) (Some []) tms >>= fun tms' ->
-        match aux i ctr with
+        begin match aux i ctr with
         | Some (TyCtr (c, _)) -> Some (TyCtr (c, List.rev tms'))
 (*        | Some (TyParam p) -> Some (TyCtr (p, tms')) *)
-        | None -> msg_error (str "Aux failed?" ++ fnl ()); None
+        | None -> msg_error (str "Aux failed?" ++ fnl ()); None 
+        | _ -> failwith "aux failed to return a TyCtr"
+        end 
       end
       else if isInd ty then begin
         let ((mind,_),_) = destInd ty in
@@ -353,9 +349,6 @@ let coerce_reference_to_dt_rep c =
     | { CAst.v = CRef (r,_) } -> r
     | _ -> failwith "Not a reference"
   in
-
-  (* Extract id/string representation - which to use? :/ *)
-  let qidl = qualid_of_reference r in
 
   let env = Global.env () in
   
@@ -443,7 +436,7 @@ let parse_dependent_type i nparams ty oib arg_names =
       let env = Global.env () in
       let mib = Environ.lookup_mind mind env in
 
-      let (mp, dn, _) = MutInd.repr3 mind in
+(*      let (mp, _dn, _) = MutInd.repr3 mind in *)
 
       (* HACKY: figure out better way to qualify constructors *)
       let names = Str.split (Str.regexp "[.]") (MutInd.to_string mind) in
@@ -544,9 +537,6 @@ let coerce_reference_to_dep_dt c =
   let r = match c with
     | { CAst.v = CRef (r,_) } -> r
     | _ -> failwith "Not a reference" in
-
-  (* Extract id/string representation - which to use? :/ *)
-  let qidl = qualid_of_reference r in
 
   let env = Global.env () in
   
@@ -688,7 +678,6 @@ let gType ty_params dep_type =
 
 (* Lookup the type of an identifier *)
 let get_type (id : Id.t) = 
-  let env = Global.env () in
   msg_debug (str ("Trying to global:" ^ Id.to_string id) ++ fnl ());
   let glob_ref = Nametab.global (id_to_reference id) in
   match glob_ref with 
@@ -698,7 +687,6 @@ let get_type (id : Id.t) =
   | ConstructRef _ -> msg_debug (str "Constructor" ++ fnl ())
 
 let is_inductive c = 
-  let env = Global.env () in
   let glob_ref = Nametab.global (qualid_to_reference c) in
   match glob_ref with
   | IndRef _ -> true
@@ -897,8 +885,8 @@ let declare_class_instance ?(global=true) ?(priority=42) instance_arguments inst
   let cid = Classes.new_instance ~global:global false 
                                iargs
                        (((None, (Name (id_of_string instance_name))), None)
-                       , Decl_kinds.Explicit, instance_type vars) 
-                       (Some (true, instance_record vars)) (* TODO: true or false? *)
+                       , Decl_kinds.Explicit, instance_type_vars) 
+                       (Some (true, instance_record_vars)) (* TODO: true or false? *)
                        { hint_priority = Some priority; hint_pattern = None }
   in
   msg_debug (str (Id.to_string cid) ++ fnl ())
@@ -919,6 +907,7 @@ let rec take_last l acc =
 
 let rec list_insert_nth x l n = 
   match n, l with 
-  | 0, _ -> x :: l
+  | 0, _  
+  | _, [] -> x :: l
   | _, h::t -> h :: list_insert_nth x t (n-1)
   

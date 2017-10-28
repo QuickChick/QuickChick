@@ -1,18 +1,5 @@
 open Pp
-open Loc
-open Names
-open Extract_env
-open Tacmach
-open Entries
-open Declarations
-open Declare
-open Libnames
 open Util
-open Constrintern
-open Topconstr
-open Constrexpr
-open Constrexpr_ops
-open Decl_kinds
 open GenericLib
 open SetLib
 open CoqLib
@@ -67,6 +54,7 @@ let rec_method (generator_body : coq_expr)
     gApp generator_body (size :: args)
   in
   let mon = gApp (gVar ih) ((s2 :: l) @ [gVar hleq]) in
+  (* Unused! *)
   let proof = gApp (gVar ih) l in
   ( (* gen *)
     (fun s -> gen_body s l),
@@ -206,6 +194,7 @@ let genSizedSTSMon_body
   (* The type of the dependent generator *)
   let gen_type = gGen (gOption full_gtyp) in
 
+  (* Unused, not exported! *)
   (* Fully applied predicate (parameters and constructors) *)
   let full_pred inputs =
     gFun ["_forGen"] (fun [fg] -> gApp (full_dt) (list_insert_nth (gVar fg) inputs (n-1)))

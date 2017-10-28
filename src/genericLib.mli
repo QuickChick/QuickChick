@@ -1,19 +1,6 @@
-open Decl_kinds
-open Pp
-open Term
-open Loc
 open Names
-open Tacmach
-open Entries
 open Declarations
-open Declare
-open Libnames
-open Util
-open Constrintern
-open Topconstr
 open Constrexpr
-open Constrexpr_ops
-open Context
 
 val debug_environ : unit -> unit 
 

@@ -808,7 +808,7 @@ Module GenLow : GenLowInterface.
     constructor. intros s1 s2 Hleq.
     intros x Hx. eapply semBindSize in Hx.
     destruct Hx as [a [Hg Hf]].
-    destruct a as [ | a].
+    destruct a as [a | ].
     - eapply H in Hg; try eassumption.
       eapply H0 in Hf; try eassumption.
       eapply semBindSize.
@@ -979,7 +979,7 @@ Module GenLow : GenLowInterface.
     split; [ eassumption |].
     unfold bindGenOpt in *.
     eapply semBindSize in Hin2. destruct Hin2 as [a [Hg' Hf']].
-    destruct a as [| a].
+    destruct a as [a |].
     - assert (Hg'' : ((fun u : option A => u) :&: semGenSize g s) (Some a)).
       { split; eauto. }
       eapply Hg in Hg''.  destruct Hg'' as [_ Hg''].

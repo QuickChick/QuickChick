@@ -1,22 +1,6 @@
 open Pp
-open Loc
-open Names
-open Extract_env
-open Tacmach
-open Entries
-open Declarations
-open Declare
-open Libnames
 open Util
-open Constrintern
-open Topconstr
-open Constrexpr
-open Constrexpr_ops
-open Decl_kinds
 open GenericLib
-open SetLib
-open CoqLib
-open GenLib
 open Error
 
 (* TODO : move to utils or smth *)
@@ -116,6 +100,7 @@ let rec raiseMatch (k : umap) (c : constructor) (rs : range list) (eqs: EqSet.t)
                Some (UM.add u' (Unknown u) k, (MatchU u')::l, eq_set_add u' u eqs)
             | _ -> failwith "Not supported yet"
             end
+         | _ -> failwith "Toplevel ranges should be Unknowns or constructors"
         ) (Some (k, [], eqs)) rs) >>= fun (k', l, eqs') ->
   Some (k', MatchCtr (c, List.rev l), eqs')
 
@@ -229,6 +214,7 @@ let rec unify (k : umap) (r1 : range) (r2 : range) (eqs : EqSet.t)
          unify k (Ctr (c,rs)) (Unknown u') eqs >>= fun (k', r', eqs', m') ->
          Some (k', Unknown u, eqs', m')
       end
+   | _, _ -> failwith "QC Internal: TopLevel ranges should be Unknowns or Constructors"
 
 let rec fixRange u r k = 
     match r with 
@@ -267,8 +253,9 @@ let rec range_to_coq_expr k r =
      | Unknown u' -> range_to_coq_expr k (Unknown u')
      | Ctr (c, rs) -> gApp (gCtr c) (List.map (range_to_coq_expr k) rs)
      end
+   | _ -> failwith "QC Internal: TopLevel ranges should be Unknowns or Constructors"
 
-let rec dt_to_coq_expr k dt = 
+let dt_to_coq_expr k dt = 
   range_to_coq_expr k (convert_to_range dt)
 
 let rec is_dep_type = function
@@ -353,8 +340,12 @@ let handle_branch
       (c : dep_ctr) : (b * bool) =
   let (ctr, typ) = c in
   let b = ref true in
+  
+  (* These were here for some reason, unused. *)
+  (* 
   let gen = mk_name_provider "gen" in
   let dec = mk_name_provider "dec" in
+  *)
   let arb = mk_name_provider "arb" in
 
   msg_debug (str "Debug branch" ++ fnl ());
@@ -430,11 +421,13 @@ let handle_branch
       | FixedInput -> cont k cmap (gVar parent)
     in 
 
+    (* TODO: Never used, not exported? *)
     (* Only used as a finalizer - discards k/cmap XXX *)
     let instantiate_range k cmap r = 
       instantiate_range_cont k cmap Unknown.undefined (fun k cmap c -> ret_exp c) r
     in
 
+    (* TODO: Never used, not exported? *)
     let rec combine_inductives k num_dts args = 
       match num_dts, args with 
       | [], _ -> []
@@ -532,7 +525,6 @@ let handle_branch
                     else if is_fixed k dt then (* Fixed argument - do nothing *)
                       build_arbs k cmap (dt_to_coq_expr k dt :: acc) rest 
                     else (* Call arbitrary and bind it to a new name *)
-                      let arb = arb.next_name () in
                       let rdt = convert_to_range dt in
                       instantiate_range_cont k cmap Unknown.undefined 
                         (fun k cmap c -> (* Continuation: call build_arbs on the rest *)
@@ -566,7 +558,6 @@ let handle_branch
                    if is_fixed k dt then (* Fixed argument - do nothing *)
                     build_arbs k cmap (dt_to_coq_expr k dt :: acc) rest 
                   else (* Call arbitrary and bind it to a new name *)
-                    let arb = arb.next_name () in
                     let rdt = convert_to_range dt in
                     instantiate_range_cont k cmap Unknown.undefined 
                       (fun k cmap c -> (* Continuation: call build_arbs on the rest *)
@@ -623,7 +614,6 @@ let handle_branch
                    if is_fixed k dt then (* Fixed argument - do nothing *)
                     build_arbs k cmap (dt_to_coq_expr k dt :: acc) rest 
                   else (* Call arbitrary and bind it to a new name *)
-                    let arb = arb.next_name () in
                     let rdt = convert_to_range dt in
                     instantiate_range_cont k cmap Unknown.undefined 
                       (fun k cmap c -> (* Continuation: call build_arbs on the rest *)
