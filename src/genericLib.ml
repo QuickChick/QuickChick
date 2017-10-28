@@ -74,21 +74,27 @@ let id_to_reference id =
 let id_to_coq_expr id = 
   mkRefC (id_to_reference id)
 
+let qualid_to_reference q = 
+  Qualid (None, q)
+let qualid_to_coq_expr q = 
+  mkRefC (Qualid (None, q))
+
 (* Maybe this should do checks? *)
 let gInject s = 
   if s = "" then failwith "Called gInject with empty string";
   CAst.make @@ CRef (Qualid (None, qualid_of_string s), None)
 
 type ty_param = Id.t (* Opaque *)
-let ty_param_to_string (x : Id.t) = Id.to_string x
+let ty_param_to_string (x : ty_param) = Id.to_string x
 
 let gTyParam = mkIdentC
 
-type ty_ctr   = Id.t (* Opaque *)
-let ty_ctr_to_string (x : ty_ctr) = Id.to_string x
-let gInjectTyCtr s = Id.of_string s
-
-let gTyCtr = id_to_coq_expr
+type ty_ctr   = qualid (* Opaque *)
+let ty_ctr_to_string (x : ty_ctr) = string_of_qualid x
+let gInjectTyCtr s = 
+  if s = "" then failwith "Called gInjectTyCtr with empty string";
+  qualid_of_string s
+let gTyCtr = qualid_to_coq_expr
 
 type arg = local_binder_expr
 let gArg ?assumName:(an=hole) ?assumType:(at=hole) ?assumImplicit:(ai=false) ?assumGeneralized:(ag=false) _ =
@@ -116,13 +122,15 @@ let rec coq_type_to_string ct =
   | TyCtr (ty_ctr, cs) -> ty_ctr_to_string ty_ctr ^ " " ^ str_lst_to_string " " (List.map coq_type_to_string cs)
   | TyParam tp -> ty_param_to_string tp
 
-type constructor = Id.t (* Opaque *)
-let constructor_to_string (x : constructor) = Id.to_string x
-let gCtr id = id_to_coq_expr id
-let injectCtr s = Id.of_string s
+type constructor = qualid (* Opaque *)
+let constructor_to_string (x : constructor) = string_of_qualid x
+let gCtr id = qualid_to_coq_expr id
+let injectCtr s = 
+  if s = "" then failwith "Called gInject with empty string";
+  qualid_of_string s
 
 let num_of_ctrs (c : constructor) =
-  let r = id_to_reference c in 
+  let r = qualid_to_reference c in 
   let env = Global.env () in
   let glob_ref = Nametab.global r in
   let ((mind,n),_) = Globnames.destConstructRef glob_ref in
@@ -141,12 +149,12 @@ end
 
 module Ord_ty_ctr = struct 
   type t = ty_ctr 
-  let compare = Id.compare 
+  let compare x y = Pervasives.compare (string_of_qualid x) (string_of_qualid y)
 end
 
 module Ord_ctr = struct
   type t = constructor
-  let compare = Id.compare
+  let compare x y = Pervasives.compare (string_of_qualid x) (string_of_qualid y)
 end
 
 type ctr_rep = constructor * coq_type 
@@ -278,7 +286,7 @@ let rec arrowify terminal l =
  *)
 let parse_constructors nparams param_names result_ty oib : ctr_rep list option =
   
-  let parse_constructor branch =
+  let parse_constructor (branch : constructor * constr) =
     let (ctr_id, ty_ctr) = branch in
 
     let (_, ty) = Term.decompose_prod_n nparams ty_ctr in
@@ -287,13 +295,13 @@ let parse_constructors nparams param_names result_ty oib : ctr_rep list option =
 
     let _, pat_types = List.split (List.rev ctr_pats) in
 
-    msg_debug (str (Id.to_string ctr_id) ++ fnl ());
+    msg_debug (str (string_of_qualid ctr_id) ++ fnl ());
     let rec aux i ty = 
       if isRel ty then begin 
         msg_debug (int (i + nparams) ++ str " Rel " ++ int (destRel ty) ++ fnl ());
         let db = destRel ty in
         if i + nparams = db then (* Current inductive, no params *)
-          Some (TyCtr (oib.mind_typename, []))
+          Some (TyCtr (qualid_of_ident oib.mind_typename, []))
         else (* [i + nparams - db]th parameter *)
           try Some (TyParam (List.nth param_names (i + nparams - db - 1)))
           with _ -> msg_error (str "nth failed: " ++ int (i + nparams - db - 1) ++ fnl ()); None
@@ -310,12 +318,12 @@ let parse_constructors nparams param_names result_ty oib : ctr_rep list option =
       end
       else if isInd ty then begin
         let ((mind,_),_) = destInd ty in
-        Some (TyCtr (Label.to_id (MutInd.label mind), []))
+        Some (TyCtr (qualid_of_ident (Label.to_id (MutInd.label mind)), []))
       end
       else if isConst ty then begin
         let (c,_) = destConst ty in 
         (* TODO: Rethink this for constants? *)
-        Some (TyCtr (Label.to_id (Constant.label c), []))
+        Some (TyCtr (qualid_of_ident (Label.to_id (Constant.label c)), []))
       end
       else (msg_error (str "Case Not Handled" ++ fnl()); None)
 
@@ -323,8 +331,9 @@ let parse_constructors nparams param_names result_ty oib : ctr_rep list option =
        Some (ctr_id, arrowify result_ty types)
   in
 
-  sequenceM parse_constructor (List.combine (Array.to_list oib.mind_consnames)
-                                            (Array.to_list oib.mind_nf_lc))
+  let cns = List.map qualid_of_ident (Array.to_list oib.mind_consnames) in
+  let lc  = Array.to_list oib.mind_nf_lc in
+  sequenceM parse_constructor (List.combine cns lc)
 
 (* Convert mutual_inductive_body to this representation, if possible *)
 let dt_rep_from_mib mib = 
@@ -335,9 +344,9 @@ let dt_rep_from_mib mib =
     let oib = mib.mind_packets.(0) in
     let ty_ctr = oib.mind_typename in 
     parse_type_params oib.mind_arity_ctxt >>= fun ty_params ->
-    let result_ctr = TyCtr (ty_ctr, List.map (fun x -> TyParam x) ty_params) in
+    let result_ctr = TyCtr (qualid_of_ident ty_ctr, List.map (fun x -> TyParam x) ty_params) in
     parse_constructors mib.mind_nparams ty_params result_ctr oib >>= fun ctr_reps ->
-    Some (ty_ctr, ty_params, ctr_reps)
+    Some (qualid_of_ident ty_ctr, ty_params, ctr_reps)
 
 let coerce_reference_to_dt_rep c = 
   let r = match c with
@@ -396,7 +405,7 @@ let parse_dependent_type i nparams ty oib arg_names =
   (*        msgerr (int (i + nparams) ++ str " Rel " ++ int (destRel ty) ++ fnl ()); *)
       let db = destRel ty in
       if i + nparams = db then (* Current inductive, no params *)
-        Some (DTyCtr (oib.mind_typename, []))
+        Some (DTyCtr (qualid_of_ident oib.mind_typename, []))
       else begin (* [i + nparams - db]th parameter *) 
         msg_debug (str (Printf.sprintf "Non-self-rel: %s" (dep_type_to_string (List.nth arg_names (i + nparams - db - 1)))) ++ fnl ());
         try Some (List.nth arg_names (i + nparams - db - 1))
@@ -425,7 +434,7 @@ let parse_dependent_type i nparams ty oib arg_names =
       let ((mind,_),_) = destInd ty in
       msg_debug (str (Printf.sprintf "LOOK HERE: %s - %s - %s" (MutInd.to_string mind) (Label.to_string (MutInd.label mind)) 
                                                             (Id.to_string (Label.to_id (MutInd.label mind)))) ++ fnl ());
-      Some (DTyCtr (Label.to_id (MutInd.label mind), []))
+      Some (DTyCtr (qualid_of_ident (Label.to_id (MutInd.label mind)), []))
     end
     else if isConstruct ty then begin
       let (((mind, midx), idx),_) = destConstruct ty in                               
@@ -444,7 +453,7 @@ let parse_dependent_type i nparams ty oib arg_names =
 
       (* Constructor name *)
       let cname = Id.to_string (mib.mind_packets.(midx).mind_consnames.(idx - 1)) in
-      let cid = Id.of_string (if (qual = "") || (qual = DirPath.to_string (Lib.cwd ()))
+      let cid = qualid_of_string (if (qual = "") || (qual = DirPath.to_string (Lib.cwd ()))
                              then cname else qual ^ "." ^ cname) in
       Some (DCtr (cid, []))
     end
@@ -514,8 +523,9 @@ let dep_parse_constructors nparams param_names oib : dep_ctr list option =
     Some (ctr_id, dep_arrowify result_ty pat_names types)
   in
 
-  sequenceM parse_constructor (List.combine (Array.to_list oib.mind_consnames)
-                                            (Array.to_list oib.mind_nf_lc))
+  let cns = List.map qualid_of_ident (Array.to_list oib.mind_consnames) in
+  let lc = Array.to_list oib.mind_nf_lc in
+  sequenceM parse_constructor (List.combine cns lc)
 
 let dep_dt_from_mib mib = 
   if Array.length mib.mind_packets > 1 then begin
@@ -528,7 +538,7 @@ let dep_dt_from_mib mib =
     List.iter (fun tp -> msg_debug (str (ty_param_to_string tp) ++ fnl ())) ty_params;
     dep_parse_constructors (List.length ty_params) ty_params oib >>= fun ctr_reps ->
     dep_parse_type (List.length ty_params) ty_params oib.mind_arity_ctxt oib >>= fun result_ty -> 
-    Some (ty_ctr, ty_params, ctr_reps, result_ty)
+    Some (qualid_of_ident ty_ctr, ty_params, ctr_reps, result_ty)
 
 let coerce_reference_to_dep_dt c = 
   let r = match c with
@@ -609,7 +619,7 @@ let gMatch discr ?catchAll:(body=None) (branches : (constructor * string list * 
           [(discr, None, None)], (* single discriminee, no as/in *)
           (List.map (fun (c, cs, bf) -> 
                       let cvs : Id.t list = List.map fresh_name cs in
-                      (None, ([(None, [CAst.make @@ CPatCstr (id_to_reference c,
+                      (None, ([(None, [CAst.make @@ CPatCstr (qualid_to_reference c,
                                       None,
                                       List.map (fun s -> CAst.make @@ CPatAtom (Some (Ident (None, s)))) cvs (* Constructor applied to patterns *)
                                      )
@@ -634,7 +644,7 @@ let gMatchReturn (discr : coq_expr)
           (List.map (fun (c, cs, bf) -> 
                       let cvs : Id.t list = List.map fresh_name cs in
                       (None,
-                       ([(None, [CAst.make @@ CPatCstr (id_to_reference c,
+                       ([(None, [CAst.make @@ CPatCstr (qualid_to_reference c,
                                       None,
                                       List.map (fun s -> CAst.make @@ CPatAtom (Some (Ident (None, s)))) cvs (* Constructor applied to patterns *)
                                      )
@@ -689,7 +699,7 @@ let get_type (id : Id.t) =
 
 let is_inductive c = 
   let env = Global.env () in
-  let glob_ref = Nametab.global (id_to_reference c) in
+  let glob_ref = Nametab.global (qualid_to_reference c) in
   match glob_ref with
   | IndRef _ -> true
   | _        -> false
@@ -715,7 +725,7 @@ let construct_match c ?catch_all:(mdef=None) alts =
       end
     | MatchCtr (c, ms) -> begin
        if is_inductive c then CAst.make @@ CPatAtom None
-       else CAst.make @@ CPatCstr (id_to_reference c,
+       else CAst.make @@ CPatCstr (qualid_to_reference c,
                    Some (List.map (fun m -> aux m) ms),
                    []) 
                         end 
@@ -740,7 +750,7 @@ let construct_match_with_return c ?catch_all:(mdef=None) (as_id : string) (ret :
          CAst.make @@ CPatAtom None
        end
        else begin 
-         CAst.make @@ CPatCstr (id_to_reference c,
+         CAst.make @@ CPatCstr (qualid_to_reference c,
                    Some (List.map (fun m -> aux m) ms),
                    []) 
          end

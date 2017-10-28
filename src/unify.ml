@@ -131,7 +131,7 @@ let rec unify (k : umap) (r1 : range) (r2 : range) (eqs : EqSet.t)
   msg_debug (str (Printf.sprintf "Calling unify with %s %s" (range_to_string r1) (range_to_string r2)) ++ fnl ());
   match r1, r2 with
   | Unknown u1, Unknown u2 ->
-     if u1 == u2 then Some (k, Unknown u1, eqs, []) else
+     if u1 = u2 then Some (k, Unknown u1, eqs, []) else
      lookup u1 k >>= fun r1 -> 
      lookup u2 k >>= fun r2 ->
      msg_debug (str (Printf.sprintf "Unifying two unknowns with ranges: %s %s" (range_to_string r1) (range_to_string r2)) ++ fnl ());
@@ -169,7 +169,7 @@ let rec unify (k : umap) (r1 : range) (r2 : range) (eqs : EqSet.t)
                                          (String.concat " " (List.map range_to_string rs1))
                                          (String.concat " " (List.map range_to_string rs2)))
                          ++ fnl ());
-        if c1 == c2 then 
+        if c1 = c2 then 
           foldM (fun b a -> let (r1, r2) = a in 
                             let (k, l, eqs, ms) = b in 
                             unify k r1 r2 eqs >>= fun res ->
@@ -194,7 +194,7 @@ let rec unify (k : umap) (r1 : range) (r2 : range) (eqs : EqSet.t)
                                          (String.concat " " (List.map range_to_string rs1))
                                          (String.concat " " (List.map range_to_string rs2)))
                          ++ fnl ());
-      if c1 == c2 then 
+      if c1 = c2 then 
         foldM (fun b a -> let (r1, r2) = a in 
                           let (k, l, eqs, ms) = b in 
                           unify k r1 r2 eqs >>= fun res ->
@@ -216,7 +216,7 @@ let rec unify (k : umap) (r1 : range) (r2 : range) (eqs : EqSet.t)
         msg_debug (str (Printf.sprintf "Constructors3: %s \n"
                                          (String.concat " " (List.map range_to_string rs')))
                          ++ fnl ());
-        if c == c' then 
+        if c = c' then 
           foldM (fun b a -> let (r1, r2) = a in 
                             let (k, l, eqs, ms) = b in 
                             unify k r1 r2 eqs >>= fun res ->
@@ -467,7 +467,7 @@ let handle_branch
 
         (* Check if we are handling the current constructor. If yes, mark the need for decidability of current constructor *)
         (* need_dec is a ref in scope *)
-        if c == gen_ctr then (need_dec := true; b := false) else ();
+        if c = gen_ctr then (need_dec := true; b := false) else ();
 
         (* Continuation handling dt2 : recurse one dt2 / None based on positivity *)
         let body_cont = recurse_type (m + 1) k cmap dt2 in
@@ -476,10 +476,11 @@ let handle_branch
         if pos then check_expr m (checker (List.map (fun dt -> dt_to_coq_expr k dt) dts)) body_cont body_fail
         else check_expr m (checker (List.map (fun dt -> dt_to_coq_expr k dt) dts)) body_fail body_cont
 
-      | [(i, DTyVar x)] -> (* Single variable to be generated for *)
-        if i == n && c == gen_ctr && pos then begin (* Recursive call *)
+      | [(i, DTyVar x)] -> begin (* Single variable to be generated for *)
+        msg_debug (str (Printf.sprintf "%d %d %s %s %b \n" i n (ty_ctr_to_string c) (ty_ctr_to_string gen_ctr) pos) ++ fnl ());
+        if i = n && c = gen_ctr && pos then begin (* Recursive call *)
           b := false;
-          let args = List.map snd (List.filter (fun (i, _) -> not (i == n)) (List.mapi (fun i dt -> (i+1, dt_to_coq_expr k dt)) dts)) in
+          let args = List.map snd (List.filter (fun (i, _) -> not (i = n)) (List.mapi (fun i dt -> (i+1, dt_to_coq_expr k dt)) dts)) in
           process_checks k cmap x 
             (* Generate using recursive function *)
             true
@@ -494,7 +495,7 @@ let handle_branch
               (fun [x] ->
                  gApp ~explicit:true (gTyCtr c) (List.map (fun (j, dt) -> 
                                              (* Replace the i-th variable with x - we're creating fun x => c dt_1 dt_2 ... x dt_{i+1} ... *)
-                                             if i == j then gVar x else dt_to_coq_expr k dt
+                                             if i = j then gVar x else dt_to_coq_expr k dt
                                            ) numbered_dts))
           in
           process_checks k cmap x true (class_methodST m pred) 
@@ -502,18 +503,19 @@ let handle_branch
         end
         else (* Negation. Since we expect the *positive* versions to be sparse, we can use suchThatMaybe for negative *)
           (* TODO: something about size for backtracking? *)
-          let new_check = fun x -> checker (List.map (fun (j,dt) -> if i == j then x else dt_to_coq_expr k dt) numbered_dts) in
+          let new_check = fun x -> checker (List.map (fun (j,dt) -> if i = j then x else dt_to_coq_expr k dt) numbered_dts) in
           let cmap' = match lookup_checks (DTyVar x) cmap with 
             | Some checks -> CMap.add (DTyVar x) ((new_check, m) :: checks) cmap
             | _ -> CMap.add (DTyVar x) [(new_check, m)] cmap in
           recurse_type (m + 1) k cmap' dt2
+        end
       | [(i, dt) ] -> failwith ("Internal error: not a variable to be generated for" ^ (dep_type_to_string dt)) 
 
       (* Multiple arguments to be generated for. Generalized arbitrarySizeST? *)
       | filtered -> if pos then begin
           (* For now, check if n is in the filtered list *)
           if c = gen_ctr then begin 
-            match List.filter (fun (i,dt) -> i == n) filtered with 
+            match List.filter (fun (i,dt) -> i = n) filtered with 
             | [(_, DTyVar x)] -> begin
                 b := false; 
                 (* Every other variable generated using "arbitrary" *)
@@ -526,7 +528,7 @@ let handle_branch
                         (fun k' cmap' x' -> recurse_type (m + 1) k' cmap' dt2)
                     else failwith "Negation / build_arbs"
                   | (i,dt)::rest -> 
-                    if i == n then build_arbs k cmap acc rest (* Recursive argument - handle at the end *)
+                    if i = n then build_arbs k cmap acc rest (* Recursive argument - handle at the end *)
                     else if is_fixed k dt then (* Fixed argument - do nothing *)
                       build_arbs k cmap (dt_to_coq_expr k dt :: acc) rest 
                     else (* Call arbitrary and bind it to a new name *)
@@ -553,7 +555,7 @@ let handle_branch
                           (fun [x] ->
                              gApp ~explicit:true (gTyCtr c) (List.map (fun (j, dt) -> 
                                                          (* Replace the i-th variable with x - we're creating fun x => c dt_1 dt_2 ... x dt_{i+1} ... *)
-                                                         if i == j then gVar x else dt_to_coq_expr k dt
+                                                         if i = j then gVar x else dt_to_coq_expr k dt
                                                        ) numbered_dts))
                       in
                       process_checks k cmap x true (class_methodST m pred) 
@@ -610,7 +612,7 @@ let handle_branch
                           (fun [x] ->
                              gApp ~explicit:true (gType [] f) (List.map (fun (j, dt) -> 
                                                          (* Replace the i-th variable with x - we're creating fun x => c dt_1 dt_2 ... x dt_{i+1} ... *)
-                                                         if i == j then gVar x else dt_to_coq_expr k dt
+                                                         if i = j then gVar x else dt_to_coq_expr k dt
                                                        ) numbered_dts))
                       in
                       process_checks k cmap x true (class_methodST m pred) 
