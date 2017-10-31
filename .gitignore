@@ -6,6 +6,7 @@ dsss17/terse
 *.cmo
 *.cmi
 *.cmx
+*.cmxa
 *.cmxs
 *.hi
 *.o
@@ -15,6 +16,7 @@ dsss17/terse
 *.glob
 *.vo
 *.aux
+*.a
 .coq-native
 \#*
 *~

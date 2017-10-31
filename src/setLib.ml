@@ -1,20 +1,3 @@
-open Decl_kinds
-open Pp
-open Term
-open Loc
-open Names
-open Tacmach
-open Entries
-open Declarations
-open Declare
-open Libnames
-open Util
-open Constrintern
-open Topconstr
-open Constrexpr
-open Constrexpr_ops
-open Ppconstr
-open Context
 open GenericLib
 
 let set_singleton (c : coq_expr) : coq_expr = gApp (gInject "set1") [c]
