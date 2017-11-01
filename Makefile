@@ -54,9 +54,10 @@ quickChickTool: src/quickChickToolTypes.cmo
 
 tests:
 	coqc examples/DependentTest.v
+	cd examples/ifc-basic; make clean && make
 #	cd examples/RedBlack; make clean && make
 #	cd examples/stlc; make clean && make
-#	cd examples/ifc-basic; make clean && make
+
 
 Makefile.coq: _CoqProject
 	$(V)coq_makefile -f _CoqProject -o Makefile.coq
