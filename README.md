@@ -19,9 +19,9 @@ https://github.com/DeepSpec/dsss17
 ### Known to work with
 
   - Branch master: 
-    * Coq 8.6
-    * OCaml 4.03.0, 4.04
-    * mathcomp-ssreflect-1.6.1 
+    * Coq 8.7
+    * OCaml 4.05.0
+    * mathcomp-ssreflect-1.6.2
 
   - Branch 8.4pl6 known to work with
     * OCaml 4.01.0 and Coq 8.4pl3 or OCaml 4.02.1 and Coq 8.4pl6
@@ -36,8 +36,6 @@ https://github.com/DeepSpec/dsss17
     * Coq 8.6
     * OCaml 4.03.0
     * mathcomp-ssreflect-1.6.1
-
-  - trunk is the experimental development branch, currently on 8.6
 
 ### Compilation and Installation
 
