@@ -1,6 +1,11 @@
+Set Warnings "-extraction-opaque-accessed,-extraction".
+Set Warnings "-notation-overridden,-parsing".
+
 Require Import mathcomp.ssreflect.ssreflect.
+Require Import Classes.RelationClasses Classes.Morphisms List Tactics.
 From mathcomp Require Import ssrfun ssrbool ssrnat seq.
-Require Import Classes.RelationClasses Classes.Morphisms.
+
+Import ListNotations.
 
 Set Implicit Arguments.
 Unset Strict Implicit.
@@ -49,7 +54,6 @@ Definition set_incl {A} (m1 m2 : set A) :=
   forall (a : A), m1 a -> m2 a.
 
 Infix "\subset" := set_incl (at level 70, no associativity) : set_scope.
-
 
 Notation "[ 'set' x : T | P ]" := (fun x : T => P)
   (at level 0, x at level 99, only parsing) : set_scope.
@@ -121,6 +125,8 @@ Notation "\bigcap_ ( i 'in' A ) F" := (bigcap A (fun i => F))
   (at level 41, F at level 41, i, A at level 50,
            format "'[' \bigcap_ ( i  'in'  A ) '/  '  F ']'") : set_scope.
 
+Definition lift {T} (S : set T) : set (option T) :=
+  Some @: S :|: [set None].
 
 Lemma subset_eqP T (A B : set T) : (A <--> B) <-> (A \subset B /\ B \subset A).
 Proof.
@@ -161,6 +167,16 @@ Lemma subset_respects_set_eq_r :
     s3 <--> s2 -> s1 \subset s2 -> s1 \subset s3.
 Proof.
   now firstorder.
+Qed.
+
+Lemma subset_respects_set_eq :
+  forall {T : Type} {s1 s2 s1' s2' : set T},
+    s1 <--> s1' ->
+    s2 <--> s2' ->
+    s1' \subset s2' ->
+    s1 \subset s2.
+Proof.
+  firstorder.
 Qed.
 
 Lemma imsetT T U (f : T -> U) : f @: setT <--> codom f.
@@ -523,8 +539,6 @@ Proof.
   intros; split; firstorder. 
 Qed.
 
-
-
 Lemma setI_subset_compat {U} (s1 s2 s1' s2' : set U) : 
   s1 \subset s1' ->
   s2 \subset s2' ->
@@ -658,4 +672,387 @@ Lemma cons_set_eq {A} (x : A) l :
   (x :: l) <--> [set x] :|: l.
 Proof. by []. Qed.
 
+Lemma singl_set_eq: forall (A : Type) (x : A), [ x ] <--> [ set x ].
+Proof.
+  intros A x x'; split; intros H.
+  - inv H. reflexivity. now inv H0.
+  - inv H. now constructor.
+Qed.
 
+Lemma incl_subset {A : Type} (l1 l2 : seq A) :
+  incl l1 l2 -> l1 \subset l2.
+Proof.
+  intros Hi x; eapply Hi.
+Qed.
+
+Lemma incl_hd_same {A : Type} (a : A) (l1 l2 : seq A) :
+  incl l1 l2 -> incl (a :: l1) (a :: l2).
+Proof.
+  intros Hin. firstorder.
+Qed.
+     
+Lemma setI_bigcup_assoc {A B} (s1 : set B) (s2 : set A) (s3 : A -> set B) :
+  s1 :&: (\bigcup_(x in s2) s3 x) <--> \bigcup_(x in s2) (s1 :&: (s3 x)).
+Proof.
+  firstorder.
+Qed.
+
+Lemma cons_subset {A : Type} (x : A) (l : seq A) (P : set A) :
+  P x ->
+  l \subset P ->
+  (x :: l) \subset P.
+Proof.
+  intros Px Pl x' Hin. inv Hin; firstorder.
+Qed.
+
+Lemma nil_subset {A : Type} (P : set A) :
+  [] \subset P.
+Proof.
+  intros x H; inv H.
+Qed.
+
+Lemma imset_union_incl {U T : Type} (s1 s2 : set U) (f : U -> T) :
+  f @: (s1 :|: s2) \subset (f @: s1) :|: (f @: s2).
+Proof.
+  firstorder.
+Qed.
+
+Lemma imset_singl_incl {U T : Type} (x : U) (f : U -> T) :
+  f @: [set x] \subset [set (f x)].
+Proof.
+  intros y Hin. destruct Hin as [y' [Hin1 Hin2]].
+  inv Hin1. inv Hin2. reflexivity.
+Qed.
+
+Lemma imset_set0_incl  {U T : Type} (f : U -> T) :
+  f @: set0 \subset set0.
+Proof.
+  firstorder.
+Qed.
+
+Lemma set_eq_set_incl_r {U : Type} (s1 s2 : set U) :
+  s1 <--> s2 -> s2 \subset s1.
+Proof.
+  firstorder.
+Qed.
+
+Lemma set_eq_set_incl_l {U : Type} (s1 s2 : set U) :
+  s1 <--> s2 -> s1 \subset s2.
+Proof.
+  firstorder.
+Qed.
+
+Lemma rewrite_set_l {U : Type} (s1 s2 : set U) x :
+  s1 x ->
+  s1 <--> s2 ->
+  s2 x.
+Proof.
+  firstorder.
+Qed.
+
+Lemma rewrite_set_r {U : Type} (s1 s2 : set U) x :
+  s2 x ->
+  s1 <--> s2 ->
+  s1 x.
+Proof.
+  firstorder.
+Qed.
+
+Lemma imset_bigcup_incl_l :
+  forall {T U V : Type} (f : U -> V) (A : set T) (F : T -> set U),
+  f @: (\bigcup_(x in A) F x) \subset \bigcup_(x in A) f @: F x.
+Proof.
+  firstorder.
+Qed.
+
+Lemma in_imset {U T} (f : U -> T) (S : set U) (x : T) :
+  (f @: S) x -> exists y, x = f y.
+Proof.
+  move => [y [H1 H2]]; eauto.
+Qed.
+
+Lemma union_lift_subset_compat {A} (s1 s2 : set (option A)) (s3 s4 : set A) :
+  s1 \subset lift s3 ->
+  s2 \subset lift s4 ->
+  (s1 :|: s2) \subset lift (s3 :|: s4).
+Proof.
+  firstorder.
+Qed.
+
+Lemma lift_subset_pres_l {A} (s1 : set (option A)) (s2 s3 : set A) :
+  s1 \subset lift s2 ->
+  s1 \subset lift (s2 :|: s3).
+Proof.
+  firstorder.
+Qed.
+
+Lemma lift_subset_pres_r {A} (s1 : set (option A)) (s2 s3 : set A) :
+  s1 \subset lift s3 ->
+  s1 \subset lift (s2 :|: s3).
+Proof.
+  firstorder.
+Qed.
+
+
+Lemma set_incl_setI_l {A} (s1 s2 s3 : set A) :
+  s1 \subset s3 ->
+  (s1 :&: s2) \subset s3.
+Proof.
+  firstorder.
+Qed.
+
+Lemma set_incl_setI_r {A} (s1 s2 s3 : set A) :
+  s2 \subset s3 ->
+  (s1 :&: s2) \subset s3.
+Proof.
+  firstorder.
+Qed.
+
+Lemma set_incl_setU_l {A} (s1 s2 s3 : set A) :
+  s1 \subset s3 ->
+  s2 \subset s3 ->
+  (s1 :|: s2) \subset s3.
+Proof.
+  firstorder.
+Qed.
+
+Lemma bigcup_set_I_l {A B} (s1 s2 : set A) (s3 : set B) (f : A -> set B) :
+  \bigcup_(x in s1) (f x) \subset s3 ->
+  \bigcup_(x in (s1 :&: s2)) (f x) \subset s3.
+Proof.
+  firstorder.
+Qed.
+
+Lemma bigcup_set_U {A B} (s1 s2 : set A) (s3 : set B) (f : A -> set B) :
+  \bigcup_(x in s1) (f x) \subset s3 ->
+  \bigcup_(x in s2) (f x) \subset s3 ->
+  \bigcup_(x in (s1 :|: s2)) (f x) \subset s3.
+Proof.
+  firstorder.
+Qed.
+
+Lemma bigcup_set0_subset {A B} (s : set B) (f : A -> set B) :
+  \bigcup_(x in set0) (f x) \subset s.
+Proof.
+  firstorder.
+Qed.
+
+Lemma bigcup_cons_subset {A B} l (ls : seq A) (f : A -> set B) s :
+  f l \subset s ->
+  \bigcup_(x in ls) (f x) \subset s ->
+  \bigcup_(x in l :: ls) (f x) \subset s. 
+Proof.
+  intros H1 H2 x [y [Hl Hr]].
+  inv Hl.
+  - eauto.
+  - eapply H2. eexists; split; eauto.
+Qed.
+
+Lemma bigcup_nil_subset {A B} (f : A -> set B) s :
+  \bigcup_(x in []) (f x) \subset s. 
+Proof.
+  intros x [y [H1 H2]]. inv H1.
+Qed.
+
+Lemma option_subset {A} (s1 : set (option A)) :
+  s1 \subset (isSome :&: s1) :|: [set None]. 
+Proof.
+  intros [x |]; firstorder.
+Qed.
+
+Lemma setU_l_subset {U} (s1 s2 s3 : set U) :
+  s1 \subset s3 ->
+  s2 \subset s3 ->
+  (s1 :|: s2) \subset s3.
+Proof.
+  firstorder.
+Qed.
+
+Lemma bigcup_lift_lift_bigcup {T U} (s1 : set T) (f : T -> set U) :
+  \bigcup_(x in s1) (lift (f x)) \subset lift (\bigcup_(x in s1) (f x)).
+Proof.
+  intros x [y [H1 [[z [H2 H3]] | H2]]].
+  + inv H3. left; eexists; split; eauto.
+    eexists; split; eauto.
+  + inv H2; now right. 
+Qed.
+
+Lemma lift_subset_compat {U} (s1 s2 : set U) :
+  s1 \subset s2 ->
+  lift s1 \subset lift s2.
+Proof.
+  firstorder.
+Qed.
+
+Lemma lift_set_eq_compat {U} (s1 s2 : set U) :
+  s1 <--> s2 ->
+  lift s1 <--> lift s2.
+Proof.
+  firstorder.
+Qed.
+
+Lemma bigcup_setU_r:
+  forall (U T : Type) (s : set U) (f g : U -> set T),
+    \bigcup_(i in s) (f i :|: g i) <-->
+    \bigcup_(i in s) f i :|: \bigcup_(i in s) g i.
+Proof.
+  firstorder.
+Qed.
+
+Lemma lift_bigcup_comm :
+  forall (U T : Type) (s : set U) (f : U -> set T),
+    inhabited U ->
+    lift (\bigcup_(i in [set : U]) (f i)) <-->
+    \bigcup_(i in [set : U]) (lift (f i)).
+Proof.
+  intros U T s f Hin. unfold lift.
+  rewrite !bigcup_setU_r -!imset_bigcup.
+  rewrite bigcup_const; eauto.
+  reflexivity.
+Qed.
+
+Lemma bigcap_setU_distr:
+  forall (U T : Type) (s1 s2 : set U) (f : U -> set T),
+    \bigcap_(i in s1) f i :&: \bigcap_(i in s2) f i <--> \bigcap_(i in s1 :|: s2) f i.
+Proof.
+  intros. split.
+  - intros [ H1 H2 ] x [ H3 | H3 ]; eauto.
+  - intros H. split; intros x H3; eapply H.
+    now left. now right.
+Qed.
+
+Lemma setI_set_incl :
+  forall (A : Type) (s1 s2 s3 : set A),
+    s1 \subset s2 ->
+    s1 \subset s3 ->
+    s1 \subset s2 :&: s3.
+Proof.
+  firstorder.
+Qed.
+
+Lemma imset_isSome {A} (s : set A) :
+  Some @: s \subset isSome.
+Proof.
+  intros y [x [Sx H]]. inv H. eauto.
+Qed.
+
+Lemma bigcup_cons_subset_r :
+  forall (A B : Type) (l : A) (ls : seq A) (f : A -> set B) (s1 s2 : set B),
+    s1 \subset f l ->
+    s2 \subset \bigcup_(x in ls) f x ->
+    s1 :|: s2 \subset \bigcup_(x in (l :: ls)) f x.
+Proof.
+  intros A B l ls f s1 s2 H1 H2.
+  apply setU_l_subset.
+  - rewrite bigcup_setU_l bigcup_set1.
+    eapply setU_subset_l. eassumption.
+  - rewrite bigcup_setU_l bigcup_set1.
+    eapply setU_subset_r. eassumption.
+Qed.
+
+Lemma bigcup_setI_cons_subset_r :
+  forall (A B : Type) (l : A) (ls : seq A) (f : A -> set B) (s1 s2 : set B) (s3 : set A),
+    s3 l ->
+    s1 \subset f l ->
+    s2 \subset \bigcup_(x in ls :&: s3) f x ->
+    s1 :|: s2 \subset \bigcup_(x in (l :: ls) :&: s3) f x.
+Proof.
+  intros A B l ls f s1 s2 s3 H1 H2 H3.
+  apply setU_l_subset.
+  - intros x Hs1. eexists l; split; eauto.
+    split; eauto. left; eauto.
+  - intros x Hs1. eapply H3 in Hs1.
+    edestruct Hs1 as [x' [[Hs3 Hls] Hin]].
+    eexists x'; split; eauto. split; eauto.
+    right; eauto.
+Qed.
+
+Lemma imset_union_set_eq:
+  forall (U T : Type) (s1 s2 : set U) (f : U -> T),
+    f @: (s1 :|: s2) <--> f @: s1 :|: f @: s2.
+Proof.
+  intros U T s1 s2 f.
+  firstorder.
+Qed.
+
+Lemma imset_bigcup_setI_cons_subset_r :
+  forall (A B : Type) (l : A) (ls : seq A) (f : A -> set (option B))
+    (s1 s2 : set B) (s3 : set A),
+    s3 l ->
+    Some @: s1 \subset f l ->
+    Some @: s2 \subset \bigcup_(x in ls :&: s3) f x ->
+    Some @: (s1 :|: s2) \subset \bigcup_(x in (l :: ls) :&: s3) f x.
+Proof.
+  intros A B l ls f s1 s2 s3 H1 H2 H3.
+  rewrite imset_union_set_eq. apply setU_l_subset.
+  - intros x Hs1. eexists l; split; eauto.
+    split; eauto. left; eauto.
+  - intros x Hs1. eapply H3 in Hs1.
+    edestruct Hs1 as [x' [[Hs3 Hls] Hin]].
+    eexists x'; split; eauto. split; eauto.
+    right; eauto.
+Qed.
+
+Lemma imset_set0_subset {A B} (f : A -> B) (s : set B) :
+  (f @: set0) \subset s.
+Proof.
+  firstorder.
+Qed.
+
+Lemma setI_set_eq_r {A : Type} (s1 s2 s2' : set A) :
+  s2 <--> s2' ->
+  (s1 :&: s2) <--> (s1 :&: s2').
+Proof.
+  intros. rewrite H; reflexivity.
+Qed.
+
+Lemma isSome_subset {A : Type} (s1 s2 s1' s2' : set (option A)) :
+  isSome :&: s1 \subset isSome :&: s2 ->
+  isSome :&: (s1 :|: ([set None] :&: s1')) \subset isSome :&: (s2 :|: ([set None] :&: s2')).
+Proof.
+  intros Hyp x [H1 H2]. destruct x as [ x | ]; try discriminate.
+  split; eauto.
+  inv H2. left; eauto.
+  eapply Hyp. now split; eauto.
+  inv H. now inv H0.
+Qed.
+
+Lemma bigcup_nil_setI {A B} (f : A -> set B)
+      (l : seq A) s :
+  \bigcup_(x in [] :&: s) (f x) \subset
+  \bigcup_(x in (l :&: s)) (f x).
+Proof.
+  intros z [y [[Hin1 _] Hin2]]. inv Hin1.
+Qed.
+
+Lemma isSome_set_eq {A} (s : set (option A)) (s' : set A) :
+  s \subset (Some @: s') :|: [set None] ->
+  Some @: s' \subset s ->
+  isSome :&: s <--> Some @: s'.
+Proof.
+  intros H1 H2 x; split.
+  - intros [H3 H4]. destruct x; try discriminate.
+    eapply H1 in H4. inv H4; try discriminate.
+    eassumption. 
+  - intros [y [H3 H4]].
+    inv H4. split. now eauto.
+    eapply H2.
+    eexists; split; eauto.
+Qed.
+
+Lemma set_eq_isSome_sound {A} (s : set (option A)) (s' : set A) :
+  isSome :&: s <--> Some @: s' ->
+  s \subset (Some @: s') :|: [set None].
+Proof.
+  intros H [x| ] Hin.
+  - left. eapply H.
+    eexists; eauto.
+  - right; reflexivity.
+Qed.
+
+Lemma set_eq_isSome_complete {A} (s : set (option A)) (s' : set A) :
+  isSome :&: s <--> Some @: s' ->
+  Some @: s' \subset s.
+Proof.
+  intros H. rewrite <- H. firstorder.
+Qed.

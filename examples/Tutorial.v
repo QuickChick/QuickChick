@@ -610,7 +610,7 @@ Print testFun.
     property combinator, comes in. In Haskell notation, [collect]
     would have the type [collect : Show A, Checkable prop => A -> prop
     -> prop]; it takes some value of type [A] that can be shown and a
-    property, and returns the property itselft. Whenever the resulting
+    property, and returns the property itself. Whenever the resulting
     property is exercised, the [A] object is captured and statistics
     are collected.
 

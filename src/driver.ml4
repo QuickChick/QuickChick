@@ -13,6 +13,7 @@ open Topconstr
 open Constrexpr
 open Constrexpr_ops
 open Decl_kinds
+open Names
 open GenericLib
 open SetLib
 open CoqLib
@@ -21,23 +22,24 @@ open SizeMon
 open SizeSMon
 open SizeCorr
 open Constrarg
+open Error
 
 type derivation = SimpleDer of SimplDriver.derivable list
                 | DepDer of DepDriver.derivable 
 
-let simpl_dispatch ind classes = 
+let simpl_dispatch ind classes name1 name2 = 
   let ind_name = match ind with 
     | CRef (r, _) -> string_of_qualid (snd (qualid_of_reference r))
     | _ -> failwith "Implement me for functions" 
-  in 
-  List.iter (fun cn -> SimplDriver.derive cn ind (SimplDriver.mk_instance_name cn ind_name) "" "") classes
-  
+  in
+  List.iter (fun cn -> SimplDriver.derive cn ind (SimplDriver.mk_instance_name cn ind_name) name1 name2) classes
+
 let dep_dispatch ind class_name = 
   (* TODO: turn this into a much once Zoe figures out what she wants *)
-  let DepDriver.ArbitrarySizedSuchThat = class_name in 
+  (* let DepDriver.ArbitrarySizedSuchThat = class_name in  *)
   match ind with 
   | CLambdaN (_loc1, [([(_loc2, Name id)], _kind, _type)], CApp (_loc3, (_flag, constructor), args)) ->
-     let n = fst (List.find (fun (_,(CRef (r,_), _)) -> Id.to_string id = string_of_reference r) (List.mapi (fun i x -> (i+1,x)) args)) in
+    let n = fst (List.find (fun (_,(CRef (r,_), _)) -> Id.to_string id = string_of_reference r) (List.mapi (fun i x -> (i+1,x)) args)) in
      let ctr_name = 
        match constructor with 
        | CRef (r,_) -> string_of_reference r
@@ -45,30 +47,70 @@ let dep_dispatch ind class_name =
      DepDriver.deriveDependent class_name constructor n (DepDriver.mk_instance_name class_name ctr_name)
   | _ -> failwith "wrongformat"
 
-let dispatch cn ind = 
-  let s = match cn with 
+let class_assoc_opts = [ ("GenSized"                 , SimpleDer [SimplDriver.GenSized])
+                       ; ("Shrink"                   , SimpleDer [SimplDriver.Shrink])
+                       ; ("Arbitrary"                , SimpleDer [SimplDriver.GenSized; SimplDriver.Shrink])
+                       ; ("Show"                     , SimpleDer [SimplDriver.Show])
+                       ; ("Sized"                    , SimpleDer [SimplDriver.Sized])
+                       ; ("CanonicalSized"           , SimpleDer [SimplDriver.CanonicalSized])
+                       ; ("SizeMonotonic"            , SimpleDer [SimplDriver.SizeMonotonic])
+                       ; ("SizedMonotonic"           , SimpleDer [SimplDriver.SizedMonotonic])
+                       ; ("SizedCorrect"             , SimpleDer [SimplDriver.SizedCorrect])
+                       ; ("ArbitrarySizedSuchThat"   , DepDer DepDriver.ArbitrarySizedSuchThat)
+                       ; ("SizeMonotonicSuchThatOpt" , DepDer DepDriver.GenSizedSuchThatMonotonicOpt)
+                       ; ("SizedProofEqs"            , DepDer DepDriver.SizedProofEqs)
+                       ; ("GenSizedSuchThatCorrect"  , DepDer DepDriver.GenSizedSuchThatCorrect)
+                       ; ("GenSizedSuchThatSizeMonotonicOpt", DepDer DepDriver.GenSizedSuchThatSizeMonotonicOpt)
+                       ]
+
+let class_assoc_table =
+  let h = Hashtbl.create (List.length class_assoc_opts) in
+  List.iter (fun (kwd, tok) -> Hashtbl.add h kwd tok) class_assoc_opts;
+  h
+
+let dispatch cn ind name1 name2 = 
+  let convert_reference_to_string c = 
+    match c with 
     | CRef (r, _) -> string_of_qualid (snd (qualid_of_reference r))
-    | _ -> failwith "Usage: Derive <class_name> for <inductive_name>"
+    | _ -> failwith "Usage: Derive <class_name> for <inductive_name> OR  Derive (<class_name>, ... , <class_name>) for <inductive_name>" in
+  let ss = match cn with 
+     | CNotation (_,_,([a],[b],_)) -> begin 
+         let c = convert_reference_to_string a in
+         let cs = List.map convert_reference_to_string b in
+         c :: cs
+       end
+     | _ -> [convert_reference_to_string cn]
   in 
 
-  let class_names = match s with 
-    | "Arbitrary" -> SimpleDer [SimplDriver.ArbitrarySized; SimplDriver.Shrink]
-    | "Show" -> SimpleDer [SimplDriver.Show]
-    | "ArbitrarySizedSuchThat" -> DepDer DepDriver.ArbitrarySizedSuchThat
-  in 
+  let get_class_names s = 
+    try Hashtbl.find class_assoc_table s 
+    with Not_found -> begin
+        (* TODO: Figure out how to pretty print in a failwith... *)
+        failwith ( "Not a valid class name. Expected one of : " ^ (String.concat " , " (List.map fst class_assoc_opts)))
+      end
+  in
+
+  let class_names = 
+    match ss with 
+    | s::ss -> List.fold_left (fun der s ->
+                               match der, get_class_names s with 
+                               | SimpleDer ds1, SimpleDer ds2 -> SimpleDer (ds1 @ ds2)
+                               | DepDer ds1, DepDer ds2 -> 
+                                  qcfail "Implement dependent derive for multiple classes"
+                              ) (get_class_names s) ss
+    | _ -> qcfail "At least one class name expected" in
 
   match class_names with 
-  | SimpleDer classes -> simpl_dispatch ind classes
+  | SimpleDer classes -> simpl_dispatch ind classes name1 name2
   | DepDer classes -> dep_dispatch ind classes 
 
 VERNAC COMMAND EXTEND Derive CLASSIFIED AS SIDEFF
    | ["Derive" constr(class_name) "for" constr(inductive)] -> 
-      [dispatch class_name inductive]
-(*   | ["Derive" constr(class_name) "for" constr(inductive) "as" string(s1)] -> 
-      [dispatch class_name inductive (Some s1) None]
-   | ["Derive" constr(class_name) "for" constr(inductive) "as" string(s1) "and" string(s2)] -> 
-      [dispatch class_name inductive (Some s1) (Some s2)]
- *)
+     [dispatch class_name inductive "" ""]
+   | ["Derive" constr(class_name) "for" constr(inductive) "using" ident(genInst)] -> 
+     [dispatch class_name inductive (Names.string_of_id genInst) ""]
+   | ["Derive" constr(class_name) "for" constr(inductive) "using" ident(genInst) "and" ident(monInst) ] -> 
+     [dispatch class_name inductive (Names.string_of_id genInst) (Names.string_of_id monInst)]
 END;;
 
 (*

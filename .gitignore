@@ -1,3 +1,8 @@
+.depend
+dsss17/full
+dsss17/sol
+dsss17/terse
+.depend
 *.cmo
 *.cmi
 *.cmx
@@ -17,3 +22,7 @@
 *.d
 Makefile.coq
 .DS_Store
+src/quickChickToolLexer.ml
+src/quickChickToolParser.ml
+src/quickChickToolParser.mli
+src/quickChickToolParser.output

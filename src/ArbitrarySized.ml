@@ -16,7 +16,7 @@ open Decl_kinds
 open GenericLib
 open SetLib
 open CoqLib
-
+open GenLib
 
 (* Derivation of ArbitrarySized. Contains mostly code from derive.ml *)
 
@@ -66,7 +66,7 @@ let arbitrarySized_decl ty_ctr ctrs iargs =
                fun _ -> oneof (List.map (create_for_branch tyParams aux_arb size) bases))
              ;(injectCtr "S", ["size'"],
                fun [size'] -> frequency (List.map (fun (ctr,ty') ->
-                   ((if isBaseBranch ty' then gInt 1 else gVar size),
+                   (Weightmap.lookup_weight ctr size',
                     create_for_branch tyParams aux_arb size' (ctr,ty'))) ctrs))
              ])
         (fun x -> gVar x) in
@@ -110,6 +110,7 @@ let shrink_decl ty_ctr ctrs iargs =
     (* Create the function body by recursing on the structure of x *)
     gFun ["x"] (fun [x] -> shrink_body x)
   in
+  debug_coq_expr shrink_fun;
   gRecord [("shrink", shrink_fun)]
 
 let show_decl ty_ctr ctrs iargs =
@@ -128,12 +129,11 @@ let show_decl ty_ctr ctrs iargs =
     let branch aux (ctr,ty) =
       
       (ctr, generate_names_from_type "p" ty,
-       fun vs -> str_append (gStr (constructor_to_string ctr ^ "  "))
-                            (fold_ty_vars (fun _ v ty' -> str_appends [ gStr "( "
-                                                                      ; gApp (if isCurrentTyCtr ty' then gVar aux else gInject "show") [gVar v]
-                                                                      ; gStr " )"
-                                                                      ])
-                                          (fun s1 s2 -> str_appends [s1; gStr " "; s2]) emptyString ty vs))
+       fun vs -> match vs with 
+                 | [] -> gStr (constructor_to_string ctr) 
+                 |_ -> str_append (gStr (constructor_to_string ctr ^ " "))
+                                  (fold_ty_vars (fun _ v ty' -> smart_paren (gApp (if isCurrentTyCtr ty' then gVar aux else gInject "show") [gVar v]))
+                                                (fun s1 s2 -> if s2 = emptyString then s1 else str_appends [s1; gStr " "; s2]) emptyString ty vs))
     in
     
     gRecFunIn "aux" ["x'"]

@@ -10,6 +10,12 @@ Import QcDefaultNotation. Open Scope qc_scope.
 
 Set Bullet Behavior "Strict Subproofs".
 
+Theorem x : Prop.
+Proof.
+
+
+
+
 Definition backGen :=
   backtrack [ (1, returnGen None) 
             ; (4, returnGen (Some 42))

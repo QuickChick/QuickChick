@@ -17,7 +17,7 @@ open GenericLib
 open SetLib
 open CoqLib
 open SemLib
-
+open GenLib
 
 let list_keep_every n l =
   let rec aux i = function
@@ -32,6 +32,11 @@ let sameTypeCtr c_ctr = function
   | TyCtr (ty_ctr', _) -> c_ctr = ty_ctr'
   | _ -> false
 
+let rec fst_leq_proof ctrs =
+  match ctrs with
+  | [] -> forall_nil (gProd hole hole)
+  | c :: ctrs ->
+     forall_cons (gProd hole hole) ltnOSn_pair (fst_leq_proof ctrs)
 
 let isBaseBranch ty_ctr ty = fold_ty' (fun b ty' -> b && not (sameTypeCtr ty_ctr ty')) true ty
 
@@ -162,10 +167,15 @@ let sizeSMon ty_ctr ctrs iargs  =
   let ind_case s s1 s2 ihs1 hleq =
     let (lg, lgs) = ind_gens s1 in
     let (rg, rgs) = ind_gens s2 in
-    (subset_set_eq_compat
-       (semFreqSize lg lgs s)
-       (semFreqSize rg rgs s)
-       (genCase ihs1 hleq ctrs))
+    match ctrs with
+    | [] -> failwith "Empty type"
+    | [(ctr, ty)] -> (* Only one constructor -- should be a base case *)
+      set_incl_refl
+    | _ ->
+      (subset_set_eq_compat
+         (semFreqSize lg lgs s (fst_leq_proof ctrs))
+         (semFreqSize rg rgs s (fst_leq_proof ctrs))
+         (genCase ihs1 hleq ctrs))
   in
 
   let rec seq_incl_proof ctrs =
@@ -179,18 +189,59 @@ let sizeSMon ty_ctr ctrs iargs  =
   in
 
   let base_case s s2 =
-    (* The generators should be explicitly passed to the lemmas *)
-    let (g, gs) = base_gens in
-    let (fg, fgs) = base_gens_with_freq in
-    let (ig, igs) = ind_gens s2 in
-    (* first write oneOf as freq *)
-    subset_respects_set_eq_l
-      (oneOf_freq g gs s)
-      (* Rewrite with the semantics of freq left and right *)
-      (subset_set_eq_compat
-         (semFreqSize fg fgs s)
-         (semFreqSize ig igs s)
-         (incl_bigcupl (incl_subset hole hole (seq_incl_proof ctrs))))
+    match ctrs with
+    | [] -> failwith "Empty type"
+    | [(ctr, ty)] -> (* Only one constructor -- should be a base case *)
+      set_incl_refl
+    | _ :: _ ->
+      match bases with
+      | [] -> failwith "No base case!"
+      | [(ctr, ty)] -> (* Only on base case and at least one inductive *)
+        let (g, gs) = base_gens in
+        let (fg, fgs) = base_gens_with_freq in
+        let (ig, igs) = ind_gens s2 in
+        let rec proof ctrs =
+          match ctrs with
+          | [] -> failwith "Could not find the constructor"
+          | (ctr', ty') :: ctrs' ->
+            (* found the constructor *)
+            if isBaseBranch ty_ctr ty' then
+              subset_respects_set_eq_r
+                (* rewrites in the rhs *)
+                (eq_bigcupl hole hole (cons_set_eq hole hole))
+                (subset_respects_set_eq_r
+                   (bigcup_setU_l hole hole hole)
+                   (setU_subset_l hole
+                      (subset_respects_set_eq_r
+                         (bigcup_set1 hole (gPair (hole, hole)))
+                         set_incl_refl)
+                   ))
+            else
+              let p = proof ctrs' in
+              subset_respects_set_eq_r
+                (* rewrites in the rhs *)
+                (eq_bigcupl hole hole (cons_set_eq hole hole))
+                (subset_respects_set_eq_r
+                   (bigcup_setU_l hole hole hole)
+                   (setU_subset_r hole p)
+                )
+        in
+        subset_respects_set_eq_r
+          (semFreqSize ig igs s (fst_leq_proof ctrs))
+          (proof ctrs)
+      | _ ->
+        (* The generators should be explicitly passed to the lemmas *)
+        let (g, gs) = base_gens in
+        let (fg, fgs) = base_gens_with_freq in
+        let (ig, igs) = ind_gens s2 in
+        subset_respects_set_eq_l
+          (* first write oneOf as freq *)
+          (oneOf_freq g gs s)
+          (* Rewrite with the semantics of freq left and right *)
+          (subset_set_eq_compat
+             (semFreqSize fg fgs s (fst_leq_proof bases))
+             (semFreqSize ig igs s (fst_leq_proof ctrs))
+             (incl_bigcupl (incl_subset hole hole (seq_incl_proof ctrs))))
   in
 
   let ret_type s s1 s2 =

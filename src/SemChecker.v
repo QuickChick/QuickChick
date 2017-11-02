@@ -1,12 +1,15 @@
+Set Warnings "-extraction-opaque-accessed,-extraction".
+Set Warnings "-notation-overridden,-parsing".
+
 Require Import mathcomp.ssreflect.ssreflect.
 From mathcomp Require Import ssrbool ssrnat eqtype.
 Require Import Show Sets GenLow GenHigh RoseTrees Checker Classes.
 
-Import GenLow GenHigh.
+Import GenLow GenHigh QcNotation.
 
 Definition resultSuccessful (r : Result) : bool :=
   match r with
-    | MkResult (Some res) expected _ _ _ _ =>
+    | MkResult (Some res) expected _ _ _ _ _ =>
       res == expected
     | _ => true
   end.

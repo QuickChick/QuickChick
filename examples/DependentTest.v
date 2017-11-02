@@ -1,3 +1,6 @@
+Set Warnings "-extraction-opaque-accessed,-extraction".
+Set Warnings "-notation-overridden,-parsing".
+
 From QuickChick Require Import QuickChick Tactics.
 Require Import String. Open Scope string.
 
@@ -11,23 +14,27 @@ Import QcDoNotation.
 
 Set Bullet Behavior "Strict Subproofs".
 
+(* QuickChickDebug Debug On *)
+
+Derive ArbitrarySizedSuchThat for (fun x => eq x y). 
+
 Inductive Foo :=
 | Foo1 : Foo 
 | Foo2 : Foo -> Foo
 | Foo3 : nat -> Foo -> Foo.
 
-Derive Arbitrary for Foo.
-Derive Show for Foo.
+QuickChickWeights [(Foo1, 1); (Foo2, size); (Foo3, size)].
+Derive (Arbitrary, Show) for Foo.
 
 (* Use custom formatting of generated code, and prove them equal (by reflexivity) *)
 
 (* begin show_foo *)
 Fixpoint showFoo' (x : Foo) := 
   match x with 
-  | Foo1 => "Foo1  " ++ ""
-  | Foo2 f => "Foo2  " ++ ("( " ++ showFoo' f ++ " )") ++ " " ++ ""
-  | Foo3 n f => "Foo3  " ++ ("( " ++ show     n ++ " )") ++
-                     " " ++ ("( " ++ showFoo' f ++ " )") ++ " " ++ ""
+  | Foo1 => "Foo1"
+  | Foo2 f => "Foo2 " ++ smart_paren (showFoo' f)
+  | Foo3 n f => "Foo3 " ++ smart_paren (show n) ++
+                        " " ++ smart_paren (showFoo' f)
   end%string.
 (* end show_foo *)
 
@@ -39,9 +46,9 @@ Fixpoint genFooSized (size : nat) :=
   match size with 
   | O => returnGen Foo1
   | S size' => freq [ (1, returnGen Foo1) 
-                    ; (size, do! f <- genFooSized size'; 
+                    ; (S size', do! f <- genFooSized size'; 
                              returnGen (Foo2 f))
-                    ; (size, do! n <- arbitrary; 
+                    ; (S size', do! n <- arbitrary; 
                              do! f <- genFooSized size';
                              returnGen (Foo3 n f)) 
                     ]
@@ -57,8 +64,10 @@ Fixpoint shrink_foo x :=
                 ([f] ++ map (fun f' => Foo3 n f') (shrink_foo f) ++ []) ++ []
   end.
 (* end shrink_foo *)
+(* JH: Foo2 -> Foo1, Foo3 n f -> Foo2 f *)
+(* Avoid exponential shrinking *)
 
-Lemma genFooSizedNotation : genFooSized = arbitrarySized.
+Lemma genFooSizedNotation : genFooSized = @arbitrarySized Foo _.
 Proof. reflexivity. Qed.
 
 Lemma shrinkFoo_equality : shrink_foo = @shrink Foo _.
@@ -74,7 +83,7 @@ Derive ArbitrarySizedSuchThat for (fun foo => goodFoo n foo).
 
 (* Need to write it as 'fun x => goodFoo 0 x'. Sadly, 'goodFoo 0' doesn't work *)
 Definition g : G (option Foo) := @arbitrarySizeST _ (fun x => goodFoo 0 x) _ 4.
-Sample g.
+(* Sample g. *)
 
 (* Simple generator for goodFoos *)
 (* begin gen_good_foo_simple *)
@@ -82,7 +91,7 @@ Sample g.
 (* end gen_good_foo_simple *)
 
 (* begin gen_good_foo *)
-Definition genGoodFoo `{_ : Arbitrary Foo} (n : nat) :=
+Definition genGoodFoo `{_ : Arbitrary Foo} (n : nat)  :=
   let fix aux_arb size n := 
     match size with 
     | 0   => backtrack [(1, do! foo <- arbitrary; returnGen (Some foo))]
@@ -228,7 +237,7 @@ Defined.
 
 Derive ArbitrarySizedSuchThat for (fun foo => goodFooPrec n foo).
 
-Definition genGoodPrec (n : nat) :=
+Definition genGoodPrec (n : nat) : nat -> G (option (Foo)):=
  let
    fix aux_arb size (n : nat) : G (option (Foo)) :=
      match size with
@@ -260,7 +269,7 @@ Admitted.
 
 Derive ArbitrarySizedSuchThat for (fun foo => goodFooNarrow n foo).
 
-Definition genGoodNarrow (n : nat) :=
+Definition genGoodNarrow (n : nat) : nat -> G (option (Foo)) :=
  let
    fix aux_arb size (n : nat) : G (option (Foo)) :=
      match size with
@@ -268,9 +277,9 @@ Definition genGoodNarrow (n : nat) :=
      | S size' =>
          backtrack [ (1, returnGen (Some Foo1))
                    ; (1, doM! foo <- aux_arb size' 0; 
-                         match (goodFooNarrow 1 foo)? with
-                         | left  _ => returnGen (Some foo)
-                         | right _ => returnGen None 
+                         match @dec (goodFooNarrow 1 foo) _ with
+                             | left _ => returnGen (Some foo)
+                             | right _ => returnGen None
                          end
                      )]
      end in fun sz => aux_arb sz n.
@@ -280,8 +289,10 @@ Lemma genGoodNarrow_equality n :
 Proof. reflexivity. Qed. 
 
 (* Non-linear constraint *)
+(*
 Inductive goodFooNL : nat -> nat -> Foo -> Prop :=
-| GoodNL : forall n foo, goodFooNL n n foo.
+| GoodNL : forall n foo, goodFooNL (Foo3 n foo) (Foo2 foo) foo.
+*)
 
 (* Derive ArbitrarySizedSuchThat for (fun foo => goodFooNL n m foo).*)
 
@@ -305,6 +316,16 @@ Inductive goodBar {A B : Type} (n : nat) : Bar A B -> Prop :=
             goodBar n (Bar3 a b (Bar1 a) bar).
 
 *)
+
+(* Generation followed by check - backtracking necessary *)
+
+(* Untouched variables - ex soundness bug *)
+Inductive goodFooFalse : Foo -> Prop :=
+| GoodFalse : forall (x : False), goodFooFalse Foo1.
+
+Instance arbFalse : Gen False. Admitted.
+
+Derive ArbitrarySizedSuchThat for (fun foo => goodFooFalse foo).
 
 Definition success := "success".
 Print success.

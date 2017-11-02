@@ -1,3 +1,6 @@
+Set Warnings "-extraction-opaque-accessed,-extraction".
+Set Warnings "-notation-overridden,-parsing".
+
 Require Import mathcomp.ssreflect.ssreflect Coq.omega.Omega.
 From mathcomp Require Import ssrfun ssrbool ssrnat eqtype seq.
 

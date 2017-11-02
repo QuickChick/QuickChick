@@ -16,7 +16,10 @@ open Decl_kinds
 open GenericLib
 open SetLib
 open CoqLib
-
+open GenLib
+open SemLib
+open Error
+    
 let list_keep_every n l =
   let rec aux i = function
     | [] -> []
@@ -31,11 +34,17 @@ let sameTypeCtr c_ctr = function
   | _ -> false
 
 
+let rec fst_leq_proof ctrs =
+  match ctrs with
+  | [] -> forall_nil (gProd hole hole)
+  | c :: ctrs ->
+     forall_cons (gProd hole hole) ltnOSn_pair (fst_leq_proof ctrs)
+
 let isBaseBranch ty_ctr ty = fold_ty' (fun b ty' -> b && not (sameTypeCtr ty_ctr ty')) true ty
 
 let base_ctrs ty_ctr ctrs = List.filter (fun (_, ty) -> isBaseBranch ty_ctr ty) ctrs
 
-let genCorr ty_ctr ctrs iargs inst_name mon_inst_name =
+let genCorr ty_ctr ctrs iargs inst_name s_inst_name c_inst_name mon_inst_name =
 
   (* Common helpers, refactor? *)
   let coqTyCtr = gTyCtr ty_ctr in
@@ -95,6 +104,21 @@ let genCorr ty_ctr ctrs iargs inst_name mon_inst_name =
   let mon_proof size =
     let args = (List.flatten (List.map (fun x -> [x; hole; hole; hole]) coqTyParams)) @ [size] in
     gApp ~explicit:true mon_inst_name args
+  in
+
+  let g_instance =
+    let args = (List.flatten (List.map (fun x -> [x; hole]) coqTyParams)) in
+    gApp ~explicit:true inst_name args
+  in
+
+  let s_instance =
+    let args = (List.flatten (List.map (fun x -> [x; hole]) coqTyParams)) in
+    gApp ~explicit:true s_inst_name args
+  in  
+
+  let c_instance =
+    let args = (List.flatten (List.map (fun x -> [x; hole; hole]) coqTyParams)) in
+    gApp ~explicit:true c_inst_name args
   in
 
   (* Code that generates the generators. Copy-pasted for the third time. XXX factor it out *)
@@ -160,31 +184,39 @@ let genCorr ty_ctr ctrs iargs inst_name mon_inst_name =
     gFun ["n"; "s"; "IHs"]
       (fun [n; s; ihs] ->
         let (gen, gens) = ind_gens n in
-         set_eq_trans
-           (gApp ~explicit:true (gInject "semFreq") [hole; gen; gens])
-           (genCase (gVar ihs) hmon (gPair (hole, hole)) ctrs))
+         match ctrs with
+         | [] -> failwith "Must have base cases"
+         | [(ctr, ty)] -> proof (gVar ihs) hmon ty 0
+         | _ :: _ ->
+           set_eq_trans
+             (semFreq gen gens (fst_leq_proof ctrs))
+             (genCase (gVar ihs) hmon (gPair (hole, hole)) ctrs))
   in
 
   let base_case =
-    set_eq_trans
-      (gApp ~explicit:true (gInject "semOneOf") [hole; fst base_gens; snd base_gens])
-      (genCase hole hole hole bases)
+    match bases with
+    | [] -> failwith "Must have base cases"
+    | [(ctr, ty)] -> proof hole hole ty 0
+    | _ :: _ ->
+      set_eq_trans
+        (gApp ~explicit:true (gInject "semOneOf") [hole; fst base_gens; snd base_gens])
+        (genCase hole hole hole bases)
   in
 
   let ret_type =
     gFun ["n"; "s"]
       (fun [n; s] ->
         set_eq
-          (gApp (gInject ("semGen")) [gApp (gInject "arbitrarySize") [gVar n]])
+          (gApp (gInject ("semGen")) [gApp (gInject "arbitrarySized") [gVar n]])
           (gVar s))
   in
 
   let gen_proof =
     gFun ["n"]
       (fun [n] ->
-         gApp ~explicit:true (gInject "nat_set_ind")
-           [full_dt; hole; hole; ret_type;
-            base_case; ind_case (mon_proof (gVar n)); (gVar n)])
+         nat_set_ind
+           full_dt g_instance s_instance c_instance base_case (ind_case (mon_proof (gVar n))) (gVar n))
   in
+  msg_debug (str "Sized proof");
   debug_coq_expr gen_proof;
-  gRecord [("genSizeCorrect", gen_proof)]
+  gRecord [("arbitrarySizedCorrect", gen_proof)]

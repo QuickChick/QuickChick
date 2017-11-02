@@ -59,6 +59,20 @@ val constructor_to_string : constructor -> string
 val gCtr : constructor -> coq_expr
 val injectCtr : string -> constructor
 
+module type Ord_ty_ctr_type = sig
+  type t = ty_ctr 
+  val compare : t -> t -> int
+  end
+module Ord_ty_ctr : Ord_ty_ctr_type
+
+module type Ord_ctr_type = sig
+  type t = constructor
+  val compare : t -> t -> int
+  end
+module Ord_ctr : Ord_ctr_type
+
+val num_of_ctrs : constructor -> int
+
 type ctr_rep = constructor * coq_type 
 val ctr_rep_to_string : ctr_rep -> string
 
@@ -120,7 +134,10 @@ val make_up_name : unit -> var
 val gApp : ?explicit:bool -> coq_expr -> coq_expr list -> coq_expr 
 val gFun : string list -> (var list -> coq_expr) -> coq_expr
 val gRecFunIn : ?assumType:coq_expr -> string -> string list -> ((var * var list) -> coq_expr) -> (var -> coq_expr) -> coq_expr
+
 val gMatch : coq_expr -> ?catchAll:(coq_expr option) -> ((constructor * string list * (var list -> coq_expr)) list) -> coq_expr
+val gMatchReturn : coq_expr -> ?catchAll:(coq_expr option) -> string -> (var -> coq_expr) ->
+  ((constructor * string list * (var list -> coq_expr)) list) -> coq_expr
 
 val gRecord : (string * coq_expr) list -> coq_expr 
 
@@ -140,6 +157,8 @@ type matcher_pat =
 val matcher_pat_to_string : matcher_pat -> string 
 
 val construct_match : coq_expr -> ?catch_all:(coq_expr option) -> (matcher_pat * coq_expr) list -> coq_expr 
+val construct_match_with_return : coq_expr -> ?catch_all:(coq_expr option) ->
+  string -> (var -> coq_expr) -> (matcher_pat * coq_expr) list -> coq_expr
 
 (* Generic List Manipulations *)
 val list_nil : coq_expr
@@ -153,6 +172,7 @@ val gStr : string -> coq_expr
 val emptyString : coq_expr 
 val str_append  : coq_expr -> coq_expr -> coq_expr 
 val str_appends : coq_expr list -> coq_expr
+val smart_paren : coq_expr -> coq_expr
 
 (* Pair *)
 val gPair : coq_expr * coq_expr -> coq_expr 
@@ -171,8 +191,8 @@ val gEq : coq_expr -> coq_expr -> coq_expr
 
 (* Maybe *)
 val gOption : coq_expr -> coq_expr
-val gNone : coq_expr
-val gSome : coq_expr -> coq_expr              
+val gNone : coq_expr -> coq_expr
+val gSome : coq_expr -> coq_expr -> coq_expr
 
 (* boolean *)
 val gNot   : coq_expr -> coq_expr
@@ -180,16 +200,16 @@ val gTrue  : coq_expr
 val gFalse : coq_expr               
 val decToBool : coq_expr -> coq_expr
 
-(* Gen combinators *)
-val gGen : coq_expr -> coq_expr
-val returnGen  : coq_expr -> coq_expr 
-val bindGen    : coq_expr -> string -> (var -> coq_expr) -> coq_expr 
-val bindGenOpt : coq_expr -> string -> (var -> coq_expr) -> coq_expr 
+(* (\* Gen combinators *\) *)
+(* val gGen : coq_expr -> coq_expr *)
+(* val returnGen  : coq_expr -> coq_expr  *)
+(* val bindGen    : coq_expr -> string -> (var -> coq_expr) -> coq_expr  *)
+(* val bindGenOpt : coq_expr -> string -> (var -> coq_expr) -> coq_expr  *)
 
-val oneof : coq_expr list -> coq_expr
-val frequency : (coq_expr * coq_expr) list -> coq_expr
-val backtracking : (coq_expr * coq_expr) list -> coq_expr
-val uniform_backtracking : coq_expr list -> coq_expr
+(* val oneof : coq_expr list -> coq_expr *)
+(* val frequency : (coq_expr * coq_expr) list -> coq_expr *)
+(* val backtracking : (coq_expr * coq_expr) list -> coq_expr *)
+(* val uniform_backtracking : coq_expr list -> coq_expr *)
 
 (* Recursion combinators / fold *)
 val fold_ty  : ('a -> coq_type -> 'a) -> (ty_ctr * coq_type list -> 'a) -> (ty_param -> 'a) -> coq_type -> 'a
@@ -205,7 +225,7 @@ val fold_ty_vars : (var list -> var -> coq_type -> 'a) -> ('a -> 'a -> 'a) -> 'a
 
 val defineConstant : string -> coq_expr -> var
 val defineTypedConstant : string -> coq_expr -> coq_expr -> var
-val declare_class_instance : arg list -> string -> (var list -> coq_expr) -> (var list -> coq_expr) -> unit 
+val declare_class_instance : ?global:bool -> ?priority:int -> arg list -> string -> (var list -> coq_expr) -> (var list -> coq_expr) -> unit 
 
 (* List utils *)
 val list_last : 'a list -> 'a 
