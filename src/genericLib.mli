@@ -122,6 +122,8 @@ val gApp : ?explicit:bool -> coq_expr -> coq_expr list -> coq_expr
 val gFun : string list -> (var list -> coq_expr) -> coq_expr
 val gRecFunIn : ?assumType:coq_expr -> string -> string list -> ((var * var list) -> coq_expr) -> (var -> coq_expr) -> coq_expr
 
+val gLetIn : string -> coq_expr -> (var -> coq_expr) -> coq_expr
+
 val gMatch : coq_expr -> ?catchAll:(coq_expr option) -> ((constructor * string list * (var list -> coq_expr)) list) -> coq_expr
 val gMatchReturn : coq_expr -> ?catchAll:(coq_expr option) -> string -> (var -> coq_expr) ->
   ((constructor * string list * (var list -> coq_expr)) list) -> coq_expr

@@ -327,5 +327,21 @@ Instance arbFalse : Gen False. Admitted.
 
 Derive ArbitrarySizedSuchThat for (fun foo => goodFooFalse foo).
 
+Definition addFoo2 (x : Foo) := Foo2 x.
+
+Fixpoint foo_depth f := 
+  match f with
+  | Foo1 => 0
+  | Foo2 f => 1 + foo_depth f
+  | Foo3 n f => 1 + foo_depth f
+  end.
+
+Inductive goodFun : Foo -> Prop :=
+| GoodFun : forall (n : nat) (a : Foo), goodFooPrec n (addFoo2 a) ->
+                                        goodFun a.
+
+QuickChickDebug Debug On.
+Derive ArbitrarySizedSuchThat for (fun a => goodFun a).
+
 Definition success := "success".
 Print success.

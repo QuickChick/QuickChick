@@ -603,6 +603,10 @@ let gRecFunIn ?assumType:(typ = hole) (fs : string) (xss : string list) (f_body 
   let xss' = List.map (fun s -> fresh_name s) xss in
   gRecFunInWithArgs ~assumType:typ fs (List.map (fun x -> gArg ~assumName:(gVar x) ()) xss') f_body let_body 
 
+let gLetIn (x : string) (e : coq_expr) (body : var -> coq_expr) = 
+  let fx = fresh_name x in
+  CAst.make @@ CLetIn ((None, Name fx), e, None, body fx)
+
 let gMatch discr ?catchAll:(body=None) (branches : (constructor * string list * (var list -> coq_expr)) list) : coq_expr =
   CAst.make @@ CCases (Term.RegularStyle,
           None (* return *), 

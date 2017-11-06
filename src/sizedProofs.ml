@@ -140,6 +140,7 @@ let sizedEqProofs_body
       handle_branch n dep_type inputs
         fail_exp ret_exp class_method class_methodST
         (rec_method (gVar (make_up_name ())) (gVar (make_up_name ()))) bind stMaybe check_expr match_inp
+        gLetIn
         gen_ctr (fun _ -> ())
     in
     (List.fold_right
@@ -157,6 +158,7 @@ let sizedEqProofs_body
       handle_branch n dep_type inputs
         fail_exp ret_exp class_method class_methodST
         (rec_method (gVar rec_name) (gVar size)) bind stMaybe check_expr match_inp
+        gLetIn
         gen_ctr (fun _ -> ())
     in
     (List.fold_right
@@ -305,7 +307,7 @@ let sizedEqProofs_body
       handle_branch n dep_type inputs
         fail_exp_mon ret_exp_mon class_method_mon class_methodST_mon
         (rec_method_mon s1 s2 (fun _ -> gVar (make_up_name ())))
-        bind_mon stMaybe_mon check_expr_mon match_inp_mon
+        bind_mon stMaybe_mon check_expr_mon match_inp_mon 
         gen_ctr (fun _ -> ()) c
     in
     match ctrs with

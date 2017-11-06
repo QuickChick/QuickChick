@@ -75,8 +75,6 @@ let match_inp (inp : var) (pat : matcher_pat) (left : coq_expr) (right  : coq_ex
     (gVar inp) ~catch_all:(catch_case) "s" (fun v -> ret_type v ret)
     [(pat,left)]
 
-
-
 (* hoisting out base and ind gen to be able to call them from proof generation *)
 let base_gens
       (size : coq_expr)
@@ -87,11 +85,13 @@ let base_gens
       (input_names : var list)
       (n : int)
       (register_arbitrary : dep_type -> unit)
-      (rec_name : coq_expr) =
+      (rec_name : coq_expr) 
+  =
   (* partially applied handle_branch *)
   let handle_branch' =
     handle_branch n dep_type input_names (fail_exp full_gtyp) (ret_exp full_gtyp)
       class_method class_methodST (rec_method rec_name size) bind stMaybe check_expr match_inp
+      gLetIn
       gen_ctr register_arbitrary
   in
   (* TODO: Base Case weights? *)
@@ -115,6 +115,7 @@ let ind_gens
   let handle_branch' =
     handle_branch n dep_type input_names (fail_exp full_gtyp) (ret_exp full_gtyp)
       class_method class_methodST (rec_method rec_name size) bind stMaybe check_expr match_inp
+      gLetIn
       gen_ctr register_arbitrary
   in
   let all_branches = List.map (fun x -> fst (handle_branch' x)) ctrs in

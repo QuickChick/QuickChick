@@ -336,6 +336,7 @@ let handle_branch
       (stMaybe : bool (* opt *) -> a -> string -> ((coq_expr -> coq_expr) * int) list -> a)
       (check_expr : int -> coq_expr -> b -> b -> b)
       (match_inp : var -> matcher_pat -> b -> b -> b)
+      (let_in_expr : string -> coq_expr -> (var -> b) -> b)
       (gen_ctr : ty_ctr)
       register_arbitrary
       (c : dep_ctr) : (b * bool) =
@@ -456,6 +457,9 @@ let handle_branch
 
           ] 
       in
+
+      let finalizer k cmap numbered_dts = 
+
       match List.filter (fun (i, dt) -> not (is_fixed k dt)) numbered_dts with
       | [] -> (* Every argument to the constructor is fixed - perform a check *)
 
@@ -569,8 +573,35 @@ let handle_branch
              (* TODO: Special handling for equality? *)
              
 (*          | _ -> failwith (Printf.sprintf "Mode failure: %s\n" (String.concat " " (List.map (fun (i,d) -> Printf.sprintf "(%d, %s)" i (dep_type_to_string d)) filtered))) *)
-        end
+                             end
         else failwith "TODO: Negation with many things to be generated"
+      in 
+      let rec instantiate_function_calls_cont k cmap dts acc = 
+        match dts with 
+        | [] -> finalizer k cmap (List.rev acc)
+        | (i,dt)::dts -> 
+           begin match dt with 
+           | DApp (fdt, argdts) -> 
+              (* TODO: Nested recursive calls *)
+              let rec traverse_dts k cmap acc_args = function 
+                | [] -> 
+                   instantiate_function_calls_cont k cmap dts 
+                      ((i,DApp (fdt, List.rev acc_args))::acc)
+                | arg::argdts' ->
+(*                    traverse_dts k cmap (arg :: acc_args) argdts' *)
+                   (* WARNING: ARG HERE COULD ALSO BE A FUNCTION *)
+                   instantiate_range_cont k cmap Unknown.undefined 
+                     (fun k' c' e' ->
+                      let u = unk_provider.next_unknown () in
+                      let_in_expr (Unknown.to_string u) e' (fun x -> 
+                      traverse_dts k' c' (DTyVar x :: acc_args) argdts')
+                     )
+                     (convert_to_range arg) 
+              in traverse_dts k cmap [] argdts
+           | _ -> instantiate_function_calls_cont k cmap dts ((i,dt)::acc)
+           end
+      in 
+      instantiate_function_calls_cont k cmap numbered_dts []
 
     and handle_app m (pos : bool) (f : dep_type) (xs : dep_type list)
                    (k : umap) (cmap : cmap) (dt2 : dep_type) =
