@@ -581,20 +581,23 @@ let handle_branch
         | [] -> finalizer k cmap (List.rev acc)
         | (i,dt)::dts -> 
            begin match dt with 
-           | DApp (fdt, argdts) -> 
+           | DApp (DTyVar f, argdts) -> 
               (* TODO: Nested recursive calls *)
               let rec traverse_dts k cmap acc_args = function 
-                | [] -> 
-                   instantiate_function_calls_cont k cmap dts 
-                      ((i,DApp (fdt, List.rev acc_args))::acc)
+                | [] ->
+                   let u = unk_provider.next_unknown () in
+                   let_in_expr (Unknown.to_string u)
+                               (gApp (gVar f) (List.rev acc_args))
+                               (fun x -> 
+                   instantiate_function_calls_cont (UM.add x FixedInput k) cmap dts 
+                                                   ((i,DTyVar x)::acc)
+                               )
                 | arg::argdts' ->
 (*                    traverse_dts k cmap (arg :: acc_args) argdts' *)
                    (* WARNING: ARG HERE COULD ALSO BE A FUNCTION *)
                    instantiate_range_cont k cmap Unknown.undefined 
                      (fun k' c' e' ->
-                      let u = unk_provider.next_unknown () in
-                      let_in_expr (Unknown.to_string u) e' (fun x -> 
-                      traverse_dts k' c' (DTyVar x :: acc_args) argdts')
+                      traverse_dts k' c' (e' :: acc_args) argdts'
                      )
                      (convert_to_range arg) 
               in traverse_dts k cmap [] argdts

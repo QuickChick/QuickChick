@@ -307,7 +307,7 @@ let sizedEqProofs_body
       handle_branch n dep_type inputs
         fail_exp_mon ret_exp_mon class_method_mon class_methodST_mon
         (rec_method_mon s1 s2 (fun _ -> gVar (make_up_name ())))
-        bind_mon stMaybe_mon check_expr_mon match_inp_mon 
+        bind_mon stMaybe_mon check_expr_mon match_inp_mon (failwith "zoe fix me!")
         gen_ctr (fun _ -> ()) c
     in
     match ctrs with
@@ -326,6 +326,7 @@ let sizedEqProofs_body
         fail_exp_mon ret_exp_mon class_method_mon class_methodST_mon
         (rec_method_mon s1 s2 ih)
         bind_mon stMaybe_mon check_expr_mon match_inp_mon
+        (failwith "zoe fix me!")
         gen_ctr (fun _ -> ()) c
     in
     match ctrs with
@@ -641,6 +642,7 @@ let sizedEqProofs_body
         fail_exp_left (ret_exp_left c) class_method_left class_methodST_left
         (rec_method_left (gVar (make_up_name ())) (gVar (make_up_name ())))
         bind_left (stMaybe_left x) (check_expr_left x) (match_inp_left x)
+        (failwith "zoe fix me!")
         gen_ctr (fun _ -> ()) c
     in
     match ctrs with
@@ -664,6 +666,7 @@ let sizedEqProofs_body
         fail_exp_left (ret_exp_left c) class_method_left class_methodST_left
         (rec_method_left (gVar ih) (gVar size))
         bind_left (stMaybe_left x) (check_expr_left x) (match_inp_left x)
+        (failwith "zoe fix me!")
         gen_ctr (fun _ -> ()) c
     in
     match ctrs with
@@ -1018,6 +1021,7 @@ let sizedEqProofs_body
         fail_exp_right ret_exp_right class_method_right class_methodST_right
         rec_method_right
         bind_right stMaybe_right check_expr_right match_inp_right
+        (failwith "zoe fix me!")
         gen_ctr (fun _ -> ()) c
     in
     let rec cases ctrs (orp : coq_expr -> coq_expr) : coq_expr list =

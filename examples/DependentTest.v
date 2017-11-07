@@ -340,7 +340,7 @@ Inductive goodFun : Foo -> Prop :=
 | GoodFun : forall (n : nat) (a : Foo), goodFooPrec n (addFoo2 a) ->
                                         goodFun a.
 
-QuickChickDebug Debug On.
+Derive ArbitrarySizedSuchThat for (fun n => goodFooPrec n x).
 Derive ArbitrarySizedSuchThat for (fun a => goodFun a).
 
 Definition success := "success".
