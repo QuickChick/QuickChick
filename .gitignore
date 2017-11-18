@@ -20,6 +20,7 @@ dsss17/terse
 *~
 *.bak
 *.d
+*.tmp
 Makefile.coq
 .DS_Store
 src/quickChickToolLexer.ml

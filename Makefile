@@ -17,7 +17,7 @@ all: plugin documentation-check
 plugin: Makefile.coq 
 	$(MAKE) -f Makefile.coq 
 
-documentation-check:
+documentation-check: plugin
 	coqc -R src QuickChick -I src BasicInterface.v
 	coqc -R src QuickChick -I src DocumentationCheck.v
 
@@ -30,7 +30,7 @@ install: all
 #	 $(V)cp src/quickChickLib.o $(COQLIB)/user-contrib/QuickChick
 	 $(V)cp src/quickChickTool $(shell echo $(PATH) | tr ':' "\n" | grep opam | uniq)/quickChick
 
-install-plugin:
+install-plugin: plugin
 	$(V)$(MAKE) -f Makefile.coq install > $(TEMPFILE) || cat $(TEMPFILE)
 
 src/quickChickToolLexer.cmo : src/quickChickToolLexer.mll 
@@ -52,11 +52,11 @@ quickChickTool: src/quickChickToolTypes.cmo
 	$(MAKE) src/quickChickTool.cmo
 	ocamlc -o src/quickChickTool unix.cma str.cma src/quickChickToolTypes.cmo src/quickChickToolLexer.cmo src/quickChickToolParser.cmo src/quickChickTool.cmo
 
-tests:
+tests: install-plugin
 	coqc examples/DependentTest.v
 #	cd examples/RedBlack; make clean && make
 #	cd examples/stlc; make clean && make
-#	cd examples/ifc-basic; make clean && make
+	cd examples/ifc-basic; make clean && make
 
 Makefile.coq: _CoqProject
 	$(V)coq_makefile -f _CoqProject -o Makefile.coq

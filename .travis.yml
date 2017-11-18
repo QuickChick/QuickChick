@@ -22,7 +22,6 @@ matrix:
   fast_finish: true
 os:
     - linux
-    - osx
 
 before_install:
     if [ $TRAVIS_OS_NAME = osx ]; then
@@ -40,6 +39,7 @@ script:
 - echo 'Building QuickChick...' && echo -en 'travis_fold:start:QuickChick.build\\r'
 - opam pin add .
 - opam update
-- travis_wait opam reinstall quickchick
+- travis_retry opam reinstall quickchick
+- make -j tests install
 - cd examples/multifile-mutation && make && quickChick -top Top
 - echo -en 'travis_fold:end:QuickChick.build\\r'
