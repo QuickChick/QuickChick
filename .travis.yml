@@ -22,7 +22,6 @@ matrix:
   fast_finish: true
 os:
     - linux
-    - osx
 
 before_install:
     if [ $TRAVIS_OS_NAME = osx ]; then
@@ -38,8 +37,8 @@ install:
 script:
 - set -e
 - echo 'Building QuickChick...' && echo -en 'travis_fold:start:QuickChick.build\\r'
-- opam pin add .
 - opam update
-- travis_wait opam reinstall quickchick
+- travis_wait opam install coq-mathcomp-ssreflect.1.6.2
+- make -j install
 - cd examples/multifile-mutation && make && quickChick -top Top
 - echo -en 'travis_fold:end:QuickChick.build\\r'
