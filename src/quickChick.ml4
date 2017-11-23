@@ -35,8 +35,22 @@ let path =
   lazy (let (_,_,path) = Library.locate_qualified_library ~warn:false qid in path)
 let path = lazy (Filename.dirname (Lazy.force path))
 
+(* [mkdir -p]: recursively make the parent directories if they do not exist. *)
+let rec mkdir_ dname =
+  let cmd () = Unix.mkdir dname 0o755 in
+  try cmd () with
+  | Unix.Unix_error (Unix.EEXIST, _, _) -> ()
+  | Unix.Unix_error (Unix.ENOENT, _, _) ->
+    (* If the parent directory doesn't exist, try making it first. *)
+    mkdir_ (Filename.dirname dname);
+    cmd ()
+
 (* Interface with OCaml compiler *)
-let temp_dirname = Filename.get_temp_dir_name ()
+let temp_dirname =
+  let dname = Filename.(concat (get_temp_dir_name ()) "QuickChick") in
+  mkdir_ dname;
+  Filename.set_temp_dir_name dname;
+  dname
 
 (* let link_files = ["quickChickLib.cmx"]*)
 let link_files = []
@@ -51,7 +65,7 @@ let comp_ml_cmd fn out =
   let link_files = List.map (Filename.concat path) link_files in
   let link_files = String.concat " " link_files in
   Printf.sprintf "%s -rectypes -w a -I %s -I %s %s %s -o %s" ocamlopt
-    temp_dirname path link_files fn out
+    (Filename.dirname fn) path link_files fn out
 
 (*
 let comp_mli_cmd fn =
@@ -63,7 +77,7 @@ let comp_mli_cmd fn =
   let link_files = List.map (Filename.concat path) link_files in
   let link_files = String.concat " " link_files in
   Printf.sprintf "%s -rectypes -w a -I %s -I %s %s %s" ocamlopt
-    temp_dirname path link_files fn
+    (Filename.dirname fn) path link_files fn
 
 
 let fresh_name n =
@@ -93,10 +107,19 @@ let define c =
        Decl_kinds.IsDefinition Decl_kinds.Definition));
   fn
 
+(* [$TMP/QuickChick/$TIME/QuickChick.ml],
+   where [$TIME] is the current time in format [HHMMSS]. *)
+let new_ml_file () =
+  let tm = Unix.localtime (Unix.time ()) in
+  let ts = Printf.sprintf "%02d%02d%02d" tm.tm_hour tm.tm_min tm.tm_sec in
+  let temp_dir = Filename.concat temp_dirname ts in
+  mkdir_ temp_dir;
+  Filename.temp_file ~temp_dir "QuickChick" ".ml"
+
 let define_and_run c =
   (** Extract the term and its dependencies *)
   let main = define c in
-  let mlf = Filename.temp_file "QuickChick" ".ml" in
+  let mlf = new_ml_file () in
   let execn = Filename.chop_extension mlf in
   let mlif = execn ^ ".mli" in
   Flags.silently (Extraction_plugin.Extract_env.full_extraction (Some mlf)) [CAst.make @@ Ident main];
