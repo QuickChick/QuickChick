@@ -849,7 +849,7 @@ Proof.
 rewrite semBindSize.
 setoid_rewrite semReturnSize.
 rewrite semChooseSize //=.
-setoid_rewrite nthE.
+setoid_rewrite nthE. (* SLOW *)
 case: l => [|x l] /=.
   rewrite (eq_bigcupl [set 0]) ?bigcup_set1 // => n.
   by rewrite leqn0; split=> [/eqP|->].
@@ -977,7 +977,7 @@ Proof.
   remember (n < i). case: b Heqb => Heqb; symmetry in Heqb.
   - have : (i + sum_fst l) < i by eapply (leq_ltn_trans); eassumption.
     rewrite -ltn_subRL. by have -> : forall i, (i - i) = 0 by elim.
-  - rewrite IHl; eauto. rewrite -(leq_add2r i) subnK.
+  - rewrite IHl; auto. rewrite -(leq_add2r i) subnK.
       by rewrite addnC. by apply/not_lt.
 Qed.
 
@@ -1052,7 +1052,7 @@ Proof.
   + exists 0.  exists xs. simpl in *.
     inversion H1; subst; clear H1.
     have H : 0 < k by  elim : k Hfst IHxs => //=.
-    rewrite H. split ; [| split ]; simpl; eauto.
+    rewrite H. split ; [| split ]; simpl; auto.
     rewrite sum_fstE. now ssromega.
     now ssromega.
   + move/(_ H2) : IHxs => [n [l' [Hpick [Hlt Hlen]]]].
@@ -1060,7 +1060,7 @@ Proof.
     rewrite -[X in _ < X]add0n ltn_add2r ltn0.
     rewrite  -[X in _ - X]add0n subnDr subn0.
     rewrite Hpick. simpl.
-    split ; [| split ]; simpl; eauto.
+    split ; [| split ]; simpl; auto.
     rewrite sum_fstE. now ssromega.
     now ssromega.
 Qed.
@@ -1174,7 +1174,7 @@ Qed.
 Lemma forall_leq_sum_fst {A} (l : list (nat * A)) :
   forall a n, seq_In l (n, a) -> n <= sum_fst l.
 Proof.
-  elim : l => [| [n a] l IH]; eauto.
+  elim : l => [| [n a] l IH]; auto.
   rewrite sum_fstE.
   move => n' a' /= [[H1 H2] | H2]; subst.
   by ssromega.
@@ -1340,17 +1340,17 @@ Lemma backtrackFuel_list_mon {A : Type} tot1 tot2 fuel1 fuel2 (lg1 lg2 : seq (na
 Proof.
   move : tot1 tot2 fuel2 lg1 lg2 s.
   induction fuel1; intros tot1 tot2 fuel2 lg1 lg2 s Htot1 Hf1 Htot2 Hf2 Hsub x [Hs Hin];
-  destruct x; try discriminate; split; eauto.
+  destruct x; try discriminate; split; auto.
   - simpl in Hin. eapply semReturnSize in Hin; inv Hin.
   - assert (Ha : tot1 > 0). 
-    { destruct tot1; eauto.
-      eapply backtrackFuel_sum_fst in Hin; eauto. inv Hin. }
-    simpl in Hin. eapply semBindSize in Hin.
+    { destruct tot1; auto.
+      apply backtrackFuel_sum_fst in Hin; auto; inv Hin. }
+    simpl in Hin. apply semBindSize in Hin.
     destruct Hin as [n [Hgen Hgen']].
-    eapply semChooseSize in Hgen; eauto.
+    apply semChooseSize in Hgen; auto.
     move : Hgen => /andP [Hleq1  Hleq2].
     destruct (pickDrop lg1 n) as [[k g] gs'] eqn:Heq.
-    eapply semBindSize in Hgen'.
+    apply semBindSize in Hgen'.
     destruct Hgen' as [b [Hg1 Hg2]].
     assert (Hlt : n < sum_fst lg1).
     { unfold leq, super, ChooseNat, OrdNat in *. now ssromega. }
@@ -1389,12 +1389,12 @@ Proof.
   move: tot lg.
   induction fuel => tot lg.
   - move => HSum /List.length_zero_iff_nil HLen; subst; simpl.
-    eauto with typeclass_instances.
+    auto with typeclass_instances.
   - move => HSum HLen Hsub.
     constructor. intros s1 s2 Hleq x [H1 H2]. destruct x; try discriminate.
     assert (Ha : tot > 0). 
-    { destruct tot; eauto.
-      eapply backtrackFuel_sum_fst in H2; eauto. inv H2. }
+    { destruct tot; auto;
+      apply backtrackFuel_sum_fst in H2; auto. inv H2. }
     eapply semBindSize in H2. split; eauto.
     destruct H2 as [n [Hn H2]]. 
     eapply semChooseSize in Hn; eauto.
@@ -1420,9 +1420,9 @@ Proof.
     + have Hin :(isSome :&: semGenSize (backtrackFuel fuel (sum_fst lg - k) gs') s1) (Some a).
       { split ; eauto. }
       eapply IHfuel in Hin; try eassumption. destruct Hin as [_ Hin].
-      * eapply backtrackFuel_list_mon; [| | | | | split; [ eauto | eassumption ] ];
-        try eauto; try ssromega.
-        rewrite Heq1. eapply setU_set_incl_r. eapply subset_refl.
+      * eapply backtrackFuel_list_mon; [| | | | | split; [ auto | eassumption ] ];
+        try auto; try ssromega.
+        rewrite Heq1. apply setU_set_incl_r. apply subset_refl.
       * ssromega.
       * ssromega.
       * eapply subset_trans; [| eassumption ].
@@ -1434,7 +1434,7 @@ Corollary backtrackSizeMonotonic {A : Type} (lg : seq (nat * G (option A))) :
   SizeMonotonic (backtrack lg).
 Proof.
   intros Hin. unfold backtrack.
-  eapply backtrackFuelSizeMonotonic; eauto.
+  apply backtrackFuelSizeMonotonic; auto.
 Qed.
 
 Corollary backtrackSizeMonotonicOpt {A : Type} (lg : seq (nat * G (option A))) :
@@ -1442,7 +1442,7 @@ Corollary backtrackSizeMonotonicOpt {A : Type} (lg : seq (nat * G (option A))) :
   SizeMonotonicOpt (backtrack lg).
 Proof.
   intros Hin. unfold backtrack.
-  eapply backtrackFuelSizeMonotonicOpt; eauto.
+  eapply backtrackFuelSizeMonotonicOpt; auto.
 Qed.
 
 Lemma semBacktrackFuel {A} tot fuel (l : list (nat * G (option A))) size :
@@ -1464,22 +1464,22 @@ Proof.
         rewrite pickDrop_def in H; eauto.
         move : H =>  /semBindSize [[b |] [H1 H2]].
         + eapply semReturnSize in H1. inversion H1.
-        + apply semBacktrackFuelDef in H2; eauto.
+        + eapply semBacktrackFuelDef in H2; auto.
           inversion H2; subst.
-          right. split; eauto.
+          right. split; auto.
           move => [n' a] [H3 H4]. eapply forall_leq_sum_fst in H3.
-          subst. simpl in *. ssromega. 
+          subst; simpl in *. ssromega.
       - move => [m [Hleq H]].
         move: (pickDrop_exists l m) => [H1 H2].
         edestruct H1 as [k [g [l' [HIn [Hpd [Hkneq [Hsub [Hlen Hfst]]]]]]]].
-        rewrite Hsum; eauto. ssromega.
+        rewrite Hsum; auto. ssromega.
         rewrite Hpd in H. eapply semBindSize in H.
         move : H => [a' [Hg Hb]]. 
         destruct a'. 
         + left. exists (k, g).
           apply semReturnSize in Hb. inversion Hb; subst.
             by firstorder.
-        + eapply IHfuel in Hb; eauto.
+        + eapply IHfuel in Hb; auto.
           * move : Hb => [Hsome | [Hnone Hcap]].
             left. eapply incl_bigcupl; [| eassumption ].
             apply setI_subset_compat.
@@ -1495,26 +1495,26 @@ Proof.
           * ssromega. }
     { move => [[[k g] [[Hg1 Hg2] [Ha1 Ha2]]] | [Hnone Hcap]]; simpl in *.
       - edestruct (pickDrop_In l) as [n [gs' Heq]]; eauto.
-        destruct a; try discriminate.        
+        destruct a; try discriminate.
         exists n. split. rewrite <- HSum.
-        eapply pickDrop_leq_top in Heq; eauto. by ssromega.
+        eapply pickDrop_leq_top in Heq; auto; [by ssromega | eauto].
         rewrite Heq.
         eapply semBindSize. exists (Some a). split; eauto.
         apply semReturnSize. reflexivity.
       - destruct a; try discriminate.
         destruct (sum_fst l) eqn:Hsum.
-        + eexists 0. split; eauto.
-          rewrite pickDrop_def; eauto.
+        + eexists 0. split; auto.
+          rewrite pickDrop_def; auto; [| rewrite Hsum; auto].
           eapply semBindSize. exists None. split.
           apply semReturnSize. reflexivity.
           subst. apply semBacktrackFuelDef; eauto.
         + subst.
           move: (pickDrop_exists l 0) => [Hex _].
-          edestruct Hex as [k [g [gs' [Hin [Hpd [Hneq [Hsub [Hlen Hfst]]]]]]]]; eauto.
+          edestruct Hex as [k [g [gs' [Hin [Hpd [Hneq [Hsub [Hlen Hfst]]]]]]]]; auto; [rewrite Hsum; auto|].
           exists 0. split; eauto. rewrite Hpd.
           eapply semBindSize. exists None. split.
           specialize (Hcap (k, g)). eapply Hcap.
-          split; eauto.
+          split; auto.
           eapply IHfuel.
           rewrite Hsum in Hfst. rewrite <- Hfst. by ssromega.
           by ssromega.
@@ -1546,14 +1546,14 @@ Proof.
   - eexists. split. split.
     now left; eauto.
     now eassumption.
-    split; eauto.
-    simpl. eapply H1. split; eauto.
+    split; auto.
+    simpl. eapply H1. split; auto.
   - edestruct H2 as [y' [[Hin1' Hin2'] [Hin3' Hin4']]].
     { eexists. split; split; eassumption. }
     eexists. split. split.
     now right; eauto.
     now eassumption.
-    split; eauto.
+    split; auto.
 Qed.
 
 Lemma bigcup_cons_setI_subset_pres_backtrack {A}
