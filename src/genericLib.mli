@@ -10,7 +10,8 @@ val hole : coq_expr
 
 val debug_coq_expr : coq_expr -> unit
 
-type var 
+type var
+val var_of_id : Id.t -> var   
 val var_to_string : var -> string
 val gVar : var -> coq_expr
 
@@ -108,6 +109,7 @@ val cat_maybes : 'a option list -> 'a list
 val foldM : ('b -> 'a -> 'b option) -> 'b option -> 'a list -> 'b option
 val sequenceM : ('a -> 'b option) -> 'a list -> 'b list option
 
+val reference_to_mib : Libnames.reference -> mutual_inductive_body
 val dt_rep_from_mib : mutual_inductive_body -> dt_rep option
 val coerce_reference_to_dt_rep : constr_expr -> dt_rep option
 
@@ -164,7 +166,11 @@ val str_appends : coq_expr list -> coq_expr
 val smart_paren : coq_expr -> coq_expr
 
 (* Pair *)
-val gPair : coq_expr * coq_expr -> coq_expr 
+val gPair : coq_expr * coq_expr -> coq_expr
+val gProd : coq_expr * coq_expr -> coq_expr
+val gTuple      : coq_expr list -> coq_expr
+val gTupleType  : coq_expr list -> coq_expr
+val dtTupleType : dep_type list -> dep_type
 
 (* Int *)
 val gInt : int -> coq_expr
@@ -186,7 +192,12 @@ val gNot   : coq_expr -> coq_expr
 val gTrue  : coq_expr
 val gFalse : coq_expr               
 val decToBool : coq_expr -> coq_expr
+val gBool  : coq_expr
 
+(* unit *)
+val gUnit : coq_expr
+val gTT   : coq_expr
+  
 (* (\* Gen combinators *\) *)
 (* val gGen : coq_expr -> coq_expr *)
 (* val returnGen  : coq_expr -> coq_expr  *)

@@ -17,6 +17,7 @@ GenSizedSTMonotonic
 GenSizedSTSizeMonotonic
 GenSTCorrect
 SimplDriver
+CheckerSized
 DepDriver
 Driver
 QuickChick

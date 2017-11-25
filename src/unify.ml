@@ -21,6 +21,7 @@ module Unknown = struct
   let to_string = var_to_string
   let from_string x = fresh_name x
   let from_var x = x
+  let from_id x = var_of_id x                 
 
   let undefined = fresh_name "Ireallywantundefinedherebutwedonthavelaziness"
 

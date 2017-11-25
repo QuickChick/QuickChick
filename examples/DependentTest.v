@@ -79,7 +79,30 @@ Inductive goodFoo : nat -> Foo -> Prop :=
 | GoodFoo : forall n foo,  goodFoo n foo.
 (* end good_foo *)
 
-Derive ArbitrarySizedSuchThat for (fun foo => goodFoo n foo).
+Definition fooFun : Foo -> nat -> nat.
+
+Inductive goodList : list nat -> Prop :=
+| GL : forall l, lengthInd (cons 42 l) 4 -> goodList l.
+
+fun l => forall x n, lengthInd l n
+
+Inductive WT :=
+  wt := forall Gamma t T,
+    (exists x U Gamma', (Gamma = Gamma', x:U) /\ (Gamma |- t : T)) ->
+    WT Gamma t T. 
+
+Derive Arbitary... for (fun Gamma => x:U /\ Gamma |- 
+Derive ArbitrarySizedSuchThat for (fun foo => goodFoo n foo). 
+Derive ArbitrarySizedSuchThat for (fun foo m => forall n, goodFoo (n, m) (Foo1 foo)).
+
+pArbitrarySizedST2 (fun foo m => ) 
+
+(fun foo bar, forall x y => FooFun x foo = FooFun y bar)
+
+QuickChickDebug Debug On.
+Derive CheckerSized for goodFoo.
+
+(fun foo bar, forall x y => FooFun x foo = FooFun y bar)
 
 (* Need to write it as 'fun x => goodFoo 0 x'. Sadly, 'goodFoo 0' doesn't work *)
 Definition g : G (option Foo) := @arbitrarySizeST _ (fun x => goodFoo 0 x) _ 4.

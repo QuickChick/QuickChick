@@ -14,6 +14,19 @@ Set Bullet Behavior "Strict Subproofs".
     Class Dec (P : Prop) : Type := { dec : decidable P }.
 (* end decidable_class *)
 
+Class DecOpt (P : Prop) := { decOpt : nat -> option bool }.
+
+Axiom checkable_size_limit : nat.
+Extract Constant checkable_size_limit => "10000".
+(* Discard tests that run further than the limit *)
+Global Instance decOpt__checkable {P} `{DecOpt P} : Checkable P :=
+  {| checker _ :=
+       match decOpt checkable_size_limit with
+       | Some b => checker b
+       | None => checker tt
+       end
+  |}.
+    
 (* BCP: If I understand correctly, removing "Global" everywhere would
    change nothing... Or? *)
 

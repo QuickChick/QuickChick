@@ -58,6 +58,7 @@ let debug_constr (c : constr) : unit =
 
 (* Non-dependent version *)
 type var = Id.t (* Opaque *)
+let var_of_id x = x         
 let var_to_string = Id.to_string
 let gVar (x : var) : coq_expr =
   CAst.make @@ CRef (Ident (None, x),None)
@@ -344,17 +345,23 @@ let dt_rep_from_mib mib =
     parse_constructors mib.mind_nparams ty_params result_ctr oib >>= fun ctr_reps ->
     Some (qualid_of_ident ty_ctr, ty_params, ctr_reps)
 
+let reference_to_mib r =
+  let env = Global.env () in
+  
+  let glob_ref = Nametab.global r in
+  let (mind,_) = Globnames.destIndRef glob_ref in
+  let mib = Environ.lookup_mind mind env in
+
+  mib
+
+    
 let coerce_reference_to_dt_rep c = 
   let r = match c with
     | { CAst.v = CRef (r,_) } -> r
     | _ -> failwith "Not a reference"
   in
 
-  let env = Global.env () in
-  
-  let glob_ref = Nametab.global r in
-  let (mind,_) = Globnames.destIndRef glob_ref in
-  let mib = Environ.lookup_mind mind env in
+  let mib = reference_to_mib r in
   
   dt_rep_from_mib mib
 
@@ -783,6 +790,29 @@ let smart_paren c = gApp (gInject "QuickChick.Show.smart_paren") [c]
 
 (* Pair *)
 let gPair (c1, c2) = gApp (gInject "Coq.Init.Datatypes.pair") [c1;c2]
+let gProd (c1, c2) = gApp (gInject "Coq.Init.Datatypes.prod") [c1;c2]
+
+let gTupleAux f cs =
+  match cs with
+  | []  -> qcfail "gTuple called with empty list" (* Should this be unit? *)
+  | c :: cs' ->
+     let rec go l acc =
+       match l with
+       | [] -> acc
+       | x :: xs -> go xs (f (acc, x))
+     in go cs' c
+let gTuple = gTupleAux gPair
+let gTupleType = gTupleAux gProd
+let dtTupleType dts =
+  match dts with
+  | [] -> qcfail "dtTuple called with empty list"
+  | dt :: dts' ->
+     let rec go l acc =
+       match l with
+       | [] -> acc
+       | x :: xs -> go xs (DTyCtr (injectCtr "Coq.Init.Datatypes.Prod", [acc; x]))
+     in go dts' dt
+
 
 (* Int *)
 
@@ -815,11 +845,16 @@ let gTrue  = gInject "Coq.Init.Datatypes.true"
 let gFalse = gInject "Coq.Init.Datatypes.false"
 
 let gNot c = gApp (gInject "Coq.Init.Datatypes.negb") [c]
+let gBool  = gInject "Coq.Init.Datatypes.bool"           
 
 let decToBool c = 
   gMatch c [ (injectCtr "Coq.Init.Specif.left" , ["eq" ], fun _ -> gTrue )
            ; (injectCtr "Coq.Init.Specif.right", ["neq"], fun _ -> gFalse)
-           ]
+    ]
+
+(* Unit *)
+let gUnit = gInject "Coq.Init.Datatypes.unit"
+let gTT   = gInject "Coq.Init.Datatypes.tt"
 
 (* Recursion combinators / fold *)
 (* fold_ty : ( a -> coq_type -> a ) -> ( ty_ctr * coq_type list -> a ) -> ( ty_param -> a ) -> coq_type -> a *)

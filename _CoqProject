@@ -29,6 +29,7 @@ src/quickChick.ml4
 src/driver.ml4
 src/simplDriver.ml
 src/depDriver.ml
+src/checkerSized.ml
 src/setLib.ml
 src/semLib.ml
 src/coqLib.ml

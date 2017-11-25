@@ -14,22 +14,15 @@ open GenSTCorrect
 
 (** Derivable classes *)
 type derivable =
-    ArbitrarySizedSuchThat
+  | DecOpt 
+  | ArbitrarySizedSuchThat
   | GenSizedSuchThatMonotonicOpt
   | GenSizedSuchThatSizeMonotonicOpt
   | GenSizedSuchThatCorrect
   | SizedProofEqs
 
-let print_der = function
-  | ArbitrarySizedSuchThat -> "GenSizedSuchThat"
-  | GenSizedSuchThatMonotonicOpt -> "SizeMonotonicOpt"
-  | SizedProofEqs -> "SizedProofEqs"
-  | GenSizedSuchThatSizeMonotonicOpt -> "SizedMonotonicOpt"
-  | GenSizedSuchThatCorrect -> "SizedSuchThatCorrect"
-
-
-let class_name cn =
-  match cn with
+let derivable_to_string = function
+  | DecOpt -> "DecOpt"
   | ArbitrarySizedSuchThat -> "GenSizedSuchThat"
   | GenSizedSuchThatMonotonicOpt -> "SizeMonotonicOpt"
   | SizedProofEqs -> "SizedProofEqs"
@@ -38,13 +31,177 @@ let class_name cn =
 
 (** Name of the instance to be generated *)
 let mk_instance_name der tn =
-  let prefix = match der with
-    | ArbitrarySizedSuchThat -> "GenSizedSuchThat"
-    | GenSizedSuchThatMonotonicOpt -> "SizeMonotonicOpt"
-    | SizedProofEqs -> "SizedProofEqs"
-    | GenSizedSuchThatCorrect -> "SizedSuchThatCorrect"
-    | GenSizedSuchThatSizeMonotonicOpt -> "SizedMonotonicOpt"
-  in var_to_string (fresh_name (prefix ^ tn))
+  var_to_string (fresh_name ((derivable_to_string der) ^ tn))
+
+let deriveChecker _ _ = failwith "foo"
+let deriveDependent _ _ _ = failwith "foo"                      
+
+(* Assumption: 
+   - generator-based classes include a "fun x => P ...." or "fun x => let (x1,x2,...) := x in P ..."
+     where "..." are bound names (to be generated), unbound names (implicitly quantified arguments) 
+     or Constructors applied to such stuff.
+   - checker-based classes only include the name of the predicate "P". All arguments to P will
+     be considered Fixed inputs
+ *)
+let dep_dispatch ind class_name = 
+  match ind with 
+  | { CAst.v = CLambdaN ([([(_loc2, Name id)], _kind, _type)], body) } -> (* {CAst.v = CApp ((_flag, constructor), args) }) } -> *)
+
+    (* Extract (x1,x2,...) if any, P and arguments *)
+    let (letbinds, constructor, args) =
+      match body with 
+      | { CAst.v = CApp ((_flag, constructor), args) } -> (None, constructor, args)
+      | { CAst.v = CLetTuple (name_list, _,
+                              _shouldbeid,
+                              { CAst.v = CApp ((_flag, constructor), args) } )} ->
+         ( Some (List.map snd name_list), constructor, args )
+    in
+
+    (* Parse the constructor's information into the more convenient generic-lib representation *)
+    let (ty_ctr, ty_params, ctrs, dep_type) : (ty_ctr * (ty_param list) * (dep_ctr list) * dep_type) =
+      match coerce_reference_to_dep_dt constructor with
+      | Some dt -> msg_debug (str (dep_dt_to_string dt) ++ fnl()); dt 
+      | None -> failwith "Not supported type"
+    in 
+
+    let init_umap : range UM.t =
+      (* Create a temporary typing map for either the let binds/variable to be generated *)
+      let to_be_typed =
+        match letbinds with
+        | Some binds ->
+           List.fold_left (fun map (Names.Name id) -> UM.add (Unknown.from_id id) None map)
+             UM.empty binds
+        | None -> UM.singleton (Unknown.from_id id) None
+      in
+
+      let umap = ref UM.empty in
+      let tmap = ref to_be_typed in
+      let rec populate_map dep_type args =
+        (* Recurse down the unnamed arrow arguments *)
+        match dep_type,args with
+        | DArrow (dt1, dt2), arg::args' ->
+           begin match arg with
+           | ({ CAst.v = CRef (r,_) }, _) ->
+              begin 
+              let current_r = Unknown.from_string (string_of_reference r) in
+              (* Lookup if the reference is meant to be generated *)
+              try begin match UM.find current_r !tmap with
+                  | None ->
+                     (* First occurence, update tmap and umap *)
+                     tmap := UM.add current_r (Some  dt1) !tmap;
+                     umap := UM.add current_r (Undef dt1) !umap
+                  | Some dt' ->
+                     (* Check if the existing binding still typechecks *)
+                     if not (dt1 == dt') then qcfail "Ill-typed application in derivation"
+                  end
+              with Not_found ->
+                umap := UM.add current_r FixedInput !umap
+                (* TODO: If we wanted to keep track of type information for everything,
+                   here is the place to start *)
+              end
+           (* TODO: If this is constructor applications, we need more type-checking machinery here *)
+           | _ -> qcfail "Non-variable patterns not implemented"
+           end;
+           populate_map dt2 args'
+        (* Not an arrow -> Finalizer (TODO: add explicit fail?) *)
+        | _ -> ()
+      in 
+      populate_map dep_type args;
+      
+      match letbinds with
+      | Some binds ->
+         (* Still need to package together the tuple *)
+         let bind_types = List.map (fun (Names.Name id) ->
+                              try match UM.find (Unknown.from_id id) !tmap with
+                                  | Some t -> t
+                                  | None ->
+                                     failwith (Printf.sprintf "Pattern not exercised: %s\n" (var_to_string (Unknown.from_id id)))
+                              with Not_found -> failwith "All patterns should be exercised"
+                            ) binds
+         in
+         UM.add (Unknown.from_id id) (Undef (dtTupleType bind_types)) !umap
+         
+      | None -> !umap
+
+    in
+
+    (* Print map *)
+    msg_debug (str "Initial map: " ++ fnl ());
+    UM.iter (fun x r -> msg_debug (str ("Bound: " ^ (var_to_string x) ^ " to Range: " ^ (range_to_string r)) ++ fnl ())) init_umap;
+
+
+    (* Constructor name as a string and instance name *)
+    let ctr_name = 
+      match constructor with 
+      | { CAst.v = CRef (r,_) } -> string_of_reference r
+    in
+    let instance_name = mk_instance_name class_name ctr_name in
+    
+    deriveDependent class_name constructor (mk_instance_name class_name ctr_name)
+  | { CAst.v = CRef (r, _) } ->
+     deriveChecker class_name ind
+       (mk_instance_name class_name (string_of_reference r))
+  | _ -> qcfail "wrongformat/driver.ml4"
+
+      (*     let n = fst (List.find (fun (_,({CAst. v = CRef (r,_)}, _)) -> Id.to_string id = string_of_reference r) (List.mapi (fun i x -> (i+1,x)) args)) in*)
+  
+
+                              
+(*
+
+
+(* This also has a lot of duplication.... *)
+(** Checker derivation function *)
+let deriveChecker (cn : derivable) (c : constr_expr) (instance_name : string) =
+  let (ty_ctr, ty_params, ctrs, dep_type) : (ty_ctr * (ty_param list) * (dep_ctr list) * dep_type) =
+    match coerce_reference_to_dep_dt c with
+    | Some dt -> msg_debug (str (dep_dt_to_string dt) ++ fnl()); dt 
+    | None -> failwith "Not supported type" in
+
+  let ctr_name = 
+    match c with 
+    | { CAst.v = CRef (r,_) } -> string_of_reference r
+  in
+
+  debug_coq_expr (gType ty_params dep_type);
+
+  let (input_types : dep_type list) =
+    let rec aux acc i = function
+      | DArrow (dt1, dt2) 
+      | DProd ((_,dt1), dt2) -> aux (dt1 :: acc) (i+1) dt2
+      | DTyParam tp -> acc
+      | DTyCtr (c,dts) -> acc
+      | DTyVar _ -> acc
+    in List.rev (aux [] 1 dep_type) (* 1 because of using 1-indexed counting for the arguments *)    in
+
+  (* The instance type *)
+  let instance_type iargs =
+    match cn with
+    | DecOpt ->
+       gApp (gInject (class_name cn)) [gInject ctr_name]
+  in
+
+  let params = List.map (fun tp -> gArg ~assumName:(gTyParam tp) ()) ty_params in
+
+  (* Name for type indices *)
+  let input_names = List.mapi (fun i _ -> Printf.sprintf "input%d_" i) input_types in
+
+  let inputs =
+    List.map (fun (n,t) -> gArg ~assumName:(gVar (fresh_name n)) ~assumType:(gType ty_params t) ())
+      (List.combine input_names input_types)
+  in
+  
+  let instance_arguments =
+    params @ inputs
+  in 
+
+  let instance_record =
+    match cn with
+    | DecOpt ->
+       CheckerSized.checkerSized ty_ctr ty_params ctrs dep_type input_names inputs 
+  in
+  
+  failwith "TODO"
 
 (** Generic derivation function *)
 let deriveDependent (cn : derivable) (c : constr_expr) (n : int) (instance_name : string) =
@@ -220,6 +377,7 @@ let deriveDependent (cn : derivable) (c : constr_expr) (n : int) (instance_name 
 
   declare_class_instance instance_arguments instance_name instance_type instance_record
 ;;
+ *)
 
 (*
 VERNAC COMMAND EXTEND DeriveArbitrarySizedSuchThat
