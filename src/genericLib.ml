@@ -792,6 +792,16 @@ let smart_paren c = gApp (gInject "QuickChick.Show.smart_paren") [c]
 let gPair (c1, c2) = gApp (gInject "Coq.Init.Datatypes.pair") [c1;c2]
 let gProd (c1, c2) = gApp (gInject "Coq.Init.Datatypes.prod") [c1;c2]
 
+let listToPairAux (f : ('a *'a) -> 'a) (l : 'a list) : 'a =
+  match l with
+  | [] -> qcfail "listToPair called with empty list"
+  | c :: cs' ->
+     let rec go (l : 'a list) (acc : 'a) : 'a =
+       match l with
+       | [] -> acc
+       | x :: xs -> go xs (f (acc, x))
+     in go cs' c
+(*      
 let gTupleAux f cs =
   match cs with
   | []  -> qcfail "gTuple called with empty list" (* Should this be unit? *)
@@ -801,10 +811,14 @@ let gTupleAux f cs =
        | [] -> acc
        | x :: xs -> go xs (f (acc, x))
      in go cs' c
-let gTuple = gTupleAux gPair
-let gTupleType = gTupleAux gProd
-let dtTupleType dts =
-  match dts with
+ *)
+let gTuple = listToPairAux gPair
+let gTupleType = listToPairAux gProd
+let dtTupleType =
+  listToPairAux (fun (acc,x) -> DTyCtr (injectCtr "Coq.Init.DatatypesProd", [acc;x]))
+                                                      
+(*
+                        match dts with
   | [] -> qcfail "dtTuple called with empty list"
   | dt :: dts' ->
      let rec go l acc =
@@ -812,7 +826,7 @@ let dtTupleType dts =
        | [] -> acc
        | x :: xs -> go xs (DTyCtr (injectCtr "Coq.Init.Datatypes.Prod", [acc; x]))
      in go dts' dt
-
+ *)
 
 (* Int *)
 

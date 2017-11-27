@@ -36,6 +36,54 @@ let mk_instance_name der tn =
 let deriveChecker _ _ = failwith "foo"
 let deriveDependent _ _ _ = failwith "foo"                      
 
+let create_t_and_u_maps explicit_args dep_type actual_args : (range UM.t * dep_type UM.t) =
+  (* Local references - the maps to be generated *)
+  let umap = ref UM.empty in
+  let tmap = ref explicit_args in
+
+  let rec populate_maps dep_type args =
+    (* Recurse down the unnamed arrow arguments *)
+    match dep_type,args with
+    | DArrow (dt1, dt2), arg::args' ->
+       begin match arg with
+       | ({ CAst.v = CRef (r,_) }, _) ->
+          begin 
+            let current_r = Unknown.from_string (string_of_reference r) in
+            (* Lookup if the reference is meant to be generated *)
+            try begin match UM.find current_r !tmap with
+            | None ->
+               (* First occurence, update tmap and umap *)
+               tmap := UM.add current_r (Some  dt1) !tmap;
+               umap := UM.add current_r (Undef dt1) !umap
+            | Some dt' ->
+               (* Check if the existing binding still typechecks *)
+               if not (dt1 == dt') then qcfail "Ill-typed application in derivation"
+            end
+            with Not_found ->
+              (* Logging the type in the tmap is ok, because we don't
+                 update the umap in the "Some dt'" case above *)
+              tmap := UM.add current_r (Some dt1) !tmap;
+              umap := UM.add current_r FixedInput !umap;
+          end
+       (* TODO: If this is constructor applications, we need more type-checking machinery here *)
+       | _ -> qcfail "Non-variable patterns not implemented"
+       end;
+       populate_maps dt2 args'
+    (* Not an arrow -> Finalizer (TODO: add explicit fail?) *)
+    | _ -> ()
+  in 
+  populate_maps dep_type actual_args;
+
+  (* Remove the option from the type map and ensure all are exercised *)
+  let tmap'=
+    UM.mapi (fun u mt ->
+        match mt with
+        | Some t -> t
+        | None -> failwith (Printf.sprintf "Pattern not exercised: %s\n" (var_to_string u))
+      ) !tmap in
+  (!umap, tmap')
+
+                          
 (* Assumption: 
    - generator-based classes include a "fun x => P ...." or "fun x => let (x1,x2,...) := x in P ..."
      where "..." are bound names (to be generated), unbound names (implicitly quantified arguments) 
@@ -64,9 +112,9 @@ let dep_dispatch ind class_name =
       | None -> failwith "Not supported type"
     in 
 
-    let init_umap : range UM.t =
+    let (init_umap, init_tmap) : (range UM.t * dep_type UM.t) =
       (* Create a temporary typing map for either the let binds/variable to be generated *)
-      let to_be_typed =
+      let explicit_args =
         match letbinds with
         | Some binds ->
            List.fold_left (fun map (Names.Name id) -> UM.add (Unknown.from_id id) None map)
@@ -74,55 +122,27 @@ let dep_dispatch ind class_name =
         | None -> UM.singleton (Unknown.from_id id) None
       in
 
-      let umap = ref UM.empty in
-      let tmap = ref to_be_typed in
-      let rec populate_map dep_type args =
-        (* Recurse down the unnamed arrow arguments *)
-        match dep_type,args with
-        | DArrow (dt1, dt2), arg::args' ->
-           begin match arg with
-           | ({ CAst.v = CRef (r,_) }, _) ->
-              begin 
-              let current_r = Unknown.from_string (string_of_reference r) in
-              (* Lookup if the reference is meant to be generated *)
-              try begin match UM.find current_r !tmap with
-                  | None ->
-                     (* First occurence, update tmap and umap *)
-                     tmap := UM.add current_r (Some  dt1) !tmap;
-                     umap := UM.add current_r (Undef dt1) !umap
-                  | Some dt' ->
-                     (* Check if the existing binding still typechecks *)
-                     if not (dt1 == dt') then qcfail "Ill-typed application in derivation"
-                  end
-              with Not_found ->
-                umap := UM.add current_r FixedInput !umap
-                (* TODO: If we wanted to keep track of type information for everything,
-                   here is the place to start *)
-              end
-           (* TODO: If this is constructor applications, we need more type-checking machinery here *)
-           | _ -> qcfail "Non-variable patterns not implemented"
-           end;
-           populate_map dt2 args'
-        (* Not an arrow -> Finalizer (TODO: add explicit fail?) *)
-        | _ -> ()
-      in 
-      populate_map dep_type args;
-      
+      (* Call the actual creation function *)
+      let (umap, tmap) = create_t_and_u_maps explicit_args dep_type args in
+
+      (* Update with the toplevel variable as necessary *)
       match letbinds with
       | Some binds ->
          (* Still need to package together the tuple *)
          let bind_types = List.map (fun (Names.Name id) ->
-                              try match UM.find (Unknown.from_id id) !tmap with
-                                  | Some t -> t
-                                  | None ->
-                                     failwith (Printf.sprintf "Pattern not exercised: %s\n" (var_to_string (Unknown.from_id id)))
+                              try UM.find (Unknown.from_id id) tmap 
                               with Not_found -> failwith "All patterns should be exercised"
                             ) binds
          in
-         UM.add (Unknown.from_id id) (Undef (dtTupleType bind_types)) !umap
+         let tmap' = UM.add (Unknown.from_id id) (dtTupleType bind_types) tmap in
+         let umap' =
+           let pair_ctr = injectCtr "Coq.Init.Datatypes.prod" in
+           let bind_unknowns = List.map (fun (Names.Name id) -> Unknown (Unknown.from_id id)) binds in
+           let range = listToPairAux (fun (r1, r2) -> Ctr (pair_ctr, [r1; r2])) bind_unknowns in
+           UM.add (Unknown.from_id id) range umap in
+         (umap', tmap')
          
-      | None -> !umap
-
+      | None -> (umap, tmap)
     in
 
     (* Print map *)
@@ -138,9 +158,26 @@ let dep_dispatch ind class_name =
     let instance_name = mk_instance_name class_name ctr_name in
     
     deriveDependent class_name constructor (mk_instance_name class_name ctr_name)
-  | { CAst.v = CRef (r, _) } ->
-     deriveChecker class_name ind
-       (mk_instance_name class_name (string_of_reference r))
+  | { CAst.v = CApp ((_flag, constructor), args) } ->
+
+    (* Parse the constructor's information into the more convenient generic-lib representation *)
+    let (ty_ctr, ty_params, ctrs, dep_type) : (ty_ctr * (ty_param list) * (dep_ctr list) * dep_type) =
+      match coerce_reference_to_dep_dt constructor with
+      | Some dt -> msg_debug (str (dep_dt_to_string dt) ++ fnl()); dt 
+      | None -> failwith "Not supported type"
+    in
+
+    (* Call the actual creation function *)
+    let explicit_args = UM.empty (* No arguments to be generated *) in
+    let (umap, tmap) = create_t_and_u_maps explicit_args dep_type args in
+    
+    (* Constructor name as a string and instance name *)
+    let ctr_name = 
+      match constructor with 
+      | { CAst.v = CRef (r,_) } -> string_of_reference r
+    in
+
+    deriveChecker class_name ind (mk_instance_name class_name ctr_name)
   | _ -> qcfail "wrongformat/driver.ml4"
 
       (*     let n = fst (List.find (fun (_,({CAst. v = CRef (r,_)}, _)) -> Id.to_string id = string_of_reference r) (List.mapi (fun i x -> (i+1,x)) args)) in*)

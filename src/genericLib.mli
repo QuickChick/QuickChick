@@ -168,6 +168,7 @@ val smart_paren : coq_expr -> coq_expr
 (* Pair *)
 val gPair : coq_expr * coq_expr -> coq_expr
 val gProd : coq_expr * coq_expr -> coq_expr
+val listToPairAux : (('a *'a) -> 'a) -> ('a list) -> 'a
 val gTuple      : coq_expr list -> coq_expr
 val gTupleType  : coq_expr list -> coq_expr
 val dtTupleType : dep_type list -> dep_type
