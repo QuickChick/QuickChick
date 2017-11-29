@@ -33,9 +33,161 @@ let derivable_to_string = function
 let mk_instance_name der tn =
   var_to_string (fresh_name ((derivable_to_string der) ^ tn))
 
-let deriveChecker _ _ = failwith "foo"
-let deriveDependent _ _ _ = failwith "foo"                      
+let derive_dependent class_name constructor umap tmap (ty_ctr, ty_params, ctrs, dep_type) forGen =
+  let ctr_name = 
+    match constructor with 
+    | { CAst.v = CRef (r,_) } -> string_of_reference r
+  in
+  let instance_name = mk_instance_name class_name ctr_name in
 
+  (* type constructor *)
+  let coqTyCtr = gTyCtr ty_ctr in
+  (* parameters of the type constructor *)
+  let coqTyParams = List.map gTyParam ty_params in
+
+  (* Fully applied type constructor *)
+  let full_dt = gApp ~explicit:true coqTyCtr coqTyParams in
+
+  (* Type parameters as arguments *)
+  let params = List.map (fun tp -> gArg ~assumName:(gTyParam tp) ()) ty_params in
+
+  (* List of input unknowns *)
+  let input_list =
+    UM.fold (fun u r acc -> if r == FixedInput then u :: acc else acc) umap []
+  in
+  (* Inputs as arguments *)
+  let inputs = 
+    List.map (fun u -> gArg ~assumName:(gVar u) ~assumType:(gType ty_params (UM.find u tmap)) ())
+      input_list 
+  in
+
+  (* The type we are generating for -- not the predicate! *)
+  let full_gtyp = Option.map (fun u -> (gType ty_params (UM.find u tmap))) forGen in
+
+  
+  (* TODO: Easy solution : add Arbitrary/DecOpt as a requirement for all type parameters. *)
+  (*
+  (* TODO: These should be generated through some writer monad *)
+  (* XXX Put dec_needed in ArbitrarySizedSuchThat *)
+  let gen_needed = [] in
+  let dec_needed = [] in
+
+  let self_dec = [] in 
+  (*     (* Maybe somethign about type paramters here *)
+     if !need_dec then [gArg ~assumType:(gApp (gInject (Printf.sprintf "DepDec%n" (dep_type_len dep_type))) [gTyCtr ty_ctr]) 
+                            ~assumGeneralized:true ()] 
+     else [] in*)
+
+  let arbitraries = ref ArbSet.empty in
+
+
+  (* The type of the dependent generator *)
+  let gen_type = gGen (gOption full_gtyp) in
+
+  (* Fully applied predicate (parameters and constructors) *)
+  let full_pred inputs =
+    gFun [forGen] (fun [fg] -> gApp (full_dt) (list_insert_nth (gVar fg) inputs (n-1)))
+  in
+
+  (* The dependent generator  *)
+  let gen =
+    arbitrarySizedST
+      ty_ctr ty_params ctrs dep_type input_names inputs n register_arbitrary
+  in
+
+  (* Generate arbitrary parameters *)
+  let arb_needed = 
+    let rec extract_params = function
+      | DTyParam tp -> ArbSet.singleton (DTyParam tp)
+      | DTyVar _ -> ArbSet.empty
+      | DTyCtr (_, dts) -> List.fold_left (fun acc dt -> ArbSet.union acc (extract_params dt)) ArbSet.empty dts
+      | _ -> failwith "Unhandled / arb_needed"  in
+    let tps = ArbSet.fold (fun dt acc -> ArbSet.union acc (extract_params dt)) !arbitraries ArbSet.empty in
+    ArbSet.fold
+      (fun dt acc ->
+        (gArg ~assumType:(gApp (gInject "Arbitrary") [gType ty_params dt]) ~assumGeneralized:true ()) :: acc
+      ) tps []
+  in
+
+  (* Generate typeclass constraints. For each type parameter "A" we need `{_ : <Class Name> A} *)
+  let instance_arguments = match cn with
+    | ArbitrarySizedSuchThat ->
+      params
+      @ gen_needed
+      @ dec_needed
+      @ self_dec
+      @ arb_needed
+      @ inputs
+    | GenSizedSuchThatMonotonicOpt -> params 
+    | SizedProofEqs -> params @ inputs
+    | GenSizedSuchThatCorrect -> params @ inputs
+    | GenSizedSuchThatSizeMonotonicOpt -> params @ inputs
+  in
+
+  let rec list_take_drop n l = 
+    if n <= 0 then ([], l)
+    else match l with 
+         | [] -> ([], [])
+         | h::t -> let (take,drop) = list_take_drop (n-1) t in (h::take, drop) 
+  in 
+  
+  (* The instance type *)
+  let instance_type iargs = match cn with
+    | ArbitrarySizedSuchThat ->
+      gApp (gInject (class_name cn))
+        [gType ty_params (nthType n dep_type);
+         full_pred (List.map (fun n -> gVar (fresh_name n)) input_names)]
+    | GenSizedSuchThatMonotonicOpt ->
+      gProdWithArgs
+        ((gArg ~assumType:(gInject "nat") ~assumName:(gInject "size") ()) :: inputs)
+        (fun (size :: inputs) ->
+(*         let (params, inputs) = list_take_drop (List.length params) paramsandinputs in *)
+           gApp (gInject (class_name cn))
+                (*              ((List.map gVar params) @  *)
+                ([gApp ~explicit:true (gInject "arbitrarySizeST")
+                  [full_gtyp; full_pred (List.map gVar inputs); hole; gVar size]]))
+    | SizedProofEqs -> gApp (gInject (class_name cn)) [full_pred (List.map (fun n -> gVar (fresh_name n)) input_names)]
+    | GenSizedSuchThatCorrect ->
+      let pred = full_pred (List.map (fun n -> gVar (fresh_name n)) input_names) in
+      gApp (gInject (class_name cn))
+        [ pred 
+        ; gApp ~explicit:true (gInject "arbitrarySizeST") [hole; pred; hole]]
+    | GenSizedSuchThatSizeMonotonicOpt ->
+      let pred = full_pred (List.map (fun n -> gVar (fresh_name n)) input_names) in
+      gApp (gInject (class_name cn))
+        [gApp ~explicit:true (gInject "arbitrarySizeST") [hole; pred; hole]]
+  in
+
+  let instance_record iargs =
+    match cn with
+    | ArbitrarySizedSuchThat -> gen
+    | GenSizedSuchThatMonotonicOpt ->
+      msg_debug (str "mon type");
+      debug_coq_expr (instance_type []);
+      genSizedSTMon_body (class_name cn) ty_ctr ty_params ctrs dep_type input_names inputs n register_arbitrary
+    | SizedProofEqs ->
+      sizedEqProofs_body (class_name cn) ty_ctr ty_params ctrs dep_type input_names inputs n register_arbitrary
+    | GenSizedSuchThatCorrect ->
+      let moninst = (class_name GenSizedSuchThatMonotonicOpt) ^ ctr_name in
+      let ginst = (class_name ArbitrarySizedSuchThat) ^ ctr_name in
+      let setinst = (class_name SizedProofEqs) ^ ctr_name in
+      genSizedSTCorr_body (class_name cn) ty_ctr ty_params ctrs dep_type input_names inputs n register_arbitrary
+        (gInject moninst) (gInject ginst) (gInject setinst)
+    | GenSizedSuchThatSizeMonotonicOpt ->
+      genSizedSTSMon_body (class_name cn) ty_ctr ty_params ctrs dep_type input_names inputs n register_arbitrary
+
+  in
+
+  msg_debug (str "Instance Type: " ++ fnl ());
+  debug_coq_expr (instance_type [gInject "input0"; gInject "input1"]);
+
+  declare_class_instance instance_arguments instance_name instance_type instance_record
+;;
+ *)
+
+  
+  ()
+                          
 let create_t_and_u_maps explicit_args dep_type actual_args : (range UM.t * dep_type UM.t) =
   (* Local references - the maps to be generated *)
   let umap = ref UM.empty in
@@ -95,6 +247,8 @@ let dep_dispatch ind class_name =
   match ind with 
   | { CAst.v = CLambdaN ([([(_loc2, Name id)], _kind, _type)], body) } -> (* {CAst.v = CApp ((_flag, constructor), args) }) } -> *)
 
+    let idu = Unknown.from_id id in
+     
     (* Extract (x1,x2,...) if any, P and arguments *)
     let (letbinds, constructor, args) =
       match body with 
@@ -119,7 +273,7 @@ let dep_dispatch ind class_name =
         | Some binds ->
            List.fold_left (fun map (Names.Name id) -> UM.add (Unknown.from_id id) None map)
              UM.empty binds
-        | None -> UM.singleton (Unknown.from_id id) None
+        | None -> UM.singleton idu None
       in
 
       (* Call the actual creation function *)
@@ -134,12 +288,12 @@ let dep_dispatch ind class_name =
                               with Not_found -> failwith "All patterns should be exercised"
                             ) binds
          in
-         let tmap' = UM.add (Unknown.from_id id) (dtTupleType bind_types) tmap in
+         let tmap' = UM.add idu (dtTupleType bind_types) tmap in
          let umap' =
            let pair_ctr = injectCtr "Coq.Init.Datatypes.prod" in
            let bind_unknowns = List.map (fun (Names.Name id) -> Unknown (Unknown.from_id id)) binds in
            let range = listToPairAux (fun (r1, r2) -> Ctr (pair_ctr, [r1; r2])) bind_unknowns in
-           UM.add (Unknown.from_id id) range umap in
+           UM.add idu range umap in
          (umap', tmap')
          
       | None -> (umap, tmap)
@@ -149,15 +303,9 @@ let dep_dispatch ind class_name =
     msg_debug (str "Initial map: " ++ fnl ());
     UM.iter (fun x r -> msg_debug (str ("Bound: " ^ (var_to_string x) ^ " to Range: " ^ (range_to_string r)) ++ fnl ())) init_umap;
 
-
-    (* Constructor name as a string and instance name *)
-    let ctr_name = 
-      match constructor with 
-      | { CAst.v = CRef (r,_) } -> string_of_reference r
-    in
-    let instance_name = mk_instance_name class_name ctr_name in
-    
-    deriveDependent class_name constructor (mk_instance_name class_name ctr_name)
+    (* Call the derivation dispatcher *)
+    derive_dependent class_name constructor init_umap init_tmap
+      (ty_ctr, ty_params, ctrs, dep_type) (Some idu)
   | { CAst.v = CApp ((_flag, constructor), args) } ->
 
     (* Parse the constructor's information into the more convenient generic-lib representation *)
@@ -170,14 +318,8 @@ let dep_dispatch ind class_name =
     (* Call the actual creation function *)
     let explicit_args = UM.empty (* No arguments to be generated *) in
     let (umap, tmap) = create_t_and_u_maps explicit_args dep_type args in
-    
-    (* Constructor name as a string and instance name *)
-    let ctr_name = 
-      match constructor with 
-      | { CAst.v = CRef (r,_) } -> string_of_reference r
-    in
 
-    deriveChecker class_name ind (mk_instance_name class_name ctr_name)
+    derive_dependent class_name constructor umap tmap (ty_ctr, ty_params, ctrs, dep_type) None
   | _ -> qcfail "wrongformat/driver.ml4"
 
       (*     let n = fst (List.find (fun (_,({CAst. v = CRef (r,_)}, _)) -> Id.to_string id = string_of_reference r) (List.mapi (fun i x -> (i+1,x)) args)) in*)

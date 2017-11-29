@@ -296,8 +296,6 @@ let rec inputWithGen i l =
   if i <= 1 then forGen :: l
   else let (h::t) = l in h :: (inputWithGen (i-1) t)
 
-let need_dec = ref false
-
 (* Handles a single branch of the inductive predicate. *)
 (* fail_exp = (returnGen gNone) *)
 (* ret_exp = \x. returnGen (gSome x) *)
@@ -339,37 +337,29 @@ let handle_branch
       (match_inp : var -> matcher_pat -> b -> b -> b)
       (let_in_expr : string -> coq_expr -> (var -> b) -> b)
       (gen_ctr : ty_ctr)
-      register_arbitrary
+      (init_umap : range UM.t)
+      (init_tmap : dep_type UM.t)
       (c : dep_ctr) : (b * bool) =
   let (ctr, typ) = c in
   let b = ref true in
+
+  (* Local references to handle map updates *)
+  let umap = ref init_umap in
+  let tmap = ref init_tmap in
   
-  (* These were here for some reason, unused. *)
-  (* 
-  let gen = mk_name_provider "gen" in
-  let dec = mk_name_provider "dec" in
-  *)
   let arb = mk_name_provider "arb" in
 
   msg_debug (str "Debug branch" ++ fnl ());
 
-  (* add unknowns in environment *)
-  let register_unknowns map = 
-    let rec aux map = function
-      | DArrow (dt1, dt2) -> aux map dt2
-      | DProd ((x, dt1), dt2) -> aux (UM.add x (Undef dt1) map) dt2
-      | _ -> map in
-    aux map typ
-  in
-
-  (* Initialize unknown map with fixed inputs, unknowns and forGen *)
-  let init_map = UM.add forGen (Undef (nthType n dep_type))
-                   (List.fold_left (fun m n -> UM.add n FixedInput m) 
-                      (register_unknowns UM.empty) input_names) 
-  in
-
   msg_debug (str ("Calculating ranges: " ^ dep_type_to_string (dep_result_type typ)) ++ fnl ());
 
+  (* Possibility of failure 1: 
+     The conclusion of each constructor must not contain function calls.
+     
+     Possible solution: 
+     Automatically transform such constructors to include an additional equality with 
+     a fresh unknown? 
+   *)
   let ranges = match dep_result_type typ with
     | DTyCtr (_, dts) -> List.map convert_to_range (List.filter (fun dt -> not (isTyParam dt)) dts)
     | _ -> failwith "Not the expected result type" in
