@@ -1,6 +1,8 @@
 QuickChick
 ==========
 
+[![Build Status](https://travis-ci.org/QuickChick/QuickChick.svg?branch=master)](https://travis-ci.org/QuickChick/QuickChick)
+
 ### Description
  
   - Randomized property-based testing plugin for Coq; a clone of [Haskell QuickCheck]

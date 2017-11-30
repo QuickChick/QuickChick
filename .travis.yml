@@ -33,6 +33,7 @@ install:
 - opam config var root
 - opam repo add coq-released https://coq.inria.fr/opam/released || true
 - opam list
+- ocamlc -v
 
 script:
 - set -e
