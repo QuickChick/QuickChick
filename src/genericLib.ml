@@ -124,6 +124,8 @@ let injectCtr s =
   if s = "" then failwith "Called gInject with empty string";
   qualid_of_string s
 
+let ty_ctr_to_ctr x = x  
+
 let num_of_ctrs (c : constructor) =
   let r = qualid_to_reference c in 
   let env = Global.env () in
@@ -247,7 +249,8 @@ let rec cat_maybes = function
 let foldM f b l = List.fold_left (fun accm x -> 
                                   accm >>= fun acc ->
                                   f acc x
-                                 ) b l
+                    ) b l
+
 let sequenceM f l = 
   (foldM (fun acc x -> f x >>= fun x' -> Some (x' :: acc)) (Some []) l) >>= fun l -> Some (List.rev l)
 

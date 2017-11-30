@@ -46,6 +46,7 @@ type constructor
 val constructor_to_string : constructor -> string
 val gCtr : constructor -> coq_expr
 val injectCtr : string -> constructor
+val ty_ctr_to_ctr : ty_ctr -> constructor  
 
 module type Ord_ty_ctr_type = sig
   type t = ty_ctr 

@@ -226,13 +226,15 @@ let rec fixRange u r k =
 
 let fixVariable x k = fixRange x (umfind x k) k
 
+(* Since this can fail - return an option *)
 let rec convert_to_range dt = 
   match dt with 
-  | DTyVar x -> Unknown x
-  | DCtr (c,dts) -> Ctr (c, List.map convert_to_range dts)
-  | DTyCtr (c, dts) -> Ctr (injectCtr (ty_ctr_to_string c), List.map convert_to_range dts)
-(*   | DTyParam tp -> Ctr (injectCtr (ty_param_to_string tp), []) *)
-  | _ -> failwith ("Unsupported range: " ^ (dep_type_to_string dt))
+  | DTyVar x -> Some (Unknown x)
+  | DCtr (c,dts) ->
+     Option.map (fun dts' -> Ctr (c, dts')) (sequenceM convert_to_range dts)
+  | DTyCtr (c, dts) -> 
+     Option.map (fun dts' -> Ctr (ty_ctr_to_ctr c, dts')) (sequenceM convert_to_range dts)
+  | _ -> None
 
 let is_fixed k dt = 
   let rec aux = function
@@ -240,7 +242,7 @@ let is_fixed k dt =
     | FixedInput -> true
     | Unknown u' -> aux (umfind u' k)
     | Ctr (_, rs) -> List.for_all aux rs
-  in aux (convert_to_range dt)
+  in Option.map aux (convert_to_range dt)
 
 (* convert a range to a coq expression *)
 let rec range_to_coq_expr k r = 
@@ -257,7 +259,7 @@ let rec range_to_coq_expr k r =
    | _ -> failwith "QC Internal: TopLevel ranges should be Unknowns or Constructors"
 
 let dt_to_coq_expr k dt = 
-  range_to_coq_expr k (convert_to_range dt)
+  Option.map (range_to_coq_expr k) (convert_to_range dt)
 
 let rec is_dep_type = function
   | DArrow (dt1, dt2) -> is_dep_type dt1 || is_dep_type dt2 
@@ -325,11 +327,10 @@ let handle_branch
       (type a) (type b) (* I've started to love ocaml again because of this *)
       (n : int)
       (dep_type : dep_type)
-      (input_names : var list)
       (fail_exp : b)
       (ret_exp : coq_expr -> b)
-      (class_method : a)
-      (class_methodST : int -> coq_expr (* pred *) -> a)
+      (instantiate_existential_method : a)
+      (instantiate_existential_methodST : int -> coq_expr (* pred *) -> a)
       (rec_method : int -> coq_expr list -> a)
       (bind : bool (* opt *) -> a -> string -> (var -> b) -> b)
       (stMaybe : bool (* opt *) -> a -> string -> ((coq_expr -> coq_expr) * int) list -> a)
@@ -339,67 +340,117 @@ let handle_branch
       (gen_ctr : ty_ctr)
       (init_umap : range UM.t)
       (init_tmap : dep_type UM.t)
+      (input_ranges : range list)
       (c : dep_ctr) : (b * bool) =
-  let (ctr, typ) = c in
-  let b = ref true in
 
-  (* Local references to handle map updates *)
-  let umap = ref init_umap in
-  let tmap = ref init_tmap in
+  (* ************************ *)
+  (* Step 0 : Initializations *)
+  (* ************************ *)
+  
+  let (ctr, typ) = c in
+
+  (* Local reference : is this constructor recursive or not? *)
+  let is_base = ref true in
+
+  (* Local references to handle map updates. Keep init_umap intact for mode analysis. *)
+  let umap_ref = ref init_umap in
+  let tmap_ref = ref init_tmap in
+
+  (* Add all universally quantified unknowns in the u/t environments. *)
+  let rec register_unknowns = function
+      | DArrow (dt1, dt2) -> register_unknowns dt2
+      | DProd ((x, dt1), dt2) ->
+         umap_ref := UM.add x (Undef dt1) !umap_ref;
+         tmap_ref := UM.add x dt1 !tmap_ref;
+         register_unknowns dt2
+      | _ -> ()
+  in
+  register_unknowns typ;
   
   let arb = mk_name_provider "arb" in
 
   msg_debug (str "Debug branch" ++ fnl ());
-
   msg_debug (str ("Calculating ranges: " ^ dep_type_to_string (dep_result_type typ)) ++ fnl ());
 
-  (* Possibility of failure 1: 
+  (* !! Possibility of failure: 
      The conclusion of each constructor must not contain function calls.
      
      Possible solution: 
      Automatically transform such constructors to include an additional equality with 
      a fresh unknown? 
    *)
-  let ranges = match dep_result_type typ with
-    | DTyCtr (_, dts) -> List.map convert_to_range (List.filter (fun dt -> not (isTyParam dt)) dts)
-    | _ -> failwith "Not the expected result type" in
-
-  let inputsWithGen = inputWithGen n input_names in
+  let result_ranges =
+    match dep_result_type typ with
+    | DTyCtr (_, dts) as res ->
+       begin match sequenceM convert_to_range (List.filter (fun dt -> not (isTyParam dt)) dts) with
+       | Some ranges -> ranges
+       | None ->
+          qcfail (Printf.sprintf "Arguments to result of constructor %s can only be variables or constructors applied to variables: %s" (constructor_to_string ctr) (dep_type_to_string res))
+       end
+    | res ->
+       qcfail (Printf.sprintf "Result type of constructor %s is not a type constructor applied to arguments: %s" (constructor_to_string ctr) (dep_type_to_string res))
+  in 
 
   (* Debugging init map *)
   msg_debug (str ("Handling branch: " ^ dep_type_to_string typ) ++ fnl ());
-  UM.iter (fun x r -> msg_debug (str ("Bound: " ^ (var_to_string x) ^ " to Range: " ^ (range_to_string r)) ++ fnl ())) init_map;
+  UM.iter (fun x r -> msg_debug (str ("Bound: " ^ (var_to_string x) ^ " to Range: " ^ (range_to_string r)) ++ fnl ())) !umap_ref;
   dep_fold_ty (fun _ dt1 -> msg_debug (str (Printf.sprintf "%s : %b\n" (dep_type_to_string dt1) (is_dep_type dt1)) ++ fnl()))
     (fun _ _ dt1 -> msg_debug (str (Printf.sprintf "%s : %b\n" (dep_type_to_string dt1) (is_dep_type dt1)) ++ fnl()))
     (fun _ -> ()) (fun _ -> ()) (fun _ -> ()) (fun _ -> ()) typ;
   (* End debugging *)
 
-  (* unify with result type *)
-  match foldM (fun (k, eqs, ms) (r, n) -> unify k (Unknown n) r eqs >>= fun (k', _, eqs', ms') ->
-                Some (k', eqs', ms @ ms')
-              ) (Some (init_map, EqSet.empty, [])) (List.combine ranges inputsWithGen) with
-  | None -> failwith "Matching result type error" 
-  | Some (map, eqs, matches) -> 
+  (* ********************************************* *)  
+  (* Step 1: Unify result ranges with input ranges *)
+  (* ********************************************* *)
 
-    (* Process check map. XXX generator specific *)
-    let process_checks k cmap x opt g (cont : umap -> cmap -> var -> b) : b = 
-      match lookup_checks (DTyVar x) cmap with
-      | Some checks -> 
-        (* Remove checks from cmap *)
-        let cmap' = CMap.remove (DTyVar x) cmap in
-        bind true
-          (stMaybe opt g (var_to_string x) checks)
-          (var_to_string x)
-          (fun x -> cont (fixVariable x k) cmap' x)
-      | None -> 
-        bind opt g (var_to_string x)
-          (fun x -> cont (fixVariable x k) cmap x)
-    in
+  (* Set of equality checks necessary *)
+  let eq_set_ref  = ref EqSet.empty in
+  (* List of necessary pattern matches *)
+  let matches_ref = ref [] in
+  (* Function to handle a single argument *)
+  let unify_single_pair r_in r_res =
+    match unify !umap_ref r_in r_res !eq_set_ref with
+    | Some (umap', _range, eq_set', extra_matches) ->
+       (* Unification succeeded; update info *)
+       umap_ref    := umap';
+       eq_set_ref  := eq_set';
+       matches_ref := extra_matches @ !matches_ref
+    | None ->
+       (* Unification failed. *)
+       qcfail "Matching result type error" (* TODO: Better error message here? *)
+  in
+  List.iter2 unify_single_pair input_ranges result_ranges;
+
+  (* ********************************************************* *)
+  (* Interlude: Helper functions to instantiate a single range *)
+  (* ********************************************************* *)
+
+  (* Note: These functions should theoretically live outside of this block, but they rely 
+     on the parameterized arguments. Move to the front? *)
+
+  (* When instantiating a single unknown, see if it must satisfy any additional predicates. *)
+  (* Old comment: Process check map. XXX generator specific *)
+  (* ZOE: What do you mean by XXX generator specific? Is this comment still relevant? *)
+  let process_checks k cmap x opt g (cont : umap -> cmap -> var -> b) : b = 
+    match lookup_checks (DTyVar x) cmap with
+    | Some checks -> 
+       (* Remove checks from cmap *)
+       let cmap' = CMap.remove (DTyVar x) cmap in
+       bind true
+         (stMaybe opt g (var_to_string x) checks)
+         (var_to_string x)
+         (fun x -> cont (fixVariable x k) cmap' x)
+    | None -> 
+       bind opt g (var_to_string x)
+         (fun x -> cont (fixVariable x k) cmap x)
+  in
     
-    (* Function to instantiate a single range *)
-    (* It also uses any checks present in the check-map *)
-    let rec instantiate_range_cont (k : umap) (cmap : cmap) (parent : unknown) (cont : umap -> cmap -> coq_expr -> b) = function
-      | Ctr (c,rs) -> 
+  (* Function to instantiate a single range; uses an input check-map for additional checks. 
+     Takes a continuation that receives the potentially updated unknown- and check-maps, as 
+     well as a coq_expr form of the instantiated range to produce a result. *)
+  let rec instantiate_range_cont umap cmap (parent : unknown)
+            (cont : umap -> cmap -> coq_expr -> b) = function
+    | Ctr (c,rs) -> 
         (* aux2 goes through the dts, enhancing the continuation to include the result of the head to the acc *)
         let rec traverse_ranges k cmap acc = function 
           | [] -> cont k cmap (gApp ~explicit:true (gCtr c) (List.rev acc)) (* Something about type parameters? *)
@@ -412,21 +463,6 @@ let handle_branch
         end
       | Unknown u -> instantiate_range_cont k cmap u cont (umfind u k)
       | FixedInput -> cont k cmap (gVar parent)
-    in 
-
-    (* TODO: Never used, not exported? *)
-    (* Only used as a finalizer - discards k/cmap XXX *)
-    let instantiate_range k cmap r = 
-      instantiate_range_cont k cmap Unknown.undefined (fun k cmap c -> ret_exp c) r
-    in
-
-    (* TODO: Never used, not exported? *)
-    let rec combine_inductives k num_dts args = 
-      match num_dts, args with 
-      | [], _ -> []
-      | (_,dt)::dts', arg::args' -> 
-        if is_inductive_dt dt then dt_to_coq_expr k dt :: combine_inductives k dts' args
-        else gVar arg :: combine_inductives k dts' args'
     in 
 
     (* Begin multiple mutually recursive functions *)
