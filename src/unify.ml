@@ -292,37 +292,52 @@ let handle_equalities eqs (check_expr : coq_expr -> 'a -> 'a -> 'a)
                check_expr checker c cright
              ) eqs cleft
 
-let forGen = Unknown.from_string "_forGen"
+type mode = Recursive of Unknown.t list * Unknown.t list  (* List of unknowns that need to be instantiated before recursive call and remaining unknowns *)
+          | NonRecursive of Unknown.t list (* List of all unknowns that are still undefined *)
 
-let rec inputWithGen i l = 
-  if i <= 1 then forGen :: l
-  else let (h::t) = l in h :: (inputWithGen (i-1) t)
-
-(* Handles a single branch of the inductive predicate. *)
-(* fail_exp = (returnGen gNone) *)
-(* ret_exp = \x. returnGen (gSome x) *)
-(* class_method = (gInject "arbitrary") *)
-(* class_methodST =
-     App ~explicit:true (gInject "arbitrarySizeST")
-              [ hole (* Implicit argument - type A *)
-              ; pred
-              ; hole (* Implicit instance *)
-              ; gVar size ]
-*)
-(* rec_method = \l. gApp (gVar rec_name) l *)
-(* stMaybe =
-   \opt.\g.\bool_pred.
-     (gApp (gInject (if opt then "suchThatMaybeOpt" else "suchThatMaybe"))
-           [ g (* Use the generator provided for base generator *)
-           ; bool_pred
-           ])
-*)
+let mode_analysis (init_ranges : range list) (init_map : range UM.t)
+      (curr_ranges : range list) (curr_map : range UM.t) =
+  let unknowns_for_mode  = ref [] in
+  let remaining_unknowns = ref [] in
+  let all_unknowns = ref [] in
+  (* Compare ranges takes two ranges (the initial range r1 and the current range r2)
+     as well as their parents, and returns:
+     - true, if we can convert the current range to the same
+       mode as the original range by instantiating a list of unknowns
+     - false, if we can not convert (i.e. some things are more instantiated 
+       than they should be)
+   *)
+  let rec compare_ranges p1 r1 p2 r2 =
+    match r1, r2 with
+    | Unknown u1, _ -> compare_ranges u1 (UM.find u1 init_map) p2 r2
+    | _, Unknown u2 -> compare_ranges p1 r1 u2 (UM.find u2 curr_map)
+    | FixedInput, FixedInput -> true
+    | FixedInput, Undef dt   ->
+       unknowns_for_mode := p2 :: !unknowns_for_mode;
+       all_unknowns := p2 :: !all_unknowns;
+       true
+    | FixedInput, Ctr (c, rs) ->
+       (* iterate through all the rs against fixed inputs *)
+       List.for_all (fun b -> b) (List.map (compare_ranges Unknown.undefined FixedInput Unknown.undefined) rs)
+    | Undef _, FixedInput -> false
+    | Undef _, Undef _    ->
+       (* Add the second range's parent to the list of unknowns that are free, 
+          but do not need to be instantiated for the mode to work *)
+       remaining_unknowns := p2 :: !remaining_unknowns;
+       all_unknowns := p2 :: !all_unknowns;
+       true
+    | Undef _, Ctr (c, rs) ->
+       List.iter (fun r' -> ignore (compare_ranges p1 r1 Unknown.undefined r')) rs; false
+    | _, _ -> qcfail "Implement constructors for initial ranges"
+  in
+  if List.for_all (fun b -> b) (List.map2 (fun r1 r2 -> compare_ranges Unknown.undefined r1 Unknown.undefined r2) init_ranges curr_ranges) 
+  then Recursive (List.rev !unknowns_for_mode, List.rev !remaining_unknowns)
+  else NonRecursive !all_unknowns
 
 let isTyParam = function
   | DTyParam _ -> true
   | _ -> false 
-
-
+  
 let handle_branch
       (type a) (type b) (* I've started to love ocaml again because of this *)
       (n : int)
