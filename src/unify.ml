@@ -593,6 +593,33 @@ let handle_branch
   let rec handle_TyCtr (ctr_index : int) (is_pos : bool) (c : ty_ctr) (dts : dep_type list)
             (dt' : dep_type) =
 
+    (* First instantiate the function calls in the dep_type list *)
+    instantiate_function_calls !umap_ref !cmap_ref dts [] (fun umap' cmap' dts' ->
+
+    (* Convert the modified dep_types to ranges *)
+    let ranges = match sequenceM convert_to_range dts' with
+      | Some ranges -> ranges
+      | None -> qcfail "Internal: After instantiating function calls, datatypes should be convertible to ranges."
+    in 
+
+    (* TODO: positive/negative context *)
+    (* Then do mode analysis on the new dts *)
+    match mode_analysis input_ranges init_tmap ranges umap' with
+    | Recursive (unknowns_for_mode, remaining_unknowns) ->
+       (* Mark recursiveness of branch *)
+       b := true;
+       (* Instantiate all the unknowns needed for the mode to work out *)
+       instantiate_toplevel_ranges_cont umap' cmap' (List.map Unknown unknowns_for_mode) (fun umap' cmap' _ranges ->
+       (* Make recursive call *)
+           process_checks k cmap x 
+            (* Generate using recursive function *)
+            true
+            (rec_method m args)
+            (fun k' cmap' x -> recurse_type (m + 1) k' cmap' dt2)
+ 
+       )
+    | NonRecursive all_unknowns ->
+    
     (*
       (* Construct the checker for the current type constructor *)
       let checker args = 
