@@ -292,8 +292,9 @@ let handle_equalities eqs (check_expr : coq_expr -> 'a -> 'a -> 'a)
                check_expr checker c cright
              ) eqs cleft
 
-type mode = Recursive of Unknown.t list * Unknown.t list  (* List of unknowns that need to be instantiated before recursive call and remaining unknowns *)
-          | NonRecursive of Unknown.t list (* List of all unknowns that are still undefined *)
+type mode = Recursive of (Unknown.t * dep_type) list
+                       * (Unknown.t * dep_type) list  (* List of unknowns that need to be instantiated before recursive call and remaining unknowns *)
+          | NonRecursive of (Unknown.t * dep_type) list (* List of all unknowns that are still undefined *)
 
 let mode_analysis (init_ranges : range list) (init_map : range UM.t)
       (curr_ranges : range list) (curr_map : range UM.t) =
@@ -313,18 +314,18 @@ let mode_analysis (init_ranges : range list) (init_map : range UM.t)
     | _, Unknown u2 -> compare_ranges p1 r1 u2 (UM.find u2 curr_map)
     | FixedInput, FixedInput -> true
     | FixedInput, Undef dt   ->
-       unknowns_for_mode := p2 :: !unknowns_for_mode;
-       all_unknowns := p2 :: !all_unknowns;
+       unknowns_for_mode := (p2, dt) :: !unknowns_for_mode;
+       all_unknowns := (p2, dt) :: !all_unknowns;
        true
     | FixedInput, Ctr (c, rs) ->
        (* iterate through all the rs against fixed inputs *)
        List.for_all (fun b -> b) (List.map (compare_ranges Unknown.undefined FixedInput Unknown.undefined) rs)
     | Undef _, FixedInput -> false
-    | Undef _, Undef _    ->
+    | Undef _, Undef dt    ->
        (* Add the second range's parent to the list of unknowns that are free, 
           but do not need to be instantiated for the mode to work *)
-       remaining_unknowns := p2 :: !remaining_unknowns;
-       all_unknowns := p2 :: !all_unknowns;
+       remaining_unknowns := (p2,dt) :: !remaining_unknowns;
+       all_unknowns := (p2, dt) :: !all_unknowns;
        true
     | Undef _, Ctr (c, rs) ->
        List.iter (fun r' -> ignore (compare_ranges p1 r1 Unknown.undefined r')) rs; false
@@ -340,14 +341,14 @@ let isTyParam = function
   
 let handle_branch
       (type a) (type b) (* I've started to love ocaml again because of this *)
-      (n : int)
       (dep_type : dep_type)
       (fail_exp : b)
       (ret_exp : coq_expr -> b)
       (instantiate_existential_method : a)
       (instantiate_existential_methodST : int -> coq_expr (* pred *) -> a)
-      (rec_method : int -> coq_expr list -> a)
-      (bind : bool (* opt *) -> a -> string -> (var -> b) -> b)
+      (ex_bind : bool (* opt *) -> a -> string -> (var -> b) -> b)
+      (rec_method : int -> unknown list option -> coq_expr list -> a)
+      (rec_bind : bool (* opt *) -> a -> string -> (var -> b) -> b)
       (stMaybe : bool (* opt *) -> a -> string -> ((coq_expr -> coq_expr) * int) list -> a)
       (check_expr : int -> coq_expr -> b -> b -> b)
       (match_inp : var -> matcher_pat -> b -> b -> b)
@@ -464,7 +465,7 @@ let handle_branch
   (* When instantiating a single unknown, see if it must satisfy any additional predicates. *)
   (* Old comment: Process check map. XXX generator specific *)
   (* ZOE: What do you mean by XXX generator specific? Is this comment still relevant? *)
-  let process_checks umap cmap x opt g (cont : umap -> cmap -> var -> b) : b = 
+  let process_checks bind umap cmap x opt g (cont : umap -> cmap -> var -> b) : b = 
     match lookup_checks (DTyVar x) cmap with
     | Some checks -> 
        (* Remove checks from cmap *)
@@ -491,7 +492,7 @@ let handle_branch
          (fun umap' cmap' rs' -> cont umap' cmap' (Ctr (c, rs')))
     | Undef dt ->
        (* For undefined, we need to instantiate the parrent by processing its checks. *)
-         process_checks umap cmap parent false instantiate_existential_method
+         process_checks ex_bind umap cmap parent false instantiate_existential_method
            (fun umap' cmap' x -> cont umap' cmap' (Unknown x))
     | Unknown u ->
        (* Unknowns just propagate one step further *)
@@ -594,7 +595,7 @@ let handle_branch
             (dt' : dep_type) =
 
     (* First instantiate the function calls in the dep_type list *)
-    instantiate_function_calls !umap_ref !cmap_ref dts [] (fun umap' cmap' dts' ->
+    instantiate_function_calls_cont !umap_ref !cmap_ref dts [] (fun umap' cmap' dts' ->
 
     (* Convert the modified dep_types to ranges *)
     let ranges = match sequenceM convert_to_range dts' with
@@ -604,23 +605,51 @@ let handle_branch
 
     (* TODO: positive/negative context *)
     (* Then do mode analysis on the new dts *)
-    match mode_analysis input_ranges init_tmap ranges umap' with
+    match mode_analysis input_ranges init_umap ranges umap' with
     | Recursive (unknowns_for_mode, remaining_unknowns) ->
        (* Mark recursiveness of branch *)
-       b := true;
+       is_base := false;
        (* Instantiate all the unknowns needed for the mode to work out *)
-       instantiate_toplevel_ranges_cont umap' cmap' (List.map Unknown unknowns_for_mode) (fun umap' cmap' _ranges ->
-       (* Make recursive call *)
-           process_checks k cmap x 
-            (* Generate using recursive function *)
-            true
-            (rec_method m args)
-            (fun k' cmap' x -> recurse_type (m + 1) k' cmap' dt2)
- 
-       )
+       instantiate_toplevel_ranges_cont umap' cmap' (List.map (fun (x,t) -> Unknown x) unknowns_for_mode) [] (fun umap' cmap' _ranges ->
+
+       (* We will instantiate an unknown. First create a fresh one *)
+       let fresh_unknown =
+         match remaining_unknowns with
+         | [(x,_)] -> x
+         | _ -> unk_provider.next_unknown ()
+       in 
+       let unknown_type =
+         match remaining_unknowns with
+         | [] -> DCtr (injectCtr "Coq.Init.Datatypes.bool", [])
+         | _ -> dtTupleType (List.map snd remaining_unknowns)
+       in
+       let unknown_range =
+         match remaining_unknowns with
+         | [] -> Undef unknown_type
+         | [(x,_)] -> Undef unknown_type
+         | _ -> listToPairAux (fun (acc, x) -> Ctr (injectCtr "Coq.Init.Datatypes.pair", [acc; x]))
+                  (List.map (fun (x,_) -> Unknown x) remaining_unknowns)
+       in
+       let updated_umap = UM.add fresh_unknown unknown_range umap' in
+
+       let letbinds =
+         match remaining_unknowns with
+         | [] -> None
+         | [_] -> None
+         | _ -> Some (List.map fst remaining_unknowns)
+       in 
+      
+       let args = List.map (range_to_coq_expr updated_umap) ranges in
+       (* TODO: Gather all checks, and add them to the check map *)
+       process_checks rec_bind updated_umap cmap' fresh_unknown true
+         (rec_method ctr_index letbinds args)
+         (fun final_umap final_cmap -> recurse_type (ctr_index+1) final_umap final_cmap dt')
+         )
     | NonRecursive all_unknowns ->
-    
-    (*
+       failwith "NonRecursive"
+    ) 
+
+(*
       (* Construct the checker for the current type constructor *)
       let checker args = 
         gApp ~explicit:true (gInject "dec") 
@@ -632,7 +661,8 @@ let handle_branch
 
           ] 
       in
-     *)
+ *)
+(*    
       let finalizer k cmap numbered_dts = 
 
       match List.filter (fun (i, dt) -> not (is_fixed k dt)) numbered_dts with
@@ -657,8 +687,8 @@ let handle_branch
           process_checks k cmap x 
             (* Generate using recursive function *)
             true
-            (rec_method m args)
-            (fun k' cmap' x -> recurse_type (m + 1) k' cmap' dt2)
+            (rec_method ctr_index args)
+            (fun k' cmap' x -> recurse_type (ctr_index + 1) k' cmap' dt2)
         end
         else if pos then begin (* Generate using "arbitrarySizeST" and annotations for type *)
           if c = gen_ctr then b := false;
@@ -780,7 +810,7 @@ let handle_branch
            end
       in 
       instantiate_function_calls_cont k cmap numbered_dts []
-
+ *)
     and handle_app m (pos : bool) (f : dep_type) (xs : dep_type list)
                    (k : umap) (cmap : cmap) (dt2 : dep_type) =
       (* Construct the checker for the current application *)

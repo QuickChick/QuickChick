@@ -813,7 +813,7 @@ let gTupleAux f cs =
        match l with
        | [] -> acc
        | x :: xs -> go xs (f (acc, x))
-     in go cs' c
+     in go cs' cx
  *)
 let gTuple = listToPairAux gPair
 let gTupleType = listToPairAux gProd
