@@ -3,10 +3,12 @@ open Libnames
 open Util
 open Constrexpr
 open GenericLib
+(*   
 open Sized
 open SizeMon
 open SizeSMon
 open SizeCorr
+ *)
 open ArbitrarySized
 open Error
 
@@ -146,6 +148,7 @@ let derive (cn : derivable) (c : constr_expr) (instance_name : string) (name1 : 
     | Show -> show_decl ty_ctr ctrs iargs 
     | Shrink -> shrink_decl ty_ctr ctrs iargs
     | GenSized -> arbitrarySized_decl ty_ctr ctrs iargs
+(* TODO: Re-add           
     | Sized -> sized_decl ty_ctr ctrs
     | CanonicalSized ->
       let ind_scheme =  gInject ((ty_ctr_to_string ty_ctr) ^ "_ind") in
@@ -160,6 +163,7 @@ let derive (cn : derivable) (c : constr_expr) (instance_name : string) (name1 : 
       let c_inst = gInject (repeat_instance_name CanonicalSized ind_name) in
       (* TODO : use default names for gen and mon as well (?) *)
       genCorr ty_ctr ctrs iargs (gInject name1) s_inst c_inst (gInject name2)
+ *)
   in
 
   (* msg_debug (str "Defined record" ++ fnl ()); *)

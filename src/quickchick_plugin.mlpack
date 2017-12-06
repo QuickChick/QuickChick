@@ -8,16 +8,7 @@ Unify
 Weightmap
 ArbitrarySized
 ArbitrarySizedST
-SizeSMon
-SizeCorr
-Sized
-SizedProofs
-SizeMon
-GenSizedSTMonotonic
-GenSizedSTSizeMonotonic
-GenSTCorrect
 SimplDriver
-CheckerSized
 DepDriver
 Driver
 QuickChick

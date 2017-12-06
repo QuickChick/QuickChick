@@ -5,12 +5,14 @@ open Constrexpr
 open GenericLib
 open GenLib
 open ArbitrarySizedST
-open GenSizedSTMonotonic
-open GenSizedSTSizeMonotonic
 open Error
 open Unify
+(*   
 open SizedProofs
 open GenSTCorrect
+open GenSizedSTMonotonic
+open GenSizedSTSizeMonotonic
+ *)
 
 (** Derivable classes *)
 type derivable =
@@ -33,7 +35,7 @@ let derivable_to_string = function
 let mk_instance_name der tn =
   var_to_string (fresh_name ((derivable_to_string der) ^ tn))
 
-let derive_dependent class_name constructor umap tmap (ty_ctr, ty_params, ctrs, dep_type) forGen =
+let derive_dependent class_name constructor umap tmap input_ranges (ty_ctr, ty_params, ctrs, dep_type) forGen =
   let ctr_name = 
     match constructor with 
     | { CAst.v = CRef (r,_) } -> string_of_reference r
@@ -64,22 +66,23 @@ let derive_dependent class_name constructor umap tmap (ty_ctr, ty_params, ctrs, 
   (* The type we are generating for -- not the predicate! *)
   let full_gtyp = Option.map (fun u -> (gType ty_params (UM.find u tmap))) forGen in
 
-  
-  (* TODO: Easy solution : add Arbitrary/DecOpt as a requirement for all type parameters. *)
-  (*
-  (* TODO: These should be generated through some writer monad *)
-  (* XXX Put dec_needed in ArbitrarySizedSuchThat *)
   let gen_needed = [] in
   let dec_needed = [] in
 
+  (* The dependent generator  *)
+  let gen =
+    arbitrarySizedST ty_ctr ty_params ctrs dep_type input_names
+      input_ranges init_umap init_tmap inputs result rec_name
+  in
+  
+  (* TODO: Easy solution : add Arbitrary/DecOpt as a requirement for all type parameters. *)
+  (*
   let self_dec = [] in 
   (*     (* Maybe somethign about type paramters here *)
      if !need_dec then [gArg ~assumType:(gApp (gInject (Printf.sprintf "DepDec%n" (dep_type_len dep_type))) [gTyCtr ty_ctr]) 
                             ~assumGeneralized:true ()] 
-     else [] in*)
-
-  let arbitraries = ref ArbSet.empty in
-
+     else [] in
+   *)
 
   (* The type of the dependent generator *)
   let gen_type = gGen (gOption full_gtyp) in
@@ -87,12 +90,6 @@ let derive_dependent class_name constructor umap tmap (ty_ctr, ty_params, ctrs, 
   (* Fully applied predicate (parameters and constructors) *)
   let full_pred inputs =
     gFun [forGen] (fun [fg] -> gApp (full_dt) (list_insert_nth (gVar fg) inputs (n-1)))
-  in
-
-  (* The dependent generator  *)
-  let gen =
-    arbitrarySizedST
-      ty_ctr ty_params ctrs dep_type input_names inputs n register_arbitrary
   in
 
   (* Generate arbitrary parameters *)

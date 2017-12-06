@@ -15,15 +15,16 @@ let ret_exp (dt : coq_expr) (c : coq_expr) =
 
 let ret_type (s : var) f = hole
 
-let class_method = (gInject "arbitrary")
+let instantiate_existential_method = (gInject "arbitrary")
 
-let class_methodST (n : int) (pred : coq_expr) = 
+let instantiate_existential_methodST (n : int) (pred : coq_expr) = 
   gApp ~explicit:true (gInject "arbitraryST")
     [ hole (* Implicit argument - type A *)
     ; pred
     ; hole (* Implicit instance *)]
 
-let rec_method (rec_name : coq_expr) (size : coq_expr) (n : int) (l : coq_expr list) =
+let rec_method (rec_name : coq_expr) (size : coq_expr) (n : int) (letbinds : unknown list option) (l : coq_expr list) =
+  (* TODO: use letbinds *)
   gApp rec_name (size :: l)
 
 let bind (opt : bool) (m : coq_expr) (x : string) (f : var -> coq_expr) =
@@ -75,63 +76,52 @@ let match_inp (inp : var) (pat : matcher_pat) (left : coq_expr) (right  : coq_ex
     (gVar inp) ~catch_all:(catch_case) "s" (fun v -> ret_type v ret)
     [(pat,left)]
 
+type generator_kind = Base_gen | Ind_gen 
+  
 (* hoisting out base and ind gen to be able to call them from proof generation *)
-let base_gens
+let construct_generators
+      (kind : generator_kind)
       (size : coq_expr)
       (full_gtyp : coq_expr)
       (gen_ctr : ty_ctr)
       (dep_type : dep_type)
       (ctrs : dep_ctr list)
-      (input_names : var list)
-      (n : int)
-      (register_arbitrary : dep_type -> unit)
-      (rec_name : coq_expr) 
+      (rec_name : coq_expr)
+      (input_ranges : range list)
+      (init_umap : range UM.t)
+      (init_tmap : dep_type UM.t)
+      (result : Unknown.t)
   =
   (* partially applied handle_branch *)
   let handle_branch' =
-    handle_branch n dep_type input_names (fail_exp full_gtyp) (ret_exp full_gtyp)
-      class_method class_methodST (rec_method rec_name size) bind stMaybe check_expr match_inp
-      gLetIn
-      gen_ctr register_arbitrary
+    handle_branch dep_type (fail_exp full_gtyp) (ret_exp full_gtyp)
+      instantiate_existential_method instantiate_existential_methodST bind
+      (rec_method rec_name size) bind
+      stMaybe check_expr match_inp gLetIn
+      gen_ctr init_umap init_tmap input_ranges result
   in
-  (* TODO: Base Case weights? *)
-  let base_branches =
-    List.map
-      fst
-      (List.filter (fun (_, b) -> b) (List.map handle_branch' ctrs)) in
-  base_branches
+  let all_gens = List.map handle_branch' ctrs in
+  match kind with
+  | Base_gen -> List.map fst (List.filter snd all_gens)
+  | Ind_gen  -> List.map fst all_gens
 
-let ind_gens
-      (size : coq_expr)
-      (full_gtyp : coq_expr)
-      (gen_ctr : ty_ctr)
-      (dep_type : dep_type)
-      (ctrs : dep_ctr list)
-      (input_names : var list)
-      (n : int)
-      (register_arbitrary : dep_type -> unit)
-      (rec_name : coq_expr) =
-  (* partially applied handle_branch *)
-  let handle_branch' =
-    handle_branch n dep_type input_names (fail_exp full_gtyp) (ret_exp full_gtyp)
-      class_method class_methodST (rec_method rec_name size) bind stMaybe check_expr match_inp
-      gLetIn
-      gen_ctr register_arbitrary
-  in
-  let all_branches = List.map (fun x -> fst (handle_branch' x)) ctrs in
-  all_branches
-
+let base_gens = construct_generators Base_gen
+let ind_gens  = construct_generators Ind_gen              
+              
 (* Advanced Generators *)
 let arbitrarySizedST
       (gen_ctr : ty_ctr)
       (ty_params : ty_param list)
       (ctrs : dep_ctr list)
       (dep_type : dep_type)
-      (input_names : string list)
+      (input_names : var list)
+      (input_ranges : range list)
+      (init_umap : range UM.t)
+      (init_tmap : dep_type UM.t)
       (inputs : arg list)
-      (n : int)
-      (register_arbitrary : dep_type -> unit) =
-
+      (result : Unknown.t)
+      (rec_name : coq_expr) =
+  
   (* type constructor *)
   let coqTyCtr = gTyCtr gen_ctr in
 
@@ -143,26 +133,24 @@ let arbitrarySizedST
   let full_dt = gApp ~explicit:true coqTyCtr coqTyParams in
 
   (* The type we are generating for -- not the predicate! *)
-  let full_gtyp = (gType ty_params (nthType n dep_type)) in
+  let full_gtyp = (gType ty_params (UM.find result init_tmap)) in
 
   (* The type of the dependent generator *)
   let gen_type = gGen (gOption full_gtyp) in
-
-  let input_names = List.map fresh_name input_names in
-
-  (*  List.iter (fun x -> ignore (handle_branch x)) ctrs;  *)
 
   let aux_arb rec_name size vars =
     gMatch (gVar size)
       [ (injectCtr "O", [],
          fun _ ->
            uniform_backtracking
-             (base_gens (gVar size) full_gtyp gen_ctr dep_type ctrs input_names n register_arbitrary rec_name))
+             (base_gens (gVar size) full_gtyp gen_ctr dep_type ctrs rec_name
+                input_ranges init_umap init_tmap result))
       ; (injectCtr "S", ["size'"],
          fun [size'] ->
            let weights = List.map (fun (c,_) -> Weightmap.lookup_weight c size') ctrs in
            backtracking (List.combine weights 
-             (ind_gens (gVar size') full_gtyp gen_ctr dep_type ctrs input_names n register_arbitrary rec_name)))
+                           (ind_gens (gVar size') full_gtyp gen_ctr dep_type ctrs rec_name
+                              input_ranges init_umap init_tmap result)))
       ]
   in
 

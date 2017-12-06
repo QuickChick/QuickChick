@@ -29,16 +29,11 @@ src/quickChick.ml4
 src/driver.ml4
 src/simplDriver.ml
 src/depDriver.ml
-src/checkerSized.ml
 src/setLib.ml
 src/semLib.ml
 src/coqLib.ml
 src/weightmap.ml4
 src/arbitrarySized.ml
-src/sized.ml
-src/sizeMon.ml
-src/sizeSMon.ml
-src/sizeCorr.ml
 src/arbitrarySizedST.ml
 src/DependentClasses.v
 src/Decidability.v
@@ -46,5 +41,4 @@ src/genSizedSTMonotonic.ml
 src/genSizedSTSizeMonotonic.ml
 src/genLib.ml
 src/unify.ml
-src/sizedProofs.ml
 src/genSTCorrect.ml
