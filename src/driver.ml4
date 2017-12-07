@@ -72,7 +72,7 @@ let dispatch cn ind name1 name2 =
 
   match class_names with 
   | SimpleDer classes -> simpl_dispatch ind classes name1 name2
-  | DepDer classes -> DepDriver.dep_dispatch ind classes 
+  | DepDer class_name -> DepDriver.dep_dispatch ind class_name
 
 VERNAC COMMAND EXTEND Derive CLASSIFIED AS SIDEFF
    | ["Derive" constr(class_name) "for" constr(inductive)] -> 

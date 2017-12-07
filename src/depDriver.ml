@@ -35,7 +35,14 @@ let derivable_to_string = function
 let mk_instance_name der tn =
   var_to_string (fresh_name ((derivable_to_string der) ^ tn))
 
-let derive_dependent class_name constructor umap tmap input_ranges (ty_ctr, ty_params, ctrs, dep_type) forGen =
+let derive_dependent (class_name : derivable)
+                     (constructor : constr_expr)
+                     (umap : range UM.t)
+                     (tmap : dep_type UM.t)
+                     (input_names : var list)
+                     (input_ranges : range list)
+                     (ty_ctr, ty_params, ctrs, dep_type)
+                     (result : unknown) =
   let ctr_name = 
     match constructor with 
     | { CAst.v = CRef (r,_) } -> string_of_reference r
@@ -64,7 +71,7 @@ let derive_dependent class_name constructor umap tmap input_ranges (ty_ctr, ty_p
   in
 
   (* The type we are generating for -- not the predicate! *)
-  let full_gtyp = Option.map (fun u -> (gType ty_params (UM.find u tmap))) forGen in
+  let full_gtyp = gType ty_params (UM.find result tmap) in
 
   let gen_needed = [] in
   let dec_needed = [] in
@@ -72,8 +79,24 @@ let derive_dependent class_name constructor umap tmap input_ranges (ty_ctr, ty_p
   (* The dependent generator  *)
   let gen =
     arbitrarySizedST ty_ctr ty_params ctrs dep_type input_names
-      input_ranges init_umap init_tmap inputs result rec_name
+      input_ranges umap tmap inputs result coqTyCtr
   in
+
+  (* Generate typeclass constraints. For each type parameter "A" we need `{_ : <Class Name> A} *)
+  let instance_arguments = match class_name with
+    | ArbitrarySizedSuchThat ->
+      params
+(*      @ gen_needed
+      @ dec_needed
+      @ self_dec
+      @ arb_needed *)
+      @ inputs
+    | GenSizedSuchThatMonotonicOpt -> params 
+    | SizedProofEqs -> params @ inputs
+    | GenSizedSuchThatCorrect -> params @ inputs
+    | GenSizedSuchThatSizeMonotonicOpt -> params @ inputs
+  in
+
   
   (* TODO: Easy solution : add Arbitrary/DecOpt as a requirement for all type parameters. *)
   (*
@@ -120,6 +143,7 @@ let derive_dependent class_name constructor umap tmap input_ranges (ty_ctr, ty_p
     | GenSizedSuchThatCorrect -> params @ inputs
     | GenSizedSuchThatSizeMonotonicOpt -> params @ inputs
   in
+
 
   let rec list_take_drop n l = 
     if n <= 0 then ([], l)
@@ -240,7 +264,7 @@ let create_t_and_u_maps explicit_args dep_type actual_args : (range UM.t * dep_t
    - checker-based classes only include the name of the predicate "P". All arguments to P will
      be considered Fixed inputs
  *)
-let dep_dispatch ind class_name = 
+let dep_dispatch ind class_name : unit = 
   match ind with 
   | { CAst.v = CLambdaN ([([(_loc2, Name id)], _kind, _type)], body) } -> (* {CAst.v = CApp ((_flag, constructor), args) }) } -> *)
 
@@ -300,9 +324,14 @@ let dep_dispatch ind class_name =
     msg_debug (str "Initial map: " ++ fnl ());
     UM.iter (fun x r -> msg_debug (str ("Bound: " ^ (var_to_string x) ^ " to Range: " ^ (range_to_string r)) ++ fnl ())) init_umap;
 
+    (* When we add constructors to the ranges, this needs to change *)
+    let input_names = List.map (fun ({CAst.v = CRef (r, _)},_) -> fresh_name (string_of_reference r)) args in
+    let input_ranges = List.map (fun v -> Unknown v) input_names in
+    
     (* Call the derivation dispatcher *)
     derive_dependent class_name constructor init_umap init_tmap
-      (ty_ctr, ty_params, ctrs, dep_type) (Some idu)
+      input_names input_ranges
+      (ty_ctr, ty_params, ctrs, dep_type) idu 
   | { CAst.v = CApp ((_flag, constructor), args) } ->
 
     (* Parse the constructor's information into the more convenient generic-lib representation *)
@@ -312,11 +341,18 @@ let dep_dispatch ind class_name =
       | None -> failwith "Not supported type"
     in
 
+    (* When we add constructors to the ranges, this needs to change *)
+    let input_names = List.map (fun ({CAst.v = CRef (r, _)},_) -> fresh_name (string_of_reference r)) args in
+    let input_ranges = List.map (fun v -> Unknown v) input_names in
+
     (* Call the actual creation function *)
     let explicit_args = UM.empty (* No arguments to be generated *) in
     let (umap, tmap) = create_t_and_u_maps explicit_args dep_type args in
 
-    derive_dependent class_name constructor umap tmap (ty_ctr, ty_params, ctrs, dep_type) None
+    let result = fresh_name "_result_bool" in
+    
+    derive_dependent class_name constructor umap tmap input_names input_ranges
+      (ty_ctr, ty_params, ctrs, dep_type) result
   | _ -> qcfail "wrongformat/driver.ml4"
 
       (*     let n = fst (List.find (fun (_,({CAst. v = CRef (r,_)}, _)) -> Id.to_string id = string_of_reference r) (List.mapi (fun i x -> (i+1,x)) args)) in*)

@@ -441,6 +441,8 @@ let handle_branch
   in
   List.iter2 unify_single_pair input_ranges result_ranges;
 
+  msg_debug (str "Unification complete" ++ fnl ());
+  
   (* ********************************************************* *)
   (* Interlude: Helper functions to instantiate a single range *)
   (* ********************************************************* *)
@@ -486,7 +488,9 @@ let handle_branch
      Takes a continuation that receives the potentially updated unknown- and check-maps, as 
      well as the (instantiated) range to produce a result. *)
   let rec instantiate_range_cont umap cmap (parent : unknown)
-            (cont : umap -> cmap -> range -> b) = function
+            (cont : umap -> cmap -> range -> b) r =
+    msg_debug (str ("Calling instantiate_range_cont with : " ^ range_to_string r) ++ fnl ());
+    match r with 
     | Ctr (c,rs) ->
        (* We need to recursively instantiate all the ranges rs, using the function below *)
        instantiate_toplevel_ranges_cont umap cmap rs []
@@ -513,7 +517,7 @@ let handle_branch
          (* The continuation receives an updated umap', cmap' and a new range res,
             representing the (potentially instantiated) range.
             We then add res to an accumulator list and continue the traversal. *)
-         (fun umap' cmap' res -> instantiate_toplevel_ranges_cont umap' cmap' (res::acc) rs' cont) r
+         (fun umap' cmap' res -> instantiate_toplevel_ranges_cont umap' cmap' rs' (res::acc) cont) r
     | [] ->
        (* When we are done traversing the rs, we reverse the accumulator and call the continuation *)
        cont umap cmap (List.rev acc)
@@ -879,22 +883,30 @@ let handle_branch
       | _ -> failwith "Constraints should be type constructors/negations"
 
     (* Iterate through constraints *)
-    and recurse_type (n : int) umap cmap : dep_type -> b = function
+    and recurse_type (n : int) umap cmap dt : b =
+      msg_debug (str ("Recursing on type: " ^ dep_type_to_string dt) ++ fnl ());
+      match dt with 
       | DProd (_, dt) -> (* Only introduces variables, doesn't constrain them *)
         recurse_type n umap cmap dt
       | DArrow (dt1, dt2) ->
-        msg_debug (str ("Darrowing: " ^ (dep_type_to_string dt1)) ++ fnl ());
+        msg_debug (str ("Darrowing: " ^ ((dep_type_to_string dt1))) ++ fnl ());
         handle_dt n true dt1 dt2 umap cmap
       | DTyCtr _ -> (* result *) 
          (* Instantiate forGen *)
+         msg_debug (str ("Instantiating result: " ^ (Unknown.to_string result)) ++ fnl ());
+         UM.iter (fun x r -> msg_debug (str ("Bound: " ^ (var_to_string x) ^ " to Range: " ^ (range_to_string r)) ++ fnl ())) umap;
+
          instantiate_range_cont umap cmap Unknown.undefined (fun umap' cmap' res_range ->
 
+         msg_debug (str ("Continuation of inst range in result") ++ fnl ());
          (* Search if there is anything that is not fixed that requires instantiation *)
          let allUnknowns = List.map fst (UM.bindings umap') in
          match List.filter (fun u -> match is_fixed umap' (DTyVar u) with
                                      | Some b -> not b
                                      | _ -> qcfail "Internal - filter") allUnknowns with
-         | [] -> ret_exp (range_to_coq_expr umap' res_range)
+         | [] ->
+            msg_debug (str "Final ret_exp call" ++ fnl ());
+            ret_exp (range_to_coq_expr umap' res_range)
          | us -> begin 
              msg_warning (str ("After proccessing all constraints, there are still uninstantiated variables: " ^ 
                                  String.concat " , " (List.map var_to_string allUnknowns) ^ ". Proceeding with caution...") ++ fnl ());
@@ -905,24 +917,27 @@ let handle_branch
            end) (Unknown result)
       | _ -> failwith "Wrong type" in
 
-    let branch_gen =
-      let rec walk_matches = function
-        | [] -> handle_equalities !eq_set_ref (check_expr (-1)) (recurse_type 0 !umap_ref CMap.empty typ) (fail_exp)
-        | (u,m)::ms -> begin
-            msg_debug (str (Printf.sprintf "Processing Match: %s @ %s" (Unknown.to_string u) (matcher_pat_to_string m)) ++ fnl ());
-            match_inp u m (walk_matches ms) fail_exp
-          end in
-      (* matches are the matches returned by unification with the result type *)
-      walk_matches !matches_ref
-    in 
+  let branch_gen =
+    msg_debug (str "Creating branch gen" ++ fnl ());
+    let rec walk_matches = function
+      | [] ->
+         msg_debug (str "Match output complete" ++ fnl ());
+         handle_equalities !eq_set_ref (check_expr (-1)) (recurse_type 0 !umap_ref CMap.empty typ) (fail_exp)
+      | (u,m)::ms -> begin
+          msg_debug (str (Printf.sprintf "Processing Match: %s @ %s" (Unknown.to_string u) (matcher_pat_to_string m)) ++ fnl ());
+          match_inp u m (walk_matches ms) fail_exp
+        end in
+    (* matches are the matches returned by unification with the result type *)
+    walk_matches !matches_ref
+  in 
 
-    (* Debugging resulting match *)
-    (* UM.iter (fun x r -> msg_debug (str ("Bound: " ^ var_to_string x ^ " to Range: " ^ (range_to_string r)) ++ fnl ())) map; *)
+  (* Debugging resulting match *)
+  (* UM.iter (fun x r -> msg_debug (str ("Bound: " ^ var_to_string x ^ " to Range: " ^ (range_to_string r)) ++ fnl ())) map; *)
     (* EqSet.iter (fun (u,u') -> msg_debug (str (Printf.sprintf "Eq: %s = %s\n" (Unknown.to_string u) (Unknown.to_string u')) ++ fnl())) eqs; *)
     (* List.iter (fun (u,m) -> msg_debug (str ((Unknown.to_string u) ^ (matcher_pat_to_string m)) ++ fnl ())) matches; *)
 
-    (* msg_debug (str "Generated..." ++ fnl ()); *)
-    (* debug_coq_expr branch_gen; *)
-    (* End debugging *)
+  msg_debug (str "Generated..." ++ fnl ()); 
+  (* debug_coq_expr branch_gen;  *)
+  (* End debugging *)
 
-    (branch_gen ,!is_base)
+  (branch_gen ,!is_base)

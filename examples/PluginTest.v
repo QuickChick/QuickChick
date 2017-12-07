@@ -6,8 +6,9 @@ Inductive Tree :=
 
 Inductive goodTree : nat -> Tree -> Prop :=
 | GoodLeaf : forall n, goodTree n Leaf 
-| GoodNode : forall m n l r,
-    m > n -> goodTree m l -> goodTree m r -> goodTree n (Node m l r).
+| GoodNode : forall m l r, goodTree m l -> goodTree m (Node m l r).
+
+                                             (* m > n -> goodTree m l -> goodTree m r -> goodTree n (Node m l r). *)
 
 Instance test_coercion A B (P : A -> B -> Prop) `{Gen B}
          {_ : forall y, GenSuchThat _ (fun x => P x y)} :
@@ -20,7 +21,7 @@ Instance test_coercion A B (P : A -> B -> Prop) `{Gen B}
 Definition foo : G (option (nat * nat)) :=
   @arbitraryST _ (fun p : nat * nat => let (x,y) := p in x = y) _.
 
-QuickChickDebug Debug On.
-Derive ArbitrarySizedSuchThat for (fun p => let (n,t) := p in goodTree n t).
+
+Derive ArbitrarySizedSuchThat for (fun p => let (m,tr) := p in goodTree m tr).
 
 
