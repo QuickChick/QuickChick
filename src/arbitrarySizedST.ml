@@ -97,7 +97,7 @@ let construct_generators
     handle_branch dep_type (fail_exp full_gtyp) (ret_exp full_gtyp)
       instantiate_existential_method instantiate_existential_methodST bind
       (rec_method rec_name size) bind
-      stMaybe check_expr match_inp gLetIn
+      stMaybe check_expr match_inp gLetIn gLetTupleIn
       gen_ctr init_umap init_tmap input_ranges result
   in
   let all_gens = List.map handle_branch' ctrs in

@@ -232,7 +232,7 @@ let create_t_and_u_maps explicit_args dep_type actual_args : (range UM.t * dep_t
        begin match arg with
        | ({ CAst.v = CRef (r,_) }, _) ->
           begin 
-            let current_r = Unknown.from_string (string_of_reference r) in
+            let current_r = Unknown.from_string (string_of_reference r ^ "_") in
             (* Lookup if the reference is meant to be generated *)
             try begin match UM.find current_r !tmap with
             | None ->
@@ -279,10 +279,10 @@ let dep_dispatch ind class_name : unit =
   match ind with 
   | { CAst.v = CLambdaN ([([(_loc2, Name id)], _kind, _type)], body) } -> (* {CAst.v = CApp ((_flag, constructor), args) }) } -> *)
 
-    let idu = Unknown.from_id id in
+    let idu = Unknown.from_string (Names.Id.to_string id ^ "_") in
      
     (* Extract (x1,x2,...) if any, P and arguments *)
-    let (letbinds, constructor, args) =
+    let (letbindsM, constructor, args) =
       match body with 
       | { CAst.v = CApp ((_flag, constructor), args) } -> (None, constructor, args)
       | { CAst.v = CLetTuple (name_list, _,
@@ -298,13 +298,18 @@ let dep_dispatch ind class_name : unit =
       | None -> failwith "Not supported type"
     in 
 
-    let (init_umap, init_tmap) : (range UM.t * dep_type UM.t) =
+    let (letbinds, init_umap, init_tmap) : (unknown list option * range UM.t * dep_type UM.t) =
       (* Create a temporary typing map for either the let binds/variable to be generated *)
+      let letbinds =
+        match letbindsM with
+        | Some binds -> Some (List.map (fun (Names.Name id) -> Unknown.from_string (Names.Id.to_string id ^ "_")) binds)
+        | None -> None
+      in 
+      
       let explicit_args =
         match letbinds with
-        | Some binds ->
-           List.fold_left (fun map (Names.Name id) -> UM.add (Unknown.from_id id) None map)
-             UM.empty binds
+        | Some binds -> 
+           List.fold_left (fun map u -> UM.add u None map) UM.empty binds
         | None -> UM.singleton idu None
       in
 
@@ -315,30 +320,27 @@ let dep_dispatch ind class_name : unit =
       match letbinds with
       | Some binds ->
          (* Still need to package together the tuple *)
-         let bind_types = List.map (fun (Names.Name id) ->
-                              try UM.find (Unknown.from_id id) tmap 
+         let bind_types = List.map (fun u ->
+                              try UM.find u tmap
                               with Not_found -> failwith "All patterns should be exercised"
                             ) binds
          in
          let tmap' = UM.add idu (dtTupleType bind_types) tmap in
          let umap' =
            let pair_ctr = injectCtr "Coq.Init.Datatypes.prod" in
-           let bind_unknowns = List.map (fun (Names.Name id) -> Unknown (Unknown.from_id id)) binds in
-           let range = listToPairAux (fun (r1, r2) -> Ctr (pair_ctr, [r1; r2])) bind_unknowns in
+           let range = listToPairAux (fun (r1, r2) -> Ctr (pair_ctr, [r1; r2])) (List.map (fun u -> Unknown u) binds) in
            UM.add idu range umap in
-         (umap', tmap')
+         (letbinds, umap', tmap')
          
-      | None -> (umap, tmap)
+      | None -> (letbinds, umap, tmap)
     in
 
-    let letbinds = Option.map (List.map (fun (Names.Name id) -> Unknown.from_id id)) letbinds in
-    
     (* Print map *)
     msg_debug (str "Initial map: " ++ fnl ());
     UM.iter (fun x r -> msg_debug (str ("Bound: " ^ (var_to_string x) ^ " to Range: " ^ (range_to_string r)) ++ fnl ())) init_umap;
 
     (* When we add constructors to the ranges, this needs to change *)
-    let input_names = List.map (fun ({CAst.v = CRef (r, _)},_) -> fresh_name (string_of_reference r)) args in
+    let input_names = List.map (fun ({CAst.v = CRef (r, _)},_) -> fresh_name (string_of_reference r ^ "_")) args in
     let input_ranges = List.map (fun v -> Unknown v) input_names in
     
     (* Call the derivation dispatcher *)
@@ -355,7 +357,7 @@ let dep_dispatch ind class_name : unit =
     in
 
     (* When we add constructors to the ranges, this needs to change *)
-    let input_names = List.map (fun ({CAst.v = CRef (r, _)},_) -> fresh_name (string_of_reference r)) args in
+    let input_names = List.map (fun ({CAst.v = CRef (r, _)},_) -> fresh_name (string_of_reference r ^ "_")) args in
     let input_ranges = List.map (fun v -> Unknown v) input_names in
 
     (* Call the actual creation function *)

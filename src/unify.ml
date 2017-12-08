@@ -353,6 +353,7 @@ let handle_branch
       (check_expr : int -> coq_expr -> b -> b -> b)
       (match_inp : var -> matcher_pat -> b -> b -> b)
       (let_in_expr : string -> coq_expr -> (var -> b) -> b)
+      (let_tuple_in_expr : var -> var list -> b -> b)
       (gen_ctr : ty_ctr)
       (init_umap : range UM.t)
       (init_tmap : dep_type UM.t)
@@ -643,12 +644,21 @@ let handle_branch
          | [_] -> None
          | _ -> Some (List.map fst remaining_unknowns)
        in 
-      
+
+       (* LEo: These args are wrong *)
        let args = List.map (range_to_coq_expr updated_umap) ranges in
        (* TODO: Gather all checks, and add them to the check map *)
        process_checks rec_bind updated_umap cmap' fresh_unknown true
          (rec_method ctr_index letbinds args)
-         (fun final_umap final_cmap _shouldletthis -> recurse_type (ctr_index+1) final_umap final_cmap dt')
+         (fun final_umap final_cmap _shouldletthis ->
+           (* If letbinds exist, need to actually bind them *)
+           match letbinds with
+           | Some binds ->
+              let_tuple_in_expr fresh_unknown binds 
+                (recurse_type (ctr_index+1) final_umap final_cmap dt')
+           | None ->
+              recurse_type (ctr_index+1) final_umap final_cmap dt'
+         )
          )
     | NonRecursive all_unknowns ->
        failwith "NonRecursive"
@@ -892,7 +902,7 @@ let handle_branch
         msg_debug (str ("Darrowing: " ^ ((dep_type_to_string dt1))) ++ fnl ());
         handle_dt n true dt1 dt2 umap cmap
       | DTyCtr _ -> (* result *) 
-         (* Instantiate forGen *)
+         (* Instantiate result *)
          msg_debug (str ("Instantiating result: " ^ (Unknown.to_string result)) ++ fnl ());
          UM.iter (fun x r -> msg_debug (str ("Bound: " ^ (var_to_string x) ^ " to Range: " ^ (range_to_string r)) ++ fnl ())) umap;
 
