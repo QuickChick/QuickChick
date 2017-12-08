@@ -21,7 +21,7 @@ Instance test_coercion A B (P : A -> B -> Prop) `{Gen B}
 Definition foo : G (option (nat * nat)) :=
   @arbitraryST _ (fun p : nat * nat => let (x,y) := p in x = y) _.
 
-
+QuickChickDebug Debug On.
 Derive ArbitrarySizedSuchThat for (fun p => let (m,tr) := p in goodTree m tr).
 
 

@@ -617,6 +617,10 @@ let gLetIn (x : string) (e : coq_expr) (body : var -> coq_expr) =
   let fx = fresh_name x in
   CAst.make @@ CLetIn ((None, Name fx), e, None, body fx)
 
+
+let gLetTupleIn (x : var) (xs : var list) (body : coq_expr) =
+  CAst.make @@ CLetTuple (List.map (fun x -> (None, Names.Name x)) xs, (None, None), gVar x, body)
+  
 let gMatch discr ?catchAll:(body=None) (branches : (constructor * string list * (var list -> coq_expr)) list) : coq_expr =
   CAst.make @@ CCases (Term.RegularStyle,
           None (* return *), 
@@ -818,7 +822,7 @@ let gTupleAux f cs =
 let gTuple = listToPairAux gPair
 let gTupleType = listToPairAux gProd
 let dtTupleType =
-  listToPairAux (fun (acc,x) -> DTyCtr (injectCtr "Coq.Init.DatatypesProd", [acc;x]))
+  listToPairAux (fun (acc,x) -> DTyCtr (injectCtr "Coq.Init.Datatypes.prod", [acc;x]))
                                                       
 (*
                         match dts with
