@@ -161,7 +161,7 @@ let arbitrarySizedST
       (fun (rec_name, size::vars) -> aux_arb (gVar rec_name) size vars)
       (fun rec_name -> gFun ["size"] 
           (fun [size] -> gApp (gVar rec_name) 
-              (gVar size :: List.map gVar input_names)
+              (gVar size :: List.map (fun i -> gVar (arg_to_var i)) inputs)
           ))
   in
 

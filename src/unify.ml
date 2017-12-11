@@ -293,7 +293,8 @@ let handle_equalities eqs (check_expr : coq_expr -> 'a -> 'a -> 'a)
              ) eqs cleft
 
 type mode = Recursive of (Unknown.t * dep_type) list
-                       * (Unknown.t * dep_type) list  (* List of unknowns that need to be instantiated before recursive call and remaining unknowns *)
+                       * (Unknown.t * dep_type) list
+                       * range list
           | NonRecursive of (Unknown.t * dep_type) list (* List of all unknowns that are still undefined *)
 
 let mode_analysis (init_ranges : range list) (init_map : range UM.t)
@@ -301,6 +302,7 @@ let mode_analysis (init_ranges : range list) (init_map : range UM.t)
   let unknowns_for_mode  = ref [] in
   let remaining_unknowns = ref [] in
   let all_unknowns = ref [] in
+  let actual_inputs = ref [] in
   (* Compare ranges takes two ranges (the initial range r1 and the current range r2)
      as well as their parents, and returns:
      - true, if we can convert the current range to the same
@@ -308,19 +310,25 @@ let mode_analysis (init_ranges : range list) (init_map : range UM.t)
      - false, if we can not convert (i.e. some things are more instantiated 
        than they should be)
    *)
-  let rec compare_ranges p1 r1 p2 r2 =
+  let rec compare_ranges isTop p1 r1 p2 r2 =
     match r1, r2 with
-    | Unknown u1, _ -> compare_ranges u1 (UM.find u1 init_map) p2 r2
-    | _, Unknown u2 -> compare_ranges p1 r1 u2 (UM.find u2 curr_map)
-    | FixedInput, FixedInput -> true
+    | Unknown u1, _ -> compare_ranges isTop u1 (UM.find u1 init_map) p2 r2
+    | _, Unknown u2 -> compare_ranges isTop p1 r1 u2 (UM.find u2 curr_map)
+    | FixedInput, FixedInput ->
+       if isTop then actual_inputs := Unknown p2 :: !actual_inputs;
+       true
     | FixedInput, Undef dt   ->
+       if isTop then actual_inputs := Unknown p2 :: !actual_inputs; 
        unknowns_for_mode := (p2, dt) :: !unknowns_for_mode;
        all_unknowns := (p2, dt) :: !all_unknowns;
        true
     | FixedInput, Ctr (c, rs) ->
+       if isTop then actual_inputs := (Ctr (c,rs)) :: !actual_inputs; 
        (* iterate through all the rs against fixed inputs *)
-       List.for_all (fun b -> b) (List.map (compare_ranges Unknown.undefined FixedInput Unknown.undefined) rs)
-    | Undef _, FixedInput -> false
+       List.for_all (fun b -> b) (List.map (compare_ranges false Unknown.undefined FixedInput Unknown.undefined) rs)
+    | Undef _, FixedInput ->
+       (* todo: something is wrong here *)
+       false
     | Undef _, Undef dt    ->
        (* Add the second range's parent to the list of unknowns that are free, 
           but do not need to be instantiated for the mode to work *)
@@ -328,11 +336,11 @@ let mode_analysis (init_ranges : range list) (init_map : range UM.t)
        all_unknowns := (p2, dt) :: !all_unknowns;
        true
     | Undef _, Ctr (c, rs) ->
-       List.iter (fun r' -> ignore (compare_ranges p1 r1 Unknown.undefined r')) rs; false
+       List.iter (fun r' -> ignore (compare_ranges false p1 r1 Unknown.undefined r')) rs; false
     | _, _ -> qcfail "Implement constructors for initial ranges"
   in
-  if List.for_all (fun b -> b) (List.map2 (fun r1 r2 -> compare_ranges Unknown.undefined r1 Unknown.undefined r2) init_ranges curr_ranges) 
-  then Recursive (List.rev !unknowns_for_mode, List.rev !remaining_unknowns)
+  if List.for_all (fun b -> b) (List.map2 (fun r1 r2 -> compare_ranges true Unknown.undefined r1 Unknown.undefined r2) init_ranges curr_ranges) 
+  then Recursive (List.rev !unknowns_for_mode, List.rev !remaining_unknowns, List.rev !actual_inputs)
   else NonRecursive !all_unknowns
 
 let isTyParam = function
@@ -612,7 +620,7 @@ let handle_branch
     (* TODO: positive/negative context *)
     (* Then do mode analysis on the new dts *)
     match mode_analysis input_ranges init_umap ranges umap' with
-    | Recursive (unknowns_for_mode, remaining_unknowns) ->
+    | Recursive (unknowns_for_mode, remaining_unknowns, actual_inputs) ->
        (* Mark recursiveness of branch *)
        is_base := false;
        (* Instantiate all the unknowns needed for the mode to work out *)
@@ -646,7 +654,8 @@ let handle_branch
        in 
 
        (* LEo: These args are wrong *)
-       let args = List.map (range_to_coq_expr updated_umap) ranges in
+       (* let args = List.map (range_to_coq_expr updated_umap) ranges in *)
+       let args = List.map (range_to_coq_expr updated_umap) actual_inputs in
        (* TODO: Gather all checks, and add them to the check map *)
        process_checks rec_bind updated_umap cmap' fresh_unknown true
          (rec_method ctr_index letbinds args)

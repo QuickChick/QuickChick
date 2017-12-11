@@ -4,6 +4,8 @@ Inductive Tree :=
 | Leaf : Tree
 | Node : nat -> Tree -> Tree -> Tree.
 
+Derive Arbitrary for Tree.
+
 Inductive goodTree : nat -> Tree -> Prop :=
 | GoodLeaf : forall n, goodTree n Leaf 
 | GoodNode : forall m l r, goodTree m l -> goodTree m (Node m l r).
@@ -23,5 +25,7 @@ Definition foo : G (option (nat * nat)) :=
 
 QuickChickDebug Debug On.
 Derive ArbitrarySizedSuchThat for (fun p => let (m,tr) := p in goodTree m tr).
+
+
 
 

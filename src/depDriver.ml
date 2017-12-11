@@ -62,13 +62,13 @@ let derive_dependent (class_name : derivable)
   let params = List.map (fun tp -> gArg ~assumName:(gTyParam tp) ()) ty_params in
 
   (* List of input unknowns *)
-  let input_list =
-    UM.fold (fun u r acc -> if r == FixedInput then u :: acc else acc) umap []
+  let actual_input_list =
+    List.rev (UM.fold (fun u r acc -> if r == FixedInput then u :: acc else acc) umap [])
   in
   (* Inputs as arguments *)
-  let inputs = 
+  let actual_input_args = 
     List.map (fun u -> gArg ~assumName:(gVar u) ~assumType:(gType ty_params (UM.find u tmap)) ())
-      input_list 
+      actual_input_list 
   in
 
   (* The type we are generating for -- not the predicate! *)
@@ -80,7 +80,7 @@ let derive_dependent (class_name : derivable)
   (* The dependent generator  *)
   let gen =
     arbitrarySizedST ty_ctr ty_params ctrs dep_type input_names
-      input_ranges umap tmap inputs result coqTyCtr
+      input_ranges umap tmap actual_input_args result coqTyCtr
   in
 
   (* Generate typeclass constraints. For each type parameter "A" we need `{_ : <Class Name> A} *)
@@ -91,11 +91,11 @@ let derive_dependent (class_name : derivable)
       @ dec_needed
       @ self_dec
       @ arb_needed *)
-      @ inputs
+      @ actual_input_args
     | GenSizedSuchThatMonotonicOpt -> params 
-    | SizedProofEqs -> params @ inputs
-    | GenSizedSuchThatCorrect -> params @ inputs
-    | GenSizedSuchThatSizeMonotonicOpt -> params @ inputs
+    | SizedProofEqs -> params @ actual_input_args
+    | GenSizedSuchThatCorrect -> params @ actual_input_args
+    | GenSizedSuchThatSizeMonotonicOpt -> params @ actual_input_args
   in
 
   (* Fully applied predicate (parameters and constructors) *)
@@ -327,7 +327,7 @@ let dep_dispatch ind class_name : unit =
          in
          let tmap' = UM.add idu (dtTupleType bind_types) tmap in
          let umap' =
-           let pair_ctr = injectCtr "Coq.Init.Datatypes.prod" in
+           let pair_ctr = injectCtr "Coq.Init.Datatypes.pair" in
            let range = listToPairAux (fun (r1, r2) -> Ctr (pair_ctr, [r1; r2])) (List.map (fun u -> Unknown u) binds) in
            UM.add idu range umap in
          (letbinds, umap', tmap')

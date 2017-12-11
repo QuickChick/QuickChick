@@ -103,6 +103,11 @@ let gArg ?assumName:(an=hole) ?assumType:(at=hole) ?assumImplicit:(ai=false) ?as
                    else if ai then Default Implicit else Default Explicit),
                   at )
 
+let arg_to_var (x : arg) =
+  match x with
+  | CLocalAssum ([(_loc, Name id)], _ ,_ ) -> id
+  | _ -> qcfail "arg_to_var must be named"
+  
 let str_lst_to_string sep (ss : string list) = 
   List.fold_left (fun acc s -> acc ^ sep ^ s) "" ss
 

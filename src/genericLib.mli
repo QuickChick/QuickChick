@@ -32,7 +32,9 @@ val gArg : ?assumName:coq_expr ->
            ?assumImplicit:bool ->
            ?assumGeneralized:bool ->
            unit -> arg
-               
+
+val arg_to_var : arg -> var
+  
 val str_lst_to_string : string -> string list -> string
 
 type coq_type = 
