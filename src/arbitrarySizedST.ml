@@ -55,8 +55,13 @@ let check_expr (n : int) (scrut : coq_expr) (left : coq_expr) (right : coq_expr)
   gMatchReturn scrut
     "s" (* as clause *)
     (fun v -> ret_type v ret_type_dec)
-    [ (injectCtr "left", ["eq" ] , fun _ -> left)
-    ; (injectCtr "right", ["neq"], fun _ -> right) 
+    [ (injectCtr "Some", ["res_b" ] , fun [b] ->
+      (* Why as clauses/returns? *)       
+      gMatch (gVar b) 
+        [ (injectCtr "true", [], fun _ -> left)
+        ; (injectCtr "false", [], fun _ -> right)
+        ])
+    ; (injectCtr "None", [], fun _ -> right) 
     ]
 
 let match_inp (inp : var) (pat : matcher_pat) (left : coq_expr) (right  : coq_expr) =

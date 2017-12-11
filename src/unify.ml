@@ -667,30 +667,41 @@ let handle_branch
          )
     | NonRecursive [] ->
 
-(*       let body_cont = recurse_type (ctr_index + 1) dt2 in
+       let body_cont = recurse_type (ctr_index + 1) dt' in
        let body_fail = fail_exp in
 
-        if pos then check_expr m (checker (List.map (fun dt -> dt_to_coq_expr k dt) dts)) body_cont body_fail
-        else check_expr m (checker (List.map (fun dt -> dt_to_coq_expr k dt) dts)) body_fail body_cont
- *)
-       failwith "Checker"
+       (* Construct the checker for the current type constructor *)
+       let checker args = 
+         gApp ~explicit:true (gInject "decOpt") 
+           (* P : Prop := c dts*)
+           [ gApp ~explicit:true (gTyCtr c) args
+
+           (* Instance *)
+           ; hole 
+
+           (* Size. TODO: what do we do about this size? *)
+           ; gInt 42
+           
+           ] 
+       in
+
+       (* Calculate arguments *)
+       let args =
+         match sequenceM (dt_to_coq_expr !umap) dts with
+         | Some rs -> rs
+         | None -> qcfail "Uninstantiated function calls after instantiation?"
+       in 
+       
+       if is_pos then
+         check_expr ctr_index
+           (checker args) body_cont body_fail
+       else
+         check_expr ctr_index
+           (checker args) body_fail body_cont
     | NonRecursive all_unknowns ->
        failwith "NonRecursive"
     ) 
 
-(*
-      (* Construct the checker for the current type constructor *)
-      let checker args = 
-        gApp ~explicit:true (gInject "dec") 
-          (* P : Prop := c dts*)
-          [ gApp ~explicit:true (gTyCtr c) args
-
-          (* Instance *)
-          ; hole 
-
-          ] 
-      in
- *)
 (*    
       let finalizer k cmap numbered_dts = 
 
