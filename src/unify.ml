@@ -379,18 +379,18 @@ let handle_branch
   let is_base = ref true in
 
   (* Local references to handle map updates. Keep init_umap intact for mode analysis. *)
-  let umap_ref = ref init_umap in
-  let tmap_ref = ref init_tmap in
+  let umap = ref init_umap in
+  let tmap = ref init_tmap in
 
   (* Check map - registers necessary checks for variable instantiation *)
-  let cmap_ref = ref CMap.empty in
+  let cmap = ref CMap.empty in
   
   (* Add all universally quantified unknowns in the u/t environments. *)
   let rec register_unknowns = function
       | DArrow (dt1, dt2) -> register_unknowns dt2
       | DProd ((x, dt1), dt2) ->
-         umap_ref := UM.add x (Undef dt1) !umap_ref;
-         tmap_ref := UM.add x dt1 !tmap_ref;
+         umap := UM.add x (Undef dt1) !umap;
+         tmap := UM.add x dt1 !tmap;
          register_unknowns dt2
       | _ -> ()
   in
@@ -422,7 +422,7 @@ let handle_branch
 
   (* Debugging init map *)
   msg_debug (str ("Handling branch: " ^ dep_type_to_string typ) ++ fnl ());
-  UM.iter (fun x r -> msg_debug (str ("Bound: " ^ (var_to_string x) ^ " to Range: " ^ (range_to_string r)) ++ fnl ())) !umap_ref;
+  UM.iter (fun x r -> msg_debug (str ("Bound: " ^ (var_to_string x) ^ " to Range: " ^ (range_to_string r)) ++ fnl ())) !umap;
   dep_fold_ty (fun _ dt1 -> msg_debug (str (Printf.sprintf "%s : %b\n" (dep_type_to_string dt1) (is_dep_type dt1)) ++ fnl()))
     (fun _ _ dt1 -> msg_debug (str (Printf.sprintf "%s : %b\n" (dep_type_to_string dt1) (is_dep_type dt1)) ++ fnl()))
     (fun _ -> ()) (fun _ -> ()) (fun _ -> ()) (fun _ -> ()) typ;
@@ -433,17 +433,17 @@ let handle_branch
   (* ********************************************* *)
 
   (* Set of equality checks necessary *)
-  let eq_set_ref  = ref EqSet.empty in
+  let eq_set  = ref EqSet.empty in
   (* List of necessary pattern matches *)
-  let matches_ref = ref [] in
+  let matches = ref [] in
   (* Function to handle a single argument *)
   let unify_single_pair r_in r_res =
-    match unify !umap_ref r_in r_res !eq_set_ref with
+    match unify !umap r_in r_res !eq_set with
     | Some (umap', _range, eq_set', extra_matches) ->
        (* Unification succeeded; update info *)
-       umap_ref    := umap';
-       eq_set_ref  := eq_set';
-       matches_ref := extra_matches @ !matches_ref
+       umap := umap';
+       eq_set := eq_set';
+       matches := extra_matches @ !matches
     | None ->
        (* Unification failed. *)
        qcfail "Matching result type error" (* TODO: Better error message here? *)
@@ -477,59 +477,58 @@ let handle_branch
   (* When instantiating a single unknown, see if it must satisfy any additional predicates. *)
   (* Old comment: Process check map. XXX generator specific *)
   (* ZOE: What do you mean by XXX generator specific? Is this comment still relevant? *)
-  let process_checks bind umap cmap x opt g (cont : umap -> cmap -> var -> b) : b = 
-    match lookup_checks (DTyVar x) cmap with
+  let process_checks bind x opt g (cont : var -> b) : b = 
+    match lookup_checks (DTyVar x) !cmap with
     | Some checks -> 
        (* Remove checks from cmap *)
-       let cmap' = CMap.remove (DTyVar x) cmap in
+       cmap := CMap.remove (DTyVar x) !cmap;
+       umap := fixVariable x !umap;
        bind true
          (stMaybe opt g (var_to_string x) checks)
          (var_to_string x)
-         (fun x -> cont (fixVariable x umap) cmap' x)
-    | None -> 
-       bind opt g (var_to_string x)
-         (fun x -> cont (fixVariable x umap) cmap x)
+         (fun x -> cont x)
+    | None ->
+       umap := fixVariable x !umap;
+       bind opt g (var_to_string x) (fun x -> cont x)
   in
 
   (* Two mutually recursive functions follow for instantiating ranges. *)
   
-  (* Function to instantiate a single range; uses an input check-map for additional checks. 
-     Takes a continuation that receives the potentially updated unknown- and check-maps, as 
-     well as the (instantiated) range to produce a result. *)
-  let rec instantiate_range_cont umap cmap (parent : unknown)
-            (cont : umap -> cmap -> range -> b) r =
+  (* Function to instantiate a single range; uses the input check-map for additional checks. 
+     Takes a continuation that receives the (instantiated) range to produce a result. *)
+  let rec instantiate_range_cont (parent : unknown) r (cont : range -> b) =
     msg_debug (str ("Calling instantiate_range_cont with : " ^ range_to_string r) ++ fnl ());
     match r with 
     | Ctr (c,rs) ->
        (* We need to recursively instantiate all the ranges rs, using the function below *)
-       instantiate_toplevel_ranges_cont umap cmap rs []
-         (fun umap' cmap' rs' -> cont umap' cmap' (Ctr (c, rs')))
+       instantiate_toplevel_ranges_cont rs []
+         (fun rs' -> cont (Ctr (c, rs')))
     | Undef dt ->
        (* For undefined, we need to instantiate the parrent by processing its checks. *)
-         process_checks ex_bind umap cmap parent false instantiate_existential_method
-           (fun umap' cmap' x -> cont umap' cmap' (Unknown x))
+         process_checks ex_bind parent false instantiate_existential_method
+           (fun x -> cont (Unknown x))
     | Unknown u ->
        (* Unknowns just propagate one step further *)
-       instantiate_range_cont umap cmap u cont (umfind u umap)
+       instantiate_range_cont u (umfind u !umap) cont
     | FixedInput ->
        (* Just call the continuation on the parent. *)
-       cont umap cmap (Unknown parent)
+       cont (Unknown parent)
 
   (* Function that operates on multiple top-level ranges at once, mapping the above over a list *)
-  and instantiate_toplevel_ranges_cont umap cmap (rs : range list) (acc : range list)
-            (cont : umap -> cmap -> range list -> b) : b =
+  and instantiate_toplevel_ranges_cont (rs : range list) (acc : range list)
+            (cont : range list -> b) : b =
     match rs with
     | r ::rs' ->
        (* For each range r, we need to recursively call instantiate_range with the 
           current umap and cmap, and no defined parent. *)
-       instantiate_range_cont umap cmap Unknown.undefined
+       instantiate_range_cont Unknown.undefined r
          (* The continuation receives an updated umap', cmap' and a new range res,
             representing the (potentially instantiated) range.
             We then add res to an accumulator list and continue the traversal. *)
-         (fun umap' cmap' res -> instantiate_toplevel_ranges_cont umap' cmap' rs' (res::acc) cont) r
+         (fun res -> instantiate_toplevel_ranges_cont rs' (res::acc) cont)
     | [] ->
        (* When we are done traversing the rs, we reverse the accumulator and call the continuation *)
-       cont umap cmap (List.rev acc)
+       cont (List.rev acc)
   in 
 
   (* Another helper function that ensures no function calls are left in the representation.
@@ -541,25 +540,24 @@ let handle_branch
      The input datatypes are range-convertible apart from any function calls.
    *)
   (* For your sanity, ask someone to explain this function before tweaking anything. *)
-  let rec instantiate_function_calls_cont umap cmap dts (acc : dep_type list)
-            (cont : umap -> cmap -> dep_type list -> b) : b =
+  let rec instantiate_function_calls_cont dts (acc : dep_type list) (cont : dep_type list -> b) : b =
     match dts with 
-    | [] -> cont umap cmap (List.rev acc)
+    | [] -> cont (List.rev acc)
     | dt::dts' -> 
        begin match dt with
        | DCtr (c, inner_dts) ->
           (* Call the instantiate function to first instantiate the inner datatypes *)
-          instantiate_function_calls_cont umap cmap inner_dts []
-            (fun umap' cmap' inner_dts' ->
+          instantiate_function_calls_cont inner_dts []
+            (fun inner_dts' ->
               (* Call the instantiate function as its continuation after repacking DCtr *)
-              instantiate_function_calls_cont umap' cmap' dts' (DCtr (c, inner_dts') :: acc) cont)
+              instantiate_function_calls_cont dts' (DCtr (c, inner_dts') :: acc) cont)
        | DTyVar x ->
           (* Just continue along instantiating the rest of the function calls *)
-          instantiate_function_calls_cont umap cmap dts' (DTyVar x :: acc) cont
+          instantiate_function_calls_cont dts' (DTyVar x :: acc) cont
        | DApp (DTyVar f, argdts) ->
           (* Again, instantiate the inner dts' function calls if necessary first *)
-          instantiate_function_calls_cont umap cmap argdts []
-            (fun umap' cmap' argdts' ->
+          instantiate_function_calls_cont argdts []
+            (fun argdts' ->
               (* Convert the datatypes to ranges *)
               let ranges =
                 match sequenceM convert_to_range argdts' with
@@ -569,21 +567,21 @@ let handle_branch
               in 
                  
               (* Then actually instantiate the ranges *)
-              instantiate_toplevel_ranges_cont umap' cmap' ranges []
-                (fun umap'' cmap'' ranges' ->
+              instantiate_toplevel_ranges_cont ranges []
+                (fun ranges' ->
                   (* Create a fresh unknown u *)
                   let u = unk_provider.next_unknown () in
                   (* Convert the ranges to coq_exprs *)
-                  let coq_expr_args = List.map (range_to_coq_expr umap'') ranges' in
+                  let coq_expr_args = List.map (range_to_coq_expr !umap) ranges' in
 
                   (* Bind the result of the application f args to u *)
                   let_in_expr (Unknown.to_string u)
                     (gApp (gVar f) coq_expr_args)
                     (fun uvar ->
+                      umap := UM.add uvar FixedInput !umap;
                       (* Given the variable representation of u, proceed to instantiate 
                          the rest of the dts' *)
-                      instantiate_function_calls_cont
-                        (UM.add uvar FixedInput umap'') cmap'' dts' (DTyVar uvar :: acc) cont)))
+                      instantiate_function_calls_cont dts' (DTyVar uvar :: acc) cont)))
        end
   in 
 
@@ -606,10 +604,10 @@ let handle_branch
      
    *)
   let rec handle_TyCtr (ctr_index : int) (is_pos : bool) (c : ty_ctr)
-            umap cmap (dts : dep_type list) (dt' : dep_type) =
+            (dts : dep_type list) (dt' : dep_type) =
 
     (* First instantiate the function calls in the dep_type list *)
-    instantiate_function_calls_cont umap cmap dts [] (fun umap' cmap' dts' ->
+    instantiate_function_calls_cont dts [] (fun dts' ->
 
     (* Convert the modified dep_types to ranges *)
     let ranges = match sequenceM convert_to_range dts' with
@@ -619,12 +617,12 @@ let handle_branch
 
     (* TODO: positive/negative context *)
     (* Then do mode analysis on the new dts *)
-    match mode_analysis input_ranges init_umap ranges umap' with
+    match mode_analysis input_ranges init_umap ranges !umap with
     | Recursive (unknowns_for_mode, remaining_unknowns, actual_inputs) ->
        (* Mark recursiveness of branch *)
        is_base := false;
        (* Instantiate all the unknowns needed for the mode to work out *)
-       instantiate_toplevel_ranges_cont umap' cmap' (List.map (fun (x,t) -> Unknown x) unknowns_for_mode) [] (fun umap' cmap' _ranges ->
+       instantiate_toplevel_ranges_cont (List.map (fun (x,t) -> Unknown x) unknowns_for_mode) [] (fun _ranges ->
 
        (* We will instantiate an unknown. First create a fresh one *)
        let fresh_unknown =
@@ -644,7 +642,7 @@ let handle_branch
          | _ -> listToPairAux (fun (acc, x) -> Ctr (injectCtr "Coq.Init.Datatypes.pair", [acc; x]))
                   (List.map (fun (x,_) -> Unknown x) remaining_unknowns)
        in
-       let updated_umap = UM.add fresh_unknown unknown_range umap' in
+       umap := UM.add fresh_unknown unknown_range !umap;
 
        let letbinds =
          match remaining_unknowns with
@@ -653,22 +651,29 @@ let handle_branch
          | _ -> Some (List.map fst remaining_unknowns)
        in 
 
-       (* LEo: These args are wrong *)
-       (* let args = List.map (range_to_coq_expr updated_umap) ranges in *)
-       let args = List.map (range_to_coq_expr updated_umap) actual_inputs in
+       let args = List.map (range_to_coq_expr !umap) actual_inputs in
        (* TODO: Gather all checks, and add them to the check map *)
-       process_checks rec_bind updated_umap cmap' fresh_unknown true
+       process_checks rec_bind fresh_unknown true
          (rec_method ctr_index letbinds args)
-         (fun final_umap final_cmap _shouldletthis ->
+         (fun _shouldletthis ->
            (* If letbinds exist, need to actually bind them *)
            match letbinds with
            | Some binds ->
               let_tuple_in_expr fresh_unknown binds 
-                (recurse_type (ctr_index+1) final_umap final_cmap dt')
+                (recurse_type (ctr_index+1) dt')
            | None ->
-              recurse_type (ctr_index+1) final_umap final_cmap dt'
+              recurse_type (ctr_index+1) dt'
          )
          )
+    | NonRecursive [] ->
+
+(*       let body_cont = recurse_type (ctr_index + 1) dt2 in
+       let body_fail = fail_exp in
+
+        if pos then check_expr m (checker (List.map (fun dt -> dt_to_coq_expr k dt) dts)) body_cont body_fail
+        else check_expr m (checker (List.map (fun dt -> dt_to_coq_expr k dt) dts)) body_fail body_cont
+ *)
+       failwith "Checker"
     | NonRecursive all_unknowns ->
        failwith "NonRecursive"
     ) 
@@ -889,12 +894,12 @@ let handle_branch
          else failwith "Negation / application"
  *)
     (* Dispatcher for constraints *)
-    and handle_dt (n : int) pos dt1 dt2 umap cmap : b = 
+    and handle_dt (n : int) pos dt1 dt2 : b = 
       match dt1 with 
       | DTyCtr (c,dts) -> 
-        handle_TyCtr n pos c umap cmap dts dt2
+        handle_TyCtr n pos c dts dt2
       | DNot dt -> 
-        handle_dt n (not pos) dt dt2 umap cmap
+        handle_dt n (not pos) dt dt2
 (*
       | DApp (dt, dts) -> 
         handle_app n pos dt dts umap cmap dt2
@@ -902,38 +907,39 @@ let handle_branch
       | _ -> failwith "Constraints should be type constructors/negations"
 
     (* Iterate through constraints *)
-    and recurse_type (n : int) umap cmap dt : b =
+    and recurse_type (n : int) dt : b =
       msg_debug (str ("Recursing on type: " ^ dep_type_to_string dt) ++ fnl ());
       match dt with 
       | DProd (_, dt) -> (* Only introduces variables, doesn't constrain them *)
-        recurse_type n umap cmap dt
+        recurse_type n dt
       | DArrow (dt1, dt2) ->
         msg_debug (str ("Darrowing: " ^ ((dep_type_to_string dt1))) ++ fnl ());
-        handle_dt n true dt1 dt2 umap cmap
+        handle_dt n true dt1 dt2
       | DTyCtr _ -> (* result *) 
          (* Instantiate result *)
          msg_debug (str ("Instantiating result: " ^ (Unknown.to_string result)) ++ fnl ());
-         UM.iter (fun x r -> msg_debug (str ("Bound: " ^ (var_to_string x) ^ " to Range: " ^ (range_to_string r)) ++ fnl ())) umap;
+         UM.iter (fun x r -> msg_debug (str ("Bound: " ^ (var_to_string x) ^ " to Range: " ^ (range_to_string r)) ++ fnl ())) !umap;
 
-         instantiate_range_cont umap cmap Unknown.undefined (fun umap' cmap' res_range ->
+         instantiate_range_cont Unknown.undefined (Unknown result) (fun res_range ->
 
          msg_debug (str ("Continuation of inst range in result") ++ fnl ());
          (* Search if there is anything that is not fixed that requires instantiation *)
-         let allUnknowns = List.map fst (UM.bindings umap') in
-         match List.filter (fun u -> match is_fixed umap' (DTyVar u) with
+         let allUnknowns = List.map fst (UM.bindings !umap) in
+         match List.filter (fun u -> match is_fixed !umap (DTyVar u) with
                                      | Some b -> not b
                                      | _ -> qcfail "Internal - filter") allUnknowns with
          | [] ->
             msg_debug (str "Final ret_exp call" ++ fnl ());
-            ret_exp (range_to_coq_expr umap' res_range)
+            ret_exp (range_to_coq_expr !umap res_range)
          | us -> begin 
              msg_warning (str ("After proccessing all constraints, there are still uninstantiated variables: " ^ 
                                  String.concat " , " (List.map var_to_string allUnknowns) ^ ". Proceeding with caution...") ++ fnl ());
-             instantiate_toplevel_ranges_cont umap' cmap' (List.map (fun u -> Unknown u) us) []
-               (fun umapf cmapf _unused_ranges ->
-                 ret_exp (range_to_coq_expr umap' res_range)
+             instantiate_toplevel_ranges_cont (List.map (fun u -> Unknown u) us) []
+               (fun _unused_ranges ->
+                 ret_exp (range_to_coq_expr !umap res_range)
                )
-           end) (Unknown result)
+           end
+           )
       | _ -> failwith "Wrong type" in
 
   let branch_gen =
@@ -941,13 +947,13 @@ let handle_branch
     let rec walk_matches = function
       | [] ->
          msg_debug (str "Match output complete" ++ fnl ());
-         handle_equalities !eq_set_ref (check_expr (-1)) (recurse_type 0 !umap_ref CMap.empty typ) (fail_exp)
+         handle_equalities !eq_set (check_expr (-1)) (recurse_type 0 typ) (fail_exp)
       | (u,m)::ms -> begin
           msg_debug (str (Printf.sprintf "Processing Match: %s @ %s" (Unknown.to_string u) (matcher_pat_to_string m)) ++ fnl ());
           match_inp u m (walk_matches ms) fail_exp
         end in
     (* matches are the matches returned by unification with the result type *)
-    walk_matches !matches_ref
+    walk_matches !matches
   in 
 
   (* Debugging resulting match *)
