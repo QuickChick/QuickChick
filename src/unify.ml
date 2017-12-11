@@ -667,6 +667,8 @@ let handle_branch
          )
     | NonRecursive [] ->
 
+       (* Checker *)
+
        let body_cont = recurse_type (ctr_index + 1) dt' in
        let body_fail = fail_exp in
 
@@ -699,7 +701,47 @@ let handle_branch
          check_expr ctr_index
            (checker args) body_fail body_cont
     | NonRecursive all_unknowns ->
-       failwith "NonRecursive"
+
+       (* Call to arbitrarySizedST *)
+       (* @arbitrarySizeST {A} (P : A -> Prop) {Instance} (size : nat) -> G (option A) *)
+       (* We will instantiate an unknown. First create a fresh one *)
+       let fresh_unknown =
+         match all_unknowns with
+         | [(x,_)] -> x
+         | _ -> unk_provider.next_unknown ()
+       in 
+       let unknown_type = dtTupleType (List.map snd all_unknowns) in
+       let unknown_range =
+         match all_unknowns with
+         | [] -> failwith "IMPOSSIBLE"
+         | [(x,_)] -> Undef unknown_type
+         | _ -> listToPairAux (fun (acc, x) -> Ctr (injectCtr "Coq.Init.Datatypes.pair", [acc; x]))
+                  (List.map (fun (x,_) -> Unknown x) all_unknowns)
+       in
+       umap := UM.add fresh_unknown unknown_range !umap;
+
+       let letbinds =
+         match all_unknowns with
+         | [] -> None
+         | [_] -> None
+         | _ -> Some (List.map fst all_unknowns)
+       in 
+
+       let args = List.map (range_to_coq_expr !umap) ranges in
+
+       let pred_result = gApp ~explicit:true (gTyCtr c) (List.map (range_to_coq_expr !umap) ranges) in
+       let pred = (* predicate we are generating for *)
+         gFun [var_to_string fresh_unknown]
+           (fun [_] ->
+             match letbinds with
+             | Some binds -> gLetTupleIn fresh_unknown binds pred_result
+             | None -> pred_result
+           )
+       in
+
+       process_checks rec_bind fresh_unknown true (instantiate_existential_methodST ctr_index pred) 
+            (fun x' -> recurse_type (ctr_index + 1) dt')
+
     ) 
 
 (*    

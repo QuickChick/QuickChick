@@ -23,6 +23,9 @@ Admitted.
 
 Derive ArbitrarySizedSuchThat for (fun p => let (m,tr) := p in checker_test m tr).
 
+(* Non recursive test *)
+Derive ArbitrarySizedSuchThat for (fun tr => recursion_test m tr).
+
 
                                              (* m > n -> goodTree m l -> goodTree m r -> goodTree n (Node m l r). *)
 
