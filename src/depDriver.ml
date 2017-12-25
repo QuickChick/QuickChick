@@ -5,6 +5,7 @@ open Constrexpr
 open GenericLib
 open GenLib
 open ArbitrarySizedST
+open CheckerSizedST
 open Error
 open Unify
 (*   
@@ -83,8 +84,14 @@ let derive_dependent (class_name : derivable)
       input_ranges umap tmap actual_input_args result coqTyCtr
   in
 
+  let dec_opt =
+    checkerSizedST ty_ctr ty_params ctrs dep_type input_names
+      input_ranges umap tmap actual_input_args result coqTyCtr
+  in 
+
   (* Generate typeclass constraints. For each type parameter "A" we need `{_ : <Class Name> A} *)
   let instance_arguments = match class_name with
+    | DecOpt -> params @ actual_input_args
     | ArbitrarySizedSuchThat ->
       params
 (*      @ gen_needed
@@ -153,22 +160,19 @@ let derive_dependent (class_name : derivable)
     | GenSizedSuchThatSizeMonotonicOpt -> params @ inputs
   in
 
-
-  let rec list_take_drop n l = 
-    if n <= 0 then ([], l)
-    else match l with 
-         | [] -> ([], [])
-         | h::t -> let (take,drop) = list_take_drop (n-1) t in (h::take, drop) 
-  in 
    *)  
   (* The instance type *)
   let instance_type iargs = match class_name with
     | ArbitrarySizedSuchThat ->
-      gApp (gInject (derivable_to_string class_name))
-        [gType ty_params (UM.find result tmap);
-         full_pred input_names]
+       gApp (gInject (derivable_to_string class_name))
+         [gType ty_params (UM.find result tmap);
+          full_pred input_names]
+    | DecOpt ->
+       gApp (gInject (derivable_to_string class_name))
+         [ gInject ctr_name ]
 (*      
     | GenSizedSuchThatMonotonicOpt ->
+
       gProdWithArgs
         ((gArg ~assumType:(gInject "nat") ~assumName:(gInject "size") ()) :: inputs)
         (fun (size :: inputs) ->
@@ -194,6 +198,7 @@ let derive_dependent (class_name : derivable)
   let instance_record iargs =
     match class_name with
     | ArbitrarySizedSuchThat -> gen
+    | DecOpt -> dec_opt 
 (*                              
     | GenSizedSuchThatMonotonicOpt ->
       msg_debug (str "mon type");
@@ -211,7 +216,6 @@ let derive_dependent (class_name : derivable)
       genSizedSTSMon_body (class_name cn) ty_ctr ty_params ctrs dep_type input_names inputs n register_arbitrary
  *)
   in
-
 
   msg_debug (str "Instance Type: " ++ fnl ());
   debug_coq_expr (instance_type [gInject "input0"; gInject "input1"]);
@@ -365,15 +369,14 @@ let dep_dispatch ind class_name : unit =
     let (umap, tmap) = create_t_and_u_maps explicit_args dep_type args in
 
     let result = fresh_name "_result_bool" in
-    
+    let umap = UM.add result (Ctr (injectCtr "Coq.Init.Datatypes.Some", [ Ctr (injectCtr "Coq.Init.Datatypes.true", []) ])) umap in
+    let tmap = UM.add result (DTyCtr (ctr_to_ty_ctr (injectCtr "Coq.Init.Datatypes.option"),
+                                      [ DTyCtr (ctr_to_ty_ctr (injectCtr "Coq.Init.Datatypes.bool"), []) ])) tmap in
+
     derive_dependent class_name constructor umap tmap input_names input_ranges
       (ty_ctr, ty_params, ctrs, dep_type) None result
   | _ -> qcfail "wrongformat/driver.ml4"
 
-      (*     let n = fst (List.find (fun (_,({CAst. v = CRef (r,_)}, _)) -> Id.to_string id = string_of_reference r) (List.mapi (fun i x -> (i+1,x)) args)) in*)
-  
-
-                              
 (*
 
 

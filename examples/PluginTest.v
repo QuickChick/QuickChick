@@ -22,6 +22,8 @@ Instance dec_opt l t : DecOpt (checker_test l t).
 Admitted.
 
 Derive ArbitrarySizedSuchThat for (fun p => let (m,tr) := p in checker_test m tr).
+Derive DecOpt for (checker_test n t).
+
 
 (* Non recursive test *)
 Derive ArbitrarySizedSuchThat for (fun tr => recursion_test m tr).

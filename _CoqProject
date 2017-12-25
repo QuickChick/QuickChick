@@ -35,6 +35,7 @@ src/coqLib.ml
 src/weightmap.ml4
 src/arbitrarySized.ml
 src/arbitrarySizedST.ml
+src/checkerSizedST.ml
 src/DependentClasses.v
 src/Decidability.v
 src/genLib.ml

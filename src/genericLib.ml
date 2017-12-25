@@ -129,7 +129,8 @@ let injectCtr s =
   if s = "" then failwith "Called gInject with empty string";
   qualid_of_string s
 
-let ty_ctr_to_ctr x = x  
+let ty_ctr_to_ctr x = x
+let ctr_to_ty_ctr x = x
 
 let num_of_ctrs (c : constructor) =
   let r = qualid_to_reference c in 
