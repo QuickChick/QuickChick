@@ -26,6 +26,17 @@ Global Instance decOpt__checkable {P} `{DecOpt P} : Checkable P :=
        | None => checker tt
        end
   |}.
+
+(* Note: maybe this should become thunked? *)
+Definition checker_backtrack (l : list (option bool)) : option bool :=
+  let fix aux l b :=
+      match l with
+      | Some true  :: _  => Some true
+      | Some false :: l' => aux l' b
+      | None :: l' => aux l' true
+      | nil => if b then None else Some false
+      end
+  in aux l false.
     
 (* BCP: If I understand correctly, removing "Global" everywhere would
    change nothing... Or? *)

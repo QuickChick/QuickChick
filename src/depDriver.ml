@@ -169,7 +169,7 @@ let derive_dependent (class_name : derivable)
           full_pred input_names]
     | DecOpt ->
        gApp (gInject (derivable_to_string class_name))
-         [ gInject ctr_name ]
+         [ gApp (full_dt) (List.map gVar input_names) ]
 (*      
     | GenSizedSuchThatMonotonicOpt ->
 
@@ -353,6 +353,8 @@ let dep_dispatch ind class_name : unit =
       (ty_ctr, ty_params, ctrs, dep_type) letbinds idu 
   | { CAst.v = CApp ((_flag, constructor), args) } ->
 
+     msg_debug (str "Parsing constructor information for checker" ++ fnl ());
+     
     (* Parse the constructor's information into the more convenient generic-lib representation *)
     let (ty_ctr, ty_params, ctrs, dep_type) : (ty_ctr * (ty_param list) * (dep_ctr list) * dep_type) =
       match coerce_reference_to_dep_dt constructor with
@@ -369,9 +371,8 @@ let dep_dispatch ind class_name : unit =
     let (umap, tmap) = create_t_and_u_maps explicit_args dep_type args in
 
     let result = fresh_name "_result_bool" in
-    let umap = UM.add result (Ctr (injectCtr "Coq.Init.Datatypes.Some", [ Ctr (injectCtr "Coq.Init.Datatypes.true", []) ])) umap in
-    let tmap = UM.add result (DTyCtr (ctr_to_ty_ctr (injectCtr "Coq.Init.Datatypes.option"),
-                                      [ DTyCtr (ctr_to_ty_ctr (injectCtr "Coq.Init.Datatypes.bool"), []) ])) tmap in
+    let umap = UM.add result (Ctr (injectCtr "Coq.Init.Datatypes.true", [])) umap in
+    let tmap = UM.add result (DTyCtr (ctr_to_ty_ctr (injectCtr "Coq.Init.Datatypes.bool"), [])) tmap in
 
     derive_dependent class_name constructor umap tmap input_names input_ranges
       (ty_ctr, ty_params, ctrs, dep_type) None result

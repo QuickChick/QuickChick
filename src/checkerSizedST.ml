@@ -9,7 +9,7 @@ open Unify
 (* arguments to handle_branch *)
 let fail_exp (dt : coq_expr) = gNone dt
 
-let ret_exp (dt : coq_expr) (c : coq_expr) = gSome dt c
+let ret_exp (dt : coq_expr) (c : coq_expr) = gSome dt c 
 
 let ret_type (s : var) f = hole
 
@@ -104,6 +104,7 @@ let construct_generators
       (init_tmap : dep_type UM.t)
       (result : Unknown.t)
   =
+  msg_debug (str "Beginning checker construction" ++ fnl());
   (* partially applied handle_branch *)
   let handle_branch' : dep_ctr -> coq_expr * bool =
     handle_branch dep_type (fail_exp full_gtyp) (ret_exp full_gtyp)
@@ -147,22 +148,21 @@ let checkerSizedST
   (* The type we are generating for -- not the predicate! *)
   let full_gtyp = (gType ty_params (UM.find result init_tmap)) in
 
-  (* The type of the dependent generator *)
-  let gen_type = gGen (gOption full_gtyp) in
+  (* The type of the derived checker *)
+  let gen_type = (gOption full_gtyp) in
 
   let aux_arb rec_name size vars =
     gMatch (gVar size)
       [ (injectCtr "O", [],
          fun _ ->
-           uniform_backtracking
+           checker_backtracking
              (base_gens (gVar size) full_gtyp gen_ctr dep_type ctrs rec_name
                 input_ranges init_umap init_tmap result))
       ; (injectCtr "S", ["size'"],
          fun [size'] ->
-           let weights = List.map (fun (c,_) -> Weightmap.lookup_weight c size') ctrs in
-           backtracking (List.combine weights 
-                           (ind_gens (gVar size') full_gtyp gen_ctr dep_type ctrs rec_name
-                              input_ranges init_umap init_tmap result)))
+         checker_backtracking 
+           (ind_gens (gVar size') full_gtyp gen_ctr dep_type ctrs rec_name
+              input_ranges init_umap init_tmap result))
       ]
   in
 
@@ -180,4 +180,4 @@ let checkerSizedST
   msg_debug (fnl () ++ fnl () ++ str "`Final body produced:" ++ fnl ());
   debug_coq_expr generator_body;
   msg_debug (fnl ());
-  gRecord [("arbitrarySizeST", generator_body)]
+  gRecord [("decOpt", generator_body)]
