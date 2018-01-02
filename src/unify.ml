@@ -297,7 +297,7 @@ type mode = Recursive of (Unknown.t * dep_type) list
                        * range list
           | NonRecursive of (Unknown.t * dep_type) list (* List of all unknowns that are still undefined *)
 
-let mode_analysis (init_ranges : range list) (init_map : range UM.t)
+let mode_analysis init_ctr curr_ctr (init_ranges : range list) (init_map : range UM.t)
       (curr_ranges : range list) (curr_map : range UM.t) =
   let unknowns_for_mode  = ref [] in
   let remaining_unknowns = ref [] in
@@ -339,7 +339,15 @@ let mode_analysis (init_ranges : range list) (init_map : range UM.t)
        List.iter (fun r' -> ignore (compare_ranges false p1 r1 Unknown.undefined r')) rs; false
     | _, _ -> qcfail "Implement constructors for initial ranges"
   in
-  if List.for_all (fun b -> b) (List.map2 (fun r1 r2 -> compare_ranges true Unknown.undefined r1 Unknown.undefined r2) init_ranges curr_ranges) 
+  if not (init_ctr == curr_ctr) then 
+    let rec find_all_unknowns p r =
+      match r with
+      | Unknown u  -> find_all_unknowns u (UM.find u curr_map)
+      | FixedInput -> ()
+      | Undef dt -> all_unknowns := (p, dt) :: !all_unknowns
+      | Ctr (c, rs) -> List.iter (find_all_unknowns Unknown.undefined) rs
+    in NonRecursive !all_unknowns
+  else if List.for_all (fun b -> b) (List.map2 (fun r1 r2 -> compare_ranges true Unknown.undefined r1 Unknown.undefined r2) init_ranges curr_ranges) 
   then Recursive (List.rev !unknowns_for_mode, List.rev !remaining_unknowns, List.rev !actual_inputs)
   else NonRecursive !all_unknowns
 
@@ -617,8 +625,13 @@ let handle_branch
 
     (* TODO: positive/negative context *)
     (* Then do mode analysis on the new dts *)
-    match mode_analysis input_ranges init_umap ranges !umap with
+    match mode_analysis ctr (ty_ctr_to_ctr c) input_ranges init_umap ranges !umap with
     | Recursive (unknowns_for_mode, remaining_unknowns, actual_inputs) ->
+
+       let ums = String.concat " " (List.map (fun (u,t) -> Unknown.to_string u ^ " : " ^ dep_type_to_string t) unknowns_for_mode) in
+       let rus = String.concat " " (List.map (fun (u,t) -> Unknown.to_string u ^ " : " ^ dep_type_to_string t) remaining_unknowns) in
+       let ais = String.concat " " (List.map range_to_string actual_inputs) in
+       msg_debug (str (ums ^ " - " ^ rus ^ " - " ^ ais) ++ fnl ());
        (* Mark recursiveness of branch *)
        is_base := false;
        (* Instantiate all the unknowns needed for the mode to work out *)

@@ -64,8 +64,8 @@ let derive_dependent (class_name : derivable)
 
   (* List of input unknowns *)
   let actual_input_list =
-    List.rev (UM.fold (fun u r acc -> if r == FixedInput then u :: acc else acc) umap [])
-  in
+    List.filter (fun u -> UM.find u umap == FixedInput) input_names in
+
   (* Inputs as arguments *)
   let actual_input_args = 
     List.map (fun u -> gArg ~assumName:(gVar u) ~assumType:(gType ty_params (UM.find u tmap)) ())
@@ -225,6 +225,9 @@ let derive_dependent (class_name : derivable)
 
                           
 let create_t_and_u_maps explicit_args dep_type actual_args : (range UM.t * dep_type UM.t) =
+
+  msg_debug (str ("create_t_u_maps for: " ^ dep_type_to_string dep_type) ++ fnl ());
+  
   (* Local references - the maps to be generated *)
   let umap = ref UM.empty in
   let tmap = ref explicit_args in
@@ -232,7 +235,9 @@ let create_t_and_u_maps explicit_args dep_type actual_args : (range UM.t * dep_t
   let rec populate_maps dep_type args =
     (* Recurse down the unnamed arrow arguments *)
     match dep_type,args with
+    | DProd ((_, dt1), dt2), arg::args' 
     | DArrow (dt1, dt2), arg::args' ->
+       msg_debug (str ("populating with: " ^ dep_type_to_string dt1) ++ fnl ());
        begin match arg with
        | ({ CAst.v = CRef (r,_) }, _) ->
           begin 
