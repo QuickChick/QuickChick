@@ -84,11 +84,6 @@ let derive_dependent (class_name : derivable)
       input_ranges umap tmap actual_input_args result coqTyCtr
   in
 
-  let dec_opt =
-    checkerSizedST ty_ctr ty_params ctrs dep_type input_names
-      input_ranges umap tmap actual_input_args result coqTyCtr
-  in 
-
   (* Generate typeclass constraints. For each type parameter "A" we need `{_ : <Class Name> A} *)
   let instance_arguments = match class_name with
     | DecOpt -> params @ actual_input_args
@@ -198,7 +193,10 @@ let derive_dependent (class_name : derivable)
   let instance_record iargs =
     match class_name with
     | ArbitrarySizedSuchThat -> gen
-    | DecOpt -> dec_opt 
+    | DecOpt ->
+       checkerSizedST ty_ctr ty_params ctrs dep_type input_names
+         input_ranges umap tmap actual_input_args result coqTyCtr
+
 (*                              
     | GenSizedSuchThatMonotonicOpt ->
       msg_debug (str "mon type");

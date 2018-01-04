@@ -299,6 +299,7 @@ type mode = Recursive of (Unknown.t * dep_type) list
 
 let mode_analysis init_ctr curr_ctr (init_ranges : range list) (init_map : range UM.t)
       (curr_ranges : range list) (curr_map : range UM.t) =
+  msg_debug (str (Printf.sprintf "Look here!! init_ctr = %s, curr_ctr = %s" (ty_ctr_to_string init_ctr) (ty_ctr_to_string curr_ctr)) ++ fnl ());
   let unknowns_for_mode  = ref [] in
   let remaining_unknowns = ref [] in
   let all_unknowns = ref [] in
@@ -339,14 +340,16 @@ let mode_analysis init_ctr curr_ctr (init_ranges : range list) (init_map : range
        List.iter (fun r' -> ignore (compare_ranges false p1 r1 Unknown.undefined r')) rs; false
     | _, _ -> qcfail "Implement constructors for initial ranges"
   in
-  if not (init_ctr == curr_ctr) then 
+  if not (init_ctr = curr_ctr) then
     let rec find_all_unknowns p r =
       match r with
       | Unknown u  -> find_all_unknowns u (UM.find u curr_map)
       | FixedInput -> ()
       | Undef dt -> all_unknowns := (p, dt) :: !all_unknowns
       | Ctr (c, rs) -> List.iter (find_all_unknowns Unknown.undefined) rs
-    in NonRecursive !all_unknowns
+    in (List.iter (find_all_unknowns Unknown.undefined) curr_ranges;
+        msg_debug (str "Mismatched constructors in mode analysis" ++ fnl ());
+        NonRecursive !all_unknowns)
   else if List.for_all (fun b -> b) (List.map2 (fun r1 r2 -> compare_ranges true Unknown.undefined r1 Unknown.undefined r2) init_ranges curr_ranges) 
   then Recursive (List.rev !unknowns_for_mode, List.rev !remaining_unknowns, List.rev !actual_inputs)
   else NonRecursive !all_unknowns
@@ -375,7 +378,8 @@ let handle_branch
       (init_tmap : dep_type UM.t)
       (input_ranges : range list)
       (result : Unknown.t)
-      (c : dep_ctr) : (b * bool) =
+      (c : dep_ctr)
+    : (b * bool) =
 
   (* ************************ *)
   (* Step 0 : Initializations *)
@@ -625,9 +629,10 @@ let handle_branch
 
     (* TODO: positive/negative context *)
     (* Then do mode analysis on the new dts *)
-    match mode_analysis ctr (ty_ctr_to_ctr c) input_ranges init_umap ranges !umap with
+    match mode_analysis gen_ctr c input_ranges init_umap ranges !umap with
     | Recursive (unknowns_for_mode, remaining_unknowns, actual_inputs) ->
 
+       msg_debug (str "Mode analysis: Recursive." ++ fnl ());
        let ums = String.concat " " (List.map (fun (u,t) -> Unknown.to_string u ^ " : " ^ dep_type_to_string t) unknowns_for_mode) in
        let rus = String.concat " " (List.map (fun (u,t) -> Unknown.to_string u ^ " : " ^ dep_type_to_string t) remaining_unknowns) in
        let ais = String.concat " " (List.map range_to_string actual_inputs) in
@@ -672,6 +677,7 @@ let handle_branch
            (* If letbinds exist, need to actually bind them *)
            match letbinds with
            | Some binds ->
+              msg_debug (str "In let binds in process checks" ++ fnl ());
               let_tuple_in_expr fresh_unknown binds 
                 (recurse_type (ctr_index+1) dt')
            | None ->
@@ -680,6 +686,7 @@ let handle_branch
          )
     | NonRecursive [] ->
 
+       msg_debug (str "Mode analysis: NonRecursive/Checker." ++ fnl ());
        (* Checker *)
 
        let body_cont = recurse_type (ctr_index + 1) dt' in
@@ -714,6 +721,10 @@ let handle_branch
          check_expr ctr_index
            (checker args) body_fail body_cont
     | NonRecursive all_unknowns ->
+
+       msg_debug (str "Mode analysis: NonRecursive/Unknowns." ++ fnl ());
+       let ais = String.concat " " (List.map var_to_string (List.map fst all_unknowns)) in
+       msg_debug (str ais ++ fnl ());
 
        (* Call to arbitrarySizedST *)
        (* @arbitrarySizeST {A} (P : A -> Prop) {Instance} (size : nat) -> G (option A) *)
