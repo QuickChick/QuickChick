@@ -28,12 +28,15 @@ Global Instance decOpt__checkable {P} `{DecOpt P} : Checkable P :=
   |}.
 
 (* Note: maybe this should become thunked? *)
-Definition checker_backtrack (l : list (option bool)) : option bool :=
+Definition checker_backtrack (l : list (unit -> option bool)) : option bool :=
   let fix aux l b :=
       match l with
-      | Some true  :: _  => Some true
-      | Some false :: l' => aux l' b
-      | None :: l' => aux l' true
+      | t :: ts =>
+        match t tt with
+        | Some true  => Some true
+        | Some false => aux ts b
+        | None => aux ts true
+        end
       | nil => if b then None else Some false
       end
   in aux l false.

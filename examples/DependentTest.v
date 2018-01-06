@@ -248,22 +248,27 @@ Definition DecOptgoodFooPrec_manual (n_ : nat) (foo_ : Foo) :=
      match size0 with
      | 0 =>
        checker_backtrack
-         [match foo_0 with
+         [(fun u:unit =>
+          match foo_0 with
           | Foo1 => Some true
           | Foo2 _ => None
           | Foo3 _ _ => None
-          end]
+          end
+         )]
      | size'.+1 =>
        checker_backtrack
-         [match foo_0 with
+         [(fun _ =>
+          match foo_0 with
           | Foo1 => Some true
           | Foo2 _ => None
           | Foo3 _ _ => None
-          end;
-            match aux_arb size' 0 Foo1 with
-            | Some _ => Some true
-            | None => None
-            end]
+          end)
+        ;(fun _ =>
+          match aux_arb size' 0 Foo1 with
+          | Some _ => Some true
+          | None => None
+          end)
+         ]
      end in
  fun size0 : nat => aux_arb size0 n_ foo_.
 Theorem DecOptgoodFooPrec_proof n foo :
