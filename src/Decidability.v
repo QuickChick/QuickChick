@@ -18,14 +18,27 @@ Class DecOpt (P : Prop) := { decOpt : nat -> option bool }.
 
 Axiom checkable_size_limit : nat.
 Extract Constant checkable_size_limit => "10000".
+
+Import GenLow.GenLow.
 (* Discard tests that run further than the limit *)
+(* For proofs, the size parameter will need to be taken into account 
+   to prove limit results. We just add it to the large, practical constant. 
+ *)
 Global Instance decOpt__checkable {P} `{DecOpt P} : Checkable P :=
   {| checker _ :=
-       match decOpt checkable_size_limit with
-       | Some b => checker b
-       | None => checker tt
-       end
+       sized (fun s =>
+                match decOpt (checkable_size_limit + s) with
+                | Some b => checker b
+                | None => checker tt
+                end
+             )
   |}.
+
+Global Instance dec_decOpt {P} `{Dec P} : DecOpt P :=
+  {| decOpt := fun _ => match @dec P _ with
+                        | left  _ => Some true
+                        | right _ => Some false
+                        end |}.
 
 (* Note: maybe this should become thunked? *)
 Definition checker_backtrack (l : list (unit -> option bool)) : option bool :=

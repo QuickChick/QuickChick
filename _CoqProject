@@ -40,3 +40,4 @@ src/DependentClasses.v
 src/Decidability.v
 src/genLib.ml
 src/unify.ml
+src/sized.ml

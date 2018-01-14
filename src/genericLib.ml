@@ -977,3 +977,11 @@ let rec list_insert_nth x l n =
   | _, [] -> x :: l
   | _, h::t -> h :: list_insert_nth x t (n-1)
   
+
+(* Leo: Where should these util functions live? *)
+let sameTypeCtr c_ctr = function
+  | TyCtr (ty_ctr', _) -> c_ctr = ty_ctr'
+  | _ -> false
+
+let isBaseBranch ty_ctr ty =
+  fold_ty' (fun b ty' -> b && not (sameTypeCtr ty_ctr ty')) true ty

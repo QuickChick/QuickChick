@@ -176,7 +176,7 @@ let derive_dependent (class_name : derivable)
                 (*              ((List.map gVar params) @  *)
                 ([gApp ~explicit:true (gInject "arbitrarySizeST")
                   [full_gtyp; full_pred (List.map gVar inputs); hole; gVar size]]))
-    | SizedProofEqs -> gApp (gInject (class_name cn)) [full_pred (List.map (fun n -> gVar (fresh_name n)) input_names)]
+    | SizedProofEqs -> gApp (gInject (class_name cn)) [full_pred (List.map (fun n -> gVar (f    resh_name n)) input_names)]
     | GenSizedSuchThatCorrect ->
       let pred = full_pred (List.map (fun n -> gVar (fresh_name n)) input_names) in
       gApp (gInject (class_name cn))

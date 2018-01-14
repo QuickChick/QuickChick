@@ -8,8 +8,9 @@ Unify
 Weightmap
 ArbitrarySized
 ArbitrarySizedST
-CheckerSizedST
+Sized
 SimplDriver
+CheckerSizedST
 DepDriver
 Driver
 QuickChick

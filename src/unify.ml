@@ -286,8 +286,10 @@ let handle_equalities eqs (check_expr : coq_expr -> 'a -> 'a -> 'a)
       (cleft : 'a) (cright : 'a) = 
   EqSet.fold (fun (u1,u2) c -> 
                let checker =
-                 gApp ~explicit:true (gInject "dec") [ gApp (gInject "eq") [gVar u1; gVar u2]
-                                                     ; hole ]
+                 gApp ~explicit:true (gInject "decOpt")
+                   [ gApp (gInject "eq") [gVar u1; gVar u2]
+                   ; hole
+                   ; gInt 42]
                in
                check_expr checker c cright
              ) eqs cleft
@@ -493,6 +495,7 @@ let handle_branch
     match lookup_checks (DTyVar x) !cmap with
     | Some checks -> 
        (* Remove checks from cmap *)
+       msg_debug (str "Actual checks needed" ++ fnl ());
        cmap := CMap.remove (DTyVar x) !cmap;
        umap := fixVariable x !umap;
        bind true
@@ -516,7 +519,7 @@ let handle_branch
        instantiate_toplevel_ranges_cont rs []
          (fun rs' -> cont (Ctr (c, rs')))
     | Undef dt ->
-       (* For undefined, we need to instantiate the parrent by processing its checks. *)
+       (* For undefined, we need to instantiate the parent by processing its checks. *)
          process_checks ex_bind parent false instantiate_existential_method
            (fun x -> cont (Unknown x))
     | Unknown u ->

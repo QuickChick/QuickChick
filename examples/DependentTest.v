@@ -311,12 +311,42 @@ Inductive goodFooNarrow : nat -> Foo -> Prop :=
                         goodFooNarrow 1 foo -> 
                         goodFooNarrow n foo.
 
-Instance goodFooNarrow_dec n foo : Dec (goodFooNarrow n foo) := 
-  { dec := _ }.
-Proof.  
-Admitted.
-
 Derive DecOpt for (goodFooNarrow n foo).
+
+Definition goodFooNarrow_decOpt (n_ : nat) (foo_ : Foo) :=
+  let fix aux_arb (size0 n_0 : nat) (foo_0 : Foo) : option bool :=
+      match size0 with
+      | 0 =>
+        checker_backtrack
+          [(fun _ : unit =>
+             match foo_0 with
+             | Foo1 => Some true
+             | Foo2 _ => None
+             | Foo3 _ _ => None
+             end)]
+      | size'.+1 =>
+        checker_backtrack
+          [(fun _ : unit =>
+             match foo_0 with
+             | Foo1 => Some true
+             | Foo2 _ => None
+             | Foo3 _ _ => None
+             end) ;
+           (fun _ : unit =>
+                 match aux_arb size' 0 foo_0 with
+                 | Some _ =>
+                   match aux_arb size' 1 foo_0 with
+                   | Some _ => Some true
+                   | None => None
+                   end
+                 | None => None
+                 end)]
+      end in
+  fun size0 : nat => aux_arb size0 n_ foo_.
+Lemma goodFooNarrow_decOpt_correct n foo :
+  goodFooNarrow_decOpt n foo = @decOpt (goodFooNarrow n foo) _.
+Proof. reflexivity. Qed.
+
 Derive ArbitrarySizedSuchThat for (fun foo => goodFooNarrow n foo).
 
 Definition genGoodNarrow (n : nat) : nat -> G (option (Foo)) :=
@@ -342,9 +372,11 @@ Proof. reflexivity. Qed.
 Inductive goodFooNL : nat -> Foo -> Foo -> Prop :=
 | GoodNL : forall n foo, goodFooNL n (Foo2 foo) foo.
 
+Instance EqDecFoo (f1 f2 : Foo) : Dec (f1 = f2).
+dec_eq. Defined.
+
 Derive ArbitrarySizedSuchThat for (fun foo => goodFooNL n m foo).
-(* TODO: Debug *)
-(* Derive DecOpt for (goodFooNL n m foo). *)
+Derive DecOpt for (goodFooNL n m foo).
 
 (* Parameters don't work yet :)  *)
 
@@ -397,3 +429,12 @@ Derive ArbitrarySizedSuchThat for (fun a => goodFun a).
 
 Definition success := "success".
 Print success.
+
+Inductive goodFooC : Foo -> Prop :=
+| goodFooC1 : goodFooC (Foo1)
+| goodFooC2 : forall f, goodFooC f -> goodFooC (Foo2 f)
+| goodFooC3 : forall f n, goodFooC f -> le n 2 -> goodFooC (Foo3 n f).
+
+
+Derive ArbitrarySizedSuchThat for (fun f => goodFooC f).
+Proof.

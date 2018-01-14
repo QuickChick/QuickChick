@@ -6,16 +6,9 @@ open GenLib
 
 (* Derivation of ArbitrarySized. Contains mostly code from derive.ml *)
 
-let list_drop_every n l =
-  let rec aux i = function
-    | [] -> []
-    | x::xs -> if i == n then aux 1 xs else x::aux (i+1) xs
-  in aux 1 l
-
 let rec replace v x = function
   | [] -> []
   | y::ys -> if y = v then x::ys else y::(replace v x ys)
-
 
 let arbitrarySized_decl ty_ctr ctrs iargs =
 
