@@ -8,7 +8,11 @@ Unify
 Weightmap
 ArbitrarySized
 ArbitrarySizedST
+SizeUtils
 Sized
+SizeSMon
+SizeMon
+SizeCorr
 SimplDriver
 CheckerSizedST
 DepDriver

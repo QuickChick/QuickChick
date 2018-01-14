@@ -1,13 +1,13 @@
+open Libnames
 open Util
 open Constrexpr
 open GenericLib
+open SizeUtils
 open Sized
-
-(*   
 open SizeMon
 open SizeSMon
 open SizeCorr
- *)
+
 open ArbitrarySized
 
 type derivable =
@@ -53,7 +53,21 @@ let derive (cn : derivable) (c : constr_expr) (instance_name : string) (name1 : 
 
   let full_dt = gApp ~explicit:true coqTyCtr coqTyParams in
 
+  let ind_name = match c with
+    | { CAst.v = CRef (r, _) } -> string_of_qualid (snd (qualid_of_reference r))
+    | _ -> failwith "Implement me for functions" 
+  in
+
   let class_name = derivable_to_string cn in
+
+  let size_config =
+    { _ty_ctr  = ty_ctr
+    ; _ctrs    = ctrs
+    ; _coqTyCtr = coqTyCtr
+    ; _coqTyParams = coqTyParams
+    ; _full_dt  = full_dt
+    ; _isCurrentTyCtr = sameTypeCtr ty_ctr
+    } in
 
   let param_class_names = match cn with
     | Sized -> ["Sized"]
@@ -114,18 +128,16 @@ let derive (cn : derivable) (c : constr_expr) (instance_name : string) (name1 : 
     | CanonicalSized ->
       let ind_scheme =  gInject ((ty_ctr_to_string ty_ctr) ^ "_ind") in
       sizeEqType ty_ctr ctrs ind_scheme iargs
-(*      
     | SizeMonotonic ->
       let (iargs', size) = take_last iargs [] in
-      sizeMon ty_ctr ctrs (gVar size) iargs' (gInject name1)
+      sizeMon size_config (gVar size) iargs' (gInject name1)
     | SizedMonotonic ->
-      sizeSMon ty_ctr ctrs iargs
+      sizeSMon size_config iargs
     | SizedCorrect ->
       let s_inst = gInject (repeat_instance_name Sized ind_name) in
       let c_inst = gInject (repeat_instance_name CanonicalSized ind_name) in
       (* TODO : use default names for gen and mon as well (?) *)
-      genCorr ty_ctr ctrs iargs (gInject name1) s_inst c_inst (gInject name2)
- *)
+      genCorr size_config iargs (gInject name1) s_inst c_inst (gInject name2)
   in
 
   (* msg_debug (str "Defined record" ++ fnl ()); *)
@@ -133,34 +145,3 @@ let derive (cn : derivable) (c : constr_expr) (instance_name : string) (name1 : 
 
   declare_class_instance instance_arguments instance_name instance_type instance_record
 
-
-(*
-VERNAC COMMAND EXTEND DeriveArbitrarySized
-  | ["DeriveArbitrarySized" constr(c) "as" string(s1)] -> [derive ArbitrarySized c s1 "aux" ""]
-END;;
-
-VERNAC COMMAND EXTEND DeriveSized
-  | ["DeriveSized" constr(c) "as" string(s1)] -> [derive Sized c s1 "aux" ""]
-END;;
-
-VERNAC COMMAND EXTEND DeriveCanonicalSized
-  | ["DeriveCanonicalSized" constr(c) "as" string(s1)] -> [derive CanonicalSized c s1 "aux" ""]
-END;;
-
-VERNAC COMMAND EXTEND DeriveArbitrarySizedMonotonic
-  | ["DeriveArbitrarySizedMonotonic" constr(c) "as" string(s1) "using" string(s2)] ->
-  (* s2 is the instance name for ArbitrarySized *)
-    [derive SizeMonotonic c s1 s2 ""]
-END;;
-
-VERNAC COMMAND EXTEND DeriveArbitrarySizedSizeMonotonic
-  | ["DeriveArbitrarySizedSizeMonotonic" constr(c) "as" string(s1)] ->
-    [derive SizeSMonotonic c s1 "" ""]
-END;;
-
-
-VERNAC COMMAND EXTEND DeriveArbitrarySizedCorrect
-  | ["DeriveArbitrarySizedCorrect" constr(c) "as" string(s1) "using" string(s2) "and" string(s3)] ->
-    [derive GenSizeCorrect c s1 s2 s3]
-END;;
-  *)

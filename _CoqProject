@@ -40,4 +40,8 @@ src/DependentClasses.v
 src/Decidability.v
 src/genLib.ml
 src/unify.ml
+src/sizeUtils.ml
 src/sized.ml
+src/sizeMon.ml
+src/sizeSMon.ml
+src/sizeCorr.ml
