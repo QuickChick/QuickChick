@@ -430,11 +430,3 @@ Derive ArbitrarySizedSuchThat for (fun a => goodFun a).
 Definition success := "success".
 Print success.
 
-Inductive goodFooC : Foo -> Prop :=
-| goodFooC1 : goodFooC (Foo1)
-| goodFooC2 : forall f, goodFooC f -> goodFooC (Foo2 f)
-| goodFooC3 : forall f n, goodFooC f -> le n 2 -> goodFooC (Foo3 n f).
-
-
-Derive ArbitrarySizedSuchThat for (fun f => goodFooC f).
-Proof.
