@@ -11,6 +11,8 @@ let fail_exp (dt : coq_expr) =
   returnGen (gApp ~explicit:true (gInject "None") [dt])
 
 let ret_exp (dt : coq_expr) (c : coq_expr) =
+  msg_debug (str "Returning...." ++ fnl ());
+  debug_coq_expr c;
   returnGen (gApp ~explicit:true (gInject "Some") [dt; c])
 
 let ret_type (s : var) f = hole

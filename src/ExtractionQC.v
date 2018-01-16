@@ -59,7 +59,7 @@ Extract Constant trace =>
    let rec copy i = function
     | [] -> s
     | c :: l -> s.[i] <- c; copy (i+1) l
-   in copy 0 l); flush stdout; fun y -> y)".
+   in Bytes.to_string (copy 0 l)); flush stdout; fun y -> y)".
 
 Set Extraction AccessOpaque.
 
@@ -78,5 +78,5 @@ Extract Constant print_extracted_coq_string =>
    let rec copy i = function
     | [] -> s
     | c :: l -> s.[i] <- c; copy (i+1) l
-   in copy 0 l)".
+   in Bytes.to_string (copy 0 l))".
 

@@ -248,7 +248,7 @@ let is_fixed k dt =
 let rec range_to_coq_expr k r = 
   match r with 
   | Ctr (c, rs) -> 
-     gApp (gCtr c) (List.map (range_to_coq_expr k) rs)
+     gApp ~explicit:true (gCtr c) (List.map (range_to_coq_expr k) rs)
   | Unknown u -> 
      begin match umfind u k with
      | FixedInput -> gVar u
