@@ -101,7 +101,6 @@ let sizedEqProofs_body
       (result : Unknown.t)
       (rec_name : coq_expr) =
 
-
   (* type constructor *)
   let coqTyCtr = gTyCtr gen_ctr in
 
@@ -416,9 +415,11 @@ let sizedEqProofs_body
        let rec construct_proof typ m acc =
          match typ with
          | DTyCtr _ ->
+            (* ZOE: Can you fix this? *)
            (* XXX currently not handling type parameters *)
-           let pred =
-             gFun ["g"] (fun [g] -> make_prop n (gVar g) hole_inps)
+            let pred =
+              (* gFun ["g"] (fun [g] -> make_prop n (gVar g) hole_inps) *)
+              gFun ["g"] (fun [g] -> gApp full_dt hole_inps)
            in
            rewrite pred (gVar hcur) (gApp (gCtr c) (List.rev acc))
          | DProd ((x, dt1), dt2) ->

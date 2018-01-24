@@ -9,6 +9,10 @@ Require Import Sets Tactics.
 Require Import Numbers.BinNums.
 Require Import Classes.RelationClasses.
 
+Require Export ExtLib.Structures.Monads.
+Import MonadNotation.
+Open Scope monad_scope.
+
 Set Implicit Arguments.
 Unset Strict Implicit.
 Unset Printing Implicit Defensive.
@@ -421,6 +425,20 @@ Module Type GenLowInterface.
     forall A B C (g : G A) (f1 : B -> C) (f2 : A -> G B),
       semGen (fmap f1 (bindGen g f2)) <-->
       semGen (bindGen g (fun x => fmap f1 (f2 x))).
+
+  Instance GMonad : Monad G :=
+  {
+    ret T x := returnGen x ;
+    bind T U m f := bindGen m f 
+  }.
+
+  Definition GOpt A := G (option A).
+
+  Instance GOptMonad : `{Monad GOpt} :=
+  {
+    ret A x := returnGen (Some x);
+    bind A B m k := bindGenOpt m k
+  }.
   
 End GenLowInterface.
 
@@ -1625,4 +1643,18 @@ Module GenLow : GenLowInterface.
     now eexists; split; eauto. eassumption. 
   Qed.
 
+  Instance GMonad : Monad G :=
+  {
+    ret T x := returnGen x ;
+    bind T U m f := bindGen m f 
+  }.
+
+  Definition GOpt A := G (option A).
+
+  Instance GOptMonad : `{Monad GOpt} :=
+  {
+    ret A x := returnGen (Some x);
+    bind A B m k := bindGenOpt m k
+  }.
+  
 End GenLow.
