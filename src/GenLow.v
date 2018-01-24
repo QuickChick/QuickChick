@@ -426,7 +426,7 @@ Module Type GenLowInterface.
       semGen (fmap f1 (bindGen g f2)) <-->
       semGen (bindGen g (fun x => fmap f1 (f2 x))).
 
-  Instance GMonad : Monad G :=
+  Global Instance GMonad : Monad G :=
   {
     ret T x := returnGen x ;
     bind T U m f := bindGen m f 
@@ -434,7 +434,7 @@ Module Type GenLowInterface.
 
   Definition GOpt A := G (option A).
 
-  Instance GOptMonad : `{Monad GOpt} :=
+  Global Instance GOptMonad : `{Monad GOpt} :=
   {
     ret A x := returnGen (Some x);
     bind A B m k := bindGenOpt m k
@@ -1643,7 +1643,7 @@ Module GenLow : GenLowInterface.
     now eexists; split; eauto. eassumption. 
   Qed.
 
-  Instance GMonad : Monad G :=
+  Global Instance GMonad : Monad G :=
   {
     ret T x := returnGen x ;
     bind T U m f := bindGen m f 
@@ -1651,7 +1651,7 @@ Module GenLow : GenLowInterface.
 
   Definition GOpt A := G (option A).
 
-  Instance GOptMonad : `{Monad GOpt} :=
+  Global Instance GOptMonad : `{Monad GOpt} :=
   {
     ret A x := returnGen (Some x);
     bind A B m k := bindGenOpt m k
