@@ -400,7 +400,7 @@ Proof.
     reflexivity. apply gen_term_size_correct. 
     repeat split. exists m. split; auto. apply Max.le_max_l. 
     eapply Const_leq_trans; last by apply max_const_Const_leq.
-    eapply NPeano.Nat.max_le_iff. right. apply Max.le_max_r.
+    eapply PeanoNat.Nat.max_le_iff. right. apply Max.le_max_r.
     eexists; split. reflexivity. 
-    eapply NPeano.Nat.max_le_iff. right. apply Max.le_max_l. 
+    eapply PeanoNat.Nat.max_le_iff. right. apply Max.le_max_l.
 Qed.
