@@ -22,7 +22,10 @@ dsss17/terse
 *~
 *.bak
 *.d
-Makefile.coq
+Makefile.coq*
+*.out
+_qc_*.tmp
+quickChickTool
 .DS_Store
 src/quickChickToolLexer.ml
 src/quickChickToolParser.ml

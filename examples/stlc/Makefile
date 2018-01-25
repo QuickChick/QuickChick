@@ -1,7 +1,7 @@
 
 .PHONY: all clean
 
-all: Makefile.coq
+all: Makefile.coq clean
 	$(MAKE) -f Makefile.coq
 
 clean: Makefile.coq

@@ -40,9 +40,21 @@ install:
 
 script:
 - set -e
-- echo 'Building QuickChick...' && echo -en 'travis_fold:start:QuickChick.build\\r'
-- opam update
-- travis_wait 30 opam install coq-mathcomp-ssreflect.1.6.2
-- make -j install
-- cd examples/multifile-mutation && make && quickChick -top Top
-- echo -en 'travis_fold:end:QuickChick.build\\r'
+- echo 'Building QuickChick...';
+  echo -en 'travis_fold:start:QuickChick.build';
+  opam update;
+  travis_wait 30 opam install coq-mathcomp-ssreflect.1.6.2;
+  make -j install;
+  echo -en 'travis_fold:end:QuickChick.build'
+- echo 'Testing IFC...';
+  echo -en 'travis_fold:start:QuickChick.test.ifc-basic';
+  make -C examples/ifc-basic;
+  echo -en 'travis_fold:end:QuickChick.test.ifc-basic'
+- echo 'Testing multifile mutation...';
+  echo -en 'travis_fold:start:QuickChick.test.multifile-mutation';
+  make -C examples/multifile-mutation test;
+  echo -en 'travis_fold:end:QuickChick.test.multifile-mutation'
+- echo 'Testing STLC...';
+  echo -en 'travis_fold:start:QuickChick.test.stlc';
+  make -C examples/stlc;
+  echo -en 'travis_fold:end:QuickChick.test.stlc'
