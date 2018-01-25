@@ -29,10 +29,13 @@ Global Instance genZSized : GenSized Z :=
 Global Instance genListSized {A : Type} `{GenSized A} : GenSized (list A) := 
   {| arbitrarySized x := vectorOf x (arbitrarySized x) |}.
 
-Global Instance genList {A : Type} `{Gen A} : Gen (list A) := 
+(* [3] is a lower priority than [Classes.GenOfGenSized],
+   avoiding an infinite loop in typeclass resolution. *)
+
+Global Instance genList {A : Type} `{Gen A} : Gen (list A) | 3 :=
   {| arbitrary := listOf arbitrary |}.
 
-Global Instance genOption {A : Type} `{Gen A} : Gen (option A) :=
+Global Instance genOption {A : Type} `{Gen A} : Gen (option A) | 3 :=
   {| arbitrary := freq [ (1, returnGen None) 
                        ; (7, liftGen Some arbitrary)] |}.
 
