@@ -51,6 +51,12 @@ Definition ainstr (st : State) : G Instruction :=
               (if sl < 2 ? then 0 else 100, returnGen Store)].
 
 Fixpoint gen_stack (n : nat) (onlyLow : bool) : G Stack :=
+  (*
+  let gen_atom :=
+      if onlyLow then liftGen2 Atm gen_Z (returnGen L)
+      else gen_atom
+  in
+   *)
   match n with
     | O => returnGen Mty
     | S n' =>
@@ -100,14 +106,9 @@ Definition gen_state : G State :=
   st' <- gen_by_exec default_table 20 (St imem0 mem stk pc) ;;
   ret st'.
 
-(* State Variations *)
-Inductive Variation {A : Type} := V : A -> A -> @Variation A.
+From QuickChick.ifcbasic Require Import Generation.
 
-Class Vary (A : Type) := {
-  vary : A -> G A
-}.
-
-Instance vary_atom : Vary Atom :=
+Instance vary_atom' : Vary Atom :=
 {|
   vary a :=
     let '(x @ l) := a in
@@ -117,7 +118,7 @@ Instance vary_atom : Vary Atom :=
     end
 |}.
 
-Instance vary_mem : Vary Mem :=
+Instance vary_mem' : Vary Mem :=
 {|
   vary m := sequenceGen (map vary m)
 |}.
@@ -135,7 +136,7 @@ Fixpoint vary_stack (s : Stack) (isLow : bool) : G Stack :=
   end.
 
 Import QcDefaultNotation.
-Instance vary_state : Vary State :=
+Instance vary_state' : Vary State :=
 {|
   vary st :=
     let '(St imem mem stk pc) := st in
@@ -158,7 +159,7 @@ Instance vary_state : Vary State :=
         ret (St imem mem' stk' pc'))
 |}.
 
-Definition gen_variation_state : G (@Variation State) :=
+Definition gen_variation_state' : G (@Variation State) :=
   bindGen gen_state (fun st =>
   bindGen (vary st) (fun st' =>
   returnGen (V st st'))).

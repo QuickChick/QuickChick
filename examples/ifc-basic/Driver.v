@@ -4,6 +4,7 @@ Import GenLow GenHigh.
 Require Import List. Import ListNotations.
 
 From QuickChick.ifcbasic Require Import Machine Printing Generation Indist DerivedGen.
+From QuickChick.ifcbasic Require GenExec.
 
 Require Import Coq.Strings.String.
 Local Open Scope string.
@@ -160,14 +161,15 @@ Fixpoint MSNI (fuel : nat) (t : table) (v : @Variation State) : Checker  :=
         | _ => (*collect "L,H,FAIL" true *) checker true
         end
     end
-  else (* collect "Not indist!" true*)  checker false
-                            )
+  else checker rejected
+(*    whenFail ("Indist with states: " ++ nl ++ show_pair st1 st2 ++ nl ++ " after steps: " ++ show fuel ++ nl) (checker false) *)
+    )         
     | _ => checker rejected
   end
   end.
 
 Definition prop_MSNI t : Checker :=
-  forAllShrink gen_variation_state (fun _ => nil)
+  forAllShrink GenExec.gen_variation_state' (fun _ => nil)
    (MSNI 20 t : Variation -> G QProp).
 
 QuickCheck (prop_MSNI default_table).
@@ -211,6 +213,11 @@ MutateCheckWith myArgs default_table
     (fun t => (forAllShrinkShow
       gen_variation_state (fun _ => nil) (fun _ => "")
       (SSNI t ))).
+
+MutateCheckWith myArgs default_table
+    (fun t => (forAllShrinkShow
+      GenExec.gen_variation_state' (fun _ => nil) (fun _ => "")
+      (MSNI 20 t ))).
 
 MutateCheckWith myArgs default_table
     (fun t => (forAllShrinkShow

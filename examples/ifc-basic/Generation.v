@@ -58,7 +58,7 @@ Definition ainstr (st : State) : G Instruction :=
 Fixpoint gen_stack (n : nat) (onlyLow : bool) : G Stack :=
   (* There is no invariant that says this. Why is this here? *)
   (*
-  let gen_atom :=
+  let gen_atom' :=
       if onlyLow then liftGen2 Atm gen_Z (returnGen L)
       else gen_atom
   in
