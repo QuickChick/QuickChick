@@ -16,8 +16,10 @@ addons:
 env:
   global:
   - NJOBS=2
-  - COMPILER="4.05.0"
   - OPAMYES=true
+  matrix:
+      - COMPILER="4.05.0"
+      - COMPILER="4.06.0"
 matrix:
   fast_finish: true
 os:
