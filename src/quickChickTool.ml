@@ -14,6 +14,7 @@ let verbose = ref false
 let ansi = ref false
 let fail_fast = ref false
 let excluded = ref []
+let excluded_mutants = ref []
 
 let speclist =
   [ ("-s", Arg.String (fun name -> sec_name := Some name), "Which section's properties to test")
@@ -23,6 +24,7 @@ let speclist =
   ; ("-cmd", Arg.String (fun name -> compile_command := name), "Compile command for entire directory")
   ; ("-top", Arg.String (fun name -> top := name), "Name of top-level logical module")
   ; ("-ocamlbuild", Arg.String (fun name -> ocamlbuild_args := name), "Arguments given to ocamlbuild")
+  ; ("-exclude_mutant", Arg.Int (fun excl -> excluded_mutants := excl :: !excluded_mutants), "Mutant to be excluded")
   ; ("-exclude", Arg.Rest (fun excl -> excluded := excl :: !excluded), "Files to be excluded. Must be the last argument")
   ]
 
@@ -631,12 +633,16 @@ let main =
       (fun i m ->
         begin
           Printf.printf "\n";
+          if List.mem i !excluded_mutants then
+              highlight Header (Printf.sprintf "Skipping mutant %d..." i)
+          else (
           highlight Header (Printf.sprintf "Testing mutant %d..." i);
           ensure_tmpdir_exists();
           (* Entire file structure is copied *)
           output_mut_dir tmp_dir m;
           reset_test_results();
           compile_and_run dir ExpectSomeFailure
+          )
         end)
       dir_mutants
   end;
