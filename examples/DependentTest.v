@@ -219,8 +219,6 @@ Inductive goodFooRec : nat -> Foo -> Prop :=
 | GoodRec : forall n foo, goodFooRec 0 foo -> goodFooRec n (Foo2 foo).
 (* end good_foo_rec *)
 
-QuickChickDebug Debug On.
-
 Derive ArbitrarySizedSuchThat for (fun foo => goodFooRec n foo).
 
 (* begin gen_good_rec *)

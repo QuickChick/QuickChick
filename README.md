@@ -20,7 +20,7 @@ https://github.com/DeepSpec/dsss17
 
   - Branch master: 
     * Coq 8.7
-    * OCaml 4.05.0
+    * OCaml 4.06.0
     * mathcomp-ssreflect-1.6.2
 
   - Branch 8.4pl6 known to work with
@@ -49,20 +49,21 @@ https://github.com/DeepSpec/dsss17
 
 ### Simple Examples
 
-  - `examples/Tests.v`
+  - `examples/Tutorial.v`
   - `examples/RedBlack`
   - `examples/stlc`
-  - `examples/ifc-basic` (not quite finished)
+  - `examples/ifc-basic` 
 
 Running `make tests` in the top-level QuickChick folder will check and execute all of these.
-
-### Larger Case Study
-
-  - See the https://github.com/QuickChick/IFC repository
 
 ### Top-level Commands
 
 - `QuickCheck c`
+- `Sample g`
+- `Derive Arbitrary for c`
+- `Derive Show for c`
+- `Derive ArbitrarySizedSuchThat for (fun x => p)`
+- `Derive ArbitrarySizedSuchThat for (fun x => let (x1,x2...) := x in p)`
 - `QuickCheckWith args c`
 - `MutateCheck c p`
 - `MutateCheckWith args c p`
@@ -70,7 +71,11 @@ Running `make tests` in the top-level QuickChick folder will check and execute a
 - `MutateCheckManyWith args c ps`
 
 ### Documentation
-Yes, we need more! Until then here are some reasonable surrogates:
+The main documentation is the DeepSpec summer school tutorial:
+- [DeepSpec QC repo](https://github.com/DeepSpec/dsss17/tree/master/qc).
+Pretty soon this will become a software foundations volume!
+
+But yes, we need more! Until then here are some reasonable surrogates:
   - Our ITP 2015 paper on [Foundational Property-Based Testing](http://prosecco.gforge.inria.fr/personal/hritcu/publications/foundational-pbt.pdf)
   - Catalin's [internship topic proposals for 2015](http://prosecco.gforge.inria.fr/personal/hritcu/students/topics/2015/quick-chick.pdf)
   - Catalin's [presentation at CoqPL 2015 workshop (2015-01-18)](http://prosecco.gforge.inria.fr/personal/hritcu/talks/QuickChick-Verified-Testing-CoqPL.pdf)
