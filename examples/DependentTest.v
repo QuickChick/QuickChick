@@ -10,7 +10,10 @@ Import GenLow GenHigh.
 Require Import List.
 Import ListNotations.
 Import QcDefaultNotation. Open Scope qc_scope.
-Import QcDoNotation.
+
+Require Export ExtLib.Structures.Monads.
+Import MonadNotation.
+Open Scope monad_scope.
 
 Set Bullet Behavior "Strict Subproofs".
 
@@ -56,11 +59,11 @@ Fixpoint genFooSized (size : nat) :=
   match size with 
   | O => returnGen Foo1
   | S size' => freq [ (1, returnGen Foo1) 
-                    ; (S size', do! f <- genFooSized size'; 
-                             returnGen (Foo2 f))
-                    ; (S size', do! n <- arbitrary; 
-                             do! f <- genFooSized size';
-                             returnGen (Foo3 n f)) 
+                    ; (S size', f <- genFooSized size';;
+                                  ret (Foo2 f))
+                    ; (S size', n <- arbitrary ;;
+                                f <- genFooSized size' ;;
+                                ret (Foo3 n f)) 
                     ]
   end.                 
 (* end genFooSized *)                                           
@@ -104,8 +107,8 @@ Definition g : G (option Foo) := @arbitrarySizeST _ (fun x => goodFoo 0 x) _ 4.
 Definition genGoodFoo `{_ : Arbitrary Foo} (n : nat)  :=
   let fix aux_arb size n := 
     match size with 
-    | 0   => backtrack [(1, do! foo <- arbitrary; returnGen (Some foo))]
-    | S _ => backtrack [(1, do! foo <- arbitrary; returnGen (Some foo))]
+    | 0   => backtrack [(1, foo <- arbitrary ;; ret (Some foo))]
+    | S _ => backtrack [(1, foo <- arbitrary ;; ret (Some foo))]
     end
   in fun sz => aux_arb sz n.
 (* end gen_good_foo *)
@@ -120,10 +123,10 @@ Definition genGoodFoo'' `{_ : Arbitrary Foo} (n : nat) :=
     match size with 
     | 0   => backtrack [(1, 
 (* begin gen_good_foo_gen *)
-  do! foo <- arbitrary; returnGen (Some foo)
+      foo <- arbitrary;; ret (Some foo)
 (* end gen_good_foo_gen *)
                         )]
-    | S _ => backtrack [(1, do! foo <- arbitrary; returnGen (Some foo))]
+    | S _ => backtrack [(1, foo <- arbitrary;; ret (Some foo))]
     end
   in fun sz => aux_arb sz n.
 
@@ -143,10 +146,10 @@ Definition genGoodUnif (n : nat) :=
     match size with 
     | 0   => backtrack [(1, 
 (* begin good_foo_unif_gen *)
-  returnGen (Some Foo1)
+  ret (Some Foo1)
 (* end good_foo_unif_gen *)
                         )] 
-    | S _ => backtrack [(1, returnGen (Some Foo1))] 
+    | S _ => backtrack [(1, ret (Some Foo1))] 
     end
   in fun sz => aux_arb sz n.
 
@@ -167,10 +170,10 @@ Definition genGoodCombo `{_ : Arbitrary Foo} (n : nat) :=
     match size with 
     | 0   => backtrack [(1, 
 (* begin good_foo_combo_gen *)
-  do! foo <- arbitrary; returnGen (Some (Foo2 foo))
+   foo <- arbitrary;; ret (Some (Foo2 foo))
 (* end good_foo_combo_gen *)
                         )] 
-    | S _ => backtrack [(1, do! foo <- arbitrary; returnGen (Some (Foo2 foo)))]
+    | S _ => backtrack [(1, foo <- arbitrary;; ret (Some (Foo2 foo)))]
     end
   in fun sz => aux_arb sz n.
 
@@ -192,15 +195,15 @@ Definition genGoodMatch (n : nat) :=
     | 0   => backtrack [(1, 
 (* begin good_foo_match_gen *)
   match n with
-  | 0 => returnGen (Some Foo1)
-  | _.+1 => returnGen None
+  | 0 => ret (Some Foo1)
+  | _.+1 => ret None
   end
 (* end good_foo_match_gen *)
                         )]
     | S _ => backtrack [(1,
            match n with
-           | 0 => returnGen (Some Foo1)
-           | _.+1 => returnGen None
+           | 0 => ret (Some Foo1)
+           | _.+1 => ret None
            end)]
     end
   in fun sz => aux_arb sz n.
@@ -222,12 +225,12 @@ Derive ArbitrarySizedSuchThat for (fun foo => goodFooRec n foo).
 
 (* begin gen_good_rec *)
 Definition genGoodRec (n : nat) :=
-  let fix aux_arb size n := 
+  let fix aux_arb size n : G (option Foo) := 
     match size with 
-    | 0 => backtrack [(1, returnGen (Some Foo1))]
-    | S size' => backtrack [ (1, returnGen (Some Foo1))
-                           ; (1, doM! foo <- aux_arb size' 0;
-                                 returnGen (Some (Foo2 foo))) ]
+    | 0 => backtrack [(1, ret (Some Foo1))]
+    | S size' => backtrack [ (1, ret (Some Foo1))
+                           ; (1, bindGenOpt (aux_arb size' 0) (fun foo => 
+                                 ret (Some (Foo2 foo)))) ]
     end
   in fun sz => aux_arb sz n.
 (* end gen_good_rec *)
@@ -282,20 +285,20 @@ Definition genGoodPrec (n : nat) : nat -> G (option (Foo)):=
    fix aux_arb size (n : nat) : G (option (Foo)) :=
      match size with
      | O => 
-                      backtrack [ (1, returnGen (Some Foo1))
+                      backtrack [ (1, ret (Some Foo1))
                      ; (1, match @decOpt (goodFooPrec O Foo1) _ 42 with
-                           | Some true => do! foo <- arbitrary;
-                                          returnGen (Some foo)
-                           | _ => returnGen None
+                           | Some true => foo <- arbitrary;;
+                                          ret (Some foo)
+                           | _ => ret None
                            end
                      )]
 
      | S size' =>
-         backtrack [ (1, returnGen (Some Foo1))
+         backtrack [ (1, ret (Some Foo1))
                      ; (1, match @decOpt (goodFooPrec O Foo1) _ 42 with
-                           | Some true => do! foo <- arbitrary;
-                                          returnGen (Some foo)
-                           | _ => returnGen None
+                           | Some true => foo <- arbitrary;;
+                                          ret (Some foo)
+                           | _ => ret None
                            end
                      )]
      end in fun sz => aux_arb sz n.
@@ -353,15 +356,15 @@ Definition genGoodNarrow (n : nat) : nat -> G (option (Foo)) :=
  let
    fix aux_arb size (n : nat) : G (option (Foo)) :=
      match size with
-     | O => backtrack [(1, returnGen (Some Foo1))]
+     | O => backtrack [(1, ret (Some Foo1))]
      | S size' =>
-         backtrack [ (1, returnGen (Some Foo1))
-                   ; (1, doM! foo <- aux_arb size' 0; 
+         backtrack [ (1, ret (Some Foo1))
+                   ; (1, bindGenOpt (aux_arb size' 0) (fun foo =>
                          match @decOpt (goodFooNarrow 1 foo) _  42 with
-                         | Some true => returnGen (Some foo)
-                         | _ => returnGen None
+                         | Some true => ret (Some foo)
+                         | _ => ret None
                          end
-                     )]
+                     ))]
      end in fun sz => aux_arb sz n.
 
 Lemma genGoodNarrow_equality n : 
