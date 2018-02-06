@@ -141,6 +141,18 @@ Definition giveUp (st : State) (_ : nat -> RandomSeed -> QProp) : Result :=
          ("*** Gave up! Passed only " ++ (show (numSuccessTests st)) ++ " tests"
           ++  newline ++ "Discarded: " ++ (show (numDiscardedTests st))).
 
+Definition callbackPostTest (st : State) (res : Checker.Result) : nat :=
+  match res with
+  | MkResult o e r i s c t =>
+    fold_left (fun acc callback =>
+                 match callback with
+                 | PostTest _ call =>
+                   (call st (MkSmallResult o e r i s t)) + acc
+                 | _ => acc
+                 end) c 0
+  end.
+  
+
 Definition callbackPostFinalFailure (st : State) (res : Checker.Result)
 : nat :=
 match res with
@@ -213,6 +225,7 @@ Function localMin (st : State) (r : Rose Checker.Result)
           let zero := callbackPostFinalFailure st res in
           (numSuccessShrinks st + zero, res)
         | cons (MkRose res' ts') t =>
+          let zero := callbackPostTest st res in 
           match ok res' with
             | Some x =>
               let consistent_tags := 
@@ -222,7 +235,7 @@ Function localMin (st : State) (r : Rose Checker.Result)
                 | _, _ => false
                 end in
               if andb (negb x) consistent_tags then
-                  localMin (updSuccessShrinks st (fun x => x + 1))
+                  localMin (updSuccessShrinks st (fun x => x + 1 + zero))
                            (MkRose res' ts')
               else
                 localMin (updTryShrinks st (fun x => x + 1)) (MkRose res (lazy t))
@@ -261,6 +274,7 @@ Fixpoint runATest (st : State) (f : nat -> RandomSeed -> QProp) (maxSteps : nat)
       match f size rnd1 with
       | MkProp (MkRose res ts) =>
         (* TODO: CallbackPostTest *)
+        let res_cb := callbackPostTest st res in
         match res with
         | MkResult (Some x) e reas _ s _ t =>
           if x then (* Success *)
@@ -272,7 +286,7 @@ Fixpoint runATest (st : State) (f : nat -> RandomSeed -> QProp) (maxSteps : nat)
                       ShowFunctions.string_concat 
                         (ShowFunctions.intersperse " , "%string s) in
                   match Map.find s_to_add ls with 
-                    | None   => Map.add s_to_add 1 ls
+                    | None   => Map.add s_to_add (res_cb + 1) ls
                     | Some k => Map.add s_to_add (k+1) ls
                   end 
                 end in
