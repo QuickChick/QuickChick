@@ -55,6 +55,7 @@ https://github.com/DeepSpec/dsss17
   - `examples/ifc-basic` 
 
 Running `make tests` in the top-level QuickChick folder will check and execute all of these.
+If successful, you should see "success" at the end.
 
 ### Top-level Commands
 
