@@ -140,7 +140,7 @@ let define_and_run c =
   (** Run the test *)
   else
     (* Should really be shared across this and the tool *)
-    let chan = Unix.open_process_in ("time " ^ execn) in
+    let chan = Unix.open_process_in ((* "time " ^ *) execn) in
     let builder = ref [] in
     let rec process_otl_aux () =
       let e = input_line chan in
