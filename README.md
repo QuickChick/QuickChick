@@ -25,16 +25,16 @@ https://github.com/DeepSpec/dsss17
     * OCaml 4.06.0
     * mathcomp-ssreflect-1.6.2
 
-  - Branch 8.4pl6 known to work with
+  - Branch 8.4pl6:
     * OCaml 4.01.0 and Coq 8.4pl3 or OCaml 4.02.1 and Coq 8.4pl6
     * SSReflect 1.5 (http://ssr.msr-inria.inria.fr/FTP/)
-  - Branch coq 8.5-* known to work with
+  - Branch coq 8.5-*:
     * Coq 8.5pl2 
     * OCaml 4.03.0
     * mathcomp-ssreflect v1.5 
     + 8.5-legacy contains the old typeclass hierarchy
     + 8.5-automation contains the new one
-  - Branch coq.8.6 known to work with
+  - Branch coq.8.6:
     * Coq 8.6
     * OCaml 4.03.0
     * mathcomp-ssreflect-1.6.1
