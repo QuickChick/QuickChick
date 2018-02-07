@@ -44,7 +44,7 @@ https://github.com/DeepSpec/dsss17
     # To get ssreflect, you need to add the Coq opam repository (if you haven't already)
     opam repo add coq-released https://coq.inria.fr/opam/released
     opam update
-    opam install coq-mathcomp-ssreflect
+    opam install coq-mathcomp-ssreflect coq-ext-lib
 
     # Then:
     make && make install

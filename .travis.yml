@@ -18,7 +18,6 @@ env:
   - NJOBS=2
   - OPAMYES=true
   matrix:
-      - COMPILER="4.05.0"
       - COMPILER="4.06.0"
 matrix:
   fast_finish: true
@@ -45,17 +44,17 @@ script:
 - echo 'Building QuickChick...';
   echo -en 'travis_fold:start:QuickChick.build';
   opam update;
-  travis_wait 30 opam install coq-mathcomp-ssreflect.1.6.2;
+  travis_wait 30 opam install coq-mathcomp-ssreflect coq-ext-lib;
   make -j install;
   echo -en 'travis_fold:end:QuickChick.build'
 - echo 'Testing IFC...';
   echo -en 'travis_fold:start:QuickChick.test.ifc-basic';
   make -C examples/ifc-basic;
   echo -en 'travis_fold:end:QuickChick.test.ifc-basic'
-- echo 'Testing multifile mutation...';
-  echo -en 'travis_fold:start:QuickChick.test.multifile-mutation';
-  make -C examples/multifile-mutation test;
-  echo -en 'travis_fold:end:QuickChick.test.multifile-mutation'
+- echo 'Testing Red-black tree...';
+  echo -en 'travis_fold:start:QuickChick.test.RedBlack';
+  make -C examples/RedBlack;
+  echo -en 'travis_fold:end:QuickChick.test.RedBlack'
 - echo 'Testing STLC...';
   echo -en 'travis_fold:start:QuickChick.test.stlc';
   make -C examples/stlc;

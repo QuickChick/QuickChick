@@ -62,6 +62,7 @@ Makefile.coq: _CoqProject
 	$(V)coq_makefile -f _CoqProject -o Makefile.coq
 
 clean:
+	$Vif [ -e Makefile.coq ]; then $(MAKE) -f Makefile.coq clean; fi
          # This might not work on macs, but then not my problem
 	find . -name '*.vo' -print -delete
 	find . -name '*.glob' -print -delete
@@ -75,7 +76,8 @@ clean:
 	find . -name *~ -print -delete
 	find . -name *.conflicts -print -delete
 	find . -name *.output -print -delete
-	rm -f Makefile.coq
+	find . -name *.aux -print -delete
+	rm -f Makefile.coq*
 
 bc:
 	coqwc src/*.v
