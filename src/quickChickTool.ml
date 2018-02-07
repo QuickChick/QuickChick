@@ -14,6 +14,8 @@ let verbose = ref false
 let ansi = ref false
 let fail_fast = ref false
 let excluded = ref []
+let nobase = ref false
+let only_mutant = ref None
 
 let speclist =
   [ ("-s", Arg.String (fun name -> sec_name := Some name), "Which section's properties to test")
@@ -23,6 +25,8 @@ let speclist =
   ; ("-cmd", Arg.String (fun name -> compile_command := name), "Compile command for entire directory")
   ; ("-top", Arg.String (fun name -> top := name), "Name of top-level logical module")
   ; ("-ocamlbuild", Arg.String (fun name -> ocamlbuild_args := name), "Arguments given to ocamlbuild")
+  ; ("-nobase", Arg.Unit (fun _ -> nobase := true), "Do not test base mutant")
+  ; ("-m", Arg.Int (fun n -> only_mutant := Some n), "Only test mutant number n")
   ; ("-exclude", Arg.Rest (fun excl -> excluded := excl :: !excluded), "Files to be excluded. Must be the last argument")
   ]
 
@@ -619,24 +623,29 @@ let main =
     ensure_tmpdir_exists();
     ignore (write_file (tmp_dir ^ "/" ^ temporary_file) tmp_file_data);
 
-    (* Base mutant *)
-    highlight Header "Testing base...";
-    (* Entire file structure is copied *)
-    output_mut_dir tmp_dir base;
     let dir = tmp_dir ^ "/" ^ s in
-    compile_and_run dir ExpectOnlySuccesses;
 
+    (* Base mutant *)
+    if not (!nobase) then begin
+      highlight Header "Testing base...";
+      (* Entire file structure is copied *)
+      output_mut_dir tmp_dir base;
+      compile_and_run dir ExpectOnlySuccesses;
+    end;
+      
     (* For each mutant structure *)
     List.iteri
       (fun i m ->
         begin
-          Printf.printf "\n";
-          highlight Header (Printf.sprintf "Testing mutant %d..." i);
-          ensure_tmpdir_exists();
-          (* Entire file structure is copied *)
-          output_mut_dir tmp_dir m;
-          reset_test_results();
-          compile_and_run dir ExpectSomeFailure
+          if !only_mutant = Some i || !only_mutant = None then begin
+              Printf.printf "\n";
+              highlight Header (Printf.sprintf "Testing mutant %d..." i);
+              ensure_tmpdir_exists();
+              (* Entire file structure is copied *)
+              output_mut_dir tmp_dir m;
+              reset_test_results();
+              compile_and_run dir ExpectSomeFailure
+          end
         end)
       dir_mutants
   end;
