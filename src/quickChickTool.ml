@@ -651,6 +651,6 @@ let main =
   end;
 
   if !something_failed then begin
-    highlight Failure "[Unexpected result for at least one test. Exiting with status 1...]";
+    highlight Failure "\nUnexpected result for at least one test. Exiting with status 1...";
     exit 1
   end
