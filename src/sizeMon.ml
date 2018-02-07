@@ -18,37 +18,25 @@ open SetLib
 open SemLib
 open CoqLib
 open GenLib
+open SizeUtils
 
-let list_drop_every n l =
-  let rec aux i = function
-    | [] -> []
-    | x::xs -> if i == n then aux 1 xs else x::aux (i+1) xs
-  in aux 1 l
-
-let sameTypeCtr c_ctr = function
-  | TyCtr (ty_ctr', _) -> c_ctr = ty_ctr'
-  | _ -> false
-
-
-let isBaseBranch ty_ctr ty = fold_ty' (fun b ty' -> b && not (sameTypeCtr ty_ctr ty')) true ty
-
-let base_ctrs ty_ctr ctrs = List.filter (fun (_, ty) -> isBaseBranch ty_ctr ty) ctrs
-
-let sizeMon ty_ctr ctrs size iargs genName =
-
-  (* Common helpers, refactor? *)
-  let coqTyCtr = gTyCtr ty_ctr in
-  let coqTyParams = List.map gVar (list_drop_every 2 iargs) in
-  let full_dt = gApp ~explicit:true coqTyCtr coqTyParams in
-  let isCurrentTyCtr = sameTypeCtr ty_ctr in
-  let bases = base_ctrs ty_ctr ctrs in
+let sizeMon arg size iargs genName =
 
   let rec proof ih ty n =
     let x = Printf.sprintf "x%d" n in
     match ty with
     | Arrow (ty1, ty2) ->
-      let h = if isCurrentTyCtr ty1 then ih else hole in
-      gApp ~explicit:true (gInject "bindMonotonic") [hole; hole; hole; hole; h; gFun [x] (fun [x] -> proof ih ty2 (n+1))]
+       let h = if arg._isCurrentTyCtr ty1 then ih else hole in
+       (* bindMonotonic has type: 
+          forall (A B : Type) (g : G A) (f : A -> G B),
+          SizeMonotonic g -> (forall x : A, SizeMonotonic (f x)) -> 
+          SizeMonotonic (bindGen g f) 
+
+          If we are in a recursive proof, we need to specify a proof that 
+          g is SizeMonotonic and the function recursively.
+        *)
+      gApp ~explicit:true (gInject "bindMonotonic")
+        [hole; hole; hole; hole; h; gFun [x] (fun [x] -> proof ih ty2 (n+1))]
     | _ -> returnGenSizeMonotonic hole
   in
 
@@ -65,55 +53,17 @@ let sizeMon ty_ctr ctrs size iargs genName =
          (injectCtr "or_intror", [hr],
           fun [hr] -> elim_cases (gVar hr) ih ctrs' (n+1))]
   in
-  (* Code from ArbitrarySize.v. Regenerate generators for type annotations *)
-  let create_for_branch tyParams rec_name size (ctr, ty) =
-    let rec aux i acc ty : coq_expr =
-      match ty with
-      | Arrow (ty1, ty2) ->
-        bindGen (if isCurrentTyCtr ty1 then
-                   gApp (gVar rec_name) [gVar size]
-                 else gInject "arbitrary")
-          (Printf.sprintf "p%d" i)
-          (fun pi -> aux (i+1) ((gVar pi) :: acc) ty2)
-      | _ -> returnGen (gApp ~explicit:true (gCtr ctr) (tyParams @ List.rev acc))
-    in aux 0 [] ty
-  in
 
-  let arb_body =
-    gRecFunInWithArgs
-      "arb_aux" [gArg ~assumName:(gInject "size") ()]
-      (fun (aux_arb, [size]) ->
-         gMatch (gVar size)
-           [(injectCtr "O", [],
-             fun _ -> oneof (List.map (create_for_branch coqTyParams aux_arb size) bases))
-           ;(injectCtr "S", ["size'"],
-             fun [size'] -> frequency (List.map (fun (ctr,ty') ->
-                 ((if isBaseBranch ty_ctr ty' then gInt 1 else gVar size),
-                  create_for_branch coqTyParams aux_arb size' (ctr,ty'))) ctrs))
-           ])
-      (fun x -> gVar x)
-  in
+  let arb_body = ArbitrarySized.arbitrarySized_body arg._ty_ctr arg._ctrs iargs in 
+  let bases = List.filter (fun (_, ty) -> isBaseBranch arg._ty_ctr ty) arg._ctrs in
 
-  let gen_list size (ctr, ty) =
-    let rec aux i acc ty : coq_expr =
-      match ty with
-      | Arrow (ty1, ty2) ->
-        bindGen (if isCurrentTyCtr ty1 then
-                   gApp arb_body [size]
-                 else gInject "arbitrary")
-          (Printf.sprintf "p%d" i)
-          (fun pi -> aux (i+1) ((gVar pi) :: acc) ty2)
-      | _ -> returnGen (gApp ~explicit:true (gCtr ctr) (coqTyParams @ List.rev acc))
-    in aux 0 [] ty
-  in
-
-  let base_gens = gList (List.map (gen_list hole) bases) in
+  let base_gens = gList (List.map (gen_list arg hole arb_body) bases) in
   let ind_gens size =
     gList
       (List.map
          (fun (ctr,ty') ->
-            gPair ((if isBaseBranch ty_ctr ty' then gInt 1 else gSucc (gVar size)),
-                   (gen_list (gVar size) (ctr,ty')))) ctrs)
+            gPair (Weightmap.lookup_weight ctr size,
+                   (gen_list arg (gVar size) arb_body (ctr,ty')))) arg._ctrs)
   in
   let base_case =
     match bases with
@@ -128,7 +78,7 @@ let sizeMon ty_ctr ctrs size iargs genName =
   let ind_case =
     gFun ["size"; "IHs"]
       (fun [size; ihs] ->
-         match ctrs with
+         match arg._ctrs with
          | [] -> failwith "Must have base cases"
          | [(ctr, ty)] -> proof (gVar ihs) ty 0
          | _ :: _ ->
@@ -137,7 +87,7 @@ let sizeMon ty_ctr ctrs size iargs genName =
              [hole; hole; hole; gFun [("x")]
                                   (fun [x] ->
                                      gFunTyped [("H", gApp (gInject "seq_In") [ind_gens size; gVar x])]
-                                       (fun [h] -> elim_cases (gVar h) (gVar ihs) ctrs 0))])
+                                       (fun [h] -> elim_cases (gVar h) (gVar ihs) arg._ctrs 0))])
   in
 
   let ret_type =
@@ -145,7 +95,7 @@ let sizeMon ty_ctr ctrs size iargs genName =
          (fun [s] -> 
           gApp (gInject "SizeMonotonic")
             (* [gApp (gInject "arbitrarySized") [gVar s]]) *)
-            [gApp ~explicit:true (gInject "arbitrarySized") [full_dt; genName; gVar s]])
+            [gApp ~explicit:true (gInject "arbitrarySized") [arg._full_dt; genName; gVar s]])
   in 
   let mon_proof =
     gApp (gInject "nat_ind") [ret_type; base_case; ind_case; size]

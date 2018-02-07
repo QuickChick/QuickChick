@@ -58,6 +58,7 @@ let debug_constr (c : constr) : unit =
 
 (* Non-dependent version *)
 type var = Id.t (* Opaque *)
+let var_of_id x = x         
 let var_to_string = Id.to_string
 let gVar (x : var) : coq_expr =
   CAst.make @@ CRef (Ident (None, x),None)
@@ -102,6 +103,11 @@ let gArg ?assumName:(an=hole) ?assumType:(at=hole) ?assumImplicit:(ai=false) ?as
                    else if ai then Default Implicit else Default Explicit),
                   at )
 
+let arg_to_var (x : arg) =
+  match x with
+  | CLocalAssum ([(_loc, Name id)], _ ,_ ) -> id
+  | _ -> qcfail "arg_to_var must be named"
+  
 let str_lst_to_string sep (ss : string list) = 
   List.fold_left (fun acc s -> acc ^ sep ^ s) "" ss
 
@@ -122,6 +128,9 @@ let gCtr id = qualid_to_coq_expr id
 let injectCtr s = 
   if s = "" then failwith "Called gInject with empty string";
   qualid_of_string s
+
+let ty_ctr_to_ctr x = x
+let ctr_to_ty_ctr x = x
 
 let num_of_ctrs (c : constructor) =
   let r = qualid_to_reference c in 
@@ -246,7 +255,8 @@ let rec cat_maybes = function
 let foldM f b l = List.fold_left (fun accm x -> 
                                   accm >>= fun acc ->
                                   f acc x
-                                 ) b l
+                    ) b l
+
 let sequenceM f l = 
   (foldM (fun acc x -> f x >>= fun x' -> Some (x' :: acc)) (Some []) l) >>= fun l -> Some (List.rev l)
 
@@ -344,17 +354,23 @@ let dt_rep_from_mib mib =
     parse_constructors mib.mind_nparams ty_params result_ctr oib >>= fun ctr_reps ->
     Some (qualid_of_ident ty_ctr, ty_params, ctr_reps)
 
+let reference_to_mib r =
+  let env = Global.env () in
+  
+  let glob_ref = Nametab.global r in
+  let (mind,_) = Globnames.destIndRef glob_ref in
+  let mib = Environ.lookup_mind mind env in
+
+  mib
+
+    
 let coerce_reference_to_dt_rep c = 
   let r = match c with
     | { CAst.v = CRef (r,_) } -> r
     | _ -> failwith "Not a reference"
   in
 
-  let env = Global.env () in
-  
-  let glob_ref = Nametab.global r in
-  let (mind,_) = Globnames.destIndRef glob_ref in
-  let mib = Environ.lookup_mind mind env in
+  let mib = reference_to_mib r in
   
   dt_rep_from_mib mib
 
@@ -603,6 +619,14 @@ let gRecFunIn ?assumType:(typ = hole) (fs : string) (xss : string list) (f_body 
   let xss' = List.map (fun s -> fresh_name s) xss in
   gRecFunInWithArgs ~assumType:typ fs (List.map (fun x -> gArg ~assumName:(gVar x) ()) xss') f_body let_body 
 
+let gLetIn (x : string) (e : coq_expr) (body : var -> coq_expr) = 
+  let fx = fresh_name x in
+  CAst.make @@ CLetIn ((None, Name fx), e, None, body fx)
+
+
+let gLetTupleIn (x : var) (xs : var list) (body : coq_expr) =
+  CAst.make @@ CLetTuple (List.map (fun x -> (None, Names.Name x)) xs, (None, None), gVar x, body)
+  
 let gMatch discr ?catchAll:(body=None) (branches : (constructor * string list * (var list -> coq_expr)) list) : coq_expr =
   CAst.make @@ CCases (Term.RegularStyle,
           None (* return *), 
@@ -779,6 +803,43 @@ let smart_paren c = gApp (gInject "QuickChick.Show.smart_paren") [c]
 
 (* Pair *)
 let gPair (c1, c2) = gApp (gInject "Coq.Init.Datatypes.pair") [c1;c2]
+let gProd (c1, c2) = gApp (gInject "Coq.Init.Datatypes.prod") [c1;c2]
+
+let listToPairAux (f : ('a *'a) -> 'a) (l : 'a list) : 'a =
+  match l with
+  | [] -> qcfail "listToPair called with empty list"
+  | c :: cs' ->
+     let rec go (l : 'a list) (acc : 'a) : 'a =
+       match l with
+       | [] -> acc
+       | x :: xs -> go xs (f (acc, x))
+     in go cs' c
+(*      
+let gTupleAux f cs =
+  match cs with
+  | []  -> qcfail "gTuple called with empty list" (* Should this be unit? *)
+  | c :: cs' ->
+     let rec go l acc =
+       match l with
+       | [] -> acc
+       | x :: xs -> go xs (f (acc, x))
+     in go cs' cx
+ *)
+let gTuple = listToPairAux gPair
+let gTupleType = listToPairAux gProd
+let dtTupleType =
+  listToPairAux (fun (acc,x) -> DTyCtr (injectCtr "Coq.Init.Datatypes.prod", [acc;x]))
+                                                      
+(*
+                        match dts with
+  | [] -> qcfail "dtTuple called with empty list"
+  | dt :: dts' ->
+     let rec go l acc =
+       match l with
+       | [] -> acc
+       | x :: xs -> go xs (DTyCtr (injectCtr "Coq.Init.Datatypes.Prod", [acc; x]))
+     in go dts' dt
+ *)
 
 (* Int *)
 
@@ -811,11 +872,16 @@ let gTrue  = gInject "Coq.Init.Datatypes.true"
 let gFalse = gInject "Coq.Init.Datatypes.false"
 
 let gNot c = gApp (gInject "Coq.Init.Datatypes.negb") [c]
+let gBool  = gInject "Coq.Init.Datatypes.bool"           
 
 let decToBool c = 
   gMatch c [ (injectCtr "Coq.Init.Specif.left" , ["eq" ], fun _ -> gTrue )
            ; (injectCtr "Coq.Init.Specif.right", ["neq"], fun _ -> gFalse)
-           ]
+    ]
+
+(* Unit *)
+let gUnit = gInject "Coq.Init.Datatypes.unit"
+let gTT   = gInject "Coq.Init.Datatypes.tt"
 
 (* Recursion combinators / fold *)
 (* fold_ty : ( a -> coq_type -> a ) -> ( ty_ctr * coq_type list -> a ) -> ( ty_param -> a ) -> coq_type -> a *)
@@ -911,3 +977,11 @@ let rec list_insert_nth x l n =
   | _, [] -> x :: l
   | _, h::t -> h :: list_insert_nth x t (n-1)
   
+
+(* Leo: Where should these util functions live? *)
+let sameTypeCtr c_ctr = function
+  | TyCtr (ty_ctr', _) -> c_ctr = ty_ctr'
+  | _ -> false
+
+let isBaseBranch ty_ctr ty =
+  fold_ty' (fun b ty' -> b && not (sameTypeCtr ty_ctr ty')) true ty

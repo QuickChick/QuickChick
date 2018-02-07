@@ -114,7 +114,7 @@ let define_and_run c =
     "let rec copy i = function\n" ^ 
     "| [] -> s\n" ^ 
     "| c :: l -> s.[i] <- c; copy (i+1) l\n" ^ 
-    "in copy 0 l)" in
+    "in Bytes.to_string (copy 0 l))" in
   Printf.fprintf oc "%s" for_output;
   close_out oc;
   (* Before compiling, remove stupid cyclic dependencies like "type int = int".
@@ -141,7 +141,7 @@ let define_and_run c =
   (** Run the test *)
   else
     (* Should really be shared across this and the tool *)
-    let chan = Unix.open_process_in ("time " ^ execn) in
+    let chan = Unix.open_process_in ((* "time " ^ *) execn) in
     let builder = ref [] in
     let rec process_otl_aux () =
       let e = input_line chan in

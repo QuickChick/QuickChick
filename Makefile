@@ -52,13 +52,11 @@ quickChickTool: src/quickChickToolTypes.cmo
 	$(MAKE) src/quickChickTool.cmo
 	ocamlc -o src/quickChickTool unix.cma str.cma src/quickChickToolTypes.cmo src/quickChickToolLexer.cmo src/quickChickToolParser.cmo src/quickChickTool.cmo
 
-tests: install
+tests:
+	cd examples/ifc-basic; make clean && make
+	cd examples/RedBlack; make clean && make
+	cd examples/stlc; make clean && make
 	coqc examples/DependentTest.v
-	make -C examples/ifc-basic
-	make -C examples/multifile-mutation test
-#	cd examples/RedBlack; make clean && make
-	make -C examples/stlc
-
 
 Makefile.coq: _CoqProject
 	$(V)coq_makefile -f _CoqProject -o Makefile.coq

@@ -6,19 +6,12 @@ open GenLib
 
 (* Derivation of ArbitrarySized. Contains mostly code from derive.ml *)
 
-let list_drop_every n l =
-  let rec aux i = function
-    | [] -> []
-    | x::xs -> if i == n then aux 1 xs else x::aux (i+1) xs
-  in aux 1 l
-
 let rec replace v x = function
   | [] -> []
   | y::ys -> if y = v then x::ys else y::(replace v x ys)
 
-
-let arbitrarySized_decl ty_ctr ctrs iargs =
-
+let arbitrarySized_body (ty_ctr : ty_ctr) (ctrs : ctr_rep list) iargs = 
+  
   let isCurrentTyCtr = function
     | TyCtr (ty_ctr', _) -> ty_ctr = ty_ctr'
     | _ -> false in
@@ -27,37 +20,38 @@ let arbitrarySized_decl ty_ctr ctrs iargs =
 
   let tyParams = List.map gVar (list_drop_every 2 iargs) in
 
-  let arbitrary_decl =
-    (* Need reverse fold for this *)
-    let create_for_branch tyParams rec_name size (ctr, ty) =
-      let rec aux i acc ty : coq_expr =
-        match ty with
-        | Arrow (ty1, ty2) ->
-          bindGen (if isCurrentTyCtr ty1 then
+  (* Need reverse fold for this *)
+  let create_for_branch tyParams rec_name size (ctr, ty) =
+    let rec aux i acc ty : coq_expr =
+      match ty with
+      | Arrow (ty1, ty2) ->
+         bindGen (if isCurrentTyCtr ty1 then
                      gApp (gVar rec_name) [gVar size]
-                   else gInject "arbitrary")
-            (Printf.sprintf "p%d" i)
-            (fun pi -> aux (i+1) ((gVar pi) :: acc) ty2)
-        | _ -> returnGen (gApp ~explicit:true (gCtr ctr) (tyParams @ List.rev acc))
-      in aux 0 [] ty in
+                  else gInject "arbitrary")
+           (Printf.sprintf "p%d" i)
+           (fun pi -> aux (i+1) ((gVar pi) :: acc) ty2)
+      | _ -> returnGen (gApp ~explicit:true (gCtr ctr) (tyParams @ List.rev acc))
+    in aux 0 [] ty in
+  
+  let bases = List.filter (fun (_, ty) -> isBaseBranch ty) ctrs in
 
-    let bases = List.filter (fun (_, ty) -> isBaseBranch ty) ctrs in
+  gRecFunInWithArgs
+    "arb_aux" [gArg ~assumName:(gInject "size") ()]
+    (fun (aux_arb, [size]) ->
+      gMatch (gVar size)
+        [(injectCtr "O", [],
+          fun _ -> oneof (List.map (create_for_branch tyParams aux_arb size) bases))
+        ;(injectCtr "S", ["size'"],
+          fun [size'] -> frequency (List.map (fun (ctr,ty') ->
+                                        (Weightmap.lookup_weight ctr size',
+                                         create_for_branch tyParams aux_arb size' (ctr,ty'))) ctrs))
+    ])
+    (fun x -> gVar x)
+  
+let arbitrarySized_decl ty_ctr ctrs iargs =
 
-    let arb_body =
-      gRecFunInWithArgs
-        "arb_aux" [gArg ~assumName:(gInject "size") ()]
-        (fun (aux_arb, [size]) ->
-           gMatch (gVar size)
-             [(injectCtr "O", [],
-               fun _ -> oneof (List.map (create_for_branch tyParams aux_arb size) bases))
-             ;(injectCtr "S", ["size'"],
-               fun [size'] -> frequency (List.map (fun (ctr,ty') ->
-                   (Weightmap.lookup_weight ctr size',
-                    create_for_branch tyParams aux_arb size' (ctr,ty'))) ctrs))
-             ])
-        (fun x -> gVar x) in
-    gFun ["s"] (fun [s] -> gApp arb_body [gVar s])
-  in
+  let arb_body = arbitrarySized_body ty_ctr ctrs iargs in
+  let arbitrary_decl = gFun ["s"] (fun [s] -> gApp arb_body [gVar s]) in
 
   gRecord [("arbitrarySized", arbitrary_decl)]
 

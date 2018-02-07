@@ -127,6 +127,13 @@ let matchDec c left right =
            ; (injectCtr "right", ["neq"], right)
            ]
 
+let matchDecOpt c left right =
+  gMatch c [ (injectCtr "left" , ["eq" ], left)
+           ; (injectCtr "right", ["neq"], right)
+           ]
+
+
+  
 let plus x y =
   gApp (gInject "Nat.add") [x;y]
 

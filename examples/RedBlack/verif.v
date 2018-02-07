@@ -178,18 +178,30 @@ Proof.
   rewrite -> semForAllUnsized2.
   rewrite /genPair. split.
   - move => H n t irt. specialize (H (n,t)). simpl in H.
-    rewrite /semCheckable in H. simpl in H. rewrite -> semImplication in H.
-    rewrite -> semCheckableBool in H.
-    apply /is_redblackP. apply : H.
-    apply semLiftGen2SizeMonotonic; eauto with typeclass_instances.
-    exists (n, t). split => //. split => //. by apply arbNat_correct.
-    by apply semRBTree. by apply/is_redblackP.
+    rewrite /semCheckable in H. simpl in H.
+    rewrite -> semReturnGen in H.
+    unfold insert_preserves_redblack.
+    { 
+    apply semCheckableBool in H; eauto.
+    destruct (is_redblack_bool t) eqn:Hyp; simpl in *; try congruence.
+    + apply /is_redblackP; auto.
+    + move: irt. move => /is_redblackP irt. congruence.
+    + apply semLiftGen2SizeMonotonic; eauto with typeclass_instances.
+      exists (n, t). split => //. split => //. by apply arbNat_correct.
+        by apply semRBTree.
+    } 
   - move => H [a t] /semLiftGen2SizeMonotonic [[n t'] [[_ Hg] [<- <-]]].
-    simpl. rewrite -> semImplication. move => Hb. rewrite semCheckableBool.
-    apply /is_redblackP. apply H. by apply /is_redblackP.
+    simpl.
+    rewrite semCheckableBool.
+    unfold insert_preserves_redblack in H.
+    specialize (H n t').
+    destruct (is_redblack_bool t') eqn:Hyp.
+    + simpl; move: Hyp => /is_redblackP Hyp. apply H in Hyp. apply /is_redblackP; auto.
+    + simpl; auto.
   - simpl. eauto with typeclass_instances.
 Qed.
 
+(*
 Lemma insert_preserves_redblack_checker_correct' :
   semChecker (insert_preserves_redblack_checker genRBTree)
   <-> insert_preserves_redblack.
@@ -214,3 +226,4 @@ Proof.
   - move => n /=. apply forAllMonotonic;
       try by (try move => ? /=); auto with typeclass_instances.
 Qed.
+*)

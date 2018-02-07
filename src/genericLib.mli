@@ -10,7 +10,8 @@ val hole : coq_expr
 
 val debug_coq_expr : coq_expr -> unit
 
-type var 
+type var
+val var_of_id : Id.t -> var   
 val var_to_string : var -> string
 val gVar : var -> coq_expr
 
@@ -31,7 +32,9 @@ val gArg : ?assumName:coq_expr ->
            ?assumImplicit:bool ->
            ?assumGeneralized:bool ->
            unit -> arg
-               
+
+val arg_to_var : arg -> var
+  
 val str_lst_to_string : string -> string list -> string
 
 type coq_type = 
@@ -45,6 +48,8 @@ type constructor
 val constructor_to_string : constructor -> string
 val gCtr : constructor -> coq_expr
 val injectCtr : string -> constructor
+val ty_ctr_to_ctr : ty_ctr -> constructor
+val ctr_to_ty_ctr : constructor -> ty_ctr 
 
 module type Ord_ty_ctr_type = sig
   type t = ty_ctr 
@@ -108,6 +113,7 @@ val cat_maybes : 'a option list -> 'a list
 val foldM : ('b -> 'a -> 'b option) -> 'b option -> 'a list -> 'b option
 val sequenceM : ('a -> 'b option) -> 'a list -> 'b list option
 
+val reference_to_mib : Libnames.reference -> mutual_inductive_body
 val dt_rep_from_mib : mutual_inductive_body -> dt_rep option
 val coerce_reference_to_dt_rep : constr_expr -> dt_rep option
 
@@ -122,6 +128,10 @@ val gApp : ?explicit:bool -> coq_expr -> coq_expr list -> coq_expr
 val gFun : string list -> (var list -> coq_expr) -> coq_expr
 val gRecFunIn : ?assumType:coq_expr -> string -> string list -> ((var * var list) -> coq_expr) -> (var -> coq_expr) -> coq_expr
 
+val gLetIn : string -> coq_expr -> (var -> coq_expr) -> coq_expr
+(* TODO: HOAS-ify *)
+val gLetTupleIn : var -> var list -> coq_expr -> coq_expr
+  
 val gMatch : coq_expr -> ?catchAll:(coq_expr option) -> ((constructor * string list * (var list -> coq_expr)) list) -> coq_expr
 val gMatchReturn : coq_expr -> ?catchAll:(coq_expr option) -> string -> (var -> coq_expr) ->
   ((constructor * string list * (var list -> coq_expr)) list) -> coq_expr
@@ -162,7 +172,12 @@ val str_appends : coq_expr list -> coq_expr
 val smart_paren : coq_expr -> coq_expr
 
 (* Pair *)
-val gPair : coq_expr * coq_expr -> coq_expr 
+val gPair : coq_expr * coq_expr -> coq_expr
+val gProd : coq_expr * coq_expr -> coq_expr
+val listToPairAux : (('a *'a) -> 'a) -> ('a list) -> 'a
+val gTuple      : coq_expr list -> coq_expr
+val gTupleType  : coq_expr list -> coq_expr
+val dtTupleType : dep_type list -> dep_type
 
 (* Int *)
 val gInt : int -> coq_expr
@@ -184,7 +199,12 @@ val gNot   : coq_expr -> coq_expr
 val gTrue  : coq_expr
 val gFalse : coq_expr               
 val decToBool : coq_expr -> coq_expr
+val gBool  : coq_expr
 
+(* unit *)
+val gUnit : coq_expr
+val gTT   : coq_expr
+  
 (* (\* Gen combinators *\) *)
 (* val gGen : coq_expr -> coq_expr *)
 (* val returnGen  : coq_expr -> coq_expr  *)
@@ -218,3 +238,7 @@ val list_init : 'a list -> 'a list
 val list_drop_every : int -> 'a list -> 'a list
 val take_last : 'a list -> 'a list -> ('a list * 'a)
 val list_insert_nth : 'a -> 'a list -> int -> 'a list
+
+val sameTypeCtr  : ty_ctr -> coq_type -> bool
+val isBaseBranch : ty_ctr -> coq_type -> bool
+                                                

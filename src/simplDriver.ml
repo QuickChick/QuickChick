@@ -1,14 +1,14 @@
-open Pp
 open Libnames
 open Util
 open Constrexpr
 open GenericLib
+open SizeUtils
 open Sized
 open SizeMon
 open SizeSMon
 open SizeCorr
+
 open ArbitrarySized
-open Error
 
 type derivable =
     Shrink
@@ -20,33 +20,7 @@ type derivable =
   | SizedMonotonic
   | SizedCorrect
 
-let mk_instance_name der tn = 
-  let prefix = match der with 
-    | Shrink -> "shr" 
-    | Show   -> "show"
-    | GenSized -> "genS"
-    | Sized -> "Sized"
-    | CanonicalSized -> "CanonicalSized"
-    | SizeMonotonic -> "SizeMonotonic"
-    | SizedMonotonic -> "SizedMonotonic"
-    | SizedCorrect ->  "SizedCorrect" in
-  let strip_last s = List.hd (List.rev (Str.split (Str.regexp "[.]") s)) in
-  var_to_string (fresh_name (prefix ^ strip_last tn))
-
-let repeat_instance_name der tn = 
-  let prefix = match der with 
-    | Shrink -> "shr" 
-    | Show   -> "show"
-    | GenSized -> "genS"
-    | Sized -> "Sized"
-    | CanonicalSized -> "CanonicalSized"
-    | SizeMonotonic -> "SizeMonotonic"
-    | SizedMonotonic -> "SizedMonotonic"
-    | SizedCorrect ->  "SizedCorrect" in
-  let strip_last s = List.hd (List.rev (Str.split (Str.regexp "[.]") s)) in
-  (prefix ^ strip_last tn)
-
-let print_der = function
+let derivable_to_string = function
   | Shrink -> "Shrink"
   | Show   -> "Show"
   | GenSized -> "GenSized"
@@ -55,12 +29,16 @@ let print_der = function
   | SizeMonotonic -> "SizeMonotonic"
   | SizedMonotonic -> "SizedMonotonic"
   | SizedCorrect ->  "SizedCorrect"
+  
+let mk_instance_name der tn = 
+  let prefix = derivable_to_string der in
+  let strip_last s = List.hd (List.rev (Str.split (Str.regexp "[.]") s)) in
+  var_to_string (fresh_name (prefix ^ strip_last tn))
 
-(* Generic derivation function *)
-let debugDerive (c : constr_expr) =
-  match coerce_reference_to_dt_rep c with
-  | Some dt -> msg_debug (str (dt_rep_to_string dt) ++ fnl ())
-  | None -> failwith "Not supported type"
+let repeat_instance_name der tn = 
+  let prefix = derivable_to_string der in
+  let strip_last s = List.hd (List.rev (Str.split (Str.regexp "[.]") s)) in
+  (prefix ^ strip_last tn)
 
 (* Generic derivation function *)
 let derive (cn : derivable) (c : constr_expr) (instance_name : string) (name1 : string) (name2 : string) =
@@ -80,16 +58,16 @@ let derive (cn : derivable) (c : constr_expr) (instance_name : string) (name1 : 
     | _ -> failwith "Implement me for functions" 
   in
 
-  let class_name = match cn with
-    | Shrink -> "Shrink"
-    | Show   -> "Show"
-    | GenSized -> "GenSized"
-    | Sized -> "Sized"
-    | CanonicalSized -> "CanonicalSized"
-    | SizeMonotonic -> "SizeMonotonic"
-    | SizedMonotonic -> "SizedMonotonic"
-    | SizedCorrect ->  "SizedCorrect"
-  in
+  let class_name = derivable_to_string cn in
+
+  let size_config =
+    { _ty_ctr  = ty_ctr
+    ; _ctrs    = ctrs
+    ; _coqTyCtr = coqTyCtr
+    ; _coqTyParams = coqTyParams
+    ; _full_dt  = full_dt
+    ; _isCurrentTyCtr = sameTypeCtr ty_ctr
+    } in
 
   let param_class_names = match cn with
     | Sized -> ["Sized"]
@@ -152,14 +130,14 @@ let derive (cn : derivable) (c : constr_expr) (instance_name : string) (name1 : 
       sizeEqType ty_ctr ctrs ind_scheme iargs
     | SizeMonotonic ->
       let (iargs', size) = take_last iargs [] in
-      sizeMon ty_ctr ctrs (gVar size) iargs' (gInject name1)
+      sizeMon size_config (gVar size) iargs' (gInject name1)
     | SizedMonotonic ->
-      sizeSMon ty_ctr ctrs iargs
+      sizeSMon size_config iargs
     | SizedCorrect ->
       let s_inst = gInject (repeat_instance_name Sized ind_name) in
       let c_inst = gInject (repeat_instance_name CanonicalSized ind_name) in
       (* TODO : use default names for gen and mon as well (?) *)
-      genCorr ty_ctr ctrs iargs (gInject name1) s_inst c_inst (gInject name2)
+      genCorr size_config iargs (gInject name1) s_inst c_inst (gInject name2)
   in
 
   (* msg_debug (str "Defined record" ++ fnl ()); *)
@@ -167,34 +145,3 @@ let derive (cn : derivable) (c : constr_expr) (instance_name : string) (name1 : 
 
   declare_class_instance instance_arguments instance_name instance_type instance_record
 
-
-(*
-VERNAC COMMAND EXTEND DeriveArbitrarySized
-  | ["DeriveArbitrarySized" constr(c) "as" string(s1)] -> [derive ArbitrarySized c s1 "aux" ""]
-END;;
-
-VERNAC COMMAND EXTEND DeriveSized
-  | ["DeriveSized" constr(c) "as" string(s1)] -> [derive Sized c s1 "aux" ""]
-END;;
-
-VERNAC COMMAND EXTEND DeriveCanonicalSized
-  | ["DeriveCanonicalSized" constr(c) "as" string(s1)] -> [derive CanonicalSized c s1 "aux" ""]
-END;;
-
-VERNAC COMMAND EXTEND DeriveArbitrarySizedMonotonic
-  | ["DeriveArbitrarySizedMonotonic" constr(c) "as" string(s1) "using" string(s2)] ->
-  (* s2 is the instance name for ArbitrarySized *)
-    [derive SizeMonotonic c s1 s2 ""]
-END;;
-
-VERNAC COMMAND EXTEND DeriveArbitrarySizedSizeMonotonic
-  | ["DeriveArbitrarySizedSizeMonotonic" constr(c) "as" string(s1)] ->
-    [derive SizeSMonotonic c s1 "" ""]
-END;;
-
-
-VERNAC COMMAND EXTEND DeriveArbitrarySizedCorrect
-  | ["DeriveArbitrarySizedCorrect" constr(c) "as" string(s1) "using" string(s2) "and" string(s3)] ->
-    [derive GenSizeCorrect c s1 s2 s3]
-END;;
-  *)

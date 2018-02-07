@@ -15,18 +15,6 @@ let simpl_dispatch ind classes name1 name2 =
   in
   List.iter (fun cn -> SimplDriver.derive cn ind (SimplDriver.mk_instance_name cn ind_name) name1 name2) classes
 
-let dep_dispatch ind class_name = 
-  (* TODO: turn this into a much once Zoe figures out what she wants *)
-  (* let DepDriver.ArbitrarySizedSuchThat = class_name in  *)
-  match ind with 
-  | { CAst.v = CLambdaN ([([(_loc2, Name id)], _kind, _type)], {CAst.v = CApp ((_flag, constructor), args) }) } ->
-    let n = fst (List.find (fun (_,({CAst. v = CRef (r,_)}, _)) -> Id.to_string id = string_of_reference r) (List.mapi (fun i x -> (i+1,x)) args)) in
-     let ctr_name = 
-       match constructor with 
-       | { CAst.v = CRef (r,_) } -> string_of_reference r
-     in 
-     DepDriver.deriveDependent class_name constructor n (DepDriver.mk_instance_name class_name ctr_name)
-  | _ -> failwith "wrongformat"
 
 let class_assoc_opts = [ ("GenSized"                 , SimpleDer [SimplDriver.GenSized])
                        ; ("Shrink"                   , SimpleDer [SimplDriver.Shrink])
@@ -37,6 +25,7 @@ let class_assoc_opts = [ ("GenSized"                 , SimpleDer [SimplDriver.Ge
                        ; ("SizeMonotonic"            , SimpleDer [SimplDriver.SizeMonotonic])
                        ; ("SizedMonotonic"           , SimpleDer [SimplDriver.SizedMonotonic])
                        ; ("SizedCorrect"             , SimpleDer [SimplDriver.SizedCorrect])
+                       ; ("DecOpt"                   , DepDer DepDriver.DecOpt)
                        ; ("ArbitrarySizedSuchThat"   , DepDer DepDriver.ArbitrarySizedSuchThat)
                        ; ("SizeMonotonicSuchThatOpt" , DepDer DepDriver.GenSizedSuchThatMonotonicOpt)
                        ; ("SizedProofEqs"            , DepDer DepDriver.SizedProofEqs)
@@ -83,7 +72,7 @@ let dispatch cn ind name1 name2 =
 
   match class_names with 
   | SimpleDer classes -> simpl_dispatch ind classes name1 name2
-  | DepDer classes -> dep_dispatch ind classes 
+  | DepDer class_name -> DepDriver.dep_dispatch ind class_name
 
 VERNAC COMMAND EXTEND Derive CLASSIFIED AS SIDEFF
    | ["Derive" constr(class_name) "for" constr(inductive)] -> 

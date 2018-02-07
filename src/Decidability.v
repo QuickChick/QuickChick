@@ -14,6 +14,46 @@ Set Bullet Behavior "Strict Subproofs".
     Class Dec (P : Prop) : Type := { dec : decidable P }.
 (* end decidable_class *)
 
+Class DecOpt (P : Prop) := { decOpt : nat -> option bool }.
+
+Axiom checkable_size_limit : nat.
+Extract Constant checkable_size_limit => "10000".
+
+Import GenLow.GenLow.
+(* Discard tests that run further than the limit *)
+(* For proofs, the size parameter will need to be taken into account 
+   to prove limit results. We just add it to the large, practical constant. 
+ *)
+Global Instance decOpt__checkable {P} `{DecOpt P} : Checkable P :=
+  {| checker _ :=
+       sized (fun s =>
+                match decOpt (checkable_size_limit + s) with
+                | Some b => checker b
+                | None => checker tt
+                end
+             )
+  |}.
+
+Global Instance dec_decOpt {P} `{Dec P} : DecOpt P :=
+  {| decOpt := fun _ => match @dec P _ with
+                        | left  _ => Some true
+                        | right _ => Some false
+                        end |}.
+
+(* Note: maybe this should become thunked? *)
+Definition checker_backtrack (l : list (unit -> option bool)) : option bool :=
+  let fix aux l b :=
+      match l with
+      | t :: ts =>
+        match t tt with
+        | Some true  => Some true
+        | Some false => aux ts b
+        | None => aux ts true
+        end
+      | nil => if b then None else Some false
+      end
+  in aux l false.
+    
 (* BCP: If I understand correctly, removing "Global" everywhere would
    change nothing... Or? *)
 

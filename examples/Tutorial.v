@@ -706,12 +706,12 @@ A lot fewer terms have small sizes, allowing us to explore larger terms*)
     for _plain_ datatypes automatically. *)
 
 Derive Arbitrary for Tree.
-(* genSTree is defined *)
-(* shrTree0 is defined *)
-Print genSTree.
-Print shrTree0.
+(* GenSizedTree is defined *)
+(* ShrinkTree is defined *)
+Print GenSizedTree.
+Print ShrinkTree.
 
 Derive Show for Tree.
-(* showTree0 is defined *)
-Print showTree0.
+(* ShowTree is defined *)
+Print ShowTree.
 

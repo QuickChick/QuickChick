@@ -33,12 +33,13 @@ let ret_exp (c : coq_expr) =
 
 let ret_type (s : var) (match_expr : var -> coq_expr -> coq_expr -> coq_expr) = hole
 
-let class_method = set_full
+let instantiate_existential_method = set_full
 
-let class_methodST (n : int) (pred : coq_expr) =
+let instantiate_existential_methodST (n : int) (pred : coq_expr) =
   pred
 
-let rec_method (rec_name : coq_expr) (size : coq_expr) (n : int)  (l : coq_expr list) =
+let rec_method (rec_name : coq_expr) (size : coq_expr) (n : int) letbinds (l : coq_expr list) =
+  (* TODO: use letbinds *)
   gApp rec_name (size :: l)
 
 let bind (opt : bool) (m : coq_expr) (x : string) (f : var -> coq_expr) =
@@ -88,15 +89,17 @@ type proofMap = (coq_expr -> coq_expr) IntMap.t
 type ctxMap = (coq_expr * coq_expr) IntMap.t
 
 let sizedEqProofs_body
-      (class_name : string)
       (gen_ctr : ty_ctr)
       (ty_params : ty_param list)
       (ctrs : dep_ctr list)
       (dep_type : dep_type)
-      (input_names : string list)
+      (input_names : var list)
+      (input_ranges : range list)
+      (init_umap : range UM.t)
+      (init_tmap : dep_type UM.t)
       (inputs : arg list)
-      (n : int)
-      (register_arbitrary : dep_type -> unit) =
+      (result : Unknown.t)
+      (rec_name : coq_expr) =
 
   (* type constructor *)
   let coqTyCtr = gTyCtr gen_ctr in
@@ -108,39 +111,39 @@ let sizedEqProofs_body
   let full_dt = gApp ~explicit:true coqTyCtr coqTyParams in
 
   (* The type we are generating for -- not the predicate! *)
-  let full_gtyp = gType ty_params (nthType n dep_type) in
+  let full_gtyp = (gType ty_params (UM.find result init_tmap)) in
 
   (* The type of the dependent generator *)
   let gen_type = gGen (gOption full_gtyp) in
 
-  (* Fully applied predicate (parameters and constructors) *)
-  let full_pred inputs =
-    gFun ["_forGen"] (fun [fg] -> gApp full_dt (list_insert_nth (gVar fg) inputs (n-1)))
-  in
-
   (* Inputs as holes *)
   let hole_inps =
-    List.map (fun _ -> hole) inputs
+    List.map (fun _ -> hole) input_ranges
   in
 
   let make_prop (m : int) (x : coq_expr) (ls : coq_expr list) =
     gApp full_dt (list_insert_nth x ls (m-1))
   in
 
+  (*
   let full_prop gtyp inputs =
     gApp full_dt (list_insert_nth gtyp inputs (n-1))
   in
+   *)
 
-  let input_vars = List.map fresh_name input_names in
+  (* let input_vars = List.map fresh_name input_ranges in *)
 
   (* iter construction *)
 
   let zero_set inputs =
     let handle_branch'  =
-      handle_branch n dep_type inputs
-        fail_exp ret_exp class_method class_methodST
-        (rec_method (gVar (make_up_name ())) (gVar (make_up_name ()))) bind stMaybe check_expr match_inp
-        gen_ctr (fun _ -> ())
+      handle_branch dep_type 
+        fail_exp ret_exp
+        instantiate_existential_method instantiate_existential_methodST bind
+        (rec_method (gVar (make_up_name ())) (gVar (make_up_name ()))) bind
+        stMaybe check_expr match_inp
+        gLetIn gLetTupleIn
+        gen_ctr init_umap init_tmap input_ranges result
     in
     (List.fold_right
        (fun c exp ->
@@ -154,10 +157,13 @@ let sizedEqProofs_body
 
   let succ_set rec_name size inputs =
     let handle_branch'  =
-      handle_branch n dep_type inputs
-        fail_exp ret_exp class_method class_methodST
-        (rec_method (gVar rec_name) (gVar size)) bind stMaybe check_expr match_inp
-        gen_ctr (fun _ -> ())
+      handle_branch dep_type 
+        fail_exp ret_exp
+        instantiate_existential_method instantiate_existential_methodST bind
+        (rec_method (gVar (make_up_name ())) (gVar (make_up_name ()))) bind
+        stMaybe check_expr match_inp
+        gLetIn gLetTupleIn
+        gen_ctr init_umap init_tmap input_ranges result
     in
     (List.fold_right
        (fun c exp ->
@@ -180,7 +186,7 @@ let sizedEqProofs_body
       "aux_iter" (gArg ~assumName:(gVar (fresh_name "size")) () :: inputs) 
       (fun (rec_name, size::vars) -> aux_iter rec_name size vars)
       (fun rec_name -> gFun ["size"] 
-                         (fun [size] -> gApp (gVar rec_name) (gVar size :: List.map gVar input_vars)
+                         (fun [size] -> gApp (gVar rec_name) (gVar size :: List.map gVar input_names)
                          ))
   in
 
@@ -194,16 +200,17 @@ let sizedEqProofs_body
     (set_singleton x, set_singleton x, set_incl_refl)
   in
 
-  let class_method_mon : coq_expr * coq_expr * coq_expr =
+  let instantiate_existential_method_mon : coq_expr * coq_expr * coq_expr =
     (set_full, set_full, set_incl_refl)
   in
 
-  let class_methodST_mon (n : int) (pred : coq_expr) : coq_expr * coq_expr * coq_expr =
+  let instantiate_existential_methodST_mon (n : int) (pred : coq_expr) : coq_expr * coq_expr * coq_expr =
     (pred, pred, set_incl_refl)
   in
 
-  let rec_method_mon (s1 : coq_expr) (s2 : coq_expr) (ih : coq_expr list -> coq_expr) (n : int) (l : coq_expr list)
-    : coq_expr * coq_expr * coq_expr =
+  let rec_method_mon (s1 : coq_expr) (s2 : coq_expr) (ih : coq_expr list -> coq_expr) (n : int) (letbinds) (l : coq_expr list)
+      : coq_expr * coq_expr * coq_expr =
+    (* TODO: Use letbinds...*)
     let iter_body args : coq_expr =
       gRecFunInWithArgs
         "aux_iter" (gArg ~assumName:(gVar (fresh_name "size")) () :: inputs)
@@ -219,6 +226,9 @@ let sizedEqProofs_body
      set_bigcup x s2 (fun x -> let (_, s, _) =  f x in s),
      incl_bigcup_compat p (gFun [x] (fun [x] -> let (_, _, s) = f x in s)))
   in
+
+  let let_in_mon = failwith "whyyy" in
+  let let_tuple_in_mon = failwith "NOOO" in
 
   let ret_type_dec (s : var) (left : coq_expr) (right : coq_expr) =
     gMatch (gVar s)
@@ -302,11 +312,13 @@ let sizedEqProofs_body
 
   let rec elim_base_cases_mon s1 s2 (inputs : var list) ctrs =
     let handle_branch' (c : dep_ctr) =
-      handle_branch n dep_type inputs
-        fail_exp_mon ret_exp_mon class_method_mon class_methodST_mon
-        (rec_method_mon s1 s2 (fun _ -> gVar (make_up_name ())))
-        bind_mon stMaybe_mon check_expr_mon match_inp_mon
-        gen_ctr (fun _ -> ()) c
+      handle_branch dep_type 
+        fail_exp_mon ret_exp_mon
+        instantiate_existential_method_mon instantiate_existential_methodST_mon bind_mon
+        (rec_method_mon s1 s2 (fun _ -> gVar (make_up_name ()))) bind_mon
+        stMaybe_mon check_expr_mon match_inp_mon 
+        let_in_mon let_tuple_in_mon 
+        gen_ctr init_umap init_tmap input_ranges result c
     in
     match ctrs with
     | [] -> set_incl_refl
@@ -320,11 +332,13 @@ let sizedEqProofs_body
 
   let rec elim_ind_cases_mon s1 s2 (ih : coq_expr list -> coq_expr) (inputs : var list) ctrs =
     let handle_branch' (c : dep_ctr)  =
-      handle_branch n dep_type inputs
-        fail_exp_mon ret_exp_mon class_method_mon class_methodST_mon
-        (rec_method_mon s1 s2 ih)
-        bind_mon stMaybe_mon check_expr_mon match_inp_mon
-        gen_ctr (fun _ -> ()) c
+      handle_branch dep_type 
+        fail_exp_mon ret_exp_mon
+        instantiate_existential_method_mon instantiate_existential_methodST_mon bind_mon
+        (rec_method_mon s1 s2 (fun _ -> gVar (make_up_name ()))) bind_mon
+        stMaybe_mon check_expr_mon match_inp_mon 
+        let_in_mon let_tuple_in_mon 
+        gen_ctr init_umap init_tmap input_ranges result c
     in
     match ctrs with
     | [] -> set_incl_refl
@@ -401,9 +415,11 @@ let sizedEqProofs_body
        let rec construct_proof typ m acc =
          match typ with
          | DTyCtr _ ->
+            (* ZOE: Can you fix this? *)
            (* XXX currently not handling type parameters *)
-           let pred =
-             gFun ["g"] (fun [g] -> make_prop n (gVar g) hole_inps)
+            let pred =
+              (* gFun ["g"] (fun [g] -> make_prop n (gVar g) hole_inps) *)
+              gFun ["g"] (fun [g] -> gApp full_dt hole_inps)
            in
            rewrite pred (gVar hcur) (gApp (gCtr c) (List.rev acc))
          | DProd ((x, dt1), dt2) ->
@@ -639,6 +655,7 @@ let sizedEqProofs_body
         fail_exp_left (ret_exp_left c) class_method_left class_methodST_left
         (rec_method_left (gVar (make_up_name ())) (gVar (make_up_name ())))
         bind_left (stMaybe_left x) (check_expr_left x) (match_inp_left x)
+        (failwith "zoe fix me!")
         gen_ctr (fun _ -> ()) c
     in
     match ctrs with
@@ -662,6 +679,7 @@ let sizedEqProofs_body
         fail_exp_left (ret_exp_left c) class_method_left class_methodST_left
         (rec_method_left (gVar ih) (gVar size))
         bind_left (stMaybe_left x) (check_expr_left x) (match_inp_left x)
+        (failwith "zoe fix me!")
         gen_ctr (fun _ -> ()) c
     in
     match ctrs with
@@ -1016,6 +1034,7 @@ let sizedEqProofs_body
         fail_exp_right ret_exp_right class_method_right class_methodST_right
         rec_method_right
         bind_right stMaybe_right check_expr_right match_inp_right
+        (failwith "zoe fix me!")
         gen_ctr (fun _ -> ()) c
     in
     let rec cases ctrs (orp : coq_expr -> coq_expr) : coq_expr list =

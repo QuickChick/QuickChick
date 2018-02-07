@@ -7,13 +7,15 @@ Import ListNotations.
 From QuickChick.ifcbasic Require Import Machine.
 
 (* Overriding default instance to generate "in-bounds" things *)
-Definition gen_Z := choose (0,1).
+Definition mem_length : Z := 10.
+
+Definition gen_Z := choose (0,mem_length).
 
 Definition gen_label := elements L [L; H].
 
 Definition gen_atom := liftGen2 Atm gen_Z gen_label.
 
-Definition gen_memory := vectorOf 2 gen_atom.
+Definition gen_memory := vectorOf 10 gen_atom.
 
 Definition is_atom_low (a : Atom) :=
   match a with
@@ -41,24 +43,16 @@ Definition ainstr (st : State) : G Instruction :=
   frequency (returnGen Nop) [
               (1, returnGen Nop);
               (10, liftGen Push gen_Z);
-              (10, liftGen BCall (if beq_nat sl 0 then returnGen 0
+              (if sl < 1 ? then 0 else 10, liftGen BCall (if beq_nat sl 0 then returnGen 0
                                   else choose (0, Z.of_nat sl-1))%Z);
               (if containsRet stk then 10 else 0, returnGen BRet);
-              (10, returnGen Add);
-              (10, returnGen Load);
-              (100, returnGen Store)].
-(*
-              (onLength 1 10, liftGen BCall (chooseZ (0, (Z.of_nat sl-1))%Z));
-              (if containsRet stk then 10 else 0, returnGen BRet);
-              (onLength 2 10, returnGen Add);
-              (onLength 1 10, returnGen Load);
-              (onLength 2 10, returnGen Store)].
-*)
+              (if sl < 2 ? then 0 else 10, returnGen Add);
+              (if sl < 1 ? then 0 else 10, returnGen Load);
+              (if sl < 2 ? then 0 else 100, returnGen Store)].
 
 Fixpoint gen_stack (n : nat) (onlyLow : bool) : G Stack :=
-  (* There is no invariant that says this. Why is this here? *)
   (*
-  let gen_atom' :=
+  let gen_atom :=
       if onlyLow then liftGen2 Atm gen_Z (returnGen L)
       else gen_atom
   in
@@ -72,22 +66,49 @@ Fixpoint gen_stack (n : nat) (onlyLow : bool) : G Stack :=
                        liftGen (RetCons pc) (gen_stack n' (is_atom_low pc))))]
   end.
 
+Fixpoint gen_by_exec (t : table) (fuel : nat) (st : State) :=
+  let '(St im m stk (Atm addr pcl)) := st in
+  match fuel with
+  | O => returnGen st
+  | S fuel' =>
+    match nth im addr with
+    | Some Nop =>
+      (* If it is a noop, generate *)
+      bindGen (ainstr st) (fun i =>
+      match upd im addr i with 
+      | Some im' => 
+        let st' := St im' m stk (Atm addr pcl) in
+        gen_by_exec t fuel' st'
+      | None => returnGen st
+      end)
+    | Some i =>
+      (* Existing instruction, execute *)
+      match exec t st with
+      | Some st' =>
+        gen_by_exec t fuel' st'
+      | None => returnGen st
+      end
+    | None =>
+      (* Out of bounds, terminate *)
+      returnGen st
+    end
+  end.
+
+Require Import ExtLib.Structures.Monads.
+Import MonadNotation.
+Open Scope monad_scope.
+
 Definition gen_state : G State :=
-  let imem0 := [Nop; Nop] in
-  bindGen gen_atom (fun pc =>
-  bindGen gen_memory (fun mem =>
-  bindGen (gen_stack 4 (is_atom_low pc)) (fun stk =>
-  bindGen (ainstr (St imem0 mem stk pc)) (fun i =>
-  returnGen (St [i;i] mem stk pc))))).
+  let imem0 := replicate 10 Nop in
+  pc <- gen_atom ;;
+  mem <- gen_memory ;;
+  stk <- gen_stack 10 (is_atom_low pc) ;;
+  st' <- gen_by_exec default_table 20 (St imem0 mem stk pc) ;;
+  ret st'.
 
-(* State Variations *)
-Inductive Variation {A : Type} := V : A -> A -> @Variation A.
+From QuickChick.ifcbasic Require Import Generation.
 
-Class Vary (A : Type) := {
-  vary : A -> G A
-}.
-
-Instance vary_atom : Vary Atom :=
+Instance vary_atom' : Vary Atom :=
 {|
   vary a :=
     let '(x @ l) := a in
@@ -97,7 +118,7 @@ Instance vary_atom : Vary Atom :=
     end
 |}.
 
-Instance vary_mem : Vary Mem :=
+Instance vary_mem' : Vary Mem :=
 {|
   vary m := sequenceGen (map vary m)
 |}.
@@ -114,26 +135,31 @@ Fixpoint vary_stack (s : Stack) (isLow : bool) : G Stack :=
     | Mty => returnGen Mty
   end.
 
-Instance vary_state : Vary State :=
+Import QcDefaultNotation.
+Instance vary_state' : Vary State :=
 {|
   vary st :=
     let '(St imem mem stk pc) := st in
-    bindGen (vary mem) (fun mem' =>
-    bindGen (vary pc)  (fun pc' =>
+    mem' <- vary mem ;;
+    pc'  <- vary pc ;;
     let isLow := match pc with
                    | _ @ L => true
                    | _ @ H => false
                  end in
     if isLow then
-      bindGen (vary_stack stk isLow) (fun stk' =>
-      returnGen (St imem mem' stk' pc'))
+      stk' <- vary_stack stk isLow ;;
+      ret (St imem mem' stk' pc')
     else
-      bindGen (vary_stack stk isLow) (fun stk' =>
-      bindGen gen_atom (fun extra_elem =>
-      returnGen (St imem mem' (extra_elem :: stk') pc')))))
+      stk' <- vary_stack stk isLow ;;
+      bindGen (@arbitrary bool _) (fun b : bool =>
+      if b then
+        extra_elem <- gen_atom ;;
+        ret (St imem mem' (extra_elem :: stk') pc')
+      else
+        ret (St imem mem' stk' pc'))
 |}.
 
-Definition gen_variation_state : G (@Variation State) :=
+Definition gen_variation_state' : G (@Variation State) :=
   bindGen gen_state (fun st =>
   bindGen (vary st) (fun st' =>
   returnGen (V st st'))).

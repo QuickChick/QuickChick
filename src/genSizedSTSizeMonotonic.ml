@@ -234,6 +234,7 @@ let genSizedSTSMon_body
       (fail_exp full_gtyp) (ret_exp full_gtyp) class_method class_methodST
       (rec_method generator_body hleq ih s2) bind
       stMaybe (check_expr s1 s2) (match_inp s1 s2)
+      (failwith "zoe fix me!")
       gen_ctr (fun _ -> ())
   in
 

@@ -125,7 +125,7 @@ let genSizedSTMon_body
     let handle_branch' (inputs : var list) =
       handle_branch n dep_type inputs
         fail_exp ret_exp class_method class_methodST
-        (rec_method (make_up_name ())) bind stMaybe check_expr match_inp
+        (rec_method (make_up_name ())) bind stMaybe check_expr match_inp gLetIn
         gen_ctr (fun _ -> ())
     in
     gFunWithArgs
@@ -150,6 +150,7 @@ let genSizedSTMon_body
       handle_branch n dep_type inputs
         fail_exp ret_exp class_method class_methodST
         (rec_method ih) bind stMaybe check_expr match_inp
+        (failwith "zoe fix me!")
         gen_ctr (fun _ -> ())
     in
     gFun ["size"; "IHs"]

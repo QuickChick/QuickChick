@@ -289,7 +289,7 @@ Notation " 'elems' [ x ; y ] " := (elements x (cons x (cons y nil))) : qc_scope.
 Notation " 'elems' [ x ; y ; .. ; z ] " :=
   (elements x (cons x (cons y .. (cons z nil) ..))) : qc_scope.
 Notation " 'elems' ( x ;; l ) " :=
-  (elements x (cons x l)) (at level 1, no associativity) : qc_scope.
+  (elements x (cons x l)) (at level 201, no associativity) : qc_scope.
 
 Notation " 'oneOf' [ x ] " := (oneof x (cons x nil)) : qc_scope.
 Notation " 'oneOf' [ x ; y ] " := (oneof x (cons x (cons y nil))) : qc_scope.
@@ -308,6 +308,7 @@ Notation " 'freq' ( ( n , x ) ;; l ) " :=
 
 End QcDefaultNotation.
 
+(* Deprecated. Use ext-lib 
 Module QcDoNotation.
 
 Notation "'do!' X <- A ; B" :=
@@ -321,6 +322,7 @@ Notation "'doM!' X <- A ; B" :=
   (at level 200, X ident, A at level 100, B at level 200).
 
 End QcDoNotation.
+*)
 
 Import QcDefaultNotation. Open Scope qc_scope.
 
