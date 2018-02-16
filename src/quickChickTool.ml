@@ -567,7 +567,7 @@ let main =
       highlight Header (Printf.sprintf "Testing mutant %d..." i);
       reset_test_results();
       compile_and_run "." (coqc_single_cmd (write_tmp_file m)) ExpectSomeFailure
-    ) muts
+    ) muts  (* BCP: Reverse it?? *)
  *)
   | Dir (s, fss) -> begin
     let ((base, dir_mutants), all_things_to_check) = calc_dir_mutants sec_graph fs in
@@ -647,7 +647,7 @@ let main =
               compile_and_run dir ExpectSomeFailure
           end
         end)
-      dir_mutants
+      dir_mutants  (* BCP: Reverse it?? *)
   end;
 
   if !something_failed then begin
