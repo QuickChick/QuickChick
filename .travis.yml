@@ -1,5 +1,6 @@
 dist: trusty
-sudo: false
+services:
+  - docker
 language: ocaml
 cache:
   apt: true
@@ -45,6 +46,7 @@ script:
   echo -en 'travis_fold:start:QuickChick.build';
   opam update;
   opam pin add . ;
+  opam reinstall coq-quickchick;
   echo -en 'travis_fold:end:QuickChick.build'
 - echo 'Testing IFC...';
   echo -en 'travis_fold:start:QuickChick.test.ifc-basic';
@@ -58,3 +60,10 @@ script:
   echo -en 'travis_fold:start:QuickChick.test.stlc';
   make -C examples/stlc;
   echo -en 'travis_fold:end:QuickChick.test.stlc'
+
+after_success:
+    if [ $TRAVIS_OS_NAME = linux ]; then
+    docker pull $DOCKER_USERNAME/quickchick;
+    docker build .;
+    docker login -u $DOCKER_USERNAME -p $DOCKER_PASSWORD;
+    docker push $DOCKER_USERNAME/quickchick; fi
