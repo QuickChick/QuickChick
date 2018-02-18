@@ -1,0 +1,5 @@
+FROM ysli/coq:debian
+RUN . ~/.profile \
+ && opam repo add coq-released https://coq.inria.fr/opam/released \
+ && git clone --depth=1 https://github.com/QuickChick/QuickChick.git \
+ && opam pin add QuickChick

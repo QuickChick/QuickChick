@@ -18,6 +18,7 @@ env:
   global:
   - NJOBS=2
   - OPAMYES=true
+  - REPO=$DOCKER_USERNAME/quickchick
   matrix:
       - COMPILER="4.06.0"
 matrix:
@@ -63,7 +64,11 @@ script:
 
 after_success:
     if [ $TRAVIS_OS_NAME = linux ]; then
-    docker pull $DOCKER_USERNAME/quickchick;
+    docker pull -a $REPO;
     docker build .;
     docker login -u $DOCKER_USERNAME -p $DOCKER_PASSWORD;
-    docker push $DOCKER_USERNAME/quickchick; fi
+    docker push $REPO;
+    docker build -t debian -f Dockerfile.debian .;
+    docker tag debian $REPO:debian;
+    docker push $REPO:debian;
+    fi
