@@ -24,14 +24,14 @@ documentation-check: plugin
 TEMPFILE := $(shell mktemp)
 
 install: all
-	$(V)$(MAKE) -f Makefile.coq install > $(TEMPFILE) || cat $(TEMPFILE)
+	$(V)$(MAKE) -f Makefile.coq install | tee $(TEMPFILE)
   # Manually copying the remaining files
 #	 $(V)cp src/quickChickLib.cmx $(COQLIB)/user-contrib/QuickChick
 #	 $(V)cp src/quickChickLib.o $(COQLIB)/user-contrib/QuickChick
 	 $(V)cp src/quickChickTool $(shell echo $(PATH) | tr ':' "\n" | grep opam | uniq)/quickChick
 
 install-plugin:
-	$(V)$(MAKE) -f Makefile.coq install > $(TEMPFILE) || cat $(TEMPFILE)
+	$(V)$(MAKE) -f Makefile.coq install | tee $(TEMPFILE)
 
 src/quickChickToolLexer.cmo : src/quickChickToolLexer.mll 
 	ocamllex src/quickChickToolLexer.mll
