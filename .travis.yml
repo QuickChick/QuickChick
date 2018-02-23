@@ -1,5 +1,6 @@
 dist: trusty
-sudo: false
+services:
+  - docker
 language: ocaml
 cache:
   apt: true
@@ -17,6 +18,7 @@ env:
   global:
   - NJOBS=2
   - OPAMYES=true
+  - REPO=$DOCKER_USERNAME/quickchick
   matrix:
       - COMPILER="4.06.0"
 matrix:
@@ -44,8 +46,8 @@ script:
 - echo 'Building QuickChick...';
   echo -en 'travis_fold:start:QuickChick.build';
   opam update;
-  travis_wait 30 opam install coq-mathcomp-ssreflect coq-ext-lib;
-  make -j install;
+  opam pin add . ;
+  opam reinstall coq-quickchick;
   echo -en 'travis_fold:end:QuickChick.build'
 - echo 'Testing IFC...';
   echo -en 'travis_fold:start:QuickChick.test.ifc-basic';
@@ -59,3 +61,14 @@ script:
   echo -en 'travis_fold:start:QuickChick.test.stlc';
   make -C examples/stlc;
   echo -en 'travis_fold:end:QuickChick.test.stlc'
+
+after_success:
+    if [ $TRAVIS_OS_NAME = linux ]; then
+    docker pull -a $REPO;
+    docker build .;
+    docker login -u $DOCKER_USERNAME -p $DOCKER_PASSWORD;
+    docker push $REPO;
+    docker build -t debian -f Dockerfile.debian .;
+    docker tag debian $REPO:debian;
+    docker push $REPO:debian;
+    fi

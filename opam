@@ -1,6 +1,6 @@
 opam-version: "1.2"
-name: "quickchick"
-version: "dev"
+name: "coq-quickchick"
+version: "0.1.0"
 maintainer: "llamp@seas.upenn.edu"
 
 homepage: "https://github.com/QuickChick/QuickChick"
@@ -12,10 +12,11 @@ build: [ make "-j%{jobs}%" "plugin" ]
 install: [ make "install-plugin" ]
 remove: [ "sh" "-c" "rm -rf '%{lib}%/coq/user-contrib/QuickChick'" ]
 depends: [
-  "coq" {>= "8.6" & < "8.7~"}
+  "coq" {>= "8.7"}
+  "coq-ext-lib"
   "coq-mathcomp-ssreflect" {>= "1.6" & < "1.7~"}
 ]
-available: [ ocaml-version >= "4.02.3" ]
+available: [ ocaml-version >= "4.06.0" ]
 
 authors: [
   "Leonidas Lampropoulos <>"
