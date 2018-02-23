@@ -597,6 +597,9 @@ let handle_branch
                       (* Given the variable representation of u, proceed to instantiate 
                          the rest of the dts' *)
                       instantiate_function_calls_cont dts' (DTyVar uvar :: acc) cont)))
+       | DTyCtr (c,dts) ->
+          instantiate_function_calls_cont dts' (dt :: acc) cont
+       | _ -> failwith ("Not a type! " ^ (dep_type_to_string dt))
        end
   in 
 
