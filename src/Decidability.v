@@ -198,9 +198,10 @@ Example bar (m n : nat) :=
 
 
 (* Not sure about the level or binding, but good idea *)
-Notation "P '?'" := (match (@dec P _) with 
-                       | left _ => true
-                       | right _ => false
+Notation "P '?'" := (match (@decOpt P _ checkable_size_limit) with 
+                       | Some true => true
+                       | Some false => false
+                       | None => false
                      end) (at level 100).
 
 Hint Resolve Dec_eq_bool : eq_dec.
