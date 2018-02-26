@@ -25,6 +25,7 @@ let nonwhite = [^ ' ' '\t' '\r' '\n']
 (* Main Parsing match *)
 rule lexer = parse
     
+(* OCaml-style comments... *)
   | (white* "(*!" white* "Section" as s)    { line_incs s lexbuf; T_StartSection s }
   | (white* "(*!" white* "extends" as s)    { line_incs s lexbuf; T_Extends s }
   | (white* "(*!" white* "QuickChick" as s) { line_incs s lexbuf; T_StartQuickChick s }
@@ -36,6 +37,7 @@ rule lexer = parse
 
   | (white* "*)" as s)                      { line_incs s lexbuf; T_EndComment s }
 
+(* C-style comments... *)
   | (white* "/*!" white* "Section" as s)    { line_incs s lexbuf; T_StartSection s }
   | (white* "/*!" white* "extends" as s)    { line_incs s lexbuf; T_Extends s }
   | (white* "/*!" white* "QuickChick" as s) { line_incs s lexbuf; T_StartQuickChick s }

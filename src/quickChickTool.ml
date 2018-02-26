@@ -453,8 +453,12 @@ let trim s =
 
 (* Create a table of sections *)
 let sec_find sec_graph s =
+  debug "sec_find: %s\n" (trim s);
   try Hashtbl.find sec_graph (trim s)
-  with Not_found -> failwith (Printf.sprintf "Didn't find: %s\n" s)
+  with Not_found -> begin
+    let keys = Hashtbl.fold (fun k v s -> k ^ " " ^ s) sec_graph "" in
+    failwith (Printf.sprintf "QuickChick: Didn't find section called %s (available sections: %s)\n" s keys)
+    end
 
 let build_sec_graph fs =
   let sec_graph = Hashtbl.create (section_length_of_fs fs) in
@@ -483,6 +487,10 @@ let build_sec_graph fs =
 let rec handle_section' sec_graph current_section starting_section =
   let current_section  = trim current_section in
   let starting_section = trim starting_section in
+  if !verbose then
+    (Printf.printf "handle_section': current_section: %s\n" current_section; 
+     Printf.printf "                 starting_section: %s\n" starting_section; 
+     flush_all ()); 
   current_section = starting_section
   || List.exists
     (fun starting_section' ->
@@ -490,7 +498,7 @@ let rec handle_section' sec_graph current_section starting_section =
     (sec_find sec_graph starting_section)
 
 let rec handle_section sec_graph sn' =
-  (* Printf.printf "Asking for %s\n" sn'; flush_all (); *)
+  if !verbose then (Printf.printf "Asking for section %s\n" sn'; flush_all ()); 
   let sn' = trim sn' in
   match !sec_name with
   | Some sn -> handle_section' sec_graph sn' sn
