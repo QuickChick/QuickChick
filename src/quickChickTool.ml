@@ -286,9 +286,7 @@ let compile_and_run where e : unit =
   let here = Sys.getcwd() in
   Sys.chdir where;
 
-  run_and_show_output_on_failure
-    (!compile_command)
-    (Printf.sprintf "Executing '%s' failed" (!compile_command));
+  Unix.system !compile_command;
 
   perl_hack ();
 
