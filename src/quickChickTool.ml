@@ -394,7 +394,9 @@ let rec parse_file_or_dir file_name =
       let s = load_file file_name in
       Some (File (file_name, [Section ("(*", "__default__" ^ file_name, "*)", None, [Text s])]))
     else
-      let handle = (Filename.check_suffix file_name "v" || Filename.check_suffix file_name "c")
+      let handle = (Filename.check_suffix file_name "v" ||
+                    Filename.check_suffix file_name "c" ||
+                    Filename.check_suffix file_name "h")
                    && not (List.exists (fun x -> x = Filename.basename file_name) !excluded) in
       if handle then begin
         debug "In file: %s\n" file_name;
