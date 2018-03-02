@@ -17,6 +17,8 @@ let excluded = ref []
 let nobase = ref false
 let only_mutant = ref None
 
+let current_filetype = ref ""
+
 let speclist =
   [ ("-s", Arg.String (fun name -> sec_name := Some name), "Which section's properties to test")
   ; ("-v", Arg.Unit (fun _ -> verbose := true), "Verbose mode")
@@ -89,12 +91,23 @@ let rec non_mutants acc muts =
   | (start, code, endc) :: rest ->
      non_mutants  (Printf.sprintf "%s%s%s" start code endc :: acc) rest
 
+let begin_comment () =
+  if !current_filetype = ".c" || !current_filetype = ".h"
+  then "/*"
+  else "(*"
+
+let end_comment () =
+  if !current_filetype = ".c" || !current_filetype = ".h"
+  then "*/"
+  else "*)"
+
 let rec all_mutants' acc (muts : mutant list) : string list list =
   match muts with
   | [] -> [List.rev acc]
   | (start, code, endc) :: rest ->
      all_mutants' (Printf.sprintf "%s%s%s" start code endc :: acc) rest @
-     non_mutants  (Printf.sprintf "%s *) %s (* %s" start code endc :: acc) rest
+     non_mutants  (Printf.sprintf "%s %s %s %s %s" start
+                     (end_comment ()) code (begin_comment ()) endc :: acc) rest
 
 let all_mutants muts =
   List.map (String.concat "") (all_mutants' [] muts)
@@ -165,7 +178,8 @@ let mutate_outs handle_section input =
               | [] -> failwith "Internal error" in
             (Printf.sprintf "%s%s%s" start base non_mutated,
              List.map
-               (fun s -> Printf.sprintf "%s (* %s *) %s" start base s)
+               (fun s -> Printf.sprintf "%s %s %s %s %s" start
+                           (begin_comment ()) base (end_comment ()) s)
                mutants)
           | QuickChick (s1,s2,s3) ->
             things_to_check := s2 :: !things_to_check;
@@ -272,9 +286,7 @@ let compile_and_run where e : unit =
   let here = Sys.getcwd() in
   Sys.chdir where;
 
-  run_and_show_output_on_failure
-    (!compile_command)
-    (Printf.sprintf "Executing '%s' failed" (!compile_command));
+  Unix.system !compile_command;
 
   perl_hack ();
 
@@ -394,7 +406,10 @@ let rec parse_file_or_dir file_name =
       let s = load_file file_name in
       Some (File (file_name, [Section ("(*", "__default__" ^ file_name, "*)", None, [Text s])]))
     else
-      let handle = (Filename.check_suffix file_name "v" || Filename.check_suffix file_name "c")
+      let handle = (Filename.check_suffix file_name "v" ||
+                    Filename.check_suffix file_name "ml"||
+                    Filename.check_suffix file_name "c" ||
+                    Filename.check_suffix file_name "h")
                    && not (List.exists (fun x -> x = Filename.basename file_name) !excluded) in
       if handle then begin
         debug "In file: %s\n" file_name;
@@ -510,7 +525,9 @@ let calc_dir_mutants sec_graph fs =
     match fs with
     | File (s, ss) ->
       (* Printf.printf "Calc mutants for file: %s\n" s; flush_all (); *)
-      begin match mutate_outs (handle_section sec_graph) ss with
+      begin
+      current_filetype := Filename.extension s;
+      match mutate_outs (handle_section sec_graph) ss with
       | base :: muts, things_to_check ->
         (* Printf.printf "Number of mutants: %d\n" (List.length muts); *)
         all_things_to_check := (List.map (fun x -> (s,x)) things_to_check)

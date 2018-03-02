@@ -10,7 +10,7 @@ license: "MIT"
 
 build: [ make "-j%{jobs}%" "plugin" ]
 install: [ make "install-plugin" ]
-remove: [ "sh" "-c" "rm -rf '%{lib}%/coq/user-contrib/QuickChick'" ]
+remove: [ make uninstall ]
 depends: [
   "coq" {>= "8.7"}
   "coq-ext-lib"

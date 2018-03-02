@@ -30,8 +30,12 @@ install: all
 #	 $(V)cp src/quickChickLib.o $(COQLIB)/user-contrib/QuickChick
 	 $(V)cp src/quickChickTool $(shell echo $(PATH) | tr ':' "\n" | grep opam | uniq)/quickChick
 
-install-plugin:
+install-plugin: Makefile.coq
 	$(V)$(MAKE) -f Makefile.coq install | tee $(TEMPFILE)
+
+uninstall:
+	$(V)if [ -e Makefile.coq ]; then $(MAKE) -f Makefile.coq uninstall; fi
+	$(RM) $(shell which quickChick | grep opam)
 
 src/quickChickToolLexer.cmo : src/quickChickToolLexer.mll 
 	ocamllex src/quickChickToolLexer.mll

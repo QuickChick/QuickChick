@@ -1,8 +1,8 @@
 #include <stdio.h>
 
 int main() {
-  /* */
-  printf("Hello!\n");
-  /* printf("Hello world!\n"); */
+  int x, y;
+  scanf("%d%d", &x, &y);
+  printf("%d\n", /*!*/ x + y /*! x * y */);
   return 0;
 }
