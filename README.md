@@ -24,6 +24,7 @@ https://github.com/DeepSpec/dsss17
     * Coq 8.7
     * OCaml 4.06.0
     * mathcomp-ssreflect-1.6.2
+    * coq-ext-lib-0.9.7
 
   - Branch 8.4pl6:
     * OCaml 4.01.0 and Coq 8.4pl3 or OCaml 4.02.1 and Coq 8.4pl6
