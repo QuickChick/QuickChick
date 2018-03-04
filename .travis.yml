@@ -63,7 +63,7 @@ script:
   echo -en 'travis_fold:end:QuickChick.test.stlc'
 
 after_success:
-    if [ $TRAVIS_OS_NAME = linux ]; then
+    if [ $TRAVIS_OS_NAME = linux ] && [ $TRAVIS_PULL_REQUEST = false ]; then
     docker pull -a $REPO;
     docker build .;
     docker login -u $DOCKER_USERNAME -p $DOCKER_PASSWORD;
