@@ -12,6 +12,7 @@ src/Instances.v
 src/CoArbitrary.v
 src/StringOT.v
 src/Show.v
+src/ShowFacts.v
 src/State.v
 src/Checker.v
 src/SemChecker.v

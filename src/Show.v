@@ -1,7 +1,8 @@
+Require Import List.
+Import ListNotations.
 Require Import Coq.Strings.String.
 Require Import Coq.Strings.Ascii.
 Require Import ZArith.
-Require Import List.
 
 Definition newline := String "010" ""%string.
 
@@ -34,21 +35,115 @@ Instance showInt : Show Z :=
   show := show_int
 |}.
 
-(* Following Coq's weird conventions -- not certain that's a good idea *)
-Definition quotechar := ascii_of_nat 34.
+Fixpoint from_list (s : list ascii) : string :=
+  match s with
+  | [] => EmptyString
+  | c :: s' => String c (from_list s')
+  end.
+
+Definition unit_digit (n : nat) : ascii :=
+  ascii_of_nat ((n mod 10) + 48 (* 0 *)).
+
+Definition three_digit (n : nat) : string :=
+  let n0 := unit_digit n in
+  let n1 := unit_digit (n / 10) in
+  let n2 := unit_digit (n / 100) in
+  from_list [n2; n1; n0].
+
+Definition digit_of_ascii (c : ascii) : option nat :=
+  let n := nat_of_ascii c in
+  if ((48 <=? n)%nat && (n <=? 57)%nat)%bool then
+    Some (n - 48)
+  else
+    None.
+
+Definition unthree_digit (c2 c1 c0 : ascii) : option ascii :=
+  let doa := digit_of_ascii in
+  match doa c2, doa c1, doa c0 with
+  | Some n2, Some n1, Some n0 =>
+    Some (ascii_of_nat (n2 * 100 + n1 * 10 + n0))
+  | _, _, _ => None
+  end.
+
 Fixpoint show_quoted_string (s:string) : string :=
   match s with
   | EmptyString => """"
   | String c s' =>
-    if nat_of_ascii c =? nat_of_ascii quotechar then
-        String quotechar (String quotechar (show_quoted_string s'))
-    else String c (show_quoted_string s')  
+    let quoted_s' := show_quoted_string s' in
+    let n := nat_of_ascii c in
+    if ascii_dec c "009" (* TAB *) then
+      "\t" ++ quoted_s'
+    else if ascii_dec c "010" (* NEWLINE *) then
+      "\n" ++ quoted_s'
+    else if ascii_dec c """" (* DOUBLEQUOTE *) then
+      "\""" ++ quoted_s'
+    else if ascii_dec c "\" (* BACKSLASH *) then
+      "\\" ++ quoted_s'
+    else if ((n <? 32)%nat (* SPACE *)
+         || (126 <? n)%nat (* ~ *))%bool then
+      "\" ++ three_digit n ++ quoted_s'
+    else
+      String c quoted_s'
   end.
 
 Instance showString : Show string :=
 {|
-  show s := String quotechar (show_quoted_string s)
+  show s := String """" (show_quoted_string s)
 |}.
+
+(* Example:
+
+Compute (show (from_list
+  [ascii_of_nat 10;
+   ascii_of_nat 14;
+   "a"%char;
+   ascii_of_nat 127])).
+
+> """\n\014a\127"""
+
+*)
+
+Fixpoint read_quoted_string (s : string) : option string :=
+  match s with
+  | String c s' =>
+    if ascii_dec c """" then
+      match s' with
+      | EmptyString => Some EmptyString
+      | _ => None
+      end
+    else if ascii_dec c "\" then
+      match s' with
+      | String c2 s'' =>
+        if ascii_dec c2 "n" then
+          option_map (String "010") (read_quoted_string s'')
+        else if ascii_dec c2 "t" then
+          option_map (String "009") (read_quoted_string s'')
+        else if ascii_dec c2 "\" then
+          option_map (String "\") (read_quoted_string s'')
+        else if ascii_dec c2 """" then
+          option_map (String """") (read_quoted_string s'')
+        else
+          match s'' with
+          | String c1 (String c0 s''') =>
+            match unthree_digit c2 c1 c0 with
+            | Some c' => option_map (String c')
+                                    (read_quoted_string s''')
+            | None => None
+            end
+          | _ => None
+          end
+      | _ => None
+      end
+    else
+      option_map (String c) (read_quoted_string s')
+  | _ => None
+  end.
+
+Definition read_string (s : string) : option string :=
+  match s with
+  | EmptyString => None
+  | String c s' => read_quoted_string s'
+  end.
 
 Fixpoint contents {A : Type} (s : A -> string) (l : list A) : string :=
   match l with
