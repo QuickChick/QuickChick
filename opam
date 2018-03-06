@@ -9,8 +9,9 @@ bug-reports: "https://github.com/QuickChick/QuickChick/issues"
 license: "MIT"
 
 build: [ make "-j%{jobs}%" "plugin" ]
-install: [ make "install-plugin" ]
-remove: [ make uninstall ]
+install: [ make "install" ]
+remove: [ [ "rm" "-rf" "%{lib}%/coq/user-contrib/QuickChick" ]
+          [ "rm" "-f" "`which quickChick | grep opam`" ] ]
 depends: [
   "coq" {>= "8.7"}
   "coq-ext-lib"

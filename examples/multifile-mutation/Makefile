@@ -9,6 +9,4 @@ clean: Makefile.coq
 	rm -rf _qc *.bak
 
 test: clean
-	quickChick -top Top
-
-
+	time quickChick -color -top Top

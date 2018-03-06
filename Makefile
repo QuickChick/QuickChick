@@ -60,6 +60,8 @@ tests:
 	cd examples/ifc-basic; make clean && make
 	cd examples/RedBlack; make clean && make
 	cd examples/stlc; make clean && make
+	$(MAKE) -C examples/multifile-mutation test
+	$(MAKE) -C examples/c-mutation test
 	coqc examples/DependentTest.v
 
 Makefile.coq: _CoqProject

@@ -21,6 +21,7 @@ env:
   - REPO=$DOCKER_USERNAME/quickchick
   matrix:
       - COMPILER="4.06.0"
+      - COMPILER="4.06.1"
 matrix:
   fast_finish: true
 os:
@@ -61,6 +62,14 @@ script:
   echo -en 'travis_fold:start:QuickChick.test.stlc';
   make -C examples/stlc;
   echo -en 'travis_fold:end:QuickChick.test.stlc'
+- echo 'Testing Multifile Mutation...';
+  echo -en 'travis_fold:start:QuickChick.test.multifile-mutation';
+  make -C examples/multifile-mutation test;
+  echo -en 'travis_fold:end:QuickChick.test.multifile-mutation'
+- echo 'Testing C Mutation...';
+  echo -en 'travis_fold:start:QuickChick.test.c-mutation';
+  make -C examples/c-mutation test;
+  echo -en 'travis_fold:end:QuickChick.test.c-mutation'
 
 after_success:
     if [ $TRAVIS_OS_NAME = linux ] && [ $TRAVIS_PULL_REQUEST = false ]; then
