@@ -54,6 +54,11 @@ Fixpoint app_no (t : term) : nat :=
 
 Definition env := list type. 
 
+Inductive bind : env -> nat -> type -> Prop :=
+| BindNow   : forall tau env, bind (tau :: env) 0 tau
+| BindLater : forall tau tau' x env,
+    bind env x tau -> bind (tau' :: env) (S x) tau.
+
 Inductive typing (e : env) : term -> type -> Prop :=
 | TId :
     forall x tau, 
@@ -71,6 +76,30 @@ Inductive typing (e : env) : term -> type -> Prop :=
       typing e t1 (Arrow tau1 tau2) ->
       typing e t2 tau1 ->
       typing e (App t1 t2) tau2.
+
+Inductive typing' (e : env) : term -> type -> Prop :=
+| TId' :
+    forall x tau,
+      bind e x tau ->
+      typing' e (Id x) tau
+| TConst' :
+    forall n, 
+      typing' e (Const n) N
+| TAbs' :
+    forall t tau1 tau2,
+      typing' (tau1 :: e) t tau2 ->
+      typing' e (Abs t) (Arrow tau1 tau2)
+| TApp' :
+    forall t1 t2 tau1 tau2,
+      typing' e t1 (Arrow tau1 tau2) ->
+      typing' e t2 tau1 ->
+      typing' e (App t1 t2) tau2.
+
+Derive Arbitrary for type.
+Instance dec_type (t1 t2 : type) : Dec (t1 = t2).
+Proof. dec_eq. Defined.
+Derive ArbitrarySizedSuchThat for (fun x => bind env x tau).
+Derive ArbitrarySizedSuchThat for (fun t => typing' env t tau).
 
 Inductive option_le : option nat -> option nat -> Prop :=
     | opt_le_1 : option_le None None
