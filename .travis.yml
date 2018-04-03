@@ -71,13 +71,19 @@ script:
   make -C examples/c-mutation test;
   echo -en 'travis_fold:end:QuickChick.test.c-mutation'
 
-after_success:
-    if [ $TRAVIS_OS_NAME = linux ] && [ $TRAVIS_PULL_REQUEST = false ]; then
-    docker pull -a $REPO;
-    docker build .;
-    docker login -u $DOCKER_USERNAME -p $DOCKER_PASSWORD;
-    docker push $REPO;
-    docker build -t debian -f Dockerfile.debian .;
-    docker tag debian $REPO:debian;
-    docker push $REPO:debian;
-    fi
+deploy:
+    provider: script
+    script:
+        if [ $TRAVIS_REPO_SLUG = QuickChick/QuickChick ]
+        && [ $TRAVIS_PULL_REQUEST = false ]
+        && [ $TRAVIS_OS_NAME = linux ]; then
+        docker pull -a $REPO;
+        docker build .;
+        docker login -u $DOCKER_USERNAME -p $DOCKER_PASSWORD;
+        docker push $REPO;
+        docker build -t debian -f Dockerfile.debian .;
+        docker tag debian $REPO:debian;
+        docker push $REPO:debian;
+        fi
+    on:
+        branch: master
