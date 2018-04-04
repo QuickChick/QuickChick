@@ -75,6 +75,8 @@ Fixpoint show_quoted_string (s:string) : string :=
       "\t" ++ quoted_s'
     else if ascii_dec c "010" (* NEWLINE *) then
       "\n" ++ quoted_s'
+    else if ascii_dec c "013" (* CARRIAGE RETURN *) then
+      "\r" ++ quoted_s'
     else if ascii_dec c """" (* DOUBLEQUOTE *) then
       "\""" ++ quoted_s'
     else if ascii_dec c "\" (* BACKSLASH *) then
@@ -116,6 +118,8 @@ Fixpoint read_quoted_string (s : string) : option string :=
       | String c2 s'' =>
         if ascii_dec c2 "n" then
           option_map (String "010") (read_quoted_string s'')
+        else if ascii_dec c2 "r" then
+          option_map (String "013") (read_quoted_string s'')
         else if ascii_dec c2 "t" then
           option_map (String "009") (read_quoted_string s'')
         else if ascii_dec c2 "\" then

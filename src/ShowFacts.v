@@ -78,6 +78,11 @@ Proof.
       simpl; rewrite IHs.
       rewrite is_nl; auto.
     }
+    destruct (ascii_dec a "013") as [is_cr | isn_cr].
+    { fold show_quoted_string.
+      simpl; rewrite IHs.
+      rewrite is_cr; auto.
+    }
     destruct (ascii_dec a """") as [is_dq | isn_dq].
     { fold show_quoted_string.
       simpl; rewrite IHs.
@@ -93,6 +98,10 @@ Proof.
       simpl.
       destruct (ascii_dec _ "n") as [is_n2 | isn_n2].
       { apply not_digit_when in is_n2. contradict is_n2.
+        compute. right. intuition.
+      }
+      destruct (ascii_dec _ "r") as [is_r2 | isn_r2].
+      { apply not_digit_when in is_r2. contradict is_r2.
         compute. right. intuition.
       }
       destruct (ascii_dec _ "t") as [is_t2 | isn_t2].
