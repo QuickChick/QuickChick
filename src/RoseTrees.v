@@ -16,6 +16,11 @@ Fixpoint joinRose {A : Type} (r : Rose (Rose A)) : Rose A :=
       MkRose a (lazy ((List.map joinRose (force tts)) ++ (force ts)))
   end.
 
+Fixpoint repeatRose {A : Type} (n : nat) (r : Rose A) :=
+  match r with
+  | MkRose a ts => MkRose a (lazy (concat (repeat (force ts) n)))
+  end.
+
 Fixpoint fmapRose {A B : Type} (f : A -> B) (r : Rose A) : Rose B :=
   match r with
     | MkRose x rs => MkRose (f x) (lazy (List.map (fmapRose f) (force rs)))
