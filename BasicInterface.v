@@ -38,7 +38,7 @@ Parameter semGen : forall {A : Type} (g : G A), set A.
 Parameter semGenSize : forall {A : Type} (g : G A) (size : nat), set A.
 
 (** * Primitive generator combinators *)
-(* Note: Soon, these will be replaced by an ExtLib dependency. *)
+(* Note: We also provide an (ext-lib) Monad instance based on these. *)
 
 Parameter returnGen  : forall {A : Type}, A -> G A.
 Parameter fmap : forall {A B : Type}, (A -> B) -> G A -> G B.
@@ -191,7 +191,7 @@ Module QcDefaultNotation.
  
 End QcDefaultNotation.
 
-(* Note: These will soon be replaced by an ExtLib dependency. *)
+(* Deprecated: Using the ExtLib notations is recommended. *)
 Module QcDoNotation.
  
   Notation "'do!' X <- A ; B" :=
@@ -554,7 +554,7 @@ Notation "'genST' x" := (@arbitraryST _ x _) (at level 70).
     
     - our ITP paper 
     - our POPL paper
-    - examples/dependentTest.v
+    - examples/DependentTest.v
 
   *)
 
