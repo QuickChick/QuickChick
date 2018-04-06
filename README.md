@@ -7,12 +7,16 @@ QuickChick
  
   - Randomized property-based testing plugin for Coq; a clone of [Haskell QuickCheck]
   - Includes a [foundational verification framework for testing code]
+  - Includes a [mechanism for automatically deriving generators for inductive relations]
 
 [Haskell QuickCheck]:
 https://hackage.haskell.org/package/QuickCheck
 
 [foundational verification framework for testing code]:
 http://prosecco.gforge.inria.fr/personal/hritcu/publications/foundational-pbt.pdf
+
+[mechanism for automatically deriving generators for inductive relations]:
+http://www.cis.upenn.edu/~llamp/pdf/GeneratingGoodGenerators.pdf
 
 For more information on QuickChick, look at the tutorial available under the qc folder 
 of the deep spec summer school:
@@ -23,7 +27,7 @@ https://github.com/DeepSpec/dsss17
   - Branch master: 
     * Coq 8.7
     * OCaml 4.06.0
-    * mathcomp-ssreflect-1.6.2
+    * mathcomp-ssreflect-1.6.4
     * coq-ext-lib-0.9.7
 
   - Branch 8.4pl6:
@@ -75,11 +79,13 @@ If successful, you should see "success" at the end.
 - `MutateCheckManyWith args c ps`
 
 ### Documentation
+The public API of QuickChick is summarized in [BasicInterface.v](https://github.com/QuickChick/QuickChick/BasicInterface.v)
 The main documentation is the DeepSpec summer school tutorial:
 - [DeepSpec QC repo](https://github.com/DeepSpec/dsss17/tree/master/qc).
 Pretty soon this will become a software foundations volume!
 
-But yes, we need more! Until then here are some reasonable surrogates:
+Here is some more reading material:
+  - Our POPL 2018 paper on [Generating Good Generators for Inductive Relations](http://www.cis.upenn.edu/~llamp/pdf/GeneratingGoodGenerators.pdf)
   - Our ITP 2015 paper on [Foundational Property-Based Testing](http://prosecco.gforge.inria.fr/personal/hritcu/publications/foundational-pbt.pdf)
   - Catalin's [internship topic proposals for 2015](http://prosecco.gforge.inria.fr/personal/hritcu/students/topics/2015/quick-chick.pdf)
   - Catalin's [presentation at CoqPL 2015 workshop (2015-01-18)](http://prosecco.gforge.inria.fr/personal/hritcu/talks/QuickChick-Verified-Testing-CoqPL.pdf)
