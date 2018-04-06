@@ -39,7 +39,8 @@ script:
 - echo 'Building QuickChick...' && echo -en 'travis_fold:start:QuickChick.build\\r'
 - opam pin add .
 - opam update
-- travis_retry opam reinstall quickchick
+- opam remove --force quickchick
+- opam install quickchick
 - make -j tests install
 - cd examples/multifile-mutation && make && quickChick -top Top
 - echo -en 'travis_fold:end:QuickChick.build\\r'
