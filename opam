@@ -1,6 +1,6 @@
 opam-version: "1.2"
 name: "coq-quickchick"
-version: "0.1.0"
+version: "1.0.0"
 maintainer: "llamp@seas.upenn.edu"
 
 homepage: "https://github.com/QuickChick/QuickChick"

@@ -79,7 +79,8 @@ If successful, you should see "success" at the end.
 - `MutateCheckManyWith args c ps`
 
 ### Documentation
-The public API of QuickChick is summarized in [BasicInterface.v](https://github.com/QuickChick/QuickChick/BasicInterface.v)
+The public API of QuickChick is summarized in BasicInterface.v.
+
 The main documentation is the DeepSpec summer school tutorial:
 - [DeepSpec QC repo](https://github.com/DeepSpec/dsss17/tree/master/qc).
 Pretty soon this will become a software foundations volume!
