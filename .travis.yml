@@ -48,7 +48,8 @@ script:
   echo -en 'travis_fold:start:QuickChick.build';
   opam update;
   opam pin add . ;
-  opam reinstall coq-quickchick;
+  opam remove --force coq-quickchick;
+  opam install coq-quickchick;
   echo -en 'travis_fold:end:QuickChick.build'
 - echo 'Testing IFC...';
   echo -en 'travis_fold:start:QuickChick.test.ifc-basic';
