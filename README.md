@@ -26,7 +26,7 @@ https://github.com/DeepSpec/dsss17
 
   - Branch master: 
     * Coq 8.7
-    * OCaml 4.06.0
+    * OCaml 4.05.0
     * mathcomp-ssreflect-1.6.4
     * coq-ext-lib-0.9.7
 
