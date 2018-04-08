@@ -17,7 +17,7 @@ depends: [
   "coq-ext-lib"
   "coq-mathcomp-ssreflect" {>= "1.6" & < "1.7~"}
 ]
-available: [ ocaml-version >= "4.05.0" ]
+available: [ ocaml-version >= "4.04.0" ]
 
 authors: [
   "Leonidas Lampropoulos <>"

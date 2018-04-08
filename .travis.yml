@@ -1,6 +1,4 @@
 dist: trusty
-services:
-  - docker
 language: ocaml
 cache:
   apt: true
@@ -18,21 +16,23 @@ env:
   global:
   - NJOBS=2
   - OPAMYES=true
-  - REPO=$DOCKER_USERNAME/quickchick
   matrix:
+      - COMPILER="4.04.0"
+      - COMPILER="4.04.1"
+      - COMPILER="4.04.2"
       - COMPILER="4.05.0"
       - COMPILER="4.06.0"
       - COMPILER="4.06.1"
 matrix:
   fast_finish: true
+  allow_failures:
+    - os: osx
 os:
     - linux
     - osx
 
 before_install:
     if [ $TRAVIS_OS_NAME = osx ]; then
-    curl -sSL https://rvm.io/mpapis.asc | gpg --import -;
-    rvm get stable;
     brew update; brew install opam; fi
 
 install:
@@ -72,20 +72,3 @@ script:
   echo -en 'travis_fold:start:QuickChick.test.c-mutation';
   make -C examples/c-mutation test;
   echo -en 'travis_fold:end:QuickChick.test.c-mutation'
-
-deploy:
-    provider: script
-    script:
-        if [ $TRAVIS_REPO_SLUG = QuickChick/QuickChick ]
-        && [ $TRAVIS_PULL_REQUEST = false ]
-        && [ $TRAVIS_OS_NAME = linux ]; then
-        docker pull -a $REPO;
-        docker build .;
-        docker login -u $DOCKER_USERNAME -p $DOCKER_PASSWORD;
-        docker push $REPO;
-        docker build -t debian -f Dockerfile.debian .;
-        docker tag debian $REPO:debian;
-        docker push $REPO:debian;
-        fi
-    on:
-        branch: master
