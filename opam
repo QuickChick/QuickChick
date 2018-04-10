@@ -16,6 +16,7 @@ depends: [
   "coq" {>= "8.7"}
   "coq-ext-lib"
   "coq-mathcomp-ssreflect" {>= "1.6" & < "1.7~"}
+  "ocamlbuild"
 ]
 available: [ ocaml-version >= "4.04.0" ]
 
