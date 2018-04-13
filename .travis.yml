@@ -33,7 +33,7 @@ os:
 
 before_install:
     if [ $TRAVIS_OS_NAME = osx ]; then
-    brew update; brew install opam; fi
+    brew update; brew install --ignore-dependencies opam; fi
 
 install:
 - "[ -e .opam ] || travis_wait opam init -j ${NJOBS} --compiler=${COMPILER} -n -y"
