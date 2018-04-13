@@ -1,9 +1,11 @@
+open Pp
 open Util
 open GenericLib
 open SetLib
 open CoqLib
 open GenLib
-
+open Error
+   
 (* Derivation of ArbitrarySized. Contains mostly code from derive.ml *)
 
 let rec replace v x = function
@@ -94,6 +96,9 @@ let shrink_decl ty_ctr ctrs iargs =
   gRecord [("shrink", shrink_fun)]
 
 let show_decl ty_ctr ctrs iargs =
+  msg_debug (str "Deriving Show Information:" ++ fnl ());
+  msg_debug (str ("Type constructor is: " ^ ty_ctr_to_string ty_ctr) ++ fnl ());
+  msg_debug (str (str_lst_to_string "\n" (List.map ctr_rep_to_string ctrs)) ++ fnl());
 
   let isCurrentTyCtr = function
     | TyCtr (ty_ctr', _) -> ty_ctr = ty_ctr'
