@@ -92,15 +92,20 @@ let rec raiseMatch (k : umap) (c : constructor) (rs : range list) (eqs: EqSet.t)
             raiseMatch k c' rs' eqs >>= fun (k', m, eqs') ->
             Some (k', m::l, eqs')
          | Unknown u ->
-            lookup u k >>= fun r' ->
-            begin match r' with 
-            | Undef _ -> (* The unknown should now be fixed *)
-               Some (UM.add u FixedInput k, (MatchU u)::l, eqs)
-            | FixedInput -> (* The unknown is already fixed, raise an eq check *)
-               let u' = unk_provider.next_unknown () in
-               Some (UM.add u' (Unknown u) k, (MatchU u')::l, eq_set_add u' u eqs)
-            | _ -> failwith "Not supported yet"
-            end
+            let rec go u = 
+              lookup u k >>= fun r' ->
+              begin match r' with 
+              | Undef _ -> (* The unknown should now be fixed *)
+                 Some (UM.add u FixedInput k, (MatchU u)::l, eqs)
+              | FixedInput -> (* The unknown is already fixed, raise an eq check *)
+                 let u' = unk_provider.next_unknown () in
+                 Some (UM.add u' (Unknown u) k, (MatchU u')::l, eq_set_add u' u eqs)
+              | Ctr (c', rs') ->
+                 raiseMatch k c' rs' eqs >>= fun (k', m, eqs') ->
+                 Some (k', m :: l, eqs')
+              | Unknown u' -> go u'
+              end
+            in go u
          | _ -> failwith "Toplevel ranges should be Unknowns or constructors"
         ) (Some (k, [], eqs)) rs) >>= fun (k', l, eqs') ->
   Some (k', MatchCtr (c, List.rev l), eqs')
