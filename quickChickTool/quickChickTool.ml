@@ -16,6 +16,7 @@ let fail_fast = ref false
 let excluded = ref []
 let nobase = ref false
 let only_mutant = ref None
+let include_file = ref None
 
 let current_filetype = ref ""
 
@@ -29,6 +30,7 @@ let speclist =
   ; ("-ocamlbuild", Arg.String (fun name -> ocamlbuild_args := name), "Arguments given to ocamlbuild")
   ; ("-nobase", Arg.Unit (fun _ -> nobase := true), "Do not test base mutant")
   ; ("-m", Arg.Int (fun n -> only_mutant := Some n), "Only test mutant number n")
+  ; ("-include", Arg.String (fun incl -> include_file := Some incl), "_CoqProject, file containing list of files to be included.")
   ; ("-exclude", Arg.Rest (fun excl -> excluded := excl :: !excluded), "Files to be excluded. Must be the last argument")
   ]
 
@@ -198,7 +200,7 @@ module SS = Set.Make(String)
 type 'a file_structure = File of string * 'a
                        | Dir of string * 'a file_structure list
 
-let gather_all_vs fs =
+let gather_all_vs_from_dir fs =
   let all_vs = ref [] in
   let rec loop fs =
     match fs with
@@ -212,6 +214,17 @@ let gather_all_vs fs =
        else ()
   in loop fs;
   !all_vs
+
+open CoqProject_file
+
+let gather_all_vs_from_file f =
+  let project = CoqProject_file.read_project_file f in
+  List.map (fun s -> Filename.chop_suffix s ".v") project.v_files
+
+let gather_all_vs fs =
+  match !include_file with
+  | None -> gather_all_vs_from_dir fs
+  | Some f -> gather_all_vs_from_file f
 
 let is_prefix pre s =
   String.length s >= String.length pre

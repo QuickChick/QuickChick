@@ -49,7 +49,7 @@ src/%.cmo : src/%.ml
 quickChickTool: $(QCTOOL_EXE)
 
 $(QCTOOL_EXE): $(QCTOOL_SRC)
-	cd $(QCTOOL_DIR) ; ocamlbuild -use-ocamlfind -pkg coq.lib quickChickTool.byte
+	cd $(QCTOOL_DIR) ; ocamlbuild -use-ocamlfind -pkg coq.lib -cflags -rectypes -tag thread quickChickTool.byte
 	cp $(QCTOOL_DIR)/quickChickTool.byte $(QCTOOL_EXE)
 
 tests:
