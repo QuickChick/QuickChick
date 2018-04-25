@@ -2,7 +2,7 @@ V=@
 .PHONY: plugin install install-plugin clean quickChickTool
 
 QCTOOL_DIR=quickChickTool
-QCTOOL_EXE=$(QCTOOL_DIR)/quickChickTool
+QCTOOL_EXE=quickChickTool.byte
 QCTOOL_SRC=$(QCTOOL_DIR)/quickChickTool.ml \
 		   $(QCTOOL_DIR)/quickChickToolTypes.ml \
 		   $(QCTOOL_DIR)/quickChickToolLexer.mll \
@@ -30,11 +30,11 @@ documentation-check: plugin
 TEMPFILE := $(shell mktemp)
 
 install: all
-	$(V)$(MAKE) -f Makefile.coq install | tee $(TEMPFILE)
-  # Manually copying the remaining files
+	$(V)$(MAKE) -f Makefile.coq install > $(TEMPFILE)
+# Manually copying the remaining files
+	$(V)cp $(QCTOOL_EXE) $(shell opam config var bin)/quickChick
 #	 $(V)cp src/quickChickLib.cmx $(COQLIB)/user-contrib/QuickChick
 #	 $(V)cp src/quickChickLib.o $(COQLIB)/user-contrib/QuickChick
-	 $(V)cp $(QCTOOL_EXE) $(shell echo $(PATH) | tr ':' "\n" | grep opam | uniq)/quickChick
 
 install-plugin: Makefile.coq
 	$(V)$(MAKE) -f Makefile.coq install | tee $(TEMPFILE)
@@ -49,8 +49,7 @@ src/%.cmo : src/%.ml
 quickChickTool: $(QCTOOL_EXE)
 
 $(QCTOOL_EXE): $(QCTOOL_SRC)
-	cd $(QCTOOL_DIR) ; ocamlbuild -use-ocamlfind -pkg coq.lib -cflags -rectypes -tag thread quickChickTool.byte
-	cp $(QCTOOL_DIR)/quickChickTool.byte $(QCTOOL_EXE)
+	ocamlbuild -use-ocamlfind -pkg coq.lib -cflags -rectypes -tag thread $(QCTOOL_DIR)/$(QCTOOL_EXE)
 
 tests:
 	cd examples/ifc-basic; make clean && make
