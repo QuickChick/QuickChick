@@ -1,5 +1,12 @@
 V=@
-.PHONY: plugin install install-plugin clean
+.PHONY: plugin install install-plugin clean quickChickTool
+
+QCTOOL_DIR=quickChickTool
+QCTOOL_EXE=$(QCTOOL_DIR)/quickChickTool
+QCTOOL_SRC=$(QCTOOL_DIR)/quickChickTool.ml \
+		   $(QCTOOL_DIR)/quickChickToolTypes.ml \
+		   $(QCTOOL_DIR)/quickChickToolLexer.mll \
+		   $(QCTOOL_DIR)/quickChickToolParser.mly
 
 # Here is a hack to make $(eval $(shell work
 # (copied from coq_makefile generated stuff):
@@ -11,8 +18,7 @@ endef
 includecmdwithout@ = $(eval $(subst @,$(donewline),$(shell { $(1) | tr -d '\r' | tr '\n' '@'; })))
 $(call includecmdwithout@,$(COQBIN)coqtop -config)
 
-all: plugin documentation-check
-	$(MAKE) quickChickTool
+all: plugin documentation-check quickChickTool
 
 plugin: Makefile.coq 
 	$(MAKE) -f Makefile.coq 
@@ -28,7 +34,7 @@ install: all
   # Manually copying the remaining files
 #	 $(V)cp src/quickChickLib.cmx $(COQLIB)/user-contrib/QuickChick
 #	 $(V)cp src/quickChickLib.o $(COQLIB)/user-contrib/QuickChick
-	 $(V)cp src/quickChickTool $(shell echo $(PATH) | tr ':' "\n" | grep opam | uniq)/quickChick
+	 $(V)cp $(QCTOOL_EXE) $(shell echo $(PATH) | tr ':' "\n" | grep opam | uniq)/quickChick
 
 install-plugin: Makefile.coq
 	$(V)$(MAKE) -f Makefile.coq install | tee $(TEMPFILE)
@@ -37,24 +43,14 @@ uninstall:
 	$(V)if [ -e Makefile.coq ]; then $(MAKE) -f Makefile.coq uninstall; fi
 	$(RM) $(shell which quickChick | grep opam)
 
-src/quickChickToolLexer.cmo : src/quickChickToolLexer.mll 
-	ocamllex src/quickChickToolLexer.mll
-	ocamlc -I src -c src/quickChickToolLexer.ml
-
-src/quickChickToolParser.cmo : src/quickChickToolParser.mly
-#	menhir --explain src/quickChickToolParser.mly
-	ocamlyacc -v src/quickChickToolParser.mly
-	ocamlc -I src -c src/quickChickToolParser.mli
-	ocamlc -I src -c src/quickChickToolParser.ml
-
 src/%.cmo : src/%.ml
 	ocamlc -I src -c $<
 
-quickChickTool: src/quickChickToolTypes.cmo
-	$(MAKE) src/quickChickToolParser.cmo
-	$(MAKE) src/quickChickToolLexer.cmo
-	$(MAKE) src/quickChickTool.cmo
-	ocamlc -o src/quickChickTool unix.cma str.cma src/quickChickToolTypes.cmo src/quickChickToolLexer.cmo src/quickChickToolParser.cmo src/quickChickTool.cmo
+quickChickTool: $(QCTOOL_EXE)
+
+$(QCTOOL_EXE): $(QCTOOL_SRC)
+	cd $(QCTOOL_DIR) ; ocamlbuild -use-ocamlfind -pkg coq.lib quickChickTool.byte
+	cp $(QCTOOL_DIR)/quickChickTool.byte $(QCTOOL_EXE)
 
 tests:
 	cd examples/ifc-basic; make clean && make
