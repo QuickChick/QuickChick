@@ -295,11 +295,23 @@ let perl_hack () =
   if Sys.command hack_mli <> 0 || Sys.command hack_ml <> 0 then
     debug "perl script hack failed. Report: %s" perl_cmd
 
+let string_of_process_status = function
+  | Unix.WEXITED i -> Printf.sprintf "EXIT %d" i
+  | Unix.WSIGNALED i -> Printf.sprintf "SIGNALED %d" i
+  | Unix.WSTOPPED i -> Printf.sprintf "STOPPED %d" i
+
+let system args =
+  match Unix.system args with
+  | Unix.WEXITED 0 -> ()
+  | e ->
+    highlight Failure (Printf.sprintf "Command failed: %s" (string_of_process_status e));
+    exit 1
+
 let compile_and_run where e : unit =
   let here = Sys.getcwd() in
   Sys.chdir where;
 
-  Unix.system !compile_command;
+  system !compile_command;
 
   perl_hack ();
 
