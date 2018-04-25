@@ -27,7 +27,5 @@ Makefile.coq*
 _qc_*.tmp
 quickChickTool
 .DS_Store
-src/quickChickToolLexer.ml
-src/quickChickToolParser.ml
-src/quickChickToolParser.mli
-src/quickChickToolParser.output
+_build/
+quickChickTool.byte
