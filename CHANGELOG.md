@@ -9,7 +9,7 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
 - `-include` option for `quickChickTool`.
 
 ### Fixed
-- Dependency on Ocamlbuild.
+- OPAM dependencies.
 
 ## [1.0.0] - 2018-04-06
 ### Added

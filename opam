@@ -13,9 +13,9 @@ install: [ make "install" ]
 remove: [ [ "rm" "-rf" "%{lib}%/coq/user-contrib/QuickChick" ]
           [ "rm" "-f" "`which quickChick | grep opam`" ] ]
 depends: [
-  "coq" {>= "8.7"}
+  "coq" {>= "8.7" < "8.8~"}
   "coq-ext-lib"
-  "coq-mathcomp-ssreflect" {>= "1.6" & < "1.7~"}
+  "coq-mathcomp-ssreflect"
   "ocamlbuild"
   "ocamlfind"
 ]
