@@ -61,23 +61,23 @@ type var = Id.t (* Opaque *)
 let var_of_id x = x         
 let var_to_string = Id.to_string
 let gVar (x : var) : coq_expr =
-  CAst.make @@ CRef (Ident (None, x),None)
+  CAst.make @@ CRef (CAst.make @@ Libnames.Ident x,None)
 
 let id_to_reference id = 
   let qualid = qualid_of_string (Id.to_string id) in
-  Qualid (None, qualid)
+  Qualid qualid
 let id_to_coq_expr id = 
-  mkRefC (id_to_reference id)
+  mkRefC @@ CAst.make @@ id_to_reference id
 
 let qualid_to_reference q = 
-  Qualid (None, q)
+  Qualid q
 let qualid_to_coq_expr q = 
-  mkRefC (Qualid (None, q))
+  mkRefC @@ CAst.make @@ Qualid q
 
 (* Maybe this should do checks? *)
 let gInject s = 
   if s = "" then failwith "Called gInject with empty string";
-  CAst.make @@ CRef (Qualid (None, qualid_of_string s), None)
+  CAst.make @@ CRef (CAst.make @@ Qualid (qualid_of_string s), None)
 
 type ty_param = Id.t (* Opaque *)
 let ty_param_to_string (x : ty_param) = Id.to_string x
@@ -94,18 +94,18 @@ let gTyCtr = qualid_to_coq_expr
 type arg = local_binder_expr
 let gArg ?assumName:(an=hole) ?assumType:(at=hole) ?assumImplicit:(ai=false) ?assumGeneralized:(ag=false) _ =
   let n = match an with
-    | { CAst.v = CRef (Ident (loc,id),_) } -> (loc,Name id)
-    | { CAst.v = CRef (Qualid (loc, q), _) } -> let (_,id) = repr_qualid q in (loc, Name id)
+    | { CAst.v = CRef ({CAst.v = Libnames.Ident id}, _); loc } -> (loc,Name id)
+    | { CAst.v = CRef ({CAst.v = Qualid q}, _); loc } -> let (_,id) = repr_qualid q in (loc, Name id)
     | { CAst.v = CHole (v,_,_); loc } -> (loc,Anonymous)
     | a -> failwith "This expression should be a name" in
-  CLocalAssum ( [n],
+  CLocalAssum ( [CAst.make ?loc:(fst n) @@ snd n],
                   (if ag then Generalized (Implicit, Implicit, false)                       
                    else if ai then Default Implicit else Default Explicit),
                   at )
 
 let arg_to_var (x : arg) =
   match x with
-  | CLocalAssum ([(_loc, Name id)], _ ,_ ) -> id
+  | CLocalAssum ([{CAst.v = id; loc}], _ ,_ ) -> id_of_name id
   | _ -> qcfail "arg_to_var must be named"
   
 let str_lst_to_string sep (ss : string list) = 
@@ -135,7 +135,7 @@ let ctr_to_ty_ctr x = x
 let num_of_ctrs (c : constructor) =
   let r = qualid_to_reference c in 
   let env = Global.env () in
-  let glob_ref = Nametab.global r in
+  let glob_ref = Nametab.global (CAst.make r) in
   let ((mind,n),_) = Globnames.destConstructRef glob_ref in
   let mib = Environ.lookup_mind mind env in
   Array.length (mib.mind_packets.(n).mind_consnames)
@@ -571,7 +571,7 @@ let gApp ?explicit:(expl=false) c cs =
   else mkAppC (c, cs)
 
 let gProdWithArgs args f_body =
-  let xvs = List.map (fun (CLocalAssum ([_, n], _, _)) ->
+  let xvs = List.map (fun (CLocalAssum ([{CAst.v = n}], _, _)) ->
                       match n with
                       | Name x -> x
                       | _ -> make_up_name ()
@@ -580,7 +580,7 @@ let gProdWithArgs args f_body =
   mkCProdN args fun_body
 
 let gFunWithArgs args f_body =
-  let xvs = List.map (fun (CLocalAssum ([_, n], _, _)) ->
+  let xvs = List.map (fun (CLocalAssum ([{CAst.v = n}], _, _)) ->
                       match n with
                       | Name x -> x
                       | _ -> make_up_name ()
@@ -591,28 +591,28 @@ let gFunWithArgs args f_body =
 let gFun xss (f_body : var list -> coq_expr) =
   let xvs = List.map (fun x -> fresh_name x) xss in
   (* TODO: optional argument types for xss *)
-  let binder_list = List.map (fun x -> CLocalAssum ([(None, Name x)], Default Explicit, hole)) xvs in
+  let binder_list = List.map (fun x -> CLocalAssum ([CAst.make @@ Name x], Default Explicit, hole)) xvs in
   let fun_body = f_body xvs in
   mkCLambdaN binder_list fun_body 
 
 let gFunTyped xts (f_body : var list -> coq_expr) =
   let xvs = List.map (fun (x,t) -> (fresh_name x,t)) xts in
   (* TODO: optional argument types for xss *)
-  let binder_list = List.map (fun (x,t) -> CLocalAssum ([(None, Name x)], Default Explicit, t)) xvs in
+  let binder_list = List.map (fun (x,t) -> CLocalAssum ([CAst.make @@ Name x], Default Explicit, t)) xvs in
   let fun_body = f_body (List.map fst xvs) in
   mkCLambdaN binder_list fun_body 
 
 (* with Explicit/Implicit annotations *)  
 let gRecFunInWithArgs ?assumType:(typ=hole) (fs : string) args (f_body : (var * var list) -> coq_expr) (let_body : var -> coq_expr) = 
   let fv  = fresh_name fs in
-  let xvs = List.map (fun (CLocalAssum ([_, n], _, _)) ->
+  let xvs = List.map (fun (CLocalAssum ([{CAst.v = n}], _, _)) ->
                       match n with
                       | Name x -> x
                       | _ -> make_up_name ()
                      ) args in
   let fix_body = f_body (fv, xvs) in
-  CAst.make @@ CLetIn ((None, Name fv),
-    CAst.make @@ CFix((None,fv),[((None,fv), (None, CStructRec), args, typ, fix_body)]), None,
+  CAst.make @@ CLetIn (CAst.make @@ Name fv,
+    CAst.make @@ CFix(CAst.make fv,[(CAst.make fv, (None, CStructRec), args, typ, fix_body)]), None,
     let_body fv)
              
 let gRecFunIn ?assumType:(typ = hole) (fs : string) (xss : string list) (f_body : (var * var list) -> coq_expr) (let_body : var -> coq_expr) =
@@ -621,11 +621,11 @@ let gRecFunIn ?assumType:(typ = hole) (fs : string) (xss : string list) (f_body 
 
 let gLetIn (x : string) (e : coq_expr) (body : var -> coq_expr) = 
   let fx = fresh_name x in
-  CAst.make @@ CLetIn ((None, Name fx), e, None, body fx)
+  CAst.make @@ CLetIn (CAst.make @@ Name fx, e, None, body fx)
 
 
 let gLetTupleIn (x : var) (xs : var list) (body : coq_expr) =
-  CAst.make @@ CLetTuple (List.map (fun x -> (None, Names.Name x)) xs, (None, None), gVar x, body)
+  CAst.make @@ CLetTuple (List.map (fun x -> CAst.make @@ Names.Name x) xs, (None, None), gVar x, body)
   
 let gMatch discr ?catchAll:(body=None) (branches : (constructor * string list * (var list -> coq_expr)) list) : coq_expr =
   CAst.make @@ CCases (Term.RegularStyle,
@@ -633,18 +633,15 @@ let gMatch discr ?catchAll:(body=None) (branches : (constructor * string list * 
           [(discr, None, None)], (* single discriminee, no as/in *)
           (List.map (fun (c, cs, bf) -> 
                       let cvs : Id.t list = List.map fresh_name cs in
-                      (None, ([(None, [CAst.make @@ CPatCstr (qualid_to_reference c,
+                      CAst.make ([[CAst.make @@ CPatCstr (CAst.make @@ qualid_to_reference c,
                                       None,
-                                      List.map (fun s -> CAst.make @@ CPatAtom (Some (Ident (None, s)))) cvs (* Constructor applied to patterns *)
-                                     )
-                           ]
-                       )],
+                                      List.map (fun s -> CAst.make @@ CPatAtom (Some (CAst.make (Ident s)))) cvs (* Constructor applied to patterns *)
+                                    )
+                           ]],
                        bf cvs)
-                      )
-                   ) branches) @ (match body with 
-                                  | None -> [] 
-                                  | Some c' -> [(None, ([(None, [CAst.make @@ CPatAtom None])], c'))])
-         )
+                   ) branches) @ match body with
+                                 | None -> []
+                                 | Some c' -> [CAst.make ([[CAst.make @@ CPatAtom None]], c')])
 
 let gMatchReturn (discr : coq_expr)
       ?catchAll:(body=None)
@@ -654,26 +651,22 @@ let gMatchReturn (discr : coq_expr)
   let as_id' = fresh_name as_id in
   CAst.make @@ CCases (Term.RegularStyle,
           Some (ret as_id'), (* return *)
-          [(discr, Some (None,Name as_id'), None)], (* single discriminee, no in *)
+          [(discr, Some (CAst.make (Name as_id')), None)], (* single discriminee, no in *)
           (List.map (fun (c, cs, bf) -> 
                       let cvs : Id.t list = List.map fresh_name cs in
-                      (None,
-                       ([(None, [CAst.make @@ CPatCstr (qualid_to_reference c,
+                       CAst.make ([[CAst.make @@ CPatCstr (CAst.make @@ qualid_to_reference c,
                                       None,
-                                      List.map (fun s -> CAst.make @@ CPatAtom (Some (Ident (None, s)))) cvs (* Constructor applied to patterns *)
-                                     )
-                           ]
-                       )],
-                       bf cvs)
-                      )
-                   ) branches) @ (match body with 
-                                  | None -> [] 
-                                  | Some c' -> [(None, ([(None, [CAst.make @@ CPatAtom None])], c'))])
+                                      List.map (fun s -> CAst.make @@ CPatAtom (Some (CAst.make @@ Libnames.Ident s))) cvs (* Constructor applied to patterns *)
+                                  )]],
+                                  bf cvs)
+                   ) branches) @ (match body with
+                                  | None -> []
+                                  | Some c' -> [CAst.make ([([CAst.make @@ CPatAtom None])], c')])
          )
 
 
 let gRecord names_and_bodies =
-  CAst.make @@ CRecord (List.map (fun (n,b) -> (id_to_reference (id_of_string n), b)) names_and_bodies)
+  CAst.make @@ CRecord (List.map (fun (n,b) -> (CAst.make @@ id_to_reference @@ id_of_string n, b)) names_and_bodies)
 
 let gAnnot (p : coq_expr) (tau : coq_expr) =
   CAst.make @@ CCast (p, CastConv tau)
@@ -703,7 +696,7 @@ let gType ty_params dep_type =
 (* Lookup the type of an identifier *)
 let get_type (id : Id.t) = 
   msg_debug (str ("Trying to global:" ^ Id.to_string id) ++ fnl ());
-  let glob_ref = Nametab.global (id_to_reference id) in
+  let glob_ref = Nametab.global (CAst.make @@ id_to_reference id) in
   match glob_ref with 
   | VarRef _ -> msg_debug  (str "Var" ++ fnl ())
   | ConstRef _ -> msg_debug (str "Constant" ++ fnl ())
@@ -711,7 +704,7 @@ let get_type (id : Id.t) =
   | ConstructRef _ -> msg_debug (str "Constructor" ++ fnl ())
 
 let is_inductive c = 
-  let glob_ref = Nametab.global (qualid_to_reference c) in
+  let glob_ref = Nametab.global @@ CAst.make @@ qualid_to_reference c in
   match glob_ref with
   | IndRef _ -> true
   | _        -> false
@@ -733,20 +726,20 @@ let rec matcher_pat_to_string = function
 let construct_match c ?catch_all:(mdef=None) alts = 
   let rec aux = function 
     | MatchU u' -> begin 
-        CAst.make @@ CPatAtom (Some (Ident (None, u')))
+        CAst.make @@ CPatAtom (Some (CAst.make @@ Libnames.Ident u'))
       end
     | MatchCtr (c, ms) -> begin
        if is_inductive c then CAst.make @@ CPatAtom None
-       else CAst.make @@ CPatCstr (qualid_to_reference c,
+       else CAst.make @@ CPatCstr (CAst.make @@ qualid_to_reference c,
                    Some (List.map (fun m -> aux m) ms),
                    []) 
                         end 
   in CAst.make @@ CCases (Term.RegularStyle,
              None (* return *), 
               [ (c, None, None)], (* single discriminee, no as/in *)
-              List.map (fun (m, body) -> (None, ([None, [aux m]], body))) alts 
+              List.map (fun (m, body) -> CAst.make @@ ([[aux m]], body)) alts
               @ (match mdef with 
-                 | Some body -> [(None, ([None, [CAst.make @@ CPatAtom None]], body))]
+                 | Some body -> [(CAst.make @@ ([[CAst.make @@ CPatAtom None]], body))]
                  | _ -> []
                 )
             )
@@ -755,27 +748,27 @@ let construct_match_with_return c ?catch_all:(mdef=None) (as_id : string) (ret :
   let as_id' = fresh_name as_id in
   let rec aux = function
     | MatchU u' -> begin
-        CAst.make @@ CPatAtom (Some (Ident (None, u')))
+        CAst.make @@ CPatAtom (Some (CAst.make @@ Libnames.Ident u'))
       end
     | MatchCtr (c, ms) -> begin
        if is_inductive c then begin 
          CAst.make @@ CPatAtom None
        end
        else begin 
-         CAst.make @@ CPatCstr (qualid_to_reference c,
+         CAst.make @@ CPatCstr (CAst.make @@ qualid_to_reference c,
                    Some (List.map (fun m -> aux m) ms),
                    []) 
          end
        end in
   let main_opts = 
-        List.map (fun (m, body) -> (None, ([None, [aux m]], body))) alts in
-  let default = 
+        List.map (fun (m, body) -> CAst.make @@ ([[aux m]], body)) alts in
+  let default =
     match mdef with 
-    | Some body -> [(None, ([None, [CAst.make @@ CPatAtom None]], body))]
+    | Some body -> [CAst.make ([[CAst.make @@ CPatAtom None]], body)]
     | _ -> [] in
   CAst.make @@ CCases (Term.RegularStyle,
              Some (ret as_id') (* return *), 
-             [ (c, Some (None, Name as_id'), None)], (* single discriminee, no as/in *)
+             [ (c, Some (CAst.make @@ Name as_id'), None)], (* single discriminee, no as/in *)
              main_opts @ default
          )
 
@@ -920,23 +913,24 @@ let fold_ty_vars (f : var list -> var -> coq_type -> 'a) (mappend : 'a -> 'a -> 
 (* Declarations *)
 
 let defineTypedConstant s c typ =
-  let id = fresh_name s in 
-  Vernacentries.interp (None,  Vernacexpr.VernacDefinition ((None, Definition), ((None, id), None), DefineBody ([], None, c, Some typ)));
+  let id = fresh_name s in
+  (* TODO: DoDischarge or NoDischarge? *)
+  Vernacentries.interp (CAst.make @@ Vernacexpr.VernacExpr ([], Vernacexpr.VernacDefinition ((NoDischarge, Definition), (CAst.make @@ Name id, None), DefineBody ([], None, c, Some typ))));
   id 
 
 let defineConstant s c =
   let id = fresh_name s in 
-  Vernacentries.interp (None, Vernacexpr.VernacDefinition ((None, Definition), ((None, id), None), DefineBody ([], None, c, None)));
+  Vernacentries.interp (CAst.make @@ Vernacexpr.VernacExpr ([], Vernacexpr.VernacDefinition ((NoDischarge, Definition), (CAst.make @@ Name id, None), DefineBody ([], None, c, None))));
   id 
                           
 (* Declare an instance *)
 let create_names_for_anon a =
   match a with 
-  | CLocalAssum ([(loc, n)], x, y) ->
+  | CLocalAssum ([{CAst.v = n; loc}], x, y) ->
      begin match n with
            | Name x -> (x, a)
            | Anonymous -> let n = make_up_name () in
-                          (n, CLocalAssum ([(loc, Name n)], x, y))
+                          (n, CLocalAssum ([CAst.make ?loc:loc @@ Names.Name n], x, y))
      end
   | _ -> failwith "Non RawAssum in create_names"
     
@@ -948,10 +942,11 @@ let declare_class_instance ?(global=true) ?(priority=42) instance_arguments inst
   msg_debug (str "Calculated instance_type_vars" ++ fnl ());
   let instance_record_vars = instance_record vars in
   msg_debug (str "Calculated instance_record_vars" ++ fnl ());
-  let cid = Classes.new_instance ~global:global false 
+  let cid = Classes.new_instance ~global:global false
+              ~program_mode:false (* TODO: true or false? *)
                                iargs
-                       (((None, (Name (id_of_string instance_name))), None)
-                       , Decl_kinds.Explicit, instance_type_vars) 
+                       ((CAst.make @@ Name (id_of_string instance_name), None)
+                       , Decl_kinds.Explicit, instance_type_vars)
                        (Some (true, instance_record_vars)) (* TODO: true or false? *)
                        { hint_priority = Some priority; hint_pattern = None }
   in

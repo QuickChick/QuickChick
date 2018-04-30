@@ -29,3 +29,6 @@ quickChickTool
 .DS_Store
 _build/
 quickChickTool.byte
+src/quickChickToolLexer.ml
+src/quickChickToolParser.ml
+src/quickChickToolParser.mli
