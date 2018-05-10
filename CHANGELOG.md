@@ -6,7 +6,11 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
 
 ## [Unreleased]
 ### Added
+- Support Coq 8.8.
 - `-include` option for `quickChickTool`.
+
+### Removed
+- No longer support Coq 8.7.
 
 ### Fixed
 - OPAM dependencies.
