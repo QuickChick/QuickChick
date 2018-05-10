@@ -48,9 +48,6 @@ script:
 - echo 'Building QuickChick...';
   echo -en 'travis_fold:start:QuickChick.build';
   opam update;
-  # opam pin add . ;
-  # opam remove --force coq-quickchick;
-  # opam install coq-quickchick;
   opam install coq.8.8.0 coq-ext-lib coq-mathcomp-ssreflect;
   make -j install;
   echo -en 'travis_fold:end:QuickChick.build'

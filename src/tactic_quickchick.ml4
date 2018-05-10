@@ -7,41 +7,42 @@ open Error
 open Constrexpr
 open Constrexpr_ops
 
-let quickchick_goal = 
+let quickchick_goal =
   Proofview.Goal.enter begin fun gl ->
     let gl = Proofview.Goal.assume gl in
 
     (* Convert goal to a constr_expr *)
-    let c = Proofview.Goal.concl gl in 
+    let c = Proofview.Goal.concl gl in
     let e = Proofview.Goal.env gl in
     let evd = Evd.from_env e in
     let ct = Constrextern.extern_constr false e evd c in
 
     (* Admit a constant with that type *)
-    let tmpid = QuickChick.fresh_name "temporary_constant" in 
-    Vernacentries.interp (None,  
-      VernacAssumption ((None, Decl_kinds.Conjectural), 
-                        NoInline, 
-                        [ 
-                          (false, 
+    let tmpid = QuickChick.fresh_name "temporary_constant" in
+    Vernacentries.interp (CAst.make @@ Vernacexpr.VernacExpr ([],
+      (* TODO: NoDischarge or DoDischarge? *)
+      Vernacexpr.VernacAssumption ((NoDischarge, Decl_kinds.Conjectural),
+                        NoInline,
+                        [
+                          (false,
                            (
-                             [(None, tmpid), None]
+                             [CAst.make tmpid, None]
                            ,
                              ct
                            )
                           )
-                        ] 
-                       ));
+                        ]
+                       )));
 
 
-    let s = QuickChick.runTest 
-            (CAst.make @@ CApp((None,QuickChick.quickCheck), [CAst.make @@ CRef (Ident (None, tmpid),None), None])) in
+    let s = QuickChick.runTest
+            (CAst.make @@ CApp((None,QuickChick.quickCheck), [CAst.make @@ CRef (CAst.make @@ Libnames.Ident tmpid,None), None])) in
 
-    match s with 
-    | Some bytes -> 
+    match s with
+    | Some bytes ->
        Tacticals.New.tclZEROMSG (str ("\n" ^ bytes) ++ fnl ())
     | None -> Tacticals.New.tclZEROMSG (str "Something went wrong. Report." ++ fnl ())
-    
+
 (*
 
     (* Refactor - needs to see internals... *)
@@ -86,7 +87,6 @@ let quickchick_goal =
   end }
  *)
 
-TACTIC EXTEND quickchick 
+TACTIC EXTEND quickchick
   | ["quickchick"] -> [ quickchick_goal ]
 END;;
-

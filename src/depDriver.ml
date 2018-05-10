@@ -47,7 +47,7 @@ let derive_dependent (class_name : derivable)
                      (result : unknown) =
   let ctr_name = 
     match constructor with 
-    | { CAst.v = CRef (r,_) } -> string_of_reference r
+    | { CAst.v = CRef (r,_); _ } -> string_of_reference r
   in
   let instance_name = mk_instance_name class_name ctr_name in
 
@@ -284,7 +284,7 @@ let create_t_and_u_maps explicit_args dep_type actual_args : (range UM.t * dep_t
  *)
 let dep_dispatch ind class_name : unit = 
   match ind with 
-  | { CAst.v = CLambdaN ([([(_loc2, Name id)], _kind, _type)], body) } -> (* {CAst.v = CApp ((_flag, constructor), args) }) } -> *)
+  | { CAst.v = CLambdaN ([CLocalAssum ([{ CAst.v = Name id; CAst.loc = _loc2 }], _kind, _type)], body) } -> (* {CAst.v = CApp ((_flag, constructor), args) }) } -> *)
 
     let idu = Unknown.from_string (Names.Id.to_string id ^ "_") in
      
@@ -295,7 +295,7 @@ let dep_dispatch ind class_name : unit =
       | { CAst.v = CLetTuple (name_list, _,
                               _shouldbeid,
                               { CAst.v = CApp ((_flag, constructor), args) } )} ->
-         ( Some (List.map snd name_list), constructor, args )
+         ( Some (List.map (function { CAst.v = name; _ } -> name ) name_list), constructor, args )
     in
 
     (* Parse the constructor's information into the more convenient generic-lib representation *)
