@@ -16,7 +16,7 @@ open Error
 open Stdarg
 
 let message = "QuickChick"
-let mk_ref s = CAst.make @@ CRef (Qualid (None, qualid_of_string s), None)
+let mk_ref s = CAst.make @@ CRef (CAst.make (Qualid (qualid_of_string s)), None)
 
 (* Names corresponding to QuickChick's .v files *)
 let show = mk_ref "QuickChick.Show.show"
@@ -58,7 +58,7 @@ let comp_ml_cmd fn out =
   Printf.sprintf "%s -rectypes -w a -I %s -I %s %s %s -o %s" ocamlopt
     temp_dirname path link_files fn out
 
-(* 
+(*
 let comp_mli_cmd fn =
   Printf.sprintf "%s -rectypes -I %s %s" ocamlc (Lazy.force path) fn
  *)
@@ -94,26 +94,26 @@ let define c =
   let fn = fresh_name "quickchick" in
   (* TODO: Maxime - which of the new internal flags should be used here? The names aren't as clear :) *)
   ignore (declare_constant ~internal:InternalTacticRequest fn
-      (DefinitionEntry (definition_entry ~univs:uctxt (EConstr.to_constr evd c)),
+      (DefinitionEntry (definition_entry ~univs:(Polymorphic_const_entry uctxt) (EConstr.to_constr evd c)),
        Decl_kinds.IsDefinition Decl_kinds.Definition));
   fn
 
-let define_and_run c = 
+let define_and_run c =
   (** Extract the term and its dependencies *)
   let main = define c in
   let mlf = Filename.temp_file "QuickChick" ".ml" in
   let execn = Filename.chop_extension mlf in
   let mlif = execn ^ ".mli" in
-  Flags.silently (Extraction_plugin.Extract_env.full_extraction (Some mlf)) [Ident (None, main)]; 
+  Flags.silently (Extraction_plugin.Extract_env.full_extraction (Some mlf)) [CAst.make @@ Ident main];
   (** Add a main function to get some output *)
   let oc = open_out_gen [Open_append;Open_text] 0o666 mlf in
-  let for_output = 
-    "\nlet _ = print_string (\n" ^ 
-    "let l = (" ^ (string_of_id main) ^ ") in\n"^ 
-    "let s = Bytes.create (List.length l) in\n" ^ 
-    "let rec copy i = function\n" ^ 
-    "| [] -> s\n" ^ 
-    "| c :: l -> s.[i] <- c; copy (i+1) l\n" ^ 
+  let for_output =
+    "\nlet _ = print_string (\n" ^
+    "let l = (" ^ (string_of_id main) ^ ") in\n"^
+    "let s = Bytes.create (List.length l) in\n" ^
+    "let rec copy i = function\n" ^
+    "| [] -> s\n" ^
+    "| c :: l -> s.[i] <- c; copy (i+1) l\n" ^
     "in Bytes.to_string (copy 0 l))" in
   Printf.fprintf oc "%s" for_output;
   close_out oc;
@@ -128,11 +128,11 @@ let define_and_run c =
   (* TODO: Maxime, thoughts? *)
   (** LEO: However, sometimes the inferred types are too abstract. So we touch the .mli to close the weak types. **)
   Sys.command ("touch " ^ mlif);
-  (* 
+  (*
   Printf.printf "Extracted ML file: %s\n" mlf;
   Printf.printf "Compile command: %s\n" (comp_ml_cmd mlf execn);
   flush_all ();
-  *) 
+  *)
   (* Compile the (empty) .mli *)
   if Sys.command (comp_mli_cmd mlif) <> 0 then msg_error (str "Could not compile mli file" ++ fnl ());
   if Sys.command (comp_ml_cmd mlf execn) <> 0 then
@@ -163,7 +163,7 @@ let define_and_run c =
          end;
          let output = String.concat "\n" (List.rev !builder) in
          Some output
-           
+
 (*
     (** If we want to print the time spent in tests *)
 (*    let execn = "time " ^ execn in *)
@@ -181,11 +181,11 @@ let runTest c =
   let env = Global.env () in
   let evd = Evd.from_env env in
   let (c,evd) = interp_constr env evd c in
-  define_and_run (EConstr.of_constr c)
+  define_and_run c
 
 let run f args =
-  begin match args with 
-  | qc_text :: _ -> Printf.printf "QuickChecking %s\n" 
+  begin match args with
+  | qc_text :: _ -> Printf.printf "QuickChecking %s\n"
                       (Pp.string_of_ppcmds (Ppconstr.pr_constr_expr qc_text));
                       flush_all()
   | _ -> failwith "run called with no arguments"
@@ -195,17 +195,17 @@ let run f args =
   ignore (runTest c)
 
 let set_debug_flag (flag_name : string) : (string * string) -> Libobject.obj =
-  let toggle s= 
-    match s with 
+  let toggle s=
+    match s with
     | "On"  -> true
-    | "Off" -> false 
-  in 
-  let reference s = 
-    match s with 
-    | "Debug" -> flag_debug 
-    | "Warn"  -> flag_warn  
-    | "Error" -> flag_error 
-  in 
+    | "Off" -> false
+  in
+  let reference s =
+    match s with
+    | "Debug" -> flag_debug
+    | "Warn"  -> flag_warn
+    | "Error" -> flag_error
+  in
   Libobject.declare_object
     {(Libobject.default_object ("QC_debug_flag: " ^ flag_name)) with
        cache_function = (fun (_,(flag_name, mode)) -> reference flag_name := toggle mode);
@@ -248,14 +248,12 @@ VERNAC COMMAND EXTEND MutateChickMany CLASSIFIED AS SIDEFF
 END;;
 
 VERNAC COMMAND EXTEND QuickChickDebug CLASSIFIED AS SIDEFF
-  | ["QuickChickDebug" ident(s1) ident(s2)] -> 
+  | ["QuickChickDebug" ident(s1) ident(s2)] ->
      [ let s1' = Names.string_of_id s1 in
-       let s2' = Names.string_of_id s2 in 
+       let s2' = Names.string_of_id s2 in
        Lib.add_anonymous_leaf (set_debug_flag s1' (s1',s2')) ]
 END;;
 
 VERNAC COMMAND EXTEND Sample CLASSIFIED AS SIDEFF
   | ["Sample" constr(c)] -> [run sample [c]]
 END;;
-
-

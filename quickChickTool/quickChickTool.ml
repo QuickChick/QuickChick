@@ -222,7 +222,8 @@ open CoqProject_file
 
 let gather_all_vs_from_file f =
   let project = CoqProject_file.read_project_file f in
-  List.map (fun s -> Filename.chop_suffix s ".v") project.v_files
+  List.map (fun s -> match s with {thing = str; _} ->
+      Filename.chop_suffix str ".v") project.v_files
 
 let gather_all_vs fs =
   match !include_file with

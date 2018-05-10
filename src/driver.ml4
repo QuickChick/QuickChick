@@ -6,12 +6,14 @@ open Stdarg
 open Error
 
 type derivation = SimpleDer of SimplDriver.derivable list
-                | DepDer of DepDriver.derivable 
+                | DepDer of DepDriver.derivable
 
-let simpl_dispatch ind classes name1 name2 = 
-  let ind_name = match ind with 
-    | { CAst.v = CRef (r, _) } -> string_of_qualid (snd (qualid_of_reference r))
-    | _ -> failwith "Implement me for functions" 
+let simpl_dispatch ind classes name1 name2 =
+  let ind_name = match ind with
+    | { CAst.v = CRef (r, _) } -> string_of_qualid
+                                    (match qualid_of_reference r with
+                                       {CAst.v = q; _} -> q)
+    | _ -> failwith "Implement me for functions"
   in
   List.iter (fun cn -> SimplDriver.derive cn ind (SimplDriver.mk_instance_name cn ind_name) name1 name2) classes
 
@@ -38,48 +40,50 @@ let class_assoc_table =
   List.iter (fun (kwd, tok) -> Hashtbl.add h kwd tok) class_assoc_opts;
   h
 
-let dispatch cn ind name1 name2 = 
-  let convert_reference_to_string c = 
-    match c with 
-    | {CAst.v = CRef (r, _)} -> string_of_qualid (snd (qualid_of_reference r))
+let dispatch cn ind name1 name2 =
+  let convert_reference_to_string c =
+    match c with
+    | {CAst.v = CRef (r, _)} -> string_of_qualid
+                                  (match qualid_of_reference r with
+                                     {CAst.v = q; _} -> q)
     | _ -> failwith "Usage: Derive <class_name> for <inductive_name> OR  Derive (<class_name>, ... , <class_name>) for <inductive_name>" in
-  let ss = match cn with 
-     | { CAst.v = CNotation (_,([a],[b],_)) } -> begin 
+  let ss = match cn with
+     | { CAst.v = CNotation (_,([a],[b],_,_)) } -> begin
          let c = convert_reference_to_string a in
          let cs = List.map convert_reference_to_string b in
          c :: cs
        end
      | _ -> [convert_reference_to_string cn]
-  in 
+  in
 
-  let get_class_names s = 
-    try Hashtbl.find class_assoc_table s 
+  let get_class_names s =
+    try Hashtbl.find class_assoc_table s
     with Not_found -> begin
         (* TODO: Figure out how to pretty print in a failwith... *)
         failwith ( "Not a valid class name. Expected one of : " ^ (String.concat " , " (List.map fst class_assoc_opts)))
       end
   in
 
-  let class_names = 
-    match ss with 
+  let class_names =
+    match ss with
     | s::ss -> List.fold_left (fun der s ->
-                               match der, get_class_names s with 
+                               match der, get_class_names s with
                                | SimpleDer ds1, SimpleDer ds2 -> SimpleDer (ds1 @ ds2)
-                               | DepDer ds1, DepDer ds2 -> 
+                               | DepDer ds1, DepDer ds2 ->
                                   qcfail "Implement dependent derive for multiple classes"
                               ) (get_class_names s) ss
     | _ -> qcfail "At least one class name expected" in
 
-  match class_names with 
+  match class_names with
   | SimpleDer classes -> simpl_dispatch ind classes name1 name2
   | DepDer class_name -> DepDriver.dep_dispatch ind class_name
 
 VERNAC COMMAND EXTEND Derive CLASSIFIED AS SIDEFF
-   | ["Derive" constr(class_name) "for" constr(inductive)] -> 
+   | ["Derive" constr(class_name) "for" constr(inductive)] ->
      [dispatch class_name inductive "" ""]
-   | ["Derive" constr(class_name) "for" constr(inductive) "using" ident(genInst)] -> 
+   | ["Derive" constr(class_name) "for" constr(inductive) "using" ident(genInst)] ->
      [dispatch class_name inductive (Names.string_of_id genInst) ""]
-   | ["Derive" constr(class_name) "for" constr(inductive) "using" ident(genInst) "and" ident(monInst) ] -> 
+   | ["Derive" constr(class_name) "for" constr(inductive) "using" ident(genInst) "and" ident(monInst) ] ->
      [dispatch class_name inductive (Names.string_of_id genInst) (Names.string_of_id monInst)]
 END;;
 
