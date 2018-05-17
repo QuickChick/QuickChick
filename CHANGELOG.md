@@ -14,6 +14,7 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
 ## [Unreleased master]
 ### Added
 - `-include` option for `quickChickTool`.
+- Highlighted success message for `quickChickTool`.
 
 ### Fixed
 - OPAM dependencies.
