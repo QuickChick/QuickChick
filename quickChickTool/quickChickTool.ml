@@ -704,7 +704,7 @@ let main =
   end;
 
   if !something_failed then begin
-    highlight Failure "\nUnexpected result for at least one test. Exiting with status 1...";
+    highlight Failure "At least one of the tests above produced an unexpected result.";
     exit 1
   end;
-  highlight Success "Got expected results for all tests"
+  highlight Success "All tests produced the expected results"
