@@ -82,9 +82,9 @@ VERNAC COMMAND EXTEND Derive CLASSIFIED AS SIDEFF
    | ["Derive" constr(class_name) "for" constr(inductive)] ->
      [dispatch class_name inductive "" ""]
    | ["Derive" constr(class_name) "for" constr(inductive) "using" ident(genInst)] ->
-     [dispatch class_name inductive (Names.string_of_id genInst) ""]
+     [dispatch class_name inductive (Id.to_string genInst) ""]
    | ["Derive" constr(class_name) "for" constr(inductive) "using" ident(genInst) "and" ident(monInst) ] ->
-     [dispatch class_name inductive (Names.string_of_id genInst) (Names.string_of_id monInst)]
+     [dispatch class_name inductive (Id.to_string genInst) (Id.to_string monInst)]
 END;;
 
 (*

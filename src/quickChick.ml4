@@ -1,17 +1,12 @@
 open Ltac_plugin
 open Pp
-open Loc
 open Names
-open Tacmach
 open Entries
-open Declarations
 open Declare
 open Libnames
 open Util
 open Constrintern
-open Topconstr
 open Constrexpr
-open Constrexpr_ops
 open Error
 open Stdarg
 
@@ -249,8 +244,8 @@ END;;
 
 VERNAC COMMAND EXTEND QuickChickDebug CLASSIFIED AS SIDEFF
   | ["QuickChickDebug" ident(s1) ident(s2)] ->
-     [ let s1' = Names.string_of_id s1 in
-       let s2' = Names.string_of_id s2 in
+     [ let s1' = Id.to_string s1 in
+       let s2' = Id.to_string s2 in
        Lib.add_anonymous_leaf (set_debug_flag s1' (s1',s2')) ]
 END;;
 
