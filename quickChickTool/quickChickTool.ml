@@ -692,7 +692,7 @@ let main =
         begin
           if !only_mutant = Some i || !only_mutant = None then begin
               Printf.printf "\n";
-              highlight Header (Printf.sprintf "Testing mutant %d..." i);
+              highlight Header (Printf.sprintf "Testing mutant %d" i);
               ensure_tmpdir_exists();
               (* Entire file structure is copied *)
               output_mut_dir tmp_dir m;

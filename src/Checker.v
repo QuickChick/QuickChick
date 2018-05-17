@@ -253,7 +253,7 @@ Definition forAllShrinkShow {A prop : Type} {_ : Checkable prop}
            (gen : G A) (shrinker : A -> list A) (show' : A -> string) (pf : A -> prop) : Checker :=
   bindGen gen (fun x =>
                  shrinking shrinker x (fun x' =>
-                                         printTestCase (show' x' ++ newline) (pf x'))).
+                                         printTestCase (show' x') (pf x'))).
 
 Global Instance testFun {A prop : Type} `{Show A}
        `{Arbitrary A} `{_ : Checkable prop} : Checkable (A -> prop) :=
