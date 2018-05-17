@@ -52,7 +52,7 @@ let ensure_dir_exists d = Sys.command ("mkdir -p " ^ d)
 let ensure_tmpdir_exists () =
   ignore (ensure_dir_exists tmp_dir)
 
-type highlight_style = Header | Failure
+type highlight_style = Header | Failure | Success
 
 let highlight style s =
   if !ansi then begin
@@ -63,6 +63,9 @@ let highlight style s =
     | Failure ->
       print_string "\027[37m"; (* white *)
       print_string "\027[41m"; (* on red *)
+    | Success ->
+      print_string "\027[30m"; (* black *)
+      print_string "\027[42m"; (* on green *)
     end;
     print_string "\027[1m"; (* bold *)
     print_string s;
@@ -697,10 +700,11 @@ let main =
               compile_and_run dir ExpectSomeFailure
           end
         end)
-      dir_mutants  (* BCP: Reverse it?? *)
+      (List.rev dir_mutants)  (* TODO: BCP: Added rev -- did it work? *)
   end;
 
   if !something_failed then begin
     highlight Failure "\nUnexpected result for at least one test. Exiting with status 1...";
     exit 1
-  end
+  end;
+  highlight Success "Got expected results for all tests"
