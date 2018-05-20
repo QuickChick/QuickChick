@@ -1,4 +1,4 @@
-type mutant = string * string * string
+type mutant = string option * string * string * string
 
 type node =
   (* Base chunk of text *)
@@ -14,7 +14,7 @@ type section =
   (* Sections: Start comment, section name, end comment, extends, contents *)
   | Section of string * string * string * extend option * node list 
 
-let rec output_mutant (a,b,c) = a ^ b ^ c
+let rec output_mutant (name, a,b,c) = a ^ b ^ c
 
 let rec output_node = function
   | Text s -> s 

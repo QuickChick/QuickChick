@@ -90,11 +90,11 @@ let rec combinations (acc : 'a list) (lists : 'a list list) : 'a list list =
     combinations (x::acc) t @ add_heads (List.map (fun x' -> x' :: acc) xs) t
   | _ -> failwith "Empty inner list"
 
-let rec non_mutants acc muts =
+let rec non_mutants mut_name acc muts : (string option * string list) =
   match muts with
-  | [] -> [List.rev acc]
-  | (start, code, endc) :: rest ->
-     non_mutants  (Printf.sprintf "%s%s%s" start code endc :: acc) rest
+  | [] -> (mut_name, List.rev acc)
+  | (_mutant_name,start, code, endc) :: rest ->
+     non_mutants mut_name (Printf.sprintf "%s%s%s" start code endc :: acc) rest
 
 let begin_comment () =
   if !current_filetype = ".c" || !current_filetype = ".h"
@@ -106,16 +106,20 @@ let end_comment () =
   then "*/"
   else "*)"
 
-let rec all_mutants' acc (muts : mutant list) : string list list =
+(* acc is a list of a mutant-free prefix until this point *)
+let rec all_mutants' (acc : string list) (muts : mutant list) : (string option * string list) list =
   match muts with
-  | [] -> [List.rev acc]
-  | (start, code, endc) :: rest ->
-     all_mutants' (Printf.sprintf "%s%s%s" start code endc :: acc) rest @
-     non_mutants  (Printf.sprintf "%s %s %s %s %s" start
-                     (end_comment ()) code (begin_comment ()) endc :: acc) rest
+  | [] -> [(None, List.rev acc)]
+  | (mutant_name, start, code, endc) :: rest ->
+     (* Insert current mutant. Mutate nothing else. *)
+     non_mutants mutant_name (Printf.sprintf "%s %s %s %s %s" start
+                                (end_comment ()) code (begin_comment ()) endc :: acc) rest
+     :: 
+       (* Don't keep current mutant, mutate the rest *)
+     all_mutants' (Printf.sprintf "%s%s%s" start code endc :: acc) rest 
 
-let all_mutants muts =
-  List.map (String.concat "") (all_mutants' [] muts)
+let all_mutants muts : (string option * string) list =
+  List.map (fun (opt, ss) -> (opt, String.concat "" ss)) (all_mutants' [] muts)
 
 let rec cartesian (lists : 'a list list) : 'a list list =
   match lists with
@@ -145,16 +149,22 @@ let test_out handle_section input =
        else output_section s
   in String.concat "" (List.map go input)
 
-let combine_mutants (bms : ('a * 'a list) list) =
+(* Combine mutants with base.
+   Receives a base mutant, plus a list of (optionally tagged) mutants.
+   Produces all mutants, including base. *)
+let combine_mutants (bms : ('a * (string option * 'a) list) list) : (string option * 'a list) list =
   let rec combine_aux bms =
     match bms with
-    | [] -> [[]]
+    | [] -> [(None, [])]
     | (b,ms)::bms' ->
+       (* Construct a non-mutant version of the rest of the possibilities *)
        let non_mutant_rest = List.map fst bms' in
+       (* Option 1: Mutate something now. *)
        let mutated_now =
-         List.map (fun m -> m :: non_mutant_rest) ms in
+         List.map (fun (tag, m) -> (tag, m :: non_mutant_rest)) ms in
+       (* Option 2: Keep base. Mutate later. *)
        let mutated_later =
-         List.map (fun ms' -> b :: ms') (combine_aux bms') in
+         List.map (fun (tag, ms') -> (tag, b :: ms')) (combine_aux bms') in
        mutated_now @ mutated_later in
   List.rev (combine_aux bms)
 
@@ -177,25 +187,32 @@ let mutate_outs handle_section input =
         let handle_node = function
           | Text s -> (s, [])
           | Mutants (start, base, muts) ->
+            (* To handle a mutant section, extract base + all mutants *)
             let (non_mutated, mutants) =
               match all_mutants muts with
-              | non_mutated :: mutants -> (non_mutated, List.rev mutants)
-              | [] -> failwith "Internal error" in
+              | (None,non_mutated) :: mutants -> (non_mutated, List.rev mutants)
+              | [] -> failwith "Internal quickChickTool error: no base mutant"
+              | _  -> failwith "Internal quickChickTool error: base mutant with mutant tag"
+            in
             (Printf.sprintf "%s%s%s" start base non_mutated,
              List.map
-               (fun s -> Printf.sprintf "%s %s %s %s %s" start
-                           (begin_comment ()) base (end_comment ()) s)
+               (fun (opt, s) ->
+                 (opt, Printf.sprintf "%s %s %s %s %s" start
+                           (begin_comment ()) base (end_comment ()) s))
                mutants)
           | QuickChick (s1,s2,s3) ->
+            (* Test sections only affect the base *)
             things_to_check := s2 :: !things_to_check;
             (Printf.sprintf "%s QuickChick %s %s" s1 s2 s3, []) (* Add all tests *)
         in
-        from_cons (List.map (String.concat "")
-                     (combine_mutants (List.map handle_node nodes)))
+        match List.map (fun (tag, ss) -> (tag, String.concat "" ss)) (combine_mutants (List.map handle_node nodes)) with
+        | (None, base) :: mutants -> (base, mutants)
+        | [] -> failwith "Internal quickChickTool error: no base mutant after combining"
+        | _  -> failwith "Internal quickChickTool error: base mutant with mutant tag after combining"
       end
       else (String.concat "" (List.map output_node nodes), [])
   in
-  let result = List.map (String.concat "") (combine_mutants (List.map go input)) in
+  let result = List.map (fun (tag, ss) -> (tag, String.concat "" ss)) (combine_mutants (List.map go input)) in
   (result, !things_to_check)
 
 module SS = Set.Make(String)
@@ -547,39 +564,40 @@ let rec handle_section sec_graph sn' =
   | Some sn -> handle_section' sec_graph sn' sn
   | None    -> true
 
-let calc_dir_mutants sec_graph fs =
+(* LEO: This has duplication with the mutant generation above *)
+let calc_dir_mutants sec_graph (fs : section list file_structure) =
   let all_things_to_check = ref [] in
-  let rec loop fs =
+  let rec loop (fs : section list file_structure) =
     match fs with
     | File (s, ss) ->
       (* Printf.printf "Calc mutants for file: %s\n" s; flush_all (); *)
       begin
       current_filetype := Filename.extension s;
       match mutate_outs (handle_section sec_graph) ss with
-      | base :: muts, things_to_check ->
+      | (None, base) :: muts, things_to_check ->
         (* Printf.printf "Number of mutants: %d\n" (List.length muts); *)
         all_things_to_check := (List.map (fun x -> (s,x)) things_to_check)
                                @ !all_things_to_check;
         (* debug "Number of tests: %d\n%s\n" (List.length things_to_check) (String.concat "\n" things_to_check); *)
-        (File (s, base), List.map (fun m -> File (s, m)) muts)
+        (File (s, base), List.map (fun (tag, m) -> (tag, File (s, m))) muts)
       | _ -> failwith "no base mutant"
       end
     | Dir (s, fss) -> begin
       (* Printf.printf "Calc mutants for dir: %s\n" s; flush_all (); *)
       let bmfs = List.map loop fss in
-      let rec all_mutant_fs (bmfs : ('a * 'a list) list) =
+      let rec all_mutant_fs (bmfs : ('a * (string option * 'a) list) list) =
         match bmfs with
-        | [] -> [[]]
+        | [] -> [(None, [])]
         | (b,mfs)::bmfs' ->
           let non_mutant_rest = List.map fst bmfs' in
           let mutated_now =
-            List.map (fun mf -> mf :: non_mutant_rest) mfs in
+            List.map (fun (tag, mf) -> (tag, mf :: non_mutant_rest)) mfs in
           let mutated_later =
-            List.map (fun mfs' -> b :: mfs') (all_mutant_fs bmfs') in
+            List.map (fun (tag, mfs') -> (tag, b :: mfs')) (all_mutant_fs bmfs') in
           mutated_now @ mutated_later in
       begin match List.rev (all_mutant_fs bmfs) with
-      | base :: muts ->
-        (Dir (s, base), List.map (fun m -> Dir (s, m)) muts)
+      | (None, base) :: muts ->
+        (Dir (s, base), List.map (fun (tag, m) -> (tag, Dir (s, m))) muts)
       | [] ->
         failwith "no base dir mutant"
       end
@@ -688,7 +706,7 @@ let main =
       
     (* For each mutant structure *)
     List.iteri
-      (fun i m ->
+      (fun i (tag, m) ->
         begin
           if !only_mutant = Some i || !only_mutant = None then begin
               Printf.printf "\n";
