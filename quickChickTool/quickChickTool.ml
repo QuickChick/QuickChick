@@ -15,6 +15,8 @@ let ansi = ref false
 let fail_fast = ref false
 let excluded = ref []
 let nobase = ref false
+
+type mutant_id = Num of int | Tag of string
 let only_mutant = ref None
 let include_file = ref None
 
@@ -29,7 +31,8 @@ let speclist =
   ; ("-top", Arg.String (fun name -> top := name), "Name of top-level logical module")
   ; ("-ocamlbuild", Arg.String (fun name -> ocamlbuild_args := name), "Arguments given to ocamlbuild")
   ; ("-nobase", Arg.Unit (fun _ -> nobase := true), "Do not test base mutant")
-  ; ("-m", Arg.Int (fun n -> only_mutant := Some n), "Only test mutant number n")
+  ; ("-m", Arg.Int (fun n -> only_mutant := Some (Num n)), "Only test mutant number n")
+  ; ("-tag", Arg.String (fun s -> only_mutant := Some (Tag s)), "Only test mutant number with a specific tag")
   ; ("-include", Arg.String (fun incl -> include_file := Some incl), "_CoqProject, file containing list of files to be included.")
   ; ("-exclude", Arg.Rest (fun excl -> excluded := excl :: !excluded), "Files to be excluded. Must be the last argument")
   ]
@@ -111,12 +114,12 @@ let rec all_mutants' (acc : string list) (muts : mutant list) : (string option *
   match muts with
   | [] -> [(None, List.rev acc)]
   | (mutant_name, start, code, endc) :: rest ->
-     (* Insert current mutant. Mutate nothing else. *)
-     non_mutants mutant_name (Printf.sprintf "%s %s %s %s %s" start
-                                (end_comment ()) code (begin_comment ()) endc :: acc) rest
-     :: 
        (* Don't keep current mutant, mutate the rest *)
-     all_mutants' (Printf.sprintf "%s%s%s" start code endc :: acc) rest 
+     all_mutants' (Printf.sprintf "%s%s%s" start code endc :: acc) rest
+       (* Insert current mutant. Mutate nothing else. *)
+     @ [non_mutants mutant_name (Printf.sprintf "%s %s %s %s %s" start
+                                (end_comment ()) code (begin_comment ()) endc :: acc) rest]
+
 
 let all_mutants muts : (string option * string) list =
   List.map (fun (opt, ss) -> (opt, String.concat "" ss)) (all_mutants' [] muts)
@@ -605,6 +608,11 @@ let calc_dir_mutants sec_graph (fs : section list file_structure) =
   let result = loop fs in
   (result, !all_things_to_check)
 
+let string_of_tag ms =
+  match ms with
+  | None -> "<no tag>"
+  | Some t -> t
+  
 (* BCP: This function is too big! And there's too much duplication. *)
 let main =
 (*   List.iter (fun x -> print_endline x) !excluded;*)
@@ -708,7 +716,10 @@ let main =
     List.iteri
       (fun i (tag, m) ->
         begin
-          if !only_mutant = Some i || !only_mutant = None then begin
+          if !only_mutant = Some (Num i) || !only_mutant = None
+             || (match tag with
+                 | Some tag -> !only_mutant = Some (Tag (trim tag))
+                 | _ -> false) then begin
               Printf.printf "\n";
               highlight Header (Printf.sprintf "Testing mutant %d" i);
               ensure_tmpdir_exists();

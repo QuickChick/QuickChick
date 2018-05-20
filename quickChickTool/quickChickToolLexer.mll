@@ -31,6 +31,7 @@ rule lexer = parse
   | (white* "(*!" white* "QuickChick" as s) { line_incs s lexbuf; T_StartQuickChick s }
   | (white* "(*!" white* "QuickCheck" as s) { line_incs s lexbuf; T_StartQuickCheck s }
 
+  | (white* "(*!!" as s)                    { line_incs s lexbuf; T_StartMutTag s }
   | (white* "(*!" white* "*)" as s)         { line_incs s lexbuf; T_StartMutants s }
   | (white* "(*!" as s)                     { line_incs s lexbuf; T_StartMutant s }
   | (white* "(*"  as s)                     { line_incs s lexbuf; T_StartComment s }

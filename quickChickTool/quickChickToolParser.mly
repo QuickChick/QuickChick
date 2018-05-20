@@ -27,6 +27,7 @@ type node =
 %token<string> T_StartSection
 %token<string> T_StartQuickChick
 %token<string> T_StartQuickCheck
+%token<string> T_StartMutTag
 %token<string> T_StartMutant
 %token<string> T_StartMutants
 %token<string> T_StartComment
@@ -78,9 +79,13 @@ code:                 T_Char { [$1] }
                               } */
 
 
-mutants:              mutant { [$1] }
-                    | mutant mutants { $1 :: $2 }
+mutants:              mutant_tag { [$1] }
+                    | mutant_tag mutants { $1 :: $2 }
 
+mutant_tag:           T_StartMutTag code T_EndComment mutant { let (_, a, b, c) = $4 in
+                                                               (Some (String.concat "" $2), a, b, c) }
+                    | mutant { $1 }
+                                                               
 mutant:               T_StartMutant code T_EndComment { (None, $1, String.concat "" $2, $3) }
                     | T_StartMutants { (None, "(*", "", "*)") }
 
