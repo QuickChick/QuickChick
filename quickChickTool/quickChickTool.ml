@@ -629,25 +629,6 @@ let main =
   match fs with
   | File (s, ss) ->
      failwith ". can never be a file. Right?"
-(*
-    let (base,muts) = match mutate_outs (handle_section sec_graph) ss with
-      | (base :: muts), _ -> (base, muts)
-      | _ -> failwith "empty mutants" in
-    (* BCP: I think we should not test the base when testing mutants *)
-    (* LEO: Really? I think it's a good baseline. Bug in base -> No point
-       in testing mutants... *)
-    (* BCP: OK, doing it first is fine.  But we also want to be able to
-       run a single mutant by name. *)
-    highlight Header "Testing base...";
-    let base_file = write_tmp_file base in
-    compile_and_run "." (coqc_single_cmd base_file) ExpectOnlySuccesses;
-    List.iteri (fun i m ->
-      (if i > 0 then Printf.printf "\n");
-      highlight Header (Printf.sprintf "Testing mutant %d..." i);
-      reset_test_results();
-      compile_and_run "." (coqc_single_cmd (write_tmp_file m)) ExpectSomeFailure
-    ) muts  (* BCP: Reverse it?? *)
- *)
   | Dir (s, fss) -> begin
     let ((base, dir_mutants), all_things_to_check) = calc_dir_mutants sec_graph fs in
     (* List.iter (fun (s1,s2) -> Printf.printf "To test: %s - %s\n" s1 s2) all_things_to_check;*)
@@ -721,7 +702,9 @@ let main =
                  | Some tag -> !only_mutant = Some (Tag (trim tag))
                  | _ -> false) then begin
               Printf.printf "\n";
-              highlight Header (Printf.sprintf "Testing mutant %d" i);
+              let t =
+                match tag with None -> "" | Some s -> ": " ^ s in
+              highlight Header (Printf.sprintf "Testing mutant %d%s" i t);
               ensure_tmpdir_exists();
               (* Entire file structure is copied *)
               output_mut_dir tmp_dir m;
