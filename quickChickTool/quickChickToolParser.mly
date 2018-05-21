@@ -53,7 +53,12 @@ program:              default_section T_Eof { [$1] }
                         failwith (Printf.sprintf "Error in line %d, position %d" 
                                                  pos.pos_lnum (pos.pos_cnum - pos.pos_bol)) }  
 
-default_section:      section_contents { Section ("", "", "", None, $1) }
+default_section:      section_contents
+                        { { sec_begin = "" 
+                          ; sec_name  = ""
+                          ; sec_end   = ""
+                          ; sec_extends = None
+                          ; sec_nodes = $1 }  }
 
 section_contents:     { [] } 
                     | section_content section_contents { $1 :: $2 }
@@ -61,13 +66,13 @@ section_contents:     { [] }
 section_content:      T_Char 
                             {  Text $1 }
                       | T_StartQuickChick code T_EndComment
-                            { QuickChick ($1, String.concat "" $2, $3) }
+                            { QuickChick { qc_begin = $1; qc_body = String.concat "" $2; qc_end = $3 } }
                       | T_StartQuickCheck code T_EndComment
-                            { QuickChick ($1, String.concat "" $2, $3) }
+                            { QuickChick { qc_begin = $1; qc_body = String.concat "" $2; qc_end = $3 } }
                       | T_StartMutants mutants
-                            { Mutants ($1, "", $2) }
+                            { Mutants { ms_begin = $1; ms_base = ""; ms_mutants = $2 } }
                       | T_StartMutants code mutants
-                            { Mutants ($1, String.concat "" $2, $3) }
+                            { Mutants { ms_begin = $1; ms_base = String.concat "" $2; ms_mutants = $3 } }
                       | T_StartComment section_contents T_EndComment
                             { Text (Printf.sprintf "%s%s%s" $1 (String.concat "" (List.map output_node $2)) $3) }
 
@@ -82,19 +87,30 @@ code:                 T_Char { [$1] }
 mutants:              mutant_tag { [$1] }
                     | mutant_tag mutants { $1 :: $2 }
 
-mutant_tag:           T_StartMutTag code T_EndComment mutant { let (_, a, b, c) = $4 in
-                                                               (Some (String.concat "" $2), a, b, c) }
+mutant_tag:           T_StartMutTag code T_EndComment mutant
+                        { let m = $4 in {m with mut_info = {m.mut_info with tag = Some (String.concat "" $2)}} }
                     | mutant { $1 }
                                                                
-mutant:               T_StartMutant code T_EndComment { (None, $1, String.concat "" $2, $3) }
-                    | T_StartMutants { (None, "(*", "", "*)") }
+mutant:               T_StartMutant code T_EndComment { let pos = Parsing.symbol_start_pos () in
+                                                        { mut_info = { line_number = pos.pos_lnum 
+                                                                     ; tag = None }
+                                                        ; mut_begin = $1 ; mut_body = String.concat "" $2 ; mut_end = $3 } }
+                    | T_StartMutants
+                        { let pos = Parsing.symbol_start_pos () in
+                          { mut_info = { line_number = pos.pos_lnum 
+                                     ; tag = None }
+                          ; mut_begin = "(*" ; mut_body = "" ; mut_end = "*)" } }
 
 sections:             section { [$1] }
                     | section sections { $1 :: $2 }
                       
 section:              T_StartSection code T_EndComment extends section_contents
-                           { Section ($1, String.concat "" $2, $3, $4, $5) }
+                        { { sec_begin   = $1
+                          ; sec_name    = String.concat "" $2
+                          ; sec_end     = $3
+                          ; sec_extends = $4
+                          ; sec_nodes   = $5 } }
 
 extends:              { None }
-                    | T_Extends code T_EndComment { Some ($1, $2, $3) }
+                    | T_Extends code T_EndComment { Some { ext_begin = $1 ; ext_extends = $2 ; ext_end = $3 } }
 

@@ -93,11 +93,11 @@ let rec combinations (acc : 'a list) (lists : 'a list list) : 'a list list =
     combinations (x::acc) t @ add_heads (List.map (fun x' -> x' :: acc) xs) t
   | _ -> failwith "Empty inner list"
 
-let rec non_mutants mut_name acc muts : (string option * string list) =
+let rec non_mutants (info : mutant_info) acc muts : (mutant_info * string list) =
   match muts with
-  | [] -> (mut_name, List.rev acc)
-  | (_mutant_name,start, code, endc) :: rest ->
-     non_mutants mut_name (Printf.sprintf "%s%s%s" start code endc :: acc) rest
+  | [] -> (info, List.rev acc)
+  | m :: muts' ->
+     non_mutants info (Printf.sprintf "%s%s%s" m.mut_begin m.mut_body m.mut_end :: acc) muts'
 
 let begin_comment () =
   if !current_filetype = ".c" || !current_filetype = ".h"
@@ -110,18 +110,18 @@ let end_comment () =
   else "*)"
 
 (* acc is a list of a mutant-free prefix until this point *)
-let rec all_mutants' (acc : string list) (muts : mutant list) : (string option * string list) list =
+let rec all_mutants' (acc : string list) (muts : mutant list) : (mutant_info * string list) list =
   match muts with
-  | [] -> [(None, List.rev acc)]
-  | (mutant_name, start, code, endc) :: rest ->
+  | [] -> [(default_info, List.rev acc)]
+  | {mut_info = info; mut_begin = start; mut_body = code; mut_end = endc} :: rest ->
        (* Don't keep current mutant, mutate the rest *)
      all_mutants' (Printf.sprintf "%s%s%s" start code endc :: acc) rest
        (* Insert current mutant. Mutate nothing else. *)
-     @ [non_mutants mutant_name (Printf.sprintf "%s %s %s %s %s" start
-                                (end_comment ()) code (begin_comment ()) endc :: acc) rest]
+     @ [non_mutants info (Printf.sprintf "%s %s %s %s %s" start
+                            (end_comment ()) code (begin_comment ()) endc :: acc) rest]
 
 
-let all_mutants muts : (string option * string) list =
+let all_mutants muts : (mutant_info * string) list =
   List.map (fun (opt, ss) -> (opt, String.concat "" ss)) (all_mutants' [] muts)
 
 let rec cartesian (lists : 'a list list) : 'a list list =
@@ -131,43 +131,42 @@ let rec cartesian (lists : 'a list list) : 'a list list =
   | [] -> []
 
 let test_out handle_section input =
-  let rec go = function
-    | Section (startSec, sn, endSec, extends, nodes) as s ->
-       if handle_section sn then
+  let rec go sec =
+       if handle_section sec.sec_name then
          let rec walk_nodes nodes =
            match nodes with
            | [] -> []
            | (Text s) :: rest ->
               s :: (walk_nodes rest)
-           | (Mutants (start, base, muts) :: rest) ->
-              (Printf.sprintf "%s%s%s" start base (String.concat "" (List.map output_mutant muts))) :: walk_nodes rest
-           | (QuickChick (s1,s2,s3)) :: rest ->
-              (Printf.sprintf "%s*) QuickChick %s (*%s" s1 s2 s3) :: walk_nodes rest
+           | (Mutants ms) :: rest ->
+              (Printf.sprintf "%s%s%s" ms.ms_begin ms.ms_base (String.concat "" (List.map output_mutant ms.ms_mutants))) :: walk_nodes rest
+           | (QuickChick qc) :: rest ->
+              (Printf.sprintf "%s*) QuickChick %s (*%s" qc.qc_begin qc.qc_body qc.qc_end) :: walk_nodes rest
          in Printf.sprintf "%s%s%s%s%s"
-                           (if sn = "" || sn.[0] = '_' then "" else startSec)
-                           (if sn = "" || sn.[0] = '_' then "" else sn) (* __default... -> don't print it *)
-                           (if sn = "" || sn.[0] = '_' then "" else endSec)
-                           (output_extends extends)
-                           (String.concat "" (walk_nodes nodes))
-       else output_section s
+                           (if sec.sec_name = "" || sec.sec_name.[0] = '_' then "" else sec.sec_begin)
+                           (if sec.sec_name = "" || sec.sec_name.[0] = '_' then "" else sec.sec_name) (* __default... -> don't print it *)
+                           (if sec.sec_name = "" || sec.sec_name.[0] = '_' then "" else sec.sec_end)
+                           (output_extends sec.sec_extends)
+                           (String.concat "" (walk_nodes sec.sec_nodes))
+       else output_section sec
   in String.concat "" (List.map go input)
 
 (* Combine mutants with base.
    Receives a base mutant, plus a list of (optionally tagged) mutants.
    Produces all mutants, including base. *)
-let combine_mutants (bms : ('a * (string option * 'a) list) list) : (string option * 'a list) list =
+let combine_mutants (bms : ('a * (mutant_info * 'a) list) list) : (mutant_info * 'a list) list =
   let rec combine_aux bms =
     match bms with
-    | [] -> [(None, [])]
+    | [] -> [(default_info, [])]
     | (b,ms)::bms' ->
        (* Construct a non-mutant version of the rest of the possibilities *)
        let non_mutant_rest = List.map fst bms' in
        (* Option 1: Mutate something now. *)
        let mutated_now =
-         List.map (fun (tag, m) -> (tag, m :: non_mutant_rest)) ms in
+         List.map (fun (info, m) -> (info, m :: non_mutant_rest)) ms in
        (* Option 2: Keep base. Mutate later. *)
        let mutated_later =
-         List.map (fun (tag, ms') -> (tag, b :: ms')) (combine_aux bms') in
+         List.map (fun (info, ms') -> (info, b :: ms')) (combine_aux bms') in
        mutated_now @ mutated_later in
   List.rev (combine_aux bms)
 
@@ -183,39 +182,38 @@ let from_Some (o : 'a option) : 'a =
 
 let mutate_outs handle_section input =
   let things_to_check = ref [] in
-  let rec go = function
-    | Section (_, sn, _, _, nodes) ->
-      if handle_section sn then begin
-        debug "Handling section: %s\n" sn;
-        let handle_node = function
+  let rec go (sec : section) =
+      if handle_section sec.sec_name then begin
+        debug "Handling section: %s\n" sec.sec_name;
+        let handle_node (n : node) = 
+          match n with                                                                              
           | Text s -> (s, [])
-          | Mutants (start, base, muts) ->
+          | Mutants ms -> 
             (* To handle a mutant section, extract base + all mutants *)
             let (non_mutated, mutants) =
-              match all_mutants muts with
-              | (None,non_mutated) :: mutants -> (non_mutated, List.rev mutants)
+              match all_mutants ms.ms_mutants with
+              | (_info,non_mutated) :: mutants -> (non_mutated, List.rev mutants)
               | [] -> failwith "Internal quickChickTool error: no base mutant"
-              | _  -> failwith "Internal quickChickTool error: base mutant with mutant tag"
             in
-            (Printf.sprintf "%s%s%s" start base non_mutated,
+            (Printf.sprintf "%s%s%s" ms.ms_begin ms.ms_base non_mutated,
              List.map
-               (fun (opt, s) ->
-                 (opt, Printf.sprintf "%s %s %s %s %s" start
-                           (begin_comment ()) base (end_comment ()) s))
+               (fun (info, s) ->
+                 (info, Printf.sprintf "%s %s %s %s %s" ms.ms_begin
+                           (begin_comment ()) ms.ms_base (end_comment ()) s))
                mutants)
-          | QuickChick (s1,s2,s3) ->
+          | QuickChick qc ->
             (* Test sections only affect the base *)
-            things_to_check := s2 :: !things_to_check;
-            (Printf.sprintf "%s QuickChick %s %s" s1 s2 s3, []) (* Add all tests *)
+            things_to_check := qc.qc_body :: !things_to_check;
+            (Printf.sprintf "%s QuickChick %s %s" qc.qc_begin qc.qc_body qc.qc_end, []) (* Add all tests *)
         in
-        match List.map (fun (tag, ss) -> (tag, String.concat "" ss)) (combine_mutants (List.map handle_node nodes)) with
-        | (None, base) :: mutants -> (base, mutants)
+        match List.map (fun (info, ss) -> (info, String.concat "" ss))
+                (combine_mutants (List.map handle_node sec.sec_nodes)) with
+        | (info, base) :: mutants -> (base, mutants)
         | [] -> failwith "Internal quickChickTool error: no base mutant after combining"
-        | _  -> failwith "Internal quickChickTool error: base mutant with mutant tag after combining"
       end
-      else (String.concat "" (List.map output_node nodes), [])
+      else (String.concat "" (List.map output_node sec.sec_nodes), [])
   in
-  let result = List.map (fun (tag, ss) -> (tag, String.concat "" ss)) (combine_mutants (List.map go input)) in
+  let result = List.map (fun (info, ss) -> (info, String.concat "" ss)) (combine_mutants (List.map go input)) in
   (result, !things_to_check)
 
 module SS = Set.Make(String)
@@ -452,7 +450,11 @@ let rec parse_file_or_dir file_name =
     end
     else if Filename.basename file_name = "Makefile" || Filename.basename file_name = "_CoqProject" then
       let s = load_file file_name in
-      Some (File (file_name, [Section ("(*", "__default__" ^ file_name, "*)", None, [Text s])]))
+      Some (File (file_name, [{ sec_begin = "(*"
+                              ; sec_name  =  "__default__" ^ file_name
+                              ; sec_end   = "*)"
+                              ; sec_extends = None
+                              ; sec_nodes = [Text s] } ]))
     else
       let handle = (Filename.check_suffix file_name "v" ||
                     Filename.check_suffix file_name "ml"||
@@ -477,22 +479,24 @@ let rec parse_file_or_dir file_name =
 
           in List.rev (loop [] [] l) in
 
-        let result = List.map (fun (Section (a,b,c,d,e)) -> Section (a,b,c,d,collapse e)) result in
+        let result = List.map
+                       (fun sec -> {sec with sec_nodes = collapse sec.sec_nodes}) result in
 
         let fix_extends extends =
           Str.split (Str.regexp "[ \r\n\t]") (String.concat "" extends) in
         let result = List.map
-          (fun (Section (a,b,c,exts,e)) ->
-            Section (a,b,c,
-                     (match exts with
-                     | Some (start, names, endc) -> Some (start, fix_extends names, endc)
-                     | None -> None),
-                     e)
+          (fun sec ->
+            {sec with sec_extends =
+               Option.map (fun e -> {e with ext_extends = fix_extends e.ext_extends}) sec.sec_extends}
           ) result in
         let fixed_default =
           match result with
-          | (Section (a,b,c,exts,e) :: ss) ->
-            Section ("(*", "__default__" ^ file_name, "*)", exts, e) :: ss
+          | sec :: ss -> 
+              { sec_begin = "(*"
+              ; sec_name  = "__default__" ^ file_name
+              ; sec_end   = "*)"
+              ; sec_extends = sec.sec_extends
+              ; sec_nodes = sec.sec_nodes } :: ss
           | _ -> failwith "Empty section list?" in
 
         Some (File (file_name, fixed_default))
@@ -529,11 +533,11 @@ let build_sec_graph fs =
   let rec populate_hashtbl_sections (sections : section list) =
     match sections with
     | [] -> ()
-    | Section (_, sn, _, extopt, _) :: rest ->
-      let extends = match extopt with
-        | Some (_, x, _) -> x
+    | sec :: rest -> 
+      let extends = match sec.sec_extends with
+        | Some ext -> ext.ext_extends 
         | None -> [] in
-      Hashtbl.add sec_graph (trim sn) extends;
+      Hashtbl.add sec_graph (trim sec.sec_name) extends;
       populate_hashtbl_sections rest in
 
   let rec populate_hashtbl (fs : section list file_structure) =
@@ -577,30 +581,30 @@ let calc_dir_mutants sec_graph (fs : section list file_structure) =
       begin
       current_filetype := Filename.extension s;
       match mutate_outs (handle_section sec_graph) ss with
-      | (None, base) :: muts, things_to_check ->
+      | (info, base) :: muts, things_to_check ->
         (* Printf.printf "Number of mutants: %d\n" (List.length muts); *)
         all_things_to_check := (List.map (fun x -> (s,x)) things_to_check)
                                @ !all_things_to_check;
         (* debug "Number of tests: %d\n%s\n" (List.length things_to_check) (String.concat "\n" things_to_check); *)
-        (File (s, base), List.map (fun (tag, m) -> (tag, File (s, m))) muts)
+        (File (s, base), List.map (fun (info, m) -> (info, File (s, m))) muts)
       | _ -> failwith "no base mutant"
       end
     | Dir (s, fss) -> begin
       (* Printf.printf "Calc mutants for dir: %s\n" s; flush_all (); *)
       let bmfs = List.map loop fss in
-      let rec all_mutant_fs (bmfs : ('a * (string option * 'a) list) list) =
+      let rec all_mutant_fs (bmfs : ('a * (mutant_info * 'a) list) list) =
         match bmfs with
-        | [] -> [(None, [])]
+        | [] -> [(default_info, [])]
         | (b,mfs)::bmfs' ->
           let non_mutant_rest = List.map fst bmfs' in
           let mutated_now =
-            List.map (fun (tag, mf) -> (tag, mf :: non_mutant_rest)) mfs in
+            List.map (fun (info, mf) -> (info, mf :: non_mutant_rest)) mfs in
           let mutated_later =
-            List.map (fun (tag, mfs') -> (tag, b :: mfs')) (all_mutant_fs bmfs') in
+            List.map (fun (info, mfs') -> (info, b :: mfs')) (all_mutant_fs bmfs') in
           mutated_now @ mutated_later in
       begin match List.rev (all_mutant_fs bmfs) with
-      | (None, base) :: muts ->
-        (Dir (s, base), List.map (fun (tag, m) -> (tag, Dir (s, m))) muts)
+      | (_, base) :: muts ->
+        (Dir (s, base), List.map (fun (info, m) -> (info, Dir (s, m))) muts)
       | [] ->
         failwith "no base dir mutant"
       end
@@ -695,16 +699,16 @@ let main =
       
     (* For each mutant structure *)
     List.iteri
-      (fun i (tag, m) ->
+      (fun i (info, m) ->
         begin
           if !only_mutant = Some (Num i) || !only_mutant = None
-             || (match tag with
+             || (match info.tag with
                  | Some tag -> !only_mutant = Some (Tag (trim tag))
                  | _ -> false) then begin
               Printf.printf "\n";
               let t =
-                match tag with None -> "" | Some s -> ": " ^ s in
-              highlight Header (Printf.sprintf "Testing mutant %d%s" i t);
+                match info.tag with None -> "" | Some s -> ": " ^ s in
+              highlight Header (Printf.sprintf "Testing mutant %d%s. Line number: %d" i t info.line_number);
               ensure_tmpdir_exists();
               (* Entire file structure is copied *)
               output_mut_dir tmp_dir m;
