@@ -708,6 +708,8 @@ let main =
               Printf.printf "\n";
               let t =
                 match info.tag with None -> "" | Some s -> ": " ^ s in
+              (* TODO: The line number info should also include the 
+                 file name! *)
               highlight Header 
                 (Printf.sprintf "Testing mutant %d (line %d)%s" 
                    i info.line_number t);
