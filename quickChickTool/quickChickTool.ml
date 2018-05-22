@@ -708,7 +708,9 @@ let main =
               Printf.printf "\n";
               let t =
                 match info.tag with None -> "" | Some s -> ": " ^ s in
-              highlight Header (Printf.sprintf "Testing mutant %d%s. Line number: %d" i t info.line_number);
+              highlight Header 
+                (Printf.sprintf "Testing mutant %d (line %d)%s" 
+                   i info.line_number t);
               ensure_tmpdir_exists();
               (* Entire file structure is copied *)
               output_mut_dir tmp_dir m;
@@ -716,7 +718,7 @@ let main =
               compile_and_run dir ExpectSomeFailure
           end
         end)
-      (List.rev dir_mutants)  (* TODO: BCP: Added rev -- did it work? *)
+      (List.rev dir_mutants) 
   end;
 
   if !something_failed then begin
