@@ -513,6 +513,7 @@ let rec section_length_of_fs fs =
   | Dir (_, fss) -> List.fold_left (+) 0
     (List.map section_length_of_fs fss)
 
+(* TODO: "trim" is a confusing name for this function! *)
 let trim s =
   match Str.split (Str.regexp "[ \r\n\t]") s with
   | [] -> ""
@@ -617,6 +618,19 @@ let string_of_tag ms =
   | None -> "<no tag>"
   | Some t -> t
   
+(* more efficient version *)
+let starts_with ~prefix b =
+  let len = String.length prefix in
+  len > String.length b |> function
+  | true -> false
+  | false ->
+    let rec f j =
+      if j >= len then true else
+      prefix.[j] = b.[j] &&
+      f (j+1)
+    in
+    f 0
+
 (* BCP: This function is too big! And there's too much duplication. *)
 let main =
 (*   List.iter (fun x -> print_endline x) !excluded;*)
@@ -690,7 +704,7 @@ let main =
     let dir = tmp_dir ^ "/" ^ s in
 
     (* Base mutant *)
-    if not (!nobase) then begin
+    if not (!nobase) && info.tag = None then begin
       highlight Header "Testing base...";
       (* Entire file structure is copied *)
       output_mut_dir tmp_dir base;
@@ -701,13 +715,15 @@ let main =
     List.iteri
       (fun i (info, m) ->
         begin
-          if !only_mutant = Some (Num i) || !only_mutant = None
-             || (match info.tag with
-                 | Some tag -> !only_mutant = Some (Tag (trim tag))
+          if    !only_mutant = Some (Num i) 
+             || !only_mutant = None
+             || (match info.tag, !only_mutant with
+                 | Some fulltag, Some (Tag tag) -> 
+                   starts_with (String.trim tag) (String.trim fulltag)
                  | _ -> false) then begin
               Printf.printf "\n";
               let t =
-                match info.tag with None -> "" | Some s -> ": " ^ s in
+                match info.tag with None -> "" | Some s -> ": " ^ String.trim s in
               (* TODO: The line number info should also include the 
                  file name! *)
               highlight Header 
