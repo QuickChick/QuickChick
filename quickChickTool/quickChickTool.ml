@@ -704,7 +704,7 @@ let main =
     let dir = tmp_dir ^ "/" ^ s in
 
     (* Base mutant *)
-    if not (!nobase) && info.tag = None then begin
+    if not (!nobase) && !only_mutant = None then begin
       highlight Header "Testing base...";
       (* Entire file structure is copied *)
       output_mut_dir tmp_dir base;
