@@ -165,66 +165,16 @@ match res with
                end) c 0
 end.
 
-Fixpoint roseSize (r : Rose Checker.Result) : nat :=
+Fixpoint localMin (st : State) (r : Rose Checker.Result)
+         {struct r} : (nat * Checker.Result) :=
   match r with
-    | MkRose _ ts =>
-      1 + fold_left (fun acc rose => acc + (roseSize rose)) (force ts) 0
-  end.
-
-Lemma roseSizeN (ts : list (Rose Checker.Result)) : forall (n:nat),
-  fold_left (fun acc rose => acc + (roseSize rose)) ts n =
-  n + (fold_left (fun acc rose => acc + (roseSize rose)) ts 0).
-Proof.
-  induction ts; intro n.
-  - simpl. apply plus_n_O.
-  - simpl. rewrite -> plus_O_n. rewrite IHts. rewrite -> (IHts (roseSize a)).
-    rewrite <- Plus.plus_assoc.
-    do 2 rewrite Nat.add_cancel_l. reflexivity.
-Qed.
-
-Lemma auxRose : forall ts res res' ts' t (H : force ts = MkRose res' ts' :: t),
-  (roseSize (MkRose res' ts') < roseSize (MkRose res ts))%coq_nat.
-Proof.
-  intros. simpl. rewrite H. clear. simpl.
-  rewrite -> plus_O_n.
-  rewrite -> roseSizeN with (n:= (1 +
-       fold_left
-         (fun (acc : nat) (rose : Rose Checker.Result) => acc + roseSize rose)
-         (force ts') 0)).
-  rewrite <- Plus.plus_assoc.
-  setoid_rewrite Plus.plus_assoc.
-  rewrite <- Plus.plus_assoc.
-  eapply Plus.plus_lt_compat_l. omega.
-Qed.
-
-Lemma auxRose2 : forall ts res res' ts' t (H : force ts = MkRose res' ts' :: t),
-  (roseSize (MkRose res (lazy t)) < roseSize (MkRose res ts))%coq_nat.
-Proof.
-  intros. simpl. rewrite H. clear. simpl.
-  rewrite -> plus_O_n.
-  rewrite -> roseSizeN with (n:= (1 +
-       fold_left
-         (fun (acc : nat) (rose : Rose Checker.Result) => acc + roseSize rose)
-         (force ts') 0)).
-  rewrite <- Plus.plus_assoc.
-  setoid_rewrite Plus.plus_assoc.
-  rewrite <- Plus.plus_assoc.
-  eapply Plus.plus_lt_compat_l. omega.
-Qed.
-
-Hint Resolve auxRose.
-Hint Resolve auxRose2.
-
-Function localMin (st : State) (r : Rose Checker.Result)
-          {measure roseSize r}
-: (nat * Checker.Result) :=
-  match r with
-    | MkRose res ts =>
-      match (force ts) return (nat * Checker.Result) with
+  | MkRose res ts =>
+    let fix localMin' st ts {struct ts} :=
+        match ts return (nat * Checker.Result) with
         | nil =>
           let zero := callbackPostFinalFailure st res in
           (numSuccessShrinks st + zero, res)
-        | cons (MkRose res' ts') t =>
+        | cons ((MkRose res' _) as r') ts' =>
           let zero := callbackPostTest st res in 
           match ok res' with
             | Some x =>
@@ -235,28 +185,16 @@ Function localMin (st : State) (r : Rose Checker.Result)
                 | _, _ => false
                 end in
               if andb (negb x) consistent_tags then
-                  localMin (updSuccessShrinks st (fun x => x + 1 + zero))
-                           (MkRose res' ts')
+                localMin (updSuccessShrinks st (fun x => x + 1 + zero))
+                         r'
               else
-                localMin (updTryShrinks st (fun x => x + 1)) (MkRose res (lazy t))
+                localMin' (updTryShrinks st (fun x => x + 1)) ts'
             | None =>
-              localMin (updTryShrinks st (fun x => x + 1)) (MkRose res (lazy t))
-         end
-      end
+              localMin' (updTryShrinks st (fun x => x + 1)) ts'
+          end
+        end in
+    localMin' st (force ts)
   end.
-(* Is there a way to apply a tactic to everything after a "Function"? *)
-- intros; eapply auxRose; eassumption.
-- intros; eapply auxRose2; eassumption.
-- intros; eapply auxRose; eassumption.
-- intros; eapply auxRose2; eassumption.
-- intros; eapply auxRose; eassumption.
-- intros; eapply auxRose2; eassumption.
-- intros; eapply auxRose; eassumption.
-- intros; eapply auxRose2; eassumption.
-- intros; eapply auxRose; eassumption.
-- intros; eapply auxRose2; eassumption.
-- intros; eapply auxRose2; eassumption.
-Qed. (* Warning: Cannot define graph(s) for localMin *)
 
 Fixpoint runATest (st : State) (f : nat -> RandomSeed -> QProp) (maxSteps : nat) :=
   if maxSteps is maxSteps'.+1 then
