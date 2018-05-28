@@ -111,7 +111,7 @@ let define c =
    where [$TIME] is the current time in format [HHMMSS]. *)
 let new_ml_file () =
   let tm = Unix.localtime (Unix.time ()) in
-  let ts = Printf.sprintf "%02d%02d%02d" tm.tm_hour tm.tm_min tm.tm_sec in
+  let ts = Printf.sprintf "%02d%02d%02d" tm.Unix.tm_hour tm.Unix.tm_min tm.Unix.tm_sec in
   let temp_dir = Filename.concat temp_dirname ts in
   mkdir_ temp_dir;
   Filename.temp_file ~temp_dir "QuickChick" ".ml"
