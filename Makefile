@@ -56,7 +56,9 @@ tests:
 	cd examples/RedBlack; make clean && make
 	cd examples/stlc; make clean && make
 	$(MAKE) -C examples/multifile-mutation test
-	$(MAKE) -C examples/c-mutation test
+# This takes too long. 
+#	$(MAKE) -C examples/c-mutation test
+	coqc examples/BSTTest.v
 	coqc examples/DependentTest.v
 
 Makefile.coq: _CoqProject

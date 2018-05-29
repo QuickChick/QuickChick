@@ -29,7 +29,7 @@ let rec_method (rec_name : coq_expr) (size : coq_expr) (n : int) (letbinds : unk
 (* For checkers, ignore the opt argument *)
 let rec_bind (opt : bool) (m : coq_expr) (x : string) (f : var -> coq_expr) : coq_expr =
   gMatch m 
-    [ (injectCtr "Some", ["x"] , fun [b] -> f b) 
+    [ (injectCtr "Some", [x] , fun [b] -> f b) 
     ; (injectCtr "None", [], fun _ -> gNone hole ) 
     ]
   
