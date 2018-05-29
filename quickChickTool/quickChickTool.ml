@@ -130,6 +130,7 @@ let rec cartesian (lists : 'a list list) : 'a list list =
   | h::t -> List.concat (List.map (fun l -> (List.map (fun x -> x :: l) h)) (cartesian t))
   | [] -> []
 
+(* DEAD CODE
 let test_out handle_section input =
   let rec go sec =
        if handle_section sec.sec_name then
@@ -150,6 +151,7 @@ let test_out handle_section input =
                            (String.concat "" (walk_nodes sec.sec_nodes))
        else output_section sec
   in String.concat "" (List.map go input)
+*)
 
 (* Combine mutants with base.
    Receives a base mutant, plus a list of (optionally tagged) mutants.
