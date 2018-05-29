@@ -72,18 +72,18 @@ If successful, you should see "success" at the end.
 - `MutateCheckManyWith args c ps`
 
 
-### Other branches
+### Other tags
 
-  - Branch 8.4pl6:
+  - coq 8.4pl6:
     * OCaml 4.01.0 and Coq 8.4pl3 or OCaml 4.02.1 and Coq 8.4pl6
     * SSReflect 1.5 (http://ssr.msr-inria.inria.fr/FTP/)
-  - Branch coq 8.5-*:
+  - coq 8.5-*:
     * Coq 8.5pl2 
     * OCaml 4.03.0
     * mathcomp-ssreflect v1.5 
     + 8.5-legacy contains the old typeclass hierarchy
     + 8.5-automation contains the new one
-  - Branch coq.8.6:
+  - coq 8.6:
     * Coq 8.6
     * OCaml 4.03.0
     * mathcomp-ssreflect-1.6.1

@@ -194,6 +194,11 @@ Definition whenFail {prop : Type} `{Checkable prop}
            (str : string) : prop -> Checker :=
   callback (PostFinalFailure Counterexample (fun _st _sr => trace (str ++ nl) 0)).
 
+Definition whenFail' {prop : Type} `{Checkable prop}
+           (str : unit -> string) : prop -> Checker :=
+  callback (PostFinalFailure Counterexample (fun _st _sr => trace (str tt ++ nl) 0)).
+
+Notation "x 'WHENFAIL' y" := (whenFail' (fun _ => x) y) (at level 55).
 
 Definition expectFailure {prop: Type} `{Checkable prop} (p: prop) :=
   mapTotalResult (fun res => updExpect res false) p.
@@ -253,7 +258,7 @@ Definition forAllShrinkShow {A prop : Type} {_ : Checkable prop}
            (gen : G A) (shrinker : A -> list A) (show' : A -> string) (pf : A -> prop) : Checker :=
   bindGen gen (fun x =>
                  shrinking shrinker x (fun x' =>
-                                         printTestCase (show' x' ++ newline) (pf x'))).
+                                         printTestCase (show' x') (pf x'))).
 
 Global Instance testFun {A prop : Type} `{Show A}
        `{Arbitrary A} `{_ : Checkable prop} : Checkable (A -> prop) :=
