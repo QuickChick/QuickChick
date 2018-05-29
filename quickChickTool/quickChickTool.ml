@@ -467,6 +467,7 @@ let rec parse_file_or_dir file_name =
       if handle then begin
         debug "In file: %s\n" file_name;
         let lexbuf = Lexing.from_channel (open_in file_name) in
+        lexbuf.lex_curr_p <- { lexbuf.lex_curr_p with pos_fname = file_name };
         let result = try program lexer lexbuf
                      with exn -> (Printf.printf "Parse error when reading file: %s\n" file_name; raise exn) in
         let collapse l =
@@ -730,8 +731,8 @@ let main =
               (* TODO: The line number info should also include the 
                  file name! *)
               highlight Header 
-                (Printf.sprintf "Testing mutant %d (line %d)%s" 
-                   i info.line_number t);
+                (Printf.sprintf "Testing mutant %d (%s: line %d)%s" 
+                   i info.file_name info.line_number t);
               ensure_tmpdir_exists();
               (* Entire file structure is copied *)
               output_mut_dir tmp_dir m;

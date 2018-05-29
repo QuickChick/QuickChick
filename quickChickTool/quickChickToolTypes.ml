@@ -1,9 +1,10 @@
 type mutant_info =
-  { line_number : int
+  { file_name   : string
+  ; line_number : int
   ; tag         : string option } 
 
 let default_info =
-  { line_number = -1 ; tag = None }
+  { file_name = "" ; line_number = -1 ; tag = None }
   
 type mutant =
   { mut_info  : mutant_info

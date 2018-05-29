@@ -92,13 +92,15 @@ mutant_tag:           T_StartMutTag code T_EndComment mutant
                     | mutant { $1 }
                                                                
 mutant:               T_StartMutant code T_EndComment { let pos = Parsing.symbol_start_pos () in
-                                                        { mut_info = { line_number = pos.pos_lnum 
+                                                        { mut_info = { file_name = pos.pos_fname
+                                                                     ; line_number = pos.pos_lnum 
                                                                      ; tag = None }
                                                         ; mut_begin = $1 ; mut_body = String.concat "" $2 ; mut_end = $3 } }
                     | T_StartMutants
                         { let pos = Parsing.symbol_start_pos () in
-                          { mut_info = { line_number = pos.pos_lnum 
-                                     ; tag = None }
+                          { mut_info = { file_name   = pos.pos_fname
+                                       ; line_number = pos.pos_lnum 
+                                       ; tag = None }
                           ; mut_begin = "(*" ; mut_body = "" ; mut_end = "*)" } }
 
 sections:             section { [$1] }
