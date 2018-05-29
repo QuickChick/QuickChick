@@ -798,7 +798,7 @@ let smart_paren c = gApp (gInject "QuickChick.Show.smart_paren") [c]
 let gPair (c1, c2) = gApp (gInject "Coq.Init.Datatypes.pair") [c1;c2]
 let gProd (c1, c2) = gApp (gInject "Coq.Init.Datatypes.prod") [c1;c2]
 
-let listToPairAux (f : ('a *'a) -> 'a) (l : 'a list) : 'a =
+let listToPairAux (f : ('a *'b) -> 'a) (l : 'b list) : 'a =
   match l with
   | [] -> qcfail "listToPair called with empty list"
   | c :: cs' ->

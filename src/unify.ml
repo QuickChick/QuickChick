@@ -34,13 +34,14 @@ end
 
 type unknown = Unknown.t
 
-type range = Ctr of constructor * range list | Unknown of unknown | Undef of dep_type | FixedInput
+type range = Ctr of constructor * range list | Unknown of unknown | Undef of dep_type | FixedInput | RangeHole
 
 let rec range_to_string = function
   | Ctr (c, rs) -> constructor_to_string c ^ " " ^ str_lst_to_string " " (List.map range_to_string rs)
   | Unknown u -> Unknown.to_string u
   | Undef dt -> Printf.sprintf "Undef (%s)" (dep_type_to_string dt)
   | FixedInput -> "FixedInput"
+  | RangeHole  -> "_"
 
 module UM = Map.Make(UnknownOrd)
 
@@ -247,6 +248,7 @@ let is_fixed k dt =
     | FixedInput -> true
     | Unknown u' -> aux (umfind u' k)
     | Ctr (_, rs) -> List.for_all aux rs
+    | RangeHole -> true (*TODO *)
   in Option.map aux (convert_to_range dt)
 
 (* convert a range to a coq expression *)
@@ -261,7 +263,8 @@ let rec range_to_coq_expr k r =
      | Unknown u' -> range_to_coq_expr k (Unknown u')
      | Ctr (c, rs) -> gApp (gCtr c) (List.map (range_to_coq_expr k) rs)
      end
-   | _ -> failwith "QC Internal: TopLevel ranges should be Unknowns or Constructors"
+  | RangeHole -> hole
+  | _ -> failwith "QC Internal: TopLevel ranges should be Unknowns or Constructors"
 
 let dt_to_coq_expr k dt = 
   Option.map (range_to_coq_expr k) (convert_to_range dt)
@@ -533,6 +536,7 @@ let handle_branch
     | FixedInput ->
        (* Just call the continuation on the parent. *)
        cont (Unknown parent)
+    | RangeHole -> cont RangeHole
 
   (* Function that operates on multiple top-level ranges at once, mapping the above over a list *)
   and instantiate_toplevel_ranges_cont (rs : range list) (acc : range list)

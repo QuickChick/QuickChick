@@ -335,7 +335,7 @@ let dep_dispatch ind class_name : unit =
          let tmap' = UM.add idu (dtTupleType bind_types) tmap in
          let umap' =
            let pair_ctr = injectCtr "Coq.Init.Datatypes.pair" in
-           let range = listToPairAux (fun (r1, r2) -> Ctr (pair_ctr, [r1; r2])) (List.map (fun u -> Unknown u) binds) in
+           let range = listToPairAux (fun (r1, r2) -> Ctr (pair_ctr, [RangeHole; RangeHole; r1; r2])) (List.map (fun u -> Unknown u) binds) in
            UM.add idu range umap in
          (letbinds, umap', tmap')
          
