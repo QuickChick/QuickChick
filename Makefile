@@ -64,7 +64,7 @@ Makefile.coq: _CoqProject
 
 clean:
 	$Vif [ -e Makefile.coq ]; then $(MAKE) -f Makefile.coq clean; fi
-         # This might not work on macs, but then not my problem
+         # This might not work on macs
 	find . -name '*.vo' -print -delete
 	find . -name '*.glob' -print -delete
 	find . -name *.d -print -delete
@@ -84,3 +84,6 @@ bc:
 	coqwc src/*.v
 	coqwc examples/RedBlack/*.v
 	coqwc ../ifc/*.v
+
+.merlin: Makefile.coq
+	make -f Makefile.coq .merlin
