@@ -372,6 +372,7 @@ let handle_branch
       (type a) (type b) (* I've started to love ocaml again because of this *)
       (dep_type : dep_type)
       (fail_exp : b)
+      (not_enough_fuel_exp : b)
       (ret_exp : coq_expr -> b)
       (instantiate_existential_method : a)
       (instantiate_existential_methodST : int -> coq_expr (* pred *) -> a)
@@ -705,7 +706,7 @@ let handle_branch
        (* Checker *)
 
        let body_cont = recurse_type (ctr_index + 1) dt' in
-       let body_fail = fail_exp in
+       let body_fail = if !is_base then not_enough_fuel_exp else fail_exp in
 
        (* Construct the checker for the current type constructor *)
        let checker args = 

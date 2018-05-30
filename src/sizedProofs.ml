@@ -28,6 +28,8 @@ type atyp = btyp -> btyp
 (* Subterms for iter *)
 let fail_exp = set_empty
 
+let not_enough_fuel_exp = set_empty
+             
 let ret_exp (c : coq_expr) =
   set_singleton c
 
@@ -146,7 +148,7 @@ let sizedEqProofs_body
   let zero_set inputs =
     
     let handle_branch'  =
-      handle_branch dep_type fail_exp ret_exp
+      handle_branch dep_type fail_exp not_enough_fuel_exp ret_exp
         instantiate_existential_method instantiate_existential_methodST bind
         (rec_method rec_name (gInt 0)) bind
         stMaybe check_expr match_inp
@@ -166,7 +168,7 @@ let sizedEqProofs_body
   let succ_set rec_name size inputs =
     let handle_branch'  =
       handle_branch dep_type 
-        fail_exp ret_exp
+        fail_exp not_enough_fuel_exp ret_exp
         instantiate_existential_method instantiate_existential_methodST bind
         (rec_method rec_name size) bind
         stMaybe check_expr match_inp

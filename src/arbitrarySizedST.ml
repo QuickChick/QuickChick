@@ -10,6 +10,9 @@ open Unify
 let fail_exp (dt : coq_expr) =
   returnGen (gApp ~explicit:true (gInject "None") [dt])
 
+let not_enough_fuel_exp (dt : coq_expr) =
+  returnGen (gApp ~explicit:true (gInject "None") [dt])
+  
 let ret_exp (dt : coq_expr) (c : coq_expr) =
   msg_debug (str "Returning...." ++ fnl ());
   debug_coq_expr c;
@@ -101,7 +104,7 @@ let construct_generators
   =
   (* partially applied handle_branch *)
   let handle_branch' =
-    handle_branch dep_type (fail_exp full_gtyp) (ret_exp full_gtyp)
+    handle_branch dep_type (fail_exp full_gtyp) (not_enough_fuel_exp full_gtyp) (ret_exp full_gtyp)
       instantiate_existential_method instantiate_existential_methodST bind
       (rec_method rec_name size) bind
       stMaybe check_expr match_inp gLetIn gLetTupleIn

@@ -7,7 +7,8 @@ open Error
 open Unify
 
 (* arguments to handle_branch *)
-let fail_exp (dt : coq_expr) = gNone dt
+let fail_exp (dt : coq_expr) : coq_expr = gSome dt gFalse
+let not_enough_fuel_exp (dt : coq_expr) : coq_expr = gNone dt                             
 
 let ret_exp (dt : coq_expr) (c : coq_expr) = gSome dt c 
 
@@ -107,7 +108,8 @@ let construct_generators
   msg_debug (str "Beginning checker construction" ++ fnl());
   (* partially applied handle_branch *)
   let handle_branch' : dep_ctr -> coq_expr * bool =
-    handle_branch dep_type (fail_exp full_gtyp) (ret_exp full_gtyp)
+    handle_branch dep_type
+      (fail_exp full_gtyp) (not_enough_fuel_exp full_gtyp) (ret_exp full_gtyp)
       instantiate_existential_method instantiate_existential_methodST exist_bind
       (rec_method rec_name size) rec_bind
       stMaybe check_expr match_inp gLetIn gLetTupleIn
