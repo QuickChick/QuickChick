@@ -8,7 +8,6 @@ Import GenLow GenHigh .
 
 Import ListNotations.
 Import QcDefaultNotation. Open Scope qc_scope.
-Import QcDoNotation.
 
 Set Bullet Behavior "Strict Subproofs".
 
@@ -28,7 +27,6 @@ Derive SizedCorrect for Foo using genSFoo and SizeMonotonicFoo.
 Inductive tree : Type :=
 | Leaf : tree
 | Node : nat -> tree -> tree -> tree.
-
 
 (* Example with two IH *)
 Inductive goodTree : nat -> tree -> Prop :=

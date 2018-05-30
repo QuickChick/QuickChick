@@ -589,6 +589,9 @@ let gFunWithArgs args f_body =
   mkCLambdaN args fun_body
 
 let gFun xss (f_body : var list -> coq_expr) =
+  match xss with
+  | [] -> f_body []
+  | _ ->
   let xvs = List.map (fun x -> fresh_name x) xss in
   (* TODO: optional argument types for xss *)
   let binder_list = List.map (fun x -> CLocalAssum ([CAst.make @@ Name x], Default Explicit, hole)) xvs in
@@ -596,6 +599,9 @@ let gFun xss (f_body : var list -> coq_expr) =
   mkCLambdaN binder_list fun_body 
 
 let gFunTyped xts (f_body : var list -> coq_expr) =
+  match xts with
+  | [] -> f_body []
+  | _ ->
   let xvs = List.map (fun (x,t) -> (fresh_name x,t)) xts in
   (* TODO: optional argument types for xss *)
   let binder_list = List.map (fun (x,t) -> CLocalAssum ([CAst.make @@ Name x], Default Explicit, t)) xvs in

@@ -121,18 +121,16 @@ let sizedEqProofs_body
     List.map (fun _ -> hole) input_ranges
   in
 
+(*
   let make_prop (m : int) (x : coq_expr) (ls : coq_expr list) =
     gApp full_dt (list_insert_nth x ls (m-1))
   in
 
-  (*
   let full_prop gtyp inputs =
     gApp full_dt (list_insert_nth gtyp inputs (n-1))
   in
-   *)
-
-  (* let input_vars = List.map fresh_name input_ranges in *)
-
+ *)
+  
   (* iter construction *)
 
   let zero_set inputs =
@@ -189,7 +187,7 @@ let sizedEqProofs_body
                          (fun [size] -> gApp (gVar rec_name) (gVar size :: List.map gVar input_names)
                          ))
   in
-
+(*
   (* monotonicity proof *)
 
   let fail_exp_mon : coq_expr * coq_expr * coq_expr =
@@ -1060,17 +1058,20 @@ let sizedEqProofs_body
     gFun ["x"]
       (fun [x] -> gConjIntro (leftp x) (rightp x))
   in
+  *)
   (* msg_debug (str "zero"); *)
   (* debug_coq_expr zero_set; *)
   msg_debug (str "iter");
   debug_coq_expr iter_body;
-  msg_debug (str "spec"); 
+(*  msg_debug (str "spec"); 
   debug_coq_expr spec;
   msg_debug (str ("dep type: " ^ (dep_type_to_string dep_type)));
+ *)
   (* msg_debug (str "mon proof"); *)
   (* debug_coq_expr (mon_proof (List.map gVar input_vars)); *)
   (* msg_debug (str "completeness"); *)
   (* debug_coq_expr (gFun ["x"] *)
   (*                   (fun [x] -> rightp x)); *)
 
-  gRecord [("iter", iter_body); ("mon", mon_proof (List.map gVar input_vars)); ("spec", spec)]
+  gRecord [("iter", iter_body); ("mon", hole); ("spec", hole)]
+           (* ("mon", mon_proof (List.map gVar input_vars)); ("spec", spec)] *)

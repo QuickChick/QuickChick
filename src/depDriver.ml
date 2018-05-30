@@ -165,6 +165,11 @@ let derive_dependent (class_name : derivable)
     | DecOpt ->
        gApp (gInject (derivable_to_string class_name))
          [ gApp (full_dt) (List.map gVar input_names) ]
+
+    | SizedProofEqs ->
+       gApp (gInject (derivable_to_string class_name))
+         [full_pred input_names]
+      
 (*      
     | GenSizedSuchThatMonotonicOpt ->
 
@@ -176,7 +181,6 @@ let derive_dependent (class_name : derivable)
                 (*              ((List.map gVar params) @  *)
                 ([gApp ~explicit:true (gInject "arbitrarySizeST")
                   [full_gtyp; full_pred (List.map gVar inputs); hole; gVar size]]))
-    | SizedProofEqs -> gApp (gInject (class_name cn)) [full_pred (List.map (fun n -> gVar (f    resh_name n)) input_names)]
     | GenSizedSuchThatCorrect ->
       let pred = full_pred (List.map (fun n -> gVar (fresh_name n)) input_names) in
       gApp (gInject (class_name cn))
@@ -196,14 +200,16 @@ let derive_dependent (class_name : derivable)
     | DecOpt ->
        checkerSizedST ty_ctr ty_params ctrs dep_type input_names
          input_ranges umap tmap actual_input_args result coqTyCtr
-
+      (*
+   | SizedProofEqs ->
+      (*       sizedEqProofs_body (class_name cn) ty_ctr ty_params ctrs dep_type input_names inputs n register_arbitrary *)
+      SizedProofs.sizedEqProofs_body ty_ctr ty_params ctrs dep_type input_names input_ranges umap tmap actual_input_args result coqTyCtr
+       *)
 (*                              
     | GenSizedSuchThatMonotonicOpt ->
       msg_debug (str "mon type");
       debug_coq_expr (instance_type []);
       genSizedSTMon_body (class_name cn) ty_ctr ty_params ctrs dep_type input_names inputs n register_arbitrary
-    | SizedProofEqs ->
-      sizedEqProofs_body (class_name cn) ty_ctr ty_params ctrs dep_type input_names inputs n register_arbitrary
     | GenSizedSuchThatCorrect ->
       let moninst = (class_name GenSizedSuchThatMonotonicOpt) ^ ctr_name in
       let ginst = (class_name ArbitrarySizedSuchThat) ^ ctr_name in

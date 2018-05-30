@@ -70,6 +70,7 @@ let rec dropIH cty ty_ctr l =
 
 
 let zeroEqProof ty_ctr ctrs (ind_scheme : coq_expr) size zeroType zeroSized iargs =
+  if List.is_empty ctrs then failwith "zeroEqProof call with no ctrs" else ();
   (* Common helpers, refactor? *)
   let coqTyCtr = gTyCtr ty_ctr in
   let coqTyParams = List.map gVar (list_drop_every 2 iargs) in
@@ -316,6 +317,6 @@ let sizeEqType ty_ctr ctrs ind_scheme iargs =
   debug_coq_expr succSized;
   msg_debug (str "zeroSized_spec");
   debug_coq_expr zeroSized_spec;
-  debug_coq_expr succSized_spec;
+  debug_coq_expr succSized_spec;  
   gRecord [("zeroSized", zeroSized); ("succSized", succSized);
            ("zeroSized_spec", zeroSized_spec); ("succSized_spec", succSized_spec)]

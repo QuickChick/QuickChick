@@ -37,4 +37,8 @@ Definition bst_checker_prop :=
               (@decOpt (bst 2 7 t) _ 40 = Some (is_bst 2 7 t))?
             | _ => false
             end).
-QuickChick bst_checker_prop.
+
+(*! QuickChick bst_checker_prop. *)
+
+
+
