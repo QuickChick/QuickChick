@@ -63,10 +63,20 @@ let ret_type_dec (s : var) (left : coq_expr) (right : coq_expr) =
 let check_expr (n : int) (scrut : coq_expr) (left : coq_expr) (right : coq_expr) =
   gMatchReturn scrut
     "s" (* as clause *)
+        (fun v -> ret_type v ret_type_dec)
+      [ (injectCtr "Some", ["res_b" ] , fun [b] ->
+      (* Why as clauses/returns? *)       
+      gMatch (gVar b) 
+        [ (injectCtr "true", [], fun _ -> left)
+        ; (injectCtr "false", [], fun _ -> right)
+        ])
+    ; (injectCtr "None", [], fun _ -> right) 
+    ]
+(*
     (fun v -> ret_type v ret_type_dec)
     [ (injectCtr "left", ["eq" ] , fun _ -> left)
     ; (injectCtr "right", ["neq"], fun _ -> right) 
-    ]
+    ]*)
 
 let match_inp (inp : var) (pat : matcher_pat) (left : coq_expr) (right  : coq_expr) =
   let ret v left right =
@@ -134,11 +144,11 @@ let sizedEqProofs_body
   (* iter construction *)
 
   let zero_set inputs =
+    
     let handle_branch'  =
-      handle_branch dep_type 
-        fail_exp ret_exp
+      handle_branch dep_type fail_exp ret_exp
         instantiate_existential_method instantiate_existential_methodST bind
-        (rec_method (gVar (make_up_name ())) (gVar (make_up_name ()))) bind
+        (rec_method rec_name (gInt 0)) bind
         stMaybe check_expr match_inp
         gLetIn gLetTupleIn
         gen_ctr init_umap init_tmap input_ranges result
@@ -158,7 +168,7 @@ let sizedEqProofs_body
       handle_branch dep_type 
         fail_exp ret_exp
         instantiate_existential_method instantiate_existential_methodST bind
-        (rec_method (gVar (make_up_name ())) (gVar (make_up_name ()))) bind
+        (rec_method rec_name size) bind
         stMaybe check_expr match_inp
         gLetIn gLetTupleIn
         gen_ctr init_umap init_tmap input_ranges result
@@ -175,16 +185,17 @@ let sizedEqProofs_body
       [ (injectCtr "O", [],
          fun _ -> zero_set vars)
       ; (injectCtr "S", ["size'"],
-         fun [size'] -> succ_set rec_name size' vars)
+         fun [size'] -> succ_set rec_name (gVar size') vars)
       ]
   in
 
   let iter_body : coq_expr =
     gRecFunInWithArgs
       "aux_iter" (gArg ~assumName:(gVar (fresh_name "size")) () :: inputs) 
-      (fun (rec_name, size::vars) -> aux_iter rec_name size vars)
+      (fun (rec_name, size::vars) -> aux_iter (gVar rec_name) size vars)
       (fun rec_name -> gFun ["size"] 
-                         (fun [size] -> gApp (gVar rec_name) (gVar size :: List.map gVar input_names)
+                         (fun [size] -> gApp (gVar rec_name)
+                                          (gVar size :: List.map (fun i -> gVar (arg_to_var i)) inputs)
                          ))
   in
 (*

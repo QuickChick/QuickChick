@@ -46,3 +46,4 @@ src/sized.ml
 src/sizeMon.ml
 src/sizeSMon.ml
 src/sizeCorr.ml
+src/sizedProofs.ml

@@ -33,12 +33,46 @@ Proof.
   split; eauto.
 Defined.
 
-(* Typeclass foo *)
+(* Typeclass instances that derive checkable from dependent generators *)
+(* Obvious TODO: Shrink *)
+
+(* Is there another way of getting around the typeclass system? *)
+Axiom ignore_generator_proofs : False.
+Ltac ignore_gen_proofs := exfalso; apply ignore_generator_proofs.
+
 Global Instance testSuchThat {A : Type} {pre : A -> Prop} {prop : A -> Type}
-       `{Show A} `{GenSuchThatCorrect A (fun x => pre x)}
+       `{Show A} `{GenSuchThat A (fun x => pre x)}
        `{forall (x : A), Checkable (prop x)} :
   Checkable (forall x, pre x -> prop x) := 
-  {| checker f := forAllProof (genST (fun x => pre x)) 
+  {| checker f := forAllMaybe (genST (fun x => pre x))
+                              (fun x => checker (f x _)) |}.
+Proof.
+  ignore_gen_proofs.
+Defined.
+
+Global Instance testSuchThat2
+       {A B : Type} {pre : A -> B -> Prop} {prop : A -> B -> Type}
+       `{Show A} `{Show B} 
+       `{GenSuchThat (A * B) (fun x => let (a,b) := x in pre a b)}
+       `{forall (a : A) (b : B), Checkable (prop a b)} :
+  Checkable (forall a b , pre a b -> prop a b) :=
+  {| checker f := forAllMaybe (genST (fun x : A * B => let (a,b) := x in pre a b))
+                              (fun x =>
+                                 let (a,b) := x in
+                                 checker (f a b _)) |}.
+Proof. ignore_gen_proofs. Defined.
+
+
+(*
+Definition t := forall x, x = 17 -> x = 17.
+Instance ct : Checkable t.
+  eapply testSuchThat; eauto.
+  Unshelve.
+  
+  QuickChck t.
+
+  (fun mx => match mx with
+                                    | 
                               (fun mx H => 
                                  (* Leo: Is there a better way to do this? *)
                                  let mx' := mx in 
@@ -164,3 +198,4 @@ Proof.
   *)
 
 
+*)

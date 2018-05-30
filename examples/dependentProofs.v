@@ -16,13 +16,13 @@ Typeclasses eauto := debug.
 Require Import DependentTest.
 
 (* XXX these instances should be present *)
-Existing Instance genSFoo.
-Existing Instance shrFoo.
+Existing Instance GenSizedFoo.
+Existing Instance ShrinkFoo.
 Derive Sized for Foo.
-Derive SizeMonotonic for Foo using genSFoo.
-Derive SizedMonotonic for Foo using genSFoo.
+Derive SizeMonotonic for Foo using GenSizedFoo.
+Derive SizedMonotonic for Foo using GenSizedFoo.
 Derive CanonicalSized for Foo.
-Derive SizedCorrect for Foo using genSFoo and SizeMonotonicFoo.
+Derive SizedCorrect for Foo using GenSizedFoo and SizeMonotonicFoo.
 
 Inductive tree : Type :=
 | Leaf : tree
@@ -36,16 +36,19 @@ Inductive goodTree : nat -> tree -> Prop :=
                       goodTree m t1 ->
                       goodTree (S n) (Node k t1 t2).
 
+(* Derive DecOpt for (goodTree n t). *)
 Instance DecgoodTree (n : nat) (t : tree) : Dec (goodTree n t).
 Admitted.
 
 Instance DecTreeEq (t1 t2 : tree) : Dec (t1 = t2).
-Admitted.
+dec_eq. Defined.
 
 Existing Instance GenOfGenSized.
 Existing Instance genNatSized.
 
 Derive ArbitrarySizedSuchThat for (fun foo => goodTree n foo).
+
+QuickChickDebug Debug On.
 
 Derive SizedProofEqs for (fun foo => goodTree n foo).
 

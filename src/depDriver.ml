@@ -200,11 +200,10 @@ let derive_dependent (class_name : derivable)
     | DecOpt ->
        checkerSizedST ty_ctr ty_params ctrs dep_type input_names
          input_ranges umap tmap actual_input_args result coqTyCtr
-      (*
    | SizedProofEqs ->
       (*       sizedEqProofs_body (class_name cn) ty_ctr ty_params ctrs dep_type input_names inputs n register_arbitrary *)
       SizedProofs.sizedEqProofs_body ty_ctr ty_params ctrs dep_type input_names input_ranges umap tmap actual_input_args result coqTyCtr
-       *)
+
 (*                              
     | GenSizedSuchThatMonotonicOpt ->
       msg_debug (str "mon type");

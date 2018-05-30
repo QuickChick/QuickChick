@@ -235,6 +235,16 @@ Definition forAll {A prop : Type} {_ : Checkable prop} `{Show A}
   bindGen gen (fun x =>
                  printTestCase (show x ++ newline) (pf x)).
 
+Definition forAllMaybe {A prop : Type} {_ : Checkable prop} `{Show A}
+           (gen : G (option A))  (pf : A -> prop) : Checker :=
+  bindGen gen (fun mx =>
+                 match mx with
+                 | Some x => printTestCase (show x ++ newline) (pf x)
+                 | None => checker tt
+                 end
+              ).
+
+
 Definition forAllProof {A prop : Type} {C : Checkable prop} `{S : Show A}
            (gen : G A)  (pf : forall (x : A), semGen gen x -> prop) : Checker :=
   bindGen' gen (fun x H => printTestCase (show x ++ newline) (pf x H)).

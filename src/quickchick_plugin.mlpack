@@ -15,6 +15,7 @@ SizeMon
 SizeCorr
 SimplDriver
 CheckerSizedST
+SizedProofs
 DepDriver
 Driver
 QuickChick
