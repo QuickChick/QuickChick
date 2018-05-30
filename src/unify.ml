@@ -290,8 +290,8 @@ let lookup_checks k m = try Some (CMap.find k m) with Not_found -> None
 (** Takes an equality map and two coq expressions [cleft] and [cright]. [cleft]
     is returned if all of the equalities hold, otherwise [cright] is
     returned. *)
-let handle_equalities eqs (check_expr : coq_expr -> 'a -> 'a -> 'a)
-      (cleft : 'a) (cright : 'a) = 
+let handle_equalities eqs (check_expr : coq_expr -> 'a -> 'a -> 'a -> 'a)
+      (cleft : 'a) (cright : 'a) (cfuel : 'a) = 
   EqSet.fold (fun (u1,u2) c -> 
                let checker =
                  gApp ~explicit:true (gInject "decOpt")
@@ -299,7 +299,7 @@ let handle_equalities eqs (check_expr : coq_expr -> 'a -> 'a -> 'a)
                    ; hole
                    ; gInt 42]
                in
-               check_expr checker c cright
+               check_expr checker c cright cfuel
              ) eqs cleft
 
 type mode = Recursive of (Unknown.t * dep_type) list
@@ -380,7 +380,7 @@ let handle_branch
       (rec_method : int -> unknown list option -> coq_expr list -> a)
       (rec_bind : bool (* opt *) -> a -> string -> (var -> b) -> b)
       (stMaybe : bool (* opt *) -> a -> string -> ((coq_expr -> coq_expr) * int) list -> a)
-      (check_expr : int -> coq_expr -> b -> b -> b)
+      (check_expr : int -> coq_expr -> b -> b -> b -> b)
       (match_inp : var -> matcher_pat -> b -> b -> b)
       (let_in_expr : string -> coq_expr -> (var -> b) -> b)
       (let_tuple_in_expr : var -> var list -> b -> b)
@@ -706,7 +706,7 @@ let handle_branch
        (* Checker *)
 
        let body_cont = recurse_type (ctr_index + 1) dt' in
-       let body_fail = if !is_base then not_enough_fuel_exp else fail_exp in
+       let body_fail = fail_exp in
 
        (* Construct the checker for the current type constructor *)
        let checker args = 
@@ -732,10 +732,10 @@ let handle_branch
        
        if is_pos then
          check_expr ctr_index
-           (checker args) body_cont body_fail
+           (checker args) body_cont body_fail not_enough_fuel_exp
        else
          check_expr ctr_index
-           (checker args) body_fail body_cont
+           (checker args) body_fail body_cont not_enough_fuel_exp
     | NonRecursive all_unknowns ->
 
        msg_debug (str "Mode analysis: NonRecursive/Unknowns." ++ fnl ());
@@ -1040,7 +1040,7 @@ let handle_branch
     let rec walk_matches = function
       | [] ->
          msg_debug (str "Match output complete" ++ fnl ());
-         handle_equalities !eq_set (check_expr (-1)) (recurse_type 0 typ) (fail_exp)
+         handle_equalities !eq_set (check_expr (-1)) (recurse_type 0 typ) (fail_exp) not_enough_fuel_exp
       | (u,m)::ms -> begin
           msg_debug (str (Printf.sprintf "Processing Match: %s @ %s" (Unknown.to_string u) (matcher_pat_to_string m)) ++ fnl ());
           match_inp u m (walk_matches ms) fail_exp

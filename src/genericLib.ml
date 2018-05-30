@@ -867,15 +867,15 @@ let gOption c = gApp (gInject "Coq.Init.Datatypes.option") [c]
 
 (* Boolean *)
 
-let gTrue  = gInject "Coq.Init.Datatypes.true"
-let gFalse = gInject "Coq.Init.Datatypes.false"
+let g_true  = gInject "Coq.Init.Datatypes.true"
+let g_false = gInject "Coq.Init.Datatypes.false"
 
 let gNot c = gApp (gInject "Coq.Init.Datatypes.negb") [c]
 let gBool  = gInject "Coq.Init.Datatypes.bool"           
 
 let decToBool c = 
-  gMatch c [ (injectCtr "Coq.Init.Specif.left" , ["eq" ], fun _ -> gTrue )
-           ; (injectCtr "Coq.Init.Specif.right", ["neq"], fun _ -> gFalse)
+  gMatch c [ (injectCtr "Coq.Init.Specif.left" , ["eq" ], fun _ -> g_true )
+           ; (injectCtr "Coq.Init.Specif.right", ["neq"], fun _ -> g_false)
     ]
 
 (* Unit *)

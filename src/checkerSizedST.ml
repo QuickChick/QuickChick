@@ -7,7 +7,7 @@ open Error
 open Unify
 
 (* arguments to handle_branch *)
-let fail_exp (dt : coq_expr) : coq_expr = gSome dt gFalse
+let fail_exp (dt : coq_expr) : coq_expr = gSome dt g_false
 let not_enough_fuel_exp (dt : coq_expr) : coq_expr = gNone dt                             
 
 let ret_exp (dt : coq_expr) (c : coq_expr) = gSome dt c 
@@ -29,8 +29,13 @@ let rec_method (rec_name : coq_expr) (size : coq_expr) (n : int) (letbinds : unk
 
 (* For checkers, ignore the opt argument *)
 let rec_bind (opt : bool) (m : coq_expr) (x : string) (f : var -> coq_expr) : coq_expr =
-  gMatch m 
-    [ (injectCtr "Some", [x] , fun [b] -> f b) 
+  gMatch m
+    [ (injectCtr "Some", ["res_b" ] , fun [b] ->
+      (* Why as clauses/returns? *)       
+      gMatch (gVar b) 
+        [ (injectCtr "true", [], fun _ -> f b)
+        ; (injectCtr "false", [], fun _ -> fail_exp hole)
+        ])
     ; (injectCtr "None", [], fun _ -> gNone hole ) 
     ]
   
@@ -59,7 +64,7 @@ let ret_type_dec (s : var) (left : coq_expr) (right : coq_expr) =
       [ (injectCtr "left", ["eq"], fun _ -> left)
       ; (injectCtr "right", ["neq"], fun _ -> right) ]
 
-let check_expr (n : int) (scrut : coq_expr) (left : coq_expr) (right : coq_expr) =
+let check_expr (n : int) (scrut : coq_expr) (left : coq_expr) (right : coq_expr) (out_of_fuel : coq_expr) =
   gMatchReturn scrut
     "s" (* as clause *)
     (fun v -> ret_type v ret_type_dec)
@@ -69,7 +74,7 @@ let check_expr (n : int) (scrut : coq_expr) (left : coq_expr) (right : coq_expr)
         [ (injectCtr "true", [], fun _ -> left)
         ; (injectCtr "false", [], fun _ -> right)
         ])
-    ; (injectCtr "None", [], fun _ -> right) 
+    ; (injectCtr "None", [], fun _ -> out_of_fuel) 
     ]
 
 let match_inp (inp : var) (pat : matcher_pat) (left : coq_expr) (right  : coq_expr) =

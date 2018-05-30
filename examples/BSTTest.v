@@ -18,10 +18,9 @@ Inductive bst : nat -> nat -> Tree -> Prop :=
 Derive ArbitrarySizedSuchThat for (fun x => le y x).
 Derive ArbitrarySizedSuchThat for (fun t => bst lo hi t).
 
-QuickChickDebug Debug On.
 Derive DecOpt for (bst lo hi t).
 
-Eval simpl in (@decOpt (bst 0 2 (Node 0 Leaf Leaf)) _ 40).
+Eval simpl in (@decOpt (bst 0 2 (Node 1 Leaf (Node 2 Leaf Leaf))) _ 40).
 
 Fixpoint is_bst (lo hi : nat) (t : Tree) :=
   match t with
