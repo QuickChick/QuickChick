@@ -93,8 +93,11 @@ Definition genAnyTree : G tree := sized genAnyTree_depth.
 (* end genAnyTree *)
 
 Extract Constant defSize => "10".
+
+Definition test_naive :=
+  insert_preserves_redblack_checker genAnyTree.
 (* begin QC_naive *)
-QuickChick (insert_preserves_redblack_checker genAnyTree).
+(*! QuickChick test_naive. *)
 (* end QC_naive *)
 
 (* gathering some size statistics *)
@@ -222,8 +225,10 @@ Definition testInsert :=
   showDiscards (quickCheck (insert_preserves_redblack_checker genRBTree)).
 
 Extract Constant defSize => "10".
+Definition test_smart :=
+  (insert_preserves_redblack_checker genRBTree). 
 (* begin QC_good *)
-QuickChick (insert_preserves_redblack_checker genRBTree).
+(*! QuickChick test_smart. *)
 (* end QC_good *)
 
 (* gathering some size statistics
