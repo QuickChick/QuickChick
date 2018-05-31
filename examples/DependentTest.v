@@ -408,7 +408,9 @@ Inductive goodFooFalse : Foo -> Prop :=
 
 Instance arbFalse : Gen False. Admitted.
 
-Derive ArbitrarySizedSuchThat for (fun foo => goodFooFalse foo).
+Set Warnings "+quickchick-uninstantiated-variables".
+Fail Derive ArbitrarySizedSuchThat for (fun foo => goodFooFalse foo).
+Set Warnings "quickchick-uninstantiated-variables".
 
 Definition addFoo2 (x : Foo) := Foo2 x.
 
