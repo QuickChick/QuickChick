@@ -1,8 +1,6 @@
 open Pp
 open Util
 open GenericLib
-open SetLib
-open CoqLib
 open GenLib
 open Error
    
@@ -18,7 +16,6 @@ let arbitrarySized_body (ty_ctr : ty_ctr) (ctrs : ctr_rep list) iargs =
     | TyCtr (ty_ctr', _) -> ty_ctr = ty_ctr'
     | _ -> false in
   let isBaseBranch ty = fold_ty' (fun b ty' -> b && not (isCurrentTyCtr ty')) true ty in
-  let base_ctrs = List.filter (fun (_, ty) -> isBaseBranch ty) ctrs in
 
   let tyParams = List.map gVar (list_drop_every 2 iargs) in
 
@@ -64,8 +61,6 @@ let shrink_decl ty_ctr ctrs iargs =
   let isCurrentTyCtr = function
     | TyCtr (ty_ctr', _) -> ty_ctr = ty_ctr'
     | _ -> false in
-  let isBaseBranch ty = fold_ty' (fun b ty' -> b && not (isCurrentTyCtr ty')) true ty in
-  let base_ctrs = List.filter (fun (_, ty) -> isBaseBranch ty) ctrs in
 
   let tyParams = List.map gVar (list_drop_every 2 iargs) in
 
@@ -103,10 +98,6 @@ let show_decl ty_ctr ctrs iargs =
   let isCurrentTyCtr = function
     | TyCtr (ty_ctr', _) -> ty_ctr = ty_ctr'
     | _ -> false in
-  let isBaseBranch ty = fold_ty' (fun b ty' -> b && not (isCurrentTyCtr ty')) true ty in
-  let base_ctrs = List.filter (fun (_, ty) -> isBaseBranch ty) ctrs in
-
-  let tyParams = List.map gVar (list_drop_every 2 iargs) in
 
   (* Create the function body by recursing on the structure of x *)
   let show_body x =

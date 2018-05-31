@@ -29,6 +29,7 @@ Fixpoint fmapRose {A B : Type} (f : A -> B) (r : Rose A) : Rose B :=
 Definition bindRose {A B : Type} (m : Rose A) (k : A -> Rose B) : Rose B :=
   joinRose (fmapRose k m).
 
+(*
 (* CH: these seem unused now *)
 Lemma joinRoseFmapRose :
   forall {A B} (f: A -> B) (x : Rose A),
@@ -68,3 +69,4 @@ Proof.
     + by apply fmapRose_id.
     + by do 2 rewrite H2.
 Qed.
+*)

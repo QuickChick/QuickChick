@@ -1,23 +1,8 @@
-open Pp
-open Loc
-open Names
-open Extract_env
-open Tacmach
-open Entries
-open Declarations
-open Declare
-open Libnames
 open Util
-open Constrintern
-open Topconstr
-open Constrexpr
-open Constrexpr_ops
-open Decl_kinds
 open GenericLib
 open SetLib
 open CoqLib
 open SemLib
-open GenLib
 open SizeUtils
    
 let sizeSMon arg iargs  =
@@ -131,8 +116,6 @@ let sizeSMon arg iargs  =
       match bases with
       | [] -> failwith "No base case!"
       | [(ctr, ty)] -> (* Only on base case and at least one inductive *)
-        let (g, gs) = base_gens in
-        let (fg, fgs) = base_gens_with_freq in
         let (ig, igs) = ind_gens s2 in
         let rec proof ctrs =
           match ctrs with

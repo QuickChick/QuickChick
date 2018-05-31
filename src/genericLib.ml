@@ -1,6 +1,7 @@
+open Vernacexpr
 open Decl_kinds
 open Pp
-open Term
+open Constr
 open Names
 open Declarations
 open Libnames
@@ -20,7 +21,7 @@ let debug_environ () =
 let cnt = ref 0 
 
 let fresh_name n : Id.t =
-    let base = Names.id_of_string n in
+    let base = Id.of_string n in
 
   (** [is_visible_name id] returns [true] if [id] is already
       used on the Coq side. *)
@@ -38,7 +39,6 @@ let make_up_name () : Id.t =
   cnt := !cnt + 1;
   id
        
-let dl x = CAst.make x
 let hole = CAst.make @@ CHole (None, Misctypes.IntroAnonymous, None)
 
 let id_of_name n = 
@@ -53,8 +53,8 @@ type coq_expr = constr_expr (* Opaque *)
 let debug_coq_expr (c : coq_expr) : unit =
   msg_debug (pr_constr_expr c)
 
-let debug_constr (c : constr) : unit = 
-  msg_debug (Printer.safe_pr_constr c ++ fnl ())
+let debug_constr env sigma (c : constr) : unit = 
+  msg_debug (Printer.safe_pr_constr_env env sigma c ++ fnl ())
 
 (* Non-dependent version *)
 type var = Id.t (* Opaque *)
@@ -66,8 +66,6 @@ let gVar (x : var) : coq_expr =
 let id_to_reference id = 
   let qualid = qualid_of_string (Id.to_string id) in
   Qualid qualid
-let id_to_coq_expr id = 
-  mkRefC @@ CAst.make @@ id_to_reference id
 
 let qualid_to_reference q = 
   Qualid q
@@ -265,7 +263,7 @@ let parse_type_params arity_ctxt =
     foldM (fun acc decl ->
            match Rel.Declaration.get_name decl with 
            | Name id -> Some (id :: acc)
-           | _ -> msg_error (str "Unnamed type parameter?" ++ fnl ()); None
+           | _ -> CErrors.user_err (str "Unnamed type parameter?" ++ fnl ())
           ) (Some []) arity_ctxt in
   param_names
 (* For /trunk 
@@ -295,7 +293,7 @@ let parse_constructors nparams param_names result_ty oib : ctr_rep list option =
 
     let (_, ty) = Term.decompose_prod_n nparams ty_ctr in
     
-    let ctr_pats = if Term.isConst ty then [] else fst (Term.decompose_prod ty) in
+    let ctr_pats = if isConst ty then [] else fst (Term.decompose_prod ty) in
 
     let _, pat_types = List.split (List.rev ctr_pats) in
 
@@ -308,7 +306,7 @@ let parse_constructors nparams param_names result_ty oib : ctr_rep list option =
           Some (TyCtr (qualid_of_ident oib.mind_typename, []))
         else (* [i + nparams - db]th parameter *)
           try Some (TyParam (List.nth param_names (i + nparams - db - 1)))
-          with _ -> msg_error (str "nth failed: " ++ int (i + nparams - db - 1) ++ fnl ()); None
+          with _ -> CErrors.user_err (str "nth failed: " ++ int (i + nparams - db - 1) ++ fnl ())
       end 
       else if isApp ty then begin
         let (ctr, tms) = decompose_app ty in 
@@ -318,7 +316,7 @@ let parse_constructors nparams param_names result_ty oib : ctr_rep list option =
         begin match aux i ctr with
         | Some (TyCtr (c, _)) -> Some (TyCtr (c, List.rev tms'))
 (*        | Some (TyParam p) -> Some (TyCtr (p, tms')) *)
-        | None -> msg_error (str "Aux failed?" ++ fnl ()); None 
+        | None -> CErrors.user_err (str "Aux failed?" ++ fnl ())
         | _ -> failwith "aux failed to return a TyCtr"
         end 
       end
@@ -331,7 +329,7 @@ let parse_constructors nparams param_names result_ty oib : ctr_rep list option =
         (* TODO: Rethink this for constants? *)
         Some (TyCtr (qualid_of_ident (Label.to_id (Constant.label c)), []))
       end
-      else (msg_error (str "Case Not Handled" ++ fnl()); None)
+      else CErrors.user_err (str "Case Not Handled" ++ fnl())
 
     in sequenceM (fun x -> x) (List.mapi aux (List.map (Vars.lift (-1)) pat_types)) >>= fun types ->
        Some (ctr_id, arrowify result_ty types)
@@ -344,8 +342,7 @@ let parse_constructors nparams param_names result_ty oib : ctr_rep list option =
 (* Convert mutual_inductive_body to this representation, if possible *)
 let dt_rep_from_mib mib = 
   if Array.length mib.mind_packets > 1 then begin
-    msg_error (str "Mutual inductive types not supported yet." ++ fnl());
-    None
+    CErrors.user_err (str "Mutual inductive types not supported yet." ++ fnl())
   end else 
     let oib = mib.mind_packets.(0) in
     let ty_ctr = oib.mind_typename in 
@@ -375,8 +372,6 @@ let coerce_reference_to_dt_rep c =
   dt_rep_from_mib mib
 
 (* Dependent derivations - lots of code reuse *)
-
-let dummy_dep_type = DTyCtr (injectCtr "Prop", [])
 
 (* Input : arity_ctxt [Name, Body (option) {expected None}, Type] 
    In reverse order.
@@ -409,7 +404,10 @@ let rec dep_arrowify terminal names types =
  *)
 let parse_dependent_type i nparams ty oib arg_names = 
   let rec aux i ty =
-    msg_debug (str "Calling aux with: " ++ int i ++ str " " ++ Printer.pr_constr ty ++ fnl()); 
+    let env = Global.env () in
+    let sigma = Evd.from_env env in
+    msg_debug (str "Calling aux with: " ++ int i ++ str " "
+               ++ Printer.pr_constr_env env sigma ty ++ fnl()); 
     if isRel ty then begin 
   (*        msgerr (int (i + nparams) ++ str " Rel " ++ int (destRel ty) ++ fnl ()); *)
       let db = destRel ty in
@@ -418,7 +416,7 @@ let parse_dependent_type i nparams ty oib arg_names =
       else begin (* [i + nparams - db]th parameter *) 
         msg_debug (str (Printf.sprintf "Non-self-rel: %s" (dep_type_to_string (List.nth arg_names (i + nparams - db - 1)))) ++ fnl ());
         try Some (List.nth arg_names (i + nparams - db - 1))
-        with _ -> msg_error (str "nth failed: " ++ int i ++ str " " ++ int nparams ++ str " " ++ int db ++ str " " ++ int (i + nparams - db - 1) ++ fnl ()); None
+        with _ -> CErrors.user_err (str "nth failed: " ++ int i ++ str " " ++ int nparams ++ str " " ++ int db ++ str " " ++ int (i + nparams - db - 1) ++ fnl ())
         end
     end 
     else if isApp ty then begin
@@ -436,8 +434,8 @@ let parse_dependent_type i nparams ty oib arg_names =
            | [c] -> Some (DNot c)
            | _   -> failwith "Not a valid negation"
          else Some (DApp (DTyVar x, List.rev tms'))
-      | Some wat -> msg_error (str ("WAT: " ^ dep_type_to_string wat) ++ fnl ()); None 
-      | None -> msg_error (str "Aux failed?" ++ fnl ()); None
+      | Some wat -> CErrors.user_err (str ("WAT: " ^ dep_type_to_string wat) ++ fnl ())
+      | None -> CErrors.user_err (str "Aux failed?" ++ fnl ())
     end
     else if isInd ty then begin
       let ((mind,_),_) = destInd ty in
@@ -478,9 +476,11 @@ let parse_dependent_type i nparams ty oib arg_names =
       let (x,_) = destConst ty in 
       Some (DTyVar (Label.to_id (Constant.label x)))
     end
-    else (msg_error (str "Dep Case Not Handled" ++ fnl()); 
-          debug_constr ty;
-          None) in
+    else (
+      let env = Global.env() in
+      let sigma = Evd.from_env env in
+      CErrors.user_err (str "Dep Case Not Handled: " ++ Printer.pr_constr_env env sigma ty ++ fnl())
+    ) in
   aux i ty
 
 let dep_parse_type nparams param_names arity_ctxt oib =
@@ -490,7 +490,9 @@ let dep_parse_type nparams param_names arity_ctxt oib =
   foldM (fun acc (i, decl) -> 
            let n = Rel.Declaration.get_name decl in
            let t = Rel.Declaration.get_type decl in
-           debug_constr t;
+           let env = Global.env () in
+           let sigma = Evd.from_env env in
+           debug_constr env sigma t;
            match n with
            | Name id -> (* Check if it is a parameter to add its type / name *)
               if is_Type t then Some acc 
@@ -513,7 +515,7 @@ let dep_parse_constructors nparams param_names oib : dep_ctr list option =
 
     let (_, ty) = Term.decompose_prod_n nparams ty_ctr in
     
-    let (ctr_pats, result) = if Term.isConst ty then ([],ty) else Term.decompose_prod ty in
+    let (ctr_pats, result) = if isConst ty then ([],ty) else Term.decompose_prod ty in
 
     let pat_names, pat_types = List.split (List.rev ctr_pats) in
 
@@ -538,8 +540,7 @@ let dep_parse_constructors nparams param_names oib : dep_ctr list option =
 
 let dep_dt_from_mib mib = 
   if Array.length mib.mind_packets > 1 then begin
-    msg_error (str "Mutual inductive types not supported yet." ++ fnl());
-    None
+    CErrors.user_err (str "Mutual inductive types not supported yet." ++ fnl())
   end else 
     let oib = mib.mind_packets.(0) in
     let ty_ctr = oib.mind_typename in 
@@ -672,10 +673,10 @@ let gMatchReturn (discr : coq_expr)
 
 
 let gRecord names_and_bodies =
-  CAst.make @@ CRecord (List.map (fun (n,b) -> (CAst.make @@ id_to_reference @@ id_of_string n, b)) names_and_bodies)
+  CAst.make @@ CRecord (List.map (fun (n,b) -> (CAst.make @@ id_to_reference @@ Id.of_string n, b)) names_and_bodies)
 
 let gAnnot (p : coq_expr) (tau : coq_expr) =
-  CAst.make @@ CCast (p, CastConv tau)
+  CAst.make @@ CCast (p, Misctypes.CastConv tau)
 
 (* Convert types back into coq *)
 let gType ty_params dep_type = 
@@ -917,17 +918,15 @@ let fold_ty_vars (f : var list -> var -> coq_type -> 'a) (mappend : 'a -> 'a -> 
   fun allVars -> fold_ty' (fun acc ty -> fun (v::vs) -> mappend (f allVars v ty) (acc vs)) (fun _ -> base) ty allVars
 
 (* Declarations *)
-
+(* LEO : There used to be defineConstant stuff here. WHY? *)
+(*
 let defineTypedConstant s c typ =
   let id = fresh_name s in
   (* TODO: DoDischarge or NoDischarge? *)
-  Vernacentries.interp (CAst.make @@ Vernacexpr.VernacExpr ([], Vernacexpr.VernacDefinition ((NoDischarge, Definition), (CAst.make @@ Name id, None), DefineBody ([], None, c, Some typ))));
-  id 
-
-let defineConstant s c =
-  let id = fresh_name s in 
-  Vernacentries.interp (CAst.make @@ Vernacexpr.VernacExpr ([], Vernacexpr.VernacDefinition ((NoDischarge, Definition), (CAst.make @@ Name id, None), DefineBody ([], None, c, None))));
-  id 
+   let v = Constrintern.interp_constr (Global.env())
+      (Evd.from_env (Global.env())) e in
+  (* Borrowed from CIW tutorial *)
+ *)
                           
 (* Declare an instance *)
 let create_names_for_anon a =
@@ -951,7 +950,7 @@ let declare_class_instance ?(global=true) ?(priority=42) instance_arguments inst
   let cid = Classes.new_instance ~global:global false
               ~program_mode:false (* TODO: true or false? *)
                                iargs
-                       ((CAst.make @@ Name (id_of_string instance_name), None)
+                       ((CAst.make @@ Name (Id.of_string instance_name), None)
                        , Decl_kinds.Explicit, instance_type_vars)
                        (Some (true, instance_record_vars)) (* TODO: true or false? *)
                        { hint_priority = Some priority; hint_pattern = None }

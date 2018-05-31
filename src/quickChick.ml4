@@ -142,7 +142,8 @@ let define_and_run c =
   (* Before compiling, remove stupid cyclic dependencies like "type int = int".
      TODO: Generalize (.) \g1\b or something *)
   let perl_cmd = "perl -i -p0e 's/type int =\\s*int/type tmptmptmp = int\\ntype int = tmptmptmp/sg' " ^ mlf in
-  if Sys.command perl_cmd <> 0 then msg_error (str ("perl script hack failed. Report: " ^ perl_cmd)  ++ fnl ());
+  if Sys.command perl_cmd <> 0 then
+    CErrors.user_err (str ("perl script hack failed. Report: " ^ perl_cmd)  ++ fnl ());
   (** Compile the extracted code *)
   (** Extraction sometimes produces ML code that does not implement its interface.
       We circumvent this problem by erasing the interface. **)
@@ -156,9 +157,9 @@ let define_and_run c =
   flush_all ();
   *)
   (* Compile the (empty) .mli *)
-  if Sys.command (comp_mli_cmd mlif) <> 0 then msg_error (str "Could not compile mli file" ++ fnl ());
+  if Sys.command (comp_mli_cmd mlif) <> 0 then CErrors.user_err (str "Could not compile mli file" ++ fnl ());
   if Sys.command (comp_ml_cmd mlf execn) <> 0 then
-    (msg_error (str "Could not compile test program" ++ fnl ()); None)
+    (CErrors.user_err (str "Could not compile test program" ++ fnl ()); None)
 
   (** Run the test *)
   else
@@ -177,11 +178,11 @@ let define_and_run c =
          | Unix.WEXITED 0 ->
             ()
          | Unix.WEXITED i ->
-            msg_error (str (Printf.sprintf "Exited with status %d" i) ++ fnl ())
+            CErrors.user_err (str (Printf.sprintf "Exited with status %d" i) ++ fnl ())
          | Unix.WSIGNALED i ->
-            msg_error (str (Printf.sprintf "Killed (%d)" i) ++ fnl ())
+            CErrors.user_err (str (Printf.sprintf "Killed (%d)" i) ++ fnl ())
          | Unix.WSTOPPED i ->
-            msg_error (str (Printf.sprintf "Stopped (%d)" i) ++ fnl ())
+            CErrors.user_err (str (Printf.sprintf "Stopped (%d)" i) ++ fnl ())
          end;
          let output = String.concat "\n" (List.rev !builder) in
          Some output
@@ -190,7 +191,7 @@ let define_and_run c =
     (** If we want to print the time spent in tests *)
 (*    let execn = "time " ^ execn in *)
     if Sys.command execn <> 0 then
-      msg_error (str "Could not run test" ++ fnl ())
+      CErrors.user_err (str "Could not run test" ++ fnl ())
  *)
 
 (* TODO: clean leftover files *)
@@ -225,8 +226,8 @@ let set_debug_flag (flag_name : string) (mode : string) =
   let reference =
     match flag_name with
     | "Debug" -> flag_debug
-    | "Warn"  -> flag_warn
-    | "Error" -> flag_error
+(*    | "Warn"  -> flag_warn
+    | "Error" -> flag_error *)
   in
   reference := toggle 
 (*  Libobject.declare_object

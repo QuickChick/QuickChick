@@ -50,7 +50,8 @@ type umap = range UM.t
 
 let umfind k m = 
   try UM.find k m 
-  with Not_found -> (msg_error (str (Printf.sprintf "Can't find: %s" (Unknown.to_string k)) ++ fnl()); failwith "Not found")
+  with Not_found ->
+    CErrors.user_err (str (Printf.sprintf "Can't find: %s" (Unknown.to_string k)) ++ fnl())
 
 let lookup (k : unknown) (m : umap) = try Some (UM.find k m) with Not_found -> None
 
@@ -428,8 +429,6 @@ let handle_branch
       | _ -> ()
   in
   register_unknowns typ;
-  
-  let arb = mk_name_provider "arb" in
 
   msg_debug (str "Debug branch" ++ fnl ());
   msg_debug (str ("Calculating ranges: " ^ dep_type_to_string (dep_result_type typ)) ++ fnl ());
@@ -777,6 +776,7 @@ let handle_branch
          | _ -> Some (List.map fst all_unknowns)
        in 
 
+       (* LEO: LOOK AT THIS *)
        let args = List.map (range_to_coq_expr !umap) ranges in
 
        let pred_result = gApp ~explicit:true (gTyCtr c) (List.map (range_to_coq_expr !umap) ranges) in

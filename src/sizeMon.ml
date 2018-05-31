@@ -1,23 +1,7 @@
-open Pp
-open Loc
-open Names
-open Extract_env
-open Tacmach
-open Entries
-open Declarations
-open Declare
-open Libnames
 open Util
-open Constrintern
-open Topconstr
-open Constrexpr
-open Constrexpr_ops
-open Decl_kinds
 open GenericLib
-open SetLib
 open SemLib
 open CoqLib
-open GenLib
 open SizeUtils
 
 let sizeMon arg size iargs genName =

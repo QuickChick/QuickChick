@@ -105,7 +105,7 @@ let derive_dependent (class_name : derivable)
     match letbinds with
     | None -> 
        gFun [Unknown.to_string result]
-         (fun [result_var] -> gApp (full_dt) (List.map gVar inputs))
+         (fun _ -> gApp (full_dt) (List.map gVar inputs))
     | Some letbinds ->
        gFun [Unknown.to_string result]
          (fun [result_var] ->
