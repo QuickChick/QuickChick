@@ -6,6 +6,10 @@ all: Makefile.coq
 
 clean: Makefile.coq
 	$(MAKE) -f Makefile.coq clean
+	rm Makefile.coq
 
-Makefile.coq: Make
-	coq_makefile -f Make -o Makefile.coq
+Makefile.coq: _CoqProject
+	coq_makefile -f _CoqProject -o Makefile.coq
+
+test: clean
+	time quickChick -color -top "QuickChick.RedBlack"

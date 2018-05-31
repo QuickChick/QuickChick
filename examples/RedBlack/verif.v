@@ -3,7 +3,6 @@ Require Import List String Omega.
 From QuickChick Require Import QuickChick.
 Import GenLow GenHigh.
 
-Add LoadPath "./" as QuickChick.RedBlack.
 From QuickChick.RedBlack Require Import redblack testing.
 
 (* correspondence between the inductive and the executable definitions *)

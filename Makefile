@@ -53,7 +53,7 @@ $(QCTOOL_EXE): $(QCTOOL_SRC)
 
 tests:
 	cd examples/ifc-basic; make clean && make
-	cd examples/RedBlack; make clean && make
+	$(MAKE) -C examples/RedBlack test
 	cd examples/stlc; make clean && make
 	$(MAKE) -C examples/multifile-mutation test
 	$(MAKE) -C examples/c-mutation test
