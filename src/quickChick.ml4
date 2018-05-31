@@ -81,7 +81,7 @@ let comp_mli_cmd fn =
 
 
 let fresh_name n =
-    let base = Names.id_of_string n in
+    let base = Id.of_string n in
 
   (** [is_visible_name id] returns [true] if [id] is already
       used on the Coq side. *)
@@ -99,7 +99,7 @@ let define c =
   let env = Global.env () in
   let evd = Evd.from_env env in
   let (evd,_) = Typing.type_of env evd c in
-  let uctxt = Evd.evar_context_universe_context (Evd.evar_universe_context evd) in
+  let uctxt = UState.context (Evd.evar_universe_context evd) in
   let fn = fresh_name "quickchick" in
   (* TODO: Maxime - which of the new internal flags should be used here? The names aren't as clear :) *)
   ignore (declare_constant ~internal:InternalTacticRequest fn
@@ -131,7 +131,7 @@ let define_and_run c =
   let oc = open_out_gen [Open_append;Open_text] 0o666 mlf in
   let for_output =
     "\nlet _ = print_string (\n" ^
-    "let l = (" ^ (string_of_id main) ^ ") in\n"^
+    "let l = (" ^ (Id.to_string main) ^ ") in\n"^
     "let s = Bytes.create (List.length l) in\n" ^
     "let rec copy i = function\n" ^
     "| [] -> s\n" ^

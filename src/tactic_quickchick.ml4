@@ -9,7 +9,6 @@ open Constrexpr_ops
 
 let quickchick_goal =
   Proofview.Goal.enter begin fun gl ->
-    let gl = Proofview.Goal.assume gl in
 
     (* Convert goal to a constr_expr *)
     let c = Proofview.Goal.concl gl in

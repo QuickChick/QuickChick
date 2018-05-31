@@ -12,12 +12,6 @@ open Ppconstr
 open Context
 open Error
 
-let debug_environ () =
-  let env = Global.env () in
-  let preEnv = Environ.pre_env env in
-  let minds = preEnv.Pre_env.env_globals.Pre_env.env_inductives in
-  Mindmap_env.iter (fun k _ -> msg_debug (str (MutInd.debug_to_string k) ++ fnl())) minds
-
 let cnt = ref 0 
 
 let fresh_name n : Id.t =
@@ -635,7 +629,7 @@ let gLetTupleIn (x : var) (xs : var list) (body : coq_expr) =
   CAst.make @@ CLetTuple (List.map (fun x -> CAst.make @@ Names.Name x) xs, (None, None), gVar x, body)
   
 let gMatch discr ?catchAll:(body=None) (branches : (constructor * string list * (var list -> coq_expr)) list) : coq_expr =
-  CAst.make @@ CCases (Term.RegularStyle,
+  CAst.make @@ CCases (RegularStyle,
           None (* return *), 
           [(discr, None, None)], (* single discriminee, no as/in *)
           (List.map (fun (c, cs, bf) -> 
@@ -656,7 +650,7 @@ let gMatchReturn (discr : coq_expr)
       (ret : var -> coq_expr)
       (branches : (constructor * string list * (var list -> coq_expr)) list) : coq_expr =
   let as_id' = fresh_name as_id in
-  CAst.make @@ CCases (Term.RegularStyle,
+  CAst.make @@ CCases (RegularStyle,
           Some (ret as_id'), (* return *)
           [(discr, Some (CAst.make (Name as_id')), None)], (* single discriminee, no in *)
           (List.map (fun (c, cs, bf) -> 
@@ -741,7 +735,7 @@ let construct_match c ?catch_all:(mdef=None) alts =
                    Some (List.map (fun m -> aux m) ms),
                    []) 
                         end 
-  in CAst.make @@ CCases (Term.RegularStyle,
+  in CAst.make @@ CCases (RegularStyle,
              None (* return *), 
               [ (c, None, None)], (* single discriminee, no as/in *)
               List.map (fun (m, body) -> CAst.make @@ ([[aux m]], body)) alts
@@ -773,7 +767,7 @@ let construct_match_with_return c ?catch_all:(mdef=None) (as_id : string) (ret :
     match mdef with 
     | Some body -> [CAst.make ([[CAst.make @@ CPatAtom None]], body)]
     | _ -> [] in
-  CAst.make @@ CCases (Term.RegularStyle,
+  CAst.make @@ CCases (RegularStyle,
              Some (ret as_id') (* return *), 
              [ (c, Some (CAst.make @@ Name as_id'), None)], (* single discriminee, no as/in *)
              main_opts @ default

@@ -9,7 +9,7 @@ clean: Makefile.coq
 	rm Makefile.coq
 
 Makefile.coq: _CoqProject
-	coq_makefile -f _CoqProject -o Makefile.coq
+	$(COQBIN)coq_makefile -f _CoqProject -o Makefile.coq
 
 test: clean
 	time quickChick -color -top "QuickChick.RedBlack"

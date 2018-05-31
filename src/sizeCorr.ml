@@ -9,7 +9,6 @@ open Declare
 open Libnames
 open Util
 open Constrintern
-open Topconstr
 open Constrexpr
 open Constrexpr_ops
 open Decl_kinds

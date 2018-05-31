@@ -2,8 +2,6 @@ open Names
 open Declarations
 open Constrexpr
 
-val debug_environ : unit -> unit 
-
 type coq_expr
 
 val hole : coq_expr
