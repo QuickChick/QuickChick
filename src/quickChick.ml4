@@ -212,23 +212,24 @@ let run f args =
   let c = CAst.make @@ CApp((None,f), args) in
   ignore (runTest c)
 
-let set_debug_flag (flag_name : string) : (string * string) -> Libobject.obj =
-  let toggle s=
-    match s with
+let set_debug_flag (flag_name : string) (mode : string) =
+  let toggle =
+    match mode with
     | "On"  -> true
     | "Off" -> false
   in
-  let reference s =
-    match s with
+  let reference =
+    match flag_name with
     | "Debug" -> flag_debug
     | "Warn"  -> flag_warn
     | "Error" -> flag_error
   in
-  Libobject.declare_object
+  reference := toggle 
+(*  Libobject.declare_object
     {(Libobject.default_object ("QC_debug_flag: " ^ flag_name)) with
        cache_function = (fun (_,(flag_name, mode)) -> reference flag_name := toggle mode);
        load_function = (fun _ (_,(flag_name, mode)) -> reference flag_name := toggle mode)}
-
+ *)
 	  (*
 let run_with f args p =
   let c = CApp(dummy_loc, (None,f), [(args,None);(p,None)]) in
@@ -269,7 +270,7 @@ VERNAC COMMAND EXTEND QuickChickDebug CLASSIFIED AS SIDEFF
   | ["QuickChickDebug" ident(s1) ident(s2)] ->
      [ let s1' = Id.to_string s1 in
        let s2' = Id.to_string s2 in
-       Lib.add_anonymous_leaf (set_debug_flag s1' (s1',s2')) ]
+       set_debug_flag s1' s2' ]
 END;;
 
 VERNAC COMMAND EXTEND Sample CLASSIFIED AS SIDEFF

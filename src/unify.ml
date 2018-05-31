@@ -367,7 +367,17 @@ let mode_analysis init_ctr curr_ctr (init_ranges : range list) (init_map : range
 let isTyParam = function
   | DTyParam _ -> true
   | _ -> false 
-  
+
+let warn_uninstantiated_variables =
+  CWarnings.create ~name:"quickchick-uninstantiated-variables"
+    ~category:"quickchick"
+    ~default:CWarnings.Enabled
+    (fun allUnknowns ->
+      str "After proccessing all constraints, there are still uninstantiated variables: "
+      ++ prlist_with_sep (fun _ -> strbrk " , ") str (List.map var_to_string allUnknowns)
+      ++ str ". Proceeding with caution..."
+      ++ fnl ())
+       
 let handle_branch
       (type a) (type b) (* I've started to love ocaml again because of this *)
       (dep_type : dep_type)
@@ -1024,9 +1034,8 @@ let handle_branch
          | [] ->
             msg_debug (str "Final ret_exp call" ++ fnl ());
             ret_exp (range_to_coq_expr !umap res_range)
-         | us -> begin 
-             msg_warning (str ("After proccessing all constraints, there are still uninstantiated variables: " ^ 
-                                 String.concat " , " (List.map var_to_string allUnknowns) ^ ". Proceeding with caution...") ++ fnl ());
+         | us -> begin
+             warn_uninstantiated_variables allUnknowns;
              instantiate_toplevel_ranges_cont (List.map (fun u -> Unknown u) us) []
                (fun _unused_ranges ->
                  ret_exp (range_to_coq_expr !umap res_range)
