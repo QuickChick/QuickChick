@@ -52,13 +52,13 @@ $(QCTOOL_EXE): $(QCTOOL_SRC)
 	ocamlbuild -use-ocamlfind -pkg coq.lib -cflags -rectypes -tag thread $(QCTOOL_DIR)/$(QCTOOL_EXE)
 
 tests:
-	cd examples/ifc-basic; make clean && make
+#	$(MAKE) -C examples/ifc-basic test
 	$(MAKE) -C examples/RedBlack test
-	cd examples/stlc; make clean && make
+#	cd examples/stlc; make clean && make
 	$(MAKE) -C examples/multifile-mutation test
 # This takes too long. 
 #	$(MAKE) -C examples/c-mutation test
-	coqc examples/BSTTest.v
+#	coqc examples/BSTTest.v
 	coqc examples/DependentTest.v
 
 Makefile.coq: _CoqProject
