@@ -297,7 +297,6 @@ Class Gen (A : Type) := { arbitrary : G A }.
 
 (** Given an instance of [GenSized], we can convert it to [Gen] automatically,
     using [sized] function. *)
-Parameter sized : forall {A: Type}, (nat -> G A) -> G A.
 Declare Instance GenOfGenSized {A} `{GenSized A} : Gen A.
 
 (** Here are some basic instances for generators: *)
