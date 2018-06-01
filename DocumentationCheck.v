@@ -18,6 +18,7 @@ Module ConsistencyCheck : QuickChickSig.
   Definition bindGen := @bindGen.
   Definition bindGen' := @bindGen'.
   Definition bindGenOpt := @bindGenOpt.
+  Definition GMonad := @GMonad.
   Definition liftGen := @liftGen.
   Definition liftGen2 := @liftGen2.
   Definition liftGen3 := @liftGen3.
@@ -37,9 +38,27 @@ Module ConsistencyCheck : QuickChickSig.
   Definition suchThatMaybe := @suchThatMaybe.
   Definition suchThatMaybeOpt := @suchThatMaybeOpt.
 
+  Class OrdType (A: Type) :=
+    {
+      leq     : A -> A -> bool;
+      refl    : reflexive leq;
+      trans   : transitive leq;
+      antisym : antisymmetric leq
+    }.
+
   Definition OrdBool := OrdBool.
   Definition OrdNat := OrdNat.
   Definition OrdZ := OrdZ.
+
+  Class ChoosableFromInterval (A : Type)  :=
+  {
+    super :> OrdType A;
+    randomR : A * A -> RandomSeed -> A * RandomSeed;
+    randomRCorrect :
+      forall (a a1 a2 : A), leq a1 a2 ->
+      (leq a1 a && leq a a2 <->
+       exists seed, fst (randomR (a1, a2) seed) = a)
+  }.
 
   Definition ChooseBool := ChooseBool.
   Definition ChooseNat := ChooseNat.
@@ -50,27 +69,27 @@ Module ConsistencyCheck : QuickChickSig.
   Module QcDefaultNotation.
 (*
     (** 'elems' as a shorthand for elements without a default argument *)
-    Notation " 'elems' [ x ] " := 
+    Notation " 'elems' [ x ] " :=
       (elements x (cons x nil)) : qc_scope.
-    Notation " 'elems' [ x ; y ] " := 
+    Notation " 'elems' [ x ; y ] " :=
       (elements x (cons x (cons y nil))) : qc_scope.
     Notation " 'elems' [ x ; y ; .. ; z ] " :=
       (elements x (cons x (cons y .. (cons z nil) ..))) : qc_scope.
     Notation " 'elems' ( x ;; l ) " :=
       (elements x (cons x l)) (at level 1, no associativity) : qc_scope.
-     
+
     (** 'oneOf' as a shorthand for oneof without a default argument *)
-    Notation " 'oneOf' [ x ] " := 
+    Notation " 'oneOf' [ x ] " :=
       (oneof x (cons x nil)) : qc_scope.
-    Notation " 'oneOf' [ x ; y ] " := 
+    Notation " 'oneOf' [ x ; y ] " :=
       (oneof x (cons x (cons y nil))) : qc_scope.
     Notation " 'oneOf' [ x ; y ; .. ; z ] " :=
       (oneof x (cons x (cons y .. (cons z nil) ..))) : qc_scope.
     Notation " 'oneOf' ( x ;; l ) " :=
       (oneof x (cons x l))  (at level 1, no associativity) : qc_scope.
-     
+
     (** 'freq' as a shorthund for frequency without a default argument *)
-    Notation " 'freq' [ x ] " := 
+    Notation " 'freq' [ x ] " :=
       (frequency x (cons x nil)) : qc_scope.
     Notation " 'freq' [ ( n , x ) ; y ] " :=
       (frequency x (cons (n, x) (cons y nil))) : qc_scope.
@@ -78,12 +97,12 @@ Module ConsistencyCheck : QuickChickSig.
       (frequency x (cons (n, x) (cons y .. (cons z nil) ..))) : qc_scope.
     Notation " 'freq' ( ( n , x ) ;; l ) " :=
       (frequency x (cons (n, x) l)) (at level 1, no associativity) : qc_scope.
-  *) 
+  *)
   End QcDefaultNotation.
-  
+
   (* Note: These will soon be replaced by an ExtLib dependency. *)
   Module QcDoNotation.
-   
+
     Notation "'do!' X <- A ; B" :=
       (bindGen A (fun X => B))
       (at level 200, X ident, A at level 100, B at level 200).
@@ -93,7 +112,7 @@ Module ConsistencyCheck : QuickChickSig.
     Notation "'doM!' X <- A ; B" :=
       (bindGenOpt A (fun X => B))
       (at level 200, X ident, A at level 100, B at level 200).
-   
+
   End QcDoNotation.
 
 
@@ -109,7 +128,7 @@ Module ConsistencyCheck : QuickChickSig.
 
   Definition nl := nl.
 
-  Definition GenOfGenSized := @GenOfGenSized. 
+  Definition GenOfGenSized := @GenOfGenSized.
 
   Definition genBoolSized := @genBoolSized .
   Definition genNatSized := @genNatSized  .
@@ -156,7 +175,7 @@ Module ConsistencyCheck : QuickChickSig.
   Module QcNotation.
     Export QcDefaultNotation.
 
-    Notation "x ==> y" := 
+    Notation "x ==> y" :=
       (implication x y) (at level 55, right associativity)
       : Checker_scope.
   End QcNotation.
@@ -167,7 +186,7 @@ Module ConsistencyCheck : QuickChickSig.
   Definition Dec_disj := @Dec_disj .
 
   (* Convenient notation. *)
-  Notation "P '?'" := (match (@dec P _) with 
+  Notation "P '?'" := (match (@dec P _) with
                        | left _ => true
                        | right _ => false
                        end) (at level 100).
@@ -187,25 +206,25 @@ Module ConsistencyCheck : QuickChickSig.
   (** =================================================================== *)
 
   (* Samples a generator. 'g' is of type 'G A' for showable 'A'. *)
-  (** 
+  (**
       Sample g.
    *)
 
   (* Runs a test. 'prop' must be 'Checkable'. *)
-  (** 
-       QuickChick prop. 
+  (**
+       QuickChick prop.
    *)
 
   (* Arguments to customize execution. *)
-  Record Args := 
+  Record Args :=
     MkArgs
       {
         (* Re-execute a test. *)
         (* Default: None *)
-        replay     : option (RandomSeed * nat); 
+        replay     : option (RandomSeed * nat);
         (* Maximum number of successful tests to run. *)
         (* Default: 10000 *)
-        maxSuccess : nat;                       
+        maxSuccess : nat;
         (* Maximum number of discards to accept. *)
         (* Default: 20000 *)
         maxDiscard : nat;
@@ -224,4 +243,3 @@ Module ConsistencyCheck : QuickChickSig.
   Notation "'genST' x" := (@arbitraryST _ x _) (at level 70).
 
 End ConsistencyCheck.
-

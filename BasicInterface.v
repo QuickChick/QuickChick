@@ -162,13 +162,7 @@ Parameter suchThatMaybeOpt :
     ordering [leq] satisfies reflexive, transitive, and antisymmetric
     predicates. *)
 
-  Class OrdType (A: Type) :=
-    {
-      leq     : A -> A -> bool;
-      refl    : reflexive leq;
-      trans   : transitive leq;
-      antisym : antisymmetric leq
-    }.
+Existing Class OrdType.
 
 Declare Instance OrdBool : OrdType bool.
 Declare Instance OrdNat  : OrdType nat.
@@ -177,15 +171,7 @@ Declare Instance OrdZ    : OrdType Z.
 (** We also expect the random function to be able to pick every element in any
     given interval. *)
 
-  Class ChoosableFromInterval (A : Type)  :=
-  {
-    super :> OrdType A;
-    randomR : A * A -> RandomSeed -> A * RandomSeed;
-    randomRCorrect :
-      forall (a a1 a2 : A), leq a1 a2 ->
-      (leq a1 a && leq a a2 <->
-       exists seed, fst (randomR (a1, a2) seed) = a)
-  }.
+Existing Class ChoosableFromInterval.
 
 (** QuickChick has provided some instances for ordered data types that are
     choosable from intervals, including [bool], [nat], and [Z]. *)
