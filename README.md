@@ -25,7 +25,7 @@ https://github.com/DeepSpec/dsss17
 ### Current release dependencies:
 
   - Branch master: 
-    * Coq 8.7
+    * Coq 8.8
     * OCaml >= 4.04.0
     * mathcomp-ssreflect-1.6.4
     * coq-ext-lib-0.9.7
