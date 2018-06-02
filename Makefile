@@ -49,7 +49,7 @@ src/%.cmo : src/%.ml
 quickChickTool: $(QCTOOL_EXE)
 
 $(QCTOOL_EXE): $(QCTOOL_SRC)
-	ocamlbuild -use-ocamlfind -pkg coq.lib -cflags -rectypes -tag thread $(QCTOOL_DIR)/$(QCTOOL_EXE)
+	ocamlbuild -use-ocamlfind -cflags -rectypes -tag thread $(QCTOOL_DIR)/$(QCTOOL_EXE)
 
 tests:
 #	$(MAKE) -C examples/ifc-basic test
