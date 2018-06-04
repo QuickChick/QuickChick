@@ -1,4 +1,4 @@
-(** * BasicInterface: QuickChick Reference Manual *)
+(** * QuickChickInterface: QuickChick Reference Manual *)
 
 (* NOW: Needs a bunch of work on writing, throughout... *)
 
