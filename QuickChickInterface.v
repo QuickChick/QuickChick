@@ -255,7 +255,7 @@ Class Show (A : Type) : Type :=
 (** Here are some [Show] instances for some basic types: *)
 Declare Instance showNat    : Show nat.
 Declare Instance showBool   : Show bool.
-Declare Instance showInt    : Show Z.
+Declare Instance showZ      : Show Z.
 Declare Instance showString : Show string.
 
 Declare Instance showList :

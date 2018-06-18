@@ -3,22 +3,58 @@ Import ListNotations.
 Require Import Coq.Strings.String.
 Require Import Coq.Strings.Ascii.
 Require Import ZArith.
+Require Import Decimal.
 
 Definition newline := String "010" ""%string.
-
-Require Extraction.
-Axiom show_nat  : nat -> string.
-Extract Constant show_nat => "Prelude.show".
-Axiom show_bool : bool -> string.
-Extract Constant show_bool => "Prelude.show".
-Axiom show_int  : Z -> string.
-Extract Constant show_int => "Prelude.show".
 
 Local Open Scope string.
 Class Show (A : Type) : Type :=
 {
   show : A -> string
 }.
+
+Fixpoint show_uint (n : uint) : string :=
+  match n with
+  | Nil => ""
+  | D0 n => String "0" (show_uint n)
+  | D1 n => String "1" (show_uint n)
+  | D2 n => String "2" (show_uint n)
+  | D3 n => String "3" (show_uint n)
+  | D4 n => String "4" (show_uint n)
+  | D5 n => String "5" (show_uint n)
+  | D6 n => String "6" (show_uint n)
+  | D7 n => String "7" (show_uint n)
+  | D8 n => String "8" (show_uint n)
+  | D9 n => String "9" (show_uint n)
+  end.
+
+Definition show_int (n : int) : string :=
+  match n with
+  | Pos n => show_uint n
+  | Neg n => String "-" (show_uint n)
+  end.
+
+Definition show_nat (n : nat) : string :=
+  show_uint (Nat.to_uint n).
+
+Definition show_bool (b : bool) : string :=
+  match b with
+  | true => "true"
+  | false => "false"
+  end.
+
+Definition show_Z (n : Z) : string :=
+  show_int (Z.to_int n).
+
+Instance showUint : Show uint :=
+{|
+  show := show_uint
+|}.
+
+Instance showInt : Show int :=
+{|
+  show := show_int
+|}.
 
 Instance showNat : Show nat :=
 {|
@@ -30,9 +66,9 @@ Instance showBool : Show bool :=
   show := show_bool
 |}.
 
-Instance showInt : Show Z :=
+Instance showZ : Show Z :=
 {|
-  show := show_int
+  show := show_Z
 |}.
 
 Fixpoint from_list (s : list ascii) : string :=
