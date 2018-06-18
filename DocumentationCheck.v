@@ -118,7 +118,7 @@ Module ConsistencyCheck : QuickChickSig.
 
   Definition showNat := showNat    .
   Definition showBool := showBool   .
-  Definition showInt := showInt    .
+  Definition showZ := showZ    .
   Definition showString := showString .
 
   Definition showList := @showList .
