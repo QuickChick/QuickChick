@@ -153,7 +153,7 @@ Fixpoint contents {A : Type} (s : A -> string) (l : list A) : string :=
   match l with
     | nil => ""%string
     | cons h nil => s h
-    | cons h t => append (append (s h) ", ") (contents s t)
+    | cons h t => append (append (s h) "; ") (contents s t)
   end.
 
 Instance showList {A : Type} `{_ : Show A} : Show (list A) :=
