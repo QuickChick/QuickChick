@@ -11,7 +11,7 @@ license: "MIT"
 build: [ make "-j%{jobs}%" "plugin" ]
 install: [ make "install" ]
 remove: [ [ "rm" "-rf" "%{lib}%/coq/user-contrib/QuickChick" ]
-          [ "rm" "-f" "`which quickChick | grep opam`" ] ]
+          [ "rm" "%{bin}%/quickChick"] ]
 depends: [
   "coq" {>= "8.8" < "8.9~"}
   "coq-ext-lib"

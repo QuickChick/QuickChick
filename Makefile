@@ -41,7 +41,7 @@ install-plugin: Makefile.coq
 
 uninstall:
 	$(V)if [ -e Makefile.coq ]; then $(MAKE) -f Makefile.coq uninstall; fi
-	$(RM) $(shell which quickChick | grep opam)
+	$(RM) $(shell opam config var bin)/quickChick
 
 src/%.cmo : src/%.ml
 	ocamlc -I src -c $<
