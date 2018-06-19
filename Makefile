@@ -24,7 +24,7 @@ plugin: Makefile.coq
 	$(MAKE) -f Makefile.coq 
 
 documentation-check: plugin
-	coqc -R src QuickChick -I src BasicInterface.v
+	coqc -R src QuickChick -I src QuickChickInterface.v
 	coqc -R src QuickChick -I src DocumentationCheck.v
 
 TEMPFILE := $(shell mktemp)
@@ -41,7 +41,7 @@ install-plugin: Makefile.coq
 
 uninstall:
 	$(V)if [ -e Makefile.coq ]; then $(MAKE) -f Makefile.coq uninstall; fi
-	$(RM) $(shell which quickChick | grep opam)
+	$(RM) $(shell opam config var bin)/quickChick
 
 src/%.cmo : src/%.ml
 	ocamlc -I src -c $<
