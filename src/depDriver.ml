@@ -47,7 +47,7 @@ let derive_dependent (class_name : derivable)
                      (result : unknown) =
   let ctr_name = 
     match constructor with 
-    | { CAst.v = CRef (r,_); _ } -> string_of_reference r
+    | { CAst.v = CRef (r,_); _ } -> string_of_qualid r
   in
   let instance_name = mk_instance_name class_name ctr_name in
 
@@ -244,7 +244,7 @@ let create_t_and_u_maps explicit_args dep_type actual_args : (range UM.t * dep_t
        begin match arg with
        | ({ CAst.v = CRef (r,_) }, _) ->
           begin 
-            let current_r = Unknown.from_string (string_of_reference r ^ "_") in
+            let current_r = Unknown.from_string (string_of_qualid r ^ "_") in
             (* Lookup if the reference is meant to be generated *)
             try begin match UM.find current_r !tmap with
             | None ->
@@ -352,7 +352,7 @@ let dep_dispatch ind class_name : unit =
     UM.iter (fun x r -> msg_debug (str ("Bound: " ^ (var_to_string x) ^ " to Range: " ^ (range_to_string r)) ++ fnl ())) init_umap;
 
     (* When we add constructors to the ranges, this needs to change *)
-    let input_names = List.map (fun ({CAst.v = CRef (r, _)},_) -> fresh_name (string_of_reference r ^ "_")) args in
+    let input_names = List.map (fun ({CAst.v = CRef (r, _)},_) -> fresh_name (string_of_qualid r ^ "_")) args in
     let input_ranges = List.map (fun v -> Unknown v) input_names in
     
     (* Call the derivation dispatcher *)
@@ -371,7 +371,7 @@ let dep_dispatch ind class_name : unit =
     in
 
     (* When we add constructors to the ranges, this needs to change *)
-    let input_names = List.map (fun ({CAst.v = CRef (r, _)},_) -> fresh_name (string_of_reference r ^ "_")) args in
+    let input_names = List.map (fun ({CAst.v = CRef (r, _)},_) -> fresh_name (string_of_qualid r ^ "_")) args in
     let input_ranges = List.map (fun v -> Unknown v) input_names in
 
     (* Call the actual creation function *)
@@ -399,7 +399,7 @@ let deriveChecker (cn : derivable) (c : constr_expr) (instance_name : string) =
 
   let ctr_name = 
     match c with 
-    | { CAst.v = CRef (r,_) } -> string_of_reference r
+    | { CAst.v = CRef (r,_) } -> string_of_qualid r
   in
 
   debug_coq_expr (gType ty_params dep_type);
@@ -469,7 +469,7 @@ let deriveDependent (cn : derivable) (c : constr_expr) (n : int) (instance_name 
 
   let ctr_name = 
     match c with 
-    | { CAst.v = CRef (r,_) } -> string_of_reference r
+    | { CAst.v = CRef (r,_) } -> string_of_qualid r
   in
 
   (* type constructor *)
