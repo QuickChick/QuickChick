@@ -1,10 +1,11 @@
-(** * BasicInterface: QuickChick Reference Manual *)
+(** * QuickChickInterface: QuickChick Reference Manual *)
 
 (* NOW: Needs a bunch of work on writing, throughout... *)
 
 Require Import mathcomp.ssreflect.ssreflect.
 From mathcomp Require Import ssrbool.
-Require Import QuickChick ZArith Strings.Ascii Strings.String.
+From QuickChick Require Import QuickChick.
+Require Import ZArith Strings.Ascii Strings.String.
 
 (* ====================================================================== *)
 (* CONTENTS                                                               *)

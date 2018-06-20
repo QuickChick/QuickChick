@@ -1,7 +1,7 @@
 Require Import mathcomp.ssreflect.ssreflect.
 From mathcomp Require Import ssrbool.
 Require Import QuickChick ZArith Strings.Ascii Strings.String.
-Require Import BasicInterface.
+Require Import QuickChickInterface.
 
 
 (* This module is just to keep the BasicInterface up-to-date with the implementation. *)
