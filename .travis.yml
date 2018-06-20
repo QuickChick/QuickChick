@@ -41,6 +41,7 @@ install:
 - opam config var root
 - opam repo add coq-released https://coq.inria.fr/opam/released || true
 - opam repo add coq-core-dev https://coq.inria.fr/opam/core-dev || true
+- opam repo add coq-extra-dev https://coq.inria.fr/opam/extra-dev || true
 - opam list
 - ocamlc -v
 
