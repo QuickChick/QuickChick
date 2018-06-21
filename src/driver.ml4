@@ -10,7 +10,9 @@ type derivation = SimpleDer of SimplDriver.derivable list
 
 let simpl_dispatch ind classes name1 name2 =
   let ind_name = match ind with
-    | { CAst.v = CRef (r, _) } -> string_of_qualid r
+    | { CAst.v = CRef (r, _) } -> string_of_qualid
+                                    (match qualid_of_reference r with
+                                       {CAst.v = q; _} -> q)
     | _ -> failwith "Implement me for functions"
   in
   List.iter (fun cn -> SimplDriver.derive cn ind (SimplDriver.mk_instance_name cn ind_name) name1 name2) classes
@@ -41,7 +43,9 @@ let class_assoc_table =
 let dispatch cn ind name1 name2 =
   let convert_reference_to_string c =
     match c with
-    | {CAst.v = CRef (r, _)} -> string_of_qualid r
+    | {CAst.v = CRef (r, _)} -> string_of_qualid
+                                  (match qualid_of_reference r with
+                                     {CAst.v = q; _} -> q)
     | _ -> failwith "Usage: Derive <class_name> for <inductive_name> OR  Derive (<class_name>, ... , <class_name>) for <inductive_name>" in
   let ss = match cn with
      | { CAst.v = CNotation (_,([a],[b],_,_)) } -> begin

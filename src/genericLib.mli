@@ -111,7 +111,7 @@ val cat_maybes : 'a option list -> 'a list
 val foldM : ('b -> 'a -> 'b option) -> 'b option -> 'a list -> 'b option
 val sequenceM : ('a -> 'b option) -> 'a list -> 'b list option
 
-val qualid_to_mib : Libnames.qualid -> mutual_inductive_body
+val reference_to_mib : Libnames.reference -> mutual_inductive_body
 val dt_rep_from_mib : mutual_inductive_body -> dt_rep option
 val coerce_reference_to_dt_rep : constr_expr -> dt_rep option
 
