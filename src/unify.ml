@@ -34,14 +34,25 @@ end
 
 type unknown = Unknown.t
 
-type range = Ctr of constructor * range list | Unknown of unknown | Undef of dep_type | FixedInput | RangeHole
+type range = Ctr of constructor * range list
+           | Unknown of unknown
+           | Undef of dep_type
+           | FixedInput
+           | Parameter of ty_param
+           | RangeHole
 
+let is_parameter r =
+  match r with
+  | Parameter _ -> true
+  | _ -> false
+           
 let rec range_to_string = function
   | Ctr (c, rs) -> constructor_to_string c ^ " " ^ str_lst_to_string " " (List.map range_to_string rs)
   | Unknown u -> Unknown.to_string u
   | Undef dt -> Printf.sprintf "Undef (%s)" (dep_type_to_string dt)
   | FixedInput -> "FixedInput"
   | RangeHole  -> "_"
+  | Parameter p -> ty_param_to_string p
 
 module UM = Map.Make(UnknownOrd)
 
@@ -106,8 +117,11 @@ let rec raiseMatch (k : umap) (c : constructor) (rs : range list) (eqs: EqSet.t)
                  raiseMatch k c' rs' eqs >>= fun (k', m, eqs') ->
                  Some (k', m :: l, eqs')
               | Unknown u' -> go u'
+              | RangeHole -> failwith "Internal: RangeHoles should not appear past entry"
+              | Parameter p -> failwith "QC Internal: Does this occur (Parameter in match)?"
               end
             in go u
+         | Parameter p -> Some (k, MatchParameter p :: l, eqs)
          | _ -> failwith "Toplevel ranges should be Unknowns or constructors"
         ) (Some (k, [], eqs)) rs) >>= fun (k', l, eqs') ->
   Some (k', MatchCtr (c, List.rev l), eqs')
@@ -181,6 +195,9 @@ let rec unify (k : umap) (r1 : range) (r2 : range) (eqs : EqSet.t)
         (* Raises a match and potential equalities *)
         raiseMatch k c rs eqs >>= fun (k', m, eqs') ->
         Some (UM.add u2 (Unknown u1) k', Unknown u2, eqs', [(u2, m)])
+     | Parameter p, Parameter q ->
+        if p = q then Some (k, Parameter p, eqs, []) else None
+     | _ -> failwith "QC Internal: RangeHole/Parameter in unify"
      end
    | Ctr (c1, rs1), Ctr (c2, rs2) ->
         msg_debug (str (Printf.sprintf "Constructors2: %s - %s\n"
@@ -221,7 +238,10 @@ let rec unify (k : umap) (r1 : range) (r2 : range) (eqs : EqSet.t)
       | Unknown u' -> 
          unify k (Ctr (c,rs)) (Unknown u') eqs >>= fun (k', r', eqs', m') ->
          Some (k', Unknown u, eqs', m')
+      | _ -> failwith "QC Internal: Range Hole in toplevel?"
       end
+   | Parameter p, Parameter q ->
+      if p = q then Some (k, Parameter p, eqs, []) else None
    | _, _ -> failwith "QC Internal: TopLevel ranges should be Unknowns or Constructors"
 
 let rec fixRange u r k = 
@@ -229,7 +249,9 @@ let rec fixRange u r k =
     | FixedInput -> k
     | Undef _ -> UM.add u FixedInput k 
     | Unknown u' -> fixRange u' (umfind u' k) k
-    | Ctr (_, rs) -> List.fold_left (fun k r -> fixRange Unknown.undefined r k) k rs 
+    | Ctr (_, rs) -> List.fold_left (fun k r -> fixRange Unknown.undefined r k) k rs
+    | Parameter p -> k
+    | RangeHole -> failwith "QC Internal: RangeHole in fixrange"
 
 let fixVariable x k = fixRange x (umfind x k) k
 
@@ -241,6 +263,7 @@ let rec convert_to_range dt =
      Option.map (fun dts' -> Ctr (c, dts')) (sequenceM convert_to_range dts)
   | DTyCtr (c, dts) -> 
      Option.map (fun dts' -> Ctr (ty_ctr_to_ctr c, dts')) (sequenceM convert_to_range dts)
+  | DTyParam p -> Some (Parameter p)
   | _ -> None
 
 let is_fixed k dt = 
@@ -249,7 +272,8 @@ let is_fixed k dt =
     | FixedInput -> true
     | Unknown u' -> aux (umfind u' k)
     | Ctr (_, rs) -> List.for_all aux rs
-    | RangeHole -> true (*TODO *)
+    | RangeHole -> true (* TODO *)
+    | Parameter p -> true
   in Option.map aux (convert_to_range dt)
 
 (* convert a range to a coq expression *)
@@ -263,6 +287,8 @@ let rec range_to_coq_expr k r =
      | Undef _ -> (msg_debug (str "It's stupid that this is called" ++ fnl ()); gVar u)
      | Unknown u' -> range_to_coq_expr k (Unknown u')
      | Ctr (c, rs) -> gApp (gCtr c) (List.map (range_to_coq_expr k) rs)
+     | Parameter p -> gTyParam p
+     | RangeHole -> hole
      end
   | RangeHole -> hole
   | _ -> failwith "QC Internal: TopLevel ranges should be Unknowns or Constructors"
@@ -315,6 +341,11 @@ let mode_analysis init_ctr curr_ctr (init_ranges : range list) (init_map : range
   let remaining_unknowns = ref [] in
   let all_unknowns = ref [] in
   let actual_inputs = ref [] in
+
+  (* Filter out parameters ranges -- hack! *)
+  let init_ranges = List.filter (fun r -> not (is_parameter r)) init_ranges in
+  let curr_ranges = List.filter (fun r -> not (is_parameter r)) curr_ranges in
+  
   (* Compare ranges takes two ranges (the initial range r1 and the current range r2)
      as well as their parents, and returns:
      - true, if we can convert the current range to the same
@@ -349,7 +380,8 @@ let mode_analysis init_ctr curr_ctr (init_ranges : range list) (init_map : range
        true
     | Undef _, Ctr (c, rs) ->
        List.iter (fun r' -> ignore (compare_ranges false p1 r1 Unknown.undefined r')) rs; false
-    | _, _ -> qcfail "Implement constructors for initial ranges"
+    | _, _ -> qcfail (Printf.sprintf "Implement constructors for initial ranges: %s vs %s"
+                           (range_to_string r1) (range_to_string r2))
   in
   if not (init_ctr = curr_ctr) then
     let rec find_all_unknowns p r =
@@ -358,6 +390,8 @@ let mode_analysis init_ctr curr_ctr (init_ranges : range list) (init_map : range
       | FixedInput -> ()
       | Undef dt -> all_unknowns := (p, dt) :: !all_unknowns
       | Ctr (c, rs) -> List.iter (find_all_unknowns Unknown.undefined) rs
+      | RangeHole -> ()
+      | Parameter _ -> ()
     in (List.iter (find_all_unknowns Unknown.undefined) curr_ranges;
         msg_debug (str "Mismatched constructors in mode analysis" ++ fnl ());
         NonRecursive !all_unknowns)
@@ -546,6 +580,7 @@ let handle_branch
     | FixedInput ->
        (* Just call the continuation on the parent. *)
        cont (Unknown parent)
+    | Parameter p -> cont (Parameter p)
     | RangeHole -> cont RangeHole
 
   (* Function that operates on multiple top-level ranges at once, mapping the above over a list *)
@@ -618,6 +653,9 @@ let handle_branch
                       instantiate_function_calls_cont dts' (DTyVar uvar :: acc) cont)))
        | DTyCtr (c,dts) ->
           instantiate_function_calls_cont dts' (dt :: acc) cont
+       | DTyParam p ->
+          (* Just continue along instantiating the rest of the function calls *)
+          instantiate_function_calls_cont dts' (DTyParam p :: acc) cont
        | _ -> failwith ("Not a type! " ^ (dep_type_to_string dt))
        end
   in 

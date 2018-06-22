@@ -711,10 +711,12 @@ let is_inductive_dt dt =
 type matcher_pat = 
   | MatchCtr of constructor * matcher_pat list
   | MatchU of var
+  | MatchParameter of ty_param (* Should become hole in pattern, so no binding *)
 
 let rec matcher_pat_to_string = function
   | MatchU u -> var_to_string u
   | MatchCtr (c, ms) -> constructor_to_string c ^ " " ^ str_lst_to_string " " (List.map matcher_pat_to_string ms)
+  | MatchParameter p -> ty_param_to_string p
 
 let construct_match c ?catch_all:(mdef=None) alts = 
   let rec aux = function 
@@ -725,8 +727,9 @@ let construct_match c ?catch_all:(mdef=None) alts =
        if is_inductive c then CAst.make @@ CPatAtom None
        else CAst.make @@ CPatCstr (c,
                    Some (List.map (fun m -> aux m) ms),
-                   []) 
-                        end 
+                   [])
+      end
+    | MatchParameter p -> CAst.make @@ CPatAtom None
   in CAst.make @@ CCases (RegularStyle,
              None (* return *), 
               [ (c, None, None)], (* single discriminee, no as/in *)
@@ -752,7 +755,9 @@ let construct_match_with_return c ?catch_all:(mdef=None) (as_id : string) (ret :
                    Some (List.map (fun m -> aux m) ms),
                    []) 
          end
-       end in
+      end
+    | MatchParameter p -> CAst.make @@ CPatAtom None
+  in
   let main_opts = 
         List.map (fun (m, body) -> CAst.make @@ ([[aux m]], body)) alts in
   let default =
