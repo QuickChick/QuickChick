@@ -88,7 +88,7 @@ Parameter sequenceGen: forall {A : Type}, list (G A) -> G (list A).
 Parameter foldGen :
   forall {A B : Type}, (A -> B -> G A) -> list B -> A -> G A.
 
-(* Run a generator on a particular random seed. *)
+(* Run a generator with a size parameter and a random seed. *)
 (* NOW: What is the [nat] parameter?? *)
 Parameter run  : forall {A : Type}, G A -> nat -> RandomSeed -> A.
 
@@ -122,12 +122,9 @@ Parameter oneof : forall {A : Type}, G A -> list (G A) -> G A.
 Parameter frequency :
   forall {A : Type}, G A -> list (nat * G A) -> G A.
 
-(** [backtrack] is the same as [frequency], but using generators that
-    can fail (return [None]).  Performs local backtracking until all
-    options are exhausted. *)
-(* NOW: What does that mean?  Is each generator tried just
-   once?  (Note that trying twice might return None the first time and
-   Some the second!) *)
+(** Try all generators until one returns a [Some] value or all failed once with
+    [None]. The generators are picked at random according to their weights
+    (like [frequency]), and each one is run at most once. *)
 Parameter backtrack :
   forall {A : Type}, list (nat * G (option A)) -> G (option A).
 
@@ -187,6 +184,10 @@ Parameter choose :
    convenience notations is not consistent -- makes it hard to
    remember (for me).  What about calling the fundamental ones
    [elems_], etc.? *)
+(* NOW: How about not taking default values but only nonempty lists?
+   So that [elems [x;y;z]] desugars to [elems_ x [y;z]] which picks
+   a random element uniformly from the nonempty list [x;y;z], instead
+   of [x;y]? This avoids conditionals in the spec. *)
 (** The [elements], [oneof], and [frequency] combinators all take
     default values; these are only used if their list arguments are
     empty, which should not normally happen.  The [QcDefaultNotation]
