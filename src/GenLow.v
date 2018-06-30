@@ -1254,5 +1254,14 @@ Module GenLow : GenLowInterface.Sig.
     ret A x := returnGen (Some x);
     bind A B := bindGenOpt;
   }.
+
+  Definition thunkGen {A} (f : unit -> G A) : G A :=
+    MkGen (fun n r => run (f tt) n r).
+
+  Lemma thunkGen_id {A} (f : unit -> G A) n :
+    semGenSize (thunkGen f) n <--> semGenSize (f tt) n.
+  Proof.
+    split; intros [r Hr]; exists r; simpl in *; assumption.
+  Qed.
   
 End GenLow.

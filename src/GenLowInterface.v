@@ -443,5 +443,15 @@ Module Type Sig.
     ret A x := returnGen (Some x);
     bind A B := bindGenOpt;
   }.
-  
+
+  (** Delay evaluation of a generator in a CBV language. *)
+  Parameter thunkGen : forall {A}, (unit -> G A) -> G A.
+
+  (** [thunkGen] doesn't change semantics. *)
+  Parameter thunkGen_id : forall A (f : unit -> G A) n,
+      semGenSize (thunkGen f) n <--> semGenSize (f tt) n.
+
+  (** A notation around [thunkGen] for convenience. *)
+  Notation etaG g := (thunkGen (fun _ => g)).
+
 End Sig.
