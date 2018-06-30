@@ -15,10 +15,13 @@ Module ConsistencyCheck : QuickChickSig.
   Definition semGenSize := @semGenSize.
   Definition returnGen := @returnGen.
   Definition fmap := @fmap.
+  Definition apGen := @apGen.
   Definition bindGen := @bindGen.
   Definition bindGen' := @bindGen'.
   Definition bindGenOpt := @bindGenOpt.
-  Definition GMonad := @GMonad.
+  Definition Functor_G := @Functor_G.
+  Definition Applicative_G := @Applicative_G.
+  Definition Monad_G := @Monad_G.
   Definition liftGen := @liftGen.
   Definition liftGen2 := @liftGen2.
   Definition liftGen3 := @liftGen3.

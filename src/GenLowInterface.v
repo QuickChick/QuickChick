@@ -11,7 +11,8 @@ Require Import ZArith List.
 Require Import mathcomp.ssreflect.ssreflect.
 From mathcomp Require Import ssrfun ssrbool ssrnat.
 
-Require Export ExtLib.Structures.Monads.
+From ExtLib.Structures Require Export
+     Functor Applicative Monads.
 Import MonadNotation.
 Open Scope monad_scope.
 
@@ -51,6 +52,7 @@ Module Type Sig.
   Parameter bindGenOpt : forall {A B : Type}, G (option A) -> (A -> G (option B)) -> G (option B).
   Parameter run  : forall {A : Type}, G A -> nat -> RandomSeed -> A.
   Parameter fmap : forall {A B : Type}, (A -> B) -> G A -> G B.
+  Parameter apGen : forall {A B : Type}, G (A -> B) -> G A -> G B.
   Parameter sized : forall {A: Type}, (nat -> G A) -> G A.
   Parameter resize : forall {A: Type}, nat -> G A -> G A.
   Parameter promote : forall {A : Type}, Rose (G A) -> G (Rose A).
@@ -421,18 +423,25 @@ Module Type Sig.
       semGen (fmap f1 (bindGen g f2)) <-->
       semGen (bindGen g (fun x => fmap f1 (f2 x))).
 
-  Global Instance GMonad : Monad G :=
-  {
-    ret T x := returnGen x ;
-    bind T U m f := bindGen m f 
+  Instance Functor_G : Functor G := {
+    fmap A B := fmap;
+  }.
+
+  Instance Applicative_G : Applicative G := {
+    pure A := returnGen;
+    ap A B := apGen;
+  }.
+
+  Instance Monad_G : Monad G := {
+    ret A := returnGen;
+    bind A B := bindGen;
   }.
 
   Definition GOpt A := G (option A).
 
-  Global Instance GOptMonad : `{Monad GOpt} :=
-  {
+  Instance Monad_GOpt : Monad GOpt := {
     ret A x := returnGen (Some x);
-    bind A B m k := bindGenOpt m k
+    bind A B := bindGenOpt;
   }.
   
 End Sig.

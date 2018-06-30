@@ -7,7 +7,10 @@ From mathcomp Require Import ssrfun ssrbool ssrnat.
 Require Import Numbers.BinNums.
 Require Import Classes.RelationClasses.
 
-Require Export ExtLib.Structures.Monads.
+From ExtLib.Structures Require Export
+     Monads.
+From ExtLib.Structures Require Import
+     Functor Applicative.
 Import MonadNotation.
 Open Scope monad_scope.
 
@@ -60,6 +63,9 @@ Module GenLow : GenLowInterface.Sig.
   
   Definition fmap {A B : Type} (f : A -> B) (g : G A) : G B :=
     MkGen (fun n r => f (run g n r)).
+
+  Definition apGen {A B} (gf : G (A -> B)) (gg : G A) : G B :=
+    bindGen gf (fun f => fmap f gg).
   
   Definition sized {A : Type} (f : nat -> G A) : G A :=
     MkGen (fun n r => run (f n) n r).
@@ -1228,18 +1234,25 @@ Module GenLow : GenLowInterface.Sig.
     now eexists; split; eauto. eassumption. 
   Qed.
 
-  Global Instance GMonad : Monad G :=
-  {
-    ret T x := returnGen x ;
-    bind T U m f := bindGen m f 
+  Instance Functor_G : Functor G := {
+    fmap A B := fmap;
+  }.
+
+  Instance Applicative_G : Applicative G := {
+    pure A := returnGen;
+    ap A B := apGen;
+  }.
+
+  Instance Monad_G : Monad G := {
+    ret A := returnGen;
+    bind A B := bindGen;
   }.
 
   Definition GOpt A := G (option A).
 
-  Global Instance GOptMonad : `{Monad GOpt} :=
-  {
+  Global Instance Monad_GOpt : Monad GOpt := {
     ret A x := returnGen (Some x);
-    bind A B m k := bindGenOpt m k
+    bind A B := bindGenOpt;
   }.
   
 End GenLow.
