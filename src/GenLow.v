@@ -1258,10 +1258,44 @@ Module GenLow : GenLowInterface.Sig.
   Definition thunkGen {A} (f : unit -> G A) : G A :=
     MkGen (fun n r => run (f tt) n r).
 
-  Lemma thunkGen_id {A} (f : unit -> G A) n :
-    semGenSize (thunkGen f) n <--> semGenSize (f tt) n.
+  Lemma semThunkGenSize {A} (f : unit -> G A) s :
+    semGenSize (thunkGen f) s <--> semGenSize (f tt) s.
   Proof.
     split; intros [r Hr]; exists r; simpl in *; assumption.
   Qed.
-  
+
+  Lemma semThunkGen {A} (f : unit -> G A) :
+    semGen (thunkGen f) <--> semGen (f tt).
+  Proof.
+    split; intros [r Hr]; exists r; simpl in *; assumption.
+  Qed.
+
+  Program Instance thunkGenUnsized {A} (f : unit -> G A)
+          `{Unsized _ (f tt)} : Unsized (thunkGen f).
+  Next Obligation.
+    do 2 rewrite semThunkGenSize.
+    apply unsized.
+  Qed.
+
+  Program Instance thunkGenSizeMonotonic {A} (f : unit -> G A)
+          `{SizeMonotonic _ (f tt)} : SizeMonotonic (thunkGen f).
+  Next Obligation.
+    do 2 rewrite semThunkGenSize.
+    by apply monotonic.
+  Qed.
+
+  Program Instance thunkGenSizeMonotonicOpt {A} (f : unit -> G (option A))
+          `{SizeMonotonicOpt _ (f tt)} : SizeMonotonicOpt (thunkGen f).
+  Next Obligation.
+    do 2 rewrite semThunkGenSize.
+    by apply monotonic_opt.
+  Qed.
+
+  Program Instance thunkGenSizeAntiMonotonicNone {A} (f : unit -> G (option A))
+          `{SizeAntiMonotonicNone _ (f tt)} : SizeAntiMonotonicNone (thunkGen f).
+  Next Obligation.
+    do 2 rewrite semThunkGenSize.
+    by apply monotonic_none.
+  Qed.
+
 End GenLow.

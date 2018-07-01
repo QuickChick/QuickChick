@@ -106,15 +106,16 @@ Proof.
     move => H. inversion H; subst; reflexivity.
   - rewrite semOneof. move => t. split.
     move => [gen [[H1 | [H1 | // _]] H2]]; subst.
-    apply semReturn in H2. rewrite - H2. constructor.
-    move : H2 => /semBindSizeMonotonic. move => [n [_ /semReturn <-]].
+    apply semThunkGen, semReturn in H2. rewrite - H2. constructor.
+    move : H2 => /semThunkGen /semBindSizeMonotonic.
+    move => [n [_ /semReturn <-]].
     constructor. constructor. constructor.
     move => H. inversion H; subst.
     { eexists. split. left. reflexivity. inversion H; subst.
-        by apply semReturn. }
+        by apply semThunkGen, semReturn. }
     { inversion H0; subst. inversion H1; subst.
       eexists. split. right. left. reflexivity.
-      apply semBindSizeMonotonic; eauto with typeclass_instances.
+      apply semThunkGen, semBindSizeMonotonic; eauto with typeclass_instances.
       eexists. split; last by apply semReturn; reflexivity.
       by apply arbNat_correct. }
   - rewrite semLiftGen4SizeMonotonic. split.

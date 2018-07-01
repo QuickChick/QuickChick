@@ -448,8 +448,23 @@ Module Type Sig.
   Parameter thunkGen : forall {A}, (unit -> G A) -> G A.
 
   (** [thunkGen] doesn't change semantics. *)
-  Parameter thunkGen_id : forall A (f : unit -> G A) n,
-      semGenSize (thunkGen f) n <--> semGenSize (f tt) n.
+  Parameter semThunkGenSize : forall A (f : unit -> G A) s,
+      semGenSize (thunkGen f) s <--> semGenSize (f tt) s.
+
+  Parameter semThunkGen : forall A (f : unit -> G A),
+      semGen (thunkGen f) <--> semGen (f tt).
+
+  Declare Instance thunkGenUnsized {A} (f : unit -> G A)
+          `{Unsized _ (f tt)} : Unsized (thunkGen f).
+
+  Declare Instance thunkGenSizeMonotonic {A} (f : unit -> G A)
+          `{SizeMonotonic _ (f tt)} : SizeMonotonic (thunkGen f).
+
+  Declare Instance thunkGenSizeMonotonicOpt {A} (f : unit -> G (option A))
+          `{SizeMonotonicOpt _ (f tt)} : SizeMonotonicOpt (thunkGen f).
+
+  Declare Instance thunkGenSizeAntiMonotonicNone {A} (f : unit -> G (option A))
+          `{SizeAntiMonotonicNone _ (f tt)} : SizeAntiMonotonicNone (thunkGen f).
 
   (** A notation around [thunkGen] for convenience. *)
   Notation etaG g := (thunkGen (fun _ => g)).
