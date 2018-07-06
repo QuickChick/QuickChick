@@ -66,9 +66,6 @@ Parameter vectorOf : forall {A : Type}, nat -> G A -> G (list A).
     element from [l] uniformly; otherwise it always yields [a]. *)
 Parameter elements : forall {A : Type}, A -> list A -> G A.
 
-(* NOW: Should this be exposed in the interface? *)
-(* NOW: (Leo): Do you mean oneof (and its notation) shouldn't be exposed?
-   It is very heavily used for the common case frequency [(1,..), (1,..)] *)
 (** Similar to [elements], instead of choosing from a list of [A]s,
     [oneof g l] returns [g] if [l] is empty; otherwise it uniformly
     picks a generator for [A] in [l]. *)
@@ -146,11 +143,7 @@ Parameter choose :
    remember (for me).  What about calling the fundamental ones
    [elems_], etc.? *)
 (* I like this idea *)
-(* NOW: How about not taking default values but only nonempty lists?
-   So that [elems [x;y;z]] desugars to [elems_ x [y;z]] which picks
-   a random element uniformly from the nonempty list [x;y;z], instead
-   of [x;y]? This avoids conditionals in the spec. *)
-(* I also like this idea, but it might potentially break everything... *)
+
 (** The [elements], [oneof], and [frequency] combinators all take
     default values; these are only used if their list arguments are
     empty, which should not normally happen.  The [QcDefaultNotation]
@@ -258,11 +251,12 @@ Declare Instance genPair :
 
 (** [Shrink] is a typeclass whose instances can be shrunk to smaller ones,
     allowing QuickChick to find a minimal counter example when errors occur. *)
-(*
+(** [[
     Class Shrink (A : Type) :=
       {
         shrink : A -> list A
       }.
+]]
 *)
 
 (** QuickChick provides default shrinking for some basic datatypes: *)
