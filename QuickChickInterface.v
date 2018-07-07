@@ -30,9 +30,9 @@ Parameter semGenSize : forall {A : Type} (g : G A) (size : nat), set A.
 (* #################################################################### *)
 (** * Primitive Generator Combinators *)
 
-(** Many generator combinators can be found in [Functor],
-   [Applicative], [Monad], [Foldable], [Traversable]
-   from [ExtLib.Structures] (coq-ext-lib). *)
+(** Many additional generator combinators can be found in the
+   [Functor], [Applicative], [Monad], [Foldable], and [Traversable]
+   modules in the [ExtLib.Structures] library from [coq-ext-lib]. *)
 
 Declare Instance Functor_G : Functor G.
 Declare Instance Applicative_G : Applicative G.
