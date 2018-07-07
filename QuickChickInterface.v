@@ -1,7 +1,8 @@
 (** * QuickChickInterface: QuickChick Reference Manual *)
 
-(* NOW: Needs a bunch of work on writing, throughout... *)
+(* SOONER: Needs a bunch of work on writing, throughout... *)
 
+(* SOONER: Should we hide this top html imports? *)
 From QuickChick Require Import QuickChick.
 Require Import ZArith Strings.Ascii Strings.String.
 
@@ -22,7 +23,7 @@ Parameter RandomSeed : Type.
 (** [G A] is the type of random generators for type [A]. *)
 Parameter G : Type -> Type.
 
-(* Semantics of [G] based on sets of outcomes *)
+(** In QuickChick, we give semantics to generators using sets of outcomes. *)
 Parameter semGen : forall {A : Type} (g : G A), set A.
 Parameter semGenSize : forall {A : Type} (g : G A) (size : nat), set A.
 
@@ -38,17 +39,17 @@ Declare Instance Applicative_G : Applicative G.
 Declare Instance Monad_G : Monad G.
 
 (** Version of bind where the continuation also takes a _proof_ that
-   the value received is within the set of outcomes of the generator *)
+    the value received is within the set of outcomes of the generator *)
 Parameter bindGen' : forall {A B : Type} (g : G A),
     (forall (a : A), (a \in semGen g) -> G B) -> G B.
 
 (** Version of bind for the (G (option .)) monad.
-   Useful for chaining generators that could fail/backtrack. *)
+    Useful for chaining generators that could fail/backtrack. *)
 Parameter bindGenOpt : forall {A B : Type},
     G (option A) -> (A -> G (option B)) -> G (option B).
 
 (** Run a generator with a size parameter (a natural number denoting
-   the maximum depth of the generated A) and a random seed. *)
+    the maximum depth of the generated A) and a random seed. *)
 Parameter run  : forall {A : Type}, G A -> nat -> RandomSeed -> A.
 
 (* #################################################################### *)
@@ -86,14 +87,11 @@ Parameter frequency :
 Parameter backtrack :
   forall {A : Type}, list (nat * G (option A)) -> G (option A).
 
-(* NOW: From here down, most of the components need better
-   documentation!!  Also, there are a lot of single-star comments that
-   should be two-stars. *)
-
-(** Set QC's internal [size] parameter. *)
-Parameter resize : forall {A: Type}, nat -> G A -> G A.
-(** Allow a size-parametric generator access to QC's internal size. *)
+(** Internally, the G monad hides a [size] parameter that can be accessed by
+    generators. The [sized] combinator provides such access. The [resize] 
+    combinator sets it. *)
 Parameter sized : forall {A: Type}, (nat -> G A) -> G A.
+Parameter resize : forall {A: Type}, nat -> G A -> G A.
 
 (** Generate-and-test approach to generate data with preconditions. *)
 Parameter suchThatMaybe :
@@ -138,16 +136,11 @@ Parameter choose :
 (* #################################################################### *)
 (** * Notations *)
 
-(* NOW: The naming of the fundamental combinators and their
-   convenience notations is not consistent -- makes it hard to
-   remember (for me).  What about calling the fundamental ones
-   [elems_], etc.? *)
-(* I like this idea *)
-
 (** The [elements], [oneof], and [frequency] combinators all take
     default values; these are only used if their list arguments are
-    empty, which should not normally happen.  The [QcDefaultNotation]
-    sub-module exposes *)
+    empty, which should not normally happen. The [QcDefaultNotation]
+    sub-module exposes notation to hide this default.
+*)
 
 Module QcDefaultNotation.
 
@@ -187,11 +180,12 @@ End QcDefaultNotation.
 (** * Printing *)
 
 (** [Show] typeclass allows the test case to be printed as a string. *)
-(*
+(** [[
     Class Show (A : Type) : Type :=
       {
         show : A -> string
       }.
+]]
 *)
 
 (** Here are some [Show] instances for some basic types: *)
@@ -219,9 +213,10 @@ Definition nl : string := String (ascii_of_nat 10) EmptyString.
 (** [GenSized] and [Gen] are typeclasses whose instances can be generated
     randomly. More specifically, [GenSized] depends on a generator for any given
     natural number that indicate the size of output. *)
-(*
+(** [[
     Class GenSized (A : Type) := { arbitrarySized : nat -> G A }.
     Class Gen (A : Type) := { arbitrary : G A }.
+]]
 *)
 
 (** Given an instance of [GenSized], we can convert it to [Gen] automatically,
@@ -244,7 +239,6 @@ Declare Instance genPairSized :
 Declare Instance genPair :
   forall {A B : Type} `{Gen A} `{Gen B}, Gen (A * B).
 
-(* TODO: Strings? *)
 
 (* #################################################################### *)
 (** * Shrinking typeclass and instances *)
@@ -271,12 +265,13 @@ Declare Instance shrinkOption {A : Type} `{Shrink A} : Shrink (option A).
 (* #################################################################### *)
 (** * Arbitrary and typeclass hierarchy *)
 
-(** Arbitrary Class *)
-(*
+(** The [Arbitrary] typeclass combines generation and shrinking. *)
+(** [[
     Class Arbitrary (A : Type) `{Gen A} `{Shrink A}.
+]]
 *)
 
-(**
+(** [[
                             GenSized
                                |
                                |
@@ -284,25 +279,29 @@ Declare Instance shrinkOption {A : Type} `{Shrink A} : Shrink (option A).
                                 \    /
                                  \  /
                                Arbitrary
+]]
 *)
 
 
-(* Automatic conversion *)
+(** If a type has a [Gen] and a [Shrink] instance, it automatically gets
+    an [Arbitrary] one.
+*)
 Declare Instance ArbitraryOfGenShrink :
   forall {A} `{Gen A} `{Shrink A}, Arbitrary A.
 
 (* #################################################################### *)
 (** * Properties - Checkers *)
 
-(** The opaque type of QuickChick properties that can be checked. *)
+(** [Checker] is the opaque type of QuickChick properties. *)
 Parameter Checker : Type.
 
-(** A Class that indicates we can check a type A. *)
-(*
+(** The [Checkable] class indicates we can check a type A. *)
+(** [[
     Class Checkable (A : Type) : Type :=
       {
         checker : A -> Checker
       }.
+]]
 *)
 
 (** Bools signify pass/fail. *)
@@ -323,7 +322,7 @@ Parameter forAllProof :
 Parameter forAllShrink :
   forall {A prop : Type} `{Checkable prop} `{Show A}
          (gen : G A) (shrinker : A -> list A) (pf : A -> prop), Checker.
-(* TODO: Do we need a forAllShrinkProof variant? *)
+(* SOONER: Do we need a forAllShrinkProof variant? *)
 
 (** Typeclass magic: Lift (Show, Gen, Shrink) instances for A
    to a Checker for functions A -> prop. *)
@@ -397,8 +396,9 @@ End QcNotation.
 (** * Decidability *)
 
 (** Decidability typeclass using ssreflect's 'decidable'. *)
-(*
+(** [[
 Class Dec (P : Prop) : Type := { dec : decidable P }.
+]]
 *)
 
 (** Decidable properties are Checkable. *)
@@ -409,7 +409,7 @@ Declare Instance Dec_neg {P} {H : Dec P} : Dec (~ P).
 Declare Instance Dec_conj {P Q} {H : Dec P} {I : Dec Q} : Dec (P /\ Q).
 Declare Instance Dec_disj {P Q} {H : Dec P} {I : Dec Q} : Dec (P \/ Q).
 
-(* NOW: We had discussed changing this to the partial decision procedure at some point. *)
+(* SOONER: We had discussed changing this to the partial decision procedure at some point. *)
 (** Convenient notation. *)
 Notation "P '?'" := (match (@dec P _) with
                      | left _ => true
@@ -419,24 +419,27 @@ Notation "P '?'" := (match (@dec P _) with
 (* #################################################################### *)
 (** * Decidable Equality *)
 
-(*
+(** [[
 Class Eq (A : Type) :=
   {
     dec_eq : forall (x y : A), decidable (x = y)
   }.
+]]
 *)
 
 (** Automation and conversions for Dec. *)
-Parameter dec_if_dec_eq :
-  forall {A} (x y: A),  Dec (x = y) -> {x = y} + {x <> y}.
-
-(* NOW: How to include LTac here? *)
-(* Tactic that decides equalities of the form Dec (x = y). *)
-(* Ltac dec_eq. *)
-
 Declare Instance Eq__Dec {A} `{H : Eq A} (x y : A) : Dec (x = y).
 
-(** Lifting common decidable instances *)
+(** Since deciding equalities is a very common requirement in testing,
+    QuickChick provides a tactic that can define instances of the form
+    [Dec (x = y)]. 
+*)
+(** [[
+ Ltac dec_eq. 
+]] 
+*)
+
+(** QuickChick also lifts common decidable instances to the [Dec] typeclass. *)
 Declare Instance Dec_eq_bool (x y : bool) : Dec (x = y).
 Declare Instance Dec_eq_nat (m n : nat) : Dec (m = n).
 Declare Instance Dec_eq_opt (A : Type) (m n : option A)
@@ -454,17 +457,24 @@ Declare Instance Dec_string (m n : string) : Dec (m = n).
 (* #################################################################### *)
 (** * QuickChick top-level commands and arguments *)
 
-(** Samples a generator. 'g' is of type 'G A' for showable 'A'. *)
-(**
+(** QuickChick provides a series of toplevel commands to 
+    sample generators, test properties, and derive useful typeclass instances.
+*)
+
+(** The [Sample] command samples a generator. 'g' needs to have type 'G A' for showable 'A'. *)
+(** [[
     Sample g.
+]]
 *)
 
-(** Runs a test. 'prop' must be 'Checkable'. *)
-(**
+(** The main command of QuickChick, [QuickChick], runs a test. 'prop' must be 'Checkable'. 
+*)
+(** [[
      QuickChick prop.
+]]
 *)
 
-(** Arguments to customize execution. *)
+(** QuickChick uses arguments to customize execution. *)
 Record Args :=
   MkArgs
     {
@@ -488,19 +498,24 @@ Record Args :=
       chatty     : bool
     }.
 
-(** Instead of record updates, you can overwrite extraction constants. *)
-(**
+(** Instead of record updates, you should overwrite extraction constants. *)
+(** [[
    Extract Constant defNumTests    => "10000".
    Extract Constant defNumDiscards => "(2 * defNumTests)".
    Extract Constant defNumShrinks  => "1000".
    Extract Constant defSize        => "7".
+]]
 *)
 
 (* #################################################################### *)
 (** * Generators for data satisfying inductive invariants *)
 
-(** Sized and unsized version, plus convenient notation. *)
-(*
+(** Just like QuickChick provides the [GenSized] and [Gen] typeclasses 
+    for generators of type [A], it provides constrained variants for 
+    generators of type [A] where [P : A -> Prop] holds. Since it is not
+    guaranteed that such [A] exist, these generators are partial.
+*)
+(** [[
 Class GenSizedSuchThat (A : Type) (P : A -> Prop) :=
   {
     arbitrarySizeST : nat -> G (option A)
@@ -510,7 +525,12 @@ Class GenSuchThat (A : Type) (P : A -> Prop) :=
   {
     arbitraryST : G (option A)
   }.
+]]
 *)
+
+(** QuickChick also provides convenient notation to call [arbitraryST]
+    by providing only the predicate [P] that constraints the generation.
+    The typeclass constraint is inferred. *)
 Notation "'genST' x" := (@arbitraryST _ x _) (at level 70).
 
 (* #################################################################### *)
@@ -535,6 +555,7 @@ Notation "'genST' x" := (@arbitraryST _ x _) (at level 70).
     <x1...xn> are (implicitly universally quantified) variable names.
 *)
 
+(* SOONER: Add links! How do we do that? *)
 (** QuickChick also allows automatic derivations of proofs of
     correctness of its derived generators! For more, look
     at:

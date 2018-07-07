@@ -76,6 +76,8 @@ Fixpoint foldGen {A B : Type} (f : A -> B -> G A) (l : list B) (a : A)
 Definition oneof {A : Type} (def: G A) (gs : list (G A)) : G A :=
   bindGen (choose (0, length gs - 1)) (nth def gs).
 
+Definition oneOf_ := @oneof.
+
 Fixpoint pick {A : Type} (def : G A) (xs : list (nat * G A)) n : nat * G A :=
   match xs with
     | nil => (0, def)
@@ -102,6 +104,8 @@ Definition frequency {A : Type} (def : G A) (gs : list (nat * G A))
   let tot := sum_fst gs in
   bindGen (choose (0, tot-1)) (fun n =>
   @snd _ _ (pick def gs n)).
+
+Definition freq_ := @frequency.
 
 Fixpoint backtrackFuel {A : Type} (fuel : nat) (tot : nat) (gs : list (nat * G (option A))) : G (option A) :=
   match fuel with 
@@ -133,6 +137,7 @@ Definition elements {A : Type} (def : A) (l : list A) :=
   bindGen (choose (0, n - 1)) (fun n' =>
   returnGen (List.nth n' l def)).
 
+Definition elems_ := @elements.
   
 Lemma semLiftGen {A B} (f: A -> B) (g: G A) :
   semGen (liftGen f g) <--> f @: semGen g.
