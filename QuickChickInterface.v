@@ -567,6 +567,89 @@ Notation "'genST' x" := (@arbitraryST _ x _) (at level 70).
 *)
 
 (* #################################################################### *)
+(** * QuickChick Command-Line Tool *)
+
+(** QuickChick comes with a command-line tool that supports:
+      - Batch processing, compilation and execution of tests
+      - Mutation testing
+      - Sectioning of tests and mutants
+    
+    Comments that begin with an exclamation mark
+    are special to the QuickChick command-line tool parser and signify
+    a test, a section, or a mutant.    
+*)
+
+(** ** Test Annotations *)
+
+(** A test annotation is just a [QuickChick] command wrapped inside 
+    a comment with an exclamation mark. 
+[[
+    (*! QuickChick prop. *)
+]]
+   Only tests that are annotated this way will be processed. Only property
+   names are allowed.
+ *)
+
+(** ** Mutant Annotations *)
+
+(** A mutant annotation consists of 4 components. First an anottation 
+    that signifies the beginning of the mutant [(*! *)]. That is followed
+    by the actual code. Then, we can include an optional annotation 
+    (in a comment with double exclamation marks) that corresponds to 
+    the mutant names. Finally, we can add a list of mutations inside
+    normal annotated comments. Each mutant should be able to be 
+    syntactically substituted in for the normal code. 
+   
+[[
+    (*! *)
+    Normal code
+    (*!! mutant-name *)
+    (*! mutant 1 *)
+    (*! mutant 2 *)
+    ... etc ...
+]]
+*)
+
+(** ** Section Annotations *)
+
+(** To organize larger developments better, we can group together 
+    different tests and mutants in sections. A section annotation is 
+    a single annotation that defines the beginning of the section 
+    (which lasts until the next section or the end of the file).
+[[
+      (*! Section section-name *)
+]]
+    Optionally, one can include an extends clause
+[[
+      (*! Section section-name *)(*! extends other-section-name *)
+]]
+   This signifies that the section being defined also 
+   contains all tests and mutants from [other-section-name].
+*)
+
+(** ** Command-Line Tool Flags *)
+
+(** The QuickChick command line tool can be passed the following options:
+    - [-s <section>]: Specify which sections properties and mutants to test
+    - [-v]: Verbose mode for debugging
+    - [-failfast]: Stop as soon as a problem is detected
+    - [-color]: Use colors on an ANSI-compatible terminal
+    - [-cmd <command>]: What compile command is used to compile the current directory
+      if it is not [make]
+    - [-top <name>]: Specify the name of the top-level logical module. That should
+      be the same as the [-Q] or [-R] directive in [_CoqProject] or [Top]
+      which is the default
+    - [-ocamlbuild <args>]: Any arguments necessary to pass to ocamlbuild when
+      compiling the extracted code (e.g. linked libraries)
+    - [-nobase]: Pass this option to not test the base mutant
+    - [-m <number>]: Pass this to only test a mutant with a specific id number
+    - [-tag <name>]: Pass this to only test a mutant with a specific tag
+    - [-include <name>]: Specify a to include in the compilation
+    - [-exclude <names>]: Specify files to be excluded from compilation. Must be the last argument passed.
+*)
+
+
+(* #################################################################### *)
 (** * Deprecated Features *)
 
 (** The following features are retained for backward compatibility,
