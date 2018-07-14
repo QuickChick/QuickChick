@@ -55,15 +55,21 @@ type var = Id.t (* Opaque *)
 let var_of_id x = x         
 let var_to_string = Id.to_string
 let gVar (x : var) : coq_expr =
-  CAst.make @@ CRef (qualid_of_ident x,None)
+  CAst.make @@ CRef (CAst.make @@ Libnames.Ident x,None)
 
+let id_to_reference id = 
+  let qualid = qualid_of_string (Id.to_string id) in
+  Qualid qualid
+
+let qualid_to_reference q = 
+  Qualid q
 let qualid_to_coq_expr q = 
-  mkRefC q
+  mkRefC @@ CAst.make @@ Qualid q
 
 (* Maybe this should do checks? *)
 let gInject s = 
   if s = "" then failwith "Called gInject with empty string";
-  CAst.make @@ CRef (qualid_of_string s, None)
+  CAst.make @@ CRef (CAst.make @@ Qualid (qualid_of_string s), None)
 
 type ty_param = Id.t (* Opaque *)
 let ty_param_to_string (x : ty_param) = Id.to_string x
@@ -80,7 +86,8 @@ let gTyCtr = qualid_to_coq_expr
 type arg = local_binder_expr
 let gArg ?assumName:(an=hole) ?assumType:(at=hole) ?assumImplicit:(ai=false) ?assumGeneralized:(ag=false) _ =
   let n = match an with
-    | { CAst.v = CRef (qid, _); loc } -> (loc,Name (qualid_basename qid))
+    | { CAst.v = CRef ({CAst.v = Libnames.Ident id}, _); loc } -> (loc,Name id)
+    | { CAst.v = CRef ({CAst.v = Qualid q}, _); loc } -> let (_,id) = repr_qualid q in (loc, Name id)
     | { CAst.v = CHole (v,_,_); loc } -> (loc,Anonymous)
     | a -> failwith "This expression should be a name" in
   CLocalAssum ( [CAst.make ?loc:(fst n) @@ snd n],
@@ -118,8 +125,9 @@ let ty_ctr_to_ctr x = x
 let ctr_to_ty_ctr x = x
 
 let num_of_ctrs (c : constructor) =
+  let r = qualid_to_reference c in 
   let env = Global.env () in
-  let glob_ref = Nametab.global c in
+  let glob_ref = Nametab.global (CAst.make r) in
   let ((mind,n),_) = Globnames.destConstructRef glob_ref in
   let mib = Environ.lookup_mind mind env in
   Array.length (mib.mind_packets.(n).mind_consnames)
@@ -337,7 +345,7 @@ let dt_rep_from_mib mib =
     parse_constructors mib.mind_nparams ty_params result_ctr oib >>= fun ctr_reps ->
     Some (qualid_of_ident ty_ctr, ty_params, ctr_reps)
 
-let qualid_to_mib r =
+let reference_to_mib r =
   let env = Global.env () in
   
   let glob_ref = Nametab.global r in
@@ -353,7 +361,7 @@ let coerce_reference_to_dt_rep c =
     | _ -> failwith "Not a reference"
   in
 
-  let mib = qualid_to_mib r in
+  let mib = reference_to_mib r in
   
   dt_rep_from_mib mib
 
@@ -626,9 +634,9 @@ let gMatch discr ?catchAll:(body=None) (branches : (constructor * string list * 
           [(discr, None, None)], (* single discriminee, no as/in *)
           (List.map (fun (c, cs, bf) -> 
                       let cvs : Id.t list = List.map fresh_name cs in
-                      CAst.make ([[CAst.make @@ CPatCstr (c,
+                      CAst.make ([[CAst.make @@ CPatCstr (CAst.make @@ qualid_to_reference c,
                                       None,
-                                      List.map (fun s -> CAst.make @@ CPatAtom (Some (qualid_of_ident s))) cvs (* Constructor applied to patterns *)
+                                      List.map (fun s -> CAst.make @@ CPatAtom (Some (CAst.make (Ident s)))) cvs (* Constructor applied to patterns *)
                                     )
                            ]],
                        bf cvs)
@@ -647,9 +655,9 @@ let gMatchReturn (discr : coq_expr)
           [(discr, Some (CAst.make (Name as_id')), None)], (* single discriminee, no in *)
           (List.map (fun (c, cs, bf) -> 
                       let cvs : Id.t list = List.map fresh_name cs in
-                       CAst.make ([[CAst.make @@ CPatCstr (c,
+                       CAst.make ([[CAst.make @@ CPatCstr (CAst.make @@ qualid_to_reference c,
                                       None,
-                                      List.map (fun s -> CAst.make @@ CPatAtom (Some (qualid_of_ident s))) cvs (* Constructor applied to patterns *)
+                                      List.map (fun s -> CAst.make @@ CPatAtom (Some (CAst.make @@ Libnames.Ident s))) cvs (* Constructor applied to patterns *)
                                   )]],
                                   bf cvs)
                    ) branches) @ (match body with
@@ -659,7 +667,7 @@ let gMatchReturn (discr : coq_expr)
 
 
 let gRecord names_and_bodies =
-  CAst.make @@ CRecord (List.map (fun (n,b) -> (qualid_of_ident @@ Id.of_string n, b)) names_and_bodies)
+  CAst.make @@ CRecord (List.map (fun (n,b) -> (CAst.make @@ id_to_reference @@ Id.of_string n, b)) names_and_bodies)
 
 let gAnnot (p : coq_expr) (tau : coq_expr) =
   CAst.make @@ CCast (p, Misctypes.CastConv tau)
@@ -689,7 +697,7 @@ let gType ty_params dep_type =
 (* Lookup the type of an identifier *)
 let get_type (id : Id.t) = 
   msg_debug (str ("Trying to global:" ^ Id.to_string id) ++ fnl ());
-  let glob_ref = Nametab.global (qualid_of_ident id) in
+  let glob_ref = Nametab.global (CAst.make @@ id_to_reference id) in
   match glob_ref with 
   | VarRef _ -> msg_debug  (str "Var" ++ fnl ())
   | ConstRef _ -> msg_debug (str "Constant" ++ fnl ())
@@ -697,7 +705,7 @@ let get_type (id : Id.t) =
   | ConstructRef _ -> msg_debug (str "Constructor" ++ fnl ())
 
 let is_inductive c = 
-  let glob_ref = Nametab.global c in
+  let glob_ref = Nametab.global @@ CAst.make @@ qualid_to_reference c in
   match glob_ref with
   | IndRef _ -> true
   | _        -> false
@@ -719,11 +727,11 @@ let rec matcher_pat_to_string = function
 let construct_match c ?catch_all:(mdef=None) alts = 
   let rec aux = function 
     | MatchU u' -> begin 
-        CAst.make @@ CPatAtom (Some (qualid_of_ident u'))
+        CAst.make @@ CPatAtom (Some (CAst.make @@ Libnames.Ident u'))
       end
     | MatchCtr (c, ms) -> begin
        if is_inductive c then CAst.make @@ CPatAtom None
-       else CAst.make @@ CPatCstr (c,
+       else CAst.make @@ CPatCstr (CAst.make @@ qualid_to_reference c,
                    Some (List.map (fun m -> aux m) ms),
                    []) 
                         end 
@@ -741,14 +749,14 @@ let construct_match_with_return c ?catch_all:(mdef=None) (as_id : string) (ret :
   let as_id' = fresh_name as_id in
   let rec aux = function
     | MatchU u' -> begin
-        CAst.make @@ CPatAtom (Some (qualid_of_ident u'))
+        CAst.make @@ CPatAtom (Some (CAst.make @@ Libnames.Ident u'))
       end
     | MatchCtr (c, ms) -> begin
        if is_inductive c then begin 
          CAst.make @@ CPatAtom None
        end
        else begin 
-         CAst.make @@ CPatCstr (c,
+         CAst.make @@ CPatCstr (CAst.make @@ qualid_to_reference c,
                    Some (List.map (fun m -> aux m) ms),
                    []) 
          end
