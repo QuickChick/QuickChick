@@ -150,7 +150,7 @@ let define_and_run c =
   Sys.remove mlif;
   (* TODO: Maxime, thoughts? *)
   (** LEO: However, sometimes the inferred types are too abstract. So we touch the .mli to close the weak types. **)
-  Sys.command ("touch " ^ mlif);
+  let _exit_code = Sys.command ("touch " ^ mlif) in
   (*
   Printf.printf "Extracted ML file: %s\n" mlf;
   Printf.printf "Compile command: %s\n" (comp_ml_cmd mlf execn);
