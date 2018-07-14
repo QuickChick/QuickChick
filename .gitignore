@@ -8,6 +8,8 @@ dsss17/terse
 *.cmx
 *.cmxa
 *.cmxs
+*.cmt
+*.cmti
 *.hi
 *.o
 *.v.d
@@ -17,6 +19,7 @@ dsss17/terse
 *.vo
 *.aux
 *.a
+*.annot
 .coq-native
 \#*
 *~
