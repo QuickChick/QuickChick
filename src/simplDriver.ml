@@ -55,7 +55,11 @@ let derive (cn : derivable) (c : constr_expr) (instance_name : string) (name1 : 
 
   let ind_name = match c with
     | { CAst.v = CRef (r, _) } ->
-         string_of_qualid r
+       begin
+         string_of_qualid @@
+           match qualid_of_reference r with
+           | { CAst.v = q } -> q
+       end
     | _ -> failwith "Implement me for functions" 
   in
 

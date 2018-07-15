@@ -18,7 +18,7 @@ let quickchick_goal =
 
     (* Admit a constant with that type *)
     let tmpid = QuickChick.fresh_name "temporary_constant" in
-    let _interp_st = Vernacentries.interp (CAst.make @@ Vernacexpr.VernacExpr ([],
+    Vernacentries.interp (CAst.make @@ Vernacexpr.VernacExpr ([],
       (* TODO: NoDischarge or DoDischarge? *)
       Vernacexpr.VernacAssumption ((NoDischarge, Decl_kinds.Conjectural),
                         NoInline,
@@ -31,10 +31,11 @@ let quickchick_goal =
                            )
                           )
                         ]
-                       ))) in
+                       )));
+
 
     let s = QuickChick.runTest
-            (CAst.make @@ CApp((None,QuickChick.quickCheck), [CAst.make @@ CRef (Libnames.qualid_of_ident tmpid,None), None])) in
+            (CAst.make @@ CApp((None,QuickChick.quickCheck), [CAst.make @@ CRef (CAst.make @@ Libnames.Ident tmpid,None), None])) in
 
     match s with
     | Some bytes ->

@@ -30,7 +30,7 @@ Extract Constant show_bool =>
     if i < 0 then acc else copy (s.[i] :: acc) (i-1)
   in copy [] (String.length s - 1))".
 
-Extract Constant show_int =>
+Extract Constant show_Z =>
   "(fun i ->
   let s = string_of_int i in
   let rec copy acc i =
