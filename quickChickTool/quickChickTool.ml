@@ -229,10 +229,10 @@ let gather_all_vs_from_dir fs =
     match fs with
     | File (s, _) ->
        if (Filename.check_suffix s ".v")
-          && not (List.exists (fun x -> x = Filename.basename s) !excluded) then
+          && not (List.exists (fun x -> Filename.basename x = Filename.basename s) !excluded) then
          all_vs := (Filename.chop_suffix s ".v") :: !all_vs
     | Dir (s, fss) ->
-       if not (List.exists (fun x -> x = s) !excluded) then 
+       if not (List.exists (fun x -> Filename.basename x = Filename.basename s) !excluded) then
          List.iter loop fss
        else ()
   in loop fs;

@@ -11,4 +11,3 @@ clean: Makefile.coq
 test: clean
 	time quickChick -color
 	-quickChick -color -include _CoqProject
-	-quickChick -color -exclude src/Zoo.v
