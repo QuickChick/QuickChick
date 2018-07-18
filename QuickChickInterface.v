@@ -457,18 +457,19 @@ Declare Instance Dec_string (m n : string) : Dec (m = n).
 (* #################################################################### *)
 (** * QuickChick top-level commands and arguments *)
 
-(** QuickChick provides a series of toplevel commands to 
-    sample generators, test properties, and derive useful typeclass instances.
-*)
+(** QuickChick provides a series of toplevel commands to sample
+    generators, test properties, and derive useful typeclass
+    instances. *)
 
-(** The [Sample] command samples a generator. 'g' needs to have type 'G A' for showable 'A'. *)
+(** The [Sample] command samples a generator. The argument [g] needs
+    to have type [G A] for some showable type [A]. *)
 (** [[
     Sample g.
 ]]
 *)
 
-(** The main command of QuickChick, [QuickChick], runs a test. 'prop' must be 'Checkable'. 
-*)
+(** The main testing command, [QuickChick], runs a test. The argument
+    [prop] must belong to a type that is an instance of [Checkable]. *)
 (** [[
      QuickChick prop.
 ]]
