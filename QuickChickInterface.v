@@ -3,8 +3,8 @@
 (* SOONER: Still needs work on writing, throughout... *)
 
 (* HIDE: Should we hide this top html imports?  BCP: No, I think it's
-   better to make it explicit, even in the HTML, what it depends on.
-   However, I'm a bit confused -- the fact that we import
+   better to make it explicit, even in the HTML, what it depends on. *)
+(* SOONER: @LEO However, I'm a bit confused -- the fact that we import
    QuickChick.ChickChick seems a bit circular (or at least
    not-self-contained)...*)
 From QuickChick Require Import QuickChick.
@@ -12,11 +12,12 @@ Require Import ZArith Strings.Ascii Strings.String.
 
 From ExtLib.Structures Require Import Functor Applicative.
 
-Module Type QuickChickSig.
-
 (** QuickChick provides a large collection of combinators and
     notations for writing property-based random tests.  This file
-    documents the entire public interface. *)
+    documents the entire public interface (the module type
+    [QuickChickSig]). *)
+
+Module Type QuickChickSig.
 
 (* #################################################################### *)
 (** * The [Show] Typeclass *)
@@ -185,14 +186,14 @@ Module QcDefaultNotation.
 End QcDefaultNotation.
 
 (* #################################################################### *)
-(** ** Choosing from intervals (choose) *)
+(** ** Choosing from Intervals *)
 
 (** The combinators above allow us to generate elements by enumeration
     and lifting. However, for numeric data types, we sometimes hope to
     choose from an interval without writing down all the possible
     values.
 
-    Such intervals can be defined on ordered data types, namely
+    Such intervals can be defined on ordered data types, instances of
     [OrdType], whose ordering [leq] satisfies reflexive, transitive,
     and antisymmetric predicates. *)
 
@@ -251,7 +252,37 @@ Declare Instance genPair :
   forall {A B : Type} `{Gen A} `{Gen B}, Gen (A * B).
 
 (* #################################################################### *)
+(** ** Generators for Data Satisfying Inductive Predicates *)
+
+(** Just as QuickChick provides the [GenSized] and [Gen] typeclasses
+    for generators of type [A], it provides constrained variants for
+    generators of type [A] such that [P : A -> Prop] holds of all
+    generated values.  Since it is not guaranteed that any such [A]
+    exist, these generators are partial. *)
+(* SOONER: Explain when these would be used... *)
+(** [[
+     Class GenSizedSuchThat (A : Type) (P : A -> Prop) :=
+       {
+         arbitrarySizeST : nat -> G (option A)
+       }.
+
+     Class GenSuchThat (A : Type) (P : A -> Prop) :=
+       {
+         arbitraryST : G (option A)
+       }.
+]]
+*)
+
+(** QuickChick also provides convenient notation to call [arbitraryST]
+    by providing only the predicate [P] that constraints the generation.
+    The typeclass constraint is inferred. *)
+(* SOONER: Explain this too! *)
+Notation "'genST' x" := (@arbitraryST _ x _) (at level 70).
+
+(* #################################################################### *)
 (** * Shrinking *)
+
+(** ** The [Shrink] Typeclass *)
 
 (** [Shrink] is a typeclass whose instances have an operation for
     shrinking larger elements to smaller ones, allowing QuickChick to
@@ -305,6 +336,8 @@ Declare Instance ArbitraryOfGenShrink :
 (* #################################################################### *)
 (** * Checkers *)
 
+(** ** Basic Definitions *)
+
 (** [Checker] is the opaque type of QuickChick properties. *)
 Parameter Checker : Type.
 
@@ -329,6 +362,7 @@ Parameter forAll :
          (gen : G A)  (pf : A -> prop), Checker.
 
 (** A variant of [forAll] that uses evidence for the generated value. *)
+(* SOONER: Uses it for what?? *)
 Parameter forAllProof :
   forall {A prop : Type} `{Checkable prop} `{Show A}
          (gen : G A)  (pf : forall (x : A), semGen gen x -> prop), Checker.
@@ -381,7 +415,9 @@ Parameter collect :
 Parameter tag :
   forall {prop : Type} `{Checkable prop} (t : string), prop -> Checker.
 
-(** For the conjunction / disjunction of a list of checkers. *)
+(** Form the conjunction / disjunction of a list of checkers. *)
+(* SOONER: We are not very consistent about when we name arguments and
+   when we do not.  E.g. [l] here: *)
 Parameter conjoin : forall (l : list Checker), Checker.
 Parameter disjoin : forall (l : list Checker), Checker.
 
@@ -394,6 +430,7 @@ Parameter implication :
     other libraries, so it lives in its own module. *)
 (* SOONER: Might not be immediately obvious that this module includes
    the notation module above -- we don't say it.*)
+(* SOONER: The FORALL notations need some explanation. *)
 Module QcNotation.
   Export QcDefaultNotation.
 
@@ -418,8 +455,9 @@ Module QcNotation.
 End QcNotation.
 
 (* #################################################################### *)
-(** * Decidability ([Dec]) and Decidable Equality ([Eq]) *)
+(** * Decidability *)
 
+(** ** The [Dec] Typeclass *)
 (** Decidability typeclass using ssreflect's 'decidable'. *)
 (** [[
      Class Dec (P : Prop) : Type := { dec : decidable P }.
@@ -440,6 +478,8 @@ Notation "P '?'" := (match (@dec P _) with
                      | left _ => true
                      | right _ => false
                      end) (at level 100).
+
+(** ** The [Eq] Typeclass *)
 
 (** [[
      Class Eq (A : Type) :=
@@ -477,42 +517,21 @@ Declare Instance Dec_ascii (m n : Ascii.ascii) : Dec (m = n).
 Declare Instance Dec_string (m n : string) : Dec (m = n).
 
 (* #################################################################### *)
-(** * Generators for Data Satisfying Inductive Invariants *)
-
-(** Just like QuickChick provides the [GenSized] and [Gen] typeclasses 
-    for generators of type [A], it provides constrained variants for 
-    generators of type [A] where [P : A -> Prop] holds. Since it is not
-    guaranteed that such [A] exist, these generators are partial. *)
-(* SOONER: Explain when these would be used... *)
-(** [[
-     Class GenSizedSuchThat (A : Type) (P : A -> Prop) :=
-       {
-         arbitrarySizeST : nat -> G (option A)
-       }.
-
-     Class GenSuchThat (A : Type) (P : A -> Prop) :=
-       {
-         arbitraryST : G (option A)
-       }.
-]]
-*)
-
-(** QuickChick also provides convenient notation to call [arbitraryST]
-    by providing only the predicate [P] that constraints the generation.
-    The typeclass constraint is inferred. *)
-(* SOONER: Ditto. *)
-Notation "'genST' x" := (@arbitraryST _ x _) (at level 70).
-
-(* #################################################################### *)
 (** * Automatic Instance Derivation *)
 
 (** QuickChick allows the automatic derivation of typeclass instances
     for simple types:
+[[
+       Derive <class> for T.
+]]
+    Here [<class>] must be one of [GenSized], [Shrink], [Arbitrary],
+    or [Show], and [T] must be an inductive defined datatype (think
+    Haskell/OCaml).
 
-     Derive <class> for <T>.
-
-    <class> must be one of: GenSized , Shrink , Arbitrary , Show
-    <T> must be an inductive defined datatype (think Haskell/OCaml).
+    To derive multiple classes at once, write:
+[[
+       Derive (<class>,...,<class>) for T.
+]]
 *)
 
 (** QuickChick also allows for the automatic derivation of generators
@@ -525,7 +544,7 @@ Notation "'genST' x" := (@arbitraryST _ x _) (at level 70).
     <x1...xn> are (implicitly universally quantified) variable names.
 *)
 
-(* SOONER: Add links! How do we do that? *)
+(* SOONER: Add links! LEO: How do we do that?  BCP: See qc/Postscript.v. *)
 (** QuickChick also allows automatic derivations of proofs of
     correctness of its derived generators! For more, look
     at:
