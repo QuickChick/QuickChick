@@ -1,8 +1,13 @@
 (** * QuickChickInterface: QuickChick Reference Manual *)
 
-(* SOONER: Still needs work on writing, throughout... *)
 (* SOONER: A lot of the "Sooner" in this file are actually 
    addressed in the QC chapter... *)
+(* SOONER: You mean the places asking for explanations?  I know there
+   are long explanations of some things elsewhere, but I still think
+   the explanations here would be more useful if there were a sentence
+   or two more detail.  We don't want to force people to grep around
+   in the whole book to remind themselves what a given function
+   does. *)
 
 (* HIDE: Should we hide this top html imports?  BCP: No, I think it's
    better to make it explicit, even in the HTML, what it depends on. *)
@@ -11,6 +16,12 @@
    not-self-contained)...*)
 (* SOONER: Why? This imports everything that a user imports as well
    and re-exports some of them in QuickChickSig. *)
+(* SOONER: Because it means that this file is not a complete,
+   self-contained description of what the user gets when they import
+   QuickChick.  E.g. (I'm not sure if there are other examples), the
+   type [set] is mentioned below, but there is no description
+   anywhere (public) of what it is or what functions / theorems can be
+   used to manipulate it. *)
 From QuickChick Require Import QuickChick.
 Require Import ZArith Strings.Ascii Strings.String.
 
@@ -80,6 +91,14 @@ Parameter semGenSize : forall {A : Type} (g : G A) (size : nat), set A.
    of that file quite a while ago (during her thesis at Catalin). It 
    is not really documented... would you want all of that file 
    here? *)
+(* SOONER: I want this file to be a complete description of what most
+   people need to know to use QC.  One possible approach could be to
+   split this interface into a "programming interface" for most users
+   and a "proving interface" for people that also want to do proofs
+   involving the QC semantics.  Then the functions from Sets.v would
+   be relevant only to the second.  (I actually kind of like this
+   idea, as it would streamline what most people need to think
+   about.) *)
 
 (* #################################################################### *)
 (** ** Structural Combinators *)
@@ -282,15 +301,17 @@ Declare Instance genPair :
 
 (* SOONER: Explain when these would be used... *)
 (* SOONER: Something like this? We address this in TImp... *)
+(* SOONER: I agree this is a little long, but it does seem useful. We
+   can (also / instead) point people to the relevant section of
+   TImp for more. *)
 (** So, for example, if you have a typing relation 
     [has_type : exp -> type -> Prop] for some language, you could, 
     given some type [T] as input, write (or derive as we will see later on) 
-    an instance of [GenSizeSuchThat (fun e => has_type e T)], that produces 
+    an instance of [GenSizedSuchThat (fun e => has_type e T)], that produces 
     an expression of with type [T]. 
     
     Calling [arbitraryST] through such an instance would require 
     making an explicit application to [@arbitraryST] as follows:
-   
 [[
     @arbitraryST _ (fun e => has_type e T) _
 ]] 
@@ -384,8 +405,9 @@ Declare Instance testBool : Checkable bool.
     the entire property holds vacuously. However, in random testing,
     such vacuous tests don't actual give confidence in the correctness
     of the property under test. Therefore, QuickChick _discards_ those 
-    tests and reports the number of such discards to the user.
-*)
+    tests and reports the number of such discards to the user. *)
+(* SOONER: This discussion doesn't seem relevant to testUnit -- it's
+   talking about implication checkers, not unit checkers. *)
 Declare Instance testUnit : Checkable unit.
 
 (** Given a generator for showable [A]s, construct a [Checker]. *)
@@ -394,9 +416,16 @@ Parameter forAll :
          (gen : G A)  (pf : A -> prop), Checker.
 
 (** A variant of [forAll] that provides evidence that the generated
-    values are members of the semantics of the generator. Such evidence
+    values are members of the semantics of the generator. (Such evidence
     can be useful when constructing dependently typed data, such as 
-    bounded integers. *)
+    bounded integers.) *)
+(* SOONER: That's exactly the sort of concise explanation that I'm
+   looking for throughout!  (And it makes me realize that separating
+   the interface into "operations for programmers" and "operations for
+   provers" may not be so simple!  Though it may still make sense to
+   lump dependently typed programming in with proving.  So one
+   interface could be called QCBasicInterface and the other
+   QCPowerUsersInterface :-) *)
 Parameter forAllProof :
   forall {A prop : Type} `{Checkable prop} `{Show A}
          (gen : G A)  (pf : forall (x : A), semGen gen x -> prop), Checker.
@@ -407,24 +436,22 @@ Parameter forAllShrink :
   forall {A prop : Type} `{Checkable prop} `{Show A}
          (gen : G A) (shrinker : A -> list A) (pf : A -> prop), Checker.
 
-(** Typeclass magic: Lift ([Show], [Gen], [Shrink]) instances for [A]
-   to a [Checker] for functions [A] -> prop. *)
-(* SOONER: Don't understand what I'd use this for. *)
-(* SOONER: You use it implicitly all the time whenever you 
-   write (for some example property "foo := fun x => x >? 0")
-   "QuickChick foo" instead of "QuickChick (forAllShrink arbitrary shrink foo)".
-*)
+(** Lift ([Show], [Gen], [Shrink]) instances for [A]
+    to a [Checker] for functions [A] -> prop.  This is what makes it
+    possible to write (for some example property [foo := fun x => x >?
+    0], say) [QuickChick foo] instead of [QuickChick (forAllShrink
+    arbitrary shrink foo)]. *)
 Declare Instance testFun :
   forall {A prop : Type} `{Show A} `{Arbitrary A} `{Checkable prop},
     Checkable (A -> prop).
 
-(** Typeclass magic revisited: Similar thing for products. *)
+(** Lift products similarly. *)
 Declare Instance testProd :
   forall {A : Type} {prop : A -> Type} `{Show A} `{Arbitrary A}
          `{forall x : A, Checkable (prop x)},
     Checkable (forall (x : A), prop x).
 
-(** Test polymorphic functions by instantiating to 'nat'. :-) *)
+(** Lift polymorphic functions by instantiating to 'nat'. :-) *)
 Declare Instance testPolyFun :
   forall {prop : Type -> Type} `{Checkable (prop nat)},
     Checkable (forall T, prop T).
@@ -437,8 +464,11 @@ Parameter whenFail :
   forall {prop : Type} `{Checkable prop} (str : string), prop -> Checker.
 
 (** Record an expectation that a property should fail, i.e. 
-    the property will fail if all the tests succeed. 
- *)
+    the property will fail if all the tests succeed. *)
+(* SOONER: Don't understand this explanation. A Checker, in my model
+   of the world, maps a random seed to the outcome of a *single* test.
+   This seems to suggest that an expectFailure checker somehow knows
+   the value of the test on *all* random seeds... *)
 Parameter expectFailure :
   forall {prop: Type} `{Checkable prop} (p: prop), Checker.
 
@@ -457,6 +487,7 @@ Parameter tag :
 (* SOONER: We are not very consistent about when we name arguments and
    when we do not.  E.g. [l] here: *)
 (* SOONER: We name all non-implicit/Typeclass ones, no? *)
+(* SOONER: whenFail does not.  Nor does, for example (of many) resize. *)
 Parameter conjoin : forall (l : list Checker), Checker.
 Parameter disjoin : forall (l : list Checker), Checker.
 
@@ -472,6 +503,7 @@ Parameter implication :
 (* SOONER: The FORALL notations need some explanation. *)
 (* SOONER: Are the FORALL notations even used by anyone? 
    I'd say delete them rather than explain them and deprecate them... *)
+(* SOONER: Also fine. *)
 Module QcNotation.
   Export QcDefaultNotation.
 
