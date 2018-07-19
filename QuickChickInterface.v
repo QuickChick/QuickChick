@@ -8,6 +8,8 @@
    or two more detail.  We don't want to force people to grep around
    in the whole book to remind themselves what a given function
    does. *)
+(* SOONER: OK, after another round I think I see what you want this 
+   to look like explanation-wise. *)
 
 (* HIDE: Should we hide this top html imports?  BCP: No, I think it's
    better to make it explicit, even in the HTML, what it depends on. *)
@@ -22,6 +24,7 @@
    type [set] is mentioned below, but there is no description
    anywhere (public) of what it is or what functions / theorems can be
    used to manipulate it. *)
+(* SOONER: For this point, see longer comment next to semGen... *)
 From QuickChick Require Import QuickChick.
 Require Import ZArith Strings.Ascii Strings.String.
 
@@ -99,6 +102,55 @@ Parameter semGenSize : forall {A : Type} (g : G A) (size : nat), set A.
    be relevant only to the second.  (I actually kind of like this
    idea, as it would streamline what most people need to think
    about.) *)
+(* SOONER: It *is* a complete description of what _the vast majority_ people need
+   to know to use QC. There are exactly three uses of the set library:
+   1) Allow derivation of correctness proofs. Here, the user doesn't 
+      need to know all the lemmas that the proof uses in order to enjoy
+      the benefits of an end-to-end specification (but the lemmas
+      need to be exposed).
+   2) Allow manual correctness proofs. I don't think anyone has ever 
+      done that outside of ourselves to practice before writing the 
+      generic derivation of proofs. Writing correctness proofs for 
+      generators is hard and not really worth it from the user's 
+      perspective.
+   3) The only potential use of the set library from a user would 
+      be in forAllProof variants to define dependently typed data. However, 
+      this intrinsic verification approach is very rarely used and 
+      comes with more severe testing problems than an undocumented 
+      set library.
+ 
+   My thinking was to have [semGen] and [forAllProof] here as a small
+   glance into the world of generator semantics. I do think that 
+   presenting the view that a generator is characterized by its set of  
+   outcomes is a very useful notion, even if a user never has to 
+   actively play with that notion. Do you want to just remove every
+   mention to [set]/[semGen] from this file to keep it a "programming
+   only" interface? 
+
+   Besides, what would the "proving interface" entail? 
+   We can't really document the entirety of the sets library. That's like 
+   200 low-level lemmas that are only expanded to facilitate proof 
+   derivation... For example, we have lemmas like the following:
+
+[[
+Lemma isSome_subset {A : Type} (s1 s2 s1' s2' : set (option A)) :
+  isSome :&: s1 \subset isSome :&: s2 ->
+  isSome :&: (s1 :|: ([set None] :&: s1')) \subset isSome :&: (s2 :|: ([set None] :&: s2')).
+]]
+   
+   This says that if the set of all "Some"s in s1 is a subset of all the 
+   "Some"s in s2, then the set of all "Some"s in the the union of s1 with 
+   [the intersection of {None} and s1'] is a subset of the set of all somes in
+   the union of s2 with [the intersection of {None} and s2']. Of course, the intersection of 
+   {None} with any set is at most {None}, and that none will be filtered 
+   out by [isSome], so this looks like a completely useless lemma. However,
+   we do need this lemma because of the particular structure of the 
+   proofs involving the backtrack combinator. How can we explain this 
+   lemma and its point to a user if we turn this file into a complete
+   documentation of everything that needs to be exposed?
+
+ *)
+  
 
 (* #################################################################### *)
 (** ** Structural Combinators *)
@@ -299,11 +351,6 @@ Declare Instance genPair :
 ]]
  *)
 
-(* SOONER: Explain when these would be used... *)
-(* SOONER: Something like this? We address this in TImp... *)
-(* SOONER: I agree this is a little long, but it does seem useful. We
-   can (also / instead) point people to the relevant section of
-   TImp for more. *)
 (** So, for example, if you have a typing relation 
     [has_type : exp -> type -> Prop] for some language, you could, 
     given some type [T] as input, write (or derive as we will see later on) 
@@ -408,6 +455,9 @@ Declare Instance testBool : Checkable bool.
     tests and reports the number of such discards to the user. *)
 (* SOONER: This discussion doesn't seem relevant to testUnit -- it's
    talking about implication checkers, not unit checkers. *)
+(* SOONER: I thought you wanted to motivate discards here. What are you
+   looking for instead? A test that results in a unit is a discarded 
+   test. *)
 Declare Instance testUnit : Checkable unit.
 
 (** Given a generator for showable [A]s, construct a [Checker]. *)
@@ -426,6 +476,7 @@ Parameter forAll :
    lump dependently typed programming in with proving.  So one
    interface could be called QCBasicInterface and the other
    QCPowerUsersInterface :-) *)
+(* SOONER: This file indeed used to be called QCBasicInterface :-) *)
 Parameter forAllProof :
   forall {A prop : Type} `{Checkable prop} `{Show A}
          (gen : G A)  (pf : forall (x : A), semGen gen x -> prop), Checker.
@@ -469,6 +520,14 @@ Parameter whenFail :
    of the world, maps a random seed to the outcome of a *single* test.
    This seems to suggest that an expectFailure checker somehow knows
    the value of the test on *all* random seeds... *)
+(* SOONER: I think I need help with the phrasing here. What I mean
+   is QuickChick will run its default number of tests (whether 
+   that is 100 or 10000000 doesn't matter). If all of those 
+   100 or 10000000 tests succeed, then an [expectFailure property] is 
+   considered to fail because a failure was expected but not found.
+   Does this make sense?
+*)
+   
 Parameter expectFailure :
   forall {prop: Type} `{Checkable prop} (p: prop), Checker.
 
@@ -488,6 +547,9 @@ Parameter tag :
    when we do not.  E.g. [l] here: *)
 (* SOONER: We name all non-implicit/Typeclass ones, no? *)
 (* SOONER: whenFail does not.  Nor does, for example (of many) resize. *)
+(* SOONER: What convention would you prefer to keep? Delete all names?
+   Keep all non-implicit names? Something else? I can do a consistency 
+   pass after we fix everything. *)
 Parameter conjoin : forall (l : list Checker), Checker.
 Parameter disjoin : forall (l : list Checker), Checker.
 
@@ -497,34 +559,16 @@ Parameter implication :
   forall {prop : Type} `{Checkable prop} (b : bool) (p : prop), Checker.
 
 (** Notation for implication. Clashes with many other notations in
-    other libraries, so it lives in its own module. *)
-(* SOONER: Might not be immediately obvious that this module includes
-   the notation module above -- we don't say it.*)
-(* SOONER: The FORALL notations need some explanation. *)
-(* SOONER: Are the FORALL notations even used by anyone? 
-   I'd say delete them rather than explain them and deprecate them... *)
-(* SOONER: Also fine. *)
+    other libraries, so it lives in its own module. Note that this
+    includes the notations for the generator combinators above
+    to avoid needing to import two modules.
+ *)
 Module QcNotation.
   Export QcDefaultNotation.
 
   Notation "x ==> y" :=
     (implication x y) (at level 55, right associativity)
     : Checker_scope.
-
-  Notation "'FORALL' x : T , c" :=
-    (forAllShrink (@arbitrary T _) shrink (fun x => c))
-      (at level 200, x ident, T at level 200, 
-       c at level 200, right associativity)
-    : type_scope.
-
-  Notation "'FORALL' x | P , c" :=
-    (forAllShrink (genST (fun x => P)) shrink (fun y => match y with
-                                                  | Some x => c
-                                                  | _ => checker tt
-                                                  end))
-      (at level 200, x ident, P at level 200, 
-       c at level 200, right associativity)
-    : type_scope.
 End QcNotation.
 
 (* #################################################################### *)
@@ -617,7 +661,6 @@ Declare Instance Dec_string (m n : string) : Dec (m = n).
     <x1...xn> are (implicitly universally quantified) variable names.
 *)
 
-(* SOONER: Add links! LEO: How do we do that?  BCP: See qc/Postscript.v. *)
 (** QuickChick also allows automatic derivations of proofs of
     correctness of its derived generators! For more, look
     at:
