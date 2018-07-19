@@ -1,12 +1,16 @@
 (** * QuickChickInterface: QuickChick Reference Manual *)
 
 (* SOONER: Still needs work on writing, throughout... *)
+(* SOONER: A lot of the "Sooner" in this file are actually 
+   addressed in the QC chapter... *)
 
 (* HIDE: Should we hide this top html imports?  BCP: No, I think it's
    better to make it explicit, even in the HTML, what it depends on. *)
 (* SOONER: @LEO However, I'm a bit confused -- the fact that we import
    QuickChick.ChickChick seems a bit circular (or at least
    not-self-contained)...*)
+(* SOONER: Why? This imports everything that a user imports as well
+   and re-exports some of them in QuickChickSig. *)
 From QuickChick Require Import QuickChick.
 Require Import ZArith Strings.Ascii Strings.String.
 
@@ -72,6 +76,10 @@ Parameter semGen : forall {A : Type} (g : G A), set A.
 Parameter semGenSize : forall {A : Type} (g : G A) (size : nat), set A.
 (* SOONER: Where does [set] come from?? Where can I read about what
    operations / theorems are available? *)
+(* SOONER: [set] comes from src/Sets.v. I think Maxime/Zoe wrote most
+   of that file quite a while ago (during her thesis at Catalin). It 
+   is not really documented... would you want all of that file 
+   here? *)
 
 (* #################################################################### *)
 (** ** Structural Combinators *)
@@ -258,8 +266,7 @@ Declare Instance genPair :
     for generators of type [A], it provides constrained variants for
     generators of type [A] such that [P : A -> Prop] holds of all
     generated values.  Since it is not guaranteed that any such [A]
-    exist, these generators are partial. *)
-(* SOONER: Explain when these would be used... *)
+    exist, these generators are partial.  *)
 (** [[
      Class GenSizedSuchThat (A : Type) (P : A -> Prop) :=
        {
@@ -271,12 +278,29 @@ Declare Instance genPair :
          arbitraryST : G (option A)
        }.
 ]]
-*)
+ *)
 
-(** QuickChick also provides convenient notation to call [arbitraryST]
+(* SOONER: Explain when these would be used... *)
+(* SOONER: Something like this? We address this in TImp... *)
+(** So, for example, if you have a typing relation 
+    [has_type : exp -> type -> Prop] for some language, you could, 
+    given some type [T] as input, write (or derive as we will see later on) 
+    an instance of [GenSizeSuchThat (fun e => has_type e T)], that produces 
+    an expression of with type [T]. 
+    
+    Calling [arbitraryST] through such an instance would require 
+    making an explicit application to [@arbitraryST] as follows:
+   
+[[
+    @arbitraryST _ (fun e => has_type e T) _
+]] 
+    where the first placeholder is the type of expressions [exp] 
+    and the second placeholder is the actual instance to be inferred.
+
+    To avoid this, QuickChick also provides convenient notation to call 
     by providing only the predicate [P] that constraints the generation.
     The typeclass constraint is inferred. *)
-(* SOONER: Explain this too! *)
+
 Notation "'genST' x" := (@arbitraryST _ x _) (at level 70).
 
 (* #################################################################### *)
@@ -352,8 +376,16 @@ Parameter Checker : Type.
 
 (** Bools signify pass/fail. *)
 Declare Instance testBool : Checkable bool.
-(** Units signify discarded tests. *)
-(* SOONER: Explain! *)
+
+(** We can use the unit type to signify discarded tests. 
+    For properties with preconditions of the form [forall x, P x -> Q x],
+    QuickChick's default approach is to generate an arbitrary [x],
+    test whether [P x] holds and then test [Q x]. If [P x] doesn't hold,
+    the entire property holds vacuously. However, in random testing,
+    such vacuous tests don't actual give confidence in the correctness
+    of the property under test. Therefore, QuickChick _discards_ those 
+    tests and reports the number of such discards to the user.
+*)
 Declare Instance testUnit : Checkable unit.
 
 (** Given a generator for showable [A]s, construct a [Checker]. *)
@@ -361,8 +393,10 @@ Parameter forAll :
   forall {A prop : Type} `{Checkable prop} `{Show A}
          (gen : G A)  (pf : A -> prop), Checker.
 
-(** A variant of [forAll] that uses evidence for the generated value. *)
-(* SOONER: Uses it for what?? *)
+(** A variant of [forAll] that provides evidence that the generated
+    values are members of the semantics of the generator. Such evidence
+    can be useful when constructing dependently typed data, such as 
+    bounded integers. *)
 Parameter forAllProof :
   forall {A prop : Type} `{Checkable prop} `{Show A}
          (gen : G A)  (pf : forall (x : A), semGen gen x -> prop), Checker.
@@ -372,11 +406,14 @@ Parameter forAllProof :
 Parameter forAllShrink :
   forall {A prop : Type} `{Checkable prop} `{Show A}
          (gen : G A) (shrinker : A -> list A) (pf : A -> prop), Checker.
-(* SOONER: Do we need a forAllShrinkProof variant? *)
 
 (** Typeclass magic: Lift ([Show], [Gen], [Shrink]) instances for [A]
    to a [Checker] for functions [A] -> prop. *)
 (* SOONER: Don't understand what I'd use this for. *)
+(* SOONER: You use it implicitly all the time whenever you 
+   write (for some example property "foo := fun x => x >? 0")
+   "QuickChick foo" instead of "QuickChick (forAllShrink arbitrary shrink foo)".
+*)
 Declare Instance testFun :
   forall {A prop : Type} `{Show A} `{Arbitrary A} `{Checkable prop},
     Checkable (A -> prop).
@@ -399,8 +436,9 @@ Declare Instance testPolyFun :
 Parameter whenFail :
   forall {prop : Type} `{Checkable prop} (str : string), prop -> Checker.
 
-(** Record an expectation that a property should fail. *)
-(* SOONER: What is the concrete effect of this. *)
+(** Record an expectation that a property should fail, i.e. 
+    the property will fail if all the tests succeed. 
+ *)
 Parameter expectFailure :
   forall {prop: Type} `{Checkable prop} (p: prop), Checker.
 
@@ -418,6 +456,7 @@ Parameter tag :
 (** Form the conjunction / disjunction of a list of checkers. *)
 (* SOONER: We are not very consistent about when we name arguments and
    when we do not.  E.g. [l] here: *)
+(* SOONER: We name all non-implicit/Typeclass ones, no? *)
 Parameter conjoin : forall (l : list Checker), Checker.
 Parameter disjoin : forall (l : list Checker), Checker.
 
@@ -431,6 +470,8 @@ Parameter implication :
 (* SOONER: Might not be immediately obvious that this module includes
    the notation module above -- we don't say it.*)
 (* SOONER: The FORALL notations need some explanation. *)
+(* SOONER: Are the FORALL notations even used by anyone? 
+   I'd say delete them rather than explain them and deprecate them... *)
 Module QcNotation.
   Export QcDefaultNotation.
 
@@ -549,8 +590,13 @@ Declare Instance Dec_string (m n : string) : Dec (m = n).
     correctness of its derived generators! For more, look
     at:
 
-    - our ITP paper
-    - our POPL paper
+    - A paper on deriving QuickChick generators for a large class of
+      inductive relations. 
+      {http://www.cis.upenn.edu/~llamp/pdf/GeneratingGoodGenerators.pdf}
+
+    - Leo's PhD dissertation.
+      {https://lemonidas.github.io/pdf/Leo-PhD-Thesis.pdf}
+
     - examples/DependentTest.v
 
 *)
