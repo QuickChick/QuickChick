@@ -1,30 +1,5 @@
 (** * QuickChickInterface: QuickChick Reference Manual *)
 
-(* SOONER: A lot of the "Sooner" in this file are actually 
-   addressed in the QC chapter... *)
-(* SOONER: You mean the places asking for explanations?  I know there
-   are long explanations of some things elsewhere, but I still think
-   the explanations here would be more useful if there were a sentence
-   or two more detail.  We don't want to force people to grep around
-   in the whole book to remind themselves what a given function
-   does. *)
-(* SOONER: OK, after another round I think I see what you want this 
-   to look like explanation-wise. *)
-
-(* HIDE: Should we hide this top html imports?  BCP: No, I think it's
-   better to make it explicit, even in the HTML, what it depends on. *)
-(* SOONER: @LEO However, I'm a bit confused -- the fact that we import
-   QuickChick.ChickChick seems a bit circular (or at least
-   not-self-contained)...*)
-(* SOONER: Why? This imports everything that a user imports as well
-   and re-exports some of them in QuickChickSig. *)
-(* SOONER: Because it means that this file is not a complete,
-   self-contained description of what the user gets when they import
-   QuickChick.  E.g. (I'm not sure if there are other examples), the
-   type [set] is mentioned below, but there is no description
-   anywhere (public) of what it is or what functions / theorems can be
-   used to manipulate it. *)
-(* SOONER: For this point, see longer comment next to semGen... *)
 From QuickChick Require Import QuickChick.
 Require Import ZArith Strings.Ascii Strings.String.
 
@@ -149,6 +124,10 @@ Lemma isSome_subset {A : Type} (s1 s2 s1' s2' : set (option A)) :
    lemma and its point to a user if we turn this file into a complete
    documentation of everything that needs to be exposed?
 
+   BCP: Ok, ok... :-)
+   
+   So what about moving all the stuff involving semantics to its own section at the 
+   end of the file?
  *)
   
 
@@ -442,22 +421,12 @@ Parameter Checker : Type.
 ]]
 *)
 
-(** Bools signify pass/fail. *)
+(** Boolean checkers always pass or always fail. *)
 Declare Instance testBool : Checkable bool.
 
-(** We can use the unit type to signify discarded tests. 
-    For properties with preconditions of the form [forall x, P x -> Q x],
-    QuickChick's default approach is to generate an arbitrary [x],
-    test whether [P x] holds and then test [Q x]. If [P x] doesn't hold,
-    the entire property holds vacuously. However, in random testing,
-    such vacuous tests don't actual give confidence in the correctness
-    of the property under test. Therefore, QuickChick _discards_ those 
-    tests and reports the number of such discards to the user. *)
-(* SOONER: This discussion doesn't seem relevant to testUnit -- it's
-   talking about implication checkers, not unit checkers. *)
-(* SOONER: I thought you wanted to motivate discards here. What are you
-   looking for instead? A test that results in a unit is a discarded 
-   test. *)
+(** The unit checker is always discarded (that is, it represents a
+    useless test).  It is used, for example, in the implementation of
+    the "implication [Checker]" combinator [==>]. *)
 Declare Instance testUnit : Checkable unit.
 
 (** Given a generator for showable [A]s, construct a [Checker]. *)
@@ -520,14 +489,18 @@ Parameter whenFail :
    of the world, maps a random seed to the outcome of a *single* test.
    This seems to suggest that an expectFailure checker somehow knows
    the value of the test on *all* random seeds... *)
-(* SOONER: I think I need help with the phrasing here. What I mean
-   is QuickChick will run its default number of tests (whether 
-   that is 100 or 10000000 doesn't matter). If all of those 
-   100 or 10000000 tests succeed, then an [expectFailure property] is 
-   considered to fail because a failure was expected but not found.
-   Does this make sense?
-*)
-   
+(* SOONER: I think I need help with the phrasing here. What I mean is
+   QuickChick will run its default number of tests (whether that is
+   100 or 10000000 doesn't matter). If all of those 100 or 10000000
+   tests succeed, then an [expectFailure property] is considered to
+   fail because a failure was expected but not found.  Does this make
+   sense?
+
+   BCP: Sort of, but not really.  E.g., can I nest uses of
+   expectFailure?  What happens then?  (How many tests get run?)  Or,
+   what happens if I conjoin an expectFailure with some other
+   checkers?  I guess I need a model for how it is
+   implemented.  (Which I think we didn't give in QC.v, right?)*)
 Parameter expectFailure :
   forall {prop: Type} `{Checkable prop} (p: prop), Checker.
 
@@ -550,6 +523,7 @@ Parameter tag :
 (* SOONER: What convention would you prefer to keep? Delete all names?
    Keep all non-implicit names? Something else? I can do a consistency 
    pass after we fix everything. *)
+(* SOONER: BCP: I think keeping is best. *)
 Parameter conjoin : forall (l : list Checker), Checker.
 Parameter disjoin : forall (l : list Checker), Checker.
 
