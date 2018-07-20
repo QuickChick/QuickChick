@@ -240,13 +240,13 @@ let gather_all_vs_from_dir fs =
 
 open CoqProject_file
 
-let gather_all_basevs_from_file f =
+let vs_from_file f =
   let project = CoqProject_file.read_project_file f in
   List.map (fun s -> match s with {thing = str; _} -> str)
     project.v_files
 
 let gather_all_vs_from_file f fs =
-  let included = gather_all_basevs_from_file f in
+  let included = vs_from_file f in
   let all_vs = ref [] in
   let rec loop fss =
     match fss with
