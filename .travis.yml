@@ -43,6 +43,7 @@ install:
 - opam repo add coq-core-dev https://coq.inria.fr/opam/core-dev || true
 - opam repo add coq-extra-dev https://coq.inria.fr/opam/extra-dev || true
 - opam update
+- opam remove --force coq
 - opam install coq.dev
 - opam list
 - ocamlc -v
