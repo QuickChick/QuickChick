@@ -20,6 +20,8 @@ type mutant_id = Num of int | Tag of string
 let only_mutant = ref None
 let include_file = ref None
 
+let maxSuccess = ref None
+
 let current_filetype = ref ""
 
 let speclist =
@@ -32,6 +34,7 @@ let speclist =
   ; ("-ocamlbuild", Arg.String (fun name -> ocamlbuild_args := name), "Arguments given to ocamlbuild")
   ; ("-nobase", Arg.Unit (fun _ -> nobase := true), "Do not test base mutant")
   ; ("-m", Arg.Int (fun n -> only_mutant := Some (Num n)), "Only test mutant number n")
+  ; ("-N", Arg.Int (fun n -> maxSuccess := Some n), "Max number of successes")
   ; ("-tag", Arg.String (fun s -> only_mutant := Some (Tag s)), "Only test mutant number with a specific tag")
   ; ("-include", Arg.String (fun incl -> include_file := Some incl), "_CoqProject, file containing list of files to be included.")
   ; ("-exclude", Arg.Rest (fun excl -> excluded := excl :: !excluded), "Files to be excluded. Must be the last argument")
@@ -152,6 +155,11 @@ let test_out handle_section input =
        else output_section sec
   in String.concat "" (List.map go input)
 *)
+
+let quickCheckFunction () =
+  match !maxSuccess with
+  | None -> "quickCheck"
+  | Some n -> "quickCheckWith (updMaxSuccess stdArgs " ^ string_of_int n ^ ")"
 
 (* Combine mutants with base.
    Receives a base mutant, plus a list of (optionally tagged) mutants.
@@ -701,8 +709,8 @@ let main =
           (* Leo: better qualification *)
           trim (Filename.basename (Filename.chop_suffix f ".v")) ^ "." ^ s in
         (Printf.sprintf "test%d" i,
-         Printf.sprintf "Definition test%d := print_extracted_coq_string (\"Checking %s...\" ++ newline ++ show (quickCheck %s))%%string.\n"
-           i testname testname) in
+         Printf.sprintf "Definition test%d := print_extracted_coq_string (\"Checking %s...\" ++ newline ++ show (%s %s))%%string.\n"
+           i testname (quickCheckFunction ()) testname) in
       List.split (List.mapi make_test all_things_to_check) in
 
     let tmp_file_data =
