@@ -1,3 +1,5 @@
+QC=quickChick -color $(QCFLAGS)
+
 all: Makefile.coq 
 	$(MAKE) -f Makefile.coq 
 
@@ -9,5 +11,7 @@ clean: Makefile.coq
 	rm -rf ../_qc_multifile-mutation.tmp *.bak
 
 test: clean
-	time quickChick -color
-	-quickChick -color -include _CoqProject
+	time $(QC)
+
+testinclude:
+	$(QC) -m 0 -include _CoqProject

@@ -240,15 +240,28 @@ let gather_all_vs_from_dir fs =
 
 open CoqProject_file
 
-let gather_all_vs_from_file f =
+let gather_all_basevs_from_file f =
   let project = CoqProject_file.read_project_file f in
-  List.map (fun s -> match s with {thing = str; _} ->
-      Filename.chop_suffix str ".v") project.v_files
+  List.map (fun s -> match s with {thing = str; _} -> str)
+    project.v_files
+
+let gather_all_vs_from_file f fs =
+  let included = gather_all_basevs_from_file f in
+  let all_vs = ref [] in
+  let rec loop fss =
+    match fss with
+    | File (s, _) ->
+       if Filename.check_suffix s ".v"
+          && List.exists (fun x -> Filename.basename x = Filename.basename s) included
+       then all_vs := (Filename.chop_suffix s ".v") :: !all_vs
+    | Dir (_, fsss) -> List.iter loop fsss in
+  loop fs;
+  !all_vs
 
 let gather_all_vs fs =
   match !include_file with
   | None -> gather_all_vs_from_dir fs
-  | Some f -> gather_all_vs_from_file f
+  | Some f -> gather_all_vs_from_file f fs
 
 let is_prefix pre s =
   String.length s >= String.length pre
