@@ -44,13 +44,16 @@ rule lexer = parse
   | (white* "/*!" white* "QuickChick" as s) { line_incs s lexbuf; T_StartQuickChick s }
   | (white* "/*!" white* "QuickCheck" as s) { line_incs s lexbuf; T_StartQuickCheck s }
 
+  | (white* "/*!!" as s)                    { line_incs s lexbuf; T_StartMutTag s }
   | (white* "/*!" white* "*/" as s)         { line_incs s lexbuf; T_StartMutants s }
   | (white* "/*!" as s)                     { line_incs s lexbuf; T_StartMutant s }
   | (white* "/*"  as s)                     { line_incs s lexbuf; T_StartComment s }
 
   | (white* "*/" as s)                      { line_incs s lexbuf; T_EndComment s }
 
-  | (white* as s) (nonwhite as c)           { line_incs (s^(String.make 1 c)) lexbuf; T_Char (s^(String.make 1 c)) }
+(* Other *)
+  | (white* as s) (nonwhite as c)           { line_incs (s^(String.make 1 c)) lexbuf; 
+                                              T_Char (s^(String.make 1 c)) }
   | (white* as s) eof                       { line_incs s lexbuf; T_Eof s }
 
 

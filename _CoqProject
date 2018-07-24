@@ -5,7 +5,10 @@ src/Sets.v
 src/Nat_util.v
 src/RandomQC.v
 src/RoseTrees.v
+src/GenLowInterface.v
 src/GenLow.v
+src/GenHighInterface.v
+src/GenHighImpl.v
 src/GenHigh.v
 src/Classes.v
 src/Instances.v

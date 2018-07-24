@@ -256,7 +256,19 @@ Fixpoint runATest (st : State) (f : nat -> RandomSeed -> QProp) (maxSteps : nat)
               Failure (nst + 1) numShrinks ndt r size (tag_text ++ pre ++ suf) (summary st) reas
         | MkResult None e reas _ s _ t =>
           (* Ignore labels of discarded tests? *)
-          test (MkState mst mdt ms cs nst ndt.+1 ls e rnd2 nss nts)
+          let ls' :=
+              match s with
+              | nil => ls
+              | _ =>
+                let s_to_add :=
+                    "(Discarded) " ++ ShowFunctions.string_concat
+                                    (ShowFunctions.intersperse " , "%string s) in
+                match Map.find s_to_add ls with
+                | None   => Map.add s_to_add (res_cb + 1) ls
+                | Some k => Map.add s_to_add (k+1) ls
+                end
+              end in
+          test (MkState mst mdt ms cs nst ndt.+1 ls' e rnd2 nss nts)
         end
       end
     end

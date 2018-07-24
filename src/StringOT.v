@@ -54,7 +54,7 @@ Proof.
   generalize dependent eq'; apply N.lt_neq; assumption.
 Qed.
 
-Theorem compare : forall c d : ascii, Compare lt eq c d.
+Theorem compare : forall c d : t, Compare lt eq c d.
 Proof.
   unfold lt, eq; intros;
   remember (N_of_ascii c ?= N_of_ascii d)%N as C; symmetry in HeqC; destruct C;
@@ -154,7 +154,7 @@ Proof.
           congruence.
 Qed.
 
-Theorem compare : forall s1 s2 : string, Compare lt eq s1 s2.
+Theorem compare : forall s1 s2 : t, Compare lt eq s1 s2.
 Proof.
   unfold lt, eq; induction s1 as [| c1 s1'].
   (* s1 = "" *)

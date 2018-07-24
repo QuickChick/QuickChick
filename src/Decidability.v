@@ -140,6 +140,9 @@ Global Instance Eq__Dec {A} `{H : Eq A} (x y : A) : Dec (x = y) :=
 Proof. dec_eq. Defined.
 
 (* Lifting common decidable instances *)
+Global Instance Dec_eq_unit (x y : unit) : Dec (x = y).
+Proof. dec_eq. Defined.
+
 Global Instance Dec_eq_bool (x y : bool) : Dec (x = y).
 Proof. dec_eq. Defined.
 
