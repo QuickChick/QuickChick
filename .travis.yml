@@ -16,13 +16,13 @@ env:
   global:
   - NJOBS=2
   - OPAMYES=true
+  - OPAMKEEPBUILDDIR=true
   matrix:
       - COMPILER="4.04.0"
-      - COMPILER="4.04.1"
       - COMPILER="4.04.2"
       - COMPILER="4.05.0"
-      - COMPILER="4.06.0"
       - COMPILER="4.06.1"
+      - COMPILER="4.07.0"
 matrix:
   fast_finish: true
   allow_failures:
@@ -36,10 +36,11 @@ before_install:
     brew update; brew install --ignore-dependencies opam; fi
 
 install:
-- "[ -e .opam ] || travis_wait opam init -j ${NJOBS} --compiler=${COMPILER} -n -y"
+- travis_wait opam init -j ${NJOBS} --compiler=${COMPILER} -n
 - eval $(opam config env)
 - opam config var root
 - opam repo add coq-released https://coq.inria.fr/opam/released || true
+- opam upgrade
 - opam list
 - ocamlc -v
 
