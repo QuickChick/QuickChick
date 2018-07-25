@@ -148,7 +148,8 @@ val gProdWithArgs : arg list -> ((var list) -> coq_expr) -> coq_expr
 type matcher_pat = 
   | MatchCtr of constructor * matcher_pat list
   | MatchU of var
-
+  | MatchParameter of ty_param (* Should become hole in pattern, so no binding *)
+                    
 val matcher_pat_to_string : matcher_pat -> string 
 
 val construct_match : coq_expr -> ?catch_all:(coq_expr option) -> (matcher_pat * coq_expr) list -> coq_expr 

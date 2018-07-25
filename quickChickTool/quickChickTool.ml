@@ -20,6 +20,8 @@ type mutant_id = Num of int | Tag of string
 let only_mutant = ref None
 let include_file = ref None
 
+let maxSuccess = ref None
+
 let current_filetype = ref ""
 
 let speclist =
@@ -32,6 +34,7 @@ let speclist =
   ; ("-ocamlbuild", Arg.String (fun name -> ocamlbuild_args := name), "Arguments given to ocamlbuild")
   ; ("-nobase", Arg.Unit (fun _ -> nobase := true), "Do not test base mutant")
   ; ("-m", Arg.Int (fun n -> only_mutant := Some (Num n)), "Only test mutant number n")
+  ; ("-N", Arg.Int (fun n -> maxSuccess := Some n), "Max number of successes")
   ; ("-tag", Arg.String (fun s -> only_mutant := Some (Tag s)), "Only test mutant number with a specific tag")
   ; ("-include", Arg.String (fun incl -> include_file := Some incl), "_CoqProject, file containing list of files to be included.")
   ; ("-exclude", Arg.Rest (fun excl -> excluded := excl :: !excluded), "Files to be excluded. Must be the last argument")
@@ -153,6 +156,11 @@ let test_out handle_section input =
   in String.concat "" (List.map go input)
 *)
 
+let quickCheckFunction () =
+  match !maxSuccess with
+  | None -> "quickCheck"
+  | Some n -> "quickCheckWith (updMaxSuccess stdArgs " ^ string_of_int n ^ ")"
+
 (* Combine mutants with base.
    Receives a base mutant, plus a list of (optionally tagged) mutants.
    Produces all mutants, including base. *)
@@ -229,10 +237,10 @@ let gather_all_vs_from_dir fs =
     match fs with
     | File (s, _) ->
        if (Filename.check_suffix s ".v")
-          && not (List.exists (fun x -> x = Filename.basename s) !excluded) then
+          && not (List.exists (fun x -> Filename.basename x = Filename.basename s) !excluded) then
          all_vs := (Filename.chop_suffix s ".v") :: !all_vs
     | Dir (s, fss) ->
-       if not (List.exists (fun x -> x = s) !excluded) then 
+       if not (List.exists (fun x -> Filename.basename x = Filename.basename s) !excluded) then
          List.iter loop fss
        else ()
   in loop fs;
@@ -240,15 +248,28 @@ let gather_all_vs_from_dir fs =
 
 open CoqProject_file
 
-let gather_all_vs_from_file f =
+let vs_from_file f =
   let project = CoqProject_file.read_project_file f in
-  List.map (fun s -> match s with {thing = str; _} ->
-      Filename.chop_suffix str ".v") project.v_files
+  List.map (fun s -> match s with {thing = str; _} -> str)
+    project.v_files
+
+let gather_all_vs_from_file f fs =
+  let included = vs_from_file f in
+  let all_vs = ref [] in
+  let rec loop fss =
+    match fss with
+    | File (s, _) ->
+       if Filename.check_suffix s ".v"
+          && List.exists (fun x -> Filename.basename x = Filename.basename s) included
+       then all_vs := (Filename.chop_suffix s ".v") :: !all_vs
+    | Dir (_, fsss) -> List.iter loop fsss in
+  loop fs;
+  !all_vs
 
 let gather_all_vs fs =
   match !include_file with
   | None -> gather_all_vs_from_dir fs
-  | Some f -> gather_all_vs_from_file f
+  | Some f -> gather_all_vs_from_file f fs
 
 let is_prefix pre s =
   String.length s >= String.length pre
@@ -688,8 +709,8 @@ let main =
           (* Leo: better qualification *)
           trim (Filename.basename (Filename.chop_suffix f ".v")) ^ "." ^ s in
         (Printf.sprintf "test%d" i,
-         Printf.sprintf "Definition test%d := print_extracted_coq_string (\"Checking %s...\" ++ newline ++ show (quickCheck %s))%%string.\n"
-           i testname testname) in
+         Printf.sprintf "Definition test%d := print_extracted_coq_string (\"Checking %s...\" ++ newline ++ show (%s %s))%%string.\n"
+           i testname (quickCheckFunction ()) testname) in
       List.split (List.mapi make_test all_things_to_check) in
 
     let tmp_file_data =

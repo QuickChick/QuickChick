@@ -16,13 +16,13 @@ env:
   global:
   - NJOBS=2
   - OPAMYES=true
+  - OPAMKEEPBUILDDIR=true
   matrix:
       - COMPILER="4.04.0"
-      - COMPILER="4.04.1"
       - COMPILER="4.04.2"
       - COMPILER="4.05.0"
-      - COMPILER="4.06.0"
       - COMPILER="4.06.1"
+      - COMPILER="4.07.0"
 matrix:
   fast_finish: true
   allow_failures:
@@ -36,13 +36,14 @@ before_install:
     brew update; brew install --ignore-dependencies opam; fi
 
 install:
-- "[ -e .opam ] || travis_wait opam init -j ${NJOBS} --compiler=${COMPILER} -n -y"
+- travis_wait opam init -j ${NJOBS} --compiler=${COMPILER} -n
 - eval $(opam config env)
 - opam config var root
 - opam repo add coq-released https://coq.inria.fr/opam/released || true
 - opam repo add coq-core-dev https://coq.inria.fr/opam/core-dev || true
 - opam repo add coq-extra-dev https://coq.inria.fr/opam/extra-dev || true
 - opam update
+- opam upgrade
 - opam install coq.dev
 - opam list
 - ocamlc -v
@@ -53,7 +54,7 @@ script:
   echo -en 'travis_fold:start:QuickChick.build';
   opam pin add . ;
   opam remove --force coq-quickchick;
-  opam install coq-quickchick;
+  travis_wait opam install coq-quickchick;
   echo -en 'travis_fold:end:QuickChick.build'
 - echo 'Testing IFC...';
   echo -en 'travis_fold:start:QuickChick.test.ifc-basic';
@@ -75,3 +76,7 @@ script:
   echo -en 'travis_fold:start:QuickChick.test.c-mutation';
   make -C examples/c-mutation test;
   echo -en 'travis_fold:end:QuickChick.test.c-mutation'
+- echo 'Testing -N option...';
+  echo -en 'travis_fold:start:QuickChick.test.less';
+  make -C examples/c-mutation lesstest;
+  echo -en 'travis_fold:end:QuickChick.test.less'
