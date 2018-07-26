@@ -1,7 +1,8 @@
 Set Warnings "-extraction-opaque-accessed,-extraction".
 Set Warnings "-notation-overridden,-parsing".
 
-Require Import mathcomp.ssreflect.ssreflect Coq.omega.Omega.
+Require Import Coq.ZArith.ZArith.
+Require Import mathcomp.ssreflect.ssreflect.
 From mathcomp Require Import ssrfun ssrbool ssrnat eqtype seq.
 
 Ltac inv H := inversion H; subst.
