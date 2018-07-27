@@ -18,6 +18,7 @@ depends: [
   "coq-mathcomp-ssreflect"
   "ocamlbuild"
   "ocamlfind"
+  "coq-simple-io" {>= "0.2" < "0.3"}
 ]
 available: [ ocaml-version >= "4.04.0" ]
 
