@@ -1,0 +1,16 @@
+#!/bin/sh
+
+# Test mutated QuickChick test executable ($1)
+# quickchick-expectfailure must be findable in PATH
+
+QC_OUT_DIR=qc-out
+mkdir -p $QC_OUT_DIR/
+
+QC_ALL_MUTANTS_FILE=$QC_OUT_DIR/qc-mutants
+
+# Dynamic mutant discovery
+# TODO: allow mutants to be found via other means
+QC_MUTANT=DISCOVERY ./$1
+
+# Test each mutant
+cat $QC_ALL_MUTANTS_FILE|xargs -n 1 -I {} quickchick-expectfailure ./$1 {}
