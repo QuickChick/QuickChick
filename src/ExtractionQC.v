@@ -67,8 +67,6 @@ Extract Constant trace =>
 
 Set Extraction AccessOpaque.
 
-Extract Constant Show.nl => "['\n']".
-
 Require Import mathcomp.ssreflect.ssreflect.
 From mathcomp Require Import ssreflect ssrnat ssrbool div eqtype.
 Extract Constant divn => "(/)".

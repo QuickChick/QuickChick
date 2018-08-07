@@ -221,7 +221,7 @@ Instance showEx {A} `{_ : Show A} P : Show ({x : A | P x}) :=
   |}.
 
 Require Import Ascii.
-Definition nl : string := String (ascii_of_nat 10) EmptyString.
+Definition nl : string := String "010" EmptyString.
 
 Definition smart_paren (s : string) : string :=
   let fix aux s (b : bool) := 
