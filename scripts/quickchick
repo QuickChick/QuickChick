@@ -15,3 +15,13 @@ QC_MUTANT=DISCOVERY ./"$1"
 
 # Test each mutant
 xargs -n 1 -I {} quickchick-expectfailure ./"$1" {} < $QC_ALL_MUTANTS_FILE
+
+if [ "$2" != "" ]
+then
+  N_MUTANTS=$(wc -l $QC_ALL_MUTANTS_FILE|grep -o "^[0-9]*")
+  if [ $2 -ne $N_MUTANTS ]
+  then
+    echo "Unexpected number of mutants: $N_MUTANTS (expected $2)"
+    exit 1
+  fi
+fi
