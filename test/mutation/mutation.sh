@@ -1,4 +1,5 @@
 #!/bin/sh
+set -e
 MUTATION=mutation
 
 # Extract and compile the example
