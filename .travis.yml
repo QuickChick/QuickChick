@@ -50,7 +50,6 @@ script:
   echo -en 'travis_fold:start:QuickChick.build';
   opam update;
   opam pin add . ;
-  opam remove --force coq-quickchick;
   travis_wait opam install coq-quickchick;
   echo -en 'travis_fold:end:QuickChick.build'
 - echo 'Testing IFC...';
@@ -77,3 +76,5 @@ script:
   echo -en 'travis_fold:start:QuickChick.test.less';
   make -C examples/c-mutation lesstest;
   echo -en 'travis_fold:end:QuickChick.test.less'
+- echo 'Removing QuickChick...';
+  opam remove --force coq-quickchick
