@@ -104,11 +104,13 @@ let rec non_mutants (info : mutant_info) acc muts : (mutant_info * string list) 
 
 let begin_comment () =
   if !current_filetype = ".c" || !current_filetype = ".h"
+  || !current_filetype = ".sol"
   then "/*"
   else "(*"
 
 let end_comment () =
   if !current_filetype = ".c" || !current_filetype = ".h"
+  || !current_filetype = ".sol"
   then "*/"
   else "*)"
 
@@ -483,6 +485,8 @@ let rec parse_file_or_dir file_name =
       let handle = (Filename.check_suffix file_name "v" ||
                     Filename.check_suffix file_name "ml"||
                     Filename.check_suffix file_name "c" ||
+                    Filename.check_suffix file_name "py"||
+                    Filename.check_suffix file_name "sol" ||
                     Filename.check_suffix file_name "h")
                    && not (List.exists (fun x -> x = Filename.basename file_name) !excluded) in
       if handle then begin

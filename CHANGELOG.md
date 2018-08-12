@@ -8,6 +8,7 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
 ### Added
 - `-N` option to modify max success in `quickChickTool`.
 - Collect labels for discarded tests.
+- `quickChickTool` takes Python and Solidity files.
 
 ## [1.0.1] - 2018-06-13
 ### Added

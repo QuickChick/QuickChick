@@ -76,5 +76,9 @@ script:
   echo -en 'travis_fold:start:QuickChick.test.less';
   make -C examples/c-mutation lesstest;
   echo -en 'travis_fold:end:QuickChick.test.less'
+- echo 'Testing Python I/O...';
+  echo -en 'travis_fold:start:QuickChick.test.python-io';
+  make -C examples/python-io lesstest;
+  echo -en 'travis_fold:end:QuickChick.test.python-io'
 - echo 'Removing QuickChick...';
   opam remove --force coq-quickchick
