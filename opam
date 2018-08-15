@@ -8,7 +8,7 @@ dev-repo: "https://github.com/QuickChick/QuickChick.git"
 bug-reports: "https://github.com/QuickChick/QuickChick/issues"
 license: "MIT"
 
-build: [ make "-j%{jobs}%" "plugin" ]
+build: [ make "-j%{jobs}%" ]
 install: [ make "install" ]
 remove: [ [ "rm" "-rf" "%{lib}%/coq/user-contrib/QuickChick" ]
           [ "rm" "%{bin}%/quickChick"] ]
