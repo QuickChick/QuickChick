@@ -33,7 +33,7 @@ os:
 
 before_install:
     if [ $TRAVIS_OS_NAME = osx ]; then
-    brew update; brew install --ignore-dependencies opam; fi
+    brew update; brew install opam; fi
 
 install:
 - travis_wait opam init -j ${NJOBS} --compiler=${COMPILER} -n
@@ -49,7 +49,7 @@ script:
 - echo 'Building QuickChick...';
   echo -en 'travis_fold:start:QuickChick.build';
   opam update;
-  opam pin add . ;
+  travis_wait opam pin add . ;
   travis_wait opam install coq-quickchick;
   echo -en 'travis_fold:end:QuickChick.build'
 - echo 'Testing IFC...';
@@ -81,4 +81,6 @@ script:
   make -C examples/python-io lesstest;
   echo -en 'travis_fold:end:QuickChick.test.python-io'
 - echo 'Removing QuickChick...';
-  opam remove --force coq-quickchick
+  echo -en 'travis_fold:start:QuickChick.remove';
+  opam remove --force coq-quickchick;
+  echo -en 'travis_fold:end:QuickChick.remove'
