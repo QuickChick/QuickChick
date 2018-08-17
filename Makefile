@@ -18,7 +18,7 @@ endef
 includecmdwithout@ = $(eval $(subst @,$(donewline),$(shell { $(1) | tr -d '\r' | tr '\n' '@'; })))
 $(call includecmdwithout@,$(COQBIN)coqtop -config)
 
-all: plugin documentation-check quickChickTool
+all: quickChickTool plugin documentation-check
 
 plugin: Makefile.coq 
 	$(MAKE) -f Makefile.coq 
