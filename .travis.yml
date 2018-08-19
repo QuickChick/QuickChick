@@ -40,7 +40,7 @@ install:
 - eval $(opam config env)
 - opam config var root
 - opam repo add coq-released https://coq.inria.fr/opam/released || true
-- opam upgrade
+- travis_wait opam upgrade
 - opam list
 - ocamlc -v
 
