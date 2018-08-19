@@ -21,8 +21,8 @@ Extract Constant checkable_size_limit => "10000".
 
 Import GenLow.GenLow.
 (* Discard tests that run further than the limit *)
-(* For proofs, the size parameter will need to be taken into account 
-   to prove limit results. We just add it to the large, practical constant. 
+(* For proofs, the size parameter will need to be taken into account
+   to prove limit results. We just add it to the large, practical constant.
  *)
 Global Instance decOpt__checkable {P} `{DecOpt P} : Checkable P :=
   {| checker _ :=
@@ -53,7 +53,7 @@ Definition checker_backtrack (l : list (unit -> option bool)) : option bool :=
       | nil => if b then None else Some false
       end
   in aux l false.
-    
+
 (* BCP: If I understand correctly, removing "Global" everywhere would
    change nothing... Or? *)
 
@@ -97,15 +97,15 @@ Global Instance Dec_impl {P Q} {H : Dec P} {I : Dec Q} : Dec (P -> Q) | 100.
 Proof.
   constructor. unfold decidable.
   destruct H as [D]. destruct D; destruct I as [D]; destruct D; auto.
-  left. intros. contradiction. 
+  left. intros. contradiction.
 Defined.
 
 Global Instance Dec_In {A} (Eq: forall (x y : A), Dec (x = y))
-         (x : A) (l : list A) : Dec (In x l) := 
+         (x : A) (l : list A) : Dec (In x l) :=
   {| dec := in_dec (fun x' y' => @dec _ (Eq x' y')) x l |}.
 
 Class Eq (A : Type) :=
-  { 
+  {
     dec_eq : forall (x y : A), decidable (x = y)
   }.
 
@@ -154,8 +154,8 @@ Global Instance Dec_eq_opt (A : Type) (m n : option A)
 Proof. dec_eq. Defined.
 
 Global Instance Dec_eq_prod (A B : Type) (m n : A * B)
-  `{_ : forall (x y : A), Dec (x = y)} 
-  `{_ : forall (x y : B), Dec (x = y)} 
+  `{_ : forall (x y : A), Dec (x = y)}
+  `{_ : forall (x y : B), Dec (x = y)}
   : Dec (m = n).
 Proof. dec_eq. Defined.
 
@@ -175,7 +175,7 @@ Proof. dec_eq. Defined.
 (* Everything that uses the Decidable Class *)
 Require Import DecidableClass.
 
-Instance dec_class_dec P (H : Decidable P): Dec P.
+Global Instance dec_class_dec P (H : Decidable P): Dec P.
 Proof.
   constructor; destruct H; destruct Decidable_witness.
   - left; auto.
@@ -186,14 +186,14 @@ Proof.
 Defined.
 
 (*
-Example foo (m n : nat) := 
-  match @dec (m = n) _ with 
-    | left  _ => 0 
+Example foo (m n : nat) :=
+  match @dec (m = n) _ with
+    | left  _ => 0
     | right _ => 1
   end.
 
 (* Eval compute in foo 0 1. *)
-Example bar (m n : nat) := 
+Example bar (m n : nat) :=
   if (m=n)? then 0 else 1.
 
 (* Eval compute in bar 0 1. *)
@@ -201,7 +201,7 @@ Example bar (m n : nat) :=
 
 
 (* Not sure about the level or binding, but good idea *)
-Notation "P '?'" := (match (@dec P _) with 
+Notation "P '?'" := (match (@dec P _) with
                        | left _ => true
                        | right _ => false
                      end) (at level 100).
