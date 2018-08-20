@@ -104,7 +104,7 @@ Global Instance Dec_In {A} (Eq: forall (x y : A), Dec (x = y))
          (x : A) (l : list A) : Dec (In x l) :=
   {| dec := in_dec (fun x' y' => @dec _ (Eq x' y')) x l |}.
 
-Class Eq (A : Type) :=
+Class Dec_Eq (A : Type) :=
   {
     dec_eq : forall (x y : A), decidable (x = y)
   }.
@@ -128,12 +128,12 @@ Ltac dec_eq :=
          | [ |- {?x = ?y} + {?x <> ?y} ] =>
            multimatch goal with
              | [ H: forall x y, Dec _ |- _ ] => apply H
-             | [ H: Eq _ |- _ ] => apply H
+             | [ H: Dec_Eq _ |- _ ] => apply H
              | [ |- _ ] => decide equality
            end
          end.
 
-Global Instance Eq__Dec {A} `{H : Eq A} (x y : A) : Dec (x = y) :=
+Global Instance Eq__Dec {A} `{H : Dec_Eq A} (x y : A) : Dec (x = y) :=
   {|
     dec := _
   |}.

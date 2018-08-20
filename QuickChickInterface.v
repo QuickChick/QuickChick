@@ -576,10 +576,10 @@ Notation "P '?'" := (match (@dec P _) with
                      | right _ => false
                      end) (at level 100).
 
-(** ** The [Eq] Typeclass *)
+(** ** The [Dec_Eq] Typeclass *)
 
 (** [[
-     Class Eq (A : Type) :=
+     Class Dec_Eq (A : Type) :=
        {
          dec_eq : forall (x y : A), decidable (x = y)
        }.
@@ -587,7 +587,7 @@ Notation "P '?'" := (match (@dec P _) with
 *)
 
 (** Automation and conversions for Dec. *)
-Declare Instance Eq__Dec {A} `{H : Eq A} (x y : A) : Dec (x = y).
+Declare Instance Eq__Dec {A} `{H : Dec_Eq A} (x y : A) : Dec (x = y).
 
 (** Since deciding equalities is a very common requirement in testing,
     QuickChick provides a tactic that can define instances of the form
