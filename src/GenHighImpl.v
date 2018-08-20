@@ -1,12 +1,16 @@
 Set Warnings "-extraction-opaque-accessed,-extraction".
 Set Warnings "-notation-overridden,-parsing".
 
+Require Import String. 
+Require Import List.
+
 Require Import ZArith.
 Require Import mathcomp.ssreflect.ssreflect.
 From mathcomp Require Import ssrfun ssrbool ssrnat eqtype seq.
 
 From QuickChick Require Import
-     GenLowInterface GenHighInterface RandomQC Tactics Sets.
+     GenLowInterface GenHighInterface RandomQC Tactics Sets Show.
+
 
 Set Bullet Behavior "Strict Subproofs".
 
@@ -73,10 +77,11 @@ Fixpoint foldGen {A B : Type} (f : A -> B -> G A) (l : list B) (a : A)
     | (x :: xs) => bindGen (f a x) (foldGen f xs)
   end).
 
-Definition oneof {A : Type} (def: G A) (gs : list (G A)) : G A :=
+Definition oneOf_ {A : Type} (def: G A) (gs : list (G A)) : G A :=
   bindGen (choose (0, length gs - 1)) (nth def gs).
 
-Definition oneOf_ := @oneof.
+Definition oneof {A} :=
+  @deprecate (G A -> list (G A) -> G A) "oneof" "oneOf_" oneOf_.
 
 Fixpoint pick {A : Type} (def : G A) (xs : list (nat * G A)) n : nat * G A :=
   match xs with
@@ -99,13 +104,14 @@ Fixpoint pickDrop {A : Type} (xs : list (nat * G (option A))) n : nat * G (optio
 Definition sum_fst {A : Type} (gs : list (nat * A)) : nat :=
   foldl (fun t p => t + (fst p)) 0 gs.
 
-Definition frequency {A : Type} (def : G A) (gs : list (nat * G A))
+Definition freq_ {A : Type} (def : G A) (gs : list (nat * G A))
 : G A :=
   let tot := sum_fst gs in
   bindGen (choose (0, tot-1)) (fun n =>
   @snd _ _ (pick def gs n)).
 
-Definition freq_ := @frequency.
+Definition frequency {A}:= 
+  @deprecate (G A -> list (nat * G A) -> G A) "frequency" "freq_" freq_.
 
 Fixpoint backtrackFuel {A : Type} (fuel : nat) (tot : nat) (gs : list (nat * G (option A))) : G (option A) :=
   match fuel with 
@@ -132,13 +138,14 @@ Definition vectorOf {A : Type} (k : nat) (g : G A)
 Definition listOf {A : Type} (g : G A) : G (list A) :=
   sized (fun n => bindGen (choose (0, n)) (fun k => vectorOf k g)).
 
-Definition elements {A : Type} (def : A) (l : list A) :=
+Definition elems_ {A : Type} (def : A) (l : list A) :=
   let n := length l in
   bindGen (choose (0, n - 1)) (fun n' =>
   returnGen (List.nth n' l def)).
 
-Definition elems_ := @elements.
-  
+Definition elements {A} :=
+  @deprecate (A -> list A -> G A) "elements" "elems_" elems_.  
+
 Lemma semLiftGen {A B} (f: A -> B) (g: G A) :
   semGen (liftGen f g) <--> f @: semGen g.
 Proof.

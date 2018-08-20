@@ -21,9 +21,9 @@ Module ConsistencyCheck : QuickChickSig.
   Definition run := @run.
   Definition listOf := @listOf.
   Definition vectorOf := @vectorOf.
-  Definition elements := @elements.
-  Definition oneof := @oneof.
-  Definition frequency := @frequency.
+  Definition elems_ := @elems_.
+  Definition oneOf_ := @oneOf_.
+  Definition freq_ := @freq_.
   Definition backtrack := @backtrack.
   Definition resize := @resize.
   Definition sized := @sized.

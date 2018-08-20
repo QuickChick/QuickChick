@@ -291,3 +291,8 @@ Instance show_fun {A B} `{_ : Show A} `{_ : ReprSubset A}
   |}.            
 
 End ShowFunctions.
+
+(* Extraction will map this to something that additionally prints stuff *)
+Definition trace {A : Type} (s : string) (a : A) : A := a.
+Definition deprecate {A : Type} (old new: string) (a : A) : A :=
+  trace ("Deprecated function: " ++ old ++ ". Use " ++ new ++ " instead.") a.
