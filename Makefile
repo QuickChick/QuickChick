@@ -32,7 +32,7 @@ TEMPFILE := $(shell mktemp)
 install: all
 	$(V)$(MAKE) -f Makefile.coq install > $(TEMPFILE)
 # Manually copying the remaining files
-	$(V)cp $(QCTOOL_EXE) $(shell opam config var bin)/quickChick
+	$(V)cp $(QCTOOL_DIR)/$(QCTOOL_EXE) $(shell opam config var bin)/quickChick
 #	 $(V)cp src/quickChickLib.cmx $(COQLIB)/user-contrib/QuickChick
 #	 $(V)cp src/quickChickLib.o $(COQLIB)/user-contrib/QuickChick
 
@@ -46,11 +46,10 @@ uninstall:
 src/%.cmo : src/%.ml
 	ocamlc -I src -c $<
 
-quickChickTool: $(QCTOOL_EXE)
+quickChickTool: $(QCTOOL_DIR)/$(QCTOOL_EXE)
 
-# TODO: Find a way to avoid -no-hygiene flag when building tool
-$(QCTOOL_EXE): $(QCTOOL_SRC)
-	ocamlbuild -no-hygiene -use-ocamlfind $(QCTOOL_DIR)/$(QCTOOL_EXE)
+$(QCTOOL_DIR)/$(QCTOOL_EXE): $(QCTOOL_SRC)
+	cd $(QCTOOL_DIR); ocamlbuild -use-ocamlfind $(QCTOOL_EXE)
 
 tests:
 #	$(MAKE) -C examples/ifc-basic test

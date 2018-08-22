@@ -6,7 +6,7 @@ all: Makefile.coq
 
 clean: Makefile.coq
 	$(MAKE) -f Makefile.coq clean
-	rm Makefile.coq
+	$(RM) -r ../_qc_RedBlack.tmp Makefile.coq*
 
 Makefile.coq: _CoqProject
 	$(COQBIN)coq_makefile -f _CoqProject -o Makefile.coq
