@@ -48,8 +48,9 @@ src/%.cmo : src/%.ml
 
 quickChickTool: $(QCTOOL_EXE)
 
+# TODO: Find a way to avoid -no-hygiene flag when building tool
 $(QCTOOL_EXE): $(QCTOOL_SRC)
-	ocamlbuild -use-ocamlfind $(QCTOOL_DIR)/$(QCTOOL_EXE)
+	ocamlbuild -no-hygiene -use-ocamlfind $(QCTOOL_DIR)/$(QCTOOL_EXE)
 
 tests:
 #	$(MAKE) -C examples/ifc-basic test
