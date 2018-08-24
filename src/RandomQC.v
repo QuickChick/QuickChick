@@ -653,7 +653,12 @@ Axiom randomRIntCorrect:
   forall z z1 z2, Z.leb z1 z2 ->
     (Z.leb z1 z && Z.leb z z2 <->
     exists seed, (fst (randomRInt (z1, z2) seed)) = z).
-
+Axiom randomRN    : N * N    -> RandomSeed -> N * RandomSeed.
+Axiom randomRNCorrect:
+  forall n n1 n2,
+    N.leb n1 n2 ->
+    N.leb n1 n && N.leb n n2 <->
+    exists seed, fst (randomRN (n1, n2) seed) = n.
 
 (* A small experiment showing that infinite random trees
    are a potential model of the randomSplitAssumption *)
@@ -721,6 +726,27 @@ move=> x y /andP[].
 exact: Zle_bool_antisym.
 Qed.
 
+Program Instance OrdN : OrdType N :=
+  {
+    leq := N.leb;
+    refl := N.leb_refl
+  }.
+Next Obligation.
+  move=> x y z le_yx le_xz.
+  unfold is_true in *.
+  apply N.leb_le in le_yx.
+  apply N.leb_le in le_xz.
+  apply N.leb_le.
+  eapply N.le_trans; eauto.
+Qed.
+Next Obligation.
+  move=> x y /andP[].
+  unfold is_true.
+  repeat rewrite N.leb_le.
+  intros.
+  apply N.le_antisymm; auto.
+Qed.
+
 Class ChoosableFromInterval (A : Type)  :=
   {
     super :> OrdType A;
@@ -747,4 +773,10 @@ Instance ChooseZ : ChoosableFromInterval Z :=
   {
     randomR := randomRInt;
     randomRCorrect := randomRIntCorrect
+  }.
+
+Instance ChooseN : ChoosableFromInterval N :=
+  {
+    randomR := randomRN;
+    randomRCorrect := randomRNCorrect
   }.

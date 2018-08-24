@@ -1,32 +1,45 @@
 Set Warnings "-extraction-opaque-accessed,-extraction".
 Set Warnings "-notation-overridden,-parsing".
 
-Require Import mathcomp.ssreflect.ssreflect.
-From mathcomp Require Import ssrbool ssrnat.
-Require Import GenLow GenHigh Sets.
-Require Import Classes.
-Require Import Recdef.
-Require Import List.
-Import ListNotations.
+From Coq Require Import
+     Arith
+     Basics
+     List
+     Recdef
+     ZArith.
+From mathcomp Require Import
+     ssrbool
+     ssreflect
+     ssrnat.
+From QuickChick Require Import
+     Classes
+     GenLow
+     GenHigh
+     Sets.
 
-Require Import ZArith ZArith.Znat Arith.
-Import GenLow GenHigh.
-Import QcDefaultNotation.
+Import GenHigh
+       GenLow
+       ListNotations
+       QcDefaultNotation.
 
 Set Bullet Behavior "Strict Subproofs".
 
 (** Basic generator instances *)
-Global Instance genBoolSized : GenSized bool := 
+Global Instance genBoolSized : GenSized bool :=
   {| arbitrarySized x := choose (false, true) |}.
 
-Instance genNatSized : GenSized nat := 
+Instance genNatSized : GenSized nat :=
   {| arbitrarySized x := choose (0,x) |}.
 
 Global Instance genZSized : GenSized Z :=
   {| arbitrarySized x := let z := Z.of_nat x in
                          choose (-z, z)%Z |}.
 
-Global Instance genListSized {A : Type} `{GenSized A} : GenSized (list A) := 
+Global Instance genNSized : GenSized N :=
+  {| arbitrarySized x := let n := N.of_nat x in
+                         choose (N0, n) |}.
+
+Global Instance genListSized {A : Type} `{GenSized A} : GenSized (list A) :=
   {| arbitrarySized x := vectorOf x (arbitrarySized x) |}.
 
 (* [3] is a lower priority than [Classes.GenOfGenSized],
@@ -36,22 +49,22 @@ Global Instance genList {A : Type} `{Gen A} : Gen (list A) | 3 :=
   {| arbitrary := listOf arbitrary |}.
 
 Global Instance genOption {A : Type} `{Gen A} : Gen (option A) | 3 :=
-  {| arbitrary := freq [ (1, returnGen None) 
+  {| arbitrary := freq [ (1, returnGen None)
                        ; (7, liftGen Some arbitrary)] |}.
 
-Global Instance genPairSized {A B : Type} `{GenSized A} `{GenSized B} 
+Global Instance genPairSized {A B : Type} `{GenSized A} `{GenSized B}
 : GenSized (A*B) :=
-  {| arbitrarySized x := 
-       liftGen2 pair (arbitrarySized x) 
+  {| arbitrarySized x :=
+       liftGen2 pair (arbitrarySized x)
                      (arbitrarySized x)
-  |}. 
+  |}.
 
 Global Instance genPair {A B : Type} `{Gen A} `{Gen B} : Gen (A * B) :=
   {| arbitrary := liftGen2 pair arbitrary arbitrary |}.
 
 (** Shrink Instances *)
-Global Instance shrinkBool : Shrink bool := 
-  {| shrink x := 
+Global Instance shrinkBool : Shrink bool :=
+  {| shrink x :=
        match x with
          | false => nil
          | true  => cons false nil
@@ -60,21 +73,21 @@ Global Instance shrinkBool : Shrink bool :=
 
 (** Shrinking of nat starts to become annoying *)
 Function shrinkNatAux (x : nat) {measure (fun x => x) x} : list nat :=
-  match x with 
+  match x with
     | O => nil
-    | S n => 
-      let x' := Nat.div x 2 in 
+    | S n =>
+      let x' := Nat.div x 2 in
       x' :: shrinkNatAux x'
   end.
 Proof.
-  move => x n Eq; 
+  move => x n Eq;
   pose proof (Nat.divmod_spec n 1 0 0) as H.
-  assert (H' : (0 <= 1)%coq_nat) by omega; apply H in H'; 
-  subst; simpl in *; clear H. 
+  assert (H' : (0 <= 1)%coq_nat) by omega; apply H in H';
+  subst; simpl in *; clear H.
   destruct (Nat.divmod n 1 0 0) as [q u];  destruct u; simpl in *; omega.
 Defined.
 
-Global Instance shrinkNat : Shrink nat := 
+Global Instance shrinkNat : Shrink nat :=
   {| shrink := shrinkNatAux |}.
 
 (** Shrinking of Z is even more so *)
@@ -148,8 +161,13 @@ Proof.
       apply Nat.div_lt. apply Pos2Nat.is_pos. omega.
 Qed.
 
-Global Instance shrinkZ : Shrink Z := 
+Global Instance shrinkZ : Shrink Z :=
   {| shrink := shrinkZAux |}.
+
+Open Scope program_scope.
+
+Global Instance shrinkN : Shrink N :=
+  {| shrink := map Z.to_N ∘ shrink ∘ Z.of_N |}.
 
 Fixpoint shrinkListAux {A : Type} (shr : A -> list A) (l : list A) : list (list A) :=
   match l with
@@ -163,15 +181,15 @@ Global Instance shrinkList {A : Type} `{Shrink A} : Shrink (list A) :=
   {| shrink := shrinkListAux shrink |}.
 
 Global Instance shrinkPair {A B} `{Shrink A} `{Shrink B} : Shrink (A * B) :=
-  {| 
+  {|
     shrink := fun (p : A * B) =>
-      let (a,b) := p in 
+      let (a,b) := p in
       map (fun a' => (a',b)) (shrink a) ++ map (fun b' => (a,b')) (shrink b)
   |}.
 
 Global Instance shrinkOption {A : Type} `{Shrink A} : Shrink (option A) :=
-  {| shrink m := 
-       match m with 
+  {| shrink m :=
+       match m with
          | None => []
          | Some x => None :: (map Some (shrink x))
        end
@@ -212,7 +230,7 @@ Proof.
   exists 0. split. constructor.
   eapply semChooseSize; eauto.
   destruct x; eauto.
-Qed.  
+Qed.
 
 Lemma arbBool_correct:
   semGen arbitrary <--> [set: bool].
@@ -284,12 +302,12 @@ Proof.
     apply Hgen. auto.
 Qed.
 
-Lemma arbOpt_correct: 
+Lemma arbOpt_correct:
   forall {A} `{H : Arbitrary A} (P : nat -> A -> Prop) s,
     (semGenSize arbitrary s <--> P s) ->
-    (semGenSize arbitrary s <--> 
-     (fun (m : option A) => 
-        match m with 
+    (semGenSize arbitrary s <-->
+     (fun (m : option A) =>
+        match m with
           | None => true
           | Some x => P s x
         end)).
@@ -298,7 +316,7 @@ Proof.
   - move => /semFrequencySize [[w g] H2]; simpl in *.
     move: H2 => [[H2 | [H2 | H2]] H3];
     destruct m => //=; apply Hgen => //=;
-    inversion H2; subst; auto.                                      
+    inversion H2; subst; auto.
     + apply semReturnSize in H3; inversion H3.
     + apply semLiftGenSize in H3; inversion H3 as [x [H0 H1]].
       inversion H1; subst; auto.
@@ -312,17 +330,17 @@ Proof.
       exists (1, returnGen None); split; auto.
       * left; auto.
       * simpl; apply semReturnSize. constructor.
-Qed.      
+Qed.
 
-Lemma arbPair_correctSize 
-      {A B} `{Arbitrary A} `{Arbitrary B} (Sa : nat -> set A) 
+Lemma arbPair_correctSize
+      {A B} `{Arbitrary A} `{Arbitrary B} (Sa : nat -> set A)
       (Sb : nat -> set B) s:
-    (semGenSize arbitrary s <--> Sa s) -> 
+    (semGenSize arbitrary s <--> Sa s) ->
     (semGenSize arbitrary s <--> Sb s) ->
     (semGenSize arbitrary s <--> setX (Sa s) (Sb s)).
 Proof.
   move => Hyp1 Hyp2 . rewrite semLiftGen2Size; move => [a b].
-  split. 
+  split.
   by move => [[a' b'] [[/= /Hyp1 Ha /Hyp2 Hb] [Heq1 Heq2]]]; subst; split.
   move => [/Hyp1 Ha /Hyp2 Hb]. eexists; split; first by split; eauto.
   reflexivity.

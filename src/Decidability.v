@@ -1,11 +1,17 @@
 Set Warnings "-extraction-opaque-accessed,-extraction".
 Set Warnings "-notation-overridden,-parsing".
 
-Require Import Checker.
-From mathcomp.ssreflect Require Import ssreflect ssrbool ssrnat.
-Require Import Coq.Strings.String.
-Require Import Coq.Strings.Ascii.
-Require Import List.
+From Coq Require Import
+     Ascii
+     List
+     NArith
+     String
+     ZArith.
+From mathcomp Require Import
+     ssrbool
+     ssreflect
+     ssrnat.
+From QuickChick Require Import Checker.
 
 Set Bullet Behavior "Strict Subproofs".
 
@@ -149,6 +155,12 @@ Proof. dec_eq. Defined.
 Global Instance Dec_eq_nat (m n : nat) : Dec (m = n).
 Proof. dec_eq. Defined.
 
+Global Instance Dec_eq_Z (m n : Z) : Dec (m = n).
+Proof. dec_eq. Defined.
+
+Global Instance Dec_eq_N (m n : N) : Dec (m = n).
+Proof. dec_eq. Defined.
+
 Global Instance Dec_eq_opt (A : Type) (m n : option A)
   `{_ : forall (x y : A), Dec (x = y)} : Dec (m = n).
 Proof. dec_eq. Defined.
@@ -208,6 +220,8 @@ Notation "P '?'" := (match (@dec P _) with
 
 Hint Resolve Dec_eq_bool : eq_dec.
 Hint Resolve Dec_eq_nat : eq_dec.
+Hint Resolve Dec_eq_Z : eq_dec.
+Hint Resolve Dec_eq_N : eq_dec.
 Hint Resolve Dec_eq_opt : eq_dec.
 Hint Resolve Dec_eq_prod : eq_dec.
 Hint Resolve Dec_eq_list : eq_dec.

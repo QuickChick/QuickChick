@@ -1,9 +1,13 @@
-Require Import List.
+From Coq Require Import
+     Ascii
+     Basics
+     Decimal
+     List
+     String
+     ZArith.
+
 Import ListNotations.
-Require Import Coq.Strings.String.
-Require Import Coq.Strings.Ascii.
-Require Import ZArith.
-Require Import Decimal.
+Open Scope program_scope.
 
 Definition newline := String "010" ""%string.
 
@@ -46,6 +50,9 @@ Definition show_bool (b : bool) : string :=
 Definition show_Z (n : Z) : string :=
   show_int (Z.to_int n).
 
+Definition show_N : N -> string :=
+  show_Z ∘ Z.of_N.
+
 Instance showUint : Show uint :=
 {|
   show := show_uint
@@ -69,6 +76,11 @@ Instance showBool : Show bool :=
 Instance showZ : Show Z :=
 {|
   show := show_Z
+|}.
+
+Instance showN : Show N :=
+{|
+  show := show_N
 |}.
 
 Fixpoint from_list (s : list ascii) : string :=
@@ -217,17 +229,17 @@ Instance showType : Show Type :=
 
 Instance showEx {A} `{_ : Show A} P : Show ({x : A | P x}) :=
   {|
-    show ex := let '(exist _ x _) := ex in show x 
+    show ex := let '(exist _ x _) := ex in show x
   |}.
 
 Require Import Ascii.
 Definition nl : string := String "010" EmptyString.
 
 Definition smart_paren (s : string) : string :=
-  let fix aux s (b : bool) := 
-      match s with 
+  let fix aux s (b : bool) :=
+      match s with
         | EmptyString => (if b then ")" else "", b)
-        | String a s => 
+        | String a s =>
           let (s', b) := aux s (orb b (nat_of_ascii a =? 32)) in
           (String a s', b)
       end in
@@ -251,8 +263,8 @@ Instance repr_option {A} `{_ : ReprSubset A} : ReprSubset (option A) :=
   {| representatives := None :: map Some representatives |}.
 
 Instance repr_list {A} `{_ : ReprSubset A} : ReprSubset (list A) :=
-  {| representatives := 
-       [] :: map (fun x => [x]) representatives 
+  {| representatives :=
+       [] :: map (fun x => [x]) representatives
           ++ flat_map (fun x : A =>
                          map (fun y : A => [x;y]) representatives
                       ) representatives
@@ -261,19 +273,19 @@ Instance repr_list {A} `{_ : ReprSubset A} : ReprSubset (list A) :=
 Instance repr_prod {A B} `{_ : ReprSubset A} `{_ : ReprSubset B} :
   ReprSubset (A * B) :=
   {| representatives :=
-       flat_map (fun x : A => 
+       flat_map (fun x : A =>
                    map (fun y : B => (x,y)) representatives
-                ) representatives 
+                ) representatives
   |}.
 
 Fixpoint prepend {A : Type} (a : A) (l : list A) :=
-  match l with 
+  match l with
     | [] => []
     | h::t => a :: h :: prepend a t
   end.
 
 Definition intersperse {A : Type} (a : A) (l : list A) :=
-  match l with 
+  match l with
     | [] => []
     | h::t => h :: prepend a t
   end.
@@ -283,12 +295,12 @@ Definition string_concat (l : list string) : string :=
 
 Instance show_fun {A B} `{_ : Show A} `{_ : ReprSubset A}
          `{_ : Show B} : Show (A -> B) :=
-  {| show f := 
-       "{ " ++ string_concat (intersperse " , " 
+  {| show f :=
+       "{ " ++ string_concat (intersperse " , "
                             (map (fun x => show x ++ " |-> " ++ show (f x))
                                  (@representatives A _)))
            ++ " }"
-  |}.            
+  |}.
 
 End ShowFunctions.
 
