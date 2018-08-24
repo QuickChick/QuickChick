@@ -38,7 +38,7 @@ Definition ainstr (st : State) : G Instruction :=
         | _ => false
       end in
   let onLength len x := if leb x len then x else 0 in
-  frequency (returnGen Nop) [
+  freq_ (returnGen Nop) [
               (1, returnGen Nop);
               (10, liftGen Push gen_Z);
               (10, liftGen BCall (if beq_nat sl 0 then returnGen 0
@@ -66,7 +66,7 @@ Fixpoint gen_stack (n : nat) (onlyLow : bool) : G Stack :=
   match n with
     | O => returnGen Mty
     | S n' =>
-      frequency (returnGen Mty) [
+      freq_ (returnGen Mty) [
                   (10, liftGen2 Cons gen_atom (gen_stack n' onlyLow));
                   (4, bindGen gen_atom (fun pc =>
                        liftGen (RetCons pc) (gen_stack n' (is_atom_low pc))))]
