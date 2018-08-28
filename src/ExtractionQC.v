@@ -11,7 +11,7 @@ Require Import ExtrOcamlString.
 Require Import ExtrOcamlNatInt.
 Require Import ExtrOcamlZInt.
 
-Extraction Blacklist String List.
+Extraction Blacklist String List Nat.
 
 (* Ignore [Decimal.int] before the extraction issue is solved:
    https://github.com/coq/coq/issues/7017. *)
