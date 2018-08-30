@@ -145,20 +145,20 @@ Parameter semFoldGen_right :
 
 Parameter semOneof:
   forall {A} (l : list (G A)) (def : G A),
-    (semGen (oneof def l)) <-->
+    (semGen (oneOf_ def l)) <-->
       if l is nil then semGen def else \bigcup_(x in l) semGen x.
 
 Parameter semOneofSize:
   forall {A} (l : list (G A)) (def : G A) s,
-    (semGenSize (oneof def l) s) <-->
+    (semGenSize (oneOf_ def l) s) <-->
       if l is nil then semGenSize def s else \bigcup_(x in l) semGenSize x s.
 
 Declare Instance oneofMonotonic {A} (x : G A) (l : list (G A))
-        `{ SizeMonotonic _ x} `(l \subset SizeMonotonic) : SizeMonotonic (oneof x l). 
+        `{ SizeMonotonic _ x} `(l \subset SizeMonotonic) : SizeMonotonic (oneOf_ x l). 
 
 Parameter semFrequency:
   forall {A} (l : list (nat * G A)) (def : G A),
-    semGen (frequency def l) <-->
+    semGen (freq_ def l) <-->
       let l' := [seq x <- l | x.1 != 0] in
       if l' is nil then semGen def else
         \bigcup_(x in l') semGen x.2.
@@ -167,17 +167,17 @@ Parameter frequencySizeMonotonic:
   forall {A} (g0 : G A) lg,
   SizeMonotonic g0 ->
   List.Forall (fun p => SizeMonotonic (snd p)) lg ->
-  SizeMonotonic (frequency g0 lg).
+  SizeMonotonic (freq_ g0 lg).
 
 Declare Instance frequencySizeMonotonic_alt 
 : forall {A : Type} (g0 : G A) (lg : seq (nat * G A)),
     SizeMonotonic g0 ->
     lg \subset [set x | SizeMonotonic x.2 ] ->
-    SizeMonotonic (frequency g0 lg).
+    SizeMonotonic (freq_ g0 lg).
 
 Parameter semFrequencySize:
   forall {A} (l : list (nat * G A)) (def : G A) (size: nat),
-    semGenSize (frequency def l) size <-->
+    semGenSize (freq_ def l) size <-->
       let l' := [seq x <- l | x.1 != 0] in
       if l' is nil then semGenSize def size else
       \bigcup_(x in l') semGenSize x.2 size.
@@ -255,13 +255,13 @@ Declare Instance listOfMonotonic {A} (g : G A)
 
 Parameter semElements:
   forall {A} (l: list A) (def : A),
-    (semGen (elements def l)) <--> if l is nil then [set def] else l.
+    (semGen (elems_ def l)) <--> if l is nil then [set def] else l.
 
 Parameter semElementsSize:
   forall {A} (l: list A) (def : A) s,
-    (semGenSize (elements def l) s) <--> if l is nil then [set def] else l.
+    (semGenSize (elems_ def l) s) <--> if l is nil then [set def] else l.
 
-Declare Instance elementsUnsized {A} {def : A} (l : list A)  : Unsized (elements def l).
+Declare Instance elementsUnsized {A} {def : A} (l : list A)  : Unsized (elems_ def l).
 
 Definition genPair {A B : Type} (ga : G A) (gb : G B) : G (A * B) :=
   liftGen2 pair ga gb.
@@ -281,34 +281,34 @@ Parameter mergeBinds :
 Module QcDefaultNotation.
 
 (* Noone would write a literal singleton. *)
-Notation " 'elems' [ x ] " := (elements x (cons x nil)) : qc_scope.
-Notation " 'elems' [ x ; y ] " := (elements x (cons x (cons y nil))) : qc_scope.
+Notation " 'elems' [ x ] " := (elems_ x (cons x nil)) : qc_scope.
+Notation " 'elems' [ x ; y ] " := (elems_ x (cons x (cons y nil))) : qc_scope.
 Notation " 'elems' [ x ; y ; .. ; z ] " :=
-  (elements x (cons x (cons y .. (cons z nil) ..))) : qc_scope.
+  (elems_ x (cons x (cons y .. (cons z nil) ..))) : qc_scope.
 (* Why not [elems (x :: l)]? *)
 Notation " 'elems' ( x ;; l ) " :=
-  (elements x (cons x l)) (at level 201, no associativity) : qc_scope.
+  (elems_ x (cons x l)) (at level 201, no associativity) : qc_scope.
 
 (* We insert thunks ([etaG]) to delay the execution of
    each element until it actually gets chosen. *)
 
 Notation " 'oneOf' [ x ] " := x : qc_scope.
 Notation " 'oneOf' [ x ; y ] " :=
-  (oneof (etaG x) (cons (etaG x) (cons (etaG y) nil))) : qc_scope.
+  (oneOf_ (etaG x) (cons (etaG x) (cons (etaG y) nil))) : qc_scope.
 Notation " 'oneOf' [ x ; y ; .. ; z ] " :=
-  (oneof (etaG x) (cons (etaG x)
+  (oneOf_ (etaG x) (cons (etaG x)
     (cons (etaG y) .. (cons (etaG z) nil) ..))) : qc_scope.
 Notation " 'oneOf' ( x ;; l ) " :=
-  (oneof x (cons x l))  (at level 1, no associativity) : qc_scope.
+  (oneOf_ x (cons x l))  (at level 1, no associativity) : qc_scope.
 
 (* freq [ 4 %: g1 ; 6 %: g2 ] *)
 Notation " 'freq' [ x ] " := ((x : nat * G _).2) : qc_scope.
 Notation " 'freq' [ x ; y ] " :=
-  (frequency x.2 (cons x (cons y nil))) : qc_scope.
+  (freq_ x.2 (cons x (cons y nil))) : qc_scope.
 Notation " 'freq' [ x ; y ; .. ; z ] " :=
-  (frequency x.2 (cons x (cons y .. (cons z nil) ..))) : qc_scope.
+  (freq_ x.2 (cons x (cons y .. (cons z nil) ..))) : qc_scope.
 Notation " 'freq' ( x ;; l ) " :=
-  (frequency x.2 (cons x l)) (at level 1, no associativity) : qc_scope.
+  (freq_ x.2 (cons x l)) (at level 1, no associativity) : qc_scope.
 
 Notation "w %: g" := (w, etaG g)
   (at level 100) : qc_scope.

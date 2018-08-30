@@ -164,23 +164,23 @@ Parameter bindGenOpt : forall {A B : Type},
 Parameter listOf : forall {A : Type}, G A -> G (list A).
 Parameter vectorOf : forall {A : Type}, nat -> G A -> G (list A).
 
-(** [elements a l] constructs a generator from a list [l] and a
+(** [elems_ a l] constructs a generator from a list [l] and a
     default element [a]. If [l] is non-empty, the generator picks an
     element from [l] uniformly; otherwise it always yields [a]. *)
-Parameter elements : forall {A : Type}, A -> list A -> G A.
+Parameter elems_ : forall {A : Type}, A -> list A -> G A.
 
-(** Similar to [elements], instead of choosing from a list of [A]s,
-    [oneof g l] returns [g] if [l] is empty; otherwise it uniformly
+(** Similar to [elems_], instead of choosing from a list of [A]s,
+    [oneOf_ g l] returns [g] if [l] is empty; otherwise it uniformly
     picks a generator for [A] in [l]. *)
-Parameter oneof : forall {A : Type}, G A -> list (G A) -> G A.
+Parameter oneOf_ : forall {A : Type}, G A -> list (G A) -> G A.
 
 (** We can also choose generators with distributions other than the
-    uniform one. [frequency g l] returns [g] if [l] is empty;
+    uniform one. [freq_ g l] returns [g] if [l] is empty;
     otherwise it chooses a generator from [l], where the first field
     indicates the chance that the second field is chosen. For example,
-    [frequency z [(2, x); (3, y)]] has 40%% probability of choosing
+    [freq_ z [(2, x); (3, y)]] has 40%% probability of choosing
     [x] and 60%% probability of choosing [y]. *)
-Parameter frequency :
+Parameter freq_ :
   forall {A : Type}, G A -> list (nat * G A) -> G A.
 
 (** Try all generators until one returns a [Some] value or all failed once with
@@ -203,45 +203,51 @@ Parameter suchThatMaybeOpt :
 
 (* #################################################################### *)
 
-(** The [elements], [oneof], and [frequency] combinators all take
+(** The [elems_], [oneOf_], and [freq_] combinators all take
     default values; these are only used if their list arguments are
     empty, which should not normally happen. The [QcDefaultNotation]
-    sub-module exposes notation to hide this default.
+    sub-module exposes notation (without the underscores) to hide this default.
 *)
 
 Module QcDefaultNotation.
 
-  (** [elems] is a shorthand for [elements] without a default argument. *)
+  (** [elems] is a shorthand for [elems_] without a default argument. *)
   Notation " 'elems' [ x ] " :=
-    (elements x (cons x nil)) : qc_scope.
+    (elems_ x (cons x nil)) : qc_scope.
   Notation " 'elems' [ x ; y ] " :=
-    (elements x (cons x (cons y nil))) : qc_scope.
+    (elems_ x (cons x (cons y nil))) : qc_scope.
   Notation " 'elems' [ x ; y ; .. ; z ] " :=
-    (elements x (cons x (cons y .. (cons z nil) ..))) : qc_scope.
+    (elems_ x (cons x (cons y .. (cons z nil) ..))) : qc_scope.
   Notation " 'elems' ( x ;; l ) " :=
-    (elements x (cons x l)) (at level 1, no associativity) : qc_scope.
+    (elems_ x (cons x l)) (at level 1, no associativity) : qc_scope.
 
-  (** [oneOf] is a shorthand for [oneof] without a default argument. *)
+  (** [oneOf] is a shorthand for [oneOf_] without a default argument. *)
   Notation " 'oneOf' [ x ] " :=
-    (oneof x (cons x nil)) : qc_scope.
+    (oneOf_ x (cons x nil)) : qc_scope.
   Notation " 'oneOf' [ x ; y ] " :=
-    (oneof x (cons x (cons y nil))) : qc_scope.
+    (oneOf_ x (cons x (cons y nil))) : qc_scope.
   Notation " 'oneOf' [ x ; y ; .. ; z ] " :=
-    (oneof x (cons x (cons y .. (cons z nil) ..))) : qc_scope.
+    (oneOf_ x (cons x (cons y .. (cons z nil) ..))) : qc_scope.
   Notation " 'oneOf' ( x ;; l ) " :=
-    (oneof x (cons x l))  (at level 1, no associativity) : qc_scope.
+    (oneOf_ x (cons x l))  (at level 1, no associativity) : qc_scope.
 
-  (** [freq] is a shorthand for [frequency] without a default argument. *)
+  (** [freq] is a shorthand for [freq_] without a default argument. *)
   Notation " 'freq' [ x ] " :=
-    (frequency x (cons x nil)) : qc_scope.
+    (freq_ x (cons x nil)) : qc_scope.
   Notation " 'freq' [ ( n , x ) ; y ] " :=
-    (frequency x (cons (n, x) (cons y nil))) : qc_scope.
+    (freq_ x (cons (n, x) (cons y nil))) : qc_scope.
   Notation " 'freq' [ ( n , x ) ; y ; .. ; z ] " :=
-    (frequency x (cons (n, x) (cons y .. (cons z nil) ..))) : qc_scope.
+    (freq_ x (cons (n, x) (cons y .. (cons z nil) ..))) : qc_scope.
   Notation " 'freq' ( ( n , x ) ;; l ) " :=
-    (frequency x (cons (n, x) l)) (at level 1, no associativity) : qc_scope.
+    (freq_ x (cons (n, x) l)) (at level 1, no associativity) : qc_scope.
 
 End QcDefaultNotation.
+
+(** The original version of QuickChick used [elements], [oneof] and [frequency]
+    as the default-argument versions of the corresponding combinators.
+    These have since been deprecated in favor of a more consistent 
+    naming scheme.
+*)
 
 (* #################################################################### *)
 (** ** Choosing from Intervals *)
@@ -570,10 +576,10 @@ Notation "P '?'" := (match (@dec P _) with
                      | right _ => false
                      end) (at level 100).
 
-(** ** The [Eq] Typeclass *)
+(** ** The [Dec_Eq] Typeclass *)
 
 (** [[
-     Class Eq (A : Type) :=
+     Class Dec_Eq (A : Type) :=
        {
          dec_eq : forall (x y : A), decidable (x = y)
        }.
@@ -581,7 +587,7 @@ Notation "P '?'" := (match (@dec P _) with
 *)
 
 (** Automation and conversions for Dec. *)
-Declare Instance Eq__Dec {A} `{H : Eq A} (x y : A) : Dec (x = y).
+Declare Instance Eq__Dec {A} `{H : Dec_Eq A} (x y : A) : Dec (x = y).
 
 (** Since deciding equalities is a very common requirement in testing,
     QuickChick provides a tactic that can define instances of the form

@@ -9,17 +9,17 @@ Import ListNotations.
 Definition tvar := nat.
 Definition var := nat.
 
-Inductive type : Type := 
+Inductive type : Type :=
 | N : type
 | Arrow : type -> type -> type.
 
-Definition type_eq_dec (t1 t2 : type) : {t1 = t2} + {t1 <> t2}. 
+Definition type_eq_dec (t1 t2 : type) : {t1 = t2} + {t1 <> t2}.
 Proof. do 2 decide equality. Defined.
 
 Fixpoint type_size (tau : type) : nat :=
-  match tau with 
+  match tau with
     | N => 0
-    | Arrow tau1 tau2 => 
+    | Arrow tau1 tau2 =>
       1 + (type_size tau1 + type_size tau2)
   end.
 
@@ -31,9 +31,9 @@ Proof.
   unfold lt_type. apply wf_inverse_image. apply lt_wf.
 Qed.
 
-Inductive term : Type := 
+Inductive term : Type :=
 | Const : nat -> term
-| Id : var -> term 
+| Id : var -> term
 | App : term -> term -> term
 | Abs : term -> term.
 
@@ -41,18 +41,18 @@ Inductive term : Type :=
 Inductive app_free : term -> Prop :=
 | ConsNoApp : forall n, app_free (Const n)
 | IdNoApp : forall x, app_free (Id x)
-| AbsNoApp : forall (t : term), 
+| AbsNoApp : forall (t : term),
                app_free t -> app_free (Abs t).
 
 (* Number of applications in a term *)
-Fixpoint app_no (t : term) : nat := 
-  match t with 
+Fixpoint app_no (t : term) : nat :=
+  match t with
     | Const _ | Id _ => 0
     | Abs t => app_no t
     | App t1 t2 => 1 + (app_no t1 + app_no t2)
   end.
 
-Definition env := list type. 
+Definition env := list type.
 
 Inductive bind : env -> nat -> type -> Prop :=
 | BindNow   : forall tau env, bind (tau :: env) 0 tau
@@ -61,11 +61,11 @@ Inductive bind : env -> nat -> type -> Prop :=
 
 Inductive typing (e : env) : term -> type -> Prop :=
 | TId :
-    forall x tau, 
+    forall x tau,
       nth_error e x = Some tau ->
       typing e (Id x) tau
 | TConst :
-    forall n, 
+    forall n,
       typing e (Const n) N
 | TAbs :
     forall t tau1 tau2,
@@ -83,7 +83,7 @@ Inductive typing' (e : env) : term -> type -> Prop :=
       bind e x tau ->
       typing' e (Id x) tau
 | TConst' :
-    forall n, 
+    forall n,
       typing' e (Const n) N
 | TAbs' :
     forall t tau1 tau2,
@@ -103,19 +103,19 @@ Derive ArbitrarySizedSuchThat for (fun t => typing' env t tau).
 
 Inductive option_le : option nat -> option nat -> Prop :=
     | opt_le_1 : option_le None None
-    | opt_le_2 : forall n, option_le None (Some n) 
-    | opt_le_3 : forall n m : nat, 
+    | opt_le_2 : forall n, option_le None (Some n)
+    | opt_le_3 : forall n m : nat,
                    n <= m -> option_le (Some n) (Some m).
 
-(* The following keeps track of the size of largest type that appears in a cut 
+(* The following keeps track of the size of largest type that appears in a cut
    in the derivation tree. Needed for verification purposes *)
 Inductive typing_max_tau (e : env) : term -> type -> nat -> Prop :=
 | TIdMax :
-    forall x tau, 
+    forall x tau,
       nth_error e x = Some tau ->
       typing_max_tau e (Id x) tau 0
 | TConstMax :
-    forall n, 
+    forall n,
       typing_max_tau e (Const n) N 0
 | TAbsMax :
     forall t tau1 tau2 m,
@@ -128,13 +128,13 @@ Inductive typing_max_tau (e : env) : term -> type -> nat -> Prop :=
       typing_max_tau e (App t1 t2) tau2 (max (type_size tau1) (max m1 m2)).
 
 Lemma typing_max_tau_correct :
-  forall e t tau, 
-    (exists m, typing_max_tau e t tau m) <-> 
+  forall e t tau,
+    (exists m, typing_max_tau e t tau m) <->
     typing e t tau.
 Proof.
   intros. split.
   - move => [maxt H]. induction H; econstructor; eauto.
-  - move => H. 
+  - move => H.
     induction H; (try now eexists; econstructor; eauto).
     destruct IHtyping as [m H']. exists m. constructor; auto.
     destruct IHtyping1 as [m1 H1];
@@ -143,7 +143,7 @@ Qed.
 
 Lemma typing_max_no_app :
   forall e t tau,
-    app_free t -> 
+    app_free t ->
     typing e t tau ->
     typing_max_tau e t tau 0.
 Proof.
@@ -164,7 +164,7 @@ Fixpoint subst (y : var) (t1 : term) (t2 : term) : term :=
     | Id x =>
       if eq_nat_dec x y then t1 else t2
     | App t t' =>
-      App (subst y t1 t) (subst y t1 t') 
+      App (subst y t1 t) (subst y t1 t')
     | Abs t =>
       subst (S y) t1 t
   end.
@@ -173,14 +173,14 @@ Fixpoint step (t : term) : option term :=
   match t with
     | Const _ | Id _ => None | Abs x => None
     | App t1 t2 =>
-      if is_value t1 then 
-        match t1 with 
-          | Abs t => 
+      if is_value t1 then
+        match t1 with
+          | Abs t =>
             if is_value t2 then ret (subst 0 t1 t)
-            else 
+            else
               t2' <- step t2;;
               ret (App t1 t2')
-          | _ => None 
+          | _ => None
         end
       else
         t1' <- step t1;;
@@ -197,7 +197,7 @@ Import DoNotation.
 
 (* Sized generator of simple types *)
 Fixpoint gen_type_size (n : nat) : G type :=
-  match n with 
+  match n with
     | 0 => returnGen N
     | S n' =>
       do! m <- choose (0, n');
@@ -228,32 +228,32 @@ Qed.
 
 (* Generator of app-free well-typed terms of type tau *)
 Fixpoint gen_term_no_app (tau : type)  (e : env) : G term :=
-  match vars_with_type e tau with 
+  match vars_with_type e tau with
     | [] =>
-      match tau with 
+      match tau with
         | N => liftGen Const arbitrary
-        | Arrow tau1 tau2 => 
+        | Arrow tau1 tau2 =>
           liftGen Abs (gen_term_no_app tau2 (tau1 :: e))
       end
     | def :: vars =>
-      oneof (returnGen def) 
-            [ match tau with 
+      oneOf_ (returnGen def)
+            [ match tau with
                 | N => liftGen Const arbitrary
-                | Arrow tau1 tau2 => 
+                | Arrow tau1 tau2 =>
                    liftGen Abs (gen_term_no_app tau2 (tau1 :: e))
               end;
-              elements def (def :: vars)]        
+              elems_ def (def :: vars)]
   end.
 
 (* Generator of well-typed terms of type tau. [fst p] is the maximum number of applications *)
 Program Fixpoint gen_term_size (p : nat * type) {wf lt_pair p} : env -> G term :=
   fun (e : env) => (* apparently with this trick we get a more manageable term *)
-  match p with 
+  match p with
     | (0, tau) => gen_term_no_app tau e
     | (S n', tau) =>
-      match vars_with_type e tau with 
+      match vars_with_type e tau with
         | [] =>
-            oneof (gen_term_no_app tau e)
+            oneOf_ (gen_term_no_app tau e)
             [ (do! tau' <- gen_type;
                do! m <- choose (0, n');
                do! m' <- choose (n' -  m, n');
@@ -261,11 +261,11 @@ Program Fixpoint gen_term_size (p : nat * type) {wf lt_pair p} : env -> G term :
                         (@gen_term_size (n' - m', tau') _ e));
               (match tau with
                  | N => liftGen Const arbitrary
-                 | Arrow tau1 tau2 => 
+                 | Arrow tau1 tau2 =>
                    liftGen Abs (@gen_term_size (S n', tau2) _ (tau1 :: e))
                end)]
         | def :: vars =>
-            oneof (gen_term_no_app tau e)
+            oneOf_ (gen_term_no_app tau e)
             [ (do! tau' <- gen_type;
                do! m <- choose (0, n');
                do! m' <- choose (n' - m, n');
@@ -273,10 +273,10 @@ Program Fixpoint gen_term_size (p : nat * type) {wf lt_pair p} : env -> G term :
                         (@gen_term_size (n' - m', tau') _ e));
               (match tau with
                  | N => liftGen Const arbitrary
-                 | Arrow tau1 tau2 => 
+                 | Arrow tau1 tau2 =>
                    liftGen Abs (@gen_term_size (S n', tau2) _ (tau1 :: e))
                end);
-              elements def (def :: vars) ] 
+              elems_ def (def :: vars) ]
       end
   end.
 Solve Obligations with
@@ -288,13 +288,13 @@ Next Obligation.
 Defined.
 
 
-Definition gen_term_size_unfold (p : nat * type) (e : env) : G term := 
-  match p with 
+Definition gen_term_size_unfold (p : nat * type) (e : env) : G term :=
+  match p with
     | (0, tau) => gen_term_no_app tau e
     | (S n', tau) =>
-      match vars_with_type e tau with 
+      match vars_with_type e tau with
         | [] =>
-            oneof (gen_term_no_app tau e)
+            oneOf_ (gen_term_no_app tau e)
             [ (do! tau' <- gen_type;
                do! m <- choose (0, n');
                do! m' <- choose (n' - m, n');
@@ -302,11 +302,11 @@ Definition gen_term_size_unfold (p : nat * type) (e : env) : G term :=
                         (gen_term_size (n' - m', tau') e));
               (match tau with
                  | N => liftGen Const arbitrary
-                 | Arrow tau1 tau2 => 
+                 | Arrow tau1 tau2 =>
                    liftGen Abs (@gen_term_size (S n', tau2) (tau1 :: e))
                end)]
         | def :: vars =>
-            oneof (gen_term_no_app tau e)
+            oneOf_ (gen_term_no_app tau e)
             [ (do! tau' <- gen_type;
                do! m <- choose (0, n');
                do! m' <- choose (n' - m, n');
@@ -314,12 +314,12 @@ Definition gen_term_size_unfold (p : nat * type) (e : env) : G term :=
                         (@gen_term_size (n' - m', tau') e));
               (match tau with
                  | N => liftGen Const arbitrary
-                 | Arrow tau1 tau2 => 
+                 | Arrow tau1 tau2 =>
                    liftGen Abs (gen_term_size (S n', tau2) (tau1 :: e))
                end);
-              elements def (def :: vars) ] 
+              elems_ def (def :: vars) ]
       end
-  end.  
+  end.
 
 Import WfExtensionality.
 
@@ -329,7 +329,7 @@ Lemma gen_term_size_eq (e : env) (p : nat * type) :
 Proof.
   unfold_sub gen_term_size (gen_term_size p e); simpl.
   destruct p as [[|n] [|]]; try reflexivity;
-  destruct (vars_with_type e _) eqn:Heq; simpl; 
+  destruct (vars_with_type e _) eqn:Heq; simpl;
   repeat (rewrite !Heq /=; apply f_equal; try reflexivity).
 Qed.
 
@@ -337,14 +337,14 @@ Global Opaque gen_term_size.
 
 Definition gen_term (tau : type) :=
   sized (fun s => gen_term_size (s, tau) []).
- 
+
 
 Open Scope string.
 
 Fixpoint show_type (tau : type) :=
   match tau with
     | N => "Nat"
-    | Arrow tau1 tau2 => 
+    | Arrow tau1 tau2 =>
       "(" ++ show_type tau1 ++ " -> " ++ show_type tau2 ++ ")"
   end.
 
@@ -355,9 +355,9 @@ Fixpoint show_term (t : term) :=
     | Const n => show n
     | Id x => "Id" ++ show x
     | App t1 t2 => "(" ++ show_term t1 ++ " " ++ show_term t2 ++ ")"
-    | Abs t => "λ.(" ++ show_term t ++ ")" 
+    | Abs t => "λ.(" ++ show_term t ++ ")"
   end.
-    
+
 Close Scope string.
 
 Instance showTerm : Show term := { show := show_term }.

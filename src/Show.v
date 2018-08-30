@@ -1,9 +1,13 @@
-Require Import List.
+From Coq Require Import
+     Ascii
+     Basics
+     Decimal
+     List
+     String
+     ZArith.
+
 Import ListNotations.
-Require Import Coq.Strings.String.
-Require Import Coq.Strings.Ascii.
-Require Import ZArith.
-Require Import Decimal.
+Open Scope program_scope.
 
 Definition newline := String "010" ""%string.
 
@@ -46,6 +50,9 @@ Definition show_bool (b : bool) : string :=
 Definition show_Z (n : Z) : string :=
   show_int (Z.to_int n).
 
+Definition show_N : N -> string :=
+  show_Z ∘ Z.of_N.
+
 Instance showUint : Show uint :=
 {|
   show := show_uint
@@ -69,6 +76,11 @@ Instance showBool : Show bool :=
 Instance showZ : Show Z :=
 {|
   show := show_Z
+|}.
+
+Instance showN : Show N :=
+{|
+  show := show_N
 |}.
 
 Fixpoint from_list (s : list ascii) : string :=
@@ -221,7 +233,7 @@ Instance showEx {A} `{_ : Show A} P : Show ({x : A | P x}) :=
   |}.
 
 Require Import Ascii.
-Definition nl : string := String (ascii_of_nat 10) EmptyString.
+Definition nl : string := String "010" EmptyString.
 
 Definition smart_paren (s : string) : string :=
   let fix aux s (b : bool) :=
@@ -291,3 +303,8 @@ Instance show_fun {A B} `{_ : Show A} `{_ : ReprSubset A}
   |}.
 
 End ShowFunctions.
+
+(* Extraction will map this to something that additionally prints stuff *)
+Definition trace {A : Type} (s : string) (a : A) : A := a.
+Definition deprecate {A : Type} (old new: string) (a : A) : A :=
+  trace ("Deprecated function: " ++ old ++ ". Use " ++ new ++ " instead.") a.

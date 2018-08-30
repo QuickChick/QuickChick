@@ -30,7 +30,9 @@ https://github.com/DeepSpec/dsss17
     * mathcomp-ssreflect-1.6.4
     * coq-ext-lib-0.9.7
 
-### Compilation and Installation (from opam)
+### Installation
+
+#### From OPAM
 
     # Add the Coq opam repository (if you haven't already)
     opam repo add coq-released https://coq.inria.fr/opam/released
@@ -38,12 +40,12 @@ https://github.com/DeepSpec/dsss17
     # Install the coq-quickchick opam package
     opam install coq-quickchick
 
-### Compilation and Installation (from source)
+#### From source
 
     # To get the dependencies, you still need to add the Coq opam repository (if you haven't already)
     opam repo add coq-released https://coq.inria.fr/opam/released
     opam update
-    opam install coq-mathcomp-ssreflect coq-ext-lib
+    opam install coq-mathcomp-ssreflect coq-ext-lib coq-simple-io
 
     # Then:
     make && make install

@@ -18,7 +18,7 @@ endef
 includecmdwithout@ = $(eval $(subst @,$(donewline),$(shell { $(1) | tr -d '\r' | tr '\n' '@'; })))
 $(call includecmdwithout@,$(COQBIN)coqtop -config)
 
-all: plugin documentation-check quickChickTool
+all: quickChickTool plugin documentation-check
 
 plugin: Makefile.coq 
 	$(MAKE) -f Makefile.coq 
@@ -32,7 +32,7 @@ TEMPFILE := $(shell mktemp)
 install: all
 	$(V)$(MAKE) -f Makefile.coq install > $(TEMPFILE)
 # Manually copying the remaining files
-	$(V)cp $(QCTOOL_EXE) $(shell opam config var bin)/quickChick
+	$(V)cp $(QCTOOL_DIR)/$(QCTOOL_EXE) $(shell opam config var bin)/quickChick
 #	 $(V)cp src/quickChickLib.cmx $(COQLIB)/user-contrib/QuickChick
 #	 $(V)cp src/quickChickLib.o $(COQLIB)/user-contrib/QuickChick
 
@@ -46,10 +46,10 @@ uninstall:
 src/%.cmo : src/%.ml
 	ocamlc -I src -c $<
 
-quickChickTool: $(QCTOOL_EXE)
+quickChickTool: $(QCTOOL_DIR)/$(QCTOOL_EXE)
 
-$(QCTOOL_EXE): $(QCTOOL_SRC)
-	ocamlbuild -use-ocamlfind -pkg coq.lib -cflags -rectypes -tag thread $(QCTOOL_DIR)/$(QCTOOL_EXE)
+$(QCTOOL_DIR)/$(QCTOOL_EXE): $(QCTOOL_SRC)
+	cd $(QCTOOL_DIR); ocamlbuild -use-ocamlfind $(QCTOOL_EXE)
 
 tests:
 #	$(MAKE) -C examples/ifc-basic test
@@ -66,6 +66,7 @@ Makefile.coq: _CoqProject
 
 clean:
 	$Vif [ -e Makefile.coq ]; then $(MAKE) -f Makefile.coq clean; fi
+	$Vocamlbuild -clean
          # This might not work on macs
 	find . -name '*.vo' -print -delete
 	find . -name '*.glob' -print -delete

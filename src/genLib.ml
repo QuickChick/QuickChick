@@ -15,13 +15,13 @@ let oneof l =
   match l with
   | [] -> failwith "oneof used with empty list"
   | [c] -> c
-  | c::cs -> gApp (gInject "oneof") [c; gList l]
+  | c::cs -> gApp (gInject "oneOf_") [c; gList l]
 
 let frequency l =
   match l with
   | [] -> failwith "frequency used with empty list"
   | [(_,c)] -> c
-  | (_,c)::cs -> gApp (gInject "frequency") [c; gList (List.map gPair l)]
+  | (_,c)::cs -> gApp (gInject "freq_") [c; gList (List.map gPair l)]
 
 let backtracking l = gApp (gInject "backtrack") [gList (List.map gPair l)]
 let uniform_backtracking l = backtracking (List.combine (List.map (fun _ -> gInt 1) l) l)

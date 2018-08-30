@@ -40,7 +40,7 @@ Definition ainstr (st : State) : G Instruction :=
         | _ => false
       end in
   let onLength len x := if leb x len then x else 0 in
-  frequency (returnGen Nop) [
+  freq_ (returnGen Nop) [
               (1, returnGen Nop);
               (10, liftGen Push gen_Z);
               (if sl < 1 ? then 0 else 10, liftGen BCall (if beq_nat sl 0 then returnGen 0
@@ -60,7 +60,7 @@ Fixpoint gen_stack (n : nat) (onlyLow : bool) : G Stack :=
   match n with
     | O => returnGen Mty
     | S n' =>
-      frequency (returnGen Mty) [
+      freq_ (returnGen Mty) [
                   (10, liftGen2 Cons gen_atom (gen_stack n' onlyLow));
                   (4, bindGen gen_atom (fun pc =>
                        liftGen (RetCons pc) (gen_stack n' (is_atom_low pc))))]
@@ -75,8 +75,8 @@ Fixpoint gen_by_exec (t : table) (fuel : nat) (st : State) :=
     | Some Nop =>
       (* If it is a noop, generate *)
       bindGen (ainstr st) (fun i =>
-      match upd im addr i with 
-      | Some im' => 
+      match upd im addr i with
+      | Some im' =>
         let st' := St im' m stk (Atm addr pcl) in
         gen_by_exec t fuel' st'
       | None => returnGen st

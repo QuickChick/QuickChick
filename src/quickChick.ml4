@@ -135,7 +135,7 @@ let define_and_run c =
     "let s = Bytes.create (List.length l) in\n" ^
     "let rec copy i = function\n" ^
     "| [] -> s\n" ^
-    "| c :: l -> s.[i] <- c; copy (i+1) l\n" ^
+    "| c :: l -> Bytes.set s i c; copy (i+1) l\n" ^
     "in Bytes.to_string (copy 0 l))" in
   Printf.fprintf oc "%s" for_output;
   close_out oc;
