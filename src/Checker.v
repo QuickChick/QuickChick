@@ -1,7 +1,7 @@
 Set Implicit Arguments.
 
+Require Import String.
 Require Import List.
-Require Import Coq.Strings.String.
 
 Require Import RoseTrees.
 Require Import Show.
@@ -37,7 +37,7 @@ Record Result :=
       reason      : string;      (* Error message *)
       interrupted : bool;        (* ? *)
       stamp       : list string; (* Collected values for this test case *)
-      callbacks   : list Callback; 
+      callbacks   : list Callback;
       result_tag  : option string (* Tag - for better shrinking *)
     }.
 
@@ -82,7 +82,7 @@ Definition addStamps res ss :=
 
 (* LEO: Should we check if there already exists a tag? *)
 Definition setTag (r : Result) (t' : string) : Result :=
-  match r with 
+  match r with
     | MkResult o e r i s cs _ => MkResult o e r i s cs (Some t')
   end.
 
@@ -180,7 +180,7 @@ Definition shrinkingNondet {prop A : Type} `{Checkable prop} (n : nat)
           (shrinker : A -> list A) (x0 : A) (pf : A -> prop) : Checker :=
   fmap (fun x => MkProp (repeatRose n (joinRose (fmapRose unProp x))))
        (promote (props pf shrinker x0)).
-  
+
 Definition callback {prop : Type} `{Checkable prop}
            (cb : Callback) : prop -> Checker :=
   mapTotalResult (fun r => addCallback r cb).
@@ -276,9 +276,9 @@ Global Instance testFun {A prop : Type} `{Show A}
     checker f := forAllShrink arbitrary shrink f
   }.
 
-Global Instance testProd {A : Type} {prop : A -> Type} `{Show A} `{Arbitrary A} 
+Global Instance testProd {A : Type} {prop : A -> Type} `{Show A} `{Arbitrary A}
        `{forall x : A, Checkable (prop x)} :
-  Checkable (forall (x : A), prop x) := 
+  Checkable (forall (x : A), prop x) :=
   {| checker f := forAllShrink arbitrary shrink (fun x => checker (f x)) |}.
 
 Global Instance testPolyFun {prop : Type -> Type} {_ : Checkable (prop nat)} : Checkable (forall T, prop T) :=
@@ -292,22 +292,22 @@ Global Instance testPolyFunSet {prop : Set -> Type} {_ : Checkable (prop nat)} :
   }.
 
 (* LEO: TODO: Prove conjoin checker *)
-Definition addCallbacks' r result := 
+Definition addCallbacks' r result :=
   addCallbacks result (callbacks r).
-Definition addStamps' r result := 
+Definition addStamps' r result :=
 (*   debug_stamps "Before_adding: " result (
   debug_stamps "Adding_stamps: " r ( *)
   let res := addStamps result (stamp r) in
 (*   debug_stamps "After_adding: " res  *)
   res.
 
-Fixpoint conjAux (f : Result -> Result) 
-         l := 
-  match l with 
+Fixpoint conjAux (f : Result -> Result)
+         l :=
+  match l with
     | nil => (MkRose (f succeeded) (lazy nil))
-    | cons res rs => 
+    | cons res rs =>
       let '(MkRose r _) := res in
-      match ok r with 
+      match ok r with
         | Some true =>
            (conjAux (fun r' => addStamps' r (addCallbacks' r (f r'))
                     ) rs)
@@ -315,7 +315,7 @@ Fixpoint conjAux (f : Result -> Result)
         | None =>
           let res' := conjAux (fun r' => (addCallbacks' r (f r'))) rs in
           let '(MkRose r' rs) := res' in
-          match ok r' with 
+          match ok r' with
             | Some true => MkRose (updOk r' None) (lazy nil)
             | Some false => res'
             | None => res'
@@ -324,7 +324,7 @@ Fixpoint conjAux (f : Result -> Result)
   end.
 
 Definition mapGen {A B} (f : A -> G B) (l : list A) : G (list B) :=
-  bindGen (foldGen (fun acc a => 
+  bindGen (foldGen (fun acc a =>
              bindGen (f a) (fun b => returnGen (cons b acc)))
           l nil) (fun l => returnGen (rev l)).
 
@@ -332,34 +332,34 @@ Fixpoint conjoin (l : list Checker) : Checker :=
 (*   trace ("Beginnning conjoin" ++ nl) ( *)
   bindGen (mapGen (liftGen unProp) l) (fun rs =>
           (returnGen (MkProp (let res := conjAux (fun x => x) rs in
-                              let '(MkRose r _) := res in 
+                              let '(MkRose r _) := res in
                               (* debug_stamps "Conjoin result: " r *) res
                              )))).
 
 Definition fmapRose' A B (r : Rose A) (f : A -> B) := fmapRose f r.
 
-Definition expectFailureError := 
+Definition expectFailureError :=
   updReason failed "Expect failure cannot occur inside a disjunction".
 
 Definition disjAux (p q : Rose Result) : Rose Result :=
   joinRose (fmapRose' p (fun result1 =>
   if expect result1 then
-    match ok result1 with 
+    match ok result1 with
     | Some true => returnRose result1
-    | Some false => 
+    | Some false =>
       joinRose (fmapRose' q (fun result2 =>
       if expect result2 then
-        match ok result2 with 
+        match ok result2 with
         | Some true => returnRose result2
-        | Some false => 
+        | Some false =>
           returnRose (MkResult (ok result2)
                                (expect result2)
-                               (if string_dec (reason result2) EmptyString 
+                               (if string_dec (reason result2) EmptyString
                                 then reason result1
                                 else reason result2)
                                (orb (interrupted result1) (interrupted result2))
                                (stamp result1 ++ stamp result2)
-                               (callbacks result1 ++ 
+                               (callbacks result1 ++
                                     cons (PostFinalFailure Counterexample
                                                       (fun _ _ => trace newline 0)) nil ++
                                     callbacks result2 )
@@ -367,9 +367,9 @@ Definition disjAux (p q : Rose Result) : Rose Result :=
         | None => returnRose result2 (* Leo: What to do here? *)
         end
       else returnRose expectFailureError))
-    | None => 
-      joinRose (fmapRose' p (fun result2 => 
-      if expect result2 then 
+    | None =>
+      joinRose (fmapRose' p (fun result2 =>
+      if expect result2 then
         match ok result2 with
         | Some true => returnRose result2
         | _ => returnRose result1 (* Not sure here as well *)
@@ -378,7 +378,7 @@ Definition disjAux (p q : Rose Result) : Rose Result :=
     end
   else returnRose expectFailureError)).
 
-Definition disjoin (l : list Checker) : Checker := 
+Definition disjoin (l : list Checker) : Checker :=
   bindGen (mapGen (liftGen unProp) l) (fun rs =>
           (returnGen (MkProp (
                           fold_right disjAux (returnRose failed) rs
@@ -405,4 +405,3 @@ Module QcNotation.
       (at level 200, x ident, P at level 200, c at level 200, right associativity)
      : type_scope.
 End QcNotation.
-
