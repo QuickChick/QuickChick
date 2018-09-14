@@ -482,13 +482,13 @@ let rec parse_file_or_dir file_name =
                               ; sec_extends = None
                               ; sec_nodes = [Text s] } ]))
     else
-      let handle = (Filename.check_suffix file_name "v" ||
-                    Filename.check_suffix file_name "ml"||
-                    Filename.check_suffix file_name "c" ||
-                    Filename.check_suffix file_name "py"||
-                    Filename.check_suffix file_name "sol" ||
-                    Filename.check_suffix file_name "_tags" ||
-                    Filename.check_suffix file_name "h")
+      let handle = (Filename.check_suffix file_name ".v" ||
+                    Filename.check_suffix file_name ".ml"||
+                    Filename.check_suffix file_name ".c" ||
+                    Filename.check_suffix file_name ".py"||
+                    Filename.check_suffix file_name ".sol" ||
+                    Filename.basename     file_name="_tags" ||
+                    Filename.check_suffix file_name ".h")
                    && not (List.exists (fun x -> x = Filename.basename file_name) !excluded) in
       if handle then begin
         debug "In file: %s\n" file_name;
