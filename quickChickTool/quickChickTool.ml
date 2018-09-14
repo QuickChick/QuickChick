@@ -36,8 +36,8 @@ let speclist =
   ; ("-m", Arg.Int (fun n -> only_mutant := Some (Num n)), "Only test mutant number n")
   ; ("-N", Arg.Int (fun n -> maxSuccess := Some n), "Max number of successes")
   ; ("-tag", Arg.String (fun s -> only_mutant := Some (Tag s)), "Only test mutant number with a specific tag")
-  ; ("-include", Arg.String (fun incl -> include_file := Some incl), "_CoqProject, file containing list of files to be included.")
-  ; ("-exclude", Arg.Rest (fun excl -> excluded := excl :: !excluded), "Files to be excluded. Must be the last argument")
+  ; ("-include", Arg.String (fun incl -> include_file := Some incl), "File containing list of files to be included.")
+  ; ("-exclude", Arg.Rest (fun excl -> excluded := excl :: !excluded), "(Deprecated) Files to be excluded. Must be the last argument")
   ]
 
 let usage_msg = "quickChick options\nMutation testing for current directory"
@@ -664,6 +664,8 @@ let starts_with ~prefix b =
 (* BCP: This function is too big! And there's too much duplication. *)
 let main =
 (*   List.iter (fun x -> print_endline x) !excluded;*)
+  if !excluded <> []
+  then output_string stderr "Warning: -exclude option is deprecated\n";
 
   (*  Parsing.set_trace true; *)
   let fs = from_Some (parse_file_or_dir ".") in
