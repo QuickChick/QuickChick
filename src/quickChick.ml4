@@ -52,8 +52,8 @@ let temp_dirname =
   Filename.set_temp_dir_name dname;
   dname
 
-(* let link_files = ["quickChickLib.cmx"]*)
-let link_files = []
+let link_files = ["quickChickLib.cmx"]
+(* let link_files = [] *)
 
 (* TODO: in Coq 8.5, fetch OCaml's path from Coq's configure *)
 (* FIX: There is probably a more elegant place to put this flag! *)
@@ -129,7 +129,8 @@ let define_and_run c =
   CWarnings.set_flags warnings;
   (** Add a main function to get some output *)
   let oc = open_out_gen [Open_append;Open_text] 0o666 mlf in
-  let for_output =
+  Printf.fprintf oc "\nlet _ = print_string (QuickChickLib.string_of_coqstring (%s))\n" (string_of_id main);
+(*  let for_output =
     "\nlet _ = print_string (\n" ^
     "let l = (" ^ (Id.to_string main) ^ ") in\n"^
     "let s = Bytes.create (List.length l) in\n" ^
@@ -138,6 +139,7 @@ let define_and_run c =
     "| c :: l -> Bytes.set s i c; copy (i+1) l\n" ^
     "in Bytes.to_string (copy 0 l))" in
   Printf.fprintf oc "%s" for_output;
+ *)
   close_out oc;
   (* Before compiling, remove stupid cyclic dependencies like "type int = int".
      TODO: Generalize (.) \g1\b or something *)
@@ -151,11 +153,11 @@ let define_and_run c =
   (* TODO: Maxime, thoughts? *)
   (** LEO: However, sometimes the inferred types are too abstract. So we touch the .mli to close the weak types. **)
   let _exit_code = Sys.command ("touch " ^ mlif) in
-  (*
+
   Printf.printf "Extracted ML file: %s\n" mlf;
   Printf.printf "Compile command: %s\n" (comp_ml_cmd mlf execn);
   flush_all ();
-  *)
+
   (* Compile the (empty) .mli *)
   if Sys.command (comp_mli_cmd mlif) <> 0 then CErrors.user_err (str "Could not compile mli file" ++ fnl ());
   if Sys.command (comp_ml_cmd mlf execn) <> 0 then

@@ -7,6 +7,7 @@ QCTOOL_SRC=$(QCTOOL_DIR)/quickChickTool.ml \
 		   $(QCTOOL_DIR)/quickChickToolTypes.ml \
 		   $(QCTOOL_DIR)/quickChickToolLexer.mll \
 		   $(QCTOOL_DIR)/quickChickToolParser.mly
+QCLIB=src/quickChickLib
 
 # Here is a hack to make $(eval $(shell work
 # (copied from coq_makefile generated stuff):
@@ -18,7 +19,7 @@ endef
 includecmdwithout@ = $(eval $(subst @,$(donewline),$(shell { $(1) | tr -d '\r' | tr '\n' '@'; })))
 $(call includecmdwithout@,$(COQBIN)coqtop -config)
 
-all: quickChickTool plugin documentation-check
+all: quickChickTool plugin documentation-check $(QCLIB).cmx
 
 plugin: Makefile.coq 
 	$(MAKE) -f Makefile.coq 
@@ -33,8 +34,9 @@ install: all
 	$(V)$(MAKE) -f Makefile.coq install > $(TEMPFILE)
 # Manually copying the remaining files
 	$(V)cp $(QCTOOL_DIR)/$(QCTOOL_EXE) $(shell opam config var bin)/quickChick
-#	 $(V)cp src/quickChickLib.cmx $(COQLIB)/user-contrib/QuickChick
-#	 $(V)cp src/quickChickLib.o $(COQLIB)/user-contrib/QuickChick
+	$(V)cp $(QCLIB).cmx $(COQLIB)/user-contrib/QuickChick/
+	$(V)cp $(QCLIB).cmi $(COQLIB)/user-contrib/QuickChick/
+	$(V)cp $(QCLIB).o $(COQLIB)/user-contrib/QuickChick/
 
 install-plugin: Makefile.coq
 	$(V)$(MAKE) -f Makefile.coq install | tee $(TEMPFILE)
@@ -45,6 +47,9 @@ uninstall:
 
 src/%.cmo : src/%.ml
 	ocamlc -I src -c $<
+
+src/%.cmx : src/%.ml
+	ocamlopt -I src -c $<
 
 quickChickTool: $(QCTOOL_DIR)/$(QCTOOL_EXE)
 
