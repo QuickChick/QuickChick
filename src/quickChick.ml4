@@ -57,14 +57,16 @@ let link_files = ["quickChickLib.cmx"]
 
 (* TODO: in Coq 8.5, fetch OCaml's path from Coq's configure *)
 (* FIX: There is probably a more elegant place to put this flag! *)
-let ocamlopt = "ocamlopt -unsafe-string"
+let ocamlopt = "ocamlopt"
 let ocamlc = "ocamlc -unsafe-string"
 
 let comp_ml_cmd fn out =
   let path = Lazy.force path in
   let link_files = List.map (Filename.concat path) link_files in
   let link_files = String.concat " " link_files in
-  Printf.sprintf "%s -rectypes -w a -I %s -I %s %s %s -o %s" ocamlopt
+  (* Figure out how to make this more general *)
+  let afl_link = "~/.opam/4.04.0+afl/lib/afl-persistent/afl-persistent.cmxa" in
+  Printf.sprintf "%s unix.cmxa %s -unsafe-string -rectypes -w a -I %s -I %s %s %s -o %s" ocamlopt afl_link
     (Filename.dirname fn) path link_files fn out
 
 (*
@@ -76,9 +78,10 @@ let comp_mli_cmd fn =
   let path = Lazy.force path in
   let link_files = List.map (Filename.concat path) link_files in
   let link_files = String.concat " " link_files in
-  Printf.sprintf "%s -rectypes -w a -I %s -I %s %s %s" ocamlopt
+  (* Figure out how to make this more general *)
+  let afl_link = "~/.opam/4.04.0+afl/lib/afl-persistent/afl-persistent.cmxa" in
+  Printf.sprintf "%s unix.cmxa %s -unsafe-string -rectypes -w a -I %s -I %s %s %s" ocamlopt afl_link
     (Filename.dirname fn) path link_files fn
-
 
 let fresh_name n =
     let base = Id.of_string n in
