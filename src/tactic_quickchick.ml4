@@ -33,7 +33,7 @@ let quickchick_goal =
                         ]
                        ))) in
 
-    let s = QuickChick.runTest
+    let s = QuickChick.runTest false
             (CAst.make @@ CApp((None,QuickChick.quickCheck), [CAst.make @@ CRef (CAst.make @@ Libnames.Ident tmpid,None), None])) in
 
     match s with

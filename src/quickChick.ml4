@@ -65,9 +65,9 @@ let comp_ml_cmd fn out =
   let link_files = List.map (Filename.concat path) link_files in
   let link_files = String.concat " " link_files in
   (* Figure out how to make this more general *)
-  let afl_link = "~/.opam/4.04.0+afl/lib/afl-persistent/afl-persistent.cmxa" in
-  Printf.sprintf "%s unix.cmxa %s -unsafe-string -rectypes -w a -I %s -I %s %s %s -o %s" ocamlopt afl_link
-    (Filename.dirname fn) path link_files fn out
+  let afl_path = "~/.opam/4.04.0+afl/lib/afl-persistent/" in
+  let afl_link = afl_path ^ "afl-persistent.cmxa" in
+  Printf.sprintf "%s unix.cmxa %s -unsafe-string -rectypes -w a -I %s -I %s -I %s %s %s -o %s" ocamlopt afl_link (Filename.dirname fn) afl_path path link_files fn out
 
 (*
 let comp_mli_cmd fn =
@@ -119,30 +119,37 @@ let new_ml_file () =
   mkdir_ temp_dir;
   Filename.temp_file ~temp_dir "QuickChick" ".ml"
 
-let define_and_run c =
+let define_and_run fuzz c show_c =
   (** Extract the term and its dependencies *)
-  let main = define c in
+  let base_c = define c in
+  let main = define show_c in
   let mlf = new_ml_file () in
   let execn = Filename.chop_extension mlf in
   let mlif = execn ^ ".mli" in
   let warnings = CWarnings.get_flags () in
   let mute_extraction = warnings ^ (if warnings = "" then "" else ",") ^ "-extraction-opaque-accessed" in
   CWarnings.set_flags mute_extraction;
-  Flags.silently (Extraction_plugin.Extract_env.full_extraction (Some mlf)) [CAst.make @@ Ident main];
+  Flags.silently (Extraction_plugin.Extract_env.full_extraction (Some mlf)) [CAst.make @@ Ident base_c; CAst.make @@ Ident main];
   CWarnings.set_flags warnings;
   (** Add a main function to get some output *)
   let oc = open_out_gen [Open_append;Open_text] 0o666 mlf in
-  Printf.fprintf oc "\nlet _ = print_string (QuickChickLib.string_of_coqstring (%s))\n" (string_of_id main);
-(*  let for_output =
-    "\nlet _ = print_string (\n" ^
-    "let l = (" ^ (Id.to_string main) ^ ") in\n"^
-    "let s = Bytes.create (List.length l) in\n" ^
-    "let rec copy i = function\n" ^
-    "| [] -> s\n" ^
-    "| c :: l -> Bytes.set s i c; copy (i+1) l\n" ^
-    "in Bytes.to_string (copy 0 l))" in
-  Printf.fprintf oc "%s" for_output;
- *)
+  Printf.fprintf oc "
+let _ = 
+  if Array.length Sys.argv = 1 then
+    print_string (QuickChickLib.string_of_coqstring (%s))
+  else 
+    let () = AflPersistent.run (fun () ->
+                 let quickchick_result =
+                   try Some (%s)
+                   with _ -> None
+                 in
+                     match quickchick_result with
+                 | Some (Failure _) -> failwith \"Test Failed\"
+                 | _ -> ()
+               )  in
+
+    print_string (QuickChickLib.string_of_coqstring (%s));
+" (string_of_id main) (string_of_id base_c) (string_of_id main);
   close_out oc;
   (* Before compiling, remove stupid cyclic dependencies like "type int = int".
      TODO: Generalize (.) \g1\b or something *)
@@ -167,7 +174,7 @@ let define_and_run c =
     (CErrors.user_err (str "Could not compile test program" ++ fnl ()); None)
 
   (** Run the test *)
-  else
+  else 
     (* Should really be shared across this and the tool *)
     let chan = Unix.open_process_in execn in
     let builder = ref [] in
@@ -200,18 +207,19 @@ let define_and_run c =
  *)
 
 (* TODO: clean leftover files *)
-let runTest c =
+let runTest fuzz c =
   (** [c] is a constr_expr representing the test to run,
       so we first build a new constr_expr representing
       show c **)
-  let c = CAst.make @@ CApp((None,show), [(c,None)]) in
+  let show_c = CAst.make @@ CApp((None,show), [(c,None)]) in
   (** Build the kernel term from the const_expr *)
   let env = Global.env () in
   let evd = Evd.from_env env in
-  let (c,evd) = interp_constr env evd c in
-  define_and_run c
+  let (c, c_evd) = interp_constr env evd c in
+  let (show_c,evd) = interp_constr env evd show_c in
+  define_and_run fuzz c show_c
 
-let run f args =
+let run fuzz f args =
   begin match args with
   | qc_text :: _ -> Printf.printf "QuickChecking %s\n"
                       (Pp.string_of_ppcmds (Ppconstr.pr_constr_expr qc_text));
@@ -220,7 +228,7 @@ let run f args =
   end;
   let args = List.map (fun x -> (x,None)) args in
   let c = CAst.make @@ CApp((None,f), args) in
-  ignore (runTest c)
+  ignore (runTest fuzz c)
 
 let set_debug_flag (flag_name : string) (mode : string) =
   let toggle =
@@ -247,33 +255,33 @@ let run_with f args p =
 	   *)
 
 VERNAC COMMAND EXTEND QuickCheck CLASSIFIED AS SIDEFF
-  | ["QuickCheck" constr(c)] ->     [run quickCheck [c]]
-  | ["QuickCheckWith" constr(c1) constr(c2)] ->     [run quickCheckWith [c1;c2]]
+  | ["QuickCheck" constr(c)] ->     [run false quickCheck [c]]
+  | ["QuickCheckWith" constr(c1) constr(c2)] ->     [run false quickCheckWith [c1;c2]]
 END;;
 
 VERNAC COMMAND EXTEND QuickChick CLASSIFIED AS SIDEFF
-  | ["QuickChick" constr(c)] ->     [run quickCheck [c]]
-  | ["QuickChickWith" constr(c1) constr(c2)] ->     [run quickCheckWith [c1;c2]]
+  | ["QuickChick" constr(c)] ->     [run false quickCheck [c]]
+  | ["QuickChickWith" constr(c1) constr(c2)] ->     [run false quickCheckWith [c1;c2]]
 END;;
 
 VERNAC COMMAND EXTEND MutateCheck CLASSIFIED AS SIDEFF
-  | ["MutateCheck" constr(c1) constr(c2)] ->     [run mutateCheck [c1;c2]]
-  | ["MutateCheckWith" constr(c1) constr(c2) constr(c3)] ->     [run mutateCheckWith [c1;c2;c3]]
+  | ["MutateCheck" constr(c1) constr(c2)] ->     [run false mutateCheck [c1;c2]]
+  | ["MutateCheckWith" constr(c1) constr(c2) constr(c3)] ->     [run false mutateCheckWith [c1;c2;c3]]
 END;;
 
 VERNAC COMMAND EXTEND MutateChick CLASSIFIED AS SIDEFF
-  | ["MutateChick" constr(c1) constr(c2)] ->     [run mutateCheck [c1;c2]]
-  | ["MutateChickWith" constr(c1) constr(c2) constr(c3)] ->     [run mutateCheckWith [c1;c2;c3]]
+  | ["MutateChick" constr(c1) constr(c2)] ->     [run false mutateCheck [c1;c2]]
+  | ["MutateChickWith" constr(c1) constr(c2) constr(c3)] ->     [run false mutateCheckWith [c1;c2;c3]]
 END;;
 
 VERNAC COMMAND EXTEND MutateCheckMany CLASSIFIED AS SIDEFF
-  | ["MutateCheckMany" constr(c1) constr(c2)] ->     [run mutateCheckMany [c1;c2]]
-  | ["MutateCheckManyWith" constr(c1) constr(c2) constr(c3)] ->     [run mutateCheckMany [c1;c2;c3]]
+  | ["MutateCheckMany" constr(c1) constr(c2)] ->     [run false mutateCheckMany [c1;c2]]
+  | ["MutateCheckManyWith" constr(c1) constr(c2) constr(c3)] ->     [run false mutateCheckMany [c1;c2;c3]]
 END;;
 
 VERNAC COMMAND EXTEND MutateChickMany CLASSIFIED AS SIDEFF
-  | ["MutateChickMany" constr(c1) constr(c2)] ->     [run mutateCheckMany [c1;c2]]
-  | ["MutateChickManyWith" constr(c1) constr(c2) constr(c3)] ->     [run mutateCheckMany [c1;c2;c3]]
+  | ["MutateChickMany" constr(c1) constr(c2)] ->     [run false mutateCheckMany [c1;c2]]
+  | ["MutateChickManyWith" constr(c1) constr(c2) constr(c3)] ->     [run false mutateCheckMany [c1;c2;c3]]
 END;;
 
 VERNAC COMMAND EXTEND QuickChickDebug CLASSIFIED AS SIDEFF
@@ -284,5 +292,5 @@ VERNAC COMMAND EXTEND QuickChickDebug CLASSIFIED AS SIDEFF
 END;;
 
 VERNAC COMMAND EXTEND Sample CLASSIFIED AS SIDEFF
-  | ["Sample" constr(c)] -> [run sample [c]]
+  | ["Sample" constr(c)] -> [run false sample [c]]
 END;;
