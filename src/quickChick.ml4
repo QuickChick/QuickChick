@@ -9,6 +9,7 @@ open Constrintern
 open Constrexpr
 open Error
 open Stdarg
+open Unix
 
 let message = "QuickChick"
 let mk_ref s = CAst.make @@ CRef (CAst.make (Qualid (qualid_of_string s)), None)
@@ -60,11 +61,18 @@ let link_files = ["quickChickLib.cmx"]
 let ocamlopt = "ocamlopt"
 let ocamlc = "ocamlc -unsafe-string"
 
+let eval_command (cmd : string) : string =
+  let ic  : in_channel = open_process_in cmd in
+  let str : string     = input_line ic       in
+  ignore (close_process_in ic);
+  str
+
 let comp_ml_cmd fn out =
   let path = Lazy.force path in
   let link_files = List.map (Filename.concat path) link_files in
   let link_files = String.concat " " link_files in
   (* Figure out how to make this more general *)
+  (*   let afl_link = eval_command "opam config var lib" ^ "/afl-persistent/afl-persistent.cmxa" in *)
   let afl_path = "~/.opam/4.04.0+afl/lib/afl-persistent/" in
   let afl_link = afl_path ^ "afl-persistent.cmxa" in
   Printf.sprintf "%s unix.cmxa %s -unsafe-string -rectypes -w a -I %s -I %s -I %s %s %s -o %s" ocamlopt afl_link (Filename.dirname fn) afl_path path link_files fn out
@@ -78,8 +86,7 @@ let comp_mli_cmd fn =
   let path = Lazy.force path in
   let link_files = List.map (Filename.concat path) link_files in
   let link_files = String.concat " " link_files in
-  (* Figure out how to make this more general *)
-  let afl_link = "~/.opam/4.04.0+afl/lib/afl-persistent/afl-persistent.cmxa" in
+  let afl_link = eval_command "opam config var lib" ^ "/afl-persistent/afl-persistent.cmxa" in
   Printf.sprintf "%s unix.cmxa %s -unsafe-string -rectypes -w a -I %s -I %s %s %s" ocamlopt afl_link
     (Filename.dirname fn) path link_files fn
 
