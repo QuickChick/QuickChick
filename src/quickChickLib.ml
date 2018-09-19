@@ -4,7 +4,7 @@ let string_of_coqstring (l : char list) : string =
   let rec copy i = function
   | [] -> s
   | c :: l -> Bytes.set s i c; copy (i+1) l
-  in copy 0 l
+  in Bytes.to_string (copy 0 l)
 
 type random_src = Random of Random.State.t | Fd of Unix.file_descr
 
