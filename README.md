@@ -1,3 +1,12 @@
+Fuzzing branch
+==============
+
+The reason I have this as a separate branch is because it breaks a lot
+of other functionality and I want to try out if it's worth the engineering
+effort to bring it up to speed with the main development first.
+
+You'll need afl (opam install afl) for the fuzzing. 
+
 QuickChick
 ==========
 
