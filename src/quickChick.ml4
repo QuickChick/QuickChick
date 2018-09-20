@@ -10,7 +10,7 @@ open Constrexpr
 open Error
 open Stdarg
 open Unix
-
+   
 let message = "QuickChick"
 let mk_ref s = CAst.make @@ CRef (CAst.make (Qualid (qualid_of_string s)), None)
 
@@ -126,28 +126,27 @@ let new_ml_file () =
   mkdir_ temp_dir;
   (temp_dir, Filename.temp_file ~temp_dir "QuickChick" ".ml")
 
-let define_and_run fuzz c show_c =
+let define_and_run fuzz show_and_c_fun =
   (** Extract the term and its dependencies *)
-  let base_c = define c in
-  let main = define show_c in
+  let main = define show_and_c_fun in
   let (temp_dir, mlf) = new_ml_file () in
   let execn = Filename.chop_extension mlf in
   let mlif = execn ^ ".mli" in
   let warnings = CWarnings.get_flags () in
   let mute_extraction = warnings ^ (if warnings = "" then "" else ",") ^ "-extraction-opaque-accessed" in
   CWarnings.set_flags mute_extraction;
-  Flags.silently (Extraction_plugin.Extract_env.full_extraction (Some mlf)) [CAst.make @@ Ident base_c; CAst.make @@ Ident main];
+  Flags.silently (Extraction_plugin.Extract_env.full_extraction (Some mlf)) [CAst.make @@ Ident main];
   CWarnings.set_flags warnings;
   (** Add a main function to get some output *)
   let oc = open_out_gen [Open_append;Open_text] 0o666 mlf in
   Printf.fprintf oc "
 let _ = 
   if Array.length Sys.argv = 1 then
-    print_string (QuickChickLib.string_of_coqstring (%s))
+    print_string (QuickChickLib.string_of_coqstring (snd (%s ())))
   else 
     let () = AflPersistent.run (fun () ->
                  let quickchick_result =
-                   try Some (%s)
+                   try Some (fst (%s ()))
                    with _ -> None
                  in
                      match quickchick_result with
@@ -155,8 +154,8 @@ let _ =
                  | _ -> ()
                )  in
 
-    print_string (QuickChickLib.string_of_coqstring (%s));
-" (string_of_id main) (string_of_id base_c) (string_of_id main);
+    print_string (QuickChickLib.string_of_coqstring (snd (%s ())));
+" (string_of_id main) (string_of_id main) (string_of_id main);
   close_out oc;
   (* Before compiling, remove stupid cyclic dependencies like "type int = int".
      TODO: Generalize (.) \g1\b or something *)
@@ -225,17 +224,26 @@ let _ =
  *)
 
 (* TODO: clean leftover files *)
-let runTest fuzz c =
+let runTest fuzz (c : constr_expr) =
   (** [c] is a constr_expr representing the test to run,
       so we first build a new constr_expr representing
       show c **)
-  let show_c = CAst.make @@ CApp((None,show), [(c,None)]) in
+  let unit_type =
+    CAst.make @@ CRef (CAst.make @@ Qualid (qualid_of_string "Coq.Init.Datatypes.unit"), None) in
+  let unit_arg =
+    CLocalAssum ( [ CAst.make (Name (fresh_name "x")) ], Default Explicit, unit_type ) in
+  let pair_ctr =
+    CAst.make @@ CRef (CAst.make @@ Qualid (qualid_of_string "Coq.Init.Datatypes.pair"), None) in
+  let show_c =
+    CAst.make @@ CApp((None,show), [(c,None)]) in
+  let show_and_c_fun : constr_expr =
+    Constrexpr_ops.mkCLambdaN [unit_arg] 
+      (CAst.make @@ CApp ((None, pair_ctr), [(c, None);(show_c, None)])) in
   (** Build the kernel term from the const_expr *)
   let env = Global.env () in
   let evd = Evd.from_env env in
-  let (c, c_evd) = interp_constr env evd c in
-  let (show_c,evd) = interp_constr env evd show_c in
-  define_and_run fuzz c show_c
+  let (show_and_c_fun, evd) = interp_constr env evd show_and_c_fun in
+  define_and_run fuzz show_and_c_fun
 
 let run fuzz f args =
   begin match args with
