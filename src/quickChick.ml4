@@ -124,13 +124,13 @@ let new_ml_file () =
   let ts = Printf.sprintf "%02d%02d%02d" tm.Unix.tm_hour tm.Unix.tm_min tm.Unix.tm_sec in
   let temp_dir = Filename.concat temp_dirname ts in
   mkdir_ temp_dir;
-  Filename.temp_file ~temp_dir "QuickChick" ".ml"
+  (temp_dir, Filename.temp_file ~temp_dir "QuickChick" ".ml")
 
 let define_and_run fuzz c show_c =
   (** Extract the term and its dependencies *)
   let base_c = define c in
   let main = define show_c in
-  let mlf = new_ml_file () in
+  let (temp_dir, mlf) = new_ml_file () in
   let execn = Filename.chop_extension mlf in
   let mlif = execn ^ ".mli" in
   let warnings = CWarnings.get_flags () in
@@ -181,30 +181,41 @@ let _ =
     (CErrors.user_err (str "Could not compile test program" ++ fnl ()); None)
 
   (** Run the test *)
-  else 
-    (* Should really be shared across this and the tool *)
-    let chan = Unix.open_process_in execn in
-    let builder = ref [] in
-    let rec process_otl_aux () =
-      let e = input_line chan in
-      print_endline e;
-      builder := e :: !builder;
-      process_otl_aux() in
-    try process_otl_aux ()
-    with End_of_file ->
-         let stat = Unix.close_process_in chan in
-         begin match stat with
-         | Unix.WEXITED 0 ->
-            ()
-         | Unix.WEXITED i ->
-            CErrors.user_err (str (Printf.sprintf "Exited with status %d" i) ++ fnl ())
-         | Unix.WSIGNALED i ->
-            CErrors.user_err (str (Printf.sprintf "Killed (%d)" i) ++ fnl ())
-         | Unix.WSTOPPED i ->
-            CErrors.user_err (str (Printf.sprintf "Stopped (%d)" i) ++ fnl ())
-         end;
-         let output = String.concat "\n" (List.rev !builder) in
-         Some output
+  else
+    if fuzz then begin
+      let input_dir = temp_dir ^ "/input" in
+      print_endline input_dir;
+      mkdir_ input_dir;
+      let stat = Sys.command (Printf.sprintf "echo QuickChick > %s/tmp" input_dir) in
+      let cmd = Printf.sprintf "afl-fuzz -i %s -o %s %s @@" input_dir (temp_dir ^ "/output") execn in
+      ignore (Sys.command cmd);
+      None                               
+    end
+    else begin 
+      (* Should really be shared across this and the tool *)
+      let chan = Unix.open_process_in execn in
+      let builder = ref [] in
+      let rec process_otl_aux () =
+        let e = input_line chan in
+        print_endline e;
+        builder := e :: !builder;
+        process_otl_aux() in
+      try process_otl_aux ()
+      with End_of_file ->
+           let stat = Unix.close_process_in chan in
+           begin match stat with
+           | Unix.WEXITED 0 ->
+              ()
+           | Unix.WEXITED i ->
+              CErrors.user_err (str (Printf.sprintf "Exited with status %d" i) ++ fnl ())
+           | Unix.WSIGNALED i ->
+              CErrors.user_err (str (Printf.sprintf "Killed (%d)" i) ++ fnl ())
+           | Unix.WSTOPPED i ->
+              CErrors.user_err (str (Printf.sprintf "Stopped (%d)" i) ++ fnl ())
+           end;
+           let output = String.concat "\n" (List.rev !builder) in
+           Some output
+      end
 
 (*
     (** If we want to print the time spent in tests *)
@@ -269,6 +280,11 @@ END;;
 VERNAC COMMAND EXTEND QuickChick CLASSIFIED AS SIDEFF
   | ["QuickChick" constr(c)] ->     [run false quickCheck [c]]
   | ["QuickChickWith" constr(c1) constr(c2)] ->     [run false quickCheckWith [c1;c2]]
+END;;
+
+VERNAC COMMAND EXTEND FuzzChick CLASSIFIED AS SIDEFF
+  | ["FuzzChick" constr(c)] ->     [run true quickCheck [c]]
+  | ["FuzzChickWith" constr(c1) constr(c2)] ->     [run true quickCheckWith [c1;c2]]
 END;;
 
 VERNAC COMMAND EXTEND MutateCheck CLASSIFIED AS SIDEFF
