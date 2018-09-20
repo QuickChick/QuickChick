@@ -93,7 +93,7 @@ let choose_int n state =
     let n2 = read_byte state in
     let n3 = read_byte state in
     let n4 = read_byte state in
-    n1 lsl 12 + n2 lsl 8 + n3 lsl 4 + n4
+    (n1 lsl 12 + n2 lsl 8 + n3 lsl 4 + n4) mod n
 
 let randomNext =
   (fun r -> choose_int 128 r, r)

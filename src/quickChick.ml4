@@ -139,6 +139,7 @@ let define_and_run fuzz show_and_c_fun =
   CWarnings.set_flags warnings;
   (** Add a main function to get some output *)
   let oc = open_out_gen [Open_append;Open_text] 0o666 mlf in
+  if fuzz then begin
   Printf.fprintf oc "
 let _ = 
   if Array.length Sys.argv = 1 then
@@ -157,6 +158,11 @@ let _ =
     print_string (QuickChickLib.string_of_coqstring (snd (%s ())));
 " (string_of_id main) (string_of_id main) (string_of_id main);
   close_out oc;
+    end
+  else begin
+      Printf.fprintf oc "let _ = print_string (QuickChickLib.string_of_coqstring (snd (%s ())))" (string_of_id main);
+      close_out oc;
+    end;
   (* Before compiling, remove stupid cyclic dependencies like "type int = int".
      TODO: Generalize (.) \g1\b or something *)
   let perl_cmd = "perl -i -p0e 's/type int =\\s*int/type tmptmptmp = int\\ntype int = tmptmptmp/sg' " ^ mlf in
