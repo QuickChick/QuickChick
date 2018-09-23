@@ -33,7 +33,7 @@ let make_up_name () : Id.t =
   cnt := !cnt + 1;
   id
        
-let hole = CAst.make @@ CHole (None, Misctypes.IntroAnonymous, None)
+let hole = CAst.make @@ CHole (None, Namegen.IntroAnonymous, None)
 
 let id_of_name n = 
   match n with 
@@ -662,7 +662,7 @@ let gRecord names_and_bodies =
   CAst.make @@ CRecord (List.map (fun (n,b) -> (qualid_of_ident @@ Id.of_string n, b)) names_and_bodies)
 
 let gAnnot (p : coq_expr) (tau : coq_expr) =
-  CAst.make @@ CCast (p, Misctypes.CastConv tau)
+  CAst.make @@ CCast (p, Glob_term.CastConv tau)
 
 (* Convert types back into coq *)
 let gType ty_params dep_type = 
