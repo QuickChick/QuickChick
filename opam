@@ -19,6 +19,8 @@ depends: [
   "ocamlbuild"
   "ocamlfind"
   "coq-simple-io" {>= "0.2" < "0.3"}
+  "afl"
+  "afl-persistent"
 ]
 available: [ ocaml-version >= "4.04.0" ]
 

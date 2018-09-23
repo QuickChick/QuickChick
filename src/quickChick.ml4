@@ -71,9 +71,7 @@ let comp_ml_cmd fn out =
   let path = Lazy.force path in
   let link_files = List.map (Filename.concat path) link_files in
   let link_files = String.concat " " link_files in
-  (* Figure out how to make this more general *)
-  (*   let afl_link = eval_command "opam config var lib" ^ "/afl-persistent/afl-persistent.cmxa" in *)
-  let afl_path = "~/.opam/4.04.0+afl/lib/afl-persistent/" in
+  let afl_path = eval_command "opam config var lib" ^ "/afl-persistent/" in
   let afl_link = afl_path ^ "afl-persistent.cmxa" in
   Printf.sprintf "%s unix.cmxa %s -unsafe-string -rectypes -w a -I %s -I %s -I %s %s %s -o %s" ocamlopt afl_link (Filename.dirname fn) afl_path path link_files fn out
 
