@@ -144,18 +144,19 @@ let _ =
   if Array.length Sys.argv = 1 then
     print_string (QuickChickLib.string_of_coqstring (snd (%s ())))
   else 
-    let () = AflPersistent.run (fun () ->
-                 let quickchick_result =
-                   try Some (fst (%s ()))
-                   with _ -> None
-                 in
-                     match quickchick_result with
-                 | Some (Failure _) -> failwith \"Test Failed\"
-                 | _ -> ()
-               )  in
-
-    print_string (QuickChickLib.string_of_coqstring (snd (%s ())));
-" (string_of_id main) (string_of_id main) (string_of_id main);
+    let quickchick_result =
+      try Some ((%s) ())
+      with _ -> None
+    in
+    match quickchick_result with
+    | Some (Failure _, s) ->
+       print_string (QuickChickLib.string_of_coqstring s); flush stdout;
+       failwith \"Test Failed\"
+    | Some (_, s) ->
+       print_string (QuickChickLib.string_of_coqstring s)
+    | _ ->
+       print_string \"Failed to generate...\n\"
+" (string_of_id main) (string_of_id main);
   close_out oc;
     end
   else begin
@@ -239,11 +240,18 @@ let runTest fuzz (c : constr_expr) =
     CLocalAssum ( [ CAst.make (Name (fresh_name "x")) ], Default Explicit, unit_type ) in
   let pair_ctr =
     CAst.make @@ CRef (CAst.make @@ Qualid (qualid_of_string "Coq.Init.Datatypes.pair"), None) in
-  let show_c =
-    CAst.make @@ CApp((None,show), [(c,None)]) in
+  let show_expr cexpr =
+    CAst.make @@ CApp((None,show), [(cexpr,None)]) in
   let show_and_c_fun : constr_expr =
     Constrexpr_ops.mkCLambdaN [unit_arg] 
-      (CAst.make @@ CApp ((None, pair_ctr), [(c, None);(show_c, None)])) in
+      (let fx = fresh_name "_qc_res" in
+       let fx_expr = (CAst.make @@ CRef (CAst.make @@ Libnames.Ident fx,None)) in
+
+       CAst.make @@ CLetIn (CAst.make @@ Name fx, c, None, 
+                            CAst.make @@ CApp ((None, pair_ctr),
+                                               [(fx_expr, None);
+                                                (show_expr fx_expr, None)]))) in
+                                                               
   (** Build the kernel term from the const_expr *)
   let env = Global.env () in
   let evd = Evd.from_env env in
