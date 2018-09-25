@@ -10,3 +10,6 @@ clean:
 
 Makefile.coq: _CoqProject
 	coq_makefile -f _CoqProject -o Makefile.coq
+
+test:
+	touch Driver.v && make

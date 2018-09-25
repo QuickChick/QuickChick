@@ -18,6 +18,7 @@ let mk_ref s = CAst.make @@ CRef (CAst.make (Qualid (qualid_of_string s)), None)
 let show = mk_ref "QuickChick.Show.show"
 let quickCheck = mk_ref "QuickChick.Test.quickCheck"
 let quickCheckWith = mk_ref "QuickChick.Test.quickCheckWith"
+let fuzzCheck = mk_ref "QuickChick.Test.fuzzCheck"
 let mutateCheck = mk_ref "QuickChick.MutateCheck.mutateCheck"
 let mutateCheckWith = mk_ref "QuickChick.MutateCheck.mutateCheckWith"
 let mutateCheckMany = mk_ref "QuickChick.MutateCheck.mutateCheckMany"
@@ -295,8 +296,7 @@ VERNAC COMMAND EXTEND QuickChick CLASSIFIED AS SIDEFF
 END;;
 
 VERNAC COMMAND EXTEND FuzzChick CLASSIFIED AS SIDEFF
-  | ["FuzzChick" constr(c)] ->     [run true quickCheck [c]]
-  | ["FuzzChickWith" constr(c1) constr(c2)] ->     [run true quickCheckWith [c1;c2]]
+  | ["FuzzChick" constr(c)] ->     [run true fuzzCheck [c]]
 END;;
 
 VERNAC COMMAND EXTEND MutateCheck CLASSIFIED AS SIDEFF

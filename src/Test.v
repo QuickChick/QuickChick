@@ -36,16 +36,17 @@ Record Args := MkArgs {
   maxDiscard : nat;
   maxShrinks : nat;
   maxSize    : nat;
-  chatty     : bool
+  chatty     : bool;
+  compFun    : nat -> nat -> nat -> nat -> nat
 }.
 
 Definition updMaxSize (a : Args) (x : nat) : Args := 
-  let '(MkArgs r msc md msh msz c) := a in 
-  MkArgs r msc md msh x c.
+  let '(MkArgs r msc md msh msz c cf) := a in 
+  MkArgs r msc md msh x c cf.
 
 Definition updMaxSuccess (a : Args) (x : nat) : Args := 
-  let '(MkArgs r msc md msh msz c) := a in 
-  MkArgs r x md msh msz c.
+  let '(MkArgs r msc md msh msz c cf) := a in 
+  MkArgs r x md msh msz c cf.
 
 Inductive Result :=
   | Success : nat -> nat -> list (string * nat) -> string -> Result
@@ -70,21 +71,23 @@ Extract Constant defNumShrinks  => "1000".
 Axiom defSize        : nat.
 Extract Constant defSize        => "7".
 
-Definition stdArgs := MkArgs None defNumTests defNumDiscards
-                             defNumShrinks defSize true.
-
 Definition roundTo n m := mult (Nat.div n m) m.
 
-Definition computeSize' (a : Args) (n : nat) (d : nat) : nat :=
-  if (roundTo n (maxSize a) <= maxSuccess a) || (n >= maxSuccess a)
-     || (maxSuccess a %| (maxSize a))
+Definition computeSizeFun maxSize maxSuccess (n : nat) (d : nat) : nat :=
+  if (roundTo n (maxSize) <= maxSuccess) || (n >= maxSuccess)
+     || (maxSuccess %| (maxSize))
   then
-    minn (n %% (maxSize a) + d %/ 10) (maxSize a)
+    minn (n %% (maxSize) + d %/ 10) (maxSize)
   else
-    minn ((n %% (maxSize a)) * maxSize a %/
-      ((maxSuccess a) %% (maxSize a) + d %/ 10)) (maxSize a).
+    minn ((n %% (maxSize)) * maxSize %/
+      ((maxSuccess) %% (maxSize) + d %/ 10)) (maxSize).
 
- Definition at0 (f : nat -> nat -> nat) (s : nat) (n d : nat) :=
+Definition computeSize' a n d := computeSizeFun (maxSize a) (maxSuccess a) n d.
+
+Definition stdArgs := MkArgs None defNumTests defNumDiscards
+                             defNumShrinks defSize true computeSizeFun.
+
+Definition at0 (f : nat -> nat -> nat) (s : nat) (n d : nat) :=
   if andb (beq_nat n 0) (beq_nat d 0) then s
   else f n d.
 
@@ -296,7 +299,7 @@ Definition quickCheckWith {prop : Type} {_ : Checkable prop}
   let (rnd, computeFun) :=
       match replay a with
         | Some (rnd, s) => (rnd, at0 (computeSize' a) s)
-        | None          => (newRandomSeed, computeSize' a)
+        | None          => (newRandomSeed, compFun a (maxSize a) (maxSuccess a))
         (* make it more random...? need IO action *)
       end in
   test (MkState (maxSuccess a)  (* maxSuccessTests   *)
@@ -330,6 +333,11 @@ Instance showResult : Show Result := Build_Show _ (fun r =>
 Definition quickCheck {prop : Type} {_ : Checkable prop}
            (p : prop) : Result :=
   quickCheckWith stdArgs p.
+
+Definition computeSizeFuzz (maxSize maxSuccess n d : nat) := maxSize.
+
+Definition fuzzCheck {prop : Type} {_ : Checkable prop} (p : prop) : Result :=
+  quickCheckWith (MkArgs None 1 1 0 defSize true computeSizeFuzz) p.
 
 Import IONotations.
 

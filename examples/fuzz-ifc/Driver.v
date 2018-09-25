@@ -101,7 +101,6 @@ Eval lazy -[labelCount helper] in
 
 QuickCheck (testMutantX 9%Z).
 
-Extract Constant defNumTests => "1".
 FuzzChick (testMutantX 9%Z). (* prop_SSNI default_table). *)
 (*
 QuickCheck (prop_SSNI_derived default_table).
