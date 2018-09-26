@@ -37,3 +37,4 @@ src/quickChickToolParser.ml
 src/quickChickToolParser.mli
 *.pyc
 __pycache__
+platform.info
