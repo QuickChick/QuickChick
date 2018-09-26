@@ -88,6 +88,7 @@ Definition labelCount (c:OpCode) : nat :=
   | OpAdd     => 2
   | OpLoad    => 2
   | OpStore   => 3
+  | OpHalt    => 0
 end%nat.
 
 Definition table := forall op, AllowModify (labelCount op).
@@ -101,6 +102,7 @@ Definition default_table : table := fun op =>
   | OpAdd     =>  ≪ TRUE , JOIN Lab1 Lab2, LabPC ≫
   | OpLoad    =>  ≪ TRUE , JOIN Lab1 Lab2 , LabPC ≫
   | OpStore   =>  ≪ LE (JOIN Lab1 LabPC) Lab3, JOIN LabPC (JOIN Lab1 Lab2) , LabPC ≫
+  | OpHalt    =>  ≪ TRUE , BOT , LabPC ≫
 end.
 
 Definition run_tmr (t : table) (op: OpCode)
@@ -200,13 +202,13 @@ Definition exec (t : table) (st:State) : option State :=
     | _,_ => None
   end.
 
-Fixpoint execN (t : table) (n : nat) (s : State) : list State :=
+Fixpoint execN (t : table) (n : nat) (s : State) : State :=
   match n with
-    | O => [s]
+    | O => s
     | S n' =>
       match exec t s with
-        | Some s' => s :: execN t n' s'
-        | None => s :: nil
+        | Some s' => execN t n' s'
+        | None => s
       end
   end%list.
 

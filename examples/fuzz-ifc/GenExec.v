@@ -41,7 +41,8 @@ Definition ainstr (st : State) : G Instruction :=
       end in
   let onLength len x := if leb x len then x else 0 in
   freq_ (returnGen Nop) [
-              (1, returnGen Nop);
+          (1, returnGen Nop);
+          (5, returnGen Halt);
               (40, liftGen Push gen_Z);
               (if sl < 1 ? then 0 else 40, liftGen BCall (if beq_nat sl 0 then returnGen 0
                                   else choose (0, Z.of_nat sl-1))%Z);

@@ -145,28 +145,26 @@ Fixpoint MSNI (fuel : nat) (t : table) (v : @Variation State) : Checker  :=
       | L,L  =>
         match exec t st1, exec t st2 with
           | Some st1', Some st2' =>
-(*
-            whenFail ("Initial states: " ++ nl ++ show_pair st1 st2 ++ nl
-                        ++ "Final states: " ++ nl ++ show_pair st1' st2' ++nl)
-*)
+            whenFail ("LL" ++ nl ++ "Initial states: " ++ nl ++ show_pair st1 st2 ++ nl
+                        ++ "Final states: " ++ nl ++ show_pair st1' st2' ++ nl ++ show st1' ++ nl ++ show st2' ++ nl)
             (* collect ("L -> L")*)
-            if indist st1' st2' then
+            (if indist st1' st2' then
               MSNI fuel' t (V st1' st2')
             else
-              checker false
+              checker false)
           | _, _ => (* collect "L,L,FAIL" true *) checker true
         end
       | H, H =>
         match exec t st1, exec t st2 with
           | Some st1', Some st2' =>
             if is_atom_low (st_pc st1') && is_atom_low (st_pc st2') then
-              (* whenFail ("Initial states: " ++ nl ++ show_pair st1 st2 ++ nl
-                        ++ "Final states: " ++ nl ++ show_pair st1' st2' ++nl) *)
+              whenFail ("Initial states: " ++ nl ++ show_pair st1 st2 ++ nl
+                        ++ "Final states: " ++ nl ++ show_pair st1' st2' ++nl) 
               (* collect ("H -> L")*)
-              if indist st1' st2' then
+              (if indist st1' st2' then
                 MSNI fuel' t (V st1' st2')
               else
-                checker false
+                checker false)
             else if is_atom_low (st_pc st1') then
                    (* whenFail ("States: " ++ nl ++ show_pair st2 st2' ++ nl )*)
                    (* collect ("H -> H")*)
@@ -177,8 +175,9 @@ Fixpoint MSNI (fuel : nat) (t : table) (v : @Variation State) : Checker  :=
             else
               if indist st1 st1' then
                 MSNI fuel' t (V st1' st2)
-              else checker false
-              (*            whenFail ("States: " ++ nl ++ show_pair st1 st1' ++ nl )*)
+              else 
+                           whenFail ("States: " ++ nl ++ show_pair st1 st1' ++ nl )
+                           (checker false)
               (* collect ("H -> H")*) 
           | _, _ => checker true
         end
@@ -211,7 +210,6 @@ Definition prop_MSNI t : Checker :=
   forAllShrink GenExec.gen_variation_state' (fun _ => nil)
    (MSNI 20 t : Variation -> G QProp).
 
-(* QuickCheck (prop_MSNI default_table).*)
 
 Definition prop_MSNI_naive t : Checker :=
   forAllShrink gen_variation_naive (fun _ => nil)
@@ -227,14 +225,46 @@ Definition testMutantX_ c n :=
     | _ => checker tt 
   end.
 
+FuzzChick (prop_MSNI_naive default_table).
+(* QuickCheck (prop_MSNI default_table). *)
+
+(* 
 QuickCheck (testMutantX_ prop_MSNI 9).
 QuickCheck (testMutantX_ prop_MSNI_naive 9).
 
 FuzzChick (testMutantX_ prop_MSNI_naive 9).
+ *)
 
-(* QuickCheck (prop_SSNI_derived default_table).*)
 
+(* EENI *)
+Fixpoint EENI (fuel : nat) (t : table) (v : @Variation State) : Checker  :=
+  let '(V st1 st2) := v in
+  let st1' := execN t fuel st1 in
+  let st2' := execN t fuel st2 in
+  if indist st1 st2 then 
+    match lookupInstr st1', lookupInstr st2' with
+    (* run to completion *)
+    | Some Halt, Some Halt =>
+      checker (indist st1' st2')
+    | _, _ => checker rejected
+    end
+  else checker rejected.    
 
+Definition prop_EENI t : Checker :=
+  forAllShrink GenExec.gen_variation_state' (fun _ => nil)
+   (EENI 20 t : Variation -> G QProp).
+
+(* QuickCheck (prop_EENI default_table).  *)
+
+Definition prop_MSNI_naive t : Checker :=
+  forAllShrink gen_variation_naive (fun _ => nil)
+               (fun mv => 
+                  match mv with 
+                  | Some v => MSNI 20 t v
+                  | _ => checker rejected 
+                  end).
+
+  
 (*
 Definition prop_SSNI_derived t : Checker :=
   forAllShrink gen_variation_state_derived (fun _ => nil)

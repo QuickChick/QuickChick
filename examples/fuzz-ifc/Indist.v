@@ -56,12 +56,16 @@ Instance indist_stack : Indist Stack :=
     in aux s1 s2
 |}.
 
+Instance DecEq_Imem (i1 i2 : Instruction) : Dec (i1 = i2).
+dec_eq. Defined.
+
 Instance indist_state : Indist State :=
 {|
   indist st1 st2 :=
     let '(St imem1 mem1 stk1 pc1) := st1 in
     let '(St imem2 mem2 stk2 pc2) := st2 in
     if negb (indist mem1 mem2) then (* trace "Memory" *) false
+    else if negb (imem1 = imem2 ?) then (* trace "Memory" *) false
     else if negb (indist pc1 pc2) then (* trace "PC" *) false
     else let (stk1',stk2') :=
            match pc1 with

@@ -30,6 +30,7 @@ Instance show_instruction : Show Instruction :=
       | Add     => "Add"
       | Load    => "Load"
       | Store   => "Store"
+      | Halt    => "Halt"
     end
 |}.
 
@@ -92,6 +93,15 @@ Instance show_int_pair : ShowPair Z :=
     else show_variation (show v1) (show v2)
 |}.
 
+Instance DecInstrEq (i1 i2 : Instruction) : Dec (i1 = i2).
+dec_eq. Defined.
+
+Instance show_instr_pair : ShowPair Instruction :=
+  {|
+    show_pair i1 i2 :=
+      if i1 = i2 ? then show i1 else show_variation (show i1) (show i2)
+  |}.
+  
 Instance show_label_pair : ShowPair Label :=
 {|
   show_pair l1 l2 :=
@@ -114,6 +124,16 @@ Instance show_mem_pair : ShowPair Mem :=
     numed_contents (fun (xy : Atom * Atom) =>
                       let (x,y) := xy in show_pair x y) (combine m1 m2) 0
 |}.
+
+
+
+Instance show_imem_pair : ShowPair IMem :=
+{|
+  show_pair im1 im2 :=
+    numed_contents (fun (xy : Instruction * Instruction) =>
+                      let (x,y) := xy in show_pair x y) (combine im1 im2) 0
+|}.
+
 
 Fixpoint total_stack_length s :=
   match s with
@@ -165,7 +185,7 @@ Instance show_state_pair : ShowPair State :=
   show_pair st1 st2 :=
     let '(St imem1 mem1 stk1 pc1) := st1 in
     let '(St imem2 mem2 stk2 pc2) := st2 in
-    "Instructions: " ++ nl ++ show imem1 ++ nl ++
+    "Instructions: " ++ nl ++ show_pair imem1 imem2 ++ nl ++
     "Memory: " ++ nl ++ show_pair mem1 mem2 ++ nl ++
     "Stack: " ++ nl ++ show_pair stk1 stk2 ++ nl ++
     "PC: " ++ show_pair pc1 pc2 ++ nl

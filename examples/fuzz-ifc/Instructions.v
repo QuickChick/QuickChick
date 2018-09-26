@@ -8,7 +8,8 @@ Inductive Instruction : Type :=
   | BRet
   | Add
   | Load
-  | Store.
+  | Store
+  | Halt.
 
 Inductive OpCode : Type :=
   | OpBCall
@@ -17,7 +18,8 @@ Inductive OpCode : Type :=
   | OpPush
   | OpAdd
   | OpLoad
-  | OpStore.
+  | OpStore
+  | OpHalt.
 
 Definition opCodes := [
   OpBCall;
@@ -26,7 +28,9 @@ Definition opCodes := [
   OpPush;
   OpAdd;
   OpLoad;
-  OpStore].
+  OpStore;
+  OpHalt].
+    
 
 Definition opCode_eq_dec : forall o1 o2 : OpCode,
   {o1 = o2} + {o1 <> o2}.
@@ -41,5 +45,6 @@ Definition opcode_of_instr (i : Instruction) : OpCode :=
   | Add     => OpAdd
   | Load    => OpLoad
   | Store   => OpStore
+  | Halt    => OpHalt
 end.
 
