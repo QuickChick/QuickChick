@@ -8,12 +8,13 @@ From QuickChick.ifcbasic Require GenExec.
 
 Require Import Coq.Strings.String.
 Local Open Scope string.
+
 Definition SSNI (t : table) (v : @Variation State) : Checker  :=
   let '(V st1 st2) := v in
   let '(St _ _ _ (_@l1)) := st1 in
   let '(St _ _ _ (_@l2)) := st2 in
   match lookupInstr st1 with
-    | Some i =>     collect (show i) (  
+    | Some i => (*     collect (show i) (   *)
   if indist st1 st2 then
     match l1, l2 with
       | L,L  =>
@@ -56,9 +57,8 @@ Definition SSNI (t : table) (v : @Variation State) : Checker  :=
           | _ => (*collect "L,H,FAIL" true *) checker rejected
         end
     end
-  else collect "Not indist!" (checker rejected)
-               )
-    | _ => collect ("None") (checker rejected)
+  else (* collect "Not indist!" *) (checker rejected)
+    | _ => (* collect ("None") *) (checker rejected)
   end.
 
 
@@ -66,12 +66,28 @@ Definition prop_SSNI t : Checker :=
   forAllShrink gen_variation_state (fun _ => nil)
    (SSNI t : Variation -> G QProp).
 
+Definition gen_variation_naive : G (option Variation) :=
+  bindGen gen_state (fun st1 =>
+  bindGen gen_state (fun st2 =>
+  if indist st1 st2 then
+    returnGen (Some (V st1 st2))
+  else
+    returnGen None)).
+  
+Definition prop_SSNI_naive t : Checker :=
+  forAllShrink gen_variation_naive (fun _ => nil)
+               (fun mv =>
+                  match mv with
+                  | Some v => SSNI t v
+                  | _ => checker rejected
+                  end).
+
 Definition prop_SSNI_derived t : Checker :=
   forAllShrink gen_variation_state_derived (fun _ => nil)
                (fun mv => 
                   match mv with 
                   | Some v => SSNI t v
-                  | _ => collect "Failed gen!" (checker tt)
+                  | _ => (* collect "Failed gen!" *) (checker tt)
                   end).
 
 Definition prop_gen_indist :=
@@ -96,18 +112,25 @@ Definition testMutantX n :=
     | _ => checker tt 
   end.
 
+Definition testMutantX_naive n :=
+  match nth (mutate_table default_table) n with
+    | Some t => prop_SSNI_naive t
+    | _ => checker tt 
+  end.
+
 Eval lazy -[labelCount helper] in
   nth (mutate_table default_table) 9.
 
-QuickCheck (testMutantX 9%Z).
-
+(*
+QuickCheck (testMutantX_naive 9%Z).
 FuzzChick (testMutantX 9%Z). (* prop_SSNI default_table). *)
+*)
 (*
 QuickCheck (prop_SSNI_derived default_table).
 
 Axiom numTests : nat.
 Extract Constant numTests => "10000".
-
+*)
 Fixpoint MSNI (fuel : nat) (t : table) (v : @Variation State) : Checker  :=
   let '(V st1 st2) := v in
   let '(St _ _ _ (_@l1)) := st1 in
@@ -116,7 +139,7 @@ Fixpoint MSNI (fuel : nat) (t : table) (v : @Variation State) : Checker  :=
   | O => checker true
   | S fuel' => 
   match lookupInstr st1 with
-    | Some i =>     collect (show i) (  
+    | Some i =>     (* collect (show i)*) (  
   if indist st1 st2 then
     match l1, l2 with
       | L,L  =>
@@ -188,7 +211,27 @@ Definition prop_MSNI t : Checker :=
   forAllShrink GenExec.gen_variation_state' (fun _ => nil)
    (MSNI 20 t : Variation -> G QProp).
 
-QuickCheck (prop_MSNI default_table).
+(* QuickCheck (prop_MSNI default_table).*)
+
+Definition prop_MSNI_naive t : Checker :=
+  forAllShrink gen_variation_naive (fun _ => nil)
+               (fun mv => 
+                  match mv with 
+                  | Some v => MSNI 20 t v
+                  | _ => checker rejected 
+                  end).
+
+Definition testMutantX_ c n :=
+  match nth (mutate_table default_table) n with
+    | Some t => c t
+    | _ => checker tt 
+  end.
+
+QuickCheck (testMutantX_ prop_MSNI 9).
+QuickCheck (testMutantX_ prop_MSNI_naive 9).
+
+FuzzChick (testMutantX_ prop_MSNI_naive 9).
+
 (* QuickCheck (prop_SSNI_derived default_table).*)
 
 
@@ -272,4 +315,4 @@ Definition ex_test :=
 Eval compute in exec default_table st1'.
 QuickCheck ex_test.
 QuickCheck (testMutantX 18).
-*)*)
+*)

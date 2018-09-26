@@ -42,13 +42,13 @@ Definition ainstr (st : State) : G Instruction :=
   let onLength len x := if leb x len then x else 0 in
   freq_ (returnGen Nop) [
               (1, returnGen Nop);
-              (10, liftGen Push gen_Z);
-              (if sl < 1 ? then 0 else 10, liftGen BCall (if beq_nat sl 0 then returnGen 0
+              (40, liftGen Push gen_Z);
+              (if sl < 1 ? then 0 else 40, liftGen BCall (if beq_nat sl 0 then returnGen 0
                                   else choose (0, Z.of_nat sl-1))%Z);
-              (if containsRet stk then 10 else 0, returnGen BRet);
-              (if sl < 2 ? then 0 else 10, returnGen Add);
-              (if sl < 1 ? then 0 else 10, returnGen Load);
-              (if sl < 2 ? then 0 else 100, returnGen Store)].
+              (if containsRet stk then 40 else 0, returnGen BRet);
+              (if sl < 2 ? then 0 else 40, returnGen Add);
+              (if sl < 1 ? then 0 else 40, returnGen Load);
+              (if sl < 2 ? then 0 else 140, returnGen Store)].
 
 Fixpoint gen_stack (n : nat) (onlyLow : bool) : G Stack :=
   (*
@@ -98,7 +98,7 @@ Require Import ExtLib.Structures.Monads.
 Import MonadNotation.
 Open Scope monad_scope.
 
-Definition gen_state : G State :=
+Definition gen_state' : G State :=
   let imem0 := replicate 10 Nop in
   pc <- gen_atom ;;
   mem <- gen_memory ;;
@@ -106,11 +106,11 @@ Definition gen_state : G State :=
   st' <- gen_by_exec default_table 20 (St imem0 mem stk pc) ;;
   ret st'.
 
-From QuickChick.ifcbasic Require Import Generation.
+From QuickChick.ifcbasic Require Generation.
 
-Instance vary_atom' : Vary Atom :=
+Instance vary_atom' : Generation.Vary Atom :=
 {|
-  vary a :=
+  Generation.vary a :=
     let '(x @ l) := a in
     match l with
       | L => returnGen a
@@ -118,30 +118,30 @@ Instance vary_atom' : Vary Atom :=
     end
 |}.
 
-Instance vary_mem' : Vary Mem :=
+Instance vary_mem' : Generation.Vary Mem :=
 {|
-  vary m := sequenceGen (map vary m)
+  Generation.vary m := sequenceGen (map Generation.vary m)
 |}.
 
 Fixpoint vary_stack (s : Stack) (isLow : bool) : G Stack :=
   match s with
-    | a :: s'  => if isLow then liftGen2 Cons (vary a) (vary_stack s' isLow)
+    | a :: s'  => if isLow then liftGen2 Cons (Generation.vary a) (vary_stack s' isLow)
                   else liftGen2 Cons gen_atom (vary_stack s' isLow)
     | (x@l) ::: s' =>
       match l with
         | L => liftGen (RetCons (x@l)) (vary_stack s' true)
-        | H => liftGen2 RetCons (vary (x@l)) (vary_stack s' false)
+        | H => liftGen2 RetCons (Generation.vary (x@l)) (vary_stack s' false)
       end
     | Mty => returnGen Mty
   end.
 
 Import QcDefaultNotation.
-Instance vary_state' : Vary State :=
+Instance vary_state' : Generation.Vary State :=
 {|
-  vary st :=
+  Generation.vary st :=
     let '(St imem mem stk pc) := st in
-    mem' <- vary mem ;;
-    pc'  <- vary pc ;;
+    mem' <- Generation.vary mem ;;
+    pc'  <- Generation.vary pc ;;
     let isLow := match pc with
                    | _ @ L => true
                    | _ @ H => false
@@ -159,7 +159,8 @@ Instance vary_state' : Vary State :=
         ret (St imem mem' stk' pc'))
 |}.
 
-Definition gen_variation_state' : G (@Variation State) :=
-  bindGen gen_state (fun st =>
-  bindGen (vary st) (fun st' =>
-  returnGen (V st st'))).
+Definition gen_variation_state' : G (@Generation.Variation State) :=
+  bindGen gen_state' (fun st =>
+  bindGen (Generation.vary st) (fun st' =>
+  returnGen (Generation.V st st'))).
+
