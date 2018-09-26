@@ -22,6 +22,9 @@ matrix:
 os:
     - linux
     - osx
+branches:
+  except:
+  - FuzzChick
 
 before_install:
     curl -L https://raw.githubusercontent.com/ocaml/ocaml-ci-scripts/master/.travis-ocaml.sh | sh
