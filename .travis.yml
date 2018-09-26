@@ -30,6 +30,9 @@ matrix:
 os:
     - linux
     - osx
+branches:
+  except:
+  - FuzzChick
 
 before_install:
     if [ $TRAVIS_OS_NAME = osx ]; then
