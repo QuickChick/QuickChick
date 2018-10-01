@@ -3,18 +3,18 @@ Import GenLow GenHigh.
 
 Require Import List. Import ListNotations.
 
-From QuickChick.ifcbasic Require Import Machine Printing Generation Indist DerivedGen.
+From QuickChick.ifcbasic Require Import Machine Printing Generation Indist DerivedGen Rules.
 From QuickChick.ifcbasic Require GenExec.
 
 Require Import Coq.Strings.String.
 Local Open Scope string.
 
-Definition SSNI (t : table) (v : @Variation State) : Checker  :=
+Definition SSNI_random (t : table) (v : @Variation State) : Checker  :=
   let '(V st1 st2) := v in
   let '(St _ _ _ (_@l1)) := st1 in
   let '(St _ _ _ (_@l2)) := st2 in
   match lookupInstr st1 with
-    | Some i => (*     collect (show i) (   *)
+    | Some i => 
   if indist st1 st2 then
     match l1, l2 with
       | L,L  =>
@@ -67,8 +67,8 @@ Definition prop_SSNI t : Checker :=
    (SSNI t : Variation -> G QProp).
 
 Definition gen_variation_naive : G (option Variation) :=
-  bindGen gen_state (fun st1 =>
-  bindGen gen_state (fun st2 =>
+  bindGen GenExec.gen_state' (fun st1 =>
+  bindGen GenExec.gen_state' (fun st2 =>
   if indist st1 st2 then
     returnGen (Some (V st1 st2))
   else
@@ -225,7 +225,7 @@ Definition testMutantX_ c n :=
     | _ => checker tt 
   end.
 
-FuzzChick (prop_MSNI_naive default_table).
+(* FuzzChick (prop_MSNI_naive default_table). *)
 (* QuickCheck (prop_MSNI default_table). *)
 
 (* 
@@ -235,6 +235,8 @@ QuickCheck (testMutantX_ prop_MSNI_naive 9).
 FuzzChick (testMutantX_ prop_MSNI_naive 9).
  *)
 
+Definition isLow (st : State) :=
+  label_eq ∂(st_pc st) L.
 
 (* EENI *)
 Fixpoint EENI (fuel : nat) (t : table) (v : @Variation State) : Checker  :=
@@ -245,7 +247,9 @@ Fixpoint EENI (fuel : nat) (t : table) (v : @Variation State) : Checker  :=
     match lookupInstr st1', lookupInstr st2' with
     (* run to completion *)
     | Some Halt, Some Halt =>
-      checker (indist st1' st2')
+      whenFail (show_pair st1' st2' ++ nl) 
+               (if isLow st1' && isLow st2' then checker (indist st1' st2')
+                else checker rejected)
     | _, _ => checker rejected
     end
   else checker rejected.    
@@ -254,15 +258,27 @@ Definition prop_EENI t : Checker :=
   forAllShrink GenExec.gen_variation_state' (fun _ => nil)
    (EENI 20 t : Variation -> G QProp).
 
-(* QuickCheck (prop_EENI default_table).  *)
+(*
+QuickChick (prop_EENI default_table). 
+FuzzChick (prop_EENI default_table).
+ *)
+Definition gen_variation_less_naive : G (option Variation) :=
+  bindGen GenExec.gen_state' (fun st1 =>
+  bindGen (Generation.vary st1) (fun st2 =>
+  if indist st1 st2 then
+    returnGen (Some (V st1 st2))
+  else
+    returnGen None)).
 
-Definition prop_MSNI_naive t : Checker :=
-  forAllShrink gen_variation_naive (fun _ => nil)
+Definition prop_EENI_g g t : Checker :=
+  forAllShrink g (fun _ => nil)
                (fun mv => 
                   match mv with 
-                  | Some v => MSNI 20 t v
+                  | Some v => EENI 20 t v
                   | _ => checker rejected 
                   end).
+
+FuzzChick (testMutantX_ (prop_EENI_g gen_variation_less_naive) 9).
 
   
 (*
