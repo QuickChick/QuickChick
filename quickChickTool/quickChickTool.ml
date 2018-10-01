@@ -36,8 +36,8 @@ let speclist =
   ; ("-m", Arg.Int (fun n -> only_mutant := Some (Num n)), "Only test mutant number n")
   ; ("-N", Arg.Int (fun n -> maxSuccess := Some n), "Max number of successes")
   ; ("-tag", Arg.String (fun s -> only_mutant := Some (Tag s)), "Only test mutant number with a specific tag")
-  ; ("-include", Arg.String (fun incl -> include_file := Some incl), "_CoqProject, file containing list of files to be included.")
-  ; ("-exclude", Arg.Rest (fun excl -> excluded := excl :: !excluded), "Files to be excluded. Must be the last argument")
+  ; ("-include", Arg.String (fun incl -> include_file := Some incl), "File containing list of files to be included.")
+  ; ("-exclude", Arg.Rest (fun excl -> excluded := excl :: !excluded), "(Deprecated) Files to be excluded. Must be the last argument")
   ]
 
 let usage_msg = "quickChick options\nMutation testing for current directory"
@@ -482,13 +482,13 @@ let rec parse_file_or_dir file_name =
                               ; sec_extends = None
                               ; sec_nodes = [Text s] } ]))
     else
-      let handle = (Filename.check_suffix file_name "v" ||
-                    Filename.check_suffix file_name "ml"||
-                    Filename.check_suffix file_name "c" ||
-                    Filename.check_suffix file_name "py"||
-                    Filename.check_suffix file_name "sol" ||
-                    Filename.check_suffix file_name "_tags" ||
-                    Filename.check_suffix file_name "h")
+      let handle = (Filename.check_suffix file_name ".v" ||
+                    Filename.check_suffix file_name ".ml"||
+                    Filename.check_suffix file_name ".c" ||
+                    Filename.check_suffix file_name ".py"||
+                    Filename.check_suffix file_name ".sol" ||
+                    Filename.basename     file_name="_tags" ||
+                    Filename.check_suffix file_name ".h")
                    && not (List.exists (fun x -> x = Filename.basename file_name) !excluded) in
       if handle then begin
         debug "In file: %s\n" file_name;
@@ -664,6 +664,8 @@ let starts_with ~prefix b =
 (* BCP: This function is too big! And there's too much duplication. *)
 let main =
 (*   List.iter (fun x -> print_endline x) !excluded;*)
+  if !excluded <> []
+  then output_string stderr "Warning: -exclude option is deprecated\n";
 
   (*  Parsing.set_trace true; *)
   let fs = from_Some (parse_file_or_dir ".") in
