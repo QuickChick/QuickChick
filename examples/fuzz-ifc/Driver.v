@@ -9,62 +9,81 @@ From QuickChick.ifcbasic Require GenExec.
 Require Import Coq.Strings.String.
 Local Open Scope string.
 
-Definition SSNI_random (t : table) (v : @Variation State) : Checker  :=
+Record exp_result := MkExpResult { exp_success : Checker
+                                 ; exp_fail    : Checker
+                                 ; exp_reject  : Checker
+                                 ; exp_check   : bool -> Checker
+                                 }.
+
+(* HACK: To get statistics on successful runs/discards/avg test failures, we can 
+   assume everything succeeds and collect the result. *)
+Definition exp_result_random : exp_result :=
+  {| exp_success := collect true  true
+   ; exp_fail    := collect false true
+   ; exp_reject  := collect "()"  true
+   ; exp_check   := (fun b => collect b true)
+  |}.
+
+(* For fuzzing, we let afl-fuzz gather the statistics (and hack afl-fuzz instead :) *)
+Definition exp_result_fuzz : exp_result :=
+  {| exp_success := collect true  true
+   ; exp_fail    := collect false false
+   ; exp_reject  := collect "()"  tt
+   ; exp_check   := (fun b => collect b b)
+  |}.
+
+Definition SSNI (t : table) (v : @Variation State) (res : exp_result) : Checker  :=
   let '(V st1 st2) := v in
   let '(St _ _ _ (_@l1)) := st1 in
   let '(St _ _ _ (_@l2)) := st2 in
   match lookupInstr st1 with
-    | Some i => 
-  if indist st1 st2 then
-    match l1, l2 with
-      | L,L  =>
-        match exec t st1, exec t st2 with
-          | Some st1', Some st2' =>
-(*
-            whenFail ("Initial states: " ++ nl ++ show_pair st1 st2 ++ nl
-                        ++ "Final states: " ++ nl ++ show_pair st1' st2' ++nl)
-*)
-            (* collect ("L -> L")*) (checker (indist st1' st2'))
-          | _, _ => (* collect "L,L,FAIL" true *) checker rejected
-        end
-      | H, H =>
-        match exec t st1, exec t st2 with
-          | Some st1', Some st2' =>
-            if is_atom_low (st_pc st1') && is_atom_low (st_pc st2') then
-              (* whenFail ("Initial states: " ++ nl ++ show_pair st1 st2 ++ nl
-                        ++ "Final states: " ++ nl ++ show_pair st1' st2' ++nl) *)
-              (* collect ("H -> L")*) (checker (indist st1' st2') )
-            else if is_atom_low (st_pc st1') then
-                   (* whenFail ("States: " ++ nl ++ show_pair st2 st2' ++ nl )*)
-              (* collect ("H -> H")*) (checker (indist st2 st2'))
-            else
-(*            whenFail ("States: " ++ nl ++ show_pair st1 st1' ++ nl )*)
-              (* collect ("H -> H")*) (checker (indist st1 st1'))
-          | _, _ => checker rejected
-        end
-      | H,_ =>
-        match exec t st1 with
-          | Some st1' =>
-(*             whenFail ("States: " ++ nl ++ show_pair st1 st1' ++ nl )*)
-                      (* collect "H -> H"*) (checker (indist st1 st1'))
-          | _ => (*collect "H,_,FAIL" true *) checker rejected
-        end
-      | _,H =>
-        match exec t st2 with
-          | Some st2' =>
-(*             whenFail ("States: " ++ nl ++ show_pair st2 st2' ++ nl )*)
-                      (* collect "H -> H"*) (checker (indist st2 st2'))
-          | _ => (*collect "L,H,FAIL" true *) checker rejected
-        end
-    end
-  else (* collect "Not indist!" *) (checker rejected)
-    | _ => (* collect ("None") *) (checker rejected)
+  | Some i => 
+    if indist st1 st2 then
+      match l1, l2 with
+        | L,L  =>
+          match exec t st1, exec t st2 with
+            | Some st1', Some st2' =>
+              exp_check res (indist st1' st2')
+            | _, _ => exp_reject res
+          end
+        | H, H =>
+          match exec t st1, exec t st2 with
+            | Some st1', Some st2' =>
+              if is_atom_low (st_pc st1') && is_atom_low (st_pc st2') then
+                exp_check res (indist st1' st2')
+              else if is_atom_low (st_pc st1') then
+                exp_check res (indist st2 st2')
+              else
+                exp_check res (indist st1 st1')
+            | _, _ => exp_reject res
+          end
+        | H,_ =>
+          match exec t st1 with
+            | Some st1' =>
+              exp_check res (indist st1 st1')
+            | _ => exp_reject res
+          end
+        | _,H =>
+          match exec t st2 with
+            | Some st2' =>
+              exp_check res (indist st2 st2')
+            | _ => exp_reject res
+          end
+      end
+    else exp_reject res
+  | _ => exp_reject res
   end.
 
+Definition gen__MaybeGen {A} (g : G A) : G (option A) :=
+  liftGen Some g.
 
-Definition prop_SSNI t : Checker :=
-  forAllShrink gen_variation_state (fun _ => nil)
-   (SSNI t : Variation -> G QProp).
+Definition prop_SSNI (gen : G (option Variation)) (t : table) (r : exp_result) : Checker :=
+  forAllShrink gen (fun _ => nil)
+               (fun mv =>
+                  match mv with
+                  | Some v => SSNI t v r
+                  | _ => exp_reject r
+                  end).
 
 Definition gen_variation_naive : G (option Variation) :=
   bindGen GenExec.gen_state' (fun st1 =>
@@ -73,64 +92,29 @@ Definition gen_variation_naive : G (option Variation) :=
     returnGen (Some (V st1 st2))
   else
     returnGen None)).
-  
-Definition prop_SSNI_naive t : Checker :=
-  forAllShrink gen_variation_naive (fun _ => nil)
-               (fun mv =>
-                  match mv with
-                  | Some v => SSNI t v
-                  | _ => checker rejected
-                  end).
 
-Definition prop_SSNI_derived t : Checker :=
-  forAllShrink gen_variation_state_derived (fun _ => nil)
-               (fun mv => 
-                  match mv with 
-                  | Some v => SSNI t v
-                  | _ => (* collect "Failed gen!" *) (checker tt)
-                  end).
+Extract Constant defNumTests => "100000".
 
-Definition prop_gen_indist :=
-  forAllShrink gen_variation_state (fun _ => nil)
-               (fun v => let '(V st1 st2) := v in indist st1 st2).
+Definition prop_SSNI_naive t r :=
+  prop_SSNI gen_variation_naive t r.
 
-Definition prop_gen_indist_derived :=
-  forAllShrink (gen_variation_state_derived) (fun _ => nil)
-               (fun mv => 
-                  match mv with 
-                  | Some (V st1 st2) => indist st1 st2 
-                  | _ => false
-                  end).
+Definition prop_SSNI_smart t r :=
+  prop_SSNI (liftGen Some gen_variation_state) t r.
+
 
 Extract Constant defNumDiscards => "30000".
 
 From QuickChick Require Import Mutate MutateCheck.
 Require Import ZArith.
-Definition testMutantX n :=
+
+Definition testMutantX prop r n :=
   match nth (mutate_table default_table) n with
-    | Some t => prop_SSNI t
-    | _ => checker tt 
+    | Some t => prop t r
+    | _ => exp_reject r
   end.
 
-Definition testMutantX_naive n :=
-  match nth (mutate_table default_table) n with
-    | Some t => prop_SSNI_naive t
-    | _ => checker tt 
-  end.
+(* QuickChick (prop_SSNI_smart default_table exp_result_random). *)
 
-Eval lazy -[labelCount helper] in
-  nth (mutate_table default_table) 9.
-
-(*
-QuickCheck (testMutantX_naive 9%Z).
-FuzzChick (testMutantX 9%Z). (* prop_SSNI default_table). *)
-*)
-(*
-QuickCheck (prop_SSNI_derived default_table).
-
-Axiom numTests : nat.
-Extract Constant numTests => "10000".
-*)
 Fixpoint MSNI (fuel : nat) (t : table) (v : @Variation State) : Checker  :=
   let '(V st1 st2) := v in
   let '(St _ _ _ (_@l1)) := st1 in
