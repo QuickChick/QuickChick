@@ -99,11 +99,11 @@ let define c =
   let env = Global.env () in
   let evd = Evd.from_env env in
   let (evd,_) = Typing.type_of env evd c in
-  let uctxt = UState.context (Evd.evar_universe_context evd) in
+  let univs = Evd.const_univ_entry ~poly:true evd in
   let fn = fresh_name "quickchick" in
   (* TODO: Maxime - which of the new internal flags should be used here? The names aren't as clear :) *)
   ignore (declare_constant ~internal:InternalTacticRequest fn
-      (DefinitionEntry (definition_entry ~univs:(Polymorphic_const_entry uctxt) (EConstr.to_constr evd c)),
+      (DefinitionEntry (definition_entry ~univs (EConstr.to_constr evd c)),
        Decl_kinds.IsDefinition Decl_kinds.Definition));
   fn
 
