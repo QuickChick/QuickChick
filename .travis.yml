@@ -52,7 +52,7 @@ script:
 - echo 'Building QuickChick...';
   echo -en 'travis_fold:start:QuickChick.build';
   opam update;
-  travis_wait opam pin add . ;
+  travis_wait 40 opam pin add . ;
   travis_wait opam install coq-quickchick;
   echo -en 'travis_fold:end:QuickChick.build'
 - echo 'Testing IFC...';
