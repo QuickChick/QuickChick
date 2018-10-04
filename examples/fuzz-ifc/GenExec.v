@@ -11,7 +11,7 @@ Definition mem_length : Z := 10.
 
 Definition gen_Z := choose (0,mem_length).
 
-Definition gen_label := elements L [L; H].
+Definition gen_label := elems_ L [L; H].
 
 Definition gen_atom := liftGen2 Atm gen_Z gen_label.
 
