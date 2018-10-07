@@ -11,7 +11,7 @@ Import ListNotations.
 Import QcDefaultNotation.
 
 Open Scope qc_scope.
-Open Scope string.
+Local Open Scope string.
 
 Set Bullet Behavior "Strict Subproofs".
 (** * Correctness of dependent generators *)
