@@ -30,7 +30,6 @@ Definition opCodes := [
   OpLoad;
   OpStore;
   OpHalt].
-    
 
 Definition opCode_eq_dec : forall o1 o2 : OpCode,
   {o1 = o2} + {o1 <> o2}.

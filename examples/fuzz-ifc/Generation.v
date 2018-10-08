@@ -37,16 +37,15 @@ Definition ainstr (st : State) : G Instruction :=
         | _ :: s' => containsRet s'
         | _ => false
       end in
-  let onLength len x := if leb x len then x else 0 in
   freq_ (returnGen Nop) [
               (1, returnGen Nop);
               (10, liftGen Push gen_Z);
               (10, liftGen BCall (if beq_nat sl 0 then returnGen 0
                                   else choose (0, Z.of_nat sl-1))%Z);
               (if containsRet stk then 10 else 0, returnGen BRet);
-              (10, returnGen Add);
-              (10, returnGen Load);
-              (100, returnGen Store)].
+              (if sl < 2 ? then 0 else 10, returnGen Add);
+              (if sl < 1 ? then 0 else 10, returnGen Load);
+              (if sl < 2 ? then 0 else 10, returnGen Store)].
 (*
               (onLength 1 10, liftGen BCall (chooseZ (0, (Z.of_nat sl-1))%Z));
               (if containsRet stk then 10 else 0, returnGen BRet);
@@ -109,7 +108,8 @@ Fixpoint vary_stack (s : Stack) (isLow : bool) : G Stack :=
     | (x@l) ::: s' =>
       match l with
         | L => liftGen (RetCons (x@l)) (vary_stack s' true)
-        | H => liftGen2 RetCons (vary (x@l)) (vary_stack s' false)
+        | H =>
+            liftGen2 RetCons (vary (x@l)) (vary_stack s' isLow)
       end
     | Mty => returnGen Mty
   end.
@@ -129,8 +129,12 @@ Instance vary_state : Vary State :=
       returnGen (St imem mem' stk' pc'))
     else
       bindGen (vary_stack stk isLow) (fun stk' =>
-      bindGen gen_atom (fun extra_elem =>
-      returnGen (St imem mem' (extra_elem :: stk') pc')))))
+      bindGen (@arbitrary bool _) (fun b : bool =>
+      if b then
+        bindGen gen_atom (fun extra_elem =>
+        ret (St imem mem' (extra_elem :: stk') pc'))
+      else
+        ret (St imem mem' stk' pc')))))
 |}.
 
 Definition gen_variation_state : G (@Variation State) :=

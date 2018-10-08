@@ -192,7 +192,8 @@ let _ =
       print_endline input_dir;
       mkdir_ input_dir;
       let stat = Sys.command (Printf.sprintf "echo QuickChick > %s/tmp" input_dir) in
-      let cmd = Printf.sprintf "afl-fuzz -i %s -o %s %s @@" input_dir (temp_dir ^ "/output") execn in
+      let timeout = 10 * 60 (* seconds *) in
+      let cmd = Printf.sprintf "timeout -s SIGINT %d `afl-fuzz -i %s -o %s %s @@`" timeout input_dir (temp_dir ^ "/output") execn in
       ignore (Sys.command cmd);
       None                               
     end
@@ -216,7 +217,7 @@ let _ =
            | Unix.WSIGNALED i ->
               CErrors.user_err (str (Printf.sprintf "Killed (%d)" i) ++ fnl ())
            | Unix.WSTOPPED i ->
-              CErrors.user_err (str (Printf.sprintf "Stopped (%d)" i) ++ fnl ())
+              Cerrors.user_err (str (Printf.sprintf "Stopped (%d)" i) ++ fnl ())
            end;
            let output = String.concat "\n" (List.rev !builder) in
            Some output

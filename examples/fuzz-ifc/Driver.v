@@ -12,6 +12,14 @@ Local Open Scope string.
 From QuickChick Require Import Mutate MutateCheck.
 Require Import ZArith.
 
+(*
+Definition prop_sanity :=
+  forAll Generation.gen_variation_state (fun v =>
+  let '(V s s') := v in                                      
+  whenFail (show_pair s s') (indist s s')).
+QuickChick prop_sanity.
+ *)
+
 Record exp_result := MkExpResult { exp_success : Checker
                                  ; exp_fail    : Checker
                                  ; exp_reject  : Checker
@@ -47,7 +55,7 @@ Definition SSNI (t : table) (v : @Variation State) (res : exp_result) : Checker 
           match exec t st1, exec t st2 with
             | Some st1', Some st2' =>
               exp_check res (indist st1' st2')
-            | _, _ => exp_reject res
+            | _, _ => collect "Not both step" (exp_reject res)
           end
         | H, H =>
           match exec t st1, exec t st2 with
@@ -58,23 +66,23 @@ Definition SSNI (t : table) (v : @Variation State) (res : exp_result) : Checker 
                 exp_check res (indist st2 st2')
               else
                 exp_check res (indist st1 st1')
-            | _, _ => exp_reject res
+            | _, _ => collect "Both don't step H" (exp_reject res)
           end
         | H,_ =>
           match exec t st1 with
             | Some st1' =>
               exp_check res (indist st1 st1')
-            | _ => exp_reject res
+            | _ => collect ("High 1 doesn't step") (exp_reject res)
           end
         | _,H =>
           match exec t st2 with
             | Some st2' =>
               exp_check res (indist st2 st2')
-            | _ => exp_reject res
+            | _ => collect "High 2 doesn't step" (exp_reject res)
           end
       end
-    else exp_reject res
-  | _ => exp_reject res
+    else collect "Not indist" (exp_reject res)
+  | _ => collect "Out-of-range" (exp_reject res)
   end.
 
 
@@ -97,47 +105,50 @@ Fixpoint MSNI_aux (fuel : nat) (t : table) (v : @Variation State) : option bool 
           else
             Some false
         | _, _ => Some true
-          end
-        | H, H =>
-          match exec t st1, exec t st2 with
-            | Some st1', Some st2' =>
-              if is_atom_low (st_pc st1') && is_atom_low (st_pc st2') then
-                if indist st1' st2' then
-                  MSNI_aux fuel' t (V st1' st2')
-                else
-                  Some false
-              else if is_atom_low (st_pc st1') then
-                if indist st2 st2' then
-                  (* Ensure still a variation by not executing st1 *)
-                  MSNI_aux fuel' t (V st1 st2') 
-                else Some false
-              else
-                if indist st1 st1' then
-                  MSNI_aux fuel' t (V st1' st2)
-                else 
-                  Some false
-            | _, _ => Some true
-          end
-        | H,_ =>
-          match exec t st1 with
-          | Some st1' =>
-            if indist st1 st1' then
-              MSNI_aux fuel' t (V st1' st2)
+        end
+      | H, H =>
+        match exec t st1, exec t st2 with
+        | Some st1', Some st2' =>
+          if is_atom_low (st_pc st1') && is_atom_low (st_pc st2') then
+            if indist st1' st2' then
+              MSNI_aux fuel' t (V st1' st2')
             else
               Some false
-            | _ => Some true
-          end
-        | _,H =>
-          match exec t st2 with
-          | Some st2' =>
-            if indist st2 st2' then
-              MSNI_aux fuel' t (V st1 st2')
+          else if is_atom_low (st_pc st1') then
+                 if indist st2 st2' then
+                   (* Ensure still a variation by not executing st1 *)
+                   MSNI_aux fuel' t (V st1 st2') 
+                 else Some false
+          else if is_atom_low (st_pc st2') then 
+                 if indist st1 st1' then
+                   MSNI_aux fuel' t (V st1' st2)
+                 else Some false
+          else (* Both high, check pairwise, continue *)
+            if indist st1 st1' && indist st2 st2' then
+              MSNI_aux fuel' t (V st1' st2')
             else Some false
-          | _ => Some true
-          end
+        | _, _ => Some true
+        end
+      | H,_ =>
+        match exec t st1 with
+        | Some st1' =>
+          if indist st1 st1' then
+            MSNI_aux fuel' t (V st1' st2)
+          else
+            Some false
+        | _ => Some true
+        end
+      | _,H =>
+        match exec t st2 with
+        | Some st2' =>
+          if indist st2 st2' then
+            MSNI_aux fuel' t (V st1 st2')
+          else Some false
+        | _ => Some true
+        end
       end
     else None
-    | _ => None
+  | _ => None
   end
   end.
 
@@ -155,10 +166,10 @@ Fixpoint EENI (fuel : nat) (t : table) (v : @Variation State) res : Checker  :=
     | Some Halt, Some Halt =>
       if isLow st1' && isLow st2' then
         exp_check res (indist st1' st2') 
-      else exp_reject res
-    | _, _ => exp_reject res
+      else (exp_reject res)
+    | _, _ => (exp_reject res)
     end
-  else exp_reject res.
+  else (exp_reject res).
 
 (* Generic property *)
 Definition prop p (gen : G (option Variation)) (t : table) (r : exp_result) : Checker :=
@@ -187,8 +198,6 @@ Definition gen_variation_medium : G (option Variation) :=
   else
     returnGen None)).
 
-Extract Constant defNumTests => "100000".
-
 Definition testMutantX prop r n :=
   match nth (mutate_table default_table) n with
     | Some t => prop t r
@@ -204,12 +213,31 @@ Definition prop_SSNI_medium t r :=
 Definition prop_SSNI_smart t r :=
   prop SSNI (liftGen Some gen_variation_state) t r.
 
+Definition ieq (i1 i2 : Instruction) : {i1 = i2} + {i1 <> i2}.
+repeat decide equality.
+Defined.
+
+Derive Show for OpCode.
+
+Definition count_instrs i im :=
+  List.count_occ opCode_eq_dec im i.
+
+Fixpoint collect_instrs_imem (im : list Instruction) x :=
+  let ops := List.map opcode_of_instr im in 
+  let cnts := List.map (fun oc : OpCode => (oc, count_instrs oc ops)) opCodes in
+  collect (cnts) x.
+
+Definition collect_instrs v x :=
+  let '(V (St i _ _ _) _) := v in
+  collect_instrs_imem i x.
+
 (* QuickChick (prop_SSNI_smart default_table exp_result_random). *)
 Definition MSNI fuel t v res :=
+(*  collect_instrs v *) (
   match MSNI_aux fuel t v with
   | Some b => exp_check res b
   | None => exp_reject res
-  end.
+  end).
 
 Definition prop_MSNI_naive t r :=
   prop (MSNI 42) (gen_variation_naive) t r.
@@ -234,7 +262,28 @@ Definition prop_EENI_medium t r : Checker :=
 Definition prop_EENI_smart t r : Checker :=
   prop (EENI 42) (liftGen Some GenExec.gen_variation_state') t r.
 
-(*
-QuickChick (prop_EENI_smart default_table exp_result_random).
-QuickChick (testMutantX prop_EENI_smart exp_result_random 9).                                 *)        
+Eval lazy -[labelCount helper] in
+  nth (mutate_table default_table) 1.
 
+Extract Constant defNumTests => "100000".
+
+QuickChick (testMutantX prop_MSNI_smart exp_result_random 0).
+QuickChick (testMutantX prop_MSNI_smart exp_result_random 1).
+QuickChick (testMutantX prop_MSNI_smart exp_result_random 2).
+QuickChick (testMutantX prop_MSNI_smart exp_result_random 3).
+QuickChick (testMutantX prop_MSNI_smart exp_result_random 4).
+QuickChick (testMutantX prop_MSNI_smart exp_result_random 5).
+QuickChick (testMutantX prop_MSNI_smart exp_result_random 6).
+QuickChick (testMutantX prop_MSNI_smart exp_result_random 7).
+QuickChick (testMutantX prop_MSNI_smart exp_result_random 8).
+QuickChick (testMutantX prop_MSNI_smart exp_result_random 9).
+QuickChick (testMutantX prop_MSNI_smart exp_result_random 10).
+QuickChick (testMutantX prop_MSNI_smart exp_result_random 11).
+QuickChick (testMutantX prop_MSNI_smart exp_result_random 12).
+QuickChick (testMutantX prop_MSNI_smart exp_result_random 13).
+QuickChick (testMutantX prop_MSNI_smart exp_result_random 14).
+QuickChick (testMutantX prop_MSNI_smart exp_result_random 15).
+QuickChick (testMutantX prop_MSNI_smart exp_result_random 16).
+QuickChick (testMutantX prop_MSNI_smart exp_result_random 17).
+QuickChick (testMutantX prop_MSNI_smart exp_result_random 18).
+QuickChick (testMutantX prop_MSNI_smart exp_result_random 19).

@@ -25,7 +25,7 @@ Definition is_atom_low (a : Atom) :=
 
 Local Open Scope nat.
 
-Definition ainstr (st : State) : G Instruction :=
+Definition ainstr (st : State) (fuel : nat) : G Instruction :=
   let '(St im m stk pc ) := st in
   let fix stack_length s :=
       match s with
@@ -39,31 +39,26 @@ Definition ainstr (st : State) : G Instruction :=
         | _ :: s' => containsRet s'
         | _ => false
       end in
-  let onLength len x := if leb x len then x else 0 in
+  
   freq_ (returnGen Nop) [
           (1, returnGen Nop);
-          (5, returnGen Halt);
-              (40, liftGen Push gen_Z);
-              (if sl < 1 ? then 0 else 40, liftGen BCall (if beq_nat sl 0 then returnGen 0
-                                  else choose (0, Z.of_nat sl-1))%Z);
-              (if containsRet stk then 40 else 0, returnGen BRet);
-              (if sl < 2 ? then 0 else 40, returnGen Add);
-              (if sl < 1 ? then 0 else 40, returnGen Load);
-              (if sl < 2 ? then 0 else 140, returnGen Store)].
+          (if is_atom_low pc then (40 - fuel) * (40 - fuel) else 0, returnGen Halt);
+          (40, liftGen Push gen_Z);
+          (if sl < 1 ? then 0 else 40,
+           liftGen BCall (if beq_nat sl 0 then returnGen 0
+                          else choose (0, Z.of_nat sl))%Z);
+          (if containsRet stk then 40 else 0, returnGen BRet);
+          (if sl < 2 ? then 0 else 40, returnGen Add);
+          (if sl < 1 ? then 0 else 40, returnGen Load);
+          (if sl < 2 ? then 0 else 60, returnGen Store)].
 
 Fixpoint gen_stack (n : nat) (onlyLow : bool) : G Stack :=
-  (*
-  let gen_atom :=
-      if onlyLow then liftGen2 Atm gen_Z (returnGen L)
-      else gen_atom
-  in
-   *)
   match n with
     | O => returnGen Mty
     | S n' =>
       freq_ (returnGen Mty) [
                   (10, liftGen2 Cons gen_atom (gen_stack n' onlyLow));
-                  (4, bindGen gen_atom (fun pc =>
+                  (2, bindGen gen_atom (fun pc =>
                        liftGen (RetCons pc) (gen_stack n' (is_atom_low pc))))]
   end.
 
@@ -75,7 +70,7 @@ Fixpoint gen_by_exec (t : table) (fuel : nat) (st : State) :=
     match nth im addr with
     | Some Nop =>
       (* If it is a noop, generate *)
-      bindGen (ainstr st) (fun i =>
+      bindGen (ainstr st fuel') (fun i =>
       match upd im addr i with
       | Some im' =>
         let st' := St im' m stk (Atm addr pcl) in
@@ -99,66 +94,32 @@ Require Import ExtLib.Structures.Monads.
 Import MonadNotation.
 Open Scope monad_scope.
 
+Fixpoint replace_some_nops imem :=
+  match imem with
+  | [] => ret []
+  | cons Nop imem' =>
+    bindGen (@arbitrary bool _) (fun (b : bool) =>
+    if b then       
+      n <- gen_Z ;;
+      liftGen (cons (Push n)) (replace_some_nops imem')
+    else
+      liftGen (cons Nop) (replace_some_nops imem'))
+  | cons i imem' =>
+    liftGen (cons i) (replace_some_nops imem')
+  end.
+
 Definition gen_state' : G State :=
-  let imem0 := replicate 10 Nop in
+  let imem0 := replicate 15 Nop in
   pc <- gen_atom ;;
   mem <- gen_memory ;;
   stk <- gen_stack 10 (is_atom_low pc) ;;
-  st' <- gen_by_exec default_table 20 (St imem0 mem stk pc) ;;
-  ret st'.
+  st' <- gen_by_exec default_table 40 (St imem0 mem stk pc) ;;
+  let '(St i m s p) := st' in
+  (*  i' <- replace_some_nops i ;; *)
+  let i' := i in
+  ret (St i' m s p).
 
 From QuickChick.ifcbasic Require Generation.
-
-Instance vary_atom' : Generation.Vary Atom :=
-{|
-  Generation.vary a :=
-    let '(x @ l) := a in
-    match l with
-      | L => returnGen a
-      | H => liftGen2 Atm gen_Z (returnGen H)
-    end
-|}.
-
-Instance vary_mem' : Generation.Vary Mem :=
-{|
-  Generation.vary m := sequenceGen (map Generation.vary m)
-|}.
-
-Fixpoint vary_stack (s : Stack) (isLow : bool) : G Stack :=
-  match s with
-    | a :: s'  => if isLow then liftGen2 Cons (Generation.vary a) (vary_stack s' isLow)
-                  else liftGen2 Cons gen_atom (vary_stack s' isLow)
-    | (x@l) ::: s' =>
-      match l with
-        | L => liftGen (RetCons (x@l)) (vary_stack s' true)
-        | H => liftGen2 RetCons (Generation.vary (x@l)) (vary_stack s' false)
-      end
-    | Mty => returnGen Mty
-  end.
-
-Import QcDefaultNotation.
-Instance vary_state' : Generation.Vary State :=
-{|
-  Generation.vary st :=
-    let '(St imem mem stk pc) := st in
-    mem' <- Generation.vary mem ;;
-    pc'  <- Generation.vary pc ;;
-    let isLow := match pc with
-                   | _ @ L => true
-                   | _ @ H => false
-                 end in
-    if isLow then
-      stk' <- vary_stack stk isLow ;;
-      ret (St imem mem' stk' pc')
-    else
-      stk' <- vary_stack stk isLow ;;
-      bindGen (@arbitrary bool _) (fun b : bool =>
-      if b then
-        extra_elem <- gen_atom ;;
-        ret (St imem mem' (extra_elem :: stk') pc')
-      else
-        ret (St imem mem' stk' pc'))
-|}.
 
 Definition gen_variation_state' : G (@Generation.Variation State) :=
   bindGen gen_state' (fun st =>
