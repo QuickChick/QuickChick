@@ -42,7 +42,7 @@ Definition ainstr (st : State) (fuel : nat) : G Instruction :=
   
   freq_ (returnGen Nop) [
           (1, returnGen Nop);
-          (if is_atom_low pc then (40 - fuel) * (40 - fuel) else 0, returnGen Halt);
+          (if is_atom_low pc then (20 - fuel) * (20 - fuel) else 0, returnGen Halt);
           (40, liftGen Push gen_Z);
           (if sl < 1 ? then 0 else 40,
            liftGen BCall (if beq_nat sl 0 then returnGen 0
@@ -109,11 +109,11 @@ Fixpoint replace_some_nops imem :=
   end.
 
 Definition gen_state' : G State :=
-  let imem0 := replicate 15 Nop in
+  let imem0 := replicate 10 Nop in
   pc <- gen_atom ;;
   mem <- gen_memory ;;
   stk <- gen_stack 10 (is_atom_low pc) ;;
-  st' <- gen_by_exec default_table 40 (St imem0 mem stk pc) ;;
+  st' <- gen_by_exec default_table 20 (St imem0 mem stk pc) ;;
   let '(St i m s p) := st' in
   (*  i' <- replace_some_nops i ;; *)
   let i' := i in

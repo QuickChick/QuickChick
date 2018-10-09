@@ -148,7 +148,7 @@ Fixpoint MSNI_aux (fuel : nat) (t : table) (v : @Variation State) : option bool 
         end
       end
     else None
-  | _ => None
+  | _ => Some true
   end
   end.
 
@@ -266,6 +266,7 @@ Eval lazy -[labelCount helper] in
   nth (mutate_table default_table) 1.
 
 Extract Constant defNumTests => "100000".
+
 
 QuickChick (testMutantX prop_MSNI_smart exp_result_random 0).
 QuickChick (testMutantX prop_MSNI_smart exp_result_random 1).
