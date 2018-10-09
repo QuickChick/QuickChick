@@ -95,9 +95,7 @@ let fresh_name n =
     Namegen.next_ident_away_from base is_visible_name
 
 (** [define c] introduces a fresh constant name for the term [c]. *)
-let define c =
-  let env = Global.env () in
-  let evd = Evd.from_env env in
+let define c env evd =
   let (evd,_) = Typing.type_of env evd c in
   let uctxt = UState.context (Evd.evar_universe_context evd) in
   let fn = fresh_name "quickchick" in
@@ -116,9 +114,9 @@ let new_ml_file () =
   mkdir_ temp_dir;
   Filename.temp_file ~temp_dir "QuickChick" ".ml"
 
-let define_and_run c =
+let define_and_run c env evd =
   (** Extract the term and its dependencies *)
-  let main = define c in
+  let main = define c env evd in
   let mlf = new_ml_file () in
   let execn = Filename.chop_extension mlf in
   let mlif = execn ^ ".mli" in
@@ -195,16 +193,19 @@ let define_and_run c =
  *)
 
 (* TODO: clean leftover files *)
-let runTest c =
+let runTest c env evd =
   (** [c] is a constr_expr representing the test to run,
       so we first build a new constr_expr representing
       show c **)
   let c = CAst.make @@ CApp((None,show), [(c,None)]) in
   (** Build the kernel term from the const_expr *)
-  let env = Global.env () in
-  let evd = Evd.from_env env in
-  let (c,evd) = interp_constr env evd c in
-  define_and_run c
+
+  (*  Printf.printf "Before interp constr\n"; flush stdout; *)
+  
+  let (c,_evd) = interp_constr env evd c in
+
+  (* Printf.printf "So far so good?\n"; flush stdout; *)
+  define_and_run c env evd
 
 let run f args =
   begin match args with
@@ -215,7 +216,9 @@ let run f args =
   end;
   let args = List.map (fun x -> (x,None)) args in
   let c = CAst.make @@ CApp((None,f), args) in
-  ignore (runTest c)
+  let env = Global.env () in
+  let evd = Evd.from_env env in
+  ignore (runTest c env evd)
 
 let set_debug_flag (flag_name : string) (mode : string) =
   let toggle =
