@@ -60,7 +60,7 @@ Definition SSNI (t : table) (v : @Variation State) (res : exp_result) : Checker 
           match exec t st1, exec t st2 with
             | Some st1', Some st2' =>
               exp_check res (indist st1' st2')
-            | _, _ => collect "Not both step" (exp_reject res)
+            | _, _ => (* collect "Not both step" *) (exp_reject res)
           end
         | H, H =>
           match exec t st1, exec t st2 with
@@ -71,23 +71,23 @@ Definition SSNI (t : table) (v : @Variation State) (res : exp_result) : Checker 
                 exp_check res (indist st2 st2')
               else
                 exp_check res (indist st1 st1')
-            | _, _ => collect "Both don't step H" (exp_reject res)
+            | _, _ => (* collect "Both don't step H" *) (exp_reject res)
           end
         | H,_ =>
           match exec t st1 with
             | Some st1' =>
               exp_check res (indist st1 st1')
-            | _ => collect ("High 1 doesn't step") (exp_reject res)
+            | _ => (* collect ("High 1 doesn't step") *) (exp_reject res)
           end
         | _,H =>
           match exec t st2 with
             | Some st2' =>
               exp_check res (indist st2 st2')
-            | _ => collect "High 2 doesn't step" (exp_reject res)
+            | _ => (* collect "High 2 doesn't step" *) (exp_reject res)
           end
       end
-    else collect "Not indist" (exp_reject res)
-  | _ => collect "Out-of-range" (exp_reject res)
+    else (* collect "Not indist" *) (exp_reject res)
+  | _ => (* collect "Out-of-range" *) (exp_reject res)
   end.
 
 
@@ -267,8 +267,10 @@ Definition prop_EENI_medium t r : Checker :=
 Definition prop_EENI_smart t r : Checker :=
   prop (EENI 42) (liftGen Some GenExec.gen_variation_state') t r.
 
+(*
 Eval lazy -[labelCount helper] in
-  nth (mutate_table default_table) 1.
+  nth (mutate_table default_table) 20. *)
 
-Extract Constant defNumTests => "1000".
+Extract Constant defNumTests => "1000000".
+
 
