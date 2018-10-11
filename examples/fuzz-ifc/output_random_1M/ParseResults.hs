@@ -5,9 +5,11 @@ import System.FilePath
 import System.IO
 
 import Control.Monad
+import Control.Arrow (second)
 
 import Text.ParserCombinators.Parsec
 
+import Data.List
 import Data.Either
 
 import Debug.Trace
@@ -97,8 +99,10 @@ main = do
   -- Filter the ones that are output files (.out)
   let outputs = filter ((== ".out") . takeExtension) allFiles
   -- Iterate through each file
-  forM_ outputs $ \f -> do
+  parsedData <- forM outputs $ \f -> do
     handle   <- openFile f ReadMode
     contents <- hGetContents handle
-    putStrLn $ f ++ ":\n" ++ show (parseOutput f contents)
-  putStrLn $ show outputs
+    return (parseOutput f contents)
+  let sorted = sort parsedData
+  let (naive,(medium,smart)) = second (splitAt 20) (splitAt 20 sorted)
+  putStrLn $ show (naive, medium, smart)

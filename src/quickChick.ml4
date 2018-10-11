@@ -191,11 +191,22 @@ let _ =
       let input_dir = temp_dir ^ "/input" in
       print_endline input_dir;
       mkdir_ input_dir;
-      let stat = Sys.command (Printf.sprintf "echo QuickChick > %s/tmp" input_dir) in
+      if Sys.file_exists "./_seeds" then
+        Sys.command (Printf.sprintf "cp _seeds/* %s" input_dir)
+      else
+        Sys.command (Printf.sprintf "echo QuickChick > %s/tmp" input_dir);
       let timeout = 10 * 60 (* seconds *) in
-      (* let cmd = Printf.sprintf "timeout -s SIGINT %d `afl-fuzz -i %s -o %s %s @@`" timeout input_dir (temp_dir ^ "/output") execn in *)
-      let cmd = Printf.sprintf "afl-fuzz -i %s -o %s %s @@" input_dir (temp_dir ^ "/output") execn in
-      ignore (Sys.command cmd);
+      (* let cmd = Printf.sprintf "timeout -s SIGINT %d `afl-fuzz -i %s -o %s %s @@`" timeout input_dir (temp_dir ^ "/output") execn in  *)
+      begin match Unix.fork() with
+      | 0 ->
+         let cmd = Printf.sprintf "afl-fuzz -i %s -o %s %s @@" input_dir (temp_dir ^ "/output") execn in
+         Printf.printf "Child is executing...\n%s\n" cmd; 
+         ignore (Sys.command cmd);
+      | pid ->
+         Printf.printf "Parent is sleeping for %d seconds...\n" timeout; 
+         Unix.sleep timeout;
+         ignore (Sys.command ("kill -2 $(pgrep afl-fuzz)"));
+      end;
       None                               
     end
     else begin 
