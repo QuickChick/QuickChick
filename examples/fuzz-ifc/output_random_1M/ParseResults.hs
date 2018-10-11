@@ -8,8 +8,10 @@ import Control.Monad
 
 import Text.ParserCombinators.Parsec
 
-import Debug.Trace
+import Data.Either
 
+import Debug.Trace
+  
 {-- File structure
 
  QuickChecking ...
@@ -24,12 +26,31 @@ import Debug.Trace
 
 -}
 
-data TestData = MkData { successes :: !Int
+data Mode = Naive | Medium | Smart
+  deriving (Eq, Ord, Show)
+
+smode "naive"  = Naive
+smode "medium" = Medium
+smode "smart"  = Smart
+
+
+data TestData = MkData { mode      :: !Mode
+                       , mutant    :: !Int
+                       , successes :: !Int
                        , discards  :: !Int
                        , failures  :: !Int
                        , time      :: !Double
                        , total     :: !Int
                        } deriving (Eq, Ord, Show)
+
+fileNameP :: GenParser Char st (Mode, Int)
+fileNameP = do
+  string "rand_SSNI_"
+  m <- smode <$> (string "naive" <|> string "medium" <|> string "smart")
+  char '_'
+  xs <- many1 digit
+  let x = read xs :: Int
+  return (m, x)
 
 numberP :: GenParser Char st (String, Int)
 numberP = do
@@ -57,6 +78,8 @@ stats fn (l : ls) acc =
     Right (s,x) -> stats fn ls (updateTriple acc s x)
     Left  _     -> acc
 
+right (Right x) = x
+
 parseOutput :: String -> String -> TestData
 parseOutput fn contents =
   -- Drop three first lines
@@ -64,9 +87,9 @@ parseOutput fn contents =
   -- Parse the next three lines for data (always at least 3)
       (s,d,f) = stats fn (take 3 rest) (0,0,0)
       (_ : timeLine : _) = reverse rest
-  in case parse timeP fn timeLine of
-       Right t -> MkData s d f t 1000000
-       Left  _ -> error "Parse failed"
+      (m,id) = right $ parse fileNameP fn fn
+      t = right $ parse timeP fn timeLine
+  in MkData m id s d f t 1000000
 
 main = do
   -- Get all files in the current dir
