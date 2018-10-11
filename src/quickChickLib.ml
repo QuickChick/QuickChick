@@ -1,4 +1,6 @@
-(* Helper functions for extraction *)
+(* Convert a list of characters (coq representation) to a string
+   (ocaml representation), in order to use the OCaml printing stdlib
+   functions. *)
 let string_of_coqstring (l : char list) : string =
   let s = Bytes.create (List.length l) in
   let rec copy i = function
@@ -6,8 +8,22 @@ let string_of_coqstring (l : char list) : string =
   | c :: l -> Bytes.set s i c; copy (i+1) l
   in Bytes.to_string (copy 0 l)
 
+(* Randomness for both random + fuzz testing:
+
+   NOTE: This *heavily* relies on the fact that we implement
+   splittable pseudorandomness through mutable seed at the OCaml
+   level.  If we ever fix that, this will need to be rethinked.  
+*)
+
+
+(* Some of the following functionality is inspired from crowbar. *)
+(* A source of randomness is either a random seed or a binary file. *)
 type random_src = Random of Random.State.t | Fd of Unix.file_descr
 
+(* A random seed is a source of randomness, a sequence of Bytes
+   and an index into that sequence. We will use the randomness
+   source to refill the bytes buffer whenever we need more bits,
+   if possible. *)
 type randomSeed =
   {
     chan : random_src;
@@ -16,6 +32,19 @@ type randomSeed =
     mutable len : int
   }
 
+
+(* HACK: For now, whether we are in random test mode or in 
+   fuzz test mode is identified by whether or not the executable
+   is called with an additional argument. For now, that is sufficient
+   but if we ever add additional arguments to our extracted random
+   tests, this will need to be rethinked. 
+
+   Random: Random.self_init
+   Fuzz  : Open the file and pass the file descriptor
+
+   NOTE: The file is never actually closed...
+   TODO: Think about buffer size. 
+ *)
 let newRandomSeed =
   if Array.length Sys.argv = 1 then
     { chan = Random (Random.State.make_self_init ());
@@ -30,6 +59,12 @@ let newRandomSeed =
                   len = 0 } in
     state
 
+(* mkRandomSeed is used by QuickChick to replay tests.
+   Only random testing mode can be used this way.
+
+   TODO: Figure out if there is anything sensible to do 
+   for fuzzing here.
+ *)    
 let mkRandomSeed =
   (fun x ->
     Random.init x;
@@ -38,21 +73,57 @@ let mkRandomSeed =
       offset = 0;
       len = 0 }
   )
-    
+
+let copySeed =
+  (fun r ->
+    match r.chan with
+    | Random r' ->
+       { chan = Random (Random.State.copy r')
+       ; buf  = Bytes.copy r.buf
+       ; offset = r.offset
+       ; len    = r.len
+       }
+    | Fd fd ->
+       (* Not sure what to do here... *)
+       r
+  )
+
+let registerSeed =
+  (fun r ->
+    match r.chan with
+    | Random r' ->
+       Printf.printf "Outputting seed\n";
+       0
+    | _ -> 0
+  ) 
+
+(* HACK: We ignore splittalbe randomness by allowing the seed to 
+   be mutable. 
+   PRO: we can actually fuzz the input randomness.
+   CONS: CoArbitrary doesn't work.
+ *)  
 let randomSplit = (fun x -> (x,x))
 
-let get_data chan buf off len =
-  match chan with
+exception InsufficientRandomness
+
+(* Fill the buffer from OFFset to LENgth using 
+   the src of randomness. *)        
+let fill_rnd_buffer src buf off len =
+  match src with
   | Random rand ->
      for i = off to off + len - 1 do
-       Bytes.set buf i (Char.chr (Random.State.bits rand land 0xff))
+       (* Set each byte of the array using Randomness.
+          This wastes a TON of randomness...
+        *)
+       let thirty_bits = Random.State.bits rand in
+       let random_byte = thirty_bits land 0xff in
+       Bytes.set buf i (Char.chr random_byte)
      done;
      len - off
   | Fd ch ->
+     (* Just read of the input binary *)
      Unix.read ch buf off len
 
-exception BadTest of string
-    
 let refill src =
   assert (src.offset <= src.len);
   let remaining = src.len - src.offset in
@@ -60,9 +131,9 @@ let refill src =
   Bytes.blit src.buf src.offset src.buf 0 remaining;
   src.len <- remaining;
   src.offset <- 0;
-  let read = get_data src.chan src.buf remaining (Bytes.length src.buf - remaining) in
+  let read = fill_rnd_buffer src.chan src.buf remaining (Bytes.length src.buf - remaining) in
   if read = 0 then
-    raise (BadTest "premature end of file")
+    raise InsufficientRandomness
   else
     src.len <- remaining + read
 

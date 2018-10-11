@@ -43,6 +43,11 @@ Definition exp_result_fuzz : exp_result :=
    ; exp_check   := (fun b => collect b b)
   |}.
 
+Definition registerSeedCallback {prop : Type} `{Checkable prop} : prop -> Checker :=
+  callback (PostTest NotCounterexample (fun _st r rs =>
+              let '(MkSmallResult _ _ _ _ ss _) := rs in
+              if ss = ["true"] ? then registerSeed r else 0)).
+
 Definition SSNI (t : table) (v : @Variation State) (res : exp_result) : Checker  :=
   let '(V st1 st2) := v in
   let '(St _ _ _ (_@l1)) := st1 in
@@ -211,7 +216,7 @@ Definition prop_SSNI_medium t r :=
   prop SSNI gen_variation_medium t r.
 
 Definition prop_SSNI_smart t r :=
-  prop SSNI (liftGen Some gen_variation_state) t r.
+  registerSeedCallback (prop SSNI (liftGen Some gen_variation_state) t r).
 
 Definition ieq (i1 i2 : Instruction) : {i1 = i2} + {i1 <> i2}.
 repeat decide equality.
@@ -265,10 +270,12 @@ Definition prop_EENI_smart t r : Checker :=
 Eval lazy -[labelCount helper] in
   nth (mutate_table default_table) 1.
 
-Extract Constant defNumTests => "100000".
+Extract Constant defNumTests => "10".
 
+QuickChick (testMutantX prop_SSNI_smart exp_result_random 0).
+FuzzChick (testMutantX prop_SSNI_smart exp_result_fuzz 0).
 
-QuickChick (testMutantX prop_MSNI_smart exp_result_random 0).
+(*
 QuickChick (testMutantX prop_MSNI_smart exp_result_random 1).
 QuickChick (testMutantX prop_MSNI_smart exp_result_random 2).
 QuickChick (testMutantX prop_MSNI_smart exp_result_random 3).
@@ -288,3 +295,4 @@ QuickChick (testMutantX prop_MSNI_smart exp_result_random 16).
 QuickChick (testMutantX prop_MSNI_smart exp_result_random 17).
 QuickChick (testMutantX prop_MSNI_smart exp_result_random 18).
 QuickChick (testMutantX prop_MSNI_smart exp_result_random 19).
+*)

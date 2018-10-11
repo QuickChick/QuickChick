@@ -5,6 +5,7 @@ Require Import Coq.Strings.String.
 
 Require Import RoseTrees.
 Require Import Show.
+Require Import RandomQC.
 Require Import State.
 Require Import GenLow GenHigh.
 Require Import Classes.
@@ -23,9 +24,9 @@ Inductive SmallResult :=
 
 Inductive Callback : Type :=
 | PostTest :
-    CallbackKind -> (State -> SmallResult -> nat) -> Callback
+    CallbackKind -> (State -> RandomSeed -> SmallResult -> nat) -> Callback
 | PostFinalFailure :
-    CallbackKind -> (State -> SmallResult -> nat) -> Callback.
+    CallbackKind -> (State -> RandomSeed -> SmallResult -> nat) -> Callback.
 
 Record Result :=
   MkResult {
@@ -185,15 +186,15 @@ Definition callback {prop : Type} `{Checkable prop}
 Definition printTestCase {prop : Type} `{Checkable prop}
            (s : string) (p : prop) : Checker :=
   (* The following newline was causing an unwanted extra new line *)
-  callback (PostFinalFailure Counterexample (fun _st _res => trace (s (* ++ nl*)) 0)) p.
+  callback (PostFinalFailure Counterexample (fun _st _r _res => trace (s (* ++ nl*)) 0)) p.
 
 Definition whenFail {prop : Type} `{Checkable prop}
            (str : string) : prop -> Checker :=
-  callback (PostFinalFailure Counterexample (fun _st _sr => trace (str ++ nl) 0)).
+  callback (PostFinalFailure Counterexample (fun _st _r _sr => trace (str ++ nl) 0)).
 
 Definition whenFail' {prop : Type} `{Checkable prop}
            (str : unit -> string) : prop -> Checker :=
-  callback (PostFinalFailure Counterexample (fun _st _sr => trace (str tt ++ nl) 0)).
+  callback (PostFinalFailure Counterexample (fun _st _r _sr => trace (str tt ++ nl) 0)).
 
 Notation "x 'WHENFAIL' y" := (whenFail' (fun _ => x) y) (at level 55).
 
@@ -358,7 +359,7 @@ Definition disjAux (p q : Rose Result) : Rose Result :=
                                (stamp result1 ++ stamp result2)
                                (callbacks result1 ++ 
                                     cons (PostFinalFailure Counterexample
-                                                      (fun _ _ => trace newline 0)) nil ++
+                                                      (fun _ _ _ => trace newline 0)) nil ++
                                     callbacks result2 )
                                (result_tag result2))
         | None => returnRose result2 (* Leo: What to do here? *)

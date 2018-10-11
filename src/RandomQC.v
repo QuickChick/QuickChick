@@ -14,6 +14,9 @@ Axiom randomNext     : RandomSeed -> Z * RandomSeed.
 Axiom randomGenRange : RandomSeed -> Z * Z.
 Axiom mkRandomSeed   : Z          -> RandomSeed.
 Axiom newRandomSeed  : RandomSeed.
+(* HACKS: for registering a seed *)
+Axiom copySeed       : RandomSeed -> RandomSeed.
+Axiom registerSeed   : RandomSeed -> nat.
 
 (* begin randomSplitAssumption *)
 Axiom randomSplit : RandomSeed -> RandomSeed * RandomSeed.

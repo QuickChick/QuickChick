@@ -147,41 +147,41 @@ Definition giveUp (st : State) (_ : nat -> RandomSeed -> QProp) : Result :=
          ("*** Gave up! Passed only " ++ (show (numSuccessTests st)) ++ " tests"
           ++  newline ++ "Discarded: " ++ (show (numDiscardedTests st))).
 
-Definition callbackPostTest (st : State) (res : Checker.Result) : nat :=
+Definition callbackPostTest (rs : RandomSeed) (st : State) (res : Checker.Result) : nat :=
   match res with
   | MkResult o e r i s c t =>
     fold_left (fun acc callback =>
                  match callback with
                  | PostTest _ call =>
-                   (call st (MkSmallResult o e r i s t)) + acc
+                   (call st rs (MkSmallResult o e r i s t)) + acc
                  | _ => acc
                  end) c 0
   end.
   
 
-Definition callbackPostFinalFailure (st : State) (res : Checker.Result)
+Definition callbackPostFinalFailure (rs : RandomSeed) (st : State) (res : Checker.Result)
 : nat :=
 match res with
   | MkResult o e r i s c t =>
   fold_left (fun acc callback =>
                match callback with
                  | PostFinalFailure _ call =>
-                   (call st (MkSmallResult o e r i s t)) + acc
+                   (call st rs (MkSmallResult o e r i s t)) + acc
                  | _ => acc
                end) c 0
 end.
 
-Fixpoint localMin (st : State) (r : Rose Checker.Result)
+Fixpoint localMin (rs : RandomSeed) (st : State) (r : Rose Checker.Result)
          {struct r} : (nat * Checker.Result) :=
   match r with
   | MkRose res ts =>
     let fix localMin' st ts {struct ts} :=
         match ts return (nat * Checker.Result) with
         | nil =>
-          let zero := callbackPostFinalFailure st res in
+          let zero := callbackPostFinalFailure rs st res in
           (numSuccessShrinks st + zero, res)
         | cons ((MkRose res' _) as r') ts' =>
-          let zero := callbackPostTest st res in 
+          let zero := callbackPostTest rs st res in 
           match ok res' with
             | Some x =>
               let consistent_tags := 
@@ -191,7 +191,7 @@ Fixpoint localMin (st : State) (r : Rose Checker.Result)
                 | _, _ => false
                 end in
               if andb (negb x) consistent_tags then
-                localMin (updSuccessShrinks st (fun x => x + 1 + zero))
+                localMin rs (updSuccessShrinks st (fun x => x + 1 + zero))
                          r'
               else
                 localMin' (updTryShrinks st (fun x => x + 1)) ts'
@@ -215,10 +215,11 @@ Fixpoint runATest (st : State) (f : nat -> RandomSeed -> QProp) (maxSteps : nat)
     in
     match st with
     | MkState mst mdt ms cs nst ndt ls e r nss nts =>
+      let rnd1_copy := copySeed rnd1 in
       match f size rnd1 with
       | MkProp (MkRose res ts) =>
         (* TODO: CallbackPostTest *)
-        let res_cb := callbackPostTest st res in
+        let res_cb := callbackPostTest rnd1_copy st res in
         match res with
         | MkResult (Some x) e reas _ s _ t =>
           if x then (* Success *)
@@ -251,7 +252,7 @@ Fixpoint runATest (st : State) (f : nat -> RandomSeed -> QProp) (maxSteps : nat)
                 end in 
             let pre : string := (if expect res then "*** Failed "
                                  else "+++ Failed (as expected) ")%string in
-            let (numShrinks, res') := localMin st (MkRose res ts) in
+            let (numShrinks, res') := localMin rnd1_copy st (MkRose res ts) in
             let suf := ("after " ++ (show (S nst)) ++ " tests and "
                                  ++ (show numShrinks) ++ " shrinks. ("
                                  ++ (show ndt) ++ " discards)")%string in

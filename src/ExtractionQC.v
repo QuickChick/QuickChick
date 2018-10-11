@@ -53,6 +53,8 @@ Extract Constant randomRBool   => "QuickChickLib.randomRBool".
 Extract Constant randomRInt    => "QuickChickLib.randomRInt". 
 Extract Constant randomRN      => "QuickChickLib.randomRN".
 Extract Constant newRandomSeed => "QuickChickLib.newRandomSeed".
+Extract Constant copySeed      => "QuickChickLib.copySeed".
+Extract Constant registerSeed  => "QuickChickLib.registerSeed".
 
 Extract Inductive Lazy => "Lazy.t" [lazy].
 Extract Constant force => "Lazy.force".
