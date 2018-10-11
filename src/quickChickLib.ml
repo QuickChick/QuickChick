@@ -100,7 +100,6 @@ let registerSeed =
   (fun r_orig r_cur ->
     match r_orig.chan with
     | Random rnd ->
-       Printf.printf "Debugging: Cur Total: %d. Old Total: %d\n" r_cur.total r_orig.total;
        
        (* Create the seed directory if it doesn't exist *)
        Sys.command "mkdir -p _seeds";
@@ -112,6 +111,8 @@ let registerSeed =
        let remaining = r_orig.len - r_orig.offset in
        let total = r_cur.total - r_orig.total + remaining + 1 in
 
+       (*       Printf.printf "Debugging:\nCur:\nTotal: %d.\nOld:\nTotal: %d\nLen: %d\nOffset: %d\n" r_cur.total r_orig.total r_orig.len r_orig.offset; *)
+       
        (* Create new buffer big enough *)
        let bits = Bytes.make total '0' in
 
