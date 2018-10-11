@@ -44,9 +44,9 @@ Definition exp_result_fuzz : exp_result :=
   |}.
 
 Definition registerSeedCallback {prop : Type} `{Checkable prop} : prop -> Checker :=
-  callback (PostTest NotCounterexample (fun _st r rs =>
+  callback (PostTest NotCounterexample (fun st r rs =>
               let '(MkSmallResult _ _ _ _ ss _) := rs in
-              if ss = ["true"] ? then registerSeed r else 0)).
+              if ss = ["true"] ? then registerSeed r (randomSeed st) else 0)).
 
 Definition SSNI (t : table) (v : @Variation State) (res : exp_result) : Checker  :=
   let '(V st1 st2) := v in
@@ -273,7 +273,7 @@ Eval lazy -[labelCount helper] in
 Extract Constant defNumTests => "10".
 
 QuickChick (testMutantX prop_SSNI_smart exp_result_random 0).
-FuzzChick (testMutantX prop_SSNI_smart exp_result_fuzz 0).
+(* FuzzChick (testMutantX prop_SSNI_smart exp_result_fuzz 0). *)
 
 (*
 QuickChick (testMutantX prop_MSNI_smart exp_result_random 1).

@@ -29,7 +29,8 @@ type randomSeed =
     chan : random_src;
     buf : Bytes.t;
     mutable offset : int;
-    mutable len : int
+    mutable len : int;
+    mutable total : int
   }
 
 
@@ -50,13 +51,17 @@ let newRandomSeed =
     { chan = Random (Random.State.make_self_init ());
       buf = Bytes.make 256 '0';
       offset = 0;
-      len = 0 }
+      len = 0;
+      total = 0
+    }
   else
     let fd = Unix.openfile Sys.argv.(1) [Unix.O_RDONLY] 0o000 in
     let state = { chan = Fd fd;
                   buf = Bytes.make 256 '0';
                   offset = 0;
-                  len = 0 } in
+                  len = 0;
+                  total = 0
+                } in
     state
 
 (* mkRandomSeed is used by QuickChick to replay tests.
@@ -71,7 +76,9 @@ let mkRandomSeed =
     { chan = Random (Random.get_state ());
       buf = Bytes.make 256 '0';
       offset = 0;
-      len = 0 }
+      len = 0;
+      total = 0
+    }
   )
 
 let copySeed =
@@ -82,6 +89,7 @@ let copySeed =
        ; buf  = Bytes.copy r.buf
        ; offset = r.offset
        ; len    = r.len
+       ; total  = r.total
        }
     | Fd fd ->
        (* Not sure what to do here... *)
@@ -89,10 +97,37 @@ let copySeed =
   )
 
 let registerSeed =
-  (fun r ->
-    match r.chan with
-    | Random r' ->
-       Printf.printf "Outputting seed\n";
+  (fun r_orig r_cur ->
+    match r_orig.chan with
+    | Random rnd ->
+       Printf.printf "Debugging: Cur Total: %d. Old Total: %d\n" r_cur.total r_orig.total;
+       
+       (* Create the seed directory if it doesn't exist *)
+       Sys.command "mkdir -p _seeds";
+       (* Open a new file to write *)
+       let f = Filename.temp_file ~temp_dir:"_seeds" "seed" ".qc" in
+       let fd = Unix.openfile f [Unix.O_WRONLY] 0o600 in
+       
+       (* Calculate how many bytes were extracted from the seed *)
+       let remaining = r_orig.len - r_orig.offset in
+       let total = r_cur.total - r_orig.total + remaining + 1 in
+
+       (* Create new buffer big enough *)
+       let bits = Bytes.make total '0' in
+
+       (* Copy whatever was left from the original buffer to the beginning of the result *)
+       Bytes.blit r_orig.buf r_orig.offset bits 0 remaining;
+
+       (* Simulate the bytes taken from the random seed *)
+       for i = remaining to total - 1 do
+         let thirty_bits = Random.State.bits rnd in
+         let random_byte = thirty_bits land 0xff in
+         Bytes.set bits i (Char.chr random_byte)
+       done;
+
+       (* Write the bits *)
+       Unix.write fd bits 0 total;
+       
        0
     | _ -> 0
   ) 
@@ -108,7 +143,7 @@ exception InsufficientRandomness
 
 (* Fill the buffer from OFFset to LENgth using 
    the src of randomness. *)        
-let fill_rnd_buffer src buf off len =
+let fill_rnd_buffer src buf off len r =
   match src with
   | Random rand ->
      for i = off to off + len - 1 do
@@ -117,6 +152,7 @@ let fill_rnd_buffer src buf off len =
         *)
        let thirty_bits = Random.State.bits rand in
        let random_byte = thirty_bits land 0xff in
+       r.total <- r.total + 1;
        Bytes.set buf i (Char.chr random_byte)
      done;
      len - off
@@ -131,7 +167,7 @@ let refill src =
   Bytes.blit src.buf src.offset src.buf 0 remaining;
   src.len <- remaining;
   src.offset <- 0;
-  let read = fill_rnd_buffer src.chan src.buf remaining (Bytes.length src.buf - remaining) in
+  let read = fill_rnd_buffer src.chan src.buf remaining (Bytes.length src.buf - remaining) src in
   if read = 0 then
     raise InsufficientRandomness
   else

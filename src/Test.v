@@ -147,7 +147,7 @@ Definition giveUp (st : State) (_ : nat -> RandomSeed -> QProp) : Result :=
          ("*** Gave up! Passed only " ++ (show (numSuccessTests st)) ++ " tests"
           ++  newline ++ "Discarded: " ++ (show (numDiscardedTests st))).
 
-Definition callbackPostTest (rs : RandomSeed) (st : State) (res : Checker.Result) : nat :=
+Definition callbackPostTest (rs: RandomSeed) (st : State) (res : Checker.Result) : nat :=
   match res with
   | MkResult o e r i s c t =>
     fold_left (fun acc callback =>
@@ -159,7 +159,7 @@ Definition callbackPostTest (rs : RandomSeed) (st : State) (res : Checker.Result
   end.
   
 
-Definition callbackPostFinalFailure (rs : RandomSeed) (st : State) (res : Checker.Result)
+Definition callbackPostFinalFailure (rs: RandomSeed) (st : State) (res : Checker.Result)
 : nat :=
 match res with
   | MkResult o e r i s c t =>
