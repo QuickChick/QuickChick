@@ -210,7 +210,7 @@ Definition testMutantX prop r n :=
   end.
 
 Definition prop_SSNI_naive t r :=
-  prop SSNI gen_variation_naive t r.
+  registerSeedCallback (prop SSNI gen_variation_naive t r).
 
 Definition prop_SSNI_medium t r :=
   prop SSNI gen_variation_medium t r.
@@ -271,5 +271,23 @@ Definition prop_EENI_smart t r : Checker :=
 Eval lazy -[labelCount helper] in
   nth (mutate_table default_table) 20. *)
 
-Extract Constant defNumTests => "1000000".
+Derive GenSized for Instruction.
+Derive GenSized for Label.
+Derive GenSized for Atom.
+Derive GenSized for Stack.
+Derive GenSized for State.
 
+Definition gen_variation_arbitrary : G (option Variation) :=
+  bindGen (@arbitrary State _) (fun st1 =>
+  bindGen (@arbitrary State _) (fun st2 =>
+  if indist st1 st2 then
+    returnGen (Some (V st1 st2))
+  else
+    returnGen None)).
+
+Extract Constant defNumTests => "10000000".
+
+Definition prop_SSNI_arbitrary t r :=
+  registerSeedCallback (prop SSNI gen_variation_arbitrary t r).
+
+QuickChick (prop_SSNI_arbitrary default_table exp_result_random).
