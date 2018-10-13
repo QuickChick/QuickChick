@@ -1,0 +1,9 @@
+QuickChecking (testMutantX prop_SSNI_smart exp_result_random 5)
+Extracted ML file: /tmp/QuickChick/112835/QuickChick62e2de.ml
+Compile command: ocamlopt unix.cmxa /home/lemonidas/.opam/4.04.0+afl/lib/afl-persistent/afl-persistent.cmxa -unsafe-string -rectypes -w a -I /tmp/QuickChick/112835 -I /home/lemonidas/.opam/4.04.0+afl/lib/afl-persistent/ -I /home/lemonidas/.opam/4.04.0+afl/lib/coq/user-contrib/QuickChick /home/lemonidas/.opam/4.04.0+afl/lib/coq/user-contrib/QuickChick/quickChickLib.cmx /tmp/QuickChick/112835/QuickChick62e2de.ml -o /tmp/QuickChick/112835/QuickChick62e2de
+7548975 : true
+2184872 : "()"
+266153 : false
++++ Passed 10000000 tests (0 discards)
+130.87user 0.00system 2:10.87elapsed 99%CPU (0avgtext+0avgdata 5960maxresident)k
+0inputs+0outputs (0major+928minor)pagefaults 0swaps
