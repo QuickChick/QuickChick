@@ -285,9 +285,19 @@ Definition gen_variation_arbitrary : G (option Variation) :=
   else
     returnGen None)).
 
-Extract Constant defNumTests => "10000000".
+Extract Constant defNumTests => "1000000".
 
 Definition prop_SSNI_arbitrary t r :=
-  registerSeedCallback (prop SSNI gen_variation_arbitrary t r).
+   (prop SSNI gen_variation_arbitrary t r).
 
-QuickChick (prop_SSNI_arbitrary default_table exp_result_random).
+Definition gen_variation_arb_medium : G (option Variation) :=
+  bindGen (@arbitrary State _ ) (fun st1 =>
+  bindGen (Generation.vary st1) (fun st2 =>
+  if indist st1 st2 then
+    returnGen (Some (V st1 st2))
+  else
+    returnGen None)).
+
+Definition prop_SSNI_arbmedium t r :=
+  (prop SSNI gen_variation_arb_medium t r).
+
