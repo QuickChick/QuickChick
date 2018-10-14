@@ -1,7 +1,6 @@
 open Pp
 open Loc
 open Names
-open Extract_env
 open Tacmach
 open Entries
 open Declarations
@@ -19,6 +18,8 @@ open GenLib
 open SemLib
 open Error
 open SizeUtils
+
+open Extraction_plugin.Extract_env
 
 let genCorr arg iargs inst_name s_inst_name c_inst_name mon_inst_name =
   let bases = List.filter (fun (_, ty) -> isBaseBranch arg._ty_ctr ty) arg._ctrs in
