@@ -1,7 +1,6 @@
 open Pp
 open Loc
 open Names
-open Extract_env
 open Tacmach
 open Entries
 open Declarations
@@ -18,6 +17,8 @@ open CoqLib
 open GenLib
 open Error
 open Unify
+
+open Extraction_plugin.Extract_env
 
 type btyp = ((coq_expr -> coq_expr -> int -> (coq_expr * coq_expr) list -> (coq_expr -> coq_expr) -> coq_expr) *
              ((coq_expr -> (coq_expr * coq_expr) list -> coq_expr) -> coq_expr -> (coq_expr * coq_expr) list -> coq_expr))
