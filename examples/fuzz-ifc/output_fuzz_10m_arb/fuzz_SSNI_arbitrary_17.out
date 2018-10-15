@@ -1,0 +1,178 @@
+QuickChecking (testMutantX prop_SSNI_arbitrary exp_result_fuzz 17)
+Extracted ML file: /tmp/QuickChick/180612/QuickChickcc2b09.ml
+Compile command: ocamlopt unix.cmxa /home/lemonidas/.opam/4.04.0+afl/lib/afl-persistent/afl-persistent.cmxa -unsafe-string -rectypes -w a -I /tmp/QuickChick/180612 -I /home/lemonidas/.opam/4.04.0+afl/lib/afl-persistent/ -I /home/lemonidas/.opam/4.04.0+afl/lib/coq/user-contrib/QuickChick /home/lemonidas/.opam/4.04.0+afl/lib/coq/user-contrib/QuickChick/quickChickLib.cmx /tmp/QuickChick/180612/QuickChickcc2b09.ml -o /tmp/QuickChick/180612/QuickChickcc2b09
+/tmp/QuickChick/180612/input
+[0;36mafl-fuzz [1;97m2.52b[0m by <lcamtuf@google.com>
+[1;92m[+] [0mLooks like we're not running on a tty, so I'll be a bit less verbose.[0m
+[1;92m[+] [0mYou have 8 CPU cores and 1 runnable tasks (utilization: 12%).[0m
+[1;92m[+] [0mTry parallel jobs - see docs/parallel_fuzzing.txt.[0m
+[1;94m[*] [0mChecking CPU core loadout...[0m
+[1;92m[+] [0mFound a free CPU core, binding to #0.[0m
+[1;94m[*] [0mChecking core_pattern...[0m
+[1;94m[*] [0mChecking CPU scaling governor...[0m
+[1;94m[*] [0mSetting up output directories...[0m
+[1;94m[*] [0mScanning '/tmp/QuickChick/180612/input'...[0m
+[1;92m[+] [0mNo auto-generated dictionary tokens to reuse.[0m
+[1;94m[*] [0mCreating hard links for all input files...[0m
+[1;94m[*] [0mValidating target binary...[0m
+[1;94m[*] [0mAttempting dry run with 'id:000000,orig:seed1'...[0m
+[1;94m[*] [0mSpinning up the fork server...[0m
+[1;92m[+] [0mAll right - fork server is up.[0m
+[1;90m    len = 11, map size = 377, exec speed = 302 us
+[0m[1;94m[*] [0mAttempting dry run with 'id:000001,orig:seed2'...[0m
+[1;90m    len = 11, map size = 389, exec speed = 279 us
+[0m[1;94m[*] [0mAttempting dry run with 'id:000002,orig:seed3'...[0m
+[1;90m    len = 11, map size = 369, exec speed = 279 us
+[0m[1;92m[+] [0mAll test cases processed.[0m
+
+[1;92m[+] [0mHere are some useful stats:
+
+[1;90m    Test case count : [0m2 favored, 0 variable, 3 total
+[1;90m       Bitmap range : [0m369 to 389 bits (average: 378.33 bits)
+[1;90m        Exec timing : [0m279 to 302 us (average: 287 us)
+[0m
+[1;94m[*] [0mNo -t option specified, so I'll use exec timeout of 20 ms.[0m
+[1;92m[+] [0mAll set and ready to roll![0m
+[1;94m[*] [0mEntering queue cycle 1.[0m
+[1;94m[*] [0mFuzzing test case #1 (3 total, 0 uniq crashes found)...[0m
+[1;94m[*] [0mFuzzing test case #39 (125 total, 0 uniq crashes found)...[0m
+[1;94m[*] [0mFuzzing test case #53 (127 total, 0 uniq crashes found)...[0m
+[1;94m[*] [0mFuzzing test case #54 (127 total, 0 uniq crashes found)...[0m
+[1;94m[*] [0mFuzzing test case #63 (140 total, 0 uniq crashes found)...[0m
+[1;94m[*] [0mFuzzing test case #68 (140 total, 0 uniq crashes found)...[0m
+[1;94m[*] [0mFuzzing test case #78 (142 total, 0 uniq crashes found)...[0m
+[1;94m[*] [0mFuzzing test case #88 (144 total, 0 uniq crashes found)...[0m
+[1;94m[*] [0mFuzzing test case #89 (148 total, 0 uniq crashes found)...[0m
+[1;94m[*] [0mFuzzing test case #90 (168 total, 0 uniq crashes found)...[0m
+[1;94m[*] [0mFuzzing test case #93 (168 total, 0 uniq crashes found)...[0m
+[1;94m[*] [0mFuzzing test case #97 (168 total, 0 uniq crashes found)...[0m
+[1;94m[*] [0mFuzzing test case #99 (168 total, 0 uniq crashes found)...[0m
+[1;94m[*] [0mFuzzing test case #101 (168 total, 0 uniq crashes found)...[0m
+[1;94m[*] [0mFuzzing test case #103 (168 total, 0 uniq crashes found)...[0m
+[1;94m[*] [0mFuzzing test case #104 (168 total, 0 uniq crashes found)...[0m
+[1;94m[*] [0mFuzzing test case #107 (168 total, 0 uniq crashes found)...[0m
+[1;94m[*] [0mFuzzing test case #109 (168 total, 0 uniq crashes found)...[0m
+[1;94m[*] [0mFuzzing test case #110 (210 total, 0 uniq crashes found)...[0m
+[1;94m[*] [0mFuzzing test case #111 (229 total, 0 uniq crashes found)...[0m
+[1;94m[*] [0mFuzzing test case #113 (229 total, 0 uniq crashes found)...[0m
+[1;94m[*] [0mFuzzing test case #114 (229 total, 0 uniq crashes found)...[0m
+[1;94m[*] [0mFuzzing test case #116 (230 total, 0 uniq crashes found)...[0m
+[1;94m[*] [0mFuzzing test case #117 (234 total, 0 uniq crashes found)...[0m
+[1;94m[*] [0mFuzzing test case #118 (236 total, 0 uniq crashes found)...[0m
+[1;94m[*] [0mFuzzing test case #121 (236 total, 0 uniq crashes found)...[0m
+[1;94m[*] [0mFuzzing test case #122 (236 total, 0 uniq crashes found)...[0m
+[1;94m[*] [0mFuzzing test case #125 (261 total, 0 uniq crashes found)...[0m
+[1;94m[*] [0mFuzzing test case #126 (262 total, 0 uniq crashes found)...[0m
+[1;94m[*] [0mFuzzing test case #131 (265 total, 0 uniq crashes found)...[0m
+[1;94m[*] [0mFuzzing test case #136 (265 total, 0 uniq crashes found)...[0m
+[1;94m[*] [0mFuzzing test case #139 (266 total, 0 uniq crashes found)...[0m
+[1;94m[*] [0mFuzzing test case #140 (266 total, 0 uniq crashes found)...[0m
+[1;94m[*] [0mFuzzing test case #141 (266 total, 0 uniq crashes found)...[0m
+[1;94m[*] [0mFuzzing test case #142 (269 total, 0 uniq crashes found)...[0m
+[1;94m[*] [0mFuzzing test case #143 (274 total, 0 uniq crashes found)...[0m
+[1;94m[*] [0mFuzzing test case #144 (274 total, 0 uniq crashes found)...[0m
+[1;94m[*] [0mFuzzing test case #145 (274 total, 0 uniq crashes found)...[0m
+[1;94m[*] [0mFuzzing test case #146 (274 total, 0 uniq crashes found)...[0m
+[1;94m[*] [0mFuzzing test case #147 (274 total, 0 uniq crashes found)...[0m
+[1;94m[*] [0mFuzzing test case #149 (274 total, 0 uniq crashes found)...[0m
+[1;94m[*] [0mFuzzing test case #151 (275 total, 0 uniq crashes found)...[0m
+[1;94m[*] [0mFuzzing test case #153 (275 total, 0 uniq crashes found)...[0m
+[1;94m[*] [0mFuzzing test case #154 (275 total, 0 uniq crashes found)...[0m
+[1;94m[*] [0mFuzzing test case #155 (275 total, 0 uniq crashes found)...[0m
+[1;94m[*] [0mFuzzing test case #161 (279 total, 0 uniq crashes found)...[0m
+[1;94m[*] [0mFuzzing test case #162 (279 total, 0 uniq crashes found)...[0m
+[1;94m[*] [0mFuzzing test case #163 (288 total, 0 uniq crashes found)...[0m
+[1;94m[*] [0mFuzzing test case #164 (288 total, 0 uniq crashes found)...[0m
+[1;94m[*] [0mFuzzing test case #166 (288 total, 0 uniq crashes found)...[0m
+[1;94m[*] [0mFuzzing test case #167 (288 total, 0 uniq crashes found)...[0m
+[1;94m[*] [0mFuzzing test case #168 (292 total, 0 uniq crashes found)...[0m
+[1;94m[*] [0mFuzzing test case #172 (292 total, 0 uniq crashes found)...[0m
+[1;94m[*] [0mFuzzing test case #175 (318 total, 0 uniq crashes found)...[0m
+[1;94m[*] [0mFuzzing test case #188 (339 total, 0 uniq crashes found)...[0m
+[1;94m[*] [0mFuzzing test case #202 (341 total, 0 uniq crashes found)...[0m
+[1;94m[*] [0mFuzzing test case #203 (344 total, 0 uniq crashes found)...[0m
+[1;94m[*] [0mFuzzing test case #208 (344 total, 0 uniq crashes found)...[0m
+[1;94m[*] [0mFuzzing test case #210 (346 total, 0 uniq crashes found)...[0m
+[1;94m[*] [0mFuzzing test case #211 (347 total, 0 uniq crashes found)...[0m
+[1;94m[*] [0mFuzzing test case #212 (347 total, 0 uniq crashes found)...[0m
+[1;94m[*] [0mFuzzing test case #215 (347 total, 0 uniq crashes found)...[0m
+[1;94m[*] [0mFuzzing test case #216 (348 total, 0 uniq crashes found)...[0m
+[1;94m[*] [0mFuzzing test case #217 (348 total, 0 uniq crashes found)...[0m
+[1;94m[*] [0mFuzzing test case #218 (348 total, 0 uniq crashes found)...[0m
+[1;94m[*] [0mFuzzing test case #219 (348 total, 0 uniq crashes found)...[0m
+[1;94m[*] [0mFuzzing test case #220 (348 total, 0 uniq crashes found)...[0m
+[1;94m[*] [0mFuzzing test case #222 (350 total, 0 uniq crashes found)...[0m
+[1;94m[*] [0mFuzzing test case #223 (350 total, 0 uniq crashes found)...[0m
+[1;94m[*] [0mFuzzing test case #224 (350 total, 0 uniq crashes found)...[0m
+[1;94m[*] [0mFuzzing test case #225 (350 total, 0 uniq crashes found)...[0m
+[1;94m[*] [0mFuzzing test case #226 (350 total, 0 uniq crashes found)...[0m
+[1;94m[*] [0mFuzzing test case #227 (350 total, 0 uniq crashes found)...[0m
+[1;94m[*] [0mFuzzing test case #229 (350 total, 0 uniq crashes found)...[0m
+[1;94m[*] [0mFuzzing test case #230 (351 total, 0 uniq crashes found)...[0m
+[1;94m[*] [0mFuzzing test case #232 (353 total, 0 uniq crashes found)...[0m
+[1;94m[*] [0mFuzzing test case #234 (357 total, 0 uniq crashes found)...[0m
+[1;94m[*] [0mFuzzing test case #235 (357 total, 0 uniq crashes found)...[0m
+[1;94m[*] [0mFuzzing test case #249 (357 total, 0 uniq crashes found)...[0m
+[1;94m[*] [0mFuzzing test case #254 (357 total, 0 uniq crashes found)...[0m
+[1;94m[*] [0mFuzzing test case #255 (358 total, 0 uniq crashes found)...[0m
+[1;94m[*] [0mFuzzing test case #257 (358 total, 0 uniq crashes found)...[0m
+[1;94m[*] [0mFuzzing test case #259 (360 total, 0 uniq crashes found)...[0m
+[1;94m[*] [0mFuzzing test case #261 (361 total, 0 uniq crashes found)...[0m
+[1;94m[*] [0mFuzzing test case #263 (362 total, 0 uniq crashes found)...[0m
+[1;94m[*] [0mFuzzing test case #264 (362 total, 0 uniq crashes found)...[0m
+[1;94m[*] [0mFuzzing test case #266 (362 total, 0 uniq crashes found)...[0m
+[1;94m[*] [0mFuzzing test case #267 (364 total, 0 uniq crashes found)...[0m
+[1;94m[*] [0mFuzzing test case #268 (372 total, 0 uniq crashes found)...[0m
+[1;94m[*] [0mFuzzing test case #270 (372 total, 0 uniq crashes found)...[0m
+[1;94m[*] [0mFuzzing test case #271 (373 total, 0 uniq crashes found)...[0m
+[1;94m[*] [0mFuzzing test case #272 (373 total, 0 uniq crashes found)...[0m
+[1;94m[*] [0mFuzzing test case #273 (373 total, 0 uniq crashes found)...[0m
+[1;94m[*] [0mFuzzing test case #275 (373 total, 0 uniq crashes found)...[0m
+[1;94m[*] [0mFuzzing test case #276 (373 total, 0 uniq crashes found)...[0m
+[1;94m[*] [0mFuzzing test case #278 (373 total, 0 uniq crashes found)...[0m
+[1;94m[*] [0mFuzzing test case #279 (373 total, 0 uniq crashes found)...[0m
+[1;94m[*] [0mFuzzing test case #280 (373 total, 0 uniq crashes found)...[0m
+[1;94m[*] [0mFuzzing test case #281 (373 total, 0 uniq crashes found)...[0m
+[1;94m[*] [0mFuzzing test case #282 (373 total, 0 uniq crashes found)...[0m
+[1;94m[*] [0mFuzzing test case #283 (373 total, 0 uniq crashes found)...[0m
+[1;94m[*] [0mFuzzing test case #284 (373 total, 0 uniq crashes found)...[0m
+[1;94m[*] [0mFuzzing test case #285 (373 total, 0 uniq crashes found)...[0m
+[1;94m[*] [0mFuzzing test case #286 (374 total, 0 uniq crashes found)...[0m
+[1;94m[*] [0mFuzzing test case #287 (375 total, 0 uniq crashes found)...[0m
+[1;94m[*] [0mFuzzing test case #288 (375 total, 0 uniq crashes found)...[0m
+[1;94m[*] [0mFuzzing test case #289 (375 total, 0 uniq crashes found)...[0m
+[1;94m[*] [0mFuzzing test case #290 (376 total, 0 uniq crashes found)...[0m
+[1;94m[*] [0mFuzzing test case #291 (377 total, 0 uniq crashes found)...[0m
+[1;94m[*] [0mFuzzing test case #295 (378 total, 0 uniq crashes found)...[0m
+[1;94m[*] [0mFuzzing test case #298 (379 total, 0 uniq crashes found)...[0m
+[1;94m[*] [0mFuzzing test case #302 (379 total, 0 uniq crashes found)...[0m
+[1;94m[*] [0mFuzzing test case #305 (380 total, 0 uniq crashes found)...[0m
+[1;94m[*] [0mFuzzing test case #309 (383 total, 0 uniq crashes found)...[0m
+[1;94m[*] [0mFuzzing test case #313 (383 total, 0 uniq crashes found)...[0m
+[1;94m[*] [0mFuzzing test case #318 (384 total, 0 uniq crashes found)...[0m
+[1;94m[*] [0mFuzzing test case #323 (385 total, 0 uniq crashes found)...[0m
+[1;94m[*] [0mFuzzing test case #329 (385 total, 0 uniq crashes found)...[0m
+[1;94m[*] [0mFuzzing test case #331 (385 total, 0 uniq crashes found)...[0m
+[1;94m[*] [0mFuzzing test case #333 (395 total, 0 uniq crashes found)...[0m
+[1;94m[*] [0mFuzzing test case #334 (395 total, 0 uniq crashes found)...[0m
+[1;94m[*] [0mFuzzing test case #339 (403 total, 0 uniq crashes found)...[0m
+[1;94m[*] [0mFuzzing test case #340 (403 total, 0 uniq crashes found)...[0m
+[1;94m[*] [0mFuzzing test case #341 (403 total, 0 uniq crashes found)...[0m
+[1;94m[*] [0mFuzzing test case #342 (403 total, 0 uniq crashes found)...[0m
+[1;94m[*] [0mFuzzing test case #343 (403 total, 0 uniq crashes found)...[0m
+[1;94m[*] [0mFuzzing test case #345 (403 total, 0 uniq crashes found)...[0m
+[1;94m[*] [0mFuzzing test case #347 (404 total, 0 uniq crashes found)...[0m
+[1;94m[*] [0mFuzzing test case #350 (404 total, 0 uniq crashes found)...[0m
+[1;94m[*] [0mFuzzing test case #351 (405 total, 0 uniq crashes found)...[0m
+[1;94m[*] [0mFuzzing test case #352 (405 total, 0 uniq crashes found)...[0m
+[1;94m[*] [0mFuzzing test case #353 (405 total, 0 uniq crashes found)...[0m
+[1;94m[*] [0mFuzzing test case #355 (414 total, 0 uniq crashes found)...[0m
+[?25h[1;91m
+
++++ Testing aborted by user +++
+[0m[1;92m[+] [0mWe're done here. Have a nice day!
+[0m
+Child is executing...
+afl-fuzz -i /tmp/QuickChick/180612/input -o /tmp/QuickChick/180612/output /tmp/QuickChick/180612/QuickChickcc2b09 @@
+Parent is sleeping for 600 seconds...
+cp /tmp/QuickChick/180612/output/fuzzer_stats output/180612
