@@ -15,7 +15,7 @@ Import MonadNotation.
 Open Scope monad_scope.
 
 From QuickChick Require Import
-     GenLowInterface RandomQC RoseTrees Sets Tactics.
+     GenLowInterface RandomQC RoseTrees Sets Tactics LazyList.
 
 Set Implicit Arguments.
 Unset Strict Implicit.
@@ -30,12 +30,13 @@ Import ListNotations.
 Open Scope fun_scope.
 Open Scope set_scope.
 
+
 Module GenLow : GenLowInterface.Sig.
 
   (** * Type of generators *)
 
   (* begin GenType *)
-  Inductive GenType (A:Type) : Type := MkGen : (nat -> RandomSeed -> A) -> GenType A.
+  Inductive GenType (A:Type) : Type := MkGen : (nat -> RandomSeed -> LazyList A) -> GenType A.
   (* end GenType *)
   
   Definition G := GenType.
@@ -47,12 +48,24 @@ Module GenLow : GenLowInterface.Sig.
   (* end run *)
   
   Definition returnGen {A : Type} (x : A) : G A :=
-    MkGen (fun _ _ => x).
-  
+    MkGen (fun _ _ => ret x).
+
+  (* Split and use a different random seed on each list *)
+  Fixpoint bind_helper {B : Type} (lgb : LazyList (G B)) (n : nat) (rs : RandomSeed) : LazyList B :=
+    match lgb with
+    | lnil => lnil _
+    | lcons gb ts =>
+      let (r1, r2) := randomSplit rs in
+      lazy_append (run gb n r1) (bind_helper (force ts) n r2)
+    end.
+
   Definition bindGen {A B : Type} (g : G A) (k : A -> G B) : G B :=
     MkGen (fun n r =>
              let (r1,r2) := randomSplit r in
-             run (k (run g n r1)) n r2).
+             let l := run g n r1 in
+             let lgb := fmap k l in
+           bind_helper lgb n r2).
+
 
   Definition bindGenOpt {A B} (g : G (option A)) (f : A -> G (option B)) : G (option B) :=
     bindGen g (fun ma => 
@@ -62,7 +75,7 @@ Module GenLow : GenLowInterface.Sig.
                  end).
   
   Definition fmap {A B : Type} (f : A -> B) (g : G A) : G B :=
-    MkGen (fun n r => f (run g n r)).
+    MkGen (fun n r => fmap f (run g n r)).
 
   Definition apGen {A B} (gf : G (A -> B)) (gg : G A) : G B :=
     bindGen gf (fun f => fmap f gg).
@@ -74,9 +87,109 @@ Module GenLow : GenLowInterface.Sig.
     match g with
       | MkGen m => MkGen (fun _ => m n)
     end.
-  
+
+  (*
+  Fixpoint promote {A : Type} (n : nat) (m : Rose (G A)) : G (Rose A) :=
+    match m with
+    | MkRose h ts => fmap (fun h => MkRose h (smoosh n (lazy (map (promote (n-1)) (force ts))))) h
+    end.
+   *)
+
+  (* To promote a Rose LazyList to a LazyList Rose it makes sense to preserve shrinking order... *)
+  (*
+  Fixpoint lazy_list_promote `{A : Type} (rl : Rose (LazyList A)) : LazyList (Rose A) :=
+    match rl with
+    | MkRose h ts =>
+      a <- h;;
+      let bleh := (map (fun rose => fmapRose lazy_list_promote rose) (force ts)) in
+      ret (MkRose a _)
+    end.
+    
+      list_to_LazyList (force ts)
+      mapLazyList (fun h => MkRose h _ (*(lazy (lazy_list_promote (force ts))) *)) h
+    end.
+   *)
+
+  (* 
+     Each level of the Rose tree is all of the enumerated tests.
+
+     Makes sense to shrink from left to right (smallest to largest
+     enumerated test)...
+
+     - Not clear which children are shrunk versions of which tests...
+     - Would we try to shrink enumerated parts as well? Should we bother?
+       + Worst case this is just a waste of time... Hmmm.
+
+     I think we need to change the representation of enumerated tests
+     to prevent this RoseTree issue.
+
+     Instead of generating a lazy list of values we should take an
+     argument for which enumerated test we should spit out (the index
+     into the lazy list).
+
+     - Do we always have a test for number x?
+       + No, what if we're not enumerating at all!
+       + Want to just specify depth and iterate until we run out...
+       + Can we do this with current monad, and change how tests are run?
+         * Generator will recursively spit out more tests on shrinking.
+
+     If I enumerate and have random tests, e.g., enumerated lists with
+     random elements... Should I...
+
+     - One random choice per enumeration?
+       + Not very good coverage, no sense for how many tests to run.
+     - 10000x per enumeration...
+       + I think this makes the most sense. Good coverage of random
+       portions.
+       + Do I have to run all of the tests, even if there is no randomness...?
+     - 10000x across all enumerations?
+       + Pick an enumeration at random, and then generate random test...
+       + Wouldn't actually hit all enumerations, so this is pointless.
+       + Could do at least one of each and then pick randomly, but... Eh.
+
+      What I actually want is a list of generators. So, not this:
+
+      G1 : (size : nat) -> RandomSeed -> (depth : nat) -> LazyList A
+
+      But this:
+
+      G2 : (depth nat) -> LazyList ((size : nat) -> RandomSeed -> A)
+
+      The first may actually be equivalent to this. We call G1 getting
+      the list of enumerated values that have random elements. Then we
+      check each of these for failure in order, and run again if need
+      be.
+
+      The second we generate a list of generator functions that can be
+      used to randomly generate values with the enumerations
+      elaborated out already...  This is actually more useful, because
+      then we can test in order of enumeration more thoroughly.
+   *)
+
+  Fixpoint join_list_lazy_list {A : Type} (l : list (LazyList A)) : LazyList A :=
+    match l with
+    | nil => lnil _
+    | cons h ts => lazy_append h (join_list_lazy_list ts)
+    end.
+
+
+  (*
+  (*
+    Okay, so each rose tree has a list at each spot. Presumably this
+    list is then shrunk... Which sounds... Bad.
+   *)
+  Fixpoint smoosh {A : Type} (rl : Rose (LazyList A)) : LazyList (Rose A) :=
+    match rl with
+    | MkRose h ts =>
+      lazy_append _ _
+
+        (* h (join_list_lazy_list (map smoosh (force ts))) *)
+    end.
+
   Definition promote {A : Type} (m : Rose (G A)) : G (Rose A) :=
     MkGen (fun n r => fmapRose (fun g => run g n r) m).
+
+   *)
   
   (* ZP: Split suchThatMaybe into two different functions
      to make a proof easier *)
@@ -126,9 +239,9 @@ Module GenLow : GenLowInterface.Sig.
     end.
   
   Definition choose {A : Type} `{ChoosableFromInterval A} (range : A * A) : G A :=
-    MkGen (fun _ r => fst (randomR range r)).
+    MkGen (fun _ r => ret (fst (randomR range r))).
   
-  Definition sample (A : Type) (g : G A) : list A :=
+  Definition sample (A : Type) (g : G A) : list (LazyList A) :=
     match g with
       | MkGen m =>
         let rnd := newRandomSeed in
@@ -142,36 +255,120 @@ Module GenLow : GenLowInterface.Sig.
     match g with 
       | MkGen f => MkGen (fun n r => f n (varySeed p r))
     end.
-  
+
+  (*
   Definition reallyUnsafeDelay {A : Type} : G (G A -> A) :=
-    MkGen (fun r n g => (match g with MkGen f => f r n end)).
-  
+    MkGen (fun r n => _ (*(match g with MkGen f => f r n end) *)).
+
   Definition reallyUnsafePromote {r A : Type} (m : r -> G A) : G (r -> A) :=
     (bindGen reallyUnsafeDelay (fun eval => 
                                   returnGen (fun r => eval (m r)))).
-
+   *)
   (* End Things *)
 
   (** * Semantics of generators *)
 
   (* Set of outcomes semantics definitions (repeated above) *)
   (* begin semGen *)
-  Definition semGenSize {A : Type} (g : G A) (s : nat) : set A := codom (run g s).
+
+  Fixpoint All_ll {A : Type} (P : A -> Prop) (l : LazyList A) : Prop :=
+    match l with
+    | lnil => True
+    | lcons h ts => P h /\ All_ll P (force ts)
+    end.
+
+  Definition semGenSize {A : Type} (g : G A) (s : nat) : set A := possibly_generated (run g s).
   Definition semGen {A : Type} (g : G A) : set A := \bigcup_s semGenSize g s.
   (* end semGen *)
 
   (* More things *)
-  Definition bindGen_aux {A : Type} (g : G A) (n : nat) (r : RandomSeed) : semGen g (run g n r).
-    unfold semGen, semGenSize, codom, bigcup.
-    exists n; split => //=.
-    exists r; auto.
+  (* TODO Need a better induction principle for lazy lists... *)
+  Check LazyList_ind.
+
+  (* LazyList_ind
+     : forall (A : Type) (P : LazyList A -> Prop),
+       P (lnil A) -> (forall (a : A) (l : Lazy (LazyList A)), P (lcons A a l)) -> forall l : LazyList A, P l
+   *)
+
+  Check list_ind.
+
+  (* list_ind
+     : forall (A : Type) (P : list A -> Prop),
+       P [] -> (forall (a : A) (l : list A), P l -> P (a :: l)) -> forall l : list A, P l
+   *)
+
+  Fixpoint LazyList_to_list {A : Type} (l : LazyList A) : list A :=
+    match l with
+    | lnil => nil
+    | lcons x x0 => x :: LazyList_to_list (force x0)
+    end.
+
+  Fixpoint list_to_LazyList {A : Type} (l : list A) : LazyList A :=
+    match l with
+    | nil => lnil _
+    | cons x x0 => lcons _ x (lazy (list_to_LazyList x0))
+    end.
+
+  Theorem LazyList_to_list_reflect :
+    forall (A : Type) (ll : LazyList A) (l : list A),
+      LazyList_to_list ll = l -> ll = list_to_LazyList l.
+  Proof.
+    intros A ll l H.
+    generalize dependent ll.
+    induction l; intros ll H.
+    - simpl. destruct ll.
+      + reflexivity.
+      + simpl in H. inversion H.
+  Admitted.
+
+  Theorem blah :
+    forall (A : Type) (f : list A -> list A) (l : list A) P,
+      P l -> P l.
+  Proof.
+    intros A f l.
+    remember (f l) as f_l. generalize dependent f_l.
+    induction (f l); intros f_l Heqf_l P X.
+    - (* Want to know that f l = [] here *) admit.
+    - (* Want to know that f l = x :: xs here *) admit.
+  Admitted.
+
+  Theorem nil_lazylist :
+    forall A (l : LazyList A),
+      [] = LazyList_to_list l -> l = lnil A.
+  Proof.
+    intros A l H.
+    destruct l.
+    - reflexivity.
+    - inversion H.
   Qed.
 
-  Definition bindGen' {A B : Type} (g : G A) (k : forall (a : A), (a \in semGen g) -> G B) : G B :=
+  Section Ind.
+    Variable A : Type.
+    Variable P : LazyList A -> Prop.
+    Variable Hnil : P (lnil A).
+    Variable Hcons : forall (a : A) (l : LazyList A), P l -> P (lcons _ a (lazy l)).
+
+    Fixpoint better_ll_ind (l : LazyList A) : P l :=
+      match l with
+      | lnil => Hnil
+      | lcons a (lazy tl) => @Hcons a tl (better_ll_ind tl)
+      end.
+  End Ind.
+
+  Program Definition bindGen' {A B : Type} (g : G A) (k : forall (a : A), (a \in semGen g) -> G B) : G B :=
     MkGen (fun n r =>
              let (r1,r2) := randomSplit r in
-             run (k (run g n r1) (bindGen_aux g n r1)) n r2).
-
+             _).
+  Next Obligation.
+    remember (run g n r1) as a's.
+    destruct a's.
+    - exact (lnil _).
+    - refine (run (k a _) n r2).
+      unfold semGen, semGenSize, bigcup, codom, bigcup, possibly_generated.
+      exists n. split => //=.
+      exists r1. inversion Heqa's. constructor.
+      auto.
+  Qed.
   
 
   (** * Semantic properties of generators *)
@@ -191,6 +388,7 @@ Module GenLow : GenLowInterface.Sig.
     }.
 
   (** Sized generators of option type monotonic in the size parameter *)
+  (*
   Class SizedMonotonicOpt {A} (g : nat -> G (option A)) :=
     {
       sizeMonotonicOpt :
@@ -198,6 +396,7 @@ Module GenLow : GenLowInterface.Sig.
           s1 <= s2 ->
           isSome :&: semGenSize (g s1) s \subset isSome :&: semGenSize (g s2) s
     }.
+   *)
   
   (** Generators monotonic in the runtime size parameter *)
   Class SizeMonotonic {A} (g : G A) :=
@@ -207,17 +406,21 @@ Module GenLow : GenLowInterface.Sig.
     }.
 
   (** Generators monotonic in the runtime size parameter *)
+  (*
   Class SizeMonotonicOpt {A} (g : G (option A)) :=
     {
       monotonic_opt :
         forall s1 s2, s1 <= s2 -> isSome :&: semGenSize g s1 \subset isSome :&: semGenSize g s2
     }.
+   *)
 
+  (*
   Class SizeAntiMonotonicNone {A} (g : G (option A)) :=
     {
       monotonic_none :
         forall s1 s2, s1 <= s2 -> isNone :&: semGenSize g s2 \subset isNone :&: semGenSize g s1
     }.
+   *)
 
   
   (* Unsizedness trivially implies size-monotonicity *)
@@ -244,8 +447,11 @@ Module GenLow : GenLowInterface.Sig.
   (* end semReturn *)
   Proof.
     rewrite /semGen /semGenSize /= bigcup_const ?codom_const //.
-            exact: randomSeed_inhabited.
-      by do 2! constructor.
+    split.
+    - intros H. inversion H. inversion H0. subst. constructor. inversion H1.
+    - intros H. inversion H. unfold possibly_generated. destruct randomSeed_inhabited as [r]. exists r.
+      constructor. auto.
+    - do 2! constructor.
   Qed.
   
   (* begin semReturnSize *)
@@ -253,7 +459,13 @@ Module GenLow : GenLowInterface.Sig.
   semGenSize (returnGen x) s <--> [set x].
   (* end semReturnSize *)
   Proof.
-      by rewrite /semGenSize /= codom_const //; apply: randomSeed_inhabited.
+    unfold semGenSize, possibly_generated.
+    split.
+    - intros [r H]. inversion H.
+      + subst; constructor.
+      + inversion H0.
+    - intros H. inversion H. destruct randomSeed_inhabited as [r]. exists r.
+      simpl. auto.
   Qed.
   
   Program Instance unsizedReturn {A} (x : A) : Unsized (returnGen x).
@@ -266,18 +478,50 @@ Module GenLow : GenLowInterface.Sig.
     firstorder.
   Qed.
 
+  (*
   Instance returnGenSizeMonotonicOpt {A} (x : option A) : SizeMonotonicOpt (returnGen x).
   Proof.
     firstorder.
   Qed.
-  
-  
+  *)
+
   (* begin semBindSize *)
   Lemma semBindSize A B (g : G A) (f : A -> G B) (s : nat) :
     semGenSize (bindGen g f) s <-->
-    \bigcup_(a in semGenSize g s) semGenSize (f a) s.
+               \bigcup_(a in semGenSize g s) semGenSize (f a) s.
   (* end semBindSize *)
   Proof.
+    unfold semGenSize, possibly_generated.
+    split.
+    - intros [r H]. unfold bigcup.
+      remember (run (bindGen g f) s r) as run.
+      generalize dependent Heqrun.
+      revert g f s r H.
+      induction run using better_ll_ind; intros g f s r H Heqrun.
+      + inversion H.
+      + simpl in H. destruct H.
+        * subst. unfold run in Heqrun. simpl in Heqrun.
+          pose proof randomSplit_codom. edestruct H.
+          destruct (randomSplit r) as [r1 r2].
+          eapply IHrun.
+          
+          induction (run g s r1) using better_ll_ind; inversion Heqrun.
+          simpl in *.
+          destruct (randomSplit r2) as [r3 r4].
+          simpl in *.
+
+
+    
+    - intros [r H]. unfold bigcup.
+      simpl in H.
+      destruct (randomSplit r) as [r1 r2].
+      induction (run g s r1) using better_ll_ind.
+      + inversion H.
+      + apply IHl.
+        simpl in H. destruct (randomSplit r2) as [r3 r4].
+        destruct (run (f a0) s r3).
+        * simpl in *. 
+    
     rewrite /semGenSize /bindGen /= bigcup_codom -curry_codom2l.
       by rewrite -[codom (prod_curry _)]imsetT -randomSplit_codom -codom_comp.
   Qed.
@@ -1297,5 +1541,5 @@ Module GenLow : GenLowInterface.Sig.
     do 2 rewrite semThunkGenSize.
     by apply monotonic_none.
   Qed.
-
+*)
 End GenLow.
