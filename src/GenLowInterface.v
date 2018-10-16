@@ -17,7 +17,7 @@ Import MonadNotation.
 Open Scope monad_scope.
 
 From QuickChick Require Import
-     RandomQC RoseTrees Sets.
+     RandomQC RoseTrees Sets LazyList.
 
 Set Implicit Arguments.
 Unset Strict Implicit.
@@ -38,6 +38,9 @@ Proof.
 by apply/subset_eqP; split=> // [[s1 s2]] _; apply: randomSplitAssumption.
 Qed.
 
+Definition possibly_generated {A B : Type} (g : A -> LazyList B) : B -> Prop :=
+  fun (b : B) => exists a : A, In_ll b (g a).
+
 Module Type Sig.
 
   (** * Type of generators *)
@@ -49,8 +52,8 @@ Module Type Sig.
   Parameter returnGen  : forall {A : Type}, A -> G A.
   (* TODO: Add dependent combinator *)
   Parameter bindGen :  forall {A B : Type}, G A -> (A -> G B) -> G B.
-  Parameter bindGenOpt : forall {A B : Type}, G (option A) -> (A -> G (option B)) -> G (option B).
-  Parameter run  : forall {A : Type}, G A -> nat -> RandomSeed -> A.
+  (* Parameter bindGenOpt : forall {A B : Type}, G (option A) -> (A -> G (option B)) -> G (option B). *)
+  Parameter run  : forall {A : Type}, G A -> nat -> RandomSeed -> LazyList A.
   Parameter fmap : forall {A B : Type}, (A -> B) -> G A -> G B.
   Parameter apGen : forall {A B : Type}, G (A -> B) -> G A -> G B.
   Parameter sized : forall {A: Type}, (nat -> G A) -> G A.
@@ -61,24 +64,26 @@ Module Type Sig.
   Parameter suchThatMaybeOpt : forall {A : Type}, G (option A) -> (A -> bool) ->
                                              G (option A).
   Parameter choose : forall {A : Type} `{ChoosableFromInterval A}, (A * A) -> G A.
-  Parameter sample : forall {A : Type}, G A -> list A.
+  Parameter sample : forall {A : Type}, G A -> list (LazyList A).
 
 
   (* LL: The abstraction barrier is annoying :D *)
+  (*
   Parameter variant : forall {A : Type}, SplitPath -> G A -> G A.
   Parameter reallyUnsafePromote : forall {r A:Type}, (r -> G A) -> G (r -> A).
 
   Parameter promoteVariant : forall {A B : Type} (a : A) (f : A -> SplitPath) (g : G B) size 
                                (r r1 r2 : RandomSeed),
                                randomSplit r = (r1,r2) ->                              
-                               run (reallyUnsafePromote (fun a => variant (f a) g)) size r a = 
+                               ap (run (reallyUnsafePromote (fun a => variant (f a) g)) size r) (ret a) = 
                                run g size (varySeed (f a) r1).
+   *)
 
   (** * Semantics of generators *)
 
   (* Set of outcomes semantics definitions (repeated below) *)
   Definition semGenSize {A : Type} (g : G A) (size : nat) : set A :=
-    codom (run g size).
+    possibly_generated (run g size).
   Definition semGen {A : Type} (g : G A) : set A :=
     \bigcup_size semGenSize g size.
 
@@ -107,6 +112,7 @@ Module Type Sig.
     }.
 
   (** Sized generators of option type monotonic in the size parameter *)
+  (*
   Class SizedMonotonicOpt {A} (g : nat -> G (option A)) :=
     {
       sizeMonotonicOpt :
@@ -114,7 +120,8 @@ Module Type Sig.
           s1 <= s2 ->
           isSome :&: semGenSize (g s1) s \subset isSome :&: semGenSize (g s2) s
     }.
-  
+  *)
+
   (** Generators monotonic in the runtime size parameter *)
   Class SizeMonotonic {A} (g : G A) :=
     {
@@ -123,18 +130,22 @@ Module Type Sig.
     }.
 
   (** Generators monotonic in the runtime size parameter *)
+  (*
   Class SizeMonotonicOpt {A} (g : G (option A)) :=
     {
       monotonic_opt :
         forall s1 s2, s1 <= s2 -> isSome :&: semGenSize g s1 \subset isSome :&: semGenSize g s2
     }.
+   *)
   
   (** Generators monotonic in the runtime size parameter *)
+  (*
   Class SizeAntiMonotonicNone {A} (g : G (option A)) :=
     {
       monotonic_none :
         forall s1 s2, s1 <= s2 -> isNone :&: semGenSize g s2 \subset isNone :&: semGenSize g s1
     }.
+   *)
   
   (* CH: Why does Unsized need a _ when A is marked as implict! *)
   Parameter unsized_alt_def :
@@ -155,7 +166,7 @@ Module Type Sig.
   
   Declare Instance unsizedReturn {A} (x : A) : Unsized (returnGen x).
   Declare Instance returnGenSizeMonotonic {A} (x : A) : SizeMonotonic (returnGen x).
-  Declare Instance returnGenSizeMonotonicOpt {A} (x : option A) : SizeMonotonicOpt (returnGen x).
+  (* Declare Instance returnGenSizeMonotonicOpt {A} (x : option A) : SizeMonotonicOpt (returnGen x). *)
 
   Parameter semBindSize :
     forall A B (g : G A) (f : A -> G B) (size : nat),
@@ -197,30 +208,38 @@ Module Type Sig.
           `{SizeMonotonic _ g} `{forall x, SizeMonotonic (f x)} : 
     SizeMonotonic (bindGen g f).
 
+  (*
   Declare Instance bindMonotonicOpt
           {A B} (g : G A) (f : A -> G (option B))
           `{SizeMonotonic _ g} `{forall x, SizeMonotonicOpt (f x)} : 
     SizeMonotonicOpt (bindGen g f).
+   *)
 
   Declare Instance bindMonotonicStrong
           {A B} (g : G A) (f : A -> G B)
           `{SizeMonotonic _ g} `{forall x, semGen g x -> SizeMonotonic (f x)} : 
     SizeMonotonic (bindGen g f).
 
+  (*
   Declare Instance bindMonotonicOptStrong
           {A B} (g : G A) (f : A -> G (option B)) `{SizeMonotonic _ g}
           `{forall x, semGen g x -> SizeMonotonicOpt (f x)} :
     SizeMonotonicOpt (bindGen g f).
+   *)
 
+  (*
   Declare Instance bindOptMonotonic
           {A B} (g : G (option A)) (f : A -> G (option B))
           `{SizeMonotonic _ g} `{forall x, SizeMonotonic (f x)} : 
     SizeMonotonic (bindGenOpt g f).
+   *)
 
+  (*
   Declare Instance bindOptMonotonicOpt
           {A B} (g : G (option A)) (f : A -> G (option B))
           `{SizeMonotonicOpt _ g} `{forall x, SizeMonotonicOpt (f x)} : 
     SizeMonotonicOpt (bindGenOpt g f).
+   *)
   
   Parameter semBindUnsized1 :
     forall A B (g : G A) (f : A -> G B) `{Unsized _ g},
@@ -235,11 +254,13 @@ Module Type Sig.
          `{SizeMonotonic _ g} `{forall a, SizeMonotonic (f a)},
     semGen (bindGen g f) <--> \bigcup_(a in semGen g) semGen (f a).
 
+  (*
   Parameter semBindOptSizeMonotonicIncl_r :
     forall {A B} (g : G (option A)) (f : A -> G (option B)) (s1 : set A) (s2 : A -> set B),
       semGen g \subset (Some @: s1) :|: [set None] ->
       (forall x, semGen (f x) \subset Some @: (s2 x) :|: [set None]) -> 
       semGen (bindGenOpt g f) \subset Some @: (\bigcup_(a in s1) s2 a) :|: [set None].
+   *)
 
   Parameter semBindSizeMonotonicIncl_r :
     forall {A B} (g : G A) (f : A -> G (option B)) (s1 : set A) (s2 : A -> set B),
@@ -247,19 +268,24 @@ Module Type Sig.
       (forall x, semGen (f x) \subset Some @: (s2 x) :|: [set None]) -> 
       semGen (bindGen g f) \subset Some @: (\bigcup_(a in s1) s2 a)  :|: [set None].
 
+  (*
   Parameter semBindOptSizeMonotonicIncl_l :
     forall {A B} (g : G (option A)) (f : A -> G (option B)) (s1 : set A)  (fs : A -> set B) 
       `{Hg : SizeMonotonicOpt _ g} {Hf : forall a, SizeMonotonicOpt (f a)},
       Some @: s1 \subset semGen g ->
       (forall x, Some @: (fs x) \subset semGen (f x)) ->
       (Some @: \bigcup_(a in s1) (fs a)) \subset semGen (bindGenOpt g f).
+   *)
 
+  (*
   Parameter semBindOptSizeOpt_subset_compat :
     forall {A B : Type} (g g' : G (option A)) (f f' : A -> G (option B)),
       (forall s, isSome :&: semGenSize g s \subset isSome :&: semGenSize g' s) ->
       (forall x s, isSome :&: semGenSize (f x) s \subset isSome :&: semGenSize (f' x) s) ->
       (forall s, isSome :&: semGenSize (bindGenOpt g f) s \subset isSome :&: semGenSize (bindGenOpt g' f') s).
+   *)
 
+  (*
   Parameter semBindSizeMonotonicIncl_l :
     forall {A B} (g : G A) (f : A -> G (option B)) (s1 : set A) (fs : A -> set B) 
       `{Hg : SizeMonotonic _ g}
@@ -267,6 +293,7 @@ Module Type Sig.
     s1 \subset semGen g ->
     (forall x, Some @: (fs x) \subset semGen (f x)) ->
     (Some @: \bigcup_(a in s1) (fs a)) \subset semGen (bindGen g f).
+   *)
 
   Parameter semFmap :
     forall A B (f : A -> B) (g : G A),
@@ -312,17 +339,21 @@ Module Type Sig.
       (forall n m s,  n <= m -> semGenSize (f n) s \subset semGenSize (f m) s) ->
       semGen (sized f) <--> \bigcup_n (semGen (f n)).
 
+  (*
   Parameter semSized_opt :
     forall A (f : nat -> G (option A)) (H : forall n, SizeMonotonicOpt (f n)) (H' : SizedMonotonicOpt f),
       isSome :&: semGen (sized f) <--> isSome :&: \bigcup_n (semGen (f n)).
+   *)
 
   Declare Instance sizedSizeMonotonic
           A (gen : nat -> G A) `{forall n, SizeMonotonic (gen n)} `{SizedMonotonic A gen} :
     SizeMonotonic (sized gen).
 
+  (*
   Declare Instance sizedSizeMonotonicOpt
           A (gen : nat -> G (option A)) `{forall n, SizeMonotonic (gen n)} `{SizedMonotonicOpt A gen} :
     SizeMonotonicOpt (sized gen).
+   *)
   
   Parameter semResize :
     forall A (n : nat) (g : G A),
@@ -348,13 +379,17 @@ Module Type Sig.
   (*         {A : Type} (g : G (option A)) (f : A -> bool) `{SizeMonotonic _ g} :  *)
   (*   SizeMonotonic (suchThatMaybeOpt g f). *)
 
+  (*
   Declare Instance suchThatMaybeMonotonicOpt
            {A : Type} (g : G A) (f : A -> bool) `{SizeMonotonic _ g} : 
     SizeMonotonicOpt (suchThatMaybe g f).
-  
+   *)
+
+  (*
   Declare Instance suchThatMaybeOptMonotonicOpt
            {A : Type} (g : G (option A)) (f : A -> bool) `{SizeMonotonicOpt _ g} : 
     SizeMonotonicOpt (suchThatMaybeOpt g f).
+   *)
 
   Parameter semSuchThatMaybe_complete:
     forall (A : Type) (g : G A) (f : A -> bool) (s : set A),
@@ -363,12 +398,14 @@ Module Type Sig.
       (Some @: (s :&: (fun x : A => f x))) \subset
                                         semGen (suchThatMaybe g f).
 
+  (*
   Parameter semSuchThatMaybeOpt_complete:
     forall (A : Type) (g : G (option A)) (f : A -> bool) (s : set A),
       SizeMonotonicOpt g ->
       (Some @: s) \subset semGen g ->
       (Some @: (s :&: (fun x : A => f x))) \subset
                                         semGen (suchThatMaybeOpt g f).
+  *)
 
   Parameter semSuchThatMaybe_sound:
     forall (A : Type) (g : G A) (f : A -> bool) (s : set A),
@@ -393,6 +430,7 @@ Module Type Sig.
             isSome :&: (semGenSize (suchThatMaybeOpt g2 p) s)).
 
   (* This (very concrete) spec is needed to prove shrinking *)
+  (*
   Parameter semPromote :
     forall A (m : Rose (G A)),
       semGen (promote m) <-->
@@ -468,5 +506,5 @@ Module Type Sig.
 
   (** A notation around [thunkGen] for convenience. *)
   Notation etaG g := (thunkGen (fun _ => g)).
-
+   *)
 End Sig.
