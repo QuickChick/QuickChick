@@ -25,6 +25,13 @@ let mutateCheckMany = mk_ref "QuickChick.MutateCheck.mutateCheckMany"
 let mutateCheckManyWith = mk_ref "QuickChick.MutateCheck.mutateCheckManyWith"
 let sample = mk_ref "QuickChick.GenLow.GenLow.sample"
 
+(* let extra_files : (string * string) list ref = ref []  *)
+let empty_ss_list : (string * string) list = []           
+let extra_files : (string * string) list ref =
+  Summary.ref ~name:"QC_extra_files" empty_ss_list
+let add_extra_file s1 s2 =
+      extra_files := (s1, s2) :: !extra_files
+                                             
 (* Locate QuickChick's files *)
 (* The computation is delayed because QuickChick's libraries are not available
 when the plugin is first loaded. *)
@@ -68,13 +75,16 @@ let eval_command (cmd : string) : string =
   ignore (close_process_in ic);
   str
 
-let comp_ml_cmd fn out =
+let comp_ml_cmd tmp_dir fn out =
   let path = Lazy.force path in
   let link_files = List.map (Filename.concat path) link_files in
   let link_files = String.concat " " link_files in
   let afl_path = eval_command "opam config var lib" ^ "/afl-persistent/" in
   let afl_link = afl_path ^ "afl-persistent.cmxa" in
-  Printf.sprintf "%s unix.cmxa %s -unsafe-string -rectypes -w a -I %s -I %s -I %s %s %s -o %s" ocamlopt afl_link (Filename.dirname fn) afl_path path link_files fn out
+  let extra_link_files =
+    String.concat " " (List.map (fun (s : string * string) -> tmp_dir ^ "/" ^ fst s) !extra_files) in
+  print_endline ("Extra: " ^ extra_link_files);
+  Printf.sprintf "%s unix.cmxa %s -unsafe-string -rectypes -w a -I %s -I %s -I %s %s %s %s -o %s" ocamlopt afl_link (Filename.dirname fn) afl_path path link_files extra_link_files fn out
 
 (*
 let comp_mli_cmd fn =
@@ -163,6 +173,16 @@ let _ =
       Printf.fprintf oc "let _ = print_string (QuickChickLib.string_of_coqstring (snd (%s ())))" (string_of_id main);
       close_out oc;
     end;
+
+  List.iter (fun (s : string * string) ->
+      let (fn, c) = s in
+      let sed_cmd = (Printf.sprintf "sed -i '1s;^;open %s\\n;' %s" c mlf) in
+      print_endline ("Sed cmd: " ^ sed_cmd);
+      ignore (Sys.command sed_cmd);
+      ignore (Sys.command (Printf.sprintf "cp %s %s" fn temp_dir));
+    ) !extra_files;
+
+  
   (* Before compiling, remove stupid cyclic dependencies like "type int = int".
      TODO: Generalize (.) \g1\b or something *)
   let perl_cmd = "perl -i -p0e 's/type int =\\s*int/type tmptmptmp = int\\ntype int = tmptmptmp/sg' " ^ mlf in
@@ -177,12 +197,12 @@ let _ =
   let _exit_code = Sys.command ("touch " ^ mlif) in
 
   Printf.printf "Extracted ML file: %s\n" mlf;
-  Printf.printf "Compile command: %s\n" (comp_ml_cmd mlf execn);
+  Printf.printf "Compile command: %s\n" (comp_ml_cmd temp_dir mlf execn);
   flush_all ();
 
   (* Compile the (empty) .mli *)
   if Sys.command (comp_mli_cmd mlif) <> 0 then CErrors.user_err (str "Could not compile mli file" ++ fnl ());
-  if Sys.command (comp_ml_cmd mlf execn) <> 0 then
+  if Sys.command (comp_ml_cmd temp_dir mlf execn) <> 0 then
     (CErrors.user_err (str "Could not compile test program" ++ fnl ()); None)
 
   (** Run the test *)
@@ -372,6 +392,13 @@ VERNAC COMMAND EXTEND QuickChickDebug CLASSIFIED AS SIDEFF
      [ let s1' = Id.to_string s1 in
        let s2' = Id.to_string s2 in
        set_debug_flag s1' s2' ]
+END;;
+
+VERNAC COMMAND EXTEND AddExtraFile CLASSIFIED AS SIDEFF
+  | ["AddExtraFile" string(s1) string(s2)] ->
+     [ ( add_extra_file s1 s2;
+         print_endline (String.concat " " (List.map fst !extra_files))
+       ) ]
 END;;
 
 VERNAC COMMAND EXTEND Sample CLASSIFIED AS SIDEFF
