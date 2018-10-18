@@ -3,6 +3,8 @@ From ExtLib.Structures Require Export
 From ExtLib.Structures Require Import
      Functor Applicative.
 From QuickChick Require Import RoseTrees.
+Require Import List.
+Import ListNotations.
 
 Import MonadNotation.
 Open Scope monad_scope.
@@ -83,3 +85,75 @@ Fixpoint In_ll {A : Type} (a : A) (l : LazyList A) : Prop :=
   | lnil => False
   | lcons h ts => h = a \/ In_ll a (force ts)
   end.
+
+
+Section Ind.
+  Variable A : Type.
+  Variable P : LazyList A -> Prop.
+  Variable Hnil : P (lnil A).
+  Variable Hcons : forall (a : A) (l : LazyList A), P l -> P (lcons _ a (lazy l)).
+
+  Fixpoint better_ll_ind (l : LazyList A) : P l :=
+    match l with
+    | lnil => Hnil
+    | lcons a (lazy tl) => @Hcons a tl (better_ll_ind tl)
+    end.
+End Ind.
+
+Lemma lazy_in_app_or :
+  forall (A : Type) (l m : LazyList A) (a : A), In_ll a (lazy_append l m) -> In_ll a l \/ In_ll a m.
+Proof.
+  intros A l.
+  induction l using better_ll_ind; intros m h H.
+  - simpl in H. auto.
+  - simpl in H. destruct H.
+    + subst. simpl. auto.
+    + simpl. rewrite or_assoc. right.
+      auto.
+Qed.
+
+Lemma lazy_in_or_app :
+  forall (A : Type) (l m : LazyList A) (a : A), In_ll a l \/ In_ll a m -> In_ll a (lazy_append l m).
+Proof.
+  intros A l.
+  induction l using better_ll_ind; intros m h H.
+  - simpl in H. destruct H as [contra | Hin]; try contradiction.
+    auto.
+  - simpl in H. destruct H as [[Hah | Hin] | Hin].
+    + subst. simpl. auto.
+    + simpl. auto.
+    + right. apply IHl. auto.
+Qed.
+
+Fixpoint LazyList_to_list {A : Type} (l : LazyList A) : list A :=
+  match l with
+  | lnil => nil
+  | lcons x x0 => x :: LazyList_to_list (force x0)
+  end.
+
+Fixpoint list_to_LazyList {A : Type} (l : list A) : LazyList A :=
+  match l with
+  | nil => lnil _
+  | cons x x0 => lcons _ x (lazy (list_to_LazyList x0))
+  end.
+
+Theorem nil_lazylist :
+  forall A (l : LazyList A),
+    [] = LazyList_to_list l -> l = lnil A.
+Proof.
+  intros A l H.
+  destruct l.
+  - reflexivity.
+  - inversion H.
+Qed.
+
+Theorem lazy_in_map:
+  forall (A B : Type) (f : A -> B) (l : LazyList A) (x : A), In_ll x l -> In_ll (f x) (fmap f l).
+Proof.
+  intros A B f l.
+  induction l using better_ll_ind; intros x H.
+  - inversion H.
+  - simpl in *. destruct H as [Hax | Hin].
+    + left. subst; reflexivity.
+    + right. auto.
+Qed.

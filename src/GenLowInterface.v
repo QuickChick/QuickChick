@@ -38,8 +38,7 @@ Proof.
 by apply/subset_eqP; split=> // [[s1 s2]] _; apply: randomSplitAssumption.
 Qed.
 
-Definition possibly_generated {A B : Type} (g : A -> LazyList B) : B -> Prop :=
-  fun (b : B) => exists a : A, In_ll b (g a).
+Definition possibly_generated {R B : Type} (g : R -> LazyList B) (b : B) : Prop := exists r : R, In_ll b (g r).
 
 Module Type Sig.
 

@@ -50,6 +50,9 @@ Module GenLow : GenLowInterface.Sig.
   Definition returnGen {A : Type} (x : A) : G A :=
     MkGen (fun _ _ => ret x).
 
+  Definition fmap {A B : Type} (f : A -> B) (g : G A) : G B :=
+    MkGen (fun n r => fmap f (run g n r)).
+
   (* Split and use a different random seed on each list *)
   Fixpoint bind_helper {B : Type} (lgb : LazyList (G B)) (n : nat) (rs : RandomSeed) : LazyList B :=
     match lgb with
@@ -62,9 +65,7 @@ Module GenLow : GenLowInterface.Sig.
   Definition bindGen {A B : Type} (g : G A) (k : A -> G B) : G B :=
     MkGen (fun n r =>
              let (r1,r2) := randomSplit r in
-             let l := run g n r1 in
-             let lgb := fmap k l in
-           bind_helper lgb n r2).
+             bind_helper (run (fmap k g) n r1) n r2).
 
 
   Definition bindGenOpt {A B} (g : G (option A)) (f : A -> G (option B)) : G (option B) :=
@@ -73,9 +74,6 @@ Module GenLow : GenLowInterface.Sig.
                    | None => returnGen None
                    | Some a => f a
                  end).
-  
-  Definition fmap {A B : Type} (f : A -> B) (g : G A) : G B :=
-    MkGen (fun n r => fmap f (run g n r)).
 
   Definition apGen {A B} (gf : G (A -> B)) (gg : G A) : G B :=
     bindGen gf (fun f => fmap f gg).
@@ -282,79 +280,6 @@ Module GenLow : GenLowInterface.Sig.
   (* end semGen *)
 
   (* More things *)
-  (* TODO Need a better induction principle for lazy lists... *)
-  Check LazyList_ind.
-
-  (* LazyList_ind
-     : forall (A : Type) (P : LazyList A -> Prop),
-       P (lnil A) -> (forall (a : A) (l : Lazy (LazyList A)), P (lcons A a l)) -> forall l : LazyList A, P l
-   *)
-
-  Check list_ind.
-
-  (* list_ind
-     : forall (A : Type) (P : list A -> Prop),
-       P [] -> (forall (a : A) (l : list A), P l -> P (a :: l)) -> forall l : list A, P l
-   *)
-
-  Fixpoint LazyList_to_list {A : Type} (l : LazyList A) : list A :=
-    match l with
-    | lnil => nil
-    | lcons x x0 => x :: LazyList_to_list (force x0)
-    end.
-
-  Fixpoint list_to_LazyList {A : Type} (l : list A) : LazyList A :=
-    match l with
-    | nil => lnil _
-    | cons x x0 => lcons _ x (lazy (list_to_LazyList x0))
-    end.
-
-  Theorem LazyList_to_list_reflect :
-    forall (A : Type) (ll : LazyList A) (l : list A),
-      LazyList_to_list ll = l -> ll = list_to_LazyList l.
-  Proof.
-    intros A ll l H.
-    generalize dependent ll.
-    induction l; intros ll H.
-    - simpl. destruct ll.
-      + reflexivity.
-      + simpl in H. inversion H.
-  Admitted.
-
-  Theorem blah :
-    forall (A : Type) (f : list A -> list A) (l : list A) P,
-      P l -> P l.
-  Proof.
-    intros A f l.
-    remember (f l) as f_l. generalize dependent f_l.
-    induction (f l); intros f_l Heqf_l P X.
-    - (* Want to know that f l = [] here *) admit.
-    - (* Want to know that f l = x :: xs here *) admit.
-  Admitted.
-
-  Theorem nil_lazylist :
-    forall A (l : LazyList A),
-      [] = LazyList_to_list l -> l = lnil A.
-  Proof.
-    intros A l H.
-    destruct l.
-    - reflexivity.
-    - inversion H.
-  Qed.
-
-  Section Ind.
-    Variable A : Type.
-    Variable P : LazyList A -> Prop.
-    Variable Hnil : P (lnil A).
-    Variable Hcons : forall (a : A) (l : LazyList A), P l -> P (lcons _ a (lazy l)).
-
-    Fixpoint better_ll_ind (l : LazyList A) : P l :=
-      match l with
-      | lnil => Hnil
-      | lcons a (lazy tl) => @Hcons a tl (better_ll_ind tl)
-      end.
-  End Ind.
-
   Program Definition bindGen' {A B : Type} (g : G A) (k : forall (a : A), (a \in semGen g) -> G B) : G B :=
     MkGen (fun n r =>
              let (r1,r2) := randomSplit r in
@@ -483,6 +408,132 @@ Module GenLow : GenLowInterface.Sig.
   Proof.
     firstorder.
   Qed.
+   *)
+
+  Lemma bind_in_f :
+    forall A B (b : B) (g : G A) (f : A -> G B) s r,
+      In_ll b (run (bindGen g f) s r) ->
+      exists a r', In_ll b (run (f a) s r').
+  Proof.
+    intros A B b g f s r H.
+    simpl in H.
+    destruct (randomSplit r) as [r1 r2].
+    remember (run g s r1) as runr1 eqn:Hrunr1. clear Hrunr1 r.
+    revert r1 r2 H. revert f s g.
+    induction runr1 using better_ll_ind; intros f s g r1 r2 H.
+    - inversion H.
+    - simpl in *.
+      destruct (randomSplit r2) as [r3 r4]. simpl in *.
+      apply lazy_in_app_or in H. destruct H.
+      + exists a. exists r3. auto.
+      + eapply IHrunr1. apply g. apply r1.
+        apply H.
+  Qed.
+
+  (*
+  Lemma bind_in_a_in_g :
+    forall (A B : Type) (b : B) (g : G A) (f : A -> G B) s r,
+      In_ll b (run (bindGen g f) s r) ->
+      exists (a : A) (r' r'' : RandomSeed), In_ll b (run (f a) s r') /\ In_ll a (run g s r'').
+  Proof.
+    intros A B b g f s r H.
+    simpl in H.
+    destruct (randomSplit r) as [r1 r2].
+    remember (run g s r1) as runr1 eqn:Hrunr1. generalize dependent runr1.
+    revert r2 r.
+    induction (run g s r1) using better_ll_ind; intros r2 r runr1 Hrunr1 H.
+    - subst; inversion H.
+    - subst; simpl in *.
+      destruct (randomSplit r2) as [r3 r4].
+      apply lazy_in_app_or in H. destruct H.
+      + eapply IHl with (runr1:=lcons _ a (lazy (lnil _))) (r2:=r2). apply r.
+        admit. simpl. destruct (randomSplit r2).
+      + eapply IHl. apply r. reflexivity.
+        auto.
+  Qed.
+  *)
+
+
+  (*
+  Fixpoint bind_helper {B : Type} (lgb : LazyList (G B)) (n : nat) (rs : RandomSeed) : LazyList B :=
+    match lgb with
+    | lnil => lnil _
+    | lcons gb ts =>
+      let (r1, r2) := randomSplit rs in
+      lazy_append (run gb n r1) (bind_helper (force ts) n r2)
+    end.
+
+  Definition bindGen {A B : Type} (g : G A) (k : A -> G B) : G B :=
+    MkGen (fun n r =>
+             let (r1,r2) := randomSplit r in
+             bind_helper (run (fmap k g) n r1) n r2).
+   *)
+
+  Lemma in_bind:
+    forall {A B : Type} f (g : G A) s r1 r2 (b : B),
+      In_ll b (bind_helper (mapLazyList f (run g s r1)) s r2) ->
+      exists (a : A), In_ll a (run g s r1) /\ (exists r'', In_ll b (run (f a) s r'')).
+  Proof.
+    intros A B f g s r1 r2 b H.
+    remember (run g s r1) as lr. clear Heqlr.
+    generalize dependent r1. revert H. revert r2.
+    induction lr using better_ll_ind; intros r2 H r1.
+    - inversion H.
+    - simpl in *.
+      destruct (randomSplit r2) as [r3 r4] eqn:Hsplit. 
+      apply lazy_in_app_or in H. destruct H.
+      + exists a. split; auto. exists r3. auto.
+      + edestruct IHlr. apply H.
+        apply r1.
+        destruct H0. destruct H1.
+        exists x. split; auto. exists x0. auto.
+  Qed.
+
+  (*
+  Lemma bind_in:
+    forall {A B : Type} f (g : G A) s (b : B),
+      (exists (a : A) r, In_ll a (run g s (randomSplit r) /\ (exists r'', In_ll b (run (f a) s r''))) ->
+      In_ll b (bind_helper (mapLazyList f (run g s r1)) s r2).
+  Proof.
+    intros A B f g s r1 r2 b H.
+    remember (run g s r1) as lr. clear Heqlr.
+    generalize dependent r1. revert H. revert r2.
+    induction lr using better_ll_ind; intros r2 H r1.
+    - destruct H as [a [[] Hblah]].
+    - simpl in *.
+      destruct (randomSplit r2) as [r3 r4] eqn:Hsplit.
+      apply lazy_in_or_app.
+      destruct H as [a' [[Haa' | Hina'] [r'' Hinb]]].
+      + subst. left. simpl in *. apply Hinb.
+      + right. apply IHlr.
+        exists a'. split; auto.
+
+
+    
+    intros A B f g s r1 r2 r3 r4 b Hsplit H.
+    remember (run g s r1) as lr. clear Heqlr.
+    generalize dependent r1.
+    generalize dependent r2.
+    generalize dependent r3.
+    generalize dependent r4.
+    induction lr using better_ll_ind; intros r4 r3 H r2 Hsplit r1.
+    - simpl in *. destruct H as [a [contra Hblah]].
+      contradiction.        
+    - simpl in *.
+      destruct H as [a' [[Haa' | Hina'] Hinb]].
+      + subst. rewrite Hsplit. apply lazy_in_or_app.
+        left. apply Hinb.
+      + subst. rewrite Hsplit. apply lazy_in_or_app.
+        right. eapply IHlr.
+
+      rewrite Hsplitr2.
+      apply lazy_in_or_app. destruct H as [a' [[Haa' | Hina'] Hinb]].
+      + subst. left. apply Hinb.
+      + right. eapply IHlr.
+        exists a'. split; auto.
+        apply Hinb.
+        apply Hr2.
+  Qed.
   *)
 
   (* begin semBindSize *)
@@ -491,39 +542,54 @@ Module GenLow : GenLowInterface.Sig.
                \bigcup_(a in semGenSize g s) semGenSize (f a) s.
   (* end semBindSize *)
   Proof.
-    unfold semGenSize, possibly_generated.
-    split.
-    - intros [r H]. unfold bigcup.
-      remember (run (bindGen g f) s r) as run.
-      generalize dependent Heqrun.
-      revert g f s r H.
-      induction run using better_ll_ind; intros g f s r H Heqrun.
-      + inversion H.
-      + simpl in H. destruct H.
-        * subst. unfold run in Heqrun. simpl in Heqrun.
-          pose proof randomSplit_codom. edestruct H.
-          destruct (randomSplit r) as [r1 r2].
-          eapply IHrun.
-          
-          induction (run g s r1) using better_ll_ind; inversion Heqrun.
-          simpl in *.
-          destruct (randomSplit r2) as [r3 r4].
-          simpl in *.
-
-
-    
-    - intros [r H]. unfold bigcup.
+    unfold semGenSize.
+    unfold bigcup.
+    unfold possibly_generated.
+    split; rename a into b.
+    - intros [r H].
       simpl in H.
-      destruct (randomSplit r) as [r1 r2].
-      induction (run g s r1) using better_ll_ind.
-      + inversion H.
-      + apply IHl.
-        simpl in H. destruct (randomSplit r2) as [r3 r4].
-        destruct (run (f a0) s r3).
-        * simpl in *. 
-    
-    rewrite /semGenSize /bindGen /= bigcup_codom -curry_codom2l.
-      by rewrite -[codom (prod_curry _)]imsetT -randomSplit_codom -codom_comp.
+      destruct (randomSplit r) as [r1 r2] eqn:Hrs.
+      pose proof H as Hin_bind.
+      apply in_bind in Hin_bind.
+      destruct Hin_bind as [a [Hina [r'' Hinb]]].
+      firstorder.
+    - intros [a [[r' Hina] [r'' HinB]]].
+      destruct (randomSplitAssumption r' r'') as [r Hsplit].
+      exists r.
+      simpl. rewrite Hsplit.
+
+      pose proof Hina as Hmap.
+      apply lazy_in_map with (f:=f) in Hmap; simpl in *.
+
+      Lemma blah:
+        forall {A B : Type} (l : LazyList A) f (a : A) (b : B) s r,
+          In_ll b (run (f a) s (fst (randomSplit r))) ->
+          In_ll (f a) (mapLazyList f l) ->
+          In_ll b (bind_helper (mapLazyList f l) s r).
+      Proof.
+        intros A B l.
+        induction l using better_ll_ind; intros f a' b s r Hinb Hinfa.
+        - simpl in *. inversion Hinfa.
+        - simpl in *. destruct (randomSplit r) as [r1 r2] eqn:Hsplit.
+          
+          
+          apply lazy_in_or_app.
+          destruct Hinfa; simpl in *.
+          + rewrite H. left. apply Hinb.
+          + right. eapply IHl.
+            Focus 2. apply H.
+      Qed.
+          
+
+      remember (run g s r') as lr'. clear Heqlr'.
+      generalize dependent Hina.
+      induction lr' using better_ll_ind; intros Hina.
+
+      + inversion Hina.
+      + simpl in *.
+        destruct Hina as [Ha0a | Hina].
+        * subst. destruct (randomSplit r'').
+          apply lazy_in_or_app. simpl.
   Qed.
   
   Lemma semBindSize_subset_compat {A B : Type} (g g' : G A) (f f' : A -> G B) :
@@ -559,8 +625,19 @@ Module GenLow : GenLowInterface.Sig.
   Lemma monad_rightid A (g : G A) : semGen (bindGen g returnGen) <--> semGen g.
   Proof.
     apply: eq_bigcupr => size; rewrite semBindSize.
-      by rewrite (eq_bigcupr _ (fun x => semReturnSize x size))
-                 /semGenSize bigcup_codom codomE.
+    unfold bigcup.
+    split.
+    - intros [a' [H1 H2]].
+      unfold semGenSize in *. simpl in H2. unfold possibly_generated in H2.
+      destruct H2. inversion H.
+      + subst. auto.
+      + inversion H0.
+    - intros H.
+      exists a. split.
+      + auto.
+      + unfold semGenSize. simpl. unfold possibly_generated.
+        destruct randomSeed_inhabited as [r]. exists r.
+        simpl. auto.
   Qed.
   
   Lemma monad_assoc A B C (ga : G A) (fb : A -> G B) (fc : B -> G C) :
@@ -587,6 +664,7 @@ Module GenLow : GenLowInterface.Sig.
     move => [a [H3 H4]]; exists a; split => //; eapply monotonic; eauto.
   Qed.
 
+  (*
   Program Instance bindMonotonicOpt
           {A B} (g : G A) (f : A -> G (option B))
           `{SizeMonotonic _ g} `{forall x, SizeMonotonicOpt (f x)} : 
@@ -600,7 +678,9 @@ Module GenLow : GenLowInterface.Sig.
     { split; eauto. }
     eapply monotonic_opt in Hin; eauto. now inv Hin.
   Qed.
+   *)
 
+  (*
   Instance bindOptMonotonicOpt
           {A B} (g : G (option A)) (f : A -> G (option B))
           `{SizeMonotonicOpt _ g} `{forall x, SizeMonotonicOpt (f x)} : 
@@ -621,6 +701,7 @@ Module GenLow : GenLowInterface.Sig.
       eapply monotonic_opt; eauto.
     - eapply semReturnSize in H5. inv H5.
   Qed.
+   *)
 
   Program Instance bindMonotonicStrong
           {A B} (g : G A) (f : A -> G B) `{SizeMonotonic _ g}
@@ -635,7 +716,8 @@ Module GenLow : GenLowInterface.Sig.
     eassumption.
     eassumption.
   Qed.
-  
+
+  (*
   Program Instance bindMonotonicOptStrong
           {A B} (g : G A) (f : A -> G (option B)) `{SizeMonotonic _ g}
           `{forall x, semGen g x -> SizeMonotonicOpt (f x)} :
@@ -652,7 +734,9 @@ Module GenLow : GenLowInterface.Sig.
     eapply monotonic_opt in Hin; eauto.
     inv Hin. eassumption.
   Qed.
+  *)
 
+  (*
   Instance bindOptMonotonic
            {A B} (g : G (option A)) (f : A -> G (option B))
            `{SizeMonotonic _ g} `{forall x, SizeMonotonic (f x)} : 
@@ -673,7 +757,8 @@ Module GenLow : GenLowInterface.Sig.
       eapply semReturnSize.
       reflexivity.
   Qed.
-  
+  *)
+
   (* begin semBindUnsized1 *)
   Lemma semBindUnsized1 {A B} (g : G A) (f : A -> G B) `{H : Unsized _ g}:
     semGen (bindGen g f) <--> \bigcup_(a in semGen g) semGen (f a).
@@ -721,6 +806,7 @@ Module GenLow : GenLowInterface.Sig.
       eapply Hf; last eassumption. by apply/leP; apply Max.le_max_r.
   Qed.
 
+  (*
   Lemma semBindOptSizeMonotonicIncl_r {A B} (g : G (option A)) (f : A -> G (option B)) (s1 : set A) (s2 : A -> set B) :
     semGen g \subset (Some @: s1) :|: [set None] ->
     (forall x, semGen (f x) \subset Some @: (s2 x) :|: [set None]) -> 
@@ -742,6 +828,7 @@ Module GenLow : GenLowInterface.Sig.
       * inv H0. inv H3. inv H5. inv H3. eassumption.
       * inv H0.
   Qed.
+   *)
   
   Lemma semBindSizeMonotonicIncl_r {A B} (g : G A) (f : A -> G (option B)) (s1 : set A) (s2 : A -> set B) :
     semGen g \subset s1 ->
@@ -752,8 +839,9 @@ Module GenLow : GenLowInterface.Sig.
     left.
     eexists; split; [| reflexivity ].
     simpl in H. destruct (randomSplit r) as [r1 r2] eqn:Heq.
-    destruct (run (f (run g s r1)) s r2) eqn:Heq2; try discriminate.
-    inv H. eexists (run g s r1). split.
+    destruct ((bind_helper (mapLazyList f (run g s r1)) s r2)) eqn:Heq2; try discriminate.
+    inv H. unfold bigcup.
+    eexists (run g s r1). split.
     eapply H1. eexists; split; [| eexists; reflexivity ].
     now constructor.
     edestruct H2.
