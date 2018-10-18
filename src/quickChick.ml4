@@ -196,7 +196,28 @@ let _ =
       else
         Sys.command (Printf.sprintf "echo QuickChick > %s/tmp" input_dir);
       let timeout = 10 * 60 (* seconds *) in
+
+      
+      
       (* let cmd = Printf.sprintf "timeout -s SIGINT %d `afl-fuzz -i %s -o %s %s @@`" timeout input_dir (temp_dir ^ "/output") execn in  *)
+      let cmd = Printf.sprintf "afl-fuzz -i %s -o %s %s @@" input_dir (temp_dir ^ "/output") execn in
+
+      let bench_cmd = Printf.sprintf "bench '%s'" cmd in
+
+      let output_file = Unix.openfile ("output/" ^ (Filename.basename temp_dir)) [Unix.O_CREAT; Unix.O_WRONLY] 0o640 in
+
+      print_endline bench_cmd;
+      (*  ignore (Unix.create_process bench_cmd [| |] stdin output_file output_file); *)
+
+                
+      (* ignore (Sys.command bench_cmd); *)
+      (*
+      let copy_cmd = Printf.sprintf "cp %s/output/fuzzer_stats output/%s" temp_dir (Filename.basename temp_dir) in
+      Printf.printf "Copy Command: %s\n" copy_cmd;
+      ignore (Sys.command copy_cmd);
+       *)
+
+      (*
       begin match Unix.fork() with
       | 0 ->
          let cmd = Printf.sprintf "afl-fuzz -i %s -o %s %s @@" input_dir (temp_dir ^ "/output") execn in
@@ -206,7 +227,12 @@ let _ =
          Printf.printf "Parent is sleeping for %d seconds...\n" timeout; 
          Unix.sleep timeout;
          ignore (Sys.command ("kill -2 $(pgrep afl-fuzz)"));
-      end;
+         (* Sleep for 5 more seconds to ensure dead *)
+         Unix.sleep 5;
+         Printf.printf "cp %s/output/fuzzer_stats output/%s" temp_dir (Filename.basename temp_dir);
+         ignore (Sys.command (Printf.sprintf "cp %s/output/fuzzer_stats output/%s" temp_dir (Filename.basename temp_dir)));
+      end
+       *) 
       None                               
     end
     else begin 
