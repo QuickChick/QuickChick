@@ -157,3 +157,49 @@ Proof.
     + left. subst; reflexivity.
     + right. auto.
 Qed.
+
+Lemma lazy_append_nil_r :
+  forall {B : Type} (b : B) l,
+    In_ll b l ->
+    In_ll b (lazy_append l (lnil _)).
+Proof.
+  intros B b l H.
+  induction l using better_ll_ind.
+  - inversion H.
+  - simpl in *. firstorder.
+Qed.
+
+Lemma lazy_append_in_l :
+  forall {B : Type} (b : B) l ll,
+    In_ll b l ->
+    In_ll b (lazy_append l ll).
+Proof.
+  intros B b l ll H.
+  induction ll using better_ll_ind.
+  - auto using lazy_append_nil_r.
+  - induction l using better_ll_ind.
+    + inversion H.
+    + simpl in *. firstorder.
+Qed.
+
+Lemma lazy_append_in_r :
+  forall {B : Type} (b : B) l ll,
+    In_ll b ll ->
+    In_ll b (lazy_append l ll).
+Proof.
+  intros B b l ll H.
+  induction l using better_ll_ind; simpl; auto.
+Qed.
+
+Lemma lazy_concat_in :
+  forall {B : Type} (b : B) l ll,
+    In_ll b l ->
+    In_ll l ll ->
+    In_ll b (concatLazyList ll).
+Proof.
+  intros B b l ll Hb Hbll.
+  induction ll using better_ll_ind.
+  - inversion Hbll.
+  - simpl in *. destruct Hbll as [Hal | Hinl]; subst;
+                  auto using lazy_append_in_l, lazy_append_in_r.
+Qed.

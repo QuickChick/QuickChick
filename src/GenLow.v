@@ -54,13 +54,16 @@ Module GenLow : GenLowInterface.Sig.
     MkGen (fun n r => fmap f (run g n r)).
 
   (* Split and use a different random seed on each list *)
-  Fixpoint bind_helper {B : Type} (lgb : LazyList (G B)) (n : nat) (rs : RandomSeed) : LazyList B :=
+  Fixpoint bind_helper' {B : Type} (lgb : LazyList (G B)) (n : nat) (rs : RandomSeed) : LazyList (LazyList B) :=
     match lgb with
     | lnil => lnil _
     | lcons gb ts =>
       let (r1, r2) := randomSplit rs in
-      lazy_append (run gb n r1) (bind_helper (force ts) n r2)
+      lcons _ (run gb n r1) (lazy (bind_helper' (force ts) n r2))
     end.
+
+  Definition bind_helper {B : Type} (lgb : LazyList (G B)) (n : nat) (rs : RandomSeed) : LazyList B := concatLazyList (bind_helper' lgb n rs).
+
 
   Definition bindGen {A B : Type} (g : G A) (k : A -> G B) : G B :=
     MkGen (fun n r =>
@@ -422,7 +425,7 @@ Module GenLow : GenLowInterface.Sig.
     revert r1 r2 H. revert f s g.
     induction runr1 using better_ll_ind; intros f s g r1 r2 H.
     - inversion H.
-    - simpl in *.
+    - simpl in *. unfold bind_helper in *. simpl in *.
       destruct (randomSplit r2) as [r3 r4]. simpl in *.
       apply lazy_in_app_or in H. destruct H.
       + exists a. exists r3. auto.
@@ -479,7 +482,7 @@ Module GenLow : GenLowInterface.Sig.
     generalize dependent r1. revert H. revert r2.
     induction lr using better_ll_ind; intros r2 H r1.
     - inversion H.
-    - simpl in *.
+    - simpl in *. unfold bind_helper in *. simpl in *.
       destruct (randomSplit r2) as [r3 r4] eqn:Hsplit. 
       apply lazy_in_app_or in H. destruct H.
       + exists a. split; auto. exists r3. auto.
@@ -489,53 +492,24 @@ Module GenLow : GenLowInterface.Sig.
         exists x. split; auto. exists x0. auto.
   Qed.
 
-  (*
-  Lemma bind_in:
-    forall {A B : Type} f (g : G A) s (b : B),
-      (exists (a : A) r, In_ll a (run g s (randomSplit r) /\ (exists r'', In_ll b (run (f a) s r''))) ->
-      In_ll b (bind_helper (mapLazyList f (run g s r1)) s r2).
+  Lemma bind_helper_rs :
+    forall {B : Type} (l : LazyList (G B)) (gb : G B) s r',
+      In_ll gb l ->
+      exists r, In_ll (run gb s r') (bind_helper' l s r).
   Proof.
-    intros A B f g s r1 r2 b H.
-    remember (run g s r1) as lr. clear Heqlr.
-    generalize dependent r1. revert H. revert r2.
-    induction lr using better_ll_ind; intros r2 H r1.
-    - destruct H as [a [[] Hblah]].
-    - simpl in *.
-      destruct (randomSplit r2) as [r3 r4] eqn:Hsplit.
-      apply lazy_in_or_app.
-      destruct H as [a' [[Haa' | Hina'] [r'' Hinb]]].
-      + subst. left. simpl in *. apply Hinb.
-      + right. apply IHlr.
-        exists a'. split; auto.
-
-
-    
-    intros A B f g s r1 r2 r3 r4 b Hsplit H.
-    remember (run g s r1) as lr. clear Heqlr.
-    generalize dependent r1.
-    generalize dependent r2.
-    generalize dependent r3.
-    generalize dependent r4.
-    induction lr using better_ll_ind; intros r4 r3 H r2 Hsplit r1.
-    - simpl in *. destruct H as [a [contra Hblah]].
-      contradiction.        
-    - simpl in *.
-      destruct H as [a' [[Haa' | Hina'] Hinb]].
-      + subst. rewrite Hsplit. apply lazy_in_or_app.
-        left. apply Hinb.
-      + subst. rewrite Hsplit. apply lazy_in_or_app.
-        right. eapply IHlr.
-
-      rewrite Hsplitr2.
-      apply lazy_in_or_app. destruct H as [a' [[Haa' | Hina'] Hinb]].
-      + subst. left. apply Hinb.
-      + right. eapply IHlr.
-        exists a'. split; auto.
-        apply Hinb.
-        apply Hr2.
+    intros B l.
+    induction l using better_ll_ind;
+      intros gb s r' H.
+    - inversion H.
+    - simpl in *. destruct H as [Hagb | Hingb].
+      + subst.
+        destruct (randomSplitAssumption r' r') as [r Hsplit].
+        exists r. rewrite Hsplit. simpl. auto.
+      + pose proof IHl gb s r' Hingb as [rlater Hexists].
+        destruct (randomSplitAssumption rlater rlater) as [r Hsplit].
+        exists r. rewrite Hsplit. simpl. right. auto.
   Qed.
-  *)
-
+    
   (* begin semBindSize *)
   Lemma semBindSize A B (g : G A) (f : A -> G B) (s : nat) :
     semGenSize (bindGen g f) s <-->
@@ -554,42 +528,21 @@ Module GenLow : GenLowInterface.Sig.
       destruct Hin_bind as [a [Hina [r'' Hinb]]].
       firstorder.
     - intros [a [[r' Hina] [r'' HinB]]].
-      destruct (randomSplitAssumption r' r'') as [r Hsplit].
+      unfold bindGen. simpl.
+
+      set l:= (mapLazyList f (run g s r')).
+      assert (In_ll (f a) l) as Hinfa.
+      apply lazy_in_map. apply Hina.
+
+      pose proof @bind_helper_rs B l (f a) s r'' Hinfa as [r2 H].
+      
+      destruct (randomSplitAssumption r' r2) as [r Hsplit].
+
       exists r.
       simpl. rewrite Hsplit.
+      unfold bind_helper.
 
-      pose proof Hina as Hmap.
-      apply lazy_in_map with (f:=f) in Hmap; simpl in *.
-
-      Lemma blah:
-        forall {A B : Type} (l : LazyList A) f (a : A) (b : B) s r,
-          In_ll b (run (f a) s (fst (randomSplit r))) ->
-          In_ll (f a) (mapLazyList f l) ->
-          In_ll b (bind_helper (mapLazyList f l) s r).
-      Proof.
-        intros A B l.
-        induction l using better_ll_ind; intros f a' b s r Hinb Hinfa.
-        - simpl in *. inversion Hinfa.
-        - simpl in *. destruct (randomSplit r) as [r1 r2] eqn:Hsplit.
-          
-          
-          apply lazy_in_or_app.
-          destruct Hinfa; simpl in *.
-          + rewrite H. left. apply Hinb.
-          + right. eapply IHl.
-            Focus 2. apply H.
-      Qed.
-          
-
-      remember (run g s r') as lr'. clear Heqlr'.
-      generalize dependent Hina.
-      induction lr' using better_ll_ind; intros Hina.
-
-      + inversion Hina.
-      + simpl in *.
-        destruct Hina as [Ha0a | Hina].
-        * subst. destruct (randomSplit r'').
-          apply lazy_in_or_app. simpl.
+      eapply lazy_concat_in; eauto.
   Qed.
   
   Lemma semBindSize_subset_compat {A B : Type} (g g' : G A) (f f' : A -> G B) :
