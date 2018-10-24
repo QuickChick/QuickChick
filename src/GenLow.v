@@ -1192,12 +1192,6 @@ Module GenLow : GenLowInterface.Sig.
     apply/leP. eapply Nat.max_le_compat_l. ssromega.
   Qed.
 
-  Lemma bigcup_setI {T U} (s1 : set T) (s2 : set U) F :
-    \bigcup_(x in s1) (s2 :&: F x) <--> s2 :&: \bigcup_(x in s1) (F x).
-  Proof.
-    firstorder.
-  Qed.
-
   Lemma suchThatMaybeOptAux_subset_compat :
     forall {A : Type} (p : A -> bool) (g1 g2 : G (option A)) n k,
       (forall s, isSome :&: (semGenSize g1 s) \subset isSome :&: (semGenSize g2 s)) ->
