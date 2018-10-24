@@ -115,12 +115,9 @@ Instance GenSuchThatCorrectOptOfSuchThatCorrect
 Instance SizeMonotonicOptofSizeMonotonic {A} (g : G (option A))
          {H : SizeMonotonic g} : SizeMonotonicOpt g.
 Proof.
-  constructor. intros.
-  eapply setI_subset_compat.
-  now eapply subset_refl.
-  eapply H; eauto.
+  intros s1 s2 Hs a.
+  eapply monotonic; eauto.
 Qed.
-
 
 (** * Coercions from sized to unsized generators *)
 

@@ -146,6 +146,61 @@ Definition elems_ {A : Type} (def : A) (l : list A) :=
 Definition elements {A} :=
   @deprecate (A -> list A -> G A) "elements" "elems_" elems_.  
 
+Definition bindGenOpt {A B}
+           (g : G (option A)) (f : A -> G (option B)) : G (option B) :=
+  bindGen g (fun ma =>
+    match ma with
+    | None => returnGen None
+    | Some a => f a
+    end).
+
+Definition retryBody {A : Type}
+           (retry : nat -> G (option A) -> G (option A))
+           (n : nat) (g : G (option A)) : G (option A) :=
+  bindGen g (fun x =>
+               match x, n with
+               | Some a, _ => returnGen (Some a)
+               | None, O => returnGen None
+               | None, S n' => retry n' g
+               end).
+
+(* Rerun a generator [g] until it returns a [Some], or stop after
+     [n+1] tries. *)
+Fixpoint retry {A : Type} (n : nat) (g : G (option A)) :
+  G (option A) :=
+  retryBody retry n g.
+
+(* Filter the output of a generator [g], returning [None] when the
+     predicate [p] is [false]. The generator is run once. *)
+Definition suchThatMaybe1 {A : Type} (g : G A) (p : A -> bool) :
+  G (option A) :=
+  fmap (fun x => if p x then Some x else None) g.
+
+(* Retry a generator [g : G A] until it returns a value satisfying
+     the predicate, or stop after [size+1] times, where [size] is the
+     current size value. *)
+Definition suchThatMaybe {A : Type} (g : G A) (p : A -> bool) :
+  G (option A) :=
+  sized (fun n => retry n (suchThatMaybe1 g p)).
+
+(* Retry a generator [g : G (option A)] until it returns a value
+     satisfying the predicate, or stop after [size+1] times, where
+     [size] is the current size value. *)
+Definition suchThatMaybeOpt {A : Type} (g : G (option A))
+           (p : A -> bool) : G (option A) :=
+  sized (fun n => retry n (fmap (fun x =>
+                                   match x with
+                                   | None => None
+                                   | Some a => if p a then Some a else None
+                                   end) g)).
+
+(* Retry a generator until it returns a value, or stop after
+     [size+1] times. *)
+Definition retrySized {A : Type} (g : G (option A)) : G (option A) :=
+  sized (fun n => retry n g).
+
+(* * Semantics *)
+
 Lemma semLiftGen {A B} (f: A -> B) (g: G A) :
   semGen (liftGen f g) <--> f @: semGen g.
 Proof.
@@ -911,7 +966,7 @@ Proof.
       * intros [ y | ].
         now eauto with typeclass_instances.
         move => _.
-        constructor. intros. rewrite !semBacktrackFuelDef; eauto.
+        intros s1 s2 Hs. rewrite !semBacktrackFuelDef; eauto.
         eapply subset_refl.
       * rewrite Hsum. ssromega.
     + edestruct (pickDrop_exists lg x) as [[k [g' [lg' [Hin' [Hdrop [Hneq [Heq [Heq' Hlen]]]]]]]] _].
@@ -1083,16 +1138,16 @@ Proof.
   - move => HSum /List.length_zero_iff_nil HLen; subst; simpl.
     auto with typeclass_instances.
   - move => HSum HLen Hsub.
-    constructor. intros s1 s2 Hleq x [H1 H2]. destruct x; try discriminate.
+    intros s1 s2 Hleq x H.
     assert (Ha : tot > 0). 
     { destruct tot; auto;
-      apply backtrackFuel_sum_fst in H2; auto. inv H2. }
-    eapply semBindSize in H2. split; eauto.
-    destruct H2 as [n [Hn H2]]. 
+      apply backtrackFuel_sum_fst in H; auto. inv H. }
+    eapply semBindSize in H.
+    destruct H as [n [Hn H]].
     eapply semChooseSize in Hn; eauto.
     destruct (pickDrop lg n) as [[k g] gs'] eqn:Heqd.
-    eapply semBindSize in H2. 
-    destruct H2 as [b [Hgb Hf]].
+    eapply semBindSize in H.
+    destruct H as [b [Hgb Hf]].
     assert (Hlt : n < sum_fst lg).
     { unfold leq, super, ChooseNat, OrdNat in *. now ssromega. }
     edestruct (pickDrop_exists lg n) as [[m [g' [lg' [Hin' [Hdrop [Hneq [Heq1 [Heq2 Hlen]]]]]]]] _];
@@ -1103,14 +1158,12 @@ Proof.
       eexists n. split.
       eapply semChooseSize; now eauto.
       rewrite Hdrop. eapply semBindSize.
-      exists (Some a). split. eapply Hsub in Hin'.
-      have Hin: (isSome :&:  semGenSize g s2) (Some a).
-      { eapply Hin'. eassumption. split; eauto.
-        eapply semReturnSize in Hf; inv Hf. eassumption. }
-      inv Hin. eassumption.
-      eapply semReturnSize. reflexivity.
-    + have Hin :(isSome :&: semGenSize (backtrackFuel fuel (sum_fst lg - k) gs') s1) (Some a).
-      { split ; eauto. }
+      exists (Some b). split. eapply Hsub in Hin'.
+      eapply monotonicOpt; eauto.
+      apply semReturnSize; apply semReturnSize in Hf; auto.
+    + Admitted. (*
+      (* have Hin :(isSome :&: semGenSize (backtrackFuel fuel (sum_fst lg - k) gs') s1) (Some a).
+      { split ; eauto. } *)
       eapply IHfuel in Hin; try eassumption. destruct Hin as [_ Hin].
       * eapply backtrackFuel_list_mon; [| | | | | split; [ auto | eassumption ] ];
         try auto; try ssromega.
@@ -1120,6 +1173,7 @@ Proof.
       * eapply subset_trans; [| eassumption ].
         eapply pickDrop_subset; eauto.
 Qed.
+*)
 
 Corollary backtrackSizeMonotonic {A : Type} (lg : seq (nat * G (option A))) :
   lg \subset [set x | SizeMonotonic x.2 ] ->
@@ -1419,6 +1473,241 @@ Next Obligation.
   move => a [s1' [/andP [_ H11] H12]].
   eexists. split; last by eapply monotonic; eauto. 
   apply/andP; split => //. by eapply leq_trans; eauto. 
+Qed.
+
+
+Instance bindOptMonotonicOpt
+         {A B} (g : G (option A)) (f : A -> G (option B))
+         `{SizeMonotonicOpt _ g} `{forall x, SizeMonotonicOpt (f x)} :
+  SizeMonotonicOpt (bindGenOpt g f).
+Proof.
+  intros s1 s2 Hleq.
+  unfold semGenSizeOpt.
+  rewrite !semBindSize. move => b.
+  move => [a [Hsome Hb]].
+  exists a.
+  destruct a.
+  - split.
+    eapply monotonicOpt; eauto; eexists; eauto.
+    eapply monotonicOpt; eauto; eexists; eauto.
+  - apply semReturnSize in Hb; discriminate Hb.
+Qed.
+
+Instance bindOptMonotonic
+         {A B} (g : G (option A)) (f : A -> G (option B))
+         `{SizeMonotonic _ g} `{forall x, SizeMonotonic (f x)} :
+  SizeMonotonic (bindGenOpt g f).
+Proof.
+  intros s1 s2 Hleq.
+  intros x Hx. eapply semBindSize in Hx.
+  destruct Hx as [a [Hg Hf]].
+  destruct a as [a | ].
+  - eapply H in Hg; try eassumption.
+    eapply H0 in Hf; try eassumption.
+    eapply semBindSize.
+    eexists; split; eauto.
+  - eapply H in Hg; try eassumption.
+    eapply semReturnSize in Hf. inv Hf.
+    eapply semBindSize.
+    eexists; split; eauto. simpl.
+    eapply semReturnSize.
+    reflexivity.
+Qed.
+
+Lemma semBindOptSizeMonotonicIncl_r {A B} (g : G (option A)) (f : A -> G (option B)) (s1 : set A) (s2 : A -> set B) :
+  semGen g \subset (Some @: s1) :|: [set None] ->
+  (forall x, semGen (f x) \subset Some @: (s2 x) :|: [set None]) ->
+  semGen (bindGenOpt g f) \subset Some @: (\bigcup_(a in s1) s2 a) :|: [set None].
+Proof.
+Admitted.
+
+Lemma semBindOptSizeMonotonicIncl_l {A B} (g : G (option A)) (f : A -> G (option B)) (s1 : set A)
+      (fs : A -> set B)
+      `{Hg : SizeMonotonicOpt _ g}
+      `{Hf : forall a, SizeMonotonicOpt (f a)} :
+  Some @: s1 \subset semGen g ->
+  (forall x, Some @: (fs x) \subset semGen (f x)) ->
+  (Some @: \bigcup_(a in s1) (fs a)) \subset semGen (bindGenOpt g f).
+Proof.
+Admitted.
+
+Lemma  semBindOptSizeOpt_subset_compat {A B : Type} (g g' : G (option A)) (f f' : A -> G (option B)) :
+  (forall s, isSome :&: semGenSize g s \subset isSome :&: semGenSize g' s) ->
+  (forall x s, isSome :&: semGenSize (f x) s \subset isSome :&: semGenSize (f' x) s) ->
+  (forall s, isSome :&: semGenSize (bindGenOpt g f) s \subset isSome :&: semGenSize (bindGenOpt g' f') s).
+Proof.
+  intros Hg Hf s x [Hin1 Hin2].
+  split; [ eassumption |].
+  unfold bindGenOpt in *.
+  eapply semBindSize in Hin2. destruct Hin2 as [a [Hg' Hf']].
+  destruct a as [a |].
+  - assert (Hg'' : ((fun u : option A => u) :&: semGenSize g s) (Some a)).
+    { split; eauto. }
+    eapply Hg in Hg''.  destruct Hg'' as [_ Hg''].
+    eapply semBindSize. eexists; split; [ eassumption |].
+    simpl. eapply Hf. split; eauto.
+  - eapply semReturnSize in Hf'.  inv Hf'. discriminate.
+Qed.
+
+Definition GOpt A := G (option A).
+
+Global Instance Monad_GOpt : Monad GOpt := {
+  ret A x := returnGen (Some x);
+  bind A B := bindGenOpt;
+}.
+
+Lemma semSize_retryBody {A} (n : nat) (g : G (option A)) (s : nat) :
+  match n with
+  | S n' => semGenSize (retry n' g) s <--> semGenSize g s
+  | O => True
+  end ->
+  semGenSize (retryBody retry n g) s <--> semGenSize g s.
+Proof.
+  intro Hn.
+  unfold retryBody.
+  rewrite semBindSize.
+  intros a; split; intro Ha.
+  - destruct Ha as [a1 [Hg Ha]].
+    destruct a1.
+    + apply semReturnSize in Ha.
+      inversion Ha; subst; auto.
+    + destruct n.
+      * apply semReturnSize in Ha; inversion Ha; auto.
+      * apply Hn; auto.
+  - exists a. split; auto.
+    destruct a.
+    + apply semReturnSize; reflexivity.
+    + destruct n.
+      * apply semReturnSize; reflexivity.
+      * apply Hn; auto.
+Qed.
+
+Lemma semSize_retry {A} (n : nat) (g : G (option A)) (s : nat) :
+  semGenSize (retry n g) s <--> semGenSize g s.
+Proof.
+  induction n; apply semSize_retryBody; auto.
+Qed.
+
+Lemma semSizeOpt_retry {A} (n : nat) (g : G (option A)) (s : nat) :
+  semGenSizeOpt (retry n g) s <--> semGenSizeOpt g s.
+Proof.
+  unfold semGenSizeOpt. rewrite semSize_retry. reflexivity.
+Qed.
+
+Lemma semSizeOpt_suchThatMaybe1 {A : Type} (g : G A) (p : A -> bool)
+      (s : nat) :
+  semGenSizeOpt (suchThatMaybe1 g p) s <--> semGenSize g s :&: p.
+Proof.
+  unfold semGenSizeOpt, suchThatMaybe1.
+  rewrite semFmapSize.
+  intros a; split; intros Ha.
+  - destruct Ha as [a' [Ha' Hp]].
+    destruct (p a') eqn:Hp'; inversion Hp; subst.
+    split; auto.
+  - destruct Ha as [Hg Hp].
+    exists a.
+    rewrite Hp.
+    split; auto.
+    reflexivity.
+Qed.
+
+Lemma semSizeOpt_suchThatMaybe {A : Type} (g : G A) (p : A -> bool)
+      (s : nat) :
+  semGenSizeOpt (suchThatMaybe g p) s <--> semGenSize g s :&: p.
+Proof.
+  unfold suchThatMaybe.
+  unfold semGenSizeOpt.
+  rewrite semSizedSize.
+  fold (semGenSizeOpt (retry s (suchThatMaybe1 g p)) s).
+  rewrite semSizeOpt_retry.
+  apply semSizeOpt_suchThatMaybe1.
+Qed.
+
+Lemma semSizeOpt_suchThatMaybeOpt {A : Type} (g : G (option A))
+      (p : A -> bool) (s : nat) :
+  semGenSizeOpt (suchThatMaybeOpt g p) s <--> semGenSizeOpt g s :&: p.
+Proof.
+  unfold suchThatMaybeOpt.
+  unfold semGenSizeOpt.
+  rewrite semSizedSize semSize_retry semFmapSize.
+  intros a; split; intros Ha.
+  - destruct Ha as [[ a'| ] [Hg Ha]]; inversion Ha.
+    destruct (p a') eqn:Hp; inversion H0; subst.
+    split; auto.
+  - destruct Ha as [Hg Hp].
+    exists (Some a).
+    rewrite Hp; split; auto; reflexivity.
+Qed.
+
+Instance Monotonic_retry {A} (n : nat) (g : G (option A)) :
+  SizeMonotonic g ->
+  SizeMonotonic (retry n g).
+Proof.
+  intros Hg s1 s2 Hs.
+  do 2 rewrite semSize_retry; auto.
+Qed.
+
+Instance MonotonicOpt_retry {A} (n : nat) (g : G (option A)) :
+  SizeMonotonicOpt g ->
+  SizeMonotonicOpt (retry n g).
+Proof.
+  intros Hg s1 s2 Hs.
+  do 2 rewrite semSizeOpt_retry; auto.
+Qed.
+
+Instance Monotonic_suchThatMaybe1
+         {A : Type} (g : G A) (f : A -> bool) :
+  SizeMonotonic g ->
+  SizeMonotonic (suchThatMaybe1 g f).
+Proof.
+  intros Hg s1 s2 Hs.
+  unfold suchThatMaybe1.
+  do 2 rewrite semFmapSize.
+  apply imset_incl; auto.
+Qed.
+
+Instance MonotonicOpt_suchThatMaybe1
+         {A : Type} (g : G A) (f : A -> bool) :
+  SizeMonotonic g ->
+  SizeMonotonicOpt (suchThatMaybe1 g f).
+Proof.
+  intros Hg s1 s2 Hs.
+  unfold semGenSizeOpt.
+  apply somes_subset.
+  apply Monotonic_suchThatMaybe1; auto.
+Qed.
+
+Instance Monotonic_suchThatMaybe
+         {A : Type} (g : G A) (f : A -> bool) :
+  SizeMonotonic g ->
+  SizeMonotonic (suchThatMaybe g f).
+Proof.
+  intros Hg s1 s2 Hs.
+  unfold suchThatMaybe.
+  do 2 rewrite semSizedSize semSize_retry.
+  apply Monotonic_suchThatMaybe1; auto.
+Qed.
+
+Instance MonotonicOpt_suchThatMaybe
+         {A : Type} (g : G A) (f : A -> bool) :
+  SizeMonotonic g ->
+  SizeMonotonicOpt (suchThatMaybe g f).
+Proof.
+  intros Hg s1 s2 Hs.
+  unfold semGenSizeOpt.
+  apply somes_subset.
+  apply Monotonic_suchThatMaybe; auto.
+Qed.
+
+Instance MonotonicOpt_suchThatMaybeOpt
+         {A : Type} (g : G (option A)) (f : A -> bool) :
+  SizeMonotonicOpt g ->
+  SizeMonotonicOpt (suchThatMaybeOpt g f).
+Proof.
+  intros Hg s1 s2 Hs.
+  do 2 rewrite semSizeOpt_suchThatMaybeOpt.
+  apply setI_subset_compat; auto.
+  apply subset_refl.
 Qed.
 
 End Impl.

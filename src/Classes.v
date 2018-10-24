@@ -209,7 +209,6 @@ Proof.
   constructor. unfold arbitrary, GenOfGenSized. 
   eapply set_eq_trans.
   - eapply semSized_alt; eauto with typeclass_instances.
-    destruct PSMon. eauto.
   - setoid_rewrite arbitrarySizedCorrect.
     split. intros [n H3]. constructor; eauto.
     intros H4. eexists; split; eauto.
