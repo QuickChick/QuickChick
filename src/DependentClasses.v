@@ -155,8 +155,8 @@ Admitted. (* XXX lemma *)
 Instance SizeMonotonicOptOfBounded (A : Type) (P : A -> Prop)
          (H1 : GenSizedSuchThat A P)
          (H2 : SizedProofEqs P) (* XXX change name *)
-         (H2 : forall s : nat, SizeMonotonicOpt (arbitrarySizeST s))
-         (H3 : SizedMonotonicOpt arbitrarySizeST) (* XXX change name *)
+         (H3 : forall s : nat, SizeMonotonicOpt (arbitrarySizeST s))
+         (H4 : SizedMonotonicOpt arbitrarySizeST) (* XXX change name *)
 : SizeMonotonicOpt (genST P).
 (* end SizeMonotonicOptOfBounded *)
 Proof.
