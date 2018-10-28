@@ -29,6 +29,9 @@ matrix:
 os:
     - linux
     - osx
+branches:
+  except:
+  - FuzzChick
 
 before_install:
     if [ $TRAVIS_OS_NAME = osx ]; then
@@ -67,10 +70,6 @@ script:
   echo -en 'travis_fold:start:QuickChick.test.multifile-mutation';
   make -C examples/multifile-mutation test;
   echo -en 'travis_fold:end:QuickChick.test.multifile-mutation'
-- echo 'Fuzzing IFC...';
-  echo -en 'travis_fold:start:QuickChick.test.fuzz-ifc';
-  make -C examples/fuzz-ifc;
-  echo -en 'travis_fold:end:QuickChick.test.fuzz-ifc'
 - echo 'Testing C Mutation...';
   echo -en 'travis_fold:start:QuickChick.test.c-mutation';
   make -C examples/c-mutation test;
