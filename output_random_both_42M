@@ -1,0 +1,1825 @@
+File "./Bench.v", line 10, characters 0-33:
+Warning: Notation _ @ _ was already used. [notation-overridden,parsing]
+File "./Bench.v", line 10, characters 0-33:
+Warning: Notation _ `[ _ ] was already used. [notation-overridden,parsing]
+File "./Bench.v", line 10, characters 0-33:
+Warning: Notation _ + _ was already used. [notation-overridden,parsing]
+File "./Bench.v", line 10, characters 0-33:
+Warning: Notation ∂ _ was already used. [notation-overridden,parsing]
+File "./Bench.v", line 10, characters 0-33:
+Warning: Notation _ ∪ _ was already used. [notation-overridden,parsing]
+QuickChecking (testMutantX_ rSSNI_naive 0)
+File "./Bench.v", line 31, characters 0-40:
+Warning: The following logical axioms were
+encountered: fstepP Mem.upd_get_frame Mem.memory_extensionality
+             Mem.upd_frame_defined.
+Having invalid logical axiom in the
+environment when extracting may lead to incorrect or non-terminating ML
+terms.
+ [extraction-logical-axiom,extraction]
+perl: warning: Setting locale failed.
+perl: warning: Please check that your locale settings:
+	LANGUAGE = (unset),
+	LC_ALL = (unset),
+	LANG = "C.UTF-8"
+    are supported and installed on your system.
+perl: warning: Falling back to the standard locale ("C").
+Extracted ML file: /tmp/QuickChick/023645/QuickChick285ed5.ml
+Extra: 
+Compile command: ocamlopt unix.cmxa -unsafe-string -rectypes -w a -I /tmp/QuickChick/023645 -I /fs/buzz/llampro/.opam/4.04.0+afl/lib/coq/user-contrib/QuickChick /fs/buzz/llampro/.opam/4.04.0+afl/lib/coq/user-contrib/QuickChick/quickChickLib.cmx  /tmp/QuickChick/023645/QuickChick285ed5.ml -o /tmp/QuickChick/023645/QuickChick285ed5
+Extra: 
+39559073 : "()"
+2440927 : true
++++ Passed 42000000 tests (0 discards)
+
+real	79m40.735s
+user	79m40.706s
+sys	0m0.011s
+QuickChecking (testMutantX_ rSSNI_naive 1)
+File "./Bench.v", line 32, characters 0-40:
+Warning: The following logical axioms were
+encountered: fstepP Mem.upd_get_frame Mem.memory_extensionality
+             Mem.upd_frame_defined.
+Having invalid logical axiom in the
+environment when extracting may lead to incorrect or non-terminating ML
+terms.
+ [extraction-logical-axiom,extraction]
+perl: warning: Setting locale failed.
+perl: warning: Please check that your locale settings:
+	LANGUAGE = (unset),
+	LC_ALL = (unset),
+	LANG = "C.UTF-8"
+    are supported and installed on your system.
+perl: warning: Falling back to the standard locale ("C").
+Extracted ML file: /tmp/QuickChick/035633/QuickChickbda862.ml
+Extra: 
+Compile command: ocamlopt unix.cmxa -unsafe-string -rectypes -w a -I /tmp/QuickChick/035633 -I /fs/buzz/llampro/.opam/4.04.0+afl/lib/coq/user-contrib/QuickChick /fs/buzz/llampro/.opam/4.04.0+afl/lib/coq/user-contrib/QuickChick/quickChickLib.cmx  /tmp/QuickChick/035633/QuickChickbda862.ml -o /tmp/QuickChick/035633/QuickChickbda862
+Extra: 
+39559336 : "()"
+2440664 : true
++++ Passed 42000000 tests (0 discards)
+
+real	75m28.519s
+user	75m28.492s
+sys	0m0.010s
+QuickChecking (testMutantX_ rSSNI_naive 2)
+File "./Bench.v", line 33, characters 0-40:
+Warning: The following logical axioms were
+encountered: fstepP Mem.upd_get_frame Mem.memory_extensionality
+             Mem.upd_frame_defined.
+Having invalid logical axiom in the
+environment when extracting may lead to incorrect or non-terminating ML
+terms.
+ [extraction-logical-axiom,extraction]
+perl: warning: Setting locale failed.
+perl: warning: Please check that your locale settings:
+	LANGUAGE = (unset),
+	LC_ALL = (unset),
+	LANG = "C.UTF-8"
+    are supported and installed on your system.
+perl: warning: Falling back to the standard locale ("C").
+Extracted ML file: /tmp/QuickChick/051207/QuickChicke63b07.ml
+Extra: 
+Compile command: ocamlopt unix.cmxa -unsafe-string -rectypes -w a -I /tmp/QuickChick/051207 -I /fs/buzz/llampro/.opam/4.04.0+afl/lib/coq/user-contrib/QuickChick /fs/buzz/llampro/.opam/4.04.0+afl/lib/coq/user-contrib/QuickChick/quickChickLib.cmx  /tmp/QuickChick/051207/QuickChicke63b07.ml -o /tmp/QuickChick/051207/QuickChicke63b07
+Extra: 
+39559021 : "()"
+2440979 : true
++++ Passed 42000000 tests (0 discards)
+
+real	75m53.972s
+user	75m52.653s
+sys	0m1.302s
+QuickChecking (testMutantX_ rSSNI_naive 3)
+File "./Bench.v", line 34, characters 0-40:
+Warning: The following logical axioms were
+encountered: fstepP Mem.upd_get_frame Mem.memory_extensionality
+             Mem.upd_frame_defined.
+Having invalid logical axiom in the
+environment when extracting may lead to incorrect or non-terminating ML
+terms.
+ [extraction-logical-axiom,extraction]
+perl: warning: Setting locale failed.
+perl: warning: Please check that your locale settings:
+	LANGUAGE = (unset),
+	LC_ALL = (unset),
+	LANG = "C.UTF-8"
+    are supported and installed on your system.
+perl: warning: Falling back to the standard locale ("C").
+Extracted ML file: /tmp/QuickChick/062808/QuickChick03c3ec.ml
+Extra: 
+Compile command: ocamlopt unix.cmxa -unsafe-string -rectypes -w a -I /tmp/QuickChick/062808 -I /fs/buzz/llampro/.opam/4.04.0+afl/lib/coq/user-contrib/QuickChick /fs/buzz/llampro/.opam/4.04.0+afl/lib/coq/user-contrib/QuickChick/quickChickLib.cmx  /tmp/QuickChick/062808/QuickChick03c3ec.ml -o /tmp/QuickChick/062808/QuickChick03c3ec
+Extra: 
+39559417 : "()"
+2440583 : true
++++ Passed 42000000 tests (0 discards)
+
+real	76m24.016s
+user	76m23.991s
+sys	0m0.011s
+QuickChecking (testMutantX_ rSSNI_naive 4)
+File "./Bench.v", line 35, characters 0-40:
+Warning: The following logical axioms were
+encountered: fstepP Mem.upd_get_frame Mem.memory_extensionality
+             Mem.upd_frame_defined.
+Having invalid logical axiom in the
+environment when extracting may lead to incorrect or non-terminating ML
+terms.
+ [extraction-logical-axiom,extraction]
+perl: warning: Setting locale failed.
+perl: warning: Please check that your locale settings:
+	LANGUAGE = (unset),
+	LC_ALL = (unset),
+	LANG = "C.UTF-8"
+    are supported and installed on your system.
+perl: warning: Falling back to the standard locale ("C").
+Extracted ML file: /tmp/QuickChick/074438/QuickChick224e10.ml
+Extra: 
+Compile command: ocamlopt unix.cmxa -unsafe-string -rectypes -w a -I /tmp/QuickChick/074438 -I /fs/buzz/llampro/.opam/4.04.0+afl/lib/coq/user-contrib/QuickChick /fs/buzz/llampro/.opam/4.04.0+afl/lib/coq/user-contrib/QuickChick/quickChickLib.cmx  /tmp/QuickChick/074438/QuickChick224e10.ml -o /tmp/QuickChick/074438/QuickChick224e10
+Extra: 
+39559267 : "()"
+2440733 : true
++++ Passed 42000000 tests (0 discards)
+
+real	77m33.893s
+user	77m33.870s
+sys	0m0.008s
+QuickChecking (testMutantX_ rSSNI_naive 5)
+File "./Bench.v", line 36, characters 0-40:
+Warning: The following logical axioms were
+encountered: fstepP Mem.upd_get_frame Mem.memory_extensionality
+             Mem.upd_frame_defined.
+Having invalid logical axiom in the
+environment when extracting may lead to incorrect or non-terminating ML
+terms.
+ [extraction-logical-axiom,extraction]
+perl: warning: Setting locale failed.
+perl: warning: Please check that your locale settings:
+	LANGUAGE = (unset),
+	LC_ALL = (unset),
+	LANG = "C.UTF-8"
+    are supported and installed on your system.
+perl: warning: Falling back to the standard locale ("C").
+Extracted ML file: /tmp/QuickChick/090218/QuickChick476e33.ml
+Extra: 
+Compile command: ocamlopt unix.cmxa -unsafe-string -rectypes -w a -I /tmp/QuickChick/090218 -I /fs/buzz/llampro/.opam/4.04.0+afl/lib/coq/user-contrib/QuickChick /fs/buzz/llampro/.opam/4.04.0+afl/lib/coq/user-contrib/QuickChick/quickChickLib.cmx  /tmp/QuickChick/090218/QuickChick476e33.ml -o /tmp/QuickChick/090218/QuickChick476e33
+Extra: 
+39558468 : "()"
+2441532 : true
++++ Passed 42000000 tests (0 discards)
+
+real	75m8.823s
+user	75m8.803s
+sys	0m0.008s
+QuickChecking (testMutantX_ rSSNI_naive 6)
+File "./Bench.v", line 37, characters 0-40:
+Warning: The following logical axioms were
+encountered: fstepP Mem.upd_get_frame Mem.memory_extensionality
+             Mem.upd_frame_defined.
+Having invalid logical axiom in the
+environment when extracting may lead to incorrect or non-terminating ML
+terms.
+ [extraction-logical-axiom,extraction]
+perl: warning: Setting locale failed.
+perl: warning: Please check that your locale settings:
+	LANGUAGE = (unset),
+	LC_ALL = (unset),
+	LANG = "C.UTF-8"
+    are supported and installed on your system.
+perl: warning: Falling back to the standard locale ("C").
+Extracted ML file: /tmp/QuickChick/101733/QuickChickfd9f05.ml
+Extra: 
+Compile command: ocamlopt unix.cmxa -unsafe-string -rectypes -w a -I /tmp/QuickChick/101733 -I /fs/buzz/llampro/.opam/4.04.0+afl/lib/coq/user-contrib/QuickChick /fs/buzz/llampro/.opam/4.04.0+afl/lib/coq/user-contrib/QuickChick/quickChickLib.cmx  /tmp/QuickChick/101733/QuickChickfd9f05.ml -o /tmp/QuickChick/101733/QuickChickfd9f05
+Extra: 
+39560326 : "()"
+2439674 : true
++++ Passed 42000000 tests (0 discards)
+
+real	76m43.254s
+user	76m43.232s
+sys	0m0.010s
+QuickChecking (testMutantX_ rSSNI_naive 7)
+File "./Bench.v", line 38, characters 0-40:
+Warning: The following logical axioms were
+encountered: fstepP Mem.upd_get_frame Mem.memory_extensionality
+             Mem.upd_frame_defined.
+Having invalid logical axiom in the
+environment when extracting may lead to incorrect or non-terminating ML
+terms.
+ [extraction-logical-axiom,extraction]
+perl: warning: Setting locale failed.
+perl: warning: Please check that your locale settings:
+	LANGUAGE = (unset),
+	LC_ALL = (unset),
+	LANG = "C.UTF-8"
+    are supported and installed on your system.
+perl: warning: Falling back to the standard locale ("C").
+Extracted ML file: /tmp/QuickChick/113423/QuickChick4a22dc.ml
+Extra: 
+Compile command: ocamlopt unix.cmxa -unsafe-string -rectypes -w a -I /tmp/QuickChick/113423 -I /fs/buzz/llampro/.opam/4.04.0+afl/lib/coq/user-contrib/QuickChick /fs/buzz/llampro/.opam/4.04.0+afl/lib/coq/user-contrib/QuickChick/quickChickLib.cmx  /tmp/QuickChick/113423/QuickChick4a22dc.ml -o /tmp/QuickChick/113423/QuickChick4a22dc
+Extra: 
+39559679 : "()"
+2440321 : true
++++ Passed 42000000 tests (0 discards)
+
+real	77m11.813s
+user	77m11.788s
+sys	0m0.008s
+QuickChecking (testMutantX_ rSSNI_naive 8)
+File "./Bench.v", line 39, characters 0-40:
+Warning: The following logical axioms were
+encountered: fstepP Mem.upd_get_frame Mem.memory_extensionality
+             Mem.upd_frame_defined.
+Having invalid logical axiom in the
+environment when extracting may lead to incorrect or non-terminating ML
+terms.
+ [extraction-logical-axiom,extraction]
+perl: warning: Setting locale failed.
+perl: warning: Please check that your locale settings:
+	LANGUAGE = (unset),
+	LC_ALL = (unset),
+	LANG = "C.UTF-8"
+    are supported and installed on your system.
+perl: warning: Falling back to the standard locale ("C").
+Extracted ML file: /tmp/QuickChick/125141/QuickChick4f379a.ml
+Extra: 
+Compile command: ocamlopt unix.cmxa -unsafe-string -rectypes -w a -I /tmp/QuickChick/125141 -I /fs/buzz/llampro/.opam/4.04.0+afl/lib/coq/user-contrib/QuickChick /fs/buzz/llampro/.opam/4.04.0+afl/lib/coq/user-contrib/QuickChick/quickChickLib.cmx  /tmp/QuickChick/125141/QuickChick4f379a.ml -o /tmp/QuickChick/125141/QuickChick4f379a
+Extra: 
+39559796 : "()"
+2440204 : true
++++ Passed 42000000 tests (0 discards)
+
+real	77m4.283s
+user	77m4.256s
+sys	0m0.011s
+QuickChecking (testMutantX_ rSSNI_naive 9)
+File "./Bench.v", line 40, characters 0-40:
+Warning: The following logical axioms were
+encountered: fstepP Mem.upd_get_frame Mem.memory_extensionality
+             Mem.upd_frame_defined.
+Having invalid logical axiom in the
+environment when extracting may lead to incorrect or non-terminating ML
+terms.
+ [extraction-logical-axiom,extraction]
+perl: warning: Setting locale failed.
+perl: warning: Please check that your locale settings:
+	LANGUAGE = (unset),
+	LC_ALL = (unset),
+	LANG = "C.UTF-8"
+    are supported and installed on your system.
+perl: warning: Falling back to the standard locale ("C").
+Extracted ML file: /tmp/QuickChick/140851/QuickChick0892d7.ml
+Extra: 
+Compile command: ocamlopt unix.cmxa -unsafe-string -rectypes -w a -I /tmp/QuickChick/140851 -I /fs/buzz/llampro/.opam/4.04.0+afl/lib/coq/user-contrib/QuickChick /fs/buzz/llampro/.opam/4.04.0+afl/lib/coq/user-contrib/QuickChick/quickChickLib.cmx  /tmp/QuickChick/140851/QuickChick0892d7.ml -o /tmp/QuickChick/140851/QuickChick0892d7
+Extra: 
+39558454 : "()"
+2441546 : true
++++ Passed 42000000 tests (0 discards)
+
+real	76m30.452s
+user	76m30.410s
+sys	0m0.014s
+QuickChecking (testMutantX_ rSSNI_naive 10)
+File "./Bench.v", line 41, characters 0-41:
+Warning: The following logical axioms were
+encountered: fstepP Mem.upd_get_frame Mem.memory_extensionality
+             Mem.upd_frame_defined.
+Having invalid logical axiom in the
+environment when extracting may lead to incorrect or non-terminating ML
+terms.
+ [extraction-logical-axiom,extraction]
+perl: warning: Setting locale failed.
+perl: warning: Please check that your locale settings:
+	LANGUAGE = (unset),
+	LC_ALL = (unset),
+	LANG = "C.UTF-8"
+    are supported and installed on your system.
+perl: warning: Falling back to the standard locale ("C").
+Extracted ML file: /tmp/QuickChick/152528/QuickChick47167a.ml
+Extra: 
+Compile command: ocamlopt unix.cmxa -unsafe-string -rectypes -w a -I /tmp/QuickChick/152528 -I /fs/buzz/llampro/.opam/4.04.0+afl/lib/coq/user-contrib/QuickChick /fs/buzz/llampro/.opam/4.04.0+afl/lib/coq/user-contrib/QuickChick/quickChickLib.cmx  /tmp/QuickChick/152528/QuickChick47167a.ml -o /tmp/QuickChick/152528/QuickChick47167a
+Extra: 
+39558489 : "()"
+2441511 : true
++++ Passed 42000000 tests (0 discards)
+
+real	75m41.625s
+user	75m41.590s
+sys	0m0.014s
+QuickChecking (testMutantX_ rSSNI_naive 11)
+File "./Bench.v", line 42, characters 0-41:
+Warning: The following logical axioms were
+encountered: fstepP Mem.upd_get_frame Mem.memory_extensionality
+             Mem.upd_frame_defined.
+Having invalid logical axiom in the
+environment when extracting may lead to incorrect or non-terminating ML
+terms.
+ [extraction-logical-axiom,extraction]
+perl: warning: Setting locale failed.
+perl: warning: Please check that your locale settings:
+	LANGUAGE = (unset),
+	LC_ALL = (unset),
+	LANG = "C.UTF-8"
+    are supported and installed on your system.
+perl: warning: Falling back to the standard locale ("C").
+Extracted ML file: /tmp/QuickChick/164116/QuickChick8df3ba.ml
+Extra: 
+Compile command: ocamlopt unix.cmxa -unsafe-string -rectypes -w a -I /tmp/QuickChick/164116 -I /fs/buzz/llampro/.opam/4.04.0+afl/lib/coq/user-contrib/QuickChick /fs/buzz/llampro/.opam/4.04.0+afl/lib/coq/user-contrib/QuickChick/quickChickLib.cmx  /tmp/QuickChick/164116/QuickChick8df3ba.ml -o /tmp/QuickChick/164116/QuickChick8df3ba
+Extra: 
+39558185 : "()"
+2441815 : true
++++ Passed 42000000 tests (0 discards)
+
+real	78m0.884s
+user	78m0.860s
+sys	0m0.011s
+QuickChecking (testMutantX_ rSSNI_naive 12)
+File "./Bench.v", line 43, characters 0-41:
+Warning: The following logical axioms were
+encountered: fstepP Mem.upd_get_frame Mem.memory_extensionality
+             Mem.upd_frame_defined.
+Having invalid logical axiom in the
+environment when extracting may lead to incorrect or non-terminating ML
+terms.
+ [extraction-logical-axiom,extraction]
+perl: warning: Setting locale failed.
+perl: warning: Please check that your locale settings:
+	LANGUAGE = (unset),
+	LC_ALL = (unset),
+	LANG = "C.UTF-8"
+    are supported and installed on your system.
+perl: warning: Falling back to the standard locale ("C").
+Extracted ML file: /tmp/QuickChick/175923/QuickChick40b344.ml
+Extra: 
+Compile command: ocamlopt unix.cmxa -unsafe-string -rectypes -w a -I /tmp/QuickChick/175923 -I /fs/buzz/llampro/.opam/4.04.0+afl/lib/coq/user-contrib/QuickChick /fs/buzz/llampro/.opam/4.04.0+afl/lib/coq/user-contrib/QuickChick/quickChickLib.cmx  /tmp/QuickChick/175923/QuickChick40b344.ml -o /tmp/QuickChick/175923/QuickChick40b344
+Extra: 
+39558017 : "()"
+2441983 : true
++++ Passed 42000000 tests (0 discards)
+
+real	75m55.881s
+user	75m54.704s
+sys	0m1.131s
+QuickChecking (testMutantX_ rSSNI_naive 13)
+File "./Bench.v", line 44, characters 0-41:
+Warning: The following logical axioms were
+encountered: fstepP Mem.upd_get_frame Mem.memory_extensionality
+             Mem.upd_frame_defined.
+Having invalid logical axiom in the
+environment when extracting may lead to incorrect or non-terminating ML
+terms.
+ [extraction-logical-axiom,extraction]
+perl: warning: Setting locale failed.
+perl: warning: Please check that your locale settings:
+	LANGUAGE = (unset),
+	LC_ALL = (unset),
+	LANG = "C.UTF-8"
+    are supported and installed on your system.
+perl: warning: Falling back to the standard locale ("C").
+Extracted ML file: /tmp/QuickChick/191525/QuickChick6be354.ml
+Extra: 
+Compile command: ocamlopt unix.cmxa -unsafe-string -rectypes -w a -I /tmp/QuickChick/191525 -I /fs/buzz/llampro/.opam/4.04.0+afl/lib/coq/user-contrib/QuickChick /fs/buzz/llampro/.opam/4.04.0+afl/lib/coq/user-contrib/QuickChick/quickChickLib.cmx  /tmp/QuickChick/191525/QuickChick6be354.ml -o /tmp/QuickChick/191525/QuickChick6be354
+Extra: 
+39557386 : "()"
+2442545 : true
+69 : false
++++ Passed 42000000 tests (0 discards)
+
+real	76m38.395s
+user	76m38.371s
+sys	0m0.009s
+QuickChecking (testMutantX_ rSSNI_naive 14)
+File "./Bench.v", line 45, characters 0-41:
+Warning: The following logical axioms were
+encountered: fstepP Mem.upd_get_frame Mem.memory_extensionality
+             Mem.upd_frame_defined.
+Having invalid logical axiom in the
+environment when extracting may lead to incorrect or non-terminating ML
+terms.
+ [extraction-logical-axiom,extraction]
+perl: warning: Setting locale failed.
+perl: warning: Please check that your locale settings:
+	LANGUAGE = (unset),
+	LC_ALL = (unset),
+	LANG = "C.UTF-8"
+    are supported and installed on your system.
+perl: warning: Falling back to the standard locale ("C").
+Extracted ML file: /tmp/QuickChick/203210/QuickChick7ca831.ml
+Extra: 
+Compile command: ocamlopt unix.cmxa -unsafe-string -rectypes -w a -I /tmp/QuickChick/203210 -I /fs/buzz/llampro/.opam/4.04.0+afl/lib/coq/user-contrib/QuickChick /fs/buzz/llampro/.opam/4.04.0+afl/lib/coq/user-contrib/QuickChick/quickChickLib.cmx  /tmp/QuickChick/203210/QuickChick7ca831.ml -o /tmp/QuickChick/203210/QuickChick7ca831
+Extra: 
+39557069 : "()"
+2442931 : true
++++ Passed 42000000 tests (0 discards)
+
+real	77m19.308s
+user	77m19.281s
+sys	0m0.007s
+QuickChecking (testMutantX_ rSSNI_naive 15)
+File "./Bench.v", line 46, characters 0-41:
+Warning: The following logical axioms were
+encountered: fstepP Mem.upd_get_frame Mem.memory_extensionality
+             Mem.upd_frame_defined.
+Having invalid logical axiom in the
+environment when extracting may lead to incorrect or non-terminating ML
+terms.
+ [extraction-logical-axiom,extraction]
+perl: warning: Setting locale failed.
+perl: warning: Please check that your locale settings:
+	LANGUAGE = (unset),
+	LC_ALL = (unset),
+	LANG = "C.UTF-8"
+    are supported and installed on your system.
+perl: warning: Falling back to the standard locale ("C").
+Extracted ML file: /tmp/QuickChick/214936/QuickChicke2739a.ml
+Extra: 
+Compile command: ocamlopt unix.cmxa -unsafe-string -rectypes -w a -I /tmp/QuickChick/214936 -I /fs/buzz/llampro/.opam/4.04.0+afl/lib/coq/user-contrib/QuickChick /fs/buzz/llampro/.opam/4.04.0+afl/lib/coq/user-contrib/QuickChick/quickChickLib.cmx  /tmp/QuickChick/214936/QuickChicke2739a.ml -o /tmp/QuickChick/214936/QuickChicke2739a
+Extra: 
+39557239 : "()"
+2442761 : true
++++ Passed 42000000 tests (0 discards)
+
+real	75m59.835s
+user	75m58.585s
+sys	0m1.231s
+QuickChecking (testMutantX_ rSSNI_naive 16)
+File "./Bench.v", line 47, characters 0-41:
+Warning: The following logical axioms were
+encountered: fstepP Mem.upd_get_frame Mem.memory_extensionality
+             Mem.upd_frame_defined.
+Having invalid logical axiom in the
+environment when extracting may lead to incorrect or non-terminating ML
+terms.
+ [extraction-logical-axiom,extraction]
+perl: warning: Setting locale failed.
+perl: warning: Please check that your locale settings:
+	LANGUAGE = (unset),
+	LC_ALL = (unset),
+	LANG = "C.UTF-8"
+    are supported and installed on your system.
+perl: warning: Falling back to the standard locale ("C").
+Extracted ML file: /tmp/QuickChick/230542/QuickChick0fc92e.ml
+Extra: 
+Compile command: ocamlopt unix.cmxa -unsafe-string -rectypes -w a -I /tmp/QuickChick/230542 -I /fs/buzz/llampro/.opam/4.04.0+afl/lib/coq/user-contrib/QuickChick /fs/buzz/llampro/.opam/4.04.0+afl/lib/coq/user-contrib/QuickChick/quickChickLib.cmx  /tmp/QuickChick/230542/QuickChick0fc92e.ml -o /tmp/QuickChick/230542/QuickChick0fc92e
+Extra: 
+39559234 : "()"
+2440766 : true
++++ Passed 42000000 tests (0 discards)
+
+real	76m51.157s
+user	76m51.134s
+sys	0m0.009s
+QuickChecking (testMutantX_ rSSNI_naive 17)
+File "./Bench.v", line 48, characters 0-41:
+Warning: The following logical axioms were
+encountered: fstepP Mem.upd_get_frame Mem.memory_extensionality
+             Mem.upd_frame_defined.
+Having invalid logical axiom in the
+environment when extracting may lead to incorrect or non-terminating ML
+terms.
+ [extraction-logical-axiom,extraction]
+perl: warning: Setting locale failed.
+perl: warning: Please check that your locale settings:
+	LANGUAGE = (unset),
+	LC_ALL = (unset),
+	LANG = "C.UTF-8"
+    are supported and installed on your system.
+perl: warning: Falling back to the standard locale ("C").
+Extracted ML file: /tmp/QuickChick/002239/QuickChickef7a4e.ml
+Extra: 
+Compile command: ocamlopt unix.cmxa -unsafe-string -rectypes -w a -I /tmp/QuickChick/002239 -I /fs/buzz/llampro/.opam/4.04.0+afl/lib/coq/user-contrib/QuickChick /fs/buzz/llampro/.opam/4.04.0+afl/lib/coq/user-contrib/QuickChick/quickChickLib.cmx  /tmp/QuickChick/002239/QuickChickef7a4e.ml -o /tmp/QuickChick/002239/QuickChickef7a4e
+Extra: 
+39559246 : "()"
+2440754 : true
++++ Passed 42000000 tests (0 discards)
+
+real	77m11.996s
+user	77m11.965s
+sys	0m0.012s
+QuickChecking (testMutantX_ rSSNI_naive 18)
+File "./Bench.v", line 49, characters 0-41:
+Warning: The following logical axioms were
+encountered: fstepP Mem.upd_get_frame Mem.memory_extensionality
+             Mem.upd_frame_defined.
+Having invalid logical axiom in the
+environment when extracting may lead to incorrect or non-terminating ML
+terms.
+ [extraction-logical-axiom,extraction]
+perl: warning: Setting locale failed.
+perl: warning: Please check that your locale settings:
+	LANGUAGE = (unset),
+	LC_ALL = (unset),
+	LANG = "C.UTF-8"
+    are supported and installed on your system.
+perl: warning: Falling back to the standard locale ("C").
+Extracted ML file: /tmp/QuickChick/013958/QuickChick0f8794.ml
+Extra: 
+Compile command: ocamlopt unix.cmxa -unsafe-string -rectypes -w a -I /tmp/QuickChick/013958 -I /fs/buzz/llampro/.opam/4.04.0+afl/lib/coq/user-contrib/QuickChick /fs/buzz/llampro/.opam/4.04.0+afl/lib/coq/user-contrib/QuickChick/quickChickLib.cmx  /tmp/QuickChick/013958/QuickChick0f8794.ml -o /tmp/QuickChick/013958/QuickChick0f8794
+Extra: 
+39557660 : "()"
+2442340 : true
++++ Passed 42000000 tests (0 discards)
+
+real	76m4.065s
+user	76m4.037s
+sys	0m0.012s
+QuickChecking (testMutantX_ rSSNI_naive 19)
+File "./Bench.v", line 50, characters 0-41:
+Warning: The following logical axioms were
+encountered: fstepP Mem.upd_get_frame Mem.memory_extensionality
+             Mem.upd_frame_defined.
+Having invalid logical axiom in the
+environment when extracting may lead to incorrect or non-terminating ML
+terms.
+ [extraction-logical-axiom,extraction]
+perl: warning: Setting locale failed.
+perl: warning: Please check that your locale settings:
+	LANGUAGE = (unset),
+	LC_ALL = (unset),
+	LANG = "C.UTF-8"
+    are supported and installed on your system.
+perl: warning: Falling back to the standard locale ("C").
+Extracted ML file: /tmp/QuickChick/025608/QuickChicka28dc4.ml
+Extra: 
+Compile command: ocamlopt unix.cmxa -unsafe-string -rectypes -w a -I /tmp/QuickChick/025608 -I /fs/buzz/llampro/.opam/4.04.0+afl/lib/coq/user-contrib/QuickChick /fs/buzz/llampro/.opam/4.04.0+afl/lib/coq/user-contrib/QuickChick/quickChickLib.cmx  /tmp/QuickChick/025608/QuickChicka28dc4.ml -o /tmp/QuickChick/025608/QuickChicka28dc4
+Extra: 
+39558356 : "()"
+2441644 : true
++++ Passed 42000000 tests (0 discards)
+
+real	79m22.345s
+user	79m22.316s
+sys	0m0.011s
+QuickChecking (testMutantX_ rSSNI_naive 20)
+File "./Bench.v", line 51, characters 0-41:
+Warning: The following logical axioms were
+encountered: fstepP Mem.upd_get_frame Mem.memory_extensionality
+             Mem.upd_frame_defined.
+Having invalid logical axiom in the
+environment when extracting may lead to incorrect or non-terminating ML
+terms.
+ [extraction-logical-axiom,extraction]
+perl: warning: Setting locale failed.
+perl: warning: Please check that your locale settings:
+	LANGUAGE = (unset),
+	LC_ALL = (unset),
+	LANG = "C.UTF-8"
+    are supported and installed on your system.
+perl: warning: Falling back to the standard locale ("C").
+Extracted ML file: /tmp/QuickChick/041537/QuickChick16a0f1.ml
+Extra: 
+Compile command: ocamlopt unix.cmxa -unsafe-string -rectypes -w a -I /tmp/QuickChick/041537 -I /fs/buzz/llampro/.opam/4.04.0+afl/lib/coq/user-contrib/QuickChick /fs/buzz/llampro/.opam/4.04.0+afl/lib/coq/user-contrib/QuickChick/quickChickLib.cmx  /tmp/QuickChick/041537/QuickChick16a0f1.ml -o /tmp/QuickChick/041537/QuickChick16a0f1
+Extra: 
+39559520 : "()"
+2440480 : true
++++ Passed 42000000 tests (0 discards)
+
+real	77m26.302s
+user	77m26.261s
+sys	0m0.009s
+QuickChecking (testMutantX_ rSSNI_naive 21)
+File "./Bench.v", line 52, characters 0-41:
+Warning: The following logical axioms were
+encountered: fstepP Mem.upd_get_frame Mem.memory_extensionality
+             Mem.upd_frame_defined.
+Having invalid logical axiom in the
+environment when extracting may lead to incorrect or non-terminating ML
+terms.
+ [extraction-logical-axiom,extraction]
+perl: warning: Setting locale failed.
+perl: warning: Please check that your locale settings:
+	LANGUAGE = (unset),
+	LC_ALL = (unset),
+	LANG = "C.UTF-8"
+    are supported and installed on your system.
+perl: warning: Falling back to the standard locale ("C").
+Extracted ML file: /tmp/QuickChick/053309/QuickChick88281d.ml
+Extra: 
+Compile command: ocamlopt unix.cmxa -unsafe-string -rectypes -w a -I /tmp/QuickChick/053309 -I /fs/buzz/llampro/.opam/4.04.0+afl/lib/coq/user-contrib/QuickChick /fs/buzz/llampro/.opam/4.04.0+afl/lib/coq/user-contrib/QuickChick/quickChickLib.cmx  /tmp/QuickChick/053309/QuickChick88281d.ml -o /tmp/QuickChick/053309/QuickChick88281d
+Extra: 
+39559558 : "()"
+2440442 : true
++++ Passed 42000000 tests (0 discards)
+
+real	77m9.727s
+user	77m9.701s
+sys	0m0.009s
+QuickChecking (testMutantX_ rSSNI_naive 22)
+File "./Bench.v", line 53, characters 0-41:
+Warning: The following logical axioms were
+encountered: fstepP Mem.upd_get_frame Mem.memory_extensionality
+             Mem.upd_frame_defined.
+Having invalid logical axiom in the
+environment when extracting may lead to incorrect or non-terminating ML
+terms.
+ [extraction-logical-axiom,extraction]
+perl: warning: Setting locale failed.
+perl: warning: Please check that your locale settings:
+	LANGUAGE = (unset),
+	LC_ALL = (unset),
+	LANG = "C.UTF-8"
+    are supported and installed on your system.
+perl: warning: Falling back to the standard locale ("C").
+Extracted ML file: /tmp/QuickChick/065025/QuickChicka1956b.ml
+Extra: 
+Compile command: ocamlopt unix.cmxa -unsafe-string -rectypes -w a -I /tmp/QuickChick/065025 -I /fs/buzz/llampro/.opam/4.04.0+afl/lib/coq/user-contrib/QuickChick /fs/buzz/llampro/.opam/4.04.0+afl/lib/coq/user-contrib/QuickChick/quickChickLib.cmx  /tmp/QuickChick/065025/QuickChicka1956b.ml -o /tmp/QuickChick/065025/QuickChicka1956b
+Extra: 
+39558384 : "()"
+2441616 : true
++++ Passed 42000000 tests (0 discards)
+
+real	77m20.399s
+user	77m20.374s
+sys	0m0.011s
+QuickChecking (testMutantX_ rSSNI_naive 23)
+File "./Bench.v", line 54, characters 0-41:
+Warning: The following logical axioms were
+encountered: fstepP Mem.upd_get_frame Mem.memory_extensionality
+             Mem.upd_frame_defined.
+Having invalid logical axiom in the
+environment when extracting may lead to incorrect or non-terminating ML
+terms.
+ [extraction-logical-axiom,extraction]
+perl: warning: Setting locale failed.
+perl: warning: Please check that your locale settings:
+	LANGUAGE = (unset),
+	LC_ALL = (unset),
+	LANG = "C.UTF-8"
+    are supported and installed on your system.
+perl: warning: Falling back to the standard locale ("C").
+Extracted ML file: /tmp/QuickChick/080752/QuickChick86890e.ml
+Extra: 
+Compile command: ocamlopt unix.cmxa -unsafe-string -rectypes -w a -I /tmp/QuickChick/080752 -I /fs/buzz/llampro/.opam/4.04.0+afl/lib/coq/user-contrib/QuickChick /fs/buzz/llampro/.opam/4.04.0+afl/lib/coq/user-contrib/QuickChick/quickChickLib.cmx  /tmp/QuickChick/080752/QuickChick86890e.ml -o /tmp/QuickChick/080752/QuickChick86890e
+Extra: 
+39558473 : "()"
+2441527 : true
++++ Passed 42000000 tests (0 discards)
+
+real	76m49.129s
+user	76m49.104s
+sys	0m0.012s
+QuickChecking (testMutantX_ rSSNI_naive 24)
+File "./Bench.v", line 55, characters 0-41:
+Warning: The following logical axioms were
+encountered: fstepP Mem.upd_get_frame Mem.memory_extensionality
+             Mem.upd_frame_defined.
+Having invalid logical axiom in the
+environment when extracting may lead to incorrect or non-terminating ML
+terms.
+ [extraction-logical-axiom,extraction]
+perl: warning: Setting locale failed.
+perl: warning: Please check that your locale settings:
+	LANGUAGE = (unset),
+	LC_ALL = (unset),
+	LANG = "C.UTF-8"
+    are supported and installed on your system.
+perl: warning: Falling back to the standard locale ("C").
+Extracted ML file: /tmp/QuickChick/092448/QuickChick5b0302.ml
+Extra: 
+Compile command: ocamlopt unix.cmxa -unsafe-string -rectypes -w a -I /tmp/QuickChick/092448 -I /fs/buzz/llampro/.opam/4.04.0+afl/lib/coq/user-contrib/QuickChick /fs/buzz/llampro/.opam/4.04.0+afl/lib/coq/user-contrib/QuickChick/quickChickLib.cmx  /tmp/QuickChick/092448/QuickChick5b0302.ml -o /tmp/QuickChick/092448/QuickChick5b0302
+Extra: 
+39557731 : "()"
+2442268 : true
+1 : false
++++ Passed 42000000 tests (0 discards)
+
+real	76m6.655s
+user	76m6.634s
+sys	0m0.009s
+QuickChecking (testMutantX_ rSSNI_naive 25)
+File "./Bench.v", line 56, characters 0-41:
+Warning: The following logical axioms were
+encountered: fstepP Mem.upd_get_frame Mem.memory_extensionality
+             Mem.upd_frame_defined.
+Having invalid logical axiom in the
+environment when extracting may lead to incorrect or non-terminating ML
+terms.
+ [extraction-logical-axiom,extraction]
+perl: warning: Setting locale failed.
+perl: warning: Please check that your locale settings:
+	LANGUAGE = (unset),
+	LC_ALL = (unset),
+	LANG = "C.UTF-8"
+    are supported and installed on your system.
+perl: warning: Falling back to the standard locale ("C").
+Extracted ML file: /tmp/QuickChick/104101/QuickChick16e8e8.ml
+Extra: 
+Compile command: ocamlopt unix.cmxa -unsafe-string -rectypes -w a -I /tmp/QuickChick/104101 -I /fs/buzz/llampro/.opam/4.04.0+afl/lib/coq/user-contrib/QuickChick /fs/buzz/llampro/.opam/4.04.0+afl/lib/coq/user-contrib/QuickChick/quickChickLib.cmx  /tmp/QuickChick/104101/QuickChick16e8e8.ml -o /tmp/QuickChick/104101/QuickChick16e8e8
+Extra: 
+39557737 : "()"
+2442263 : true
++++ Passed 42000000 tests (0 discards)
+
+real	79m20.324s
+user	79m20.227s
+sys	0m0.016s
+QuickChecking (testMutantX_ rSSNI_naive 26)
+File "./Bench.v", line 57, characters 0-41:
+Warning: The following logical axioms were
+encountered: fstepP Mem.upd_get_frame Mem.memory_extensionality
+             Mem.upd_frame_defined.
+Having invalid logical axiom in the
+environment when extracting may lead to incorrect or non-terminating ML
+terms.
+ [extraction-logical-axiom,extraction]
+perl: warning: Setting locale failed.
+perl: warning: Please check that your locale settings:
+	LANGUAGE = (unset),
+	LC_ALL = (unset),
+	LANG = "C.UTF-8"
+    are supported and installed on your system.
+perl: warning: Falling back to the standard locale ("C").
+Extracted ML file: /tmp/QuickChick/120027/QuickChickd26031.ml
+Extra: 
+Compile command: ocamlopt unix.cmxa -unsafe-string -rectypes -w a -I /tmp/QuickChick/120027 -I /fs/buzz/llampro/.opam/4.04.0+afl/lib/coq/user-contrib/QuickChick /fs/buzz/llampro/.opam/4.04.0+afl/lib/coq/user-contrib/QuickChick/quickChickLib.cmx  /tmp/QuickChick/120027/QuickChickd26031.ml -o /tmp/QuickChick/120027/QuickChickd26031
+Extra: 
+39558268 : "()"
+2441732 : true
++++ Passed 42000000 tests (0 discards)
+
+real	77m15.935s
+user	77m15.830s
+sys	0m0.010s
+QuickChecking (testMutantX_ rSSNI_naive 27)
+File "./Bench.v", line 58, characters 0-41:
+Warning: The following logical axioms were
+encountered: fstepP Mem.upd_get_frame Mem.memory_extensionality
+             Mem.upd_frame_defined.
+Having invalid logical axiom in the
+environment when extracting may lead to incorrect or non-terminating ML
+terms.
+ [extraction-logical-axiom,extraction]
+perl: warning: Setting locale failed.
+perl: warning: Please check that your locale settings:
+	LANGUAGE = (unset),
+	LC_ALL = (unset),
+	LANG = "C.UTF-8"
+    are supported and installed on your system.
+perl: warning: Falling back to the standard locale ("C").
+Extracted ML file: /tmp/QuickChick/131750/QuickChick5c5337.ml
+Extra: 
+Compile command: ocamlopt unix.cmxa -unsafe-string -rectypes -w a -I /tmp/QuickChick/131750 -I /fs/buzz/llampro/.opam/4.04.0+afl/lib/coq/user-contrib/QuickChick /fs/buzz/llampro/.opam/4.04.0+afl/lib/coq/user-contrib/QuickChick/quickChickLib.cmx  /tmp/QuickChick/131750/QuickChick5c5337.ml -o /tmp/QuickChick/131750/QuickChick5c5337
+Extra: 
+39559363 : "()"
+2440637 : true
++++ Passed 42000000 tests (0 discards)
+
+real	80m27.858s
+user	80m27.813s
+sys	0m0.015s
+QuickChecking (testMutantX_ rSSNI_naive 28)
+File "./Bench.v", line 59, characters 0-41:
+Warning: The following logical axioms were
+encountered: fstepP Mem.upd_get_frame Mem.memory_extensionality
+             Mem.upd_frame_defined.
+Having invalid logical axiom in the
+environment when extracting may lead to incorrect or non-terminating ML
+terms.
+ [extraction-logical-axiom,extraction]
+perl: warning: Setting locale failed.
+perl: warning: Please check that your locale settings:
+	LANGUAGE = (unset),
+	LC_ALL = (unset),
+	LANG = "C.UTF-8"
+    are supported and installed on your system.
+perl: warning: Falling back to the standard locale ("C").
+Extracted ML file: /tmp/QuickChick/143824/QuickChick6e2b8f.ml
+Extra: 
+Compile command: ocamlopt unix.cmxa -unsafe-string -rectypes -w a -I /tmp/QuickChick/143824 -I /fs/buzz/llampro/.opam/4.04.0+afl/lib/coq/user-contrib/QuickChick /fs/buzz/llampro/.opam/4.04.0+afl/lib/coq/user-contrib/QuickChick/quickChickLib.cmx  /tmp/QuickChick/143824/QuickChick6e2b8f.ml -o /tmp/QuickChick/143824/QuickChick6e2b8f
+Extra: 
+39558833 : "()"
+2441167 : true
++++ Passed 42000000 tests (0 discards)
+
+real	75m29.351s
+user	75m29.329s
+sys	0m0.006s
+QuickChecking (testMutantX_ rSSNI_naive 29)
+File "./Bench.v", line 60, characters 0-41:
+Warning: The following logical axioms were
+encountered: fstepP Mem.upd_get_frame Mem.memory_extensionality
+             Mem.upd_frame_defined.
+Having invalid logical axiom in the
+environment when extracting may lead to incorrect or non-terminating ML
+terms.
+ [extraction-logical-axiom,extraction]
+perl: warning: Setting locale failed.
+perl: warning: Please check that your locale settings:
+	LANGUAGE = (unset),
+	LC_ALL = (unset),
+	LANG = "C.UTF-8"
+    are supported and installed on your system.
+perl: warning: Falling back to the standard locale ("C").
+Extracted ML file: /tmp/QuickChick/155359/QuickChick43118f.ml
+Extra: 
+Compile command: ocamlopt unix.cmxa -unsafe-string -rectypes -w a -I /tmp/QuickChick/155359 -I /fs/buzz/llampro/.opam/4.04.0+afl/lib/coq/user-contrib/QuickChick /fs/buzz/llampro/.opam/4.04.0+afl/lib/coq/user-contrib/QuickChick/quickChickLib.cmx  /tmp/QuickChick/155359/QuickChick43118f.ml -o /tmp/QuickChick/155359/QuickChick43118f
+Extra: 
+39558568 : "()"
+2441432 : true
++++ Passed 42000000 tests (0 discards)
+
+real	79m43.581s
+user	79m43.442s
+sys	0m0.115s
+QuickChecking (testMutantX_ rSSNI_naive 30)
+File "./Bench.v", line 61, characters 0-41:
+Warning: The following logical axioms were
+encountered: fstepP Mem.upd_get_frame Mem.memory_extensionality
+             Mem.upd_frame_defined.
+Having invalid logical axiom in the
+environment when extracting may lead to incorrect or non-terminating ML
+terms.
+ [extraction-logical-axiom,extraction]
+perl: warning: Setting locale failed.
+perl: warning: Please check that your locale settings:
+	LANGUAGE = (unset),
+	LC_ALL = (unset),
+	LANG = "C.UTF-8"
+    are supported and installed on your system.
+perl: warning: Falling back to the standard locale ("C").
+Extracted ML file: /tmp/QuickChick/171349/QuickChick903cc6.ml
+Extra: 
+Compile command: ocamlopt unix.cmxa -unsafe-string -rectypes -w a -I /tmp/QuickChick/171349 -I /fs/buzz/llampro/.opam/4.04.0+afl/lib/coq/user-contrib/QuickChick /fs/buzz/llampro/.opam/4.04.0+afl/lib/coq/user-contrib/QuickChick/quickChickLib.cmx  /tmp/QuickChick/171349/QuickChick903cc6.ml -o /tmp/QuickChick/171349/QuickChick903cc6
+Extra: 
+39559375 : "()"
+2440625 : true
++++ Passed 42000000 tests (0 discards)
+
+real	77m17.198s
+user	77m15.821s
+sys	0m1.335s
+QuickChecking (testMutantX_ rSSNI_naive 31)
+File "./Bench.v", line 62, characters 0-41:
+Warning: The following logical axioms were
+encountered: fstepP Mem.upd_get_frame Mem.memory_extensionality
+             Mem.upd_frame_defined.
+Having invalid logical axiom in the
+environment when extracting may lead to incorrect or non-terminating ML
+terms.
+ [extraction-logical-axiom,extraction]
+perl: warning: Setting locale failed.
+perl: warning: Please check that your locale settings:
+	LANGUAGE = (unset),
+	LC_ALL = (unset),
+	LANG = "C.UTF-8"
+    are supported and installed on your system.
+perl: warning: Falling back to the standard locale ("C").
+Extracted ML file: /tmp/QuickChick/183113/QuickChickfcf626.ml
+Extra: 
+Compile command: ocamlopt unix.cmxa -unsafe-string -rectypes -w a -I /tmp/QuickChick/183113 -I /fs/buzz/llampro/.opam/4.04.0+afl/lib/coq/user-contrib/QuickChick /fs/buzz/llampro/.opam/4.04.0+afl/lib/coq/user-contrib/QuickChick/quickChickLib.cmx  /tmp/QuickChick/183113/QuickChickfcf626.ml -o /tmp/QuickChick/183113/QuickChickfcf626
+Extra: 
+39555884 : "()"
+2444116 : true
++++ Passed 42000000 tests (0 discards)
+
+real	76m11.219s
+user	76m11.187s
+sys	0m0.011s
+QuickChecking (testMutantX_ rSSNI_naive 32)
+File "./Bench.v", line 63, characters 0-41:
+Warning: The following logical axioms were
+encountered: fstepP Mem.upd_get_frame Mem.memory_extensionality
+             Mem.upd_frame_defined.
+Having invalid logical axiom in the
+environment when extracting may lead to incorrect or non-terminating ML
+terms.
+ [extraction-logical-axiom,extraction]
+perl: warning: Setting locale failed.
+perl: warning: Please check that your locale settings:
+	LANGUAGE = (unset),
+	LC_ALL = (unset),
+	LANG = "C.UTF-8"
+    are supported and installed on your system.
+perl: warning: Falling back to the standard locale ("C").
+Extracted ML file: /tmp/QuickChick/194731/QuickChickb3320a.ml
+Extra: 
+Compile command: ocamlopt unix.cmxa -unsafe-string -rectypes -w a -I /tmp/QuickChick/194731 -I /fs/buzz/llampro/.opam/4.04.0+afl/lib/coq/user-contrib/QuickChick /fs/buzz/llampro/.opam/4.04.0+afl/lib/coq/user-contrib/QuickChick/quickChickLib.cmx  /tmp/QuickChick/194731/QuickChickb3320a.ml -o /tmp/QuickChick/194731/QuickChickb3320a
+Extra: 
+39559656 : "()"
+2440344 : true
++++ Passed 42000000 tests (0 discards)
+
+real	79m17.039s
+user	79m17.012s
+sys	0m0.011s
+QuickChecking (testMutantX_ rSSNI_smart 0)
+File "./Bench.v", line 65, characters 0-40:
+Warning: The following logical axioms were
+encountered: fstepP Mem.upd_get_frame Mem.memory_extensionality
+             Mem.upd_frame_defined.
+Having invalid logical axiom in the
+environment when extracting may lead to incorrect or non-terminating ML
+terms.
+ [extraction-logical-axiom,extraction]
+perl: warning: Setting locale failed.
+perl: warning: Please check that your locale settings:
+	LANGUAGE = (unset),
+	LC_ALL = (unset),
+	LANG = "C.UTF-8"
+    are supported and installed on your system.
+perl: warning: Falling back to the standard locale ("C").
+Extracted ML file: /tmp/QuickChick/210654/QuickChick3f4d55.ml
+Extra: 
+Compile command: ocamlopt unix.cmxa -unsafe-string -rectypes -w a -I /tmp/QuickChick/210654 -I /fs/buzz/llampro/.opam/4.04.0+afl/lib/coq/user-contrib/QuickChick /fs/buzz/llampro/.opam/4.04.0+afl/lib/coq/user-contrib/QuickChick/quickChickLib.cmx  /tmp/QuickChick/210654/QuickChick3f4d55.ml -o /tmp/QuickChick/210654/QuickChick3f4d55
+Extra: 
+40709234 : true
+1194966 : "()"
+95800 : false
++++ Passed 42000000 tests (0 discards)
+
+real	76m12.023s
+user	76m11.923s
+sys	0m0.066s
+QuickChecking (testMutantX_ rSSNI_smart 1)
+File "./Bench.v", line 66, characters 0-40:
+Warning: The following logical axioms were
+encountered: fstepP Mem.upd_get_frame Mem.memory_extensionality
+             Mem.upd_frame_defined.
+Having invalid logical axiom in the
+environment when extracting may lead to incorrect or non-terminating ML
+terms.
+ [extraction-logical-axiom,extraction]
+perl: warning: Setting locale failed.
+perl: warning: Please check that your locale settings:
+	LANGUAGE = (unset),
+	LC_ALL = (unset),
+	LANG = "C.UTF-8"
+    are supported and installed on your system.
+perl: warning: Falling back to the standard locale ("C").
+Extracted ML file: /tmp/QuickChick/222313/QuickChick31c731.ml
+Extra: 
+Compile command: ocamlopt unix.cmxa -unsafe-string -rectypes -w a -I /tmp/QuickChick/222313 -I /fs/buzz/llampro/.opam/4.04.0+afl/lib/coq/user-contrib/QuickChick /fs/buzz/llampro/.opam/4.04.0+afl/lib/coq/user-contrib/QuickChick/quickChickLib.cmx  /tmp/QuickChick/222313/QuickChick31c731.ml -o /tmp/QuickChick/222313/QuickChick31c731
+Extra: 
+40787928 : true
+1193548 : "()"
+18524 : false
++++ Passed 42000000 tests (0 discards)
+
+real	75m29.065s
+user	75m29.044s
+sys	0m0.009s
+QuickChecking (testMutantX_ rSSNI_smart 2)
+File "./Bench.v", line 67, characters 0-40:
+Warning: The following logical axioms were
+encountered: fstepP Mem.upd_get_frame Mem.memory_extensionality
+             Mem.upd_frame_defined.
+Having invalid logical axiom in the
+environment when extracting may lead to incorrect or non-terminating ML
+terms.
+ [extraction-logical-axiom,extraction]
+perl: warning: Setting locale failed.
+perl: warning: Please check that your locale settings:
+	LANGUAGE = (unset),
+	LC_ALL = (unset),
+	LANG = "C.UTF-8"
+    are supported and installed on your system.
+perl: warning: Falling back to the standard locale ("C").
+Extracted ML file: /tmp/QuickChick/233848/QuickChicke3f8c1.ml
+Extra: 
+Compile command: ocamlopt unix.cmxa -unsafe-string -rectypes -w a -I /tmp/QuickChick/233848 -I /fs/buzz/llampro/.opam/4.04.0+afl/lib/coq/user-contrib/QuickChick /fs/buzz/llampro/.opam/4.04.0+afl/lib/coq/user-contrib/QuickChick/quickChickLib.cmx  /tmp/QuickChick/233848/QuickChicke3f8c1.ml -o /tmp/QuickChick/233848/QuickChicke3f8c1
+Extra: 
+40772187 : true
+1192574 : "()"
+35239 : false
++++ Passed 42000000 tests (0 discards)
+
+real	74m42.957s
+user	74m42.937s
+sys	0m0.008s
+QuickChecking (testMutantX_ rSSNI_smart 3)
+File "./Bench.v", line 68, characters 0-40:
+Warning: The following logical axioms were
+encountered: fstepP Mem.upd_get_frame Mem.memory_extensionality
+             Mem.upd_frame_defined.
+Having invalid logical axiom in the
+environment when extracting may lead to incorrect or non-terminating ML
+terms.
+ [extraction-logical-axiom,extraction]
+perl: warning: Setting locale failed.
+perl: warning: Please check that your locale settings:
+	LANGUAGE = (unset),
+	LC_ALL = (unset),
+	LANG = "C.UTF-8"
+    are supported and installed on your system.
+perl: warning: Falling back to the standard locale ("C").
+Extracted ML file: /tmp/QuickChick/005337/QuickChick6e46ba.ml
+Extra: 
+Compile command: ocamlopt unix.cmxa -unsafe-string -rectypes -w a -I /tmp/QuickChick/005337 -I /fs/buzz/llampro/.opam/4.04.0+afl/lib/coq/user-contrib/QuickChick /fs/buzz/llampro/.opam/4.04.0+afl/lib/coq/user-contrib/QuickChick/quickChickLib.cmx  /tmp/QuickChick/005337/QuickChick6e46ba.ml -o /tmp/QuickChick/005337/QuickChick6e46ba
+Extra: 
+40792554 : true
+1193522 : "()"
+13924 : false
++++ Passed 42000000 tests (0 discards)
+
+real	75m25.819s
+user	75m25.785s
+sys	0m0.017s
+QuickChecking (testMutantX_ rSSNI_smart 4)
+File "./Bench.v", line 69, characters 0-40:
+Warning: The following logical axioms were
+encountered: fstepP Mem.upd_get_frame Mem.memory_extensionality
+             Mem.upd_frame_defined.
+Having invalid logical axiom in the
+environment when extracting may lead to incorrect or non-terminating ML
+terms.
+ [extraction-logical-axiom,extraction]
+perl: warning: Setting locale failed.
+perl: warning: Please check that your locale settings:
+	LANGUAGE = (unset),
+	LC_ALL = (unset),
+	LANG = "C.UTF-8"
+    are supported and installed on your system.
+perl: warning: Falling back to the standard locale ("C").
+Extracted ML file: /tmp/QuickChick/020910/QuickChicka82e28.ml
+Extra: 
+Compile command: ocamlopt unix.cmxa -unsafe-string -rectypes -w a -I /tmp/QuickChick/020910 -I /fs/buzz/llampro/.opam/4.04.0+afl/lib/coq/user-contrib/QuickChick /fs/buzz/llampro/.opam/4.04.0+afl/lib/coq/user-contrib/QuickChick/quickChickLib.cmx  /tmp/QuickChick/020910/QuickChicka82e28.ml -o /tmp/QuickChick/020910/QuickChicka82e28
+Extra: 
+40507176 : true
+1165379 : "()"
+327445 : false
++++ Passed 42000000 tests (0 discards)
+
+real	74m47.327s
+user	74m47.270s
+sys	0m0.010s
+QuickChecking (testMutantX_ rSSNI_smart 5)
+File "./Bench.v", line 70, characters 0-40:
+Warning: The following logical axioms were
+encountered: fstepP Mem.upd_get_frame Mem.memory_extensionality
+             Mem.upd_frame_defined.
+Having invalid logical axiom in the
+environment when extracting may lead to incorrect or non-terminating ML
+terms.
+ [extraction-logical-axiom,extraction]
+perl: warning: Setting locale failed.
+perl: warning: Please check that your locale settings:
+	LANGUAGE = (unset),
+	LC_ALL = (unset),
+	LANG = "C.UTF-8"
+    are supported and installed on your system.
+perl: warning: Falling back to the standard locale ("C").
+Extracted ML file: /tmp/QuickChick/032404/QuickChickb92cfa.ml
+Extra: 
+Compile command: ocamlopt unix.cmxa -unsafe-string -rectypes -w a -I /tmp/QuickChick/032404 -I /fs/buzz/llampro/.opam/4.04.0+afl/lib/coq/user-contrib/QuickChick /fs/buzz/llampro/.opam/4.04.0+afl/lib/coq/user-contrib/QuickChick/quickChickLib.cmx  /tmp/QuickChick/032404/QuickChickb92cfa.ml -o /tmp/QuickChick/032404/QuickChickb92cfa
+Extra: 
+40430456 : true
+1203343 : "()"
+366201 : false
++++ Passed 42000000 tests (0 discards)
+
+real	75m45.403s
+user	75m45.380s
+sys	0m0.011s
+QuickChecking (testMutantX_ rSSNI_smart 6)
+File "./Bench.v", line 71, characters 0-40:
+Warning: The following logical axioms were
+encountered: fstepP Mem.upd_get_frame Mem.memory_extensionality
+             Mem.upd_frame_defined.
+Having invalid logical axiom in the
+environment when extracting may lead to incorrect or non-terminating ML
+terms.
+ [extraction-logical-axiom,extraction]
+perl: warning: Setting locale failed.
+perl: warning: Please check that your locale settings:
+	LANGUAGE = (unset),
+	LC_ALL = (unset),
+	LANG = "C.UTF-8"
+    are supported and installed on your system.
+perl: warning: Falling back to the standard locale ("C").
+Extracted ML file: /tmp/QuickChick/043955/QuickChickce7f9a.ml
+Extra: 
+Compile command: ocamlopt unix.cmxa -unsafe-string -rectypes -w a -I /tmp/QuickChick/043955 -I /fs/buzz/llampro/.opam/4.04.0+afl/lib/coq/user-contrib/QuickChick /fs/buzz/llampro/.opam/4.04.0+afl/lib/coq/user-contrib/QuickChick/quickChickLib.cmx  /tmp/QuickChick/043955/QuickChickce7f9a.ml -o /tmp/QuickChick/043955/QuickChickce7f9a
+Extra: 
+40699159 : true
+1191530 : "()"
+109311 : false
++++ Passed 42000000 tests (0 discards)
+
+real	75m51.647s
+user	75m51.616s
+sys	0m0.011s
+QuickChecking (testMutantX_ rSSNI_smart 7)
+File "./Bench.v", line 72, characters 0-40:
+Warning: The following logical axioms were
+encountered: fstepP Mem.upd_get_frame Mem.memory_extensionality
+             Mem.upd_frame_defined.
+Having invalid logical axiom in the
+environment when extracting may lead to incorrect or non-terminating ML
+terms.
+ [extraction-logical-axiom,extraction]
+perl: warning: Setting locale failed.
+perl: warning: Please check that your locale settings:
+	LANGUAGE = (unset),
+	LC_ALL = (unset),
+	LANG = "C.UTF-8"
+    are supported and installed on your system.
+perl: warning: Falling back to the standard locale ("C").
+Extracted ML file: /tmp/QuickChick/055553/QuickChick264e47.ml
+Extra: 
+Compile command: ocamlopt unix.cmxa -unsafe-string -rectypes -w a -I /tmp/QuickChick/055553 -I /fs/buzz/llampro/.opam/4.04.0+afl/lib/coq/user-contrib/QuickChick /fs/buzz/llampro/.opam/4.04.0+afl/lib/coq/user-contrib/QuickChick/quickChickLib.cmx  /tmp/QuickChick/055553/QuickChick264e47.ml -o /tmp/QuickChick/055553/QuickChick264e47
+Extra: 
+40719654 : true
+1180810 : "()"
+99536 : false
++++ Passed 42000000 tests (0 discards)
+
+real	74m8.731s
+user	74m8.612s
+sys	0m0.048s
+QuickChecking (testMutantX_ rSSNI_smart 8)
+File "./Bench.v", line 73, characters 0-40:
+Warning: The following logical axioms were
+encountered: fstepP Mem.upd_get_frame Mem.memory_extensionality
+             Mem.upd_frame_defined.
+Having invalid logical axiom in the
+environment when extracting may lead to incorrect or non-terminating ML
+terms.
+ [extraction-logical-axiom,extraction]
+perl: warning: Setting locale failed.
+perl: warning: Please check that your locale settings:
+	LANGUAGE = (unset),
+	LC_ALL = (unset),
+	LANG = "C.UTF-8"
+    are supported and installed on your system.
+perl: warning: Falling back to the standard locale ("C").
+Extracted ML file: /tmp/QuickChick/071009/QuickChick02e37f.ml
+Extra: 
+Compile command: ocamlopt unix.cmxa -unsafe-string -rectypes -w a -I /tmp/QuickChick/071009 -I /fs/buzz/llampro/.opam/4.04.0+afl/lib/coq/user-contrib/QuickChick /fs/buzz/llampro/.opam/4.04.0+afl/lib/coq/user-contrib/QuickChick/quickChickLib.cmx  /tmp/QuickChick/071009/QuickChick02e37f.ml -o /tmp/QuickChick/071009/QuickChick02e37f
+Extra: 
+40767605 : true
+1151887 : "()"
+80508 : false
++++ Passed 42000000 tests (0 discards)
+
+real	74m43.239s
+user	74m43.214s
+sys	0m0.013s
+QuickChecking (testMutantX_ rSSNI_smart 9)
+File "./Bench.v", line 74, characters 0-40:
+Warning: The following logical axioms were
+encountered: fstepP Mem.upd_get_frame Mem.memory_extensionality
+             Mem.upd_frame_defined.
+Having invalid logical axiom in the
+environment when extracting may lead to incorrect or non-terminating ML
+terms.
+ [extraction-logical-axiom,extraction]
+perl: warning: Setting locale failed.
+perl: warning: Please check that your locale settings:
+	LANGUAGE = (unset),
+	LC_ALL = (unset),
+	LANG = "C.UTF-8"
+    are supported and installed on your system.
+perl: warning: Falling back to the standard locale ("C").
+Extracted ML file: /tmp/QuickChick/082458/QuickChick28d900.ml
+Extra: 
+Compile command: ocamlopt unix.cmxa -unsafe-string -rectypes -w a -I /tmp/QuickChick/082458 -I /fs/buzz/llampro/.opam/4.04.0+afl/lib/coq/user-contrib/QuickChick /fs/buzz/llampro/.opam/4.04.0+afl/lib/coq/user-contrib/QuickChick/quickChickLib.cmx  /tmp/QuickChick/082458/QuickChick28d900.ml -o /tmp/QuickChick/082458/QuickChick28d900
+Extra: 
+40762462 : true
+1172316 : "()"
+65222 : false
++++ Passed 42000000 tests (0 discards)
+
+real	75m12.466s
+user	75m12.444s
+sys	0m0.010s
+QuickChecking (testMutantX_ rSSNI_smart 10)
+File "./Bench.v", line 75, characters 0-41:
+Warning: The following logical axioms were
+encountered: fstepP Mem.upd_get_frame Mem.memory_extensionality
+             Mem.upd_frame_defined.
+Having invalid logical axiom in the
+environment when extracting may lead to incorrect or non-terminating ML
+terms.
+ [extraction-logical-axiom,extraction]
+perl: warning: Setting locale failed.
+perl: warning: Please check that your locale settings:
+	LANGUAGE = (unset),
+	LC_ALL = (unset),
+	LANG = "C.UTF-8"
+    are supported and installed on your system.
+perl: warning: Falling back to the standard locale ("C").
+Extracted ML file: /tmp/QuickChick/094017/QuickChick179213.ml
+Extra: 
+Compile command: ocamlopt unix.cmxa -unsafe-string -rectypes -w a -I /tmp/QuickChick/094017 -I /fs/buzz/llampro/.opam/4.04.0+afl/lib/coq/user-contrib/QuickChick /fs/buzz/llampro/.opam/4.04.0+afl/lib/coq/user-contrib/QuickChick/quickChickLib.cmx  /tmp/QuickChick/094017/QuickChick179213.ml -o /tmp/QuickChick/094017/QuickChick179213
+Extra: 
+40152293 : true
+1192010 : "()"
+655697 : false
++++ Passed 42000000 tests (0 discards)
+
+real	75m51.402s
+user	75m51.377s
+sys	0m0.012s
+QuickChecking (testMutantX_ rSSNI_smart 11)
+File "./Bench.v", line 76, characters 0-41:
+Warning: The following logical axioms were
+encountered: fstepP Mem.upd_get_frame Mem.memory_extensionality
+             Mem.upd_frame_defined.
+Having invalid logical axiom in the
+environment when extracting may lead to incorrect or non-terminating ML
+terms.
+ [extraction-logical-axiom,extraction]
+perl: warning: Setting locale failed.
+perl: warning: Please check that your locale settings:
+	LANGUAGE = (unset),
+	LC_ALL = (unset),
+	LANG = "C.UTF-8"
+    are supported and installed on your system.
+perl: warning: Falling back to the standard locale ("C").
+Extracted ML file: /tmp/QuickChick/105615/QuickChick953b50.ml
+Extra: 
+Compile command: ocamlopt unix.cmxa -unsafe-string -rectypes -w a -I /tmp/QuickChick/105615 -I /fs/buzz/llampro/.opam/4.04.0+afl/lib/coq/user-contrib/QuickChick /fs/buzz/llampro/.opam/4.04.0+afl/lib/coq/user-contrib/QuickChick/quickChickLib.cmx  /tmp/QuickChick/105615/QuickChick953b50.ml -o /tmp/QuickChick/105615/QuickChick953b50
+Extra: 
+40795334 : true
+1195250 : "()"
+9416 : false
++++ Passed 42000000 tests (0 discards)
+
+real	74m36.650s
+user	74m36.620s
+sys	0m0.013s
+QuickChecking (testMutantX_ rSSNI_smart 12)
+File "./Bench.v", line 77, characters 0-41:
+Warning: The following logical axioms were
+encountered: fstepP Mem.upd_get_frame Mem.memory_extensionality
+             Mem.upd_frame_defined.
+Having invalid logical axiom in the
+environment when extracting may lead to incorrect or non-terminating ML
+terms.
+ [extraction-logical-axiom,extraction]
+perl: warning: Setting locale failed.
+perl: warning: Please check that your locale settings:
+	LANGUAGE = (unset),
+	LC_ALL = (unset),
+	LANG = "C.UTF-8"
+    are supported and installed on your system.
+perl: warning: Falling back to the standard locale ("C").
+Extracted ML file: /tmp/QuickChick/121058/QuickChickf5d07b.ml
+Extra: 
+Compile command: ocamlopt unix.cmxa -unsafe-string -rectypes -w a -I /tmp/QuickChick/121058 -I /fs/buzz/llampro/.opam/4.04.0+afl/lib/coq/user-contrib/QuickChick /fs/buzz/llampro/.opam/4.04.0+afl/lib/coq/user-contrib/QuickChick/quickChickLib.cmx  /tmp/QuickChick/121058/QuickChickf5d07b.ml -o /tmp/QuickChick/121058/QuickChickf5d07b
+Extra: 
+40797777 : true
+1192795 : "()"
+9428 : false
++++ Passed 42000000 tests (0 discards)
+
+real	74m18.775s
+user	74m18.752s
+sys	0m0.009s
+QuickChecking (testMutantX_ rSSNI_smart 13)
+File "./Bench.v", line 78, characters 0-41:
+Warning: The following logical axioms were
+encountered: fstepP Mem.upd_get_frame Mem.memory_extensionality
+             Mem.upd_frame_defined.
+Having invalid logical axiom in the
+environment when extracting may lead to incorrect or non-terminating ML
+terms.
+ [extraction-logical-axiom,extraction]
+perl: warning: Setting locale failed.
+perl: warning: Please check that your locale settings:
+	LANGUAGE = (unset),
+	LC_ALL = (unset),
+	LANG = "C.UTF-8"
+    are supported and installed on your system.
+perl: warning: Falling back to the standard locale ("C").
+Extracted ML file: /tmp/QuickChick/132524/QuickChick34a349.ml
+Extra: 
+Compile command: ocamlopt unix.cmxa -unsafe-string -rectypes -w a -I /tmp/QuickChick/132524 -I /fs/buzz/llampro/.opam/4.04.0+afl/lib/coq/user-contrib/QuickChick /fs/buzz/llampro/.opam/4.04.0+afl/lib/coq/user-contrib/QuickChick/quickChickLib.cmx  /tmp/QuickChick/132524/QuickChick34a349.ml -o /tmp/QuickChick/132524/QuickChick34a349
+Extra: 
+40773522 : true
+1194087 : "()"
+32391 : false
++++ Passed 42000000 tests (0 discards)
+
+real	74m39.410s
+user	74m39.389s
+sys	0m0.008s
+QuickChecking (testMutantX_ rSSNI_smart 14)
+File "./Bench.v", line 79, characters 0-41:
+Warning: The following logical axioms were
+encountered: fstepP Mem.upd_get_frame Mem.memory_extensionality
+             Mem.upd_frame_defined.
+Having invalid logical axiom in the
+environment when extracting may lead to incorrect or non-terminating ML
+terms.
+ [extraction-logical-axiom,extraction]
+perl: warning: Setting locale failed.
+perl: warning: Please check that your locale settings:
+	LANGUAGE = (unset),
+	LC_ALL = (unset),
+	LANG = "C.UTF-8"
+    are supported and installed on your system.
+perl: warning: Falling back to the standard locale ("C").
+Extracted ML file: /tmp/QuickChick/144009/QuickChickb13809.ml
+Extra: 
+Compile command: ocamlopt unix.cmxa -unsafe-string -rectypes -w a -I /tmp/QuickChick/144009 -I /fs/buzz/llampro/.opam/4.04.0+afl/lib/coq/user-contrib/QuickChick /fs/buzz/llampro/.opam/4.04.0+afl/lib/coq/user-contrib/QuickChick/quickChickLib.cmx  /tmp/QuickChick/144009/QuickChickb13809.ml -o /tmp/QuickChick/144009/QuickChickb13809
+Extra: 
+40789540 : true
+1193538 : "()"
+16922 : false
++++ Passed 42000000 tests (0 discards)
+
+real	75m53.227s
+user	75m53.193s
+sys	0m0.010s
+QuickChecking (testMutantX_ rSSNI_smart 15)
+File "./Bench.v", line 80, characters 0-41:
+Warning: The following logical axioms were
+encountered: fstepP Mem.upd_get_frame Mem.memory_extensionality
+             Mem.upd_frame_defined.
+Having invalid logical axiom in the
+environment when extracting may lead to incorrect or non-terminating ML
+terms.
+ [extraction-logical-axiom,extraction]
+perl: warning: Setting locale failed.
+perl: warning: Please check that your locale settings:
+	LANGUAGE = (unset),
+	LC_ALL = (unset),
+	LANG = "C.UTF-8"
+    are supported and installed on your system.
+perl: warning: Falling back to the standard locale ("C").
+Extracted ML file: /tmp/QuickChick/155609/QuickChick3e27ef.ml
+Extra: 
+Compile command: ocamlopt unix.cmxa -unsafe-string -rectypes -w a -I /tmp/QuickChick/155609 -I /fs/buzz/llampro/.opam/4.04.0+afl/lib/coq/user-contrib/QuickChick /fs/buzz/llampro/.opam/4.04.0+afl/lib/coq/user-contrib/QuickChick/quickChickLib.cmx  /tmp/QuickChick/155609/QuickChick3e27ef.ml -o /tmp/QuickChick/155609/QuickChick3e27ef
+Extra: 
+40738451 : true
+1194419 : "()"
+67130 : false
++++ Passed 42000000 tests (0 discards)
+
+real	76m33.207s
+user	76m33.088s
+sys	0m0.074s
+QuickChecking (testMutantX_ rSSNI_smart 16)
+File "./Bench.v", line 81, characters 0-41:
+Warning: The following logical axioms were
+encountered: fstepP Mem.upd_get_frame Mem.memory_extensionality
+             Mem.upd_frame_defined.
+Having invalid logical axiom in the
+environment when extracting may lead to incorrect or non-terminating ML
+terms.
+ [extraction-logical-axiom,extraction]
+perl: warning: Setting locale failed.
+perl: warning: Please check that your locale settings:
+	LANGUAGE = (unset),
+	LC_ALL = (unset),
+	LANG = "C.UTF-8"
+    are supported and installed on your system.
+perl: warning: Falling back to the standard locale ("C").
+Extracted ML file: /tmp/QuickChick/171249/QuickChick71e6e9.ml
+Extra: 
+Compile command: ocamlopt unix.cmxa -unsafe-string -rectypes -w a -I /tmp/QuickChick/171249 -I /fs/buzz/llampro/.opam/4.04.0+afl/lib/coq/user-contrib/QuickChick /fs/buzz/llampro/.opam/4.04.0+afl/lib/coq/user-contrib/QuickChick/quickChickLib.cmx  /tmp/QuickChick/171249/QuickChick71e6e9.ml -o /tmp/QuickChick/171249/QuickChick71e6e9
+Extra: 
+40765293 : true
+1196070 : "()"
+38637 : false
++++ Passed 42000000 tests (0 discards)
+
+real	75m50.537s
+user	75m50.509s
+sys	0m0.012s
+QuickChecking (testMutantX_ rSSNI_smart 17)
+File "./Bench.v", line 82, characters 0-41:
+Warning: The following logical axioms were
+encountered: fstepP Mem.upd_get_frame Mem.memory_extensionality
+             Mem.upd_frame_defined.
+Having invalid logical axiom in the
+environment when extracting may lead to incorrect or non-terminating ML
+terms.
+ [extraction-logical-axiom,extraction]
+perl: warning: Setting locale failed.
+perl: warning: Please check that your locale settings:
+	LANGUAGE = (unset),
+	LC_ALL = (unset),
+	LANG = "C.UTF-8"
+    are supported and installed on your system.
+perl: warning: Falling back to the standard locale ("C").
+Extracted ML file: /tmp/QuickChick/182846/QuickChickd30ae0.ml
+Extra: 
+Compile command: ocamlopt unix.cmxa -unsafe-string -rectypes -w a -I /tmp/QuickChick/182846 -I /fs/buzz/llampro/.opam/4.04.0+afl/lib/coq/user-contrib/QuickChick /fs/buzz/llampro/.opam/4.04.0+afl/lib/coq/user-contrib/QuickChick/quickChickLib.cmx  /tmp/QuickChick/182846/QuickChickd30ae0.ml -o /tmp/QuickChick/182846/QuickChickd30ae0
+Extra: 
+40787656 : true
+1194377 : "()"
+17967 : false
++++ Passed 42000000 tests (0 discards)
+
+real	76m29.056s
+user	76m27.988s
+sys	0m1.040s
+QuickChecking (testMutantX_ rSSNI_smart 18)
+File "./Bench.v", line 83, characters 0-41:
+Warning: The following logical axioms were
+encountered: fstepP Mem.upd_get_frame Mem.memory_extensionality
+             Mem.upd_frame_defined.
+Having invalid logical axiom in the
+environment when extracting may lead to incorrect or non-terminating ML
+terms.
+ [extraction-logical-axiom,extraction]
+perl: warning: Setting locale failed.
+perl: warning: Please check that your locale settings:
+	LANGUAGE = (unset),
+	LC_ALL = (unset),
+	LANG = "C.UTF-8"
+    are supported and installed on your system.
+perl: warning: Falling back to the standard locale ("C").
+Extracted ML file: /tmp/QuickChick/194521/QuickChick89a37b.ml
+Extra: 
+Compile command: ocamlopt unix.cmxa -unsafe-string -rectypes -w a -I /tmp/QuickChick/194521 -I /fs/buzz/llampro/.opam/4.04.0+afl/lib/coq/user-contrib/QuickChick /fs/buzz/llampro/.opam/4.04.0+afl/lib/coq/user-contrib/QuickChick/quickChickLib.cmx  /tmp/QuickChick/194521/QuickChick89a37b.ml -o /tmp/QuickChick/194521/QuickChick89a37b
+Extra: 
+40730269 : true
+1193230 : "()"
+76501 : false
++++ Passed 42000000 tests (0 discards)
+
+real	74m59.821s
+user	74m59.802s
+sys	0m0.006s
+QuickChecking (testMutantX_ rSSNI_smart 19)
+File "./Bench.v", line 84, characters 0-41:
+Warning: The following logical axioms were
+encountered: fstepP Mem.upd_get_frame Mem.memory_extensionality
+             Mem.upd_frame_defined.
+Having invalid logical axiom in the
+environment when extracting may lead to incorrect or non-terminating ML
+terms.
+ [extraction-logical-axiom,extraction]
+perl: warning: Setting locale failed.
+perl: warning: Please check that your locale settings:
+	LANGUAGE = (unset),
+	LC_ALL = (unset),
+	LANG = "C.UTF-8"
+    are supported and installed on your system.
+perl: warning: Falling back to the standard locale ("C").
+Extracted ML file: /tmp/QuickChick/210027/QuickChick37681d.ml
+Extra: 
+Compile command: ocamlopt unix.cmxa -unsafe-string -rectypes -w a -I /tmp/QuickChick/210027 -I /fs/buzz/llampro/.opam/4.04.0+afl/lib/coq/user-contrib/QuickChick /fs/buzz/llampro/.opam/4.04.0+afl/lib/coq/user-contrib/QuickChick/quickChickLib.cmx  /tmp/QuickChick/210027/QuickChick37681d.ml -o /tmp/QuickChick/210027/QuickChick37681d
+Extra: 
+40692571 : true
+1193990 : "()"
+113439 : false
++++ Passed 42000000 tests (0 discards)
+
+real	76m59.098s
+user	76m59.074s
+sys	0m0.007s
+QuickChecking (testMutantX_ rSSNI_smart 20)
+File "./Bench.v", line 85, characters 0-41:
+Warning: The following logical axioms were
+encountered: fstepP Mem.upd_get_frame Mem.memory_extensionality
+             Mem.upd_frame_defined.
+Having invalid logical axiom in the
+environment when extracting may lead to incorrect or non-terminating ML
+terms.
+ [extraction-logical-axiom,extraction]
+perl: warning: Setting locale failed.
+perl: warning: Please check that your locale settings:
+	LANGUAGE = (unset),
+	LC_ALL = (unset),
+	LANG = "C.UTF-8"
+    are supported and installed on your system.
+perl: warning: Falling back to the standard locale ("C").
+Extracted ML file: /tmp/QuickChick/221733/QuickChickce62c6.ml
+Extra: 
+Compile command: ocamlopt unix.cmxa -unsafe-string -rectypes -w a -I /tmp/QuickChick/221733 -I /fs/buzz/llampro/.opam/4.04.0+afl/lib/coq/user-contrib/QuickChick /fs/buzz/llampro/.opam/4.04.0+afl/lib/coq/user-contrib/QuickChick/quickChickLib.cmx  /tmp/QuickChick/221733/QuickChickce62c6.ml -o /tmp/QuickChick/221733/QuickChickce62c6
+Extra: 
+40741853 : true
+1195049 : "()"
+63098 : false
++++ Passed 42000000 tests (0 discards)
+
+real	75m28.610s
+user	75m28.583s
+sys	0m0.006s
+QuickChecking (testMutantX_ rSSNI_smart 21)
+File "./Bench.v", line 86, characters 0-41:
+Warning: The following logical axioms were
+encountered: fstepP Mem.upd_get_frame Mem.memory_extensionality
+             Mem.upd_frame_defined.
+Having invalid logical axiom in the
+environment when extracting may lead to incorrect or non-terminating ML
+terms.
+ [extraction-logical-axiom,extraction]
+perl: warning: Setting locale failed.
+perl: warning: Please check that your locale settings:
+	LANGUAGE = (unset),
+	LC_ALL = (unset),
+	LANG = "C.UTF-8"
+    are supported and installed on your system.
+perl: warning: Falling back to the standard locale ("C").
+Extracted ML file: /tmp/QuickChick/233308/QuickChick1d012e.ml
+Extra: 
+Compile command: ocamlopt unix.cmxa -unsafe-string -rectypes -w a -I /tmp/QuickChick/233308 -I /fs/buzz/llampro/.opam/4.04.0+afl/lib/coq/user-contrib/QuickChick /fs/buzz/llampro/.opam/4.04.0+afl/lib/coq/user-contrib/QuickChick/quickChickLib.cmx  /tmp/QuickChick/233308/QuickChick1d012e.ml -o /tmp/QuickChick/233308/QuickChick1d012e
+Extra: 
+40773482 : true
+1151229 : "()"
+75289 : false
++++ Passed 42000000 tests (0 discards)
+
+real	76m10.054s
+user	76m8.189s
+sys	0m1.837s
+QuickChecking (testMutantX_ rSSNI_smart 22)
+File "./Bench.v", line 87, characters 0-41:
+Warning: The following logical axioms were
+encountered: fstepP Mem.upd_get_frame Mem.memory_extensionality
+             Mem.upd_frame_defined.
+Having invalid logical axiom in the
+environment when extracting may lead to incorrect or non-terminating ML
+terms.
+ [extraction-logical-axiom,extraction]
+perl: warning: Setting locale failed.
+perl: warning: Please check that your locale settings:
+	LANGUAGE = (unset),
+	LC_ALL = (unset),
+	LANG = "C.UTF-8"
+    are supported and installed on your system.
+perl: warning: Falling back to the standard locale ("C").
+Extracted ML file: /tmp/QuickChick/004924/QuickChick8361d5.ml
+Extra: 
+Compile command: ocamlopt unix.cmxa -unsafe-string -rectypes -w a -I /tmp/QuickChick/004924 -I /fs/buzz/llampro/.opam/4.04.0+afl/lib/coq/user-contrib/QuickChick /fs/buzz/llampro/.opam/4.04.0+afl/lib/coq/user-contrib/QuickChick/quickChickLib.cmx  /tmp/QuickChick/004924/QuickChick8361d5.ml -o /tmp/QuickChick/004924/QuickChick8361d5
+Extra: 
+40783138 : true
+1176437 : "()"
+40425 : false
++++ Passed 42000000 tests (0 discards)
+
+real	77m23.223s
+user	77m23.188s
+sys	0m0.014s
+QuickChecking (testMutantX_ rSSNI_smart 23)
+File "./Bench.v", line 88, characters 0-41:
+Warning: The following logical axioms were
+encountered: fstepP Mem.upd_get_frame Mem.memory_extensionality
+             Mem.upd_frame_defined.
+Having invalid logical axiom in the
+environment when extracting may lead to incorrect or non-terminating ML
+terms.
+ [extraction-logical-axiom,extraction]
+perl: warning: Setting locale failed.
+perl: warning: Please check that your locale settings:
+	LANGUAGE = (unset),
+	LC_ALL = (unset),
+	LANG = "C.UTF-8"
+    are supported and installed on your system.
+perl: warning: Falling back to the standard locale ("C").
+Extracted ML file: /tmp/QuickChick/020654/QuickChickd4914b.ml
+Extra: 
+Compile command: ocamlopt unix.cmxa -unsafe-string -rectypes -w a -I /tmp/QuickChick/020654 -I /fs/buzz/llampro/.opam/4.04.0+afl/lib/coq/user-contrib/QuickChick /fs/buzz/llampro/.opam/4.04.0+afl/lib/coq/user-contrib/QuickChick/quickChickLib.cmx  /tmp/QuickChick/020654/QuickChickd4914b.ml -o /tmp/QuickChick/020654/QuickChickd4914b
+Extra: 
+40547535 : true
+1195698 : "()"
+256767 : false
++++ Passed 42000000 tests (0 discards)
+
+real	77m2.697s
+user	77m2.666s
+sys	0m0.010s
+QuickChecking (testMutantX_ rSSNI_smart 24)
+File "./Bench.v", line 89, characters 0-41:
+Warning: The following logical axioms were
+encountered: fstepP Mem.upd_get_frame Mem.memory_extensionality
+             Mem.upd_frame_defined.
+Having invalid logical axiom in the
+environment when extracting may lead to incorrect or non-terminating ML
+terms.
+ [extraction-logical-axiom,extraction]
+perl: warning: Setting locale failed.
+perl: warning: Please check that your locale settings:
+	LANGUAGE = (unset),
+	LC_ALL = (unset),
+	LANG = "C.UTF-8"
+    are supported and installed on your system.
+perl: warning: Falling back to the standard locale ("C").
+Extracted ML file: /tmp/QuickChick/032403/QuickChickb89b38.ml
+Extra: 
+Compile command: ocamlopt unix.cmxa -unsafe-string -rectypes -w a -I /tmp/QuickChick/032403 -I /fs/buzz/llampro/.opam/4.04.0+afl/lib/coq/user-contrib/QuickChick /fs/buzz/llampro/.opam/4.04.0+afl/lib/coq/user-contrib/QuickChick/quickChickLib.cmx  /tmp/QuickChick/032403/QuickChickb89b38.ml -o /tmp/QuickChick/032403/QuickChickb89b38
+Extra: 
+39906813 : true
+1194693 : "()"
+898494 : false
++++ Passed 42000000 tests (0 discards)
+
+real	77m47.483s
+user	77m47.461s
+sys	0m0.011s
+QuickChecking (testMutantX_ rSSNI_smart 25)
+File "./Bench.v", line 90, characters 0-41:
+Warning: The following logical axioms were
+encountered: fstepP Mem.upd_get_frame Mem.memory_extensionality
+             Mem.upd_frame_defined.
+Having invalid logical axiom in the
+environment when extracting may lead to incorrect or non-terminating ML
+terms.
+ [extraction-logical-axiom,extraction]
+perl: warning: Setting locale failed.
+perl: warning: Please check that your locale settings:
+	LANGUAGE = (unset),
+	LC_ALL = (unset),
+	LANG = "C.UTF-8"
+    are supported and installed on your system.
+perl: warning: Falling back to the standard locale ("C").
+Extracted ML file: /tmp/QuickChick/044157/QuickChick601723.ml
+Extra: 
+Compile command: ocamlopt unix.cmxa -unsafe-string -rectypes -w a -I /tmp/QuickChick/044157 -I /fs/buzz/llampro/.opam/4.04.0+afl/lib/coq/user-contrib/QuickChick /fs/buzz/llampro/.opam/4.04.0+afl/lib/coq/user-contrib/QuickChick/quickChickLib.cmx  /tmp/QuickChick/044157/QuickChick601723.ml -o /tmp/QuickChick/044157/QuickChick601723
+Extra: 
+40806650 : true
+1193350 : "()"
++++ Passed 42000000 tests (0 discards)
+
+real	76m37.076s
+user	76m37.051s
+sys	0m0.012s
+QuickChecking (testMutantX_ rSSNI_smart 26)
+File "./Bench.v", line 91, characters 0-41:
+Warning: The following logical axioms were
+encountered: fstepP Mem.upd_get_frame Mem.memory_extensionality
+             Mem.upd_frame_defined.
+Having invalid logical axiom in the
+environment when extracting may lead to incorrect or non-terminating ML
+terms.
+ [extraction-logical-axiom,extraction]
+perl: warning: Setting locale failed.
+perl: warning: Please check that your locale settings:
+	LANGUAGE = (unset),
+	LC_ALL = (unset),
+	LANG = "C.UTF-8"
+    are supported and installed on your system.
+perl: warning: Falling back to the standard locale ("C").
+Extracted ML file: /tmp/QuickChick/055841/QuickChick907990.ml
+Extra: 
+Compile command: ocamlopt unix.cmxa -unsafe-string -rectypes -w a -I /tmp/QuickChick/055841 -I /fs/buzz/llampro/.opam/4.04.0+afl/lib/coq/user-contrib/QuickChick /fs/buzz/llampro/.opam/4.04.0+afl/lib/coq/user-contrib/QuickChick/quickChickLib.cmx  /tmp/QuickChick/055841/QuickChick907990.ml -o /tmp/QuickChick/055841/QuickChick907990
+Extra: 
+40807409 : true
+1192591 : "()"
++++ Passed 42000000 tests (0 discards)
+
+real	77m16.209s
+user	77m16.178s
+sys	0m0.010s
+QuickChecking (testMutantX_ rSSNI_smart 27)
+File "./Bench.v", line 92, characters 0-41:
+Warning: The following logical axioms were
+encountered: fstepP Mem.upd_get_frame Mem.memory_extensionality
+             Mem.upd_frame_defined.
+Having invalid logical axiom in the
+environment when extracting may lead to incorrect or non-terminating ML
+terms.
+ [extraction-logical-axiom,extraction]
+perl: warning: Setting locale failed.
+perl: warning: Please check that your locale settings:
+	LANGUAGE = (unset),
+	LC_ALL = (unset),
+	LANG = "C.UTF-8"
+    are supported and installed on your system.
+perl: warning: Falling back to the standard locale ("C").
+Extracted ML file: /tmp/QuickChick/071603/QuickChick8a7fb8.ml
+Extra: 
+Compile command: ocamlopt unix.cmxa -unsafe-string -rectypes -w a -I /tmp/QuickChick/071603 -I /fs/buzz/llampro/.opam/4.04.0+afl/lib/coq/user-contrib/QuickChick /fs/buzz/llampro/.opam/4.04.0+afl/lib/coq/user-contrib/QuickChick/quickChickLib.cmx  /tmp/QuickChick/071603/QuickChick8a7fb8.ml -o /tmp/QuickChick/071603/QuickChick8a7fb8
+Extra: 
+40749151 : true
+1192942 : "()"
+57907 : false
++++ Passed 42000000 tests (0 discards)
+
+real	74m2.171s
+user	74m2.134s
+sys	0m0.022s
+QuickChecking (testMutantX_ rSSNI_smart 28)
+File "./Bench.v", line 93, characters 0-41:
+Warning: The following logical axioms were
+encountered: fstepP Mem.upd_get_frame Mem.memory_extensionality
+             Mem.upd_frame_defined.
+Having invalid logical axiom in the
+environment when extracting may lead to incorrect or non-terminating ML
+terms.
+ [extraction-logical-axiom,extraction]
+perl: warning: Setting locale failed.
+perl: warning: Please check that your locale settings:
+	LANGUAGE = (unset),
+	LC_ALL = (unset),
+	LANG = "C.UTF-8"
+    are supported and installed on your system.
+perl: warning: Falling back to the standard locale ("C").
+Extracted ML file: /tmp/QuickChick/083012/QuickChick8ddbe3.ml
+Extra: 
+Compile command: ocamlopt unix.cmxa -unsafe-string -rectypes -w a -I /tmp/QuickChick/083012 -I /fs/buzz/llampro/.opam/4.04.0+afl/lib/coq/user-contrib/QuickChick /fs/buzz/llampro/.opam/4.04.0+afl/lib/coq/user-contrib/QuickChick/quickChickLib.cmx  /tmp/QuickChick/083012/QuickChick8ddbe3.ml -o /tmp/QuickChick/083012/QuickChick8ddbe3
+Extra: 
+40781515 : true
+1194246 : "()"
+24239 : false
++++ Passed 42000000 tests (0 discards)
+
+real	75m12.676s
+user	75m12.649s
+sys	0m0.007s
+QuickChecking (testMutantX_ rSSNI_smart 29)
+File "./Bench.v", line 94, characters 0-41:
+Warning: The following logical axioms were
+encountered: fstepP Mem.upd_get_frame Mem.memory_extensionality
+             Mem.upd_frame_defined.
+Having invalid logical axiom in the
+environment when extracting may lead to incorrect or non-terminating ML
+terms.
+ [extraction-logical-axiom,extraction]
+perl: warning: Setting locale failed.
+perl: warning: Please check that your locale settings:
+	LANGUAGE = (unset),
+	LC_ALL = (unset),
+	LANG = "C.UTF-8"
+    are supported and installed on your system.
+perl: warning: Falling back to the standard locale ("C").
+Extracted ML file: /tmp/QuickChick/094531/QuickChick4718ed.ml
+Extra: 
+Compile command: ocamlopt unix.cmxa -unsafe-string -rectypes -w a -I /tmp/QuickChick/094531 -I /fs/buzz/llampro/.opam/4.04.0+afl/lib/coq/user-contrib/QuickChick /fs/buzz/llampro/.opam/4.04.0+afl/lib/coq/user-contrib/QuickChick/quickChickLib.cmx  /tmp/QuickChick/094531/QuickChick4718ed.ml -o /tmp/QuickChick/094531/QuickChick4718ed
+Extra: 
+40772927 : true
+1193342 : "()"
+33731 : false
++++ Passed 42000000 tests (0 discards)
+
+real	77m5.151s
+user	77m5.112s
+sys	0m0.010s
+QuickChecking (testMutantX_ rSSNI_smart 30)
+File "./Bench.v", line 95, characters 0-41:
+Warning: The following logical axioms were
+encountered: fstepP Mem.upd_get_frame Mem.memory_extensionality
+             Mem.upd_frame_defined.
+Having invalid logical axiom in the
+environment when extracting may lead to incorrect or non-terminating ML
+terms.
+ [extraction-logical-axiom,extraction]
+perl: warning: Setting locale failed.
+perl: warning: Please check that your locale settings:
+	LANGUAGE = (unset),
+	LC_ALL = (unset),
+	LANG = "C.UTF-8"
+    are supported and installed on your system.
+perl: warning: Falling back to the standard locale ("C").
+Extracted ML file: /tmp/QuickChick/110243/QuickChick02698d.ml
+Extra: 
+Compile command: ocamlopt unix.cmxa -unsafe-string -rectypes -w a -I /tmp/QuickChick/110243 -I /fs/buzz/llampro/.opam/4.04.0+afl/lib/coq/user-contrib/QuickChick /fs/buzz/llampro/.opam/4.04.0+afl/lib/coq/user-contrib/QuickChick/quickChickLib.cmx  /tmp/QuickChick/110243/QuickChick02698d.ml -o /tmp/QuickChick/110243/QuickChick02698d
+Extra: 
+40778417 : true
+1194802 : "()"
+26781 : false
++++ Passed 42000000 tests (0 discards)
+
+real	76m2.313s
+user	76m2.289s
+sys	0m0.009s
+QuickChecking (testMutantX_ rSSNI_smart 31)
+File "./Bench.v", line 96, characters 0-41:
+Warning: The following logical axioms were
+encountered: fstepP Mem.upd_get_frame Mem.memory_extensionality
+             Mem.upd_frame_defined.
+Having invalid logical axiom in the
+environment when extracting may lead to incorrect or non-terminating ML
+terms.
+ [extraction-logical-axiom,extraction]
+perl: warning: Setting locale failed.
+perl: warning: Please check that your locale settings:
+	LANGUAGE = (unset),
+	LC_ALL = (unset),
+	LANG = "C.UTF-8"
+    are supported and installed on your system.
+perl: warning: Falling back to the standard locale ("C").
+Extracted ML file: /tmp/QuickChick/121852/QuickChick47e02f.ml
+Extra: 
+Compile command: ocamlopt unix.cmxa -unsafe-string -rectypes -w a -I /tmp/QuickChick/121852 -I /fs/buzz/llampro/.opam/4.04.0+afl/lib/coq/user-contrib/QuickChick /fs/buzz/llampro/.opam/4.04.0+afl/lib/coq/user-contrib/QuickChick/quickChickLib.cmx  /tmp/QuickChick/121852/QuickChick47e02f.ml -o /tmp/QuickChick/121852/QuickChick47e02f
+Extra: 
+40790010 : true
+1194207 : "()"
+15783 : false
++++ Passed 42000000 tests (0 discards)
+
+real	76m12.179s
+user	76m12.146s
+sys	0m0.014s
+QuickChecking (testMutantX_ rSSNI_smart 32)
+File "./Bench.v", line 97, characters 0-41:
+Warning: The following logical axioms were
+encountered: fstepP Mem.upd_get_frame Mem.memory_extensionality
+             Mem.upd_frame_defined.
+Having invalid logical axiom in the
+environment when extracting may lead to incorrect or non-terminating ML
+terms.
+ [extraction-logical-axiom,extraction]
+perl: warning: Setting locale failed.
+perl: warning: Please check that your locale settings:
+	LANGUAGE = (unset),
+	LC_ALL = (unset),
+	LANG = "C.UTF-8"
+    are supported and installed on your system.
+perl: warning: Falling back to the standard locale ("C").
+Extracted ML file: /tmp/QuickChick/133510/QuickChick78dd9f.ml
+Extra: 
+Compile command: ocamlopt unix.cmxa -unsafe-string -rectypes -w a -I /tmp/QuickChick/133510 -I /fs/buzz/llampro/.opam/4.04.0+afl/lib/coq/user-contrib/QuickChick /fs/buzz/llampro/.opam/4.04.0+afl/lib/coq/user-contrib/QuickChick/quickChickLib.cmx  /tmp/QuickChick/133510/QuickChick78dd9f.ml -o /tmp/QuickChick/133510/QuickChick78dd9f
+Extra: 
+40761499 : true
+1194900 : "()"
+43601 : false
++++ Passed 42000000 tests (0 discards)
+
+real	75m31.974s
+user	75m31.945s
+sys	0m0.015s
