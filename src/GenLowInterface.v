@@ -57,6 +57,16 @@ Module Type Sig.
   Parameter apGen : forall {A B : Type}, G (A -> B) -> G A -> G B.
   Parameter sized : forall {A: Type}, (nat -> G A) -> G A.
   Parameter resize : forall {A: Type}, nat -> G A -> G A.
+
+  (* Series stuff for enumeration *)
+  Parameter series_sum : forall {A : Type} (s1 s2 : G A), G A.
+  Parameter series_prod : forall {A B : Type} (s1 : G A) (s2 : G B), G (A * B).
+
+  Parameter cons0 : forall {A} (con : A), G A.
+  Parameter cons1 : forall {A B} (m : G A) (con : A -> B), G B.
+  Parameter cons2 : forall {A B C} (ma : G A) (mb : G B) (con : A -> B -> C), G C.
+  Parameter cons3 : forall {A B C D} (ma : G A) (mb : G B) (mc : G C) (con : A -> B -> C -> D), G D.
+
   Parameter promote : forall {A : Type}, Rose (G A) -> G (Rose A).
   Parameter suchThatMaybe : forall {A : Type}, G A -> (A -> bool) ->
                                           G (option A).
