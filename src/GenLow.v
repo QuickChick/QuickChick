@@ -221,13 +221,6 @@ Module GenLow : GenLowInterface.Sig.
       then we can test in order of enumeration more thoroughly.
    *)
 
-  Fixpoint join_list_lazy_list {A : Type} (l : list (LazyList A)) : LazyList A :=
-    match l with
-    | nil => lnil _
-    | cons h ts => lazy_append h (join_list_lazy_list ts)
-    end.
-
-
   (*
   (*
     Okay, so each rose tree has a list at each spot. Presumably this
@@ -295,12 +288,12 @@ Module GenLow : GenLowInterface.Sig.
   Definition choose {A : Type} `{ChoosableFromInterval A} (range : A * A) : G A :=
     MkGen (fun _ r => ret (fst (randomR range r))).
   
-  Definition sample (A : Type) (g : G A) : list (LazyList A) :=
+  Definition sample (A : Type) (g : G A) : list A :=
     match g with
       | MkGen m =>
         let rnd := newRandomSeed in
         let l := List.combine (rnds rnd 20) (createRange 10 nil) in
-        List.map (fun (p : RandomSeed * nat) => let (r,n) := p in m n r) l
+        joint_list_lazy_list_list (List.map (fun (p : RandomSeed * nat) => let (r,n) := p in m n r) l)
     end.
   
   (* LL : Things that need to be in GenLow because of MkGen *)
@@ -1576,6 +1569,8 @@ Module GenLow : GenLowInterface.Sig.
     now eexists; split; eauto. eassumption. 
   Qed.
 
+   *)
+
   Instance Functor_G : Functor G := {
     fmap A B := fmap;
   }.
@@ -1597,7 +1592,6 @@ Module GenLow : GenLowInterface.Sig.
     bind A B := bindGenOpt;
   }.
 
-   *)
   Definition thunkGen {A} (f : unit -> G A) : G A :=
     MkGen (fun n r => run (f tt) n r).
 

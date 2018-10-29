@@ -51,7 +51,7 @@ Module Type Sig.
   Parameter returnGen  : forall {A : Type}, A -> G A.
   (* TODO: Add dependent combinator *)
   Parameter bindGen :  forall {A B : Type}, G A -> (A -> G B) -> G B.
-  (* Parameter bindGenOpt : forall {A B : Type}, G (option A) -> (A -> G (option B)) -> G (option B). *)
+  Parameter bindGenOpt : forall {A B : Type}, G (option A) -> (A -> G (option B)) -> G (option B).
   Parameter run  : forall {A : Type}, G A -> nat -> RandomSeed -> LazyList A.
   Parameter fmap : forall {A B : Type}, (A -> B) -> G A -> G B.
   Parameter apGen : forall {A B : Type}, G (A -> B) -> G A -> G B.
@@ -63,7 +63,7 @@ Module Type Sig.
   Parameter suchThatMaybeOpt : forall {A : Type}, G (option A) -> (A -> bool) ->
                                              G (option A).
   Parameter choose : forall {A : Type} `{ChoosableFromInterval A}, (A * A) -> G A.
-  Parameter sample : forall {A : Type}, G A -> list (LazyList A).
+  Parameter sample : forall {A : Type}, G A -> list A.
 
 
   (* LL: The abstraction barrier is annoying :D *)
@@ -455,6 +455,8 @@ Module Type Sig.
       semGen (fmap f1 (bindGen g f2)) <-->
       semGen (bindGen g (fun x => fmap f1 (f2 x))).
 
+   *)
+
   Instance Functor_G : Functor G := {
     fmap A B := fmap;
   }.
@@ -476,7 +478,6 @@ Module Type Sig.
     bind A B := bindGenOpt;
   }.
 
-   *)
   (** Delay evaluation of a generator in a CBV language. *)
   Parameter thunkGen : forall {A}, (unit -> G A) -> G A.
 

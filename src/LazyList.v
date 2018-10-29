@@ -203,3 +203,15 @@ Proof.
   - simpl in *. destruct Hbll as [Hal | Hinl]; subst;
                   auto using lazy_append_in_l, lazy_append_in_r.
 Qed.
+
+Fixpoint join_list_lazy_list {A : Type} (l : list (LazyList A)) : LazyList A :=
+  match l with
+  | nil => lnil _
+  | cons h ts => lazy_append h (join_list_lazy_list ts)
+  end.
+
+Fixpoint joint_list_lazy_list_list {A : Type} (l : list (LazyList A)) : list A :=
+  match l with
+  | nil => nil
+  | cons h ts => (LazyList_to_list h) ++ (joint_list_lazy_list_list ts)
+  end.

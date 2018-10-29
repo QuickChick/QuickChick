@@ -8,7 +8,7 @@ From mathcomp Require Import ssrnat ssrbool eqtype div.
 (* N.B.: this pulls in [ExtrOcamlString] (ExtractionQC also does) *)
 From SimpleIO Require Import CoqPervasives.
 
-From QuickChick Require Import RoseTrees RandomQC GenLow GenHigh SemChecker.
+From QuickChick Require Import RoseTrees RandomQC GenLow GenHigh SemChecker LazyList.
 From QuickChick Require Import Show Checker State Classes.
 
 Require Import Coq.Strings.Ascii.
@@ -129,7 +129,7 @@ Definition summary (st : State) : list (string * nat) :=
   let res := Map.fold (fun key elem acc => (key,elem) :: acc) (labels st) nil
   in insSortBy (fun x y => snd y <= snd x) res .
 
-Definition doneTesting (st : State) (f : nat -> RandomSeed -> QProp) : Result :=
+Definition doneTesting (st : State) (f : nat -> RandomSeed -> LazyList QProp) : Result :=
  if expectedFailure st then
     Success (numSuccessTests st + 1) (numDiscardedTests st) (summary st)
             ("+++ Passed " ++ (show (numSuccessTests st)) ++ " tests (" ++ (show (numDiscardedTests st)) ++ " discards)")
@@ -139,7 +139,7 @@ Definition doneTesting (st : State) (f : nat -> RandomSeed -> QProp) : Result :=
                                              ++ " tests (expected Failure)").
   (* TODO: success st - labels *)
 
-Definition giveUp (st : State) (_ : nat -> RandomSeed -> QProp) : Result :=
+Definition giveUp (st : State) (_ : nat -> RandomSeed -> LazyList QProp) : Result :=
   GaveUp (numSuccessTests st) (summary st)
          ("*** Gave up! Passed only " ++ (show (numSuccessTests st)) ++ " tests"
           ++  newline ++ "Discarded: " ++ (show (numDiscardedTests st))).
@@ -199,7 +199,7 @@ Fixpoint localMin (st : State) (r : Rose Checker.Result)
     localMin' st (force ts)
   end.
 
-Fixpoint runATest (st : State) (f : nat -> RandomSeed -> QProp) (maxSteps : nat) :=
+Fixpoint runATest (st : State) (f : nat -> RandomSeed -> LazyList QProp) (maxSteps : nat) :=
   if maxSteps is maxSteps'.+1 then
     let size := (computeSize st) (numSuccessTests st) (numDiscardedTests st) in
     let (rnd1, rnd2) := randomSplit (randomSeed st) in
@@ -213,25 +213,28 @@ Fixpoint runATest (st : State) (f : nat -> RandomSeed -> QProp) (maxSteps : nat)
     match st with
     | MkState mst mdt ms cs nst ndt ls e r nss nts =>
       match f size rnd1 with
-      | MkProp (MkRose res ts) =>
-        (* TODO: CallbackPostTest *)
-        let res_cb := callbackPostTest st res in
-        match res with
-        | MkResult (Some x) e reas _ s _ t =>
-          if x then (* Success *)
-            let ls' := 
-                match s with 
-                | nil => ls 
-                | _ => 
-                  let s_to_add := 
-                      ShowFunctions.string_concat 
-                        (ShowFunctions.intersperse " , "%string s) in
-                  match Map.find s_to_add ls with 
+      | lnil => doneTesting st f
+      | lcons test_head test_rest =>
+        match test_head with
+        | MkProp (MkRose res ts) =>
+          (* TODO: CallbackPostTest *)
+          let res_cb := callbackPostTest st res in
+          match res with
+          | MkResult (Some x) e reas _ s _ t =>
+            if x then (* Success *)
+              let ls' := 
+                  match s with 
+                  | nil => ls 
+                  | _ => 
+                    let s_to_add := 
+                        ShowFunctions.string_concat 
+                          (ShowFunctions.intersperse " , "%string s) in
+                    match Map.find s_to_add ls with 
                     | None   => Map.add s_to_add (res_cb + 1) ls
                     | Some k => Map.add s_to_add (k+1) ls
-                  end 
-                end in
-(*                  
+                    end 
+                  end in
+              (*                  
             let ls' := fold_left (fun stamps stamp =>
                                     let oldBind := Map.find stamp stamps in
                                     match oldBind with
@@ -239,45 +242,46 @@ Fixpoint runATest (st : State) (f : nat -> RandomSeed -> QProp) (maxSteps : nat)
                                     | Some k => Map.add stamp (k+1) stamps
                                     end
                                  ) s ls in*)
-            test (MkState mst mdt ms cs (nst + 1) ndt ls' e rnd2 nss nts)
-          else (* Failure *)
-            let tag_text := 
-                match t with 
-                | Some s => "Tag: " ++ s ++ nl
-                | _ => "" 
-                end in 
-            let pre : string := (if expect res then "*** Failed "
-                                 else "+++ Failed (as expected) ")%string in
-            let (numShrinks, res') := localMin st (MkRose res ts) in
-            let suf := ("after " ++ (show (S nst)) ++ " tests and "
-                                 ++ (show numShrinks) ++ " shrinks. ("
-                                 ++ (show ndt) ++ " discards)")%string in
-            (* TODO: Output *)
-            if (negb (expect res)) then
-              Success (nst + 1) ndt (summary st) (tag_text ++ pre ++ suf)
-            else
-              Failure (nst + 1) numShrinks ndt r size (tag_text ++ pre ++ suf) (summary st) reas
-        | MkResult None e reas _ s _ t =>
-          (* Ignore labels of discarded tests? *)
-          let ls' :=
-              match s with
-              | nil => ls
-              | _ =>
-                let s_to_add :=
-                    "(Discarded) " ++ ShowFunctions.string_concat
-                                    (ShowFunctions.intersperse " , "%string s) in
-                match Map.find s_to_add ls with
-                | None   => Map.add s_to_add (res_cb + 1) ls
-                | Some k => Map.add s_to_add (k+1) ls
-                end
-              end in
-          test (MkState mst mdt ms cs nst ndt.+1 ls' e rnd2 nss nts)
+              test (MkState mst mdt ms cs (nst + 1) ndt ls' e rnd2 nss nts)
+            else (* Failure *)
+              let tag_text := 
+                  match t with 
+                  | Some s => "Tag: " ++ s ++ nl
+                  | _ => "" 
+                  end in 
+              let pre : string := (if expect res then "*** Failed "
+                                   else "+++ Failed (as expected) ")%string in
+              let (numShrinks, res') := localMin st (MkRose res ts) in
+              let suf := ("after " ++ (show (S nst)) ++ " tests and "
+                                   ++ (show numShrinks) ++ " shrinks. ("
+                                   ++ (show ndt) ++ " discards)")%string in
+              (* TODO: Output *)
+              if (negb (expect res)) then
+                Success (nst + 1) ndt (summary st) (tag_text ++ pre ++ suf)
+              else
+                Failure (nst + 1) numShrinks ndt r size (tag_text ++ pre ++ suf) (summary st) reas
+          | MkResult None e reas _ s _ t =>
+            (* Ignore labels of discarded tests? *)
+            let ls' :=
+                match s with
+                | nil => ls
+                | _ =>
+                  let s_to_add :=
+                      "(Discarded) " ++ ShowFunctions.string_concat
+                                     (ShowFunctions.intersperse " , "%string s) in
+                  match Map.find s_to_add ls with
+                  | None   => Map.add s_to_add (res_cb + 1) ls
+                  | Some k => Map.add s_to_add (k+1) ls
+                  end
+                end in
+            test (MkState mst mdt ms cs nst ndt.+1 ls' e rnd2 nss nts)
+          end
         end
       end
     end
   else giveUp st f.
 
-Definition test (st : State) (f : nat -> RandomSeed -> QProp) : Result :=
+Definition test (st : State) (f : nat -> RandomSeed -> LazyList QProp) : Result :=
   if (gte (numSuccessTests st) (maxSuccessTests st)) then
     doneTesting st f
   else if (gte (numDiscardedTests st) (maxDiscardedTests st)) then

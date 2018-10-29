@@ -1,6 +1,6 @@
 (** * QuickChickInterface: QuickChick Reference Manual *)
 
-From QuickChick Require Import QuickChick.
+From QuickChick Require Import QuickChick LazyList.
 Require Import ZArith Strings.Ascii Strings.String.
 
 From ExtLib.Structures Require Import Functor Applicative.
@@ -58,7 +58,7 @@ Parameter G : Type -> Type.
 
 (** Run a generator with a size parameter (a natural number denoting
     the maximum depth of the generated A) and a random seed. *)
-Parameter run  : forall {A : Type}, G A -> nat -> RandomSeed -> A.
+Parameter run  : forall {A : Type}, G A -> nat -> RandomSeed -> LazyList A.
 
 (** The semantics of a generator is its set of possible outcomes. *)
 Parameter semGen : forall {A : Type} (g : G A), set A.
