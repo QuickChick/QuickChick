@@ -215,44 +215,45 @@ let _ =
         Sys.command (Printf.sprintf "cp _seeds/* %s" input_dir)
       else
         Sys.command (Printf.sprintf "echo QuickChick > %s/tmp" input_dir);
-      let timeout = 10 * 60 (* seconds *) in
+      let timeout = 60 * 60 (* seconds *) in
 
-      
-      
-      (* let cmd = Printf.sprintf "timeout -s SIGINT %d `afl-fuzz -i %s -o %s %s @@`" timeout input_dir (temp_dir ^ "/output") execn in  *)
-      let cmd = Printf.sprintf "afl-fuzz -i %s -o %s %s @@" input_dir (temp_dir ^ "/output") execn in
-
-      let bench_cmd = Printf.sprintf "bench '%s'" cmd in
-
-      let output_file = Unix.openfile ("output/" ^ (Filename.basename temp_dir)) [Unix.O_CREAT; Unix.O_WRONLY] 0o640 in
-
-      print_endline bench_cmd;
-      (*  ignore (Unix.create_process bench_cmd [| |] stdin output_file output_file); *)
-
-                
-      (* ignore (Sys.command bench_cmd); *)
-      (*
-      let copy_cmd = Printf.sprintf "cp %s/output/fuzzer_stats output/%s" temp_dir (Filename.basename temp_dir) in
-      Printf.printf "Copy Command: %s\n" copy_cmd;
-      ignore (Sys.command copy_cmd);
-       *)
-
-      (*
       begin match Unix.fork() with
       | 0 ->
-         let cmd = Printf.sprintf "afl-fuzz -i %s -o %s %s @@" input_dir (temp_dir ^ "/output") execn in
-         Printf.printf "Child is executing...\n%s\n" cmd; 
-         ignore (Sys.command cmd);
+         (* Kid forks two processes, one that is the worker, one that is the timeout *)
+         begin match Unix.fork () with
+         | 0 -> (* worker *)
+            let cmd = Printf.sprintf "time afl-fuzz -i %s -o %s %s @@" input_dir (temp_dir ^ "/output") execn in
+            Printf.printf "Child is executing...\n%s\n" cmd; 
+            ignore (Sys.command cmd);
+            exit 0;
+         | pid_worker ->
+            begin match Unix.fork () with
+            | 0 -> (* timeout *)
+               Printf.printf "Timeout is sleeping for %d seconds...\n" timeout; 
+               Unix.sleep timeout;
+               exit 0;
+            | pid_timeout ->
+               (* parent : wait for one process to finish *)
+               let (pid', _) = Unix.wait () in
+               let kill_cmd = 
+                 if pid' = pid_worker then
+                   Printf.sprintf "kill -9 %d" pid_timeout
+                 else
+                   Printf.sprintf "kill -2 $(pgrep afl-fuzz)"
+               in
+               ignore (Sys.command kill_cmd);
+               exit 0;
+            end
+         end;
       | pid ->
-         Printf.printf "Parent is sleeping for %d seconds...\n" timeout; 
-         Unix.sleep timeout;
-         ignore (Sys.command ("kill -2 $(pgrep afl-fuzz)"));
-         (* Sleep for 5 more seconds to ensure dead *)
-         Unix.sleep 5;
-         Printf.printf "cp %s/output/fuzzer_stats output/%s" temp_dir (Filename.basename temp_dir);
-         ignore (Sys.command (Printf.sprintf "cp %s/output/fuzzer_stats output/%s" temp_dir (Filename.basename temp_dir)));
-      end
-       *) 
+         Printf.printf "Parent is waiting for a child to finish....\n";
+         let _ = Unix.wait () in
+         let cp_cmd =
+           Printf.sprintf "cp %s/output/fuzzer_stats output/%s"
+             temp_dir (Filename.basename temp_dir) in
+         print_endline cp_cmd;
+         ignore (Sys.command cp_cmd);
+      end;
       None                               
     end
     else begin 
