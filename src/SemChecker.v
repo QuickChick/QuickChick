@@ -87,6 +87,7 @@ Class SizeMonotonicChecker (c : Checker) :=
                                            
   }.
 
+(*
 Lemma unsizedChecker_alt_def (c : Checker) `{UnsizedChecker c} :
   forall s1 s2, semCheckerSize c s1 <-> semCheckerSize c s2.
 Proof.
@@ -843,3 +844,4 @@ Next Obligation.
   - move=> /proof H'. by apply semCheckablePolyFunSetSize.
   - move=> /semCheckablePolyFunSetSize H'. by apply proof.
 Qed.
+*)

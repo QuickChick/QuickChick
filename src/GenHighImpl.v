@@ -456,6 +456,7 @@ Next Obligation.
 Qed.
 
 
+(*
 Lemma semListOfSize {A : Type} (g : G A) size :
   semGenSize (listOf g) size <-->
   [set l | length l <= size /\ l \subset (semGenSize g size)].
@@ -1343,7 +1344,7 @@ Proof.
     inversion H; subst; clear H.
     exists a. split. by []. exists b. split; by [].
 Qed.    
-
+*)
 Module QcDefaultNotation.
 
 Notation " 'elems' [ x ] " := (elements x (cons x nil)) : qc_scope.
@@ -1375,14 +1376,15 @@ Module QcDoNotation.
 Notation "'do!' X <- A ; B" :=
   (bindGen A (fun X => B))
   (at level 200, X ident, A at level 100, B at level 200).
+(*
 Notation "'doM!' X <- A ; B" :=
   (bindGenOpt A (fun X => B))
   (at level 200, X ident, A at level 100, B at level 200).
-
+*)
 End QcDoNotation.
 
 Import QcDefaultNotation. Open Scope qc_scope.
-
+(*
 (* CH: Reusing :: instead of ;; would have been nice, but I didn't manage *)
 
 Lemma semElemsSize A (x : A) xs s : semGenSize (elems (x ;; xs)) s <--> x :: xs.
@@ -1420,5 +1422,5 @@ Next Obligation.
   eexists. split; last by eapply monotonic; eauto. 
   apply/andP; split => //. by eapply leq_trans; eauto. 
 Qed.
-
+*)
 End Impl.

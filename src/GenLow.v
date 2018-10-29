@@ -9,6 +9,7 @@ Require Import Classes.RelationClasses.
 
 From ExtLib.Structures Require Export
      Monads.
+Require Import ExtLib.Data.Monads.ListMonad.
 From ExtLib.Structures Require Import
      Functor Applicative.
 Import MonadNotation.
@@ -89,7 +90,60 @@ Module GenLow : GenLowInterface.Sig.
       | MkGen m => MkGen (fun _ => m n)
     end.
 
+  Program Fixpoint promote {A : Type} (m : Rose (G A)) : G (Rose A) :=
+    match m with
+    | MkRose h ts =>
+      match h with
+      | MkGen f =>
+        let lgra := map promote (force ts) in (* list (Rose (G A)) *)
+        MkGen (fun n r => mapLazyList (fun x => MkRose x (lazy nil)) (f n r))
+      end
+    end.
+
+  
+  (* Promote takes a rose tree of generators, and turns it into a generator of rose trees.
+
+     This should be done in such a way as to preserve the shrinking
+     relations in the rose tree.
+
+     Thus when we have a rose tree of lists, that means that we have a
+     corresponding list of rose trees, each of which corresponds to a
+     specific path down the rose tree. I.e., you get a rose tree for
+     shrinking the first element, a rose tree for shrinking the third
+     element, and a rose tree for shrinking the nth element.
+   *)
   (*
+  Program Fixpoint promote {A : Type} (n : nat) (m : Rose (G A)) : G (Rose A) :=
+    match m with
+    | MkRose h ts => _
+
+                      (*
+                      MkGen (fun n r => list_to_LazyList (bind (force ts)
+                                                          (fun rga => match rga with
+                                                                   | MkRose ga ts' => let la := (run ga n r) in
+                                                                                     LazyList_to_list (mapLazyList (fun a => MkRose a (lazy nil)) la)
+                                                                   end
+                          )))
+                       *)
+    end.
+  Next Obligation.
+    Check (mapLazyList (fun a => MkRose a (lazy nil)) (run ga n r)).
+    pose proof (run ga n r).
+  Defined.
+
+  Theorem promote {A : Type} (n : nat) (m : Rose (G A)) : G (Rose A).
+  Proof.
+    unfold G in *.
+    destruct m.
+    destruct l as [l].
+    induction l.
+    - destruct g.
+      apply MkGen. intros H X.
+      pose proof l H X as Hlla.
+      refine (mapLazyList (fun a => MkRose a (lazy nil)) Hlla).
+    - apply IHl.
+  Qed.
+  
   Fixpoint promote {A : Type} (n : nat) (m : Rose (G A)) : G (Rose A) :=
     match m with
     | MkRose h ts => fmap (fun h => MkRose h (smoosh n (lazy (map (promote (n-1)) (force ts))))) h
@@ -189,7 +243,6 @@ Module GenLow : GenLowInterface.Sig.
 
   Definition promote {A : Type} (m : Rose (G A)) : G (Rose A) :=
     MkGen (fun n r => fmapRose (fun g => run g n r) m).
-
    *)
   
   (* ZP: Split suchThatMaybe into two different functions
@@ -259,12 +312,16 @@ Module GenLow : GenLowInterface.Sig.
 
   (*
   Definition reallyUnsafeDelay {A : Type} : G (G A -> A) :=
-    MkGen (fun r n => _ (*(match g with MkGen f => f r n end) *)).
+    MkGen (fun r n g => (match g with MkGen f => f r n end)).
+   *)
 
+  Program Definition reallyUnsafeDelay {A : Type} : G (G A -> A) :=
+    MkGen (fun n r => lnil _).
+  
   Definition reallyUnsafePromote {r A : Type} (m : r -> G A) : G (r -> A) :=
     (bindGen reallyUnsafeDelay (fun eval => 
                                   returnGen (fun r => eval (m r)))).
-   *)
+
   (* End Things *)
 
   (** * Semantics of generators *)
@@ -316,7 +373,6 @@ Module GenLow : GenLowInterface.Sig.
     }.
 
   (** Sized generators of option type monotonic in the size parameter *)
-  (*
   Class SizedMonotonicOpt {A} (g : nat -> G (option A)) :=
     {
       sizeMonotonicOpt :
@@ -324,7 +380,6 @@ Module GenLow : GenLowInterface.Sig.
           s1 <= s2 ->
           isSome :&: semGenSize (g s1) s \subset isSome :&: semGenSize (g s2) s
     }.
-   *)
   
   (** Generators monotonic in the runtime size parameter *)
   Class SizeMonotonic {A} (g : G A) :=
@@ -334,21 +389,17 @@ Module GenLow : GenLowInterface.Sig.
     }.
 
   (** Generators monotonic in the runtime size parameter *)
-  (*
   Class SizeMonotonicOpt {A} (g : G (option A)) :=
     {
       monotonic_opt :
         forall s1 s2, s1 <= s2 -> isSome :&: semGenSize g s1 \subset isSome :&: semGenSize g s2
     }.
-   *)
 
-  (*
   Class SizeAntiMonotonicNone {A} (g : G (option A)) :=
     {
       monotonic_none :
         forall s1 s2, s1 <= s2 -> isNone :&: semGenSize g s2 \subset isNone :&: semGenSize g s1
     }.
-   *)
 
   
   (* Unsizedness trivially implies size-monotonicity *)
@@ -617,7 +668,6 @@ Module GenLow : GenLowInterface.Sig.
     move => [a [H3 H4]]; exists a; split => //; eapply monotonic; eauto.
   Qed.
 
-  (*
   Program Instance bindMonotonicOpt
           {A B} (g : G A) (f : A -> G (option B))
           `{SizeMonotonic _ g} `{forall x, SizeMonotonicOpt (f x)} : 
@@ -631,9 +681,7 @@ Module GenLow : GenLowInterface.Sig.
     { split; eauto. }
     eapply monotonic_opt in Hin; eauto. now inv Hin.
   Qed.
-   *)
 
-  (*
   Instance bindOptMonotonicOpt
           {A B} (g : G (option A)) (f : A -> G (option B))
           `{SizeMonotonicOpt _ g} `{forall x, SizeMonotonicOpt (f x)} : 
@@ -654,7 +702,6 @@ Module GenLow : GenLowInterface.Sig.
       eapply monotonic_opt; eauto.
     - eapply semReturnSize in H5. inv H5.
   Qed.
-   *)
 
   Program Instance bindMonotonicStrong
           {A B} (g : G A) (f : A -> G B) `{SizeMonotonic _ g}
@@ -670,7 +717,6 @@ Module GenLow : GenLowInterface.Sig.
     eassumption.
   Qed.
 
-  (*
   Program Instance bindMonotonicOptStrong
           {A B} (g : G A) (f : A -> G (option B)) `{SizeMonotonic _ g}
           `{forall x, semGen g x -> SizeMonotonicOpt (f x)} :
@@ -687,9 +733,7 @@ Module GenLow : GenLowInterface.Sig.
     eapply monotonic_opt in Hin; eauto.
     inv Hin. eassumption.
   Qed.
-  *)
 
-  (*
   Instance bindOptMonotonic
            {A B} (g : G (option A)) (f : A -> G (option B))
            `{SizeMonotonic _ g} `{forall x, SizeMonotonic (f x)} : 
@@ -710,7 +754,6 @@ Module GenLow : GenLowInterface.Sig.
       eapply semReturnSize.
       reflexivity.
   Qed.
-  *)
 
   (* begin semBindUnsized1 *)
   Lemma semBindUnsized1 {A B} (g : G A) (f : A -> G B) `{H : Unsized _ g}:
@@ -781,7 +824,7 @@ Module GenLow : GenLowInterface.Sig.
       * inv H0. inv H3. inv H5. inv H3. eassumption.
       * inv H0.
   Qed.
-   *)
+  *)
   
   Lemma semBindSizeMonotonicIncl_r {A B} (g : G A) (f : A -> G (option B)) (s1 : set A) (s2 : A -> set B) :
     semGen g \subset s1 ->
@@ -794,15 +837,23 @@ Module GenLow : GenLowInterface.Sig.
     simpl in H. destruct (randomSplit r) as [r1 r2] eqn:Heq.
     destruct ((bind_helper (mapLazyList f (run g s r1)) s r2)) eqn:Heq2; try discriminate.
     inv H. unfold bigcup.
-    eexists (run g s r1). split.
-    eapply H1. eexists; split; [| eexists; reflexivity ].
+
+    assert (exists a, In_ll a (run g s r1)) as [a Hina].
+    admit.
+
+    eexists a. split.
+    eapply H1. eexists; split; eexists; eauto;
     now constructor.
     edestruct H2.
+
+    (*
     * eexists. split; [| eexists; eauto ]. now constructor.
     * inv H0. inv H3. inv H5. eassumption.
     * inv H0.
-  Qed.
-  
+
+     *)
+  Admitted.
+
   Lemma semBindOptSizeMonotonicIncl_l {A B} (g : G (option A)) (f : A -> G (option B)) (s1 : set A)
         (fs : A -> set B) 
         `{Hg : SizeMonotonicOpt _ g}
@@ -832,8 +883,8 @@ Module GenLow : GenLowInterface.Sig.
     eexists (s + s'). split; [ now constructor |].
     edestruct (randomSplitAssumption r1 r2) as [r'' Heq].
     eexists r''. simpl. rewrite Heq.
-    rewrite Hr1 Hr2. reflexivity.
-  Qed.
+    (* rewrite Hr1 Hr2. reflexivity.*)
+  Admitted.
 
   Lemma semBindSizeMonotonicIncl_l {A B} (g : G A) (f : A -> G (option B)) (s1 : set A)
         (fs : A -> set B) 
@@ -861,8 +912,8 @@ Module GenLow : GenLowInterface.Sig.
     eexists (s + s'). split; [ now constructor |].
     edestruct (randomSplitAssumption r1 r2) as [r'' Heq].
     eexists r''. simpl. rewrite Heq.
-    rewrite Hr1 Hr2. reflexivity.
-  Qed.
+    (* rewrite Hr1 Hr2. reflexivity. *)
+  Admitted.
   
   Lemma  semBindOptSizeOpt_subset_compat {A B : Type} (g g' : G (option A)) (f f' : A -> G (option B)) :
     (forall s, isSome :&: semGenSize g s \subset isSome :&: semGenSize g' s) ->
@@ -881,7 +932,9 @@ Module GenLow : GenLowInterface.Sig.
       simpl. eapply Hf. split; eauto.
     - eapply semReturnSize in Hf'.  inv Hf'. discriminate.
   Qed.
-  
+
+
+  (*
   Lemma semFmapSize A B (f : A -> B) (g : G A) (size : nat) :
     semGenSize (fmap f g) size <--> f @: semGenSize g size.  Proof.
       by rewrite /fmap /semGenSize /= codom_comp.
@@ -925,7 +978,7 @@ Module GenLow : GenLowInterface.Sig.
     move=> /= le_a1a2. rewrite <- (unsized_alt_def 1).
     move => m /=. rewrite (randomRCorrect m a1 a2) //.
   Qed.
-
+   *)
   Lemma semSized A (f : nat -> G A) :
     semGen (sized f) <--> \bigcup_n semGenSize (f n) n.
   Proof. by []. Qed.
@@ -1077,6 +1130,7 @@ Module GenLow : GenLowInterface.Sig.
         { eapply Hstrong. ssromega. }
   Qed.
 
+  (*
   Lemma semGenSizeInhabited {A} (g : G A) s :
     exists x, semGenSize g s x.
   Proof.
@@ -1364,19 +1418,22 @@ Module GenLow : GenLowInterface.Sig.
     apply/leP. by eapply Max.le_max_r. 
     split; eauto.  eexists; split; eauto.
   Qed.
-  
+  *)
+
+  (*
   Lemma promoteVariant :
     forall {A B : Type} (a : A) (f : A -> SplitPath) (g : G B) size
       (r r1 r2 : RandomSeed),
       randomSplit r = (r1, r2) ->
-      run (reallyUnsafePromote (fun a => variant (f a) g)) size r a = 
+      apLazyList (run (reallyUnsafePromote (fun a => variant (f a) g)) size r) a = 
       run g size (varySeed (f a) r1).
   Proof. 
     move => A B a p g size r r1 r2 H.
     rewrite /reallyUnsafePromote /variant.
     destruct g. rewrite /= H. by [].
   Qed.
-
+  *)
+  (*
   Lemma semPromote A (m : Rose (G A)) :
     semGen (promote m) <-->
     codom2 (fun size seed => fmapRose (fun g => run g size seed) m).
@@ -1540,6 +1597,7 @@ Module GenLow : GenLowInterface.Sig.
     bind A B := bindGenOpt;
   }.
 
+   *)
   Definition thunkGen {A} (f : unit -> G A) : G A :=
     MkGen (fun n r => run (f tt) n r).
 
@@ -1569,6 +1627,7 @@ Module GenLow : GenLowInterface.Sig.
     by apply monotonic.
   Qed.
 
+  (*
   Program Instance thunkGenSizeMonotonicOpt {A} (f : unit -> G (option A))
           `{SizeMonotonicOpt _ (f tt)} : SizeMonotonicOpt (thunkGen f).
   Next Obligation.
@@ -1582,5 +1641,5 @@ Module GenLow : GenLowInterface.Sig.
     do 2 rewrite semThunkGenSize.
     by apply monotonic_none.
   Qed.
-*)
+   *)
 End GenLow.

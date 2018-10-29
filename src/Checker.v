@@ -177,7 +177,7 @@ Definition shrinkingNondet {prop A : Type} `{Checkable prop} (n : nat)
           (shrinker : A -> list A) (x0 : A) (pf : A -> prop) : Checker :=
   fmap (fun x => MkProp (repeatRose n (joinRose (fmapRose unProp x))))
        (promote (props pf shrinker x0)).
-  
+
 Definition callback {prop : Type} `{Checkable prop}
            (cb : Callback) : prop -> Checker :=
   mapTotalResult (fun r => addCallback r cb).
@@ -247,12 +247,13 @@ Definition forAllProof {A prop : Type} {C : Checkable prop} `{S : Show A}
   bindGen' gen (fun x H => printTestCase (show x ++ newline) (pf x H)).
 Arguments forAllProof {A} {prop} {C} {S} _ _.
 
+
 Definition forAllShrink {A prop : Type} {_ : Checkable prop} `{Show A}
            (gen : G A) (shrinker : A -> list A) (pf : A -> prop) : Checker :=
-
   bindGen gen (fun x : A =>
                  shrinking shrinker x (fun x' =>
                                          printTestCase (show x' ++ newline) (pf x'))).
+
 
 Definition forAllShrinkNonDet {A prop : Type} {_ : Checkable prop} `{Show A}
            (n : nat) (gen : G A) (shrinker : A -> list A) (pf : A -> prop) : Checker :=

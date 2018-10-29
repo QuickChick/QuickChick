@@ -527,6 +527,7 @@ Variables A B : Type.
 Hypothesis choice : FunctionalChoice_on A RandomSeed.
 
 (* begin arbFunCorrect *)
+(*
 Theorem arbFunComplete `{CoArbitrary A, Arbitrary B} (max:A) (f:A-> B) (s:nat) :
   s = Pos.to_nat (coarbitrary max) -> (semGenSize arbitrary s <--> setT) ->
   exists seed, forall a, coarbLe a max -> run arbitrary s seed a = f a.
@@ -542,6 +543,7 @@ exists seed' => a le_a; rewrite -fseedP -Hseed //=.
 apply (@promoteVariant A B a (fun a => posToPath (coarbitrary a)) arbitrary 
                        s seed' seed seed Hsplit).
 Qed.
+*)
 
 End arbFun_completeness.
 

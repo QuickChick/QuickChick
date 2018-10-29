@@ -40,6 +40,7 @@ Parameter elements : forall {A : Type}, A -> list A -> G A.
 Parameter elems_ : forall {A : Type}, A -> list A -> G A.
 
 (* Correctness for derived generators *)
+(*
 Parameter semLiftGen :
   forall {A B} (f: A -> B) (g: G A),
     semGen (liftGen f g) <--> f @: semGen g.
@@ -194,10 +195,12 @@ Parameter backtrackSizeMonotonic:
     lg \subset [set x | SizeMonotonic x.2 ] ->
     SizeMonotonic (backtrack lg).
 
+(*
 Parameter backtrackSizeMonotonicOpt :
   forall {A : Type} (lg : seq (nat * G (option A))),
     lg \subset [set x | SizeMonotonicOpt x.2 ] ->
     SizeMonotonicOpt (backtrack lg).
+*)
 
 Parameter bigcup_cons_setI_subset_compat_backtrack :
   forall {A} (n : nat) (g g' : G (option A)) (l l' : seq (nat * G (option A))) s,
@@ -278,6 +281,7 @@ Parameter mergeBinds :
     semGen (bindGen ga (fun x => bindGen gb (f x))) <-->
     semGen (bindGen (genPair ga gb) (uncurry f)).
 
+*)
 Module QcDefaultNotation.
 
 (* Noone would write a literal singleton. *)
@@ -319,6 +323,7 @@ End QcDefaultNotation.
 
 Import QcDefaultNotation. Open Scope qc_scope.
 
+(*
 Parameter semElemsSize : forall A (x : A) xs s,
   semGenSize (elems (x ;; xs)) s <--> x :: xs.
 
@@ -330,5 +335,5 @@ Parameter semOneOfSize : forall A (g0 : G A) (gs : list (G A)) s,
 
 Parameter semOneOf : forall A (g0 : G A) (gs : list (G A)),
   semGen (oneOf (g0 ;; gs))  <--> \bigcup_(g in (g0 :: gs)) semGen g.
-
+*)
 End Sig.
