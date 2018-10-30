@@ -52,6 +52,10 @@ script:
   travis_wait opam pin add . ;
   travis_wait opam install coq-quickchick;
   echo -en 'travis_fold:end:QuickChick.build'
+- echo 'Unit testing...';
+  echo -en 'travis_fold:start:QuickChick.test.unit';
+  make -C test;
+  echo -en 'travis_fold:end:QuickChick.test.unit'
 - echo 'Testing IFC...';
   echo -en 'travis_fold:start:QuickChick.test.ifc-basic';
   make -C examples/ifc-basic;
