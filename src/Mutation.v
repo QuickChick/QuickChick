@@ -110,8 +110,9 @@ Definition mutate : forall a,
     (unit -> a) -> (unit -> a) -> mutation_id -> a :=
   fun _ f g l => if mutation l then g tt else f tt.
 
+(* [Sys.getenv_opt] also exists but only since OCaml 4.05.  *)
 Extract Constant mutation =>
-  "match Sys.getenv_opt ""QC_MUTANT"" with
+  "match try Some (Sys.getenv ""QC_MUTANT"") with Not_found -> None with
    | None -> fun _ -> false
    | Some ""DISCOVERY"" ->
      let mutant_log = open_out ""qc-out/qc-mutants"" in
