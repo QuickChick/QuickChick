@@ -118,13 +118,12 @@ Extract Constant mutation =>
      let mutant_log = open_out ""qc-out/qc-mutants"" in
      let mutants = Hashtbl.create 10 in
      fun mid ->
-        begin match Hashtbl.find_opt mutants mid with
-        | None ->
+        begin try ignore (Hashtbl.find mutants mid) with
+        | Not_found ->
             Hashtbl.add mutants mid ();
             output_string mutant_log mid;
             output_char mutant_log '\n';
             flush mutant_log
-        | Some () -> ()
         end; false
    | Some this_mutant ->
      (* print_string this_mutant; *) (* Debugging *)
