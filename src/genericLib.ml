@@ -785,7 +785,8 @@ let rec gList = function
   | x::xs -> gCons x (gList xs)
 
 (* Generic String Manipulations *)
-let gStr s = CAst.make @@ CPrim (String s)
+let string_scope ast = CAst.make @@ CDelimiters ("string", ast)
+let gStr s = string_scope (CAst.make @@ CPrim (String s))
 let emptyString = gInject "Coq.Strings.String.EmptyString"
 let str_append c1 c2 = gApp (gInject "Coq.Strings.String.append") [c1; c2]
 let rec str_appends cs = 
