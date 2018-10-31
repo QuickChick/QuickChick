@@ -60,7 +60,7 @@ let ensure_dir_exists d = Sys.command ("mkdir -p " ^ d)
 let ensure_tmpdir_exists () =
   ignore (ensure_dir_exists tmp_dir)
 
-type highlight_style = Header | Failure | Success
+type highlight_style = Header | Failure | Success | Summary
 
 let highlight style s =
   if !ansi then begin
@@ -74,6 +74,9 @@ let highlight style s =
     | Success ->
       print_string "\027[30m"; (* black *)
       print_string "\027[42m"; (* on green *)
+    | Summary ->
+      print_string "\027[37m"; (* white *)
+      print_string "\027[44m"; (* on blue *)
     end;
     print_string "\027[1m"; (* bold *)
     print_string s;
@@ -280,15 +283,17 @@ let is_prefix pre s =
   && String.sub s 0 (String.length pre) = pre
 
 type test_result =
-  { mutable passed: int;
+  { mutable runs: int;
+    mutable passed: int;
     mutable failed: int;
     mutable inconclusive: int;
     mutable total_tests: int;
   }
 
-let test_results = {passed=0; failed=0; inconclusive=0; total_tests=0}
+let test_results = {runs=0; passed=0; failed=0; inconclusive=0; total_tests=0}
 
 let reset_test_results () =
+  test_results.runs <- 0;
   test_results.passed <- 0;
   test_results.failed <- 0;
   test_results.inconclusive <- 0;
@@ -362,6 +367,8 @@ let system args =
 let numtests_re = Str.regexp ".* after \\([0-9]+\\) tests"
 
 let compile_and_run where e : unit =
+  test_results.runs <- test_results.runs+1;
+
   let here = Sys.getcwd() in
   Sys.chdir where;
 
@@ -626,7 +633,9 @@ let calc_dir_mutants sec_graph (fs : section list file_structure) =
         (* Printf.printf "Number of mutants: %d\n" (List.length muts); *)
         all_things_to_check := (List.map (fun x -> (s,x)) things_to_check)
                                @ !all_things_to_check;
-        (* debug "Number of tests: %d\n%s\n" (List.length things_to_check) (String.concat "\n" things_to_check); *)
+        (* debug "Number of tests: %d\n%s\n"
+              (List.length things_to_check) 
+              (String.concat "\n" things_to_check); *)
         (File (s, base), List.map (fun (info, m) -> (info, File (s, m))) muts)
       | _ -> failwith "no base mutant"
       end
@@ -641,7 +650,8 @@ let calc_dir_mutants sec_graph (fs : section list file_structure) =
           let mutated_now =
             List.map (fun (info, mf) -> (info, mf :: non_mutant_rest)) mfs in
           let mutated_later =
-            List.map (fun (info, mfs') -> (info, b :: mfs')) (all_mutant_fs bmfs') in
+            List.map (fun (info, mfs') -> 
+                        (info, b :: mfs')) (all_mutant_fs bmfs') in
           mutated_now @ mutated_later in
       begin match List.rev (all_mutant_fs bmfs) with
       | (_, base) :: muts ->
@@ -776,16 +786,20 @@ let main =
               (* Entire file structure is copied *)
               output_mut_dir tmp_dir m;
               reset_test_results();
-              for i = 1 to !runs do 
+              while (test_results.runs < !runs
+                  && test_results.failed = test_results.runs) do
                 compile_and_run dir ExpectSomeFailure
               done;
-              if !runs <> 1 then begin
-                highlight Header
-                  (Printf.sprintf
-                     "Average tests needed to find mutant %d (%s: line %d) = %d"
-                     i info.file_name info.line_number
-                     (test_results.total_tests / !runs));
-              end
+              if !runs <> 1 then 
+                if test_results.failed <> !runs then
+                  highlight Failure (Printf.sprintf
+                    "Unable to reliably find mutant %d (%s: line %d)"
+                    i info.file_name info.line_number)
+                else
+                  highlight Summary (Printf.sprintf
+                    "Average tests to find mutant %d (%s: line %d) = %d"
+                    i info.file_name info.line_number
+                    (test_results.total_tests / !runs));
           end
         end)
       (List.rev dir_mutants)
