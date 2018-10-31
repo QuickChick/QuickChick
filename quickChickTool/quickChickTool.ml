@@ -15,6 +15,7 @@ let ansi = ref false
 let fail_fast = ref false
 let excluded = ref []
 let nobase = ref false
+let runs = ref 1
 
 type mutant_id = Num of int | Tag of string
 let only_mutant = ref None
@@ -35,6 +36,7 @@ let speclist =
   ; ("-nobase", Arg.Unit (fun _ -> nobase := true), "Do not test base mutant")
   ; ("-m", Arg.Int (fun n -> only_mutant := Some (Num n)), "Only test mutant number n")
   ; ("-N", Arg.Int (fun n -> maxSuccess := Some n), "Max number of successes")
+  ; ("-runs", Arg.Int (fun n -> runs := n), "How many times to run each mutant (default 1)")
   ; ("-tag", Arg.String (fun s -> only_mutant := Some (Tag s)), "Only test mutant number with a specific tag")
   ; ("-include", Arg.String (fun incl -> include_file := Some incl), "File containing list of files to be included.")
   ; ("-exclude", Arg.Rest (fun excl -> excluded := excl :: !excluded), "(Deprecated) Files to be excluded. Must be the last argument")
@@ -280,14 +282,17 @@ let is_prefix pre s =
 type test_result =
   { mutable passed: int;
     mutable failed: int;
-    mutable inconclusive: int }
+    mutable inconclusive: int;
+    mutable total_tests: int;
+  }
 
-let test_results = {passed=0; failed=0; inconclusive=0}
+let test_results = {passed=0; failed=0; inconclusive=0; total_tests=0}
 
 let reset_test_results () =
   test_results.passed <- 0;
   test_results.failed <- 0;
-  test_results.inconclusive <- 0
+  test_results.inconclusive <- 0;
+  test_results.total_tests <- 0
 
 type expected_results = ExpectOnlySuccesses | ExpectSomeFailure
 
@@ -354,6 +359,8 @@ let system args =
     highlight Failure (Printf.sprintf "Command failed: %s" (string_of_process_status e));
     exit 1
 
+let numtests_re = Str.regexp ".* after \\([0-9]+\\) tests"
+
 let compile_and_run where e : unit =
   let here = Sys.getcwd() in
   Sys.chdir where;
@@ -368,8 +375,6 @@ let compile_and_run where e : unit =
       (Filename.chop_suffix temporary_file ".v") in
   run_and_show_output_on_failure
     ocamlbuild_cmd "Ocamlbuild failure";
-
-  reset_test_results();
 
   let run_command =
     Printf.sprintf "./%s.native" (Filename.chop_suffix temporary_file ".v") in
@@ -387,7 +392,12 @@ let compile_and_run where e : unit =
       (test_results.passed <- test_results.passed+1; found_result := true)
     else if is_prefix "*** Failed" e then
       (test_results.failed <- test_results.failed+1; found_result := true) end;
-    process_otl_aux() in
+    if Str.string_match numtests_re e 0 then begin
+      let n = Str.matched_group 1 e in
+      test_results.total_tests <- test_results.total_tests + int_of_string n;
+      (* Printf.printf "Matched! n = %s (total = %d)\n" n test_results.total_tests *)
+    end;     
+    process_otl_aux() in 
   try process_otl_aux ()
   with End_of_file ->
     if not !found_result then begin
@@ -740,6 +750,7 @@ let main =
       highlight Header "Testing base...";
       (* Entire file structure is copied *)
       output_mut_dir tmp_dir base;
+      reset_test_results();
       compile_and_run dir ExpectOnlySuccesses;
     end;
 
@@ -765,7 +776,16 @@ let main =
               (* Entire file structure is copied *)
               output_mut_dir tmp_dir m;
               reset_test_results();
-              compile_and_run dir ExpectSomeFailure
+              for i = 1 to !runs do 
+                compile_and_run dir ExpectSomeFailure
+              done;
+              if !runs <> 1 then begin
+                highlight Header
+                  (Printf.sprintf
+                     "Average tests needed to find mutant %d (%s: line %d) = %d"
+                     i info.file_name info.line_number
+                     (test_results.total_tests / !runs));
+              end
           end
         end)
       (List.rev dir_mutants)
