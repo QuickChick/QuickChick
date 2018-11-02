@@ -39,7 +39,7 @@ Module GenLow : GenLowInterface.Sig.
   (* begin GenType *)
   Inductive GenType (A:Type) : Type := MkGen : (nat -> RandomSeed -> LazyList A) -> GenType A.
   (* end GenType *)
-  
+
   Definition G := GenType.
 
   (** * Primitive generator combinators *)
@@ -50,6 +50,9 @@ Module GenLow : GenLowInterface.Sig.
   
   Definition returnGen {A : Type} (x : A) : G A :=
     MkGen (fun _ _ => ret x).
+
+  Definition returnGenL {A : Type} (x : LazyList A) : G A :=
+    MkGen (fun _ _ => x).
 
   Definition fmap {A B : Type} (f : A -> B) (g : G A) : G B :=
     MkGen (fun n r => fmap f (run g n r)).

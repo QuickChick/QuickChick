@@ -49,6 +49,7 @@ Module Type Sig.
   (** * Primitive generator combinators *)
 
   Parameter returnGen  : forall {A : Type}, A -> G A.
+  Parameter returnGenL  : forall {A : Type}, LazyList A -> G A.
   (* TODO: Add dependent combinator *)
   Parameter bindGen :  forall {A B : Type}, G A -> (A -> G B) -> G B.
   Parameter bindGenOpt : forall {A B : Type}, G (option A) -> (A -> G (option B)) -> G (option B).
