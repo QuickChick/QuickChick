@@ -129,7 +129,22 @@ Module GenLow : GenLowInterface.Sig.
                 end).
 
 
-  Program Fixpoint promote {A : Type} (m : Rose (G A)) : G (Rose A) :=
+  Program Fixpoint lazy_rose_flatten {A : Type} (r : Rose (LazyList A)) : LazyList (Rose A) :=
+    match r with
+    | MkRose las ts =>
+      a <- las;;
+      lcons _ (MkRose a (lazy (LazyList_to_list (join_list_lazy_list (map lazy_rose_flatten (force ts)))))) (lazy (lnil _))
+    end.
+  
+  Program Fixpoint promote {A : Type} (m : Rose (G A)) : G (Rose A) := _.
+  Next Obligation.
+    refine (MkGen (fun n r => _)).
+    Print GenType.
+    refine (_ (fmapRose (fun ga => run ga n r) m)).
+    apply lazy_rose_flatten.
+  Defined.
+  
+    (*
     match m with
     | MkRose h ts =>
       match h with
@@ -138,8 +153,9 @@ Module GenLow : GenLowInterface.Sig.
         MkGen (fun n r => mapLazyList (fun x => MkRose x (lazy nil)) (f n r))
       end
     end.
+    *)
 
-  
+
   (* Promote takes a rose tree of generators, and turns it into a generator of rose trees.
 
      This should be done in such a way as to preserve the shrinking
@@ -323,7 +339,7 @@ Module GenLow : GenLowInterface.Sig.
       | O => List.rev (cons O acc)
       | S n' => createRange n' (cons n acc)
     end.
-  
+
   Definition choose {A : Type} `{ChoosableFromInterval A} (range : A * A) : G A :=
     MkGen (fun _ r => ret (fst (randomR range r))).
   
