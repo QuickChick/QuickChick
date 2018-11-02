@@ -1,0 +1,7 @@
+benchmarking afl-fuzz -i /tmp/QuickChick/143052/input -o /tmp/QuickChick/143052/output /tmp/QuickChick/143052/QuickChick0cd8f5 @@
+time                 1.677 s    (407.5 ms .. 3.243 s)
+                     0.909 R²   (0.768 R² .. 1.000 R²)
+mean                 1.100 s    (744.4 ms .. 1.384 s)
+std dev              368.5 ms   (166.6 ms .. 496.0 ms)
+variance introduced by outliers: 73% (severely inflated)
+
