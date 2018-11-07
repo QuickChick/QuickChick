@@ -384,7 +384,7 @@ let dep_dispatch ind class_name : unit =
 
     derive_dependent class_name constructor umap tmap input_names input_ranges
       (ty_ctr, ty_params, ctrs, dep_type) None result
-  | _ -> qcfail "wrongformat/driver.ml4"
+  | _ -> qcfail "wrongformat/driver.mlg"
 
 (*
 

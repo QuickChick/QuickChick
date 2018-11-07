@@ -1,3 +1,5 @@
+{
+
 open Libnames
 open Util
 open Constrexpr
@@ -74,43 +76,45 @@ let dispatch cn ind name1 name2 =
   | SimpleDer classes -> simpl_dispatch ind classes name1 name2
   | DepDer class_name -> DepDriver.dep_dispatch ind class_name
 
+}
+
 VERNAC COMMAND EXTEND Derive CLASSIFIED AS SIDEFF
    | ["Derive" constr(class_name) "for" constr(inductive)] ->
-     [dispatch class_name inductive "" ""]
+     {dispatch class_name inductive "" ""}
    | ["Derive" constr(class_name) "for" constr(inductive) "using" ident(genInst)] ->
-     [dispatch class_name inductive (Id.to_string genInst) ""]
+     {dispatch class_name inductive (Id.to_string genInst) ""}
    | ["Derive" constr(class_name) "for" constr(inductive) "using" ident(genInst) "and" ident(monInst) ] ->
-     [dispatch class_name inductive (Id.to_string genInst) (Id.to_string monInst)]
-END;;
+     {dispatch class_name inductive (Id.to_string genInst) (Id.to_string monInst)}
+END
 
 (*
 
 VERNAC COMMAND EXTEND DeriveArbitrarySized
-  | ["DeriveArbitrarySized" constr(c) "as" string(s1)] -> [derive ArbitrarySized c s1 "aux" ""]
-END;;
+  | ["DeriveArbitrarySized" constr(c) "as" string(s1)] -> {derive ArbitrarySized c s1 "aux" ""}
+END
 
 VERNAC COMMAND EXTEND DeriveSized
-  | ["DeriveSized" constr(c) "as" string(s1)] -> [derive Sized c s1 "aux" ""]
-END;;
+  | ["DeriveSized" constr(c) "as" string(s1)] -> {derive Sized c s1 "aux" ""}
+END
 
 VERNAC COMMAND EXTEND DeriveCanonicalSized
-  | ["DeriveCanonicalSized" constr(c) "as" string(s1)] -> [derive CanonicalSized c s1 "aux" ""]
-END;;
+  | ["DeriveCanonicalSized" constr(c) "as" string(s1)] -> {derive CanonicalSized c s1 "aux" ""}
+END
 
 VERNAC COMMAND EXTEND DeriveArbitrarySizedMonotonic
   | ["DeriveArbitrarySizedMonotonic" constr(c) "as" string(s1) "using" string(s2)] ->
   (* s2 is the instance name for ArbitrarySized *)
-    [derive SizeMonotonic c s1 s2 ""]
-END;;
+    {derive SizeMonotonic c s1 s2 ""}
+END
 
 VERNAC COMMAND EXTEND DeriveArbitrarySizedSizeMonotonic
   | ["DeriveArbitrarySizedSizeMonotonic" constr(c) "as" string(s1)] ->
-    [derive SizeSMonotonic c s1 "" ""]
-END;;
+    {derive SizeSMonotonic c s1 "" ""}
+END
 
 
 VERNAC COMMAND EXTEND DeriveArbitrarySizedCorrect
   | ["DeriveArbitrarySizedCorrect" constr(c) "as" string(s1) "using" string(s2) "and" string(s3)] ->
-    [derive GenSizeCorrect c s1 s2 s3]
-END;;
+    {derive GenSizeCorrect c s1 s2 s3}
+END
  *)

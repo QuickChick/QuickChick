@@ -22,7 +22,7 @@ src/SemChecker.v
 src/Test.v
 src/ExtractionQC.v
 src/Mutation.v
-src/tactic_quickchick.ml4
+src/tactic_quickchick.mlg
 src/quickchick_plugin.mlpack
 src/Typeclasses.v
 src/QuickChick.v
@@ -30,14 +30,14 @@ src/MutateCheck.v
 src/genericLib.ml
 src/genericLib.mli
 src/error.ml
-src/quickChick.ml4
-src/driver.ml4
+src/quickChick.mlg
+src/driver.mlg
 src/simplDriver.ml
 src/depDriver.ml
 src/setLib.ml
 src/semLib.ml
 src/coqLib.ml
-src/weightmap.ml4
+src/weightmap.mlg
 src/arbitrarySized.ml
 src/arbitrarySizedST.ml
 src/checkerSizedST.ml

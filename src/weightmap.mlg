@@ -1,3 +1,5 @@
+{
+
 open GenericLib
 open Stdarg
 open Error
@@ -62,9 +64,11 @@ let lookup_weight ctr size_var =
       | WSize  -> gSucc (gVar (size_var))
   with Not_found -> gInt 1
 
+}
+
 VERNAC COMMAND EXTEND QuickChickWeights CLASSIFIED AS SIDEFF
   | ["QuickChickWeights" constr(c)] -> 
-     [
+     {
        let weight_assocs = 
          match c with 
          | { CAst.v = CNotation (_,([a],[b],_,_)) } -> begin
@@ -77,8 +81,8 @@ VERNAC COMMAND EXTEND QuickChickWeights CLASSIFIED AS SIDEFF
        msg_debug (str "Current weights: " ++ fnl ());
        msg_debug (str (weight_env_to_string ()) ++ fnl ());
        Lib.add_anonymous_leaf (register_weights_object weight_assocs)
-     ]
-END;;
+     }
+END
 
 (*
 let s1' = Names.string_of_id s1 in

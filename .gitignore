@@ -13,7 +13,7 @@ dsss17/terse
 *.hi
 *.o
 *.v.d
-*.ml4.d
+*.mlg.d
 *.ml.d
 *.glob
 *.vo

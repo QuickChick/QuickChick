@@ -1,3 +1,5 @@
+{
+
 open Ltac_plugin
 open Pp
 open Names
@@ -241,43 +243,45 @@ let run_with f args p =
   runTest c
 	   *)
 
+}
+
 VERNAC COMMAND EXTEND QuickCheck CLASSIFIED AS SIDEFF
-  | ["QuickCheck" constr(c)] ->     [run quickCheck [c]]
-  | ["QuickCheckWith" constr(c1) constr(c2)] ->     [run quickCheckWith [c1;c2]]
-END;;
+  | ["QuickCheck" constr(c)] ->     {run quickCheck [c]}
+  | ["QuickCheckWith" constr(c1) constr(c2)] ->     {run quickCheckWith [c1;c2]}
+END
 
 VERNAC COMMAND EXTEND QuickChick CLASSIFIED AS SIDEFF
-  | ["QuickChick" constr(c)] ->     [run quickCheck [c]]
-  | ["QuickChickWith" constr(c1) constr(c2)] ->     [run quickCheckWith [c1;c2]]
-END;;
+  | ["QuickChick" constr(c)] ->     {run quickCheck [c]}
+  | ["QuickChickWith" constr(c1) constr(c2)] ->     {run quickCheckWith [c1;c2]}
+END
 
 VERNAC COMMAND EXTEND MutateCheck CLASSIFIED AS SIDEFF
-  | ["MutateCheck" constr(c1) constr(c2)] ->     [run mutateCheck [c1;c2]]
-  | ["MutateCheckWith" constr(c1) constr(c2) constr(c3)] ->     [run mutateCheckWith [c1;c2;c3]]
-END;;
+  | ["MutateCheck" constr(c1) constr(c2)] ->     {run mutateCheck [c1;c2]}
+  | ["MutateCheckWith" constr(c1) constr(c2) constr(c3)] ->     {run mutateCheckWith [c1;c2;c3]}
+END
 
 VERNAC COMMAND EXTEND MutateChick CLASSIFIED AS SIDEFF
-  | ["MutateChick" constr(c1) constr(c2)] ->     [run mutateCheck [c1;c2]]
-  | ["MutateChickWith" constr(c1) constr(c2) constr(c3)] ->     [run mutateCheckWith [c1;c2;c3]]
-END;;
+  | ["MutateChick" constr(c1) constr(c2)] ->     {run mutateCheck [c1;c2]}
+  | ["MutateChickWith" constr(c1) constr(c2) constr(c3)] ->     {run mutateCheckWith [c1;c2;c3]}
+END
 
 VERNAC COMMAND EXTEND MutateCheckMany CLASSIFIED AS SIDEFF
-  | ["MutateCheckMany" constr(c1) constr(c2)] ->     [run mutateCheckMany [c1;c2]]
-  | ["MutateCheckManyWith" constr(c1) constr(c2) constr(c3)] ->     [run mutateCheckMany [c1;c2;c3]]
-END;;
+  | ["MutateCheckMany" constr(c1) constr(c2)] ->     {run mutateCheckMany [c1;c2]}
+  | ["MutateCheckManyWith" constr(c1) constr(c2) constr(c3)] ->     {run mutateCheckMany [c1;c2;c3]}
+END
 
 VERNAC COMMAND EXTEND MutateChickMany CLASSIFIED AS SIDEFF
-  | ["MutateChickMany" constr(c1) constr(c2)] ->     [run mutateCheckMany [c1;c2]]
-  | ["MutateChickManyWith" constr(c1) constr(c2) constr(c3)] ->     [run mutateCheckMany [c1;c2;c3]]
-END;;
+  | ["MutateChickMany" constr(c1) constr(c2)] ->     {run mutateCheckMany [c1;c2]}
+  | ["MutateChickManyWith" constr(c1) constr(c2) constr(c3)] ->     {run mutateCheckMany [c1;c2;c3]}
+END
 
 VERNAC COMMAND EXTEND QuickChickDebug CLASSIFIED AS SIDEFF
   | ["QuickChickDebug" ident(s1) ident(s2)] ->
-     [ let s1' = Id.to_string s1 in
+     { let s1' = Id.to_string s1 in
        let s2' = Id.to_string s2 in
-       set_debug_flag s1' s2' ]
-END;;
+       set_debug_flag s1' s2' }
+END
 
 VERNAC COMMAND EXTEND Sample CLASSIFIED AS SIDEFF
-  | ["Sample" constr(c)] -> [run sample [c]]
-END;;
+  | ["Sample" constr(c)] -> {run sample [c]}
+END
