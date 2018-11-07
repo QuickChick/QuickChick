@@ -1,7 +1,4 @@
-FROM ysli/coq:8.8
-ENV QC_VERSION 8.8
-WORKDIR ..
-RUN . ~/.profile \
- && opam repo add coq-released https://coq.inria.fr/opam/released \
- && git clone --depth 1 -b $QC_VERSION https://github.com/QuickChick/QuickChick \
- && opam pin add QuickChick
+FROM coqorg/coq:8.8.2
+COPY --chown=coq . QuickChick
+ENV OPAMYES true
+RUN opam pin add QuickChick
