@@ -1,4 +1,4 @@
 FROM coqorg/coq:8.7
-RUN . ~/.profile \
- && opam repo add coq-released https://coq.inria.fr/opam/released \
- && opam install coq-quickchick
+COPY --chown=coq . QuickChick
+ENV OPAMYES true
+RUN opam pin add QuickChick
