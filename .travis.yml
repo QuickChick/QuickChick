@@ -1,28 +1,18 @@
-dist: trusty
+sudo: required
 language: ocaml
 cache:
   apt: true
   directories:
   - $HOME/.opam
   - $HOME/Library/Caches/Homebrew
-addons:
-  apt:
-    sources:
-    - avsm
-    packages:
-    - opam
-    - aspcud
 env:
   global:
   - NJOBS=2
   - OPAMYES=true
   - OPAMKEEPBUILDDIR=true
   matrix:
-      - COMPILER="4.04.0"
-      - COMPILER="4.04.2"
-      - COMPILER="4.05.0"
-      - COMPILER="4.06.1"
-      - COMPILER="4.07.0"
+  - OCAML_VERSION=4.04
+  - OCAML_VERSION=4.07
 matrix:
   fast_finish: true
   allow_failures:
@@ -32,11 +22,9 @@ os:
     - osx
 
 before_install:
-    if [ $TRAVIS_OS_NAME = osx ]; then
-    brew update; brew install opam; fi
+    curl -L https://raw.githubusercontent.com/ocaml/ocaml-ci-scripts/master/.travis-ocaml.sh | sh
 
 install:
-- travis_wait opam init -j ${NJOBS} --compiler=${COMPILER} -n
 - eval $(opam config env)
 - opam config var root
 - opam repo add coq-released https://coq.inria.fr/opam/released || true
