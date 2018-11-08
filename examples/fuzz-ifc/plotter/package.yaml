@@ -43,6 +43,8 @@ executables:
     - colour
     - directory
     - filepath
+    - statistics-linreg
+    - vector
 
 tests:
   plotter-test:

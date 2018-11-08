@@ -22,6 +22,9 @@ import Control.Lens hiding (noneOf)
 import Data.Default.Class
 import Graphics.Rendering.Chart
 import Graphics.Rendering.Chart.Backend.Cairo
+
+import qualified Data.Vector as V
+import Statistics.LinearRegression (linearRegression)
   
 {-- File structure
 
@@ -94,8 +97,43 @@ parseStatsFuzz time fn allLines =
   in MkData k m id (execsDone - total) unique time
 
 parseOutputFuzz :: String -> Double
-parseOutputFuzz s = 0.42
+parseOutputFuzz s =
+  let (_:_:times:rest) = reverse $ lines s in
+  let times' = case times of
+                 't' : _ -> let (_:_:x:_) = rest in x
+                 _ -> times in
+--  traceShow times' $ 
+  right $ parse timeElapsedP times' times'
 
+timeElapsedP :: GenParser Char st Double
+timeElapsedP = do
+  user <- many1 (noneOf "u")
+  string "user "
+  system <- many1 (noneOf "s")
+  string "system "
+--  traceM user
+--  traceM system
+  -- returns in seconds
+  let parseMinuteBased () = do
+        elapsed_minutes <- many1 (noneOf ":")
+--        traceM elapsed_minutes
+        char ':'
+        elapsed_secs  <- many1 (noneOf ".:e")
+--        traceM elapsed_secs
+        char '.' <|> char 'e'
+--        elapsed_micro  <- many1 (noneOf "e")
+--        traceM elapsed_micro
+        let elapsed = (read elapsed_minutes) * 60 + (read elapsed_secs) -- + (read elapsed_micro) / 100
+        return elapsed
+  elapsed <- (try $ parseMinuteBased ()) <|> (do hours <- many1 (noneOf ":")
+--                                                 traceM hours
+                                                 char ':'
+                                                 minutes <- parseMinuteBased ()
+--                                                 traceShowM minutes
+                                                 return (read hours * 60 * 60 + minutes))
+  -- in Minutes
+  return $ (elapsed / 60)
+  
 parse_fuzz_dir dir = do
   -- Get all files in the current dir
   allFiles <- map ((dir ++ "/") ++) <$> getDirectoryContents dir
@@ -105,7 +143,7 @@ parse_fuzz_dir dir = do
   parsedData  <- forM outputs $ \f -> do
     handle    <- openFile f ReadMode
     contents  <- hGetContents handle
-    -- putStrLn $ show (f, lines contents !! 1)
+--    putStrLn $ show (f, lines contents !! 1)
     let assocDirName  = getIntegerInLine (lines contents !! 1)
         timeTaken = parseOutputFuzz contents
         assocDirStats = dir ++ "/" ++ assocDirName 
@@ -117,9 +155,6 @@ parse_fuzz_dir dir = do
       medium = filter (\d -> mode d == Medium) sorted
       smart  = filter (\d -> mode d == Smart ) sorted
   return (naive, medium, smart)
-
-  let (naive,(medium,smart)) = second (splitAt 20) (splitAt 20 sorted)
-  return $ (naive, medium, smart)
 
 numberP :: GenParser Char st (String, Int)
 numberP = do
@@ -179,31 +214,118 @@ parse_rand_dir dir = do
       smart  = filter (\d -> mode d == Smart ) sorted
   return (naive, medium, smart)
 
+inf :: Double
+inf = 42424242
+
+calc_mttf_random :: TestData -> Double
+calc_mttf_random info
+  | failures info == 0 = inf
+  | otherwise = time info / (fromIntegral (failures info))
+
+-- Fuzz has one failure per
+calc_mttf_fuzz :: [TestData] -> Double
+calc_mttf_fuzz infos =
+  let infos' = filter ((==1) .failures) infos in
+  if null infos' then inf
+  else sum (map time infos') / (fromIntegral $ length infos)
+
+data Benchmark = Bench { bname :: String
+                       , bmuts :: [Int]
+                       , btime :: [Double]
+                       }
+                 deriving (Show)
+                       
 main = do
-  randoms <- parse_rand_dir "output_random_10M"
-  fuzz    <- {- forM [1..5] $ \i -> -} parse_fuzz_dir $ "output_fuzz_run1"
-  putStrLn $ show (randoms, fuzz)
-  renderableToFile def "random.png" chart  
+  (nr, mr, sr) <- parse_rand_dir "output_random_10M"
+  fuzz    <- forM [1..5] $ \i -> parse_fuzz_dir $ "output_fuzz_run" ++ show i
+  fuzz_arb <- parse_fuzz_dir "output_fuzz_arbitrary_1h"
+  fuzz_seeded <- parse_fuzz_dir "output_fuzz_arbitrary_1h_seeded"
 
+  -- Randoms
+  let mkBench name times = Bench name [0..19] $ map calc_mttf_random times
+      nrb = mkBench "naive-random" nr
+      mrb = mkBench "med-random"   mr
+      srb = mkBench "smart-random" sr
 
-chart = toRenderable layout 
-  where
-    am :: Double -> Double
-    am x = (sin (x*3.14159/45) + 1) / 2 * (sin (x*3.14159/5))
+  -- Fuzzs
+  let afs  = (\(n,_,_) -> n) fuzz_arb
+      afss = (\(n,_,_) -> n) fuzz_seeded
+      mfs = transpose $ map (\(_,m,_) -> m) fuzz
+      sfs = transpose $ map (\(_,_,s) -> s) fuzz
+      mkFuzz name times = Bench name [0..19] $ map calc_mttf_fuzz times
+      afb  = mkFuzz "naive-fuzz" (map return afs)
+      afbs = mkFuzz "naive-fuzz" (map return afss)
+      mfb = mkFuzz "med-fuzz" mfs
+      sfb = mkFuzz "smart-fuzz" sfs
 
-    sinusoid1 = plot_lines_values .~ [[ (x,(am x)) | x <- [0,(0.5)..400]]]
-              $ plot_lines_style  . line_color .~ opaque blue
-              $ plot_lines_title .~ "am"
-              $ def
+  renderableToFile def "arbitraries.png"  $ chart fromIntegral ( * 60) [nrb, afb, afbs]
+  renderableToFile def "medium-smart.png" $ chart fromIntegral ( * 60) [mrb, srb, mfb, sfb]
 
-    sinusoid2 = plot_points_style .~ filledCircles 2 (opaque red)
-              $ plot_points_values .~ [ (x,(am x)) | x <- [0,7..400]]
-              $ plot_points_title .~ "am points"
-              $ def
+calculateLine :: (Int -> Double) -> (Double -> Double) -> Benchmark -> [(Double, Double)]
+calculateLine xlogger ylogger bs =
+  zip (map xlogger $ bmuts bs) (map ylogger $ btime bs)
 
-    layout = layout_title .~ "Amplitude Modulation"
-           $ layout_plots .~ [toPlot sinusoid1,
-                              toPlot sinusoid2]
-           $ def
+chart :: (Int -> Double) -> (Double -> Double) -> [Benchmark] -> Renderable ()
+chart xlogger ylogger inputData = toRenderable layout 
+    where layout = layout_title .~ "Random vs Fuzz" 
+                 $ layout_x_axis  . laxis_generate .~ scaledAxis (def{_la_labelf = \x -> map ("mutant id: " ++) ((_la_labelf def) x)}) (0, xlogger 20)
+                 $ layout_y_axis  . laxis_generate .~ scaledAxis (def{_la_labelf = \x -> map (++ "sec") ((_la_labelf def) x)})
+                                                                 (0, ylogger ((maximum $ filter (< inf) $ concatMap btime inputData)))
+                 $ layout_plots .~ lines
+                 $ def
+
+          colors = [ opaque red, opaque blue, opaque green , opaque grey ]
+
+          lines = map (\(c,d) -> toPlot $ plot_lines_values .~ [d]
+                                        $ plot_lines_style  .  line_color .~ c
+                                        $ def
+                      ) (zip colors (map (calculateLine xlogger ylogger) inputData))
+
+-- 
+--          bars = map (\(c,d) -> toPlot $ plot_errbars_values .~ (
+--                                       let errps = map (\d -> ErrPoint (ErrValue (xlogger $ listLength d) 
+--                                                                                 (xlogger $ listLength d) 
+--                                                                                 (xlogger $ listLength d))
+--                                                                       (ErrValue (ylogger $ if not $ isNaN (time_min d) then time_min d 
+--                                                                                           else time d - (time_max d - time d))
+--                                                                                 (ylogger $ time d) 
+--                                                                                 (ylogger $ if not $ isNaN (time_max d) then time_max d 
+--                                                                                           else time d + (time d - time_min d))
+--                                                                       )) d in
+--                                       errps)
+--                                   $ plot_errbars_line_style  .  line_color .~ c
+--                                   $ def
+--                     ) (zip colors inputData)
+
+-- 
+--chart nrd mrd srd = toRenderable layout 
+--  where
+--    nr_line = plot_lines_values .~ [nrd]
+--            $ plot_lines_style  . line_color .~ opaque blue
+--            $ plot_lines_title .~ "naive"
+--            $ def
+-- 
+--    mr_line = plot_lines_values .~ [mrd]
+--            $ plot_lines_style  . line_color .~ opaque blue
+--            $ plot_lines_title .~ "medium"
+--            $ def
+-- 
+--    sr_line = plot_lines_values .~ [srd]
+--            $ plot_lines_style  . line_color .~ opaque blue
+--            $ plot_lines_title .~ "smart"
+--            $ def
+-- 
+-- 
+-- 
+----    sinusoid2 = plot_points_style .~ filledCircles 2 (opaque red)
+----              $ plot_points_values .~ [ (x,(am x)) | x <- [0,7..400]]
+----              $ plot_points_title .~ "am points"
+----              $ def
+-- 
+--    layout :: Layout LogValue Double
+--    layout = layout_title .~ "Random vs Fuzz"
+--           $ layout_plots .~ [toPlot nr_line, toPlot mr_line, toPlot sr_line]
+-- 
+--           $ def
 
 
