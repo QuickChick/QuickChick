@@ -1,0 +1,7 @@
+flags: {}
+packages:
+- .
+extra-deps:
+- Chart-1.9
+- Chart-cairo-1.9
+resolver: lts-12.17

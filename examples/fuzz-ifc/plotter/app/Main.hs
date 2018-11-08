@@ -18,9 +18,8 @@ import Debug.Trace
 import System.Environment(getArgs)
 import Data.Colour.Names
 import Data.Colour
-import Control.Lens
+import Control.Lens hiding (noneOf)
 import Data.Default.Class
-import Data.Time.LocalTime
 import Graphics.Rendering.Chart
 import Graphics.Rendering.Chart.Backend.Cairo
   
