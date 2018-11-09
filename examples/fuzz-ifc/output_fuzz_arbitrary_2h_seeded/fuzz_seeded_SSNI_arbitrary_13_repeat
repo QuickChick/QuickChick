@@ -1,0 +1,411 @@
+QuickChecking (testMutantX prop_SSNI_arbitrary exp_result_fuzz 13)
+Extracted ML file: /tmp/QuickChick/195926/QuickChickb6f7db.ml
+Extra: 
+Compile command: ocamlopt unix.cmxa /home/lemonidas/.opam/4.04.0+afl/lib/afl-persistent/afl-persistent.cmxa -unsafe-string -rectypes -w a -I /tmp/QuickChick/195926 -I /home/lemonidas/.opam/4.04.0+afl/lib/afl-persistent/ -I /home/lemonidas/.opam/4.04.0+afl/lib/coq/user-contrib/QuickChick /home/lemonidas/.opam/4.04.0+afl/lib/coq/user-contrib/QuickChick/quickChickLib.cmx  /tmp/QuickChick/195926/QuickChickb6f7db.ml -o /tmp/QuickChick/195926/QuickChickb6f7db
+Extra: 
+/tmp/QuickChick/195926/input
+[0;36mafl-fuzz [1;97m2.52b[0m by <lcamtuf@google.com>
+[1;92m[+] [0mLooks like we're not running on a tty, so I'll be a bit less verbose.[0m
+[1;92m[+] [0mYou have 8 CPU cores and 2 runnable tasks (utilization: 25%).[0m
+[1;92m[+] [0mTry parallel jobs - see docs/parallel_fuzzing.txt.[0m
+[1;94m[*] [0mChecking CPU core loadout...[0m
+[1;92m[+] [0mFound a free CPU core, binding to #1.[0m
+[1;94m[*] [0mChecking core_pattern...[0m
+[1;94m[*] [0mChecking CPU scaling governor...[0m
+[1;94m[*] [0mSetting up output directories...[0m
+[1;94m[*] [0mScanning '/tmp/QuickChick/195926/input'...[0m
+[1;92m[+] [0mNo auto-generated dictionary tokens to reuse.[0m
+[1;94m[*] [0mCreating hard links for all input files...[0m
+[1;94m[*] [0mValidating target binary...[0m
+[1;94m[*] [0mAttempting dry run with 'id:000000,orig:seed040f3b.qc'...[0m
+[1;94m[*] [0mSpinning up the fork server...[0m
+[1;92m[+] [0mAll right - fork server is up.[0m
+[1;90m    len = 203, map size = 529, exec speed = 343 us
+[0m[1;94m[*] [0mAttempting dry run with 'id:000001,orig:seed09b2d8.qc'...[0m
+[1;90m    len = 129, map size = 533, exec speed = 373 us
+[0m[1;94m[*] [0mAttempting dry run with 'id:000002,orig:seed0bcf08.qc'...[0m
+[1;90m    len = 53, map size = 422, exec speed = 357 us
+[0m[1;94m[*] [0mAttempting dry run with 'id:000003,orig:seed0d51c2.qc'...[0m
+[1;90m    len = 163, map size = 545, exec speed = 361 us
+[0m[1;94m[*] [0mAttempting dry run with 'id:000004,orig:seed0fbda9.qc'...[0m
+[1;90m    len = 205, map size = 549, exec speed = 350 us
+[0m[1;94m[*] [0mAttempting dry run with 'id:000005,orig:seed139d25.qc'...[0m
+[1;90m    len = 261, map size = 541, exec speed = 326 us
+[0m[1;94m[*] [0mAttempting dry run with 'id:000006,orig:seed194a76.qc'...[0m
+[1;90m    len = 254, map size = 542, exec speed = 345 us
+[0m[1;94m[*] [0mAttempting dry run with 'id:000007,orig:seed1d2ab9.qc'...[0m
+[1;90m    len = 114, map size = 550, exec speed = 351 us
+[0m[1;94m[*] [0mAttempting dry run with 'id:000008,orig:seed25c4ba.qc'...[0m
+[1;90m    len = 104, map size = 551, exec speed = 350 us
+[0m[1;94m[*] [0mAttempting dry run with 'id:000009,orig:seed2a5a0c.qc'...[0m
+[1;90m    len = 81, map size = 525, exec speed = 349 us
+[0m[1;94m[*] [0mAttempting dry run with 'id:000010,orig:seed2fbcc0.qc'...[0m
+[1;90m    len = 40, map size = 422, exec speed = 354 us
+[0m[1;94m[*] [0mAttempting dry run with 'id:000011,orig:seed36d713.qc'...[0m
+[1;90m    len = 243, map size = 532, exec speed = 542 us
+[0m[1;94m[*] [0mAttempting dry run with 'id:000012,orig:seed37e2f0.qc'...[0m
+[1;90m    len = 76, map size = 549, exec speed = 384 us
+[0m[1;93m[!] [1;97mWARNING: [0mNo new instrumentation output, test case may be useless.[0m
+[1;94m[*] [0mAttempting dry run with 'id:000013,orig:seed3828c3.qc'...[0m
+[1;90m    len = 105, map size = 537, exec speed = 389 us
+[0m[1;94m[*] [0mAttempting dry run with 'id:000014,orig:seed4694b0.qc'...[0m
+[1;90m    len = 37, map size = 426, exec speed = 378 us
+[0m[1;94m[*] [0mAttempting dry run with 'id:000015,orig:seed48691d.qc'...[0m
+[1;90m    len = 226, map size = 523, exec speed = 437 us
+[0m[1;93m[!] [1;97mWARNING: [0mNo new instrumentation output, test case may be useless.[0m
+[1;94m[*] [0mAttempting dry run with 'id:000016,orig:seed48c8e2.qc'...[0m
+[1;90m    len = 26, map size = 408, exec speed = 314 us
+[0m[1;94m[*] [0mAttempting dry run with 'id:000017,orig:seed48fbfe.qc'...[0m
+[1;90m    len = 220, map size = 542, exec speed = 335 us
+[0m[1;93m[!] [1;97mWARNING: [0mNo new instrumentation output, test case may be useless.[0m
+[1;94m[*] [0mAttempting dry run with 'id:000018,orig:seed4a4b6f.qc'...[0m
+[1;90m    len = 234, map size = 554, exec speed = 318 us
+[0m[1;94m[*] [0mAttempting dry run with 'id:000019,orig:seed50556e.qc'...[0m
+[1;90m    len = 119, map size = 526, exec speed = 322 us
+[0m[1;93m[!] [1;97mWARNING: [0mNo new instrumentation output, test case may be useless.[0m
+[1;94m[*] [0mAttempting dry run with 'id:000020,orig:seed50ae19.qc'...[0m
+[1;90m    len = 43, map size = 409, exec speed = 318 us
+[0m[1;93m[!] [1;97mWARNING: [0mNo new instrumentation output, test case may be useless.[0m
+[1;94m[*] [0mAttempting dry run with 'id:000021,orig:seed5311b0.qc'...[0m
+[1;90m    len = 87, map size = 539, exec speed = 334 us
+[0m[1;93m[!] [1;97mWARNING: [0mNo new instrumentation output, test case may be useless.[0m
+[1;94m[*] [0mAttempting dry run with 'id:000022,orig:seed54f359.qc'...[0m
+[1;90m    len = 206, map size = 548, exec speed = 346 us
+[0m[1;94m[*] [0mAttempting dry run with 'id:000023,orig:seed618104.qc'...[0m
+[1;90m    len = 210, map size = 552, exec speed = 362 us
+[0m[1;94m[*] [0mAttempting dry run with 'id:000024,orig:seed63ab75.qc'...[0m
+[1;90m    len = 241, map size = 529, exec speed = 471 us
+[0m[1;93m[!] [1;97mWARNING: [0mNo new instrumentation output, test case may be useless.[0m
+[1;94m[*] [0mAttempting dry run with 'id:000025,orig:seed66bba0.qc'...[0m
+[1;90m    len = 152, map size = 547, exec speed = 453 us
+[0m[1;93m[!] [1;97mWARNING: [0mNo new instrumentation output, test case may be useless.[0m
+[1;94m[*] [0mAttempting dry run with 'id:000026,orig:seed66e86e.qc'...[0m
+[1;90m    len = 39, map size = 421, exec speed = 431 us
+[0m[1;94m[*] [0mAttempting dry run with 'id:000027,orig:seed6948be.qc'...[0m
+[1;90m    len = 160, map size = 553, exec speed = 365 us
+[0m[1;94m[*] [0mAttempting dry run with 'id:000028,orig:seed6a5439.qc'...[0m
+[1;90m    len = 129, map size = 544, exec speed = 333 us
+[0m[1;93m[!] [1;97mWARNING: [0mNo new instrumentation output, test case may be useless.[0m
+[1;94m[*] [0mAttempting dry run with 'id:000029,orig:seed6b16c4.qc'...[0m
+[1;90m    len = 137, map size = 547, exec speed = 332 us
+[0m[1;93m[!] [1;97mWARNING: [0mNo new instrumentation output, test case may be useless.[0m
+[1;94m[*] [0mAttempting dry run with 'id:000030,orig:seed6d43d5.qc'...[0m
+[1;90m    len = 211, map size = 526, exec speed = 337 us
+[0m[1;94m[*] [0mAttempting dry run with 'id:000031,orig:seed72d3fa.qc'...[0m
+[1;90m    len = 52, map size = 432, exec speed = 313 us
+[0m[1;93m[!] [1;97mWARNING: [0mNo new instrumentation output, test case may be useless.[0m
+[1;94m[*] [0mAttempting dry run with 'id:000032,orig:seed7b7cdd.qc'...[0m
+[1;90m    len = 126, map size = 539, exec speed = 338 us
+[0m[1;94m[*] [0mAttempting dry run with 'id:000033,orig:seed7f583e.qc'...[0m
+[1;90m    len = 165, map size = 537, exec speed = 351 us
+[0m[1;93m[!] [1;97mWARNING: [0mNo new instrumentation output, test case may be useless.[0m
+[1;94m[*] [0mAttempting dry run with 'id:000034,orig:seed80de1e.qc'...[0m
+[1;90m    len = 81, map size = 537, exec speed = 355 us
+[0m[1;93m[!] [1;97mWARNING: [0mNo new instrumentation output, test case may be useless.[0m
+[1;94m[*] [0mAttempting dry run with 'id:000035,orig:seed80e0f6.qc'...[0m
+[1;90m    len = 85, map size = 542, exec speed = 387 us
+[0m[1;93m[!] [1;97mWARNING: [0mNo new instrumentation output, test case may be useless.[0m
+[1;94m[*] [0mAttempting dry run with 'id:000036,orig:seed820620.qc'...[0m
+[1;90m    len = 125, map size = 551, exec speed = 384 us
+[0m[1;94m[*] [0mAttempting dry run with 'id:000037,orig:seed88ce8e.qc'...[0m
+[1;90m    len = 209, map size = 567, exec speed = 432 us
+[0m[1;94m[*] [0mAttempting dry run with 'id:000038,orig:seed8de087.qc'...[0m
+[1;90m    len = 254, map size = 540, exec speed = 445 us
+[0m[1;94m[*] [0mAttempting dry run with 'id:000039,orig:seed9898a1.qc'...[0m
+[1;90m    len = 251, map size = 539, exec speed = 354 us
+[0m[1;93m[!] [1;97mWARNING: [0mNo new instrumentation output, test case may be useless.[0m
+[1;94m[*] [0mAttempting dry run with 'id:000040,orig:seed9ab040.qc'...[0m
+[1;90m    len = 115, map size = 546, exec speed = 332 us
+[0m[1;93m[!] [1;97mWARNING: [0mNo new instrumentation output, test case may be useless.[0m
+[1;94m[*] [0mAttempting dry run with 'id:000041,orig:seed9be40e.qc'...[0m
+[1;90m    len = 143, map size = 559, exec speed = 337 us
+[0m[1;94m[*] [0mAttempting dry run with 'id:000042,orig:seed9c1081.qc'...[0m
+[1;90m    len = 75, map size = 540, exec speed = 384 us
+[0m[1;94m[*] [0mAttempting dry run with 'id:000043,orig:seed9f5c6b.qc'...[0m
+[1;90m    len = 244, map size = 538, exec speed = 326 us
+[0m[1;93m[!] [1;97mWARNING: [0mNo new instrumentation output, test case may be useless.[0m
+[1;94m[*] [0mAttempting dry run with 'id:000044,orig:seed9fdfc0.qc'...[0m
+[1;90m    len = 41, map size = 417, exec speed = 335 us
+[0m[1;94m[*] [0mAttempting dry run with 'id:000045,orig:seeda0eb2a.qc'...[0m
+[1;90m    len = 150, map size = 548, exec speed = 382 us
+[0m[1;93m[!] [1;97mWARNING: [0mNo new instrumentation output, test case may be useless.[0m
+[1;94m[*] [0mAttempting dry run with 'id:000046,orig:seeda596f5.qc'...[0m
+[1;90m    len = 144, map size = 549, exec speed = 370 us
+[0m[1;93m[!] [1;97mWARNING: [0mNo new instrumentation output, test case may be useless.[0m
+[1;94m[*] [0mAttempting dry run with 'id:000047,orig:seeda818e2.qc'...[0m
+[1;90m    len = 134, map size = 554, exec speed = 381 us
+[0m[1;93m[!] [1;97mWARNING: [0mNo new instrumentation output, test case may be useless.[0m
+[1;94m[*] [0mAttempting dry run with 'id:000048,orig:seeda98fa1.qc'...[0m
+[1;90m    len = 57, map size = 429, exec speed = 356 us
+[0m[1;93m[!] [1;97mWARNING: [0mNo new instrumentation output, test case may be useless.[0m
+[1;94m[*] [0mAttempting dry run with 'id:000049,orig:seedae18b4.qc'...[0m
+[1;90m    len = 184, map size = 543, exec speed = 363 us
+[0m[1;93m[!] [1;97mWARNING: [0mNo new instrumentation output, test case may be useless.[0m
+[1;94m[*] [0mAttempting dry run with 'id:000050,orig:seedbba54f.qc'...[0m
+[1;90m    len = 260, map size = 537, exec speed = 349 us
+[0m[1;93m[!] [1;97mWARNING: [0mNo new instrumentation output, test case may be useless.[0m
+[1;94m[*] [0mAttempting dry run with 'id:000051,orig:seedbcdfce.qc'...[0m
+[1;90m    len = 129, map size = 543, exec speed = 412 us
+[0m[1;93m[!] [1;97mWARNING: [0mNo new instrumentation output, test case may be useless.[0m
+[1;94m[*] [0mAttempting dry run with 'id:000052,orig:seedc712c4.qc'...[0m
+[1;90m    len = 231, map size = 544, exec speed = 352 us
+[0m[1;93m[!] [1;97mWARNING: [0mNo new instrumentation output, test case may be useless.[0m
+[1;94m[*] [0mAttempting dry run with 'id:000053,orig:seedc89460.qc'...[0m
+[1;90m    len = 196, map size = 543, exec speed = 380 us
+[0m[1;93m[!] [1;97mWARNING: [0mNo new instrumentation output, test case may be useless.[0m
+[1;94m[*] [0mAttempting dry run with 'id:000054,orig:seedc910c6.qc'...[0m
+[1;90m    len = 103, map size = 535, exec speed = 352 us
+[0m[1;94m[*] [0mAttempting dry run with 'id:000055,orig:seedcdc900.qc'...[0m
+[1;90m    len = 91, map size = 537, exec speed = 362 us
+[0m[1;93m[!] [1;97mWARNING: [0mNo new instrumentation output, test case may be useless.[0m
+[1;94m[*] [0mAttempting dry run with 'id:000056,orig:seedce83f9.qc'...[0m
+[1;90m    len = 178, map size = 548, exec speed = 397 us
+[0m[1;93m[!] [1;97mWARNING: [0mNo new instrumentation output, test case may be useless.[0m
+[1;94m[*] [0mAttempting dry run with 'id:000057,orig:seedcea7fa.qc'...[0m
+[1;90m    len = 101, map size = 539, exec speed = 366 us
+[0m[1;94m[*] [0mAttempting dry run with 'id:000058,orig:seedd00191.qc'...[0m
+[1;90m    len = 226, map size = 541, exec speed = 336 us
+[0m[1;93m[!] [1;97mWARNING: [0mNo new instrumentation output, test case may be useless.[0m
+[1;94m[*] [0mAttempting dry run with 'id:000059,orig:seedd00467.qc'...[0m
+[1;90m    len = 162, map size = 541, exec speed = 327 us
+[0m[1;93m[!] [1;97mWARNING: [0mNo new instrumentation output, test case may be useless.[0m
+[1;94m[*] [0mAttempting dry run with 'id:000060,orig:seedd51ab5.qc'...[0m
+[1;90m    len = 99, map size = 536, exec speed = 335 us
+[0m[1;93m[!] [1;97mWARNING: [0mNo new instrumentation output, test case may be useless.[0m
+[1;94m[*] [0mAttempting dry run with 'id:000061,orig:seedd8ce27.qc'...[0m
+[1;90m    len = 151, map size = 548, exec speed = 330 us
+[0m[1;94m[*] [0mAttempting dry run with 'id:000062,orig:seedd94c77.qc'...[0m
+[1;90m    len = 69, map size = 545, exec speed = 344 us
+[0m[1;93m[!] [1;97mWARNING: [0mNo new instrumentation output, test case may be useless.[0m
+[1;94m[*] [0mAttempting dry run with 'id:000063,orig:seedda4fd8.qc'...[0m
+[1;90m    len = 155, map size = 547, exec speed = 330 us
+[0m[1;94m[*] [0mAttempting dry run with 'id:000064,orig:seeddaeffa.qc'...[0m
+[1;90m    len = 44, map size = 417, exec speed = 309 us
+[0m[1;93m[!] [1;97mWARNING: [0mNo new instrumentation output, test case may be useless.[0m
+[1;94m[*] [0mAttempting dry run with 'id:000065,orig:seeddf2a19.qc'...[0m
+[1;90m    len = 132, map size = 544, exec speed = 427 us
+[0m[1;93m[!] [1;97mWARNING: [0mNo new instrumentation output, test case may be useless.[0m
+[1;94m[*] [0mAttempting dry run with 'id:000066,orig:seede00e8f.qc'...[0m
+[1;90m    len = 111, map size = 541, exec speed = 522 us
+[0m[1;93m[!] [1;97mWARNING: [0mNo new instrumentation output, test case may be useless.[0m
+[1;94m[*] [0mAttempting dry run with 'id:000067,orig:seede4fd38.qc'...[0m
+[1;90m    len = 263, map size = 567, exec speed = 526 us
+[0m[1;94m[*] [0mAttempting dry run with 'id:000068,orig:seede6012f.qc'...[0m
+[1;90m    len = 71, map size = 550, exec speed = 382 us
+[0m[1;93m[!] [1;97mWARNING: [0mNo new instrumentation output, test case may be useless.[0m
+[1;94m[*] [0mAttempting dry run with 'id:000069,orig:seede60a45.qc'...[0m
+[1;90m    len = 250, map size = 544, exec speed = 371 us
+[0m[1;93m[!] [1;97mWARNING: [0mNo new instrumentation output, test case may be useless.[0m
+[1;94m[*] [0mAttempting dry run with 'id:000070,orig:seede6e491.qc'...[0m
+[1;90m    len = 23, map size = 397, exec speed = 318 us
+[0m[1;94m[*] [0mAttempting dry run with 'id:000071,orig:seedef2cd2.qc'...[0m
+[1;90m    len = 181, map size = 551, exec speed = 362 us
+[0m[1;93m[!] [1;97mWARNING: [0mNo new instrumentation output, test case may be useless.[0m
+[1;94m[*] [0mAttempting dry run with 'id:000072,orig:seedefc63a.qc'...[0m
+[1;90m    len = 34, map size = 410, exec speed = 347 us
+[0m[1;93m[!] [1;97mWARNING: [0mNo new instrumentation output, test case may be useless.[0m
+[1;94m[*] [0mAttempting dry run with 'id:000073,orig:seedf0cc3f.qc'...[0m
+[1;90m    len = 241, map size = 542, exec speed = 353 us
+[0m[1;93m[!] [1;97mWARNING: [0mNo new instrumentation output, test case may be useless.[0m
+[1;94m[*] [0mAttempting dry run with 'id:000074,orig:seedf2f174.qc'...[0m
+[1;90m    len = 202, map size = 551, exec speed = 339 us
+[0m[1;93m[!] [1;97mWARNING: [0mNo new instrumentation output, test case may be useless.[0m
+[1;94m[*] [0mAttempting dry run with 'id:000075,orig:seedf66a39.qc'...[0m
+[1;90m    len = 231, map size = 545, exec speed = 337 us
+[0m[1;93m[!] [1;97mWARNING: [0mNo new instrumentation output, test case may be useless.[0m
+[1;94m[*] [0mAttempting dry run with 'id:000076,orig:seedfb255f.qc'...[0m
+[1;90m    len = 81, map size = 548, exec speed = 348 us
+[0m[1;94m[*] [0mAttempting dry run with 'id:000077,orig:seedfe826a.qc'...[0m
+[1;90m    len = 31, map size = 409, exec speed = 295 us
+[0m[1;93m[!] [1;97mWARNING: [0mNo new instrumentation output, test case may be useless.[0m
+[1;92m[+] [0mAll test cases processed.[0m
+
+[1;93m[!] [1;97mWARNING: [0m[1;91mSome test cases look useless. Consider using a smaller set.[0m
+[1;93m[!] [1;97mWARNING: [0mYou have lots of input files; try starting small.[0m
+[1;92m[+] [0mHere are some useful stats:
+
+[1;90m    Test case count : [0m12 favored, 0 variable, 78 total
+[1;90m       Bitmap range : [0m397 to 567 bits (average: 522.15 bits)
+[1;90m        Exec timing : [0m295 to 542 us (average: 365 us)
+[0m
+[1;94m[*] [0mNo -t option specified, so I'll use exec timeout of 20 ms.[0m
+[1;92m[+] [0mAll set and ready to roll![0m
+[1;94m[*] [0mEntering queue cycle 1.[0m
+[1;94m[*] [0mFuzzing test case #26 (78 total, 0 uniq crashes found)...[0m
+[1;94m[*] [0mFuzzing test case #27 (140 total, 0 uniq crashes found)...[0m
+[1;94m[*] [0mFuzzing test case #38 (141 total, 0 uniq crashes found)...[0m
+[1;94m[*] [0mFuzzing test case #41 (144 total, 0 uniq crashes found)...[0m
+[1;94m[*] [0mFuzzing test case #48 (145 total, 0 uniq crashes found)...[0m
+[1;94m[*] [0mFuzzing test case #57 (145 total, 0 uniq crashes found)...[0m
+[1;94m[*] [0mFuzzing test case #68 (145 total, 0 uniq crashes found)...[0m
+[1;94m[*] [0mFuzzing test case #90 (146 total, 0 uniq crashes found)...[0m
+[1;94m[*] [0mFuzzing test case #92 (146 total, 0 uniq crashes found)...[0m
+[1;94m[*] [0mFuzzing test case #96 (146 total, 0 uniq crashes found)...[0m
+[1;94m[*] [0mFuzzing test case #99 (168 total, 0 uniq crashes found)...[0m
+[1;94m[*] [0mFuzzing test case #101 (168 total, 0 uniq crashes found)...[0m
+[1;94m[*] [0mFuzzing test case #109 (168 total, 0 uniq crashes found)...[0m
+[1;94m[*] [0mFuzzing test case #112 (168 total, 0 uniq crashes found)...[0m
+[1;94m[*] [0mFuzzing test case #113 (179 total, 0 uniq crashes found)...[0m
+[1;94m[*] [0mFuzzing test case #118 (180 total, 0 uniq crashes found)...[0m
+[1;94m[*] [0mFuzzing test case #119 (180 total, 0 uniq crashes found)...[0m
+[1;94m[*] [0mFuzzing test case #122 (181 total, 0 uniq crashes found)...[0m
+[1;94m[*] [0mFuzzing test case #123 (183 total, 0 uniq crashes found)...[0m
+[1;94m[*] [0mFuzzing test case #125 (184 total, 0 uniq crashes found)...[0m
+[1;94m[*] [0mFuzzing test case #127 (204 total, 0 uniq crashes found)...[0m
+[1;94m[*] [0mFuzzing test case #129 (204 total, 0 uniq crashes found)...[0m
+[1;94m[*] [0mFuzzing test case #131 (204 total, 0 uniq crashes found)...[0m
+[1;94m[*] [0mFuzzing test case #133 (304 total, 0 uniq crashes found)...[0m
+[1;94m[*] [0mFuzzing test case #134 (314 total, 0 uniq crashes found)...[0m
+[1;94m[*] [0mFuzzing test case #138 (325 total, 0 uniq crashes found)...[0m
+[1;94m[*] [0mFuzzing test case #139 (325 total, 0 uniq crashes found)...[0m
+[1;94m[*] [0mFuzzing test case #140 (325 total, 0 uniq crashes found)...[0m
+[1;94m[*] [0mFuzzing test case #141 (326 total, 0 uniq crashes found)...[0m
+[1;94m[*] [0mFuzzing test case #144 (326 total, 0 uniq crashes found)...[0m
+[1;94m[*] [0mFuzzing test case #145 (326 total, 0 uniq crashes found)...[0m
+[1;94m[*] [0mFuzzing test case #147 (327 total, 0 uniq crashes found)...[0m
+[1;94m[*] [0mFuzzing test case #149 (330 total, 0 uniq crashes found)...[0m
+[1;94m[*] [0mFuzzing test case #150 (332 total, 0 uniq crashes found)...[0m
+[1;94m[*] [0mFuzzing test case #153 (332 total, 0 uniq crashes found)...[0m
+[1;94m[*] [0mFuzzing test case #155 (332 total, 0 uniq crashes found)...[0m
+[1;94m[*] [0mFuzzing test case #156 (332 total, 0 uniq crashes found)...[0m
+[1;94m[*] [0mFuzzing test case #158 (334 total, 0 uniq crashes found)...[0m
+[1;94m[*] [0mFuzzing test case #160 (340 total, 0 uniq crashes found)...[0m
+[1;94m[*] [0mFuzzing test case #161 (356 total, 0 uniq crashes found)...[0m
+[1;94m[*] [0mFuzzing test case #164 (356 total, 0 uniq crashes found)...[0m
+[1;94m[*] [0mFuzzing test case #166 (356 total, 0 uniq crashes found)...[0m
+[1;94m[*] [0mFuzzing test case #167 (359 total, 0 uniq crashes found)...[0m
+[1;94m[*] [0mFuzzing test case #171 (359 total, 0 uniq crashes found)...[0m
+[1;94m[*] [0mFuzzing test case #172 (359 total, 0 uniq crashes found)...[0m
+[1;94m[*] [0mFuzzing test case #177 (359 total, 0 uniq crashes found)...[0m
+[1;94m[*] [0mFuzzing test case #178 (359 total, 0 uniq crashes found)...[0m
+[1;94m[*] [0mFuzzing test case #180 (361 total, 0 uniq crashes found)...[0m
+[1;94m[*] [0mFuzzing test case #181 (361 total, 0 uniq crashes found)...[0m
+[1;94m[*] [0mFuzzing test case #182 (361 total, 0 uniq crashes found)...[0m
+[1;94m[*] [0mFuzzing test case #183 (362 total, 0 uniq crashes found)...[0m
+[1;94m[*] [0mFuzzing test case #184 (362 total, 0 uniq crashes found)...[0m
+[1;94m[*] [0mFuzzing test case #186 (362 total, 0 uniq crashes found)...[0m
+[1;94m[*] [0mFuzzing test case #187 (362 total, 0 uniq crashes found)...[0m
+[1;94m[*] [0mFuzzing test case #188 (362 total, 0 uniq crashes found)...[0m
+[1;94m[*] [0mFuzzing test case #189 (362 total, 0 uniq crashes found)...[0m
+[1;94m[*] [0mFuzzing test case #192 (362 total, 0 uniq crashes found)...[0m
+[1;94m[*] [0mFuzzing test case #193 (362 total, 0 uniq crashes found)...[0m
+[1;94m[*] [0mFuzzing test case #194 (362 total, 0 uniq crashes found)...[0m
+[1;94m[*] [0mFuzzing test case #196 (363 total, 0 uniq crashes found)...[0m
+[1;94m[*] [0mFuzzing test case #197 (363 total, 0 uniq crashes found)...[0m
+[1;94m[*] [0mFuzzing test case #200 (363 total, 0 uniq crashes found)...[0m
+[1;94m[*] [0mFuzzing test case #202 (363 total, 0 uniq crashes found)...[0m
+[1;94m[*] [0mFuzzing test case #203 (363 total, 0 uniq crashes found)...[0m
+[1;94m[*] [0mFuzzing test case #209 (363 total, 0 uniq crashes found)...[0m
+[1;94m[*] [0mFuzzing test case #211 (363 total, 0 uniq crashes found)...[0m
+[1;94m[*] [0mFuzzing test case #224 (364 total, 0 uniq crashes found)...[0m
+[1;94m[*] [0mFuzzing test case #228 (364 total, 0 uniq crashes found)...[0m
+[1;94m[*] [0mFuzzing test case #230 (365 total, 0 uniq crashes found)...[0m
+[1;94m[*] [0mFuzzing test case #232 (366 total, 0 uniq crashes found)...[0m
+[1;94m[*] [0mFuzzing test case #239 (366 total, 0 uniq crashes found)...[0m
+[1;94m[*] [0mFuzzing test case #254 (367 total, 0 uniq crashes found)...[0m
+[1;94m[*] [0mFuzzing test case #263 (368 total, 0 uniq crashes found)...[0m
+[1;94m[*] [0mFuzzing test case #264 (368 total, 0 uniq crashes found)...[0m
+[1;94m[*] [0mFuzzing test case #266 (371 total, 0 uniq crashes found)...[0m
+[1;94m[*] [0mFuzzing test case #267 (372 total, 0 uniq crashes found)...[0m
+[1;94m[*] [0mFuzzing test case #268 (372 total, 0 uniq crashes found)...[0m
+[1;94m[*] [0mFuzzing test case #270 (373 total, 0 uniq crashes found)...[0m
+[1;94m[*] [0mFuzzing test case #274 (374 total, 0 uniq crashes found)...[0m
+[1;94m[*] [0mFuzzing test case #277 (374 total, 0 uniq crashes found)...[0m
+[1;94m[*] [0mFuzzing test case #279 (374 total, 0 uniq crashes found)...[0m
+[1;94m[*] [0mFuzzing test case #282 (374 total, 0 uniq crashes found)...[0m
+[1;94m[*] [0mFuzzing test case #288 (379 total, 0 uniq crashes found)...[0m
+[1;94m[*] [0mFuzzing test case #298 (382 total, 0 uniq crashes found)...[0m
+[1;94m[*] [0mFuzzing test case #299 (383 total, 0 uniq crashes found)...[0m
+[1;94m[*] [0mFuzzing test case #304 (383 total, 0 uniq crashes found)...[0m
+[1;94m[*] [0mFuzzing test case #307 (383 total, 0 uniq crashes found)...[0m
+[1;94m[*] [0mFuzzing test case #308 (383 total, 0 uniq crashes found)...[0m
+[1;94m[*] [0mFuzzing test case #309 (384 total, 0 uniq crashes found)...[0m
+[1;94m[*] [0mFuzzing test case #310 (384 total, 0 uniq crashes found)...[0m
+[1;94m[*] [0mFuzzing test case #311 (384 total, 0 uniq crashes found)...[0m
+[1;94m[*] [0mFuzzing test case #312 (384 total, 0 uniq crashes found)...[0m
+[1;94m[*] [0mFuzzing test case #313 (385 total, 0 uniq crashes found)...[0m
+[1;94m[*] [0mFuzzing test case #314 (385 total, 0 uniq crashes found)...[0m
+[1;94m[*] [0mFuzzing test case #315 (385 total, 0 uniq crashes found)...[0m
+[1;94m[*] [0mFuzzing test case #316 (385 total, 0 uniq crashes found)...[0m
+[1;94m[*] [0mFuzzing test case #317 (385 total, 0 uniq crashes found)...[0m
+[1;94m[*] [0mFuzzing test case #318 (386 total, 0 uniq crashes found)...[0m
+[1;94m[*] [0mFuzzing test case #319 (386 total, 0 uniq crashes found)...[0m
+[1;94m[*] [0mFuzzing test case #320 (386 total, 0 uniq crashes found)...[0m
+[1;94m[*] [0mFuzzing test case #321 (386 total, 0 uniq crashes found)...[0m
+[1;94m[*] [0mFuzzing test case #322 (386 total, 0 uniq crashes found)...[0m
+[1;94m[*] [0mFuzzing test case #323 (386 total, 0 uniq crashes found)...[0m
+[1;94m[*] [0mFuzzing test case #324 (386 total, 0 uniq crashes found)...[0m
+[1;94m[*] [0mFuzzing test case #326 (386 total, 0 uniq crashes found)...[0m
+[1;94m[*] [0mFuzzing test case #328 (388 total, 0 uniq crashes found)...[0m
+[1;94m[*] [0mFuzzing test case #330 (388 total, 0 uniq crashes found)...[0m
+[1;94m[*] [0mFuzzing test case #331 (390 total, 0 uniq crashes found)...[0m
+[1;94m[*] [0mFuzzing test case #332 (390 total, 0 uniq crashes found)...[0m
+[1;94m[*] [0mFuzzing test case #333 (394 total, 0 uniq crashes found)...[0m
+[1;94m[*] [0mFuzzing test case #334 (395 total, 0 uniq crashes found)...[0m
+[1;94m[*] [0mFuzzing test case #335 (395 total, 0 uniq crashes found)...[0m
+[1;94m[*] [0mFuzzing test case #336 (395 total, 0 uniq crashes found)...[0m
+[1;94m[*] [0mFuzzing test case #337 (397 total, 0 uniq crashes found)...[0m
+[1;94m[*] [0mFuzzing test case #345 (397 total, 0 uniq crashes found)...[0m
+[1;94m[*] [0mFuzzing test case #351 (400 total, 0 uniq crashes found)...[0m
+[1;94m[*] [0mFuzzing test case #361 (400 total, 0 uniq crashes found)...[0m
+[1;94m[*] [0mFuzzing test case #362 (400 total, 0 uniq crashes found)...[0m
+[1;94m[*] [0mFuzzing test case #364 (402 total, 0 uniq crashes found)...[0m
+[1;94m[*] [0mFuzzing test case #365 (403 total, 0 uniq crashes found)...[0m
+[1;94m[*] [0mFuzzing test case #367 (404 total, 0 uniq crashes found)...[0m
+[1;94m[*] [0mFuzzing test case #372 (405 total, 0 uniq crashes found)...[0m
+[1;94m[*] [0mFuzzing test case #373 (405 total, 0 uniq crashes found)...[0m
+[1;94m[*] [0mFuzzing test case #374 (411 total, 0 uniq crashes found)...[0m
+[1;94m[*] [0mFuzzing test case #375 (412 total, 0 uniq crashes found)...[0m
+[1;94m[*] [0mFuzzing test case #376 (412 total, 0 uniq crashes found)...[0m
+[1;94m[*] [0mFuzzing test case #377 (413 total, 0 uniq crashes found)...[0m
+[1;94m[*] [0mFuzzing test case #378 (413 total, 0 uniq crashes found)...[0m
+[1;94m[*] [0mFuzzing test case #379 (413 total, 0 uniq crashes found)...[0m
+[1;94m[*] [0mFuzzing test case #380 (414 total, 0 uniq crashes found)...[0m
+[1;94m[*] [0mFuzzing test case #381 (414 total, 0 uniq crashes found)...[0m
+[1;94m[*] [0mFuzzing test case #382 (414 total, 0 uniq crashes found)...[0m
+[1;94m[*] [0mFuzzing test case #383 (414 total, 0 uniq crashes found)...[0m
+[1;94m[*] [0mFuzzing test case #384 (414 total, 0 uniq crashes found)...[0m
+[1;94m[*] [0mFuzzing test case #385 (414 total, 0 uniq crashes found)...[0m
+[1;94m[*] [0mFuzzing test case #387 (414 total, 0 uniq crashes found)...[0m
+[1;94m[*] [0mFuzzing test case #388 (418 total, 0 uniq crashes found)...[0m
+[1;94m[*] [0mFuzzing test case #389 (418 total, 0 uniq crashes found)...[0m
+[1;94m[*] [0mFuzzing test case #390 (418 total, 0 uniq crashes found)...[0m
+[1;94m[*] [0mFuzzing test case #391 (418 total, 0 uniq crashes found)...[0m
+[1;94m[*] [0mFuzzing test case #392 (418 total, 0 uniq crashes found)...[0m
+[1;94m[*] [0mFuzzing test case #393 (418 total, 0 uniq crashes found)...[0m
+[1;94m[*] [0mFuzzing test case #394 (418 total, 0 uniq crashes found)...[0m
+[1;94m[*] [0mFuzzing test case #396 (418 total, 0 uniq crashes found)...[0m
+[1;94m[*] [0mFuzzing test case #398 (418 total, 0 uniq crashes found)...[0m
+[1;94m[*] [0mFuzzing test case #401 (419 total, 0 uniq crashes found)...[0m
+[1;94m[*] [0mFuzzing test case #402 (419 total, 0 uniq crashes found)...[0m
+[1;94m[*] [0mFuzzing test case #403 (420 total, 0 uniq crashes found)...[0m
+[1;94m[*] [0mFuzzing test case #405 (420 total, 0 uniq crashes found)...[0m
+[1;94m[*] [0mFuzzing test case #406 (420 total, 0 uniq crashes found)...[0m
+[1;94m[*] [0mFuzzing test case #408 (420 total, 0 uniq crashes found)...[0m
+[1;94m[*] [0mFuzzing test case #410 (420 total, 0 uniq crashes found)...[0m
+[1;94m[*] [0mFuzzing test case #411 (420 total, 0 uniq crashes found)...[0m
+[1;94m[*] [0mFuzzing test case #412 (420 total, 0 uniq crashes found)...[0m
+[1;94m[*] [0mFuzzing test case #414 (420 total, 0 uniq crashes found)...[0m
+[1;94m[*] [0mFuzzing test case #415 (422 total, 0 uniq crashes found)...[0m
+[1;94m[*] [0mFuzzing test case #416 (423 total, 0 uniq crashes found)...[0m
+[1;94m[*] [0mFuzzing test case #417 (424 total, 0 uniq crashes found)...[0m
+[1;94m[*] [0mFuzzing test case #419 (424 total, 0 uniq crashes found)...[0m
+[1;94m[*] [0mFuzzing test case #420 (424 total, 0 uniq crashes found)...[0m
+[1;94m[*] [0mFuzzing test case #421 (431 total, 0 uniq crashes found)...[0m
+[1;94m[*] [0mFuzzing test case #422 (434 total, 0 uniq crashes found)...[0m
+[1;94m[*] [0mFuzzing test case #423 (434 total, 0 uniq crashes found)...[0m
+[1;94m[*] [0mFuzzing test case #426 (434 total, 0 uniq crashes found)...[0m
+[1;94m[*] [0mFuzzing test case #428 (434 total, 0 uniq crashes found)...[0m
+[1;94m[*] [0mFuzzing test case #429 (435 total, 0 uniq crashes found)...[0m
+[1;94m[*] [0mFuzzing test case #430 (436 total, 0 uniq crashes found)...[0m
+[?25h[1;91m
+
++++ Testing aborted programmatically +++
+[0m[1;92m[+] [0mWe're done here. Have a nice day!
+[0m
+51.45user 77.69system 13:50.09elapsed 15%CPU (0avgtext+0avgdata 4628maxresident)k
+0inputs+18870704outputs (0major+1204minor)pagefaults 0swaps
+Child is executing...
+time afl-fuzz -i /tmp/QuickChick/195926/input -o /tmp/QuickChick/195926/output /tmp/QuickChick/195926/QuickChickb6f7db @@
+Parent is waiting for a child to finish....
+cp /tmp/QuickChick/195926/output/fuzzer_stats output/195926

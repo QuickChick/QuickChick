@@ -73,7 +73,8 @@ fileNameP = do
   _ <- many1 (noneOf "/")
   char '/'
   k <- skind <$> (string "fuzz" <|> string "rand")
-  string "_SSNI_"
+  char '_'
+  string "SSNI_" <|> string "seeded_SSNI_"
   m <- smode <$> (try (string "arbitrary") <|> string "arbmedium" <|> string "smart")
   char '_'
   xs <- many1 digit
@@ -81,6 +82,7 @@ fileNameP = do
   return (k, m, x)
 
 right (Right x) = x
+right x = error (show x)
 
 getIntegerInLine :: String -> String
 getIntegerInLine line =
@@ -102,7 +104,7 @@ parseOutputFuzz s =
   let times' = case times of
                  't' : _ -> let (_:_:x:_) = rest in x
                  _ -> times in
---  traceShow times' $ 
+--  traceShow (s, times, times') $ 
   right $ parse timeElapsedP times' times'
 
 timeElapsedP :: GenParser Char st Double
@@ -239,7 +241,8 @@ main = do
   (nr, mr, sr) <- parse_rand_dir "output_random_10M"
   fuzz    <- forM [1..5] $ \i -> parse_fuzz_dir $ "output_fuzz_run" ++ show i
   fuzz_arb <- parse_fuzz_dir "output_fuzz_arbitrary_1h"
-  fuzz_seeded <- parse_fuzz_dir "output_fuzz_arbitrary_1h_seeded"
+  fuzz_seeded  <- parse_fuzz_dir "output_fuzz_arbitrary_1h_seeded"
+  fuzz_seeded2 <- parse_fuzz_dir "output_fuzz_arbitrary_2h_seeded"
 
   -- Randoms
   let mkBench name times = Bench name [0..19] $ map calc_mttf_random times
@@ -249,12 +252,15 @@ main = do
 
   -- Fuzzs
   let afs  = (\(n,_,_) -> n) fuzz_arb
-      afss = (\(n,_,_) -> n) fuzz_seeded
+      afss1 = (\(n,_,_) -> n) fuzz_seeded
+      afss2 = (\(n,_,_) -> n) fuzz_seeded2
+      afss = transpose [afss1, afss2]
       mfs = transpose $ map (\(_,m,_) -> m) fuzz
       sfs = transpose $ map (\(_,_,s) -> s) fuzz
       mkFuzz name times = Bench name [0..19] $ map calc_mttf_fuzz times
       afb  = mkFuzz "naive-fuzz" (map return afs)
-      afbs = mkFuzz "naive-fuzz" (map return afss)
+      afbs = mkFuzz "naive-fuzz-seeded" (afss)
+--      afb' = mkFuzz "naive-fuzz-seeded2" (map return afs2)
       mfb = mkFuzz "med-fuzz" mfs
       sfb = mkFuzz "smart-fuzz" sfs
 
@@ -270,7 +276,7 @@ chart xlogger ylogger inputData = toRenderable layout
     where layout = layout_title .~ "Random vs Fuzz" 
                  $ layout_x_axis  . laxis_generate .~ scaledAxis (def{_la_labelf = \x -> map ("mutant id: " ++) ((_la_labelf def) x)}) (0, xlogger 20)
                  $ layout_y_axis  . laxis_generate .~ scaledAxis (def{_la_labelf = \x -> map (++ "sec") ((_la_labelf def) x)})
-                                                                 (0, ylogger ((maximum $ filter (< inf) $ concatMap btime inputData)))
+                                                                 (0, ylogger (1.2 * (maximum $ filter (< inf) $ concatMap btime inputData)))
                  $ layout_plots .~ lines
                  $ def
 
