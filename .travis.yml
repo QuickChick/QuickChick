@@ -32,7 +32,8 @@ os:
     - osx
 branches:
   except:
-  - FuzzChick
+  - /FuzzChick.*/
+  - coverage
 
 before_install:
     if [ $TRAVIS_OS_NAME = osx ]; then
