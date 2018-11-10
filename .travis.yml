@@ -24,7 +24,8 @@ os:
     - osx
 branches:
   except:
-  - FuzzChick
+  - /FuzzChick.*/
+  - coverage
 
 before_install:
     curl -L https://raw.githubusercontent.com/ocaml/ocaml-ci-scripts/master/.travis-ocaml.sh | sh
