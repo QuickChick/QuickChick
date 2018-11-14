@@ -4,6 +4,7 @@ src/Tactics.v
 src/Sets.v
 src/Nat_util.v
 src/RandomQC.v
+src/EnumerationQC.v
 src/RoseTrees.v
 src/LazyList.v
 src/GenLowInterface.v

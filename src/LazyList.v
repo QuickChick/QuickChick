@@ -22,6 +22,15 @@ Fixpoint lazy_append {A : Type} (l1 : LazyList A) (l2 : LazyList A) : LazyList A
   | lcons x l1' => lcons _ x (lazy (lazy_append (force l1') l2))
   end.
 
+Fixpoint lazy_take {A : Type} (n : nat) (l : LazyList A) : LazyList A :=
+  match n with
+  | 0 => lnil _
+  | S n' => match l with
+           | lnil => lnil _
+           | lcons h ts => lcons _ h (lazy (lazy_take n' (force ts)))
+           end
+  end.
+
 (* Functor instace for LazyList *)
 Fixpoint mapLazyList {A B : Type} (f : A -> B) (l : LazyList A) : LazyList B :=
   match l with

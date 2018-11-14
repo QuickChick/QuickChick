@@ -16,7 +16,7 @@ Import MonadNotation.
 Open Scope monad_scope.
 
 From QuickChick Require Import
-     GenLowInterface RandomQC RoseTrees Sets Tactics LazyList.
+     GenLowInterface RandomQC EnumerationQC RoseTrees Sets Tactics LazyList.
 
 Set Implicit Arguments.
 Unset Strict Implicit.
@@ -132,20 +132,15 @@ Module GenLow : GenLowInterface.Sig.
                 end).
 
 
-  Program Fixpoint lazy_rose_flatten {A : Type} (r : Rose (LazyList A)) : LazyList (Rose A) :=
+  Fixpoint lazy_rose_flatten {A : Type} (r : Rose (LazyList A)) : LazyList (Rose A) :=
     match r with
     | MkRose las ts =>
       a <- las;;
       lcons _ (MkRose a (lazy (LazyList_to_list (join_list_lazy_list (map lazy_rose_flatten (force ts)))))) (lazy (lnil _))
     end.
-  
-  Program Fixpoint promote {A : Type} (m : Rose (G A)) : G (Rose A) := _.
-  Next Obligation.
-    refine (MkGen (fun n r => _)).
-    Print GenType.
-    refine (_ (fmapRose (fun ga => run ga n r) m)).
-    apply lazy_rose_flatten.
-  Defined.
+
+  Fixpoint promote {A : Type} (m : Rose (G A)) : G (Rose A)
+    := MkGen (fun n r => lazy_rose_flatten (fmapRose (fun ga => run ga n r) m)).
   
   (* ZP: Split suchThatMaybe into two different functions
      to make a proof easier *)
@@ -196,6 +191,15 @@ Module GenLow : GenLowInterface.Sig.
 
   Definition choose {A : Type} `{ChoosableFromInterval A} (range : A * A) : G A :=
     MkGen (fun _ r => ret (fst (randomR range r))).
+
+  Definition enumR {A : Type} `{EnumFromInterval A} (range : A * A) : G A :=
+    MkGen (fun _ _ => enumFromTo (fst range) (snd range)).
+
+  Definition enum {A : Type} `{EnumN A} : G A :=
+    MkGen (fun n _ => enumN n).
+
+  Definition enum' {A : Type} `{EnumN A} (n : nat) : G A :=
+    MkGen (fun _ _ => enumN n).
   
   Definition sample (A : Type) (g : G A) : list A :=
     match g with

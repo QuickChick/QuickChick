@@ -17,7 +17,7 @@ Import MonadNotation.
 Open Scope monad_scope.
 
 From QuickChick Require Import
-     RandomQC RoseTrees Sets LazyList.
+     RandomQC EnumerationQC RoseTrees Sets LazyList.
 
 Set Implicit Arguments.
 Unset Strict Implicit.
@@ -74,6 +74,9 @@ Module Type Sig.
   Parameter suchThatMaybeOpt : forall {A : Type}, G (option A) -> (A -> bool) ->
                                              G (option A).
   Parameter choose : forall {A : Type} `{ChoosableFromInterval A}, (A * A) -> G A.
+  Parameter enumR : forall {A : Type} `{EnumFromInterval A} (range : A * A), G A.
+  Parameter enum : forall {A : Type} `{EnumN A}, G A.
+  Parameter enum' : forall {A : Type} `{EnumN A} (n : nat), G A.
   Parameter sample : forall {A : Type}, G A -> list A.
 
 
