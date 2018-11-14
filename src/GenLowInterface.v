@@ -59,15 +59,6 @@ Module Type Sig.
   Parameter sized : forall {A: Type}, (nat -> G A) -> G A.
   Parameter resize : forall {A: Type}, nat -> G A -> G A.
 
-  (* Series stuff for enumeration *)
-  Parameter series_sum : forall {A : Type} (s1 s2 : G A), G A.
-  Parameter series_prod : forall {A B : Type} (s1 : G A) (s2 : G B), G (A * B).
-
-  Parameter cons0 : forall {A} (con : A), G A.
-  Parameter cons1 : forall {A B} (m : G A) (con : A -> B), G B.
-  Parameter cons2 : forall {A B C} (ma : G A) (mb : G B) (con : A -> B -> C), G C.
-  Parameter cons3 : forall {A B C D} (ma : G A) (mb : G B) (mc : G C) (con : A -> B -> C -> D), G D.
-
   Parameter promote : forall {A : Type}, Rose (G A) -> G (Rose A).
   Parameter suchThatMaybe : forall {A : Type}, G A -> (A -> bool) ->
                                           G (option A).
@@ -75,8 +66,8 @@ Module Type Sig.
                                              G (option A).
   Parameter choose : forall {A : Type} `{ChoosableFromInterval A}, (A * A) -> G A.
   Parameter enumR : forall {A : Type} `{EnumFromInterval A} (range : A * A), G A.
-  Parameter enum : forall {A : Type} `{EnumN A}, G A.
-  Parameter enum' : forall {A : Type} `{EnumN A} (n : nat), G A.
+  Parameter enum : forall {A : Type} `{Serial A}, G A.
+  Parameter enum' : forall {A : Type} `{Serial A} (n : nat), G A.
   Parameter sample : forall {A : Type}, G A -> list A.
 
 

@@ -93,44 +93,6 @@ Module GenLow : GenLowInterface.Sig.
       | MkGen m => MkGen (fun _ => m n)
     end.
 
-  (* Union of two series *)
-  Definition series_sum {A : Type} (s1 s2 : G A) : G A
-    := MkGen (fun n r =>
-                let (r1, r2) := randomSplit r in
-                lazy_append (run s1 n r1) (run s2 n r2)).
-
-  (* Product of two series *)
-  Definition series_prod {A B : Type} (s1 : G A) (s2 : G B) : G (A * B)
-    := MkGen (fun n r =>
-                let (r1, r2) := randomSplit r in
-                x <- run s1 n r1;;
-                y <- run s2 n r2;;
-                ret (x, y)).
-
-  (* Helper functions for generating G's for constructors of "n" arguments *)
-  Definition cons0 {A} (con : A) : G A := MkGen (fun n r => ret con).
-  Definition cons1 {A B} (m : G A) (con : A -> B) : G B
-    := MkGen (fun n r =>
-                guard (Nat.ltb 0 n);;
-                a <- run m (n-1) r;;
-                ret (con a)).
-
-  Definition cons2 {A B C} (ma : G A) (mb : G B) (con : A -> B -> C) : G C
-    := MkGen (fun n r =>
-                guard (Nat.ltb 0 n);;
-                p <- run (series_prod ma mb) (n-1) r ;;
-                match p with
-                | (a, b) => ret (con a b)
-                end).
-
-  Definition cons3 {A B C D} (ma : G A) (mb : G B) (mc : G C) (con : A -> B -> C -> D) : G D
-    := MkGen (fun n r =>
-                guard (Nat.ltb 0 n);;
-                p <- run (series_prod ma (series_prod mb mc)) (n-1) r ;;
-                match p with
-                | (a, (b, c)) => ret (con a b c)
-                end).
-
 
   Fixpoint lazy_rose_flatten {A : Type} (r : Rose (LazyList A)) : LazyList (Rose A) :=
     match r with
@@ -195,11 +157,11 @@ Module GenLow : GenLowInterface.Sig.
   Definition enumR {A : Type} `{EnumFromInterval A} (range : A * A) : G A :=
     MkGen (fun _ _ => enumFromTo (fst range) (snd range)).
 
-  Definition enum {A : Type} `{EnumN A} : G A :=
-    MkGen (fun n _ => enumN n).
+  Definition enum {A : Type} `{Serial A} : G A :=
+    MkGen (fun n r => series n r).
 
-  Definition enum' {A : Type} `{EnumN A} (n : nat) : G A :=
-    MkGen (fun _ _ => enumN n).
+  Definition enum' {A : Type} `{Serial A} (n : nat) : G A :=
+    MkGen (fun _ r => series n r).
   
   Definition sample (A : Type) (g : G A) : list A :=
     match g with
