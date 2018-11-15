@@ -5,9 +5,11 @@ cache:
   directories:
   - $HOME/.opam
   - $HOME/Library/Caches/Homebrew
+  timeout: 1000
 env:
   global:
   - NJOBS=2
+  - OPAMVERBOSE=1
   - OPAMYES=true
   - OPAMKEEPBUILDDIR=true
   matrix:
@@ -28,6 +30,7 @@ install:
 - eval $(opam config env)
 - opam config var root
 - opam repo add coq-released https://coq.inria.fr/opam/released || true
+- opam upgrade
 - opam list
 - ocamlc -v
 
@@ -36,8 +39,8 @@ script:
 - echo 'Building QuickChick...';
   echo -en 'travis_fold:start:QuickChick.build';
   opam update;
-  travis_wait opam pin add . ;
-  travis_wait opam install coq-quickchick;
+  opam pin add . ;
+  opam install coq-quickchick;
   echo -en 'travis_fold:end:QuickChick.build'
 - echo 'Testing IFC...';
   echo -en 'travis_fold:start:QuickChick.test.ifc-basic';
@@ -63,3 +66,9 @@ script:
   echo -en 'travis_fold:start:QuickChick.remove';
   opam remove --force coq-quickchick;
   echo -en 'travis_fold:end:QuickChick.remove'
+
+notifications:
+  slack:
+    rooms:
+      secure: Sk34Z1q5T/Zz0zfe4KcIVF2qhI3UkkE7Uo6bs9jcB7+KVynzt9Dqe9ie1oNtbtl5UOjxb8KsdN+dbu6T6keRin8BpCvMS6tXTjjGEWP81JYXVoJQO1T5iuV5v67/6G092qijHVG6MBtJPchgdxTq9IYVW1lr0bqNQrf5ceJ94X3XLbSX0olwqguGkmmdw+duy0UkLDc+IzGR2Cfpljb/esfcwsrJNZck7j+lai4/DTITTN/Q8MMjpuiXPftcXx0iXUllXNxdctd4c1IvKM5iy6ecp8AP4SOB2Re++rDqcIY75ShDHDAEMcYUC7XcSuxfAWHqTUiuUHoVFBV9pKbFo3fQFGIebtDba2y7c7Bf1guOyoJ839I9752jKx82OOGmxqOZDXNUYuBI6Kr1Kg/V1MJE/ITTzl7qVC5T6LGyEGImExR5R/JLAQOJETPPZ4m986GroiVdUPwSl8LOxKmW8rAKScQWxLJi5JxQCqMXgswcbWlBaRHa5klklEvSSGqvRMbhDIXOtfSDJVSrk/JJztb7wb1wGGV2d/3bpQ7E4xxmrKDunSguxNoVmLGoXK9k3hvDx7+HCLpjPXrUNgk6g1WnP5cVaEA2HKyfzw40/2uPaGKxu3//OCE3CXDRlENKkxSMgEEo3XLraA12gY2mT5WSMyqweenHOsvdzUnGQZQ=
+    on_success: :change
