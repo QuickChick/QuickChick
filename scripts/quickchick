@@ -18,8 +18,8 @@ xargs -n 1 -I {} quickchick-expectfailure ./"$1" {} < $QC_ALL_MUTANTS_FILE
 
 if [ "$2" != "" ]
 then
-  N_MUTANTS=$(wc -l $QC_ALL_MUTANTS_FILE|grep -o "^[0-9]*")
-  if [ $2 -ne $N_MUTANTS ]
+  N_MUTANTS=$(wc -l $QC_ALL_MUTANTS_FILE|egrep -o "[0-9]+")
+  if [ -z "$N_MUTANTS" ] || [ $2 -ne $N_MUTANTS ]
   then
     echo "Unexpected number of mutants: $N_MUTANTS (expected $2)"
     exit 1

@@ -32,6 +32,10 @@ quickChickTool
 .DS_Store
 _build/
 quickChickTool.byte
+src/driver.ml
+src/quickChick.ml
+src/tactic_quickchick.ml
+src/weightmap.ml
 src/quickChickToolLexer.ml
 src/quickChickToolParser.ml
 src/quickChickToolParser.mli
