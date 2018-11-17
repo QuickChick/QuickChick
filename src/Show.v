@@ -10,6 +10,8 @@ Import ListNotations.
 Local Open Scope program_scope.
 Local Open Scope string_scope.
 
+Export Coq.Strings.String.StringSyntax.
+
 (* This makes just the [%string] key available to [Derive Show]. *)
 Delimit Scope string_scope with string.
 
