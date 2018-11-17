@@ -251,7 +251,8 @@ let gather_all_vs_from_dir fs =
 open CoqProject_file
 
 let vs_from_file f =
-  let project = CoqProject_file.read_project_file f in
+  let warning_fn x = Feedback.msg_warning Pp.(str x) in
+  let project = CoqProject_file.read_project_file ~warning_fn f in
   List.map (fun s -> match s with {thing = str; _} -> str)
     project.v_files
 
