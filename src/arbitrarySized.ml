@@ -39,11 +39,14 @@ let arbitrarySized_body (ty_ctr : ty_ctr) (ctrs : ctr_rep list) iargs =
     (fun (aux_arb, [size]) ->
       gMatch (gVar size)
         [(injectCtr "O", [],
-          fun _ -> oneof (List.map (create_for_branch tyParams aux_arb size) bases))
+          fun _ -> (oneof' (List.map (
+                                         fun x -> (gFunTyped [("_tt", gUnit)] (fun _ -> 
+                                         create_for_branch tyParams aux_arb size x))) bases)))
         ;(injectCtr "S", ["size'"],
-          fun [size'] -> frequency (List.map (fun (ctr,ty') ->
-                                        (Weightmap.lookup_weight ctr size',
-                                         create_for_branch tyParams aux_arb size' (ctr,ty'))) ctrs))
+          fun [size'] -> (frequency' (List.map (fun (ctr,ty') ->
+                                                   (Weightmap.lookup_weight ctr size',
+                                                    gFunTyped [("_tt", gUnit)] (fun _ -> 
+                                         create_for_branch tyParams aux_arb size' (ctr,ty')))) ctrs)))
     ])
     (fun x -> gVar x)
   
@@ -52,6 +55,7 @@ let arbitrarySized_decl ty_ctr ctrs iargs =
   let arb_body = arbitrarySized_body ty_ctr ctrs iargs in
   let arbitrary_decl = gFun ["s"] (fun [s] -> gApp arb_body [gVar s]) in
 
+  debug_coq_expr arb_body;
   gRecord [("arbitrarySized", arbitrary_decl)]
 
 

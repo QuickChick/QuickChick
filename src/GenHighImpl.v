@@ -83,7 +83,7 @@ Definition oneOf_ {A : Type} (def: G A) (gs : list (G A)) : G A :=
 Definition oneof {A} :=
   @deprecate (G A -> list (G A) -> G A) "oneof" "oneOf_" oneOf_.
 
-Fixpoint pick {A : Type} (def : G A) (xs : list (nat * G A)) n : nat * G A :=
+Fixpoint pick {A : Type} (def : A) (xs : list (nat * A)) n : nat * A :=
   match xs with
     | nil => (0, def)
     | (k, x) :: xs =>
@@ -1344,6 +1344,20 @@ Proof.
     exists a. split. by []. exists b. split; by [].
 Qed.    
 
+Definition thunkGen {A} (x : nat * G A) :=
+  let (n,a) := x in (n, fun (_ : unit) => a).
+Definition forceGen {A} (g : G (unit -> G A)) : G A :=
+  bindGen g (fun x => x tt).
+
+Definition oneOf' {A : Type} (def: unit -> G A) (gs : list (unit -> G A)) : G A :=
+  (bindGen (choose (0, length gs - 1)) (fun n => (nth def gs n) tt)).
+
+Definition freq' {A : Type} (def : unit -> G A) (gs : list (nat * (unit -> G A)))
+: G A :=
+  let tot := sum_fst gs in
+  bindGen (choose (0, tot-1)) (fun n =>
+  @snd _ _ (pick def gs n) tt).
+
 Module QcDefaultNotation.
 
 Notation " 'elems' [ x ] " := (elements x (cons x nil)) : qc_scope.
@@ -1364,7 +1378,7 @@ Notation " 'freq' [ x ] " := (frequency x nil) : qc_scope.
 Notation " 'freq' [ ( n , x ) ; y ] " :=
   (frequency x (cons (n, x) (cons y nil))) : qc_scope.
 Notation " 'freq' [ ( n , x ) ; y ; .. ; z ] " :=
-  (frequency x (cons (n, x) (cons y .. (cons z nil) ..))) : qc_scope.
+  ((frequency x (cons ( (n, x)) (cons ( y) .. (cons ( z) nil) ..)))) : qc_scope.
 Notation " 'freq' ( ( n , x ) ;; l ) " :=
   (frequency x (cons (n, x) l)) (at level 1, no associativity) : qc_scope.
 

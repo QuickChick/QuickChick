@@ -8,6 +8,10 @@ let returnGen c = gApp (gInject "returnGen") [c]
 let bindGen cg xn cf = 
   gApp (gInject "bindGen") [cg; gFun [xn] (fun [x] -> cf x)]
 
+let forceGen c = gApp (gInject "forceGen") [c]
+let thunkGen c = gApp (gInject "thunkGen") [c]
+
+  
 let bindGenOpt cg xn cf = 
   gApp (gInject "bindGenOpt") [cg; gFun [xn] (fun [x] -> cf x)]
 
@@ -17,12 +21,26 @@ let oneof l =
   | [c] -> c
   | c::cs -> gApp (gInject "oneOf_") [c; gList l]
 
+let oneof' l =
+  match l with
+  | [] -> failwith "oneof used with empty list"
+  | [c] -> c
+  | c::cs -> gApp (gInject "oneOf'") [c; gList l]
+
+           
 let frequency l =
   match l with
   | [] -> failwith "frequency used with empty list"
   | [(_,c)] -> c
   | (_,c)::cs -> gApp (gInject "freq_") [c; gList (List.map gPair l)]
 
+let frequency' l =
+  match l with
+  | [] -> failwith "frequency used with empty list"
+  | [(_,c)] -> c
+  | (_,c)::cs -> gApp (gInject "freq'") [c; gList (List.map gPair l)]
+
+               
 let backtracking l = gApp (gInject "backtrack") [gList (List.map gPair l)]
 let uniform_backtracking l = backtracking (List.combine (List.map (fun _ -> gInt 1) l) l)
 

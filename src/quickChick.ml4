@@ -215,7 +215,7 @@ let _ =
         Sys.command (Printf.sprintf "cp _seeds/* %s" input_dir)
       else
         Sys.command (Printf.sprintf "echo QuickChick > %s/tmp" input_dir);
-      let timeout = 60 * 60 (* seconds *) in
+      let timeout = 2 * 60 * 60 (* seconds *) in
 
       begin match Unix.fork() with
       | 0 ->
