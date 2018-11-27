@@ -57,15 +57,16 @@ let link_files = []
 
 (* TODO: in Coq 8.5, fetch OCaml's path from Coq's configure *)
 (* FIX: There is probably a more elegant place to put this flag! *)
-let ocamlopt = "ocamlopt -unsafe-string"
+let ocamlopt = "ocamlfind ocamlopt -unsafe-string"
+(* let ocamlopt = "ocamlopt -unsafe-string" *)
 let ocamlc = "ocamlc -unsafe-string"
 
-let comp_ml_cmd fn out =
+let comp_ml_cmd dir fn out =
   let path = Lazy.force path in
   let link_files = List.map (Filename.concat path) link_files in
   let link_files = String.concat " " link_files in
-  Printf.sprintf "%s -rectypes -w a -I %s -I %s %s %s -o %s" ocamlopt
-    (Filename.dirname fn) path link_files fn out
+  Printf.sprintf "%s -linkpkg -package bisect_ppx -w a -I %s -I %s %s %s -o %s" ocamlopt
+    dir path link_files fn out
 
 (*
 let comp_mli_cmd fn =
@@ -76,7 +77,7 @@ let comp_mli_cmd fn =
   let path = Lazy.force path in
   let link_files = List.map (Filename.concat path) link_files in
   let link_files = String.concat " " link_files in
-  Printf.sprintf "%s -rectypes -w a -I %s -I %s %s %s" ocamlopt
+  Printf.sprintf "%s -package bisect_ppx -w a -I %s -I %s %s %s" ocamlopt
     (Filename.dirname fn) path link_files fn
 
 
@@ -155,8 +156,8 @@ let define_and_run c env evd =
   flush_all ();
   *)
   (* Compile the (empty) .mli *)
-  if Sys.command (comp_mli_cmd mlif) <> 0 then CErrors.user_err (str "Could not compile mli file" ++ fnl ());
-  if Sys.command (comp_ml_cmd mlf execn) <> 0 then
+  (* if Sys.command (comp_mli_cmd mlif) <> 0 then CErrors.user_err (str "Could not compile mli file" ++ fnl ()); *)
+  if Sys.command (comp_ml_cmd (Filename.dirname mlf) (String.concat " " [mlif; mlf]) execn) <> 0 then
     (CErrors.user_err (str "Could not compile test program" ++ fnl ()); None)
 
   (** Run the test *)
@@ -182,6 +183,8 @@ let define_and_run c env evd =
          | Unix.WSTOPPED i ->
             CErrors.user_err (str (Printf.sprintf "Stopped (%d)" i) ++ fnl ())
          end;
+         (* Generate coverage report *)
+         Sys.command "bisect-ppx-report -I . -html coverage/ bisect*out";
          let output = String.concat "\n" (List.rev !builder) in
          Some output
 
@@ -209,7 +212,7 @@ let runTest c env evd =
 
 let run f args =
   begin match args with
-  | qc_text :: _ -> Printf.printf "QuickChecking %s\n"
+  | qc_text :: _ -> Printf.printf "QuickChecking bisect %s\n"
                       (Pp.string_of_ppcmds (Ppconstr.pr_constr_expr qc_text));
                       flush_all()
   | _ -> failwith "run called with no arguments"
@@ -246,6 +249,7 @@ let run_with f args p =
 
 VERNAC COMMAND EXTEND QuickCheck CLASSIFIED AS SIDEFF
   | ["QuickCheck" constr(c)] ->     [run quickCheck [c]]
+  | ["QuickC" constr(c)] ->     [run quickCheck [c]]
   | ["QuickCheckWith" constr(c1) constr(c2)] ->     [run quickCheckWith [c1;c2]]
 END;;
 
