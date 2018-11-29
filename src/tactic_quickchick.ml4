@@ -40,7 +40,7 @@ let quickchick_goal =
 
     Printf.printf "So far so good 2.5\n"; flush stdout;
     
-    let s = QuickChick.define_and_run to_run e evd in
+    let s = QuickChick.define_and_run to_run e evd "tactic" in
 
     Printf.printf "So far so good3\n"; flush stdout;
     

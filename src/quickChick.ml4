@@ -61,10 +61,16 @@ let ocamlopt = "ocamlfind ocamlopt -unsafe-string"
 (* let ocamlopt = "ocamlopt -unsafe-string" *)
 let ocamlc = "ocamlc -unsafe-string"
 
+let shell_escape st =
+  let escape_regex = Str.regexp "\\( \\|(\\|)\\|\"\\|'\\)" in
+  Str.global_replace escape_regex "\\\\\\1" st;;
+
 let comp_ml_cmd dir fn out =
   let path = Lazy.force path in
   let link_files = List.map (Filename.concat path) link_files in
   let link_files = String.concat " " link_files in
+  Printf.printf "%s -linkpkg -package bisect_ppx -w a -I %s -I %s %s %s -o %s" ocamlopt
+    dir path link_files fn out;
   Printf.sprintf "%s -linkpkg -package bisect_ppx -w a -I %s -I %s %s %s -o %s" ocamlopt
     dir path link_files fn out
 
@@ -77,6 +83,8 @@ let comp_mli_cmd fn =
   let path = Lazy.force path in
   let link_files = List.map (Filename.concat path) link_files in
   let link_files = String.concat " " link_files in
+  Printf.printf "%s -package bisect_ppx -w a -I %s -I %s %s %s" ocamlopt
+    (Filename.dirname fn) path link_files fn;
   Printf.sprintf "%s -package bisect_ppx -w a -I %s -I %s %s %s" ocamlopt
     (Filename.dirname fn) path link_files fn
 
@@ -108,17 +116,17 @@ let define c env evd =
 
 (* [$TMP/QuickChick/$TIME/QuickChick.ml],
    where [$TIME] is the current time in format [HHMMSS]. *)
-let new_ml_file () =
+let new_ml_file name =
   let tm = Unix.localtime (Unix.time ()) in
   let ts = Printf.sprintf "%02d%02d%02d" tm.Unix.tm_hour tm.Unix.tm_min tm.Unix.tm_sec in
   let temp_dir = Filename.concat temp_dirname ts in
   mkdir_ temp_dir;
-  Filename.temp_file ~temp_dir "QuickChick" ".ml"
+  Filename.temp_file ~temp_dir ("QuickChick_" ^ name ^ "_") ".ml"
 
-let define_and_run c env evd =
+let define_and_run c env evd name =
   (** Extract the term and its dependencies *)
   let main = define c env evd in
-  let mlf = new_ml_file () in
+  let mlf = shell_escape (new_ml_file name) in
   let execn = Filename.chop_extension mlf in
   let mlif = execn ^ ".mli" in
   let warnings = CWarnings.get_flags () in
@@ -196,7 +204,7 @@ let define_and_run c env evd =
  *)
 
 (* TODO: clean leftover files *)
-let runTest c env evd =
+let runTest c env evd name =
   (** [c] is a constr_expr representing the test to run,
       so we first build a new constr_expr representing
       show c **)
@@ -208,20 +216,23 @@ let runTest c env evd =
   let (c,_evd) = interp_constr env evd c in
 
   (* Printf.printf "So far so good?\n"; flush stdout; *)
-  define_and_run c env evd
+  define_and_run c env evd name
 
 let run f args =
   begin match args with
-  | qc_text :: _ -> Printf.printf "QuickChecking bisect %s\n"
-                      (Pp.string_of_ppcmds (Ppconstr.pr_constr_expr qc_text));
-                      flush_all()
+  | qc_text :: _ -> let name = (Pp.string_of_ppcmds (Ppconstr.pr_constr_expr qc_text)) in
+                    Printf.printf "QuickChecking %s\n" name;
+                    flush_all();
+
+                    let args = List.map (fun x -> (x,None)) args in
+                    let c = CAst.make @@ CApp((None,f), args) in
+                    let env = Global.env () in
+                    let evd = Evd.from_env env in
+                    let name = (Pp.string_of_ppcmds (Ppconstr.pr_constr_expr qc_text)) in
+                    ignore (runTest c env evd name)
+
   | _ -> failwith "run called with no arguments"
-  end;
-  let args = List.map (fun x -> (x,None)) args in
-  let c = CAst.make @@ CApp((None,f), args) in
-  let env = Global.env () in
-  let evd = Evd.from_env env in
-  ignore (runTest c env evd)
+  end
 
 let set_debug_flag (flag_name : string) (mode : string) =
   let toggle =
