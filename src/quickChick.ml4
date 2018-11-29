@@ -63,7 +63,7 @@ let ocamlc = "ocamlc -unsafe-string"
 
 let shell_escape st =
   let escape_regex = Str.regexp "\\( \\|(\\|)\\|\"\\|'\\)" in
-  Str.global_replace escape_regex "\\\\\\1" st;;
+  Str.global_replace escape_regex "" st;;
 
 let comp_ml_cmd dir fn out =
   let path = Lazy.force path in
