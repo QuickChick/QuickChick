@@ -38,6 +38,9 @@ Parameter vectorOf : forall {A : Type}, nat -> G A -> G (list A).
 Parameter listOf : forall {A : Type}, G A -> G (list A).
 Parameter elements : forall {A : Type}, A -> list A -> G A.
 Parameter elems_ : forall {A : Type}, A -> list A -> G A.
+Parameter oneOf' : forall {A : Type} (def: unit -> G A) (gs : list (unit -> G A)), G A.
+Parameter freq'  : forall {A : Type} (def : unit -> G A) (gs : list (nat * (unit -> G A))), G A.
+
 
 (* Correctness for derived generators *)
 Parameter semLiftGen :

@@ -18,13 +18,13 @@ let bindGenOpt cg xn cf =
 let oneof l =
   match l with
   | [] -> failwith "oneof used with empty list"
-  | [c] -> c
+  | [c] -> c 
   | c::cs -> gApp (gInject "oneOf_") [c; gList l]
 
 let oneof' l =
   match l with
   | [] -> failwith "oneof used with empty list"
-  | [c] -> c
+  | [c] -> gApp c [gTT]
   | c::cs -> gApp (gInject "oneOf'") [c; gList l]
 
            
@@ -37,7 +37,7 @@ let frequency l =
 let frequency' l =
   match l with
   | [] -> failwith "frequency used with empty list"
-  | [(_,c)] -> c
+  | [(_,c)] -> gApp c [gTT]
   | (_,c)::cs -> gApp (gInject "freq'") [c; gList (List.map gPair l)]
 
                
