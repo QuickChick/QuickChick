@@ -68,6 +68,7 @@ Module Type Sig.
   Parameter enumR : forall {A : Type} `{EnumFromInterval A} (range : A * A), G A.
   Parameter enum : forall {A : Type} `{Serial A}, G A.
   Parameter enum' : forall {A : Type} `{Serial A} (n : nat), G A.
+  Parameter sumG : forall {A : Type} (lga : LazyList (G A)), G A.
   Parameter sample : forall {A : Type}, G A -> list A.
 
 

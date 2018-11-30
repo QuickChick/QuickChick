@@ -162,6 +162,9 @@ Module GenLow : GenLowInterface.Sig.
 
   Definition enum' {A : Type} `{Serial A} (n : nat) : G A :=
     MkGen (fun _ r => series n r).
+
+  Fixpoint sumG {A : Type} (lga : LazyList (G A)) : G A :=
+    MkGen (fun n r => bind_helper lga n r).
   
   Definition sample (A : Type) (g : G A) : list A :=
     match g with
