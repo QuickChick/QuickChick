@@ -285,7 +285,7 @@ Definition gen_variation_arbitrary : G (option Variation) :=
   else
     returnGen None)).
 
-Extract Constant defNumTests => "10000000".
+Extract Constant defNumTests => "1000000".
 
 Definition prop_SSNI_arbitrary t r :=
    (prop SSNI gen_variation_arbitrary t r).
@@ -301,3 +301,4 @@ Definition gen_variation_arb_medium : G (option Variation) :=
 Definition prop_SSNI_arbmedium t r :=
   (prop SSNI gen_variation_arb_medium t r).
 
+QuickChick (testMutantX prop_SSNI_smart exp_result_random 0).
