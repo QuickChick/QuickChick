@@ -40,3 +40,4 @@ __pycache__
 platform.info
 Tmp*
 ParseResults
+output/
