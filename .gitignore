@@ -39,3 +39,4 @@ src/quickChickToolParser.mli
 __pycache__
 platform.info
 Tmp*
+ParseResults
