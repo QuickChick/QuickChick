@@ -358,5 +358,5 @@ Fixpoint testRunner (tests : list Test) : IO unit :=
   end.
 
 (* Actually run the tests. (Only meant for extraction.) *)
-Definition runTests (tests : list Test) : unit :=
+Definition runTests (tests : list Test) : io_unit :=
   unsafe_run (testRunner tests).
