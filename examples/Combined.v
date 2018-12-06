@@ -29,6 +29,11 @@ From ExtLib Require Import Monads. Import MonadNotation.
 
    - gEnum enumerates all lists up to length 10 with elements 0, 1,
      and 2.
+
+   - gRandomFirst shows a different way to combine enumeration and
+     random testing, in this case it randomly generates a length for
+     the lists, and then enumerates all possible lists of that length
+     with elements 0, 1, and 2
  *)
 Definition gMixed : G (list nat) :=
   x <- enumR (0, 10);;
@@ -40,13 +45,18 @@ Definition gRand : G (list nat) :=
 
 Definition gEnum : G (list nat) :=
   n <- enumR (0, 10);;
-  vectorOf n (enumR (0, 2)).
+    vectorOf n (enumR (0, 2)).
+
+Definition gRandomFirst : G (list nat) :=
+  x <- choose (0, 10);;
+    vectorOf x (enumR (0, 2)).
 
 Definition token_prop (x : list nat) := collect (length x) true.
 
 QuickChick (forAll gRand token_prop).
 QuickChick (forAll gMixed token_prop).
 QuickChick (forAll gEnum token_prop).
+QuickChick (forAll gRandomFirst token_prop).
 (* Note: Enumeration counts for total number of tests. *)
 
 
