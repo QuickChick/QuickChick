@@ -5,8 +5,12 @@ Require Import Omega.
 Require Import mathcomp.ssreflect.ssreflect.
 From mathcomp Require Import ssrnat ssrbool eqtype div.
 
-(* N.B.: this pulls in [ExtrOcamlString] (ExtractionQC also does) *)
-From SimpleIO Require Import CoqPervasives.
+From ExtLib Require Import
+     Structures.Monad.
+Import MonadNotation.
+Local Open Scope monad_scope.
+
+From SimpleIO Require Import SimpleIO.
 
 From QuickChick Require Import RoseTrees RandomQC GenLow GenHigh SemChecker.
 From QuickChick Require Import Show Checker State Classes.
@@ -331,8 +335,6 @@ Definition quickCheck {prop : Type} {_ : Checkable prop}
            (p : prop) : Result :=
   quickCheckWith stdArgs p.
 
-Import IONotations.
-
 (* A named test property with parameters. *)
 Inductive Test : Type :=
 | QuickChickTest : string -> Args -> Checker -> Test.
@@ -350,7 +352,7 @@ Definition qc {prop : Type} {_ : Checkable prop}
 (* IO action that runs the tests. *)
 Fixpoint testRunner (tests : list Test) : IO unit :=
   match tests with
-  | [] => IOMonad.ret tt
+  | [] => ret tt
   | QuickChickTest name args test :: tests =>
     print_endline ("Checking " ++ name ++ "...");;
     print_endline (show (quickCheckWith args test));;
@@ -359,4 +361,4 @@ Fixpoint testRunner (tests : list Test) : IO unit :=
 
 (* Actually run the tests. (Only meant for extraction.) *)
 Definition runTests (tests : list Test) : io_unit :=
-  unsafe_run (testRunner tests).
+  IO.unsafe_run (testRunner tests).
