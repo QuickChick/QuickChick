@@ -1,8 +1,7 @@
 From Coq Require Extraction.
 From Coq Require Import String.
 
-From SimpleIO Require Import
-     OcamlPervasives OcamlString.
+From SimpleIO Require Import SimpleIO.
 
 (* Simple mutation testing framework for Coq.
 
