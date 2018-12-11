@@ -29,6 +29,7 @@ https://github.com/DeepSpec/dsss17
     * OCaml >= 4.04.0
     * mathcomp-ssreflect-1.6.4
     * coq-ext-lib-0.9.7
+    * coq-simple-io-0.2
 
 ### Installation
 
