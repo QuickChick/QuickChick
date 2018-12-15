@@ -2,9 +2,11 @@ From QuickChick Require Import QuickChick.
 From Coq Require Import List String ExtrOcamlNatInt.
 Import ListNotations.
 
+Local Instance this_section : Mutant.section := "test"%string.
+
 Definition prop_example :=
-  let x := mutant! 10 20 in
-  let y := mutants! 1 (2,3,4) in
+  let x := 10 mutant! 20 in
+  let y := 1 mutant: "foo" 2 mutant! 3 mutant: "bar" 4 in
   whenFail (show x ++ " + " ++ show y ++ " <> 11")%string
            (x + y = 11 ?).
 

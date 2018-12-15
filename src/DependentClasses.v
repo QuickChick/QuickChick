@@ -11,7 +11,7 @@ Import ListNotations.
 Import QcDefaultNotation.
 
 Open Scope qc_scope.
-Open Scope string.
+Local Open Scope string.
 
 Set Bullet Behavior "Strict Subproofs".
 (** * Correctness of dependent generators *)
@@ -115,12 +115,9 @@ Instance GenSuchThatCorrectOptOfSuchThatCorrect
 Instance SizeMonotonicOptofSizeMonotonic {A} (g : G (option A))
          {H : SizeMonotonic g} : SizeMonotonicOpt g.
 Proof.
-  constructor. intros.
-  eapply setI_subset_compat.
-  now eapply subset_refl.
-  eapply H; eauto.
+  intros s1 s2 Hs a.
+  eapply monotonic; eauto.
 Qed.
-
 
 (** * Coercions from sized to unsized generators *)
 

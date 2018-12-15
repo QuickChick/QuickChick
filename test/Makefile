@@ -1,4 +1,4 @@
-TESTS=mutation.test
+TESTS=mutation.test plugin.test
 
 .PHONY: test $(TESTS)
 
@@ -8,3 +8,6 @@ MUTATION=mutation
 
 mutation.test:
 	cd $(MUTATION)/; sh $(MUTATION).sh
+
+plugin.test:
+	cd plugin/; sh plugin.sh

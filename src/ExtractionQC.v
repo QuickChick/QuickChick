@@ -70,7 +70,7 @@ Extract Constant trace =>
    let s = Bytes.create (List.length l) in
    let rec copy i = function
     | [] -> s
-    | c :: l -> s.[i] <- c; copy (i+1) l
+    | c :: l -> Bytes.set s i c; copy (i+1) l
    in Bytes.to_string (copy 0 l)); flush stdout; fun y -> y)".
 
 Set Extraction AccessOpaque.

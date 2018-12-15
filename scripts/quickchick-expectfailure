@@ -12,6 +12,6 @@ LOG_FILE=$QC_OUT_DIR/testlog-${1##*/}-${2##*/}
 
 echo "Mutant $2: Testing..."
 QC_MUTANT=$2 $1 > $LOG_FILE
-grep -q '^*** Failed' $LOG_FILE \
+grep -q '^\*\*\* Failed' $LOG_FILE \
   || (echo "Mutant $2: Tests passed, but failure was expected."; exit 1)
 echo "Mutant $2: Killed!"

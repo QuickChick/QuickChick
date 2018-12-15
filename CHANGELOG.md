@@ -8,6 +8,7 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
 ### Fixed
 - Examples use new generator combinators.
 - Determine C source files with `*.c` rather than `*c`.
+- Derive instances properly regardless of interpretation scope.
 
 ### Deprecated
 - `-exclude` option in `quickChickTool` is deprecated. Use `-include` instead.

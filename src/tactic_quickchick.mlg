@@ -9,9 +9,7 @@ DECLARE PLUGIN "quickchick_plugin"
 {
 
 open Pp
-open Error
 open Constrexpr
-open Constrexpr_ops
 
 let quickchick_goal =
   Proofview.Goal.enter begin fun gl ->
@@ -20,8 +18,47 @@ let quickchick_goal =
     let c = Proofview.Goal.concl gl in
     let e = Proofview.Goal.env gl in
     let evd = Evd.from_env e in
-    let ct = Constrextern.extern_constr false e evd c in
 
+    (* Make an evar with the goal as the type *)
+    let evar_info = Evd.make_evar (Environ.named_context_val e) (EConstr.to_constr evd c) in
+    let evd, evar = Evd.new_evar evd evar_info in
+
+    Printf.printf "So far so good\n"; flush stdout;
+    
+    (* Externalize it *)
+    let ct = Constrextern.extern_constr false e evd (EConstr.mkEvar (evar , [||])) in
+
+    (* Construct : show (quickCheck (_ : ct)) *)
+    let qct =
+      (CAst.make @@ CApp((None,QuickChick.quickCheck), [ct, None])) in    
+    let sqct = CAst.make @@ CApp((None,QuickChick.show), [(qct,None)]) in
+
+    Printf.printf "So far so good2\n"; flush stdout;
+
+    (* From here on I've tried a couple of things. 
+       Calling run_test directly with qct. Fails.
+       Internalize here before calling define and run, fails.
+
+       It always seems to fail in the 'interp' phase, with an 
+       unknown existential variable error. So I'm probably doing something
+       stupid with the evar maps *)
+    let evd, to_run = Constrintern.interp_open_constr e evd sqct in
+
+    Printf.printf "So far so good 2.5\n"; flush stdout;
+    
+    let s = QuickChick.define_and_run to_run e evd in
+
+    Printf.printf "So far so good3\n"; flush stdout;
+    
+    match s with
+    | Some bytes ->
+       Tacticals.New.tclZEROMSG (str ("\n" ^ bytes) ++ fnl ())
+    | None -> Tacticals.New.tclZEROMSG (str "Something went wrong. Report." ++ fnl ())
+
+    end
+
+    
+    (*
     (* Admit a constant with that type *)
     let tmpid = QuickChick.fresh_name "temporary_constant" in
     let _interp_st = Vernacentries.interp (CAst.make @@ Vernacexpr.VernacExpr ([],
@@ -41,12 +78,31 @@ let quickchick_goal =
 
     let s = QuickChick.runTest
             (CAst.make @@ CApp((None,QuickChick.quickCheck), [CAst.make @@ CRef (Libnames.qualid_of_ident tmpid,None), None])) in
+    (* I need to create an existential of type Checkable ct, and then
+       call QuickChick.quickChick on that in the ast, before running
+       QuickChick.runTest on the constr_expr. *)
 
-    match s with
-    | Some bytes ->
-       Tacticals.New.tclZEROMSG (str ("\n" ^ bytes) ++ fnl ())
-    | None -> Tacticals.New.tclZEROMSG (str "Something went wrong. Report." ++ fnl ())
+    
+    (*
 
+       HACK (there *has* to be a better way): 
+         (\x : Checkable ct -> x) _ *)
+
+    let base = Names.Id.of_string "x" in
+    let is_visible_name id =
+      try
+        ignore (Nametab.locate (Libnames.qualid_of_ident id));
+        true
+      with Not_found -> false
+    in
+    (** Safe fresh name generation. *)
+    let xid = Namegen.next_ident_away_from base is_visible_name in
+
+    let binder_list = [CLocalAssum ([CAst.make @@ Names.Name xid], Default Explicit, ct)]  in
+    let f_body = CAst.make @@ CRef (CAst.make @@ Libnames.Ident xid,None) in
+    let f = mkCLambdaN binder_list f_body in
+    let hack_value = mkAppC (f , [ CAst.make @@ CEVarHole (None, Misctypes.IntroAnonymous, None) ] ) in
+     *)
 (*
 
     (* Refactor - needs to see internals... *)
@@ -60,7 +116,7 @@ let quickchick_goal =
     (** Safe fresh name generation. *)
     let xid = Namegen.next_ident_away_from base is_visible_name in
 
-    let bind_list = [LocalRawAssum ([(Loc.dummy_loc, Name xid)], Default Explicit, CHole (Loc.dummy_loc, None, Misctypes.IntroAnonymous, None))] in
+
     let f_body = mkAppC (QuickChick.show, [mkAppC (QuickChick.quickCheck, [mkAppC (QuickChick.mk_ref "checker", [ CRef (Ident ((Loc.dummy_loc, xid)),None) ])])]) in
     let f = mkCLambdaN Loc.dummy_loc bind_list f_body in
 
@@ -72,7 +128,6 @@ let quickchick_goal =
  *)
 
 
-  end
 
 (*
     let concl = Proofview.Goal.concl gl in

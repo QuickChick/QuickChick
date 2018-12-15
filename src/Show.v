@@ -7,11 +7,14 @@ From Coq Require Import
      ZArith.
 
 Import ListNotations.
-Open Scope program_scope.
+Local Open Scope program_scope.
+Local Open Scope string_scope.
+
+(* This makes just the [%string] key available to [Derive Show]. *)
+Delimit Scope string_scope with string.
 
 Definition newline := String "010" ""%string.
 
-Local Open Scope string.
 Class Show (A : Type) : Type :=
 {
   show : A -> string
@@ -247,8 +250,6 @@ Definition smart_paren (s : string) : string :=
   if b then "(" ++ s' else s'.
 
 Module ShowFunctions.
-
-Import ListNotations.
 
 Class ReprSubset (A : Type) :=
   { representatives : list A }.

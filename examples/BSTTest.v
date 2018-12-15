@@ -1,6 +1,7 @@
 From QuickChick Require Import QuickChick.
 
 Require Import List. Import ListNotations.
+Require Import String. Open Scope string.
 
 Inductive Tree :=
 | Leaf : Tree

@@ -331,6 +331,9 @@ move=> t; split=> [[x [[y [Ay Fyx]] Gxt]] | [y [Ay [x [Fyx Gxt]]]]].
 by exists x; split=> //; exists y.
 Qed.
 
+Lemma codom_apply {A B : Type} {f : A -> B} {x : A} : f x \in codom f.
+Proof. eexists; eauto. Qed.
+
 Lemma codomE T U (f : T -> U) : codom f <--> \bigcup_x [set f x].
 Proof. by move=> y; split=> [[x fx]|[x [_ fx]]]; exists x. Qed.
 
@@ -410,10 +413,16 @@ by case: (surj (h y)) => Ahy _; apply: Ahy; exists y.
 Qed.
 Arguments reindex_bigcup [I J K] h [F A] B _ _.
 
-Instance proper_set_incl A : Morphisms.Proper (Morphisms.respectful set_eq
-  (Morphisms.respectful set_eq (Basics.flip Basics.impl))) (@set_incl A).
-Proof. firstorder. Qed.
+Lemma bigcup_pointwise_incl A B (s : set A) (t : A -> set B) (u : set B) :
+  (forall x, x \in s -> t x \subset u) ->
+  \bigcup_(x in s) t x \subset u.
+Proof.
+  intros H b [x []]; eapply H; eauto.
+Qed.
 
+Instance proper_set_incl A :
+  Morphisms.Proper (set_eq ==> set_eq ==> Basics.impl) (@set_incl A).
+Proof. firstorder. Qed.
 
 (** Lemmas about [setU] and [setI] *)
 
@@ -1056,3 +1065,27 @@ Lemma set_eq_isSome_complete {A} (s : set (option A)) (s' : set A) :
 Proof.
   intros H. rewrite <- H. firstorder.
 Qed.
+
+Definition somes {A} (s : set (option A)) : set A :=
+  [set x | Some x \in s].
+
+Lemma somes_subset {A} (s1 s2 : set (option A)) :
+  s1 \subset s2 ->
+  somes s1 \subset somes s2.
+Proof.
+  intros Hs a.
+  apply Hs.
+Qed.
+
+Lemma bigcup_somes {A B} (sA : set A) (s : A -> set (option B)) :
+  somes (\bigcup_(a in sA) s a) <--> \bigcup_(a in sA) somes (s a).
+Proof.
+  intro b; split; intros [a Ha]; eexists a; auto.
+Qed.
+
+Instance proper_somes A : Morphisms.Proper (set_eq ==> set_eq) (@somes A).
+Proof. firstorder. Qed.
+
+Lemma bigcup_setI {T U} (s1 : set T) (s2 : set U) F :
+  \bigcup_(x in s1) (s2 :&: F x) <--> s2 :&: \bigcup_(x in s1) (F x).
+Proof. firstorder. Qed.
