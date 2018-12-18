@@ -42,6 +42,7 @@ script:
 - echo 'Building QuickChick...';
   echo -en 'travis_fold:start:QuickChick.build';
   opam update;
+  opam install coq-ext-lib;
   opam pin add . ;
   opam install coq-quickchick;
   echo -en 'travis_fold:end:QuickChick.build'
