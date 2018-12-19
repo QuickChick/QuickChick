@@ -456,7 +456,7 @@ let parse_dependent_type i nparams ty oib arg_names =
       (* Are the 'i's correct? *)
       aux i t1 >>= fun t1' -> 
       aux i t2 >>= fun t2' ->
-      Some (DProd ((id_of_name n, t1'), t2'))
+      Some (DProd ((id_of_name n.binder_name, t1'), t2'))
     end
     (* Rel, App, Ind, Construct, Prod *)
     else if isConst ty then begin 
@@ -506,6 +506,7 @@ let dep_parse_constructors nparams param_names oib : dep_ctr list option =
 
     let pat_names, pat_types = List.split (List.rev ctr_pats) in
 
+    let pat_names = List.map (fun n -> n.binder_name) pat_names in
     let arg_names = 
       List.map (fun x -> DTyParam x) param_names @ 
       List.map (fun n -> match n with
