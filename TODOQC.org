@@ -1,3 +1,27 @@
+In-QC FUZZ (sketch):
+  - Needs to be based around a command. That command takes
+    + An (A -> Checker) constant p (What about more than one arguments?)
+    + A generator for A (Gen A)
+    + A fuzzer for A (A -> Gen A)
+    + Optionally a shrinker (A -> [A])? Maybe not at first
+    + Obviously printer (A -> String)
+  - Extracts the definition of p (single, monolithic extraction)
+    + Uses a driver (written in gallina) that 
+  - Adds a specific constant name (of type A -> checker)
+  - Requires an axiom of that type in the Coq code
+  - A driver, written in gallina, links against that axiom via extraction.
+    + The driver generates a value of type A and runs the linked checker.
+    + On fail, shrink/report as usual
+    + On success, try mutating a few times using the fuzzer.
+    + For every fuzz, call a (stateful, initialized by this command 
+      everytime) oracle that has access to the coverage information
+      (written in ocaml)
+  - The driver is extracted again (again, monolithic)
+  - The command then compiles:
+    + The p file, using instrumentation
+    + The driver file, without instrumentation
+    + Hopefully everything works out
+
 HIGH PRIORITY:
   - We need a way of naming mutants so that, for example, we can test just a
     single mutant (that we have just added) instead of all mutants.  I'm
