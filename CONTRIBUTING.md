@@ -3,8 +3,16 @@
 The master branch of QuickChick is pull-request based only.
 It is used to track the developmental branch of Coq for use in the Coq CI. 
 
-If your change is compatible with Coq >= 8.8, please submit a pull request to
-8.8 branch.
+Changes that specifically aim at forward compatibility with unreleased versions
+of Coq should be proposed to master branch.
 
-Otherwise, please submit the PR to master branch of QuickChick, make sure it
-works with master branch of Coq.
+Otherwise, if you are proposing a fix or improvement, please submit the PR to
+corresponding branch:
+
+- `master` works with `coq.dev`
+- `8.8`    works with Coq >= 8.8
+
+Please state the compatibility with other Coq versions in your pull request.
+
+Our next release will be based on `8.8` branch by default, unless `8.7` requires
+a critical fix.
