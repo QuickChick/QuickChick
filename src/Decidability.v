@@ -64,15 +64,13 @@ Definition checker_backtrack (l : list (unit -> option bool)) : option bool :=
    change nothing... Or? *)
 
 (* Additional Checkable instance *)
-Global Instance testDec {P} `{H : Dec P} : Checkable P :=
-  {|
-    checker p := _
-  |}.
+Global Instance testDec {P} `{H : Dec P} : Checkable P.
 Proof.
+  constructor.
   destruct H.
   destruct dec0.
-  - exact (checker true).
-  - exact (checker false).
+  - intros; exact (checker true).
+  - intros; exact (checker false).
 Defined.
 
 Global Instance Dec_neg {P} {H : Dec P} : Dec (~ P).
@@ -139,11 +137,11 @@ Ltac dec_eq :=
            end
          end.
 
-Global Instance Eq__Dec {A} `{H : Dec_Eq A} (x y : A) : Dec (x = y) :=
-  {|
-    dec := _
-  |}.
-Proof. dec_eq. Defined.
+Global Instance Eq__Dec {A} `{H : Dec_Eq A} (x y : A) : Dec (x = y).
+Proof.
+constructor.
+dec_eq.
+Defined.
 
 (* Lifting common decidable instances *)
 Global Instance Dec_eq_unit (x y : unit) : Dec (x = y).
