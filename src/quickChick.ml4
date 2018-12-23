@@ -66,7 +66,7 @@ let link_files = ["quickChickLib.cmx"]
 
 (* TODO: in Coq 8.5, fetch OCaml's path from Coq's configure *)
 (* FIX: There is probably a more elegant place to put this flag! *)
-let ocamlopt = "ocamlopt"
+let ocamlopt = "ocamlopt -afl-instrument"
 let ocamlc = "ocamlc -unsafe-string"
 
 let eval_command (cmd : string) : string =
@@ -79,16 +79,14 @@ let comp_ml_cmd tmp_dir fn out =
   let path = Lazy.force path in
   let link_files = List.map (Filename.concat path) link_files in
   let link_files = String.concat " " link_files in
-(*
   let afl_path = eval_command "opam config var lib" ^ "/afl-persistent/" in
   let afl_link = afl_path ^ "afl-persistent.cmxa" in
- *)
   let extra_link_files =
     String.concat " " (List.map (fun (s : string * string) -> tmp_dir ^ "/" ^ fst s) !extra_files) in
   print_endline ("Extra: " ^ extra_link_files);
-  (*  Printf.sprintf "%s unix.cmxa %s -unsafe-string -rectypes -w a -I %s -I %s -I %s %s %s %s -o %s" ocamlopt afl_link (Filename.dirname fn) afl_path path link_files extra_link_files fn out *)
-  Printf.sprintf "%s unix.cmxa -unsafe-string -rectypes -w a -I %s -I %s %s %s %s -o %s" ocamlopt (Filename.dirname fn) path link_files extra_link_files fn out
-
+  Printf.sprintf "%s unix.cmxa %s -unsafe-string -rectypes -w a -I %s -I %s -I %s %s %s %s -o %s" ocamlopt afl_link (Filename.dirname fn) afl_path path link_files extra_link_files fn out 
+(*  Printf.sprintf "%s unix.cmxa -unsafe-string -rectypes -w a -I %s -I %s %s %s %s -o %s" ocamlopt (Filename.dirname fn) path link_files extra_link_files fn out
+ *)
 (*
 let comp_mli_cmd fn =
   Printf.sprintf "%s -rectypes -I %s %s" ocamlc (Lazy.force path) fn
@@ -98,8 +96,8 @@ let comp_mli_cmd fn =
   let path = Lazy.force path in
   let link_files = List.map (Filename.concat path) link_files in
   let link_files = String.concat " " link_files in
-  (*   let afl_link = eval_command "opam config var lib" ^ "/afl-persistent/afl-persistent.cmxa" in *)
-  Printf.sprintf "%s unix.cmxa -unsafe-string -rectypes -w a -I %s -I %s %s %s" ocamlopt 
+  let afl_link = eval_command "opam config var lib" ^ "/afl-persistent/afl-persistent.cmxa" in 
+  Printf.sprintf "%s unix.cmxa %s -unsafe-string -rectypes -w a -I %s -I %s %s %s" ocamlopt afl_link
     (Filename.dirname fn) path link_files fn
 
 let fresh_name n =
@@ -157,18 +155,20 @@ let _ =
   if Array.length Sys.argv = 1 then
     print_string (QuickChickLib.string_of_coqstring (snd (%s ())))
   else 
-    let quickchick_result =
-      try Some ((%s) ())
-      with _ -> None
-    in
-    match quickchick_result with
-    | Some (Failure _, s) ->
-       print_string (QuickChickLib.string_of_coqstring s); flush stdout;
-       failwith \"Test Failed\"
-    | Some (_, s) ->
-       print_string (QuickChickLib.string_of_coqstring s)
-    | _ ->
-       print_string \"Failed to generate...\n\"
+    let f () = 
+      let quickchick_result =
+        try Some ((%s) ())
+        with _ -> None
+      in
+      match quickchick_result with
+      | Some (Failure _, s) ->
+         print_string (QuickChickLib.string_of_coqstring s); flush stdout;
+         failwith \"Test Failed\"
+      | Some (_, s) ->
+         print_string (QuickChickLib.string_of_coqstring s)
+      | _ ->
+         print_string \"Failed to generate...\"
+    in AflPersistent.run f
 " (string_of_id main) (string_of_id main);
   close_out oc;
     end

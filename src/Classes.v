@@ -53,6 +53,9 @@ Class Shrink (A : Type) :=
 (** Arbitrary Class *)
 Class Arbitrary (A : Type) `{Gen A} `{Shrink A}.
 
+Class Fuzzy (A : Type) :=
+  { fuzz : A -> G A }.
+  
 (** * Sizes of types *)
   
 Class Sized (A : Type) :=

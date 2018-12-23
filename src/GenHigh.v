@@ -17,9 +17,10 @@ Module Import GenHigh := GenHighImpl.Impl GenLow.
 
 Import QcDefaultNotation.
 
+(*
 Lemma oneOf_freq {A} (g : G A) (gs : list (G A)) size :
   semGenSize (oneOf (g ;; gs)) size <-->
-  semGenSize (freq ((1, g) ;; map (fun x => (1, x)) gs)) size.
+  semGenSize (freq_ g ((1, g) :: map (fun x => (1, x)) gs)) size.
 Proof.
   rewrite semOneofSize semFrequencySize /=.
   elim : gs => [| g' gs IHgs ] /=.
@@ -106,3 +107,4 @@ Lemma bigcup_cons_setI_subset_pres_backtrack_weak
 Proof.
   intros. eapply bigcup_cons_setI_subset_pres_backtrack; eauto.
 Qed.
+*)

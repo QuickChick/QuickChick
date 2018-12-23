@@ -1374,13 +1374,13 @@ Notation " 'oneOf' [ x ; y ; .. ; z ] " :=
 Notation " 'oneOf' ( x ;; l ) " :=
   (oneof x (cons x l))  (at level 1, no associativity) : qc_scope.
 
-Notation " 'freq' [ x ] " := (frequency x nil) : qc_scope.
-Notation " 'freq' [ ( n , x ) ; y ] " :=
-  (frequency x (cons (n, x) (cons y nil))) : qc_scope.
-Notation " 'freq' [ ( n , x ) ; y ; .. ; z ] " :=
-  ((frequency x (cons ( (n, x)) (cons ( y) .. (cons ( z) nil) ..)))) : qc_scope.
-Notation " 'freq' ( ( n , x ) ;; l ) " :=
-  (frequency x (cons (n, x) l)) (at level 1, no associativity) : qc_scope.
+Notation " 'freq' [ x ] " := ((x : nat * G _).2) : qc_scope.
+Notation " 'freq' [ x ; y ] " :=
+  (freq' x.2 (cons (fun (_:unit) => x) (cons (fun (_ : unit) => y) nil))) : qc_scope.
+Notation " 'freq' [ x ; y ; .. ; z ] " :=
+  (freq' x.2 (cons (fun (_:unit) => x) (cons (fun (_: unit) => y) .. (cons (fun (_:unit) => z) nil) ..))) : qc_scope.
+Notation " 'freq' ( x ;; l ) " :=
+  (freq' x.2 (cons (fun (_: unit) => x) l)) (at level 1, no associativity) : qc_scope.
 
 End QcDefaultNotation.
 

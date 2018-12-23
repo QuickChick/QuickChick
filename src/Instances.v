@@ -49,7 +49,7 @@ Global Instance genList {A : Type} `{Gen A} : Gen (list A) | 3 :=
   {| arbitrary := listOf arbitrary |}.
 
 Global Instance genOption {A : Type} `{Gen A} : Gen (option A) | 3 :=
-  {| arbitrary := freq [ (1, returnGen None)
+  {| arbitrary := freq [ (1, returnGen (@None A))
                        ; (7, liftGen Some arbitrary)] |}.
 
 Global Instance genPairSized {A B : Type} `{GenSized A} `{GenSized B}
@@ -80,7 +80,7 @@ Function shrinkNatAux (x : nat) {measure (fun x => x) x} : list nat :=
       x' :: shrinkNatAux x'
   end.
 Proof.
-  move => x n Eq;
+  move => x n Eq.
   pose proof (Nat.divmod_spec n 1 0 0) as H.
   assert (H' : (0 <= 1)%coq_nat) by omega; apply H in H';
   subst; simpl in *; clear H.
@@ -197,6 +197,37 @@ Global Instance shrinkOption {A : Type} `{Shrink A} : Shrink (option A) :=
 
 (** Arbitraries are derived automatically! *)
 
+
+(** Fuzzy instances *)
+Global Instance fuzzyNat : Fuzzy nat :=
+  {| fuzz n :=
+       freq [ (1, ret 0) ; (1, arbitrary) ]
+  |}.
+
+Global Instance fuzzList {A} `{Gen A} `{Fuzzy A} : Fuzzy (list A) :=
+  {| fuzz l :=
+       let n := length l in
+       let fix aux n l :=
+         match l with
+         | nil => arbitrary
+         | cons x xs =>
+           freq [ (1, liftGen (fun x' => cons x' xs) (fuzz x))
+                ; (1, ret xs)
+                ; (n, liftGen (cons x) (aux (n-1) xs)) ]
+         end in
+       aux n l
+  |}.
+
+Global Instance fuzzyOption {A} `{Gen A} `{Fuzzy A} : Fuzzy (option A) :=
+  {| fuzz m :=
+       match m with
+       | None => arbitrary
+       | Some x =>
+         freq [ ( 1, liftGen Some (fuzz x) )
+              ; ( 1, ret (@None A) )
+              ]
+       end
+  |}.
 
 (** Instance correctness *)
 

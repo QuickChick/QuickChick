@@ -306,12 +306,15 @@ Notation " 'oneOf' ( x ;; l ) " :=
 
 (* freq [ 4 %: g1 ; 6 %: g2 ] *)
 Notation " 'freq' [ x ] " := ((x : nat * G _).2) : qc_scope.
-Notation " 'freq' [ x ; y ] " :=
-  (freq_ x.2 (cons x (cons y nil))) : qc_scope.
+Notation " 'freq' [ x  ; y  ] " :=
+  (freq' (fun (_:unit) => x.2) (cons (fst x, (fun (_:unit) => snd x))
+                   (cons (fst y, (fun (_ : unit) => snd y)) nil))) : qc_scope.
 Notation " 'freq' [ x ; y ; .. ; z ] " :=
-  (freq_ x.2 (cons x (cons y .. (cons z nil) ..))) : qc_scope.
+  (freq' (fun (_:unit) =>x.2) (cons (fst x, (fun (_:unit) => snd x))
+                   (cons (fst y, (fun (_: unit) => snd y)) ..
+                         (cons (fst z, (fun (_:unit) => snd z)) nil) ..))) : qc_scope.
 Notation " 'freq' ( x ;; l ) " :=
-  (freq_ x.2 (cons x l)) (at level 1, no associativity) : qc_scope.
+  (freq' (fun (_:unit) => x.2) (cons (fst x, fun (_: unit) => snd x) (map (fun y => (fst y, fun (_:unit) => snd y) l)))) (at level 1, no associativity) : qc_scope.
 
 Notation "w %: g" := (w, etaG g)
   (at level 100) : qc_scope.
