@@ -2,3 +2,4 @@
 *.mli
 *.native
 qc-mutants
+qc-out

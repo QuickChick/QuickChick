@@ -84,8 +84,8 @@ let comp_ml_cmd tmp_dir fn out =
   let extra_link_files =
     String.concat " " (List.map (fun (s : string * string) -> tmp_dir ^ "/" ^ fst s) !extra_files) in
   print_endline ("Extra: " ^ extra_link_files);
-  Printf.sprintf "%s unix.cmxa %s -unsafe-string -rectypes -w a -I %s -I %s -I %s %s %s %s -o %s" ocamlopt afl_link (Filename.dirname fn) afl_path path link_files extra_link_files fn out 
-(*  Printf.sprintf "%s unix.cmxa -unsafe-string -rectypes -w a -I %s -I %s %s %s %s -o %s" ocamlopt (Filename.dirname fn) path link_files extra_link_files fn out
+  Printf.sprintf "%s unix.cmxa str.cmxa %s -unsafe-string -rectypes -w a -I %s -I %s -I %s %s %s %s -o %s" ocamlopt afl_link (Filename.dirname fn) afl_path path link_files extra_link_files fn out 
+(*  Printf.sprintf "%s unix.cmxa str.cmxa -unsafe-string -rectypes -w a -I %s -I %s %s %s %s -o %s" ocamlopt (Filename.dirname fn) path link_files extra_link_files fn out
  *)
 (*
 let comp_mli_cmd fn =
