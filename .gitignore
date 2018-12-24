@@ -27,6 +27,9 @@ dsss17/terse
 *.d
 Makefile.coq*
 *.out
+*.so
+*.opt
+*.byte
 _qc_*.tmp
 quickChickTool
 .DS_Store
