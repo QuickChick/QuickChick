@@ -5,6 +5,7 @@
 #include <caml/alloc.h>
 
 static s32 shm_id;                    /* ID of the SHM region             */
+u8* trace_bits;
 
 #define MAP_SIZE_POW2       16
 #define MAP_SIZE            (1 << MAP_SIZE_POW2)
@@ -16,7 +17,7 @@ static void remove_shm(void) {
 }
 
 
-u8* setup_shm(void) {
+void setup_shm(void) {
 
   u8* shm_str;
 
@@ -42,18 +43,29 @@ u8* setup_shm(void) {
 
   ck_free(shm_str);
 
-  u8* trace_bits = shmat(shm_id, NULL, 0);
+  trace_bits = shmat(shm_id, NULL, 0);
   
   if (!trace_bits) PFATAL("shmat() failed");
-
-  return trace_bits;
 
 }
 
 CAMLprim value setup_shm_prim(value unit)
 {
-  u8* trace_bits = setup_shm();
-  printf ("Setup succesful!\n");
-  return trace_bits;
+  setup_shm();
+  //  printf ("Setup succesful!\n");
+  return Val_unit;
+}
+
+CAMLprim value copy_trace_bits( value ml_array )
+{
+    int i, len;
+    len = Wosize_val(ml_array);
+    for (i=0; i < len; i++)
+    {
+      //      caml_modify(&Field(ml_array, i), trace_bits[i]);
+      if (i == 42) { caml_modify(&Field(ml_array, i), 42); }
+    }
+
+    return Val_unit ;
 }
 
