@@ -62,8 +62,8 @@ CAMLprim value copy_trace_bits( value ml_array )
     len = Wosize_val(ml_array);
     for (i=0; i < len; i++)
     {
-      //      caml_modify(&Field(ml_array, i), trace_bits[i]);
-      if (i == 42) { caml_modify(&Field(ml_array, i), 42); }
+      // *2 for some reason probably to do with ocaml encoding
+      caml_modify(&Field(ml_array, i), Val_int (trace_bits[i]));
     }
 
     return Val_unit ;

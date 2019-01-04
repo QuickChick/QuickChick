@@ -9,16 +9,17 @@ external copy_trace_bits : int array -> unit = "copy_trace_bits"
 let count_ones arr =
   Array.iteri (fun i n ->
       if n != 0 then
-        Printf.printf "%d: %d\n" i n
+        Printf.printf "%d: %d %b %b\n" i n (n != 0) (n == 0)
       else ()
     ) arr
 
-  
 let main =
-  (*   let setup_shm = foreign "setup_shm" (void @-> Array.t unit8_t) in *)
-  setup_shm ();
   let trace_bits = Array.make map_size 0 in
+  setup_shm ();
   count_ones trace_bits;
+
+  Sys.command "echo 42 | ./Cout";
+  
   copy_trace_bits trace_bits;
   count_ones trace_bits;
 
