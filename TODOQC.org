@@ -1,4 +1,19 @@
 In-QC FUZZ (sketch):
+  - Start in ocaml plain
+  - prop.ml
+  - prop_stub.ml uses prop and has instrumentation
+
+
+QCFuzz gen fuzz shrink print prop.
+
+Extract Constant prop. 
+
+loop 
+  x <- gen
+  prop x 
+  x' <- fuzz x
+  check coverage prop x'
+
   - Needs to be based around a command. That command takes
     + An (A -> Checker) constant p (What about more than one arguments?)
     + A generator for A (Gen A)
@@ -6,7 +21,6 @@ In-QC FUZZ (sketch):
     + Optionally a shrinker (A -> [A])? Maybe not at first
     + Obviously printer (A -> String)
   - Extracts the definition of p (single, monolithic extraction)
-    + Uses a driver (written in gallina) that 
   - Adds a specific constant name (of type A -> checker)
   - Requires an axiom of that type in the Coq code
   - A driver, written in gallina, links against that axiom via extraction.

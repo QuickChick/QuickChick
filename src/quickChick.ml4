@@ -322,6 +322,21 @@ let runTest fuzz (c : constr_expr) =
   let (show_and_c_fun, evd) = interp_constr env evd show_and_c_fun in
   define_and_run fuzz show_and_c_fun
 
+let qcFuzz prop gen fuzz show =
+  (** Extract the property and its dependencies *)
+  let env = Global.env () in
+  let evd = Evd.from_env env in
+  let (prop_expr, evd) = interp_constr env evd prop in
+  let prop_def = define prop_expr in
+  let (temp_dir, prop_mlf) = new_ml_file () in
+  let execn = Filename.chop_extension prop_mlf in
+  let prop_mlif = execn ^ ".mli" in
+  let warnings = CWarnings.get_flags () in
+  let mute_extraction = warnings ^ (if warnings = "" then "" else ",") ^ "-extraction-opaque-accessed" in
+  CWarnings.set_flags mute_extraction;
+  Flags.silently (Extraction_plugin.Extract_env.full_extraction (Some prop_mlf)) [CAst.make @@ Ident prop_def];
+  CWarnings.set_flags warnings
+  
 let run fuzz f args =
   begin match args with
   | qc_text :: _ -> Printf.printf "QuickChecking %s\n"
@@ -390,6 +405,11 @@ VERNAC COMMAND EXTEND MutateChickMany CLASSIFIED AS SIDEFF
   | ["MutateChickMany" constr(c1) constr(c2)] ->     [run false mutateCheckMany [c1;c2]]
   | ["MutateChickManyWith" constr(c1) constr(c2) constr(c3)] ->     [run false mutateCheckMany [c1;c2;c3]]
 END;;
+
+VERNAC COMMAND EXTEND Fuzz CLASSIFIED AS SIDEFF
+  | ["Fuzz" constr(prop) constr(gen) constr(fuzz) constr(show)] ->  [ qcFuzz prop gen fuzz show ]
+END;;
+
 
 VERNAC COMMAND EXTEND QuickChickDebug CLASSIFIED AS SIDEFF
   | ["QuickChickDebug" ident(s1) ident(s2)] ->
