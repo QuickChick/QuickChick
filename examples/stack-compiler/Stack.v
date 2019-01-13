@@ -27,18 +27,9 @@ Fixpoint execute (stack : list nat) (prog : list sinstr) : list nat :=
 (* Compilation... *)
 Fixpoint compile (e : exp) : list sinstr :=
   match e with
-  | ANum n => [SPush n]
-(*! *)
-  | APlus  e1 e2 => compile e2 ++ compile e1 ++ [SPlus]
-  | AMinus e1 e2 => compile e2 ++ compile e1 ++ [SMinus]
-  | AMult  e1 e2 => compile e2 ++ compile e1 ++ [SMult]
-(*!! Wrong associativity *)
-(*!
-  | APlus  e1 e2 => compile e1 ++ compile e2 ++ [SPlus]
-  | AMinus e1 e2 => compile e1 ++ compile e2 ++ [SMinus]
-  | AMult  e1 e2 => compile e1 ++ compile e2 ++ [SMult]
-*)
+  (* TODO: WRITE DURING TUTORIAL! *)
+  | _ => nil
   end.
 
-Definition compiles_correctly (e : exp) := (execute [] (compile e)) = [eval e]?.
-(*! QuickChick compiles_correctly. *)
+Definition compile_correct (e : exp) := (execute [] (compile e)) = [eval e]?.
+(*! QuickChick compile_correct. *)

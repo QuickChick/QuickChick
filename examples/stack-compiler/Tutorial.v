@@ -5,6 +5,7 @@
 From QuickChick Require Import QuickChick.
 Open Scope qc_scope.
 Set Warnings "-extraction-opaque-accessed,-extraction".
+Set Warnings "-notation-overridden,-parsing".
 
 Require Import List ZArith. Import ListNotations.
 
@@ -45,7 +46,7 @@ Definition removeP (x : nat) (l : list nat) :=
     QuickChick provides a toplevel command [QuickChick] that receives
     as input an executable property and attempts to falsify it. *)
 
-QuickChick removeP.
+(* QuickChick removeP. *)
 
 (** Internally, the code is extracted to OCaml, compiled and ran to
 obtain the output:

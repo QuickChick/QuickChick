@@ -18,7 +18,7 @@ Inductive exp : Type :=
   | AMult : exp -> exp -> exp.
 
 Derive Show for exp.
-(* Print Showexp.*)
+(* Print Showexp. *)
 (*
 Showexp = 
 {|
@@ -44,55 +44,18 @@ show := fun x : exp =>
      : Show exp
  *)
 
-
-
-
-
-
-Instance Shrink_exp_bad : Shrink exp | 100 :=
-  {| shrink := fun _ => nil |}.
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 (* We can also derive a generator for expressions. *)
-Derive GenSized for exp.
+Derive Arbitrary for exp.
 
 (* Sample (@arbitrary exp _). *)
-
 
 (* Let's define an evaluation function... *)
 Fixpoint eval (e : exp) : nat :=
   match e with
   | ANum n => n
-(*! *)                
-  | APlus e1 e2 => (eval e1) + (eval e2)
-(*!! Plus-copy-paste-error *)                                 
-(*! | APlus e1 e2 => (eval e1) + (eval e1) *)
-  | AMinus e1 e2  => (eval e1) - (eval e2)
-  | AMult e1 e2 => (eval e1) * (eval e2)
+  | APlus e1 e2  => (eval e1) + (eval e2)
+  | AMinus e1 e2 => (eval e1) - (eval e2)
+  | AMult e1 e2  => (eval e1) * (eval e2)
   end.
 
 (* ...and perform a few optimizations: *)
@@ -100,16 +63,8 @@ Fixpoint optimize (e : exp) : exp :=
   match e with
   | ANum n => ANum n
   | APlus e (ANum 0)  => optimize e
-  | APlus (ANum 0) e  => optimize e
-  | APlus e1 e2 => APlus (optimize e1) (optimize e2)
-(*! *)
-  | AMinus e (ANum 0) => optimize e 
-(*!! Minus-Reverse *)
-(*!
-  | AMinus (ANum 0) e => optimize e 
-*)
-  | AMinus e1 e2 => AMinus (optimize e1) (optimize e2)
-  | AMult e1 e2 => AMult (optimize e1) (optimize e2)
+  (* TODO: FILL ME DURING TUTORIAL! *)
+  | _ => ANum 0
   end.
 
 (* We would expect that optimizations don't affect the evaluation result. *)
@@ -117,7 +72,3 @@ Definition optimize_correct_prop (e : exp) := eval (optimize e) = eval e?.
 
 (* Does that hold? *)
 (*! QuickChick optimize_correct_prop. *)
-
-Derive Shrink for exp.
-
-QuickChick optimize_correct_prop.
