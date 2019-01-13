@@ -6,7 +6,7 @@ Makefile.coq:
 
 clean: Makefile.coq
 	$(MAKE) -f Makefile.coq clean
-	rm -rf _qc *.bak
+	rm -rf _qc *.bak Makefile.coq*
 
 test: clean
 	quickChick -color -top Stack
