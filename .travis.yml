@@ -46,6 +46,10 @@ script:
   echo -en 'travis_fold:start:QuickChick.test.unit';
   make -C test;
   echo -en 'travis_fold:end:QuickChick.test.unit'
+- echo 'Testing Stack Compiler...';
+  echo -en 'travis_fold:start:QuickChick.test.stack-compiler';
+  make -C examples/stack-compiler test;
+  echo -en 'travis_fold:end:QuickChick.test.stack-compiler'
 - echo 'Testing IFC...';
   echo -en 'travis_fold:start:QuickChick.test.ifc-basic';
   make -C examples/ifc-basic;
