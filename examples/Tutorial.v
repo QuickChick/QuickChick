@@ -53,6 +53,7 @@ Definition removeP (x : nat) (l : list nat) :=
 
     QuickChick provides a toplevel command [QuickChick] that receives
     as input an executable property and attempts to falsify it. *)
+FuzzChick removeP.
 
 QuickChick removeP.
 
@@ -412,7 +413,7 @@ Check frequency.
 Fixpoint genTreeSized' {A} (sz : nat) (g : G A) : G (Tree A) :=
   match sz with
     | O => returnGen Leaf 
-    | S sz' => freq [ (1,  returnGen Leaf) ;
+    | S sz' => freq [ (1,  returnGen (@Leaf A)) ;
                       (sz, liftGen3  Node g (genTreeSized' sz' g) (genTreeSized' sz' g))
                     ]
   end.

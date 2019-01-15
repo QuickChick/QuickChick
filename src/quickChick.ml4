@@ -406,10 +406,9 @@ VERNAC COMMAND EXTEND MutateChickMany CLASSIFIED AS SIDEFF
   | ["MutateChickManyWith" constr(c1) constr(c2) constr(c3)] ->     [run false mutateCheckMany [c1;c2;c3]]
 END;;
 
-VERNAC COMMAND EXTEND Fuzz CLASSIFIED AS SIDEFF
-  | ["Fuzz" constr(prop) constr(gen) constr(fuzz) constr(show)] ->  [ qcFuzz prop gen fuzz show ]
+VERNAC COMMAND EXTEND FuzzQC CLASSIFIED AS SIDEFF
+  | ["FuzzQC" constr(prop) constr(gen) constr(fuzz) constr(show)] ->  [ qcFuzz prop gen fuzz show ]
 END;;
-
 
 VERNAC COMMAND EXTEND QuickChickDebug CLASSIFIED AS SIDEFF
   | ["QuickChickDebug" ident(s1) ident(s2)] ->
