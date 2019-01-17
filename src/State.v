@@ -27,6 +27,19 @@ Record State := MkState
   ; numTryShrinks     : nat
   }.
 
+Definition updSuccTests st f :=
+  match st with
+    | MkState mst mdt ms cs nst     ndt ls e r nss nts =>
+      MkState mst mdt ms cs (f nst) ndt ls e r nss nts
+  end.
+
+Definition updDiscTests st f :=
+  match st with
+    | MkState mst mdt ms cs nst ndt     ls e r nss nts =>
+      MkState mst mdt ms cs nst (f ndt) ls e r nss nts
+  end.
+
+
 Definition updTryShrinks (st : State) (f : nat -> nat) : State :=
   match st with
     | MkState mst mdt ms cs nst ndt ls e r nss nts =>

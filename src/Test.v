@@ -132,7 +132,7 @@ Definition summary (st : State) : list (string * nat) :=
   let res := Map.fold (fun key elem acc => (key,elem) :: acc) (labels st) nil
   in insSortBy (fun x y => snd y <= snd x) res .
 
-Definition doneTesting (st : State) (f : nat -> RandomSeed -> QProp) : Result :=
+Definition doneTesting (st : State) : Result :=
  if expectedFailure st then
     Success (numSuccessTests st + 1) (numDiscardedTests st) (summary st)
             ("+++ Passed " ++ (show (numSuccessTests st)) ++ " tests (" ++ (show (numDiscardedTests st)) ++ " discards)")
@@ -142,7 +142,7 @@ Definition doneTesting (st : State) (f : nat -> RandomSeed -> QProp) : Result :=
                                              ++ " tests (expected Failure)").
   (* TODO: success st - labels *)
 
-Definition giveUp (st : State) (_ : nat -> RandomSeed -> QProp) : Result :=
+Definition giveUp (st : State) : Result :=
   GaveUp (numSuccessTests st) (summary st)
          ("*** Gave up! Passed only " ++ (show (numSuccessTests st)) ++ " tests"
           ++  newline ++ "Discarded: " ++ (show (numDiscardedTests st))).
@@ -208,9 +208,9 @@ Fixpoint runATest (st : State) (f : nat -> RandomSeed -> QProp) (maxSteps : nat)
     let (rnd1, rnd2) := randomSplit (randomSeed st) in
     let test (st : State) :=
         if (gte (numSuccessTests st) (maxSuccessTests st)) then
-          doneTesting st f
+          doneTesting st
         else if (gte (numDiscardedTests st) (maxDiscardedTests st)) then
-               giveUp st f
+               giveUp st
              else runATest st f maxSteps'
     in
     match st with
@@ -279,13 +279,13 @@ Fixpoint runATest (st : State) (f : nat -> RandomSeed -> QProp) (maxSteps : nat)
         end
       end
     end
-  else giveUp st f.
+  else giveUp st.
 
 Definition test (st : State) (f : nat -> RandomSeed -> QProp) : Result :=
   if (gte (numSuccessTests st) (maxSuccessTests st)) then
-    doneTesting st f
+    doneTesting st
   else if (gte (numDiscardedTests st) (maxDiscardedTests st)) then
-         giveUp st f
+         giveUp st
   else
     let maxSteps := maxSuccessTests st + maxDiscardedTests st in
     runATest st f maxSteps.
@@ -369,3 +369,52 @@ Fixpoint testRunner (tests : list Test) : IO unit :=
 (* Actually run the tests. (Only meant for extraction.) *)
 Definition runTests (tests : list Test) : unit :=
   unsafe_run (testRunner tests).
+
+Axiom withInstrumentation : (unit -> bool) -> (option bool -> bool -> Result) -> Result.
+Extract Constant withInstrumentation => "QuickChickLib.withInstrumentation".
+Fixpoint fuzzLoop {A} (fuel : nat) (st : State)
+         (* TODO: priorities for seeds? *)
+         (seeds : list A)
+         (gen : G A) (fuzz : A -> G A) (print : A -> string)
+         (prop : A -> option bool) :=
+  match fuel with
+  | O => giveUp st
+  | S fuel' =>
+    if (gte (numSuccessTests st) (maxSuccessTests st)) then
+      doneTesting st
+    else if (gte (numDiscardedTests st) (maxDiscardedTests st)) then
+      giveUp st 
+    else 
+    let size := (computeSize st) (numSuccessTests st) (numDiscardedTests st) in
+    let (rnd1, rnd2) := randomSplit (randomSeed st) in
+    (* How to decide between generation and fuzzing? *)
+    (* For now, if there is an "interesting" seed, use it *)
+    let (g,seeds') :=
+        match seeds with
+        | [] => (gen, [])
+        | s::ss => (fuzz s, ss)
+        end in
+    let a := run g size rnd1 in
+    withInstrumentation (fun _ : unit => prop a) (fun res is_interesting =>
+      match res with                                                     
+      | Some true =>
+        if is_interesting then
+          (* KEEP *)
+          fuzzLoop fuel' (updSuccTests st S) (a :: seeds') gen fuzz print prop
+        else
+          fuzzLoop fuel' (updSuccTests st S) (seeds') gen fuzz print prop
+      | Some false =>
+        let '(MkState mst mdt ms cs nst ndt ls e r nss nts) := st in
+        let zero := trace (print a ++ nl) 0 in
+        let pre : string := "*** Failed " in
+        (* TODO: shrinking *)
+        (*         let (numShrinks, res') := localMin rnd1_copy st (MkRose res ts) in *)
+        let numShrinks := 0 in
+        let suf := ("after " ++ (show (S nst)) ++ " tests and "
+                                 ++ (show numShrinks) ++ " shrinks. ("
+                                 ++ (show ndt) ++ " discards)")%string in
+        Failure (nst + 1 + zero) numShrinks ndt r size (pre ++ suf) (summary st) "Falsified!"
+      | None =>
+        fuzzLoop fuel' (updDiscTests st S) seeds' gen fuzz print prop
+      end)
+  end.

@@ -242,7 +242,6 @@ Definition forAllMaybe {A prop : Type} {_ : Checkable prop} `{Show A}
                  end
               ).
 
-
 Definition forAllProof {A prop : Type} {C : Checkable prop} `{S : Show A}
            (gen : G A)  (pf : forall (x : A), semGen gen x -> prop) : Checker :=
   bindGen' gen (fun x H => printTestCase (show x ++ newline) (pf x H)).
@@ -403,4 +402,6 @@ Module QcNotation.
       (at level 200, x ident, P at level 200, c at level 200, right associativity)
      : type_scope.
 End QcNotation.
+
+(* IN-QC fuzz variants *)
 
