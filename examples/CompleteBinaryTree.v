@@ -184,3 +184,10 @@ Proof.
   - inversion H; constructor.
 Qed.
  *)
+
+
+(* Want to build up a largish BST randomly, and then enumerate.
+
+ *)
+
+(* How can we motivate this example? *)
