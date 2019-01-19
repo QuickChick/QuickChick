@@ -777,7 +777,8 @@ let rec gList = function
   | x::xs -> gCons x (gList xs)
 
 (* Generic String Manipulations *)
-let gStr s = CAst.make @@ CPrim (String s)
+let string_scope ast = CAst.make @@ CDelimiters ("string", ast)
+let gStr s = string_scope (CAst.make @@ CPrim (String s))
 let emptyString = gInject "Coq.Strings.String.EmptyString"
 let str_append c1 c2 = gApp (gInject "Coq.Strings.String.append") [c1; c2]
 let rec str_appends cs = 
@@ -833,7 +834,8 @@ let mkNumeral n =
   if n >= 0 then Numeral (string_of_int n, true)
   else Numeral (string_of_int (-n), false)
 
-let gInt n = CAst.make @@ CPrim (mkNumeral n)
+let nat_scope ast = CAst.make @@ CDelimiters ("nat", ast)
+let gInt n = nat_scope (CAst.make @@ CPrim (mkNumeral n))
 let gSucc x = gApp (gInject "Coq.Init.Datatypes.S") [x]
 let rec maximum = function
   | [] -> failwith "maximum called with empty list"

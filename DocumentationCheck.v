@@ -13,25 +13,17 @@ Module ConsistencyCheck : QuickChickSig.
   Definition G := @G.
   Definition semGen := @semGen.
   Definition semGenSize := @semGenSize.
-  Definition returnGen := @returnGen.
-  Definition fmap := @fmap.
-  Definition bindGen := @bindGen.
+  Definition Functor_G := Functor_G.
+  Definition Applicative_G := Applicative_G.
+  Definition Monad_G := Monad_G.
   Definition bindGen' := @bindGen'.
   Definition bindGenOpt := @bindGenOpt.
-  Definition GMonad := @GMonad.
-  Definition liftGen := @liftGen.
-  Definition liftGen2 := @liftGen2.
-  Definition liftGen3 := @liftGen3.
-  Definition liftGen4 := @liftGen4.
-  Definition liftGen5 := @liftGen5.
-  Definition sequenceGen := @sequenceGen.
-  Definition foldGen := @foldGen.
   Definition run := @run.
   Definition listOf := @listOf.
   Definition vectorOf := @vectorOf.
-  Definition elements := @elements.
-  Definition oneof := @oneof.
-  Definition frequency := @frequency.
+  Definition elems_ := @elems_.
+  Definition oneOf_ := @oneOf_.
+  Definition freq_ := @freq_.
   Definition backtrack := @backtrack.
   Definition resize := @resize.
   Definition sized := @sized.
@@ -118,7 +110,7 @@ Module ConsistencyCheck : QuickChickSig.
 
   Definition showNat := showNat    .
   Definition showBool := showBool   .
-  Definition showInt := showInt    .
+  Definition showZ := showZ    .
   Definition showString := showString .
 
   Definition showList := @showList .

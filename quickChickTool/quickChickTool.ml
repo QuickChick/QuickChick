@@ -20,6 +20,8 @@ type mutant_id = Num of int | Tag of string
 let only_mutant = ref None
 let include_file = ref None
 
+let maxSuccess = ref None
+
 let current_filetype = ref ""
 
 let speclist =
@@ -32,9 +34,10 @@ let speclist =
   ; ("-ocamlbuild", Arg.String (fun name -> ocamlbuild_args := name), "Arguments given to ocamlbuild")
   ; ("-nobase", Arg.Unit (fun _ -> nobase := true), "Do not test base mutant")
   ; ("-m", Arg.Int (fun n -> only_mutant := Some (Num n)), "Only test mutant number n")
+  ; ("-N", Arg.Int (fun n -> maxSuccess := Some n), "Max number of successes")
   ; ("-tag", Arg.String (fun s -> only_mutant := Some (Tag s)), "Only test mutant number with a specific tag")
-  ; ("-include", Arg.String (fun incl -> include_file := Some incl), "_CoqProject, file containing list of files to be included.")
-  ; ("-exclude", Arg.Rest (fun excl -> excluded := excl :: !excluded), "Files to be excluded. Must be the last argument")
+  ; ("-include", Arg.String (fun incl -> include_file := Some incl), "File containing list of files to be included.")
+  ; ("-exclude", Arg.Rest (fun excl -> excluded := excl :: !excluded), "(Deprecated) Files to be excluded. Must be the last argument")
   ]
 
 let usage_msg = "quickChick options\nMutation testing for current directory"
@@ -101,11 +104,13 @@ let rec non_mutants (info : mutant_info) acc muts : (mutant_info * string list) 
 
 let begin_comment () =
   if !current_filetype = ".c" || !current_filetype = ".h"
+  || !current_filetype = ".sol"
   then "/*"
   else "(*"
 
 let end_comment () =
   if !current_filetype = ".c" || !current_filetype = ".h"
+  || !current_filetype = ".sol"
   then "*/"
   else "*)"
 
@@ -153,6 +158,11 @@ let test_out handle_section input =
   in String.concat "" (List.map go input)
 *)
 
+let quickCheckFunction () =
+  match !maxSuccess with
+  | None -> "quickCheck"
+  | Some n -> "quickCheckWith (updMaxSuccess stdArgs " ^ string_of_int n ^ ")"
+
 (* Combine mutants with base.
    Receives a base mutant, plus a list of (optionally tagged) mutants.
    Produces all mutants, including base. *)
@@ -187,10 +197,10 @@ let mutate_outs handle_section input =
   let rec go (sec : section) =
       if handle_section sec.sec_name then begin
         debug "Handling section: %s\n" sec.sec_name;
-        let handle_node (n : node) = 
-          match n with                                                                              
+        let handle_node (n : node) =
+          match n with
           | Text s -> (s, [])
-          | Mutants ms -> 
+          | Mutants ms ->
             (* To handle a mutant section, extract base + all mutants *)
             let (non_mutated, mutants) =
               match all_mutants ms.ms_mutants with
@@ -229,10 +239,10 @@ let gather_all_vs_from_dir fs =
     match fs with
     | File (s, _) ->
        if (Filename.check_suffix s ".v")
-          && not (List.exists (fun x -> x = Filename.basename s) !excluded) then
+          && not (List.exists (fun x -> Filename.basename x = Filename.basename s) !excluded) then
          all_vs := (Filename.chop_suffix s ".v") :: !all_vs
     | Dir (s, fss) ->
-       if not (List.exists (fun x -> x = s) !excluded) then 
+       if not (List.exists (fun x -> Filename.basename x = Filename.basename s) !excluded) then
          List.iter loop fss
        else ()
   in loop fs;
@@ -240,15 +250,28 @@ let gather_all_vs_from_dir fs =
 
 open CoqProject_file
 
-let gather_all_vs_from_file f =
+let vs_from_file f =
   let project = CoqProject_file.read_project_file f in
-  List.map (fun s -> match s with {thing = str; _} ->
-      Filename.chop_suffix str ".v") project.v_files
+  List.map (fun s -> match s with {thing = str; _} -> str)
+    project.v_files
+
+let gather_all_vs_from_file f fs =
+  let included = vs_from_file f in
+  let all_vs = ref [] in
+  let rec loop fss =
+    match fss with
+    | File (s, _) ->
+       if Filename.check_suffix s ".v"
+          && List.exists (fun x -> Filename.basename x = Filename.basename s) included
+       then all_vs := (Filename.chop_suffix s ".v") :: !all_vs
+    | Dir (_, fsss) -> List.iter loop fsss in
+  loop fs;
+  !all_vs
 
 let gather_all_vs fs =
   match !include_file with
   | None -> gather_all_vs_from_dir fs
-  | Some f -> gather_all_vs_from_file f
+  | Some f -> gather_all_vs_from_file f fs
 
 let is_prefix pre s =
   String.length s >= String.length pre
@@ -439,7 +462,7 @@ let rec parse_file_or_dir file_name =
     debug "[parse_file_or_dir %s]\n" file_name;
     if is_dir file_name then begin
       if is_prefix tmp_dir (Filename.basename file_name)
-                   || (List.exists (fun x -> x = Filename.basename file_name) !excluded) 
+                   || (List.exists (fun x -> x = Filename.basename file_name) !excluded)
       then None else begin
         let ls = Sys.readdir file_name in
         if !verbose then begin
@@ -459,10 +482,13 @@ let rec parse_file_or_dir file_name =
                               ; sec_extends = None
                               ; sec_nodes = [Text s] } ]))
     else
-      let handle = (Filename.check_suffix file_name "v" ||
-                    Filename.check_suffix file_name "ml"||
-                    Filename.check_suffix file_name "c" ||
-                    Filename.check_suffix file_name "h")
+      let handle = (Filename.check_suffix file_name ".v" ||
+                    Filename.check_suffix file_name ".ml"||
+                    Filename.check_suffix file_name ".c" ||
+                    Filename.check_suffix file_name ".py"||
+                    Filename.check_suffix file_name ".sol" ||
+                    Filename.basename     file_name="_tags" ||
+                    Filename.check_suffix file_name ".h")
                    && not (List.exists (fun x -> x = Filename.basename file_name) !excluded) in
       if handle then begin
         debug "In file: %s\n" file_name;
@@ -495,7 +521,7 @@ let rec parse_file_or_dir file_name =
           ) result in
         let fixed_default =
           match result with
-          | sec :: ss -> 
+          | sec :: ss ->
               { sec_begin = "(*"
               ; sec_name  = "__default__" ^ file_name
               ; sec_end   = "*)"
@@ -538,9 +564,9 @@ let build_sec_graph fs =
   let rec populate_hashtbl_sections (sections : section list) =
     match sections with
     | [] -> ()
-    | sec :: rest -> 
+    | sec :: rest ->
       let extends = match sec.sec_extends with
-        | Some ext -> ext.ext_extends 
+        | Some ext -> ext.ext_extends
         | None -> [] in
       Hashtbl.add sec_graph (trim sec.sec_name) extends;
       populate_hashtbl_sections rest in
@@ -560,9 +586,9 @@ let rec handle_section' sec_graph current_section starting_section =
   let current_section  = trim current_section in
   let starting_section = trim starting_section in
   if !verbose then
-    (Printf.printf "handle_section': current_section: %s\n" current_section; 
-     Printf.printf "                 starting_section: %s\n" starting_section; 
-     flush_all ()); 
+    (Printf.printf "handle_section': current_section: %s\n" current_section;
+     Printf.printf "                 starting_section: %s\n" starting_section;
+     flush_all ());
   current_section = starting_section
   || List.exists
     (fun starting_section' ->
@@ -570,7 +596,7 @@ let rec handle_section' sec_graph current_section starting_section =
     (sec_find sec_graph starting_section)
 
 let rec handle_section sec_graph sn' =
-  if !verbose then (Printf.printf "Asking for section %s\n" sn'; flush_all ()); 
+  if !verbose then (Printf.printf "Asking for section %s\n" sn'; flush_all ());
   let sn' = trim sn' in
   match !sec_name with
   | Some sn -> handle_section' sec_graph sn' sn
@@ -621,7 +647,7 @@ let string_of_tag ms =
   match ms with
   | None -> "<no tag>"
   | Some t -> t
-  
+
 (* more efficient version *)
 let starts_with ~prefix b =
   let len = String.length prefix in
@@ -638,6 +664,8 @@ let starts_with ~prefix b =
 (* BCP: This function is too big! And there's too much duplication. *)
 let main =
 (*   List.iter (fun x -> print_endline x) !excluded;*)
+  if !excluded <> []
+  then output_string stderr "Warning: -exclude option is deprecated\n";
 
   (*  Parsing.set_trace true; *)
   let fs = from_Some (parse_file_or_dir ".") in
@@ -688,8 +716,8 @@ let main =
           (* Leo: better qualification *)
           trim (Filename.basename (Filename.chop_suffix f ".v")) ^ "." ^ s in
         (Printf.sprintf "test%d" i,
-         Printf.sprintf "Definition test%d := print_extracted_coq_string (\"Checking %s...\" ++ newline ++ show (quickCheck %s))%%string.\n"
-           i testname testname) in
+         Printf.sprintf "Definition test%d := print_extracted_coq_string (\"Checking %s...\" ++ newline ++ show (%s %s))%%string.\n"
+           i testname (quickCheckFunction ()) testname) in
       List.split (List.mapi make_test all_things_to_check) in
 
     let tmp_file_data =
@@ -714,24 +742,24 @@ let main =
       output_mut_dir tmp_dir base;
       compile_and_run dir ExpectOnlySuccesses;
     end;
-      
+
     (* For each mutant structure *)
     List.iteri
       (fun i (info, m) ->
         begin
-          if    !only_mutant = Some (Num i) 
+          if    !only_mutant = Some (Num i)
              || !only_mutant = None
              || (match info.tag, !only_mutant with
-                 | Some fulltag, Some (Tag tag) -> 
+                 | Some fulltag, Some (Tag tag) ->
                    starts_with (String.trim tag) (String.trim fulltag)
                  | _ -> false) then begin
               Printf.printf "\n";
               let t =
                 match info.tag with None -> "" | Some s -> ": " ^ String.trim s in
-              (* TODO: The line number info should also include the 
+              (* TODO: The line number info should also include the
                  file name! *)
-              highlight Header 
-                (Printf.sprintf "Testing mutant %d (%s: line %d)%s" 
+              highlight Header
+                (Printf.sprintf "Testing mutant %d (%s: line %d)%s"
                    i info.file_name info.line_number t);
               ensure_tmpdir_exists();
               (* Entire file structure is copied *)
@@ -740,11 +768,11 @@ let main =
               compile_and_run dir ExpectSomeFailure
           end
         end)
-      (List.rev dir_mutants) 
+      (List.rev dir_mutants)
   end;
 
   if !something_failed then begin
-    highlight Failure 
+    highlight Failure
       "At least one of the tests above produced an unexpected result.";
     exit 1
   end;

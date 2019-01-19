@@ -11,7 +11,7 @@ Require Import ExtrOcamlString.
 Require Import ExtrOcamlNatInt.
 Require Import ExtrOcamlZInt.
 
-Extraction Blacklist String List.
+Extraction Blacklist String List Nat.
 
 (* Ignore [Decimal.int] before the extraction issue is solved:
    https://github.com/coq/coq/issues/7017. *)
@@ -30,7 +30,13 @@ Extract Constant show_bool =>
     if i < 0 then acc else copy (s.[i] :: acc) (i-1)
   in copy [] (String.length s - 1))".
 
-Extract Constant show_int =>
+Extract Constant show_Z =>
+  "(fun i ->
+  let s = string_of_int i in
+  let rec copy acc i =
+    if i < 0 then acc else copy (s.[i] :: acc) (i-1)
+  in copy [] (String.length s - 1))".
+Extract Constant show_N =>
   "(fun i ->
   let s = string_of_int i in
   let rec copy acc i =
@@ -47,6 +53,8 @@ Extract Constant randomRNat  =>
 Extract Constant randomRBool => "(fun _ r -> Random.State.bool r, r)".
 Extract Constant randomRInt  =>
   "(fun (x,y) r -> if y < x then failwith ""choose called with unordered arguments"" else  (x + (Random.State.int r (y - x + 1)), r))".
+Extract Constant randomRN =>
+  "(fun (x,y) r -> if y < x then failwith ""choose called with unordered arguments"" else  (x + (Random.State.int r (y - x + 1)), r))".
 Extract Constant newRandomSeed => "(Random.State.make_self_init ())".
 
 Extract Inductive Lazy => "Lazy.t" [lazy].
@@ -62,12 +70,10 @@ Extract Constant trace =>
    let s = Bytes.create (List.length l) in
    let rec copy i = function
     | [] -> s
-    | c :: l -> s.[i] <- c; copy (i+1) l
+    | c :: l -> Bytes.set s i c; copy (i+1) l
    in Bytes.to_string (copy 0 l)); flush stdout; fun y -> y)".
 
 Set Extraction AccessOpaque.
-
-Extract Constant Show.nl => "['\n']".
 
 Require Import mathcomp.ssreflect.ssreflect.
 From mathcomp Require Import ssreflect ssrnat ssrbool div eqtype.

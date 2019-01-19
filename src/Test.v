@@ -5,13 +5,16 @@ Require Import Omega.
 Require Import mathcomp.ssreflect.ssreflect.
 From mathcomp Require Import ssrnat ssrbool eqtype div.
 
+(* N.B.: this pulls in [ExtrOcamlString] (ExtractionQC also does) *)
+From SimpleIO Require Import CoqPervasives.
+
 From QuickChick Require Import RoseTrees RandomQC GenLow GenHigh SemChecker.
 From QuickChick Require Import Show Checker State Classes.
 
-Require Import Coq.Strings.String.
 Require Import Coq.Strings.Ascii.
 Require Import Coq.Strings.String.
 Require Import List.
+Import ListNotations.
 
 Require Import Recdef.
 
@@ -256,7 +259,19 @@ Fixpoint runATest (st : State) (f : nat -> RandomSeed -> QProp) (maxSteps : nat)
               Failure (nst + 1) numShrinks ndt r size (tag_text ++ pre ++ suf) (summary st) reas
         | MkResult None e reas _ s _ t =>
           (* Ignore labels of discarded tests? *)
-          test (MkState mst mdt ms cs nst ndt.+1 ls e rnd2 nss nts)
+          let ls' :=
+              match s with
+              | nil => ls
+              | _ =>
+                let s_to_add :=
+                    "(Discarded) " ++ ShowFunctions.string_concat
+                                    (ShowFunctions.intersperse " , "%string s) in
+                match Map.find s_to_add ls with
+                | None   => Map.add s_to_add (res_cb + 1) ls
+                | Some k => Map.add s_to_add (k+1) ls
+                end
+              end in
+          test (MkState mst mdt ms cs nst ndt.+1 ls' e rnd2 nss nts)
         end
       end
     end
@@ -315,3 +330,33 @@ Instance showResult : Show Result := Build_Show _ (fun r =>
 Definition quickCheck {prop : Type} {_ : Checkable prop}
            (p : prop) : Result :=
   quickCheckWith stdArgs p.
+
+Import IONotations.
+
+(* A named test property with parameters. *)
+Inductive Test : Type :=
+| QuickChickTest : string -> Args -> Checker -> Test.
+
+(* Make a named test property with explicit parameters. *)
+Definition qc_ {prop : Type} {_ : Checkable prop}
+           (name : string) (a : Args) (p : prop) : Test :=
+  QuickChickTest name a (checker p).
+
+(* Make a named test property with implicit default parameters. *)
+Definition qc {prop : Type} {_ : Checkable prop}
+           (name : string) (p : prop) : Test :=
+  qc_ name stdArgs (checker p).
+
+(* IO action that runs the tests. *)
+Fixpoint testRunner (tests : list Test) : IO unit :=
+  match tests with
+  | [] => IOMonad.ret tt
+  | QuickChickTest name args test :: tests =>
+    print_endline ("Checking " ++ name ++ "...");;
+    print_endline (show (quickCheckWith args test));;
+    testRunner tests
+  end.
+
+(* Actually run the tests. (Only meant for extraction.) *)
+Definition runTests (tests : list Test) : unit :=
+  unsafe_run (testRunner tests).

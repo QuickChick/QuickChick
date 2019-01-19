@@ -5,7 +5,10 @@ src/Sets.v
 src/Nat_util.v
 src/RandomQC.v
 src/RoseTrees.v
+src/GenLowInterface.v
 src/GenLow.v
+src/GenHighInterface.v
+src/GenHighImpl.v
 src/GenHigh.v
 src/Classes.v
 src/Instances.v
@@ -18,6 +21,7 @@ src/Checker.v
 src/SemChecker.v
 src/Test.v
 src/ExtractionQC.v
+src/Mutation.v
 src/tactic_quickchick.ml4
 src/quickchick_plugin.mlpack
 src/Typeclasses.v

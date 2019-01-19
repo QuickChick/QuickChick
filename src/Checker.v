@@ -12,9 +12,6 @@ Require Import DependentClasses.
 
 Import GenLow GenHigh.
 
-(* Extraction will map this to something that additionally prints stuff *)
-Definition trace (A : Type) (s : string) (a : A) : A := a.
-
 (* Note : Simple Callbacks fall under strict positivity of result... *)
 Inductive CallbackKind :=
 | Counterexample

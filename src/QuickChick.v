@@ -50,6 +50,7 @@ Require Export Classes.
 Require Export Instances.
 Require Export DependentClasses.
 Require Export Typeclasses.
+Require Export Mutation.
 Export GenLow GenHigh.
 
 (* TODO: Figure out better place for these *)
