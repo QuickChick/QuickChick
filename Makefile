@@ -38,6 +38,13 @@ install: all
 	$(V)cp $(QCLIB).cmi $(COQLIB)/user-contrib/QuickChick/
 	$(V)cp $(QCLIB).o $(COQLIB)/user-contrib/QuickChick/
 
+	$(V)cp Fuzz/alloc-inl.h $(COQLIB)/user-contrib/QuickChick/
+	$(V)cp Fuzz/config.h $(COQLIB)/user-contrib/QuickChick/
+	$(V)cp Fuzz/debug.h $(COQLIB)/user-contrib/QuickChick/
+	$(V)cp Fuzz/types.h $(COQLIB)/user-contrib/QuickChick/
+	$(V)cp Fuzz/SHM.c $(COQLIB)/user-contrib/QuickChick/
+	$(V)cp Fuzz/Stub.ml $(COQLIB)/user-contrib/QuickChick/
+
 install-plugin: Makefile.coq
 	$(V)$(MAKE) -f Makefile.coq install | tee $(TEMPFILE)
 

@@ -49,23 +49,54 @@ void setup_shm(void) {
 
 }
 
+void setup_shm_aux(void) {
+
+  u8* shm_str;
+
+  shm_str = getenv(SHM_ENV_VAR);
+
+  if (shm_str == NULL) PFATAL("getenv() failed");
+
+  sscanf(shm_str, "%d", &shm_id);
+  // shm_id = shmget(shm_str, MAP_SIZE, 0600);
+
+  //ck_free(shm_str);
+
+  trace_bits = shmat(shm_id, NULL, 0);
+  
+  if (!trace_bits) PFATAL("shmat() failed");
+
+}
+
+
 CAMLprim value setup_shm_prim(value unit)
 {
   setup_shm();
-  //  printf ("Setup succesful!\n");
+  printf ("SHM Setup succesful!\n");
   return Val_unit;
 }
 
+CAMLprim value setup_shm_prim_aux(value unit)
+{
+  setup_shm_aux();
+  printf ("SHM Setup succesful!\n");
+  return Val_unit;
+}
+
+
 CAMLprim value copy_trace_bits( value ml_array )
 {
+  printf("Entering copy_trace_bits....\n");
     int i, len;
     len = Wosize_val(ml_array);
+    printf("Size: %d\n", len);
     for (i=0; i < len; i++)
     {
       // *2 for some reason probably to do with ocaml encoding
       caml_modify(&Field(ml_array, i), Val_int (trace_bits[i]));
     }
 
+    printf("Returning from copy trace bits...\n");
     return Val_unit ;
 }
 

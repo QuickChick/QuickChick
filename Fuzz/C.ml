@@ -16,8 +16,3 @@ let unlikely_branch =
        else 0
   else 0
 
-let main =
-  let n =
-    try read_int () 
-    with _ -> 42
-  in unlikely_branch n
