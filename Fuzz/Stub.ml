@@ -3,7 +3,7 @@ let map_size = 1 lsl map_size_pow2
 
 let trace_bits = Array.make map_size 0
              
-external setup_shm : unit -> unit = "setup_shm_prim"
+external setup_shm_aux : unit -> unit = "setup_shm_prim_aux"
 external copy_trace_bits : int array -> unit = "copy_trace_bits"
 external reset_trace_bits : unit -> unit = "reset_trace_bits"
 

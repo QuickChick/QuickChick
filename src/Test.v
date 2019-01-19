@@ -370,9 +370,10 @@ Fixpoint testRunner (tests : list Test) : IO unit :=
 Definition runTests (tests : list Test) : unit :=
   unsafe_run (testRunner tests).
 
-Axiom withInstrumentation : (unit -> bool) -> (option bool -> bool -> Result) -> Result.
-Extract Constant withInstrumentation => "QuickChickLib.withInstrumentation".
-Fixpoint fuzzLoop {A} (fuel : nat) (st : State)
+(* HACK! This will be implemented by appending it to the beginning of the file...*)
+Axiom withInstrumentation : (unit -> option bool) -> (option bool -> bool -> Result) -> Result.
+Extract Constant withInstrumentation => "withInstrumentation".
+Fixpoint fuzzLoopAux {A} (fuel : nat) (st : State)
          (* TODO: priorities for seeds? *)
          (seeds : list A)
          (gen : G A) (fuzz : A -> G A) (print : A -> string)
@@ -400,9 +401,9 @@ Fixpoint fuzzLoop {A} (fuel : nat) (st : State)
       | Some true =>
         if is_interesting then
           (* KEEP *)
-          fuzzLoop fuel' (updSuccTests st S) (a :: seeds') gen fuzz print prop
+          fuzzLoopAux fuel' (updSuccTests st S) (a :: seeds') gen fuzz print prop
         else
-          fuzzLoop fuel' (updSuccTests st S) (seeds') gen fuzz print prop
+          fuzzLoopAux fuel' (updSuccTests st S) (seeds') gen fuzz print prop
       | Some false =>
         let '(MkState mst mdt ms cs nst ndt ls e r nss nts) := st in
         let zero := trace (print a ++ nl) 0 in
@@ -415,6 +416,25 @@ Fixpoint fuzzLoop {A} (fuel : nat) (st : State)
                                  ++ (show ndt) ++ " discards)")%string in
         Failure (nst + 1 + zero) numShrinks ndt r size (pre ++ suf) (summary st) "Falsified!"
       | None =>
-        fuzzLoop fuel' (updDiscTests st S) seeds' gen fuzz print prop
+        fuzzLoopAux fuel' (updDiscTests st S) seeds' gen fuzz print prop
       end)
   end.
+
+Definition fuzzLoopWith {A} (a : Args)
+         (gen : G A) (fuzz : A -> G A) (print : A -> string)
+         (prop : A -> option bool) :=
+  let (rnd, computeFun) := (newRandomSeed, compFun a (maxSize a) (maxSuccess a)) in
+  let st := MkState (maxSuccess a)  (* maxSuccessTests   *)
+                    (maxDiscard a)  (* maxDiscardTests   *)
+                    (maxShrinks a)  (* maxShrinks        *)
+                    computeFun      (* computeSize       *)
+                    0               (* numSuccessTests   *)
+                    0               (* numDiscardTests   *)
+                    (Map.empty nat) (* labels            *)
+                    false           (* expectedFailure   *)
+                    rnd             (* randomSeed        *)
+                    0               (* numSuccessShrinks *)
+                    0               (* numTryShrinks     *)
+  in fuzzLoopAux (maxSuccess a + maxDiscard a) st [] gen fuzz print prop.
+
+Definition fuzzLoop {A} := @fuzzLoopWith A stdArgs.

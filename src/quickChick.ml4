@@ -66,7 +66,7 @@ let link_files = ["quickChickLib.cmx"]
 
 (* TODO: in Coq 8.5, fetch OCaml's path from Coq's configure *)
 (* FIX: There is probably a more elegant place to put this flag! *)
-let ocamlopt = "ocamlopt -afl-instrument"
+let ocamlopt = "ocamlopt"
 let ocamlc = "ocamlc -unsafe-string"
 
 let eval_command (cmd : string) : string =
@@ -84,7 +84,7 @@ let comp_ml_cmd tmp_dir fn out =
   let extra_link_files =
     String.concat " " (List.map (fun (s : string * string) -> tmp_dir ^ "/" ^ fst s) !extra_files) in
   print_endline ("Extra: " ^ extra_link_files);
-  Printf.sprintf "%s unix.cmxa str.cmxa %s -unsafe-string -rectypes -w a -I %s -I %s -I %s %s %s %s -o %s" ocamlopt afl_link (Filename.dirname fn) afl_path path link_files extra_link_files fn out 
+  Printf.sprintf "%s -afl-instrument unix.cmxa str.cmxa %s -unsafe-string -rectypes -w a -I %s -I %s -I %s %s %s %s -o %s" ocamlopt afl_link (Filename.dirname fn) afl_path path link_files extra_link_files fn out 
 (*  Printf.sprintf "%s unix.cmxa str.cmxa -unsafe-string -rectypes -w a -I %s -I %s %s %s %s -o %s" ocamlopt (Filename.dirname fn) path link_files extra_link_files fn out
  *)
 (*
@@ -97,7 +97,7 @@ let comp_mli_cmd fn =
   let link_files = List.map (Filename.concat path) link_files in
   let link_files = String.concat " " link_files in
   let afl_link = eval_command "opam config var lib" ^ "/afl-persistent/afl-persistent.cmxa" in 
-  Printf.sprintf "%s unix.cmxa %s -unsafe-string -rectypes -w a -I %s -I %s %s %s" ocamlopt afl_link
+  Printf.sprintf "%s -afl-instrument unix.cmxa %s -unsafe-string -rectypes -w a -I %s -I %s %s %s" ocamlopt afl_link
     (Filename.dirname fn) path link_files fn
 
 let fresh_name n =
@@ -320,9 +320,10 @@ let runTest fuzz (c : constr_expr) =
   let env = Global.env () in
   let evd = Evd.from_env env in
   let (show_and_c_fun, evd) = interp_constr env evd show_and_c_fun in
+
   define_and_run fuzz show_and_c_fun
 
-let qcFuzz prop gen fuzz show =
+let qcFuzz prop fuzzLoop =
   (** Extract the property and its dependencies *)
   let env = Global.env () in
   let evd = Evd.from_env env in
@@ -335,7 +336,151 @@ let qcFuzz prop gen fuzz show =
   let mute_extraction = warnings ^ (if warnings = "" then "" else ",") ^ "-extraction-opaque-accessed" in
   CWarnings.set_flags mute_extraction;
   Flags.silently (Extraction_plugin.Extract_env.full_extraction (Some prop_mlf)) [CAst.make @@ Ident prop_def];
-  CWarnings.set_flags warnings
+  CWarnings.set_flags warnings;
+
+  (** Override extraction to use the new, instrumented property *)
+  let prop_name = Filename.basename execn ^ "." ^ Id.to_string prop_def in
+  let prop_ref =
+    match prop with
+    | { CAst.v = CRef (r,_) } -> r
+    | _ -> failwith "Not a reference"
+  in
+  Extraction_plugin.Table.extract_constant_inline false prop_ref [] prop_name;
+
+  (** Define fuzzLoop applied appropriately *)
+  let unit_type =
+    CAst.make @@ CRef (CAst.make @@ Qualid (qualid_of_string "Coq.Init.Datatypes.unit"), None) in
+  let unit_arg =
+    CLocalAssum ( [ CAst.make (Name (fresh_name "x")) ], Default Explicit, unit_type ) in
+  let pair_ctr =
+    CAst.make @@ CRef (CAst.make @@ Qualid (qualid_of_string "Coq.Init.Datatypes.pair"), None) in
+  let show_expr cexpr =
+    CAst.make @@ CApp((None,show), [(cexpr,None)]) in
+  let show_and_c_fun : constr_expr =
+    Constrexpr_ops.mkCLambdaN [unit_arg] 
+      (let fx = fresh_name "_qc_res" in
+       let fx_expr = (CAst.make @@ CRef (CAst.make @@ Libnames.Ident fx,None)) in
+
+       CAst.make @@ CLetIn (CAst.make @@ Name fx, fuzzLoop, None, 
+                            CAst.make @@ CApp ((None, pair_ctr),
+                                               [(fx_expr, None);
+                                                (show_expr fx_expr, None)]))) in
+  
+  (** Build the kernel term from the const_expr *)
+  let env = Global.env () in
+  let evd = Evd.from_env env in
+  let (show_and_c_fun, evd) = interp_constr env evd show_and_c_fun in
+
+  let show_and_c_fun_def = define show_and_c_fun in
+  let mlf = Filename.temp_file ~temp_dir "QuickChick" ".ml" in
+  let execn = Filename.chop_extension mlf in
+  let mlif = execn ^ ".mli" in
+  let mute_extraction = warnings ^ (if warnings = "" then "" else ",") ^ "-extraction-opaque-accessed" in
+  Flags.silently (Extraction_plugin.Extract_env.full_extraction (Some mlf)) [CAst.make @@ Ident show_and_c_fun_def];
+  CWarnings.set_flags warnings;
+
+  (** Add a main function to get some output *)
+  let oc = open_out_gen [Open_append;Open_text] 0o666 mlf in
+  Printf.fprintf oc "
+let _ = 
+  print_endline \"Calling setup_sum_aux()...\\n\"; flush stdout;
+  setup_shm_aux ();
+  print_endline \"setup_sum_aux() called succesfully\\n\";
+  let f () = 
+    let quickchick_result =
+      try Some ((%s) ())
+      with _ -> None
+    in
+    match quickchick_result with
+    | Some (Failure _, s) ->
+       print_string (QuickChickLib.string_of_coqstring s); flush stdout;
+       failwith \"Test Failed\"
+    | Some (_, s) ->
+       print_string (QuickChickLib.string_of_coqstring s)
+    | _ ->
+       print_string \"Failed to generate...\"
+  in f ()
+" (string_of_id show_and_c_fun_def);
+  close_out oc;
+
+  (* Append the appropriate definitions in the beginning *)
+  let user_contrib = "$(opam config var lib)/coq/user-contrib/QuickChick" in
+  (* Add preamble *)
+  let echo_cmd =
+    Printf.sprintf "cat %s/Stub.ml | cat - %s > temp && mv temp %s" user_contrib mlf mlf in
+  print_endline echo_cmd;
+  ignore (Sys.command echo_cmd);
+
+  (* Copy fuzz-related files to temp directory *)
+  ignore (Sys.command (Printf.sprintf "cp %s/alloc-inl.h %s" user_contrib temp_dir));
+  ignore (Sys.command (Printf.sprintf "cp %s/debug.h %s" user_contrib temp_dir));
+  ignore (Sys.command (Printf.sprintf "cp %s/types.h %s" user_contrib temp_dir));
+  ignore (Sys.command (Printf.sprintf "cp %s/config.h %s" user_contrib temp_dir));
+  ignore (Sys.command (Printf.sprintf "cp %s/SHM.c %s" user_contrib temp_dir));
+
+  (* Compile. Prop with instrumentation, rest without *)
+  let path = Lazy.force path in
+  let link_files = List.map (Filename.concat path) link_files in
+  let link_files = String.concat " " link_files in
+  let afl_path = eval_command "opam config var lib" ^ "/afl-persistent/" in
+  let afl_link = afl_path ^ "afl-persistent.cmxa" in
+  let extra_link_files =
+    String.concat " " (List.map (fun (s : string * string) -> temp_dir ^ "/" ^ fst s) !extra_files) in
+  print_endline ("Extra: " ^ extra_link_files);
+
+  let comp_mli_cmd instr_flag fn =
+    Printf.sprintf "%s %s unix.cmxa %s -unsafe-string -rectypes -w a -I %s -I %s %s %s" ocamlopt instr_flag afl_link
+      (Filename.dirname fn) path link_files fn
+  in
+
+  let comp_prop_ml_cmd fn = 
+    Printf.sprintf "%s -afl-instrument unix.cmxa str.cmxa %s -unsafe-string -rectypes -w a -I %s -I %s -I %s %s %s %s"
+      ocamlopt afl_link (Filename.dirname fn) afl_path path link_files extra_link_files fn
+  in 
+
+  let comp_exec_ml_cmd fn prop_fn execn =
+    Printf.sprintf "%s unix.cmxa str.cmxa %s -unsafe-string -rectypes -w a -I %s -I %s -I %s %s %s %s -o %s %s %s/SHM.c"
+      ocamlopt afl_link (Filename.dirname fn) afl_path path link_files extra_link_files (Filename.chop_extension prop_fn ^ ".cmx") execn fn temp_dir
+  in
+
+  (* Compile the .mli *)
+  if Sys.command (comp_mli_cmd "-afl-instrument" prop_mlif) <> 0 then CErrors.user_err (str "Could not compile mli file" ++ fnl ());
+  (* Compile the instrumented property .ml *)
+  if Sys.command (comp_prop_ml_cmd prop_mlf) <> 0 then
+    (CErrors.user_err (str "Could not compile test program" ++ fnl ()));
+
+  (* Compile the executable .mli, no instrumentation *)
+  if Sys.command (comp_mli_cmd " " mlif) <> 0 then CErrors.user_err (str "Could not compile exec mli file" ++ fnl ());
+  (* Compile the actual executable *)
+  let cmp_cmd = comp_exec_ml_cmd mlf prop_mlf (temp_dir ^ "/qc_exec") in
+  Printf.printf "Compile Command: %s\n" cmp_cmd;
+  if Sys.command (cmp_cmd) <> 0 then
+    (CErrors.user_err (str "Could not compile exec program" ++ fnl ()));
+
+  (* Copy over the main file that actually sets up the shm... *)
+  ignore (Sys.command (Printf.sprintf "cp %s/Main.ml %s" user_contrib temp_dir));
+  let comp_main_cmd fn execn : string = 
+    Printf.sprintf "%s unix.cmxa str.cmxa %s -unsafe-string -rectypes -w a -I %s -I %s -I %s %s %s -o %s %s %s/SHM.c"
+      ocamlopt afl_link (Filename.dirname fn) afl_path path link_files extra_link_files execn fn temp_dir in
+  let cmp_cmd_main = comp_main_cmd (temp_dir ^ "/Main.ml") (temp_dir ^ "/main_exec") in
+  if (Sys.command cmp_cmd_main <> 0) then
+    (CErrors.user_err (str "Could not compile main program" ++ fnl ()));
+  
+  ignore (Sys.command (temp_dir ^ "/main_exec " ^ temp_dir ^ "/qc_exec"))
+  (* open linked ocaml files 
+  List.iter (fun (s : string * string) ->
+      let (fn, c) = s in
+      let sed_cmd = (Printf.sprintf "sed -i '1s;^;open %s\\n;' %s" c mlf) in
+      print_endline ("Sed cmd: " ^ sed_cmd);
+      ignore (Sys.command sed_cmd);
+      ignore (Sys.command (Printf.sprintf "cp %s %s" fn temp_dir));
+    ) !extra_files;
+   *)
+  
+
+  
+
+      
   
 let run fuzz f args =
   begin match args with
@@ -407,7 +552,7 @@ VERNAC COMMAND EXTEND MutateChickMany CLASSIFIED AS SIDEFF
 END;;
 
 VERNAC COMMAND EXTEND FuzzQC CLASSIFIED AS SIDEFF
-  | ["FuzzQC" constr(prop) constr(gen) constr(fuzz) constr(show)] ->  [ qcFuzz prop gen fuzz show ]
+  | ["FuzzQC" constr(prop) constr(fuzzLoop) ] ->  [ qcFuzz prop fuzzLoop ]
 END;;
 
 VERNAC COMMAND EXTEND QuickChickDebug CLASSIFIED AS SIDEFF

@@ -78,8 +78,9 @@ CAMLprim value setup_shm_prim(value unit)
 
 CAMLprim value setup_shm_prim_aux(value unit)
 {
+  printf ("Preparing to setup aux...\n");
   setup_shm_aux();
-  printf ("SHM Setup succesful!\n");
+  printf ("SHM Setup (aux) succesful!\n");
   return Val_unit;
 }
 
@@ -99,4 +100,18 @@ CAMLprim value copy_trace_bits( value ml_array )
     printf("Returning from copy trace bits...\n");
     return Val_unit ;
 }
+
+CAMLprim value reset_trace_bits(value unit)
+{
+  printf("Entering reset trace bits...\n");
+  fflush(stdout);
+  int i;
+  //TODO: memset
+  for (i=0; i<MAP_SIZE; i++){
+    trace_bits[i] = 0;
+  }
+  printf("Returnging from reset trace bits...\n");
+  return Val_unit ;
+}
+
 

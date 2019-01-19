@@ -229,6 +229,14 @@ Global Instance fuzzyOption {A} `{Gen A} `{Fuzzy A} : Fuzzy (option A) :=
        end
   |}.
 
+Global Instance FuzzyProd {A B} `{Fuzzy A} `{Fuzzy B} : Fuzzy (A * B) :=
+  {| fuzz (ab : A * B) :=
+       let (a,b) := ab in
+       freq [ (1, bindGen (fuzz a) (fun a' => ret (a', b)))
+            ; (1, bindGen (fuzz b) (fun b' => ret (a, b')))
+            ]
+  |}. 
+
 (** Instance correctness *)
 
 Program Instance arbNatMon : SizeMonotonic (@arbitrary nat _).

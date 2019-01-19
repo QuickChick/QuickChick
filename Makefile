@@ -44,6 +44,7 @@ install: all
 	$(V)cp Fuzz/types.h $(COQLIB)/user-contrib/QuickChick/
 	$(V)cp Fuzz/SHM.c $(COQLIB)/user-contrib/QuickChick/
 	$(V)cp Fuzz/Stub.ml $(COQLIB)/user-contrib/QuickChick/
+	$(V)cp Fuzz/Main.ml $(COQLIB)/user-contrib/QuickChick/
 
 install-plugin: Makefile.coq
 	$(V)$(MAKE) -f Makefile.coq install | tee $(TEMPFILE)
