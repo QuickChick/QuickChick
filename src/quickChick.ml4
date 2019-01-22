@@ -383,9 +383,7 @@ let qcFuzz prop fuzzLoop =
   let oc = open_out_gen [Open_append;Open_text] 0o666 mlf in
   Printf.fprintf oc "
 let _ = 
-  print_endline \"Calling setup_sum_aux()...\\n\"; flush stdout;
   setup_shm_aux ();
-  print_endline \"setup_sum_aux() called succesfully\\n\";
   let f () = 
     let quickchick_result =
       try Some ((%s) ())
@@ -394,7 +392,6 @@ let _ =
     match quickchick_result with
     | Some (Failure _, s) ->
        print_string (QuickChickLib.string_of_coqstring s); flush stdout;
-       failwith \"Test Failed\"
     | Some (_, s) ->
        print_string (QuickChickLib.string_of_coqstring s)
     | _ ->
