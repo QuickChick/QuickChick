@@ -392,7 +392,7 @@ let _ =
     match quickchick_result with
     | Some (Failure _, s) ->
        print_string (QuickChickLib.string_of_coqstring s); flush stdout;
-    | Some (_, s) ->
+    | Some  (_, s) ->
        print_string (QuickChickLib.string_of_coqstring s)
     | _ ->
        print_string \"Failed to generate...\"

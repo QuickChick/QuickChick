@@ -58,6 +58,62 @@ let arbitrarySized_decl ty_ctr ctrs iargs =
   debug_coq_expr arb_body;
   gRecord [("arbitrarySized", arbitrary_decl)]
 
+let fuzzy_decl ty_ctr ctrs iargs =
+
+  let isCurrentTyCtr = function
+    | TyCtr (ty_ctr', _) -> ty_ctr = ty_ctr'
+    | _ -> false in
+
+  
+  let tyParams = List.map gVar (list_keep_every 3 iargs) in
+
+  let fuzzy_fun = 
+    let fuzzy_body x =
+      let create_branch aux_fuzz (ctr, ty) =
+        (ctr, generate_names_from_type "p" ty,
+         fun all_vars -> 
+         let rec aux opts ty acc_vars : coq_expr =
+           match ty, acc_vars with
+           | Arrow (ty1, ty2), v :: vs ->
+              (* lift a generator for ty1 to a generator for the whole thing *)
+              let liftNth g =
+                bindGen g "fuzzed" (fun fuzzed ->
+                    returnGen (gApp ~explicit:true (gCtr ctr)
+                                               (tyParams @ (replace (gVar v) (gVar fuzzed) (List.map gVar all_vars))))) in
+              let fuzz_options = 
+                if isCurrentTyCtr ty1 then
+                  (* Recursive argument. Fuzz with aux, or keep *)
+                  [ liftNth (gApp (gVar aux_fuzz) [gVar v])
+                  ; returnGen (gVar v)
+                  ]
+                else
+                  [ liftNth (gApp (gInject "fuzz") [gVar v]) ]
+              in 
+
+              aux (fuzz_options @ opts) ty2  vs
+           (* Finalize, pick one of the options, using oneof' for now. *)
+           | _ ->
+              (* If no options are available (i.e, you're fuzzing a nullary constructor,
+                 just generate an arbitrary thing *)
+              begin match opts with
+              | [] -> gInject "arbitrary"
+              | _  -> oneof' (List.map (fun x -> (gFunTyped [("_tt", gUnit)] (fun _ -> x))) opts)
+              end
+         in aux [] ty all_vars)
+      in
+
+      let aux_fuzz_body rec_fun x' = gMatch (gVar x') (List.map (create_branch rec_fun) ctrs) in
+
+      gRecFunIn "aux_fuzz" ["x'"]
+        (fun (aux_fuzz, [x']) -> aux_fuzz_body aux_fuzz x')
+        (fun aux_fuzz -> gApp (gVar aux_fuzz) [gVar x])
+    in
+    (* Create the function body by recursing on the structure of x *)
+    gFun ["x"] (fun [x] -> fuzzy_body x)
+  in
+  debug_coq_expr fuzzy_fun;
+  gRecord [("fuzz", fuzzy_fun)]
+
 
 (** Shrinking Derivation *)
 let shrink_decl ty_ctr ctrs iargs =
