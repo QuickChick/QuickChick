@@ -89,28 +89,28 @@ Class GenSuchThatMonotonicCorrect (A : Type) (P : A -> Prop)
 Instance GenSizedSuchThatMonotonicOptOfSizeMonotonic
          (A : Type) (P : A -> Prop) (Hgen : GenSizedSuchThat A P)
          (Hmon : forall s : nat, SizeMonotonicOpt (arbitrarySizeST s))
-: @GenSizedSuchThatMonotonicOpt A _ Hgen Hmon.
+: @GenSizedSuchThatMonotonicOpt A _ Hgen Hmon := {}.
 
 Instance GenSizedSuchThatSizeMonotonicOptOfSizedMonotonic
          (A : Type) (P : A -> Prop) (Hgen : GenSizedSuchThat A P)
          (Hmon : SizedMonotonicOpt arbitrarySizeST)
-: @GenSizedSuchThatSizeMonotonicOpt A _ Hgen Hmon.
+: @GenSizedSuchThatSizeMonotonicOpt A _ Hgen Hmon := {}.
 
 Instance GenSizedSuchThatCorrectOptOfSizedSuchThatCorrect
          (A : Type) (P : A -> Prop) (H : GenSizedSuchThat A P)
          (Heqs : SizedProofEqs P)
          (Hcorr : SizedSuchThatCorrect P arbitrarySizeST)
-: @GenSizedSuchThatCorrect A P H Heqs Hcorr.
+: @GenSizedSuchThatCorrect A P H Heqs Hcorr := {}.
 
 Instance GenSuchThatMonotonicOptOfSizeMonotonic
          (A : Type) (P : A -> Prop) (Hgen : GenSuchThat A P)
          (Hmon : SizeMonotonicOpt arbitraryST)
-: @GenSuchThatMonotonicOpt A _ Hgen Hmon.
+: @GenSuchThatMonotonicOpt A _ Hgen Hmon := {}.
 
 Instance GenSuchThatCorrectOptOfSuchThatCorrect
          (A : Type) (P : A -> Prop) (H : GenSuchThat A P)
          (Hcorr : SuchThatCorrect P (genST P))
-: @GenSuchThatCorrect A P H Hcorr.
+: @GenSuchThatCorrect A P H Hcorr := {}.
 
 Instance SizeMonotonicOptofSizeMonotonic {A} (g : G (option A))
          {H : SizeMonotonic g} : SizeMonotonicOpt g.
@@ -136,7 +136,7 @@ Instance GenSuchThatMonotonicOfSized (A : Type) (P : A -> Prop)
          {H : GenSizedSuchThat A P}
          `{@GenSizedSuchThatMonotonic A P H PMon}
          `{@GenSizedSuchThatSizeMonotonic A P H PSMon}
-: GenSuchThatMonotonic A P.
+: GenSuchThatMonotonic A P := {}.
 
 
 Instance SizeMonotonicOptOfBounded' (A : Type) (P : A -> Prop)
@@ -166,7 +166,7 @@ Instance GenSuchThatMonotonicOptOfSized' (A : Type) (P : A -> Prop)
          {H : GenSizedSuchThat A P}
          `{@GenSizedSuchThatMonotonicOpt A P H PMon}
          `{@GenSizedSuchThatSizeMonotonicOpt A P H PSMon}
-: GenSuchThatMonotonicOpt A P.
+: GenSuchThatMonotonicOpt A P := {}.
 
 (* Correctness *)
 Instance SuchThatCorrectOfBounded' (A : Type) (P : A -> Prop)
