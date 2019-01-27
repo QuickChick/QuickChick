@@ -32,9 +32,10 @@ let register_weights (l : (constructor * weight_ast) list) =
 
 let convert_constr_to_weight c = 
   match c with 
-  | { CAst.v = CPrim (Numeral (i,s)) } -> 
-     if s then WNum (int_of_string i)
-     else failwith "QC: Numeric weights should be greater than 0."
+  | { CAst.v = CPrim (Numeral (SPlus,{NumTok.int=i;frac="";exp=""})) } ->
+     WNum (int_of_string i)
+  | { CAst.v = CPrim (Numeral (SMinus,_)) } ->
+     failwith "QC: Numeric weights should be greater than 0."
   | { CAst.v = CRef (r, _) } -> 
      if string_of_qualid r = "size" then WSize
      else failwith "QC: Expected number or 'size'."
