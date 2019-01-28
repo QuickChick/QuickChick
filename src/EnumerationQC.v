@@ -30,7 +30,7 @@ Fixpoint enumFromTo {A : Type} `{EnumFromInterval A} (a1 : A) (a2 : A) : LazyLis
 
 (* EnumFromInterval for bool *)
 Definition enumFromToBool (b1 : bool) (b2 : bool) : LazyList bool
-  := if b1 =? b2 then ret b1 else if b1 =? false then lcons _ b1 (lazy (lcons _ b2 (lazy (lnil _)))) else lnil _.
+  := if b1 =? b2 then ret b1 else if b1 =? false then lcons _ b1 (fun _ => (lcons _ b2 (fun _ => (lnil _)))) else lnil _.
 
 Program Instance EnumBool : EnumFromInterval bool :=
   {
@@ -42,7 +42,7 @@ Program Instance EnumBool : EnumFromInterval bool :=
 Fixpoint enumFromN (n : nat) (num : nat) : LazyList nat
   := match num with
      | 0 => lnil _
-     | S num' => lcons _ n (lazy (enumFromN (S n) num'))
+     | S num' => lcons _ n (fun _ => (enumFromN (S n) num'))
      end.
 
 Fixpoint enumFromToNat (n1 : nat) (n2 : nat) : LazyList nat

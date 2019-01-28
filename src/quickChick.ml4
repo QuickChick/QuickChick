@@ -151,11 +151,11 @@ let define_and_run c =
   (* TODO: Maxime, thoughts? *)
   (** LEO: However, sometimes the inferred types are too abstract. So we touch the .mli to close the weak types. **)
   let _exit_code = Sys.command ("touch " ^ mlif) in
-  (*
+
   Printf.printf "Extracted ML file: %s\n" mlf;
   Printf.printf "Compile command: %s\n" (comp_ml_cmd mlf execn);
   flush_all ();
-  *)
+
   (* Compile the (empty) .mli *)
   if Sys.command (comp_mli_cmd mlif) <> 0 then CErrors.user_err (str "Could not compile mli file" ++ fnl ());
   if Sys.command (comp_ml_cmd mlf execn) <> 0 then
@@ -164,7 +164,7 @@ let define_and_run c =
   (** Run the test *)
   else
     (* Should really be shared across this and the tool *)
-    let chan = Unix.open_process_in execn in
+    let chan = Unix.open_process_in ("time " ^ execn) in
     let builder = ref [] in
     let rec process_otl_aux () =
       let e = input_line chan in

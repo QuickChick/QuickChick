@@ -234,7 +234,7 @@ Fixpoint checkTests (st : State) (tests : LazyList QProp) : (State * Result) :=
                                     | Some k => Map.add stamp (k+1) stamps
                                     end
                                  ) s ls in*)
-            checkTests (MkState mst mdt ms cs (nst + 1) ndt ls' e rnd2 nss nts) (force test_rest)
+            checkTests (MkState mst mdt ms cs (nst + 1) ndt ls' e rnd2 nss nts) (test_rest tt)
           else (* Failure *)
             let tag_text := 
                 match t with 
@@ -266,7 +266,7 @@ Fixpoint checkTests (st : State) (tests : LazyList QProp) : (State * Result) :=
                 | Some k => Map.add s_to_add (k+1) ls
                 end
               end in
-          checkTests (MkState mst mdt ms cs nst ndt.+1 ls' e rnd2 nss nts) (force test_rest)
+          checkTests (MkState mst mdt ms cs nst ndt.+1 ls' e rnd2 nss nts) (test_rest tt)
         end
       end
     end
