@@ -58,15 +58,15 @@ Module GenLow : GenLowInterface.Sig.
     MkGen (fun n r => fmap f (run g n r)).
 
   (* Split and use a different random seed on each list *)
-  Fixpoint bind_helper' {B : Type} (lgb : LazyList (G B)) (n : nat) (rs : RandomSeed) : LazyList (LazyList B) :=
+  Fixpoint bind_helper' {B : Type} (acc : LazyList B) (lgb : LazyList (G B)) (n : nat) (rs : RandomSeed) : LazyList B :=
     match lgb with
-    | lnil => lnil _
+    | lnil => acc
     | lcons gb ts =>
       let (r1, r2) := randomSplit rs in
-      lcons _ (run gb n r1) (fun _ => (bind_helper' (ts tt) n r2))
+      bind_helper' (lazy_append (run gb n r1) acc) (ts tt) n r2
     end.
 
-  Definition bind_helper {B : Type} (lgb : LazyList (G B)) (n : nat) (rs : RandomSeed) : LazyList B := concatLazyList (bind_helper' lgb n rs).
+  Definition bind_helper {B : Type} (lgb : LazyList (G B)) (n : nat) (rs : RandomSeed) : LazyList B := bind_helper' (lnil _) lgb n rs.
 
 
   Definition bindGen {A B : Type} (g : G A) (k : A -> G B) : G B :=
@@ -417,6 +417,7 @@ Module GenLow : GenLowInterface.Sig.
         exists x. split; auto. exists x0. auto.
   Qed.
 *)
+(*
   Lemma bind_helper_rs :
     forall {B : Type} (l : LazyList (G B)) (gb : G B) s r',
       In_ll gb l ->
@@ -437,6 +438,7 @@ Module GenLow : GenLowInterface.Sig.
         exists r. rewrite Hsplit. simpl. right. auto.
   Qed.
     *)
+*)
   (* begin semBindSize *)
   Lemma semBindSize A B (g : G A) (f : A -> G B) (s : nat) :
     semGenSize (bindGen g f) s <-->
