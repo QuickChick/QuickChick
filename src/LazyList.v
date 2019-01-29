@@ -13,11 +13,13 @@ Open Scope monad_scope.
 (* A lazy list *)
 Inductive LazyList (A : Type) : Type :=
 | lnil : LazyList A
+| lsing : A -> LazyList A
 | lcons : A -> (unit -> (LazyList A)) -> LazyList A.
 
 Fixpoint lazy_append {A : Type} (l1 : LazyList A) (l2 : LazyList A) : LazyList A :=
   match l1 with
   | lnil => l2
+  | lsing x => lcons _ x (fun _ => l2)
   | lcons x l1' => lcons _ x (fun _ => (lazy_append (l1' tt) l2))
   end.
 
@@ -25,15 +27,17 @@ Fixpoint lazy_take {A : Type} (n : nat) (l : LazyList A) : LazyList A :=
   match n with
   | 0 => lnil _
   | S n' => match l with
-           | lnil => lnil _
-           | lcons h ts => lcons _ h (fun _ => (lazy_take n' (ts tt)))
-           end
+            | lnil => lnil _
+            | lsing x => lsing _ x
+            | lcons h ts => lcons _ h (fun _ => (lazy_take n' (ts tt)))
+            end
   end.
 
 (* Functor instace for LazyList *)
 Fixpoint mapLazyList {A B : Type} (f : A -> B) (l : LazyList A) : LazyList B :=
   match l with
   | lnil => lnil _
+  | lsing x => lsing _ (f x)
   | lcons x l' => lcons _ (f x) (fun _ => (mapLazyList f (l' tt)))
   end.
 
@@ -45,11 +49,13 @@ Instance FunctorLazyList : Functor LazyList :=
 
 (* Monad and applicative instances for LazyList *)
 Definition retLazyList {A : Type} (a : A) : LazyList A :=
-  lcons _ a (fun _ => (lnil _)).
+  lsing _ a.
+(*   lcons _ a (fun _ => (lnil _)). *)
 
 Fixpoint concatLazyList {A : Type} (l : LazyList (LazyList A)) : LazyList A :=
   match l with
   | lnil => lnil _
+  | lsing l => l
   | lcons x l' => lazy_append x (concatLazyList (l' tt))
   end.
 
@@ -67,7 +73,6 @@ Definition apLazyList {A B : Type} (lab : LazyList (A -> B)) (la : LazyList A) :
   ab <- lab;;
   a <- la;;
   ret (ab a).
-
 
 Instance ApplicativeLazyList : Applicative LazyList :=
   {
@@ -91,6 +96,7 @@ Definition guard (b : bool) : LazyList unit :=
 Fixpoint In_ll {A : Type} (a : A) (l : LazyList A) : Prop :=
   match l with
   | lnil => False
+  | lsing x => x = a
   | lcons h ts => h = a \/ In_ll a (ts tt)
   end.
 
@@ -136,12 +142,14 @@ Qed.
 Fixpoint LazyList_to_list {A : Type} (l : LazyList A) : list A :=
   match l with
   | lnil => nil
+  | lsing x => [x]
   | lcons x x0 => x :: LazyList_to_list (x0 tt)
   end.
 
 Fixpoint list_to_LazyList {A : Type} (l : list A) : LazyList A :=
   match l with
   | nil => lnil _
+  | cons x nil => lsing _ x
   | cons x x0 => lcons _ x (fun _ => (list_to_LazyList x0))
   end.
 

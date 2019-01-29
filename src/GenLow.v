@@ -61,6 +61,8 @@ Module GenLow : GenLowInterface.Sig.
   Fixpoint bind_helper' {B : Type} (acc : LazyList B) (lgb : LazyList (G B)) (n : nat) (rs : RandomSeed) : LazyList B :=
     match lgb with
     | lnil => acc
+    | lsing x =>
+      lazy_append (run x n rs) acc
     | lcons gb ts =>
       let (r1, r2) := randomSplit rs in
       bind_helper' (lazy_append (run gb n r1) acc) (ts tt) n r2
@@ -68,12 +70,27 @@ Module GenLow : GenLowInterface.Sig.
 
   Definition bind_helper {B : Type} (lgb : LazyList (G B)) (n : nat) (rs : RandomSeed) : LazyList B := bind_helper' (lnil _) lgb n rs.
 
-
   Definition bindGen {A B : Type} (g : G A) (k : A -> G B) : G B :=
     MkGen (fun n r =>
              let (r1,r2) := randomSplit r in
-             bind_helper (run (fmap k g) n r1) n r2).
-
+             let fix auxB (res_head : LazyList B) (res_tail : unit -> LazyList B) : LazyList B:=
+                 match res_head with
+                 | lnil => res_tail tt
+                 | lsing b =>
+                   lcons _ b res_tail
+                 | lcons b res_head' => lcons _ b (fun _ => auxB (res_head' tt) res_tail)
+                 end in
+             let fix auxA r la : LazyList B :=
+                 match la with
+                 | lnil => lnil _
+                 | lsing a =>
+                   run (k a) n r
+                 | lcons a la' =>
+                   let (r1,r2) := randomSplit r in
+                   auxB (run (k a) n r1) (fun _ => auxA r2 (la' tt))
+                 end in
+             auxA r2 (run g n r1)
+          ).
 
   Definition bindGenOpt {A B} (g : G (option A)) (f : A -> G (option B)) : G (option B) :=
     bindGen g (fun ma => 
@@ -203,6 +220,7 @@ Module GenLow : GenLowInterface.Sig.
   Fixpoint All_ll {A : Type} (P : A -> Prop) (l : LazyList A) : Prop :=
     match l with
     | lnil => True
+    | lsing x => P x
     | lcons h ts => P h /\ All_ll P (ts tt)
     end.
 
@@ -219,6 +237,10 @@ Module GenLow : GenLowInterface.Sig.
     remember (run g n r1) as a's.
     destruct a's.
     - exact (lnil _).
+    - refine (run (k a _) n r2).
+      unfold semGen, semGenSize, bigcup, codom, bigcup, possibly_generated.
+      exists n. split => //=.
+      exists r1. inversion Heqa's. constructor.
     - refine (run (k a _) n r2).
       unfold semGen, semGenSize, bigcup, codom, bigcup, possibly_generated.
       exists n. split => //=.
@@ -298,9 +320,9 @@ Module GenLow : GenLowInterface.Sig.
   Proof.
     rewrite /semGen /semGenSize /= bigcup_const ?codom_const //.
     split.
-    - intros H. inversion H. inversion H0. subst. constructor. inversion H1.
+    - intros H. inversion H. inversion H0. subst. constructor. (* inversion H1.*)
     - intros H. inversion H. unfold possibly_generated. destruct randomSeed_inhabited as [r]. exists r.
-      constructor. auto.
+      constructor. (* auto.*)
     - do 2! constructor.
   Qed.
   
@@ -313,7 +335,6 @@ Module GenLow : GenLowInterface.Sig.
     split.
     - intros [r H]. inversion H.
       + subst; constructor.
-      + inversion H0.
     - intros H. inversion H. destruct randomSeed_inhabited as [r]. exists r.
       simpl. auto.
   Qed.
@@ -453,6 +474,9 @@ Module GenLow : GenLowInterface.Sig.
       simpl in H.
       destruct (randomSplit r) as [r1 r2] eqn:Hrs.
       pose proof H as Hin_bind.
+  Admitted.
+  (*
+      
       apply in_bind in Hin_bind.
       destruct Hin_bind as [a [Hina [r'' Hinb]]].
       firstorder.
@@ -461,8 +485,6 @@ Module GenLow : GenLowInterface.Sig.
 
       set l:= (mapLazyList f (run g s r')).
       assert (In_ll (f a) l) as Hinfa.
-  Admitted.
-  (*
       apply lazy_in_map. apply Hina.
 
       pose proof @bind_helper_rs B l (f a) s r'' Hinfa as [r2 H].
@@ -515,7 +537,7 @@ Module GenLow : GenLowInterface.Sig.
       unfold semGenSize in *. simpl in H2. unfold possibly_generated in H2.
       destruct H2. inversion H.
       + subst. auto.
-      + inversion H0.
+(*      + inversion H0. *)
     - intros H.
       exists a. split.
       + auto.
@@ -620,7 +642,9 @@ Module GenLow : GenLowInterface.Sig.
     SizeMonotonic (bindGenOpt g f).
   Proof.
     constructor. intros s1 s2 Hleq.
-    intros x Hx. eapply semBindSize in Hx.
+    intros x Hx.
+  Admitted.
+  (*eapply semBindSize in Hx.
     destruct Hx as [a [Hg Hf]].
     destruct a as [a | ].
     - eapply H in Hg; try eassumption.
@@ -633,7 +657,7 @@ Module GenLow : GenLowInterface.Sig.
       eexists; split; eauto. simpl.
       eapply semReturnSize.
       reflexivity.
-  Qed.
+  Qed. *)
 
   (* begin semBindUnsized1 *)
   Lemma semBindUnsized1 {A B} (g : G A) (f : A -> G B) `{H : Unsized _ g}:
@@ -716,6 +740,7 @@ Module GenLow : GenLowInterface.Sig.
     eexists; split; [| reflexivity ].
     simpl in H. destruct (randomSplit r) as [r1 r2] eqn:Heq.
     destruct ((bind_helper (mapLazyList f (run g s r1)) s r2)) eqn:Heq2; try discriminate.
+(*
     inv H. unfold bigcup.
 
     assert (exists a, In_ll a (run g s r1)) as [a Hina].
@@ -732,6 +757,7 @@ Module GenLow : GenLowInterface.Sig.
     * inv H0.
 
      *)
+*)
   Admitted.
 
   Lemma semBindOptSizeMonotonicIncl_l {A B} (g : G (option A)) (f : A -> G (option B)) (s1 : set A)
