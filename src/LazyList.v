@@ -9,36 +9,52 @@ Import ListNotations.
 Import MonadNotation.
 Open Scope monad_scope.
 
+Set Bullet Behavior "Strict Subproofs".
 
 (* A lazy list *)
+(* Laziness is implemented by just thunking the computation for the tail
+   of a cons-cell. Since each such tail is used exactly once, there is no
+   point in using ocaml's 'lazy' that memoizes computation and results in
+   unnecessary overheads. 
+ *)
+(* We add a singleton constructor, lsing to make the common case --- pure 
+   randomness --- fast. *)
 Inductive LazyList (A : Type) : Type :=
 | lnil : LazyList A
 | lsing : A -> LazyList A
 | lcons : A -> (unit -> (LazyList A)) -> LazyList A.
 
+Arguments lnil {A}.
+Arguments lsing {A} _.
+Arguments lcons {A} _ _.
+
 Fixpoint lazy_append {A : Type} (l1 : LazyList A) (l2 : LazyList A) : LazyList A :=
   match l1 with
   | lnil => l2
-  | lsing x => lcons _ x (fun _ => l2)
-  | lcons x l1' => lcons _ x (fun _ => (lazy_append (l1' tt) l2))
+  | lsing x =>
+    match l2 with
+    | lnil => lsing x
+    | _ => lcons x (fun _ => l2)
+    end
+  | lcons x l1' => lcons x (fun _ => (lazy_append (l1' tt) l2))
   end.
 
 Fixpoint lazy_take {A : Type} (n : nat) (l : LazyList A) : LazyList A :=
   match n with
-  | 0 => lnil _
+  | 0 => lnil
   | S n' => match l with
-            | lnil => lnil _
-            | lsing x => lsing _ x
-            | lcons h ts => lcons _ h (fun _ => (lazy_take n' (ts tt)))
+            | lnil => lnil
+            | lsing x => lsing x
+            | lcons h ts => lcons h (fun _ => (lazy_take n' (ts tt)))
             end
   end.
 
 (* Functor instace for LazyList *)
 Fixpoint mapLazyList {A B : Type} (f : A -> B) (l : LazyList A) : LazyList B :=
   match l with
-  | lnil => lnil _
-  | lsing x => lsing _ (f x)
-  | lcons x l' => lcons _ (f x) (fun _ => (mapLazyList f (l' tt)))
+  | lnil => lnil
+  | lsing x => lsing (f x)
+  | lcons x l' => lcons (f x) (fun _ => (mapLazyList f (l' tt)))
   end.
 
 Instance FunctorLazyList : Functor LazyList :=
@@ -48,13 +64,14 @@ Instance FunctorLazyList : Functor LazyList :=
 
 
 (* Monad and applicative instances for LazyList *)
+(* Injecting into a monad must crucially use the singleton constructor. *)
 Definition retLazyList {A : Type} (a : A) : LazyList A :=
-  lsing _ a.
+  lsing a.
 (*   lcons _ a (fun _ => (lnil _)). *)
 
 Fixpoint concatLazyList {A : Type} (l : LazyList (LazyList A)) : LazyList A :=
   match l with
-  | lnil => lnil _
+  | lnil => lnil
   | lsing l => l
   | lcons x l' => lazy_append x (concatLazyList (l' tt))
   end.
@@ -88,7 +105,7 @@ Definition apComp {F: Type -> Type} `{Functor F} {A B C : Type} (f : B -> C) (fa
 Definition guard (b : bool) : LazyList unit :=
   match b with
   | true => ret tt
-  | false => lnil _
+  | false => lnil
   end.
 
 
@@ -102,43 +119,47 @@ Fixpoint In_ll {A : Type} (a : A) (l : LazyList A) : Prop :=
 
 (*
 Section Ind.
+
   Variable A : Type.
   Variable P : LazyList A -> Prop.
-  Variable Hnil : P (lnil A).
-  Variable Hcons : forall (a : A) (l : LazyList A), P l -> P (lcons _ a (fun _ => l)).
+  Variable Hnil  : P (lnil).
+  Variable Hsing : forall (a : A), P (lsing a).
+  Variable Hcons : forall (a : A) (l : LazyList A), P l -> P (lcons a (fun _ => l)).
 
   Fixpoint better_ll_ind (l : LazyList A) : P l :=
     match l with
     | lnil => Hnil
-    | lcons a tl => @Hcons a (tl tt) (better_ll_ind ( tl tt))
+    | lsing x => Hsing x
+    | lcons a tl => @Hcons a (tl tt) (better_ll_ind (tl tt))
     end.
+  
 End Ind.
+ *)
 
 Lemma lazy_in_app_or :
   forall (A : Type) (l m : LazyList A) (a : A), In_ll a (lazy_append l m) -> In_ll a l \/ In_ll a m.
 Proof.
   intros A l.
-  induction l using better_ll_ind; intros m h H.
-  - simpl in H. auto.
-  - simpl in H. destruct H.
-    + subst. simpl. auto.
-    + simpl. rewrite or_assoc. right.
-      auto.
+  induction l; intros m h Hyp; simpl in *; auto.
+  - destruct m eqn:M; subst; simpl in *; auto.
+  - destruct Hyp; subst; simpl in *; auto.
+    rewrite or_assoc.
+    apply H in H0.
+    destruct H0; auto.
 Qed.
 
 Lemma lazy_in_or_app :
   forall (A : Type) (l m : LazyList A) (a : A), In_ll a l \/ In_ll a m -> In_ll a (lazy_append l m).
 Proof.
   intros A l.
-  induction l using better_ll_ind; intros m h H.
-  - simpl in H. destruct H as [contra | Hin]; try contradiction.
-    auto.
-  - simpl in H. destruct H as [[Hah | Hin] | Hin].
-    + subst. simpl. auto.
-    + simpl. auto.
-    + right. apply IHl. auto.
-Qed.
-*)
+  induction l; intros m h HIn; simpl in *.
+  - destruct HIn as [Contra | HIn]; [ contradiction | auto ].
+  - destruct HIn as [HEq | HIn]; subst; auto;
+      destruct m; simpl; auto.
+    + inversion HIn.
+  - destruct HIn as [[HEq | HIn] | HIn]; subst; simpl in *; auto.
+Qed.    
+
 Fixpoint LazyList_to_list {A : Type} (l : LazyList A) : list A :=
   match l with
   | lnil => nil
@@ -148,54 +169,68 @@ Fixpoint LazyList_to_list {A : Type} (l : LazyList A) : list A :=
 
 Fixpoint list_to_LazyList {A : Type} (l : list A) : LazyList A :=
   match l with
-  | nil => lnil _
-  | cons x nil => lsing _ x
-  | cons x x0 => lcons _ x (fun _ => (list_to_LazyList x0))
+  | nil => lnil
+  | cons x nil => lsing x
+  | cons x x0 => lcons x (fun _ => (list_to_LazyList x0))
   end.
 
-(*
 Theorem nil_lazylist :
   forall A (l : LazyList A),
-    [] = LazyList_to_list l -> l = lnil A.
+    [] = LazyList_to_list l -> l = lnil.
 Proof.
   intros A l H.
-  destruct l.
-  - reflexivity.
-  - inversion H.
+  destruct l; simpl in *; auto; inversion H.
 Qed.
 
 Theorem lazy_in_map:
   forall (A B : Type) (f : A -> B) (l : LazyList A) (x : A), In_ll x l -> In_ll (f x) (fmap f l).
 Proof.
   intros A B f l.
-  induction l using better_ll_ind; intros x H.
-  - inversion H.
-  - simpl in *. destruct H as [Hax | Hin].
-    + left. subst; reflexivity.
+  induction l; intros x HIn.
+  - inversion HIn.
+  - inversion HIn; subst; simpl; auto.
+  - destruct HIn as [Hax | Hin]; subst; auto.
+    + left. auto.
     + right. auto.
 Qed.
 
 Lemma lazy_append_nil_r :
   forall {B : Type} (b : B) l,
     In_ll b l ->
-    In_ll b (lazy_append l (lnil _)).
+    In_ll b (lazy_append l lnil).
 Proof.
   intros B b l H.
-  induction l using better_ll_ind.
+  induction l.
   - inversion H.
+  - inversion H; subst; auto.
+  - simpl in *. firstorder.
+Qed.
+
+Lemma lazy_append_sing_r :
+  forall {B : Type} (b x : B) l,
+    In_ll b l ->
+    In_ll b (lazy_append l (lsing x)).
+Proof.
+  intros B b x l H.
+  induction l.
+  - inversion H.
+  - inversion H; subst; auto.
+    left; auto.
   - simpl in *. firstorder.
 Qed.
 
 Lemma lazy_append_in_l :
-  forall {B : Type} (b : B) l ll,
+  forall {B : Type} ll (b : B) l,
     In_ll b l ->
     In_ll b (lazy_append l ll).
 Proof.
-  intros B b l ll H.
-  induction ll using better_ll_ind.
+  intros B ll; induction ll; intros b l0 HIn.
   - auto using lazy_append_nil_r.
-  - induction l using better_ll_ind.
-    + inversion H.
+  - auto using lazy_append_sing_r.
+  - induction l0.
+    + inversion HIn.
+    + inversion HIn; subst; auto.
+      left; auto.
     + simpl in *. firstorder.
 Qed.
 
@@ -205,7 +240,9 @@ Lemma lazy_append_in_r :
     In_ll b (lazy_append l ll).
 Proof.
   intros B b l ll H.
-  induction l using better_ll_ind; simpl; auto.
+  induction l; simpl; auto.
+  destruct ll eqn:LL; simpl in *; auto.
+  contradiction.
 Qed.
 
 Lemma lazy_concat_in :
@@ -215,16 +252,14 @@ Lemma lazy_concat_in :
     In_ll b (concatLazyList ll).
 Proof.
   intros B b l ll Hb Hbll.
-  induction ll using better_ll_ind.
-  - inversion Hbll.
-  - simpl in *. destruct Hbll as [Hal | Hinl]; subst;
-                  auto using lazy_append_in_l, lazy_append_in_r.
+  induction ll; simpl in *; subst; auto.
+  destruct Hbll as [Hal | Hinl]; subst;
+    auto using lazy_append_in_l, lazy_append_in_r.
 Qed.
- *)
 
 Fixpoint join_list_lazy_list {A : Type} (l : list (LazyList A)) : LazyList A :=
   match l with
-  | nil => lnil _
+  | nil => lnil
   | cons h ts => lazy_append h (join_list_lazy_list ts)
   end.
 
