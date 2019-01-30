@@ -70,26 +70,19 @@ Module GenLow : GenLowInterface.Sig.
 
   Definition bind_helper {B : Type} (lgb : LazyList (G B)) (n : nat) (rs : RandomSeed) : LazyList B := bind_helper' (lnil) lgb n rs.
 
+  Fixpoint bindGenAux {A B} (la : LazyList A) (k : A -> G B) n (rs : RandomSeed) : LazyList B :=
+    match la with
+    | lnil => lnil
+    | lsing a => run (k a) n rs
+    | lcons a la' =>
+      let (r1,r2) := randomSplit rs in
+      lazy_append (run (k a) n r1) (bindGenAux (la' tt) k n r2)
+    end.
+  
   Definition bindGen {A B : Type} (g : G A) (k : A -> G B) : G B :=
     MkGen (fun n r =>
              let (r1,r2) := randomSplit r in
-             let fix auxB (res_head : LazyList B) (res_tail : unit -> LazyList B) : LazyList B:=
-                 match res_head with
-                 | lnil => res_tail tt
-                 | lsing b =>
-                   lcons b res_tail
-                 | lcons b res_head' => lcons b (fun _ => auxB (res_head' tt) res_tail)
-                 end in
-             let fix auxA r la : LazyList B :=
-                 match la with
-                 | lnil => lnil
-                 | lsing a =>
-                   run (k a) n r
-                 | lcons a la' =>
-                   let (r1,r2) := randomSplit r in
-                   auxB (run (k a) n r1) (fun _ => auxA r2 (la' tt))
-                 end in
-             auxA r2 (run g n r1)
+             bindGenAux (run g n r1) k n r2
           ).
 
   Definition bindGenOpt {A B} (g : G (option A)) (f : A -> G (option B)) : G (option B) :=
@@ -109,7 +102,6 @@ Module GenLow : GenLowInterface.Sig.
     match g with
       | MkGen m => MkGen (fun _ => m n)
     end.
-
 
   Fixpoint lazy_rose_flatten {A : Type} (r : Rose (LazyList A)) : LazyList (Rose A) :=
     match r with
