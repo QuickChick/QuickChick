@@ -68,7 +68,7 @@ Module Type Sig.
   Parameter enumR : forall {A : Type} `{EnumFromInterval A} (range : A * A), G A.
   Parameter enum : forall {A : Type} `{Serial A}, G A.
   Parameter enum' : forall {A : Type} `{Serial A} (n : nat), G A.
-  Parameter sumG : forall {A : Type} (lga : LazyList (G A)), G A.
+  (* Parameter sumG : forall {A : Type} (lga : LazyList (G A)), G A. *)
   Parameter sample : forall {A : Type}, G A -> list A.
 
 
@@ -260,12 +260,14 @@ Module Type Sig.
       semGen (bindGenOpt g f) \subset Some @: (\bigcup_(a in s1) s2 a) :|: [set None].
    *)
 
+  (*
   Parameter semBindSizeMonotonicIncl_r :
     forall {A B} (g : G A) (f : A -> G (option B)) (s1 : set A) (s2 : A -> set B),
       semGen g \subset s1 ->
       (forall x, semGen (f x) \subset Some @: (s2 x) :|: [set None]) -> 
       semGen (bindGen g f) \subset Some @: (\bigcup_(a in s1) s2 a)  :|: [set None].
-
+   *)
+  
   (*
   Parameter semBindOptSizeMonotonicIncl_l :
     forall {A B} (g : G (option A)) (f : A -> G (option B)) (s1 : set A)  (fs : A -> set B) 
