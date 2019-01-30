@@ -30,7 +30,10 @@ Fixpoint enumFromTo {A : Type} `{EnumFromInterval A} (a1 : A) (a2 : A) : LazyLis
 
 (* EnumFromInterval for bool *)
 Definition enumFromToBool (b1 : bool) (b2 : bool) : LazyList bool
-  := if b1 =? b2 then ret b1 else if b1 =? false then lcons _ b1 (fun _ => (lcons _ b2 (fun _ => (lnil _)))) else lnil _.
+  := if b1 =? b2 then ret b1
+     else if b1 =? false
+          then lcons b1 (fun _ => (lcons b2 (fun _ => (lnil))))
+          else lnil .
 
 Program Instance EnumBool : EnumFromInterval bool :=
   {
@@ -41,8 +44,8 @@ Program Instance EnumBool : EnumFromInterval bool :=
 (* EnumFromInterval for nat *)
 Fixpoint enumFromN (n : nat) (num : nat) : LazyList nat
   := match num with
-     | 0 => lnil _
-     | S num' => lcons _ n (fun _ => (enumFromN (S n) num'))
+     | 0 => lnil
+     | S num' => lcons n (fun _ => (enumFromN (S n) num'))
      end.
 
 Fixpoint enumFromToNat (n1 : nat) (n2 : nat) : LazyList nat
@@ -81,7 +84,7 @@ Definition cons0 {A} (con : A) : Series A := (fun n r => ret con).
 Definition cons1 {A B} (m : Series A) (con : A -> B) : Series B
   := (fun n r =>
         match n with
-           | 0 => lnil _
+           | 0 => lnil
            | S n' => a <- m n' r;;
                      ret (con a)
         end).
@@ -89,7 +92,7 @@ Definition cons1 {A B} (m : Series A) (con : A -> B) : Series B
 Definition cons2 {A B C} (ma : Series A) (mb : Series B) (con : A -> B -> C) : Series C
   := (fun n r =>
         match n with
-        | 0 => lnil _
+        | 0 => lnil
         | S n' =>
           p <- (series_prod ma mb) n' r ;;
           match p with
@@ -100,7 +103,7 @@ Definition cons2 {A B C} (ma : Series A) (mb : Series B) (con : A -> B -> C) : S
 Definition cons3 {A B C D} (ma : Series A) (mb : Series B) (mc : Series C) (con : A -> B -> C -> D) : Series D
   := (fun n r =>
         match n with
-        | 0 => lnil _
+        | 0 => lnil
         | S n' =>
           p <- (series_prod ma (series_prod mb mc)) n' r ;;
           match p with

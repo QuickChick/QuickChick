@@ -68,7 +68,7 @@ Module GenLow : GenLowInterface.Sig.
       bind_helper' (lazy_append (run gb n r1) acc) (ts tt) n r2
     end.
 
-  Definition bind_helper {B : Type} (lgb : LazyList (G B)) (n : nat) (rs : RandomSeed) : LazyList B := bind_helper' (lnil _) lgb n rs.
+  Definition bind_helper {B : Type} (lgb : LazyList (G B)) (n : nat) (rs : RandomSeed) : LazyList B := bind_helper' (lnil) lgb n rs.
 
   Definition bindGen {A B : Type} (g : G A) (k : A -> G B) : G B :=
     MkGen (fun n r =>
@@ -77,12 +77,12 @@ Module GenLow : GenLowInterface.Sig.
                  match res_head with
                  | lnil => res_tail tt
                  | lsing b =>
-                   lcons _ b res_tail
-                 | lcons b res_head' => lcons _ b (fun _ => auxB (res_head' tt) res_tail)
+                   lcons b res_tail
+                 | lcons b res_head' => lcons b (fun _ => auxB (res_head' tt) res_tail)
                  end in
              let fix auxA r la : LazyList B :=
                  match la with
-                 | lnil => lnil _
+                 | lnil => lnil
                  | lsing a =>
                    run (k a) n r
                  | lcons a la' =>
@@ -115,7 +115,7 @@ Module GenLow : GenLowInterface.Sig.
     match r with
     | MkRose las ts =>
       a <- las;;
-      lcons _ (MkRose a (lazy (LazyList_to_list (join_list_lazy_list (map lazy_rose_flatten (force ts)))))) (fun _ => (lnil _))
+      lcons (MkRose a (lazy (LazyList_to_list (join_list_lazy_list (map lazy_rose_flatten (force ts)))))) (fun _ => (lnil))
     end.
 
   Fixpoint promote {A : Type} (m : Rose (G A)) : G (Rose A)
@@ -204,7 +204,7 @@ Module GenLow : GenLowInterface.Sig.
    *)
 
   Program Definition reallyUnsafeDelay {A : Type} : G (G A -> A) :=
-    MkGen (fun n r => lnil _).
+    MkGen (fun n r => lnil).
   
   Definition reallyUnsafePromote {r A : Type} (m : r -> G A) : G (r -> A) :=
     (bindGen reallyUnsafeDelay (fun eval => 
@@ -236,7 +236,7 @@ Module GenLow : GenLowInterface.Sig.
   Next Obligation.
     remember (run g n r1) as a's.
     destruct a's.
-    - exact (lnil _).
+    - exact (lnil).
     - refine (run (k a _) n r2).
       unfold semGen, semGenSize, bigcup, codom, bigcup, possibly_generated.
       exists n. split => //=.
