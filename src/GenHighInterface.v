@@ -40,7 +40,7 @@ Parameter elements : forall {A : Type}, A -> list A -> G A.
 Parameter elems_ : forall {A : Type}, A -> list A -> G A.
 
 (* Correctness for derived generators *)
-(*
+
 Parameter semLiftGen :
   forall {A B} (f: A -> B) (g: G A),
     semGen (liftGen f g) <--> f @: semGen g.
@@ -183,6 +183,7 @@ Parameter semFrequencySize:
       if l' is nil then semGenSize def size else
       \bigcup_(x in l') semGenSize x.2 size.
 
+(*
 (** [backtrack] generates Some's unless all of the input generators are empty *)
 Parameter semBacktrackSize:
   forall {A} (l : list (nat * G (option A))) size,

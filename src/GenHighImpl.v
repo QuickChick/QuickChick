@@ -455,8 +455,6 @@ Next Obligation.
   move => l [H1 H2]; split => // a Ha. by eapply (monotonic H0); eauto.
 Qed.
 
-
-(*
 Lemma semListOfSize {A : Type} (g : G A) size :
   semGenSize (listOf g) size <-->
   [set l | length l <= size /\ l \subset (semGenSize g size)].
@@ -1150,7 +1148,7 @@ Proof.
     by rewrite setI_comm !nil_set_eq setI_set0_abs bigcup_set0 bigcap_set0
                setU_comm setU_set0_neut setI_setT_neut semReturnSize.
   - move => HSum HLen.
-    rewrite semBindSize semChooseSize //=. 
+    rewrite spemBindSize semChooseSize //=. 
     split.
     { destruct (sum_fst l) eqn:Hsum; subst.
       - move => [n [Hleq H]].

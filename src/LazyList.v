@@ -117,7 +117,29 @@ Fixpoint In_ll {A : Type} (a : A) (l : LazyList A) : Prop :=
   | lcons h ts => h = a \/ In_ll a (ts tt)
   end.
 
-(*
+From Coq Require Import ssreflect.
+Lemma lazy_in_map_iff :
+  forall (A B : Type) (f : A -> B) (l : LazyList A) (y : B),
+  In_ll y (mapLazyList f l) <-> (exists x : A, f x = y /\ In_ll x l).
+Proof.
+  move => A B f l; induction l => y; split => [HIn | [x [Hfx HIn]]].
+  - inversion HIn.
+  - inversion HIn.
+  - inversion HIn.
+    exists a; split; constructor.
+  - inversion HIn; subst; simpl; auto.
+  - simpl in *.
+    destruct HIn as [Hf | HIn].
+    + exists a; split; auto.
+    + apply H in HIn.
+      destruct HIn as [x [Hf HIn]].
+      exists x; split; auto.
+  - destruct HIn as [Hf | HIn]; subst; simpl in *; auto.
+    right; apply H.
+    exists x; auto.
+Qed.
+
+    (*
 Section Ind.
 
   Variable A : Type.

@@ -47,6 +47,10 @@ Module GenLow : GenLowInterface.Sig.
   (* begin run *)
   Definition run {A : Type} (g : G A) := match g with MkGen f => f end.
   (* end run *)
+
+  (* LEO: lnil could have a "reason for failure" included probably. *)
+  Definition failGen {A : Type} : G A :=
+    MkGen (fun _ _ => lnil).
   
   Definition returnGen {A : Type} (x : A) : G A :=
     MkGen (fun _ _ => ret x).
@@ -57,19 +61,7 @@ Module GenLow : GenLowInterface.Sig.
   Definition fmap {A B : Type} (f : A -> B) (g : G A) : G B :=
     MkGen (fun n r => fmap f (run g n r)).
 
-  (* Split and use a different random seed on each list *)
-  Fixpoint bind_helper' {B : Type} (acc : LazyList B) (lgb : LazyList (G B)) (n : nat) (rs : RandomSeed) : LazyList B :=
-    match lgb with
-    | lnil => acc
-    | lsing x =>
-      lazy_append (run x n rs) acc
-    | lcons gb ts =>
-      let (r1, r2) := randomSplit rs in
-      bind_helper' (lazy_append (run gb n r1) acc) (ts tt) n r2
-    end.
-
-  Definition bind_helper {B : Type} (lgb : LazyList (G B)) (n : nat) (rs : RandomSeed) : LazyList B := bind_helper' (lnil) lgb n rs.
-
+  (* Go through the lazy list la and run (k a) for each element in la with a different seed. *)
   Fixpoint bindGenAux {A B} (la : LazyList A) (k : A -> G B) n (rs : RandomSeed) : LazyList B :=
     match la with
     | lnil => lnil
@@ -84,16 +76,23 @@ Module GenLow : GenLowInterface.Sig.
              let (r1,r2) := randomSplit r in
              bindGenAux (run g n r1) k n r2
           ).
-
-  Definition bindGenOpt {A B} (g : G (option A)) (f : A -> G (option B)) : G (option B) :=
-    bindGen g (fun ma => 
-                 match ma with
-                   | None => returnGen None
-                   | Some a => f a
-                 end).
-
+  
   Definition apGen {A B} (gf : G (A -> B)) (gg : G A) : G B :=
     bindGen gf (fun f => fmap f gg).
+
+  Instance Functor_G : Functor G := {
+    fmap A B := fmap;
+  }.
+
+  Instance Applicative_G : Applicative G := {
+    pure A := returnGen;
+    ap A B := apGen;
+  }.
+
+  Instance Monad_G : Monad G := {
+    ret A := returnGen;
+    bind A B := bindGen;
+  }.
   
   Definition sized {A : Type} (f : nat -> G A) : G A :=
     MkGen (fun n r => run (f n) n r).
@@ -116,35 +115,16 @@ Module GenLow : GenLowInterface.Sig.
   (* ZP: Split suchThatMaybe into two different functions
      to make a proof easier *)
   Definition suchThatMaybeAux {A : Type} (g : G A) (p : A -> bool) :=
-    fix aux (k : nat) (n : nat) : G (option A) :=
+    fix aux (k : nat) (n : nat) : G A :=
     match n with
-      | O => returnGen None
+      | O => failGen
       | S n' =>
-        bindGen (resize (2 * k + n) g) (fun x =>
-                                          if p x then returnGen (Some x)
-                                          else aux (S k) n')
+        x <- resize (2 * k + n) g ;;
+        if p x then ret x else aux (S k) n'
     end.
 
-  Definition suchThatMaybe {A : Type} (g : G A) (p : A -> bool)
-  : G (option A) :=
+  Definition suchThatMaybe {A : Type} (g : G A) (p : A -> bool) : G A :=
     sized (fun x => suchThatMaybeAux g p 0 (max 1 x)).
-
-  Definition suchThatMaybeOptAux {A : Type} (g : G (option A)) (p : A -> bool) :=
-    fix aux (k : nat) (n : nat) : G (option A) :=
-    match n with
-      | O => returnGen None
-      | S n' =>
-        (* What is this 2 * k + n ? *)
-        bindGen (resize (2 * k + n) g) 
-                (fun mx => match mx with 
-                          | Some x => if p x then returnGen (Some x) else (aux (S k) n')
-                          | _ => aux (S k) n'
-                        end)
-    end.
-
-  Definition suchThatMaybeOpt {A : Type} (g : G (option A)) (p : A -> bool)
-  : G (option A) := 
-    sized (fun x => suchThatMaybeOptAux g p 0 (max 1 x)).
 
   Fixpoint rnds (rnd : RandomSeed) (n' : nat) : list RandomSeed :=
     match n' with
@@ -163,6 +143,7 @@ Module GenLow : GenLowInterface.Sig.
   Definition choose {A : Type} `{ChoosableFromInterval A} (range : A * A) : G A :=
     MkGen (fun _ r => ret (fst (randomR range r))).
 
+  (* TODO @Calvin: Do these use laziness? *)
   Definition enumR {A : Type} `{EnumFromInterval A} (range : A * A) : G A :=
     MkGen (fun _ _ => enumFromTo (fst range) (snd range)).
 
@@ -176,7 +157,8 @@ Module GenLow : GenLowInterface.Sig.
   Fixpoint sumG {A : Type} (lga : LazyList (G A)) : G A :=
     MkGen (fun n r => bind_helper lga n r).
    *)
-  
+
+  (* TODO: This looks stupid. *)
   Definition sample (A : Type) (g : G A) : list A :=
     match g with
       | MkGen m =>
@@ -192,15 +174,12 @@ Module GenLow : GenLowInterface.Sig.
       | MkGen f => MkGen (fun n r => f n (varySeed p r))
     end.
 
-  (*
-  Definition reallyUnsafeDelay {A : Type} : G (G A -> A) :=
-    MkGen (fun r n g => (match g with MkGen f => f r n end)).
-   *)
+  Definition reallyUnsafeDelay {A : Type} : G (G A -> LazyList A) :=
+    MkGen (fun r n => lsing (fun g => match g with MkGen f => f r n end)).
 
-  Program Definition reallyUnsafeDelay {A : Type} : G (G A -> A) :=
-    MkGen (fun n r => lnil).
-  
   Definition reallyUnsafePromote {r A : Type} (m : r -> G A) : G (r -> A) :=
+    eval <- reallyUnsafeDelay ;;
+    ret (fun r => returnGenL (eval (m r))).
     (bindGen reallyUnsafeDelay (fun eval => 
                                   returnGen (fun r => eval (m r)))).
 
@@ -218,7 +197,9 @@ Module GenLow : GenLowInterface.Sig.
     | lcons h ts => P h /\ All_ll P (ts tt)
     end.
 
-  Definition semGenSize {A : Type} (g : G A) (s : nat) : set A := possibly_generated (run g s).
+  Definition semGenSize {A : Type} (g : G A) (s : nat) : set A :=
+    possibly_generated (run g s).
+  
   Definition semGen {A : Type} (g : G A) : set A := \bigcup_s semGenSize g s.
   (* end semGen *)
 
@@ -705,6 +686,7 @@ Module GenLow : GenLowInterface.Sig.
   Qed.
   *)
 
+  (*
   Lemma semBindSizeMonotonicIncl_r {A B} (g : G A) (f : A -> G (option B)) (s1 : set A) (s2 : A -> set B) :
     semGen g \subset s1 ->
     (forall x, semGen (f x) \subset Some @: (s2 x) :|: [set None]) -> 
@@ -733,7 +715,6 @@ Module GenLow : GenLowInterface.Sig.
       + inv H.
   Qed.
 
-  (*
   Lemma semBindOptSizeMonotonicIncl_l {A B} (g : G (option A)) (f : A -> G (option B)) (s1 : set A)
         (fs : A -> set B) 
         `{Hg : SizeMonotonicOpt _ g}
@@ -794,7 +775,6 @@ Module GenLow : GenLowInterface.Sig.
     eexists r''. simpl. rewrite Heq.
     (* rewrite Hr1 Hr2. reflexivity. *)
   Admitted.
-   *)
   
   Lemma  semBindOptSizeOpt_subset_compat {A B : Type} (g g' : G (option A)) (f f' : A -> G (option B)) :
     (forall s, isSome :&: semGenSize g s \subset isSome :&: semGenSize g' s) ->
@@ -813,12 +793,20 @@ Module GenLow : GenLowInterface.Sig.
       simpl. eapply Hf. split; eauto.
     - eapply semReturnSize in Hf'.  inv Hf'. discriminate.
   Qed.
+   *)
 
-
-  (*
   Lemma semFmapSize A B (f : A -> B) (g : G A) (size : nat) :
-    semGenSize (fmap f g) size <--> f @: semGenSize g size.  Proof.
-      by rewrite /fmap /semGenSize /= codom_comp.
+    semGenSize (fmap f g) size <--> f @: semGenSize g size.
+  Proof.
+    rewrite /fmap /semGenSize /possibly_generated /= /imset => b; split.
+    - move => [r HIn].
+      apply lazy_in_map_iff in HIn.
+      destruct HIn as [a [HFa HIn]].
+      exists a; split; eauto.
+    - move => [a [[r Hr] HIn]].
+      exists r.
+      apply lazy_in_map_iff.
+      eexists; eauto.
   Qed.
   
   Lemma semFmap A B (f : A -> B) (g : G A) :
@@ -859,7 +847,7 @@ Module GenLow : GenLowInterface.Sig.
     move=> /= le_a1a2. rewrite <- (unsized_alt_def 1).
     move => m /=. rewrite (randomRCorrect m a1 a2) //.
   Qed.
-   *)
+
   Lemma semSized A (f : nat -> G A) :
     semGen (sized f) <--> \bigcup_n semGenSize (f n) n.
   Proof. by []. Qed.
@@ -1011,7 +999,7 @@ Module GenLow : GenLowInterface.Sig.
         { eapply Hstrong. ssromega. }
   Qed.
 
-  (*
+  (* LEO: No longer true! 
   Lemma semGenSizeInhabited {A} (g : G A) s :
     exists x, semGenSize g s x.
   Proof.
@@ -1019,7 +1007,9 @@ Module GenLow : GenLowInterface.Sig.
     eexists (run g s r ). unfold semGenSize, codom.
     exists r. reflexivity.
   Qed.
+   *)
 
+  (*
   Lemma semSizeGenSuchThatMaybeOptAux_sound_alt {A} :
     forall g p k n (a : A) size seed,
       run (suchThatMaybeOptAux g p k n) size seed = Some a ->
@@ -1458,20 +1448,6 @@ Module GenLow : GenLowInterface.Sig.
   Qed.
 
    *)
-
-  Instance Functor_G : Functor G := {
-    fmap A B := fmap;
-  }.
-
-  Instance Applicative_G : Applicative G := {
-    pure A := returnGen;
-    ap A B := apGen;
-  }.
-
-  Instance Monad_G : Monad G := {
-    ret A := returnGen;
-    bind A B := bindGen;
-  }.
 
   Definition GOpt A := G (option A).
 
