@@ -117,6 +117,13 @@ Fixpoint In_ll {A : Type} (a : A) (l : LazyList A) : Prop :=
   | lcons h ts => h = a \/ In_ll a (ts tt)
   end.
 
+Fixpoint All_ll {A : Type} (P : A -> Prop) (l : LazyList A) : Prop :=
+  match l with
+  | lnil => True
+  | lsing x => P x
+  | lcons h ts => P h /\ All_ll P (ts tt)
+  end.
+
 From Coq Require Import ssreflect.
 Lemma lazy_in_map_iff :
   forall (A B : Type) (f : A -> B) (l : LazyList A) (y : B),

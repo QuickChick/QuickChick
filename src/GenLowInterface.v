@@ -66,8 +66,7 @@ Module Type Sig.
   Parameter resize : forall {A: Type}, nat -> G A -> G A.
 
   Parameter promote : forall {A : Type}, Rose (G A) -> G (Rose A).
-  Parameter suchThatMaybe : forall {A : Type}, G A -> (A -> bool) ->
-                                               G (option A).
+  Parameter suchThatMaybe : forall {A : Type}, G A -> (A -> bool) -> G A.
   (*
   Parameter suchThatMaybeOpt : forall {A : Type}, G (option A) -> (A -> bool) ->
                                              G (option A).
@@ -83,7 +82,7 @@ Module Type Sig.
 
   (* LL: The abstraction barrier is annoying :D *)
   Parameter variant : forall {A : Type}, SplitPath -> G A -> G A.
-  Parameter reallyUnsafePromote : forall {r A:Type}, (r -> G A) -> G (r -> A).
+  (* Parameter reallyUnsafePromote : forall {r A:Type}, (r -> G A) -> G (r -> A). *)
 
   (*
   Parameter promoteVariant : forall {A B : Type} (a : A) (f : A -> SplitPath) (g : G B) size 
@@ -169,6 +168,9 @@ Module Type Sig.
   
 
   (** *  Semantics of combinators *)
+
+  Parameter semFail : forall {A}, semGen failGen <--> @set0 A.
+  Parameter semFailSize : forall {A} size, semGenSize failGen size <--> @set0 A.
   
   Parameter semReturn :
     forall A (x : A), semGen (returnGen x) <--> [set x].
@@ -381,10 +383,16 @@ Module Type Sig.
     Unsized (resize n g).
 
 
+  (* LEO - TODO: suchThat maybe 
   Parameter semSuchThatMaybe_sound':
     forall A (g : G A) (f : A -> bool),
-      semGen (suchThatMaybe g f) \subset None |: some @: (semGen g :&: f).
+      semGen (suchThatMaybe g f) \subset (semGen g :&: f).
 
+  Parameter semSuchThatMaybe_sound:
+    forall (A : Type) (g : G A) (f : A -> bool) (s : set A),
+      semGen g \subset s ->
+      semGen (suchThatMaybe g f) \subset (s :&: (fun x : A => f x)).
+  
   (* Declare Instance suchThatMaybeMonotonic *)
   (*        {A : Type} (g : G A) (f : A -> bool) `{SizeMonotonic _ g} :  *)
   (*   SizeMonotonic (suchThatMaybe g f). *)
@@ -421,11 +429,6 @@ Module Type Sig.
                                         semGen (suchThatMaybeOpt g f).
   *)
 
-  Parameter semSuchThatMaybe_sound:
-    forall (A : Type) (g : G A) (f : A -> bool) (s : set A),
-      semGen g \subset s ->
-      semGen (suchThatMaybe g f) \subset ((Some @: (s :&: (fun x : A => f x))) :|: [set None]).
-
   (*
   Parameter semSuchThatMaybeOpt_sound:
     forall (A : Type) (g : G (option A)) (f : A -> bool) (s : set A),
@@ -446,6 +449,8 @@ Module Type Sig.
       (forall s, isSome :&: (semGenSize (suchThatMaybeOpt g1 p) s) \subset
             isSome :&: (semGenSize (suchThatMaybeOpt g2 p) s)).
    *)
+   *) 
+
   (* This (very concrete) spec is needed to prove shrinking *)
   (*
   Parameter semPromote :
