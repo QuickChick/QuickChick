@@ -55,16 +55,27 @@ let temp_dirname =
 (* let link_files = ["quickChickLib.cmx"]*)
 let link_files = []
 
+(* Flag enabling / disabling the profiler *)
+let flag_profile = Summary.ref ~name:"QC_flag_profile" false
+
+let set_profile_flag (mode : string) =
+  let toggle =
+    match mode with
+    | "On"  -> true
+    | "Off" -> false
+  in
+  flag_profile := toggle
+
 (* TODO: in Coq 8.5, fetch OCaml's path from Coq's configure *)
 (* FIX: There is probably a more elegant place to put this flag! *)
-let ocamlopt = "ocamlopt -unsafe-string"
+let ocamlopt () = if !flag_profile then "ocamlopt -p -unsafe-string" else "ocamlopt -unsafe-string"
 let ocamlc = "ocamlc -unsafe-string"
 
 let comp_ml_cmd fn out =
   let path = Lazy.force path in
   let link_files = List.map (Filename.concat path) link_files in
   let link_files = String.concat " " link_files in
-  Printf.sprintf "%s -rectypes -w a -I %s -I %s %s %s -o %s" ocamlopt
+  Printf.sprintf "%s -rectypes -w a -I %s -I %s %s %s -o %s" (ocamlopt ())
     (Filename.dirname fn) path link_files fn out
 
 (*
@@ -76,7 +87,7 @@ let comp_mli_cmd fn =
   let path = Lazy.force path in
   let link_files = List.map (Filename.concat path) link_files in
   let link_files = String.concat " " link_files in
-  Printf.sprintf "%s -rectypes -w a -I %s -I %s %s %s" ocamlopt
+  Printf.sprintf "%s -rectypes -w a -I %s -I %s %s %s" (ocamlopt ())
     (Filename.dirname fn) path link_files fn
 
 
@@ -164,7 +175,8 @@ let define_and_run c =
   (** Run the test *)
   else
     (* Should really be shared across this and the tool *)
-    let chan = Unix.open_process_in ("time " ^ execn) in
+    let compile_cmd = if !flag_profile then ("time " ^ execn ^ " && gprof " ^ execn ^ " > profile.txt && gprof2dot profile.txt > profile.dot && dot -Tpng profile.dot > profile.png") else ("time " ^ execn) in
+    let chan = Unix.open_process_in compile_cmd in
     let builder = ref [] in
     let rec process_otl_aux () =
       let e = input_line chan in
@@ -276,6 +288,12 @@ VERNAC COMMAND EXTEND QuickChickDebug CLASSIFIED AS SIDEFF
      [ let s1' = Id.to_string s1 in
        let s2' = Id.to_string s2 in
        set_debug_flag s1' s2' ]
+END;;
+
+VERNAC COMMAND EXTEND QuickChickProfile CLASSIFIED AS SIDEFF
+  | ["QuickChickProfile" ident(s1)] ->
+     [ let s1' = Id.to_string s1 in
+       set_profile_flag s1' ]
 END;;
 
 VERNAC COMMAND EXTEND Sample CLASSIFIED AS SIDEFF
