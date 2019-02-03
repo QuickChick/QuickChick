@@ -140,13 +140,8 @@ Definition vectorOf {A : Type} (k : nat) (g : G A)
 Definition listOf {A : Type} (g : G A) : G (list A) :=
   sized (fun n => bindGen (choose (0, n)) (fun k => vectorOf k g)).
 
-Definition elems_ {A : Type} (def : A) (l : list A) :=
-  let n := length l in
-  bindGen (choose (0, n - 1)) (fun n' =>
-  returnGen (List.nth n' l def)).
-
-Definition elements {A} :=
-  @deprecate (A -> list A -> G A) "elements" "elems_" elems_.  
+Definition elems_ {A : Type} (l : list A) :=
+  oneOf_ (List.map ret l).
 
 Lemma semLiftGen {A B} (f: A -> B) (g: G A) :
   semGen (liftGen f g) <--> f @: semGen g.
@@ -503,7 +498,7 @@ split; first by case=> n [? <-]; rewrite -nthE; apply/List.nth_In/ltP.
 by case/(In_nth_exists _ _ def) => n [? ?]; exists n; split=> //; apply/ltP.
 Qed.
 
-Lemma semOneofSize {A} (l : list (G A)) s :
+Lemma semOneOfSize {A} (l : list (G A)) s :
   semGenSize (oneOf_ l) s <--> \bigcup_(x in l) semGenSize x s.
 Proof.
   induction l.
@@ -518,51 +513,61 @@ Proof.
     by rewrite (reindex_bigcup (nth failGen (a :: l)) X) // /X subn1 nth_imset.    
 Qed.
 
-Lemma semOneof {A} (l : list (G A)) :
+Lemma semOneOf {A} (l : list (G A)) :
   semGen (oneOf_ l) <--> \bigcup_(x in l) semGen x.
 Proof.
 by case: l => [|g l]; rewrite 1?bigcupC; apply: eq_bigcupr => sz;
-  apply: semOneofSize.
+  apply: semOneOfSize.
 Qed.
 
-Program Instance oneofMonotonic {A} (x : G A) (l : list (G A))
-        `{ SizeMonotonic _ x} `(l \subset SizeMonotonic) 
-: SizeMonotonic (oneof x l). 
+Program Instance oneOfMonotonic {A} (x : G A) (l : list (G A)) `(l \subset SizeMonotonic) 
+: SizeMonotonic (oneOf_ l). 
 Next Obligation.
-  rewrite !semOneofSize. elim : l H0 => [_ | g gs IH /subconsset [H2 H3]] /=.
-  - by apply monotonic.
+  rewrite !semOneOfSize. elim : l H => [_ | g gs IH /subconsset [H2 H3]] /=.
+  - rewrite /set_incl => a Contra.
+    destruct Contra as [x' [Contra ?]]; inv Contra.
   - specialize (IH H3). move => a [ga [[Hga | Hga] Hgen]]; subst.
     exists ga. split => //. left => //.
     eapply monotonic; eauto. exists ga.
     split. right => //.
-    apply H3 in Hga. by apply (monotonic H1). 
+    apply H3 in Hga. by apply (monotonic H0). 
 Qed.
 
-Lemma semElementsSize {A} (l: list A) (def : A) s :
-  semGenSize (elements def l) s <--> if l is nil then [set def] else l.
+Lemma semElemsSize {A} (l: list A) s :
+  semGenSize (elems_  l) s <--> l.
 Proof.
-rewrite semBindSize.
-setoid_rewrite semReturnSize.
-rewrite semChooseSize //=.
-setoid_rewrite nthE. (* SLOW *)
-case: l => [|x l] /=.
-  rewrite (eq_bigcupl [set 0]) ?bigcup_set1 // => n.
-  by rewrite leqn0; split=> [/eqP|->].
-rewrite -(@reindex_bigcup _ _ _ (nth def (x :: l)) _ (x :: l)) ?coverE //.
-by rewrite subn1 /= nth_imset.
+  rewrite /elems_ semOneOfSize; simpl in *.
+  induction l; split => Hyp; simpl in *; eauto.
+  - destruct Hyp as [? [Contra ?]].
+    inv Contra.
+  - inv Hyp.
+  - destruct Hyp as [g [Hg Hsem]].
+    destruct Hg; subst.
+    + left. apply semReturnSize in Hsem; inv Hsem; auto.
+    + right.
+      apply IHl.
+      exists g; split; auto.
+  - destruct Hyp; subst; simpl in *.
+    + exists (returnGen a0); split; simpl; eauto.
+      apply semReturnSize; constructor.
+    + exists (returnGen a0); split; eauto.
+      * right.
+        apply List.in_map_iff.
+        exists a0; split; auto.
+      * apply semReturnSize; constructor.
 Qed.
 
-Lemma semElements {A} (l: list A) (def : A) :
-  (semGen (elements def l)) <--> if l is nil then [set def] else l.
+Lemma semElems {A} (l: list A) :
+  semGen (elems_ l) <--> l.
 Proof.
-rewrite /semGen; setoid_rewrite semElementsSize; rewrite bigcup_const //.
+rewrite /semGen; setoid_rewrite semElemsSize; rewrite bigcup_const //.
 by do 2! constructor.
 Qed.
 
-Program Instance elementsUnsized {A} {def : A} (l : list A) : 
-  Unsized (elements def l).
+Program Instance elemsUnsized {A} {def : A} (l : list A) : 
+  Unsized (elems_ l).
 Next Obligation.
-  rewrite ! semElementsSize. by case: l.
+  rewrite ! semElemsSize. by case: l.
 Qed.
 
 (* A rather long frequency proof, probably we can do better *)
