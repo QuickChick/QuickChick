@@ -171,6 +171,9 @@ Module Type Sig.
 
   Parameter semFail : forall {A}, semGen failGen <--> @set0 A.
   Parameter semFailSize : forall {A} size, semGenSize failGen size <--> @set0 A.
+
+  Parameter semFailSizeContra : forall {A} s (a : A), semGenSize failGen s a -> False.
+  Parameter semFailContra : forall {A} (a : A), semGen failGen a -> False.
   
   Parameter semReturn :
     forall A (x : A), semGen (returnGen x) <--> [set x].

@@ -11,6 +11,14 @@ From mathcomp Require Import ssrfun ssrbool ssrnat eqtype seq.
 From QuickChick Require Import
      GenLowInterface GenHighInterface RandomQC Tactics Sets Show.
 
+From ExtLib.Structures Require Export
+     Monads.
+Require Import ExtLib.Data.Monads.ListMonad.
+From ExtLib.Structures Require Import
+     Functor Applicative.
+Import MonadNotation.
+Open Scope monad_scope.
+
 
 Set Bullet Behavior "Strict Subproofs".
 
@@ -77,13 +85,11 @@ Fixpoint foldGen {A B : Type} (f : A -> B -> G A) (l : list B) (a : A)
     | (x :: xs) => bindGen (f a x) (foldGen f xs)
   end).
 
-Definition oneOf_ {A : Type} (def: G A) (gs : list (G A)) : G A :=
-  bindGen (choose (0, length gs - 1)) (nth def gs).
+Definition oneOf_ {A : Type} (gs : list (G A)) : G A :=
+  n <- choose (0, length gs - 1) ;;
+  nth failGen gs n.
 
-Definition oneof {A} :=
-  @deprecate (G A -> list (G A) -> G A) "oneof" "oneOf_" oneOf_.
-
-Fixpoint pick {A : Type} (def : G A) (xs : list (nat * G A)) n : nat * G A :=
+Fixpoint pick {A : Type} (def : A ) (xs : list (nat * A)) n : nat * A :=
   match xs with
     | nil => (0, def)
     | (k, x) :: xs =>
@@ -92,32 +98,28 @@ Fixpoint pick {A : Type} (def : G A) (xs : list (nat * G A)) n : nat * G A :=
   end.
 
 (* This should use urns! *)
-Fixpoint pickDrop {A : Type} (xs : list (nat * G (option A))) n : nat * G (option A) * list (nat * G (option A)) :=
+Fixpoint pickDrop {A : Type} (def : A) (xs : list (nat * A)) n : nat * A * list (nat * A) :=
   match xs with
-    | nil => (0, returnGen None, nil)
+    | nil => (0, def, nil)
     | (k, x) :: xs =>
       if (n < k) then  (k, x, xs)
-      else let '(k', x', xs') := pickDrop xs (n - k)
+      else let '(k', x', xs') := pickDrop def xs (n - k)
            in (k', x', (k,x)::xs')
   end. 
 
 Definition sum_fst {A : Type} (gs : list (nat * A)) : nat :=
   foldl (fun t p => t + (fst p)) 0 gs.
 
-Definition freq_ {A : Type} (def : G A) (gs : list (nat * G A))
-: G A :=
+Definition freq_ {A : Type} (gs : list (nat * G A)) : G A :=
   let tot := sum_fst gs in
-  bindGen (choose (0, tot-1)) (fun n =>
-  @snd _ _ (pick def gs n)).
-
-Definition frequency {A}:= 
-  @deprecate (G A -> list (nat * G A) -> G A) "frequency" "freq_" freq_.
+  n <- choose (0, tot-1) ;;
+  snd (pick failGen gs n).
 
 Fixpoint backtrackFuel {A : Type} (fuel : nat) (tot : nat) (gs : list (nat * G (option A))) : G (option A) :=
   match fuel with 
     | O => returnGen None
     | S fuel' => bindGen (choose (0, tot-1)) (fun n => 
-                 let '(k, g, gs') := pickDrop gs n in
+                 let '(k, g, gs') := pickDrop failGen gs n in
                  bindGen g (fun ma =>
                  match ma with 
                    | Some a => returnGen (Some a)
@@ -501,21 +503,23 @@ split; first by case=> n [? <-]; rewrite -nthE; apply/List.nth_In/ltP.
 by case/(In_nth_exists _ _ def) => n [? ?]; exists n; split=> //; apply/ltP.
 Qed.
 
-Lemma semOneofSize {A} (l : list (G A)) (def : G A) s : semGenSize (oneof def l) s
-  <--> if l is nil then semGenSize def s else \bigcup_(x in l) semGenSize x s.
+Lemma semOneofSize {A} (l : list (G A)) s :
+  semGenSize (oneOf_ l) s <--> \bigcup_(x in l) semGenSize x s.
 Proof.
-case: l => [|g l].
-  rewrite semBindSize semChooseSize //.
-  rewrite (eq_bigcupl [set 0]) ?bigcup_set1 // => a; split=> [/andP [? ?]|<-] //.
-  by apply/antisym/andP.
-rewrite semBindSize semChooseSize //.
-set X := (fun a : nat => is_true (_ && _)).
-by rewrite (reindex_bigcup (nth def (g :: l)) X) // /X subn1 nth_imset.
+  induction l.
+  - rewrite semBindSize semChooseSize //.
+    rewrite (eq_bigcupl [set 0]) ?bigcup_set1 // => a; split; simpl in * => Hyp.
+    + exfalso. eapply semFailSizeContra; eauto.
+    + destruct Hyp as [x [Contra ?]]; inversion Contra.
+    + assert (a = 0) by ssromega; subst; constructor.
+    + inv Hyp; ssromega.
+  - rewrite semBindSize semChooseSize //.
+    set X := (fun a : nat => is_true (_ && _)).
+    by rewrite (reindex_bigcup (nth failGen (a :: l)) X) // /X subn1 nth_imset.    
 Qed.
 
-Lemma semOneof {A} (l : list (G A)) (def : G A) :
-  semGen (oneof def l) <-->
-  if l is nil then semGen def else \bigcup_(x in l) semGen x.
+Lemma semOneof {A} (l : list (G A)) :
+  semGen (oneOf_ l) <--> \bigcup_(x in l) semGen x.
 Proof.
 by case: l => [|g l]; rewrite 1?bigcupC; apply: eq_bigcupr => sz;
   apply: semOneofSize.

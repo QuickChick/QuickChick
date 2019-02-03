@@ -29,15 +29,12 @@ Parameter liftGen5 : forall {A1 A2 A3 A4 A5 B : Type},
 Parameter sequenceGen: forall {A : Type}, list (G A) -> G (list A).
 Parameter foldGen :
   forall {A B : Type}, (A -> B -> G A) -> list B -> A -> G A.
-Parameter oneof : forall {A : Type}, G A -> list (G A) -> G A.
-Parameter oneOf_ : forall {A : Type}, G A -> list (G A) -> G A.
-Parameter frequency : forall {A : Type}, G A -> list (nat * G A) -> G A.
-Parameter freq_ : forall {A : Type}, G A -> list (nat * G A) -> G A.
-Parameter backtrack : forall {A : Type}, list (nat * G (option A)) -> G (option A).
+Parameter oneOf_ : forall {A : Type}, list (G A) -> G A.
+Parameter freq_ : forall {A : Type}, list (nat * G A) -> G A.
+Parameter backtrack : forall {A : Type}, list (nat * G A) -> G A.
 Parameter vectorOf : forall {A : Type}, nat -> G A -> G (list A).
 Parameter listOf : forall {A : Type}, G A -> G (list A).
-Parameter elements : forall {A : Type}, A -> list A -> G A.
-Parameter elems_ : forall {A : Type}, A -> list A -> G A.
+Parameter elems_ : forall {A : Type}, list A -> G A.
 
 (* Correctness for derived generators *)
 
@@ -143,7 +140,7 @@ Parameter semFoldGen_right :
       foldr (fun b p => [set a_prev | exists a, a \in (semGenSize (f a_prev b) s :&: p)]) 
             [set an] bs a0 ].
 
-
+(*
 Parameter semOneof:
   forall {A} (l : list (G A)) (def : G A),
     (semGen (oneOf_ def l)) <-->
@@ -182,7 +179,7 @@ Parameter semFrequencySize:
       let l' := [seq x <- l | x.1 != 0] in
       if l' is nil then semGenSize def size else
       \bigcup_(x in l') semGenSize x.2 size.
-
+*)
 (*
 (** [backtrack] generates Some's unless all of the input generators are empty *)
 Parameter semBacktrackSize:
@@ -282,7 +279,8 @@ Parameter mergeBinds :
     semGen (bindGen ga (fun x => bindGen gb (f x))) <-->
     semGen (bindGen (genPair ga gb) (uncurry f)).
 
-*)
+ *)
+(*
 Module QcDefaultNotation.
 
 (* Noone would write a literal singleton. *)
@@ -323,7 +321,7 @@ Delimit Scope qc_scope with qc.
 End QcDefaultNotation.
 
 Import QcDefaultNotation. Open Scope qc_scope.
-
+*)
 (*
 Parameter semElemsSize : forall A (x : A) xs s,
   semGenSize (elems (x ;; xs)) s <--> x :: xs.

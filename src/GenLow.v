@@ -268,7 +268,13 @@ Module GenLow : GenLowInterface.Sig.
     - move => [? Contra]; inversion Contra.
     - move => Contra; inversion Contra.
   Qed.
-  
+
+  Lemma semFailSizeContra {A} s (a : A) : semGenSize failGen s a -> False.
+  Proof.
+    rewrite /semGenSize /possibly_generated /= => Contra.
+    by inversion Contra.
+  Qed.
+    
   Lemma semFail {A} : semGen failGen <--> @set0 A.
   Proof.
     rewrite /semGen /semGenSize /= /possibly_generated; split.
@@ -278,6 +284,13 @@ Module GenLow : GenLowInterface.Sig.
       inversion Contra.
   Qed.
 
+  Lemma semFailContra {A} (a : A) : semGen failGen a -> False.
+  Proof.
+    rewrite /semGen => H.
+    destruct H as [x [H1 H2]].
+    eapply semFailSizeContra; eauto.
+  Qed.
+  
   (* begin semReturn *)
   Lemma semReturn {A} (x : A) : semGen (returnGen x) <--> [set x].
   (* end semReturn *)
