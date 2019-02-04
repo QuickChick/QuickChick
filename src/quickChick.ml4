@@ -153,7 +153,7 @@ let define_and_run fuzz show_and_c_fun =
   Printf.fprintf oc "
 let _ = 
   if Array.length Sys.argv = 1 then
-    print_string (QuickChickLib.string_of_coqstring (snd (%s ())))
+    Pervasives.print_string (QuickChickLib.string_of_coqstring (snd (%s ())))
   else 
     let f () = 
       let quickchick_result =
@@ -162,12 +162,12 @@ let _ =
       in
       match quickchick_result with
       | Some (Failure _, s) ->
-         print_string (QuickChickLib.string_of_coqstring s); flush stdout;
+         Pervasives.print_string (QuickChickLib.string_of_coqstring s); Pervasives.flush Pervasives.stdout;
          failwith \"Test Failed\"
       | Some (_, s) ->
-         print_string (QuickChickLib.string_of_coqstring s)
+         Pervasives.print_string (QuickChickLib.string_of_coqstring s)
       | _ ->
-         print_string \"Failed to generate...\"
+         Pervasives.print_string \"Failed to generate...\"
     in AflPersistent.run f
 " (string_of_id main) (string_of_id main);
   close_out oc;
