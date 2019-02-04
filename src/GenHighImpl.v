@@ -666,6 +666,88 @@ rewrite -(IHl t); case=> p [lt_p <-]; exists (n.+1 + p); split.
 by rewrite ltnNge leq_addr addKn.
 Qed.
 
+Lemma semFrequencySize {A} (l : list (nat * G A)) (size: nat) :
+  semGenSize (freq_ l) size <-->
+             let l' := [seq x <- l | x.1 != 0] in
+             \bigcup_(x in l') (semGenSize x.2 size).
+Proof.
+rewrite semBindSize semChooseSize //=.
+case lsupp: {1}[seq x <- l | x.1 != 0] => [|[n g] gs].
+- move/sum_fst_eq0P: lsupp => suml; rewrite suml.
+  rewrite (@eq_bigcupl _ _ _ [set 0]) ?bigcup_set1 ?pick_def // ?leqn0 ?suml //.
+  + simpl. split => Contra.
+    * exfalso. eapply semFailSizeContra; eauto.
+    * destruct Contra as [? [Contra ?]]; inv Contra.
+  + split => H.
+    * assert (a = 0) by ssromega; subst; constructor.
+    * inv H; eauto.
+- symmetry; apply: reindex_bigcup.
+  have pos_suml: 0 < sum_fst l.
+  { have [] := sum_fst_eq0P l.
+    by rewrite lsupp; case: (sum_fst l) => // /(_ erefl).
+  } 
+  have->: (fun a : nat => a <= sum_fst l - 1) <--> [set m | m < sum_fst l].
+  { by move=> m /=; rewrite -ltnS subn1 prednK. }
+  rewrite -lsupp. exact: pick_imset.
+Qed.
+
+(* begin semFrequency *)
+Lemma semFrequency {A} (l : list (nat * G A)) :
+  semGen (freq_ l) <-->
+    let l' := [seq x <- l | x.1 != 0] in
+    \bigcup_(x in l') semGen x.2.
+(* end semFrequency *)
+Proof.
+by case lsupp: {1}[seq x <- l | x.1 != 0] => [|[n g] gs] /=;
+rewrite 1?bigcupC; apply: eq_bigcupr => sz;
+have := (semFrequencySize l sz); rewrite lsupp.
+Qed.
+
+Lemma frequencySizeMonotonic {A} (lg : list (nat * G A)) :
+  List.Forall (fun p => SizeMonotonic (snd p)) lg ->
+  SizeMonotonic (freq_ lg).
+Proof.
+  intros Hall.  unfold freq_.
+  eapply bindMonotonicStrong.
+  eauto with typeclass_instances.
+  intros x Heq. eapply semChoose in Heq; eauto.  
+  move : Heq => /andP [Hep1 Heq2]. 
+  destruct (sum_fst lg) eqn:Heq.
+  - rewrite pick_def.
+    + apply failSizeMonotonic.
+    + subst. ssromega.
+  - edestruct (pick_exists lg x failGen) as [[[n' g] [Hin [Hp Hg]]] H2].
+    rewrite Heq. unfold leq, super, ChooseNat, OrdNat in Hep1, Heq2.
+    ssromega.
+    eapply List.Forall_forall in Hall; [ | ].
+    eassumption.
+    subst. rewrite Hp. eassumption.
+Qed.
+
+Instance frequencySizeMonotonic_alt :
+  forall {A : Type} (lg : seq (nat * G A)),
+    lg \subset [set x | SizeMonotonic x.2 ] ->
+    SizeMonotonic (freq_ lg).
+Proof.
+  intros A ls Hin.
+  eapply frequencySizeMonotonic. 
+  induction ls. now constructor.
+  constructor. eapply Hin.
+  constructor. reflexivity.
+  eapply IHls.  eapply subset_trans; eauto.
+  constructor 2. eassumption.
+Qed.
+
+Lemma eq_lt_0 : (fun x => x <= 0) <--> [set 0].
+Proof. 
+  move => x; split => H; auto.
+  - destruct x; auto. 
+    + unfold set1; auto.
+    + inversion H.
+  - inversion H; auto.
+Qed.
+
+
 Lemma pickDrop_def :
   forall {A} (l: list (nat * G (option A))) n,
     sum_fst l <= n ->
@@ -765,86 +847,8 @@ Proof.
     now ssromega.
 Qed.
 
-(* begin semFrequencySize *)
-Lemma semFrequencySize {A}
-      (l : list (nat * G A)) (def : G A) (size: nat) :
-  semGenSize (frequency def l) size <-->
-    let l' := [seq x <- l | x.1 != 0] in
-    if l' is nil then semGenSize def size else
-      \bigcup_(x in l') semGenSize x.2 size.
-(* end semFrequencySize *)
-Proof.
-rewrite semBindSize semChooseSize //=.
-case lsupp: {1}[seq x <- l | x.1 != 0] => [|[n g] gs].
-move/sum_fst_eq0P: lsupp => suml; rewrite suml.
-  rewrite (@eq_bigcupl _ _ _ [set 0]) ?bigcup_set1 ?pick_def // ?leqn0 ?suml //.
-  by move=> n; split; rewrite leqn0; [move/eqP|] => ->.
-symmetry; apply: reindex_bigcup.
-have pos_suml: 0 < sum_fst l.
-  have [] := sum_fst_eq0P l.
-  by rewrite lsupp; case: (sum_fst l) => // /(_ erefl).
-have->: (fun a : nat => a <= sum_fst l - 1) <--> [set m | m < sum_fst l].
-  by move=> m /=; rewrite -ltnS subn1 prednK.
-exact: pick_imset.
-Qed.
 
-(* begin semFrequency *)
-Lemma semFrequency {A} (l : list (nat * G A)) (def : G A) :
-  semGen (frequency def l) <-->
-    let l' := [seq x <- l | x.1 != 0] in
-    if l' is nil then semGen def else
-      \bigcup_(x in l') semGen x.2.
-(* end semFrequency *)
-Proof.
-by case lsupp: {1}[seq x <- l | x.1 != 0] => [|[n g] gs] /=;
-rewrite 1?bigcupC; apply: eq_bigcupr => sz;
-have := (semFrequencySize l def sz); rewrite lsupp.
-Qed.
 
-Lemma frequencySizeMonotonic {A} (g0 : G A) lg :
-  SizeMonotonic g0 ->
-  List.Forall (fun p => SizeMonotonic (snd p)) lg ->
-  SizeMonotonic (frequency g0 lg).
-Proof.
-  intros H1.  unfold frequency.
-  intros Hall. eapply bindMonotonicStrong.
-  eauto with typeclass_instances.
-  intros x Heq. eapply semChoose in Heq; eauto.  
-  move : Heq => /andP [Hep1 Heq2]. 
-  destruct (sum_fst lg) eqn:Heq.
-  - rewrite pick_def. eassumption.
-    subst. ssromega.
-  - edestruct (pick_exists lg x g0) as [[[n' g] [Hin [Hp Hg]]] H2].
-    rewrite Heq. unfold leq, super, ChooseNat, OrdNat in Hep1, Heq2.
-    ssromega.
-    eapply List.Forall_forall in Hall; [ | ].
-    eassumption.
-    subst. rewrite Hp. eassumption.
-Qed.
-
-Instance frequencySizeMonotonic_alt :
-  forall {A : Type} (g0 : G A) (lg : seq (nat * G A)),
-    SizeMonotonic g0 ->
-    lg \subset [set x | SizeMonotonic x.2 ] ->
-    SizeMonotonic (frequency g0 lg).
-Proof.
-  intros A g ls Hm Hin.
-  eapply frequencySizeMonotonic. eassumption.
-  induction ls. now constructor.
-  constructor. eapply Hin.
-  constructor. reflexivity.
-  eapply IHls.  eapply subset_trans; eauto.
-  constructor 2. eassumption.
-Qed.
-
-Lemma eq_lt_0 : (fun x => x <= 0) <--> [set 0].
-Proof. 
-  move => x; split => H; auto.
-  - destruct x; auto. 
-    + unfold set1; auto.
-    + inversion H.
-  - inversion H; auto.
-Qed.
 
 Lemma semBacktrackFuelDef {A} fuel (l : list (nat * G (option A))) size :
   sum_fst l = 0 -> 

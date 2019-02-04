@@ -290,6 +290,17 @@ Module GenLow : GenLowInterface.Sig.
     destruct H as [x [H1 H2]].
     eapply semFailSizeContra; eauto.
   Qed.
+
+  Program Instance unsizedFail {A} : Unsized (@failGen A).
+  Next Obligation.
+      by rewrite ! semFailSize; split; auto.
+  Qed.
+
+  Instance failSizeMonotonic {A} : SizeMonotonic (@failGen A).
+  Proof.
+    firstorder.
+  Qed.
+
   
   (* begin semReturn *)
   Lemma semReturn {A} (x : A) : semGen (returnGen x) <--> [set x].

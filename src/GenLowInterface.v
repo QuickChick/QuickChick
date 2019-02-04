@@ -179,6 +179,9 @@ Module Type Sig.
     forall A (x : A), semGen (returnGen x) <--> [set x].
   Parameter semReturnSize :
     forall A (x : A) size, semGenSize (returnGen x) size <--> [set x].
+
+  Declare Instance unsizedFail {A} : Unsized (@failGen A).
+  Declare Instance failSizeMonotonic {A} : SizeMonotonic (@failGen A).
   
   Declare Instance unsizedReturn {A} (x : A) : Unsized (returnGen x).
   Declare Instance returnGenSizeMonotonic {A} (x : A) : SizeMonotonic (returnGen x).
