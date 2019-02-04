@@ -31,7 +31,7 @@ Parameter foldGen :
   forall {A B : Type}, (A -> B -> G A) -> list B -> A -> G A.
 Parameter oneOf_ : forall {A : Type}, list (G A) -> G A.
 Parameter freq_ : forall {A : Type}, list (nat * G A) -> G A.
-Parameter backtrack : forall {A : Type}, list (nat * G A) -> G A.
+(* Parameter backtrack : forall {A : Type}, list (nat * G A) -> G A. *)
 Parameter vectorOf : forall {A : Type}, nat -> G A -> G (list A).
 Parameter listOf : forall {A : Type}, G A -> G (list A).
 Parameter elems_ : forall {A : Type}, list A -> G A.

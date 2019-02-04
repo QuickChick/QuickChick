@@ -747,7 +747,7 @@ Proof.
   - inversion H; auto.
 Qed.
 
-
+(*
 Lemma pickDrop_def :
   forall {A} (l: list (nat * G (option A))) n,
     sum_fst l <= n ->
@@ -961,6 +961,7 @@ Lemma length_sum_lst {A} (l : list (nat * A)) :
 Proof.
   destruct l; eauto; intros H; inv H.
 Qed.
+*)
 
 (* Lemma pickDrop_length_strong {A} (l1 l2 : seq (nat * G (option A))) (n m : nat) g : *)
 (*   pickDrop l1 n = (m, g, l2) -> *)
@@ -996,6 +997,7 @@ Qed.
 (* Qed. *)
 
 
+(*
 Lemma pickDrop_sum_fst {A} (lg  : seq (nat * G (option A))) n :
   sum_fst lg = 0 -> exists l, pickDrop lg n = (0, returnGen None, l) /\ sum_fst l = 0.
 Proof.
@@ -1309,6 +1311,7 @@ Proof.
   left. eexists.
   split; split; eauto.
 Qed.
+ *)
 
 Lemma semFoldGen_right :
   forall {A B : Type} (f : A -> B -> G A) (bs : list B) (a0 : A) (s : nat),
@@ -1355,7 +1358,8 @@ Proof.
     inversion H; subst; clear H.
     exists a. split. by []. exists b. split; by [].
 Qed.    
-*)
+
+(*
 Module QcDefaultNotation.
 
 Notation " 'elems' [ x ] " := (elements x (cons x nil)) : qc_scope.
@@ -1381,20 +1385,8 @@ Notation " 'freq' ( ( n , x ) ;; l ) " :=
   (frequency x (cons (n, x) l)) (at level 1, no associativity) : qc_scope.
 
 End QcDefaultNotation.
-
-Module QcDoNotation.
-
-Notation "'do!' X <- A ; B" :=
-  (bindGen A (fun X => B))
-  (at level 200, X ident, A at level 100, B at level 200).
-(*
-Notation "'doM!' X <- A ; B" :=
-  (bindGenOpt A (fun X => B))
-  (at level 200, X ident, A at level 100, B at level 200).
 *)
-End QcDoNotation.
 
-Import QcDefaultNotation. Open Scope qc_scope.
 (*
 (* CH: Reusing :: instead of ;; would have been nice, but I didn't manage *)
 
