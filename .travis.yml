@@ -30,10 +30,9 @@ install:
 - eval $(opam config env)
 - opam config var root
 - opam repo add coq-released https://coq.inria.fr/opam/released || true
-- opam repo add coq-core-dev https://coq.inria.fr/opam/core-dev || true
 - opam repo add coq-extra-dev https://coq.inria.fr/opam/extra-dev || true
 - opam update
-- opam install coq.8.9.dev
+- opam install coq.8.9.0
 - opam list
 - ocamlc -v
 
