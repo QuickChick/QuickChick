@@ -199,7 +199,7 @@ Global Instance shrinkOption {A : Type} `{Shrink A} : Shrink (option A) :=
 
 
 (** Instance correctness *)
-(*
+
 Program Instance arbNatMon : SizeMonotonic (@arbitrary nat _).
 Next Obligation.
   rewrite !semSizedSize !semChooseSize // => n /andP [/leP H1 /leP H2].
@@ -345,4 +345,3 @@ Proof.
   move => [/Hyp1 Ha /Hyp2 Hb]. eexists; split; first by split; eauto.
   reflexivity.
 Qed.
-*)

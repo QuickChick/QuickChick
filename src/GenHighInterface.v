@@ -149,7 +149,7 @@ Parameter semOneOfSize : forall {A} (l : list (G A)) s,
 Parameter semOneOf : forall {A} (l : list (G A)),
   semGen (oneOf_ l) <--> \bigcup_(x in l) semGen x.
 
-Declare Instance oneOfMonotonic {A} (x : G A) (l : list (G A))
+Declare Instance oneOfMonotonic {A} (l : list (G A))
         `(l \subset SizeMonotonic) : SizeMonotonic (oneOf_ l). 
 
 Parameter semFrequency:

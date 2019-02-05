@@ -4,6 +4,7 @@ From QuickChick Require Import QuickChick.
 Import GenLow GenHigh.
 
 From QuickChick.RedBlack Require Import redblack testing.
+Set Bullet Behavior "Strict Subproofs".
 
 (* correspondence between the inductive and the executable definitions *)
 Lemma has_black_height :
@@ -62,7 +63,7 @@ Qed.
 Lemma semColor : semGen genColor <--> [set : color].
 (* end semColor *)
 Proof.
-  rewrite /genColor. rewrite semElements.
+  rewrite /genColor. rewrite semElems.
   intros c. destruct c; simpl; unfold setT; tauto.
 Qed.
 
@@ -78,7 +79,7 @@ Proof.
   eapply (well_founded_induction well_founded_hc).
   move => [[|n] c] IH; rewrite genRBTree_height_eq.
   - case : c {IH}; eauto with typeclass_instances.
-    apply oneofMonotonic; eauto with typeclass_instances.
+    apply oneOfMonotonic; eauto with typeclass_instances.
     move => t [H1 | [H2 | //]]; subst; eauto with typeclass_instances.
   - case : c IH => IH. apply liftGen4Monotonic; eauto with typeclass_instances;
     eapply IH; eauto; by constructor; omega.
@@ -104,20 +105,20 @@ Proof.
   move => [[|h] []] IH /=; rewrite genRBTree_height_eq.
   - rewrite semReturn. split. move => <-. constructor.
     move => H. inversion H; subst; reflexivity.
-  - rewrite semOneof. move => t. split.
-    move => [gen [[H1 | [H1 | // _]] H2]]; subst.
-    apply semThunkGen, semReturn in H2. rewrite - H2. constructor.
-    move : H2 => /semThunkGen /semBindSizeMonotonic.
-    move => [n [_ /semReturn <-]].
-    constructor. constructor. constructor.
-    move => H. inversion H; subst.
-    { eexists. split. left. reflexivity. inversion H; subst.
-        by apply semThunkGen, semReturn. }
-    { inversion H0; subst. inversion H1; subst.
-      eexists. split. right. left. reflexivity.
-      apply semThunkGen, semBindSizeMonotonic; eauto with typeclass_instances.
-      eexists. split; last by apply semReturn; reflexivity.
-      by apply arbNat_correct. }
+  - rewrite semOneOf. move => t. split.
+    + move => [gen [[H1 | [H1 | // _]] H2]]; subst.
+      * apply semReturn in H2. rewrite - H2. constructor.
+      * move : H2 => /semBindSizeMonotonic.
+        move => [n [_ /semReturn <-]].
+        do 2 constructor.
+    + move => H. inversion H; subst.
+      * eexists. split. left. reflexivity. inversion H; subst.
+          by apply semReturn.
+      * inversion H0; subst. inversion H1; subst.
+        eexists. split. right. left. reflexivity.
+        apply semBindSizeMonotonic; eauto with typeclass_instances.
+        eexists. split; last by apply semReturn; reflexivity.
+        by apply arbNat_correct. 
   - rewrite semLiftGen4SizeMonotonic. split.
     + move => /= [c [t1 [n [t2 [/semReturn H1 [H2 [H3 [H4 H5]]]]]]]].
       rewrite <- H1 in *. clear H1. subst.
@@ -168,6 +169,7 @@ Proof.
     by apply arbNat_correct.
 Qed.
 
+(* LEO - TODO: Checker correctness
 (* begin insert_preserves_redblack_checker_correct *)
 Lemma insert_preserves_redblack_checker_correct:
   semChecker (insert_preserves_redblack_checker genRBTree)
@@ -200,6 +202,7 @@ Proof.
     + simpl; auto.
   - simpl. eauto with typeclass_instances.
 Qed.
+ *)
 
 (*
 Lemma insert_preserves_redblack_checker_correct' :

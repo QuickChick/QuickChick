@@ -520,7 +520,7 @@ by case: l => [|g l]; rewrite 1?bigcupC; apply: eq_bigcupr => sz;
   apply: semOneOfSize.
 Qed.
 
-Program Instance oneOfMonotonic {A} (x : G A) (l : list (G A)) `(l \subset SizeMonotonic) 
+Program Instance oneOfMonotonic {A} (l : list (G A)) `(l \subset SizeMonotonic) 
 : SizeMonotonic (oneOf_ l). 
 Next Obligation.
   rewrite !semOneOfSize. elim : l H => [_ | g gs IH /subconsset [H2 H3]] /=.
