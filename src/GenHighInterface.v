@@ -143,46 +143,37 @@ Parameter semFoldGen_right :
       foldr (fun b p => [set a_prev | exists a, a \in (semGenSize (f a_prev b) s :&: p)]) 
             [set an] bs a0 ].
 
-(*
-Parameter semOneof:
-  forall {A} (l : list (G A)) (def : G A),
-    (semGen (oneOf_ def l)) <-->
-      if l is nil then semGen def else \bigcup_(x in l) semGen x.
+Parameter semOneOfSize : forall {A} (l : list (G A)) s,
+  semGenSize (oneOf_ l) s <--> \bigcup_(x in l) semGenSize x s.
 
-Parameter semOneofSize:
-  forall {A} (l : list (G A)) (def : G A) s,
-    (semGenSize (oneOf_ def l) s) <-->
-      if l is nil then semGenSize def s else \bigcup_(x in l) semGenSize x s.
+Parameter semOneOf : forall {A} (l : list (G A)),
+  semGen (oneOf_ l) <--> \bigcup_(x in l) semGen x.
 
-Declare Instance oneofMonotonic {A} (x : G A) (l : list (G A))
-        `{ SizeMonotonic _ x} `(l \subset SizeMonotonic) : SizeMonotonic (oneOf_ x l). 
+Declare Instance oneOfMonotonic {A} (x : G A) (l : list (G A))
+        `(l \subset SizeMonotonic) : SizeMonotonic (oneOf_ l). 
 
 Parameter semFrequency:
-  forall {A} (l : list (nat * G A)) (def : G A),
-    semGen (freq_ def l) <-->
-      let l' := [seq x <- l | x.1 != 0] in
-      if l' is nil then semGen def else
-        \bigcup_(x in l') semGen x.2.
+  forall {A} (l : list (nat * G A)),
+    semGen (freq_ l) <-->
+    let l' := [seq x <- l | x.1 != 0] in
+    \bigcup_(x in l') semGen x.2.
 
-Parameter frequencySizeMonotonic:
-  forall {A} (g0 : G A) lg,
-  SizeMonotonic g0 ->
+Parameter frequencySizeMonotonic : forall {A} (lg : list (nat * G A)),
   List.Forall (fun p => SizeMonotonic (snd p)) lg ->
-  SizeMonotonic (freq_ g0 lg).
+  SizeMonotonic (freq_ lg).
 
 Declare Instance frequencySizeMonotonic_alt 
-: forall {A : Type} (g0 : G A) (lg : seq (nat * G A)),
-    SizeMonotonic g0 ->
+  :
+  forall {A : Type} (lg : seq (nat * G A)),
     lg \subset [set x | SizeMonotonic x.2 ] ->
-    SizeMonotonic (freq_ g0 lg).
+    SizeMonotonic (freq_ lg).
 
 Parameter semFrequencySize:
-  forall {A} (l : list (nat * G A)) (def : G A) (size: nat),
-    semGenSize (freq_ def l) size <-->
-      let l' := [seq x <- l | x.1 != 0] in
-      if l' is nil then semGenSize def size else
-      \bigcup_(x in l') semGenSize x.2 size.
-*)
+  forall {A} (l : list (nat * G A)) (size: nat),
+  semGenSize (freq_ l) size <-->
+             let l' := [seq x <- l | x.1 != 0] in
+             \bigcup_(x in l') (semGenSize x.2 size).
+
 (*
 (** [backtrack] generates Some's unless all of the input generators are empty *)
 Parameter semBacktrackSize:
@@ -228,7 +219,7 @@ Parameter semBacktrack_complete :
   forall (A : Type) (l : seq (nat * G (option A))),
     \bigcup_(x in (l :&: (fun x => x.1 <> 0))) (isSome :&: (semGen x.2)) \subset
     semGen (backtrack l).
-
+*)
 
 Parameter semVectorOfSize:
   forall {A : Type} (k : nat) (g : G A) size,
@@ -257,15 +248,15 @@ Parameter semListOfUnsized:
 Declare Instance listOfMonotonic {A} (g : G A) 
         `{SizeMonotonic _ g } : SizeMonotonic (listOf g).
 
-Parameter semElements:
-  forall {A} (l: list A) (def : A),
-    (semGen (elems_ def l)) <--> if l is nil then [set def] else l.
+Parameter semElems :
+  forall {A} (l: list A),
+    (semGen (elems_ l)) <--> l.
 
-Parameter semElementsSize:
-  forall {A} (l: list A) (def : A) s,
-    (semGenSize (elems_ def l) s) <--> if l is nil then [set def] else l.
+Parameter semElemsSize:
+  forall {A} (l: list A) s,
+    (semGenSize (elems_ l) s) <--> l.
 
-Declare Instance elementsUnsized {A} {def : A} (l : list A)  : Unsized (elems_ def l).
+Declare Instance elemsUnsized {A} (l : list A)  : Unsized (elems_ l).
 
 Definition genPair {A B : Type} (ga : G A) (gb : G B) : G (A * B) :=
   liftGen2 pair ga gb.
@@ -281,8 +272,6 @@ Parameter mergeBinds :
   forall A B C (ga : G A) (gb : G B) (f : A -> B -> G C),
     semGen (bindGen ga (fun x => bindGen gb (f x))) <-->
     semGen (bindGen (genPair ga gb) (uncurry f)).
-
- *)
 
 (* LEO: Leaving the notation in for future-proofing: unit-thunking *)
 Module QcDefaultNotation.

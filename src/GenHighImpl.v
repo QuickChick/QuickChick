@@ -564,7 +564,7 @@ rewrite /semGen; setoid_rewrite semElemsSize; rewrite bigcup_const //.
 by do 2! constructor.
 Qed.
 
-Program Instance elemsUnsized {A} {def : A} (l : list A) : 
+Program Instance elemsUnsized {A} (l : list A) : 
   Unsized (elems_ l).
 Next Obligation.
   rewrite ! semElemsSize. by case: l.
