@@ -77,6 +77,9 @@ Module Type Sig.
   Parameter enum : forall {A : Type} `{Serial A}, G A.
   Parameter enum' : forall {A : Type} `{Serial A} (n : nat), G A.
 
+  Parameter cut : forall {A : Type}, G A -> G A.
+  Parameter backTrack : forall {A : Type}, nat -> G A -> G A.
+  
   (* Parameter sumG : forall {A : Type} (lga : LazyList (G A)), G A. *)
   Parameter sample : forall {A : Type}, G A -> list A.
 
@@ -388,7 +391,14 @@ Module Type Sig.
   Declare Instance unsizedResize {A} (g : G A) n : 
     Unsized (resize n g).
 
+  (* TODO: Not true.
+  Parameter semBacktrackSize : forall {A : Type} (n : nat) (g : G A) s,
+      semGenSize (backtrack n g) s <--> semGenSize g s.
 
+  Parameter semBacktrack : forall {A : Type} (n : nat) (g : G A),
+      semGen (backtrack n g) <--> semGen g .
+   *)
+  
   (* LEO - TODO: suchThat maybe 
   Parameter semSuchThatMaybe_sound':
     forall A (g : G A) (f : A -> bool),

@@ -3,7 +3,7 @@ Set Warnings "-notation-overridden,-parsing".
 
 Require Import ZArith List.
 Require Import mathcomp.ssreflect.ssreflect.
-From mathcomp Require Import ssrfun ssrbool ssrnat.
+From mathcomp Require Import ssrfun ssrbool ssrnat seq.
 Require Import Numbers.BinNums.
 Require Import Classes.RelationClasses.
 
@@ -126,6 +126,29 @@ Module GenLow : GenLowInterface.Sig.
   Definition suchThatMaybe {A : Type} (g : G A) (p : A -> bool) : G A :=
     sized (fun x => suchThatMaybeAux g p 0 (max 1 x)).
 
+  Definition cut {A : Type} (g : G A) : G A :=
+    MkGen (fun s r =>
+             match run g s r with
+             | lcons x _ => lsing x
+             | lsing x => lsing x
+             | lnil => lnil
+             end).
+  
+  Fixpoint backTrackAux {A : Type} (n : nat) (g : nat -> RandomSeed -> LazyList A) (s : nat) (r : RandomSeed) :=
+    match n with
+    | O => lnil
+    | S n' =>
+      let (r1, r2) := randomSplit r in 
+      match g s r1 with
+      | lnil => backTrackAux n' g s r2
+      | lsing x   => lsing x
+      | lcons x _ => lsing x
+      end
+    end.
+
+  Definition backTrack {A : Type} (n : nat) (g : G A) :=
+    MkGen (fun s r => backTrackAux n (run g) s r).
+
   Fixpoint rnds (rnd : RandomSeed) (n' : nat) : list RandomSeed :=
     match n' with
       | O => nil
@@ -140,8 +163,41 @@ Module GenLow : GenLowInterface.Sig.
       | S n' => createRange n' (cons n acc)
     end.
 
+  
   Definition choose {A : Type} `{ChoosableFromInterval A} (range : A * A) : G A :=
     MkGen (fun _ r => ret (fst (randomR range r))).
+
+  (* This should use urns! *)
+  Fixpoint pickDrop {A : Type} (def : A) (xs : list (nat * A)) n : nat * A * list (nat * A) :=
+    match xs with
+      | nil => (0, def, nil)
+      | (k, x) :: xs =>
+        if (n < k) then  (k, x, xs)
+        else let '(k', x', xs') := pickDrop def xs (n - k)
+             in (k', x', (k,x)::xs')
+    end. 
+
+  Definition sum_fst {A : Type} (gs : list (nat * A)) : nat :=
+    foldl (fun t p => t + (fst p)) 0 gs.
+  
+  Fixpoint shuffleFuel {A : Type} (fuel : nat) (tot : nat)
+           (gs : list (nat * (nat -> RandomSeed -> LazyList A)))
+           (s : nat) (r : RandomSeed) : LazyList A :=
+    match fuel with 
+      | O => lnil
+      | S fuel' =>
+        let (r1, r2) := randomSplit r in
+        let (r11, r12) := randomSplit r1 in
+        n <- run (choose (0, tot-1)) s r11 ;;
+        let '(k, g, gs') := pickDrop (fun _ _ => lnil) gs n in
+        lazy_append' (g s r12) (fun _ => shuffleFuel fuel' (tot - k) gs' s r2)
+    end.
+
+  Definition run_snd {A B : Type} (ag : A * G B) : A * (nat -> RandomSeed -> LazyList B) :=
+    let (a,g) := ag in (a, run g).
+  
+  Definition shuffle {A : Type} (gs : list (nat * G A)) : G A :=
+    MkGen (fun s r => shuffleFuel (length gs) (sum_fst gs) (List.map run_snd gs) s r).
 
   (* TODO @Calvin: Do these use laziness? *)
   Definition enumR {A : Type} `{EnumFromInterval A} (range : A * A) : G A :=
@@ -661,7 +717,50 @@ Module GenLow : GenLowInterface.Sig.
     rewrite /Unsized /resize /semGenSize.
     destruct g; split; auto.
   Qed.
-  
+
+  Lemma semBackTrackSizeAux : forall {A : Type} (n : nat) (g : nat -> RandomSeed -> LazyList A) s,
+      possibly_generated (backTrackAux n g s) <--> 
+      if n is O then set0 else possibly_generated (g s).
+  Proof.
+    move => A n; induction n => g s;
+    unfold semGenSize; simpl in *.
+    - split => [[r Contra] | Contra ]; inv Contra.
+    - split => [[r HIn] | [r HIn]].
+      + destruct (randomSplit r) as (r1, r2) eqn:Split.
+        destruct (g s r1) eqn:Hg.
+        * destruct (IHn g s a) as [H1 H2].
+          { destruct n.
+            - inv HIn.
+            - apply H1.
+              exists r2; auto.
+          } 
+        * exists r1.
+          inv HIn.
+          rewrite Hg.
+          constructor.
+        * inv HIn.
+          exists r1.
+          rewrite Hg.
+          constructor; auto.
+      + pose proof (randomSplitAssumption r r) as [r' Hr'].
+        exists r'.
+        rewrite Hr'.
+        destruct (g s r) eqn:Hg.
+        * inv HIn.
+        * inv HIn; auto.
+        * 
+  Admitted.
+     
+  Lemma semBackTrackSize : forall {A : Type} (n : nat) (g : G A) s,
+      n > 0 -> semGenSize (backTrack n g) s <--> semGenSize g s.
+  Proof.
+    move => a n g s Hn.
+    unfold semGenSize; simpl.
+    pose proof (semBackTrackSizeAux n (run g) s) as H.
+    destruct n; [ inv Hn |].
+    exact H.
+  Qed.
+    
   Lemma SuchThatMaybeAuxMonotonic {A} :
     forall (g : G A) p k n,
       SizeMonotonic g -> 

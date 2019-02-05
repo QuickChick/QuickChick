@@ -151,8 +151,10 @@ Parameter bindGen' : forall {A B : Type} (g : G A),
 
 (** A variant of bind for the [(G (option --))] monad.  Useful for
     chaining generators that can fail / backtrack. *)
+(*
 Parameter bindGenOpt : forall {A B : Type},
     G (option A) -> (A -> G (option B)) -> G (option B).
+ *)
 
 (* #################################################################### *)
 (** ** Basic Generator Combinators *)
@@ -167,12 +169,12 @@ Parameter vectorOf : forall {A : Type}, nat -> G A -> G (list A).
 (** [elems_ a l] constructs a generator from a list [l] and a
     default element [a]. If [l] is non-empty, the generator picks an
     element from [l] uniformly; otherwise it always yields [a]. *)
-Parameter elems_ : forall {A : Type}, A -> list A -> G A.
+Parameter elems_ : forall {A : Type}, list A -> G A.
 
 (** Similar to [elems_], instead of choosing from a list of [A]s,
     [oneOf_ g l] returns [g] if [l] is empty; otherwise it uniformly
     picks a generator for [A] in [l]. *)
-Parameter oneOf_ : forall {A : Type}, G A -> list (G A) -> G A.
+Parameter oneOf_ : forall {A : Type}, list (G A) -> G A.
 
 (** We can also choose generators with distributions other than the
     uniform one. [freq_ g l] returns [g] if [l] is empty;
@@ -181,14 +183,15 @@ Parameter oneOf_ : forall {A : Type}, G A -> list (G A) -> G A.
     [freq_ z [(2, x); (3, y)]] has 40%% probability of choosing
     [x] and 60%% probability of choosing [y]. *)
 Parameter freq_ :
-  forall {A : Type}, G A -> list (nat * G A) -> G A.
+  forall {A : Type}, list (nat * G A) -> G A.
 
 (** Try all generators until one returns a [Some] value or all failed once with
     [None]. The generators are picked at random according to their weights
     (like [frequency]), and each one is run at most once. *)
+(*
 Parameter backtrack :
   forall {A : Type}, list (nat * G (option A)) -> G (option A).
-
+*)
 (** Internally, the G monad hides a [size] parameter that can be accessed by
     generators. The [sized] combinator provides such access. The [resize] 
     combinator sets it. *)
@@ -197,10 +200,11 @@ Parameter resize : forall {A: Type}, nat -> G A -> G A.
 
 (** Generate-and-test approach to generate data with preconditions. *)
 Parameter suchThatMaybe :
-  forall {A : Type}, G A -> (A -> bool) -> G (option A).
+  forall {A : Type}, G A -> (A -> bool) -> G A.
+(*
 Parameter suchThatMaybeOpt :
   forall {A : Type}, G (option A) -> (A -> bool) -> G (option A).
-
+*)
 (* #################################################################### *)
 
 (** The [elems_], [oneOf_], and [freq_] combinators all take
@@ -209,6 +213,7 @@ Parameter suchThatMaybeOpt :
     sub-module exposes notation (without the underscores) to hide this default.
 *)
 
+(*
 Module QcDefaultNotation.
 
   (** [elems] is a shorthand for [elems_] without a default argument. *)
@@ -242,6 +247,7 @@ Module QcDefaultNotation.
     (freq_ x (cons (n, x) l)) (at level 1, no associativity) : qc_scope.
 
 End QcDefaultNotation.
+ *)
 
 (** The original version of QuickChick used [elements], [oneof] and [frequency]
     as the default-argument versions of the corresponding combinators.
@@ -353,9 +359,9 @@ Declare Instance genPair :
     To avoid this, QuickChick also provides convenient notation to call 
     by providing only the predicate [P] that constraints the generation.
     The typeclass constraint is inferred. *)
-
+(*
 Notation "'genST' x" := (@arbitraryST _ x _) (at level 70).
-
+*)
 (* #################################################################### *)
 (** * Shrinking *)
 
@@ -799,6 +805,7 @@ Record Args :=
 
 (** Use the monad notations from [coq-ext-lib] instead of the
     [QcDoNotation] sub-module: *)
+(*
 Module QcDoNotation.
   Notation "'do!' X <- A ; B" :=
     (bindGen A (fun X => B))
@@ -810,5 +817,5 @@ Module QcDoNotation.
     (bindGenOpt A (fun X => B))
     (at level 200, X ident, A at level 100, B at level 200).
 End QcDoNotation.
-
+*)
 End QuickChickSig.

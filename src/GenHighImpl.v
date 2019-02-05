@@ -1359,33 +1359,47 @@ Proof.
     exists a. split. by []. exists b. split; by [].
 Qed.    
 
-(*
+(* LEO: Leaving the notation in for future-proofing: unit-thunking *)
 Module QcDefaultNotation.
 
-Notation " 'elems' [ x ] " := (elements x (cons x nil)) : qc_scope.
-Notation " 'elems' [ x ; y ] " := (elements x (cons x (cons y nil))) : qc_scope.
+(* Noone would write a literal singleton. *)
+Notation " 'elems' [ x ] " := (elems_ (cons x nil)) : qc_scope.
+Notation " 'elems' [ x ; y ] " := (elems_ (cons x (cons y nil))) : qc_scope.
 Notation " 'elems' [ x ; y ; .. ; z ] " :=
-  (elements x (cons x (cons y .. (cons z nil) ..))) : qc_scope.
+  (elems_ (cons x (cons y .. (cons z nil) ..))) : qc_scope.
+(* Why not [elems (x :: l)]? *)
 Notation " 'elems' ( x ;; l ) " :=
-  (elements x (cons x l)) (at level 1, no associativity) : qc_scope.
+  (elems_ (cons x l)) (at level 201, no associativity) : qc_scope.
 
-Notation " 'oneOf' [ x ] " := (oneof x (cons x nil)) : qc_scope.
-Notation " 'oneOf' [ x ; y ] " := (oneof x (cons x (cons y nil))) : qc_scope.
+(* We insert thunks ([etaG]) to delay the execution of
+   each element until it actually gets chosen. *)
+
+Notation " 'oneOf' [ x ] " := x : qc_scope.
+Notation " 'oneOf' [ x ; y ] " :=
+  (oneOf_ (cons x (cons y nil))) : qc_scope.
 Notation " 'oneOf' [ x ; y ; .. ; z ] " :=
-  (oneof x (cons x (cons y .. (cons z nil) ..))) : qc_scope.
+  (oneOf_ (cons x
+    (cons y .. (cons z nil) ..))) : qc_scope.
 Notation " 'oneOf' ( x ;; l ) " :=
-  (oneof x (cons x l))  (at level 1, no associativity) : qc_scope.
+  (oneOf_ (cons x l))  (at level 1, no associativity) : qc_scope.
 
-Notation " 'freq' [ x ] " := (frequency x nil) : qc_scope.
-Notation " 'freq' [ ( n , x ) ; y ] " :=
-  (frequency x (cons (n, x) (cons y nil))) : qc_scope.
-Notation " 'freq' [ ( n , x ) ; y ; .. ; z ] " :=
-  (frequency x (cons (n, x) (cons y .. (cons z nil) ..))) : qc_scope.
-Notation " 'freq' ( ( n , x ) ;; l ) " :=
-  (frequency x (cons (n, x) l)) (at level 1, no associativity) : qc_scope.
+(* freq [ 4 %: g1 ; 6 %: g2 ] *)
+Notation " 'freq' [ x ] " := ((x : nat * G _).2) : qc_scope.
+Notation " 'freq' [ x ; y ] " :=
+  (freq_ (cons x (cons y nil))) : qc_scope.
+Notation " 'freq' [ x ; y ; .. ; z ] " :=
+  (freq_ (cons x (cons y .. (cons z nil) ..))) : qc_scope.
+Notation " 'freq' ( x ;; l ) " :=
+  (freq_ (cons x l)) (at level 1, no associativity) : qc_scope.
+
+Notation "w %: g" := (w, etaG g)
+  (at level 100) : qc_scope.
+
+Delimit Scope qc_scope with qc.
 
 End QcDefaultNotation.
-*)
+
+Import QcDefaultNotation. Open Scope qc_scope.
 
 (*
 (* CH: Reusing :: instead of ;; would have been nice, but I didn't manage *)

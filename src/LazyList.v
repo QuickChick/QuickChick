@@ -39,6 +39,17 @@ Fixpoint lazy_append {A : Type} (l1 : LazyList A) (l2 : LazyList A) : LazyList A
   | lcons x l1' => lcons x (fun _ => (lazy_append (l1' tt) l2))
   end.
 
+Fixpoint lazy_append' {A : Type} (l1 : LazyList A) (l2 : unit -> LazyList A) : LazyList A :=
+  match l1 with
+  | lnil => l2 tt
+  | lsing x =>
+    match l2 tt with
+    | lnil => lsing x
+    | l2' => lcons x (fun _ => l2')
+    end
+  | lcons x l1' => lcons x (fun _ => (lazy_append' (l1' tt) l2))
+  end.
+
 Fixpoint lazy_take {A : Type} (n : nat) (l : LazyList A) : LazyList A :=
   match n with
   | 0 => lnil
