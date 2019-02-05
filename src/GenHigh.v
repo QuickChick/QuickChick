@@ -15,8 +15,6 @@ Set Bullet Behavior "Strict Subproofs".
 Import GenLow.
 Module Import GenHigh := GenHighImpl.Impl GenLow.
 
-Import QcDefaultNotation.
-
 (*
 Lemma oneOf_freq {A} (g : G A) (gs : list (G A)) size :
   semGenSize (oneOf (g ;; gs)) size <-->

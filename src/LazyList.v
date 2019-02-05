@@ -39,6 +39,17 @@ Fixpoint lazy_append {A : Type} (l1 : LazyList A) (l2 : LazyList A) : LazyList A
   | lcons x l1' => lcons x (fun _ => (lazy_append (l1' tt) l2))
   end.
 
+Fixpoint lazy_append' {A : Type} (l1 : LazyList A) (l2 : unit -> LazyList A) : LazyList A :=
+  match l1 with
+  | lnil => l2 tt
+  | lsing x =>
+    match l2 tt with
+    | lnil => lsing x
+    | l2' => lcons x (fun _ => l2')
+    end
+  | lcons x l1' => lcons x (fun _ => (lazy_append' (l1' tt) l2))
+  end.
+
 Fixpoint lazy_take {A : Type} (n : nat) (l : LazyList A) : LazyList A :=
   match n with
   | 0 => lnil
@@ -117,7 +128,36 @@ Fixpoint In_ll {A : Type} (a : A) (l : LazyList A) : Prop :=
   | lcons h ts => h = a \/ In_ll a (ts tt)
   end.
 
-(*
+Fixpoint All_ll {A : Type} (P : A -> Prop) (l : LazyList A) : Prop :=
+  match l with
+  | lnil => True
+  | lsing x => P x
+  | lcons h ts => P h /\ All_ll P (ts tt)
+  end.
+
+From Coq Require Import ssreflect.
+Lemma lazy_in_map_iff :
+  forall (A B : Type) (f : A -> B) (l : LazyList A) (y : B),
+  In_ll y (mapLazyList f l) <-> (exists x : A, f x = y /\ In_ll x l).
+Proof.
+  move => A B f l; induction l => y; split => [HIn | [x [Hfx HIn]]].
+  - inversion HIn.
+  - inversion HIn.
+  - inversion HIn.
+    exists a; split; constructor.
+  - inversion HIn; subst; simpl; auto.
+  - simpl in *.
+    destruct HIn as [Hf | HIn].
+    + exists a; split; auto.
+    + apply H in HIn.
+      destruct HIn as [x [Hf HIn]].
+      exists x; split; auto.
+  - destruct HIn as [Hf | HIn]; subst; simpl in *; auto.
+    right; apply H.
+    exists x; auto.
+Qed.
+
+    (*
 Section Ind.
 
   Variable A : Type.

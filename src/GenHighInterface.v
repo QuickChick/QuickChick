@@ -29,18 +29,18 @@ Parameter liftGen5 : forall {A1 A2 A3 A4 A5 B : Type},
 Parameter sequenceGen: forall {A : Type}, list (G A) -> G (list A).
 Parameter foldGen :
   forall {A B : Type}, (A -> B -> G A) -> list B -> A -> G A.
-Parameter oneof : forall {A : Type}, G A -> list (G A) -> G A.
-Parameter oneOf_ : forall {A : Type}, G A -> list (G A) -> G A.
-Parameter frequency : forall {A : Type}, G A -> list (nat * G A) -> G A.
-Parameter freq_ : forall {A : Type}, G A -> list (nat * G A) -> G A.
-Parameter backtrack : forall {A : Type}, list (nat * G (option A)) -> G (option A).
+Parameter oneOf_ : forall {A : Type}, list (G A) -> G A.
+Parameter freq_ : forall {A : Type}, list (nat * G A) -> G A.
+
 Parameter vectorOf : forall {A : Type}, nat -> G A -> G (list A).
 Parameter listOf : forall {A : Type}, G A -> G (list A).
-Parameter elements : forall {A : Type}, A -> list A -> G A.
-Parameter elems_ : forall {A : Type}, A -> list A -> G A.
+Parameter elems_ : forall {A : Type}, list A -> G A.
+
+(* Parameter shuffle : forall {A : Type}, list (nat * G A) -> G A. *)
+(* Parameter backtrack : forall {A : Type}, list (nat * G A) -> G A. *)
 
 (* Correctness for derived generators *)
-(*
+
 Parameter semLiftGen :
   forall {A B} (f: A -> B) (g: G A),
     semGen (liftGen f g) <--> f @: semGen g.
@@ -143,7 +143,7 @@ Parameter semFoldGen_right :
       foldr (fun b p => [set a_prev | exists a, a \in (semGenSize (f a_prev b) s :&: p)]) 
             [set an] bs a0 ].
 
-
+(*
 Parameter semOneof:
   forall {A} (l : list (G A)) (def : G A),
     (semGen (oneOf_ def l)) <-->
@@ -182,7 +182,8 @@ Parameter semFrequencySize:
       let l' := [seq x <- l | x.1 != 0] in
       if l' is nil then semGenSize def size else
       \bigcup_(x in l') semGenSize x.2 size.
-
+*)
+(*
 (** [backtrack] generates Some's unless all of the input generators are empty *)
 Parameter semBacktrackSize:
   forall {A} (l : list (nat * G (option A))) size,
@@ -281,38 +282,40 @@ Parameter mergeBinds :
     semGen (bindGen ga (fun x => bindGen gb (f x))) <-->
     semGen (bindGen (genPair ga gb) (uncurry f)).
 
-*)
+ *)
+
+(* LEO: Leaving the notation in for future-proofing: unit-thunking *)
 Module QcDefaultNotation.
 
 (* Noone would write a literal singleton. *)
-Notation " 'elems' [ x ] " := (elems_ x (cons x nil)) : qc_scope.
-Notation " 'elems' [ x ; y ] " := (elems_ x (cons x (cons y nil))) : qc_scope.
+Notation " 'elems' [ x ] " := (elems_ (cons x nil)) : qc_scope.
+Notation " 'elems' [ x ; y ] " := (elems_ (cons x (cons y nil))) : qc_scope.
 Notation " 'elems' [ x ; y ; .. ; z ] " :=
-  (elems_ x (cons x (cons y .. (cons z nil) ..))) : qc_scope.
+  (elems_ (cons x (cons y .. (cons z nil) ..))) : qc_scope.
 (* Why not [elems (x :: l)]? *)
 Notation " 'elems' ( x ;; l ) " :=
-  (elems_ x (cons x l)) (at level 201, no associativity) : qc_scope.
+  (elems_ (cons x l)) (at level 201, no associativity) : qc_scope.
 
 (* We insert thunks ([etaG]) to delay the execution of
    each element until it actually gets chosen. *)
 
 Notation " 'oneOf' [ x ] " := x : qc_scope.
 Notation " 'oneOf' [ x ; y ] " :=
-  (oneOf_ (etaG x) (cons (etaG x) (cons (etaG y) nil))) : qc_scope.
+  (oneOf_ (cons x (cons y nil))) : qc_scope.
 Notation " 'oneOf' [ x ; y ; .. ; z ] " :=
-  (oneOf_ (etaG x) (cons (etaG x)
-    (cons (etaG y) .. (cons (etaG z) nil) ..))) : qc_scope.
+  (oneOf_ (cons x
+    (cons y .. (cons z nil) ..))) : qc_scope.
 Notation " 'oneOf' ( x ;; l ) " :=
-  (oneOf_ x (cons x l))  (at level 1, no associativity) : qc_scope.
+  (oneOf_ (cons x l))  (at level 1, no associativity) : qc_scope.
 
 (* freq [ 4 %: g1 ; 6 %: g2 ] *)
 Notation " 'freq' [ x ] " := ((x : nat * G _).2) : qc_scope.
 Notation " 'freq' [ x ; y ] " :=
-  (freq_ x.2 (cons x (cons y nil))) : qc_scope.
+  (freq_ (cons x (cons y nil))) : qc_scope.
 Notation " 'freq' [ x ; y ; .. ; z ] " :=
-  (freq_ x.2 (cons x (cons y .. (cons z nil) ..))) : qc_scope.
+  (freq_ (cons x (cons y .. (cons z nil) ..))) : qc_scope.
 Notation " 'freq' ( x ;; l ) " :=
-  (freq_ x.2 (cons x l)) (at level 1, no associativity) : qc_scope.
+  (freq_ (cons x l)) (at level 1, no associativity) : qc_scope.
 
 Notation "w %: g" := (w, etaG g)
   (at level 100) : qc_scope.

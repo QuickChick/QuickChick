@@ -17,18 +17,17 @@ Module ConsistencyCheck : QuickChickSig.
   Definition Applicative_G := Applicative_G.
   Definition Monad_G := Monad_G.
   Definition bindGen' := @bindGen'.
-  Definition bindGenOpt := @bindGenOpt.
   Definition run := @run.
   Definition listOf := @listOf.
   Definition vectorOf := @vectorOf.
   Definition elems_ := @elems_.
   Definition oneOf_ := @oneOf_.
   Definition freq_ := @freq_.
-  Definition backtrack := @backtrack.
+(*  Definition backtrack := @backtrack. *)
   Definition resize := @resize.
   Definition sized := @sized.
   Definition suchThatMaybe := @suchThatMaybe.
-  Definition suchThatMaybeOpt := @suchThatMaybeOpt.
+(*  Definition suchThatMaybeOpt := @suchThatMaybeOpt. *)
 
   Class OrdType (A: Type) :=
     {
@@ -93,6 +92,7 @@ Module ConsistencyCheck : QuickChickSig.
   End QcDefaultNotation.
 
   (* Note: These will soon be replaced by an ExtLib dependency. *)
+  (*
   Module QcDoNotation.
 
     Notation "'do!' X <- A ; B" :=
@@ -106,7 +106,7 @@ Module ConsistencyCheck : QuickChickSig.
       (at level 200, X ident, A at level 100, B at level 200).
 
   End QcDoNotation.
-
+   *)
 
   Definition showNat := showNat    .
   Definition showBool := showBool   .
@@ -232,6 +232,6 @@ Module ConsistencyCheck : QuickChickSig.
       }.
 
 
-  Notation "'genST' x" := (@arbitraryST _ x _) (at level 70).
+  (*  Notation "'genST' x" := (@arbitraryST _ x _) (at level 70). *)
 
 End ConsistencyCheck.

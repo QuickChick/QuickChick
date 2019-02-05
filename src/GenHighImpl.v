@@ -11,6 +11,14 @@ From mathcomp Require Import ssrfun ssrbool ssrnat eqtype seq.
 From QuickChick Require Import
      GenLowInterface GenHighInterface RandomQC Tactics Sets Show.
 
+From ExtLib.Structures Require Export
+     Monads.
+Require Import ExtLib.Data.Monads.ListMonad.
+From ExtLib.Structures Require Import
+     Functor Applicative.
+Import MonadNotation.
+Open Scope monad_scope.
+
 
 Set Bullet Behavior "Strict Subproofs".
 
@@ -77,13 +85,11 @@ Fixpoint foldGen {A B : Type} (f : A -> B -> G A) (l : list B) (a : A)
     | (x :: xs) => bindGen (f a x) (foldGen f xs)
   end).
 
-Definition oneOf_ {A : Type} (def: G A) (gs : list (G A)) : G A :=
-  bindGen (choose (0, length gs - 1)) (nth def gs).
+Definition oneOf_ {A : Type} (gs : list (G A)) : G A :=
+  n <- choose (0, length gs - 1) ;;
+  nth failGen gs n.
 
-Definition oneof {A} :=
-  @deprecate (G A -> list (G A) -> G A) "oneof" "oneOf_" oneOf_.
-
-Fixpoint pick {A : Type} (def : G A) (xs : list (nat * G A)) n : nat * G A :=
+Fixpoint pick {A : Type} (def : A ) (xs : list (nat * A)) n : nat * A :=
   match xs with
     | nil => (0, def)
     | (k, x) :: xs =>
@@ -92,32 +98,28 @@ Fixpoint pick {A : Type} (def : G A) (xs : list (nat * G A)) n : nat * G A :=
   end.
 
 (* This should use urns! *)
-Fixpoint pickDrop {A : Type} (xs : list (nat * G (option A))) n : nat * G (option A) * list (nat * G (option A)) :=
+Fixpoint pickDrop {A : Type} (def : A) (xs : list (nat * A)) n : nat * A * list (nat * A) :=
   match xs with
-    | nil => (0, returnGen None, nil)
+    | nil => (0, def, nil)
     | (k, x) :: xs =>
       if (n < k) then  (k, x, xs)
-      else let '(k', x', xs') := pickDrop xs (n - k)
+      else let '(k', x', xs') := pickDrop def xs (n - k)
            in (k', x', (k,x)::xs')
   end. 
 
 Definition sum_fst {A : Type} (gs : list (nat * A)) : nat :=
   foldl (fun t p => t + (fst p)) 0 gs.
 
-Definition freq_ {A : Type} (def : G A) (gs : list (nat * G A))
-: G A :=
+Definition freq_ {A : Type} (gs : list (nat * G A)) : G A :=
   let tot := sum_fst gs in
-  bindGen (choose (0, tot-1)) (fun n =>
-  @snd _ _ (pick def gs n)).
-
-Definition frequency {A}:= 
-  @deprecate (G A -> list (nat * G A) -> G A) "frequency" "freq_" freq_.
+  n <- choose (0, tot-1) ;;
+  snd (pick failGen gs n).
 
 Fixpoint backtrackFuel {A : Type} (fuel : nat) (tot : nat) (gs : list (nat * G (option A))) : G (option A) :=
   match fuel with 
     | O => returnGen None
     | S fuel' => bindGen (choose (0, tot-1)) (fun n => 
-                 let '(k, g, gs') := pickDrop gs n in
+                 let '(k, g, gs') := pickDrop failGen gs n in
                  bindGen g (fun ma =>
                  match ma with 
                    | Some a => returnGen (Some a)
@@ -138,13 +140,8 @@ Definition vectorOf {A : Type} (k : nat) (g : G A)
 Definition listOf {A : Type} (g : G A) : G (list A) :=
   sized (fun n => bindGen (choose (0, n)) (fun k => vectorOf k g)).
 
-Definition elems_ {A : Type} (def : A) (l : list A) :=
-  let n := length l in
-  bindGen (choose (0, n - 1)) (fun n' =>
-  returnGen (List.nth n' l def)).
-
-Definition elements {A} :=
-  @deprecate (A -> list A -> G A) "elements" "elems_" elems_.  
+Definition elems_ {A : Type} (l : list A) :=
+  oneOf_ (List.map ret l).
 
 Lemma semLiftGen {A B} (f: A -> B) (g: G A) :
   semGen (liftGen f g) <--> f @: semGen g.
@@ -455,8 +452,6 @@ Next Obligation.
   move => l [H1 H2]; split => // a Ha. by eapply (monotonic H0); eauto.
 Qed.
 
-
-(*
 Lemma semListOfSize {A : Type} (g : G A) size :
   semGenSize (listOf g) size <-->
   [set l | length l <= size /\ l \subset (semGenSize g size)].
@@ -503,64 +498,76 @@ split; first by case=> n [? <-]; rewrite -nthE; apply/List.nth_In/ltP.
 by case/(In_nth_exists _ _ def) => n [? ?]; exists n; split=> //; apply/ltP.
 Qed.
 
-Lemma semOneofSize {A} (l : list (G A)) (def : G A) s : semGenSize (oneof def l) s
-  <--> if l is nil then semGenSize def s else \bigcup_(x in l) semGenSize x s.
+Lemma semOneOfSize {A} (l : list (G A)) s :
+  semGenSize (oneOf_ l) s <--> \bigcup_(x in l) semGenSize x s.
 Proof.
-case: l => [|g l].
-  rewrite semBindSize semChooseSize //.
-  rewrite (eq_bigcupl [set 0]) ?bigcup_set1 // => a; split=> [/andP [? ?]|<-] //.
-  by apply/antisym/andP.
-rewrite semBindSize semChooseSize //.
-set X := (fun a : nat => is_true (_ && _)).
-by rewrite (reindex_bigcup (nth def (g :: l)) X) // /X subn1 nth_imset.
+  induction l.
+  - rewrite semBindSize semChooseSize //.
+    rewrite (eq_bigcupl [set 0]) ?bigcup_set1 // => a; split; simpl in * => Hyp.
+    + exfalso. eapply semFailSizeContra; eauto.
+    + destruct Hyp as [x [Contra ?]]; inversion Contra.
+    + assert (a = 0) by ssromega; subst; constructor.
+    + inv Hyp; ssromega.
+  - rewrite semBindSize semChooseSize //.
+    set X := (fun a : nat => is_true (_ && _)).
+    by rewrite (reindex_bigcup (nth failGen (a :: l)) X) // /X subn1 nth_imset.    
 Qed.
 
-Lemma semOneof {A} (l : list (G A)) (def : G A) :
-  semGen (oneof def l) <-->
-  if l is nil then semGen def else \bigcup_(x in l) semGen x.
+Lemma semOneOf {A} (l : list (G A)) :
+  semGen (oneOf_ l) <--> \bigcup_(x in l) semGen x.
 Proof.
 by case: l => [|g l]; rewrite 1?bigcupC; apply: eq_bigcupr => sz;
-  apply: semOneofSize.
+  apply: semOneOfSize.
 Qed.
 
-Program Instance oneofMonotonic {A} (x : G A) (l : list (G A))
-        `{ SizeMonotonic _ x} `(l \subset SizeMonotonic) 
-: SizeMonotonic (oneof x l). 
+Program Instance oneOfMonotonic {A} (x : G A) (l : list (G A)) `(l \subset SizeMonotonic) 
+: SizeMonotonic (oneOf_ l). 
 Next Obligation.
-  rewrite !semOneofSize. elim : l H0 => [_ | g gs IH /subconsset [H2 H3]] /=.
-  - by apply monotonic.
+  rewrite !semOneOfSize. elim : l H => [_ | g gs IH /subconsset [H2 H3]] /=.
+  - rewrite /set_incl => a Contra.
+    destruct Contra as [x' [Contra ?]]; inv Contra.
   - specialize (IH H3). move => a [ga [[Hga | Hga] Hgen]]; subst.
     exists ga. split => //. left => //.
     eapply monotonic; eauto. exists ga.
     split. right => //.
-    apply H3 in Hga. by apply (monotonic H1). 
+    apply H3 in Hga. by apply (monotonic H0). 
 Qed.
 
-Lemma semElementsSize {A} (l: list A) (def : A) s :
-  semGenSize (elements def l) s <--> if l is nil then [set def] else l.
+Lemma semElemsSize {A} (l: list A) s :
+  semGenSize (elems_  l) s <--> l.
 Proof.
-rewrite semBindSize.
-setoid_rewrite semReturnSize.
-rewrite semChooseSize //=.
-setoid_rewrite nthE. (* SLOW *)
-case: l => [|x l] /=.
-  rewrite (eq_bigcupl [set 0]) ?bigcup_set1 // => n.
-  by rewrite leqn0; split=> [/eqP|->].
-rewrite -(@reindex_bigcup _ _ _ (nth def (x :: l)) _ (x :: l)) ?coverE //.
-by rewrite subn1 /= nth_imset.
+  rewrite /elems_ semOneOfSize; simpl in *.
+  induction l; split => Hyp; simpl in *; eauto.
+  - destruct Hyp as [? [Contra ?]].
+    inv Contra.
+  - inv Hyp.
+  - destruct Hyp as [g [Hg Hsem]].
+    destruct Hg; subst.
+    + left. apply semReturnSize in Hsem; inv Hsem; auto.
+    + right.
+      apply IHl.
+      exists g; split; auto.
+  - destruct Hyp; subst; simpl in *.
+    + exists (returnGen a0); split; simpl; eauto.
+      apply semReturnSize; constructor.
+    + exists (returnGen a0); split; eauto.
+      * right.
+        apply List.in_map_iff.
+        exists a0; split; auto.
+      * apply semReturnSize; constructor.
 Qed.
 
-Lemma semElements {A} (l: list A) (def : A) :
-  (semGen (elements def l)) <--> if l is nil then [set def] else l.
+Lemma semElems {A} (l: list A) :
+  semGen (elems_ l) <--> l.
 Proof.
-rewrite /semGen; setoid_rewrite semElementsSize; rewrite bigcup_const //.
+rewrite /semGen; setoid_rewrite semElemsSize; rewrite bigcup_const //.
 by do 2! constructor.
 Qed.
 
-Program Instance elementsUnsized {A} {def : A} (l : list A) : 
-  Unsized (elements def l).
+Program Instance elemsUnsized {A} {def : A} (l : list A) : 
+  Unsized (elems_ l).
 Next Obligation.
-  rewrite ! semElementsSize. by case: l.
+  rewrite ! semElemsSize. by case: l.
 Qed.
 
 (* A rather long frequency proof, probably we can do better *)
@@ -659,6 +666,88 @@ rewrite -(IHl t); case=> p [lt_p <-]; exists (n.+1 + p); split.
 by rewrite ltnNge leq_addr addKn.
 Qed.
 
+Lemma semFrequencySize {A} (l : list (nat * G A)) (size: nat) :
+  semGenSize (freq_ l) size <-->
+             let l' := [seq x <- l | x.1 != 0] in
+             \bigcup_(x in l') (semGenSize x.2 size).
+Proof.
+rewrite semBindSize semChooseSize //=.
+case lsupp: {1}[seq x <- l | x.1 != 0] => [|[n g] gs].
+- move/sum_fst_eq0P: lsupp => suml; rewrite suml.
+  rewrite (@eq_bigcupl _ _ _ [set 0]) ?bigcup_set1 ?pick_def // ?leqn0 ?suml //.
+  + simpl. split => Contra.
+    * exfalso. eapply semFailSizeContra; eauto.
+    * destruct Contra as [? [Contra ?]]; inv Contra.
+  + split => H.
+    * assert (a = 0) by ssromega; subst; constructor.
+    * inv H; eauto.
+- symmetry; apply: reindex_bigcup.
+  have pos_suml: 0 < sum_fst l.
+  { have [] := sum_fst_eq0P l.
+    by rewrite lsupp; case: (sum_fst l) => // /(_ erefl).
+  } 
+  have->: (fun a : nat => a <= sum_fst l - 1) <--> [set m | m < sum_fst l].
+  { by move=> m /=; rewrite -ltnS subn1 prednK. }
+  rewrite -lsupp. exact: pick_imset.
+Qed.
+
+(* begin semFrequency *)
+Lemma semFrequency {A} (l : list (nat * G A)) :
+  semGen (freq_ l) <-->
+    let l' := [seq x <- l | x.1 != 0] in
+    \bigcup_(x in l') semGen x.2.
+(* end semFrequency *)
+Proof.
+by case lsupp: {1}[seq x <- l | x.1 != 0] => [|[n g] gs] /=;
+rewrite 1?bigcupC; apply: eq_bigcupr => sz;
+have := (semFrequencySize l sz); rewrite lsupp.
+Qed.
+
+Lemma frequencySizeMonotonic {A} (lg : list (nat * G A)) :
+  List.Forall (fun p => SizeMonotonic (snd p)) lg ->
+  SizeMonotonic (freq_ lg).
+Proof.
+  intros Hall.  unfold freq_.
+  eapply bindMonotonicStrong.
+  eauto with typeclass_instances.
+  intros x Heq. eapply semChoose in Heq; eauto.  
+  move : Heq => /andP [Hep1 Heq2]. 
+  destruct (sum_fst lg) eqn:Heq.
+  - rewrite pick_def.
+    + apply failSizeMonotonic.
+    + subst. ssromega.
+  - edestruct (pick_exists lg x failGen) as [[[n' g] [Hin [Hp Hg]]] H2].
+    rewrite Heq. unfold leq, super, ChooseNat, OrdNat in Hep1, Heq2.
+    ssromega.
+    eapply List.Forall_forall in Hall; [ | ].
+    eassumption.
+    subst. rewrite Hp. eassumption.
+Qed.
+
+Instance frequencySizeMonotonic_alt :
+  forall {A : Type} (lg : seq (nat * G A)),
+    lg \subset [set x | SizeMonotonic x.2 ] ->
+    SizeMonotonic (freq_ lg).
+Proof.
+  intros A ls Hin.
+  eapply frequencySizeMonotonic. 
+  induction ls. now constructor.
+  constructor. eapply Hin.
+  constructor. reflexivity.
+  eapply IHls.  eapply subset_trans; eauto.
+  constructor 2. eassumption.
+Qed.
+
+Lemma eq_lt_0 : (fun x => x <= 0) <--> [set 0].
+Proof. 
+  move => x; split => H; auto.
+  - destruct x; auto. 
+    + unfold set1; auto.
+    + inversion H.
+  - inversion H; auto.
+Qed.
+
+(*
 Lemma pickDrop_def :
   forall {A} (l: list (nat * G (option A))) n,
     sum_fst l <= n ->
@@ -758,86 +847,8 @@ Proof.
     now ssromega.
 Qed.
 
-(* begin semFrequencySize *)
-Lemma semFrequencySize {A}
-      (l : list (nat * G A)) (def : G A) (size: nat) :
-  semGenSize (frequency def l) size <-->
-    let l' := [seq x <- l | x.1 != 0] in
-    if l' is nil then semGenSize def size else
-      \bigcup_(x in l') semGenSize x.2 size.
-(* end semFrequencySize *)
-Proof.
-rewrite semBindSize semChooseSize //=.
-case lsupp: {1}[seq x <- l | x.1 != 0] => [|[n g] gs].
-move/sum_fst_eq0P: lsupp => suml; rewrite suml.
-  rewrite (@eq_bigcupl _ _ _ [set 0]) ?bigcup_set1 ?pick_def // ?leqn0 ?suml //.
-  by move=> n; split; rewrite leqn0; [move/eqP|] => ->.
-symmetry; apply: reindex_bigcup.
-have pos_suml: 0 < sum_fst l.
-  have [] := sum_fst_eq0P l.
-  by rewrite lsupp; case: (sum_fst l) => // /(_ erefl).
-have->: (fun a : nat => a <= sum_fst l - 1) <--> [set m | m < sum_fst l].
-  by move=> m /=; rewrite -ltnS subn1 prednK.
-exact: pick_imset.
-Qed.
 
-(* begin semFrequency *)
-Lemma semFrequency {A} (l : list (nat * G A)) (def : G A) :
-  semGen (frequency def l) <-->
-    let l' := [seq x <- l | x.1 != 0] in
-    if l' is nil then semGen def else
-      \bigcup_(x in l') semGen x.2.
-(* end semFrequency *)
-Proof.
-by case lsupp: {1}[seq x <- l | x.1 != 0] => [|[n g] gs] /=;
-rewrite 1?bigcupC; apply: eq_bigcupr => sz;
-have := (semFrequencySize l def sz); rewrite lsupp.
-Qed.
 
-Lemma frequencySizeMonotonic {A} (g0 : G A) lg :
-  SizeMonotonic g0 ->
-  List.Forall (fun p => SizeMonotonic (snd p)) lg ->
-  SizeMonotonic (frequency g0 lg).
-Proof.
-  intros H1.  unfold frequency.
-  intros Hall. eapply bindMonotonicStrong.
-  eauto with typeclass_instances.
-  intros x Heq. eapply semChoose in Heq; eauto.  
-  move : Heq => /andP [Hep1 Heq2]. 
-  destruct (sum_fst lg) eqn:Heq.
-  - rewrite pick_def. eassumption.
-    subst. ssromega.
-  - edestruct (pick_exists lg x g0) as [[[n' g] [Hin [Hp Hg]]] H2].
-    rewrite Heq. unfold leq, super, ChooseNat, OrdNat in Hep1, Heq2.
-    ssromega.
-    eapply List.Forall_forall in Hall; [ | ].
-    eassumption.
-    subst. rewrite Hp. eassumption.
-Qed.
-
-Instance frequencySizeMonotonic_alt :
-  forall {A : Type} (g0 : G A) (lg : seq (nat * G A)),
-    SizeMonotonic g0 ->
-    lg \subset [set x | SizeMonotonic x.2 ] ->
-    SizeMonotonic (frequency g0 lg).
-Proof.
-  intros A g ls Hm Hin.
-  eapply frequencySizeMonotonic. eassumption.
-  induction ls. now constructor.
-  constructor. eapply Hin.
-  constructor. reflexivity.
-  eapply IHls.  eapply subset_trans; eauto.
-  constructor 2. eassumption.
-Qed.
-
-Lemma eq_lt_0 : (fun x => x <= 0) <--> [set 0].
-Proof. 
-  move => x; split => H; auto.
-  - destruct x; auto. 
-    + unfold set1; auto.
-    + inversion H.
-  - inversion H; auto.
-Qed.
 
 Lemma semBacktrackFuelDef {A} fuel (l : list (nat * G (option A))) size :
   sum_fst l = 0 -> 
@@ -950,6 +961,7 @@ Lemma length_sum_lst {A} (l : list (nat * A)) :
 Proof.
   destruct l; eauto; intros H; inv H.
 Qed.
+*)
 
 (* Lemma pickDrop_length_strong {A} (l1 l2 : seq (nat * G (option A))) (n m : nat) g : *)
 (*   pickDrop l1 n = (m, g, l2) -> *)
@@ -985,6 +997,7 @@ Qed.
 (* Qed. *)
 
 
+(*
 Lemma pickDrop_sum_fst {A} (lg  : seq (nat * G (option A))) n :
   sum_fst lg = 0 -> exists l, pickDrop lg n = (0, returnGen None, l) /\ sum_fst l = 0.
 Proof.
@@ -1150,7 +1163,7 @@ Proof.
     by rewrite setI_comm !nil_set_eq setI_set0_abs bigcup_set0 bigcap_set0
                setU_comm setU_set0_neut setI_setT_neut semReturnSize.
   - move => HSum HLen.
-    rewrite semBindSize semChooseSize //=. 
+    rewrite spemBindSize semChooseSize //=. 
     split.
     { destruct (sum_fst l) eqn:Hsum; subst.
       - move => [n [Hleq H]].
@@ -1298,6 +1311,7 @@ Proof.
   left. eexists.
   split; split; eauto.
 Qed.
+ *)
 
 Lemma semFoldGen_right :
   forall {A B : Type} (f : A -> B -> G A) (bs : list B) (a0 : A) (s : nat),
@@ -1344,46 +1358,49 @@ Proof.
     inversion H; subst; clear H.
     exists a. split. by []. exists b. split; by [].
 Qed.    
-*)
+
+(* LEO: Leaving the notation in for future-proofing: unit-thunking *)
 Module QcDefaultNotation.
 
-Notation " 'elems' [ x ] " := (elements x (cons x nil)) : qc_scope.
-Notation " 'elems' [ x ; y ] " := (elements x (cons x (cons y nil))) : qc_scope.
+(* Noone would write a literal singleton. *)
+Notation " 'elems' [ x ] " := (elems_ (cons x nil)) : qc_scope.
+Notation " 'elems' [ x ; y ] " := (elems_ (cons x (cons y nil))) : qc_scope.
 Notation " 'elems' [ x ; y ; .. ; z ] " :=
-  (elements x (cons x (cons y .. (cons z nil) ..))) : qc_scope.
+  (elems_ (cons x (cons y .. (cons z nil) ..))) : qc_scope.
+(* Why not [elems (x :: l)]? *)
 Notation " 'elems' ( x ;; l ) " :=
-  (elements x (cons x l)) (at level 1, no associativity) : qc_scope.
+  (elems_ (cons x l)) (at level 201, no associativity) : qc_scope.
 
-Notation " 'oneOf' [ x ] " := (oneof x (cons x nil)) : qc_scope.
-Notation " 'oneOf' [ x ; y ] " := (oneof x (cons x (cons y nil))) : qc_scope.
+(* We insert thunks ([etaG]) to delay the execution of
+   each element until it actually gets chosen. *)
+
+Notation " 'oneOf' [ x ] " := x : qc_scope.
+Notation " 'oneOf' [ x ; y ] " :=
+  (oneOf_ (cons x (cons y nil))) : qc_scope.
 Notation " 'oneOf' [ x ; y ; .. ; z ] " :=
-  (oneof x (cons x (cons y .. (cons z nil) ..))) : qc_scope.
+  (oneOf_ (cons x
+    (cons y .. (cons z nil) ..))) : qc_scope.
 Notation " 'oneOf' ( x ;; l ) " :=
-  (oneof x (cons x l))  (at level 1, no associativity) : qc_scope.
+  (oneOf_ (cons x l))  (at level 1, no associativity) : qc_scope.
 
-Notation " 'freq' [ x ] " := (frequency x nil) : qc_scope.
-Notation " 'freq' [ ( n , x ) ; y ] " :=
-  (frequency x (cons (n, x) (cons y nil))) : qc_scope.
-Notation " 'freq' [ ( n , x ) ; y ; .. ; z ] " :=
-  (frequency x (cons (n, x) (cons y .. (cons z nil) ..))) : qc_scope.
-Notation " 'freq' ( ( n , x ) ;; l ) " :=
-  (frequency x (cons (n, x) l)) (at level 1, no associativity) : qc_scope.
+(* freq [ 4 %: g1 ; 6 %: g2 ] *)
+Notation " 'freq' [ x ] " := ((x : nat * G _).2) : qc_scope.
+Notation " 'freq' [ x ; y ] " :=
+  (freq_ (cons x (cons y nil))) : qc_scope.
+Notation " 'freq' [ x ; y ; .. ; z ] " :=
+  (freq_ (cons x (cons y .. (cons z nil) ..))) : qc_scope.
+Notation " 'freq' ( x ;; l ) " :=
+  (freq_ (cons x l)) (at level 1, no associativity) : qc_scope.
+
+Notation "w %: g" := (w, etaG g)
+  (at level 100) : qc_scope.
+
+Delimit Scope qc_scope with qc.
 
 End QcDefaultNotation.
 
-Module QcDoNotation.
-
-Notation "'do!' X <- A ; B" :=
-  (bindGen A (fun X => B))
-  (at level 200, X ident, A at level 100, B at level 200).
-(*
-Notation "'doM!' X <- A ; B" :=
-  (bindGenOpt A (fun X => B))
-  (at level 200, X ident, A at level 100, B at level 200).
-*)
-End QcDoNotation.
-
 Import QcDefaultNotation. Open Scope qc_scope.
+
 (*
 (* CH: Reusing :: instead of ;; would have been nice, but I didn't manage *)
 
