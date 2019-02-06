@@ -10,9 +10,9 @@ Otherwise, if you are proposing a fix or improvement, please submit the PR to
 corresponding branch:
 
 - `master` works with `coq.dev`
-- `8.8`    works with Coq >= 8.8
+- `8.*`    works with the specific version of Coq
 
 Please state the compatibility with other Coq versions in your pull request.
 
-Our next release will be based on `8.8` branch by default, unless `8.7` requires
-a critical fix.
+Our next release will be based on `8.9` branch by default, unless older branches
+require a critical fix.
