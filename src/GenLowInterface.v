@@ -79,6 +79,9 @@ Module Type Sig.
 
   Parameter cut : forall {A : Type}, G A -> G A.
   Parameter backTrack : forall {A : Type}, nat -> G A -> G A.
+
+  Parameter shuffle : forall {A : Type}, list (nat * G A) -> G A.
+
   
   (* Parameter sumG : forall {A : Type} (lga : LazyList (G A)), G A. *)
   Parameter sample : forall {A : Type}, G A -> list A.

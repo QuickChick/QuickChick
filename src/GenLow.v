@@ -718,48 +718,6 @@ Module GenLow : GenLowInterface.Sig.
     destruct g; split; auto.
   Qed.
 
-  Lemma semBackTrackSizeAux : forall {A : Type} (n : nat) (g : nat -> RandomSeed -> LazyList A) s,
-      possibly_generated (backTrackAux n g s) <--> 
-      if n is O then set0 else possibly_generated (g s).
-  Proof.
-    move => A n; induction n => g s;
-    unfold semGenSize; simpl in *.
-    - split => [[r Contra] | Contra ]; inv Contra.
-    - split => [[r HIn] | [r HIn]].
-      + destruct (randomSplit r) as (r1, r2) eqn:Split.
-        destruct (g s r1) eqn:Hg.
-        * destruct (IHn g s a) as [H1 H2].
-          { destruct n.
-            - inv HIn.
-            - apply H1.
-              exists r2; auto.
-          } 
-        * exists r1.
-          inv HIn.
-          rewrite Hg.
-          constructor.
-        * inv HIn.
-          exists r1.
-          rewrite Hg.
-          constructor; auto.
-      + pose proof (randomSplitAssumption r r) as [r' Hr'].
-        exists r'.
-        rewrite Hr'.
-        destruct (g s r) eqn:Hg.
-        * inv HIn.
-        * inv HIn; auto.
-        * 
-  Admitted.
-     
-  Lemma semBackTrackSize : forall {A : Type} (n : nat) (g : G A) s,
-      n > 0 -> semGenSize (backTrack n g) s <--> semGenSize g s.
-  Proof.
-    move => a n g s Hn.
-    unfold semGenSize; simpl.
-    pose proof (semBackTrackSizeAux n (run g) s) as H.
-    destruct n; [ inv Hn |].
-    exact H.
-  Qed.
     
   Lemma SuchThatMaybeAuxMonotonic {A} :
     forall (g : G A) p k n,
@@ -1128,4 +1086,93 @@ Module GenLow : GenLowInterface.Sig.
     by apply monotonic_none.
   Qed.
    *)
+
+  Definition not_enum {A : Type} (m : G A) (s : nat) (r : RandomSeed) :=
+    match run m s r with
+    | lnil => true
+    | lsing _ => true
+    | lcons _ _ => false
+    end.
+
+  Class NotEnum {A : Type} (m : G A) :=
+    { not_enum_pf : forall s r, not_enum m s r }.
+
+  Instance NotEnumFail {A} : NotEnum (@failGen A) := {}.
+  Proof. intros; auto. Defined.
+
+  Instance NotEnumRet {A} (x : A) : NotEnum (returnGen x) := {}.
+  Proof. intros; auto. Defined.
+
+  Instance NotEnumBind {A B} (m : G A) (k : A -> G B)
+           `{NotEnum A m} `{forall (x : A), NotEnum (k x)} : NotEnum (bindGen m k) := {}.
+  Proof.
+    move => s r.
+    unfold bindGen, not_enum; simpl.
+    destruct (randomSplit r) as [r1 r2] eqn:Split.
+    destruct (run m s r1) eqn:Hm; simpl; auto.
+    - destruct (run (k a) s r2) eqn:Hk; auto.
+      destruct (H0 a) as [ Contra ].
+      specialize (Contra s r2).
+      unfold not_enum in *.
+      rewrite Hk in Contra.
+      congruence.
+    - destruct H as [ Contra ].
+      specialize (Contra s r1).
+      unfold not_enum in Contra.
+      rewrite Hm in Contra.
+      congruence.
+  Defined.
+
+  Lemma semBackTrackSizeAux : forall {A : Type} (n : nat) (g : nat -> RandomSeed -> LazyList A) s,
+      (forall s r, not_enum (MkGen g) s r) ->
+      possibly_generated (backTrackAux n g s) <--> 
+      if n is O then set0 else possibly_generated (g s).
+  Proof.
+    move => A n; induction n => g s HNE;
+    unfold semGenSize; simpl in *.
+    - split => [[r Contra] | Contra ]; inv Contra.
+    - split => [[r HIn] | [r HIn]].
+      + destruct (randomSplit r) as (r1, r2) eqn:Split.
+        destruct (g s r1) eqn:Hg.
+        * destruct (IHn g s HNE a) as [H1 H2].
+          { destruct n.
+            - inv HIn.
+            - apply H1.
+              exists r2; auto.
+          } 
+        * exists r1.
+          inv HIn.
+          rewrite Hg.
+          constructor.
+        * inv HIn.
+          exists r1.
+          rewrite Hg.
+          constructor; auto.
+      + pose proof (randomSplitAssumption r r) as [r' Hr'].
+        exists r'.
+        rewrite Hr'.
+        destruct (g s r) eqn:Hg.
+        * inv HIn.
+        * inv HIn; auto.
+        * specialize (HNE s r); unfold not_enum, run in HNE; simpl.
+          rewrite Hg in HNE.
+          congruence.
+  Qed.          
+     
+  Lemma semBackTrackSize : forall {A : Type} (n : nat) (g : G A) s `{NotEnum A g},
+      n > 0 -> semGenSize (backTrack n g) s <--> semGenSize g s.
+  Proof.
+    move => a n g s HNE Hn.
+    unfold semGenSize; simpl.
+    assert (HNE': forall s r, not_enum (MkGen (run g)) s r).
+    { move => s' r'. 
+      destruct HNE as [ HNE ].
+      specialize (HNE s' r').
+      auto.
+    } 
+    pose proof (@semBackTrackSizeAux a n (run g) s HNE') as H.
+    destruct n; [ inv Hn |].
+    exact H.
+  Qed.
+
 End GenLow.
