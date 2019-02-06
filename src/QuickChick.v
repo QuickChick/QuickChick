@@ -56,7 +56,7 @@ Export GenLow GenHigh.
 (* TODO: Figure out better place for these *)
 (* String and Ascii Instances *)
 
-Require Import Ascii String.
+Require Export Ascii String.
 
 (* Derive (Arbitrary, Show) for ascii. *)
 
