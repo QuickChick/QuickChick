@@ -3,7 +3,7 @@ Set Warnings "-notation-overridden,-parsing".
 
 Require Import ZArith List.
 Require Import mathcomp.ssreflect.ssreflect.
-From mathcomp Require Import ssrfun ssrbool ssrnat seq.
+From mathcomp Require Import ssrfun ssrbool ssrnat eqtype seq.
 Require Import Numbers.BinNums.
 Require Import Classes.RelationClasses.
 
@@ -1175,4 +1175,77 @@ Module GenLow : GenLowInterface.Sig.
     exact H.
   Qed.
 
+  Definition can_not_fail {A : Type} (m : G A) (s : nat) (r : RandomSeed) :=
+    match run m s r with
+    | lnil => false
+    | lsing _ => true
+    | lcons _ _ => true
+    end.
+
+  Class CanNotFail {A : Type} (m : G A) :=
+    { can_not_fail_pf : forall s r, can_not_fail m s r }.
+
+  Instance CanNotFailRet {A} (x : A) : CanNotFail (returnGen x) := {}.
+  Proof. intros; auto. Defined.
+
+  Instance CanNotFailBind {A B} (m : G A) (k : A -> G B)
+           `{CanNotFail A m} `{forall (x : A), CanNotFail (k x)} : CanNotFail (bindGen m k) := {}.
+  Proof.
+    move => s r.
+    unfold bindGen, can_not_fail; simpl.
+    destruct (randomSplit r) as [r1 r2] eqn:Split.
+    destruct (run m s r1) eqn:Hm; simpl; auto.
+    - destruct H as [ Contra ].
+      specialize (Contra s r1).
+      unfold can_not_fail in Contra.
+      rewrite Hm in Contra.
+      congruence.
+    - destruct (run (k a) s r2) eqn:Hk; auto.
+      destruct (H0 a) as [ Contra ].
+      specialize (Contra s r2).
+      unfold can_not_fail in *.
+      rewrite Hk in Contra.
+      congruence.
+    - destruct (randomSplit r2) as [r3 r4] eqn:Split'.
+      destruct (run (k a) s r3) eqn:Hk; simpl in *; auto.
+      + destruct (H0 a) as [ Contra ].
+        specialize (Contra s r3).
+        unfold can_not_fail in Contra.
+        rewrite Hk in Contra.
+        congruence.
+      + destruct (bindGenAux (l tt) k s r4); auto.
+  Defined.
+
+  (*
+  Lemma semCutShuffleAux : forall {A} (l : list (nat * G A)),
+    let l' :=  [seq x <- l | x.1 != 0] in
+    (semGen (cut (shuffle l)) <--> \bigcup_(x in l') semGen x.2).
+  Proof.
+    move => A l.
+    case lsupp: {1}[seq x <- l | x.1 != 0] => [|[n g] gs]; simpl.
+    - simpl.
+    
+    
+            
+  
+  Fixpoint shuffleFuel {A : Type} (fuel : nat) (tot : nat)
+           (gs : list (nat * (nat -> RandomSeed -> LazyList A)))
+           (s : nat) (r : RandomSeed) : LazyList A :=
+    match fuel with 
+      | O => lnil
+      | S fuel' =>
+        let (r1, r2) := randomSplit r in
+        let (r11, r12) := randomSplit r1 in
+        n <- run (choose (0, tot-1)) s r11 ;;
+        let '(k, g, gs') := pickDrop (fun _ _ => lnil) gs n in
+        lazy_append' (g s r12) (fun _ => shuffleFuel fuel' (tot - k) gs' s r2)
+    end.
+
+  Definition run_snd {A B : Type} (ag : A * G B) : A * (nat -> RandomSeed -> LazyList B) :=
+    let (a,g) := ag in (a, run g).
+  
+  Definition shuffle {A : Type} (gs : list (nat * G A)) : G A :=
+    MkGen (fun s r => shuffleFuel (length gs) (sum_fst gs) (List.map run_snd gs) s r).
+*)
+  
 End GenLow.
