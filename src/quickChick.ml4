@@ -10,6 +10,8 @@ open Constrexpr
 open Error
 open Stdarg
 open Unix
+
+let fuzz_timeout = Summary.ref ~name:"QC_timeout" 120
    
 let message = "QuickChick"
 let mk_ref s = CAst.make @@ CRef (CAst.make (Qualid (qualid_of_string s)), None)
@@ -218,7 +220,7 @@ let _ =
         Sys.command (Printf.sprintf "cp _seeds/* %s" input_dir)
       else
         Sys.command (Printf.sprintf "echo QuickChick > %s/tmp" input_dir);
-      let timeout = 2 * 60 * 60 (* seconds *) in
+      let timeout = !fuzz_timeout (* seconds *) in
 
       begin match Unix.fork() with
       | 0 ->
@@ -490,6 +492,10 @@ let run fuzz f args =
   let c = CAst.make @@ CApp((None,f), args) in
   ignore (runTest fuzz c)
 
+  
+let set_fuzz_timeout (n : int) =
+  fuzz_timeout := n
+  
 let set_debug_flag (flag_name : string) (mode : string) =
   let toggle =
     match mode with
@@ -558,6 +564,12 @@ VERNAC COMMAND EXTEND QuickChickDebug CLASSIFIED AS SIDEFF
        let s2' = Id.to_string s2 in
        set_debug_flag s1' s2' ]
 END;;
+
+VERNAC COMMAND EXTEND QuickChickTimeout CLASSIFIED AS SIDEFF
+  | ["QuickChickTimeout" int(n) ] ->
+     [ set_fuzz_timeout n ]
+END;;
+
 
 VERNAC COMMAND EXTEND AddExtraFile CLASSIFIED AS SIDEFF
   | ["AddExtraFile" string(s1) string(s2)] ->
