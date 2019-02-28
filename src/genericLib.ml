@@ -322,7 +322,8 @@ let parse_constructors nparams param_names result_ty oib : ctr_rep list option =
   in
 
   let cns = List.map qualid_of_ident (Array.to_list oib.mind_consnames) in
-  let lc  = Array.to_list oib.mind_nf_lc in
+  let map (ctx, t) = Term.it_mkProd_or_LetIn t ctx in
+  let lc = Array.map_to_list map oib.mind_nf_lc in
   sequenceM parse_constructor (List.combine cns lc)
 
 (* Convert mutual_inductive_body to this representation, if possible *)
@@ -521,7 +522,8 @@ let dep_parse_constructors nparams param_names oib : dep_ctr list option =
   in
 
   let cns = List.map qualid_of_ident (Array.to_list oib.mind_consnames) in
-  let lc = Array.to_list oib.mind_nf_lc in
+  let map (ctx, t) = Term.it_mkProd_or_LetIn t ctx in
+  let lc = Array.map_to_list map oib.mind_nf_lc in
   sequenceM parse_constructor (List.combine cns lc)
 
 let dep_dt_from_mib mib = 
