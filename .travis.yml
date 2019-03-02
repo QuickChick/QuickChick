@@ -11,7 +11,6 @@ env:
   - NJOBS=2
   - OPAMVERBOSE=1
   - OPAMYES=true
-  - OPAMKEEPBUILDDIR=true
   matrix:
   - OCAML_VERSION=4.04
   - OCAML_VERSION=4.07
@@ -30,6 +29,7 @@ install:
 - eval $(opam config env)
 - opam config var root
 - opam repo add coq-released https://coq.inria.fr/opam/released || true
+- opam pin coq 8.7.2
 - opam upgrade
 - opam list
 - ocamlc -v
@@ -39,8 +39,7 @@ script:
 - echo 'Building QuickChick...';
   echo -en 'travis_fold:start:QuickChick.build';
   opam update;
-  opam pin add . ;
-  opam install coq-quickchick;
+  opam install .;
   echo -en 'travis_fold:end:QuickChick.build'
 - echo 'Testing IFC...';
   echo -en 'travis_fold:start:QuickChick.test.ifc-basic';
@@ -64,8 +63,12 @@ script:
   echo -en 'travis_fold:end:QuickChick.test.c-mutation'
 - echo 'Removing QuickChick...';
   echo -en 'travis_fold:start:QuickChick.remove';
-  opam remove --force coq-quickchick;
+  opam remove .;
   echo -en 'travis_fold:end:QuickChick.remove'
+
+before_cache:
+- if [ $TRAVIS_OS_NAME = osx ]; then brew cleanup; fi
+- rm -rf $HOME/.opam/log
 
 notifications:
   slack:
