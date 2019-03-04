@@ -209,6 +209,9 @@ Module GenLow : GenLowInterface.Sig.
   Definition enum' {A : Type} `{Serial A} (n : nat) : G A :=
     MkGen (fun _ r => series n r).
 
+  Definition enumerate {A : Type} (l : list A) : G A :=
+    MkGen (fun _ _ => list_to_LazyList l).
+  
   (* TODO: Rethink this.
   Fixpoint sumG {A : Type} (lga : LazyList (G A)) : G A :=
     MkGen (fun n r => bind_helper lga n r).
@@ -233,13 +236,8 @@ Module GenLow : GenLowInterface.Sig.
   Definition reallyUnsafeDelay {A : Type} : G (G A -> LazyList A) :=
     MkGen (fun r n => lsing (fun g => match g with MkGen f => f r n end)).
 
-  (* Leo: Even more unsafe with fail option... 
-  Definition reallyUnsafePromote {r A : Type} (m : r -> G A) : G (r -> A) :=
-    eval <- reallyUnsafeDelay ;;
-    ret (fun r => match (eval (m r))).
-    (bindGen reallyUnsafeDelay (fun eval => 
-                                  returnGen (fun r => eval (m r)))).
-  *)
+
+
 
   (* End Things *)
 
@@ -369,6 +367,29 @@ Module GenLow : GenLowInterface.Sig.
       constructor. (* auto.*)
     - do 2! constructor.
   Qed.
+
+  Lemma semEnumerate {A} (l : list A) : semGen (enumerate l) <--> l.
+  Proof.
+    rewrite /semGen /semGenSize /= bigcup_const ?codom_const //; [ | do 2! constructor].
+    split; induction l; intros; eauto; inv H.
+    - inv H0.
+    - simpl in H0.
+      destruct l eqn:L; eauto.
+      + inv H0; simpl; auto.
+      + inv H0.
+        * left; auto.
+        * right; eauto.
+          eapply IHl.
+          exists x; auto.
+    - destruct randomSeed_inhabited. exists X; destruct l; simpl; eauto.
+    - destruct randomSeed_inhabited; exists X.
+      inv H.
+      + destruct l; simpl; eauto.
+      + destruct IHl; eauto.
+        destruct l eqn:L; simpl; eauto.
+        inv H0.
+  Qed.
+
   
   (* begin semReturnSize *)
   Lemma semReturnSize A (x : A) (s : nat) :
@@ -1247,5 +1268,21 @@ Module GenLow : GenLowInterface.Sig.
   Definition shuffle {A : Type} (gs : list (nat * G A)) : G A :=
     MkGen (fun s r => shuffleFuel (length gs) (sum_fst gs) (List.map run_snd gs) s r).
 *)
+
+  Program Definition reallyUnsafePromote {A B : Type} (m : A -> G B) (H : forall a, CanNotFail (m a)) : G (A -> B) :=
+    MkGen (fun s r =>
+             lsing (fun a => match run (m a) s r with
+                             | lnil => _
+                             | lsing x => x
+                             | lcons x _ => x
+                             end)).
+  Next Obligation.
+    destruct (H a).
+    specialize (can_not_fail_pf0 s r).
+    unfold can_not_fail in *.
+    rewrite -Heq_anonymous in can_not_fail_pf0.
+    inv can_not_fail_pf0.
+  Defined.
+
   
 End GenLow.

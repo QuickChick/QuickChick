@@ -71,6 +71,8 @@ Module Type Sig.
   Parameter suchThatMaybeOpt : forall {A : Type}, G (option A) -> (A -> bool) ->
                                              G (option A).
    *)
+
+  Parameter enumerate : forall {A : Type}, list A -> G A.
   
   Parameter choose : forall {A : Type} `{ChoosableFromInterval A}, (A * A) -> G A.
   Parameter enumR : forall {A : Type} `{EnumFromInterval A} (range : A * A), G A.
