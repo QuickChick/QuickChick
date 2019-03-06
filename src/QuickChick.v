@@ -52,6 +52,8 @@ Require Export DependentClasses.
 Require Export Typeclasses.
 Export GenLow GenHigh.
 
+Global Unset Asymmetric Patterns.
+
 (* TODO: Figure out better place for these *)
 (* String and Ascii Instances *)
 
