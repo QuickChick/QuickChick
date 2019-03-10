@@ -11,7 +11,7 @@ Definition removeP (xl : nat * list nat) : option bool :=
   Some (negb (existsb (fun y => beq_nat y (fst xl)) (remove (fst xl) (snd xl)))).
 
 Definition fuzzer := (fun _ : unit => fuzzLoop arbitrary fuzz show removeP).
-(* FuzzQC removeP (fuzzer tt). *)
+FuzzQC removeP (fuzzer tt). 
 
 Inductive Tree :=
 | Leaf : Tree

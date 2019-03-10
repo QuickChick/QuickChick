@@ -7,6 +7,8 @@
 static s32 shm_id;                    /* ID of the SHM region             */
 u8* trace_bits;
 
+static u8  virgin_bits[MAP_SIZE];     /* Regions yet untouched by fuzzing */
+
 #define MAP_SIZE_POW2       16
 #define MAP_SIZE            (1 << MAP_SIZE_POW2)
 
@@ -21,7 +23,8 @@ void setup_shm(void) {
 
   u8* shm_str;
 
-  //  if (!in_bitmap) memset(virgin_bits, 255, MAP_SIZE);
+  // if (!in_bitmap)
+  memset(virgin_bits, 255, MAP_SIZE);
 
   //  memset(virgin_tmout, 255, MAP_SIZE);
   //  memset(virgin_crash, 255, MAP_SIZE);
@@ -114,4 +117,180 @@ CAMLprim value reset_trace_bits(value unit)
   return Val_unit ;
 }
 
+/* AFL-FUZZ borrowed functions to obtain faster statistics */
 
+
+/* Count the number of bits set in the provided bitmap. Used for the status
+   screen several times every second, does not have to be fast. */
+
+static u32 count_bits(u8* mem) {
+
+  u32* ptr = (u32*)mem;
+  u32  i   = (MAP_SIZE >> 2);
+  u32  ret = 0;
+
+  while (i--) {
+
+    u32 v = *(ptr++);
+
+    /* This gets called on the inverse, virgin bitmap; optimize for sparse
+       data. */
+
+    if (v == 0xffffffff) {
+      ret += 32;
+      continue;
+    }
+
+    v -= ((v >> 1) & 0x55555555);
+    v = (v & 0x33333333) + ((v >> 2) & 0x33333333);
+    ret += (((v + (v >> 4)) & 0xF0F0F0F) * 0x01010101) >> 24;
+
+  }
+
+  return ret;
+
+}
+
+
+#define FF(_b)  (0xff << ((_b) << 3))
+
+/* Count the number of bytes set in the bitmap. Called fairly sporadically,
+   mostly to update the status screen or calibrate and examine confirmed
+   new paths. */
+
+static u32 count_bytes(u8* mem) {
+
+  u32* ptr = (u32*)mem;
+  u32  i   = (MAP_SIZE >> 2);
+  u32  ret = 0;
+
+  while (i--) {
+
+    u32 v = *(ptr++);
+
+    if (!v) continue;
+    if (v & FF(0)) ret++;
+    if (v & FF(1)) ret++;
+    if (v & FF(2)) ret++;
+    if (v & FF(3)) ret++;
+
+  }
+
+  return ret;
+
+}
+
+CAMLprim value count_bytes_aux(void){
+  return Val_int(count_bytes(trace_bits));
+}
+
+
+/* Count the number of non-255 bytes set in the bitmap. Used strictly for the
+   status screen, several calls per second or so. */
+
+static u32 count_non_255_bytes(u8* mem) {
+
+  u32* ptr = (u32*)mem;
+  u32  i   = (MAP_SIZE >> 2);
+  u32  ret = 0;
+
+  while (i--) {
+
+    u32 v = *(ptr++);
+
+    /* This is called on the virgin bitmap, so optimize for the most likely
+       case. */
+
+    if (v == 0xffffffff) continue;
+    if ((v & FF(0)) != FF(0)) ret++;
+    if ((v & FF(1)) != FF(1)) ret++;
+    if ((v & FF(2)) != FF(2)) ret++;
+    if ((v & FF(3)) != FF(3)) ret++;
+
+  }
+
+  return ret;
+
+}
+
+
+/* Check if the current execution path brings anything new to the table.
+   Update virgin bits to reflect the finds. Returns 1 if the only change is
+   the hit-count for a particular tuple; 2 if there are new tuples seen. 
+   Updates the map, so subsequent calls will always return 0.
+
+   This function is called after every exec() on a fairly large buffer, so
+   it needs to be fast. We do this in 32-bit and 64-bit flavors. */
+
+static inline u8 has_new_bits(u8* virgin_map) {
+
+#ifdef __x86_64__
+
+  u64* current = (u64*)trace_bits;
+  u64* virgin  = (u64*)virgin_map;
+
+  u32  i = (MAP_SIZE >> 3);
+
+#else
+
+  u32* current = (u32*)trace_bits;
+  u32* virgin  = (u32*)virgin_map;
+
+  u32  i = (MAP_SIZE >> 2);
+
+#endif /* ^__x86_64__ */
+
+  u8   ret = 0;
+
+  while (i--) {
+
+    /* Optimize for (*current & *virgin) == 0 - i.e., no bits in current bitmap
+       that have not been already cleared from the virgin map - since this will
+       almost always be the case. */
+
+    if (unlikely(*current) && unlikely(*current & *virgin)) {
+
+      if (likely(ret < 2)) {
+
+        u8* cur = (u8*)current;
+        u8* vir = (u8*)virgin;
+
+        /* Looks like we have not found any new bytes yet; see if any non-zero
+           bytes in current[] are pristine in virgin[]. */
+
+#ifdef __x86_64__
+
+        if ((cur[0] && vir[0] == 0xff) || (cur[1] && vir[1] == 0xff) ||
+            (cur[2] && vir[2] == 0xff) || (cur[3] && vir[3] == 0xff) ||
+            (cur[4] && vir[4] == 0xff) || (cur[5] && vir[5] == 0xff) ||
+            (cur[6] && vir[6] == 0xff) || (cur[7] && vir[7] == 0xff)) ret = 2;
+        else ret = 1;
+
+#else
+
+        if ((cur[0] && vir[0] == 0xff) || (cur[1] && vir[1] == 0xff) ||
+            (cur[2] && vir[2] == 0xff) || (cur[3] && vir[3] == 0xff)) ret = 2;
+        else ret = 1;
+
+#endif /* ^__x86_64__ */
+
+      }
+
+      *virgin &= ~*current;
+
+    }
+
+    current++;
+    virgin++;
+
+  }
+
+  // if (ret && virgin_map == virgin_bits) bitmap_changed = 1;
+
+  return ret;
+
+}
+
+CAMLprim value has_new_bits_aux(void) {
+  return (Val_bool (has_new_bits(virgin_bits)));
+}
