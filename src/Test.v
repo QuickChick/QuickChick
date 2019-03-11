@@ -341,8 +341,45 @@ Definition fuzzCheck {prop : Type} {_ : Checkable prop} (p : prop) : Result :=
 
 
 (* HACK! This will be implemented by appending it to the beginning of the file...*)
-Axiom withInstrumentation : (unit -> option bool) -> (option bool -> bool -> nat -> Result) -> Result.
+Axiom withInstrumentation : (unit -> option bool) -> (option bool * (bool * nat)).
 Extract Constant withInstrumentation => "withInstrumentation".
+
+Fixpoint pick_next_aux pick_fuel {A} (gen : G A) (fuzz : A -> G A) fs ds fsq dsq :=
+  match pick_fuel with
+  | O => (gen, fs, ds, fsq, dsq)
+  | S pick_fuel =>
+    match fs with
+    (* First pick: something from the favorite queue.
+       If its weight is 0, try the next one. *)
+    | ((O, fav)::fs') =>
+      pick_next_aux pick_fuel gen fuzz fs' ds fsq dsq
+    | ((S n, fav)::fs') =>
+      (fuzz fav, (n, fav)::fs', ds, fsq, dsq)
+    | [] =>
+      (* Then: If no favorites exist, check if there are still favorites in the queue. *)
+      match fsq with
+      (* If not, go to the discards. *)
+      | [] => 
+        match ds with
+        (* If we have fuzzed this (discarded) seed to completion, randomly generate a new test. *)
+        | ((O, _)::ds') => (gen, fs, ds', fsq, dsq)
+        | ((S n, dis)::ds') => (fuzz dis, fs, ((n, dis):: ds'), fsq, dsq)
+        | [] =>
+          (* If no discards, look at the queue. *)
+          match dsq with
+          (* No queue -> Random generation *)
+          | [] => (gen, [], [], [], [])
+          (* Discarded in queue: update queue. *)
+          | _  => pick_next_aux pick_fuel gen fuzz [] dsq [] []
+          end
+        end
+      (* If yes, updated the favored list. *)
+      | _ => pick_next_aux pick_fuel gen fuzz fsq ds [] dsq
+      end
+    end
+  end.
+
+Definition pick_next := @pick_next_aux 4.
 
 (* Keep two lists for seeds: 
    favored  : contains _successful_ runs and their energy.
@@ -358,7 +395,7 @@ Fixpoint fuzzLoopAux {A} (fuel : nat) (st : State)
          (prop : A -> option bool) :=
   match fuel with
   | O => giveUp st
-  | S fuel' =>
+  | S fuel' => 
     if (gte (numSuccessTests st) (maxSuccessTests st)) then
       doneTesting st
     else if (gte (numDiscardedTests st) (maxDiscardedTests st)) then
@@ -371,46 +408,12 @@ Fixpoint fuzzLoopAux {A} (fuel : nat) (st : State)
        If there is not, pick the first discarded one, fuzz it until
        you run out of energy, and then generate a random test again.
      *)
-    let fix pick_next pick_fuel fs ds fsq dsq :=
-        match pick_fuel with
-        | O => (gen, fs, ds, fsq, dsq)
-        | S pick_fuel =>
-        match fs with
-        (* First pick: something from the favorite queue.
-           If its weight is 0, try the next one. *)
-        | ((O, fav)::fs') =>
-          pick_next pick_fuel fs' ds fsq dsq
-        | ((S n, fav)::fs') =>
-          (fuzz fav, (n, fav)::fs', ds, fsq, dsq)
-        | [] =>
-          (* Then: If no favorites exist, check if there are still favorites in the queue. *)
-          match fsq with
-          (* If not, go to the discards. *)
-          | [] => 
-            match ds with
-            (* If we have fuzzed this (discarded) seed to completion, randomly generate a new test. *)
-            | ((O, _)::ds') => (gen, fs, ds', fsq, dsq)
-            | ((S n, dis)::ds') => (fuzz dis, fs, ((n, dis):: ds'), fsq, dsq)
-            | [] =>
-              (* If no discards, look at the queue. *)
-              match dsq with
-              (* No queue -> Random generation *)
-              | [] => (gen, [], [], [], [])
-              (* Discarded in queue: update queue. *)
-              | _  => pick_next pick_fuel [] dsq [] []
-              end
-            end
-          (* If yes, updated the favored list. *)
-          | _ => pick_next pick_fuel fsq ds [] dsq
-          end
-        end
-        end in
     let '(g,favored',discards',favored_queue', discard_queue') :=
-        pick_next 4 favored discards favored_queue discard_queue in
+        pick_next gen fuzz favored discards favored_queue discard_queue in
     let a := run g size rnd1 in
     (* TODO: These recursive calls are a place to hold depth/handicap information as well.*)
-    withInstrumentation (fun _ : unit => prop a) (fun res is_interesting energy =>
-      match res with                                                     
+    let '(res, (is_interesting, energy)) := withInstrumentation (fun _ : unit => prop a) in
+    match res with                                                     
       | Some true =>
         if is_interesting then
           (* Successful and interesting, keep in favored queue! *)
@@ -432,11 +435,12 @@ Fixpoint fuzzLoopAux {A} (fuel : nat) (st : State)
       | None =>
         if is_interesting then
           (* Interesting (new path), but discard. Put in discard queue *)
-          fuzzLoopAux fuel' (updDiscTests st S) favored' discards' favored_queue' ((energy, a)::discard_queue') gen fuzz print prop
+          fuzzLoopAux fuel' (updDiscTests st S) favored' discards' favored_queue' ((energy, a)::discard_queue') gen fuzz print prop 
+          (* fuzzLoopAux fuel' (updDiscTests st S) favored' discards' favored_queue' discard_queue' gen fuzz print prop  *)
         else
           (* Not interesting + discard. Throw away. *)
           fuzzLoopAux fuel' (updDiscTests st S) favored' discards' favored_queue' discard_queue' gen fuzz print prop
-      end)
+    end
   end.
 
 Definition fuzzLoopWith {A} (a : Args)

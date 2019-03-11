@@ -425,10 +425,13 @@ let qcFuzz prop fuzzLoop =
   Printf.fprintf oc "
 let _ = 
   setup_shm_aux ();
-  let f () = 
+(*  Printexc.record_backtrace true; *)
+  Pervasives.print_string (QuickChickLib.string_of_coqstring (snd ((%s) ()))); Pervasives.flush stdout;
+" (string_of_id show_and_c_fun_def);
+(*  let f () = 
     let quickchick_result =
       try Some ((%s) ())
-      with _ -> None
+      with err -> failwith err
     in
     match quickchick_result with
     | Some (Failure _, s) ->
@@ -438,7 +441,7 @@ let _ =
     | _ ->
        print_string \"Failed to generate...\"
   in f ()
-" (string_of_id show_and_c_fun_def);
+" *) 
   close_out oc;
 
   (* Append the appropriate definitions in the beginning *)
@@ -449,6 +452,14 @@ let _ =
   print_endline echo_cmd;
   ignore (Sys.command echo_cmd);
 
+  (* HORRIBLE. HORRIBLE. Perl hack to ensure tail recursion... *)
+  (* First copy them over from contrib... *)
+  ignore (Sys.command (Printf.sprintf "cp %s/cmdprefix.pl %s" user_contrib temp_dir));
+  ignore (Sys.command (Printf.sprintf "cp %s/cmdsuffix.pl %s" user_contrib temp_dir));
+  (* ... then execute them ... *)
+  ignore (Sys.command (Printf.sprintf "%s/cmdprefix.pl %s" temp_dir mlf));
+  ignore (Sys.command (Printf.sprintf "%s/cmdsuffix.pl %s" temp_dir mlf));
+  
   (* Copy fuzz-related files to temp directory *)
   ignore (Sys.command (Printf.sprintf "cp %s/alloc-inl.h %s" user_contrib temp_dir));
   ignore (Sys.command (Printf.sprintf "cp %s/debug.h %s" user_contrib temp_dir));
@@ -501,6 +512,7 @@ let _ =
     Printf.sprintf "%s unix.cmxa str.cmxa %s -unsafe-string -rectypes -w a -I %s -I %s -I %s %s %s -o %s %s %s/SHM.c"
       ocamlopt afl_link (Filename.dirname fn) afl_path path link_files extra_link_files execn fn temp_dir in
   let cmp_cmd_main = comp_main_cmd (temp_dir ^ "/Main.ml") (temp_dir ^ "/main_exec") in
+  Printf.printf "Compile Main Command: %s\n" cmp_cmd_main;
   if (Sys.command cmp_cmd_main <> 0) then
     (CErrors.user_err (str "Could not compile main program" ++ fnl ()));
   

@@ -118,12 +118,12 @@ let calc_energy time size result =
   
   Float.to_int energy_capped_bot
     
-let withInstrumentation f cont =
+let withInstrumentation f =
   (* Reset the C-array bitmap. *)
   reset_trace_bits ();
 
   (* TODO: Convert to DEBUG *)
-  (* print_endline "Executing..."; *)
+  (*   print_endline "Executing...";  *)
   
   let cur_time = Sys.time () in
   let result = f () in
@@ -144,7 +144,7 @@ let withInstrumentation f cont =
     incr total_bitmap_cnt;
     (* Calculate the energy for the new path *)
     let energy = calc_energy time size result in
-    cont result true  energy
+    (result, (true, energy))
   end
   else
-    cont result false 0
+    (result, (false, 0))

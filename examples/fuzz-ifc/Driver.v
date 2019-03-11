@@ -313,7 +313,7 @@ Definition fuzz_variation (v : Variation) : G Variation :=
   bindGen (fuzz st2) (fun st2' =>
   returnGen (V st1' st2'))).
   
-Extract Constant defNumTests => "1000000".
+Extract Constant defNumTests => "100000".
 
 Definition prop_SSNI_arbitrary t r :=
    (prop SSNI gen_variation_arbitrary t r).
@@ -339,6 +339,10 @@ Definition fuzzMutantX g f r n :=
     | _ => fun _ => GaveUp 0 [] ""
   end.
 
+Definition gen_variation_copy :=
+  bindGen (@arbitrary State _) (fun st =>
+  returnGen (V st st)).
+                                  
 Definition SSNI_0 (v : @Variation State) : option bool :=
   match nth (mutate_table default_table) 0 with
     | Some t => SSNI t v exp_result_fuzzqc
@@ -347,7 +351,8 @@ Definition SSNI_0 (v : @Variation State) : option bool :=
 
 Definition fuzzLoop_0 :=
   fun _ : unit =>
-  fuzzLoop arbitrary fuzz show SSNI_0.
+    (* fuzzLoop (resize 3 gen_variation_copy) fuzz show SSNI_0. *)
+    fuzzLoop arbitrary fuzz show SSNI_0.
 
 ManualExtract [Instruction; Label; Atom; Stack; State; Variation].
 FuzzQC SSNI_0 (fuzzLoop_0 tt). 
