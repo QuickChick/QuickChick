@@ -57,10 +57,10 @@ Notation "'∂' pc" := (pc_lab pc) (at level 0).
 
 Inductive Stack :=
   | Mty                         (* empty stack *)
-  | Cons (a:Atom) (s:Stack)     (* stack atom cons *)
+  | MCons (a:Atom) (s:Stack)    (* stack atom cons *)
   | RetCons (pc:Atom) (s:Stack) (* stack frame marker cons *)
 .
-Infix "::"  := Cons (at level 60, right associativity).
+Infix "::"  := MCons (at level 60, right associativity).
 Infix ":::" := RetCons (at level 60, right associativity).
 
 Fixpoint app_stack (l:list Atom) (s:Stack) : Stack :=
@@ -72,12 +72,15 @@ Infix "$" := app_stack (at level 60, right associativity).
 
 Definition IMem := list Instruction.
 Definition Mem  := list Atom.
-Record State := St {
-  st_imem  : IMem ; (* instruction memory *)
-  st_mem   : Mem  ; (* memory *)
-  st_stack : Stack; (* operand stack *)
-  st_pc    : Atom   (* program counter *)
-}.
+Inductive State := St : IMem -> Mem -> Stack -> Atom -> State.
+Definition st_imem (st : State) : IMem :=
+  let '(St x _ _ _) := st in x.
+Definition st_mem (st : State) : Mem :=
+  let '(St _ x _ _) := st in x.
+Definition st_stack (st : State) : Stack :=
+  let '(St _ _ x _) := st in x.
+Definition st_pc (st : State) : Atom :=
+  let '(St _ _ _ x) := st in x.
 
 Definition labelCount (c:OpCode) : nat :=
   match c with

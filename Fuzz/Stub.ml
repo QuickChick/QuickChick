@@ -123,7 +123,7 @@ let withInstrumentation f cont =
   reset_trace_bits ();
 
   (* TODO: Convert to DEBUG *)
-  print_endline "Executing...";
+  (* print_endline "Executing..."; *)
   
   let cur_time = Sys.time () in
   let result = f () in

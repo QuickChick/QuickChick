@@ -23,7 +23,8 @@ type ty_ctr
 val ty_ctr_to_string : ty_ctr -> string
 val gInjectTyCtr : string -> ty_ctr
 val gTyCtr : ty_ctr -> coq_expr
-
+val tyCtrToQualid : ty_ctr -> Libnames.qualid
+  
 type arg
 val gArg : ?assumName:coq_expr ->
            ?assumType:coq_expr ->
@@ -45,6 +46,7 @@ val coq_type_to_string : coq_type -> string
 type constructor 
 val constructor_to_string : constructor -> string
 val gCtr : constructor -> coq_expr
+val ctrToQualid : constructor -> Libnames.qualid 
 val injectCtr : string -> constructor
 val ty_ctr_to_ctr : ty_ctr -> constructor
 val ctr_to_ty_ctr : constructor -> ty_ctr 

@@ -33,7 +33,7 @@ let extra_files : (string * string) list ref =
   Summary.ref ~name:"QC_extra_files" empty_ss_list
 let add_extra_file s1 s2 =
       extra_files := (s1, s2) :: !extra_files
-                                             
+
 (* Locate QuickChick's files *)
 (* The computation is delayed because QuickChick's libraries are not available
 when the plugin is first loaded. *)
@@ -325,6 +325,23 @@ let runTest fuzz (c : constr_expr) =
 
   define_and_run fuzz show_and_c_fun
 
+let extract_manually : reference list ref =
+  Summary.ref ~name:"QC_manual_extracts" []
+let add_manual_extract cs =
+  let convert_reference_to_qualid c : reference =
+    match c with
+    | {CAst.v = CRef (r, _)} -> r (* (match qualid_of_reference r with {CAst.v = q; _} -> q) *)
+    | _ -> failwith "Usage: Extract Manually failed." in
+  let refs : reference list =
+    match cs with
+    | { CAst.v = CNotation (_,([a],[b],_,_)) } -> begin
+         let q = convert_reference_to_qualid a in
+         let qs = List.map convert_reference_to_qualid b in
+         q :: qs
+       end
+    | _ -> [convert_reference_to_qualid cs] in 
+  extract_manually := refs @ !extract_manually
+
 let qcFuzz prop fuzzLoop =
   (** Extract the property and its dependencies *)
   let env = Global.env () in
@@ -341,7 +358,8 @@ let qcFuzz prop fuzzLoop =
   CWarnings.set_flags warnings;
 
   (** Override extraction to use the new, instrumented property *)
-  let prop_name = Filename.basename execn ^ "." ^ Id.to_string prop_def in
+  let qualify s = Printf.sprintf "%s.%s" (Filename.basename execn) s in
+  let prop_name = qualify (Id.to_string prop_def) in
   let prop_ref =
     match prop with
     | { CAst.v = CRef (r,_) } -> r
@@ -349,6 +367,27 @@ let qcFuzz prop fuzzLoop =
   in
   Extraction_plugin.Table.extract_constant_inline false prop_ref [] prop_name;
 
+  List.iter (fun x -> print_endline (string_of_qualid
+                                       ((match qualid_of_reference x with {CAst.v = q; _} -> q)))) !extract_manually; 
+  List.iter (fun r ->
+      match GenericLib.dt_rep_from_mib (GenericLib.reference_to_mib r) with
+      | Some (ty_ctr, ty_params, ctrs) -> begin
+          (*          print_endline "Extracting inductive..."; *)
+          let ty_ctr_name = qualify (String.uncapitalize_ascii (GenericLib.ty_ctr_to_string ty_ctr)) in
+          (*          print_endline ty_ctr_name; *)
+          let ctr_names = List.map (fun (ctr,_) -> qualify (GenericLib.constructor_to_string ctr)) ctrs in
+          (* List.iter print_endline ctr_names; *)
+          Extraction_plugin.Table.extract_inductive 
+            (CAst.make @@ Qualid (GenericLib.tyCtrToQualid ty_ctr))
+            ty_ctr_name
+            ctr_names
+            None
+        end
+      | None -> failwith "Can't be represented..."
+    ) !extract_manually;
+
+  
+  
   (** Define fuzzLoop applied appropriately *)
   let unit_type =
     CAst.make @@ CRef (CAst.make @@ Qualid (qualid_of_string "Coq.Init.Datatypes.unit"), None) in
@@ -570,7 +609,6 @@ VERNAC COMMAND EXTEND QuickChickTimeout CLASSIFIED AS SIDEFF
      [ set_fuzz_timeout n ]
 END;;
 
-
 VERNAC COMMAND EXTEND AddExtraFile CLASSIFIED AS SIDEFF
   | ["AddExtraFile" string(s1) string(s2)] ->
      [ ( add_extra_file s1 s2;
@@ -580,4 +618,8 @@ END;;
 
 VERNAC COMMAND EXTEND Sample CLASSIFIED AS SIDEFF
   | ["Sample" constr(c)] -> [run false sample [c]]
+END;;
+
+VERNAC COMMAND EXTEND ManualExtract CLASSIFIED AS SIDEFF
+   | ["ManualExtract" constr(inductives) ] -> [ add_manual_extract inductives ]
 END;;

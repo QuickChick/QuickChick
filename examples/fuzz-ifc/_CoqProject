@@ -1,11 +1,11 @@
 -Q . QuickChick.ifcbasic
-Indist.v
+Rules.v
 Instructions.v
 Machine.v
+Indist.v
 Mutate.v
-Printing.v
 Generation.v
+Printing.v
 DerivedGen.v
 GenExec.v
-Rules.v
 Driver.v

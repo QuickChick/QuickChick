@@ -20,15 +20,20 @@ Definition prop_sanity :=
 QuickChick prop_sanity.
  *)
 
-Record exp_result := MkExpResult { exp_success : Checker
-                                 ; exp_fail    : Checker
-                                 ; exp_reject  : Checker
-                                 ; exp_check   : bool -> Checker
-                                 }.
+Record exp_result A := MkExpResult { exp_success : A
+                                   ; exp_fail    : A
+                                   ; exp_reject  : A
+                                   ; exp_check   : bool -> A
+                                   }.
+Arguments exp_success {_} _.
+Arguments exp_fail {_} _.
+Arguments exp_reject {_} _.
+Arguments exp_check {_} _ _.
+
 
 (* HACK: To get statistics on successful runs/discards/avg test failures, we can 
    assume everything succeeds and collect the result. *)
-Definition exp_result_random : exp_result :=
+Definition exp_result_random : exp_result Checker :=
   {| exp_success := collect true  true
    ; exp_fail    := collect false true
    ; exp_reject  := collect "()"  true
@@ -36,11 +41,18 @@ Definition exp_result_random : exp_result :=
   |}.
 
 (* For fuzzing, we let afl-fuzz gather the statistics (and hack afl-fuzz instead :) *)
-Definition exp_result_fuzz : exp_result :=
+Definition exp_result_fuzz : exp_result Checker :=
   {| exp_success := collect true  true
    ; exp_fail    := collect false false
    ; exp_reject  := collect "()"  tt
    ; exp_check   := (fun b => collect b b)
+  |}.
+
+Definition exp_result_fuzzqc : exp_result (option bool) :=
+  {| exp_success := Some true
+   ; exp_fail    := Some false
+   ; exp_reject  := None
+   ; exp_check   := (fun b => Some b)
   |}.
 
 Definition registerSeedCallback {prop : Type} `{Checkable prop} : prop -> Checker :=
@@ -48,7 +60,7 @@ Definition registerSeedCallback {prop : Type} `{Checkable prop} : prop -> Checke
               let '(MkSmallResult _ _ _ _ ss _) := rs in
               if ss = ["true"] ? then registerSeed r (randomSeed st) else 0)).
 
-Definition SSNI (t : table) (v : @Variation State) (res : exp_result) : Checker  :=
+Definition SSNI {A} (t : table) (v : @Variation State) (res : exp_result A) : A  :=
   let '(V st1 st2) := v in
   let '(St _ _ _ (_@l1)) := st1 in
   let '(St _ _ _ (_@l2)) := st2 in
@@ -89,7 +101,6 @@ Definition SSNI (t : table) (v : @Variation State) (res : exp_result) : Checker 
     else (* collect "Not indist" *) (exp_reject res)
   | _ => (* collect "Out-of-range" *) (exp_reject res)
   end.
-
 
 Fixpoint MSNI_aux (fuel : nat) (t : table) (v : @Variation State) : option bool :=
   let '(V st1 st2) := v in
@@ -177,7 +188,7 @@ Fixpoint EENI (fuel : nat) (t : table) (v : @Variation State) res : Checker  :=
   else (exp_reject res).
 
 (* Generic property *)
-Definition prop p (gen : G (option Variation)) (t : table) (r : exp_result) : Checker :=
+Definition prop p (gen : G (option Variation)) (t : table) (r : exp_result Checker) : Checker :=
   forAllShrink gen (fun _ => nil)
                (fun mv =>
                   match mv with
@@ -206,7 +217,7 @@ Definition gen_variation_medium : G (option Variation) :=
 Definition testMutantX prop r n :=
   match nth (mutate_table default_table) n with
     | Some t => prop t r
-    | _ => exp_reject r
+    | _ => @exp_reject Checker r
   end.
 
 Definition prop_SSNI_naive t r :=
@@ -240,8 +251,8 @@ Definition collect_instrs v x :=
 Definition MSNI fuel t v res :=
 (*  collect_instrs v *) (
   match MSNI_aux fuel t v with
-  | Some b => exp_check res b
-  | None => exp_reject res
+  | Some b => @exp_check Checker res b
+  | None => @exp_reject Checker res
   end).
 
 Definition prop_MSNI_naive t r :=
@@ -277,6 +288,12 @@ Derive GenSized for Atom.
 Derive GenSized for Stack.
 Derive GenSized for State.
 
+Derive Fuzzy for Instruction.
+Derive Fuzzy for Label.
+Derive Fuzzy for Atom.
+Derive Fuzzy for Stack.
+Derive Fuzzy for State.
+
 Definition gen_variation_arbitrary : G (option Variation) :=
   bindGen (@arbitrary State _) (fun st1 =>
   bindGen (@arbitrary State _) (fun st2 =>
@@ -285,6 +302,17 @@ Definition gen_variation_arbitrary : G (option Variation) :=
   else
     returnGen None)).
 
+(* simpl *)
+Derive Fuzzy for Variation.
+Derive Arbitrary for Variation.
+
+(* Fuzz both states once *)
+Definition fuzz_variation (v : Variation) : G Variation :=
+  let '(V st1 st2) := v in
+  bindGen (fuzz st1) (fun st1' =>
+  bindGen (fuzz st2) (fun st2' =>
+  returnGen (V st1' st2'))).
+  
 Extract Constant defNumTests => "1000000".
 
 Definition prop_SSNI_arbitrary t r :=
@@ -301,4 +329,26 @@ Definition gen_variation_arb_medium : G (option Variation) :=
 Definition prop_SSNI_arbmedium t r :=
   (prop SSNI gen_variation_arb_medium t r).
 
-QuickChick (testMutantX prop_SSNI_smart exp_result_random 0).
+Definition fuzz_SSNI_qc g f (t : table) (r : exp_result (option bool)) : unit -> Result :=
+  fun _ : unit =>
+  fuzzLoop g f show (fun v => SSNI t v r).
+
+Definition fuzzMutantX g f r n :=
+  match nth (mutate_table default_table) n with
+    | Some t => fuzz_SSNI_qc g f t r
+    | _ => fun _ => GaveUp 0 [] ""
+  end.
+
+Definition SSNI_0 (v : @Variation State) : option bool :=
+  match nth (mutate_table default_table) 0 with
+    | Some t => SSNI t v exp_result_fuzzqc
+    | _ => None
+  end.
+
+Definition fuzzLoop_0 :=
+  fun _ : unit =>
+  fuzzLoop arbitrary fuzz show SSNI_0.
+
+ManualExtract [Instruction; Label; Atom; Stack; State; Variation].
+FuzzQC SSNI_0 (fuzzLoop_0 tt). 
+

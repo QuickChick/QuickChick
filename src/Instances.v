@@ -204,6 +204,11 @@ Global Instance fuzzyNat : Fuzzy nat :=
        freq [ (1, ret 0) ; (1, arbitrary) ]
   |}.
 
+Global Instance fuzzyZ : Fuzzy Z :=
+  {| fuzz n :=
+       freq [ (1, ret Z0) ; (1, arbitrary) ]
+  |}.
+
 Global Instance fuzzList {A} `{Gen A} `{Fuzzy A} : Fuzzy (list A) :=
   {| fuzz l :=
        let n := length l in

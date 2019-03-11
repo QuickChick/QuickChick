@@ -75,7 +75,7 @@ void setup_shm_aux(void) {
 CAMLprim value setup_shm_prim(value unit)
 {
   setup_shm();
-  printf ("SHM Setup succesful!\n");
+  //printf ("SHM Setup succesful!\n");
   return Val_unit;
 }
 
@@ -90,7 +90,7 @@ CAMLprim value setup_shm_prim_aux(value unit)
 
 CAMLprim value copy_trace_bits( value ml_array )
 {
-  printf("Entering copy_trace_bits....\n");
+  //  printf("Entering copy_trace_bits....\n");
     int i, len;
     len = Wosize_val(ml_array);
     printf("Size: %d\n", len);
@@ -100,20 +100,20 @@ CAMLprim value copy_trace_bits( value ml_array )
       caml_modify(&Field(ml_array, i), Val_int (trace_bits[i]));
     }
 
-    printf("Returning from copy trace bits...\n");
+    //    printf("Returning from copy trace bits...\n");
     return Val_unit ;
 }
 
 CAMLprim value reset_trace_bits(value unit)
 {
-  printf("Entering reset trace bits...\n");
+  //  printf("Entering reset trace bits...\n");
   fflush(stdout);
   int i;
   //TODO: memset
   for (i=0; i<MAP_SIZE; i++){
     trace_bits[i] = 0;
   }
-  printf("Returnging from reset trace bits...\n");
+  //  printf("Returnging from reset trace bits...\n");
   return Val_unit ;
 }
 

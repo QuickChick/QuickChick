@@ -82,6 +82,7 @@ let gInjectTyCtr s =
   if s = "" then failwith "Called gInjectTyCtr with empty string";
   qualid_of_string s
 let gTyCtr = qualid_to_coq_expr
+let tyCtrToQualid x = x
 
 type arg = local_binder_expr
 let gArg ?assumName:(an=hole) ?assumType:(at=hole) ?assumImplicit:(ai=false) ?assumGeneralized:(ag=false) _ =
@@ -117,6 +118,7 @@ let rec coq_type_to_string ct =
 type constructor = qualid (* Opaque *)
 let constructor_to_string (x : constructor) = string_of_qualid x
 let gCtr id = qualid_to_coq_expr id
+let ctrToQualid x = x            
 let injectCtr s = 
   if s = "" then failwith "Called gInject with empty string";
   qualid_of_string s

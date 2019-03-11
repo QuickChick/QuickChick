@@ -66,7 +66,7 @@ Fixpoint gen_stack (n : nat) (onlyLow : bool) : G Stack :=
     | O => returnGen Mty
     | S n' =>
       freq_ (returnGen Mty) [
-                  (10, liftGen2 Cons gen_atom (gen_stack n' onlyLow));
+                  (10, liftGen2 MCons gen_atom (gen_stack n' onlyLow));
                   (4, bindGen gen_atom (fun pc =>
                        liftGen (RetCons pc) (gen_stack n' (is_atom_low pc))))]
   end.
@@ -103,8 +103,8 @@ Instance vary_mem : Vary Mem :=
 
 Fixpoint vary_stack (s : Stack) (isLow : bool) : G Stack :=
   match s with
-    | a :: s'  => if isLow then liftGen2 Cons (vary a) (vary_stack s' isLow)
-                  else liftGen2 Cons gen_atom (vary_stack s' isLow)
+    | a :: s'  => if isLow then liftGen2 MCons (vary a) (vary_stack s' isLow)
+                  else liftGen2 MCons gen_atom (vary_stack s' isLow)
     | (x@l) ::: s' =>
       match l with
         | L => liftGen (RetCons (x@l)) (vary_stack s' true)
