@@ -15,6 +15,7 @@ src/Instances.v
 src/CoArbitrary.v
 src/StringOT.v
 src/Show.v
+src/FMapWeakListInstances.v
 src/ShowFacts.v
 src/State.v
 src/Checker.v
