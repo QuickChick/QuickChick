@@ -375,7 +375,12 @@ let qcFuzz prop fuzzLoop =
           (*          print_endline "Extracting inductive..."; *)
           let ty_ctr_name = qualify (String.uncapitalize_ascii (GenericLib.ty_ctr_to_string ty_ctr)) in
           (*          print_endline ty_ctr_name; *)
-          let ctr_names = List.map (fun (ctr,_) -> qualify (GenericLib.constructor_to_string ctr)) ctrs in
+          let ctr_names =
+            match ctrs with
+            | [ctr,ctr_ty] ->
+               if GenericLib.coq_type_size ctr_ty = 1 then [""]
+               else [qualify (GenericLib.constructor_to_string ctr)]
+            | _ -> List.map (fun (ctr,_) -> qualify (GenericLib.constructor_to_string ctr)) ctrs in
           (* List.iter print_endline ctr_names; *)
           Extraction_plugin.Table.extract_inductive 
             (CAst.make @@ Qualid (GenericLib.tyCtrToQualid ty_ctr))
@@ -425,7 +430,7 @@ let qcFuzz prop fuzzLoop =
   Printf.fprintf oc "
 let _ = 
   setup_shm_aux ();
-(*  Printexc.record_backtrace true; *)
+(*  Printexc.record_backtrace true;  *)
   Pervasives.print_string (QuickChickLib.string_of_coqstring (snd ((%s) ()))); Pervasives.flush stdout;
 " (string_of_id show_and_c_fun_def);
 (*  let f () = 

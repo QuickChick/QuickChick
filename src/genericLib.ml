@@ -109,6 +109,11 @@ type coq_type =
   | TyCtr of ty_ctr * coq_type list
   | TyParam of ty_param
 
+let rec coq_type_size ct =
+  match ct with
+  | Arrow (_,ct') -> 1 + coq_type_size ct'
+  | _ -> 0
+             
 let rec coq_type_to_string ct = 
   match ct with
   | Arrow (c1, c2) -> Printf.sprintf "%s -> %s" (coq_type_to_string c1) (coq_type_to_string c2)
