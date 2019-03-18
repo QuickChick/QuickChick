@@ -381,6 +381,10 @@ Fixpoint pick_next_aux pick_fuel {A} (gen : G A) (fuzz : A -> G A) fs ds fsq dsq
 
 Definition pick_next := @pick_next_aux 4.
 
+Axiom printnvb : unit -> nat.
+Extract Constant printnvb => "(fun u -> Printf.printf ""%d\n"" (count_non_virgin_bytes u); 42)".
+Definition doneTestingFuzz (x : nat) st := doneTesting st.
+
 (* Keep two lists for seeds: 
    favored  : contains _successful_ runs and their energy.
    discards : contains _discarded_ runs and their energy (lower priority)
@@ -397,7 +401,8 @@ Fixpoint fuzzLoopAux {A} (fuel : nat) (st : State)
   | O => giveUp st
   | S fuel' => 
     if (gte (numSuccessTests st) (maxSuccessTests st)) then
-      doneTesting st
+      let x : nat := printnvb tt in
+      doneTestingFuzz (trace (show x) x) st 
     else if (gte (numDiscardedTests st) (maxDiscardedTests st)) then
       giveUp st 
     else 
@@ -413,6 +418,7 @@ Fixpoint fuzzLoopAux {A} (fuel : nat) (st : State)
     let a := run g size rnd1 in
     (* TODO: These recursive calls are a place to hold depth/handicap information as well.*)
     let '(res, (is_interesting, energy)) := withInstrumentation (fun _ : unit => prop a) in
+    let zero_0 := trace (show res ++ nl) 0 in
     match res with                                                     
       | Some true =>
         if is_interesting then
@@ -423,7 +429,7 @@ Fixpoint fuzzLoopAux {A} (fuel : nat) (st : State)
           fuzzLoopAux fuel' (updSuccTests st S) favored' discards' favored_queue' discard_queue' gen fuzz print prop
       | Some false =>
         let '(MkState mst mdt ms cs nst ndt ls e r nss nts) := st in
-        let zero := trace (print a ++ nl) 0 in
+        let zero := trace (print a ++ nl) zero_0 in
         let pre : string := "*** Failed " in
         (* TODO: shrinking *)
         (*         let (numShrinks, res') := localMin rnd1_copy st (MkRose res ts) in *)

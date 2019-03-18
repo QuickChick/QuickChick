@@ -16,7 +16,8 @@ external copy_trace_bits : int array -> unit = "copy_trace_bits"
 external reset_trace_bits : unit -> unit = "reset_trace_bits"
 external has_new_bits : unit -> bool = "has_new_bits_aux"
 external count_bytes : unit -> int = "count_bytes_aux"
-                                         
+external count_non_virgin_bytes : unit -> int = "count_non_virgin_bytes"
+
 let count_ones arr =
   Array.iteri (fun i n ->
       if n != 0 then
@@ -129,11 +130,18 @@ let withInstrumentation f =
   let result = f () in
   let stop_time = Sys.time () in
 
+  (match result with
+  | Some b -> Printf.printf "%b\n" b; flush stdout
+  | None -> Printf.printf "Discard\n"; flush stdout
+  );
+  
   (* Update total time (in us) *)
   let time = Float.to_int ((stop_time -. cur_time) *. 1000000.0) in
   total_time := !total_time + time;
   incr total_time_cnt;
 
+  Printf.printf "%d\n" (count_non_virgin_bytes ());
+  
   (* Check for new paths *)
   let new_paths = has_new_bits () in
 

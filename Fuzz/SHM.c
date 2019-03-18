@@ -23,9 +23,7 @@ void setup_shm(void) {
 
   u8* shm_str;
 
-  // if (!in_bitmap)
-  memset(virgin_bits, 255, MAP_SIZE);
-
+  
   //  memset(virgin_tmout, 255, MAP_SIZE);
   //  memset(virgin_crash, 255, MAP_SIZE);
 
@@ -54,6 +52,18 @@ void setup_shm(void) {
 
 void setup_shm_aux(void) {
 
+  // if (!in_bitmap)
+  memset(virgin_bits, 255, MAP_SIZE);
+
+//  printf("Init:\n");
+//  for (u32 j = 0; j < MAP_SIZE; j++){
+//    if (virgin_bits[j]) {
+//      printf ("%d ", j);
+//    }
+//  }
+//  printf("\n");
+
+  
   u8* shm_str;
 
   shm_str = getenv(SHM_ENV_VAR);
@@ -176,6 +186,7 @@ static u32 count_bytes(u8* mem) {
 
   }
 
+  printf("Counted Bytes: %d\n", ret);
   return ret;
 
 }
@@ -213,6 +224,11 @@ static u32 count_non_255_bytes(u8* mem) {
 
 }
 
+CAMLprim value count_non_virgin_bytes(void){
+  return Val_int(count_non_255_bytes(virgin_bits));
+}
+
+
 
 /* Check if the current execution path brings anything new to the table.
    Update virgin bits to reflect the finds. Returns 1 if the only change is
@@ -224,6 +240,9 @@ static u32 count_non_255_bytes(u8* mem) {
 
 static inline u8 has_new_bits(u8* virgin_map) {
 
+  //  count_bytes(trace_bits);
+  //  count_non_255_bytes(virgin_bits);
+  
 #ifdef __x86_64__
 
   u64* current = (u64*)trace_bits;
@@ -242,6 +261,13 @@ static inline u8 has_new_bits(u8* virgin_map) {
 
   u8   ret = 0;
 
+//  for (u32 j = 0; j < MAP_SIZE; j++){
+//    if (virgin_bits[j]) {
+//      printf ("%d ", j);
+//    }
+//  }
+//  printf("\n");
+  
   while (i--) {
 
     /* Optimize for (*current & *virgin) == 0 - i.e., no bits in current bitmap
@@ -285,6 +311,16 @@ static inline u8 has_new_bits(u8* virgin_map) {
 
   }
 
+
+//  printf("After...\n");
+//  for (u32 j = 0; j < MAP_SIZE; j++){
+//    if (virgin_bits[j]) {
+//      printf ("%d ", j);
+//    }
+//  }
+// printf("\n");
+
+  
   // if (ret && virgin_map == virgin_bits) bitmap_changed = 1;
 
   return ret;

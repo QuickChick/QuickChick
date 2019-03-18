@@ -201,12 +201,18 @@ Global Instance shrinkOption {A : Type} `{Shrink A} : Shrink (option A) :=
 (** Fuzzy instances *)
 Global Instance fuzzyNat : Fuzzy nat :=
   {| fuzz n :=
-       freq [ (1, ret 0) ; (1, arbitrary) ]
+       match n with
+       | O => arbitrary
+       | _ => freq [ (1, ret 0) ; (1, arbitrary) ]
+       end
   |}.
 
 Global Instance fuzzyZ : Fuzzy Z :=
   {| fuzz n :=
-       freq [ (1, ret Z0) ; (1, arbitrary) ]
+       match n with
+       | Z0 => arbitrary
+       | _ => freq [ (1, ret Z0) ; (1, arbitrary) ]
+       end
   |}.
 
 Global Instance fuzzList {A} `{Gen A} `{Fuzzy A} : Fuzzy (list A) :=
