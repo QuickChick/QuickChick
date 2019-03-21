@@ -45,7 +45,9 @@ let id_of_name n =
 type coq_expr = constr_expr (* Opaque *)
 
 let debug_coq_expr (c : coq_expr) : unit =
-  msg_debug (pr_constr_expr c)
+  let env = Global.env () in
+  let sigma = Evd.from_env env in
+  msg_debug (pr_constr_expr env sigma c)
 
 let debug_constr env sigma (c : constr) : unit = 
   msg_debug (Printer.safe_pr_constr_env env sigma c ++ fnl ())
