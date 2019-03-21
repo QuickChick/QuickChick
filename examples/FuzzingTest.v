@@ -13,6 +13,14 @@ Definition removeP (xl : nat * list nat) : option bool :=
 Definition fuzzer := (fun _ : unit => fuzzLoop arbitrary fuzz show removeP).
 FuzzQC removeP (fuzzer tt). 
 
+Inductive Foo :=
+| Foo0 : Foo
+| Foo1 : Foo -> Foo
+| Foo2 : nat -> Foo -> Foo
+| Foo3 : Foo -> nat -> Foo.
+Derive Arbitrary for Foo.
+Derive Fuzzy for Foo.
+
 Inductive Tree :=
 | Leaf : Tree
 | Node : nat -> Tree -> Tree -> Tree.

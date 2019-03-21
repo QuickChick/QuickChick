@@ -186,7 +186,7 @@ static u32 count_bytes(u8* mem) {
 
   }
 
-  printf("Counted Bytes: %d\n", ret);
+  //printf("Counted Bytes: %d\n", ret);
   return ret;
 
 }

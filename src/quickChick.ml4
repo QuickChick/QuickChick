@@ -367,8 +367,10 @@ let qcFuzz prop fuzzLoop =
   in
   Extraction_plugin.Table.extract_constant_inline false prop_ref [] prop_name;
 
+(*
   List.iter (fun x -> print_endline (string_of_qualid
-                                       ((match qualid_of_reference x with {CAst.v = q; _} -> q)))) !extract_manually; 
+                                       ((match qualid_of_reference x with {CAst.v = q; _} -> q)))) !extract_manually;
+                                       *)      
   List.iter (fun r ->
       match GenericLib.dt_rep_from_mib (GenericLib.reference_to_mib r) with
       | Some (ty_ctr, ty_params, ctrs) -> begin
@@ -521,7 +523,7 @@ let _ =
   if (Sys.command cmp_cmd_main <> 0) then
     (CErrors.user_err (str "Could not compile main program" ++ fnl ()));
   
-  ignore (Sys.command (temp_dir ^ "/main_exec " ^ temp_dir ^ "/qc_exec"))
+  ignore (Sys.command ("time " ^ temp_dir ^ "/main_exec " ^ temp_dir ^ "/qc_exec"))
   (* open linked ocaml files 
   List.iter (fun (s : string * string) ->
       let (fn, c) = s in

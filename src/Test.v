@@ -418,7 +418,7 @@ Fixpoint fuzzLoopAux {A} (fuel : nat) (st : State)
     let a := run g size rnd1 in
     (* TODO: These recursive calls are a place to hold depth/handicap information as well.*)
     let '(res, (is_interesting, energy)) := withInstrumentation (fun _ : unit => prop a) in
-    let zero_0 := trace (show res ++ nl) 0 in
+    let zero_0 := 0 in (* trace (show res ++ nl) 0 in*)
     match res with                                                     
       | Some true =>
         if is_interesting then

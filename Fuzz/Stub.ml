@@ -116,8 +116,9 @@ let calc_energy time size result =
   let energy_capped_bot =
     if energy_capped_top < havoc_min then havoc_min
     else energy_capped_top in
-  
-  Float.to_int energy_capped_bot
+
+  let multiplier = 10 in
+  10 * (Float.to_int energy_capped_bot)
     
 let withInstrumentation f =
   (* Reset the C-array bitmap. *)
@@ -130,17 +131,19 @@ let withInstrumentation f =
   let result = f () in
   let stop_time = Sys.time () in
 
+  (*
   (match result with
   | Some b -> Printf.printf "%b\n" b; flush stdout
   | None -> Printf.printf "Discard\n"; flush stdout
   );
+   *)
   
   (* Update total time (in us) *)
   let time = Float.to_int ((stop_time -. cur_time) *. 1000000.0) in
   total_time := !total_time + time;
   incr total_time_cnt;
 
-  Printf.printf "%d\n" (count_non_virgin_bytes ());
+  (* Printf.printf "%d\n" (count_non_virgin_bytes ()); *)
   
   (* Check for new paths *)
   let new_paths = has_new_bits () in
