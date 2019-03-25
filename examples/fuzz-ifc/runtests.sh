@@ -6,7 +6,7 @@ for i in `seq 0 19`; do
             echo "Handling : ${prop} ${mode} exp_result_fuzz ${i}"
             cp Driver.v Tmp.v
 	    echo -e "\nFuzzChick (testMutantX prop_${prop}_${mode} exp_result_fuzz ${i})." >> Tmp.v
-            coqc Tmp.v -Q . QuickChick.ifcbasic &> output/fuzz_seeded_${prop}_${mode}_${i}.out
+            coqc Tmp.v -Q . QuickChick.ifcbasic &> output/fuzz_arbitrary_1h_${i}.out 
         done
     done
 done

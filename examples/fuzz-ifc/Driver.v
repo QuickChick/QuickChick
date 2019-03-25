@@ -313,7 +313,6 @@ Definition fuzz_variation (v : Variation) : G Variation :=
   bindGen (fuzz st2) (fun st2' =>
   returnGen (V st1' st2'))).
   
-Extract Constant defNumTests => "10000000".
 
 Definition prop_SSNI_arbitrary t r :=
    (prop SSNI gen_variation_arbitrary t r).
@@ -346,5 +345,8 @@ Definition gen_variation_copy :=
 Definition es : string := "".
 
 ManualExtract [Instruction; Label; Atom; Stack; State; Variation].
+Extract Constant defNumTests => "10000000".
+QuickChickTimeout 3600.
+
 
 

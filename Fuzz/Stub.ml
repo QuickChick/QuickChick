@@ -117,7 +117,7 @@ let calc_energy time size result =
     if energy_capped_top < havoc_min then havoc_min
     else energy_capped_top in
 
-  let multiplier = 10 in
+  let multiplier = 100 in
   10 * (Float.to_int energy_capped_bot)
     
 let withInstrumentation f =
