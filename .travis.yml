@@ -5,7 +5,6 @@ cache:
   directories:
   - $HOME/.opam
   - $HOME/Library/Caches/Homebrew
-  timeout: 1000
 env:
   global:
   - NJOBS=2
@@ -29,7 +28,7 @@ install:
 - eval $(opam config env)
 - opam config var root
 - opam repo add coq-released https://coq.inria.fr/opam/released || true
-- opam pin coq 8.7.2
+- opam update
 - opam upgrade
 - opam list
 - ocamlc -v
@@ -37,38 +36,37 @@ install:
 script:
 - set -e
 - echo 'Building QuickChick...';
-  echo -en 'travis_fold:start:QuickChick.build';
-  opam update;
+  echo -e 'travis_fold:start:QuickChick.build';
   opam install .;
-  echo -en 'travis_fold:end:QuickChick.build'
+  echo -e 'travis_fold:end:QuickChick.build'
 - echo 'Testing IFC...';
-  echo -en 'travis_fold:start:QuickChick.test.ifc-basic';
+  echo -e 'travis_fold:start:QuickChick.test.ifc-basic';
   make -C examples/ifc-basic;
-  echo -en 'travis_fold:end:QuickChick.test.ifc-basic'
+  echo -e 'travis_fold:end:QuickChick.test.ifc-basic'
 - echo 'Testing Red-black tree...';
-  echo -en 'travis_fold:start:QuickChick.test.RedBlack';
+  echo -e 'travis_fold:start:QuickChick.test.RedBlack';
   make -C examples/RedBlack;
-  echo -en 'travis_fold:end:QuickChick.test.RedBlack'
+  echo -e 'travis_fold:end:QuickChick.test.RedBlack'
 - echo 'Testing STLC...';
-  echo -en 'travis_fold:start:QuickChick.test.stlc';
+  echo -e 'travis_fold:start:QuickChick.test.stlc';
   make -C examples/stlc;
-  echo -en 'travis_fold:end:QuickChick.test.stlc'
+  echo -e 'travis_fold:end:QuickChick.test.stlc'
 - echo 'Testing Multifile Mutation...';
-  echo -en 'travis_fold:start:QuickChick.test.multifile-mutation';
+  echo -e 'travis_fold:start:QuickChick.test.multifile-mutation';
   make -C examples/multifile-mutation test;
-  echo -en 'travis_fold:end:QuickChick.test.multifile-mutation'
+  echo -e 'travis_fold:end:QuickChick.test.multifile-mutation'
 - echo 'Testing C Mutation...';
-  echo -en 'travis_fold:start:QuickChick.test.c-mutation';
+  echo -e 'travis_fold:start:QuickChick.test.c-mutation';
   make -C examples/c-mutation test;
-  echo -en 'travis_fold:end:QuickChick.test.c-mutation'
+  echo -e 'travis_fold:end:QuickChick.test.c-mutation'
 - echo 'Removing QuickChick...';
-  echo -en 'travis_fold:start:QuickChick.remove';
-  opam remove .;
-  echo -en 'travis_fold:end:QuickChick.remove'
+  echo -e 'travis_fold:start:QuickChick.remove';
+  opam remove coq-quickchick;
+  echo -e 'travis_fold:end:QuickChick.remove'
 
 before_cache:
 - if [ $TRAVIS_OS_NAME = osx ]; then brew cleanup; fi
-- rm -rf $HOME/.opam/log
+- opam clean
 
 notifications:
   slack:
