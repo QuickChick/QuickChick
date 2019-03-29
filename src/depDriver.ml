@@ -35,16 +35,16 @@ let derivable_to_string = function
 let mk_instance_name der tn =
   var_to_string (fresh_name ((derivable_to_string der) ^ tn))
 
-let derive_dependent ~(pstate : Proof_global.t option)
-                     (class_name : derivable)
-                     (constructor : constr_expr)
-                     (umap : range UM.t)
-                     (tmap : dep_type UM.t)
-                     (input_names : var list)
-                     (input_ranges : range list)
-                     (ty_ctr, ty_params, ctrs, dep_type)
-                     (letbinds : var list option)
-                     (result : unknown) =
+let derive_dependent ~(ontop : Lemmas.t option)
+                      (class_name : derivable)
+                      (constructor : constr_expr)
+                      (umap : range UM.t)
+                      (tmap : dep_type UM.t)
+                      (input_names : var list)
+                      (input_ranges : range list)
+                      (ty_ctr, ty_params, ctrs, dep_type)
+                      (letbinds : var list option)
+                      (result : unknown) =
   let ctr_name = 
     match constructor with 
     | { CAst.v = CRef (r,_); _ } -> string_of_qualid r
@@ -223,7 +223,7 @@ let derive_dependent ~(pstate : Proof_global.t option)
   msg_debug (str "Instance Type: " ++ fnl ());
   debug_coq_expr (instance_type [gInject "input0"; gInject "input1"]);
 
-  declare_class_instance ~pstate instance_arguments instance_name instance_type instance_record
+  declare_class_instance ~ontop instance_arguments instance_name instance_type instance_record
 ;;
 
                           
@@ -287,7 +287,7 @@ let create_t_and_u_maps explicit_args dep_type actual_args : (range UM.t * dep_t
    - checker-based classes only include the name of the predicate "P". All arguments to P will
      be considered Fixed inputs
  *)
-let dep_dispatch ~pstate ind class_name : Proof_global.t option = 
+let dep_dispatch ~ontop ind class_name : Lemmas.t option = 
   match ind with 
   | { CAst.v = CLambdaN ([CLocalAssum ([{ CAst.v = Names.Name id; CAst.loc = _loc2 }], _kind, _type)], body); _ } -> (* {CAst.v = CApp ((_flag, constructor), args) }) } -> *)
 
@@ -356,7 +356,7 @@ let dep_dispatch ~pstate ind class_name : Proof_global.t option =
     let input_ranges = List.map (fun v -> Unknown v) input_names in
     
     (* Call the derivation dispatcher *)
-    derive_dependent ~pstate class_name constructor init_umap init_tmap
+    derive_dependent ~ontop class_name constructor init_umap init_tmap
       input_names input_ranges
       (ty_ctr, ty_params, ctrs, dep_type) letbinds idu 
   | { CAst.v = CApp ((_flag, constructor), args); _ } ->
@@ -382,7 +382,7 @@ let dep_dispatch ~pstate ind class_name : Proof_global.t option =
     let umap = UM.add result (Ctr (injectCtr "Coq.Init.Datatypes.true", [])) umap in
     let tmap = UM.add result (DTyCtr (ctr_to_ty_ctr (injectCtr "Coq.Init.Datatypes.bool"), [])) tmap in
 
-    derive_dependent ~pstate class_name constructor umap tmap input_names input_ranges
+    derive_dependent ~ontop class_name constructor umap tmap input_names input_ranges
       (ty_ctr, ty_params, ctrs, dep_type) None result
   | _ -> qcfail "wrongformat/driver.mlg"
 

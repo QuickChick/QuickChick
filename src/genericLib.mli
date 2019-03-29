@@ -230,17 +230,18 @@ val fold_ty_vars : (var list -> var -> coq_type -> 'a) -> ('a -> 'a -> 'a) -> 'a
 (* val defineConstant : string -> coq_expr -> var
    val defineTypedConstant : string -> coq_expr -> coq_expr -> var *)
 val declare_class_instance
-  : ?global:bool -> ?priority:int
-  -> pstate:Proof_global.t option -> arg list -> string -> (var list -> coq_expr) -> (var list -> coq_expr)
-  -> Proof_global.t option
+  : ?global:bool
+  -> ?priority:int
+  -> ontop:Lemmas.t option -> arg list -> string -> (var list -> coq_expr) -> (var list -> coq_expr)
+  -> Lemmas.t option
 
 (* List utils *)
-val list_last : 'a list -> 'a 
-val list_init : 'a list -> 'a list 
+val list_last : 'a list -> 'a
+val list_init : 'a list -> 'a list
 val list_drop_every : int -> 'a list -> 'a list
 val take_last : 'a list -> 'a list -> ('a list * 'a)
 val list_insert_nth : 'a -> 'a list -> int -> 'a list
 
 val sameTypeCtr  : ty_ctr -> coq_type -> bool
 val isBaseBranch : ty_ctr -> coq_type -> bool
-                                                
+
