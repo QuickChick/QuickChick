@@ -53,10 +53,13 @@ Require Export Typeclasses.
 Require Export Mutation.
 Export GenLow GenHigh.
 
+Global Unset Asymmetric Patterns.
+Global Set Bullet Behavior "Strict Subproofs".
+
 (* TODO: Figure out better place for these *)
 (* String and Ascii Instances *)
 
-Require Import Ascii String.
+Require Export Ascii String.
 
 (* Derive (Arbitrary, Show) for ascii. *)
 
