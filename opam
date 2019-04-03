@@ -1,26 +1,26 @@
-opam-version: "1.2"
+opam-version: "2.0"
 name: "coq-quickchick"
 version: "1.0.0"
 maintainer: "llamp@seas.upenn.edu"
 synopsis: "Randomized Property-Based Testing Plugin for Coq"
 
 homepage: "https://github.com/QuickChick/QuickChick"
-dev-repo: "https://github.com/QuickChick/QuickChick.git"
+dev-repo: "git+https://github.com/QuickChick/QuickChick.git"
 bug-reports: "https://github.com/QuickChick/QuickChick/issues"
 license: "MIT"
 
 build: [ make "-j%{jobs}%" ]
 install: [ make "install" ]
-remove: [ [ "rm" "-rf" "%{lib}%/coq/user-contrib/QuickChick" ]
-          [ "rm" "-f" "`which quickChick | grep opam`" ] ]
+remove: [ [ make "uninstall" ]
+          [ "rm" "%{bin}%/quickChick"] ]
 depends: [
+  "ocaml" {>= "4.04.0"}
   "coq" {>= "8.7" < "8.8~"}
   "coq-ext-lib"
   "coq-mathcomp-ssreflect"
   "ocamlbuild"
   "ocamlfind"
 ]
-available: [ ocaml-version >= "4.04.0" ]
 
 authors: [
   "Leonidas Lampropoulos <>"
@@ -31,3 +31,4 @@ authors: [
   "Arthur Azevedo de Amorim <>"
   "Antal Spector-Zabusky <>"
 ]
+flags: light-uninstall

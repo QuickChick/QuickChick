@@ -10,6 +10,7 @@ env:
   - NJOBS=2
   - OPAMVERBOSE=1
   - OPAMYES=true
+  - COQ=8.7.2
   matrix:
   - OCAML_VERSION=4.04
   - OCAML_VERSION=4.07
@@ -29,6 +30,8 @@ install:
 - opam config var root
 - opam repo add coq-released https://coq.inria.fr/opam/released || true
 - opam update
+- opam unpin . || true
+- opam pin coq $COQ
 - opam upgrade
 - opam list
 - ocamlc -v
@@ -61,7 +64,7 @@ script:
   echo -e 'travis_fold:end:QuickChick.test.c-mutation'
 - echo 'Removing QuickChick...';
   echo -e 'travis_fold:start:QuickChick.remove';
-  opam remove coq-quickchick;
+  opam remove .;
   echo -e 'travis_fold:end:QuickChick.remove'
 
 before_cache:
