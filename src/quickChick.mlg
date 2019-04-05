@@ -33,7 +33,13 @@ let qid = Libnames.make_qualid (DirPath.make [Id.of_string "QuickChick"]) (Id.of
 let qid = qualid_of_string "QuickChick.QuickChick"
 				*)
 let path =
-  lazy (let (_,_,path) = Library.locate_qualified_library ~warn:false qid in path)
+  lazy (
+    match Loadpath.locate_qualified_library ~warn:false qid with
+    | Ok (_,_,path) -> path
+    | Error _ ->
+      CErrors.user_err (Pp.str "cannot locate QuickChick Coq library")
+  )
+
 let path = lazy (Filename.dirname (Lazy.force path))
 
 (* [mkdir -p]: recursively make the parent directories if they do not exist. *)
