@@ -34,6 +34,8 @@ _qc_*.tmp
 quickChickTool
 .DS_Store
 _build/
+src/.merlin
+*.install
 quickChickTool.byte
 src/driver.ml
 src/quickChick.ml

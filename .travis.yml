@@ -17,6 +17,18 @@ matrix:
   fast_finish: true
   allow_failures:
     - os: osx
+  include:
+    - os: linux
+      env:
+        - OCAML_VERSION=4.07
+      script: |
+        set -e
+        opam pin add dune --dev
+        opam install --deps-only .
+        dune build
+        ls -l quickchick.install
+        cat quickchick.install
+
 os:
     - linux
     - osx
