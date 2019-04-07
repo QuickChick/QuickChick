@@ -150,7 +150,7 @@ let checkerSizedST
 
   (* Unused, not exported... *)
   (* Fully applied type constructor *)
-  let full_dt = gApp ~explicit:true coqTyCtr coqTyParams in
+  let _full_dt = gApp ~explicit:true coqTyCtr coqTyParams in
 
   (* The type we are generating for -- not the predicate! *)
   let full_gtyp = (gType ty_params (UM.find result init_tmap)) in

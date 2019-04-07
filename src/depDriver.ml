@@ -3,7 +3,6 @@ open Libnames
 open Util
 open Constrexpr
 open GenericLib
-open GenLib
 open ArbitrarySizedST
 open CheckerSizedST
 open Error
@@ -74,10 +73,10 @@ let derive_dependent ~(pstate : Proof_global.t option)
   in
 
   (* The type we are generating for -- not the predicate! *)
-  let full_gtyp = gType ty_params (UM.find result tmap) in
+  let _full_gtyp = gType ty_params (UM.find result tmap) in
 
-  let gen_needed = [] in
-  let dec_needed = [] in
+  let _gen_needed = [] in
+  let _dec_needed = [] in
 
   (* The dependent generator  *)
   let gen =
@@ -243,7 +242,7 @@ let create_t_and_u_maps explicit_args dep_type actual_args : (range UM.t * dep_t
     | DArrow (dt1, dt2), arg::args' ->
        msg_debug (str ("populating with: " ^ dep_type_to_string dt1) ++ fnl ());
        begin match arg with
-       | ({ CAst.v = CRef (r,_) }, _) ->
+       | ({ CAst.v = CRef (r,_); _ }, _) ->
           begin 
             let current_r = Unknown.from_string (string_of_qualid r ^ "_") in
             (* Lookup if the reference is meant to be generated *)
@@ -290,17 +289,17 @@ let create_t_and_u_maps explicit_args dep_type actual_args : (range UM.t * dep_t
  *)
 let dep_dispatch ~pstate ind class_name : Proof_global.t option = 
   match ind with 
-  | { CAst.v = CLambdaN ([CLocalAssum ([{ CAst.v = Name id; CAst.loc = _loc2 }], _kind, _type)], body) } -> (* {CAst.v = CApp ((_flag, constructor), args) }) } -> *)
+  | { CAst.v = CLambdaN ([CLocalAssum ([{ CAst.v = Name id; CAst.loc = _loc2 }], _kind, _type)], body); _ } -> (* {CAst.v = CApp ((_flag, constructor), args) }) } -> *)
 
     let idu = Unknown.from_string (Names.Id.to_string id ^ "_") in
      
     (* Extract (x1,x2,...) if any, P and arguments *)
     let (letbindsM, constructor, args) =
       match body with 
-      | { CAst.v = CApp ((_flag, constructor), args) } -> (None, constructor, args)
+      | { CAst.v = CApp ((_flag, constructor), args); _ } -> (None, constructor, args)
       | { CAst.v = CLetTuple (name_list, _,
                               _shouldbeid,
-                              { CAst.v = CApp ((_flag, constructor), args) } )} ->
+                              { CAst.v = CApp ((_flag, constructor), args); _ } ); _} ->
          ( Some (List.map (function { CAst.v = name; _ } -> name ) name_list), constructor, args )
     in
 
@@ -353,14 +352,14 @@ let dep_dispatch ~pstate ind class_name : Proof_global.t option =
     UM.iter (fun x r -> msg_debug (str ("Bound: " ^ (var_to_string x) ^ " to Range: " ^ (range_to_string r)) ++ fnl ())) init_umap;
 
     (* When we add constructors to the ranges, this needs to change *)
-    let input_names = List.map (fun ({CAst.v = CRef (r, _)},_) -> fresh_name (string_of_qualid r ^ "_")) args in
+    let input_names = List.map (fun ({CAst.v = CRef (r, _); _},_) -> fresh_name (string_of_qualid r ^ "_")) args in
     let input_ranges = List.map (fun v -> Unknown v) input_names in
     
     (* Call the derivation dispatcher *)
     derive_dependent ~pstate class_name constructor init_umap init_tmap
       input_names input_ranges
       (ty_ctr, ty_params, ctrs, dep_type) letbinds idu 
-  | { CAst.v = CApp ((_flag, constructor), args) } ->
+  | { CAst.v = CApp ((_flag, constructor), args); _ } ->
 
      msg_debug (str "Parsing constructor information for checker" ++ fnl ());
      
@@ -372,7 +371,7 @@ let dep_dispatch ~pstate ind class_name : Proof_global.t option =
     in
 
     (* When we add constructors to the ranges, this needs to change *)
-    let input_names = List.map (fun ({CAst.v = CRef (r, _)},_) -> fresh_name (string_of_qualid r ^ "_")) args in
+    let input_names = List.map (fun ({CAst.v = CRef (r, _); _},_) -> fresh_name (string_of_qualid r ^ "_")) args in
     let input_ranges = List.map (fun v -> Unknown v) input_names in
 
     (* Call the actual creation function *)

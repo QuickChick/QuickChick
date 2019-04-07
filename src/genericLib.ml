@@ -1,4 +1,3 @@
-open Vernacexpr
 open Decl_kinds
 open Pp
 open Constr
@@ -17,15 +16,15 @@ let cnt = ref 0
 let fresh_name n : Id.t =
     let base = Id.of_string n in
 
-  (** [is_visible_name id] returns [true] if [id] is already
-      used on the Coq side. *)
+  (* [is_visible_name id] returns [true] if [id] is already
+     used on the Coq side. *)
     let is_visible_name id =
       try
         ignore (Nametab.locate (Libnames.qualid_of_ident id));
         true
       with Not_found -> false
     in
-    (** Safe fresh name generation. *)
+    (* Safe fresh name generation. *)
     Namegen.next_ident_away_from base is_visible_name
 
 let make_up_name () : Id.t =
@@ -83,8 +82,8 @@ type arg = local_binder_expr
 let gArg ?assumName:(an=hole) ?assumType:(at=hole) ?assumImplicit:(ai=false) ?assumGeneralized:(ag=false) _ =
   let n = match an with
     | { CAst.v = CRef (qid, _); loc } -> (loc,Name (qualid_basename qid))
-    | { CAst.v = CHole (v,_,_); loc } -> (loc,Anonymous)
-    | a -> failwith "This expression should be a name" in
+    | { CAst.v = CHole (_v,_,_); loc } -> (loc,Anonymous)
+    | _a -> failwith "This expression should be a name" in
   CLocalAssum ( [CAst.make ?loc:(fst n) @@ snd n],
                   (if ag then Generalized (Implicit, Implicit, false)                       
                    else if ai then Default Implicit else Default Explicit),
@@ -92,7 +91,7 @@ let gArg ?assumName:(an=hole) ?assumType:(at=hole) ?assumImplicit:(ai=false) ?as
 
 let arg_to_var (x : arg) =
   match x with
-  | CLocalAssum ([{CAst.v = id; loc}], _ ,_ ) -> id_of_name id
+  | CLocalAssum ([{CAst.v = id; _}], _ ,_ ) -> id_of_name id
   | _ -> qcfail "arg_to_var must be named"
   
 let str_lst_to_string sep (ss : string list) = 
@@ -352,7 +351,7 @@ let qualid_to_mib r =
     
 let coerce_reference_to_dt_rep c = 
   let r = match c with
-    | { CAst.v = CRef (r,_) } -> r
+    | { CAst.v = CRef (r,_);_ } -> r
     | _ -> failwith "Not a reference"
   in
 
@@ -543,7 +542,7 @@ let dep_dt_from_mib mib =
 
 let coerce_reference_to_dep_dt c = 
   let r = match c with
-    | { CAst.v = CRef (r,_) } -> r
+    | { CAst.v = CRef (r,_); _ } -> r
     | _ -> failwith "Not a reference" in
 
   let env = Global.env () in
@@ -563,7 +562,7 @@ let gApp ?explicit:(expl=false) c cs =
   else mkAppC (c, cs)
 
 let gProdWithArgs args f_body =
-  let xvs = List.map (fun (CLocalAssum ([{CAst.v = n}], _, _)) ->
+  let xvs = List.map (fun (CLocalAssum ([{CAst.v = n;_}], _, _)) ->
                       match n with
                       | Name x -> x
                       | _ -> make_up_name ()
@@ -572,7 +571,7 @@ let gProdWithArgs args f_body =
   mkCProdN args fun_body
 
 let gFunWithArgs args f_body =
-  let xvs = List.map (fun (CLocalAssum ([{CAst.v = n}], _, _)) ->
+  let xvs = List.map (fun (CLocalAssum ([{CAst.v = n;_}], _, _)) ->
                       match n with
                       | Name x -> x
                       | _ -> make_up_name ()
@@ -603,7 +602,7 @@ let gFunTyped xts (f_body : var list -> coq_expr) =
 (* with Explicit/Implicit annotations *)  
 let gRecFunInWithArgs ?assumType:(typ=hole) (fs : string) args (f_body : (var * var list) -> coq_expr) (let_body : var -> coq_expr) = 
   let fv  = fresh_name fs in
-  let xvs = List.map (fun (CLocalAssum ([{CAst.v = n}], _, _)) ->
+  let xvs = List.map (fun (CLocalAssum ([{CAst.v = n;_}], _, _)) ->
                       match n with
                       | Name x -> x
                       | _ -> make_up_name ()

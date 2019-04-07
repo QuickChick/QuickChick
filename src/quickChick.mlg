@@ -1,6 +1,5 @@
 {
 
-open Ltac_plugin
 open Pp
 open Names
 open Entries
@@ -85,21 +84,21 @@ let comp_mli_cmd fn =
 let fresh_name n =
     let base = Id.of_string n in
 
-  (** [is_visible_name id] returns [true] if [id] is already
-      used on the Coq side. *)
+    (* [is_visible_name id] returns [true] if [id] is already used on
+       the Coq side. *)
     let is_visible_name id =
       try
         ignore (Nametab.locate (Libnames.qualid_of_ident id));
         true
       with Not_found -> false
     in
-    (** Safe fresh name generation. *)
+    (* Safe fresh name generation. *)
     Namegen.next_ident_away_from base is_visible_name
 
 (** [define c] introduces a fresh constant name for the term [c]. *)
 let define c env evd =
   let (evd,_) = Typing.type_of env evd c in
-  let univs = Evd.const_univ_entry ~poly:true evd in
+  let univs = Evd.univ_entry ~poly:true evd in
   let fn = fresh_name "quickchick" in
   (* TODO: Maxime - which of the new internal flags should be used here? The names aren't as clear :) *)
   ignore (declare_constant ~internal:InternalTacticRequest fn
@@ -117,7 +116,7 @@ let new_ml_file () =
   Filename.temp_file ~temp_dir "QuickChick" ".ml"
 
 let define_and_run c env evd =
-  (** Extract the term and its dependencies *)
+  (* Extract the term and its dependencies *)
   let main = define c env evd in
   let mlf = new_ml_file () in
   let execn = Filename.chop_extension mlf in
@@ -127,7 +126,7 @@ let define_and_run c env evd =
   CWarnings.set_flags mute_extraction;
   Flags.silently (Extraction_plugin.Extract_env.full_extraction (Some mlf)) [qualid_of_ident main];
   CWarnings.set_flags warnings;
-  (** Add a main function to get some output *)
+  (* Add a main function to get some output *)
   let oc = open_out_gen [Open_append;Open_text] 0o666 mlf in
   let for_output =
     "\nlet _ = print_string (\n" ^
@@ -144,12 +143,12 @@ let define_and_run c env evd =
   let perl_cmd = "perl -i -p0e 's/type int =\\s*int/type tmptmptmp = int\\ntype int = tmptmptmp/sg' " ^ mlf in
   if Sys.command perl_cmd <> 0 then
     CErrors.user_err (str ("perl script hack failed. Report: " ^ perl_cmd)  ++ fnl ());
-  (** Compile the extracted code *)
-  (** Extraction sometimes produces ML code that does not implement its interface.
-      We circumvent this problem by erasing the interface. **)
+  (* Compile the extracted code *)
+  (* Extraction sometimes produces ML code that does not implement its interface.
+     We circumvent this problem by erasing the interface. **)
   Sys.remove mlif;
   (* TODO: Maxime, thoughts? *)
-  (** LEO: However, sometimes the inferred types are too abstract. So we touch the .mli to close the weak types. **)
+  (* LEO: However, sometimes the inferred types are too abstract. So we touch the .mli to close the weak types. **)
   let _exit_code = Sys.command ("touch " ^ mlif) in
   (*
   Printf.printf "Extracted ML file: %s\n" mlf;
@@ -159,9 +158,9 @@ let define_and_run c env evd =
   (* Compile the (empty) .mli *)
   if Sys.command (comp_mli_cmd mlif) <> 0 then CErrors.user_err (str "Could not compile mli file" ++ fnl ());
   if Sys.command (comp_ml_cmd mlf execn) <> 0 then
-    (CErrors.user_err (str "Could not compile test program" ++ fnl ()); None)
+    CErrors.user_err (str "Could not compile test program" ++ fnl ())
 
-  (** Run the test *)
+  (* Run the test *)
   else
     (* Should really be shared across this and the tool *)
     let chan = Unix.open_process_in execn in
@@ -196,14 +195,14 @@ let define_and_run c env evd =
 
 (* TODO: clean leftover files *)
 let runTest c env evd =
-  (** [c] is a constr_expr representing the test to run,
-      so we first build a new constr_expr representing
-      show c **)
+  (* [c] is a constr_expr representing the test to run,
+     so we first build a new constr_expr representing
+     show c **)
   let c = CAst.make @@ CApp((None,show), [(c,None)]) in
-  (** Build the kernel term from the const_expr *)
+  (* Build the kernel term from the const_expr *)
 
   (*  Printf.printf "Before interp constr\n"; flush stdout; *)
-  
+
   let (c,_evd) = interp_constr env evd c in
 
   (* Printf.printf "So far so good?\n"; flush stdout; *)

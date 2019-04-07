@@ -21,14 +21,14 @@ let sizeSMon arg iargs  =
       subset_set_eq_compat
         (semBindSize hole hole hole)
         (semBindSize hole hole hole)
-        (incl_bigcup_compat h (gFun [x] (fun [x] -> proof ih hleq ty2 (n+1))))
+        (incl_bigcup_compat h (gFun [x] (fun [_x] -> proof ih hleq ty2 (n+1))))
     | _ -> set_incl_refl
   in
 
   let rec genCase ih hleq ctrs =
     match ctrs with
     | [] -> set_incl_refl
-    | (ctr, ty) :: ctrs' ->
+    | (_ctr, ty) :: ctrs' ->
       let gproof =
         if isBaseBranch arg._ty_ctr ty then set_incl_refl
         else
@@ -88,7 +88,7 @@ let sizeSMon arg iargs  =
     let (rg, rgs) = ind_gens s2 in
     match arg._ctrs with
     | [] -> failwith "Empty type"
-    | [(ctr, ty)] -> (* Only one constructor -- should be a base case *)
+    | [(_ctr, _ty)] -> (* Only one constructor -- should be a base case *)
       set_incl_refl
     | _ ->
       (subset_set_eq_compat
@@ -100,7 +100,7 @@ let sizeSMon arg iargs  =
   let rec seq_incl_proof ctrs =
     match ctrs with
     | [] -> incl_refl
-    | (ctr, ty') :: ctrs' ->
+    | (_ctr, ty') :: ctrs' ->
       (if isBaseBranch arg._ty_ctr ty' then
          incl_hd_same
        else
@@ -110,17 +110,17 @@ let sizeSMon arg iargs  =
   let base_case s s2 =
     match arg._ctrs with
     | [] -> failwith "Empty type"
-    | [(ctr, ty)] -> (* Only one constructor -- should be a base case *)
+    | [(_ctr, _ty)] -> (* Only one constructor -- should be a base case *)
       set_incl_refl
     | _ :: _ ->
       match bases with
       | [] -> failwith "No base case!"
-      | [(ctr, ty)] -> (* Only on base case and at least one inductive *)
+      | [(_ctr, _ty)] -> (* Only on base case and at least one inductive *)
         let (ig, igs) = ind_gens s2 in
         let rec proof ctrs =
           match ctrs with
           | [] -> failwith "Could not find the constructor"
-          | (ctr', ty') :: ctrs' ->
+          | (_ctr', ty') :: ctrs' ->
             (* found the constructor *)
             if isBaseBranch arg._ty_ctr ty' then
               subset_respects_set_eq_r
@@ -190,10 +190,10 @@ let sizeSMon arg iargs  =
            [ret_type1 (gVar s);
             (gApp ~explicit:true (gInject "nat_ind")
                [ret_type2 (gVar s) (gInt 0);
-                gFun ["Hleq"] (fun [h] -> set_incl_refl);
+                gFun ["Hleq"] (fun [_h] -> set_incl_refl);
                 gFun
                   ["s2"; "IHs2"; "Hleq"]
-                  (fun [s2; ihs2; hleq] -> base_case (gVar s) s2)
+                  (fun [s2; _ihs2; _hleq] -> base_case (gVar s) s2)
                ]
             );
             (gFun
@@ -204,7 +204,7 @@ let sizeSMon arg iargs  =
                     gFun ["Hleq"] (fun [hleq] -> false_ind hole (lt0_False (gVar hleq)));
                     gFun
                       ["s2"; "IHs2"; "Hleq"]
-                        (fun [s2; ihs2; hleq] ->
+                        (fun [s2; _ihs2; hleq] ->
                           ind_case (gVar s) s1 s2 (gVar ihs1) (gVar hleq))
                    ]
                )

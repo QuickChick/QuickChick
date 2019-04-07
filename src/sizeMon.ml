@@ -20,7 +20,7 @@ let sizeMon arg size iargs genName =
           g is SizeMonotonic and the function recursively.
         *)
       gApp ~explicit:true (gInject "bindMonotonic")
-        [hole; hole; hole; hole; h; gFun [x] (fun [x] -> proof ih ty2 (n+1))]
+        [hole; hole; hole; hole; h; gFun [x] (fun [_x] -> proof ih ty2 (n+1))]
     | _ -> returnGenSizeMonotonic hole
   in
 
@@ -30,7 +30,7 @@ let sizeMon arg size iargs genName =
 
     match ctrs with
     | [] -> false_ind hole h
-    | (ctr, ty) :: ctrs' ->
+    | (_ctr, ty) :: ctrs' ->
       gMatch h
         [(injectCtr "or_introl", [hl],
           fun [hl] -> gMatch (gVar hl) [(injectCtr "erefl", [], fun [] -> proof ih ty 0)]);
@@ -52,7 +52,7 @@ let sizeMon arg size iargs genName =
   let base_case =
     match bases with
     | [] -> failwith "Must have base cases"
-    | [(ctr, ty)] -> proof hole ty 0
+    | [(_ctr, ty)] -> proof hole ty 0
     | _ :: _ ->
       (gApp
          (gInject "oneofMonotonic")
@@ -64,7 +64,7 @@ let sizeMon arg size iargs genName =
       (fun [size; ihs] ->
          match arg._ctrs with
          | [] -> failwith "Must have base cases"
-         | [(ctr, ty)] -> proof (gVar ihs) ty 0
+         | [(_ctr, ty)] -> proof (gVar ihs) ty 0
          | _ :: _ ->
            gApp
              (gInject "frequencySizeMonotonic_alt")

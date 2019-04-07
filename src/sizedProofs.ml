@@ -1,24 +1,11 @@
 open Pp
-open Loc
-open Names
-open Tacmach
-open Entries
-open Declarations
-open Declare
-open Libnames
 open Util
-open Constrintern
-open Constrexpr
-open Constrexpr_ops
-open Decl_kinds
 open GenericLib
 open SetLib
 open CoqLib
 open GenLib
 open Error
 open Unify
-
-open Extraction_plugin.Extract_env
 
 type btyp = ((coq_expr -> coq_expr -> int -> (coq_expr * coq_expr) list -> (coq_expr -> coq_expr) -> coq_expr) *
              ((coq_expr -> (coq_expr * coq_expr) list -> coq_expr) -> coq_expr -> (coq_expr * coq_expr) list -> coq_expr))
@@ -60,7 +47,6 @@ let ret_type_dec (s : var) (left : coq_expr) (right : coq_expr) =
   gMatch (gVar s)
     [ (injectCtr "left", ["eq"], fun _ -> left)
     ; (injectCtr "right", ["neq"], fun _ -> right) ]
-
 
 let check_expr (n : int) (scrut : coq_expr) (left : coq_expr) (right : coq_expr) (out_of_fuel : coq_expr) =
   gMatchReturn scrut
@@ -120,16 +106,16 @@ let sizedEqProofs_body
   let coqTyParams = List.map gTyParam ty_params in
 
   (* Fully applied type constructor *)
-  let full_dt = gApp ~explicit:true coqTyCtr coqTyParams in
+  let _full_dt = gApp ~explicit:true coqTyCtr coqTyParams in
 
   (* The type we are generating for -- not the predicate! *)
   let full_gtyp = (gType ty_params (UM.find result init_tmap)) in
 
   (* The type of the dependent generator *)
-  let gen_type = gGen (gOption full_gtyp) in
+  let _gen_type = gGen (gOption full_gtyp) in
 
   (* Inputs as holes *)
-  let hole_inps =
+  let _hole_inps =
     List.map (fun _ -> hole) input_ranges
   in
 

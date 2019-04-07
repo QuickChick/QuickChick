@@ -133,10 +133,10 @@ let arbitrarySizedST
       (rec_name : coq_expr) =
   
   (* type constructor *)
-  let coqTyCtr = gTyCtr gen_ctr in
+  let _coqTyCtr = gTyCtr gen_ctr in
 
   (* parameters of the type constructor *)
-  let coqTyParams = List.map gTyParam ty_params in
+  let _coqTyParams = List.map gTyParam ty_params in
 
   (* The type we are generating for -- not the predicate! *)
   let full_gtyp = (gType ty_params (UM.find result init_tmap)) in

@@ -12,7 +12,7 @@ type derivation = SimpleDer of SimplDriver.derivable list
 
 let simpl_dispatch ~pstate ind classes name1 name2 =
   let ind_name = match ind with
-    | { CAst.v = CRef (r, _) } -> string_of_qualid r
+    | { CAst.v = CRef (r, _); _ } -> string_of_qualid r
     | _ -> failwith "Implement me for functions"
   in
   List.fold_left (fun pstate cn -> SimplDriver.derive ~pstate cn ind (SimplDriver.mk_instance_name cn ind_name) name1 name2) pstate classes
@@ -42,10 +42,10 @@ let class_assoc_table =
 let dispatch ~pstate cn ind name1 name2 =
   let convert_reference_to_string c =
     match c with
-    | {CAst.v = CRef (r, _)} -> string_of_qualid r
+    | {CAst.v = CRef (r, _) ; _} -> string_of_qualid r
     | _ -> failwith "Usage: Derive <class_name> for <inductive_name> OR  Derive (<class_name>, ... , <class_name>) for <inductive_name>" in
   let ss = match cn with
-     | { CAst.v = CNotation (_,([a],[b],_,_)) } -> begin
+     | { CAst.v = CNotation (_,([a],[b],_,_)); _ } -> begin
          let c = convert_reference_to_string a in
          let cs = List.map convert_reference_to_string b in
          c :: cs

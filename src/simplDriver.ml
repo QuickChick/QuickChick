@@ -54,7 +54,7 @@ let derive ~pstate (cn : derivable) (c : constr_expr) (instance_name : string) (
   let full_dt = gApp ~explicit:true coqTyCtr coqTyParams in
 
   let ind_name = match c with
-    | { CAst.v = CRef (r, _) } ->
+    | { CAst.v = CRef (r, _); _ } ->
          string_of_qualid r
     | _ -> failwith "Implement me for functions" 
   in

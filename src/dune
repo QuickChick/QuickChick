@@ -1,7 +1,7 @@
 (library
  (name quickchick_plugin)
  (public_name quickchick.plugin)
- (flags :standard -warn-error -3-8-9-21-26-27-32-33-40-50 -rectypes)
+ (flags :standard -rectypes -w -8-27)
  (modules :standard \ genSTCorrect genSizedSTMonotonic genSizedSTSizeMonotonic)
  (libraries coq.plugins.extraction))
 

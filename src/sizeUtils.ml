@@ -26,6 +26,6 @@ let gen_list (arg : size_inputs) size arb_body (ctr, ty) =
 let rec fst_leq_proof ctrs =
   match ctrs with
   | [] -> forall_nil (gProd hole hole)
-  | c :: ctrs ->
+  | _c :: ctrs ->
      forall_cons (gProd hole hole) ltnOSn_pair (fst_leq_proof ctrs)
 
