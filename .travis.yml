@@ -28,6 +28,7 @@ matrix:
         dune build
         ls -l quickchick.install
         cat quickchick.install
+        make -C examples/multifile-mutation
 
 os:
     - linux
