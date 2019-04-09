@@ -26,8 +26,8 @@ matrix:
         opam pin add dune --dev
         opam install --deps-only .
         dune build
-        ls -l quickchick.install
-        cat quickchick.install
+        # egallego: this should be moved to dune runtest once we have composition
+        dune install quickchick
         make -C examples/multifile-mutation
 
 os:
