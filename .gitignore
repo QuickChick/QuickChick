@@ -31,7 +31,6 @@ Makefile.coq*
 *.opt
 *.byte
 _qc_*.tmp
-quickChickTool
 .DS_Store
 _build/
 src/.merlin
