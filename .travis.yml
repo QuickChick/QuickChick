@@ -25,8 +25,6 @@ matrix:
         - OCAML_VERSION=4.07
       script: |
         set -e
-        opam install --deps-only .
-        opam install dune.1.9.0
         dune build
         # egallego: this should be moved to dune runtest once we have composition
         dune install quickchick
@@ -47,6 +45,7 @@ install:
 - opam repo add coq-extra-dev https://coq.inria.fr/opam/extra-dev || true
 - opam update
 - opam upgrade
+- opam install --deps-only .
 - opam list
 - ocamlc -v
 
