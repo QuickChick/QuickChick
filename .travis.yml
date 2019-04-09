@@ -1,5 +1,7 @@
+dist: xenial
 sudo: required
-language: ocaml
+language: c
+
 cache:
   apt: true
   directories:
