@@ -23,8 +23,8 @@ matrix:
         - OCAML_VERSION=4.07
       script: |
         set -e
-        opam pin add dune --dev
         opam install --deps-only .
+        opam install dune.1.9.0
         dune build
         # egallego: this should be moved to dune runtest once we have composition
         dune install quickchick
