@@ -1,7 +1,6 @@
 %{
 
 open Lexing
-open Parsing
 open QuickChickToolTypes
 
 (*

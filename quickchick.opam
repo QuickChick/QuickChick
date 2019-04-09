@@ -1,28 +1,24 @@
-opam-version: "1.2"
+synopsis: "Randomized Property-Based Testing Plugin for Coq"
+description: "Randomized Property-Based Testing Plugin for Coq"
+opam-version: "2.0"
 name: "coq-quickchick"
 version: "1.0.2"
 maintainer: "llamp@seas.upenn.edu"
-synopsis: "Randomized Property-Based Testing Plugin for Coq"
-
 homepage: "https://github.com/QuickChick/QuickChick"
-dev-repo: "https://github.com/QuickChick/QuickChick.git"
+dev-repo: "git+https://github.com/QuickChick/QuickChick.git"
 bug-reports: "https://github.com/QuickChick/QuickChick/issues"
 license: "MIT"
 
-build: [ make "-j%{jobs}%" ]
-install: [ make "install" ]
-remove: [ [ "rm" "-rf" "%{lib}%/coq/user-contrib/QuickChick" ]
-          [ "rm" "%{bin}%/quickChick"] ]
+build: [ "dune" "build" "-p" name "-j" jobs ]
 depends: [
-  "coq" {= "dev"}
+  "ocaml"                   { >= "4.05.0" }
+  "dune"                    { >= "1.9.0"  }
+  "menhir"
+  "coq"                     {  = "dev"    }
   "coq-ext-lib"
   "coq-mathcomp-ssreflect"
-  "ocamlbuild"
-  "ocamlfind"
-  "menhir"
-  "coq-simple-io" {= "dev"}
+  "coq-simple-io"           {  = "dev"    }
 ]
-available: [ ocaml-version >= "4.04.0" ]
 
 authors: [
   "Leonidas Lampropoulos <>"

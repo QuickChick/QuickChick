@@ -1,5 +1,7 @@
+dist: xenial
 sudo: required
-language: ocaml
+language: c
+
 cache:
   apt: true
   directories:
@@ -17,6 +19,17 @@ matrix:
   fast_finish: true
   allow_failures:
     - os: osx
+  include:
+    - os: linux
+      env:
+        - OCAML_VERSION=4.07
+      script: |
+        set -e
+        dune build
+        # egallego: this should be moved to dune runtest once we have composition
+        dune install quickchick
+        make -C examples/multifile-mutation test
+
 os:
     - linux
     - osx
@@ -32,6 +45,7 @@ install:
 - opam repo add coq-extra-dev https://coq.inria.fr/opam/extra-dev || true
 - opam update
 - opam upgrade
+- opam install --deps-only .
 - opam list
 - ocamlc -v
 

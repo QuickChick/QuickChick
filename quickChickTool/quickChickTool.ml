@@ -194,7 +194,7 @@ let from_Some (o : 'a option) : 'a =
 
 let mutate_outs handle_section input =
   let things_to_check = ref [] in
-  let rec go (sec : section) =
+  let go (sec : section) =
       if handle_section sec.sec_name then begin
         debug "Handling section: %s\n" sec.sec_name;
         let handle_node (n : node) =
@@ -220,7 +220,7 @@ let mutate_outs handle_section input =
         in
         match List.map (fun (info, ss) -> (info, String.concat "" ss))
                 (combine_mutants (List.map handle_node sec.sec_nodes)) with
-        | (info, base) :: mutants -> (base, mutants)
+        | (_info, base) :: mutants -> (base, mutants)
         | [] -> failwith "Internal quickChickTool error: no base mutant after combining"
       end
       else (String.concat "" (List.map output_node sec.sec_nodes), [])
@@ -248,9 +248,8 @@ let gather_all_vs_from_dir fs =
   in loop fs;
   !all_vs
 
-open CoqProject_file
-
 let vs_from_file f =
+  let open CoqProject_file in
   let warning_fn x = Feedback.msg_warning Pp.(str x) in
   let project = CoqProject_file.read_project_file ~warning_fn f in
   List.map (fun s -> match s with {thing = str; _} -> str)

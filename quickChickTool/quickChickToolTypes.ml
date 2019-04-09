@@ -39,10 +39,10 @@ type section =
   ; sec_extends : extend option
   ; sec_nodes   : node list }
   
-let rec output_mutant (m : mutant) : string =
+let output_mutant (m : mutant) : string =
   m.mut_begin ^ m.mut_body ^ m.mut_end
 
-let rec output_node (n : node) : string =
+let output_node (n : node) : string =
   match n with
   | Text s -> s 
   | QuickChick qc ->

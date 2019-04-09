@@ -1,0 +1,8 @@
+(executable
+ (name quickChickTool)
+ (public_name quickChick)
+ (flags -rectypes)
+ (libraries coq.lib))
+
+(ocamllex quickChickToolLexer)
+(menhir (modules quickChickToolParser))

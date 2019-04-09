@@ -1,7 +1,5 @@
 {
-open Lexing
 open QuickChickToolParser
-open QuickChickToolTypes
 
 (* Function to increase line count in lexbuf *)
 let line_incs s lexbuf =

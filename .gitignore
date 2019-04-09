@@ -31,9 +31,10 @@ Makefile.coq*
 *.opt
 *.byte
 _qc_*.tmp
-quickChickTool
 .DS_Store
 _build/
+.merlin
+*.install
 quickChickTool.byte
 src/driver.ml
 src/quickChick.ml
