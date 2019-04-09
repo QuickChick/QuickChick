@@ -28,7 +28,7 @@ matrix:
         dune build
         # egallego: this should be moved to dune runtest once we have composition
         dune install quickchick
-        make -C examples/multifile-mutation
+        make -C examples/multifile-mutation test
 
 os:
     - linux
