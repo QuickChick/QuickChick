@@ -19,6 +19,7 @@ depends: [
   "coq-mathcomp-ssreflect"
   "ocamlbuild"
   "ocamlfind"
+  "menhir"
   "coq-simple-io" {= "dev"}
 ]
 available: [ ocaml-version >= "4.04.0" ]
