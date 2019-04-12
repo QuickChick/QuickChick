@@ -30,7 +30,10 @@ Qed.
 
 Lemma nat_lemma :   forall a : nat,
   Some (Init.Nat.pred (Pos.to_nat (Pos.of_nat (S a)))) = Some a.
-Admitted.
+Proof.
+  intros; apply f_equal.
+  rewrite Nat2Pos.id; auto.
+Qed.
 
 Instance coqArbNat : CoArbitrary nat.
 Proof.
