@@ -43,10 +43,33 @@ Qed.
 Lemma decimal_thousand : forall n,
     n < 256 ->
     (n / 100) mod 10 * 100 + (n / 10) mod 10 * 10 + n mod 10 = n.
-Admitted.
+Proof.
+  intros.
+  rewrite Nat.div_mod with (y:=10); auto.
+  rewrite Nat.add_cancel_r.
+  replace 100 with (10*10) by auto.
+  rewrite <- mult_assoc_reverse.
+  rewrite <- Nat.mul_add_distr_r.
+  rewrite mult_comm.
+  rewrite Nat.mul_cancel_l; auto.
+  rewrite <- Nat.div_div; auto.
+  rewrite (Nat.div_mod (n/10) 10) at 3; auto.
+  rewrite Nat.add_cancel_r.
+  rewrite mult_comm.
+  rewrite Nat.mul_cancel_l; auto.
+  rewrite Nat.mod_small; auto.
+  rewrite Nat.div_div; auto.
+  simpl.
+  rewrite (Nat.div_lt_upper_bound n 100 9); auto.
+  intuition.
+Qed.
 
 Lemma ascii_256 : forall c, nat_of_ascii c < 256.
-Admitted.
+Proof.
+  intros.
+  destruct c as [b0 b1 b2 b3 b4 b5 b6 b7].
+  destruct b0, b1, b2, b3, b4, b5, b6, b7; simpl; compute; intuition.
+Qed.
 
 Lemma unthree_three_digit (c : ascii) :
   let n := nat_of_ascii c in
@@ -64,7 +87,7 @@ Qed.
 Lemma read_show_quoted_string : forall (s : string),
     read_quoted_string (show_quoted_string s) = Some s.
 Proof.
-  induction 0.
+  induction s.
   - auto.
   - unfold show_quoted_string.
     destruct (ascii_dec a "009") as [is_tab | isn_tab].
