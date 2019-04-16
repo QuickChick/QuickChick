@@ -609,7 +609,7 @@ let gRecFunInWithArgs ?assumType:(typ=hole) (fs : string) args (f_body : (var * 
                      ) args in
   let fix_body = f_body (fv, xvs) in
   CAst.make @@ CLetIn (CAst.make @@ Name fv,
-    CAst.make @@ CFix(CAst.make fv,[(CAst.make fv, (None, CStructRec), args, typ, fix_body)]), None,
+    CAst.make @@ CFix(CAst.make fv,[(CAst.make fv, None, args, typ, fix_body)]), None,
     let_body fv)
              
 let gRecFunIn ?assumType:(typ = hole) (fs : string) (xss : string list) (f_body : (var * var list) -> coq_expr) (let_body : var -> coq_expr) =
