@@ -170,7 +170,7 @@ let _ =
          Pervasives.print_string (QuickChickLib.string_of_coqstring s)
       | _ ->
          Pervasives.print_string \"Failed to generate...\"
-    in AflPersistent.run f
+    in (* AflPersistent.run *) f ()
 " (string_of_id main) (string_of_id main);
   close_out oc;
     end

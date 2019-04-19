@@ -67,20 +67,6 @@ data TestData = MkData { kind      :: !Kind
                        } deriving (Eq, Ord, Show)
 
 
-
-fileNameP :: GenParser Char st (Kind, Mode, Int)
-fileNameP = do
-  _ <- many1 (noneOf "/")
-  char '/'
-  k <- skind <$> (string "fuzz" <|> string "rand")
-  char '_'
-  string "SSNI_" <|> string "seeded_SSNI_"
-  m <- smode <$> (try (string "arbitrary") <|> string "arbmedium" <|> string "smart")
-  char '_'
-  xs <- many1 digit
-  let x = read xs :: Int
-  return (k, m, x)
-
 right (Right x) = x
 right x = error (show x)
 
@@ -95,8 +81,8 @@ parseStatsFuzz time fn allLines =
       -- should be 1
       unique = lines !! 17
       total = lines !! 28
-      (k, m, id) = right $ parse fileNameP fn fn
-  in MkData k m id (execsDone - total) unique time
+      mutantId = getIntegerInLine fn
+  in MkData  m id (execsDone - total) unique time
 
 parseOutputFuzz :: String -> Double
 parseOutputFuzz s =

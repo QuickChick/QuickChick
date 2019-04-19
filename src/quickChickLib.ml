@@ -105,13 +105,14 @@ let registerSeed =
        Sys.command "mkdir -p _seeds";
        (* Open a new file to write *)
        let f = Filename.temp_file ~temp_dir:"_seeds" "seed" ".qc" in
+       print_endline f;
        let fd = Unix.openfile f [Unix.O_WRONLY] 0o600 in
        
        (* Calculate how many bytes were extracted from the seed *)
        let remaining = r_orig.len - r_orig.offset in
        let total = r_cur.total - r_orig.total + remaining + 1 in
 
-       (*       Printf.printf "Debugging:\nCur:\nTotal: %d.\nOld:\nTotal: %d\nLen: %d\nOffset: %d\n" r_cur.total r_orig.total r_orig.len r_orig.offset; *)
+       Printf.printf "Debugging:\nCur:\nTotal: %d.\nOld:\nTotal: %d\nLen: %d\nOffset: %d\n" r_cur.total r_orig.total r_orig.len r_orig.offset; 
        
        (* Create new buffer big enough *)
        let bits = Bytes.make total '0' in

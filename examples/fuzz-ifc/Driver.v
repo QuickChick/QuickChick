@@ -344,9 +344,15 @@ Definition gen_variation_copy :=
 
 Definition es : string := "".
 
+Definition prop_SSNI_seeds t r :=
+  registerSeedCallback (prop SSNI gen_variation_arbitrary t r).
+
+Definition gen_variation_arb : G Variation :=
+  bindGen (@arbitrary State _) (fun st1 =>
+  bindGen (@arbitrary State _) (fun st2 =>
+  returnGen (V st1 st2))).
+
 ManualExtract [Instruction; Label; Atom; Stack; State; Variation].
-Extract Constant defNumTests => "10000000".
+Extract Constant defNumTests => "200000000".
 QuickChickTimeout 3600.
-
-
 
