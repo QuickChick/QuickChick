@@ -57,8 +57,8 @@ let convert_constr_to_cw_pair c : (constructor * weight_ast) =
 let register_weights_object = 
   Libobject.declare_object
     {(Libobject.default_object ("QC_register_weights")) with
-       cache_function = (fun (_,ws) -> register_weights ws);
-       load_function = (fun _ (_,ws) -> register_weights ws)}
+      Libobject.cache_function = (fun (_,ws) -> register_weights ws);
+      Libobject.load_function = (fun _ (_,ws) -> register_weights ws)}
 
 let lookup_weight ctr size_var = 
   try match CtrMap.find ctr !weight_env with

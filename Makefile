@@ -81,7 +81,7 @@ clean:
 	find . -name *.conflicts -print -delete
 	find . -name *.output -print -delete
 	find . -name *.aux -print -delete
-	rm -f Makefile.coq*
+	rm -f Makefile.coq Makefile.coq.conf
 
 bc:
 	coqwc src/*.v
