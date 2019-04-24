@@ -10,6 +10,7 @@ open Constrexpr_ops
 open Ppconstr
 open Context
 open Error
+open Globnames
 
 let cnt = ref 0 
 
@@ -950,7 +951,7 @@ let declare_class_instance ?(global=true) ?(priority=42) ~pstate instance_argume
                        ((CAst.make @@ Name (Id.of_string instance_name), None)
                        , Decl_kinds.Explicit, instance_type_vars)
                        (Some (true, instance_record_vars)) (* TODO: true or false? *)
-                       { hint_priority = Some priority; hint_pattern = None }
+                       { Typeclasses.hint_priority = Some priority; hint_pattern = None }
   in
   msg_debug (str (Id.to_string cid) ++ fnl ());
   pstate
