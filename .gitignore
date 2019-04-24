@@ -25,7 +25,8 @@ dsss17/terse
 *~
 *.bak
 *.d
-Makefile.coq*
+Makefile.coq
+Makefile.coq.conf
 *.out
 *.so
 *.opt

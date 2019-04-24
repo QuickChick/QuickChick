@@ -289,7 +289,7 @@ let create_t_and_u_maps explicit_args dep_type actual_args : (range UM.t * dep_t
  *)
 let dep_dispatch ~pstate ind class_name : Proof_global.t option = 
   match ind with 
-  | { CAst.v = CLambdaN ([CLocalAssum ([{ CAst.v = Name id; CAst.loc = _loc2 }], _kind, _type)], body); _ } -> (* {CAst.v = CApp ((_flag, constructor), args) }) } -> *)
+  | { CAst.v = CLambdaN ([CLocalAssum ([{ CAst.v = Names.Name id; CAst.loc = _loc2 }], _kind, _type)], body); _ } -> (* {CAst.v = CApp ((_flag, constructor), args) }) } -> *)
 
     let idu = Unknown.from_string (Names.Id.to_string id ^ "_") in
      
