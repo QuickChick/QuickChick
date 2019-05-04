@@ -11,8 +11,6 @@ license: "MIT"
 
 build: [ make "-j%{jobs}%" ]
 install: [ make "install" ]
-remove: [ [ make "uninstall" ]
-          [ "rm" "%{bin}%/quickChick"] ]
 depends: [
   "ocaml" {>= "4.04.0"}
   "coq" {>= "8.7" < "8.8~"}
@@ -31,4 +29,3 @@ authors: [
   "Arthur Azevedo de Amorim <>"
   "Antal Spector-Zabusky <>"
 ]
-flags: light-uninstall
