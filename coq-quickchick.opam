@@ -1,5 +1,4 @@
 opam-version: "2.0"
-name: "coq-quickchick"
 version: "1.0.0"
 maintainer: "llamp@seas.upenn.edu"
 synopsis: "Randomized Property-Based Testing Plugin for Coq"
@@ -28,4 +27,10 @@ authors: [
   "Benjamin Pierce <>"
   "Arthur Azevedo de Amorim <>"
   "Antal Spector-Zabusky <>"
+]
+
+tags: [
+  "keyword:extraction"
+  "category:Miscellaneous/Coq Extensions"
+  "logpath:QuickChick"
 ]
