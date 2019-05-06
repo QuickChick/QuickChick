@@ -414,28 +414,28 @@ Module GenLow : GenLowInterface.Sig.
     (forall x, Some @: (fs x) \subset semGen (f x)) ->
     (Some @: \bigcup_(a in s1) (fs a)) \subset semGen (bindGen g f).
   Proof.
-  Admitted. (*
     intros H1 H2 y [y' [[x [Hs1 Hfs2]] Heq]]; inv Heq; clear Heq.
     eapply H1 in Hs1.
     assert (Hin2 : (Some @: fs x) (Some y')).
     { eexists; split; eauto. now constructor. }
     eapply H2 in Hin2.
-    destruct Hg as [Hgmon].
-    destruct (Hf x) as [Hfgmon].
+    unfold SizeMonotonic in Hg.
     edestruct Hs1 as [s [_ Hgen]].
     edestruct Hin2 as [s' [_ Hfgen]].
     assert (Hin2' : ((fun u : option B => u) :&: semGenSize (f x) s') (Some y')).
     { split; eauto. }
-    eapply Hgmon with (s2 := s + s')  in Hgen; [| now ssromega ].
-    eapply Hfgmon with (s2 := s + s')  in Hin2'; [| now ssromega ].
-    edestruct Hgen as [r1 Hr1].
-    edestruct Hin2' as [_ [r2 Hr2]].
-    eexists (s + s'). split; [ now constructor |].
-    edestruct (randomSplitAssumption r1 r2) as [r'' Heq].
-    eexists r''. simpl. rewrite Heq.
-    rewrite Hr1 Hr2. reflexivity.
+    apply Hg with (s2 := s + s') in Hgen; [| now ssromega].
+    destruct Hgen as [r1 Hr1].
+    specialize Hf with x.
+    assert (Iss: is_true (s' <= s + s')) by ssromega.
+    destruct (Hf s' (s + s') Iss y') as [rs rr].
+    - edestruct Hin2' as [_ [r2 Hr2]].
+      exists r2; assumption.
+    - exists (s + s'). split; [now constructor | ].
+      destruct (randomSplitAssumption r1 rs) as [r'' Heq].
+      exists r''. simpl; rewrite Heq Hr1 rr.
+      reflexivity.
   Qed.
-*)
   
   Lemma semFmapSize A B (f : A -> B) (g : G A) (size : nat) :
     semGenSize (fmap f g) size <--> f @: semGenSize g size.  Proof.

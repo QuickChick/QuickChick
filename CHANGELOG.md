@@ -5,6 +5,14 @@ The format is based on [Keep a Changelog](http://keepachangelog.com/en/1.0.0/)
 and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
+
+## [1.1.0] - 2019-04-19
+### Added
+- Support Coq 8.9.
+
+### Removed
+- No longer support Coq 8.8.
+
 ### Fixed
 - Examples use new generator combinators.
 - Determine C source files with `*.c` rather than `*c`.
@@ -53,7 +61,8 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
 ### Added
 - OPAM package `coq-quickchick` on [coq-released](https://coq.inria.fr/opam/www/).
 
-[Unreleased]: https://github.com/QuickChick/QuickChick/compare/v1.0.2...8.8
+[Unreleased]: https://github.com/QuickChick/QuickChick/compare/v1.1.0...8.9
+[1.1.0]: https://github.com/QuickChick/QuickChick/compare/v1.0.2...v1.1.0
 [1.0.2]: https://github.com/QuickChick/QuickChick/compare/v1.0.1...v1.0.2
 [1.0.1]: https://github.com/QuickChick/QuickChick/compare/v1.0.0...v1.0.1
 [1.0.0]: https://github.com/QuickChick/QuickChick/compare/itp-2015-final...v1.0.0

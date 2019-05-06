@@ -146,7 +146,16 @@ Instance SizeMonotonicOptOfBounded' (A : Type) (P : A -> Prop)
 : SizeMonotonicOpt (genST P).
 Proof.
   unfold arbitraryST, GenSuchThatOfBounded.
-Admitted. (* XXX lemma *)
+  red. red in PMon.
+  do 2 red. intros.
+  unfold semGenSizeOpt in *.
+  red in PMon.
+  apply semSizedSize in H3.
+  apply semSizedSize.
+  destruct (PSMon s1 s1 s2 H2 a). apply H3.
+  apply (PMon s2 s1 s2); auto. do 3 red.
+  eauto.
+Qed.
 
 (* begin SizeMonotonicOptOfBounded *)
 Instance SizeMonotonicOptOfBounded (A : Type) (P : A -> Prop)
