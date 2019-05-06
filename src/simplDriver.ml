@@ -41,7 +41,7 @@ let repeat_instance_name der tn =
   (prefix ^ strip_last tn)
 
 (* Generic derivation function *)
-let derive ~pstate (cn : derivable) (c : constr_expr) (instance_name : string) (name1 : string) (name2 : string) =
+let derive (cn : derivable) (c : constr_expr) (instance_name : string) (name1 : string) (name2 : string) =
 
   let (ty_ctr, ty_params, ctrs) =
     match coerce_reference_to_dt_rep c with
@@ -144,5 +144,4 @@ let derive ~pstate (cn : derivable) (c : constr_expr) (instance_name : string) (
   (* msg_debug (str "Defined record" ++ fnl ()); *)
   (* debug_coq_expr (instance_record []); *)
 
-  declare_class_instance ~pstate instance_arguments instance_name instance_type instance_record
-
+  declare_class_instance instance_arguments instance_name instance_type instance_record
