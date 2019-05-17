@@ -86,7 +86,7 @@ let gArg ?assumName:(an=hole) ?assumType:(at=hole) ?assumImplicit:(ai=false) ?as
     | { CAst.v = CHole (_v,_,_); loc } -> (loc,Anonymous)
     | _a -> failwith "This expression should be a name" in
   CLocalAssum ( [CAst.make ?loc:(fst n) @@ snd n],
-                  (if ag then Generalized (Implicit, Implicit, false)                       
+                  (if ag then Generalized (Implicit, false)
                    else if ai then Default Implicit else Default Explicit),
                   at )
 
