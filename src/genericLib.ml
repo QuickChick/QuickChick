@@ -947,11 +947,10 @@ let declare_class_instance ?(global=true) ?(priority=42) ~pstate instance_argume
   msg_debug (str "Calculated instance_record_vars" ++ fnl ());
   let cid, pstate = Classes.new_instance ~pstate ~global:global false
               ~program_mode:false (* TODO: true or false? *)
-                               iargs
-                       ((CAst.make @@ Name (Id.of_string instance_name), None)
-                       , Decl_kinds.Explicit, instance_type_vars)
-                       (Some (true, instance_record_vars)) (* TODO: true or false? *)
-                       { Typeclasses.hint_priority = Some priority; hint_pattern = None }
+              (CAst.make @@ Name (Id.of_string instance_name), None) iargs
+              instance_type_vars
+              (Some (true, instance_record_vars)) (* TODO: true or false? *)
+              { Typeclasses.hint_priority = Some priority; hint_pattern = None }
   in
   msg_debug (str (Id.to_string cid) ++ fnl ());
   pstate
