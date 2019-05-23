@@ -1,20 +1,17 @@
-opam-version: "1.2"
-name: "coq-quickchick"
+opam-version: "2.0"
 version: "1.0.2"
 maintainer: "llamp@seas.upenn.edu"
 synopsis: "Randomized Property-Based Testing Plugin for Coq"
 
 homepage: "https://github.com/QuickChick/QuickChick"
-dev-repo: "https://github.com/QuickChick/QuickChick.git"
+dev-repo: "git+https://github.com/QuickChick/QuickChick.git"
 bug-reports: "https://github.com/QuickChick/QuickChick/issues"
 license: "MIT"
 
 build: [ make "-j%{jobs}%" ]
 install: [ make "install" ]
-remove: [ [ "rm" "-rf" "%{lib}%/coq/user-contrib/QuickChick" ]
-          [ "rm" "%{bin}%/quickChick"] ]
 depends: [
-  "coq" {= "dev"}
+  "coq" {>= "8.10"}
   "coq-ext-lib"
   "coq-mathcomp-ssreflect"
   "ocamlbuild"
@@ -22,7 +19,6 @@ depends: [
   "menhir"
   "coq-simple-io" {= "dev"}
 ]
-available: [ ocaml-version >= "4.04.0" ]
 
 authors: [
   "Leonidas Lampropoulos <>"
@@ -34,4 +30,10 @@ authors: [
   "Arthur Azevedo de Amorim <>"
   "Yishuai Li <>"
   "Antal Spector-Zabusky <>"
+]
+
+tags: [
+  "keyword:extraction"
+  "category:Miscellaneous/Coq Extensions"
+  "logpath:QuickChick"
 ]

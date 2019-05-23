@@ -1,4 +1,5 @@
 (executable
+ (package quickchick)
  (name quickChickTool)
  (public_name quickChick)
  (flags -rectypes)

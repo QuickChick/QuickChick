@@ -1,2 +1,2 @@
-(coqlib
+(coq.theory
  (name multifile_mutation))

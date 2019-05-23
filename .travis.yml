@@ -12,6 +12,7 @@ env:
   - NJOBS=2
   - OPAMVERBOSE=1
   - OPAMYES=true
+  - COQ=8.10.dev
   matrix:
   - OCAML_VERSION=4.05
   - OCAML_VERSION=4.07
@@ -44,6 +45,8 @@ install:
 - opam repo add coq-core-dev https://coq.inria.fr/opam/core-dev || true
 - opam repo add coq-extra-dev https://coq.inria.fr/opam/extra-dev || true
 - opam update
+- opam unpin . || true
+- opam pin coq $COQ
 - opam upgrade
 - opam install --deps-only .
 - opam list
@@ -53,7 +56,7 @@ script:
 - set -e
 - echo 'Building QuickChick...';
   echo -e 'travis_fold:start:QuickChick.build';
-  opam install .;
+  opam install coq-quickchick;
   echo -e 'travis_fold:end:QuickChick.build'
 - echo 'Unit testing...';
   echo -e 'travis_fold:start:QuickChick.test.unit';
