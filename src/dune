@@ -25,7 +25,7 @@
  (deps (:pp-file weightmap.mlg))
  (action (run coqpp %{pp-file})))
 
-(coqlib
+(coq.theory
  (name QuickChick)
  (public_name quickchick)
  (libraries quickchick.plugin))
