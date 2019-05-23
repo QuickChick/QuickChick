@@ -10,7 +10,7 @@ env:
   - NJOBS=2
   - OPAMVERBOSE=1
   - OPAMYES=true
-  - COQ=8.9.0
+  - COQ=8.9.1
   matrix:
   - OCAML_VERSION=4.04
   - OCAML_VERSION=4.07
