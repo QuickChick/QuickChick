@@ -1,5 +1,4 @@
 opam-version: "2.0"
-name: "coq-quickchick"
 version: "1.0.2"
 maintainer: "llamp@seas.upenn.edu"
 synopsis: "Randomized Property-Based Testing Plugin for Coq"
@@ -11,8 +10,6 @@ license: "MIT"
 
 build: [ make "-j%{jobs}%" ]
 install: [ make "install" ]
-remove: [ [ make "uninstall" ]
-          [ "rm" "%{bin}%/quickChick"] ]
 depends: [
   "ocaml" {>= "4.04.0"}
   "coq" {>= "8.8" < "8.9~"}
@@ -34,4 +31,9 @@ authors: [
   "Yishuai Li <>"
   "Antal Spector-Zabusky <>"
 ]
-flags: light-uninstall
+
+tags: [
+  "keyword:extraction"
+  "category:Miscellaneous/Coq Extensions"
+  "logpath:QuickChick"
+]
