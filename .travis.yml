@@ -12,7 +12,6 @@ env:
   - NJOBS=2
   - OPAMVERBOSE=1
   - OPAMYES=true
-  - COQ=8.10.dev
   matrix:
   - OCAML_VERSION=4.05
   - OCAML_VERSION=4.07
@@ -46,7 +45,6 @@ install:
 - opam repo add coq-extra-dev https://coq.inria.fr/opam/extra-dev || true
 - opam update
 - opam unpin . || true
-- opam pin coq $COQ
 - opam upgrade
 - opam install --deps-only .
 - opam list
