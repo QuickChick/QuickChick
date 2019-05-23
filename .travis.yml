@@ -56,7 +56,7 @@ script:
 - set -e
 - echo 'Building QuickChick...';
   echo -e 'travis_fold:start:QuickChick.build';
-  opam install .;
+  opam install coq-quickchick;
   echo -e 'travis_fold:end:QuickChick.build'
 - echo 'Unit testing...';
   echo -e 'travis_fold:start:QuickChick.test.unit';
@@ -92,7 +92,7 @@ script:
   echo -e 'travis_fold:end:QuickChick.test.python-io'
 - echo 'Removing QuickChick...';
   echo -e 'travis_fold:start:QuickChick.remove';
-  opam remove .;
+  opam remove coq-quickchick;
   echo -e 'travis_fold:end:QuickChick.remove'
 
 before_cache:

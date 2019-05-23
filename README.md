@@ -16,7 +16,7 @@ https://hackage.haskell.org/package/QuickCheck
 http://prosecco.gforge.inria.fr/personal/hritcu/publications/foundational-pbt.pdf
 
 [mechanism for automatically deriving generators for inductive relations]:
-http://www.cis.upenn.edu/~llamp/pdf/GeneratingGoodGenerators.pdf
+https://lemonidas.github.io/pdf/GeneratingGoodGenerators.pdf
 
 For more information on QuickChick, look at the tutorial available under the qc folder 
 of the deep spec summer school:
@@ -100,7 +100,7 @@ The main documentation is the DeepSpec summer school tutorial:
 Pretty soon this will become a software foundations volume!
 
 Here is some more reading material:
-  - Our POPL 2018 paper on [Generating Good Generators for Inductive Relations](http://www.cis.upenn.edu/~llamp/pdf/GeneratingGoodGenerators.pdf)
+  - Our POPL 2018 paper on [Generating Good Generators for Inductive Relations][mechanism for automatically deriving generators for inductive relations]
   - Our ITP 2015 paper on [Foundational Property-Based Testing](http://prosecco.gforge.inria.fr/personal/hritcu/publications/foundational-pbt.pdf)
   - Leo's invited talk at CLA on [Random Testing in the Coq Proof Assistant](https://lemonidas.github.io/pdf/InvitedCLA.pdf)
   - Catalin's [internship topic proposals for 2015](http://prosecco.gforge.inria.fr/personal/hritcu/students/topics/2015/quick-chick.pdf)
