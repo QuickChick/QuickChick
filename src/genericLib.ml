@@ -945,14 +945,12 @@ let declare_class_instance ?(global=true) ?(priority=42) instance_arguments inst
   msg_debug (str "Calculated instance_type_vars" ++ fnl ());
   let instance_record_vars = instance_record vars in
   msg_debug (str "Calculated instance_record_vars" ++ fnl ());
-  let cid, pstate = Classes.new_instance ~global:global false
-              ~program_mode:false (* TODO: true or false? *)
+  let cid = Classes.new_instance ~global:global false
               (CAst.make @@ Name (Id.of_string instance_name), None) iargs
               instance_type_vars
-              (Some (true, instance_record_vars)) (* TODO: true or false? *)
+              (true, instance_record_vars) (* TODO: true or false? *)
               { Typeclasses.hint_priority = Some priority; hint_pattern = None }
   in
-  assert (Option.is_empty pstate); (* refine:false with term *)
   msg_debug (str (Id.to_string cid) ++ fnl ())
 
 (* List Utils. Probably should move to a util file instead *)
