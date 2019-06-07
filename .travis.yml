@@ -54,6 +54,7 @@ script:
 - set -e
 - echo 'Building QuickChick...';
   echo -e 'travis_fold:start:QuickChick.build';
+  opam pin -k path coq-quickchick .;
   opam install coq-quickchick;
   echo -e 'travis_fold:end:QuickChick.build'
 - echo 'Unit testing...';

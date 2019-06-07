@@ -937,7 +937,7 @@ let create_names_for_anon a =
      end
   | _ -> failwith "Non RawAssum in create_names"
     
-let declare_class_instance ?(global=true) ?(priority=42) ~pstate instance_arguments instance_name instance_type instance_record =
+let declare_class_instance ?(global=true) ?(priority=42) instance_arguments instance_name instance_type instance_record =
   msg_debug (str "Declaring class instance..." ++ fnl ());
   msg_debug (str (Printf.sprintf "Total arguments: %d" (List.length instance_arguments)) ++ fnl ());
   let (vars,iargs) = List.split (List.map create_names_for_anon instance_arguments) in
@@ -945,15 +945,13 @@ let declare_class_instance ?(global=true) ?(priority=42) ~pstate instance_argume
   msg_debug (str "Calculated instance_type_vars" ++ fnl ());
   let instance_record_vars = instance_record vars in
   msg_debug (str "Calculated instance_record_vars" ++ fnl ());
-  let cid, pstate = Classes.new_instance ~pstate ~global:global false
-              ~program_mode:false (* TODO: true or false? *)
+  let cid = Classes.new_instance ~global:global false
               (CAst.make @@ Name (Id.of_string instance_name), None) iargs
               instance_type_vars
-              (Some (true, instance_record_vars)) (* TODO: true or false? *)
+              (true, instance_record_vars) (* TODO: true or false? *)
               { Typeclasses.hint_priority = Some priority; hint_pattern = None }
   in
-  msg_debug (str (Id.to_string cid) ++ fnl ());
-  pstate
+  msg_debug (str (Id.to_string cid) ++ fnl ())
 
 (* List Utils. Probably should move to a util file instead *)
 let list_last l = List.nth l (List.length l - 1)
