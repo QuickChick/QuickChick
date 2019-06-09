@@ -945,7 +945,7 @@ let declare_class_instance ?(global=true) ?(priority=42) instance_arguments inst
   msg_debug (str "Calculated instance_type_vars" ++ fnl ());
   let instance_record_vars = instance_record vars in
   msg_debug (str "Calculated instance_record_vars" ++ fnl ());
-  let cid = Classes.new_instance ~global:global false
+  let cid = Classes.new_instance ~global:global ~poly:false
               (CAst.make @@ Name (Id.of_string instance_name), None) iargs
               instance_type_vars
               (true, instance_record_vars) (* TODO: true or false? *)
