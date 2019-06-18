@@ -14,7 +14,28 @@ Inductive type : Type :=
 Notation "%" := Base.
 Notation "x :-> y" := (Fun x y) (at level 50).
 
-Derive (Arbitrary, Show, Fuzzy) for type.
+Inductive Prec := POuter | PApp | PInner.
+
+Definition ltp (p1 p2 : Prec) :=
+  match p1, p2 with
+  | POuter, PApp => true
+  | POuter, PInner => true
+  | PApp  , PInner => true
+  | _, _ => false
+  end.
+
+Definition parens outer inner s := if ltp inner outer then "(" ++ s ++ ")" else s.
+
+Fixpoint showType' prec (τ : type) :=
+  match τ with
+  | Base => "()"
+  | Fun τ1 τ2 => parens prec PApp (showType' PInner τ1 ++ "->" ++ showType' PApp τ2)
+  end.
+
+Instance show_type : Show type :=
+  { show := showType' POuter }.
+
+Derive (Arbitrary, Fuzzy) for type.
 
 Instance dec_eq_type (τ1 τ2 : type) : Dec (τ1 = τ2).
 Proof. dec_eq. Defined.
@@ -27,7 +48,18 @@ Inductive term : Type :=
 
 Notation "#" := Unit.
 
-Derive (Arbitrary, Show, Fuzzy) for term.
+Derive (Arbitrary, Fuzzy) for term.
+
+Fixpoint showExpr' prec (e : term) :=
+  match e with
+  | Unit => "#"
+  | Var x => show x
+  | Lam τ e' => parens prec POuter ("λ" ++ show τ ++ ". " ++ showExpr' POuter e')
+  | App e1 e2 => parens prec PApp (showExpr' PApp e1 ++ " " ++ showExpr' PInner e2)
+  end.
+
+Instance show_term : Show term :=
+  { show := showExpr' POuter }.
 
 Definition env := list type.
 
@@ -148,13 +180,17 @@ QuickChick prop_gen_wt.
 Definition preservation (e : term) :=
   match typeOf [] e with
   | Some τ =>
-     checker (typeOf [] (pstep e) = Some τ?)
+    whenFail ("Expr: " ++ show e ++ nl ++
+              "With type: " ++ show (typeOf [] e) ++ nl ++
+              "Steps to: " ++ show (pstep e) ++ nl ++
+              "With type: " ++ show (typeOf [] (pstep e)))
+             (typeOf [] (pstep e) = Some τ?)
   | _ => checker tt
   end.
 
 Definition prop_preservation :=
-  forAll (gen_type 5) (fun τ =>
-  forAll (gen_expr 6 [] τ) (fun e =>
+  forAll (gen_type 1) (fun τ =>
+  forAll (gen_expr 2 [] τ) (fun e =>
   preservation e)).
 
 QuickCheck prop_preservation.
