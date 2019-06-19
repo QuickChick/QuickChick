@@ -1,0 +1,8 @@
+QuickChecking prop_specialized
+Extracted ML file: /tmp/QuickChick/171300/QuickChick6ea74a.ml
+Extra: 
+Compile command: ocamlopt -afl-instrument unix.cmxa str.cmxa /home/lemonidas/.opam/ocaml-variants.4.07.1+afl/lib/afl-persistent/afl-persistent.cmxa -unsafe-string -rectypes -w a -I /tmp/QuickChick/171300 -I /home/lemonidas/.opam/ocaml-variants.4.07.1+afl/lib/afl-persistent/ -I /home/lemonidas/.opam/ocaml-variants.4.07.1+afl/lib/coq/user-contrib/QuickChick /home/lemonidas/.opam/ocaml-variants.4.07.1+afl/lib/coq/user-contrib/QuickChick/quickChickLib.cmx  /tmp/QuickChick/171300/QuickChick6ea74a.ml -o /tmp/QuickChick/171300/QuickChick6ea74a
+Extra: 
++++ Passed 200000 tests (368035 discards)
+2.26user 0.00system 0:02.26elapsed 99%CPU (0avgtext+0avgdata 6324maxresident)k
+0inputs+0outputs (0major+935minor)pagefaults 0swaps

@@ -1,0 +1,14 @@
+QuickChecking prop_specialized
+Extracted ML file: /tmp/QuickChick/171211/QuickChick14340e.ml
+Extra: 
+Compile command: ocamlopt -afl-instrument unix.cmxa str.cmxa /home/lemonidas/.opam/ocaml-variants.4.07.1+afl/lib/afl-persistent/afl-persistent.cmxa -unsafe-string -rectypes -w a -I /tmp/QuickChick/171211 -I /home/lemonidas/.opam/ocaml-variants.4.07.1+afl/lib/afl-persistent/ -I /home/lemonidas/.opam/ocaml-variants.4.07.1+afl/lib/coq/user-contrib/QuickChick /home/lemonidas/.opam/ocaml-variants.4.07.1+afl/lib/coq/user-contrib/QuickChick/quickChickLib.cmx  /tmp/QuickChick/171211/QuickChick14340e.ml -o /tmp/QuickChick/171211/QuickChick14340e
+Extra: 
+()
+(λ(). (λ()->(). λ()->(). 1) (λ(). 1)) # (λ(). #) #
+Expr: (λ(). (λ()->(). λ()->(). 1) (λ(). 1)) # (λ(). #) #
+With Typ: Some ()
+Steps to: λ(). #
+With Typ: Some ()->()
+*** Failed after 3351 tests and 8 shrinks. (0 discards)
+0.13user 0.00system 0:00.14elapsed 99%CPU (0avgtext+0avgdata 8916maxresident)k
+0inputs+0outputs (0major+1627minor)pagefaults 0swaps

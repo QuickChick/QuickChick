@@ -1,0 +1,28 @@
+File "./Tmp.v", line 267, characters 0-28:
+Warning: The extraction is currently set to bypass opacity, the following
+opaque constant bodies have been accessed
+: find_rect fold_rect ssrnat.eqnP mem_rect equal_rect add_rect
+  StringOT.StringOT.compare ssrbool.iffP ssrbool.idP remove_rect
+  StringOT.AsciiOT.compare.
+ [extraction-opaque-accessed,extraction]
+cat $(opam config var lib)/coq/user-contrib/QuickChick/Stub.ml | cat - /tmp/QuickChick/170439/QuickChickb5a8b5.ml > temp && mv temp /tmp/QuickChick/170439/QuickChickb5a8b5.ml
+Extra: 
+/tmp/QuickChick/170439/SHM.c: In function ‘copy_trace_bits’:
+/tmp/QuickChick/170439/SHM.c:110:7: warning: implicit declaration of function ‘caml_modify’; did you mean ‘modify’? [-Wimplicit-function-declaration]
+       caml_modify(&Field(ml_array, i), Val_int (trace_bits[i]));
+       ^~~~~~~~~~~
+       modify
+/tmp/QuickChick/170439/SHM.c: In function ‘copy_trace_bits’:
+/tmp/QuickChick/170439/SHM.c:110:7: warning: implicit declaration of function ‘caml_modify’; did you mean ‘modify’? [-Wimplicit-function-declaration]
+       caml_modify(&Field(ml_array, i), Val_int (trace_bits[i]));
+       ^~~~~~~~~~~
+       modify
+Preparing to setup aux...
+SHM Setup (aux) succesful!
+(λ()->(). (λ(). λ()->(). 2) ((λ(). #) #)) (λ(). (λ(). 1) #)
+*** Failed after 22671 tests and 0 shrinks. (22948 discards)
+Calling /tmp/QuickChick/170439/qc_exec...
+1.27user 0.02system 0:01.30elapsed 100%CPU (0avgtext+0avgdata 6904maxresident)k
+0inputs+0outputs (0major+1272minor)pagefaults 0swaps
+Compile Command: ocamlopt unix.cmxa str.cmxa /home/lemonidas/.opam/ocaml-variants.4.07.1+afl/lib/afl-persistent/afl-persistent.cmxa -unsafe-string -rectypes -w a -I /tmp/QuickChick/170439 -I /home/lemonidas/.opam/ocaml-variants.4.07.1+afl/lib/afl-persistent/ -I /home/lemonidas/.opam/ocaml-variants.4.07.1+afl/lib/coq/user-contrib/QuickChick /home/lemonidas/.opam/ocaml-variants.4.07.1+afl/lib/coq/user-contrib/QuickChick/quickChickLib.cmx  /tmp/QuickChick/170439/QuickChick20f010.cmx -o /tmp/QuickChick/170439/qc_exec /tmp/QuickChick/170439/QuickChickb5a8b5.ml /tmp/QuickChick/170439/SHM.c
+Compile Main Command: ocamlopt unix.cmxa str.cmxa /home/lemonidas/.opam/ocaml-variants.4.07.1+afl/lib/afl-persistent/afl-persistent.cmxa -unsafe-string -rectypes -w a -I /tmp/QuickChick/170439 -I /home/lemonidas/.opam/ocaml-variants.4.07.1+afl/lib/afl-persistent/ -I /home/lemonidas/.opam/ocaml-variants.4.07.1+afl/lib/coq/user-contrib/QuickChick /home/lemonidas/.opam/ocaml-variants.4.07.1+afl/lib/coq/user-contrib/QuickChick/quickChickLib.cmx  -o /tmp/QuickChick/170439/main_exec /tmp/QuickChick/170439/Main.ml /tmp/QuickChick/170439/SHM.c
