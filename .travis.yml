@@ -11,6 +11,7 @@ env:
   - OPAMVERBOSE=1
   - OPAMYES=true
   - COQ=8.7.2
+  - BASE_REMOTE=http://opam.ocaml.org/
   matrix:
   - OCAML_VERSION=4.04
   - OCAML_VERSION=4.07
