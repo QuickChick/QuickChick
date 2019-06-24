@@ -106,7 +106,7 @@ let define c env evd =
   let univs = Evd.univ_entry ~poly:true evd in
   let fn = fresh_name "quickchick" in
   (* TODO: Maxime - which of the new internal flags should be used here? The names aren't as clear :) *)
-  ignore (declare_constant ~internal:InternalTacticRequest fn
+  ignore (declare_constant fn
       (DefinitionEntry (definition_entry ~univs (EConstr.to_constr evd c)),
        Decl_kinds.IsDefinition Decl_kinds.Definition));
   fn
