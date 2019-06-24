@@ -2,7 +2,6 @@
 
 open Pp
 open Names
-open Entries
 open Declare
 open Libnames
 open Util
