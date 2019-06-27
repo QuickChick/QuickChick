@@ -326,26 +326,47 @@ Definition lift_env :=
   map (lift_type NoMutant 0).
 
 Fixpoint gen_base_expr (ftv : nat) (Γ : env) (τ : Typ) : G (option Term) :=
+  (*  trace ("Generating base. ftv = " ++ show ftv ++ ", Γ = " ++ show Γ ++ ", τ = " ++ show τ ++ nl) *)
+  (
   let vars : list Term :=
-      map (fun '(n, τ') => Var n)
+      map (fun '(n, τ') =>
+(*             trace ("picking variable " ++ show n ++ " with type " ++ show τ' ++ nl)*)
+                   (Var n))
           (filter (fun '(n, τ') => τ = τ'?)
                   (combine (seq 0 (List.length Γ)) Γ)) in
-  trace ("Vars of type: " ++ show τ ++ " in " ++ show Γ ++ " are " ++ show vars ++ nl) (
+  (*  trace ("Vars of type: " ++ show τ ++ " in " ++ show Γ ++ " are " ++ show vars ++ nl) *)
+  (
   let base : G (option Term) :=
       match τ with
       | Base => ret (Some Unit)
       | τ1 :-> τ2 => e' <- gen_base_expr ftv (τ1 :: Γ) τ2;;
-                     ret (Lam τ1 e')
+                        (*                   trace ("Base - lam - generated: " ++ show (Lam τ1 e') ++ " : " ++ show τ ++ " from " ++ show (τ1 :: Γ) ++ ". ftv = " ++ show ftv ++ ". Vars: " ++ show vars ++ nl) *)
+                     (ret (Lam τ1 e'))
       | ForAll τ' => e' <- gen_base_expr (ftv + 1) (lift_env Γ) τ';;
-                     ret (TLam e')
+(*                     trace ("Base - Tlam - generated: " ++ show (TLam e') ++ " : " ++ show τ ++ " from " ++ show Γ ++ ". Lifted: " ++ show (lift_env Γ) ++ ". ftv + 1= " ++ show (ftv + 1) ++ ". Vars: " ++ show vars ++ nl) *)
+
+                     (ret (TLam e'))
       | TVar x =>
-        match vars with
-        | v :: vs => χ <- elems_ v vars;;
-                     ret (Some (Var x))
+(*        trace ("TVar base case with vars = " ++ show vars ++ " for : " ++ show x ++ nl) *)
+        (match vars with
+         | v :: vs =>
+           bindGen (elems_ v vars) (fun y =>
+(*           trace ("Picking one of vars: " ++ show vars ++ ". Picked: " ++ show y ++ nl) *)
+           (ret (Some y)))
         | [] => ret (@None Term)
-        end
+        end)
       end in
-  oneOf_ base (base :: map ret vars)).
+  oneOf_ base (base :: map ret vars))).
+
+Definition prop_gen_base_wt :=
+  forAll (gen_type 1 2) (fun τ =>
+  forAllMaybe (gen_base_expr 1 [TVar 0] τ) (fun e =>
+  whenFail ("Type was: " ++ show τ ++ nl ++
+            "Term was: " ++ show e ++ nl ++
+            "With Type: " ++ show (typeOf 1 [TVar 0] e) ++ nl)
+           (typeOf 1 [TVar 0] e = Some τ?))).
+
+(* QuickChick prop_gen_base_wt.*)
 
 Fixpoint closed tc τ : bool :=
   match τ with
@@ -428,60 +449,71 @@ Definition prop_gen_unsubst :=
 QuickChick prop_gen_unsubst.
                     
 Fixpoint gen_expr (n ftv : nat) (Γ : env) (τ : Typ) : G (option Term) :=
+(*  trace ("Generating expr with size: " ++ show n ++ nl ++
+         "FTV : " ++ show ftv ++ nl ++
+         "Γ : " ++ show Γ ++ nl ++
+         "τ : " ++ show τ ++ nl
+        ) *)
+        (        
   match n with
   | O    =>
-    trace ("Generating base (0) of type:" ++ show τ ++ nl)
+(*    trace ("Generating base (0) of type:" ++ show τ ++ nl) *)
           (bindGen (gen_base_expr ftv Γ τ) (fun x =>
-          (trace ("Generated: " ++ show x ++ nl) (ret x))))
+                                              (*        (trace ("Generated: " ++ show x ++ " : " ++ show τ ++ nl) *)
+                                              (ret x)))
   | S n' =>
     let gLam : list (G (option Term)) :=
-        trace ("Generating lam of type: " ++ show τ ++ nl)
+(*        trace ("Generating lam of type: " ++ show τ ++ nl) *)
               (
         match τ with
         | τ1 :-> τ2 =>
           [ e <- gen_expr n' ftv (τ1 :: Γ) τ2 ;;
-            ret (Lam τ1 e)
+(*            trace ("Generated Lam: " ++ show (Lam τ1 e) ++ " : " ++ show τ ++ nl) *)
+            (ret (Lam τ1 e))
           ]
         | _ => []
         end) in
     let gTLam : list (G (option Term)) :=
-        trace ("Generating τlam of type: " ++ show τ ++ nl)
+(*        trace ("Generating τlam of type: " ++ show τ ++ nl) *)
               (
         match τ with
         | ForAll τ' =>
           [ e <- gen_expr n' (ftv + 1) (lift_env Γ) τ' ;;
-            ret (TLam e)
+(*            trace ("Generated TLam: " ++ show (TLam e) ++ " : " ++ show τ ++ nl) *)
+            (ret (TLam e))
           ] 
         | _ => []
         end) in
     let gApp : G (option Term) :=
-        trace ("Generating app of type: " ++ show τ ++ nl)
+(*        trace ("Generating app of type: " ++ show τ ++ nl) *)
               (
-        bindGen (gen_type (min n 5) ftv) (fun τ1 =>
+        bindGen (gen_type ftv (min n 5)) (fun τ1 =>
         e1 <- gen_expr n' ftv Γ (τ1 :-> τ);;
         e2 <- gen_expr n' ftv Γ τ1;;
-        ret (App e1 e2))
+(*        trace ("Generated App: " ++ show (App e1 e2) ++ " : " ++ show τ ++ nl) *)
+        (ret (App e1 e2)))
               ) in
     let gTApp : G (option Term) :=
-        trace ("Generating tapp of type: " ++ show τ ++ nl)
+(*         trace ("Generating tapp of type: " ++ show τ ++ nl) *)
               (
         bindGen (genUnsubst τ) (fun τ12 =>
         let (τ1, τ2) := (τ12 : Typ * Typ) in 
         e <- gen_expr n' ftv Γ (ForAll τ1);;
-        ret (TApp e τ2)))
+(*        trace ("Generated TApp: " ++ show (TApp e τ2) ++ " : " ++ show τ ++ nl) *)
+        (ret (TApp e τ2))))
     in
     oneOf_ (gen_base_expr ftv Γ τ)
            ([ gen_base_expr ftv Γ τ] ++ gLam ++ gTLam ++ [gApp ; gTApp])
-  end.
-
+  end).
+ 
 Fixpoint shrink_expr (τ : Typ) (t : Term) : list Term :=
   List.filter (fun t' => typeOf 0 [] t' = Some τ?)
               (shrink t ++ List.concat (List.map shrink (shrink t))).
 
 (* Sample (gen_expr 3 [] (Base :-> Base)). *)
 Definition prop_gen_wt :=
-  forAll (gen_type 0 2) (fun τ =>
-  forAllMaybe (gen_expr 3 0 [] τ) (fun e =>
+  forAll (gen_type 0 4) (fun τ =>
+  forAllMaybe (gen_expr 7 0 [] τ) (fun e =>
   whenFail ("Type was: " ++ show τ ++ nl ++
             "Term was: " ++ show e ++ nl ++
             "With Type: " ++ show (typeOf 0 [] e) ++ nl)
@@ -490,26 +522,26 @@ Definition prop_gen_wt :=
 QuickChick prop_gen_wt. 
 
 Definition preservation (c : Mutant) (e : Term) :=
-  match typeOf [] e with
+  match typeOf 0 [] e with
   | Some τ =>
     whenFail ("Expr: " ++ show e ++ nl ++
-              "With Typ: " ++ show (typeOf [] e) ++ nl ++
+              "With Typ: " ++ show (typeOf 0 [] e) ++ nl ++
               "Steps to: " ++ show (pstep c e) ++ nl ++
-              "With Typ: " ++ show (typeOf [] (pstep c e)))
-             (typeOf [] (pstep c e) = Some τ?)
+              "With Typ: " ++ show (typeOf 0 [] (pstep c e)))
+             (typeOf 0 [] (pstep c e) = Some τ?)
   | _ => checker tt
   end.
 
 Definition preservation' (c : Mutant) (e : Term) : option bool := 
-  match typeOf [] e with
+  match typeOf 0 [] e with
   | Some τ =>
-    Some (typeOf [] (pstep c e) = Some τ?)
+    Some (typeOf 0 [] (pstep c e) = Some τ?)
   | _ => None
   end.
 
 Definition prop_preservation_smart (c : Mutant) :=
-  forAll (gen_Typ 3) (fun τ =>
-  forAllShrink (gen_expr 6 [] τ) (shrink_expr τ) (fun e =>
+  forAll (gen_type 0 4) (fun τ =>
+  forAllShrinkMaybe (gen_expr 7 0 [] τ) (shrink_expr τ) (fun e =>
   preservation c e)).
 
 Definition prop_preservation_naive (c : Mutant) := 
@@ -518,4 +550,4 @@ Definition prop_preservation_naive (c : Mutant) :=
 ManualExtract [Term; Typ; Mutant].
 Extract Constant defNumTests => "200000".
 
-(* QuickChick (prop_preservation NoMutant). *)
+QuickChick (prop_preservation_smart NoMutant). *)
