@@ -330,6 +330,7 @@ Fixpoint gen_base_expr (ftv : nat) (Γ : env) (τ : Typ) : G (option Term) :=
       map (fun '(n, τ') => Var n)
           (filter (fun '(n, τ') => τ = τ'?)
                   (combine (seq 0 (List.length Γ)) Γ)) in
+  trace ("Vars of type: " ++ show τ ++ " in " ++ show Γ ++ " are " ++ show vars ++ nl) (
   let base : G (option Term) :=
       match τ with
       | Base => ret (Some Unit)
@@ -344,7 +345,7 @@ Fixpoint gen_base_expr (ftv : nat) (Γ : env) (τ : Typ) : G (option Term) :=
         | [] => ret (@None Term)
         end
       end in
-  oneOf_ base (base :: map ret vars).
+  oneOf_ base (base :: map ret vars)).
 
 Fixpoint closed tc τ : bool :=
   match τ with
@@ -354,24 +355,43 @@ Fixpoint closed tc τ : bool :=
   | τ1 :-> τ2 => closed tc τ1 && closed tc τ2
   end.
 
-(* Calculates whether a type is closed and its possible closed subtypes. *)
-Fixpoint all_closed_subtypes tc (τ : Typ) : (bool * list Typ) :=
+(* Calculates how many foralls a subtype needs to become closed,
+   how many closed subterms it has, and a generator that picks
+   one of them uniformly. TODO: uniformly? uniformly on depth?
+ *)
+Fixpoint gen_closed_subtype' (τ : Typ) : (nat * nat * G Typ) :=
   match τ with
-  | TVar x => if x <? tc then (true, [TVar x]) else (false, [])
-  | Base => (true, [Base])
+  | TVar x => (x + 1, 0, ret Base) (* Base shouldn't be accesed ever *)
+  | Base => (0, 1, ret Base)
   | ForAll τ' =>
-    let (b, τs) := all_closed_subtypes (tc+1) τ' in
-    if b then (true, ForAll τ' :: τs) else (false, τs)
+    match gen_closed_subtype' τ' with
+    | (0, ns, g) =>
+(*       trace ("Forall is now closed: " ++ show τ' ++ nl)  *)
+      (0, ns + 1, freq_ g [ (1 , ret τ)
+                          ; (ns, g) ])
+    | (S nf', ns, g) =>
+      (nf', ns, g)
+    end
   | τ1 :-> τ2 =>
-    let (b1, τs1) := all_closed_subtypes tc τ1 in
-    let (b2, τs2) := all_closed_subtypes tc τ2 in
-    if (b1 && b2)%bool then (true, τ :: τs1 ++ τs2) else (false, τs1 ++ τs2)
-  end%list.
+    match gen_closed_subtype' τ1, gen_closed_subtype' τ2 with
+    | (0, ns1, g1), (0, ns2, g2) =>
+(*       trace ("Both subtypes are closed: " ++ show τ1 ++ " , " ++ show τ2 ++ nl) *)
+      (0, 1 + ns1 + ns2, freq_ (ret τ) [ (1  , ret τ)
+                                       ; (ns1, g1)
+                                       ; (ns2, g2) ])
+    | (nf1, ns1, g1), (nf2, ns2, g2) =>
+(*      trace ("At least one not closed. " ++ show τ1 ++ " , " ++ show τ2 ++ nl ++
+             "Now needs: " ++ show (max nf1 nf2) ++ nl
+            )       *)
+      (max nf1 nf2, ns1 + ns2, freq_ g1 [ (ns1, g1) ; (ns2, g2) ])
+    end
+  end.
   
-Fixpoint fetch_sub_type τ : G (option Typ) :=
-  elems_ (None)
-         (map Some (snd (all_closed_subtypes 0 τ))).
-                              
+Fixpoint fetch_sub_type τ : G Typ :=
+  match gen_closed_subtype' τ with
+  | (_, _, g) => g
+  end.
+
 (* Replace (some occurrences of) closed type σ in type τ by (TVar n) *)
 Fixpoint replace_sub_type n σ τ : G Typ :=
   if σ = τ ? then
@@ -384,47 +404,71 @@ Fixpoint replace_sub_type n σ τ : G Typ :=
        | τ1 :-> τ2 => τ1' <- replace_sub_type n σ τ1;;
                       τ2' <- replace_sub_type n σ τ2;;
                       ret (τ1' :-> τ2')
-       | ForAll τ' => τ'' <- replace_sub_type n σ τ';;
+       | ForAll τ' => τ'' <- replace_sub_type (n+1) σ τ';;
                       ret (ForAll τ'')
        end.
 
 (* Generate t1 t2 such that t1{0:=t2} = t *)
-Definition genUnsubst τ : G (option (Typ * Typ)) :=
+Definition genUnsubst τ : G (Typ * Typ) :=
   let τ' := lift_type NoMutant 0 τ in
-  bindGenOpt (fetch_sub_type τ') (fun τ2 =>
-  bindGen  (replace_sub_type 0 τ2 τ') (fun τ1 =>
-  returnGen (Some (τ1, τ2)))).                                         
+  τ2 <- fetch_sub_type τ;;
+  τ1 <- replace_sub_type 0 τ2 τ';;
+  ret (τ1, τ2).     
 
+Definition prop_gen_unsubst :=
+  forAll (gen_type 0 10) (fun τ =>
+  forAll (genUnsubst τ) (fun τ12 =>                            
+  let (τ1, τ2) := τ12 in
+  whenFail ("Original Type: " ++ show τ ++ nl ++
+            "τ1: " ++ show τ1 ++ nl ++
+            "τ2: " ++ show τ2 ++ nl ++
+            "subst 0 τ2 τ1 := " ++ show (subst_in_type NoMutant 0 τ2 τ1) ++ nl)
+           (subst_in_type NoMutant 0 τ2 τ1 = τ ?))).
+
+QuickChick prop_gen_unsubst.
+                    
 Fixpoint gen_expr (n ftv : nat) (Γ : env) (τ : Typ) : G (option Term) :=
   match n with
-  | O    => gen_base_expr ftv Γ τ
+  | O    =>
+    trace ("Generating base (0) of type:" ++ show τ ++ nl)
+          (bindGen (gen_base_expr ftv Γ τ) (fun x =>
+          (trace ("Generated: " ++ show x ++ nl) (ret x))))
   | S n' =>
     let gLam : list (G (option Term)) :=
+        trace ("Generating lam of type: " ++ show τ ++ nl)
+              (
         match τ with
         | τ1 :-> τ2 =>
           [ e <- gen_expr n' ftv (τ1 :: Γ) τ2 ;;
             ret (Lam τ1 e)
           ]
         | _ => []
-        end in
+        end) in
     let gTLam : list (G (option Term)) :=
+        trace ("Generating τlam of type: " ++ show τ ++ nl)
+              (
         match τ with
         | ForAll τ' =>
           [ e <- gen_expr n' (ftv + 1) (lift_env Γ) τ' ;;
             ret (TLam e)
           ] 
         | _ => []
-        end in
+        end) in
     let gApp : G (option Term) :=
+        trace ("Generating app of type: " ++ show τ ++ nl)
+              (
         bindGen (gen_type (min n 5) ftv) (fun τ1 =>
         e1 <- gen_expr n' ftv Γ (τ1 :-> τ);;
         e2 <- gen_expr n' ftv Γ τ1;;
-        ret (App e1 e2)) in
+        ret (App e1 e2))
+              ) in
     let gTApp : G (option Term) :=
-        τ12 <- genUnsubst τ;;
+        trace ("Generating tapp of type: " ++ show τ ++ nl)
+              (
+        bindGen (genUnsubst τ) (fun τ12 =>
         let (τ1, τ2) := (τ12 : Typ * Typ) in 
-        e <- gen_expr n' ftv Γ τ1;;
-        ret (TApp e τ2)
+        e <- gen_expr n' ftv Γ (ForAll τ1);;
+        ret (TApp e τ2)))
     in
     oneOf_ (gen_base_expr ftv Γ τ)
            ([ gen_base_expr ftv Γ τ] ++ gLam ++ gTLam ++ [gApp ; gTApp])
@@ -436,9 +480,12 @@ Fixpoint shrink_expr (τ : Typ) (t : Term) : list Term :=
 
 (* Sample (gen_expr 3 [] (Base :-> Base)). *)
 Definition prop_gen_wt :=
-  forAll (gen_type 0 5) (fun τ =>
-  forAllMaybe (gen_expr 6 0 [] τ) (fun e =>
-  typeOf 0 [] e = Some τ?)). 
+  forAll (gen_type 0 2) (fun τ =>
+  forAllMaybe (gen_expr 3 0 [] τ) (fun e =>
+  whenFail ("Type was: " ++ show τ ++ nl ++
+            "Term was: " ++ show e ++ nl ++
+            "With Type: " ++ show (typeOf 0 [] e) ++ nl)
+           (typeOf 0 [] e = Some τ?))).
 
 QuickChick prop_gen_wt. 
 
