@@ -1,7 +1,7 @@
 Require Import Arith List String.
 From QuickChick Require Import QuickChick.
 From ExtLib Require Import Monad.
-From ExtLib.Data.Monads Require Import OptionMonad.
+From ExtLib.Data.Monads Require Import OptionMonad ListMonad.
 Import QcNotation.
 
 Import MonadNotation.
@@ -203,6 +203,7 @@ Fixpoint type_subst c n σ e :=
   end.
 
 Fixpoint subst (c : Mutant) (n : nat) (s : Term) (e : Term) : Term :=
+(*  trace ("Subst: " ++ show e ++ " {" ++ show n ++ " := " ++ show s ++ "}" ++ nl) *) ( 
   match e with
   | Unit  => Unit
   | Var x =>
@@ -217,7 +218,7 @@ Fixpoint subst (c : Mutant) (n : nat) (s : Term) (e : Term) : Term :=
   | TLam e'   => mut c (TLam (subst c n (lift_types c 0 s) e'))
                      [ (SubstNoLiftT, TLam (subst c n s e')) ]
   | TApp e' τ => TApp (subst c n s e') τ
-  end.
+  end).
 
 (** Typing *)
 
@@ -292,13 +293,15 @@ Fixpoint pstep (c : Mutant) (e : Term) : Term :=
   | App e1 e2 => let e1' := pstep c e1 in
                  let e2' := pstep c e2 in
                  match e1' with
-                 | Lam τ body => subst c 0 e2' body
+                 | Lam τ body =>
+(*                   trace ("Substituting..." ++ show e2' ++ " into " ++ show body ++ " for 0 yields: " ++ show (subst c 0 e2' body) ++ nl) *)
+                         (subst c 0 e2' body) 
                  | _ => App e1' e2'
                  end
   | TLam e' => TLam (pstep c e')
   | TApp e' τ => match pstep c e' with
                  | TLam body => type_subst c 0 τ body
-                 | e => e
+                 | e => TApp e' τ
                  end
   end.
 
@@ -446,7 +449,7 @@ Definition prop_gen_unsubst :=
             "subst 0 τ2 τ1 := " ++ show (subst_in_type NoMutant 0 τ2 τ1) ++ nl)
            (subst_in_type NoMutant 0 τ2 τ1 = τ ?))).
 
-QuickChick prop_gen_unsubst.
+(* QuickChick prop_gen_unsubst. *)
                     
 Fixpoint gen_expr (n ftv : nat) (Γ : env) (τ : Typ) : G (option Term) :=
 (*  trace ("Generating expr with size: " ++ show n ++ nl ++
@@ -550,4 +553,22 @@ Definition prop_preservation_naive (c : Mutant) :=
 ManualExtract [Term; Typ; Mutant].
 Extract Constant defNumTests => "200000".
 
-QuickChick (prop_preservation_smart NoMutant). *)
+Definition genTypeExpr : G (option (Typ * Term)) :=
+  bindGen (gen_type 0 4) (fun τ =>
+  e <- gen_expr 7 0 [] τ;;
+  ret (τ, e)).
+
+Definition shrinkTypeExpr (τe : Typ * Term) : list (Typ * Term) :=
+  let '(τ, e) := τe in
+  (τ' <- shrink τ;;
+   e' <- shrink_expr τ' e;;
+   ret (τ', e')
+  ) ++
+  (e' <- shrink_expr τ e;;
+   ret (τ, e')).      
+
+Definition prop_preservation_debug :=
+  forAllShrinkMaybe genTypeExpr shrinkTypeExpr (fun te => preservation NoMutant (snd te)).
+
+QuickChick (prop_preservation_debug).
+
