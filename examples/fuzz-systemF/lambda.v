@@ -545,7 +545,7 @@ Definition preservation' (c : Mutant) (e : Term) : option bool :=
 
 Definition prop_preservation_smart (c : Mutant) :=
   forAll (gen_type 0 4) (fun τ =>
-  forAllShrinkMaybe (gen_expr 7 0 [] τ) (shrink_expr τ) (fun e =>
+  forAllMaybe (gen_expr 7 0 [] τ) (fun e =>
   preservation c e)).
 
 Definition prop_preservation_naive (c : Mutant) := 
