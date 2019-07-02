@@ -146,9 +146,9 @@ Fixpoint lift (c : Mutant) (n : nat) (e : Term) : Term :=
                        [ (LiftLamNoIncr, Lam τ (lift c n e'))
                        ; (LiftLamNoLift, Lam τ e') ]
   | App e1 e2 => App (lift c n e1) (lift c n e2)
-  | TLam e'   => mut c (TLam (lift c (n+1) e'))
+  | TLam e'   => mut c (TLam (lift c n e'))
                        [ (LiftTLamNoLift, TLam e')
-                       ; (LiftTLamNoIncr, TLam (lift c n e')) ]
+                       ; (LiftTLamNoIncr, TLam (lift c (n+1) e')) ]
   | TApp e' τ => mut c (TApp (lift c n e') τ)
                        [ (LiftTAppNoLift, (TApp e' τ)) ]
   end.
@@ -203,7 +203,8 @@ Fixpoint type_subst c n σ e :=
   end.
 
 Fixpoint subst (c : Mutant) (n : nat) (s : Term) (e : Term) : Term :=
-(*  trace ("Subst: " ++ show e ++ " {" ++ show n ++ " := " ++ show s ++ "}" ++ nl) *) ( 
+(* trace ("Subst: " ++ show e ++ " {" ++ show n ++ " := " ++ show s ++ "}" ++ nl)  *)
+(
   match e with
   | Unit  => Unit
   | Var x =>
@@ -294,14 +295,14 @@ Fixpoint pstep (c : Mutant) (e : Term) : Term :=
                  let e2' := pstep c e2 in
                  match e1' with
                  | Lam τ body =>
-(*                   trace ("Substituting..." ++ show e2' ++ " into " ++ show body ++ " for 0 yields: " ++ show (subst c 0 e2' body) ++ nl) *)
+(*                   trace ("Substituting..." ++ show e2' ++ " into " ++ show body ++ " for 0 yields: " ++ show (subst c 0 e2' body) ++ nl)  *)
                          (subst c 0 e2' body) 
                  | _ => App e1' e2'
                  end
   | TLam e' => TLam (pstep c e')
   | TApp e' τ => match pstep c e' with
                  | TLam body => type_subst c 0 τ body
-                 | e => TApp e' τ
+                 | _ => TApp e' τ
                  end
   end.
 
@@ -522,7 +523,7 @@ Definition prop_gen_wt :=
             "With Type: " ++ show (typeOf 0 [] e) ++ nl)
            (typeOf 0 [] e = Some τ?))).
 
-QuickChick prop_gen_wt. 
+(* QuickChick prop_gen_wt.  *)
 
 Definition preservation (c : Mutant) (e : Term) :=
   match typeOf 0 [] e with
@@ -551,7 +552,7 @@ Definition prop_preservation_naive (c : Mutant) :=
   forAll arbitrary (preservation c).
 
 ManualExtract [Term; Typ; Mutant].
-Extract Constant defNumTests => "200000".
+Extract Constant defNumTests => "1000000".
 
 Definition genTypeExpr : G (option (Typ * Term)) :=
   bindGen (gen_type 0 4) (fun τ =>
@@ -570,5 +571,7 @@ Definition shrinkTypeExpr (τe : Typ * Term) : list (Typ * Term) :=
 Definition prop_preservation_debug :=
   forAllShrinkMaybe genTypeExpr shrinkTypeExpr (fun te => preservation NoMutant (snd te)).
 
-QuickChick (prop_preservation_debug).
+(* QuickChick (prop_preservation_debug). *)
+
+
 
