@@ -20,8 +20,10 @@ matrix:
   fast_finish: true
   allow_failures:
     - os: osx
+    - name: Dune
   include:
     - os: linux
+      name: Dune
       env:
         - OCAML_VERSION=4.07
       script: |
