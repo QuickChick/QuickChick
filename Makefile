@@ -49,7 +49,7 @@ src/%.cmo : src/%.ml
 quickChickTool: $(QCTOOL_DIR)/$(QCTOOL_EXE)
 
 $(QCTOOL_DIR)/$(QCTOOL_EXE): $(QCTOOL_SRC)
-	cd $(QCTOOL_DIR); ocamlbuild -use-ocamlfind $(QCTOOL_EXE)
+	cd $(QCTOOL_DIR); ocamlbuild -pkg unix -use-ocamlfind $(QCTOOL_EXE)
 
 tests:
 #	$(MAKE) -C examples/ifc-basic test
