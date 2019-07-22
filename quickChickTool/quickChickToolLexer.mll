@@ -6,7 +6,7 @@ open QuickChickToolTypes
 (* Function to increase line count in lexbuf *)
 let line_incs s lexbuf =
 (*  Printf.printf "Read: %s\n" s; *)
-  let splits = Str.split_delim (Str.regexp "\n") s in 
+  let splits = String.split_on_char '\n' s in
   let pos = lexbuf.Lexing.lex_curr_p in
 (* Printf.printf "Was in line %d, position %d\n" pos.pos_lnum (pos.pos_cnum - pos.pos_bol); *)
   lexbuf.Lexing.lex_curr_p <- {
