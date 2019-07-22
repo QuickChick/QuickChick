@@ -248,12 +248,24 @@ let gather_all_vs_from_dir fs =
   in loop fs;
   !all_vs
 
-open CoqProject_file
-
-let vs_from_file f =
-  let project = CoqProject_file.read_project_file f in
-  List.map (fun s -> match s with {thing = str; _} -> str)
-    project.v_files
+(* Find all .v files listed by file fpath. Assumes filenames have no
+ * whitespace, and recognizes single-line comments prefixed with '#'. *)
+let vs_from_file fpath =
+  let f = open_in fpath in
+  let files = ref [] in
+  try while true do (* Read the whole file f *)
+    let line = input_line f in
+    let line = match String.index line '#' with
+               | exception Not_found -> line
+               | i -> String.sub line 0 i
+    in
+    line
+      |> String.split_on_char ' '
+      |> List.iter (fun w ->
+          if Filename.check_suffix w ".v" then
+            files := w :: !files)
+  done; assert false with
+  | End_of_file -> !files
 
 let gather_all_vs_from_file f fs =
   let included = vs_from_file f in
