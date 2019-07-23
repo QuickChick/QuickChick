@@ -105,6 +105,7 @@ val dep_type_len : dep_type -> int
 val dep_result_type : dep_type -> dep_type
 
 (* option type helpers *)
+val option_map : ('a -> 'b) -> 'a option -> 'b option
 val (>>=) : 'a option -> ('a -> 'b option) -> 'b option                                   
 val isSome : 'a option -> bool
 val cat_maybes : 'a option list -> 'a list
