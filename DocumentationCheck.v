@@ -1,6 +1,8 @@
 Require Import mathcomp.ssreflect.ssreflect.
 From mathcomp Require Import ssrbool.
-Require Import QuickChick ZArith Strings.Ascii Strings.String.
+Require Import ZArith Strings.Ascii Strings.String.
+
+Require Import QuickChick.Core.
 Require Import QuickChickInterface.
 
 

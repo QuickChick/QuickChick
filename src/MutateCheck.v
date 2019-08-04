@@ -1,4 +1,4 @@
-Require Import QuickChick.
+Require Import QuickChick.Core.
 
 Class Mutateable (A : Type) : Type :=
 {
