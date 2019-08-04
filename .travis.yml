@@ -60,38 +60,38 @@ script:
   opam pin -k path coq-quickchick .;
   opam install coq-quickchick;
   echo -e 'travis_fold:end:QuickChick.build'
-- echo 'Unit testing...';
-  echo -e 'travis_fold:start:QuickChick.test.unit';
-  make -C test;
-  echo -e 'travis_fold:end:QuickChick.test.unit'
-- echo 'Testing IFC...';
-  echo -e 'travis_fold:start:QuickChick.test.ifc-basic';
-  make -C examples/ifc-basic;
-  echo -e 'travis_fold:end:QuickChick.test.ifc-basic'
-- echo 'Testing Red-black tree...';
-  echo -e 'travis_fold:start:QuickChick.test.RedBlack';
-  make -C examples/RedBlack;
-  echo -e 'travis_fold:end:QuickChick.test.RedBlack'
-- echo 'Testing STLC...';
-  echo -e 'travis_fold:start:QuickChick.test.stlc';
-  make -C examples/stlc;
-  echo -e 'travis_fold:end:QuickChick.test.stlc'
-- echo 'Testing Multifile Mutation...';
-  echo -e 'travis_fold:start:QuickChick.test.multifile-mutation';
-  make -C examples/multifile-mutation test;
-  echo -e 'travis_fold:end:QuickChick.test.multifile-mutation'
-- echo 'Testing C Mutation...';
-  echo -e 'travis_fold:start:QuickChick.test.c-mutation';
-  make -C examples/c-mutation test;
-  echo -e 'travis_fold:end:QuickChick.test.c-mutation'
-- echo 'Testing -N option...';
-  echo -e 'travis_fold:start:QuickChick.test.less';
-  make -C examples/c-mutation lesstest;
-  echo -e 'travis_fold:end:QuickChick.test.less'
-- echo 'Testing Python I/O...';
-  echo -e 'travis_fold:start:QuickChick.test.python-io';
-  make -C examples/python-io lesstest;
-  echo -e 'travis_fold:end:QuickChick.test.python-io'
+# - echo 'Unit testing...';
+#   echo -e 'travis_fold:start:QuickChick.test.unit';
+#   make -C test;
+#   echo -e 'travis_fold:end:QuickChick.test.unit'
+# - echo 'Testing IFC...';
+#   echo -e 'travis_fold:start:QuickChick.test.ifc-basic';
+#   make -C examples/ifc-basic;
+#   echo -e 'travis_fold:end:QuickChick.test.ifc-basic'
+# - echo 'Testing Red-black tree...';
+#   echo -e 'travis_fold:start:QuickChick.test.RedBlack';
+#   make -C examples/RedBlack;
+#   echo -e 'travis_fold:end:QuickChick.test.RedBlack'
+# - echo 'Testing STLC...';
+#   echo -e 'travis_fold:start:QuickChick.test.stlc';
+#   make -C examples/stlc;
+#   echo -e 'travis_fold:end:QuickChick.test.stlc'
+# - echo 'Testing Multifile Mutation...';
+#   echo -e 'travis_fold:start:QuickChick.test.multifile-mutation';
+#   make -C examples/multifile-mutation test;
+#   echo -e 'travis_fold:end:QuickChick.test.multifile-mutation'
+# - echo 'Testing C Mutation...';
+#   echo -e 'travis_fold:start:QuickChick.test.c-mutation';
+#   make -C examples/c-mutation test;
+#   echo -e 'travis_fold:end:QuickChick.test.c-mutation'
+# - echo 'Testing -N option...';
+#   echo -e 'travis_fold:start:QuickChick.test.less';
+#   make -C examples/c-mutation lesstest;
+#   echo -e 'travis_fold:end:QuickChick.test.less'
+# - echo 'Testing Python I/O...';
+#   echo -e 'travis_fold:start:QuickChick.test.python-io';
+#   make -C examples/python-io lesstest;
+#   echo -e 'travis_fold:end:QuickChick.test.python-io'
 - echo 'Removing QuickChick...';
   echo -e 'travis_fold:start:QuickChick.remove';
   opam remove coq-quickchick;
