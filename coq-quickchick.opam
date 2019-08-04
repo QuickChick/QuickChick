@@ -17,7 +17,7 @@ depends: [
   "coq-mathcomp-ssreflect"
   "ocamlbuild"
   "ocamlfind"
-  "coq-simple-io" {>= "1.0" < "1.1"}
+  "coq-simple-io" {>= "1.0" < "1.3"}
 ]
 
 authors: [
