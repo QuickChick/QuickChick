@@ -1,5 +1,7 @@
 -R src QuickChick
 -I src
+src/Int64.v
+src/Prng.v
 src/Tactics.v
 src/Sets.v
 src/Nat_util.v
