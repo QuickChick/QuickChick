@@ -9,7 +9,6 @@ open Constrexpr_ops
 open Ppconstr
 open Context
 open Error
-open Globnames
 
 let cnt = ref 0 
 
@@ -694,6 +693,7 @@ let gType ty_params dep_type =
 let get_type (id : Id.t) = 
   msg_debug (str ("Trying to global:" ^ Id.to_string id) ++ fnl ());
   let glob_ref = Nametab.global (qualid_of_ident id) in
+  let open GlobRef in
   match glob_ref with 
   | VarRef _ -> msg_debug  (str "Var" ++ fnl ())
   | ConstRef _ -> msg_debug (str "Constant" ++ fnl ())
@@ -703,7 +703,7 @@ let get_type (id : Id.t) =
 let is_inductive c = 
   let glob_ref = Nametab.global c in
   match glob_ref with
-  | IndRef _ -> true
+  | GlobRef.IndRef _ -> true
   | _        -> false
 
 let is_inductive_dt dt = 
