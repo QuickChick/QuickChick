@@ -122,6 +122,10 @@ Definition of_hex (s : string) : int64 :=
 
 (** *** From [int64] *)
 
+(** Truncates *)
+Definition to_int '(Int64 m i) : int :=
+  (m << 1) + b2i i.
+
 Definition to_Z (n : int64) : Z :=
   2 * Int63.to_Z (ms63b n) + Z.b2z (lsb n).
 
