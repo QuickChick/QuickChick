@@ -1,4 +1,3 @@
-open Decl_kinds
 open Pp
 open Constr
 open Names
@@ -10,7 +9,6 @@ open Constrexpr_ops
 open Ppconstr
 open Context
 open Error
-open Globnames
 
 let cnt = ref 0 
 
@@ -86,8 +84,8 @@ let gArg ?assumName:(an=hole) ?assumType:(at=hole) ?assumImplicit:(ai=false) ?as
     | { CAst.v = CHole (_v,_,_); loc } -> (loc,Anonymous)
     | _a -> failwith "This expression should be a name" in
   CLocalAssum ( [CAst.make ?loc:(fst n) @@ snd n],
-                  (if ag then Generalized (Implicit, false)
-                   else if ai then Default Implicit else Default Explicit),
+                  (if ag then Generalized (Glob_term.Implicit, false)
+                   else if ai then Default Glob_term.Implicit else Default Glob_term.Explicit),
                   at )
 
 let arg_to_var (x : arg) =
@@ -586,7 +584,7 @@ let gFun xss (f_body : var list -> coq_expr) =
   | _ ->
   let xvs = List.map (fun x -> fresh_name x) xss in
   (* TODO: optional argument types for xss *)
-  let binder_list = List.map (fun x -> CLocalAssum ([CAst.make @@ Name x], Default Explicit, hole)) xvs in
+  let binder_list = List.map (fun x -> CLocalAssum ([CAst.make @@ Name x], Default Glob_term.Explicit, hole)) xvs in
   let fun_body = f_body xvs in
   mkCLambdaN binder_list fun_body 
 
@@ -596,7 +594,7 @@ let gFunTyped xts (f_body : var list -> coq_expr) =
   | _ ->
   let xvs = List.map (fun (x,t) -> (fresh_name x,t)) xts in
   (* TODO: optional argument types for xss *)
-  let binder_list = List.map (fun (x,t) -> CLocalAssum ([CAst.make @@ Name x], Default Explicit, t)) xvs in
+  let binder_list = List.map (fun (x,t) -> CLocalAssum ([CAst.make @@ Name x], Default Glob_term.Explicit, t)) xvs in
   let fun_body = f_body (List.map fst xvs) in
   mkCLambdaN binder_list fun_body 
 
@@ -695,6 +693,7 @@ let gType ty_params dep_type =
 let get_type (id : Id.t) = 
   msg_debug (str ("Trying to global:" ^ Id.to_string id) ++ fnl ());
   let glob_ref = Nametab.global (qualid_of_ident id) in
+  let open GlobRef in
   match glob_ref with 
   | VarRef _ -> msg_debug  (str "Var" ++ fnl ())
   | ConstRef _ -> msg_debug (str "Constant" ++ fnl ())
@@ -704,7 +703,7 @@ let get_type (id : Id.t) =
 let is_inductive c = 
   let glob_ref = Nametab.global c in
   match glob_ref with
-  | IndRef _ -> true
+  | GlobRef.IndRef _ -> true
   | _        -> false
 
 let is_inductive_dt dt = 
