@@ -141,7 +141,8 @@ tablify fn allData = do
 main = do
   smartRuns <- parseRandomDir Smart "../output_smart/"
   naiveRuns <- parseRandomDir Naive "../output_naive/"
-  putStrLn $ show naiveRuns
+  fuzzRuns  <- parseRandomDir Fuzz  "../output_fuzz/"
+  putStrLn $ show fuzzRuns
 
 --register :: IO ()
 --register = do

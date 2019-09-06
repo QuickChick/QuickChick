@@ -62,9 +62,14 @@ realP = do
   return elapsed
 
 isPassFailLine :: String -> Maybe Bool
-isPassFailLine ('+':'+':'+':_) = Just True
-isPassFailLine ('*':'*':'*':_) = Just False
-isPassFailLine _ = Nothing
+isPassFailLine s
+  | "+++ Passed" `isInfixOf` s = Just True
+  | "*** Failed" `isInfixOf` s = Just False
+  | otherwise = Nothing
+--  
+--isPassFailLine ('+':'+':'+':_) = Just True
+--isPassFailLine ('*':'*':'*':_) = Just False
+--isPassFailLine _ = Nothing
 
 isRealLine :: String -> String -> Maybe Double
 isRealLine fn line =
@@ -72,14 +77,14 @@ isRealLine fn line =
     Right d  -> Just d
     Left err -> Nothing
 
-getData :: String -> (String -> Maybe a) -> [String] -> a
+getData :: String -> (String -> Maybe a) -> [String] -> Maybe a
 getData desc fun lines =
   let mapped = map fun lines
   in case catMaybes mapped of
-       [x] -> x
-       []  -> error $ "No options for (" ++ desc ++ "): " ++ show lines
-
-parseRandomFile :: Mode -> String -> String -> SingleRun
+       [x] -> Just x
+       []  -> traceShow ("Error!", desc) Nothing
+       
+parseRandomFile :: Mode -> String -> String -> Maybe SingleRun
 parseRandomFile m fn contents =
   -- Drop all but the last 5 lines
   let allLines = lines contents
@@ -89,13 +94,16 @@ parseRandomFile m fn contents =
       discards = 0 -- TODO
       t = getData (fn ++ "Real") (isRealLine fn) allLines
   in
-  Run { mode = m
-      , mutant = mutantId
-      , failed = isFail
-      , time   = t
-      , execs = runs
-      , discs = discards
-      } 
+  case (isFail, t) of
+    (Just isFail, Just t) ->
+      Just $ Run { mode = m
+                 , mutant = mutantId
+                 , failed = isFail
+                 , time   = t
+                 , execs = runs
+                 , discs = discards
+                 }
+    _ -> Nothing
 
 parseRandomDir :: Mode -> String -> IO [SingleRun]
 parseRandomDir mode dir = do
@@ -110,7 +118,7 @@ parseRandomDir mode dir = do
     let result = parseRandomFile mode f contents
     result `deepseq` hClose handle
     return result
-  return allRuns
+  return $ catMaybes allRuns
 
 
 {-
