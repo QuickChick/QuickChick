@@ -1,0 +1,10 @@
+flags: {}
+packages:
+- .
+extra-deps:
+- cairo-0.13.6.0
+- Chart-1.9.1
+- Chart-cairo-1.9.1
+- gtk2hs-buildtools-0.13.5.0
+allow-newer: true
+resolver: lts-14.4
