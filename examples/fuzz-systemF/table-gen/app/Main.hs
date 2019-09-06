@@ -2,6 +2,7 @@ module Main where
 
 import Control.Monad
 import Data.List
+import Data.Function (on)
 
 import System.Directory
 import System.FilePath
@@ -138,11 +139,41 @@ tablify fn allData = do
 --    hPutStrLn outFile $ printf "%s & %s & %s & %s & %s\\\\" (mttf rs) (mttf fs) (mttf q) (mttf rd) (mttf fd)
 --  hClose outFile
 
+chartRuns smart naive fuzz = renderableToFile def "bargraph.png" $ toRenderable layout
+  where calcTime runs =
+          let perMutantRuns  = groupBy ((==) `on` mutant) runs
+              perMutantTimes = map (\mr -> let rs = map time mr in sum rs / genericLength rs) perMutantRuns
+          in perMutantTimes
+        times = transpose [calcTime smart, calcTime naive, calcTime fuzz]
+       
+        layout = 
+              layout_title .~ "System F" ++ btitle
+            $ layout_title_style . font_size .~ 10
+            $ layout_x_axis . laxis_generate .~ autoIndexAxis alabels
+            $ layout_y_axis . laxis_override .~ axisGridHide
+            $ layout_left_axis_visibility . axis_show_ticks .~ False
+            $ layout_plots .~ [ plotBars bars2 ]
+            $ def :: Layout PlotIndex Double
+       
+        bars2 = plot_bars_titles .~ ["Smart", "Random", "Fuzz"]
+            $ plot_bars_values .~ addIndexes times
+            $ plot_bars_style .~ BarsClustered
+            $ plot_bars_spacing .~ BarsFixGap 30 5
+            $ plot_bars_item_styles .~ map mkstyle (cycle defaultColorSeq)
+            $ def
+       
+        alabels = map show [1..19]
+       
+        btitle = "" 
+        bstyle = Nothing
+        mkstyle c = (solidFillStyle c, bstyle)
+  
+
 main = do
   smartRuns <- parseRandomDir Smart "../output_smart/"
   naiveRuns <- parseRandomDir Naive "../output_naive/"
   fuzzRuns  <- parseRandomDir Fuzz  "../output_fuzz/"
-  putStrLn $ show fuzzRuns
+  chartRuns smartRuns naiveRuns fuzzRuns
 
 --register :: IO ()
 --register = do
