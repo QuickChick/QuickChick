@@ -174,13 +174,14 @@ Module ConsistencyCheck : QuickChickSig.
 
   Definition dec_if_dec_eq := @dec_if_dec_eq.
   Definition Eq__Dec     := @Eq__Dec.
-  Definition Dec_eq_bool := @Dec_eq_bool.
-  Definition Dec_eq_nat  := @Dec_eq_nat .
-  Definition Dec_eq_opt  := @Dec_eq_opt .
-  Definition Dec_eq_prod := @Dec_eq_prod.
-  Definition Dec_eq_list := @Dec_eq_list.
-  Definition Dec_ascii   := @Dec_ascii.
-  Definition Dec_string  := @Dec_string.
+  Definition Eq_bool   := @Eq_bool.
+  Definition Eq_nat    := @Eq_nat.
+  Definition Eq_opt    := @Eq_opt.
+  Definition Eq_prod   := @Eq_prod.
+  Definition Eq_sum    := @Eq_sum.
+  Definition Eq_list   := @Eq_list.
+  Definition Eq_ascii  := @Eq_ascii.
+  Definition Eq_string := @Eq_string.
 
   (** =================================================================== *)
   (** QuickChick toplevel commands and arguments.                         *)

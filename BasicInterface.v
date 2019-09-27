@@ -447,19 +447,15 @@ Parameter dec_if_dec_eq :
 Declare Instance Eq__Dec {A} `{H : Eq A} (x y : A) : Dec (x = y).
 
 (* Lifting common decidable instances *)
-Declare Instance Dec_eq_bool (x y : bool) : Dec (x = y).
-Declare Instance Dec_eq_nat (m n : nat) : Dec (m = n).
-Declare Instance Dec_eq_opt (A : Type) (m n : option A)
-`{_ : forall (x y : A), Dec (x = y)} : Dec (m = n).
-Declare Instance Dec_eq_prod (A B : Type) (m n : A * B)
-`{_ : forall (x y : A), Dec (x = y)} 
-`{_ : forall (x y : B), Dec (x = y)} 
-: Dec (m = n).
-Declare Instance Dec_eq_list (A : Type) (m n : list A)
-`{_ : forall (x y : A), Dec (x = y)} : Dec (m = n).
+Declare Instance Eq_bool : Eq bool.
+Declare Instance Eq_nat  : Eq nat.
+Declare Instance Eq_opt (A : Type) `{Eq A} : Eq (option A).
+Declare Instance Eq_prod (A B : Type) `{Eq A} `{Eq B} : Eq (A * B).
+Declare Instance Eq_sum (A B : Type) `{Eq A} `{Eq B} : Eq (A + B).
+Declare Instance Eq_list (A : Type) `{Eq A} : Eq (list A).
 
-Declare Instance Dec_ascii (m n : Ascii.ascii) : Dec (m = n).
-Declare Instance Dec_string (m n : string) : Dec (m = n).
+Declare Instance Eq_ascii : Eq ascii.
+Declare Instance Eq_string : Eq string.
 
 (** =================================================================== *)
 (** QuickChick toplevel commands and arguments.                         *)
