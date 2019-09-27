@@ -125,10 +125,12 @@ Ltac dec_eq :=
   repeat match goal with
          | [ |- _ ] => solve [auto with eq_dec]
          | [ |- Dec _ ] => constructor
+         | [ |- Dec_Eq _ ]  => constructor
          | [ |- context[decidable _] ] => unfold decidable
 
          | [ H: context[decidable _] |- _ ] => unfold decidable in H
 
+         | [ |- forall x y, {x = y} + {x <> y} ] => decide equality
          | [ |- {?x = ?y} + {?x <> ?y} ] =>
            multimatch goal with
              | [ H: forall x y, Dec _ |- _ ] => apply H
@@ -144,42 +146,40 @@ dec_eq.
 Defined.
 
 (* Lifting common decidable instances *)
-Global Instance Dec_eq_unit (x y : unit) : Dec (x = y).
+Global Instance Dec_eq_unit : Dec_Eq unit.
 Proof. dec_eq. Defined.
 
-Global Instance Dec_eq_bool (x y : bool) : Dec (x = y).
+Global Instance Dec_eq_bool : Dec_Eq bool.
 Proof. dec_eq. Defined.
 
-Global Instance Dec_eq_nat (m n : nat) : Dec (m = n).
+Global Instance Dec_eq_nat : Dec_Eq nat.
 Proof. dec_eq. Defined.
 
-Global Instance Dec_eq_Z (m n : Z) : Dec (m = n).
+Global Instance Dec_eq_Z : Dec_Eq Z.
 Proof. dec_eq. Defined.
 
-Global Instance Dec_eq_N (m n : N) : Dec (m = n).
+Global Instance Dec_eq_N : Dec_Eq N.
 Proof. dec_eq. Defined.
 
-Global Instance Dec_eq_opt (A : Type) (m n : option A)
-  `{_ : forall (x y : A), Dec (x = y)} : Dec (m = n).
+Global Instance Dec_eq_opt (A : Type) `{Dec_Eq A} : Dec_Eq (option A).
 Proof. dec_eq. Defined.
 
-Global Instance Dec_eq_prod (A B : Type) (m n : A * B)
-  `{_ : forall (x y : A), Dec (x = y)}
-  `{_ : forall (x y : B), Dec (x = y)}
-  : Dec (m = n).
+Global Instance Dec_eq_prod (A B : Type) `{Dec_Eq A} `{Dec_Eq B} : Dec_Eq (A * B).
 Proof. dec_eq. Defined.
 
-Global Instance Dec_eq_list (A : Type) (m n : list A)
-  `{_ : forall (x y : A), Dec (x = y)} : Dec (m = n).
+Global Instance Dec_eq_sum (A B : Type) `{Dec_Eq A} `{Dec_Eq B} : Dec_Eq (A + B).
+Proof. dec_eq. Defined.
+
+Global Instance Dec_eq_list (A : Type) `{Dec_Eq A} : Dec_Eq (list A).
 Proof. dec_eq. Defined.
 
 Hint Resolve ascii_dec: eq_dec.
 Hint Resolve string_dec: eq_dec.
 
-Global Instance Dec_ascii (m n : Ascii.ascii) : Dec (m = n).
+Global Instance Dec_eq_ascii : Dec_Eq ascii.
 Proof. dec_eq. Defined.
 
-Global Instance Dec_string (m n : string) : Dec (m = n).
+Global Instance Dec_eq_string : Dec_Eq string.
 Proof. dec_eq. Defined.
 
 (* Everything that uses the Decidable Class *)
@@ -216,11 +216,14 @@ Notation "P '?'" := (match (@dec P _) with
                        | right _ => false
                      end) (at level 100).
 
+Hint Resolve Dec_eq_unit : eq_dec.
 Hint Resolve Dec_eq_bool : eq_dec.
 Hint Resolve Dec_eq_nat : eq_dec.
 Hint Resolve Dec_eq_Z : eq_dec.
 Hint Resolve Dec_eq_N : eq_dec.
 Hint Resolve Dec_eq_opt : eq_dec.
 Hint Resolve Dec_eq_prod : eq_dec.
+Hint Resolve Dec_eq_sum : eq_dec.
 Hint Resolve Dec_eq_list : eq_dec.
-Hint Resolve Dec_string : eq_dec.
+Hint Resolve Dec_eq_ascii : eq_dec.
+Hint Resolve Dec_eq_string : eq_dec.
