@@ -11,9 +11,10 @@ env:
   - OPAMVERBOSE=1
   - OPAMYES=true
   - COQ=8.8.2
+  - BASE_REMOTE=http://opam.ocaml.org/
   matrix:
   - OCAML_VERSION=4.04
-  - OCAML_VERSION=4.07
+  - OCAML_VERSION=4.08
 matrix:
   fast_finish: true
   allow_failures:
