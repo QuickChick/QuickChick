@@ -552,7 +552,7 @@ Definition prop_preservation_naive (c : Mutant) :=
   forAll arbitrary (preservation c).
 
 ManualExtract [Term; Typ; Mutant].
-Extract Constant defNumTests => "1000000".
+(* Extract Constant defNumTests => "1000000". *)
 
 Definition genTypeExpr : G (option (Typ * Term)) :=
   bindGen (gen_type 0 4) (fun τ =>

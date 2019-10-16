@@ -1,16 +1,11 @@
 #!/bin/bash
-
-for i in `seq $1 $2`; do
-    echo "Handling mutant #: $i"
-    cp lambda.v Tmp.v
-    echo "Definition prop_specialized (e : Term) : option bool :=" >> Tmp.v
-    echo "  let c := List.nth $i all_mutants NoMutant in" >> Tmp.v
-    echo "  preservation' c e." >> Tmp.v
-    echo "" >> Tmp.v
-    echo "Definition fuzzLoop :=" >> Tmp.v
-    echo "  fun _ : unit =>" >> Tmp.v
-    echo "    fuzzLoop arbitrary fuzz show prop_specialized." >> Tmp.v
-    echo "" >> Tmp.v
-    echo "FuzzQC prop_specialized (fuzzLoop tt). " >> Tmp.v
-    coqc Tmp.v -Q . QuickChick.FuzzSTLC &> output/qc_fuzz_${i}.out
+# Usage:  ./fuzz_driver per_run total 
+for run in `seq 0 $2`; do
+  export LOW=$(expr $run \* $1)
+  export HI=$(expr $run \* $1 + $1 - 1)
+  echo $LOW
+  echo $HI
+  echo './fuzz_driver_one_run.sh 1 19 $LOW $HI 10000000 100000000 $MODE'
+  screen -S run$run -dm bash -c './fuzz_driver_one_run.sh 1 19 $LOW $HI 10000000 100000000'
+  sleep 2
 done

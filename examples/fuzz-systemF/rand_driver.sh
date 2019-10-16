@@ -1,12 +1,13 @@
 #!/bin/bash
-
-for i in `seq $1 $2`; do
-    echo "Handling mutant #$i with generator $3"
-    cp lambda.v Tmp.v
-    echo "Definition prop_specialized :=" >> Tmp.v
-    echo "  let c := List.nth $i all_mutants NoMutant in" >> Tmp.v
-    echo "  prop_preservation_$3 c." >> Tmp.v
-    echo "" >> Tmp.v
-    echo "QuickChick prop_specialized. " >> Tmp.v
-    coqc Tmp.v -Q . QuickChick.FuzzSTLC &> output/qc_$3_${i}.out
+# Usage:  ./rand_driver per_run total 
+for run in `seq 0 $2`; do
+  export LOW=$(expr $run \* $1)
+  export HI=$(expr $run \* $1 + $1 - 1)
+  echo $LOW
+  echo $HI
+  export MODE=$3
+  echo './rand_driver_one_run.sh 1 19 $LOW $HI 50000000 500000000 $MODE'
+  screen -S run$run -dm bash -c './rand_driver_one_run.sh 1 19 $LOW $HI 50000000 500000000 $MODE'
+  sleep 1
 done
+
