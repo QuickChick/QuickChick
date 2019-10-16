@@ -31,6 +31,7 @@ dependencies:
 - lens
 - data-default-class
 - deepseq
+- colour
 
 library:
   source-dirs: src

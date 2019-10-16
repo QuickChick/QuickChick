@@ -4,6 +4,8 @@ import Control.Monad
 import Data.List
 import Data.Function (on)
 
+import Control.Arrow (second)
+  
 import System.Directory
 import System.FilePath
 import System.IO
@@ -21,7 +23,8 @@ import Control.Lens hiding (noneOf)
 import Data.Default.Class
 import Graphics.Rendering.Chart
 import Graphics.Rendering.Chart.Backend.Cairo
-
+import Data.Colour
+import Data.Colour.Names
 
 import Debug.Trace
 
@@ -139,27 +142,28 @@ tablify fn allData = do
 --    hPutStrLn outFile $ printf "%s & %s & %s & %s & %s\\\\" (mttf rs) (mttf fs) (mttf q) (mttf rd) (mttf fd)
 --  hClose outFile
 
-chartRuns smart naive fuzz = renderableToFile def "bargraph.png" $ toRenderable layout
+chartRuns smart naive fuzz fuzzNew = renderableToFile def "bargraph.png" $ toRenderable layout
   where calcTime runs =
           let perMutantRuns  = groupBy ((==) `on` mutant) runs
               perMutantTimes = map (\mr -> let rs = map time mr in sum rs / genericLength rs) perMutantRuns
           in perMutantTimes
-        times = transpose [calcTime smart, calcTime naive, calcTime fuzz]
+        times = map (map (\t -> log (t * 1000))) $ transpose [calcTime smart, calcTime naive, calcTime fuzz, calcTime fuzzNew]
        
         layout = 
               layout_title .~ "System F" ++ btitle
             $ layout_title_style . font_size .~ 10
             $ layout_x_axis . laxis_generate .~ autoIndexAxis alabels
-            $ layout_y_axis . laxis_override .~ axisGridHide
+--            $ layout_y_axis . laxis_override .~ axisGridHide
+            $ layout_y_axis . laxis_override .~ (\ad -> ad {_axis_labels = [ map (\x -> (log x, show x)) (map (10^) [1..8]) ]}) --map (map (\(x,l) -> (x, show $ exp x))) (_axis_labels ad)})
             $ layout_left_axis_visibility . axis_show_ticks .~ False
             $ layout_plots .~ [ plotBars bars2 ]
-            $ def :: Layout PlotIndex Double
+            $ def :: Layout PlotIndex  Double
        
-        bars2 = plot_bars_titles .~ ["Smart", "Random", "Fuzz"]
+        bars2 = plot_bars_titles .~ ["Smart", "Random", "Fuzz", "FuzzNew"]
             $ plot_bars_values .~ addIndexes times
             $ plot_bars_style .~ BarsClustered
-            $ plot_bars_spacing .~ BarsFixGap 30 5
-            $ plot_bars_item_styles .~ map mkstyle (cycle defaultColorSeq)
+            $ plot_bars_spacing .~ BarsFixGap 30 30
+            $ plot_bars_item_styles .~ map mkstyle (cycle $ map opaque [blue, red, green, plum])
             $ def
        
         alabels = map show [1..19]
@@ -173,7 +177,8 @@ main = do
   smartRuns <- parseRandomDir Smart "../output_smart/"
   naiveRuns <- parseRandomDir Naive "../output_naive/"
   fuzzRuns  <- parseRandomDir Fuzz  "../output_fuzz/"
-  chartRuns smartRuns naiveRuns fuzzRuns
+  fuzzRunsRep <- parseRandomDir Fuzz "../fuzz_output_repeat/"
+  chartRuns smartRuns naiveRuns fuzzRuns fuzzRunsRep
 
 --register :: IO ()
 --register = do
