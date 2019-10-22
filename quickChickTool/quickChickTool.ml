@@ -248,12 +248,37 @@ let gather_all_vs_from_dir fs =
   in loop fs;
   !all_vs
 
-let vs_from_file f =
-  let open CoqProject_file in
-  let warning_fn x = Feedback.msg_warning Pp.(str x) in
-  let project = CoqProject_file.read_project_file ~warning_fn f in
-  List.map (fun s -> match s with {thing = str; _} -> str)
-    project.v_files
+let split_words s =
+  let i = ref 0 in
+  let words = ref [] in
+  let testchar j c =
+    if String.contains " \r\t\n" c then (
+      (if !i < j then words := String.sub s !i (j - !i) :: !words);
+      i := j + 1
+    )
+  in
+  s |> String.iteri testchar;
+  testchar (String.length s) '\n';
+  List.rev !words
+
+(* Find all .v files listed by file fpath. Assumes filenames have no
+ * whitespace, and recognizes single-line comments prefixed with '#'. *)
+let vs_from_file fpath =
+  let f = open_in fpath in
+  let files = ref [] in
+  try while true do (* Read the whole file f *)
+    let line = input_line f in
+    let line = match String.index line '#' with
+               | exception Not_found -> line
+               | i -> String.sub line 0 i
+    in
+    line
+      |> split_words
+      |> List.iter (fun w ->
+          if Filename.check_suffix w ".v" then
+            files := w :: !files)
+  done; assert false with
+  | End_of_file -> !files
 
 let gather_all_vs_from_file f fs =
   let included = vs_from_file f in
@@ -457,6 +482,11 @@ let is_dir f =
   try Sys.is_directory f
   with Sys_error _ -> false
 
+let option_map f o =
+  match o with
+  | Some x -> Some (f x)
+  | None -> None
+
 let rec parse_file_or_dir file_name =
   try
     debug "[parse_file_or_dir %s]\n" file_name;
@@ -513,11 +543,11 @@ let rec parse_file_or_dir file_name =
                        (fun sec -> {sec with sec_nodes = collapse sec.sec_nodes}) result in
 
         let fix_extends extends =
-          Str.split (Str.regexp "[ \r\n\t]") (String.concat "" extends) in
+          split_words (String.concat "" extends) in
         let result = List.map
           (fun sec ->
             {sec with sec_extends =
-               Option.map (fun e -> {e with ext_extends = fix_extends e.ext_extends}) sec.sec_extends}
+               option_map (fun e -> {e with ext_extends = fix_extends e.ext_extends}) sec.sec_extends}
           ) result in
         let fixed_default =
           match result with
@@ -545,7 +575,7 @@ let rec section_length_of_fs fs =
 
 (* TODO: "trim" is a confusing name for this function! *)
 let trim s =
-  match Str.split (Str.regexp "[ \r\n\t]") s with
+  match split_words s with
   | [] -> ""
   | h :: _ -> h
 
@@ -704,7 +734,7 @@ let main =
     let all_vs = gather_all_vs (Dir (s, fss)) in
     let extractions = List.map (fun s -> Filename.basename s) all_vs in
     let mk_import s =
-      let splits = List.tl (Str.split (Str.regexp "/") s) in
+      let splits = List.tl (String.split_on_char '/' s) in
       String.concat "." splits in
 
     let imports = List.map (fun s -> (if !top = "" then "" else !top ^ ".") ^ (mk_import s)) all_vs in

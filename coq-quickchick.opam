@@ -17,7 +17,7 @@ depends: [
   "ocamlbuild"
   "ocamlfind"
   "menhir"
-  "coq-simple-io" {= "dev"}
+  "coq-simple-io"
 ]
 
 authors: [

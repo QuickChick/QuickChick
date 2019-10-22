@@ -150,11 +150,8 @@ let define_and_run c env evd =
   (* TODO: Maxime, thoughts? *)
   (* LEO: However, sometimes the inferred types are too abstract. So we touch the .mli to close the weak types. **)
   let _exit_code = Sys.command ("touch " ^ mlif) in
-  (*
-  Printf.printf "Extracted ML file: %s\n" mlf;
-  Printf.printf "Compile command: %s\n" (comp_ml_cmd mlf execn);
-  flush_all ();
-  *)
+  msg_debug (str "Extracted ML file: " ++ str mlf);
+  msg_debug (str "Compile command: " ++ str (comp_ml_cmd mlf execn));
   (* Compile the (empty) .mli *)
   if Sys.command (comp_mli_cmd mlif) <> 0 then CErrors.user_err (str "Could not compile mli file" ++ fnl ());
   if Sys.command (comp_ml_cmd mlf execn) <> 0 then

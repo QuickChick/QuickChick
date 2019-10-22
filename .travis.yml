@@ -13,6 +13,7 @@ env:
   - OPAMVERBOSE=1
   - OPAMYES=true
   - COQ=8.10.0
+  - BASE_REMOTE=http://opam.ocaml.org/
   matrix:
   - OCAML_VERSION=4.05
   - OCAML_VERSION=4.09
@@ -61,6 +62,10 @@ script:
   echo -e 'travis_fold:start:QuickChick.test.unit';
   make -C test;
   echo -e 'travis_fold:end:QuickChick.test.unit'
+- echo 'Testing Tutorial...';
+  echo -e 'travis_fold:start:QuickChick.test.tutorial';
+  make -C examples tutorial;
+  echo -e 'travis_fold:end:QuickChick.test.tutorial'
 - echo 'Testing IFC...';
   echo -e 'travis_fold:start:QuickChick.test.ifc-basic';
   make -C examples/ifc-basic;

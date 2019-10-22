@@ -29,15 +29,15 @@ let derivable_to_string = function
   | SizeMonotonic -> "SizeMonotonic"
   | SizedMonotonic -> "SizedMonotonic"
   | SizedCorrect ->  "SizedCorrect"
-  
+
 let mk_instance_name der tn = 
   let prefix = derivable_to_string der in
-  let strip_last s = List.hd (List.rev (Str.split (Str.regexp "[.]") s)) in
+  let strip_last s = List.hd (List.rev (String.split_on_char '.' s)) in
   var_to_string (fresh_name (prefix ^ strip_last tn))
 
 let repeat_instance_name der tn = 
   let prefix = derivable_to_string der in
-  let strip_last s = List.hd (List.rev (Str.split (Str.regexp "[.]") s)) in
+  let strip_last s = List.hd (List.rev (String.split_on_char '.' s)) in
   (prefix ^ strip_last tn)
 
 (* Generic derivation function *)

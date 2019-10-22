@@ -223,6 +223,11 @@ let rec dep_type_len = function
   | _ -> 0
 
 (* Option monad *)
+let option_map f ox =
+  match ox with
+  | Some x -> Some (f x)
+  | None -> None
+
 let (>>=) m f = 
   match m with
   | Some x -> f x 
@@ -442,7 +447,7 @@ let parse_dependent_type i nparams ty oib arg_names =
 (*      let (mp, _dn, _) = MutInd.repr3 mind in *)
 
       (* HACKY: figure out better way to qualify constructors *)
-      let names = Str.split (Str.regexp "[.]") (MutInd.to_string mind) in
+      let names = String.split_on_char '.' (MutInd.to_string mind) in
       let prefix = List.rev (List.tl (List.rev names)) in
       let qual = String.concat "." prefix in
       msg_debug (str (Printf.sprintf "CONSTR: %s %s" qual (DirPath.to_string (Lib.cwd ()))) ++ fnl ());
