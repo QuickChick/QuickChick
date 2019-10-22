@@ -12,10 +12,10 @@ env:
   - NJOBS=2
   - OPAMVERBOSE=1
   - OPAMYES=true
-  - COQ=8.10.dev
+  - COQ=8.10.0
   matrix:
   - OCAML_VERSION=4.05
-  - OCAML_VERSION=4.07
+  - OCAML_VERSION=4.09
 matrix:
   fast_finish: true
   allow_failures:
@@ -42,7 +42,6 @@ install:
 - eval $(opam config env)
 - opam config var root
 - opam repo add coq-released https://coq.inria.fr/opam/released || true
-- opam repo add coq-core-dev https://coq.inria.fr/opam/core-dev || true
 - opam repo add coq-extra-dev https://coq.inria.fr/opam/extra-dev || true
 - opam update
 - opam unpin . || true
