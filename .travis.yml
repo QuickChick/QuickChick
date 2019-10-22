@@ -12,7 +12,7 @@ env:
   - NJOBS=2
   - OPAMVERBOSE=1
   - OPAMYES=true
-  - COQ=8.10.0
+  - COQ=8.10.1
   - BASE_REMOTE=http://opam.ocaml.org/
   matrix:
   - OCAML_VERSION=4.05

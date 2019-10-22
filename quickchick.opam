@@ -13,8 +13,8 @@ build: [ "dune" "build" "-p" name "-j" jobs ]
 depends: [
   "ocaml"                   { >= "4.05.0" }
   "dune"                    { >= "1.9.0"  }
-  "menhir"
-  "coq"                     { >= "8.10"    }
+  "menhir"                  {     build   }
+  "coq"                     { >= "8.10" < "8.11~" }
   "coq-ext-lib"
   "coq-mathcomp-ssreflect"
   "coq-simple-io"           {  = "dev"    }
