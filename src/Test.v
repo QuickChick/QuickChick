@@ -395,6 +395,9 @@ Axiom printnvb : unit -> nat.
 Extract Constant printnvb => "(fun u -> Printf.printf ""%d\n"" (count_non_virgin_bytes u); 42)".
 Definition doneTestingFuzz (x : nat) st := doneTesting st.
 
+Axiom clear_cnt : nat.
+Extract Constant clear_cnt => "5000".
+
 (* Keep two lists for seeds: 
    favored  : contains _successful_ runs and their energy.
    discards : contains _discarded_ runs and their energy (lower priority)
@@ -431,14 +434,18 @@ Fixpoint fuzzLoopAux {A} (fuel : nat) (st : State)
     let '(res, (is_interesting, energy)) := withInstrumentation (fun _ : unit => prop a) in
     let zero_0 := 0 in (* trace (show res ++ nl) 0 in*)
     match res with                                                     
-      | Some true =>
+    | Some true =>
+      match Nat.modulo fuel clear_cnt with
+      | 0 => fuzzLoopAux fuel' (updSuccTests st S) nil nil nil nil randoms' nil gen fuzz print prop
+      | _ => let is_interesting := true in
         if is_interesting then
           (* Successful and interesting, keep in favored queue and save! *)
           fuzzLoopAux fuel' (updSuccTests st S) favored' discards' ((energy, a)::favored_queue') discard_queue' randoms' ((energy,a) :: saved') gen fuzz print prop
         else
           (* Successful but no new paths, don't keep. *)
           fuzzLoopAux fuel' (updSuccTests st S) favored' discards' favored_queue' discard_queue' randoms' saved' gen fuzz print prop
-      | Some false =>
+      end
+    | Some false =>
         let '(MkState mst mdt ms cs nst ndt ls e r nss nts) := st in
         let zero := trace (print a ++ nl) zero_0 in
         let pre : string := "*** Failed " in
@@ -449,7 +456,10 @@ Fixpoint fuzzLoopAux {A} (fuel : nat) (st : State)
                                  ++ (show numShrinks) ++ " shrinks. ("
                                  ++ (show ndt) ++ " discards)")%string in
         Failure (nst + 1 + zero) numShrinks ndt r size (pre ++ suf) (summary st) "Falsified!"
-      | None =>
+    | None =>
+      match Nat.modulo fuel clear_cnt with
+      | 0 => fuzzLoopAux fuel' (updDiscTests st S) nil nil nil nil randoms' nil gen fuzz print prop
+      | _ => let is_interesting := true in
         if is_interesting then
           (* Interesting (new path), but discard. Put in discard queue *)
           fuzzLoopAux fuel' (updDiscTests st S) favored' discards' favored_queue' ((energy, a)::discard_queue') randoms' saved' gen fuzz print prop 
@@ -457,6 +467,7 @@ Fixpoint fuzzLoopAux {A} (fuel : nat) (st : State)
         else
           (* Not interesting + discard. Throw away. *)
           fuzzLoopAux fuel' (updDiscTests st S) favored' discards' favored_queue' discard_queue' randoms' saved' gen fuzz print prop
+      end
     end
   end.
 
