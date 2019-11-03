@@ -395,8 +395,8 @@ Axiom printnvb : unit -> nat.
 Extract Constant printnvb => "(fun u -> Printf.printf ""%d\n"" (count_non_virgin_bytes u); 42)".
 Definition doneTestingFuzz (x : nat) st := doneTesting st.
 
-Axiom clear_cnt : nat.
-Extract Constant clear_cnt => "5000".
+Axiom clear_queues : nat -> bool.
+Extract Constant clear_queues => "(fun n -> n land 1023 == 0)".
 
 (* Keep two lists for seeds: 
    favored  : contains _successful_ runs and their energy.
@@ -435,8 +435,8 @@ Fixpoint fuzzLoopAux {A} (fuel : nat) (st : State)
     let zero_0 := 0 in (* trace (show res ++ nl) 0 in*)
     match res with                                                     
     | Some true =>
-      match Nat.modulo fuel clear_cnt with
-      | 0 => fuzzLoopAux fuel' (updSuccTests st S) nil nil nil nil randoms' nil gen fuzz print prop
+      match clear_queues fuel with
+      | true => fuzzLoopAux fuel' (updSuccTests st S) nil nil nil nil randoms' nil gen fuzz print prop
       | _ => let is_interesting := true in
         if is_interesting then
           (* Successful and interesting, keep in favored queue and save! *)
@@ -457,8 +457,8 @@ Fixpoint fuzzLoopAux {A} (fuel : nat) (st : State)
                                  ++ (show ndt) ++ " discards)")%string in
         Failure (nst + 1 + zero) numShrinks ndt r size (pre ++ suf) (summary st) "Falsified!"
     | None =>
-      match Nat.modulo fuel clear_cnt with
-      | 0 => fuzzLoopAux fuel' (updDiscTests st S) nil nil nil nil randoms' nil gen fuzz print prop
+      match clear_queues fuel with
+      | true => fuzzLoopAux fuel' (updDiscTests st S) nil nil nil nil randoms' nil gen fuzz print prop
       | _ => let is_interesting := true in
         if is_interesting then
           (* Interesting (new path), but discard. Put in discard queue *)
