@@ -1,0 +1,87 @@
+version: 2.1
+
+defaults: &defaults
+  environment:
+    OPAMVERBOSE: 1
+    OPAMWITHTEST: true
+    OPAMYES: true
+    TERM: xterm
+  docker:
+  - image: coqorg/coq:8.9
+
+commands:
+  startup:
+    steps:
+    - checkout
+    - run:
+        name: Configure environment
+        command: echo . ~/.profile >> $BASH_ENV
+  build:
+    steps:
+    - run:
+        name: Install dependencies
+        command: opam install --deps-only .
+    - run:
+        name: List installed packages
+        command: opam list
+    - run:
+        name: Building QuickChick
+        command: opam install .
+    - run:
+        name: Unit testing
+        working_directory: test
+        command: make
+    - run:
+        name: Testing Tutorial
+        working_directory: examples
+        command: make tutorial
+    - run:
+        name: Testing IFC
+        working_directory: examples/ifc-basic
+        command: make
+    - run:
+        name: Testing Red-black tree
+        working_directory: examples/RedBlack
+        command: make
+    - run:
+        name: Testing STLC
+        working_directory: examples/stlc
+        command: make
+    - run:
+        name: Testing Multifile Mutation
+        working_directory: examples/multifile-mutation
+        command: make test
+    - run:
+        name: Testing C Mutation
+        working_directory: examples/c-mutation
+        command: make test
+    - run:
+        name: Testing -N option
+        working_directory: examples/c-mutation
+        command: make lesstest
+    - run:
+        name: Testing Python I/O
+        working_directory: examples/python-io
+        command: make lesstest
+    - run:
+        name: Removing QuickChick
+        command: opam remove .
+jobs:
+  ocaml 4_05:
+    <<: *defaults
+    steps:
+    - startup
+    - build
+  ocaml 4_07:
+    <<: *defaults
+    steps:
+    - startup
+    - run: opam switch 4.07.1+flambda
+    - build
+
+workflows:
+  version: 2
+  build:
+    jobs:
+    - ocaml 4_05
+    - ocaml 4_07
