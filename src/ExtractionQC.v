@@ -13,9 +13,9 @@ Require Import ExtrOcamlZInt.
 
 Extraction Blacklist String List Nat.
 
-(* Ignore [Decimal.int] before the extraction issue is solved:
-   https://github.com/coq/coq/issues/7017. *)
-Extract Inductive Decimal.int => unit [ "(fun _ -> ())" "(fun _ -> ())" ] "(fun _ _ _ -> ())".
+(** Temporary fix for https://github.com/coq/coq/issues/7017.
+    See [define_and_run] in `quickChick.ml4` for definition of [M] module. *)
+Extract Inductive Decimal.int => "((uint, uint) M.sum)" ["M.Inl" "M.Inr"].
 
 Extract Constant show_nat =>
   "(fun i ->
