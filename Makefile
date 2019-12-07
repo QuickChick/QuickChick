@@ -55,7 +55,7 @@ tests:
 	$(MAKE) -C examples tutorial
 #	$(MAKE) -C examples/ifc-basic test
 	$(MAKE) -C examples/RedBlack test
-#	cd examples/stlc; make clean && make
+	cd examples/stlc; make clean && make
 	$(MAKE) -C examples/multifile-mutation test
 # This takes too long. 
 #	$(MAKE) -C examples/c-mutation test

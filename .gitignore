@@ -17,6 +17,8 @@ dsss17/terse
 *.ml.d
 *.glob
 *.vo
+*.vok
+*.vos
 *.aux
 *.a
 *.annot
