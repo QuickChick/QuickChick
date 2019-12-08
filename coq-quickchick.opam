@@ -1,5 +1,5 @@
 opam-version: "2.0"
-version: "1.0.2"
+version: "8.10.dev"
 maintainer: "llamp@seas.upenn.edu"
 synopsis: "Randomized Property-Based Testing Plugin for Coq"
 
@@ -16,8 +16,8 @@ depends: [
   "coq-mathcomp-ssreflect"
   "ocamlbuild"
   "ocamlfind"
-  "menhir"
-  "coq-simple-io" {= "dev"}
+  "menhir" {build}
+  "coq-simple-io"
 ]
 
 authors: [

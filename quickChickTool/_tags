@@ -1,1 +1,1 @@
-true: package(coq.lib), rectypes, thread, traverse
+true: rectypes, thread, traverse

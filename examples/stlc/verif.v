@@ -1,7 +1,7 @@
 From mathcomp Require Import ssreflect ssrbool ssrnat eqtype.
 Require Import String. (* I don't know why we need this.. Probably I am forgetting something *)
-Require Import Arith List Omega.
 From QuickChick Require Import QuickChick.
+Require Import Arith List Omega.
 From QuickChick.stlc Require Import lambda.
 Require Import Wellfounded.
 

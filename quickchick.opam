@@ -13,7 +13,7 @@ build: [ "dune" "build" "-p" name "-j" jobs ]
 depends: [
   "ocaml"                   { >= "4.05.0" }
   "dune"                    { >= "1.9.0"  }
-  "menhir"
+  "menhir"                  {     build   }
   "coq"                     {  = "dev"    }
   "coq-ext-lib"
   "coq-mathcomp-ssreflect"

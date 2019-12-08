@@ -260,10 +260,9 @@ let rec convert_to_range dt =
   match dt with 
   | DTyVar x -> Some (Unknown x)
   | DCtr (c,dts) ->
-     Option.map (fun dts' -> Ctr (c, dts')) (sequenceM convert_to_range dts)
+     option_map (fun dts' -> Ctr (c, dts')) (sequenceM convert_to_range dts)
   | DTyCtr (c, dts) -> 
-     Option.map (fun dts' -> Ctr (ty_ctr_to_ctr c, dts')) (sequenceM convert_to_range dts)
-  | DTyParam p -> Some (Parameter p)
+     option_map (fun dts' -> Ctr (ty_ctr_to_ctr c, dts')) (sequenceM convert_to_range dts)
   | _ -> None
 
 let is_fixed k dt = 
@@ -272,9 +271,8 @@ let is_fixed k dt =
     | FixedInput -> true
     | Unknown u' -> aux (umfind u' k)
     | Ctr (_, rs) -> List.for_all aux rs
-    | RangeHole -> true (* TODO *)
-    | Parameter _p -> true
-  in Option.map aux (convert_to_range dt)
+    | RangeHole -> true (*TODO *)
+  in option_map aux (convert_to_range dt)
 
 (* convert a range to a coq expression *)
 let rec range_to_coq_expr k r = 
@@ -294,7 +292,7 @@ let rec range_to_coq_expr k r =
   | _ -> failwith "QC Internal: TopLevel ranges should be Unknowns or Constructors"
 
 let dt_to_coq_expr k dt = 
-  Option.map (range_to_coq_expr k) (convert_to_range dt)
+  option_map (range_to_coq_expr k) (convert_to_range dt)
 
 let rec is_dep_type = function
   | DArrow (dt1, dt2) -> is_dep_type dt1 || is_dep_type dt2 
