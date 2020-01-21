@@ -9,7 +9,7 @@ bug-reports: "https://github.com/QuickChick/QuickChick/issues"
 license: "MIT"
 
 build: [ make "-j%{jobs}%" ]
-install: [ make "install" ]
+install: [ make "-j%{jobs}%" "install" ]
 depends: [
   "ocaml" {>= "4.04.0"}
   "coq" {>= "8.7" < "8.8~"}

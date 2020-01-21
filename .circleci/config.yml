@@ -2,8 +2,8 @@ version: 2.1
 
 defaults: &defaults
   environment:
+    OPAMJOBS: 2
     OPAMVERBOSE: 1
-    OPAMWITHTEST: true
     OPAMYES: true
     TERM: xterm
   docker:
@@ -30,30 +30,27 @@ commands:
     - run:
         name: Unit testing
         working_directory: test
-        command: make
+        command: make -j`nproc`
     - run:
         name: Testing IFC
         working_directory: examples/ifc-basic
-        command: make
+        command: make -j`nproc`
     - run:
         name: Testing Red-black tree
         working_directory: examples/RedBlack
-        command: make
+        command: make -j`nproc`
     - run:
         name: Testing STLC
         working_directory: examples/stlc
-        command: make
+        command: make -j`nproc`
     - run:
         name: Testing Multifile Mutation
         working_directory: examples/multifile-mutation
-        command: make test
+        command: make -j`nproc` test
     - run:
         name: Testing C Mutation
         working_directory: examples/c-mutation
-        command: make test
-    - run:
-        name: Removing QuickChick
-        command: opam remove .
+        command: make -j`nproc` test
 jobs:
   ocaml 4_05:
     <<: *defaults
