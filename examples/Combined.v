@@ -1,4 +1,4 @@
-From QuickChick Require Import QuickChick EnumerationQC.
+From QuickChick Require Import QuickChick EnumerationQC LazyList.
 
 From ExtLib Require Import Monads. Import MonadNotation.
 
@@ -52,7 +52,6 @@ Definition gRandomFirst : G (list nat) :=
     vectorOf x (enumR (0, 2)).
 
 Definition token_prop (x : list nat) := collect (length x) true.
-
 QuickChick (forAll gRand token_prop).
 QuickChick (forAll gMixed token_prop).
 QuickChick (forAll gEnum token_prop).
@@ -79,9 +78,18 @@ Definition bucket_prop (x : nat) := collect (Nat.div x 10) true.
 
 QuickChick (forAll gBuckets bucket_prop).
 
-(* Get a much less even distributin into buckets, also may need to
+(* Get a much less even distribution into buckets, also may need to
    tweek the generator for nats to make large numbers more
    likely. With enumeration it's much more obvious how large your
    numbers can get.
 *)
 QuickChick (forAll gNoBuckets bucket_prop).
+
+
+(** Backtracking **)
+
+(* Enumerate with cut. Pick the first element that is greater than 2.*)
+Definition gCut : G (nat * nat) :=
+  x <- (x <- enumR (0, 10);; guard (x >= 2)?;; ret x);;
+  y <- enumR (0, 10);;
+  ret (x, y);;
