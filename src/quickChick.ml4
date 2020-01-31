@@ -11,7 +11,7 @@ open Error
 open Stdarg
 
 let message = "QuickChick"
-let mk_ref s = CAst.make @@ CRef (CAst.make (Qualid (qualid_of_string s)), None)
+let mk_ref s = CAst.make @@ CRef (qualid_of_string s, None)
 
 (* Names corresponding to QuickChick's .v files *)
 let show = mk_ref "QuickChick.Show.show"
@@ -136,7 +136,7 @@ let define_and_run c =
   let warnings = CWarnings.get_flags () in
   let mute_extraction = warnings ^ (if warnings = "" then "" else ",") ^ "-extraction-opaque-accessed" in
   CWarnings.set_flags mute_extraction;
-  Flags.silently (Extraction_plugin.Extract_env.full_extraction (Some mlf)) [CAst.make @@ Ident main];
+  Flags.silently (Extraction_plugin.Extract_env.full_extraction (Some mlf)) [qualid_of_ident main];
   CWarnings.set_flags warnings;
   (** Add a main function to get some output *)
   let oc = open_out_gen [Open_append;Open_text] 0o666 mlf in

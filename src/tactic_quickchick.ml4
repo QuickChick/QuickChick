@@ -34,7 +34,7 @@ let quickchick_goal =
                        ))) in
 
     let s = QuickChick.runTest
-            (CAst.make @@ CApp((None,QuickChick.quickCheck), [CAst.make @@ CRef (CAst.make @@ Libnames.Ident tmpid,None), None])) in
+            (CAst.make @@ CApp((None,QuickChick.quickCheck), [CAst.make @@ CRef (Libnames.qualid_of_ident tmpid,None), None])) in
 
     match s with
     | Some bytes ->

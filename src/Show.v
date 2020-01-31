@@ -240,7 +240,7 @@ Definition smart_paren (s : string) : string :=
       match s with
         | EmptyString => (if b then ")" else "", b)
         | String a s =>
-          let (s', b) := aux s (orb b (nat_of_ascii a =? 32)) in
+          let (s', b) := aux s (orb b (nat_of_ascii a =? 32)%nat) in
           (String a s', b)
       end in
   let (s', b) := aux s false in

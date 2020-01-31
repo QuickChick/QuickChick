@@ -45,7 +45,11 @@ install:
 - eval $(opam config env)
 - opam config var root
 - opam repo add coq-released https://coq.inria.fr/opam/released || true
-- travis_wait opam upgrade
+- opam repo add coq-core-dev https://coq.inria.fr/opam/core-dev || true
+- opam repo add coq-extra-dev https://coq.inria.fr/opam/extra-dev || true
+- opam update
+- opam upgrade
+- opam install coq.dev
 - opam list
 - ocamlc -v
 
@@ -53,8 +57,8 @@ script:
 - set -e
 - echo 'Building QuickChick...';
   echo -en 'travis_fold:start:QuickChick.build';
-  opam update;
-  travis_wait opam pin add . ;
+  opam pin add . ;
+  opam remove --force coq-quickchick;
   travis_wait opam install coq-quickchick;
   echo -en 'travis_fold:end:QuickChick.build'
 - echo 'Testing IFC...';
