@@ -34,6 +34,8 @@ commands:
     - run:
         name: Building QuickChick
         command: opam pin coq-quickchick .
+  test:
+    steps:
     - run:
         name: Unit testing
         working_directory: test
@@ -70,6 +72,8 @@ commands:
         name: Testing Python I/O
         working_directory: examples/python-io
         command: make lesstest
+  remove:
+    steps:
     - run:
         name: Removing QuickChick
         command: opam remove .
@@ -80,6 +84,8 @@ jobs:
     - startup
     - prepare
     - build
+    - test
+    - remove
   ocaml 4_07:
     <<: *defaults
     steps:
@@ -87,6 +93,8 @@ jobs:
     - run: opam switch 4.07.1+flambda
     - prepare
     - build
+    - test
+    - remove
   dune:
     <<: *defaults
     steps:
@@ -95,10 +103,8 @@ jobs:
     - prepare
     - run: dune build
     - run: dune install quickchick
-    - run:
-        name: Testing Multifile Mutation
-        working_directory: examples/multifile-mutation
-        command: make test
+    - test
+    - run: dune uninstall quickchick
 
 workflows:
   version: 2
