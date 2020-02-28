@@ -845,8 +845,7 @@ let dtTupleType =
 (* Int *)
 
 let mkNumeral n =
-  if n >= 0 then Numeral (SPlus, NumTok.int (string_of_int n))
-  else Numeral (SMinus, NumTok.int (string_of_int (-n)))
+  Numeral (NumTok.Signed.of_int_string (string_of_int n))
 
 let nat_scope ast = CAst.make @@ CDelimiters ("nat", ast)
 let gInt n = nat_scope (CAst.make @@ CPrim (mkNumeral n))
