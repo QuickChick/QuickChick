@@ -229,7 +229,8 @@ val dep_fold_ty  : ('a -> dep_type -> 'a) -> ('a -> var -> dep_type -> 'a) ->
 (* Generate Type Names *)
 val generate_names_from_type : string -> coq_type -> string list 
 val fold_ty_vars : (var list -> var -> coq_type -> 'a) -> ('a -> 'a -> 'a) -> 'a -> coq_type -> var list -> 'a
-
+val fold_ty_vars2 : ((var * var) list -> var * var -> coq_type -> 'a) -> ('a -> 'a -> 'a) -> 'a -> coq_type -> (var * var) list -> 'a
+  
 (* val defineConstant : string -> coq_expr -> var
    val defineTypedConstant : string -> coq_expr -> coq_expr -> var *)
 val declare_class_instance : ?global:bool -> ?priority:int -> arg list -> string -> (var list -> coq_expr) -> (var list -> coq_expr) -> unit 

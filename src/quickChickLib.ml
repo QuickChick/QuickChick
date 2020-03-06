@@ -204,6 +204,12 @@ let choose_int n state =
     let n4 = read_byte state in
     (n1 lsl 12 + n2 lsl 8 + n3 lsl 4 + n4) mod n
 
+let choose_float d state =
+  assert (d > 0.0);
+  let ip = float_of_int (choose_int (truncate d) state) in
+  let rp = (float_of_int (choose_int 1000 state)) /. 1000.0 in
+  ip +. rp
+      
 let randomNext =
   (fun r -> choose_int 128 r, r)
     
@@ -224,6 +230,14 @@ let randomRBool =
 
 let randomRInt = randomRNat
 let randomRN   = randomRNat                   
-
+let randomRFloat =
+  (fun (x,y) r ->
+    let min = x in
+    let n = y -. x in
+    if n <= 0.0 then
+      raise (Invalid_argument ("QuickChick.randomR: range is empty " ^ string_of_float x ^ " " ^ string_of_float y));
+    min +. choose_float n r, r
+  )
+      
 
                    

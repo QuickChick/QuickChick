@@ -16,6 +16,7 @@ type derivable =
   | GenSized
   | Sized
   | Fuzzy
+  | Distance
   | CanonicalSized
   | SizeMonotonic
   | SizedMonotonic
@@ -27,6 +28,7 @@ let derivable_to_string = function
   | GenSized -> "GenSized"
   | Sized -> "Sized"
   | Fuzzy -> "Fuzzy"
+  | Distance -> "Distance"
   | CanonicalSized -> "CanonicalSized"
   | SizeMonotonic -> "SizeMonotonic"
   | SizedMonotonic -> "SizedMonotonic"
@@ -81,6 +83,7 @@ let derive (cn : derivable) (c : constr_expr) (instance_name : string) (name1 : 
     | Shrink -> ["Shrink"]
     | Show -> ["Show"]
     | GenSized -> ["Gen"]
+    | Distance -> ["Distance"]
     | Fuzzy -> ["Fuzzy"; "Gen"]
     | CanonicalSized -> ["CanonicalSized"]
     | SizeMonotonic -> ["GenMonotonic"]
@@ -94,6 +97,7 @@ let derive (cn : derivable) (c : constr_expr) (instance_name : string) (name1 : 
     | Sized -> []
     | GenSized -> []
     | Fuzzy -> []
+    | Distance -> []
     | CanonicalSized -> []
     | SizeMonotonic -> [(gInject "s", gInject "nat")]
     | SizedMonotonic -> []
@@ -134,6 +138,7 @@ let derive (cn : derivable) (c : constr_expr) (instance_name : string) (name1 : 
     | Shrink -> shrink_decl ty_ctr ctrs iargs
     | GenSized -> arbitrarySized_decl ty_ctr ctrs iargs
     | Sized -> sized_decl ty_ctr ctrs
+    | Distance -> Distance.distance_decl ty_ctr ctrs             
     | Fuzzy -> fuzzy_decl ty_ctr ctrs iargs
     | CanonicalSized ->
       let ind_scheme =  gInject ((ty_ctr_to_string ty_ctr) ^ "_ind") in

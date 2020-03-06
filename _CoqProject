@@ -22,6 +22,7 @@ src/Checker.v
 src/SemChecker.v
 src/Test.v
 src/ExtractionQC.v
+src/ExtractReal.v
 src/Mutation.v
 src/tactic_quickchick.ml4
 src/quickchick_plugin.mlpack
@@ -48,6 +49,7 @@ src/genLib.ml
 src/unify.ml
 src/sizeUtils.ml
 src/sized.ml
+src/distance.ml
 src/sizeMon.ml
 src/sizeSMon.ml
 src/sizeCorr.ml

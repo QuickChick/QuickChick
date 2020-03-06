@@ -918,6 +918,16 @@ let generate_names_from_type base_name ty =
 let fold_ty_vars (f : var list -> var -> coq_type -> 'a) (mappend : 'a -> 'a -> 'a) (base : 'a) ty : var list -> 'a =
   fun allVars -> fold_ty' (fun acc ty -> fun (v::vs) -> mappend (f allVars v ty) (acc vs)) (fun _ -> base) ty allVars
 
+let fold_ty_vars2 (f : (var * var) list -> var * var -> coq_type -> 'a)
+      (mappend : 'a -> 'a -> 'a) (base : 'a) ty :
+      (var * var) list -> 'a =
+  fun allVars2 -> 
+  fold_ty' (fun acc ty -> fun ((v1,v2)::vs)->
+                          mappend (f allVars2 (v1, v2) ty)
+                                  (acc vs)
+           ) (fun _ -> base) ty allVars2
+
+               
 (* Declarations *)
 (* LEO : There used to be defineConstant stuff here. WHY? *)
 (*
