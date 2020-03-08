@@ -192,7 +192,8 @@ let read_byte src =
   Char.code (read_char src)
 
 let choose_int n state =
-  assert (n > 0);
+  assert (n >= 0);  
+  if n = 0 then 0 else
   if n = 1 then
     0
   else if n < 100 then
@@ -205,9 +206,18 @@ let choose_int n state =
     (n1 lsl 12 + n2 lsl 8 + n3 lsl 4 + n4) mod n
 
 let choose_float d state =
-  assert (d > 0.0);
+  if not (d >= 0.0) then (print_endline ("Error: " ^ string_of_float d); assert (d >= 0.0));
+(*   print_endline ("Trunc of d is: " ^ string_of_float d);  *)
   let ip = float_of_int (choose_int (truncate d) state) in
-  let rp = (float_of_int (choose_int 1000 state)) /. 1000.0 in
+  let rp =
+    if ip < floor d then
+      (* Can generate arbitrary float in 0 - 1 *)
+      float_of_int (choose_int 1000 state) /. 1000.0
+    else begin
+        (*      print_endline ("Argument to truncate: " ^ string_of_float (1000.0 *. (d -. (floor d)))); *)
+      float_of_int (choose_int (truncate (1000.0 *. (d -. (floor d)))) state) /. 1000.0
+    end
+  in 
   ip +. rp
       
 let randomNext =
@@ -232,11 +242,14 @@ let randomRInt = randomRNat
 let randomRN   = randomRNat                   
 let randomRFloat =
   (fun (x,y) r ->
+    (*    print_endline ("Choosing float in range: " ^ string_of_float x ^ " - " ^ string_of_float y); *)
     let min = x in
     let n = y -. x in
-    if n <= 0.0 then
+    if n < 0.0 then
       raise (Invalid_argument ("QuickChick.randomR: range is empty " ^ string_of_float x ^ " " ^ string_of_float y));
-    min +. choose_float n r, r
+    let res = min +. choose_float n r in
+    (*    print_endline ("Returning... " ^ string_of_float res); *)
+    res, r
   )
       
 
