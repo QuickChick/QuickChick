@@ -6,8 +6,9 @@ defaults: &defaults
     OPAMWITHTEST: true
     OPAMYES: true
     TERM: xterm
-  docker:
-  - image: coqorg/coq:8.8
+  steps:
+  - startup
+  - build
 
 commands:
   startup:
@@ -65,19 +66,16 @@ commands:
 jobs:
   ocaml 4_05:
     <<: *defaults
-    steps:
-    - startup
-    - build
-  ocaml 4_07:
+    docker:
+    - image: coqorg/coq:8.8
+  ocaml 4_09:
     <<: *defaults
-    steps:
-    - startup
-    - run: opam switch 4.07.1+flambda
-    - build
+    docker:
+    - image: coqorg/coq:8.8-ocaml-4.09.0-flambda
 
 workflows:
   version: 2
   build:
     jobs:
     - ocaml 4_05
-    - ocaml 4_07
+    - ocaml 4_09
