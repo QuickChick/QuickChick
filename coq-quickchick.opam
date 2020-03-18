@@ -1,5 +1,5 @@
 opam-version: "2.0"
-version: "8.10.dev"
+version: "dev"
 maintainer: "llamp@seas.upenn.edu"
 synopsis: "Randomized Property-Based Testing Plugin for Coq"
 
@@ -9,7 +9,10 @@ bug-reports: "https://github.com/QuickChick/QuickChick/issues"
 license: "MIT"
 
 build: [ make "-j%{jobs}%" ]
-install: [ make "install" ]
+install: [
+  [make "-j%{jobs}%" "install" ]
+  [make "-j%{jobs}%" "tests"] {with-test}
+]
 depends: [
   "coq" {= "dev"}
   "coq-ext-lib"
