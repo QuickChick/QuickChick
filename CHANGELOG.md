@@ -6,6 +6,13 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
 
 ## [Unreleased]
 ### Added
+- Support Coq 8.11.
+
+### Removed
+- No longer support Coq 8.10.
+
+## [1.2.0] - 2020-01-30
+### Added
 - Support Coq 8.10.
 
 ### Removed
@@ -69,7 +76,8 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
 ### Added
 - OPAM package `coq-quickchick` on [coq-released](https://coq.inria.fr/opam/www/).
 
-[Unreleased]: https://github.com/QuickChick/QuickChick/compare/v1.1.0...8.10
+[Unreleased]: https://github.com/QuickChick/QuickChick/compare/v1.2.0...8.11
+[1.2.0]: https://github.com/QuickChick/QuickChick/compare/v1.1.0...v1.2.0
 [1.1.0]: https://github.com/QuickChick/QuickChick/compare/v1.0.2...v1.1.0
 [1.0.2]: https://github.com/QuickChick/QuickChick/compare/v1.0.1...v1.0.2
 [1.0.1]: https://github.com/QuickChick/QuickChick/compare/v1.0.0...v1.0.1
