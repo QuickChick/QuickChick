@@ -52,7 +52,8 @@ $(QCTOOL_DIR)/$(QCTOOL_EXE): $(QCTOOL_SRC)
 	cd $(QCTOOL_DIR); ocamlbuild -use-ocamlfind $(QCTOOL_EXE)
 
 tests:
-#	$(MAKE) -C examples/ifc-basic test
+	cd examples/ifc-basic; make clean && make
+	$(MAKE) -C test
 	$(MAKE) -C examples/RedBlack test
 #	cd examples/stlc; make clean && make
 	$(MAKE) -C examples/multifile-mutation test
