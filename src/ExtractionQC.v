@@ -13,9 +13,9 @@ Require Import ExtrOcamlZInt.
 
 Extraction Blacklist String List Nat.
 
-(* Ignore [Decimal.int] before the extraction issue is solved:
-   https://github.com/coq/coq/issues/7017. *)
-Extract Inductive Decimal.int => unit [ "(fun _ -> ())" "(fun _ -> ())" ] "(fun _ _ _ -> ())".
+(** Temporary fix for https://github.com/coq/coq/issues/7017.
+    See [define_and_run] in `quickChick.ml4` for definition of [M] module. *)
+Extract Inductive Decimal.int => "((uint, uint) M.sum)" ["M.Inl" "M.Inr"].
 
 Extract Constant show_nat =>
   "(fun i ->
@@ -62,7 +62,7 @@ Extract Constant force => "Lazy.force".
 
 (* Extract Constant Test.ltAscii => "(<=)". *)
 (* Extract Constant Test.strEq   => "(=)". *)
-Extract Constant Nat.div => "(/)".
+Extract Constant Nat.div => "(fun m -> function 0 -> 0 | d -> m / d)".
 Extract Constant Test.gte => "(>=)".
 Extract Constant le_gt_dec => "(<=)".
 Extract Constant trace =>
@@ -77,8 +77,8 @@ Set Extraction AccessOpaque.
 
 Require Import mathcomp.ssreflect.ssreflect.
 From mathcomp Require Import ssreflect ssrnat ssrbool div eqtype.
-Extract Constant divn => "(/)".
-Extract Constant modn => "(fun x y -> x mod y)".
+Extract Constant divn => "(fun m -> function 0 -> 0 | d -> m / d)".
+Extract Constant modn => "(fun m -> function 0 -> 0 | d -> m mod d)".
 Extract Constant eqn => "(==)".
 
 Axiom print_extracted_coq_string : string -> unit.

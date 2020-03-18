@@ -1,0 +1,104 @@
+version: 2.1
+
+defaults: &defaults
+  environment:
+    OPAMJOBS: 2
+    OPAMVERBOSE: 1
+    OPAMYES: true
+    TERM: xterm
+
+commands:
+  startup:
+    steps:
+    - checkout
+    - run:
+        name: Configure environment
+        command: echo . ~/.profile >> $BASH_ENV
+  prepare:
+    steps:
+    - run:
+        name: Install dependencies
+        command: |
+            opam repo add coq-extra-dev https://coq.inria.fr/opam/extra-dev
+            opam install --deps-only .
+    - run:
+        name: List installed packages
+        command: opam list
+  build:
+    steps:
+    - run:
+        name: Building QuickChick
+        command: opam install .
+    - run:
+        name: Unit testing
+        working_directory: test
+        command: make -j`nproc`
+    - run:
+        name: Testing Tutorial
+        working_directory: examples
+        command: make tutorial
+    - run:
+        name: Testing IFC
+        working_directory: examples/ifc-basic
+        command: make -j`nproc`
+    - run:
+        name: Testing Red-black tree
+        working_directory: examples/RedBlack
+        command: make -j`nproc`
+    - run:
+        name: Testing STLC
+        working_directory: examples/stlc
+        command: make -j`nproc`
+    - run:
+        name: Testing Multifile Mutation
+        working_directory: examples/multifile-mutation
+        command: make -j`nproc` test
+    - run:
+        name: Testing C Mutation
+        working_directory: examples/c-mutation
+        command: make -j`nproc` lesstest
+    - run:
+        name: Testing Python I/O
+        working_directory: examples/python-io
+        command: make -j`nproc` lesstest
+    - run:
+        name: Removing QuickChick
+        command: opam remove .
+jobs:
+  ocaml 4_05:
+    <<: *defaults
+    steps:
+    - startup
+    - prepare
+    - build
+    docker:
+    - image: coqorg/coq:8.11
+  ocaml 4_09:
+    <<: *defaults
+    steps:
+    - startup
+    - prepare
+    - build
+    docker:
+    - image: coqorg/coq:8.11-ocaml-4.09.0-flambda
+  dune:
+    <<: *defaults
+    steps:
+    - startup
+    - prepare
+    - run: dune build
+    - run: dune install quickchick
+    - run:
+        name: Testing Multifile Mutation
+        working_directory: examples/multifile-mutation
+        command: make test
+    docker:
+    - image: coqorg/coq:8.11
+
+workflows:
+  version: 2
+  build:
+    jobs:
+    - ocaml 4_05
+    - ocaml 4_09
+    - dune

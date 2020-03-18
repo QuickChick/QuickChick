@@ -112,7 +112,7 @@ let define c env evd =
 
 (* [$TMP/QuickChick/$TIME/QuickChick.ml],
    where [$TIME] is the current time in format [HHMMSS]. *)
-let new_ml_file () =
+let new_ml_file () : string =
   let tm = Unix.localtime (Unix.time ()) in
   let ts = Printf.sprintf "%02d%02d%02d" tm.Unix.tm_hour tm.Unix.tm_min tm.Unix.tm_sec in
   let temp_dir = Filename.concat temp_dirname ts in
@@ -122,9 +122,10 @@ let new_ml_file () =
 let define_and_run c env evd =
   (* Extract the term and its dependencies *)
   let main = define c env evd in
-  let mlf = new_ml_file () in
-  let execn = Filename.chop_extension mlf in
-  let mlif = execn ^ ".mli" in
+  let mlf   : string = new_ml_file () in
+  let execn : string = Filename.chop_extension mlf ^ ".native" in
+  let mlif  : string = Filename.chop_extension mlf ^ ".mli"    in
+  let dir   : string = Filename.dirname mlf in
   let warnings = CWarnings.get_flags () in
   let mute_extraction = warnings ^ (if warnings = "" then "" else ",") ^ "-extraction-opaque-accessed" in
   CWarnings.set_flags mute_extraction;
@@ -153,16 +154,27 @@ let define_and_run c env evd =
   Sys.remove mlif;
   (* TODO: Maxime, thoughts? *)
   (* LEO: However, sometimes the inferred types are too abstract. So we touch the .mli to close the weak types. **)
+  (*
   let _exit_code = Sys.command ("touch " ^ mlif) in
+  msg_debug (str "Extracted ML file: " ++ str mlf);
+  msg_debug (str "Compile command: " ++ str (comp_ml_cmd mlf execn));
+   *)
+  let oc' : out_channel = open_out (Filename.concat dir "m.ml") in
+  output_string oc' "type ('a, 'b) sum = Inl of 'a | Inr of 'b";
+  close_out oc';
   (*
   Printf.printf "Extracted ML file: %s\n" mlf;
   Printf.printf "Compile command: %s\n" (comp_ml_cmd mlf execn);
   flush_all ();
   *)
   (* Compile the (empty) .mli *)
+  (*
   if Sys.command (comp_mli_cmd mlif) <> 0 then CErrors.user_err (str "Could not compile mli file" ++ fnl ());
   if Sys.command (comp_ml_cmd mlf execn) <> 0 then
     CErrors.user_err (str "Could not compile test program" ++ fnl ())
+   *)
+  if Sys.command ("cd " ^ dir ^ "; ocamlbuild " ^ Filename.basename execn) <> 0 then
+    (CErrors.user_err (str "Could not compile test program" ++ fnl ()))
 
   (* Run the test *)
   else

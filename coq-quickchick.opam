@@ -1,5 +1,5 @@
 opam-version: "2.0"
-version: "1.0.2"
+version: "8.11.dev"
 maintainer: "llamp@seas.upenn.edu"
 synopsis: "Randomized Property-Based Testing Plugin for Coq"
 
@@ -9,15 +9,18 @@ bug-reports: "https://github.com/QuickChick/QuickChick/issues"
 license: "MIT"
 
 build: [ make "-j%{jobs}%" ]
-install: [ make "install" ]
+install: [
+  [make "-j%{jobs}%" "install" ]
+  [make "-j%{jobs}%" "tests"] {with-test}
+]
 depends: [
-  "coq" {= "dev"}
+  "coq" {>= "8.11" < "8.12~"}
   "coq-ext-lib"
   "coq-mathcomp-ssreflect"
   "ocamlbuild"
   "ocamlfind"
-  "menhir"
-  "coq-simple-io" {= "dev"}
+  "menhir" {build}
+  "coq-simple-io"
 ]
 
 authors: [

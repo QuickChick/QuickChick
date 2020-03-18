@@ -14,5 +14,5 @@ corresponding branch:
 
 Please state the compatibility with other Coq versions in your pull request.
 
-Our next release will be based on `8.9` branch by default, unless older branches
+Our next release will be based on `8.10` branch by default, unless older branches
 require a critical fix.
