@@ -9,7 +9,10 @@ bug-reports: "https://github.com/QuickChick/QuickChick/issues"
 license: "MIT"
 
 build: [ make "-j%{jobs}%" ]
-install: [ make "install" ]
+install: [
+  [make "-j%{jobs}%" "install" ]
+  [make "-j%{jobs}%" "tests"] {with-test}
+]
 depends: [
   "coq" {>= "8.10" < "8.11~"}
   "coq-ext-lib"
