@@ -342,7 +342,7 @@ let add_manual_extract cs =
     | _ -> [convert_reference_to_qualid cs] in 
   extract_manually := refs @ !extract_manually
 
-let qcFuzz prop fuzzLoop =
+let extract_prop_and_deps prop =
   (** Extract the property and its dependencies *)
   let env = Global.env () in
   let evd = Evd.from_env env in
@@ -356,6 +356,9 @@ let qcFuzz prop fuzzLoop =
   CWarnings.set_flags mute_extraction;
   Flags.silently (Extraction_plugin.Extract_env.full_extraction (Some prop_mlf)) [CAst.make @@ Ident prop_def];
   CWarnings.set_flags warnings;
+  (prop_def, temp_dir, execn, prop_mlf, prop_mlif, warnings)
+  
+let qcFuzz_main prop_def temp_dir execn prop_mlf prop_mlif warnings prop fuzzLoop =
 
   (** Override extraction to use the new, instrumented property *)
   let qualify s = Printf.sprintf "%s.%s" (Filename.basename execn) s in
@@ -509,7 +512,7 @@ let _ =
   if Sys.command (comp_mli_cmd " " mlif) <> 0 then CErrors.user_err (str "Could not compile exec mli file" ++ fnl ());
   (* Compile the actual executable *)
   let cmp_cmd = comp_exec_ml_cmd mlf prop_mlf (temp_dir ^ "/qc_exec") in
-  Printf.printf "Compile Command: %s\n" cmp_cmd;
+  Printf.printf "Compile Command: %s\n" cmp_cmd; flush Pervasives.stdout;
   if Sys.command (cmp_cmd) <> 0 then
     (CErrors.user_err (str "Could not compile exec program" ++ fnl ()));
 
@@ -522,8 +525,43 @@ let _ =
   Printf.printf "Compile Main Command: %s\n" cmp_cmd_main;
   if (Sys.command cmp_cmd_main <> 0) then
     (CErrors.user_err (str "Could not compile main program" ++ fnl ()));
-  
-  ignore (Sys.command ("time " ^ temp_dir ^ "/main_exec " ^ temp_dir ^ "/qc_exec"))
+
+  (* Run the FuzzQC command, parse the output, search for "Passed" or "Failed" *)
+  let found_result = ref (None : bool option) in
+  let run_and_show_output command =
+    let chan = Unix.open_process_in command in
+    let res = ref ([] : string list) in
+    let str_success = Str.regexp_string "Passed" in
+    let str_failure = Str.regexp_string "Failed" in
+    let contains r s =
+      try let ix = Str.search_forward r s 0 in ix >= 0
+      with _ -> false in
+    let rec process_otl_aux () =
+      let e = input_line chan in
+      res := e::!res;
+      if contains str_success e then found_result := Some true;
+      if contains str_failure e then found_result := Some false;
+      process_otl_aux() in
+    try process_otl_aux ()
+    with End_of_file ->
+          let stat = Unix.close_process_in chan in
+          let result =
+            match stat with
+              Unix.WEXITED 0 -> List.rev !res
+            | Unix.WEXITED i -> List.rev (Printf.sprintf "Exited with status %d" i :: !res)
+            | Unix.WSIGNALED i -> List.rev (Printf.sprintf "Killed (%d)" i :: !res)
+            | Unix.WSTOPPED i -> List.rev (Printf.sprintf "Stopped (%d)" i :: !res) in
+          List.iter (fun s -> (print_string s; print_newline())) result
+       | _ -> failwith "LOL"
+  in
+    
+  run_and_show_output ("time " ^ temp_dir ^ "/main_exec " ^ temp_dir ^ "/qc_exec");
+  print_endline (match !found_result with
+                 | Some true -> "Found success!"
+                 | Some false -> "Found failure!"
+                 | _ -> "Found nothing..."
+    );
+  !found_result
   (* open linked ocaml files 
   List.iter (fun (s : string * string) ->
       let (fn, c) = s in
@@ -533,11 +571,45 @@ let _ =
       ignore (Sys.command (Printf.sprintf "cp %s %s" fn temp_dir));
     ) !extra_files;
    *)
-  
 
+let qcFuzz prop fuzzLoop =
+  let (prop_def, temp_dir, execn, prop_mlf, prop_mlif, warnings) =
+    extract_prop_and_deps prop in
+  qcFuzz_main prop_def temp_dir execn prop_mlf prop_mlif warnings prop fuzzLoop
   
-
-      
+(* amin, amax: names of axioms representing min and max.
+   smin, smax: string based init values. *)
+let binarySearchFuzz amid smin smax prop fuzzLoop =
+  let amid_ref =
+    match amid with
+    | { CAst.v = CRef (r,_) } -> r
+    | _ -> failwith "Not a reference"
+  in
+  (* set up amid extraction. Will be hackily replaced *)
+  Extraction_plugin.Table.extract_constant_inline false amid_ref [] "REPLACE ME";
+  let (prop_def, temp_dir, execn, prop_mlf, prop_mlif, warnings) =
+    extract_prop_and_deps prop in
+  let rmin = float_of_string smin in
+  let rmax = float_of_string smax in
+  let eps = 0.001 in
+  let rec loop min max =
+    Printf.printf "Binary Search with: %.6f %.6f" min max;
+    let mid = min +. (max -. min) /. 2.0 in
+    if max < min +. eps then
+      Printf.printf "Estimation: %.6f" max
+    else begin
+        (* HACK: Override extraction of amid by walking the file and printing mid instead *)
+        let sed_cmd = Printf.sprintf "sed -i 's/let amid = .*/let amid = %.6f/g' %s" mid prop_mlf in
+        Printf.printf "Overriding amid using sed: %s" sed_cmd;
+        if Sys.command sed_cmd <> 0 then
+          CErrors.user_err (str ("sed hack failed. Report: " ^ sed_cmd)  ++ fnl ());
+        (* Now just call the main... *)
+        match qcFuzz_main prop_def temp_dir execn prop_mlf prop_mlif warnings prop fuzzLoop with
+        | Some true  -> loop min mid
+        | Some false -> loop mid max
+        | _ -> Printf.printf "WTF error bin search"
+      end in
+  loop rmin rmax
   
 let run fuzz f args =
   begin match args with
@@ -613,7 +685,11 @@ VERNAC COMMAND EXTEND MutateChickMany CLASSIFIED AS SIDEFF
 END;;
 
 VERNAC COMMAND EXTEND FuzzQC CLASSIFIED AS SIDEFF
-  | ["FuzzQC" constr(prop) constr(fuzzLoop) ] ->  [ qcFuzz prop fuzzLoop ]
+  | ["FuzzQC" constr(prop) constr(fuzzLoop) ] ->  [ ignore (qcFuzz prop fuzzLoop) ]
+END;;
+
+VERNAC COMMAND EXTEND BinarySearchFuzz CLASSIFIED AS SIDEFF
+  | ["BinarySearchFuzz" constr(amid) string(min) string(max) constr(prop) constr(fuzzLoop) ] ->  [ binarySearchFuzz amid min max prop fuzzLoop ]
 END;;
 
 VERNAC COMMAND EXTEND QuickChickDebug CLASSIFIED AS SIDEFF

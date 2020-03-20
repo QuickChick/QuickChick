@@ -109,9 +109,9 @@ Class Distance (A : Type) :=
 Instance distR : Distance R :=
   { dist := fun x y => Rabs (Rminus x y) }.
 
-Definition checker :=
+(*Definition checker :=
   forAll (choose (R0, R1)) (fun r1 =>
   forAll (choose (R0, R1)) (fun r2 =>
-  r1 = r2?)).
+  r1 = r2?)). *)
 (* QuickChick checker. *)
 
