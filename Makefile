@@ -49,12 +49,14 @@ src/%.cmo : src/%.ml
 quickChickTool: $(QCTOOL_DIR)/$(QCTOOL_EXE)
 
 $(QCTOOL_DIR)/$(QCTOOL_EXE): $(QCTOOL_SRC)
-	cd $(QCTOOL_DIR); ocamlbuild -use-ocamlfind $(QCTOOL_EXE)
+	cd $(QCTOOL_DIR); ocamlbuild -pkg unix -use-ocamlfind $(QCTOOL_EXE)
 
 tests:
-#	$(MAKE) -C examples/ifc-basic test
+	$(MAKE) -C examples tutorial
+	cd examples/ifc-basic; make clean && make
+	$(MAKE) -C test
 	$(MAKE) -C examples/RedBlack test
-#	cd examples/stlc; make clean && make
+	cd examples/stlc; make clean && make
 	$(MAKE) -C examples/multifile-mutation test
 # This takes too long. 
 #	$(MAKE) -C examples/c-mutation test

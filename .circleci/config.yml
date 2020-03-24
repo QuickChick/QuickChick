@@ -1,0 +1,113 @@
+version: 2.1
+
+defaults: &defaults
+  environment:
+    OPAMJOBS: 2
+    OPAMVERBOSE: 1
+    OPAMYES: true
+    TERM: xterm
+
+commands:
+  startup:
+    steps:
+    - checkout
+    - run:
+        name: Configure environment
+        command: echo . ~/.profile >> $BASH_ENV
+  prepare:
+    steps:
+    - run:
+        name: Install dependencies
+        command: |
+            opam unpin coq
+            opam upgrade
+            opam install --deps-only .
+    - run:
+        name: List installed packages
+        command: |
+            opam list
+            opam info coq
+  build:
+    steps:
+    - run:
+        name: Building QuickChick
+        command: opam pin coq-quickchick .
+  test:
+    steps:
+    - run:
+        name: Unit testing
+        working_directory: test
+        command: make -j`nproc`
+    - run:
+        name: Testing Tutorial
+        working_directory: examples
+        command: make tutorial
+    - run:
+        name: Testing IFC
+        working_directory: examples/ifc-basic
+        command: make -j`nproc`
+    - run:
+        name: Testing Red-black tree
+        working_directory: examples/RedBlack
+        command: make -j`nproc`
+    - run:
+        name: Testing STLC
+        working_directory: examples/stlc
+        command: make -j`nproc`
+    - run:
+        name: Testing Multifile Mutation
+        working_directory: examples/multifile-mutation
+        command: make -j`nproc` test
+    - run:
+        name: Testing C Mutation
+        working_directory: examples/c-mutation
+        command: make -j`nproc` lesstest
+    - run:
+        name: Testing Python I/O
+        working_directory: examples/python-io
+        command: make -j`nproc` lesstest
+  remove:
+    steps:
+    - run:
+        name: Removing QuickChick
+        command: opam remove .
+jobs:
+  ocaml 4_05:
+    <<: *defaults
+    steps:
+    - startup
+    - prepare
+    - build
+    - test
+    - remove
+    docker:
+    - image: coqorg/coq:dev
+  ocaml 4_09:
+    <<: *defaults
+    steps:
+    - startup
+    - prepare
+    - build
+    - test
+    - remove
+    docker:
+    - image: coqorg/coq:dev-ocaml-4.09.0-flambda
+  dune:
+    <<: *defaults
+    steps:
+    - startup
+    - prepare
+    - run: dune build
+    - run: dune install quickchick
+    - test
+    - run: dune uninstall quickchick
+    docker:
+    - image: coqorg/coq:dev
+
+workflows:
+  version: 2
+  build:
+    jobs:
+    - ocaml 4_05
+    - ocaml 4_09
+    - dune

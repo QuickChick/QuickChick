@@ -17,6 +17,8 @@ dsss17/terse
 *.ml.d
 *.glob
 *.vo
+*.vok
+*.vos
 *.aux
 *.a
 *.annot
@@ -46,3 +48,4 @@ src/quickChickToolParser.ml
 src/quickChickToolParser.mli
 *.pyc
 __pycache__
+.nfs*

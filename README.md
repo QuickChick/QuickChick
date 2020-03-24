@@ -1,7 +1,7 @@
 QuickChick
 ==========
 
-[![Build Status](https://travis-ci.org/QuickChick/QuickChick.svg?branch=master)](https://travis-ci.org/QuickChick/QuickChick)
+[![CircleCI](https://circleci.com/gh/QuickChick/QuickChick/tree/master.svg?style=svg)](https://circleci.com/gh/QuickChick/QuickChick/tree/master)
 
 ### Description
  

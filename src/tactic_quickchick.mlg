@@ -26,7 +26,7 @@ let quickchick_goal =
     Printf.printf "So far so good\n"; flush stdout;
     
     (* Externalize it *)
-    let ct = Constrextern.extern_constr false e evd (EConstr.mkEvar (evar , [||])) in
+    let ct = Constrextern.extern_constr e evd (EConstr.mkEvar (evar , [||])) in
 
     (* Construct : show (quickCheck (_ : ct)) *)
     let qct =

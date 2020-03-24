@@ -45,7 +45,7 @@ let convert_constr_to_weight c =
 
 let convert_constr_to_cw_pair c : (constructor * weight_ast) = 
   match c with 
-  | { CAst.v = CNotation (_,([a],[[b]],_,_)); _ } -> begin
+  | { CAst.v = CNotation (_,_,([a],[[b]],_,_)); _ } -> begin
       let ctr = 
         match a with 
         | { CAst.v = CRef (r, _); _ } -> injectCtr (string_of_qualid r)
@@ -75,7 +75,7 @@ VERNAC COMMAND EXTEND QuickChickWeights CLASSIFIED AS SIDEFF
      {
        let weight_assocs = 
          match c with 
-         | { CAst.v = CNotation (_,([a],[b],_,_)); _ } -> begin
+         | { CAst.v = CNotation (_,_,([a],[b],_,_)); _ } -> begin
              let c = convert_constr_to_cw_pair a in
              let cs = List.map convert_constr_to_cw_pair b in
              c :: cs

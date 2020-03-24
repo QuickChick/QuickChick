@@ -84,8 +84,8 @@ let gArg ?assumName:(an=hole) ?assumType:(at=hole) ?assumImplicit:(ai=false) ?as
     | { CAst.v = CHole (_v,_,_); loc } -> (loc,Anonymous)
     | _a -> failwith "This expression should be a name" in
   CLocalAssum ( [CAst.make ?loc:(fst n) @@ snd n],
-                  (if ag then Generalized (Glob_term.Implicit, false)
-                   else if ai then Default Glob_term.Implicit else Default Glob_term.Explicit),
+                  (if ag then Generalized (Glob_term.MaxImplicit, false)
+                   else if ai then Default Glob_term.MaxImplicit else Default Glob_term.Explicit),
                   at )
 
 let arg_to_var (x : arg) =
@@ -221,6 +221,11 @@ let rec dep_type_len = function
   | _ -> 0
 
 (* Option monad *)
+let option_map f ox =
+  match ox with
+  | Some x -> Some (f x)
+  | None -> None
+
 let (>>=) m f = 
   match m with
   | Some x -> f x 
@@ -440,7 +445,7 @@ let parse_dependent_type i nparams ty oib arg_names =
 (*      let (mp, _dn, _) = MutInd.repr3 mind in *)
 
       (* HACKY: figure out better way to qualify constructors *)
-      let names = Str.split (Str.regexp "[.]") (MutInd.to_string mind) in
+      let names = String.split_on_char '.' (MutInd.to_string mind) in
       let prefix = List.rev (List.tl (List.rev names)) in
       let qual = String.concat "." prefix in
       msg_debug (str (Printf.sprintf "CONSTR: %s %s" qual (DirPath.to_string (Lib.cwd ()))) ++ fnl ());
