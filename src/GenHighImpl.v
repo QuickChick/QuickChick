@@ -1400,6 +1400,8 @@ Qed.
 
 Module QcDefaultNotation.
 
+Declare Scope qc_scope.
+
 Notation " 'elems' [ x ] " := (elements x (cons x nil)) : qc_scope.
 Notation " 'elems' [ x ; y ] " := (elements x (cons x (cons y nil))) : qc_scope.
 Notation " 'elems' [ x ; y ; .. ; z ] " :=

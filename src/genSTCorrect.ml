@@ -17,7 +17,7 @@ open SetLib
 open CoqLib
 open GenLib
 open SemLib
-open Unify
+open UnifyQC
 open ArbitrarySizedST
 open Feedback
 

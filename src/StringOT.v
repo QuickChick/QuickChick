@@ -45,7 +45,7 @@ Definition eq_dec   := ascii_dec.
 Definition lt (c d : ascii) : Prop := (N_of_ascii c < N_of_ascii d)%N.
 
 Theorem lt_trans : forall c d e : ascii, lt c d -> lt d e -> lt c e.
-Proof. intros until 0; unfold lt; apply N.lt_trans. Qed.
+Proof. intros *; unfold lt; apply N.lt_trans. Qed.
 
 Theorem lt_not_eq : forall c d : ascii, lt c d -> ~ eq c d.
 Proof.

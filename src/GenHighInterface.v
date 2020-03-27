@@ -292,6 +292,7 @@ Parameter mergeBinds :
 
 Module QcDefaultNotation.
 
+Declare Scope qc_scope.
 (* Noone would write a literal singleton. *)
 Notation " 'elems' [ x ] " := (elems_ x (cons x nil)) : qc_scope.
 Notation " 'elems' [ x ; y ] " := (elems_ x (cons x (cons y nil))) : qc_scope.

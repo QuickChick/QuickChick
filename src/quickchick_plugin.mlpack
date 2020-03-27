@@ -4,7 +4,7 @@ GenLib
 CoqLib
 SemLib
 SetLib
-Unify
+UnifyQC
 Weightmap
 ArbitrarySized
 ArbitrarySizedST

@@ -136,12 +136,12 @@ end
 
 module Ord_ty_ctr = struct 
   type t = ty_ctr 
-  let compare x y = Pervasives.compare (string_of_qualid x) (string_of_qualid y)
+  let compare x y = Stdlib.compare (string_of_qualid x) (string_of_qualid y)
 end
 
 module Ord_ctr = struct
   type t = constructor
-  let compare x y = Pervasives.compare (string_of_qualid x) (string_of_qualid y)
+  let compare x y = Stdlib.compare (string_of_qualid x) (string_of_qualid y)
 end
 
 type ctr_rep = constructor * coq_type 
@@ -167,7 +167,7 @@ type dep_type =
 
 module OrdDepType = struct
     type t = dep_type
-    let compare = Pervasives.compare
+    let compare = Stdlib.compare
 end
 
 let rec dep_type_to_string dt = 

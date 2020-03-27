@@ -384,6 +384,8 @@ Definition disjoin (l : list Checker) : Checker :=
 Module QcNotation.
   Export QcDefaultNotation.
 
+  Declare Scope Checker_scope.
+
   Notation "x ==> y" := (implication x y) (at level 55, right associativity)
                            : Checker_scope.
 
