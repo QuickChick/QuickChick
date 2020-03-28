@@ -28,7 +28,7 @@ commands:
     steps:
     - run:
         name: Building QuickChick
-        command: opam install .
+        command: opam install coq-quickchick .
     - run:
         name: Unit testing
         working_directory: test
