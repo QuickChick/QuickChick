@@ -8,10 +8,10 @@ dev-repo: "git+https://github.com/QuickChick/QuickChick.git"
 bug-reports: "https://github.com/QuickChick/QuickChick/issues"
 license: "MIT"
 
-build: [ make "-j%{jobs}%" ]
+build: [ make "-j" jobs ]
 install: [
-  [make "-j%{jobs}%" "install" ]
-  [make "-j%{jobs}%" "tests"] {with-test}
+  [make "-j" jobs "install" ]
+  [make "-j" jobs "tests"] {with-test}
 ]
 depends: [
   "ocaml" {>= "4.07"}
