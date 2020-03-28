@@ -17,6 +17,7 @@ Unset Printing Implicit Defensive.
 
 Definition set T := T -> Prop.
 
+Declare Scope set_scope.
 Notation "x \in A" := (A x) (at level 70, only parsing) : set_scope.
 
 Definition set_eq {A} (m1 m2 : set A) :=

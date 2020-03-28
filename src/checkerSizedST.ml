@@ -4,7 +4,7 @@ open GenericLib
 open CoqLib
 open GenLib
 open Error
-open Unify
+open UnifyQC
 
 (* arguments to handle_branch *)
 let fail_exp (dt : coq_expr) : coq_expr = gSome dt g_false

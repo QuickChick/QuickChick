@@ -72,16 +72,6 @@ commands:
         name: Removing QuickChick
         command: opam remove .
 jobs:
-  ocaml 4_05:
-    <<: *defaults
-    steps:
-    - startup
-    - prepare
-    - build
-    - test
-    - remove
-    docker:
-    - image: coqorg/coq:dev
   ocaml 4_09:
     <<: *defaults
     steps:
@@ -102,12 +92,11 @@ jobs:
     - test
     - run: dune uninstall quickchick
     docker:
-    - image: coqorg/coq:dev
+    - image: coqorg/coq:dev-ocaml-4.09.0-flambda
 
 workflows:
   version: 2
   build:
     jobs:
-    - ocaml 4_05
     - ocaml 4_09
     - dune

@@ -6,7 +6,7 @@ open GenericLib
 open ArbitrarySizedST
 open CheckerSizedST
 open Error
-open Unify
+open UnifyQC
 (*   
 open SizedProofs
 open GenSTCorrect
