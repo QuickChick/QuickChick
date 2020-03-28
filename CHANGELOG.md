@@ -5,6 +5,23 @@ The format is based on [Keep a Changelog](http://keepachangelog.com/en/1.0.0/)
 and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
+### Changed
+- Add `-cflags -w -3` to `ocamlbuild` for running extracted code.
+  This silences the warning from using the deprecated `Pervasives` functions
+  until it's fixed by Coq (Issue #11359).
+- Rename `src/unify.ml` to `src/unifyQC.ml` to avoid clashing with the
+  Coq module of the same name.
+
+### Removed
+- Remove our own reliance on `Pervasives`.
+  This will enforce OCaml >= 4.07 going forward,
+  but it's marked for deprecation anyways.
+
+### Fixed
+- Declare all scopes before using them.
+- Fix most remaining warnings during compilation.
+
+## [1.3.0] - 2020-03-19
 ### Added
 - Support Coq 8.11.
 
