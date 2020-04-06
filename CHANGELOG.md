@@ -20,6 +20,7 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
 ### Fixed
 - Declare all scopes before using them.
 - Fix most remaining warnings during compilation.
+- Fix compatibility with ExtLib monad notations.
 
 ## [1.3.0] - 2020-03-19
 ### Added
