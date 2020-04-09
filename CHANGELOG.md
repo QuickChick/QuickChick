@@ -33,6 +33,7 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
 
 ## [1.2.1] - 2020-04-09
 Backport some fixes in [1.3.1] to Coq 8.10.
+These changes are not included in [1.3.0].
 ### Fixed
 - Fix most remaining warnings during compilation.
 - Fix compatibility with ExtLib monad notations.
