@@ -31,6 +31,13 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
 ### Removed
 - No longer support Coq 8.10.
 
+## [1.2.1] - 2020-04-09
+Backport some fixes in [1.3.1] to Coq 8.10.
+These changes are not included in [1.3.0].
+### Fixed
+- Fix most remaining warnings during compilation.
+- Fix compatibility with ExtLib monad notations.
+
 ## [1.2.0] - 2020-01-30
 ### Added
 - Support Coq 8.10.
@@ -98,7 +105,8 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
 
 [Unreleased]: https://github.com/QuickChick/QuickChick/compare/v1.3.1...8.11
 [1.3.1]: https://github.com/QuickChick/QuickChick/compare/v1.3.0...v1.3.1
-[1.3.0]: https://github.com/QuickChick/QuickChick/compare/v1.2.0...v1.3.0
+[1.3.0]: https://github.com/QuickChick/QuickChick/compare/v1.2.1...v1.3.0
+[1.2.1]: https://github.com/QuickChick/QuickChick/compare/v1.2.0...v1.2.1
 [1.2.0]: https://github.com/QuickChick/QuickChick/compare/v1.1.0...v1.2.0
 [1.1.0]: https://github.com/QuickChick/QuickChick/compare/v1.0.2...v1.1.0
 [1.0.2]: https://github.com/QuickChick/QuickChick/compare/v1.0.1...v1.0.2
