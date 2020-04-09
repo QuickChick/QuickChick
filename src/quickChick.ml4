@@ -151,11 +151,6 @@ let define_and_run c env evd =
   (** LEO: However, sometimes the inferred types are too abstract. So we touch the .mli to close the weak types. **)
   (*
   let _exit_code = Sys.command ("touch " ^ mlif) in
-   *)
-  let oc' : out_channel = open_out (Filename.concat dir "m.ml") in
-  output_string oc' "type ('a, 'b) sum = Inl of 'a | Inr of 'b";
-  close_out oc';
-  (*
   Printf.printf "Extracted ML file: %s\n" mlf;
   Printf.printf "Compile command: %s\n" (comp_ml_cmd mlf execn);
   flush_all ();
