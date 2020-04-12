@@ -23,6 +23,12 @@ let mutateCheckMany = mk_ref "QuickChick.MutateCheck.mutateCheckMany"
 let mutateCheckManyWith = mk_ref "QuickChick.MutateCheck.mutateCheckManyWith"
 let sample = mk_ref "QuickChick.GenLow.GenLow.sample"
 
+(* Handle extra ocaml directory to be copied *)
+let empty_slist : string list = []           
+let extra_dir : string list ref =
+  Summary.ref ~name:"QC_ocaml_dir" empty_slist
+let add_extra_dir s = extra_dir := s :: !extra_dir
+           
 (* Locate QuickChick's files *)
 (* The computation is delayed because QuickChick's libraries are not available
 when the plugin is first loaded. *)
@@ -168,6 +174,13 @@ let define_and_run c env evd =
   if Sys.command (comp_ml_cmd mlf execn) <> 0 then
     CErrors.user_err (str "Could not compile test program" ++ fnl ())
    *)
+
+  (* Copy over the contents of the ocaml directory *)
+  let ocaml_dir_cps = List.map (fun s -> Printf.sprintf "cp -r %s %s" s dir) !extra_dir
+  in 
+  List.iter print_endline ocaml_dir_cps;
+  List.iter (fun cmd -> ignore (Sys.command cmd)) ocaml_dir_cps;
+  
   if Sys.command ("cd " ^ dir ^ "; ocamlbuild -cflags \"-w -3\" " ^ Filename.basename execn) <> 0 then
     (CErrors.user_err (str "Could not compile test program" ++ fnl ()))
 
@@ -297,4 +310,8 @@ END
 
 VERNAC COMMAND EXTEND Sample CLASSIFIED AS SIDEFF
   | ["Sample" constr(c)] -> {run sample [c]}
+END
+
+VERNAC COMMAND EXTEND QCInclude CLASSIFIED AS SIDEFF
+  | ["QCInclude" string(s)] -> { add_extra_dir s }
 END
