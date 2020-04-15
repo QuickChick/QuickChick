@@ -60,7 +60,7 @@ commands:
     - run:
         name: Testing Python I/O
         working_directory: examples/python-io
-        command: make -j`nproc` lesstest
+        command: make -j`nproc`
     - run:
         name: Removing QuickChick
         command: opam remove .

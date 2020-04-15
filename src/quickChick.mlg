@@ -181,7 +181,7 @@ let define_and_run c env evd =
   List.iter print_endline ocaml_dir_cps;
   List.iter (fun cmd -> ignore (Sys.command cmd)) ocaml_dir_cps;
   
-  if Sys.command ("cd " ^ dir ^ "; ocamlbuild -cflags \"-w -3\" " ^ Filename.basename execn) <> 0 then
+  if Sys.command ("cd " ^ dir ^ "; ocamlbuild -lib unix -cflags \"-w -3\" " ^ Filename.basename execn) <> 0 then
     (CErrors.user_err (str "Could not compile test program" ++ fnl ()))
 
   (* Run the test *)
