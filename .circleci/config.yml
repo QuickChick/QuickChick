@@ -27,7 +27,7 @@ commands:
         command: opam list
     - run:
         name: Building QuickChick
-        command: opam install coq-quickchick .
+        command: opam pin coq-quickchick .
     - run:
         name: Unit testing
         working_directory: test
