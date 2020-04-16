@@ -118,7 +118,7 @@ let rec raiseMatch (k : umap) (c : constructor) (rs : range list) (eqs: EqSet.t)
                  Some (k', m :: l, eqs')
               | Unknown u' -> go u'
               | RangeHole -> failwith "Internal: RangeHoles should not appear past entry"
-              | Parameter p -> failwith "QC Internal: Does this occur (Parameter in match)?"
+              | Parameter _p -> failwith "QC Internal: Does this occur (Parameter in match)?"
               end
             in go u
          | Parameter p -> Some (k, MatchParameter p :: l, eqs)
@@ -146,10 +146,10 @@ let rec unify (k : umap) (r1 : range) (r2 : range) (eqs : EqSet.t)
      (* "Delay" cases - unknowns call unify again *)
      (* TODO: rething return value *)
      | Unknown u1', _ -> 
-        unify k (Unknown u1') (Unknown u2) eqs >>= fun (k', r', eqs', ms') ->
+        unify k (Unknown u1') (Unknown u2) eqs >>= fun (k', _r', eqs', ms') ->
         Some (k', Unknown u1, eqs', ms')
      | _, Unknown u2' ->
-        unify k (Unknown u1) (Unknown u2') eqs >>= fun (k', r', eqs', ms') ->
+        unify k (Unknown u1) (Unknown u2') eqs >>= fun (k', _r', eqs', ms') ->
         Some (k', Unknown u2, eqs', ms')
 
      (* "Hard" case: both are fixed. Need to raise an equality check on the inputs *)
@@ -232,11 +232,11 @@ let rec unify (k : umap) (r1 : range) (r2 : range) (eqs : EqSet.t)
                             unify k r1 r2 eqs >>= fun res ->
                             let (k', r', eqs', ms') = res in 
                             Some (k', r'::l, eqs', ms @ ms')
-                ) (Some (k, [], eqs, [])) (List.combine rs rs') >>= fun (k', rs', eqs', ms) ->
+                ) (Some (k, [], eqs, [])) (List.combine rs rs') >>= fun (k', _rs', eqs', ms) ->
           Some (k', Unknown u, eqs', ms)
         else None
       | Unknown u' -> 
-         unify k (Ctr (c,rs)) (Unknown u') eqs >>= fun (k', r', eqs', m') ->
+         unify k (Ctr (c,rs)) (Unknown u') eqs >>= fun (k', _r', eqs', m') ->
          Some (k', Unknown u, eqs', m')
       | _ -> failwith "QC Internal: Range Hole in toplevel?"
       end
@@ -250,7 +250,7 @@ let rec fixRange u r k =
     | Undef _ -> UM.add u FixedInput k 
     | Unknown u' -> fixRange u' (umfind u' k) k
     | Ctr (_, rs) -> List.fold_left (fun k r -> fixRange Unknown.undefined r k) k rs
-    | Parameter p -> k
+    | Parameter _p -> k
     | RangeHole -> failwith "QC Internal: RangeHole in fixrange"
 
 let fixVariable x k = fixRange x (umfind x k) k
@@ -260,10 +260,9 @@ let rec convert_to_range dt =
   match dt with 
   | DTyVar x -> Some (Unknown x)
   | DCtr (c,dts) ->
-     Option.map (fun dts' -> Ctr (c, dts')) (sequenceM convert_to_range dts)
+     option_map (fun dts' -> Ctr (c, dts')) (sequenceM convert_to_range dts)
   | DTyCtr (c, dts) -> 
-     Option.map (fun dts' -> Ctr (ty_ctr_to_ctr c, dts')) (sequenceM convert_to_range dts)
-  | DTyParam p -> Some (Parameter p)
+     option_map (fun dts' -> Ctr (ty_ctr_to_ctr c, dts')) (sequenceM convert_to_range dts)
   | _ -> None
 
 let is_fixed k dt = 
@@ -272,9 +271,8 @@ let is_fixed k dt =
     | FixedInput -> true
     | Unknown u' -> aux (umfind u' k)
     | Ctr (_, rs) -> List.for_all aux rs
-    | RangeHole -> true (* TODO *)
-    | Parameter p -> true
-  in Option.map aux (convert_to_range dt)
+    | RangeHole -> true (*TODO *)
+  in option_map aux (convert_to_range dt)
 
 (* convert a range to a coq expression *)
 let rec range_to_coq_expr k r = 
@@ -294,7 +292,7 @@ let rec range_to_coq_expr k r =
   | _ -> failwith "QC Internal: TopLevel ranges should be Unknowns or Constructors"
 
 let dt_to_coq_expr k dt = 
-  Option.map (range_to_coq_expr k) (convert_to_range dt)
+  option_map (range_to_coq_expr k) (convert_to_range dt)
 
 let rec is_dep_type = function
   | DArrow (dt1, dt2) -> is_dep_type dt1 || is_dep_type dt2 
@@ -378,7 +376,7 @@ let mode_analysis init_ctr curr_ctr (init_ranges : range list) (init_map : range
        remaining_unknowns := (p2,dt) :: !remaining_unknowns;
        all_unknowns := (p2, dt) :: !all_unknowns;
        true
-    | Undef _, Ctr (c, rs) ->
+    | Undef _, Ctr (_c, rs) ->
        List.iter (fun r' -> ignore (compare_ranges false p1 r1 Unknown.undefined r')) rs; false
     | _, _ -> qcfail (Printf.sprintf "Implement constructors for initial ranges: %s vs %s"
                            (range_to_string r1) (range_to_string r2))
@@ -389,7 +387,7 @@ let mode_analysis init_ctr curr_ctr (init_ranges : range list) (init_map : range
       | Unknown u  -> find_all_unknowns u (UM.find u curr_map)
       | FixedInput -> ()
       | Undef dt -> all_unknowns := (p, dt) :: !all_unknowns
-      | Ctr (c, rs) -> List.iter (find_all_unknowns Unknown.undefined) rs
+      | Ctr (_c, rs) -> List.iter (find_all_unknowns Unknown.undefined) rs
       | RangeHole -> ()
       | Parameter _ -> ()
     in (List.iter (find_all_unknowns Unknown.undefined) curr_ranges;
@@ -415,7 +413,7 @@ let warn_uninstantiated_variables =
        
 let handle_branch
       (type a) (type b) (* I've started to love ocaml again because of this *)
-      (dep_type : dep_type)
+      (_dep_type : dep_type)
       (fail_exp : b)
       (not_enough_fuel_exp : b)
       (ret_exp : coq_expr -> b)
@@ -455,7 +453,7 @@ let handle_branch
   
   (* Add all universally quantified unknowns in the u/t environments. *)
   let rec register_unknowns = function
-      | DArrow (dt1, dt2) -> register_unknowns dt2
+      | DArrow (_dt1, dt2) -> register_unknowns dt2
       | DProd ((x, dt1), dt2) ->
          umap := UM.add x (Undef dt1) !umap;
          tmap := UM.add x dt1 !tmap;
@@ -570,7 +568,7 @@ let handle_branch
        (* We need to recursively instantiate all the ranges rs, using the function below *)
        instantiate_toplevel_ranges_cont rs []
          (fun rs' -> cont (Ctr (c, rs')))
-    | Undef dt ->
+    | Undef _dt ->
        (* For undefined, we need to instantiate the parent by processing its checks. *)
          process_checks ex_bind parent false instantiate_existential_method
            (fun x -> cont (Unknown x))
@@ -651,7 +649,7 @@ let handle_branch
                       (* Given the variable representation of u, proceed to instantiate 
                          the rest of the dts' *)
                       instantiate_function_calls_cont dts' (DTyVar uvar :: acc) cont)))
-       | DTyCtr (c,dts) ->
+       | DTyCtr (_c,_dts) ->
           instantiate_function_calls_cont dts' (dt :: acc) cont
        | DTyParam p ->
           (* Just continue along instantiating the rest of the function calls *)
@@ -703,7 +701,7 @@ let handle_branch
        (* Mark recursiveness of branch *)
        is_base := false;
        (* Instantiate all the unknowns needed for the mode to work out *)
-       instantiate_toplevel_ranges_cont (List.map (fun (x,t) -> Unknown x) unknowns_for_mode) [] (fun _ranges ->
+       instantiate_toplevel_ranges_cont (List.map (fun (x,_t) -> Unknown x) unknowns_for_mode) [] (fun _ranges ->
 
        (* We will instantiate an unknown. First create a fresh one *)
        let fresh_unknown =
@@ -719,7 +717,7 @@ let handle_branch
        let unknown_range =
          match remaining_unknowns with
          | [] -> Undef unknown_type
-         | [(x,_)] -> Undef unknown_type
+         | [(_x,_)] -> Undef unknown_type
          | _ -> listToPairAux (fun (acc, x) -> Ctr (injectCtr "Coq.Init.Datatypes.pair", [acc; x]))
                   (List.map (fun (x,_) -> Unknown x) remaining_unknowns)
        in
@@ -801,7 +799,7 @@ let handle_branch
        let unknown_range =
          match all_unknowns with
          | [] -> failwith "IMPOSSIBLE"
-         | [(x,_)] -> Undef unknown_type
+         | [(_x,_)] -> Undef unknown_type
          | _ -> listToPairAux (fun (acc, x) -> Ctr (injectCtr "Coq.Init.Datatypes.pair", [acc; x]))
                   (List.map (fun (x,_) -> Unknown x) all_unknowns)
        in
@@ -815,7 +813,7 @@ let handle_branch
        in 
 
        (* LEO: LOOK AT THIS *)
-       let args = List.map (range_to_coq_expr !umap) ranges in
+       let _args = List.map (range_to_coq_expr !umap) ranges in
 
        let pred_result = gApp ~explicit:true (gTyCtr c) (List.map (range_to_coq_expr !umap) ranges) in
        let pred = (* predicate we are generating for *)
@@ -828,7 +826,7 @@ let handle_branch
        in
 
        process_checks rec_bind fresh_unknown true (instantiate_existential_methodST ctr_index pred) 
-            (fun x' -> recurse_type (ctr_index + 1) dt')
+            (fun _x' -> recurse_type (ctr_index + 1) dt')
 
     ) 
 

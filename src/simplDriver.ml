@@ -29,19 +29,19 @@ let derivable_to_string = function
   | SizeMonotonic -> "SizeMonotonic"
   | SizedMonotonic -> "SizedMonotonic"
   | SizedCorrect ->  "SizedCorrect"
-  
+
 let mk_instance_name der tn = 
   let prefix = derivable_to_string der in
-  let strip_last s = List.hd (List.rev (Str.split (Str.regexp "[.]") s)) in
+  let strip_last s = List.hd (List.rev (String.split_on_char '.' s)) in
   var_to_string (fresh_name (prefix ^ strip_last tn))
 
 let repeat_instance_name der tn = 
   let prefix = derivable_to_string der in
-  let strip_last s = List.hd (List.rev (Str.split (Str.regexp "[.]") s)) in
+  let strip_last s = List.hd (List.rev (String.split_on_char '.' s)) in
   (prefix ^ strip_last tn)
 
 (* Generic derivation function *)
-let derive (cn : derivable) (c : constr_expr) (instance_name : string) (name1 : string) (name2 : string) =
+let derive ~pstate (cn : derivable) (c : constr_expr) (instance_name : string) (name1 : string) (name2 : string) =
 
   let (ty_ctr, ty_params, ctrs) =
     match coerce_reference_to_dt_rep c with
@@ -54,7 +54,7 @@ let derive (cn : derivable) (c : constr_expr) (instance_name : string) (name1 : 
   let full_dt = gApp ~explicit:true coqTyCtr coqTyParams in
 
   let ind_name = match c with
-    | { CAst.v = CRef (r, _) } ->
+    | { CAst.v = CRef (r, _); _ } ->
          string_of_qualid r
     | _ -> failwith "Implement me for functions" 
   in
@@ -144,5 +144,5 @@ let derive (cn : derivable) (c : constr_expr) (instance_name : string) (name1 : 
   (* msg_debug (str "Defined record" ++ fnl ()); *)
   (* debug_coq_expr (instance_record []); *)
 
-  declare_class_instance instance_arguments instance_name instance_type instance_record
+  declare_class_instance ~pstate instance_arguments instance_name instance_type instance_record
 

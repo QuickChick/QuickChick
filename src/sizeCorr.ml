@@ -1,20 +1,7 @@
 open Pp
-open Loc
-open Names
-open Extract_env
-open Tacmach
-open Entries
-open Declarations
-open Declare
-open Libnames
 open Util
-open Constrintern
-open Constrexpr
-open Constrexpr_ops
-open Decl_kinds
 open GenericLib
 open SetLib
-open CoqLib
 open GenLib
 open SemLib
 open Error
@@ -30,7 +17,7 @@ let genCorr arg iargs inst_name s_inst_name c_inst_name mon_inst_name =
     | Arrow (ty1, ty2) ->
       let h = if arg._isCurrentTyCtr ty1 then hmon else hole in
       gApp ~explicit:true (gInject "bindMonotonic")
-           [hole; hole; hole; hole; h; gFun [x] (fun [x] -> mon_proof hmon ty2 (n+1))]
+           [hole; hole; hole; hole; h; gFun [x] (fun [_x] -> mon_proof hmon ty2 (n+1))]
     | _ -> hole
   in
 
@@ -44,23 +31,23 @@ let genCorr arg iargs inst_name s_inst_name c_inst_name mon_inst_name =
         else gInject "arbitraryCorrect"
       in
       let mon_proof_l = if arg._isCurrentTyCtr ty1 then hmon else hole in
-      let mon_proof_r = gFun ["m"] (fun [m] -> mon_proof hmon ty2 0) in
+      let mon_proof_r = gFun ["m"] (fun [_m] -> mon_proof hmon ty2 0) in
       set_eq_trans
         (gApp (gInject "semBindSizeMonotonic") ~explicit:true
               [hole; hole; hole; hole; mon_proof_l; mon_proof_r])
         (gApp (gInject "eq_bigcup'")
-              [h; gFun [x] (fun [x] -> proof ih hmon ty2 (n+1))])
+              [h; gFun [x] (fun [_x] -> proof ih hmon ty2 (n+1))])
     | _ -> gApp (gInject "semReturn") [hole]
   in
 
   let rec genCase ih hmon list_typ ctrs =
     match ctrs with
     | [] -> failwith "Invalid type"
-    | [(ctr, ty)] ->
+    | [(_ctr, ty)] ->
       set_eq_trans
         (eq_bigcupl hole hole (singl_set_eq hole hole))
         (set_eq_trans (bigcup_set1 hole list_typ) (proof ih hmon ty 0))
-    | (ctr, ty) :: ctrs' ->
+    | (_ctr, ty) :: ctrs' ->
       set_eq_trans
         (eq_bigcupl hole hole (cons_set_eq hole hole))
         (set_eq_trans
@@ -126,11 +113,11 @@ let genCorr arg iargs inst_name s_inst_name c_inst_name mon_inst_name =
 
   let ind_case hmon =
     gFun ["n"; "s"; "IHs"]
-      (fun [n; s; ihs] ->
+      (fun [n; _s; ihs] ->
         let (gen, gens) = ind_gens n in
          match arg._ctrs with
          | [] -> failwith "Must have base cases"
-         | [(ctr, ty)] -> proof (gVar ihs) hmon ty 0
+         | [(_ctr, ty)] -> proof (gVar ihs) hmon ty 0
          | _ :: _ ->
            set_eq_trans
              (semFreq gen gens (fst_leq_proof arg._ctrs))
@@ -140,14 +127,14 @@ let genCorr arg iargs inst_name s_inst_name c_inst_name mon_inst_name =
   let base_case =
     match bases with
     | [] -> failwith "Must have base cases"
-    | [(ctr, ty)] -> proof hole hole ty 0
+    | [(_ctr, ty)] -> proof hole hole ty 0
     | _ :: _ ->
       set_eq_trans
         (gApp ~explicit:true (gInject "semOneOf") [hole; fst base_gens; snd base_gens])
         (genCase hole hole hole bases)
   in
 
-  let ret_type =
+  let _ret_type =
     gFun ["n"; "s"]
       (fun [n; s] ->
         set_eq

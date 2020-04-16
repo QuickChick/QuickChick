@@ -5,7 +5,6 @@ Require Import QuickChickInterface.
 
 
 (* This module is just to keep the BasicInterface up-to-date with the implementation. *)
-
 Module ConsistencyCheck : QuickChickSig.
 
   Definition RandomSeed := RandomSeed.
@@ -26,7 +25,7 @@ Module ConsistencyCheck : QuickChickSig.
 (*  Definition backtrack := @backtrack. *)
   Definition resize := @resize.
   Definition sized := @sized.
-  Definition suchThatMaybe := @suchThatMaybe.
+  Definition suchThatMaybe := @GenLow.suchThatMaybe.
 (*  Definition suchThatMaybeOpt := @suchThatMaybeOpt. *)
 
   Class OrdType (A: Type) :=
@@ -185,13 +184,17 @@ Module ConsistencyCheck : QuickChickSig.
 
   Definition dec_if_dec_eq := @dec_if_dec_eq.
   Definition Eq__Dec     := @Eq__Dec.
-  Definition Dec_eq_bool := @Dec_eq_bool.
-  Definition Dec_eq_nat  := @Dec_eq_nat .
-  Definition Dec_eq_opt  := @Dec_eq_opt .
-  Definition Dec_eq_prod := @Dec_eq_prod.
-  Definition Dec_eq_list := @Dec_eq_list.
-  Definition Dec_ascii   := @Dec_ascii.
-  Definition Dec_string  := @Dec_string.
+  Definition Dec_eq_unit   := @Dec_eq_unit.
+  Definition Dec_eq_bool   := @Dec_eq_bool.
+  Definition Dec_eq_nat    := @Dec_eq_nat.
+  Definition Dec_eq_Z      := @Dec_eq_Z.
+  Definition Dec_eq_N      := @Dec_eq_N.
+  Definition Dec_eq_opt    := @Dec_eq_opt.
+  Definition Dec_eq_prod   := @Dec_eq_prod.
+  Definition Dec_eq_sum    := @Dec_eq_sum.
+  Definition Dec_eq_list   := @Dec_eq_list.
+  Definition Dec_eq_ascii  := @Dec_eq_ascii.
+  Definition Dec_eq_string := @Dec_eq_string.
 
   (** =================================================================== *)
   (** QuickChick toplevel commands and arguments.                         *)

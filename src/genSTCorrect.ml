@@ -1,7 +1,6 @@
 open Pp
 open Loc
 open Names
-open Extract_env
 open Tacmach
 open Entries
 open Declarations
@@ -21,6 +20,8 @@ open SemLib
 open Unify
 open ArbitrarySizedST
 open Feedback
+
+open Extraction_plugin.Extract_env
 
 let appinst mthd inst s inps =
   gApp ~explicit:true (gInject mthd) [hole; hole; gApp inst inps; s]

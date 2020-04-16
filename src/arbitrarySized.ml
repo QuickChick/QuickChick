@@ -90,7 +90,7 @@ let shrink_decl ty_ctr ctrs iargs =
   debug_coq_expr shrink_fun;
   gRecord [("shrink", shrink_fun)]
 
-let show_decl ty_ctr ctrs iargs =
+let show_decl ty_ctr ctrs _iargs =
   msg_debug (str "Deriving Show Information:" ++ fnl ());
   msg_debug (str ("Type constructor is: " ^ ty_ctr_to_string ty_ctr) ++ fnl ());
   msg_debug (str (str_lst_to_string "\n" (List.map ctr_rep_to_string ctrs)) ++ fnl());

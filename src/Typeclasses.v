@@ -12,9 +12,9 @@ Import GenLow GenHigh.
 Instance arbST_eq {A} (a : A) : GenSuchThat A (fun x => x = a) :=
   {| arbitraryST := returnGen (Some a) |}.
 Instance arbST_Correct {A} (a : A) 
-  : SuchThatCorrect (fun x => x = a) (genST (fun x => x = a)) :=
-  {| STCorrect := _ |}.
+  : SuchThatCorrect (fun x => x = a) (genST (fun x => x = a)).
 Proof.
+  constructor.
   simpl; rewrite semReturn.
   split; intros H. now firstorder.
   destruct H as [x [Heq H]]. subst. inversion H. subst.
@@ -24,9 +24,9 @@ Defined.
 Instance arbST_eq' {A} (a : A) : GenSuchThat A (fun x => a = x) :=
   {| arbitraryST := returnGen (Some a) |}.
 Instance arbST_Correct' {A} (a : A) 
-  : SuchThatCorrect (fun x => a = x ) (genST (fun x => a = x)) :=
-  {| STCorrect := _  |}.
+  : SuchThatCorrect (fun x => a = x ) (genST (fun x => a = x)).
 Proof.
+  constructor.
   simpl; rewrite semReturn.
   split; intros H. now firstorder.
   destruct H as [x [Heq H]]. subst. inversion H. subst.
@@ -43,10 +43,11 @@ Ltac ignore_gen_proofs := exfalso; apply ignore_generator_proofs.
 Global Instance testSuchThat {A : Type} {pre : A -> Prop} {prop : A -> Type}
        `{Show A} `{GenSuchThat A (fun x => pre x)}
        `{forall (x : A), Checkable (prop x)} :
-  Checkable (forall x, pre x -> prop x) := 
+  Checkable (forall x, pre x -> prop x).
+Proof.
+refine
   {| checker f := forAllMaybe (genST (fun x => pre x))
                               (fun x => checker (f x _)) |}.
-Proof.
   ignore_gen_proofs.
 Defined.
 
@@ -55,12 +56,15 @@ Global Instance testSuchThat2
        `{Show A} `{Show B} 
        `{GenSuchThat (A * B) (fun x => let (a,b) := x in pre a b)}
        `{forall (a : A) (b : B), Checkable (prop a b)} :
-  Checkable (forall a b , pre a b -> prop a b) :=
+  Checkable (forall a b , pre a b -> prop a b).
+Proof.
+refine
   {| checker f := forAllMaybe (genST (fun x : A * B => let (a,b) := x in pre a b))
                               (fun x =>
                                  let (a,b) := x in
                                  checker (f a b _)) |}.
-Proof. ignore_gen_proofs. Defined.
+ignore_gen_proofs.
+Defined.
 
 
 (*

@@ -105,6 +105,7 @@ val dep_type_len : dep_type -> int
 val dep_result_type : dep_type -> dep_type
 
 (* option type helpers *)
+val option_map : ('a -> 'b) -> 'a option -> 'b option
 val (>>=) : 'a option -> ('a -> 'b option) -> 'b option                                   
 val isSome : 'a option -> bool
 val cat_maybes : 'a option list -> 'a list
@@ -229,7 +230,10 @@ val fold_ty_vars : (var list -> var -> coq_type -> 'a) -> ('a -> 'a -> 'a) -> 'a
 
 (* val defineConstant : string -> coq_expr -> var
    val defineTypedConstant : string -> coq_expr -> coq_expr -> var *)
-val declare_class_instance : ?global:bool -> ?priority:int -> arg list -> string -> (var list -> coq_expr) -> (var list -> coq_expr) -> unit 
+val declare_class_instance
+  : ?global:bool -> ?priority:int
+  -> pstate:Proof_global.t option -> arg list -> string -> (var list -> coq_expr) -> (var list -> coq_expr)
+  -> Proof_global.t option
 
 (* List utils *)
 val list_last : 'a list -> 'a 

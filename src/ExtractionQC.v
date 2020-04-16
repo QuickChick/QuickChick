@@ -13,9 +13,12 @@ Require Import ExtrOcamlZInt.
 
 Extraction Blacklist String List Nat.
 
-(* Ignore [Decimal.int] before the extraction issue is solved:
-   https://github.com/coq/coq/issues/7017. *)
-Extract Inductive Decimal.int => unit [ "(fun _ -> ())" "(fun _ -> ())" ] "(fun _ _ _ -> ())".
+(** Temporary fix for https://github.com/coq/coq/issues/7017. *)
+(** Scott encoding of [Decimal.int] as [forall r. (uint -> r) -> (uint -> r) -> r]. *)
+Extract Inductive Decimal.int => "((Obj.t -> Obj.t) -> (Obj.t -> Obj.t) -> Obj.t) (* Decimal.int *)"
+  [ "(fun x pos _ -> pos (Obj.magic x))"
+    "(fun y _ neg -> neg (Obj.magic y))"
+  ] "(fun i pos neg -> Obj.magic i pos neg)".
 
 Extract Constant show_nat =>
   "(fun i ->
@@ -62,7 +65,7 @@ Extract Constant force => "Lazy.force".
 
 (* Extract Constant Test.ltAscii => "(<=)". *)
 (* Extract Constant Test.strEq   => "(=)". *)
-Extract Constant Nat.div => "(/)".
+Extract Constant Nat.div => "(fun m -> function 0 -> 0 | d -> m / d)".
 Extract Constant Test.gte => "(>=)".
 Extract Constant le_gt_dec => "(<=)".
 Extract Constant trace =>
@@ -70,15 +73,15 @@ Extract Constant trace =>
    let s = Bytes.create (List.length l) in
    let rec copy i = function
     | [] -> s
-    | c :: l -> s.[i] <- c; copy (i+1) l
+    | c :: l -> Bytes.set s i c; copy (i+1) l
    in Bytes.to_string (copy 0 l)); flush stdout; fun y -> y)".
 
 Set Extraction AccessOpaque.
 
 Require Import mathcomp.ssreflect.ssreflect.
 From mathcomp Require Import ssreflect ssrnat ssrbool div eqtype.
-Extract Constant divn => "(/)".
-Extract Constant modn => "(fun x y -> x mod y)".
+Extract Constant divn => "(fun m -> function 0 -> 0 | d -> m / d)".
+Extract Constant modn => "(fun m -> function 0 -> 0 | d -> m mod d)".
 Extract Constant eqn => "(==)".
 
 Axiom print_extracted_coq_string : string -> unit.

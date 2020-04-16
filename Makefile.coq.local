@@ -1,0 +1,1 @@
+OCAMLWARN=-w -8 -warn-error +a-3

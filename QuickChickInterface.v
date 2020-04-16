@@ -597,7 +597,7 @@ Declare Instance Eq__Dec {A} `{H : Dec_Eq A} (x y : A) : Dec (x = y).
 
 (** Since deciding equalities is a very common requirement in testing,
     QuickChick provides a tactic that can define instances of the form
-    [Dec (x = y)]. 
+    [Dec_Eq].
 *)
 (** [[
      Ltac dec_eq. 
@@ -605,19 +605,22 @@ Declare Instance Eq__Dec {A} `{H : Dec_Eq A} (x y : A) : Dec (x = y).
 *)
 
 (** QuickChick also lifts common decidable instances to the [Dec] typeclass. *)
-Declare Instance Dec_eq_bool (x y : bool) : Dec (x = y).
-Declare Instance Dec_eq_nat (m n : nat) : Dec (m = n).
-Declare Instance Dec_eq_opt (A : Type) (m n : option A)
-`{_ : forall (x y : A), Dec (x = y)} : Dec (m = n).
-Declare Instance Dec_eq_prod (A B : Type) (m n : A * B)
-`{_ : forall (x y : A), Dec (x = y)}
-`{_ : forall (x y : B), Dec (x = y)}
-: Dec (m = n).
-Declare Instance Dec_eq_list (A : Type) (m n : list A)
-`{_ : forall (x y : A), Dec (x = y)} : Dec (m = n).
+Declare Instance Dec_eq_unit   : Dec_Eq unit.
+Declare Instance Dec_eq_bool   : Dec_Eq bool.
+Declare Instance Dec_eq_nat    : Dec_Eq nat.
+Declare Instance Dec_eq_Z      : Dec_Eq Z.
+Declare Instance Dec_eq_N      : Dec_Eq N.
+Declare Instance Dec_eq_ascii  : Dec_Eq ascii.
+Declare Instance Dec_eq_string : Dec_Eq string.
 
-Declare Instance Dec_ascii (m n : Ascii.ascii) : Dec (m = n).
-Declare Instance Dec_string (m n : string) : Dec (m = n).
+Declare Instance Dec_eq_opt  (A : Type)
+        `{Dec_Eq A}             : Dec_Eq (option A).
+Declare Instance Dec_eq_prod (A B : Type)
+        `{Dec_Eq A} `{Dec_Eq B} : Dec_Eq (A * B).
+Declare Instance Dec_eq_sum  (A B : Type)
+        `{Dec_Eq A} `{Dec_Eq B} : Dec_Eq (A + B).
+Declare Instance Dec_eq_list (A : Type)
+        `{Dec_Eq A}             : Dec_Eq (list A).
 
 (* #################################################################### *)
 (** * Automatic Instance Derivation *)

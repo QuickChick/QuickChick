@@ -19,23 +19,28 @@ Class CoArbitrary (A : Type) : Type :=
     coarbCorrect : forall a, coarbReverse (coarbitrary a) = Some a
   }.
 
-Instance coArbPos : CoArbitrary positive := 
-  {|
+Instance coArbPos : CoArbitrary positive.
+Proof.
+refine {|
     coarbitrary x := x;
     coarbReverse x := Some x
   |}.
-Proof. auto. Qed.
+auto.
+Qed.
 
 Lemma nat_lemma :   forall a : nat,
   Some (Init.Nat.pred (Pos.to_nat (Pos.of_nat (S a)))) = Some a.
-Admitted.
+Proof.
+  intros; apply f_equal.
+  rewrite Nat2Pos.id; auto.
+Qed.
 
-Instance coqArbNat : CoArbitrary nat := 
-  {|
+Instance coqArbNat : CoArbitrary nat.
+Proof.
+refine {|
     coarbitrary x := Pos.of_nat (S x);
     coarbReverse p := Some (Coq.Init.Peano.pred (Pos.to_nat p))
   |}.
-Proof.
   apply nat_lemma.
 Qed.
 

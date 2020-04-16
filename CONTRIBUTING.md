@@ -1,12 +1,18 @@
+# Contribute to QuickChick
+
 The master branch of QuickChick is pull-request based only.
 It is used to track the developmental branch of Coq for use in the Coq CI. 
-Only pull requests from Coq developers will be accepted for the master branch.
-If you want to contribute to QuickChick, see below.
 
-If you want to contribute OCaml code to the plugin you must use the dev branch.
-The dev branch closely follows master and ensures that any ocaml code does not 
-become obsolete.
+Changes that specifically aim at forward compatibility with unreleased versions
+of Coq should be proposed to master branch.
 
-If you want to contribute to QuickChick on the Coq/documentation side of things and your
-change is 8.8 compatible, you can choose to submit a pull request to the latest stable 
-version (8.8) or otherwise to the dev branch for use in a future release.
+Otherwise, if you are proposing a fix or improvement, please submit the PR to
+corresponding branch:
+
+- `master` works with `coq.dev`
+- `8.*`    works with the specific version of Coq
+
+Please state the compatibility with other Coq versions in your pull request.
+
+Our next release will be based on `8.10` branch by default, unless older branches
+require a critical fix.

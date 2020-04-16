@@ -171,23 +171,23 @@ Class GenMonotonicCorrect (A : Type)
   
 Instance GenSizedMonotonicOfSizeMonotonic
          (A : Type) (Hgen : GenSized A) (Hmon : forall s, @SizeMonotonic A (arbitrarySized s))
-: @GenSizedMonotonic A Hgen Hmon.
+: @GenSizedMonotonic A Hgen Hmon := {}.
   
 Instance GenMonotonicOfSizeMonotonic
          (A : Type) (Hgen : Gen A) (Hmon : @SizeMonotonic A arbitrary)
-: @GenMonotonic A Hgen Hmon.
+: @GenMonotonic A Hgen Hmon := {}.
 
 Instance GenSizedCorrectOfSizedCorrect
          (A : Type) (Hgen : GenSized A) `{Hcor : SizedCorrect A arbitrarySized}
-: @GenSizedCorrect A Hgen _ Hcor.
+: @GenSizedCorrect A Hgen _ Hcor := {}.
 
 Instance GenCorrectOfCorrect
          (A : Type) (Hgen : Gen A) `{Hcor : Correct A arbitrary}
-: @GenCorrect A Hgen Hcor.
+: @GenCorrect A Hgen Hcor := {}.
 
 Instance GenSizedSizeMonotonicOfSizedMonotonic
          (A : Type) (Hgen : GenSized A) (Hmon : @SizedMonotonic A arbitrarySized)
-: @GenSizedSizeMonotonic A Hgen Hmon.
+: @GenSizedSizeMonotonic A Hgen Hmon := {}.
 
 (* Zoe : Is global really needed here? *)
 Global Instance GenOfGenSized {A} `{GenSized A} : Gen A :=
@@ -198,7 +198,7 @@ Global Instance GenEnumOfGenEnumSized {A} `{GenEnumSized A} : GenEnum A :=
   {| arbEnum := arbEnumSized arbitrarySized |}.
  *)
 
-Global Instance ArbitraryOfGenShrink {A} `{Gen A} `{Shrink A} : Arbitrary A.
+Global Program Instance ArbitraryOfGenShrink {A} `{Gen A} `{Shrink A} : Arbitrary A.
 
 Generalizable Variables PSized PMon PSMon PCorr.
 
@@ -207,7 +207,7 @@ Instance GenMonotonicOfSized (A : Type)
          {H : GenSized A}
          `{@GenSizedMonotonic A H PMon}
          `{@GenSizedSizeMonotonic A H PSMon}
-: GenMonotonic A.
+: GenMonotonic A := {}.
 
 Instance GenCorrectOfSized (A : Type)
          {H : GenSized A}
@@ -218,7 +218,6 @@ Proof.
   constructor. unfold arbitrary, GenOfGenSized. 
   eapply set_eq_trans.
   - eapply semSized_alt; eauto with typeclass_instances.
-    destruct PSMon. eauto.
   - setoid_rewrite arbitrarySizedCorrect.
     split. intros [n H3]. constructor; eauto.
     intros H4. eexists; split; eauto.

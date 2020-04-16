@@ -38,7 +38,7 @@ let set_eq_refl x =
 let set_incl_refl =
   gApp ~explicit:true (gInject "subset_refl") [hole; hole]
 
-let incl_subset l1 l2 p =
+let _incl_subset l1 l2 p =
   gApp (gInject "incl_subset") [l1; l2; p]
 
 let incl_refl =
@@ -108,6 +108,7 @@ let isSomeSet a =
        gApp (gInject "is_true")
          [gApp ~explicit:true (gInject "isSome") [a; gVar x]]
     )
+    [@ocaml.warning "-8"]
 
 let incl_subset l1 l2 p =
   gApp ~explicit:true (gInject "incl_subset") [hole; l1; l2; p]

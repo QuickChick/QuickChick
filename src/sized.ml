@@ -55,7 +55,7 @@ let rec dropIH cty ty_ctr l =
     (if sameTypeCtr ty_ctr ty1
      then
        match l with
-       | x :: ihx :: l ->
+       | x :: _ihx :: l ->
          let (l1, l2) = dropIH ty2 ty_ctr l in
          (x :: l1, x :: l2)
        | _ -> failwith "Internal: Wrong number of arguments" 
@@ -74,13 +74,13 @@ let zeroEqProof ty_ctr ctrs (ind_scheme : coq_expr) size zeroType zeroSized iarg
   (* Common helpers, refactor? *)
   let coqTyCtr = gTyCtr ty_ctr in
   let coqTyParams = List.map gVar (list_drop_every 2 iargs) in
-  let full_dt = gApp ~explicit:true coqTyCtr coqTyParams in
+  let _full_dt = gApp ~explicit:true coqTyCtr coqTyParams in
 
   let base_ctrs = base_ctrs ty_ctr ctrs in
 
   let rec elim_set h ty n =
     match ty with
-    | Arrow (ty1, ty2) ->
+    | Arrow (_ty1, ty2) ->
 
       let w' = Printf.sprintf "x%d" n in
       let hw' = Printf.sprintf "Hx%d" n in
@@ -89,30 +89,31 @@ let zeroEqProof ty_ctr ctrs (ind_scheme : coq_expr) size zeroType zeroSized iarg
 
       gMatch (gVar h)
         [(injectCtr "ex_intro", [w'; hw'],
-          fun [w'; hw'] ->
+          fun [_w'; hw'] ->
             gMatch (gVar hw')
               [(injectCtr "conj", [hc1; hc2],
-                fun [hc1; hc2] ->
+                fun [_hc1; hc2] ->
                   elim_set hc2 ty2 (n+1) 
                    )]
-         )]
+         )] [@ocaml.warning "-8"]
+
     | _ -> discriminate (gVar h)
   in
 
   let rec elim_unions h ctrs =
     match ctrs with
-    | [(ctr, ty)] -> elim_set h ty 0
-    | (ctr, ty) :: ctrs' ->
+    | [(_ctr, ty)] -> elim_set h ty 0
+    | (_ctr, ty) :: ctrs' ->
       gMatch (gVar h)
         [(injectCtr "or_introl", ["H1"],
           fun [h1] -> elim_set h1 ty 0);
          (injectCtr "or_intror", ["H1"],
-          fun [h1] -> elim_unions h1 ctrs')] 
+          fun [h1] -> elim_unions h1 ctrs')]
   in
 
   let rec intro_set ty ctr_args ctr acc =
     match ty with
-    | Arrow (ty1, ty2) ->
+    | Arrow (_ty1, ty2) ->
       (match ctr_args with
        | arg :: ctr_args' ->
          gExIntro_impl arg (gConjIntro gI (intro_set ty2 ctr_args' ctr (arg :: acc)))
@@ -135,7 +136,6 @@ let zeroEqProof ty_ctr ctrs (ind_scheme : coq_expr) size zeroType zeroSized iarg
         gOrIntroR (intro_unions ctrs' args curr_ctr)
   in
 
-
   let create_case (ctr, ty) =
     let (_, iargs) = gen_args ty ty_ctr 0 in
     gFun iargs (fun iargs ->
@@ -145,8 +145,8 @@ let zeroEqProof ty_ctr ctrs (ind_scheme : coq_expr) size zeroType zeroSized iarg
         let rhs = gEq (gApp size [elem]) (gInt 0) in
         if isBaseBranch ty_ctr ty then
           gConjIntro
-            (gFunTyped [("H1", lhs)] (fun [h1] -> gEqRefl hole))
-            (gFunTyped [("H1", rhs)] (fun [h1] -> intro_unions base_ctrs (List.map gVar args) ctr))
+            (gFunTyped [("H1", lhs)] (fun [_h1] -> gEqRefl hole))
+            (gFunTyped [("H1", rhs)] (fun [_h1] -> intro_unions base_ctrs (List.map gVar args) ctr))
         else
           gConjIntro
             (gFunTyped [("H1", lhs)] (fun [h1] -> elim_unions h1 base_ctrs))
@@ -162,7 +162,7 @@ let succEqProof ty_ctr ctrs (ind_scheme : coq_expr) succType succSized iargs =
   let coqTyParams = List.map gVar (list_drop_every 2 iargs) in
   let full_dt = gApp ~explicit:true coqTyCtr coqTyParams in
 
-  let base_ctrs = base_ctrs ty_ctr ctrs in
+  let _base_ctrs = base_ctrs ty_ctr ctrs in
 
   let rec elim_set h leq ty n f ctr_flag size =
     match ty with
@@ -175,7 +175,7 @@ let succEqProof ty_ctr ctrs (ind_scheme : coq_expr) succType succSized iargs =
 
       gMatch (gVar h)
         [(injectCtr "ex_intro", [w'; hw'],
-          fun [w'; hw'] ->
+          fun [_w'; hw'] ->
             gMatch (gVar hw')
               [(injectCtr "conj", [hc1; hc2],
                 fun [hc1; hc2] ->
@@ -218,9 +218,9 @@ let succEqProof ty_ctr ctrs (ind_scheme : coq_expr) succType succSized iargs =
          if sameTypeCtr ty_ctr ty1
          then
            (match iargs with
-            | [arg] ->
+            | [_arg] ->
               (leq, leq, [])
-            | arg :: args ->
+            | _arg :: args ->
               (gApp (gInject "max_lub_l_ssr") [hole; hole; hole; leq],
                gApp (gInject "max_lub_r_ssr") [hole; hole; hole; leq],
                args))
@@ -256,7 +256,7 @@ let succEqProof ty_ctr ctrs (ind_scheme : coq_expr) succType succSized iargs =
         let rhs = gApp (leq_size (gSucc (gVar size))) [elem] in
         if isBaseBranch ty_ctr ty then
           gConjIntro
-            (gFunTyped [("H1", lhs)] (fun [h1] -> gApp (gInject "leq0n") [hole]))
+            (gFunTyped [("H1", lhs)] (fun [_h1] -> gApp (gInject "leq0n") [hole]))
             (gFunTyped [("H1", rhs)] (fun [h1] -> intro_unions h1 ctrs (List.map gVar args) ihargs ctr))
         else
           gConjIntro

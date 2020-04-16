@@ -39,6 +39,18 @@ Parameter elems_ : forall {A : Type}, list A -> G A.
 (* Parameter shuffle : forall {A : Type}, list (nat * G A) -> G A. *)
 (* Parameter backtrack : forall {A : Type}, list (nat * G A) -> G A. *)
 
+Parameter bindGenOpt : forall {A B : Type},
+    G (option A) -> (A -> G (option B)) -> G (option B).
+
+Parameter retry : forall {A : Type},
+    nat -> G (option A) -> G (option A).
+Parameter suchThatMaybe1 : forall {A : Type},
+    G A -> (A -> bool) -> G (option A).
+Parameter suchThatMaybe : forall {A : Type},
+    G A -> (A -> bool) -> G (option A).
+Parameter suchThatMaybeOpt : forall {A : Type},
+    G (option A) -> (A -> bool) -> G (option A).
+
 (* Correctness for derived generators *)
 
 Parameter semLiftGen :

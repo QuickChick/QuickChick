@@ -213,12 +213,12 @@ Proof.
   unfold arbitrary, GenOfGenSized.
   eapply sizedSizeMonotonic; unfold arbitrarySized, genBoolSized.
   intros _. eauto with typeclass_instances.
-  constructor. intros. eapply subset_refl.
+  intros n s1 s2 Hs. eapply subset_refl.
 Qed.
 
 Instance boolSizedMonotonic : SizedMonotonic (@arbitrarySized bool _).
 Proof.
-  constructor. intros. eapply subset_refl.
+  intros n s1 s2 Hs. eapply subset_refl.
 Qed.
 
 Instance boolCorrect : Correct bool arbitrary.

@@ -107,6 +107,17 @@ Module Type Sig.
   Definition semGen {A : Type} (g : G A) : set A :=
     \bigcup_size semGenSize g size.
 
+  (* Set of outcomes semantics for generators that can fail
+     (ignoring [None] as a value). *)
+  Definition semGenSizeOpt {A : Type} (g : G (option A)) (s : nat) : set A :=
+    somes (semGenSize g s).
+
+  Definition semGenOpt {A : Type} (g : G (option A)) : set A :=
+    somes (semGen g).
+
+  Parameter semGenOpt_equiv : forall {A} (g : G (option A)),
+    semGenOpt g <--> \bigcup_s semGenSizeOpt g s.
+
   Parameter bindGen' : forall {A B : Type} (g : G A), 
                        (forall (a : A), (a \in semGen g) -> G B) -> G B. 
 
@@ -117,19 +128,14 @@ Module Type Sig.
   (** A generator is [Unsized] if its semantics does not depend on the runtime size *)
   (* begin Unsized *)
   Class Unsized {A} (g : G A) :=
-    {
-      unsized : forall s1 s2, semGenSize g s1 <--> semGenSize g s2
-    }.
+    unsized : forall s1 s2, semGenSize g s1 <--> semGenSize g s2.
   (* end Unsized *)
   
   (** Sized generators monotonic in the size parameter *)
   Class SizedMonotonic {A} (g : nat -> G A) :=
-    {
-      sizeMonotonic :
-        forall s s1 s2,
-          s1 <= s2 ->
-          semGenSize (g s1) s \subset semGenSize (g s2) s
-    }.
+    sizeMonotonic : forall s s1 s2,
+      s1 <= s2 ->
+      semGenSize (g s1) s \subset semGenSize (g s2) s.
 
   (*
   (** Sized generators of option type monotonic in the size parameter *)
@@ -144,18 +150,16 @@ Module Type Sig.
   
   (** Generators monotonic in the runtime size parameter *)
   Class SizeMonotonic {A} (g : G A) :=
-    {
-      monotonic :
-        forall s1 s2, s1 <= s2 -> semGenSize g s1 \subset semGenSize g s2
-    }.
+    monotonic : forall s1 s2,
+      s1 <= s2 ->
+      semGenSize g s1 \subset semGenSize g s2.
 
   (*
   (** Generators monotonic in the runtime size parameter *)
   Class SizeMonotonicOpt {A} (g : G (option A)) :=
-    {
-      monotonic_opt :
-        forall s1 s2, s1 <= s2 -> isSome :&: semGenSize g s1 \subset isSome :&: semGenSize g s2
-    }.
+    monotonicOpt : forall s1 s2,
+      s1 <= s2 ->
+      semGenSizeOpt g s1 \subset semGenSizeOpt g s2.
   
   (** Generators monotonic in the runtime size parameter *)
   Class SizeAntiMonotonicNone {A} (g : G (option A)) :=
@@ -342,17 +346,17 @@ Module Type Sig.
     SizeMonotonic (fmap f g).
 
   Parameter semChoose :
-    forall A `{ChoosableFromInterval A} (a1 a2 : A),
+    forall A `{RandomQC.ChoosableFromInterval A} (a1 a2 : A),
       RandomQC.leq a1 a2 ->
       (semGen (choose (a1,a2)) <--> [set a | RandomQC.leq a1 a && RandomQC.leq a a2]).
 
   Parameter semChooseSize :
-    forall A `{ChoosableFromInterval A} (a1 a2 : A),
+    forall A `{RandomQC.ChoosableFromInterval A} (a1 a2 : A),
       RandomQC.leq a1 a2 ->
       forall size, (semGenSize (choose (a1,a2)) size <-->
               [set a | RandomQC.leq a1 a && RandomQC.leq a a2]).
 
-  Declare Instance chooseUnsized A `{ChoosableFromInterval A} (a1 a2 : A) : 
+  Declare Instance chooseUnsized A `{RandomQC.ChoosableFromInterval A} (a1 a2 : A) :
     Unsized (choose (a1, a2)).
   
   Parameter semSized :
@@ -494,7 +498,7 @@ Module Type Sig.
   Parameter runFmap :
     forall (A B : Type) (f : A -> B) (g : G A) seed size,
       run (fmap f g) seed size = f (run g seed size).
-  
+
   Parameter runPromote :
     forall A (m : Rose (G A)) seed size,
       run (promote m) seed size = fmapRose (fun (g : G A) => run g seed size) m.

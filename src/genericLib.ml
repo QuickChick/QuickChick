@@ -1,4 +1,3 @@
-open Vernacexpr
 open Decl_kinds
 open Pp
 open Constr
@@ -11,21 +10,22 @@ open Constrexpr_ops
 open Ppconstr
 open Context
 open Error
+open Globnames
 
 let cnt = ref 0 
 
 let fresh_name n : Id.t =
     let base = Id.of_string n in
 
-  (** [is_visible_name id] returns [true] if [id] is already
-      used on the Coq side. *)
+  (* [is_visible_name id] returns [true] if [id] is already
+     used on the Coq side. *)
     let is_visible_name id =
       try
         ignore (Nametab.locate (Libnames.qualid_of_ident id));
         true
       with Not_found -> false
     in
-    (** Safe fresh name generation. *)
+    (* Safe fresh name generation. *)
     Namegen.next_ident_away_from base is_visible_name
 
 let make_up_name () : Id.t =
@@ -33,7 +33,7 @@ let make_up_name () : Id.t =
   cnt := !cnt + 1;
   id
        
-let hole = CAst.make @@ CHole (None, Misctypes.IntroAnonymous, None)
+let hole = CAst.make @@ CHole (None, Namegen.IntroAnonymous, None)
 
 let id_of_name n = 
   match n with 
@@ -45,7 +45,9 @@ let id_of_name n =
 type coq_expr = constr_expr (* Opaque *)
 
 let debug_coq_expr (c : coq_expr) : unit =
-  msg_debug (pr_constr_expr c)
+  let env = Global.env () in
+  let sigma = Evd.from_env env in
+  msg_debug (pr_constr_expr env sigma c)
 
 let debug_constr env sigma (c : constr) : unit = 
   msg_debug (Printer.safe_pr_constr_env env sigma c ++ fnl ())
@@ -81,16 +83,16 @@ type arg = local_binder_expr
 let gArg ?assumName:(an=hole) ?assumType:(at=hole) ?assumImplicit:(ai=false) ?assumGeneralized:(ag=false) _ =
   let n = match an with
     | { CAst.v = CRef (qid, _); loc } -> (loc,Name (qualid_basename qid))
-    | { CAst.v = CHole (v,_,_); loc } -> (loc,Anonymous)
-    | a -> failwith "This expression should be a name" in
+    | { CAst.v = CHole (_v,_,_); loc } -> (loc,Anonymous)
+    | _a -> failwith "This expression should be a name" in
   CLocalAssum ( [CAst.make ?loc:(fst n) @@ snd n],
-                  (if ag then Generalized (Implicit, Implicit, false)                       
+                  (if ag then Generalized (Implicit, false)
                    else if ai then Default Implicit else Default Explicit),
                   at )
 
 let arg_to_var (x : arg) =
   match x with
-  | CLocalAssum ([{CAst.v = id; loc}], _ ,_ ) -> id_of_name id
+  | CLocalAssum ([{CAst.v = id; _}], _ ,_ ) -> id_of_name id
   | _ -> qcfail "arg_to_var must be named"
   
 let str_lst_to_string sep (ss : string list) = 
@@ -221,6 +223,11 @@ let rec dep_type_len = function
   | _ -> 0
 
 (* Option monad *)
+let option_map f ox =
+  match ox with
+  | Some x -> Some (f x)
+  | None -> None
+
 let (>>=) m f = 
   match m with
   | Some x -> f x 
@@ -322,7 +329,8 @@ let parse_constructors nparams param_names result_ty oib : ctr_rep list option =
   in
 
   let cns = List.map qualid_of_ident (Array.to_list oib.mind_consnames) in
-  let lc  = Array.to_list oib.mind_nf_lc in
+  let map (ctx, t) = Term.it_mkProd_or_LetIn t ctx in
+  let lc = Array.map_to_list map oib.mind_nf_lc in
   sequenceM parse_constructor (List.combine cns lc)
 
 (* Convert mutual_inductive_body to this representation, if possible *)
@@ -349,7 +357,7 @@ let qualid_to_mib r =
     
 let coerce_reference_to_dt_rep c = 
   let r = match c with
-    | { CAst.v = CRef (r,_) } -> r
+    | { CAst.v = CRef (r,_);_ } -> r
     | _ -> failwith "Not a reference"
   in
 
@@ -439,7 +447,7 @@ let parse_dependent_type i nparams ty oib arg_names =
 (*      let (mp, _dn, _) = MutInd.repr3 mind in *)
 
       (* HACKY: figure out better way to qualify constructors *)
-      let names = Str.split (Str.regexp "[.]") (MutInd.to_string mind) in
+      let names = String.split_on_char '.' (MutInd.to_string mind) in
       let prefix = List.rev (List.tl (List.rev names)) in
       let qual = String.concat "." prefix in
       msg_debug (str (Printf.sprintf "CONSTR: %s %s" qual (DirPath.to_string (Lib.cwd ()))) ++ fnl ());
@@ -455,7 +463,7 @@ let parse_dependent_type i nparams ty oib arg_names =
       (* Are the 'i's correct? *)
       aux i t1 >>= fun t1' -> 
       aux i t2 >>= fun t2' ->
-      Some (DProd ((id_of_name n, t1'), t2'))
+      Some (DProd ((id_of_name n.binder_name, t1'), t2'))
     end
     (* Rel, App, Ind, Construct, Prod *)
     else if isConst ty then begin 
@@ -505,6 +513,7 @@ let dep_parse_constructors nparams param_names oib : dep_ctr list option =
 
     let pat_names, pat_types = List.split (List.rev ctr_pats) in
 
+    let pat_names = List.map (fun n -> n.binder_name) pat_names in
     let arg_names = 
       List.map (fun x -> DTyParam x) param_names @ 
       List.map (fun n -> match n with
@@ -521,7 +530,8 @@ let dep_parse_constructors nparams param_names oib : dep_ctr list option =
   in
 
   let cns = List.map qualid_of_ident (Array.to_list oib.mind_consnames) in
-  let lc = Array.to_list oib.mind_nf_lc in
+  let map (ctx, t) = Term.it_mkProd_or_LetIn t ctx in
+  let lc = Array.map_to_list map oib.mind_nf_lc in
   sequenceM parse_constructor (List.combine cns lc)
 
 let dep_dt_from_mib mib = 
@@ -538,7 +548,7 @@ let dep_dt_from_mib mib =
 
 let coerce_reference_to_dep_dt c = 
   let r = match c with
-    | { CAst.v = CRef (r,_) } -> r
+    | { CAst.v = CRef (r,_); _ } -> r
     | _ -> failwith "Not a reference" in
 
   let env = Global.env () in
@@ -558,7 +568,7 @@ let gApp ?explicit:(expl=false) c cs =
   else mkAppC (c, cs)
 
 let gProdWithArgs args f_body =
-  let xvs = List.map (fun (CLocalAssum ([{CAst.v = n}], _, _)) ->
+  let xvs = List.map (fun (CLocalAssum ([{CAst.v = n;_}], _, _)) ->
                       match n with
                       | Name x -> x
                       | _ -> make_up_name ()
@@ -567,7 +577,7 @@ let gProdWithArgs args f_body =
   mkCProdN args fun_body
 
 let gFunWithArgs args f_body =
-  let xvs = List.map (fun (CLocalAssum ([{CAst.v = n}], _, _)) ->
+  let xvs = List.map (fun (CLocalAssum ([{CAst.v = n;_}], _, _)) ->
                       match n with
                       | Name x -> x
                       | _ -> make_up_name ()
@@ -598,14 +608,14 @@ let gFunTyped xts (f_body : var list -> coq_expr) =
 (* with Explicit/Implicit annotations *)  
 let gRecFunInWithArgs ?assumType:(typ=hole) (fs : string) args (f_body : (var * var list) -> coq_expr) (let_body : var -> coq_expr) = 
   let fv  = fresh_name fs in
-  let xvs = List.map (fun (CLocalAssum ([{CAst.v = n}], _, _)) ->
+  let xvs = List.map (fun (CLocalAssum ([{CAst.v = n;_}], _, _)) ->
                       match n with
                       | Name x -> x
                       | _ -> make_up_name ()
                      ) args in
   let fix_body = f_body (fv, xvs) in
   CAst.make @@ CLetIn (CAst.make @@ Name fv,
-    CAst.make @@ CFix(CAst.make fv,[(CAst.make fv, (None, CStructRec), args, typ, fix_body)]), None,
+    CAst.make @@ CFix(CAst.make fv,[(CAst.make fv, None, args, typ, fix_body)]), None,
     let_body fv)
              
 let gRecFunIn ?assumType:(typ = hole) (fs : string) (xss : string list) (f_body : (var * var list) -> coq_expr) (let_body : var -> coq_expr) =
@@ -662,7 +672,7 @@ let gRecord names_and_bodies =
   CAst.make @@ CRecord (List.map (fun (n,b) -> (qualid_of_ident @@ Id.of_string n, b)) names_and_bodies)
 
 let gAnnot (p : coq_expr) (tau : coq_expr) =
-  CAst.make @@ CCast (p, Misctypes.CastConv tau)
+  CAst.make @@ CCast (p, Glob_term.CastConv tau)
 
 (* Convert types back into coq *)
 let gType ty_params dep_type = 
@@ -782,7 +792,8 @@ let rec gList = function
   | x::xs -> gCons x (gList xs)
 
 (* Generic String Manipulations *)
-let gStr s = CAst.make @@ CPrim (String s)
+let string_scope ast = CAst.make @@ CDelimiters ("string", ast)
+let gStr s = string_scope (CAst.make @@ CPrim (String s))
 let emptyString = gInject "Coq.Strings.String.EmptyString"
 let str_append c1 c2 = gApp (gInject "Coq.Strings.String.append") [c1; c2]
 let rec str_appends cs = 
@@ -835,10 +846,11 @@ let dtTupleType =
 (* Int *)
 
 let mkNumeral n =
-  if n >= 0 then Numeral (string_of_int n, true)
-  else Numeral (string_of_int (-n), false)
+  if n >= 0 then Numeral (SPlus, NumTok.int (string_of_int n))
+  else Numeral (SMinus, NumTok.int (string_of_int (-n)))
 
-let gInt n = CAst.make @@ CPrim (mkNumeral n)
+let nat_scope ast = CAst.make @@ CDelimiters ("nat", ast)
+let gInt n = nat_scope (CAst.make @@ CPrim (mkNumeral n))
 let gSucc x = gApp (gInject "Coq.Init.Datatypes.S") [x]
 let rec maximum = function
   | [] -> failwith "maximum called with empty list"
@@ -930,7 +942,7 @@ let create_names_for_anon a =
      end
   | _ -> failwith "Non RawAssum in create_names"
     
-let declare_class_instance ?(global=true) ?(priority=42) instance_arguments instance_name instance_type instance_record =
+let declare_class_instance ?(global=true) ?(priority=42) ~pstate instance_arguments instance_name instance_type instance_record =
   msg_debug (str "Declaring class instance..." ++ fnl ());
   msg_debug (str (Printf.sprintf "Total arguments: %d" (List.length instance_arguments)) ++ fnl ());
   let (vars,iargs) = List.split (List.map create_names_for_anon instance_arguments) in
@@ -938,15 +950,16 @@ let declare_class_instance ?(global=true) ?(priority=42) instance_arguments inst
   msg_debug (str "Calculated instance_type_vars" ++ fnl ());
   let instance_record_vars = instance_record vars in
   msg_debug (str "Calculated instance_record_vars" ++ fnl ());
-  let cid = Classes.new_instance ~global:global false
+  let cid, pstate = Classes.new_instance ~pstate ~global:global false
               ~program_mode:false (* TODO: true or false? *)
                                iargs
                        ((CAst.make @@ Name (Id.of_string instance_name), None)
                        , Decl_kinds.Explicit, instance_type_vars)
                        (Some (true, instance_record_vars)) (* TODO: true or false? *)
-                       { hint_priority = Some priority; hint_pattern = None }
+                       { Typeclasses.hint_priority = Some priority; hint_pattern = None }
   in
-  msg_debug (str (Id.to_string cid) ++ fnl ())
+  msg_debug (str (Id.to_string cid) ++ fnl ());
+  pstate
 
 (* List Utils. Probably should move to a util file instead *)
 let list_last l = List.nth l (List.length l - 1)

@@ -1,3 +1,5 @@
+{
+
 open GenericLib
 open Stdarg
 open Error
@@ -30,19 +32,21 @@ let register_weights (l : (constructor * weight_ast) list) =
 
 let convert_constr_to_weight c = 
   match c with 
-  | { CAst.v = CPrim (Numeral (i,s)) } -> 
-     if s then WNum (int_of_string i)
-     else failwith "QC: Numeric weights should be greater than 0."
-  | { CAst.v = CRef (r, _) } -> 
+  | { CAst.v = CPrim (Numeral (SPlus,{NumTok.int=i;frac="";exp=""})); _ } ->
+     WNum (int_of_string i)
+  | { CAst.v = CPrim (Numeral (SMinus,_)); _ } ->
+     failwith "QC: Numeric weights should be greater than 0."
+  | { CAst.v = CRef (r, _); _ } -> 
      if string_of_qualid r = "size" then WSize
      else failwith "QC: Expected number or 'size'."
+  | _ -> failwith "QC: match failure."
 
 let convert_constr_to_cw_pair c : (constructor * weight_ast) = 
   match c with 
-  | {CAst.v = CNotation (_,([a],[[b]],_,_)) } -> begin
+  | { CAst.v = CNotation (_,([a],[[b]],_,_)); _ } -> begin
       let ctr = 
         match a with 
-        | { CAst.v = CRef (r, _) } -> injectCtr (string_of_qualid r)
+        | { CAst.v = CRef (r, _); _ } -> injectCtr (string_of_qualid r)
         | _ -> failwith "First argument should be a constructor name"
       in 
       let w = convert_constr_to_weight b in
@@ -53,8 +57,8 @@ let convert_constr_to_cw_pair c : (constructor * weight_ast) =
 let register_weights_object = 
   Libobject.declare_object
     {(Libobject.default_object ("QC_register_weights")) with
-       cache_function = (fun (_,ws) -> register_weights ws);
-       load_function = (fun _ (_,ws) -> register_weights ws)}
+      Libobject.cache_function = (fun (_,ws) -> register_weights ws);
+      Libobject.load_function = (fun _ (_,ws) -> register_weights ws)}
 
 let lookup_weight ctr size_var = 
   try match CtrMap.find ctr !weight_env with
@@ -62,12 +66,14 @@ let lookup_weight ctr size_var =
       | WSize  -> gSucc (gVar (size_var))
   with Not_found -> gInt 1
 
+}
+
 VERNAC COMMAND EXTEND QuickChickWeights CLASSIFIED AS SIDEFF
   | ["QuickChickWeights" constr(c)] -> 
-     [
+     {
        let weight_assocs = 
          match c with 
-         | { CAst.v = CNotation (_,([a],[b],_,_)) } -> begin
+         | { CAst.v = CNotation (_,([a],[b],_,_)); _ } -> begin
              let c = convert_constr_to_cw_pair a in
              let cs = List.map convert_constr_to_cw_pair b in
              c :: cs
@@ -77,8 +83,8 @@ VERNAC COMMAND EXTEND QuickChickWeights CLASSIFIED AS SIDEFF
        msg_debug (str "Current weights: " ++ fnl ());
        msg_debug (str (weight_env_to_string ()) ++ fnl ());
        Lib.add_anonymous_leaf (register_weights_object weight_assocs)
-     ]
-END;;
+     }
+END
 
 (*
 let s1' = Names.string_of_id s1 in
