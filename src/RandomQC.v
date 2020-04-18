@@ -230,8 +230,8 @@ simpl in InPL.
 inversion InPL.
 Qed.
 
-Hint Resolve corrEmptyUndef.
-Hint Resolve corrNodeNonEmpty.
+Hint Resolve corrEmptyUndef corrNodeNonEmpty.
+
 Definition Direction_eq_dec : forall (d1 d2 : SplitDirection),
                                 {d1 = d2} + {d1 <> d2}.
 decide equality.
@@ -334,7 +334,7 @@ auto.
 Qed.
 
 Hint Rewrite refineFunCorrect.
-Hint Unfold refineFunction.
+Hint Unfold  refineFunction  .
 Program Fixpoint addToTree (st : SeedTree) (p : SplitPath) (f : SplitPath -> RandomSeed)
         (l : list SplitPath)
         (Corr : correspondingSeedTree l f st)

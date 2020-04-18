@@ -2,7 +2,6 @@
 
 open Pp
 open Names
-open Entries
 open Declare
 open Libnames
 open Util
@@ -33,7 +32,13 @@ let qid = Libnames.make_qualid (DirPath.make [Id.of_string "QuickChick"]) (Id.of
 let qid = qualid_of_string "QuickChick.QuickChick"
 				*)
 let path =
-  lazy (let (_,_,path) = Library.locate_qualified_library ~warn:false qid in path)
+  lazy (
+    match Loadpath.locate_qualified_library ~warn:false qid with
+    | Ok (_,_,path) -> path
+    | Error _ ->
+      CErrors.user_err (Pp.str "cannot locate QuickChick Coq library")
+  )
+
 let path = lazy (Filename.dirname (Lazy.force path))
 
 (* [mkdir -p]: recursively make the parent directories if they do not exist. *)
@@ -112,9 +117,8 @@ let define c env evd =
   let univs = Evd.univ_entry ~poly:true evd in
   let fn = fresh_name "quickchick" in
   (* TODO: Maxime - which of the new internal flags should be used here? The names aren't as clear :) *)
-  ignore (declare_constant ~internal:InternalTacticRequest fn
-      (DefinitionEntry (definition_entry ~univs (EConstr.to_constr evd c)),
-       Decl_kinds.IsDefinition Decl_kinds.Definition));
+  let _ : Constant.t = declare_constant ~name:fn ~kind:Decls.(IsDefinition Definition)
+      (DefinitionEntry (definition_entry ~univs (EConstr.to_constr evd c))) in
   fn
 
 (* [$TMP/QuickChick/$TIME/QuickChick.ml],
@@ -175,7 +179,7 @@ let define_and_run c env evd =
   if Sys.command (comp_ml_cmd mlf execn) <> 0 then
     CErrors.user_err (str "Could not compile test program" ++ fnl ())
    *)
-  if Sys.command ("cd " ^ dir ^ "; ocamlbuild " ^ Filename.basename execn) <> 0 then
+  if Sys.command ("cd " ^ dir ^ "; ocamlbuild -cflags \"-w -3\" " ^ Filename.basename execn) <> 0 then
     (CErrors.user_err (str "Could not compile test program" ++ fnl ()))
 
   (* Run the test *)

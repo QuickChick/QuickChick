@@ -5,7 +5,7 @@ open SetLib
 open CoqLib
 open GenLib
 open Error
-open Unify
+open UnifyQC
 
 type btyp = ((coq_expr -> coq_expr -> int -> (coq_expr * coq_expr) list -> (coq_expr -> coq_expr) -> coq_expr) *
              ((coq_expr -> (coq_expr * coq_expr) list -> coq_expr) -> coq_expr -> (coq_expr * coq_expr) list -> coq_expr))
