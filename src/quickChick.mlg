@@ -2,6 +2,7 @@
 
 open Pp
 open Names
+open Entries
 open Declare
 open Libnames
 open Util
@@ -32,13 +33,7 @@ let qid = Libnames.make_qualid (DirPath.make [Id.of_string "QuickChick"]) (Id.of
 let qid = qualid_of_string "QuickChick.QuickChick"
 				*)
 let path =
-  lazy (
-    match Loadpath.locate_qualified_library ~warn:false qid with
-    | Ok (_,_,path) -> path
-    | Error _ ->
-      CErrors.user_err (Pp.str "cannot locate QuickChick Coq library")
-  )
-
+  lazy (let (_,_,path) = Library.locate_qualified_library ~warn:false qid in path)
 let path = lazy (Filename.dirname (Lazy.force path))
 
 (* [mkdir -p]: recursively make the parent directories if they do not exist. *)
@@ -61,27 +56,16 @@ let temp_dirname =
 (* let link_files = ["quickChickLib.cmx"]*)
 let link_files = []
 
-(* Flag enabling / disabling the profiler *)
-let flag_profile = Summary.ref ~name:"QC_flag_profile" false
-
-let set_profile_flag (mode : string) =
-  let toggle =
-    match mode with
-    | "On"  -> true
-    | "Off" -> false
-  in
-  flag_profile := toggle
-
 (* TODO: in Coq 8.5, fetch OCaml's path from Coq's configure *)
 (* FIX: There is probably a more elegant place to put this flag! *)
-let ocamlopt () = if !flag_profile then "ocamlopt -p -unsafe-string" else "ocamlopt -unsafe-string"
+let ocamlopt = "ocamlopt -unsafe-string"
 let ocamlc = "ocamlc -unsafe-string"
 
 let comp_ml_cmd fn out =
   let path = Lazy.force path in
   let link_files = List.map (Filename.concat path) link_files in
   let link_files = String.concat " " link_files in
-  Printf.sprintf "%s -rectypes -w a -I %s -I %s %s %s -o %s" (ocamlopt ())
+  Printf.sprintf "%s -rectypes -w a -I %s -I %s %s %s -o %s" ocamlopt
     (Filename.dirname fn) path link_files fn out
 
 (*
@@ -93,7 +77,7 @@ let comp_mli_cmd fn =
   let path = Lazy.force path in
   let link_files = List.map (Filename.concat path) link_files in
   let link_files = String.concat " " link_files in
-  Printf.sprintf "%s -rectypes -w a -I %s -I %s %s %s" (ocamlopt ())
+  Printf.sprintf "%s -rectypes -w a -I %s -I %s %s %s" ocamlopt
     (Filename.dirname fn) path link_files fn
 
 
@@ -117,8 +101,9 @@ let define c env evd =
   let univs = Evd.univ_entry ~poly:true evd in
   let fn = fresh_name "quickchick" in
   (* TODO: Maxime - which of the new internal flags should be used here? The names aren't as clear :) *)
-  let _ : Constant.t = declare_constant ~name:fn ~kind:Decls.(IsDefinition Definition)
-      (DefinitionEntry (definition_entry ~univs (EConstr.to_constr evd c))) in
+  ignore (declare_constant ~internal:InternalTacticRequest fn
+      (DefinitionEntry (definition_entry ~univs (EConstr.to_constr evd c)),
+       Decl_kinds.IsDefinition Decl_kinds.Definition));
   fn
 
 (* [$TMP/QuickChick/$TIME/QuickChick.ml],
@@ -172,21 +157,20 @@ let define_and_run c env evd =
   Printf.printf "Extracted ML file: %s\n" mlf;
   Printf.printf "Compile command: %s\n" (comp_ml_cmd mlf execn);
   flush_all ();
-
+  *)
   (* Compile the (empty) .mli *)
   (*
   if Sys.command (comp_mli_cmd mlif) <> 0 then CErrors.user_err (str "Could not compile mli file" ++ fnl ());
   if Sys.command (comp_ml_cmd mlf execn) <> 0 then
     CErrors.user_err (str "Could not compile test program" ++ fnl ())
    *)
-  if Sys.command ("cd " ^ dir ^ "; ocamlbuild -cflags \"-w -3\" " ^ Filename.basename execn) <> 0 then
+  if Sys.command ("cd " ^ dir ^ "; ocamlbuild " ^ Filename.basename execn) <> 0 then
     (CErrors.user_err (str "Could not compile test program" ++ fnl ()))
 
   (* Run the test *)
   else
     (* Should really be shared across this and the tool *)
-    let compile_cmd = if !flag_profile then ("time " ^ execn ^ " && gprof " ^ execn ^ " > profile.txt && gprof2dot profile.txt > profile.dot && dot -Tpng profile.dot > profile.png") else ("time " ^ execn) in
-    let chan = Unix.open_process_in compile_cmd in
+    let chan = Unix.open_process_in execn in
     let builder = ref [] in
     let rec process_otl_aux () =
       let e = input_line chan in
@@ -306,12 +290,6 @@ VERNAC COMMAND EXTEND QuickChickDebug CLASSIFIED AS SIDEFF
        let s2' = Id.to_string s2 in
        set_debug_flag s1' s2' }
 END
-
-VERNAC COMMAND EXTEND QuickChickProfile CLASSIFIED AS SIDEFF
-  | ["QuickChickProfile" ident(s1)] ->
-     [ let s1' = Id.to_string s1 in
-       set_profile_flag s1' ]
-END;;
 
 VERNAC COMMAND EXTEND Sample CLASSIFIED AS SIDEFF
   | ["Sample" constr(c)] -> {run sample [c]}

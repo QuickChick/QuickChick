@@ -10,12 +10,12 @@ open Error
 type derivation = SimpleDer of SimplDriver.derivable list
                 | DepDer of DepDriver.derivable
 
-let simpl_dispatch ind classes name1 name2 =
+let simpl_dispatch ~pstate ind classes name1 name2 =
   let ind_name = match ind with
     | { CAst.v = CRef (r, _); _ } -> string_of_qualid r
     | _ -> failwith "Implement me for functions"
   in
-  List.iter (fun cn -> SimplDriver.derive cn ind (SimplDriver.mk_instance_name cn ind_name) name1 name2) classes
+  List.fold_left (fun pstate cn -> SimplDriver.derive ~pstate cn ind (SimplDriver.mk_instance_name cn ind_name) name1 name2) pstate classes
 
 let class_assoc_opts = [ ("GenSized"                 , SimpleDer [SimplDriver.GenSized])
                        ; ("Shrink"                   , SimpleDer [SimplDriver.Shrink])
@@ -39,7 +39,7 @@ let class_assoc_table =
   List.iter (fun (kwd, tok) -> Hashtbl.add h kwd tok) class_assoc_opts;
   h
 
-let dispatch cn ind name1 name2 =
+let dispatch ~pstate cn ind name1 name2 =
   let convert_reference_to_string c =
     match c with
     | {CAst.v = CRef (r, _) ; _} -> string_of_qualid r
@@ -72,17 +72,17 @@ let dispatch cn ind name1 name2 =
     | _ -> qcfail "At least one class name expected" in
 
   match class_names with
-  | SimpleDer classes -> simpl_dispatch ind classes name1 name2
-  | DepDer class_name -> DepDriver.dep_dispatch ind class_name
+  | SimpleDer classes -> simpl_dispatch ~pstate:None ind classes name1 name2
+  | DepDer class_name -> DepDriver.dep_dispatch ~pstate:None ind class_name
 
 }
 
 VERNAC COMMAND EXTEND Derive CLASSIFIED AS SIDEFF
-   | ["Derive" constr(class_name) "for" constr(inductive)] ->
+   | ![proof] ["Derive" constr(class_name) "for" constr(inductive)] ->
      { dispatch class_name inductive "" "" }
-   | ["Derive" constr(class_name) "for" constr(inductive) "using" ident(genInst)] ->
+   | ![proof] ["Derive" constr(class_name) "for" constr(inductive) "using" ident(genInst)] ->
      { dispatch class_name inductive (Id.to_string genInst) ""}
-   | ["Derive" constr(class_name) "for" constr(inductive) "using" ident(genInst) "and" ident(monInst) ] ->
+   | ![proof] ["Derive" constr(class_name) "for" constr(inductive) "using" ident(genInst) "and" ident(monInst) ] ->
      { dispatch class_name inductive (Id.to_string genInst) (Id.to_string monInst)}
 END
 

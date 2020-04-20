@@ -1,3 +1,4 @@
+open Decl_kinds
 open Pp
 open Constr
 open Names
@@ -9,6 +10,7 @@ open Constrexpr_ops
 open Ppconstr
 open Context
 open Error
+open Globnames
 
 let cnt = ref 0 
 
@@ -84,8 +86,8 @@ let gArg ?assumName:(an=hole) ?assumType:(at=hole) ?assumImplicit:(ai=false) ?as
     | { CAst.v = CHole (_v,_,_); loc } -> (loc,Anonymous)
     | _a -> failwith "This expression should be a name" in
   CLocalAssum ( [CAst.make ?loc:(fst n) @@ snd n],
-                  (if ag then Generalized (Glob_term.Implicit, false)
-                   else if ai then Default Glob_term.Implicit else Default Glob_term.Explicit),
+                  (if ag then Generalized (Implicit, false)
+                   else if ai then Default Implicit else Default Explicit),
                   at )
 
 let arg_to_var (x : arg) =
@@ -136,12 +138,12 @@ end
 
 module Ord_ty_ctr = struct 
   type t = ty_ctr 
-  let compare x y = Stdlib.compare (string_of_qualid x) (string_of_qualid y)
+  let compare x y = Pervasives.compare (string_of_qualid x) (string_of_qualid y)
 end
 
 module Ord_ctr = struct
   type t = constructor
-  let compare x y = Stdlib.compare (string_of_qualid x) (string_of_qualid y)
+  let compare x y = Pervasives.compare (string_of_qualid x) (string_of_qualid y)
 end
 
 type ctr_rep = constructor * coq_type 
@@ -167,7 +169,7 @@ type dep_type =
 
 module OrdDepType = struct
     type t = dep_type
-    let compare = Stdlib.compare
+    let compare = Pervasives.compare
 end
 
 let rec dep_type_to_string dt = 
@@ -589,7 +591,7 @@ let gFun xss (f_body : var list -> coq_expr) =
   | _ ->
   let xvs = List.map (fun x -> fresh_name x) xss in
   (* TODO: optional argument types for xss *)
-  let binder_list = List.map (fun x -> CLocalAssum ([CAst.make @@ Name x], Default Glob_term.Explicit, hole)) xvs in
+  let binder_list = List.map (fun x -> CLocalAssum ([CAst.make @@ Name x], Default Explicit, hole)) xvs in
   let fun_body = f_body xvs in
   mkCLambdaN binder_list fun_body 
 
@@ -599,7 +601,7 @@ let gFunTyped xts (f_body : var list -> coq_expr) =
   | _ ->
   let xvs = List.map (fun (x,t) -> (fresh_name x,t)) xts in
   (* TODO: optional argument types for xss *)
-  let binder_list = List.map (fun (x,t) -> CLocalAssum ([CAst.make @@ Name x], Default Glob_term.Explicit, t)) xvs in
+  let binder_list = List.map (fun (x,t) -> CLocalAssum ([CAst.make @@ Name x], Default Explicit, t)) xvs in
   let fun_body = f_body (List.map fst xvs) in
   mkCLambdaN binder_list fun_body 
 
@@ -698,7 +700,6 @@ let gType ty_params dep_type =
 let get_type (id : Id.t) = 
   msg_debug (str ("Trying to global:" ^ Id.to_string id) ++ fnl ());
   let glob_ref = Nametab.global (qualid_of_ident id) in
-  let open GlobRef in
   match glob_ref with 
   | VarRef _ -> msg_debug  (str "Var" ++ fnl ())
   | ConstRef _ -> msg_debug (str "Constant" ++ fnl ())
@@ -708,7 +709,7 @@ let get_type (id : Id.t) =
 let is_inductive c = 
   let glob_ref = Nametab.global c in
   match glob_ref with
-  | GlobRef.IndRef _ -> true
+  | IndRef _ -> true
   | _        -> false
 
 let is_inductive_dt dt = 
@@ -941,7 +942,7 @@ let create_names_for_anon a =
      end
   | _ -> failwith "Non RawAssum in create_names"
     
-let declare_class_instance ?(global=true) ?(priority=42) instance_arguments instance_name instance_type instance_record =
+let declare_class_instance ?(global=true) ?(priority=42) ~pstate instance_arguments instance_name instance_type instance_record =
   msg_debug (str "Declaring class instance..." ++ fnl ());
   msg_debug (str (Printf.sprintf "Total arguments: %d" (List.length instance_arguments)) ++ fnl ());
   let (vars,iargs) = List.split (List.map create_names_for_anon instance_arguments) in
@@ -949,13 +950,16 @@ let declare_class_instance ?(global=true) ?(priority=42) instance_arguments inst
   msg_debug (str "Calculated instance_type_vars" ++ fnl ());
   let instance_record_vars = instance_record vars in
   msg_debug (str "Calculated instance_record_vars" ++ fnl ());
-  let cid = Classes.new_instance ~global:global ~poly:false
-              (CAst.make @@ Name (Id.of_string instance_name), None) iargs
-              instance_type_vars
-              (true, instance_record_vars) (* TODO: true or false? *)
-              { Typeclasses.hint_priority = Some priority; hint_pattern = None }
+  let cid, pstate = Classes.new_instance ~pstate ~global:global false
+              ~program_mode:false (* TODO: true or false? *)
+                               iargs
+                       ((CAst.make @@ Name (Id.of_string instance_name), None)
+                       , Decl_kinds.Explicit, instance_type_vars)
+                       (Some (true, instance_record_vars)) (* TODO: true or false? *)
+                       { Typeclasses.hint_priority = Some priority; hint_pattern = None }
   in
-  msg_debug (str (Id.to_string cid) ++ fnl ())
+  msg_debug (str (Id.to_string cid) ++ fnl ());
+  pstate
 
 (* List Utils. Probably should move to a util file instead *)
 let list_last l = List.nth l (List.length l - 1)
