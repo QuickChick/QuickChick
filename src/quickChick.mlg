@@ -28,7 +28,15 @@ let empty_slist : string list = []
 let extra_dir : string list ref =
   Summary.ref ~name:"QC_ocaml_dir" empty_slist
 let add_extra_dir s = extra_dir := s :: !extra_dir
-           
+
+let extra_pkg : string list ref =
+  Summary.ref ~name:"QC_ocaml_pkg" empty_slist
+let add_extra_pkg s = extra_pkg := s :: !extra_pkg
+
+let dune_file : string option ref =
+  Summary.ref ~name:"QC_dune_file" None
+let set_dune_file s = dune_file := Some s
+                    
 (* Locate QuickChick's files *)
 (* The computation is delayed because QuickChick's libraries are not available
 when the plugin is first loaded. *)
@@ -180,8 +188,30 @@ let define_and_run c env evd =
   in 
   List.iter print_endline ocaml_dir_cps;
   List.iter (fun cmd -> ignore (Sys.command cmd)) ocaml_dir_cps;
-  
-  if Sys.command ("cd " ^ dir ^ "; ocamlbuild -lib unix -cflags \"-w -3\" " ^ Filename.basename execn) <> 0 then
+
+  let packages =
+    match !extra_pkg with
+    | [] -> ""
+    | [x] -> "-pkg " ^ x
+    | _ -> failwith "QC ERROR: implement more than one linked package"
+  in
+  let exec_command =
+    match !dune_file with
+    | None -> "cd " ^ dir ^ "; ocamlbuild " ^ packages ^ " -lib unix -cflags \"-w -3\" " ^ Filename.basename execn
+    | Some s ->
+       (* Modify the dune file to add the executable name and put it in the output dir *)
+       let sed_cmd = Printf.sprintf "sed '2i   (name %s)' %s > %s" (Filename.chop_extension (Filename.basename mlf)) s (dir ^ "/" ^ s) in
+       ignore (Sys.command sed_cmd);
+       (* The command is just dune build *)
+       Printf.sprintf "cd %s; dune build" dir
+  in
+  (* Overwrite execn in case of dune *)
+  let execn =
+    match !dune_file with
+    | None -> execn
+    | Some _ -> dir ^ "/_build/default/" ^ (Filename.chop_extension (Filename.basename execn)) ^ ".exe" in
+    
+  if Sys.command exec_command <> 0 then 
     (CErrors.user_err (str "Could not compile test program" ++ fnl ()))
 
   (* Run the test *)
@@ -314,4 +344,12 @@ END
 
 VERNAC COMMAND EXTEND QCInclude CLASSIFIED AS SIDEFF
   | ["QCInclude" string(s)] -> { add_extra_dir s }
+END
+
+VERNAC COMMAND EXTEND QCPackage CLASSIFIED AS SIDEFF
+  | ["QCPackage" string(s)] -> { add_extra_pkg s }
+END
+
+VERNAC COMMAND EXTEND QCdune CLASSIFIED AS SIDEFF
+  | ["QCDune" string(s)] -> { set_dune_file s }
 END
