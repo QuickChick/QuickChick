@@ -36,6 +36,10 @@ let add_extra_pkg s = extra_pkg := s :: !extra_pkg
 let dune_file : string option ref =
   Summary.ref ~name:"QC_dune_file" None
 let set_dune_file s = dune_file := Some s
+
+let modules_to_open : string list ref =
+  Summary.ref ~name:"QC_modules_to_open" empty_slist
+let add_module_to_open s = modules_to_open := s :: !modules_to_open  
                     
 (* Locate QuickChick's files *)
 (* The computation is delayed because QuickChick's libraries are not available
@@ -157,6 +161,11 @@ let define_and_run c env evd =
     "in Bytes.to_string (copy 0 l))" in
   Printf.fprintf oc "%s" for_output;
   close_out oc;
+
+  (* Add any modules that have been marked "open" *)
+  let open_cmd s = Printf.sprintf "awk -v n=1 -v s=\"open %s\" 'NR == n {print s} {print}' %s > __qc_tmp; mv __qc_tmp %s" s mlf mlf in
+  List.iter (fun s -> ignore (Sys.command (open_cmd s))) !modules_to_open;
+  
   (* Before compiling, remove stupid cyclic dependencies like "type int = int".
      TODO: Generalize (.) \g1\b or something *)
   let perl_cmd = "perl -i -p0e 's/type int =\\s*int/type tmptmptmp = int\\ntype int = tmptmptmp/sg' " ^ mlf in
@@ -345,6 +354,10 @@ END
 
 VERNAC COMMAND EXTEND QCInclude CLASSIFIED AS SIDEFF
   | ["QCInclude" string(s)] -> { add_extra_dir s }
+END
+
+VERNAC COMMAND EXTEND QCOpen CLASSIFIED AS SIDEFF
+  | ["QCOpen" string(s)] -> { add_module_to_open s }
 END
 
 VERNAC COMMAND EXTEND QCPackage CLASSIFIED AS SIDEFF
