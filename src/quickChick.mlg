@@ -199,9 +199,10 @@ let define_and_run c env evd =
     match !dune_file with
     | None -> "cd " ^ dir ^ "; ocamlbuild " ^ packages ^ " -lib unix -cflags \"-w -3\" " ^ Filename.basename execn
     | Some s ->
-       (* Modify the dune file to add the executable name and put it in the output dir *)
-       let sed_cmd = Printf.sprintf "sed '2i   (name %s)' %s > %s" (Filename.chop_extension (Filename.basename mlf)) s (dir ^ "/" ^ s) in
-       ignore (Sys.command sed_cmd);
+       (* Modify the dune file to add the executable name and put it in the output dir *) 
+       let awk_cmd = Printf.sprintf "awk -v n=2 -v s=\"   (name %s)\" 'NR == n {print s} {print}' %s > %s" (Filename.chop_extension (Filename.basename mlf)) s (dir ^ "/" ^ s) in
+       (*       let sed_cmd = Printf.sprintf "sed '2i   (name %s)' %s > %s" (Filename.chop_extension (Filename.basename mlf)) s (dir ^ "/" ^ s) in *)
+       ignore (Sys.command awk_cmd);
        (* The command is just dune build *)
        Printf.sprintf "cd %s; dune build" dir
   in
