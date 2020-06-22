@@ -175,11 +175,9 @@ let define_and_run c env evd =
   else
     (* Should really be shared across this and the tool *)
     let chan = Unix.open_process_in execn in
-    let builder = ref [] in
     let rec process_otl_aux () =
       let e = input_line chan in
-      print_endline e;
-      builder := e :: !builder;
+      Feedback.msg_info (Pp.str e);
       process_otl_aux() in
     try process_otl_aux ()
     with End_of_file ->
@@ -193,9 +191,7 @@ let define_and_run c env evd =
             CErrors.user_err (str (Printf.sprintf "Killed (%d)" i) ++ fnl ())
          | Unix.WSTOPPED i ->
             CErrors.user_err (str (Printf.sprintf "Stopped (%d)" i) ++ fnl ())
-         end;
-         let output = String.concat "\n" (List.rev !builder) in
-         Some output
+         end
 
 (*
     (** If we want to print the time spent in tests *)
@@ -204,8 +200,10 @@ let define_and_run c env evd =
       CErrors.user_err (str "Could not run test" ++ fnl ())
  *)
 
+;;
+
 (* TODO: clean leftover files *)
-let runTest c env evd =
+let runTest c env evd : unit =
   (* [c] is a constr_expr representing the test to run,
      so we first build a new constr_expr representing
      show c **)
@@ -230,7 +228,7 @@ let run f args =
   end;
   let args = List.map (fun x -> (x,None)) args in
   let c = CAst.make @@ CApp((None,f), args) in
-  ignore (runTest c env evd)
+  runTest c env evd
 
 let set_debug_flag (flag_name : string) (mode : string) =
   let toggle =
