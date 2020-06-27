@@ -62,6 +62,7 @@ commands:
         command: make -j`nproc` lesstest
     - run:
         name: Test dependants
+        no_output_timeout: 20m
         command: |
           PINS=$(echo `opam list -s --pinned --columns=package` | sed 's/ /,/g')
           PACKAGES=`opam list -s --depends-on coq-quickchick --coinstallable-with $PINS`

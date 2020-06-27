@@ -29,3 +29,11 @@ Section Failures.
     fun a => match a with | Qux a => true end.
 
 End Failures.
+
+From mathcomp Require Import ssreflect ssrnat div.
+
+QuickChick
+   (fun (s : nat) (t : nat) =>
+      eqn
+        (gcdn s t)
+        (gcdn t s)).
