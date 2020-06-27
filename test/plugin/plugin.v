@@ -41,3 +41,11 @@ Definition b : G nat :=
 Sample a.
 Sample b.
 Sample (liftM Some a).
+
+From mathcomp Require Import ssreflect ssrnat div.
+
+QuickChick
+   (fun (s : nat) (t : nat) =>
+      eqn
+        (gcdn s t)
+        (gcdn t s)).
