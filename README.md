@@ -1,7 +1,7 @@
 QuickChick
 ==========
 
-[![CircleCI](https://circleci.com/gh/QuickChick/QuickChick/tree/8.10.svg?style=svg)](https://circleci.com/gh/QuickChick/QuickChick/tree/8.10)
+[![CircleCI](https://circleci.com/gh/QuickChick/QuickChick.svg?style=svg)](https://circleci.com/gh/QuickChick/QuickChick)
 
 ### Description
  
