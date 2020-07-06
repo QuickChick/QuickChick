@@ -49,3 +49,4 @@ src/quickChickToolParser.mli
 *.pyc
 __pycache__
 .nfs*
+.lia.cache
