@@ -1,6 +1,6 @@
 QC=quickChick -color -ocamlbuild '-lib unix'
 
-all: Makefile.coq Foo extract.cmxs
+all: Makefile.coq Foo
 	@$(MAKE) -f $<
 
 test:
@@ -11,6 +11,3 @@ lesstest:
 
 Makefile.coq: _CoqProject
 	@coq_makefile -o $@ -f $<
-
-%.cmxs: %.ml
-	ocamlopt -shared -o $@

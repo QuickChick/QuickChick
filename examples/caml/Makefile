@@ -1,6 +1,6 @@
 QC=quickChick -color -ocamlbuild '-lib unix -no-hygiene'
 TMP_DIR=../_qc_$(shell basename $(CURDIR)).tmp
-all: Makefile.coq extract.cmxs
+all: Makefile.coq
 	$(MAKE) -f $<
 
 test:
@@ -20,9 +20,6 @@ libcamlplus.a: camlplus.o cplus.o
 
 dllcamlplus.so: camlplus.o cplus.o
 	ocamlmklib -o camlplus $^
-
-extract.cmxs: extract.ml libcamlplus.a
-	ocamlopt -shared -o $@ $< -cclib -lcamlplus -ccopt -L.
 
 testextract.opt: extract.ml testextract.ml libcamlplus.a
 	ocamlopt -o $@ extract.ml testextract.ml -cclib -lcamlplus -ccopt -L.

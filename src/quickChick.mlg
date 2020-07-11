@@ -23,6 +23,24 @@ let mutateCheckMany = mk_ref "QuickChick.MutateCheck.mutateCheckMany"
 let mutateCheckManyWith = mk_ref "QuickChick.MutateCheck.mutateCheckManyWith"
 let sample = mk_ref "QuickChick.GenLow.GenLow.sample"
 
+(* Handle extra ocaml directory to be copied *)
+let empty_slist : string list = []           
+let extra_dir : string list ref =
+  Summary.ref ~name:"QC_ocaml_dir" empty_slist
+let add_extra_dir s = extra_dir := s :: !extra_dir
+
+let extra_pkg : string list ref =
+  Summary.ref ~name:"QC_ocaml_pkg" empty_slist
+let add_extra_pkg s = extra_pkg := s :: !extra_pkg
+
+let dune_file : string option ref =
+  Summary.ref ~name:"QC_dune_file" None
+let set_dune_file s = dune_file := Some s
+
+let modules_to_open : string list ref =
+  Summary.ref ~name:"QC_modules_to_open" empty_slist
+let add_module_to_open s = modules_to_open := s :: !modules_to_open  
+                    
 (* Locate QuickChick's files *)
 (* The computation is delayed because QuickChick's libraries are not available
 when the plugin is first loaded. *)
@@ -143,6 +161,11 @@ let define_and_run c env evd =
     "in Bytes.to_string (copy 0 l))" in
   Printf.fprintf oc "%s" for_output;
   close_out oc;
+
+  (* Add any modules that have been marked "open" *)
+  let open_cmd s = Printf.sprintf "awk -v n=1 -v s=\"open %s\" 'NR == n {print s} {print}' %s > __qc_tmp; mv __qc_tmp %s" s mlf mlf in
+  List.iter (fun s -> ignore (Sys.command (open_cmd s))) !modules_to_open;
+  
   (* Before compiling, remove stupid cyclic dependencies like "type int = int".
      TODO: Generalize (.) \g1\b or something *)
   let perl_cmd = "perl -i -p0e 's/type int =\\s*int/type tmptmptmp = int\\ntype int = tmptmptmp/sg' " ^ mlf in
@@ -168,7 +191,37 @@ let define_and_run c env evd =
   if Sys.command (comp_ml_cmd mlf execn) <> 0 then
     CErrors.user_err (str "Could not compile test program" ++ fnl ())
    *)
-  if Sys.command ("cd " ^ dir ^ "; ocamlbuild -cflags \"-w -3\" " ^ Filename.basename execn) <> 0 then
+
+  (* Copy over the contents of the ocaml directory *)
+  let ocaml_dir_cps = List.map (fun s -> Printf.sprintf "cp -r %s %s" s dir) !extra_dir
+  in 
+  List.iter print_endline ocaml_dir_cps;
+  List.iter (fun cmd -> ignore (Sys.command cmd)) ocaml_dir_cps;
+
+  let packages =
+    match !extra_pkg with
+    | [] -> ""
+    | [x] -> "-pkg " ^ x
+    | _ -> failwith "QC ERROR: implement more than one linked package"
+  in
+  let exec_command =
+    match !dune_file with
+    | None -> "cd " ^ dir ^ "; ocamlbuild " ^ packages ^ " -lib unix -cflags \"-w -3\" " ^ Filename.basename execn
+    | Some s ->
+       (* Modify the dune file to add the executable name and put it in the output dir *) 
+       let awk_cmd = Printf.sprintf "awk -v n=2 -v s=\"   (name %s)\" 'NR == n {print s} {print}' %s > %s" (Filename.chop_extension (Filename.basename mlf)) s (dir ^ "/" ^ s) in
+       (*       let sed_cmd = Printf.sprintf "sed '2i   (name %s)' %s > %s" (Filename.chop_extension (Filename.basename mlf)) s (dir ^ "/" ^ s) in *)
+       ignore (Sys.command awk_cmd);
+       (* The command is just dune build *)
+       Printf.sprintf "cd %s; dune build" dir
+  in
+  (* Overwrite execn in case of dune *)
+  let execn =
+    match !dune_file with
+    | None -> execn
+    | Some _ -> dir ^ "/_build/default/" ^ (Filename.chop_extension (Filename.basename execn)) ^ ".exe" in
+    
+  if Sys.command exec_command <> 0 then 
     (CErrors.user_err (str "Could not compile test program" ++ fnl ()))
 
   (* Run the test *)
@@ -295,4 +348,20 @@ END
 
 VERNAC COMMAND EXTEND Sample CLASSIFIED AS SIDEFF
   | ["Sample" constr(c)] -> {run sample [c]}
+END
+
+VERNAC COMMAND EXTEND QCInclude CLASSIFIED AS SIDEFF
+  | ["QCInclude" string(s)] -> { add_extra_dir s }
+END
+
+VERNAC COMMAND EXTEND QCOpen CLASSIFIED AS SIDEFF
+  | ["QCOpen" string(s)] -> { add_module_to_open s }
+END
+
+VERNAC COMMAND EXTEND QCPackage CLASSIFIED AS SIDEFF
+  | ["QCPackage" string(s)] -> { add_extra_pkg s }
+END
+
+VERNAC COMMAND EXTEND QCdune CLASSIFIED AS SIDEFF
+  | ["QCDune" string(s)] -> { set_dune_file s }
 END
