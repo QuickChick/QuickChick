@@ -8,7 +8,6 @@ DECLARE PLUGIN "quickchick_plugin"
 
 {
 
-open Pp
 open Constrexpr
 
 let quickchick_goal =
@@ -46,18 +45,14 @@ let quickchick_goal =
 
     Printf.printf "So far so good 2.5\n"; flush stdout;
     
-    let s = QuickChick.define_and_run to_run e evd in
+    QuickChick.define_and_run to_run e evd;
 
     Printf.printf "So far so good3\n"; flush stdout;
-    
-    match s with
-    | Some bytes ->
-       Tacticals.New.tclZEROMSG (str ("\n" ^ bytes) ++ fnl ())
-    | None -> Tacticals.New.tclZEROMSG (str "Something went wrong. Report." ++ fnl ())
 
-    end
+    (* TODO: This whole block doesn't look very monadic... *)
+    Tacticals.New.tclIDTAC
+  end
 
-    
     (*
     (* Admit a constant with that type *)
     let tmpid = QuickChick.fresh_name "temporary_constant" in

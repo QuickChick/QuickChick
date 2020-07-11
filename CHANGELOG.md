@@ -5,6 +5,13 @@ The format is based on [Keep a Changelog](http://keepachangelog.com/en/1.0.0/)
 and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
+### Fixed
+- Sound extraction of `modn`.
+
+### Changed
+- `Decimal.int` no longer depend on an external file for extraction.
+
+## [1.3.1] - 2020-04-06
 ### Changed
 - Add `-cflags -w -3` to `ocamlbuild` for running extracted code.
   This silences the warning from using the deprecated `Pervasives` functions
@@ -20,6 +27,7 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
 ### Fixed
 - Declare all scopes before using them.
 - Fix most remaining warnings during compilation.
+- Fix compatibility with ExtLib monad notations.
 
 ## [1.3.0] - 2020-03-19
 ### Added
@@ -27,6 +35,13 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
 
 ### Removed
 - No longer support Coq 8.10.
+
+## [1.2.1] - 2020-04-09
+Backport some fixes in [1.3.1] to Coq 8.10.
+These changes are not included in [1.3.0].
+### Fixed
+- Fix most remaining warnings during compilation.
+- Fix compatibility with ExtLib monad notations.
 
 ## [1.2.0] - 2020-01-30
 ### Added
@@ -93,7 +108,10 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
 ### Added
 - OPAM package `coq-quickchick` on [coq-released](https://coq.inria.fr/opam/www/).
 
-[Unreleased]: https://github.com/QuickChick/QuickChick/compare/v1.2.0...8.11
+[Unreleased]: https://github.com/QuickChick/QuickChick/compare/v1.3.1...8.11
+[1.3.1]: https://github.com/QuickChick/QuickChick/compare/v1.3.0...v1.3.1
+[1.3.0]: https://github.com/QuickChick/QuickChick/compare/v1.2.1...v1.3.0
+[1.2.1]: https://github.com/QuickChick/QuickChick/compare/v1.2.0...v1.2.1
 [1.2.0]: https://github.com/QuickChick/QuickChick/compare/v1.1.0...v1.2.0
 [1.1.0]: https://github.com/QuickChick/QuickChick/compare/v1.0.2...v1.1.0
 [1.0.2]: https://github.com/QuickChick/QuickChick/compare/v1.0.1...v1.0.2

@@ -1,9 +1,8 @@
 QC=quickChick -color -ocamlbuild '-use-ocamlfind'
 TMP_DIR=../_qc_pyml.tmp
-EXTR_BIN=extract.cmxs
 V=@
 
-all: Makefile.coq $(EXTR_BIN)
+all: Makefile.coq
 	$V$(MAKE) -f $<
 
 test:
@@ -11,9 +10,6 @@ test:
 
 Makefile.coq: _CoqProject
 	$Vcoq_makefile -o $@ -f $<
-
-%.cmxs: %.ml
-	$Vocamlopt -shared -o $@
 
 clean:
 	$Vif [ -e Makefile.coq ]; then $(MAKE) -f Makefile.coq clean; fi

@@ -6,6 +6,8 @@ defaults: &defaults
     OPAMVERBOSE: 1
     OPAMYES: true
     TERM: xterm
+  docker:
+    - image: coqorg/coq:8.12-ocaml-4.09-flambda
 
 commands:
   startup:
@@ -19,8 +21,6 @@ commands:
     - run:
         name: Install dependencies
         command: |
-            opam unpin coq
-            opam upgrade
             opam install --deps-only .
     - run:
         name: List installed packages
@@ -65,14 +65,23 @@ commands:
     - run:
         name: Testing Python I/O
         working_directory: examples/python-io
-        command: make -j`nproc` lesstest
+        command: make -j`nproc`
+    - run:
+        name: Test dependants
+        no_output_timeout: 20m
+        command: |
+          PINS=$(echo `opam list -s --pinned --columns=package` | sed 's/ /,/g')
+          PACKAGES=`opam list -s --depends-on coq-quickchick --coinstallable-with $PINS`
+          if ! [ -z "$PACKAGES" ]
+          then opam install -t $PACKAGES
+          fi
   remove:
     steps:
     - run:
         name: Removing QuickChick
         command: opam remove .
 jobs:
-  ocaml 4_09:
+  opam:
     <<: *defaults
     steps:
     - startup
@@ -80,8 +89,6 @@ jobs:
     - build
     - test
     - remove
-    docker:
-    - image: coqorg/coq:dev-ocaml-4.09.0-flambda
   dune:
     <<: *defaults
     steps:
@@ -91,12 +98,10 @@ jobs:
     - run: dune install quickchick
     - test
     - run: dune uninstall quickchick
-    docker:
-    - image: coqorg/coq:dev-ocaml-4.09.0-flambda
 
 workflows:
   version: 2
   build:
     jobs:
-    - ocaml 4_09
+    - opam
     - dune

@@ -89,7 +89,7 @@ Set Extraction AccessOpaque.
 Require Import mathcomp.ssreflect.ssreflect.
 From mathcomp Require Import ssreflect ssrnat ssrbool div eqtype.
 Extract Constant divn => "(fun m -> function 0 -> 0 | d -> m / d)".
-Extract Constant modn => "(fun m -> function 0 -> 0 | d -> m mod d)".
+Extract Constant modn => "(fun m -> function 0 -> m | d -> m mod d)".
 Extract Constant eqn => "(==)".
 
 Axiom print_extracted_coq_string : string -> unit.

@@ -1,16 +1,12 @@
-QC=quickChick -color -ocamlbuild '-lib unix'
+COQMAKEFILE ?= Makefile.coq
 
-all: Makefile.coq foo.py extract.cmxs
+all: $(COQMAKEFILE) foo.py
 	@$(MAKE) -f $<
 
-test:
-	time $(QC)
+clean: $(COQMAKEFILE)
+	$(MAKE) -f $^ $@
+	$(RM) $(COQMAKEFILE) $(COQMAKEFILE).conf
 
-lesstest:
-	time $(QC) -N 100
-
-Makefile.coq: _CoqProject
+$(COQMAKEFILE): _CoqProject
 	@coq_makefile -o $@ -f $<
 
-%.cmxs: %.ml
-	ocamlopt -shared -o $@

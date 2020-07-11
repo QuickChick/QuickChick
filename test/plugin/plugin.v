@@ -29,3 +29,23 @@ Section Failures.
     fun a => match a with | Qux a => true end.
 
 End Failures.
+
+Import MonadNotation.
+
+Definition a : G nat :=
+  returnGen 1.
+Definition b : G nat :=
+  v <- a ;;
+  returnGen v.
+
+Sample a.
+Sample b.
+Sample (liftM Some a).
+
+From mathcomp Require Import ssreflect ssrnat div.
+
+QuickChick
+   (fun (s : nat) (t : nat) =>
+      eqn
+        (gcdn s t)
+        (gcdn t s)).
