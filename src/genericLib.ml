@@ -844,11 +844,11 @@ let dtTupleType =
 
 (* Int *)
 
-let mkNumeral n =
-  Numeral (NumTok.Signed.of_int_string (string_of_int n))
+let mkNumber n =
+  Number (NumTok.Signed.of_int_string (string_of_int n))
 
 let nat_scope ast = CAst.make @@ CDelimiters ("nat", ast)
-let gInt n = nat_scope (CAst.make @@ CPrim (mkNumeral n))
+let gInt n = nat_scope (CAst.make @@ CPrim (mkNumber n))
 let gSucc x = gApp (gInject "Coq.Init.Datatypes.S") [x]
 let rec maximum = function
   | [] -> failwith "maximum called with empty list"

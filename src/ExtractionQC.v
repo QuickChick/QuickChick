@@ -23,7 +23,7 @@ Extract Inductive Hexadecimal.int => "((Obj.t -> Obj.t) -> (Obj.t -> Obj.t) -> O
   [ "(fun x pos _ -> pos (Obj.magic x))"
     "(fun y _ neg -> neg (Obj.magic y))"
   ] "(fun i pos neg -> Obj.magic i pos neg)".
-Extract Inductive Numeral.int => "((Obj.t -> Obj.t) -> (Obj.t -> Obj.t) -> Obj.t) (* Numeral.int *)"
+Extract Inductive Number.int => "((Obj.t -> Obj.t) -> (Obj.t -> Obj.t) -> Obj.t) (* Number.int *)"
   [ "(fun x dec _ -> dec (Obj.magic x))"
     "(fun y _ hex -> hex (Obj.magic y))"
   ] "(fun i dec hex -> Obj.magic i dec hex)".

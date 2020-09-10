@@ -32,11 +32,11 @@ let register_weights (l : (constructor * weight_ast) list) =
 
 let convert_constr_to_weight c = 
   match c with 
-  | { CAst.v = CPrim (Numeral (NumTok.SPlus,i)); _ } ->
+  | { CAst.v = CPrim (Number (NumTok.SPlus,i)); _ } ->
      (match NumTok.Unsigned.to_nat i with
      | Some n -> WNum (int_of_string n)
      | None -> failwith "QC: Numeric weights should be positive integers.")
-  | { CAst.v = CPrim (Numeral (NumTok.SMinus,_)); _ } ->
+  | { CAst.v = CPrim (Number (NumTok.SMinus,_)); _ } ->
      failwith "QC: Numeric weights should be greater than 0."
   | { CAst.v = CRef (r, _); _ } -> 
      if string_of_qualid r = "size" then WSize
