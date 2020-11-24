@@ -39,10 +39,10 @@ _build/
 .merlin
 *.install
 quickChickTool.byte
-src/driver.ml
-src/quickChick.ml
-src/tactic_quickchick.ml
-src/weightmap.ml
+plugin/driver.ml
+plugin/quickChick.ml
+plugin/tactic_quickchick.ml
+plugin/weightmap.ml
 src/quickChickToolLexer.ml
 src/quickChickToolParser.ml
 src/quickChickToolParser.mli
