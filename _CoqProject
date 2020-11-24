@@ -25,6 +25,7 @@ plugin/sizeMon.ml
 plugin/sizeSMon.ml
 plugin/sizeCorr.ml
 plugin/sizedProofs.ml
+plugin/compat.ml
 
 src/Tactics.v
 src/Sets.v
@@ -46,10 +47,11 @@ src/State.v
 src/Checker.v
 src/SemChecker.v
 src/Test.v
-src/ExtractionQC.v
 src/Mutation.v
 src/Typeclasses.v
 src/QuickChick.v
 src/MutateCheck.v
 src/DependentClasses.v
 src/Decidability.v
+src/ExtractionQC.v
+src/ExtractionQCCompat.v

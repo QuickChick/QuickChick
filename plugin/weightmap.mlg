@@ -31,14 +31,18 @@ let register_weights (l : (constructor * weight_ast) list) =
   List.iter (fun (c,w) -> weight_env := CtrMap.add c w !weight_env) l
 
 let convert_constr_to_weight c = 
-  match c with 
-  | { CAst.v = CPrim (Number (NumTok.SPlus,i)); _ } ->
-     (match NumTok.Unsigned.to_nat i with
-     | Some n -> WNum (int_of_string n)
-     | None -> failwith "QC: Numeric weights should be positive integers.")
-  | { CAst.v = CPrim (Number (NumTok.SMinus,_)); _ } ->
-     failwith "QC: Numeric weights should be greater than 0."
-  | { CAst.v = CRef (r, _); _ } -> 
+  match c.CAst.v with
+  | CPrim p ->
+    (match Compat.from_Number p with
+    | Some  (NumTok.SPlus,i) ->
+      (match NumTok.Unsigned.to_nat i with
+      | Some n -> WNum (int_of_string n)
+      | None -> failwith "QC: Numeric weights should be positive integers.")
+    | Some (NumTok.SMinus,_) ->
+      failwith "QC: Numeric weights should be greater than 0."
+    | None -> failwith "QC: match failure."
+    )
+  | CRef (r, _) ->
      if string_of_qualid r = "size" then WSize
      else failwith "QC: Expected number or 'size'."
   | _ -> failwith "QC: match failure."

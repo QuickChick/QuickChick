@@ -1,0 +1,32 @@
+(library
+ (name quickchick_plugin)
+ (public_name quickchick.plugin)
+ (flags :standard -rectypes -warn-error -3 -w -8-27+40)
+ (modules :standard \ genSTCorrect genSizedSTMonotonic genSizedSTSizeMonotonic)
+ (libraries coq.plugins.extraction))
+
+(rule
+ (targets driver.ml)
+ (deps (:pp-file driver.mlg))
+ (action (run coqpp %{pp-file})))
+
+(rule
+ (targets quickChick.ml)
+ (deps (:pp-file quickChick.mlg))
+ (action (run coqpp %{pp-file})))
+
+(rule
+ (targets tactic_quickchick.ml)
+ (deps (:pp-file tactic_quickchick.mlg))
+ (action (run coqpp %{pp-file})))
+
+(rule
+ (targets weightmap.ml)
+ (deps (:pp-file weightmap.mlg))
+ (action (run coqpp %{pp-file})))
+
+(rule
+  (target compat.ml)
+  (action
+    (run "perl" %{dep:../compat.pl} %{target}))
+  (package quickchick))

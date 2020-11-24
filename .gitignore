@@ -50,3 +50,5 @@ src/quickChickToolParser.mli
 __pycache__
 .nfs*
 .lia.cache
+plugin/compat.ml
+src/ExtractionQCCompat.v
