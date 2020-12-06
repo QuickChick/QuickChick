@@ -1,5 +1,5 @@
 V=@
-.PHONY: plugin install install-plugin clean quickChickTool
+.PHONY: plugin install install-plugin clean quickChickTool compat
 
 QCTOOL_DIR=quickChickTool
 QCTOOL_EXE=quickChickTool.byte
@@ -20,12 +20,12 @@ $(call includecmdwithout@,$(COQBIN)coqtop -config)
 
 all: quickChickTool plugin documentation-check
 
-plugin: Makefile.coq 
+plugin: compat Makefile.coq
 	$(MAKE) -f Makefile.coq 
 
 documentation-check: plugin
-	coqc -R src QuickChick -I src QuickChickInterface.v
-	coqc -R src QuickChick -I src DocumentationCheck.v
+	coqc -R src QuickChick -I plugin QuickChickInterface.v
+	coqc -R src QuickChick -I plugin DocumentationCheck.v
 
 TEMPFILE := $(shell mktemp)
 
@@ -42,9 +42,6 @@ install-plugin: Makefile.coq
 uninstall:
 	$(V)if [ -e Makefile.coq ]; then $(MAKE) -f Makefile.coq uninstall; fi
 	$(RM) $(shell opam config var bin)/quickChick
-
-src/%.cmo : src/%.ml
-	ocamlc -I src -c $<
 
 quickChickTool: $(QCTOOL_DIR)/$(QCTOOL_EXE)
 
@@ -63,13 +60,20 @@ tests:
 #	coqc examples/BSTTest.v
 	coqc examples/DependentTest.v
 
+COMPATFILES:=plugin/compat.ml src/ExtractionQCCompat.v
+
+compat: $(COMPATFILES)
+
+$(COMPATFILES): compat.pl
+	$(V)perl -- compat.pl $(COMPATFILES)
+
 Makefile.coq: _CoqProject
 	$(V)coq_makefile -f _CoqProject -o Makefile.coq
 
 clean:
 	$Vif [ -e Makefile.coq ]; then $(MAKE) -f Makefile.coq clean; fi
 	$Vocamlbuild -clean
-         # This might not work on macs
+	# This might not work on macs
 	find . -name '*.vo' -print -delete
 	find . -name '*.glob' -print -delete
 	find . -name *.d -print -delete
@@ -84,6 +88,7 @@ clean:
 	find . -name *.output -print -delete
 	find . -name *.aux -print -delete
 	rm -f Makefile.coq Makefile.coq.conf
+	rm -f $(COMPATFILES)
 
 bc:
 	coqwc src/*.v

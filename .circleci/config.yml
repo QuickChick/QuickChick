@@ -6,8 +6,11 @@ defaults: &defaults
     OPAMVERBOSE: 1
     OPAMYES: true
     TERM: xterm
+  parameters:
+    coq:
+      type: string
   docker:
-    - image: coqorg/coq:dev-ocaml-4.09-flambda
+    - image: coqorg/coq:<<parameters.coq>>
 
 commands:
   startup:
@@ -21,6 +24,7 @@ commands:
     - run:
         name: Install dependencies
         command: |
+            opam repo add coq-extra-dev https://coq.inria.fr/opam/extra-dev
             opam install --deps-only .
     - run:
         name: List installed packages
@@ -103,5 +107,15 @@ workflows:
   version: 2
   build:
     jobs:
-    - opam
-    - dune
+      - opam:
+          name: OPAM 8.12
+          coq: 8.12-ocaml-4.09-flambda
+      - dune:
+          name: Dune 8.12
+          coq: 8.12-ocaml-4.09-flambda
+      - opam:
+          name: OPAM dev
+          coq: dev-ocaml-4.09-flambda
+      - dune:
+          name: Dune dev
+          coq: dev-ocaml-4.09-flambda

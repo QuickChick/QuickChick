@@ -845,7 +845,7 @@ let dtTupleType =
 (* Int *)
 
 let mkNumber n =
-  Number (NumTok.Signed.of_int_string (string_of_int n))
+  Compat.number (NumTok.Signed.of_int_string (string_of_int n))
 
 let nat_scope ast = CAst.make @@ CDelimiters ("nat", ast)
 let gInt n = nat_scope (CAst.make @@ CPrim (mkNumber n))
