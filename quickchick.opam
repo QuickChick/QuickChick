@@ -14,7 +14,7 @@ depends: [
   "ocaml"                   { >= "4.05.0" }
   "dune"                    { >= "1.9.0"  }
   "menhir"                  {     build   }
-  "coq"                     { >= "8.12"    }
+  "coq"                     { >= "8.11"    }
   "coq-ext-lib"
   "coq-mathcomp-ssreflect"
   "coq-simple-io"           {  = "dev"    }

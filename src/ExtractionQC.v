@@ -20,10 +20,6 @@ Extract Inductive Decimal.int => "((Obj.t -> Obj.t) -> (Obj.t -> Obj.t) -> Obj.t
   [ "(fun x pos _ -> pos (Obj.magic x))"
     "(fun y _ neg -> neg (Obj.magic y))"
   ] "(fun i pos neg -> Obj.magic i pos neg)".
-Extract Inductive Hexadecimal.int => "((Obj.t -> Obj.t) -> (Obj.t -> Obj.t) -> Obj.t) (* Hexadecimal.int *)"
-  [ "(fun x pos _ -> pos (Obj.magic x))"
-    "(fun y _ neg -> neg (Obj.magic y))"
-  ] "(fun i pos neg -> Obj.magic i pos neg)".
 
 Extract Constant show_nat =>
   "(fun i ->
