@@ -33,14 +33,9 @@ let register_weights (l : (constructor * weight_ast) list) =
 let convert_constr_to_weight c = 
   match c.CAst.v with
   | CPrim p ->
-    (match Compat.from_Number p with
-    | Some  (NumTok.SPlus,i) ->
-      (match NumTok.Unsigned.to_nat i with
-      | Some n -> WNum (int_of_string n)
-      | None -> failwith "QC: Numeric weights should be positive integers.")
-    | Some (NumTok.SMinus,_) ->
-      failwith "QC: Numeric weights should be greater than 0."
-    | None -> failwith "QC: match failure."
+    (match Compat.from_nonnegative_Number p with
+    | Some n -> WNum n
+    | None -> failwith "QC: Numeric weights should be positive integers."
     )
   | CRef (r, _) ->
      if string_of_qualid r = "size" then WSize
@@ -48,8 +43,8 @@ let convert_constr_to_weight c =
   | _ -> failwith "QC: match failure."
 
 let convert_constr_to_cw_pair c : (constructor * weight_ast) = 
-  match c with 
-  | { CAst.v = CNotation (_,_,([a],[[b]],_,_)); _ } -> begin
+  match Compat.from_CNotation c.CAst.v with
+  | Some ([a],[[b]],_,_) -> begin
       let ctr = 
         match a with 
         | { CAst.v = CRef (r, _); _ } -> injectCtr (string_of_qualid r)
@@ -78,8 +73,8 @@ VERNAC COMMAND EXTEND QuickChickWeights CLASSIFIED AS SIDEFF
   | ["QuickChickWeights" constr(c)] -> 
      {
        let weight_assocs = 
-         match c with 
-         | { CAst.v = CNotation (_,_,([a],[b],_,_)); _ } -> begin
+         match Compat.from_CNotation c.CAst.v with
+         | Some ([a],[b],_,_) -> begin
              let c = convert_constr_to_cw_pair a in
              let cs = List.map convert_constr_to_cw_pair b in
              c :: cs

@@ -108,6 +108,12 @@ workflows:
   build:
     jobs:
       - opam:
+          name: OPAM 8.11
+          coq: 8.11-ocaml-4.09-flambda
+      - dune:
+          name: Dune 8.11
+          coq: 8.11-ocaml-4.09-flambda
+      - opam:
           name: OPAM 8.12
           coq: 8.12-ocaml-4.09-flambda
       - dune:

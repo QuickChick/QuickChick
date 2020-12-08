@@ -84,8 +84,8 @@ let gArg ?assumName:(an=hole) ?assumType:(at=hole) ?assumImplicit:(ai=false) ?as
     | { CAst.v = CHole (_v,_,_); loc } -> (loc,Anonymous)
     | _a -> failwith "This expression should be a name" in
   CLocalAssum ( [CAst.make ?loc:(fst n) @@ snd n],
-                  (if ag then Generalized (Glob_term.MaxImplicit, false)
-                   else if ai then Default Glob_term.MaxImplicit else Default Glob_term.Explicit),
+                  (if ag then Generalized (Compat.max_implicit, false)
+                   else if ai then Default Compat.max_implicit else Default Glob_term.Explicit),
                   at )
 
 let arg_to_var (x : arg) =
@@ -844,11 +844,8 @@ let dtTupleType =
 
 (* Int *)
 
-let mkNumber n =
-  Compat.number (NumTok.Signed.of_int_string (string_of_int n))
-
 let nat_scope ast = CAst.make @@ CDelimiters ("nat", ast)
-let gInt n = nat_scope (CAst.make @@ CPrim (mkNumber n))
+let gInt n = nat_scope (CAst.make @@ CPrim (Compat.number n))
 let gSucc x = gApp (gInject "Coq.Init.Datatypes.S") [x]
 let rec maximum = function
   | [] -> failwith "maximum called with empty list"
