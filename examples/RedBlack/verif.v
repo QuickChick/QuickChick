@@ -1,5 +1,5 @@
 From mathcomp Require Import ssreflect ssrnat ssrbool eqtype.
-Require Import List String Omega.
+Require Import List String Lia.
 From QuickChick Require Import QuickChick.
 Import GenLow GenHigh.
 
@@ -81,11 +81,11 @@ Proof.
     apply oneofMonotonic; eauto with typeclass_instances.
     move => t [H1 | [H2 | //]]; subst; eauto with typeclass_instances.
   - case : c IH => IH. apply liftGen4Monotonic; eauto with typeclass_instances;
-    eapply IH; eauto; by constructor; omega.
+    eapply IH; eauto; by constructor; lia.
     apply bindMonotonic; eauto with typeclass_instances.
     unfold genColor.
     move => x /=. apply liftGen4Monotonic; eauto with typeclass_instances;
-    eapply IH; eauto; (case : x; [ by right | by left; omega]).
+    eapply IH; eauto; (case : x; [ by right | by left; lia]).
 Qed.
 
 Instance genRBTreeMonotonic : SizeMonotonic genRBTree.
@@ -121,11 +121,11 @@ Proof.
   - rewrite semLiftGen4SizeMonotonic. split.
     + move => /= [c [t1 [n [t2 [/semReturn H1 [H2 [H3 [H4 H5]]]]]]]].
       rewrite <- H1 in *. clear H1. subst.
-      apply IH in H2; last by left; omega.
-      apply IH in H4; last by left; omega. constructor; eauto.
+      apply IH in H2; last by left; lia.
+      apply IH in H4; last by left; lia. constructor; eauto.
     + move => H. inversion H; subst.
-      apply (IH (h, Black)) in H1; last by left; omega.
-      apply (IH (h, Black)) in H4; last by left; omega.
+      apply (IH (h, Black)) in H1; last by left; lia.
+      apply (IH (h, Black)) in H4; last by left; lia.
       eexists. eexists. eexists. eexists. repeat (split; auto; try reflexivity).
       by apply semReturn. by auto.
       by apply arbNat_correct. by auto.
@@ -136,8 +136,8 @@ Proof.
       apply IH in H2; last by right.
       apply IH in H4; last by right. simpl in *.
       constructor; eauto.
-      apply IH in H2; last by left; omega.
-      apply IH in H4; last by left; omega. constructor; eauto.
+      apply IH in H2; last by left; lia.
+      apply IH in H4; last by left; lia. constructor; eauto.
     + move => H. inversion H; subst.
       apply (IH (h.+1, Red)) in H0; last by right.
       apply (IH (h.+1, Red)) in H1; last by right.
@@ -146,8 +146,8 @@ Proof.
       eexists. eexists. eexists. eexists. repeat (split; auto; try reflexivity).
       by apply semReturn. by auto.
       by apply arbNat_correct. by auto.
-      apply (IH (h, Black)) in H1; last by left; omega.
-      apply (IH (h, Black)) in H4; last by left; omega.
+      apply (IH (h, Black)) in H1; last by left; lia.
+      apply (IH (h, Black)) in H4; last by left; lia.
       eexists Black. split; first by apply semColor.
       apply semLiftGen4SizeMonotonic; eauto with typeclass_instances.
       eexists. eexists. eexists. eexists. repeat (split; auto; try reflexivity).

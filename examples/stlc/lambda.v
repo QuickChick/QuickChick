@@ -1,5 +1,5 @@
 From mathcomp Require Import ssreflect ssrbool eqtype.
-Require Import Arith List String Omega.
+Require Import Arith List String Lia.
 Require Import Program Relations Wellfounded Lexicographic_Product.
 From QuickChick Require Import QuickChick.
 From QuickChick.stlc Require Import monad.
@@ -280,9 +280,9 @@ Program Fixpoint gen_term_size (p : nat * type) {wf lt_pair p} : env -> G term :
       end
   end.
 Solve Obligations with
-  program_simpl; unfold lt_pair; apply left_lex; omega.
+  program_simpl; unfold lt_pair; apply left_lex; lia.
 Solve Obligations with
-  program_simpl; unfold lt_pair; apply right_lex; unfold lt_type; simpl; omega.
+  program_simpl; unfold lt_pair; apply right_lex; unfold lt_type; simpl; lia.
 Next Obligation.
   unfold MR. apply wf_inverse_image. apply wf_lt_pair.
 Defined.

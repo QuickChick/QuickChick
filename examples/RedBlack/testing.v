@@ -1,5 +1,5 @@
 From QuickChick Require Import QuickChick GenLow GenHigh.
-Require Import NPeano Omega.
+Require Import NPeano Lia.
 
 From mathcomp Require Import ssreflect ssrnat ssrbool eqtype.
 
@@ -173,16 +173,16 @@ Program Fixpoint genRBTree_height (hc : nat*color) {wf wf_hc hc} : G tree :=
                                        arbitrary (genRBTree_height (h', c')) end.
 (* end genRBTree_height *)
 Next Obligation.
-  unfold wf_hc; simpl; left; omega.
+  unfold wf_hc; simpl; left; lia.
 Qed.
 Next Obligation.
-  unfold wf_hc; simpl; left; omega.
+  unfold wf_hc; simpl; left; lia.
 Qed.
 Next Obligation.
-  unfold wf_hc; simpl; destruct c'; [right; apply I | left; omega].
+  unfold wf_hc; simpl; destruct c'; [right; apply I | left; lia].
 Qed.
 Next Obligation.
-  unfold wf_hc; simpl; destruct c'; [right; apply I | left; omega].
+  unfold wf_hc; simpl; destruct c'; [right; apply I | left; lia].
 Qed.
 Next Obligation.
   abstract (apply well_founded_hc).

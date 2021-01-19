@@ -548,15 +548,15 @@ Lemma pumping : forall T (re : reg_exp T) s,
     s2 <> [] /\
     forall m, s1 ++ napp m s2 ++ s3 =~ re.
 
-(** To streamline the proof (which you are to fill in), the [omega]
+(** To streamline the proof (which you are to fill in), the [lia]
     tactic, which is enabled by the following [Require], is helpful in
     several places for automatically completing tedious low-level
     arguments involving equalities or inequalities over natural
-    numbers.  We'll return to [omega] in a later chapter, but feel
+    numbers.  We'll return to [lia] in a later chapter, but feel
     free to experiment with it now if you like.  The first case of the
     induction gives an example of how it is used. *)
 
-Require Import Coq.omega.Omega.
+Require Import Coq.lia.Lia.
 
 Proof.
   intros T re s Hmatch.
@@ -565,7 +565,7 @@ Proof.
        | s1 re1 re2 Hmatch IH | re1 s2 re2 Hmatch IH
        | re | s1 s2 re Hmatch1 IH1 Hmatch2 IH2 ].
   - (* MEmpty *)
-    simpl. omega.
+    simpl. lia.
   (* FILL IN HERE *) Admitted.
 
 End Pumping.
