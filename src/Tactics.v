@@ -1,14 +1,15 @@
 Set Warnings "-extraction-opaque-accessed,-extraction".
 Set Warnings "-notation-overridden,-parsing".
 
-Require Import Coq.ZArith.ZArith.
+From Coq Require Import
+  ZArith Lia.
 Require Import mathcomp.ssreflect.ssreflect.
 From mathcomp Require Import ssrfun ssrbool ssrnat eqtype seq.
 
 Ltac inv H := inversion H; subst.
 
 
-(* omega for ssrnat, taken from https://github.com/pi8027/formalized-postscript/blob/master/stdlib_ext.v *)
+(* lia for ssrnat, taken from https://github.com/pi8027/formalized-postscript/blob/master/stdlib_ext.v *)
 
 Ltac arith_hypo_ssrnat2coqnat :=
   match goal with
@@ -34,4 +35,4 @@ Ltac arith_goal_ssrnat2coqnat :=
 Ltac ssromega :=
   repeat arith_hypo_ssrnat2coqnat;
   arith_goal_ssrnat2coqnat; simpl;
-  omega.
+  lia.

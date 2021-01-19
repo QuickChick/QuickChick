@@ -6,7 +6,8 @@ From Coq Require Import
      Basics
      List
      Recdef
-     ZArith.
+     ZArith
+     Lia.
 From mathcomp Require Import
      ssrbool
      ssreflect
@@ -82,9 +83,9 @@ Function shrinkNatAux (x : nat) {measure (fun x => x) x} : list nat :=
 Proof.
   move => x n Eq;
   pose proof (Nat.divmod_spec n 1 0 0) as H.
-  assert (H' : (0 <= 1)%coq_nat) by omega; apply H in H';
+  assert (H' : (0 <= 1)%coq_nat) by lia; apply H in H';
   subst; simpl in *; clear H.
-  destruct (Nat.divmod n 1 0 0) as [q u];  destruct u; simpl in *; omega.
+  destruct (Nat.divmod n 1 0 0) as [q u];  destruct u; simpl in *; lia.
 Defined.
 
 Global Instance shrinkNat : Shrink nat :=
@@ -97,10 +98,10 @@ Proof.
     rewrite /Z.div2 /Pos.div2.
       rewrite /Z.abs_nat. rewrite Pos2Nat.inj_xI.
       rewrite <- Nat.add_1_r. rewrite mult_comm.
-      rewrite Nat.div2_div. rewrite Nat.div_add_l; simpl; omega.
+      rewrite Nat.div2_div. rewrite Nat.div_add_l; simpl; lia.
     rewrite /Z.div2 /Pos.div2.
       rewrite /Z.abs_nat. rewrite Pos2Nat.inj_xO.
-      rewrite mult_comm. rewrite Nat.div2_div. rewrite Nat.div_mul. reflexivity. omega.
+      rewrite mult_comm. rewrite Nat.div2_div. rewrite Nat.div_mul. reflexivity. lia.
   reflexivity.
 Qed.
 
@@ -137,11 +138,11 @@ Proof.
     left. rewrite /Z.div2 /Pos.div2.
       rewrite neg_succ. rewrite <- Zsucc_pred. rewrite /Z.abs_nat. rewrite Pos2Nat.inj_xI.
       rewrite <- Nat.add_1_r. rewrite mult_comm.
-      rewrite Nat.div2_div. rewrite Nat.div_add_l; simpl; omega.
+      rewrite Nat.div2_div. rewrite Nat.div_add_l; simpl; lia.
     right. rewrite /Z.div2 /Pos.div2.
       rewrite Pos2Nat.inj_xO. rewrite mult_comm.
       rewrite Nat.div2_div. rewrite Nat.div_mul. simpl.
-      apply abs_succ_neg. omega.
+      apply abs_succ_neg. lia.
   left. simpl. reflexivity.
 Qed.
 
@@ -153,12 +154,12 @@ Function shrinkZAux (x : Z) {measure (fun x => Z.abs_nat x) x}: list Z :=
   end.
 Proof.
   move => ? p ?. subst. rewrite abs_div2_pos. rewrite Zabs2Nat.inj_pos.
-    rewrite Nat.div2_div. apply Nat.div_lt. apply Pos2Nat.is_pos. omega.
+    rewrite Nat.div2_div. apply Nat.div_lt. apply Pos2Nat.is_pos. lia.
   move => ? p ?. subst. destruct (abs_succ_div2_neg p) as [H | H].
     rewrite {}H /Z.abs_nat. rewrite Nat.div2_div.
-      apply Nat.div_lt. apply Pos2Nat.is_pos. omega.
+      apply Nat.div_lt. apply Pos2Nat.is_pos. lia.
     rewrite {}H /Z.abs_nat. eapply le_lt_trans. apply le_pred_n. rewrite Nat.div2_div.
-      apply Nat.div_lt. apply Pos2Nat.is_pos. omega.
+      apply Nat.div_lt. apply Pos2Nat.is_pos. lia.
 Qed.
 
 Global Instance shrinkZ : Shrink Z :=
@@ -203,7 +204,7 @@ Global Instance shrinkOption {A : Type} `{Shrink A} : Shrink (option A) :=
 Program Instance arbNatMon : SizeMonotonic (@arbitrary nat _).
 Next Obligation.
   rewrite !semSizedSize !semChooseSize // => n /andP [/leP H1 /leP H2].
-  move : H => /leP => Hle. apply/andP. split; apply/leP; omega.
+  move : H => /leP => Hle. apply/andP. split; apply/leP; lia.
 Qed.
 
 (** Correctness proof about built-in generators *)
