@@ -20,6 +20,8 @@ type mutant_id = Num of int | Tag of string
 let only_mutant = ref None
 let include_file = ref None
 
+let reuse_folder = ref true
+
 let maxSuccess = ref None
 
 let current_filetype = ref ""
@@ -28,6 +30,7 @@ let speclist =
   [ ("-s", Arg.String (fun name -> sec_name := Some name), "Which section's properties to test")
   ; ("-v", Arg.Unit (fun _ -> verbose := true), "Verbose mode")
   ; ("-failfast", Arg.Unit (fun _ -> fail_fast := true), "Stop as soon as a problem is detected")
+  ; ("-noreuse", Arg.Unit (fun _ -> reuse_folder := false), "Extract different mutants to different folders")
   ; ("-color", Arg.Unit (fun _ -> ansi := true), "Use colors on an ANSI-compatible terminal")
   ; ("-cmd", Arg.String (fun name -> compile_command := name), "Compile command for entire directory")
   ; ("-top", Arg.String (fun name -> top := name), "Name of top-level logical module")
@@ -51,12 +54,13 @@ let debug fmt =
   if !verbose then Printf.fprintf stdout (fmt ^^ "%!")
   else Printf.ifprintf stdout fmt
 
-let tmp_dir = "../_qc_" ^ Filename.basename (Unix.getcwd ()) ^ ".tmp"
+let tmp_dir =
+  "../_qc_" ^ Filename.basename (Unix.getcwd ()) ^ ".tmp" 
 
 let ensure_dir_exists d = Sys.command ("mkdir -p " ^ d)
 
 let ensure_tmpdir_exists () =
-  ignore (ensure_dir_exists tmp_dir)
+  ignore (ensure_dir_exists (tmp_dir))
 
 type highlight_style = Header | Failure | Success
 
@@ -491,7 +495,7 @@ let rec parse_file_or_dir file_name =
   try
     debug "[parse_file_or_dir %s]\n" file_name;
     if is_dir file_name then begin
-      if is_prefix tmp_dir (Filename.basename file_name)
+      if is_prefix (tmp_dir) (Filename.basename file_name)
                    || (List.exists (fun x -> x = Filename.basename file_name) !excluded)
       then None else begin
         let ls = Sys.readdir file_name in
@@ -795,6 +799,17 @@ let main =
               (* Entire file structure is copied *)
               output_mut_dir tmp_dir m;
               reset_test_results();
+              let dir =
+                if !reuse_folder then dir
+                else begin
+                    (*                    let dir' = Printf.sprintf "%s_%n_%s" (Filename.dirname dir) i (String.trim s) in *)
+                    let dir' = Printf.sprintf "%s_%n" (Filename.dirname dir) i in
+                    let copy_cmd = Printf.sprintf "cp -r %s %s" (Filename.dirname dir) dir' in
+                    Printf.printf "Dir: %s\nFilename.dirname dir: %s\ndir': %s\ncmd: %s\n" dir (Filename.dirname dir) dir' copy_cmd;
+                    ignore (Sys.command copy_cmd);
+                    dir' 
+                end
+              in 
               compile_and_run dir ExpectSomeFailure
           end
         end)
