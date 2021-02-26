@@ -10,7 +10,7 @@ Module ConsistencyCheck : QuickChickSig.
 
   Definition RandomSeed := RandomSeed.
 
-  Definition G := @G.
+  Definition G := @GenLow.G.
   Definition semGen := @semGen.
   Definition semGenSize := @semGenSize.
   Definition Functor_G := Functor_G.
@@ -234,8 +234,5 @@ Module ConsistencyCheck : QuickChickSig.
         (* Default true. *)
         chatty     : bool
       }.
-
-
-  Notation "'genST' x" := (@arbitraryST _ x _) (at level 70).
 
 End ConsistencyCheck.

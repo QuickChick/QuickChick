@@ -15,8 +15,7 @@ Set Bullet Behavior "Strict Subproofs".
 Import GenLow.
 Module Import GenHigh := GenHighImpl.Impl GenLow.
 
-Import QcDefaultNotation.
-
+(*
 Lemma oneOf_freq {A} (g : G A) (gs : list (G A)) size :
   semGenSize (oneOf (g ;; gs)) size <-->
   semGenSize (freq ((1, g) ;; map (fun x => (1, x)) gs)) size.
@@ -106,3 +105,4 @@ Lemma bigcup_cons_setI_subset_pres_backtrack_weak
 Proof.
   intros. eapply bigcup_cons_setI_subset_pres_backtrack; eauto.
 Qed.
+*)

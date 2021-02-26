@@ -40,7 +40,6 @@ Class GenSizedSuchThat (A : Type) (P : A -> Prop) := { arbitrarySizeST : nat -> 
 Class GenSizedSuchThatMonotonic (A : Type)
       `{GenSizedSuchThat A} `{forall s, SizeMonotonic (arbitrarySizeST s)}.
 
-
 Class GenSizedSuchThatMonotonicOpt (A : Type)
       `{GenSizedSuchThat A} `{forall s, SizeMonotonicOpt (arbitrarySizeST s)}.
 
@@ -131,13 +130,13 @@ Instance GenSuchThatOfBounded (A : Type) (P : A -> Prop) (H : GenSizedSuchThat A
 Generalizable Variables PSized PMon PSMon PCorr.
 
 (* Monotonicity *)
-
+(*
 Instance GenSuchThatMonotonicOfSized (A : Type) (P : A -> Prop)
          {H : GenSizedSuchThat A P}
          `{@GenSizedSuchThatMonotonic A P H PMon}
          `{@GenSizedSuchThatSizeMonotonic A P H PSMon}
-: GenSuchThatMonotonic A P := {}.
-
+: GenSuchThatMonotonic A P.
+*)
 
 Instance SizeMonotonicOptOfBounded' (A : Type) (P : A -> Prop)
          {H : GenSizedSuchThat A P}

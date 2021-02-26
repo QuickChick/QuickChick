@@ -8,7 +8,6 @@ Require Import Show.
 Require Import State.
 Require Import GenLow GenHigh.
 Require Import Classes.
-Require Import DependentClasses.
 
 Import GenLow GenHigh.
 
@@ -247,12 +246,13 @@ Definition forAllProof {A prop : Type} {C : Checkable prop} `{S : Show A}
   bindGen' gen (fun x H => printTestCase (show x ++ newline) (pf x H)).
 Arguments forAllProof {A} {prop} {C} {S} _ _.
 
+
 Definition forAllShrink {A prop : Type} {_ : Checkable prop} `{Show A}
            (gen : G A) (shrinker : A -> list A) (pf : A -> prop) : Checker :=
-
   bindGen gen (fun x : A =>
                  shrinking shrinker x (fun x' =>
                                          printTestCase (show x' ++ newline) (pf x'))).
+
 
 Definition forAllShrinkNonDet {A prop : Type} {_ : Checkable prop} `{Show A}
            (n : nat) (gen : G A) (shrinker : A -> list A) (pf : A -> prop) : Checker :=
@@ -395,7 +395,7 @@ Module QcNotation.
     (at level 200, x ident, T at level 200, c at level 200, right associativity
      (* , format "'[' 'exists' '/ ' x .. y , '/ ' p ']'" *) )
     : type_scope.
-
+(*
   Notation "'FORALL' x | P , c" :=
     (forAllShrink (genST (fun x => P)) shrink (fun y => match y with
                                                     | Some x => c
@@ -403,4 +403,5 @@ Module QcNotation.
                                                     end))
       (at level 200, x ident, P at level 200, c at level 200, right associativity)
      : type_scope.
+*)
 End QcNotation.

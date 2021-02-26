@@ -195,47 +195,47 @@ Parameter semFrequencySize:
       \bigcup_(x in l') semGenSize x.2 size.
 
 (** [backtrack] generates Some's unless all of the input generators are empty *)
-Parameter semBacktrackSize:
-  forall {A} (l : list (nat * G (option A))) size,
-  semGenSize (backtrack l) size <--> 
-  (\bigcup_(x in (l :&: (fun x => x.1 <> 0))) (isSome :&: (semGenSize x.2 size))) :|:
-  ([set None] :&: (\bigcap_(x in l :&: (fun x => x.1 <> 0)) (semGenSize x.2 size))).
+(* Parameter semBacktrackSize: *)
+(*   forall {A} (l : list (nat * G (option A))) size, *)
+(*   semGenSize (backtrack l) size <-->  *)
+(*   (\bigcup_(x in (l :&: (fun x => x.1 <> 0))) (isSome :&: (semGenSize x.2 size))) :|: *)
+(*   ([set None] :&: (\bigcap_(x in l :&: (fun x => x.1 <> 0)) (semGenSize x.2 size))). *)
 
-Parameter backtrackSizeMonotonic: 
-  forall {A : Type} (lg : seq (nat * G (option A))),
-    lg \subset [set x | SizeMonotonic x.2 ] ->
-    SizeMonotonic (backtrack lg).
+(* Parameter backtrackSizeMonotonic:  *)
+(*   forall {A : Type} (lg : seq (nat * G (option A))), *)
+(*     lg \subset [set x | SizeMonotonic x.2 ] -> *)
+(*     SizeMonotonic (backtrack lg). *)
 
-Parameter backtrackSizeMonotonicOpt :
-  forall {A : Type} (lg : seq (nat * G (option A))),
-    lg \subset [set x | SizeMonotonicOpt x.2 ] ->
-    SizeMonotonicOpt (backtrack lg).
+(* Parameter backtrackSizeMonotonicOpt : *)
+(*   forall {A : Type} (lg : seq (nat * G (option A))), *)
+(*     lg \subset [set x | SizeMonotonicOpt x.2 ] -> *)
+(*     SizeMonotonicOpt (backtrack lg). *)
 
-Parameter bigcup_cons_setI_subset_compat_backtrack :
-  forall {A} (n : nat) (g g' : G (option A)) (l l' : seq (nat * G (option A))) s,
-    isSome :&: semGenSize g s  \subset isSome :&: semGenSize g' s ->
-    \bigcup_(x in (l :&: (fun x => x.1 <> 0))) (isSome :&: semGenSize x.2 s) \subset
-    \bigcup_(x in (l' :&: (fun x => x.1 <> 0))) (isSome :&: semGenSize x.2 s) ->
-    \bigcup_(x in (((n, g) :: l) :&: (fun x => x.1 <> 0))) (isSome :&: semGenSize x.2 s) \subset
-    \bigcup_(x in (((n, g') :: l') :&: (fun x => x.1 <> 0))) (isSome :&: semGenSize x.2 s).
+(* Parameter bigcup_cons_setI_subset_compat_backtrack : *)
+(*   forall {A} (n : nat) (g g' : G (option A)) (l l' : seq (nat * G (option A))) s, *)
+(*     isSome :&: semGenSize g s  \subset isSome :&: semGenSize g' s -> *)
+(*     \bigcup_(x in (l :&: (fun x => x.1 <> 0))) (isSome :&: semGenSize x.2 s) \subset *)
+(*     \bigcup_(x in (l' :&: (fun x => x.1 <> 0))) (isSome :&: semGenSize x.2 s) -> *)
+(*     \bigcup_(x in (((n, g) :: l) :&: (fun x => x.1 <> 0))) (isSome :&: semGenSize x.2 s) \subset *)
+(*     \bigcup_(x in (((n, g') :: l') :&: (fun x => x.1 <> 0))) (isSome :&: semGenSize x.2 s). *)
 
-Parameter bigcup_cons_setI_subset_pres_backtrack :
-  forall {A} (n : nat) (g : G (option A)) (l l' : seq (nat * G (option A))) s,
-    \bigcup_(x in (l :&: (fun x => x.1 <> 0))) (isSome :&: semGenSize x.2 s) \subset
-    \bigcup_(x in (l' :&: (fun x => x.1 <> 0))) (isSome :&: semGenSize x.2 s) ->
-    \bigcup_(x in (l :&: (fun x => x.1 <> 0))) (isSome :&: semGenSize x.2 s) \subset
-    \bigcup_(x in ((n, g) :: l') :&: (fun x => x.1 <> 0)) (isSome :&: semGenSize x.2 s).
+(* Parameter bigcup_cons_setI_subset_pres_backtrack : *)
+(*   forall {A} (n : nat) (g : G (option A)) (l l' : seq (nat * G (option A))) s, *)
+(*     \bigcup_(x in (l :&: (fun x => x.1 <> 0))) (isSome :&: semGenSize x.2 s) \subset *)
+(*     \bigcup_(x in (l' :&: (fun x => x.1 <> 0))) (isSome :&: semGenSize x.2 s) -> *)
+(*     \bigcup_(x in (l :&: (fun x => x.1 <> 0))) (isSome :&: semGenSize x.2 s) \subset *)
+(*     \bigcup_(x in ((n, g) :: l') :&: (fun x => x.1 <> 0)) (isSome :&: semGenSize x.2 s). *)
 
-Parameter semBacktrack_sound :
-  forall (A : Type) (l : seq (nat * G (option A))),
-    semGen (backtrack l) \subset
-    (\bigcup_(x in (l :&: (fun x => x.1 <> 0))) (isSome :&: (semGen x.2))) :|:
-    ([set None] :&: (\bigcap_(x in l :&: (fun x => x.1 <> 0)) (semGen x.2))).
+(* Parameter semBacktrack_sound : *)
+(*   forall (A : Type) (l : seq (nat * G (option A))), *)
+(*     semGen (backtrack l) \subset *)
+(*     (\bigcup_(x in (l :&: (fun x => x.1 <> 0))) (isSome :&: (semGen x.2))) :|: *)
+(*     ([set None] :&: (\bigcap_(x in l :&: (fun x => x.1 <> 0)) (semGen x.2))). *)
 
-Parameter semBacktrack_complete :
-  forall (A : Type) (l : seq (nat * G (option A))),
-    \bigcup_(x in (l :&: (fun x => x.1 <> 0))) (isSome :&: (semGen x.2)) \subset
-    semGen (backtrack l).
+(* Parameter semBacktrack_complete : *)
+(*   forall (A : Type) (l : seq (nat * G (option A))), *)
+(*     \bigcup_(x in (l :&: (fun x => x.1 <> 0))) (isSome :&: (semGen x.2)) \subset *)
+(*     semGen (backtrack l). *)
 
 
 Parameter semVectorOfSize:
@@ -343,80 +343,5 @@ Parameter semOneOfSize : forall A (g0 : G A) (gs : list (G A)) s,
 
 Parameter semOneOf : forall A (g0 : G A) (gs : list (G A)),
   semGen (oneOf (g0 ;; gs))  <--> \bigcup_(g in (g0 :: gs)) semGen g.
-
-Declare Instance bindOptMonotonic
-        {A B} (g : G (option A)) (f : A -> G (option B)) :
-  SizeMonotonic g ->
-  (forall x, SizeMonotonic (f x)) ->
-  SizeMonotonic (bindGenOpt g f).
-
-Declare Instance bindOptMonotonicOpt
-        {A B} (g : G (option A)) (f : A -> G (option B)) :
-  SizeMonotonicOpt g ->
-  (forall x, SizeMonotonicOpt (f x)) ->
-  SizeMonotonicOpt (bindGenOpt g f).
-
-  (* Review this *)
-  Parameter semBindOptSizeMonotonicIncl_r :
-    forall {A B} (g : G (option A)) (f : A -> G (option B)) (s1 : set A) (s2 : A -> set B),
-      semGen g \subset (Some @: s1) :|: [set None] ->
-      (forall x, semGen (f x) \subset Some @: (s2 x) :|: [set None]) ->
-      semGen (bindGenOpt g f) \subset Some @: (\bigcup_(a in s1) s2 a) :|: [set None].
-
-  Parameter semBindOptSizeMonotonicIncl_l :
-    forall {A B} (g : G (option A)) (f : A -> G (option B)) (s1 : set A)  (fs : A -> set B)
-      `{Hg : SizeMonotonicOpt _ g} {Hf : forall a, SizeMonotonicOpt (f a)},
-      Some @: s1 \subset semGen g ->
-      (forall x, Some @: (fs x) \subset semGen (f x)) ->
-      (Some @: \bigcup_(a in s1) (fs a)) \subset semGen (bindGenOpt g f).
-
-  Parameter semBindOptSizeOpt_subset_compat :
-    forall {A B : Type} (g g' : G (option A)) (f f' : A -> G (option B)),
-      (forall s, isSome :&: semGenSize g s \subset isSome :&: semGenSize g' s) ->
-      (forall x s, isSome :&: semGenSize (f x) s \subset isSome :&: semGenSize (f' x) s) ->
-      (forall s, isSome :&: semGenSize (bindGenOpt g f) s \subset isSome :&: semGenSize (bindGenOpt g' f') s).
-
-Definition GOpt A := G (option A).
-
-Instance Monad_GOpt : Monad GOpt := {
-  ret A x := returnGen (Some x);
-  bind A B := bindGenOpt;
-}.
-
-Parameter semSizeOpt_retry :
-  forall {A} (n : nat) (g : G (option A)) (s : nat),
-    semGenSizeOpt (retry n g) s <--> semGenSizeOpt g s.
-
-Parameter semSizeOpt_suchThatMaybe1 :
-  forall {A : Type} (g : G A) (p : A -> bool) (s : nat),
-    semGenSizeOpt (suchThatMaybe1 g p) s <--> semGenSize g s :&: p.
-
-Parameter semSizeOpt_suchThatMaybe :
-  forall {A : Type} (g : G A) (p : A -> bool) (s : nat),
-    semGenSizeOpt (suchThatMaybe g p) s <--> semGenSize g s :&: p.
-
-Parameter semSizeOpt_suchThatMaybeOpt :
-  forall {A : Type} (g : G (option A)) (p : A -> bool) (s : nat),
-    semGenSizeOpt (suchThatMaybeOpt g p) s <-->
-    semGenSizeOpt g s :&: p.
-
-Declare Instance MonotonicOpt_retry {A} (n : nat) (g : G (option A)) :
-  SizeMonotonicOpt g ->
-  SizeMonotonicOpt (retry n g).
-
-Declare Instance MonotonicOpt_suchThatMaybe1
-        {A : Type} (g : G A) (f : A -> bool) :
-  SizeMonotonic g ->
-  SizeMonotonicOpt (suchThatMaybe1 g f).
-
-Declare Instance MonotonicOpt_suchThatMaybe
-        {A : Type} (g : G A) (f : A -> bool) :
-  SizeMonotonic g ->
-  SizeMonotonicOpt (suchThatMaybe g f).
-
-Declare Instance MonotonicOpt_suchThatMaybeOpt
-        {A : Type} (g : G (option A)) (f : A -> bool) :
-  SizeMonotonicOpt g ->
-  SizeMonotonicOpt (suchThatMaybeOpt g f).
 
 End Sig.

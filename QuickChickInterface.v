@@ -58,7 +58,7 @@ Parameter G : Type -> Type.
 
 (** Run a generator with a size parameter (a natural number denoting
     the maximum depth of the generated A) and a random seed. *)
-Parameter run  : forall {A : Type}, G A -> nat -> RandomSeed -> A.
+Parameter run  : forall {A : Type}, G A -> nat -> RandomSeed -> LazyList.LazyList A.
 
 (** The semantics of a generator is its set of possible outcomes. *)
 Parameter semGen : forall {A : Type} (g : G A), set A.
@@ -353,8 +353,6 @@ Declare Instance genPair :
     To avoid this, QuickChick also provides convenient notation to call 
     by providing only the predicate [P] that constraints the generation.
     The typeclass constraint is inferred. *)
-
-Notation "'genST' x" := (@arbitraryST _ x _) (at level 70).
 
 (* #################################################################### *)
 (** * Shrinking *)

@@ -3,19 +3,20 @@ Set Warnings "-notation-overridden,-parsing".
 
 Require Import ZArith List.
 Require Import mathcomp.ssreflect.ssreflect.
-From mathcomp Require Import ssrfun ssrbool ssrnat.
+From mathcomp Require Import ssrfun ssrbool ssrnat eqtype seq.
 Require Import Numbers.BinNums.
 Require Import Classes.RelationClasses.
 
 From ExtLib.Structures Require Export
      Monads.
+Require Import ExtLib.Data.Monads.ListMonad.
 From ExtLib.Structures Require Import
      Functor Applicative.
 Import MonadNotation.
 Open Scope monad_scope.
 
 From QuickChick Require Import
-     GenLowInterface RandomQC RoseTrees Sets Tactics.
+     GenLowInterface RandomQC EnumerationQC RoseTrees Sets Tactics LazyList.
 
 Set Implicit Arguments.
 Unset Strict Implicit.
@@ -30,14 +31,15 @@ Import ListNotations.
 Open Scope fun_scope.
 Open Scope set_scope.
 
+
 Module GenLow : GenLowInterface.Sig.
 
   (** * Type of generators *)
 
   (* begin GenType *)
-  Inductive GenType (A:Type) : Type := MkGen : (nat -> RandomSeed -> A) -> GenType A.
+  Inductive GenType (A:Type) : Type := MkGen : (nat -> RandomSeed -> LazyList A) -> GenType A.
   (* end GenType *)
-  
+
   Definition G := GenType.
 
   (** * Primitive generator combinators *)
@@ -45,21 +47,53 @@ Module GenLow : GenLowInterface.Sig.
   (* begin run *)
   Definition run {A : Type} (g : G A) := match g with MkGen f => f end.
   (* end run *)
+
+  (* LEO: lnil could have a "reason for failure" included probably. *)
+  Definition failGen {A : Type} : G A :=
+    MkGen (fun _ _ => lnil).
   
   Definition returnGen {A : Type} (x : A) : G A :=
+    MkGen (fun _ _ => ret x).
+
+  Definition returnGenL {A : Type} (x : LazyList A) : G A :=
     MkGen (fun _ _ => x).
 
+  Definition fmap {A B : Type} (f : A -> B) (g : G A) : G B :=
+    MkGen (fun n r => fmap f (run g n r)).
+
+  (* Go through the lazy list la and run (k a) for each element in la with a different seed. *)
+  Fixpoint bindGenAux {A B} (la : LazyList A) (k : A -> G B) n (rs : RandomSeed) : LazyList B :=
+    match la with
+    | lnil => lnil
+    | lsing a => run (k a) n rs
+    | lcons a la' =>
+      let (r1,r2) := randomSplit rs in
+      lazy_append (run (k a) n r1) (bindGenAux (la' tt) k n r2)
+    end.
+  
   Definition bindGen {A B : Type} (g : G A) (k : A -> G B) : G B :=
     MkGen (fun n r =>
              let (r1,r2) := randomSplit r in
-             run (k (run g n r1)) n r2).
+             bindGenAux (run g n r1) k n r2
+          ).
   
-  Definition fmap {A B : Type} (f : A -> B) (g : G A) : G B :=
-    MkGen (fun n r => f (run g n r)).
-
   Definition apGen {A B} (gf : G (A -> B)) (gg : G A) : G B :=
     bindGen gf (fun f => fmap f gg).
 
+  Instance Functor_G : Functor G := {
+    fmap A B := fmap;
+  }.
+
+  Instance Applicative_G : Applicative G := {
+    pure A := returnGen;
+    ap A B := apGen;
+  }.
+
+  Instance Monad_G : Monad G := {
+    ret A := returnGen;
+    bind A B := bindGen;
+  }.
+  
   Definition sized {A : Type} (f : nat -> G A) : G A :=
     MkGen (fun n r => run (f n) n r).
 
@@ -68,8 +102,52 @@ Module GenLow : GenLowInterface.Sig.
     | MkGen m => MkGen (fun _ => m n)
     end.
 
-  Definition promote {A : Type} (m : Rose (G A)) : G (Rose A) :=
-    MkGen (fun n r => fmapRose (fun g => run g n r) m).
+  Fixpoint lazy_rose_flatten {A : Type} (r : Rose (LazyList A)) : LazyList (Rose A) :=
+    match r with
+    | MkRose las ts =>
+      a <- las;;
+      lcons (MkRose a (lazy (LazyList_to_list (join_list_lazy_list (map lazy_rose_flatten (force ts)))))) (fun _ => (lnil))
+    end.
+
+  Fixpoint promote {A : Type} (m : Rose (G A)) : G (Rose A)
+    := MkGen (fun n r => lazy_rose_flatten (fmapRose (fun ga => run ga n r) m)).
+  
+  (* ZP: Split suchThatMaybe into two different functions
+     to make a proof easier *)
+  Definition suchThatMaybeAux {A : Type} (g : G A) (p : A -> bool) :=
+    fix aux (k : nat) (n : nat) : G A :=
+    match n with
+      | O => failGen
+      | S n' =>
+        x <- resize (2 * k + n) g ;;
+        if p x then ret x else aux (S k) n'
+    end.
+
+  Definition suchThatMaybe {A : Type} (g : G A) (p : A -> bool) : G A :=
+    sized (fun x => suchThatMaybeAux g p 0 (max 1 x)).
+
+  Definition cut {A : Type} (g : G A) : G A :=
+    MkGen (fun s r =>
+             match run g s r with
+             | lcons x _ => lsing x
+             | lsing x => lsing x
+             | lnil => lnil
+             end).
+  
+  Fixpoint backTrackAux {A : Type} (n : nat) (g : nat -> RandomSeed -> LazyList A) (s : nat) (r : RandomSeed) :=
+    match n with
+    | O => lnil
+    | S n' =>
+      let (r1, r2) := randomSplit r in 
+      match g s r1 with
+      | lnil => backTrackAux n' g s r2
+      | lsing x   => lsing x
+      | lcons x _ => lsing x
+      end
+    end.
+
+  Definition backTrack {A : Type} (n : nat) (g : G A) :=
+    MkGen (fun s r => backTrackAux n (run g) s r).
 
   Fixpoint rnds (s : RandomSeed) (n' : nat) : list RandomSeed :=
     match n' with
@@ -85,15 +163,67 @@ Module GenLow : GenLowInterface.Sig.
       | S n' => createRange n' (cons n acc)
     end.
 
+  
   Definition choose {A : Type} `{ChoosableFromInterval A} (range : A * A) : G A :=
-    MkGen (fun _ r => fst (randomR range r)).
+    MkGen (fun _ r => ret (fst (randomR range r))).
 
+  (* This should use urns! *)
+  Fixpoint pickDrop {A : Type} (def : A) (xs : list (nat * A)) n : nat * A * list (nat * A) :=
+    match xs with
+      | nil => (0, def, nil)
+      | (k, x) :: xs =>
+        if (n < k) then  (k, x, xs)
+        else let '(k', x', xs') := pickDrop def xs (n - k)
+             in (k', x', (k,x)::xs')
+    end. 
+
+  Definition sum_fst {A : Type} (gs : list (nat * A)) : nat :=
+    foldl (fun t p => t + (fst p)) 0 gs.
+  
+  Fixpoint shuffleFuel {A : Type} (fuel : nat) (tot : nat)
+           (gs : list (nat * (nat -> RandomSeed -> LazyList A)))
+           (s : nat) (r : RandomSeed) : LazyList A :=
+    match fuel with 
+      | O => lnil
+      | S fuel' =>
+        let (r1, r2) := randomSplit r in
+        let (r11, r12) := randomSplit r1 in
+        n <- run (choose (0, tot-1)) s r11 ;;
+        let '(k, g, gs') := pickDrop (fun _ _ => lnil) gs n in
+        lazy_append' (g s r12) (fun _ => shuffleFuel fuel' (tot - k) gs' s r2)
+    end.
+
+  Definition run_snd {A B : Type} (ag : A * G B) : A * (nat -> RandomSeed -> LazyList B) :=
+    let (a,g) := ag in (a, run g).
+  
+  Definition shuffle {A : Type} (gs : list (nat * G A)) : G A :=
+    MkGen (fun s r => shuffleFuel (length gs) (sum_fst gs) (List.map run_snd gs) s r).
+
+  (* TODO @Calvin: Do these use laziness? *)
+  Definition enumR {A : Type} `{EnumFromInterval A} (range : A * A) : G A :=
+    MkGen (fun _ _ => enumFromTo (fst range) (snd range)).
+
+  Definition enum {A : Type} `{Serial A} : G A :=
+    MkGen (fun n r => series n r).
+
+  Definition enum' {A : Type} `{Serial A} (n : nat) : G A :=
+    MkGen (fun _ r => series n r).
+
+  Definition enumerate {A : Type} (l : list A) : G A :=
+    MkGen (fun _ _ => list_to_LazyList l).
+  
+  (* TODO: Rethink this.
+  Fixpoint sumG {A : Type} (lga : LazyList (G A)) : G A :=
+    MkGen (fun n r => bind_helper lga n r).
+   *)
+
+  (* TODO: This looks stupid. *)
   Definition sample (A : Type) (g : G A) : list A :=
     match g with
       | MkGen m =>
         let rnd := newRandomSeed in
         let l := List.combine (rnds rnd 20) (createRange 10 nil) in
-        List.map (fun (p : RandomSeed * nat) => let (r,n) := p in m n r) l
+        joint_list_lazy_list_list (List.map (fun (p : RandomSeed * nat) => let (r,n) := p in m n r) l)
     end.
   
   (* LL : Things that need to be in GenLow because of MkGen *)
@@ -102,13 +232,12 @@ Module GenLow : GenLowInterface.Sig.
     match g with 
       | MkGen f => MkGen (fun n r => f n (varySeed p r))
     end.
-  
-  Definition reallyUnsafeDelay {A : Type} : G (G A -> A) :=
-    MkGen (fun r n g => (match g with MkGen f => f r n end)).
-  
-  Definition reallyUnsafePromote {r A : Type} (m : r -> G A) : G (r -> A) :=
-    (bindGen reallyUnsafeDelay (fun eval => 
-                                  returnGen (fun r => eval (m r)))).
+
+  Definition reallyUnsafeDelay {A : Type} : G (G A -> LazyList A) :=
+    MkGen (fun r n => lsing (fun g => match g with MkGen f => f r n end)).
+
+
+
 
   (* End Things *)
 
@@ -116,7 +245,10 @@ Module GenLow : GenLowInterface.Sig.
 
   (* Set of outcomes semantics definitions (repeated above) *)
   (* begin semGen *)
-  Definition semGenSize {A : Type} (g : G A) (s : nat) : set A := codom (run g s).
+
+  Definition semGenSize {A : Type} (g : G A) (s : nat) : set A :=
+    possibly_generated (run g s).
+  
   Definition semGen {A : Type} (g : G A) : set A := \bigcup_s semGenSize g s.
 
   Definition semGenSizeOpt {A : Type} (g : G (option A)) (s : nat) : set A :=
@@ -126,24 +258,32 @@ Module GenLow : GenLowInterface.Sig.
     somes (semGen g).
   (* end semGen *)
 
-  Lemma semGenOpt_equiv {A} (g : G (option A)) :
-    semGenOpt g <--> \bigcup_s semGenSizeOpt g s.
+  Lemma semGenOpt_equiv : forall {A} (g : G (option A)),
+      semGenOpt g <--> \bigcup_s semGenSizeOpt g s.
   Proof.
-    split; intros [n [Hn [t H]]];
-      (exists n; split; [constructor | exists t; auto]).
-  Qed.
+  Admitted.
 
-  Lemma bindGen_aux {A : Type} (g : G A) (n : nat) (r : RandomSeed) : semGen g (run g n r).
-  Proof.
-    unfold semGen, semGenSize, codom, bigcup.
-    exists n; split => //=.
-    exists r; auto.
-  Qed.
 
-  Definition bindGen' {A B : Type} (g : G A) (k : forall (a : A), (a \in semGen g) -> G B) : G B :=
+  (* More things *)
+  Program Definition bindGen' {A B : Type} (g : G A) (k : forall (a : A), (a \in semGen g) -> G B) : G B :=
     MkGen (fun n r =>
              let (r1,r2) := randomSplit r in
-             run (k (run g n r1) (bindGen_aux g n r1)) n r2).
+             _).
+  Next Obligation.
+    remember (run g n r1) as a's.
+    destruct a's.
+    - exact (lnil).
+    - refine (run (k a _) n r2).
+      unfold semGen, semGenSize, bigcup, codom, bigcup, possibly_generated.
+      exists n. split => //=.
+      exists r1. inversion Heqa's. constructor.
+    - refine (run (k a _) n r2).
+      unfold semGen, semGenSize, bigcup, codom, bigcup, possibly_generated.
+      exists n. split => //=.
+      exists r1. inversion Heqa's. constructor.
+      auto.
+  Qed.
+  
 
   (** * Semantic properties of generators *)
 
@@ -156,27 +296,10 @@ Module GenLow : GenLowInterface.Sig.
       s1 <= s2 ->
       semGenSize (g s1) s \subset semGenSize (g s2) s.
 
-  (** Sized generators of option type monotonic in the size parameter *)
-  Class SizedMonotonicOpt {A} (g : nat -> G (option A)) :=
-    sizeMonotonicOpt : forall s s1 s2,
-      s1 <= s2 ->
-      semGenSizeOpt (g s1) s \subset semGenSizeOpt (g s2) s.
-  
   (** Generators monotonic in the runtime size parameter *)
   Class SizeMonotonic {A} (g : G A) :=
     monotonic : forall s1 s2,
       s1 <= s2 -> semGenSize g s1 \subset semGenSize g s2.
-
-  (** Generators monotonic in the runtime size parameter *)
-  Class SizeMonotonicOpt {A} (g : G (option A)) :=
-    monotonicOpt : forall s1 s2,
-      s1 <= s2 ->
-      semGenSizeOpt g s1 \subset semGenSizeOpt g s2.
-
-  Class SizeAntiMonotonicNone {A} (g : G (option A)) :=
-    monotonicNone : forall s1 s2,
-      s1 <= s2 ->
-      isNone :&: semGenSize g s2 \subset isNone :&: semGenSize g s1.
 
   (* Unsizedness trivially implies size-monotonicity *)
   Lemma unsizedMonotonic {A} (g : G A) : Unsized g -> SizeMonotonic g. 
@@ -197,22 +320,93 @@ Module GenLow : GenLowInterface.Sig.
 
   (** * Semantics of combinators *)
 
+  (* Fail yields the empty set *)
+  Lemma semFailSize {A} (s : nat) : semGenSize failGen s <--> @set0 A.
+  Proof.
+    rewrite /semGenSize /possibly_generated /=; split.
+    - move => [? Contra]; inversion Contra.
+    - move => Contra; inversion Contra.
+  Qed.
+
+  Lemma semFailSizeContra {A} s (a : A) : semGenSize failGen s a -> False.
+  Proof.
+    rewrite /semGenSize /possibly_generated /= => Contra.
+    by inversion Contra.
+  Qed.
+    
+  Lemma semFail {A} : semGen failGen <--> @set0 A.
+  Proof.
+    rewrite /semGen /semGenSize /= /possibly_generated; split.
+    - move => [? [? [? Contra]]].
+      inversion Contra.
+    - move => Contra.
+      inversion Contra.
+  Qed.
+
+  Lemma semFailContra {A} (a : A) : semGen failGen a -> False.
+  Proof.
+    rewrite /semGen => H.
+    destruct H as [x [H1 H2]].
+    eapply semFailSizeContra; eauto.
+  Qed.
+
+  Program Instance unsizedFail {A} : Unsized (@failGen A).
+  Next Obligation.
+      by rewrite ! semFailSize; split; auto.
+  Qed.
+
+  Instance failSizeMonotonic {A} : SizeMonotonic (@failGen A).
+  Proof.
+    firstorder.
+  Qed.
+
+  
   (* begin semReturn *)
   Lemma semReturn {A} (x : A) : semGen (returnGen x) <--> [set x].
   (* end semReturn *)
   Proof.
     rewrite /semGen /semGenSize /= bigcup_const ?codom_const //.
-            exact: randomSeed_inhabited.
-      by do 2! constructor.
+    split.
+    - intros H. inversion H. inversion H0. subst. constructor. (* inversion H1.*)
+    - intros H. inversion H. unfold possibly_generated. destruct randomSeed_inhabited as [r]. exists r.
+      constructor. (* auto.*)
+    - do 2! constructor.
   Qed.
+
+  Lemma semEnumerate {A} (l : list A) : semGen (enumerate l) <--> l.
+  Proof.
+    rewrite /semGen /semGenSize /= bigcup_const ?codom_const //; [ | do 2! constructor].
+    split; induction l; intros; eauto; inv H.
+    - inv H0.
+    - simpl in H0.
+      destruct l eqn:L; eauto.
+      + inv H0; simpl; auto.
+      + inv H0.
+        * left; auto.
+        * right; eauto.
+          eapply IHl.
+          exists x; auto.
+    - destruct randomSeed_inhabited. exists X; destruct l; simpl; eauto.
+    - destruct randomSeed_inhabited; exists X.
+      inv H.
+      + destruct l; simpl; eauto.
+      + destruct IHl; eauto.
+        destruct l eqn:L; simpl; eauto.
+        inv H0.
+  Qed.
+
   
   (* begin semReturnSize *)
   Lemma semReturnSize A (x : A) (s : nat) :
   semGenSize (returnGen x) s <--> [set x].
   (* end semReturnSize *)
   Proof.
-    unfold semGenSize.
-    rewrite codom_const; [ reflexivity | apply randomSeed_inhabited ].
+    unfold semGenSize, possibly_generated.
+    split.
+    - intros [r H]. inversion H.
+      + subst; constructor.
+    - intros H. inversion H. destruct randomSeed_inhabited as [r]. exists r.
+      simpl. auto.
   Qed.
   
   Instance unsizedReturn {A} (x : A) : Unsized (returnGen x).
@@ -221,19 +415,108 @@ Module GenLow : GenLowInterface.Sig.
   Instance returnGenSizeMonotonic {A} (x : A) : SizeMonotonic (returnGen x).
   Proof. firstorder. Qed.
 
-  Instance returnGenSizeMonotonicOpt {A} (x : option A) : SizeMonotonicOpt (returnGen x).
-  Proof. firstorder. Qed.
+  Lemma bind_in_f :
+    forall A B (b : B) (g : G A) (f : A -> G B) s r,
+      In_ll b (run (bindGen g f) s r) ->
+      exists a r', In_ll b (run (f a) s r').
+  Proof.
+    intros A B b g f s r H.
+    simpl in H.
+    destruct (randomSplit r) as [r1 r2].
+    remember (run g s r1) as runr1 eqn:Hrunr1. clear Hrunr1 r.
+    revert r1 r2 H. revert f s g.
+    induction runr1; intros f s g r1 r2 HIn; simpl in *.
+    - inversion HIn.
+    - exists a. exists r2. assumption.
+    - unfold bindGenAux in *. simpl in *.
+      destruct (randomSplit r2) as [r3 r4]. simpl in *.
+      apply lazy_in_app_or in HIn. destruct HIn.
+      + exists a. exists r3. auto.
+      + eapply H; eauto. 
+  Qed.
+
+  Lemma in_bind_aux :
+    forall {A B : Type} (la : LazyList A) f s r (b : B),
+      In_ll b (bindGenAux la f s r) ->
+      exists (a : A),
+        (In_ll a la) /\
+        (exists r' : RandomSeed, In_ll b (run (f a) s r')).
+  Proof.
+    move => A B la; induction la => f s r b HIn; simpl in *.
+    - inversion HIn.
+    - exists a; split; [ | exists r]; auto.
+    - destruct (randomSplit r) as [r1 r2].
+      apply lazy_in_app_or in HIn; destruct HIn.
+      + exists a; split; [ | exists r1]; auto.
+      + apply H in H0.
+        destruct H0 as [a' [Ha' [r' Hb]]].
+        exists a'; split; auto.
+        exists r'; auto.
+  Qed.
+        
+  Lemma in_bind:
+    forall {A B : Type} f (g : G A) s r (b : B),
+      In_ll b (run (bindGen g f) s r) ->
+      exists (a : A),
+        (exists r1 : RandomSeed, In_ll a (run g s r1)) /\
+        (exists r2 : RandomSeed, In_ll b (run (f a) s r2)).
+  Proof.
+    move => A B f g s r b HIn.
+    simpl in *.
+    destruct (randomSplit r) as [r1 r2].
+    apply in_bind_aux in HIn.
+    destruct HIn as [a [HIna [r' HInB]]].
+    exists a; split.
+    - exists r1; auto.
+    - exists r'; auto.
+  Qed.
+
+  Lemma bind_aux_in :
+    forall {A B} (la : LazyList A) f s r (a : A) (b : B),
+      In_ll a la -> In_ll b (run (f a) s r) ->
+      exists r, In_ll b (bindGenAux la f s r).
+  Proof.
+    move => A B la; induction la => f s r x b HInX HInB; simpl in *; subst.
+    - inversion HInX.
+    - exists r; assumption.
+    - destruct HInX as [? | HIn]; subst; simpl in *; auto.
+      + (* Second component of rsa could be whatever *)
+        destruct (randomSplitAssumption r r) as [r' Hr'].
+        exists r'. rewrite Hr'.
+        apply lazy_append_in_l.
+        assumption.
+      + eapply H in HInB; eauto.
+        destruct HInB as [r' HInB].
+        (* First component of rsa could be whatever *)
+        destruct (randomSplitAssumption r r') as [R HR].
+        exists R.
+        rewrite HR.
+        apply lazy_append_in_r.
+        assumption.
+  Qed.
   
   (* begin semBindSize *)
   Lemma semBindSize A B (g : G A) (f : A -> G B) (s : nat) :
     semGenSize (bindGen g f) s <-->
-    \bigcup_(a in semGenSize g s) semGenSize (f a) s.
+               \bigcup_(a in semGenSize g s) semGenSize (f a) s.
   (* end semBindSize *)
   Proof.
-    rewrite /semGenSize /bindGen /= bigcup_codom -curry_codom2l.
-      by rewrite -[codom (prod_curry _)]imsetT -randomSplit_codom -codom_comp.
-  Qed.
-  
+    unfold semGenSize.
+    unfold bigcup.
+    unfold possibly_generated.
+    split; rename a into b.
+    - intros [r H].
+      destruct (randomSplit r) as [r1 r2] eqn:Hrs.
+      eapply in_bind; eauto.
+    - move => [a [[r1 HIn1] [r2 HIn2]]].
+      simpl in *.
+      eapply bind_aux_in in HIn2; eauto.
+      destruct HIn2 as [r' HIn].
+      destruct (randomSplitAssumption r1 r') as [r HSplit].      
+      exists r; rewrite HSplit.
+      assumption.
+  Qed.      
+
   Lemma semBindSize_subset_compat {A B : Type} (g g' : G A) (f f' : A -> G B) :
     (forall s, semGenSize g s \subset semGenSize g' s) ->
     (forall x s, semGenSize (f x) s \subset semGenSize (f' x) s) ->
@@ -245,19 +528,6 @@ Module GenLow : GenLowInterface.Sig.
     eapply incl_bigcupr. intros; eapply H2.
   Qed.
   
-  Lemma semBindSizeOpt_subset_compat {A B : Type} (g g' : G A) (f f' : A -> G (option B)) :
-    (forall s, semGenSize g s \subset semGenSize g' s) ->
-    (forall x s, isSome :&: semGenSize (f x) s \subset isSome :&: semGenSize (f' x) s) ->
-    (forall s, isSome :&: semGenSize (bindGen g f) s \subset isSome :&: semGenSize (bindGen g' f') s).
-  Proof.
-    intros H1 H2 s. rewrite !semBindSize.
-    eapply subset_trans.
-    eapply setI_subset_compat. eapply subset_refl.
-    eapply incl_bigcupl. eapply H1.
-    rewrite !setI_bigcup_assoc. 
-    eapply incl_bigcupr. intros. eapply H2.
-  Qed.
-  
   Lemma monad_leftid A B (a : A) (f : A -> G B) :
     semGen (bindGen (returnGen a) f) <--> semGen (f a).
   Proof.
@@ -267,8 +537,19 @@ Module GenLow : GenLowInterface.Sig.
   Lemma monad_rightid A (g : G A) : semGen (bindGen g returnGen) <--> semGen g.
   Proof.
     apply: eq_bigcupr => size; rewrite semBindSize.
-      by rewrite (eq_bigcupr _ (fun x => semReturnSize x size))
-                 /semGenSize bigcup_codom codomE.
+    unfold bigcup.
+    split.
+    - intros [a' [H1 H2]].
+      unfold semGenSize in *. simpl in H2. unfold possibly_generated in H2.
+      destruct H2. inversion H.
+      + subst. auto.
+(*      + inversion H0. *)
+    - intros H.
+      exists a. split.
+      + auto.
+      + unfold semGenSize. simpl. unfold possibly_generated.
+        destruct randomSeed_inhabited as [r]. exists r.
+        simpl. auto.
   Qed.
   
   Lemma monad_assoc A B C (ga : G A) (fb : A -> G B) (fc : B -> G C) :
@@ -297,25 +578,11 @@ Module GenLow : GenLowInterface.Sig.
     move => [a [H3 H4]]; exists a; split => //; eapply monotonic; eauto.
   Qed.
 
-  Instance bindMonotonicOpt
-          {A B} (g : G A) (f : A -> G (option B))
-          `{SizeMonotonic _ g} `{forall x, SizeMonotonicOpt (f x)} : 
-    SizeMonotonicOpt (bindGen g f).
-  Proof.
-    intros s1 s2 Hs.
-    unfold semGenSizeOpt.
-    rewrite !semBindSize. move => b.
-    move => [a [Hsome [H4 H5]]].
-    eexists a; split => //. eapply monotonic; eauto.
-    eapply monotonicOpt; eauto; eexists; eauto.
-  Qed.
-
-  Instance bindMonotonicStrong
+  Program Instance bindMonotonicStrong
           {A B} (g : G A) (f : A -> G B) `{SizeMonotonic _ g}
           `{forall x, semGen g x -> SizeMonotonic (f x)} :
     SizeMonotonic (bindGen g f).
-  Proof.
-    intros s1 s2 Hleq.
+  Next Obligation.
     rewrite !semBindSize. move => b.
     move => [a [H3 H4]]; exists a; split => //.
     now eapply monotonic; eauto.
@@ -324,22 +591,7 @@ Module GenLow : GenLowInterface.Sig.
     eassumption.
     eassumption.
   Qed.
-  
-  Instance bindMonotonicOptStrong
-          {A B} (g : G A) (f : A -> G (option B)) `{SizeMonotonic _ g}
-          `{forall x, semGen g x -> SizeMonotonicOpt (f x)} :
-    SizeMonotonicOpt (bindGen g f).
-  Proof.
-    intros s1 s2 Hleq.
-    unfold semGenSizeOpt.
-    rewrite !semBindSize. move => b.
-    move => [a [Hsome [H4 H5]]].
-    exists a; split => //.
-    - eapply monotonic; eauto.
-    - eapply H0; eauto. exists s1; split; auto. constructor.
-      eexists; eauto.
-  Qed.
-  
+
   (* begin semBindUnsized1 *)
   Lemma semBindUnsized1 {A B} (g : G A) (f : A -> G B) `{H : Unsized _ g}:
     semGen (bindGen g f) <--> \bigcup_(a in semGen g) semGen (f a).
@@ -386,60 +638,19 @@ Module GenLow : GenLowInterface.Sig.
       eapply Hg; last eassumption. by apply/leP; apply Max.le_max_l.
       eapply Hf; last eassumption. by apply/leP; apply Max.le_max_r.
   Qed.
-  
-  Lemma semBindSizeMonotonicIncl_r {A B} (g : G A) (f : A -> G (option B)) (s1 : set A) (s2 : A -> set B) :
-    semGen g \subset s1 ->
-    (forall x, semGen (f x) \subset Some @: (s2 x) :|: [set None]) -> 
-    semGen (bindGen g f) \subset Some @: (\bigcup_(a in s1) s2 a)  :|: [set None].
-  Proof.
-    intros H1 H2 [x |] [s [_ [r H]]]; [| right; reflexivity ].
-    left.
-    eexists; split; [| reflexivity ].
-    simpl in H. destruct (randomSplit r) as [r1 r2] eqn:Heq.
-    destruct (run (f (run g s r1)) s r2) eqn:Heq2; try discriminate.
-    inv H. eexists (run g s r1). split.
-    eapply H1. eexists; split; [| eexists; reflexivity ].
-    now constructor.
-    edestruct H2.
-    * eexists. split; [| eexists; eauto ]. now constructor.
-    * inv H0. inv H3. inv H5. eassumption.
-    * inv H0.
-  Qed.
 
-  Lemma semBindSizeMonotonicIncl_l {A B} (g : G A) (f : A -> G (option B)) (s1 : set A)
-        (fs : A -> set B) 
-        `{Hg : SizeMonotonic _ g}
-        `{Hf : forall a, SizeMonotonicOpt (f a)} :
-    s1 \subset semGen g ->
-    (forall x, Some @: (fs x) \subset semGen (f x)) ->
-    (Some @: \bigcup_(a in s1) (fs a)) \subset semGen (bindGen g f).
-  Proof.
-    intros H1 H2 y [y' [[x [Hs1 Hfs2]] Heq]]; inv Heq; clear Heq.
-    eapply H1 in Hs1.
-    assert (Hin2 : (Some @: fs x) (Some y')).
-    { eexists; split; eauto. now constructor. }
-    eapply H2 in Hin2.
-    unfold SizeMonotonic in Hg.
-    edestruct Hs1 as [s [_ Hgen]].
-    edestruct Hin2 as [s' [_ Hfgen]].
-    assert (Hin2' : ((fun u : option B => u) :&: semGenSize (f x) s') (Some y')).
-    { split; eauto. }
-    apply Hg with (s2 := s + s') in Hgen; [| now ssromega].
-    destruct Hgen as [r1 Hr1].
-    specialize Hf with x.
-    assert (Iss: is_true (s' <= s + s')) by ssromega.
-    destruct (Hf s' (s + s') Iss y') as [rs rr].
-    - edestruct Hin2' as [_ [r2 Hr2]].
-      exists r2; assumption.
-    - exists (s + s'). split; [now constructor | ].
-      destruct (randomSplitAssumption r1 rs) as [r'' Heq].
-      exists r''. simpl; rewrite Heq Hr1 rr.
-      reflexivity.
-  Qed.
-  
   Lemma semFmapSize A B (f : A -> B) (g : G A) (size : nat) :
-    semGenSize (fmap f g) size <--> f @: semGenSize g size.  Proof.
-      by rewrite /fmap /semGenSize /= codom_comp.
+    semGenSize (fmap f g) size <--> f @: semGenSize g size.
+  Proof.
+    rewrite /fmap /semGenSize /possibly_generated /= /imset => b; split.
+    - move => [r HIn].
+      apply lazy_in_map_iff in HIn.
+      destruct HIn as [a [HFa HIn]].
+      exists a; split; eauto.
+    - move => [a [[r Hr] HIn]].
+      exists r.
+      apply lazy_in_map_iff.
+      eexists; eauto.
   Qed.
   
   Lemma semFmap A B (f : A -> B) (g : G A) :
@@ -483,35 +694,122 @@ Module GenLow : GenLowInterface.Sig.
     move => m /=. rewrite (randomRCorrect m a1 a2) //.
   Qed.
 
-  Lemma promoteVariant :
-    forall {A B : Type} (a : A) (f : A -> SplitPath) (g : G B) size
-      (r r1 r2 : RandomSeed),
-      randomSplit r = (r1, r2) ->
-      run (reallyUnsafePromote (fun a => variant (f a) g)) size r a =
-      run g size (varySeed (f a) r1).
+  Definition can_not_fail {A : Type} (m : G A) (s : nat) (r : RandomSeed) :=
+    match run m s r with
+    | lnil => false
+    | lsing _ => true
+    | lcons _ _ => true
+    end.
+
+  Class CanNotFail {A : Type} (m : G A) :=
+    { can_not_fail_pf : forall s r, can_not_fail m s r }.
+
+  Program Instance CanNotFailRet {A} (x : A) : CanNotFail (returnGen x).
+
+  Instance CanNotFailBind {A B} (m : G A) (k : A -> G B)
+           `{CanNotFail A m} `{forall (x : A), CanNotFail (k x)} : CanNotFail (bindGen m k).
   Proof.
-    move => A B a p g size r r1 r2 H.
-    rewrite /reallyUnsafePromote /variant.
-    destruct g. rewrite /= H. by [].
-  Qed.
+  Admitted.
+  (*   unfold bindGen, can_not_fail; simpl. *)
+  (*   destruct (randomSplit r) as [r1 r2] eqn:Split. *)
+  (*   destruct (run m s r1) eqn:Hm; simpl; auto. *)
+  (*   - destruct H as [ Contra ]. *)
+  (*     specialize (Contra s r1). *)
+  (*     unfold can_not_fail in Contra. *)
+  (*     rewrite Hm in Contra. *)
+  (*     congruence. *)
+  (*   - destruct (run (k a) s r2) eqn:Hk; auto. *)
+  (*     destruct (H0 a) as [ Contra ]. *)
+  (*     specialize (Contra s r2). *)
+  (*     unfold can_not_fail in *. *)
+  (*     rewrite Hk in Contra. *)
+  (*     congruence. *)
+  (*   - destruct (randomSplit r2) as [r3 r4] eqn:Split'. *)
+  (*     destruct (run (k a) s r3) eqn:Hk; simpl in *; auto. *)
+  (*     + destruct (H0 a) as [ Contra ]. *)
+  (*       specialize (Contra s r3). *)
+  (*       unfold can_not_fail in Contra. *)
+  (*       rewrite Hk in Contra. *)
+  (*       congruence. *)
+  (*     + destruct (bindGenAux (l tt) k s r4); auto. *)
+  (* Defined. *)
 
-  Lemma semPromote A (m : Rose (G A)) :
-    semGen (promote m) <-->
-    codom2 (fun size seed => fmapRose (fun g => run g size seed) m).
-  Proof. by rewrite /codom2 curry_codom2l. Qed.
+  (*
+  Lemma semCutShuffleAux : forall {A} (l : list (nat * G A)),
+    let l' :=  [seq x <- l | x.1 != 0] in
+    (semGen (cut (shuffle l)) <--> \bigcup_(x in l') semGen x.2).
+  Proof.
+    move => A l.
+    case lsupp: {1}[seq x <- l | x.1 != 0] => [|[n g] gs]; simpl.
+    - simpl.
+    
+    
+            
+  
+  Fixpoint shuffleFuel {A : Type} (fuel : nat) (tot : nat)
+           (gs : list (nat * (nat -> RandomSeed -> LazyList A)))
+           (s : nat) (r : RandomSeed) : LazyList A :=
+    match fuel with 
+      | O => lnil
+      | S fuel' =>
+        let (r1, r2) := randomSplit r in
+        let (r11, r12) := randomSplit r1 in
+        n <- run (choose (0, tot-1)) s r11 ;;
+        let '(k, g, gs') := pickDrop (fun _ _ => lnil) gs n in
+        lazy_append' (g s r12) (fun _ => shuffleFuel fuel' (tot - k) gs' s r2)
+    end.
 
-  Lemma semPromoteSize (A : Type) (m : Rose (G A)) n :
-    semGenSize (promote m) n <-->
-               codom (fun seed => fmapRose (fun g => run g n seed) m).
-  Proof. by []. Qed.
+  Definition run_snd {A B : Type} (ag : A * G B) : A * (nat -> RandomSeed -> LazyList B) :=
+    let (a,g) := ag in (a, run g).
+  
+  Definition shuffle {A : Type} (gs : list (nat * G A)) : G A :=
+    MkGen (fun s r => shuffleFuel (length gs) (sum_fst gs) (List.map run_snd gs) s r).
+*)
 
-  Lemma runPromote A (m : Rose (G A)) seed size :
-    run (promote m) seed size = fmapRose (fun (g : G A) => run g seed size) m.
-  Proof. by []. Qed.
+  Program Definition reallyUnsafePromote {A B : Type} (m : A -> G B) (H : forall a, CanNotFail (m a)) : G (A -> B) :=
+    MkGen (fun s r =>
+             lsing (fun a => match run (m a) s r with
+                             | lnil => _
+                             | lsing x => x
+                             | lcons x _ => x
+                             end)).
+  Next Obligation.
+    destruct (H a).
+    specialize (can_not_fail_pf0 s r).
+    unfold can_not_fail in *.
+    rewrite -Heq_anonymous in can_not_fail_pf0.
+    inv can_not_fail_pf0.
+  Defined.
 
-  Lemma runFmap (A B : Type) (f : A -> B) (g : G A) seed size :
-    run (fmap f g) seed size = f (run g seed size).
-  Proof. by []. Qed.
+  (* Lemma promoteVariant : *)
+  (*   forall {A B : Type} (a : A) (f : A -> SplitPath) (g : G B) size *)
+  (*     (r r1 r2 : RandomSeed), *)
+  (*     randomSplit r = (r1, r2) -> *)
+  (*     run (reallyUnsafePromote (fun a => variant (f a) g)) size r a = *)
+  (*     run g size (varySeed (f a) r1). *)
+  (* Proof. *)
+  (*   move => A B a p g size r r1 r2 H. *)
+  (*   rewrite /reallyUnsafePromote /variant. *)
+  (*   destruct g. rewrite /= H. by []. *)
+  (* Qed. *)
+
+  (* Lemma semPromote A (m : Rose (G A)) : *)
+  (*   semGen (promote m) <--> *)
+  (*   codom2 (fun size seed => fmapRose (fun g => run g size seed) m). *)
+  (* Proof. by rewrite /codom2 curry_codom2l. Qed. *)
+
+  (* Lemma semPromoteSize (A : Type) (m : Rose (G A)) n : *)
+  (*   semGenSize (promote m) n <--> *)
+  (*              codom (fun seed => fmapRose (fun g => run g n seed) m). *)
+  (* Proof. by []. Qed. *)
+
+  (* Lemma runPromote A (m : Rose (G A)) seed size : *)
+  (*   run (promote m) seed size = fmapRose (fun (g : G A) => run g seed size) m. *)
+  (* Proof. by []. Qed. *)
+
+  (* Lemma runFmap (A B : Type) (f : A -> B) (g : G A) seed size : *)
+  (*   run (fmap f g) seed size = f (run g seed size). *)
+  (* Proof. by []. Qed. *)
 
   Lemma semFmapBind :
     forall A B C (g : G A) (f1 : B -> C) (f2 : A -> G B),
@@ -530,24 +828,6 @@ Module GenLow : GenLowInterface.Sig.
 
   Lemma semSizedSize A(f:nat->G A)s : semGenSize (sized f) s <--> semGenSize (f s) s.
   Proof. by []. Qed.
-
-  Lemma semSized_opt A (f : nat -> G (option A)) (H : forall n, SizeMonotonicOpt (f n)) (H' : SizedMonotonicOpt f) :
-    isSome :&: semGen (sized f) <--> isSome :&: \bigcup_n (semGen (f n)).
-  Proof.
-    rewrite semSized. rewrite !setI_bigcup_assoc.
-    move => x; split.
-    - move => [n [HT [Hs1 Hs2]]].
-      eexists. split; eauto. split; eauto. eexists; eauto.
-    - move => [n [HT [Hs1 [m [HT' Hs2]]]]].
-      eexists (m + n).
-      split. now constructor. 
-      split; [ eassumption | ].
-      destruct x as [ x | ].
-      + eapply monotonicOpt with (s2 := m + n) in Hs2; [| now ssromega ].
-        eapply sizeMonotonicOpt with (s1 := n) (s2 := m + n); [now ssromega |].
-        auto.
-      + inv Hs1.
-  Qed.
 
   Lemma semSized_alt A (f : nat -> G A) (H : forall n, SizeMonotonic (f n))
         (H' : forall n m s,  n <= m -> semGenSize (f n) s \subset semGenSize (f m) s) :
@@ -574,18 +854,6 @@ Module GenLow : GenLowInterface.Sig.
     eapply H0; eassumption.
   Qed.
 
-  Instance sizedSizeMonotonicOpt
-          A (gen : nat -> G (option A)) `{forall n, SizeMonotonic (gen n)} `{SizedMonotonicOpt A gen} :
-    SizeMonotonicOpt (sized gen).
-  Proof.
-    move => s1 s2 Hleq a H1.
-    eapply semSizedSize.
-    eapply H. eassumption.
-    unfold semGenSizeOpt in H1.
-    unfold somes in H1.
-    eapply @sizeMonotonicOpt; eauto.
-  Qed.
-  
   Lemma semResize A n (g : G A) : semGen (resize n g) <--> semGenSize g n .
   Proof.
       by case: g => g; rewrite /semGen /semGenSize /= bigcup_const.
@@ -595,30 +863,335 @@ Module GenLow : GenLowInterface.Sig.
     semGenSize (resize n g) s <--> semGenSize g n.
   Proof. by case: g => g; rewrite /semGenSize. Qed.
   
-  Instance unsizedResize {A} (g : G A) n :
+  Program Instance unsizedResize {A} (g : G A) n :
     Unsized (resize n g).
-  Proof. by case: g => g; rewrite /semGenSize. Qed.
+  Next Obligation.
+    rewrite /Unsized /resize /semGenSize.
+    destruct g; split; auto.
+  Qed.
+    
+  (* Lemma SuchThatMaybeAuxMonotonic {A} : *)
+  (*   forall (g : G A) p k n, *)
+  (*     SizeMonotonic g ->  *)
+  (*     SizeMonotonic (suchThatMaybeAux g p k n). *)
+  (* Proof. *)
+  (*   intros g p k n Hmon. elim : n k => [| n IHn ] k. *)
+  (*   - constructor. intros s1 s2 Hleq. *)
+  (*     simpl. rewrite !semFailSize. now apply subset_refl. *)
+  (*   - constructor. intros s1 s2 Hleq. *)
+  (*     simpl. *)
+  (*     rewrite !semBindSize. eapply incl_bigcup_compat. *)
+  (*     + rewrite !semSizeResize. eapply Hmon. *)
+  (*       by ssromega. *)
+  (*     + intros x. *)
+  (*       destruct (p x); eauto. *)
+  (*       now apply subset_refl. *)
+  (*       eapply IHn.  *)
+  (*       eassumption. *)
+  (* Qed. *)
 
+  (* LEO: No longer true! 
   Lemma semGenSizeInhabited {A} (g : G A) s :
     exists x, semGenSize g s x.
   Proof.
     destruct randomSeed_inhabited as [r].
-    exists (run g s r); exists r; reflexivity.
+    eexists (run g s r ). unfold semGenSize, codom.
+    exists r. reflexivity.
+  Qed.
+   *)
+
+  (* LEO: Is this needed?
+  Lemma SuchThatMaybeAuxParamMonotonicOpt {A} :
+    forall (g : G A) p n1 n2 k s,
+      SizeMonotonic g ->
+      n1 <= n2 ->
+      semGenSize (suchThatMaybeAux g p k n1) s \subset
+      semGenSize (suchThatMaybeAux g p k n2) s.
+  Proof.
+    intros g p. elim  => [| n IHn ] n2 k s Hmon Heq.
+    - intros x [r HIn]; inv HIn.
+    - intros x [r HIn]; simpl in *.
+      destruct (randomSplit r) as [r1 r2] eqn:Split.
+      apply in_bind_aux in HIn.
+      destruct HIn as [a [HIn [r' HIn']]].
+      apply IHn; eauto.
+      destruct (p a) eqn:PA; simpl in *; subst; eauto.
+      + rewrite /suchThatMaybeAux; simpl.
+      esplit; eauto.
+      simpl in H2. 
+      eapply semBindSize in H2. destruct H2 as [ a[Hg Hf]].
+      eapply semSizeResize with (g := g) in Hg. 
+      destruct n2; [ now ssromega |].
+      + simpl. eapply semBindSize. eexists.
+        split. eapply semSizeResize with (g := g).
+        eapply Hmon; [| eassumption ]. by ssromega.
+        destruct (p a).
+        * eassumption.
+        * eapply IHn; eauto.
+          split; eauto.
+  Qed.
+  
+  Lemma suchThatMaybeAux_subset_compat :
+    forall {A : Type} (p : A -> bool) (g1 g2 : G A) n k,
+      (forall s, (semGenSize g1 s) \subset (semGenSize g2 s)) ->
+      (forall s, (semGenSize (suchThatMaybeAux g1 p k n) s) \subset
+            (semGenSize (suchThatMaybeAux g2 p k n) s)).
+  Proof.
+    intros A p g1 g2 n k H2 s.
+    elim : n k => [| n IHn ] k.
+    - now apply subset_refl.
+    - simpl. rewrite !semBindSize !semSizeResize.
+      eapply incl_bigcup_compat.
+      + eapply H2.
+      + intros x. destruct (p x); [ now apply subset_refl |].
+        eauto.
+  Qed.
+  
+  Lemma semGenSuchThatMaybeAux_sound {A} :
+    forall g p k n (a : A) size seed,
+      run (suchThatMaybeAux g p k n) size seed = Some a ->
+      a \in semGen g :&: p.
+  Proof.
+    case=> g p k n; elim: n k =>  [//=| n IHn] k a size seed /=.
+    case: (randomSplit seed) => r1 r2; case: ifP=> [/= ? [<-]|_]; last exact: IHn.
+      by split=> //; exists (2 * k + n.+1); split=> //; exists r1.
   Qed.
 
-  Instance Functor_G : Functor G := {
-    fmap A B := fmap;
-  }.
+  (* Not an exact spec !!! *)
+  Lemma semSuchThatMaybe_sound' A (g : G A) (f : A -> bool) :
+    semGen (suchThatMaybe g f) \subset None |: some @: (semGen g :&: f).
+  Proof.
+    case=> [a [size [_ [x run_x]]] | ]; last by left.
+    by right; exists a; split=> //; apply: (semGenSuchThatMaybeAux_sound run_x).
+  Qed.
 
-  Instance Applicative_G : Applicative G := {
-    pure A := returnGen;
-    ap A B := apGen;
-  }.
+  Lemma semGenSuchThatMaybeOptAux_sound {A} :
+    forall g p k n (a : A) size seed,
+      run (suchThatMaybeOptAux g p k n) size seed = Some a ->
+      (Some a) \in semGen g :&: (Some @: p).
+  Proof.
+    case=> g p k n; elim: n k =>  [//=| n IHn] k a size seed /=.
+                                             case: (randomSplit seed) => r1 r2 Hrun.
+    destruct (g (2 * k + n.+1) r1) as [a' |] eqn:Heq.
+    - destruct (p a') eqn:Hpa.
+      + inv Hrun.
+        split. eexists (2 * k + n.+1). split. constructor.
+        eexists. eassumption. eexists. split. eassumption.
+        reflexivity.
+      + eapply IHn. eassumption.
+    - eapply IHn. eassumption. 
+  Qed.
+   *)
 
-  Instance Monad_G : Monad G := {
-    ret A := returnGen;
-    bind A B := bindGen;
-  }.
+  (* LEO: Why is this here? *)
+  Lemma lt_leq_trans n m u : n < m -> m <= u -> n < u.
+  Proof.
+    intros H1 H2. ssromega.
+  Qed.
+  
+  (*
+  Lemma semGenSizeSuchThatMaybeAux_complete {A} :
+    forall g (p : A -> bool) k s n,
+      n > 0 ->
+      n >= s ->
+      SizeMonotonic g ->
+      (semGenSize g s :&: p) \subset semGenSize (suchThatMaybeAux g p k n) s.
+  Proof.
+    intros g p k s.
+    intros n Hleq1 Hleq2 Hmon x [a [[Hg Hp] Hs]]. destruct x as [x | ]; try discriminate.
+    case : n k Hleq1 Hleq2 => [//= | n ] k Hleq1 Hleq2.
+    inv Hs. unfold suchThatMaybeAux. eapply semBindSize.
+    eexists. split. eapply semSizeResize.
+    eapply Hmon; [| eassumption ]. by ssromega.
+    rewrite Hp.
+    apply semReturnSize. reflexivity.
+  Qed.
+
+  Lemma semSuchThatMaybe_complete' A (g : G A) (f : A -> bool) :
+    SizeMonotonic g -> 
+    Some @: (semGen g :&: f) \subset semGen (suchThatMaybe g f).
+  Proof.
+    intros Hmon.
+    intros x [y [[[s Hg] Hf] Hin]]. exists s.
+    split; [ now constructor | eapply semGenSizeSuchThatMaybeAux_complete; try eassumption ].
+    eapply lt_leq_trans with (m := 1). by ssromega.
+    apply/leP. by eapply Max.le_max_l. 
+    apply/leP. by eapply Max.le_max_r. 
+    inv Hin. eexists; split; eauto. inv Hg. split; eauto.
+  Qed.
+
+  Lemma semSuchThatMaybe_complete:
+    forall (A : Type) (g : G A) (f : A -> bool) (s : set A),
+      SizeMonotonic g ->
+      s \subset semGen g ->
+      Some @: (s :&: (fun x : A => f x)) \subset semGen (suchThatMaybe g f).
+  Proof.
+    intros A g f s Hmon Hsub.
+    eapply subset_trans.
+    eapply imset_incl. eapply setI_subset_compat.
+    eassumption. now apply subset_refl.
+    eapply subset_trans; [| eapply semSuchThatMaybe_complete' ].
+    now apply subset_refl. eassumption.
+  Qed.
+  *)
+
+  (*
+  Lemma promoteVariant :
+    forall {A B : Type} (a : A) (f : A -> SplitPath) (g : G B) size
+      (r r1 r2 : RandomSeed),
+      randomSplit r = (r1, r2) ->
+      apLazyList (run (reallyUnsafePromote (fun a => variant (f a) g)) size r) a = 
+      run g size (varySeed (f a) r1).
+  Proof. 
+    move => A B a p g size r r1 r2 H.
+    rewrite /reallyUnsafePromote /variant.
+    destruct g. rewrite /= H. by [].
+  Qed.
+  *)
+  (*
+  Lemma semPromote A (m : Rose (G A)) :
+    semGen (promote m) <-->
+    codom2 (fun size seed => fmapRose (fun g => run g size seed) m).
+  Proof. by rewrite /codom2 curry_codom2l. Qed.
+
+  Lemma semPromoteSize (A : Type) (m : Rose (G A)) n :
+    semGenSize (promote m) n <-->
+               codom (fun seed => fmapRose (fun g => run g n seed) m).
+  Proof. by []. Qed.
+
+  Lemma runFmap (A B : Type) (f : A -> B) (g : G A) seed size :
+    run (fmap f g) seed size = f (run g seed size).
+  Proof. by []. Qed.
+  
+  Lemma runPromote A (m : Rose (G A)) seed size :
+    run (promote m) seed size = fmapRose (fun (g : G A) => run g seed size) m.
+  Proof. by []. Qed.
+  
+  Lemma semFmapBind :
+    forall A B C (g : G A) (f1 : B -> C) (f2 : A -> G B),
+      semGen (fmap f1 (bindGen g f2)) <-->
+      semGen (bindGen g (fun x => fmap f1 (f2 x))).
+  Proof.
+    intros. rewrite /semGen. setoid_rewrite semFmapSize.
+    setoid_rewrite semBindSize.
+    apply eq_bigcupr => s. setoid_rewrite semFmapSize.
+    rewrite imset_bigcup. reflexivity.
+  Qed.
+  
+  Instance suchThatMaybeMonotonicOpt
+           {A : Type} (g : G A) (f : A -> bool) `{SizeMonotonic _ g} : 
+    SizeMonotonicOpt (suchThatMaybe g f).
+  Proof.
+    unfold suchThatMaybe. eapply sizedSizeMonotonicOpt.
+    intros n. now apply SuchThatMaybeAuxMonotonic; eauto.
+    constructor. intros s s1 s2 Hleq x H1.
+    eapply SuchThatMaybeAuxParamMonotonicOpt; try eassumption.
+    apply/leP. eapply Nat.max_le_compat_l. ssromega.
+  Qed.
+
+  Lemma semSuchThatMaybe_sound:
+    forall (A : Type) (g : G A) (f : A -> bool) (s : set A),
+      semGen g \subset s ->
+      semGen (suchThatMaybe g f) \subset ((Some @: (s :&: (fun x : A => f x))) :|: [set None]).
+  Proof.
+    intros. eapply subset_trans.
+    eapply semSuchThatMaybe_sound'.
+    rewrite setU_comm. eapply setU_set_subset_compat.
+    eapply imset_incl.
+    eapply setI_subset_compat. eassumption.
+    now apply subset_refl.
+    now apply subset_refl.
+  Qed.
+
+  Lemma suchThatMaybe_subset_compat :
+    forall {A : Type} (p : A -> bool) (g1 g2 : G A),
+      (forall s, (semGenSize g1 s) \subset (semGenSize g2 s)) ->
+      (forall s, isSome :&: (semGenSize (suchThatMaybe g1 p) s) \subset
+                   isSome :&: (semGenSize (suchThatMaybe g2 p) s)).
+  Proof.
+    intros A p g1 g2 H1 s.
+    eapply setI_subset_compat.
+    now apply subset_refl.
+    unfold suchThatMaybe.
+    rewrite !semSizedSize.
+    eapply suchThatMaybeAux_subset_compat. eassumption.
+  Qed.
+
+  Lemma semSuchThatMaybeOpt_sound:
+    forall (A : Type) (g : G (option A)) (f : A -> bool) (s : set A),
+      semGen g \subset ((Some @: s) :|: [set None]) ->
+      semGen (suchThatMaybeOpt g f) \subset (Some @: (s :&: (fun x : A => f x)) :|: [set None]).
+  Proof.
+    intros A g f s.
+    intros Hsub1.
+    eapply subset_trans. eapply semSuchThatMaybeOpt_sound'.
+    eapply subset_trans. eapply setU_set_subset_compat.
+    now apply subset_refl.
+    eapply setI_subset_compat. eassumption.
+    now apply subset_refl.
+    rewrite setI_setU_distr setU_comm.
+    eapply setU_l_subset; [| now firstorder ].
+    eapply setU_l_subset; [| now firstorder ].
+    intros x [[a [H1 Heq1]] [a' [H2 Heq2]]].
+    inv Heq1; inv Heq2. left.
+    eexists. repeat split; eauto.
+  Qed.
+  
+  Instance suchThatMaybeOptMonotonicOpt
+           {A : Type} (g : G (option A)) (f : A -> bool) `{SizeMonotonicOpt _ g} : 
+    SizeMonotonicOpt (suchThatMaybeOpt g f).
+  Proof.
+    unfold suchThatMaybeOpt. eapply sizedSizeMonotonicOpt.
+    intros n. eapply unsizedMonotonic.
+    eapply SuchThatMaybeAuxOptUnsized.
+    constructor. intros s s1 s2 Hleq x H1.
+    eapply SuchThatMaybeAuxOptParamMonotonicOpt; try eassumption.
+    apply/leP. eapply Nat.max_le_compat_l. ssromega.
+  Qed.
+
+  Lemma bigcup_setI {T U} (s1 : set T) (s2 : set U) F :
+    \bigcup_(x in s1) (s2 :&: F x) <--> s2 :&: \bigcup_(x in s1) (F x).
+  Proof.
+    firstorder.
+  Qed.
+
+  Lemma suchThatMaybeOptAux_subset_compat :
+    forall {A : Type} (p : A -> bool) (g1 g2 : G (option A)) n k,
+      (forall s, isSome :&: (semGenSize g1 s) \subset isSome :&: (semGenSize g2 s)) ->
+      (forall s, isSome :&: (semGenSize (suchThatMaybeOptAux g1 p k n) s) \subset
+            isSome :&: (semGenSize (suchThatMaybeOptAux g2 p k n) s)).
+  Proof. 
+    intros A p g1 g2 n k H2 s.
+    elim : n k => [| n IHn ] k.
+    - now apply subset_refl.
+    - simpl. rewrite !semBindSize !semSizeResize.
+  Admitted.
+
+  Lemma suchThatMaybeOpt_subset_compat {A : Type} (p : A -> bool) (g1 g2 : G (option A)) :
+    (forall s, isSome :&: (semGenSize g1 s) \subset isSome :&: (semGenSize g2 s)) ->
+    (forall s, isSome :&: (semGenSize (suchThatMaybeOpt g1 p) s) \subset
+          isSome :&: (semGenSize (suchThatMaybeOpt g2 p) s)).
+  Proof.
+    intros H1.
+    unfold suchThatMaybeOpt. intros s. rewrite !semSizedSize.
+    eapply suchThatMaybeOptAux_subset_compat. eassumption.
+  Qed.
+
+  Lemma semSuchThatMaybeOpt_complete:
+    forall (A : Type) (g : G (option A)) (f : A -> bool) (s : set A),
+      SizeMonotonicOpt g ->
+      (Some @: s) \subset semGen g ->
+      (Some @: (s :&: (fun x : A => f x))) \subset semGen (suchThatMaybeOpt g f).
+  Proof.
+    intros A g f s Hmon.
+    intros Hsub1.
+    eapply subset_trans; [| eapply semSuchThatMaybeOpt_complete'].
+    intros x [a [[Hs Hf] Hin]]; inv Hin.
+    split. eapply Hsub1. now eexists; split; eauto.
+    now eexists; split; eauto. eassumption. 
+  Qed.
+
+   *)
 
   Definition thunkGen {A} (f : unit -> G A) : G A :=
     MkGen (fun n r => run (f tt) n r).
@@ -651,7 +1224,8 @@ Module GenLow : GenLowInterface.Sig.
     by apply monotonic.
   Qed.
 
-  Instance thunkGenSizeMonotonicOpt {A} (f : unit -> G (option A))
+  (*
+  Program Instance thunkGenSizeMonotonicOpt {A} (f : unit -> G (option A))
           `{SizeMonotonicOpt _ (f tt)} : SizeMonotonicOpt (thunkGen f).
   Proof.
     intros s1 s2 Hs. unfold semGenSizeOpt.
@@ -666,5 +1240,94 @@ Module GenLow : GenLowInterface.Sig.
     do 2 rewrite semThunkGenSize.
     by apply monotonicNone.
   Qed.
+   *)
 
+  Definition not_enum {A : Type} (m : G A) (s : nat) (r : RandomSeed) :=
+    match run m s r with
+    | lnil => true
+    | lsing _ => true
+    | lcons _ _ => false
+    end.
+
+  Class NotEnum {A : Type} (m : G A) :=
+    { not_enum_pf : forall s r, not_enum m s r }.
+
+  Program Instance NotEnumFail {A} : NotEnum (@failGen A).
+
+  Program Instance NotEnumRet {A} (x : A) : NotEnum (returnGen x).
+
+  Program Instance NotEnumBind {A B} (m : G A) (k : A -> G B)
+           `{NotEnum A m} `{forall (x : A), NotEnum (k x)} : NotEnum (bindGen m k).
+  Next Obligation.
+  Admitted.
+  (*   move => s r. *)
+  (*   unfold bindGen, not_enum; simpl. *)
+  (*   destruct (randomSplit r) as [r1 r2] eqn:Split. *)
+  (*   destruct (run m s r1) eqn:Hm; simpl; auto. *)
+  (*   - destruct (run (k a) s r2) eqn:Hk; auto. *)
+  (*     destruct (H0 a) as [ Contra ]. *)
+  (*     specialize (Contra s r2). *)
+  (*     unfold not_enum in *. *)
+  (*     rewrite Hk in Contra. *)
+  (*     congruence. *)
+  (*   - destruct H as [ Contra ]. *)
+  (*     specialize (Contra s r1). *)
+  (*     unfold not_enum in Contra. *)
+  (*     rewrite Hm in Contra. *)
+  (*     congruence. *)
+  (* Defined. *)
+
+  Lemma semBackTrackSizeAux : forall {A : Type} (n : nat) (g : nat -> RandomSeed -> LazyList A) s,
+      (forall s r, not_enum (MkGen g) s r) ->
+      possibly_generated (backTrackAux n g s) <--> 
+      if n is O then set0 else possibly_generated (g s).
+  Proof.
+    move => A n; induction n => g s HNE;
+    unfold semGenSize; simpl in *.
+    - split => [[r Contra] | Contra ]; inv Contra.
+    - split => [[r HIn] | [r HIn]].
+      + destruct (randomSplit r) as (r1, r2) eqn:Split.
+        destruct (g s r1) eqn:Hg.
+        * destruct (IHn g s HNE a) as [H1 H2].
+          { destruct n.
+            - inv HIn.
+            - apply H1.
+              exists r2; auto.
+          } 
+        * exists r1.
+          inv HIn.
+          rewrite Hg.
+          constructor.
+        * inv HIn.
+          exists r1.
+          rewrite Hg.
+          constructor; auto.
+      + pose proof (randomSplitAssumption r r) as [r' Hr'].
+        exists r'.
+        rewrite Hr'.
+        destruct (g s r) eqn:Hg.
+        * inv HIn.
+        * inv HIn; auto.
+        * specialize (HNE s r); unfold not_enum, run in HNE; simpl.
+          rewrite Hg in HNE.
+          congruence.
+  Qed.          
+     
+  Lemma semBackTrackSize : forall {A : Type} (n : nat) (g : G A) s `{NotEnum A g},
+      n > 0 -> semGenSize (backTrack n g) s <--> semGenSize g s.
+  Proof.
+    move => a n g s HNE Hn.
+    unfold semGenSize; simpl.
+    assert (HNE': forall s r, not_enum (MkGen (run g)) s r).
+    { move => s' r'. 
+      destruct HNE as [ HNE ].
+      specialize (HNE s' r').
+      auto.
+    } 
+    pose proof (@semBackTrackSizeAux a n (run g) s HNE') as H.
+    destruct n; [ inv Hn |].
+    exact H.
+  Qed.
+
+  
 End GenLow.

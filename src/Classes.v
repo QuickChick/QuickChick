@@ -39,12 +39,15 @@ Infix "^" := appn (at level 30, right associativity) : fun_scope.
 (** * Generator-related classes *)
 
 (* begin gen_sized_class *)
-  Class GenSized (A : Type) := { arbitrarySized : nat -> G A }.
+Class GenSized (A : Type) := { arbitrarySized : nat -> G A }.
 (* end gen_sized_class *)
 
 (* begin gen_class *)
-  Class Gen (A : Type) := { arbitrary : G A }.
+Class Gen (A : Type) := { arbitrary : G A }.
 (* end gen_class *)
+
+Class GenEnumSized (A : Type) := { arbEnumSized : nat -> G A }.
+Class GenEnum (A : Type) := { arbEnum : G A }.
 
 (** Shrink class *)
 Class Shrink (A : Type) :=
@@ -190,10 +193,16 @@ Instance GenSizedSizeMonotonicOfSizedMonotonic
 Global Instance GenOfGenSized {A} `{GenSized A} : Gen A :=
   {| arbitrary := sized arbitrarySized |}.
 
-Global Instance ArbitraryOfGenShrink {A} `{Gen A} `{Shrink A} : Arbitrary A := {}.
+(*
+Global Instance GenEnumOfGenEnumSized {A} `{GenEnumSized A} : GenEnum A :=
+  {| arbEnum := arbEnumSized arbitrarySized |}.
+ *)
+
+Global Program Instance ArbitraryOfGenShrink {A} `{Gen A} `{Shrink A} : Arbitrary A.
 
 Generalizable Variables PSized PMon PSMon PCorr.
 
+(*
 Instance GenMonotonicOfSized (A : Type)
          {H : GenSized A}
          `{@GenSizedMonotonic A H PMon}
@@ -213,6 +222,7 @@ Proof.
     split. intros [n H3]. constructor; eauto.
     intros H4. eexists; split; eauto.
 Qed.
+*)
 
 Lemma nat_set_ind (A : Type) `{GenSized A} `{Hyp : CanonicalSized A} :
   (semGen (arbitrarySized 0) <--> zeroSized) ->
