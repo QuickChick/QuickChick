@@ -265,7 +265,7 @@ inversion H; clear H.
 inversion H0; clear H0.
 generalize H1; clear H1.
 rewrite filter_In.
-intros.
+intros H0.
 inversion H0; clear H0.
 unfold tl in H.
 destruct x eqn:X.
