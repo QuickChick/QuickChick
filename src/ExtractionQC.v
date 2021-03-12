@@ -19,7 +19,7 @@ Extraction Blacklist String List Nat.
 Extract Inductive Decimal.int => "((Obj.t -> Obj.t) -> (Obj.t -> Obj.t) -> Obj.t) (* Decimal.int *)"
   [ "(fun x pos _ -> pos (Obj.magic x))"
     "(fun y _ neg -> neg (Obj.magic y))"
-  ] "(fun i pos neg -> Obj.magic i pos neg)".
+  ] "(fun pos neg i -> Obj.magic i pos neg)".
 
 Extract Constant show_nat =>
   "(fun i ->
