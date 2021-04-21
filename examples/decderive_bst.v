@@ -71,33 +71,48 @@ Derive ArbitrarySizedSuchThat for (fun n => inrange n m t x).
 
 
 Section TypeClasses.
-
-  Definition decideOpt : Type := nat -> option bool.
-  
-  (* Class decOptSizeMonotonic (decOpt : decideOpt) := *)
-  (*   size_mon : forall s1 s2, s1 <= s2 -> decOpt s1 = Some true -> decOpt s2 = Some true. *)
-  
-  Class DecOptSizeMonotonic (P : Prop) {H : DecOpt P} :=
+    
+  Class DecOptSizeMonotonicPos (P : Prop) {H : DecOpt P} :=
     size_mon : forall s1 s2, s1 <= s2 -> decOpt s1 = Some true -> decOpt s2 = Some true.
+  
+  Class DecOptSizeMonotonicNeg (P : Prop) {H : DecOpt P} :=
+    size_mon' : forall s1 s2, s1 <= s2 -> decOpt s1 = Some false -> decOpt s2 = Some false.
+  
 
+  Class DecOptDecidable (P : Prop) {H : DecOpt P} :=
+    { wit : exists s a, decOpt s = Some a }.
 
-  (* Class decOptCorrect (P : Prop) (decOpt : decideOpt) := *)
-  (*   { sound : forall s, decOpt s = Some true -> P;  *)
-  (*     complete : forall s, P -> decOpt s = Some true }. *)
-
-  Class DecOptCorrect (P : Prop) {H : DecOpt P} :=
+  Class DecOptCorrectPos (P : Prop) {H : DecOpt P} :=
     { sound : forall s, decOpt s = Some true -> P; 
       complete : P -> exists s, decOpt s = Some true }.
 
+  Class DecOptCorrectNeg (P : Prop) {H : DecOpt P} :=
+    { sound' : forall s, decOpt s = Some false -> ~ P; 
+      complete' :~ P -> exists s, decOpt s = Some false }.
+
   
   (* Coersions from [Dec] *)
-    
-  Global Instance decSizeMonotonic (P : Prop) {_ : Dec P} : DecOptSizeMonotonic P.
+  
+  Global Instance decSizeMonotonicPos (P : Prop) {_ : Dec P} : DecOptSizeMonotonicPos P.
   Proof. firstorder. Qed.
 
-  (* Instance DecSizeMonotonic P {_ : Dec P} : @DecOptSizeMonotonic P _ _ := {}. *)
+  Global Instance decSizeMonotonicNeg (P : Prop) {_ : Dec P} : DecOptSizeMonotonicNeg P.
+  Proof. firstorder. Qed.
 
-  Global Instance decCorrect (P : Prop) {_ : Dec P} : DecOptCorrect P.
+  
+  Global Instance decCorrectPos (P : Prop) {_ : Dec P} : DecOptCorrectPos P.
+  Proof.
+    constructor. 
+    - intros s.
+      unfold decOpt, dec_decOpt, Decidability.dec. destruct H.
+      destruct dec. now firstorder. congruence.
+    - intros s.
+      unfold decOpt, dec_decOpt, Decidability.dec. destruct H.
+      exists 0. 
+      destruct dec. now firstorder. congruence.
+  Qed.
+
+  Global Instance decCorrectNeg (P : Prop) {_ : Dec P} : DecOptCorrectNeg P.
   Proof.
     constructor. 
     - intros s.
@@ -107,11 +122,39 @@ Section TypeClasses.
       unfold decOpt, dec_decOpt, dec. destruct H.
       exists 0. 
       destruct dec. now firstorder. congruence.
-  Qed.    
+  Qed.
 
-  (* Instance DecCorrect  P {_ : Dec P} : @DecOptCorrect P _ _ := {}.   *)
+  Global Instance decOptCorrectNeg (P : Prop) {H : DecOpt P}
+         {Hmonp : DecOptSizeMonotonicPos P} 
+         {Hmonn : DecOptSizeMonotonicNeg P}
+         {Hdec : DecOptDecidable P}
+         {Hcor : DecOptCorrectPos P} : DecOptCorrectNeg P.
+  Proof.
+    constructor. 
+    - intros s Hopt. intros HP. eapply Hcor in HP.
+      destruct HP.
+      edestruct (Compare_dec.le_lt_dec s x).
+      + eapply Hmonn in Hopt; eauto. congruence.
+      + eapply Hmonp in H0.
+        2:{ eapply PeanoNat.Nat.lt_le_incl. eassumption. } congruence.
+    - intros Hn.
+      destruct Hdec. destruct wit0 as [s [a Hopt]].
+      destruct a; eauto.
+      eapply Hcor in Hopt. contradiction. 
+  Qed.
+
+
+  Inductive wf_list : list nat -> Prop :=
+  | lnil : wf_list nil
+  | lcons :
+      forall l,
+        wf_list l -> wf_list l.
+
+  Derive DecOpt for (wf_list l).
   
-End TypeClasses.    
+  
+  
+End TypeClasses.
 
 
 Section BSTProofs.
@@ -141,18 +184,37 @@ Section BSTProofs.
         * eapply IHl. eexists. split; eauto.
   Qed.
 
-  (* Generalize instance DecOpt from Decidable *)
+  Lemma checker_backtrack_spec_false l :
+    checker_backtrack l = Some false <->
+    (forall f, List.In f l -> f tt = Some false).
+  Proof.
+    unfold checker_backtrack.
+    induction l.
+    - split; eauto. intros Heq; intros f Hin; inv Hin.
+    - destruct (a tt) eqn:Hdec.
+      * destruct b.
+        -- split; try congruence.
+           intros Hin.
+           assert (Hc : a tt = Some false).
+           { eapply Hin. now left. } congruence.
+        -- split.
+           ++ intros Haux f Hin. inv Hin; eauto.
+              eapply IHl; eauto.
+           ++ intros Hin. eapply IHl. intros.
+              eapply Hin. now right. 
+      * split.
+        -- intros H1 f Hin.
+           exfalso. 
+           revert H1. clear. intros H1; induction l.
+           congruence.
+           destruct (a tt).
+           ++ destruct b. congruence. eauto.
+           ++ eauto.
+        -- intros Hall. 
+           assert (Hc : a tt = Some false).
+           { eapply Hall. now left. } congruence.
+  Qed.
 
-  (* Lemma DecOptle_sound k m n : *)
-  (*   @decOpt (le m n) _ k = Some true -> le m n. *)
-  (* Proof. *)
-  (*   unfold decOpt, dec_decOpt, dec. *)
-  (*   destruct DecidableClass.Decidable_le_nat.   *)
-  (*   simpl. destruct Decidable_witness; firstorder. *)
-  (*   congruence. *)
-  (* Qed. *)
-
-  (* XXX fix typeclass *) 
   Lemma DecOptle_complete k m n :
     le m n -> @decOpt (le m n) _ k = Some true.
   Proof.
@@ -210,9 +272,28 @@ Section BSTProofs.
         reflexivity. lia. eassumption. lia. eassumption.
   Qed.
 
-  Instance decOptbstSizeMonotonic m n t : DecOptSizeMonotonic (bst m n t).
+  Instance decOptbstSizeMonotonic m n t : DecOptSizeMonotonicPos (bst m n t).
   Proof. intro; intros. eapply DecOptbst_monotonic; eauto. Qed.
-  
+
+  Lemma DecOptbst_monotonic_neg k1 k2 m n t:
+    k1 <= k2 ->
+    @decOpt _ (DecOptbst m n t) k1 = Some false ->
+    @decOpt _ (DecOptbst m n t) k2 = Some false.
+  Proof.
+    revert k2 m n t. induction k1; intros k2 m n t Hleq Hdec.
+    - simpl in Hdec. destruct t; inv Hdec.
+    - destruct k2; try lia. 
+      unfold decOpt, DecOptbst in *.
+      assert (Hf := proj1 (checker_backtrack_spec_false _) Hdec). 
+      eapply checker_backtrack_spec_false.
+      intros f Hin. inv Hin.
+      + destruct t; eauto.
+      + inv H; eauto.
+  Abort.
+
+  Instance decOptbstSizeMonotonicPos m n t : DecOptSizeMonotonicPos (bst m n t).
+  Proof. intro; intros. eapply DecOptbst_monotonic; eauto. Qed.
+
   
   Lemma DecOptbst_correct k m n t :
     @decOpt _ (DecOptbst m n t) k = Some true ->
@@ -290,7 +371,7 @@ Section BSTProofs.
       reflexivity.
   Qed.
 
-  Instance decOptbstCorrect m n t : DecOptCorrect (bst m n t).
+  Instance decOptbstCorrect m n t : DecOptCorrectPos (bst m n t).
   Proof.
     constructor.
     - intros. eapply DecOptbst_correct. eassumption.
