@@ -152,7 +152,7 @@ Section ElemProofs.
   Qed.
 
   Check elem.
-  Lemma DecOptbst_monotonic k1 k2 n lst:
+  Lemma DecOptelem_monotonic k1 k2 n lst:
     k1 <= k2 ->
     @decOpt _ (DecOptelem n lst) k1 = Some true ->
     @decOpt _ (DecOptelem n lst) k2 = Some true.
