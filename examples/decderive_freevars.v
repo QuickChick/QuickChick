@@ -1,7 +1,7 @@
 From QuickChick Require Import QuickChick.
 Import QcNotation. Import QcDefaultNotation.
 Open Scope qc_scope.
-From Coq Require Import Init.Nat.
+From Coq Require Import Init.Nat Lia.
 Open Scope nat_scope.
 From Coq Require Import Lists.List.
 Import ListNotations.
@@ -158,52 +158,111 @@ Section ElemProofs.
     @decOpt _ (DecOptelem n lst) k2 = Some true.
   Proof.
     revert k2 n lst. induction k1; intros k2 n lst Hleq Hdec.
-    - simpl in Hdec. destruct lst; inv Hdec.
-      destruct k2; simpl.
-      + simpl. reflexivity.
+    - simpl in Hdec.
+      (* destruct the second fuel value *)
+      destruct k2. 
+      + (* if it's zero, it's exactly the same as the Hdec assumption *)
+        eassumption.
       + simpl.
-      eapply checker_backtrack_spec.
-      eexists. split. now left. reflexivity.
-    - destruct k2; try lia.
-      unfold decOpt, DecOptbst in *.
-      eapply checker_backtrack_spec in Hdec.
-      destruct Hdec as [f [[H1 | [ H2 | [] ]] H3]].
-      destruct t; subst; try congruence.
+        (* otherwise we have:
+           Hdec : checker_backtrack checkers1 = Some true,
+           for some list of checkers checkers1
 
-      + eapply checker_backtrack_spec.
-        eexists. split. now left. reflexivity.
+           and we have to show that
+           checker_backtrack checkers2 = Some true,
+           for some list of checkers checkers2.
 
-      + subst. destruct t; try congruence.
+           (Note: recall the spec of checker_backtrack checker_backtrack_spec)
 
+           But each checker that can return true in checkers1,
+           is also in checkers2, therefore we can show the goal *) 
+           
+      
+        (* we apply checker_backtrack_spec in Hdec and we get that one
+           of the checkers in checkers1 must return Some true *) 
+        eapply checker_backtrack_spec in Hdec.
+        destruct Hdec as [f [Hin Heq]].
+
+        (* we apply checker_backtrack_spec in our goal, and
+           we must provide a checker in checkers2 that returns Some true *)
         eapply checker_backtrack_spec.
-        eexists. split. right. now left.
 
-        destruct (@decOpt (m <= n) _ 42) eqn:Hdle; [ | congruence ].
-        destruct b; [ | congruence ].
+        (* the witness is the checker f in checkers1 that returns Some true *)
+        eexists f. split; [| eassumption ].
 
-        destruct (@decOpt (m <= n0) _ 42) eqn:Hdle'; [ | congruence ].
-        destruct b; [ | congruence ].
+        (* f is either the first or the second element of checkers1 *) 
+        destruct Hin as [H1 | [H2 | [] (* impossible, the rest of the list is empty *) ]].
 
-        destruct (@decOpt (n0 <= n) _ 42) eqn:Hdle''; [ | congruence ].
-        destruct b; [ | congruence ].
+        (* if its the first element in checkers1, then it's also the first element in checkers2 *) 
 
-        match goal with
-        | [ H : (match ?e with _ => _ end = Some true) |- _ ] =>
+        now left; eauto.
+
+        (* if it's the second element in checkers1, it's a contradiction because it always returns None *)
+        
+        subst. congruence. 
+        
+    - destruct k2.
+      lia.
+      (* Again, we have:
+         Hdec : checker_backtrack checkers1 = Some true,
+         for some list of checkers checkers1
+
+         and we have to show that
+         checker_backtrack checkers2 = Some true,
+         for some list of checkers checkers2.
+         
+         Each checker in checkers2, either appears in 
+         checkers1 as it is (for the non-inductive cases),
+         or it in in checkers1 with a smaller fuel value
+         (k1 instead of k2) in recursive calls (for the inductive cases). 
+       *)
+      
+
+      (* we apply checker_backtrack_spec in Hdec and we get that one
+         of the checkers in checkers1 must return Some true *) 
+      unfold decOpt, DecOptelem in *. (* to avoid simple because it unfold the recursive call and the the IH does not quite match *)
+      
+      eapply checker_backtrack_spec in Hdec.
+      destruct Hdec as [f [Hin Heq]].
+
+      (* we apply checker_backtrack_spec in our goal, and
+         we must provide a checker in checkers2 that returns Some true *)
+      eapply checker_backtrack_spec.
+      
+      (* the witness is the checker f in checkers1 that returns Some true *)
+        
+      (* f is either the first or the second element of checkers1 *) 
+      destruct Hin as [H1 | [H2 | [] (* impossible, the rest of the list is empty *) ]].
+
+      (* if its the first element in checkers1,
+         then it's also the first element in checkers2 *) 
+        
+      eexists. split. now left. subst. eassumption. 
+        
+      
+      (* if it's the second element in checkers1, then the second element of
+         checkers2 must return Some true because of the inductive hypothesis *)
+        
+      subst. eexists. split. right. now left. 
+      destruct lst. congruence.
+                
+      match goal with
+      | [ H : (match ?e with _ => _ end = Some true) |- _ ] =>
+        (* here, ?e is the rec call in the checker in hypothesis Heq.
+           I use an Ltac pattern match so that I don't have to copy it
+           in order to destruct it.  *)        
           destruct e eqn:Heqb
-        end; [ | congruence ].
-        destruct b; [ | congruence ].
-        match goal with
-        | [ H : (match ?e with _ => _ end = Some true) |- _ ] =>
-          destruct e eqn:Heqb'
-        end; [ | congruence ].
-        destruct b; [ | congruence ].
-        rewrite IHk1. rewrite IHk1.
-        reflexivity. lia. eassumption. lia. eassumption.
+      end; [ | congruence ].
+      destruct b; [ | congruence ].
+
+      (* now Heqb says that the call to aux_arb with fuel k1 retruns Some true.
+         Therefore, by the IHk1 the same call with fuel k2 returns Some true *)
+      
+      eapply IHk1 with (k2 := k2) in Heqb; [ | lia (* k1 <= k2 *)].
+      rewrite Heqb. reflexivity.
   Qed.
 
-  Instance decOptbstSizeMonotonic m n t : DecOptSizeMonotonic (bst m n t).
-  Proof. intro; intros. eapply DecOptbst_monotonic; eauto. Qed.
-
+  
 
   Lemma DecOptbst_correct k m n t :
     @decOpt _ (DecOptbst m n t) k = Some true ->
