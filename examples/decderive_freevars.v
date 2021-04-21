@@ -23,11 +23,11 @@ Inductive elem : nat -> list nat -> Prop :=
 | ElemRecur : forall n1 n2 rst,
     elem n1 rst ->
     elem n1 (n2 :: rst).
-(* This fails *)
 Derive (DecOpt) for (elem n l).
-(* Derive ArbitrarySizedSuchThat for (fun l => elem n l). *)
 Derive ArbitrarySizedSuchThat for (fun n => elem n l).
 Sample (@arbitrarySizeST _ (fun n => elem n [1;2;3;4;5;6;7]) _ 20).
+
+
 
 
 Inductive closedunder : list nat -> term -> Prop :=
@@ -49,3 +49,243 @@ Derive DecOpt for (closed t).
 Derive ArbitrarySizedSuchThat for (fun t => closed t).
 
 Sample (@arbitrarySizeST _ (fun t => closed t) _ 10).
+
+Inductive tree {a : Type} :=
+| Empty : tree
+| Node : a -> tree -> tree -> tree.
+Derive Show for tree.
+Derive Arbitrary for tree.
+
+(* Sample (arbitrary : G (tree)). *)
+
+Section TypeClasses.
+
+  Definition decideOpt : Type := nat -> option bool.
+
+  (* Class decOptSizeMonotonic (decOpt : decideOpt) := *)
+  (*   size_mon : forall s1 s2, s1 <= s2 -> decOpt s1 = Some true -> decOpt s2 = Some true. *)
+
+  Class DecOptSizeMonotonic (P : Prop) {H : DecOpt P} :=
+    size_mon : forall s1 s2, s1 <= s2 -> decOpt s1 = Some true -> decOpt s2 = Some true.
+
+
+  (* Class decOptCorrect (P : Prop) (decOpt : decideOpt) := *)
+  (*   { sound : forall s, decOpt s = Some true -> P;  *)
+  (*     complete : forall s, P -> decOpt s = Some true }. *)
+
+  Class DecOptCorrect (P : Prop) {H : DecOpt P} :=
+    { sound : forall s, decOpt s = Some true -> P;
+      complete : P -> exists s, decOpt s = Some true }.
+
+
+  (* Coersions from [Dec] *)
+
+  Global Instance decSizeMonotonic (P : Prop) {_ : Dec P} : DecOptSizeMonotonic P.
+  Proof. firstorder. Qed.
+
+  (* Instance DecSizeMonotonic P {_ : Dec P} : @DecOptSizeMonotonic P _ _ := {}. *)
+
+  Global Instance decCorrect (P : Prop) {_ : Dec P} : DecOptCorrect P.
+  Proof.
+    constructor.
+    - intros s.
+      unfold decOpt, dec_decOpt, dec. destruct H.
+      destruct dec. now firstorder. congruence.
+    - intros s.
+      unfold decOpt, dec_decOpt, dec. destruct H.
+      exists 0.
+      destruct dec. now firstorder. congruence.
+  Qed.
+
+  (* Instance DecCorrect  P {_ : Dec P} : @DecOptCorrect P _ _ := {}.   *)
+
+End TypeClasses.
+
+
+Section ElemProofs.
+
+  Ltac inv H := inversion H; subst.
+
+
+  Lemma checker_backtrack_spec l :
+    checker_backtrack l = Some true <->
+    exists f, List.In f l /\ f tt = Some true.
+  Proof.
+    unfold checker_backtrack. generalize false at 2.
+    induction l.
+    - intros b. destruct b; split; try (intros; congruence).
+      * intros H. inv H. inv H0. inv H1.
+      * intros H. inv H. inv H0. inv H1.
+    - intros b. split.
+      + intros H.
+        destruct (a tt) eqn:Hdec.
+        * destruct b0. exists a. split; eauto. now left.
+          eapply IHl in H. destruct H. inv H.
+          eexists; split; eauto. now right.
+        * eapply IHl in H. destruct H. inv H.
+          eexists; split; eauto. now right.
+      + intros H. inv H. inv H0. inv H1. rewrite H2. reflexivity.
+        destruct (a tt). destruct b0. reflexivity.
+        * eapply IHl. eexists. split; eauto.
+        * eapply IHl. eexists. split; eauto.
+  Qed.
+
+  (* Generalize instance DecOpt from Decidable *)
+
+  (* Lemma DecOptle_sound k m n : *)
+  (*   @decOpt (le m n) _ k = Some true -> le m n. *)
+  (* Proof. *)
+  (*   unfold decOpt, dec_decOpt, dec. *)
+  (*   destruct DecidableClass.Decidable_le_nat.   *)
+  (*   simpl. destruct Decidable_witness; firstorder. *)
+  (*   congruence. *)
+  (* Qed. *)
+
+  (* XXX fix typeclass *)
+  Lemma DecOptle_complete k m n :
+    le m n -> @decOpt (le m n) _ k = Some true.
+  Proof.
+    unfold decOpt, dec_decOpt, dec.
+    destruct DecidableClass.Decidable_le_nat. intros Hleq.
+    simpl. destruct Decidable_witness; firstorder.
+    congruence.
+  Qed.
+
+  Check elem.
+  Lemma DecOptbst_monotonic k1 k2 n lst:
+    k1 <= k2 ->
+    @decOpt _ (DecOptelem n lst) k1 = Some true ->
+    @decOpt _ (DecOptelem n lst) k2 = Some true.
+  Proof.
+    revert k2 n lst. induction k1; intros k2 n lst Hleq Hdec.
+    - simpl in Hdec. destruct lst; inv Hdec.
+      destruct k2; simpl.
+      + simpl. reflexivity.
+      + simpl.
+      eapply checker_backtrack_spec.
+      eexists. split. now left. reflexivity.
+    - destruct k2; try lia.
+      unfold decOpt, DecOptbst in *.
+      eapply checker_backtrack_spec in Hdec.
+      destruct Hdec as [f [[H1 | [ H2 | [] ]] H3]].
+      destruct t; subst; try congruence.
+
+      + eapply checker_backtrack_spec.
+        eexists. split. now left. reflexivity.
+
+      + subst. destruct t; try congruence.
+
+        eapply checker_backtrack_spec.
+        eexists. split. right. now left.
+
+        destruct (@decOpt (m <= n) _ 42) eqn:Hdle; [ | congruence ].
+        destruct b; [ | congruence ].
+
+        destruct (@decOpt (m <= n0) _ 42) eqn:Hdle'; [ | congruence ].
+        destruct b; [ | congruence ].
+
+        destruct (@decOpt (n0 <= n) _ 42) eqn:Hdle''; [ | congruence ].
+        destruct b; [ | congruence ].
+
+        match goal with
+        | [ H : (match ?e with _ => _ end = Some true) |- _ ] =>
+          destruct e eqn:Heqb
+        end; [ | congruence ].
+        destruct b; [ | congruence ].
+        match goal with
+        | [ H : (match ?e with _ => _ end = Some true) |- _ ] =>
+          destruct e eqn:Heqb'
+        end; [ | congruence ].
+        destruct b; [ | congruence ].
+        rewrite IHk1. rewrite IHk1.
+        reflexivity. lia. eassumption. lia. eassumption.
+  Qed.
+
+  Instance decOptbstSizeMonotonic m n t : DecOptSizeMonotonic (bst m n t).
+  Proof. intro; intros. eapply DecOptbst_monotonic; eauto. Qed.
+
+
+  Lemma DecOptbst_correct k m n t :
+    @decOpt _ (DecOptbst m n t) k = Some true ->
+    bst m n t.
+  Proof.
+    revert m n t. induction k; intros m n t Hdec.
+    + destruct t. now constructor.
+      inversion Hdec.
+    + unfold decOpt, DecOptbst in *.
+      eapply checker_backtrack_spec in Hdec.
+      destruct Hdec as [f [Hin Htrue]]. destruct Hin; subst.
+      * destruct t. now constructor. congruence.
+      * destruct H; subst; [ | contradiction ].
+        destruct t. congruence.
+
+        destruct (@decOpt (m <= n) _ 42) eqn:Hdle; [ | congruence ].
+        destruct b; [ | congruence ].
+
+        destruct (@decOpt (m <= n0) _ 42) eqn:Hdle'; [ | congruence ].
+        destruct b; [ | congruence ].
+
+        destruct (@decOpt (n0 <= n) _ 42) eqn:Hdle''; [ | congruence ].
+        destruct b; [ | congruence ].
+
+        eapply sound in Hdle.
+        eapply sound in Hdle'.
+        eapply sound in Hdle''.
+
+        match goal with
+        | [ H : (match ?e with _ => _ end = Some true) |- _ ] =>
+          remember e as x
+        end.
+        destruct x eqn:Hdec; [ | congruence ].
+        destruct b; [ | congruence ].
+
+        constructor. eassumption. eassumption. eassumption.
+
+        now eapply IHk; eauto.
+
+        match goal with
+        | [ H : (match ?e with _ => _ end = Some true) |- _ ] =>
+          remember e as y
+        end.
+        destruct y eqn:Hdec'; [ | congruence ].
+        destruct b; [ | congruence ].
+
+        now eapply IHk; eauto.
+  Qed.
+
+  Lemma DecOptbst_complete m n t :
+    bst m n t ->
+    exists k, @decOpt _ (DecOptbst m n t) k = Some true.
+  Proof.
+    intros H. induction H.
+    - exists 0. reflexivity.
+    - destruct IHbst1 as [k1 IH1].
+      destruct IHbst2 as [k2 IH2].
+      exists (S (Nat.max k1 k2)).
+      unfold decOpt, DecOptbst.
+      eapply checker_backtrack_spec.
+      eexists.
+      split. right. now left.
+
+      erewrite !DecOptle_complete; eauto.
+
+      assert (Hmax1 : @decOpt (bst min n t1) _ (Nat.max k1 k2) = Some true).
+      { eapply DecOptbst_monotonic; [ | eassumption ]. lia. }
+
+      assert (Hmax2 : @decOpt (bst n max t2) _ (Nat.max k1 k2) = Some true).
+      { eapply DecOptbst_monotonic; [ | eassumption ]. lia. }
+
+      unfold decOpt, DecOptbst in Hmax1, Hmax2.
+      rewrite Hmax1, Hmax2.
+
+      reflexivity.
+  Qed.
+
+  Instance decOptbstCorrect m n t : DecOptCorrect (bst m n t).
+  Proof.
+    constructor.
+    - intros. eapply DecOptbst_correct. eassumption.
+    - intros. eapply DecOptbst_complete. eassumption.
+  Qed.
+
+End BSTProofs.
