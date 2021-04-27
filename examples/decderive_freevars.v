@@ -262,55 +262,62 @@ Section ElemProofs.
       rewrite Heqb. reflexivity.
   Qed.
 
-  
 
-  Lemma DecOptbst_correct k m n t :
-    @decOpt _ (DecOptbst m n t) k = Some true ->
-    bst m n t.
+  Lemma DecOptbst_correct k n lst :
+    @decOpt _ (DecOptelem n lst) k = Some true ->
+    elem n lst.
   Proof.
-    revert m n t. induction k; intros m n t Hdec.
-    + destruct t. now constructor.
-      inversion Hdec.
-    + unfold decOpt, DecOptbst in *.
-      eapply checker_backtrack_spec in Hdec.
-      destruct Hdec as [f [Hin Htrue]]. destruct Hin; subst.
-      * destruct t. now constructor. congruence.
-      * destruct H; subst; [ | contradiction ].
-        destruct t. congruence.
-
-        destruct (@decOpt (m <= n) _ 42) eqn:Hdle; [ | congruence ].
+    revert lst n. induction k; intros lst n decTrue.
+    destruct lst.
+    - inversion decTrue.
+    - unfold decOpt, DecOptelem in *.
+      apply checker_backtrack_spec in decTrue.
+      destruct decTrue as [f [Hin Htrue]].
+      destruct Hin.
+      + subst.
+        destruct (@decOpt (n = n0) _ 42) eqn:H; [ | congruence ].
         destruct b; [ | congruence ].
+        eapply sound in H.
+        subst. now constructor.
+      + inversion H.
+        * subst. congruence.
+        * inversion H0.
+    - unfold decOpt, DecOptelem in *.
+      apply checker_backtrack_spec in decTrue.
+      destruct decTrue as [f [Hin Htrue]].
+      destruct Hin.
+      + subst. destruct lst.
+        * congruence.
+        * destruct (@decOpt (n = n0) _ 42) eqn:H.
+          destruct b.
+          apply sound in H. subst. now constructor.
+          congruence. congruence.
+      + destruct H.
+        * subst. destruct lst.
+          -- congruence.
+          -- match goal with
+             | [ H : (match ?e with _ => _ end = Some true) |- _ ] =>
+               remember e as x
+             end.
+             destruct x eqn:Heq; [ | congruence ].
+             destruct b; [ | congruence ].
+             constructor.
 
-        destruct (@decOpt (m <= n0) _ 42) eqn:Hdle'; [ | congruence ].
-        destruct b; [ | congruence ].
 
-        destruct (@decOpt (n0 <= n) _ 42) eqn:Hdle''; [ | congruence ].
-        destruct b; [ | congruence ].
+             
 
-        eapply sound in Hdle.
-        eapply sound in Hdle'.
-        eapply sound in Hdle''.
 
-        match goal with
-        | [ H : (match ?e with _ => _ end = Some true) |- _ ] =>
-          remember e as x
-        end.
-        destruct x eqn:Hdec; [ | congruence ].
-        destruct b; [ | congruence ].
 
-        constructor. eassumption. eassumption. eassumption.
 
-        now eapply IHk; eauto.
 
-        match goal with
-        | [ H : (match ?e with _ => _ end = Some true) |- _ ] =>
-          remember e as y
-        end.
-        destruct y eqn:Hdec'; [ | congruence ].
-        destruct b; [ | congruence ].
+        
 
-        now eapply IHk; eauto.
-  Qed.
+
+
+
+
+
+
 
   Lemma DecOptbst_complete m n t :
     bst m n t ->
