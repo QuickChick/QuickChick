@@ -1,5 +1,6 @@
 From Coq Require Import Init.Nat Lia.
 From QuickChick Require Import QuickChick.
+From mathcomp Require Import ssreflect ssreflect.eqtype.
 Import QcNotation. Import QcDefaultNotation.
 Require Import ExtLib.Structures.Monads.
 Open Scope monad_scope.
@@ -72,13 +73,11 @@ Derive ArbitrarySizedSuchThat for (fun n => inrange n m t x).
 
 Section TypeClasses.
     
-  Class DecOptSizeMonotonicPos (P : Prop) {H : DecOpt P} :=
-    size_mon : forall s1 s2, s1 <= s2 -> decOpt s1 = Some true -> decOpt s2 = Some true.
+  Class DecOptSizeMonotonic (P : Prop) {H : DecOpt P} :=
+    size_mon : forall s1 s2 b, s1 <= s2 -> decOpt s1 = Some b -> decOpt s2 = Some b.
   
-  Class DecOptSizeMonotonicNeg (P : Prop) {H : DecOpt P} :=
-    size_mon' : forall s1 s2, s1 <= s2 -> decOpt s1 = Some false -> decOpt s2 = Some false.
   
-
+  
   Class DecOptDecidable (P : Prop) {H : DecOpt P} :=
     { wit : exists s a, decOpt s = Some a }.
 
@@ -90,13 +89,14 @@ Section TypeClasses.
     { sound' : forall s, decOpt s = Some false -> ~ P; 
       complete' :~ P -> exists s, decOpt s = Some false }.
 
+  (* Not true: *) 
+  (* Class DecOptCorrect (P : Prop) {H : DecOpt P} := *)
+  (*   { refl_decOpt : forall s, ssrbool.reflect P (decOpt s == Some true) }. *)
+
   
   (* Coersions from [Dec] *)
   
-  Global Instance decSizeMonotonicPos (P : Prop) {_ : Dec P} : DecOptSizeMonotonicPos P.
-  Proof. firstorder. Qed.
-
-  Global Instance decSizeMonotonicNeg (P : Prop) {_ : Dec P} : DecOptSizeMonotonicNeg P.
+  Global Instance decSizeMonotonic (P : Prop) {_ : Dec P} : DecOptSizeMonotonic P.
   Proof. firstorder. Qed.
 
   
@@ -125,8 +125,7 @@ Section TypeClasses.
   Qed.
 
   Global Instance decOptCorrectNeg (P : Prop) {H : DecOpt P}
-         {Hmonp : DecOptSizeMonotonicPos P} 
-         {Hmonn : DecOptSizeMonotonicNeg P}
+         {Hmon : DecOptSizeMonotonic P} 
          {Hdec : DecOptDecidable P}
          {Hcor : DecOptCorrectPos P} : DecOptCorrectNeg P.
   Proof.
@@ -134,8 +133,8 @@ Section TypeClasses.
     - intros s Hopt. intros HP. eapply Hcor in HP.
       destruct HP.
       edestruct (Compare_dec.le_lt_dec s x).
-      + eapply Hmonn in Hopt; eauto. congruence.
-      + eapply Hmonp in H0.
+      + eapply Hmon in Hopt; eauto. congruence.
+      + eapply Hmon in H0.
         2:{ eapply PeanoNat.Nat.lt_le_incl. eassumption. } congruence.
     - intros Hn.
       destruct Hdec. destruct wit0 as [s [a Hopt]].
@@ -225,73 +224,132 @@ Section BSTProofs.
   Qed.
 
 
-  Lemma DecOptbst_monotonic k1 k2 m n t:
+  Lemma DecOptbst_monotonic k1 k2 m n t b:
     k1 <= k2 ->
-    @decOpt _ (DecOptbst m n t) k1 = Some true ->
-    @decOpt _ (DecOptbst m n t) k2 = Some true.
+    @decOpt _ (DecOptbst m n t) k1 = Some b ->
+    @decOpt _ (DecOptbst m n t) k2 = Some b.
   Proof.
-    revert k2 m n t. induction k1; intros k2 m n t Hleq Hdec.
+    revert b k2 m n t. induction k1; intros b k2 m n t Hleq Hdec.
     - simpl in Hdec. destruct t; inv Hdec.
       destruct k2; simpl. eassumption.
       eapply checker_backtrack_spec.
       eexists. split. now left. reflexivity.
     - destruct k2; try lia.
-      unfold decOpt, DecOptbst in *. 
-      eapply checker_backtrack_spec in Hdec.
-      destruct Hdec as [f [[H1 | [ H2 | [] ]] H3]].
-      destruct t; subst; try congruence.
 
-      + eapply checker_backtrack_spec.
-        eexists. split. now left. reflexivity.
+      destruct b.
 
-      + subst. destruct t; try congruence.
+      { (* b = true *) 
+      
+        unfold decOpt, DecOptbst in *. 
+        eapply checker_backtrack_spec in Hdec.
+        destruct Hdec as [f [[H1 | [ H2 | [] ]] H3]].
+        destruct t; subst; try congruence.
 
-        eapply checker_backtrack_spec.
-        eexists. split. right. now left.
-         
-        destruct (@decOpt (m <= n) _ 42) eqn:Hdle; [ | congruence ].
-        destruct b; [ | congruence ].
-        
-        destruct (@decOpt (m <= n0) _ 42) eqn:Hdle'; [ | congruence ].
-        destruct b; [ | congruence ].
+        + eapply checker_backtrack_spec.
+          eexists. split. now left. reflexivity.
 
-        destruct (@decOpt (n0 <= n) _ 42) eqn:Hdle''; [ | congruence ].
-        destruct b; [ | congruence ].
+        + subst. destruct t; try congruence.
 
-        match goal with
-        | [ H : (match ?e with _ => _ end = Some true) |- _ ] =>
-          destruct e eqn:Heqb
-        end; [ | congruence ].
-        destruct b; [ | congruence ]. 
-        match goal with
-        | [ H : (match ?e with _ => _ end = Some true) |- _ ] =>
-          destruct e eqn:Heqb'
-        end; [ | congruence ].
-        destruct b; [ | congruence ].       
-        rewrite IHk1. rewrite IHk1.
-        reflexivity. lia. eassumption. lia. eassumption.
+          eapply checker_backtrack_spec.
+          eexists. split. right. now left.
+          
+          destruct (@decOpt (m <= n) _ 42) eqn:Hdle; [ | congruence ].
+          destruct b; [ | congruence ].
+          
+          destruct (@decOpt (m <= n0) _ 42) eqn:Hdle'; [ | congruence ].
+          destruct b; [ | congruence ].
+
+          destruct (@decOpt (n0 <= n) _ 42) eqn:Hdle''; [ | congruence ].
+          destruct b; [ | congruence ].
+
+          match goal with
+          | [ H : (match ?e with _ => _ end = Some true) |- _ ] =>
+            destruct e eqn:Heqb
+          end; [ | congruence ].
+          destruct b; [ | congruence ]. 
+          match goal with
+          | [ H : (match ?e with _ => _ end = Some true) |- _ ] =>
+            destruct e eqn:Heqb'
+          end; [ | congruence ].
+          destruct b; [ | congruence ].       
+          rewrite (IHk1 true). rewrite (IHk1 true).
+          reflexivity. lia. eassumption. lia. eassumption. }
+
+
+      { (* b = false *)
+        unfold decOpt, DecOptbst in *.
+        assert (Hf := proj1 (checker_backtrack_spec_false _) Hdec). 
+        eapply checker_backtrack_spec_false.
+        intros f Hin. destruct Hin.
+        - subst; destruct t; eauto.
+        - destruct H; eauto. 2:{ now inv H. } subst.
+          destruct t. reflexivity.
+          
+          destruct (@decOpt (m <= n) _ 42) eqn:Hdle.
+          2:{ assert (Hc : (fun (_ : unit) => @None bool) tt = Some false).
+              { eapply Hf with (f := (fun (_ : unit) => @None bool)).
+                right. left. reflexivity. }
+              congruence. }  
+
+          destruct b; [ | congruence ].
+          
+          destruct (@decOpt (m <= n0) _ 42) eqn:Hdle'.
+          2:{ assert (Hc : (fun (_ : unit) => @None bool) tt = Some false).
+              { eapply Hf with (f := (fun (_ : unit) => @None bool)).
+                right. left. reflexivity. }
+              congruence. }  
+
+          destruct b; [ | congruence ].
+
+          destruct (@decOpt (n0 <= n) _ 42) eqn:Hdle''.
+          2:{ assert (Hc : (fun (_ : unit) => @None bool) tt = Some false).
+              { eapply Hf with (f := (fun (_ : unit) => @None bool)).
+                right. left. reflexivity. }
+              congruence. }  
+          
+          destruct b; [ | congruence ].
+          
+          match goal with 
+          | [ |- match ?g ?k ?m ?n ?t with _ => _ end = Some false ] => set (ch := g)
+          end.
+
+          destruct (ch k1 m n0 t1) as [ b1 | ] eqn:Heq1.
+
+          2:{ unfold ch in *. rewrite Heq1 in Hf. 
+              assert (Hc : (fun (_ : unit) => @None bool) tt = Some false).
+              { eapply Hf with (f := (fun (_ : unit) => @None bool)).
+                right. left. reflexivity. }
+              congruence. }
+            
+          assert (Heq2 := Heq1).
+          eapply IHk1 with (k2 := k2) in Heq2; [ | lia ].
+          
+          unfold ch in Heq1. rewrite Heq1 in Hf.
+
+          unfold ch. rewrite Heq2. 
+          destruct b1. 2:{ reflexivity. } 
+          
+          destruct (ch k1 n0 n t2) as [ b2 | ] eqn:Heq1'.
+          
+          2:{ unfold ch in *. rewrite Heq1' in Hf. 
+              assert (Hc : (fun (_ : unit) => @None bool) tt = Some false).
+              { eapply Hf with (f := (fun (_ : unit) => @None bool)).
+                right. left. reflexivity. }
+              congruence. }
+
+
+          assert (Heq2' := Heq1').
+          eapply IHk1 with (k2 := k2) in Heq2'; [ | lia ].
+
+          unfold ch in Heq1'. rewrite Heq1' in Hf.
+
+          rewrite Heq2'.
+          eapply Hf with (f := (fun _ : unit => if b2 then Some true else Some false)).
+          right. left. reflexivity. }
+          
   Qed.
 
-  Instance decOptbstSizeMonotonic m n t : DecOptSizeMonotonicPos (bst m n t).
-  Proof. intro; intros. eapply DecOptbst_monotonic; eauto. Qed.
-
-  Lemma DecOptbst_monotonic_neg k1 k2 m n t:
-    k1 <= k2 ->
-    @decOpt _ (DecOptbst m n t) k1 = Some false ->
-    @decOpt _ (DecOptbst m n t) k2 = Some false.
-  Proof.
-    revert k2 m n t. induction k1; intros k2 m n t Hleq Hdec.
-    - simpl in Hdec. destruct t; inv Hdec.
-    - destruct k2; try lia. 
-      unfold decOpt, DecOptbst in *.
-      assert (Hf := proj1 (checker_backtrack_spec_false _) Hdec). 
-      eapply checker_backtrack_spec_false.
-      intros f Hin. inv Hin.
-      + destruct t; eauto.
-      + inv H; eauto.
-  Abort.
-
-  Instance decOptbstSizeMonotonicPos m n t : DecOptSizeMonotonicPos (bst m n t).
+  Instance decOptbstSizeMonotonic m n t : DecOptSizeMonotonic (bst m n t).
   Proof. intro; intros. eapply DecOptbst_monotonic; eauto. Qed.
 
   
