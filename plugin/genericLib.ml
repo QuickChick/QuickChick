@@ -946,7 +946,7 @@ let declare_class_instance ?(global=true) ?(priority=42) instance_arguments inst
   let instance_record_vars = instance_record vars in
   msg_debug (str "Calculated instance_record_vars" ++ fnl ());
   let locality = if global then Goptions.OptGlobal else Goptions.OptLocal in
-  let cid = Classes.new_instance ~locality ~poly:false
+  let cid = Compat.new_instance ~locality ~poly:false
               (CAst.make @@ Name (Id.of_string instance_name), None) iargs
               instance_type_vars
               (true, instance_record_vars) (* TODO: true or false? *)
