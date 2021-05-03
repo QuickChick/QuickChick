@@ -170,13 +170,14 @@ Open Scope program_scope.
 Global Instance shrinkN : Shrink N :=
   {| shrink := map Z.to_N ∘ shrink ∘ Z.of_N |}.
 
-Fixpoint shrinkListAux {A : Type} (shr : A -> list A) (l : list A) : list (list A) :=
-  match l with
+Definition shrinkListAux {A : Type} (shr : A -> list A) : list A -> list (list A) :=
+  fix shrinkListAux_ (l : list A) : list (list A) :=
+    match l with
     | nil => nil
     | cons x xs =>
-      cons xs (map (fun xs' => cons x xs') (shrinkListAux shr xs))
-           ++ (map (fun x'  => cons x' xs) (shr x ))
-  end.
+      xs :: map (fun xs' => cons x xs') (shrinkListAux_ xs)
+         ++ map (fun x'  => cons x' xs) (shr x )
+    end.
 
 Global Instance shrinkList {A : Type} `{Shrink A} : Shrink (list A) :=
   {| shrink := shrinkListAux shrink |}.
