@@ -262,8 +262,24 @@ Section ElemProofs.
       rewrite Heqb. reflexivity.
   Qed.
 
+  Ltac pull :=
+    match goal with
+    | [ H : (match ?e with _ => _ end = Some true) |- _ ] =>
+      remember e as x
+    end.
 
-  Lemma DecOptbst_correct k n lst :
+  Lemma onlyone : forall {X : Type} (a b : X),
+      In a [b] -> a = b.
+  Proof.
+    intros.
+    destruct H eqn:Hin.
+    - subst. auto.
+    - inversion i.
+  Qed.
+
+
+
+  Lemma DecOptelem_correct k n lst :
     @decOpt _ (DecOptelem n lst) k = Some true ->
     elem n lst.
   Proof.
@@ -285,23 +301,57 @@ Section ElemProofs.
     - unfold decOpt, DecOptelem in *.
       apply checker_backtrack_spec in decTrue.
       destruct decTrue as [f [Hin Htrue]].
-      destruct Hin.
-      + subst. destruct lst.
-        * congruence.
-        * destruct (@decOpt (n = n0) _ 42) eqn:H.
-          destruct b.
-          apply sound in H. subst. now constructor.
-          congruence. congruence.
-      + destruct H.
-        * subst. destruct lst.
-          -- congruence.
-          -- match goal with
-             | [ H : (match ?e with _ => _ end = Some true) |- _ ] =>
-               remember e as x
-             end.
-             destruct x eqn:Heq; [ | congruence ].
-             destruct b; [ | congruence ].
-             constructor.
+      destruct Hin; subst.
+      + destruct lst. congruence.
+        destruct (@decOpt (n = n0) _ 42) eqn:H1;
+          [ | congruence ].
+        destruct b; [ | congruence ].
+        eapply sound in H1. subst. now constructor.
+      + apply onlyone in H.
+        subst.
+        destruct lst; try congruence.
+        pull. destruct x; [| congruence].
+        destruct b; [|congruence].
+        destruct k; destruct n; destruct lst;
+          symmetry in Heqx; apply checker_backtrack_spec in Heqx;
+            destruct Heqx as [f [Hin Htrue']];
+            destruct Hin; try (subst; congruence).
+        * destruct H. subst. congruence.
+          destruct H.
+        * subst.
+          destruct (@decOpt (0 = n) _ 42) eqn:Heq; [|congruence].
+          destruct b; [|congruence].
+          apply sound in Heq. subst.
+          apply ElemRecur. now constructor.
+        * destruct H. subst. congruence.
+          inversion H.
+        * destruct H. subst. congruence. inversion H.
+        * subst.
+          destruct (@decOpt ((S n) = n1) _ 42) eqn:H';
+            [|congruence].
+          destruct b; [|congruence].
+          apply sound in H'. subst.
+          apply ElemRecur. now constructor.
+        * destruct H. subst. congruence.
+          destruct H.
+        * destruct H. subst. congruence.
+          destruct H.
+        * destruct H.
+          destruct (@decOpt (0 = n) _ 42) eqn:H';
+            [|congruence].
+          destruct b;[|congruence].
+          apply sound in H'.
+          subst. apply ElemRecur. now constructor.
+        * destruct H.
+          subst.
+
+
+
+
+
+
+
+
 
 
              
