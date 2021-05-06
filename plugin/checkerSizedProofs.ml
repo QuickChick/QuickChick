@@ -31,8 +31,7 @@ let not_enough_fuel_exp (dt : coq_expr) : btyp =
     (* mon true *)
     (fun hin' -> gEqRefl hole))
 
-let instantiate_existential_method =
-  failwith "Implement existentials in checkers"
+let instantiate_existential_method = (fun _ -> hole)
 
 let instantiate_existential_methodST (n : int) (pred : coq_expr) =
   failwith "Implement existentials in checkers"
