@@ -10,6 +10,7 @@ val debug_coq_expr : coq_expr -> unit
 
 type var
 val var_of_id : Id.t -> var   
+val id_of_var : var -> Id.t
 val var_to_string : var -> string
 val gVar : var -> coq_expr
 

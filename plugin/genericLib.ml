@@ -52,7 +52,8 @@ let debug_constr env sigma (c : constr) : unit =
 
 (* Non-dependent version *)
 type var = Id.t (* Opaque *)
-let var_of_id x = x         
+let var_of_id x = x
+let id_of_var x = x
 let var_to_string = Id.to_string
 let gVar (x : var) : coq_expr =
   CAst.make @@ CRef (qualid_of_ident x,None)

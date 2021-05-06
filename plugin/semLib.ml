@@ -1,5 +1,5 @@
 open GenericLib
-
+open CoqLib
 
 let semGenSize gen size =
   gApp (gInject "semGenSize") [gen; size]
@@ -133,3 +133,21 @@ let suchThatMaybeOpt_subset_compat p h =
 
 let nat_set_ind typ ginst sinst cinst hb hi x =
  gApp ~explicit:true (gInject "nat_set_ind") [typ; ginst; sinst; cinst; hb; hi; x]
+
+
+
+(* Checker proofs *)
+
+let destruct_match_true_r (h : coq_expr) (k : coq_expr) =
+  gApp ~explicit:true (gInject "destruct_match_true_r") [hole; hole; h; k]
+
+let destruct_match_true_l (h : coq_expr) =
+  gApp ~explicit:true (gInject "destruct_match_true_l") [hole; hole; h]
+
+let checker_backtrack_spec_l (gens : coq_expr) (h : coq_expr) =
+  let heq = gApp ~explicit:true (gInject "checker_backtrack_spec") [gens] in
+  gApp (gProjL heq) [h]
+
+let checker_backtrack_spec_r (gens : coq_expr) (h : coq_expr) =
+  let heq = gApp ~explicit:true (gInject "checker_backtrack_spec") [gens] in
+  gApp (gProjR heq) [h]

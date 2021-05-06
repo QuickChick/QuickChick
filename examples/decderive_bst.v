@@ -149,9 +149,8 @@ Section TypeClasses.
       forall l,
         wf_list l -> wf_list l.
 
-  Derive DecOpt for (wf_list l).
-  
-  
+  Derive DecOpt for (wf_list l).  
+
   
 End TypeClasses.
 
@@ -214,6 +213,43 @@ Section BSTProofs.
            { eapply Hall. now left. } congruence.
   Qed.
 
+
+  Lemma DecOptwf_list_correct k l :
+    @decOpt _ (DecOptwf_list l) k = Some true ->
+    wf_list l.
+  Proof.
+    revert l. induction k; intros l Hdec.
+    + destruct l. now constructor.
+      inversion Hdec.
+    + unfold decOpt, DecOptwf_list in *.
+      eapply checker_backtrack_spec in Hdec.
+      destruct Hdec as [f [Hin Htrue]]. destruct Hin; subst.
+      * destruct l. now constructor. congruence.
+      * destruct H; subst; [ | contradiction ]. 
+        eapply IHk.
+        match goal with
+        | [ |- ?e = _ ] => destruct e
+        end.
+        destruct b; eauto. congruence.
+  Qed.
+
+
+  Lemma DecOptwf_list_complete l :
+    wf_list l -> 
+    exists k, @decOpt _ (DecOptwf_list l) k = Some true.
+  Proof.
+    intros H. induction H.
+    - exists 0. reflexivity.
+    - destruct IHwf_list as [k1 IH1].
+      exists (S k1).
+      unfold decOpt, DecOptwf_list in *.
+      eapply checker_backtrack_spec.
+      eexists.
+      split. right. now left.
+      rewrite IH1.  reflexivity.
+  Qed.
+  
+
   Lemma DecOptle_complete k m n :
     le m n -> @decOpt (le m n) _ k = Some true.
   Proof.
@@ -224,37 +260,590 @@ Section BSTProofs.
   Qed.
 
 
-  Lemma DecOptbst_monotonic k1 k2 m n t b:
-    k1 <= k2 ->
-    @decOpt _ (DecOptbst m n t) k1 = Some b ->
-    @decOpt _ (DecOptbst m n t) k2 = Some b.
+  Lemma destruct_match_true_l (check b : option bool):
+    match check with
+    | Some true => b
+    | Some false => Some false
+    | None => None
+    end = Some true ->
+  check = Some true /\ b = Some true. 
   Proof.
-    revert b k2 m n t. induction k1; intros b k2 m n t Hleq Hdec.
-    - simpl in Hdec. destruct t; inv Hdec.
-      destruct k2; simpl. eassumption.
-      eapply checker_backtrack_spec.
-      eexists. split. now left. reflexivity.
-    - destruct k2; try lia.
+    intros H. destruct check as [ [ | ] | ]; eauto; discriminate.
+  Qed.
 
-      destruct b.
+  Lemma destruct_match_true_r (check b : option bool):
+    check = Some true -> b = Some true ->
+    match check with
+    | Some true => b
+    | Some false => Some false
+    | None => None
+    end = Some true. 
+  Proof.
+    intros H1 H2. destruct check as [ [ | ] | ]; eauto; discriminate.
+  Qed.
 
-      { (* b = true *) 
+  Lemma DecOptbst_monotonic :
+    forall k1 k2 m n t,
+      k1 <= k2 ->
+      @decOpt _ (DecOptbst m n t) k1 = Some true ->
+      @decOpt _ (DecOptbst m n t) k2 = Some true.
+  Proof.
+    refine (fun k1 : nat =>
+              nat_ind
+                (fun k2 : nat =>
+                   forall (k3 m n : nat) (t : tree),
+                     k2 <= k3 -> decOpt k2 = Some true -> decOpt k3 = Some true) 
+                (fun k2 m n t Hleq Hdec =>
+                   match k2 with
+                   | 0 => Hdec
+                   | S k2 => _
+                   end)
+                (fun (k2 : nat)
+                     (IHk1 : forall (k3 m n : nat) (t : tree),
+                         k2 <= k3 -> decOpt k2 = Some true -> decOpt k3 = Some true) k2 m n t Hleq Hdec =>
+                   match k2 with
+                   | 0 => fun Hleq => False_ind _ (PeanoNat.Nat.nle_succ_0 _ Hleq)
+                   | S k2 => fun Hleq => _
+                   end Hleq
+                ) k1).
+    -
+ 
+      refine (let ls := ((fun _ : unit =>
+                           match t with
+                           | Leaf => Some true
+                           | Node _ _ _ => Some false
+                           end)
+                          :: (fun _ : unit =>
+                                match t with
+                                | Leaf => Some false
+                                | Node n0 t1 t2 =>
+                                  match decOpt 42 with
+                                  | Some true =>
+                                    match decOpt 42 with
+                                    | Some true =>
+                                      match decOpt 42 with
+                                      | Some true =>
+                                        match
+                                          (fix aux_arb
+                                               (size0 min_ max_ : nat) (t_ : tree) {struct size0} :
+                                             option bool :=
+                                             match size0 with
+                                             | 0 =>
+                                               checker_backtrack
+                                                 ((fun _ : unit =>
+                                                     match t_ with
+                                                     | Leaf => Some true
+                                                     | Node _ _ _ => Some false
+                                                     end) :: (fun _ : unit => None) :: nil)
+                                             | S size' =>
+                                               checker_backtrack
+                                                 ((fun _ : unit =>
+                                                     match t_ with
+                                                     | Leaf => Some true
+                                                     | Node _ _ _ => Some false
+                                                     end)
+                                                    :: (fun _ : unit =>
+                                                          match t_ with
+                                                          | Leaf => Some false
+                                                          | Node n t3 t4 =>
+                                                            match decOpt 42 with
+                                                            | Some true =>
+                                                              match decOpt 42 with
+                                                              | Some true =>
+                                                                match decOpt 42 with
+                                                                | Some true =>
+                                                                  match
+                                                                    aux_arb size' min_ n t3
+                                                                  with
+                                                                  | Some true =>
+                                                                    match
+                                                                      aux_arb size' n max_ t4
+                                                                    with
+                                                                    | Some true => Some true
+                                                                    | Some false => Some false
+                                                                    | None => None
+                                                                    end
+                                                                  | Some false => Some false
+                                                                  | None => None
+                                                                  end
+                                                                | Some false => Some false
+                                                                | None => None
+                                                                end
+                                                              | Some false => Some false
+                                                              | None => None
+                                                              end
+                                                            | Some false => Some false
+                                                            | None => None
+                                                            end
+                                                          end) :: nil)
+                                             end) k2 m n0 t1
+                                        with
+                                        | Some true =>
+                                          match
+                                            (fix aux_arb
+                                                 (size0 min_ max_ : nat) 
+                                                 (t_ : tree) {struct size0} : 
+                                               option bool :=
+                                               match size0 with
+                                               | 0 =>
+                                                 checker_backtrack
+                                                   ((fun _ : unit =>
+                                                       match t_ with
+                                                       | Leaf => Some true
+                                                       | Node _ _ _ => Some false
+                                                       end) :: (fun _ : unit => None) :: nil)
+                                               | S size' =>
+                                                 checker_backtrack
+                                                   ((fun _ : unit =>
+                                                       match t_ with
+                                                       | Leaf => Some true
+                                                       | Node _ _ _ => Some false
+                                                       end)
+                                                      :: (fun _ : unit =>
+                                                            match t_ with
+                                                            | Leaf => Some false
+                                                            | Node n t3 t4 =>
+                                                              match decOpt 42 with
+                                                              | Some true =>
+                                                                match decOpt 42 with
+                                                                | Some true =>
+                                                                  match decOpt 42 with
+                                                                  | Some true =>
+                                                                    match
+                                                                      aux_arb size' min_ n t3
+                                                                    with
+                                                                    | Some true =>
+                                                                      match
+                                                                        aux_arb size' n max_ t4
+                                                                      with
+                                                                      | Some true => Some true
+                                                                      | Some false => Some false
+                                                                      | None => None
+                                                                      end
+                                                                    | Some false => Some false
+                                                                    | None => None
+                                                                    end
+                                                                  | Some false => Some false
+                                                                  | None => None
+                                                                  end
+                                                                | Some false => Some false
+                                                                | None => None
+                                                                end
+                                                              | Some false => Some false
+                                                              | None => None
+                                                              end
+                                                            end) :: nil)
+                                               end) k2 n0 n t2
+                                          with
+                                          | Some true => Some true
+                                          | Some false => Some false
+                                          | None => None
+                                          end
+                                        | Some false => Some false
+                                        | None => None
+                                        end
+                                      | Some false => Some false
+                                      | None => None
+                                      end
+                                    | Some false => Some false
+                                    | None => None
+                                    end
+                                  | Some false => Some false
+                                  | None => None
+                                  end
+                                end) :: nil)%list in
+             match
+               proj1
+                 (checker_backtrack_spec
+                    ((fun _ : unit =>
+                        match t with
+                        | Leaf => Some true
+                        | Node _ _ _ => Some false
+                        end) :: (fun _ : unit => None) :: nil)) Hdec
+             with
+             | ex_intro _ f (conj Hin Heq) =>
+               proj2 (checker_backtrack_spec ls)
+                     match Hin with
+                     | or_introl Hin1 =>
+                       (* (* let Hin':= eq_ind_r (fun f0 => f0 tt = Some true) *) *)
+                       (* (*                     Heq Hin1 in *) *)
+                       
+                       ex_intro _ _
+                       (conj (or_introl Hin1) Heq)
+                     | or_intror (or_introl Hin1) =>
+                       let Hin':= eq_ind_r (fun f0 => f0 tt = Some true)
+                                           Heq Hin1 in
+                       (* (False_ind _ (match Hin' with Logic.eq_refl => I end)) *)
+                     | or_intror (or_intror Hin1) =>
+                       False_ind _ Hin1
+                     end
+             end).
+    - refine (match k2 with
+              | 0 => fun Hleq => False_ind _ (PeanoNat.Nat.nle_succ_0 _ Hleq)
+              | S k2 => fun Hleq => _
+              end Hleq).
+             
+      unfold decOpt, DecOptbst in *.
       
-        unfold decOpt, DecOptbst in *. 
-        eapply checker_backtrack_spec in Hdec.
-        destruct Hdec as [f [[H1 | [ H2 | [] ]] H3]].
-        destruct t; subst; try congruence.
+      Set Printing Depth 100.
+      
+      refine (let ls1 := (((fun _ : unit =>
+                              match t with
+                              | Leaf => Some true
+                              | Node _ _ _ => Some false
+                              end)
+                             :: (fun _ : unit =>
+                                   match t with
+                                   | Leaf => Some false
+                                   | Node n0 t1 t2 =>
+                                     match decOpt 42 with
+                                     | Some true =>
+                                       match decOpt 42 with
+                                       | Some true =>
+                                         match decOpt 42 with
+                                         | Some true =>
+                                           match
+                                             (fix aux_arb
+                                                  (size0 min_ max_ : nat) 
+                                                  (t_ : tree) {struct size0} : 
+                                                option bool :=
+                                                match size0 with
+                                                | 0 =>
+                                                  checker_backtrack
+                                                    ((fun _ : unit =>
+                                                        match t_ with
+                                                        | Leaf => Some true
+                                                        | Node _ _ _ => Some false
+                                                        end) :: (fun _ : unit => None) :: nil)
+                                                | S size' =>
+                                                  checker_backtrack
+                                                    ((fun _ : unit =>
+                                                        match t_ with
+                                                        | Leaf => Some true
+                                                        | Node _ _ _ => Some false
+                                                        end)
+                                                       :: (fun _ : unit =>
+                                                             match t_ with
+                                                             | Leaf => Some false
+                                                             | Node n t3 t4 =>
+                                                               match decOpt 42 with
+                                                               | Some true =>
+                                                                 match decOpt 42 with
+                                                                 | Some true =>
+                                                                   match decOpt 42 with
+                                                                   | Some true =>
+                                                                     match
+                                                                       aux_arb size' min_ n t3
+                                                                     with
+                                                                     | Some true =>
+                                                                       match
+                                                                         aux_arb size' n max_ t4
+                                                                       with
+                                                                       | Some true => Some true
+                                                                       | Some false => Some false
+                                                                       | None => None
+                                                                       end
+                                                                     | Some false => Some false
+                                                                     | None => None
+                                                                     end
+                                                                   | Some false => Some false
+                                                                   | None => None
+                                                                   end
+                                                                 | Some false => Some false
+                                                                 | None => None
+                                                                 end
+                                                               | Some false => Some false
+                                                               | None => None
+                                                               end
+                                                             end) :: nil)
+                                                end) k3 m n0 t1
+                                           with
+                                           | Some true =>
+                                             match
+                                               (fix aux_arb
+                                                    (size0 min_ max_ : nat) 
+                                                    (t_ : tree) {struct size0} :
+                                                  option bool :=
+                                                  match size0 with
+                                                  | 0 =>
+                                                    checker_backtrack
+                                                      ((fun _ : unit =>
+                                                          match t_ with
+                                                          | Leaf => Some true
+                                                          | Node _ _ _ => Some false
+                                                          end)
+                                                         :: (fun _ : unit => None) :: nil)
+                                                  | S size' =>
+                                                    checker_backtrack
+                                                      ((fun _ : unit =>
+                                                          match t_ with
+                                                          | Leaf => Some true
+                                                          | Node _ _ _ => Some false
+                                                          end)
+                                                         :: (fun _ : unit =>
+                                                               match t_ with
+                                                               | Leaf => Some false
+                                                               | Node n t3 t4 =>
+                                                                 match decOpt 42 with
+                                                                 | Some true =>
+                                                                   match decOpt 42 with
+                                                                   | Some true =>
+                                                                     match decOpt 42 with
+                                                                     | Some true =>
+                                                                       match
+                                                                         aux_arb size' min_ n t3
+                                                                       with
+                                                                       | Some true =>
+                                                                         match
+                                                                           aux_arb size' n max_ t4
+                                                                         with
+                                                                         | Some true => Some true
+                                                                         | Some false => Some false
+                                                                         | None => None
+                                                                         end
+                                                                       | Some false => Some false
+                                                                       | None => None
+                                                                       end
+                                                                     | Some false => Some false
+                                                                     | None => None
+                                                                     end
+                                                                   | Some false => Some false
+                                                                   | None => None
+                                                                   end
+                                                                 | Some false => Some false
+                                                                 | None => None
+                                                                 end
+                                                               end) :: nil)
+                                                  end) k3 n0 n t2
+                                             with
+                                             | Some true => Some true
+                                             | Some false => Some false
+                                             | None => None
+                                             end
+                                           | Some false => Some false
+                                           | None => None
+                                           end
+                                         | Some false => Some false
+                                         | None => None
+                                         end
+                                       | Some false => Some false
+                                       | None => None
+                                       end
+                                     | Some false => Some false
+                                     | None => None
+                                     end
+                                   end) :: nil)%list) in
+              let ls2 := ((fun _ : unit =>
+                             match t with
+                             | Leaf => Some true
+                             | Node _ _ _ => Some false
+                             end)
+                            :: (fun _ : unit =>
+                                  match t with
+                                  | Leaf => Some false
+                                  | Node n0 t1 t2 =>
+                                    match decOpt 42 with
+                                    | Some true =>
+                                      match decOpt 42 with
+                                      | Some true =>
+                                        match decOpt 42 with
+                                        | Some true =>
+                                          match
+                                            (fix aux_arb
+                                                 (size0 min_ max_ : nat) (t_ : tree) {struct size0} :
+                                               option bool :=
+                                               match size0 with
+                                               | 0 =>
+                                                 checker_backtrack
+                                                   ((fun _ : unit =>
+                                                       match t_ with
+                                                       | Leaf => Some true
+                                                       | Node _ _ _ => Some false
+                                                       end) :: (fun _ : unit => None) :: nil)
+                                               | S size' =>
+                                                 checker_backtrack
+                                                   ((fun _ : unit =>
+                                                       match t_ with
+                                                       | Leaf => Some true
+                                                       | Node _ _ _ => Some false
+                                                       end)
+                                                      :: (fun _ : unit =>
+                                                            match t_ with
+                                                            | Leaf => Some false
+                                                            | Node n1 t0 t3 =>
+                                                              match decOpt 42 with
+                                                              | Some true =>
+                                                                match decOpt 42 with
+                                                                | Some true =>
+                                                                  match decOpt 42 with
+                                                                  | Some true =>
+                                                                    match
+                                                                      aux_arb size' min_ n1 t0
+                                                                    with
+                                                                    | Some true =>
+                                                                      match
+                                                                        aux_arb size' n1 max_ t3
+                                                                      with
+                                                                      | Some true => Some true
+                                                                      | Some false => Some false
+                                                                      | None => None
+                                                                      end
+                                                                    | Some false => Some false
+                                                                    | None => None
+                                                                    end
+                                                                  | Some false => Some false
+                                                                  | None => None
+                                                                  end
+                                                                | Some false => Some false
+                                                                | None => None
+                                                                end
+                                                              | Some false => Some false
+                                                              | None => None
+                                                              end
+                                                            end) :: nil)
+                                               end) k2 m n0 t1
+                                          with
+                                          | Some true =>
+                                            match
+                                              (fix aux_arb
+                                                   (size0 min_ max_ : nat) 
+                                                   (t_ : tree) {struct size0} : 
+                                                 option bool :=
+                                                 match size0 with
+                                                 | 0 =>
+                                                   checker_backtrack
+                                                     ((fun _ : unit =>
+                                                         match t_ with
+                                                         | Leaf => Some true
+                                                         | Node _ _ _ => Some false
+                                                         end) :: (fun _ : unit => None) :: nil)
+                                                 | S size' =>
+                                                   checker_backtrack
+                                                     ((fun _ : unit =>
+                                                         match t_ with
+                                                         | Leaf => Some true
+                                                         | Node _ _ _ => Some false
+                                                         end)
+                                                        :: (fun _ : unit =>
+                                                              match t_ with
+                                                              | Leaf => Some false
+                                                              | Node n1 t0 t3 =>
+                                                                match decOpt 42 with
+                                                                | Some true =>
+                                                                  match decOpt 42 with
+                                                                  | Some true =>
+                                                                    match decOpt 42 with
+                                                                    | Some true =>
+                                                                      match
+                                                                        aux_arb size' min_ n1 t0
+                                                                      with
+                                                                      | Some true =>
+                                                                        match
+                                                                          aux_arb size' n1 max_ t3
+                                                                        with
+                                                                        | Some true => Some true
+                                                                        | Some false => Some false
+                                                                        | None => None
+                                                                        end
+                                                                      | Some false => Some false
+                                                                      | None => None
+                                                                      end
+                                                                    | Some false => Some false
+                                                                    | None => None
+                                                                    end
+                                                                  | Some false => Some false
+                                                                  | None => None
+                                                                  end
+                                                                | Some false => Some false
+                                                                | None => None
+                                                                end
+                                                              end) :: nil)
+                                                 end) k2 n0 n t2
+                                            with
+                                            | Some true => Some true
+                                            | Some false => Some false
+                                            | None => None
+                                            end
+                                          | Some false => Some false
+                                          | None => None
+                                          end
+                                        | Some false => Some false
+                                        | None => None
+                                        end
+                                      | Some false => Some false
+                                      | None => None
+                                      end
+                                    | Some false => Some false
+                                    | None => None
+                                    end
+                                  end) :: nil)%list in
+              match
+                proj1
+                  (checker_backtrack_spec ls1) Hdec
+              with
+              | ex_intro _ f (conj Hin Heq) =>
+                
+                proj2 (checker_backtrack_spec ls2) _
+              end).
 
-        + eapply checker_backtrack_spec.
+
+      unfold ls1, ls2 in *. clear ls1 ls2. 
+      refine (match Hin with
+              | or_introl Hin =>
+                ex_intro _ f (conj (or_introl Hin) Heq)
+              | or_intror Hin =>
+                match Hin with
+                | or_introl Hin =>
+                  let Hin':= eq_ind_r (fun f0 : unit -> option bool => f0 tt = Some true)
+                                      Heq Hin in _
+
+                | or_intror Hfalse => False_ind _ Hfalse
+                end
+              end).
+      refine (ex_intro _ _ (conj (or_intror (or_introl Logic.eq_refl)) _)).
+      refine (match t with
+              | Leaf => fun Hin' => _
+              | Node n0 t1 t2 => fun Hin' => _
+              end Hin').
+      exact (False_ind _ (match Hin' with Logic.eq_refl => I end)).
+
+      refine (match destruct_match_true_l _ _ Hin' with
+              | conj Heq1 Hin' =>
+                destruct_match_true_r _ _ Heq1
+                                      (match destruct_match_true_l _ _ Hin' with
+                                       | conj Heq1 Hin' =>
+                                         destruct_match_true_r _ _ Heq1
+                                                               (match destruct_match_true_l _ _ Hin' with
+                                                                | conj Heq1 Hin' =>
+                                                                  destruct_match_true_r _ _ Heq1 _
+                                                                end)
+                                       end)
+              end).
+
+      refine (match destruct_match_true_l _ _ Hin' with
+              | conj Heqg1 Hin' => destruct_match_true_r _ _ (IHk1 _ _ _ _ (le_S_n _ _ Hleq) Heqg1) _
+              end).
+      refine (match destruct_match_true_l _ _ Hin' with
+              | conj Heqg2 Hin' => destruct_match_true_r _ _ (IHk1 _ _ _ _ (le_S_n _ _ Hleq) Heqg2) _
+              end).
+      reflexivity. 
+      suchThatMaybeOpt
+
+      2:{ 
+      
+      eapply (checker_backtrack_spec ls1). in Hdec.
+        
+        destruct Hdec as [f [[H1 | [ H2 | [] ]] H3]].
+        +         Show Proof. 
+ destruct t; subst; try congruence.
+          subst. eapply checker_backtrack_spec.
           eexists. split. now left. reflexivity.
 
         + subst. destruct t; try congruence.
-
+           
           eapply checker_backtrack_spec.
           eexists. split. right. now left.
           
-          destruct (@decOpt (m <= n) _ 42) eqn:Hdle; [ | congruence ].
-          destruct b; [ | congruence ].
           
           destruct (@decOpt (m <= n0) _ 42) eqn:Hdle'; [ | congruence ].
           destruct b; [ | congruence ].
@@ -271,7 +860,7 @@ Section BSTProofs.
           | [ H : (match ?e with _ => _ end = Some true) |- _ ] =>
             destruct e eqn:Heqb'
           end; [ | congruence ].
-          destruct b; [ | congruence ].       
+          destruct b; [ | congruence ].
           rewrite (IHk1 true). rewrite (IHk1 true).
           reflexivity. lia. eassumption. lia. eassumption. }
 
@@ -326,7 +915,7 @@ Section BSTProofs.
           
           unfold ch in Heq1. rewrite Heq1 in Hf.
 
-          unfold ch. rewrite Heq2. 
+          unfold ch. rewrite Heq2.  
           destruct b1. 2:{ reflexivity. } 
           
           destruct (ch k1 n0 n t2) as [ b2 | ] eqn:Heq1'.
@@ -342,8 +931,12 @@ Section BSTProofs.
           eapply IHk1 with (k2 := k2) in Heq2'; [ | lia ].
 
           unfold ch in Heq1'. rewrite Heq1' in Hf.
-
+          
           rewrite Heq2'.
+
+          destruct b2; [| reflexivity ].
+
+          
           eapply Hf with (f := (fun _ : unit => if b2 then Some true else Some false)).
           right. left. reflexivity. }
           
@@ -397,7 +990,6 @@ Section BSTProofs.
         end.
         destruct y eqn:Hdec'; [ | congruence ].
         destruct b; [ | congruence ].
-
         now eapply IHk; eauto.
   Qed.
 
@@ -424,7 +1016,76 @@ Section BSTProofs.
       { eapply DecOptbst_monotonic; [ | eassumption ]. lia. }
 
       unfold decOpt, DecOptbst in Hmax1, Hmax2. 
-      rewrite Hmax1, Hmax2.
+      rewrite Hmax1 Hmax2.
+
+      reflexivity.
+  Qed.
+
+  Instance decOptbstCorrect m n t : DecOptCorrectPos (bst m n t).
+  Proof.
+    constructor.
+    - intros. eapply DecOptbst_correct. eassumption.
+    - intros. eapply DecOptbst_complete. eassumption.
+  Qed.
+  
+
+
+  Lemma DecOptbst_correct_false k m n t :
+    @decOpt _ (DecOptbst m n t) k = Some false ->
+    ~ bst m n t.
+  Proof.
+    intros Hdec Hbst.
+    eapply DecOptbst_complete in Hbst.
+    destruct Hbst as [k' Hbst].
+    edestruct (Compare_dec.le_lt_dec k k').
+
+    + eapply decOptbstSizeMonotonic in Hdec; [ | eassumption ].
+      congruence.
+
+    + eapply decOptbstSizeMonotonic in Hbst; [ | eapply PeanoNat.Nat.lt_le_incl; eassumption ].
+      congruence.
+  Qed.
+
+  Lemma DecOptbst_complete_false m n t :
+    ~ bst m n t ->
+    exists k, @decOpt _ (DecOptbst m n t) k = Some false.
+  Proof.
+    revert m n; induction t; intros m1 n2 Hbst.
+    - exfalso. eapply Hbst. constructor.
+    - 
+
+    intros H. revert m n. 
+    assert (Hnot : ~ forall k, ~ @decOpt _ (DecOptbst m n t) k = Some false).
+    { intros Hnot. eapply H.
+      
+
+      admit. }
+
+    
+    exfalso. eapply Hnot.
+    intros k Hfalse. eapply DecOptbst_correct_false in Hfalse. 
+    eapply DecOptbst_sound.
+
+              induction H.
+    - exists 0. reflexivity.
+    - destruct IHbst1 as [k1 IH1].
+      destruct IHbst2 as [k2 IH2].    
+      exists (S (Nat.max k1 k2)).
+      unfold decOpt, DecOptbst.
+      eapply checker_backtrack_spec.
+      eexists.
+      split. right. now left.
+      
+      erewrite !DecOptle_complete; eauto.
+      
+      assert (Hmax1 : @decOpt (bst min n t1) _ (Nat.max k1 k2) = Some true).
+      { eapply DecOptbst_monotonic; [ | eassumption ]. lia. }
+
+      assert (Hmax2 : @decOpt (bst n max t2) _ (Nat.max k1 k2) = Some true).
+      { eapply DecOptbst_monotonic; [ | eassumption ]. lia. }
+
+      unfold decOpt, DecOptbst in Hmax1, Hmax2. 
+      rewrite Hmax1 Hmax2.
 
       reflexivity.
   Qed.

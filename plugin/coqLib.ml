@@ -52,8 +52,6 @@ let gEqRefl p =
 
 let gI = gInject "I"
 
-let gT = gInject "True"
-
 let gTrueb = gInject "true"
 
 let gFalseb = gInject "false"
@@ -61,6 +59,8 @@ let gFalseb = gInject "false"
 let gTrue = gInject "True"
 
 let gFalse = gInject "False"
+
+let gTt = gInject "tt"
 
 let gIff p1 p2 =
   gApp (gInject "iff") [p1; p2]
@@ -164,3 +164,6 @@ let ltnOSn =
 
 let ltnOSn_pair =
   gApp ~explicit:true (gInject "ltn0Sn_pair") [hole; hole; hole]
+
+let le_S_n hleq =
+  gApp (gInject "le_S_n") [hole; hole; hleq]

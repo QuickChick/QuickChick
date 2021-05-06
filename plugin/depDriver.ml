@@ -5,6 +5,7 @@ open Constrexpr
 open GenericLib
 open ArbitrarySizedST
 open CheckerSizedST
+open CheckerSizedProofs
 open Error
 open UnifyQC
 (*   
@@ -16,7 +17,8 @@ open GenSizedSTSizeMonotonic
 
 (** Derivable classes *)
 type derivable =
-  | DecOpt 
+  | DecOpt
+  | DecOptMon
   | ArbitrarySizedSuchThat
   | GenSizedSuchThatMonotonicOpt
   | GenSizedSuchThatSizeMonotonicOpt
@@ -25,6 +27,7 @@ type derivable =
 
 let derivable_to_string = function
   | DecOpt -> "DecOpt"
+  | DecOptMon -> "DecOptSizedMonotonic"
   | ArbitrarySizedSuchThat -> "GenSizedSuchThat"
   | GenSizedSuchThatMonotonicOpt -> "SizeMonotonicOpt"
   | SizedProofEqs -> "SizedProofEqs"
@@ -87,6 +90,7 @@ let derive_dependent
   (* Generate typeclass constraints. For each type parameter "A" we need `{_ : <Class Name> A} *)
   let instance_arguments = match class_name with
     | DecOpt -> params @ actual_input_args
+    | DecOptMon -> params @ actual_input_args
     | ArbitrarySizedSuchThat ->
       params
 (*      @ gen_needed
@@ -166,6 +170,10 @@ let derive_dependent
        gApp (gInject (derivable_to_string class_name))
          [ gApp (full_dt) (List.map gVar input_names) ]
 
+    | DecOptMon ->
+       gApp (gInject (derivable_to_string class_name))
+         [ gApp (full_dt) (List.map gVar input_names) ]
+
     | SizedProofEqs ->
        gApp (gInject (derivable_to_string class_name))
          [full_pred input_names]
@@ -199,6 +207,9 @@ let derive_dependent
     | ArbitrarySizedSuchThat -> gen
     | DecOpt ->
        checkerSizedST ty_ctr ty_params ctrs dep_type input_names
+         input_ranges umap tmap actual_input_args result coqTyCtr
+    | DecOptMon ->
+       checkerSizedProofs ty_ctr ty_params ctrs dep_type input_names
          input_ranges umap tmap actual_input_args result coqTyCtr
    | SizedProofEqs ->
       (*       sizedEqProofs_body (class_name cn) ty_ctr ty_params ctrs dep_type input_names inputs n register_arbitrary *)
