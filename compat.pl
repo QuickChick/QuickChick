@@ -77,6 +77,18 @@ let extern_constr_ e evd evar = Constrextern.extern_constr false e evd (EConstr.
 
   }
 
+  if ('8.14' le $coq_version) {
+    $compat_ml .= "
+let new_instance = Classes.new_instance
+"
+  } else {
+    $compat_ml .= "
+let new_instance ~locality =
+  let global = locality <> Goptions.OptLocal in
+  Classes.new_instance ~global
+"
+  }
+
   return $compat_ml;
 }
 
