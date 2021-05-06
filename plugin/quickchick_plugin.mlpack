@@ -16,6 +16,7 @@ SizeMon
 SizeCorr
 SimplDriver
 CheckerSizedST
+CheckerSizedProofs
 SizedProofs
 DepDriver
 Driver
