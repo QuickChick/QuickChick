@@ -629,7 +629,7 @@ let gLetIn (x : string) (e : coq_expr) (body : var -> coq_expr) =
 let gLetTupleIn (x : var) (xs : var list) (body : coq_expr) =
   CAst.make @@ CLetTuple (List.map (fun x -> CAst.make @@ Names.Name x) xs, (None, None), gVar x, body)
   
-let gMatch discr ?catchAll:(body=None) (branches : (constructor * string list * (var list -> coq_expr)) list) : coq_expr =
+let gMatch discr ?catchAll:(body=None) ?params:(holes=0) (branches : (constructor * string list * (var list -> coq_expr)) list) : coq_expr =
   CAst.make @@ CCases (RegularStyle,
           None (* return *), 
           [(discr, None, None)], (* single discriminee, no as/in *)
@@ -637,6 +637,7 @@ let gMatch discr ?catchAll:(body=None) (branches : (constructor * string list * 
                       let cvs : Id.t list = List.map fresh_name cs in
                       CAst.make ([[CAst.make @@ CPatCstr (c,
                                       None,
+                                      List.init holes (fun _ -> CAst.make @@ CPatAtom None) @
                                       List.map (fun s -> CAst.make @@ CPatAtom (Some (qualid_of_ident s))) cvs (* Constructor applied to patterns *)
                                     )
                            ]],

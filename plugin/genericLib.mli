@@ -132,7 +132,7 @@ val gLetIn : string -> coq_expr -> (var -> coq_expr) -> coq_expr
 (* TODO: HOAS-ify *)
 val gLetTupleIn : var -> var list -> coq_expr -> coq_expr
   
-val gMatch : coq_expr -> ?catchAll:(coq_expr option) -> ((constructor * string list * (var list -> coq_expr)) list) -> coq_expr
+val gMatch : coq_expr -> ?catchAll:(coq_expr option) -> ?params:(int) -> ((constructor * string list * (var list -> coq_expr)) list) -> coq_expr
 val gMatchReturn : coq_expr -> ?catchAll:(coq_expr option) -> string -> (var -> coq_expr) ->
   ((constructor * string list * (var list -> coq_expr)) list) -> coq_expr
 

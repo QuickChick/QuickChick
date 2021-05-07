@@ -36,6 +36,9 @@ let gProd e1 e2 =
 let gLeq e1 e2 =
   gApp (gInject "leq") [e1; e2]
 
+let gLe e1 e2 =
+  gApp (gInject "le") [e1; e2]
+
 let gIsTrueLeq e1 e2 =
   gApp
     (gInject "is_true")
@@ -79,7 +82,7 @@ let gfalse = gInject "False"
 (* TODO extend gMatch to write the return type? *)
 let discriminate h =
   false_ind hole
-    (gMatch h [(injectCtr "erefl", [], fun [] -> gI)])
+    (gMatch h [(injectCtr "Logic.eq_refl", [], fun [] -> gI)])
 
 
 let rewrite pred h hin =
@@ -167,3 +170,6 @@ let ltnOSn_pair =
 
 let le_S_n hleq =
   gApp (gInject "le_S_n") [hole; hole; hleq]
+
+let nle_succ_0 hleq =
+  gApp (gInject "PeanoNat.Nat.nle_succ_0") [hole; hleq]

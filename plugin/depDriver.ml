@@ -27,7 +27,7 @@ type derivable =
 
 let derivable_to_string = function
   | DecOpt -> "DecOpt"
-  | DecOptMon -> "DecOptSizedMonotonic"
+  | DecOptMon -> "DecOptSizeMonotonic"
   | ArbitrarySizedSuchThat -> "GenSizedSuchThat"
   | GenSizedSuchThatMonotonicOpt -> "SizeMonotonicOpt"
   | SizedProofEqs -> "SizedProofEqs"

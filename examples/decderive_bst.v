@@ -29,7 +29,7 @@ Derive DecOpt for (bst min max t).
 Derive ArbitrarySizedSuchThat for (fun b => bst min max b).
 
 
-Compute (sample (@arbitrarySizeST _ (fun t => bst 0 30 t) _ 10)).
+(* Compute (sample (@arbitrarySizeST _ (fun t => bst 0 30 t) _ 10)). *)
 
 
 Conjecture expand_range : forall t,
@@ -74,9 +74,8 @@ Derive ArbitrarySizedSuchThat for (fun n => inrange n m t x).
 Section TypeClasses.
     
   Class DecOptSizeMonotonic (P : Prop) {H : DecOpt P} :=
-    size_mon : forall s1 s2 b, s1 <= s2 -> decOpt s1 = Some b -> decOpt s2 = Some b.
-  
-  
+    mon_true : forall s1 s2, s1 <= s2 -> decOpt s1 = Some true -> decOpt s2 = Some true.
+    (* size_mon : forall s1 s2 b, s1 <= s2 -> decOpt s1 = Some b -> decOpt s2 = Some b. *)    
   
   Class DecOptDecidable (P : Prop) {H : DecOpt P} :=
     { wit : exists s a, decOpt s = Some a }.
@@ -124,23 +123,23 @@ Section TypeClasses.
       destruct dec. now firstorder. congruence.
   Qed.
 
-  Global Instance decOptCorrectNeg (P : Prop) {H : DecOpt P}
-         {Hmon : DecOptSizeMonotonic P} 
-         {Hdec : DecOptDecidable P}
-         {Hcor : DecOptCorrectPos P} : DecOptCorrectNeg P.
-  Proof.
-    constructor. 
-    - intros s Hopt. intros HP. eapply Hcor in HP.
-      destruct HP.
-      edestruct (Compare_dec.le_lt_dec s x).
-      + eapply Hmon in Hopt; eauto. congruence.
-      + eapply Hmon in H0.
-        2:{ eapply PeanoNat.Nat.lt_le_incl. eassumption. } congruence.
-    - intros Hn.
-      destruct Hdec. destruct wit0 as [s [a Hopt]].
-      destruct a; eauto.
-      eapply Hcor in Hopt. contradiction. 
-  Qed.
+  (* Global Instance decOptCorrectNeg (P : Prop) {H : DecOpt P} *)
+  (*        {Hmon : DecOptSizeMonotonic P}  *)
+  (*        {Hdec : DecOptDecidable P} *)
+  (*        {Hcor : DecOptCorrectPos P} : DecOptCorrectNeg P. *)
+  (* Proof. *)
+  (*   constructor.  *)
+  (*   - intros s Hopt. intros HP. eapply Hcor in HP. *)
+  (*     destruct HP. *)
+  (*     edestruct (Compare_dec.le_lt_dec s x). *)
+  (*     + eapply Hmon in Hopt; eauto. congruence. *)
+  (*     + eapply Hmon in H0. *)
+  (*       2:{ eapply PeanoNat.Nat.lt_le_incl. eassumption. } congruence. *)
+  (*   - intros Hn. *)
+  (*     destruct Hdec. destruct wit0 as [s [a Hopt]]. *)
+  (*     destruct a; eauto. *)
+  (*     eapply Hcor in Hopt. contradiction.  *)
+  (* Qed. *)
 
 
   Inductive wf_list : list nat -> Prop :=
@@ -154,9 +153,7 @@ Section TypeClasses.
   
 End TypeClasses.
 
-
-Section BSTProofs.
-
+Section Lemmas. 
   Ltac inv H := inversion H; subst.
 
   Lemma checker_backtrack_spec l :
@@ -213,6 +210,38 @@ Section BSTProofs.
            { eapply Hall. now left. } congruence.
   Qed.
 
+  Lemma destruct_match_true_l (check b : option bool):
+    match check with
+    | Some true => b
+    | Some false => Some false
+    | None => None
+    end = Some true ->
+    check = Some true /\ b = Some true. 
+  Proof.
+    intros H. destruct check as [ [ | ] | ]; eauto; discriminate.
+  Qed.
+
+  Lemma destruct_match_true_r (check b : option bool):
+    check = Some true -> b = Some true ->
+    match check with
+    | Some true => b
+    | Some false => Some false
+    | None => None
+    end = Some true. 
+  Proof.
+    intros H1 H2. destruct check as [ [ | ] | ]; eauto; discriminate.
+  Qed.
+
+
+End Lemmas. 
+  
+Section BSTProofs.
+
+  Set Printing Depth 100.
+
+  QuickChickDebug Debug On.
+   
+  Derive DecOptMon for (bst min max t).
 
   Lemma DecOptwf_list_correct k l :
     @decOpt _ (DecOptwf_list l) k = Some true ->
@@ -259,28 +288,6 @@ Section BSTProofs.
     congruence.
   Qed.
 
-
-  Lemma destruct_match_true_l (check b : option bool):
-    match check with
-    | Some true => b
-    | Some false => Some false
-    | None => None
-    end = Some true ->
-  check = Some true /\ b = Some true. 
-  Proof.
-    intros H. destruct check as [ [ | ] | ]; eauto; discriminate.
-  Qed.
-
-  Lemma destruct_match_true_r (check b : option bool):
-    check = Some true -> b = Some true ->
-    match check with
-    | Some true => b
-    | Some false => Some false
-    | None => None
-    end = Some true. 
-  Proof.
-    intros H1 H2. destruct check as [ [ | ] | ]; eauto; discriminate.
-  Qed.
 
   Lemma DecOptbst_monotonic :
     forall k1 k2 m n t,
@@ -473,7 +480,7 @@ Section BSTProofs.
                      | or_intror (or_introl Hin1) =>
                        let Hin':= eq_ind_r (fun f0 => f0 tt = Some true)
                                            Heq Hin1 in
-                       (* (False_ind _ (match Hin' with Logic.eq_refl => I end)) *)
+                       (False_ind _ (match Hin' with Logic.eq_refl => I end))
                      | or_intror (or_intror Hin1) =>
                        False_ind _ Hin1
                      end
@@ -485,7 +492,6 @@ Section BSTProofs.
              
       unfold decOpt, DecOptbst in *.
       
-      Set Printing Depth 100.
       
       refine (let ls1 := (((fun _ : unit =>
                               match t with
