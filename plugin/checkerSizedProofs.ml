@@ -141,6 +141,13 @@ let lettuplein (x : var) (xs : var list) (f : btyp) : btyp =
 type generator_kind = Base_gen | Ind_gen 
 
 
+let discriminate_none_some h =
+  let pred =
+    gFun ["e"] (fun [e] -> gMatch (gVar e) [(injectCtr "Some", ["x"], (fun _ -> gFalse));
+                                            (injectCtr "None", [], (fun _ -> gTrue))])
+  in
+  false_ind hole ( gApp (gInject "eq_ind") [gNone hole; pred; gI; gSome hole gTrueb; h] )
+  
 let construct_terms
       (kind : generator_kind)
       (full_gtyp : coq_expr)
@@ -153,7 +160,7 @@ let construct_terms
       (init_tmap : dep_type UM.t)
       (result : Unknown.t)
       (ih : coq_expr)
-      (hleq : coq_expr) : ((coq_expr -> coq_expr list) * ((coq_expr -> coq_expr) * bool) list)
+      (hleq : coq_expr) : ((coq_expr -> coq_expr list) * ((((coq_expr -> coq_expr) * bool) option) list))
   =
   (* partially applied handle_branch *)
   let handle_branch' : dep_ctr -> btyp * bool =
@@ -172,12 +179,13 @@ let construct_terms
     then [gNone gBool] else [] in
   let padNone_mon =
     if List.exists (fun gb -> not (snd gb)) mon
-    then [((fun hin -> discriminate hin), false)] else [] in
+    then [Some ((fun hin -> discriminate_none_some hin), false)] else [] in
   match kind with
   | Base_gen ->
-     ((fun s -> List.map (fun t -> fst t s) (List.filter snd gens) @ padNone), (List.filter snd mon) @ padNone_mon)
+     ((fun s -> List.map (fun t -> fst t s) (List.filter snd gens) @ padNone),
+      (List.map (fun (p, b) -> if b then Some (p, b) else None) mon) @ padNone_mon)
   | Ind_gen ->
-     ((fun s -> List.map (fun t -> fst t s) gens), mon)
+     ((fun s -> List.map (fun t -> fst t s) gens), List.map (fun x -> Some x) mon)
 
 let base_terms = construct_terms Base_gen
 let ind_terms  = construct_terms Ind_gen              
@@ -258,14 +266,14 @@ let checkerSizedProofs
     let rec aux hin heq proofs path =
       match proofs with
       | [] -> false_ind hole hin
-      | (pr, true) :: proofs -> (* base cases *)
+      | Some (pr, true) :: proofs -> (* base cases *)
          gMatch hin
                 [ ( injectCtr "or_introl", ["Hin"],
                     fun [hin] -> gExIntro "z1" (fun _ -> hole) hole (gConjIntro (path (gOrIntroL (gVar hin))) heq) )
                 ; ( injectCtr "or_intror", ["Hin"],
-                    fun [hin] -> aux (gVar hin) (gVar hin) proofs (fun t -> gOrIntroR t) )
+                    fun [hin] -> aux (gVar hin) heq proofs (fun t -> gOrIntroR t) )
                 ]
-      | (pr, false) :: proofs when ind = false -> (* None case in base case *)
+      | Some (pr, false) :: proofs when ind = false -> (* None case in base case *)
          gMatch hin
                 [ ( injectCtr "or_introl", ["Hin"],
                     fun [hin] ->
@@ -273,9 +281,9 @@ let checkerSizedProofs
                          [rewrite_sym (gFun ["f0"] (fun [f] -> gEqType (gApp (gVar f) [gTt]) (gSome hole (gTrueb))))
                                                                         (gVar hin) heq] )
                 ; ( injectCtr "or_intror", ["Hin"],
-                    fun [hin] -> aux (gVar hin) (gVar hin) proofs (fun t -> gOrIntroR t) )
+                    fun [hin] -> aux (gVar hin) heq proofs (fun t -> gOrIntroR t) )
                 ]
-      | (pr, false) :: proofs when ind = true -> (* Inductive case *)
+      | Some (pr, false) :: proofs when ind = true -> (* Inductive case *)
          gMatch hin
                 [ ( injectCtr "or_introl", ["Hin"],
                     fun [hin] ->
@@ -284,8 +292,10 @@ let checkerSizedProofs
                          [rewrite_sym (gFun ["f0"] (fun [f] -> gEqType (gApp (gVar f) [gTt]) (gSome hole (gTrueb))))
                                       (gVar hin) heq] )
                 ; ( injectCtr "or_intror", ["Hin"],
-                    fun [hin] -> aux (gVar hin) (gVar hin) proofs (fun t -> gOrIntroR t) )
+                    fun [hin] -> aux (gVar hin) heq proofs (fun t -> gOrIntroR t) )
                 ]
+      | None :: proofs -> (* Inductive gen in base case *)         
+         aux hin heq proofs (fun t -> gOrIntroR t)
     in aux hin heq proofs (fun t -> t)
   in
   
@@ -298,24 +308,26 @@ let checkerSizedProofs
                                  let hleq = gVar hleq in
                                  let htrue = gVar htrue in
 
-                                 let (gen, proofs) = base_terms full_gtyp gen_ctr dep_type ctrs rec_name
+                                 let (gen1, proofs) = base_terms full_gtyp gen_ctr dep_type ctrs generator_body
                                                                 input_ranges init_umap init_tmap result hole hleq in
+                                 let (gen2, _) = ind_terms full_gtyp gen_ctr dep_type ctrs generator_body
+                                                           input_ranges init_umap init_tmap result hole hleq in
                                  
-                                 let gens1 = gList (List.map (fun opt -> gFun ["_unit"] (fun _ -> opt)) (gen (gInject "O"))) in
-                                 let gens2 = gList (List.map (fun opt -> gFun ["_unit"] (fun _ -> opt)) (gen s2)) in
+                                 let gens1 = gList (List.map (fun opt -> gFun ["_unit"] (fun _ -> opt)) (gen1 (gInject "O"))) in
+                                 let gens2 s2 = gList (List.map (fun opt -> gFun ["_unit"] (fun _ -> opt)) (gen2 s2)) in
                                  
-                                 let succ_body =
+                                 let succ_body s2 =
                                    gMatch ~params:1 (checker_backtrack_spec_l gens1 htrue)
                                           [ ( injectCtr "ex_intro", ["f"; "Hand"],
                                               fun [f; hand] -> 
                                               gMatch (gVar hand)
                                                      [ ( injectCtr "conj", ["Hin"; "Heq"],
                                                          fun [hin; heq] ->
-                                                         checker_backtrack_spec_r gens2 (fold_proofs (gVar hin) (gVar heq) proofs false) ) ] ) ]
+                                                         checker_backtrack_spec_r (gens2 s2) (fold_proofs (gVar hin) (gVar heq) proofs false) ) ] ) ]
                                  in
                                  gMatch s2
                                         [ (injectCtr "O", [], fun _ -> htrue)
-                                        ; (injectCtr "S", ["s2'"], fun [s2] -> succ_body) ] )))
+                                        ; (injectCtr "S", ["s2'"], fun [s2] -> succ_body (gVar s2)) ] )))
   in 
   let mon_true_ind_case =    
     gFun ["s1"; "IHs1"; "s2"] (fun [s1; ih; s2] -> 
@@ -328,24 +340,24 @@ let checkerSizedProofs
                                  let hleq = gVar hleq in
                                  let htrue = gVar htrue in
 
-                                 let (gen, proofs) = ind_terms full_gtyp gen_ctr dep_type ctrs rec_name
+                                 let (gen, proofs) = ind_terms full_gtyp gen_ctr dep_type ctrs generator_body
                                                                input_ranges init_umap init_tmap result ih hleq in
                                  
                                  let gens1 = gList (List.map (fun opt -> gFun ["_unit"] (fun _ -> opt)) (gen s1)) in
-                                 let gens2 = gList (List.map (fun opt -> gFun ["_unit"] (fun _ -> opt)) (gen s2)) in
+                                 let gens2 s2 = gList (List.map (fun opt -> gFun ["_unit"] (fun _ -> opt)) (gen s2)) in
                                  
-                                 let succ_body =
+                                 let succ_body s2 =
                                    gMatch ~params:1 (checker_backtrack_spec_l gens1 htrue)
                                           [ ( injectCtr "ex_intro", ["f"; "Hand"],
                                               fun [f; hand] -> 
                                               gMatch (gVar hand)
                                                      [ ( injectCtr "conj", ["Hin"; "Heq"],
                                                          fun [hin; heq] ->
-                                                         checker_backtrack_spec_r gens2 (fold_proofs (gVar hin) (gVar heq) proofs true) ) ] ) ]
+                                                         checker_backtrack_spec_r (gens2 s2) (fold_proofs (gVar hin) (gVar heq) proofs true) ) ] ) ]
                                  in
                                  gMatch s2
                                         [ (injectCtr "O", [], fun _ -> false_ind hole (nle_succ_0 hleq))
-                                        ; (injectCtr "S", ["s2'"], fun [s2] -> succ_body) ] )))
+                                        ; (injectCtr "S", ["s2'"], fun [s2] -> succ_body (gVar s2)) ] )))
   in 
 
   
