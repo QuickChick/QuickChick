@@ -95,6 +95,13 @@ Module GenLow : GenLowInterface.Sig.
         let l := List.combine (rnds rnd 20) (createRange 10 nil) in
         List.map (fun (p : RandomSeed * nat) => let (r,n) := p in m n r) l
     end.
+
+  Definition sample1 (A : Type) (g : G A) : A :=
+    match g with
+      | MkGen m =>
+        let rnd := newRandomSeed in
+        m 10 rnd
+    end.
   
   (* LL : Things that need to be in GenLow because of MkGen *)
   

@@ -104,7 +104,8 @@ Section TypeClasses.
       forall l,
         wf_list l -> wf_list l.
 
-  Derive DecOpt for (wf_list l).  
+  Derive DecOpt for (wf_list l).
+  Print DecOptwf_list.
 
   
 End TypeClasses.
@@ -375,6 +376,7 @@ Inductive bst : nat -> nat -> tree -> Prop :=
 (* Derive DecOpt for (le n m). *)
 Derive DecOpt for (bst min max t).
 
+Set Printing All.
 Derive ArbitrarySizedSuchThat for (fun b => bst min max b).
 
 Instance decOptbstSizeMonotonic m n t : DecOptSizeMonotonic (bst m n t).

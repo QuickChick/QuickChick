@@ -22,6 +22,7 @@ let mutateCheckWith = mk_ref "QuickChick.MutateCheck.mutateCheckWith"
 let mutateCheckMany = mk_ref "QuickChick.MutateCheck.mutateCheckMany"
 let mutateCheckManyWith = mk_ref "QuickChick.MutateCheck.mutateCheckManyWith"
 let sample = mk_ref "QuickChick.GenLow.GenLow.sample"
+let sample1 = mk_ref "QuickChick.GenLow.GenLow.sample1"
 
 (* Handle extra ocaml directory to be copied *)
 let empty_slist : string list = []           
@@ -227,6 +228,7 @@ let define_and_run c env evd =
   (* Run the test *)
   else
     (* Should really be shared across this and the tool *)
+(*     let execn = "time " ^ execn in *)
     let chan = Unix.open_process_in execn in
     let rec process_otl_aux () =
       let e = input_line chan in
@@ -248,7 +250,7 @@ let define_and_run c env evd =
 
 (*
     (** If we want to print the time spent in tests *)
-(*    let execn = "time " ^ execn in *)
+(*    let execn = "time " ^ execn in  *)
     if Sys.command execn <> 0 then
       CErrors.user_err (str "Could not run test" ++ fnl ())
  *)
@@ -348,6 +350,10 @@ END
 
 VERNAC COMMAND EXTEND Sample CLASSIFIED AS SIDEFF
   | ["Sample" constr(c)] -> {run sample [c]}
+END
+
+VERNAC COMMAND EXTEND Sample1 CLASSIFIED AS SIDEFF
+  | ["Sample1" constr(c)] -> {run sample1 [c]}
 END
 
 VERNAC COMMAND EXTEND QCInclude CLASSIFIED AS SIDEFF

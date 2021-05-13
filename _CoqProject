@@ -17,15 +17,10 @@ plugin/coqLib.ml
 plugin/arbitrarySized.ml
 plugin/arbitrarySizedST.ml
 plugin/checkerSizedST.ml
-plugin/checkerSizedProofs.ml
 plugin/genLib.ml
 plugin/unifyQC.ml
 plugin/sizeUtils.ml
 plugin/sized.ml
-plugin/sizeMon.ml
-plugin/sizeSMon.ml
-plugin/sizeCorr.ml
-plugin/sizedProofs.ml
 plugin/compat.ml
 
 src/Tactics.v
