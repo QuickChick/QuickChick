@@ -4,9 +4,11 @@ open Constrexpr
 open GenericLib
 open SizeUtils
 open Sized
+(*
 open SizeMon
 open SizeSMon
 open SizeCorr
+ *)
 
 open ArbitrarySized
 
@@ -15,21 +17,25 @@ type derivable =
   | Show
   | GenSized
   | Sized
+  (*
   | CanonicalSized
   | SizeMonotonic
   | SizedMonotonic
   | SizedCorrect
-
+   *)
+  
 let derivable_to_string = function
   | Shrink -> "Shrink"
   | Show   -> "Show"
   | GenSized -> "GenSized"
   | Sized -> "Sized"
+           (*
   | CanonicalSized -> "CanonicalSized"
   | SizeMonotonic -> "SizeMonotonic"
   | SizedMonotonic -> "SizedMonotonic"
   | SizedCorrect ->  "SizedCorrect"
-
+            *)
+           
 let mk_instance_name der tn = 
   let prefix = derivable_to_string der in
   let strip_last s = List.hd (List.rev (String.split_on_char '.' s)) in
@@ -75,10 +81,11 @@ let derive (cn : derivable) (c : constr_expr) (instance_name : string) (name1 : 
     | Shrink -> ["Shrink"]
     | Show -> ["Show"]
     | GenSized -> ["Gen"]
+                (*
     | CanonicalSized -> ["CanonicalSized"]
     | SizeMonotonic -> ["GenMonotonic"]
     | SizedMonotonic -> ["Gen"]
-    | SizedCorrect ->  ["GenMonotonicCorrect"; "CanonicalSized"]
+    | SizedCorrect ->  ["GenMonotonicCorrect"; "CanonicalSized"]*)
   in
 
   let extra_arguments = match cn with
@@ -86,10 +93,12 @@ let derive (cn : derivable) (c : constr_expr) (instance_name : string) (name1 : 
     | Shrink -> []
     | Sized -> []
     | GenSized -> []
+                (*
     | CanonicalSized -> []
     | SizeMonotonic -> [(gInject "s", gInject "nat")]
     | SizedMonotonic -> []
     | SizedCorrect -> []
+                 *)
   in
 
   (* Generate typeclass constraints. For each type parameter "A" we need `{_ : <Class Name> A} *)
@@ -107,6 +116,7 @@ let derive (cn : derivable) (c : constr_expr) (instance_name : string) (name1 : 
 
   (* The instance type *)
   let instance_type iargs =
+    (*
     match cn with
     | SizeMonotonic ->
       let (_, size) = take_last iargs [] in
@@ -116,7 +126,7 @@ let derive (cn : derivable) (c : constr_expr) (instance_name : string) (name1 : 
     | SizedCorrect ->
       gApp ~explicit:true (gInject class_name)
         [full_dt; hole; gInject ("arbitrarySized")]
-    | _ -> gApp (gInject class_name) [full_dt]
+    | _ -> *) gApp (gInject class_name) [full_dt]
   in
   (* Create the instance record. Only need to extend this for extra instances *)
   let instance_record iargs =
@@ -126,6 +136,7 @@ let derive (cn : derivable) (c : constr_expr) (instance_name : string) (name1 : 
     | Shrink -> shrink_decl ty_ctr ctrs iargs
     | GenSized -> arbitrarySized_decl ty_ctr ctrs iargs
     | Sized -> sized_decl ty_ctr ctrs
+             (*
     | CanonicalSized ->
       let ind_scheme =  gInject ((ty_ctr_to_string ty_ctr) ^ "_ind") in
       sizeEqType ty_ctr ctrs ind_scheme iargs
@@ -139,6 +150,7 @@ let derive (cn : derivable) (c : constr_expr) (instance_name : string) (name1 : 
       let c_inst = gInject (repeat_instance_name CanonicalSized ind_name) in
       (* TODO : use default names for gen and mon as well (?) *)
       genCorr size_config iargs (gInject name1) s_inst c_inst (gInject name2)
+              *)
   in
 
   (* msg_debug (str "Defined record" ++ fnl ()); *)

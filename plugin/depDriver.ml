@@ -5,7 +5,7 @@ open Constrexpr
 open GenericLib
 open ArbitrarySizedST
 open CheckerSizedST
-open CheckerSizedProofs
+
 open Error
 open UnifyQC
 (*   
@@ -23,17 +23,18 @@ type derivable =
   | GenSizedSuchThatMonotonicOpt
   | GenSizedSuchThatSizeMonotonicOpt
   | GenSizedSuchThatCorrect
-  | SizedProofEqs
+(*   | SizedProofEqs*)
 
 let derivable_to_string = function
   | DecOpt -> "DecOpt"
-  | DecOptMon -> "DecOptSizeMonotonic"
+  (*   | DecOptMon -> "DecOptSizeMonotonic" *)
   | ArbitrarySizedSuchThat -> "GenSizedSuchThat"
+                            (*
   | GenSizedSuchThatMonotonicOpt -> "SizeMonotonicOpt"
   | SizedProofEqs -> "SizedProofEqs"
   | GenSizedSuchThatSizeMonotonicOpt -> "SizedMonotonicOpt"
   | GenSizedSuchThatCorrect -> "SizedSuchThatCorrect"
-
+                             *)
 (** Name of the instance to be generated *)
 let mk_instance_name der tn =
   var_to_string (fresh_name ((derivable_to_string der) ^ tn))
@@ -90,7 +91,7 @@ let derive_dependent
   (* Generate typeclass constraints. For each type parameter "A" we need `{_ : <Class Name> A} *)
   let instance_arguments = match class_name with
     | DecOpt -> params @ actual_input_args
-    | DecOptMon -> params @ actual_input_args
+    (*    | DecOptMon -> params @ actual_input_args *)
     | ArbitrarySizedSuchThat ->
       params
 (*      @ gen_needed
@@ -99,9 +100,11 @@ let derive_dependent
       @ arb_needed *)
       @ actual_input_args
     | GenSizedSuchThatMonotonicOpt -> params 
+(*
     | SizedProofEqs -> params @ actual_input_args
     | GenSizedSuchThatCorrect -> params @ actual_input_args
-    | GenSizedSuchThatSizeMonotonicOpt -> params @ actual_input_args
+    | GenSizedSuchThatSizeMonotonicOpt -> params @ actual_input_args *)
+                                    
   in
 
   (* Fully applied predicate (parameters and constructors) *)
@@ -173,10 +176,11 @@ let derive_dependent
     | DecOptMon ->
        gApp (gInject (derivable_to_string class_name))
          [ gApp (full_dt) (List.map gVar input_names) ]
-
+(*
     | SizedProofEqs ->
        gApp (gInject (derivable_to_string class_name))
          [full_pred input_names]
+ *)
       
 (*      
     | GenSizedSuchThatMonotonicOpt ->
@@ -208,13 +212,14 @@ let derive_dependent
     | DecOpt ->
        checkerSizedST ty_ctr ty_params ctrs dep_type input_names
          input_ranges umap tmap actual_input_args result coqTyCtr
+      (*
     | DecOptMon ->
        checkerSizedProofs ty_ctr ty_params ctrs dep_type input_names
          input_ranges umap tmap actual_input_args result coqTyCtr
    | SizedProofEqs ->
       (*       sizedEqProofs_body (class_name cn) ty_ctr ty_params ctrs dep_type input_names inputs n register_arbitrary *)
       SizedProofs.sizedEqProofs_body ty_ctr ty_params ctrs dep_type input_names input_ranges umap tmap actual_input_args result coqTyCtr
-
+       *)
 (*                              
     | GenSizedSuchThatMonotonicOpt ->
       msg_debug (str "mon type");

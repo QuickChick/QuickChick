@@ -24,8 +24,8 @@ let instantiate_existential_methodST (n : int) (pred : coq_expr) =
     ; hole (* Implicit instance *)]
  *)
 
-let rec_method (rec_name : coq_expr) (size : coq_expr) (n : int) (letbinds : unknown list option) (l : coq_expr list) =
-  gApp rec_name (size :: l)
+let rec_method (rec_name : coq_expr) (init_size : coq_expr) (size : coq_expr) (n : int) (letbinds : unknown list option) (l : coq_expr list) =
+  gApp rec_name (init_size :: size :: l)
 
 (* For checkers, ignore the opt argument *)
 let rec_bind (opt : bool) (m : coq_expr) (x : string) (f : var -> coq_expr) : coq_expr =
@@ -99,6 +99,7 @@ type generator_kind = Base_gen | Ind_gen
 (* hoisting out base and ind gen to be able to call them from proof generation *)
 let construct_generators
       (kind : generator_kind)
+      (init_size : coq_expr)
       (size : coq_expr)
       (full_gtyp : coq_expr)
       (gen_ctr : ty_ctr)
@@ -113,10 +114,10 @@ let construct_generators
   msg_debug (str "Beginning checker construction" ++ fnl());
   (* partially applied handle_branch *)
   let handle_branch' : dep_ctr -> coq_expr * bool =
-    handle_branch dep_type
+    handle_branch dep_type init_size
       (fail_exp full_gtyp) (not_enough_fuel_exp full_gtyp) (ret_exp full_gtyp)
       instantiate_existential_method instantiate_existential_methodST exist_bind
-      (rec_method rec_name size) rec_bind
+      (rec_method rec_name init_size size) rec_bind
       stMaybe check_expr match_inp gLetIn gLetTupleIn
       gen_ctr init_umap init_tmap input_ranges result
   in
@@ -162,17 +163,17 @@ let checkerSizedST
   (* The type of the derived checker *)
   let gen_type = (gOption full_gtyp) in
 
-  let aux_arb rec_name size vars =
+  let aux_arb rec_name init_size size vars =
     gMatch (gVar size)
       [ (injectCtr "O", [],
          fun _ ->
            checker_backtracking
-             (base_gens (gVar size) full_gtyp gen_ctr dep_type ctrs rec_name
+             (base_gens init_size (gVar size) full_gtyp gen_ctr dep_type ctrs rec_name
                 input_ranges init_umap init_tmap result))
       ; (injectCtr "S", ["size'"],
          fun [size'] ->
          checker_backtracking 
-           (ind_gens (gVar size') full_gtyp gen_ctr dep_type ctrs rec_name
+           (ind_gens init_size (gVar size') full_gtyp gen_ctr dep_type ctrs rec_name
               input_ranges init_umap init_tmap result))
       ]
   in
@@ -180,11 +181,13 @@ let checkerSizedST
   let generator_body : coq_expr =
     gRecFunInWithArgs
       ~assumType:(gen_type)
-      "aux_arb" (gArg ~assumName:(gVar (fresh_name "size")) () :: inputs) 
-      (fun (rec_name, size::vars) -> aux_arb (gVar rec_name) size vars)
+      "aux_arb"
+      (gArg ~assumName:(gVar (fresh_name "init_size")) ()
+       :: gArg ~assumName:(gVar (fresh_name "size")) () :: inputs) 
+      (fun (rec_name, init_size::size::vars) -> aux_arb (gVar rec_name) (gVar init_size) size vars)
       (fun rec_name -> gFun ["size"] 
           (fun [size] -> gApp (gVar rec_name) 
-              (gVar size :: List.map (fun i -> gVar (arg_to_var i)) inputs)
+              (gVar size :: gVar size :: List.map (fun i -> gVar (arg_to_var i)) inputs)
           ))
   in
 

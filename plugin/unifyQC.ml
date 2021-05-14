@@ -272,6 +272,7 @@ let is_fixed k dt =
     | Unknown u' -> aux (umfind u' k)
     | Ctr (_, rs) -> List.for_all aux rs
     | RangeHole -> true (*TODO *)
+    | Parameter _ -> failwith "not handled/is_fixed"
   in option_map aux (convert_to_range dt)
 
 (* convert a range to a coq expression *)
@@ -315,14 +316,14 @@ let lookup_checks k m = try Some (CMap.find k m) with Not_found -> None
 (** Takes an equality map and two coq expressions [cleft] and [cright]. [cleft]
     is returned if all of the equalities hold, otherwise [cright] is
     returned. *)
-let handle_equalities eqs (check_expr : coq_expr -> 'a -> 'a -> 'a -> 'a)
+let handle_equalities init_size eqs (check_expr : coq_expr -> 'a -> 'a -> 'a -> 'a)
       (cleft : 'a) (cright : 'a) (cfuel : 'a) = 
   EqSet.fold (fun (u1,u2) c -> 
                let checker =
                  gApp ~explicit:true (gInject "decOpt")
                    [ gApp (gInject "eq") [gVar u1; gVar u2]
                    ; hole
-                   ; gInt 42]
+                   ; init_size]
                in
                check_expr checker c cright cfuel
              ) eqs cleft
@@ -414,6 +415,7 @@ let warn_uninstantiated_variables =
 let handle_branch
       (type a) (type b) (* I've started to love ocaml again because of this *)
       (_dep_type : dep_type)
+      (init_size : coq_expr)
       (fail_exp : b)
       (not_enough_fuel_exp : b)
       (ret_exp : coq_expr -> b)
@@ -763,7 +765,7 @@ let handle_branch
            ; hole 
 
            (* Size. TODO: what do we do about this size? *)
-           ; gInt 42
+           ; init_size
            
            ] 
        in
@@ -818,7 +820,7 @@ let handle_branch
        let pred_result = gApp ~explicit:true (gTyCtr c) (List.map (range_to_coq_expr !umap) ranges) in
        let pred = (* predicate we are generating for *)
          gFun [var_to_string fresh_unknown]
-           (fun [_] ->
+           (fun _ ->
              match letbinds with
              | Some binds -> gLetTupleIn fresh_unknown binds pred_result
              | None -> pred_result
@@ -1085,7 +1087,7 @@ let handle_branch
     let rec walk_matches = function
       | [] ->
          msg_debug (str "Match output complete" ++ fnl ());
-         handle_equalities !eq_set (check_expr (-1)) (recurse_type 0 typ) (fail_exp) not_enough_fuel_exp
+         handle_equalities init_size !eq_set (check_expr (-1)) (recurse_type 0 typ) (fail_exp) not_enough_fuel_exp
       | (u,m)::ms -> begin
           msg_debug (str (Printf.sprintf "Processing Match: %s @ %s" (Unknown.to_string u) (matcher_pat_to_string m)) ++ fnl ());
           match_inp u m (walk_matches ms) fail_exp

@@ -11,13 +11,8 @@ ArbitrarySized
 ArbitrarySizedST
 SizeUtils
 Sized
-SizeSMon
-SizeMon
-SizeCorr
 SimplDriver
 CheckerSizedST
-CheckerSizedProofs
-SizedProofs
 DepDriver
 Driver
 QuickChick

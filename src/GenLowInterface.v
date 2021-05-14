@@ -57,6 +57,7 @@ Module Type Sig.
   Parameter promote : forall {A : Type}, Rose (G A) -> G (Rose A).
   Parameter choose : forall {A : Type} `{ChoosableFromInterval A}, (A * A) -> G A.
   Parameter sample : forall {A : Type}, G A -> list A.
+  Parameter sample1 : forall {A : Type}, G A -> A.
 
 
   (* LL: The abstraction barrier is annoying :D *)
