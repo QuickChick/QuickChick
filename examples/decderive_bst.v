@@ -28,6 +28,9 @@ Ltac2 Notation "lia" := lia_ltac1 ().
 
 Ltac2 inv := fun (h : ident) =>  inversion h; subst.
 
+Ltac2 eassumption_ltac2 () := ltac1:(eassumption).
+Ltac2 Notation "eassumption" := eassumption_ltac2 ().
+
 Section TypeClasses.
     
   Class DecOptSizeMonotonic (P : Prop) {H : DecOpt P} :=
@@ -42,6 +45,12 @@ Section TypeClasses.
   Class DecOptCompletePos (P : Prop) {H : DecOpt P} :=
     complete : P -> exists s, decOpt s = Some true.
 
+  Class DecOptSoundNeg (P : Prop) {H : DecOpt P} :=
+    sound_neg : forall s, decOpt s = Some false -> ~ P.
+
+  Class DecOptCompleteNeg (P : Prop) {H : DecOpt P} :=
+    complete_neg : ~ P -> exists s, decOpt s = Some false.
+  
   Class DecOptCorrectPos (P : Prop) {H : DecOpt P} :=
     { corr_sound : forall s, decOpt s = Some true -> P; 
       corr_complete : P -> exists s, decOpt s = Some true }.
@@ -50,6 +59,7 @@ Section TypeClasses.
     { corr_sound' : forall s, decOpt s = Some false -> ~ P; 
       corr_complete' :~ P -> exists s, decOpt s = Some false }.
 
+  
   (* Not true: *) 
   (* Class DecOptCorrect (P : Prop) {H : DecOpt P} := *)
   (*   { refl_decOpt : forall s, ssrbool.reflect P (decOpt s == Some true) }. *)
@@ -100,34 +110,39 @@ Section TypeClasses.
       destruct dec; eauto. congruence.
   Qed.
 
-  (* Global Instance decOptCorrectNeg (P : Prop) {H : DecOpt P} *)
-  (*        {Hmon : DecOptSizeMonotonic P}  *)
-  (*        {Hdec : DecOptDecidable P} *)
-  (*        {Hcor : DecOptCorrectPos P} : DecOptCorrectNeg P. *)
-  (* Proof. *)
-  (*   constructor.  *)
-  (*   - intros s Hopt. intros HP. eapply Hcor in HP. *)
-  (*     destruct HP. *)
-  (*     edestruct (Compare_dec.le_lt_dec s x). *)
-  (*     + eapply Hmon in Hopt; eauto. congruence. *)
-  (*     + eapply Hmon in H0. *)
-  (*       2:{ eapply PeanoNat.Nat.lt_le_incl. eassumption. } congruence. *)
-  (*   - intros Hn. *)
-  (*     destruct Hdec. destruct wit0 as [s [a Hopt]]. *)
-  (*     destruct a; eauto. *)
-  (*     eapply Hcor in Hopt. contradiction.  *)
-  (* Qed. *)
-
+  Global Instance decOptSoundNeg (P : Prop) {H : DecOpt P}
+         {Hm : DecOptSizeMonotonic P} 
+         {Hc : DecOptCompletePos P} : DecOptSoundNeg P.
+  Proof.
+    intros s Hopt HP. eapply Hc in HP.
+    destruct HP.
+    edestruct (Compare_dec.le_lt_dec s x).
+    + eapply Hm in Hopt; eauto. congruence.
+    + eapply Hm in H0 > [ | eapply PeanoNat.Nat.lt_le_incl; eassumption ].
+      congruence.
+  Qed.
 
   Inductive wf_list : list nat -> Prop :=
   | lnil : wf_list nil
   | lcons :
       forall l,
         wf_list l -> wf_list l.
-
+  
   Derive DecOpt for (wf_list l).
   Print DecOptwf_list.
 
+  Inductive wf_list2 : list nat -> Prop :=
+  | lcons2 :
+      forall l,
+        wf_list2 l -> wf_list2 l.
+
+  Derive DecOpt for (wf_list2 l).
+  
+  (* Counter-example for completess *) 
+  Goal (forall l, ~ wf_list2 l).
+  Proof.
+    intros l Hwf. induction Hwf; eauto.
+  Qed. 
   
 End TypeClasses.
 
@@ -227,8 +242,6 @@ Ltac2 constrs_to_idents (a : Init.constr list) := List.map constr_to_ident a.
 
 Opaque dec_decOpt.
 
-Ltac2 eassumption_ltac2 () := ltac1:(eassumption).
-Ltac2 Notation "eassumption" := eassumption_ltac2 ().
 
 Ltac2 rec in_list_last (_ : unit) :=
   match! goal with
@@ -289,7 +302,7 @@ Ltac2 rec base_case_mont_aux (t : unit) (path : unit -> unit) :=
     try (destruct $h > [ eexists;
                          split > [ path () ; left ; reflexivity | subst; now repeat (handle_checker_mon_t @IH1 @Heq) ]
                        |  ]);
-    base_case_mont_aux () (fun _ => path; right)
+    base_case_mont_aux () (fun _ => path (); right)
 end.
 
 Ltac2 rec ind_case_mont_aux (ih : ident) (heq : ident) (path : unit -> unit) :=
@@ -299,7 +312,7 @@ Ltac2 rec ind_case_mont_aux (ih : ident) (heq : ident) (path : unit -> unit) :=
     let h := Control.hyp h in
     destruct $h > [ eexists;
                     split > [ path () ; left ; reflexivity | subst; now repeat (handle_checker_mon_t @IH1 @Heq) ]
-                  | ind_case_mont_aux ih heq (fun _ => path; right) ]
+                  | ind_case_mont_aux ih heq (fun _ => path (); right) ]
                     
                     
   end.
@@ -346,18 +359,15 @@ Ltac2 rec ind_case_monf_aux (t : unit) (path : unit -> unit) :=
   | [h : List.In _ nil |- _ ] => let h := Control.hyp h in destruct $h
   | [h : List.In _ (cons ?g ?gs) |- _ ] =>
     let h := Control.hyp h in
-    destruct $h > [ try (eapply checker_backtrack_spec_false >
-                         [ eassumption | now left ]); (* succeds in base cases *)
-                    eapply checker_backtrack_spec_false in Hdec > [ | right; now left ] (* for inductive cases *)
-                  | ind_case_monf_aux () (fun _ => path; right) ]
+    destruct $h > [ eapply checker_backtrack_spec_false in Hdec > [ | path (); now left ] (* for inductive cases *)
+                  | ind_case_monf_aux () (fun _ => path (); right) ]
   end.
-
-
 
 Ltac2 ind_case_monf (ih : ident) (heqb : ident) :=
   (ind_case_monf_aux () (fun _ => ())); subst;
   simpl_minus_decOpt ();
   repeat (handle_ind_checkerf @IH1 @Heqb).
+
 
 Ltac2 derive_mon (_ : unit) :=
   match! goal with
@@ -434,35 +444,53 @@ Ltac2 handle_checker_match_sound (ih : ident) (heq : ident) :=
     ].
 
 Ltac2 rec try_constructors_aux (n : int) :=
-  first [ now (constructor n; eauto)
+  first [ now (econstructor n; eauto)
         | try_constructors_aux (Int.add n 1) ].
 
 
 Ltac2 try_constructors (_ : unit) := try_constructors_aux 1.
 
+Ltac2 eauto_using (e : constr) := eauto using $e. 
 
-Ltac2 rec base_case_sound (heq : ident) :=
+  Inductive test :=
+  | Many_evars :
+      forall n m x y,
+        n <= m ->
+        x <= y ->
+        odd x = true ->
+        test.
+
+  Goal (forall n m x y, n <= m -> x <= y -> odd n = true -> test).
+  Proof.
+    eauto_using 'test.
+  Qed. 
+        
+  (* Goal (bst 0 0 Leaf). *)
+  (*   eauto_using 'bst. *)
+
+
+Ltac2 rec base_case_sound (heq : ident) (ty : constr) :=
   match! goal with
   | [h : List.In _ nil |- _ ] => let h := Control.hyp h in destruct $h
   | [h : List.In _ (cons ?g nil) |- _ ] =>
-    let h := Control.hyp h in (destruct $h > [ subst; congruence | base_case_sound heq ])
+    let h := Control.hyp h in (destruct $h > [ subst; congruence | base_case_sound heq ty])
   | [h : List.In _ (cons ?g ?gs) |- _ ] =>
     let h := Control.hyp h in
     let hdummy := Fresh.in_goal (id_of_string "Hdummy") in
-    (destruct $h > [ subst; repeat (handle_checker_match_sound hdummy heq); now (try_constructors ())
-                   | base_case_sound heq ])
+    (destruct $h > [ subst; repeat (handle_checker_match_sound hdummy heq); now (eauto 20 using $ty)
+                   | base_case_sound heq ty ])
   end.
 
-Ltac2 rec ind_case_sound_aux (ih : ident) (heq : ident) (n : int) :=
+Ltac2 rec ind_case_sound (ih : ident) (heq : ident) (ty : constr) :=
   match! goal with
   | [h : List.In _ nil |- _ ] => let h := Control.hyp h in destruct $h
   | [h : List.In _ (cons ?g ?gs) |- _ ] =>
     let h := Control.hyp h in
-    (destruct $h > [ subst; repeat (handle_checker_match_sound ih heq); now (constructor n; eauto)
-                   | ind_case_sound_aux ih heq (Int.add n 1) ])
+    (destruct $h > [ subst; repeat (handle_checker_match_sound ih heq); now (eauto 20 using $ty)
+                   | ind_case_sound ih heq ty ])
   end.
 
-Ltac2 ind_case_sound (ih : ident) (heq : ident) := ind_case_sound_aux ih heq 1.
+
 
 Ltac2 derive_sound (_ : unit) :=
   match! goal with
@@ -478,7 +506,7 @@ Ltac2 derive_sound (_ : unit) :=
        (List.map (fun x => intro $x) (List.rev l));
        intros s' Hdec;
        eapply checker_backtrack_spec in Hdec;
-       destruct Hdec as [f [Hin Htrue]]) > [ base_case_sound @Htrue | ind_case_sound @IH1 @Htrue ]
+       destruct Hdec as [f [Hin Htrue]]) > [ base_case_sound @Htrue ty | ind_case_sound @IH1 @Htrue ty ]
    | _ => () 
    end 
 end.
@@ -505,11 +533,9 @@ Derive DecOpt for (bst min max t).
 Derive ArbitrarySizedSuchThat for (fun b => bst min max b).
 
 
-
 Instance decOptbstSizeMonotonic m n t : DecOptSizeMonotonic (bst m n t).
-Proof. derive_mon (). Qed.
-
-
+Proof. derive_mon (). Qed. 
+                       
 Instance DecOptbst_sound m n t : DecOptSoundPos (bst m n t).
 Proof. derive_sound (). Qed.
 
@@ -597,17 +623,17 @@ Section BSTProofs.
     wf_list l -> 
     exists k, @decOpt _ (DecOptwf_list l) k = Some true.
   Proof.
-    intros H. induction H.
-    - exists 0. reflexivity.
-    - destruct IHwf_list as [k1 IH1].
-      exists (S k1).
-      unfold decOpt, DecOptwf_list in *.
-      eapply checker_backtrack_spec.
-      eexists.
-      split. right. now left.
-      rewrite IH1.  reflexivity.
-  Qed.
-
+  (*   intros H. induction H. *)
+  (*   - exists 0. reflexivity. *)
+  (*   - destruct IHwf_list as [k1 IH1]. *)
+  (*     exists (S k1). *)
+  (*     unfold decOpt, DecOptwf_list in *. *)
+  (*     eapply checker_backtrack_spec. *)
+  (*     eexists. *)
+  (*     split. right. now left. *)
+  (*     rewrite IH1.  reflexivity. *)
+  (* Qed. *)
+  Abort. 
 
   Lemma checker_backtrack_spec_exists (l : nat -> list (unit -> option bool))  :
     (exists (f : nat -> (unit -> option bool)),
@@ -671,88 +697,53 @@ Section BSTProofs.
     eexists (max s1 s2).
     erewrite Hmon > [ | | eassumption ].
     eassumption. lia.
-  Qed. 
+  Qed.
+
+
 
   Lemma DecOptbst_complete m n t :
     bst m n t ->
     exists k, @decOpt _ (DecOptbst m n t) k = Some true.
   Proof.
-    intros H. induction H.
-    - exists 0. reflexivity.
-    - revert min max H H0 H1 H2 H3 IHbst1 IHbst2;
-        intros m1 m2 H H0 H1 H2 H3 IHbst1 IHbst2.
-      eapply exists_Sn.
-      simpl. eapply checker_backtrack_spec_exists.
-      eexists. split.
+    (* intros H. induction H. *)
+    (* - exists 0. reflexivity. *)
+    (* - revert min max H H0 H1 H2 H3 IHbst1 IHbst2; *)
+    (*     intros m1 m2 H H0 H1 H2 H3 IHbst1 IHbst2. *)
+    (*   eapply exists_Sn. *)
+    (*   simpl. eapply checker_backtrack_spec_exists. *)
+    (*   eexists. split. *)
 
-      intros s. right. left. reflexivity. simpl.
+    (*   intros s. right. left. reflexivity. simpl. *)
 
-      eapply DecOptle_complete with (k := 42) in H.
-      rewrite H. 
-      eapply DecOptle_complete with (k := 42) in H0.
-      rewrite H0. 
-      eapply DecOptle_complete with (k := 42) in H1.
-      rewrite H1. 
+    (*   eapply DecOptle_complete with (k := 42) in H. *)
+    (*   rewrite H.  *)
+    (*   eapply DecOptle_complete with (k := 42) in H0. *)
+    (*   rewrite H0.  *)
+    (*   eapply DecOptle_complete with (k := 42) in H1. *)
+    (*   rewrite H1.  *)
       
-      destruct IHbst1 as [s1' Hs1']. simpl in Hs1'. 
-      eapply exists_match.
-      + eassumption.
-      + intros s1 s2 Hleq. assert (Hm := @mon (bst m1 n t1) _ _ s1 s2 true Hleq).
-        simpl in Hm. eassumption.
-      + destruct IHbst2 as [s2' Hs2']. simpl in Hs2'. 
-        eapply exists_match with (s1 := s2').
-        * assert (Hm := @mon (bst n m2 t2) _ _).
-          simpl in Hm. eapply Hm> [ | eassumption ]. lia.
-        * assert (Hm := @mon (bst n m2 t2) _ _). simpl in Hm. 
-          intros s1 s2 Hleq Heq. eapply Hm > [ | eassumption ]. lia.
-        * exists 0. reflexivity.
-  Qed.
+    (*   destruct IHbst1 as [s1' Hs1']. simpl in Hs1'.  *)
+    (*   eapply exists_match. *)
+    (*   + eassumption. *)
+    (*   + intros s1 s2 Hleq. assert (Hm := @mon (bst m1 n t1) _ _ s1 s2 true Hleq). *)
+    (*     simpl in Hm. eassumption. *)
+    (*   + destruct IHbst2 as [s2' Hs2']. simpl in Hs2'.  *)
+    (*     eapply exists_match with (s1 := s2'). *)
+    (*     * assert (Hm := @mon (bst n m2 t2) _ _). *)
+    (*       simpl in Hm. eapply Hm> [ | eassumption ]. lia. *)
+    (*     * assert (Hm := @mon (bst n m2 t2) _ _). simpl in Hm.  *)
+    (*       intros s1 s2 Hleq Heq. eapply Hm > [ | eassumption ]. lia. *)
+    (*     * exists 0. reflexivity. *)
+  Abort.
 
   
   Lemma DecOptbst_complete_false m n t :
     ~ bst m n t ->
     exists k, @decOpt _ (DecOptbst m n t) k = Some false.
   Proof.
-    revert m n; induction t; intros m1 n2 Hbst.
-    - exfalso. eapply Hbst. constructor.
-    - 
-
-    intros H. revert m n. 
-    assert (Hnot : ~ forall k, ~ @decOpt _ (DecOptbst m n t) k = Some false).
-    { intros Hnot. eapply H.
-      
-
-      admit. }
-
-    
-    exfalso. eapply Hnot.
-    intros k Hfalse. eapply DecOptbst_correct_false in Hfalse. 
-    eapply DecOptbst_sound.
-
-              induction H.
-    - exists 0. reflexivity.
-    - destruct IHbst1 as [k1 IH1].
-      destruct IHbst2 as [k2 IH2].    
-      exists (S (Nat.max k1 k2)).
-      unfold decOpt, DecOptbst.
-      eapply checker_backtrack_spec.
-      eexists.
-      split. right. now left.
-      
-      erewrite !DecOptle_complete; eauto.
-      
-      assert (Hmax1 : @decOpt (bst min n t1) _ (Nat.max k1 k2) = Some true).
-      { eapply DecOptbst_monotonic; [ | eassumption ]. lia. }
-
-      assert (Hmax2 : @decOpt (bst n max t2) _ (Nat.max k1 k2) = Some true).
-      { eapply DecOptbst_monotonic; [ | eassumption ]. lia. }
-
-      unfold decOpt, DecOptbst in Hmax1, Hmax2. 
-      rewrite Hmax1 Hmax2.
-
-      reflexivity.
-  Qed.
-
+  Abort.
+  
+(*
   Instance decOptbstCorrect m n t : DecOptCorrectPos (bst m n t).
   Proof.
     constructor.
