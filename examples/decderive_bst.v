@@ -214,6 +214,7 @@ Section Lemmas.
 
 End Lemmas. 
 
+From Ltac2 Require Import Fresh.
 
 (* Tactics for deriving monotonicity. TODO move to some library *)
 Ltac2 constr_to_ident (a : Init.constr) :=
@@ -238,11 +239,43 @@ Ltac2 rec in_list_last (_ : unit) :=
 Lemma exfalso_none_some_false (P : Prop) :
   (fun (_ : unit) => None) tt = Some false -> P. 
 Proof. congruence. Qed.
-  
-Ltac2 base_case_monf (_ : unit) :=
-  apply exfalso_none_some_false;
-  (eapply checker_backtrack_spec_false with (f := (fun (_ : unit) => @None bool))) >
-  [ eassumption | in_list_last () ].
+
+Ltac simplstar := simpl in *.
+
+Ltac2 simpl_minus_decOpt (_ : unit) :=
+  ltac1:(with_strategy opaque [decOpt] simplstar).
+
+Ltac2 id_of_string (s : string) :=
+  match Ident.of_string s with
+  | Some i => i
+  | None => Control.throw (Tactic_failure (Some (Message.of_string ("Not a valid string for identifier"))))
+  end.
+
+Ltac2 handle_checker_mon_t (ih : ident) (heq : ident) := 
+  first
+    [ let heq1 := Fresh.in_goal heq in
+      let heq' := Control.hyp heq in
+      (* because apply .... in $heq doesn't work *)
+      assert ($heq1 := destruct_match_true_l _ _ $heq'); clear $heq;
+      let heq1 := Control.hyp heq1 in
+      let ih := Control.hyp ih in
+      let hdec := Fresh.in_goal (id_of_string "Hdec") in
+      destruct $heq1 as [$hdec $heq];
+      first
+        [ match! goal with
+          | [ h : @decOpt ?p _ ?s = Some true |- _ ] =>
+            eapply (@mon $p _ _) in $h > [ | eassumption ];
+            let hdec' := Control.hyp hdec in
+            rewrite $hdec'; clear $hdec
+          end
+        | eapply $ih in $hdec > [ | now eapply le_S_n; eauto | eassumption ];
+          let hdec' := Control.hyp hdec in
+          rewrite $hdec'; clear $hdec ]                         
+    | match! goal with
+      | [h : match ?m with _ => _  end = Some true |- _ ] =>
+        destruct $m; try (congruence)
+      end
+    | reflexivity ].
 
 
 
@@ -253,57 +286,60 @@ Ltac2 rec base_case_mont_aux (t : unit) (path : unit -> unit) :=
     let h := Control.hyp h in destruct $h > [ subst; congruence | base_case_mont_aux () path ]
   | [h : List.In _ (cons ?g ?gs) |- _ ] =>
     let h := Control.hyp h in
-    try (destruct $h > [ eexists; split > [ path () ; left ; eassumption | eassumption ]
-                       | ]);
+    try (destruct $h > [ eexists;
+                         split > [ path () ; left ; reflexivity | subst; now repeat (handle_checker_mon_t @IH1 @Heq) ]
+                       |  ]);
     base_case_mont_aux () (fun _ => path; right)
 end.
 
-(* TODO check if it works with reversed order of constructors *)
-
-Ltac2 base_case_mont (t : unit) := base_case_mont_aux () (fun _ => ()).
-
-From Ltac2 Require Import Fresh.
-
-Ltac2 handle_ind_checkert (ih : ident) (heq : ident) := 
-  first
-    [ let heq1 := Fresh.in_goal heq in
-      let heq' := Control.hyp heq in
-      (* because apply .... in $heq doesn't work *)
-      assert ($heq1 := destruct_match_true_l _ _ $heq'); clear $heq;
-      let heq1 := Control.hyp heq1 in
-      let ih := Control.hyp ih in
-      (* XXX fresh names in as [ ... ] *)     
-      destruct $heq1 as [Hdeq Heq]; try (eapply $ih in Hdeq > [ | now eapply le_S_n; eauto ]);
-      rewrite &Hdeq; clear Hdeq 
-    | match! goal with
-      | [h : match ?m with _ => _  end = Some true |- _ ] =>
-        destruct $m; try (congruence)
-      end
-    | reflexivity ].
-
-
-
-Ltac2 rec ind_case_mont_aux (t : unit) (path : unit -> unit) :=
+Ltac2 rec ind_case_mont_aux (ih : ident) (heq : ident) (path : unit -> unit) :=
   match! goal with
   | [h : List.In _ nil |- _ ] => let h := Control.hyp h in destruct $h
   | [h : List.In _ (cons ?g ?gs) |- _ ] =>
     let h := Control.hyp h in
-    destruct $h > [ eexists; try (split > [ path () ; left ; eassumption | eassumption ]) (* succeds for base cases *); 
-                    split > [ path () ; left ; reflexivity | ] (* leaves one goal for each inductive case *)
-                  | ind_case_mont_aux () (fun _ => path; right) ]
+    destruct $h > [ eexists;
+                    split > [ path () ; left ; reflexivity | subst; now repeat (handle_checker_mon_t @IH1 @Heq) ]
+                  | ind_case_mont_aux ih heq (fun _ => path; right) ]
                     
                     
   end.
+
+Ltac2 base_case_mont (t : unit) := base_case_mont_aux () (fun _ => ()).
 
 Ltac2 ind_case_mont (ih : ident) (heq : ident) :=
-  (ind_case_mont_aux () (fun _ => ())); subst; repeat (handle_ind_checkert @IH1 @Heq).
+  ind_case_mont_aux ih heq (fun _ => ()).
 
-Ltac2 id_of_string (s : string) :=
-  match Ident.of_string s with
-  | Some i => i
-  | None => Control.throw (Tactic_failure (Some (Message.of_string ("Not a valid string for identifier"))))
-  end.
+Ltac2 base_case_monf (_ : unit) :=
+  apply exfalso_none_some_false;
+  (eapply checker_backtrack_spec_false with (f := (fun (_ : unit) => @None bool))) >
+  [ eassumption | in_list_last () ].
 
+
+Ltac2 handle_ind_checkerf (ih : ident) (heqb : ident) := 
+  first
+    [ match! goal with
+      | [ _ : match ?e with _ => _ end = Some false |- _ ] =>
+        destruct $e > [ reflexivity | ]
+      end
+    | let ih := Control.hyp ih in
+      let heqb := Fresh.in_goal @Heq in
+      match! goal with
+      | [ _ :  match ?e with _ => _ end = Some false |- _ ] =>
+        (destruct $e as [ [ | ] | ] eqn:$heqb > [ | | congruence ])
+      end;
+      first
+        [ match! goal with
+          | [ h : @decOpt ?p _ ?s = Some _ |- _ ] =>
+            eapply (@mon $p _ _) in $h > [ | eassumption ];
+            let heqb' := Control.hyp heqb in
+            rewrite $heqb'; clear $heqb; try reflexivity
+          end
+         | eapply $ih in $heqb > [ | now eapply le_S_n; eauto | eassumption ];
+           let heqb' := Control.hyp heqb in
+           rewrite $heqb'; clear $heqb; try reflexivity
+        ]
+    | congruence
+    ].
 
 Ltac2 rec ind_case_monf_aux (t : unit) (path : unit -> unit) :=
   match! goal with
@@ -316,31 +352,12 @@ Ltac2 rec ind_case_monf_aux (t : unit) (path : unit -> unit) :=
                   | ind_case_monf_aux () (fun _ => path; right) ]
   end.
 
-Ltac2 handle_ind_checkerf (ih : ident) (heqb : ident) := 
-  first
-    [ match! goal with
-      | [ _ :  match ?e with _ => _ end = Some false |- _ ] =>
-        let ih := Control.hyp ih in
-        let heqb := Fresh.in_goal @Heq in
-        (destruct $e as [ [ | ] | ] eqn:$heqb > [ | | congruence ]);
-        erewrite $ih > [ | eapply le_S_n; eassumption | eassumption ]; simpl
-      end
-    | match! goal with
-      | [ _ : match ?e with _ => _ end = Some false |- _ ] =>
-        destruct $e > [ reflexivity | ]
-      end
-    | match! goal with
-      | [ _ : match ?e with _ => _ end = Some false |- _ ] =>
-        destruct $e as [ [ | ] | ] > [ | reflexivity | congruence ]
-      end
-    | congruence
-    | () ].
-
 
 
 Ltac2 ind_case_monf (ih : ident) (heqb : ident) :=
-  (ind_case_monf_aux () (fun _ => ())); subst; simpl in *; repeat (handle_ind_checkerf @IH1 @Heqb).
-
+  (ind_case_monf_aux () (fun _ => ())); subst;
+  simpl_minus_decOpt ();
+  repeat (handle_ind_checkerf @IH1 @Heqb).
 
 Ltac2 derive_mon (_ : unit) :=
   match! goal with
@@ -348,35 +365,40 @@ Ltac2 derive_mon (_ : unit) :=
     match Constr.Unsafe.kind e with
     | Constr.Unsafe.App ty args  =>
       let l := constrs_to_idents (Array.to_list args) in
-      intro s1;          
+      intros s1 s2 b Hleq; unfold decOpt; simpl_minus_decOpt ();
+      assert (Hleq' := &Hleq); revert Hleq Hleq';
+      generalize &s1 at 2 3 as s1'; generalize &s2 at 2 3 as s2';
+      revert s2 b;
       List.map (fun x => revert $x) l;
       (induction s1 as [ | s1 IH1 ];
-      (List.map (fun x => intro $x) (List.rev l); intros s2 b Hleq Hdec);
-      destruct b) >
+       (List.map (fun x => intro $x) (List.rev l);
+        intros s2 b s2' s1' Hleq Hleq' Hdec);
+         destruct b) >
        [ (* base case true *)
          destruct s2 > [ assumption | ];
          (* simplify and apply checker_backtrack_spec *)
-         simpl in *; apply checker_backtrack_spec in Hdec;
+         apply checker_backtrack_spec in Hdec;
          destruct Hdec as [f [Hin Heq]];
          apply checker_backtrack_spec;
          now base_case_mont ()
        | (* base case false *)
-         simpl in *; now base_case_monf ()
+          now base_case_monf ()
        | (* ind case true *)
-         destruct s2 > [ lia | ];
-         (* simplify and apply checker_backtrack_spec *)
-         simpl in *; apply checker_backtrack_spec in Hdec;
+          destruct s2 > [ lia | ];
+         (* (* simplify and apply checker_backtrack_spec *) *)
+         apply checker_backtrack_spec in Hdec;
          destruct Hdec as [f [Hin Heq]];
          apply checker_backtrack_spec;
          now ind_case_mont @IH1 @Heq
-
+             
       | (* ind case false *)
-        destruct s2 > [ lia | ] ];
-        simpl in *; eapply checker_backtrack_spec_false;
+        destruct s2 > [ lia | ];
+        eapply checker_backtrack_spec_false;
         intros f Hin; now ind_case_monf @IH1 @Heq
+      ]
     | _ => () 
        end
-  end.  
+  end.
 
 
 (* Soundness *)
@@ -479,16 +501,17 @@ Inductive bst : nat -> nat -> tree -> Prop :=
 (* Derive DecOpt for (le n m). *)
 Derive DecOpt for (bst min max t).
 
-Set Printing All.
 Derive ArbitrarySizedSuchThat for (fun b => bst min max b).
 
-genST
- arbitrarySizeST
+
+
 Instance decOptbstSizeMonotonic m n t : DecOptSizeMonotonic (bst m n t).
-Proof. derive_mon (). Qed. 
+Proof. derive_mon (). Qed.
 
 Instance DecOptbst_sound m n t : DecOptSoundPos (bst m n t).
-Proof. derive_sound (). Qed. 
+Proof.
+ (* derive_sound (). Qed.  *)
+Abort.
 
 (* Compute (sample (@arbitrarySizeST _ (fun t => bst 0 30 t) _ 10)). *)
 
@@ -537,19 +560,32 @@ Inductive list_len : nat -> list nat -> Prop :=
 | cons_len :
     forall n x l,
       list_len n l ->
-      wf_list l -> 
+      wf_list l ->
       list_len (S n) (x :: l). 
 
 Derive DecOpt for (list_len n l).
-
-Set Printing Implicit.
 
 Instance DecOptwf_listSizeMonotonic l : DecOptSizeMonotonic (wf_list l).
 Proof. derive_mon (). Qed. 
 
 Instance DecOptwf_list_sound l : DecOptSoundPos (wf_list l).
-Proof. derive_sound (). Qed. 
+(* Proof. derive_sound (). Qed.  *)
+Abort.
 
+
+Ltac2 rec ind_case_mont_aux' (ih : ident) (heq : ident) (path : unit -> unit) :=
+  match! goal with
+  | [h : List.In _ nil |- _ ] => let h := Control.hyp h in inversion $h
+  | [h : List.In _ (cons ?g ?gs) |- _ ] =>
+    let h := Control.hyp h in
+    destruct $h > [ eexists; split > [ path () ; left ; reflexivity | subst ]
+                  | ind_case_mont_aux' ih heq (fun _ => path; right) ]                    
+  end.
+
+Ltac2 ind_case_mont' (ih : ident) (heq : ident) :=
+  ind_case_mont_aux' ih heq (fun _ => ()).
+
+(* Ltac2 unfold_decOpt :=  *)
 Instance DecOptlist_lenSizeMonotonic n l : DecOptSizeMonotonic (list_len n l).
 Proof. derive_mon (). Qed. 
 
