@@ -467,19 +467,20 @@ Ltac2 ind_case_sound (ih : ident) (heq : ident) := ind_case_sound_aux ih heq 1.
 Ltac2 derive_sound (_ : unit) :=
   match! goal with
   | [ |- DecOptSoundPos ?e ] =>
-    (* Message.print (Message.of_constr e); *)
     match Constr.Unsafe.kind e with
     | Constr.Unsafe.App ty args  =>
       let l := constrs_to_idents (Array.to_list args) in
-      intro s; List.map (fun x => revert $x) l;
-      (induction s as [ | s IH ];
-      List.map (fun x => intro $x) (List.rev l); intros Hdec;
-      simpl in *;
-      eapply checker_backtrack_spec in Hdec;
-      destruct Hdec as [f [Hin Htrue]]) >
-      [ base_case_sound @Htrue | ind_case_sound @IH @Htrue ]
-   | _ => ()
-   end
+      intros s; unfold decOpt; simpl_minus_decOpt ();
+      (* assert (Hleq' := &Hleq); revert Hleq Hleq'; *)
+      generalize &s at 1 as s';
+      List.map (fun x => revert $x) l;
+      ((induction s as [ | s IH1 ]);
+       (List.map (fun x => intro $x) (List.rev l));
+       intros s' Hdec;
+       eapply checker_backtrack_spec in Hdec;
+       destruct Hdec as [f [Hin Htrue]]) > [ base_case_sound @Htrue | ind_case_sound @IH1 @Htrue ]
+   | _ => () 
+   end 
 end.
 
 Inductive tree :=
@@ -508,10 +509,9 @@ Derive ArbitrarySizedSuchThat for (fun b => bst min max b).
 Instance decOptbstSizeMonotonic m n t : DecOptSizeMonotonic (bst m n t).
 Proof. derive_mon (). Qed.
 
+
 Instance DecOptbst_sound m n t : DecOptSoundPos (bst m n t).
-Proof.
- (* derive_sound (). Qed.  *)
-Abort.
+Proof. derive_sound (). Qed.
 
 (* Compute (sample (@arbitrarySizeST _ (fun t => bst 0 30 t) _ 10)). *)
 
@@ -569,8 +569,7 @@ Instance DecOptwf_listSizeMonotonic l : DecOptSizeMonotonic (wf_list l).
 Proof. derive_mon (). Qed. 
 
 Instance DecOptwf_list_sound l : DecOptSoundPos (wf_list l).
-(* Proof. derive_sound (). Qed.  *)
-Abort.
+Proof. derive_sound (). Qed.
 
 
 Ltac2 rec ind_case_mont_aux' (ih : ident) (heq : ident) (path : unit -> unit) :=
@@ -585,12 +584,11 @@ Ltac2 rec ind_case_mont_aux' (ih : ident) (heq : ident) (path : unit -> unit) :=
 Ltac2 ind_case_mont' (ih : ident) (heq : ident) :=
   ind_case_mont_aux' ih heq (fun _ => ()).
 
-(* Ltac2 unfold_decOpt :=  *)
 Instance DecOptlist_lenSizeMonotonic n l : DecOptSizeMonotonic (list_len n l).
 Proof. derive_mon (). Qed. 
 
 Instance DecOptlist_len_sound n l : DecOptSoundPos (list_len n l).
-Proof. (* derive_sound (). *) (* XXX fails *) Abort.
+Proof. derive_sound (). Qed.
 
 
 Section BSTProofs.
