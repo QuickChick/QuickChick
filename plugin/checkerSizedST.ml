@@ -128,7 +128,8 @@ let construct_generators
   match kind with
   | Base_gen ->
      List.map fst (List.filter snd all_gens) @ padNone
-  | Ind_gen  -> List.map fst all_gens
+  | Ind_gen  ->
+     List.map fst ((List.filter snd all_gens) @ (List.filter (fun x -> not (snd x)) all_gens))
 
 let base_gens = construct_generators Base_gen
 let ind_gens  = construct_generators Ind_gen              
