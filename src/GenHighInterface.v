@@ -4,6 +4,8 @@ Set Warnings "-notation-overridden,-parsing".
 Require Import ZArith.
 Require Import mathcomp.ssreflect.ssreflect.
 From mathcomp Require Import ssrfun ssrbool ssrnat eqtype seq.
+From SimpleIO Require Import
+     IO_Monad.
 
 From QuickChick Require Import
      GenLowInterface RandomQC Sets.
@@ -50,6 +52,9 @@ Parameter suchThatMaybe : forall {A : Type},
     G A -> (A -> bool) -> G (option A).
 Parameter suchThatMaybeOpt : forall {A : Type},
     G (option A) -> (A -> bool) -> G (option A).
+
+Parameter ioGenSized : forall {A : Type}, (nat -> IO A) -> G A.
+Parameter ioGen      : forall {A : Type}, IO A -> G A.
 
 (* Correctness for derived generators *)
 Parameter semLiftGen :

@@ -3,6 +3,8 @@ Set Warnings "-notation-overridden,-parsing".
 
 From Coq Require Import
   String List ZArith Lia.
+From SimpleIO Require Import
+     IO_Monad.
 Require Import mathcomp.ssreflect.ssreflect.
 From mathcomp Require Import ssrfun ssrbool ssrnat eqtype seq.
 
@@ -196,6 +198,13 @@ Definition suchThatMaybeOpt {A : Type} (g : G (option A))
      [size+1] times. *)
 Definition retrySized {A : Type} (g : G (option A)) : G (option A) :=
   sized (fun n => retry n g).
+
+(* IO as generator. *)
+Definition ioGenSized {A} (ia : nat -> IO A) : G A :=
+  sized (fun n => returnGen (IO.very_unsafe_eval (ia n))).
+
+Definition ioGen {A} (ia : IO A) : G A :=
+  ioGenSized (fun _ => ia).
 
 (* * Semantics *)
 

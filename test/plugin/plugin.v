@@ -1,3 +1,7 @@
+From Coq Require Import
+     ExtrOcamlIntConv.
+From SimpleIO Require Import
+     IO_Random.
 From QuickChick Require Import QuickChick.
 Set Warnings "-extraction-opaque-accessed,-extraction".
 
@@ -38,9 +42,15 @@ Definition b : G nat :=
   v <- a ;;
   returnGen v.
 
+Instance showInt : Show int :=
+  {| show i := show (z_of_int i) |}.
+
 Sample a.
 Sample b.
 Sample (liftM Some a).
+Sample (ioGen (ORandom.bool tt)).
+(** Avoid [ORandom.int 0], which will throw an exception. *)
+Sample (ioGenSized (fun n => ORandom.int (int_succ (int_of_nat n)))).
 
 From mathcomp Require Import ssreflect ssrnat div.
 
