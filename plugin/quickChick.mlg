@@ -206,14 +206,14 @@ let define_and_run c env evd =
   in
   let exec_command =
     match !dune_file with
-    | None -> "cd " ^ dir ^ "; ocamlbuild " ^ packages ^ " -lib unix -cflags \"-w -3\" " ^ Filename.basename execn
+    | None -> "cd " ^ dir ^ "; ocamlbuild " ^ packages ^ " -lib unix -cflags \"-w -3\" " ^ Filename.basename execn ^ " -quiet > build.log 2> build.err"
     | Some s ->
        (* Modify the dune file to add the executable name and put it in the output dir *) 
        let awk_cmd = Printf.sprintf "awk -v n=2 -v s=\"   (name %s)\" 'NR == n {print s} {print}' %s > %s" (Filename.chop_extension (Filename.basename mlf)) s (dir ^ "/" ^ s) in
        (*       let sed_cmd = Printf.sprintf "sed '2i   (name %s)' %s > %s" (Filename.chop_extension (Filename.basename mlf)) s (dir ^ "/" ^ s) in *)
        ignore (Sys.command awk_cmd);
        (* The command is just dune build *)
-       Printf.sprintf "cd %s; dune build" dir
+       Printf.sprintf "cd %s; dune build --display=quiet > build.log 2> build.err" dir
   in
   (* Overwrite execn in case of dune *)
   let execn =
@@ -274,9 +274,9 @@ let run f args =
   let env = Global.env () in
   let evd = Evd.from_env env in
   begin match args with
-  | qc_text :: _ -> Printf.printf "QuickChecking %s\n"
-                      (Pp.string_of_ppcmds (Ppconstr.pr_constr_expr env evd qc_text));
-                      flush_all()
+  | qc_text :: _ ->
+    let msg = "QuickChecking " ^ Pp.string_of_ppcmds (Ppconstr.pr_constr_expr env evd qc_text) in
+    Feedback.msg_info (Pp.str msg)
   | _ -> failwith "run called with no arguments"
   end;
   let args = List.map (fun x -> (x,None)) args in
