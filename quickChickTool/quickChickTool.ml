@@ -584,7 +584,7 @@ let sec_find sec_graph s =
   debug "sec_find: %s\n" (trim s);
   try Hashtbl.find sec_graph (trim s)
   with Not_found -> begin
-    let keys = Hashtbl.fold (fun k v s -> k ^ " " ^ s) sec_graph "" in
+    let keys = Hashtbl.fold (fun k _v s -> k ^ " " ^ s) sec_graph "" in
     failwith (Printf.sprintf "QuickChick: Didn't find section called %s (available sections: %s)\n" s keys)
     end
 
@@ -625,7 +625,7 @@ let rec handle_section' sec_graph current_section starting_section =
       handle_section' sec_graph current_section starting_section')
     (sec_find sec_graph starting_section)
 
-let rec handle_section sec_graph sn' =
+let handle_section sec_graph sn' =
   if !verbose then (Printf.printf "Asking for section %s\n" sn'; flush_all ());
   let sn' = trim sn' in
   match !sec_name with
@@ -642,7 +642,7 @@ let calc_dir_mutants sec_graph (fs : section list file_structure) =
       begin
       current_filetype := Filename.extension s;
       match mutate_outs (handle_section sec_graph) ss with
-      | (info, base) :: muts, things_to_check ->
+      | (_info, base) :: muts, things_to_check ->
         (* Printf.printf "Number of mutants: %d\n" (List.length muts); *)
         all_things_to_check := (List.map (fun x -> (s,x)) things_to_check)
                                @ !all_things_to_check;
@@ -707,7 +707,7 @@ let main =
       (String.concat ", " b)) sec_graph; flush_all ();  *)
 
   match fs with
-  | File (s, ss) ->
+  | File (_, _) ->
      failwith ". can never be a file. Right?"
   | Dir (s, fss) -> begin
     let ((base, dir_mutants), all_things_to_check) = calc_dir_mutants sec_graph fs in
@@ -781,7 +781,7 @@ let main =
              || !only_mutant = None
              || (match info.tag, !only_mutant with
                  | Some fulltag, Some (Tag tag) ->
-                   starts_with (String.trim tag) (String.trim fulltag)
+                   starts_with ~prefix:(String.trim tag) (String.trim fulltag)
                  | _ -> false) then begin
               Printf.printf "\n";
               let t =
