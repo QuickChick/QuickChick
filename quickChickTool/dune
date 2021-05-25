@@ -2,8 +2,7 @@
  (package quickchick)
  (name quickChickTool)
  (public_name quickChick)
- (flags -rectypes)
- (libraries coq.lib))
+ (libraries unix))
 
 (ocamllex quickChickToolLexer)
 (menhir (modules quickChickToolParser))
