@@ -153,19 +153,6 @@ Class ProducerSemantics G `{Producer G} :=
   
   }.
 
-(* TODO: Prove now. 
-  Lemma monad_leftid : 
-    forall {A B : Type} (a: A) (f : A -> G B),
-      semProd (bind (ret a) f) <--> semProd (f a).
-  monad_rightid : 
-    forall {A : Type} (g : G A),
-      semProd (bind g ret) <--> semProd g;
-  monad_assoc: 
-    forall {A B C : Type} (ga : G A) (fb : A -> G B) (fc : B -> G C),
-      semProd (bind (bind ga fb) fc) <--> 
-             semProd (bind ga (fun a => bind (fb a) fc))
-*)        
-
 (*
   semBindSize_subset_compat :
     forall {A B : Type} (g g' : G A) (f f' : A -> G B),
@@ -184,6 +171,36 @@ Section ProducerProofs.
   Variable G  : Type -> Type.
   Context `{PG: Producer G}.
   Context `{PS: @ProducerSemantics G PG}.
+
+  Lemma monad_leftid : 
+    forall {A B : Type} 
+           (a: A) (f : A -> G B),
+      semProd (bind (ret a) f) <--> semProd (f a).
+  Proof.
+    intros.
+    rewrite /semProd.
+    apply eq_bigcupr => size.
+    rewrite semBindSize semReturnSize bigcup_set1.
+    reflexivity.
+  Qed.
+
+  Lemma monad_rightid : 
+    forall {A : Type} (g : G A),
+      semProd (bind g ret) <--> semProd g.
+  Proof.
+    intros; rewrite /semProd.
+    apply: eq_bigcupr => size; rewrite semBindSize.
+    rewrite (eq_bigcupr _ (fun x => semReturnSize x size)).
+    apply coverE.
+  Qed.
+  
+  Lemma monad_assoc A B C (ga : G A) (fb : A -> G B) (fc : B -> G C) :
+    semProd (bind (bind ga fb) fc) <--> 
+    semProd (bind ga (fun a => bind (fb a) fc)).
+  Proof.
+    apply eq_bigcupr => ?; rewrite !semBindSize ?bigcup_flatten.
+    by apply eq_bigcupr => ?; rewrite !semBindSize ?bigcup_flatten.
+  Qed.
 
   Instance unsizedReturn {A} (x : A) :
     Unsized (ret x).
@@ -542,4 +559,5 @@ Qed.
     split; auto.
   Qed.    
 
+  
 End ProducerProofs.  
