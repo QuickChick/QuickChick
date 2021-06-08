@@ -232,5 +232,18 @@ Qed.
   Qed.
 
 
+  (* More stuff *)
+
+    Definition vectorOf {A : Type} (k : nat) (g : G A)
+    : G (list A) :=
+    foldr (fun m m' =>
+                bind m (fun x =>
+                bind m' (fun xs => ret (cons x xs)))
+             ) (ret nil) (nseq k g).
+  
+  Definition listOf {A : Type} (g : G A) : G (list A) :=
+  sized (fun n => bind (choose (0, n)) (fun k => vectorOf k g)).
 
 
+
+  
