@@ -5,6 +5,8 @@ Require Import mathcomp.ssreflect.ssreflect.
 From mathcomp Require Import ssrfun ssrbool ssrnat eqtype.
 Require Import ZArith.
 
+Require Import LazyList.
+
 (* We axiomatize a random number generator
    (currently written in OCaml only) *)
 Axiom RandomSeed : Type.
@@ -754,29 +756,70 @@ Class ChoosableFromInterval (A : Type)  :=
     randomRCorrect :
       forall (a a1 a2 : A), leq a1 a2 ->
       (leq a1 a && leq a a2 <->
-       exists seed, fst (randomR (a1, a2) seed) = a)
+       exists seed, fst (randomR (a1, a2) seed) = a);
+    enumR : A * A -> LazyList A;
+    enumRCorrect :
+      forall (a a1 a2 : A), leq a1 a2 ->
+      (leq a1 a && leq a a2 <->
+       In_ll a (enumR (a1,a2)))
   }.
 
+(* This is false. 
 Program Instance ChooseBool : ChoosableFromInterval bool :=
   {
     randomR := randomRBool;
     randomRCorrect := randomRBoolCorrect
   }.
+ *)
 
+Definition enumRNat (p : nat * nat) :=
+  lazy_seq S (fst p) (S (snd p - fst p)).
+
+Lemma enumRNatCorrect : 
+      forall (a a1 a2 : nat), leq a1 a2 ->
+      (leq a1 a && leq a a2 <->
+       In_ll a (enumRNat (a1,a2))).
+Admitted.
+  
 Instance ChooseNat : ChoosableFromInterval nat :=
   {
     randomR := randomRNat;
-    randomRCorrect := randomRNatCorrect
+    randomRCorrect := randomRNatCorrect;
+    enumR := enumRNat;
+    enumRCorrect := enumRNatCorrect
   }.
+
+Definition enumRZ (p : Z * Z) :=
+  lazy_seq (Z.add 1%Z) (fst p) (S (Z.to_nat (snd p - fst p))).
+
+Lemma enumRZCorrect : 
+      forall (a a1 a2 : Z), leq a1 a2 ->
+      (leq a1 a && leq a a2 <->
+       In_ll a (enumRZ (a1,a2))).
+Admitted.
 
 Instance ChooseZ : ChoosableFromInterval Z :=
   {
     randomR := randomRInt;
-    randomRCorrect := randomRIntCorrect
+    randomRCorrect := randomRIntCorrect;
+    enumR := enumRZ;
+    enumRCorrect := enumRZCorrect
   }.
+
+(* Needed? *)
+Definition enumRN (p : N * N) :=
+  lazy_seq N.succ N.one (S (N.to_nat (snd p - fst p))).
+
+Lemma enumRNCorrect : 
+      forall (a a1 a2 : N), leq a1 a2 ->
+      (leq a1 a && leq a a2 <->
+       In_ll a (enumRN (a1,a2))).
+Admitted.
 
 Instance ChooseN : ChoosableFromInterval N :=
   {
     randomR := randomRN;
-    randomRCorrect := randomRNCorrect
+    randomRCorrect := randomRNCorrect;
+    enumR := enumRN;
+    enumRCorrect := enumRNCorrect
   }.

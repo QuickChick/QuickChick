@@ -3,7 +3,7 @@ Set Warnings "-notation-overridden,-parsing".
 
 Require Import ZArith List.
 Require Import mathcomp.ssreflect.ssreflect.
-From mathcomp Require Import ssrfun ssrbool ssrnat.
+From mathcomp Require Import ssrfun ssrbool ssrnat seq.
 Require Import Numbers.BinNums.
 Require Import Classes.RelationClasses.
 
@@ -15,7 +15,7 @@ Import MonadNotation.
 Open Scope monad_scope.
 
 From QuickChick Require Import
-     GenLowInterface RandomQC RoseTrees Sets Tactics Producer.
+     RandomQC RoseTrees Sets Tactics Producer.
 
 Set Implicit Arguments.
 Unset Strict Implicit.
@@ -82,6 +82,9 @@ Definition resizeGen {A : Type} (n : nat) (g : G A) : G A :=
 
 Definition semGenSize {A : Type} (g : G A) (s : nat) : set A := codom (run g s).
 
+Definition chooseGen {A : Type} `{ChoosableFromInterval A} (range : A * A) : G A :=
+    MkGen (fun _ r => fst (randomR range r)).
+
 Program Instance ProducerGen : Producer G :=
   {
   super := MonadGen;
@@ -91,6 +94,8 @@ Program Instance ProducerGen : Producer G :=
   sized  := @sizedGen; 
   resize := @resizeGen;
 
+  choose := @chooseGen;
+  
   semProdSize := @semGenSize;
 
   (* Probably belongs in another class for modularity? *)
@@ -231,18 +236,98 @@ Qed.
     by apply monotonicNone.
   Qed.
 
+Fixpoint pick {A : Type} (def : G A) (xs : list (nat * G A)) n : nat * G A :=
+  match xs with
+    | nil => (0, def)
+    | (k, x) :: xs =>
+      if (n < k) then (k, x)
+      else pick def xs (n - k)
+  end.
 
-  (* More stuff *)
+(* This should use urns! *)
+Fixpoint pickDrop {A : Type} (xs : list (nat * G (option A))) n : nat * G (option A) * list (nat * G (option A)) :=
+  match xs with
+    | nil => (0, returnGen None, nil)
+    | (k, x) :: xs =>
+      if (n < k) then  (k, x, xs)
+      else let '(k', x', xs') := pickDrop xs (n - k)
+           in (k', x', (k,x)::xs')
+  end. 
 
-    Definition vectorOf {A : Type} (k : nat) (g : G A)
-    : G (list A) :=
-    foldr (fun m m' =>
-                bind m (fun x =>
-                bind m' (fun xs => ret (cons x xs)))
-             ) (ret nil) (nseq k g).
-  
-  Definition listOf {A : Type} (g : G A) : G (list A) :=
-  sized (fun n => bind (choose (0, n)) (fun k => vectorOf k g)).
+Definition sum_fst {A : Type} (gs : list (nat * A)) : nat :=
+  foldl (fun t p => t + (fst p)) 0 gs.
+
+Definition freq_ {A : Type} (def : G A) (gs : list (nat * G A))
+: G A :=
+  let tot := sum_fst gs in
+  bindGen (choose (0, tot-1)) (fun n =>
+  @snd _ _ (pick def gs n)).
+
+(*
+Definition frequency {A}:= 
+  @deprecate (G A -> list (nat * G A) -> G A) "frequency" "freq_" freq_.
+ *)
+
+Fixpoint backtrackFuel {A : Type} (fuel : nat) (tot : nat) (gs : list (nat * G (option A))) : G (option A) :=
+  match fuel with 
+    | O => returnGen None
+    | S fuel' => bindGen (choose (0, tot-1)) (fun n => 
+                 let '(k, g, gs') := pickDrop gs n in
+                 bindGen g (fun ma =>
+                 match ma with 
+                   | Some a => returnGen (Some a)
+                   | None => backtrackFuel fuel' (tot - k) gs'
+                 end ))
+  end.
+
+Definition backtrack {A : Type} (gs : list (nat * G (option A))) : G (option A) :=
+  backtrackFuel (length gs) (sum_fst gs) gs.
+
+Definition retryBody {A : Type}
+           (retry : nat -> G (option A) -> G (option A))
+           (n : nat) (g : G (option A)) : G (option A) :=
+  bindGen g (fun x =>
+               match x, n with
+               | Some a, _ => returnGen (Some a)
+               | None, O => returnGen None
+               | None, S n' => retry n' g
+               end).
+
+(* Rerun a generator [g] until it returns a [Some], or stop after
+     [n+1] tries. *)
+Fixpoint retry {A : Type} (n : nat) (g : G (option A)) :
+  G (option A) :=
+  retryBody retry n g.
+
+(* Filter the output of a generator [g], returning [None] when the
+     predicate [p] is [false]. The generator is run once. *)
+Definition suchThatMaybe1 {A : Type} (g : G A) (p : A -> bool) :
+  G (option A) :=
+  fmap (fun x => if p x then Some x else None) g.
+
+(* Retry a generator [g : G A] until it returns a value satisfying
+     the predicate, or stop after [size+1] times, where [size] is the
+     current size value. *)
+Definition suchThatMaybe {A : Type} (g : G A) (p : A -> bool) :
+  G (option A) :=
+  sized (fun n => retry n (suchThatMaybe1 g p)).
+
+(* Retry a generator [g : G (option A)] until it returns a value
+     satisfying the predicate, or stop after [size+1] times, where
+     [size] is the current size value. *)
+Definition suchThatMaybeOpt {A : Type} (g : G (option A))
+           (p : A -> bool) : G (option A) :=
+  sized (fun n => retry n (fmap (fun x =>
+                                   match x with
+                                   | None => None
+                                   | Some a => if p a then Some a else None
+                                   end) g)).
+
+(* Retry a generator until it returns a value, or stop after
+     [size+1] times. *)
+Definition retrySized {A : Type} (g : G (option A)) : G (option A) :=
+  sized (fun n => retry n g).
+
 
 
 

@@ -7,16 +7,16 @@
 Set Warnings "-extraction-opaque-accessed,-extraction".
 Set Warnings "-notation-overridden,-parsing".
 
-Require Import ZArith List.
+Require Import ZArith List Lia.
 Require Import mathcomp.ssreflect.ssreflect.
-From mathcomp Require Import ssrfun ssrbool ssrnat seq.
+From mathcomp Require Import ssrfun ssrbool ssrnat seq eqtype.
 
 From ExtLib.Structures Require Export
      Functor Applicative Monads.
 Import MonadNotation.
 Open Scope monad_scope.
 
-From QuickChick Require Import Sets Tactics.
+From QuickChick Require Import Sets Tactics RandomQC.
 
 Set Implicit Arguments.
 Unset Strict Implicit.
@@ -35,6 +35,8 @@ Class Producer (G : Type -> Type) :=
   
   sized  : forall {A: Type}, (nat -> G A) -> G A;
   resize : forall {A: Type}, nat -> G A -> G A;
+
+  choose : forall {A : Type} `{ChoosableFromInterval A}, (A * A) -> G A;
   
   semProdSize :
     forall {A : Type}, G A -> nat -> set A;
@@ -127,6 +129,23 @@ Class ProducerSemantics G `{Producer G} :=
       semProdSize (bind g f) size <-->
                   \bigcup_(a in semProdSize g size) semProdSize (f a) size;
 
+  semChoose :
+    forall A `{RandomQC.ChoosableFromInterval A} (a1 a2 : A),
+      RandomQC.leq a1 a2 ->
+      (semProd (choose (a1,a2)) <--> [set a | RandomQC.leq a1 a && RandomQC.leq a a2]);
+
+  semChooseSize :
+    forall A `{RandomQC.ChoosableFromInterval A} (a1 a2 : A),
+      RandomQC.leq a1 a2 ->
+      forall size, (semProdSize (choose (a1,a2)) size <-->
+              [set a | RandomQC.leq a1 a && RandomQC.leq a a2]);
+
+  semChooseSizeEmpty :
+    forall A `{RandomQC.ChoosableFromInterval A} (a1 a2 : A),
+      ~ (RandomQC.leq a1 a2) ->
+      forall size, (semProdSize (choose (a1,a2)) size <-->
+                                set0);
+  
   semSized :
     forall A (f : nat -> G A),
       semProd (sized f) <--> \bigcup_s semProdSize (f s) s;
@@ -140,9 +159,6 @@ Class ProducerSemantics G `{Producer G} :=
   semResizeSize :
     forall A (s n : nat) (g : G A),
       semProdSize (resize n g) s <--> semProdSize g n;
-
-
-  
   
   (*
   semBindSizeOpt :
@@ -433,6 +449,17 @@ Qed.
       exists a; split; unfold set1; auto.
   Qed.
 
+  (* Needs decidability to be agnostic of impl *)
+  (*
+  Instance chooseUnsized A `{RandomQC.ChoosableFromInterval A} (a1 a2 : A) :
+    Unsized (choose (a1, a2)).
+  Proof.
+    unfold Unsized => s1 s2.
+    
+    split => /semChooseSize C.
+    apply semChooseSize.
+   *)
+  
   Lemma semFmap :
     forall A B (f : A -> B) (g : G A),
       semProd (fmap f g) <--> f @: semProd g.
@@ -467,22 +494,6 @@ Qed.
     rewrite !semFmapSize. move => b.
     move => [a [H1 <-]]; eexists; split; eauto => //; eapply monotonic; eauto.
   Qed.
-
-(* TODO: Move to Generator. 
-  Parameter semChoose :
-    forall A `{RandomQC.ChoosableFromInterval A} (a1 a2 : A),
-      RandomQC.leq a1 a2 ->
-      (semGen (choose (a1,a2)) <--> [set a | RandomQC.leq a1 a && RandomQC.leq a a2]).
-
-  Parameter semChooseSize :
-    forall A `{RandomQC.ChoosableFromInterval A} (a1 a2 : A),
-      RandomQC.leq a1 a2 ->
-      forall size, (semGenSize (choose (a1,a2)) size <-->
-              [set a | RandomQC.leq a1 a && RandomQC.leq a a2]).
-
-  Declare Instance chooseUnsized A `{RandomQC.ChoosableFromInterval A} (a1 a2 : A) :
-    Unsized (choose (a1, a2)).
-  *)
 
   Lemma semSized_alt A (f : nat -> G A)
         `{H : forall n, SizeMonotonic (f n)}
@@ -566,6 +577,24 @@ Section ProducerHigh.
   Variable G  : Type -> Type.
   Context `{PG: Producer G}.
 
+  Definition vectorOf {A : Type} (k : nat) (g : G A)
+    : G (list A) :=
+    foldr (fun m m' =>
+                bind m (fun x =>
+                bind m' (fun xs => ret (cons x xs)))
+             ) (ret nil) (nseq k g).
+  
+  Definition listOf {A : Type} (g : G A) : G (list A) :=
+    sized (fun n => bind (choose (0, n)) (fun k => vectorOf k g)).
+
+  Definition oneOf_ {A : Type} (def: G A) (gs : list (G A)) : G A :=
+    bind (choose (0, length gs - 1)) (nth def gs).
+
+  Definition elems_ {A : Type} (def : A) (l : list A) :=
+    let n := length l in
+    bind (choose (0, n - 1)) (fun n' =>
+    ret (List.nth n' l def)).
+  
   Definition liftProd4 {A1 A2 A3 A4 R}
              (F : A1 -> A2 -> A3 -> A4 -> R)
              (m1 : G A1) (m2 : G A2) (m3 : G A3) (m4: G A4)
@@ -599,3 +628,436 @@ Section ProducerHigh.
                  | (x :: xs) => bind (f a x) (foldProd f xs)
                  end).
 
+End ProducerHigh.
+
+Section ProducerHighProofs.
+  Variable G  : Type -> Type.
+  Context `{PG: Producer G}.
+  Context `{PS: @ProducerSemantics G PG}.
+
+(* * Semantics *)
+
+Lemma semLiftGen {A B} (f: A -> B) (g: G A) :
+  semProd (liftM f g) <--> f @: semProd g.
+Proof.
+  rewrite imset_bigcup. apply: eq_bigcupr => size.
+    by rewrite semBindSize (eq_bigcupr _ (fun a => semReturnSize (f a) size)).
+Qed.
+
+Ltac solveLiftProdX :=
+intros; split; intros;
+repeat
+  match goal with
+    | [ H : exists _, _ |- _ ] => destruct H as [? [? ?]]
+    | [ H : semProdSize _ _ _ |- _ ] =>
+      try (apply semBindSize in H; destruct H as [? [? ?]]);
+      try (apply semReturnSize in H; subst)
+  end;
+  [ by repeat (eexists; split; [eassumption |])
+  | repeat (apply semBindSize; eexists; split; try eassumption);
+      by apply semReturnSize ].
+
+Lemma semLiftProdSize {A B} (f: A -> B) (g: G A) size :
+  semProdSize (liftM f g) size <--> f @: (semProdSize g size).
+Proof. 
+    by rewrite semBindSize (eq_bigcupr _ (fun a => semReturnSize (f a) size)).
+ Qed.
+
+Program Instance liftProdUnsized {A B} (f : A -> B) (g : G A) 
+        `{@Unsized _ _ PG g} : Unsized (liftM f g).
+Next Obligation.
+  by rewrite ! semLiftProdSize (unsized s1 s2).
+Qed.
+
+Program Instance liftProdMonotonic {A B} (f : A -> B) (g : G A) 
+        `{@SizeMonotonic _ _ PG g} : SizeMonotonic (liftM f g).
+Next Obligation.
+  rewrite ! semLiftProdSize. apply imset_incl. by apply monotonic.
+Qed.
+
+Lemma semLiftProd2Size {A1 A2 B} (f: A1 -> A2 -> B) (g1 : G A1) (g2 : G A2) s :
+  semProdSize (liftM2 f g1 g2) s <-->
+  f @2: (semProdSize g1 s, semProdSize g2 s).
+Proof. 
+  rewrite semBindSize curry_imset2l; apply: eq_bigcupr => x.
+    by rewrite semBindSize; apply: eq_bigcupr => y; rewrite semReturnSize.
+Qed.
+
+     
+Lemma semLiftProd2SizeMonotonic {A1 A2 B} (f: A1 -> A2 -> B)
+                               (g1 : G A1) (g2 : G A2) 
+                               `{@SizeMonotonic _ _ PG g1} `{@SizeMonotonic _ _ PG g2} :
+  semProd (liftM2 f g1 g2) <--> f @2: (semProd g1, semProd g2).
+Proof.
+  rewrite /semProd. setoid_rewrite semLiftProd2Size.
+  move => b. split. 
+  - move => [sb [_ Hb]]. (* point-free reasoning would be nice here *)
+    destruct Hb as [a [[Hb11 Hb12] Hb2]]. exists a. split; [| by apply Hb2].
+    split; eexists; by split; [| eassumption].
+  - move => [[a1 a2] [[[s1 [_ G1]] [s2 [_ G2]]] Hf]]. compute in Hf.
+    exists (max s1 s2). split; first by [].
+    exists (a1,a2). split; last by []. split => /=;
+    (eapply monotonic; last eassumption); 
+    apply/leP; solve [ apply Max.le_max_l | apply Max.le_max_r ].
+Qed.
+
+Lemma semLiftProd2Unsized1 {A1 A2 B} (f: A1 -> A2 -> B)
+      (g1 : G A1) (g2 : G A2) `{@Unsized _ _ PG g1}:
+  semProd (liftM2 f g1 g2) <--> f @2: (semProd g1, semProd g2).
+Proof.
+  rewrite /semProd. setoid_rewrite semLiftProd2Size.
+  move=> b. split.
+  - move => [n [_ [[a1 a2] [[/= H2 H3] H4]]]]. exists (a1, a2).
+    split; auto; split; eexists; split; eauto; reflexivity.
+  - move => [[a1 a2] [[[s1 /= [H2 H2']] [s2 [H3 H3']]] H4]].
+    eexists. split; first by eauto. 
+    exists (a1, a2); split; eauto.
+    split; last by eauto. simpl. 
+    eapply unsized; eauto; apply (unsized2 H); eauto.
+Qed.
+  
+Lemma semLiftProd2Unsized2 {A1 A2 B} (f: A1 -> A2 -> B)
+      (g1 : G A1) (g2 : G A2) `{@Unsized _ _ PG g2}:
+  semProd (liftM2 f g1 g2) <--> f @2: (semProd g1, semProd g2).
+Proof.
+  rewrite /semProd. setoid_rewrite semLiftProd2Size.
+  move=> b. split. 
+  - move => [n [_ [[a1 a2] [[/= H2 H3] H4]]]]. exists (a1, a2).
+    split; auto; split; eexists; split; eauto; reflexivity.
+  - move => [[a1 a2] [[[s1 /= [H2 H2']] [s2 [H3 H3']]] H4]].
+    eexists. split; first by auto.
+    exists (a1, a2). split; eauto.
+    split; first by eauto. simpl. 
+    eapply unsized; eauto.
+Qed.
+
+Lemma semLiftProd3Size :
+forall {A1 A2 A3 B} (f: A1 -> A2 -> A3 -> B)
+       (g1: G A1) (g2: G A2) (g3: G A3) size,
+  semProdSize (liftM3 f g1 g2 g3) size <-->
+  fun b =>
+    exists a1, semProdSize g1 size a1 /\
+               (exists a2, semProdSize g2 size a2 /\
+                           (exists a3, semProdSize g3 size a3 /\
+                                       (f a1 a2 a3) = b)).
+Proof. solveLiftProdX. Qed.
+
+Program Instance liftM2Unsized {A1 A2 B} (f : A1 -> A2 -> B) (g1 : G A1)
+        `{@Unsized _ _ PG g1} (g2 : G A2) `{@Unsized _ _ PG g2} : Unsized (liftM2 f g1 g2).
+Next Obligation.
+  rewrite ! semLiftProd2Size. 
+  rewrite ! curry_imset2l. by setoid_rewrite (unsized s1 s2).
+Qed.
+
+Program Instance liftM2Monotonic {A1 A2 B} (f : A1 -> A2 -> B) (g1 : G A1)
+        `{@SizeMonotonic _ _ PG g1} (g2 : G A2)
+        `{@SizeMonotonic _ _ PG g2} : 
+  SizeMonotonic (liftM2 f g1 g2).
+Next Obligation.
+  rewrite ! semLiftProd2Size. rewrite ! curry_imset2l. 
+  move => b [a1 [Ha1 [a2 [Ha2 <-]]]].
+  do 2 (eexists; split; first by eapply (monotonic H1); eauto).
+  reflexivity.
+Qed.
+
+
+(* CH: Made this more beautiful than the rest *)
+(* CH: Should anyway use dependent types for a generic liftMN *)
+Lemma semLiftProd4Size A1 A2 A3 A4 B (f : A1 -> A2 -> A3 -> A4 -> B)
+                     (g1 : G A1) (g2 : G A2) (g3 : G A3) (g4 : G A4) s :
+  semProdSize (liftProd4 f g1 g2 g3 g4) s <-->
+  [set b : B | exists a1 a2 a3 a4, semProdSize g1 s a1 /\ semProdSize g2 s a2 /\
+                 semProdSize g3 s a3 /\ semProdSize g4 s a4 /\ f a1 a2 a3 a4 = b].
+Proof.
+  split; unfold liftProd4; intros.
+  - repeat match goal with
+    | [ H : semProdSize _ _ _ |- _ ] =>
+      try (apply semBindSize in H; destruct H as [? [? ?]]);
+      try (apply semReturnSize in H; subst)
+    end.
+    do 4 eexists. repeat (split; [eassumption|]). assumption.
+  - repeat match goal with
+    | [ H : exists _, _ |- _ ] => destruct H as [? [? ?]]
+    | [ H : and _ _ |- _ ] => destruct H as [? ?]
+    end.
+    repeat (apply semBindSize; eexists; split; [eassumption|]).
+    apply semReturnSize. assumption.
+Qed.
+
+(* begin semLiftProd4SizeMonotonic *)
+Lemma semLiftProd4SizeMonotonic A1 A2 A3 A4 B (f : A1 -> A2 -> A3 -> A4 -> B)
+                               (g1 : G A1) (g2 : G A2) (g3 : G A3) (g4 : G A4)
+                               `{@SizeMonotonic _ _ PG g1} `{@SizeMonotonic _ _ PG g2}
+                               `{@SizeMonotonic _ _ PG g3} `{@SizeMonotonic _ _ PG g4} :
+  semProd (liftProd4 f g1 g2 g3 g4) <-->
+  [set b : B | exists a1 a2 a3 a4, semProd g1 a1 /\ semProd g2 a2 /\
+                 semProd g3 a3 /\ semProd g4 a4 /\ f a1 a2 a3 a4 = b].
+(* end semLiftProd4SizeMonotonic *)
+Proof.
+  rewrite /semProd. setoid_rewrite semLiftProd4Size.
+  move => b. split. 
+  - move => [s [_ [a1 [a2 [a3 [a4 [Ha1 [Ha2 [Ha3 [Ha4 Hb]]]]]]]]]]; subst.
+    exists a1. exists a2. exists a3. exists a4. 
+    repeat split; exists s; (split; [reflexivity | eassumption ]). 
+  -  move => [a1 [a2 [a3 [a4 [[s1 [_ Ha1]] 
+                                [[s2 [_ Ha2]] 
+                                   [[s3 [_ Ha3]] 
+                                      [[s4 [_ Ha4]] Hb]]]]]]]]; subst.
+    exists (max s1 (max s2 (max s3 s4))). 
+    split; first by [].
+    exists a1. exists a2. exists a3. exists a4. 
+    repeat split; (eapply monotonic; [ apply/leP | ]; last eassumption).
+    by eapply Max.le_max_l.
+    eapply Nat.max_le_iff. right. by eapply Max.le_max_l.
+    eapply Nat.max_le_iff. right.
+    eapply Nat.max_le_iff. right. by eapply Max.le_max_l.
+    eapply Nat.max_le_iff. right.
+    eapply Nat.max_le_iff. right.
+    eapply Nat.max_le_iff. by right. 
+Qed.
+
+Program Instance liftM4Monotonic {A B C D E} 
+        (f : A -> B -> C -> D -> E)
+        (g1 : G A) (g2 : G B) (g3 : G C) (g4 : G D) 
+        `{ @SizeMonotonic _ _ PG g1} `{ @SizeMonotonic _ _ PG g2}
+        `{ @SizeMonotonic _ _ PG g3} `{ @SizeMonotonic _ _ PG g4} 
+: SizeMonotonic (liftProd4 f g1 g2 g3 g4). 
+Next Obligation.
+  rewrite ! semLiftProd4Size.
+  move => t /= [a1 [a2 [a3 [a4 [Ha1 [Ha2 [Ha3 [Ha4 H5]]]]]]]]; subst.
+  eexists. eexists. eexists. eexists. 
+  repeat (split; try reflexivity); by eapply monotonic; eauto. 
+Qed.
+
+Lemma semLiftProd5Size :
+forall {A1 A2 A3 A4 A5 B} (f: A1 -> A2 -> A3 -> A4 -> A5 -> B)
+       (g1: G A1) (g2: G A2) (g3: G A3) (g4: G A4) (g5: G A5) size,
+  semProdSize (liftProd5 f g1 g2 g3 g4 g5) size <-->
+  fun b =>
+    exists a1, semProdSize g1 size a1 /\
+               (exists a2, semProdSize g2 size a2 /\
+                           (exists a3, semProdSize g3 size a3 /\
+                                       (exists a4, semProdSize g4 size a4 /\
+                                                   (exists a5, semProdSize g5 size a5 /\
+                                                               (f a1 a2 a3 a4 a5) = b)))).
+Proof. solveLiftProdX. Qed.
+
+Lemma Forall2_cons T U (P : T -> U -> Prop) x1 s1 x2 s2 :
+  List.Forall2 P (x1 :: s1) (x2 :: s2) <-> P x1 x2 /\ List.Forall2 P s1 s2.
+Proof.
+split=> [H|[? ?]]; last by constructor.
+by inversion H.
+Qed.
+
+Lemma semSequenceProdSize A (gs : list (G A)) n :
+  semProdSize (sequenceProd gs) n <-->
+  [set l | length l = length gs /\
+    List.Forall2 (fun y => semProdSize y n) gs l].
+Proof.
+elim: gs => [|g gs IHgs].
+  by rewrite semReturnSize /set1; case=> // a l; split=> // [[]].
+rewrite /= semBindSize; setoid_rewrite semBindSize; setoid_rewrite semReturnSize.
+setoid_rewrite IHgs; case=> [| x l].
+  split; first by case=> ? [? [? [?]]].
+  by move=> H; inversion H.
+rewrite Forall2_cons; split; first by case=> y [gen_y [s [[<- ?]]]] [<- <-].
+by case=> [[<-] [? ?]]; exists x; split => //; exists l; split.
+Qed.
+
+Lemma Forall2_SizeMonotonic {A} x n (gs : list (G A)) l :
+  x <= n -> gs \subset SizeMonotonic -> 
+  List.Forall2 (semProdSize^~ x) gs l ->
+  List.Forall2 (semProdSize^~ n) gs l.
+Proof. 
+  intros. induction H1; auto.
+  apply subconsset in H0. destruct H0; auto. 
+  constructor; auto. eapply H0; eauto.
+Qed.
+
+Lemma semSequenceProdSizeMonotonic A (gs : list (G A)) :
+  (gs \subset SizeMonotonic) ->
+  semProd (sequenceProd gs) <-->
+  [set l | length l = length gs /\
+    List.Forall2 semProd gs l].
+Proof.
+  intros. rewrite /semProd. setoid_rewrite semSequenceProdSize.
+  move => l. split.
+  - move => [n [ _ [H1 H2]]]. split; auto.
+    induction H2; subst; simpl; constructor.
+    + exists n. split; auto. reflexivity. 
+    + apply IHForall2; eauto. 
+      apply subconsset in H. destruct H; auto. 
+  - move => [H1 H2]. revert gs H H1 H2. induction l; intros gs H H1 H2.
+    + destruct gs; try discriminate. exists 0. 
+      split; auto. reflexivity.
+    + destruct gs; try discriminate.
+      apply subconsset in H. move : H => [H3 H4].  
+      inversion H2; subst. destruct H6 as [n [ _ H5]].
+      eapply IHl in H8; auto. destruct H8 as [x [_ [H7 H8]]].
+      destruct (x <= n) eqn:Hle. 
+      { exists n. split; eauto; first by reflexivity. split; auto. 
+        constructor; auto. eapply Forall2_SizeMonotonic; eauto. }
+      { exists x.  split; first by reflexivity. split; auto.
+        constructor; auto. eapply H3; last by eassumption. 
+        rewrite -> leq_eqVlt, -> Bool.orb_false_iff in Hle. 
+        destruct Hle; auto. rewrite leqNgt H0 //. }
+Qed.
+ 
+Lemma semVectorOfSize {A : Type} (k : nat) (g : G A) n :
+  semProdSize (vectorOf k g) n <-->
+  [set l | length l = k /\ l \subset (semProdSize g n)].
+Proof.
+elim: k => [|k IHk].
+  rewrite /vectorOf /= semReturnSize.
+  by move=> s; split=> [<-|[] /size0nil ->] //; split.
+rewrite /vectorOf /= semBindSize; setoid_rewrite semBindSize.
+setoid_rewrite semReturnSize; setoid_rewrite IHk.
+case=> [|x l]; first by split=> [[? [? [? [?]]]] | []].
+split=> [[y [gen_y [l' [[length_l' ?] [<- <-]]]]]|] /=.
+  split; first by rewrite length_l'.
+  exact/subconsset.
+by case=> [[?]] /subconsset [? ?]; exists x; split => //; exists l.
+Qed.
+
+Lemma semVectorOfUnsized {A} (g : G A) (k : nat) `{@Unsized _ _ PG g}: 
+  semProd (vectorOf k g) <--> [set l | length l = k /\ l \subset semProd g ]. 
+Proof.
+  rewrite /semProd.
+  setoid_rewrite semVectorOfSize.
+  move => l; split.
+  - move => [k' [_ [H1 H2]]]. split; auto. exists k'. split; auto.
+    reflexivity.
+  - move => [H1 H2]. 
+    exists k. split; first by reflexivity.
+    split; auto. move => a /H2 [x [_ Hx]]. 
+    by eapply unsized; eauto.
+Qed.
+
+Program Instance vectorOfUnsized {A} (k : nat) (g : G A) 
+        `{@Unsized _ _ PG g } : Unsized (vectorOf k g).
+Next Obligation.
+  rewrite ! semVectorOfSize. 
+  split; move => [H1 H2]; split => //; by rewrite unsized; eauto.
+Qed.
+
+Program Instance vectorOfMonotonic {A} (k : nat) (g : G A) 
+        `{@SizeMonotonic _ _ PG g } : SizeMonotonic (vectorOf k g).
+Next Obligation.
+  rewrite ! semVectorOfSize. 
+  move => l [H1 H2]; split => // a Ha. by eapply (monotonic H0); eauto.
+Qed.
+
+
+Lemma semListOfSize {A : Type} (g : G A) size :
+  semProdSize (listOf g) size <-->
+  [set l | length l <= size /\ l \subset (semProdSize g size)].
+Proof.
+rewrite /listOf semSizedSize semBindSize; setoid_rewrite semVectorOfSize.
+rewrite semChooseSize // => l; split=> [[n [/andP [_ ?] [-> ?]]]| [? ?]] //.
+by exists (length l).
+Qed.
+
+Lemma semListOfUnsized {A} (g : G A) (k : nat) `{@Unsized _ _ PG g} : 
+  semProd (listOf g) <--> [set l | l \subset semProd g ]. 
+Proof.
+  rewrite /semProd.
+  setoid_rewrite semListOfSize. 
+  move => l; split.
+  - move => [k' [_ [H1 H2]]]. exists k'. split; auto.
+    reflexivity.
+  - move => Hl. exists (length l). repeat split => //.
+    move => a /Hl [s [_ Ha]]. by eapply unsized; eauto.
+Qed.
+
+Program Instance listOfMonotonic {A} (g : G A) 
+        `{@SizeMonotonic _ _ PG g } : SizeMonotonic (listOf g).
+Next Obligation.
+  rewrite ! semListOfSize.
+  move => l [H1 H2]; split => //. by eapply leq_trans; eauto.
+  move => a /H2 Ha. by eapply monotonic; eauto.
+Qed.
+
+
+Lemma In_nth_exists {A} (l: list A) x def :
+  List.In x l -> exists n, nth def l n = x /\ (n < length l)%coq_nat.
+Proof.
+elim : l => [| a l IHl] //=.
+move => [H | /IHl [n [H1 H2]]]; subst.
+  exists 0; split => //; lia.
+exists n.+1; split => //; lia.
+Qed.
+
+Lemma nthE T (def : T) s i : List.nth i s def = nth def s i.
+Proof.
+elim: s i => [|x s IHs i]; first by case.
+by case: i.
+Qed.
+
+Lemma nth_imset T (def : T) l : nth def l @: [set n | n < length l] <--> l.
+Proof.
+case: l => [|x l] t; first by split=> //; case=> ?; rewrite ltn0; case.
+split; first by case=> n [? <-]; rewrite -nthE; apply/List.nth_In/ltP.
+by case/(In_nth_exists def) => n [? ?]; exists n; split=> //; apply/ltP.
+Qed.
+
+Lemma semOneofSize {A} (l : list (G A)) (def : G A) s : semProdSize (oneOf_ def l) s
+  <--> if l is nil then semProdSize def s else \bigcup_(x in l) semProdSize x s.
+Proof.
+case: l => [|g l].
+  rewrite semBindSize semChooseSize //.
+  rewrite (eq_bigcupl [set 0]) ?bigcup_set1 // => a; split=> [/andP [? ?]|<-] //.
+  by apply/antisym/andP.
+rewrite semBindSize semChooseSize //.
+set X := (fun a : nat => is_true (_ && _)).
+by rewrite (reindex_bigcup (nth def (g :: l)) X) // /X subn1 nth_imset.
+Qed.
+
+Lemma semOneof {A} (l : list (G A)) (def : G A) :
+  semProd (oneOf_ def l) <-->
+  if l is nil then semProd def else \bigcup_(x in l) semProd x.
+Proof.
+by case: l => [|g l]; rewrite 1?bigcupC; apply: eq_bigcupr => sz;
+  apply: semOneofSize.
+Qed.
+
+Program Instance oneofMonotonic {A} (x : G A) (l : list (G A))
+        `{ @SizeMonotonic _ _ PG x} `(l \subset SizeMonotonic) 
+: SizeMonotonic (oneOf_ x l). 
+Next Obligation.
+  rewrite !semOneofSize. elim : l H0 => [_ | g gs IH /subconsset [H2 H3]] /=.
+  - by apply monotonic.
+  - specialize (IH H3). move => a [ga [[Hga | Hga] Hgen]]; subst.
+    exists ga. split => //. left => //.
+    eapply monotonic; eauto. exists ga.
+    split. right => //.
+    apply H3 in Hga. by apply (monotonic H1). 
+Qed.
+
+Lemma semElementsSize {A} (l: list A) (def : A) s :
+  semProdSize (elems_ def l) s <--> if l is nil then [set def] else l.
+Proof.
+rewrite semBindSize.
+setoid_rewrite semReturnSize.
+rewrite semChooseSize //=.
+setoid_rewrite nthE. (* SLOW *)
+case: l => [|x l] /=.
+  rewrite (eq_bigcupl [set 0]) ?bigcup_set1 // => n.
+  by rewrite leqn0; split=> [/eqP|->].
+rewrite -(@reindex_bigcup _ _ _ (nth def (x :: l)) _ (x :: l)) ?coverE //.
+by rewrite subn1 /= nth_imset.
+Qed.
+
+Lemma semElements {A} (l: list A) (def : A) :
+  (semProd (elems_ def l)) <--> if l is nil then [set def] else l.
+Proof.
+rewrite /semProd; setoid_rewrite semElementsSize; rewrite bigcup_const //.
+by do 2! constructor.
+Qed.
+
+Program Instance elementsUnsized {A} {def : A} (l : list A) : 
+  Unsized (elems_ def l).
+Next Obligation.
+  rewrite ! semElementsSize. by case: l.
+Qed.
+  
+End ProducerHighProofs.
