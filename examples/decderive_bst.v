@@ -31,6 +31,33 @@ Ltac2 inv := fun (h : ident) =>  inversion h; subst.
 Ltac2 eassumption_ltac2 () := ltac1:(eassumption).
 Ltac2 Notation "eassumption" := eassumption_ltac2 ().
 
+
+Ltac2 print_string (s : string) := Message.print (Message.of_string s).
+
+Ltac2 print_kind (p : constr) :=
+  match Constr.Unsafe.kind p with
+  | Constr.Unsafe.Rel _ => print_string "Rel"
+  | Constr.Unsafe.Var _ => print_string "Var"
+  | Constr.Unsafe.Meta _ => print_string "Meta"
+  | Constr.Unsafe.Evar _ _ => print_string "Evar"
+  | Constr.Unsafe.Sort _ => print_string "Sort"
+  | Constr.Unsafe.Cast _ _ _ => print_string "Case"
+  | Constr.Unsafe.Prod _ _ => print_string "Prod"
+  | Constr.Unsafe.Lambda _ _ => print_string "Lambda"
+  | Constr.Unsafe.LetIn _ _ _ => print_string "Letin"
+  | Constr.Unsafe.App _ _ => print_string "App"
+  | Constr.Unsafe.Constant _ _ => print_string "Constant"
+  | Constr.Unsafe.Ind _ _ => print_string "Ind"
+  | Constr.Unsafe.Constructor _ _ => print_string "Constructor"
+  | Constr.Unsafe.Case _ _ _ _ => print_string "Case"
+  | Constr.Unsafe.Fix _ _ _ _ => print_string "fix"
+  | Constr.Unsafe.CoFix _ _ _ => print_string "Cofix"
+  | Constr.Unsafe.Proj _ _ => print_string "Proj"
+  | Constr.Unsafe.Uint63 _ => print_string "Uint63"
+  | Constr.Unsafe.Float _ => print_string "Float"
+                                          (* | Constr.Unsafe.Array _ _ _ _ =>print_string "Array" *)
+  end.
+
 Section TypeClasses.
     
   Class DecOptSizeMonotonic (P : Prop) {H : DecOpt P} :=
@@ -227,6 +254,55 @@ Section Lemmas.
   Qed.
 
 
+  Lemma exists_match check k s1 :        
+    check s1 = Some true ->
+    (forall s1 s2, s1 <= s2 -> check s1 = Some true -> check s2 = Some true) ->
+    (exists s, k (max s1 s) = Some true) ->
+    (exists (s : nat) ,
+        match check s with
+        | Some true => k s
+        | Some false => Some false
+        | None => None
+        end = Some true).
+  Proof.
+    intros Hch Hmon Hk. destruct Hk as [s2 Hk].
+    eexists (max s1 s2).
+    erewrite Hmon > [ | | eassumption ].
+    eassumption. lia.
+  Qed.  
+
+  
+  Lemma exists_match_decOpt P {_ : DecOpt P} { _ : DecOptSizeMonotonic P }
+        s1 k :
+    decOpt s1 = Some true ->
+    (exists s, k (max s1 s) = Some true) ->
+    (exists (s : nat) ,
+        match decOpt s with
+        | Some true => k s
+        | Some false => Some false
+        | None => None
+        end = Some true).
+  Proof.
+    intros. eapply exists_match; eauto.
+  Qed.
+
+  Lemma checker_backtrack_spec_exists (l : nat -> list (unit -> option bool))  :
+    (exists (f : nat -> (unit -> option bool)),
+        (forall s, List.In (f s) (l s)) /\ exists s, f s tt = Some true) ->
+    exists s, checker_backtrack (l s) = Some true.                               
+  Proof.
+    intros [f [Hall [s Heq]]].
+    eexists s. eapply checker_backtrack_spec. eexists.
+    split; eauto.
+  Qed.
+
+  Lemma exists_Sn (P : nat -> Prop) : 
+    (exists n, P (S n)) -> exists n, P n.
+  Proof.
+    intros [n H]. eexists; eauto.
+  Qed.
+
+  
 End Lemmas. 
 
 From Ltac2 Require Import Fresh.
@@ -368,6 +444,33 @@ Ltac2 ind_case_monf (ih : ident) (heqb : ident) :=
   simpl_minus_decOpt ();
   repeat (handle_ind_checkerf @IH1 @Heqb).
 
+Ltac2 derive_mon_aux (l : ident list) :=
+  (induction s1 as [ | s1 IH1 ];
+  (List.map (fun x => intro $x) (List.rev l);
+  intros s2 b s2' s1' Hleq Hleq' Hdec);
+  destruct b) >
+  [ (* base case true *)
+    destruct s2 > [ assumption | ];
+    (* simplify and apply checker_backtrack_spec *)
+    apply checker_backtrack_spec in Hdec;
+    destruct Hdec as [f [Hin Heq]];
+    apply checker_backtrack_spec;
+    now base_case_mont ()
+  | (* base case false *)
+    now base_case_monf ()
+  | (* ind case true *)
+    destruct s2 > [ lia | ];
+    (* (* simplify and apply checker_backtrack_spec *) *)
+    apply checker_backtrack_spec in Hdec;
+    destruct Hdec as [f [Hin Heq]];
+    apply checker_backtrack_spec;
+    now ind_case_mont @IH1 @Heq     
+  | (* ind case false *)
+    destruct s2 > [ lia | ];
+    eapply checker_backtrack_spec_false;
+    intros f Hin; now ind_case_monf @IH1 @Heq
+  ].
+
 
 Ltac2 derive_mon (_ : unit) :=
   match! goal with
@@ -378,37 +481,32 @@ Ltac2 derive_mon (_ : unit) :=
       intros s1 s2 b Hleq; unfold decOpt; simpl_minus_decOpt ();
       assert (Hleq' := &Hleq); revert Hleq Hleq';
       generalize &s1 at 2 3 as s1'; generalize &s2 at 2 3 as s2';
-      revert s2 b;
-      List.map (fun x => revert $x) l;
-      (induction s1 as [ | s1 IH1 ];
-       (List.map (fun x => intro $x) (List.rev l);
-        intros s2 b s2' s1' Hleq Hleq' Hdec);
-         destruct b) >
-       [ (* base case true *)
-         destruct s2 > [ assumption | ];
-         (* simplify and apply checker_backtrack_spec *)
-         apply checker_backtrack_spec in Hdec;
-         destruct Hdec as [f [Hin Heq]];
-         apply checker_backtrack_spec;
-         now base_case_mont ()
-       | (* base case false *)
-          now base_case_monf ()
-       | (* ind case true *)
-          destruct s2 > [ lia | ];
-         (* (* simplify and apply checker_backtrack_spec *) *)
-         apply checker_backtrack_spec in Hdec;
-         destruct Hdec as [f [Hin Heq]];
-         apply checker_backtrack_spec;
-         now ind_case_mont @IH1 @Heq
-             
-      | (* ind case false *)
-        destruct s2 > [ lia | ];
-        eapply checker_backtrack_spec_false;
-        intros f Hin; now ind_case_monf @IH1 @Heq
-      ]
-    | _ => () 
-       end
-  end.
+      revert s2 b; List.map (fun x => revert $x) l; derive_mon_aux l
+   | _ => () 
+   end
+end.
+
+(* For deriving monotonicity inside the completness proof *)
+
+Ltac2 derive_mon_true (l : ident list) :=
+  (intro s1; induction s1 as [ | s1 IH1 ];
+  intros s2 s2' s1' Hleq Hleq';
+  (List.map (fun x => intro $x) (List.rev l)); intro Hdec) >
+  [ (* base case true *)
+    destruct s2 > [ assumption | ];
+  (* simplify and apply checker_backtrack_spec *)
+  apply checker_backtrack_spec in Hdec;
+  destruct Hdec as [f [Hin Heq]];
+  apply checker_backtrack_spec;
+  now base_case_mont ()
+  | (* ind case true *)
+  destruct s2 > [ lia | ];
+  (* (* simplify and apply checker_backtrack_spec *) *)
+  apply checker_backtrack_spec in Hdec;
+  destruct Hdec as [f [Hin Heq]];
+  apply checker_backtrack_spec;
+  now ind_case_mont @IH1 @Heq
+  ].
 
 
 (* Soundness *)
@@ -452,21 +550,18 @@ Ltac2 try_constructors (_ : unit) := try_constructors_aux 1.
 
 Ltac2 eauto_using (e : constr) := eauto using $e. 
 
-  Inductive test :=
-  | Many_evars :
-      forall n m x y,
-        n <= m ->
-        x <= y ->
-        odd x = true ->
-        test.
+Inductive test :=
+| Many_evars :
+    forall n m x y,
+      n <= m ->
+      x <= y ->
+      odd x = true ->
+      test.
 
-  Goal (forall n m x y, n <= m -> x <= y -> odd n = true -> test).
-  Proof.
-    eauto_using 'test.
-  Qed. 
-        
-  (* Goal (bst 0 0 Leaf). *)
-  (*   eauto_using 'bst. *)
+Goal (forall n m x y, n <= m -> x <= y -> odd n = true -> test).
+Proof.
+  eauto_using 'test.
+Qed. 
 
 
 Ltac2 rec base_case_sound (heq : ident) (ty : constr) :=
@@ -511,6 +606,224 @@ Ltac2 derive_sound (_ : unit) :=
    end 
 end.
 
+(* Completeness *)
+
+(* TODO fix indent *) 
+
+  Ltac2 make_prod (bs : constr array) (c : constr) :=
+    let bs := Array.map (fun b => let t := Constr.type b in
+                                  Constr.Binder.make (Some (constr_to_ident b)) t) bs in
+    
+    Array.fold_left (fun t b => Constr.Unsafe.make (Constr.Unsafe.Prod b t)) c bs.
+
+  (* Proves monotonicity assertion inside completness proof *)
+  Ltac2 prove_mon (_ : unit) :=
+    match! goal with
+    | [ |- ex ?p ] =>
+      match Constr.Unsafe.kind p with
+      | Constr.Unsafe.Lambda b eq =>
+        match Constr.Unsafe.kind eq with
+        | Constr.Unsafe.App t eq_args =>
+          let app := Array.get eq_args 1 in
+          match Constr.Unsafe.kind app with
+          | Constr.Unsafe.App aux args =>              
+            let make_eq (lhs : constr) :=
+                let a := Array.copy eq_args in
+                Array.set a 1 lhs; Constr.Unsafe.make (Constr.Unsafe.App t a) in
+                let make_impl (t1 : constr) (t2 : constr) :=
+                let b := Constr.Binder.make None t1 in
+                Constr.Unsafe.make (Constr.Unsafe.Prod b t2)
+            in
+            let inner_term  (t1 : constr) (t2 : constr) :=
+                make_impl (make_eq t1) (make_eq t2)
+            in
+
+            let len := Int.sub (Array.length args) 2 in
+            let inps := Array.sub args 2 len in
+
+            let args (s1 : constr) (s2 : constr) (offs : int) :=
+                let ind := Array.mapi (fun i _ => Constr.Unsafe.make (Constr.Unsafe.Rel (Int.add i offs))) inps in
+                let a := Array.make 2 s1 in
+                Array.set a 1 s2; Array.append a ind
+           in
+           let term (s1 : constr) (s2 : constr) (offs : int) :=
+               Constr.Unsafe.make (Constr.Unsafe.App aux (args s1 s2 offs))
+           in
+           let prod_term (t1 : constr) (t2 : constr) := make_prod inps (inner_term t1 t2) in
+           let mon (s1 : constr) (s2 : constr) (s1' : constr) (s2' : constr) :=
+               let t1 := (term s1' s1 1) in
+               let t2 := (term s2' s2 2) in
+               prod_term t1 t2 in
+
+           let l := constrs_to_idents (Array.to_list inps) in
+           assert (Hmon : forall (s1 : nat) (s2 s2' s1': nat), s1 <= s2 -> s1' <= s2' ->
+                                                               ltac2:(let s1 := Control.hyp @s1 in
+                                                                      let s1' := Control.hyp @s1' in
+                                                                      let s2 := Control.hyp @s2 in
+                                                                      let s2' := Control.hyp @s2' in
+                                                                      let t := mon s1 s2 s1' s2' in exact $t)) >
+           [ clear; now derive_mon_true l | ]
+         | _ => Control.throw (Tactic_failure (Some (Message.of_string ("Expecting an application"))))
+         end
+       | _ => Control.throw (Tactic_failure (Some (Message.of_string ("Expecting an application"))))
+       end
+     | _ => Control.throw (Tactic_failure (Some (Message.of_string ("Expecting a lambda"))))
+     end
+  end.
+
+
+  Ltac2 prove_ih (ih : ident) :=
+    match! goal with
+    | [ |- ex ?p ] =>
+      match Constr.Unsafe.kind p with
+      | Constr.Unsafe.Lambda b eq =>
+        match Constr.Unsafe.kind eq with
+        | Constr.Unsafe.App t eq_args =>
+          let m := Array.get eq_args 1 in          
+          match Constr.Unsafe.kind m with
+          | Constr.Unsafe.Case _ _ a _  =>            
+            match Constr.Unsafe.kind a with
+            | Constr.Unsafe.App f args =>
+
+              let make_app (a : constr) :=
+                  let args' := Array.copy args in
+                  let _ := Array.set args' 0 a in
+                  let _ := Array.set args' 1 a in                 
+                  let a := Constr.Unsafe.App f args' in
+                  Constr.Unsafe.make a
+              in
+
+              let ih := Fresh.in_goal (id_of_string "IH") in
+              let s := Fresh.in_goal (id_of_string "s") in
+              (* Create the IH and prove it from the context. *)
+              (* Kind of hacky because I don't know how to create a cpattern from the term. *)
+              assert ($ih : exists (k : nat),
+                         ltac2:(let b := Control.hyp @k in
+                                let t := make_app b in exact $t) = Some true)
+                by eassumption
+            | _ => ()
+              (* Control.throw (Tactic_failure (Some (Message.of_string ("Expecting an app")))) *)
+            end
+          | _ => ()
+            (* Control.throw (Tactic_failure (Some (Message.of_string ("Expecting a case")))) *)
+          end
+        | _ => ()
+             (* Control.throw (Tactic_failure (Some (Message.of_string ("Expecting an app")))) *)
+        end
+      | _ => ()
+               (* Control.throw (Tactic_failure (Some (Message.of_string ("Expecting a lambda")))) *)
+      end
+    end.
+
+  
+  Ltac2 handle_match (hmon : constr) :=
+    first [ exists 0 ; reflexivity
+          | match! goal with
+            | [ |- exists s, match @decOpt ?p ?i _ with _ => _ end = Some true ] =>
+              let hc := Fresh.in_goal (id_of_string "Hc") in
+              let s := Fresh.in_goal (id_of_string "s") in
+              assert ($hc := @complete $p _ _ (ltac2:(eassumption)));
+              let hc1 := Control.hyp hc in
+              destruct $hc1 as [$s $hc];
+              let s1 := Control.hyp s in
+              eapply exists_match with (s1 := $s1) >
+                                       [ eapply (@mon $p _ _) > [ | eassumption ]; lia
+                                       | intros; eapply (@mon $p _ _) > [ | eassumption ]; lia | ]
+             end
+           | let ih := Fresh.in_goal (id_of_string "IH") in
+             let s := Fresh.in_goal (id_of_string "s") in
+             prove_ih ih;
+             let ih1 := Control.hyp ih in
+             destruct $ih1 as [$s $ih];
+             let s1 := Control.hyp s in
+             eapply exists_match with (s1 := $s1) >
+                                     [ eapply $hmon > [| | eassumption ] > [ lia | lia ]
+                                     | intros; eapply $hmon > [| | eassumption ] > [ lia | lia ] | ]
+
+          ].
+
+
+
+  Ltac2 rec path_aux (m : int) (n : int) :=
+    match Int.equal n m with
+    | true => left
+    | false => right; path_aux m (Int.add n 1)
+    end.
+
+  Ltac2 rec path (n : int) := path_aux n 0.
+
+
+  Ltac2 handle_base_case (hmon : constr) := handle_match hmon.
+
+
+  Ltac2 rec solve_ind_case (hmon : constr) (n : int) :=
+    first [ now eexists; split > [ intros s; path n; reflexivity | 
+                               simpl_minus_decOpt (); repeat (handle_match hmon) ]
+          | solve_ind_case hmon (Int.add n 1) ].
+
+  Ltac2 rec handle_ind_case (hmon : constr) :=
+    match! goal with
+    | [ |- ?e ] =>
+      match Constr.Unsafe.kind e with
+      | Constr.Unsafe.App ex p =>
+        let pr := Array.get p 1 in
+        match Constr.Unsafe.kind pr with
+        | Constr.Unsafe.Lambda b eq =>
+          match Constr.Unsafe.kind eq with
+          | Constr.Unsafe.App t eq_args =>
+            let app := Array.get eq_args 1 in
+            match Constr.Unsafe.kind app with
+            | Constr.Unsafe.App aux args => 
+
+              set (auxt := ltac2:(exact $aux));
+              let succ (c : constr) :=
+                  match Constr.Unsafe.kind (constr:(S 0)) with
+                  | Constr.Unsafe.App s n =>
+                    let n' := Array.copy n in
+                    let _ := Array.set n' 0 c in
+                    Constr.Unsafe.make (Constr.Unsafe.App s n')
+                  | _ => Control.throw (Tactic_failure (Some (Message.of_string ("Expecting an application"))))
+                  end
+              in                  
+              
+              let args' := Array.copy args in
+              let _ := Array.set args' 1 (succ (Array.get args 1)) in
+              let aux' := Control.hyp @auxt in
+              let app' := Constr.Unsafe.make (Constr.Unsafe.App aux' args') in
+              let eq_args' := Array.copy eq_args in
+              let _ := Array.set eq_args' 1 app' in
+              let pr' := Constr.Unsafe.make (Constr.Unsafe.Lambda b (Constr.Unsafe.make (Constr.Unsafe.App t eq_args'))) in
+              let p' := Array.make 2 (Array.get p 0) in
+              let _ := Array.set p' 1 pr' in
+              
+              let e' := Constr.Unsafe.make (Constr.Unsafe.App ex p') in
+              
+              let s := Fresh.in_goal (id_of_string "s") in
+              let hyp := Fresh.in_goal (id_of_string "Hyp") in
+              
+              assert (Hsuff : ltac2:(exact $e')) >
+              [ | destruct Hsuff as [$s $hyp];
+              let s1 := Control.hyp s in
+              eexists (S $s1); eapply $hmon > [ | | eassumption ]; lia ];
+              eapply checker_backtrack_spec_exists; solve_ind_case hmon 0
+                                                     
+            | _ => Control.throw (Tactic_failure (Some (Message.of_string ("Expecting an application"))))
+            end
+          | _ => Control.throw (Tactic_failure (Some (Message.of_string ("Expecting an application"))))
+          end
+        | _ => Control.throw (Tactic_failure (Some (Message.of_string ("Expecting a lambda"))))
+        end
+      | _ => Control.throw (Tactic_failure (Some (Message.of_string ("Expecting an application"))))
+      end
+    end.
+
+  Ltac2 derive_complete (_ : unit ) := 
+    intros H; unfold decOpt; simpl_minus_decOpt ();
+    prove_mon ();
+    let hmon := Control.hyp @Hmon in
+    induction H; first [ handle_base_case hmon | handle_ind_case hmon ].
+
+
 Inductive tree :=
 | Leaf : tree
 | Node : nat -> tree -> tree -> tree.
@@ -533,11 +846,16 @@ Derive DecOpt for (bst min max t).
 Derive ArbitrarySizedSuchThat for (fun b => bst min max b).
 
 
+
 Instance decOptbstSizeMonotonic m n t : DecOptSizeMonotonic (bst m n t).
 Proof. derive_mon (). Qed. 
                        
 Instance DecOptbst_sound m n t : DecOptSoundPos (bst m n t).
 Proof. derive_sound (). Qed.
+
+Instance DecOptbst_complete m n t : DecOptCompletePos (bst m n t).
+Proof. derive_complete (). Qed.
+
 
 (* Compute (sample (@arbitrarySizeST _ (fun t => bst 0 30 t) _ 10)). *)
 
@@ -597,18 +915,9 @@ Proof. derive_mon (). Qed.
 Instance DecOptwf_list_sound l : DecOptSoundPos (wf_list l).
 Proof. derive_sound (). Qed.
 
+Instance DecOptwf_list_complete l : DecOptCompletePos (wf_list l).
+Proof. derive_complete (). Qed.
 
-Ltac2 rec ind_case_mont_aux' (ih : ident) (heq : ident) (path : unit -> unit) :=
-  match! goal with
-  | [h : List.In _ nil |- _ ] => let h := Control.hyp h in inversion $h
-  | [h : List.In _ (cons ?g ?gs) |- _ ] =>
-    let h := Control.hyp h in
-    destruct $h > [ eexists; split > [ path () ; left ; reflexivity | subst ]
-                  | ind_case_mont_aux' ih heq (fun _ => path; right) ]                    
-  end.
-
-Ltac2 ind_case_mont' (ih : ident) (heq : ident) :=
-  ind_case_mont_aux' ih heq (fun _ => ()).
 
 Instance DecOptlist_lenSizeMonotonic n l : DecOptSizeMonotonic (list_len n l).
 Proof. derive_mon (). Qed. 
@@ -616,141 +925,6 @@ Proof. derive_mon (). Qed.
 Instance DecOptlist_len_sound n l : DecOptSoundPos (list_len n l).
 Proof. derive_sound (). Qed.
 
+Instance DecOptlist_len_complete n l : DecOptCompletePos (list_len n l).
+Proof. derive_complete (). Qed.
 
-Section BSTProofs.
-   
-  Lemma DecOptwf_list_complete l :
-    wf_list l -> 
-    exists k, @decOpt _ (DecOptwf_list l) k = Some true.
-  Proof.
-  (*   intros H. induction H. *)
-  (*   - exists 0. reflexivity. *)
-  (*   - destruct IHwf_list as [k1 IH1]. *)
-  (*     exists (S k1). *)
-  (*     unfold decOpt, DecOptwf_list in *. *)
-  (*     eapply checker_backtrack_spec. *)
-  (*     eexists. *)
-  (*     split. right. now left. *)
-  (*     rewrite IH1.  reflexivity. *)
-  (* Qed. *)
-  Abort. 
-
-  Lemma checker_backtrack_spec_exists (l : nat -> list (unit -> option bool))  :
-    (exists (f : nat -> (unit -> option bool)),
-        (forall s, List.In (f s) (l s)) /\ exists s, f s tt = Some true) ->
-    exists s, checker_backtrack (l s) = Some true.                                                     
-  Proof. Admitted.
-  (*   unfold checker_backtrack. generalize false at 2. *)
-  (*   induction l. *)
-  (*   - intros b. destruct b; split; try (intros; congruence). *)
-  (*     * intros H. inv H. inv H0. inv H. *)
-  (*     * intros H. inv H. inv H0. inv H. *)
-  (*   - intros b. split. *)
-  (*     + intros H. *)
-  (*       destruct (a tt) eqn:Hdec. *)
-  (*       * destruct b0. exists a. split; eauto. now left. *)
-  (*         eapply IHl in H. destruct H. inv H. *)
-  (*         eexists; split; eauto. now right. *)
-  (*       * eapply IHl in H. destruct H. inv H. *)
-  (*         eexists; split; eauto. now right. *)
-  (*     + intros H. inv H. inv H0. inv H. rewrite H1. reflexivity. *)
-  (*       destruct (a tt). destruct b0. reflexivity. *)
-  (*       * eapply IHl. eexists. split; eauto. *)
-  (*       * eapply IHl. eexists. split; eauto. *)
-  (* Qed. *)
-
-
-  Lemma exists_Sn (P : nat -> Prop) : 
-    (exists n, P (S n)) -> exists n, P n.
-  Proof.
-    intros [n H]. eexists; eauto.
-  Qed.
-
-
-  Transparent dec_decOpt.
-  
-  Lemma DecOptle_complete k m n :
-    le m n -> @decOpt (le m n) _ k = Some true.
-  Proof.
-    unfold decOpt, dec_decOpt, dec.
-    destruct (DecidableClass.Decidable_le_nat _ _). intros Hleq.
-    simpl. destruct Decidable_witness; eauto.
-    f_equal. eapply Decidable_spec. assumption. 
-  Qed.
-
-  Opaque dec_decOpt.
-
-  Set Nested Proofs Allowed. 
-
-  Lemma exists_match check k s1 :        
-    check s1 = Some true ->
-    (forall s1 s2, s1 <= s2 -> check s1 = Some true -> check s2 = Some true) ->
-    (exists s, k (max s1 s) = Some true) ->
-    (exists (s : nat) ,
-        match check s with
-        | Some true => k s
-        | Some false => Some false
-        | None => None
-        end = Some true).
-  Proof.
-    intros Hch Hmon Hk. destruct Hk as [s2 Hk].
-    eexists (max s1 s2).
-    erewrite Hmon > [ | | eassumption ].
-    eassumption. lia.
-  Qed.
-
-
-
-  Lemma DecOptbst_complete m n t :
-    bst m n t ->
-    exists k, @decOpt _ (DecOptbst m n t) k = Some true.
-  Proof.
-    (* intros H. induction H. *)
-    (* - exists 0. reflexivity. *)
-    (* - revert min max H H0 H1 H2 H3 IHbst1 IHbst2; *)
-    (*     intros m1 m2 H H0 H1 H2 H3 IHbst1 IHbst2. *)
-    (*   eapply exists_Sn. *)
-    (*   simpl. eapply checker_backtrack_spec_exists. *)
-    (*   eexists. split. *)
-
-    (*   intros s. right. left. reflexivity. simpl. *)
-
-    (*   eapply DecOptle_complete with (k := 42) in H. *)
-    (*   rewrite H.  *)
-    (*   eapply DecOptle_complete with (k := 42) in H0. *)
-    (*   rewrite H0.  *)
-    (*   eapply DecOptle_complete with (k := 42) in H1. *)
-    (*   rewrite H1.  *)
-      
-    (*   destruct IHbst1 as [s1' Hs1']. simpl in Hs1'.  *)
-    (*   eapply exists_match. *)
-    (*   + eassumption. *)
-    (*   + intros s1 s2 Hleq. assert (Hm := @mon (bst m1 n t1) _ _ s1 s2 true Hleq). *)
-    (*     simpl in Hm. eassumption. *)
-    (*   + destruct IHbst2 as [s2' Hs2']. simpl in Hs2'.  *)
-    (*     eapply exists_match with (s1 := s2'). *)
-    (*     * assert (Hm := @mon (bst n m2 t2) _ _). *)
-    (*       simpl in Hm. eapply Hm> [ | eassumption ]. lia. *)
-    (*     * assert (Hm := @mon (bst n m2 t2) _ _). simpl in Hm.  *)
-    (*       intros s1 s2 Hleq Heq. eapply Hm > [ | eassumption ]. lia. *)
-    (*     * exists 0. reflexivity. *)
-  Abort.
-
-  
-  Lemma DecOptbst_complete_false m n t :
-    ~ bst m n t ->
-    exists k, @decOpt _ (DecOptbst m n t) k = Some false.
-  Proof.
-  Abort.
-  
-(*
-  Instance decOptbstCorrect m n t : DecOptCorrectPos (bst m n t).
-  Proof.
-    constructor.
-    - intros. eapply DecOptbst_correct. eassumption.
-    - intros. eapply DecOptbst_complete. eassumption.
-  Qed.
- *)
-  
-End BSTProofs.
- 
