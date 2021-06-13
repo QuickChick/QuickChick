@@ -17,6 +17,8 @@ Open Scope monad_scope.
 From QuickChick Require Import
      Sets Tactics Producer LazyList RandomQC.
 
+Set Bullet Behavior "Strict Subproofs".
+
 Inductive EnumType (A:Type) : Type :=
   MkEnum : (nat -> LazyList A) -> EnumType A.
 Arguments MkEnum {A}.
@@ -92,4 +94,103 @@ Next Obligation.
   apply (X n).
 Defined.
 
+(* begin semReturn *)
+Lemma semReturnEnum {A} (x : A) : semProd (ret x) <--> [set x].
+(* end semReturn *)
+Proof.
+  rewrite /semProd /semProdSize /= /semEnumSize /=
+  bigcup_const ?codom_const //.
+  - split; auto.
+    + intros [Eq | Contra]; [subst; reflexivity | inversion Contra].
+  - do 2! constructor.
+Qed.
+  
+Lemma semReturnSizeEnum A (x : A) (s : nat) :
+  semProdSize (ret x) s <--> [set x].
+Proof.
+  rewrite /semProdSize /= /semEnumSize.
+  simpl; split; auto.
+  move => [Eq | []]; subst; reflexivity.
+Qed.
 
+Lemma semBindSizeEnum A B (g : E A) (f : A -> E B) (s : nat) :
+    semEnumSize (bindEnum g f) s <-->
+    \bigcup_(a in semEnumSize g s) semEnumSize (f a) s.
+Proof.
+  rewrite /semEnumSize /bindEnum /=.
+Admitted.
+
+Lemma semChooseSize A `{ChoosableFromInterval A} (a1 a2 : A) :
+    RandomQC.leq a1 a2 ->
+    forall size, semProdSize (choose (a1,a2)) size <-->
+                       [set a | RandomQC.leq a1 a && RandomQC.leq a a2].
+Proof.
+  move=> /= le_a1a2 m n //=;
+  rewrite (enumRCorrect n a1 a2) //=.
+Qed.
+  
+Instance chooseUnsized {A} `{RandomQC.ChoosableFromInterval A} (a1 a2 : A) :
+    Unsized (choose (a1, a2)).
+Proof. by []. Qed.
+  
+Lemma semChoose A `{RandomQC.ChoosableFromInterval A} (a1 a2 : A) :
+    RandomQC.leq a1 a2 ->
+    (semProd (choose (a1,a2)) <--> [set a | RandomQC.leq a1 a && RandomQC.leq a a2]).
+Proof.
+  move=> /= le_a1a2. rewrite <- (unsized_alt_def 1).
+  move => m /=. rewrite (enumRCorrect m a1 a2) //.
+Qed.
+
+
+Lemma semChooseEnum A `{RandomQC.ChoosableFromInterval A} (a1 a2 : A) :
+    RandomQC.leq a1 a2 ->
+    (semProd (choose (a1,a2)) <--> [set a | RandomQC.leq a1 a && RandomQC.leq a a2]).
+Proof.
+  move=> /= le_a1a2. rewrite <- (unsized_alt_def 1).
+  move => m /=. rewrite (enumRCorrect m a1 a2) //.
+Qed.
+  
+Lemma semChooseSizeEnum A `{ChoosableFromInterval A} (a1 a2 : A) :
+    RandomQC.leq a1 a2 ->
+    forall size, semEnumSize (choose (a1,a2)) size <-->
+                       [set a | RandomQC.leq a1 a && RandomQC.leq a a2].
+Proof. by move=> /= le_a1a2 m n; rewrite (enumRCorrect n a1 a2). Qed.
+
+Lemma  semChooseSizeEmptyEnum :
+    forall A `{RandomQC.ChoosableFromInterval A} (a1 a2 : A),
+      ~ (RandomQC.leq a1 a2) ->
+      forall size, (semProdSize (choose (a1,a2)) size <-->
+                                set0).
+Admitted.  
+
+
+Lemma semSizedEnum A (f : nat -> E A) :
+    semProd (sized f) <--> \bigcup_n semEnumSize (f n) n.
+Proof. by []. Qed.
+
+Lemma semSizedSizeEnum A (f:nat->E A) s : semEnumSize (sized f) s <--> semEnumSize (f s) s.
+Proof. by []. Qed.
+
+Lemma semResizeEnum A n (g : E A) : semProd (resize n g) <--> semEnumSize g n .
+Proof.
+   by case: g => g; rewrite /semProd /semProdSize /= /semEnumSize /= bigcup_const.
+Qed.
+
+Lemma semResizeSizeEnum A (s n : nat) (g : E A) :
+    semEnumSize (resize n g) s <--> semEnumSize g n.
+Proof. by case: g => g; rewrite /semEnumSize. Qed.
+
+Instance ProducerSemanticsEnum :
+  @ProducerSemantics E ProducerEnum :=
+  {
+  semReturn     := @semReturnEnum; 
+  semReturnSize := @semReturnSizeEnum;
+  semBindSize   := @semBindSizeEnum;
+  semChoose     := @semChooseEnum;
+  semChooseSize := @semChooseSizeEnum;
+  semChooseSizeEmpty := @semChooseSizeEmptyEnum;
+  semSized      := @semSizedEnum;
+  semSizedSize  := @semSizedSizeEnum;
+  semResize     := @semResizeEnum;
+  semResizeSize := @semResizeSizeEnum
+  }.
