@@ -1,4 +1,4 @@
-From QuickChick Require Import QuickChick GenLow GenHigh.
+From QuickChick Require Import QuickChick Generators.
 Require Import NPeano Lia.
 
 From mathcomp Require Import ssreflect ssrnat ssrbool eqtype.

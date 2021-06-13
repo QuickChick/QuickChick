@@ -1,6 +1,5 @@
 Set Implicit Arguments.
 
-Require Import GenLow.
 Require Import RandomQC.
 Require Import Coq.Strings.String.
 

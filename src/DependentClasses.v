@@ -5,8 +5,7 @@ Require Import String List.
 
 From mathcomp Require Import ssreflect ssrfun ssrbool ssrnat eqtype seq.
 
-Require Import GenLow GenHigh Tactics Sets Classes.
-Import GenLow GenHigh.
+Require Import Producer Generators Enumerators Tactics Sets Classes.
 Import ListNotations.
 Import QcDefaultNotation.
 
@@ -24,10 +23,10 @@ Class SizedProofEqs {A : Type} (P : A -> Prop) :=
 (* end sizeEqs *)
 
 Class SizedSuchThatCorrect {A : Type} (P : A -> Prop) `{SizedProofEqs A P} (g : nat -> G (option A)) :=
-  { sizedSTCorrect : forall s, isSome :&: semGen (g s) <--> Some @: (iter s) }.
+  { sizedSTCorrect : forall s, isSome :&: semProd (g s) <--> Some @: (iter s) }.
 
 Class SuchThatCorrect {A : Type} (P : A -> Prop) (g : G (option A)) :=
-  { STCorrect : isSome :&: semGen g <-->  Some @: [set x : A | P x ] }.
+  { STCorrect : isSome :&: semProd g <-->  Some @: [set x : A | P x ] }.
 
 (** * Dependent sized generators *)
 
@@ -45,10 +44,12 @@ Class GenSizedSuchThatMonotonicOpt (A : Type)
       `{GenSizedSuchThat A} `{forall s, SizeMonotonicOpt (arbitrarySizeST s)}.
 
 Class GenSizedSuchThatSizeMonotonic (A : Type)
-      `{GenSizedSuchThat A} `{SizedMonotonic _ arbitrarySizeST}.
+      `{GenSizedSuchThat A}
+      `{@SizedMonotonic _ G ProducerGen arbitrarySizeST}.
 
 Class GenSizedSuchThatSizeMonotonicOpt (A : Type)
-      `{GenSizedSuchThat A} `{SizedMonotonicOpt _ arbitrarySizeST}.
+      `{GenSizedSuchThat A}
+      `{@SizedMonotonicOpt A G ProducerGen arbitrarySizeST}.
 
 
 (** * Correctness of denendent sized generators *)
@@ -68,10 +69,10 @@ Notation "'genST' x" := (@arbitraryST _ x _) (at level 70).
 (** * Monotonicity of denendent generators *)
 
 Class GenSuchThatMonotonic (A : Type) (P : A -> Prop) `{GenSuchThat A P}
-      `{@SizeMonotonic _ arbitraryST}.
+      `{@SizeMonotonic (option A) G ProducerGen arbitraryST}.
 
 Class GenSuchThatMonotonicOpt (A : Type) (P : A -> Prop) `{GenSuchThat A P}
-      `{@SizeMonotonicOpt _ arbitraryST}.
+      `{@SizeMonotonicOpt A G ProducerGen arbitraryST}.
 
 (** * Correctness of dependent generators *)  
 
@@ -81,7 +82,7 @@ Class GenSuchThatCorrect {A : Type} (P : A -> Prop)
 
 Class GenSuchThatMonotonicCorrect (A : Type) (P : A -> Prop)
       `{GenSuchThat A P}
-      `{@SizeMonotonicOpt _ arbitraryST}
+      `{@SizeMonotonicOpt A G ProducerGen arbitraryST}
       `{SuchThatCorrect A P arbitraryST}.
 
 (** Coercions *)
@@ -89,12 +90,12 @@ Class GenSuchThatMonotonicCorrect (A : Type) (P : A -> Prop)
 Instance GenSizedSuchThatMonotonicOptOfSizeMonotonic
          (A : Type) (P : A -> Prop) (Hgen : GenSizedSuchThat A P)
          (Hmon : forall s : nat, SizeMonotonicOpt (arbitrarySizeST s))
-: @GenSizedSuchThatMonotonicOpt A _ Hgen Hmon := {}.
+: @GenSizedSuchThatMonotonicOpt A P Hgen Hmon := {}.
 
 Instance GenSizedSuchThatSizeMonotonicOptOfSizedMonotonic
          (A : Type) (P : A -> Prop) (Hgen : GenSizedSuchThat A P)
          (Hmon : SizedMonotonicOpt arbitrarySizeST)
-: @GenSizedSuchThatSizeMonotonicOpt A _ Hgen Hmon := {}.
+: @GenSizedSuchThatSizeMonotonicOpt A P Hgen Hmon := {}.
 
 Instance GenSizedSuchThatCorrectOptOfSizedSuchThatCorrect
          (A : Type) (P : A -> Prop) (H : GenSizedSuchThat A P)
@@ -136,8 +137,10 @@ Instance GenSuchThatMonotonicOfSized (A : Type) (P : A -> Prop)
          {H : GenSizedSuchThat A P}
          `{@GenSizedSuchThatMonotonic A P H PMon}
          `{@GenSizedSuchThatSizeMonotonic A P H PSMon}
-: GenSuchThatMonotonic A P := {}.
-
+  : @GenSuchThatMonotonic A P (GenSuchThatOfBounded _ _ H)
+    (@sizedSizeMonotonic G ProducerGen _ _
+                         _
+                         PMon PSMon) := {}.
 
 Instance SizeMonotonicOptOfBounded' (A : Type) (P : A -> Prop)
          {H : GenSizedSuchThat A P}
@@ -148,12 +151,15 @@ Proof.
   unfold arbitraryST, GenSuchThatOfBounded.
   red. red in PMon.
   do 2 red. intros.
-  unfold semGenSizeOpt in *.
+  unfold semProdSizeOpt in *.
   red in PMon.
   apply semSizedSize in H3.
   apply semSizedSize.
   destruct (PSMon s1 s1 s2 H2 a). apply H3.
   apply (PMon s2 s1 s2); auto. do 3 red.
+  eauto.
+  rewrite /semGenSize => //=.
+  exists x.
   eauto.
 Qed.
 
@@ -193,7 +199,7 @@ Proof.
     eapply spec.
     destruct H4 as [n [_ Hsem]]. 
     exists n. split. now constructor.
-    assert (Ha : (isSome :&: semGen (arbitrarySizeST n)) (Some a)).
+    assert (Ha : (isSome :&: semProd (arbitrarySizeST n)) (Some a)).
     { split; eauto. }
     eapply PCorr in Ha. destruct Ha as [a' [Hit Heq]]. inv Heq. eassumption.
   - intros [y [HP Heq]]. inv Heq.

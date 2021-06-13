@@ -21,8 +21,8 @@ let mutateCheck = mk_ref "QuickChick.MutateCheck.mutateCheck"
 let mutateCheckWith = mk_ref "QuickChick.MutateCheck.mutateCheckWith"
 let mutateCheckMany = mk_ref "QuickChick.MutateCheck.mutateCheckMany"
 let mutateCheckManyWith = mk_ref "QuickChick.MutateCheck.mutateCheckManyWith"
-let sample = mk_ref "QuickChick.GenLow.GenLow.sample"
-let sample1 = mk_ref "QuickChick.GenLow.GenLow.sample1"
+let sample = mk_ref "QuickChick.Generators.sampleGen"
+let sample1 = mk_ref "QuickChick.Generators.sample1"
 
 (* Handle extra ocaml directory to be copied *)
 let empty_slist : string list = []           

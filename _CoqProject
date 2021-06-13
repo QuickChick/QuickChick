@@ -26,13 +26,12 @@ plugin/compat.ml
 src/Tactics.v
 src/Sets.v
 src/Nat_util.v
+src/LazyList.v
 src/RandomQC.v
 src/RoseTrees.v
-src/GenLowInterface.v
-src/GenLow.v
-src/GenHighInterface.v
-src/GenHighImpl.v
-src/GenHigh.v
+src/Producer.v
+src/Generators.v
+src/Enumerators.v
 src/Classes.v
 src/Instances.v
 src/CoArbitrary.v

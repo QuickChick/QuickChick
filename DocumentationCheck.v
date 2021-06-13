@@ -11,22 +11,23 @@ Module ConsistencyCheck : QuickChickSig.
   Definition RandomSeed := RandomSeed.
 
   Definition G := @G.
-  Definition semGen := @semGen.
+  Definition semGen := @semProd G ProducerGen.
   Definition semGenSize := @semGenSize.
-  Definition Functor_G := Functor_G.
-  Definition Applicative_G := Applicative_G.
-  Definition Monad_G := Monad_G.
-  Definition bindGen' := @bindGen'.
+  Definition Functor_G := @Functor_Monad _ (@super _ ProducerGen). 
+  Definition Applicative_G :=
+    @Applicative_Monad _ (@super _ ProducerGen). 
+  Definition Monad_G := @super _ ProducerGen. 
+  Definition bindGen' := @bindPf G ProducerGen.
   Definition bindGenOpt := @bindGenOpt.
-  Definition run := @run.
-  Definition listOf := @listOf.
-  Definition vectorOf := @vectorOf.
-  Definition elems_ := @elems_.
-  Definition oneOf_ := @oneOf_.
+  Definition run := @Generators.run.
+  Definition listOf := @listOf G ProducerGen.
+  Definition vectorOf := @vectorOf G ProducerGen.
+  Definition elems_ := @elems_ G ProducerGen.
+  Definition oneOf_ := @oneOf_ G ProducerGen.
   Definition freq_ := @freq_.
   Definition backtrack := @backtrack.
-  Definition resize := @resize.
-  Definition sized := @sized.
+  Definition resize := @resize G ProducerGen.
+  Definition sized := @sized G ProducerGen.
   Definition suchThatMaybe := @suchThatMaybe.
   Definition suchThatMaybeOpt := @suchThatMaybeOpt.
 
@@ -52,7 +53,6 @@ Module ConsistencyCheck : QuickChickSig.
        exists seed, fst (randomR (a1, a2) seed) = a)
   }.
 
-  Definition ChooseBool := ChooseBool.
   Definition ChooseNat := ChooseNat.
   Definition ChooseZ := ChooseZ.
 
