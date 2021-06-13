@@ -9,7 +9,7 @@ From QuickChick.ifcbasic Require Import Machine.
 (* Overriding default instance to generate "in-bounds" things *)
 Definition gen_Z := choose (0,1).
 
-Definition gen_label := elements L [L; H].
+Definition gen_label := elems_ L [L; H].
 
 Definition gen_atom := liftGen2 Atm gen_Z gen_label.
 

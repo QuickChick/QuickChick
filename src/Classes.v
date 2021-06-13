@@ -4,13 +4,13 @@ Set Warnings "-notation-overridden,-parsing".
 Require Import Coq.Classes.Morphisms.
 Require Import mathcomp.ssreflect.ssreflect.
 From mathcomp Require Import ssrbool ssrnat.
-Require Import Sets GenLow Tactics.
+Require Import Sets Tactics.
 Require Import Recdef.
 Require Import List.
 
 Require Import ZArith ZArith.Znat Arith.
 
-Import GenLow.
+Require Import Producer Generators Enumerators.
 
 Set Bullet Behavior "Strict Subproofs".
 
@@ -39,11 +39,12 @@ Infix "^" := appn (at level 30, right associativity) : fun_scope.
 (** * Generator-related classes *)
 
 (* begin gen_sized_class *)
-  Class GenSized (A : Type) := { arbitrarySized : nat -> G A }.
+Class GenSized (A : Type) :=
+  { arbitrarySized : nat -> G A }.
 (* end gen_sized_class *)
 
 (* begin gen_class *)
-  Class Gen (A : Type) := { arbitrary : G A }.
+Class Gen (A : Type) := { arbitrary : G A }.
 (* end gen_class *)
 
 (** Shrink class *)
@@ -134,13 +135,13 @@ Qed.
 (** Correctness of sized generators *)
 Class SizedCorrect {A : Type} `{Sized A} (g : nat -> G A) :=
   {
-    arbitrarySizedCorrect : forall s, semGen (g s) <--> [set x : A | size x <= s ]
+    arbitrarySizedCorrect : forall s, semProd (g s) <--> [set x : A | size x <= s ]
   }.
 
 (** Correctness of generators *)
 Class Correct (A : Type) (g : G A)  :=
   {
-    arbitraryCorrect : semGen g <--> [set : A]
+    arbitraryCorrect : semProd g <--> [set : A]
   }.
 
 (** * Monotonic generators *)
@@ -150,9 +151,10 @@ Class GenSizedMonotonic (A : Type) `{GenSized A}
       `{forall s, SizeMonotonic (arbitrarySized s)}.
 
 (** Monotonicity of size parametric generators v2 *)
-Class GenSizedSizeMonotonic (A : Type) `{GenSized A} `{SizedMonotonic A arbitrarySized}.
+Class GenSizedSizeMonotonic (A : Type) `{GenSized A}
+        `{SizedMonotonic A G arbitrarySized}.
 
-Class GenMonotonic (A : Type) `{Gen A} `{SizeMonotonic A arbitrary}.
+Class GenMonotonic (A : Type) `{Gen A} `{SizeMonotonic A G arbitrary}.
 
 (** * Correct generators *)
 
@@ -162,29 +164,32 @@ Class GenCorrect (A : Type) `{Gen A} `{Correct A arbitrary}.
  
 (* Monotonic and Correct generators *)
 Class GenMonotonicCorrect (A : Type)
-      `{Gen A} `{SizeMonotonic A arbitrary} `{Correct A arbitrary}.
+      `{Gen A} `{SizeMonotonic A G arbitrary} `{Correct A arbitrary}.
 
 (** Coercions *)
   
 Instance GenSizedMonotonicOfSizeMonotonic
-         (A : Type) (Hgen : GenSized A) (Hmon : forall s, @SizeMonotonic A (arbitrarySized s))
+         (A : Type) (Hgen : GenSized A) (Hmon : forall s, @SizeMonotonic A G ProducerGen (arbitrarySized s))
 : @GenSizedMonotonic A Hgen Hmon := {}.
   
 Instance GenMonotonicOfSizeMonotonic
-         (A : Type) (Hgen : Gen A) (Hmon : @SizeMonotonic A arbitrary)
-: @GenMonotonic A Hgen Hmon := {}.
+         (A : Type) (Hgen : Gen A) (Hmon : @SizeMonotonic A G ProducerGen arbitrary)
+: @GenMonotonic A Hgen ProducerGen Hmon := {}.
 
 Instance GenSizedCorrectOfSizedCorrect
-         (A : Type) (Hgen : GenSized A) `{Hcor : SizedCorrect A arbitrarySized}
-: @GenSizedCorrect A Hgen _ Hcor := {}.
+         (A : Type) (Hgen : GenSized A)
+         {HS : Sized A}
+         `{Hcor : @SizedCorrect A HS arbitrarySized}
+: @GenSizedCorrect A Hgen HS Hcor := {}.
 
 Instance GenCorrectOfCorrect
-         (A : Type) (Hgen : Gen A) `{Hcor : Correct A arbitrary}
+         (A : Type) (Hgen : Gen A)
+         `{Hcor : Correct A arbitrary}
 : @GenCorrect A Hgen Hcor := {}.
 
 Instance GenSizedSizeMonotonicOfSizedMonotonic
-         (A : Type) (Hgen : GenSized A) (Hmon : @SizedMonotonic A arbitrarySized)
-: @GenSizedSizeMonotonic A Hgen Hmon := {}.
+         (A : Type) (Hgen : GenSized A) (Hmon : @SizedMonotonic A G ProducerGen arbitrarySized)
+: @GenSizedSizeMonotonic A Hgen ProducerGen Hmon := {}.
 
 (* Zoe : Is global really needed here? *)
 Global Instance GenOfGenSized {A} `{GenSized A} : Gen A :=
@@ -195,15 +200,19 @@ Global Instance ArbitraryOfGenShrink {A} `{Gen A} `{Shrink A} : Arbitrary A := {
 Generalizable Variables PSized PMon PSMon PCorr.
 
 Instance GenMonotonicOfSized (A : Type)
-         {H : GenSized A}
+         `{H : GenSized A}
          `{@GenSizedMonotonic A H PMon}
-         `{@GenSizedSizeMonotonic A H PSMon}
-: GenMonotonic A := {}.
+         `{@GenSizedSizeMonotonic A H ProducerGen PSMon}
+  : @GenMonotonic A
+                  (@GenOfGenSized A H) ProducerGen 
+                  (@sizedSizeMonotonic G ProducerGen _ A
+                                       (@arbitrarySized A H)
+                                       PMon PSMon) := {}.
 
 Instance GenCorrectOfSized (A : Type)
          {H : GenSized A}
          `{@GenSizedMonotonic A H PMon}
-         `{@GenSizedSizeMonotonic A H PSMon}
+         `{@GenSizedSizeMonotonic A H ProducerGen PSMon}
          `{@GenSizedCorrect A H PSized PCorr} : Correct A arbitrary.
 Proof.
   constructor. unfold arbitrary, GenOfGenSized. 
@@ -215,11 +224,11 @@ Proof.
 Qed.
 
 Lemma nat_set_ind (A : Type) `{GenSized A} `{Hyp : CanonicalSized A} :
-  (semGen (arbitrarySized 0) <--> zeroSized) ->
+  (semProd (arbitrarySized 0) <--> zeroSized) ->
   (forall (s : nat) (elems : set A),
-     semGen (arbitrarySized s) <--> elems ->
-     semGen (arbitrarySized (s.+1)) <--> succSized elems) ->
-  (forall s : nat, semGen (arbitrarySized s) <--> (fun x : A => size x <= s)).
+     semProd (arbitrarySized s) <--> elems ->
+     semProd (arbitrarySized (s.+1)) <--> succSized elems) ->
+  (forall s : nat, semProd (arbitrarySized s) <--> (fun x : A => size x <= s)).
 Proof.
   intros HO IH. intros n; induction n.
   - eapply set_eq_trans with (B := (fun x : A => size x = 0)).

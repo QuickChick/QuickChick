@@ -2,8 +2,7 @@ Require Import PArith List ChoiceFacts Lia.
 Require Import mathcomp.ssreflect.ssreflect.
 From mathcomp Require Import ssrfun ssrbool.
 
-Require Import Classes RandomQC GenLow Sets.
-Import GenLow.
+Require Import Classes RandomQC Generators Sets.
 
 Import ListNotations.
 

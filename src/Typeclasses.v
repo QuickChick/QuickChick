@@ -5,8 +5,7 @@ Require Import mathcomp.ssreflect.ssreflect.
 From mathcomp Require Import ssreflect ssrfun ssrbool ssrnat eqtype seq.
 Require Import Classes DependentClasses Checker Show.
 
-Require Import GenLow GenHigh Sets.
-Import GenLow GenHigh.
+Require Import Producer Generators Sets.
 
 (* TODO: Derive these *)
 Instance arbST_eq {A} (a : A) : GenSuchThat A (fun x => x = a) :=

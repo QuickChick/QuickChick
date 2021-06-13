@@ -274,7 +274,7 @@ Existing Class ChoosableFromInterval.
 
 (** QuickChick has provided some instances for ordered data types that are
     choosable from intervals, including [bool], [nat], and [Z]. *)
-Declare Instance ChooseBool : ChoosableFromInterval bool.
+(* Declare Instance ChooseBool : ChoosableFromInterval bool. *)
 Declare Instance ChooseNat : ChoosableFromInterval nat.
 Declare Instance ChooseZ : ChoosableFromInterval Z.
 

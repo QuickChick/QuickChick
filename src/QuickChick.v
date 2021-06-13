@@ -38,8 +38,9 @@ Require Export Show.
 Require Export RandomQC.
 Require Export Sets.
 Require Export Nat_util.
-Require Export GenLow.
-Require Export GenHigh.
+Require Export Producer.
+Require Export Enumerators.
+Require Export Generators.
 Require Export State.
 Require Export Checker.
 Require Export SemChecker.
@@ -51,7 +52,6 @@ Require Export Instances.
 Require Export DependentClasses.
 Require Export Typeclasses.
 Require Export Mutation.
-Export GenLow GenHigh.
 
 Global Unset Asymmetric Patterns.
 Global Set Bullet Behavior "Strict Subproofs".

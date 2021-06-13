@@ -117,6 +117,16 @@ Parameter unsized_alt_def :
   forall {A} {G} `{Producer G} (g : G A) `{Unsized _ _ g},
     forall s, semProdSize g s <--> semProd g.
  *)
+
+Instance unsizedMonotonic {A} {G} `{PG :Producer G}
+         (g : G A) `{@Unsized A G PG g} :
+SizeMonotonic g. 
+Proof.
+    intros s1 s2 Hleq.
+    rewrite /unsized /monotonic => a H12.
+    eapply unsized; eauto.
+Qed.
+
 Class ProducerSemantics G `{Producer G} :=
   {
   semReturn :

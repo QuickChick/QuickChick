@@ -14,20 +14,19 @@ From mathcomp Require Import
      ssrnat.
 From QuickChick Require Import
      Classes
-     GenLow
-     GenHigh
-     Sets.
+     Sets
+     Producer
+     Enumerators
+     Generators.
 
-Import GenHigh
-       GenLow
-       ListNotations
-       QcDefaultNotation.
+Import ListNotations QcDefaultNotation.
+Open Scope qc_scope.
 
 Set Bullet Behavior "Strict Subproofs".
 
 (** Basic generator instances *)
 Global Instance genBoolSized : GenSized bool :=
-  {| arbitrarySized x := choose (false, true) |}.
+  {| arbitrarySized x := elems_ true [true; false] |}.
 
 Instance genNatSized : GenSized nat :=
   {| arbitrarySized x := choose (0,x) |}.
@@ -50,18 +49,18 @@ Global Instance genList {A : Type} `{Gen A} : Gen (list A) | 3 :=
   {| arbitrary := listOf arbitrary |}.
 
 Global Instance genOption {A : Type} `{Gen A} : Gen (option A) | 3 :=
-  {| arbitrary := freq [ (1, returnGen None)
-                       ; (7, liftGen Some arbitrary)] |}.
+  {| arbitrary := freq [ (1, ret None)
+                       ; (7, liftM Some arbitrary)] |}.
 
 Global Instance genPairSized {A B : Type} `{GenSized A} `{GenSized B}
 : GenSized (A*B) :=
   {| arbitrarySized x :=
-       liftGen2 pair (arbitrarySized x)
-                     (arbitrarySized x)
+       liftM2 pair (arbitrarySized x)
+                   (arbitrarySized x)
   |}.
 
 Global Instance genPair {A B : Type} `{Gen A} `{Gen B} : Gen (A * B) :=
-  {| arbitrary := liftGen2 pair arbitrary arbitrary |}.
+  {| arbitrary := liftM2 pair arbitrary arbitrary |}.
 
 (** Shrink Instances *)
 Global Instance shrinkBool : Shrink bool :=
@@ -202,7 +201,11 @@ Global Instance shrinkOption {A : Type} `{Shrink A} : Shrink (option A) :=
 
 (** Instance correctness *)
 
-Program Instance arbNatMon : SizeMonotonic (@arbitrary nat _).
+(* Needed to add this! *)
+Opaque semProdSize.
+
+Program Instance arbNatMon :
+  @SizeMonotonic nat G ProducerGen (@arbitrary nat _).
 Next Obligation.
   rewrite !semSizedSize !semChooseSize // => n /andP [/leP H1 /leP H2].
   move : H => /leP => Hle. apply/andP. split; apply/leP; lia.
@@ -214,8 +217,13 @@ Instance boolSizeMonotonic : SizeMonotonic (@arbitrary bool _).
 Proof.
   unfold arbitrary, GenOfGenSized.
   eapply sizedSizeMonotonic; unfold arbitrarySized, genBoolSized.
-  intros _. eauto with typeclass_instances.
-  intros n s1 s2 Hs. eapply subset_refl.
+  - eauto with typeclass_instances.
+  - intros; eauto with typeclass_instances.
+    (* Why are these not found? *)
+    apply unsizedMonotonic.
+    apply elementsUnsized.
+    eauto with typeclass_instances.
+  - intros n s1 s2 Hs. eapply subset_refl.
 Qed.
 
 Instance boolSizedMonotonic : SizedMonotonic (@arbitrarySized bool _).
@@ -230,21 +238,23 @@ Proof.
   unfold arbitrarySized, genBoolSized.
   intros x. split; intros H; try now constructor.
   exists 0. split. constructor.
-  eapply semChooseSize; eauto.
-  destruct x; eauto.
+  eapply semElementsSize; eauto with typeclass_instances.
+  destruct x; try solve [left; auto]; right; left; auto.
 Qed.
 
 Lemma arbBool_correct:
-  semGen arbitrary <--> [set: bool].
+  semProd arbitrary <--> [set: bool].
 Proof.
 rewrite /arbitrary /arbitrarySized /genBoolSized /=.
 rewrite semSized => n; split=> // _.
 exists n; split=> //.
-apply semChooseSize => //=; case n => //.
+apply semElementsSize => //=;
+                           eauto with typeclass_instances.
+destruct n; repeat (try solve [left; auto]; right).
 Qed.
 
 Lemma arbNat_correct:
-  semGen arbitrary <--> [set: nat].
+  semProd arbitrary <--> [set: nat].
 Proof.
 rewrite /arbitrary /=.
 rewrite semSized => n; split=> // _; exists n; split=> //.
@@ -257,7 +267,7 @@ Proof.
 Qed.
 
 Lemma arbInt_correct s :
-  semGenSize arbitrary s <-->
+  semProdSize arbitrary s <-->
   [set z | (- Z.of_nat s <= z <= Z.of_nat s)%Z].
 Proof.
 rewrite semSizedSize semChooseSize.
@@ -268,19 +278,21 @@ exact/Zle_0_nat.
 Qed.
 
 Lemma arbBool_correctSize s :
-  semGenSize arbitrary s <--> [set: bool].
+  semProdSize arbitrary s <--> [set: bool].
 Proof.
 rewrite /arbitrary //=.
-rewrite semSizedSize semChooseSize //; split=> /RandomQC.leq _ //=; case a=> //=.
+rewrite semSizedSize semElementsSize //; split=> /RandomQC.leq _ //=; case a=> //=.
+repeat (try solve [left; auto]; right).
+repeat (try solve [left; auto]; right).
 Qed.
 
 Lemma arbNat_correctSize s :
-  semGenSize arbitrary s <--> [set n : nat | (n <= s)%coq_nat].
+  semProdSize arbitrary s <--> [set n : nat | (n <= s)%coq_nat].
 Proof.
 by rewrite semSizedSize semChooseSize // => n /=; case: leP.
 Qed.
 
-Lemma arbInt_correctSize : semGen arbitrary <--> [set: Z].
+Lemma arbInt_correctSize : semProd arbitrary <--> [set: Z].
 Proof.
 rewrite /arbitrarySized semSized => n; split=> // _; exists (Z.abs_nat n); split=> //.
 simpl.
@@ -293,55 +305,65 @@ Qed.
 
 Lemma arbList_correct:
   forall {A} `{H : Arbitrary A} (P : nat -> A -> Prop) s,
-    (semGenSize arbitrary s <--> P s) ->
-    (semGenSize arbitrary s <-->
+    (semProdSize arbitrary s <--> P s) ->
+    (semProdSize arbitrary s <-->
      (fun (l : list A) => length l <= s /\ (forall x, List.In x l -> P s x))).
 Proof.
-  move => A G S H P s Hgen l. rewrite !/arbitrary //=.
+  move => A G S H P s Hgen l.
+  rewrite !/arbitrary /genList.
   split.
   - move => /semListOfSize [Hl Hsize]. split => // x HIn //=. apply Hgen. auto.
-  - move => [Hl HP]. apply semListOfSize. split => // x HIn.
+  - move => [Hl HP].
+    apply semListOfSize; eauto with typeclass_instances.
+    split => // x HIn.
     apply Hgen. auto.
 Qed.
 
+Opaque ret.
+Opaque liftM.
 Lemma arbOpt_correct:
   forall {A} `{H : Arbitrary A} (P : nat -> A -> Prop) s,
-    (semGenSize arbitrary s <--> P s) ->
-    (semGenSize arbitrary s <-->
+    (semProdSize arbitrary s <--> P s) ->
+    (semProdSize arbitrary s <-->
      (fun (m : option A) =>
         match m with
           | None => true
           | Some x => P s x
         end)).
 Proof.
-  move => A G S Arb P s Hgen m. rewrite !/arbitrary //=; split.
-  - move => /semFrequencySize [[w g] H2]; simpl in *.
+  move => A G S Arb P s Hgen m. rewrite !/arbitrary /genOption; split.
+  - move => /semFrequencySize [[w g] H2].
     move: H2 => [[H2 | [H2 | H2]] H3];
     destruct m => //=; apply Hgen => //=;
-    inversion H2; subst; auto.
-    + apply semReturnSize in H3; inversion H3.
-    + apply semLiftGenSize in H3; inversion H3 as [x [H0 H1]].
+    inversion H2; subst; auto; simpl in *.
+    + apply (@semReturnSize Generators.G ProducerGen ProducerSemanticsGen (option A) _) in H3; inversion H3.
+    + apply semLiftProdSize in H3; eauto with typeclass_instances. inversion H3 as [x [H0 H1]].
       inversion H1; subst; auto.
   - destruct m eqn:Hm; simpl in *; move => HP; subst.
     + apply semFrequencySize; simpl.
-      exists (7, liftGen Some arbitrary); split; auto.
+      exists (7, liftM Some arbitrary); split; auto.
       * right; left; auto.
-      * simpl. apply semLiftGenSize; simpl.
+      * simpl. apply semLiftProdSize; simpl;
+                 eauto with typeclass_instances.
         apply imset_in; apply Hgen; auto.
     + apply semFrequencySize; simpl.
-      exists (1, returnGen None); split; auto.
+      exists (1, ret None); split; auto.
       * left; auto.
-      * simpl; apply semReturnSize. constructor.
+      * simpl.
+        apply (@semReturnSize Generators.G ProducerGen ProducerSemanticsGen). constructor.
 Qed.
 
 Lemma arbPair_correctSize
       {A B} `{Arbitrary A} `{Arbitrary B} (Sa : nat -> set A)
       (Sb : nat -> set B) s:
-    (semGenSize arbitrary s <--> Sa s) ->
-    (semGenSize arbitrary s <--> Sb s) ->
-    (semGenSize arbitrary s <--> setX (Sa s) (Sb s)).
+    (semProdSize arbitrary s <--> Sa s) ->
+    (semProdSize arbitrary s <--> Sb s) ->
+    (semProdSize arbitrary s <--> setX (Sa s) (Sb s)).
 Proof.
-  move => Hyp1 Hyp2 . rewrite semLiftGen2Size; move => [a b].
+  move => Hyp1 Hyp2 .
+  Opaque liftM2.
+  simpl.
+  rewrite semLiftProd2Size; move => [a b].
   split.
   by move => [[a' b'] [[/= /Hyp1 Ha /Hyp2 Hb] [Heq1 Heq2]]]; subst; split.
   move => [/Hyp1 Ha /Hyp2 Hb]. eexists; split; first by split; eauto.
