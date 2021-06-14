@@ -8,7 +8,9 @@ SetLib
 UnifyQC
 Weightmap
 ArbitrarySized
+EnumSized
 ArbitrarySizedST
+EnumSizedST
 SizeUtils
 Sized
 SimplDriver

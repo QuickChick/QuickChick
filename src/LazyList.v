@@ -309,4 +309,10 @@ Definition bindLazyListPf {A B : Type}
                In_ll x l -> LazyList B) : LazyList B :=
   (concatLazyList (mapLazyListProof l f)).
   
-  
+Fixpoint filter_LazyList {A} (p : A -> bool) (l : LazyList A) :=
+  match l with
+  | lnil => lnil
+  | lcons h t => if p h then
+                   lcons h (fun tt => filter_LazyList p (t tt))
+                 else filter_LazyList p (t tt)
+  end.

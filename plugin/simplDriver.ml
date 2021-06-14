@@ -10,6 +10,7 @@ open SizeSMon
 open SizeCorr
  *)
 
+open EnumSized
 open ArbitrarySized
 
 type derivable =
@@ -17,6 +18,7 @@ type derivable =
   | Show
   | GenSized
   | Sized
+  | EnumSized
   (*
   | CanonicalSized
   | SizeMonotonic
@@ -28,6 +30,7 @@ let derivable_to_string = function
   | Shrink -> "Shrink"
   | Show   -> "Show"
   | GenSized -> "GenSized"
+  | EnumSized -> "EnumSized"              
   | Sized -> "Sized"
            (*
   | CanonicalSized -> "CanonicalSized"
@@ -81,6 +84,7 @@ let derive (cn : derivable) (c : constr_expr) (instance_name : string) (name1 : 
     | Shrink -> ["Shrink"]
     | Show -> ["Show"]
     | GenSized -> ["Gen"]
+    | EnumSized -> ["Enum"]                
                 (*
     | CanonicalSized -> ["CanonicalSized"]
     | SizeMonotonic -> ["GenMonotonic"]
@@ -93,6 +97,7 @@ let derive (cn : derivable) (c : constr_expr) (instance_name : string) (name1 : 
     | Shrink -> []
     | Sized -> []
     | GenSized -> []
+    | EnumSized -> []                
                 (*
     | CanonicalSized -> []
     | SizeMonotonic -> [(gInject "s", gInject "nat")]
@@ -135,6 +140,7 @@ let derive (cn : derivable) (c : constr_expr) (instance_name : string) (name1 : 
     | Show -> show_decl ty_ctr ctrs iargs 
     | Shrink -> shrink_decl ty_ctr ctrs iargs
     | GenSized -> arbitrarySized_decl ty_ctr ctrs iargs
+    | EnumSized -> enumSized_decl ty_ctr ctrs iargs                
     | Sized -> sized_decl ty_ctr ctrs
              (*
     | CanonicalSized ->

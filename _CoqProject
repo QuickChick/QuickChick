@@ -16,6 +16,8 @@ plugin/semLib.ml
 plugin/coqLib.ml
 plugin/arbitrarySized.ml
 plugin/arbitrarySizedST.ml
+plugin/enumSized.ml
+plugin/enumSizedST.ml
 plugin/checkerSizedST.ml
 plugin/genLib.ml
 plugin/unifyQC.ml

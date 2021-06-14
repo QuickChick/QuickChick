@@ -194,3 +194,32 @@ Instance ProducerSemanticsEnum :
   semResize     := @semResizeEnum;
   semResizeSize := @semResizeSizeEnum
   }.
+
+(* This should use urns! *)
+Fixpoint pickDrop {A : Type}  (xs : list (E (option A))) n : E (option A) * list (E (option A)) :=
+  match xs with
+    | nil => (ret None, nil)
+    | x :: xs =>
+      match n with
+      | O => (x, xs)
+      | S n' => let '(x', xs') := pickDrop xs n' in
+                (x', x::xs')
+      end
+  end.
+
+Fixpoint enumerateFuel {A : Type} (fuel : nat) (tot : nat) (gs : list (E (option A))) : E (option A) :=
+  match fuel with 
+    | O => ret None
+    | S fuel' =>
+      bind (choose (0, tot-1)) (fun n => 
+      let '(g, gs') := pickDrop gs n in
+      bind g (fun ma =>
+                match ma with 
+                | Some a => ret (Some a)
+                | None => enumerateFuel fuel' (tot - 1) gs'
+                 end ))
+  end.
+
+Definition enumerate {A : Type} (gs : list (E (option A))) : E (option A) :=
+  enumerateFuel (length gs) (length gs) gs.
+

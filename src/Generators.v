@@ -173,10 +173,6 @@ Proof. by []. Qed.
 
 
 (* Generator specific - choose and its semantics. *)
-Definition choose {A : Type} `{ChoosableFromInterval A} (range : A * A) : G A :=
-    MkGen (fun _ r => fst (randomR range r)).
-
-
 Lemma semChooseSize A `{ChoosableFromInterval A} (a1 a2 : A) :
     RandomQC.leq a1 a2 ->
     forall size, semProdSize (choose (a1,a2)) size <-->

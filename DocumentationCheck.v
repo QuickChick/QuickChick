@@ -56,7 +56,7 @@ Module ConsistencyCheck : QuickChickSig.
   Definition ChooseNat := ChooseNat.
   Definition ChooseZ := ChooseZ.
 
-  Definition choose := @choose.
+  Definition choose := @choose G ProducerGen.
 
   Module QcDefaultNotation.
 (*

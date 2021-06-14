@@ -4,6 +4,7 @@ open Util
 open Constrexpr
 open GenericLib
 open ArbitrarySizedST
+open EnumSizedST   
 open CheckerSizedST
 
 open Error
@@ -20,6 +21,7 @@ type derivable =
   | DecOpt
   | DecOptMon
   | ArbitrarySizedSuchThat
+  | EnumSizedSuchThat  
   | GenSizedSuchThatMonotonicOpt
   | GenSizedSuchThatSizeMonotonicOpt
   | GenSizedSuchThatCorrect
@@ -29,6 +31,7 @@ let derivable_to_string = function
   | DecOpt -> "DecOpt"
   (*   | DecOptMon -> "DecOptSizeMonotonic" *)
   | ArbitrarySizedSuchThat -> "GenSizedSuchThat"
+  | EnumSizedSuchThat -> "EnumSizedSuchThat"                            
                             (*
   | GenSizedSuchThatMonotonicOpt -> "SizeMonotonicOpt"
   | SizedProofEqs -> "SizedProofEqs"
@@ -92,6 +95,8 @@ let derive_dependent
   let instance_arguments = match class_name with
     | DecOpt -> params @ actual_input_args
     (*    | DecOptMon -> params @ actual_input_args *)
+    | EnumSizedSuchThat ->
+       params @ actual_input_args
     | ArbitrarySizedSuchThat ->
       params
 (*      @ gen_needed
@@ -169,6 +174,10 @@ let derive_dependent
        gApp (gInject (derivable_to_string class_name))
          [gType ty_params (UM.find result tmap);
           full_pred input_names]
+    | EnumSizedSuchThat ->
+       gApp (gInject (derivable_to_string class_name))
+         [gType ty_params (UM.find result tmap);
+          full_pred input_names]
     | DecOpt ->
        gApp (gInject (derivable_to_string class_name))
          [ gApp (full_dt) (List.map gVar input_names) ]
@@ -209,6 +218,8 @@ let derive_dependent
   let instance_record iargs =
     match class_name with
     | ArbitrarySizedSuchThat -> gen
+    | EnumSizedSuchThat -> enumSizedST ty_ctr ty_params ctrs dep_type input_names
+      input_ranges umap tmap actual_input_args result coqTyCtr
     | DecOpt ->
        checkerSizedST ty_ctr ty_params ctrs dep_type input_names
          input_ranges umap tmap actual_input_args result coqTyCtr

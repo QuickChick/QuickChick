@@ -62,6 +62,45 @@ Global Instance genPairSized {A B : Type} `{GenSized A} `{GenSized B}
 Global Instance genPair {A B : Type} `{Gen A} `{Gen B} : Gen (A * B) :=
   {| arbitrary := liftM2 pair arbitrary arbitrary |}.
 
+(* Enumerator Instances *)
+
+Global Instance enumBoolSized : EnumSized bool :=
+  {| enumSized x := elems_ true [true; false] |}.
+
+Instance enumNatSized : EnumSized nat :=
+  {| enumSized x := chooseEnum (0,x) |}.
+
+Global Instance enumZSized : EnumSized Z :=
+  {| enumSized x := let z := Z.of_nat x in
+                         chooseEnum (-z, z)%Z |}.
+
+Global Instance enumNSized : EnumSized N :=
+  {| enumSized x := let n := N.of_nat x in
+                         chooseEnum (N0, n) |}.
+
+Global Instance enumListSized {A : Type} `{EnumSized A} : EnumSized (list A) :=
+  {| enumSized x := vectorOf x (enumSized x) |}.
+
+(* [3] is a lower priority than [Classes.EnumOfEnumSized],
+   avoiding an infinite loop in typeclass resolution. *)
+
+Global Instance enumList {A : Type} `{Enum A} : Enum (list A) | 3 :=
+  {| enum := listOf enum |}.
+
+Global Instance enumOption {A : Type} `{Enum A} : Enum (option A) | 3 :=
+  {| enum := oneOf [ (ret None)
+                   ; (liftM Some enum)] |}.
+
+Global Instance enumPairSized {A B : Type} `{EnumSized A} `{EnumSized B}
+: EnumSized (A*B) :=
+  {| enumSized x :=
+       liftM2 pair (enumSized x)
+                   (enumSized x)
+  |}.
+
+Global Instance enumPair {A B : Type} `{Enum A} `{Enum B} : Enum (A * B) :=
+  {| enum := liftM2 pair enum enum |}.
+
 (** Shrink Instances *)
 Global Instance shrinkBool : Shrink bool :=
   {| shrink x :=
