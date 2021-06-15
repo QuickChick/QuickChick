@@ -16,7 +16,141 @@ Open Scope monad_scope.
 
 Set Bullet Behavior "Strict Subproofs".
 
-Derive ArbitrarySizedSuchThat for (fun x => eq x y).
+Inductive tree : Type :=
+| Leaf : tree
+| Node : nat -> tree -> tree -> tree.
+
+(* Example with two IH *)
+Inductive goodTree : nat -> tree -> Prop :=
+| GL : goodTree 0 Leaf
+| GN : forall k t1 t2 n m, goodTree n t1 ->
+                      goodTree m t2 ->
+                      goodTree m t1 ->
+                      goodTree (S n) (Node k t1 t2).
+
+Set Typeclasses Debug.
+QuickChickDebug Debug On.
+Instance DecgoodTree (n : nat) (t : tree) : DecOpt (goodTree n t) := { decOpt := fun _ => Some true }.
+
+Derive ArbitrarySizedSuchThat for (fun t => goodTree n t).
+(* Derive EnumSizedSuchThat for (fun t => goodTree n t).  *)
+
+Definition test m t1 init_size : option bool :=
+  @decOpt (@goodTree m t1) (DecgoodTree m t1) init_size.
+
+Definition baz m (t1 : tree) : option bool :=
+  match m with
+  | O => Some true
+  | _ => Some false
+  end.
+
+Definition bar := Some (negb true).
+
+Definition foo n_ :=
+  let
+   fix aux_arb init_size size0 (n_ : nat) :
+       E (Coq.Init.Datatypes.option (tree)) :=
+     match size0 with
+     | O =>
+         enumerate
+           (Coq.Lists.List.cons
+              match n_ as s with
+              | @Coq.Init.Datatypes.O =>
+                  returnEnum (@Some (tree) (@Leaf))
+              | _ => returnEnum (@None (tree))
+              end Coq.Lists.List.nil)
+     | S size' =>
+         enumerate
+           (Coq.Lists.List.cons
+              match n_ as s with
+              | @Coq.Init.Datatypes.O =>
+                  returnEnum (@Some (tree) (@Leaf))
+              | _ => returnEnum (@None (tree))
+              end
+           (Coq.Lists.List.cons
+                 match n_ as s with
+                 | @Coq.Init.Datatypes.S n =>
+                     bindEnumOpt
+                       (aux_arb init_size size' n)
+                       (fun t1 =>
+                        bindEnum enum
+                          (fun m =>
+                           bindEnumOpt
+                             (aux_arb init_size size' m)
+                             (fun t2 =>
+                              match bar m t1 
+(*                                @decOpt 
+                                  (@goodTree m t1) (DecgoodTree m t1)
+                                  init_size as s return E (option tree) *)
+                              with
+                              | Some res_b =>
+                                
+                                  match res_b with
+                                  | true =>
+                                    bindEnum enum
+                                    (fun k : nat =>
+                                    returnEnum
+                                    (@Some 
+                                    (tree)
+                                    (@Node k t1 t2)))
+                                  | false =>
+                                    returnEnum
+                                    (@None (tree))
+                                  end
+                              | None =>
+                                  returnEnum
+                                    (@None (tree))
+                              end))) 
+                 | _ => returnEnum (@None (tree))
+                 end Coq.Lists.List.nil))
+     end  
+  in fun size0 => aux_arb size0 size0 n_. 
+
+   | S size' =>
+         enumerate
+           (Coq.Lists.List.cons
+              match n_ as s with
+              | @Coq.Init.Datatypes.O =>
+                  returnEnum (@Some (tree) (@Leaf))
+              | _ => returnEnum (@None (tree))
+              end
+              (Coq.Lists.List.cons
+                 match n_ as s with
+                 | @Coq.Init.Datatypes.S n =>
+                     bindEnumOpt
+                       (aux_arb init_size size' n)
+                       (fun t1 =>
+                        bindEnum enum
+                          (fun m =>
+                           bindEnumOpt
+                             (aux_arb init_size size' m)
+                             (fun t2 =>
+                              match
+                                @decOpt 
+                                  (@goodTree m t1) _
+                                  init_size as s
+                              with
+                              | Some res_b =>
+                                  match res_b with
+                                  | true =>
+                                    bindEnum enum
+                                    (fun k =>
+                                    returnEnum
+                                    (@Some 
+                                    (tree)
+                                    (@Node k t1 t2)))
+                                  | false =>
+                                    returnEnum
+                                    (@None (tree))
+                                  end
+                              | None =>
+                                  returnEnum
+                                    (@None (tree))
+                              end)))
+                 | _ => returnEnum (@None (tree))
+                 end Coq.Lists.List.nil))
+     end in
+ fun size0 => aux_arb size0 size0 n_).
 
 Definition GenSizedSuchThateq_manual {A} (y_ : A) :=
   let fix aux_arb (init_size size : nat) (y_0 : A) {struct size} : G (option A) :=
