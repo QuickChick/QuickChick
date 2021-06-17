@@ -78,7 +78,7 @@ Definition foo n_ :=
                            bindEnumOpt
                              (aux_arb init_size size' m)
                              (fun t2 =>
-                              match bar m t1 
+                              match baz m t1 
 (*                                @decOpt 
                                   (@goodTree m t1) (DecgoodTree m t1)
                                   init_size as s return E (option tree) *)
