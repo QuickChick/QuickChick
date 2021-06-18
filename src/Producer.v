@@ -180,16 +180,6 @@ Class ProducerSemantics G `{Producer G} :=
   }.
 
 (*
-  semBindSize_subset_compat :
-    forall {A B : Type} (g g' : G A) (f f' : A -> G B),
-      (forall s, semProdSize g s \subset semProdSize g' s) ->
-      (forall x s, semProdSize (f x) s \subset semProdSize (f' x) s) ->
-      (forall s, semProdSize (bind g f) s \subset semProdSize (bind g' f') s);
-  semBindSizeOpt_subset_compat :
-    forall {A B : Type} (g g' : G A) (f f' : A -> G (option B)),
-      (forall s, semProdSize g s \subset semProdSize g' s) ->
-      (forall x s, isSome :&: semProdSize (f x) s \subset isSome :&: semProdSize (f' x) s) ->
-      (forall s, isSome :&: semProdSize (bind g f) s \subset isSome :&: semProdSize (bind g' f') s);
 *)
 
 (* I'm not sure how this universal quantifier will behave *)
@@ -425,6 +415,19 @@ Section ProducerProofs.
     apply monotonicOpt with (s2 := s'); eauto; try ssromega.
 Qed.    
 
+  Lemma semBindSize_subset_compat :
+    forall {A B : Type} (g g' : G A) (f f' : A -> G B),
+      (forall s, semProdSize g s \subset semProdSize g' s) ->
+      (forall x s, semProdSize (f x) s \subset semProdSize (f' x) s) ->
+      (forall s, semProdSize (bind g f) s \subset semProdSize (bind g' f') s).
+  Admitted.
+  
+  (* semBindSizeOpt_subset_compat : *)
+  (*   forall {A B : Type} (g g' : G A) (f f' : A -> G (option B)), *)
+  (*     (forall s, semProdSize g s \subset semProdSize g' s) -> *)
+  (*     (forall x s, isSome :&: semProdSize (f x) s \subset isSome :&: semProdSize (f' x) s) -> *)
+  (*     (forall s, isSome :&: semProdSize (bind g f) s \subset isSome :&: semProdSize (bind g' f') s); *)
+  
   Lemma semBindRetFSize :
     forall (A B : Type) (f : A -> B) (g : G A)
            (size : nat),
