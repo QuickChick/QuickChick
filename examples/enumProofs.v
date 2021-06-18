@@ -114,38 +114,45 @@ Proof.
 Qed.
 
 
-Lemma incl_bigcup_compat_list :
-  forall (T U : Type) (h1 h2 : T) (t1 t2 : list T) (F G : T -> set U),
+Lemma incl_bigcup_compat_list (T U : Type) (h1 h2 : T) (t1 t2 : list T) (F G : T -> set U) :
     F h1 \subset G h2 ->
     \bigcup_(x in t1) F x \subset \bigcup_(x in t2) G x ->
     \bigcup_(x in h1 :: t1) F x \subset \bigcup_(x in h2 :: t2) G x.
 Proof.
-Admitted.
+  intros Hs1 Hs2.
+  intros x Hin. inv Hin. inv H. inv H0.
+  - eexists. split. now left. eauto.
+  - edestruct Hs2.
+    eexists. split; eauto.
+    destruct H0. eexists. split. now right; eauto.
+    eassumption.
+Qed.
 
 
-Lemma incl_bigcup_list_tl :
-  forall (T U : Type) (h : T) (t : list T) (G : T -> set U) s,
+Lemma incl_bigcup_list_tl (T U : Type) (h : T) (t : list T) (G : T -> set U) s :
     s \subset \bigcup_(x in t) G x ->
     s \subset \bigcup_(x in h :: t) G x.
 Proof.
-Admitted.
+  intros Hyp x Hin. eapply Hyp in Hin.
+  inv Hin. inv H. 
+  eexists. split. now right; eauto. eauto.
+Qed.
 
-Lemma incl_bigcup_list_hd :
-  forall (T U : Type) (h : T) (t : list T) (G : T -> set U) s,
+Lemma incl_bigcup_list_hd (T U : Type) (h : T) (t : list T) (G : T -> set U) s :
     s \subset G h ->
     s \subset \bigcup_(x in h :: t) G x.
 Proof.
-Admitted.
+  intros Hyp x Hin. eapply Hyp in Hin.
+  eexists. split. now left. eauto.
+Qed.
 
-Lemma incl_bigcup_list_nil :
-  forall (T U : Type) (G : T -> set U) s,
+
+Lemma incl_bigcup_list_nil (T U : Type) (G : T -> set U) s :
     \bigcup_(x in [::]) G x \subset s.
 Proof. 
-Admitted.
+  intros x Hin. inv Hin. inv H. inv H0.
+Qed.
 
-
-(* Ltac2 Notation "ssromega" := ssromega_ltac1 (). *)
-(* XXX notation? *)
 
 Inductive tree A : Type :=
 | Leaf : A -> tree A
@@ -236,12 +243,12 @@ Lemma list_subset_cons {A} (h : A) (t : seq A) (s : set A)  :
   t \subset s ->
   (h :: t) \subset s.
 Proof.
-Admitted.
+  intros H1 H2 x Hin. inv Hin; eauto.
+Qed.
 
 Lemma list_subset_nil {A} (s : set A)  :
   [::] \subset s.
-Proof.
-Admitted.
+Proof. intros x Hin. inv Hin. Qed.
 
 
 Ltac2 rec enum_size_mon (ih : ident) :=
@@ -293,26 +300,48 @@ Proof. derive_enum_size_mon (). Qed.
 Lemma exists_oneOf_hd A (x : A) g' (g : nat -> E A) (l : nat -> seq (E A)) :
   (exists s : nat, semProd (g s) x) ->
   exists s : nat, semProd (oneOf_ g' ((g s) :: (l s))) x.
-Admitted.
+Proof.
+  intros Hin. inv Hin.
+  eexists. eapply semOneof. now eauto with typeclass_instances.
+  eexists. split; eauto. now left. 
+Qed.
 
 Lemma exists_oneOf_tl A (x : A) g' (g : nat -> E A) (l : nat -> seq (E A)) :
-  (exists s : nat, semProd (oneOf_ g' (l s)) x) ->
+  (exists s : nat, match l s with
+                   | nil => False
+                   | g1 :: gs => semProd (oneOf_ g' (g1 :: gs)) x
+                   end) ->
   exists s : nat, semProd (oneOf_ g' ((g s) :: (l s))) x.
-Admitted.
-
-Lemma exists_bind_Sized A B (x : A) (g : nat -> E B) (f : nat -> B -> E A) :
-  CorrectSized g ->
-  (exists z s, semProd (f s z) x) ->  
-  exists s : nat, semProd (bindEnum (g s) (f s)) x.
 Proof.
-Admitted.
+  intros Hin. inv Hin.
+  eexists. eapply semOneof. 
+  now eauto with typeclass_instances.
+  destruct (l x0)  eqn:Heq.
+  - exfalso; eauto.
+  - eapply semOneof in H > [ | now eauto with typeclass_instances ].
+    rewrite Heq. inv H. destruct H0. eexists. split > [ | eassumption ].
+    now right; eauto.
+Qed.
 
 Lemma exists_bind A B (x : A) (g : E B) (f : nat -> B -> E A) :
   Correct g ->
+  SizeMonotonic g ->
+  (forall a s, SizeMonotonic (f a s)) ->
+
   (exists z s, semProd (f s z) x) ->  
   exists s : nat, semProd (bindEnum g (f s)) x.
 Proof.
-Admitted.
+  intros Hc Hs1 Hs2 He. inv He. inv H. inv H0.
+  inv H.
+  assert (Hin : [set : B] x0) by reflexivity.
+  eapply Hc in Hin. inv Hin. inv H.
+  exists x1, (Nat.max x2 x3). split. reflexivity.
+  eapply (@semBindSize E _ _ B A).
+  eexists. split.
+
+  eapply Hs1 > [ | eassumption ]. now ssromega ().
+  eapply Hs2 > [ | eassumption ]. now ssromega ().
+Qed.
 
 Lemma exists_return A (x : A) :
   exists s : nat, semProd (returnEnum x) x.
@@ -387,7 +416,10 @@ Ltac2 rec enum_size_correct (_ : unit) :=
     | (* bind non rec *)
       match! goal with
       |  [ |- exists _ : nat, semProd (bindEnum enum _) _ ] => 
-         eapply exists_bind > [ now eauto with typeclass_instances | now eexists; enum_size_correct () ]
+         eapply exists_bind > [ now eauto with typeclass_instances
+                              | now eauto with typeclass_instances
+                              | now solve_size_mon @Hsize
+                              | now eexists; enum_size_correct () ]
       end
     | (* bind rec *)
       match! goal with
@@ -436,7 +468,8 @@ Ltac2 derive_enum_correct (_ : unit) :=
       assert ($hsize : forall s, SizeMonotonic ($en s)) > [ now eauto with typeclass_instances | ];
       econstructor; intro $ind; split > [ intro; exact I | intros _ ];
       let ind' := Control.hyp ind in
-      induction $ind'; eapply exists_Sn; repeat (destructIH ()); simpl_enumSized (); try_solve_correct ()
+      induction $ind'; eapply exists_Sn; repeat (destructIH ()); simpl_enumSized ();
+      try_solve_correct ()
     end
   end.
 
