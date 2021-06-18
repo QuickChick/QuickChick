@@ -143,6 +143,12 @@ Class SizedCorrect {A : Type} `{Sized A} {G} `{Producer G}
     prodSizedCorrect : forall s, semProd (g s) <--> [set x : A | size x <= s ]
   }.
 
+Class CorrectSized {A : Type} {G} `{Producer G} (g : nat -> G A)  :=
+  { prodCorrectSized :
+      [ set n | exists s, semProd (g s) n ] <--> [set : A]
+  }.
+
+
 (** Correctness of generators *)
 Class Correct (A : Type) {G} `{Producer G} (g : G A)  :=
   {
@@ -163,14 +169,14 @@ Class GenMonotonic (A : Type) `{Gen A} `{SizeMonotonic A G arbitrary}.
 
 (** Monotonicity of size parametric generators *)
 Class EnumSizedMonotonic (A : Type) `{EnumSized A}
-      `{forall s, SizeMonotonic (enumSized s)}.
+      `{forall s, @SizeMonotonic A E ProducerEnum (enumSized s)}.
 
 (** Monotonicity of size parametric generators v2 *)
 Class EnumSizedSizeMonotonic (A : Type) `{EnumSized A}
-        `{SizedMonotonic A E enumSized}.
+        `{@SizedMonotonic A E ProducerEnum enumSized}.
 
 Class EnumMonotonic (A : Type) `{Enum A}
-        `{SizeMonotonic A E enum}.
+        `{@SizeMonotonic A E ProducerEnum enum}.
   
 (** * Correct generators *)
 
@@ -276,7 +282,7 @@ Instance EnumSizedMonotonicOfSizeMonotonic
   
 Instance EnumMonotonicOfSizeMonotonic
          (A : Type) (Hgen : Enum A) (Hmon : @SizeMonotonic A E ProducerEnum enum)
-: @EnumMonotonic A Hgen ProducerEnum Hmon := {}.
+: @EnumMonotonic A Hgen Hmon := {}.
 
 Instance EnumSizedCorrectOfSizedCorrect
          (A : Type) (Hgen : EnumSized A)
@@ -291,7 +297,7 @@ Instance EnumCorrectOfCorrect
 
 Instance EnumSizedSizeMonotonicOfSizedMonotonic
          (A : Type) (Hgen : EnumSized A) (Hmon : @SizedMonotonic A E ProducerEnum enumSized)
-: @EnumSizedSizeMonotonic A Hgen ProducerEnum Hmon := {}.
+: @EnumSizedSizeMonotonic A Hgen Hmon := {}.
 
 Global Instance EnumOfEnumSized {A} `{EnumSized A} : Enum A :=
   {| enum := sized enumSized |}.
@@ -303,9 +309,9 @@ Global Instance EnumOfGenShrink {A} `{Gen A} `{Shrink A} : Arbitrary A := {}.
 Instance EnumMonotonicOfSized (A : Type)
          `{H : EnumSized A}
          `{@EnumSizedMonotonic A H PMon}
-         `{@EnumSizedSizeMonotonic A H ProducerEnum PSMon}
+         `{@EnumSizedSizeMonotonic A H PSMon}
   : @EnumMonotonic A
-                  (@EnumOfEnumSized A H) ProducerEnum
+                  (@EnumOfEnumSized A H)
                   (@sizedSizeMonotonic E ProducerEnum _ A
                                        (@enumSized A H)
                                        PMon PSMon) := {}.
@@ -313,7 +319,7 @@ Instance EnumMonotonicOfSized (A : Type)
 Instance EnumCorrectOfSized (A : Type)
          {H : EnumSized A}
          `{@EnumSizedMonotonic A H PMon}
-         `{@EnumSizedSizeMonotonic A H ProducerEnum PSMon}
+         `{@EnumSizedSizeMonotonic A H PSMon}
          `{@EnumSizedCorrect A PSized H PCorr} : Correct A enum.
 Proof.
   constructor. unfold arbitrary, EnumOfEnumSized. 

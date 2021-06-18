@@ -17,7 +17,8 @@ From QuickChick Require Import
      Sets
      Producer
      Enumerators
-     Generators.
+     Generators
+     Tactics.
 
 Import ListNotations QcDefaultNotation.
 Open Scope qc_scope.
@@ -109,6 +110,87 @@ Global Instance shrinkBool : Shrink bool :=
          | true  => cons false nil
        end
   |}.
+
+Instance enumNatSized_CorrectSized :
+  CorrectSized (@enumSized _ enumNatSized).
+Proof.
+  constructor. 
+  intros t; split; eauto.
+  - intros. exact I.
+  - intros _. 
+    
+    induction t.
+
+    + exists 0.
+
+      assert (Hsize := @Enumerators.semChooseSize nat _).
+      simpl in *.
+      exists 0. split. exact I. eapply Hsize.
+      reflexivity.
+      reflexivity.
+      
+    + destruct IHt.
+      assert (Hsize := @Enumerators.semChooseSize nat _).
+      simpl in *.
+      inv H. inv H0. eapply Hsize in H2; [ | now eauto ].
+      
+      exists (x.+1). exists 0. split. exact I. eapply Hsize.
+      now eauto.
+      ssromega.
+Qed.       
+
+Instance enumNatSized_SizedMonotonic :
+  SizedMonotonic (@enumSized _ enumNatSized).
+Proof.
+  intros s s1 s2. revert s2.
+  induction s1 as [ | s1 IHs1 ].
+  - intros s2 Hleq. simpl.
+    intros x Hin.
+    
+    assert (Hsize := @Enumerators.semChooseSize nat _).
+    eapply Hsize in Hin; eauto.
+    simpl in Hin.
+    eapply Hsize. eassumption. simpl.
+    ssromega.
+  - intros s2 Hleq.
+    destruct s2. ssromega.
+
+    simpl.
+    erewrite !Enumerators.semChooseSize.
+    intros x.
+    simpl. intros H. 
+    ssromega. 
+    simpl. ssromega.
+
+    simpl. ssromega. 
+Qed.
+
+Instance enumNatSized_SizeMonotonic s:
+  SizeMonotonic (@enumSized _ enumNatSized s).
+Proof.
+  intros s1 s2. revert s2.
+  induction s1 as [ | s1 IHs1 ].
+  - intros s2 Hleq. simpl.
+    intros x Hin.
+
+    assert (Hsize := @Enumerators.semChooseSize nat _).
+    eapply Hsize in Hin; eauto.
+    simpl in Hin.
+    eapply Hsize. eassumption. simpl.
+    ssromega.
+  - intros s2 Hleq.
+    destruct s2. ssromega.
+
+    simpl.
+    erewrite !Enumerators.semChooseSize.
+    intros x.
+    simpl. intros H. 
+    ssromega. 
+    simpl. ssromega. 
+
+    simpl. ssromega. 
+Qed.
+
 
 (** Shrinking of nat starts to become annoying *)
 Function shrinkNatAux (x : nat) {measure (fun x => x) x} : list nat :=

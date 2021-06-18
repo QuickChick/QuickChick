@@ -7,6 +7,7 @@ Require Import State.
 Require Import Producer Generators.
 Require Import Classes.
 Require Import DependentClasses.
+Require Import Tactics.
 
 From Ltac2 Require Import Ltac2.
 From Ltac2 Require Import Message.
@@ -74,3 +75,9 @@ Ltac2 id_of_string (s : string) :=
   | Some i => i
   | None => Control.throw (Tactic_failure (Some (Message.of_string ("Not a valid string for identifier"))))
   end.
+
+Ltac2 print_constr (c : constr) := Message.print (Message.of_constr c). 
+Ltac2 print_str (c : string) := Message.print (Message.of_string c). 
+
+Local Ltac2 ssromega_tac () := ltac1:(ssromega).
+Ltac2 Notation "ssromega" := ssromega_tac ().

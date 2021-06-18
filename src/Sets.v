@@ -1090,3 +1090,43 @@ Proof. firstorder. Qed.
 Lemma bigcup_setI {T U} (s1 : set T) (s2 : set U) F :
   \bigcup_(x in s1) (s2 :&: F x) <--> s2 :&: \bigcup_(x in s1) (F x).
 Proof. firstorder. Qed.
+
+
+Lemma incl_bigcup_compat_list (T U : Type) (h1 h2 : T) (t1 t2 : list T) (F G : T -> set U) :
+    F h1 \subset G h2 ->
+    \bigcup_(x in t1) F x \subset \bigcup_(x in t2) G x ->
+    \bigcup_(x in h1 :: t1) F x \subset \bigcup_(x in h2 :: t2) G x.
+Proof.
+  intros Hs1 Hs2.
+  intros x Hin. inv Hin. inv H. inv H0.
+  - eexists. split. now left. eauto.
+  - edestruct Hs2.
+    eexists. split; eauto.
+    destruct H3. eexists. split. now right; eauto.
+    eassumption.
+Qed.
+
+
+Lemma incl_bigcup_list_tl (T U : Type) (h : T) (t : list T) (G : T -> set U) s :
+    s \subset \bigcup_(x in t) G x ->
+    s \subset \bigcup_(x in h :: t) G x.
+Proof.
+  intros Hyp x Hin. eapply Hyp in Hin.
+  inv Hin. inv H. 
+  eexists. split. now right; eauto. eauto.
+Qed.
+
+Lemma incl_bigcup_list_hd (T U : Type) (h : T) (t : list T) (G : T -> set U) s :
+    s \subset G h ->
+    s \subset \bigcup_(x in h :: t) G x.
+Proof.
+  intros Hyp x Hin. eapply Hyp in Hin.
+  eexists. split. now left. eauto.
+Qed.
+
+
+Lemma incl_bigcup_list_nil (T U : Type) (G : T -> set U) s :
+    \bigcup_(x in [::]) G x \subset s.
+Proof. 
+  intros x Hin. inv Hin. inv H. inv H0.
+Qed.
