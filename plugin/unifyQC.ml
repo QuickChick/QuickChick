@@ -292,9 +292,28 @@ let rec range_to_coq_expr k r =
   | RangeHole -> hole
   | _ -> failwith "QC Internal: TopLevel ranges should be Unknowns or Constructors"
 
-let dt_to_coq_expr k dt = 
-  option_map (range_to_coq_expr k) (convert_to_range dt)
-
+let rec dt_to_coq_expr k dt =
+  match dt with
+  | DTyVar u ->
+     begin try 
+       begin match umfind u k with
+       | FixedInput -> gVar u
+       | Undef _ -> (msg_debug (str "It's stupid that this is called" ++ fnl ()); gVar u)
+       | Unknown u' -> range_to_coq_expr k (Unknown u')
+       | Ctr (c, rs) -> gApp (gCtr c) (List.map (range_to_coq_expr k) rs)
+       | Parameter p -> gTyParam p
+       | RangeHole -> hole
+       end
+       with _ -> gVar u
+     end
+  | DCtr (c,dts) ->
+     gApp ~explicit:true (gCtr c) (List.map (dt_to_coq_expr k) dts)     
+  | DTyCtr (c, dts) ->
+     gApp ~explicit:true (gCtr (ty_ctr_to_ctr c)) (List.map (dt_to_coq_expr k) dts)     
+  | DApp (dt, dts) ->
+     gApp ~explicit:true (dt_to_coq_expr k dt) (List.map (dt_to_coq_expr k) dts)
+  | _ -> failwith "QC Internal: dt_to_coq_expr"
+  
 let rec is_dep_type = function
   | DArrow (dt1, dt2) -> is_dep_type dt1 || is_dep_type dt2 
   | DProd ((_, dt1), dt2) -> is_dep_type dt1 || is_dep_type dt2 
@@ -772,9 +791,11 @@ let handle_branch
 
        (* Calculate arguments *)
        let args =
-         match sequenceM (dt_to_coq_expr !umap) dts with
+         msg_debug (str ("Calculating arguments with: " ^ (String.concat " " (List.map dep_type_to_string dts))) ++ fnl ());
+         List.map (dt_to_coq_expr !umap) dts
+(*         match sequenceM (dt_to_coq_expr !umap) dts with
          | Some rs -> rs
-         | None -> qcfail "Uninstantiated function calls after instantiation?"
+         | None -> qcfail "Uninstantiated function calls after instantiation?"*)
        in 
        
        if is_pos then
