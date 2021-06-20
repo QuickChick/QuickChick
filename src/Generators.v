@@ -557,7 +557,6 @@ Proof.
 Qed.
 
 (* Probably needs something about l' and l. *)
-(* ZP : added a few things *)
 Lemma pickDrop_exists :
   forall {A} (l: list (nat * G (option A))) n,
     n <  sum_fst l <->
