@@ -230,3 +230,138 @@ Definition bindEnumOpt {A B}
     | None => ret None
     | Some a => f a
     end).
+
+
+
+
+Lemma pickDrop_exists {A} (l: list (E (option A))) n :
+    n < length l ->
+    exists x l',
+      Enumerators.pickDrop l n = (x, l') /\
+      seq_In l x /\ length l' + 1 = length l /\
+      l' \subset l. 
+Proof.
+  revert n; induction l; intros n H.
+  - simpl in *; ssromega. 
+  - simpl in *.
+    destruct n.
+    + do 2 eexists. split. reflexivity.
+      split; eauto. split. ssromega.
+      simpl.
+      intros z Hin. now right; eauto.
+    + edestruct (IHl n). ssromega.
+      inv H0. inv H1. inv H2. inv H3.
+      do 2 eexists. split. rewrite H2. reflexivity.
+      split; eauto. split. simpl. ssromega.
+
+      intros z Hin; inv Hin; eauto. now left.
+      inv H6. now right; eauto.
+Qed. 
+
+Lemma pickDrop_In {A} (l: list (E (option A))) x :
+    List.In x l ->
+    exists n l', Enumerators.pickDrop l n = (x,l') /\ n < length l.
+Proof.
+  induction l; intros Hin; inv Hin.
+
+  - exists 0. eexists. split. reflexivity.
+    simpl. ssromega.
+
+  - destruct IHl. eassumption. inv H0. inv H1.
+    exists (S x0). eexists. split. simpl. rewrite H2. reflexivity.
+    simpl. ssromega.
+Qed.
+
+
+Lemma enumerate_correct_size {A} (lst : list (E (option A))) s :
+  isSome :&: semProdSize (enumerate lst) s <--> \bigcup_(x in lst) (fun g => isSome :&: semProdSize g s) x.  
+Proof.
+  unfold enumerate.
+  assert (Hret := @semReturnSize E _ _ (option A)).
+  assert (Hbind := @semBindSize E _ _). simpl in *. 
+  
+  assert (Datatypes.length lst = Datatypes.length lst)%coq_nat by reflexivity.  
+  revert H.
+  generalize (Datatypes.length lst) at 2 3 4.
+  intros n. generalize lst. induction n; intros l Hleq.
+  - simpl. intros x; split; intros Hin.  inv Hin. 
+    + eapply Hret in H0. inv H0; exfalso; eauto. 
+    + inv Hin. inv H. destruct l; try (simpl in *; congruence). inv H0.
+  - intros x; split; intros Hin.
+    + inv Hin. destruct x; [ | now exfalso; eauto ].
+      with_strategy opaque [Enumerators.pickDrop] (simpl in H0). 
+      
+      eapply Hbind in H0.
+      inv H0. inv H1.
+      
+      eapply Enumerators.semChooseSize in H2; eauto. simpl in .
+      
+      destruct (pickDrop_exists l x). simpl in *. now ssromega.
+      destruct H1. destruct H4. destruct H4. destruct H6. destruct H7.
+      
+      rewrite H4 in H3.
+      
+      eapply Hbind in H3.
+      destruct H2. destruct H3. destruct H2.
+      destruct x2.
+      
+      
+      -- eapply Hret in H3.
+         inv H3.
+         
+         eexists. split.  eassumption.
+         constructor; eauto.
+         
+      -- assert (Hsem : (isSome :&: semProdSize
+                                (enumerateFuel n (n.+1 - 1)
+                                               x1) s) (Some a)).
+         { split; eauto. }
+         
+         assert (Heq' : (n.+1 - 1) = n).
+         { ssromega. }
+         
+         rewrite Heq' in Hsem.
+         eapply IHn in Hsem.
+         inv Hsem. destruct H9.
+         eexists. split.
+         eapply H8. eassumption. 
+         eassumption.
+         ssromega. 
+    + inv Hin. inv H. inv H1. destruct x; try (now exfalso; eauto).
+      constructor. now eauto.
+      simpl. 
+      eapply Hbind.
+      
+      destruct (pickDrop_In _ _ H0). destruct H4.
+      destruct H4.
+      
+      exists x. split.
+      eapply Enumerators.semChooseSize; eauto.
+      simpl. now ssromega. 
+
+      rewrite H4.
+      eapply Hbind.
+
+      exists (Some a). split.
+      eassumption.
+      eapply Hret. reflexivity. 
+Qed.       
+
+Lemma enumerate_correct {A} (lst : list (E (option A))) :
+  isSome :&: semProd (enumerate lst) <--> \bigcup_(x in lst) (fun g => isSome :&: semProd g) x.  
+Proof.
+  split; intros H.
+  - inv H. inv H1. inv H2.
+    assert (Hin : (isSome :&: semProdSize (enumerate lst) x) a).
+    { split; eauto. }
+    eapply (@enumerate_correct_size A) in Hin.
+    inv Hin. inv H5. inv H7.
+    eexists. split; eauto. split; eauto.
+    eexists; eauto.
+  - destruct H. destruct H. destruct H0. destruct H1. destruct H1.
+    assert (Hin :  (\bigcup_(x in lst) (fun g => isSome :&: semProdSize g x0) x) a).
+    { eexists. split; eauto. split; eauto. }
+
+    eapply (@enumerate_correct_size A) in Hin.
+    inv Hin. split; eauto. eexists. split; eauto. 
+Qed.   

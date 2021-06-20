@@ -14,15 +14,13 @@ let ret_exp (dt : coq_expr) (c : coq_expr) = gSome dt c
 
 let ret_type (s : var) f = hole
 
-let instantiate_existential_method = (gInject "arbitrary")
+let instantiate_existential_method = (gInject "enum")
 
 let instantiate_existential_methodST (n : int) (pred : coq_expr) =
-  failwith "Implement existentials in checkers"
-(*  gApp ~explicit:true (gInject "arbitraryST")
+  gApp ~explicit:true (gInject "enumSuchThat")
     [ hole (* Implicit argument - type A *)
     ; pred
     ; hole (* Implicit instance *)]
- *)
 
 let rec_method (rec_name : coq_expr) (init_size : coq_expr) (size : coq_expr) (n : int) (letbinds : unknown list option) (l : coq_expr list) =
   gApp rec_name (init_size :: size :: l)
