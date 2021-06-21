@@ -109,13 +109,13 @@ Inductive IndistState : State -> State -> Prop :=
     IndistAtom pc1 pc2 ->
     IndistMem m1 m2 ->
     pc_lab pc1 = L ->
-    IndistStack (cropTop s1) (cropTop s2) ->
+    IndistStack s1 s2 ->
     IndistState (St im1 m1 s1 pc1) (St im2 m2 s2 pc2)
 | IState_High : forall im1 im2 m1 m2 s1 s2 pc1 pc2,
     IndistAtom pc1 pc2 ->
     IndistMem m1 m2 ->
     pc_lab pc1 = H ->
-    IndistStack s1 s2 ->
+    IndistStack (cropTop s1) (cropTop s2) ->
     IndistState (St im1 m1 s1 pc1) (St im2 m2 s2 pc2).
 
 Derive DecOpt for (IndistState s1 s2).
