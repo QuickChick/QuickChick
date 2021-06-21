@@ -18,7 +18,7 @@ Module ConsistencyCheck : QuickChickSig.
     @Applicative_Monad _ (@super _ ProducerGen). 
   Definition Monad_G := @super _ ProducerGen. 
   Definition bindGen' := @bindPf G ProducerGen.
-  Definition bindGenOpt := @bindGenOpt.
+  Definition bindGenOpt := @bindOpt G ProducerGen.
   Definition run := @Generators.run.
   Definition listOf := @listOf G ProducerGen.
   Definition vectorOf := @vectorOf G ProducerGen.

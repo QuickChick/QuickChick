@@ -9,7 +9,7 @@ let bindGen cg xn cf =
   gApp (gInject "bindGen") [cg; gFun [xn] (fun [x] -> cf x)]
 
 let bindGenOpt cg xn cf = 
-  gApp (gInject "bindGenOpt") [cg; gFun [xn] (fun [x] -> cf x)]
+  gApp (gInject "bindOpt") [cg; gFun [xn] (fun [x] -> cf x)]
 
 (* Gen combinators *)
 let gEnum c = gApp (gInject "E") [c]
@@ -19,7 +19,7 @@ let bindEnum cg xn cf =
   gApp (gInject "bindEnum") [cg; gFun [xn] (fun [x] -> cf x)]
 
 let bindEnumOpt cg xn cf = 
-  gApp (gInject "bindEnumOpt") [cg; gFun [xn] (fun [x] -> cf x)]
+  gApp (gInject "bindOpt") [cg; gFun [xn] (fun [x] -> cf x)]
   
 let oneof l =
   match l with

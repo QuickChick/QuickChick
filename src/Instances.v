@@ -340,10 +340,6 @@ Proof.
   eapply sizedSizeMonotonic; unfold arbitrarySized, genBoolSized.
   - eauto with typeclass_instances.
   - intros; eauto with typeclass_instances.
-    (* Why are these not found? *)
-    apply unsizedMonotonic.
-    apply elementsUnsized.
-    eauto with typeclass_instances.
   - intros n s1 s2 Hs. eapply subset_refl.
 Qed.
 

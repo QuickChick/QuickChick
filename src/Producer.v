@@ -218,7 +218,7 @@ Section ProducerProofs.
     by apply eq_bigcupr => ?; rewrite !semBindSize ?bigcup_flatten.
   Qed.
 
-  Instance unsizedReturn {A} (x : A) :
+  Global Instance unsizedReturn {A} (x : A) :
     Unsized (ret x).
   Proof.
     unfold Unsized => s1 s2.
@@ -226,7 +226,7 @@ Section ProducerProofs.
     firstorder.
   Qed.
 
-  Instance returnGenSizeMonotonic {A} (x : A) :
+  Global Instance returnGenSizeMonotonic {A} (x : A) :
     SizeMonotonic (ret x).
   Proof.
     unfold Unsized => s1 s2.
@@ -234,7 +234,7 @@ Section ProducerProofs.
     firstorder.
   Qed.
 
-  Instance returnGenSizeMonotonicOpt {A} (x : option A) :
+  Global Instance returnGenSizeMonotonicOpt {A} (x : option A) :
     SizeMonotonicOpt (ret x).
   Proof.
     unfold Unsized => s1 s2 Hs.
@@ -243,7 +243,7 @@ Section ProducerProofs.
     firstorder.
   Qed.
 
-  Instance bindUnsized {A B} (g : G A) (f : A -> G B)
+  Global Instance bindUnsized {A B} (g : G A) (f : A -> G B)
            `{@Unsized _ _ PG g}
            `{forall x, Unsized (f x)} :
     Unsized (bind g f).
@@ -256,7 +256,7 @@ Section ProducerProofs.
   Qed.
 
   (* XXX these will always succeed and they have the same priority *)
-  Instance bindMonotonic
+  Global Instance bindMonotonic
            {A B} (g : G A) (f : A -> G B)
            `{@SizeMonotonic _ _ PG g} `{forall x, SizeMonotonic (f x)} : 
     SizeMonotonic (bind g f).
@@ -266,7 +266,7 @@ Section ProducerProofs.
     exists a; split => //; eapply monotonic; eauto.
   Qed.
     
-  Instance bindMonotonicOpt
+  Global Instance bindMonotonicOpt
            {A B} (g : G A) (f : A -> G (option B))
           `{@SizeMonotonic _ _ PG g} `{forall x, SizeMonotonicOpt (f x)} : 
     SizeMonotonicOpt (bind g f).
@@ -280,7 +280,7 @@ Section ProducerProofs.
     - eapply monotonicOpt; eauto.
   Qed.      
   
-  Instance bindMonotonicStrong
+  Global Instance bindMonotonicStrong
           {A B} (g : G A) (f : A -> G B)
           `{@SizeMonotonic _ _ PG g}
           `{forall x, semProd g x -> SizeMonotonic (f x)} : 
@@ -295,7 +295,7 @@ Section ProducerProofs.
       now constructor.
   Qed.      
   
-  Instance bindMonotonicOptStrong
+  Global Instance bindMonotonicOptStrong
            {A B} (g : G A) (f : A -> G (option B))
            `{@SizeMonotonic _ _ PG g}
            `{forall x, semProd g x -> SizeMonotonicOpt (f x)} :
@@ -490,7 +490,7 @@ Qed.
     apply semBindRetFSize.
   Qed.
     
-  Instance fmapUnsized {A B} (f : A -> B) (g : G A)
+  Global Instance fmapUnsized {A B} (f : A -> B) (g : G A)
            `{@Unsized _ _ PG g} : 
     Unsized (fmap f g).
   Proof.
@@ -499,7 +499,7 @@ Qed.
        eexists; split; eauto => //; eapply unsized; eauto.
   Qed.
 
-  Instance fmapMonotonic
+  Global Instance fmapMonotonic
           {A B} (f : A -> B) (g : G A) `{@SizeMonotonic _ _ PG g} : 
     SizeMonotonic (fmap f g).
   Proof.
@@ -548,7 +548,7 @@ Qed.
       + inv Hs1.
   Qed.
 
-  Instance sizedSizeMonotonic
+  Global Instance sizedSizeMonotonic
            A (gen : nat -> G A)
            `{forall n, SizeMonotonic (gen n)}
            `{@SizedMonotonic _ _ PG gen} :
@@ -560,7 +560,7 @@ Qed.
     eapply H0; eassumption.
   Qed.
 
-  Instance sizedSizeMonotonicOpt
+  Global Instance sizedSizeMonotonicOpt
            A (gen : nat -> G (option A))
            `{forall n, SizeMonotonic (gen n)}
            `{@SizedMonotonicOpt _ _ PG gen} :
@@ -575,7 +575,7 @@ Qed.
     auto.
   Qed.
   
-  Instance unsizedResize {A} (g : G A) n :
+  Global Instance unsizedResize {A} (g : G A) n :
     Unsized (resize n g).
   Proof.
     move => s1 s2.
@@ -641,6 +641,14 @@ Section ProducerHigh.
                  | (x :: xs) => bind (f a x) (foldProd f xs)
                  end).
 
+  Definition bindOpt {A B}
+             (g : G (option A)) (f : A -> G (option B)) : G (option B) :=
+    bind g (fun ma =>
+              match ma with
+              | None => ret None
+              | Some a => f a
+              end).
+  
 End ProducerHigh.
 
 Section ProducerHighProofs.
@@ -755,14 +763,14 @@ forall {A1 A2 A3 B} (f: A1 -> A2 -> A3 -> B)
                                        (f a1 a2 a3) = b)).
 Proof. solveLiftProdX. Qed.
 
-Program Instance liftM2Unsized {A1 A2 B} (f : A1 -> A2 -> B) (g1 : G A1)
+Global Program Instance liftM2Unsized {A1 A2 B} (f : A1 -> A2 -> B) (g1 : G A1)
         `{@Unsized _ _ PG g1} (g2 : G A2) `{@Unsized _ _ PG g2} : Unsized (liftM2 f g1 g2).
 Next Obligation.
   rewrite ! semLiftProd2Size. 
   rewrite ! curry_imset2l. by setoid_rewrite (unsized s1 s2).
 Qed.
 
-Program Instance liftM2Monotonic {A1 A2 B} (f : A1 -> A2 -> B) (g1 : G A1)
+Global Program Instance liftM2Monotonic {A1 A2 B} (f : A1 -> A2 -> B) (g1 : G A1)
         `{@SizeMonotonic _ _ PG g1} (g2 : G A2)
         `{@SizeMonotonic _ _ PG g2} : 
   SizeMonotonic (liftM2 f g1 g2).
@@ -829,7 +837,7 @@ Proof.
     eapply Nat.max_le_iff. by right. 
 Qed.
 
-Program Instance liftM4Monotonic {A B C D E} 
+Global Program Instance liftM4Monotonic {A B C D E} 
         (f : A -> B -> C -> D -> E)
         (g1 : G A) (g2 : G B) (g3 : G C) (g4 : G D) 
         `{ @SizeMonotonic _ _ PG g1} `{ @SizeMonotonic _ _ PG g2}
@@ -946,14 +954,14 @@ Proof.
     by eapply unsized; eauto.
 Qed.
 
-Program Instance vectorOfUnsized {A} (k : nat) (g : G A) 
+Global Program Instance vectorOfUnsized {A} (k : nat) (g : G A) 
         `{@Unsized _ _ PG g } : Unsized (vectorOf k g).
 Next Obligation.
   rewrite ! semVectorOfSize. 
   split; move => [H1 H2]; split => //; by rewrite unsized; eauto.
 Qed.
 
-Program Instance vectorOfMonotonic {A} (k : nat) (g : G A) 
+Global Program Instance vectorOfMonotonic {A} (k : nat) (g : G A) 
         `{@SizeMonotonic _ _ PG g } : SizeMonotonic (vectorOf k g).
 Next Obligation.
   rewrite ! semVectorOfSize. 
@@ -982,7 +990,7 @@ Proof.
     move => a /Hl [s [_ Ha]]. by eapply unsized; eauto.
 Qed.
 
-Program Instance listOfMonotonic {A} (g : G A) 
+Global Program Instance listOfMonotonic {A} (g : G A) 
         `{@SizeMonotonic _ _ PG g } : SizeMonotonic (listOf g).
 Next Obligation.
   rewrite ! semListOfSize.
@@ -1033,7 +1041,7 @@ by case: l => [|g l]; rewrite 1?bigcupC; apply: eq_bigcupr => sz;
   apply: semOneofSize.
 Qed.
 
-Program Instance oneofMonotonic {A} (x : G A) (l : list (G A))
+Global Program Instance oneofMonotonic {A} (x : G A) (l : list (G A))
         `{ @SizeMonotonic _ _ PG x} `(l \subset SizeMonotonic) 
 : SizeMonotonic (oneOf_ x l). 
 Next Obligation.
@@ -1067,10 +1075,31 @@ rewrite /semProd; setoid_rewrite semElementsSize; rewrite bigcup_const //.
 by do 2! constructor.
 Qed.
 
-Program Instance elementsUnsized {A} {def : A} (l : list A) : 
+Global Program Instance elementsUnsized {A} {def : A} (l : list A) : 
   Unsized (elems_ def l).
 Next Obligation.
   rewrite ! semElementsSize. by case: l.
 Qed.
-  
+
+Global Instance bindOptMonotonic
+         {A B} (g : G (option A)) (f : A -> G (option B))
+         {_ : SizeMonotonic g} `{forall x, SizeMonotonic (f x)} :
+  SizeMonotonic (bindOpt g f).
+Proof.
+  intros s1 s2 Hleq.
+  intros x Hx. unfold bindOpt in *.
+  eapply (@semBindSize G _ _) in Hx.
+  eapply (@semBindSize G _ _).
+  destruct Hx. destruct H1.
+
+  eexists. split. now eapply H0; eauto.
+  destruct x0; eauto.
+
+  eapply H; eauto.
+
+  eapply semReturnSize. eapply semReturnSize in H2.
+  eassumption. 
+Qed. 
+
+
 End ProducerHighProofs.
