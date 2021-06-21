@@ -714,14 +714,6 @@ Proof.
 Qed.
 
 End FrequencyProof.  
-
-Definition bindGenOpt {A B}
-           (g : G (option A)) (f : A -> G (option B)) : G (option B) :=
-  bindGen g (fun ma =>
-    match ma with
-    | None => returnGen None
-    | Some a => f a
-    end).
   
 (* Backwards compatibility. *)
 Definition elements := @elems_ G ProducerGen.

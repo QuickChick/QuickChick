@@ -123,19 +123,8 @@ Qed.
 (** Tactics for proofs *)
 
 (*** Sized Monotonicity *)
-Ltac2 rec find_enum (_ : unit) :=
-  first
-    [ now eapply incl_bigcup_list_nil
-    | eapply incl_bigcup_compat_list > [ now eapply subset_refl  | find_enum () ]
-    | eapply incl_bigcup_list_hd; now eapply subset_refl
-    | eapply incl_bigcup_list_tl; find_enum ()
-    ].
 
 
-Ltac2 base_case_size_mon (_ : unit) :=
-  destruct s2 > 
-  [ now eapply subset_refl | simpl; first [ now eapply subset_refl
-                                          | simpl; rewrite !&Hone; now find_enum () ] ]. 
 
 Ltac2 rec enum_sized_mon (ih : ident) :=
   first
@@ -154,6 +143,22 @@ Ltac2 rec enum_sized_mon (ih : ident) :=
       intros $x $s; enum_sized_mon ih
     ]
     ].
+
+Ltac2 rec find_enum (_ : unit) :=
+  first
+    [ now eapply incl_bigcup_list_nil
+    | eapply incl_bigcup_compat_list > [ now eapply subset_refl  | find_enum () ]
+    | eapply incl_bigcup_list_hd; now eapply subset_refl
+    | eapply incl_bigcup_list_tl; find_enum ()
+    ].
+
+
+
+Ltac2 base_case_size_mon (_ : unit) :=
+  destruct s2 > 
+  [ now eapply subset_refl | simpl; first [ now eapply subset_refl
+                                          | simpl; rewrite !&Hone; now find_enum () ] ]. 
+
 
 Ltac2 rec enums_sized_mon (ih : ident) :=
   first
@@ -381,4 +386,5 @@ Inductive goodTree : nat -> tree nat  -> Prop :=
       goodTree m t2 ->
       goodTree m t1 ->
       goodTree (S n) (Node nat k t1 t2).
+
 

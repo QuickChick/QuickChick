@@ -223,16 +223,6 @@ Fixpoint enumerateFuel {A : Type} (fuel : nat) (tot : nat) (gs : list (E (option
 Definition enumerate {A : Type} (gs : list (E (option A))) : E (option A) :=
   enumerateFuel (length gs) (length gs) gs.
 
-Definition bindEnumOpt {A B}
-           (g : E (option A)) (f : A -> E (option B)) : E (option B) :=
-  bind g (fun ma =>
-    match ma with
-    | None => ret None
-    | Some a => f a
-    end).
-
-
-
 
 Lemma pickDrop_exists {A} (l: list (E (option A))) n :
     n < length l ->
