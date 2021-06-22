@@ -110,6 +110,17 @@ Axiom withTime : Checker -> Checker.
 Extract Constant withTime =>
   "(fun c -> Printf.printf ""%.8f\n"" (Sys.time ()); c)".
 
+Definition prop_manual : Checker :=
+  forAllShrink gen_variation_state (fun _ => nil)
+               (fun v => SSNI_manual default_table v).
+
+Definition prop_derived : Checker :=
+  forAllShrink gen_variation_state (fun _ => nil)
+               (fun v => SSNI_derived default_table v).
+
+QuickChick prop_manual.
+QuickChick prop_derived.
+(*
 Definition prop_test : Checker :=
   forAllShrink gen_variation_state (fun _ => nil)
                (fun v =>
@@ -119,4 +130,4 @@ Definition prop_test : Checker :=
                   withTime (conjoin [r0;r2;r1])).
 
 QuickChick prop_test.
-
+*)
