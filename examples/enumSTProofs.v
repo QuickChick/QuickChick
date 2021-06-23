@@ -163,7 +163,8 @@ Ltac2 derive_enumST_SizedMonotonic (_ : unit) :=
       let hleq' := Control.hyp hleq in
       let s1' := Control.hyp s1 in
       let s2' := Control.hyp s2 in
-      assert ($hleqi := $hleq'); revert $hleqi $hleq;
+      assert ($hleqi := $hleq');
+      revert $hleqi $hleq;
       generalize $s2' at 1 3; generalize $s1' at 1 3; revert $s $s2; revert_params inst;
         (induction $s1' as [| $s1 $ihs1 ]; intro_params inst; intros $s $s2 $s1i $s2i $hleqi $hleq) >
         [ base_case_size_mon s2' | ind_case_sized_mon s2' ihs1 ]
@@ -283,72 +284,11 @@ Ltac2 make_prod (bs : constr array) (c : constr) :=
 
 
 (* To derive monotonicity inside the correctness proof *)
-Ltac2 mon_expr (tapp : constr) (inst : constr) :=
-  match! goal with
-  | [ |- CorrectSizedST _ ?f ] =>
-    match Constr.Unsafe.kind f with
-    | Constr.Unsafe.Lambda b app =>
-      match Constr.Unsafe.kind app with
-      | Constr.Unsafe.App aux args =>
-
-        let len := Int.sub (Array.length args) 2 in
-        let inps := Array.sub args 2 len in
-
-        let args' (s1 : constr) (s2 : constr) (offs : int) :=
-            let ind := Array.mapi (fun i _ => Constr.Unsafe.make (Constr.Unsafe.Rel (Int.add i offs))) inps in
-            let a := Array.make 2 s1 in
-            Array.set a 1 s2; Array.append a ind
-        in
-
-        let aux_app s1 s2 := Constr.Unsafe.make (Constr.Unsafe.App aux (args' s1 s2 1)) in
-
-
-        (* SizeMonotonic *) 
-        let dummy_app s1 s2 :=
-            let args' := Array.copy args in
-            let _ := Array.set args' 0 s1 in
-            let _ := Array.set args' 1 s1 in
-            Constr.Unsafe.make (Constr.Unsafe.App aux args')
-        in
-
-        let dummy_term := constr:(SizeMonotonicOpt (ltac2:(let t := dummy_app '0 '0 in exact $t))) in
-
-        let make_term s1 s2 :=
-            match Constr.Unsafe.kind dummy_term with
-            | Constr.Unsafe.App mon margs =>
-              let margs' := Array.copy margs in
-              Array.set margs' 3 (aux_app s1 s2);
-              make_prod inps (Constr.Unsafe.make (Constr.Unsafe.App mon margs'))
-            | _ => Control.throw (Tactic_failure (Some (Message.of_string ("Expecting an application"))))
-            end
-        in 
-        
-        assert (Hmon : forall (_s1 _s2 : nat), ltac2:(let s1 := Control.hyp @_s1 in
-                                                      let s2 := Control.hyp @_s2 in
-                                                      let t := make_term s1 s2  in exact $t)) >
-        [  let s := Fresh.in_goal (id_of_string "s") in 
-           let si := Fresh.in_goal (id_of_string "si") in 
-           let ihs := Fresh.in_goal (id_of_string "IHs") in 
-           intros $si $s;
-           let s' := Control.hyp s in revert $si;
-           induction $s' as [ | $s $ihs ]; intros $si;
-           Array.iter (fun _ => intro) inps; eapply enumerate_SizeMonotonicOpt; now enumsST_size_mon tapp ihs
-        | ]
-
-        (* SizedMonotonic, generalized *) 
-          
-
-      | _ => Control.throw (Tactic_failure (Some (Message.of_string ("Expecting an application"))))
-      end
-    | _ => Control.throw (Tactic_failure (Some (Message.of_string ("Expecting a function"))))
-    end
-end.
-
-
 Ltac2 find_size_mon_inst (_ : unit) :=
   first [ now eauto with typeclass_instances
         | eapply sizedSizeMonotonicOpt; now eauto with typeclass_instances
         | eapply sizedSizeMonotonic; now eauto with typeclass_instances ].
+
 
 
 
@@ -428,6 +368,118 @@ Ltac2 derive_sound_enumST (ty : constr) (inst : constr) :=
      eapply &Henum in $hgen) > [ sound_enums ty ihs | sound_enums ty ihs  ]
   end.
 
+Definition empty_enum {A} : E (option A) := MkEnum (fun _ => LazyList.lnil).
+
+Ltac2 make_semEnum (t : constr) (enum : constr) (s : constr) :=
+  let c := constr:(@semProdSizeOpt E _ ltac2:(exact $t) empty_enum ltac2:(exact $s)) in
+  match Constr.Unsafe.kind c with
+  | Constr.Unsafe.App sem sargs => 
+    let sargs' := Array.copy sargs in
+    let _ := Array.set sargs' 3 enum in
+    Constr.Unsafe.make (Constr.Unsafe.App sem sargs')
+  | _ => Control.throw (Tactic_failure (Some (Message.of_string ("Expecting an application"))))
+  end.
+
+Lemma semProdSizeOpt_semProdOpt {A} {G : Type -> Type} {_ : Producer G} (e1 e2 : E (option A)) :
+  (forall s, semProdSizeOpt e1 s \subset semProdSizeOpt e2 s) ->
+  semProdOpt e1 \subset semProdOpt e2.
+Proof.
+  intros H x Hin. inv Hin. inv H0. eexists. split; eauto. eapply H. eassumption.
+Qed. 
+  
+
+Ltac2 mon_expr (tapp : constr) (inst : constr) :=
+  match! goal with
+  | [ |- CorrectSizedST _ ?f ] =>
+    match Constr.Unsafe.kind f with
+    | Constr.Unsafe.Lambda b app =>
+      match Constr.Unsafe.kind app with
+      | Constr.Unsafe.App aux args =>
+
+        let len := Int.sub (Array.length args) 2 in
+        let inps := Array.sub args 2 len in
+
+        let args' (s1 : constr) (s2 : constr) (offs : int) :=
+            let ind := Array.mapi (fun i _ => Constr.Unsafe.make (Constr.Unsafe.Rel (Int.add i offs))) inps in
+            let a := Array.make 2 s1 in
+            Array.set a 1 s2; Array.append a ind
+        in
+
+        let aux_app s1 s2 offs := Constr.Unsafe.make (Constr.Unsafe.App aux (args' s1 s2 offs)) in
+
+
+        (* SizeMonotonic *) 
+        let dummy_app s1 s2 :=
+            let args' := Array.copy args in
+            let _ := Array.set args' 0 s1 in
+            let _ := Array.set args' 1 s1 in
+            Constr.Unsafe.make (Constr.Unsafe.App aux args')
+        in
+
+        let dummy_term := constr:(SizeMonotonicOpt (ltac2:(let t := dummy_app '0 '0 in exact $t))) in
+
+        let make_term s1 s2 :=
+            match Constr.Unsafe.kind dummy_term with
+            | Constr.Unsafe.App mon margs =>
+              let margs' := Array.copy margs in
+              Array.set margs' 3 (aux_app s1 s2 1);
+              make_prod inps (Constr.Unsafe.make (Constr.Unsafe.App mon margs'))
+            | _ => Control.throw (Tactic_failure (Some (Message.of_string ("Expecting an application"))))
+            end
+        in 
+        
+        assert (Hmon : forall (_s1 _s2 : nat), ltac2:(let s1 := Control.hyp @_s1 in
+                                                      let s2 := Control.hyp @_s2 in
+                                                      let t := make_term s1 s2  in exact $t)) >
+        [  let s := Fresh.in_goal (id_of_string "s") in 
+           let si := Fresh.in_goal (id_of_string "si") in 
+           let ihs := Fresh.in_goal (id_of_string "IHs") in 
+           intros $si $s;
+           let s' := Control.hyp s in revert $si;
+           induction $s' as [ | $s $ihs ]; intros $si;
+           Array.iter (fun _ => intro) inps; eapply enumerate_SizeMonotonicOpt; now enumsST_size_mon tapp ihs
+        | ];
+
+        (* SizedMonotonic, generalized *)          
+        let subset (t1 : constr) (t2 : constr) :=
+            let dummy := constr:(set_incl (@set0 (ltac2:(exact $tapp))) set0) in
+            match Constr.Unsafe.kind dummy with
+            | Constr.Unsafe.App sub sargs =>
+              let sargs' := Array.copy sargs in
+              let _ := Array.set sargs' 1 t1 in
+              let _ := Array.set sargs' 2 t2 in
+              Constr.Unsafe.make (Constr.Unsafe.App sub sargs')
+            | _ => Control.throw (Tactic_failure (Some (Message.of_string ("Expecting an application"))))
+            end
+        in
+        let mon s1 s2 s1' s2' s :=
+            make_prod inps (subset (make_semEnum tapp (aux_app s1' s1 1) s) (make_semEnum tapp (aux_app s2' s2 1) s))
+        in
+        
+        (* print_constr (mon '1 '2 '3 '4); set (s := ltac2:(let t := mon '1 '2 '3 '4 in exact $t)); () *)
+                                                                                      
+        assert (Hmons : forall (s1 s2 s2' s1' s: nat), s1 <= s2 -> s1' <= s2' -> 
+                                                       ltac2:(let s1 := Control.hyp @s1 in
+                                                              let s1' := Control.hyp @s1' in
+                                                              let s2 := Control.hyp @s2 in
+                                                              let s2' := Control.hyp @s2' in 
+                                                              let s' := Control.hyp @s in 
+                                                              let t := mon s1 s2 s1' s2' s' in exact $t)) >
+        [ let s1 := Fresh.in_goal (id_of_string "s1") in
+          let s2 := Fresh.in_goal (id_of_string "s2_") in
+          let ihs1 := Fresh.in_goal (id_of_string "ihs1") in
+          intros $s1; simpl_enumSizeST ();
+          let s1' := Control.hyp s1 in
+          (induction $s1' as [| $s1 $ihs1 ]; intros $s2 ? ? ? ? ? ; Array.iter (fun _ => intro) inps) >
+          [ let s2' := Control.hyp s2 in base_case_size_mon s2' | let s2' := Control.hyp s2 in ind_case_sized_mon s2' ihs1 ]
+        | ]
+    | _ => Control.throw (Tactic_failure (Some (Message.of_string ("Expecting an application"))))
+    end
+  | _ => Control.throw (Tactic_failure (Some (Message.of_string ("Expecting a function"))))
+  end
+end.
+
+
 
 Ltac2 derive_enumST_Correct (_ : unit) := 
   match! goal with
@@ -447,9 +499,22 @@ Ltac2 derive_enumST_Correct (_ : unit) :=
 
 Instance EnumSizedSuchThatgoodTree_Correct n :
   CorrectSizedST (goodTree n) (@enumSizeST _ _ (@EnumSizedSuchThatgoodTree n)).
-Proof. derive_enumST_Correct (). admit. Admitted. 
+Proof.
 
-(* XXX predicate must be eta expanded, otherwise typeclass resolution fails *)
+  derive_enumST_Correct ().
+
+  
+  Ltac2 derive_complete_enumST (ty : constr) (inst : constr) := 
+    let ind := Fresh.in_goal (id_of_string "ind") in
+    intros $ind;
+    let ind' := Control.hyp 
+    [ derive_sound_enumST ty inst | (* complete *) ]
+  end.
+
+  
+  
+
+  (* XXX predicate must be eta expanded, otherwise typeclass resolution fails *)
 Instance EnumSizedSuchThatle_Correct n :
   CorrectSizedST [eta le n] (@enumSizeST _ _ (@EnumSizedSuchThatle n)).
 Proof. derive_enumST_Correct (). admit. Admitted.
