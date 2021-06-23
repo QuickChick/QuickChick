@@ -15,18 +15,11 @@ Local Open Scope string.
 Set Bullet Behavior "Strict Subproofs".
 (** * Correctness of dependent generators *)
 
-(* begin sizeEqs *)
-Class SizedProofEqs {A : Type} (P : A -> Prop) :=
-  { iter : nat -> set A;
-    mon : forall n1 n2, n1 <= n2 -> iter n1 \subset iter n2;
-    spec : \bigcup_(n : nat) iter n <--> P}.
-(* end sizeEqs *)
+Class CorrectSizedST {A : Type} (P : A -> Prop) {G} `{Producer G} (g : nat -> G (option A)) :=
+  { corrST : [ set x | exists s, semProdOpt (g s) x ]  <-->  P }.
 
-Class SizedSuchThatCorrect {A : Type} (P : A -> Prop) `{SizedProofEqs A P} {G} `{Producer G} (g : nat -> G (option A)) :=
-  { sizedSTCorrect : forall s, isSome :&: semProd (g s) <--> Some @: (iter s) }.
-
-Class SuchThatCorrect {A : Type} (P : A -> Prop) {G} `{Producer G} (g : G (option A)) :=
-  { STCorrect : isSome :&: semProd g <-->  Some @: [set x : A | P x ] }.
+Class CorrectST {A : Type} (P : A -> Prop) {G} `{Producer G} (g : G (option A)) :=
+  { corr : semProdOpt g  <-->  P  }.
 
 (** * Dependent sized generators *)
 
@@ -39,7 +32,6 @@ Class GenSizedSuchThat (A : Type) (P : A -> Prop) :=
 
 Class GenSizedSuchThatMonotonic (A : Type)
       `{GenSizedSuchThat A} `{forall s, SizeMonotonic (arbitrarySizeST s)}.
-
 
 Class GenSizedSuchThatMonotonicOpt (A : Type)
       `{GenSizedSuchThat A} `{forall s, SizeMonotonicOpt (arbitrarySizeST s)}.
@@ -57,9 +49,9 @@ Class GenSizedSuchThatSizeMonotonicOpt (A : Type)
   
 Class GenSizedSuchThatCorrect (A : Type) (P : A -> Prop)
       `{GenSizedSuchThat A P}
-      `{SizedProofEqs _ P}
-      `{@SizedSuchThatCorrect A P _ G ProducerGen arbitrarySizeST}.
+      `{@CorrectSizedST A P G ProducerGen arbitrarySizeST}.
 
+  
 (** * Dependent generators *)
 
 (* begin genST_class *)
@@ -80,12 +72,12 @@ Class GenSuchThatMonotonicOpt (A : Type) (P : A -> Prop) `{GenSuchThat A P}
 
 Class GenSuchThatCorrect {A : Type} (P : A -> Prop) 
       `{GenSuchThat A P}
-      `{@SuchThatCorrect A P G ProducerGen arbitraryST}.
+      `{@CorrectST A P G ProducerGen arbitraryST}.
 
 Class GenSuchThatMonotonicCorrect (A : Type) (P : A -> Prop)
       `{GenSuchThat A P}
       `{@SizeMonotonicOpt A G ProducerGen arbitraryST}
-      `{@SuchThatCorrect A P G ProducerGen arbitraryST}.
+      `{@CorrectST A P G ProducerGen arbitraryST}.
 
 (** Coercions *)
    
@@ -101,9 +93,8 @@ Instance GenSizedSuchThatSizeMonotonicOptOfSizedMonotonic
 
 Instance GenSizedSuchThatCorrectOptOfSizedSuchThatCorrect
          (A : Type) (P : A -> Prop) (H : GenSizedSuchThat A P)
-         (Heqs : SizedProofEqs P)
-         (Hcorr : SizedSuchThatCorrect P arbitrarySizeST)
-: @GenSizedSuchThatCorrect A P H Heqs Hcorr := {}.
+         (Hcorr : CorrectSizedST P arbitrarySizeST)
+: @GenSizedSuchThatCorrect A P H Hcorr := {}.
 
 Instance GenSuchThatMonotonicOptOfSizeMonotonic
          (A : Type) (P : A -> Prop) (Hgen : GenSuchThat A P)
@@ -112,7 +103,7 @@ Instance GenSuchThatMonotonicOptOfSizeMonotonic
 
 Instance GenSuchThatCorrectOptOfSuchThatCorrect
          (A : Type) (P : A -> Prop) (H : GenSuchThat A P)
-         (Hcorr : SuchThatCorrect P (genST P))
+         (Hcorr : CorrectST P (genST P))
 : @GenSuchThatCorrect A P H Hcorr := {}.
 
 Instance SizeMonotonicOptofSizeMonotonic {A} (g : G (option A))
@@ -170,7 +161,6 @@ Qed.
 (* begin SizeMonotonicOptOfBounded *)
 Instance SizeMonotonicOptOfBounded (A : Type) (P : A -> Prop)
          (H1 : GenSizedSuchThat A P)
-         (H2 : SizedProofEqs P) (* XXX change name *)
          (H3 : forall s : nat, SizeMonotonicOpt (arbitrarySizeST s))
          (H4 : SizedMonotonicOpt arbitrarySizeST) (* XXX change name *)
 : SizeMonotonicOpt (genST P).
@@ -192,34 +182,32 @@ Instance SuchThatCorrectOfBounded' (A : Type) (P : A -> Prop)
          {H : GenSizedSuchThat A P}
          `{@GenSizedSuchThatMonotonicOpt A P H PMon}
          `{@GenSizedSuchThatSizeMonotonicOpt A P H PSMon}
-         `{@GenSizedSuchThatCorrect A P H PSized PCorr}
-: SuchThatCorrect P arbitraryST.
+         `{@GenSizedSuchThatCorrect A P H PCorr}
+: CorrectST P arbitraryST.
 Proof.
   constructor; unfold arbitraryST, GenSuchThatOfBounded.
-  rewrite semSized_opt; eauto.
   split.
-  - intros [H3 H4]. destruct a; try discriminate.
-    eexists. split; [| reflexivity ].
-    eapply spec.
-    destruct H4 as [n [_ Hsem]]. 
-    exists n. split. now constructor.
-    assert (Ha : (isSome :&: semProd (arbitrarySizeST n)) (Some a)).
-    { split; eauto. }
-    eapply PCorr in Ha. destruct Ha as [a' [Hit Heq]]. inv Heq. eassumption.
-  - intros [y [HP Heq]]. inv Heq.
-    eapply spec in HP. destruct HP as [n [_ Hit]].
-    split; eauto. exists n. split; [ now constructor |].
-    eapply PCorr. eexists; split; eauto.
+  - intros [s [_ H4]].
+    eapply semSizedSizeGen in H4.
+    eapply PCorr. eexists; eauto. eexists; eauto.
+    split; eauto. reflexivity.
+    
+  - intros Hp. eapply PCorr in Hp. destruct Hp as [s [x [_ Hs]]].
+    eexists (max s x). split. reflexivity.
+    eapply semSizedSizeGen.
+
+    eapply PMon; [ | eapply PSMon; [ | eassumption ]].
+    ssromega.
+    ssromega.
 Qed.
 
 (* begin SuchThatCorrectOfBounded *)
 Instance SuchThatCorrectOfBounded (A : Type) (P : A -> Prop)
          (H1 : GenSizedSuchThat A P)
-         (H2 : SizedProofEqs P) (* XXX change name *)
          (H3 : forall s : nat, SizeMonotonicOpt (arbitrarySizeST s))
          (H4 : SizedMonotonicOpt arbitrarySizeST) (* XXX change name *)
-         (H5 : SizedSuchThatCorrect P arbitrarySizeST)
-: SuchThatCorrect P arbitraryST.
+         (H5 : CorrectSizedST P arbitrarySizeST)
+: CorrectST P arbitraryST.
 (* end SuchThatCorrectOfBounded *)
 Proof.
   eapply SuchThatCorrectOfBounded'; eauto.
@@ -227,6 +215,7 @@ Proof.
   constructor; eauto.
   constructor; eauto.
 Qed.
+
 
 (* Dependent Sized Enumerators *)
 (** * Dependent sized generators *)
@@ -258,8 +247,7 @@ Class EnumSizedSuchThatSizeMonotonicOpt (A : Type)
   
 Class EnumSizedSuchThatCorrect (A : Type) (P : A -> Prop)
       `{EnumSizedSuchThat A P}
-      `{SizedProofEqs _ P}
-      `{@SizedSuchThatCorrect A P _ E ProducerEnum enumSizeST}.
+      `{@CorrectSizedST A P E ProducerEnum enumSizeST}.
 
 (** * Dependent generators *)
 
@@ -281,12 +269,12 @@ Class EnumSuchThatMonotonicOpt (A : Type) (P : A -> Prop) `{EnumSuchThat A P}
 
 Class EnumSuchThatCorrect {A : Type} (P : A -> Prop) 
       `{EnumSuchThat A P}
-      `{@SuchThatCorrect A P E ProducerEnum enumSuchThat}.
+      `{@CorrectST A P E ProducerEnum enumSuchThat}.
 
 Class EnumSuchThatMonotonicCorrect (A : Type) (P : A -> Prop)
       `{EnumSuchThat A P}
       `{@SizeMonotonicOpt A E ProducerEnum enumSuchThat}
-      `{@SuchThatCorrect A P E ProducerEnum enumSuchThat}.
+      `{@CorrectST A P E ProducerEnum enumSuchThat}.
 
 (** Coercions *)
    
@@ -302,9 +290,8 @@ Instance EnumSizedSuchThatSizeMonotonicOptOfSizedMonotonic
 
 Instance EnumSizedSuchThatCorrectOptOfSizedSuchThatCorrect
          (A : Type) (P : A -> Prop) (H : EnumSizedSuchThat A P)
-         (Heqs : SizedProofEqs P)
-         (Hcorr : SizedSuchThatCorrect P enumSizeST)
-: @EnumSizedSuchThatCorrect A P H Heqs Hcorr := {}.
+         (Hcorr : CorrectSizedST P enumSizeST)
+: @EnumSizedSuchThatCorrect A P H Hcorr := {}.
 
 Instance EnumSuchThatMonotonicOptOfSizeMonotonic
          (A : Type) (P : A -> Prop) (Hgen : EnumSuchThat A P)
@@ -313,7 +300,7 @@ Instance EnumSuchThatMonotonicOptOfSizeMonotonic
 
 Instance EnumSuchThatCorrectOptOfSuchThatCorrect
          (A : Type) (P : A -> Prop) (H : EnumSuchThat A P)
-         (Hcorr : SuchThatCorrect P (enumST P))
+         (Hcorr : CorrectST P (enumST P))
 : @EnumSuchThatCorrect A P H Hcorr := {}.
 
 Instance SizeMonotonicOptofSizeMonotonicEnum {A} (g : E (option A))
@@ -343,7 +330,7 @@ Instance EnumSuchThatMonotonicOfSized (A : Type) (P : A -> Prop)
                          _
                          PMon PSMon) := {}.
 
-Set Printing All.
+
 Instance SizeMonotonicOptOfBoundedEnum' (A : Type) (P : A -> Prop)
          {H : EnumSizedSuchThat A P}
          `{@EnumSizedSuchThatMonotonicOpt A P H PMon}
@@ -351,29 +338,12 @@ Instance SizeMonotonicOptOfBoundedEnum' (A : Type) (P : A -> Prop)
 : SizeMonotonicOpt (enumST P).
 Proof.
   unfold enumSuchThat, EnumSuchThatOfBounded.
-  red. red in PMon.
-  do 2 red. intros.
-  unfold semProdSizeOpt in *.
-  red in PMon.
-  apply semSizedSize in H3.
-  apply semSizedSize.
-  unfold SizedMonotonicOpt in PSMon.
-  unfold semProdSizeOpt in *.
-(*
-  destruct (PSMon s1 s1 s2 H2 a). apply H3.
-  apply (PMon s2 s1 s2); auto. do 3 red.
-  eauto.
-  rewrite /semEnumSize => //=.
-  exists x.
-  eauto.
+  eapply sizedSizeMonotonicOpt; eauto with typeclass_instances.
 Qed.
- *)
-Admitted.
 
 (* begin SizeMonotonicOptOfBounded *)
 Instance SizeMonotonicOptOfBoundedEnum (A : Type) (P : A -> Prop)
          (H1 : EnumSizedSuchThat A P)
-         (H2 : SizedProofEqs P) (* XXX change name *)
          (H3 : forall s : nat, SizeMonotonicOpt (enumSizeST s))
          (H4 : SizedMonotonicOpt enumSizeST) (* XXX change name *)
 : SizeMonotonicOpt (enumST P).
@@ -390,39 +360,42 @@ Instance EnumSuchThatMonotonicOptOfSized' (A : Type) (P : A -> Prop)
          `{@EnumSizedSuchThatSizeMonotonicOpt A P H PSMon}
 : EnumSuchThatMonotonicOpt A P := {}.
 
+
+Lemma size_CorrectST {A : Type} (P : A -> Prop) {G} {PG : Producer G}
+         {PS: @ProducerSemantics G PG} (g : nat -> G (option A))
+         {Hm1 : forall s, SizeMonotonicOpt (g s)}
+         {Hm2 : SizedMonotonicOpt g}
+         {_ : CorrectSizedST P g} : CorrectST P (sized g).
+Proof.
+  inv H. constructor.
+  intros x. split; intros Hin.
+  - eapply corrST0.
+    inv Hin. inv H0. eapply semSizedSize in H2.
+    eexists. eexists; split; eauto.
+  - eapply corrST0 in Hin. inv Hin. inv H0. inv H1.
+    eexists (max x0 x1). split; eauto. eapply semSizedSize.
+    eapply Hm1; [ | eapply Hm2; [ | eassumption ]]; ssromega. 
+Qed.
+
 (* Correctness *)
 Instance SuchThatCorrectOfBoundedEnum' (A : Type) (P : A -> Prop)
          {H : EnumSizedSuchThat A P}
          `{@EnumSizedSuchThatMonotonicOpt A P H PMon}
          `{@EnumSizedSuchThatSizeMonotonicOpt A P H PSMon}
-         `{@EnumSizedSuchThatCorrect A P H PSized PCorr}
-: SuchThatCorrect P enumSuchThat.
+         `{@EnumSizedSuchThatCorrect A P H PCorr}
+: CorrectST P enumSuchThat.
 Proof.
   constructor; unfold enumSuchThat, EnumSuchThatOfBounded.
-  rewrite semSized_opt; eauto.
-  split.
-  - intros [H3 H4]. destruct a; try discriminate.
-    eexists. split; [| reflexivity ].
-    eapply spec.
-    destruct H4 as [n [_ Hsem]]. 
-    exists n. split. now constructor.
-    assert (Ha : (isSome :&: semProd (enumSizeST n)) (Some a)).
-    { split; eauto. }
-    eapply PCorr in Ha. destruct Ha as [a' [Hit Heq]]. inv Heq. eassumption.
-  - intros [y [HP Heq]]. inv Heq.
-    eapply spec in HP. destruct HP as [n [_ Hit]].
-    split; eauto. exists n. split; [ now constructor |].
-    eapply PCorr. eexists; split; eauto.
+  eapply size_CorrectST; eauto with typeclass_instances.
 Qed.
 
 (* begin SuchThatCorrectOfBounded *)
 Instance SuchThatCorrectOfBoundedEnum (A : Type) (P : A -> Prop)
          (H1 : EnumSizedSuchThat A P)
-         (H2 : SizedProofEqs P) (* XXX change name *)
          (H3 : forall s : nat, SizeMonotonicOpt (enumSizeST s))
          (H4 : SizedMonotonicOpt enumSizeST) (* XXX change name *)
-         (H5 : SizedSuchThatCorrect P enumSizeST)
-: SuchThatCorrect P enumSuchThat.
+         (H5 : CorrectSizedST P enumSizeST)
+: CorrectST P enumSuchThat.
 (* end SuchThatCorrectOfBounded *)
 Proof.
   eapply SuchThatCorrectOfBoundedEnum'; eauto.
@@ -430,8 +403,6 @@ Proof.
   constructor; eauto.
   constructor; eauto.
 Qed.
-
-
 
 
 (* TODO: Move to another file *)

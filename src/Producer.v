@@ -279,7 +279,7 @@ Section ProducerProofs.
     - eapply monotonic; eauto.
     - eapply monotonicOpt; eauto.
   Qed.      
-  
+
   Global Instance bindMonotonicStrong
           {A B} (g : G A) (f : A -> G B)
           `{@SizeMonotonic _ _ PG g}
@@ -562,7 +562,7 @@ Qed.
 
   Global Instance sizedSizeMonotonicOpt
            A (gen : nat -> G (option A))
-           `{forall n, SizeMonotonic (gen n)}
+           `{forall n, SizeMonotonicOpt (gen n)}
            `{@SizedMonotonicOpt _ _ PG gen} :
     SizeMonotonicOpt (sized gen).
   Proof.
@@ -1099,7 +1099,156 @@ Proof.
 
   eapply semReturnSize. eapply semReturnSize in H2.
   eassumption. 
+Qed.
+
+Lemma semReturnSizeOpt (A : Type) (x : A) (size : nat) :
+  semProdSizeOpt (ret (Some x)) size <--> [set x].
+Proof.
+  intros x1; simpl; split; intros Hin.
+  - unfold semProdSizeOpt, somes in *.
+    eapply semReturnSize in Hin. inv Hin. reflexivity.
+
+  - unfold semProdSizeOpt, somes in *.
+    eapply semReturnSize. inv Hin. reflexivity.
 Qed. 
+
+Lemma semReturnSizeOpt_None (A : Type) (size : nat) :
+  semProdSizeOpt (ret None) size <--> @set0 A.
+Proof.
+  intros x1; simpl; split; intros Hin.
+  - unfold semProdOpt, somes in *.
+    eapply semReturnSize in Hin. inv Hin.
+  - inv Hin.
+Qed. 
+
+Lemma semReturnOpt (A : Type) (x : A) :
+  semProdOpt (ret (Some x)) <--> [set x].
+Proof.
+  intros x1; simpl; split; intros Hin.
+  - unfold semProdOpt, somes in *.
+    eapply semReturn in Hin. inv Hin. reflexivity.
+    
+  - unfold semProdOpt, somes in *.
+    eapply semReturn. inv Hin. reflexivity.
+Qed. 
+
+
+Lemma semReturnOpt_None (A : Type) :
+  semProdOpt (ret None) <--> @set0 A.
+Proof.
+  intros x1; simpl; split; intros Hin.
+  - unfold semProdOpt, somes in *.
+    eapply semReturn in Hin. inv Hin.
+  - inv Hin.
+Qed. 
+
+Lemma semOptBind A B (g : G A) (f : A -> G (option B)) :
+  SizeMonotonic g ->
+  (forall a : A, SizeMonotonicOpt (f a)) ->
+  semProdOpt (bind g f) <-->
+  \bigcup_(a in semProd g) semProdOpt (f a).
+Proof.
+  intros Hs Hsf.
+  rewrite /semProdOpt /semProd. setoid_rewrite semBindSize.
+  intro b. split.
+  - intros [s [_ [a [H1 H2]]]].
+    exists a. split; exists s; (split; first (compute; by []); first by[]).
+  - intros [a [[s1 [_ H1]] [s2 [_ H2]]]]. exists (max s1 s2).
+      split; first (compute; by []).
+      exists a. split.
+      eapply Hs; last eassumption. by apply/leP; apply Max.le_max_l.
+      eapply Hsf; last eassumption. by apply/leP; apply Max.le_max_r.
+  Qed.
+
+Lemma semOptBindSize A B (g : G A) (f : A -> G (option B)) size :
+  semProdSizeOpt (bind g f) size <-->
+  \bigcup_(a in semProdSize g size) semProdSizeOpt (f a) size.
+Proof.
+  unfold semProdSizeOpt.
+  rewrite semBindSize; eauto.
+
+  split.
+  - intros Hin. inv Hin. inv H.
+    eexists. split; eauto.
+
+  - intros Hin. inv Hin. inv H.
+    eexists. split; eauto.
+Qed. 
+
+Lemma semOptBindOpt A B (g : G (option A)) (f : A -> G (option B)) :
+  SizeMonotonicOpt g ->
+  (forall a : A, SizeMonotonicOpt (f a)) ->
+  semProdOpt (bindOpt g f) <-->
+  \bigcup_(a in semProdOpt g) semProdOpt (f a).
+Proof.
+  intros Hs Hsf.
+  rewrite /semProdOpt /semProd /bindOpt. setoid_rewrite semBindSize.
+  intro b. split.
+  - intros [s [_ [a [H1 H2]]]].
+    destruct a.
+    2:{ eapply semReturnSize in H2. inv H2. }
+    
+    exists a. split; exists s; (split; first (compute; by []); first by[]).
+  - intros [a [[s1 [_ H1]] [s2 [_ H2]]]]. exists (max s1 s2).
+    split; first (compute; by []).    
+    exists (Some a). split.
+    eapply Hs; last eassumption. by apply/leP; apply Max.le_max_l.
+    eapply Hsf; last eassumption. by apply/leP; apply Max.le_max_r.
+  Qed.
+
+
+Lemma semOptBindOptSize A B (g : G (option A)) (f : A -> G (option B)) size :
+  semProdSizeOpt (bindOpt g f) size <-->
+  \bigcup_(a in semProdSizeOpt g size) semProdSizeOpt (f a) size.
+Proof.
+  unfold bindOpt. rewrite semOptBindSize; eauto.
+  
+  - split. 
+    + intros Hin. inv Hin. inv H.
+      destruct x. eexists. split; eauto.
+      eapply semReturnSizeOpt_None in H1. inv H1.
+
+    + intros Hin. inv Hin. inv H.
+      eexists. split; eauto.
+Qed.
+
+Global Instance bindOptMonotonicOpt
+       {A B} (g : G (option A)) (f : A -> G (option B))
+       `{@SizeMonotonicOpt _ _ PG g} `{forall x, SizeMonotonicOpt (f x)} : 
+  SizeMonotonicOpt (bindOpt g f).
+Proof.
+  intros s1 s2 Hs.  
+  rewrite !semOptBindOptSize.
+  move => b [a [Hg Hf]].
+  exists a; split.
+  - eapply H; eauto.
+  - eapply H0; eauto.
+Qed.      
+
+
+Lemma semBindOptSizeOpt_subset_compat      
+      (A B : Type) (g g' : G (option A)) (f f' : A -> G (option B)) s : 
+  semProdSizeOpt g s \subset semProdSizeOpt g' s ->
+  (forall (x : A),
+      semProdSizeOpt (f x) s \subset semProdSizeOpt (f' x) s) ->
+  semProdSizeOpt (bindOpt g f) s \subset semProdSizeOpt (bindOpt g' f') s.
+Proof.
+  intros Hyp1 Hyp2.
+  rewrite !semOptBindOptSize.
+  eapply incl_bigcup_compat; eauto.
+Qed. 
+
+Lemma semBindSizeOpt_subset_compat
+      (A B : Type) (g g' : G A) (f f' : A -> G (option B)) s : 
+  semProdSize g s \subset semProdSize g' s ->
+  (forall (x : A),
+      semProdSizeOpt (f x) s \subset semProdSizeOpt (f' x) s) ->
+  semProdSizeOpt (bind g f) s \subset semProdSizeOpt (bind g' f') s.
+Proof.
+  intros Hyp1 Hyp2.
+  rewrite !semOptBindSize.
+  eapply incl_bigcup_compat; eauto.
+Qed.
 
 
 End ProducerHighProofs.

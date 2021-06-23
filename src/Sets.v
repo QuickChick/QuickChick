@@ -1130,3 +1130,36 @@ Lemma incl_bigcup_list_nil (T U : Type) (G : T -> set U) s :
 Proof. 
   intros x Hin. inv Hin. inv H. inv H0.
 Qed.
+
+
+Lemma in_bigcup_list_hd (T U : Type) (h : T) (t : seq T) (G : T -> set U) (z : U) :
+  G h z -> (\bigcup_(x in (h :: t)) G x) z.
+Proof.
+  intros Hin.
+  eapply incl_bigcup_list_hd. now eapply subset_refl.
+  eassumption.
+Qed.
+
+Lemma in_bigcup_list_tl (T U : Type) (h : T) (t : seq T) (G : T -> set U) (z : U) :
+  (\bigcup_(x in t) G x) z -> (\bigcup_(x in (h :: t)) G x) z.
+Proof.
+  intros Hin.
+  eapply incl_bigcup_list_tl. now eapply subset_refl.
+  eassumption.
+Qed.
+
+
+Lemma in_bigcup_list_cons (T U : Type) (h : T) (t : seq T) (G : T -> set U) (z : U) :
+  (\bigcup_(x in (h :: t)) G x) z ->
+  G h z \/ (\bigcup_(x in t) G x) z.
+Proof.
+  intros Hin. inv Hin. inv H. inv H0; eauto.
+  right. eexists; split; eauto.
+Qed.
+
+Lemma bigcup_nil_set0 (T U : Type) (F : T -> set U) : 
+  \bigcup_(x in [::]) F x <--> set0.
+Proof.
+  split; intros Hin; inv Hin; eauto.
+  inv H. inv H0.
+Qed.
