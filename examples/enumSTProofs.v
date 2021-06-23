@@ -253,34 +253,15 @@ Proof. derive_enumST_SizeMonotonic (). Qed.
 
 Instance EnumSizedSuchThatle_SizeMonotonic n :
   forall s, SizeMonotonicOpt (@enumSizeST _ _ (@EnumSizedSuchThatle n) s).
-Proof. derive_enumST_SizeMonotonic (). Qed.
+Proof. Admitted.
+(* derive_enumST_SizeMonotonic (). Qed. *)
 
 Instance EnumSizedSuchThatbst_SizeMonotonic min max :
   forall s, SizeMonotonicOpt (@enumSizeST _ _ (@EnumSizedSuchThatbst min max) s).
 Proof. derive_enumST_SizeMonotonic (). Qed.
 
 
-Class CorrectSizedST {A : Type} (P : A -> Prop) {G} `{Producer G} (g : nat -> G (option A)) :=
-  { corrST : [ set x | exists s, semProdOpt (g s) x ]  <-->  P }.
 
-Class CorrectST {A : Type} (P : A -> Prop) {G} `{Producer G} (g : G (option A)) :=
-  { corr : semProdOpt g  <-->  P  }.
-
-Instance size_CorrectST {A : Type} (P : A -> Prop) {G} {PG : Producer G}
-         {PS: @ProducerSemantics G PG} (g : nat -> G (option A))
-         {Hm1 : forall s, SizeMonotonicOpt (g s)}
-         {Hm2 : SizedMonotonicOpt g}
-         {_ : CorrectSizedST P g} : CorrectST P (sized g).
-Proof.
-  inv H. constructor.
-  intros x. split; intros Hin.
-  - eapply corrST0.
-    inv Hin. inv H. eapply semSizedSize in H1.
-    eexists. eexists; split; eauto.
-  - eapply corrST0 in Hin. inv Hin. inv H. inv H0.
-    eexists (max x0 x1). split; eauto. eapply semSizedSize.
-    eapply Hm1 > [ | eapply Hm2 > [ | eassumption ]]; ssromega. 
-Qed.
     
 Ltac2 get_ty (e : constr) :=
   match Constr.Unsafe.kind e with
@@ -321,6 +302,8 @@ Ltac2 mon_expr (tapp : constr) (inst : constr) :=
 
         let aux_app s1 s2 := Constr.Unsafe.make (Constr.Unsafe.App aux (args' s1 s2 1)) in
 
+
+        (* SizeMonotonic *) 
         let dummy_app s1 s2 :=
             let args' := Array.copy args in
             let _ := Array.set args' 0 s1 in
@@ -339,7 +322,7 @@ Ltac2 mon_expr (tapp : constr) (inst : constr) :=
             | _ => Control.throw (Tactic_failure (Some (Message.of_string ("Expecting an application"))))
             end
         in 
-
+        
         assert (Hmon : forall (_s1 _s2 : nat), ltac2:(let s1 := Control.hyp @_s1 in
                                                       let s2 := Control.hyp @_s2 in
                                                       let t := make_term s1 s2  in exact $t)) >
@@ -351,6 +334,9 @@ Ltac2 mon_expr (tapp : constr) (inst : constr) :=
            induction $s' as [ | $s $ihs ]; intros $si;
            Array.iter (fun _ => intro) inps; eapply enumerate_SizeMonotonicOpt; now enumsST_size_mon tapp ihs
         | ]
+
+        (* SizedMonotonic, generalized *) 
+          
 
       | _ => Control.throw (Tactic_failure (Some (Message.of_string ("Expecting an application"))))
       end
@@ -375,7 +361,7 @@ Ltac2 rec sound_enum (ty : constr) (ih : ident) :=
     destruct (@decOpt $p $i $s) as [ $b | ] eqn:$hdec > [ | now eapply (@semReturnOpt_None E _ _) in $h; inv $h ];
     let b' := Control.hyp b in                                                            
     destruct $b' > [ | now eapply (@semReturnOpt_None E _ _) in $h; inv $h ];
-    eapply (@sound $p) in Hdec > [ | now eauto with typeclass_instances ]; sound_enum ty ih
+    eapply (@sound $p) in $hdec > [ | now eauto with typeclass_instances ]; sound_enum ty ih
 
  (* match input *) 
   | [ h : semProdOpt (match ?n with _ => _ end) ?x |- _ ] =>
@@ -394,7 +380,12 @@ Ltac2 rec sound_enum (ty : constr) (ih : ident) :=
                                          P     icking ? for now *) 
                                        destruct $h' as [? [$h ?]];
                                        let ih' := Control.hyp ih in 
-                                       first [ eapply $ih' in $h | eapply corr in $h (* TODO test and fix *) ];
+                                       first [ eapply $ih' in $h
+                                             | match! goal with
+                                               | [h : semProdOpt (sizedEnum (@enumSizeST ?t ?pred ?inst)) _ |- _ ] =>
+                                                 eapply (@SuchThatCorrectOfBoundedEnum $t $pred $inst) in $h >
+                                                                                                          [ | now eauto with typeclass_instances |  now eauto with typeclass_instances | now eauto with typeclass_instances ]
+                                               end ];
                                        sound_enum ty ih
                                      | find_size_mon_inst ()
                                      | intro; now enumST_size_mon @Hmon ]
@@ -451,59 +442,19 @@ Ltac2 derive_enumST_Correct (_ : unit) :=
     let ty := get_ty pred in
     let x := Fresh.in_goal (id_of_string "x") in
     split; intros $x; split >
-      [ derive_sound_enumST ty inst | (* complete *) admit ]
+      [ derive_sound_enumST ty inst | (* complete *) ]
   end.
 
 Instance EnumSizedSuchThatgoodTree_Correct n :
   CorrectSizedST (goodTree n) (@enumSizeST _ _ (@EnumSizedSuchThatgoodTree n)).
-Proof. derive_enumST_Correct (). Admitted. 
+Proof. derive_enumST_Correct (). admit. Admitted. 
 
+(* XXX predicate must be eta expanded, otherwise typeclass resolution fails *)
 Instance EnumSizedSuchThatle_Correct n :
-  CorrectSizedST (le n) (@enumSizeST _ _ (@EnumSizedSuchThatle n)).
-Proof. derive_enumST_Correct (). Admitted.
-
-Instance EnumSizedSuchThatbst_SizeMonotonic min max :
-  CorrectSizedST (bst min max) (@enumSizeST _ _ (@EnumSizedSuchThatbst min max)).
-Proof.
-  derive_enumST_Correct ().
+  CorrectSizedST [eta le n] (@enumSizeST _ _ (@EnumSizedSuchThatle n)).
+Proof. derive_enumST_Correct (). admit. Admitted.
   
-       eapply (@semOptBindOpt E _ _) in H.
 
-       destruct H as [? [H ? ] ].
-
-       Set Printing All. 
-       eapply (@corr in H. 
-       @semProdOpt E ProducerEnum nat
-        (@sizedEnum (option nat) (@enumSizeST nat (fun n : nat => le min n) (EnumSizedSuchThatle min))) x0
-       admit.
-       now find_size_mon_inst ().
-       intro; now enumST_size_mon @Hmon.
-       
-       
-$h >
-                                     [ let h' := Control.hyp h in
-                                       (* let x := Fresh.in_goal (id_of_string "_x") in *)
-                                       (* let hin1 := Fresh.in_goal (id_of_string "_Hin1") in *)
-                                       (* let hin2 := Fresh.in_goal (id_of_string "_Hin2") in *)
-                                       (* XXX there seems to be a bug in fresh, and it fails to freshen after a while.
-                                         P     icking ? for now *) 
-                                       destruct $h' as [? [$h ?]];
-                                       let ih' := Control.hyp ih in 
-                                       first [ eapply $ih' in $h | eapply corr in $h (* TODO test and fix *) ];
-                                       sound_enum ty ih
-                                     | find_size_mon_inst ()
-                                     | intro; now enumST_size_mon @Hmon ]
-
-
-Admitted.
- derive_enumST_SizeMonotonic (). Qed.
-
-
-
-       
-
-
-
-Instance EnumSizedSuchThatgoodTree_Correct n :
-  CorrectSizedST (goodTree n) (@enumSizeST _ _ (@EnumSizedSuchThatgoodTree n)).
-Proof. derive_enumST_Correct (). Admitted. 
+Instance EnumSizedSuchThatbst_Correct n m :
+  CorrectSizedST (bst n m) (@enumSizeST _ _ (@EnumSizedSuchThatbst n m)).
+Proof. derive_enumST_Correct (). admit. Admitted. 

@@ -11,25 +11,23 @@ Require Import Producer Generators Sets.
 Instance arbST_eq {A} (a : A) : GenSuchThat A (fun x => x = a) :=
   {| arbitraryST := returnGen (Some a) |}.
 Instance arbST_Correct {A} (a : A) 
-  : SuchThatCorrect (fun x => x = a) (genST (fun x => x = a)).
+  : CorrectST (fun x => x = a) (genST (fun x => x = a)).
 Proof.
   constructor.
-  simpl; rewrite semReturn.
+  simpl; rewrite semReturnOpt.
   split; intros H. now firstorder.
-  destruct H as [x [Heq H]]. subst. inversion H. subst.
-  split; eauto.
+  destruct H as [x [Heq H]]. subst. reflexivity.
 Defined.
 
 Instance arbST_eq' {A} (a : A) : GenSuchThat A (fun x => a = x) :=
   {| arbitraryST := returnGen (Some a) |}.
+
 Instance arbST_Correct' {A} (a : A) 
-  : SuchThatCorrect (fun x => a = x ) (genST (fun x => a = x)).
+  : CorrectST (fun x => a = x ) (genST (fun x => a = x)).
 Proof.
   constructor.
-  simpl; rewrite semReturn.
-  split; intros H. now firstorder.
-  destruct H as [x [Heq H]]. subst. inversion H. subst.
-  split; eauto.
+  simpl; rewrite semReturnOpt.
+  split; intros H. now firstorder. now firstorder.
 Defined.
 
 (* Typeclass instances that derive checkable from dependent generators *)
