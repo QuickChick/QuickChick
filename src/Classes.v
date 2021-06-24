@@ -58,6 +58,8 @@ Class EnumSized (A : Type) := { enumSized : nat -> E A }.
   
 Class Enum (A : Type) := { enum : E A }.
 
+(* ZP: This is not longer usefull *) 
+(* 
 (** * Sizes of types *)
   
 Class Sized (A : Type) :=
@@ -106,7 +108,7 @@ Proof.
   - simpl. rewrite <- succSized_spec.
     rewrite IHs. reflexivity.
 Qed.
-
+*) 
 (* Lemma succ_lfp' (A : Type) `{Hyp : CanonicalSized A} : *)
 (*   \bigcup_(s : nat)  (succSized ^ s) zeroSized <--> [ set x : A | True ]. *)
 (* Proof. *)
@@ -137,11 +139,6 @@ Qed.
 (** * Correctness classes *)
 
 (** Correctness of sized generators *)
-Class SizedCorrect {A : Type} `{Sized A} {G} `{Producer G}
-      (g : nat -> G A) :=
-  {
-    prodSizedCorrect : forall s, semProd (g s) <--> [set x : A | size x <= s ]
-  }.
 
 Class CorrectSized {A : Type} {G} `{Producer G} (g : nat -> G A)  :=
   { prodCorrectSized :
@@ -180,8 +177,8 @@ Class EnumMonotonic (A : Type) `{Enum A}
   
 (** * Correct generators *)
 
-Class GenSizedCorrect (A : Type) `{Sized A} `{GenSized A}
-      `{@SizedCorrect A _ G ProducerGen arbitrarySized}.
+Class GenSizedCorrect (A : Type) `{GenSized A}
+      `{@CorrectSized A G ProducerGen arbitrarySized}.
 
 Class GenCorrect (A : Type) `{Gen A}
         `{@Correct A G ProducerGen arbitrary}.
@@ -192,8 +189,8 @@ Class GenMonotonicCorrect (A : Type)
       `{@SizeMonotonic A G ProducerGen arbitrary}
       `{@Correct  A G ProducerGen arbitrary}.
 
-Class EnumSizedCorrect (A : Type) `{Sized A}
-        `{EnumSized A} `{@SizedCorrect A _ E ProducerEnum enumSized}.
+Class EnumSizedCorrect (A : Type)
+        `{EnumSized A} `{@CorrectSized A E ProducerEnum enumSized}.
 
 Class EnumCorrect (A : Type) `{Enum A}
         `{@Correct A E ProducerEnum enum}.
@@ -217,14 +214,16 @@ Instance GenMonotonicOfSizeMonotonic
 
 Instance GenSizedCorrectOfSizedCorrect
          (A : Type) (Hgen : GenSized A)
-         {HS : Sized A}
-         `{Hcor : @SizedCorrect A HS G ProducerGen arbitrarySized}
-: @GenSizedCorrect A HS Hgen Hcor := {}.
+         `{Hcor : @CorrectSized A G ProducerGen arbitrarySized}
+: @GenSizedCorrect A Hgen Hcor := {}.
 
-Instance GenCorrectOfCorrect
+Instance GenMonotonicCorrectOfMonotnicCorrect
          (A : Type) (Hgen : Gen A)
+         (Hmon : @SizeMonotonic A G ProducerGen arbitrary)
          `{Hcor : @Correct A G ProducerGen arbitrary}
-: @GenCorrect A Hgen Hcor := {}.
+  : @GenMonotonicCorrect A Hgen Hmon Hcor := {}.
+
+
 
 Instance GenSizedSizeMonotonicOfSizedMonotonic
          (A : Type) (Hgen : GenSized A) (Hmon : @SizedMonotonic A G ProducerGen arbitrarySized)
@@ -251,16 +250,20 @@ Instance GenCorrectOfSized (A : Type)
          {H : GenSized A}
          `{@GenSizedMonotonic A H PMon}
          `{@GenSizedSizeMonotonic A H ProducerGen PSMon}
-         `{@GenSizedCorrect A PSized H PCorr} : Correct A arbitrary.
+         `{@GenSizedCorrect A H PCorr} : Correct A arbitrary.
 Proof.
   constructor. unfold arbitrary, GenOfGenSized. 
   eapply set_eq_trans.
-  - eapply semSized_alt; eauto with typeclass_instances.
-  - setoid_rewrite prodSizedCorrect.
-    split. intros [n H3]. constructor; eauto.
-    intros H4. eexists; split; eauto.
+  - eapply semSized_alt; now eauto with typeclass_instances.
+  - destruct PCorr. 
+    rewrite <- prodCorrectSized0. 
+
+    split. intros [n [? H3]]. eexists. eassumption.
+
+    intros [s H4]. eexists; split; eauto. reflexivity.
 Qed.
 
+(* 
 Lemma nat_set_ind (A : Type) `{GenSized A} `{Hyp : CanonicalSized A} :
   (semProd (arbitrarySized 0) <--> zeroSized) ->
   (forall (s : nat) (elems : set A),
@@ -275,6 +278,7 @@ Proof.
     split; intros; ssromega.
   - rewrite -succSized_spec. eauto.
 Qed.
+ *)
 
 Instance EnumSizedMonotonicOfSizeMonotonic
          (A : Type) (Hgen : EnumSized A) (Hmon : forall s, @SizeMonotonic A E ProducerEnum (enumSized s))
@@ -286,14 +290,20 @@ Instance EnumMonotonicOfSizeMonotonic
 
 Instance EnumSizedCorrectOfSizedCorrect
          (A : Type) (Hgen : EnumSized A)
-         {HS : Sized A}
-         `{Hcor : @SizedCorrect A HS E ProducerEnum enumSized}
-: @EnumSizedCorrect A HS Hgen Hcor := {}.
+         `{Hcor : @CorrectSized A E ProducerEnum enumSized}
+: @EnumSizedCorrect A Hgen Hcor := {}.
 
 Instance EnumCorrectOfCorrect
          (A : Type) (Hgen : Enum A)
          `{Hcor : @Correct A E ProducerEnum enum}
 : @EnumCorrect A Hgen Hcor := {}.
+
+Instance EnumMonotonicCorrectOfMonotnicCorrect
+         (A : Type) (Hgen : Enum A)
+         (Hmon : @SizeMonotonic A E ProducerEnum enum)
+         `{Hcor : @Correct A E ProducerEnum enum}
+  : @EnumMonotonicCorrect A Hgen Hmon Hcor := {}.
+
 
 Instance EnumSizedSizeMonotonicOfSizedMonotonic
          (A : Type) (Hgen : EnumSized A) (Hmon : @SizedMonotonic A E ProducerEnum enumSized)
@@ -316,31 +326,32 @@ Instance EnumMonotonicOfSized (A : Type)
                                        (@enumSized A H)
                                        PMon PSMon) := {}.
 
-Instance EnumCorrectOfSized (A : Type)
+Instance EnumCorrectOfSized' (A : Type)
          {H : EnumSized A}
          `{@EnumSizedMonotonic A H PMon}
          `{@EnumSizedSizeMonotonic A H PSMon}
-         `{@EnumSizedCorrect A PSized H PCorr} : Correct A enum.
+         `{@EnumSizedCorrect A H PCorr} : Correct A enum.
 Proof.
   constructor. unfold arbitrary, EnumOfEnumSized. 
   eapply set_eq_trans.
   - eapply semSized_alt; eauto with typeclass_instances.
-  - setoid_rewrite prodSizedCorrect.
-    split. intros [n H3]. constructor; eauto.
-    intros H4. eexists; split; eauto.
+  - destruct PCorr. 
+    rewrite <- prodCorrectSized0. 
+
+    split. intros [n [? H3]]. eexists. eassumption.
+
+    intros [s H4]. eexists; split; eauto. reflexivity.
 Qed.
 
-Lemma nat_set_ind_enum (A : Type) `{EnumSized A} `{Hyp : CanonicalSized A} :
-  (semProd (enumSized 0) <--> zeroSized) ->
-  (forall (s : nat) (elems : set A),
-     semProd (enumSized s) <--> elems ->
-     semProd (enumSized (s.+1)) <--> succSized elems) ->
-  (forall s : nat, semProd (enumSized s) <--> (fun x : A => size x <= s)).
+Instance EnumCorrectOfSized (A : Type)
+         (H1 : EnumSized A)
+         (H3 : forall s : nat, SizeMonotonic (enumSized s))
+         (H4 : SizedMonotonic enumSized)
+         (H5 : CorrectSized enumSized)
+  : Correct A enum.
 Proof.
-  intros HO IH. intros n; induction n.
-  - eapply set_eq_trans with (B := (fun x : A => size x = 0)).
-    rewrite -zeroSized_spec //=.
-    intros s. destruct (size s). now firstorder.
-    split; intros; ssromega.
-  - rewrite -succSized_spec. eauto.
+  eapply EnumCorrectOfSized'; eauto.
+  constructor; eauto.
+  constructor; eauto.
+  constructor; eauto.
 Qed.

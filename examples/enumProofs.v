@@ -153,7 +153,6 @@ Ltac2 rec find_enum (_ : unit) :=
     ].
 
 
-
 Ltac2 base_case_size_mon (_ : unit) :=
   destruct s2 > 
   [ now eapply subset_refl | simpl; first [ now eapply subset_refl
@@ -328,7 +327,7 @@ Proof. derive_enum_size_mon (). Qed.
 
 
 
-Lemma EnumTree_correct A {H : Enum A} `{EnumMonotonicCorrect A} :
+Instance EnumTree_correct A `{EnumMonotonicCorrect A} :
   CorrectSized (@enumSized _(@EnumSizedtree A _)).
 Proof. derive_enum_correct (). Qed. 
 
@@ -349,7 +348,7 @@ Instance EnumFoo_SizeMonotonic s :
 Proof. derive_enum_size_mon (). Qed. 
 
 
-Lemma EnumFoo_correct :
+Instance EnumFoo_correct :
   CorrectSized (@enumSized _ EnumSizedFoo).
 Proof. derive_enum_correct (). Qed. 
 
@@ -372,7 +371,7 @@ Instance EnumFoo2_SizeMonotonic A `{EnumMonotonic A} s :
 Proof. derive_enum_size_mon (). Qed. 
 
 
-Lemma EnumFoo2_correct A {H : Enum A} `{EnumMonotonicCorrect A} :
+Instance EnumFoo2_correct A `{EnumMonotonicCorrect A} :
   CorrectSized (@enumSized _ (@EnumSizedFoo2 A _)).
 Proof. derive_enum_correct (). Qed. 
 

@@ -98,7 +98,9 @@ Ltac2 rec enums_sized_mon (ih : ident) :=
 Ltac2 rec enumST_sized_mon (ih : ident) :=
   first
     [ (* ret *)
-      now eapply subset_refl
+      match! goal with
+      | [ |- ?s \subset ?s ] => now eapply subset_refl
+      end
     | (* dec matching *)
       match! goal with
       | [ |- semProdSizeOpt (match @decOpt ?p ?i ?s1 with _ => _ end) _ \subset
@@ -254,8 +256,7 @@ Proof. derive_enumST_SizeMonotonic (). Qed.
 
 Instance EnumSizedSuchThatle_SizeMonotonic n :
   forall s, SizeMonotonicOpt (@enumSizeST _ _ (@EnumSizedSuchThatle n) s).
-Proof. Admitted.
-(* derive_enumST_SizeMonotonic (). Qed. *)
+Proof. derive_enumST_SizeMonotonic (). Qed.
 
 Instance EnumSizedSuchThatbst_SizeMonotonic min max :
   forall s, SizeMonotonicOpt (@enumSizeST _ _ (@EnumSizedSuchThatbst min max) s).
@@ -292,7 +293,7 @@ Ltac2 find_size_mon_inst (_ : unit) :=
 
 
 
-Ltac2 rec sound_enum (ty : constr) (ih : ident) :=    
+Ltac2 rec enumST_sound (ty : constr) (ih : ident) :=    
   match! goal with
   (* match decOpt *) 
   | [ h : semProdOpt (match @decOpt ?p ?i ?s with _ => _ end) ?x |- _ ] =>
@@ -301,11 +302,11 @@ Ltac2 rec sound_enum (ty : constr) (ih : ident) :=
     destruct (@decOpt $p $i $s) as [ $b | ] eqn:$hdec > [ | now eapply (@semReturnOpt_None E _ _) in $h; inv $h ];
     let b' := Control.hyp b in                                                            
     destruct $b' > [ | now eapply (@semReturnOpt_None E _ _) in $h; inv $h ];
-    eapply (@sound $p) in $hdec > [ | now eauto with typeclass_instances ]; sound_enum ty ih
+    eapply (@sound $p) in $hdec > [ | now eauto with typeclass_instances ]; enumST_sound ty ih
 
  (* match input *) 
   | [ h : semProdOpt (match ?n with _ => _ end) ?x |- _ ] =>
-    destruct $n; try (now eapply (@semReturnOpt_None E _ _) in $h; inv $h); sound_enum ty ih
+    destruct $n; try (now eapply (@semReturnOpt_None E _ _) in $h; inv $h); enumST_sound ty ih
   | (* return *)
     [ h : semProdOpt (returnEnum _) _ |- _ ] =>
     eapply (@semReturnOpt E _ _) in $h; inv $h;  now eauto 20 using $ty
@@ -326,7 +327,7 @@ Ltac2 rec sound_enum (ty : constr) (ih : ident) :=
                                                  eapply (@SuchThatCorrectOfBoundedEnum $t $pred $inst) in $h >
                                                                                                           [ | now eauto with typeclass_instances |  now eauto with typeclass_instances | now eauto with typeclass_instances ]
                                                end ];
-                                       sound_enum ty ih
+                                       enumST_sound ty ih
                                      | find_size_mon_inst ()
                                      | intro; now enumST_size_mon @Hmon ]
 
@@ -335,7 +336,7 @@ Ltac2 rec sound_enum (ty : constr) (ih : ident) :=
     [ h : semProdOpt (bindEnum _ _) _ |- _ ] =>
     eapply (@semOptBind E _ _) in $h >
                                   [ let h' := Control.hyp h in
-                                    destruct $h' as [? [? ?]]; sound_enum ty ih
+                                    destruct $h' as [? [? ?]]; enumST_sound ty ih
                                   | find_size_mon_inst ()
                                   | intro; now enumST_size_mon @Hmon ]
 
@@ -347,7 +348,7 @@ Ltac2 rec sound_enums (ty : constr) (ih : ident) :=
   | [ h : (\bigcup_(x in (seq_In (_ :: _))) _) _ |- _ ] =>
     eapply in_bigcup_list_cons in $h;
     let h' := Control.hyp h in
-    destruct $h' as [ | ] > [ sound_enum ty ih | sound_enums ty ih  ]
+    destruct $h' as [ | ] > [ enumST_sound ty ih | sound_enums ty ih  ]
   | [ h : (\bigcup_(x in seq_In nil) _) _ |- _ ] =>
     apply bigcup_nil_set0 in $h; inv $h
   end. 
@@ -428,7 +429,7 @@ Ltac2 mon_expr (tapp : constr) (inst : constr) :=
             end
         in 
         
-        assert (Hmon : forall (_s1 _s2 : nat), ltac2:(let s1 := Control.hyp @_s1 in
+        assert (_Hmon : forall (_s1 _s2 : nat), ltac2:(let s1 := Control.hyp @_s1 in
                                                       let s2 := Control.hyp @_s2 in
                                                       let t := make_term s1 s2  in exact $t)) >
         [  let s := Fresh.in_goal (id_of_string "s") in 
@@ -458,7 +459,7 @@ Ltac2 mon_expr (tapp : constr) (inst : constr) :=
         
         (* print_constr (mon '1 '2 '3 '4); set (s := ltac2:(let t := mon '1 '2 '3 '4 in exact $t)); () *)
                                                                                       
-        assert (Hmons : forall (s1 s2 s2' s1' s: nat), s1 <= s2 -> s1' <= s2' -> 
+        assert (_Hmons : forall (s1 s2 s2' s1' s: nat), s1 <= s2 -> s1' <= s2' -> 
                                                        ltac2:(let s1 := Control.hyp @s1 in
                                                               let s1' := Control.hyp @s1' in
                                                               let s2 := Control.hyp @s2 in
@@ -481,6 +482,173 @@ end.
 
 
 
+Lemma exists_enum_hd A (g : nat -> E (option A)) (gs : nat -> list (E (option A))) x : 
+  (exists s, semProdOpt (g s) x) ->
+  exists s, semProdOpt (enumerate (g s :: gs s)) x.
+Proof.
+  intros [s He].
+  exists s.
+  eapply (@enumerate_correct_opt A).
+  eexists. split. now left. eassumption.
+Qed.
+
+Lemma exists_enum_tl A (g : nat -> E (option A)) (gs : nat -> list (E (option A))) x : 
+  (exists s, semProdOpt (enumerate (gs s)) x) ->
+  exists s, semProdOpt (enumerate (g s :: gs s)) x.
+Proof.
+  intros [s He].
+  exists s.
+  eapply (@enumerate_correct_opt A).
+  eapply (@enumerate_correct_opt A) in He. destruct He as [z [Hin Hsem]].
+  eexists. split. now right; eauto. eassumption.
+Qed.
+
+
+Lemma exists_bind_Opt A B (x : A) (g : E B) (f : B -> nat -> E (option A)) z :
+  Correct B g ->
+  SizeMonotonic g ->
+  (forall a s, SizeMonotonicOpt (f a s)) ->
+
+  (exists s, semProdOpt (f z s) x) ->  
+  exists s : nat, semProdOpt (bindEnum g (fun x => f x s)) x.
+Proof.
+  intros Hc Hs1 Hs2 He. inv He. inv H. inv H0.
+  inv H.
+  assert (Hin : [set : B] z) by reflexivity.
+  eapply Hc in Hin. inv Hin. inv H.
+  exists x0, (Nat.max x1 x2). split. reflexivity.
+  eapply (@semBindSize E _ _ B).
+  eexists. split.
+
+  eapply Hs1 > [ | eassumption ]. now ssromega.
+  eapply Hs2 > [ | eassumption ]. now ssromega.
+Qed.
+
+Lemma exists_return_Opt A (x : A) :
+  exists s : nat, semProdOpt (returnEnum (Some x)) x.
+Proof.
+  exists 0. eapply (@semReturn E _ ProducerSemanticsEnum); reflexivity.
+Qed.
+
+Lemma exists_bindOpt_Opt A B (x : A) (g : E (option B)) (f : B -> nat -> E (option A)) z :
+  SizeMonotonicOpt g ->
+  (forall a s, SizeMonotonicOpt (f a s)) ->
+
+  semProdOpt g z ->
+  (exists s, semProdOpt (f z s) x) ->  
+  exists s : nat, semProdOpt (bindOpt g (fun x => f x s)) x.
+Proof.
+  intros Hc Hs1 Hs2 He. destruct He as [s1 He].
+  exists s1.
+  eapply (@semOptBindOpt E _ _ B); eauto with typeclass_instances.
+
+  eexists. split; eassumption.
+Qed.
+
+Lemma exists_bindOpt_Opt_Sized A B (x : A) (g : nat -> E (option B)) (f : B -> nat -> E (option A)) z :
+  SizedMonotonicOpt g ->
+  (forall s, SizeMonotonicOpt (g s)) ->
+
+  (forall a, SizedMonotonicOpt (f a)) ->
+  (forall a s, SizeMonotonicOpt (f a s)) ->
+
+  (exists s, semProdOpt (g s) z) ->
+  (exists s, semProdOpt (f z s) x) ->  
+  exists s : nat, semProdOpt (bindOpt (g s) (fun z => f z s)) x.
+Proof.
+  intros Hs1 Hs1' Hs2 Hs2' Hg Hf. destruct Hg as [s1 He].
+  destruct Hf.
+  exists (max x0 s1).
+  eapply (@semOptBindOpt E _ _ B); eauto with typeclass_instances.
+  inv He. inv H. inv H0. inv H1. 
+  eexists. split. 
+  eexists. split. reflexivity.
+  eapply Hs1 > [ | eassumption ]. ssromega.
+  eexists. split. reflexivity.
+  eapply Hs2 > [ | eassumption ]. ssromega.  
+Qed.
+
+
+Ltac2 destructIH (_ : unit) :=
+  match! goal with
+  | [ h : (exists s, semProdOpt _ _) |- _ ] =>
+    let h' := Control.hyp h in destruct $h' as [ ? $h]; destruct $h' as [? [? $h]]
+  end.
+
+Lemma exists_match_DecOpt {B} P {_ : DecOpt P} (k : nat -> E (option B)) z :
+  DecOptSizeMonotonic P ->
+  DecOptCompletePos P -> 
+  SizedMonotonicOpt k ->
+  P ->
+  (exists s, semProdOpt (k s) z) ->
+  exists (s : nat),
+    semProdOpt (match decOpt s.+1 with
+                | Some true => k s
+                | _ => returnEnum None
+                end) z.
+Proof.
+  intros Hmon Hcom Hmonk Hp [s1 [s [_ He]]].
+  eapply Hcom in Hp. destruct Hp as [s2 Hdec].
+  eexists (max s1 s2).
+  eapply Hmon in Hdec. rewrite Hdec.
+
+  eexists. split. reflexivity. eapply Hmonk > [ | eassumption ].
+  ssromega. ssromega.
+Qed.
+
+
+Ltac2 rec enumST_complete (ty : constr):=
+  let hmons := Control.hyp @_Hmons in
+  first
+    [ (* return *) 
+      now eapply exists_return_Opt
+    | (* match decOpt *)
+      (eapply (@exists_match_DecOpt $ty) > [ | | | | enumST_complete ty ]) > 
+      [ (* decOpt mon *) now eauto with typeclass_instances
+      | (* decOpt complete *) now eauto with typeclass_instances
+      | (* sizedMon *) intros ? ? ? ? ?; now enumST_sized_mon @_Hmons 
+      | (* P *) eassumption ]
+    | (* bindOpt rec call *)
+      (eapply exists_bindOpt_Opt_Sized > [ | | | | | enumST_complete ty ]) >
+      [ (* sizedMon *) 
+        intro; intros; eapply $hmons; ssromega
+      | (* sizeMon *) now find_size_mon_inst ()
+      | (* sizedMon *) intros ? ? ? ? ?; now enumST_sized_mon @_Hmons
+      | (* sizeMon *) intros ? ?; now enumST_size_mon @_Hmon
+      | eexists; eexists; split > [ reflexivity
+                                  | eapply $hmons > [ eapply leq_refl | | eassumption ]; ssromega ] ]
+    | (* bindOpt sized *)
+      (eapply exists_bindOpt_Opt_Sized > [ | | | | | enumST_complete ty ]) > 
+      [ now eauto with typeclass_instances
+      | intros _; now find_size_mon_inst ()
+      | (* sizedMon *) intros ? ? ? ? ?; now enumST_sized_mon @_Hmons
+      | (* sizeMon *) intros ? ?; now enumST_size_mon @_Hmon
+      | match! goal with
+      | [ |- exists _, semProdOpt (sizedEnum (@enumSizeST ?t ?pred ?inst)) _ ] =>
+        exists 0; eapply (@size_CorrectST $t $pred E _ _) > [ | | | eassumption ];
+        now eauto with typeclass_instances
+        end ]
+    | (* bind *)
+      match! goal with
+      |  [ |- exists _ : nat, semProdOpt (bindEnum enum _) _ ] => 
+         (eapply exists_bind_Opt > [ | | | enumST_complete ty ]) >
+         [ now eauto with typeclass_instances
+         | now find_size_mon_inst ()
+         | intros ? ?; now enumST_size_mon @_Hmon ]
+      end
+
+    | ( ) ]. 
+
+Ltac2 rec try_solve_complete (ty : constr) :=
+  first [ eapply exists_enum_hd; now enumST_complete ty 
+        | eapply exists_enum_tl; try_solve_complete ty ].
+
+Ltac2 derive_complete_enumST (ty : constr) (inst : constr) := 
+  let ind := Fresh.in_goal (id_of_string "ind") in
+  (intros $ind; let ind' := Control.hyp ind in induction $ind';
+   eapply exists_Sn) > [ try_solve_complete ty | repeat (destructIH ()); try_solve_complete ty ].
+
+
 Ltac2 derive_enumST_Correct (_ : unit) := 
   match! goal with
   | [ |- CorrectSizedST _ (@enumSizeST ?tapp ?pred ?inst) ] =>
@@ -494,32 +662,19 @@ Ltac2 derive_enumST_Correct (_ : unit) :=
     let ty := get_ty pred in
     let x := Fresh.in_goal (id_of_string "x") in
     split; intros $x; split >
-      [ derive_sound_enumST ty inst | (* complete *) ]
+      [ derive_sound_enumST ty inst | derive_complete_enumST tapp inst ]
   end.
 
 Instance EnumSizedSuchThatgoodTree_Correct n :
   CorrectSizedST (goodTree n) (@enumSizeST _ _ (@EnumSizedSuchThatgoodTree n)).
-Proof.
+Proof. derive_enumST_Correct (). Qed.  
 
-  derive_enumST_Correct ().
-
-  
-  Ltac2 derive_complete_enumST (ty : constr) (inst : constr) := 
-    let ind := Fresh.in_goal (id_of_string "ind") in
-    intros $ind;
-    let ind' := Control.hyp 
-    [ derive_sound_enumST ty inst | (* complete *) ]
-  end.
-
-  
-  
-
-  (* XXX predicate must be eta expanded, otherwise typeclass resolution fails *)
+(* XXX predicate must be eta expanded, otherwise typeclass resolution fails *)
 Instance EnumSizedSuchThatle_Correct n :
   CorrectSizedST [eta le n] (@enumSizeST _ _ (@EnumSizedSuchThatle n)).
-Proof. derive_enumST_Correct (). admit. Admitted.
-  
+Proof. derive_enumST_Correct (). Qed.
+
 
 Instance EnumSizedSuchThatbst_Correct n m :
   CorrectSizedST (bst n m) (@enumSizeST _ _ (@EnumSizedSuchThatbst n m)).
-Proof. derive_enumST_Correct (). admit. Admitted. 
+Proof. derive_enumST_Correct (). Qed.

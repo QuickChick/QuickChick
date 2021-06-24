@@ -106,6 +106,12 @@ Instance GenSuchThatCorrectOptOfSuchThatCorrect
          (Hcorr : CorrectST P (genST P))
 : @GenSuchThatCorrect A P H Hcorr := {}.
 
+Instance GenSuchThatMonotonicCorrectOptOfSuchThatCorrect
+         (A : Type) (P : A -> Prop) (H : GenSuchThat A P)
+         (Hcorr : CorrectST P (genST P))
+         (Hmon : SizeMonotonicOpt (genST P))
+: @GenSuchThatMonotonicCorrect A P H Hmon Hcorr := {}.
+
 Instance SizeMonotonicOptofSizeMonotonic {A} (g : G (option A))
          {H : SizeMonotonic g} : SizeMonotonicOpt g.
 Proof.
@@ -309,6 +315,13 @@ Proof.
   intros s1 s2 Hs a.
   eapply monotonic; eauto.
 Qed.
+
+Instance EnumSuchThatMonotonicCorrectOptOfSuchThatCorrect
+         (A : Type) (P : A -> Prop) (H : EnumSuchThat A P)
+         (Hcorr : CorrectST P (enumST P))
+         (Hmon : SizeMonotonicOpt (enumST P))
+  : @EnumSuchThatMonotonicCorrect A P H Hmon Hcorr := {}.
+
 
 (** * Coercions from sized to unsized generators *)
 
