@@ -485,3 +485,16 @@ Proof.
     eexists. split; eauto. 
 Qed.       
 
+Fixpoint lazylist_backtrack {A} (l : LazyList A) (f : A -> option bool) (anyNone : bool) : option bool :=
+  match l with
+  | lnil  => if anyNone then None else Some false
+  | lcons x xs =>
+    match f x with
+    | Some true  => Some true
+    | Some false => lazylist_backtrack (xs tt) f anyNone
+    | None       => lazylist_backtrack (xs tt) f true
+    end
+  end.
+
+Fixpoint enumerating {A} (g : E A) (f : A -> option bool) (n : nat) : option bool :=
+  lazylist_backtrack (run g n) f false.
