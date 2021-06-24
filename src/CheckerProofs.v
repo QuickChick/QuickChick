@@ -315,10 +315,7 @@ Ltac2 base_case_monf (_ : unit) :=
 
 Ltac2 handle_ind_checkerf (ih : ident) (heqb : ident) := 
   first
-    [ match! goal with
-      | [ _ : match ?e with _ => _ end = Some false |- _ ] =>
-        destruct $e > [ reflexivity | ]
-      end
+    [ congruence
     | let ih := Control.hyp ih in
       let heqb := Fresh.in_goal @Heq in
       match! goal with
@@ -336,8 +333,13 @@ Ltac2 handle_ind_checkerf (ih : ident) (heqb : ident) :=
            let heqb' := Control.hyp heqb in
            rewrite $heqb'; clear $heqb; try reflexivity
         ]
-    | congruence
+    | match! goal with
+      | [ _ : match ?e with _ => _ end = Some false |- _ ] =>
+        destruct $e; try reflexivity
+      end
+
     ].
+
 
 Ltac2 rec ind_case_monf_aux (t : unit) (path : unit -> unit) :=
   match! goal with
@@ -351,7 +353,7 @@ Ltac2 rec ind_case_monf_aux (t : unit) (path : unit -> unit) :=
 Ltac2 ind_case_monf (ih : ident) (heqb : ident) :=
   (ind_case_monf_aux () (fun _ => ())); subst;
   simpl_minus_decOpt ();
-  repeat (handle_ind_checkerf @IH1 @Heqb).
+  repeat (handle_ind_checkerf ih heqb).
 
 Ltac2 derive_mon_aux (l : ident list) :=
   (induction s1 as [ | s1 IH1 ];

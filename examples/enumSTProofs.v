@@ -31,10 +31,11 @@ Inductive goodTree : nat -> tree nat  -> Prop :=
       goodTree (S n) (Node nat k t1 t2).
 
 Derive DecOpt for (goodTree n t).
+
 (* XXX this fails if tree has type param A ... *) 
 
 Instance DecOptgoodTree_listSizeMonotonic n t : DecOptSizeMonotonic (goodTree n t).
-Proof. Admitted. (* TODO debug *) 
+Proof. derive_mon (). Qed.
 
 Instance DecOptgoodTree_list_sound n t : DecOptSoundPos (goodTree n t).
 Proof. derive_sound (). Qed.
