@@ -74,7 +74,7 @@ Class Unsized {A} {G} `{Producer G} (g : G A) :=
 Class SizedMonotonic {A} {G} `{Producer G}
       (g : nat -> G A) :=
   sizeMonotonic : forall s s1 s2,
-    s1 <= s2 ->
+    (s1 <= s2)%coq_nat ->
     semProdSize (g s1) s \subset semProdSize (g s2) s.
 
 (** Sized generators of option type monotonic in the size
@@ -82,20 +82,20 @@ Class SizedMonotonic {A} {G} `{Producer G}
 Class SizedMonotonicOpt {A} {G} `{Producer G}
       (g : nat -> G (option A)) :=
     sizeMonotonicOpt : forall s s1 s2,
-      s1 <= s2 ->
+      (s1 <= s2)%coq_nat ->
       semProdSizeOpt (g s1) s \subset semProdSizeOpt (g s2) s.
   
 (** Generators monotonic in the runtime size parameter *)
 Class SizeMonotonic {A} {G} `{Producer G} (g : G A) :=
   monotonic : forall s1 s2,
-      s1 <= s2 ->
+      (s1 <= s2)%coq_nat ->
       semProdSize g s1 \subset semProdSize g s2.
 
 (** Generators monotonic in the runtime size parameter *)
 Class SizeMonotonicOpt {A} {G} `{Producer G}
       (g : G (option A)) :=
     monotonicOpt : forall s1 s2,
-      s1 <= s2 ->
+      (s1 <= s2)%coq_nat ->
       semProdSizeOpt g s1 \subset semProdSizeOpt g s2.
 
 Definition isNone {T : Type} (u : option T) :=
@@ -362,8 +362,8 @@ Section ProducerProofs.
     - intros [a [[s1 [_ H1]] [s2 [_ H2]]]]. exists (max s1 s2).
       split; first (compute; by []).
       exists a. split.
-      eapply Hg; last eassumption. by apply/leP; apply Max.le_max_l.
-      eapply Hf; last eassumption. by apply/leP; apply Max.le_max_r.
+      eapply Hg; last eassumption. lia.
+      eapply Hf; last eassumption. lia.
   Qed.
   
   Lemma semBindSizeMonotonicIncl_r {A B} (g : G A) (f : A -> G (option B)) (s1 : set A) (s2 : A -> set B) :
@@ -511,7 +511,7 @@ Qed.
   Lemma semSized_alt A (f : nat -> G A)
         `{H : forall n, SizeMonotonic (f n)}
          (H' : forall n m s,
-             n <= m ->
+             (n <= m)%coq_nat ->
              semProdSize (f n) s \subset semProdSize (f m) s) :
     semProd (sized f) <--> \bigcup_n (semProd (f n)).
   Proof.
@@ -717,9 +717,8 @@ Proof.
     split; eexists; by split; [| eassumption].
   - move => [[a1 a2] [[[s1 [_ G1]] [s2 [_ G2]]] Hf]]. compute in Hf.
     exists (max s1 s2). split; first by [].
-    exists (a1,a2). split; last by []. split => /=;
-    (eapply monotonic; last eassumption); 
-    apply/leP; solve [ apply Max.le_max_l | apply Max.le_max_r ].
+    exists (a1,a2). split; last by [].
+    split => /=; (eapply monotonic; last eassumption). lia. lia.
 Qed.
 
 Lemma semLiftProd2Unsized1 {A1 A2 B} (f: A1 -> A2 -> B)
@@ -815,7 +814,7 @@ Lemma semLiftProd4SizeMonotonic A1 A2 A3 A4 B (f : A1 -> A2 -> A3 -> A4 -> B)
                  semProd g3 a3 /\ semProd g4 a4 /\ f a1 a2 a3 a4 = b].
 (* end semLiftProd4SizeMonotonic *)
 Proof.
-  rewrite /semProd. setoid_rewrite semLiftProd4Size.
+  rewrite /semProd. setoid_rewrite semLiftProd4Size. 
   move => b. split. 
   - move => [s [_ [a1 [a2 [a3 [a4 [Ha1 [Ha2 [Ha3 [Ha4 Hb]]]]]]]]]]; subst.
     exists a1. exists a2. exists a3. exists a4. 
@@ -824,17 +823,10 @@ Proof.
                                 [[s2 [_ Ha2]] 
                                    [[s3 [_ Ha3]] 
                                       [[s4 [_ Ha4]] Hb]]]]]]]]; subst.
-    exists (max s1 (max s2 (max s3 s4))). 
-    split; first by [].
-    exists a1. exists a2. exists a3. exists a4. 
-    repeat split; (eapply monotonic; [ apply/leP | ]; last eassumption).
-    by eapply Max.le_max_l.
-    eapply Nat.max_le_iff. right. by eapply Max.le_max_l.
-    eapply Nat.max_le_iff. right.
-    eapply Nat.max_le_iff. right. by eapply Max.le_max_l.
-    eapply Nat.max_le_iff. right.
-    eapply Nat.max_le_iff. right.
-    eapply Nat.max_le_iff. by right. 
+     exists (max s1 (max s2 (max s3 s4))). 
+     split; first by [].
+     exists a1. exists a2. exists a3. exists a4.  
+     repeat split; (eapply monotonic; last eassumption); lia.
 Qed.
 
 Global Program Instance liftM4Monotonic {A B C D E} 
@@ -886,7 +878,7 @@ by case=> [[<-] [? ?]]; exists x; split => //; exists l; split.
 Qed.
 
 Lemma Forall2_SizeMonotonic {A} x n (gs : list (G A)) l :
-  x <= n -> gs \subset SizeMonotonic -> 
+  (x <= n)%coq_nat -> gs \subset SizeMonotonic -> 
   List.Forall2 (semProdSize^~ x) gs l ->
   List.Forall2 (semProdSize^~ n) gs l.
 Proof. 
@@ -915,13 +907,12 @@ Proof.
       apply subconsset in H. move : H => [H3 H4].  
       inversion H2; subst. destruct H6 as [n [ _ H5]].
       eapply IHl in H8; auto. destruct H8 as [x [_ [H7 H8]]].
-      destruct (x <= n) eqn:Hle. 
+      
+      destruct (le_dec x n) eqn:Hle. 
       { exists n. split; eauto; first by reflexivity. split; auto. 
         constructor; auto. eapply Forall2_SizeMonotonic; eauto. }
       { exists x.  split; first by reflexivity. split; auto.
-        constructor; auto. eapply H3; last by eassumption. 
-        rewrite -> leq_eqVlt, -> Bool.orb_false_iff in Hle. 
-        destruct Hle; auto. rewrite leqNgt H0 //. }
+        constructor; auto. eapply H3; last by eassumption. lia. }
 Qed.
  
 Lemma semVectorOfSize {A : Type} (k : nat) (g : G A) n :
@@ -994,7 +985,10 @@ Global Program Instance listOfMonotonic {A} (g : G A)
         `{@SizeMonotonic _ _ PG g } : SizeMonotonic (listOf g).
 Next Obligation.
   rewrite ! semListOfSize.
-  move => l [H1 H2]; split => //. by eapply leq_trans; eauto.
+  move => l [/leP H1 H2]; split => //.
+
+  destruct (@leP (length l)  s2); eauto.
+  exfalso. eapply n. lia.
   move => a /H2 Ha. by eapply monotonic; eauto.
 Qed.
 
@@ -1156,8 +1150,8 @@ Proof.
   - intros [a [[s1 [_ H1]] [s2 [_ H2]]]]. exists (max s1 s2).
       split; first (compute; by []).
       exists a. split.
-      eapply Hs; last eassumption. by apply/leP; apply Max.le_max_l.
-      eapply Hsf; last eassumption. by apply/leP; apply Max.le_max_r.
+      eapply Hs; last eassumption. lia.
+      eapply Hsf; last eassumption. lia.
   Qed.
 
 Lemma semOptBindSize A B (g : G A) (f : A -> G (option B)) size :
@@ -1192,8 +1186,8 @@ Proof.
   - intros [a [[s1 [_ H1]] [s2 [_ H2]]]]. exists (max s1 s2).
     split; first (compute; by []).    
     exists (Some a). split.
-    eapply Hs; last eassumption. by apply/leP; apply Max.le_max_l.
-    eapply Hsf; last eassumption. by apply/leP; apply Max.le_max_r.
+    eapply Hs; last eassumption. lia.
+    eapply Hsf; last eassumption. lia.
   Qed.
 
 

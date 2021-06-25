@@ -54,3 +54,4 @@ src/ExtractionQC.v
 src/ExtractionQCCompat.v
 src/TacticsUtil.v
 src/CheckerProofs.v
+src/EnumProofs.v

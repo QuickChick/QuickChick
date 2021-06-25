@@ -150,7 +150,9 @@ Proof.
     assert (Hsize := @Enumerators.semChooseSize nat _).
     eapply Hsize in Hin; eauto.
     simpl in Hin.
-    eapply Hsize. eassumption. simpl.
+    eapply Hsize.
+    reflexivity.
+    simpl.
     ssromega.
   - intros s2 Hleq.
     destruct s2. ssromega.
@@ -176,7 +178,7 @@ Proof.
     assert (Hsize := @Enumerators.semChooseSize nat _).
     eapply Hsize in Hin; eauto.
     simpl in Hin.
-    eapply Hsize. eassumption. simpl.
+    eapply Hsize. reflexivity. simpl.
     ssromega.
   - intros s2 Hleq.
     destruct s2. ssromega.
@@ -329,7 +331,8 @@ Program Instance arbNatMon :
   @SizeMonotonic nat G ProducerGen (@arbitrary nat _).
 Next Obligation.
   rewrite !semSizedSize !semChooseSize // => n /andP [/leP H1 /leP H2].
-  move : H => /leP => Hle. apply/andP. split; apply/leP; lia.
+  move : H => /leP => Hle. apply/andP.
+  split; apply/leP; ssromega.
 Qed.
 
 (** Correctness proof about built-in generators *)

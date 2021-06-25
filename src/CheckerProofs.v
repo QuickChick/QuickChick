@@ -242,8 +242,8 @@ End Lemmas.
 
 Ltac2 rec in_list_last (_ : unit) :=
   match! goal with
-  | [ |- List.In _ (cons _ nil) ] => now left
-  | [ |- List.In _ (cons _ _) ] => right; in_list_last ()
+  | [ |- List.In _ (Datatypes.cons _ Datatypes.nil) ] => now left
+  | [ |- List.In _ (Datatypes.cons _ _) ] => right; in_list_last ()
   end.
 
 Ltac2 simpl_minus_decOpt (_ : unit) :=
@@ -256,7 +256,6 @@ Ltac2 handle_checker_mon_t (ih : ident) (heq : ident) :=
       (* because apply .... in $heq doesn't work *)
       assert ($heq1 := destruct_match_true_l _ _ $heq'); clear $heq;
       let heq1 := Control.hyp heq1 in
-      let ih := Control.hyp ih in
       let hdec := Fresh.in_goal (id_of_string "Hdec") in
       destruct $heq1 as [$hdec $heq];
       first
@@ -266,7 +265,8 @@ Ltac2 handle_checker_mon_t (ih : ident) (heq : ident) :=
             let hdec' := Control.hyp hdec in
             rewrite $hdec'; clear $hdec
           end
-        | eapply $ih in $hdec > [ | now eapply le_S_n; eauto | eassumption ];
+        | let ih := Control.hyp ih in
+          eapply $ih in $hdec > [ | now eapply le_S_n; eauto | eassumption ];
           let hdec' := Control.hyp hdec in
           rewrite $hdec'; clear $hdec ]                         
     | match! goal with
@@ -279,10 +279,10 @@ Ltac2 handle_checker_mon_t (ih : ident) (heq : ident) :=
 
 Ltac2 rec base_case_mont_aux (t : unit) (path : unit -> unit) :=
   match! goal with
-  | [h : List.In _ nil |- _ ] => let h := Control.hyp h in destruct $h
-  | [h : List.In _ (cons ?g nil) |- _ ] =>
+  | [h : List.In _ Datatypes.nil |- _ ] => let h := Control.hyp h in destruct $h
+  | [h : List.In _ (Datatypes.cons ?g Datatypes.nil) |- _ ] =>
     let h := Control.hyp h in destruct $h > [ subst; congruence | base_case_mont_aux () path ]
-  | [h : List.In _ (cons ?g ?gs) |- _ ] =>
+  | [h : List.In _ (Datatypes.cons ?g ?gs) |- _ ] =>
     let h := Control.hyp h in
     try (destruct $h > [ eexists;
                          split > [ path () ; left ; reflexivity | subst; now repeat (handle_checker_mon_t @IH1 @Heq) ]
@@ -292,8 +292,8 @@ end.
 
 Ltac2 rec ind_case_mont_aux (ih : ident) (heq : ident) (path : unit -> unit) :=
   match! goal with
-  | [h : List.In _ nil |- _ ] => let h := Control.hyp h in destruct $h
-  | [h : List.In _ (cons ?g ?gs) |- _ ] =>
+  | [h : List.In _ Datatypes.nil |- _ ] => let h := Control.hyp h in destruct $h
+  | [h : List.In _ (Datatypes.cons ?g ?gs) |- _ ] =>
     let h := Control.hyp h in
     destruct $h > [ eexists;
                     split > [ path () ; left ; reflexivity | subst; now repeat (handle_checker_mon_t @IH1 @Heq) ]
@@ -316,8 +316,7 @@ Ltac2 base_case_monf (_ : unit) :=
 Ltac2 handle_ind_checkerf (ih : ident) (heqb : ident) := 
   first
     [ congruence
-    | let ih := Control.hyp ih in
-      let heqb := Fresh.in_goal @Heq in
+    | let heqb := Fresh.in_goal @Heq in
       match! goal with
       | [ _ :  match ?e with _ => _ end = Some false |- _ ] =>
         (destruct $e as [ [ | ] | ] eqn:$heqb > [ | | congruence ])
@@ -329,7 +328,8 @@ Ltac2 handle_ind_checkerf (ih : ident) (heqb : ident) :=
             let heqb' := Control.hyp heqb in
             rewrite $heqb'; clear $heqb; try reflexivity
           end
-         | eapply $ih in $heqb > [ | now eapply le_S_n; eauto | eassumption ];
+         | let ih := Control.hyp ih in
+           eapply $ih in $heqb > [ | now eapply le_S_n; eauto | eassumption ];
            let heqb' := Control.hyp heqb in
            rewrite $heqb'; clear $heqb; try reflexivity
         ]
@@ -343,8 +343,8 @@ Ltac2 handle_ind_checkerf (ih : ident) (heqb : ident) :=
 
 Ltac2 rec ind_case_monf_aux (t : unit) (path : unit -> unit) :=
   match! goal with
-  | [h : List.In _ nil |- _ ] => let h := Control.hyp h in destruct $h
-  | [h : List.In _ (cons ?g ?gs) |- _ ] =>
+  | [h : List.In _ Datatypes.nil |- _ ] => let h := Control.hyp h in destruct $h
+  | [h : List.In _ (Datatypes.cons ?g ?gs) |- _ ] =>
     let h := Control.hyp h in
     destruct $h > [ eapply checker_backtrack_spec_false in Hdec > [ | path (); now left ] (* for inductive cases *)
                   | ind_case_monf_aux () (fun _ => path (); right) ]
@@ -397,6 +397,8 @@ Ltac2 derive_mon (_ : unit) :=
    end
 end.
 
+
+
 (* For deriving monotonicity inside the completness proof *)
 
 Ltac2 derive_mon_true (l : ident list) :=
@@ -437,7 +439,6 @@ Ltac2 handle_checker_match_sound (ih : ident) (heq : ident) :=
       let heq' := Control.hyp heq in
       assert ($heq1 := destruct_match_true_l _ _ $heq'); clear $heq;
       let heq1 := Control.hyp heq1 in
-      let ih := Control.hyp ih in      
       let hdec := Fresh.in_goal (id_of_string "Hdec") in
       destruct $heq1 as [$hdec $heq];
       (* TODO match hdec directly *) 
@@ -455,10 +456,10 @@ Ltac2 handle_checker_match_sound (ih : ident) (heq : ident) :=
 
 Ltac2 rec base_case_sound (heq : ident) (ty : constr) :=
   match! goal with
-  | [h : List.In _ nil |- _ ] => let h := Control.hyp h in destruct $h
-  | [h : List.In _ (cons ?g nil) |- _ ] =>
+  | [h : List.In _ Datatypes.nil |- _ ] => let h := Control.hyp h in destruct $h
+  | [h : List.In _ (Datatypes.cons ?g Datatypes.nil) |- _ ] =>
     let h := Control.hyp h in (destruct $h > [ subst; congruence | base_case_sound heq ty])
-  | [h : List.In _ (cons ?g ?gs) |- _ ] =>
+  | [h : List.In _ (Datatypes.cons ?g ?gs) |- _ ] =>
     let h := Control.hyp h in
     let hdummy := Fresh.in_goal (id_of_string "Hdummy") in
     (destruct $h > [ subst; repeat (handle_checker_match_sound hdummy heq); now (eauto 20 using $ty)
@@ -467,8 +468,8 @@ Ltac2 rec base_case_sound (heq : ident) (ty : constr) :=
 
 Ltac2 rec ind_case_sound (ih : ident) (heq : ident) (ty : constr) :=
   match! goal with
-  | [h : List.In _ nil |- _ ] => let h := Control.hyp h in destruct $h
-  | [h : List.In _ (cons ?g ?gs) |- _ ] =>
+  | [h : List.In _ Datatypes.nil |- _ ] => let h := Control.hyp h in destruct $h
+  | [h : List.In _ (Datatypes.cons ?g ?gs) |- _ ] =>
     let h := Control.hyp h in
     (destruct $h > [ subst; repeat (handle_checker_match_sound ih heq); now (eauto 20 using $ty)
                    | ind_case_sound ih heq ty ])
@@ -710,4 +711,5 @@ Ltac2 derive_complete (_ : unit ) :=
   prove_mon ();
   let hmon := Control.hyp @Hmon in
   induction H; first [ handle_base_case hmon | handle_ind_case hmon ].
+
 
