@@ -389,7 +389,7 @@ Lemma semBindGenSizeMonotonic {A} (gen : G A) (f : A -> Checker)
    forall a, semProd gen a -> semChecker (f a)).
 Proof.
   split; move => Hgen a.
-  - move => [s [_ H']] s'. case_eq (s <= s') => [Hleq |  
+  - move => [s [_ H']] s'. case_eq (s <= s') => [/leP Hleq |  
                                                  /leP/Compare_dec.not_le/ltP/ltnW Hleq].
     + specialize (Hgen s').
       eapply semBindGenSize in Hgen; eauto. 
@@ -462,7 +462,7 @@ Lemma semForAllSizeMonotonic {A C} `{Show A, Checkable C} (g : G A) (f : A -> C)
 (* end semForAllSizeMonotonic *)
 Proof.
   split; move => Hcheck a.
-  - move => [s [_ H']] s'. case_eq (s <= s') => [Hleq |  
+  - move => [s [_ H']] s'. case_eq (s <= s') => [/leP Hleq |  
                                                  /leP/Compare_dec.not_le/ltP/ltnW Hleq].
     + specialize (Hcheck s').
       rewrite -> semForAllSize in Hcheck. apply Hcheck. 
@@ -607,7 +607,7 @@ Lemma semForAllShrinkMonotonic :
 Proof.
   move => A C H1 H2 gen f sh Hmon1 Hmon2.
   split; move => Hcheck a.
-  - move => [s [_ H']] s'. case_eq (s <= s') => [Hleq |  
+  - move => [s [_ H']] s'. case_eq (s <= s') => [/leP Hleq |  
                                                  /leP/Compare_dec.not_le/ltP/ltnW Hleq].
     + specialize (Hcheck s').
       rewrite -> semForAllShrinkSize in Hcheck. apply Hcheck. 

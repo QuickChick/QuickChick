@@ -117,7 +117,6 @@ Section Lemmas.
     eexists x0. split; eauto.
     eapply H > [ | eassumption ].
     destruct (leqP s1 s2); eauto.
-    ssromega.
   Qed.
 
   
@@ -837,7 +836,7 @@ Ltac2 rec enumST_complete (ty : constr):=
       | (* sizedMon *) intros ? ? ? ? ?; now enumST_sized_mon @_Hmons
       | (* sizeMon *) intros ? ?; now enumST_size_mon @_Hmon
       | eexists; eexists; split > [ reflexivity
-                                  | eapply $hmons > [ eapply leqnn | | eassumption ]; ssromega ] ]
+                                  | eapply $hmons > [ eapply Peano.le_n | | eassumption ]; ssromega ] ]
     | (* bindOpt sized *)
       (eapply exists_bindOpt_Opt_Sized > [ | | | | | enumST_complete ty ]) > 
       [ now eauto with typeclass_instances

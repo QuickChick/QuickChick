@@ -21,8 +21,6 @@ Set Bullet Behavior "Strict Subproofs".
 
 Derive EnumSizedSuchThat for (fun n => le m n).
 
-Derive EnumSizedSuchThat for (fun n => le m n).
-
 
 Inductive goodTree : nat -> tree nat  -> Prop :=
 | GL : forall a, goodTree 0 (Leaf nat a)
