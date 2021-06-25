@@ -126,7 +126,7 @@ val make_up_name : unit -> var
 (* Generic Combinators *)
 val gApp : ?explicit:bool -> coq_expr -> coq_expr list -> coq_expr 
 val gFun : string list -> (var list -> coq_expr) -> coq_expr
-val gRecFunIn : ?assumType:coq_expr -> string -> string list -> ((var * var list) -> coq_expr) -> (var -> coq_expr) -> coq_expr
+val gRecFunIn : ?structRec:(var option) -> ?assumType:coq_expr -> string -> string list -> ((var * var list) -> coq_expr) -> (var -> coq_expr) -> coq_expr
 
 val gLetIn : string -> coq_expr -> (var -> coq_expr) -> coq_expr
 (* TODO: HOAS-ify *)
@@ -141,7 +141,7 @@ val gRecord : (string * coq_expr) list -> coq_expr
 val gAnnot : coq_expr -> coq_expr -> coq_expr
 val gFunTyped : (string * coq_expr) list -> (var list -> coq_expr) -> coq_expr
 val gFunWithArgs : arg list -> ((var list) -> coq_expr) -> coq_expr
-val gRecFunInWithArgs : ?assumType:coq_expr -> string -> arg list -> ((var * var list) -> coq_expr) -> (var -> coq_expr) -> coq_expr
+val gRecFunInWithArgs : ?structRec:(var option) -> ?assumType:coq_expr -> string -> arg list -> ((var * var list) -> coq_expr) -> (var -> coq_expr) -> coq_expr
 
 val gProdWithArgs : arg list -> ((var list) -> coq_expr) -> coq_expr
 

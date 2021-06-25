@@ -605,7 +605,7 @@ let gFunTyped xts (f_body : var list -> coq_expr) =
   mkCLambdaN binder_list fun_body 
 
 (* with Explicit/Implicit annotations *)  
-let gRecFunInWithArgs ?assumType:(typ=hole) (fs : string) args (f_body : (var * var list) -> coq_expr) (let_body : var -> coq_expr) = 
+let gRecFunInWithArgs ?structRec:(rec_id=None) ?assumType:(typ=hole) (fs : string) args (f_body : (var * var list) -> coq_expr) (let_body : var -> coq_expr) = 
   let fv  = fresh_name fs in
   let xvs = List.map (fun (CLocalAssum ([{CAst.v = n;_}], _, _)) ->
                       match n with
@@ -613,13 +613,16 @@ let gRecFunInWithArgs ?assumType:(typ=hole) (fs : string) args (f_body : (var * 
                       | _ -> make_up_name ()
                      ) args in
   let fix_body = f_body (fv, xvs) in
+  let rec_wf = match rec_id with
+    | None -> None
+    | Some id -> Some (CAst.make @@ CStructRec (CAst.make id)) in
   CAst.make @@ CLetIn (CAst.make @@ Name fv,
-    CAst.make @@ CFix(CAst.make fv,[(CAst.make fv, None, args, typ, fix_body)]), None,
+    CAst.make @@ CFix(CAst.make fv,[(CAst.make fv, rec_wf, args, typ, fix_body)]), None,
     let_body fv)
              
-let gRecFunIn ?assumType:(typ = hole) (fs : string) (xss : string list) (f_body : (var * var list) -> coq_expr) (let_body : var -> coq_expr) =
+let gRecFunIn ?structRec:(rec_id=None) ?assumType:(typ = hole) (fs : string) (xss : string list) (f_body : (var * var list) -> coq_expr) (let_body : var -> coq_expr) =
   let xss' = List.map (fun s -> fresh_name s) xss in
-  gRecFunInWithArgs ~assumType:typ fs (List.map (fun x -> gArg ~assumName:(gVar x) ()) xss') f_body let_body 
+  gRecFunInWithArgs ~structRec:rec_id ~assumType:typ fs (List.map (fun x -> gArg ~assumName:(gVar x) ()) xss') f_body let_body 
 
 let gLetIn (x : string) (e : coq_expr) (body : var -> coq_expr) = 
   let fx = fresh_name x in
