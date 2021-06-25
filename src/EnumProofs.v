@@ -864,9 +864,9 @@ Ltac2 rec try_solve_complete (ty : constr) :=
         | eapply exists_enum_tl; try_solve_complete ty ].
 
 Ltac2 derive_complete_enumST (ty : constr) (inst : constr) := 
-  let ind := Fresh.in_goal (id_of_string "ind") in
-  (intros $ind; let ind' := Control.hyp ind in induction $ind';
-   eapply exists_Sn) > [ try_solve_complete ty | repeat (destructIH_opt ()); try_solve_complete ty ].
+  let ind := Fresh.in_goal (id_of_string "ind") in 
+  intros $ind; let ind' := Control.hyp ind in induction $ind';
+  eapply exists_Sn; repeat (destructIH_opt ()); try_solve_complete ty.
 
 
 Ltac2 derive_enumST_Correct (_ : unit) := 
@@ -884,3 +884,5 @@ Ltac2 derive_enumST_Correct (_ : unit) :=
     split; intros $x; split >
       [ derive_sound_enumST ty inst | derive_complete_enumST tapp inst ]
   end.
+
+
