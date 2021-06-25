@@ -785,7 +785,7 @@ Ltac2 mon_expr (tapp : constr) (inst : constr) :=
         
         (* print_constr (mon '1 '2 '3 '4); set (s := ltac2:(let t := mon '1 '2 '3 '4 in exact $t)); () *)
                                                                                       
-        assert (_Hmons : forall (s1 s2 s2' s1' s: nat), s1 <= s2 -> s1' <= s2' -> 
+        assert (_Hmons : forall (s1 s2 s2' s1' s: nat), (s1 <= s2)%coq_nat -> (s1' <= s2')%coq_nat -> 
                                                        ltac2:(let s1 := Control.hyp @s1 in
                                                               let s1' := Control.hyp @s1' in
                                                               let s2 := Control.hyp @s2 in
