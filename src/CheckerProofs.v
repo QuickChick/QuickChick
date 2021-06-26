@@ -351,6 +351,12 @@ Ltac2 rec base_case_monf_aux (heqb : ident) (path : unit -> unit) :=
 Ltac2 base_case_monf (heqb : ident) :=
   base_case_monf_aux heqb (fun _ => ()).
 
+(* Zoe : if it has inductive cases this is required... *) 
+Ltac2 base_case_monf_None (_ : unit) :=
+  apply exfalso_none_some_false;
+  (eapply checker_backtrack_spec_false with (f := (fun (_ : unit) => @None bool))) >
+  [ eassumption | in_list_last () ].
+
 
 Ltac2 rec ind_case_monf_aux (t : unit) (path : unit -> unit) :=
   match! goal with
@@ -380,9 +386,11 @@ Ltac2 derive_mon_aux (l : ident list) :=
      apply checker_backtrack_spec) > 
     [ first [ eassumption | now base_case_mont () ] | now base_case_mont () ]
   | (* base case false *)  
-    (destruct s2; eapply checker_backtrack_spec_false; intros f Hin) >
-    [ first [ eassumption | now base_case_monf @Heq ]
-    | now base_case_monf @Heq ]
+    first
+      [ now base_case_monf_None ()
+      | (destruct s2; eapply checker_backtrack_spec_false; intros f Hin) >
+        [ first [ eassumption | now base_case_monf @Heq ]
+        | now base_case_monf @Heq ] ]
   | (* ind case true *)
     destruct s2 > [ lia | ];
     (* simplify and apply checker_backtrack_spec *)
