@@ -325,7 +325,7 @@ Ltac2 rec enums_size_mon (t : constr) (ih : ident) :=
       | enums_size_mon t ih ] ]. 
 
 Ltac2 derive_enum_SizeMonotonic (_ : unit) :=
-  (* intros s;  *)
+  intros s;
     match! goal with
     | [ |- @SizeMonotonic ?t _ _ _ ] =>
       induction s as [ | s IHs ];
