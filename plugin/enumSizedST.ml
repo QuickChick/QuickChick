@@ -165,11 +165,13 @@ let enumSizedST
   in
 
   let generator_body : coq_expr =
+    let sizeVar = fresh_name "size" in
     gRecFunInWithArgs
+      ~structRec:(Some sizeVar)
       ~assumType:(gen_type)
       "aux_arb"
       (gArg ~assumName:(gVar (fresh_name "init_size")) () ::
-         gArg ~assumName:(gVar (fresh_name "size")) ()
+         gArg ~assumName:(gVar sizeVar) ()
          :: inputs)
       (fun (rec_name, init_size::size::vars) -> aux_arb (gVar rec_name) (gVar init_size) size vars)
       (fun rec_name -> gFun ["size"] 

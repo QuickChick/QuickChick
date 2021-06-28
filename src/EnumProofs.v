@@ -498,7 +498,8 @@ Ltac2 rec find_enumST (ih : ident) :=
 
 Ltac2 base_case_st_size_mon (s2 : constr) :=
   destruct $s2 > 
-  [ now eapply subset_refl | rewrite !enumerate_correct_size_opt; find_enumST @dummy ]. 
+  [ first [ now eapply subset_refl | rewrite !enumerate_correct_size_opt; find_enumST @dummy ]
+  | rewrite !enumerate_correct_size_opt; find_enumST @dummy ]. 
 
 Ltac2 ind_case_st_sized_mon (s2 : constr) (ih : ident) :=
   destruct $s2 > 
@@ -527,6 +528,8 @@ Ltac2 derive_enumST_SizedMonotonic (_ : unit) :=
         (induction $s1' as [| $s1 $ihs1 ]; intro_params inst; intros $s $s2 $s1i $s2i $hleqi $hleq) >
         [ base_case_st_size_mon s2' | ind_case_st_sized_mon s2' ihs1 ]
   end.
+
+
 
 
 
@@ -884,5 +887,7 @@ Ltac2 derive_enumST_Correct (_ : unit) :=
     split; intros $x; split >
       [ derive_sound_enumST ty inst | derive_complete_enumST tapp inst ]
   end.
+
+
 
 
