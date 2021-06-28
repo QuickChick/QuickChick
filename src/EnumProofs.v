@@ -435,7 +435,7 @@ Ltac2 derive_enum_Correct (_ : unit) :=
       econstructor; intro $ind; split > [ intro; exact I | intros _ ];
       let ind' := Control.hyp ind in
       induction $ind'; eapply exists_Sn; repeat (destructIH ()); simpl_enumSized ();
-      first [ try_solve_correct () | enum_size_correct () ]
+      first [ enum_size_correct () | try_solve_correct () ]
     end
   end.
 
