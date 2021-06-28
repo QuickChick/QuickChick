@@ -453,7 +453,7 @@ Ltac2 revert_params (inst : constr) :=
   match Constr.Unsafe.kind inst with
   | Constr.Unsafe.App ty args  =>
     let l := constrs_to_idents (Array.to_list args) in
-    List.iter (fun x => revert $x) l; ()
+    List.iter (fun x => try (revert $x)) l; ()
       | _ => () 
 end.
 
@@ -461,7 +461,7 @@ Ltac2 intro_params (inst : constr) :=
   match Constr.Unsafe.kind inst with
   | Constr.Unsafe.App ty args  =>
     let l := constrs_to_idents (Array.to_list args) in
-    List.iter (fun x => intro $x) (List.rev l); ()
+    List.iter (fun x => try (intro $x)) (List.rev l); ()
       | _ => () 
 end.
 
