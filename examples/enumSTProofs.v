@@ -16,10 +16,10 @@ Require Import enumProofs. (* TODO change *)
 Set Bullet Behavior "Strict Subproofs".
 
 
-Inductive mylist (A : Type) : Type :=
-    mynil : mylist A | mycons : A -> mylist A -> mylist A.
+(* Inductive mylist (A : Type) : Type := *)
+(*     mynil : mylist A | mycons : A -> mylist A -> mylist A. *)
 
-Derive EnumSized for mylist.
+(* Derive EnumSized for mylist. *)
 
 Inductive In' : nat -> list nat -> Prop :=
 | In_hd :
@@ -27,31 +27,36 @@ Inductive In' : nat -> list nat -> Prop :=
 | In_tl :
     forall x y l, In' x l -> In' x (cons y l).
 
-(* XXX BUG *)
+(* (* XXX BUG *) *)
 Derive DecOpt for (In' a l).
-(* Derive ArbitrarySizedSuchThat for (fun x => In' x l). *)
-(* Derive EnumSizedSuchThat for (fun x => In' x l). *)
+Derive ArbitrarySizedSuchThat for (fun x => In' x l).
+Derive EnumSizedSuchThat for (fun x => In' x l).
 
 Inductive ltest : list nat -> nat -> Prop :=
-  | ltestnil (n : nat) :
+  | ltestnil :
       ltest [] 0
   | ltestcons :
       forall x m' m l,
+        (* eq (m' + 1) m -> *)
+        In' m' l ->
         ltest l m' ->
-        eq (m' + 1) m ->
         ltest (x :: l) m.
 
-(* Derive EnumSizedSuchThat for (fun n => eq x n). *)
-(* Derive EnumSizedSuchThat for (fun n => eq n x). *)
+Derive EnumSizedSuchThat for (fun n => eq x n).
+Derive EnumSizedSuchThat for (fun n => eq n x).
+
+(* Derive DecOpt for (ltest l n). *)
 
 (* Derive EnumSizedSuchThat for (fun n => ltest l n). *)
 
-(* Set Typeclasses Debug. *)
-(* QuickChickDebug Debug On. *)
 
-(* XXX BUG *)
-(* Derive DecOpt for (ltest l n). *)
+Set Typeclasses Debug.
+QuickChickDebug Debug On.
 
+Derive DecOpt for (ltest l n).
+
+
+  
 Derive EnumSizedSuchThat for (fun n => le m n).
 
 Inductive goodTree : nat -> tree nat  -> Prop :=

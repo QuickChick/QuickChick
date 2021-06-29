@@ -37,8 +37,8 @@ let rec_bind (opt : bool) (m : coq_expr) (x : string) (f : var -> coq_expr) : co
     ; (injectCtr "None", [], fun _ -> gNone hole ) 
     ]
   
-let exist_bind (opt : bool) (m : coq_expr) (x : string) (f : var -> coq_expr) : coq_expr =
-  (if opt then enumCheckerOpt else enumChecker) m x f
+let exist_bind (init_size : coq_expr) (opt : bool) (m : coq_expr) (x : string) (f : var -> coq_expr) : coq_expr =
+  (if opt then enumCheckerOpt else enumChecker) m x f init_size
 
 let stMaybe (opt : bool) (g : coq_expr) (x : string) (checks : ((coq_expr -> coq_expr) * int) list) =
   let rec sumbools_to_bool x lst =
@@ -113,7 +113,7 @@ let construct_generators
   let handle_branch' : dep_ctr -> coq_expr * bool =
     handle_branch dep_type init_size
       (fail_exp full_gtyp) (not_enough_fuel_exp full_gtyp) (ret_exp full_gtyp)
-      instantiate_existential_method instantiate_existential_methodST exist_bind
+      instantiate_existential_method instantiate_existential_methodST (exist_bind init_size)
       (rec_method rec_name init_size size) rec_bind
       stMaybe check_expr match_inp gLetIn gLetTupleIn
       gen_ctr init_umap init_tmap input_ranges result

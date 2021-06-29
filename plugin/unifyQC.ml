@@ -563,7 +563,7 @@ let handle_branch
   
   (* When instantiating a single unknown, see if it must satisfy any additional predicates. *)
   (* Old comment: Process check map. XXX generator specific *)
-  (* ZOE: What do you mean by XXX generator specific? Is this comment still relevant? *)
+
   let process_checks bind x opt g (cont : var -> b) : b = 
     match lookup_checks (DTyVar x) !cmap with
     | Some checks -> 
@@ -850,7 +850,7 @@ let handle_branch
            )
        in
 
-       process_checks rec_bind fresh_unknown true (instantiate_existential_methodST ctr_index pred) 
+       process_checks ex_bind fresh_unknown true (instantiate_existential_methodST ctr_index pred) 
             (fun _x' -> recurse_type (ctr_index + 1) dt')
 
     ) 
