@@ -79,6 +79,21 @@ let derive_dependent
       actual_input_list 
   in
 
+  (* Typeclass arguments - depends on the class *)
+  let param_class_names = match class_name with
+    | DecOpt -> ["Dec_Eq"; "Enum"]
+    | EnumSizedSuchThat -> ["Enum"]
+    | ArbitrarySizedSuchThat -> ["Gen"]
+    | _ -> []
+  in
+  
+  let typeclass_args =
+    List.concat (List.map (fun tp ->
+                     ((gArg ~assumName:tp ~assumImplicit:true ()) ::
+                        (List.map (fun name -> gArg ~assumType:(gApp (gInject name) [tp])
+                                                    ~assumGeneralized:true ()) param_class_names))
+                   ) coqTyParams) in
+  
   (* The type we are generating for -- not the predicate! *)
   let _full_gtyp = gType ty_params (UM.find result tmap) in
 
@@ -93,12 +108,12 @@ let derive_dependent
 
   (* Generate typeclass constraints. For each type parameter "A" we need `{_ : <Class Name> A} *)
   let instance_arguments = match class_name with
-    | DecOpt -> params @ actual_input_args
+    | DecOpt -> params @ typeclass_args @ actual_input_args
     (*    | DecOptMon -> params @ actual_input_args *)
     | EnumSizedSuchThat ->
-       params @ actual_input_args
+       params @ typeclass_args @ actual_input_args
     | ArbitrarySizedSuchThat ->
-      params
+      params @ typeclass_args
 (*      @ gen_needed
       @ dec_needed
       @ self_dec
