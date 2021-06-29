@@ -14,7 +14,9 @@ val id_of_var : var -> Id.t
 val var_to_string : var -> string
 val gVar : var -> coq_expr
 
-val gInject : string -> coq_expr 
+val gInject : string -> coq_expr
+
+val gType0 : coq_expr   
 
 type ty_param 
 val ty_param_to_string : ty_param -> string

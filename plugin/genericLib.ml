@@ -66,6 +66,8 @@ let gInject s =
   if s = "" then failwith "Called gInject with empty string";
   CAst.make @@ CRef (qualid_of_string s, None)
 
+let gType0 = CAst.make @@ CSort (UAnonymous {rigid = true})
+         
 type ty_param = Id.t (* Opaque *)
 let ty_param_to_string (x : ty_param) = Id.to_string x
 

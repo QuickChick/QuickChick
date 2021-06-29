@@ -67,7 +67,9 @@ let derive_dependent
   let full_dt = gApp ~explicit:true coqTyCtr coqTyParams in
 
   (* Type parameters as arguments *)
-  let params = List.map (fun tp -> gArg ~assumName:(gTyParam tp) ()) ty_params in
+  let params = List.map (fun tp -> gArg ~assumName:(gTyParam tp)
+                                        ~assumType:gType0
+                                     ()) ty_params in
 
   (* List of input unknowns *)
   let actual_input_list =
