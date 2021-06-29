@@ -498,3 +498,21 @@ Fixpoint lazylist_backtrack {A} (l : LazyList A) (f : A -> option bool) (anyNone
 
 Fixpoint enumerating {A} (g : E A) (f : A -> option bool) (n : nat) : option bool :=
   lazylist_backtrack (run g n) f false.
+
+Fixpoint lazylist_backtrack_opt {A} (l : LazyList (option A)) (f : A -> option bool) (anyNone : bool) : option bool :=
+  match l with
+  | lnil  => if anyNone then None else Some false
+  | lcons mx xs =>
+    match mx with
+    | Some x =>
+      match f x with
+      | Some true  => Some true
+      | Some false => lazylist_backtrack_opt (xs tt) f anyNone
+      | None       => lazylist_backtrack_opt (xs tt) f true
+      end
+    | None => lazylist_backtrack_opt (xs tt) f anyNone
+    end
+  end.
+
+Fixpoint enumeratingOpt {A} (g : E (option A)) (f : A -> option bool) (n : nat) : option bool :=
+  lazylist_backtrack_opt (run g n) f false.

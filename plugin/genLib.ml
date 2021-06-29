@@ -20,6 +20,13 @@ let bindEnum cg xn cf =
 
 let bindEnumOpt cg xn cf = 
   gApp (gInject "bindOpt") [cg; gFun [xn] (fun [x] -> cf x)]
+
+let enumChecker cg xn cf = 
+  gApp (gInject "enumerating") [cg; gFun [xn] (fun [x] -> cf x)]
+
+let enumCheckerOpt cg xn cf = 
+  gApp (gInject "enumeratingOpt") [cg; gFun [xn] (fun [x] -> cf x)]
+
   
 let oneof l =
   match l with
