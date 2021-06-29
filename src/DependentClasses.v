@@ -418,73 +418,38 @@ Proof.
 Qed.
 
 
-(* TODO: Move to another file *)
-(*
-(** Leo's example from DependentTest.v *)
+Lemma enumeratingOpt_sound A P (e : E (option A)) {Hc : CorrectST P e} ch s :
+  enumeratingOpt e ch s = Some true ->
+  exists x, P x /\ ch x = Some true.
+Proof.
+  unfold enumeratingOpt.
+  assert (Hs : forall x, LazyList.In_ll (Some x) (Enumerators.run e s) ->
+                         P x).
+  { intros. eapply Hc. eexists. split; eauto. reflexivity. 
+    simpl. eassumption. }
+  revert Hs.
+  generalize (Enumerators.run e s), false. clear.
+  induction l; intros b Hyp Heq; simpl in *.
+  - destruct b; congruence.
+  - destruct a; eauto. destruct (ch a) as [ [| ] | ] eqn:Heq'; eauto.
+Qed.
 
-Print Foo.
-Print goodFooNarrow.
-
-DeriveSized Foo as "SizedFoo".
-
-(*
-Inductive Foo : Set :=
-    Foo1 : Foo | Foo2 : Foo -> Foo | Foo3 : nat -> Foo -> Foo
-
-Inductive goodFooNarrow : nat -> Foo -> Prop :=
-    GoodNarrowBase : forall n : nat, goodFooNarrow n Foo1
-  | GoodNarrow : forall (n : nat) (foo : Foo),
-                 goodFooNarrow 0 foo ->
-                 goodFooNarrow 1 foo -> goodFooNarrow n foo
- *)
-
-(* Q : Can we but the size last so we don't have to eta expand?? *)
-Print genGoodNarrow. 
-
-(** For dependent gens we show generate this instance *)
-Instance genGoodNarrow (n : nat) : EnumSizedSuchThat Foo (goodFooNarrow n) :=
-  {
-    enumSizeST := genGoodNarrow' n;
-    shrinkSizeST x := []
-  }.
-
-(* For proofs we should generate this instances *)
-
-Instance genGoodNarrowMon (n : nat) (s : nat) :
-  SizeMonotonic (@enumSizeST Foo (goodFooNarrow n) _ s).
-Abort.
-
-Instance genGoodNarrowSMon (n : nat) :
-  @EnumSTSizedSizeMotonic Foo (@goodFooNarrow n) _.
-Abort.
-
-Instance genGoodNarrowCorr (n : nat) :
-  EnumSizeSuchThatCorrect (goodFooNarrow n) (@enumSizeST Foo (goodFooNarrow n) _).
-Abort.
-*)
-
-(** We can now abstract away from sizes and get the generator and the proofs for free *)
-
-(* Class SizedProofEqs' {A : Type} (P : A -> Prop) := *)
-(*   { *)
-(*     zero' : set (option A); *)
-(*     succ' : set (option A) -> set (option A); *)
-(*     spec1 : Some @: P \subset \bigcup_(n : nat) ((succ' ^ n) zero'); *)
-(*     spec2 : \bigcup_(n : nat) ((succ' ^ n) zero') \subset  Some @: P :|: [ None ]; *)
-(*   }. *)
-
-
-(* Looks like Scott induction, although we have not proved that
-   succ is continuous *)
-(* Lemma fixed_point_ind {A} (Q P : A -> Prop) `{SizedProofEqs A P}: *)
-(*   zero \subset Q -> *)
-(*   (forall (s : set A), s \subset Q -> succ s \subset Q) -> *)
-(*   P \subset Q. *)
-(* Proof. *)
-(*   intros Hz IH. rewrite <- spec. intros x [n [_ HP]]. *)
-(*   revert x HP.  *)
-(*   induction n. *)
-(*   - eauto. *)
-(*   - intros x. eapply IH. eauto. *)
-(* Qed. *)
+Lemma enumeratingOpt_complete A P (e : E (option A)) {Hc : CorrectST P e} ch x :
+  P x ->
+  ch x = Some true ->
+  exists s, enumeratingOpt e ch s = Some true.
+Proof.
+  unfold enumeratingOpt. intros Hp Heq. 
+  assert (Hs : semProdOpt e x).
+  { eapply Hc. eassumption. }
+  destruct Hs as [s [_ Hs]]. simpl in *. unfold semEnumSize in Hs.
+  exists s. revert Hs Heq. 
+  generalize (Enumerators.run e s), false. clear.
+  induction l; intros b Hin Heq; simpl in *.
+  - exfalso; eauto.
+  - inv Hin. 
+    + rewrite Heq. reflexivity.
+    + destruct a; eauto.
+      destruct (ch a) as [ [| ] | ] eqn:Heq'; eauto.    
+Qed.
 

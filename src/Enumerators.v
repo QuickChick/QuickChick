@@ -496,7 +496,7 @@ Fixpoint lazylist_backtrack {A} (l : LazyList A) (f : A -> option bool) (anyNone
     end
   end.
 
-Fixpoint enumerating {A} (g : E A) (f : A -> option bool) (n : nat) : option bool :=
+Definition enumerating {A} (g : E A) (f : A -> option bool) (n : nat) : option bool :=
   lazylist_backtrack (run g n) f false.
 
 Fixpoint lazylist_backtrack_opt {A} (l : LazyList (option A)) (f : A -> option bool) (anyNone : bool) : option bool :=
@@ -514,5 +514,17 @@ Fixpoint lazylist_backtrack_opt {A} (l : LazyList (option A)) (f : A -> option b
     end
   end.
 
-Fixpoint enumeratingOpt {A} (g : E (option A)) (f : A -> option bool) (n : nat) : option bool :=
+Definition enumeratingOpt {A} (g : E (option A)) (f : A -> option bool) (n : nat) : option bool :=
   lazylist_backtrack_opt (run g n) f false.
+
+Lemma enumerating_sound A (e : E A) ch s :
+  enumerating e ch s = Some true ->
+  exists x, ch x = Some true.
+Proof.
+  unfold enumerating.
+  generalize (Enumerators.run e s), false.
+  induction l; intros b Heq; simpl in *.
+  - destruct b; congruence.
+  - destruct (ch a) as [ [| ] | ] eqn:Heq'; eauto.
+Qed.    
+

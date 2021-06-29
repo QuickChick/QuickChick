@@ -355,3 +355,41 @@ Proof.
   constructor; eauto.
   constructor; eauto.
 Qed.
+
+Lemma enumerating_complete A (e : E A) {Hc : Correct A e} ch :
+  (exists x, ch x = Some true) ->
+  exists s, enumerating e ch s = Some true.
+Proof.
+  intros [x Hch].
+  unfold enumerating.
+  assert (Hin : semProd e x).
+  { eapply Hc. reflexivity. }
+  destruct Hin as [s [_ Hsem]]. simpl in *.
+  unfold semEnumSize in *.
+  exists s. revert Hsem.
+  generalize (Enumerators.run e s), false.
+  induction l; intros b Hin; inv Hin; simpl.
+  - rewrite Hch. reflexivity.
+  - destruct (ch a); eauto.
+    destruct b0; eauto.
+Qed.
+
+
+
+Lemma enumerating_monotonic A (e : E A) {Hc : SizeMonotonic e}
+      ch1 ch2 s1 s2 b :
+  s1 <= s2 ->
+  (forall x, ch1 x = Some b -> ch2 x = Some b) ->
+  enumerating e ch1 s1 = Some b ->
+  enumerating e ch2 s2 = Some b.
+Proof.
+Admitted.
+
+Lemma enumeratingOpt_monotonic A (e : E (option A)) {Hc : SizeMonotonicOpt e}
+      ch1 ch2 s1 s2 b :
+  s1 <= s2 ->
+  (forall x, ch1 x = Some b -> ch2 x = Some b) ->
+  enumeratingOpt e ch1 s1 = Some b ->
+  enumeratingOpt e ch2 s2 = Some b.
+Proof.
+Admitted.
