@@ -240,7 +240,19 @@ Section Lemmas.
 End Lemmas.
 
 
-(** ** Enum **) 
+(** ** Enum **)
+
+Ltac2 simpl_minus_enumSized (_ : unit) :=
+  ltac1:(with_strategy opaque [enumSized] simplstar).
+
+Ltac2 simpl_enumSized (_ : unit) :=
+  unfold enumSized; simpl_minus_enumSized (). 
+
+
+Ltac2 find_size_mon_inst (_ : unit) :=
+  first [ now eauto with typeclass_instances
+        | eapply sizedSizeMonotonicOpt; now eauto with typeclass_instances
+        | eapply sizedSizeMonotonic; now eauto with typeclass_instances ].
 
 (*** Sized Monotonicity *)
 
@@ -273,8 +285,8 @@ Ltac2 rec find_enum (_ : unit) :=
 
 Ltac2 base_case_size_mon (_ : unit) :=
   destruct s2 > 
-  [ now eapply subset_refl | simpl; first [ now eapply subset_refl
-                                          | simpl; rewrite !&Hone; now find_enum () ] ]. 
+  [ now eapply subset_refl | simpl_enumSized (); first [ now eapply subset_refl
+                                                       | simpl; rewrite !&Hone; now find_enum () ] ]. 
 
 
 Ltac2 rec enums_sized_mon (ih : ident) :=
@@ -284,8 +296,8 @@ Ltac2 rec enums_sized_mon (ih : ident) :=
 
 Ltac2 ind_case_sized_mon (_ : unit) :=
   destruct s2 > 
-  [ now ssromega | simpl; first [ now enum_sized_mon @IHs1
-                                | rewrite !&Hone; now enums_sized_mon @IHs1 ] ]. 
+  [ now ssromega | simpl_enumSized (); first [ now enum_sized_mon @IHs1
+                                             | rewrite !&Hone; now enums_sized_mon @IHs1 ] ]. 
 
 
 Ltac2 derive_enum_SizedMonotonic (_ : unit) :=
@@ -309,7 +321,7 @@ Ltac2 rec enum_size_mon (ih : ident) :=
       eapply bindMonotonic >
       [ now eauto with typeclass_instances
       | first
-          [ now eauto with typeclass_instances (* for calls to enum *)
+          [ now find_size_mon_inst ()  (* for calls to enum *)
           | let ih' := Control.hyp ih in (* for recursive calls *)
             eapply $ih'; now ssromega ]
       | let x := Fresh.in_goal (id_of_string "x") in
@@ -325,11 +337,11 @@ Ltac2 rec enums_size_mon (t : constr) (ih : ident) :=
       | enums_size_mon t ih ] ]. 
 
 Ltac2 derive_enum_SizeMonotonic (_ : unit) :=
-  (* intros s;  *)
+  intros s;
     match! goal with
     | [ |- @SizeMonotonic ?t _ _ _ ] =>
       induction s as [ | s IHs ];
-        simpl;
+        simpl_enumSized ();
         first [ eapply oneofMonotonic >  
                 [ now eauto with typeclass_instances
                 | now enum_size_mon @IHs
@@ -338,6 +350,16 @@ Ltac2 derive_enum_SizeMonotonic (_ : unit) :=
     end.
 
 (*** Correct *) 
+
+Ltac2 find_corr_inst (_ : unit) :=
+  first [ now eauto with typeclass_instances
+        | match! goal with
+          | [ |- Correct ?ty (sizedEnum enumSized) ] =>
+            eapply (@EnumCorrectOfSized $ty _) >
+            [ now eauto with typeclass_instances
+            | now find_size_mon_inst ()
+            | now eauto with typeclass_instances ]
+          end ].
 
 Ltac2 solve_sized_mon (hs : ident) :=
   let t := Fresh.in_goal (id_of_string "t") in
@@ -364,9 +386,9 @@ Ltac2 rec enum_size_correct (_ : unit) :=
                                   
     | (* bind non rec *)
       match! goal with
-      |  [ |- exists _ : nat, semProd (bindEnum enum _) _ ] => 
-         eapply exists_bind > [ now eauto with typeclass_instances
-                              | now eauto with typeclass_instances
+      |  [ |- exists _ : nat, semProd (bindEnum (* enum *) _ _) _ ] => 
+         eapply exists_bind > [ now find_corr_inst ()
+                              | now find_size_mon_inst ()
                               | now solve_size_mon @Hsize
                               | now eexists; enum_size_correct () ]
       end
@@ -375,7 +397,7 @@ Ltac2 rec enum_size_correct (_ : unit) :=
       | [|- exists z, semProd (bindEnum (&_aux_enum z) _) _  ] =>
         eapply exists_bind_Sized_alt >
         [ now eauto with typeclass_instances
-        | now eauto with typeclass_instances
+        | now find_size_mon_inst ()
         | now solve_sized_mon @Hsized
         | now solve_size_mon @Hsize
         |
@@ -389,11 +411,6 @@ Ltac2 destructIH (_ : unit) :=
     let h' := Control.hyp h in destruct $h'
   end.
 
-Ltac2 simpl_minus_enumSized (_ : unit) :=
-  ltac1:(with_strategy opaque [enumSized] simplstar).
-
-Ltac2 simpl_enumSized (_ : unit) :=
-  unfold enumSized; simpl_minus_enumSized (). 
 
 Ltac2 rec try_solve_correct (_ : unit) :=
   first
@@ -418,7 +435,7 @@ Ltac2 derive_enum_Correct (_ : unit) :=
       econstructor; intro $ind; split > [ intro; exact I | intros _ ];
       let ind' := Control.hyp ind in
       induction $ind'; eapply exists_Sn; repeat (destructIH ()); simpl_enumSized ();
-      first [ try_solve_correct () | enum_size_correct () ]
+      first [ enum_size_correct () | try_solve_correct () ]
     end
   end.
 
@@ -436,7 +453,7 @@ Ltac2 revert_params (inst : constr) :=
   match Constr.Unsafe.kind inst with
   | Constr.Unsafe.App ty args  =>
     let l := constrs_to_idents (Array.to_list args) in
-    List.iter (fun x => revert $x) l; ()
+    List.iter (fun x => try (revert $x)) l; ()
       | _ => () 
 end.
 
@@ -444,7 +461,7 @@ Ltac2 intro_params (inst : constr) :=
   match Constr.Unsafe.kind inst with
   | Constr.Unsafe.App ty args  =>
     let l := constrs_to_idents (Array.to_list args) in
-    List.iter (fun x => intro $x) (List.rev l); ()
+    List.iter (fun x => try (intro $x)) (List.rev l); ()
       | _ => () 
 end.
 
@@ -463,7 +480,7 @@ Ltac2 rec enumST_sized_mon (ih : ident) :=
              semProdSizeOpt (match decOpt ?s2 with _ => _ end) _ ] =>
         let hdec := Fresh.in_goal (id_of_string "Hdec") in 
         destruct (@decOpt $p $i $s1) eqn:$hdec >
-        [ ((erewrite CheckerProofs.mon > [ | | eassumption ]) > [ enumST_sized_mon ih | ssromega ])
+        [ ((erewrite (@CheckerProofs.mon $p $i _ $s1 $s2) > [ | | eassumption ]) > [ enumST_sized_mon ih | ssromega ])
         | rewrite (@semReturnSizeOpt_None E _ ProducerSemanticsEnum); now eapply sub0set ]
       end
      | (* input matching *) 
@@ -492,13 +509,14 @@ Ltac2 rec enumST_sized_mon (ih : ident) :=
 Ltac2 rec find_enumST (ih : ident) :=
   first
     [ now eapply incl_bigcup_list_nil
-    | eapply incl_bigcup_compat_list > [ (enumST_sized_mon ih)  | find_enumST ih ]
+    | eapply incl_bigcup_compat_list > [ (now enumST_sized_mon ih)  | find_enumST ih ]
     | eapply incl_bigcup_list_tl; find_enumST ih
     ].
 
 Ltac2 base_case_st_size_mon (s2 : constr) :=
   destruct $s2 > 
-  [ now eapply subset_refl | rewrite !enumerate_correct_size_opt; find_enumST @dummy ]. 
+  [ first [ now eapply subset_refl | rewrite !enumerate_correct_size_opt; find_enumST @dummy ]
+  | rewrite !enumerate_correct_size_opt; find_enumST @dummy ]. 
 
 Ltac2 ind_case_st_sized_mon (s2 : constr) (ih : ident) :=
   destruct $s2 > 
@@ -527,6 +545,8 @@ Ltac2 derive_enumST_SizedMonotonic (_ : unit) :=
         (induction $s1' as [| $s1 $ihs1 ]; intro_params inst; intros $s $s2 $s1i $s2i $hleqi $hleq) >
         [ base_case_st_size_mon s2' | ind_case_st_sized_mon s2' ihs1 ]
   end.
+
+
 
 
 
@@ -618,10 +638,6 @@ Ltac2 make_prod (bs : constr array) (c : constr) :=
 
 
 (* To derive monotonicity inside the correctness proof *)
-Ltac2 find_size_mon_inst (_ : unit) :=
-  first [ now eauto with typeclass_instances
-        | eapply sizedSizeMonotonicOpt; now eauto with typeclass_instances
-        | eapply sizedSizeMonotonic; now eauto with typeclass_instances ].
 
 
 
@@ -635,7 +651,7 @@ Ltac2 rec enumST_sound (ty : constr) (ih : ident) :=
     destruct (@decOpt $p $i $s) as [ $b | ] eqn:$hdec > [ | now eapply (@semReturnOpt_None E _ _) in $h; inv $h ];
     let b' := Control.hyp b in                                                            
     destruct $b' > [ | now eapply (@semReturnOpt_None E _ _) in $h; inv $h ];
-    eapply (@sound $p) in $hdec > [ | now eauto with typeclass_instances ]; enumST_sound ty ih
+    eapply (@CheckerProofs.sound $p) in $hdec > [ | now eauto with typeclass_instances ]; enumST_sound ty ih
 
  (* match input *) 
   | [ h : semProdOpt (match ?n with _ => _ end) ?x |- _ ] =>
@@ -827,7 +843,7 @@ Ltac2 rec enumST_complete (ty : constr):=
       [ (* decOpt mon *) now eauto with typeclass_instances
       | (* decOpt complete *) now eauto with typeclass_instances
       | (* sizedMon *) intros ? ? ? ? ?; now enumST_sized_mon @_Hmons 
-      | (* P *) eassumption ]
+      | (* P *) now eauto ]
     | (* bindOpt rec call *)
       (eapply exists_bindOpt_Opt_Sized > [ | | | | | enumST_complete ty ]) >
       [ (* sizedMon *) 
@@ -886,3 +902,13 @@ Ltac2 derive_enumST_Correct (_ : unit) :=
   end.
 
 
+
+(* Ltac tactics *)
+Ltac derive_enum_SizeMonotonic := ltac2:(derive_enum_SizeMonotonic ()).
+Ltac derive_enum_SizedMonotonic :=  ltac2:(derive_enum_SizedMonotonic ()).
+Ltac derive_enum_Correct := ltac2:(derive_enum_Correct ()).
+
+
+Ltac derive_enumST_SizeMonotonic := ltac2:(derive_enumST_SizeMonotonic ()).
+Ltac derive_enumST_SizedMonotonic :=  ltac2:(derive_enumST_SizedMonotonic ()).
+Ltac derive_enumST_Correct := ltac2:(derive_enumST_Correct ()).

@@ -340,7 +340,7 @@ let handle_equalities init_size eqs (check_expr : coq_expr -> 'a -> 'a -> 'a -> 
   EqSet.fold (fun (u1,u2) c -> 
                let checker =
                  gApp ~explicit:true (gInject "decOpt")
-                   [ gApp (gInject "eq") [gVar u1; gVar u2]
+                   [ gApp (gInject "Logic.eq") [gVar u1; gVar u2]
                    ; hole
                    ; init_size]
                in

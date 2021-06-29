@@ -29,14 +29,14 @@ Instance EnumTree_SizedMonotonic A {_ : Enum A} :
 Proof. derive_enum_SizedMonotonic (). Qed.
   
 
-Instance EnumTree_SizeMonotonic A `{EnumMonotonic A} s :
-  SizeMonotonic (@enumSized _ (@EnumSizedtree A _) s).
+Instance EnumTree_SizeMonotonic A `{EnumMonotonic A} :
+  forall s, SizeMonotonic (@enumSized _ (@EnumSizedtree A _) s).
 Proof. derive_enum_SizeMonotonic (). Qed. 
 
 
 
 Instance EnumTree_correct A `{EnumMonotonicCorrect A} :
-  CorrectSized (@enumSized _(@EnumSizedtree A _)).
+  CorrectSized (@enumSized _ (@EnumSizedtree A _)).
 Proof. derive_enum_Correct (). Qed. 
 
 Inductive Foo : Type :=
@@ -49,8 +49,8 @@ Instance EnumFoo_SizedMonotonic :
 Proof. derive_enum_SizedMonotonic (). Qed.
   
 
-Instance EnumFoo_SizeMonotonic s :
-  SizeMonotonic (@enumSized _ EnumSizedFoo s).
+Instance EnumFoo_SizeMonotonic :
+  forall s, SizeMonotonic (@enumSized _ EnumSizedFoo s).
 Proof. derive_enum_SizeMonotonic (). Qed. 
 
 
@@ -72,8 +72,8 @@ Instance EnumFoo2_SizedMonotonic A {_ : Enum A} :
 Proof. derive_enum_SizedMonotonic (). Qed.
   
 
-Instance EnumFoo2_SizeMonotonic A `{EnumMonotonic A} s :
-  SizeMonotonic (@enumSized _ (@EnumSizedFoo2 A _) s).
+Instance EnumFoo2_SizeMonotonic A `{EnumMonotonic A} :
+  forall s, SizeMonotonic (@enumSized _ (@EnumSizedFoo2 A _) s).
 Proof. derive_enum_SizeMonotonic (). Qed. 
 
 
