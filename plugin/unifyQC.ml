@@ -263,6 +263,7 @@ let rec convert_to_range dt =
      option_map (fun dts' -> Ctr (c, dts')) (sequenceM convert_to_range dts)
   | DTyCtr (c, dts) -> 
      option_map (fun dts' -> Ctr (ty_ctr_to_ctr c, dts')) (sequenceM convert_to_range dts)
+  | DTyParam param -> Some (Parameter param)
   | _ -> None
 
 let is_fixed k dt = 
@@ -272,7 +273,7 @@ let is_fixed k dt =
     | Unknown u' -> aux (umfind u' k)
     | Ctr (_, rs) -> List.for_all aux rs
     | RangeHole -> true (*TODO *)
-    | Parameter _ -> failwith "not handled/is_fixed"
+    | Parameter _ -> true (* TODO *)
   in option_map aux (convert_to_range dt)
 
 (* convert a range to a coq expression *)
@@ -290,6 +291,7 @@ let rec range_to_coq_expr k r =
      | RangeHole -> hole
      end
   | RangeHole -> hole
+  | Parameter p -> gTyParam p
   | _ -> failwith "QC Internal: TopLevel ranges should be Unknowns or Constructors"
 
 let rec dt_to_coq_expr k dt =
