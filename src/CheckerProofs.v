@@ -731,3 +731,8 @@ Ltac2 derive_complete (_ : unit ) :=
   let hmon := Control.hyp @Hmon in
   induction H; first [ handle_base_case hmon | handle_ind_case hmon ].
 
+
+(* Ltac tactics *)
+Ltac derive_mon := ltac2:(derive_mon ()).
+Ltac derive_sound := ltac2:(derive_sound ()).
+Ltac derive_complete := ltac2:(derive_complete ()).

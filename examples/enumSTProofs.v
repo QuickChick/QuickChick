@@ -41,17 +41,16 @@ Inductive ltest : list nat -> nat -> Prop :=
         eq (m' + 1) m ->
         ltest (x :: l) m.
 
-Derive EnumSizedSuchThat for (fun n => eq x n).
-Derive EnumSizedSuchThat for (fun n => eq n x).
+(* Derive EnumSizedSuchThat for (fun n => eq x n). *)
+(* Derive EnumSizedSuchThat for (fun n => eq n x). *)
 
-Derive EnumSizedSuchThat for (fun n => ltest l n).
+(* Derive EnumSizedSuchThat for (fun n => ltest l n). *)
 
 (* Set Typeclasses Debug. *)
 (* QuickChickDebug Debug On. *)
 
 (* XXX BUG *)
 (* Derive DecOpt for (ltest l n). *)
-
 
 Derive EnumSizedSuchThat for (fun n => le m n).
 
