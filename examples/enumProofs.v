@@ -36,7 +36,7 @@ Proof. derive_enum_SizeMonotonic (). Qed.
 
 
 Instance EnumTree_correct A `{EnumMonotonicCorrect A} :
-  CorrectSized (@enumSized _(@EnumSizedtree A _)).
+  CorrectSized (@enumSized _ (@EnumSizedtree A _)).
 Proof. derive_enum_Correct (). Qed. 
 
 Inductive Foo : Type :=
