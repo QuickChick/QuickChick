@@ -378,7 +378,7 @@ Ltac2 rec base_case_mont_aux (t : unit) (path : unit -> unit) :=
   | [h : List.In _ (Datatypes.cons ?g ?gs) |- _ ] =>
     let h := Control.hyp h in
     try (destruct $h > [ eexists;
-                         split > [ path () ; left ; reflexivity | subst; now repeat (handle_checker_mon_t @IH1 @Heq) ]
+                         split > [ path () ; left ; reflexivity | subst; now repeat (simpl_minus_methods (); handle_checker_mon_t @IH1 @Heq) ]
                        |  ]);
     base_case_mont_aux () (fun _ => path (); right)
 end.
@@ -389,7 +389,7 @@ Ltac2 rec ind_case_mont_aux (ih : ident) (heq : ident) (path : unit -> unit) :=
   | [h : List.In _ (Datatypes.cons ?g ?gs) |- _ ] =>
     let h := Control.hyp h in
     destruct $h > [ eexists;
-                    split > [ path () ; left ; reflexivity | subst; now repeat (handle_checker_mon_t @IH1 @Heq) ]
+                    split > [ path () ; left ; reflexivity | subst; now repeat (simpl_minus_methods (); handle_checker_mon_t @IH1 @Heq) ]
                   | ind_case_mont_aux ih heq (fun _ => path (); right) ]
                     
                     
