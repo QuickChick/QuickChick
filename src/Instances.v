@@ -225,6 +225,38 @@ Proof.
   eapply subset_refl.
 Qed.
 
+Instance enumListSized_CorrectSized {A : Type} {_ : EnumSized A}:
+  CorrectSized (@enumSized _ (@enumListSized A _)).
+Proof.
+  constructor. unfold enumSized. 
+  intros t; split; eauto.
+  - intros. exact I.
+  - intros _. 
+    destruct t; exists 0; simpl;
+    eapply semElements; eauto with typeclass_instances.
+
+    now left.
+    right. now left.
+Qed.       
+
+Instance enumBoolSized_SizedMonotonic :
+  SizedMonotonic (@enumSized _ enumBoolSized).
+Proof.
+  intros s s1 s2 Hleq. simpl.
+  assert ( Heq := @semElementsSize E _ _).
+  simpl in *. rewrite Heq.
+  eapply subset_refl.
+Qed.
+
+Instance enumBoolSized_SizeMonotonic s:
+  SizeMonotonic (@enumSized _ enumBoolSized s).
+Proof.
+  intros s1 s2 Hleq.
+  assert ( Heq := @semElementsSize E _ _).
+  simpl in *. rewrite Heq.
+  eapply subset_refl.
+Qed.
+
 (** Shrinking of nat starts to become annoying *)
 Function shrinkNatAux (x : nat) {measure (fun x => x) x} : list nat :=
   match x with

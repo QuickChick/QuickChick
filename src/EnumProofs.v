@@ -463,7 +463,16 @@ Ltac2 get_args (pred : constr) :=
   match Constr.Unsafe.kind pred with
   | Constr.Unsafe.Lambda b app =>
     match Constr.Unsafe.kind app with
-    | Constr.Unsafe.App ty args  => args
+    | Constr.Unsafe.App ty args  =>
+      List.filter (fun x =>
+                     match Constr.Unsafe.kind x with
+                     | Constr.Unsafe.Rel _ => (* the arg we are enumeting *)
+                       false
+                     | Constr.Unsafe.Var _ => (* other args *) 
+                       true
+                     | _ => Control.throw (Tactic_failure (Some (Message.of_string ("Internal error : args must be free or bound vars"))))
+                     end) (Array.to_list args)
+                           
     | _ => Control.throw (Tactic_failure (Some (Message.of_string ("Expecting an application"))))
     end
   | _ => Control.throw (Tactic_failure (Some (Message.of_string ("Expecting a function"))))
@@ -471,16 +480,15 @@ Ltac2 get_args (pred : constr) :=
 
 Ltac2 revert_params (pred : constr) :=
   let args := get_args pred in 
-  let l := constrs_to_idents (Array.to_list args) in
+  let l := constrs_to_idents args in
   List.iter (fun x => try (revert $x)) l. 
 
 Ltac2 intro_params (pred : constr) :=
   let args := get_args pred in 
-  let l := constrs_to_idents (Array.to_list args) in
+  let l := constrs_to_idents args in
   List.iter (fun x => try (intro $x)) (List.rev l).
 
 (*** Sized monotonic *) 
-
 
 Ltac2 rec enumST_sized_mon (ih : ident) :=
   first

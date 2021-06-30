@@ -37,146 +37,24 @@ Proof. derive_complete (). Qed.
 Derive ArbitrarySizedSuchThat for (fun x => In' x l).
 Derive EnumSizedSuchThat for (fun x => In' x l).
 
-
-
-Ltac2 rec enumST_sized_mon (ih : ident) :=
-  first
-    [ (* ret *)
-      match! goal with
-      | [ |- ?s \subset ?s ] => now eapply subset_refl
-      end
-    | (* dec matching *)
-      match! goal with
-      | [ |- semProdSizeOpt (match @decOpt ?p ?i ?s1 with _ => _ end) _ \subset
-             semProdSizeOpt (match decOpt ?s2 with _ => _ end) _ ] =>
-        let hdec := Fresh.in_goal (id_of_string "Hdec") in 
-        destruct (@decOpt $p $i $s1) eqn:$hdec >
-        [ ((erewrite (@CheckerProofs.mon $p $i _ $s1 $s2) > [ | | eassumption ]) > [ enumST_sized_mon ih | ssromega ])
-        | rewrite (@semReturnSizeOpt_None E _ ProducerSemanticsEnum); now eapply sub0set ]
-      end
-     | (* input matching *) 
-      match! goal with
-      | [ |- semProdSizeOpt (match ?p with _ => _ end) _ \subset _ ] =>
-        destruct $p; enumST_sized_mon ih
-      end
-    | (* bindOpt *)
-      eapply (@semBindOptSizeOpt_subset_compat E _ ProducerSemanticsEnum) >
-      [ first
-          [ now eapply subset_refl (* for calls to enum *)
-          | let ih' := Control.hyp ih in (* for recursive calls *)
-            eapply $ih'; now ssromega ]
-      | let x := Fresh.in_goal (id_of_string "x") in
-        intros $x; enumST_sized_mon ih
-      ]
-    | (* bind *)
-      eapply (@semBindSizeOpt_subset_compat E _ ProducerSemanticsEnum) >
-      [ now eapply subset_refl 
-      | let x := Fresh.in_goal (id_of_string "x") in
-        intros $x; enumST_sized_mon ih
-      ]
-    | ()
-    ].
-
-Ltac2 rec find_enumST (ih : ident) :=
-  first
-    [ now eapply incl_bigcup_list_nil
-    | eapply incl_bigcup_compat_list > [ (now enumST_sized_mon ih)  | find_enumST ih ]
-    | eapply incl_bigcup_list_tl; find_enumST ih
-    ].
-
-Ltac2 base_case_st_size_mon (s2 : constr) :=
-  destruct $s2 > 
-  [ first [ now eapply subset_refl | rewrite !enumerate_correct_size_opt; find_enumST @dummy ]
-  | rewrite !enumerate_correct_size_opt; find_enumST @dummy ]. 
-
-Ltac2 ind_case_st_sized_mon (s2 : constr) (ih : ident) :=
-  destruct $s2 > 
-  [ now ssromega |  rewrite !enumerate_correct_size_opt; (* find_enumST ih *) () ]. 
-
-Ltac2 derive_enumST_SizedMonotonic (_ : unit) :=
-  match! goal with
-  | [ |- SizedMonotonicOpt (@enumSizeST ?typ ?pred ?inst) ] =>
-    assert (Henum := @enumerate_correct_size $typ);
-      
-    let s := Fresh.in_goal (id_of_string "s") in
-    let s1 := Fresh.in_goal (id_of_string "s1") in
-    let s2 := Fresh.in_goal (id_of_string "s2") in
-    let s1i := Fresh.in_goal (id_of_string "s1i") in
-    let s2i := Fresh.in_goal (id_of_string "s2i") in
-    let hleq := Fresh.in_goal (id_of_string "Hleq") in
-    let hleqi := Fresh.in_goal (id_of_string "Hleqi") in
-    let ihs1 := Fresh.in_goal (id_of_string "ihs1") in
-    intros $s $s1 $s2 $hleq; simpl_enumSizeST ();
-      let hleq' := Control.hyp hleq in
-      let s1' := Control.hyp s1 in
-      let s2' := Control.hyp s2 in
-      assert ($hleqi := $hleq');
-      revert $hleqi $hleq;
-      generalize $s2' at 1 3; generalize $s1' at 1 3; revert $s $s2; revert_params inst;
-        (induction $s1' as [| $s1 $ihs1 ]; intro_params inst; intros $s $s2 $s1i $s2i $hleqi $hleq) >
-        [ base_case_st_size_mon s2' | ind_case_st_sized_mon s2' ihs1  ]
-  end.
-
-
-
-
-
-
 Instance EnumSizedSuchThatIn'_SizedMonotonic A {_ : Enum A} l :
   SizedMonotonicOpt (@enumSizeST _ _ (EnumSizedSuchThatIn' l)).
-Proof. derive_enumST_SizedMonotonic ().
+Proof. derive_enumST_SizedMonotonic (). Qed.
 
-       eapply incl_bigcup_compat_list.
-       now enumST_sized_mon @ihs1.
+Instance EnumSizedSuchThatIn'_SizeMonotonic  A {_ : Enum A} (* `{EnumMonotonic A} *) l :
+  forall s, SizeMonotonicOpt (@enumSizeST _ _ (EnumSizedSuchThatIn' l) s).
+Proof. derive_enumST_SizeMonotonic (). Qed.
 
-       eapply incl_bigcup_compat_list.
+Instance EnumSizedSuchThatIn'_Correct A {_ : Enum A}  (* `{EnumMonotonicCorrect A} *) l :
+  CorrectSizedST (fun x => In' x l) (@enumSizeST _ _ (EnumSizedSuchThatIn' l)).
+Proof. derive_enumST_Correct (). Qed.
 
+Derive EnumSizedSuchThat for (fun l => In' x l).
 
-Ltac2 rec enumST_sized_mon (ih : ident) :=
-  first
-    [ (* ret *)
-      match! goal with
-      | [ |- ?s \subset ?s ] => now eapply subset_refl
-      end
-    | (* dec matching *)
-      match! goal with
-      | [ |- semProdSizeOpt (match @decOpt ?p ?i ?s1 with _ => _ end) _ \subset
-             semProdSizeOpt (match decOpt ?s2 with _ => _ end) _ ] =>
-        let hdec := Fresh.in_goal (id_of_string "Hdec") in 
-        destruct (@decOpt $p $i $s1) eqn:$hdec >
-        [ ((erewrite (@CheckerProofs.mon $p $i _ $s1 $s2) > [ | | eassumption ]) > [ (* enumST_sized_mon ih *) | ssromega ])
-        | rewrite (@semReturnSizeOpt_None E _ ProducerSemanticsEnum); now eapply sub0set ]
-      end
-     | (* input matching *) 
-      match! goal with
-      | [ |- semProdSizeOpt (match ?p with _ => _ end) _ \subset _ ] =>
-        destruct $p; (* enumST_sized_mon ih *) ()
-      end
-    | (* bindOpt *)
-      eapply (@semBindOptSizeOpt_subset_compat E _ ProducerSemanticsEnum) >
-      [ first
-          [ now eapply subset_refl (* for calls to enum *)
-          | let ih' := Control.hyp ih in (* for recursive calls *)
-            eapply $ih'; now ssromega ]
-      | let x := Fresh.in_goal (id_of_string "x") in
-        intros $x; (* enumST_sized_mon ih *) ()
-      ]
-    | (* bind *)
-      eapply (@semBindSizeOpt_subset_compat E _ ProducerSemanticsEnum) >
-      [ now eapply subset_refl 
-      | let x := Fresh.in_goal (id_of_string "x") in
-        intros $x; enumST_sized_mon ih
-      ]
-    | ()
-    ].
-
-
-
-       now enumST_sized_mon @ihs1.
-
-Qed.
-
-
+(* XXX missing enum list instances. *) 
+(* Instance EnumSizedSuchThatIn'0_SizedMonotonic A {_ : Enum A} x : *)
+(*   SizedMonotonicOpt (@enumSizeST _ _ (EnumSizedSuchThatIn'0 x)). *)
+(* Proof. derive_enumST_SizedMonotonic (). Qed. *)
 
 
 Inductive ltest : list nat -> nat -> Prop :=
@@ -192,19 +70,13 @@ Inductive ltest : list nat -> nat -> Prop :=
 Derive EnumSizedSuchThat for (fun n => eq x n).
 Derive EnumSizedSuchThat for (fun n => eq n x).
 
-(* Derive DecOpt for (ltest l n). *)
-
-(* Derive EnumSizedSuchThat for (fun n => ltest l n). *)
-
-
-Set Typeclasses Debug.
-QuickChickDebug Debug On.
+(* Set Typeclasses Debug. *)
+(* QuickChickDebug Debug On. *)
 
 Derive DecOpt for (ltest l n).
-
-
-  
-Derive EnumSizedSuchThat for (fun n => le m n).
+Derive EnumSizedSuchThat for (fun n => ltest l n).
+(* XXX error *)
+(* Derive EnumSizedSuchThat for (fun l => ltest l n). *)
 
 Inductive goodTree : nat -> tree nat  -> Prop :=
 | GL : forall a, goodTree 0 (Leaf nat a)
@@ -246,9 +118,9 @@ Inductive bst : nat -> nat -> tree1 -> Prop :=
 
 Derive DecOpt for (bst min max t).
 
+Derive EnumSizedSuchThat for (fun m => le n m).
 
 Derive EnumSizedSuchThat for (fun t => bst min max t).
-
 
 
 Instance EnumSizedSuchThatgoodTree_SizedMonotonic n :
