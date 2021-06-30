@@ -4,7 +4,7 @@ Require Import List.
 Require Import RoseTrees.
 Require Import Show.
 Require Import State.
-Require Import Producer Generators.
+Require Import Producer Generators Enumerators.
 Require Import Classes.
 Require Import DependentClasses.
 Require Import Checker.
@@ -204,7 +204,7 @@ Section Lemmas.
         s1 k :
     decOpt s1 = Some true ->
     (exists s, k (max s1 s) = Some true) ->
-    (exists (s : nat) ,
+    (exists (s : nat),
         match decOpt s with
         | Some true => k s
         | Some false => Some false
@@ -234,6 +234,72 @@ Section Lemmas.
   Lemma exfalso_none_some_false (P : Prop) :
     (fun (_ : unit) => None) tt = Some false -> P. 
   Proof. congruence. Qed.
+
+  Lemma enumerating_complete' A (e : E A) ch {Hm : SizeMonotonic e} {Hc : Correct A e} :
+    (forall x s1 s2, (s1 <= s2) -> ch s1 x = Some true -> ch s2 x = Some true) ->
+    (exists x s, ch s x = Some true) ->
+    (exists (s : nat),
+        enumerating e (ch s) s = Some true).
+  Proof.
+    intros Hmon [x [s Hch]].
+    unfold enumerating.
+    assert (Hin : semProd e x).
+    { eapply Hc. reflexivity. }
+    destruct Hin as [s' [_ Hsem]]. simpl in *.
+    unfold semEnumSize in *.  
+
+    assert (Hsem' : LazyList.In_ll x (Enumerators.run e (max s s'))).
+    { eapply Hm > [| simpl; eassumption ]. lia. }
+    clear Hsem.
+    exists (max s s'). revert Hsem'.    
+    generalize (Enumerators.run e (max s s')), false.
+    induction l; intros b Hin; inv Hin; simpl.
+    - erewrite Hmon > [ reflexivity | | eassumption ]. lia.
+    - destruct (ch (Nat.max s s') a); eauto.
+      destruct b0; eauto.
+  Qed.
+
+  Lemma enumeratingOpt_complete' A (e : E (option A)) ch P {Hm : SizeMonotonicOpt e} {Hc : CorrectST P e} :
+    (forall x s1 s2, (s1 <= s2) -> ch s1 x = Some true -> ch s2 x = Some true) ->
+    (exists x, P x /\ exists s, ch s x = Some true) ->
+    (exists (s : nat),
+        enumeratingOpt e (ch s) s = Some true).
+  Proof.
+    intros Hmon [x [Hp [s Hch]]].
+    unfold enumeratingOpt.
+    assert (Hin : semProdOpt e x).
+    { eapply Hc. eassumption. }
+    destruct Hin as [s' [_ Hsem]]. simpl in *.
+    unfold semEnumSize in *.  
+
+    assert (Hsem' : LazyList.In_ll (Some x) (Enumerators.run e (max s s'))).
+    { eapply Hm > [| simpl; eassumption ]. lia. }
+    clear Hsem.
+    exists (max s s'). revert Hsem'.    
+    generalize (Enumerators.run e (max s s')), false.
+    induction l; intros b Hin; inv Hin; simpl.
+    - erewrite Hmon > [ reflexivity | | eassumption ]. lia.
+    - destruct a; eauto. destruct (ch (Nat.max s s') a); eauto.
+      destruct b0; eauto.
+  Qed.
+
+  Lemma exists_match' check k s1 :        
+    check s1 = Some true ->
+    (forall s1 s2, (s1 <= s2) -> check s1 = Some true -> check s2 = Some true) ->
+    (forall s1 s2, (s1 <= s2) -> k s1 = Some true -> k s2 = Some true) ->
+    (exists s, k s = Some true) ->
+    (exists (s : nat) ,
+        match check s with
+        | Some true => k s
+        | Some false => Some false
+        | None => None
+        end = Some true).
+  Proof.
+    intros Hch Hmon Hmon' Hk. destruct Hk as [s2 Hk].
+    eexists (max s1 s2).
+    erewrite Hmon > [ | | eassumption ].
+    eapply Hmon' > [ | eassumption ]. lia. lia.
+  Qed.  
 
 End Lemmas. 
 
@@ -280,7 +346,7 @@ Ltac2 handle_checker_mon_t (ih : ident) (heq : ident) :=
           end
         | (* rec call *)
           let ih := Control.hyp ih in
-          eapply $ih in $hdec > [ | now eapply le_S_n; eauto | eassumption ];
+          eapply $ih in $hdec > [ | first [ eassumption | now eapply le_S_n; eauto ] | eassumption ];
           let hdec' := Control.hyp hdec in
           rewrite $hdec'; clear $hdec ]                         
     | (* input matching *)
@@ -484,6 +550,15 @@ Ltac2 derive_mon_true (l : ident list) :=
 
 (** Soundness *)
 
+Ltac2 find_CorrectST_inst (_ : unit) :=
+  match! goal with
+  | [ |- CorrectST _ (sizedEnum (@enumSizeST ?t ?pred ?inst)) ] =>
+    eapply (@size_CorrectST $t $pred E _ _) >
+    [ now eauto with typeclass_instances
+    | find_size_mon_inst ()
+    | eauto with typeclass_instances ]
+  end.
+
 Ltac2 handle_checker_match_sound (ih : ident) (heq : ident) :=
   first
     [ (* match is the current inductive type *)
@@ -510,6 +585,20 @@ Ltac2 handle_checker_match_sound (ih : ident) (heq : ident) :=
       match! goal with
       | [h : match ?m with _ => _  end = Some true |- _ ] =>
         destruct $m; try (congruence)
+      end
+    | (* enumerating *)
+      match! goal with
+      | [h : enumerating _ _ _ = Some true |- _ ] =>
+        eapply enumerating_sound in $h;
+        let h' := Control.hyp h in 
+        destruct $h' as [? $h]
+      end
+    | (* enumeratingOpt *)
+      match! goal with
+      | [h : enumeratingOpt _ _ _ = Some true |- _ ] =>
+        eapply enumeratingOpt_sound in $h > [ | find_CorrectST_inst () ];
+        let h' := Control.hyp h in
+        destruct $h' as [? [? $h ]]
       end
     ].
 
@@ -665,7 +754,7 @@ Ltac2 prove_ih (ih : ident) :=
   end.
 
   
-Ltac2 handle_match (hmon : constr) :=
+Ltac2 rec handle_checker (hmon : ident) :=
   first [ exists 0 ; reflexivity
         | match! goal with
           | [ |- exists s, match @decOpt ?p ?i _ with _ => _ end = Some true ] =>
@@ -675,9 +764,13 @@ Ltac2 handle_match (hmon : constr) :=
             let hc1 := Control.hyp hc in
             destruct $hc1 as [$s $hc];
             let s1 := Control.hyp s in
-            eapply exists_match with (s1 := $s1) >
-                                     [ eapply (@mon $p _ _) > [ | eassumption ]; lia
-                                     | intros; eapply (@mon $p _ _) > [ | eassumption ]; lia | ]
+            eapply exists_match' with (s1 := $s1) >
+                                      [ eapply (@mon $p _ _) > [ | eassumption ]; lia
+                                      | intros; eapply (@mon $p _ _) > [ | eassumption ]; lia
+                                      | let heq := Fresh.in_goal (id_of_string "_heq") in
+                                        intros ? ? ? $heq; 
+                                        now repeat (handle_checker_mon_t hmon heq)
+                                      | handle_checker hmon ]
           end
         | let ih := Fresh.in_goal (id_of_string "IH") in
           let s := Fresh.in_goal (id_of_string "s") in
@@ -685,13 +778,33 @@ Ltac2 handle_match (hmon : constr) :=
           let ih1 := Control.hyp ih in
           destruct $ih1 as [$s $ih];
           let s1 := Control.hyp s in
-          eapply exists_match with (s1 := $s1) >
-                                   [ eapply $hmon > [| | eassumption ] > [ lia | lia ]
-                                   | intros; eapply $hmon > [| | eassumption ] > [ lia | lia ] | ]
+          eapply exists_match' with (s1 := $s1) >
+                                    [ let hmon := Control.hyp hmon in
+                                      eapply $hmon > [| | eassumption ] > [ lia | lia ]
+                                    | let hmon := Control.hyp hmon in
+                                      intros; eapply $hmon > [| | eassumption ] > [ lia | lia ]
+                                    | let heq := Fresh.in_goal (id_of_string "_heq") in
+                                      intros ? ? ? $heq; 
+                                      now repeat (handle_checker_mon_t hmon heq)
+                                    | handle_checker hmon ]
                                      
+        | (* enumerating *)
+          eapply enumerating_complete' >
+          [ now find_size_mon_inst ()
+          | now eauto with typeclass_instances
+          | let heq := Fresh.in_goal (id_of_string "_heq") in
+            intros ? ? ? ? $heq; 
+            now repeat (handle_checker_mon_t hmon heq)
+          | eexists; handle_checker hmon ]
+        | (* enumeratingOpt *)
+          eapply enumeratingOpt_complete' >        
+          [ now find_size_mon_inst ()
+          | now find_CorrectST_inst ()
+          | let heq := Fresh.in_goal (id_of_string "_heq") in
+            intros ? ? ? ? $heq; 
+            now repeat (handle_checker_mon_t hmon heq)
+          | eexists; split > [ | handle_checker hmon ] ]; eassumption
         ].
-
-
 
 Ltac2 rec path_aux (m : int) (n : int) :=
   match Int.equal n m with
@@ -702,15 +815,15 @@ end.
 Ltac2 rec path (n : int) := path_aux n 0.
 
 
-Ltac2 handle_base_case (hmon : constr) := handle_match hmon.
+Ltac2 handle_base_case (hmon : ident) := handle_checker hmon.
 
 
-Ltac2 rec solve_ind_case (hmon : constr) (n : int) :=
+Ltac2 rec solve_ind_case (hmon : ident) (n : int) :=
   first [ now eexists; split > [ intros s; path n; reflexivity | 
-                                 simpl_minus_methods (); repeat (handle_match hmon) ]
+                                 simpl_minus_methods (); handle_checker hmon ]
         | solve_ind_case hmon (Int.add n 1) ].
 
-Ltac2 rec handle_ind_case (hmon : constr) :=
+Ltac2 rec handle_ind_case (hmon : ident) :=
   match! goal with
   | [ |- ?e ] =>
     match Constr.Unsafe.kind e with
@@ -751,9 +864,9 @@ Ltac2 rec handle_ind_case (hmon : constr) :=
             assert (Hsuff : ltac2:(exact $e')) >
             [ | destruct Hsuff as [$s $hyp];
                 let s1 := Control.hyp s in
+                let hmon := Control.hyp hmon in 
                 eexists (S $s1); eapply $hmon > [ | | eassumption ]; lia ];
-                eapply checker_backtrack_spec_exists; solve_ind_case hmon 0
-                                                     
+                eapply checker_backtrack_spec_exists; solve_ind_case hmon 0                                     
           | _ => Control.throw (Tactic_failure (Some (Message.of_string ("Expecting an application"))))
           end
         | _ => Control.throw (Tactic_failure (Some (Message.of_string ("Expecting an application"))))
@@ -767,8 +880,7 @@ Ltac2 rec handle_ind_case (hmon : constr) :=
 Ltac2 derive_complete (_ : unit ) := 
   intros H; unfold decOpt; simpl_minus_methods (); 
   prove_mon ();
-  let hmon := Control.hyp @Hmon in
-  induction H; first [ handle_base_case hmon | handle_ind_case hmon ].
+  induction H; first [ now handle_base_case @Hmon | now handle_ind_case @Hmon ].
 
 
 (* Ltac tactics *)
