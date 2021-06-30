@@ -240,6 +240,12 @@ End Lemmas.
 
 (** Monotonicity *)
 
+Ltac2 revert_params (l : ident list) :=
+  List.iter (fun x => try (revert $x)) l.
+
+Ltac2 intro_params (l : ident list) :=
+  List.iter (fun x => try (intro $x)) (List.rev l).
+
 Ltac2 rec in_list_last (_ : unit) :=
   match! goal with
   | [ |- List.In _ (Datatypes.cons _ Datatypes.nil) ] => now left
@@ -375,7 +381,7 @@ Ltac2 ind_case_monf (ih : ident) (heqb : ident) :=
 
 Ltac2 derive_mon_aux (l : ident list) :=
   (induction s1 as [ | s1 IH1 ];
-  (List.map (fun x => intro $x) (List.rev l);
+  (intro_params l;
   intros s2 b s2' s1' Hleq Hleq' Hdec);
   destruct b) >
   [ (* base case true *)
@@ -414,7 +420,7 @@ Ltac2 derive_mon (_ : unit) :=
       intros s1 s2 b Hleq; unfold decOpt; simpl_minus_decOpt ();
       assert (Hleq' := &Hleq); revert Hleq Hleq';
       generalize &s1 at 2 3 as s1'; generalize &s2 at 2 3 as s2';
-      revert s2 b; List.map (fun x => revert $x) l; derive_mon_aux l
+      revert s2 b; revert_params l; derive_mon_aux l
    | _ => () 
    end
 end.
@@ -425,7 +431,7 @@ end.
 Ltac2 derive_mon_true (l : ident list) :=
   (intro s1; induction s1 as [ | s1 IH1 ];
   intros s2 s2' s1' Hleq Hleq';
-  (List.map (fun x => intro $x) (List.rev l)); intro Hdec) >
+  intro_params l; intro Hdec) >
   [ (* base case true *)
     (destruct s2;
      (* simplify and apply checker_backtrack_spec *)
@@ -507,9 +513,9 @@ Ltac2 derive_sound (_ : unit) :=
       intros s; unfold decOpt; simpl_minus_decOpt ();
       (* assert (Hleq' := &Hleq); revert Hleq Hleq'; *)
       generalize &s at 1 as s';
-      List.map (fun x => revert $x) l;
+      revert_params l;
       ((induction s as [ | s IH1 ]);
-       (List.map (fun x => intro $x) (List.rev l));
+       intro_params l;
        intros s' Hdec;
        eapply checker_backtrack_spec in Hdec;
        destruct Hdec as [f [Hin Htrue]]) > [ base_case_sound @Htrue ty | ind_case_sound @IH1 @Htrue ty ]

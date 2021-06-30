@@ -449,21 +449,35 @@ Ltac2 simpl_minus_enumSizeST (_ : unit) :=
 Ltac2 simpl_enumSizeST (_ : unit) :=
   unfold enumSizeST; simpl_minus_enumSizeST (). 
 
-Ltac2 revert_params (inst : constr) :=
-  match Constr.Unsafe.kind inst with
-  | Constr.Unsafe.App ty args  =>
-    let l := constrs_to_idents (Array.to_list args) in
-    List.iter (fun x => try (revert $x)) l; ()
-      | _ => () 
-end.
+Ltac2 get_ty (e : constr) :=
+  match Constr.Unsafe.kind e with
+  | Constr.Unsafe.Lambda b app =>
+    match Constr.Unsafe.kind app with
+    | Constr.Unsafe.App ty args  => ty
+    | _ => Control.throw (Tactic_failure (Some (Message.of_string ("Expecting an application"))))
+    end
+  | _ => Control.throw (Tactic_failure (Some (Message.of_string ("Expecting a function"))))
+  end.
 
-Ltac2 intro_params (inst : constr) :=
-  match Constr.Unsafe.kind inst with
-  | Constr.Unsafe.App ty args  =>
-    let l := constrs_to_idents (Array.to_list args) in
-    List.iter (fun x => try (intro $x)) (List.rev l); ()
-      | _ => () 
-end.
+Ltac2 get_args (pred : constr) :=
+  match Constr.Unsafe.kind pred with
+  | Constr.Unsafe.Lambda b app =>
+    match Constr.Unsafe.kind app with
+    | Constr.Unsafe.App ty args  => args
+    | _ => Control.throw (Tactic_failure (Some (Message.of_string ("Expecting an application"))))
+    end
+  | _ => Control.throw (Tactic_failure (Some (Message.of_string ("Expecting a function"))))
+  end.
+
+Ltac2 revert_params (pred : constr) :=
+  let args := get_args pred in 
+  let l := constrs_to_idents (Array.to_list args) in
+  List.iter (fun x => try (revert $x)) l. 
+
+Ltac2 intro_params (pred : constr) :=
+  let args := get_args pred in 
+  let l := constrs_to_idents (Array.to_list args) in
+  List.iter (fun x => try (intro $x)) (List.rev l).
 
 (*** Sized monotonic *) 
 
@@ -541,8 +555,8 @@ Ltac2 derive_enumST_SizedMonotonic (_ : unit) :=
       let s2' := Control.hyp s2 in
       assert ($hleqi := $hleq');
       revert $hleqi $hleq;
-      generalize $s2' at 1 3; generalize $s1' at 1 3; revert $s $s2; revert_params inst;
-        (induction $s1' as [| $s1 $ihs1 ]; intro_params inst; intros $s $s2 $s1i $s2i $hleqi $hleq) >
+      generalize $s2' at 1 3; generalize $s1' at 1 3; revert $s $s2; revert_params pred;
+        (induction $s1' as [| $s1 $ihs1 ]; intro_params pred; intros $s $s2 $s1i $s2i $hleqi $hleq) >
         [ base_case_st_size_mon s2' | ind_case_st_sized_mon s2' ihs1 ]
   end.
 
@@ -610,23 +624,14 @@ Ltac2 derive_enumST_SizeMonotonic (_ : unit) :=
 
   match! goal with
   | [ |- SizeMonotonicOpt (@enumSizeST ?typ ?pred ?inst _) ] =>   
-    simpl_enumSizeST (); generalize $s' at 1; revert_params inst;
-    induction $s' as [ | $s $ihs ]; intro_params inst; intros $si;
+    simpl_enumSizeST (); generalize $s' at 1; revert_params pred;
+    induction $s' as [ | $s $ihs ]; intro_params pred; intros $si;
     eapply enumerate_SizeMonotonicOpt; enumsST_size_mon typ @IHs
   end.
 
 
 (** Correctness *)
 
-Ltac2 get_ty (e : constr) :=
-  match Constr.Unsafe.kind e with
-  | Constr.Unsafe.Lambda b app =>
-    match Constr.Unsafe.kind app with
-    | Constr.Unsafe.App ty args  => ty
-    | _ => Control.throw (Tactic_failure (Some (Message.of_string ("Expecting an application"))))
-    end
-  | _ => Control.throw (Tactic_failure (Some (Message.of_string ("Expecting a function"))))
-  end.
 
 (* TODO duplicate *)
 
@@ -702,7 +707,7 @@ Ltac2 rec sound_enums (ty : constr) (ih : ident) :=
     apply bigcup_nil_set0 in $h; inv $h
   end. 
 
-Ltac2 derive_sound_enumST (ty : constr) (inst : constr) :=
+Ltac2 derive_sound_enumST (ty : constr) (pred : constr) :=
   let s := Fresh.in_goal (id_of_string "s") in
   let si := Fresh.in_goal (id_of_string "si") in
   let ihs := Fresh.in_goal (id_of_string "ihs") in
@@ -713,7 +718,8 @@ Ltac2 derive_sound_enumST (ty : constr) (inst : constr) :=
 
   match! goal with
     [ |- semProdOpt _ ?x -> _ ] => 
-    (generalize $s' at 1; revert_params inst; revert x; induction $s' as [ | $s $ihs]; intro; intro_params inst;
+    (generalize $s' at 1; revert_params pred; revert x; induction $s' as [ | $s $ihs]; intro;
+     intro_params pred;
      intros $si $hgen;
      eapply &Henum in $hgen) > [ sound_enums ty ihs | sound_enums ty ihs  ]
   end.
@@ -898,7 +904,7 @@ Ltac2 derive_enumST_Correct (_ : unit) :=
     let ty := get_ty pred in
     let x := Fresh.in_goal (id_of_string "x") in
     split; intros $x; split >
-      [ derive_sound_enumST ty inst | derive_complete_enumST tapp inst ]
+      [ derive_sound_enumST ty pred | derive_complete_enumST tapp inst ]
   end.
 
 

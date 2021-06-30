@@ -110,12 +110,11 @@ let derive_dependent
 
   (* Generate typeclass constraints. For each type parameter "A" we need `{_ : <Class Name> A} *)
   let instance_arguments = match class_name with
-    | DecOpt -> params @ typeclass_args @ actual_input_args
-    (*    | DecOptMon -> params @ actual_input_args *)
+    | DecOpt -> (* params @ *) typeclass_args @ actual_input_args
     | EnumSizedSuchThat ->
-       params @ typeclass_args @ actual_input_args
+       (* params @ *) typeclass_args @ actual_input_args
     | ArbitrarySizedSuchThat ->
-      params @ typeclass_args
+       (* params @ *) typeclass_args
 (*      @ gen_needed
       @ dec_needed
       @ self_dec
