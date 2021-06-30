@@ -252,12 +252,18 @@ Ltac2 rec in_list_last (_ : unit) :=
   | [ |- List.In _ (Datatypes.cons _ _) ] => right; in_list_last ()
   end.
 
-Ltac2 simpl_minus_decOpt (_ : unit) :=
-  ltac1:(with_strategy opaque [decOpt] simplstar).
+Ltac2 simpl_minus_methods (_ : unit) :=
+  ltac1:(with_strategy opaque [enumSizeST enum decOpt enumSized] simplstar).
+
+Ltac2 find_size_mon_inst (_ : unit) :=
+  first [ now eauto with typeclass_instances
+        | eapply sizedSizeMonotonicOpt; now eauto with typeclass_instances
+        | eapply sizedSizeMonotonic; now eauto with typeclass_instances ].
 
 Ltac2 handle_checker_mon_t (ih : ident) (heq : ident) := 
   first
-    [ let heq1 := Fresh.in_goal heq in
+    [ (* decOpt matcing *)
+      let heq1 := Fresh.in_goal heq in
       let heq' := Control.hyp heq in
       (* because apply .... in $heq doesn't work *)
       assert ($heq1 := destruct_match_true_l _ _ $heq'); clear $heq;
@@ -265,20 +271,35 @@ Ltac2 handle_checker_mon_t (ih : ident) (heq : ident) :=
       let hdec := Fresh.in_goal (id_of_string "Hdec") in
       destruct $heq1 as [$hdec $heq];
       first
-        [ match! goal with
+        [ (* other decOpt *)
+          match! goal with
           | [ h : @decOpt ?p _ ?s = Some true |- _ ] =>
             eapply (@mon $p _ _) in $h > [ | eassumption ];
             let hdec' := Control.hyp hdec in
             rewrite $hdec'; clear $hdec
           end
-        | let ih := Control.hyp ih in
+        | (* rec call *)
+          let ih := Control.hyp ih in
           eapply $ih in $hdec > [ | now eapply le_S_n; eauto | eassumption ];
           let hdec' := Control.hyp hdec in
           rewrite $hdec'; clear $hdec ]                         
-    | match! goal with
+    | (* input matching *)
+      match! goal with
       | [h : match ?m with _ => _  end = Some true |- _ ] =>
         destruct $m; try (congruence)
       end
+    | (* enumerating *)
+      eapply enumerating_monotonic >
+      [ now find_size_mon_inst ()
+      | eassumption
+      | intro; clear $heq; simpl_minus_methods (); intro $heq
+      | eassumption ]
+    | (* enumeratingOpt *)
+      eapply enumeratingOpt_monotonic >
+      [ now find_size_mon_inst ()
+      | eassumption
+      | intro; simpl_minus_methods (); clear $heq; intro $heq
+      | eassumption ]    
     | reflexivity ].
 
 
@@ -315,10 +336,11 @@ Ltac2 ind_case_mont (ih : ident) (heq : ident) :=
 
 
 
-Ltac2 handle_ind_checkerf (ih : ident) (heqb : ident) := 
+Ltac2 handle_checker_mon_f (ih : ident) (heqb : ident) := 
   first
     [ congruence
-    | let heqb := Fresh.in_goal @heqb in
+    | (* decOpt matching *)
+      let heqb := Fresh.in_goal @heqb in
       match! goal with
       | [ _ :  match ?e with _ => _ end = Some false |- _ ] =>
         (destruct $e as [ [ | ] | ] eqn:$heqb > [ | | congruence ])
@@ -335,11 +357,23 @@ Ltac2 handle_ind_checkerf (ih : ident) (heqb : ident) :=
            let heqb' := Control.hyp heqb in
            rewrite $heqb'; clear $heqb; try reflexivity
         ]
-    | match! goal with
+    | (* input matching *)
+      match! goal with
       | [ _ : match ?e with _ => _ end = Some false |- _ ] =>
         destruct $e; try reflexivity
       end
-
+    | (* enumerating *)
+      eapply enumerating_monotonic >
+      [ now find_size_mon_inst ()
+      | eassumption
+      | intro; simpl_minus_methods (); clear $heqb; intro $heqb
+      | eassumption ]
+    | (* enumeratingOpt *)
+      eapply enumeratingOpt_monotonic >
+      [ now find_size_mon_inst ()
+      | eassumption
+      | intro; simpl_minus_methods (); clear $heqb; intro $heqb
+      | eassumption ]
     ].
 
 
@@ -349,7 +383,7 @@ Ltac2 rec base_case_monf_aux (heqb : ident) (path : unit -> unit) :=
   | [h : List.In _ (Datatypes.cons ?g ?gs) |- _ ] =>
     let h := Control.hyp h in
     first [ (destruct $h > [ eapply checker_backtrack_spec_false in Hdec (* TODO fix name ... *) > [ | path (); now left ];
-                             subst; simpl_minus_decOpt (); now repeat (handle_ind_checkerf @dummy heqb)
+                             subst; simpl_minus_methods (); now repeat (handle_checker_mon_f @dummy heqb)
                            |  base_case_monf_aux heqb (fun _ => path (); right) ] )
           | base_case_monf_aux heqb (fun _ => path (); right) ]
     end.
@@ -376,8 +410,7 @@ Ltac2 rec ind_case_monf_aux (t : unit) (path : unit -> unit) :=
 
 Ltac2 ind_case_monf (ih : ident) (heqb : ident) :=
   (ind_case_monf_aux () (fun _ => ())); subst;
-  simpl_minus_decOpt ();
-  repeat (handle_ind_checkerf ih heqb).
+  repeat (simpl_minus_methods (); handle_checker_mon_f ih heqb).
 
 Ltac2 derive_mon_aux (l : ident list) :=
   (induction s1 as [ | s1 IH1 ];
@@ -417,7 +450,7 @@ Ltac2 derive_mon (_ : unit) :=
     match Constr.Unsafe.kind e with
     | Constr.Unsafe.App ty args  =>
       let l := constrs_to_idents (Array.to_list args) in
-      intros s1 s2 b Hleq; unfold decOpt; simpl_minus_decOpt ();
+      intros s1 s2 b Hleq; unfold decOpt; simpl_minus_methods ();
       assert (Hleq' := &Hleq); revert Hleq Hleq';
       generalize &s1 at 2 3 as s1'; generalize &s2 at 2 3 as s2';
       revert s2 b; revert_params l; derive_mon_aux l
@@ -510,7 +543,7 @@ Ltac2 derive_sound (_ : unit) :=
     match Constr.Unsafe.kind e with
     | Constr.Unsafe.App ty args  =>
       let l := constrs_to_idents (Array.to_list args) in
-      intros s; unfold decOpt; simpl_minus_decOpt ();
+      intros s; unfold decOpt; simpl_minus_methods ();
       (* assert (Hleq' := &Hleq); revert Hleq Hleq'; *)
       generalize &s at 1 as s';
       revert_params l;
@@ -674,7 +707,7 @@ Ltac2 handle_base_case (hmon : constr) := handle_match hmon.
 
 Ltac2 rec solve_ind_case (hmon : constr) (n : int) :=
   first [ now eexists; split > [ intros s; path n; reflexivity | 
-                                 simpl_minus_decOpt (); repeat (handle_match hmon) ]
+                                 simpl_minus_methods (); repeat (handle_match hmon) ]
         | solve_ind_case hmon (Int.add n 1) ].
 
 Ltac2 rec handle_ind_case (hmon : constr) :=
@@ -732,7 +765,7 @@ Ltac2 rec handle_ind_case (hmon : constr) :=
   end.
 
 Ltac2 derive_complete (_ : unit ) := 
-  intros H; unfold decOpt; simpl_minus_decOpt (); 
+  intros H; unfold decOpt; simpl_minus_methods (); 
   prove_mon ();
   let hmon := Control.hyp @Hmon in
   induction H; first [ handle_base_case hmon | handle_ind_case hmon ].

@@ -378,7 +378,7 @@ Qed.
 
 Lemma enumerating_monotonic A (e : E A) {Hc : SizeMonotonic e}
       ch1 ch2 s1 s2 b :
-  s1 <= s2 ->
+  (s1 <= s2)%coq_nat ->
   (forall x, ch1 x = Some b -> ch2 x = Some b) ->
   enumerating e ch1 s1 = Some b ->
   enumerating e ch2 s2 = Some b.
@@ -387,7 +387,7 @@ Admitted.
 
 Lemma enumeratingOpt_monotonic A (e : E (option A)) {Hc : SizeMonotonicOpt e}
       ch1 ch2 s1 s2 b :
-  s1 <= s2 ->
+  (s1 <= s2)%coq_nat ->
   (forall x, ch1 x = Some b -> ch2 x = Some b) ->
   enumeratingOpt e ch1 s1 = Some b ->
   enumeratingOpt e ch2 s2 = Some b.

@@ -62,19 +62,43 @@ Inductive ltest : list nat -> nat -> Prop :=
       ltest [] 0
   | ltestcons :
       forall x m' m l,
-        (* eq (m' + 1) m -> *)
-        In' m' l ->
+        eq (m' + 1) m ->
+        (* In' m' l -> *)
         ltest l m' ->
         ltest (x :: l) m.
+
 
 Derive EnumSizedSuchThat for (fun n => eq x n).
 Derive EnumSizedSuchThat for (fun n => eq n x).
 
+Derive DecOpt for (ltest l n).
+
+
+Instance DecOptltest_listSizeMonotonic l x : DecOptSizeMonotonic (ltest l x).
+Proof. derive_mon (). Qed.
+
+  
+
+Instance DecOptIn'_list_sound A {_ : Enum A} {_ : Dec_Eq A} (x : A) (l : list A) :
+  DecOptSoundPos (In' x l).
+Proof. derive_sound (). Qed.
+
+Instance DecOptIn'_list_complete A {_ : Enum A} {_ : Dec_Eq A} (x : A) (l : list A) :
+  DecOptCompletePos (In' x l).
+Proof. derive_complete (). Qed.
+
+
+
+
+
+
+Set Printing All. 
+
+Derive EnumSizedSuchThat for (fun n => ltest l n).
+
 (* Set Typeclasses Debug. *)
 (* QuickChickDebug Debug On. *)
 
-Derive DecOpt for (ltest l n).
-Derive EnumSizedSuchThat for (fun n => ltest l n).
 (* XXX error *)
 (* Derive EnumSizedSuchThat for (fun l => ltest l n). *)
 
