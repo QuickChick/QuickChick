@@ -897,16 +897,21 @@ Ltac2 rec enumST_complete (ty : constr):=
   let hmons := Control.hyp @_Hmons in
   first
     [ (* return *)
-      now eapply exists_return_Opt
-    | (* match decOpt *)
-      eapply (@exists_match_DecOpt $ty) >
+      subst; now eapply exists_return_Opt
+    | (* match decOpt for eq *)
+      (eapply (@exists_match_DecOpt $ty) > [ | | | now eapply Logic.eq_refl | enumST_complete ty ]) >
       [ (* decOpt mon *) now eauto with typeclass_instances
       | (* decOpt complete *) now eauto with typeclass_instances
       | (* sizedMon *) intros ? ? ? ?; enumST_sized_mon @_Hmons
-      | (* P *) now eauto
       | enumST_complete ty ]
+    | (* match decOpt *)
+      (eapply (@exists_match_DecOpt $ty) > [ | | | | enumST_complete ty ]) >
+      [ (* decOpt mon *) now eauto with typeclass_instances
+      | (* decOpt complete *) now eauto with typeclass_instances
+      | (* sizedMon *) intros ? ? ? ?; enumST_sized_mon @_Hmons
+      | (* P *) now eauto ]
     | (* bindOpt rec call *)
-      eapply exists_bindOpt_Opt_Sized >
+      (eapply exists_bindOpt_Opt_Sized > [ | | | | | now enumST_complete ty ]) >
       [ (* sizedMon *)
         intro; intros; eapply $hmons; ssromega
       | (* sizeMon *) now find_size_mon_inst ()
@@ -914,9 +919,22 @@ Ltac2 rec enumST_complete (ty : constr):=
       | (* sizeMon *) intros ? ?; enumST_size_mon @_Hmon
       | eexists; eexists; split > [ reflexivity
                                   | eapply $hmons > [ eapply Peano.le_n | | eassumption ]; ssromega ]
-      | enumST_complete ty ]
-    | (* bindOpt sized *)
+      ]
+    | (* bindOpt sized eq *)
       eapply exists_bindOpt_Opt_Sized >
+      [ now eauto with typeclass_instances
+      | intros _; now find_size_mon_inst ()
+      | (* sizedMon *) intros ? ? ? ? ?; now enumST_sized_mon @_Hmons
+      | (* sizeMon *) intros ? ?; enumST_size_mon @_Hmon
+      | match! goal with
+      | [ |- exists _, semProdOpt (sizedEnum (@enumSizeST ?t ?pred ?inst)) _ ] =>
+        exists 0; eapply (@size_CorrectST $t $pred E _ _) > [ | | | now eapply Logic.eq_refl ];
+        now eauto with typeclass_instances
+        end
+      | now enumST_complete ty
+      ]
+    | (* bindOpt sized *)
+      (eapply exists_bindOpt_Opt_Sized > [ | | | | | now enumST_complete ty ]) >
       [ now eauto with typeclass_instances
       | intros _; now find_size_mon_inst ()
       | (* sizedMon *) intros ? ? ? ? ?; now enumST_sized_mon @_Hmons
@@ -926,14 +944,14 @@ Ltac2 rec enumST_complete (ty : constr):=
         exists 0; eapply (@size_CorrectST $t $pred E _ _) > [ | | | eassumption ];
         now eauto with typeclass_instances
         end
-      | enumST_complete ty ]
+      ]
     | (* bind *)
       match! goal with
       |  [ |- exists _ : nat, semProdOpt (bindEnum enum _) _ ] =>
          eapply exists_bind_Opt >
          [ now eauto with typeclass_instances
          | now find_size_mon_inst ()
-         | intros ? ?; enumST_size_mon @_Hmon | enumST_complete ty ]
+         | intros ? ?; enumST_size_mon @_Hmon | now enumST_complete ty ]
       end
 
     | ( ) ].

@@ -63,7 +63,7 @@ Inductive ltest : list nat -> nat -> Prop :=
   | ltestcons :
       forall x m' m l,
         (m' + 1) = m ->
-        In' m' l ->
+        (* In' m' l -> *)
         ltest l m' ->
         ltest (x :: l) m.
 
@@ -169,8 +169,6 @@ Proof. derive_enumST_Correct (). Qed.
 Instance EnumSizedSuchThatgoodTree_Correct n :
   CorrectSizedST (goodTree n) (@enumSizeST _ _ (@EnumSizedSuchThatgoodTree n)).
 Proof. derive_enumST_Correct (). Qed.  
-
-
 
 Instance EnumSizedSuchThatbst_Correct n m :
   CorrectSizedST (bst n m) (@enumSizeST _ _ (@EnumSizedSuchThatbst n m)).
