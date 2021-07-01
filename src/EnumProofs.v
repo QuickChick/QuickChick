@@ -239,6 +239,10 @@ Section Lemmas.
 
 End Lemmas.
 
+Ltac2 guarded_subset_refl (_ : unit) :=
+  match! goal with
+  | [ |- ?s \subset ?s ] => now eapply subset_refl
+  end.
 
 (** ** Enum **)
 
@@ -259,7 +263,7 @@ Ltac2 find_size_mon_inst (_ : unit) :=
 Ltac2 rec enum_sized_mon (ih : ident) :=
   first
     [ (* ret *)
-      now eapply subset_refl
+      guarded_subset_refl ()
     | (* bind *)
     eapply (@semBindSize_subset_compat _ _ ProducerSemanticsEnum) >
     [ let x := Fresh.in_goal (id_of_string "x") in
@@ -285,7 +289,7 @@ Ltac2 rec find_enum (_ : unit) :=
 
 Ltac2 base_case_size_mon (_ : unit) :=
   destruct s2 > 
-  [ now eapply subset_refl | simpl_enumSized (); first [ now eapply subset_refl
+  [ guarded_subset_refl () | simpl_enumSized (); first [ guarded_subset_refl ()
                                                        | simpl; rewrite !&Hone; now find_enum () ] ]. 
 
 
@@ -488,14 +492,14 @@ Ltac2 intro_params (pred : constr) :=
   let l := constrs_to_idents args in
   List.iter (fun x => try (intro $x)) (List.rev l).
 
+
+          
 (*** Sized monotonic *) 
 
 Ltac2 rec enumST_sized_mon (ih : ident) :=
   first
     [ (* ret *)
-      match! goal with
-      | [ |- ?s \subset ?s ] => now eapply subset_refl
-      end
+      guarded_subset_refl ()
     | (* dec matching *)
       match! goal with
       | [ |- semProdSizeOpt (match @decOpt ?p ?i ?s1 with _ => _ end) _ \subset
@@ -537,7 +541,7 @@ Ltac2 rec find_enumST (ih : ident) :=
 
 Ltac2 base_case_st_size_mon (s2 : constr) :=
   destruct $s2 > 
-  [ first [ now eapply subset_refl | rewrite !enumerate_correct_size_opt; find_enumST @dummy ]
+  [ first [ guarded_subset_refl () | rewrite !enumerate_correct_size_opt; find_enumST @dummy ]
   | rewrite !enumerate_correct_size_opt; find_enumST @dummy ]. 
 
 Ltac2 ind_case_st_sized_mon (s2 : constr) (ih : ident) :=

@@ -62,7 +62,7 @@ Inductive ltest : list nat -> nat -> Prop :=
       ltest [] 0
   | ltestcons :
       forall x m' m l,
-        (* eq (m' + 1) m -> *)
+        (m' + 1) = m ->
         In' m' l ->
         ltest l m' ->
         ltest (x :: l) m.
