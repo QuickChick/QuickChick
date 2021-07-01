@@ -96,9 +96,22 @@ Section TypeClasses.
     + eapply Hm in Hopt; eauto. congruence.
     + eapply Hm in H0 > [ | eapply PeanoNat.Nat.lt_le_incl; eassumption ].
       congruence.
-  Qed.
+  Qed. 
 
-  
+  Lemma reflect_decOpt (P : Prop) {Hd : Dec P}
+        {Hm : DecOptSizeMonotonic P}
+        {Hc : DecOptCompletePos P}
+        {Hs : DecOptCorrectPos P} s b :
+    decOpt s = Some b ->
+    Bool.reflect P b.
+  Proof.
+    intros Heq.
+    destruct b.
+    - constructor. eapply Hs. eassumption.
+    - constructor. intros HP.
+      eapply decOptSoundNeg in Heq; now eauto.
+  Qed.
+    
 End TypeClasses.
 
 

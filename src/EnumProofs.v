@@ -899,7 +899,7 @@ Ltac2 rec enumST_complete (ty : constr):=
     [ (* return *)
       subst; now eapply exists_return_Opt
     | (* match decOpt for eq *)
-      (eapply (@exists_match_DecOpt $ty) > [ | | | now eapply Logic.eq_refl | enumST_complete ty ]) >
+      (eapply (@exists_match_DecOpt $ty) > [ | | | ltac1:(now eapply Logic.eq_refl) | enumST_complete ty ]) >
       [ (* decOpt mon *) now eauto with typeclass_instances
       | (* decOpt complete *) now eauto with typeclass_instances
       | (* sizedMon *) intros ? ? ? ?; enumST_sized_mon @_Hmons
@@ -928,7 +928,7 @@ Ltac2 rec enumST_complete (ty : constr):=
       | (* sizeMon *) intros ? ?; enumST_size_mon @_Hmon
       | match! goal with
       | [ |- exists _, semProdOpt (sizedEnum (@enumSizeST ?t ?pred ?inst)) _ ] =>
-        exists 0; eapply (@size_CorrectST $t $pred E _ _) > [ | | | now eapply Logic.eq_refl ];
+        exists 0; eapply (@size_CorrectST $t $pred E _ _) > [ | | | ltac1:(now eapply Logic.eq_refl) ];
         now eauto with typeclass_instances
         end
       | now enumST_complete ty
