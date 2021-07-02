@@ -31,6 +31,8 @@ Ltac2 inv := fun (h : ident) =>  inversion h; subst.
 Ltac2 eassumption_ltac2 () := ltac1:(eassumption).
 Ltac2 Notation "eassumption" := eassumption_ltac2 ().
 
+Ltac2 tci_ltac (_ : unit) := now eauto 20 with typeclass_instances.
+Ltac2 Notation "tci" := tci_ltac ().
 
 Ltac2 print_string (s : string) := Message.print (Message.of_string s).
 

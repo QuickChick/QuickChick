@@ -193,6 +193,51 @@ Proof.
     simpl. ssromega. 
 Qed.
 
+(* TODO. These case be derived automatically. Change the default definitions *)
+
+Instance enumListSized_CorrectSized A {_ : EnumSized A} { _ : CorrectSized (@enumSized A _)} :
+  CorrectSized (@enumSized (list A) enumListSized).
+Proof.
+Admitted.       
+
+Instance enumListSized_SizedMonotonic A {_ : EnumSized A} { _ : SizedMonotonic (@enumSized A _)} :
+  SizedMonotonic (@enumSized (list A) enumListSized).
+Proof.
+Admitted.
+
+Instance enumListSized_SizeMonotonic A {_ : EnumSized A} { _ : forall s, SizeMonotonic (@enumSized A _ s)} s :
+  SizeMonotonic (@enumSized (list A) enumListSized s).
+Proof.
+Admitted.
+
+Instance enumPairSized_CorrectSized A {_ : EnumSized A} { _ : CorrectSized (@enumSized A _)}
+  B {_ : EnumSized B} { _ : CorrectSized (@enumSized B _)}:
+  CorrectSized (@enumSized (A * B) enumPairSized).
+Proof.
+Admitted.       
+
+Instance enumPairSized_SizedMonotonic A {_ : EnumSized A} { _ : SizedMonotonic (@enumSized A _)}
+  B {_ : EnumSized B} { _ : SizedMonotonic (@enumSized B _)}:
+  SizedMonotonic (@enumSized (A * B) enumPairSized).
+Proof.
+Admitted.
+
+Instance enumPairSized_SizeMonotonic A {_ : EnumSized A} { _ : forall s, SizeMonotonic (@enumSized A _ s)}
+         B {_ : EnumSized B} { _ : forall s, SizeMonotonic (@enumSized B _ s)} s :
+  SizeMonotonic (@enumSized (A * B) enumPairSized s).
+Proof.
+Admitted.
+
+
+Instance enumBoolSized_SizeMonotonic s:
+  SizeMonotonic (@enumSized _ enumBoolSized s).
+Proof.
+  intros s1 s2 Hleq.
+  assert ( Heq := @semElementsSize E _ _).
+  simpl in *. rewrite Heq.
+  eapply subset_refl.
+Qed.
+
 Instance enumBoolSized_CorrectSized :
   CorrectSized (@enumSized _ enumBoolSized).
 Proof.
@@ -202,10 +247,10 @@ Proof.
   - intros _. 
     destruct t; exists 0; simpl;
     eapply semElements; eauto with typeclass_instances.
-
     now left.
     right. now left.
 Qed.       
+
 
 Instance enumBoolSized_SizedMonotonic :
   SizedMonotonic (@enumSized _ enumBoolSized).
@@ -216,14 +261,6 @@ Proof.
   eapply subset_refl.
 Qed.
 
-Instance enumBoolSized_SizeMonotonic s:
-  SizeMonotonic (@enumSized _ enumBoolSized s).
-Proof.
-  intros s1 s2 Hleq.
-  assert ( Heq := @semElementsSize E _ _).
-  simpl in *. rewrite Heq.
-  eapply subset_refl.
-Qed.
 
 (** Shrinking of nat starts to become annoying *)
 Function shrinkNatAux (x : nat) {measure (fun x => x) x} : list nat :=

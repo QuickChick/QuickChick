@@ -254,9 +254,9 @@ Ltac2 simpl_enumSized (_ : unit) :=
 
 
 Ltac2 find_size_mon_inst (_ : unit) :=
-  first [ now eauto with typeclass_instances
-        | eapply sizedSizeMonotonicOpt; now eauto with typeclass_instances
-        | eapply sizedSizeMonotonic; now eauto with typeclass_instances ].
+  first [ tci
+        | eapply sizedSizeMonotonicOpt; tci
+        | eapply sizedSizeMonotonic; tci ].
 
 (*** Sized Monotonicity *)
 
@@ -290,7 +290,7 @@ Ltac2 rec find_enum (_ : unit) :=
 Ltac2 base_case_size_mon (_ : unit) :=
   destruct s2 > 
   [ guarded_subset_refl () | simpl_enumSized (); first [ guarded_subset_refl ()
-                                                       | simpl; rewrite !&Hone; now find_enum () ] ]. 
+                                                       | rewrite !&Hone; now find_enum () ] ]. 
 
 
 Ltac2 rec enums_sized_mon (ih : ident) :=
@@ -319,11 +319,10 @@ Ltac2 derive_enum_SizedMonotonic (_ : unit) :=
 Ltac2 rec enum_size_mon (ih : ident) :=
   first
     [ (* ret *)
-      eapply returnGenSizeMonotonic;
-      now eauto with typeclass_instances
+      eapply returnGenSizeMonotonic; tci
     | (* bind *)
       eapply bindMonotonic >
-      [ now eauto with typeclass_instances
+      [ tci
       | first
           [ now find_size_mon_inst ()  (* for calls to enum *)
           | let ih' := Control.hyp ih in (* for recursive calls *)
@@ -347,7 +346,7 @@ Ltac2 derive_enum_SizeMonotonic (_ : unit) :=
       induction s as [ | s IHs ];
         simpl_enumSized ();
         first [ eapply oneofMonotonic >  
-                [ now eauto with typeclass_instances
+                [ tci
                 | now enum_size_mon @IHs
                 | now enums_size_mon t @IHs ]
               | now enum_size_mon @IHs ]
@@ -356,13 +355,13 @@ Ltac2 derive_enum_SizeMonotonic (_ : unit) :=
 (*** Correct *) 
 
 Ltac2 find_corr_inst (_ : unit) :=
-  first [ now eauto with typeclass_instances
+  first [ tci
         | match! goal with
           | [ |- Correct ?ty (sizedEnum enumSized) ] =>
             eapply (@EnumCorrectOfSized $ty _) >
-            [ now eauto with typeclass_instances
+            [ tci
             | now find_size_mon_inst ()
-            | now eauto with typeclass_instances ]
+            | tci ]
           end ].
 
 Ltac2 solve_sized_mon (hs : ident) :=
@@ -400,7 +399,7 @@ Ltac2 rec enum_size_correct (_ : unit) :=
       match! goal with
       | [|- exists z, semProd (bindEnum (&_aux_enum z) _) _  ] =>
         eapply exists_bind_Sized_alt >
-        [ now eauto with typeclass_instances
+        [ tci
         | now find_size_mon_inst ()
         | now solve_sized_mon @Hsized
         | now solve_size_mon @Hsize
@@ -434,8 +433,8 @@ Ltac2 derive_enum_Correct (_ : unit) :=
       let hsized := Fresh.in_goal (id_of_string "Hsized") in
       let ind := Fresh.in_goal (id_of_string "t") in
       (* Derive monotonicity instances *)
-      assert ($hsized : SizedMonotonic $en) > [ now eauto with typeclass_instances | ];
-      assert ($hsize : forall s, SizeMonotonic ($en s)) > [ now eauto with typeclass_instances | ];
+      assert ($hsized : SizedMonotonic $en) > [ tci | ];
+      assert ($hsize : forall s, SizeMonotonic ($en s)) > [ tci | ];
       econstructor; intro $ind; split > [ intro; exact I | intros _ ];
       let ind' := Control.hyp ind in
       induction $ind'; eapply exists_Sn; repeat (destructIH ()); simpl_enumSized ();
@@ -581,16 +580,15 @@ Ltac2 derive_enumST_SizedMonotonic (_ : unit) :=
 Ltac2 rec enumST_size_mon (ih : ident) :=
   first
     [ (* ret *)
-      eapply returnGenSizeMonotonicOpt;
-      now eauto with typeclass_instances
+      eapply returnGenSizeMonotonicOpt; tci
     | (* bindOpt *)
       eapply bindOptMonotonicOpt >
-      [ now eauto with typeclass_instances
+      [ tci
       | first
           [ (* for calls to enum in params *)
-            now eauto with typeclass_instances 
+            tci
           | (* for call to existing enum instances. XXX not sure why typeclass resulotion doesn't work *)
-            eapply sizedSizeMonotonicOpt; now eauto with typeclass_instances 
+            eapply sizedSizeMonotonicOpt; tci 
           | (* for recursive calls *)
              let ih' := Control.hyp ih in 
             eapply $ih' ]
@@ -599,12 +597,12 @@ Ltac2 rec enumST_size_mon (ih : ident) :=
       ]
     | (* bind *)
       eapply bindMonotonicOpt >
-      [ now eauto with typeclass_instances
+      [ tci
       | first
           [ (* for calls to enum in params *)
-            now eauto with typeclass_instances 
+            tci 
           | (* for call to existing enum instances. XXX not sure why typeclass resulotion doesn't work *)
-            eapply sizedSizeMonotonic; now eauto with typeclass_instances 
+            eapply sizedSizeMonotonic; tci 
           | (* for recursive calls *)
              let ih' := Control.hyp ih in 
             eapply $ih' ]
@@ -668,7 +666,7 @@ Ltac2 rec enumST_sound (ty : constr) (ih : ident) :=
     destruct (@decOpt $p $i $s) as [ $b | ] eqn:$hdec > [ | now eapply (@semReturnOpt_None E _ _) in $h; inv $h ];
     let b' := Control.hyp b in                                                            
     destruct $b' > [ | now eapply (@semReturnOpt_None E _ _) in $h; inv $h ];
-    eapply (@CheckerProofs.sound $p) in $hdec > [ | now eauto with typeclass_instances ]; enumST_sound ty ih
+    eapply (@CheckerProofs.sound $p) in $hdec > [ | tci ]; enumST_sound ty ih
 
  (* match input *) 
   | [ h : semProdOpt (match ?n with _ => _ end) ?x |- _ ] =>
@@ -690,8 +688,7 @@ Ltac2 rec enumST_sound (ty : constr) (ih : ident) :=
                                        first [ let ih' := Control.hyp ih in eapply $ih' in $h
                                              | match! goal with
                                                | [h : semProdOpt (sizedEnum (@enumSizeST ?t ?pred ?inst)) _ |- _ ] =>
-                                                 eapply (@SuchThatCorrectOfBoundedEnum $t $pred $inst) in $h >
-                                                                                                          [ | now eauto with typeclass_instances |  now eauto with typeclass_instances | now eauto with typeclass_instances ]
+                                                 eapply (@SuchThatCorrectOfBoundedEnum $t $pred $inst) in $h > [ | tci | tci | tci ]
                                                end ];
                                        enumST_sound ty ih
                                      | find_size_mon_inst ()
@@ -900,14 +897,14 @@ Ltac2 rec enumST_complete (ty : constr):=
       subst; now eapply exists_return_Opt
     | (* match decOpt for eq *)
       (eapply (@exists_match_DecOpt $ty) > [ | | | ltac1:(now eapply Logic.eq_refl) | enumST_complete ty ]) >
-      [ (* decOpt mon *) now eauto with typeclass_instances
-      | (* decOpt complete *) now eauto with typeclass_instances
+      [ (* decOpt mon *) tci
+      | (* decOpt complete *) tci
       | (* sizedMon *) intros ? ? ? ?; enumST_sized_mon @_Hmons
       | enumST_complete ty ]
     | (* match decOpt *)
       (eapply (@exists_match_DecOpt $ty) > [ | | | | enumST_complete ty ]) >
-      [ (* decOpt mon *) now eauto with typeclass_instances
-      | (* decOpt complete *) now eauto with typeclass_instances
+      [ (* decOpt mon *) tci
+      | (* decOpt complete *) tci
       | (* sizedMon *) intros ? ? ? ?; enumST_sized_mon @_Hmons
       | (* P *) now eauto ]
     | (* bindOpt rec call *)
@@ -922,34 +919,32 @@ Ltac2 rec enumST_complete (ty : constr):=
       ]
     | (* bindOpt sized eq *)
       eapply exists_bindOpt_Opt_Sized >
-      [ now eauto with typeclass_instances
+      [ tci
       | intros _; now find_size_mon_inst ()
       | (* sizedMon *) intros ? ? ? ? ?; now enumST_sized_mon @_Hmons
       | (* sizeMon *) intros ? ?; enumST_size_mon @_Hmon
       | match! goal with
       | [ |- exists _, semProdOpt (sizedEnum (@enumSizeST ?t ?pred ?inst)) _ ] =>
-        exists 0; eapply (@size_CorrectST $t $pred E _ _) > [ | | | ltac1:(now eapply Logic.eq_refl) ];
-        now eauto with typeclass_instances
+        exists 0; eapply (@size_CorrectST $t $pred E _ _) > [ | | | ltac1:(now eapply Logic.eq_refl) ]; tci
         end
       | now enumST_complete ty
       ]
     | (* bindOpt sized *)
       (eapply exists_bindOpt_Opt_Sized > [ | | | | | now enumST_complete ty ]) >
-      [ now eauto with typeclass_instances
+      [ tci
       | intros _; now find_size_mon_inst ()
       | (* sizedMon *) intros ? ? ? ? ?; now enumST_sized_mon @_Hmons
       | (* sizeMon *) intros ? ?; enumST_size_mon @_Hmon
       | match! goal with
       | [ |- exists _, semProdOpt (sizedEnum (@enumSizeST ?t ?pred ?inst)) _ ] =>
-        exists 0; eapply (@size_CorrectST $t $pred E _ _) > [ | | | eassumption ];
-        now eauto with typeclass_instances
+        exists 0; eapply (@size_CorrectST $t $pred E _ _) > [ | | | eassumption ]; tci
         end
       ]
     | (* bind *)
       match! goal with
       |  [ |- exists _ : nat, semProdOpt (bindEnum enum _) _ ] =>
          eapply exists_bind_Opt >
-         [ now eauto with typeclass_instances
+         [ tci
          | now find_size_mon_inst ()
          | intros ? ?; enumST_size_mon @_Hmon | now enumST_complete ty ]
       end

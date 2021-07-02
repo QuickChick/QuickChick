@@ -334,10 +334,11 @@ Ltac2 rec in_list_last (_ : unit) :=
 Ltac2 simpl_minus_methods (_ : unit) :=
   ltac1:(with_strategy opaque [enumSizeST enum decOpt enumSized] simplstar).
 
+
 Ltac2 find_size_mon_inst (_ : unit) :=
-  first [ now eauto with typeclass_instances
-        | eapply sizedSizeMonotonicOpt; now eauto with typeclass_instances
-        | eapply sizedSizeMonotonic; now eauto with typeclass_instances ].
+  first [ tci
+        | eapply sizedSizeMonotonicOpt; tci
+        | eapply sizedSizeMonotonic; tci ].
 
 Ltac2 handle_checker_mon_t (ih : ident) (heq : ident) := 
   first
@@ -567,9 +568,9 @@ Ltac2 find_CorrectST_inst (_ : unit) :=
   match! goal with
   | [ |- CorrectST _ (sizedEnum (@enumSizeST ?t ?pred ?inst)) ] =>
     eapply (@size_CorrectST $t $pred E _ _) >
-    [ now eauto with typeclass_instances
+    [ tci
     | find_size_mon_inst ()
-    | eauto with typeclass_instances ]
+    | eauto 20 with typeclass_instances ]
   end.
 
 Ltac2 handle_checker_match_sound (ih : ident) (heq : ident) :=
@@ -804,7 +805,7 @@ Ltac2 rec handle_checker (hmon : ident) :=
         | (* enumerating *)
           eapply enumerating_complete' >
           [ now find_size_mon_inst ()
-          | now eauto with typeclass_instances
+          | tci
           | let heq := Fresh.in_goal (id_of_string "_heq") in
             intros ? ? ? ? $heq; 
             now repeat (handle_checker_mon_t hmon heq)
