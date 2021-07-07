@@ -162,7 +162,7 @@ Class GenSizedMonotonic (A : Type) `{GenSized A}
 Class GenSizedSizeMonotonic (A : Type) `{GenSized A}
         `{SizedMonotonic A G arbitrarySized}.
 
-Class GenMonotonic (A : Type) `{Gen A} `{SizeMonotonic A G arbitrary}.
+Class GenMonotonic (A : Type) `{Gen A} `{@SizeMonotonic A G ProducerGen arbitrary}.
 
 (** Monotonicity of size parametric generators *)
 Class EnumSizedMonotonic (A : Type) `{EnumSized A}
@@ -210,7 +210,7 @@ Instance GenSizedMonotonicOfSizeMonotonic
   
 Instance GenMonotonicOfSizeMonotonic
          (A : Type) (Hgen : Gen A) (Hmon : @SizeMonotonic A G ProducerGen arbitrary)
-: @GenMonotonic A Hgen ProducerGen Hmon := {}.
+: @GenMonotonic A Hgen Hmon := {}.
 
 Instance GenSizedCorrectOfSizedCorrect
          (A : Type) (Hgen : GenSized A)
@@ -241,7 +241,7 @@ Instance GenMonotonicOfSized (A : Type)
          `{@GenSizedMonotonic A H PMon}
          `{@GenSizedSizeMonotonic A H ProducerGen PSMon}
   : @GenMonotonic A
-                  (@GenOfGenSized A H) ProducerGen 
+                  (@GenOfGenSized A H) 
                   (@sizedSizeMonotonic G ProducerGen _ A
                                        (@arbitrarySized A H)
                                        PMon PSMon) := {}.

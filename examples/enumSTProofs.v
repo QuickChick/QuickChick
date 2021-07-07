@@ -130,35 +130,19 @@ Inductive bst : nat -> nat -> tree1 -> Prop :=
 Derive DecOpt for (bst min max t).
 
 Derive EnumSizedSuchThat for (fun m => le n m).
-
 Derive EnumSizedSuchThat for (fun t => bst min max t).
 
+Derive ArbitrarySizedSuchThat for (fun m => le n m).
+Derive ArbitrarySizedSuchThat for (fun t => bst min max t).
 
-Instance EnumSizedSuchThatgoodTree_SizedMonotonic n :
-  SizedMonotonicOpt (@enumSizeST _ _ (@EnumSizedSuchThatgoodTree n)).
-Proof. derive_enumST_SizedMonotonic (). Qed.
 
 Instance EnumSizedSuchThatle_SizedMonotonic n :
   SizedMonotonicOpt (@enumSizeST _ _ (@EnumSizedSuchThatle n)).
 Proof. derive_enumST_SizedMonotonic (). Qed.
 
-Instance EnumSizedSuchThatbst_SizedMonotonic min max :
-  SizedMonotonicOpt (@enumSizeST _ _ (@EnumSizedSuchThatbst min max)).
-Proof. derive_enumST_SizedMonotonic (). Qed.  
-
-
-Instance EnumSizedSuchThatgoodTree_SizeMonotonic n :
-  forall s, SizeMonotonicOpt (@enumSizeST _ _ (@EnumSizedSuchThatgoodTree n) s).
-Proof. derive_enumST_SizeMonotonic (). Qed.
-
 Instance EnumSizedSuchThatle_SizeMonotonic n :
   forall s, SizeMonotonicOpt (@enumSizeST _ _ (@EnumSizedSuchThatle n) s).
 Proof. derive_enumST_SizeMonotonic (). Qed.
-
-Instance EnumSizedSuchThatbst_SizeMonotonic min max :
-  forall s, SizeMonotonicOpt (@enumSizeST _ _ (@EnumSizedSuchThatbst min max) s).
-Proof. derive_enumST_SizeMonotonic (). Qed.
-
 
 (* XXX predicate must be eta expanded, otherwise typeclass resolution fails *)
 Instance EnumSizedSuchThatle_Correct n :
@@ -166,9 +150,27 @@ Instance EnumSizedSuchThatle_Correct n :
 Proof. derive_enumST_Correct (). Qed.
 
 
+
+Instance EnumSizedSuchThatgoodTree_SizedMonotonic n :
+  SizedMonotonicOpt (@enumSizeST _ _ (@EnumSizedSuchThatgoodTree n)).
+Proof. derive_enumST_SizedMonotonic (). Qed.
+
+Instance EnumSizedSuchThatgoodTree_SizeMonotonic n :
+  forall s, SizeMonotonicOpt (@enumSizeST _ _ (@EnumSizedSuchThatgoodTree n) s).
+Proof. derive_enumST_SizeMonotonic (). Qed.
+
 Instance EnumSizedSuchThatgoodTree_Correct n :
   CorrectSizedST (goodTree n) (@enumSizeST _ _ (@EnumSizedSuchThatgoodTree n)).
 Proof. derive_enumST_Correct (). Qed.  
+
+
+Instance EnumSizedSuchThatbst_SizedMonotonic min max :
+  SizedMonotonicOpt (@enumSizeST _ _ (@EnumSizedSuchThatbst min max)).
+Proof. derive_enumST_SizedMonotonic (). Qed.  
+
+Instance EnumSizedSuchThatbst_SizeMonotonic min max :
+  forall s, SizeMonotonicOpt (@enumSizeST _ _ (@EnumSizedSuchThatbst min max) s).
+Proof. derive_enumST_SizeMonotonic (). Qed.
 
 Instance EnumSizedSuchThatbst_Correct n m :
   CorrectSizedST (bst n m) (@enumSizeST _ _ (@EnumSizedSuchThatbst n m)).

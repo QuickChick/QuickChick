@@ -356,95 +356,6 @@ Proof.
     inv Hin. split; eauto. eexists. split; eauto. 
 Qed.   
 
-Lemma enumerate_SizeMonotonic (A : Type) (l : list (E (option A))) :
-  l \subset SizeMonotonic ->
-  SizeMonotonic (enumerate l).
-Proof.
-  unfold enumerate. 
-  assert (Datatypes.length l = Datatypes.length l)%coq_nat by reflexivity.  
-  revert H.
-  generalize (Datatypes.length l) at 2 3 4.
-  intros n. revert l. induction n; intros l Heq Hsub.
-  - simpl. now eauto with typeclass_instances.
-  - simpl.
-    eapply bindMonotonicStrong; eauto with typeclass_instances.
-    
-    intros x1 Hin. eapply Enumerators.semChoose in Hin; eauto. simpl in *. 
-    
-    destruct (Enumerators.pickDrop_exists l x1). simpl in *. now ssromega.
-    destruct H. destruct H. destruct H0. destruct H1.
-
-    rewrite H.
-
-    eapply bindMonotonicStrong; eauto with typeclass_instances.
-    
-    intros a Hin'.
-
-    destruct a; eauto with typeclass_instances. 
-
-    eapply returnGenSizeMonotonic; eauto with typeclass_instances.
-
-    assert (Heq' : (n.+1 - 1) = n). { ssromega. }
-
-    rewrite Heq'. eapply IHn. 
-
-    now ssromega.
-
-    eapply subset_trans. eassumption. eassumption.
-Qed.
-
-
-Lemma enumerate_SizeMonotonicOpt (A : Type) (l : list (E (option A))) :
-  l \subset SizeMonotonicOpt ->
-  SizeMonotonicOpt (enumerate l).
-Proof.
-  unfold enumerate. 
-  assert (Datatypes.length l = Datatypes.length l)%coq_nat by reflexivity.  
-  revert H.
-  generalize (Datatypes.length l) at 2 3 4.
-  intros n. revert l. induction n; intros l Heq Hsub.
-  - simpl. now eauto with typeclass_instances.
-  - simpl.
-    intros s1 s2 Hleq.
-    
-    erewrite !semOptBindSize; eauto with typeclass_instances.
-
-    intros x Hin. inv Hin. inv H.
-    eapply Enumerators.semChooseSize in H0; eauto. simpl in *. 
-
-    destruct (Enumerators.pickDrop_exists l x0). simpl in *. now ssromega.
-    destruct H2. destruct H2. destruct H3. destruct H4.
-
-    rewrite H2 in H1. 
-
-    assert (Hbind := @semBindSize E _ _).
-    simpl in *. eapply Hbind in H1.
-
-
-    destruct H1 as [a [Hina Hin2]].
-
-    destruct a.
-
-    + exists x0. split.
-
-      eapply Enumerators.semChooseSize. simpl. now ssromega.
-      simpl. now ssromega.
-
-      rewrite H2.
-
-      eapply Hbind. exists (Some a). split.
-      
-      eapply Hsub in Hina. simpl in Hina. eassumption.
-      eassumption. ssromega.
-
-      assert (Hret := @semReturnSize E _ _).
-      eapply Hret. eapply Hret in Hin2. eassumption.
-
-    + replace (n.+1 - 1) with n in * by ssromega.
-      admit.
-      (* TODO need lemma about pickDrop *) 
-Admitted.
-
 
 Lemma enumerate_correct_size_opt {A} (lst : list (E (option A))) s :
   semProdSizeOpt (enumerate lst) s <--> \bigcup_(x in lst) (semProdSizeOpt x s).
@@ -484,6 +395,56 @@ Proof.
     eapply (@enumerate_correct_size_opt A) in Hin.
     eexists. split; eauto. 
 Qed.       
+
+
+
+Lemma enumerate_SizeMonotonicOpt (A : Type) (l : list (E (option A))) :
+  l \subset SizeMonotonicOpt ->
+  SizeMonotonicOpt (enumerate l).
+Proof.
+  intros Hin. intros s1 s2 Hleq.
+  rewrite !enumerate_correct_size_opt.
+  intros x Hin'.  destruct Hin' as [e [Hl Hs]].
+  eexists. split; eauto. eapply Hin; eauto. 
+Qed.
+
+Lemma enumerate_SizeMonotonic (A : Type) (l : list (E (option A))) :
+  l \subset SizeMonotonic ->
+  SizeMonotonic (enumerate l).
+Proof.
+  unfold enumerate. 
+  assert (Datatypes.length l = Datatypes.length l)%coq_nat by reflexivity.  
+  revert H.
+  generalize (Datatypes.length l) at 2 3 4.
+  intros n. revert l. induction n; intros l Heq Hsub.
+  - simpl. now eauto with typeclass_instances.
+  - simpl.
+    eapply bindMonotonicStrong; eauto with typeclass_instances.
+    
+    intros x1 Hin. eapply Enumerators.semChoose in Hin; eauto. simpl in *. 
+    
+    destruct (Enumerators.pickDrop_exists l x1). simpl in *. now ssromega.
+    destruct H. destruct H. destruct H0. destruct H1.
+
+    rewrite H.
+
+    eapply bindMonotonicStrong; eauto with typeclass_instances.
+    
+    intros a Hin'.
+
+    destruct a; eauto with typeclass_instances. 
+
+    eapply returnGenSizeMonotonic; eauto with typeclass_instances.
+
+    assert (Heq' : (n.+1 - 1) = n). { ssromega. }
+
+    rewrite Heq'. eapply IHn. 
+
+    now ssromega.
+
+    eapply subset_trans. eassumption. eassumption.
+Qed.
+
 
 Fixpoint lazylist_backtrack {A} (l : LazyList A) (f : A -> option bool) (anyNone : bool) : option bool :=
   match l with

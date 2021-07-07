@@ -365,17 +365,15 @@ Ltac2 find_corr_inst (_ : unit) :=
           end ].
 
 Ltac2 solve_sized_mon (hs : ident) :=
-  let t := Fresh.in_goal (id_of_string "t") in
-  let s := Fresh.in_goal (id_of_string "s") in
-  let s1 := Fresh.in_goal (id_of_string "s1") in
-  let s2 := Fresh.in_goal (id_of_string "s2") in
-  let hleq := Fresh.in_goal (id_of_string "Hleq") in
-  intros $t $s $s1 $s2 $hleq; now enum_sized_mon hs.      
+  (* let t := Fresh.in_goal (id_of_string "t") in *)
+  (* let s := Fresh.in_goal (id_of_string "s") in *)
+  (* let s1 := Fresh.in_goal (id_of_string "s1") in *)
+  (* let s2 := Fresh.in_goal (id_of_string "s2") in *)
+  (* let hleq := Fresh.in_goal (id_of_string "Hleq") in *)
+  intros ? ? ? ? ?; now enum_sized_mon hs.      
 
 Ltac2 solve_size_mon (hs : ident) :=
-  let t := Fresh.in_goal (id_of_string "t") in
-  let s := Fresh.in_goal (id_of_string "s") in
-  intros $t $s; now enum_size_mon hs.      
+  intros ? ?; now enum_size_mon hs.      
 
 Ltac2 if_exists tac :=
   match! goal with
@@ -550,7 +548,7 @@ Ltac2 ind_case_st_sized_mon (s2 : constr) (ih : ident) :=
 Ltac2 derive_enumST_SizedMonotonic (_ : unit) :=
   match! goal with
   | [ |- SizedMonotonicOpt (@enumSizeST ?typ ?pred ?inst) ] =>
-    assert (Henum := @enumerate_correct_size $typ);
+    (* assert (Henum := @enumerate_correct_size $typ); *)
       
     let s := Fresh.in_goal (id_of_string "s") in
     let s1 := Fresh.in_goal (id_of_string "s1") in

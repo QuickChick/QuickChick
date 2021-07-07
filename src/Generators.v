@@ -714,7 +714,157 @@ Proof.
 Qed.
 
 End FrequencyProof.  
+
+Lemma backtrack_correct_size_opt {A} (lst : list (nat * G (option A))) s :
+  semProdSizeOpt (backtrack lst) s <-->
+  \bigcup_(x in lst :&: (fun x => x.1 <> 0)) (fun g => semProdSizeOpt (snd g) s) x.  
+Proof.
+  unfold backtrack.
+  assert (Hret := @semReturnSize G _ _ (option A)).
+  assert (Hbind := @semBindSize G _ _). simpl in *. 
   
+
+  assert (sum_fst lst = sum_fst lst)%coq_nat by reflexivity.  
+  revert H.
+  assert (Datatypes.length lst = Datatypes.length lst)%coq_nat by reflexivity.  
+  revert H.
+  
+  generalize (sum_fst lst) at 1 3.
+  generalize (Datatypes.length lst) at 1 3.
+  
+  intros n1. generalize lst. induction n1; intros l n2 Heq1 Heq2.
+  - simpl. intros x; split; intros Hin.
+    + eapply semReturnSizeOpt_None in Hin; eauto with typeclass_instances. inv Hin.
+    + inv Hin. inv H. destruct l; try (simpl in *; congruence). inv H0.
+      inv H2.
+  - intros x; split; intros Hin.
+    + with_strategy opaque [pickDrop] (simpl in Hin). 
+      
+      eapply Hbind in Hin.
+      inv Hin. inv H.
+      
+      eapply semChooseSize in H0; eauto. simpl in *.
+      
+    (*   destruct (pickDrop_exists l x). simpl in *. destruct H4.       *)
+
+    (*   now lia. *)
+    (*   destruct H1. destruct H4. destruct H4. destruct H6. destruct H7. *)
+      
+    (*   rewrite H4 in H3. *)
+      
+    (*   eapply Hbind in H3. *)
+    (*   destruct H2. destruct H3. destruct H2. *)
+    (*   destruct x2. *)
+      
+      
+    (*   -- eapply Hret in H3. *)
+    (*      inv H3. *)
+         
+    (*      eexists. split.  eassumption. *)
+    (*      constructor; eauto. *)
+         
+    (*   -- assert (Hsem : (isSome :&: semProdSize *)
+    (*                             (enumerateFuel n (n.+1 - 1) *)
+    (*                                            x1) s) (Some a)). *)
+    (*      { split; eauto. } *)
+         
+    (*      assert (Heq' : (n.+1 - 1) = n). *)
+    (*      { ssromega. } *)
+         
+    (*      rewrite Heq' in Hsem. *)
+    (*      eapply IHn in Hsem. *)
+    (*      inv Hsem. destruct H9. *)
+    (*      eexists. split. *)
+    (*      eapply H8. eassumption.  *)
+    (*      eassumption. *)
+    (*      ssromega.  *)
+    (* + inv Hin. inv H. inv H1. destruct x; try (now exfalso; eauto). *)
+    (*   constructor. now eauto. *)
+    (*   simpl.  *)
+    (*   eapply Hbind. *)
+      
+    (*   destruct (pickDrop_In _ _ H0). destruct H4. *)
+    (*   destruct H4. *)
+      
+    (*   exists x. split. *)
+    (*   eapply Enumerators.semChooseSize; eauto. *)
+    (*   simpl. now ssromega.  *)
+
+    (*   rewrite H4. *)
+    (*   eapply Hbind. *)
+
+    (*   exists (Some a). split. *)
+    (*   eassumption. *)
+    (*   eapply Hret. reflexivity.  *)
+Admitted. (* TODO bring back to life *)       
+
+
+Lemma backtrack_correct_opt {A} (lst : list (nat * G (option A))) :
+  semProdOpt (backtrack lst) <--> \bigcup_(x in lst :&: fun x => x.1 <> 0) (semProdOpt x.2). 
+Proof.
+  split; intros H.
+  - inv H. inv H0.
+    assert (Hin : semProdSizeOpt (backtrack lst) x a).
+    { eassumption. }
+    eapply (@backtrack_correct_size_opt A) in Hin.
+    inv Hin. inv H3.
+    eexists. split; eauto. eexists. split; eauto.
+  - destruct H. destruct H. destruct H0. destruct H0.
+    destruct x. simpl in *. inv H. simpl in *.
+    assert (Hin :  (\bigcup_(x in lst :&: fun x => x.1 <> 0) (semProdSizeOpt x.2 x0)) a).
+    { eexists. split; eauto. }
+    eapply (@backtrack_correct_size_opt A) in Hin.
+    eexists. split; eauto. 
+Qed.
+
+Lemma backtrack_SizeMonotonicOpt (A : Type) (l : list (nat * G (option A))) :
+  l \subset (fun x => SizeMonotonicOpt x.2) ->
+  SizeMonotonicOpt (backtrack l).
+Proof.
+  intros Hin. intros s1 s2 Hleq.
+  rewrite !backtrack_correct_size_opt.
+  intros x Hin'.  destruct Hin' as [e [Hl Hs]].
+  eexists. split; eauto. eapply Hin; inv Hl; eauto.  
+Qed.
+
+Lemma enumerate_SizeMonotonic (A : Type) (l : list (nat * G (option A))) :
+  l \subset (fun x => SizeMonotonic x.2) ->
+  SizeMonotonic (backtrack l).
+Proof.
+(*   unfold backtrack.  *)
+(*   assert (Datatypes.length l = Datatypes.length l)%coq_nat by reflexivity.   *)
+(*   revert H. *)
+(*   generalize (Datatypes.length l) at 2 3 4. *)
+(*   intros n. revert l. induction n; intros l Heq Hsub. *)
+(*   - simpl. now eauto with typeclass_instances. *)
+(*   - simpl. *)
+(*     eapply bindMonotonicStrong; eauto with typeclass_instances. *)
+    
+(*     intros x1 Hin. eapply Enumerators.semChoose in Hin; eauto. simpl in *.  *)
+    
+(*     destruct (Enumerators.pickDrop_exists l x1). simpl in *. now ssromega. *)
+(*     destruct H. destruct H. destruct H0. destruct H1. *)
+
+(*     rewrite H. *)
+
+(*     eapply bindMonotonicStrong; eauto with typeclass_instances. *)
+    
+(*     intros a Hin'. *)
+
+(*     destruct a; eauto with typeclass_instances.  *)
+
+(*     eapply returnGenSizeMonotonic; eauto with typeclass_instances. *)
+
+(*     assert (Heq' : (n.+1 - 1) = n). { ssromega. } *)
+
+(*     rewrite Heq'. eapply IHn.  *)
+
+(*     now ssromega. *)
+
+(*     eapply subset_trans. eassumption. eassumption. *)
+(* Qed. *)
+Admitted. (* TODO bring back to life *)
+
 (* Backwards compatibility. *)
 Definition elements := @elems_ G ProducerGen.
 Definition liftGen := @liftM G (@super _ ProducerGen).

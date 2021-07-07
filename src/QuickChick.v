@@ -54,6 +54,7 @@ Require Export Typeclasses.
 Require Export Mutation.
 Require Export CheckerProofs.
 Require Export EnumProofs.
+Require Export GenProofs.
 
 Global Unset Asymmetric Patterns.
 Global Set Bullet Behavior "Strict Subproofs".
