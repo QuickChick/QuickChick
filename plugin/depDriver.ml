@@ -296,10 +296,10 @@ let dep_dispatch ind class_name : unit =
     (* Extract (x1,x2,...) if any, P and arguments *)
     let (letbindsM, constructor, args) =
       match body with 
-      | { CAst.v = CApp ((_flag, constructor), args); _ } -> (None, constructor, args)
+      | { CAst.v = CApp (constructor, args); _ } -> (None, constructor, args)
       | { CAst.v = CLetTuple (name_list, _,
                               _shouldbeid,
-                              { CAst.v = CApp ((_flag, constructor), args); _ } ); _} ->
+                              { CAst.v = CApp (constructor, args); _ } ); _} ->
          ( Some (List.map (function { CAst.v = name; _ } -> name ) name_list), constructor, args )
     in
 
@@ -359,7 +359,7 @@ let dep_dispatch ind class_name : unit =
     derive_dependent class_name constructor init_umap init_tmap
       input_names input_ranges
       (ty_ctr, ty_params, ctrs, dep_type) letbinds idu 
-  | { CAst.v = CApp ((_flag, constructor), args); _ } ->
+  | { CAst.v = CApp (constructor, args); _ } ->
 
      msg_debug (str "Parsing constructor information for checker" ++ fnl ());
      
