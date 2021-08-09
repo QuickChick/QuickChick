@@ -560,7 +560,7 @@ let coerce_reference_to_dep_dt c =
 let gApp ?explicit:(expl=false) c cs =
   if expl then
     let f c = match c with
-    | CRef (r,_) -> CAppExpl ((None, r, None), cs)
+    | CRef (r,_) -> CAppExpl ((r, None), cs)
     | _ -> failwith "invalid argument to gApp"
     in CAst.map f c
   else mkAppC (c, cs)
