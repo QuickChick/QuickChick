@@ -560,7 +560,7 @@ let coerce_reference_to_dep_dt c =
 let gApp ?explicit:(expl=false) c cs =
   if expl then
     let f c = match c with
-    | CRef (r,_) -> CAppExpl ((r, None), cs)
+    | CRef (r,_) -> Compat._CAppExpl (r, cs)
     | _ -> failwith "invalid argument to gApp"
     in CAst.map f c
   else mkAppC (c, cs)
@@ -945,8 +945,7 @@ let declare_class_instance ?(global=true) ?(priority=42) instance_arguments inst
   msg_debug (str "Calculated instance_type_vars" ++ fnl ());
   let instance_record_vars = instance_record vars in
   msg_debug (str "Calculated instance_record_vars" ++ fnl ());
-  let locality = if global then Hints.SuperGlobal else Hints.Local in
-  let cid = Compat.new_instance ~locality ~poly:false
+  let cid = Compat.new_instance ~global ~poly:false
               (CAst.make @@ Name (Id.of_string instance_name), None) iargs
               instance_type_vars
               (true, instance_record_vars) (* TODO: true or false? *)

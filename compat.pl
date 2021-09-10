@@ -15,7 +15,7 @@ use File::Basename;
 my $coq_version = `coqc -print-version`;
 $coq_version =~ s/([\d.]+).*/$1/;
 
-if ($coq_version lt '8.11' || '8.14' le $coq_version) {
+if ($coq_version lt '8.11' || '8.15' le $coq_version) {
   print STDERR "Warning: This version of Coq is not supported: $coq_version";
   print STDERR "Currently supported versions of Coq: 8.13, 8.12, 8.11.\n"
 }
@@ -77,22 +77,38 @@ let extern_constr_ e evd evar = Constrextern.extern_constr false e evd (EConstr.
 
   }
 
-  if ('8.14' le $coq_version) {
+  if ('8.15' le $coq_version) {
     $compat_ml .= "
-let new_instance = Classes.new_instance
-"
+let new_instance ~global = Classes.new_instance ~locality:(if global then Hints.SuperGlobal else Hints.Local)
+";
+  } elsif ('8.14' le $coq_version) {
+    $compat_ml .= "
+let new_instance ~global = Classes.new_instance ~locality:(if global then Goptions.OptGlobal else Goptions.OptLocal)
+";
   } else {
     $compat_ml .= "
-let new_instance ~locality =
-  let global = locality <> Goptions.OptLocal in
-  Classes.new_instance ~global
-"
+let new_instance = Classes.new_instance
+";
+  }
+
+  if ('8.15' le $coq_version) {
+    $compat_ml .= "
+let _CApp (x, y) = Constrexpr.CApp(x, y)
+let _CAppExpl (x, y) = Constrexpr.CAppExpl((x, None), y)
+let fromCApp1 x = x (* Compatibility projection from CApp's first field *)
+";
+  } else {
+    $compat_ml .= "
+let _CApp (x, y) = Constrexpr.CApp((None, x), y)
+let _CAppExpl (x, y) = Constrexpr.CAppExpl((None, x, None), y)
+let fromCApp1 (_, x) = x
+";
   }
 
   return $compat_ml;
 }
 
-# Generate file src/ExtractionQCCompat.ml
+# Generate file src/ExtractionQCCompat.v
 sub extractionqccompat_v {
   # Hexadecimal.int and Numeral.int don't exist before 8.11
   if ($coq_version lt '8.12') {

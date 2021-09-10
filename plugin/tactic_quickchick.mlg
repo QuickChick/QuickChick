@@ -8,8 +8,6 @@ DECLARE PLUGIN "quickchick_plugin"
 
 {
 
-open Constrexpr
-
 let quickchick_goal =
   Proofview.Goal.enter begin fun gl ->
 
@@ -29,8 +27,8 @@ let quickchick_goal =
 
     (* Construct : show (quickCheck (_ : ct)) *)
     let qct =
-      (CAst.make @@ CApp(QuickChick.quickCheck, [ct, None])) in    
-    let sqct = CAst.make @@ CApp(QuickChick.show, [(qct,None)]) in
+      (CAst.make @@ Compat._CApp(QuickChick.quickCheck, [ct, None])) in
+    let sqct = CAst.make @@ Compat._CApp(QuickChick.show, [(qct,None)]) in
 
     Printf.printf "So far so good2\n"; flush stdout;
 
@@ -72,7 +70,7 @@ let quickchick_goal =
                        ))) in
 
     let s = QuickChick.runTest
-            (CAst.make @@ CApp(QuickChick.quickCheck, [CAst.make @@ CRef (Libnames.qualid_of_ident tmpid,None), None])) in
+            (CAst.make @@ Compat._CApp(QuickChick.quickCheck, [CAst.make @@ CRef (Libnames.qualid_of_ident tmpid,None), None])) in
     (* I need to create an existential of type Checkable ct, and then
        call QuickChick.quickChick on that in the ast, before running
        QuickChick.runTest on the constr_expr. *)

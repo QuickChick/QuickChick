@@ -296,11 +296,11 @@ let dep_dispatch ind class_name : unit =
     (* Extract (x1,x2,...) if any, P and arguments *)
     let (letbindsM, constructor, args) =
       match body with 
-      | { CAst.v = CApp (constructor, args); _ } -> (None, constructor, args)
+      | { CAst.v = CApp (constructor, args); _ } -> (None, Compat.fromCApp1 constructor, args)
       | { CAst.v = CLetTuple (name_list, _,
                               _shouldbeid,
                               { CAst.v = CApp (constructor, args); _ } ); _} ->
-         ( Some (List.map (function { CAst.v = name; _ } -> name ) name_list), constructor, args )
+         ( Some (List.map (function { CAst.v = name; _ } -> name ) name_list), Compat.fromCApp1 constructor, args )
     in
 
     (* Parse the constructor's information into the more convenient generic-lib representation *)
@@ -360,6 +360,7 @@ let dep_dispatch ind class_name : unit =
       input_names input_ranges
       (ty_ctr, ty_params, ctrs, dep_type) letbinds idu 
   | { CAst.v = CApp (constructor, args); _ } ->
+    let constructor = Compat.fromCApp1 constructor in
 
      msg_debug (str "Parsing constructor information for checker" ++ fnl ());
      
