@@ -127,6 +127,12 @@ workflows:
           name: Dune 8.13
           coq: 8.13-ocaml-4.11-flambda
       - opam:
+          name: OPAM 8.14
+          coq: 8.14-ocaml-4.12-flambda
+      - dune:
+          name: Dune 8.14
+          coq: 8.14-ocaml-4.12-flambda
+      - opam:
           name: OPAM dev
           coq: dev-ocaml-4.11-flambda
       - dune:
