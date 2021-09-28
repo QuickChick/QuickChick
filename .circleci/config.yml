@@ -24,6 +24,7 @@ commands:
     - run:
         name: Install dependencies
         command: |
+            opam update
             opam repo add coq-extra-dev https://coq.inria.fr/opam/extra-dev
             opam install --deps-only .
     - run:
@@ -77,7 +78,8 @@ commands:
           PINS=$(echo `opam list -s --pinned --columns=package` | sed 's/ /,/g')
           PACKAGES=`opam list -s --depends-on coq-quickchick --coinstallable-with $PINS`
           if ! [ -z "$PACKAGES" ]
-          then opam install -t $PACKAGES
+          then opam install --deps-only $PACKAGES || DEPS_FAILED=true
+               [ -n "$DEPS_FAILED" ] || opam install -t $PACKAGES
           fi
   remove:
     steps:
