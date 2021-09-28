@@ -2,7 +2,7 @@
  (package quickchick)
  (name quickChickTool)
  (public_name quickChick)
- (libraries unix))
+ (libraries unix str))
 
 (ocamllex quickChickToolLexer)
 (menhir (modules quickChickToolParser))
