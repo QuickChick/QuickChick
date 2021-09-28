@@ -77,10 +77,11 @@ commands:
         command: |
           PINS=$(echo `opam list -s --pinned --columns=package` | sed 's/ /,/g')
           PACKAGES=`opam list -s --depends-on coq-quickchick --coinstallable-with $PINS`
-          if ! [ -z "$PACKAGES" ]
-          then opam install --deps-only $PACKAGES || DEPS_FAILED=true
-               [ -n "$DEPS_FAILED" ] || opam install -t $PACKAGES
-          fi
+          for PACKAGE in $PACKAGES
+          do DEPS_FAILED=false
+             opam install --deps-only $PACKAGE || DEPS_FAILED=true
+             [ $DEPS_FAILED == true ] || opam install -t $PACKAGE
+          done
   remove:
     steps:
     - run:
