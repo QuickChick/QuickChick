@@ -73,7 +73,6 @@ let rec mkdir_ dname =
 let temp_dirname =
   let dname = Filename.(concat (get_temp_dir_name ()) "QuickChick") in
   mkdir_ dname;
-  Filename.set_temp_dir_name dname;
   dname
 
 (* let link_files = ["quickChickLib.cmx"]*)
