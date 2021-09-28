@@ -46,7 +46,7 @@ uninstall:
 quickChickTool: $(QCTOOL_DIR)/$(QCTOOL_EXE)
 
 $(QCTOOL_DIR)/$(QCTOOL_EXE): $(QCTOOL_SRC)
-	cd $(QCTOOL_DIR); ocamlbuild -pkg unix -use-ocamlfind $(QCTOOL_EXE)
+	cd $(QCTOOL_DIR); ocamlbuild -pkg str -pkg unix -use-ocamlfind $(QCTOOL_EXE)
 
 tests:
 	$(MAKE) -C examples tutorial
