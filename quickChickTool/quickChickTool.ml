@@ -2,6 +2,33 @@ open QuickChickToolLexer
 open QuickChickToolParser
 open QuickChickToolTypes
 
+(* Utilities *)
+
+(* Apply a function for every file in a directory *)
+let for_all_files d f =
+  let files = Sys.readdir d in
+  Array.iter (fun file -> f (d ^ "/" ^ file)) files
+
+(* Rewrite a file line by line *)
+let sed_file file f =
+  let src = open_in file in
+  let tmpfile = file ^ ".tmp" in
+  let tmp = open_out tmpfile in
+  let rec go () =
+    match input_line src with
+    | line -> output_string tmp (f line); output_char tmp '\n'; go ()
+    | exception End_of_file ->
+        close_in src;
+        close_out tmp;
+        Sys.rename tmpfile file
+  in go ()
+
+(* [String.ends_with] only available since 4.13.0 *)
+let ends_with ~suffix s =
+  let n = String.length s in
+  let nsuff = String.length suffix in
+  nsuff <= n && String.sub s (n - nsuff) nsuff = suffix
+
 (* ----------------------------------------------------------------- *)
 (* Command-line *)
 
@@ -360,12 +387,7 @@ let run_and_show_output_on_failure command msg =
     else
       failwith msg
 
-let perl_hack () =
-  let perl_cmd = "perl -i -p0e 's/type int =\\s*int/type tmptmptmp = int\\ntype int = tmptmptmp/sg' " in
-  let hack_mli = perl_cmd ^ "*.mli" in
-  let hack_ml = perl_cmd ^ "*.ml" in
-  if Sys.command hack_mli <> 0 || Sys.command hack_ml <> 0 then
-    debug "perl script hack failed. Report: %s" perl_cmd
+let tmp_int_re = Str.regexp "type int =[ ]*int"
 
 let string_of_process_status = function
   | Unix.WEXITED i -> Printf.sprintf "EXIT %d" i
@@ -385,7 +407,12 @@ let compile_and_run where e : unit =
 
   system !compile_command;
 
-  perl_hack ();
+  for_all_files (Sys.getcwd ()) (fun file ->
+    if ends_with ~suffix:".ml" file || ends_with ~suffix:".mli" file then
+    sed_file file (fun line ->
+      if Str.string_match tmp_int_re line 0 then
+        "type tmptmptmp = int;; type int = tmptmptmp"
+      else line));
 
   let ocamlbuild_cmd =
     Printf.sprintf "ocamlbuild %s %s.native"

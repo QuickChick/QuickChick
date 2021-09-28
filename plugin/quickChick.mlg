@@ -79,6 +79,20 @@ let temp_dirname =
 (* let link_files = ["quickChickLib.cmx"]*)
 let link_files = []
 
+(* Rewrite a file line by line *)
+let sed_file file f =
+  let src = open_in file in
+  let tmpfile = file ^ ".tmp" in
+  let tmp = open_out tmpfile in
+  let rec go () =
+    match input_line src with
+    | line -> output_string tmp (f line); output_char tmp '\n'; go ()
+    | exception End_of_file ->
+        close_in src;
+        close_out tmp;
+        Sys.rename tmpfile file
+  in go ()
+
 (* TODO: in Coq 8.5, fetch OCaml's path from Coq's configure *)
 (* FIX: There is probably a more elegant place to put this flag! *)
 let ocamlopt = "ocamlopt -unsafe-string"
@@ -137,6 +151,8 @@ let new_ml_file () : string =
   mkdir_ temp_dir;
   Filename.temp_file ~temp_dir "QuickChick" ".ml"
 
+let tmp_int_re = Str.regexp "type int =[ ]*int"
+
 let define_and_run c env evd =
   (* Extract the term and its dependencies *)
   let main = define c env evd in
@@ -166,11 +182,14 @@ let define_and_run c env evd =
   let open_cmd s = Printf.sprintf "awk -v n=1 -v s=\"open %s\" 'NR == n {print s} {print}' %s > __qc_tmp; mv __qc_tmp %s" s mlf mlf in
   List.iter (fun s -> ignore (Sys.command (open_cmd s))) !modules_to_open;
   
-  (* Before compiling, remove stupid cyclic dependencies like "type int = int".
+  (* Before compiling, fix stupid cyclic dependencies like "type int = int".
+     Introduced by "Definition int := int." possibly inside a module, so just
+     removing it might break other definitions that depend on it.
      TODO: Generalize (.) \g1\b or something *)
-  let perl_cmd = "perl -i -p0e 's/type int =\\s*int/type tmptmptmp = int\\ntype int = tmptmptmp/sg' " ^ mlf in
-  if Sys.command perl_cmd <> 0 then
-    CErrors.user_err (str ("perl script hack failed. Report: " ^ perl_cmd)  ++ fnl ());
+  sed_file mlf (fun line ->
+    if Str.string_match tmp_int_re line 0 then
+      "type tmptmptmp = int;; type int = tmptmptmp"
+    else line);
   (* Compile the extracted code *)
   (* Extraction sometimes produces ML code that does not implement its interface.
      We circumvent this problem by erasing the interface. **)
