@@ -10,7 +10,6 @@ open Constrexpr
 open Error
 open Stdarg
 
-let message = "QuickChick"
 let mk_ref s = CAst.make @@ CRef (qualid_of_string s, None)
 
 (* Names corresponding to QuickChick's .v files *)
@@ -40,24 +39,6 @@ let set_dune_file s = dune_file := Some s
 let modules_to_open : string list ref =
   Summary.ref ~name:"QC_modules_to_open" empty_slist
 let add_module_to_open s = modules_to_open := s :: !modules_to_open  
-                    
-(* Locate QuickChick's files *)
-(* The computation is delayed because QuickChick's libraries are not available
-when the plugin is first loaded. *)
-(* For trunk and forthcoming Coq 8.5: *)
-let qid = Libnames.make_qualid (DirPath.make [Id.of_string "QuickChick"]) (Id.of_string "QuickChick")
-			       (*
-let qid = qualid_of_string "QuickChick.QuickChick"
-				*)
-let path =
-  lazy (
-    match Loadpath.locate_qualified_library ~warn:false qid with
-    | Ok (_,_,path) -> path
-    | Error _ ->
-      CErrors.user_err (Pp.str "cannot locate QuickChick Coq library")
-  )
-
-let path = lazy (Filename.dirname (Lazy.force path))
 
 (* [mkdir -p]: recursively make the parent directories if they do not exist. *)
 let rec mkdir_ dname =
@@ -75,9 +56,6 @@ let temp_dirname =
   mkdir_ dname;
   dname
 
-(* let link_files = ["quickChickLib.cmx"]*)
-let link_files = []
-
 (* Rewrite a file line by line *)
 let sed_file file f =
   let src = open_in file in
@@ -91,31 +69,6 @@ let sed_file file f =
         close_out tmp;
         Sys.rename tmpfile file
   in go ()
-
-(* TODO: in Coq 8.5, fetch OCaml's path from Coq's configure *)
-(* FIX: There is probably a more elegant place to put this flag! *)
-let ocamlopt = "ocamlopt -unsafe-string"
-let ocamlc = "ocamlc -unsafe-string"
-
-let comp_ml_cmd fn out =
-  let path = Lazy.force path in
-  let link_files = List.map (Filename.concat path) link_files in
-  let link_files = String.concat " " link_files in
-  Printf.sprintf "%s -rectypes -w a -I %s -I %s %s %s -o %s" ocamlopt
-    (Filename.dirname fn) path link_files fn out
-
-(*
-let comp_mli_cmd fn =
-  Printf.sprintf "%s -rectypes -I %s %s" ocamlc (Lazy.force path) fn
- *)
-
-let comp_mli_cmd fn =
-  let path = Lazy.force path in
-  let link_files = List.map (Filename.concat path) link_files in
-  let link_files = String.concat " " link_files in
-  Printf.sprintf "%s -rectypes -w a -I %s -I %s %s %s" ocamlopt
-    (Filename.dirname fn) path link_files fn
-
 
 let fresh_name n =
     let base = Id.of_string n in
@@ -278,7 +231,13 @@ let runTest c env evd : unit =
   (* [c] is a constr_expr representing the test to run,
      so we first build a new constr_expr representing
      show c **)
-  let c = CAst.make @@ Compat._CApp(show, [(c,None)]) in
+  let c = CAst.make @@
+#if COQ_VERSION >= (8, 15, 0)
+    CApp (show, [(c, None)])
+#else
+    CApp ((None, show), [(c, None)])
+#endif
+  in
   (* Build the kernel term from the const_expr *)
 
   (*  Printf.printf "Before interp constr\n"; flush stdout; *)
@@ -298,7 +257,13 @@ let run f args =
   | _ -> failwith "run called with no arguments"
   end;
   let args = List.map (fun x -> (x,None)) args in
-  let c = CAst.make @@ Compat._CApp(f, args) in
+  let c = CAst.make @@
+#if COQ_VERSION >= (8, 15, 0)
+    CApp (f, args)
+#else
+    CApp ((None, f), args)
+#endif
+  in
   runTest c env evd
 
 let set_debug_flag (flag_name : string) (mode : string) =
@@ -349,12 +314,12 @@ END
 
 VERNAC COMMAND EXTEND MutateCheckMany CLASSIFIED AS SIDEFF
   | ["MutateCheckMany" constr(c1) constr(c2)] ->     {run mutateCheckMany [c1;c2]}
-  | ["MutateCheckManyWith" constr(c1) constr(c2) constr(c3)] ->     {run mutateCheckMany [c1;c2;c3]}
+  | ["MutateCheckManyWith" constr(c1) constr(c2) constr(c3)] ->     {run mutateCheckManyWith [c1;c2;c3]}
 END
 
 VERNAC COMMAND EXTEND MutateChickMany CLASSIFIED AS SIDEFF
   | ["MutateChickMany" constr(c1) constr(c2)] ->     {run mutateCheckMany [c1;c2]}
-  | ["MutateChickManyWith" constr(c1) constr(c2) constr(c3)] ->     {run mutateCheckMany [c1;c2;c3]}
+  | ["MutateChickManyWith" constr(c1) constr(c2) constr(c3)] ->     {run mutateCheckManyWith [c1;c2;c3]}
 END
 
 VERNAC COMMAND EXTEND QuickChickDebug CLASSIFIED AS SIDEFF

@@ -29,10 +29,4 @@
  (action (run coqpp %{pp-file})))
 
 (rule
-  (target compat.ml)
-  (action
-    (run "perl" %{dep:../compat.pl} %{target}))
-  (package quickchick))
-
-(rule
  (action (write-file void_for_linking-plugin-extraction.empty "")))

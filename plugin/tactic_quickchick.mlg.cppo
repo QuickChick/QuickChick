@@ -7,6 +7,11 @@ open Ltac_plugin
 DECLARE PLUGIN "quickchick_plugin"
 
 {
+#if COQ_VERSION >= (8, 15, 0)
+let capp (x, y) = Constrexpr.CApp (x, y)
+#else
+let capp (x, y) = Constrexpr.CApp ((None, x), y)
+#endif
 
 let quickchick_goal =
   Proofview.Goal.enter begin fun gl ->
@@ -23,12 +28,15 @@ let quickchick_goal =
     Printf.printf "So far so good\n"; flush stdout;
     
     (* Externalize it *)
-    let ct = Compat.extern_constr_ e evd evar in
+#if COQ_VERSION >= (8, 12, 0)
+    let ct = Constrextern.extern_constr e evd (EConstr.mkEvar (evar, [])) in
+#else
+    let ct = Constrextern.extern_constr false e evd (EConstr.mkEvar (evar, [||])) in
+#endif
 
     (* Construct : show (quickCheck (_ : ct)) *)
-    let qct =
-      (CAst.make @@ Compat._CApp(QuickChick.quickCheck, [ct, None])) in
-    let sqct = CAst.make @@ Compat._CApp(QuickChick.show, [(qct,None)]) in
+    let  qct = CAst.make @@ capp (QuickChick.quickCheck, [ct, None]) in
+    let sqct = CAst.make @@ capp (QuickChick.show, [(qct,None)]) in
 
     Printf.printf "So far so good2\n"; flush stdout;
 
@@ -69,8 +77,8 @@ let quickchick_goal =
                         ]
                        ))) in
 
-    let s = QuickChick.runTest
-            (CAst.make @@ Compat._CApp(QuickChick.quickCheck, [CAst.make @@ CRef (Libnames.qualid_of_ident tmpid,None), None])) in
+    let s = QuickChick.runTest @@ CAst.make @@
+      capp (QuickChick.quickCheck, [CAst.make @@ CRef (Libnames.qualid_of_ident tmpid,None), None]) in
     (* I need to create an existential of type Checkable ct, and then
        call QuickChick.quickChick on that in the ast, before running
        QuickChick.runTest on the constr_expr. *)
