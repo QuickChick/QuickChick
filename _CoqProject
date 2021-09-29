@@ -1,13 +1,35 @@
 -R src QuickChick
 -I plugin
 
+plugin/quickChick.mli
+plugin/driver.mli
+plugin/tactic_quickchick.mli
+plugin/weightmap.mli
+plugin/genericLib.mli
+plugin/error.mli
+plugin/simplDriver.mli
+plugin/depDriver.mli
+plugin/setLib.mli
+plugin/semLib.mli
+plugin/coqLib.mli
+plugin/arbitrarySized.mli
+plugin/arbitrarySizedST.mli
+plugin/checkerSizedST.mli
+plugin/genLib.mli
+plugin/unifyQC.mli
+plugin/sizeUtils.mli
+plugin/sized.mli
+plugin/sizeMon.mli
+plugin/sizeSMon.mli
+plugin/sizeCorr.mli
+plugin/sizedProofs.mli
+
 plugin/quickChick.mlg
 plugin/driver.mlg
 plugin/tactic_quickchick.mlg
 plugin/weightmap.mlg
 plugin/quickchick_plugin.mlpack
 plugin/genericLib.ml
-plugin/genericLib.mli
 plugin/error.ml
 plugin/simplDriver.ml
 plugin/depDriver.ml
