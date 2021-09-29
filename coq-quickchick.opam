@@ -21,6 +21,7 @@ depends: [
   "ocamlbuild"
   "ocamlfind"
   "menhir" {build}
+  "cppo"   {build & >= "1.6.8"}
   "coq-simple-io"
 ]
 
