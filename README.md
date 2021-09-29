@@ -51,6 +51,11 @@ https://github.com/DeepSpec/dsss17
     # Then:
     make && make install
 
+#### Build using Dune
+
+    make compat
+    dune build
+
 ### Simple Examples
 
   - `examples/Tutorial.v`
