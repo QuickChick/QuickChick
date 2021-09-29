@@ -2,9 +2,3 @@
  (name QuickChick)
  (package quickchick)
  (libraries quickchick.plugin))
-
-(rule
-  (target ExtractionQCCompat.v)
-  (action
-    (run "perl" %{dep:../compat.pl} %{target}))
-  (package quickchick))

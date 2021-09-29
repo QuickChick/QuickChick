@@ -60,12 +60,12 @@ tests:
 #	coqc examples/BSTTest.v
 	coqc examples/DependentTest.v
 
-COMPATFILES:=plugin/compat.ml src/ExtractionQCCompat.v
+COMPATFILES:=plugin/depDriver.ml plugin/driver.mlg plugin/genericLib.ml plugin/quickChick.mlg plugin/tactic_quickchick.mlg plugin/weightmap.mlg src/ExtractionQC.v
 
 compat: $(COMPATFILES)
 
-$(COMPATFILES): compat.pl
-	$(V)perl -- compat.pl $(COMPATFILES)
+%: %.cppo
+	$(V)cppo -V COQ:$(word 1, $(shell coqc -print-version)) -n -o $@ $^
 
 Makefile.coq: _CoqProject
 	$(V)coq_makefile -f _CoqProject -o Makefile.coq

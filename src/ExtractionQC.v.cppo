@@ -5,7 +5,7 @@ Require Import ZArith.
 Require Import Coq.Strings.Ascii.
 Require Import Coq.Strings.String.
 From QuickChick Require Import
-  RandomQC RoseTrees Test Show Checker ExtractionQCCompat.
+  RandomQC RoseTrees Test Show Checker.
 
 Require Import ExtrOcamlBasic.
 Require Import ExtrOcamlString.
@@ -13,6 +13,24 @@ Require Import ExtrOcamlNatInt.
 Require Import ExtrOcamlZInt.
 
 Extraction Blacklist String List Nat.
+
+#if COQ_VERSION >= (8, 12, 0)
+#if COQ_VERSION >= (8, 13, 0)
+#define Number_int Number.int
+#else
+#define Number_int Numeral.int
+#endif
+Extract Inductive Hexadecimal.int => "((Obj.t -> Obj.t) -> (Obj.t -> Obj.t) -> Obj.t) (* Hexadecimal.int *)"
+  [ "(fun x pos _ -> pos (Obj.magic x))"
+    "(fun y _ neg -> neg (Obj.magic y))"
+  ] "(fun i pos neg -> Obj.magic i pos neg)".
+Extract Inductive Number_int => "((Obj.t -> Obj.t) -> (Obj.t -> Obj.t) -> Obj.t) (* Number_int *)"
+  [ "(fun x dec _ -> dec (Obj.magic x))"
+    "(fun y _ hex -> hex (Obj.magic y))"
+  ] "(fun i dec hex -> Obj.magic i dec hex)".
+#else
+(* Hexadecimal.int and Numeral.int don't exist before 8.12 *)
+#endif
 
 (** Temporary fix for https://github.com/coq/coq/issues/7017. *)
 (** Scott encoding of [Decimal.int] as [forall r. (uint -> r) -> (uint -> r) -> r]. *)
