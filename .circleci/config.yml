@@ -102,7 +102,7 @@ jobs:
     - startup
     - prepare
     - run: opam pin -n add coq-quickchick .
-    - run: dune build
+    - run: make compat && dune build
     - run: dune install quickchick
     - test
     - run: dune uninstall quickchick
