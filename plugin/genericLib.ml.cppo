@@ -680,7 +680,11 @@ let gRecord names_and_bodies =
   CAst.make @@ CRecord (List.map (fun (n,b) -> (qualid_of_ident @@ Id.of_string n, b)) names_and_bodies)
 
 let gAnnot (p : coq_expr) (tau : coq_expr) =
+#if COQ_VERSION >= (8, 15, 0)
   CAst.make @@ CCast (p, DEFAULTcast, tau)
+#else
+  CAst.make @@ CCast (p, Glob_term.CastConv tau)
+#endif
 
 (* Convert types back into coq *)
 let gType ty_params dep_type = 
