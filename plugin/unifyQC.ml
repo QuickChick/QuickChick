@@ -264,6 +264,7 @@ let rec convert_to_range dt =
   | DTyCtr (c, dts) -> 
      option_map (fun dts' -> Ctr (ty_ctr_to_ctr c, dts')) (sequenceM convert_to_range dts)
   | DTyParam param -> Some (Parameter param)
+  | DHole -> Some RangeHole
   | _ -> None
 
 let is_fixed k dt = 
@@ -314,6 +315,7 @@ let rec dt_to_coq_expr k dt =
      gApp ~explicit:true (gCtr (ty_ctr_to_ctr c)) (List.map (dt_to_coq_expr k) dts)     
   | DApp (dt, dts) ->
      gApp ~explicit:true (dt_to_coq_expr k dt) (List.map (dt_to_coq_expr k) dts)
+  | DHole -> hole
   | _ -> failwith "QC Internal: dt_to_coq_expr"
   
 let rec is_dep_type = function
@@ -325,6 +327,7 @@ let rec is_dep_type = function
   | DTyCtr (_, dts) -> List.exists is_dep_type dts
   | DApp (dt, dts) -> List.exists is_dep_type (dt::dts)
   | DNot dt -> is_dep_type dt
+  | DHole -> false
 
 type check = (coq_expr -> coq_expr) * int
 
@@ -677,6 +680,9 @@ let handle_branch
        | DTyParam p ->
           (* Just continue along instantiating the rest of the function calls *)
           instantiate_function_calls_cont dts' (DTyParam p :: acc) cont
+       | DHole ->
+          (* Just continue along instantiating the rest of the function calls *)
+          instantiate_function_calls_cont dts' (DHole :: acc) cont
        | _ -> failwith ("Not a type! " ^ (dep_type_to_string dt))
        end
   in 

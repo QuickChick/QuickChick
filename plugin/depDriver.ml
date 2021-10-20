@@ -269,7 +269,7 @@ let derive_dependent
   declare_class_instance instance_arguments instance_name instance_type instance_record
 ;;
 
-                          
+(* Creates the initial t and u maps. *)
 let create_t_and_u_maps explicit_args dep_type actual_args : (range UM.t * dep_type UM.t) =
 
   msg_debug (str ("create_t_u_maps for: " ^ dep_type_to_string dep_type) ++ fnl ());
@@ -347,11 +347,14 @@ let dep_dispatch ind class_name : unit =
     in
 
     (* Parse the constructor's information into the more convenient generic-lib representation *)
-    let (ty_ctr, ty_params, ctrs, dep_type) : (ty_ctr * (ty_param list) * (dep_ctr list) * dep_type) =
+    (*    let (ty_ctr, ty_params, ctrs, dep_type) : (ty_ctr * (ty_param list) * (dep_ctr list) * dep_type) = *)
+    let dt : (ty_ctr * (ty_param list) * (dep_ctr list) * dep_type) = 
       match coerce_reference_to_dep_dt constructor with
       | Some dt -> msg_debug (str (dep_dt_to_string dt) ++ fnl()); dt 
       | None -> failwith "Not supported type"
-    in 
+    in
+
+    let (ty_ctr, ty_params, ctrs, dep_type) = dt in
 
     let (letbinds, init_umap, init_tmap) : (unknown list option * range UM.t * dep_type UM.t) =
       (* Create a temporary typing map for either the let binds/variable to be generated *)
@@ -394,12 +397,82 @@ let dep_dispatch ind class_name : unit =
     msg_debug (str "Initial map: " ++ fnl ());
     UM.iter (fun x r -> msg_debug (str ("Bound: " ^ (var_to_string x) ^ " to Range: " ^ (range_to_string r)) ++ fnl ())) init_umap;
 
+    let umap = ref init_umap in
+    let tmap = ref init_tmap in
+    let new_eqs = ref [] in
+    (* Rewrite the function applications in constructors. *)
+    let rewrite_ct ct =
+      (* Check if a datatype contains an application *)
+      let rec contains_app dt =
+        match dt with
+        | DApp _ -> true
+        | DCtr (ctr, dts) -> List.exists contains_app dts
+        | _ -> false in
+
+      (* Rewrite the datatypes *)
+      let rec traverse_and_rewrite dts top_dt : dep_type list =
+        match dts, top_dt with
+        | [], _ -> []
+        | dt::dts', DArrow (dt1,dt2) when not (contains_app dt) ->
+           dt :: (traverse_and_rewrite dts' dt2)
+        | dt::dts', DProd ((_,dt1),dt2) when not (contains_app dt) ->
+           dt :: (traverse_and_rewrite dts' dt2)
+        | dt::dts', DProd ((_,dt1),dt2) when (contains_app dt) ->
+           begin
+             (* Create a fresh name *)
+             let x = make_up_name () in
+             new_eqs := (dt, x) :: !new_eqs;
+             tmap := UM.add x dt1 !tmap;
+             umap := UM.add x (Undef dt1) !umap;
+             DTyVar x :: (traverse_and_rewrite dts' dt2)
+           end
+        | dt::dts', DArrow (dt1,dt2) when (contains_app dt) ->
+           begin
+             (* Create a fresh name *)
+             let x = make_up_name () in
+             new_eqs := (dt, x) :: !new_eqs;
+             tmap := UM.add x dt1 !tmap;
+             umap := UM.add x (Undef dt1) !umap;
+             DTyVar x :: (traverse_and_rewrite dts' dt2)
+           end
+      in 
+
+      let rec construct_eqs eqs dt =
+        match eqs with
+        | [] -> dt
+        | (dteq, x)::eqs' -> 
+           DArrow (DTyCtr (ctr_to_ty_ctr (injectCtr "eq"), [DHole; dteq; DTyVar x]),
+                   construct_eqs eqs' dt) 
+        in 
+      
+      (* - Find the result of the constructor
+         - Traverse its arguments, rewriting if necessary 
+       *)
+      let rec recurse_to_result ct =
+        match ct with
+        | DProd ((x, ct1), ct2) ->
+           DProd ((x, ct1), recurse_to_result ct2)
+        | DArrow (ct1, ct2) ->
+           DArrow (ct1, recurse_to_result ct2)
+        | DTyCtr (ty_ctr, dts) ->
+           (* TODO: While recursing dts need top level dep-type for map. *)
+           let dts' = traverse_and_rewrite dts dep_type in
+           construct_eqs !new_eqs (DTyCtr (ty_ctr, dts'))
+        | _ -> failwith ("Not a result: " ^ dep_type_to_string ct)
+      in
+
+      let rewritten = recurse_to_result ct in
+      msg_debug (str ("Rewritten from: " ^ dep_type_to_string ct ^ " to " ^ dep_type_to_string rewritten) ++ fnl ());
+      rewritten
+    in            
+    let ctrs = List.map (fun (ctr, ct) -> (ctr, rewrite_ct ct)) ctrs in
+    
     (* When we add constructors to the ranges, this needs to change *)
     let input_names = List.map (fun ({CAst.v = CRef (r, _); _},_) -> fresh_name (string_of_qualid r ^ "_")) args in
     let input_ranges = List.map (fun v -> Unknown v) input_names in
     
     (* Call the derivation dispatcher *)
-    derive_dependent class_name constructor init_umap init_tmap
+    derive_dependent class_name constructor !umap !tmap (* init_umap init_tmap *)
       input_names input_ranges
       (ty_ctr, ty_params, ctrs, dep_type) letbinds idu 
   | { CAst.v = CApp ((_flag, constructor), args); _ } ->
@@ -422,10 +495,80 @@ let dep_dispatch ind class_name : unit =
     let (umap, tmap) = create_t_and_u_maps explicit_args dep_type args in
 
     let result = fresh_name "_result_bool" in
-    let umap = UM.add result (Ctr (injectCtr "Coq.Init.Datatypes.true", [])) umap in
-    let tmap = UM.add result (DTyCtr (ctr_to_ty_ctr (injectCtr "Coq.Init.Datatypes.bool"), [])) tmap in
+    let umap = ref (UM.add result (Ctr (injectCtr "Coq.Init.Datatypes.true", [])) umap) in
+    let tmap = ref (UM.add result (DTyCtr (ctr_to_ty_ctr (injectCtr "Coq.Init.Datatypes.bool"), [])) tmap) in
 
-    derive_dependent class_name constructor umap tmap input_names input_ranges
+(*     let umap = ref init_umap in
+    let tmap = ref init_tmap in *)
+    let new_eqs = ref [] in
+    (* Rewrite the function applications in constructors. *)
+    let rewrite_ct ct =
+      (* Check if a datatype contains an application *)
+      let rec contains_app dt =
+        match dt with
+        | DApp _ -> true
+        | DCtr (ctr, dts) -> List.exists contains_app dts
+        | _ -> false in
+
+      (* Rewrite the datatypes *)
+      let rec traverse_and_rewrite dts top_dt : dep_type list =
+        match dts, top_dt with
+        | [], _ -> []
+        | dt::dts', DArrow (dt1,dt2) when not (contains_app dt) ->
+           dt :: (traverse_and_rewrite dts' dt2)
+        | dt::dts', DProd ((_,dt1),dt2) when not (contains_app dt) ->
+           dt :: (traverse_and_rewrite dts' dt2)
+        | dt::dts', DProd ((_,dt1),dt2) when (contains_app dt) ->
+           begin
+             (* Create a fresh name *)
+             let x = make_up_name () in
+             new_eqs := (dt, x) :: !new_eqs;
+             tmap := UM.add x dt1 !tmap;
+             umap := UM.add x (Undef dt1) !umap;
+             DTyVar x :: (traverse_and_rewrite dts' dt2)
+           end
+        | dt::dts', DArrow (dt1,dt2) when (contains_app dt) ->
+           begin
+             (* Create a fresh name *)
+             let x = make_up_name () in
+             new_eqs := (dt, x) :: !new_eqs;
+             tmap := UM.add x dt1 !tmap;
+             umap := UM.add x (Undef dt1) !umap;
+             DTyVar x :: (traverse_and_rewrite dts' dt2)
+           end
+      in 
+
+      let rec construct_eqs eqs dt =
+        match eqs with
+        | [] -> dt
+        | (dteq, x)::eqs' -> 
+           DArrow (DTyCtr (ctr_to_ty_ctr (injectCtr "eq"), [DHole; dteq; DTyVar x]),
+                   construct_eqs eqs' dt) 
+        in 
+      
+      (* - Find the result of the constructor
+         - Traverse its arguments, rewriting if necessary 
+       *)
+      let rec recurse_to_result ct =
+        match ct with
+        | DProd ((x, ct1), ct2) ->
+           DProd ((x, ct1), recurse_to_result ct2)
+        | DArrow (ct1, ct2) ->
+           DArrow (ct1, recurse_to_result ct2)
+        | DTyCtr (ty_ctr, dts) ->
+           (* TODO: While recursing dts need top level dep-type for map. *)
+           let dts' = traverse_and_rewrite dts dep_type in
+           construct_eqs !new_eqs (DTyCtr (ty_ctr, dts'))
+        | _ -> failwith ("Not a result: " ^ dep_type_to_string ct)
+      in
+
+      let rewritten = recurse_to_result ct in
+      msg_debug (str ("Rewritten from: " ^ dep_type_to_string ct ^ " to " ^ dep_type_to_string rewritten) ++ fnl ());
+      rewritten
+    in            
+    let ctrs = List.map (fun (ctr, ct) -> (ctr, rewrite_ct ct)) ctrs in
+    
+    derive_dependent class_name constructor !umap !tmap input_names input_ranges
       (ty_ctr, ty_params, ctrs, dep_type) None result
   | _ -> qcfail "wrongformat/driver.mlg"
 

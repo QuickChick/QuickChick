@@ -12,6 +12,7 @@ type var
 val var_of_id : Id.t -> var   
 val id_of_var : var -> Id.t
 val var_to_string : var -> string
+val inject_var : string -> var 
 val gVar : var -> coq_expr
 
 val gInject : string -> coq_expr
@@ -82,6 +83,7 @@ type dep_type =
   | DTyVar of var (* Use of a previously captured type variable *)
   | DApp of dep_type * dep_type list (* Type-level function applications *)
   | DNot of dep_type (* Negation as a toplevel *)
+  | DHole (* For adding holes *)
 
 module OrdDepType : sig
     type t = dep_type
