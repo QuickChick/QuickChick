@@ -8,6 +8,8 @@ QCTOOL_SRC=$(QCTOOL_DIR)/quickChickTool.ml \
 		   $(QCTOOL_DIR)/quickChickToolLexer.mll \
 		   $(QCTOOL_DIR)/quickChickToolParser.mly
 
+INSTALLDIR?=$(shell opam config var bin)
+
 # Here is a hack to make $(eval $(shell work
 # (copied from coq_makefile generated stuff):
 define donewline
@@ -32,7 +34,7 @@ TEMPFILE := $(shell mktemp)
 install: all
 	$(V)$(MAKE) -f Makefile.coq install > $(TEMPFILE)
 # Manually copying the remaining files
-	$(V)cp $(QCTOOL_DIR)/$(QCTOOL_EXE) $(shell opam config var bin)/quickChick
+	$(V)cp $(QCTOOL_DIR)/$(QCTOOL_EXE) $(INSTALLDIR)/quickChick
 #	 $(V)cp src/quickChickLib.cmx $(COQLIB)/user-contrib/QuickChick
 #	 $(V)cp src/quickChickLib.o $(COQLIB)/user-contrib/QuickChick
 
@@ -41,7 +43,7 @@ install-plugin: Makefile.coq
 
 uninstall:
 	$(V)if [ -e Makefile.coq ]; then $(MAKE) -f Makefile.coq uninstall; fi
-	$(RM) $(shell opam config var bin)/quickChick
+	$(RM) $(INSTALLDIR)/quickChick
 
 quickChickTool: $(QCTOOL_DIR)/$(QCTOOL_EXE)
 

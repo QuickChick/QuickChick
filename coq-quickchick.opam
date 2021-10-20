@@ -10,7 +10,7 @@ license: "MIT"
 
 build: [ make "-j" jobs ]
 install: [
-  [make "-j" jobs "install" ]
+  [make "-j" jobs "install" "INSTALLDIR=%{bin}%"]
   [make "-j" jobs "tests"] {with-test}
 ]
 depends: [
