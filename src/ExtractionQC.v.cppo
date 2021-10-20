@@ -56,26 +56,33 @@ Extract Constant show_bool =>
     if i < 0 then acc else copy (s.[i] :: acc) (i-1)
   in copy [] (String.length s - 1))".
 
+#if COQ_VERSION >= (8, 15, 0)
 Extract Constant show_Z =>
   "(fun i ->
-#if COQ_VERSION >= (8, 15, 0)
   let s = Big_int_Z.string_of_big_int i in
-#else
-  let s = string_of_int i in
-#endif
   let rec copy acc i =
     if i < 0 then acc else copy (s.[i] :: acc) (i-1)
   in copy [] (String.length s - 1))".
 Extract Constant show_N =>
   "(fun i ->
-#if COQ_VERSION >= (8, 15, 0)
   let s = Big_int_Z.string_of_big_int i in
-#else
-  let s = string_of_int i in
-#endif
   let rec copy acc i =
     if i < 0 then acc else copy (s.[i] :: acc) (i-1)
   in copy [] (String.length s - 1))".
+#else
+Extract Constant show_Z =>
+  "(fun i ->
+  let s = string_of_int i in
+  let rec copy acc i =
+    if i < 0 then acc else copy (s.[i] :: acc) (i-1)
+  in copy [] (String.length s - 1))".
+Extract Constant show_N =>
+  "(fun i ->
+  let s = string_of_int i in
+  let rec copy acc i =
+    if i < 0 then acc else copy (s.[i] :: acc) (i-1)
+  in copy [] (String.length s - 1))".
+#endif
 
 Extract Constant RandomSeed   => "Random.State.t".
 Extract Constant randomNext   => "(fun r -> Random.State.bits r, r)".
