@@ -29,7 +29,7 @@ let extra_dir : string list ref =
 let add_extra_dir s = extra_dir := s :: !extra_dir
 
 let extra_pkg : string list ref =
-  Summary.ref ~name:"QC_ocaml_pkg" empty_slist
+  Summary.ref ~name:"QC_ocaml_pkg" ["zarith"]
 let add_extra_pkg s = extra_pkg := s :: !extra_pkg
 
 let dune_file : string option ref =
@@ -172,8 +172,7 @@ let define_and_run c env evd =
   let packages =
     match !extra_pkg with
     | [] -> ""
-    | [x] -> "-pkg " ^ x
-    | _ -> failwith "QC ERROR: implement more than one linked package"
+    | x -> "-pkgs '" ^ (String.concat "," x) ^ "'"
   in
   let exec_command =
     match !dune_file with
