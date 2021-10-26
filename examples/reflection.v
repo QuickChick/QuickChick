@@ -30,7 +30,7 @@ Time Qed.
 
 Lemma sorted_2000' : Sorted (repeat 1 2000).
 Proof.
-  time (eapply sound with (s := 2000); vm_compute; reflexivity).
+  time (eapply sound with (s := 2000); compute; reflexivity).
 Time Qed.
 (* Tactic call ran for 0.05 secs (0.05u,0.s) (success) *)
 (* Finished transaction in 0.059 secs (0.058u,0.s) (successful) *)
@@ -38,5 +38,5 @@ Time Qed.
 
 Lemma sorted_5000' : Sorted (repeat 1 5000).
 Proof.
-  time (eapply sound with (s := 5000); vm_compute; reflexivity).
+  time (eapply sound with (s := 5000); compute; reflexivity).
 Time Qed.
