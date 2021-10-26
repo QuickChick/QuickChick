@@ -58,6 +58,9 @@ let var_to_string = Id.to_string
 let gVar (x : var) : coq_expr =
   CAst.make @@ CRef (qualid_of_ident x,None)
 
+let inject_var (s : string) : var =
+  Id.of_string s 
+  
 let qualid_to_coq_expr q = 
   mkRefC q
 
@@ -167,6 +170,7 @@ type dep_type =
   | DTyVar of var (* Use of a previously captured type variable *)
   | DApp of dep_type * dep_type list (* Type-level function applications *)
   | DNot of dep_type (* Negation pushed up a level *)
+  | DHole 
 
 module OrdDepType = struct
     type t = dep_type
@@ -183,6 +187,7 @@ let rec dep_type_to_string dt =
   | DTyVar tv -> var_to_string tv
   | DApp (d, ds) -> Printf.sprintf "(%s $ %s)" (dep_type_to_string d) (str_lst_to_string " " (List.map dep_type_to_string ds))
   | DNot d -> Printf.sprintf "~ ( %s )" (dep_type_to_string d)
+  | DHole -> "_"
 
 type dep_ctr = constructor * dep_type
 let dep_ctr_to_string (ctr, dt) = 
@@ -692,7 +697,9 @@ let gType ty_params dep_type =
     | DTyParam tp -> gTyParam tp
     | DTyCtr (c,dts) -> gApp (gTyCtr c) (List.map aux dts)
     | DTyVar x -> gVar x 
-    | DApp (c, dts) -> gApp (aux c) (List.map aux dts) in
+    | DApp (c, dts) -> gApp (aux c) (List.map aux dts) 
+    | DHole -> hole
+  in 
   aux dep_type
 (*    
   match ty_params with 
