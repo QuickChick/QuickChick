@@ -411,7 +411,9 @@ let dep_dispatch ind class_name : unit =
 
       (* Rewrite the datatypes *)
       let rec traverse_and_rewrite dts top_dt : dep_type list =
+        msg_debug (str (String.concat " " (List.map dep_type_to_string dts) ^ " vs " ^ (dep_type_to_string top_dt)) ++ fnl ());
         match dts, top_dt with
+        | (DTyParam _)::dts', _ -> traverse_and_rewrite dts' top_dt
         | [], _ -> []
         | dt::dts', DArrow (dt1,dt2) when not (contains_app dt) ->
            dt :: (traverse_and_rewrite dts' dt2)
@@ -435,6 +437,7 @@ let dep_dispatch ind class_name : unit =
              umap := UM.add x (Undef dt1) !umap;
              DTyVar x :: (traverse_and_rewrite dts' dt2)
            end
+        | _, _ -> failwith (String.concat " " (List.map dep_type_to_string dts) ^ " vs " ^ (dep_type_to_string top_dt))
       in 
 
       let rec construct_eqs eqs dt =
