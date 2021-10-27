@@ -767,7 +767,13 @@ Ltac2 prove_ih (ih : ident) :=
     end
   end.
 
-  
+
+Ltac2 destructIH (_ : unit) :=
+  match! goal with
+  | [ h : (exists s, _ = Some true) |- _ ] =>
+    let h' := Control.hyp h in destruct $h'
+  end.
+
 Ltac2 rec handle_checker (hmon : ident) :=
   first [ exists 0 ; reflexivity
         | match! goal with
@@ -786,22 +792,22 @@ Ltac2 rec handle_checker (hmon : ident) :=
                                         now repeat (handle_checker_mon_t hmon heq)
                                       | handle_checker hmon ]
           end
-        | let ih := Fresh.in_goal (id_of_string "IH") in
-          let s := Fresh.in_goal (id_of_string "s") in
-          prove_ih ih;
-          let ih1 := Control.hyp ih in
-          destruct $ih1 as [$s $ih];
-          let s1 := Control.hyp s in
-          eapply exists_match' with (s1 := $s1) >
-                                    [ let hmon := Control.hyp hmon in
-                                      eapply $hmon > [| | eassumption ] > [ lia | lia ]
-                                    | let hmon := Control.hyp hmon in
-                                      intros; eapply $hmon > [| | eassumption ] > [ lia | lia ]
-                                    | let heq := Fresh.in_goal (id_of_string "_heq") in
-                                      intros ? ? ? $heq; 
-                                      now repeat (handle_checker_mon_t hmon heq)
-                                    | handle_checker hmon ]
-                                     
+       |
+          (* let ih := Fresh.in_goal (id_of_string "IH") in *)
+          (* let s := Fresh.in_goal (id_of_string "s") in *)
+          (* prove_ih ih; *)
+          (* let ih1 := Control.hyp ih in *)
+          (* destruct $ih1 as [$s $ih]; *)
+          (* let s1 := Control.hyp s in *)
+          (* TODO remove comments when stable *)
+          eapply exists_match'  >
+          [ ()
+          | let hmon := Control.hyp hmon in
+            intros; eapply $hmon > [| | eassumption ] > [ lia | lia ]
+          | let heq := Fresh.in_goal (id_of_string "_heq") in
+            intros ? ? ? $heq; 
+            now repeat (handle_checker_mon_t hmon heq)
+          | handle_checker hmon ]; eassumption                                     
         | (* enumerating *)
           eapply enumerating_complete' >
           [ now find_size_mon_inst ()
@@ -834,7 +840,7 @@ Ltac2 handle_base_case (hmon : ident) := handle_checker hmon.
 
 Ltac2 rec solve_ind_case (hmon : ident) (n : int) :=
   first [ now eexists; split > [ intros s; path n; reflexivity | 
-                                 simpl_minus_methods (); handle_checker hmon ]
+                                 simpl_minus_methods (); repeat (destructIH ()); handle_checker hmon ]
         | solve_ind_case hmon (Int.add n 1) ].
 
 Ltac2 rec handle_ind_case (hmon : ident) :=
