@@ -2,7 +2,7 @@ Require Import PArith List ChoiceFacts Lia.
 Require Import mathcomp.ssreflect.ssreflect.
 From mathcomp Require Import ssrfun ssrbool.
 
-Require Import Classes RandomQC GenLow Sets.
+Require Import Classes Random GenLow Sets.
 Import GenLow.
 
 Import ListNotations.
@@ -92,6 +92,7 @@ Definition list_ind' (A : Type) (P : list A -> Prop) :
 Lemma aux1 : forall l p f, pathToPosAux (l ++ [Right]) f = Some p ->
                exists f', forall l', pathToPosAux (l ++ l') f =
                                     pathToPosAux l' f' /\ f' xH = p.
+Proof.
 induction l using list_ind'; intros.
 + simpl in *; inversion H; subst.
   exists f; intros.
@@ -110,6 +111,7 @@ induction l using list_ind'; intros.
 Qed.
 
 Lemma posPathInj : forall p, pathToPos (posToPath p) = Some p.
+Proof.
 induction p; unfold posToPath, pathToPos in *; simpl in *.
 - apply aux1 in IHp. 
   inversion IHp as [f' Hyp]; clear IHp.
@@ -140,6 +142,7 @@ Fixpoint lengthSplit {A : Type} (l l' : list A) : option (list A * list A) :=
 Lemma lengthSplit1 : forall {A : Type} (l l' : list A), 
                        le (length l) (length l') -> 
                        exists p, lengthSplit l l' = Some p.
+Proof.
 induction l as [ | x xs IHxs].
 + intros; exists ([], l'); auto.
 + intros l' LE; destruct l' as [ | b bs] eqn:LEq.
@@ -160,6 +163,7 @@ Qed.
 
 Lemma lengthSplit2 : forall {A : Type} (l l' l1 l2 : list A), 
                        lengthSplit l l' = Some (l1, l2) -> l1 ++ l2 = l'.
+Proof.
 induction l.
 + intros l' l1 l2 Hyp; simpl in Hyp; inversion_clear Hyp; auto.
 + intros l' l1 l2 Hyp. 
@@ -179,6 +183,7 @@ Qed.
 
 Lemma lengthSplit3 : forall {A : Type} (l l' l1 l2 : list A), 
                        lengthSplit l l' = Some (l1, l2) -> length l1 = length l.
+Proof.
 induction l as [ | x xs IHxs].
 + intros; simpl in H; inversion H; auto.
 + intros l' l1 l2 Split.
@@ -198,6 +203,7 @@ induction l as [ | x xs IHxs].
 Qed.        
 
 Lemma lengthPathEven : forall p, exists n, length (posToPathAux p) = (2 * n)%nat.
+Proof.
 induction p.
 + inversion IHp as [n Hyp]; clear IHp.
   simpl.
@@ -223,6 +229,7 @@ Lemma evenPathAux : forall l l' l'' lApp f n p, length l = (2 * n)%nat ->
                       exists f', pathToPosAux (l ++ l') f = pathToPosAux l' f'
                                  /\ pathToPosAux (l ++ l' ++ lApp) f = 
                                     pathToPosAux (l' ++ lApp) f'.
+Proof.
 induction l using list_ind'.
 + intros. exists f. auto.
 + intros. simpl in *. lia.
@@ -248,6 +255,7 @@ Qed.
 Lemma pathBeginsLeft : forall l1 l2 f x, l1 <> [] -> l2 <> [] -> 
                                      pathToPosAux (l1 ++ l2) f = Some x ->
                                      head l1 = Some Left.
+Proof.
 destruct l1.
 + intros. exfalso; apply H; auto.
 + intros. 
@@ -265,6 +273,7 @@ Lemma listAppNeq : forall (A : Type) (l1 l2 l3 l4 : list A),
                      length l1 = length l2 -> 
                      l1 <> l2 ->
                      l1 ++ l3 <> l2 ++ l4.
+Proof.
 induction l1.
 + intros.
   destruct l2.
@@ -290,10 +299,52 @@ induction l1.
       congruence.
 Qed.
 
+Definition Direction_eq_dec : forall (d1 d2 : SplitDirection),
+                                {d1 = d2} + {d1 <> d2}.
+Proof.
+decide equality.
+Qed.
+
+Definition eq_dir_b (d1 d2 : SplitDirection) : bool :=
+  match d1,d2 with
+    | Left, Left => true
+    | Right, Right => true
+    | _, _ => false
+  end.
+
+Inductive PrefixFree : list SplitPath -> Prop :=
+| FreeNil : PrefixFree []
+| FreeCons : forall (p : SplitPath) (l : list SplitPath),
+               PrefixFree l ->
+               (forall (p' : SplitPath), In p' l ->
+                                        (forall p1 p2, p' ++ p1 = p ++ p2-> False)) ->
+                                        PrefixFree (p :: l).
+
+Lemma prefixFreeSingleton : forall p, PrefixFree [p].
+Proof.
+intro.
+apply FreeCons.
++ apply FreeNil.
++ intros. inversion H.
+Qed.
+
+Lemma prefixFreeEmpty : forall l, PrefixFree ([] :: l) -> l = [].
+Proof.
+intros.
+destruct l; auto.
+inversion H.
+subst.
+pose proof H3 l.
+assert (In l (l :: l0)) by (left; auto).
+eapply H0 in H1. inversion H1.
+instantiate (2 := []). rewrite app_nil_r; simpl; eauto.
+Qed.
+
 Lemma PosToPathPrefixFreeAux : forall (x y : positive), (x <> y) -> 
                                  le (length (posToPathAux y)) (length(posToPathAux x)) ->
                               PrefixFree [posToPath x;
                                           posToPath y].
+Proof.
 intros x y H Leq.
 apply FreeCons; [ apply FreeCons ; [ constructor | intros p Contra; inversion Contra] | ].
 intros.
@@ -343,6 +394,7 @@ destruct (list_eq_dec Direction_eq_dec (posToPathAux y) l0).
 Qed.
 
 Lemma prefixFreeCommutative : forall l1 l2, PrefixFree [l1;l2] -> PrefixFree [l2;l1].
+Proof.
 intros.
 inversion H.
 apply FreeCons.
@@ -363,6 +415,7 @@ Qed.
 Lemma PosToPathPrefixFree : forall (x y : positive), (x <> y) -> 
                               PrefixFree [posToPath x;
                                           posToPath y].
+Proof.
 intros. 
 destruct (Compare_dec.le_ge_dec (length (posToPathAux y)) 
                                 (length (posToPathAux x))).
@@ -383,6 +436,7 @@ Definition rangePos (p : positive) : list positive :=
   map Pos.of_nat (rangeNat (Pos.to_nat p)).
 
 Lemma ltInRange : forall m n, le n m -> n <> O -> In n (rangeNat m).
+Proof.
   induction m; intros.
   + inversion H. simpl. auto.
   + simpl. inversion H.
@@ -391,6 +445,7 @@ Lemma ltInRange : forall m n, le n m -> n <> O -> In n (rangeNat m).
 Qed.
 
 Lemma posLtInRange : forall max pos, Pos.le pos max -> In pos (rangePos max).
+Proof.
   intros.
   apply in_map_iff.
   exists (Pos.to_nat pos).
@@ -402,6 +457,7 @@ Lemma posLtInRange : forall max pos, Pos.le pos max -> In pos (rangePos max).
 Qed.
 
 Lemma rangeNatLt : forall n m, In m (rangeNat n) -> lt m (S n) /\ m <> O.
+Proof.
   induction n; intros.
   + simpl in H. inversion H. 
   + inversion H.
@@ -416,6 +472,7 @@ Lemma rangeNatLt : forall n m, In m (rangeNat n) -> lt m (S n) /\ m <> O.
 Qed.    
 
 Lemma rangePosPrefixFree : forall p, PrefixFree (map posToPath (rangePos p)).
+Proof.
   intros.
   unfold rangePos.
   induction (Pos.to_nat p) as [ | n IHn].
@@ -456,18 +513,68 @@ Lemma rangePosPrefixFree : forall p, PrefixFree (map posToPath (rangePos p)).
     + eauto.
 Qed.    
 
-Definition posFunToPathFun (f : positive -> RandomSeed) (p : SplitPath) 
-: RandomSeed :=
+Definition posFunToPathFun (f : positive -> random) (p : SplitPath) : random :=
   match pathToPos p with 
     | Some a => f a
-    | None   => newRandomSeed
+    | None   => dummy_random
   end.
 
-Theorem coarbComplete' : forall (max : positive) (f : positive -> RandomSeed) ,
+Fixpoint add_path (p : SplitPath) (sp : random) (s : random) : random :=
+  match p with
+  | [] => sp
+  | d :: p =>
+    {| split _ :=
+         let '(s1, s2) := split s tt in
+         match d with
+         | Left => (add_path p sp s1, s2)
+         | Right => (s1, add_path p sp s2)
+         end
+    ;  bits := bits s
+    |}
+  end.
+
+Definition add_paths (l : list SplitPath) (f : SplitPath -> random) : random :=
+  fold_right (fun p s => add_path p (f p) s) dummy_random l.
+
+Lemma varySeed_add_path_same p sp : forall s, varySeed p (add_path p sp s) = sp.
+Proof.
+  induction p as [ | [] ]; cbn; auto.
+  all: intros; destruct (split _ tt); cbn; auto.
+Qed.
+
+Lemma varySeed_add_path_noprefix p sp
+  : forall p' s,
+      (forall p1 p2, p' ++ p1 = p ++ p2 -> False) ->
+      varySeed p' (add_path p sp s) = varySeed p' s.
+Proof.
+  induction p as [ | [] ]; cbn; intros p' s H.
+  { contradiction (H [] p'). rewrite app_nil_r; reflexivity. }
+  all: intros; destruct (split _ tt) eqn:Esplit; cbn.
+  all: destruct p' as [ | d p' ]; [ exfalso; eapply (H (_ :: p) []); rewrite app_nil_r; reflexivity | ].
+  all: destruct d; cbn; rewrite Esplit; cbn; auto.
+  all: apply IHp; intros; apply (H p1 p2); cbn; f_equal; auto.
+Qed.
+
+(* begin SplitPathCompleteness *)
+Theorem SplitPathCompleteness (l : list SplitPath) (f : SplitPath -> random) :
+  PrefixFree l -> exists (s : random), forall p, In p l -> varySeed p s = f p.
+(* end SplitPathCompleteness *)
+Proof.
+intros Pref.
+exists (add_paths l f).
+induction Pref.
+- contradiction.
+- cbn. intros p0 [<- | Hl].
+  + rewrite varySeed_add_path_same. reflexivity.
+  + rewrite varySeed_add_path_noprefix; eauto.
+Qed.
+
+Theorem coarbComplete' : forall (max : positive) (f : positive -> random) ,
                           exists seed, forall p, p <= max -> 
                             varySeed (posToPath p) seed = f p.
+Proof.
 intros.
-pose proof (SplitPathCompleteness (map posToPath (rangePos max)) 
+pose proof (SplitPathCompleteness (l := map posToPath (rangePos max))
                                 (posFunToPathFun f) (rangePosPrefixFree max)).
 inversion H; clear H.
 exists x.
@@ -484,11 +591,11 @@ rewrite H1.
   auto.
 Qed.
 
-Definition funToPosFun {A : Type} `{_ : CoArbitrary A} (f : A -> RandomSeed) (p : positive)
-: RandomSeed :=
+Definition funToPosFun {A : Type} `{_ : CoArbitrary A} (f : A -> random) (p : positive)
+: random :=
   match coarbReverse p with 
-    | Some a => f a
-    | None   => newRandomSeed
+  | Some a => f a
+  | None   => dummy_random
   end.
 
 Definition coarbLe {A : Type} `{_ : CoArbitrary A} (x y : A) : Prop :=
@@ -496,13 +603,13 @@ Definition coarbLe {A : Type} `{_ : CoArbitrary A} (x y : A) : Prop :=
 
 Lemma coarbLePreservesLe : forall {A : Type} `{_ : CoArbitrary A} (x y : A),
   coarbLe x y -> Pos.le (coarbitrary x) (coarbitrary y).
-by [].
-Qed.
+Proof. by []. Qed.
 
 Theorem coarbComplete : forall {A : Type} `{_ : CoArbitrary A} (max : A)
-                               (f : A -> RandomSeed),
+                               (f : A -> random),
                           exists seed, forall a, coarbLe a max ->
                                           varySeed (posToPath (coarbitrary a)) seed = f a.
+Proof.
 intros.
 pose proof (coarbComplete' (coarbitrary max) (funToPosFun f)) as Hyp.
 inversion Hyp as [seed HSeed]; clear Hyp.
@@ -529,7 +636,7 @@ Instance shrinkFunNil {A B : Type} : Shrink (A -> B) :=
 Section arbFun_completeness.
 
 Variables A B : Type.
-Hypothesis choice : FunctionalChoice_on A RandomSeed.
+Hypothesis choice : FunctionalChoice_on A random.
 
 (* begin arbFunCorrect *)
 Theorem arbFunComplete `{CoArbitrary A, Arbitrary B} (max:A) (f:A-> B) (s:nat) :
@@ -538,15 +645,13 @@ Theorem arbFunComplete `{CoArbitrary A, Arbitrary B} (max:A) (f:A-> B) (s:nat) :
 (* end arbFunCorrect *)
 Proof.
 move=> eqsize semB.
-have/choice [fseed fseedP]: forall a, exists seed : RandomSeed, run arbitrary s seed = f a.
+have/choice [fseed fseedP]: forall a, exists seed : random, run arbitrary s seed = f a.
   by move => a; case: (semB (f a))=> _ /(_ I) [seed ?]; exists seed.
 case: (coarbComplete max fseed) => seed Hseed.
-pose proof (randomSplitAssumption seed seed) as Hyp.
-move : Hyp => [seed' Hsplit].
-exists seed' => a le_a; rewrite -fseedP -Hseed //=.
+exists (unsplit seed seed).
+cbn. intros. rewrite -fseedP -Hseed //.
 apply (@promoteVariant A B a (fun a => posToPath (coarbitrary a)) arbitrary 
-                       s seed' seed seed Hsplit).
+                       s (unsplit seed seed) seed seed eq_refl).
 Qed.
 
 End arbFun_completeness.
-

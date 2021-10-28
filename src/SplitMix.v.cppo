@@ -1,0 +1,258 @@
+From Coq Require Import ZArith NArith.
+From Coq Require Ascii String HexString.
+
+#if COQ_VERSION < (8, 15, 0)
+#define Uint63 Int63
+#endif
+From Coq Require Import Uint63.
+
+Set Primitive Projections.
+
+(* Avoid shadowing the [Int64] name from the stdlib.
+   We could still refer to [Stdlib.Int64], but only on OCaml 4.08,
+   and Coq currently supports 4.05. *)
+Module Import CoqInt64.
+
+#if COQ_VERSION < (8, 15, 0)
+#define uint63 int63
+#endif
+Local Open Scope uint63.
+
+Record int64 := MkInt64 { msb : int ; ls63b : int }.
+
+Definition add (x y : int64) : int64 :=
+  let '(MkInt64 i m) := x in
+  let '(MkInt64 j n) := y in
+  let s := (m + n)%uint63 in
+  {| msb := (i lxor j) lxor (b2i (Uint63.ltb s m))
+  ;  ls63b := s
+  |}.
+
+Definition sub (x y : int64) : int64 :=
+  let '(MkInt64 i m) := x in
+  let '(MkInt64 j n) := y in
+  let ls63b_ := m - n in
+  {| msb := (i lxor j) lxor (b2i (Uint63.ltb m ls63b_))
+  ;  ls63b := ls63b_ |}.
+
+Definition mul (x y : int64) : int64 :=
+  let '(MkInt64 i m) := x in
+  let '(MkInt64 j n) := y in
+  let mn := (m * n) in
+  let p1 := (m * (lsr n 1)) in
+  let p2 := p1 + (lsr (m * (n land 1)) 1) in
+  let b := (((i land n) lxor (j land m)) lxor (p2 >> 62)) land 1 in
+  MkInt64 b mn.
+
+Definition land_ (x : int64) (y : int64) : int64 :=
+  {| msb := (msb x) land (msb y)
+  ;  ls63b := (ls63b x) land (ls63b y)
+  |}.
+
+Definition lor_ (x : int64) (y : int64) : int64 :=
+  {| msb := (msb x) lor (msb y)
+  ;  ls63b := (ls63b x) lor (ls63b y)
+  |}.
+
+Definition lxor_ (x : int64) (y : int64) : int64 :=
+  {| msb := (msb x) lxor (msb y)
+  ;  ls63b := (ls63b x) lxor (ls63b y)
+  |}.
+
+(* Assume [0 < y < 63] *)
+Definition lsr (x : int64) (y : int) : int64 :=
+  {| msb := 0
+  ;  ls63b := lsl (msb x) (63 - y) + lsr (ls63b x) y
+  |}.
+
+Definition compare (x y : int64) : comparison :=
+  let '(MkInt64 i m) := x in
+  let '(MkInt64 j n) := y in
+  match Uint63.compare i j with
+  | Eq => Uint63.compare m n
+  | Lt => Gt  (* [int] is unsigned; [int64] is signed *)
+  | Gt => Lt
+  end.
+
+Definition lt (x y : int64) : bool :=
+  match compare x y with
+  | Lt => true
+  | Eq | Gt => false
+  end.
+
+Infix "+" := add : int64_scope.
+Infix "-" := sub : int64_scope.
+Infix "*" := mul : int64_scope.
+Infix "land" := land_ : int64_scope.
+Infix "lor" := lor_ : int64_scope.
+Infix "lxor" := lxor_ : int64_scope.
+Infix ">>" := lsr : int64_scope.
+Infix "<?" := lt : int64_scope.
+
+(* Numeric conversions *)
+
+Definition of_int63 (n : int) : int64 :=
+  MkInt64 0 n.
+
+Definition of_Z (n : Z) : int64 :=
+  MkInt64 (b2i (Z.testbit n 63)) (Uint63.of_Z n).
+
+Definition of_N (n : N) : int64 :=
+  MkInt64 (b2i (N.testbit n 63)) (Uint63.of_Z (Z.of_N n)).
+
+Definition to_int (x : int64) : int :=
+  ls63b x.
+
+Definition Z_2_63 : Z := Eval compute in 2 ^ 63.
+
+Definition to_Z (n : int64) : Z :=
+   let y := Uint63.to_Z (ls63b n) in
+   if eqb (msb n) 0 then y else y - Z_2_63.
+(* Parsing literals *)
+
+Import String.
+
+Section filterHex.
+Import Ascii HexString.
+
+(** See [of_hex] *)
+Local Fixpoint _filterhex (s : string) : string :=
+  match s with
+  | ""%string => ""
+  | String x xs =>
+    match x with
+    | "0" | "1" | "2" | "3" | "4" | "5" | "6" | "7" | "8" | "9"
+    | "a" | "b" | "c" | "d" | "e" | "f"
+    | "A" | "B" | "C" | "D" | "E" | "F" => String x (_filterhex xs)
+    | _ => _filterhex xs
+    end%char
+  end.
+End filterHex.
+
+(** Convert a hex string to a 64-bit int.
+
+  Separators [_] are allowed for readability: ["DEAD_BEEF"].
+ *)
+(* TODO: forbid bad characters *)
+Definition of_hex (s : string) : int64 :=
+  of_N (HexString.Raw.to_N (_filterhex s) 0).
+
+Declare Scope int64_scope.
+Delimit Scope int64_scope with int64.
+Bind Scope int64_scope with int64.
+
+Declare Scope int64_hex_scope.
+Delimit Scope int64_hex_scope with int64_hex.
+
+(** NB: Literals are evaluated, as opposed to plain function applications. *)
+#if COQ_VERSION >= (8, 13, 0)
+Number
+#else
+Numeral
+#endif
+  Notation int64 CoqInt64.of_Z CoqInt64.to_Z : int64_scope.
+
+Local Definition _print_byte_dummy : int64 -> option Byte.byte := fun _ => None.
+Definition of_bytes (s : list Byte.byte) : int64 :=
+  CoqInt64.of_hex (string_of_list_byte s).
+
+String Notation int64 CoqInt64.of_bytes CoqInt64._print_byte_dummy
+  : int64_hex_scope.
+
+End CoqInt64.
+
+Local Open Scope int64.
+
+Definition popcount (z : int64) : int64 :=
+  let z : int64 := z - ((z >> 1) land "5555_5555_5555_5555"%int64_hex) in
+  let z : int64 := (z land "3333_3333_3333_3333"%int64_hex) + ((z >> 2) land "3333_3333_3333_3333"%int64_hex) in
+  let z := (z + (z >> 4)) land "0f0f_0f0f_0f0f_0f0f"%int64_hex in
+  (z * "01010101_01010101"%int64_hex) >> 56.
+
+Section PopcountUnitTests.
+
+Let popcount_0 : popcount 0 = 0 := eq_refl.
+Let popcount_1 : popcount 1 = 1 := eq_refl.
+Let popcount_2 : popcount 2 = 1 := eq_refl.
+Let popcount_3 : popcount 3 = 2 := eq_refl.
+Let popcount_7 : popcount 7 = 3 := eq_refl.
+Let popcount_15 : popcount 15 = 4 := eq_refl.
+Let popcount_42 : popcount 42 = 3 := eq_refl.
+
+End PopcountUnitTests.
+
+(** * SplitMix constants *)
+
+Definition golden_gamma : int64 := "9e3779b97f4a7c15"%int64_hex.
+Definition x_ff51afd7ed558ccd : int64 := "ff51afd7ed558ccd"%int64_hex.
+Definition x_c4ceb9fe1a85ec53 : int64 := "c4ceb9fe1a85ec53"%int64_hex.
+Definition x_bf58476d1ce4e5b9 : int64 := "bf58476d1ce4e5b9"%int64_hex.
+Definition x_94d049bb133111eb : int64 := "94d049bb133111eb"%int64_hex.
+Definition x_aaaaaaaaaaaaaaaa : int64 := "aaaaaaaaaaaaaaaa"%int64_hex.
+
+(** * Conversions *)
+
+(* SplitMix implementation. *)
+
+(* [z ^ (z >>> n)]*)
+Definition shift_xor (z : int64) (n : int) :=
+  (z lxor (z >> n))%int64.
+
+Definition mix64 (z : int64) : int64 :=
+  let z := x_ff51afd7ed558ccd * shift_xor z 33 in
+  let z := x_c4ceb9fe1a85ec53 * shift_xor z 33 in
+  shift_xor z 33.
+
+Definition mix64_variant13 (z : int64) : int64 :=
+  let z := x_bf58476d1ce4e5b9 * shift_xor z 30 in
+  let z := x_94d049bb133111eb * shift_xor z 27 in
+  shift_xor z 31.
+
+Definition mix_gamma (z : int64) : int64 :=
+  let z := (mix64 z) lor 1 in
+  if popcount (shift_xor z 1) <? 24 then
+    z lxor x_aaaaaaaaaaaaaaaa
+  else
+    z.
+
+(* Invariant: c is even, 0 <= r < 64 *)
+Record state := MkState_ {
+  seed_ : int;
+  gamma_ : int;
+  extrabits : int;
+}.
+
+Definition seed (s : state) : int64 :=
+  {| msb := extrabits s land 1; ls63b := seed_ s |}.
+
+Definition gamma (s : state) : int64 :=
+  {| msb := extrabits s >> 1; ls63b := gamma_ s |}.
+
+Definition MkState (seed : int64) (gamma : int64) : state :=
+  {| seed_ := ls63b seed
+  ;  gamma_ := ls63b gamma
+  ;  extrabits := (msb gamma << 1) lor (msb seed)
+  |}.
+
+Definition split s : state * state :=
+  let gamma := gamma s in
+  let seed1 := seed s + gamma in
+  let seed2 := seed1 + gamma in
+  ( MkState (mix64_variant13 seed1) (mix_gamma seed2)
+  , MkState seed2 gamma
+  ).
+
+Definition vary (n : int) (s : state) : state :=
+  let n := (2 * n + 1)%uint63 in
+  let gamma := gamma s in
+  let seed1 := seed s + of_int63 n * gamma in
+  let seed2 := seed1 + gamma in
+  MkState (mix64_variant13 seed1) (mix_gamma seed2).
+
+Definition of_seed (n : int64) : state :=
+  MkState n golden_gamma.
+
+(* Get 63 random bits. *)
+Definition bits (s : state) : int :=
+  let s1 := seed s + gamma s in
+  ls63b (mix64_variant13 s1).

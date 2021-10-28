@@ -1,7 +1,7 @@
 Set Implicit Arguments.
 
 Require Import GenLow.
-Require Import RandomQC.
+Require Import RandomSplitMix.
 Require Import Coq.Strings.String.
 
 Require Import StringOT.
@@ -21,7 +21,7 @@ Record State := MkState
   ; labels            : Map.t nat
 
   ; expectedFailure   : bool
-  ; randomSeed        : RandomSeed
+  ; randomSeed        : seed
 
   ; numSuccessShrinks : nat
   ; numTryShrinks     : nat

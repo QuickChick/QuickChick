@@ -51,14 +51,14 @@ Definition nl : string := String (ascii_of_nat 10) EmptyString.
 
 (** A [RandomSeed] represents a particular starting point in a
     pseudo-random sequence. *)
-Parameter RandomSeed : Type.
+Parameter seed : Type.
 
 (** [G A] is the type of random generators for type [A]. *)
 Parameter G : Type -> Type.
 
 (** Run a generator with a size parameter (a natural number denoting
     the maximum depth of the generated A) and a random seed. *)
-Parameter run  : forall {A : Type}, G A -> nat -> RandomSeed -> A.
+Parameter run  : forall {A : Type}, G A -> nat -> random -> A.
 
 (** The semantics of a generator is its set of possible outcomes. *)
 Parameter semGen : forall {A : Type} (g : G A), set A.
@@ -274,7 +274,6 @@ Existing Class ChoosableFromInterval.
 
 (** QuickChick has provided some instances for ordered data types that are
     choosable from intervals, including [bool], [nat], and [Z]. *)
-Declare Instance ChooseBool : ChoosableFromInterval bool.
 Declare Instance ChooseNat : ChoosableFromInterval nat.
 Declare Instance ChooseZ : ChoosableFromInterval Z.
 
@@ -686,7 +685,7 @@ Record Args :=
     {
       (* Re-execute a test. *)
       (* Default: None *)
-      replay     : option (RandomSeed * nat);
+      replay     : option (seed * nat);
       (* Maximum number of successful tests to run. *)
       (* Default: 10000 *)
       maxSuccess : nat;

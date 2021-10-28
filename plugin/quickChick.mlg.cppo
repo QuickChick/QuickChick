@@ -26,7 +26,7 @@ let mutateCheck = mk_ref "QuickChick.MutateCheck.mutateCheck"
 let mutateCheckWith = mk_ref "QuickChick.MutateCheck.mutateCheckWith"
 let mutateCheckMany = mk_ref "QuickChick.MutateCheck.mutateCheckMany"
 let mutateCheckManyWith = mk_ref "QuickChick.MutateCheck.mutateCheckManyWith"
-let sample = mk_ref "QuickChick.GenLow.GenLow.sample"
+let sample = mk_ref "QuickChick.Test.sample"
 
 (* Handle extra ocaml directory to be copied *)
 let empty_slist : string list = []           
@@ -35,7 +35,7 @@ let extra_dir : string list ref =
 let add_extra_dir s = extra_dir := s :: !extra_dir
 
 let extra_pkg : string list ref =
-  Summary.ref ~name:"QC_ocaml_pkg" ["zarith"]
+  Summary.ref ~name:"QC_ocaml_pkg" ["zarith"; "pure-splitmix"]
 let add_extra_pkg s = extra_pkg := s :: !extra_pkg
 
 let dune_file : string option ref =
@@ -124,6 +124,7 @@ let new_ml_file () : string =
   Filename.temp_file ~temp_dir "QuickChick" ".ml"
 
 let tmp_int_re = Str.regexp "type int =[ ]*int"
+let uint63_re = Str.regexp "Uint63\\.of_int"
 
 let define_and_run c env evd =
   (* Extract the term and its dependencies *)
@@ -161,7 +162,7 @@ let define_and_run c env evd =
   sed_file mlf (fun line ->
     if Str.string_match tmp_int_re line 0 then
       "type tmptmptmp = int;; type int = tmptmptmp"
-    else line);
+    else Str.global_replace uint63_re "" line);
   (* Compile the extracted code *)
   (* Extraction sometimes produces ML code that does not implement its interface.
      We circumvent this problem by erasing the interface. **)

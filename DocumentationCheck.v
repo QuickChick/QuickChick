@@ -8,7 +8,7 @@ Require Import QuickChickInterface.
 
 Module ConsistencyCheck : QuickChickSig.
 
-  Definition RandomSeed := RandomSeed.
+  Definition seed := RandomSplitMix.seed.
 
   Definition G := @G.
   Definition semGen := @semGen.
@@ -45,14 +45,13 @@ Module ConsistencyCheck : QuickChickSig.
   Class ChoosableFromInterval (A : Type)  :=
   {
     super :> OrdType A;
-    randomR : A * A -> RandomSeed -> A * RandomSeed;
+    randomR : A * A -> random -> A * random;
     randomRCorrect :
       forall (a a1 a2 : A), leq a1 a2 ->
       (leq a1 a && leq a a2 <->
        exists seed, fst (randomR (a1, a2) seed) = a)
   }.
 
-  Definition ChooseBool := ChooseBool.
   Definition ChooseNat := ChooseNat.
   Definition ChooseZ := ChooseZ.
 
@@ -217,7 +216,7 @@ Module ConsistencyCheck : QuickChickSig.
       {
         (* Re-execute a test. *)
         (* Default: None *)
-        replay     : option (RandomSeed * nat);
+        replay     : option (seed * nat);
         (* Maximum number of successful tests to run. *)
         (* Default: 10000 *)
         maxSuccess : nat;

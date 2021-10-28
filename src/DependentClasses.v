@@ -150,10 +150,11 @@ Proof.
   do 2 red. intros.
   unfold semGenSizeOpt in *.
   red in PMon.
-  apply semSizedSize in H3.
+  unfold somes in *.
+  setrw_hyp semSizedSize H3.
   apply semSizedSize.
   destruct (PSMon s1 s1 s2 H2 a). apply H3.
-  apply (PMon s2 s1 s2); auto. do 3 red.
+  apply (PMon s2 s1 s2); auto. do 2 red.
   eauto.
 Qed.
 

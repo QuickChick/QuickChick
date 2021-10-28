@@ -8,7 +8,7 @@ From mathcomp Require Import ssrfun ssrbool ssrnat eqtype seq.
 From QuickChick Require Import
      GenLow GenLowInterface
      GenHighImpl GenHighInterface
-     RandomQC Tactics Sets.
+     Tactics Sets.
 
 Set Bullet Behavior "Strict Subproofs".
 

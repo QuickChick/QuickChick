@@ -1,11 +1,8 @@
 Set Warnings "-extraction-opaque-accessed,-extraction".
 Set Warnings "-notation-overridden,-parsing".
 
-Require Import ZArith List.
-Require Import mathcomp.ssreflect.ssreflect.
-From mathcomp Require Import ssrfun ssrbool ssrnat.
-Require Import Numbers.BinNums.
-Require Import Classes.RelationClasses.
+From Coq Require Import ZArith List.
+From mathcomp Require Import ssreflect ssrfun ssrbool ssrnat.
 
 From ExtLib.Structures Require Export
      Monads.
@@ -15,7 +12,7 @@ Import MonadNotation.
 Open Scope monad_scope.
 
 From QuickChick Require Import
-     GenLowInterface RandomQC RoseTrees Sets Tactics.
+     GenLowInterface Random RoseTrees Sets Tactics.
 
 Set Implicit Arguments.
 Unset Strict Implicit.
@@ -35,7 +32,7 @@ Module GenLow : GenLowInterface.Sig.
   (** * Type of generators *)
 
   (* begin GenType *)
-  Inductive GenType (A:Type) : Type := MkGen : (nat -> RandomSeed -> A) -> GenType A.
+  Inductive GenType (A:Type) : Type := MkGen : (nat -> random -> A) -> GenType A.
   (* end GenType *)
   
   Definition G := GenType.
@@ -51,7 +48,7 @@ Module GenLow : GenLowInterface.Sig.
 
   Definition bindGen {A B : Type} (g : G A) (k : A -> G B) : G B :=
     MkGen (fun n r =>
-             let (r1,r2) := randomSplit r in
+             let (r1,r2) := split r tt in
              run (k (run g n r1)) n r2).
   
   Definition fmap {A B : Type} (f : A -> B) (g : G A) : G B :=
@@ -71,30 +68,11 @@ Module GenLow : GenLowInterface.Sig.
   Definition promote {A : Type} (m : Rose (G A)) : G (Rose A) :=
     MkGen (fun n r => fmapRose (fun g => run g n r) m).
 
-  Fixpoint rnds (s : RandomSeed) (n' : nat) : list RandomSeed :=
-    match n' with
-      | O => nil
-      | S n'' =>
-        let (s1, s2) := randomSplit s in
-        cons s1 (rnds s2 n'')
-    end.
-  
-  Fixpoint createRange (n : nat) (acc : list nat) : list nat :=
-    match n with
-      | O => List.rev (cons O acc)
-      | S n' => createRange n' (cons n acc)
-    end.
+  Definition genBool : G bool :=
+    MkGen (fun _ r => random_bool r).
 
   Definition choose {A : Type} `{ChoosableFromInterval A} (range : A * A) : G A :=
-    MkGen (fun _ r => fst (randomR range r)).
-
-  Definition sample (A : Type) (g : G A) : list A :=
-    match g with
-      | MkGen m =>
-        let rnd := newRandomSeed in
-        let l := List.combine (rnds rnd 20) (createRange 10 nil) in
-        List.map (fun (p : RandomSeed * nat) => let (r,n) := p in m n r) l
-    end.
+    MkGen (fun _ r => randomR range r).
   
   (* LL : Things that need to be in GenLow because of MkGen *)
   
@@ -133,7 +111,7 @@ Module GenLow : GenLowInterface.Sig.
       (exists n; split; [constructor | exists t; auto]).
   Qed.
 
-  Lemma bindGen_aux {A : Type} (g : G A) (n : nat) (r : RandomSeed) : semGen g (run g n r).
+  Lemma bindGen_aux {A : Type} (g : G A) (n : nat) (r : random) : semGen g (run g n r).
   Proof.
     unfold semGen, semGenSize, codom, bigcup.
     exists n; split => //=.
@@ -142,7 +120,7 @@ Module GenLow : GenLowInterface.Sig.
 
   Definition bindGen' {A B : Type} (g : G A) (k : forall (a : A), (a \in semGen g) -> G B) : G B :=
     MkGen (fun n r =>
-             let (r1,r2) := randomSplit r in
+             let (r1,r2) := split r tt in
              run (k (run g n r1) (bindGen_aux g n r1)) n r2).
 
   (** * Semantic properties of generators *)
@@ -201,18 +179,19 @@ Module GenLow : GenLowInterface.Sig.
   Lemma semReturn {A} (x : A) : semGen (returnGen x) <--> [set x].
   (* end semReturn *)
   Proof.
-    rewrite /semGen /semGenSize /= bigcup_const ?codom_const //.
-            exact: randomSeed_inhabited.
-      by do 2! constructor.
+    rewrite /semGen /semGenSize /= bigcup_const ?codom_const.
+    - by reflexivity.
+    - by exact inhabited_random.
+    - by constructor; exact O.
   Qed.
-  
+
   (* begin semReturnSize *)
   Lemma semReturnSize A (x : A) (s : nat) :
   semGenSize (returnGen x) s <--> [set x].
   (* end semReturnSize *)
   Proof.
     unfold semGenSize.
-    rewrite codom_const; [ reflexivity | apply randomSeed_inhabited ].
+    rewrite codom_const; [ reflexivity | exact inhabited_random ].
   Qed.
   
   Instance unsizedReturn {A} (x : A) : Unsized (returnGen x).
@@ -231,9 +210,13 @@ Module GenLow : GenLowInterface.Sig.
   (* end semBindSize *)
   Proof.
     rewrite /semGenSize /bindGen /= bigcup_codom -curry_codom2l.
-      by rewrite -[codom (prod_curry _)]imsetT -randomSplit_codom -codom_comp.
+    assert (H : codom (fun r => split r tt) <--> setT).
+    { intros [s1 s2]; split.
+      - constructor.
+      - exists (unsplit s1 s2). reflexivity. }
+    by rewrite -[codom (prod_curry _)]imsetT -H -codom_comp.
   Qed.
-  
+
   Lemma semBindSize_subset_compat {A B : Type} (g g' : G A) (f f' : A -> G B) :
     (forall s, semGenSize g s \subset semGenSize g' s) ->
     (forall x s, semGenSize (f x) s \subset semGenSize (f' x) s) ->
@@ -366,8 +349,8 @@ Module GenLow : GenLowInterface.Sig.
       exists a. split; exists s; split => //. 
     - intros [a [[s1 [_ H1]] [s2 [_  H2]]]].
       exists s1. split; first by []. exists a. 
-      split; first by []; apply unsized_alt_def; eauto.
-        by eapply unsized_alt_def; eauto.
+      split; first by [].
+      apply (unsized_alt_def _). apply (proj1 (unsized_alt_def _ _)) in H2. apply H2.
   Qed.
 
   (* begin semBindSizeMonotonic *)
@@ -395,7 +378,7 @@ Module GenLow : GenLowInterface.Sig.
     intros H1 H2 [x |] [s [_ [r H]]]; [| right; reflexivity ].
     left.
     eexists; split; [| reflexivity ].
-    simpl in H. destruct (randomSplit r) as [r1 r2] eqn:Heq.
+    simpl in H. destruct (split r tt) as [r1 r2] eqn:Heq.
     destruct (run (f (run g s r1)) s r2) eqn:Heq2; try discriminate.
     inv H. eexists (run g s r1). split.
     eapply H1. eexists; split; [| eexists; reflexivity ].
@@ -432,8 +415,7 @@ Module GenLow : GenLowInterface.Sig.
     - edestruct Hin2' as [_ [r2 Hr2]].
       exists r2; assumption.
     - exists (s + s'). split; [now constructor | ].
-      destruct (randomSplitAssumption r1 rs) as [r'' Heq].
-      exists r''. simpl; rewrite Heq Hr1 rr.
+      exists (unsplit r1 rs). simpl; rewrite Hr1 rr.
       reflexivity.
   Qed.
   
@@ -465,28 +447,44 @@ Module GenLow : GenLowInterface.Sig.
     move => [a [H1 <-]]; eexists; split; eauto => //; eapply monotonic; eauto.
   Qed.
 
+  Instance genBoolUnsized : Unsized genBool.
+  Proof. by []. Qed.
+
+  Lemma semGenBoolSize : forall size, semGenSize genBool size <--> setT.
+  Proof.
+    intros size b; split; [ constructor | intros _ ].
+    apply random_bool_complete.
+  Qed.
+
+  Lemma semGenBool : semGen genBool <--> setT.
+  Proof.
+    intros b; split; [ constructor | intros _ ].
+    exists 0; split; [ constructor | ].
+    apply random_bool_complete.
+  Qed.
+
   Lemma semChooseSize A `{ChoosableFromInterval A} (a1 a2 : A) :
-    RandomQC.leq a1 a2 ->
+    leq a1 a2 ->
     forall size, semGenSize (choose (a1,a2)) size <-->
-                       [set a | RandomQC.leq a1 a && RandomQC.leq a a2].
-  Proof. by move=> /= le_a1a2 m n; rewrite (randomRCorrect n a1 a2). Qed.
+                       [set a | leq a1 a && leq a a2].
+  Proof. by move=> /= le_a1a2 m n; rewrite (randomRCorrect a1 a2). Qed.
   
-  Instance chooseUnsized {A} `{RandomQC.ChoosableFromInterval A} (a1 a2 : A) :
+  Instance chooseUnsized {A} `{ChoosableFromInterval A} (a1 a2 : A) :
     Unsized (choose (a1, a2)).
   Proof. by []. Qed.
   
-  Lemma semChoose A `{RandomQC.ChoosableFromInterval A} (a1 a2 : A) :
-    RandomQC.leq a1 a2 ->
-    (semGen (choose (a1,a2)) <--> [set a | RandomQC.leq a1 a && RandomQC.leq a a2]).
+  Lemma semChoose A `{ChoosableFromInterval A} (a1 a2 : A) :
+    leq a1 a2 ->
+    (semGen (choose (a1,a2)) <--> [set a | leq a1 a && leq a a2]).
   Proof.
     move=> /= le_a1a2. rewrite <- (unsized_alt_def 1).
-    move => m /=. rewrite (randomRCorrect m a1 a2) //.
+    move => m /=. rewrite (randomRCorrect a1 a2) //.
   Qed.
 
   Lemma promoteVariant :
     forall {A B : Type} (a : A) (f : A -> SplitPath) (g : G B) size
-      (r r1 r2 : RandomSeed),
-      randomSplit r = (r1, r2) ->
+      (r r1 r2 : random),
+      split r tt = (r1, r2) ->
       run (reallyUnsafePromote (fun a => variant (f a) g)) size r a =
       run g size (varySeed (f a) r1).
   Proof.
@@ -602,8 +600,7 @@ Module GenLow : GenLowInterface.Sig.
   Lemma semGenSizeInhabited {A} (g : G A) s :
     exists x, semGenSize g s x.
   Proof.
-    destruct randomSeed_inhabited as [r].
-    exists (run g s r); exists r; reflexivity.
+    exists (run g s dummy_random); exists dummy_random; reflexivity.
   Qed.
 
   Instance Functor_G : Functor G := {

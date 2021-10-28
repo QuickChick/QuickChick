@@ -6,7 +6,7 @@ Require Import mathcomp.ssreflect.ssreflect.
 From mathcomp Require Import ssrfun ssrbool ssrnat eqtype seq.
 
 From QuickChick Require Import
-     GenLowInterface RandomQC Sets.
+     GenLowInterface Sets.
 
 Set Bullet Behavior "Strict Subproofs".
 

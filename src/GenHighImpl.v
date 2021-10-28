@@ -7,7 +7,7 @@ Require Import mathcomp.ssreflect.ssreflect.
 From mathcomp Require Import ssrfun ssrbool ssrnat eqtype seq.
 
 From QuickChick Require Import
-     GenLowInterface GenHighInterface RandomQC Tactics Sets Show.
+     GenLowInterface GenHighInterface Random Tactics Sets Show.
 
 
 Set Bullet Behavior "Strict Subproofs".
@@ -207,17 +207,23 @@ Proof.
 Qed.
 
 Ltac solveLiftGenX :=
-intros; split; intros;
-repeat
-  match goal with
-    | [ H : exists _, _ |- _ ] => destruct H as [? [? ?]]
-    | [ H : semGenSize _ _ _ |- _ ] =>
-      try (apply semBindSize in H; destruct H as [? [? ?]]);
-      try (apply semReturnSize in H; subst)
-  end;
-  [ by repeat (eexists; split; [eassumption |])
-  | repeat (apply semBindSize; eexists; split; try eassumption);
-      by apply semReturnSize ].
+  intros; split; intros;
+  [ repeat lazymatch goal with
+    | H:semGenSize (bindGen _ _) ?size ?a |- _ =>
+        apply (proj1 (semBindSize _ _ size a)) in H; destruct H as [? [? ?]]
+    | H:semGenSize (returnGen _) _ _ |- _ =>
+        apply (proj1 (semReturnSize _ _ _)) in H; red in H; subst
+    end;
+    repeat lazymatch goal with
+    | [ |- exists _, _ ] => eexists
+    | [ |- _ /\ _ ] => constructor; [ eassumption | ]
+    end; reflexivity
+  | repeat lazymatch goal with
+    | H:exists _, _ |- _ => destruct H as [? ?]
+    | H: _ /\ _ |- _ => destruct H as [? ?]
+    | |- semGenSize (bindGen _ _) _ _ => apply semBindSize; eexists; split; [ eassumption | ]
+    | |- semGenSize (returnGen _) _ _ => by apply semReturnSize
+    end ].
 
 Lemma semLiftGenSize {A B} (f: A -> B) (g: G A) size :
   semGenSize (liftGen f g) size <--> f @: (semGenSize g size).
@@ -302,7 +308,9 @@ forall {A1 A2 A3 B} (f: A1 -> A2 -> A3 -> B)
                (exists a2, semGenSize g2 size a2 /\
                            (exists a3, semGenSize g3 size a3 /\
                                        (f a1 a2 a3) = b)).
-Proof. solveLiftGenX. Qed.
+Proof.
+  unfold liftGen3. solveLiftGenX.
+Qed.
 
 Program Instance liftGen2Unsized {A1 A2 B} (f : A1 -> A2 -> B) (g1 : G A1)
         `{Unsized _ g1} (g2 : G A2) `{Unsized _ g2} : Unsized (liftGen2 f g1 g2).
@@ -330,19 +338,7 @@ Lemma semLiftGen4Size A1 A2 A3 A4 B (f : A1 -> A2 -> A3 -> A4 -> B)
   [set b : B | exists a1 a2 a3 a4, semGenSize g1 s a1 /\ semGenSize g2 s a2 /\
                  semGenSize g3 s a3 /\ semGenSize g4 s a4 /\ f a1 a2 a3 a4 = b].
 Proof.
-  split; unfold liftGen4; intros.
-  - repeat match goal with
-    | [ H : semGenSize _ _ _ |- _ ] =>
-      try (apply semBindSize in H; destruct H as [? [? ?]]);
-      try (apply semReturnSize in H; subst)
-    end.
-    do 4 eexists. repeat (split; [eassumption|]). assumption.
-  - repeat match goal with
-    | [ H : exists _, _ |- _ ] => destruct H as [? [? ?]]
-    | [ H : and _ _ |- _ ] => destruct H as [? ?]
-    end.
-    repeat (apply semBindSize; eexists; split; [eassumption|]).
-    apply semReturnSize. assumption.
+  unfold liftGen4. solveLiftGenX.
 Qed.
 
 (* begin semLiftGen4SizeMonotonic *)
@@ -401,7 +397,7 @@ forall {A1 A2 A3 A4 A5 B} (f: A1 -> A2 -> A3 -> A4 -> A5 -> B)
                                        (exists a4, semGenSize g4 size a4 /\
                                                    (exists a5, semGenSize g5 size a5 /\
                                                                (f a1 a2 a3 a4 a5) = b)))).
-Proof. solveLiftGenX. Qed.
+Proof. unfold liftGen5. solveLiftGenX. Qed.
 
 Lemma Forall2_cons T U (P : T -> U -> Prop) x1 s1 x2 s2 :
   List.Forall2 P (x1 :: s1) (x2 :: s2) <-> P x1 x2 /\ List.Forall2 P s1 s2.
@@ -934,7 +930,8 @@ Proof.
   revert n l'.
   elim : l => [|[m a] l IH] n l' /= Hpd Hgen.
   - move : Hpd => [H1 H2 H3]; subst.
-    apply semReturnSize in Hgen. discriminate.
+    setrw_hyp semReturnSize Hgen.
+    discriminate.
   - rewrite sum_fstE.
     destruct (n < m) eqn:H. by ssromega.
     destruct (pickDrop l (n - m)) as [[k' x'] xs'] eqn:Heq. 
@@ -1060,11 +1057,12 @@ Proof.
   - rewrite semBindSize.
     intros x; split.
     + move => [n [H1 H2]].
-      eapply semChooseSize in H1; eauto.
+      setrw_hyp semChooseSize H1; eauto.
       edestruct (@pickDrop_sum_fst A) with (n := n) as [l' [H3 H4]]. eassumption.
-      rewrite H3 in H2. eapply semBindSize in H2.
+      rewrite H3 in H2.
+      setrw_hyp semBindSize H2.
       move : H2 => [a [/semReturnSize Heq1 Hb]]. inv Heq1.
-      eapply IHfuel; eassumption.
+      setrw_hyp IHfuel Hb; eassumption.
     + move => H; inv H. eexists 0.
       split.
       now eapply semChooseSize; eauto.
@@ -1074,7 +1072,7 @@ Proof.
       eapply semBindSize.
       eexists None. split. eapply semReturnSize; reflexivity.
       eapply IHfuel; eauto.
-Qed.      
+Qed.
 
 Lemma backtrackFuel_list_mon {A : Type} tot1 tot2 fuel1 fuel2 (lg1 lg2 : seq (nat * G (option A))) s :
   sum_fst lg1 = tot1 -> length lg1 = fuel1 ->
@@ -1086,16 +1084,16 @@ Proof.
   move : tot1 tot2 fuel2 lg1 lg2 s.
   induction fuel1; intros tot1 tot2 fuel2 lg1 lg2 s Htot1 Hf1 Htot2 Hf2 Hsub x [Hs Hin];
   destruct x; try discriminate; split; auto.
-  - simpl in Hin. eapply semReturnSize in Hin; inv Hin.
+  - simpl in Hin. setrw_hyp semReturnSize Hin; inv Hin.
   - assert (Ha : tot1 > 0). 
     { destruct tot1; auto.
-      apply backtrackFuel_sum_fst in Hin; auto; inv Hin. }
-    simpl in Hin. apply semBindSize in Hin.
+      setrw_hyp (backtrackFuel_sum_fst (A := A)) Hin; auto; inv Hin. }
+    simpl in Hin. setrw_hyp semBindSize Hin.
     destruct Hin as [n [Hgen Hgen']].
-    apply semChooseSize in Hgen; auto.
+    setrw_hyp semChooseSize Hgen; auto.
     move : Hgen => /andP [Hleq1  Hleq2].
     destruct (pickDrop lg1 n) as [[k g] gs'] eqn:Heq.
-    apply semBindSize in Hgen'.
+    setrw_hyp semBindSize Hgen'.
     destruct Hgen' as [b [Hg1 Hg2]].
     assert (Hlt : n < sum_fst lg1).
     { unfold leq, super, ChooseNat, OrdNat in *. now ssromega. }
@@ -1103,17 +1101,17 @@ Proof.
       subst; eauto.
     rewrite Heq in Hdrop. inv Hdrop.
     destruct b. 
-    + eapply semReturnSize in Hg2. inv Hg2.
+    + setrw_hyp semReturnSize Hg2. inv Hg2.
       edestruct (@pickDrop_In_strong A) as [b' [l' [Hpick [Hfst Hlen']]]].
       split; [| eassumption ].
       eapply Hsub.  eassumption.
       rewrite Hlen'. simpl.
       replace (length l' + 1) with ((length l').+1); [| now ssromega ].
       simpl.
-      eapply semBindSize. eexists b'. split.
-      eapply semChooseSize. now eauto.
-      apply/andP. unfold leq, super, ChooseNat, OrdNat in *.
-      split; now ssromega.
+      setrw semBindSize. eexists b'. split.
+      { setrw semChooseSize; [ | eauto ].
+        apply/andP. unfold leq, super, ChooseNat, OrdNat in *.
+        split; now ssromega. }
       rewrite Hpick.
       eapply semBindSize. eexists. split.
       eassumption. simpl. eapply semReturnSize. reflexivity.
@@ -1137,14 +1135,16 @@ Proof.
     auto with typeclass_instances.
   - move => HSum HLen Hsub.
     intros s1 s2 Hleq x H.
+    unfold semGenSizeOpt, somes in H.
     assert (Ha : tot > 0). 
-    { destruct tot; auto;
-      apply backtrackFuel_sum_fst in H; auto. inv H. }
-    eapply semBindSize in H.
+    { destruct tot; auto.
+      setrw_hyp (backtrackFuel_sum_fst (A := A)) H; auto. inv H. }
+    unfold backtrackFuel in H.
+    setrw_hyp semBindSize H.
     destruct H as [n [Hn H]].
-    eapply semChooseSize in Hn; eauto.
+    setrw_hyp semChooseSize Hn; eauto.
     destruct (pickDrop lg n) as [[k g] gs'] eqn:Heqd.
-    eapply semBindSize in H.
+    setrw_hyp semBindSize H.
     destruct H as [b [Hgb Hf]].
     assert (Hlt : n < sum_fst lg).
     { unfold leq, super, ChooseNat, OrdNat in *. now ssromega. }
@@ -1158,7 +1158,7 @@ Proof.
       rewrite Hdrop. eapply semBindSize.
       exists (Some b). split. eapply Hsub in Hin'.
       eapply monotonicOpt; eauto.
-      apply semReturnSize; apply semReturnSize in Hf; auto.
+      apply semReturnSize. setrw_hyp semReturnSize Hf. auto.
     + Admitted. (*
       (* have Hin :(isSome :&: semGenSize (backtrackFuel fuel (sum_fst lg - k) gs') s1) (Some a).
       { split ; eauto. } *)
@@ -1207,8 +1207,8 @@ Proof.
       - move => [n [Hleq H]].
         rewrite pickDrop_def in H; eauto.
         move : H =>  /semBindSize [[b |] [H1 H2]].
-        + eapply semReturnSize in H1. inversion H1.
-        + eapply semBacktrackFuelDef in H2; auto.
+        + setrw_hyp semReturnSize H1. inversion H1.
+        + setrw_hyp (semBacktrackFuelDef (A := A)) H2; auto.
           inversion H2; subst.
           right. split; auto.
           move => [n' a] [H3 H4]. eapply forall_leq_sum_fst in H3.
@@ -1217,13 +1217,17 @@ Proof.
         move: (pickDrop_exists l m) => [H1 H2].
         edestruct H1 as [k [g [l' [HIn [Hpd [Hkneq [Hsub [Hlen Hfst]]]]]]]].
         rewrite Hsum; auto. ssromega.
-        rewrite Hpd in H. eapply semBindSize in H.
+        rewrite Hpd in H. setrw_hyp semBindSize H.
         move : H => [a' [Hg Hb]]. 
         destruct a'. 
         + left. exists (k, g).
-          apply semReturnSize in Hb. inversion Hb; subst.
-            by firstorder.
-        + eapply IHfuel in Hb; auto.
+          setrw_hyp semReturnSize Hb. inversion Hb; subst.
+          split.
+          { red. split.
+            { apply Hsub. red. left. reflexivity. }
+            { assumption. } }
+          { red. split; [ constructor | assumption ]. }
+        + setrw_hyp IHfuel Hb; auto.
           * move : Hb => [Hsome | [Hnone Hcap]].
             left. eapply incl_bigcupl; [| eassumption ].
             apply setI_subset_compat.
@@ -1323,7 +1327,7 @@ Lemma semBacktrack_sound :
     ([set None] :&: (\bigcap_(x in l :&: (fun x => x.1 <> 0)) (semGen x.2))).
 Proof.
   intros A l x [s [_ H]].
-  eapply semBacktrackSize in H.
+  setrw_hyp (semBacktrackSize (A := A)) H.
   inv H.
   + left. destruct H0 as [y [[Hin1 Hin2] [Hin3 Hin4]]].
     eexists. split; split; eauto.
@@ -1364,7 +1368,7 @@ Proof.
      + move => ->. now apply semReturnSize.
   - split. 
     + move/semBindSize => [a [H1 H2]]. 
-       exists a. split => //. now apply IHbs.
+       exists a. split => //. symmetry in IHbs. now apply IHbs.
     + move => [a [H1 H2]]. apply semBindSize. exists a. split => //.
        now apply IHbs. 
 Qed.
@@ -1490,7 +1494,7 @@ Proof.
   - split.
     eapply monotonicOpt; eauto; eexists; eauto.
     eapply monotonicOpt; eauto; eexists; eauto.
-  - apply semReturnSize in Hb; discriminate Hb.
+  - setrw_hyp semReturnSize Hb; discriminate Hb.
 Qed.
 
 Instance bindOptMonotonic
@@ -1499,7 +1503,7 @@ Instance bindOptMonotonic
   SizeMonotonic (bindGenOpt g f).
 Proof.
   intros s1 s2 Hleq.
-  intros x Hx. eapply semBindSize in Hx.
+  intros x Hx. unfold bindGenOpt in Hx. setrw_hyp semBindSize Hx.
   destruct Hx as [a [Hg Hf]].
   destruct a as [a | ].
   - eapply H in Hg; try eassumption.
@@ -1507,7 +1511,7 @@ Proof.
     eapply semBindSize.
     eexists; split; eauto.
   - eapply H in Hg; try eassumption.
-    eapply semReturnSize in Hf. inv Hf.
+    setrw_hyp semReturnSize Hf. inv Hf.
     eapply semBindSize.
     eexists; split; eauto. simpl.
     eapply semReturnSize.
@@ -1539,14 +1543,14 @@ Proof.
   intros Hg Hf s x [Hin1 Hin2].
   split; [ eassumption |].
   unfold bindGenOpt in *.
-  eapply semBindSize in Hin2. destruct Hin2 as [a [Hg' Hf']].
+  setrw_hyp semBindSize Hin2. destruct Hin2 as [a [Hg' Hf']].
   destruct a as [a |].
   - assert (Hg'' : ((fun u : option A => u) :&: semGenSize g s) (Some a)).
     { split; eauto. }
     eapply Hg in Hg''.  destruct Hg'' as [_ Hg''].
     eapply semBindSize. eexists; split; [ eassumption |].
     simpl. eapply Hf. split; eauto.
-  - eapply semReturnSize in Hf'.  inv Hf'. discriminate.
+  - setrw_hyp semReturnSize Hf'.  inv Hf'. discriminate.
 Qed.
 
 Definition GOpt A := G (option A).
@@ -1569,11 +1573,11 @@ Proof.
   intros a; split; intro Ha.
   - destruct Ha as [a1 [Hg Ha]].
     destruct a1.
-    + apply semReturnSize in Ha.
+    + setrw_hyp semReturnSize Ha.
       inversion Ha; subst; auto.
     + destruct n.
-      * apply semReturnSize in Ha; inversion Ha; auto.
-      * apply Hn; auto.
+      * setrw_hyp semReturnSize Ha; inversion Ha; auto.
+      * symmetry in Hn; apply Hn; auto.
   - exists a. split; auto.
     destruct a.
     + apply semReturnSize; reflexivity.

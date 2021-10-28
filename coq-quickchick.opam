@@ -23,6 +23,7 @@ depends: [
   "menhir" {build}
   "cppo"   {build & >= "1.6.8"}
   "coq-simple-io"
+  "pure-splitmix" {>= "0.3"}
 ]
 
 authors: [

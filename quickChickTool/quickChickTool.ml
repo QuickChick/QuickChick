@@ -388,6 +388,7 @@ let run_and_show_output_on_failure command msg =
       failwith msg
 
 let tmp_int_re = Str.regexp "type int =[ ]*int"
+let uint63_re = Str.regexp "Uint63\\.of_int"
 
 let string_of_process_status = function
   | Unix.WEXITED i -> Printf.sprintf "EXIT %d" i
@@ -412,10 +413,10 @@ let compile_and_run where e : unit =
     sed_file file (fun line ->
       if Str.string_match tmp_int_re line 0 then
         "type tmptmptmp = int;; type int = tmptmptmp"
-      else line));
+      else Str.global_replace uint63_re "" line));
 
   let ocamlbuild_cmd =
-    Printf.sprintf "ocamlbuild -pkg zarith -cflag -rectypes %s %s.native"
+    Printf.sprintf "ocamlbuild -pkg zarith -pkg pure-splitmix -cflag -rectypes %s %s.native"
       !ocamlbuild_args
       (Filename.chop_suffix temporary_file ".v") in
   run_and_show_output_on_failure
