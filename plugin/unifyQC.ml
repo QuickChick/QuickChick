@@ -360,6 +360,7 @@ type mode = Recursive of (Unknown.t * dep_type) list
 let mode_analysis init_ctr curr_ctr (init_ranges : range list) (init_map : range UM.t)
       (curr_ranges : range list) (curr_map : range UM.t) =
   msg_debug (str (Printf.sprintf "Look here!! init_ctr = %s, curr_ctr = %s" (ty_ctr_to_string init_ctr) (ty_ctr_to_string curr_ctr)) ++ fnl ());
+  find_typeclass_bindings "EnumSizedSuchThat" curr_ctr;
   let unknowns_for_mode  = ref [] in
   let remaining_unknowns = ref [] in
   let all_unknowns = ref [] in

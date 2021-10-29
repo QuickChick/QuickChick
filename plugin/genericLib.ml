@@ -996,3 +996,37 @@ let sameTypeCtr c_ctr = function
 
 let isBaseBranch ty_ctr ty =
   fold_ty' (fun b ty' -> b && not (sameTypeCtr ty_ctr ty')) true ty
+
+(* Look for typeclass instances *)
+let find_typeclass_bindings typeclass_name ctr =  
+  let env = Global.env () in
+  let evd = Evd.from_env env in
+  let db = Hints.searchtable_map "typeclass_instances" in
+  Hints.Hint_db.iter (fun go hm hints ->
+      begin match go with
+      | Some (GlobRef.IndRef i) when
+             String.equal (MutInd.to_string (fst i)) ("QuickChick.DependentClasses." ^ typeclass_name) ->
+         List.iter (fun hint ->
+             begin match Hints.FullHint.pattern hint with
+             | Some (PApp (PRef g, args)) ->
+                begin 
+                match args.(1) with
+                | PLambda (name, t, PApp (PRef gctr, res_args)) ->
+                   let gctr_qualid = Nametab.shortest_qualid_of_global Id.Set.empty gctr in
+                   if qualid_eq gctr_qualid ctr then begin
+                     msg_debug (str "Found a match!" ++ fnl ());
+                     msg_debug (str ("Conclusion is Application of:" ^
+                                  (string_of_qualid (Nametab.shortest_qualid_of_global Id.Set.empty gctr)))
+                                ++ fnl ());
+                     end
+                   else ()
+                | _ -> failwith "FTB/1"
+                end
+             | _ -> failwith "FTB/2"
+             end;
+           ) hints
+      | _ -> ()
+      end
+    ) db
+
+    

@@ -733,7 +733,7 @@ Ltac2 prove_ih (ih : ident) :=
       | Constr.Unsafe.App t eq_args =>
         let m := Array.get eq_args 1 in          
         match Constr.Unsafe.kind m with
-        | Constr.Unsafe.Case _ _ a _  =>            
+        | Constr.Unsafe.Case _ _ _ a _  =>            
           match Constr.Unsafe.kind a with
           | Constr.Unsafe.App f args =>
             

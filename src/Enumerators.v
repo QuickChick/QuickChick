@@ -284,7 +284,7 @@ Proof.
       eapply Hbind in H0.
       inv H0. inv H1.
       
-      eapply Enumerators.semChooseSize in H2; eauto. simpl in .
+      eapply Enumerators.semChooseSize in H2; eauto. simpl in *.
       
       destruct (pickDrop_exists l x). simpl in *. now ssromega.
       destruct H1. destruct H4. destruct H4. destruct H6. destruct H7.

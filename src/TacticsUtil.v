@@ -51,13 +51,13 @@ Ltac2 print_kind (p : constr) :=
   | Constr.Unsafe.Constant _ _ => print_string "Constant"
   | Constr.Unsafe.Ind _ _ => print_string "Ind"
   | Constr.Unsafe.Constructor _ _ => print_string "Constructor"
-  | Constr.Unsafe.Case _ _ _ _ => print_string "Case"
+  | Constr.Unsafe.Case _ _ _ _ _ => print_string "Case"
   | Constr.Unsafe.Fix _ _ _ _ => print_string "fix"
   | Constr.Unsafe.CoFix _ _ _ => print_string "Cofix"
   | Constr.Unsafe.Proj _ _ => print_string "Proj"
   | Constr.Unsafe.Uint63 _ => print_string "Uint63"
   | Constr.Unsafe.Float _ => print_string "Float"
-                                          (* | Constr.Unsafe.Array _ _ _ _ =>print_string "Array" *)
+  | Constr.Unsafe.Array _ _ _ _ =>print_string "Array" 
   end.
 
 
