@@ -516,6 +516,7 @@ let dep_dispatch ind class_name : unit =
       (* Rewrite the datatypes *)
       let rec traverse_and_rewrite dts top_dt : dep_type list =
         match dts, top_dt with
+        | (DTyParam _)::dts', _ -> traverse_and_rewrite dts' top_dt
         | [], _ -> []
         | dt::dts', DArrow (dt1,dt2) when not (contains_app dt) ->
            dt :: (traverse_and_rewrite dts' dt2)
