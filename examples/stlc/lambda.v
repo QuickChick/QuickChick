@@ -280,13 +280,10 @@ Program Fixpoint gen_term_size (p : nat * type) {wf lt_pair p} : env -> G term :
       end
   end.
 Solve Obligations with
-  program_simpl; unfold lt_pair; apply left_lex; lia.
-Solve Obligations with
-  program_simpl; unfold lt_pair; apply right_lex; unfold lt_type; simpl; lia.
+  try (program_simpl; unfold lt_pair; (apply left_lex + (apply right_lex; unfold lt_type; simpl)); lia).
 Next Obligation.
   unfold MR. apply wf_inverse_image. apply wf_lt_pair.
 Defined.
-
 
 Definition gen_term_size_unfold (p : nat * type) (e : env) : G term :=
   match p with
