@@ -246,14 +246,19 @@ let runTest c env evd : unit =
   (* Printf.printf "So far so good?\n"; flush stdout; *)
   define_and_run c env evd
 
+let rec last = function
+  | [] -> None
+  | x :: [] -> Some x
+  | _ :: xs -> last xs
+
 let run f args =
   let env = Global.env () in
   let evd = Evd.from_env env in
-  begin match args with
-  | qc_text :: _ ->
+  begin match last args with
+  | Some qc_text ->
     let msg = "QuickChecking " ^ Pp.string_of_ppcmds (Ppconstr.pr_constr_expr env evd qc_text) in
     Feedback.msg_info (Pp.str msg)
-  | _ -> failwith "run called with no arguments"
+  | None -> failwith "run called with no arguments"
   end;
   let args = List.map (fun x -> (x,None)) args in
   let c = CAst.make @@
