@@ -1,5 +1,12 @@
 {
 
+(*
+
+THIS FILE IS PREPROCESSED USING cppo
+MAKE SURE TO EDIT THE .cppo SOURCE OF THIS FILE RATHER THAN THE GENERATED RESULT
+
+*)
+
 open Libnames
 open Util
 open Constrexpr
