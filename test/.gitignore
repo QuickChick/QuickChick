@@ -3,3 +3,4 @@
 *.native
 qc-mutants
 qc-out
+plugin.v

@@ -15,6 +15,7 @@ depends: [
   "dune"                    { >= "1.9.0"  }
   "menhir"                  {     build   }
   "cppo"                    { >= "1.6.8" & build }
+  "bignum"                  { >= "v0.14.0" }
   "coq"                     { >= "8.11"    }
   "coq-ext-lib"
   "coq-mathcomp-ssreflect"

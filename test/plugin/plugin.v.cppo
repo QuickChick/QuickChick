@@ -1,3 +1,8 @@
+(*
+THIS FILE IS PREPROCESSED USING cppo
+MAKE SURE TO EDIT THE .cppo SOURCE OF THIS FILE RATHER THAN THE GENERATED RESULT
+*)
+
 From QuickChick Require Import QuickChick.
 Set Warnings "-extraction-opaque-accessed,-extraction".
 
@@ -54,3 +59,13 @@ QuickChick
 Definition int := nat.
 Definition teh := fun x : int => Nat.eqb x x.
 QuickChick teh.
+
+From Coq Require Import
+     ZArith.
+#if COQ_VERSION >= (8, 15, 0)
+Sample (choose (-12345678901234567890, 12345678901234567890))%Z.
+Sample (choose (0, 12345678901234567890))%N.
+#else
+Sample (choose (-123456789, 123456789))%Z.
+Sample (choose (0, 123456789))%N.
+#endif

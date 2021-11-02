@@ -22,6 +22,7 @@ depends: [
   "ocamlfind"
   "menhir" {build}
   "cppo"   {build & >= "1.6.8"}
+  "bignum" {>= "v0.14.0"}
   "coq-simple-io"
 ]
 

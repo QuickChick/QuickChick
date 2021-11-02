@@ -8,7 +8,7 @@ QCTOOL_SRC=$(QCTOOL_DIR)/quickChickTool.ml \
 		   $(QCTOOL_DIR)/quickChickToolLexer.mll \
 		   $(QCTOOL_DIR)/quickChickToolParser.mly
 
-INSTALLDIR?=$(shell opam config var bin)
+INSTALLDIR?=$(shell opam var bin)
 
 # Here is a hack to make $(eval $(shell work
 # (copied from coq_makefile generated stuff):

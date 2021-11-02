@@ -1,4 +1,4 @@
-QC=quickChick -color -ocamlbuild '-lib unix -no-hygiene'
+QC=quickChick -color -ocamlbuild '-no-hygiene'
 TMP_DIR=../_qc_$(shell basename $(CURDIR)).tmp
 all: Makefile.coq
 	$(MAKE) -f $<

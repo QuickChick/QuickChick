@@ -1,4 +1,4 @@
-QC=quickChick -color -ocamlbuild '-lib unix'
+QC=quickChick -color
 
 all: Makefile.coq Foo
 	@$(MAKE) -f $<
