@@ -229,6 +229,21 @@ Proof.
 Admitted.
 
 
+Instance enumNSized_CorrectSized :
+  CorrectSized (@enumSized _ enumNSized).
+Proof.
+Admitted.
+
+Instance enumNSized_SizedMonotonic :
+  SizedMonotonic (@enumSized _ enumNSized).
+Proof.
+Admitted.
+
+Instance enumNSized_SizeMonotonic s:
+  SizeMonotonic (@enumSized _ enumNSized s).
+Proof.
+Admitted.
+
 Instance enumBoolSized_SizeMonotonic s:
   SizeMonotonic (@enumSized _ enumBoolSized s).
 Proof.
