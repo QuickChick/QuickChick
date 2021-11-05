@@ -74,16 +74,33 @@ Section TypeClasses.
       destruct dec; eauto. congruence.
   Qed.
 
+
+  Global Instance decCompleteNeg (P : Prop) {_ : Dec P} : DecOptCompleteNeg P.
+  Proof.
+    intros s.
+    unfold decOpt, dec_decOpt, Decidability.dec. destruct H.
+    exists 0. 
+    destruct dec; eauto. congruence.
+  Qed.
+
+  
   Global Instance decCorrectNeg (P : Prop) {_ : Dec P} : DecOptCorrectNeg P.
   Proof.
     constructor. 
     - intros s.
-      unfold decOpt, dec_decOpt, dec. destruct H.
+      unfold decOpt, dec_decOpt, Decidability.dec. destruct H.
       destruct dec; eauto. congruence.
     - intros s.
-      unfold decOpt, dec_decOpt, dec. destruct H.
-      exists 0.
+      unfold decOpt, dec_decOpt, Decidability.dec. destruct H.
+      exists 0. 
       destruct dec; eauto. congruence.
+  Qed.
+
+  Global Instance decSoundNeg (P : Prop) {_ : Dec P} : DecOptSoundNeg P.
+  Proof.
+    intros s.
+    unfold decOpt, dec_decOpt, dec. destruct H.
+    destruct dec; eauto. congruence.
   Qed.
 
   Global Instance decOptSoundNeg (P : Prop) {H : DecOpt P}
@@ -179,6 +196,17 @@ Section Lemmas.
     | None => None
     end = Some true ->
     check = Some true /\ b = Some true. 
+  Proof.
+    intros H. destruct check as [ [ | ] | ]; eauto; discriminate.
+  Qed.
+
+  Lemma destruct_match_false_l (check b : option bool):
+    match check with
+    | Some false => b
+    | Some true => Some false
+    | None => None
+    end = Some true ->
+    check = Some false /\ b = Some true. 
   Proof.
     intros H. destruct check as [ [ | ] | ]; eauto; discriminate.
   Qed.
@@ -314,6 +342,25 @@ Section Lemmas.
     eapply Hmon' > [ | eassumption ]. lia. lia.
   Qed.  
 
+
+  Lemma exists_match_false' check k s1 :        
+    check s1 = Some false ->
+    (forall s1 s2, (s1 <= s2) -> check s1 = Some false -> check s2 = Some false) ->
+    (forall s1 s2, (s1 <= s2) -> k s1 = Some true -> k s2 = Some true) ->
+    (exists s, k s = Some true) ->
+    (exists (s : nat) ,
+        match check s with
+        | Some false => k s
+        | Some true => Some false
+        | None => None
+        end = Some true).
+  Proof.
+    intros Hch Hmon Hmon' Hk. destruct Hk as [s2 Hk].
+    eexists (max s1 s2).
+    erewrite Hmon > [ | | eassumption ].
+    eapply Hmon' > [ | eassumption ]. lia. lia.
+  Qed.  
+
 End Lemmas. 
 
 
@@ -346,14 +393,16 @@ Ltac2 handle_checker_mon_t (ih : ident) (heq : ident) :=
       let heq1 := Fresh.in_goal heq in
       let heq' := Control.hyp heq in
       (* because apply .... in $heq doesn't work *)
-      assert ($heq1 := destruct_match_true_l _ _ $heq'); clear $heq;
+      first [ assert ($heq1 := destruct_match_true_l _ _ $heq')
+            | assert ($heq1 := destruct_match_false_l _ _ $heq') ];
+      clear $heq;
       let heq1 := Control.hyp heq1 in
       let hdec := Fresh.in_goal (id_of_string "Hdec") in
       destruct $heq1 as [$hdec $heq];
       first
         [ (* other decOpt *)
           match! goal with
-          | [ h : @decOpt ?p _ ?s = Some true |- _ ] =>
+          | [ h : @decOpt ?p _ ?s = Some _ |- _ ] =>
             eapply (@mon $p _ _) in $h > [ | eassumption ];
             let hdec' := Control.hyp hdec in
             rewrite $hdec'; clear $hdec
@@ -583,10 +632,11 @@ Ltac2 handle_checker_match_sound (ih : ident) (heq : ident) :=
       let ih := Control.hyp ih in      
       let hdec := Fresh.in_goal (id_of_string "Hdec") in
       destruct $heq1 as [$hdec $heq]; eapply $ih in $hdec
-    | (* match is the an other inductive type *)
+    | (* match is an other inductive type *)
       let heq1 := Fresh.in_goal heq in
       let heq' := Control.hyp heq in
-      assert ($heq1 := destruct_match_true_l _ _ $heq'); clear $heq;
+      first [ assert ($heq1 := destruct_match_true_l _ _ $heq')
+            | assert ($heq1 := destruct_match_false_l _ _ $heq') ]; clear $heq;
       let heq1 := Control.hyp heq1 in
       let hdec := Fresh.in_goal (id_of_string "Hdec") in
       destruct $heq1 as [$hdec $heq];
@@ -594,6 +644,8 @@ Ltac2 handle_checker_match_sound (ih : ident) (heq : ident) :=
       match! goal with
       | [ h : @decOpt ?p _ ?s = Some true |- _ ] =>
         eapply (@sound $p _ _) in $h
+      | [ h : @decOpt ?p _ ?s = Some false |- _ ] =>
+        eapply (@sound_neg $p _ _) in $h
       end
     | (* match is an input *) 
       match! goal with
@@ -792,6 +844,23 @@ Ltac2 rec handle_checker (hmon : ident) :=
                                         now repeat (handle_checker_mon_t hmon heq)
                                       | handle_checker hmon ]
           end
+        | match! goal with
+          | [ |- exists s, match @decOpt ?p ?i _ with _ => _ end = Some true ] =>
+            let hc := Fresh.in_goal (id_of_string "Hc") in
+            let s := Fresh.in_goal (id_of_string "s") in
+            assert ($hc := @complete_neg $p _ _ (ltac2:(now eauto)));
+            let hc1 := Control.hyp hc in
+            destruct $hc1 as [$s $hc];
+            let s1 := Control.hyp s in
+            eapply exists_match_false' with (s1 := $s1) >
+                                      [ eapply (@mon $p _ _) > [ | eassumption ]; lia
+                                      | intros; eapply (@mon $p _ _) > [ | eassumption ]; lia
+                                      | let heq := Fresh.in_goal (id_of_string "_heq") in
+                                        intros ? ? ? $heq; 
+                                        now repeat (handle_checker_mon_t hmon heq)
+                                      | handle_checker hmon ]
+          end
+
        |
           (* let ih := Fresh.in_goal (id_of_string "IH") in *)
           (* let s := Fresh.in_goal (id_of_string "s") in *)
