@@ -1,6 +1,6 @@
 From Coq Require Import Init.Nat Lia List.
 From QuickChick Require Import QuickChick.
-From mathcomp Require Import ssreflect ssreflect.eqtype.
+From mathcomp Require Import ssreflect ssreflect.eqtype ssrnat.
 Import QcNotation. Import QcDefaultNotation.
 Import ListNotations.
 
@@ -61,6 +61,16 @@ Proof. derive_enumST_Correct (). Qed.
 
 Derive EnumSizedSuchThat for (fun n => not_In n l).
 
+Instance EnumSizedSuchThatnot_In_SizedMonotonic l :
+  SizedMonotonicOpt (@enumSizeST _ _ (EnumSizedSuchThatnot_In l)).
+Proof. derive_enumST_SizedMonotonic (). Qed.
+
+Instance EnumSizedSuchThatnot_In_SizeMonotonic l :
+    forall s, SizeMonotonicOpt (@enumSizeST _ _ (EnumSizedSuchThatnot_In l) s).
+Proof. derive_enumST_SizeMonotonic (). Qed.
 
 
-Set Printing All. 
+Instance EnumSizedSuchThatnot_In_Correct l :
+    CorrectSizedST (fun n => not_In n l) (@enumSizeST _ _ (EnumSizedSuchThatnot_In l)).
+Proof. derive_enumST_Correct (). Qed.
+

@@ -229,6 +229,27 @@ Section Lemmas.
     ssromega. ssromega.
   Qed.
 
+  Lemma exists_match_DecOpt_neg {B} P {_ : DecOpt P} (k : nat -> E (option B)) z :
+    DecOptSizeMonotonic P ->
+    DecOptCompleteNeg P -> 
+    SizedMonotonicOpt k ->
+    ~ P ->
+    (exists s, semProdOpt (k s) z) ->
+    exists (s : nat),
+      semProdOpt (match decOpt s.+1 with
+                  | Some false => k s
+                  | _ => returnEnum None
+                  end) z.
+  Proof.
+    intros Hmon Hcom Hmonk Hp [s1 [s [_ He]]].
+    eapply Hcom in Hp. destruct Hp as [s2 Hdec].
+    eexists (max s1 s2).
+    eapply Hmon in Hdec. rewrite Hdec.
+
+    eexists. split. reflexivity. eapply Hmonk > [ | eassumption ].
+    ssromega. ssromega.
+  Qed.
+
   Lemma semProdSizeOpt_semProdOpt {A} {G : Type -> Type} {_ : Producer G} (e1 e2 : E (option A)) :
     (forall s, semProdSizeOpt e1 s \subset semProdSizeOpt e2 s) ->
     semProdOpt e1 \subset semProdOpt e2.
@@ -657,7 +678,7 @@ Ltac2 make_prod (bs : constr array) (c : constr) :=
 
 Ltac2 rec enumST_sound (ty : constr) (ih : ident) :=    
   match! goal with
-  (* match decOpt *) 
+  (* match decOpt pos *) 
   | [ h : semProdOpt (match @decOpt ?p ?i ?s with _ => _ end) ?x |- _ ] =>
     let hdec := Fresh.in_goal (id_of_string "Hdec") in 
     let b := Fresh.in_goal (id_of_string "b") in 
@@ -665,7 +686,14 @@ Ltac2 rec enumST_sound (ty : constr) (ih : ident) :=
     let b' := Control.hyp b in                                                            
     destruct $b' > [ | now eapply (@semReturnOpt_None E _ _) in $h; inv $h ];
     eapply (@CheckerProofs.sound $p) in $hdec > [ | tci ]; enumST_sound ty ih
-
+  (* match decOpt neg *) 
+  | [ h : semProdOpt (match @decOpt ?p ?i ?s with _ => _ end) ?x |- _ ] =>
+    let hdec := Fresh.in_goal (id_of_string "Hdec") in 
+    let b := Fresh.in_goal (id_of_string "b") in 
+    destruct (@decOpt $p $i $s) as [ $b | ] eqn:$hdec > [ | now eapply (@semReturnOpt_None E _ _) in $h; inv $h ];
+    let b' := Control.hyp b in                                                            
+    destruct $b' > [ now eapply (@semReturnOpt_None E _ _) in $h; inv $h | ];
+    eapply (@CheckerProofs.sound_neg $p) in $hdec > [ | tci ]; enumST_sound ty ih
  (* match input *) 
   | [ h : semProdOpt (match ?n with _ => _ end) ?x |- _ ] =>
     destruct $n; try (now eapply (@semReturnOpt_None E _ _) in $h; inv $h); enumST_sound ty ih
@@ -811,15 +839,15 @@ Ltac2 mon_expr (tapp : constr) (inst : constr) :=
         let mon s1 s2 s1' s2' s :=
             make_prod inps (subset (make_semEnum tapp (aux_app s1' s1 1) s) (make_semEnum tapp (aux_app s2' s2 1) s))
         in
-        
+       
         (* print_constr (mon '1 '2 '3 '4); set (s := ltac2:(let t := mon '1 '2 '3 '4 in exact $t)); () *)
                                                                                       
-        assert (_Hmons : forall (s1 s2 s2' s1' s: nat), (s1 <= s2)%coq_nat -> (s1' <= s2')%coq_nat -> 
+        assert (_Hmons : forall (s1 s2 s2' s1' s: nat), (s1 <= s2)%coq_nat -> (s1' <= s2')%coq_nat ->
                                                        ltac2:(let s1 := Control.hyp @s1 in
                                                               let s1' := Control.hyp @s1' in
                                                               let s2 := Control.hyp @s2 in
-                                                              let s2' := Control.hyp @s2' in 
-                                                              let s' := Control.hyp @s in 
+                                                              let s2' := Control.hyp @s2' in
+                                                              let s' := Control.hyp @s in
                                                               let t := mon s1 s2 s1' s2' s' in exact $t)) >
         [ let s1 := Fresh.in_goal (id_of_string "s1") in
           let s2 := Fresh.in_goal (id_of_string "s2_") in
@@ -827,14 +855,14 @@ Ltac2 mon_expr (tapp : constr) (inst : constr) :=
           intros $s1; simpl_enumSizeST ();
           let s1' := Control.hyp s1 in
           (induction $s1' as [| $s1 $ihs1 ]; intros $s2 ? ? ? ? ? ; Array.iter (fun _ => intro) inps) >
-          [ let s2' := Control.hyp s2 in base_case_st_size_mon s2' | let s2' := Control.hyp s2 in ind_case_st_sized_mon s2' ihs1 ]
+          [ let s2' := Control.hyp s2 in EnumProofs.base_case_st_size_mon s2'
+          | let s2' := Control.hyp s2 in EnumProofs.ind_case_st_sized_mon s2' ihs1 ]
         | ]
     | _ => Control.throw (Tactic_failure (Some (Message.of_string ("Expecting an application"))))
     end
   | _ => Control.throw (Tactic_failure (Some (Message.of_string ("Expecting a function"))))
   end
 end.
-
 
 
 
@@ -905,6 +933,12 @@ Ltac2 rec enumST_complete (ty : constr):=
       | (* decOpt complete *) tci
       | (* sizedMon *) intros ? ? ? ?; enumST_sized_mon @_Hmons
       | (* P *) now eauto ]
+    | (* match decOpt neg *)
+      (eapply (@exists_match_DecOpt_neg $ty) > [ | | | | enumST_complete ty ]) >
+      [ (* decOpt mon *) tci
+      | (* decOpt complete *) tci
+      | (* sizedMon *) intros ? ? ? ?; enumST_sized_mon @_Hmons
+      | (* ~ P *) now eauto ]
     | (* bindOpt rec call *)
       (eapply exists_bindOpt_Opt_Sized > [ | | | | | now enumST_complete ty ]) >
       [ (* sizedMon *)
