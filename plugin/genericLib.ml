@@ -9,6 +9,7 @@ open Constrexpr_ops
 open Ppconstr
 open Context
 open Error
+open Pattern
 
 let cnt = ref 0 
 
@@ -1002,6 +1003,7 @@ let find_typeclass_bindings typeclass_name ctr =
   let env = Global.env () in
   let evd = Evd.from_env env in
   let db = Hints.searchtable_map "typeclass_instances" in
+  let result = ref [] in
   Hints.Hint_db.iter (fun go hm hints ->
       begin match go with
       | Some (GlobRef.IndRef i) when
@@ -1018,6 +1020,37 @@ let find_typeclass_bindings typeclass_name ctr =
                      msg_debug (str ("Conclusion is Application of:" ^
                                   (string_of_qualid (Nametab.shortest_qualid_of_global Id.Set.empty gctr)))
                                 ++ fnl ());
+                     let standard = ref true in
+                     let res = List.map (fun p ->
+                                   match p with
+                                   | PMeta (Some id) ->
+                                      if not (Name.equal (Name id) name)
+                                      then false
+                                      else failwith "FTB/How is this true"
+                                   | PRef _ -> false 
+                                   | PRel _ -> true
+                                   | PVar v -> failwith "VAR"
+                                   | PEvar _ -> failwith "EVAR"
+                                   | PMeta _ -> failwith "META"
+                                   | PLetIn _ -> failwith "LET"
+                                   | PRel _ -> failwith "REL"
+                                   | PSort _ -> failwith "SORT"
+                                   | PInt _ -> failwith "INT"
+                                   | PFloat _ -> failwith "FLOAT"
+                                   | PApp _ -> standard := false; true
+                                   | PSoApp _ -> failwith "SOAPP"
+                                   | PLambda _ -> failwith "LAMBDA"
+                                   | PProj _ -> failwith "PROJ"
+                                   | PIf _ -> failwith "IF"
+                                   | PCase _ -> failwith "CASE"
+                                   | PFix _ -> failwith "FIX"
+                                   | PCoFix _ -> failwith "COFIX"
+                                   | PArray _ -> failwith "ARRAY"
+                                   | _ -> failwith "SOMETHING ELSE"
+                                 ) (Array.to_list res_args) in
+                     if !standard then 
+                       result := res :: !result
+                     else ()
                      end
                    else ()
                 | _ -> failwith "FTB/1"
@@ -1027,6 +1060,7 @@ let find_typeclass_bindings typeclass_name ctr =
            ) hints
       | _ -> ()
       end
-    ) db
+    ) db;
+    !result
 
     

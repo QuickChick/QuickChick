@@ -250,6 +250,6 @@ val list_insert_nth : 'a -> 'a list -> int -> 'a list
 val sameTypeCtr  : ty_ctr -> coq_type -> bool
 val isBaseBranch : ty_ctr -> coq_type -> bool
                                                 
-val find_typeclass_bindings : string -> ty_ctr -> unit
+val find_typeclass_bindings : string -> ty_ctr -> (bool list) list
 
                                            

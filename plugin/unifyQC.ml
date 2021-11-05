@@ -267,15 +267,16 @@ let rec convert_to_range dt =
   | DHole -> Some RangeHole
   | _ -> None
 
-let is_fixed k dt = 
-  let rec aux = function
+let rec is_fixed_range k = function
     | Undef _ -> false
     | FixedInput -> true
-    | Unknown u' -> aux (umfind u' k)
-    | Ctr (_, rs) -> List.for_all aux rs
+    | Unknown u' -> is_fixed_range k (umfind u' k)
+    | Ctr (_, rs) -> List.for_all (is_fixed_range k) rs
     | RangeHole -> true (*TODO *)
     | Parameter _ -> true (* TODO *)
-  in option_map aux (convert_to_range dt)
+       
+let is_fixed k dt = 
+  option_map (is_fixed_range k) (convert_to_range dt)
 
 (* convert a range to a coq expression *)
 let rec range_to_coq_expr k r = 
@@ -357,10 +358,17 @@ type mode = Recursive of (Unknown.t * dep_type) list
                        * range list
           | NonRecursive of (Unknown.t * dep_type) list (* List of all unknowns that are still undefined *)
 
+type range_mode =
+  | ModeFixed
+  | ModeUndefUnknown of (Unknown.t * dep_type)
+  | ModePartlyDef of ((Unknown.t * Unknown.t) list * (Unknown.t * dep_type) list * matcher_pat)
+
+type compatible = Compatible | Incompatible | PartCompatible | InstCompatible
+                   
 let mode_analysis init_ctr curr_ctr (init_ranges : range list) (init_map : range UM.t)
       (curr_ranges : range list) (curr_map : range UM.t) =
   msg_debug (str (Printf.sprintf "Look here!! init_ctr = %s, curr_ctr = %s" (ty_ctr_to_string init_ctr) (ty_ctr_to_string curr_ctr)) ++ fnl ());
-  find_typeclass_bindings "EnumSizedSuchThat" curr_ctr;
+  ignore (find_typeclass_bindings "EnumSizedSuchThat" curr_ctr);
   let unknowns_for_mode  = ref [] in
   let remaining_unknowns = ref [] in
   let all_unknowns = ref [] in
@@ -439,6 +447,7 @@ let warn_uninstantiated_variables =
        
 let handle_branch
       (type a) (type b) (* I've started to love ocaml again because of this *)
+      (prod_class_name : string)
       (_dep_type : dep_type)
       (init_size : coq_expr)
       (fail_exp : b)
@@ -718,6 +727,168 @@ let handle_branch
       | None -> qcfail "Internal: After instantiating function calls, datatypes should be convertible to ranges."
     in 
 
+    (* Rewrite: Actually look at available instances. *)
+
+    (* Inv: r has to be a toplevel range. *)
+    let mode_analyze r umap =
+      if is_fixed_range umap r then ModeFixed
+      else 
+        let handle_partial r umap =
+          let eqs = ref [] in
+          let unks = ref [] in 
+          let rec convert_to_pat parent r =
+            match r with
+            | Parameter x -> MatchParameter x
+            | Ctr (ctr, rs) -> MatchCtr (ctr, List.map (convert_to_pat Unknown.undefined) rs)
+            | Unknown u -> convert_to_pat u (UM.find u umap)
+            | FixedInput ->
+               (* introduce fresh unknown, match that, yield equality *)               
+               let u = make_up_name () in
+               eqs := (u, parent) :: !eqs;
+               MatchU u
+            | Undef dt ->
+               (* register as unknown to be generated from pattern *)
+               if List.exists (fun ut -> (fst ut) = parent) !unks then
+                 begin
+                   (* Already fixed from another pattern. Test equality *)
+                   let u = make_up_name () in
+                   eqs := (u, parent) :: !eqs;
+                   MatchU u
+                 end
+               else
+                 begin
+                   unks := (parent, dt) :: !unks;
+                   MatchU parent
+                 end
+          in ModePartlyDef (!eqs, !unks, convert_to_pat Unknown.undefined r)
+        in
+        (* At this point, it can only be an unknown or a constructor. *)        
+        match r with
+        | Unknown u ->
+           begin match UM.find u umap with
+           | Undef dt -> ModeUndefUnknown (u, dt)
+           | _ -> handle_partial r umap
+           end
+        | Ctr _ -> handle_partial r umap
+        | _ -> failwith "Not U/C MA"
+    in
+
+    (* r: range
+       b: boolean
+          false = input, true = output.
+       m: Mode *)
+    let compatible b m =
+      match m, b with
+      | ModeFixed, false -> Compatible
+      | ModeUndefUnknown _, false -> InstCompatible
+      | ModePartlyDef (eqs, unks, pat), false -> InstCompatible
+      | ModeFixed, true  -> Incompatible
+      | ModeUndefUnknown _ , true -> Compatible
+      | ModePartlyDef _, true -> PartCompatible
+    in
+    let rec mode_score bs ms =
+      let cs = List.map2 compatible bs ms in
+      ((List.filter (fun c -> c == Compatible) cs),
+       (List.filter (fun c -> c == InstCompatible) cs),
+       (List.filter (fun c -> c == Incompatible) cs),
+       (List.filter (fun c -> c == PartCompatible) cs))
+    in 
+             
+    (*  LOGIC: 
+        - Filter out incompatible
+        - Prioritize production
+          + Prioritize Modes that don't have PartCompatible
+          + Default to PartCompatible with the shallowest pattern (TODO)
+        - Fallback to checker
+        - If none exist, fail with a more useful error message
+          + Alternative: Call a let-bound generator to show the instance to the user 
+     *)
+    let curr_modes = List.map (fun r -> mode_analyze r !umap) input_ranges in
+    msg_debug (str (Printf.sprintf "Look here v2!! %s %s" (ty_ctr_to_string gen_ctr) (ty_ctr_to_string c)) ++ fnl ());
+(*    
+    if not (gen_ctr = c) then
+      begin
+        msg_debug (str "Non-recursive constructor" ++ fnl ());
+        let producer_classes = find_typeclass_bindings prod_class_name c in
+        let checker_classes = find_typeclass_bindings "DecOpt" c in
+        (* Quick-and-dirty sorting based on logic above. 
+           Most of the time there will only be one producer, and the 
+           effect will be filtering for (in)compatibility.
+         *)
+        let producer_sorted =
+          List.sort (fun ((c1,i1,_,p1),_) ((c2,i2,_,p2),_) ->
+                       compare (List.length p1, List.length i1)
+                               (List.length p2, List.length i2)) 
+            (List.filter (fun ((_,_,inc,_),_) -> List.length inc == 0)
+               (List.map (fun bs -> (mode_score bs curr_modes, bs)) producer_classes)) in
+        begin match producer_sorted with
+        | (_,bs) :: _ ->
+           msg_debug (str ("Found Producer! " ^ String.concat "," (List.map (Printf.sprintf "%b") bs)) ++ fnl ());
+
+           (* Begin producer stuff. *)
+           let cs = List.map2 
+             
+             let ais = String.concat " " (List.map var_to_string (List.map fst all_unknowns)) in
+       msg_debug (str ais ++ fnl ());
+
+       (* Call to arbitrarySizedST *)
+       (* @arbitrarySizeST {A} (P : A -> Prop) {Instance} (size : nat) -> G (option A) *)
+       (* We will instantiate an unknown. First create a fresh one *)
+       let fresh_unknown =
+         match all_unknowns with
+         | [(x,_)] -> x
+         | _ -> unk_provider.next_unknown ()
+       in 
+       let unknown_type = dtTupleType (List.map snd all_unknowns) in
+       let unknown_range =
+         match all_unknowns with
+         | [] -> failwith "IMPOSSIBLE"
+         | [(_x,_)] -> Undef unknown_type
+         | _ -> listToPairAux (fun (acc, x) -> Ctr (injectCtr "Coq.Init.Datatypes.pair", [acc; x]))
+                  (List.map (fun (x,_) -> Unknown x) all_unknowns)
+       in
+       umap := UM.add fresh_unknown unknown_range !umap;
+
+       let letbinds =
+         match all_unknowns with
+         | [] -> None
+         | [_] -> None
+         | _ -> Some (List.map fst all_unknowns)
+       in 
+
+       (* LEO: LOOK AT THIS *)
+       let _args = List.map (range_to_coq_expr !umap) ranges in
+
+       let pred_result = gApp ~explicit:true (gTyCtr c) (List.map (range_to_coq_expr !umap) ranges) in
+       let pred = (* predicate we are generating for *)
+         gFun [var_to_string fresh_unknown]
+           (fun _ ->
+             match letbinds with
+             | Some binds -> gLetTupleIn fresh_unknown binds pred_result
+             | None -> pred_result
+           )
+       in
+
+       process_checks ex_bind fresh_unknown true (instantiate_existential_methodST ctr_index pred) 
+            (fun _x' -> recurse_type (ctr_index + 1) dt')
+
+    ) 
+
+end
+           
+        | _ ->
+           begin match checker_classes with
+           | bs :: _ ->
+              msg_debug (str ("Found Checker! " ^ String.concat "," (List.map (Printf.sprintf "%b") bs)) ++ fnl ())
+           (* Begin Checker stuff *)
+              
+           | _ -> failwith "TODO: ERR MSG. No Classes found."
+           end
+        end
+      end
+else ();
+*)
+    
     (* TODO: positive/negative context *)
     (* Then do mode analysis on the new dts *)
     match mode_analysis gen_ctr c input_ranges init_umap ranges !umap with

@@ -37,6 +37,7 @@ Derive ArbitrarySizedSuchThat for (fun x => bind env x tau).
 (* Get the type of a given variable in an env. *)
 Derive EnumSizedSuchThat for (fun tau => bind env x tau).
 (* Check whether a variable has a given type in an env. *)
+QuickChickDebug Debug On.
 Derive DecOpt for (bind env t tau).
 
 (* Typing *)
@@ -72,7 +73,11 @@ Instance ESST_A2 (t t1 : type) : EnumSizedSuchThat _ (fun t2 => t = Arrow t1 t2)
                            | _ => returnEnum None
                            end }.
 
+QuickChickDebug Debug On.
 Derive EnumSizedSuchThat for (fun tau => typing env t tau).
+
+
+
 
 (* Check whether a variable has a given type in an env. *)
 Derive DecOpt for (typing env t tau).
