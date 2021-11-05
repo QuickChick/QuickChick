@@ -999,6 +999,30 @@ let isBaseBranch ty_ctr ty =
   fold_ty' (fun b ty' -> b && not (sameTypeCtr ty_ctr ty')) true ty
 
 (* Look for typeclass instances *)
+let debug_pattern s p =
+  match p with 
+  | PMeta _ -> failwith (s ^ "META")
+  | PRef _ -> failwith (s ^ "REF")
+  | PRel _ -> failwith (s ^ "REL")
+  | PVar v -> failwith (s ^ "VAR")
+  | PEvar _ -> failwith (s ^ "EVAR")
+  | PMeta _ -> failwith (s ^ "META")
+  | PLetIn _ -> failwith (s ^ "LET")
+  | PRel _ -> failwith (s ^ "REL")
+  | PSort _ -> failwith (s ^ "SORT")
+  | PInt _ -> failwith (s ^ "INT")
+  | PFloat _ -> failwith (s ^ "FLOAT")
+  | PApp _ -> failwith (s ^ "APP")
+  | PSoApp _ -> failwith (s ^ "SOAPP")
+  | PLambda _ -> failwith (s ^ "LAMBDA")
+  | PProj _ -> failwith (s ^ "PROJ")
+  | PIf _ -> failwith (s ^ "IF")
+  | PCase _ -> failwith (s ^ "CASE")
+  | PFix _ -> failwith (s ^ "FIX")
+  | PCoFix _ -> failwith (s ^ "COFIX")
+  | PArray _ -> failwith (s ^ "ARRAY")
+  | _ -> failwith (s ^ "SOMETHING ELSE")
+  
 let find_typeclass_bindings typeclass_name ctr =  
   let env = Global.env () in
   let evd = Evd.from_env env in
@@ -1009,8 +1033,10 @@ let find_typeclass_bindings typeclass_name ctr =
       | Some (GlobRef.IndRef i) when
              String.equal (MutInd.to_string (fst i)) ("QuickChick.DependentClasses." ^ typeclass_name) ->
          List.iter (fun hint ->
+             msg_debug (str "Processing... (" ++ str typeclass_name ++ str ")"  ++ Hints.FullHint.print env evd hint ++ fnl ());
              begin match Hints.FullHint.pattern hint with
              | Some (PApp (PRef g, args)) ->
+                msg_debug (str ("Hint for :" ^ (string_of_qualid (Nametab.shortest_qualid_of_global Id.Set.empty g))) ++ fnl ());
                 begin 
                 match args.(1) with
                 | PLambda (name, t, PApp (PRef gctr, res_args)) ->
@@ -1029,31 +1055,15 @@ let find_typeclass_bindings typeclass_name ctr =
                                       else failwith "FTB/How is this true"
                                    | PRef _ -> false 
                                    | PRel _ -> true
-                                   | PVar v -> failwith "VAR"
-                                   | PEvar _ -> failwith "EVAR"
-                                   | PMeta _ -> failwith "META"
-                                   | PLetIn _ -> failwith "LET"
-                                   | PRel _ -> failwith "REL"
-                                   | PSort _ -> failwith "SORT"
-                                   | PInt _ -> failwith "INT"
-                                   | PFloat _ -> failwith "FLOAT"
-                                   | PApp _ -> standard := false; true
-                                   | PSoApp _ -> failwith "SOAPP"
-                                   | PLambda _ -> failwith "LAMBDA"
-                                   | PProj _ -> failwith "PROJ"
-                                   | PIf _ -> failwith "IF"
-                                   | PCase _ -> failwith "CASE"
-                                   | PFix _ -> failwith "FIX"
-                                   | PCoFix _ -> failwith "COFIX"
-                                   | PArray _ -> failwith "ARRAY"
-                                   | _ -> failwith "SOMETHING ELSE"
+                                   | _ -> debug_pattern "FTB/0" p
                                  ) (Array.to_list res_args) in
                      if !standard then 
                        result := res :: !result
                      else ()
                      end
                    else ()
-                | _ -> failwith "FTB/1"
+                | PMeta (Some id) -> () (* failwith (Id.to_string id) *)
+                | _ -> debug_pattern "FTB/1" args.(1)
                 end
              | _ -> failwith "FTB/2"
              end;

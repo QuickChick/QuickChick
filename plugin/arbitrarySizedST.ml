@@ -105,7 +105,7 @@ let construct_generators
   =
   (* partially applied handle_branch *)
   let handle_branch' =
-    handle_branch "GenSizedSuchThat"
+    handle_branch ["GenSizedSuchThat"; "GenSuchThat"]
       dep_type init_size (fail_exp full_gtyp) (not_enough_fuel_exp full_gtyp) (ret_exp full_gtyp)
       instantiate_existential_method instantiate_existential_methodST bind
       (rec_method rec_name init_size size) bind

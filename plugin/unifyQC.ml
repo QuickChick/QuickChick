@@ -459,7 +459,7 @@ let warn_uninstantiated_variables =
        
 let handle_branch
       (type a) (type b) (* I've started to love ocaml again because of this *)
-      (prod_class_name : string)
+      (prod_class_names : string list)
       (_dep_type : dep_type)
       (init_size : coq_expr)
       (fail_exp : b)
@@ -823,9 +823,19 @@ let handle_branch
      *)
     msg_debug (str (Printf.sprintf "Look here v2!! %s %s" (ty_ctr_to_string gen_ctr) (ty_ctr_to_string c)) ++ fnl ());
     
-    let producer_classes = find_typeclass_bindings prod_class_name c in
-    let checker_classes = find_typeclass_bindings "DecOpt" c in
-    let curr_modes  = List.map (fun r -> mode_analyze r !umap) ranges in        
+    let producer_classes =
+      List.concat (List.map (fun n -> find_typeclass_bindings n c) prod_class_names) in
+    let checker_classes =
+      List.concat (List.map (fun n -> find_typeclass_bindings n c) ["DecOpt"; "Dec"]) in      
+    let curr_modes  = List.map (fun r -> mode_analyze r !umap) ranges in
+    msg_debug (str (Printf.sprintf "Current Ranges: %s" (ranges_to_string ranges)) ++ fnl ());
+    msg_debug (str (Printf.sprintf "Current Modes: %s\n" (String.concat " " (List.map range_mode_to_string curr_modes))) ++ fnl ());
+    
+    msg_debug (str "Producer classes: " ++ fnl ());
+    List.iter (fun bs -> msg_debug (str (String.concat " " (List.map (fun b -> Printf.sprintf "%b" b) bs)) ++ fnl ())) producer_classes;
+    msg_debug (str "Checker classes: " ++ fnl ());
+    List.iter (fun bs -> msg_debug (str (String.concat " " (List.map (fun b -> Printf.sprintf "%b" b) bs)) ++ fnl ())) checker_classes; 
+    
     let ranked_producers =
       List.sort (fun ((c1,i1,_,p1),_) ((c2,i2,_,p2),_) ->
           compare (List.length p1, List.length i1)
