@@ -777,10 +777,12 @@ let handle_branch
         (* At this point, it can only be an unknown or a constructor. *)        
         match r with
         | Unknown u ->
-           begin match UM.find u umap with
-           | Undef dt -> ModeUndefUnknown (u, dt)
-           | _ -> handle_partial r umap
-           end
+           let rec unknown_chain u =
+             match UM.find u umap with
+             | Undef dt -> ModeUndefUnknown (u,dt) (* TODO which u? *)
+             | Unknown u' -> unknown_chain u'
+             | _ -> handle_partial r umap in
+           unknown_chain u
         | Ctr _ -> handle_partial r umap
         | _ -> failwith "Not U/C MA"
     in
@@ -958,7 +960,69 @@ let handle_branch
         )
         end
       else
-        failwith "Check"
+        (* The recursive case is not a producer - check if there is an enumerator that works better! *)
+
+        begin match ranked_producers with
+        | (_,bs) :: _ ->
+           msg_debug (str ("Found producer instead of recursive checker! " ^ String.concat "," (List.map (Printf.sprintf "%b") bs)) ++ fnl ());
+           (* Begin producer stuff. *)
+           (* Step 1: Figure out which unknowns need to be instantiated for mode to work out *)
+           (* Invariant: These are not Incompatible *)
+           let (uts, need_filtering, unknown_gen) = compute_for_mode curr_modes bs in
+           let unknowns_for_mode = UM.bindings uts in
+           (* Instantiate any unknowns that need to be for the mode to work. *)
+           instantiate_toplevel_ranges_cont (List.map (fun (x,_t) -> Unknown x) unknowns_for_mode) [] (fun _ranges ->
+           (* TODO: Need filtering. *)
+
+           let unknown_to_generate_for =
+             match need_filtering, unknown_gen with
+             | None, Some (u, dt, i) -> u
+             | Some (eqs, unks, pat, i), None -> unk_provider.next_unknown ()
+             | _, _ -> failwith "Simultaneous Some/None" 
+           in
+           let ranges_for_pred =
+             let rs = List.map (range_to_coq_expr !umap) ranges in
+             match need_filtering with
+             | Some (_,_,_,i) -> List.mapi (fun j x -> if i = j then gVar unknown_to_generate_for else x) rs
+             | _ -> rs 
+           in 
+           let pred_result = gApp ~explicit:true (gTyCtr c) ranges_for_pred in
+           let pred = (* predicate we are generating for *)
+             gFun [var_to_string unknown_to_generate_for] (fun _ -> pred_result)
+           in
+
+           (* Need to add the unknown in the map. The type as it will be fixed soon. *)
+           umap := UM.add unknown_to_generate_for (Undef DHole) !umap;
+
+           (* TODO: Filtering. *)
+           process_checks ex_bind unknown_to_generate_for true (instantiate_existential_methodST ctr_index pred) 
+             (fun _x' -> recurse_type (ctr_index + 1) dt')
+           
+             )
+        | _ ->
+           (* There is no good producer, just instantiate everything and make a recursive call. *)
+           is_base := false;
+          
+           (* Then just make the recursive call. *)
+           let (uts, need_filtering, unknown_gen) = compute_for_mode curr_modes rec_bs in
+        
+           let unknowns_for_mode = UM.bindings uts in
+           (* Instantiate any unknowns that need to be for the mode to work. *)
+           instantiate_toplevel_ranges_cont (List.map (fun (x,_t) -> Unknown x) unknowns_for_mode) [] (fun _ranges ->
+           (* Generate a fresh boolean unknown *)
+           let unknown_to_generate_for = unk_provider.next_unknown () in
+           umap := UM.add unknown_to_generate_for (Undef (DCtr (injectCtr "Coq.Init.Datatypes.bool", []))) !umap;
+
+           let inputs_for_rec_method =
+             List.map (range_to_coq_expr !umap) ranges
+           in 
+           
+           let letbinds = None in
+           process_checks rec_bind unknown_to_generate_for true
+             (rec_method ctr_index letbinds inputs_for_rec_method)
+             (fun _shouldletthis -> recurse_type (ctr_index+1) dt')
+           )
+        end
       end
       )
 (*    
