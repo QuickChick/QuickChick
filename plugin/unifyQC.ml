@@ -914,7 +914,7 @@ let handle_branch
                let rec construct_eqs = function
                  | [] -> cont
                  | (u1,u2)::eqs' ->
-                    umap := UM.add u1 FixedInput !umap;
+                    (* umap := UM.add u1 FixedInput !umap; *)
                     let checker =
                       gApp ~explicit:true (gInject "decOpt")
                         [ gApp (gInject "Logic.eq") [gVar u1; gVar u2]
@@ -926,7 +926,7 @@ let handle_branch
                match need_filtering with
                | None -> cont
                | Some (eqs, unks, pat, i) ->
-                  List.iter (fun (u,_) -> umap := UM.add u FixedInput !umap) unks;
+                  List.iter (fun (u,_) -> umap := fixVariable u !umap) unks;
                   match_inp unknown_to_generate_for pat (construct_eqs eqs) fail_exp
              )
            
@@ -1029,7 +1029,7 @@ let handle_branch
                let rec construct_eqs = function
                  | [] -> cont
                  | (u1,u2)::eqs' ->
-                    umap := UM.add u1 FixedInput !umap;
+                    (*                    umap := UM.add u1 FixedInput !umap; *)
                     let checker =
                       gApp ~explicit:true (gInject "decOpt")
                         [ gApp (gInject "Logic.eq") [gVar u1; gVar u2]
@@ -1041,7 +1041,7 @@ let handle_branch
                match need_filtering with
                | None -> cont
                | Some (eqs, unks, pat, i) ->
-                  List.iter (fun (u,_) -> umap := UM.add u FixedInput !umap) unks;
+                  List.iter (fun (u,_) -> umap := fixVariable u !umap) unks;
                   match_inp unknown_to_generate_for pat (construct_eqs eqs) fail_exp
           )
         )
