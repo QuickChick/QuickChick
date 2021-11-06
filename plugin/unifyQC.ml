@@ -908,11 +908,29 @@ let handle_branch
            (* Need to add the unknown in the map. The type as it will be fixed soon. *)
            umap := UM.add unknown_to_generate_for (Undef DHole) !umap;
 
-           (* TODO: Filtering. *)
            process_checks ex_bind unknown_to_generate_for true (instantiate_existential_methodST ctr_index pred) 
-             (fun _x' -> recurse_type (ctr_index + 1) dt')
-           
+             (fun _x' ->
+               let cont = recurse_type (ctr_index + 1) dt' in
+               let rec construct_eqs = function
+                 | [] -> cont
+                 | (u1,u2)::eqs' ->
+                    umap := UM.add u1 FixedInput !umap;
+                    let checker =
+                      gApp ~explicit:true (gInject "decOpt")
+                        [ gApp (gInject "Logic.eq") [gVar u1; gVar u2]
+                        ; hole
+                        ; init_size]
+                    in
+                    check_expr ctr_index checker (construct_eqs eqs') fail_exp not_enough_fuel_exp
+               in 
+               match need_filtering with
+               | None -> cont
+               | Some (eqs, unks, pat, i) ->
+                  List.iter (fun (u,_) -> umap := UM.add u FixedInput !umap) unks;
+                  match_inp unknown_to_generate_for pat (construct_eqs eqs) fail_exp
              )
+           
+           )
         | _ ->
            begin match checker_classes with
            | bs :: _ ->
@@ -995,7 +1013,7 @@ let handle_branch
           | Some (eqs, unks, pat, i), None -> unk_provider.next_unknown ()
           | _, _ -> failwith "Simultaneous Some/None" 
         in
-
+        umap := UM.add unknown_to_generate_for (Undef DHole) !umap;
         msg_debug (str (Printf.sprintf "Unknown to generate for: %s\n" (Unknown.to_string (unknown_to_generate_for))) ++ fnl ());
         
         let inputs_for_rec_method =
@@ -1006,7 +1024,26 @@ let handle_branch
         let letbinds = None in
         process_checks rec_bind unknown_to_generate_for true
           (rec_method ctr_index letbinds inputs_for_rec_method)
-          (fun _shouldletthis -> recurse_type (ctr_index+1) dt')
+          (fun _shouldletthis ->
+               let cont = recurse_type (ctr_index + 1) dt' in
+               let rec construct_eqs = function
+                 | [] -> cont
+                 | (u1,u2)::eqs' ->
+                    umap := UM.add u1 FixedInput !umap;
+                    let checker =
+                      gApp ~explicit:true (gInject "decOpt")
+                        [ gApp (gInject "Logic.eq") [gVar u1; gVar u2]
+                        ; hole
+                        ; init_size]
+                    in
+                    check_expr ctr_index checker (construct_eqs eqs') fail_exp not_enough_fuel_exp
+               in 
+               match need_filtering with
+               | None -> cont
+               | Some (eqs, unks, pat, i) ->
+                  List.iter (fun (u,_) -> umap := UM.add u FixedInput !umap) unks;
+                  match_inp unknown_to_generate_for pat (construct_eqs eqs) fail_exp
+          )
         )
         end
       else
@@ -1046,9 +1083,27 @@ let handle_branch
 
            (* TODO: Filtering. *)
            process_checks ex_bind unknown_to_generate_for true (instantiate_existential_methodST ctr_index pred) 
-             (fun _x' -> recurse_type (ctr_index + 1) dt')
-           
+             (fun _x' ->
+               let cont = recurse_type (ctr_index + 1) dt' in
+               let rec construct_eqs = function
+                 | [] -> cont
+                 | (u1,u2)::eqs' ->
+                    umap := UM.add u1 FixedInput !umap;
+                    let checker =
+                      gApp ~explicit:true (gInject "decOpt")
+                        [ gApp (gInject "Logic.eq") [gVar u1; gVar u2]
+                        ; hole
+                        ; init_size]
+                    in
+                    check_expr ctr_index checker (construct_eqs eqs') fail_exp not_enough_fuel_exp
+               in 
+               match need_filtering with
+               | None -> cont
+               | Some (eqs, unks, pat, i) ->
+                  List.iter (fun (u,_) -> umap := UM.add u FixedInput !umap) unks;
+                  match_inp unknown_to_generate_for pat (construct_eqs eqs) fail_exp
              )
+           )
         | _ ->
            (* There is no good producer, just instantiate everything and make a recursive call. *)
            is_base := false;
