@@ -423,18 +423,18 @@ let dep_dispatch ind class_name : unit =
            begin
              (* Create a fresh name *)
              let x = make_up_name () in
-             new_eqs := (dt, x) :: !new_eqs;
-             tmap := UM.add x dt1 !tmap;
-             umap := UM.add x (Undef dt1) !umap;
+             new_eqs := (dt, x, dt1) :: !new_eqs;
+(*             tmap := UM.add x dt1 !tmap;
+               umap := UM.add x (Undef dt1) !umap; *)
              DTyVar x :: (traverse_and_rewrite dts' dt2)
            end
         | dt::dts', DArrow (dt1,dt2) when (contains_app dt) ->
            begin
              (* Create a fresh name *)
              let x = make_up_name () in
-             new_eqs := (dt, x) :: !new_eqs;
-             tmap := UM.add x dt1 !tmap;
-             umap := UM.add x (Undef dt1) !umap;
+             new_eqs := (dt, x, dt1) :: !new_eqs;
+(*             tmap := UM.add x dt1 !tmap;
+               umap := UM.add x (Undef dt1) !umap; *)
              DTyVar x :: (traverse_and_rewrite dts' dt2)
            end
         | _, _ -> failwith (String.concat " " (List.map dep_type_to_string dts) ^ " vs " ^ (dep_type_to_string top_dt))
@@ -443,9 +443,9 @@ let dep_dispatch ind class_name : unit =
       let rec construct_eqs eqs dt =
         match eqs with
         | [] -> dt
-        | (dteq, x)::eqs' -> 
+        | (dteq, x, dtx)::eqs' -> 
            DArrow (DTyCtr (ctr_to_ty_ctr (injectCtr "eq"), [DHole; dteq; DTyVar x]),
-                   construct_eqs eqs' dt) 
+                   construct_eqs eqs' dt)
         in 
       
       (* - Find the result of the constructor
@@ -464,7 +464,14 @@ let dep_dispatch ind class_name : unit =
         | _ -> failwith ("Not a result: " ^ dep_type_to_string ct)
       in
 
-      let rewritten = recurse_to_result ct in
+      let rec add_bindings ct eqs =
+        msg_debug (str "Adding bindings..." ++ fnl ());
+        match eqs with 
+        | [] -> ct
+        | (_,x,dt)::eqs' -> DProd ((x,dt), add_bindings ct eqs')
+      in 
+      let rewritten_result = recurse_to_result ct in
+      let rewritten  = add_bindings rewritten_result !new_eqs in
       msg_debug (str ("Rewritten from: " ^ dep_type_to_string ct ^ " to " ^ dep_type_to_string rewritten) ++ fnl ());
       rewritten
     in            
@@ -526,18 +533,18 @@ let dep_dispatch ind class_name : unit =
            begin
              (* Create a fresh name *)
              let x = make_up_name () in
-             new_eqs := (dt, x) :: !new_eqs;
-             tmap := UM.add x dt1 !tmap;
-             umap := UM.add x (Undef dt1) !umap;
+             new_eqs := (dt, x, dt1) :: !new_eqs;
+(*              tmap := UM.add x dt1 !tmap;
+               umap := UM.add x (Undef dt1) !umap; *)
              DTyVar x :: (traverse_and_rewrite dts' dt2)
            end
         | dt::dts', DArrow (dt1,dt2) when (contains_app dt) ->
            begin
              (* Create a fresh name *)
              let x = make_up_name () in
-             new_eqs := (dt, x) :: !new_eqs;
-             tmap := UM.add x dt1 !tmap;
-             umap := UM.add x (Undef dt1) !umap;
+             new_eqs := (dt, x, dt1) :: !new_eqs;
+(*              tmap := UM.add x dt1 !tmap;
+             umap := UM.add x (Undef dt1) !umap; *)
              DTyVar x :: (traverse_and_rewrite dts' dt2)
            end
       in 
@@ -545,7 +552,7 @@ let dep_dispatch ind class_name : unit =
       let rec construct_eqs eqs dt =
         match eqs with
         | [] -> dt
-        | (dteq, x)::eqs' -> 
+        | (dteq, x, _)::eqs' -> 
            DArrow (DTyCtr (ctr_to_ty_ctr (injectCtr "eq"), [DHole; dteq; DTyVar x]),
                    construct_eqs eqs' dt) 
         in 
@@ -566,7 +573,14 @@ let dep_dispatch ind class_name : unit =
         | _ -> failwith ("Not a result: " ^ dep_type_to_string ct)
       in
 
-      let rewritten = recurse_to_result ct in
+      let rec add_bindings ct eqs =
+        msg_debug (str "Adding bindings..." ++ fnl ());
+        match eqs with 
+        | [] -> ct
+        | (_,x,dt)::eqs' -> DProd ((x,dt), add_bindings ct eqs')
+      in 
+      let rewritten_result = recurse_to_result ct in
+      let rewritten  = add_bindings rewritten_result !new_eqs in      
       msg_debug (str ("Rewritten from: " ^ dep_type_to_string ct ^ " to " ^ dep_type_to_string rewritten) ++ fnl ());
       rewritten
     in            
