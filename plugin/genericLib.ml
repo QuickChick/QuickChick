@@ -1004,7 +1004,7 @@ let debug_pattern s p =
   | PMeta _ -> failwith (s ^ "META")
   | PRef _ -> failwith (s ^ "REF")
   | PRel _ -> failwith (s ^ "REL")
-  | PVar v -> failwith (s ^ "VAR")
+  | PVar _ -> failwith (s ^ "VAR")
   | PEvar _ -> failwith (s ^ "EVAR")
   | PMeta _ -> failwith (s ^ "META")
   | PLetIn _ -> failwith (s ^ "LET")
@@ -1021,6 +1021,7 @@ let debug_pattern s p =
   | PFix _ -> failwith (s ^ "FIX")
   | PCoFix _ -> failwith (s ^ "COFIX")
   | PArray _ -> failwith (s ^ "ARRAY")
+  | PProd _ -> failwith (s ^ "PROD")
   | _ -> failwith (s ^ "SOMETHING ELSE")
   
 let find_typeclass_bindings typeclass_name ctr =  
@@ -1028,46 +1029,76 @@ let find_typeclass_bindings typeclass_name ctr =
   let evd = Evd.from_env env in
   let db = Hints.searchtable_map "typeclass_instances" in
   let result = ref [] in
+  let prod_check i =
+    String.equal (MutInd.to_string (fst i)) ("QuickChick.DependentClasses." ^ typeclass_name)  in    
+  let dec_check i =
+    String.equal (MutInd.to_string (fst i)) ("QuickChick.Decidability." ^ typeclass_name)  in    
+  let handle_hint b hint =
+    msg_debug (str "Processing... (" ++ str typeclass_name ++ str ")"  ++ Hints.FullHint.print env evd hint ++ fnl ());
+    begin match Hints.FullHint.pattern hint with
+    | Some (PApp (PRef g, args)) ->
+       begin
+         let arg_index = if b then 1 else 0 in 
+         msg_debug (str ("Hint for :" ^ (string_of_qualid (Nametab.shortest_qualid_of_global Id.Set.empty g))) ++ fnl ());
+         msg_debug (str (Printf.sprintf "Arg Length: %d. Arg index: %d\n" (Array.length args) arg_index) ++ fnl ());
+         match args.(arg_index) with
+         | PLambda (name, t, PApp (PRef gctr, res_args)) ->
+            let gctr_qualid = Nametab.shortest_qualid_of_global Id.Set.empty gctr in
+            if qualid_eq gctr_qualid ctr then begin
+                msg_debug (str "Found a match!" ++ fnl ());
+                msg_debug (str ("Conclusion is Application of:" ^
+                                  (string_of_qualid (Nametab.shortest_qualid_of_global Id.Set.empty gctr)))
+                           ++ fnl ());
+                let standard = ref true in
+                let res = List.map (fun p ->
+                              match p with
+                              | PMeta (Some id) ->
+                                 if not (Name.equal (Name id) name)
+                                 then false
+                                 else failwith "FTB/How is this true"
+                              | PRef _ -> false 
+                              | PRel _ -> true
+                              | PApp _ -> standard := false; true                                        
+                              | _ -> debug_pattern "FTB/0" p
+                            ) (Array.to_list res_args) in
+                if !standard then 
+                  result := res :: !result
+                else ()
+              end
+            else ()
+         | PApp (PRef gctr, res_args) ->
+            let gctr_qualid = Nametab.shortest_qualid_of_global Id.Set.empty gctr in
+            if qualid_eq gctr_qualid ctr then begin
+                msg_debug (str "Found a match!" ++ fnl ());
+                msg_debug (str ("Conclusion is Application of:" ^
+                                  (string_of_qualid (Nametab.shortest_qualid_of_global Id.Set.empty gctr)))
+                           ++ fnl ());
+                let standard = ref true in
+                let res = List.map (fun p ->
+                              match p with
+                              | PMeta (Some id) -> false
+                              | PRef _ -> false 
+                              | PRel _ -> true
+                              | PApp _ -> standard := false; true                                        
+                              | _ -> debug_pattern "FTB/00" p
+                            ) (Array.to_list res_args) in
+                if !standard then 
+                  result := res :: !result
+                else ()
+              end
+            else ()
+         | PMeta (Some id) -> () (* failwith (Id.to_string id) *)
+         | PProd _ -> ()
+         | _ -> debug_pattern "FTB/1" args.(arg_index)
+       end
+    | _ -> failwith "FTB/2"
+    end in
   Hints.Hint_db.iter (fun go hm hints ->
       begin match go with
-      | Some (GlobRef.IndRef i) when
-             String.equal (MutInd.to_string (fst i)) ("QuickChick.DependentClasses." ^ typeclass_name) ->
-         List.iter (fun hint ->
-             msg_debug (str "Processing... (" ++ str typeclass_name ++ str ")"  ++ Hints.FullHint.print env evd hint ++ fnl ());
-             begin match Hints.FullHint.pattern hint with
-             | Some (PApp (PRef g, args)) ->
-                msg_debug (str ("Hint for :" ^ (string_of_qualid (Nametab.shortest_qualid_of_global Id.Set.empty g))) ++ fnl ());
-                begin 
-                match args.(1) with
-                | PLambda (name, t, PApp (PRef gctr, res_args)) ->
-                   let gctr_qualid = Nametab.shortest_qualid_of_global Id.Set.empty gctr in
-                   if qualid_eq gctr_qualid ctr then begin
-                     msg_debug (str "Found a match!" ++ fnl ());
-                     msg_debug (str ("Conclusion is Application of:" ^
-                                  (string_of_qualid (Nametab.shortest_qualid_of_global Id.Set.empty gctr)))
-                                ++ fnl ());
-                     let standard = ref true in
-                     let res = List.map (fun p ->
-                                   match p with
-                                   | PMeta (Some id) ->
-                                      if not (Name.equal (Name id) name)
-                                      then false
-                                      else failwith "FTB/How is this true"
-                                   | PRef _ -> false 
-                                   | PRel _ -> true
-                                   | _ -> debug_pattern "FTB/0" p
-                                 ) (Array.to_list res_args) in
-                     if !standard then 
-                       result := res :: !result
-                     else ()
-                     end
-                   else ()
-                | PMeta (Some id) -> () (* failwith (Id.to_string id) *)
-                | _ -> debug_pattern "FTB/1" args.(1)
-                end
-             | _ -> failwith "FTB/2"
-             end;
-           ) hints
+      | Some (GlobRef.IndRef i) when prod_check i ->
+         List.iter (handle_hint true ) hints
+      | Some (GlobRef.IndRef i) when dec_check i ->
+         List.iter (handle_hint false) hints
       | _ -> ()
       end
     ) db;

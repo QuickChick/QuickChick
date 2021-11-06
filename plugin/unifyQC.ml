@@ -917,8 +917,48 @@ let handle_branch
            begin match checker_classes with
            | bs :: _ ->
               msg_debug (str ("Found Checker! " ^ String.concat "," (List.map (Printf.sprintf "%b") bs)) ++ fnl ());
-           (* Begin Checker stuff *)
-             failwith "Checker TODO"
+              (* Begin checker stuff. *)
+
+              (* Then just make the checker call. *)
+              let (uts, need_filtering, unknown_gen) = compute_for_mode curr_modes bs in
+        
+              let unknowns_for_mode = UM.bindings uts in
+              (* Instantiate any unknowns that need to be for the mode to work. *)
+              instantiate_toplevel_ranges_cont (List.map (fun (x,_t) -> Unknown x) unknowns_for_mode) [] (fun _ranges ->
+              (* Generate a fresh boolean unknown *)
+              let unknown_to_generate_for = unk_provider.next_unknown () in
+              umap := UM.add unknown_to_generate_for (Undef (DCtr (injectCtr "Coq.Init.Datatypes.bool", []))) !umap;
+
+              let inputs_for_pred =
+                List.map (range_to_coq_expr !umap) ranges
+              in
+              let pred = gApp ~explicit:true (gTyCtr c) inputs_for_pred in
+
+              let body_cont = recurse_type (ctr_index + 1) dt' in
+              let body_fail = fail_exp in
+
+              (* Construct the checker for the current type constructor *)
+              let checker = 
+                gApp ~explicit:true (gInject "decOpt") 
+                  (* P : Prop := c dts*)
+                  [ pred
+                  
+                  (* Instance *)
+                  ; hole 
+
+                  (* Size. TODO: what do we do about this size? *)
+                  ; init_size
+                  
+                  ] 
+              in
+
+              if is_pos then
+                check_expr ctr_index
+                  checker body_cont body_fail not_enough_fuel_exp
+              else
+                check_expr ctr_index
+                  checker body_fail body_cont not_enough_fuel_exp
+                )
            | _ -> failwith "TODO: ERR MSG. No Classes found."
            end
         end
