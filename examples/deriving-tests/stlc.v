@@ -54,25 +54,17 @@ Inductive typing (e : env) : term -> type -> Prop :=
       typing (tau1 :: e) t tau2 ->
       typing e (Abs t) (Arrow tau1 tau2)
 | TApp :
-    forall t1 t2 tau1 tau2 tau12,
+    forall t1 t2 tau1 tau2,
       typing e t2 tau1 ->
-      typing e t1 tau12 ->
-      tau12 = Arrow tau1 tau2 ->      
+      typing e t1 (Arrow tau1 tau2) ->
       typing e (App t1 t2) tau2.
 
 (* Generate terms of a specific type in an env. *)
 Derive ArbitrarySizedSuchThat for (fun t => typing env t tau).
-(* Get the type of a given term in an env. Requires helper *)
-Instance ESST_A2 (t t1 : type) : EnumSizedSuchThat _ (fun t2 => t = Arrow t1 t2) :=
-  { enumSizeST := fun _ => match t with
-                           | Arrow t1' t2 =>
-                             if t1 = t1'? then
-                               returnEnum (Some t2)
-                             else returnEnum None
-                           | _ => returnEnum None
-                           end }.
 
 Derive EnumSizedSuchThat for (fun tau => typing env t tau).
+
+
 
 (* Check whether a variable has a given type in an env. *)
 Derive DecOpt for (typing env t tau).

@@ -105,11 +105,12 @@ let construct_generators
   =
   (* partially applied handle_branch *)
   let handle_branch' =
-    handle_branch dep_type init_size (fail_exp full_gtyp) (not_enough_fuel_exp full_gtyp) (ret_exp full_gtyp)
+    handle_branch ["GenSizedSuchThat"; "GenSuchThat"]
+      dep_type init_size (fail_exp full_gtyp) (not_enough_fuel_exp full_gtyp) (ret_exp full_gtyp)
       instantiate_existential_method instantiate_existential_methodST bind
       (rec_method rec_name init_size size) bind
       stMaybe check_expr match_inp gLetIn gLetTupleIn
-      gen_ctr init_umap init_tmap input_ranges result
+      gen_ctr init_umap init_tmap input_ranges result 
   in
   let all_gens = List.map handle_branch' ctrs in
   match kind with
