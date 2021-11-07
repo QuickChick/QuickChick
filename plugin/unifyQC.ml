@@ -56,6 +56,12 @@ let rec range_to_string = function
 
 let ranges_to_string rs = String.concat " " (List.map range_to_string rs)
 
+let rec matcher_pat_to_range m =
+  match m with
+  | MatchCtr (c,ms) -> Ctr (c, List.map matcher_pat_to_range ms)
+  | MatchU u -> Unknown u
+  | MatchParameter p -> Parameter p
+
 module UM = Map.Make(UnknownOrd)
 module US = Set.Make(UnknownOrd)
           
@@ -871,7 +877,7 @@ let handle_branch
       (!uts, !need_filtering, !unknown_gen)
     in
 
-    
+
     if not (gen_ctr = c) then
       begin
         msg_debug (str "Non-recursive constructor" ++ fnl ());
@@ -926,7 +932,12 @@ let handle_branch
                match need_filtering with
                | None -> cont
                | Some (eqs, unks, pat, i) ->
+                  msg_debug (str "Before matching..." ++ fnl ());
+                  UM.iter (fun x r -> msg_debug (str ("Bound: " ^ (var_to_string x) ^ " to Range: " ^ (range_to_string r)) ++ fnl ())) !umap;
                   List.iter (fun (u,_) -> umap := fixVariable u !umap) unks;
+                  umap := UM.add unknown_to_generate_for (matcher_pat_to_range pat) !umap;
+                  msg_debug (str "After matching..." ++ fnl ());
+                  UM.iter (fun x r -> msg_debug (str ("Bound: " ^ (var_to_string x) ^ " to Range: " ^ (range_to_string r)) ++ fnl ())) !umap;
                   match_inp unknown_to_generate_for pat (construct_eqs eqs) fail_exp
              )
            
@@ -1029,7 +1040,7 @@ let handle_branch
                let rec construct_eqs = function
                  | [] -> cont
                  | (u1,u2)::eqs' ->
-                    (*                    umap := UM.add u1 FixedInput !umap; *)
+                    umap := UM.add u1 FixedInput !umap; 
                     let checker =
                       gApp ~explicit:true (gInject "decOpt")
                         [ gApp (gInject "Logic.eq") [gVar u1; gVar u2]
@@ -1041,7 +1052,12 @@ let handle_branch
                match need_filtering with
                | None -> cont
                | Some (eqs, unks, pat, i) ->
+                  msg_debug (str "Before matching..." ++ fnl ());
+                  UM.iter (fun x r -> msg_debug (str ("Bound: " ^ (var_to_string x) ^ " to Range: " ^ (range_to_string r)) ++ fnl ())) !umap;
                   List.iter (fun (u,_) -> umap := fixVariable u !umap) unks;
+                  umap := UM.add unknown_to_generate_for (matcher_pat_to_range pat) !umap;
+                  msg_debug (str "After matching..." ++ fnl ());
+                  UM.iter (fun x r -> msg_debug (str ("Bound: " ^ (var_to_string x) ^ " to Range: " ^ (range_to_string r)) ++ fnl ())) !umap; 
                   match_inp unknown_to_generate_for pat (construct_eqs eqs) fail_exp
           )
         )
@@ -1100,7 +1116,12 @@ let handle_branch
                match need_filtering with
                | None -> cont
                | Some (eqs, unks, pat, i) ->
-                  List.iter (fun (u,_) -> umap := UM.add u FixedInput !umap) unks;
+                  msg_debug (str "Before matching..." ++ fnl ());
+                  UM.iter (fun x r -> msg_debug (str ("Bound: " ^ (var_to_string x) ^ " to Range: " ^ (range_to_string r)) ++ fnl ())) !umap;
+                  List.iter (fun (u,_) -> umap := fixVariable u !umap) unks;
+                  umap := UM.add unknown_to_generate_for (matcher_pat_to_range pat) !umap;
+                  msg_debug (str "After matching..." ++ fnl ());
+                  UM.iter (fun x r -> msg_debug (str ("Bound: " ^ (var_to_string x) ^ " to Range: " ^ (range_to_string r)) ++ fnl ())) !umap;                   
                   match_inp unknown_to_generate_for pat (construct_eqs eqs) fail_exp
              )
            )
