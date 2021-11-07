@@ -920,7 +920,13 @@ let handle_branch
                let rec construct_eqs = function
                  | [] -> cont
                  | (u1,u2)::eqs' ->
-                    (* umap := UM.add u1 FixedInput !umap; *)
+                    msg_debug (str (Printf.sprintf "Handling eq: %s = %s" (Unknown.to_string u1) (Unknown.to_string u2)) ++ fnl ());
+                    msg_debug (str "Before fixing..." ++ fnl ());
+                    UM.iter (fun x r -> msg_debug (str ("Bound: " ^ (var_to_string x) ^ " to Range: " ^ (range_to_string r)) ++ fnl ())) !umap;
+                    umap := fixVariable u1 !umap;
+                    msg_debug (str "After fixing..." ++ fnl ());
+                    UM.iter (fun x r -> msg_debug (str ("Bound: " ^ (var_to_string x) ^ " to Range: " ^ (range_to_string r)) ++ fnl ())) !umap;
+                    
                     let checker =
                       gApp ~explicit:true (gInject "decOpt")
                         [ gApp (gInject "Logic.eq") [gVar u1; gVar u2]
@@ -945,7 +951,7 @@ let handle_branch
         | _ ->
            begin match checker_classes with
            | bs :: _ ->
-              msg_debug (str ("Found Checker! " ^ String.concat "," (List.map (Printf.sprintf "%b") bs)) ++ fnl ());
+              msg_debug (str ("Found Checker ! " ^ String.concat "," (List.map (Printf.sprintf "%b") bs)) ++ fnl ());
               (* Begin checker stuff. *)
 
               (* Then just make the checker call. *)
@@ -954,10 +960,12 @@ let handle_branch
               let unknowns_for_mode = UM.bindings uts in
               (* Instantiate any unknowns that need to be for the mode to work. *)
               instantiate_toplevel_ranges_cont (List.map (fun (x,_t) -> Unknown x) unknowns_for_mode) [] (fun _ranges ->
-              (* Generate a fresh boolean unknown *)
+                  (* Generate a fresh boolean unknown *)
+                  (* 
               let unknown_to_generate_for = unk_provider.next_unknown () in
               umap := UM.add unknown_to_generate_for (Undef (DCtr (injectCtr "Coq.Init.Datatypes.bool", []))) !umap;
-
+                   *)
+                  
               let inputs_for_pred =
                 List.map (range_to_coq_expr !umap) ranges
               in
@@ -1040,7 +1048,7 @@ let handle_branch
                let rec construct_eqs = function
                  | [] -> cont
                  | (u1,u2)::eqs' ->
-                    umap := UM.add u1 FixedInput !umap; 
+                    umap := fixVariable u1 !umap;
                     let checker =
                       gApp ~explicit:true (gInject "decOpt")
                         [ gApp (gInject "Logic.eq") [gVar u1; gVar u2]
@@ -1104,7 +1112,7 @@ let handle_branch
                let rec construct_eqs = function
                  | [] -> cont
                  | (u1,u2)::eqs' ->
-                    umap := UM.add u1 FixedInput !umap;
+                    umap := fixVariable u1 !umap;
                     let checker =
                       gApp ~explicit:true (gInject "decOpt")
                         [ gApp (gInject "Logic.eq") [gVar u1; gVar u2]
@@ -1138,7 +1146,7 @@ let handle_branch
            (* Generate a fresh boolean unknown *)
            let unknown_to_generate_for = unk_provider.next_unknown () in
            umap := UM.add unknown_to_generate_for (Undef (DCtr (injectCtr "Coq.Init.Datatypes.bool", []))) !umap;
-
+           
            let inputs_for_rec_method =
              List.map (range_to_coq_expr !umap) ranges
            in 
