@@ -811,7 +811,14 @@ let handle_branch
       | ModePartlyDef _, true -> PartCompatible
     in
     let mode_score bs ms =
-      let cs = List.map2 compatible bs ms in
+      let rec walk_scores ms bs =
+        match ms, bs with
+        | ModeParameter::ms', _ -> walk_scores ms' bs
+        | m::ms', b::bs' -> compatible b m :: walk_scores ms' bs'
+        | _, _ -> []
+      in
+      let cs = walk_scores ms bs in
+      (*      let cs = List.map2 compatible bs ms in *)
       ((List.filter (fun c -> c == Compatible) cs),
        (List.filter (fun c -> c == InstCompatible) cs),
        (List.filter (fun c -> c == Incompatible) cs),
@@ -980,7 +987,7 @@ let handle_branch
                    *)
                   
               let inputs_for_pred =
-                List.map (range_to_coq_expr !umap) ranges
+                List.map (range_to_coq_expr !umap) (List.filter (fun r -> not (is_parameter r)) ranges)
               in
               let pred = gApp ~explicit:true (gTyCtr c) inputs_for_pred in
 
@@ -1106,7 +1113,7 @@ let handle_branch
              | _, _ -> failwith "Simultaneous Some/None" 
            in
            let ranges_for_pred =
-             let rs = List.map (range_to_coq_expr !umap) ranges in
+             let rs = List.map (range_to_coq_expr !umap) (List.filter (fun r -> not (is_parameter r)) ranges) in
              match need_filtering with
              | Some (_,_,_,i) -> List.mapi (fun j x -> if i = j then gVar unknown_to_generate_for else x) rs
              | _ -> rs 
@@ -1163,7 +1170,7 @@ let handle_branch
            umap := UM.add unknown_to_generate_for (Undef (DCtr (injectCtr "Coq.Init.Datatypes.bool", []))) !umap;
            
            let inputs_for_rec_method =
-             List.map (range_to_coq_expr !umap) ranges
+             List.map (range_to_coq_expr !umap) (List.filter (fun r -> not (is_parameter r)) ranges)
            in 
            
            let letbinds = None in
