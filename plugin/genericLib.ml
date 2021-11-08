@@ -1039,8 +1039,8 @@ let find_typeclass_bindings typeclass_name ctr =
     | Some (PApp (PRef g, args)) ->
        begin
          let arg_index = if b then 1 else 0 in 
-         msg_debug (str ("Hint for :" ^ (string_of_qualid (Nametab.shortest_qualid_of_global Id.Set.empty g))) ++ fnl ());
-         msg_debug (str (Printf.sprintf "Arg Length: %d. Arg index: %d\n" (Array.length args) arg_index) ++ fnl ());
+(*         msg_debug (str ("Hint for :" ^ (string_of_qualid (Nametab.shortest_qualid_of_global Id.Set.empty g))) ++ fnl ());
+         msg_debug (str (Printf.sprintf "Arg Length: %d. Arg index: %d\n" (Array.length args) arg_index) ++ fnl ());*)
          match args.(arg_index) with
          | PLambda (name, t, PApp (PRef gctr, res_args)) ->
             let gctr_qualid = Nametab.shortest_qualid_of_global Id.Set.empty gctr in

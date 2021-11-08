@@ -595,7 +595,8 @@ let handle_branch
   (* When instantiating a single unknown, see if it must satisfy any additional predicates. *)
   (* Old comment: Process check map. XXX generator specific *)
 
-  let process_checks bind x opt g (cont : var -> b) : b = 
+  let process_checks bind x opt g (cont : var -> b) : b =
+    msg_debug (str ("Processing checks for variable: " ^ (Unknown.to_string x)) ++ fnl ());
     match lookup_checks (DTyVar x) !cmap with
     | Some checks -> 
        (* Remove checks from cmap *)
@@ -916,14 +917,14 @@ let handle_branch
 
            process_checks ex_bind unknown_to_generate_for true (instantiate_existential_methodST ctr_index pred) 
              (fun _x' ->
-               let cont = recurse_type (ctr_index + 1) dt' in
+               let cont () = recurse_type (ctr_index + 1) dt' in
                let rec construct_eqs = function
-                 | [] -> cont
+                 | [] -> cont ()
                  | (u1,u2)::eqs' ->
                     msg_debug (str (Printf.sprintf "Handling eq: %s = %s" (Unknown.to_string u1) (Unknown.to_string u2)) ++ fnl ());
                     msg_debug (str "Before fixing..." ++ fnl ());
                     UM.iter (fun x r -> msg_debug (str ("Bound: " ^ (var_to_string x) ^ " to Range: " ^ (range_to_string r)) ++ fnl ())) !umap;
-                    umap := fixVariable u1 !umap;
+                    (*                    umap := fixVariable u1 !umap; *)
                     msg_debug (str "After fixing..." ++ fnl ());
                     UM.iter (fun x r -> msg_debug (str ("Bound: " ^ (var_to_string x) ^ " to Range: " ^ (range_to_string r)) ++ fnl ())) !umap;
                     
@@ -936,9 +937,10 @@ let handle_branch
                     check_expr ctr_index checker (construct_eqs eqs') fail_exp not_enough_fuel_exp
                in 
                match need_filtering with
-               | None -> cont
+               | None -> cont ()
                | Some (eqs, unks, pat, i) ->
-                  msg_debug (str "Before matching..." ++ fnl ());
+                  msg_debug (str (Printf.sprintf "0/Before matching %s with %s..." (Unknown.to_string unknown_to_generate_for) (matcher_pat_to_string pat)) ++ fnl ());
+                  msg_debug (str (Printf.sprintf "About to fix: %s" (String.concat " " (List.map (fun (x,_) -> Unknown.to_string x) unks))) ++ fnl ());
                   UM.iter (fun x r -> msg_debug (str ("Bound: " ^ (var_to_string x) ^ " to Range: " ^ (range_to_string r)) ++ fnl ())) !umap;
                   List.iter (fun (u,_) -> umap := fixVariable u !umap) unks;
                   umap := UM.add unknown_to_generate_for (matcher_pat_to_range pat) !umap;
@@ -1044,11 +1046,11 @@ let handle_branch
         process_checks rec_bind unknown_to_generate_for true
           (rec_method ctr_index letbinds inputs_for_rec_method)
           (fun _shouldletthis ->
-               let cont = recurse_type (ctr_index + 1) dt' in
+               let cont (_ : unit) = recurse_type (ctr_index + 1) dt' in
                let rec construct_eqs = function
-                 | [] -> cont
+                 | [] -> cont ()
                  | (u1,u2)::eqs' ->
-                    umap := fixVariable u1 !umap;
+                    (*                    umap := fixVariable u1 !umap; *)
                     let checker =
                       gApp ~explicit:true (gInject "decOpt")
                         [ gApp (gInject "Logic.eq") [gVar u1; gVar u2]
@@ -1058,9 +1060,10 @@ let handle_branch
                     check_expr ctr_index checker (construct_eqs eqs') fail_exp not_enough_fuel_exp
                in 
                match need_filtering with
-               | None -> cont
+               | None -> cont ()
                | Some (eqs, unks, pat, i) ->
-                  msg_debug (str "Before matching..." ++ fnl ());
+                  msg_debug (str (Printf.sprintf "1/Before matching %s with %s..." (Unknown.to_string unknown_to_generate_for) (matcher_pat_to_string pat)) ++ fnl ());
+                  msg_debug (str (Printf.sprintf "About to fix: %s" (String.concat " " (List.map (fun (x,_) -> Unknown.to_string x) unks))) ++ fnl ());
                   UM.iter (fun x r -> msg_debug (str ("Bound: " ^ (var_to_string x) ^ " to Range: " ^ (range_to_string r)) ++ fnl ())) !umap;
                   List.iter (fun (u,_) -> umap := fixVariable u !umap) unks;
                   umap := UM.add unknown_to_generate_for (matcher_pat_to_range pat) !umap;
@@ -1108,11 +1111,11 @@ let handle_branch
            (* TODO: Filtering. *)
            process_checks ex_bind unknown_to_generate_for true (instantiate_existential_methodST ctr_index pred) 
              (fun _x' ->
-               let cont = recurse_type (ctr_index + 1) dt' in
+               let cont () = recurse_type (ctr_index + 1) dt' in
                let rec construct_eqs = function
-                 | [] -> cont
+                 | [] -> cont ()
                  | (u1,u2)::eqs' ->
-                    umap := fixVariable u1 !umap;
+                    (*                    umap := fixVariable u1 !umap;*)
                     let checker =
                       gApp ~explicit:true (gInject "decOpt")
                         [ gApp (gInject "Logic.eq") [gVar u1; gVar u2]
@@ -1122,9 +1125,10 @@ let handle_branch
                     check_expr ctr_index checker (construct_eqs eqs') fail_exp not_enough_fuel_exp
                in 
                match need_filtering with
-               | None -> cont
+               | None -> cont ()
                | Some (eqs, unks, pat, i) ->
-                  msg_debug (str "Before matching..." ++ fnl ());
+                  msg_debug (str (Printf.sprintf "2/Before matching %s with %s..." (Unknown.to_string unknown_to_generate_for) (matcher_pat_to_string pat)) ++ fnl ());
+                  msg_debug (str (Printf.sprintf "About to fix: %s" (String.concat " " (List.map (fun (x,_) -> Unknown.to_string x) unks))) ++ fnl ());
                   UM.iter (fun x r -> msg_debug (str ("Bound: " ^ (var_to_string x) ^ " to Range: " ^ (range_to_string r)) ++ fnl ())) !umap;
                   List.iter (fun (u,_) -> umap := fixVariable u !umap) unks;
                   umap := UM.add unknown_to_generate_for (matcher_pat_to_range pat) !umap;

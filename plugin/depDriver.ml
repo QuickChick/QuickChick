@@ -103,7 +103,7 @@ let derive_dependent
   let _dec_needed = [] in
 
   (* The dependent generator  *)
-  let gen =
+  let gen () =
     arbitrarySizedST ty_ctr ty_params ctrs dep_type input_names
       input_ranges umap tmap actual_input_args result coqTyCtr
   in
@@ -233,9 +233,10 @@ let derive_dependent
 
   let instance_record iargs =
     match class_name with
-    | ArbitrarySizedSuchThat -> gen
-    | EnumSizedSuchThat -> enumSizedST ty_ctr ty_params ctrs dep_type input_names
-      input_ranges umap tmap actual_input_args result coqTyCtr
+    | ArbitrarySizedSuchThat -> gen ()
+    | EnumSizedSuchThat ->
+       enumSizedST ty_ctr ty_params ctrs dep_type input_names
+         input_ranges umap tmap actual_input_args result coqTyCtr
     | DecOpt ->
        checkerSizedST ty_ctr ty_params ctrs dep_type input_names
          input_ranges umap tmap actual_input_args result coqTyCtr
