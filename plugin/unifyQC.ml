@@ -371,9 +371,11 @@ type range_mode =
   | ModeFixed
   | ModeUndefUnknown of (Unknown.t * dep_type)
   | ModePartlyDef of ((Unknown.t * Unknown.t) list * (Unknown.t * dep_type) list * matcher_pat)
+  | ModeParameter
 
 let range_mode_to_string = function
   | ModeFixed -> "Fixed"
+  | ModeParameter -> "Param"
   | ModeUndefUnknown (u,_) -> Printf.sprintf "Unknown %s" (Unknown.to_string u)
   | ModePartlyDef (eqs, unks, pat) ->
      Printf.sprintf "Partial (eqs = %s, unks = %s, pat = %s)"
@@ -750,6 +752,7 @@ let handle_branch
 
     (* Inv: r has to be a toplevel range. *)
     let mode_analyze r umap =
+      if is_parameter r then ModeParameter else
       if is_fixed_range umap r then ModeFixed
       else 
         let handle_partial r umap =
@@ -852,7 +855,7 @@ let handle_branch
 
     msg_debug (str (Printf.sprintf "Look here v2!! %s %s" (ty_ctr_to_string gen_ctr) (ty_ctr_to_string c)) ++ fnl ());
 
-    let compute_for_mode ms bs =
+    let compute_for_mode (ms : range_mode list) (bs : bool list) =
       let uts = ref UM.empty in
       let need_filtering = ref None in
       let unknown_gen    = ref None in
@@ -862,7 +865,7 @@ let handle_branch
           else failwith "Trying to add unknown in two different types?"
         with
           Not_found -> uts := UM.add u dt !uts in
-      let process_mb_pair i (m,b) =
+      let process_mb_pair i m b =
         match m, b with
         | ModeFixed, false -> ()
         | ModeUndefUnknown (u,dt), false -> add_to_map u dt
@@ -874,7 +877,15 @@ let handle_branch
         | ModePartlyDef (eqs,unks,pat), true ->
            need_filtering := Some (eqs, unks, pat, i)
       in
-      List.iteri process_mb_pair (List.combine ms bs);
+      let rec walk_mbs i ms bs =
+        match ms, bs with
+        | ModeParameter::ms',_ -> walk_mbs i ms' bs
+        | m::ms', b::bs' ->
+           process_mb_pair i m b;
+           walk_mbs (i+1) ms' bs'
+        | _, _ -> ()
+      in
+      walk_mbs 0 ms bs;
       (!uts, !need_filtering, !unknown_gen)
     in
 
@@ -1038,7 +1049,7 @@ let handle_branch
         msg_debug (str (Printf.sprintf "Unknown to generate for: %s\n" (Unknown.to_string (unknown_to_generate_for))) ++ fnl ());
         
         let inputs_for_rec_method =
-          let rs = List.map (range_to_coq_expr !umap) ranges in
+          let rs = List.map (range_to_coq_expr !umap) (List.filter (fun r -> not (is_parameter r)) ranges) in
           List.map fst (List.filter (fun (r,b) -> not b) (List.combine rs rec_bs))
         in 
 
