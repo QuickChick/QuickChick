@@ -356,6 +356,7 @@ Proof.
   constructor; eauto.
 Qed.
 
+
 Lemma enumerating_complete A (e : E A) {Hc : Correct A e} ch :
   (exists x, ch x = Some true) ->
   exists s, enumerating e ch s = Some true.

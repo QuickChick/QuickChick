@@ -841,7 +841,7 @@ Ltac2 rec handle_checker (hmon : ident) :=
                                       | intros; eapply (@mon $p _ _) > [ | eassumption ]; lia
                                       | let heq := Fresh.in_goal (id_of_string "_heq") in
                                         intros ? ? ? $heq; 
-                                        now repeat (handle_checker_mon_t hmon heq)
+                                        now repeat (simpl_minus_methods (); handle_checker_mon_t hmon heq)
                                       | handle_checker hmon ]
           end
         | match! goal with
@@ -857,7 +857,7 @@ Ltac2 rec handle_checker (hmon : ident) :=
                                       | intros; eapply (@mon $p _ _) > [ | eassumption ]; lia
                                       | let heq := Fresh.in_goal (id_of_string "_heq") in
                                         intros ? ? ? $heq; 
-                                        now repeat (handle_checker_mon_t hmon heq)
+                                        now repeat (simpl_minus_methods (); handle_checker_mon_t hmon heq)
                                       | handle_checker hmon ]
           end
 
@@ -875,7 +875,7 @@ Ltac2 rec handle_checker (hmon : ident) :=
             intros; eapply $hmon > [| | eassumption ] > [ lia | lia ]
           | let heq := Fresh.in_goal (id_of_string "_heq") in
             intros ? ? ? $heq; 
-            now repeat (handle_checker_mon_t hmon heq)
+            now repeat (simpl_minus_methods (); handle_checker_mon_t hmon heq)
           | handle_checker hmon ]; eassumption                                     
         | (* enumerating *)
           eapply enumerating_complete' >
@@ -883,7 +883,7 @@ Ltac2 rec handle_checker (hmon : ident) :=
           | tci
           | let heq := Fresh.in_goal (id_of_string "_heq") in
             intros ? ? ? ? $heq; 
-            now repeat (handle_checker_mon_t hmon heq)
+            now repeat (simpl_minus_methods (); handle_checker_mon_t hmon heq)
           | eexists; handle_checker hmon ]
         | (* enumeratingOpt *)
           eapply enumeratingOpt_complete' >        
@@ -891,7 +891,7 @@ Ltac2 rec handle_checker (hmon : ident) :=
           | now find_CorrectST_inst ()
           | let heq := Fresh.in_goal (id_of_string "_heq") in
             intros ? ? ? ? $heq; 
-            now repeat (handle_checker_mon_t hmon heq)
+            now repeat (simpl_minus_methods (); handle_checker_mon_t hmon heq)
           | eexists; split > [ | handle_checker hmon ] ]; eassumption
         ].
 

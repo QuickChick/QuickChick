@@ -228,6 +228,16 @@ Instance enumPairSized_SizeMonotonic A {_ : EnumSized A} { _ : forall s, SizeMon
 Proof.
 Admitted.
 
+Instance enumOption_Correct A {_ : Enum A} { _ : Correct A (@enum A _)}:
+  Correct _ (@enum (option A) enumOption).
+Proof.
+Admitted.       
+
+Instance enumOption_SizeMonotonic A {_ : Enum A} { _ : SizeMonotonic (@enum A _)} :
+  SizeMonotonic (@enum (option A) enumOption).
+Proof.
+Admitted.
+
 
 Instance enumNSized_CorrectSized :
   CorrectSized (@enumSized _ enumNSized).
