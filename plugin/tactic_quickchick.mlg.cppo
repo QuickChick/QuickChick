@@ -56,7 +56,11 @@ let quickchick_goal =
     Printf.printf "So far so good3\n"; flush stdout;
 
     (* TODO: This whole block doesn't look very monadic... *)
+#if COQ_VERSION >= (8, 15, 0)
     Tacticals.tclIDTAC
+#else
+    Tacticals.New.tclIDTAC
+#endif
   end
 
     (*
