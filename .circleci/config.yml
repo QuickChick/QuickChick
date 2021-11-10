@@ -6,6 +6,8 @@ defaults: &defaults
     OPAMVERBOSE: 1
     OPAMYES: true
     TERM: xterm
+    SKIP_BUILD: |
+      coq-async-test
   parameters:
     coq:
       type: string
@@ -75,15 +77,15 @@ commands:
         name: Test dependants
         no_output_timeout: 20m
         command: |
-          if [ `opam list -s coq` != "coq.dev" ]; then
           PINS=$(echo `opam list -s --pinned --columns=package` | sed 's/ /,/g')
           PACKAGES=`opam list -s --depends-on coq-quickchick --coinstallable-with $PINS`
           for PACKAGE in $PACKAGES
           do DEPS_FAILED=false
+             echo $SKIP_BUILD | tr ' ' '\n' | grep ^$PACKAGE$ > /dev/null &&
+               echo Skip $PACKAGE && continue
              opam install --deps-only $PACKAGE || DEPS_FAILED=true
              [ $DEPS_FAILED == true ] || opam install -t $PACKAGE
           done
-          fi
   remove:
     steps:
     - run:
