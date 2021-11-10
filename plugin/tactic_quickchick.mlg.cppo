@@ -56,7 +56,7 @@ let quickchick_goal =
     Printf.printf "So far so good3\n"; flush stdout;
 
     (* TODO: This whole block doesn't look very monadic... *)
-    Tacticals.New.tclIDTAC
+    Tacticals.tclIDTAC
   end
 
     (*
@@ -132,7 +132,7 @@ let quickchick_goal =
 
 (*
     let concl = Proofview.Goal.concl gl in
-    let sigma = Tacmach.New.project gl in
+    let sigma = Tacmach.project gl in
     let hyps = named_context_val (Proofview.Goal.env gl) in
     let store = Proofview.Goal.extra gl in
     let env = Proofview.Goal.env gl in

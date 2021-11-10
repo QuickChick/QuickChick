@@ -1,7 +1,7 @@
 open Pp
 open Loc
 open Names
-open Tacmach
+open Tacmach.Old
 open Entries
 open Declarations
 open Declare
