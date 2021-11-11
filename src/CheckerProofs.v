@@ -908,7 +908,7 @@ Ltac2 handle_base_case (hmon : ident) := handle_checker hmon.
 
 
 Ltac2 rec solve_ind_case (hmon : ident) (n : int) :=
-  first [ now eexists; split > [ intros s; path n; reflexivity | 
+  first [ now eexists; split > [ intros ?; path n; reflexivity | 
                                  simpl_minus_methods (); repeat (destructIH ()); handle_checker hmon ]
         | solve_ind_case hmon (Int.add n 1) ].
 
