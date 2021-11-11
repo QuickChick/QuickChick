@@ -400,9 +400,9 @@ let dep_dispatch ind class_name : unit =
 
     let umap = ref init_umap in
     let tmap = ref init_tmap in
-    let new_eqs = ref [] in
     (* Rewrite the function applications in constructors. *)
     let rewrite_ct ct =
+      let new_eqs = ref [] in
       (* Check if a datatype contains an application *)
       let rec contains_app dt =
         match dt with
@@ -511,9 +511,9 @@ let dep_dispatch ind class_name : unit =
 
 (*     let umap = ref init_umap in
     let tmap = ref init_tmap in *)
-    let new_eqs = ref [] in
     (* Rewrite the function applications in constructors. *)
     let rewrite_ct ct =
+      let new_eqs = ref [] in
       (* Check if a datatype contains an application *)
       let rec contains_app dt =
         match dt with
