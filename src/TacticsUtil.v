@@ -83,3 +83,8 @@ Ltac2 print_str (c : string) := Message.print (Message.of_string c).
 
 Local Ltac2 ssromega_tac () := ltac1:(ssromega).
 Ltac2 Notation "ssromega" := ssromega_tac ().
+
+
+Ltac2 clear_dependent (x : ident) :=
+  let x := Control.hyp x in
+  ltac1:(x |- clear dependent x) (Ltac1.of_constr x).

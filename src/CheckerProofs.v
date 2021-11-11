@@ -766,7 +766,7 @@ Ltac2 prove_mon (_ : unit) :=
                                                                          let s2 := Control.hyp @s2 in
                                                                          let s2' := Control.hyp @s2' in
                                                                          let t := mon s1 s2 s1' s2' in exact $t)) >
-              [ clear; now derive_mon_true l | ]
+              [  List.iter clear_dependent l; now derive_mon_true l | ]
         | _ => Control.throw (Tactic_failure (Some (Message.of_string ("Expecting an application"))))
         end
       | _ => Control.throw (Tactic_failure (Some (Message.of_string ("Expecting an application"))))
@@ -841,7 +841,7 @@ Ltac2 rec handle_checker (hmon : ident) :=
                                       | intros; eapply (@mon $p _ _) > [ | eassumption ]; lia
                                       | let heq := Fresh.in_goal (id_of_string "_heq") in
                                         intros ? ? ? $heq; 
-                                        now repeat (handle_checker_mon_t hmon heq)
+                                        now repeat (simpl_minus_methods (); handle_checker_mon_t hmon heq)
                                       | handle_checker hmon ]
           end
         | match! goal with
@@ -857,7 +857,7 @@ Ltac2 rec handle_checker (hmon : ident) :=
                                       | intros; eapply (@mon $p _ _) > [ | eassumption ]; lia
                                       | let heq := Fresh.in_goal (id_of_string "_heq") in
                                         intros ? ? ? $heq; 
-                                        now repeat (handle_checker_mon_t hmon heq)
+                                        now repeat (simpl_minus_methods (); handle_checker_mon_t hmon heq)
                                       | handle_checker hmon ]
           end
 
@@ -875,7 +875,7 @@ Ltac2 rec handle_checker (hmon : ident) :=
             intros; eapply $hmon > [| | eassumption ] > [ lia | lia ]
           | let heq := Fresh.in_goal (id_of_string "_heq") in
             intros ? ? ? $heq; 
-            now repeat (handle_checker_mon_t hmon heq)
+            now repeat (simpl_minus_methods (); handle_checker_mon_t hmon heq)
           | handle_checker hmon ]; eassumption                                     
         | (* enumerating *)
           eapply enumerating_complete' >
@@ -883,7 +883,7 @@ Ltac2 rec handle_checker (hmon : ident) :=
           | tci
           | let heq := Fresh.in_goal (id_of_string "_heq") in
             intros ? ? ? ? $heq; 
-            now repeat (handle_checker_mon_t hmon heq)
+            now repeat (simpl_minus_methods (); handle_checker_mon_t hmon heq)
           | eexists; handle_checker hmon ]
         | (* enumeratingOpt *)
           eapply enumeratingOpt_complete' >        
@@ -891,7 +891,7 @@ Ltac2 rec handle_checker (hmon : ident) :=
           | now find_CorrectST_inst ()
           | let heq := Fresh.in_goal (id_of_string "_heq") in
             intros ? ? ? ? $heq; 
-            now repeat (handle_checker_mon_t hmon heq)
+            now repeat (simpl_minus_methods (); handle_checker_mon_t hmon heq)
           | eexists; split > [ | handle_checker hmon ] ]; eassumption
         ].
 
@@ -967,9 +967,9 @@ Ltac2 rec handle_ind_case (hmon : ident) :=
   end.
 
 Ltac2 derive_complete (_ : unit ) := 
-  intros H; unfold decOpt; simpl_minus_methods (); 
+  intros __H; unfold decOpt; simpl_minus_methods (); 
   prove_mon ();
-  induction H; first [ now handle_base_case @Hmon | now handle_ind_case @Hmon ].
+  induction __H; first [ now handle_base_case @Hmon | now handle_ind_case @Hmon ].
 
 
 (* Ltac tactics *)

@@ -675,26 +675,25 @@ Ltac2 make_prod (bs : constr array) (c : constr) :=
 
 
 
-
-Ltac2 rec enumST_sound (ty : constr) (ih : ident) :=    
+Ltac2 rec enumST_sound (ty : constr) (ih : ident) :=
   match! goal with
-  (* match decOpt pos *) 
+  (* match decOpt pos *)
   | [ h : semProdOpt (match @decOpt ?p ?i ?s with _ => _ end) ?x |- _ ] =>
-    let hdec := Fresh.in_goal (id_of_string "Hdec") in 
-    let b := Fresh.in_goal (id_of_string "b") in 
+    let hdec := Fresh.in_goal (id_of_string "Hdec") in
+    let b := Fresh.in_goal (id_of_string "b") in
     destruct (@decOpt $p $i $s) as [ $b | ] eqn:$hdec > [ | now eapply (@semReturnOpt_None E _ _) in $h; inv $h ];
-    let b' := Control.hyp b in                                                            
+    let b' := Control.hyp b in
     destruct $b' > [ | now eapply (@semReturnOpt_None E _ _) in $h; inv $h ];
     eapply (@CheckerProofs.sound $p) in $hdec > [ | tci ]; enumST_sound ty ih
-  (* match decOpt neg *) 
+  (* match decOpt neg *)
   | [ h : semProdOpt (match @decOpt ?p ?i ?s with _ => _ end) ?x |- _ ] =>
-    let hdec := Fresh.in_goal (id_of_string "Hdec") in 
-    let b := Fresh.in_goal (id_of_string "b") in 
+    let hdec := Fresh.in_goal (id_of_string "Hdec") in
+    let b := Fresh.in_goal (id_of_string "b") in
     destruct (@decOpt $p $i $s) as [ $b | ] eqn:$hdec > [ | now eapply (@semReturnOpt_None E _ _) in $h; inv $h ];
-    let b' := Control.hyp b in                                                            
+    let b' := Control.hyp b in
     destruct $b' > [ now eapply (@semReturnOpt_None E _ _) in $h; inv $h | ];
     eapply (@CheckerProofs.sound_neg $p) in $hdec > [ | tci ]; enumST_sound ty ih
- (* match input *) 
+ (* match input *)
   | [ h : semProdOpt (match ?n with _ => _ end) ?x |- _ ] =>
     destruct $n; try (now eapply (@semReturnOpt_None E _ _) in $h; inv $h); enumST_sound ty ih
   | (* return *)
@@ -707,8 +706,8 @@ Ltac2 rec enumST_sound (ty : constr) (ih : ident) :=
                                        (* let x := Fresh.in_goal (id_of_string "_x") in *)
                                        (* let hin1 := Fresh.in_goal (id_of_string "_Hin1") in *)
                                        (* let hin2 := Fresh.in_goal (id_of_string "_Hin2") in *)
-                                       (* XXX there seems to be a bug in fresh, and it fails to freshen after a while.
-                                         P     icking ? for now *) 
+                                       (* XXX there seems to be a bug in fresh, and it fails to freshen after a while. *)
+(*                                          P     icking ? for now *)
                                        destruct $h' as [? [$h ?]];
                                         
                                        first [ let ih' := Control.hyp ih in eapply $ih' in $h
@@ -731,6 +730,7 @@ Ltac2 rec enumST_sound (ty : constr) (ih : ident) :=
 
   | [ |- _ ] => ()
   end.
+
 
 Ltac2 rec sound_enums (ty : constr) (ih : ident) :=
   match! goal with
@@ -917,7 +917,7 @@ Ltac2 destructIH_opt (_ : unit) :=
 (*     | ( ) ].  *)
 
 Ltac2 rec enumST_complete (ty : constr):=
-  let hmons := Control.hyp @_Hmons in
+  let hmons := Control.hyp @_Hmons in simpl_minus_methods ();
   first
     [ (* return *)
       subst; now eapply exists_return_Opt
@@ -949,6 +949,16 @@ Ltac2 rec enumST_complete (ty : constr):=
       | eexists; eexists; split > [ reflexivity
                                   | eapply $hmons > [ eapply Peano.le_n | | eassumption ]; ssromega ]
       ]
+    | (* bindOpt rec call alt *)
+      eapply exists_bindOpt_Opt_Sized >
+      [ (* sizedMon *)
+        intro; intros; eapply $hmons; ssromega
+      | (* sizeMon *) now find_size_mon_inst ()
+      | (* sizedMon *) intros ? ? ? ? ?; now enumST_sized_mon @_Hmons
+      | (* sizeMon *) intros ? ?; enumST_size_mon @_Hmon
+      | eexists; eexists; split > [ reflexivity
+                                  | eapply $hmons > [ eapply Peano.le_n | | eassumption ]; ssromega ]
+      | now enumST_complete ty ]
     | (* bindOpt sized eq *)
       eapply exists_bindOpt_Opt_Sized >
       [ tci
@@ -969,19 +979,37 @@ Ltac2 rec enumST_complete (ty : constr):=
       | (* sizeMon *) intros ? ?; enumST_size_mon @_Hmon
       | match! goal with
       | [ |- exists _, semProdOpt (sizedEnum (@enumSizeST ?t ?pred ?inst)) _ ] =>
-        exists 0; eapply (@size_CorrectST $t $pred E _ _) > [ | | | eassumption ]; tci
+        exists 0; eapply (@size_CorrectST $t $pred E _ _) > [ | | | first [ eassumption | reflexivity ] ]; tci
         end
+      ]
+    | (* bindOpt sized alt *)
+      eapply exists_bindOpt_Opt_Sized >
+      [ tci
+      | intros _; now find_size_mon_inst ()
+      | (* sizedMon *) intros ? ? ? ? ?; now enumST_sized_mon @_Hmons
+      | (* sizeMon *) intros ? ?; enumST_size_mon @_Hmon
+      | match! goal with
+      | [ |- exists _, semProdOpt (sizedEnum (@enumSizeST ?t ?pred ?inst)) _ ] =>
+        exists 0; eapply (@size_CorrectST $t $pred E _ _) > [ | | | first [ eassumption | reflexivity ] ]; tci
+        end
+      | now enumST_complete ty
       ]
     | (* bind *)
       match! goal with
-      |  [ |- exists _ : nat, semProdOpt (bindEnum enum _) _ ] =>
+      | [ |- exists _ : nat, semProdOpt (bindEnum enum _) _ ] =>
+         eapply exists_bind_Opt >
+         [ tci
+         | now find_size_mon_inst ()
+         | intros ? ?; enumST_size_mon @_Hmon | now enumST_complete ty ]
+           (* LTAC2 feature request branch grouping *)
+      | [ |- exists _ : nat, semProdOpt (bindEnum (sizedEnum enumSized) _) _ ] =>
          eapply exists_bind_Opt >
          [ tci
          | now find_size_mon_inst ()
          | intros ? ?; enumST_size_mon @_Hmon | now enumST_complete ty ]
       end
-
     | ( ) ].
+
 
 Ltac2 rec try_solve_complete (ty : constr) :=
   first [ eapply exists_enum_hd; now enumST_complete ty 
