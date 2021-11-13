@@ -257,12 +257,18 @@ let rec fixRange u r k =
     match r with 
     | FixedInput -> k
     | Undef _ -> UM.add u FixedInput k 
-    | Unknown u' -> fixRange u' (umfind u' k) k
+    | Unknown u' ->
+       begin
+         try fixRange u' (UM.find u' k) k
+         with Not_found -> UM.add u' FixedInput k
+       end
     | Ctr (_, rs) -> List.fold_left (fun k r -> fixRange Unknown.undefined r k) k rs
     | Parameter _p -> k
     | RangeHole -> failwith "QC Internal: RangeHole in fixrange"
 
-let fixVariable x k = fixRange x (umfind x k) k
+let fixVariable x k =
+  try fixRange x (UM.find x k) k
+  with Not_found -> UM.add x FixedInput k
 
 (* Since this can fail - return an option *)
 let rec convert_to_range dt = 
@@ -384,7 +390,9 @@ let range_mode_to_string = function
        (matcher_pat_to_string pat)
                    
 type compatible = Compatible | Incompatible | PartCompatible | InstCompatible
-                   
+
+exception Incompatible_mode
+                                                             
 let mode_analysis init_ctr curr_ctr (init_ranges : range list) (init_map : range UM.t)
       (curr_ranges : range list) (curr_map : range UM.t) =
   msg_debug (str (Printf.sprintf "Look here!! init_ctr = %s, curr_ctr = %s" (ty_ctr_to_string init_ctr) (ty_ctr_to_string curr_ctr)) ++ fnl ());
@@ -774,6 +782,7 @@ let handle_branch
                  begin
                    (* Already fixed from another pattern. Test equality *)
                    let u = make_up_name () in
+                   (* Add it in the map temporarily - will be fixed soon. *)
                    eqs := (u, parent) :: !eqs;
                    MatchU u
                  end
@@ -878,7 +887,7 @@ let handle_branch
         | ModeUndefUnknown (u,dt), false -> add_to_map u dt
         | ModePartlyDef (_, unks, _), false ->
            List.iter (fun (u,dt) -> add_to_map u dt) unks
-        | ModeFixed, true -> failwith "Incompatible modes/1"
+        | ModeFixed, true -> raise Incompatible_mode
         | ModeUndefUnknown (u,dt), true ->
            unknown_gen := Some (u, dt, i)
         | ModePartlyDef (eqs,unks,pat), true ->
@@ -961,6 +970,7 @@ let handle_branch
                   msg_debug (str (Printf.sprintf "About to fix: %s" (String.concat " " (List.map (fun (x,_) -> Unknown.to_string x) unks))) ++ fnl ());
                   UM.iter (fun x r -> msg_debug (str ("Bound: " ^ (var_to_string x) ^ " to Range: " ^ (range_to_string r)) ++ fnl ())) !umap;
                   List.iter (fun (u,_) -> umap := fixVariable u !umap) unks;
+                  List.iter (fun (u,_) -> umap := fixVariable u !umap) eqs;                  
                   umap := UM.add unknown_to_generate_for (matcher_pat_to_range pat) !umap;
                   msg_debug (str "After matching..." ++ fnl ());
                   UM.iter (fun x r -> msg_debug (str ("Bound: " ^ (var_to_string x) ^ " to Range: " ^ (range_to_string r)) ++ fnl ())) !umap;
@@ -1034,9 +1044,19 @@ let handle_branch
         | _ -> failwith "Partial toplevel input?"
       in 
       let rec_bs = List.map mode_to_b rec_ms in
-      
+
+      let can_use_recursive =
+        msg_debug (str "Trying compute..." ++ fnl ());
+        try begin
+            ignore (compute_for_mode curr_modes rec_bs);
+            msg_debug (str "Reaching here somehow?" ++ fnl ());
+            true
+          end
+        with Incompatible_mode -> false in
+      msg_debug (str (Printf.sprintf "Is it? %b" can_use_recursive) ++ fnl ());
+        
       (* If the recursive case is a producer... *)
-      if List.exists (fun b -> b) rec_bs then begin
+      if List.exists (fun b -> b) rec_bs && can_use_recursive then begin
 
         is_base := false;
           
@@ -1083,6 +1103,7 @@ let handle_branch
                   msg_debug (str (Printf.sprintf "1/Before matching %s with %s..." (Unknown.to_string unknown_to_generate_for) (matcher_pat_to_string pat)) ++ fnl ());
                   msg_debug (str (Printf.sprintf "About to fix: %s" (String.concat " " (List.map (fun (x,_) -> Unknown.to_string x) unks))) ++ fnl ());
                   UM.iter (fun x r -> msg_debug (str ("Bound: " ^ (var_to_string x) ^ " to Range: " ^ (range_to_string r)) ++ fnl ())) !umap;
+                  List.iter (fun (u,_) -> umap := fixVariable u !umap) eqs;                  
                   List.iter (fun (u,_) -> umap := fixVariable u !umap) unks;
                   umap := UM.add unknown_to_generate_for (matcher_pat_to_range pat) !umap;
                   msg_debug (str "After matching..." ++ fnl ());
@@ -1149,6 +1170,7 @@ let handle_branch
                   msg_debug (str (Printf.sprintf "About to fix: %s" (String.concat " " (List.map (fun (x,_) -> Unknown.to_string x) unks))) ++ fnl ());
                   UM.iter (fun x r -> msg_debug (str ("Bound: " ^ (var_to_string x) ^ " to Range: " ^ (range_to_string r)) ++ fnl ())) !umap;
                   List.iter (fun (u,_) -> umap := fixVariable u !umap) unks;
+                  List.iter (fun (u,_) -> umap := fixVariable u !umap) eqs;                  
                   umap := UM.add unknown_to_generate_for (matcher_pat_to_range pat) !umap;
                   msg_debug (str "After matching..." ++ fnl ());
                   UM.iter (fun x r -> msg_debug (str ("Bound: " ^ (var_to_string x) ^ " to Range: " ^ (range_to_string r)) ++ fnl ())) !umap;                   
