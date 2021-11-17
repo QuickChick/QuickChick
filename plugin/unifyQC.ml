@@ -819,10 +819,11 @@ let handle_branch
       | ModeUndefUnknown _ , true -> Compatible
       | ModePartlyDef _, true -> PartCompatible
     in
-    let mode_score bs ms =
+    let mode_score bs ms filter_bs =
       let rec walk_scores ms bs =
         match ms, bs with
-        | ModeParameter::ms', _ -> walk_scores ms' bs
+        | ModeParameter::ms', _::bs' when filter_bs-> walk_scores ms' bs'
+        | ModeParameter::ms', bs when not filter_bs-> walk_scores ms' bs
         | m::ms', b::bs' -> compatible b m :: walk_scores ms' bs'
         | _, _ -> []
       in
@@ -867,11 +868,22 @@ let handle_branch
           compare (List.length p1, List.length i1)
             (List.length p2, List.length i2)) 
         (List.filter (fun ((_,_,inc,_),_) -> List.length inc == 0)
-           (List.map (fun bs -> (mode_score bs curr_modes, bs)) producer_classes)) in
+           (List.map (fun bs -> (mode_score bs curr_modes true, bs)) producer_classes)) in
 
     msg_debug (str (Printf.sprintf "Look here v2!! %s %s" (ty_ctr_to_string gen_ctr) (ty_ctr_to_string c)) ++ fnl ());
+    List.iter (fun ((c,i,inc,p), bs) ->
+        msg_debug (str (Printf.sprintf "%d-%d-%d-%d" (List.length c) (List.length i) (List.length inc) (List.length p)) ++ fnl ());
+        msg_debug (str (String.concat " " (List.map (Printf.sprintf "%b") bs)) ++ fnl ());
+      ) ranked_producers;
 
-    let compute_for_mode (ms : range_mode list) (bs : bool list) =
+    (* Invariant: filter out params in recursive mode *)
+    let compute_for_mode (ms : range_mode list) (bs : bool list) (is_rec : bool) =
+
+      msg_debug (str "Computing for Mode: " ++
+                   str (String.concat " " (List.map range_mode_to_string ms)) ++
+                   str (String.concat " " (List.map (Printf.sprintf "%b") bs)) ++
+                   fnl ());
+                   
       let uts = ref UM.empty in
       let need_filtering = ref None in
       let unknown_gen    = ref None in
@@ -895,7 +907,8 @@ let handle_branch
       in
       let rec walk_mbs i ms bs =
         match ms, bs with
-        | ModeParameter::ms',_ -> walk_mbs i ms' bs
+        | ModeParameter::ms',_ when is_rec -> walk_mbs i ms' bs
+        | ModeParameter::ms',false::bs' when not is_rec -> walk_mbs i ms' bs'
         | m::ms', b::bs' ->
            process_mb_pair i m b;
            walk_mbs (i+1) ms' bs'
@@ -914,10 +927,13 @@ let handle_branch
         | (_,bs) :: _ ->
            msg_debug (str ("Found Producer! " ^ String.concat "," (List.map (Printf.sprintf "%b") bs)) ++ fnl ());
            (* Begin producer stuff. *)
+
            (* Step 1: Figure out which unknowns need to be instantiated for mode to work out *)
            (* Invariant: These are not Incompatible *)
-           let (uts, need_filtering, unknown_gen) = compute_for_mode curr_modes bs in
+           let (uts, need_filtering, unknown_gen) = compute_for_mode curr_modes bs false in
            let unknowns_for_mode = UM.bindings uts in
+           msg_debug (str "Unknowns for mode: " ++ str (String.concat " " (List.map (fun (u,_) -> Unknown.to_string u) unknowns_for_mode)) ++ fnl ());
+
            (* Instantiate any unknowns that need to be for the mode to work. *)
            instantiate_toplevel_ranges_cont (List.map (fun (x,_t) -> Unknown x) unknowns_for_mode) [] (fun _ranges ->
            (* TODO: Need filtering. *)
@@ -926,7 +942,7 @@ let handle_branch
              match need_filtering, unknown_gen with
              | None, Some (u, dt, i) -> u
              | Some (eqs, unks, pat, i), None -> unk_provider.next_unknown ()
-             | _, _ -> failwith "Simultaneous Some/None" 
+             | _, _ -> failwith "Simultaneous Some/None/1" 
            in
            let ranges_for_pred =
              let rs = List.map (range_to_coq_expr !umap) ranges in
@@ -985,7 +1001,7 @@ let handle_branch
               (* Begin checker stuff. *)
 
               (* Then just make the checker call. *)
-              let (uts, need_filtering, unknown_gen) = compute_for_mode curr_modes bs in
+              let (uts, need_filtering, unknown_gen) = compute_for_mode curr_modes bs false in
         
               let unknowns_for_mode = UM.bindings uts in
               (* Instantiate any unknowns that need to be for the mode to work. *)
@@ -997,7 +1013,7 @@ let handle_branch
                    *)
                   
               let inputs_for_pred =
-                List.map (range_to_coq_expr !umap) (List.filter (fun r -> not (is_parameter r)) ranges)
+                List.map (range_to_coq_expr !umap) ranges (* (List.filter (fun r -> not (is_parameter r)) ranges) *)
               in
               let pred = gApp ~explicit:true (gTyCtr c) inputs_for_pred in
 
@@ -1048,7 +1064,7 @@ let handle_branch
       let can_use_recursive =
         msg_debug (str "Trying compute..." ++ fnl ());
         try begin
-            ignore (compute_for_mode curr_modes rec_bs);
+            ignore (compute_for_mode curr_modes rec_bs true);
             msg_debug (str "Reaching here somehow?" ++ fnl ());
             true
           end
@@ -1058,10 +1074,11 @@ let handle_branch
       (* If the recursive case is a producer... *)
       if List.exists (fun b -> b) rec_bs && can_use_recursive then begin
 
+        msg_debug (str "Entering recursive producer handler" ++ fnl ());
         is_base := false;
           
         (* Then just make the recursive call. *)
-        let (uts, need_filtering, unknown_gen) = compute_for_mode curr_modes rec_bs in
+        let (uts, need_filtering, unknown_gen) = compute_for_mode curr_modes rec_bs true in
         
         let unknowns_for_mode = UM.bindings uts in
         (* Instantiate any unknowns that need to be for the mode to work. *)
@@ -1070,7 +1087,7 @@ let handle_branch
           match need_filtering, unknown_gen with
           | None, Some (u, dt, i) -> u
           | Some (eqs, unks, pat, i), None -> unk_provider.next_unknown ()
-          | _, _ -> failwith "Simultaneous Some/None" 
+          | _, _ -> failwith "Simultaneous Some/None/2" 
         in
         umap := UM.add unknown_to_generate_for (Undef DHole) !umap;
         msg_debug (str (Printf.sprintf "Unknown to generate for: %s\n" (Unknown.to_string (unknown_to_generate_for))) ++ fnl ());
@@ -1112,16 +1129,68 @@ let handle_branch
           )
         )
         end
-      else
+      else if List.exists (fun b -> b) rec_bs && not can_use_recursive then begin
+          msg_debug (str "Can't use recursive producer - checker must exist." ++ fnl ());
+          begin match checker_classes with
+          | bs :: _ ->
+             msg_debug (str ("Found Checker ! " ^ String.concat "," (List.map (Printf.sprintf "%b") bs)) ++ fnl ());
+             (* Begin checker stuff. *)
+             
+             (* Then just make the checker call. *)
+             let (uts, need_filtering, unknown_gen) = compute_for_mode curr_modes bs false in
+             
+             let unknowns_for_mode = UM.bindings uts in
+             (* Instantiate any unknowns that need to be for the mode to work. *)
+             instantiate_toplevel_ranges_cont (List.map (fun (x,_t) -> Unknown x) unknowns_for_mode) [] (fun _ranges ->
+                 (* Generate a fresh boolean unknown *)
+                 (* 
+              let    unknown_to_generate_for = unk_provider.next_unknown () in
+              umap : = UM.add unknown_to_generate_for (Undef (DCtr (injectCtr "Coq.Init.Datatypes.bool", []))) !umap;
+                  *)
+                 
+             let inputs_for_pred =
+               List.map (range_to_coq_expr !umap) ranges (* (List.filter (fun r -> not (is_parameter r)) ranges) *)
+             in
+             let pred = gApp ~explicit:true (gTyCtr c) inputs_for_pred in
+             
+             let body_cont = recurse_type (ctr_index + 1) dt' in
+             let body_fail = fail_exp in
+             
+             (* Construct the checker for the current type constructor *)
+             let checker = 
+               gApp ~explicit:true (gInject "decOpt") 
+                 (* P : Prop := c dts*)
+                 [ pred
+                 
+                 (* Instance *)
+                 ; hole 
+                 
+                 (* Size. TODO: what do we do about this size? *)
+                 ; init_size
+                 
+                 ] 
+             in
+             
+             if is_pos then
+               check_expr ctr_index
+                 checker body_cont body_fail not_enough_fuel_exp
+             else
+               check_expr ctr_index
+                 checker body_fail body_cont not_enough_fuel_exp
+               )
+          | _ -> failwith "TODO: ERR MSG. No Classes found."
+          end
+        end
+      else begin
         (* The recursive case is not a producer - check if there is an enumerator that works better! *)
-
-        begin match ranked_producers with
+        msg_debug (str "Entering non-recursive handler" ++ fnl ());
+        match ranked_producers with
         | (_,bs) :: _ ->
            msg_debug (str ("Found producer instead of recursive checker! " ^ String.concat "," (List.map (Printf.sprintf "%b") bs)) ++ fnl ());
            (* Begin producer stuff. *)
            (* Step 1: Figure out which unknowns need to be instantiated for mode to work out *)
            (* Invariant: These are not Incompatible *)
-           let (uts, need_filtering, unknown_gen) = compute_for_mode curr_modes bs in
+           let (uts, need_filtering, unknown_gen) = compute_for_mode curr_modes bs false in
            let unknowns_for_mode = UM.bindings uts in
            (* Instantiate any unknowns that need to be for the mode to work. *)
            instantiate_toplevel_ranges_cont (List.map (fun (x,_t) -> Unknown x) unknowns_for_mode) [] (fun _ranges ->
@@ -1131,10 +1200,10 @@ let handle_branch
              match need_filtering, unknown_gen with
              | None, Some (u, dt, i) -> u
              | Some (eqs, unks, pat, i), None -> unk_provider.next_unknown ()
-             | _, _ -> failwith "Simultaneous Some/None" 
+             | _, _ -> failwith "Simultaneous Some/None/3" 
            in
            let ranges_for_pred =
-             let rs = List.map (range_to_coq_expr !umap) (List.filter (fun r -> not (is_parameter r)) ranges) in
+             let rs = List.map (range_to_coq_expr !umap) ranges in (* (List.filter (fun r -> not (is_parameter r)) ranges) in*)
              match need_filtering with
              | Some (_,_,_,i) -> List.mapi (fun j x -> if i = j then gVar unknown_to_generate_for else x) rs
              | _ -> rs 
@@ -1179,10 +1248,11 @@ let handle_branch
            )
         | _ ->
            (* There is no good producer, just instantiate everything and make a recursive call. *)
+           msg_debug (str "Entering recursive checker call" ++ fnl ());
            is_base := false;
           
            (* Then just make the recursive call. *)
-           let (uts, need_filtering, unknown_gen) = compute_for_mode curr_modes rec_bs in
+           let (uts, need_filtering, unknown_gen) = compute_for_mode curr_modes rec_bs true in
         
            let unknowns_for_mode = UM.bindings uts in
            (* Instantiate any unknowns that need to be for the mode to work. *)

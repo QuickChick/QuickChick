@@ -84,8 +84,8 @@ let derive_dependent
   (* Typeclass arguments - depends on the class *)
   let param_class_names = match class_name with
     | DecOpt -> ["Dec_Eq"; "Enum"]
-    | EnumSizedSuchThat -> ["Enum"]
-    | ArbitrarySizedSuchThat -> ["Gen"]
+    | EnumSizedSuchThat -> ["Dec_Eq"; "Enum"]
+    | ArbitrarySizedSuchThat -> ["Dec_Eq"; "Gen"; "Enum"]
     | _ -> []
   in
   
