@@ -118,6 +118,7 @@ Definition prop_derived : Checker :=
   forAllShrink gen_variation_state (fun _ => nil)
                (fun v => SSNI_derived default_table v).
 
+Extract Constant defNumTests => "20000".
 QuickChick prop_manual.
 QuickChick prop_derived.
 (*

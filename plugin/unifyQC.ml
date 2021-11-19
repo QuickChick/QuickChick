@@ -918,13 +918,12 @@ let handle_branch
       (!uts, !need_filtering, !unknown_gen)
     in
 
-
     if not (gen_ctr = c) then
       begin
         msg_debug (str "Non-recursive constructor" ++ fnl ());
 
         begin match ranked_producers with
-        | (_,bs) :: _ ->
+        | (_,bs) :: _ when is_pos ->
            msg_debug (str ("Found Producer! " ^ String.concat "," (List.map (Printf.sprintf "%b") bs)) ++ fnl ());
            (* Begin producer stuff. *)
 
