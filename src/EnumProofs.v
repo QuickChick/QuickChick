@@ -698,7 +698,7 @@ Ltac2 rec enumST_sound (ty : constr) (ih : ident) :=
     destruct $n; try (now eapply (@semReturnOpt_None E _ _) in $h; inv $h); enumST_sound ty ih
   | (* return *)
     [ h : semProdOpt (returnEnum _) _ |- _ ] =>
-    eapply (@semReturnOpt E _ _) in $h; inv $h;  now eauto 20 using $ty
+    eapply (@semReturnOpt E _ _) in $h; inv $h; first [ now eauto using $ty | now eauto 20 using $ty ]
   | (* bindOpt *)
     [ h : semProdOpt (bindOpt _ _) _ |- _ ] =>
     eapply (@semOptBindOpt E _ _) in $h >
@@ -753,7 +753,7 @@ Ltac2 derive_sound_enumST (ty : constr) (pred : constr) :=
 
   match! goal with
     [ |- semProdOpt _ ?x -> _ ] => 
-    (generalize $s' at 1; revert_params pred; revert x; induction $s' as [ | $s $ihs]; intro;
+    (generalize $s' at 1; revert_params pred; generalize $x; induction $s' as [ | $s $ihs]; intro;
      intro_params pred;
      intros $si $hgen;
      eapply &Henum in $hgen) > [ sound_enums ty ihs | sound_enums ty ihs  ]
