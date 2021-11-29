@@ -1,1 +1,2 @@
 OCAMLWARN=-w -8 -warn-error +a-3
+CAMLPKGS+= -package coq-core.plugins.extraction
