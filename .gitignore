@@ -29,6 +29,7 @@ dsss17/terse
 *.d
 Makefile.coq
 Makefile.coq.conf
+plugin/META.coq-quickchick
 *.out
 *.so
 *.opt
