@@ -5,6 +5,21 @@ The format is based on [Keep a Changelog](http://keepachangelog.com/en/1.0.0/)
 and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
+
+## [1.6.0]
+- Remove all dependency on perl (replaced with cppo (OCaml preprocessor) at compile time; awk at runtime).
+- Added more informative error messages when tests fail to compile or throw exceptions.
+- Fixed inefficient extraction of Nat arithmetic; this previously caused tests to run in time quadratic in the number of generated test cases.
+- Added `RelDec` instance for `eq`.
+
+## [1.5.1]
+- Support Coq 8.11 to 8.14.
+
+## [1.5.0]
+- Support Coq 8.13.
+- No longer support Coq 8.12.
+
+## [1.4.0]
 ### Added
 - Support Coq 8.12.
 
