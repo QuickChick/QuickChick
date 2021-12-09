@@ -75,12 +75,23 @@ let convert_constr_to_cw_pair c : (constructor * weight_ast) =
       (ctr,w)
   | _ -> failwith "Not a pair?"
 
+#if COQ_VERSION >= (8, 16, 0)
+let register_weights_object =
+  Libobject.declare_object
+    {(Libobject.default_object ("QC_register_weights")) with
+      Libobject.cache_function = (fun ws -> register_weights ws);
+      Libobject.load_function = (fun _ ws -> register_weights ws)}
+
+let add_weights w = Lib.add_leaf (register_weights_object w)
+#else
 let register_weights_object = 
   Libobject.declare_object
     {(Libobject.default_object ("QC_register_weights")) with
       Libobject.cache_function = (fun (_,ws) -> register_weights ws);
       Libobject.load_function = (fun _ (_,ws) -> register_weights ws)}
 
+let add_weights w = Lib.add_anonymous_leaf (register_weights_object w)
+#endif
 let lookup_weight ctr size_var = 
   try match CtrMap.find ctr !weight_env with
       | WNum n -> gInt n
@@ -106,7 +117,7 @@ VERNAC COMMAND EXTEND QuickChickWeights CLASSIFIED AS SIDEFF
        in 
        msg_debug (str "Current weights: " ++ fnl ());
        msg_debug (str (weight_env_to_string ()) ++ fnl ());
-       Lib.add_anonymous_leaf (register_weights_object weight_assocs)
+       add_weights weight_assocs
      }
 END
 
