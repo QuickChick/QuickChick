@@ -6,14 +6,10 @@ Import IO.Notations.
 
 RunIOPackage "zarith".
 
-Definition assert_equal {A} `{Dec_Eq A} `{Show A} (x y : A) : IO unit :=
+Definition _assert_equal {A} `{Dec_Eq A} `{Show A} (x y : A) (_ : x = y) : IO unit :=
   if dec_eq x y then ret tt else print_endline ("Failed: " ++ show (x, y))%string.
 
-Definition test_div_ : unit :=
-  let _ : (1 / (-3) = -1)%Z := eq_refl in
-  let _ : ((-1) / (-3) = 0)%Z := eq_refl in
-  let _ : ((-1) / 3 = (-1))%Z := eq_refl in
-  tt.
+Notation assert_equal x y := (_assert_equal x y eq_refl).
 
 Definition test_div : IO unit :=
   ( assert_equal (1 / (-3)) (-1) ;;
@@ -21,24 +17,11 @@ Definition test_div : IO unit :=
     assert_equal ((-1) / 3) (-1)
   )%Z%io.
 
-Definition test_mod_ : unit :=
-  let _ : (1 mod (-3) = -2)%Z := eq_refl in
-  let _ : ((-1) mod (-3) = -1)%Z := eq_refl in
-  let _ : ((-1) mod 3 = 2)%Z := eq_refl in
-  tt.
-
 Definition test_mod : IO unit :=
   ( assert_equal (1 mod (-3)) (-2) ;;
     assert_equal ((-1) mod (-3)) (-1) ;;
     assert_equal ((-1) mod 3) 2
   )%Z%io.
-
-Definition test_shiftr_ : unit :=
-  let _ : (Z.shiftr 3 1 = 1)%Z := eq_refl in
-  let _ : (Z.shiftr 3 (-1) = 6)%Z := eq_refl in
-  let _ : (Z.shiftr (-3) 1 = -2)%Z := eq_refl in
-  let _ : (Z.shiftr (-3) (-1) = -6)%Z := eq_refl in
-  tt.
 
 Definition test_shiftr : IO unit :=
   ( assert_equal (Z.shiftr 3 1) 1 ;;
@@ -46,13 +29,6 @@ Definition test_shiftr : IO unit :=
     assert_equal (Z.shiftr (-3) 1) (-2) ;;
     assert_equal (Z.shiftr (-3) (-1)) (-6)
   )%Z%io.
-
-Definition test_shiftl_ : unit :=
-  let _ : (Z.shiftl 3 1 = 6)%Z := eq_refl in
-  let _ : (Z.shiftl 3 (-1) = 1)%Z := eq_refl in
-  let _ : (Z.shiftl (-3) 1 = -6)%Z := eq_refl in
-  let _ : (Z.shiftl (-3) (-1) = -2)%Z := eq_refl in
-  tt.
 
 Definition test_shiftl : IO unit :=
   ( assert_equal (Z.shiftl 3 1) 6 ;;

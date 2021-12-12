@@ -1,5 +1,4 @@
 From mathcomp Require Import ssreflect ssrbool ssrnat eqtype.
-Require Import String. (* I don't know why we need this.. Probably I am forgetting something *)
 From QuickChick Require Import QuickChick.
 Require Import Arith List Lia.
 From QuickChick.stlc Require Import lambda.
@@ -172,7 +171,7 @@ Proof.
                       [m1 [/semChooseSize H1 H2]]. fold gen_type_size in H2.
         move : H2 => /semLiftGen2Size [[tau1' tau2'] [[/=  H3  H4] Heq]].
         rewrite /set1 in Heq. inversion Heq; subst.
-        rewrite IH1 in H3. rewrite IH2 in H4.
+        setoid_rewrite IH1 in H3. setoid_rewrite IH2 in H4.
         have Hle1 : type_size tau1 = (n - m1)%coq_nat
           by apply H3; lia.
         have Hle2 : type_size tau2 = (n - (n - m1)%coq_nat)%coq_nat
@@ -299,8 +298,8 @@ Proof.
         move : H5 H2=> [[t1 t2] [[H5 H6] H7]]
                          /gen_type_correctSize H2;
         rewrite /set1 in H7; subst;
-        (rewrite (IH (n - m, Arrow tau' tau)) in H5; last by left; lia);
-        (rewrite (IH (n - m', tau')) in H6; last by left; lia);
+        (setoid_rewrite (IH (n - m, Arrow tau' tau)) in H5; last by left; lia);
+        (setoid_rewrite (IH (n - m', tau')) in H6; last by left; lia);
         move : H5 H6 => /= [[max1 [H5 Hle1]] [H6 [h1 [H7 H7']]]]
                            [[max2 [H8 Hle2]] [H9 [h2 [H10 H10']]]]; subst;
         repeat (split; simpl; try now econstructor; eauto);
@@ -320,7 +319,7 @@ Proof.
                     split; auto; try lia; constructor
                 | move /semLiftGenSize : H2 => [t' [ H2 H3]];
               rewrite /set1 in H3; subst;
-              (rewrite (IH (n.+1, tau2)) in H2; last by
+              (setoid_rewrite (IH (n.+1, tau2)) in H2; last by
                    right; unfold lt_type; simpl; lia);
               move : H2 => /= [[maxt [H1 Hle]] [H2 [h [H3 H4]]]];
                     (repeat split; try now econstructor); eauto;

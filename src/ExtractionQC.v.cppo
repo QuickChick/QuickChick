@@ -163,13 +163,12 @@ Extract Constant Nat.log2 => "(let rec log2 x = if x <= 1 then 0 else 1 + log2 (
 Extract Constant Nat.div => "(fun x y -> if y = 0 then 0 else x / y)".
 Extract Constant Coq.Init.Nat.div => "(fun x y -> if y = 0 then 0 else x / y)".
 
-(* shiftr must be an arithmetic shift for Z *)
 #define EXTRACT_SHIFTR \
-"(fun i j -> if j < 0 || Sys.int_size < j then failwith ""shift overflow"" else i asr j)"
+"(fun i j -> if j < 0 || Sys.int_size < j then failwith (Printf.sprintf ""overflow: shiftr %d %d"" i j) else i asr j)"
 
 (* shiftl checks its result for overflow *)
 #define EXTRACT_SHIFTL \
-"(fun i j -> if j < 0 || Sys.int_size < j then failwith ""shift overflow"" else let r = i lsl j in if r asr j = i then r else failwith ""shift overflow"")"
+"(let overflow i j = failwith (Printf.sprintf ""overflow: shiftl %d %d"" i j) in fun i j -> if j < 0 || Sys.int_size < j then overflow i j else let r = i lsl j in if r asr j = i then r else overflow i j)"
 
 Extract Constant Nat.shiftr => EXTRACT_SHIFTR.
 Extract Constant Nat.shiftl => EXTRACT_SHIFTL.
@@ -189,8 +188,14 @@ Extract Constant Z.modulo => "fun x y ->
 Extract Constant N.shiftr => EXTRACT_SHIFTR.
 Extract Constant N.shiftl => EXTRACT_SHIFTL.
 
-Extract Constant Z.shiftr => EXTRACT_SHIFTR.
-Extract Constant Z.shiftl => EXTRACT_SHIFTL.
+Extract Constant Z.shiftr =>
+  "(let overflow i j = failwith (Printf.sprintf ""overflow: shiftr %d %d"" i j) in
+   fun i j -> if Sys.int_size < j || Sys.int_size < -j then overflow i j else
+   if 0 < j then i asr j else let r = i lsl (-j) in if r asr (-j) = i then r else overflow i j)".
+Extract Constant Z.shiftl =>
+  "(let overflow i j = failwith (Printf.sprintf ""overflow: shiftl %d %d"" i j) in
+   fun i j -> if Sys.int_size < j || Sys.int_size < -j then overflow i j else
+   if j < 0 then i asr (-j) else let r = i lsl j in if r asr j = i then r else overflow i j)".
 #endif
 
 (** Override the extraction of [int].
