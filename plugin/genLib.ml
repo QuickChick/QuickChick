@@ -17,7 +17,10 @@ let gEnum c = gApp (gInject "E") [c]
 let returnEnum c = gApp (gInject "returnEnum") [c]
 let bindEnum cg xn cf = 
   gApp (gInject "bindEnum") [cg; gFun [xn] (fun [x] -> cf x)]
+let failEnum c =
+  gApp ~explicit:true (gInject "failEnum") [c]
 
+  
 let bindEnumOpt cg xn cf = 
   gApp (gInject "bindOpt") [cg; gFun [xn] (fun [x] -> cf x)]
 

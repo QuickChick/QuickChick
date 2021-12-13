@@ -8,10 +8,10 @@ open UnifyQC
 
 (* arguments to handle_branch *)
 let fail_exp (dt : coq_expr) =
-  returnEnum (gApp ~explicit:true (gInject "None") [dt])
+  failEnum (gOption dt)
 
 let not_enough_fuel_exp (dt : coq_expr) =
-  returnEnum (gApp ~explicit:true (gInject "None") [dt])
+  returnEnum (gApp ~explicit:true (gInject "None") [dt]) 
   
 let ret_exp (dt : coq_expr) (c : coq_expr) =
   msg_debug (str "Returning...." ++ fnl ());
@@ -115,8 +115,11 @@ let construct_generators
       gen_ctr init_umap init_tmap input_ranges result
   in
   let all_gens = List.map handle_branch' ctrs in
+  let padNone =
+    if List.exists (fun gb -> not (snd gb)) all_gens
+    then [not_enough_fuel_exp full_gtyp] else [] in
   match kind with
-  | Base_gen -> List.map fst (List.filter snd all_gens)
+  | Base_gen -> List.map fst (List.filter snd all_gens) @ padNone
   | Ind_gen  -> List.map fst all_gens
 
 let base_gens = construct_generators Base_gen

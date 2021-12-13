@@ -38,6 +38,9 @@ Definition bindEnum {A B : Type} (g : E A) (k : A -> E B) : E B :=
             x <- run g n;;
             run (k x) n).
 
+Definition failEnum {A : Type} : E A :=
+  MkEnum (fun _ => lnil).
+
 Instance MonadEnum : Monad E :=
   { ret := @returnEnum
   ; bind := @bindEnum }.
