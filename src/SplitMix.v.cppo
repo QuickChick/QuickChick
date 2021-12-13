@@ -1,8 +1,9 @@
 From Coq Require Import ZArith NArith.
 From Coq Require Ascii String HexString.
 
-#if COQ_VERSION < (8, 15, 0)
+#if COQ_VERSION < (8, 14, 0)
 #define Uint63 Int63
+#define uint63 int63
 #endif
 From Coq Require Import Uint63.
 
@@ -13,12 +14,13 @@ Set Primitive Projections.
    and Coq currently supports 4.05. *)
 Module Import CoqInt64.
 
-#if COQ_VERSION < (8, 15, 0)
-#define uint63 int63
-#endif
 Local Open Scope uint63.
 
 Record int64 := MkInt64 { msb : int ; ls63b : int }.
+
+Declare Scope int64_scope.
+Delimit Scope int64_scope with int64.
+Bind Scope int64_scope with int64.
 
 Definition add (x y : int64) : int64 :=
   let '(MkInt64 i m) := x in
@@ -136,10 +138,6 @@ End filterHex.
 (* TODO: forbid bad characters *)
 Definition of_hex (s : string) : int64 :=
   of_N (HexString.Raw.to_N (_filterhex s) 0).
-
-Declare Scope int64_scope.
-Delimit Scope int64_scope with int64.
-Bind Scope int64_scope with int64.
 
 Declare Scope int64_hex_scope.
 Delimit Scope int64_hex_scope with int64_hex.

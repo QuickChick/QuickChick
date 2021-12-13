@@ -8,7 +8,7 @@ MAKE SURE TO EDIT THE .cppo SOURCE OF THIS FILE RATHER THAN THE GENERATED RESULT
 Set Warnings "-extraction-opaque-accessed,-extraction".
 Set Warnings "-notation-overridden,-parsing".
 
-#if COQ_VERSION < (8, 15, 0)
+#if COQ_VERSION < (8, 14, 0)
 #define Uint63 Int63
 #endif
 From Coq Require Import ZArith Ascii String Uint63.
