@@ -76,6 +76,20 @@ let sed_file file f =
         Sys.rename tmpfile file
   in go ()
 
+let read_all chan =
+  let buf = Buffer.create 1024 in
+  let rec go () =
+    match Buffer.add_channel buf chan 1024 with
+    | () -> go ()
+    | exception End_of_file -> Buffer.contents buf
+  in go ()
+
+let read_file file =
+  let h = open_in file in
+  let s = read_all h in
+  close_in h;
+  s
+
 let fresh_name n =
     let base = Id.of_string n in
 
@@ -198,28 +212,33 @@ let define_and_run c env evd =
     | Some _ -> dir ^ "/_build/default/" ^ (Filename.chop_extension (Filename.basename execn)) ^ ".exe" in
     
   if Sys.command exec_command <> 0 then 
-    (CErrors.user_err (str "Could not compile test program: " ++ str mlf ++ fnl ()))
+    let build_log = read_file (dir ^ "/build.log") in
+    let build_err = read_file (dir ^ "/build.err") in
+    let msg = str "Could not compile test program: " ++ str mlf ++ fnl () in
+    let msg = if build_log = "" then msg else
+      msg ++ fnl () ++ str "Build stdout:" ++ fnl () ++ str build_log ++ fnl () in
+    let msg = if build_err = "" then msg else
+      msg ++ fnl () ++ str "Build stderr:" ++ fnl () ++ str build_err ++ fnl () in
+    CErrors.user_err msg
 
   (* Run the test *)
   else
     (* Should really be shared across this and the tool *)
-    let chan = Unix.open_process_in execn in
+    let (p_out, _, p_err) as process = Unix.open_process_full execn [||] in
     let rec process_otl_aux () =
-      let e = input_line chan in
+      let e = input_line p_out in
       Feedback.msg_info (Pp.str e);
       process_otl_aux() in
     try process_otl_aux ()
     with End_of_file ->
-         let stat = Unix.close_process_in chan in
+         let err_msg = read_all p_err in
+         let err descr = CErrors.user_err (str (execn ^ ": " ^ descr) ++ fnl () ++ fnl () ++ str err_msg ++ fnl ()) in
+         let stat = Unix.close_process_full process in
          begin match stat with
-         | Unix.WEXITED 0 ->
-            ()
-         | Unix.WEXITED i ->
-            CErrors.user_err (str (Printf.sprintf "Exited with status %d" i) ++ fnl ())
-         | Unix.WSIGNALED i ->
-            CErrors.user_err (str (Printf.sprintf "Killed (%d)" i) ++ fnl ())
-         | Unix.WSTOPPED i ->
-            CErrors.user_err (str (Printf.sprintf "Stopped (%d)" i) ++ fnl ())
+         | Unix.WEXITED 0 -> ()
+         | Unix.WEXITED i -> err (Printf.sprintf "Exited with status %d" i)
+         | Unix.WSIGNALED i -> err (Printf.sprintf "Killed (%d)" i)
+         | Unix.WSTOPPED i -> err (Printf.sprintf "Stopped (%d)" i)
          end
 
 (*
