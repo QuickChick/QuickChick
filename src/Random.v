@@ -198,15 +198,24 @@ Let seq {X} (_ : X) (x : Prop) := x.
 Class RandomRAssum : Prop :=
   { ssss : seq H (seq sub (seq add (seq mul (seq modulo (seq shiftr (seq log2 (seq div (seq of_int (seq to_int (seq iter (seq shiftl False)))))))))))
   ; leq_sub : forall x y z, x <= y -> y <= z -> y - x <= z - x
+  ; leq_add_sub : forall x y z, y <= z -> x <= z - y -> x + y <= z
   ; sub_diag : forall x, x - x = of_int 0
   ; add_sub : forall x y, x <= y -> x + (y - x) = y
   ; sub_add : forall x y, (x + y) - x = y
   ; add_mon : forall x y z, y <= z -> x + y <= x + z
   ; add_0_r : forall x, x + of_int 0 = x
+  ; div_pos : forall x y, of_int 0 <= x -> of_int 1 <= y -> of_int 0 <= x / y
+  ; log2_pos : forall x, of_int 0 <= log2 x
+  ; of_int_mon : forall x y, (x <=? y)%int63 -> of_int x <= of_int y
+  ; log2_63 : forall r bound, r <= bound - of_int 1 ->
+      log2 r <= of_int 62 + of_int 63 * (log2 bound / of_int 63)
+  ; modulo_idem : forall x y, of_int 0 <= x -> x + of_int 1 <= y -> modulo x y = x
+  ; modulo_pos : forall x y, of_int 1 <= y -> of_int 0 <= modulo x y
+  ; modulo_up : forall x y, of_int 1 <= y -> modulo x y <= y - of_int 1
   ; iter_ind : forall {T} (P : A -> T -> Prop) (f : T -> T) (t0 : T),
       (forall y t, P y t -> P (add (of_int 1) y) (f t)) ->
       P (of_int 0) t0 ->
-      forall x, P x (iter x T f t0)
+      forall x, of_int 0 <= x -> P x (iter x T f t0)
   }.
 
 Context {RRA : RandomRAssum}.
@@ -215,6 +224,12 @@ Definition leq_sub_0 : forall x y, leq x y -> leq (of_int 0) (sub y x).
 Proof.
   intros x y; rewrite <- (sub_diag x).
   apply leq_sub. apply refl.
+Qed.
+
+Definition leq_sub_1 : forall x y, leq x y -> leq (of_int 1) (of_int 1 + sub y x).
+Proof.
+  intros x y Hx; apply leq_sub_0 in Hx. apply (add_mon (of_int 1)) in Hx. rewrite add_0_r in Hx.
+  assumption.
 Qed.
 
 Definition manybits (l63 : A) : random -> A :=
@@ -243,21 +258,31 @@ Proof.
   intros Hl63. unfold manybits. eapply iter_ind; intros *.
   - intros IH r; specialize (IH (shiftr r (of_int 63))). destruct IH as [IH1 IH2].
     split.
-    + intros [Hr0 Hr1].
-      eassert (HH : _); [ | specialize (IH1 HH) ].
+    + clear IH2. intros [Hr0 Hr1].
+      match type of IH1 with
+      | (?ZZ -> _) => eassert (HH : ZZ); [ | specialize (IH1 HH) ]
+      end.
       { admit. }
       destruct IH1 as [s Hs].
 
-Abort.
+Admitted.
 
 Lemma randomR0Correct (bound : A)
-  : of_int 0 <= bound - of_int 1 ->
+  : of_int 1 <= bound ->
     forall r,
       ((of_int 0 <= r) && (r <= bound - of_int 1)) <-> exists s, randomR0 bound s = r.
 Proof.
-  intros Hbound; split.
+  unfold randomR0; intros Hbound r; split.
   { move => /andP [Hmin Hmax].
-Admitted.
+    assert (EX : exists s, manybits (log2 bound / of_int 63) s = r).
+    { apply manybitsCorrect.
+      { apply div_pos; [ apply log2_pos | apply of_int_mon; reflexivity ]. }
+      { split; [ exact Hmin | apply log2_63; exact Hmax ]. } }
+    destruct EX as [s Hs]; exists s; rewrite Hs.
+    apply modulo_idem; [ apply Hmin | apply leq_add_sub, Hmax; auto ]. }
+  { move => [s Hs]. apply /andP. unfold randomR0 in Hs.
+    subst r; split; [ apply modulo_pos, Hbound | apply modulo_up, Hbound ]. }
+Qed.
 
 Lemma randomRCorrect_ (minb maxb : A)
   : leq minb maxb ->
@@ -267,7 +292,7 @@ Lemma randomRCorrect_ (minb maxb : A)
 Proof.
   intros Hb r.
   assert (HR0 := randomR0Correct (of_int 1 + (maxb - minb))).
-  rewrite sub_add in HR0. specialize (HR0 (leq_sub_0 _ _ Hb)).
+  rewrite sub_add in HR0. specialize (HR0 (leq_sub_1 _ _ Hb)).
   split.
   { destruct (HR0 (r - minb)) as [HR1 _].
     move => /andP [Hmin Hmax].
@@ -300,14 +325,27 @@ End RandomR.
   (of_int := nat_of_int) (to_int := int_of_nat)
   (iter := Nat.iter).
 Proof.
-  constructor; cbn [leq OrdNat]; intros.
+  constructor; cbn [leq OrdNat]; intros; try reflexivity.
   - admit.
   - apply (introT leP). apply (elimT leP) in H. apply (elimT leP) in H0. lia.
+  - apply /leP. move: H => /leP. move: H0 => /leP. by lia.
   - rewrite Nat.sub_diag. reflexivity.
   - apply (elimT leP) in H. apply le_plus_minus_r, H.
   - lia.
   - apply (introT leP); apply (elimT leP) in H; lia.
   - cbn. lia.
+  - apply /leP. apply Z2Nat.inj_le; [ apply Int63.to_Z_bounded .. |]. by apply /Uint63.lebP.
+  - apply /leP. move: H => /leP H. rewrite (Nat.div_mod_eq (Nat.log2 r) 63).
+    rewrite Nat.add_comm.
+    apply Nat.add_le_mono.
+    + by apply lt_n_Sm_le, Nat.mod_upper_bound; lia.
+    + by apply Nat.mul_le_mono_l, Nat.div_le_mono; [ cbn; lia | apply Nat.log2_le_mono; lia ].
+  - move: H0 => /leP H0. move: H => /leP H.
+    change (nat_of_int 0) with 0%nat in H. change (nat_of_int 1) with 1%nat in H0.
+    apply Nat.mod_small. lia.
+  - apply /leP; move: H => /leP H. change (nat_of_int 1) with 1 in *.
+    assert (HH := Nat.mod_upper_bound x y). by lia.
+  - induction x; cbn; auto.
 Admitted.
 
 #[local] Instance RandomRAssum_Z : RandomRAssum (A := Z)
@@ -316,6 +354,41 @@ Admitted.
   (of_int := Int63.to_Z) (to_int := Int63.of_Z)
   (iter := Z.iter).
 Proof.
+  constructor; cbn [leq OrdZ]; intros.
+  - admit.
+  - apply /Z.leb_spec0. move: H0 => /Z.leb_spec0; move: H => /Z.leb_spec0. lia.
+  - apply /Z.leb_spec0. move: H0 => /Z.leb_spec0; move: H => /Z.leb_spec0. lia.
+  - apply Z.sub_diag.
+  - lia.
+  - lia.
+  - apply /Z.leb_spec0. move: H => /Z.leb_spec0. lia.
+  - cbn. lia.
+  - cbn in *. apply /Z.leb_spec0; move: H => /Z.leb_spec0 H; move: H0 => /Z.leb_spec0 H0.
+    apply Z_div_nonneg_nonneg; lia.
+  - cbn. apply /Z.leb_spec0; apply Z.log2_nonneg.
+  - by apply /Z.leb_spec0 /Uint63.lebP.
+  - apply /Z.leb_spec0; move: H => /Z.leb_spec0.
+    repeat lazymatch goal with
+    | |- context [ Uint63.to_Z ?u ] => let v := eval cbv in (Uint63.to_Z u) in
+        change (Uint63.to_Z u) with v
+    end.
+    intros H. rewrite (Z_div_mod_eq_full (Z.log2 r) 63) Z.add_comm.
+    apply Z.add_le_mono.
+    + by apply Zlt_succ_le; apply Z.mod_pos_bound.
+    + apply Z.mul_le_mono_nonneg_l; [ lia | ]. apply Z_div_le; [ lia | ].
+      apply Z.log2_le_mono; lia.
+  - move: H0 => /Z.leb_spec0 H0; move: H => /Z.leb_spec0 H. cbn in *.
+    apply Z.mod_small; lia.
+  - apply /Z.leb_spec0; move: H => /Z.leb_spec0 H. cbn in *.
+    apply Z.mod_pos_bound; lia.
+  - apply /Z.leb_spec0; move: H => /Z.leb_spec0 H. cbn in *.
+    assert (HH := Z.mod_pos_bound x y); lia.
+  - move: H1 => /Z.leb_spec0 H1. cbn - [Z.add] in *. rewrite iter_nat_of_Z; [ | assumption].
+    replace x with (Z.of_nat (Z.abs_nat x)) at 1;
+      [ | rewrite Zabs2Nat.id_abs; rewrite Z.abs_eq; lia ].
+    induction (Z.abs_nat x).
+    + apply H0.
+    + rewrite Nat2Z.inj_succ. rewrite <- Z.add_1_l. apply H; auto.
 Admitted.
 
 #[local] Instance RandomRAssum_N : RandomRAssum (A := N)
