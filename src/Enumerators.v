@@ -223,51 +223,16 @@ Fixpoint enumerateFuel {A : Type} (fuel : nat) (tot : nat) (gs : list (E (option
                  end ))
   end.
 
-Definition enumerate {A : Type} (gs : list (E (option A))) : E (option A) :=
+Definition enumerate' {A : Type} (gs : list (E (option A))) : E (option A) :=
   enumerateFuel (length gs) (length gs) gs.
 
-
-Lemma pickDrop_exists {A} (l: list (E (option A))) n :
-    n < length l ->
-    exists x l',
-      Enumerators.pickDrop l n = (x, l') /\
-      seq_In l x /\ length l' + 1 = length l /\
-      l' \subset l. 
-Proof.
-  revert n; induction l; intros n H.
-  - simpl in *; ssromega. 
-  - simpl in *.
-    destruct n.
-    + do 2 eexists. split. reflexivity.
-      split; eauto. split. ssromega.
-      simpl.
-      intros z Hin. now right; eauto.
-    + edestruct (IHl n). ssromega.
-      inv H0. inv H1. inv H2. inv H3.
-      do 2 eexists. split. rewrite H2. reflexivity.
-      split; eauto. split. simpl. ssromega.
-
-      intros z Hin; inv Hin; eauto. now left.
-      inv H6. now right; eauto.
-Qed. 
-
-Lemma pickDrop_In {A} (l: list (E (option A))) x :
-    List.In x l ->
-    exists n l', Enumerators.pickDrop l n = (x,l') /\ n < length l.
-Proof.
-  induction l; intros Hin; inv Hin.
-
-  - exists 0. eexists. split. reflexivity.
-    simpl. ssromega.
-
-  - destruct IHl. eassumption. inv H0. inv H1.
-    exists (S x0). eexists. split. simpl. rewrite H2. reflexivity.
-    simpl. ssromega.
-Qed.
-
+Definition enumerate {A : Type} (gs : list (E (option A))) : E (option A) :=
+  MkEnum (fun s => join_list_lazy_list (map (fun g => run g s) gs)).
 
 Lemma enumerate_correct_size {A} (lst : list (E (option A))) s :
-  isSome :&: semProdSize (enumerate lst) s <--> \bigcup_(x in lst) (fun g => isSome :&: semProdSize g s) x.  
+  isSome :&: semProdSize (enumerate lst) s <--> \bigcup_(x in lst) (fun g => isSome :&: semProdSize g s) x.
+Admitted.
+(*
 Proof.
   unfold enumerate.
   assert (Hret := @semReturnSize E _ _ (option A)).
@@ -339,9 +304,11 @@ Proof.
       eassumption.
       eapply Hret. reflexivity. 
 Qed.       
-
+*)
 Lemma enumerate_correct {A} (lst : list (E (option A))) :
-  isSome :&: semProd (enumerate lst) <--> \bigcup_(x in lst) (fun g => isSome :&: semProd g) x.  
+  isSome :&: semProd (enumerate lst) <--> \bigcup_(x in lst) (fun g => isSome :&: semProd g) x.
+Admitted.
+(*
 Proof.
   split; intros H.
   - inv H. inv H1. inv H2.
@@ -357,11 +324,13 @@ Proof.
 
     eapply (@enumerate_correct_size A) in Hin.
     inv Hin. split; eauto. eexists. split; eauto. 
-Qed.   
+Qed.    *)
 
 
 Lemma enumerate_correct_size_opt {A} (lst : list (E (option A))) s :
   semProdSizeOpt (enumerate lst) s <--> \bigcup_(x in lst) (semProdSizeOpt x s).
+Admitted.
+(*
 Proof.
   assert (Hc := enumerate_correct_size lst s).
   intros x. destruct (Hc (Some x)) as [H1 H2].
@@ -380,10 +349,12 @@ Proof.
     { inv Hin. inv H. eexists; split; eauto. split; eauto. }
     
     eapply Hc in Hin'. destruct Hin'. eassumption.
-Qed.       
+Qed.       *)
 
 Lemma enumerate_correct_opt {A} (lst : list (E (option A))) :
   semProdOpt (enumerate lst) <--> \bigcup_(x in lst) (semProdOpt x).
+  Admitted.
+(*
 Proof.
   split; intros H.
   - inv H. inv H0.
@@ -397,23 +368,27 @@ Proof.
     { eexists. split; eauto. }
     eapply (@enumerate_correct_size_opt A) in Hin.
     eexists. split; eauto. 
-Qed.       
+Qed.        *)
 
 
 
 Lemma enumerate_SizeMonotonicOpt (A : Type) (l : list (E (option A))) :
   l \subset SizeMonotonicOpt ->
   SizeMonotonicOpt (enumerate l).
+Admitted.
+(*
 Proof.
   intros Hin. intros s1 s2 Hleq.
   rewrite !enumerate_correct_size_opt.
   intros x Hin'.  destruct Hin' as [e [Hl Hs]].
   eexists. split; eauto. eapply Hin; eauto. 
-Qed.
+Qed.*)
 
 Lemma enumerate_SizeMonotonic (A : Type) (l : list (E (option A))) :
   l \subset SizeMonotonic ->
   SizeMonotonic (enumerate l).
+Admitted.
+(*
 Proof.
   unfold enumerate. 
   assert (Datatypes.length l = Datatypes.length l)%coq_nat by reflexivity.  
@@ -447,7 +422,7 @@ Proof.
 
     eapply subset_trans. eassumption. eassumption.
 Qed.
-
+*)
 
 Fixpoint lazylist_backtrack {A} (l : LazyList A) (f : A -> option bool) (anyNone : bool) : option bool :=
   match l with

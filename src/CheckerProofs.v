@@ -677,7 +677,8 @@ Ltac2 rec base_case_sound (heq : ident) (ty : constr) :=
   | [h : List.In _ (Datatypes.cons ?g ?gs) |- _ ] =>
     let h := Control.hyp h in
     let hdummy := Fresh.in_goal (id_of_string "Hdummy") in
-    (destruct $h > [ subst; repeat (handle_checker_match_sound hdummy heq); subst; now (eauto 20 using $ty)
+    (destruct $h > [ subst; repeat (handle_checker_match_sound hdummy heq); subst; first [ eauto using $ty
+                                                                                         | now (eauto 20 using $ty) ]
                    | base_case_sound heq ty ])
   end.
 
@@ -686,7 +687,8 @@ Ltac2 rec ind_case_sound (ih : ident) (heq : ident) (ty : constr) :=
   | [h : List.In _ Datatypes.nil |- _ ] => let h := Control.hyp h in destruct $h
   | [h : List.In _ (Datatypes.cons ?g ?gs) |- _ ] =>
     let h := Control.hyp h in
-    (destruct $h > [ subst; repeat (handle_checker_match_sound ih heq); subst; now (eauto 20 using $ty)
+    (destruct $h > [ subst; repeat (handle_checker_match_sound ih heq); subst; first [ eauto using $ty
+                                                                                     | now (eauto 20 using $ty) ]
                    | ind_case_sound ih heq ty ])
   end.
 
@@ -893,6 +895,14 @@ Ltac2 rec handle_checker (hmon : ident) :=
             intros ? ? ? ? $heq; 
             now repeat (simpl_minus_methods (); handle_checker_mon_t hmon heq)
           | eexists; split > [ | handle_checker hmon ] ]; eassumption
+        | (* enumeratingOpt alt *)
+          eapply enumeratingOpt_complete' >        
+          [ now find_size_mon_inst ()
+          | now find_CorrectST_inst ()
+          | let heq := Fresh.in_goal (id_of_string "_heq") in
+            intros ? ? ? ? $heq; 
+            now repeat (simpl_minus_methods (); handle_checker_mon_t hmon heq)
+          | eexists; split > [ eassumption | handle_checker hmon ] ]
         ].
 
 Ltac2 rec path_aux (m : int) (n : int) :=

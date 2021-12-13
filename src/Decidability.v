@@ -73,6 +73,14 @@ Proof.
   - intros; exact (checker false).
 Defined.
 
+Global Instance Checkable_opt {p} `{Checkable p} : Checkable (option p) :=
+  { checker m :=
+      match m with
+      | Some x => checker x
+      | None => checker tt
+      end
+  }.
+
 Global Instance Dec_neg {P} {H : Dec P} : Dec (~ P).
 Proof.
   constructor. unfold decidable.
@@ -215,6 +223,10 @@ Notation "P '?'" := (match (@dec P _) with
                        | left _ => true
                        | right _ => false
                      end) (at level 100).
+
+Notation "P '??' n" := (checker (@decOpt P _ n))
+                         (at level 100).
+
 
 Hint Resolve Dec_eq_unit : eq_dec.
 Hint Resolve Dec_eq_bool : eq_dec.
