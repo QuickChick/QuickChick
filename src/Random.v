@@ -312,6 +312,12 @@ Qed.
 
 End RandomR.
 
+Ltac normnat :=
+  repeat lazymatch goal with
+  | [ |- is_true (_ <= _) ] => apply (introT leP)
+  | [ H : is_true (_ <= _) |- _ ] => apply (elimT leP) in H
+  end.
+
 (** [randomR_nat (minb, maxb)] generates a rendom [nat] in the closed
     interval [[minb, maxb]].
 
@@ -325,28 +331,29 @@ End RandomR.
   (of_int := nat_of_int) (to_int := int_of_nat)
   (iter := Nat.iter).
 Proof.
-  constructor; cbn [leq OrdNat]; intros; try reflexivity.
+  constructor; cbn [leq OrdNat]; intros; normnat; cbn in *; try (reflexivity + lia).
   - admit.
-  - apply (introT leP). apply (elimT leP) in H. apply (elimT leP) in H0. lia.
-  - apply /leP. move: H => /leP. move: H0 => /leP. by lia.
-  - rewrite Nat.sub_diag. reflexivity.
-  - apply (elimT leP) in H. apply le_plus_minus_r, H.
-  - lia.
-  - apply (introT leP); apply (elimT leP) in H; lia.
-  - cbn. lia.
-  - apply /leP. apply Z2Nat.inj_le; [ apply Int63.to_Z_bounded .. |]. by apply /Uint63.lebP.
-  - apply /leP. move: H => /leP H. rewrite (Nat.div_mod_eq (Nat.log2 r) 63).
+  - apply Z2Nat.inj_le; [ apply Int63.to_Z_bounded .. |]. by apply /Int63.lebP.
+  - rewrite (Nat.div_mod (Nat.log2 r) 63); [ | lia ].
     rewrite Nat.add_comm.
     apply Nat.add_le_mono.
     + by apply lt_n_Sm_le, Nat.mod_upper_bound; lia.
     + by apply Nat.mul_le_mono_l, Nat.div_le_mono; [ cbn; lia | apply Nat.log2_le_mono; lia ].
-  - move: H0 => /leP H0. move: H => /leP H.
-    change (nat_of_int 0) with 0%nat in H. change (nat_of_int 1) with 1%nat in H0.
-    apply Nat.mod_small. lia.
-  - apply /leP; move: H => /leP H. change (nat_of_int 1) with 1 in *.
+  - change (Pos.to_nat 1) with 1%nat in H0. apply Nat.mod_small. lia.
+  - change (Pos.to_nat 1) with 1 in *.
     assert (HH := Nat.mod_upper_bound x y). by lia.
-  - induction x; cbn; auto.
+  - change (Nat.add (Pos.to_nat 1)) with S in *.
+    match goal with [ H1 : (0 <= x)%coq_nat |- _ ] => clear H1 end.
+    induction x; cbn; auto.
 Admitted.
+
+Ltac normZ :=
+  repeat match goal with
+  | [ |- is_true (_ <=? _)%Z ] => apply (introT (Z.leb_spec0 _ _))
+  | [ H : is_true (_ <=? _)%Z |- _ ] => apply (elimT (Z.leb_spec0 _ _)) in H
+  | [ |- context [ Int63.to_Z ?u ]] => tryif is_var u then fail else let v := eval cbv in (Int63.to_Z u) in change (Int63.to_Z u) with v
+  | [ H : context [ Int63.to_Z ?u ] |- _ ] => tryif is_var u then fail else let v := eval cbv in (Int63.to_Z u) in change (Int63.to_Z u) with v in *
+  end.
 
 #[local] Instance RandomRAssum_Z : RandomRAssum (A := Z)
   (add := Z.add) (sub := Z.sub) (mul := Z.mul) (div := Z.div) (modulo := Z.modulo)
@@ -354,36 +361,20 @@ Admitted.
   (of_int := Int63.to_Z) (to_int := Int63.of_Z)
   (iter := Z.iter).
 Proof.
-  constructor; cbn [leq OrdZ]; intros.
+  constructor; cbn [leq OrdZ]; intros; normZ; try (cbn in *; reflexivity + lia).
   - admit.
-  - apply /Z.leb_spec0. move: H0 => /Z.leb_spec0; move: H => /Z.leb_spec0. lia.
-  - apply /Z.leb_spec0. move: H0 => /Z.leb_spec0; move: H => /Z.leb_spec0. lia.
-  - apply Z.sub_diag.
-  - lia.
-  - lia.
-  - apply /Z.leb_spec0. move: H => /Z.leb_spec0. lia.
-  - cbn. lia.
-  - cbn in *. apply /Z.leb_spec0; move: H => /Z.leb_spec0 H; move: H0 => /Z.leb_spec0 H0.
-    apply Z_div_nonneg_nonneg; lia.
-  - cbn. apply /Z.leb_spec0; apply Z.log2_nonneg.
-  - by apply /Z.leb_spec0 /Uint63.lebP.
-  - apply /Z.leb_spec0; move: H => /Z.leb_spec0.
-    repeat lazymatch goal with
-    | |- context [ Uint63.to_Z ?u ] => let v := eval cbv in (Uint63.to_Z u) in
-        change (Uint63.to_Z u) with v
-    end.
-    intros H. rewrite (Z_div_mod_eq_full (Z.log2 r) 63) Z.add_comm.
+  - apply Z.div_pos; lia.
+  - cbn in *; apply Z.log2_nonneg.
+  - by apply /Int63.lebP.
+  - rewrite (Z.div_mod (Z.log2 r) 63); [ | lia ]. rewrite Z.add_comm.
     apply Z.add_le_mono.
     + by apply Zlt_succ_le; apply Z.mod_pos_bound.
     + apply Z.mul_le_mono_nonneg_l; [ lia | ]. apply Z_div_le; [ lia | ].
       apply Z.log2_le_mono; lia.
-  - move: H0 => /Z.leb_spec0 H0; move: H => /Z.leb_spec0 H. cbn in *.
-    apply Z.mod_small; lia.
-  - apply /Z.leb_spec0; move: H => /Z.leb_spec0 H. cbn in *.
-    apply Z.mod_pos_bound; lia.
-  - apply /Z.leb_spec0; move: H => /Z.leb_spec0 H. cbn in *.
-    assert (HH := Z.mod_pos_bound x y); lia.
-  - move: H1 => /Z.leb_spec0 H1. cbn - [Z.add] in *. rewrite iter_nat_of_Z; [ | assumption].
+  - apply Z.mod_small; lia.
+  - apply Z.mod_pos_bound; lia.
+  - assert (HH := Z.mod_pos_bound x y); lia.
+  - rewrite iter_nat_of_Z; [ | assumption].
     replace x with (Z.of_nat (Z.abs_nat x)) at 1;
       [ | rewrite Zabs2Nat.id_abs; rewrite Z.abs_eq; lia ].
     induction (Z.abs_nat x).
