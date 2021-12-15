@@ -1,0 +1,701 @@
+#if COQ_VERSION < (8, 14, 0)
+#define Uint63 Int63
+#define uint63 int63
+#endif
+From Coq Require Import ZArith NArith Uint63 List Lia.
+
+Require Import mathcomp.ssreflect.ssreflect.
+From mathcomp Require Import ssrfun ssrbool ssrnat eqtype.
+
+Set Primitive Projections.
+Set Bullet Behavior "Strict Subproofs".
+
+Import ListNotations.
+
+(** A splittable source of randomness *)
+(** Implementation notes
+
+    Represented as an infinite tree of [int], to be generated from some
+    PRNG algorithm and a seed.
+
+    One should only call at most one of [split] or [bits] on a given [random],
+    because they are correlated in practice. Enforcing that requirement seems
+    challenging. We could change the implementation to avoid the correlation (TODO).
+
+    The fields take a [unit] argument to delay the evaluation of both fields,
+    since only at most one is necessary. *)
+CoInductive random :=
+  { split : unit -> random * random
+  ; bits : unit -> int
+  }.
+
+(**)
+
+Definition dummy_random : random.
+Proof.
+  exact (cofix dummy := {| split := fun _ => (dummy, dummy) ; bits := fun _ => 0%uint63 |}).
+Qed.
+
+Lemma inhabited_random : inhabited random.
+Proof. constructor; apply dummy_random. Qed.
+
+Definition unsplit s1 s2 : random :=
+  {| split := fun _ => (s1, s2)
+  ;  bits := fun _ => 0%uint63
+  |}.
+
+Definition unbits x : random :=
+  {| split := fun _ => (dummy_random, dummy_random)
+  ;  bits := fun _ => x
+  |}.
+
+(** [random_int s bound] chooses a random [int] (63-bit) in [[0 .. bound-1]],
+    i.e., [bound] is the number of possible values.
+
+    This is not a uniform distribution in general, but should be close enough
+    for practical purposes.
+
+    Assumes [0 < bound].
+*)
+(** Implementation notes
+
+    We simply take the remainder of a big random number uniformly in [[0 .. max_int]]
+    modulo [bound], which does not yield a uniform distribution unless [bound]
+    divides [max_int+1], but it is arguably "close enough".
+
+    The least probable elements have probabilty [(max_int `div` bound) / max_int] where
+    [div] is integer division. Note that when [bound] is much smaller than [max_int],
+    this is close to the ideal [1/bound].
+
+    There are [max_int `mod` bound] elements whose probability is
+    [((max_int `div` bound) + 1) / max_int] instead. When [bound > max_int/2]
+    those elements are twice as likely as others, but they have a very
+    small probability [2 / max_int].
+  *)
+Definition random_int (s : random) (bound : int) : int :=
+  let b := bits s tt in
+  Uint63.mod b bound.
+
+(* [0 < bound < 2^63] *)
+Definition random_Z_small (s : random) (bound : Z) : Z :=
+  Uint63.to_Z (random_int s (Uint63.of_Z bound)).
+
+Definition random_N_small (s : random) (bound : N) : N :=
+  Z.to_N (random_Z_small s (Z.of_N bound)).
+
+Definition random_bool (s : random) : bool :=
+  Uint63.is_zero (bits s tt).
+
+Lemma random_bool_complete : forall b, exists s, random_bool s = b.
+Proof.
+  intros []; [ exists (unbits 0%uint63) | exists (unbits 1%uint63)]; reflexivity.
+Qed.
+
+(**)
+
+(* Type class machinery for generating things in intervals *)
+
+Class OrdType (A: Type) :=
+  {
+    leq     : A -> A -> bool;
+    refl    : reflexive leq;
+    trans   : transitive leq;
+    antisym : antisymmetric leq
+  }.
+
+#[global] Program Instance OrdBool : OrdType bool :=
+  {
+    leq b1 b2 := implb b1 b2
+  }.
+Next Obligation.
+  by case.
+Qed.
+Next Obligation.
+  by do 3! case.
+Qed.
+Next Obligation.
+  by do 2! case.
+Qed.
+
+#[global] Program Instance OrdNat : OrdType nat :=
+  {
+    leq := ssrnat.leq;
+    refl := leqnn;
+    trans := leq_trans;
+    antisym := anti_leq
+  }.
+
+#[global] Program Instance OrdZ : OrdType Z :=
+  {
+    leq := Z.leb;
+    refl := Z.leb_refl
+  }.
+Next Obligation.
+move=> x y z le_yx le_xz.
+exact: (Zle_bool_trans y x z).
+Qed.
+Next Obligation.
+move=> x y /andP[].
+exact: Zle_bool_antisym.
+Qed.
+
+#[global] Program Instance OrdN : OrdType N :=
+  {
+    leq := N.leb;
+    refl := N.leb_refl
+  }.
+Next Obligation.
+  move=> x y z le_yx le_xz.
+  unfold is_true in *.
+  apply N.leb_le in le_yx.
+  apply N.leb_le in le_xz.
+  apply N.leb_le.
+  eapply N.le_trans; eauto.
+Qed.
+Next Obligation.
+  move=> x y /andP[].
+  unfold is_true.
+  repeat rewrite N.leb_le.
+  intros.
+  apply N.le_antisymm; auto.
+Qed.
+
+Class ChoosableFromInterval (A : Type)  :=
+  {
+    super :> OrdType A;
+    randomR : A * A -> random -> A;
+    randomRCorrect :
+      forall (a1 a2 : A), leq a1 a2 -> forall a,
+       (leq a1 a && leq a a2 <->
+       exists seed, randomR (a1, a2) seed = a)
+  }.
+
+Definition int_of_nat (n : nat) : int := Uint63.of_Z (Z.of_nat n).
+Definition nat_of_int (n : int) : nat := Z.to_nat (Uint63.to_Z n).
+
+Section RandomR.
+
+Context {A : Type} `{OrdType A}
+    {add : A -> A -> A}
+    {sub : A -> A -> A}
+    {mul : A -> A -> A}
+    {div : A -> A -> A}
+    {modulo : A -> A -> A}
+    {shiftl : A -> A -> A}
+    {shiftr : A -> A -> A}
+    {log2 : A -> A}
+    {of_int : int -> A}
+    {to_int : A -> int}
+    {iter : A -> forall (X : Type), (X -> X) -> X -> X}.
+
+#[local] Declare Scope a_scope.
+#[local] Delimit Scope a_scope with a.
+#[local] Open Scope a_scope.
+
+#[local] Infix "+" := add : a_scope.
+#[local] Infix "-" := sub : a_scope.
+#[local] Infix "*" := mul : a_scope.
+#[local] Infix "/" := div : a_scope.
+#[local] Infix "<=" := leq : a_scope.
+
+Let seq {X} (_ : X) (x : Prop) := x.
+
+Class RandomRAssum : Prop :=
+  { leq_sub : forall x y z, x <= y -> y <= z -> y - x <= z - x
+  ; leq_add_sub : forall x y z, y <= z -> x <= z - y -> x + y <= z
+  ; sub_diag : forall x, x - x = of_int 0
+  ; add_sub : forall x y, x <= y -> x + (y - x) = y
+  ; sub_add : forall x y, (x + y) - x = y
+  ; add_mon : forall {x x' y y'}, x <= x' -> y <= y' -> x + y <= x' + y'
+  ; add_0_r : forall x, x + of_int 0 = x
+  ; add_assoc : forall x y z, x + (y + z) = x + y + z
+  ; mul_0_r : forall x, x * of_int 0 = of_int 0
+  ; mul_pos : forall x y, of_int 0 <= x -> of_int 0 <= y -> of_int 0 <= x * y
+  ; mul_add_1_distr : forall x y, x * (of_int 1 + y) = x * y + x
+  ; div_pos : forall x y, of_int 0 <= x -> of_int 1 <= y -> of_int 0 <= x / y
+  ; log2_pos : forall x, of_int 0 <= log2 x
+  ; of_int_mon : forall x y, Uint63.leb x y -> of_int x <= of_int y
+  ; log2_63 : forall r bound, r <= bound - of_int 1 ->
+      log2 r <= of_int 62 + of_int 63 * (log2 bound / of_int 63)
+  ; shiftr_mon : forall x y z, of_int 0 <= z -> x <= y -> shiftr x z <= shiftr y z
+  ; shiftr_0 : forall z, shiftr (of_int 0) z = of_int 0
+  ; shiftl_pos : forall x z, of_int 0 <= x -> of_int 0 <= shiftl x z
+  ; log2_shiftr : forall x y, of_int 0 <= x -> of_int 0 <= y ->
+      log2 x <= y + of_int 63 <-> log2 (shiftr x (of_int 63)) <= y
+  ; shiftl_shiftr : forall x, shiftl (shiftr x (of_int 63)) (of_int 63) + of_int (to_int x) = x
+  ; shiftr_shiftl : forall x y r, shiftl x (of_int 63) + of_int y = r -> x = shiftr r (of_int 63)
+  ; modulo_idem : forall x y, of_int 0 <= x -> x + of_int 1 <= y -> modulo x y = x
+  ; modulo_pos : forall x y, of_int 1 <= y -> of_int 0 <= modulo x y
+  ; modulo_up : forall x y, of_int 1 <= y -> modulo x y <= y - of_int 1
+  ; of_int_pos : forall x, of_int 0 <= of_int x
+  ; of_int_to_int : forall r, of_int 0 <= r -> log2 r <= of_int 62 -> of_int (to_int r) = r
+  ; log2_of_int : forall x, log2 (of_int x) <= of_int 62
+  ; iter_ind : forall {T} (P : A -> T -> Prop) (f : T -> T) (t0 : T),
+      (forall y t, of_int 0 <= y -> P y t -> P (add (of_int 1) y) (f t)) ->
+      P (of_int 0) t0 ->
+      forall x, of_int 0 <= x -> P x (iter x T f t0)
+  }.
+
+Context {RRA : RandomRAssum}.
+
+Lemma minint_0 : forall x, Uint63.leb 0 x.
+Proof.
+  intros x; apply /lebP. apply to_Z_bounded.
+Qed.
+
+Definition leq_sub_0 : forall x y, leq x y -> leq (of_int 0) (sub y x).
+Proof.
+  intros x y; rewrite <- (sub_diag x).
+  apply leq_sub. apply refl.
+Qed.
+
+Definition leq_sub_1 : forall x y, leq x y -> leq (of_int 1) (of_int 1 + sub y x).
+Proof.
+  intros x y Hx; apply leq_sub_0 in Hx. apply (add_mon (refl (of_int 1))) in Hx.
+  rewrite add_0_r in Hx. assumption.
+Qed.
+
+Definition manybits (l63 : A) : random -> A :=
+  iter l63 _
+    (fun prefix s =>
+      let '(sp, s) := split s tt in
+      shiftl (prefix sp) (of_int 63) + of_int (bits s tt))
+    (fun s => of_int (bits s tt)).
+
+Definition randomR0 (bound : A) (s : random) : A :=
+  let l2 := log2 bound in
+  let l63 := l2 / of_int 63 in
+  let bs := manybits l63 s in
+  modulo bs bound.
+
+Definition randomR_ (bounds : A * A) (s : random) : A :=
+  let '(minb, maxb) := bounds in
+  let b := maxb - minb in
+  minb + randomR0 (of_int 1 + (maxb - minb)) s.
+
+Lemma manybitsCorrect (l63 : A)
+  : (of_int 0 <= l63) ->
+    forall r : A,
+      (of_int 0 <= r /\ log2 r <= of_int 62 + of_int 63 * l63) <-> exists s, manybits l63 s = r.
+Proof.
+  intros Hl63. unfold manybits. eapply iter_ind; intros *.
+  - intros Hy IH r. specialize (IH (shiftr r (of_int 63))). destruct IH as [IH1 IH2].
+    rewrite mul_add_1_distr add_assoc.
+    split.
+    + clear IH2. intros [Hr0 Hr1].
+      match type of IH1 with
+      | (?ZZ -> _) => eassert (HH : ZZ); [ | specialize (IH1 HH) ]
+      end.
+      { split.
+        - rewrite <- (shiftr_0 (of_int 63)). apply shiftr_mon, Hr0. apply of_int_mon; reflexivity.
+        - apply log2_shiftr; try assumption.
+          { rewrite <- (add_0_r (of_int 0)). apply add_mon; [ | apply mul_pos ].
+            1,2: apply of_int_mon; reflexivity.
+            apply Hy. } }
+      destruct IH1 as [s Hs].
+      exists (unsplit s (unbits (to_int r))); cbn.
+      rewrite Hs.
+      apply shiftl_shiftr.
+    + clear IH1. intros [s Hs]. destruct (split s tt) as [s1 s2] eqn:Hs1.
+      assert (HH : t s1 = shiftr r (of_int 63)).
+      { revert Hs; apply shiftr_shiftl. }
+      specialize (IH2 (ex_intro _ _ HH)).
+      assert (Hr : of_int 0 <= r).
+      { rewrite <- Hs. rewrite <- (add_0_r (of_int 0)). apply add_mon.
+        { apply shiftl_pos. rewrite HH. apply IH2. }
+        { apply of_int_mon. apply minint_0. } }
+      destruct IH2 as [IH2 IH3]. split; [ assumption | ].
+      { apply log2_shiftr.
+        { assumption. }
+        { eapply trans; [ apply log2_pos | eassumption ]. }
+        { assumption. }}
+  - rewrite mul_0_r add_0_r. split.
+    + intros [H1 H2]. exists (unbits (to_int r)); cbn.
+      apply of_int_to_int; assumption.
+    + intros [s <-]; split.
+      { apply of_int_mon, minint_0. }
+      { apply log2_of_int. }
+  - assumption.
+Qed.
+
+Lemma randomR0Correct (bound : A)
+  : of_int 1 <= bound ->
+    forall r,
+      ((of_int 0 <= r) && (r <= bound - of_int 1)) <-> exists s, randomR0 bound s = r.
+Proof.
+  unfold randomR0; intros Hbound r; split.
+  { move => /andP [Hmin Hmax].
+    assert (EX : exists s, manybits (log2 bound / of_int 63) s = r).
+    { apply manybitsCorrect.
+      { apply div_pos; [ apply log2_pos | apply of_int_mon; reflexivity ]. }
+      { split; [ exact Hmin | apply log2_63; exact Hmax ]. } }
+    destruct EX as [s Hs]; exists s; rewrite Hs.
+    apply modulo_idem; [ apply Hmin | apply leq_add_sub, Hmax; auto ]. }
+  { move => [s Hs]. apply /andP. unfold randomR0 in Hs.
+    subst r; split; [ apply modulo_pos, Hbound | apply modulo_up, Hbound ]. }
+Qed.
+
+Lemma randomRCorrect_ (minb maxb : A)
+  : leq minb maxb ->
+    forall r,
+      ((minb <= r) && (r <= maxb)) <->
+      exists seed, randomR_ (minb, maxb) seed = r.
+Proof.
+  intros Hb r.
+  assert (HR0 := randomR0Correct (of_int 1 + (maxb - minb))).
+  rewrite sub_add in HR0. specialize (HR0 (leq_sub_1 _ _ Hb)).
+  split.
+  { destruct (HR0 (r - minb)) as [HR1 _].
+    move => /andP [Hmin Hmax].
+    destruct HR1 as [s Hs].
+    { apply (introT andP); split.
+      { apply leq_sub_0, Hmin. }
+      { apply leq_sub; assumption. } }
+    exists s; cbn; rewrite Hs add_sub; auto. }
+  { move => [s Hs]. cbn in Hs.
+    destruct (HR0 (randomR0 (of_int 1 + (maxb - minb)) s)) as [_ HR2].
+    specialize (HR2 (ex_intro _ s Logic.eq_refl)).
+    apply (elimT andP) in HR2. destruct HR2 as [H1 H2].
+    apply (introT andP); split.
+    { apply (add_mon (refl minb)) in H1. rewrite add_0_r Hs in H1. exact H1. }
+    { apply (add_mon (refl minb)) in H2. rewrite Hs add_sub in H2; [ exact H2 | exact Hb ]. } }
+Qed.
+
+End RandomR.
+
+Ltac normnat :=
+  repeat lazymatch goal with
+  | [ |- context [nat_of_int ?u] ] =>
+    let v := eval cbv in (nat_of_int u) in change (nat_of_int u) with v
+  end; intros;
+  repeat lazymatch goal with
+  | [ |- is_true (_ <= _) ] => apply (introT leP)
+  | [ H : is_true (_ <= _) |- _ ] => apply (elimT leP) in H
+  | [ |- is_true (_ <= _) <-> _ ] => rewrite <- (rwP leP)
+  | [ |- _ <-> is_true (_ <= _) ] => rewrite <- (rwP leP)
+  end.
+
+Lemma pow_Z_of_nat x y : Z.pow (Z.of_nat x) (Z.of_nat y) = Z.of_nat (Nat.pow x y).
+Proof.
+  induction y.
+  - reflexivity.
+  - rewrite Nat2Z.inj_succ.
+    cbn. rewrite Nat2Z.inj_mul Z.pow_succ_r; [ | apply Nat2Z.is_nonneg ].
+    f_equal; assumption.
+Qed.
+
+Lemma nat_of_int_of_nat x : nat_of_int (int_of_nat x) = Nat.modulo x (Nat.pow 2 63).
+Proof.
+  unfold nat_of_int, int_of_nat.
+  rewrite Uint63.of_Z_spec.
+  assert (HwB : wB = Z.of_nat (Nat.pow 2 63)).
+  { apply (pow_Z_of_nat 2 63). }
+  rewrite HwB. rewrite <- mod_Zmod; [ | apply Nat.pow_nonzero; auto ].
+  rewrite Nat2Z.id. reflexivity.
+Qed.
+
+Lemma int_of_nat_of_int x : int_of_nat (nat_of_int x) = x.
+Proof.
+  unfold nat_of_int, int_of_nat. rewrite Z2Nat.id; [ | apply Uint63.to_Z_bounded].
+  rewrite of_to_Z. reflexivity.
+Qed.
+
+Lemma log2_nat_of_int y : (Nat.log2 (nat_of_int y) < 63)%coq_nat.
+Proof.
+  rewrite <- (int_of_nat_of_int y), nat_of_int_of_nat.
+  destruct (Nat.modulo _ _) as [ | ?] eqn:E.
+  { cbn; lia. }
+  apply Nat.log2_lt_pow2; [ lia | ].
+  rewrite <- E.
+  apply Nat.mod_upper_bound.
+  apply Nat.pow_nonzero. auto.
+Qed.
+
+(** [randomR_nat (minb, maxb)] generates a rendom [nat] in the closed
+    interval [[minb, maxb]].
+
+    Assumes the bounds fit in an [int]. Otherwise, you're gonna
+    have a bad time anyway.
+
+    Assumes [0 <= minb < maxb <= max_int] and [maxb - minb < max_int]. *)
+#[local] Instance RandomRAssum_nat : RandomRAssum (A := nat)
+  (add := Nat.add) (sub := Nat.sub) (mul := Nat.mul) (div := Nat.div) (modulo := Nat.modulo)
+  (log2 := Nat.log2) (shiftl := Nat.shiftl) (shiftr := Nat.shiftr)
+  (of_int := nat_of_int) (to_int := int_of_nat)
+  (iter := Nat.iter).
+Proof.
+  constructor; cbn [leq OrdNat]; normnat; try (reflexivity + lia).
+  - apply Z2Nat.inj_le; [ apply Uint63.to_Z_bounded .. |]. by apply /Uint63.lebP.
+  - rewrite (Nat.div_mod (Nat.log2 r) 63); [ | lia ].
+    rewrite Nat.add_comm.
+    apply Nat.add_le_mono.
+    + by apply lt_n_Sm_le, Nat.mod_upper_bound; lia.
+    + by apply Nat.mul_le_mono_l, Nat.div_le_mono; [ cbn; lia | apply Nat.log2_le_mono; lia ].
+  - do 2 rewrite Nat.shiftr_div_pow2; apply Nat.div_le_mono; [apply Nat.pow_nonzero | ]; lia.
+  - apply Nat.shiftr_0_l.
+  - rewrite Nat.log2_shiftr. lia.
+  - rewrite <- Nat.ldiff_ones_r. rewrite nat_of_int_of_nat. rewrite <- Nat.land_ones.
+    assert (H : Nat.land (Nat.ldiff x (Nat.ones 63)) (Nat.land x (Nat.ones 63)) = 0).
+    { apply Nat.bits_inj_0. intros n.
+      do 2 rewrite Nat.land_spec. rewrite Nat.ldiff_spec.
+      destruct (Nat.le_gt_cases 63 n) as [H | H].
+      { apply Nat.ones_spec_high in H. rewrite H. rewrite !Bool.andb_false_r; reflexivity. }
+      { apply Nat.ones_spec_low in H. rewrite H. cbn [negb].
+        rewrite !Bool.andb_false_r; reflexivity. }
+    }
+    rewrite -> Nat.add_nocarry_lxor, -> Nat.lxor_lor by assumption.
+    apply Nat.lor_ldiff_and.
+  - rewrite <- H.
+    assert (HH : Nat.land (Nat.shiftl x 63) (nat_of_int y) = 0).
+    { apply Nat.bits_inj_0; intros n.
+      rewrite Nat.land_spec.
+      destruct (Nat.le_gt_cases 63 n) as [Hn | Hn].
+      { rewrite (Nat.bits_above_log2 (nat_of_int _)); [ apply Bool.andb_false_r | ].
+        eapply Nat.lt_le_trans; [ apply log2_nat_of_int | assumption ]. }
+      { rewrite Nat.shiftl_spec_low; auto. } }
+    rewrite -> Nat.add_nocarry_lxor, -> Nat.lxor_lor by assumption.
+    rewrite Nat.shiftr_lor.
+    rewrite (Nat.shiftr_eq_0 (nat_of_int y)); [ | apply log2_nat_of_int ].
+    rewrite Nat.lor_0_r Nat.shiftr_shiftl_r; [ | lia ].
+    rewrite Nat.sub_diag Nat.shiftr_0_r; reflexivity.
+  - apply Nat.mod_small. lia.
+  - assert (HH := Nat.mod_upper_bound x y). by lia.
+  - rewrite nat_of_int_of_nat. apply Nat.mod_small.
+    destruct (zerop r).
+    { subst. rewrite <- Nat.le_succ_l. apply (Nat.pow_le_mono 1 0); lia. }
+    { apply Nat.log2_lt_pow2; lia. }
+  - apply Nat.lt_succ_r, log2_nat_of_int.
+  - match goal with [ H1 : (0 <= x)%coq_nat |- _ ] => clear H1 end.
+    induction x; cbn; auto.
+Qed.
+
+Ltac normZ :=
+  repeat lazymatch goal with
+  | [ |- context [Uint63.to_Z ?u] ] =>
+    let v := eval cbv in (Uint63.to_Z u) in change (Uint63.to_Z u) with v
+  end; intros;
+  repeat lazymatch goal with
+  | [ |- is_true (_ <=? _)%Z ] => apply (introT (Z.leb_spec0 _ _))
+  | [ H : is_true (_ <=? _)%Z |- _ ] => apply (elimT (Z.leb_spec0 _ _)) in H
+  | [ |- is_true (_ <=? _)%Z <-> _ ] => rewrite <- (rwP (Z.leb_spec0 _ _))
+  | [ |- _ <-> is_true (_ <=? _)%Z ] => rewrite <- (rwP (Z.leb_spec0 _ _))
+  end.
+
+Lemma int_to_Z_pos x : (0 <= Uint63.to_Z x)%Z.
+Proof.
+  apply to_Z_bounded.
+Qed.
+
+Lemma log2_lt_pow2' :
+  forall a b : Z, (0 <= a)%Z -> (0 < b)%Z -> (a < 2 ^ b)%Z <-> (Z.log2 a < b)%Z.
+Proof.
+  intros.
+  destruct (Z.nonpos_pos_cases a).
+  { replace a with 0%Z by lia. split; intros; [ assumption | apply Z.pow_pos_nonneg; lia ]. }
+  apply Z.log2_lt_pow2; assumption.
+Qed.
+
+Lemma log2_int_to_Z x : (Z.log2 (Uint63.to_Z x) < 63)%Z.
+Proof.
+  apply log2_lt_pow2'.
+  - apply Uint63.to_Z_bounded.
+  - lia.
+  - apply Uint63.to_Z_bounded.
+Qed.
+
+#[local] Instance RandomRAssum_Z : RandomRAssum (A := Z)
+  (add := Z.add) (sub := Z.sub) (mul := Z.mul) (div := Z.div) (modulo := Z.modulo)
+  (log2 := Z.log2) (shiftl := Z.shiftl) (shiftr := Z.shiftr)
+  (of_int := Uint63.to_Z) (to_int := Uint63.of_Z)
+  (iter := Z.iter).
+Proof.
+  constructor; cbn [leq OrdZ]; normZ; try (reflexivity + lia).
+  - apply Z.div_pos; lia.
+  - cbn in *; apply Z.log2_nonneg.
+  - by apply /Uint63.lebP.
+  - rewrite (Z.div_mod (Z.log2 r) 63); [ | lia ]. rewrite Z.add_comm.
+    apply Z.add_le_mono.
+    + by apply Zlt_succ_le; apply Z.mod_pos_bound.
+    + apply Z.mul_le_mono_nonneg_l; [ lia | ]. apply Z_div_le; [ lia | ].
+      apply Z.log2_le_mono; lia.
+  - do 2 (rewrite Z.shiftr_div_pow2; [ | assumption ]).
+    apply Z.div_le_mono; [ apply Z.pow_pos_nonneg | ]; lia.
+  - apply Z.shiftr_0_l.
+  - apply Z.shiftl_nonneg; auto.
+  - destruct (Z.nonpos_pos_cases x).
+    { replace x with 0%Z by lia. rewrite Z.shiftr_0_l. change (Z.log2 0) with 0%Z. lia. }
+    rewrite Z.log2_shiftr; [ | assumption].
+    lia.
+  - rewrite of_Z_spec. rewrite <- Z.ldiff_ones_r; [ | lia ].
+    change wB with (2 ^ 63)%Z.
+    rewrite <- Z.land_ones; [ | lia ].
+    assert (Hz : Z.land (Z.ldiff x (Z.ones 63)) (Z.land x (Z.ones 63)) = 0%Z).
+    { apply Z.bits_inj_0. intros n.
+      destruct (Z.le_gt_cases 0 n) as [H0 | H0]; [ | apply (Z.testbit_neg_r _ _ H0) ].
+      do 2 rewrite Z.land_spec. rewrite Z.ldiff_spec.
+      destruct (Z.le_gt_cases 63 n) as [H | H].
+      { rewrite Z.ones_spec_high; [ rewrite !Bool.andb_false_r; reflexivity | lia ]. }
+      { rewrite Z.ones_spec_low; [ rewrite !Bool.andb_false_r; reflexivity | lia ]. }
+    }
+    rewrite -> Z.add_nocarry_lxor, -> Z.lxor_lor by assumption.
+    apply Z.lor_ldiff_and.
+  - rewrite <- H.
+    assert (HH : Z.land (Z.shiftl x 63) (Uint63.to_Z y) = 0%Z).
+    { apply Z.bits_inj_0; intros n.
+      rewrite Z.land_spec.
+      destruct (Z.le_gt_cases 63 n) as [Hn | Hn].
+      { rewrite (Z.bits_above_log2 (Uint63.to_Z _));
+          [ apply Bool.andb_false_r | apply int_to_Z_pos | ].
+        eapply Z.lt_le_trans; [ apply log2_int_to_Z | assumption ]. }
+      { rewrite Z.shiftl_spec_low; auto. } }
+    rewrite -> Z.add_nocarry_lxor, -> Z.lxor_lor by assumption.
+    rewrite Z.shiftr_lor.
+    rewrite (Z.shiftr_eq_0 (Uint63.to_Z y)); [ | apply int_to_Z_pos | apply log2_int_to_Z ].
+    rewrite Z.lor_0_r Z.shiftr_shiftl_r; [ | lia ].
+    rewrite Z.sub_diag Z.shiftr_0_r; reflexivity.
+  - apply Z.mod_small; lia.
+  - apply Z.mod_pos_bound; lia.
+  - assert (HH := Z.mod_pos_bound x y); lia.
+  - apply int_to_Z_pos.
+  - rewrite of_Z_spec. change wB with (Z.pow 2 63). apply Z.mod_small.
+    split; [ assumption | ]. apply log2_lt_pow2'; lia.
+  - assert (HH := log2_int_to_Z x). lia.
+  - rewrite iter_nat_of_Z; [ | assumption].
+    replace x with (Z.of_nat (Z.abs_nat x)) at 1;
+      [ | rewrite Zabs2Nat.id_abs; rewrite Z.abs_eq; lia ].
+    induction (Z.abs_nat x).
+    + apply H0.
+    + rewrite Nat2Z.inj_succ. rewrite <- Z.add_1_l. apply H; auto.
+      apply /Z.leb_spec0. apply Nat2Z.is_nonneg.
+Qed.
+
+Definition N_of_int (x : int) : N := Z.to_N (Uint63.to_Z x).
+Definition int_of_N (x : N) : int := Uint63.of_Z (Z.of_N x).
+
+Lemma pow_Z_of_N x y : Z.pow (Z.of_N x) (Z.of_N y) = Z.of_N (N.pow x y).
+Proof.
+  induction y using N.peano_ind.
+  - reflexivity.
+  - rewrite N2Z.inj_succ. rewrite N.pow_succ_r'.
+    rewrite N2Z.inj_mul Z.pow_succ_r; [ | apply N2Z.is_nonneg ].
+    f_equal; assumption.
+Qed.
+
+Lemma N_of_int_of_N x : N_of_int (int_of_N x) = N.modulo x (N.pow 2 63).
+Proof.
+  unfold N_of_int, int_of_N.
+  rewrite Uint63.of_Z_spec.
+  assert (HwB : wB = Z.of_N (N.pow 2 63)).
+  { apply (pow_Z_of_N 2 63). }
+  rewrite HwB. rewrite <- N2Z.inj_mod; try (apply N.pow_nonzero; lia).
+  rewrite N2Z.id. reflexivity.
+Qed.
+
+Lemma int_of_N_of_int x : int_of_N (N_of_int x) = x.
+Proof.
+  unfold N_of_int, int_of_N. rewrite Z2N.id; [ | apply Uint63.to_Z_bounded].
+  rewrite of_to_Z. reflexivity.
+Qed.
+
+Lemma log2_N_of_int y : (N.log2 (N_of_int y) < 63)%num.
+Proof.
+  destruct (N.eq_0_gt_0_cases (N_of_int y)) as [ H | H ].
+  { rewrite H. cbn. lia. }
+  rewrite <- (int_of_N_of_int y), N_of_int_of_N in *.
+  apply N.log2_lt_pow2; [ lia | ].
+  apply N.mod_upper_bound.
+  apply N.pow_nonzero. lia.
+Qed.
+
+Ltac normN :=
+  repeat lazymatch goal with
+  | [ |- context [N_of_int ?u] ] =>
+    let v := eval cbv in (N_of_int u) in change (N_of_int u) with v
+  end; intros;
+  repeat lazymatch goal with
+  | [ |- is_true (_ <=? _)%num ] => apply (introT (N.leb_spec0 _ _))
+  | [ H : is_true (_ <=? _)%num |- _ ] => apply (elimT (N.leb_spec0 _ _)) in H
+  | [ |- is_true (_ <=? _)%num <-> _ ] => rewrite <- (rwP (N.leb_spec0 _ _))
+  | [ |- _ <-> is_true (_ <=? _)%num ] => rewrite <- (rwP (N.leb_spec0 _ _))
+  end.
+
+#[local] Instance RandomRAssum_N : RandomRAssum (A := N)
+  (add := N.add) (sub := N.sub) (mul := N.mul) (div := N.div) (modulo := N.modulo)
+  (log2 := N.log2) (shiftl := N.shiftl) (shiftr := N.shiftr)
+  (of_int := N_of_int) (to_int := int_of_N)
+  (iter := N.iter).
+Proof.
+  constructor; cbn [leq OrdN]; normN; try (reflexivity + lia).
+  - apply (N.div_le_mono 0); lia.
+  - apply Z2N.inj_le; [ apply Uint63.to_Z_bounded .. |]. by apply /Uint63.lebP.
+  - rewrite (N.div_mod (N.log2 r) 63); [ | lia ].
+    rewrite N.add_comm.
+    apply N.add_le_mono.
+    + apply N.lt_succ_r. apply N.mod_upper_bound. lia.
+    + by apply N.mul_le_mono_l, N.div_le_mono; [ cbn; lia | apply N.log2_le_mono; lia ].
+  - do 2 rewrite N.shiftr_div_pow2; apply N.div_le_mono; [apply N.pow_nonzero | ]; lia.
+  - apply N.shiftr_0_l.
+  - rewrite N.log2_shiftr. lia.
+  - rewrite <- N.ldiff_ones_r. rewrite N_of_int_of_N. rewrite <- N.land_ones.
+    assert (H : N.land (N.ldiff x (N.ones 63)) (N.land x (N.ones 63)) = 0%num).
+    { apply N.bits_inj_0. intros n.
+      do 2 rewrite N.land_spec. rewrite N.ldiff_spec.
+      destruct (N.le_gt_cases 63 n) as [H | H].
+      { apply N.ones_spec_high in H. rewrite H. rewrite !Bool.andb_false_r; reflexivity. }
+      { apply N.ones_spec_low in H. rewrite H. cbn [negb].
+        rewrite !Bool.andb_false_r; reflexivity. }
+    }
+    rewrite -> N.add_nocarry_lxor, -> N.lxor_lor by assumption.
+    apply N.lor_ldiff_and.
+  - rewrite <- H.
+    assert (HH : N.land (N.shiftl x 63) (N_of_int y) = 0%num).
+    { apply N.bits_inj_0; intros n.
+      rewrite N.land_spec.
+      destruct (N.le_gt_cases 63 n) as [Hn | Hn].
+      { rewrite (N.bits_above_log2 (N_of_int _)); [ apply Bool.andb_false_r | ].
+        eapply N.lt_le_trans; [ apply log2_N_of_int | assumption ]. }
+      { rewrite N.shiftl_spec_low; auto. } }
+    rewrite -> N.add_nocarry_lxor, -> N.lxor_lor by assumption.
+    rewrite N.shiftr_lor.
+    rewrite (N.shiftr_eq_0 (N_of_int y)); [ | apply log2_N_of_int ].
+    rewrite N.lor_0_r N.shiftr_shiftl_r; [ | lia ].
+    rewrite N.sub_diag N.shiftr_0_r; reflexivity.
+  - apply N.mod_small. lia.
+  - apply N.le_0_l.
+  - assert (HH := N.mod_upper_bound x y). by lia.
+  - rewrite N_of_int_of_N. apply N.mod_small.
+    destruct (N.eq_0_gt_0_cases r).
+    { subst. rewrite <- N.le_succ_l. apply (N.pow_le_mono 1 0); lia. }
+    { apply N.log2_lt_pow2; lia. }
+  - apply N.lt_succ_r, log2_N_of_int.
+  - match goal with [ H1 : (0 <= x)%num |- _ ] => clear H1 end.
+    induction x using N.peano_ind; cbn; auto.
+    rewrite N.iter_succ. rewrite <- N.add_1_l. apply H; auto.
+    { apply /N.leb_spec0. lia. }
+Qed.
+
+#[global] Instance ChooseNat : ChoosableFromInterval nat :=
+  { randomR := _;
+    randomRCorrect := randomRCorrect_ (A := nat)
+  }.
+
+#[global] Instance ChooseZ : ChoosableFromInterval Z :=
+  { randomR := _;
+    randomRCorrect := randomRCorrect_ (A := Z)
+  }.
+
+#[global] Instance ChooseN : ChoosableFromInterval N :=
+  { randomR := _;
+    randomRCorrect := randomRCorrect_ (A := N)
+  }.
+
+Inductive SplitDirection := Left | Right.
+
+Definition SplitPath := list SplitDirection.
+
+Fixpoint varySeed (p : SplitPath) (s : random) : random :=
+  match p with
+  | [] => s
+  | Left  :: p' => varySeed p' (fst (split s tt))
+  | Right :: p' => varySeed p' (snd (split s tt))
+  end.

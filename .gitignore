@@ -59,4 +59,5 @@ plugin/compat.ml
 src/ExtractionQCCompat.v
 src/QuickChick.v
 src/SplitMix.v
+src/Random.v
 _CoqProject
