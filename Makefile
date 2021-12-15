@@ -74,7 +74,7 @@ Makefile.coq: _CoqProject
 
 clean:
 	$Vif [ -e Makefile.coq ]; then $(MAKE) -f Makefile.coq clean; fi
-	$Vocamlbuild -clean
+	$Vcd $(QCTOOL_DIR); ocamlbuild -clean
 	# This might not work on macs
 	find . -name '*.vo' -print -delete
 	find . -name '*.glob' -print -delete
