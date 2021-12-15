@@ -325,7 +325,7 @@ Definition mapGen {A B} (f : A -> G B) (l : list A) : G (list B) :=
              bindGen (f a) (fun b => returnGen (cons b acc)))
           l nil) (fun l => returnGen (rev l)).
 
-Fixpoint conjoin (l : list Checker) : Checker :=
+Definition conjoin (l : list Checker) : Checker :=
 (*   trace ("Beginnning conjoin" ++ nl) ( *)
   bindGen (mapGen (liftGen unProp) l) (fun rs =>
           (returnGen (MkProp (let res := conjAux (fun x => x) rs in
