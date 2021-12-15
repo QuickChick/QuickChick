@@ -1,13 +1,11 @@
-QuickChick
+QuickChick [![CircleCI](https://circleci.com/gh/QuickChick/QuickChick.svg?style=svg)](https://circleci.com/gh/QuickChick/QuickChick)
 ==========
 
-[![CircleCI](https://circleci.com/gh/QuickChick/QuickChick.svg?style=svg)](https://circleci.com/gh/QuickChick/QuickChick)
-
-### Description
+## Description
  
-  - Randomized property-based testing plugin for Coq; a clone of [Haskell QuickCheck]
-  - Includes a [foundational verification framework for testing code]
-  - Includes a [mechanism for automatically deriving generators for inductive relations]
+- Randomized property-based testing plugin for Coq; a clone of [Haskell QuickCheck]
+- Includes a [foundational verification framework for testing code]
+- Includes a [mechanism for automatically deriving generators for inductive relations]
 
 [Haskell QuickCheck]:
 https://hackage.haskell.org/package/QuickCheck
@@ -18,22 +16,15 @@ http://prosecco.gforge.inria.fr/personal/hritcu/publications/foundational-pbt.pd
 [mechanism for automatically deriving generators for inductive relations]:
 https://lemonidas.github.io/pdf/GeneratingGoodGenerators.pdf
 
-For more information on QuickChick, look at the tutorial available under the qc folder 
-of the deep spec summer school:
-https://github.com/DeepSpec/dsss17
+## Tutorial
 
-### Current release dependencies:
+[QuickChick: Property-Based Testing in Coq][sfqc] (Software Foundations, Volume 4)
 
-  - Branch master: 
-    * Coq 8.8
-    * OCaml >= 4.04.0
-    * mathcomp-ssreflect-1.6.4
-    * coq-ext-lib-0.9.7
-    * coq-simple-io-0.2
+[sfqc]: https://softwarefoundations.cis.upenn.edu/qc-current/index.html
 
-### Installation
+## Installation
 
-#### From OPAM
+### From OPAM
 
     # Add the Coq opam repository (if you haven't already)
     opam repo add coq-released https://coq.inria.fr/opam/released
@@ -41,22 +32,29 @@ https://github.com/DeepSpec/dsss17
     # Install the coq-quickchick opam package
     opam install coq-quickchick
 
-#### From source
+### From source
 
-    # To get the dependencies, you still need to add the Coq opam repository (if you haven't already)
+Dependencies are listed in [`coq-quickchick.opam`](./coq-quickchick.opam).
+
+    # To get the dependencies, add the Coq opam repository if you haven't already
     opam repo add coq-released https://coq.inria.fr/opam/released
     opam update
-    opam install coq-mathcomp-ssreflect coq-ext-lib coq-simple-io
+    opam install --deps-only
 
-    # Then:
-    make && make install
+#### Build using Make
 
-#### Build using Dune
+    make
+
+    # To install the package:
+    # (proceed with caution: this will clobber your `.opam` directory)
+    make install
+
+### Build using Dune
 
     make compat
     dune build
 
-### Simple Examples
+## Simple Examples
 
   - `examples/Tutorial.v`
   - `examples/RedBlack`
@@ -65,6 +63,10 @@ https://github.com/DeepSpec/dsss17
 
 Running `make tests` in the top-level QuickChick folder will check and execute all of these.
 If successful, you should see "success" at the end.
+
+## Documentation
+
+The public API of QuickChick is summarized in `BasicInterface.v`.
 
 ### Top-level Commands
 
@@ -80,29 +82,7 @@ If successful, you should see "success" at the end.
 - `MutateCheckMany c ps`
 - `MutateCheckManyWith args c ps`
 
-
-### Other tags
-
-  - coq 8.4pl6:
-    * OCaml 4.01.0 and Coq 8.4pl3 or OCaml 4.02.1 and Coq 8.4pl6
-    * SSReflect 1.5 (http://ssr.msr-inria.inria.fr/FTP/)
-  - coq 8.5-*:
-    * Coq 8.5pl2 
-    * OCaml 4.03.0
-    * mathcomp-ssreflect v1.5 
-    + 8.5-legacy contains the old typeclass hierarchy
-    + 8.5-automation contains the new one
-  - coq 8.6:
-    * Coq 8.6
-    * OCaml 4.03.0
-    * mathcomp-ssreflect-1.6.1
-
-### Documentation
-The public API of QuickChick is summarized in BasicInterface.v.
-
-The main documentation is the DeepSpec summer school tutorial:
-- [DeepSpec QC repo](https://github.com/DeepSpec/dsss17/tree/master/qc).
-Pretty soon this will become a software foundations volume!
+### More resources
 
 Here is some more reading material:
   - Our POPL 2018 paper on [Generating Good Generators for Inductive Relations][mechanism for automatically deriving generators for inductive relations]
