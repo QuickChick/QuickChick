@@ -8,6 +8,7 @@ defaults: &defaults
     TERM: xterm
     SKIP_BUILD: |
       coq-async-test
+      coq-http
   parameters:
     coq:
       type: string
