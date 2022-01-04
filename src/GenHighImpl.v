@@ -594,7 +594,7 @@ Proof.
 rewrite semBindSize.
 setoid_rewrite semReturnSize.
 rewrite semChooseSize //=.
-setoid_rewrite nthE. (* SLOW *)
+setoid_rewrite nthE.
 case: l => [|x l] /=.
   rewrite (eq_bigcupl [set 0]) ?bigcup_set1 // => n.
   by rewrite leqn0; split=> [/eqP|->].
