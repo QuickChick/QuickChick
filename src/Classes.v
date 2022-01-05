@@ -375,22 +375,138 @@ Proof.
     destruct b0; eauto.
 Qed.
 
-
-
-Lemma enumerating_monotonic A (e : E A) {Hc : SizeMonotonic e}
-      ch1 ch2 s1 s2 b :
-  (s1 <= s2)%coq_nat ->
-  (forall x, ch1 x = Some b -> ch2 x = Some b) ->
-  enumerating e ch1 s1 = Some b ->
-  enumerating e ch2 s2 = Some b.
+Lemma lazylist_backtrack_opt_is_true A (l: LazyList.LazyList (option A)) ch b :
+  lazylist_backtrack_opt l ch true = Some b -> b = true. 
 Proof.
-Admitted.
+  induction l.
+  - simpl. congruence.
+  - simpl in *.
+    destruct a.
+    + destruct (ch a) eqn:Heq. destruct b0. congruence.
+      now eauto. now eauto.
+    + eauto.
+Qed. 
 
-Lemma enumeratingOpt_monotonic A (e : E (option A)) {Hc : SizeMonotonicOpt e}
+Lemma lazylist_backtrack_opt_is_false A (l: LazyList.LazyList (option A)) ch b :
+  lazylist_backtrack_opt l ch b = Some false -> b = false. 
+Proof.
+  revert b; induction l; intros b.
+  - simpl. destruct b; try congruence.
+  - simpl in *. 
+    destruct a.
+    + destruct (ch a) eqn:Heq. destruct b0. congruence.
+      now eauto. intros Hin. eapply H in Hin. congruence. 
+    + intros Hn. eapply lazylist_backtrack_opt_is_true in Hn.
+      congruence.
+Qed. 
+
+Lemma lazylist_backtrack_opt_true A (l: LazyList.LazyList (option A)) ch b :
+  lazylist_backtrack_opt l ch b = Some true <->
+  exists x, LazyList.In_ll (Some x) l /\ ch x = Some true.
+Proof.
+  revert b; induction l; intros b.
+  - simpl. split; intros Hc; try congruence.
+    destruct b; congruence. 
+    destruct Hc. inv H; exfalso; eauto.
+  - split.
+    + intros Hl.
+      simpl in *. destruct a.
+      destruct (ch a) eqn:Heq.
+      * destruct b0.
+        -- eexists. split; eauto.
+        -- eapply H in Hl. destruct Hl. inv H0.
+           eexists; split; eauto.
+      * eapply H in Hl. destruct Hl. inv H0.
+        eexists; split; eauto.
+      * eapply H in Hl. destruct Hl. inv H0.
+        eexists; split; eauto.
+    + intros Hc; inv Hc. inv H0. simpl in *. destruct a. 
+      * inv H1. inv H3. rewrite H2. reflexivity.
+        destruct (ch a) eqn:Heq. destruct b0. reflexivity.
+        eapply H. eexists. now split; eauto.
+        eapply H. eexists. now split; eauto.
+      * inv H1. congruence. eapply H. eexists. now split; eauto.
+Qed.
+
+Lemma lazylist_backtrack_opt_false A (l: LazyList.LazyList (option A)) ch :
+  lazylist_backtrack_opt l ch false = Some false <->
+  (forall x, LazyList.In_ll (Some x) l -> ch x = Some false) /\
+  ~ LazyList.In_ll None l.
+Proof.
+  induction l. 
+  - simpl. split; intros Hc.
+    split; eauto. intros. now inv H.
+    reflexivity.
+  - split.
+    + intros Hl.
+      simpl in *.
+      destruct a.
+      * destruct (ch a) eqn:Heq. destruct b.
+        congruence.
+        
+        -- eapply H in Hl. inv Hl.
+           split.
+           intros. inv H2; eauto. inv H3. eassumption.
+
+           intros Hc; inv Hc. congruence. eauto.
+
+        -- eapply lazylist_backtrack_opt_is_false in Hl. congruence.
+
+      * eapply lazylist_backtrack_opt_is_false in Hl. congruence.
+
+    + intros [H1 H2].
+      simpl.
+      destruct a. 
+      * destruct (ch a) eqn:Heq. destruct b.
+        rewrite H1 in Heq. congruence.
+        now left.
+        eapply H. split. intros. eapply H1.
+        right. eassumption.
+        intros Hc. eapply H2. right. eassumption.
+        rewrite H1 in Heq. congruence. now left.
+
+      * exfalso. eapply H2. now left.
+Qed.        
+        
+
+Lemma enumeratingOpt_monotonic A (e : E (option A))
+      {Hc : SizeMonotonicOpt e} {Hfp : SizeFP e}
       ch1 ch2 s1 s2 b :
   (s1 <= s2)%coq_nat ->
   (forall x, ch1 x = Some b -> ch2 x = Some b) ->
   enumeratingOpt e ch1 s1 = Some b ->
   enumeratingOpt e ch2 s2 = Some b.
 Proof.
-Admitted.
+  intros Hleq Hall Hen.
+
+  specialize (Hc _ _ Hleq).
+  specialize (Hfp _ _ Hleq).
+  
+  unfold enumeratingOpt in *.
+  unfold semProdSizeOpt in *. simpl in *. 
+  unfold semEnumSize in *.
+  revert Hc Hfp Hen. 
+
+  generalize (run e s1), (run e s2).
+
+  intros l1 l2 Hs1 Hs2 Hl.
+  destruct b.
+
+  - eapply lazylist_backtrack_opt_true in Hl.
+    destruct Hl. destruct H.
+
+    eapply lazylist_backtrack_opt_true.
+    eexists. split.
+    eapply Hs1. eassumption.
+    eapply Hall. eassumption.
+
+  - eapply lazylist_backtrack_opt_false in Hl.
+    destruct Hl. 
+
+    eapply lazylist_backtrack_opt_false.
+
+    split. intros x Hin. eapply Hall. eapply H.
+    eapply Hs2. eassumption. eassumption.
+
+    intros Hc. eapply H0. eapply Hs2. eassumption. eassumption.
+Qed. 

@@ -417,12 +417,13 @@ Ltac2 handle_checker_mon_t (ih : ident) (heq : ident) :=
       | [h : match ?m with _ => _  end = Some true |- _ ] =>
         destruct $m; try (congruence)
       end
-    | (* enumerating *)
-      eapply enumerating_monotonic >
-      [ now find_size_mon_inst ()
-      | eassumption
-      | intro; clear $heq; simpl_minus_methods (); intro $heq
-      | eassumption ]
+    (* | (* enumerating *) *)
+    (* XXX all enumerators should be OPT. This case should not arise *) 
+    (*   eapply enumerating_monotonic > *)
+    (*   [ now find_size_mon_inst () *)
+    (*   | eassumption *)
+    (*   | intro; clear $heq; simpl_minus_methods (); intro $heq *)
+    (*   | eassumption ] *)
     | (* enumeratingOpt *)
       eapply enumeratingOpt_monotonic >
       [ now find_size_mon_inst ()
@@ -491,12 +492,13 @@ Ltac2 handle_checker_mon_f (ih : ident) (heqb : ident) :=
       | [ _ : match ?e with _ => _ end = Some false |- _ ] =>
         destruct $e; try reflexivity
       end
-    | (* enumerating *)
-      eapply enumerating_monotonic >
-      [ now find_size_mon_inst ()
-      | eassumption
-      | intro; simpl_minus_methods (); clear $heqb; intro $heqb
-      | eassumption ]
+    (* | (* enumerating *) *)
+    (* XXX all enumerators should be OPT. This case should not arise *) 
+    (*   eapply enumerating_monotonic > *)
+    (*   [ now find_size_mon_inst () *)
+    (*   | eassumption *)
+    (*   | intro; simpl_minus_methods (); clear $heqb; intro $heqb *)
+    (*   | eassumption ] *)
     | (* enumeratingOpt *)
       eapply enumeratingOpt_monotonic >
       [ now find_size_mon_inst ()

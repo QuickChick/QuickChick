@@ -98,6 +98,13 @@ Class SizeMonotonicOpt {A} {G} `{Producer G}
       (s1 <= s2)%coq_nat ->
       semProdSizeOpt g s1 \subset semProdSizeOpt g s2.
 
+(** A fixed point is reached when the producer no longer produces None *)
+Class SizeFP {A} {G} `{Producer G} (g : G (option A)) :=
+  sizeFP : forall s1 s2,
+    (s1 <= s2)%coq_nat ->
+    ~ None \in semProdSize g s1 -> 
+    semProdSize g s1 <--> semProdSize g s2.
+
 Definition isNone {T : Type} (u : option T) :=
   match u with
     | Some _ => false
@@ -243,6 +250,14 @@ Section ProducerProofs.
     firstorder.
   Qed.
 
+  Global Instance returnGenSizeFP {A} (x : (option A)) :
+    SizeFP (ret x).
+  Proof.
+    unfold SizeFP => s1 s2 Hleq Hnin.
+    repeat rewrite semReturnSize. reflexivity. 
+  Qed.
+
+
   Global Instance bindUnsized {A B} (g : G A) (f : A -> G B)
            `{@Unsized _ _ PG g}
            `{forall x, Unsized (f x)} :
@@ -264,7 +279,7 @@ Section ProducerProofs.
     move => s1 s2 Hs.
     rewrite !semBindSize => b [a [Hsa Hsb]].
     exists a; split => //; eapply monotonic; eauto.
-  Qed.
+  Qed.   
     
   Global Instance bindMonotonicOpt
            {A B} (g : G A) (f : A -> G (option B))
@@ -294,7 +309,7 @@ Section ProducerProofs.
       eexists. split; eauto.
       now constructor.
   Qed.      
-  
+
   Global Instance bindMonotonicOptStrong
            {A B} (g : G A) (f : A -> G (option B))
            `{@SizeMonotonic _ _ PG g}

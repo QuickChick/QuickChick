@@ -121,7 +121,79 @@ Lemma semBindSizeEnum A B (g : E A) (f : A -> E B) (s : nat) :
     \bigcup_(a in semEnumSize g s) semEnumSize (f a) s.
 Proof.
   rewrite /semEnumSize /bindEnum /=.
-Admitted.
+  unfold bindLazyList.
+  generalize (run g s).
+  induction l.
+  - simpl. split; intros; try contradiction.
+
+    inv H. destruct H0. contradiction.
+
+  - simpl in *.
+    intros z; split; intros H1.
+    + eapply lazy_in_app_or in H1.
+      inv H1.
+      * eexists. split. left. reflexivity.
+        eassumption.
+      * eapply H in H0. inv H0.
+        destruct H2.
+        eexists. split. right. eassumption.
+        eassumption.
+    + inv H1. destruct H0.
+      inv H0.
+      * eapply lazy_append_in_l. eassumption.
+      * eapply lazy_append_in_r.
+        eapply H. eexists. split; eauto. 
+Qed. 
+
+Global Instance bindOptSizeFP
+       {A B} (g : E (option A)) (f : A -> E (option B))
+       {Hsg : SizeFP g} {Hsf : forall x, SizeFP (f x)} :
+  SizeFP (bindOpt g f).
+Proof.
+  simpl.   
+  move => s1 s2 Hs Hnin.
+  specialize (Hsg _ _ Hs). simpl in *.
+  rewrite !semBindSizeEnum. split.
+  - intros [z [Hin1 Hin2]].
+    destruct z.
+    + eexists. split. eapply Hsg; [ | eassumption ].
+      intros Hc1.
+      eapply Hnin.
+      eapply semBindSizeEnum. eexists. split. eassumption. 
+      simpl. eapply semReturnSizeEnum. reflexivity.
+      simpl. eapply (Hsf _ _ _ Hs); [ | eassumption ].
+      intros Hc1. eapply Hnin.
+      eapply semBindSizeEnum. eexists. split. eassumption. 
+      simpl. eassumption.
+    + exfalso. eapply Hnin.
+      eapply semBindSizeEnum. eexists. split. eassumption. 
+      simpl. eapply semReturnSizeEnum. reflexivity.
+  - intros [z [Hin1 Hin2]].
+    destruct z.
+    + eexists. split. eapply Hsg; [ | eassumption ].
+      intros Hc1.
+      eapply Hnin.
+      eapply semBindSizeEnum. eexists. split. eassumption. 
+      simpl. eapply semReturnSizeEnum. reflexivity.
+      simpl. eapply (Hsf _ _ _ Hs); [ | eassumption ].
+      intros Hc1. eapply Hnin.
+      eapply semBindSizeEnum. eexists. split.
+      eapply Hsg; [| eassumption ].
+      intros Hc. eapply Hnin.
+      eapply semBindSizeEnum. eexists. split. eassumption. 
+      simpl. eapply semReturnSizeEnum. reflexivity.
+      simpl. eassumption.
+    + simpl in *.
+      exfalso. eapply Hnin.
+      eapply Hsg in Hin1.
+      eapply semBindSizeEnum. eexists. split. eassumption. 
+      simpl. eapply semReturnSizeEnum. reflexivity.
+      intros Hc.
+      eapply Hnin. 
+      eapply semBindSizeEnum. eexists. split.
+      eassumption. eapply semReturnSizeEnum. reflexivity.
+Qed. 
+
 
 Lemma semChooseSize A `{ChoosableFromInterval A} (a1 a2 : A) :
     RandomQC.leq a1 a2 ->
@@ -449,7 +521,7 @@ Fixpoint lazylist_backtrack_opt {A} (l : LazyList (option A)) (f : A -> option b
       | Some false => lazylist_backtrack_opt (xs tt) f anyNone
       | None       => lazylist_backtrack_opt (xs tt) f true
       end
-    | None => lazylist_backtrack_opt (xs tt) f anyNone
+    | None => lazylist_backtrack_opt (xs tt) f true
     end
   end.
 
