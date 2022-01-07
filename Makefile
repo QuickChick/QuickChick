@@ -67,7 +67,7 @@ COMPATFILES:=plugin/depDriver.ml plugin/driver.mlg plugin/genericLib.ml plugin/q
 compat: $(COMPATFILES)
 
 %: %.cppo
-	$(V)cppo -V COQ:$(word 1, $(shell coqc -print-version)) -n -o $@ $^
+	$(V)cppo -V OCAML:$(shell ocamlc -version) -V COQ:$(word 1, $(shell coqc -print-version)) -n -o $@ $^
 
 Makefile.coq: _CoqProject
 	$(V)coq_makefile -f _CoqProject -o Makefile.coq
