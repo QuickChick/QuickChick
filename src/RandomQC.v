@@ -759,7 +759,7 @@ Class ChoosableFromInterval (A : Type)  :=
        exists seed, fst (randomR (a1, a2) seed) = a);
     enumR : A * A -> LazyList A;
     enumRCorrect :
-      forall (a a1 a2 : A), leq a1 a2 ->
+      forall (a a1 a2 : A), leq a1 a2 -> 
       (leq a1 a && leq a a2 <->
        In_ll a (enumR (a1,a2)))
   }.

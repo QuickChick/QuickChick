@@ -198,6 +198,15 @@ Qed.
 Instance enumListSized_CorrectSized A {_ : EnumSized A} { _ : CorrectSized (@enumSized A _)} :
   CorrectSized (@enumSized (list A) enumListSized).
 Proof.
+  constructor. intros l; induction l; simpl.
+  - split; intros Hin; simpl in *. now constructor.
+    eexists 0. eexists 0. split; eauto. eapply semVectorOfSize; eauto.
+    eapply ProducerSemanticsEnum.
+    split. simpl. reflexivity.
+    eapply nil_subset.
+  - split; intros Hin. now constructor.
+    destruct IHl. destruct H1. now constructor.
+    destruct H as [[_ [s [s' [_ Ha]]]]]. now constructor.
 Admitted.       
 
 Instance enumListSized_SizedMonotonic A {_ : EnumSized A} { _ : SizedMonotonic (@enumSized A _)} :

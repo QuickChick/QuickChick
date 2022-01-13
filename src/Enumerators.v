@@ -236,6 +236,13 @@ Lemma  semChooseSizeEmptyEnum :
       ~ (RandomQC.leq a1 a2) ->
       forall size, (semProdSize (choose (a1,a2)) size <-->
                                 set0).
+Proof.
+  intros.
+  simpl. intros x; split; intros H1; try now inv H1.
+  unfold semEnumSize, chooseEnum in H1.
+  exfalso. simpl in *. eapply H0.
+  (* This is not provable with the current spec of choose,
+     but maybe is not needed *) 
 Admitted.  
 
 
@@ -302,199 +309,150 @@ Definition enumerate {A : Type} (gs : list (E (option A))) : E (option A) :=
   MkEnum (fun s => join_list_lazy_list (map (fun g => run g s) gs)).
 
 Lemma enumerate_correct_size {A} (lst : list (E (option A))) s :
-  isSome :&: semProdSize (enumerate lst) s <--> \bigcup_(x in lst) (fun g => isSome :&: semProdSize g s) x.
-Admitted.
-(*
+  isSome :&: semProdSize (enumerate lst) s <-->
+  \bigcup_(x in lst) (fun g => isSome :&: semProdSize g s) x.
 Proof.
   unfold enumerate.
-  assert (Hret := @semReturnSize E _ _ (option A)).
-  assert (Hbind := @semBindSize E _ _). simpl in *. 
-  
-  assert (Datatypes.length lst = Datatypes.length lst)%coq_nat by reflexivity.  
-  revert H.
-  generalize (Datatypes.length lst) at 2 3 4.
-  intros n. generalize lst. induction n; intros l Hleq.
-  - simpl. intros x; split; intros Hin.  inv Hin. 
-    + eapply Hret in H0. inv H0; exfalso; eauto. 
-    + inv Hin. inv H. destruct l; try (simpl in *; congruence). inv H0.
-  - intros x; split; intros Hin.
-    + inv Hin. destruct x; [ | now exfalso; eauto ].
-      with_strategy opaque [Enumerators.pickDrop] (simpl in H0). 
-      
-      eapply Hbind in H0.
-      inv H0. inv H1.
-      
-      eapply Enumerators.semChooseSize in H2; eauto. simpl in *.
-      
-      destruct (pickDrop_exists l x). simpl in *. now ssromega.
-      destruct H1. destruct H4. destruct H4. destruct H6. destruct H7.
-      
-      rewrite H4 in H3.
-      
-      eapply Hbind in H3.
-      destruct H2. destruct H3. destruct H2.
-      destruct x2.
-      
-      
-      -- eapply Hret in H3.
-         inv H3.
-         
-         eexists. split.  eassumption.
-         constructor; eauto.
-         
-      -- assert (Hsem : (isSome :&: semProdSize
-                                (enumerateFuel n (n.+1 - 1)
-                                               x1) s) (Some a)).
-         { split; eauto. }
-         
-         assert (Heq' : (n.+1 - 1) = n).
-         { ssromega. }
-         
-         rewrite Heq' in Hsem.
-         eapply IHn in Hsem.
-         inv Hsem. destruct H9.
-         eexists. split.
-         eapply H8. eassumption. 
-         eassumption.
-         ssromega. 
-    + inv Hin. inv H. inv H1. destruct x; try (now exfalso; eauto).
-      constructor. now eauto.
-      simpl. 
-      eapply Hbind.
-      
-      destruct (pickDrop_In _ _ H0). destruct H4.
-      destruct H4.
-      
-      exists x. split.
-      eapply Enumerators.semChooseSize; eauto.
-      simpl. now ssromega. 
+  induction lst.
+  - rewrite bigcup_nil_set0. simpl. intros x; split; intros H; inv H.
+    inv H1.
+  - simpl in *.
+    split.
+    + intros H1. inv H1. unfold semEnumSize in *.
+      simpl in *.
+      eapply lazy_in_app_or in H0. inv H0.
+      * eexists. split. now left.
+        split; eassumption.
+      * assert (Hin : a0 \in \bigcup_(x in lst) ((fun u : option A => u) :&: In_ll^~ (run x s))).
+        { eapply IHlst. split; eassumption. }
 
-      rewrite H4.
-      eapply Hbind.
+        inv Hin. inv H3. eexists. split. right. eassumption. eassumption.
+    + intros [b [H1 H2]]. inv H2. inv H1.
+      * split. eassumption. simpl. unfold semEnumSize in *. simpl in *.
+        eapply lazy_append_in_l. eassumption.
+      * split. eassumption.
+        eapply lazy_append_in_r. eapply IHlst. eexists. split; eassumption.
+Qed.
 
-      exists (Some a). split.
-      eassumption.
-      eapply Hret. reflexivity. 
-Qed.       
-*)
 Lemma enumerate_correct {A} (lst : list (E (option A))) :
   isSome :&: semProd (enumerate lst) <--> \bigcup_(x in lst) (fun g => isSome :&: semProd g) x.
-Admitted.
-(*
 Proof.
-  split; intros H.
-  - inv H. inv H1. inv H2.
-    assert (Hin : (isSome :&: semProdSize (enumerate lst) x) a).
-    { split; eauto. }
-    eapply (@enumerate_correct_size A) in Hin.
-    inv Hin. inv H5. inv H7.
-    eexists. split; eauto. split; eauto.
-    eexists; eauto.
-  - destruct H. destruct H. destruct H0. destruct H1. destruct H1.
-    assert (Hin :  (\bigcup_(x in lst) (fun g => isSome :&: semProdSize g x0) x) a).
-    { eexists. split; eauto. split; eauto. }
-
-    eapply (@enumerate_correct_size A) in Hin.
-    inv Hin. split; eauto. eexists. split; eauto. 
-Qed.    *)
+  unfold enumerate.
+  induction lst.
+  - rewrite bigcup_nil_set0. simpl. intros x; split; intros H; inv H.
+    inv H1. inv H2. inv H4. 
+  - simpl in *.
+    split.
+    + intros H1. inv H1. inv H0. inv H2. unfold semEnumSize in *.
+      simpl in *.
+      eapply lazy_in_app_or in H4. inv H4.
+      * eexists. split. now left.
+        split; try eassumption. eexists; split; eauto.
+      * assert (Hin : a0 \in  (\bigcup_(x0 in lst) ((fun u : option A => u) :&: semProd x0))).
+        { eapply IHlst. split; eauto. eexists; split; eassumption. }
+        
+        inv Hin. inv H6. inv H8. eexists. split. right. eassumption. eassumption.
+    + intros [b [H1 H2]]. inv H2. inv H1.
+      * split. eassumption. simpl. unfold semProd in *. simpl in *.
+        inv H0. inv H3. eexists. split. eassumption. eapply lazy_append_in_l. eassumption.
+      * assert (Hin : a0 \in ((fun u : option A => u)
+                                :&: semProd (MkEnum (fun s : nat => join_list_lazy_list (map (run^~ s) lst))))).
+        { eapply IHlst. eexists. split; eauto. }
+        inv Hin. inv H5. inv H6.
+        split; eauto. eexists; split; eauto.
+        simpl. eapply lazy_append_in_r. eassumption.
+Qed.
 
 
 Lemma enumerate_correct_size_opt {A} (lst : list (E (option A))) s :
   semProdSizeOpt (enumerate lst) s <--> \bigcup_(x in lst) (semProdSizeOpt x s).
-Admitted.
-(*
 Proof.
-  assert (Hc := enumerate_correct_size lst s).
-  intros x. destruct (Hc (Some x)) as [H1 H2].
-  split.
-  - intros Hin. simpl in *.
-
-    assert (Hin' : ((fun u : option A => u) :&: semEnumSize (enumerate lst) s) (Some x)).
-    { split; eauto. }
-    
-    eapply Hc in Hin'. destruct Hin'. inv H. inv H3.
-    eexists. split; eauto.
-
-  - intros Hin. simpl in *.
-    
-    assert (Hin' : (\bigcup_(x in lst) ((fun u : option A => u) :&: semEnumSize x s)) (Some x)).
-    { inv Hin. inv H. eexists; split; eauto. split; eauto. }
-    
-    eapply Hc in Hin'. destruct Hin'. eassumption.
-Qed.       *)
+  unfold enumerate.
+  induction lst.
+  - rewrite bigcup_nil_set0. simpl. intros x; split; intros H; inv H.
+  - simpl in *.
+    split.
+    + intros H1. unfold semEnumSize in *.
+      simpl in *.
+      eapply lazy_in_app_or in H1. inv H1.
+      * eexists. split. now left. eassumption. 
+      * assert (Hin : a0 \in \bigcup_(x in lst) (semProdSizeOpt x s)).
+        { eapply IHlst. eassumption. }
+       
+        inv Hin. inv H0. eexists. split. right. eassumption. eassumption.
+    + intros [b [H1 H2]]. inv H1.
+      * unfold semEnumSize in *. simpl in *.
+        eapply lazy_append_in_l. eassumption.
+      * simpl. eapply lazy_append_in_r. eapply IHlst. eexists. split; eassumption.
+Qed.
+  
+Lemma enumerate_correct_size' {A} (lst : list (E (option A))) s :
+  semProdSize (enumerate lst) s <--> \bigcup_(x in lst) (semProdSize x s).
+Proof.
+  unfold enumerate.
+  induction lst.
+  - rewrite bigcup_nil_set0. simpl. intros x; split; intros H; inv H.
+  - simpl in *.
+    split.
+    + intros H1. unfold semEnumSize in *.
+      simpl in *.
+      eapply lazy_in_app_or in H1. inv H1.
+      * eexists. split. now left. eassumption. 
+      * assert (Hin : a0 \in \bigcup_(x in lst) (semProdSize x s)).
+        { eapply IHlst. eassumption. }
+       
+        inv Hin. inv H0. eexists. split. right. eassumption. eassumption.
+    + intros [b [H1 H2]]. inv H1.
+      * unfold semEnumSize in *. simpl in *.
+        eapply lazy_append_in_l. eassumption.
+      * simpl. eapply lazy_append_in_r. eapply IHlst. eexists. split; eassumption.
+Qed.
+  
 
 Lemma enumerate_correct_opt {A} (lst : list (E (option A))) :
   semProdOpt (enumerate lst) <--> \bigcup_(x in lst) (semProdOpt x).
-  Admitted.
-(*
 Proof.
-  split; intros H.
-  - inv H. inv H0.
-    assert (Hin : semProdSizeOpt (enumerate lst) x a).
-    { eassumption. }
-    eapply (@enumerate_correct_size_opt A) in Hin.
-    inv Hin. inv H3.
-    eexists. split; eauto. eexists. split; eauto.
-  - destruct H. destruct H. destruct H0. destruct H0.
-    assert (Hin :  (\bigcup_(x in lst) (semProdSizeOpt x x0)) a).
-    { eexists. split; eauto. }
-    eapply (@enumerate_correct_size_opt A) in Hin.
-    eexists. split; eauto. 
-Qed.        *)
-
-
+  unfold enumerate.
+  induction lst.
+  - rewrite bigcup_nil_set0. simpl. intros x; split; intros H; inv H; inv H0; inv H2.
+  - simpl in *.
+    split.
+    + intros H1. unfold semEnumSize in *.
+      inv H1. inv H. simpl in *. 
+      eapply lazy_in_app_or in H2. inv H2.
+      * eexists. split. now left. eexists. split; eassumption. 
+      * assert (Hin : a0 \in \bigcup_(x in lst) (semProdOpt x)).
+        { eapply IHlst. eexists. split; eassumption. }       
+        inv Hin. inv H4. eexists. split. right. eassumption. eassumption.
+    + intros [b [H1 H2]]. inv H1.
+      * unfold semEnumSize in *. simpl in *.
+        inv H2. inv H. eexists. split. reflexivity. simpl. eapply lazy_append_in_l. simpl in *. eassumption.
+      * assert (Hin :  semProdOpt (MkEnum (fun s : nat =>  join_list_lazy_list (map (run^~ s) lst))) a0).
+        { eapply IHlst. inv H2. inv H0. simpl. eexists. split; eauto. }
+        inv Hin. inv H0.
+        simpl. eexists. split. reflexivity. simpl in *. 
+        eapply lazy_append_in_r. simpl in *. eassumption.
+Qed.
 
 Lemma enumerate_SizeMonotonicOpt (A : Type) (l : list (E (option A))) :
   l \subset SizeMonotonicOpt ->
   SizeMonotonicOpt (enumerate l).
-Admitted.
-(*
 Proof.
   intros Hin. intros s1 s2 Hleq.
   rewrite !enumerate_correct_size_opt.
   intros x Hin'.  destruct Hin' as [e [Hl Hs]].
   eexists. split; eauto. eapply Hin; eauto. 
-Qed.*)
+Qed.
 
 Lemma enumerate_SizeMonotonic (A : Type) (l : list (E (option A))) :
   l \subset SizeMonotonic ->
   SizeMonotonic (enumerate l).
-Admitted.
-(*
 Proof.
-  unfold enumerate. 
-  assert (Datatypes.length l = Datatypes.length l)%coq_nat by reflexivity.  
-  revert H.
-  generalize (Datatypes.length l) at 2 3 4.
-  intros n. revert l. induction n; intros l Heq Hsub.
-  - simpl. now eauto with typeclass_instances.
-  - simpl.
-    eapply bindMonotonicStrong; eauto with typeclass_instances.
-    
-    intros x1 Hin. eapply Enumerators.semChoose in Hin; eauto. simpl in *. 
-    
-    destruct (Enumerators.pickDrop_exists l x1). simpl in *. now ssromega.
-    destruct H. destruct H. destruct H0. destruct H1.
-
-    rewrite H.
-
-    eapply bindMonotonicStrong; eauto with typeclass_instances.
-    
-    intros a Hin'.
-
-    destruct a; eauto with typeclass_instances. 
-
-    eapply returnGenSizeMonotonic; eauto with typeclass_instances.
-
-    assert (Heq' : (n.+1 - 1) = n). { ssromega. }
-
-    rewrite Heq'. eapply IHn. 
-
-    now ssromega.
-
-    eapply subset_trans. eassumption. eassumption.
+  intros Hin. intros s1 s2 Hleq.
+  rewrite !enumerate_correct_size'.  
+  intros x Hin'.  destruct Hin' as [e [Hl Hs]].
+  eexists. split; eauto. eapply Hin; eauto. 
 Qed.
-*)
 
 Fixpoint lazylist_backtrack {A} (l : LazyList A) (f : A -> option bool) (anyNone : bool) : option bool :=
   match l with

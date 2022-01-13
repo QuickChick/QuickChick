@@ -416,6 +416,7 @@ Qed.
 Instance forAllMonotonic {A C} {_ : Checkable C} `{Show A} (g : G A) (f : A -> C)
         `{@SizeMonotonic _ _ ProducerGen g} `{forall x, SizeMonotonicChecker (checker (f x))} :
   SizeMonotonicChecker (forAll g f).
+Proof.
 Admitted.
 
 Lemma semForAllSize {A C} `{Show A, Checkable C} (g : G A) (f : A -> C) (s:nat) :

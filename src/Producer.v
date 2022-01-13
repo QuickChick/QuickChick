@@ -430,12 +430,16 @@ Section ProducerProofs.
     apply monotonicOpt with (s2 := s'); eauto; try ssromega.
 Qed.    
 
-  Lemma semBindSize_subset_compat :
-    forall {A B : Type} (g g' : G A) (f f' : A -> G B),
+  Lemma semBindSize_subset_compat {A B : Type} (g g' : G A) (f f' : A -> G B) :
       (forall s, semProdSize g s \subset semProdSize g' s) ->
       (forall x s, semProdSize (f x) s \subset semProdSize (f' x) s) ->
       (forall s, semProdSize (bind g f) s \subset semProdSize (bind g' f') s).
-  Admitted.
+  Proof.
+    intros Hs1 Hs2 s.
+    rewrite !semBindSize.
+    specialize (Hs1 s). 
+    eapply incl_bigcup_compat; eauto.
+  Qed.
   
   (* semBindSizeOpt_subset_compat : *)
   (*   forall {A B : Type} (g g' : G A) (f f' : A -> G (option B)), *)
