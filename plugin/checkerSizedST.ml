@@ -38,7 +38,8 @@ let rec_bind (opt : bool) (m : coq_expr) (x : string) (f : var -> coq_expr) : co
     ]
   
 let exist_bind (init_size : coq_expr) (opt : bool) (m : coq_expr) (x : string) (f : var -> coq_expr) : coq_expr =
-  (if opt then enumCheckerOpt else enumChecker) m x f init_size
+  enumCheckerOpt m x f init_size
+(*  (if opt then enumCheckerOpt else enumChecker) m x f init_size *)
 
 let stMaybe (opt : bool) (g : coq_expr) (x : string) (checks : ((coq_expr -> coq_expr) * int) list) =
   let rec sumbools_to_bool x lst =

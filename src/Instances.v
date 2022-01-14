@@ -102,6 +102,15 @@ Global Instance enumPairSized {A B : Type} `{EnumSized A} `{EnumSized B}
 Global Instance enumPair {A B : Type} `{Enum A} `{Enum B} : Enum (A * B) :=
   {| enum := liftM2 pair enum enum |}.
 
+
+Global Instance enumOpt {A} (H : Enum A) : Enum (option A) :=
+  {| enum :=
+       match enum with
+       | MkEnum f => MkEnum (fun n => LazyList.lcons None (fun _ => LazyList.mapLazyList Some (f n)))
+       end
+  |}.
+
+
 (** Shrink Instances *)
 Global Instance shrinkBool : Shrink bool :=
   {| shrink x :=
@@ -110,6 +119,58 @@ Global Instance shrinkBool : Shrink bool :=
          | true  => cons false nil
        end
   |}.
+
+
+Instance enumOptCorrect A `{EnumCorrect A} :
+  Correct _ (@enum _ (enumOpt _)).
+Proof.
+  constructor.  
+  intros t; split; eauto.
+  - intros. exact I.
+  - intros _. 
+    simpl.
+    inv H. inv H0. unfold semProd. simpl.
+    destruct t.
+    + destruct (prodCorrect a).
+      destruct H3. now reflexivity.
+      inv H3. simpl in *.
+      eexists x. split. eassumption.
+      destruct H. simpl in *. destruct enum0.
+      unfold semEnumSize in *. simpl. right.
+      eapply LazyList.lazy_in_map_iff.
+      eexists. split. reflexivity.
+      eassumption.
+    + exists 0. split. reflexivity.
+      destruct H. simpl. destruct enum0.
+      unfold semEnumSize in *. simpl. left. reflexivity.
+Qed.       
+
+Instance enumOpt_SizeMonotonic A `{EnumMonotonic A} :
+  SizeMonotonic (@enum _ (enumOpt _)).
+Proof.
+  destruct H. destruct enum. simpl in *. 
+  intros s1 s2 Hleq [ x |]; simpl.
+  - eapply H0 in Hleq. simpl in *.
+    intros Hin.
+    unfold semEnumSize in *. simpl in *. right.
+    inv Hin; try congruence.
+    eapply LazyList.lazy_in_map_iff.
+    eexists. split. reflexivity.
+    eapply Hleq.
+    eapply LazyList.lazy_in_map_iff in H. destruct H.
+    inv H. inv H2. eassumption.
+  - unfold semEnumSize in *. simpl in *. firstorder.
+Qed.
+
+Instance enumOpt_SizeFP A `{Enum A} :
+  SizeFP (@enum _ (enumOpt _)).
+Proof.
+  destruct H. destruct enum. simpl in *.
+  
+  intros s1 s2 Hleq Hnin. simpl.
+  unfold semEnumSize in *. simpl in *. firstorder.
+Qed.
+
 
 Instance enumNatSized_CorrectSized :
   CorrectSized (@enumSized _ enumNatSized).

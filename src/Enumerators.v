@@ -97,6 +97,8 @@ Next Obligation.
   apply (X n).
 Defined.
 
+Global Instance enum_enumOpt {A} (H : E A) : E (option A).  
+       
 (* begin semReturn *)
 Lemma semReturnEnum {A} (x : A) : semProd (ret x) <--> [set x].
 (* end semReturn *)
@@ -452,6 +454,37 @@ Proof.
   rewrite !enumerate_correct_size'.  
   intros x Hin'.  destruct Hin' as [e [Hl Hs]].
   eexists. split; eauto. eapply Hin; eauto. 
+Qed.
+
+Lemma enumerate_SizeFP (A : Type) (l : list (E (option A))) :
+  l \subset SizeFP ->
+  l \subset SizeMonotonic ->
+  SizeFP (enumerate l).
+Proof.
+  intros Hin Hmon. intros s1 s2 Hleq Hnin.
+  rewrite !enumerate_correct_size'.
+  intros x; split. 
+  - intros [e [Hl Hs]].
+    eexists. split. eassumption.
+    eapply Hmon; eauto.
+  - intros [e [Hl Hs]].
+    destruct x.
+    2:{ exfalso. eapply Hnin.
+        
+        eapply enumerate_correct_size'.
+        eexists. split. eassumption.
+        eapply Hin; try eassumption.
+        intros Hc.
+        eapply Hnin.
+        eapply enumerate_correct_size'.
+        eexists. split; eassumption. }
+
+    eexists. split. eassumption.
+    eapply Hin; try eassumption.
+    intros Hc.
+    eapply Hnin.
+    eapply enumerate_correct_size'.
+    eexists. split; eassumption.
 Qed.
 
 Fixpoint lazylist_backtrack {A} (l : LazyList A) (f : A -> option bool) (anyNone : bool) : option bool :=
