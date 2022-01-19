@@ -14,6 +14,15 @@ Set Bullet Behavior "Strict Subproofs".
 
 Section Lemmas. 
 
+  Lemma semProdSizeOpt_bicupNone A s (S : set A) :
+    \bigcup_(x in [:: returnEnum (@None A)]) semProdSizeOpt x s \subset S.
+  Proof.
+    intros x Hin. inv Hin. inv H. inv H0.
+    - inv H1. congruence.
+      inv H.
+    - inv H.
+  Qed.
+
   Lemma list_subset_cons {A} (h : A) (t : seq A) (s : set A)  :
     s h ->
     t \subset s ->
@@ -206,8 +215,6 @@ Section Lemmas.
     eapply Hs2 > [ | eassumption ]. ssromega.  
   Qed.
 
-  
-
   Lemma exists_match_DecOpt {B} P {_ : DecOpt P} (k : nat -> E (option B)) z :
     DecOptSizeMonotonic P ->
     DecOptCompletePos P -> 
@@ -217,7 +224,8 @@ Section Lemmas.
     exists (s : nat),
       semProdOpt (match decOpt s.+1 with
                   | Some true => k s
-                  | _ => returnEnum None
+                  | Some false => failEnum
+                  | None => returnEnum None
                   end) z.
   Proof.
     intros Hmon Hcom Hmonk Hp [s1 [s [_ He]]].
@@ -238,7 +246,8 @@ Section Lemmas.
     exists (s : nat),
       semProdOpt (match decOpt s.+1 with
                   | Some false => k s
-                  | _ => returnEnum None
+                  | Some true => failEnum
+                  | None => returnEnum None
                   end) z.
   Proof.
     intros Hmon Hcom Hmonk Hp [s1 [s [_ He]]].
@@ -257,6 +266,46 @@ Section Lemmas.
     intros H x Hin. inv Hin. inv H0. eexists. split; eauto. eapply H. eassumption.
   Qed. 
 
+
+  Global Instance SizeMonotonicOpt_failEnum A :
+    @SizeMonotonicOpt A E _ failEnum.
+  Proof.
+    intros s1 s2 Hleq.
+    eapply subset_refl.
+  Qed.
+
+  Lemma semProdOpt_failEnum A :
+    semProdOpt failEnum <--> (@set0 A). 
+  Proof.
+    intro x; split; intros H1.
+    inv H1. inv H. now inv H1.
+    now inv H1. 
+  Qed.
+
+  Lemma semProdOpt_return_None {A} :
+    semProdOpt (returnEnum None) <--> (@set0 A).
+  Proof.
+    intro x; split; intro H; inv H.
+    inv H0. inv H1. congruence. inv H0.
+  Qed.
+
+  Lemma SizeMonotonicOptFP_proof A (g : nat -> E (option A)) :
+    (forall s s1 s2,
+        (s1 <= s2)%coq_nat ->
+        (* monotonic Opt *) 
+        (semProdSizeOpt (g s1) s \subset semProdSizeOpt (g s2) s) /\
+        (* sizeFP *)
+        (~ semProdSize (g s1) s None ->
+         semProdSize (g s1) s <--> semProdSize (g s2) s) /\
+        (* Antimonotonic None *) 
+        (isNone :&: semProdSize (g s2) s \subset isNone :&: semProdSize (g s1) s)) ->
+    SizedMonotonicOptFP g.
+  Proof.
+    intros H. constructor.
+    intro; intros. eapply H; eauto. 
+    intro; intros. eapply H; eauto. 
+    intro; intros. eapply H; eauto. 
+  Qed.
 
 End Lemmas.
 
@@ -553,6 +602,7 @@ Ltac2 rec enumST_sized_mon (ih : ident) :=
 Ltac2 rec find_enumST (ih : ident) :=
   first
     [ now eapply incl_bigcup_list_nil
+    | now eapply semProdSizeOpt_bicupNone
     | eapply incl_bigcup_compat_list > [ (now enumST_sized_mon ih)  | find_enumST ih ]
     | eapply incl_bigcup_list_tl; find_enumST ih
     ].
@@ -591,14 +641,231 @@ Ltac2 derive_enumST_SizedMonotonic (_ : unit) :=
   end.
 
 
+Ltac2 rec enumST_antimon (ih : ident) :=
+  first
+    [ (* ret *)
+      guarded_subset_refl ()
+    | (* dec matching *)
+      match! goal with
+      | [ |- _ :&: semProdSize (match @decOpt _ _ ?s2 with _ => _ end) _ \subset
+             _ :&: semProdSize (match  @decOpt ?p ?i ?s1 with _ => _ end) _ ] =>
+        let hdec := Fresh.in_goal (id_of_string "Hdec") in
+        destruct (@decOpt $p $i $s1) eqn:$hdec > 
+        [ (erewrite (@CheckerProofs.mon $p $i _ $s1 $s2) > [ | | first [ eassumption | ssromega ] ]) >
+          [ enumST_antimon ih | ssromega ]
+        |  now eapply semProdSize_return_None  ]
+    end
+  | (* input matching *)
+    match! goal with
+    | [ |- _ :&: semProdSize (match ?p with _ => _ end) _ \subset _ ] =>
+      destruct $p; enumST_antimon ih
+    end
+ | (* bindOpt *)
+    eapply semBindOptSize_isNone_subset_compat >
+    [ first
+        [ intros; now eapply subset_refl (* for calls to enum *)
+        | let ih' := Control.hyp ih in (* for recursive calls *)
+          eapply $ih'; now ssromega ]
+    | first
+        [ intros; now eapply subset_refl (* for calls to enum *)
+        | let ih' := Control.hyp ih in (* for recursive calls *)
+          eapply $ih'; now ssromega ] 
+    | let x := Fresh.in_goal (id_of_string "x") in
+      intros $x; enumST_antimon ih
+    ]
+    (* | (* bind *) *)
+    (*   eapply (@semBindSizeOpt_subset_compat E _ ProducerSemanticsEnum) > *)
+    (*   [ now eapply subset_refl *)
+    (*   | let x := Fresh.in_goal (id_of_string "x") in *)
+    (*     intros $x; enumST_sized_mon ih *)
+    (*   ] *)
+ | () ].
+
+Ltac2 rec base_case_antimon (_ : unit) :=
+  match! goal with
+  | [|- ?s1 :&: ?s2 \subset ?s3 :&: (@bigcup ?t ?u (seq_In (cons _ (cons _ _))) ?g)] =>
+    eapply (@incl_bigcup_list_tl_inter $t $u); base_case_antimon ()
+   | [|- _ \subset _  :&: (@bigcup ?t ?u (seq_In (cons _ nil)) _)] =>
+     eapply semProdSize_bigcup_isNone
+end.
+
+Ltac2 rec ind_case_antimon (ih : ident) :=
+  match! goal with
+  | [|- ?s1 :&: ?s2 \subset ?s3 :&: (@bigcup ?t ?u (@seq_In _ (@nil _)) _)] =>
+    now eapply subset_refl
+  | [|- ?s1 :&: ?s2 \subset ?s3 :&: (@bigcup ?t ?u _ _)] =>
+    eapply (@incl_bigcup_compat_list_inter $t $u) > [ enumST_antimon ih | ind_case_antimon ih ]
+  end.
+
+Ltac2 rec base_case_fp (_ : unit) :=
+  match! goal with
+  | [|- (@bigcup ?t ?u (seq_In (cons _ (cons _ _))) ?g) _] =>
+    eapply (@in_bigcup_list_tl $t $u); base_case_fp ()
+   | [|- (@bigcup ?t ?u (seq_In (cons _ nil)) _) _] =>
+     eapply in_bigcup_list_hd; eapply semReturnSizeEnum; reflexivity
+end.
+
+Ltac2 rewrite_eqs (eqs: constr list) :=
+  List.iter (fun eq => try (rewrite $eq)) eqs.
 
 
+Ltac2 rec pick_enum (cnt : int) :=
+  if Int.equal cnt 0 then
+    (eapply in_bigcup_list_hd)
+  else
+    (eapply in_bigcup_list_tl; pick_enum (Int.sub cnt 1)).
+
+Ltac2 rec find_none (eqs : constr list) (binds : constr list) :=
+  first
+    [ (* ret *)
+      eapply semReturnSizeEnum; reflexivity
+    | (* dec matching *) 
+      match! goal with
+      | [ |- semEnumSize (match  @decOpt ?p ?i ?s1 with _ => _ end) _ _ ] =>
+        rewrite_eqs eqs; simpl_minus_methods (); find_none eqs binds
+      end
+    (* | (* input matching *) () *)
+      (* match! goal with *)
+      (* | [ |- _ :&: semProdSize (match ?p with _ => _ end) _ \subset _ ] => *)
+      (*   destruct $p; enumST_antimon ih *)
+      (* end *)
+    | (* bindOpt *)
+      first
+        [ eapply semProdSize_bindOpt_1; eassumption 
+        | eapply semProdSize_bindOpt_2 > [ let h := List.hd binds in eapply $h
+                                         | simpl_minus_methods (); find_none eqs (List.tl binds) ] ] 
+    | ()
+    ].
+
+Ltac2 rec solve_ih_hyp (hnin : constr) (cnt : int) (typ : constr) (eqs : constr list) (binds : constr list) :=
+  let hc := Fresh.in_goal (id_of_string "Hc") in intros $hc;
+  eapply $hnin; eapply (@enumerate_correct_size' $typ);
+  pick_enum cnt; simpl_minus_methods (); find_none eqs binds.
+
+Ltac2 rec enumST_fp (ih : constr) (hnin: constr) (cnt : int) (typ : constr) (eqs : constr list) (binds : constr list) :=
+  first
+    [ (* ret *)
+      reflexivity
+    | (* dec matching *)
+      match! goal with
+      | [ |- semEnumSize (match @decOpt ?p ?i ?s1 with _ => _ end) _ <-->
+             semEnumSize (match @decOpt _ _ ?s2 with _ => _ end) _ ] =>
+        let hdec := Fresh.in_goal (id_of_string "Hdec") in
+        (* destruct decOpt *)
+        destruct (@decOpt $p $i $s1) eqn:$hdec (* ; simpl_minus_methods () *) >
+        [ (* is Some *)
+          (erewrite (@CheckerProofs.mon $p $i _ $s1 $s2) > [ | | first [ eassumption | ssromega ] ]) >
+          [ let hdec := Control.hyp hdec in enumST_fp ih hnin cnt typ (hdec :: eqs) binds | ssromega ]
+        | (* is None *)
+          let hdec := Control.hyp hdec in
+          exfalso; eapply $hnin;
+          match! goal with
+          | [ |- semEnumSize (enumerate ?lst) ?s _ ] =>
+            eapply (@enumerate_correct_size' _ $lst $s); pick_enum cnt; find_none (hdec :: eqs) (List.rev binds)
+          end        
+        ]
+      end
+    | (* input matching *)
+      match! goal with
+      | [ |-  semEnumSize (match ?p with _ => _ end) _ <--> _ ] =>
+        destruct $p; simpl_minus_methods (); enumST_fp ih hnin cnt typ eqs binds
+      end
+    | (* bindOpt *)
+       (eapply semBindOptSize_subset_compat_eq; simpl_minus_methods ()) >
+       [ first [ eapply $ih > [ lia |  lia | solve_ih_hyp hnin cnt typ eqs (List.rev binds) ]
+               | reflexivity ]
+       | let x := Fresh.in_goal (id_of_string "x") in
+         let hin := Fresh.in_goal (id_of_string "Hin") in intros $x $hin;
+         let hin := Control.hyp hin in
+         enumST_fp ih hnin cnt typ eqs (hin :: binds)
+       ]  
+    | ()
+    ].
+
+Ltac2 rec ind_case_fp (ih : constr) (hnin : constr) (cnt : int) (typ : constr) :=
+  match! goal with
+  | [|- (@bigcup ?t ?u (seq_In (cons _ _)) ?g) <--> _] =>
+    eapply incl_bigcup_compat_list_eq >
+    [ simpl_minus_methods (); enumST_fp ih hnin cnt typ [] [] | ind_case_fp ih hnin (Int.add cnt 1) typ ]
+  | [|- (@bigcup ?t ?u (seq_In nil)) _ <--> _ ] =>
+    reflexivity
+  end.
+
+Ltac2 derive_enumST_SizedMonotonicFP (_ : unit) :=
+  match! goal with
+  | [ |- SizedMonotonicOptFP (@enumSizeST ?typ ?pred ?inst) ] => 
+    eapply SizeMonotonicOptFP_proof;
+    let s := Fresh.in_goal (id_of_string "s") in
+    let s1 := Fresh.in_goal (id_of_string "s1") in
+    let s2 := Fresh.in_goal (id_of_string "s2") in
+    let s1i := Fresh.in_goal (id_of_string "s1i") in
+    let s2i := Fresh.in_goal (id_of_string "s2i") in
+    let hleq := Fresh.in_goal (id_of_string "Hleq") in
+    let hleqi := Fresh.in_goal (id_of_string "Hleqi") in
+    let ihs1 := Fresh.in_goal (id_of_string "ihs1") in
+    intros $s $s1 $s2 $hleq; simpl_enumSizeST (); 
+    let hleq' := Control.hyp hleq in
+    let s1' := Control.hyp s1 in
+    let s2' := Control.hyp s2 in 
+    assert ($hleqi := $hleq');
+    revert $hleqi $hleq;
+    generalize $s2' at 1 3 5 7; generalize $s1' at 1 3 5 7 9;
+    revert $s $s2; revert_params pred;
+
+    (induction $s1' as [| $s1 $ihs1 ]; intro_params pred; intros $s $s2 $s1i $s2i $hleqi $hleq) >
+                      [ (* base cases *)
+                        split >
+                        [ | split ] >
+                          [ (* mon *)
+                            now base_case_st_size_mon s2'
+                          | (* fp *)
+                            let hnin := Fresh.in_goal (id_of_string "hnin") in
+                            intros $hnin;
+                            first [ destruct $s2'; reflexivity
+                                  | exfalso;
+                                    let hnin' := Control.hyp hnin in eapply $hnin';
+                                    eapply (@enumerate_correct_size' $typ); base_case_fp ()
+                                  | let hnin' := Control.hyp hnin in
+                                    let dummy := Control.hyp hnin in
+                                    (* XXX says not focused when using ; after destruct *)
+                                    destruct $s2'>  [ rewrite !enumerate_correct_size';
+                                                      ind_case_fp dummy hnin' 0 typ
+                                                    | rewrite !enumerate_correct_size';
+                                                      ind_case_fp dummy hnin' 0 typ ] ]
+                                  (* | () ] *)
+                          | (* antimon *)
+                            first [ destruct $s2'; now eapply subset_refl
+                                  | rewrite !enumerate_correct_size'; now base_case_antimon ()
+                                  | destruct $s2' >
+                                    [ rewrite !enumerate_correct_size'; ind_case_antimon @dummy | rewrite !enumerate_correct_size'; ind_case_antimon @dummy ]
+]
+                          ]
+                      | (* inuctive cases *)
+                        split >
+                        [ | split ] >
+                          [ (* mon *)
+                            ind_case_st_sized_mon s2' ihs1
+                          | (* fp *)
+                            let hnin := Fresh.in_goal (id_of_string "hnin") in
+                            intros $hnin;
+                            destruct $s2' >
+                            [ lia | let hnin' := Control.hyp hnin in
+                                    let ihs1' := Control.hyp ihs1 in
+                                    rewrite !enumerate_correct_size'; now ind_case_fp ihs1' hnin' 0 typ ]
+                          | (* antimon *)
+                            destruct $s2' >
+                            [ lia | rewrite !enumerate_correct_size'; ind_case_antimon ihs1 ]
+                          ]
+                      ]
+end.
 
 (* Size Monotonicity *) 
  
 Ltac2 rec enumST_size_mon (ih : ident) :=
   first
-    [ (* ret *)
+    [ (* fail *)
+      eapply SizeMonotonicOpt_failEnum; tci
+    | (* ret *)
       eapply returnGenSizeMonotonicOpt; tci
     | (* bindOpt *)
       eapply bindOptMonotonicOpt >
@@ -636,12 +903,12 @@ Ltac2 rec enumST_size_mon (ih : ident) :=
     | ()
     ].
 
-Ltac2 rec enumsST_size_mon (t : constr) (ih : ident) :=
+Ltac2 rec enumsST_size_mon (ih : ident) (t : constr) :=
   first
     [ now eapply (@list_subset_nil (E (option $t)))
     | eapply (@list_subset_cons (E (option $t))) > 
-      [ enumST_size_mon @ih
-      | enumsST_size_mon t ih ] ]. 
+      [ enumST_size_mon ih
+      | enumsST_size_mon ih t ] ]. 
 
 
 Ltac2 derive_enumST_SizeMonotonic (_ : unit) :=
@@ -655,9 +922,61 @@ Ltac2 derive_enumST_SizeMonotonic (_ : unit) :=
   | [ |- SizeMonotonicOpt (@enumSizeST ?typ ?pred ?inst _) ] =>   
     simpl_enumSizeST (); generalize $s' at 1; revert_params pred;
     induction $s' as [ | $s $ihs ]; intro_params pred; intros $si;
-    eapply enumerate_SizeMonotonicOpt; enumsST_size_mon typ @IHs
+    eapply enumerate_SizeMonotonicOpt; enumsST_size_mon @IHs typ
   end.
 
+
+(* Size Monotonicity + FP *) 
+
+                                                           
+Ltac2 rec enumST_size_fp (ih : ident) (typ : constr) :=
+  first
+    [ (* ret *)
+      eapply returnGenSizeFP; tci
+    | (* fail *)
+      eapply (@SizeFP_failEnum $typ)
+    | (* bindOpt.  *)
+      match! goal with
+       |[|- SizeFP (@bindOpt _ _ ?a ?b _ _) ] =>
+        eapply (@bindOptSizeFP $a $b) >
+        [ first
+            [ tci
+            | eapply sizedSizeFP; tci
+            | let ih' := Control.hyp ih in
+              eapply $ih' ]
+        | let x := Fresh.in_goal (id_of_string "x") in
+          intros $x; enumST_size_fp ih typ ]
+      end
+    | (* input/dec matching *)
+      match! goal with
+      | [ |- SizeFP (match ?p with _ => _ end) ] =>
+        destruct $p; enumST_size_fp ih typ
+      end
+    | ()
+    ].
+
+Ltac2 rec enumsST_size_fp (ih : ident) (t : constr) :=
+  first
+    [ now eapply (@list_subset_nil (E (option $t)))
+    | eapply (@list_subset_cons (E (option $t))) > 
+      [ enumST_size_fp ih t
+      | enumsST_size_fp ih t ] ]. 
+
+Ltac2 derive_enumST_SizeMonotonicFP (_ : unit) :=
+  let s := Fresh.in_goal (id_of_string "s") in
+  let ihs := Fresh.in_goal (id_of_string "Ihs") in
+  let si := Fresh.in_goal (id_of_string "si") in
+  intro $s;
+  let s' := Control.hyp s in 
+
+  match! goal with
+  | [ |- SizeMonotonicOptFP (@enumSizeST ?typ ?pred ?inst _) ] =>   
+    simpl_enumSizeST (); generalize $s' at 1; revert_params pred;
+    (induction $s' as [ | $s $ihs ]; intro_params pred; intros $si;
+    eapply enumerate_SizeMonFP) >
+    [ enumsST_size_fp ihs typ | enumsST_size_mon ihs typ
+    | enumsST_size_fp ihs typ  | enumsST_size_mon ihs typ ]
+  end.
 
 (** Correctness *)
 
@@ -681,47 +1000,47 @@ Ltac2 rec enumST_sound (ty : constr) (ih : ident) :=
   | [ h : semProdOpt (match @decOpt ?p ?i ?s with _ => _ end) ?x |- _ ] =>
     let hdec := Fresh.in_goal (id_of_string "Hdec") in
     let b := Fresh.in_goal (id_of_string "b") in
-    destruct (@decOpt $p $i $s) as [ $b | ] eqn:$hdec > [ | now eapply (@semReturnOpt_None E _ _) in $h; inv $h ];
+    destruct (@decOpt $p $i $s) as [ $b | ] eqn:$hdec > [ | now enumST_sound ty ih (* return None *) ];
     let b' := Control.hyp b in
-    destruct $b' > [ | now eapply (@semReturnOpt_None E _ _) in $h; inv $h ];
+    destruct $b' > [ | now eapply semProdOpt_failEnum in $h; inv $h ];
     eapply (@CheckerProofs.sound $p) in $hdec > [ | tci ]; enumST_sound ty ih
   (* match decOpt neg *)
   | [ h : semProdOpt (match @decOpt ?p ?i ?s with _ => _ end) ?x |- _ ] =>
     let hdec := Fresh.in_goal (id_of_string "Hdec") in
     let b := Fresh.in_goal (id_of_string "b") in
-    destruct (@decOpt $p $i $s) as [ $b | ] eqn:$hdec > [ | now eapply (@semReturnOpt_None E _ _) in $h; inv $h ];
+    destruct (@decOpt $p $i $s) as [ $b | ] eqn:$hdec > [ | now enumST_sound ty ih (* return None *) ];
     let b' := Control.hyp b in
-    destruct $b' > [ now eapply (@semReturnOpt_None E _ _) in $h; inv $h | ];
+    destruct $b' > [ now eapply semProdOpt_failEnum in $h; inv $h | ];
     eapply (@CheckerProofs.sound_neg $p) in $hdec > [ | tci ]; enumST_sound ty ih
- (* match input *)
+  (* match input *)
   | [ h : semProdOpt (match ?n with _ => _ end) ?x |- _ ] =>
-    destruct $n; try (now eapply (@semReturnOpt_None E _ _) in $h; inv $h); enumST_sound ty ih
-  | (* return *)
-    [ h : semProdOpt (returnEnum _) _ |- _ ] =>
+    destruct $n; try (now eapply semProdOpt_failEnum in $h; inv $h); enumST_sound ty ih
+  (* return Some *)   
+  | [ h : semProdOpt (returnEnum (Some _)) _ |- _ ] =>
     eapply (@semReturnOpt E _ _) in $h; inv $h; first [ now eauto using $ty | now eauto 20 using $ty ]
-  | (* bindOpt *)
-    [ h : semProdOpt (bindOpt _ _) _ |- _ ] =>
+  (* return None*)   
+  | [ h : semProdOpt (returnEnum (@None ?a)) _ |- _ ] =>
+    eapply (@semProdOpt_return_None $a) in $h; inv $h
+  (* fail *)    
+  | [ h : semProdOpt failEnum _ |- _ ] =>
+    eapply semProdOpt_failEnum in $h; inv $h 
+  (* bindOpt *)    
+  | [ h : semProdOpt (bindOpt _ _) _ |- _ ] =>
     eapply (@semOptBindOpt E _ _) in $h >
                                      [ let h' := Control.hyp h in
-                                       (* let x := Fresh.in_goal (id_of_string "_x") in *)
-                                       (* let hin1 := Fresh.in_goal (id_of_string "_Hin1") in *)
-                                       (* let hin2 := Fresh.in_goal (id_of_string "_Hin2") in *)
-                                       (* XXX there seems to be a bug in fresh, and it fails to freshen after a while. *)
-(*                                          P     icking ? for now *)
                                        destruct $h' as [? [$h ?]];
-                                        
                                        first [ let ih' := Control.hyp ih in eapply $ih' in $h
                                              | match! goal with
                                                | [h : semProdOpt (sizedEnum (@enumSizeST ?t ?pred ?inst)) _ |- _ ] =>
                                                  eapply (@SuchThatCorrectOfBoundedEnum $t $pred $inst) in $h > [ | tci | tci | tci ]
-                                               end ];
-                                       enumST_sound ty ih
+                                               end                     
+                                             | match! goal with
+                                               | [h : semProdOpt enum _ |- _ ] => clear $h
+                                               end ]; enumST_sound ty ih
                                      | find_size_mon_inst ()
                                      | intro; now enumST_size_mon @Hmon ]
-
-
-  | (* bind *)
-    [ h : semProdOpt (bindEnum _ _) _ |- _ ] =>
+  (* bind *)  
+  | [ h : semProdOpt (bindEnum _ _) _ |- _ ] =>
     eapply (@semOptBind E _ _) in $h >
                                   [ let h' := Control.hyp h in
                                     destruct $h' as [? [? ?]]; enumST_sound ty ih
@@ -730,7 +1049,6 @@ Ltac2 rec enumST_sound (ty : constr) (ih : ident) :=
 
   | [ |- _ ] => ()
   end.
-
 
 Ltac2 rec sound_enums (ty : constr) (ih : ident) :=
   match! goal with
@@ -821,7 +1139,7 @@ Ltac2 mon_expr (tapp : constr) (inst : constr) :=
            intros $si $s;
            let s' := Control.hyp s in revert $si;
            induction $s' as [ | $s $ihs ]; intros $si;
-           Array.iter (fun _ => intro) inps; eapply enumerate_SizeMonotonicOpt; now enumsST_size_mon tapp ihs
+           Array.iter (fun _ => intro) inps; eapply enumerate_SizeMonotonicOpt; now enumsST_size_mon ihs tapp
         | ];
 
         (* SizedMonotonic, generalized *)          
@@ -839,9 +1157,7 @@ Ltac2 mon_expr (tapp : constr) (inst : constr) :=
         let mon s1 s2 s1' s2' s :=
             make_prod inps (subset (make_semEnum tapp (aux_app s1' s1 1) s) (make_semEnum tapp (aux_app s2' s2 1) s))
         in
-       
-        (* print_constr (mon '1 '2 '3 '4); set (s := ltac2:(let t := mon '1 '2 '3 '4 in exact $t)); () *)
-                                                                                      
+                                                                                             
         assert (_Hmons : forall (s1 s2 s2' s1' s: nat), (s1 <= s2)%coq_nat -> (s1' <= s2')%coq_nat ->
                                                        ltac2:(let s1 := Control.hyp @s1 in
                                                               let s1' := Control.hyp @s1' in
@@ -978,8 +1294,19 @@ Ltac2 rec enumST_complete (ty : constr):=
       | (* sizedMon *) intros ? ? ? ? ?; now enumST_sized_mon @_Hmons
       | (* sizeMon *) intros ? ?; enumST_size_mon @_Hmon
       | match! goal with
-      | [ |- exists _, semProdOpt (sizedEnum (@enumSizeST ?t ?pred ?inst)) _ ] =>
-        exists 0; eapply (@size_CorrectST $t $pred E _ _) > [ | | | first [ eassumption | reflexivity ] ]; tci
+        | [ |- exists _, semProdOpt (sizedEnum (@enumSizeST ?t ?pred ?inst)) _ ] =>
+           exists 0; eapply (@size_CorrectST $t $pred E _ _) > [ | | | first [ eassumption | reflexivity ] ]; tci
+        end
+      ]
+    | (* bindOpt sized simple *)
+      (eapply exists_bindOpt_Opt_Sized > [ | | | | | now enumST_complete ty ]) >
+      [ tci
+      | intros _; now find_size_mon_inst ()
+      | (* sizedMon *) intros ? ? ? ? ?; now enumST_sized_mon @_Hmons
+      | (* sizeMon *) intros ? ?; enumST_size_mon @_Hmon
+      | match! goal with
+        | [ |- exists _, semProdOpt enum _ ] =>
+          exists 0; eapply enumOptCorrect > [ tci | reflexivity ]
         end
       ]
     | (* bindOpt sized alt *)
@@ -1048,3 +1375,6 @@ Ltac derive_enum_Correct := ltac2:(derive_enum_Correct ()).
 Ltac derive_enumST_SizeMonotonic := ltac2:(derive_enumST_SizeMonotonic ()).
 Ltac derive_enumST_SizedMonotonic :=  ltac2:(derive_enumST_SizedMonotonic ()).
 Ltac derive_enumST_Correct := ltac2:(derive_enumST_Correct ()).
+
+Ltac derive_enumST_SizeMonotonicFP := ltac2:(derive_enumST_SizeMonotonicFP ()).
+Ltac derive_enumST_SizedMonotonicFP :=  ltac2:(derive_enumST_SizedMonotonicFP ()).

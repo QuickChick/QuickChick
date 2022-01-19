@@ -1163,3 +1163,43 @@ Proof.
   split; intros Hin; inv Hin; eauto.
   inv H. inv H0.
 Qed.
+
+Lemma incl_bigcup_compat_list_inter (T U : Type) (h1 h2 : T) 
+         (t1 t2 : seq T) (F G : T -> set U) S : 
+  S :&: F h1 \subset S :&: G h2 ->
+  S :&: \bigcup_(x in t1) F x \subset S :&: \bigcup_(x in t2) G x ->
+  S :&: \bigcup_(x in (h1 :: t1)) F x \subset
+  S :&: \bigcup_(x in (h2 :: t2)) G x.
+Proof.
+  intros Hs1 Hs2.
+  intros x Hin. inv Hin. constructor; eauto.
+  inv H0. inv H1. inv H2. 
+  - eexists. split. now left. eapply Hs1. split; eauto.
+  - edestruct Hs2. split. eassumption. 
+    eexists. split; eauto.
+    destruct H6. destruct H6.
+    eexists. split. right; eauto. eassumption. 
+Qed.
+
+Lemma incl_bigcup_list_tl_inter {T U : Type} (h : T) (t : list T) (G : T -> set U) s S :
+    s \subset S :&: (\bigcup_(x in t) G x) ->
+    s \subset S :&: (\bigcup_(x in h :: t) G x).
+Proof.
+  intros Hyp x Hin. eapply Hyp in Hin.
+  inv Hin. inv H0. inv H1.
+  split. eassumption. 
+  eexists. split. now right; eauto. eauto.
+Qed.
+
+Lemma incl_bigcup_compat_list_eq (T U : Type) (h1 h2 : T) (t1 t2 : list T) (F G : T -> set U) :
+    F h1 <--> G h2 ->
+    \bigcup_(x in t1) F x <--> \bigcup_(x in t2) G x ->
+    \bigcup_(x in h1 :: t1) F x <--> \bigcup_(x in h2 :: t2) G x.
+Proof.
+  intros Hs1 Hs2. split; eapply incl_bigcup_compat_list.
+  - rewrite Hs1. eapply subset_refl.
+  - rewrite Hs2. eapply subset_refl.
+  - rewrite Hs1. eapply subset_refl.
+  - rewrite Hs2. eapply subset_refl.
+Qed.
+

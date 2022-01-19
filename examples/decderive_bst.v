@@ -84,12 +84,12 @@ Inductive bst : nat -> nat -> tree -> Prop :=
     bst min n t1 -> bst n max t2 ->
     bst min max (Node n t1 t2).
 
-(* Derive DecOpt for (le n m). *)
+Derive DecOpt for (le n m).
 Derive DecOpt for (bst min max t).
 
 (* For each DecOpt instance we should be able to derive the following *) 
 Instance decOptbstSizeMonotonic m n t : DecOptSizeMonotonic (bst m n t).
-Proof. derive_mon (). Qed. 
+Proof. derive_mon (). Qed.
                        
 Instance DecOptbst_sound m n t : DecOptSoundPos (bst m n t).
 Proof. derive_sound (). Qed.

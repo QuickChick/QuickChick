@@ -41,7 +41,7 @@ Global Instance genNSized : GenSized N :=
                          choose (N0, n) |}.
 
 Global Instance genListSized {A : Type} `{GenSized A} : GenSized (list A) :=
-  {| arbitrarySized x := vectorOf x (arbitrarySized x) |}.
+  {| arbitrarySized x := listOf (arbitrarySized x) |}.
 
 (* [3] is a lower priority than [Classes.GenOfGenSized],
    avoiding an infinite loop in typeclass resolution. *)
@@ -79,8 +79,8 @@ Global Instance enumNSized : EnumSized N :=
   {| enumSized x := let n := N.of_nat x in
                          chooseEnum (N0, n) |}.
 
-Global Instance enumListSized {A : Type} `{EnumSized A} : EnumSized (list A) :=
-  {| enumSized x := vectorOf x (enumSized x) |}.
+Global Instance enumListSized {A : Type} `{Enum A} : EnumSized (list A) :=
+  {| enumSized x := bindEnum (choose (0,x)) (fun x => vectorOf x enum) |}.
 
 (* [3] is a lower priority than [Classes.EnumOfEnumSized],
    avoiding an infinite loop in typeclass resolution. *)
@@ -180,150 +180,249 @@ Proof.
   - intros. exact I.
   - intros _. 
     
-    induction t.
-
-    + exists 0.
-
       assert (Hsize := @Enumerators.semChooseSize nat _).
       simpl in *.
-      exists 0. split. exact I. eapply Hsize.
-      reflexivity.
-      reflexivity.
       
-    + destruct IHt.
-      assert (Hsize := @Enumerators.semChooseSize nat _).
-      simpl in *.
-      inv H. inv H0. eapply Hsize in H2; [ | now eauto ].
-      
-      exists (x.+1). exists 0. split. exact I. eapply Hsize.
-      now eauto.
-      ssromega.
+      exists t. exists t. split. exact I. eapply Hsize.
+      reflexivity. ssromega.
 Qed.       
 
 Instance enumNatSized_SizedMonotonic :
   SizedMonotonic (@enumSized _ enumNatSized).
 Proof.
-  intros s s1 s2. revert s2.
-  induction s1 as [ | s1 IHs1 ].
-  - intros s2 Hleq. simpl.
-    intros x Hin.
+  intros s s1 s2 Hleq. simpl.
+  intros x Hin.
     
-    assert (Hsize := @Enumerators.semChooseSize nat _).
-    eapply Hsize in Hin; eauto.
-    simpl in Hin.
-    eapply Hsize.
-    reflexivity.
-    simpl.
-    ssromega.
-  - intros s2 Hleq.
-    destruct s2. ssromega.
-
-    simpl.
-    erewrite !Enumerators.semChooseSize.
-    intros x.
-    simpl. intros H. 
-    ssromega. 
-    simpl. ssromega.
-
-    simpl. ssromega. 
+  assert (Hsize := @Enumerators.semChooseSize nat _).
+  eapply Hsize in Hin; eauto.
+  simpl in Hin.
+  eapply Hsize.
+  reflexivity.
+  simpl.
+  ssromega.
 Qed.
 
 Instance enumNatSized_SizeMonotonic s:
   SizeMonotonic (@enumSized _ enumNatSized s).
 Proof.
-  intros s1 s2. revert s2.
-  induction s1 as [ | s1 IHs1 ].
-  - intros s2 Hleq. simpl.
-    intros x Hin.
+  intros s1 s2 Hleq. simpl.
+  intros x Hin.
 
-    assert (Hsize := @Enumerators.semChooseSize nat _).
-    eapply Hsize in Hin; eauto.
-    simpl in Hin.
-    eapply Hsize. reflexivity. simpl.
-    ssromega.
-  - intros s2 Hleq.
-    destruct s2. ssromega.
-
-    simpl.
-    erewrite !Enumerators.semChooseSize.
-    intros x.
-    simpl. intros H. 
-    ssromega. 
-    simpl. ssromega. 
-
-    simpl. ssromega. 
+  assert (Hsize := @Enumerators.semChooseSize nat _).
+  eapply Hsize in Hin; eauto.
+  simpl in Hin.
+  eapply Hsize. reflexivity. simpl.
+  ssromega.
 Qed.
 
 (* TODO. These case be derived automatically. Change the default definitions *)
 
-Instance enumListSized_CorrectSized A {_ : EnumSized A} { _ : CorrectSized (@enumSized A _)} :
-  CorrectSized (@enumSized (list A) enumListSized).
-Proof.
-  constructor. intros l; induction l; simpl.
-  - split; intros Hin; simpl in *. now constructor.
-    eexists 0. eexists 0. split; eauto. eapply semVectorOfSize; eauto.
-    eapply ProducerSemanticsEnum.
-    split. simpl. reflexivity.
-    eapply nil_subset.
-  - split; intros Hin. now constructor.
-    destruct IHl. destruct H1. now constructor.
-    destruct H as [[_ [s [s' [_ Ha]]]]]. now constructor.
-Admitted.       
-
-Instance enumListSized_SizedMonotonic A {_ : EnumSized A} { _ : SizedMonotonic (@enumSized A _)} :
+Instance enumListSized_SizedMonotonic A `{EnumSizedMonotonic A} :
   SizedMonotonic (@enumSized (list A) enumListSized).
 Proof.
-Admitted.
+  intros s s1 s2 Hleq x Hin.
+  eapply semBindSizeEnum in Hin. destruct Hin as [a [Hin He]].
+  assert (Hvec := @semVectorOfSize E _ _). eapply Hvec in He. destruct He as [Heq Hin'].
+  eapply semBindSizeEnum. exists a. split.
+  eapply Enumerators.semChooseSize in Hin. simpl in *.
+  eapply Enumerators.semChooseSize. now eauto.
+  simpl. now ssromega. now eauto.
+  eapply Hvec. split; eauto.
+Qed. 
+ 
 
-Instance enumListSized_SizeMonotonic A {_ : EnumSized A} { _ : forall s, SizeMonotonic (@enumSized A _ s)} s :
+Instance enumListSized_SizeMonotonic A `{EnumMonotonic A} s :
   SizeMonotonic (@enumSized (list A) enumListSized s).
 Proof.
-Admitted.
+  eapply bindMonotonic; eauto with typeclass_instances.
+Qed.
 
-Instance enumPairSized_CorrectSized A {_ : EnumSized A} { _ : CorrectSized (@enumSized A _)}
-  B {_ : EnumSized B} { _ : CorrectSized (@enumSized B _)}:
-  CorrectSized (@enumSized (A * B) enumPairSized).
+
+Instance enumListSized_CorrectSized A `{EnumMonotonicCorrect A} :
+  CorrectSized (@enumSized (list A) enumListSized).
 Proof.
-Admitted.       
+  assert (Hvec := @semVectorOfSize E _ _).
+  constructor. intros l; induction l; simpl.
+  - split; intros Hin; simpl in *. now constructor.
+    eexists 0. eexists 0. split; eauto.
+    eapply semBindSizeEnum. eexists. split.
+    eapply Enumerators.semChooseSize. now eauto.
+    2:{ eapply Hvec. split. reflexivity. eapply sub0set. }
+    now eauto.
+  - split; intros Hin. now constructor.
+    destruct IHl as [_ IHl].
+    edestruct IHl as [x [s1 [Hin1 He]]]. now constructor.
+    eapply semBindSizeEnum in He.
+    destruct He as [y [Hen Hv]].
+    eapply Hvec in Hv; eauto with typeclass_instances. destruct Hv as [Heq Hinl].
+    subst.
+    eapply Enumerators.semChooseSize in Hen; eauto. simpl in *.
+
+    destruct H2. destruct H1. edestruct prodCorrect with (a := a).
+    edestruct H2 as [s2 [ _ Hin'] ]. reflexivity.
+      
+    eexists (x + 1). eexists (s1 + s2). split. reflexivity.
+    eapply semBindSizeEnum. exists (length l+1). split.
+    eapply Enumerators.semChooseSize; eauto. simpl in *. ssromega.
+    eapply Hvec. split. simpl. now ssromega.
+    eapply cons_subset.
+
+    eapply H0; [| eassumption ].  now ssromega.
+
+    eapply subset_trans. eassumption.
+    eapply H0. now ssromega. 
+Qed.       
 
 Instance enumPairSized_SizedMonotonic A {_ : EnumSized A} { _ : SizedMonotonic (@enumSized A _)}
   B {_ : EnumSized B} { _ : SizedMonotonic (@enumSized B _)}:
   SizedMonotonic (@enumSized (A * B) enumPairSized).
 Proof.
-Admitted.
+  intros s s1 s2 Hleq.
+  simpl. rewrite !semBindSizeEnum.
+  eapply incl_bigcup_compat; eauto.
+  intros x.
+  simpl. rewrite !semBindSizeEnum.
+  eapply incl_bigcup_compat; eauto.
+  intros y. eapply subset_refl.
+Qed.
 
 Instance enumPairSized_SizeMonotonic A {_ : EnumSized A} { _ : forall s, SizeMonotonic (@enumSized A _ s)}
          B {_ : EnumSized B} { _ : forall s, SizeMonotonic (@enumSized B _ s)} s :
   SizeMonotonic (@enumSized (A * B) enumPairSized s).
 Proof.
-Admitted.
+  eapply bindMonotonic; eauto with typeclass_instances.
+  intros x.
+  eapply bindMonotonic; eauto with typeclass_instances.
+  intros y. eapply returnGenSizeMonotonic; eauto with typeclass_instances.  
+Qed.
 
-Instance enumOption_Correct A {_ : Enum A} { _ : Correct A (@enum A _)}:
-  Correct _ (@enum (option A) enumOption).
+Instance enumPairSized_CorrectSized
+         A {_ : EnumSized A} { _ : forall s, SizeMonotonic (@enumSized A _ s)}
+         { _ : SizedMonotonic (@enumSized A _)} { _ : CorrectSized (@enumSized A _)}
+         B {_ : EnumSized B} { _ : forall s, SizeMonotonic (@enumSized B _ s)}
+         { _ : SizedMonotonic (@enumSized B _)} { _ : CorrectSized (@enumSized B _)}:
+  CorrectSized (@enumSized (A * B) enumPairSized).
 Proof.
-Admitted.       
+  constructor. split.
+  { intros. reflexivity. }
+  destruct a.
+  intros _.
+  destruct H1 as [[_ Hca]]. 
+  destruct H4 as [[_ Hcb]].
+  destruct Hca as [x1 [s1 [_ Hin1]]]. reflexivity.
+  destruct Hcb as [x2 [s2 [_ Hin2]]]. reflexivity.
+  eexists (x1 + x2). simpl. eexists (s1 + s2). split. reflexivity.
+  simpl. eapply semBindSizeEnum.
+  eexists. split.
+  eapply H0. 2:{ eapply H; [| eassumption ]. ssromega. }
+  ssromega.
+  eapply semBindSizeEnum.
+  eexists. split.
+  eapply H2. 2:{ eapply H3; [| eassumption ]. ssromega. }
+  ssromega.
+  eapply semReturnSizeEnum. reflexivity. 
+Qed.       
+
 
 Instance enumOption_SizeMonotonic A {_ : Enum A} { _ : SizeMonotonic (@enum A _)} :
   SizeMonotonic (@enum (option A) enumOption).
 Proof.
-Admitted.
+  simpl. eapply oneofMonotonic; eauto with typeclass_instances.
+  eapply returnGenSizeMonotonic; eauto with typeclass_instances.
+  eapply cons_subset.
+  eapply returnGenSizeMonotonic; eauto with typeclass_instances.
+  eapply cons_subset.
+  eapply bindMonotonic; eauto with typeclass_instances.
+  intros y. eapply returnGenSizeMonotonic; eauto with typeclass_instances.  
+  eapply sub0set.
+Qed.
 
-
-Instance enumNSized_CorrectSized :
-  CorrectSized (@enumSized _ enumNSized).
+ 
+Instance enumOption_Correct A {_ : Enum A} { _ : Correct A (@enum A _)}:
+  Correct _ (@enum (option A) enumOption).
 Proof.
-Admitted.
+  constructor. split. intros. reflexivity.
+  intros _.
+  simpl. destruct a.
+  - destruct H as [ [ _ Hc ] ]. destruct Hc as [x [H1 H2]]. reflexivity.
+    eexists x. split. reflexivity.
+    eapply semOneofSize. eauto with typeclass_instances.
+    eexists. split. right. left.
+    eexists. eapply semBindSizeEnum. eexists. split. eassumption.
+    eapply semReturnSizeEnum. reflexivity.
+  - exists 0. split. reflexivity.
+    eapply semOneofSize. eauto with typeclass_instances.
+    eexists. split. left. reflexivity.
+    eapply semReturnSizeEnum. reflexivity.
+Qed.       
+
+Lemma andb_len x1 x2 x3 x4 : 
+  (x1 <=? x2)%num && (x3 <=? x4)%num <-> (x1 <= x2)%num /\ (x3 <= x4)%num.
+Proof.
+  destruct (x1 <=? x2)%num eqn:Heq1; simpl; split; try easy;
+    destruct (x3 <=? x4)%num eqn:Heq2; simpl; try easy.
+  - eapply N.leb_le in Heq1. eapply N.leb_le in Heq2.
+    easy.
+  - intros [H1 H2]. eapply N.leb_nle in Heq2.
+    eauto.
+  - intros [H1 H2]. eapply N.leb_nle in Heq1. eauto.
+  - intros [H1 H2]. eapply N.leb_nle in Heq1. eauto.
+Qed.   
 
 Instance enumNSized_SizedMonotonic :
   SizedMonotonic (@enumSized _ enumNSized).
-Proof.
-Admitted.
+Proof. 
+  intros s s1 s2 Hleq. simpl.
+  intros x Hin.
+  assert (Hsize := @Enumerators.semChooseSize N _).
+  eapply Hsize in Hin; eauto.
+  simpl in Hin. 
+  eapply Hsize. simpl in *.
+  eapply N.leb_le. now lia. 
+  eapply andb_len in Hin. eapply andb_len. ssromega.
+  simpl. eapply N.leb_le. ssromega. 
+Qed. 
 
 Instance enumNSized_SizeMonotonic s:
   SizeMonotonic (@enumSized _ enumNSized s).
 Proof.
-Admitted.
+  intros s1 s2 Hleq. simpl.
+  intros x Hin.
 
+  assert (Hsize := @Enumerators.semChooseSize N _).
+  
+  eapply Hsize in Hin; eauto.
+  simpl in Hin.
+  eapply Hsize. simpl. eapply N.leb_le. ssromega.
+  eapply andb_len in Hin. eapply andb_len. split; ssromega.
+  eapply N.leb_le. ssromega.
+Qed.
+
+(* Lemma of_nat_bin t : *)
+(*   (N.of_nat (nat_of_bin t)) = t. *)
+(* Proof. *)
+(*   destruct t. reflexivity. *)
+(*   simpl. *)
+(*   induction p; simpl. *)
+(*   - admit. *)
+(*   -  *)
+  
+Instance enumNSized_CorrectSized :
+  CorrectSized (@enumSized _ enumNSized).
+Proof.
+  constructor. 
+  intros t; split; eauto.
+  - intros. exact I.
+  - intros _. 
+    
+      assert (Hsize := @Enumerators.semChooseSize N _).
+      simpl in *.
+      
+      exists (N.to_nat t). exists 0 . split. exact I. eapply Hsize.
+      eapply N.leb_le. ssromega.
+      eapply andb_len. split; ssromega.
+Qed.       
+  
 Instance enumBoolSized_SizeMonotonic s:
   SizeMonotonic (@enumSized _ enumBoolSized s).
 Proof.

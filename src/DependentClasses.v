@@ -453,3 +453,14 @@ Proof.
       destruct (ch a) as [ [| ] | ] eqn:Heq'; eauto.    
 Qed.
 
+
+Lemma enumeratingOpt_sound_simpl A (e : E (option A)) ch s :
+  enumeratingOpt e ch s = Some true ->
+  exists x, ch x = Some true.
+Proof.
+  unfold enumeratingOpt.
+  generalize (Enumerators.run e s), false. clear.
+  induction l; intros b Heq; simpl in *.
+  - destruct b; congruence.
+  - destruct a; eauto. destruct (ch a) as [ [| ] | ] eqn:Heq'; eauto.
+Qed.    

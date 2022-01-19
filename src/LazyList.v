@@ -5,6 +5,8 @@ From ExtLib.Structures Require Import
 Require Import List.
 Import ListNotations.
 
+From QuickChick Require Import Tactics.
+
 Import MonadNotation.
 Open Scope monad_scope.
 
@@ -316,3 +318,33 @@ Fixpoint filter_LazyList {A} (p : A -> bool) (l : LazyList A) :=
                    lcons h (fun tt => filter_LazyList p (t tt))
                  else filter_LazyList p (t tt)
   end.
+
+Require Import Coq.Logic.ClassicalFacts.
+
+Axiom EM : excluded_middle.
+
+Lemma In_ll_Dec {A : Type} (* {_ : Dec_Eq A} *) (x : A) l :
+  (LazyList.In_ll x l) \/ (~ LazyList.In_ll x l ).
+Proof.
+  induction l.
+  - right. intros Hc; inv Hc.
+  - assert (Hem := EM (x = a)). destruct Hem.
+    + left; eauto. left; eauto.
+    + destruct (H tt).
+      * left. right. eassumption.
+      * right. intros Hc. inv Hc; eauto.
+Qed.
+
+Lemma lazy_concat_in' :
+  forall {B : Type} (b : B) ll,
+    LazyList.In_ll b (LazyList.concatLazyList ll) ->
+    exists l, LazyList.In_ll b l /\ LazyList.In_ll l ll.
+Proof.
+  intros B b ll Hbll.
+  induction ll; simpl in *; subst; auto.
+  - exfalso; eauto.
+  - eapply LazyList.lazy_in_app_or in Hbll. inv Hbll; eauto.
+    eapply H in H0. destruct H0 as [l' [Hin1 Hin2]].
+    eexists. split; eauto. 
+Qed.
+

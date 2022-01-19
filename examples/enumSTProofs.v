@@ -3,11 +3,10 @@ From QuickChick Require Import QuickChick Tactics TacticsUtil Instances Classes
 
 Require Import String. Open Scope string.
 Require Import List micromega.Lia.
+Require Import enumProofs. 
 
 Import ListNotations.
 From mathcomp Require Import ssreflect ssrfun ssrbool ssrnat eqtype seq.
-
-Require Import enumProofs.
 
 From Ltac2 Require Import Ltac2.
 
@@ -34,7 +33,14 @@ Inductive perfect : tree1 -> Prop :=
 
 Derive DecOpt for (perfect t).
 
-Require Import enumProofs. (* TODO change *)
+Lemma semProdSizeOpt_bicupNone A s (S : set A) :
+  \bigcup_(x in [:: returnEnum (@None A)]) semProdSizeOpt x s \subset S.
+Proof.
+  intros x Hin. inv Hin. inv H. inv H0.
+  - inv H1. congruence.
+    inv H.
+  - inv H.
+Qed.
 
 Set Bullet Behavior "Strict Subproofs".
 
@@ -46,7 +52,7 @@ Inductive In' {A} : A -> list A -> Prop :=
 
 
 Derive DecOpt for (In' a l).
-
+ 
 Instance DecOptIn'_listSizeMonotonic A {_ : Enum A} {_ : Dec_Eq A}
          (x : A) (l : list A) : DecOptSizeMonotonic (In' x l).
 Proof. derive_mon (). Qed.
@@ -62,19 +68,82 @@ Proof. derive_complete (). Qed.
 Derive ArbitrarySizedSuchThat for (fun x => In' x l).
 Derive EnumSizedSuchThat for (fun x => In' x l).
 
-Instance EnumSizedSuchThatIn'_SizedMonotonic A {_ : Enum A} l :
-  SizedMonotonicOpt (@enumSizeST _ _ (EnumSizedSuchThatIn' l)).
+Instance EnumSizedSuchThatIn'_SizedMonotonic A {_ : Enum A} {_ : Dec_Eq A} l :
+  SizedMonotonicOpt (@enumSizeST A _ (EnumSizedSuchThatIn' l)).
 Proof. derive_enumST_SizedMonotonic (). Qed.
 
-Instance EnumSizedSuchThatIn'_SizeMonotonic  A {_ : Enum A} (* `{EnumMonotonic A} *) l :
+Instance EnumSizedSuchThatIn'_SizeMonotonic  A {_ : Enum A} {_ : Dec_Eq A}
+         (* `{EnumMonotonic A} *) l :
   forall s, SizeMonotonicOpt (@enumSizeST _ _ (EnumSizedSuchThatIn' l) s).
 Proof. derive_enumST_SizeMonotonic (). Qed.
 
-Instance EnumSizedSuchThatIn'_Correct A {_ : Enum A}  (* `{EnumMonotonicCorrect A} *) l :
+
+Instance EnumSizedSuchThatIn'_Correct A {_ : Enum A}  {_ : Dec_Eq A}
+         (* `{EnumMonotonicCorrect A} *) l :
   CorrectSizedST (fun x => In' x l) (@enumSizeST _ _ (EnumSizedSuchThatIn' l)).
 Proof. derive_enumST_Correct (). Qed.
-
+ 
 Derive EnumSizedSuchThat for (fun l => In' x l).
+
+
+Inductive bst : nat -> nat -> tree1 -> Prop :=
+| BstLeaf : forall n1 n2, bst n1 n2 Leaf1
+| BstNode : forall min max n t1 t2,
+    le min max -> le min n -> le n max ->
+    bst min n t1 -> bst n max t2 ->
+    bst min max (Node1 n t1 t2).
+
+Derive DecOpt for (le min max).
+Derive EnumSizedSuchThat for (fun m => le n m).
+
+Derive EnumSizedSuchThat for (fun t => bst min max t).
+
+Derive ArbitrarySizedSuchThat for (fun m => le n m).
+Derive ArbitrarySizedSuchThat for (fun t => bst min max t).
+
+Derive DecOpt for (bst min max t).
+  
+Instance EnumSizedSuchThatle_SizedAMonotonic n :
+  SizedMonotonicOptFP (@enumSizeST _ _ (@EnumSizedSuchThatle n)).
+Proof. derive_enumST_SizedMonotonicFP (). Qed. 
+
+Instance EnumSizedSuchThatle_SizedMonotonic n :
+  SizedMonotonicOpt (@enumSizeST _ _ (@EnumSizedSuchThatle n)).
+Proof. derive_enumST_SizedMonotonic (). Qed.
+
+Instance EnumSizedSuchThatle_SizeMonotonic n :
+  forall s, SizeMonotonicOpt (@enumSizeST _ _ (@EnumSizedSuchThatle n) s).
+Proof. derive_enumST_SizeMonotonic (). Qed.
+
+Instance EnumSizedSuchThatle_SizeMonotonicFP n :
+  forall s, SizeMonotonicOptFP (@enumSizeST _ _ (@EnumSizedSuchThatle n) s).
+Proof. derive_enumST_SizeMonotonicFP (). Qed. 
+
+(* XXX predicate must be eta expanded, otherwise typeclass resolution fails *)
+Instance EnumSizedSuchThatle_Correct n :
+  CorrectSizedST [eta le n] (@enumSizeST _ _ (@EnumSizedSuchThatle n)).
+Proof. derive_enumST_Correct (). Qed.
+
+Instance EnumSizedSuchThatbst_SizedMonotonicFP min max :
+  SizedMonotonicOptFP (@enumSizeST _ _ (@EnumSizedSuchThatbst min max)).
+Proof. derive_enumST_SizedMonotonicFP (). Qed.
+
+Instance EnumSizedSuchThatbst_SizedMonotonic min max :
+  SizedMonotonicOpt (@enumSizeST _ _ (@EnumSizedSuchThatbst min max)).
+Proof. derive_enumST_SizedMonotonic (). Qed.  
+
+Instance EnumSizedSuchThatbst_SizeMonotonic min max :
+  forall s, SizeMonotonicOpt (@enumSizeST _ _ (@EnumSizedSuchThatbst min max) s).
+Proof. derive_enumST_SizeMonotonic (). Qed.
+
+Instance EnumSizedSuchThatbst_SizeMonotonicFP min max :
+  forall s, SizeMonotonicOptFP (@enumSizeST _ _ (@EnumSizedSuchThatbst min max) s).
+Proof. derive_enumST_SizeMonotonicFP (). Qed.
+  
+Instance EnumSizedSuchThatbst_Correct n m :
+  CorrectSizedST (bst n m) (@enumSizeST _ _ (@EnumSizedSuchThatbst n m)).
+Proof. derive_enumST_Correct (). Qed.
+
 
 (* XXX missing enum list instances. *) 
 (* Instance EnumSizedSuchThatIn'0_SizedMonotonic A {_ : Enum A} x : *)
@@ -102,7 +171,7 @@ Instance DecOptltest_listSizeMonotonic l x : DecOptSizeMonotonic (ltest l x).
 Proof. derive_mon (). Qed.
 
 Instance DecOptltest_listsound l x : DecOptSoundPos (ltest l x).
-Proof. derive_sound (). Qed.
+Proof. derive_sound (). Qed. 
 
 Instance DecOptIn'ltest_complete A {_ : Enum A} {_ : Dec_Eq A} x l :
   DecOptCompletePos (ltest x l).
@@ -140,38 +209,6 @@ Derive EnumSizedSuchThat for (fun t => goodTree k t).
 
 
 
-Inductive bst : nat -> nat -> tree1 -> Prop :=
-| BstLeaf : forall n1 n2, bst n1 n2 Leaf1
-| BstNode : forall min max n t1 t2,
-    le min max -> le min n -> le n max ->
-    bst min n t1 -> bst n max t2 ->
-    bst min max (Node1 n t1 t2).
-
-
-Derive DecOpt for (bst min max t).
-
-Derive EnumSizedSuchThat for (fun m => le n m).
-Derive EnumSizedSuchThat for (fun t => bst min max t).
-
-Derive ArbitrarySizedSuchThat for (fun m => le n m).
-Derive ArbitrarySizedSuchThat for (fun t => bst min max t).
-
-
-Instance EnumSizedSuchThatle_SizedMonotonic n :
-  SizedMonotonicOpt (@enumSizeST _ _ (@EnumSizedSuchThatle n)).
-Proof. derive_enumST_SizedMonotonic (). Qed.
-
-Instance EnumSizedSuchThatle_SizeMonotonic n :
-  forall s, SizeMonotonicOpt (@enumSizeST _ _ (@EnumSizedSuchThatle n) s).
-Proof. derive_enumST_SizeMonotonic (). Qed.
-
-(* XXX predicate must be eta expanded, otherwise typeclass resolution fails *)
-Instance EnumSizedSuchThatle_Correct n :
-  CorrectSizedST [eta le n] (@enumSizeST _ _ (@EnumSizedSuchThatle n)).
-Proof. derive_enumST_Correct (). Qed.
-
-
-
 Instance EnumSizedSuchThatgoodTree_SizedMonotonic n :
   SizedMonotonicOpt (@enumSizeST _ _ (@EnumSizedSuchThatgoodTree n)).
 Proof. derive_enumST_SizedMonotonic (). Qed.
@@ -180,19 +217,15 @@ Instance EnumSizedSuchThatgoodTree_SizeMonotonic n :
   forall s, SizeMonotonicOpt (@enumSizeST _ _ (@EnumSizedSuchThatgoodTree n) s).
 Proof. derive_enumST_SizeMonotonic (). Qed.
 
+Instance EnumSizedSuchThatgoodTree_SizedMonotonicFP n :
+  SizedMonotonicOptFP (@enumSizeST _ _ (@EnumSizedSuchThatgoodTree n)).
+Proof. derive_enumST_SizedMonotonicFP (). Qed.
+   
+Instance EnumSizedSuchThatgoodTree_SizeMonotonicFP n :
+  forall s, SizeMonotonicOptFP (@enumSizeST _ _ (@EnumSizedSuchThatgoodTree n) s).
+Proof. derive_enumST_SizeMonotonicFP (). Qed.
+
+
 Instance EnumSizedSuchThatgoodTree_Correct n :
   CorrectSizedST (goodTree n) (@enumSizeST _ _ (@EnumSizedSuchThatgoodTree n)).
-Proof. derive_enumST_Correct (). Qed.  
-
-
-Instance EnumSizedSuchThatbst_SizedMonotonic min max :
-  SizedMonotonicOpt (@enumSizeST _ _ (@EnumSizedSuchThatbst min max)).
-Proof. derive_enumST_SizedMonotonic (). Qed.  
-
-Instance EnumSizedSuchThatbst_SizeMonotonic min max :
-  forall s, SizeMonotonicOpt (@enumSizeST _ _ (@EnumSizedSuchThatbst min max) s).
-Proof. derive_enumST_SizeMonotonic (). Qed.
-
-Instance EnumSizedSuchThatbst_Correct n m :
-  CorrectSizedST (bst n m) (@enumSizeST _ _ (@EnumSizedSuchThatbst n m)).
 Proof. derive_enumST_Correct (). Qed.

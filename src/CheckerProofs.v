@@ -323,6 +323,30 @@ Section Lemmas.
     - destruct a; eauto. destruct (ch (Nat.max s s') a); eauto.
       destruct b0; eauto.
   Qed.
+  
+  Lemma enumeratingOpt_complete_simpl' A (e : E (option A)) ch {Hm : SizeMonotonicOpt e} {Hc : Correct (option A) e} :
+    (forall x s1 s2, (s1 <= s2) -> ch s1 x = Some true -> ch s2 x = Some true) ->
+    (exists x s, ch s x = Some true) ->
+    (exists (s : nat),
+        enumeratingOpt e (ch s) s = Some true).
+  Proof.
+    intros Hmon [x [s Hch]].
+    unfold enumeratingOpt.
+    assert (Hin : semProd e (Some x)).
+    { eapply Hc. reflexivity. }
+    destruct Hin as [s' [_ Hsem]]. simpl in *.
+    unfold semEnumSize in *.  
+
+    assert (Hsem' : LazyList.In_ll (Some x) (Enumerators.run e (max s s'))).
+    { eapply Hm > [| simpl; eassumption ]. lia. }
+    clear Hsem.
+    exists (max s s'). revert Hsem'.    
+    generalize (Enumerators.run e (max s s')), false.
+    induction l; intros b Hin; inv Hin; simpl.
+    - erewrite Hmon > [ reflexivity | | eassumption ]. lia.
+    - destruct a; eauto. destruct (ch (Nat.max s s') a); eauto.
+      destruct b0; eauto.
+  Qed.
 
   Lemma exists_match' check k s1 :        
     check s1 = Some true ->
@@ -387,6 +411,10 @@ Ltac2 find_size_mon_inst (_ : unit) :=
         | eapply sizedSizeMonotonicOpt; tci
         | eapply sizedSizeMonotonic; tci ].
 
+Ltac2 find_size_fp_inst (_ : unit) :=
+  first [ tci
+        | eapply sizedSizeFP; tci ].
+
 Ltac2 handle_checker_mon_t (ih : ident) (heq : ident) := 
   first
     [ (* decOpt matcing *)
@@ -427,6 +455,7 @@ Ltac2 handle_checker_mon_t (ih : ident) (heq : ident) :=
     | (* enumeratingOpt *)
       eapply enumeratingOpt_monotonic >
       [ now find_size_mon_inst ()
+      | now find_size_fp_inst ()
       | eassumption
       | intro; simpl_minus_methods (); clear $heq; intro $heq
       | eassumption ]    
@@ -472,21 +501,21 @@ Ltac2 handle_checker_mon_f (ih : ident) (heqb : ident) :=
     | (* decOpt matching *)
       let heqb := Fresh.in_goal @heqb in
       match! goal with
-      | [ _ :  match ?e with _ => _ end = Some false |- _ ] =>
-        (destruct $e as [ [ | ] | ] eqn:$heqb > [ | | congruence ])
-      end;
-      first
-        [ match! goal with
-          | [ h : @decOpt ?p _ ?s = Some _ |- _ ] =>
-            eapply (@mon $p _ _) in $h > [ | eassumption ];
+      | [ _ :  match ?e with | Some _ => match _ with | true => _ | false => _ end | None => _ end = Some false |- _ ] =>
+        (destruct $e as [ [ | ] | ] eqn:$heqb > [ | | congruence ]);
+          first
+          [ match! goal with
+            | [ h : @decOpt ?p _ ?s = Some _ |- _ ] =>
+              eapply (@mon $p _ _) in $h > [ | eassumption ];
+              let heqb' := Control.hyp heqb in
+              rewrite $heqb'; clear $heqb; try reflexivity
+            end
+          | let ih := Control.hyp ih in
+            eapply $ih in $heqb > [ | now eapply le_S_n; eauto | eassumption ];
             let heqb' := Control.hyp heqb in
             rewrite $heqb'; clear $heqb; try reflexivity
-          end
-         | let ih := Control.hyp ih in
-           eapply $ih in $heqb > [ | now eapply le_S_n; eauto | eassumption ];
-           let heqb' := Control.hyp heqb in
-           rewrite $heqb'; clear $heqb; try reflexivity
-        ]
+          ]
+      end
     | (* input matching *)
       match! goal with
       | [ _ : match ?e with _ => _ end = Some false |- _ ] =>
@@ -502,6 +531,7 @@ Ltac2 handle_checker_mon_f (ih : ident) (heqb : ident) :=
     | (* enumeratingOpt *)
       eapply enumeratingOpt_monotonic >
       [ now find_size_mon_inst ()
+      | now find_size_fp_inst ()
       | eassumption
       | intro; simpl_minus_methods (); clear $heqb; intro $heqb
       | eassumption ]
@@ -654,19 +684,19 @@ Ltac2 handle_checker_match_sound (ih : ident) (heq : ident) :=
       | [h : match ?m with _ => _  end = Some true |- _ ] =>
         destruct $m; try (congruence)
       end
-    | (* enumerating *)
-      match! goal with
-      | [h : enumerating _ _ _ = Some true |- _ ] =>
-        eapply enumerating_sound in $h;
-        let h' := Control.hyp h in 
-        destruct $h' as [? $h]
-      end
-    | (* enumeratingOpt *)
+    | (* enumeratingOpt constrained *)
       match! goal with
       | [h : enumeratingOpt _ _ _ = Some true |- _ ] =>
         eapply enumeratingOpt_sound in $h > [ | find_CorrectST_inst () ];
         let h' := Control.hyp h in
         destruct $h' as [? [? $h ]]
+      end
+    | (* enumeratingOpt simpl *)
+      match! goal with
+      | [h : enumeratingOpt _ _ _ = Some true |- _ ] =>
+        eapply enumeratingOpt_sound_simpl in $h;
+        let h' := Control.hyp h in
+        destruct $h' as [? $h]
       end
     ].
 
@@ -881,15 +911,7 @@ Ltac2 rec handle_checker (hmon : ident) :=
             intros ? ? ? $heq; 
             now repeat (simpl_minus_methods (); handle_checker_mon_t hmon heq)
           | handle_checker hmon ]; eassumption                                     
-        | (* enumerating *)
-          eapply enumerating_complete' >
-          [ now find_size_mon_inst ()
-          | tci
-          | let heq := Fresh.in_goal (id_of_string "_heq") in
-            intros ? ? ? ? $heq; 
-            now repeat (simpl_minus_methods (); handle_checker_mon_t hmon heq)
-          | eexists; handle_checker hmon ]
-        | (* enumeratingOpt *)
+        | (* enumeratingOpt constrained *)
           eapply enumeratingOpt_complete' >        
           [ now find_size_mon_inst ()
           | now find_CorrectST_inst ()
@@ -897,7 +919,7 @@ Ltac2 rec handle_checker (hmon : ident) :=
             intros ? ? ? ? $heq; 
             now repeat (simpl_minus_methods (); handle_checker_mon_t hmon heq)
           | eexists; split > [ | handle_checker hmon ] ]; eassumption
-        | (* enumeratingOpt alt *)
+        | (* enumeratingOpt constrained alt *)
           eapply enumeratingOpt_complete' >        
           [ now find_size_mon_inst ()
           | now find_CorrectST_inst ()
@@ -905,6 +927,15 @@ Ltac2 rec handle_checker (hmon : ident) :=
             intros ? ? ? ? $heq; 
             now repeat (simpl_minus_methods (); handle_checker_mon_t hmon heq)
           | eexists; split > [ eassumption | handle_checker hmon ] ]
+        | (* enumeratingOpt simpl *)
+          eapply enumeratingOpt_complete_simpl' >
+          [ now find_size_mon_inst ()
+          | tci
+          | let heq := Fresh.in_goal (id_of_string "_heq") in
+            intros ? ? ? ? $heq; 
+            now repeat (simpl_minus_methods (); handle_checker_mon_t hmon heq)
+          | eexists; handle_checker hmon ]
+
         ].
 
 Ltac2 rec path_aux (m : int) (n : int) :=

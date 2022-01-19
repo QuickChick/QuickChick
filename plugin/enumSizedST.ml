@@ -33,7 +33,8 @@ let rec_method (rec_name : coq_expr) (init_size : coq_expr) (size : coq_expr) (n
   gApp rec_name (init_size :: size :: l)
 
 let bind (opt : bool) (m : coq_expr) (x : string) (f : var -> coq_expr) =
-  (if opt then bindEnumOpt else bindEnum) m x f
+  bindEnumOpt m x f
+  (* (if opt then bindEnumOpt else bindEnum) m x f *)
 
 let stMaybe (opt : bool) (g : coq_expr) (x : string) (checks : ((coq_expr -> coq_expr) * int) list) =
   failwith "Implement stMaybe for enum"

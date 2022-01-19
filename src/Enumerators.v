@@ -97,7 +97,6 @@ Next Obligation.
   apply (X n).
 Defined.
 
-Global Instance enum_enumOpt {A} (H : E A) : E (option A).  
        
 (* begin semReturn *)
 Lemma semReturnEnum {A} (x : A) : semProd (ret x) <--> [set x].
@@ -245,7 +244,7 @@ Proof.
   exfalso. simpl in *. eapply H0.
   (* This is not provable with the current spec of choose,
      but maybe is not needed *) 
-Admitted.  
+Abort.  
 
 
 Lemma semSizedEnum A (f : nat -> E A) :
@@ -272,7 +271,7 @@ Instance ProducerSemanticsEnum :
   semBindSize   := @semBindSizeEnum;
   semChoose     := @semChooseEnum;
   semChooseSize := @semChooseSizeEnum;
-  semChooseSizeEmpty := @semChooseSizeEmptyEnum;
+  (* semChooseSizeEmpty := @semChooseSizeEmptyEnum; *)
   semSized      := @semSizedEnum;
   semSizedSize  := @semSizedSizeEnum;
   semResize     := @semResizeEnum;
@@ -458,7 +457,7 @@ Qed.
 
 Lemma enumerate_SizeFP (A : Type) (l : list (E (option A))) :
   l \subset SizeFP ->
-  l \subset SizeMonotonic ->
+  l \subset SizeMonotonicOpt ->
   SizeFP (enumerate l).
 Proof.
   intros Hin Hmon. intros s1 s2 Hleq Hnin.
@@ -466,7 +465,14 @@ Proof.
   intros x; split. 
   - intros [e [Hl Hs]].
     eexists. split. eassumption.
-    eapply Hmon; eauto.
+    destruct x.    
+    + eapply Hmon; eauto.
+    + exfalso. 
+      eapply Hnin.
+        
+      eapply enumerate_correct_size'.
+      eexists. split; eassumption.
+      
   - intros [e [Hl Hs]].
     destruct x.
     2:{ exfalso. eapply Hnin.
@@ -486,6 +492,18 @@ Proof.
     eapply enumerate_correct_size'.
     eexists. split; eassumption.
 Qed.
+
+
+Lemma enumerate_SizeMonFP (A : Type) (l : list (E (option A))) :
+  l \subset SizeFP ->
+  l \subset SizeMonotonicOpt ->
+  SizeMonotonicOptFP (enumerate l).
+Proof.
+  intros H1 H2.
+  constructor.
+  eapply enumerate_SizeMonotonicOpt. eassumption.
+  eapply enumerate_SizeFP; eassumption.
+Qed. 
 
 Fixpoint lazylist_backtrack {A} (l : LazyList A) (f : A -> option bool) (anyNone : bool) : option bool :=
   match l with
@@ -529,4 +547,201 @@ Proof.
   - destruct b; congruence.
   - destruct (ch a) as [ [| ] | ] eqn:Heq'; eauto.
 Qed.    
+
+Lemma semBindOptSize_isNone_subset_compat      
+      (A B : Type) (g g' : E (option A)) (f f' : A -> E (option B)) s :
+  (~ semProdSize g' s None -> semProdSize g' s <--> semProdSize g s) ->
+  isNone :&: semProdSize g s \subset isNone :&: semProdSize g' s ->
+  (forall (x : A),
+      isNone :&: semProdSize (f x) s \subset isNone :&: semProdSize (f' x) s) ->
+  (fun u : option _ => isNone u) :&: semProdSize (bindOpt g f) s \subset (fun u : option _ => isNone u) :&: semProdSize (bindOpt g' f') s.
+Proof.
+  intros Hyp0 Hyp1 Hyp2 z [Hin1 Hin2].
+  destruct z. now inv Hin1.
+  simpl in Hin2. split. reflexivity.
+  simpl in *. unfold semEnumSize in *.  
+  simpl in *. unfold LazyList.bindLazyList in *. 
+  simpl in *. 
+  eapply (@lazy_concat_in' (option B)) in Hin2. 
+  destruct Hin2 as [l1 [Hinl1 Hinl2]].
+
+  assert (Hinl2' := Hinl2).
+  eapply LazyList.lazy_in_map_iff in Hinl2'.
+  destruct Hinl2' as [x [Hrun Hin]].
+  
+  destruct x. 
+  - unfold semProdSizeOpt in *. simpl in *. unfold semEnumSize in *. 
+    destruct (In_ll_Dec None (Enumerators.run g' s)).
+    eapply (@LazyList.lazy_concat_in (option B)).
+    Focus 2.
+    eapply LazyList.lazy_in_map with
+        (f := fun x : option A =>
+                Enumerators.run
+                  match x with
+                  | Some a0 => f' a0
+                  | None => returnEnum None
+                  end s) (x := None). eassumption.
+    simpl. now left.
+
+
+    eapply Hyp0 in H.
+    eapply H in Hin. 
+
+    assert (Hina  : ((fun u : option B => isNone u) :&: LazyList.In_ll^~ (Enumerators.run (f a) s)) None).
+    { split; eauto. rewrite Hrun; eassumption. }
+    eapply Hyp2 in Hina.
+    inv Hina.
+    eapply (@LazyList.lazy_concat_in (option B)).
+
+    eapply H1.
+
+    eapply LazyList.lazy_in_map with
+        (f := fun x : option A =>
+                     Enumerators.run
+                       match x with
+                       | Some a0 => f' a0
+                       | None => returnEnum None
+                       end s) (x := Some a). eassumption.
+
+  - assert (Hin' : LazyList.In_ll None (Enumerators.run g' s)).
+    { eapply Hyp1. split; eauto. }
+    
+    eapply (@LazyList.lazy_concat_in (option B)).
+    eassumption.
+    rewrite <- Hrun.
+
+    eapply LazyList.lazy_in_map with
+        (f := fun x : option A =>
+                Enumerators.run
+                  match x with
+                  | Some a0 => f' a0
+                  | None => returnEnum None
+                  end s) (x := None). eassumption.
+Qed. 
+
+Lemma semBindOptSize_subset_compat      
+      (A B : Type) (g g' : E (option A)) (f f' : A -> E (option B)) s :
+  semProdSize g s \subset semProdSize g' s ->
+  (forall (x : A), semProdSize g s (Some x) -> semProdSize (f x) s \subset semProdSize (f' x) s) ->
+  semProdSize (bindOpt g f) s \subset semProdSize (bindOpt g' f') s.
+Proof.
+  intros Hyp0 Hyp1 x H. simpl in *.
+  unfold semEnumSize in *.
+  unfold LazyList.bindLazyList in *. 
+  simpl in *. 
+  eapply (@lazy_concat_in' (option B)) in H. 
+  destruct H as [l1 [Hinl1 Hinl2]].
+
+  assert (Hinl2' := Hinl2).
+  eapply LazyList.lazy_in_map_iff in Hinl2'.
+  destruct Hinl2' as [z [Hrun Hin]].
+   
+  destruct z. 
+  - subst. assert (Hin' := Hin). eapply Hyp0 in Hin. eapply Hyp1 in Hinl1.
+    
+    
+    eapply (@LazyList.lazy_concat_in (option B)).
+    
+    eassumption. 
+    eapply LazyList.lazy_in_map with
+        (f := fun x : option A =>
+                Enumerators.run
+                  match x with
+                  | Some a0 => f' a0
+                  | None => returnEnum None
+                  end s) (x := Some a). eassumption. eassumption. 
+  - subst.
+    eapply Hyp0 in Hin. 
+    
+    eapply (@LazyList.lazy_concat_in (option B)).
+    eassumption.
+    eapply LazyList.lazy_in_map with
+        (f := fun x : option A =>
+                Enumerators.run
+                  match x with
+                  | Some a0 => f' a0
+                  | None => returnEnum None
+                  end s) (x := None). eassumption.
+Qed. 
+
+Lemma semBindOptSize_subset_compat_eq    
+      (A B : Type) (g g' : E (option A)) (f f' : A -> E (option B)) s :
+  semProdSize g s <--> semProdSize g' s ->
+  (forall (x : A), semProdSize g s (Some x) -> semProdSize (f x) s <--> semProdSize (f' x) s) ->
+  semProdSize (bindOpt g f) s <--> semProdSize (bindOpt g' f') s.
+Proof.
+  intros H1 H2 a. split.
+  eapply semBindOptSize_subset_compat.
+  rewrite H1. now eapply subset_refl. 
+  intros x Hin. rewrite H2; eauto. now eapply subset_refl.
+  eapply semBindOptSize_subset_compat.
+  rewrite H1. now eapply subset_refl. 
+  intros x Hin. rewrite H2; eauto. now eapply subset_refl.
+  eapply H1; eassumption. 
+Qed.  
+  
+  
+Lemma semProdSize_bigcup_isNone A s (S : set (option A)) :
+  isNone :&: S \subset isNone :&: (\bigcup_(x in (cons (returnEnum (@None A)) nil)) semProdSize x s).
+Proof.
+  intros x Hin. inv Hin. destruct x. now inv H.
+  split; eauto.
+  eexists. split; eauto. now left.
+  eapply semReturnSizeEnum. reflexivity. 
+Qed.
+
+Lemma semProdSize_return_None A s (S : set (option A)) :
+  isNone :&: S \subset isNone :&: semProdSize (returnEnum None) s.
+Proof.
+  intros x Hin. inv Hin. destruct x. now inv H.
+  split; eauto.
+  eapply semReturnSizeEnum. reflexivity. 
+Qed.
+
+Lemma semProdSize_bindOpt_1 A B (e : E (option A)) (f : A -> E (option B)) s : 
+  semProdSize e s None ->
+  semProdSize (bindOpt e f) s None.
+Proof.
+  unfold semProdSize; simpl. unfold semEnumSize.
+  intros H. simpl. unfold LazyList.bindLazyList.
+  eapply (@LazyList.lazy_concat_in (option B)).
+  Focus 2. 
+    eapply LazyList.lazy_in_map with
+        (f := fun x : option A =>
+                Enumerators.run
+                  match x with
+                  | Some a0 => f a0
+                  | None => returnEnum None
+                  end s) (x := None). eassumption.
+
+    simpl. now left.
+Qed. 
+
+Lemma semProdSize_bindOpt_2 A B (e : E (option A)) (f : A -> E (option B)) s x : 
+  semProdSize e s (Some x) ->
+  semProdSize (f x) s None ->  
+  semProdSize (bindOpt e f) s None.
+Proof.
+  unfold semProdSize; simpl. unfold semEnumSize.
+  intros Hin1 Hin2. simpl in *. unfold LazyList.bindLazyList.
+  eapply (@LazyList.lazy_concat_in (option B)). eassumption.
+  eapply LazyList.lazy_in_map with
+      (f := fun x : option A =>
+              Enumerators.run
+                match x with
+                | Some a0 => f a0
+                | None => returnEnum None
+                end s) (x := Some x). eassumption.
+Qed. 
+
+Global Instance SizeFP_failEnum {A : Type} : SizeFP (@failEnum (option A)).
+Proof.
+  intros s1 s2 Hleq Hnin.
+  split; intros.
+  unfold semProdSize in *. simpl in *.
+  unfold semEnumSize in *. simpl in *. eassumption. 
+  unfold semProdSize in *. simpl in *.
+  unfold semEnumSize in *. simpl in *. eassumption. 
+Qed.
+
 

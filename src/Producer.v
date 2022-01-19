@@ -105,18 +105,65 @@ Class SizeFP {A} {G} `{Producer G} (g : G (option A)) :=
     ~ None \in semProdSize g s1 -> 
     semProdSize g s1 <--> semProdSize g s2.
 
+Class SizedFP {A} {G} `{Producer G} (g :nat -> G (option A)) :=
+  sizedFP : forall s s1 s2,
+    (s1 <= s2)%coq_nat ->
+    ~ None \in semProdSize (g s1) s -> 
+    semProdSize (g s1) s <--> semProdSize (g s2) s.
+
 Definition isNone {T : Type} (u : option T) :=
   match u with
     | Some _ => false
     | None => true
   end.
 
-(** TODO: Comment *)
-Class SizeAntiMonotonicNone {A} {G} `{Producer G}
+Class SizedAntimonotonicNone {A} {G} `{Producer G}
+      (g : nat -> G (option A)) :=
+    monotonicNone : forall s s1 s2,
+    (s1 <= s2)%coq_nat ->    
+    isNone :&: semProdSize (g s2) s \subset isNone :&: semProdSize (g s1) s. 
+
+(** FP + SizeMon *)
+Class SizeMonotonicOptFP {A} {G} {H : Producer G}
       (g : G (option A)) :=
-    monotonicNone : forall s1 s2,
-      s1 <= s2 ->
-      isNone :&: semProdSize g s2 \subset isNone :&: semProdSize g s1.
+  { IsMon :> @SizeMonotonicOpt _ _ H g;
+    IsFP  :> @SizeFP _ _ H g }.
+
+Class SizedMonotonicOptFP {A} {G} {H : Producer G}
+      (g : nat -> G (option A)) :=
+  { IsMonSized :> @SizedMonotonicOpt _ _ H g;
+    IsFPSized  :> @SizedFP _ _ H g;
+    IsAntimon  :> @SizedAntimonotonicNone _ _ _ g }.
+
+Global Instance SizeMonotonicOptFP_FP {A} {G}
+       (g : G (option A))
+       `{SizeMonotonicOptFP A G g} : SizeFP g.
+Proof. inv H0. eassumption. Qed.
+
+Global Instance SizeMonotonicOptFP_SizeMonotonic {A} {G}
+       (g : G (option A))
+       `{SizeMonotonicOptFP A G g} : SizeMonotonicOpt g.
+Proof. inv H0. eassumption. Qed.
+
+
+Global Instance SizedMonotonicOptFP_FP {A} {G}
+       (g : nat -> G (option A))
+       `{SizedMonotonicOptFP A G g} : SizedFP g.
+Proof. inv H0. eassumption. Qed.
+
+Global Instance SizedMonotonicOptFP_SizeMonotonic {A} {G}
+       (g : nat -> G (option A))
+       `{SizedMonotonicOptFP A G g} : SizedMonotonicOpt g.
+Proof. inv H0. eassumption. Qed.
+
+
+Global Instance SizedMonotonicOptFP_Antimonotonic {A} {G}
+       (g : nat -> G (option A))
+       `{SizedMonotonicOptFP A G g} : SizedAntimonotonicNone g.
+Proof. inv H0. eassumption. Qed.
+
+
+
 
 (*
 (* TODO: Why does Unsized need _ when A is marked as implict! *)
@@ -157,11 +204,11 @@ Class ProducerSemantics G `{Producer G} :=
       forall size, (semProdSize (choose (a1,a2)) size <-->
               [set a | RandomQC.leq a1 a && RandomQC.leq a a2]);
 
-  semChooseSizeEmpty :
-    forall A `{RandomQC.ChoosableFromInterval A} (a1 a2 : A),
-      ~ (RandomQC.leq a1 a2) ->
-      forall size, (semProdSize (choose (a1,a2)) size <-->
-                                set0);
+  (* semChooseSizeEmpty : *)
+  (*   forall A `{RandomQC.ChoosableFromInterval A} (a1 a2 : A), *)
+  (*     ~ (RandomQC.leq a1 a2) -> *)
+  (*     forall size, (semProdSize (choose (a1,a2)) size <--> *)
+  (*                               set0); *)
   
   semSized :
     forall A (f : nat -> G A),
@@ -592,6 +639,30 @@ Qed.
     unfold semProdSizeOpt in *; unfold somes in *.
     apply semSizedSize in H1.
     auto.
+  Qed.
+
+  Global Instance sizedSizeFP
+         A (gen : nat -> G (option A))
+         `{forall n, SizeFP (gen n)}
+         `{@SizedFP _ _ PG gen}
+         `{@SizedAntimonotonicNone _ _ _ gen}
+    : SizeFP (sized gen).
+  Proof.
+    move => s1 s2 Hleq Hn.
+    rewrite !semSizedSize.
+    rewrite H0; [ | eassumption | ].
+    2:{ intros Hc. eapply Hn.
+        eapply semSizedSize. eassumption. }
+
+    rewrite H; [ | eassumption | ].
+    reflexivity.
+
+    intros Hc. eapply Hn.
+    eapply semSizedSize.
+    assert (Hnone : None \in isNone :&: semProdSize (gen s2) s1).
+    { split; eauto. }
+    eapply H1 in Hnone; [| eassumption ].
+    inv Hnone. eassumption. 
   Qed.
   
   Global Instance unsizedResize {A} (g : G A) n :

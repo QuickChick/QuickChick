@@ -230,13 +230,13 @@ Qed.
     by apply monotonicOpt.
   Qed.
 
-  Instance thunkGenSizeAntiMonotonicNone {A} (f : unit -> G (option A))
-          `{@SizeAntiMonotonicNone _ _ ProducerGen (f tt)} : SizeAntiMonotonicNone (thunkGen f).
-  Proof.
-    intros s1 s2 Hs.
-    do 2 rewrite semThunkGenSize.
-    by apply monotonicNone.
-  Qed.
+  (* Instance thunkGenSizeAntiMonotonicNone {A} (f : unit -> G (option A)) *)
+  (*         `{@SizedAntimonotonicNone _ _ ProducerGen (f tt)} : SizedAntimonotonicNone (thunkGen f). *)
+  (* Proof. *)
+  (*   intros s1 s2 Hs. *)
+  (*   do 2 rewrite semThunkGenSize. *)
+  (*   by apply monotonicNone. *)
+  (* Qed. *)
 
 Fixpoint pick {A : Type} (def : G A) (xs : list (nat * G A)) n : nat * G A :=
   match xs with
@@ -408,7 +408,7 @@ Global Instance ProducerSemanticsGen :
   semBindSize   := @semBindSizeGen;
   semChoose     := @semChooseGen;
   semChooseSize := @semChooseSizeGen;
-  semChooseSizeEmpty := @semChooseSizeEmptyGen;
+  (* semChooseSizeEmpty := @semChooseSizeEmptyGen; *)
   semSized      := @semSizedGen;
   semSizedSize  := @semSizedSizeGen;
   semResize     := @semResizeGen;
