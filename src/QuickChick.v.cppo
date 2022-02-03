@@ -29,7 +29,11 @@ Declare ML Module "simplDriver".
 Declare ML Module "depDriver".
 Declare ML Module "driver".
 *)
+#if COQ_VERSION >= (8, 16, 0)
 Declare ML Module "quickchick_plugin:coq-quickchick.plugin".
+#else
+Declare ML Module "quickchick_plugin".
+#endif
 
 Axiom _W : nat -> Prop.
 Axiom _Size : Prop.

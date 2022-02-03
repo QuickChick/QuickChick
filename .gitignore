@@ -57,3 +57,5 @@ __pycache__
 .lia.cache
 plugin/compat.ml
 src/ExtractionQCCompat.v
+src/QuickChick.v
+_CoqProject
