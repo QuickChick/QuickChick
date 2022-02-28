@@ -1,4 +1,4 @@
 (coq.theory
  (name QuickChick)
- (package quickchick)
- (libraries quickchick.plugin))
+ (package coq-quickchick)
+ (libraries coq-quickchick.plugin))

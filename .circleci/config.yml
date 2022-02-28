@@ -108,9 +108,9 @@ jobs:
     - prepare
     - run: opam pin -n add coq-quickchick .
     - run: make compat && dune build
-    - run: dune install quickchick
+    - run: dune install coq-quickchick
     - test
-    - run: dune uninstall quickchick
+    - run: dune uninstall coq-quickchick
 
 workflows:
   version: 2
