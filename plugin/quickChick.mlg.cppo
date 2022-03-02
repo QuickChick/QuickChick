@@ -151,7 +151,7 @@ let define_and_run c env evd =
   close_out oc;
 
   (* Add any modules that have been marked "open" *)
-  let open_cmd s = Printf.sprintf "awk -v n=1 -v s=\"open %s\" 'NR == n {print s} {print}' %s > __qc_tmp; mv __qc_tmp %s" s mlf mlf in
+  let open_cmd s = Printf.sprintf "awk -v n=1 -v s=\"open %s\" 'NR == n {print s} {print}' %s > __qc_tmp && mv __qc_tmp %s" s mlf mlf in
   List.iter (fun s -> ignore (Sys.command (open_cmd s))) !modules_to_open;
   
   (* Before compiling, fix stupid cyclic dependencies like "type int = int".
@@ -196,21 +196,22 @@ let define_and_run c env evd =
   in
   let exec_command =
     match !dune_file with
-    | None -> "cd " ^ dir ^ "; ocamlbuild " ^ packages ^ " -lib unix -cflags \"-w -3\" " ^ Filename.basename execn ^ " -quiet > build.log 2> build.err"
+    | None -> "cd " ^ dir ^ " && ocamlbuild " ^ packages ^ " -lib unix -cflags \"-w -3\" " ^ Filename.basename execn ^ " -quiet > build.log 2> build.err"
     | Some s ->
        (* Modify the dune file to add the executable name and put it in the output dir *) 
        let awk_cmd = Printf.sprintf "awk -v n=2 -v s=\"   (name %s)\" 'NR == n {print s} {print}' %s > %s" (Filename.chop_extension (Filename.basename mlf)) s (dir ^ "/" ^ s) in
        (*       let sed_cmd = Printf.sprintf "sed '2i   (name %s)' %s > %s" (Filename.chop_extension (Filename.basename mlf)) s (dir ^ "/" ^ s) in *)
        ignore (Sys.command awk_cmd);
        (* The command is just dune build *)
-       Printf.sprintf "cd %s; dune build --display=quiet > build.log 2> build.err" dir
+       Printf.sprintf "cd %s && dune build --display=quiet > build.log 2> build.err" dir
   in
   (* Overwrite execn in case of dune *)
   let execn =
+    let (</>) = Filename.concat in
     match !dune_file with
-    | None -> execn
+    | None -> Filename.dirname execn </> "_build" </> Filename.basename execn
     | Some _ -> dir ^ "/_build/default/" ^ (Filename.chop_extension (Filename.basename execn)) ^ ".exe" in
-    
+
   if Sys.command exec_command <> 0 then 
     let build_log = read_file (dir ^ "/build.log") in
     let build_err = read_file (dir ^ "/build.err") in
