@@ -6,6 +6,11 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
 
 ## [Unreleased]
 
+## [1.6.1] - 2022-03-03
+- Add Windows compatibility
+- Improve extraction of `randomRNat`, `randomRInt`, `randomRN` by using
+  `Random.State.full_int` instead of `Random.State.int`.
+
 ## [1.6.0]
 - Remove all dependency on perl (replaced with cppo (OCaml preprocessor) at compile time; awk at runtime).
 - Added more informative error messages when tests fail to compile or throw exceptions.
