@@ -2,6 +2,33 @@ open QuickChickToolLexer
 open QuickChickToolParser
 open QuickChickToolTypes
 
+(* Utilities *)
+
+(* Apply a function for every file in a directory *)
+let for_all_files d f =
+  let files = Sys.readdir d in
+  Array.iter (fun file -> f (d ^ "/" ^ file)) files
+
+(* Rewrite a file line by line *)
+let sed_file file f =
+  let src = open_in file in
+  let tmpfile = file ^ ".tmp" in
+  let tmp = open_out tmpfile in
+  let rec go () =
+    match input_line src with
+    | line -> output_string tmp (f line); output_char tmp '\n'; go ()
+    | exception End_of_file ->
+        close_in src;
+        close_out tmp;
+        Sys.rename tmpfile file
+  in go ()
+
+(* [String.ends_with] only available since 4.13.0 *)
+let ends_with ~suffix s =
+  let n = String.length s in
+  let nsuff = String.length suffix in
+  nsuff <= n && String.sub s (n - nsuff) nsuff = suffix
+
 (* ----------------------------------------------------------------- *)
 (* Command-line *)
 
@@ -360,12 +387,7 @@ let run_and_show_output_on_failure command msg =
     else
       failwith msg
 
-let perl_hack () =
-  let perl_cmd = "perl -i -p0e 's/type int =\\s*int/type tmptmptmp = int\\ntype int = tmptmptmp/sg' " in
-  let hack_mli = perl_cmd ^ "*.mli" in
-  let hack_ml = perl_cmd ^ "*.ml" in
-  if Sys.command hack_mli <> 0 || Sys.command hack_ml <> 0 then
-    debug "perl script hack failed. Report: %s" perl_cmd
+let tmp_int_re = Str.regexp "type int =[ ]*int"
 
 let string_of_process_status = function
   | Unix.WEXITED i -> Printf.sprintf "EXIT %d" i
@@ -385,10 +407,15 @@ let compile_and_run where e : unit =
 
   system !compile_command;
 
-  perl_hack ();
+  for_all_files (Sys.getcwd ()) (fun file ->
+    if ends_with ~suffix:".ml" file || ends_with ~suffix:".mli" file then
+    sed_file file (fun line ->
+      if Str.string_match tmp_int_re line 0 then
+        "type tmptmptmp = int;; type int = tmptmptmp"
+      else line));
 
   let ocamlbuild_cmd =
-    Printf.sprintf "ocamlbuild %s %s.native"
+    Printf.sprintf "ocamlbuild -pkg zarith -cflag -rectypes %s %s.native"
       !ocamlbuild_args
       (Filename.chop_suffix temporary_file ".v") in
   run_and_show_output_on_failure
@@ -584,7 +611,7 @@ let sec_find sec_graph s =
   debug "sec_find: %s\n" (trim s);
   try Hashtbl.find sec_graph (trim s)
   with Not_found -> begin
-    let keys = Hashtbl.fold (fun k v s -> k ^ " " ^ s) sec_graph "" in
+    let keys = Hashtbl.fold (fun k _v s -> k ^ " " ^ s) sec_graph "" in
     failwith (Printf.sprintf "QuickChick: Didn't find section called %s (available sections: %s)\n" s keys)
     end
 
@@ -625,7 +652,7 @@ let rec handle_section' sec_graph current_section starting_section =
       handle_section' sec_graph current_section starting_section')
     (sec_find sec_graph starting_section)
 
-let rec handle_section sec_graph sn' =
+let handle_section sec_graph sn' =
   if !verbose then (Printf.printf "Asking for section %s\n" sn'; flush_all ());
   let sn' = trim sn' in
   match !sec_name with
@@ -642,7 +669,7 @@ let calc_dir_mutants sec_graph (fs : section list file_structure) =
       begin
       current_filetype := Filename.extension s;
       match mutate_outs (handle_section sec_graph) ss with
-      | (info, base) :: muts, things_to_check ->
+      | (_info, base) :: muts, things_to_check ->
         (* Printf.printf "Number of mutants: %d\n" (List.length muts); *)
         all_things_to_check := (List.map (fun x -> (s,x)) things_to_check)
                                @ !all_things_to_check;
@@ -707,7 +734,7 @@ let main =
       (String.concat ", " b)) sec_graph; flush_all ();  *)
 
   match fs with
-  | File (s, ss) ->
+  | File (_, _) ->
      failwith ". can never be a file. Right?"
   | Dir (s, fss) -> begin
     let ((base, dir_mutants), all_things_to_check) = calc_dir_mutants sec_graph fs in
@@ -781,7 +808,7 @@ let main =
              || !only_mutant = None
              || (match info.tag, !only_mutant with
                  | Some fulltag, Some (Tag tag) ->
-                   starts_with (String.trim tag) (String.trim fulltag)
+                   starts_with ~prefix:(String.trim tag) (String.trim fulltag)
                  | _ -> false) then begin
               Printf.printf "\n";
               let t =

@@ -1,4 +1,11 @@
 {
+(*
+
+THIS FILE IS PREPROCESSED USING cppo
+MAKE SURE TO EDIT THE .cppo SOURCE OF THIS FILE RATHER THAN THE GENERATED RESULT
+
+*)
+
 
 open GenericLib
 open Stdarg
@@ -31,21 +38,34 @@ let register_weights (l : (constructor * weight_ast) list) =
   List.iter (fun (c,w) -> weight_env := CtrMap.add c w !weight_env) l
 
 let convert_constr_to_weight c = 
-  match c with 
-  | { CAst.v = CPrim (Number (NumTok.SPlus,i)); _ } ->
-     (match NumTok.Unsigned.to_nat i with
-     | Some n -> WNum (int_of_string n)
-     | None -> failwith "QC: Numeric weights should be positive integers.")
-  | { CAst.v = CPrim (Number (NumTok.SMinus,_)); _ } ->
-     failwith "QC: Numeric weights should be greater than 0."
-  | { CAst.v = CRef (r, _); _ } -> 
+  match c.CAst.v with
+#if COQ_VERSION >= (8, 12, 0)
+#if COQ_VERSION >= (8, 13, 0)
+  | CPrim (Number (NumTok.SPlus, i)) ->
+#else
+  | CPrim (Numeral (NumTok.SPlus, i)) ->
+#endif
+      (match NumTok.Unsigned.to_nat i with
+      | Some n -> WNum (int_of_string n)
+      | None -> failwith "QC: Numeric weights should be positive integers."
+      )
+#else
+
+  | CPrim (Constrexpr.Numeral (Constrexpr.SPlus, NumTok.{int=n;frac="";exp=""})) ->
+      WNum (int_of_string n)
+#endif
+  | CRef (r, _) ->
      if string_of_qualid r = "size" then WSize
      else failwith "QC: Expected number or 'size'."
   | _ -> failwith "QC: match failure."
 
 let convert_constr_to_cw_pair c : (constructor * weight_ast) = 
-  match c with 
-  | { CAst.v = CNotation (_,_,([a],[[b]],_,_)); _ } -> begin
+  match c.CAst.v with
+#if COQ_VERSION >= (8, 12, 0)
+  | CNotation (_, _, ([a],[[b]],_,_)) ->
+#else
+  | CNotation (_, ([a],[[b]],_,_)) ->
+#endif
       let ctr = 
         match a with 
         | { CAst.v = CRef (r, _); _ } -> injectCtr (string_of_qualid r)
@@ -53,15 +73,25 @@ let convert_constr_to_cw_pair c : (constructor * weight_ast) =
       in 
       let w = convert_constr_to_weight b in
       (ctr,w)
-    end
   | _ -> failwith "Not a pair?"
 
+#if COQ_VERSION >= (8, 16, 0)
+let register_weights_object =
+  Libobject.declare_object
+    {(Libobject.default_object ("QC_register_weights")) with
+      Libobject.cache_function = (fun ws -> register_weights ws);
+      Libobject.load_function = (fun _ ws -> register_weights ws)}
+
+let add_weights w = Lib.add_leaf (register_weights_object w)
+#else
 let register_weights_object = 
   Libobject.declare_object
     {(Libobject.default_object ("QC_register_weights")) with
       Libobject.cache_function = (fun (_,ws) -> register_weights ws);
       Libobject.load_function = (fun _ (_,ws) -> register_weights ws)}
 
+let add_weights w = Lib.add_anonymous_leaf (register_weights_object w)
+#endif
 let lookup_weight ctr size_var = 
   try match CtrMap.find ctr !weight_env with
       | WNum n -> gInt n
@@ -74,17 +104,20 @@ VERNAC COMMAND EXTEND QuickChickWeights CLASSIFIED AS SIDEFF
   | ["QuickChickWeights" constr(c)] -> 
      {
        let weight_assocs = 
-         match c with 
-         | { CAst.v = CNotation (_,_,([a],[b],_,_)); _ } -> begin
+         match c.CAst.v with
+#if COQ_VERSION >= (8, 12, 0)
+         | CNotation (_, _, ([a],[b],_,_)) ->
+#else
+         | CNotation (_, ([a],[b],_,_)) ->
+#endif
              let c = convert_constr_to_cw_pair a in
              let cs = List.map convert_constr_to_cw_pair b in
              c :: cs
-           end
          | _ -> failwith "QC: Expected list of constructor -> weights"
        in 
        msg_debug (str "Current weights: " ++ fnl ());
        msg_debug (str (weight_env_to_string ()) ++ fnl ());
-       Lib.add_anonymous_leaf (register_weights_object weight_assocs)
+       add_weights weight_assocs
      }
 END
 

@@ -1,10 +1,8 @@
 Set Warnings "-extraction-opaque-accessed,-extraction".
 Set Warnings "-notation-overridden,-parsing".
 
-Require Import String. 
-Require Import List.
-
-Require Import ZArith.
+From Coq Require Import
+  String List ZArith Lia.
 Require Import mathcomp.ssreflect.ssreflect.
 From mathcomp Require Import ssrfun ssrbool ssrnat eqtype seq.
 
@@ -546,8 +544,8 @@ Lemma In_nth_exists {A} (l: list A) x def :
 Proof.
 elim : l => [| a l IHl] //=.
 move => [H | /IHl [n [H1 H2]]]; subst.
-  exists 0; split => //; omega.
-exists n.+1; split => //; omega.
+  exists 0; split => //; lia.
+exists n.+1; split => //; lia.
 Qed.
 
 Lemma nth_imset T (def : T) l : nth def l @: [set n | n < length l] <--> l.
@@ -596,7 +594,7 @@ Proof.
 rewrite semBindSize.
 setoid_rewrite semReturnSize.
 rewrite semChooseSize //=.
-setoid_rewrite nthE. (* SLOW *)
+setoid_rewrite nthE.
 case: l => [|x l] /=.
   rewrite (eq_bigcupl [set 0]) ?bigcup_set1 // => n.
   by rewrite leqn0; split=> [/eqP|->].

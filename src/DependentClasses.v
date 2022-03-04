@@ -40,6 +40,7 @@ Class GenSizedSuchThat (A : Type) (P : A -> Prop) := { arbitrarySizeST : nat -> 
 Class GenSizedSuchThatMonotonic (A : Type)
       `{GenSizedSuchThat A} `{forall s, SizeMonotonic (arbitrarySizeST s)}.
 
+
 Class GenSizedSuchThatMonotonicOpt (A : Type)
       `{GenSizedSuchThat A} `{forall s, SizeMonotonicOpt (arbitrarySizeST s)}.
 
@@ -130,13 +131,13 @@ Instance GenSuchThatOfBounded (A : Type) (P : A -> Prop) (H : GenSizedSuchThat A
 Generalizable Variables PSized PMon PSMon PCorr.
 
 (* Monotonicity *)
-(*
+
 Instance GenSuchThatMonotonicOfSized (A : Type) (P : A -> Prop)
          {H : GenSizedSuchThat A P}
          `{@GenSizedSuchThatMonotonic A P H PMon}
          `{@GenSizedSuchThatSizeMonotonic A P H PSMon}
-: GenSuchThatMonotonic A P.
-*)
+: GenSuchThatMonotonic A P := {}.
+
 
 Instance SizeMonotonicOptOfBounded' (A : Type) (P : A -> Prop)
          {H : GenSizedSuchThat A P}
@@ -220,43 +221,33 @@ Qed.
 (* TODO: Move to another file *)
 (*
 (** Leo's example from DependentTest.v *)
-
 Print Foo.
 Print goodFooNarrow.
-
 DeriveSized Foo as "SizedFoo".
-
 (*
 Inductive Foo : Set :=
     Foo1 : Foo | Foo2 : Foo -> Foo | Foo3 : nat -> Foo -> Foo
-
 Inductive goodFooNarrow : nat -> Foo -> Prop :=
     GoodNarrowBase : forall n : nat, goodFooNarrow n Foo1
   | GoodNarrow : forall (n : nat) (foo : Foo),
                  goodFooNarrow 0 foo ->
                  goodFooNarrow 1 foo -> goodFooNarrow n foo
  *)
-
 (* Q : Can we but the size last so we don't have to eta expand?? *)
 Print genGoodNarrow. 
-
 (** For dependent gens we show generate this instance *)
 Instance genGoodNarrow (n : nat) : ArbitrarySizedSuchThat Foo (goodFooNarrow n) :=
   {
     arbitrarySizeST := genGoodNarrow' n;
     shrinkSizeST x := []
   }.
-
 (* For proofs we should generate this instances *)
-
 Instance genGoodNarrowMon (n : nat) (s : nat) :
   SizeMonotonic (@arbitrarySizeST Foo (goodFooNarrow n) _ s).
 Abort.
-
 Instance genGoodNarrowSMon (n : nat) :
   @ArbitrarySTSizedSizeMotonic Foo (@goodFooNarrow n) _.
 Abort.
-
 Instance genGoodNarrowCorr (n : nat) :
   GenSizeSuchThatCorrect (goodFooNarrow n) (@arbitrarySizeST Foo (goodFooNarrow n) _).
 Abort.

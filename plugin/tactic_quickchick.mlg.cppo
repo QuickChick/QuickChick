@@ -1,4 +1,11 @@
 {
+(*
+
+THIS FILE IS PREPROCESSED USING cppo
+MAKE SURE TO EDIT THE .cppo SOURCE OF THIS FILE RATHER THAN THE GENERATED RESULT
+
+*)
+
 
 open Ltac_plugin
 
@@ -7,8 +14,11 @@ open Ltac_plugin
 DECLARE PLUGIN "quickchick_plugin"
 
 {
-
-open Constrexpr
+#if COQ_VERSION >= (8, 15, 0)
+let capp (x, y) = Constrexpr.CApp (x, y)
+#else
+let capp (x, y) = Constrexpr.CApp ((None, x), y)
+#endif
 
 let quickchick_goal =
   Proofview.Goal.enter begin fun gl ->
@@ -25,12 +35,15 @@ let quickchick_goal =
     Printf.printf "So far so good\n"; flush stdout;
     
     (* Externalize it *)
-    let ct = Constrextern.extern_constr e evd (EConstr.mkEvar (evar , [])) in
+#if COQ_VERSION >= (8, 12, 0)
+    let ct = Constrextern.extern_constr e evd (EConstr.mkEvar (evar, [])) in
+#else
+    let ct = Constrextern.extern_constr false e evd (EConstr.mkEvar (evar, [||])) in
+#endif
 
     (* Construct : show (quickCheck (_ : ct)) *)
-    let qct =
-      (CAst.make @@ CApp((None,QuickChick.quickCheck), [ct, None])) in    
-    let sqct = CAst.make @@ CApp((None,QuickChick.show), [(qct,None)]) in
+    let  qct = CAst.make @@ capp (QuickChick.quickCheck, [ct, None]) in
+    let sqct = CAst.make @@ capp (QuickChick.show, [(qct,None)]) in
 
     Printf.printf "So far so good2\n"; flush stdout;
 
@@ -50,7 +63,11 @@ let quickchick_goal =
     Printf.printf "So far so good3\n"; flush stdout;
 
     (* TODO: This whole block doesn't look very monadic... *)
+#if COQ_VERSION >= (8, 15, 0)
+    Tacticals.tclIDTAC
+#else
     Tacticals.New.tclIDTAC
+#endif
   end
 
     (*
@@ -71,8 +88,8 @@ let quickchick_goal =
                         ]
                        ))) in
 
-    let s = QuickChick.runTest
-            (CAst.make @@ CApp((None,QuickChick.quickCheck), [CAst.make @@ CRef (Libnames.qualid_of_ident tmpid,None), None])) in
+    let s = QuickChick.runTest @@ CAst.make @@
+      capp (QuickChick.quickCheck, [CAst.make @@ CRef (Libnames.qualid_of_ident tmpid,None), None]) in
     (* I need to create an existential of type Checkable ct, and then
        call QuickChick.quickChick on that in the ast, before running
        QuickChick.runTest on the constr_expr. *)
@@ -126,7 +143,7 @@ let quickchick_goal =
 
 (*
     let concl = Proofview.Goal.concl gl in
-    let sigma = Tacmach.New.project gl in
+    let sigma = Tacmach.project gl in
     let hyps = named_context_val (Proofview.Goal.env gl) in
     let store = Proofview.Goal.extra gl in
     let env = Proofview.Goal.env gl in

@@ -1,5 +1,5 @@
 V=@
-.PHONY: plugin install install-plugin clean quickChickTool
+.PHONY: plugin install install-plugin clean quickChickTool compat
 
 QCTOOL_DIR=quickChickTool
 QCTOOL_EXE=quickChickTool.byte
@@ -7,6 +7,8 @@ QCTOOL_SRC=$(QCTOOL_DIR)/quickChickTool.ml \
 		   $(QCTOOL_DIR)/quickChickToolTypes.ml \
 		   $(QCTOOL_DIR)/quickChickToolLexer.mll \
 		   $(QCTOOL_DIR)/quickChickToolParser.mly
+
+INSTALLDIR?=$(dir $(shell which coqc))
 
 # Here is a hack to make $(eval $(shell work
 # (copied from coq_makefile generated stuff):
@@ -20,19 +22,19 @@ $(call includecmdwithout@,$(COQBIN)coqtop -config)
 
 all: quickChickTool plugin documentation-check
 
-plugin: Makefile.coq 
+plugin: compat Makefile.coq
 	$(MAKE) -f Makefile.coq 
 
 documentation-check: plugin
-	coqc -R src QuickChick -I src QuickChickInterface.v
-	coqc -R src QuickChick -I src DocumentationCheck.v
+	coqc -R src QuickChick -I plugin QuickChickInterface.v
+	coqc -R src QuickChick -I plugin DocumentationCheck.v
 
 TEMPFILE := $(shell mktemp)
 
 install: all
 	$(V)$(MAKE) -f Makefile.coq install > $(TEMPFILE)
 # Manually copying the remaining files
-	$(V)cp $(QCTOOL_DIR)/$(QCTOOL_EXE) $(shell opam config var bin)/quickChick
+	$(V)cp $(QCTOOL_DIR)/$(QCTOOL_EXE) $(INSTALLDIR)/quickChick
 #	 $(V)cp src/quickChickLib.cmx $(COQLIB)/user-contrib/QuickChick
 #	 $(V)cp src/quickChickLib.o $(COQLIB)/user-contrib/QuickChick
 
@@ -41,15 +43,12 @@ install-plugin: Makefile.coq
 
 uninstall:
 	$(V)if [ -e Makefile.coq ]; then $(MAKE) -f Makefile.coq uninstall; fi
-	$(RM) $(shell opam config var bin)/quickChick
-
-src/%.cmo : src/%.ml
-	ocamlc -I src -c $<
+	$(RM) $(INSTALLDIR)/quickChick
 
 quickChickTool: $(QCTOOL_DIR)/$(QCTOOL_EXE)
 
 $(QCTOOL_DIR)/$(QCTOOL_EXE): $(QCTOOL_SRC)
-	cd $(QCTOOL_DIR); ocamlbuild -pkg unix -use-ocamlfind $(QCTOOL_EXE)
+	cd $(QCTOOL_DIR); ocamlbuild -pkg str -pkg unix -use-ocamlfind $(QCTOOL_EXE)
 
 tests:
 	$(MAKE) -C examples tutorial
@@ -64,13 +63,20 @@ tests:
 # LEO: Need to fix GenST for this
 #	coqc examples/DependentTest.v
 
+COMPATFILES:=plugin/depDriver.ml plugin/driver.mlg plugin/genericLib.ml plugin/quickChick.mlg plugin/tactic_quickchick.mlg plugin/weightmap.mlg src/ExtractionQC.v src/QuickChick.v _CoqProject
+
+compat: $(COMPATFILES)
+
+%: %.cppo
+	$(V)cppo -V OCAML:$(shell ocamlc -version) -V COQ:$(word 1, $(shell coqc -print-version)) -n -o $@ $^
+
 Makefile.coq: _CoqProject
 	$(V)coq_makefile -f _CoqProject -o Makefile.coq
 
 clean:
 	$Vif [ -e Makefile.coq ]; then $(MAKE) -f Makefile.coq clean; fi
-	$Vocamlbuild -clean
-         # This might not work on macs
+	$Vcd $(QCTOOL_DIR); ocamlbuild -clean
+	# This might not work on macs
 	find . -name '*.vo' -print -delete
 	find . -name '*.glob' -print -delete
 	find . -name *.d -print -delete
@@ -85,6 +91,7 @@ clean:
 	find . -name *.output -print -delete
 	find . -name *.aux -print -delete
 	rm -f Makefile.coq Makefile.coq.conf
+	rm -f $(COMPATFILES)
 
 bc:
 	coqwc src/*.v

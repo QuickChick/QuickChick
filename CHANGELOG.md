@@ -11,6 +11,31 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
 ### Removed
 - No longer support Coq 8.11.
 
+## [1.6.1] - 2022-03-03
+- Add Windows compatibility
+- Improve extraction of `randomRNat`, `randomRInt`, `randomRN` by using
+  `Random.State.full_int` instead of `Random.State.int`.
+
+## [1.6.0]
+- Remove all dependency on perl (replaced with cppo (OCaml preprocessor) at compile time; awk at runtime).
+- Added more informative error messages when tests fail to compile or throw exceptions.
+- Fixed inefficient extraction of Nat arithmetic; this previously caused tests to run in time quadratic in the number of generated test cases.
+- Added `RelDec` instance for `eq`.
+
+## [1.5.1]
+- Support Coq 8.11 to 8.14.
+
+## [1.5.0]
+- Support Coq 8.13.
+- No longer support Coq 8.12.
+
+## [1.4.0]
+### Added
+- Support Coq 8.12.
+
+### Removed
+- No longer support Coq 8.11.
+
 ## [1.3.2] - 2020-07-11
 ### Added
 - `QCInclude` command to replace `Declare ML Module`.
@@ -118,7 +143,7 @@ These changes are not included in [1.3.0].
 ### Added
 - OPAM package `coq-quickchick` on [coq-released](https://coq.inria.fr/opam/www/).
 
-[Unreleased]: https://github.com/QuickChick/QuickChick/compare/v1.3.2...8.12
+[Unreleased]: https://github.com/QuickChick/QuickChick/compare/v1.3.2...master
 [1.3.2]: https://github.com/QuickChick/QuickChick/compare/v1.3.1...v1.3.2
 [1.3.1]: https://github.com/QuickChick/QuickChick/compare/v1.3.0...v1.3.1
 [1.3.0]: https://github.com/QuickChick/QuickChick/compare/v1.2.1...v1.3.0

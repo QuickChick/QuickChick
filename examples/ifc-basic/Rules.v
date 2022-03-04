@@ -1,5 +1,5 @@
 Require Import List.
-Require Import Omega.
+Require Import Lia.
 Require Import Utils.
 Require Import Coq.Unicode.Utf8.
 Require Import Coq.Vectors.Vector.
@@ -63,8 +63,8 @@ refine
 | O => _ (le_n n)
 | S m' => _ (le_S _ _ (nlem n m'))
 end).
-intros; omega.
-intros; zify; omega.
+intros; lia.
+intros; lia.
 Qed.
 
 Inductive rule_expr (n: nat) : Type :=

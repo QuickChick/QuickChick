@@ -1,0 +1,11 @@
+name: "Check conflicts"
+on: [push, pull_request_target]
+
+jobs:
+  main:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: eps1lon/actions-label-merge-conflict@v2.0.0
+        with:
+          dirtyLabel: "needs: rebase"
+          repoToken: "${{ secrets.GITHUB_TOKEN }}"

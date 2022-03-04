@@ -15,7 +15,7 @@ Set Bullet Behavior "Strict Subproofs".
 Require Import Coq.Bool.Bool.
 Require Import Coq.Arith.Arith.
 Require Import Coq.Arith.EqNat.
-Require Import Coq.omega.Omega.
+Require Import Coq.lia.Lia.
 Require Import Imp.
 Require Import Maps.
 

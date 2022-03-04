@@ -1,4 +1,4 @@
-FROM coqorg/coq:8.12-ocaml-4.09-flambda
+FROM coqorg/coq:dev-ocaml-4.11-flambda
 COPY --chown=coq . QuickChick
 ENV OPAMYES true
 RUN opam repo add coq-extra-dev https://coq.inria.fr/opam/extra-dev \

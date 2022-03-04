@@ -1,7 +1,7 @@
 From mathcomp Require Import ssreflect ssrbool ssrnat eqtype.
 Require Import String. (* I don't know why we need this.. Probably I am forgetting something *)
 From QuickChick Require Import QuickChick.
-Require Import Arith List Omega.
+Require Import Arith List Lia.
 From QuickChick.stlc Require Import lambda.
 Require Import Wellfounded.
 
@@ -43,8 +43,8 @@ Proof.
   move => e. induction e; intros x tau n H; simpl in *.
   now exfalso; auto.
   destruct (type_eq_dec tau a); subst; simpl in *.
-  destruct H; solve [ inversion H; omega | eapply IHe in H; omega]. 
-  eapply IHe in H; omega.
+  destruct H; solve [ inversion H; lia | eapply IHe in H; lia].
+  eapply IHe in H; lia.
 Qed.
 
 Lemma vars_with_type_le_length_aux: 
@@ -59,8 +59,8 @@ Proof.
   move => e. induction e; intros x tau n H; simpl in *. 
   now exfalso; auto. unfold addn, addn_rec in *.
   destruct (type_eq_dec tau a); subst; simpl in *.
-  destruct H. inversion H; subst. omega.
-  apply IHe in H. omega. eapply IHe in H; omega.
+  destruct H. inversion H; subst. lia.
+  apply IHe in H. lia. eapply IHe in H; lia.
 Qed.
 
 Lemma vars_with_type_le_length: 
@@ -68,7 +68,7 @@ Lemma vars_with_type_le_length:
     In (Id x) (vars_with_type e tau) -> x < (length e).
 Proof.
   intros. apply vars_with_type_le_length_aux in H. 
-  unfold addn, addn_rec in *. omega.
+  unfold addn, addn_rec in *. lia.
 Qed.
 
 Lemma vars_with_type_Id :
@@ -94,7 +94,7 @@ Proof.
       setoid_rewrite vars_with_type_shift in H1. apply IHe in H1. 
       inversion H1; subst. constructor; auto. 
     + destruct x; simpl in *; auto.
-      constructor; auto. apply vars_with_type_le in H. omega.
+      constructor; auto. apply vars_with_type_le in H. lia.
       setoid_rewrite vars_with_type_shift in H. apply IHe in H. 
       inversion H; subst. constructor; auto. 
     + destruct x; simpl in *; auto. 
@@ -140,17 +140,17 @@ Lemma Const_leq_trans :
     n1 <= n2 -> 
     Const_leq n1 t -> Const_leq n2 t.
 Proof.
-  intros. induction t; try (constructor; simpl; omega);
+  intros. induction t; try (constructor; simpl; lia);
   inversion H0; subst;
-  solve [ constructor; simpl; omega | constructor; eauto ]. 
+  solve [ constructor; simpl; lia | constructor; eauto ].
 Qed.
 
 Lemma max_const_Const_leq :
   forall t, Const_leq (max_const t) t.
 Proof.
-  intros. induction t; try (constructor; simpl; omega);
+  intros. induction t; try (constructor; simpl; lia);
   constructor; simpl; eapply Const_leq_trans; try eassumption;
-  (try now apply Max.le_max_l); (try now apply Max.le_max_r); omega.
+  (try now apply Max.le_max_l); (try now apply Max.le_max_r); lia.
 Qed.
 
 Lemma gen_type_size_correctSize :
@@ -174,17 +174,17 @@ Proof.
         rewrite /set1 in Heq. inversion Heq; subst.
         apply IH1 in H3. apply IH2 in H4.
         have Hle1 : type_size tau1 = (n - m1)%coq_nat 
-          by apply H3; omega.
+          by apply H3; lia.
         have Hle2 : type_size tau2 = (n - (n - m1)%coq_nat)%coq_nat
-          by apply H4; omega. omega. 
+          by apply H4; lia. lia.
     - move => /= H. destruct n as [| n]; first by discriminate.
       apply semBindSize. exists (n - type_size tau1). split.
       apply semChooseSize; unfold leq, super, OrdNat in *.
-      apply/leP. omega. apply/andP; split; apply /leP; omega.
+      apply/leP. lia. apply/andP; split; apply /leP; lia.
       apply semLiftGen2Size. exists (tau1, tau2). 
       split; last by reflexivity.
       split; fold gen_type_size; [ apply IH1 | apply IH2]; 
-      simpl; simpl in H; omega. }
+      simpl; simpl in H; lia. }
 Qed.
 
 Lemma gen_type_correctSize :
@@ -194,7 +194,7 @@ Proof.
   intros s. unfold gen_type. rewrite semBindSize => tau. 
   split => H. 
   - move : H => [n  [/arbNat_correctSize H1 /gen_type_size_correctSize H2]]. 
-    omega.
+    lia.
   - exists (type_size tau). split. apply arbNat_correctSize; auto.
     apply gen_type_size_correctSize; auto.
 Qed.
@@ -286,9 +286,9 @@ Proof.
   intros [n tau] IH e s t; rewrite gen_term_size_eq. split.
   { destruct n as [| n]; simpl.
     - move => /gen_term_no_app_correctSize /= [H1 [H2 H3]].
-      repeat split; auto. exists 0. split; try omega.  
+      repeat split; auto. exists 0. split; try lia.
       now apply typing_max_no_app.
-      exists 0; split; try omega. apply app_free_app_no_0; auto. 
+      exists 0; split; try lia. apply app_free_app_no_0; auto.
     - destruct (vars_with_type e tau) eqn:Hvars;
       move /semOneofSize => [gen [[H1 | [H1 | //]] H2]]; subst;
       try (move : H2=>  /semBindSize [tau' [ H2 /semBindSize 
@@ -299,8 +299,8 @@ Proof.
         move : H5 H2=> [[t1 t2] [[H5 H6] H7]]
                          /gen_type_correctSize H2;
         rewrite /set1 in H7; subst;
-        (apply (IH (n - m, Arrow tau' tau)) in H5; last by left; omega);
-        (apply (IH (n - m', tau')) in H6; last by left; omega);
+        (apply (IH (n - m, Arrow tau' tau)) in H5; last by left; lia);
+        (apply (IH (n - m', tau')) in H6; last by left; lia);
         move : H5 H6 => /= [[max1 [H5 Hle1]] [H6 [h1 [H7 H7']]]] 
                            [[max2 [H8 Hle2]] [H9 [h2 [H10 H10']]]]; subst;
         repeat (split; simpl; try now econstructor; eauto);
@@ -311,17 +311,17 @@ Proof.
           unfold leq, super, OrdNat in H3, H4;
           (have /andP [_ /leP Hle] : 0 <= m <= n by auto); 
           (have /andP [/leP Hle3 /leP Hle4]  : (n - m)%coq_nat <= m' <= n
-            by apply H4; apply/leP; omega); omega ]); 
+            by apply H4; apply/leP; lia); lia ]);
         try ( destruct tau; 
               solve 
                 [ move /semLiftGenSize : H2 => [t' [/arbNat_correctSize H2 H3]];
                     rewrite /set1 in H3; subst;
                     repeat split; try constructor; auto; exists 0; 
-                    split; auto; try omega; constructor
+                    split; auto; try lia; constructor
                 | move /semLiftGenSize : H2 => [t' [ H2 H3]]; 
               rewrite /set1 in H3; subst; 
               (apply (IH (n.+1, tau2)) in H2; last by 
-                   right; unfold lt_type; simpl; omega);
+                   right; unfold lt_type; simpl; lia);
               move : H2 => /= [[maxt [H1 Hle]] [H2 [h [H3 H4]]]];
                     (repeat split; try now econstructor); eauto;
                     exists maxt; split; auto; constructor; auto ]).
@@ -330,11 +330,11 @@ Proof.
       specialize (vars_with_type_Id _ _ _ H); move => [x' ?]; subst.
       specialize (vars_with_type_le_length _ _ _ H); move => H1; subst.
       apply type_var in H. repeat split; auto. 
-      exists 0; split. constructor. inversion H; auto. omega.
-      constructor. exists 0. split; try omega. constructor. }
+      exists 0; split. constructor. inversion H; auto. lia.
+      constructor. exists 0. split; try lia. constructor. }
   { move => /= [[maxt [H1 Hle1]] [H2 [h [H3 Hle2]]]].
     destruct n.
-    - apply gen_term_no_app_correctSize. destruct h; try omega.
+    - apply gen_term_no_app_correctSize. destruct h; try lia.
       repeat (split; auto); 
         solve [apply typing_max_tau_correct; eexists; eauto | 
                apply app_free_app_no_0; auto].
@@ -346,11 +346,11 @@ Proof.
         | apply semOneofSize; eexists; 
           (split; first by right; left; reflexivity); apply semLiftGenSize;
           eexists; (split; last by reflexivity); inversion H2; subst; 
-          apply arbNat_correctSize; omega
+          apply arbNat_correctSize; lia
         | apply semOneofSize; eexists; 
           (split; first by right; left; reflexivity); apply semLiftGenSize;
           eexists; (split; last by reflexivity); 
-          (apply (IH (n.+1, tau2)); first by right; unfold lt_type; simpl; omega);
+          (apply (IH (n.+1, tau2)); first by right; unfold lt_type; simpl; lia);
           inversion H2; inversion H1; subst; (repeat split; auto); simpl;
           solve [eexists; split; eauto; simpl; eauto | 
                  eexists; (split; first by reflexivity); simpl; auto ]
@@ -363,24 +363,24 @@ Proof.
           (split; first by
               apply semChooseSize; auto;
               unfold leq, super, randomR, OrdNat;
-              apply/andP; split; apply/leP; omega);
+              apply/andP; split; apply/leP; lia);
           apply semBindSize;
           exists (n - (app_no t2));
           (split; first by apply semChooseSize; auto;
            unfold leq, super, randomR, OrdNat;
-           try (apply/leP; omega);
-             apply/andP; split; apply/leP; omega);
+           try (apply/leP; lia);
+             apply/andP; split; apply/leP; lia);
           apply semLiftGen2Size;
           exists (t1, t2); (split; last by reflexivity);
           split => /=;
           [ apply (IH (n - (n - app_no t1)%coq_nat, Arrow tau1 tau)) |
             apply (IH (n - (n - app_no t2)%coq_nat, tau1)) ];
-            try (left; omega);
+            try (left; lia);
             inversion H2; subst; repeat (split; auto);
-            solve [ inversion H; subst; eexists; split; eauto; try omega;
+            solve [ inversion H; subst; eexists; split; eauto; try lia;
                     (try now eapply Max.max_lub_l; eapply Max.max_lub_r; eauto);
                     try (now eapply Max.max_lub_r; eapply Max.max_lub_r; eauto) |
-                   eexists; split; eauto; simpl in Hle2; simpl; omega ] 
+                   eexists; split; eauto; simpl in Hle2; simpl; lia ]
         | apply semOneofSize; eexists; 
           (split; first by right; right; left; reflexivity);
           apply semElementsSize; rewrite /seq_In -Hvars;

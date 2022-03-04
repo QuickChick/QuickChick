@@ -9,7 +9,7 @@ Require Import Classes.RelationClasses.
 
 From ExtLib.Structures Require Export
      Monads.
-Require Import ExtLib.Data.Monads.ListMonad.
+Require Import ExtLib.Data.List.
 From ExtLib.Structures Require Import
      Functor Applicative.
 Import MonadNotation.
@@ -296,10 +296,25 @@ Module GenLow : GenLowInterface.Sig.
       s1 <= s2 ->
       semGenSize (g s1) s \subset semGenSize (g s2) s.
 
+  Class SizedMonotonicOpt {A} (g : nat -> G (option A)) :=
+    sizeMonotonicOpt : forall s s1 s2,
+      s1 <= s2 ->
+      semGenSizeOpt (g s1) s \subset semGenSizeOpt (g s2) s.
+
   (** Generators monotonic in the runtime size parameter *)
   Class SizeMonotonic {A} (g : G A) :=
     monotonic : forall s1 s2,
       s1 <= s2 -> semGenSize g s1 \subset semGenSize g s2.
+
+  Class SizeMonotonicOpt {A} (g : G (option A)) :=
+    monotonicOpt : forall s1 s2,
+      s1 <= s2 ->
+      semGenSizeOpt g s1 \subset semGenSizeOpt g s2.
+
+  Class SizeAntiMonotonicNone {A} (g : G (option A)) :=
+    monotonicNone : forall s1 s2,
+      s1 <= s2 ->
+      isNone :&: semGenSize g s2 \subset isNone :&: semGenSize g s1.
 
   (* Unsizedness trivially implies size-monotonicity *)
   Lemma unsizedMonotonic {A} (g : G A) : Unsized g -> SizeMonotonic g. 
@@ -415,6 +430,9 @@ Module GenLow : GenLowInterface.Sig.
   Instance returnGenSizeMonotonic {A} (x : A) : SizeMonotonic (returnGen x).
   Proof. firstorder. Qed.
 
+  Instance returnGenSizeMonotonicOpt {A} (x : option A) : SizeMonotonicOpt (returnGen x).
+  Proof. firstorder. Qed.
+
   Lemma bind_in_f :
     forall A B (b : B) (g : G A) (f : A -> G B) s r,
       In_ll b (run (bindGen g f) s r) ->
@@ -527,6 +545,19 @@ Module GenLow : GenLowInterface.Sig.
     eapply incl_bigcupl. eapply H1.
     eapply incl_bigcupr. intros; eapply H2.
   Qed.
+
+  Lemma semBindSizeOpt_subset_compat {A B : Type} (g g' : G A) (f f' : A -> G (option B)) :
+    (forall s, semGenSize g s \subset semGenSize g' s) ->
+    (forall x s, isSome :&: semGenSize (f x) s \subset isSome :&: semGenSize (f' x) s) ->
+    (forall s, isSome :&: semGenSize (bindGen g f) s \subset isSome :&: semGenSize (bindGen g' f') s).
+  Proof.
+    intros H1 H2 s. rewrite !semBindSize.
+    eapply subset_trans.
+    eapply setI_subset_compat. eapply subset_refl.
+    eapply incl_bigcupl. eapply H1.
+    rewrite !setI_bigcup_assoc. 
+    eapply incl_bigcupr. intros. eapply H2.
+  Qed.
   
   Lemma monad_leftid A B (a : A) (f : A -> G B) :
     semGen (bindGen (returnGen a) f) <--> semGen (f a).
@@ -578,6 +609,19 @@ Module GenLow : GenLowInterface.Sig.
     move => [a [H3 H4]]; exists a; split => //; eapply monotonic; eauto.
   Qed.
 
+  Instance bindMonotonicOpt
+          {A B} (g : G A) (f : A -> G (option B))
+          `{SizeMonotonic _ g} `{forall x, SizeMonotonicOpt (f x)} : 
+    SizeMonotonicOpt (bindGen g f).
+  Proof.
+    intros s1 s2 Hs.
+    unfold semGenSizeOpt.
+    rewrite !semBindSize. move => b.
+    move => [a [Hsome [H4 H5]]].
+    eexists a; split => //. eapply monotonic; eauto.
+    eapply monotonicOpt; eauto; eexists; eauto.
+  Qed.
+
   Program Instance bindMonotonicStrong
           {A B} (g : G A) (f : A -> G B) `{SizeMonotonic _ g}
           `{forall x, semGen g x -> SizeMonotonic (f x)} :
@@ -590,6 +634,22 @@ Module GenLow : GenLowInterface.Sig.
     eexists. split; eauto. now constructor.
     eassumption.
     eassumption.
+  Qed.
+
+
+  Instance bindMonotonicOptStrong
+          {A B} (g : G A) (f : A -> G (option B)) `{SizeMonotonic _ g}
+          `{forall x, semGen g x -> SizeMonotonicOpt (f x)} :
+    SizeMonotonicOpt (bindGen g f).
+  Proof.
+    intros s1 s2 Hleq.
+    unfold semGenSizeOpt.
+    rewrite !semBindSize. move => b.
+    move => [a [Hsome [H4 H5]]].
+    exists a; split => //.
+    - eapply monotonic; eauto.
+    - eapply H0; eauto. exists s1; split; auto. constructor.
+      eexists; eauto.
   Qed.
 
   (* begin semBindUnsized1 *)
@@ -766,21 +826,14 @@ Module GenLow : GenLowInterface.Sig.
     MkGen (fun s r => shuffleFuel (length gs) (sum_fst gs) (List.map run_snd gs) s r).
 *)
 
-  Program Definition reallyUnsafePromote {A B : Type} (m : A -> G B) (H : forall a, CanNotFail (m a)) : G (A -> B) :=
-    MkGen (fun s r =>
-             lsing (fun a => match run (m a) s r with
-                             | lnil => _
-                             | lsing x => x
-                             | lcons x _ => x
-                             end)).
+  Program Definition reallyUnsafePromote :
+          forall {r A:Type}, (r -> G A) -> G (r -> A) :=
+    fun R A rga => MkGen (fun sz sd => _).
   Next Obligation.
-    destruct (H a).
-    specialize (can_not_fail_pf0 s r).
-    unfold can_not_fail in *.
-    rewrite -Heq_anonymous in can_not_fail_pf0.
-    inv can_not_fail_pf0.
+    (* Obviously very wrong *)
+    apply lnil.
   Defined.
-
+ 
   (* Lemma promoteVariant : *)
   (*   forall {A B : Type} (a : A) (f : A -> SplitPath) (g : G B) size *)
   (*     (r r1 r2 : RandomSeed), *)
@@ -842,6 +895,24 @@ Module GenLow : GenLowInterface.Sig.
       split. constructor. 
       eapply (H' n). ssromega.
       eapply (H n); try eassumption. ssromega.
+  Qed.
+
+  Lemma semSized_opt A (f : nat -> G (option A)) (H : forall n, SizeMonotonicOpt (f n)) (H' : SizedMonotonicOpt f) :
+    isSome :&: semGen (sized f) <--> isSome :&: \bigcup_n (semGen (f n)).
+  Proof.
+    rewrite semSized. rewrite !setI_bigcup_assoc.
+    move => x; split.
+    - move => [n [HT [Hs1 Hs2]]].
+      eexists. split; eauto. split; eauto. eexists; eauto.
+    - move => [n [HT [Hs1 [m [HT' Hs2]]]]].
+      eexists (m + n).
+      split. now constructor. 
+      split; [ eassumption | ].
+      destruct x as [ x | ].
+      + eapply monotonicOpt with (s2 := m + n) in Hs2; [| now ssromega ].
+        eapply sizeMonotonicOpt with (s1 := n) (s2 := m + n); [now ssromega |].
+        auto.
+      + inv Hs1.
   Qed.
 
   Instance sizedSizeMonotonic
@@ -1328,6 +1399,5 @@ Module GenLow : GenLowInterface.Sig.
     destruct n; [ inv Hn |].
     exact H.
   Qed.
-
   
 End GenLow.

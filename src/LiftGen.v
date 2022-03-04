@@ -8,6 +8,7 @@ Inductive vec A : nat -> Type :=
   | cons : forall {n:nat}, A -> vec A n -> vec A (S n).
 
 Definition vapp {A}{n}{p} (v:vec A n) (w:vec A p) : vec A (n+p).
+Proof.
 induction v. apply w. simpl.
 apply cons. apply a. apply IHv.
 Defined.
@@ -33,9 +34,10 @@ Fixpoint tvec_to_prod {n} (v : vec Type n) : Type :=
 
 Definition applyN {n:nat} {As : vec Type n} {B : Type}
   (F : tvec_to_fun As B id) (vs : tvec_to_prod As) : B.
+Proof.
 induction As as [| n A1 As']; simpl in *. exact F.
-destruct vs as [v vs']. info_eauto.
-Defined. Print applyN.
+destruct vs as [v vs']. eauto.
+Defined.
 
 (* of course writing terms is a pain ... it's Coq
 Fixpoint applyN {n:nat} {As : vec Type n} {B : Type}
@@ -49,6 +51,7 @@ Fixpoint applyN {n:nat} {As : vec Type n} {B : Type}
 Definition liftGenN_aux : forall {n :nat} {As : vec Type n} {B : Type}
                                  (n':nat) (As': vec Type n') (vs : tvec_to_prod As')
              (F : tvec_to_fun (vapp As As') B id), tvec_to_fun As (G B) G.
+Proof.
 induction As as [| n AH AsT]; intros; simpl in *. exact (returnGen (applyN F vs)).
 intro m1. (* need to get to type G B before I can apply bindGen, need to curry? *)
 

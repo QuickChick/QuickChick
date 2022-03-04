@@ -1,4 +1,4 @@
-Require Import PArith List ChoiceFacts Omega.
+Require Import PArith List ChoiceFacts Lia.
 Require Import mathcomp.ssreflect.ssreflect.
 From mathcomp Require Import ssrfun ssrbool.
 
@@ -146,7 +146,7 @@ induction l as [ | x xs IHxs].
   - inversion LE.
   - pose proof IHxs bs as IH; clear IHxs.
     assert (LE' : le (length xs) (length bs))
-           by (simpl in *; omega). (* Overkill? :) *)
+           by (simpl in *; lia). (* Overkill? :) *)
     clear LE.
     apply IH in LE'; clear IH.
     inversion LE' as [pair Split]; clear LE'.
@@ -205,14 +205,14 @@ induction p.
   rewrite app_length. 
   rewrite Hyp.
   simpl.
-  omega.
+  lia.
 + inversion IHp as [n Hyp]; clear IHp.
   simpl.
   exists (S n).
   rewrite app_length. 
   rewrite Hyp.
   simpl.
-  omega.
+  lia.
 + exists (O).
   simpl.
   auto.
@@ -225,11 +225,11 @@ Lemma evenPathAux : forall l l' l'' lApp f n p, length l = (2 * n)%nat ->
                                     pathToPosAux (l' ++ lApp) f'.
 induction l using list_ind'.
 + intros. exists f. auto.
-+ intros. simpl in *. omega.
++ intros. simpl in *. lia.
 + intros l' l'' lApp f n p Len Valid.
   destruct n.
   - simpl in Len. congruence.
-  - simpl in Len; assert (length l = (2 * n)%nat) by omega.
+  - simpl in Len; assert (length l = (2 * n)%nat) by lia.
     destruct a eqn:A; destruct b eqn:B; simpl in *.
     * unfold pathToPos in Valid. simpl in Valid.
       pose proof (IHl l' l'' lApp (fun p => xO (f p)) n p H Valid) as Hyp; clear IHl H.
@@ -438,14 +438,14 @@ Lemma rangePosPrefixFree : forall p, PrefixFree (map posToPath (rangePos p)).
       destruct y.
       - congruence.
       - destruct n.
-        * omega.
+        * lia.
         * assert (Pos.to_nat (Pos.of_nat (S y)) = Pos.to_nat (Pos.succ (Pos.of_nat (S n))))
             by (rewrite H; auto).
           rewrite Pos2Nat.inj_succ in H0.
           
           rewrite Nat2Pos.id in H0.
           rewrite Nat2Pos.id in H0.
-          + subst; omega.
+          + subst; lia.
           + congruence.
           + congruence.
     pose proof (@PosToPathPrefixFree x m) as Hyp.
@@ -551,4 +551,3 @@ Qed.
 *)
 
 End arbFun_completeness.
-
