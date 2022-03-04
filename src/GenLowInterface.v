@@ -17,7 +17,7 @@ Import MonadNotation.
 Open Scope monad_scope.
 
 From QuickChick Require Import
-     RandomQC RoseTrees Sets LazyList.
+     RandomQC EnumerationQC RoseTrees Sets LazyList.
 
 Set Implicit Arguments.
 Unset Strict Implicit.
@@ -49,7 +49,10 @@ Module Type Sig.
 
   (** * Primitive generator combinators *)
 
-  Parameter returnGen  : forall {A : Type}, A -> G A.
+  Parameter failGen     : forall {A : Type}, G A.
+  Parameter returnGen   : forall {A : Type}, A -> G A.
+  Parameter returnGenL  : forall {A : Type}, LazyList A -> G A.
+
   (* TODO: Add dependent combinator *)
   Parameter bindGen :  forall {A B : Type}, G A -> (A -> G B) -> G B.
   Parameter run  : forall {A : Type}, G A -> nat -> RandomSeed -> LazyList A.
@@ -59,6 +62,13 @@ Module Type Sig.
   Parameter resize : forall {A: Type}, nat -> G A -> G A.
   Parameter promote : forall {A : Type}, Rose (G A) -> G (Rose A).
   Parameter choose : forall {A : Type} `{ChoosableFromInterval A}, (A * A) -> G A.
+  Parameter enumerate : forall {A : Type}, list A -> G A.
+  Parameter enumR : forall {A : Type} `{EnumFromInterval A} (range : A * A), G A.
+  Parameter enum : forall {A : Type} `{Serial A}, G A.
+  Parameter enum' : forall {A : Type} `{Serial A} (n : nat), G A.
+  Parameter cut : forall {A : Type}, G A -> G A.
+  Parameter backTrack : forall {A : Type}, nat -> G A -> G A.
+  Parameter shuffle : forall {A : Type}, list (nat * G A) -> G A.
   Parameter sample : forall {A : Type}, G A -> list A.
 
 
