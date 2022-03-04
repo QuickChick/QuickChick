@@ -369,3 +369,9 @@ Instance EnumSizedSuchThatexp_match_Correct {T} `{_ : Dec_Eq T} `{_ : EnumMonoto
 Proof. derive_enumST_Correct. Qed.
 
 
+(* Νote that we can also generate a enumerator for all the regular
+   expressions that can match a string (i.e., the input is the string
+   and the output is the regular expression)
+ *)
+
+Derive EnumSizedSuchThat for (fun e => exp_match l e). 
