@@ -217,7 +217,7 @@ Qed.
 
 (* TODO. These case be derived automatically. Change the default definitions *)
 
-Instance enumListSized_SizedMonotonic A `{EnumSizedMonotonic A} :
+Instance enumListSized_SizedMonotonic A `{EnumMonotonic A} :
   SizedMonotonic (@enumSized (list A) enumListSized).
 Proof.
   intros s s1 s2 Hleq x Hin.
@@ -271,7 +271,7 @@ Proof.
 
     eapply subset_trans. eassumption.
     eapply H0. now ssromega. 
-Qed.       
+Qed.
 
 Instance enumPairSized_SizedMonotonic A {_ : EnumSized A} { _ : SizedMonotonic (@enumSized A _)}
   B {_ : EnumSized B} { _ : SizedMonotonic (@enumSized B _)}:

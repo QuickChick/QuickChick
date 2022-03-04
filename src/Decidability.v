@@ -22,6 +22,7 @@ Set Bullet Behavior "Strict Subproofs".
 
 Class DecOpt (P : Prop) := { decOpt : nat -> option bool }.
 
+
 Axiom checkable_size_limit : nat.
 Extract Constant checkable_size_limit => "10000".
 
@@ -180,6 +181,10 @@ Proof. dec_eq. Defined.
 
 Global Instance Dec_eq_list (A : Type) `{Dec_Eq A} : Dec_Eq (list A).
 Proof. dec_eq. Defined.
+
+Global Instance list_Dec_Eq X (_ : Dec_Eq X) : Dec_Eq (list X).
+Proof. dec_eq. Defined.
+
 
 Hint Resolve ascii_dec: eq_dec.
 Hint Resolve string_dec: eq_dec.
