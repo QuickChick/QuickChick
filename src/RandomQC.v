@@ -5,7 +5,8 @@ Require Import mathcomp.ssreflect.ssreflect.
 From mathcomp Require Import ssrfun ssrbool ssrnat eqtype.
 Require Import ZArith.
 
-Require Import LazyList.
+Require Import LazyList Tactics.
+Set Bullet Behavior "Strict Subproofs".
 
 (* We axiomatize a random number generator
    (currently written in OCaml only) *)
@@ -125,7 +126,7 @@ Proof.
 elim: st => [|r|st1 [s1 st_s1] st2 [s2 st_s2]].
 + by case: randomSeed_inhabited=> seed; exists seed; apply: SubUndef.
 + by exists r; rewrite mkSeedTreeHelper; constructor.
-have [s eq_s] := randomSplitAssumption s1 s2.
++ have [s eq_s] := randomSplitAssumption s1 s2.
 by exists s; rewrite mkSeedTreeHelper eq_s; constructor.
 Qed.
 
@@ -211,9 +212,9 @@ Lemma corrEmptyLeaf : forall s l f, correspondingSeedTree l f (SeedTreeLeaf s) -
     - destruct s0 eqn : S0.
       * apply PrefixFreeWithNil in Pref; subst; auto.
       * pose proof (In_Vary (s1 :: s2)) as Hyp; clear In_Vary.
-
-  + inversion Pref.
-    fireInLeft Hyp'. simpl in Hyp'. inversion Hyp'.
+        
+        inversion Pref.
+        fireInLeft Hyp'. simpl in Hyp'. inversion Hyp'.
 
   + pose proof In_Vary [] as Hyp; clear In_Vary.
     apply Hyp in InNilL; clear Hyp.
@@ -295,36 +296,36 @@ Lemma refinePreservesPrefixFree : forall d l, PrefixFree l -> PrefixFree (refine
     * destruct s eqn:S; destruct d; subst.
       + unfold refineList; simpl.
         eapply FreeCons.
-        - apply IHl. inversion H; auto.
-        - intros. inversion H; subst; clear H.
-          apply in_map_iff in H0.
-          inversion H0; subst; clear H0.
-          inversion H; subst; clear H.
-          apply filter_In in H2. inversion H2; subst; clear H2.
-          destruct x eqn:X; simpl in *. inversion H0.
-          destruct s eqn:S; simpl in *.
-          pose proof H5 (Left :: l0).
-          eapply H2 in H; auto.
-          simpl. instantiate (1 := p2). instantiate (1:= p1). rewrite H1. auto.
-          inversion H0.
+        -- apply IHl. inversion H; auto.
+        -- intros. inversion H; subst; clear H.
+           apply in_map_iff in H0.
+           inversion H0; subst; clear H0.
+           inversion H; subst; clear H.
+           apply filter_In in H2. inversion H2; subst; clear H2.
+           destruct x eqn:X; simpl in *. inversion H0.
+           destruct s eqn:S; simpl in *.
+           pose proof H5 (Left :: l0).
+           eapply H2 in H; auto.
+           simpl. instantiate (1 := p2). instantiate (1:= p1). rewrite H1. auto.
+           inversion H0.
       + unfold refineList; simpl. apply IHl.
         inversion H. auto.
       + unfold refineList; simpl. apply IHl.
         inversion H. auto.
       + unfold refineList; simpl.
         eapply FreeCons.
-        - apply IHl. inversion H; auto.
-        - intros. inversion H; subst; clear H.
-          apply in_map_iff in H0.
-          inversion H0; subst; clear H0.
-          inversion H; subst; clear H.
-          apply filter_In in H2. inversion H2; subst; clear H2.
-          destruct x eqn:X; simpl in *. inversion H0.
-          destruct s eqn:S; simpl in *.
-          inversion H0.
-          pose proof H5 (Right :: l0).
-          eapply H2 in H; auto.
-          simpl. instantiate (1 := p2). instantiate (1:= p1). rewrite H1. auto.
+        -- apply IHl. inversion H; auto.
+        -- intros. inversion H; subst; clear H.
+           apply in_map_iff in H0.
+           inversion H0; subst; clear H0.
+           inversion H; subst; clear H.
+           apply filter_In in H2. inversion H2; subst; clear H2.
+           destruct x eqn:X; simpl in *. inversion H0.
+           destruct s eqn:S; simpl in *.
+           inversion H0.
+           pose proof H5 (Right :: l0).
+           eapply H2 in H; auto.
+           simpl. instantiate (1 := p2). instantiate (1:= p1). rewrite H1. auto.
 Qed.
 
 Definition refineFunction (f : SplitPath -> RandomSeed) (d : SplitDirection) (arg : SplitPath) :
@@ -439,13 +440,13 @@ induction p.
   - exfalso. eapply corrEmptyLeaf in Corr; inversion Corr; subst; clear Corr.
     pose proof (Pref []).
     eapply H.
-    - subst; left; auto.
-    - simpl. instantiate (2:= []); rewrite app_nil_r. instantiate (1 := Left ::p); auto.
+    -- subst; left; auto.
+    -- simpl. instantiate (2:= []); rewrite app_nil_r. instantiate (1 := Left ::p); auto.
   - exfalso. eapply corrEmptyLeaf in Corr; inversion Corr; subst; clear Corr.
     pose proof (Pref []).
     eapply H.
-    - subst; left; auto.
-    - simpl. instantiate (2:= []); rewrite app_nil_r. instantiate (1 := Right ::p); auto.
+    -- subst; left; auto.
+    -- simpl. instantiate (2:= []); rewrite app_nil_r. instantiate (1 := Right ::p); auto.
   - rewrite refineFunCorrect; apply IHp.
   - rewrite refineFunCorrect; apply IHp.
 Qed.
@@ -482,13 +483,13 @@ induction p as [ | d ds].
   * destruct p'.
     - simpl in VarySome. inversion VarySome.
     - destruct s.
-      + apply IHds; auto.
-      + auto.
+      ++ apply IHds; auto.
+      ++ auto.
   * destruct p'.
     - simpl in VarySome; inversion VarySome.
     - destruct s.
-      + auto.
-      + apply IHds; auto.
+      ++ auto.
+      ++ apply IHds; auto.
 Qed.
 
 Lemma addToTreeCorrect3 : forall (st : SeedTree) (p : SplitPath)
@@ -516,31 +517,31 @@ induction p.
 + intros.
   destruct p'; destruct st; destruct a; simpl in *;
   try solve [match goal with [ H : None = Some _ |- _ ] => inversion H end].
-  + exfalso. clear H. apply corrEmptyLeaf in Corr; inversion Corr; subst; clear Corr.
+  ++ exfalso. clear H. apply corrEmptyLeaf in Corr; inversion Corr; subst; clear Corr.
     eapply Pref.
     subst.
     instantiate (1 := []) ; left; auto.
     instantiate (1 := (Left :: p)); instantiate (1 := []); rewrite app_nil_r; auto.
-  + exfalso. clear H. apply corrEmptyLeaf in Corr; inversion Corr; subst; clear Corr.
+  ++ exfalso. clear H. apply corrEmptyLeaf in Corr; inversion Corr; subst; clear Corr.
     eapply Pref.
     subst.
     instantiate (1 := []) ; left; auto.
     instantiate (1 := (Right :: p)); instantiate (1 := []); rewrite app_nil_r; auto.
-  + destruct s; simpl in *.
+  ++ destruct s; simpl in *.
     - assert (p = p' \/ varySeed' SeedTreeUndef p' = Some seed)
              by (eapply IHp; eauto).
       inversion H0.
       * left; subst; auto.
       * simpl in H1. inversion H1.
     - inversion H.
-  + destruct s; simpl in *.
+  ++ destruct s; simpl in *.
     - inversion H.
     - assert (p = p' \/ varySeed' SeedTreeUndef p' = Some seed)
         by (eapply IHp; eauto).
       inversion H0.
       * left; subst; auto.
       * simpl in H1. inversion H1.
-  + exfalso.
+  ++ exfalso.
     clear H.
     apply corrEmptyLeaf in Corr; inversion Corr; subst; clear Corr.
     subst.
@@ -548,7 +549,7 @@ induction p.
     instantiate (1 := []).
     - left; auto.
     - instantiate (1 := Left :: p); instantiate (1 := []); rewrite app_nil_r; auto.
-  + exfalso.
+  ++ exfalso.
     clear H.
     apply corrEmptyLeaf in Corr; inversion Corr; subst; clear Corr.
     subst.
@@ -556,14 +557,14 @@ induction p.
     instantiate (1 := []).
     - left; auto.
     - instantiate (1 := Right :: p); instantiate (1 := []); rewrite app_nil_r; auto.
-  + destruct s eqn:S; simpl in *.
+  ++ destruct s eqn:S; simpl in *.
     - assert (p = p' \/ varySeed' st1 p' = Some seed)
         by (eapply IHp; eauto).
       inversion H0.
       * left; subst; auto.
       * right; auto.
     - right; auto.
-  + destruct s eqn:S; simpl in *.
+  ++ destruct s eqn:S; simpl in *.
     - right; auto.
     - assert (p = p' \/ varySeed' st2 p' = Some seed)
         by (eapply IHp; eauto).
@@ -775,11 +776,34 @@ Program Instance ChooseBool : ChoosableFromInterval bool :=
 Definition enumRNat (p : nat * nat) :=
   lazy_seq S (fst p) (S (snd p - fst p)).
 
+
 Lemma enumRNatCorrect : 
-      forall (a a1 a2 : nat), leq a1 a2 ->
-      (leq a1 a && leq a a2 <->
-       In_ll a (enumRNat (a1,a2))).
-Admitted.
+  forall (a a1 a2 : nat),
+    a1 <= a2 ->
+    (a1 <= a  <= a2 <->
+     In_ll a (enumRNat (a1,a2))).
+Proof.
+  unfold enumRNat. intros a a1 a2. 
+  replace (a1, a2).1  with a1 by reflexivity.
+  replace ((a1, a2).2 - a1).+1 with ((a2 - a1).+1) by reflexivity.
+  intros Hleq1. simpl in Hleq1. 
+
+  assert ((a2 - a1).+1 > 0) by ssromega.
+  assert (a2 = ((a2 - a1).+1 - 1) + a1) by ssromega.
+  revert H H0. 
+  generalize ((a2 - a1).+1) as n. intros n Hlt Heq.
+  rewrite Heq. clear Heq Hleq1 a2.
+  simpl. revert a1 a. induction n; intros a1 a.
+  - ssromega.
+  - simpl in *. split.
+    + intros Hleq.
+      destruct (Nat.eq_dec a1 a); eauto.
+      right. eapply IHn; ssromega.
+    + intros Hin. destruct Hin. subst. ssromega.
+      destruct n.
+      simpl in *. contradiction.
+      simpl in *. eapply IHn in H; now ssromega.
+Qed.
   
 Instance ChooseNat : ChoosableFromInterval nat :=
   {
@@ -796,6 +820,7 @@ Lemma enumRZCorrect :
       forall (a a1 a2 : Z), leq a1 a2 ->
       (leq a1 a && leq a a2 <->
        In_ll a (enumRZ (a1,a2))).
+Proof. 
 Admitted.
 
 Instance ChooseZ : ChoosableFromInterval Z :=
