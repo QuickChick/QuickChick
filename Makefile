@@ -8,6 +8,8 @@ QCTOOL_SRC=$(QCTOOL_DIR)/quickChickTool.ml \
 		   $(QCTOOL_DIR)/quickChickToolLexer.mll \
 		   $(QCTOOL_DIR)/quickChickToolParser.mly
 
+INSTALLDIR?=$(dir $(shell which coqc))
+
 # Here is a hack to make $(eval $(shell work
 # (copied from coq_makefile generated stuff):
 define donewline
@@ -32,7 +34,7 @@ TEMPFILE := $(shell mktemp)
 install: all
 	$(V)$(MAKE) -f Makefile.coq install > $(TEMPFILE)
 # Manually copying the remaining files
-	$(V)cp $(QCTOOL_DIR)/$(QCTOOL_EXE) $(shell opam config var bin)/quickChick
+	$(V)cp $(QCTOOL_DIR)/$(QCTOOL_EXE) $(INSTALLDIR)/quickChick
 #	 $(V)cp src/quickChickLib.cmx $(COQLIB)/user-contrib/QuickChick
 #	 $(V)cp src/quickChickLib.o $(COQLIB)/user-contrib/QuickChick
 
@@ -41,12 +43,12 @@ install-plugin: Makefile.coq
 
 uninstall:
 	$(V)if [ -e Makefile.coq ]; then $(MAKE) -f Makefile.coq uninstall; fi
-	$(RM) $(shell opam config var bin)/quickChick
+	$(RM) $(INSTALLDIR)/quickChick
 
 quickChickTool: $(QCTOOL_DIR)/$(QCTOOL_EXE)
 
 $(QCTOOL_DIR)/$(QCTOOL_EXE): $(QCTOOL_SRC)
-	cd $(QCTOOL_DIR); ocamlbuild -pkg unix -use-ocamlfind $(QCTOOL_EXE)
+	cd $(QCTOOL_DIR); ocamlbuild -pkg str -pkg unix -use-ocamlfind $(QCTOOL_EXE)
 
 tests:
 	$(MAKE) -C examples tutorial
@@ -60,19 +62,19 @@ tests:
 #	coqc examples/BSTTest.v
 	coqc examples/DependentTest.v
 
-COMPATFILES:=plugin/compat.ml src/ExtractionQCCompat.v
+COMPATFILES:=plugin/depDriver.ml plugin/driver.mlg plugin/genericLib.ml plugin/quickChick.mlg plugin/tactic_quickchick.mlg plugin/weightmap.mlg src/ExtractionQC.v src/QuickChick.v _CoqProject
 
 compat: $(COMPATFILES)
 
-$(COMPATFILES): compat.pl
-	$(V)perl -- compat.pl $(COMPATFILES)
+%: %.cppo
+	$(V)cppo -V OCAML:$(shell ocamlc -version) -V COQ:$(word 1, $(shell coqc -print-version)) -n -o $@ $^
 
 Makefile.coq: _CoqProject
 	$(V)coq_makefile -f _CoqProject -o Makefile.coq
 
 clean:
 	$Vif [ -e Makefile.coq ]; then $(MAKE) -f Makefile.coq clean; fi
-	$Vocamlbuild -clean
+	$Vcd $(QCTOOL_DIR); ocamlbuild -clean
 	# This might not work on macs
 	find . -name '*.vo' -print -delete
 	find . -name '*.glob' -print -delete

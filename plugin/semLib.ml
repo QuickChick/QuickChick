@@ -1,5 +1,5 @@
 open GenericLib
-open CoqLib
+(* open CoqLib *)
 
 let semGenSize gen size =
   gApp (gInject "semGenSize") [gen; size]
@@ -135,7 +135,7 @@ let nat_set_ind typ ginst sinst cinst hb hi x =
  gApp ~explicit:true (gInject "nat_set_ind") [typ; ginst; sinst; cinst; hb; hi; x]
 
 
-
+(*
 (* Checker proofs *)
 
 let destruct_match_true_r (h : coq_expr) (k : coq_expr) =
@@ -151,3 +151,4 @@ let checker_backtrack_spec_l (gens : coq_expr) (h : coq_expr) =
 let checker_backtrack_spec_r (gens : coq_expr) (h : coq_expr) =
   let heq = gApp ~explicit:true (gInject "checker_backtrack_spec") [gens] in
   gApp (gProjR heq) [h]
+ *)

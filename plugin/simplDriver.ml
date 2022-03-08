@@ -1,8 +1,8 @@
-open Libnames
+(* open Libnames *)
 open Util
 open Constrexpr
 open GenericLib
-open SizeUtils
+(* open SizeUtils *)
 open Sized
 (*
 open SizeMon
@@ -62,14 +62,16 @@ let derive (cn : derivable) (c : constr_expr) (instance_name : string) (name1 : 
 
   let full_dt = gApp ~explicit:true coqTyCtr coqTyParams in
 
+(*
   let ind_name = match c with
     | { CAst.v = CRef (r, _); _ } ->
          string_of_qualid r
     | _ -> failwith "Implement me for functions" 
   in
-
+ *)
   let class_name = derivable_to_string cn in
 
+  (*
   let size_config =
     { _ty_ctr  = ty_ctr
     ; _ctrs    = ctrs
@@ -78,7 +80,7 @@ let derive (cn : derivable) (c : constr_expr) (instance_name : string) (name1 : 
     ; _full_dt  = full_dt
     ; _isCurrentTyCtr = sameTypeCtr ty_ctr
     } in
-
+   *)
   let param_class_names = match cn with
     | Sized -> ["Sized"]
     | Shrink -> ["Shrink"]

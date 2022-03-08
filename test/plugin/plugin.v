@@ -49,3 +49,8 @@ QuickChick
       eqn
         (gcdn s t)
         (gcdn t s)).
+
+(* Test extraction hack (substitute type int = int) *)
+Definition int := nat.
+Definition teh := fun x : int => Nat.eqb x x.
+QuickChick teh.

@@ -1,0 +1,9 @@
+package "plugin" (
+  directory = "."
+  requires = "coq-core.plugins.ltac coq-core.plugins.extraction"
+  archive(byte) = "quickchick_plugin.cma"
+  archive(native) = "quickchick_plugin.cmxa"
+  plugin(byte) = "quickchick_plugin.cma"
+  plugin(native) = "quickchick_plugin.cmxs"
+)
+directory = "."

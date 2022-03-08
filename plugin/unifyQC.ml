@@ -63,7 +63,7 @@ let rec matcher_pat_to_range m =
   | MatchParameter p -> Parameter p
 
 module UM = Map.Make(UnknownOrd)
-module US = Set.Make(UnknownOrd)
+(* module US = Set.Make(UnknownOrd) *)
           
 (* Maps unknowns to range *)
 type umap = range UM.t

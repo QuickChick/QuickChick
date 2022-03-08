@@ -1,0 +1,3 @@
+*.ml.cppo linguist-language=OCaml
+*.mlg.cppo linguist-language=OCaml
+*.v.cppo linguist-language=Coq

@@ -1,3 +1,10 @@
+(*
+
+THIS FILE IS PREPROCESSED USING cppo
+MAKE SURE TO EDIT THE .cppo SOURCE OF THIS FILE RATHER THAN THE GENERATED RESULT
+
+*)
+
 open Pp
 open Constr
 open Names
@@ -70,7 +77,7 @@ let gInject s =
   if s = "" then failwith "Called gInject with empty string";
   CAst.make @@ CRef (qualid_of_string s, None)
 
-let gType0 = CAst.make @@ CSort (UAnonymous {rigid = true})
+let gType0 = CAst.make @@ CSort (Glob_term.UAnonymous {rigid = true})
          
 type ty_param = Id.t (* Opaque *)
 let ty_param_to_string (x : ty_param) = Id.to_string x
@@ -90,9 +97,14 @@ let gArg ?assumName:(an=hole) ?assumType:(at=hole) ?assumImplicit:(ai=false) ?as
     | { CAst.v = CRef (qid, _); loc } -> (loc,Name (qualid_basename qid))
     | { CAst.v = CHole (_v,_,_); loc } -> (loc,Anonymous)
     | _a -> failwith "This expression should be a name" in
+#if COQ_VERSION >= (8, 12, 0)
+  let max_implicit = Glob_term.MaxImplicit in
+#else
+  let max_implicit = Glob_term.Implicit in
+#endif
   CLocalAssum ( [CAst.make ?loc:(fst n) @@ snd n],
-                  (if ag then Generalized (Compat.max_implicit, false)
-                   else if ai then Default Compat.max_implicit else Default Glob_term.Explicit),
+                  (if ag then Generalized (max_implicit, false)
+                   else if ai then Default max_implicit else Default Glob_term.Explicit),
                   at )
 
 let arg_to_var (x : arg) =
@@ -569,7 +581,12 @@ let coerce_reference_to_dep_dt c =
 let gApp ?explicit:(expl=false) c cs =
   if expl then
     let f c = match c with
-    | CRef (r,_) -> CAppExpl ((None, r, None), cs)
+    | CRef (r,_) ->
+#if COQ_VERSION >= (8, 15, 0)
+        Constrexpr.CAppExpl((r, None), cs)
+#else
+        Constrexpr.CAppExpl((None, r, None), cs)
+#endif
     | _ -> failwith "invalid argument to gApp"
     in CAst.map f c
   else mkAppC (c, cs)
@@ -683,7 +700,11 @@ let gRecord names_and_bodies =
   CAst.make @@ CRecord (List.map (fun (n,b) -> (qualid_of_ident @@ Id.of_string n, b)) names_and_bodies)
 
 let gAnnot (p : coq_expr) (tau : coq_expr) =
+#if COQ_VERSION >= (8, 15, 0)
+  CAst.make @@ CCast (p, DEFAULTcast, tau)
+#else
   CAst.make @@ CCast (p, Glob_term.CastConv tau)
+#endif
 
 (* Convert types back into coq *)
 let gType ty_params dep_type = 
@@ -860,7 +881,17 @@ let dtTupleType =
 (* Int *)
 
 let nat_scope ast = CAst.make @@ CDelimiters ("nat", ast)
-let gInt n = nat_scope (CAst.make @@ CPrim (Compat.number n))
+let gInt n =
+  let number =
+#if COQ_VERSION >= (8, 13, 0)
+    Number (NumTok.Signed.of_int_string (string_of_int n))
+#elif COQ_VERSION >= (8, 12, 0)
+    Numeral (NumTok.Signed.of_int_string (string_of_int n))
+#else
+    if n >= 0 then Numeral (SPlus, NumTok.int (string_of_int n))
+    else Numeral (SMinus, NumTok.int (string_of_int (-n)))
+#endif
+  in nat_scope (CAst.make @@ CPrim number)
 let gSucc x = gApp (gInject "Coq.Init.Datatypes.S") [x]
 let rec maximum = function
   | [] -> failwith "maximum called with empty list"
@@ -960,8 +991,16 @@ let declare_class_instance ?(global=true) ?(priority=42) instance_arguments inst
   msg_debug (str "Calculated instance_type_vars" ++ fnl ());
   let instance_record_vars = instance_record vars in
   msg_debug (str "Calculated instance_record_vars" ++ fnl ());
-  let locality = if global then Goptions.OptGlobal else Goptions.OptLocal in
-  let cid = Compat.new_instance ~locality ~poly:false
+  let cid =
+    Classes.new_instance
+#if COQ_VERSION >= (8, 15, 0)
+      ~locality:(if global then Hints.SuperGlobal else Hints.Local)
+#elif COQ_VERSION >= (8, 14, 0)
+      ~locality:(if global then Goptions.OptGlobal else Goptions.OptLocal)
+#else
+      ~global
+#endif
+              ~poly:false
               (CAst.make @@ Name (Id.of_string instance_name), None) iargs
               instance_type_vars
               (true, instance_record_vars) (* TODO: true or false? *)
@@ -1006,9 +1045,7 @@ let debug_pattern s p =
   | PRel _ -> failwith (s ^ "REL")
   | PVar _ -> failwith (s ^ "VAR")
   | PEvar _ -> failwith (s ^ "EVAR")
-  | PMeta _ -> failwith (s ^ "META")
   | PLetIn _ -> failwith (s ^ "LET")
-  | PRel _ -> failwith (s ^ "REL")
   | PSort _ -> failwith (s ^ "SORT")
   | PInt _ -> failwith (s ^ "INT")
   | PFloat _ -> failwith (s ^ "FLOAT")
@@ -1022,7 +1059,6 @@ let debug_pattern s p =
   | PCoFix _ -> failwith (s ^ "COFIX")
   | PArray _ -> failwith (s ^ "ARRAY")
   | PProd _ -> failwith (s ^ "PROD")
-  | _ -> failwith (s ^ "SOMETHING ELSE")
   
 let find_typeclass_bindings typeclass_name ctr =  
   let env = Global.env () in

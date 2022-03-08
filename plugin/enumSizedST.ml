@@ -1,7 +1,6 @@
 open Pp
 open Util
 open GenericLib
-open CoqLib
 open GenLib
 open Error
 open UnifyQC

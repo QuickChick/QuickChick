@@ -474,7 +474,7 @@ Section ProducerProofs.
     exists (s + s'); split; unfold setT; auto.
     apply semBindSize.
     exists x; split; auto.
-    apply monotonicOpt with (s2 := s'); eauto; try ssromega.
+    apply monotonicOpt with (s1 := s'); eauto; try ssromega.
 Qed.    
 
   Lemma semBindSize_subset_compat {A B : Type} (g g' : G A) (f f' : A -> G B) :

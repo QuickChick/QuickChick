@@ -1,6 +1,8 @@
 Set Warnings "-extraction-opaque-accessed,-extraction".
 Set Warnings "-notation-overridden,-parsing".
 
+From ExtLib Require Import
+     RelDec.
 From Coq Require Import
      Ascii
      List
@@ -153,6 +155,14 @@ Proof.
 constructor.
 dec_eq.
 Defined.
+
+Global Instance Eq__RelDec {A} `{Dec_Eq A} : RelDec (@eq A) :=
+  {| rel_dec x y :=
+       match dec_eq x y with
+       | left  _ => true
+       | right _ => false
+       end
+  |}.
 
 (* Lifting common decidable instances *)
 Global Instance Dec_eq_unit : Dec_Eq unit.

@@ -1,10 +1,4 @@
 (coq.theory
  (name QuickChick)
- (package quickchick)
- (libraries quickchick.plugin))
-
-(rule
-  (target ExtractionQCCompat.v)
-  (action
-    (run "perl" %{dep:../compat.pl} %{target}))
-  (package quickchick))
+ (package coq-quickchick)
+ (libraries coq-quickchick.plugin))

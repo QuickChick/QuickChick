@@ -51,6 +51,8 @@ move=> T; constructor=> // [A B eqAB | A B C] x; first by split=> /eqAB.
 exact: set_eq_trans.
 Qed.
 
+#[global] Instance set_eq_rew A : RelationClasses.RewriteRelation (@set_eq A) := {}.
+
 Definition set_incl {A} (m1 m2 : set A) :=
   forall (a : A), m1 a -> m2 a.
 

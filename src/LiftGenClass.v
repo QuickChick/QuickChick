@@ -24,6 +24,7 @@ Definition ex2 : G nat := liftM (fun x y => x + y) (returnGen 0) (returnGen 1).
 Definition ex3 : G nat := liftM (fun x y z => x + y + z)
                                 (returnGen 0) (returnGen 1) (returnGen 2).
 
+(*
 Eval cbv -[plus] in ex1.
 (* = fmap (fun x : nat => x + 3) (returnGen 0) -- fair enough *)
 
@@ -48,6 +49,7 @@ Check (liftM (fun x y => x + y + y) (returnGen 0) (returnGen 1) (returnGen 2)
 
 (* it's even worse ... all kinds of stuff are accepted in Check and Eval *)
 Eval simpl in (liftM (fun x => x + 1) (returnGen 0) 0 0 : G nat).
+*)
 (*
 liftM nat nat (nat -> nat -> G nat) `{liftable (G nat) (nat -> nat -> G nat)} ...
 -- but we don't have such an instance!

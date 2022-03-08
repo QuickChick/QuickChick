@@ -1,5 +1,27 @@
+#if COQ_VERSION >= (8, 16, 0)
+plugin/META.coq-quickchick.in
+#endif
 -R src QuickChick
 -I plugin
+
+plugin/quickChick.mli
+plugin/driver.mli
+plugin/tactic_quickchick.mli
+plugin/weightmap.mli
+plugin/genericLib.mli
+plugin/error.mli
+plugin/simplDriver.mli
+plugin/depDriver.mli
+plugin/setLib.mli
+plugin/semLib.mli
+plugin/coqLib.mli
+plugin/arbitrarySized.mli
+plugin/arbitrarySizedST.mli
+plugin/checkerSizedST.mli
+plugin/genLib.mli
+plugin/unifyQC.mli
+plugin/sizeUtils.mli
+plugin/sized.mli
 
 plugin/quickChick.mlg
 plugin/driver.mlg
@@ -7,7 +29,6 @@ plugin/tactic_quickchick.mlg
 plugin/weightmap.mlg
 plugin/quickchick_plugin.mlpack
 plugin/genericLib.ml
-plugin/genericLib.mli
 plugin/error.ml
 plugin/simplDriver.ml
 plugin/depDriver.ml
@@ -23,7 +44,6 @@ plugin/genLib.ml
 plugin/unifyQC.ml
 plugin/sizeUtils.ml
 plugin/sized.ml
-plugin/compat.ml
 
 src/Tactics.v
 src/Sets.v
@@ -51,7 +71,6 @@ src/MutateCheck.v
 src/DependentClasses.v
 src/Decidability.v
 src/ExtractionQC.v
-src/ExtractionQCCompat.v
 src/TacticsUtil.v
 src/CheckerProofs.v
 src/EnumProofs.v

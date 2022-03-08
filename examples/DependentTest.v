@@ -16,141 +16,7 @@ Open Scope monad_scope.
 
 Set Bullet Behavior "Strict Subproofs".
 
-Inductive tree : Type :=
-| Leaf : tree
-| Node : nat -> tree -> tree -> tree.
-
-(* Example with two IH *)
-Inductive goodTree : nat -> tree -> Prop :=
-| GL : goodTree 0 Leaf
-| GN : forall k t1 t2 n m, goodTree n t1 ->
-                      goodTree m t2 ->
-                      goodTree m t1 ->
-                      goodTree (S n) (Node k t1 t2).
-
-Set Typeclasses Debug.
-QuickChickDebug Debug On.
-Instance DecgoodTree (n : nat) (t : tree) : DecOpt (goodTree n t) := { decOpt := fun _ => Some true }.
-
-Derive ArbitrarySizedSuchThat for (fun t => goodTree n t).
-(* Derive EnumSizedSuchThat for (fun t => goodTree n t).  *)
-
-Definition test m t1 init_size : option bool :=
-  @decOpt (@goodTree m t1) (DecgoodTree m t1) init_size.
-
-Definition baz m (t1 : tree) : option bool :=
-  match m with
-  | O => Some true
-  | _ => Some false
-  end.
-
-Definition bar := Some (negb true).
-
-Definition foo n_ :=
-  let
-   fix aux_arb init_size size0 (n_ : nat) :
-       E (Coq.Init.Datatypes.option (tree)) :=
-     match size0 with
-     | O =>
-         enumerate
-           (Coq.Lists.List.cons
-              match n_ as s with
-              | @Coq.Init.Datatypes.O =>
-                  returnEnum (@Some (tree) (@Leaf))
-              | _ => returnEnum (@None (tree))
-              end Coq.Lists.List.nil)
-     | S size' =>
-         enumerate
-           (Coq.Lists.List.cons
-              match n_ as s with
-              | @Coq.Init.Datatypes.O =>
-                  returnEnum (@Some (tree) (@Leaf))
-              | _ => returnEnum (@None (tree))
-              end
-           (Coq.Lists.List.cons
-                 match n_ as s with
-                 | @Coq.Init.Datatypes.S n =>
-                     bindEnumOpt
-                       (aux_arb init_size size' n)
-                       (fun t1 =>
-                        bindEnum enum
-                          (fun m =>
-                           bindEnumOpt
-                             (aux_arb init_size size' m)
-                             (fun t2 =>
-                              match baz m t1 
-(*                                @decOpt 
-                                  (@goodTree m t1) (DecgoodTree m t1)
-                                  init_size as s return E (option tree) *)
-                              with
-                              | Some res_b =>
-                                
-                                  match res_b with
-                                  | true =>
-                                    bindEnum enum
-                                    (fun k : nat =>
-                                    returnEnum
-                                    (@Some 
-                                    (tree)
-                                    (@Node k t1 t2)))
-                                  | false =>
-                                    returnEnum
-                                    (@None (tree))
-                                  end
-                              | None =>
-                                  returnEnum
-                                    (@None (tree))
-                              end))) 
-                 | _ => returnEnum (@None (tree))
-                 end Coq.Lists.List.nil))
-     end  
-  in fun size0 => aux_arb size0 size0 n_. 
-
-   | S size' =>
-         enumerate
-           (Coq.Lists.List.cons
-              match n_ as s with
-              | @Coq.Init.Datatypes.O =>
-                  returnEnum (@Some (tree) (@Leaf))
-              | _ => returnEnum (@None (tree))
-              end
-              (Coq.Lists.List.cons
-                 match n_ as s with
-                 | @Coq.Init.Datatypes.S n =>
-                     bindEnumOpt
-                       (aux_arb init_size size' n)
-                       (fun t1 =>
-                        bindEnum enum
-                          (fun m =>
-                           bindEnumOpt
-                             (aux_arb init_size size' m)
-                             (fun t2 =>
-                              match
-                                @decOpt 
-                                  (@goodTree m t1) _
-                                  init_size as s
-                              with
-                              | Some res_b =>
-                                  match res_b with
-                                  | true =>
-                                    bindEnum enum
-                                    (fun k =>
-                                    returnEnum
-                                    (@Some 
-                                    (tree)
-                                    (@Node k t1 t2)))
-                                  | false =>
-                                    returnEnum
-                                    (@None (tree))
-                                  end
-                              | None =>
-                                  returnEnum
-                                    (@None (tree))
-                              end)))
-                 | _ => returnEnum (@None (tree))
-                 end Coq.Lists.List.nil))
-     end in
- fun size0 => aux_arb size0 size0 n_).
+Derive ArbitrarySizedSuchThat for (fun x => eq x y).
 
 Definition GenSizedSuchThateq_manual {A} (y_ : A) :=
   let fix aux_arb (init_size size : nat) (y_0 : A) {struct size} : G (option A) :=
@@ -160,7 +26,7 @@ Definition GenSizedSuchThateq_manual {A} (y_ : A) :=
       end
   in fun size => aux_arb size size y_.
 
-Theorem GenSizedSuchThateq_proof A (n : A) :
+Theorem GenSizedSuchThateq_proof A (n : A) `{Dec_Eq A} `{Gen A} `{Enum A}:
   GenSizedSuchThateq_manual n = @arbitrarySizeST _ (fun x => eq x n) _.
 Proof. reflexivity. Qed.
 
@@ -360,9 +226,9 @@ Derive ArbitrarySizedSuchThat for (fun foo => goodFooRec n foo).
 Definition genGoodRec (n : nat) :=
   let fix aux_arb (init_size size : nat) n : G (option Foo) := 
     match size with 
-    | 0 => backtrack [(1, ret (Some Foo1))]
+    | 0 => backtrack [(1, ret (Some Foo1)); (1, ret None)]
     | S size' => backtrack [ (1, ret (Some Foo1))
-                           ; (1, bindGenOpt (aux_arb init_size size' 0) (fun foo => 
+                           ; (1, bindOpt (aux_arb init_size size' 0) (fun foo => 
                                  ret (Some (Foo2 foo)))) ]
     end
   in fun sz => aux_arb sz sz n.
@@ -387,8 +253,7 @@ Definition DecOptgoodFooPrec_manual (n_ : nat) (foo_ : Foo) :=
          [(fun u:unit =>
           match foo_0 with
           | Foo1 => Some true
-          | Foo2 _ => None
-          | Foo3 _ _ => None
+          | _ => Some false
           end
          ); fun u:unit => None]
      | size'.+1 =>
@@ -396,12 +261,12 @@ Definition DecOptgoodFooPrec_manual (n_ : nat) (foo_ : Foo) :=
          [(fun u:unit =>
           match foo_0 with
           | Foo1 => Some true
-          | Foo2 _ => None
-          | Foo3 _ _ => None
+          | _ => Some false
           end)
         ;(fun u:unit =>
           match aux_arb init_size size' 0 Foo1 with
-          | Some _ => Some true
+          | Some true => Some true
+          | Some false => Some false
           | None => None
           end)
          ]
@@ -411,8 +276,7 @@ Definition DecOptgoodFooPrec_manual (n_ : nat) (foo_ : Foo) :=
 
 Theorem DecOptgoodFooPrec_proof n foo :
   DecOptgoodFooPrec_manual n foo = @decOpt (goodFooPrec n foo) _.
-Proof.
-Admitted. 
+Proof. reflexivity. Qed.
 
 Derive ArbitrarySizedSuchThat for (fun foo => goodFooPrec n foo).
 
@@ -421,17 +285,17 @@ Definition genGoodPrec (n : nat) : nat -> G (option (Foo)):=
    fix aux_arb init_size size (n : nat) : G (option (Foo)) :=
      match size with
      | O => 
-                      backtrack [ (1, ret (Some Foo1))
-                     ; (1, match @decOpt (goodFooPrec O Foo1) _ 42 with
+         backtrack [ (1, ret (Some Foo1))
+                     ; (1, match @decOpt (goodFooPrec O Foo1) _ init_size with
                            | Some true => foo <- arbitrary;;
                                           ret (Some foo)
                            | _ => ret None
-                           end
-                     )]
+                           end)
+           ]
 
      | S size' =>
          backtrack [ (1, ret (Some Foo1))
-                     ; (1, match @decOpt (goodFooPrec O Foo1) _ 42 with
+                     ; (1, match @decOpt (goodFooPrec O Foo1) _ init_size with
                            | Some true => foo <- arbitrary;;
                                           ret (Some foo)
                            | _ => ret None
@@ -453,55 +317,57 @@ Inductive goodFooNarrow : nat -> Foo -> Prop :=
 Derive DecOpt for (goodFooNarrow n foo).
 
 Definition goodFooNarrow_decOpt (n_ : nat) (foo_ : Foo) :=
-  let fix aux_arb (size0 n_0 : nat) (foo_0 : Foo) : option bool :=
+  let fix aux_arb (init_size size0 n_0 : nat) (foo_0 : Foo) : option bool :=
       match size0 with
       | 0 =>
         checker_backtrack
           [(fun _ : unit =>
              match foo_0 with
              | Foo1 => Some true
-             | Foo2 _ => None
-             | Foo3 _ _ => None
-             end)]
+             | _ => Some false
+             end)
+          ; (fun _ : unit => None)]
       | size'.+1 =>
         checker_backtrack
           [(fun _ : unit =>
              match foo_0 with
              | Foo1 => Some true
-             | Foo2 _ => None
-             | Foo3 _ _ => None
+             | _ => Some false
              end) ;
            (fun _ : unit =>
-                 match aux_arb size' 0 foo_0 with
-                 | Some _ =>
-                   match aux_arb size' 1 foo_0 with
-                   | Some _ => Some true
+                 match aux_arb init_size size' 0 foo_0 with
+                 | Some true =>
+                   match aux_arb init_size size' 1 foo_0 with
+                   | Some true => Some true
+                   | Some false => Some false
                    | None => None
                    end
+                 | Some false => Some false
                  | None => None
                  end)]
       end in
-  fun size0 : nat => aux_arb size0 n_ foo_.
+  fun size0 : nat => aux_arb size0 size0 n_ foo_.
+
 Lemma goodFooNarrow_decOpt_correct n foo :
   goodFooNarrow_decOpt n foo = @decOpt (goodFooNarrow n foo) _.
-Proof. Admitted.
+Proof. reflexivity. Qed. 
 
 Derive ArbitrarySizedSuchThat for (fun foo => goodFooNarrow n foo).
 
 Definition genGoodNarrow (n : nat) : nat -> G (option (Foo)) :=
  let
-   fix aux_arb size (n : nat) : G (option (Foo)) :=
+   fix aux_arb init_size size (n : nat) : G (option (Foo)) :=
      match size with
-     | O => backtrack [(1, ret (Some Foo1))]
+     | O => backtrack [(1, ret (Some Foo1)); (1, ret None)]
      | S size' =>
          backtrack [ (1, ret (Some Foo1))
-                   ; (1, bindGenOpt (aux_arb size' 0) (fun foo =>
-                         match @decOpt (goodFooNarrow 1 foo) _  42 with
+                   ; (1, bindOpt (aux_arb init_size size' 0) (fun foo =>
+                         match @decOpt (goodFooNarrow 1 foo) _  init_size with
                          | Some true => ret (Some foo)
                          | _ => ret None
                          end
                      ))]
-     end in fun sz => aux_arb sz n.
+     end in fun sz => aux_arb sz sz n.
 
 Lemma genGoodNarrow_equality n : 
   genGoodNarrow n = @arbitrarySizeST _ (fun foo => goodFooNarrow n foo) _. 
@@ -512,7 +378,7 @@ Inductive goodFooNL : nat -> Foo -> Foo -> Prop :=
 | GoodNL : forall n foo, goodFooNL n (Foo2 foo) foo.
 
 Instance EqDecFoo (f1 f2 : Foo) : Dec (f1 = f2).
-dec_eq. Defined.
+Proof. dec_eq. Defined.
 
 Derive ArbitrarySizedSuchThat for (fun foo => goodFooNL n m foo).
 Derive DecOpt for (goodFooNL n m foo).

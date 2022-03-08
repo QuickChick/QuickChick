@@ -1,3 +1,10 @@
+(*
+
+THIS FILE IS PREPROCESSED USING cppo
+MAKE SURE TO EDIT THE .cppo SOURCE OF THIS FILE RATHER THAN THE GENERATED RESULT
+
+*)
+
 Set Warnings "-extraction-opaque-accessed,-extraction".
 Set Warnings "-notation-overridden,-parsing".
 
@@ -5,14 +12,36 @@ Require Import ZArith.
 Require Import Coq.Strings.Ascii.
 Require Import Coq.Strings.String.
 From QuickChick Require Import
-  RandomQC RoseTrees Test Show Checker ExtractionQCCompat.
+  RandomQC RoseTrees Test Show Checker.
 
 Require Import ExtrOcamlBasic.
 Require Import ExtrOcamlString.
 Require Import ExtrOcamlNatInt.
+#if COQ_VERSION >= (8, 15, 0)
+Require Import ExtrOcamlZBigInt.
+#else
 Require Import ExtrOcamlZInt.
+#endif
 
 Extraction Blacklist String List Nat.
+
+#if COQ_VERSION >= (8, 12, 0)
+#if COQ_VERSION >= (8, 13, 0)
+#define Number_int Number.int
+#else
+#define Number_int Numeral.int
+#endif
+Extract Inductive Hexadecimal.int => "((Obj.t -> Obj.t) -> (Obj.t -> Obj.t) -> Obj.t) (* Hexadecimal.int *)"
+  [ "(fun x pos _ -> pos (Obj.magic x))"
+    "(fun y _ neg -> neg (Obj.magic y))"
+  ] "(fun i pos neg -> Obj.magic i pos neg)".
+Extract Inductive Number_int => "((Obj.t -> Obj.t) -> (Obj.t -> Obj.t) -> Obj.t) (* Number_int *)"
+  [ "(fun x dec _ -> dec (Obj.magic x))"
+    "(fun y _ hex -> hex (Obj.magic y))"
+  ] "(fun i dec hex -> Obj.magic i dec hex)".
+#else
+(* Hexadecimal.int and Numeral.int don't exist before 8.12 *)
+#endif
 
 (** Temporary fix for https://github.com/coq/coq/issues/7017. *)
 (** Scott encoding of [Decimal.int] as [forall r. (uint -> r) -> (uint -> r) -> r]. *)
@@ -34,6 +63,20 @@ Extract Constant show_bool =>
     if i < 0 then acc else copy (s.[i] :: acc) (i-1)
   in copy [] (String.length s - 1))".
 
+#if COQ_VERSION >= (8, 15, 0)
+Extract Constant show_Z =>
+  "(fun i ->
+  let s = Big_int_Z.string_of_big_int i in
+  let rec copy acc i =
+    if i < 0 then acc else copy (s.[i] :: acc) (i-1)
+  in copy [] (String.length s - 1))".
+Extract Constant show_N =>
+  "(fun i ->
+  let s = Big_int_Z.string_of_big_int i in
+  let rec copy acc i =
+    if i < 0 then acc else copy (s.[i] :: acc) (i-1)
+  in copy [] (String.length s - 1))".
+#else
 Extract Constant show_Z =>
   "(fun i ->
   let s = string_of_int i in
@@ -46,6 +89,7 @@ Extract Constant show_N =>
   let rec copy acc i =
     if i < 0 then acc else copy (s.[i] :: acc) (i-1)
   in copy [] (String.length s - 1))".
+#endif
 
 Extract Constant RandomSeed   => "Random.State.t".
 Extract Constant randomNext   => "(fun r -> Random.State.bits r, r)".
@@ -53,12 +97,40 @@ Extract Constant randomNext   => "(fun r -> Random.State.bits r, r)".
 Extract Constant randomSplit  => "(fun x -> (x,x))".
 Extract Constant mkRandomSeed => "(fun x -> Random.init x; Random.get_state())".
 Extract Constant randomRNat  =>
+#if OCAML_VERSION >= (4, 13, 0)
+  "(fun (x,y) r -> if y < x then failwith ""choose called with unordered arguments"" else  (x + (Random.State.full_int r (y - x + 1)), r))".
+#else
   "(fun (x,y) r -> if y < x then failwith ""choose called with unordered arguments"" else  (x + (Random.State.int r (y - x + 1)), r))".
+#endif
 Extract Constant randomRBool => "(fun _ r -> Random.State.bool r, r)".
 Extract Constant randomRInt  =>
+#if COQ_VERSION >= (8, 15, 0)
+  "(fun (x,y) r ->
+   if Big_int_Z.lt_big_int y x
+   then failwith ""choose called with unordered arguments""
+   else
+    let range_Z = Big_int_Z.succ_big_int (Big_int_Z.sub_big_int y x) in
+    let range_int = Big_int_Z.int_of_big_int range_Z in
+    (Big_int_Z.add_big_int x (Big_int_Z.big_int_of_int (Random.State.int r range_int)), r))".
+#elif OCAML_VERSION >= (4, 13, 0)
+  "(fun (x,y) r -> if y < x then failwith ""choose called with unordered arguments"" else  (x + (Random.State.full_int r (y - x + 1)), r))".
+#else
   "(fun (x,y) r -> if y < x then failwith ""choose called with unordered arguments"" else  (x + (Random.State.int r (y - x + 1)), r))".
+#endif
 Extract Constant randomRN =>
+#if COQ_VERSION >= (8, 15, 0)
+  "(fun (x,y) r ->
+   if Big_int_Z.lt_big_int y x
+   then failwith ""choose called with unordered arguments""
+   else
+    let range_Z = Big_int_Z.succ_big_int (Big_int_Z.sub_big_int y x) in
+    let range_int = Big_int_Z.int_of_big_int range_Z in
+    (Big_int_Z.add_big_int x (Big_int_Z.big_int_of_int (Random.State.int r range_int)), r))".
+#elif OCAML_VERSION >= (4, 13, 0)
+  "(fun (x,y) r -> if y < x then failwith ""choose called with unordered arguments"" else  (x + (Random.State.full_int r (y - x + 1)), r))".
+#else
   "(fun (x,y) r -> if y < x then failwith ""choose called with unordered arguments"" else  (x + (Random.State.int r (y - x + 1)), r))".
+#endif
 Extract Constant newRandomSeed => "(Random.State.make_self_init ())".
 
 Extract Inductive Lazy => "Lazy.t" [lazy].
@@ -66,7 +138,6 @@ Extract Constant force => "Lazy.force".
 
 (* Extract Constant Test.ltAscii => "(<=)". *)
 (* Extract Constant Test.strEq   => "(=)". *)
-Extract Constant Nat.div => "(fun m -> function 0 -> 0 | d -> m / d)".
 Extract Constant Test.gte => "(>=)".
 Extract Constant le_gt_dec => "(<=)".
 Extract Constant trace =>
@@ -84,6 +155,15 @@ From mathcomp Require Import ssreflect ssrnat ssrbool div eqtype.
 Extract Constant divn => "(fun m -> function 0 -> 0 | d -> m / d)".
 Extract Constant modn => "(fun m -> function 0 -> m | d -> m mod d)".
 Extract Constant eqn => "(==)".
+
+Extract Constant Nat.add => "(+)".
+Extract Constant Nat.mul => "( * )".
+Extract Constant Nat.sub => "(-)".
+Extract Constant Nat.log2 => "(let rec log2 x = if x <= 1 then 0 else 1 + log2 (x / 2) in log2)".
+Extract Constant Nat.eqb => "(=)".
+Extract Constant Coq.Init.Nat.eqb => "(=)".
+Extract Constant Nat.div => "(fun x -> function 0 -> 0 | y -> x / y)".
+Extract Constant Coq.Init.Nat.div => "(fun x -> function 0 -> 0 | y -> x / y)".
 
 Axiom print_extracted_coq_string : string -> unit.
 Extract Constant print_extracted_coq_string =>

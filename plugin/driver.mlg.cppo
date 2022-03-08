@@ -1,5 +1,12 @@
 {
 
+(*
+
+THIS FILE IS PREPROCESSED USING cppo
+MAKE SURE TO EDIT THE .cppo SOURCE OF THIS FILE RATHER THAN THE GENERATED RESULT
+
+*)
+
 open Libnames
 open Util
 open Constrexpr
@@ -48,12 +55,15 @@ let dispatch cn ind name1 name2 =
     match c with
     | {CAst.v = CRef (r, _) ; _} -> string_of_qualid r
     | _ -> failwith "Usage: Derive <class_name> for <inductive_name> OR  Derive (<class_name>, ... , <class_name>) for <inductive_name>" in
-  let ss = match Compat.from_CNotation cn.CAst.v with
-     | Some ([a],[b],_,_) -> begin
+  let ss = match cn.CAst.v with
+#if COQ_VERSION >= (8, 12, 0)
+     | CNotation (_, _, ([a],[b],_,_)) ->
+#else
+     | CNotation (_, ([a],[b],_,_)) ->
+#endif
          let c = convert_reference_to_string a in
          let cs = List.map convert_reference_to_string b in
          c :: cs
-       end
      | _ -> [convert_reference_to_string cn]
   in
 

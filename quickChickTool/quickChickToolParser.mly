@@ -47,7 +47,7 @@ type node =
 %% 
 program:              default_section T_Eof { [$1] }
                     | default_section sections T_Eof { $1 :: $2 }
-                    | error T_Eof { 
+                    | error {
                         let pos = Parsing.symbol_start_pos () in
                         failwith (Printf.sprintf "Error in line %d, position %d" 
                                                  pos.pos_lnum (pos.pos_cnum - pos.pos_bol)) }  

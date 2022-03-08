@@ -1,9 +1,12 @@
 (library
  (name quickchick_plugin)
- (public_name quickchick.plugin)
+ (public_name coq-quickchick.plugin)
  (flags :standard -rectypes -warn-error -3 -w -8-27+40)
  (modules :standard \ genSTCorrect genSizedSTMonotonic genSizedSTSizeMonotonic)
- (libraries coq.plugins.extraction))
+ (libraries unix str
+  (select void_for_linking-plugin-extraction from
+   (coq-core.plugins.extraction -> void_for_linking-plugin-extraction.empty)
+   (coq.plugins.extraction -> void_for_linking-plugin-extraction.empty))))
 
 (rule
  (targets driver.ml)
@@ -26,7 +29,4 @@
  (action (run coqpp %{pp-file})))
 
 (rule
-  (target compat.ml)
-  (action
-    (run "perl" %{dep:../compat.pl} %{target}))
-  (package quickchick))
+ (action (write-file void_for_linking-plugin-extraction.empty "")))
