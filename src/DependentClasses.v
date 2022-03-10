@@ -11,6 +11,7 @@ Import QcDefaultNotation.
 
 Open Scope qc_scope.
 Local Open Scope string.
+Local Open Scope set_scope.
 
 Set Bullet Behavior "Strict Subproofs".
 (** * Correctness of dependent generators *)
@@ -81,38 +82,38 @@ Class GenSuchThatMonotonicCorrect (A : Type) (P : A -> Prop)
 
 (** Coercions *)
    
-Instance GenSizedSuchThatMonotonicOptOfSizeMonotonic
+#[global] Instance GenSizedSuchThatMonotonicOptOfSizeMonotonic
          (A : Type) (P : A -> Prop) (Hgen : GenSizedSuchThat A P)
          (Hmon : forall s : nat, SizeMonotonicOpt (arbitrarySizeST s))
 : @GenSizedSuchThatMonotonicOpt A P Hgen Hmon := {}.
 
-Instance GenSizedSuchThatSizeMonotonicOptOfSizedMonotonic
+#[global] Instance GenSizedSuchThatSizeMonotonicOptOfSizedMonotonic
          (A : Type) (P : A -> Prop) (Hgen : GenSizedSuchThat A P)
          (Hmon : SizedMonotonicOpt arbitrarySizeST)
 : @GenSizedSuchThatSizeMonotonicOpt A P Hgen Hmon := {}.
 
-Instance GenSizedSuchThatCorrectOptOfSizedSuchThatCorrect
+#[global] Instance GenSizedSuchThatCorrectOptOfSizedSuchThatCorrect
          (A : Type) (P : A -> Prop) (H : GenSizedSuchThat A P)
          (Hcorr : CorrectSizedST P arbitrarySizeST)
 : @GenSizedSuchThatCorrect A P H Hcorr := {}.
 
-Instance GenSuchThatMonotonicOptOfSizeMonotonic
+#[global] Instance GenSuchThatMonotonicOptOfSizeMonotonic
          (A : Type) (P : A -> Prop) (Hgen : GenSuchThat A P)
          (Hmon : SizeMonotonicOpt arbitraryST)
 : @GenSuchThatMonotonicOpt A _ Hgen Hmon := {}.
 
-Instance GenSuchThatCorrectOptOfSuchThatCorrect
+#[global] Instance GenSuchThatCorrectOptOfSuchThatCorrect
          (A : Type) (P : A -> Prop) (H : GenSuchThat A P)
          (Hcorr : CorrectST P (genST P))
 : @GenSuchThatCorrect A P H Hcorr := {}.
 
-Instance GenSuchThatMonotonicCorrectOptOfSuchThatCorrect
+#[global] Instance GenSuchThatMonotonicCorrectOptOfSuchThatCorrect
          (A : Type) (P : A -> Prop) (H : GenSuchThat A P)
          (Hcorr : CorrectST P (genST P))
          (Hmon : SizeMonotonicOpt (genST P))
 : @GenSuchThatMonotonicCorrect A P H Hmon Hcorr := {}.
 
-Instance SizeMonotonicOptofSizeMonotonic {A} (g : G (option A))
+#[global] Instance SizeMonotonicOptofSizeMonotonic {A} (g : G (option A))
          {H : SizeMonotonic g} : SizeMonotonicOpt g.
 Proof.
   intros s1 s2 Hs a.
@@ -124,7 +125,7 @@ Qed.
 (* Generators *)
 
 (* begin GenSuchThatOfBounded *)
-Instance GenSuchThatOfBounded (A : Type) (P : A -> Prop) (H : GenSizedSuchThat A P)
+#[global] Instance GenSuchThatOfBounded (A : Type) (P : A -> Prop) (H : GenSizedSuchThat A P)
 : GenSuchThat A P := { arbitraryST := sized arbitrarySizeST }.
 (* end GenSuchThatOfBounded *)
 
@@ -132,7 +133,7 @@ Generalizable Variables PSized PMon PSMon PCorr.
 
 (* Monotonicity *)
 
-Instance GenSuchThatMonotonicOfSized (A : Type) (P : A -> Prop)
+#[global] Instance GenSuchThatMonotonicOfSized (A : Type) (P : A -> Prop)
          {H : GenSizedSuchThat A P}
          `{@GenSizedSuchThatMonotonic A P H PMon}
          `{@GenSizedSuchThatSizeMonotonic A P H PSMon}
@@ -141,7 +142,7 @@ Instance GenSuchThatMonotonicOfSized (A : Type) (P : A -> Prop)
                          _
                          PMon PSMon) := {}.
 
-Instance SizeMonotonicOptOfBounded' (A : Type) (P : A -> Prop)
+#[global] Instance SizeMonotonicOptOfBounded' (A : Type) (P : A -> Prop)
          {H : GenSizedSuchThat A P}
          `{@GenSizedSuchThatMonotonicOpt A P H PMon}
          `{@GenSizedSuchThatSizeMonotonicOpt A P H PSMon}
@@ -165,7 +166,7 @@ Proof.
 Qed.
 
 (* begin SizeMonotonicOptOfBounded *)
-Instance SizeMonotonicOptOfBounded (A : Type) (P : A -> Prop)
+#[global] Instance SizeMonotonicOptOfBounded (A : Type) (P : A -> Prop)
          (H1 : GenSizedSuchThat A P)
          (H3 : forall s : nat, SizeMonotonicOpt (arbitrarySizeST s))
          (H4 : SizedMonotonicOpt arbitrarySizeST) (* XXX change name *)
@@ -177,14 +178,14 @@ Proof.
   constructor; eauto.
 Qed.
 
-Instance GenSuchThatMonotonicOptOfSized' (A : Type) (P : A -> Prop)
+#[global] Instance GenSuchThatMonotonicOptOfSized' (A : Type) (P : A -> Prop)
          {H : GenSizedSuchThat A P}
          `{@GenSizedSuchThatMonotonicOpt A P H PMon}
          `{@GenSizedSuchThatSizeMonotonicOpt A P H PSMon}
 : GenSuchThatMonotonicOpt A P := {}.
 
 (* Correctness *)
-Instance SuchThatCorrectOfBounded' (A : Type) (P : A -> Prop)
+#[global] Instance SuchThatCorrectOfBounded' (A : Type) (P : A -> Prop)
          {H : GenSizedSuchThat A P}
          `{@GenSizedSuchThatMonotonicOpt A P H PMon}
          `{@GenSizedSuchThatSizeMonotonicOpt A P H PSMon}
@@ -208,7 +209,7 @@ Proof.
 Qed.
 
 (* begin SuchThatCorrectOfBounded *)
-Instance SuchThatCorrectOfBounded (A : Type) (P : A -> Prop)
+#[global] Instance SuchThatCorrectOfBounded (A : Type) (P : A -> Prop)
          (H1 : GenSizedSuchThat A P)
          (H3 : forall s : nat, SizeMonotonicOpt (arbitrarySizeST s))
          (H4 : SizedMonotonicOpt arbitrarySizeST) (* XXX change name *)
@@ -284,39 +285,39 @@ Class EnumSuchThatMonotonicCorrect (A : Type) (P : A -> Prop)
 
 (** Coercions *)
    
-Instance EnumSizedSuchThatMonotonicOptOfSizeMonotonic
+#[global] Instance EnumSizedSuchThatMonotonicOptOfSizeMonotonic
          (A : Type) (P : A -> Prop) (Hgen : EnumSizedSuchThat A P)
          (Hmon : forall s : nat, SizeMonotonicOpt (enumSizeST s))
 : @EnumSizedSuchThatMonotonicOpt A P Hgen Hmon := {}.
 
-Instance EnumSizedSuchThatSizeMonotonicOptOfSizedMonotonic
+#[global] Instance EnumSizedSuchThatSizeMonotonicOptOfSizedMonotonic
          (A : Type) (P : A -> Prop) (Hgen : EnumSizedSuchThat A P)
          (Hmon : SizedMonotonicOpt enumSizeST)
 : @EnumSizedSuchThatSizeMonotonicOpt A P Hgen Hmon := {}.
 
-Instance EnumSizedSuchThatCorrectOptOfSizedSuchThatCorrect
+#[global] Instance EnumSizedSuchThatCorrectOptOfSizedSuchThatCorrect
          (A : Type) (P : A -> Prop) (H : EnumSizedSuchThat A P)
          (Hcorr : CorrectSizedST P enumSizeST)
 : @EnumSizedSuchThatCorrect A P H Hcorr := {}.
 
-Instance EnumSuchThatMonotonicOptOfSizeMonotonic
+#[global] Instance EnumSuchThatMonotonicOptOfSizeMonotonic
          (A : Type) (P : A -> Prop) (Hgen : EnumSuchThat A P)
          (Hmon : SizeMonotonicOpt enumSuchThat)
 : @EnumSuchThatMonotonicOpt A _ Hgen Hmon := {}.
 
-Instance EnumSuchThatCorrectOptOfSuchThatCorrect
+#[global] Instance EnumSuchThatCorrectOptOfSuchThatCorrect
          (A : Type) (P : A -> Prop) (H : EnumSuchThat A P)
          (Hcorr : CorrectST P (enumST P))
 : @EnumSuchThatCorrect A P H Hcorr := {}.
 
-Instance SizeMonotonicOptofSizeMonotonicEnum {A} (g : E (option A))
+#[global] Instance SizeMonotonicOptofSizeMonotonicEnum {A} (g : E (option A))
          {H : SizeMonotonic g} : SizeMonotonicOpt g.
 Proof.
   intros s1 s2 Hs a.
   eapply monotonic; eauto.
 Qed.
 
-Instance EnumSuchThatMonotonicCorrectOptOfSuchThatCorrect
+#[global] Instance EnumSuchThatMonotonicCorrectOptOfSuchThatCorrect
          (A : Type) (P : A -> Prop) (H : EnumSuchThat A P)
          (Hcorr : CorrectST P (enumST P))
          (Hmon : SizeMonotonicOpt (enumST P))
@@ -328,13 +329,13 @@ Instance EnumSuchThatMonotonicCorrectOptOfSuchThatCorrect
 (* Enumerators *)
 
 (* begin EnumSuchThatOfBounded *)
-Instance EnumSuchThatOfBounded (A : Type) (P : A -> Prop) (H : EnumSizedSuchThat A P)
+#[global] Instance EnumSuchThatOfBounded (A : Type) (P : A -> Prop) (H : EnumSizedSuchThat A P)
 : EnumSuchThat A P := { enumSuchThat := sized enumSizeST }.
 (* end EnumSuchThatOfBounded *)
 
 (* Monotonicity *)
 
-Instance EnumSuchThatMonotonicOfSized (A : Type) (P : A -> Prop)
+#[global] Instance EnumSuchThatMonotonicOfSized (A : Type) (P : A -> Prop)
          {H : EnumSizedSuchThat A P}
          `{@EnumSizedSuchThatMonotonic A P H PMon}
          `{@EnumSizedSuchThatSizeMonotonic A P H PSMon}
@@ -344,7 +345,7 @@ Instance EnumSuchThatMonotonicOfSized (A : Type) (P : A -> Prop)
                          PMon PSMon) := {}.
 
 
-Instance SizeMonotonicOptOfBoundedEnum' (A : Type) (P : A -> Prop)
+#[global] Instance SizeMonotonicOptOfBoundedEnum' (A : Type) (P : A -> Prop)
          {H : EnumSizedSuchThat A P}
          `{@EnumSizedSuchThatMonotonicOpt A P H PMon}
          `{@EnumSizedSuchThatSizeMonotonicOpt A P H PSMon}
@@ -355,7 +356,7 @@ Proof.
 Qed.
 
 (* begin SizeMonotonicOptOfBounded *)
-Instance SizeMonotonicOptOfBoundedEnum (A : Type) (P : A -> Prop)
+#[global] Instance SizeMonotonicOptOfBoundedEnum (A : Type) (P : A -> Prop)
          (H1 : EnumSizedSuchThat A P)
          (H3 : forall s : nat, SizeMonotonicOpt (enumSizeST s))
          (H4 : SizedMonotonicOpt enumSizeST) (* XXX change name *)
@@ -367,7 +368,7 @@ Proof.
   constructor; eauto.
 Qed.
 
-Instance EnumSuchThatMonotonicOptOfSized' (A : Type) (P : A -> Prop)
+#[global] Instance EnumSuchThatMonotonicOptOfSized' (A : Type) (P : A -> Prop)
          {H : EnumSizedSuchThat A P}
          `{@EnumSizedSuchThatMonotonicOpt A P H PMon}
          `{@EnumSizedSuchThatSizeMonotonicOpt A P H PSMon}
@@ -391,7 +392,7 @@ Proof.
 Qed.
 
 (* Correctness *)
-Instance SuchThatCorrectOfBoundedEnum' (A : Type) (P : A -> Prop)
+#[global] Instance SuchThatCorrectOfBoundedEnum' (A : Type) (P : A -> Prop)
          {H : EnumSizedSuchThat A P}
          `{@EnumSizedSuchThatMonotonicOpt A P H PMon}
          `{@EnumSizedSuchThatSizeMonotonicOpt A P H PSMon}
@@ -403,7 +404,7 @@ Proof.
 Qed.
 
 (* begin SuchThatCorrectOfBounded *)
-Instance SuchThatCorrectOfBoundedEnum (A : Type) (P : A -> Prop)
+#[global] Instance SuchThatCorrectOfBoundedEnum (A : Type) (P : A -> Prop)
          (H1 : EnumSizedSuchThat A P)
          (H3 : forall s : nat, SizeMonotonicOpt (enumSizeST s))
          (H4 : SizedMonotonicOpt enumSizeST) (* XXX change name *)

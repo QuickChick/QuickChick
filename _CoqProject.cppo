@@ -75,3 +75,4 @@ src/TacticsUtil.v
 src/CheckerProofs.v
 src/EnumProofs.v
 src/GenProofs.v
+src/Proofs.v

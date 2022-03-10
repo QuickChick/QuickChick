@@ -5,7 +5,10 @@ Require Import Tactics TacticsUtil Instances Classes DependentClasses Sets
 
 Import ListNotations.
 
+Set Warnings "-notation-overwritten, -parsing".
 From mathcomp Require Import ssreflect ssrfun ssrbool ssrnat eqtype seq.
+
+Local Open Scope set_scope.
 
 From Ltac2 Require Import Ltac2.
 

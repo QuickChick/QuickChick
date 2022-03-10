@@ -17,6 +17,8 @@ Open Scope monad_scope.
 From QuickChick Require Import
      Sets Tactics Producer LazyList RandomQC.
 
+Local Open Scope set_scope.
+
 Set Bullet Behavior "Strict Subproofs".
 
 Inductive EnumType (A:Type) : Type :=
@@ -41,7 +43,7 @@ Definition bindEnum {A B : Type} (g : E A) (k : A -> E B) : E B :=
 Definition failEnum {A : Type} : E A :=
   MkEnum (fun _ => lnil).
 
-Instance MonadEnum : Monad E :=
+#[global] Instance MonadEnum : Monad E :=
   { ret := @returnEnum
   ; bind := @bindEnum }.
 
@@ -61,7 +63,7 @@ Definition chooseEnum {A : Type} `{ChoosableFromInterval A} (range : A * A) : E 
 Definition sampleEnum (A : Type) (g : E A) : list A :=
   LazyList_to_list (run g 5).
 
-Program Instance ProducerEnum : Producer E :=
+#[global] Program Instance ProducerEnum : Producer E :=
   {
   super := MonadEnum;
 
@@ -146,7 +148,7 @@ Proof.
         eapply H. eexists. split; eauto. 
 Qed. 
 
-Global Instance bindOptSizeFP
+#[global] Instance bindOptSizeFP
        {A B} (g : E (option A)) (f : A -> E (option B))
        {Hsg : SizeFP g} {Hsf : forall x, SizeFP (f x)} :
   SizeFP (bindOpt g f).
@@ -205,7 +207,7 @@ Proof.
   rewrite (enumRCorrect n a1 a2) //=.
 Qed.
   
-Instance chooseUnsized {A} `{RandomQC.ChoosableFromInterval A} (a1 a2 : A) :
+#[global] Instance chooseUnsized {A} `{RandomQC.ChoosableFromInterval A} (a1 a2 : A) :
     Unsized (choose (a1, a2)).
 Proof. by []. Qed.
   
@@ -263,7 +265,7 @@ Lemma semResizeSizeEnum A (s n : nat) (g : E A) :
     semEnumSize (resize n g) s <--> semEnumSize g n.
 Proof. by case: g => g; rewrite /semEnumSize. Qed.
 
-Instance ProducerSemanticsEnum :
+#[global] Instance ProducerSemanticsEnum :
   @ProducerSemantics E ProducerEnum :=
   {
   semReturn     := @semReturnEnum; 
@@ -573,7 +575,7 @@ Proof.
   - unfold semProdSizeOpt in *. simpl in *. unfold semEnumSize in *. 
     destruct (In_ll_Dec None (Enumerators.run g' s)).
     eapply (@LazyList.lazy_concat_in (option B)).
-    Focus 2.
+    2:{
     eapply LazyList.lazy_in_map with
         (f := fun x : option A =>
                 Enumerators.run
@@ -581,6 +583,7 @@ Proof.
                   | Some a0 => f' a0
                   | None => returnEnum None
                   end s) (x := None). eassumption.
+    } 
     simpl. now left.
 
 
@@ -705,7 +708,7 @@ Proof.
   unfold semProdSize; simpl. unfold semEnumSize.
   intros H. simpl. unfold LazyList.bindLazyList.
   eapply (@LazyList.lazy_concat_in (option B)).
-  Focus 2. 
+  2:{
     eapply LazyList.lazy_in_map with
         (f := fun x : option A =>
                 Enumerators.run
@@ -713,7 +716,7 @@ Proof.
                   | Some a0 => f a0
                   | None => returnEnum None
                   end s) (x := None). eassumption.
-
+  }
     simpl. now left.
 Qed. 
 
@@ -734,7 +737,7 @@ Proof.
                 end s) (x := Some x). eassumption.
 Qed. 
 
-Global Instance SizeFP_failEnum {A : Type} : SizeFP (@failEnum (option A)).
+#[global] Instance SizeFP_failEnum {A : Type} : SizeFP (@failEnum (option A)).
 Proof.
   intros s1 s2 Hleq Hnin.
   split; intros.

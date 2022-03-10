@@ -24,6 +24,8 @@ Unset Printing Implicit Defensive.
 
 Set Bullet Behavior "Strict Subproofs".
 
+Local Open Scope set_scope.
+
 Import ListNotations.
 
 (* Rename? *)
@@ -135,29 +137,29 @@ Class SizedMonotonicOptFP {A} {G} {H : Producer G}
     IsFPSized  :> @SizedFP _ _ H g;
     IsAntimon  :> @SizedAntimonotonicNone _ _ _ g }.
 
-Global Instance SizeMonotonicOptFP_FP {A} {G}
+#[global] Instance SizeMonotonicOptFP_FP {A} {G}
        (g : G (option A))
        `{SizeMonotonicOptFP A G g} : SizeFP g.
 Proof. inv H0. eassumption. Qed.
 
-Global Instance SizeMonotonicOptFP_SizeMonotonic {A} {G}
+#[global] Instance SizeMonotonicOptFP_SizeMonotonic {A} {G}
        (g : G (option A))
        `{SizeMonotonicOptFP A G g} : SizeMonotonicOpt g.
 Proof. inv H0. eassumption. Qed.
 
 
-Global Instance SizedMonotonicOptFP_FP {A} {G}
+#[global] Instance SizedMonotonicOptFP_FP {A} {G}
        (g : nat -> G (option A))
        `{SizedMonotonicOptFP A G g} : SizedFP g.
 Proof. inv H0. eassumption. Qed.
 
-Global Instance SizedMonotonicOptFP_SizeMonotonic {A} {G}
+#[global] Instance SizedMonotonicOptFP_SizeMonotonic {A} {G}
        (g : nat -> G (option A))
        `{SizedMonotonicOptFP A G g} : SizedMonotonicOpt g.
 Proof. inv H0. eassumption. Qed.
 
 
-Global Instance SizedMonotonicOptFP_Antimonotonic {A} {G}
+#[global] Instance SizedMonotonicOptFP_Antimonotonic {A} {G}
        (g : nat -> G (option A))
        `{SizedMonotonicOptFP A G g} : SizedAntimonotonicNone g.
 Proof. inv H0. eassumption. Qed.
@@ -172,7 +174,7 @@ Parameter unsized_alt_def :
     forall s, semProdSize g s <--> semProd g.
  *)
 
-Instance unsizedMonotonic {A} {G} `{PG :Producer G}
+#[global] Instance unsizedMonotonic {A} {G} `{PG :Producer G}
          (g : G A) `{@Unsized A G PG g} :
 SizeMonotonic g. 
 Proof.
@@ -272,7 +274,7 @@ Section ProducerProofs.
     by apply eq_bigcupr => ?; rewrite !semBindSize ?bigcup_flatten.
   Qed.
 
-  Global Instance unsizedReturn {A} (x : A) :
+  #[global] Instance unsizedReturn {A} (x : A) :
     Unsized (ret x).
   Proof.
     unfold Unsized => s1 s2.
@@ -280,7 +282,7 @@ Section ProducerProofs.
     firstorder.
   Qed.
 
-  Global Instance returnGenSizeMonotonic {A} (x : A) :
+  #[global] Instance returnGenSizeMonotonic {A} (x : A) :
     SizeMonotonic (ret x).
   Proof.
     unfold Unsized => s1 s2.
@@ -288,7 +290,7 @@ Section ProducerProofs.
     firstorder.
   Qed.
 
-  Global Instance returnGenSizeMonotonicOpt {A} (x : option A) :
+  #[global] Instance returnGenSizeMonotonicOpt {A} (x : option A) :
     SizeMonotonicOpt (ret x).
   Proof.
     unfold Unsized => s1 s2 Hs.
@@ -297,7 +299,7 @@ Section ProducerProofs.
     firstorder.
   Qed.
 
-  Global Instance returnGenSizeFP {A} (x : (option A)) :
+  #[global] Instance returnGenSizeFP {A} (x : (option A)) :
     SizeFP (ret x).
   Proof.
     unfold SizeFP => s1 s2 Hleq Hnin.
@@ -305,7 +307,7 @@ Section ProducerProofs.
   Qed.
 
 
-  Global Instance bindUnsized {A B} (g : G A) (f : A -> G B)
+  #[global] Instance bindUnsized {A B} (g : G A) (f : A -> G B)
            `{@Unsized _ _ PG g}
            `{forall x, Unsized (f x)} :
     Unsized (bind g f).
@@ -318,7 +320,7 @@ Section ProducerProofs.
   Qed.
 
   (* XXX these will always succeed and they have the same priority *)
-  Global Instance bindMonotonic
+  #[global] Instance bindMonotonic
            {A B} (g : G A) (f : A -> G B)
            `{@SizeMonotonic _ _ PG g} `{forall x, SizeMonotonic (f x)} : 
     SizeMonotonic (bind g f).
@@ -328,7 +330,7 @@ Section ProducerProofs.
     exists a; split => //; eapply monotonic; eauto.
   Qed.   
     
-  Global Instance bindMonotonicOpt
+  #[global] Instance bindMonotonicOpt
            {A B} (g : G A) (f : A -> G (option B))
           `{@SizeMonotonic _ _ PG g} `{forall x, SizeMonotonicOpt (f x)} : 
     SizeMonotonicOpt (bind g f).
@@ -342,7 +344,7 @@ Section ProducerProofs.
     - eapply monotonicOpt; eauto.
   Qed.      
 
-  Global Instance bindMonotonicStrong
+  #[global] Instance bindMonotonicStrong
           {A B} (g : G A) (f : A -> G B)
           `{@SizeMonotonic _ _ PG g}
           `{forall x, semProd g x -> SizeMonotonic (f x)} : 
@@ -357,7 +359,7 @@ Section ProducerProofs.
       now constructor.
   Qed.      
 
-  Global Instance bindMonotonicOptStrong
+  #[global] Instance bindMonotonicOptStrong
            {A B} (g : G A) (f : A -> G (option B))
            `{@SizeMonotonic _ _ PG g}
            `{forall x, semProd g x -> SizeMonotonicOpt (f x)} :
@@ -556,7 +558,7 @@ Qed.
     apply semBindRetFSize.
   Qed.
     
-  Global Instance fmapUnsized {A B} (f : A -> B) (g : G A)
+  #[global] Instance fmapUnsized {A B} (f : A -> B) (g : G A)
            `{@Unsized _ _ PG g} : 
     Unsized (fmap f g).
   Proof.
@@ -565,7 +567,7 @@ Qed.
        eexists; split; eauto => //; eapply unsized; eauto.
   Qed.
 
-  Global Instance fmapMonotonic
+  #[global] Instance fmapMonotonic
           {A B} (f : A -> B) (g : G A) `{@SizeMonotonic _ _ PG g} : 
     SizeMonotonic (fmap f g).
   Proof.
@@ -614,7 +616,7 @@ Qed.
       + inv Hs1.
   Qed.
 
-  Global Instance sizedSizeMonotonic
+  #[global] Instance sizedSizeMonotonic
            A (gen : nat -> G A)
            `{forall n, SizeMonotonic (gen n)}
            `{@SizedMonotonic _ _ PG gen} :
@@ -626,7 +628,7 @@ Qed.
     eapply H0; eassumption.
   Qed.
 
-  Global Instance sizedSizeMonotonicOpt
+  #[global] Instance sizedSizeMonotonicOpt
            A (gen : nat -> G (option A))
            `{forall n, SizeMonotonicOpt (gen n)}
            `{@SizedMonotonicOpt _ _ PG gen} :
@@ -641,7 +643,7 @@ Qed.
     auto.
   Qed.
 
-  Global Instance sizedSizeFP
+  #[global] Instance sizedSizeFP
          A (gen : nat -> G (option A))
          `{forall n, SizeFP (gen n)}
          `{@SizedFP _ _ PG gen}
@@ -665,7 +667,7 @@ Qed.
     inv Hnone. eassumption. 
   Qed.
   
-  Global Instance unsizedResize {A} (g : G A) n :
+  #[global] Instance unsizedResize {A} (g : G A) n :
     Unsized (resize n g).
   Proof.
     move => s1 s2.
@@ -677,7 +679,7 @@ Qed.
 End ProducerProofs.  
 
 Section ProducerHigh.
-  Variable G  : Type -> Type.
+  Context {G : Type -> Type}.
   Context `{PG: Producer G}.
 
   Definition vectorOf {A : Type} (k : nat) (g : G A)
@@ -852,14 +854,14 @@ forall {A1 A2 A3 B} (f: A1 -> A2 -> A3 -> B)
                                        (f a1 a2 a3) = b)).
 Proof. solveLiftProdX. Qed.
 
-Global Program Instance liftM2Unsized {A1 A2 B} (f : A1 -> A2 -> B) (g1 : G A1)
+#[global] Program Instance liftM2Unsized {A1 A2 B} (f : A1 -> A2 -> B) (g1 : G A1)
         `{@Unsized _ _ PG g1} (g2 : G A2) `{@Unsized _ _ PG g2} : Unsized (liftM2 f g1 g2).
 Next Obligation.
   rewrite ! semLiftProd2Size. 
   rewrite ! curry_imset2l. by setoid_rewrite (unsized s1 s2).
 Qed.
 
-Global Program Instance liftM2Monotonic {A1 A2 B} (f : A1 -> A2 -> B) (g1 : G A1)
+#[global] Program Instance liftM2Monotonic {A1 A2 B} (f : A1 -> A2 -> B) (g1 : G A1)
         `{@SizeMonotonic _ _ PG g1} (g2 : G A2)
         `{@SizeMonotonic _ _ PG g2} : 
   SizeMonotonic (liftM2 f g1 g2).
@@ -919,7 +921,7 @@ Proof.
      repeat split; (eapply monotonic; last eassumption); lia.
 Qed.
 
-Global Program Instance liftM4Monotonic {A B C D E} 
+#[global] Program Instance liftM4Monotonic {A B C D E} 
         (f : A -> B -> C -> D -> E)
         (g1 : G A) (g2 : G B) (g3 : G C) (g4 : G D) 
         `{ @SizeMonotonic _ _ PG g1} `{ @SizeMonotonic _ _ PG g2}
@@ -1035,14 +1037,14 @@ Proof.
     by eapply unsized; eauto.
 Qed.
 
-Global Program Instance vectorOfUnsized {A} (k : nat) (g : G A) 
+#[global] Program Instance vectorOfUnsized {A} (k : nat) (g : G A) 
         `{@Unsized _ _ PG g } : Unsized (vectorOf k g).
 Next Obligation.
   rewrite ! semVectorOfSize. 
   split; move => [H1 H2]; split => //; by rewrite unsized; eauto.
 Qed.
 
-Global Program Instance vectorOfMonotonic {A} (k : nat) (g : G A) 
+#[global] Program Instance vectorOfMonotonic {A} (k : nat) (g : G A) 
         `{@SizeMonotonic _ _ PG g } : SizeMonotonic (vectorOf k g).
 Next Obligation.
   rewrite ! semVectorOfSize. 
@@ -1071,7 +1073,7 @@ Proof.
     move => a /Hl [s [_ Ha]]. by eapply unsized; eauto.
 Qed.
 
-Global Program Instance listOfMonotonic {A} (g : G A) 
+#[global] Program Instance listOfMonotonic {A} (g : G A) 
         `{@SizeMonotonic _ _ PG g } : SizeMonotonic (listOf g).
 Next Obligation.
   rewrite ! semListOfSize.
@@ -1125,7 +1127,7 @@ by case: l => [|g l]; rewrite 1?bigcupC; apply: eq_bigcupr => sz;
   apply: semOneofSize.
 Qed.
 
-Global Program Instance oneofMonotonic {A} (x : G A) (l : list (G A))
+#[global] Program Instance oneofMonotonic {A} (x : G A) (l : list (G A))
         `{ @SizeMonotonic _ _ PG x} `(l \subset SizeMonotonic) 
 : SizeMonotonic (oneOf_ x l). 
 Next Obligation.
@@ -1159,13 +1161,13 @@ rewrite /semProd; setoid_rewrite semElementsSize; rewrite bigcup_const //.
 by do 2! constructor.
 Qed.
 
-Global Program Instance elementsUnsized {A} {def : A} (l : list A) : 
+#[global] Program Instance elementsUnsized {A} {def : A} (l : list A) : 
   Unsized (elems_ def l).
 Next Obligation.
   rewrite ! semElementsSize. by case: l.
 Qed.
 
-Global Instance bindOptMonotonic
+#[global] Instance bindOptMonotonic
          {A B} (g : G (option A)) (f : A -> G (option B))
          {_ : SizeMonotonic g} `{forall x, SizeMonotonic (f x)} :
   SizeMonotonic (bindOpt g f).
@@ -1296,7 +1298,7 @@ Proof.
       eexists. split; eauto.
 Qed.
 
-Global Instance bindOptMonotonicOpt
+#[global] Instance bindOptMonotonicOpt
        {A B} (g : G (option A)) (f : A -> G (option B))
        `{@SizeMonotonicOpt _ _ PG g} `{forall x, SizeMonotonicOpt (f x)} : 
   SizeMonotonicOpt (bindOpt g f).

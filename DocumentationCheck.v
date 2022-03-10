@@ -1,3 +1,5 @@
+Set Warnings "-notation-overridden,-parsing".
+
 Require Import mathcomp.ssreflect.ssreflect.
 From mathcomp Require Import ssrbool.
 Require Import QuickChick ZArith Strings.Ascii Strings.String.
@@ -97,13 +99,13 @@ Module ConsistencyCheck : QuickChickSig.
 
     Notation "'do!' X <- A ; B" :=
       (bindGen A (fun X => B))
-      (at level 200, X ident, A at level 100, B at level 200).
+      (at level 200, X name, A at level 100, B at level 200).
     Notation "'do\'' X <- A ; B" :=
       (bindGen' A (fun X H => B))
-      (at level 200, X ident, A at level 100, B at level 200).
+      (at level 200, X name, A at level 100, B at level 200).
     Notation "'doM!' X <- A ; B" :=
       (bindGenOpt A (fun X => B))
-      (at level 200, X ident, A at level 100, B at level 200).
+      (at level 200, X name, A at level 100, B at level 200).
 
   End QcDoNotation.
 

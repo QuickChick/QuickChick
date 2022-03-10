@@ -233,7 +233,7 @@ simpl in InPL.
 inversion InPL.
 Qed.
 
-Hint Resolve corrEmptyUndef corrNodeNonEmpty.
+#[local] Hint Resolve corrEmptyUndef corrNodeNonEmpty : core.
 
 Definition Direction_eq_dec : forall (d1 d2 : SplitDirection),
                                 {d1 = d2} + {d1 <> d2}.
@@ -336,8 +336,8 @@ Lemma refineFunCorrect : forall f d p, f (d :: p) = (refineFunction f d) p.
 auto.
 Qed.
 
-Hint Rewrite refineFunCorrect.
-Hint Unfold  refineFunction  .
+#[local] Hint Rewrite refineFunCorrect : core.
+#[local] Hint Unfold  refineFunction   : core.
 Program Fixpoint addToTree (st : SeedTree) (p : SplitPath) (f : SplitPath -> RandomSeed)
         (l : list SplitPath)
         (Corr : correspondingSeedTree l f st)
@@ -693,7 +693,7 @@ Class OrdType (A: Type) :=
     antisym : antisymmetric leq
   }.
 
-Program Instance OrdBool : OrdType bool :=
+#[global] Program Instance OrdBool : OrdType bool :=
   {
     leq b1 b2 := implb b1 b2
   }.
@@ -707,7 +707,7 @@ Next Obligation.
   by do 2! case.
 Qed.
 
-Program Instance OrdNat : OrdType nat :=
+#[global] Program Instance OrdNat : OrdType nat :=
   {
     leq := ssrnat.leq;
     refl := leqnn;
@@ -715,7 +715,7 @@ Program Instance OrdNat : OrdType nat :=
     antisym := anti_leq
   }.
 
-Program Instance OrdZ : OrdType Z :=
+#[global] Program Instance OrdZ : OrdType Z :=
   {
     leq := Z.leb;
     refl := Z.leb_refl
@@ -729,7 +729,7 @@ move=> x y /andP[].
 exact: Zle_bool_antisym.
 Qed.
 
-Program Instance OrdN : OrdType N :=
+#[global] Program Instance OrdN : OrdType N :=
   {
     leq := N.leb;
     refl := N.leb_refl
@@ -766,7 +766,7 @@ Class ChoosableFromInterval (A : Type)  :=
   }.
 
 (* This is false. 
-Program Instance ChooseBool : ChoosableFromInterval bool :=
+#[global] Program Instance ChooseBool : ChoosableFromInterval bool :=
   {
     randomR := randomRBool;
     randomRCorrect := randomRBoolCorrect
@@ -805,7 +805,7 @@ Proof.
       simpl in *. eapply IHn in H; now ssromega.
 Qed.
   
-Instance ChooseNat : ChoosableFromInterval nat :=
+#[global] Instance ChooseNat : ChoosableFromInterval nat :=
   {
     randomR := randomRNat;
     randomRCorrect := randomRNatCorrect;
@@ -823,7 +823,7 @@ Lemma enumRZCorrect :
 Proof. 
 Admitted.
 
-Instance ChooseZ : ChoosableFromInterval Z :=
+#[global] Instance ChooseZ : ChoosableFromInterval Z :=
   {
     randomR := randomRInt;
     randomRCorrect := randomRIntCorrect;
@@ -841,7 +841,7 @@ Lemma enumRNCorrect :
        In_ll a (enumRN (a1,a2))).
 Admitted.
 
-Instance ChooseN : ChoosableFromInterval N :=
+#[global] Instance ChooseN : ChoosableFromInterval N :=
   {
     randomR := randomRN;
     randomRCorrect := randomRNCorrect;

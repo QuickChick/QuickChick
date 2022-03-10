@@ -26,8 +26,8 @@ Import ListNotations.
 
 (* Low-level Generators *)
 
-Open Scope fun_scope.
-Open Scope set_scope.
+Local Open Scope fun_scope.
+Local Open Scope set_scope.
 
 Inductive GenType (A:Type) : Type := MkGen : (nat -> RandomSeed -> A) -> GenType A.
   
@@ -45,7 +45,7 @@ Definition bindGen {A B : Type} (g : G A) (k : A -> G B) : G B :=
              let (r1,r2) := randomSplit r in
              run (k (run g n r1)) n r2).
 
-Instance MonadGen : Monad G :=
+#[global] Instance MonadGen : Monad G :=
   { ret := @returnGen
   ; bind := @bindGen }.
 
@@ -84,7 +84,7 @@ Definition semGenSize {A : Type} (g : G A) (s : nat) : set A := codom (run g s).
 Definition chooseGen {A : Type} `{ChoosableFromInterval A} (range : A * A) : G A :=
     MkGen (fun _ r => fst (randomR range r)).
 
-Program Instance ProducerGen : Producer G :=
+#[global] Program Instance ProducerGen : Producer G :=
   {
   super := MonadGen;
 
@@ -179,7 +179,7 @@ Lemma semChooseSize A `{ChoosableFromInterval A} (a1 a2 : A) :
                        [set a | RandomQC.leq a1 a && RandomQC.leq a a2].
 Proof. by move=> /= le_a1a2 m n; rewrite (randomRCorrect n a1 a2). Qed.
   
-Instance chooseUnsized {A} `{RandomQC.ChoosableFromInterval A} (a1 a2 : A) :
+#[global] Instance chooseUnsized {A} `{RandomQC.ChoosableFromInterval A} (a1 a2 : A) :
     Unsized (choose (a1, a2)).
 Proof. by []. Qed.
   
@@ -206,7 +206,7 @@ Qed.
     split; intros [r Hr]; exists r; simpl in *; assumption.
   Qed.
 
-  Instance thunkGenUnsized {A} (f : unit -> G A)
+  #[global] Instance thunkGenUnsized {A} (f : unit -> G A)
           `{@Unsized _ _ ProducerGen (f tt)} : Unsized (thunkGen f).
   Proof.
     intros s1 s2.
@@ -214,7 +214,7 @@ Qed.
     apply unsized.
   Qed.
 
-  Instance thunkGenSizeMonotonic {A} (f : unit -> G A)
+  #[global] Instance thunkGenSizeMonotonic {A} (f : unit -> G A)
           `{@SizeMonotonic _ _ ProducerGen (f tt)} : SizeMonotonic (thunkGen f).
   Proof.
     intros s1 s2 Hs.
@@ -222,7 +222,7 @@ Qed.
     by apply monotonic.
   Qed.
 
-  Instance thunkGenSizeMonotonicOpt {A} (f : unit -> G (option A))
+  #[global] Instance thunkGenSizeMonotonicOpt {A} (f : unit -> G (option A))
           `{@SizeMonotonicOpt _ _ ProducerGen (f tt)} : SizeMonotonicOpt (thunkGen f).
   Proof.
     intros s1 s2 Hs. unfold semProdSizeOpt.
@@ -230,7 +230,7 @@ Qed.
     by apply monotonicOpt.
   Qed.
 
-  (* Instance thunkGenSizeAntiMonotonicNone {A} (f : unit -> G (option A)) *)
+  (* #[global] Instance thunkGenSizeAntiMonotonicNone {A} (f : unit -> G (option A)) *)
   (*         `{@SizedAntimonotonicNone _ _ ProducerGen (f tt)} : SizedAntimonotonicNone (thunkGen f). *)
   (* Proof. *)
   (*   intros s1 s2 Hs. *)
@@ -358,7 +358,7 @@ Lemma semBindSizeGen A B (g : G A) (f : A -> G B) (s : nat) :
     \bigcup_(a in semGenSize g s) semGenSize (f a) s.
 Proof.
     rewrite /semGenSize /bindGen /= bigcup_codom -curry_codom2l.
-    by rewrite -[codom (prod_curry _)]imsetT -randomSplit_codom -codom_comp.
+    by rewrite -[codom (uncurry _)]imsetT -randomSplit_codom -codom_comp.
 Qed.
 
 Lemma semChooseGen A `{RandomQC.ChoosableFromInterval A} (a1 a2 : A) :
@@ -400,7 +400,7 @@ Lemma semResizeSizeGen A (s n : nat) (g : G A) :
     semGenSize (resize n g) s <--> semGenSize g n.
 Proof. by case: g => g; rewrite /semGenSize. Qed.
 
-Global Instance ProducerSemanticsGen :
+#[global] Instance ProducerSemanticsGen :
   @ProducerSemantics G ProducerGen :=
   {
   semReturn     := @semReturnGen; 
@@ -698,7 +698,7 @@ Proof.
     subst. rewrite Hp. eassumption.
 Qed.
 
-Instance frequencySizeMonotonic_alt :
+#[global] Instance frequencySizeMonotonic_alt :
   forall {A : Type} (g0 : G A) (lg : seq (nat * G A)),
     SizeMonotonic g0 ->
     lg \subset [set x | SizeMonotonic x.2 ] ->

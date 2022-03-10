@@ -390,7 +390,7 @@ Module QcNotation.
   (* TODO: Figure out pretty printing too *)
   Notation "'FORALL' x : T , c" :=
     (forAllShrink (@arbitrary T _) shrink (fun x => c))
-    (at level 200, x ident, T at level 200, c at level 200, right associativity
+    (at level 200, x name, T at level 200, c at level 200, right associativity
      (* , format "'[' 'exists' '/ ' x .. y , '/ ' p ']'" *) )
     : type_scope.
 
@@ -399,6 +399,6 @@ Module QcNotation.
                                                     | Some x => c
                                                     | _ => checker tt
                                                     end))
-      (at level 200, x ident, P at level 200, c at level 200, right associativity)
+      (at level 200, x name, P at level 200, c at level 200, right associativity)
      : type_scope.
 End QcNotation.

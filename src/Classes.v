@@ -14,6 +14,8 @@ Require Import Producer Generators Enumerators.
 
 Set Bullet Behavior "Strict Subproofs".
 
+Local Open Scope set_scope.
+
 (** Apply a function n times *)
 Fixpoint appn {A} (f : A -> A) (n : nat) : A ->  A :=
   fun x =>
@@ -204,20 +206,20 @@ Class EnumMonotonicCorrect (A : Type)
   
 (** Coercions *)
   
-Instance GenSizedMonotonicOfSizeMonotonic
+#[global] Instance GenSizedMonotonicOfSizeMonotonic
          (A : Type) (Hgen : GenSized A) (Hmon : forall s, @SizeMonotonic A G ProducerGen (arbitrarySized s))
 : @GenSizedMonotonic A Hgen Hmon := {}.
   
-Instance GenMonotonicOfSizeMonotonic
+#[global] Instance GenMonotonicOfSizeMonotonic
          (A : Type) (Hgen : Gen A) (Hmon : @SizeMonotonic A G ProducerGen arbitrary)
 : @GenMonotonic A Hgen Hmon := {}.
 
-Instance GenSizedCorrectOfSizedCorrect
+#[global] Instance GenSizedCorrectOfSizedCorrect
          (A : Type) (Hgen : GenSized A)
          `{Hcor : @CorrectSized A G ProducerGen arbitrarySized}
 : @GenSizedCorrect A Hgen Hcor := {}.
 
-Instance GenMonotonicCorrectOfMonotnicCorrect
+#[global] Instance GenMonotonicCorrectOfMonotnicCorrect
          (A : Type) (Hgen : Gen A)
          (Hmon : @SizeMonotonic A G ProducerGen arbitrary)
          `{Hcor : @Correct A G ProducerGen arbitrary}
@@ -225,18 +227,18 @@ Instance GenMonotonicCorrectOfMonotnicCorrect
 
 
 
-Instance GenSizedSizeMonotonicOfSizedMonotonic
+#[global] Instance GenSizedSizeMonotonicOfSizedMonotonic
          (A : Type) (Hgen : GenSized A) (Hmon : @SizedMonotonic A G ProducerGen arbitrarySized)
 : @GenSizedSizeMonotonic A Hgen ProducerGen Hmon := {}.
 
-Global Instance GenOfGenSized {A} `{GenSized A} : Gen A :=
+#[global] Instance GenOfGenSized {A} `{GenSized A} : Gen A :=
   {| arbitrary := sized arbitrarySized |}.
 
-Global Instance ArbitraryOfGenShrink {A} `{Gen A} `{Shrink A} : Arbitrary A := {}.
+#[global] Instance ArbitraryOfGenShrink {A} `{Gen A} `{Shrink A} : Arbitrary A := {}.
 
 Generalizable Variables PSized PMon PSMon PCorr.
 
-Instance GenMonotonicOfSized (A : Type)
+#[global] Instance GenMonotonicOfSized (A : Type)
          `{H : GenSized A}
          `{@GenSizedMonotonic A H PMon}
          `{@GenSizedSizeMonotonic A H ProducerGen PSMon}
@@ -246,7 +248,7 @@ Instance GenMonotonicOfSized (A : Type)
                                        (@arbitrarySized A H)
                                        PMon PSMon) := {}.
 
-Instance GenCorrectOfSized (A : Type)
+#[global] Instance GenCorrectOfSized (A : Type)
          {H : GenSized A}
          `{@GenSizedMonotonic A H PMon}
          `{@GenSizedSizeMonotonic A H ProducerGen PSMon}
@@ -280,43 +282,43 @@ Proof.
 Qed.
  *)
 
-Instance EnumSizedMonotonicOfSizeMonotonic
+#[global] Instance EnumSizedMonotonicOfSizeMonotonic
          (A : Type) (Hgen : EnumSized A) (Hmon : forall s, @SizeMonotonic A E ProducerEnum (enumSized s))
 : @EnumSizedMonotonic A Hgen Hmon := {}.
   
-Instance EnumMonotonicOfSizeMonotonic
+#[global] Instance EnumMonotonicOfSizeMonotonic
          (A : Type) (Hgen : Enum A) (Hmon : @SizeMonotonic A E ProducerEnum enum)
 : @EnumMonotonic A Hgen Hmon := {}.
 
-Instance EnumSizedCorrectOfSizedCorrect
+#[global] Instance EnumSizedCorrectOfSizedCorrect
          (A : Type) (Hgen : EnumSized A)
          `{Hcor : @CorrectSized A E ProducerEnum enumSized}
 : @EnumSizedCorrect A Hgen Hcor := {}.
 
-Instance EnumCorrectOfCorrect
+#[global] Instance EnumCorrectOfCorrect
          (A : Type) (Hgen : Enum A)
          `{Hcor : @Correct A E ProducerEnum enum}
 : @EnumCorrect A Hgen Hcor := {}.
 
-Instance EnumMonotonicCorrectOfMonotnicCorrect
+#[global] Instance EnumMonotonicCorrectOfMonotnicCorrect
          (A : Type) (Hgen : Enum A)
          (Hmon : @SizeMonotonic A E ProducerEnum enum)
          `{Hcor : @Correct A E ProducerEnum enum}
   : @EnumMonotonicCorrect A Hgen Hmon Hcor := {}.
 
 
-Instance EnumSizedSizeMonotonicOfSizedMonotonic
+#[global] Instance EnumSizedSizeMonotonicOfSizedMonotonic
          (A : Type) (Hgen : EnumSized A) (Hmon : @SizedMonotonic A E ProducerEnum enumSized)
 : @EnumSizedSizeMonotonic A Hgen Hmon := {}.
 
-Global Instance EnumOfEnumSized {A} `{EnumSized A} : Enum A :=
+#[global] Instance EnumOfEnumSized {A} `{EnumSized A} : Enum A :=
   {| enum := sized enumSized |}.
 
 (*
-Global Instance EnumOfGenShrink {A} `{Gen A} `{Shrink A} : Arbitrary A := {}.
+#[global] Instance EnumOfGenShrink {A} `{Gen A} `{Shrink A} : Arbitrary A := {}.
  *)
 
-Instance EnumMonotonicOfSized (A : Type)
+#[global] Instance EnumMonotonicOfSized (A : Type)
          `{H : EnumSized A}
          `{@EnumSizedMonotonic A H PMon}
          `{@EnumSizedSizeMonotonic A H PSMon}
@@ -326,7 +328,7 @@ Instance EnumMonotonicOfSized (A : Type)
                                        (@enumSized A H)
                                        PMon PSMon) := {}.
 
-Instance EnumCorrectOfSized' (A : Type)
+#[global] Instance EnumCorrectOfSized' (A : Type)
          {H : EnumSized A}
          `{@EnumSizedMonotonic A H PMon}
          `{@EnumSizedSizeMonotonic A H PSMon}
@@ -343,7 +345,7 @@ Proof.
     intros [s H4]. eexists; split; eauto. reflexivity.
 Qed.
 
-Instance EnumCorrectOfSized (A : Type)
+#[global] Instance EnumCorrectOfSized (A : Type)
          (H1 : EnumSized A)
          (H3 : forall s : nat, SizeMonotonic (enumSized s))
          (H4 : SizedMonotonic enumSized)

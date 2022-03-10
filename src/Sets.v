@@ -25,7 +25,7 @@ Definition set_eq {A} (m1 m2 : set A) :=
 
 Infix "<-->" := set_eq (at level 70, no associativity) : set_scope.
 
-Open Scope set_scope.
+Local Open Scope set_scope.
 
 Lemma set_eq_trans T B (A C : set T) : A <--> B -> B <--> C -> A <--> C.
 Proof.
@@ -44,8 +44,7 @@ Proof.
   firstorder.
 Qed.
 
-
-Global Instance : forall T, Equivalence (@set_eq T).
+#[global] Instance : forall T, Equivalence (@set_eq T).
 Proof.
 move=> T; constructor=> // [A B eqAB | A B C] x; first by split=> /eqAB.
 exact: set_eq_trans.
@@ -95,9 +94,9 @@ Definition imset {T U} (f : T -> U) A := bigcup A (fun x => set1 (f x)).
 Definition setX T U (A : set T) (B : set U) := [set x | x.1 \in A /\ x.2 \in B].
 
 Definition imset2 T U V (f : T -> U -> V) A1 A2 :=
-  imset (prod_curry f) (setX A1 A2).
+  imset (uncurry f) (setX A1 A2).
 
-Definition codom2 T U V (f : T -> U -> V) := codom (prod_curry f).
+Definition codom2 T U V (f : T -> U -> V) := codom (uncurry f).
 
 Notation "[ 'set' a ]" := (set1 a)
   (at level 0, a at level 99, format "[ 'set'  a ]") : set_scope.
@@ -235,13 +234,13 @@ Proof. exact: imset_id. Qed.
 Lemma setXT T U : setX [set: T] [set: U] <--> [set: T * U].
 Proof. by case. Qed.
 
-Instance set_incl_Proper T U :
+#[global] Instance set_incl_Proper T U :
   Proper (@eq (T -> U) ==> set_incl ==> set_incl) imset.
 Proof.
 by move=> f ? <- A B subAB y [x [Ax fx]]; exists x; split=> //; apply: subAB.
 Qed.
 
-Instance set_eq_Proper T U : Proper (@eq (T -> U) ==> set_eq ==> set_eq) imset.
+#[global] Instance set_eq_Proper T U : Proper (@eq (T -> U) ==> set_eq ==> set_eq) imset.
 Proof.
 by move=> f ? <- A B /subset_eqP[subAB subBA] y; split; apply: set_incl_Proper.
 Qed.
@@ -318,7 +317,7 @@ Qed.
 
 Arguments eq_bigcupl [T U A] B F _ _.
 
-Global Instance eq_bigcup T U : Proper (set_eq ==> pointwise_relation T (@set_eq U) ==> set_eq) bigcup.
+#[global] Instance eq_bigcup T U : Proper (set_eq ==> pointwise_relation T (@set_eq U) ==> set_eq) bigcup.
 Proof.
   move=> A B eqAB F G eqFG a; apply: (@set_eq_trans _ (\bigcup_(i in A) G i)).
   exact: eq_bigcupr.
@@ -370,7 +369,7 @@ Lemma curry_imset2r T U V (f : T -> U -> V) A1 A2 :
 Proof. by rewrite curry_imset2l bigcupC. Qed.
 
 Lemma curry_codom2l T U V (f : T -> U -> V) :
-  codom (prod_curry f) <--> \bigcup_x1 codom (f x1).
+  codom (uncurry f) <--> \bigcup_x1 codom (f x1).
 Proof.
 rewrite -imsetT -setXT -/(imset2 f _ _) curry_imset2l.
 by apply: eq_bigcupr => x; rewrite imsetT.
@@ -423,19 +422,19 @@ Proof.
   intros H b [x []]; eapply H; eauto.
 Qed.
 
-Instance proper_set_incl A :
+#[global] Instance proper_set_incl A :
   Morphisms.Proper (set_eq ==> set_eq ==> Basics.impl) (@set_incl A).
 Proof. firstorder. Qed.
 
 (** Lemmas about [setU] and [setI] *)
 
-Instance eq_setU U : Proper (set_eq ==> set_eq ==> set_eq) (@setU U).
+#[global] Instance eq_setU U : Proper (set_eq ==> set_eq ==> set_eq) (@setU U).
 Proof.
   move=> A B eqAB F G eqFG a.
   split; by move => [H1 | H2]; firstorder.
 Qed.
 
-Instance eq_setI U : Proper (set_eq ==> set_eq ==> set_eq) (@setI U).
+#[global] Instance eq_setI U : Proper (set_eq ==> set_eq ==> set_eq) (@setI U).
 Proof.
   move=> A B eqAB F G eqFG a.
   by split; move => [H1 H2]; firstorder.
@@ -610,7 +609,7 @@ Proof.
 Qed.
 
 
-Instance eq_bigcap T U : Proper (set_eq ==> pointwise_relation T (@set_eq U) ==> set_eq) bigcap.
+#[global] Instance eq_bigcap T U : Proper (set_eq ==> pointwise_relation T (@set_eq U) ==> set_eq) bigcap.
 Proof.
   move=> A B eqAB F G eqFG a. apply: (@set_eq_trans _ (\bigcap_(i in A) G i)).
   exact: eq_bigcapr.
@@ -1086,7 +1085,7 @@ Proof.
   intro b; split; intros [a Ha]; eexists a; auto.
 Qed.
 
-Instance proper_somes A : Morphisms.Proper (set_eq ==> set_eq) (@somes A).
+#[global] Instance proper_somes A : Morphisms.Proper (set_eq ==> set_eq) (@somes A).
 Proof. firstorder. Qed.
 
 Lemma bigcup_setI {T U} (s1 : set T) (s2 : set U) F :

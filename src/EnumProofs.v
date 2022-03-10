@@ -5,10 +5,12 @@ Require Import Tactics TacticsUtil Instances Classes DependentClasses Sets
 
 Import ListNotations.
 
-From mathcomp Require Import ssreflect ssrfun ssrbool ssrnat eqtype seq.
-
 From Ltac2 Require Import Ltac2.
 
+Set Warnings "-notation-overwritten, -parsing".
+From mathcomp Require Import ssreflect ssrfun ssrbool ssrnat eqtype seq.
+
+Local Open Scope set_scope.
 
 Set Bullet Behavior "Strict Subproofs".
 

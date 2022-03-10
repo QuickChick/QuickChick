@@ -60,7 +60,7 @@ Fixpoint mapLazyList {A B : Type} (f : A -> B) (l : LazyList A) : LazyList B :=
   | lcons x l' => lcons (f x) (fun _ => (mapLazyList f (l' tt)))
   end.
 
-Instance FunctorLazyList : Functor LazyList :=
+#[global] Instance FunctorLazyList : Functor LazyList :=
   {
     fmap := @mapLazyList
   }.
@@ -81,7 +81,7 @@ Fixpoint concatLazyList {A : Type} (l : LazyList (LazyList A)) : LazyList A :=
 Definition bindLazyList {A B : Type} (l : LazyList A) (f : A -> LazyList B) : LazyList B :=
   concatLazyList (mapLazyList f l).
 
-Instance MonadLazyList : Monad LazyList :=
+#[global] Instance MonadLazyList : Monad LazyList :=
   {
     ret := @retLazyList;
     bind := @bindLazyList
@@ -93,7 +93,7 @@ Definition apLazyList {A B : Type} (lab : LazyList (A -> B)) (la : LazyList A) :
   a <- la;;
   ret (ab a).
 
-Instance ApplicativeLazyList : Applicative LazyList :=
+#[global] Instance ApplicativeLazyList : Applicative LazyList :=
   {
     pure := @retLazyList;
     ap := @apLazyList

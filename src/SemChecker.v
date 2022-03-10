@@ -6,6 +6,7 @@ From mathcomp Require Import ssrbool ssrnat eqtype.
 Require Import Show Sets Generators Producer RoseTrees Checker Classes.
 
 Import QcDefaultNotation.
+Local Open Scope set_scope.
 
 Definition resultSuccessful (r : Result) : bool :=
   match r with
@@ -107,7 +108,7 @@ Proof.
   move => H1 b H2. apply H1. eauto.
 Qed.
 
-Instance unsizedMonotonicChecker (c : Checker) `{UnsizedChecker c} : 
+#[global] Instance unsizedMonotonicChecker (c : Checker) `{UnsizedChecker c} : 
   SizeMonotonicChecker c.
 Proof.
   constructor => s1 s2 LE.
@@ -223,7 +224,7 @@ Proof.
   by apply H.
 Qed.
 
-(* Program Instance shrinkingUnsized {C A} `{Checkable C} *)
+(* Program #[global] Instance shrinkingUnsized {C A} `{Checkable C} *)
 (*         (sh : A -> list A) (x : A) (pf : A -> C)  *)
 (*         `{UnsizedChecker (checker (pf x))} : UnsizedChecker (shrinking sh x pf). *)
 (* Next Obligation.  *)
@@ -307,7 +308,7 @@ Proof.
 Qed.
 
 Opaque semProdSize.
-Program Instance implicationUnsized
+#[global] Program Instance implicationUnsized
         {C} `{Checkable C} b (c : C) `{UnsizedChecker (checker c)} : 
   UnsizedChecker (implication b c).
 Next Obligation.
@@ -318,7 +319,7 @@ Next Obligation.
   apply imset_eq. rewrite !semReturnSize. reflexivity.
 Qed.
 
-Program Instance implicationMonotonic
+#[global] Program Instance implicationMonotonic
         {C} `{Checkable C} b (c : C) `{SizeMonotonicChecker (checker c)} : 
   SizeMonotonicChecker (implication b c).
 Next Obligation.
@@ -413,7 +414,7 @@ Proof.
   split => H s; eapply semPredQPropSize; eauto.
 Qed.
 
-Instance forAllMonotonic {A C} {_ : Checkable C} `{Show A} (g : G A) (f : A -> C)
+#[global] Instance forAllMonotonic {A C} {_ : Checkable C} `{Show A} (g : G A) (f : A -> C)
         `{@SizeMonotonic _ _ ProducerGen g} `{forall x, SizeMonotonicChecker (checker (f x))} :
   SizeMonotonicChecker (forAll g f).
 Proof.
@@ -650,7 +651,7 @@ Proof.
   constructor.
 Qed.
  
-Program Instance boolUnsized (b : bool) : UnsizedChecker (checker b).
+#[global] Program Instance boolUnsized (b : bool) : UnsizedChecker (checker b).
 Next Obligation.
   rewrite !semFmapSize !semReturnSize. apply imset_eq. reflexivity.
 Qed.
@@ -683,7 +684,7 @@ Proof.
   constructor.
 Qed.
 
-Program Instance resultUnsized (r : Result) : UnsizedChecker (checker r).
+#[global] Program Instance resultUnsized (r : Result) : UnsizedChecker (checker r).
 Next Obligation.
   rewrite !semFmapSize !semReturnSize. apply imset_eq. reflexivity.
 Qed.
@@ -701,7 +702,7 @@ Proof.
   constructor.
 Qed.
 
-Program Instance unitUnsized : UnsizedChecker (checker tt).
+#[global] Program Instance unitUnsized : UnsizedChecker (checker tt).
 Next Obligation.
   rewrite !semFmapSize !semReturnSize. apply imset_eq. reflexivity.
 Qed.
@@ -727,7 +728,7 @@ Proof.
   constructor.
 Qed.
 
-Program Instance qpUnsized (qp : QProp) : UnsizedChecker (checker qp).
+#[global] Program Instance qpUnsized (qp : QProp) : UnsizedChecker (checker qp).
 Next Obligation.
   rewrite !semFmapSize !semReturnSize. apply imset_eq. reflexivity.
 Qed.
@@ -775,7 +776,7 @@ Proof.
   by rewrite semPrintTestCase_idSize.
 Qed.
 
-Program Instance uncurryUsized {A B} (f : A -> B -> Checker) p
+Program #[global] Instance uncurryUsized {A B} (f : A -> B -> Checker) p
         `{UnsizedChecker (f (fst p) (snd p))} : UnsizedChecker (uncurry f p).
 Next Obligation. by apply unsizedChecker. Qed.
 
@@ -788,7 +789,7 @@ Class Provable (A : Type) {H: Checkable A} : Type :=
     proposition_equiv : forall a s, proposition s a <-> semCheckableSize a s
   }.
 
-Program Instance proveResult : Provable Result :=
+Program #[global] Instance proveResult : Provable Result :=
   {|
     proposition s r := resultSuccessful r
   |}.
@@ -796,7 +797,7 @@ Next Obligation.
   by rewrite semCheckableResultSize.
 Qed.
 
-Program Instance proveUnit : Provable unit :=
+Program #[global] Instance proveUnit : Provable unit :=
   {|
     proposition := fun _ _ => True
   |}.
@@ -804,7 +805,7 @@ Next Obligation.
   by rewrite semCheckableUnitSize.
 Qed.
 
-Program Instance proveQProp : Provable QProp :=
+Program #[global] Instance proveQProp : Provable QProp :=
   {|
     proposition s qp := successful qp = true
   |}.
@@ -812,7 +813,7 @@ Next Obligation.
   by rewrite semCheckableQPropSize.
 Qed.
 
-Program Instance proveBool : Provable bool :=
+Program #[global] Instance proveBool : Provable bool :=
   {|
     proposition s b :=  b = true
   |}.
@@ -820,7 +821,7 @@ Next Obligation.
   by rewrite semCheckableBoolSize.
 Qed.
 
-Program Instance proveGenProp {C} `{Provable C} :
+Program #[global] Instance proveGenProp {C} `{Provable C} :
   Provable (G C) :=
   {|
     proposition s g := (forall p, semProdSize g s p -> proposition s p)
@@ -831,7 +832,7 @@ Next Obligation.
   - move => /semCheckableGenSize H' p Hgen. eapply proof. apply H'. by auto.
 Qed.
 
-Program Instance proveChecker : Provable Checker :=
+Program #[global] Instance proveChecker : Provable Checker :=
   {|
     proposition s g := semCheckerSize g s
   |}.
@@ -839,7 +840,7 @@ Next Obligation.
   split; intros H; by apply semPredQPropSize.
 Qed.
 
-Program Instance proveFun {A C: Type} `{Arbitrary A} `{Show A}
+Program #[global] Instance proveFun {A C: Type} `{Arbitrary A} `{Show A}
         `{Provable C}: Provable (A -> C) :=
   {|
     proposition s p :=
@@ -856,7 +857,7 @@ Next Obligation.
   - move=> H' a' Hgen. apply proof. by apply semCheckableFunSize.
 Qed.
 
-Program Instance provePolyFun {C : Type -> Type} `{Provable (C nat)} :
+Program #[global] Instance provePolyFun {C : Type -> Type} `{Provable (C nat)} :
   Provable (forall T, C T) :=
   {
     proposition s f := proposition s (f nat)
@@ -867,7 +868,7 @@ Next Obligation.
   - move=> /semCheckablePolyFunSize H'. by apply proof.
 Qed.
 
-Program Instance provePolyFunSet {C : Set -> Type} `{Provable (C nat)} :
+Program #[global] Instance provePolyFunSet {C : Set -> Type} `{Provable (C nat)} :
   Provable (forall T, C T) :=
   {
     proposition s f := proposition s (f nat)

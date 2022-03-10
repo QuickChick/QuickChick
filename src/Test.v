@@ -320,7 +320,7 @@ Fixpoint showCollectStatistics (l : list (string * nat)) :=
       show n ++ " : " ++ s ++ newline ++ showCollectStatistics l'
   end.
 
-Instance showResult : Show Result := Build_Show _ (fun r =>
+#[global] Instance showResult : Show Result := Build_Show _ (fun r =>
   match r with
   | Success _ _ l s => showCollectStatistics l ++ s
   | GaveUp _ l s => showCollectStatistics l ++ s

@@ -33,7 +33,7 @@ Require Import Generators Producer.
 (* For proofs, the size parameter will need to be taken into account
    to prove limit results. We just add it to the large, practical constant.
  *)
-Global Instance decOpt__checkable {P} `{DecOpt P} : Checkable P :=
+#[global] Instance decOpt__checkable {P} `{DecOpt P} : Checkable P :=
   {| checker _ :=
        sized (fun s =>
                 match decOpt (checkable_size_limit + s) with
@@ -43,7 +43,7 @@ Global Instance decOpt__checkable {P} `{DecOpt P} : Checkable P :=
              )
   |}.
 
-Global Instance dec_decOpt {P} `{Dec P} : DecOpt P :=
+#[global] Instance dec_decOpt {P} `{Dec P} : DecOpt P :=
   {| decOpt := fun _ => match @dec P _ with
                         | left  _ => Some true
                         | right _ => Some false
@@ -67,7 +67,7 @@ Definition checker_backtrack (l : list (unit -> option bool)) : option bool :=
    change nothing... Or? *)
 
 (* Additional Checkable instance *)
-Global Instance testDec {P} `{H : Dec P} : Checkable P.
+#[global] Instance testDec {P} `{H : Dec P} : Checkable P.
 Proof.
   constructor.
   destruct H.
@@ -76,7 +76,7 @@ Proof.
   - intros; exact (checker false).
 Defined.
 
-Global Instance Checkable_opt {p} `{Checkable p} : Checkable (option p) :=
+#[global] Instance Checkable_opt {p} `{Checkable p} : Checkable (option p) :=
   { checker m :=
       match m with
       | Some x => checker x
@@ -84,13 +84,13 @@ Global Instance Checkable_opt {p} `{Checkable p} : Checkable (option p) :=
       end
   }.
 
-Global Instance Dec_neg {P} {H : Dec P} : Dec (~ P).
+#[global] Instance Dec_neg {P} {H : Dec P} : Dec (~ P).
 Proof.
   constructor. unfold decidable.
   destruct H as [D]; destruct D; auto.
 Defined.
 
-Global Instance Dec_conj {P Q} {H : Dec P} {I : Dec Q} : Dec (P /\ Q).
+#[global] Instance Dec_conj {P Q} {H : Dec P} {I : Dec Q} : Dec (P /\ Q).
 Proof.
   constructor. unfold decidable.
   destruct H as [D]; destruct D;
@@ -98,7 +98,7 @@ Proof.
       right; intro; destruct H; contradiction.
 Defined.
 
-Global Instance Dec_disj {P Q} {H : Dec P} {I : Dec Q} : Dec (P \/ Q).
+#[global] Instance Dec_disj {P Q} {H : Dec P} {I : Dec Q} : Dec (P \/ Q).
 Proof.
   constructor. unfold decidable.
   destruct H as [D]; destruct D;
@@ -108,14 +108,14 @@ Defined.
 
 (* BCP: Not clear this is a good idea, but... *)
 (* Leo: Should be ok with really low priority *)
-Global Instance Dec_impl {P Q} {H : Dec P} {I : Dec Q} : Dec (P -> Q) | 100.
+#[global] Instance Dec_impl {P Q} {H : Dec P} {I : Dec Q} : Dec (P -> Q) | 100.
 Proof.
   constructor. unfold decidable.
   destruct H as [D]. destruct D; destruct I as [D]; destruct D; auto.
   left. intros. contradiction.
 Defined.
 
-Global Instance Dec_In {A} (Eq: forall (x y : A), Dec (x = y))
+#[global] Instance Dec_In {A} (Eq: forall (x y : A), Dec (x = y))
          (x : A) (l : list A) : Dec (In x l) :=
   {| dec := in_dec (fun x' y' => @dec _ (Eq x' y')) x l |}.
 
@@ -130,7 +130,7 @@ Proof.
   unfold decidable in D. assumption.
 Defined.
 
-Hint Resolve dec_if_dec_eq: eq_dec.
+#[global] Hint Resolve dec_if_dec_eq: eq_dec.
 
 Ltac dec_eq :=
   repeat match goal with
@@ -150,13 +150,13 @@ Ltac dec_eq :=
            end
          end.
 
-Global Instance Eq__Dec {A} `{H : Dec_Eq A} (x y : A) : Dec (x = y).
+#[global] Instance Eq__Dec {A} `{H : Dec_Eq A} (x y : A) : Dec (x = y).
 Proof.
 constructor.
 dec_eq.
 Defined.
 
-Global Instance Eq__RelDec {A} `{Dec_Eq A} : RelDec (@eq A) :=
+#[global] Instance Eq__RelDec {A} `{Dec_Eq A} : RelDec (@eq A) :=
   {| rel_dec x y :=
        match dec_eq x y with
        | left  _ => true
@@ -165,50 +165,50 @@ Global Instance Eq__RelDec {A} `{Dec_Eq A} : RelDec (@eq A) :=
   |}.
 
 (* Lifting common decidable instances *)
-Global Instance Dec_eq_unit : Dec_Eq unit.
+#[global] Instance Dec_eq_unit : Dec_Eq unit.
 Proof. dec_eq. Defined.
 
-Global Instance Dec_eq_bool : Dec_Eq bool.
+#[global] Instance Dec_eq_bool : Dec_Eq bool.
 Proof. dec_eq. Defined.
 
-Global Instance Dec_eq_nat : Dec_Eq nat.
+#[global] Instance Dec_eq_nat : Dec_Eq nat.
 Proof. dec_eq. Defined.
 
-Global Instance Dec_eq_Z : Dec_Eq Z.
+#[global] Instance Dec_eq_Z : Dec_Eq Z.
 Proof. dec_eq. Defined.
 
-Global Instance Dec_eq_N : Dec_Eq N.
+#[global] Instance Dec_eq_N : Dec_Eq N.
 Proof. dec_eq. Defined.
 
-Global Instance Dec_eq_opt (A : Type) `{Dec_Eq A} : Dec_Eq (option A).
+#[global] Instance Dec_eq_opt (A : Type) `{Dec_Eq A} : Dec_Eq (option A).
 Proof. dec_eq. Defined.
 
-Global Instance Dec_eq_prod (A B : Type) `{Dec_Eq A} `{Dec_Eq B} : Dec_Eq (A * B).
+#[global] Instance Dec_eq_prod (A B : Type) `{Dec_Eq A} `{Dec_Eq B} : Dec_Eq (A * B).
 Proof. dec_eq. Defined.
 
-Global Instance Dec_eq_sum (A B : Type) `{Dec_Eq A} `{Dec_Eq B} : Dec_Eq (A + B).
+#[global] Instance Dec_eq_sum (A B : Type) `{Dec_Eq A} `{Dec_Eq B} : Dec_Eq (A + B).
 Proof. dec_eq. Defined.
 
-Global Instance Dec_eq_list (A : Type) `{Dec_Eq A} : Dec_Eq (list A).
+#[global] Instance Dec_eq_list (A : Type) `{Dec_Eq A} : Dec_Eq (list A).
 Proof. dec_eq. Defined.
 
-Global Instance list_Dec_Eq X (_ : Dec_Eq X) : Dec_Eq (list X).
+#[global] Instance list_Dec_Eq X (_ : Dec_Eq X) : Dec_Eq (list X).
 Proof. dec_eq. Defined.
 
 
-Hint Resolve ascii_dec: eq_dec.
-Hint Resolve string_dec: eq_dec.
+#[global] Hint Resolve ascii_dec: eq_dec.
+#[global] Hint Resolve string_dec: eq_dec.
 
-Global Instance Dec_eq_ascii : Dec_Eq ascii.
+#[global] Instance Dec_eq_ascii : Dec_Eq ascii.
 Proof. dec_eq. Defined.
 
-Global Instance Dec_eq_string : Dec_Eq string.
+#[global] Instance Dec_eq_string : Dec_Eq string.
 Proof. dec_eq. Defined.
 
 (* Everything that uses the Decidable Class *)
 Require Import DecidableClass.
 
-Global Instance dec_class_dec P (H : Decidable P): Dec P.
+#[global] Instance dec_class_dec P (H : Decidable P): Dec P.
 Proof.
   constructor; destruct H; destruct Decidable_witness.
   - left; auto.
@@ -243,14 +243,14 @@ Notation "P '??' n" := (checker (@decOpt P _ n))
                          (at level 100).
 
 
-Hint Resolve Dec_eq_unit : eq_dec.
-Hint Resolve Dec_eq_bool : eq_dec.
-Hint Resolve Dec_eq_nat : eq_dec.
-Hint Resolve Dec_eq_Z : eq_dec.
-Hint Resolve Dec_eq_N : eq_dec.
-Hint Resolve Dec_eq_opt : eq_dec.
-Hint Resolve Dec_eq_prod : eq_dec.
-Hint Resolve Dec_eq_sum : eq_dec.
-Hint Resolve Dec_eq_list : eq_dec.
-Hint Resolve Dec_eq_ascii : eq_dec.
-Hint Resolve Dec_eq_string : eq_dec.
+#[global] Hint Resolve Dec_eq_unit : eq_dec.
+#[global] Hint Resolve Dec_eq_bool : eq_dec.
+#[global] Hint Resolve Dec_eq_nat : eq_dec.
+#[global] Hint Resolve Dec_eq_Z : eq_dec.
+#[global] Hint Resolve Dec_eq_N : eq_dec.
+#[global] Hint Resolve Dec_eq_opt : eq_dec.
+#[global] Hint Resolve Dec_eq_prod : eq_dec.
+#[global] Hint Resolve Dec_eq_sum : eq_dec.
+#[global] Hint Resolve Dec_eq_list : eq_dec.
+#[global] Hint Resolve Dec_eq_ascii : eq_dec.
+#[global] Hint Resolve Dec_eq_string : eq_dec.

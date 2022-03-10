@@ -47,7 +47,6 @@ Require Export Enumerators.
 Require Export Generators.
 Require Export State.
 Require Export Checker.
-Require Export SemChecker.
 Require Export Test.
 Require Export ExtractionQC.
 Require Export Decidability.
@@ -56,9 +55,6 @@ Require Export Instances.
 Require Export DependentClasses.
 Require Export Typeclasses.
 Require Export Mutation.
-Require Export CheckerProofs.
-Require Export EnumProofs.
-Require Export GenProofs.
 
 Global Unset Asymmetric Patterns.
 Global Set Bullet Behavior "Strict Subproofs".

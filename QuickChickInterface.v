@@ -10,6 +10,7 @@ From ExtLib.Structures Require Import Functor Applicative.
     documents the entire public interface (the module type
     [QuickChickSig]). *)
 
+Set Warnings "-already-existing-class, -automation".
 Module Type QuickChickSig.
 
 (* #################################################################### *)
@@ -25,18 +26,18 @@ Module Type QuickChickSig.
 *)
 
 (** Here are some [Show] instances for some basic types: *)
-Declare Instance showNat    : Show nat.
-Declare Instance showBool   : Show bool.
-Declare Instance showZ      : Show Z.
-Declare Instance showString : Show string.
+#[global] Declare Instance showNat    : Show nat.
+#[global] Declare Instance showBool   : Show bool.
+#[global] Declare Instance showZ      : Show Z.
+#[global] Declare Instance showString : Show string.
 
-Declare Instance showList :
+#[global] Declare Instance showList :
   forall {A : Type} `{Show A}, Show (list A).
-Declare Instance showPair :
+#[global] Declare Instance showPair :
   forall {A B : Type} `{Show A} `{Show B}, Show (A * B).
-Declare Instance showOpt :
+#[global] Declare Instance showOpt :
   forall {A : Type} `{Show A}, Show (option A).
-Declare Instance showEx :
+#[global] Declare Instance showEx :
   forall {A} `{Show A} P, Show ({x : A | P x}).
 
 (** When defining [Show] instance for your own datatypes, you sometimes need to
@@ -60,76 +61,6 @@ Parameter G : Type -> Type.
     the maximum depth of the generated A) and a random seed. *)
 Parameter run  : forall {A : Type}, G A -> nat -> RandomSeed -> A.
 
-(** The semantics of a generator is its set of possible outcomes. *)
-Parameter semGen : forall {A : Type} (g : G A), set A.
-Parameter semGenSize : forall {A : Type} (g : G A) (size : nat), set A.
-(* SOONER: Where does [set] come from?? Where can I read about what
-   operations / theorems are available? *)
-(* SOONER: [set] comes from src/Sets.v. I think Maxime/Zoe wrote most
-   of that file quite a while ago (during her thesis at Catalin). It 
-   is not really documented... would you want all of that file 
-   here? *)
-(* SOONER: I want this file to be a complete description of what most
-   people need to know to use QC.  One possible approach could be to
-   split this interface into a "programming interface" for most users
-   and a "proving interface" for people that also want to do proofs
-   involving the QC semantics.  Then the functions from Sets.v would
-   be relevant only to the second.  (I actually kind of like this
-   idea, as it would streamline what most people need to think
-   about.) *)
-(* SOONER: It *is* a complete description of what _the vast majority_ people need
-   to know to use QC. There are exactly three uses of the set library:
-   1) Allow derivation of correctness proofs. Here, the user doesn't 
-      need to know all the lemmas that the proof uses in order to enjoy
-      the benefits of an end-to-end specification (but the lemmas
-      need to be exposed).
-   2) Allow manual correctness proofs. I don't think anyone has ever 
-      done that outside of ourselves to practice before writing the 
-      generic derivation of proofs. Writing correctness proofs for 
-      generators is hard and not really worth it from the user's 
-      perspective.
-   3) The only potential use of the set library from a user would 
-      be in forAllProof variants to define dependently typed data. However, 
-      this intrinsic verification approach is very rarely used and 
-      comes with more severe testing problems than an undocumented 
-      set library.
- 
-   My thinking was to have [semGen] and [forAllProof] here as a small
-   glance into the world of generator semantics. I do think that 
-   presenting the view that a generator is characterized by its set of  
-   outcomes is a very useful notion, even if a user never has to 
-   actively play with that notion. Do you want to just remove every
-   mention to [set]/[semGen] from this file to keep it a "programming
-   only" interface? 
-
-   Besides, what would the "proving interface" entail? 
-   We can't really document the entirety of the sets library. That's like 
-   200 low-level lemmas that are only expanded to facilitate proof 
-   derivation... For example, we have lemmas like the following:
-
-[[
-Lemma isSome_subset {A : Type} (s1 s2 s1' s2' : set (option A)) :
-  isSome :&: s1 \subset isSome :&: s2 ->
-  isSome :&: (s1 :|: ([set None] :&: s1')) \subset isSome :&: (s2 :|: ([set None] :&: s2')).
-]]
-   
-   This says that if the set of all "Some"s in s1 is a subset of all the 
-   "Some"s in s2, then the set of all "Some"s in the the union of s1 with 
-   [the intersection of {None} and s1'] is a subset of the set of all somes in
-   the union of s2 with [the intersection of {None} and s2']. Of course, the intersection of 
-   {None} with any set is at most {None}, and that none will be filtered 
-   out by [isSome], so this looks like a completely useless lemma. However,
-   we do need this lemma because of the particular structure of the 
-   proofs involving the backtrack combinator. How can we explain this 
-   lemma and its point to a user if we turn this file into a complete
-   documentation of everything that needs to be exposed?
-
-   BCP: Ok, ok... :-)
-   
-   So what about moving all the stuff involving semantics to its own section at the 
-   end of the file?
- *)
-  
 
 (* #################################################################### *)
 (** ** Structural Combinators *)
@@ -139,15 +70,10 @@ Lemma isSome_subset {A : Type} (s1 s2 s1' s2' : set (option A)) :
     [Functor], [Applicative], [Foldable], and [Traversable] modules in
     the [ExtLib.Structures] library from [coq-ext-lib]. *)
 
-Declare Instance Monad_G : Monad G.
-Declare Instance Functor_G : Functor G.
-Declare Instance Applicative_G : Applicative G.
+#[global] Declare Instance Monad_G : Monad G.
+#[global] Declare Instance Functor_G : Functor G.
+#[global] Declare Instance Applicative_G : Applicative G.
 
-(** A variant of monadic bind where the continuation also takes a
-    _proof_ that the value received is within the set of outcomes of
-    the first generator. *)
-Parameter bindGen' : forall {A B : Type} (g : G A),
-    (forall (a : A), (a \in semGen g) -> G B) -> G B.
 
 (** A variant of bind for the [(G (option --))] monad.  Useful for
     chaining generators that can fail / backtrack. *)
@@ -263,9 +189,9 @@ End QcDefaultNotation.
 
 Existing Class OrdType.
 
-Declare Instance OrdBool : OrdType bool.
-Declare Instance OrdNat  : OrdType nat.
-Declare Instance OrdZ    : OrdType Z.
+#[global] Declare Instance OrdBool : OrdType bool.
+#[global] Declare Instance OrdNat  : OrdType nat.
+#[global] Declare Instance OrdZ    : OrdType Z.
 
 (** We also expect the random function to be able to pick every element in any
     given interval. *)
@@ -274,9 +200,9 @@ Existing Class ChoosableFromInterval.
 
 (** QuickChick has provided some instances for ordered data types that are
     choosable from intervals, including [bool], [nat], and [Z]. *)
-(* Declare Instance ChooseBool : ChoosableFromInterval bool. *)
-Declare Instance ChooseNat : ChoosableFromInterval nat.
-Declare Instance ChooseZ : ChoosableFromInterval Z.
+(* #[global] Declare Instance ChooseBool : ChoosableFromInterval bool. *)
+#[global] Declare Instance ChooseNat : ChoosableFromInterval nat.
+#[global] Declare Instance ChooseZ : ChoosableFromInterval Z.
 
 (** [choose l r] generates a value between [l] and [r], inclusive the two
     extremes. It causes a runtime error if [r < l]. *)
@@ -297,22 +223,22 @@ Parameter choose :
 
 (** Given an instance of [GenSized], we can convert it to [Gen] automatically,
     using [sized] function. *)
-Declare Instance GenOfGenSized {A} `{GenSized A} : Gen A.
+#[global] Declare Instance GenOfGenSized {A} `{GenSized A} : Gen A.
 
 (** Here are some basic instances for generators: *)
-Declare Instance genBoolSized : GenSized bool.
-Declare Instance genNatSized  : GenSized nat.
-Declare Instance genZSized    : GenSized Z.
+#[global] Declare Instance genBoolSized : GenSized bool.
+#[global] Declare Instance genNatSized  : GenSized nat.
+#[global] Declare Instance genZSized    : GenSized Z.
 
-Declare Instance genListSized :
+#[global] Declare Instance genListSized :
   forall {A : Type} `{GenSized A}, GenSized (list A).
-Declare Instance genList :
+#[global] Declare Instance genList :
   forall {A : Type} `{Gen A}, Gen (list A).
-Declare Instance genOption :
+#[global] Declare Instance genOption :
   forall {A : Type} `{Gen A}, Gen (option A).
-Declare Instance genPairSized :
+#[global] Declare Instance genPairSized :
   forall {A B : Type} `{GenSized A} `{GenSized B}, GenSized (A*B).
-Declare Instance genPair :
+#[global] Declare Instance genPair :
   forall {A B : Type} `{Gen A} `{Gen B}, Gen (A * B).
 
 (* #################################################################### *)
@@ -373,13 +299,13 @@ Notation "'genST' x" := (@arbitraryST _ x _) (at level 70).
 *)
 
 (** Default shrinkers for some basic datatypes: *)
-Declare Instance shrinkBool : Shrink bool.
-Declare Instance shrinkNat : Shrink nat.
-Declare Instance shrinkZ : Shrink Z.
+#[global] Declare Instance shrinkBool : Shrink bool.
+#[global] Declare Instance shrinkNat : Shrink nat.
+#[global] Declare Instance shrinkZ : Shrink Z.
 
-Declare Instance shrinkList {A : Type} `{Shrink A} : Shrink (list A).
-Declare Instance shrinkPair {A B} `{Shrink A} `{Shrink B} : Shrink (A * B).
-Declare Instance shrinkOption {A : Type} `{Shrink A} : Shrink (option A).
+#[global] Declare Instance shrinkList {A : Type} `{Shrink A} : Shrink (list A).
+#[global] Declare Instance shrinkPair {A B} `{Shrink A} `{Shrink B} : Shrink (A * B).
+#[global] Declare Instance shrinkOption {A : Type} `{Shrink A} : Shrink (option A).
 
 (* #################################################################### *)
 (** ** The [Arbitrary] Typeclass *)
@@ -407,7 +333,7 @@ Declare Instance shrinkOption {A : Type} `{Shrink A} : Shrink (option A).
 
 (** If a type has a [Gen] and a [Shrink] instance, it automatically gets
     an [Arbitrary] one. *)
-Declare Instance ArbitraryOfGenShrink :
+#[global] Declare Instance ArbitraryOfGenShrink :
   forall {A} `{Gen A} `{Shrink A}, Arbitrary A.
 
 (* #################################################################### *)
@@ -428,33 +354,17 @@ Parameter Checker : Type.
 *)
 
 (** Boolean checkers always pass or always fail. *)
-Declare Instance testBool : Checkable bool.
+#[global] Declare Instance testBool : Checkable bool.
 
 (** The unit checker is always discarded (that is, it represents a
     useless test).  It is used, for example, in the implementation of
     the "implication [Checker]" combinator [==>]. *)
-Declare Instance testUnit : Checkable unit.
+#[global] Declare Instance testUnit : Checkable unit.
 
 (** Given a generator for showable [A]s, construct a [Checker]. *)
 Parameter forAll :
   forall {A prop : Type} `{Checkable prop} `{Show A}
          (gen : G A)  (pf : A -> prop), Checker.
-
-(** A variant of [forAll] that provides evidence that the generated
-    values are members of the semantics of the generator. (Such evidence
-    can be useful when constructing dependently typed data, such as 
-    bounded integers.) *)
-(* SOONER: That's exactly the sort of concise explanation that I'm
-   looking for throughout!  (And it makes me realize that separating
-   the interface into "operations for programmers" and "operations for
-   provers" may not be so simple!  Though it may still make sense to
-   lump dependently typed programming in with proving.  So one
-   interface could be called QCBasicInterface and the other
-   QCPowerUsersInterface :-) *)
-(* SOONER: This file indeed used to be called QCBasicInterface :-) *)
-Parameter forAllProof :
-  forall {A prop : Type} `{Checkable prop} `{Show A}
-         (gen : G A)  (pf : forall (x : A), semGen gen x -> prop), Checker.
 
 (** Given a generator and a shrinker for showable [A]s, construct a
     [Checker]. *)
@@ -467,18 +377,18 @@ Parameter forAllShrink :
     possible to write (for some example property [foo := fun x => x >?
     0], say) [QuickChick foo] instead of [QuickChick (forAllShrink
     arbitrary shrink foo)]. *)
-Declare Instance testFun :
+#[global] Declare Instance testFun :
   forall {A prop : Type} `{Show A} `{Arbitrary A} `{Checkable prop},
     Checkable (A -> prop).
 
 (** Lift products similarly. *)
-Declare Instance testProd :
+#[global] Declare Instance testProd :
   forall {A : Type} {prop : A -> Type} `{Show A} `{Arbitrary A}
          `{forall x : A, Checkable (prop x)},
     Checkable (forall (x : A), prop x).
 
 (** Lift polymorphic functions by instantiating to 'nat'. :-) *)
-Declare Instance testPolyFun :
+#[global] Declare Instance testPolyFun :
   forall {prop : Type -> Type} `{Checkable (prop nat)},
     Checkable (forall T, prop T).
 
@@ -562,12 +472,12 @@ End QcNotation.
 *)
 
 (** Decidable properties are Checkable. *)
-Declare Instance testDec {P} `{H : Dec P} : Checkable P.
+#[global] Declare Instance testDec {P} `{H : Dec P} : Checkable P.
 
 (** Logic Combinator instances. *)
-Declare Instance Dec_neg {P} {H : Dec P} : Dec (~ P).
-Declare Instance Dec_conj {P Q} {H : Dec P} {I : Dec Q} : Dec (P /\ Q).
-Declare Instance Dec_disj {P Q} {H : Dec P} {I : Dec Q} : Dec (P \/ Q).
+#[global] Declare Instance Dec_neg {P} {H : Dec P} : Dec (~ P).
+#[global] Declare Instance Dec_conj {P Q} {H : Dec P} {I : Dec Q} : Dec (P /\ Q).
+#[global] Declare Instance Dec_disj {P Q} {H : Dec P} {I : Dec Q} : Dec (P \/ Q).
 
 (* SOONER: We had discussed changing this to the partial decision procedure at some point. *)
 (** A convenient notation for coercing a decidable proposition to a [bool]. *)
@@ -587,7 +497,7 @@ Notation "P '?'" := (match (@dec P _) with
 *)
 
 (** Automation and conversions for Dec. *)
-Declare Instance Eq__Dec {A} `{H : Dec_Eq A} (x y : A) : Dec (x = y).
+#[global] Declare Instance Eq__Dec {A} `{H : Dec_Eq A} (x y : A) : Dec (x = y).
 
 (** Since deciding equalities is a very common requirement in testing,
     QuickChick provides a tactic that can define instances of the form
@@ -599,21 +509,21 @@ Declare Instance Eq__Dec {A} `{H : Dec_Eq A} (x y : A) : Dec (x = y).
 *)
 
 (** QuickChick also lifts common decidable instances to the [Dec] typeclass. *)
-Declare Instance Dec_eq_unit   : Dec_Eq unit.
-Declare Instance Dec_eq_bool   : Dec_Eq bool.
-Declare Instance Dec_eq_nat    : Dec_Eq nat.
-Declare Instance Dec_eq_Z      : Dec_Eq Z.
-Declare Instance Dec_eq_N      : Dec_Eq N.
-Declare Instance Dec_eq_ascii  : Dec_Eq ascii.
-Declare Instance Dec_eq_string : Dec_Eq string.
+#[global] Declare Instance Dec_eq_unit   : Dec_Eq unit.
+#[global] Declare Instance Dec_eq_bool   : Dec_Eq bool.
+#[global] Declare Instance Dec_eq_nat    : Dec_Eq nat.
+#[global] Declare Instance Dec_eq_Z      : Dec_Eq Z.
+#[global] Declare Instance Dec_eq_N      : Dec_Eq N.
+#[global] Declare Instance Dec_eq_ascii  : Dec_Eq ascii.
+#[global] Declare Instance Dec_eq_string : Dec_Eq string.
 
-Declare Instance Dec_eq_opt  (A : Type)
+#[global] Declare Instance Dec_eq_opt  (A : Type)
         `{Dec_Eq A}             : Dec_Eq (option A).
-Declare Instance Dec_eq_prod (A B : Type)
+#[global] Declare Instance Dec_eq_prod (A B : Type)
         `{Dec_Eq A} `{Dec_Eq B} : Dec_Eq (A * B).
-Declare Instance Dec_eq_sum  (A B : Type)
+#[global] Declare Instance Dec_eq_sum  (A B : Type)
         `{Dec_Eq A} `{Dec_Eq B} : Dec_Eq (A + B).
-Declare Instance Dec_eq_list (A : Type)
+#[global] Declare Instance Dec_eq_list (A : Type)
         `{Dec_Eq A}             : Dec_Eq (list A).
 
 (* #################################################################### *)
@@ -713,6 +623,98 @@ Record Args :=
 ]]
 *)
 
+(* Semantics of Generators *)
+
+(* To reason about generators, we need to import the Proofs module 
+from QuickChick. *)
+Set Warnings "-notation-overwritten, -parsing".
+Set Warnings "-require-in-module, -fragile]".
+
+From QuickChick Require Import Proofs.
+Local Open Scope set_scope.
+
+(** The semantics of a generator is its set of possible outcomes. *)
+Parameter semGen : forall {A : Type} (g : G A), set A.
+Parameter semGenSize : forall {A : Type} (g : G A) (size : nat), set A.
+(* SOONER: Where does [set] come from?? Where can I read about what
+   operations / theorems are available? *)
+(* SOONER: [set] comes from src/Sets.v. I think Maxime/Zoe wrote most
+   of that file quite a while ago (during her thesis at Catalin). It 
+   is not really documented... would you want all of that file 
+   here? *)
+(* SOONER: I want this file to be a complete description of what most
+   people need to know to use QC.  One possible approach could be to
+   split this interface into a "programming interface" for most users
+   and a "proving interface" for people that also want to do proofs
+   involving the QC semantics.  Then the functions from Sets.v would
+   be relevant only to the second.  (I actually kind of like this
+   idea, as it would streamline what most people need to think
+   about.) *)
+(* SOONER: It *is* a complete description of what _the vast majority_ people need
+   to know to use QC. There are exactly three uses of the set library:
+   1) Allow derivation of correctness proofs. Here, the user doesn't 
+      need to know all the lemmas that the proof uses in order to enjoy
+      the benefits of an end-to-end specification (but the lemmas
+      need to be exposed).
+   2) Allow manual correctness proofs. I don't think anyone has ever 
+      done that outside of ourselves to practice before writing the 
+      generic derivation of proofs. Writing correctness proofs for 
+      generators is hard and not really worth it from the user's 
+      perspective.
+   3) The only potential use of the set library from a user would 
+      be in forAllProof variants to define dependently typed data. However, 
+      this intrinsic verification approach is very rarely used and 
+      comes with more severe testing problems than an undocumented 
+      set library.
+ 
+   My thinking was to have [semGen] and [forAllProof] here as a small
+   glance into the world of generator semantics. I do think that 
+   presenting the view that a generator is characterized by its set of  
+   outcomes is a very useful notion, even if a user never has to 
+   actively play with that notion. Do you want to just remove every
+   mention to [set]/[semGen] from this file to keep it a "programming
+   only" interface? 
+
+   Besides, what would the "proving interface" entail? 
+   We can't really document the entirety of the sets library. That's like 
+   200 low-level lemmas that are only expanded to facilitate proof 
+   derivation... For example, we have lemmas like the following:
+
+[[
+Lemma isSome_subset {A : Type} (s1 s2 s1' s2' : set (option A)) :
+  isSome :&: s1 \subset isSome :&: s2 ->
+  isSome :&: (s1 :|: ([set None] :&: s1')) \subset isSome :&: (s2 :|: ([set None] :&: s2')).
+]]
+   
+   This says that if the set of all "Some"s in s1 is a subset of all the 
+   "Some"s in s2, then the set of all "Some"s in the the union of s1 with 
+   [the intersection of {None} and s1'] is a subset of the set of all somes in
+   the union of s2 with [the intersection of {None} and s2']. Of course, the intersection of 
+   {None} with any set is at most {None}, and that none will be filtered 
+   out by [isSome], so this looks like a completely useless lemma. However,
+   we do need this lemma because of the particular structure of the 
+   proofs involving the backtrack combinator. How can we explain this 
+   lemma and its point to a user if we turn this file into a complete
+   documentation of everything that needs to be exposed?
+
+ *)
+
+(** A variant of monadic bind where the continuation also takes a
+    _proof_ that the value received is within the set of outcomes of
+    the first generator. *)
+Parameter bindGen' : forall {A B : Type} (g : G A),
+    (forall (a : A), (a \in semGen g) -> G B) -> G B.
+
+(** A variant of [forAll] that provides evidence that the generated
+    values are members of the semantics of the generator. (Such evidence
+    can be useful when constructing dependently typed data, such as 
+    bounded integers.) *)
+Parameter forAllProof :
+  forall {A prop : Type} `{Checkable prop} `{Show A}
+         (gen : G A)  (pf : forall (x : A), semGen gen x -> prop), Checker.
+
+
+
 (* #################################################################### *)
 (** * The [quickChick] Command-Line Tool *)
 
@@ -805,13 +807,14 @@ Record Args :=
 Module QcDoNotation.
   Notation "'do!' X <- A ; B" :=
     (bindGen A (fun X => B))
-    (at level 200, X ident, A at level 100, B at level 200).
+    (at level 200, X name, A at level 100, B at level 200).
   Notation "'do\'' X <- A ; B" :=
     (bindGen' A (fun X H => B))
-    (at level 200, X ident, A at level 100, B at level 200).
+    (at level 200, X name, A at level 100, B at level 200).
   Notation "'doM!' X <- A ; B" :=
     (bindGenOpt A (fun X => B))
-    (at level 200, X ident, A at level 100, B at level 200).
+    (at level 200, X name, A at level 100, B at level 200).
 End QcDoNotation.
+
 
 End QuickChickSig.
