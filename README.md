@@ -15,11 +15,18 @@ This is the branch that accompanies the PLDI 2022 paper: Computing Correctly wit
 
 - You need Coq 8.13.2 installed.
 - Make sure you have the Coq opam repository (if you haven't already)
+
     opam repo add coq-released https://coq.inria.fr/opam/released
     opam update
+
 - Install the coq-quickchick opam package dependencies
+
     opam install coq-quickchick --deps-only
+
 - Compile the code
+
     make
+
 - Install in your current switch (this will clobber any opam-installed QuickChick packages)
+    
     make install
