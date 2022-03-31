@@ -71,6 +71,11 @@ Fixpoint insert (x : nat) (t : Tree) :=
       else t
   end.
 
+
+Extract Constant defNumTests => "100000".
+
+(*! Section base *)
+
 Definition insert_bst :=
   forAll (gen_bst 5 0 10) (fun t =>
   forAll (choose (1, 9)) (fun x => 
@@ -78,12 +83,16 @@ Definition insert_bst :=
 
 (*! QuickChick insert_bst. *)
 
+(*! Section derived-dec *)
+
 Definition insert_bst_derived_checker :=
   forAll (gen_bst 5 0 10) (fun t =>
   forAll (choose (1, 9)) (fun x => 
   bst 0 10 (insert x t) ?? 10)).
 
 (*! QuickChick insert_bst_derived_checker. *)
+
+(*! Section derived-gen *)
 
 Definition insert_bst_derived_gen :=
   forAllMaybe (@arbitrarySizeST _ (fun t => bst 0 10 t) _ 5) (fun t =>
