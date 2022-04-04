@@ -22,6 +22,10 @@ Inductive bal : nat -> Tree -> Prop :=
 | bal_node : forall n t1 t2 m,
     bal n t1 -> bal n t2 -> bal (S n) (Node m t1 t2).
 
+QuickChickDebug Debug On.
+Merge (fun t => bst lo hi t) With (fun t => bal n t)
+      As bstbalmerged.
+
 Inductive bstbal : nat -> nat -> nat -> Tree -> Prop :=
 | leafleaf0 : forall lo hi, bstbal lo hi 0 Leaf
 | leafleaf1 : forall lo hi, bstbal lo hi 1 Leaf

@@ -88,8 +88,17 @@ let dispatch cn ind name1 name2 =
   match class_names with
   | SimpleDer classes -> simpl_dispatch ind classes name1 name2
   | DepDer class_name -> DepDriver.dep_dispatch ind class_name
+;;                       
 
+let merge ind1 ind2 ind3 =
+  MergeTypes.merge ind1 ind2 ind3
 }
+
+  
+VERNAC COMMAND EXTEND Merge CLASSIFIED AS SIDEFF
+ | ["Merge" constr(ind1) "With" constr(ind2) "As" constr(ind)] ->
+    { merge ind1 ind2 ind }
+END
 
 VERNAC COMMAND EXTEND Derive CLASSIFIED AS SIDEFF
    | ["Derive" constr(class_name) "for" constr(inductive)] ->

@@ -5,6 +5,7 @@ MAKE SURE TO EDIT THE .cppo SOURCE OF THIS FILE RATHER THAN THE GENERATED RESULT
 
 *)
 
+open Entries
 open Pp
 open Constr
 open Names
@@ -1008,6 +1009,35 @@ let declare_class_instance ?(global=true) ?(priority=42) instance_arguments inst
   in
   msg_debug (str (Id.to_string cid) ++ fnl ())
 
+let define_new_inductive (ty_ctr, ty_params, ctrs, typ) =
+  let oie =
+    { mind_entry_typename = Id.of_string (string_of_qualid ty_ctr) 
+    ; mind_entry_arity = gType ty_params typ
+    ; mind_entry_consnames = List.map (fun (c,_) -> Id.of_string (string_of_qualid c)) ctrs
+    ; mind_entry_lc = List.map (fun (_, t) -> gType ty_params t) ctrs
+    } in
+  let entry =
+    { mind_entry_record = None
+    ; mind_entry_finite = Declarations.Finite
+    ; mind_entry_params = []
+    ; mind_entry_inds = [ oie ]
+    ; mind_entry_universes = Entries.Monomorphic_ind_entry 
+    ; mind_entry_variance  = None
+    ; mind_entry_private   = None
+    } in
+  let uentry = failwith "lol" in
+  let impls = [] in
+  ignore (DeclareInd.declare_mutual_inductive_with_eliminations
+            entry uentry impls)
+(*val declare_mutual_inductive_with_eliminations
+  : ?primitive_expected:bool
+  -> ?typing_flags:Declarations.typing_flags
+  -> Entries.mutual_inductive_entry
+  -> UState.named_universes_entry
+  -> one_inductive_impls list
+  -> Names.MutInd.t *)
+  
+  
 (* List Utils. Probably should move to a util file instead *)
 let list_last l = List.nth l (List.length l - 1)
 let list_init l = List.rev (List.tl (List.rev l))

@@ -240,6 +240,8 @@ val declare_class_instance
   -> arg list -> string -> (var list -> coq_expr) -> (var list -> coq_expr)
   -> unit
 
+val define_new_inductive : dep_dt -> unit
+
 (* List utils *)
 val list_last : 'a list -> 'a 
 val list_init : 'a list -> 'a list 
