@@ -1,22 +1,6 @@
 {
-(*
-
-THIS FILE IS PREPROCESSED USING cppo
-MAKE SURE TO EDIT THE .cppo SOURCE OF THIS FILE RATHER THAN THE GENERATED RESULT
-
-*)
-
-open Pp
-open Names
-open Declare
-open Libnames
-open Util
-open Constrintern
-open Constrexpr
-open Error
+open Coqsimpleio_plugin.Lib
 open Stdarg
-
-let mk_ref s = CAst.make @@ CRef (qualid_of_string s, None)
 
 (* Names corresponding to QuickChick's .v files *)
 let show = mk_ref "QuickChick.Show.show"
@@ -28,354 +12,44 @@ let mutateCheckMany = mk_ref "QuickChick.MutateCheck.mutateCheckMany"
 let mutateCheckManyWith = mk_ref "QuickChick.MutateCheck.mutateCheckManyWith"
 let sample = mk_ref "QuickChick.Test.sample"
 
-(* Handle extra ocaml directory to be copied *)
-let empty_slist : string list = []           
-let extra_dir : string list ref =
-  Summary.ref ~name:"QC_ocaml_dir" empty_slist
-let add_extra_dir s = extra_dir := s :: !extra_dir
-
-let extra_pkg : string list ref =
-  Summary.ref ~name:"QC_ocaml_pkg" ["zarith"; "pure-splitmix"]
-let add_extra_pkg s = extra_pkg := s :: !extra_pkg
-
-let dune_file : string option ref =
-  Summary.ref ~name:"QC_dune_file" None
-let set_dune_file s = dune_file := Some s
-
-let modules_to_open : string list ref =
-  Summary.ref ~name:"QC_modules_to_open" empty_slist
-let add_module_to_open s = modules_to_open := s :: !modules_to_open  
-
-(* [mkdir -p]: recursively make the parent directories if they do not exist. *)
-let rec mkdir_ dname =
-  let cmd () = Unix.mkdir dname 0o755 in
-  try cmd () with
-  | Unix.Unix_error (Unix.EEXIST, _, _) -> ()
-  | Unix.Unix_error (Unix.ENOENT, _, _) ->
-    (* If the parent directory doesn't exist, try making it first. *)
-    mkdir_ (Filename.dirname dname);
-    cmd ()
-
-(* Interface with OCaml compiler *)
-let temp_dirname =
-  let dname = Filename.(concat (get_temp_dir_name ()) "QuickChick") in
-  mkdir_ dname;
-  dname
-
-(* Rewrite a file line by line *)
-let sed_file file f =
-  let src = open_in file in
-  let tmpfile = file ^ ".tmp" in
-  let tmp = open_out tmpfile in
-  let rec go () =
-    match input_line src with
-    | line -> output_string tmp (f line); output_char tmp '\n'; go ()
-    | exception End_of_file ->
-        close_in src;
-        close_out tmp;
-        Sys.rename tmpfile file
-  in go ()
-
-let read_all chan =
-  let buf = Buffer.create 1024 in
-  let rec go () =
-    match Buffer.add_channel buf chan 1024 with
-    | () -> go ()
-    | exception End_of_file -> Buffer.contents buf
-  in go ()
-
-let read_file file =
-  let h = open_in file in
-  let s = read_all h in
-  close_in h;
-  s
-
-let fresh_name n =
-    let base = Id.of_string n in
-
-    (* [is_visible_name id] returns [true] if [id] is already used on
-       the Coq side. *)
-    let is_visible_name id =
-      try
-        ignore (Nametab.locate (Libnames.qualid_of_ident id));
-        true
-      with Not_found -> false
-    in
-    (* Safe fresh name generation. *)
-    Namegen.next_ident_away_from base is_visible_name
-
-(** [define c] introduces a fresh constant name for the term [c]. *)
-let define c env evd =
-  let (evd,_) = Typing.type_of env evd c in
-  let univs = Evd.univ_entry ~poly:true evd in
-  let fn = fresh_name "quickchick" in
-  (* TODO: Maxime - which of the new internal flags should be used here? The names aren't as clear :) *)
-  let _ : Constant.t = declare_constant ~name:fn ~kind:Decls.(IsDefinition Definition)
-      (DefinitionEntry (definition_entry ~univs (EConstr.to_constr evd c))) in
-  fn
-
-(* [$TMP/QuickChick/$TIME/QuickChick.ml],
-   where [$TIME] is the current time in format [HHMMSS]. *)
-let new_ml_file () : string =
-  let tm = Unix.localtime (Unix.time ()) in
-  let ts = Printf.sprintf "%02d%02d%02d" tm.Unix.tm_hour tm.Unix.tm_min tm.Unix.tm_sec in
-  let temp_dir = Filename.concat temp_dirname ts in
-  mkdir_ temp_dir;
-  Filename.temp_file ~temp_dir "QuickChick" ".ml"
-
-let tmp_int_re = Str.regexp "type int =[ ]*int"
-let uint63_re = Str.regexp "Uint63\\.of_int"
-
-let define_and_run c env evd =
-  (* Extract the term and its dependencies *)
-  let main = define c env evd in
-  let mlf   : string = new_ml_file () in
-  let execn : string = Filename.chop_extension mlf ^ ".native" in
-  let mlif  : string = Filename.chop_extension mlf ^ ".mli"    in
-  let dir   : string = Filename.dirname mlf in
-  let warnings = CWarnings.get_flags () in
-  let mute_extraction = warnings ^ (if warnings = "" then "" else ",") ^ "-extraction-opaque-accessed" in
-  CWarnings.set_flags mute_extraction;
-  Flags.silently (Extraction_plugin.Extract_env.full_extraction (Some mlf)) [qualid_of_ident main];
-  CWarnings.set_flags warnings;
-  (* Add a main function to get some output *)
-  let oc = open_out_gen [Open_append;Open_text] 0o666 mlf in
-  let for_output =
-    "\nlet _ = print_string (\n" ^
-    "let l = (" ^ (Id.to_string main) ^ ") in\n"^
-    "let s = Bytes.create (List.length l) in\n" ^
-    "let rec copy i = function\n" ^
-    "| [] -> s\n" ^
-    "| c :: l -> Bytes.set s i c; copy (i+1) l\n" ^
-    "in Bytes.to_string (copy 0 l))" in
-  Printf.fprintf oc "%s" for_output;
-  close_out oc;
-
-  (* Add any modules that have been marked "open" *)
-  let open_cmd s = Printf.sprintf "awk -v n=1 -v s=\"open %s\" 'NR == n {print s} {print}' %s > __qc_tmp && mv __qc_tmp %s" s mlf mlf in
-  List.iter (fun s -> ignore (Sys.command (open_cmd s))) !modules_to_open;
-  
-  (* Before compiling, fix stupid cyclic dependencies like "type int = int".
-     Introduced by "Definition int := int." possibly inside a module, so just
-     removing it might break other definitions that depend on it.
-     TODO: Generalize (.) \g1\b or something *)
-  sed_file mlf (fun line ->
-    if Str.string_match tmp_int_re line 0 then
-      "type tmptmptmp = int;; type int = tmptmptmp"
-    else Str.global_replace uint63_re "" line);
-  (* Compile the extracted code *)
-  (* Extraction sometimes produces ML code that does not implement its interface.
-     We circumvent this problem by erasing the interface. **)
-  Sys.remove mlif;
-  (* TODO: Maxime, thoughts? *)
-  (* LEO: However, sometimes the inferred types are too abstract. So we touch the .mli to close the weak types. **)
-  let _exit_code = Sys.command ("touch " ^ mlif) in
-  (*
-  msg_debug (str "Extracted ML file: " ++ str mlf);
-  msg_debug (str "Compile command: " ++ str (comp_ml_cmd mlf execn));
-  Printf.printf "Extracted ML file: %s\n" mlf;
-  Printf.printf "Compile command: %s\n" (comp_ml_cmd mlf execn);
-  flush_all ();
-  *)
-  (* Compile the (empty) .mli *)
-  (*
-  if Sys.command (comp_mli_cmd mlif) <> 0 then CErrors.user_err (str "Could not compile mli file" ++ fnl ());
-  if Sys.command (comp_ml_cmd mlf execn) <> 0 then
-    CErrors.user_err (str "Could not compile test program" ++ fnl ())
-   *)
-
-  (* Copy over the contents of the ocaml directory *)
-  let ocaml_dir_cps = List.map (fun s -> Printf.sprintf "cp -r %s %s" s dir) !extra_dir
-  in 
-  List.iter print_endline ocaml_dir_cps;
-  List.iter (fun cmd -> ignore (Sys.command cmd)) ocaml_dir_cps;
-
-  let packages =
-    match !extra_pkg with
-    | [] -> ""
-    | x -> "-pkgs '" ^ (String.concat "," x) ^ "'"
-  in
-  let exec_command =
-    match !dune_file with
-    | None -> "cd " ^ dir ^ " && ocamlbuild " ^ packages ^ " -lib unix -cflags \"-w -3\" " ^ Filename.basename execn ^ " -quiet > build.log 2> build.err"
-    | Some s ->
-       (* Modify the dune file to add the executable name and put it in the output dir *) 
-       let awk_cmd = Printf.sprintf "awk -v n=2 -v s=\"   (name %s)\" 'NR == n {print s} {print}' %s > %s" (Filename.chop_extension (Filename.basename mlf)) s (dir ^ "/" ^ s) in
-       (*       let sed_cmd = Printf.sprintf "sed '2i   (name %s)' %s > %s" (Filename.chop_extension (Filename.basename mlf)) s (dir ^ "/" ^ s) in *)
-       ignore (Sys.command awk_cmd);
-       (* The command is just dune build *)
-       Printf.sprintf "cd %s && dune build --display=quiet > build.log 2> build.err" dir
-  in
-  (* Overwrite execn in case of dune *)
-  let execn =
-    let (</>) = Filename.concat in
-    match !dune_file with
-    | None -> Filename.dirname execn </> "_build" </> Filename.basename execn
-    | Some _ -> dir ^ "/_build/default/" ^ (Filename.chop_extension (Filename.basename execn)) ^ ".exe" in
-
-  if Sys.command exec_command <> 0 then 
-    let build_log = read_file (dir ^ "/build.log") in
-    let build_err = read_file (dir ^ "/build.err") in
-    let msg = str "Could not compile test program: " ++ str mlf ++ fnl () in
-    let msg = if build_log = "" then msg else
-      msg ++ fnl () ++ str "Build stdout:" ++ fnl () ++ str build_log ++ fnl () in
-    let msg = if build_err = "" then msg else
-      msg ++ fnl () ++ str "Build stderr:" ++ fnl () ++ str build_err ++ fnl () in
-    CErrors.user_err msg
-
-  (* Run the test *)
-  else
-    (* Should really be shared across this and the tool *)
-    let (p_out, _, p_err) as process = Unix.open_process_full execn (Unix.environment ()) in
-    let rec process_otl_aux () =
-      let e = input_line p_out in
-      Feedback.msg_info (Pp.str e);
-      process_otl_aux() in
-    try process_otl_aux ()
-    with End_of_file ->
-         let err_msg = read_all p_err in
-         let err descr = CErrors.user_err (str (execn ^ ": " ^ descr) ++ fnl () ++ fnl () ++ str err_msg ++ fnl ()) in
-         let stat = Unix.close_process_full process in
-         begin match stat with
-         | Unix.WEXITED 0 -> ()
-         | Unix.WEXITED i -> err (Printf.sprintf "Exited with status %d" i)
-         | Unix.WSIGNALED i -> err (Printf.sprintf "Killed (%d)" i)
-         | Unix.WSTOPPED i -> err (Printf.sprintf "Stopped (%d)" i)
-         end
-
-(*
-    (** If we want to print the time spent in tests *)
-(*    let execn = "time " ^ execn in *)
-    if Sys.command execn <> 0 then
-      CErrors.user_err (str "Could not run test" ++ fnl ())
- *)
-
-;;
-
-(* TODO: clean leftover files *)
-let runTest c env evd : unit =
-  (* [c] is a constr_expr representing the test to run,
-     so we first build a new constr_expr representing
-     show c **)
-  let c = CAst.make @@
-#if COQ_VERSION >= (8, 15, 0)
-    CApp (show, [(c, None)])
-#else
-    CApp ((None, show), [(c, None)])
-#endif
-  in
-  (* Build the kernel term from the const_expr *)
-
-  (*  Printf.printf "Before interp constr\n"; flush stdout; *)
-
-  let (c,_evd) = interp_constr env evd c in
-
-  (* Printf.printf "So far so good?\n"; flush stdout; *)
-  define_and_run c env evd
-
+let () = add_extra_pkg "pure-splitmix"
 let rec last = function
   | [] -> None
   | x :: [] -> Some x
   | _ :: xs -> last xs
 
 let run f args =
-  let env = Global.env () in
-  let evd = Evd.from_env env in
   begin match last args with
   | Some qc_text ->
-    let msg = "QuickChecking " ^ Pp.string_of_ppcmds (Ppconstr.pr_constr_expr env evd qc_text) in
-    Feedback.msg_info (Pp.str msg)
+    Feedback.msg_info (Pp.str ("QuickChecking " ^ string_of_constr_expr qc_text ^ " ..."))
   | None -> failwith "run called with no arguments"
   end;
-  let args = List.map (fun x -> (x,None)) args in
-  let c = CAst.make @@
-#if COQ_VERSION >= (8, 15, 0)
-    CApp (f, args)
-#else
-    CApp ((None, f), args)
-#endif
-  in
-  runTest c env evd
-
-let set_debug_flag (flag_name : string) (mode : string) =
-  let toggle =
-    match mode with
-    | "On"  -> true
-    | "Off" -> false
-  in
-  let reference =
-    match flag_name with
-    | "Debug" -> flag_debug
-(*    | "Warn"  -> flag_warn
-    | "Error" -> flag_error *)
-  in
-  reference := toggle 
-(*  Libobject.declare_object
-    {(Libobject.default_object ("QC_debug_flag: " ^ flag_name)) with
-       cache_function = (fun (_,(flag_name, mode)) -> reference flag_name := toggle mode);
-       load_function = (fun _ (_,(flag_name, mode)) -> reference flag_name := toggle mode)}
- *)
-	  (*
-let run_with f args p =
-  let c = CApp(dummy_loc, (None,f), [(args,None);(p,None)]) in
-  runTest c
-	   *)
-
+  let c = CAst.make @@ apply_constr show [CAst.make @@ apply_constr f args] in
+  run ~plugin_name:"quickchick" c
 }
 
 VERNAC COMMAND EXTEND QuickCheck CLASSIFIED AS SIDEFF
   | ["QuickCheck" constr(c)] ->     {run quickCheck [c]}
-  | ["QuickCheckWith" constr(c1) constr(c2)] ->     {run quickCheckWith [c1;c2]}
-END
-
-VERNAC COMMAND EXTEND QuickChick CLASSIFIED AS SIDEFF
   | ["QuickChick" constr(c)] ->     {run quickCheck [c]}
+  | ["QuickCheckWith" constr(c1) constr(c2)] ->     {run quickCheckWith [c1;c2]}
   | ["QuickChickWith" constr(c1) constr(c2)] ->     {run quickCheckWith [c1;c2]}
-END
 
-VERNAC COMMAND EXTEND MutateCheck CLASSIFIED AS SIDEFF
   | ["MutateCheck" constr(c1) constr(c2)] ->     {run mutateCheck [c1;c2]}
   | ["MutateCheckWith" constr(c1) constr(c2) constr(c3)] ->     {run mutateCheckWith [c1;c2;c3]}
-END
 
-VERNAC COMMAND EXTEND MutateChick CLASSIFIED AS SIDEFF
   | ["MutateChick" constr(c1) constr(c2)] ->     {run mutateCheck [c1;c2]}
   | ["MutateChickWith" constr(c1) constr(c2) constr(c3)] ->     {run mutateCheckWith [c1;c2;c3]}
-END
 
-VERNAC COMMAND EXTEND MutateCheckMany CLASSIFIED AS SIDEFF
   | ["MutateCheckMany" constr(c1) constr(c2)] ->     {run mutateCheckMany [c1;c2]}
   | ["MutateCheckManyWith" constr(c1) constr(c2) constr(c3)] ->     {run mutateCheckManyWith [c1;c2;c3]}
-END
 
-VERNAC COMMAND EXTEND MutateChickMany CLASSIFIED AS SIDEFF
   | ["MutateChickMany" constr(c1) constr(c2)] ->     {run mutateCheckMany [c1;c2]}
   | ["MutateChickManyWith" constr(c1) constr(c2) constr(c3)] ->     {run mutateCheckManyWith [c1;c2;c3]}
-END
 
-VERNAC COMMAND EXTEND QuickChickDebug CLASSIFIED AS SIDEFF
-  | ["QuickChickDebug" ident(s1) ident(s2)] ->
-     { let s1' = Id.to_string s1 in
-       let s2' = Id.to_string s2 in
-       set_debug_flag s1' s2' }
-END
-
-VERNAC COMMAND EXTEND Sample CLASSIFIED AS SIDEFF
   | ["Sample" constr(c)] -> {run sample [c]}
-END
 
-VERNAC COMMAND EXTEND QCInclude CLASSIFIED AS SIDEFF
   | ["QCInclude" string(s)] -> { add_extra_dir s }
-END
-
-VERNAC COMMAND EXTEND QCOpen CLASSIFIED AS SIDEFF
   | ["QCOpen" string(s)] -> { add_module_to_open s }
-END
-
-VERNAC COMMAND EXTEND QCPackage CLASSIFIED AS SIDEFF
   | ["QCPackage" string(s)] -> { add_extra_pkg s }
-END
-
-VERNAC COMMAND EXTEND QCdune CLASSIFIED AS SIDEFF
-  | ["QCDune" string(s)] -> { set_dune_file s }
+  | ["QCDune" string(s)] -> { set_builder (Dune s) }
 END

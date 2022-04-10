@@ -9,7 +9,7 @@ From ExtLib Require Import
 Import MonadNotation.
 Local Open Scope monad_scope.
 
-From SimpleIO Require Import SimpleIO.
+From SimpleIO Require Import IO_Monad IO_Stdlib IO_RawChar.
 
 From QuickChick Require Import RoseTrees RandomSplitMix GenLow GenHigh SemChecker.
 From QuickChick Require Import Show Checker State Classes.

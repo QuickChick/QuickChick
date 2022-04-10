@@ -3,7 +3,7 @@
  (public_name coq-quickchick.plugin)
  (flags :standard -rectypes -warn-error -3 -w -8-27+40)
  (modules :standard \ genSTCorrect genSizedSTMonotonic genSizedSTSizeMonotonic)
- (libraries unix str
+ (libraries unix coq-simple-io.plugin
   (select void_for_linking-plugin-extraction from
    (coq-core.plugins.extraction -> void_for_linking-plugin-extraction.empty)
    (coq.plugins.extraction -> void_for_linking-plugin-extraction.empty))))
