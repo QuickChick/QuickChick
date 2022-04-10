@@ -30,7 +30,7 @@ Extraction Blacklist String List Nat.
 
 Extract Inductive Random.random => "PureSplitMix.t" [ "(fun _ _ -> failwith ""The constructor of random should not be used"")" ] "(fun _ _ -> failwith ""The destructor of random should not be used"")".
 Extract Constant Random.split => "(fun s _ -> PureSplitMix.split s)".
-Extract Constant Random.bits => "(fun s _ -> PureSplitMix.int_signed s)".
+Extract Constant Random.bits => "(fun s _ -> Uint63.of_int (PureSplitMix.int_signed s))".
 
 Extract Inlined Constant RandomSplitMix.seed => "PureSplitMix.t".
 Extract Inlined Constant RandomSplitMix.generate => "(fun x -> x)".
@@ -193,4 +193,21 @@ Extract Constant Z.shiftl =>
   "(let overflow i j = failwith (Printf.sprintf ""overflow: shiftl %d %d"" i j) in
    fun i j -> if Sys.int_size < j || Sys.int_size < -j then overflow i j else
    if j < 0 then i asr (-j) else let r = i lsl j in if r asr j = i then r else overflow i j)".
+#endif
+
+#if COQ_VERSION < (8, 16, 0)
+Extract Constant Nat.compare =>
+ "(fun n m -> if n=m then 0 else if n<m then -1 else 1)".
+Extract Constant Pos.compare =>
+ "(fun x y -> let s = Big_int_Z.compare_big_int x y in
+  if s = 0 then 0 else if s < 0 then -1 else 1)".
+Extract Constant Pos.compare_cont =>
+ "(fun c x y -> let s = Big_int_Z.compare_big_int x y in
+  if s = 0 then c else if s < 0 then -1 else 1)".
+Extract Constant N.compare =>
+ "(fun x y -> let s = Big_int_Z.compare_big_int x y in
+  if s = 0 then 0 else if s < 0 then -1 else 1)".
+Extract Constant Z.compare =>
+ "(fun x y -> let s = Big_int_Z.compare_big_int x y in
+  if s = 0 then 0 else if s < 0 then -1 else 1)".
 #endif
