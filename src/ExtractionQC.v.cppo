@@ -10,7 +10,7 @@ Set Warnings "-notation-overridden,-parsing".
 
 From Coq Require Import ZArith Ascii String.
 
-From Coq Require Extraction ExtrOcamlBasic ExtrOcamlString ExtrOcamlNatInt.
+From Coq Require Extraction ExtrOcamlBasic ExtrOcamlString ExtrOcamlNatInt ExtrOCamlInt63.
 
 #if COQ_VERSION >= (8, 15, 0)
 From Coq Require ExtrOcamlZBigInt.
