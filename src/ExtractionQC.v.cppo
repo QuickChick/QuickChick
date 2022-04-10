@@ -24,7 +24,7 @@ From QuickChick Require Import
 From QuickChick Require
   Random RandomSplitMix.
 
-Extraction Blacklist String List Nat.
+Extraction Blacklist Bool Int String List Nat Uint63 Random Seq.
 
 (** Extraction of [Random] *)
 
