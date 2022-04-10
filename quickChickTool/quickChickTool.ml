@@ -415,7 +415,7 @@ let compile_and_run where e : unit =
       else line));
 
   let ocamlbuild_cmd =
-    Printf.sprintf "ocamlbuild -pkg zarith -pkg pure-splitmix -cflag -rectypes %s %s.native"
+    Printf.sprintf "ocamlbuild -pkg zarith,pure-splitmix,coq-core.kernel -cflag -rectypes %s %s.native"
       !ocamlbuild_args
       (Filename.chop_suffix temporary_file ".v") in
   run_and_show_output_on_failure

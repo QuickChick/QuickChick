@@ -4,8 +4,6 @@ From QuickChick Require Import QuickChick.
 From SimpleIO Require Import SimpleIO.
 Import IO.Notations.
 
-RunIOPackage "zarith".
-
 Definition _assert_equal {A} `{Dec_Eq A} `{Show A} (x y : A) (_ : x = y) : IO unit :=
   if dec_eq x y then ret tt else print_endline ("Failed: " ++ show (x, y))%string.
 
