@@ -8,10 +8,7 @@ MAKE SURE TO EDIT THE .cppo SOURCE OF THIS FILE RATHER THAN THE GENERATED RESULT
 Set Warnings "-extraction-opaque-accessed,-extraction".
 Set Warnings "-notation-overridden,-parsing".
 
-#if COQ_VERSION < (8, 14, 0)
-#define Uint63 Int63
-#endif
-From Coq Require Import ZArith Ascii String Uint63.
+From Coq Require Import ZArith Ascii String.
 
 From Coq Require Extraction ExtrOcamlBasic ExtrOcamlString ExtrOcamlNatInt.
 
@@ -197,45 +194,3 @@ Extract Constant Z.shiftl =>
    fun i j -> if Sys.int_size < j || Sys.int_size < -j then overflow i j else
    if j < 0 then i asr (-j) else let r = i lsl j in if r asr j = i then r else overflow i j)".
 #endif
-
-(** Override the extraction of [int].
-
-    Coq also extracts [int] literals [n] to [Uint63.of_int n].
-    That cannot be configured, so our QuickChick plugin postprocesses
-    the extracted OCaml to erase that unbound [Uint63.of_int]. *)
-
-(* Note: this does not yet cover all of [Uint63]. *)
-
-Extract Inlined Constant Uint63.int => "int".
-
-Extract Inlined Constant Uint63.is_zero => "((=) 0)".
-#if COQ_VERSION >= (8, 15, 0)
-Extract Constant Uint63.of_Z => "Big_int_Z.(fun x -> Int64.to_int (int64_of_big_int (extract_big_int x 0 63)))".
-Extract Constant Uint63.to_Z => "Big_int_Z.(fun x -> big_int_of_int64 (Int64.(logand max_int (of_int x))))".
-#else
-Extract Inlined Constant Uint63.of_Z => "(fun x -> x)".  (* Assumes [Z] extract to [int]. *)
-Extract Inlined Constant Uint63.to_Z => "(fun x -> x)".
-#endif
-
-Extract Constant Uint63.lsl => "(fun i j ->
-  if j < 0 || Sys.int_size < j then failwith ""shift overflow"" else i lsl j)".
-Extract Constant Uint63.lsr => "(fun i j ->
-  if j < 0 || Sys.int_size < j then failwith ""shift overflow"" else i lsr j)".
-Extract Inlined Constant Uint63.land => "(land)".
-Extract Inlined Constant Uint63.lor => "(lor)".
-Extract Inlined Constant Uint63.lxor => "(lxor)".
-Extract Inlined Constant Uint63.add => "(+)".
-Extract Inlined Constant Uint63.sub => "(-)".
-Extract Inlined Constant Uint63.mul => "( * )".
-Extract Constant Uint63.div => "(fun i j ->
-  if j = 0 then 0 else if i < 0 || j < 0 then failwith ""Negative modulo"" else i / j)".
-Extract Constant Uint63.mod => "(fun i j ->
-  if j = 0 then i else if i < 0 || j < 0 then failwith ""Negative modulo"" else i mod j)".
-
-(* Note: Uint63 in Coq is unsigned *)
-Extract Constant Uint63.ltb => "(fun x y -> if x < 0 then x < y && y < 0 else x < y || y < 0)".
-Extract Constant Uint63.leb => "(fun x y -> if x < 0 then x <= y && y < 0 else x <= y || y < 0)".
-Extract Constant Uint63.compare =>
-  "(fun x y -> if x = y then Eq else
-    if x < 0 then if x < y && y < 0 then Lt else Gt else if x < y || y < 0 then Lt else Gt)".
-
