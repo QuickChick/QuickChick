@@ -30,6 +30,7 @@ commands:
             opam update
             opam repo add coq-extra-dev https://coq.inria.fr/opam/extra-dev
             opam install --deps-only .
+            opam install ocamlbuild  # for tests
     - run:
         name: List installed packages
         command: |
@@ -116,27 +117,15 @@ workflows:
   version: 2
   build:
     jobs:
-      - opam:
-          name: OPAM 8.11
-          coq: 8.11-ocaml-4.11-flambda
       - dune:
           name: Dune 8.11
           coq: 8.11-ocaml-4.11-flambda
-      - opam:
-          name: OPAM 8.12
-          coq: 8.12-ocaml-4.11-flambda
       - dune:
           name: Dune 8.12
           coq: 8.12-ocaml-4.11-flambda
-      - opam:
-          name: OPAM 8.13
-          coq: 8.13-ocaml-4.13-flambda
       - dune:
           name: Dune 8.13
           coq: 8.13-ocaml-4.13-flambda
-      - opam:
-          name: OPAM 8.14
-          coq: 8.14-ocaml-4.12-flambda
       - dune:
           name: Dune 8.14
           coq: 8.14-ocaml-4.12-flambda
