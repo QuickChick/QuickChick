@@ -198,6 +198,7 @@ Extract Constant Z.shiftl =>
 #if COQ_VERSION < (8, 16, 0)
 Extract Constant Nat.compare =>
  "(fun n m -> if n=m then 0 else if n<m then -1 else 1)".
+#if COQ_VERSION >= (8, 15, 0)
 Extract Constant Pos.compare =>
  "(fun x y -> let s = Big_int_Z.compare_big_int x y in
   if s = 0 then 0 else if s < 0 then -1 else 1)".
@@ -210,4 +211,18 @@ Extract Constant N.compare =>
 Extract Constant Z.compare =>
  "(fun x y -> let s = Big_int_Z.compare_big_int x y in
   if s = 0 then 0 else if s < 0 then -1 else 1)".
+#else
+Extract Constant Pos.compare =>
+ "(fun x y -> let s = Int.compare x y in
+  if s = 0 then 0 else if s < 0 then -1 else 1)".
+Extract Constant Pos.compare_cont =>
+ "(fun c x y -> let s = Int.compare x y in
+  if s = 0 then c else if s < 0 then -1 else 1)".
+Extract Constant N.compare =>
+ "(fun x y -> let s = Int.compare x y in
+  if s = 0 then 0 else if s < 0 then -1 else 1)".
+Extract Constant Z.compare =>
+ "(fun x y -> let s = Int.compare x y in
+  if s = 0 then 0 else if s < 0 then -1 else 1)".
+#endif
 #endif
