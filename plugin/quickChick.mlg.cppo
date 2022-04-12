@@ -196,7 +196,7 @@ let define_and_run c env evd =
   in
   let exec_command =
     match !dune_file with
-    | None -> "cd " ^ dir ^ " && ocamlbuild " ^ packages ^ " -lib unix -cflags \"-w -3\" " ^ Filename.basename execn ^ " -quiet > build.log 2> build.err"
+    | None -> "cd " ^ dir ^ " && ocamlbuild -use-ocamlfind " ^ packages ^ " -lib unix -cflags \"-w -3\" " ^ Filename.basename execn ^ " -quiet > build.log 2> build.err"
     | Some s ->
        (* Modify the dune file to add the executable name and put it in the output dir *) 
        let awk_cmd = Printf.sprintf "awk -v n=2 -v s=\"   (name %s)\" 'NR == n {print s} {print}' %s > %s" (Filename.chop_extension (Filename.basename mlf)) s (dir ^ "/" ^ s) in
