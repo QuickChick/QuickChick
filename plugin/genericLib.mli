@@ -98,6 +98,7 @@ val dep_ctr_to_string : dep_ctr -> string
 type dep_dt = ty_ctr * ty_param list * dep_ctr list * dep_type
 val dep_dt_to_string : dep_dt -> string
 
+val constr_of_type : ty_param list -> dep_type -> Constr.t
 val gType : ty_param list -> dep_type -> coq_expr
 val get_type : Id.t -> unit
 val is_inductive : constructor -> bool

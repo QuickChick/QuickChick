@@ -719,9 +719,11 @@ let gType ty_params dep_type =
                               gProdWithArgs [gArg ~assumName:(gVar x) ~assumType:t1 ()] (fun _ -> t2)
     | DTyParam tp -> gTyParam tp
     | DTyCtr (c,dts) -> gApp (gTyCtr c) (List.map aux dts)
+    | DCtr (c, dts) -> gApp (gCtr c) (List.map aux dts)
     | DTyVar x -> gVar x 
     | DApp (c, dts) -> gApp (aux c) (List.map aux dts) 
     | DHole -> hole
+    | DNot dt -> gApp (gInject "Coq.Init.Datatypes.negb") [aux dt]
   in 
   aux dep_type
 (*    
@@ -731,6 +733,51 @@ let gType ty_params dep_type =
                         (fun _ -> aux dep_type)
  *)
 
+(*
+let locate_constant c = 
+  match Nametab.locate c with GlobRef.ConstRef x -> x | _ -> failwith ("loc_const: " ^ string_of_qualid c)
+ *)
+  
+let locate_ind c = 
+  match Nametab.locate c with GlobRef.IndRef x -> x | _ -> failwith ("loc_ind: " ^ string_of_qualid c)
+
+let locate_constructor c =
+  match Nametab.locate c with GlobRef.ConstructRef x -> x | _ -> failwith ("loc_constr: " ^ string_of_qualid c)
+                                                           
+(* Convert types back into constr *)
+let constr_of_type ty_params dep_type =
+  let rec aux dt : Constr.t = 
+    match dt with
+    | DArrow (dt1, dt2) -> let t1 = aux dt1 in
+                           let t2 = aux dt2 in
+                           Constr.mkLambda (Context.anonR, t1, t2)
+    | DProd ((x,dt1), dt2) -> let t1 = aux dt1 in
+                              let t2 = aux dt2 in 
+                              Constr.mkLambda (Context.nameR x, t1, t2)
+    | DTyParam tp -> Constr.mkVar tp
+    | DTyCtr (c,dts) ->
+       Constr.mkApp (Constr.mkInd (locate_ind c), Array.of_list (List.map aux dts))
+    | DCtr (c,dts) ->
+       Constr.mkApp (Constr.mkConstruct (locate_constructor c), Array.of_list (List.map aux dts))
+    | DTyVar x -> mkVar x
+    | DApp (c, dts) ->
+       Constr.mkApp (aux c, Array.of_list (List.map aux dts))
+    | DNot dt -> failwith "Not" (* Constr.mkApp (Constr.mkVar (Id.of_string "negb"), [| aux dt |])*)
+    | _ -> failwith "No holes allowed in constr_of_type"
+    (*
+    | DHole -> hole
+                     *)
+  in  
+  aux dep_type
+  
+(*  let cexpr = gType ty_params dep_type in
+  let env = Global.env () in
+  let evd = Evd.from_env env in
+
+  let _,_ec = Constrintern.interp_open_constr env evd cexpr in
+  failwith "Reaching here" *)
+  (*  EConstr.Unsafe.to_constr es *)
+  
 (* Lookup the type of an identifier *)
 let get_type (id : Id.t) = 
   msg_debug (str ("Trying to global:" ^ Id.to_string id) ++ fnl ());
@@ -1011,10 +1058,10 @@ let declare_class_instance ?(global=true) ?(priority=42) instance_arguments inst
 
 let define_new_inductive (ty_ctr, ty_params, ctrs, typ) =
   let oie =
-    { mind_entry_typename = Id.of_string (string_of_qualid ty_ctr) 
-    ; mind_entry_arity = gType ty_params typ
+    { mind_entry_typename = Id.of_string (string_of_qualid ty_ctr)
+    ; mind_entry_arity = constr_of_type ty_params typ
     ; mind_entry_consnames = List.map (fun (c,_) -> Id.of_string (string_of_qualid c)) ctrs
-    ; mind_entry_lc = List.map (fun (_, t) -> gType ty_params t) ctrs
+    ; mind_entry_lc = List.map (fun (_, t) -> constr_of_type ty_params t) ctrs
     } in
   let entry =
     { mind_entry_record = None
@@ -1025,18 +1072,13 @@ let define_new_inductive (ty_ctr, ty_params, ctrs, typ) =
     ; mind_entry_variance  = None
     ; mind_entry_private   = None
     } in
-  let uentry = failwith "lol" in
+  let env = Global.env () in
+  let evd = Evd.from_env env in
+  let uentry = Evd.univ_entry ~poly:false evd in
   let impls = [] in
-  ignore (DeclareInd.declare_mutual_inductive_with_eliminations
-            entry uentry impls)
-(*val declare_mutual_inductive_with_eliminations
-  : ?primitive_expected:bool
-  -> ?typing_flags:Declarations.typing_flags
-  -> Entries.mutual_inductive_entry
-  -> UState.named_universes_entry
-  -> one_inductive_impls list
-  -> Names.MutInd.t *)
-  
+  Flags.quiet := false;
+  msg_debug (str "About to declare: " ++ Constr.debug_print oie.mind_entry_arity ++ fnl ());
+  ignore (DeclareInd.declare_mutual_inductive_with_eliminations entry uentry impls) 
   
 (* List Utils. Probably should move to a util file instead *)
 let list_last l = List.nth l (List.length l - 1)

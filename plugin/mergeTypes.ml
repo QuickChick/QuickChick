@@ -50,6 +50,5 @@ let merge ind1 ind2 ind =
       | None -> failwith "Not supported type"
     in
     msg_debug (str (dep_dt_to_string (renamer dt1)) ++ fnl ());
-    define_new_inductive (renamer dt1);
-    qcfail "Foo"
+    define_new_inductive (renamer dt1)
   | _ -> qcfail "Merge/NotLam"
