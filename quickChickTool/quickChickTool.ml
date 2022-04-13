@@ -451,6 +451,7 @@ let compile_and_run where e : unit =
     process_otl_aux() in
   try process_otl_aux ()
   with End_of_file ->
+    if not !analysis then
     if not !found_result then begin
       highlight Failure "Test neither 'Passed' nor 'Failed'";
       test_results.inconclusive <- test_results.inconclusive + 1
@@ -846,10 +847,11 @@ let main =
         end)
       (List.rev dir_mutants)
   end;
-
-  if !something_failed then begin
-    highlight Failure
-      "At least one of the tests above produced an unexpected result.";
-    exit 1
-  end;
-  highlight Success "All tests produced the expected results"
+  if not !analysis then begin
+    if !something_failed then begin
+      highlight Failure
+        "At least one of the tests above produced an unexpected result.";
+      exit 1
+    end;
+    highlight Success "All tests produced the expected results"
+  end
