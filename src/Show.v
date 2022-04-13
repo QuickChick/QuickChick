@@ -223,11 +223,11 @@ Instance showList {A : Type} `{_ : Show A} : Show (list A) :=
 
 Instance show_time : Show Time :=
 {| 
-  show t := "time: " ++ 
+  show t := """time"": " ++ 
   (
     let s := (show (time t)) in
     let len := length s in
-    (substring 0 (len - 3) s) ++ "." ++ (substring (len-3) len s)  ++ "ms"
+    """" ++ (substring 0 (len - 3) s) ++ "." ++ (substring (len-3) len s)  ++ "ms"""
   ) 
   
 |}.

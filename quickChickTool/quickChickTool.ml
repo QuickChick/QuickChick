@@ -784,7 +784,7 @@ let main =
           (* Leo: better qualification *)
           trim (Filename.basename (Filename.chop_suffix f ".v")) ^ "." ^ s in
         let structured_structured_output = (
-          Printf.sprintf "Definition test%d := print_extracted_coq_string (\"{name: %s, \"  ++ show (withTime(fun tt => %s %s)) ++ \"}" 
+          Printf.sprintf "Definition test%d := print_extracted_coq_string (\"{\"\"name\"\": \"\"%s\"\", \"  ++ show (withTime(fun tt => %s %s)) ++ \"}" 
           i testname (quickCheckFunction ()) testname 
           ^ (if i == number_of_tests - 1 then "" else ", ")
           ^ "\")%string.\n"

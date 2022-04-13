@@ -145,7 +145,7 @@ Definition doneTesting (st : State) (f : nat -> RandomSeed -> QProp) : Result :=
     Success (numSuccessTests st + 1) (numDiscardedTests st) (summary st)
             (
               if (stDoAnalysis st) 
-                then ("result: success, passed: " ++ (show (numSuccessTests st)) ++ ", discards:" ++ (show (numDiscardedTests st)))
+                then ("""result"": ""success"", ""passed"": " ++ (show (numSuccessTests st)) ++ ", ""discards"": " ++ (show (numDiscardedTests st)))
                 else ("+++ Passed " ++ (show (numSuccessTests st)) ++ " tests (" ++ (show (numDiscardedTests st)) ++ " discards)" ++ newline)
             )
 
