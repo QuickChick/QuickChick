@@ -27,7 +27,6 @@ commands:
     - run:
         name: Install dependencies
         command: |
-            opam update
             opam repo add coq-extra-dev https://coq.inria.fr/opam/extra-dev
             opam install --deps-only .
             opam install ocamlbuild  # for tests
