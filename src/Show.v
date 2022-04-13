@@ -15,6 +15,8 @@ Export Coq.Strings.String.StringSyntax.
 (* This makes just the [%string] key available to [Derive Show]. *)
 Delimit Scope string_scope with string.
 
+Record Time : Set := mkTime {time: nat}.
+
 Definition newline := String "010" ""%string.
 
 Class Show (A : Type) : Type :=
@@ -214,9 +216,21 @@ Instance showList {A : Type} `{_ : Show A} : Show (list A) :=
   show l := append "[" (append (contents show l) "]")
 |}.
 
+Instance show_time : Show Time :=
+{| 
+  show t := "time: " ++ 
+  (
+    let s := (show (time t)) in
+    let len := length s in
+    (substring 0 (len - 3) s) ++ "." ++ (substring (len-3) len s)  ++ "ms"
+  ) 
+  
+|}.
+
+
 Instance showPair {A B : Type} `{_ : Show A} `{_ : Show B} : Show (A * B) :=
 {|
-  show p := match p with (a,b) => ("(" ++ show a ++ "," ++  show b ++ ")")%string end
+  show p := match p with (a,b) => ("" ++ show a ++ ", " ++  show b ++ "")%string end
 |}.
 
 Instance showOpt {A : Type} `{_ : Show A} : Show (option A) :=
