@@ -16,6 +16,11 @@ Export Coq.Strings.String.StringSyntax.
 Delimit Scope string_scope with string.
 
 Record Time : Set := mkTime {time: nat}.
+Record AugmentedTime (A: Type) := 
+  mkAugTime {
+    result    : A;
+    timeAux   : Time
+  }.
 
 Definition newline := String "010" ""%string.
 
@@ -227,10 +232,14 @@ Instance show_time : Show Time :=
   
 |}.
 
+Instance show_augmented_time {A : Type} `{_ : Show A} : Show (AugmentedTime A) :=
+{|
+  show aut := match aut with mkAugTime _ res tAux => (show (res) ++ ", " ++  show (tAux))%string end
+|}.
 
 Instance showPair {A B : Type} `{_ : Show A} `{_ : Show B} : Show (A * B) :=
 {|
-  show p := match p with (a,b) => ("" ++ show a ++ ", " ++  show b ++ "")%string end
+  show p := match p with (a,b) => ("(" ++ show a ++ ", " ++  show b ++ ")")%string end
 |}.
 
 Instance showOpt {A : Type} `{_ : Show A} : Show (option A) :=
