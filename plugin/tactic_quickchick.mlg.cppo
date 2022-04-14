@@ -14,6 +14,8 @@ open Ltac_plugin
 DECLARE PLUGIN "quickchick_plugin"
 
 {
+module Runiolib = Coqsimpleio_plugin.Lib
+
 #if COQ_VERSION >= (8, 15, 0)
 let capp (x, y) = Constrexpr.CApp (x, y)
 #else
@@ -58,7 +60,7 @@ let quickchick_goal =
 
     Printf.printf "So far so good 2.5\n"; flush stdout;
     
-    QuickChick.define_and_run to_run e evd;
+    Runiolib.define_and_run ~plugin_name:"quickchick" e evd to_run;
 
     Printf.printf "So far so good3\n"; flush stdout;
 

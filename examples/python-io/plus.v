@@ -4,6 +4,8 @@ From QuickChick Require Import QuickChick.
 Set Warnings "-extraction-opaque-accessed,-extraction".
 (* end hide *)
 QCInclude ".".
+QCPackage "unix".
+RunIO Builder Ocamlbuild.
 
 Parameter plus' : nat -> nat -> nat.
 

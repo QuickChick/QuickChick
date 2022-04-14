@@ -17,7 +17,7 @@ Import MonadNotation.
 Open Scope monad_scope.
 
 From QuickChick Require Import
-     RandomQC RoseTrees Sets.
+     Random RoseTrees Sets.
 
 Set Implicit Arguments.
 Unset Strict Implicit.
@@ -33,11 +33,6 @@ Definition isNone {T : Type} (u : option T) :=
     | None => true
   end.
 
-Lemma randomSplit_codom : codom randomSplit <--> setT.
-Proof.
-by apply/subset_eqP; split=> // [[s1 s2]] _; apply: randomSplitAssumption.
-Qed.
-
 Module Type Sig.
 
   (** * Type of generators *)
@@ -49,24 +44,23 @@ Module Type Sig.
   Parameter returnGen  : forall {A : Type}, A -> G A.
   (* TODO: Add dependent combinator *)
   Parameter bindGen :  forall {A B : Type}, G A -> (A -> G B) -> G B.
-  Parameter run  : forall {A : Type}, G A -> nat -> RandomSeed -> A.
+  Parameter run  : forall {A : Type}, G A -> nat -> random -> A.
   Parameter fmap : forall {A B : Type}, (A -> B) -> G A -> G B.
   Parameter apGen : forall {A B : Type}, G (A -> B) -> G A -> G B.
   Parameter sized : forall {A: Type}, (nat -> G A) -> G A.
   Parameter resize : forall {A: Type}, nat -> G A -> G A.
   Parameter promote : forall {A : Type}, Rose (G A) -> G (Rose A).
   Parameter choose : forall {A : Type} `{ChoosableFromInterval A}, (A * A) -> G A.
-  Parameter sample : forall {A : Type}, G A -> list A.
-
+  Parameter genBool : G bool.
 
   (* LL: The abstraction barrier is annoying :D *)
   Parameter variant : forall {A : Type}, SplitPath -> G A -> G A.
   Parameter reallyUnsafePromote : forall {r A:Type}, (r -> G A) -> G (r -> A).
 
-  Parameter promoteVariant : forall {A B : Type} (a : A) (f : A -> SplitPath) (g : G B) size 
-                               (r r1 r2 : RandomSeed),
-                               randomSplit r = (r1,r2) ->                              
-                               run (reallyUnsafePromote (fun a => variant (f a) g)) size r a = 
+  Parameter promoteVariant : forall {A B : Type} (a : A) (f : A -> SplitPath) (g : G B) size
+                               (r r1 r2 : random),
+                               split r tt = (r1,r2) ->
+                               run (reallyUnsafePromote (fun a => variant (f a) g)) size r a =
                                run g size (varySeed (f a) r1).
 
   (** * Semantics of generators *)
@@ -249,18 +243,22 @@ Module Type Sig.
           {A B} (f : A -> B) (g : G A) `{SizeMonotonic _ g} : 
     SizeMonotonic (fmap f g).
 
+  Parameter semGenBool : semGen genBool <--> setT.
+  Parameter semGenBoolSize : forall size, semGenSize genBool size <--> setT.
+  Declare Instance genBoolUnsized : Unsized genBool.
+
   Parameter semChoose :
-    forall A `{RandomQC.ChoosableFromInterval A} (a1 a2 : A),
-      RandomQC.leq a1 a2 ->
-      (semGen (choose (a1,a2)) <--> [set a | RandomQC.leq a1 a && RandomQC.leq a a2]).
+    forall A `{ChoosableFromInterval A} (a1 a2 : A),
+      leq a1 a2 ->
+      (semGen (choose (a1,a2)) <--> [set a | leq a1 a && leq a a2]).
 
   Parameter semChooseSize :
-    forall A `{RandomQC.ChoosableFromInterval A} (a1 a2 : A),
-      RandomQC.leq a1 a2 ->
+    forall A `{ChoosableFromInterval A} (a1 a2 : A),
+      leq a1 a2 ->
       forall size, (semGenSize (choose (a1,a2)) size <-->
-              [set a | RandomQC.leq a1 a && RandomQC.leq a a2]).
+              [set a | leq a1 a && leq a a2]).
 
-  Declare Instance chooseUnsized A `{RandomQC.ChoosableFromInterval A} (a1 a2 : A) :
+  Declare Instance chooseUnsized A `{ChoosableFromInterval A} (a1 a2 : A) :
     Unsized (choose (a1, a2)).
 
   Parameter semSized :
@@ -311,7 +309,7 @@ Module Type Sig.
     forall (A : Type) (m : Rose (G A)) n,
       semGenSize (promote m) n <-->
       (fun t : Rose A =>
-         exists (seed : RandomSeed),
+         exists (seed : random),
            fmapRose (fun g : G A => run g n seed) m = t).
 
   (* Those are too concrete, but I need them to prove shrinking.

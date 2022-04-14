@@ -1,7 +1,7 @@
 From Coq Require Extraction.
 From Coq Require Import String.
 
-From SimpleIO Require Import SimpleIO.
+From SimpleIO Require Import IO_Stdlib IO_RawChar.
 
 (* Simple mutation testing framework for Coq.
 

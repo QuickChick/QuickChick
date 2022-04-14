@@ -1,0 +1,57 @@
+DECLARE PLUGIN "coq-quickchick.plugin"
+
+{
+open Coqsimpleio_plugin.Lib
+open Stdarg
+
+(* Names corresponding to QuickChick's .v files *)
+let show = mk_ref "QuickChick.Show.show"
+let quickCheck = mk_ref "QuickChick.Test.quickCheck"
+let quickCheckWith = mk_ref "QuickChick.Test.quickCheckWith"
+let mutateCheck = mk_ref "QuickChick.MutateCheck.mutateCheck"
+let mutateCheckWith = mk_ref "QuickChick.MutateCheck.mutateCheckWith"
+let mutateCheckMany = mk_ref "QuickChick.MutateCheck.mutateCheckMany"
+let mutateCheckManyWith = mk_ref "QuickChick.MutateCheck.mutateCheckManyWith"
+let sample = mk_ref "QuickChick.Test.sample"
+
+let () = add_extra_pkg "pure-splitmix"
+let rec last = function
+  | [] -> None
+  | x :: [] -> Some x
+  | _ :: xs -> last xs
+
+let run f args =
+  begin match last args with
+  | Some qc_text ->
+    Feedback.msg_info (Pp.str ("QuickChecking " ^ string_of_constr_expr qc_text ^ " ..."))
+  | None -> failwith "run called with no arguments"
+  end;
+  let c = CAst.make @@ apply_constr show [CAst.make @@ apply_constr f args] in
+  run ~plugin_name:"quickchick" c
+}
+
+VERNAC COMMAND EXTEND QuickCheck CLASSIFIED AS SIDEFF
+  | ["QuickCheck" constr(c)] ->     {run quickCheck [c]}
+  | ["QuickChick" constr(c)] ->     {run quickCheck [c]}
+  | ["QuickCheckWith" constr(c1) constr(c2)] ->     {run quickCheckWith [c1;c2]}
+  | ["QuickChickWith" constr(c1) constr(c2)] ->     {run quickCheckWith [c1;c2]}
+
+  | ["MutateCheck" constr(c1) constr(c2)] ->     {run mutateCheck [c1;c2]}
+  | ["MutateCheckWith" constr(c1) constr(c2) constr(c3)] ->     {run mutateCheckWith [c1;c2;c3]}
+
+  | ["MutateChick" constr(c1) constr(c2)] ->     {run mutateCheck [c1;c2]}
+  | ["MutateChickWith" constr(c1) constr(c2) constr(c3)] ->     {run mutateCheckWith [c1;c2;c3]}
+
+  | ["MutateCheckMany" constr(c1) constr(c2)] ->     {run mutateCheckMany [c1;c2]}
+  | ["MutateCheckManyWith" constr(c1) constr(c2) constr(c3)] ->     {run mutateCheckManyWith [c1;c2;c3]}
+
+  | ["MutateChickMany" constr(c1) constr(c2)] ->     {run mutateCheckMany [c1;c2]}
+  | ["MutateChickManyWith" constr(c1) constr(c2) constr(c3)] ->     {run mutateCheckManyWith [c1;c2;c3]}
+
+  | ["Sample" constr(c)] -> {run sample [c]}
+
+  | ["QCInclude" string(s)] -> { add_extra_dir s }
+  | ["QCOpen" string(s)] -> { add_module_to_open s }
+  | ["QCPackage" string(s)] -> { add_extra_pkg s }
+  | ["QCDune" string(s)] -> { set_builder (Dune s) }
+END

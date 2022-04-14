@@ -9,9 +9,9 @@ From ExtLib Require Import
 Import MonadNotation.
 Local Open Scope monad_scope.
 
-From SimpleIO Require Import SimpleIO.
+From SimpleIO Require Import IO_Monad IO_Stdlib IO_RawChar.
 
-From QuickChick Require Import RoseTrees RandomQC GenLow GenHigh SemChecker.
+From QuickChick Require Import RoseTrees RandomSplitMix GenLow GenHigh SemChecker.
 From QuickChick Require Import Show Checker State Classes.
 
 Require Import Coq.Strings.Ascii.
@@ -33,8 +33,19 @@ Unset Printing Implicit Defensive.
 
 Set Bullet Behavior "Strict Subproofs".
 
+
+Definition sample (A : Type) (g : G A) : list A :=
+  let fix sample_ {A} (g : G A) (n : nat) (z : nat) (s : random) : list A :=
+    match n with
+    | O => []
+    | S n =>
+      let '(s0, s) := Random.split s tt in
+      run g z s0 :: sample_ g n (S z) s
+    end in
+  sample_ g 20 0 (generate (new_seed tt)).
+
 Record Args := MkArgs {
-  replay     : option (RandomSeed * nat);
+  replay     : option (seed * nat);
   maxSuccess : nat;
   maxDiscard : nat;
   maxShrinks : nat;
@@ -53,7 +64,7 @@ Definition updMaxSuccess (a : Args) (x : nat) : Args :=
 Inductive Result :=
   | Success : nat -> nat -> list (string * nat) -> string -> Result
   | GaveUp  : nat -> list (string * nat) -> string -> Result
-  | Failure : nat -> nat -> nat -> RandomSeed -> nat -> string ->
+  | Failure : nat -> nat -> nat -> seed -> nat -> string ->
               list (string * nat) -> string -> Result
   | NoExpectedFailure : nat -> list (string * nat) -> string -> Result.
 
@@ -132,7 +143,7 @@ Definition summary (st : State) : list (string * nat) :=
   let res := Map.fold (fun key elem acc => (key,elem) :: acc) (labels st) nil
   in insSortBy (fun x y => snd y <= snd x) res .
 
-Definition doneTesting (st : State) (f : nat -> RandomSeed -> QProp) : Result :=
+Definition doneTesting (st : State) : Result :=
  if expectedFailure st then
     Success (numSuccessTests st + 1) (numDiscardedTests st) (summary st)
             ("+++ Passed " ++ (show (numSuccessTests st)) ++ " tests (" ++ (show (numDiscardedTests st)) ++ " discards)")
@@ -142,7 +153,7 @@ Definition doneTesting (st : State) (f : nat -> RandomSeed -> QProp) : Result :=
                                              ++ " tests (expected Failure)").
   (* TODO: success st - labels *)
 
-Definition giveUp (st : State) (_ : nat -> RandomSeed -> QProp) : Result :=
+Definition giveUp (st : State) : Result :=
   GaveUp (numSuccessTests st) (summary st)
          ("*** Gave up! Passed only " ++ (show (numSuccessTests st)) ++ " tests"
           ++  newline ++ "Discarded: " ++ (show (numDiscardedTests st))).
@@ -202,20 +213,20 @@ Fixpoint localMin (st : State) (r : Rose Checker.Result)
     localMin' st (force ts)
   end.
 
-Fixpoint runATest (st : State) (f : nat -> RandomSeed -> QProp) (maxSteps : nat) :=
+Fixpoint runATest (st : State) (f : nat -> random -> QProp) (maxSteps : nat) :=
   if maxSteps is maxSteps'.+1 then
     let size := (computeSize st) (numSuccessTests st) (numDiscardedTests st) in
-    let (rnd1, rnd2) := randomSplit (randomSeed st) in
+    let (rnd1, rnd2) := split_seed (randomSeed st) in
     let test (st : State) :=
         if (gte (numSuccessTests st) (maxSuccessTests st)) then
-          doneTesting st f
+          doneTesting st
         else if (gte (numDiscardedTests st) (maxDiscardedTests st)) then
-               giveUp st f
+               giveUp st
              else runATest st f maxSteps'
     in
     match st with
     | MkState mst mdt ms cs nst ndt ls e r nss nts =>
-      match f size rnd1 with
+      match f size (generate rnd1) with
       | MkProp (MkRose res ts) =>
         (* TODO: CallbackPostTest *)
         let res_cb := callbackPostTest st res in
@@ -278,13 +289,13 @@ Fixpoint runATest (st : State) (f : nat -> RandomSeed -> QProp) (maxSteps : nat)
         end
       end
     end
-  else giveUp st f.
+  else giveUp st.
 
-Definition test (st : State) (f : nat -> RandomSeed -> QProp) : Result :=
+Definition test (st : State) (f : nat -> random -> QProp) : Result :=
   if (gte (numSuccessTests st) (maxSuccessTests st)) then
-    doneTesting st f
+    doneTesting st
   else if (gte (numDiscardedTests st) (maxDiscardedTests st)) then
-         giveUp st f
+         giveUp st
   else
     let maxSteps := maxSuccessTests st + maxDiscardedTests st in
     runATest st f maxSteps.
@@ -299,7 +310,7 @@ Definition quickCheckWith {prop : Type} {_ : Checkable prop}
   let (rnd, computeFun) :=
       match replay a with
         | Some (rnd, s) => (rnd, at0 (computeSize' a) s)
-        | None          => (newRandomSeed, computeSize' a)
+        | None          => (new_seed tt, computeSize' a)
         (* make it more random...? need IO action *)
       end in
   test (MkState (maxSuccess a)  (* maxSuccessTests   *)

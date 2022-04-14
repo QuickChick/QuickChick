@@ -148,8 +148,8 @@ Proof.
     }
     { fold show_quoted_string.
       simpl.
-      destruct (ascii_dec a """"); [contradiction |].
-      destruct (ascii_dec a "\"); [contradiction |].
+      destruct (ascii_dec a """"); [contradiction | ].
+      destruct (ascii_dec a "\"); [contradiction | ].
       rewrite IHs.
       auto.
     }

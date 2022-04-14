@@ -8,22 +8,34 @@ MAKE SURE TO EDIT THE .cppo SOURCE OF THIS FILE RATHER THAN THE GENERATED RESULT
 Set Warnings "-extraction-opaque-accessed,-extraction".
 Set Warnings "-notation-overridden,-parsing".
 
-Require Import ZArith.
-Require Import Coq.Strings.Ascii.
-Require Import Coq.Strings.String.
-From QuickChick Require Import
-  RandomQC RoseTrees Test Show Checker.
+From Coq Require Import ZArith Ascii String.
 
-Require Import ExtrOcamlBasic.
-Require Import ExtrOcamlString.
-Require Import ExtrOcamlNatInt.
+From Coq Require Extraction ExtrOcamlBasic ExtrOcamlString ExtrOcamlNatInt ExtrOCamlInt63.
+
 #if COQ_VERSION >= (8, 15, 0)
-Require Import ExtrOcamlZBigInt.
+From Coq Require ExtrOcamlZBigInt.
 #else
-Require Import ExtrOcamlZInt.
+From Coq Require ExtrOcamlZInt.
 #endif
 
-Extraction Blacklist String List Nat.
+From QuickChick Require Import
+  RoseTrees Test Show Checker.
+
+From QuickChick Require
+  Random RandomSplitMix.
+
+Extraction Blacklist Bool Int String List Nat Uint63 Random Seq.
+
+(** Extraction of [Random] *)
+
+Extract Inductive Random.random => "PureSplitMix.t" [ "(fun _ _ -> failwith ""The constructor of random should not be used"")" ] "(fun _ _ -> failwith ""The destructor of random should not be used"")".
+Extract Constant Random.split => "(fun s _ -> PureSplitMix.split s)".
+Extract Constant Random.bits => "(fun s _ -> Uint63.of_int (PureSplitMix.int_signed s))".
+
+Extract Inlined Constant RandomSplitMix.seed => "PureSplitMix.t".
+Extract Inlined Constant RandomSplitMix.generate => "(fun x -> x)".
+Extract Inlined Constant RandomSplitMix.split_seed => "PureSplitMix.split".
+Extract Inlined Constant RandomSplitMix.new_seed => "(fun _ -> PureSplitMix.auto_seed ())".
 
 #if COQ_VERSION >= (8, 12, 0)
 #if COQ_VERSION >= (8, 13, 0)
@@ -91,48 +103,6 @@ Extract Constant show_N =>
   in copy [] (String.length s - 1))".
 #endif
 
-Extract Constant RandomSeed   => "Random.State.t".
-Extract Constant randomNext   => "(fun r -> Random.State.bits r, r)".
-(* Extract Constant rndGenRange => "SR.genRange".*)
-Extract Constant randomSplit  => "(fun x -> (x,x))".
-Extract Constant mkRandomSeed => "(fun x -> Random.init x; Random.get_state())".
-Extract Constant randomRNat  =>
-#if OCAML_VERSION >= (4, 13, 0)
-  "(fun (x,y) r -> if y < x then failwith ""choose called with unordered arguments"" else  (x + (Random.State.full_int r (y - x + 1)), r))".
-#else
-  "(fun (x,y) r -> if y < x then failwith ""choose called with unordered arguments"" else  (x + (Random.State.int r (y - x + 1)), r))".
-#endif
-Extract Constant randomRBool => "(fun _ r -> Random.State.bool r, r)".
-Extract Constant randomRInt  =>
-#if COQ_VERSION >= (8, 15, 0)
-  "(fun (x,y) r ->
-   if Big_int_Z.lt_big_int y x
-   then failwith ""choose called with unordered arguments""
-   else
-    let range_Z = Big_int_Z.succ_big_int (Big_int_Z.sub_big_int y x) in
-    let range_int = Big_int_Z.int_of_big_int range_Z in
-    (Big_int_Z.add_big_int x (Big_int_Z.big_int_of_int (Random.State.int r range_int)), r))".
-#elif OCAML_VERSION >= (4, 13, 0)
-  "(fun (x,y) r -> if y < x then failwith ""choose called with unordered arguments"" else  (x + (Random.State.full_int r (y - x + 1)), r))".
-#else
-  "(fun (x,y) r -> if y < x then failwith ""choose called with unordered arguments"" else  (x + (Random.State.int r (y - x + 1)), r))".
-#endif
-Extract Constant randomRN =>
-#if COQ_VERSION >= (8, 15, 0)
-  "(fun (x,y) r ->
-   if Big_int_Z.lt_big_int y x
-   then failwith ""choose called with unordered arguments""
-   else
-    let range_Z = Big_int_Z.succ_big_int (Big_int_Z.sub_big_int y x) in
-    let range_int = Big_int_Z.int_of_big_int range_Z in
-    (Big_int_Z.add_big_int x (Big_int_Z.big_int_of_int (Random.State.int r range_int)), r))".
-#elif OCAML_VERSION >= (4, 13, 0)
-  "(fun (x,y) r -> if y < x then failwith ""choose called with unordered arguments"" else  (x + (Random.State.full_int r (y - x + 1)), r))".
-#else
-  "(fun (x,y) r -> if y < x then failwith ""choose called with unordered arguments"" else  (x + (Random.State.int r (y - x + 1)), r))".
-#endif
-Extract Constant newRandomSeed => "(Random.State.make_self_init ())".
-
 Extract Inductive Lazy => "Lazy.t" [lazy].
 Extract Constant force => "Lazy.force".
 
@@ -173,3 +143,86 @@ Extract Constant print_extracted_coq_string =>
     | [] -> s
     | c :: l -> s.[i] <- c; copy (i+1) l
    in Bytes.to_string (copy 0 l))".
+
+(* For Nat and N we need to remember that a negative [x] in OCaml really
+   represents [x + 2^64], so we adjust the result accordingly. *)
+
+Extract Constant Nat.modulo => "fun x y ->
+  if y < 0 then failwith ""negative modulo""
+  else if max_int / 2 < y then failwith ""too big divisor""
+  else if y = 0 then x
+  else if x < 0 then ((((x mod y) - 2 * (min_int mod y)) mod y) + y) mod y else x mod y".
+
+Extract Constant Nat.add => "(+)".
+Extract Constant Nat.mul => "( * )".
+Extract Constant Nat.sub => "(-)".
+Extract Constant Nat.log2 => "(let rec log2 x = if x <= 1 then 0 else 1 + log2 (x / 2) in log2)".
+Extract Constant Nat.div => "(fun x y -> if y = 0 then 0 else x / y)".
+Extract Constant Coq.Init.Nat.div => "(fun x y -> if y = 0 then 0 else x / y)".
+
+#define EXTRACT_SHIFTR \
+"(fun i j -> if j < 0 || Sys.int_size < j then failwith (Printf.sprintf ""overflow: shiftr %d %d"" i j) else i asr j)"
+
+(* shiftl checks its result for overflow *)
+#define EXTRACT_SHIFTL \
+"(let overflow i j = failwith (Printf.sprintf ""overflow: shiftl %d %d"" i j) in fun i j -> if j < 0 || Sys.int_size < j then overflow i j else let r = i lsl j in if r asr j = i then r else overflow i j)"
+
+Extract Constant Nat.shiftr => EXTRACT_SHIFTR.
+Extract Constant Nat.shiftl => EXTRACT_SHIFTL.
+
+#if COQ_VERSION < (8, 15, 0)
+Extract Constant N.modulo => "fun x y ->
+  if y < 0 then failwith ""negative modulo""
+  else if max_int / 2 < y then failwith ""too big divisor""
+  else if y = 0 then x
+  else if x < 0 then ((((x mod y) - 2 * (min_int mod y)) mod y) + y) mod y else x mod y".
+
+Extract Constant Z.modulo => "fun x y ->
+  if y = 0 then x
+  else let r = x mod y in
+  if (y < 0 && r <= 0) || (y > 0 && r >= 0) then r else r + y".
+
+Extract Constant N.shiftr => EXTRACT_SHIFTR.
+Extract Constant N.shiftl => EXTRACT_SHIFTL.
+
+Extract Constant Z.shiftr =>
+  "(let overflow i j = failwith (Printf.sprintf ""overflow: shiftr %d %d"" i j) in
+   fun i j -> if Sys.int_size < j || Sys.int_size < -j then overflow i j else
+   if 0 < j then i asr j else let r = i lsl (-j) in if r asr (-j) = i then r else overflow i j)".
+Extract Constant Z.shiftl =>
+  "(let overflow i j = failwith (Printf.sprintf ""overflow: shiftl %d %d"" i j) in
+   fun i j -> if Sys.int_size < j || Sys.int_size < -j then overflow i j else
+   if j < 0 then i asr (-j) else let r = i lsl j in if r asr j = i then r else overflow i j)".
+#endif
+
+#if COQ_VERSION < (8, 16, 0)
+Extract Constant Nat.compare =>
+ "(fun n m -> if n=m then 0 else if n<m then -1 else 1)".
+#if COQ_VERSION >= (8, 15, 0)
+Extract Constant Pos.compare =>
+ "(fun x y -> let s = Big_int_Z.compare_big_int x y in
+  if s = 0 then 0 else if s < 0 then -1 else 1)".
+Extract Constant Pos.compare_cont =>
+ "(fun c x y -> let s = Big_int_Z.compare_big_int x y in
+  if s = 0 then c else if s < 0 then -1 else 1)".
+Extract Constant N.compare =>
+ "(fun x y -> let s = Big_int_Z.compare_big_int x y in
+  if s = 0 then 0 else if s < 0 then -1 else 1)".
+Extract Constant Z.compare =>
+ "(fun x y -> let s = Big_int_Z.compare_big_int x y in
+  if s = 0 then 0 else if s < 0 then -1 else 1)".
+#else
+Extract Constant Pos.compare =>
+ "(fun x y -> let s = Int.compare x y in
+  if s = 0 then 0 else if s < 0 then -1 else 1)".
+Extract Constant Pos.compare_cont =>
+ "(fun c x y -> let s = Int.compare x y in
+  if s = 0 then c else if s < 0 then -1 else 1)".
+Extract Constant N.compare =>
+ "(fun x y -> let s = Int.compare x y in
+  if s = 0 then 0 else if s < 0 then -1 else 1)".
+Extract Constant Z.compare =>
+ "(fun x y -> let s = Int.compare x y in
+  if s = 0 then 0 else if s < 0 then -1 else 1)".
+#endif
+#endif

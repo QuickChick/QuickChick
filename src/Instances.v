@@ -27,7 +27,7 @@ Set Bullet Behavior "Strict Subproofs".
 
 (** Basic generator instances *)
 Global Instance genBoolSized : GenSized bool :=
-  {| arbitrarySized x := choose (false, true) |}.
+  {| arbitrarySized x := genBool |}.
 
 Instance genNatSized : GenSized nat :=
   {| arbitrarySized x := choose (0,x) |}.
@@ -230,8 +230,7 @@ Proof.
   unfold arbitrarySized, genBoolSized.
   intros x. split; intros H; try now constructor.
   exists 0. split. constructor.
-  eapply semChooseSize; eauto.
-  destruct x; eauto.
+  eapply semGenBoolSize; eauto.
 Qed.
 
 Lemma arbBool_correct:
@@ -240,7 +239,7 @@ Proof.
 rewrite /arbitrary /arbitrarySized /genBoolSized /=.
 rewrite semSized => n; split=> // _.
 exists n; split=> //.
-apply semChooseSize => //=; case n => //.
+apply semGenBoolSize => //=.
 Qed.
 
 Lemma arbNat_correct:
@@ -248,7 +247,7 @@ Lemma arbNat_correct:
 Proof.
 rewrite /arbitrary /=.
 rewrite semSized => n; split=> // _; exists n; split=> //.
-by rewrite (semChooseSize _ _ _) /RandomQC.leq /=.
+by rewrite (semChooseSize _ _ _) /Random.leq /=.
 Qed.
 
 Instance ArbNatGenCorrect : Correct nat arbitrary.
@@ -261,7 +260,7 @@ Lemma arbInt_correct s :
   [set z | (- Z.of_nat s <= z <= Z.of_nat s)%Z].
 Proof.
 rewrite semSizedSize semChooseSize.
-  by move=> n; split=> [/andP|] [? ?]; [|apply/andP]; split; apply/Zle_is_le_bool.
+  by move=> n; split=> [/andP| ] [? ?]; [|apply/andP]; split; apply/Zle_is_le_bool.
 apply/(Zle_bool_trans _ 0%Z); apply/Zle_is_le_bool.
   exact/Z.opp_nonpos_nonneg/Zle_0_nat.
 exact/Zle_0_nat.
@@ -271,7 +270,7 @@ Lemma arbBool_correctSize s :
   semGenSize arbitrary s <--> [set: bool].
 Proof.
 rewrite /arbitrary //=.
-rewrite semSizedSize semChooseSize //; split=> /RandomQC.leq _ //=; case a=> //=.
+rewrite semSizedSize semGenBoolSize //.
 Qed.
 
 Lemma arbNat_correctSize s :
@@ -299,7 +298,7 @@ Lemma arbList_correct:
 Proof.
   move => A G S H P s Hgen l. rewrite !/arbitrary //=.
   split.
-  - move => /semListOfSize [Hl Hsize]. split => // x HIn //=. apply Hgen. auto.
+  - move => /semListOfSize [Hl Hsize]. split => // x HIn //=. symmetry in Hgen; apply Hgen. auto.
   - move => [Hl HP]. apply semListOfSize. split => // x HIn.
     apply Hgen. auto.
 Qed.
@@ -317,10 +316,10 @@ Proof.
   move => A G S Arb P s Hgen m. rewrite !/arbitrary //=; split.
   - move => /semFrequencySize [[w g] H2]; simpl in *.
     move: H2 => [[H2 | [H2 | H2]] H3];
-    destruct m => //=; apply Hgen => //=;
+    destruct m => //=; symmetry in Hgen; apply Hgen => //=;
     inversion H2; subst; auto.
-    + apply semReturnSize in H3; inversion H3.
-    + apply semLiftGenSize in H3; inversion H3 as [x [H0 H1]].
+    + setrw_hyp semReturnSize H3; inversion H3.
+    + setrw_hyp (semLiftGenSize (A := A) (B := option A)) H3; inversion H3 as [x [H0 H1]].
       inversion H1; subst; auto.
   - destruct m eqn:Hm; simpl in *; move => HP; subst.
     + apply semFrequencySize; simpl.

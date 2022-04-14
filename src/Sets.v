@@ -17,6 +17,8 @@ Unset Printing Implicit Defensive.
 
 Definition set T := T -> Prop.
 
+Definition IN {T} (x : T) (A : set T) : Prop := A x.
+
 Declare Scope set_scope.
 Notation "x \in A" := (A x) (at level 70, only parsing) : set_scope.
 
@@ -53,6 +55,24 @@ Qed.
 
 #[global] Instance set_eq_rew A : RelationClasses.RewriteRelation (@set_eq A) := {}.
 
+#[global] Instance Proper_IN {A} : Proper (eq (A := A) ==> set_eq ==> iff) IN.
+Proof.
+  apply proper_sym_impl_iff_2; [ auto | exact _ | ].
+  unfold Proper, respectful, Basics.impl, IN, set_eq. intros; subst; firstorder.
+Qed.
+
+Ltac setrw_hyp f H :=
+  match type of H with
+  | IN _ _ => setoid_rewrite f in H
+  | ?F ?x => change (F x) with (IN x F) in H; setoid_rewrite f in H
+  end.
+
+Ltac setrw f :=
+  match goal with
+  | |- IN _ _ => rewrite f
+  | |- ?F ?x => change (F x) with (IN x F); rewrite f
+  end.
+
 Definition set_incl {A} (m1 m2 : set A) :=
   forall (a : A), m1 a -> m2 a.
 
@@ -61,7 +81,7 @@ Infix "\subset" := set_incl (at level 70, no associativity) : set_scope.
 Notation "[ 'set' x : T | P ]" := (fun x : T => P)
   (at level 0, x at level 99, only parsing) : set_scope.
 Notation "[ 'set' x | P ]" := [set x : _ | P]
-  (at level 0, x, P at level 99, format "[ 'set'  x  |  P ]", only parsing) : set_scope.
+  (at level 0, x, P at level 99, only parsing) : set_scope.
 
 Definition set0 {T} := [set _ : T | False].
 
@@ -867,9 +887,9 @@ Proof.
 Qed.
 
 Lemma option_subset {A} (s1 : set (option A)) :
-  s1 \subset (isSome :&: s1) :|: [set None]. 
+  s1 \subset (isSome :&: s1) :|: [set None].
 Proof.
-  intros [x |]; firstorder.
+  intros [x | ]; firstorder.
 Qed.
 
 Lemma setU_l_subset {U} (s1 s2 s3 : set U) :

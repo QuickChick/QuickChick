@@ -123,7 +123,7 @@ Proof.
     (* s1 = "" *)
       destruct s3; [congruence | trivial].
     (* s1 <> "" *)
-      destruct s3 as [| c3 s3']; [congruence |].
+      destruct s3 as [| c3 s3']; [congruence | ].
       (* s3 <> "" *)
         destruct (AsciiOT.compare c1 c2) as [? | ? | ?] eqn:?;
         destruct (AsciiOT.compare c2 c3) as [? | ? | ?] eqn:?;

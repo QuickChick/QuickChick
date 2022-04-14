@@ -40,6 +40,10 @@ _build/
 .merlin
 *.install
 quickChickTool.byte
+*.pyc
+__pycache__
+.nfs*
+.lia.cache
 plugin/depDriver.ml
 plugin/genericLib.ml
 plugin/driver.ml
@@ -51,11 +55,8 @@ plugin/tactic_quickchick.mlg
 plugin/weightmap.ml
 plugin/weightmap.mlg
 src/ExtractionQC.v
-*.pyc
-__pycache__
-.nfs*
-.lia.cache
-plugin/compat.ml
 src/ExtractionQCCompat.v
-src/QuickChick.v
+src/SplitMix.v
+src/Random.v
+src/QuickChick_Plugin.v
 _CoqProject

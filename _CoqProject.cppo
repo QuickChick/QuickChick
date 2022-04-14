@@ -51,10 +51,12 @@ plugin/sizeSMon.ml
 plugin/sizeCorr.ml
 plugin/sizedProofs.ml
 
+src/SplitMix.v
+src/Random.v
+src/RandomSplitMix.v
 src/Tactics.v
 src/Sets.v
 src/Nat_util.v
-src/RandomQC.v
 src/RoseTrees.v
 src/GenLowInterface.v
 src/GenLow.v
@@ -73,8 +75,9 @@ src/SemChecker.v
 src/Test.v
 src/Mutation.v
 src/Typeclasses.v
-src/QuickChick.v
 src/MutateCheck.v
 src/DependentClasses.v
 src/Decidability.v
 src/ExtractionQC.v
+src/QuickChick_Plugin.v
+src/QuickChick.v
