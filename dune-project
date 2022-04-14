@@ -26,9 +26,9 @@
  (description
   "A library for property-based testing in Coq.
 
-  - Combinators for testable properties and random generators.
-  - QuickChick plugin for running tests in a Coq session.
-  - Includes a mutation testing tool.")
+- Combinators for testable properties and random generators.
+- QuickChick plugin for running tests in a Coq session.
+- Includes a mutation testing tool.")
  (depends
   (ocaml (>= 4.05.0))
   (menhir :build)
