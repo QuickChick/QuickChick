@@ -889,7 +889,7 @@ Qed.
 Lemma option_subset {A} (s1 : set (option A)) :
   s1 \subset (isSome :&: s1) :|: [set None].
 Proof.
-  intros [x |]; firstorder.
+  intros [x | ]; firstorder.
 Qed.
 
 Lemma setU_l_subset {U} (s1 s2 s3 : set U) :

@@ -199,7 +199,7 @@ Proof.
     eapply PCorr in Ha. destruct Ha as [a' [Hit Heq]]. inv Heq. eassumption.
   - intros [y [HP Heq]]. inv Heq.
     eapply spec in HP. destruct HP as [n [_ Hit]].
-    split; eauto. exists n. split; [ now constructor |].
+    split; eauto. exists n. split; [ now constructor | ].
     eapply PCorr. eexists; split; eauto.
 Qed.
 

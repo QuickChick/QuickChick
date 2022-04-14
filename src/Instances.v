@@ -260,7 +260,7 @@ Lemma arbInt_correct s :
   [set z | (- Z.of_nat s <= z <= Z.of_nat s)%Z].
 Proof.
 rewrite semSizedSize semChooseSize.
-  by move=> n; split=> [/andP|] [? ?]; [|apply/andP]; split; apply/Zle_is_le_bool.
+  by move=> n; split=> [/andP| ] [? ?]; [|apply/andP]; split; apply/Zle_is_le_bool.
 apply/(Zle_bool_trans _ 0%Z); apply/Zle_is_le_bool.
   exact/Z.opp_nonpos_nonneg/Zle_0_nat.
 exact/Zle_0_nat.

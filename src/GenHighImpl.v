@@ -470,7 +470,7 @@ elim: k => [|k IHk].
 rewrite /vectorOf /= semBindSize; setoid_rewrite semBindSize.
 setoid_rewrite semReturnSize; setoid_rewrite IHk.
 case=> [|x l]; first by split=> [[? [? [? [?]]]] | []].
-split=> [[y [gen_y [l' [[length_l' ?] [<- <-]]]]]|] /=.
+split=> [[y [gen_y [l' [[length_l' ?] [<- <-]]]]]| ] /=.
   split; first by rewrite length_l'.
   exact/subconsset.
 by case=> [[?]] /subconsset [? ?]; exists x; split => //; exists l.
@@ -693,15 +693,15 @@ elim: l => [|[n x] l IHl] /=.
   have->: (fun m => m < 0) <--> set0 by [].
   by rewrite imset0.
 case: n => /= [|n].
-  rewrite -IHl => t; split=> [[y []]|].
+  rewrite -IHl => t; split=> [[y []]| ].
     by rewrite sum_fstE add0n subn0 => lt_y <-; exists y.
   by case=> y [lt_y <-]; exists y; split=> //; rewrite subn0.
-move=> t; split=> /= [[p [lt_p]]|].
+move=> t; split=> /= [[p [lt_p]]| ].
   case: ifP => [_ <-|lt_pn ?]; first by left.
     right; rewrite -(IHl t); exists (p - n.+1); split=> //.
   rewrite sum_fstE in lt_p.
   by rewrite -(ltn_add2r n.+1) subnK 1?addnC // leqNgt lt_pn.
-case=> [<-|]; first by exists 0; split => //; rewrite sum_fstE.
+case=> [<-| ]; first by exists 0; split => //; rewrite sum_fstE.
 rewrite -(IHl t); case=> p [lt_p <-]; exists (n.+1 + p); split.
   by rewrite sum_fstE ltn_add2l.
 by rewrite ltnNge leq_addr addKn.
@@ -819,7 +819,7 @@ rewrite semBindSize semChooseSize //=.
 case lsupp: {1}[seq x <- l | x.1 != 0] => [|[n g] gs].
 move/sum_fst_eq0P: lsupp => suml; rewrite suml.
   rewrite (@eq_bigcupl _ _ _ [set 0]) ?bigcup_set1 ?pick_def // ?leqn0 ?suml //.
-  by move=> n; split; rewrite leqn0; [move/eqP|] => ->.
+  by move=> n; split; rewrite leqn0; [move/eqP| ] => ->.
 symmetry; apply: reindex_bigcup.
 have pos_suml: 0 < sum_fst l.
   have [] := sum_fst_eq0P l.
@@ -1151,7 +1151,7 @@ Proof.
     edestruct (pickDrop_exists lg n) as [[m [g' [lg' [Hin' [Hdrop [Hneq [Heq1 [Heq2 Hlen]]]]]]]] _];
       subst; eauto.
     rewrite Hdrop in Heqd; inv Heqd. subst.
-    destruct b as [b |].
+    destruct b as [b | ].
     + eapply semBindSize.
       eexists n. split.
       eapply semChooseSize; now eauto.
@@ -1206,7 +1206,7 @@ Proof.
     { destruct (sum_fst l) eqn:Hsum; subst.
       - move => [n [Hleq H]].
         rewrite pickDrop_def in H; eauto.
-        move : H =>  /semBindSize [[b |] [H1 H2]].
+        move : H =>  /semBindSize [[b | ] [H1 H2]].
         + setrw_hyp semReturnSize H1. inversion H1.
         + setrw_hyp (semBacktrackFuelDef (A := A)) H2; auto.
           inversion H2; subst.
@@ -1258,7 +1258,7 @@ Proof.
           subst. apply semBacktrackFuelDef; eauto.
         + subst.
           move: (pickDrop_exists l 0) => [Hex _].
-          edestruct Hex as [k [g [gs' [Hin [Hpd [Hneq [Hsub [Hlen Hfst]]]]]]]]; auto; [rewrite Hsum; auto|].
+          edestruct Hex as [k [g [gs' [Hin [Hpd [Hneq [Hsub [Hlen Hfst]]]]]]]]; auto; [rewrite Hsum; auto| ].
           exists 0. split; eauto. rewrite Hpd.
           eapply semBindSize. exists None. split.
           specialize (Hcap (k, g)). eapply Hcap.
@@ -1541,14 +1541,14 @@ Lemma  semBindOptSizeOpt_subset_compat {A B : Type} (g g' : G (option A)) (f f' 
   (forall s, isSome :&: semGenSize (bindGenOpt g f) s \subset isSome :&: semGenSize (bindGenOpt g' f') s).
 Proof.
   intros Hg Hf s x [Hin1 Hin2].
-  split; [ eassumption |].
+  split; [ eassumption | ].
   unfold bindGenOpt in *.
   setrw_hyp semBindSize Hin2. destruct Hin2 as [a [Hg' Hf']].
-  destruct a as [a |].
+  destruct a as [a | ].
   - assert (Hg'' : ((fun u : option A => u) :&: semGenSize g s) (Some a)).
     { split; eauto. }
     eapply Hg in Hg''.  destruct Hg'' as [_ Hg''].
-    eapply semBindSize. eexists; split; [ eassumption |].
+    eapply semBindSize. eexists; split; [ eassumption | ].
     simpl. eapply Hf. split; eauto.
   - setrw_hyp semReturnSize Hf'.  inv Hf'. discriminate.
 Qed.

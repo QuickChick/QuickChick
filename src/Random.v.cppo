@@ -425,7 +425,7 @@ Qed.
   (iter := Nat.iter).
 Proof.
   constructor; cbn [leq OrdNat]; normnat; try (reflexivity + lia).
-  - apply Z2Nat.inj_le; [ apply Uint63.to_Z_bounded .. |]. by apply /Uint63.lebP.
+  - apply Z2Nat.inj_le; [ apply Uint63.to_Z_bounded .. | ]. by apply /Uint63.lebP.
   - rewrite (Nat.div_mod (Nat.log2 r) 63); [ | lia ].
     rewrite Nat.add_comm.
     apply Nat.add_le_mono.
@@ -619,6 +619,12 @@ Ltac normN :=
   | [ |- _ <-> is_true (_ <=? _)%num ] => rewrite <- (rwP (N.leb_spec0 _ _))
   end.
 
+Lemma N_iter_succ : forall (n : N) (A : Type) (f : A -> A) (x : A),
+  N.iter (N.succ n) f x = f (N.iter n f x).
+Proof.
+  intros [] *; cbn; trivial. apply Pos.iter_succ.
+Qed.
+
 #[local] Instance RandomRAssum_N : RandomRAssum (A := N)
   (add := N.add) (sub := N.sub) (mul := N.mul) (div := N.div) (modulo := N.modulo)
   (log2 := N.log2) (shiftl := N.shiftl) (shiftr := N.shiftr)
@@ -627,7 +633,7 @@ Ltac normN :=
 Proof.
   constructor; cbn [leq OrdN]; normN; try (reflexivity + lia).
   - apply (N.div_le_mono 0); lia.
-  - apply Z2N.inj_le; [ apply Uint63.to_Z_bounded .. |]. by apply /Uint63.lebP.
+  - apply Z2N.inj_le; [ apply Uint63.to_Z_bounded .. | ]. by apply /Uint63.lebP.
   - rewrite (N.div_mod (N.log2 r) 63); [ | lia ].
     rewrite N.add_comm.
     apply N.add_le_mono.
@@ -670,7 +676,7 @@ Proof.
   - apply N.lt_succ_r, log2_N_of_int.
   - match goal with [ H1 : (0 <= x)%num |- _ ] => clear H1 end.
     induction x using N.peano_ind; cbn; auto.
-    rewrite N.iter_succ. rewrite <- N.add_1_l. apply H; auto.
+    rewrite N_iter_succ. rewrite <- N.add_1_l. apply H; auto.
     { apply /N.leb_spec0. lia. }
 Qed.
 

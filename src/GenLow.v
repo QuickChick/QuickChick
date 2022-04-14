@@ -375,7 +375,7 @@ Module GenLow : GenLowInterface.Sig.
     (forall x, semGen (f x) \subset Some @: (s2 x) :|: [set None]) -> 
     semGen (bindGen g f) \subset Some @: (\bigcup_(a in s1) s2 a)  :|: [set None].
   Proof.
-    intros H1 H2 [x |] [s [_ [r H]]]; [| right; reflexivity ].
+    intros H1 H2 [x | ] [s [_ [r H]]]; [| right; reflexivity ].
     left.
     eexists; split; [| reflexivity ].
     simpl in H. destruct (split r tt) as [r1 r2] eqn:Heq.
@@ -542,7 +542,7 @@ Module GenLow : GenLowInterface.Sig.
       split; [ eassumption | ].
       destruct x as [ x | ].
       + eapply monotonicOpt with (s2 := m + n) in Hs2; [| now ssromega ].
-        eapply sizeMonotonicOpt with (s1 := n) (s2 := m + n); [now ssromega |].
+        eapply sizeMonotonicOpt with (s1 := n) (s2 := m + n); [now ssromega | ].
         auto.
       + inv Hs1.
   Qed.
