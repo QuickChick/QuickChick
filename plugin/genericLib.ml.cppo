@@ -752,31 +752,34 @@ let locate_constructor c =
   with Not_found -> failwith ("locate constr: " ^ string_of_qualid c)
                                                            
 (* Convert types back into constr *)
-let constr_of_type ty_params dep_type =
-  let rec aux dt : Constr.t = 
+let constr_of_type name ty_params dep_type =
+  let rec aux i dt : Constr.t = 
     match dt with
-    | DArrow (dt1, dt2) -> let t1 = aux dt1 in
-                           let t2 = aux dt2 in
+    | DArrow (dt1, dt2) -> let t1 = aux i dt1 in
+                           let t2 = aux (i+1) dt2 in
                            Constr.mkLambda (Context.anonR, t1, t2)
-    | DProd ((x,dt1), dt2) -> let t1 = aux dt1 in
-                              let t2 = aux dt2 in 
+    | DProd ((x,dt1), dt2) -> let t1 = aux i dt1 in
+                              let t2 = aux (i+1) dt2 in 
                               Constr.mkLambda (Context.nameR x, t1, t2)
     | DTyParam tp -> Constr.mkVar tp
     | DTyCtr (c,dts) ->
-       let c' = if string_of_qualid c = "Prop" then Constr.mkProp else Constr.mkInd (locate_ind c) in
-       Constr.mkApp (c', Array.of_list (List.map aux dts))
+       let cname = string_of_qualid c in
+       let c' = if cname = "Prop" then Constr.mkProp
+                else if cname = name then Constr.mkRel i
+                else Constr.mkInd (locate_ind c) in
+       Constr.mkApp (c', Array.of_list (List.map (aux i) dts))
     | DCtr (c,dts) ->
-       Constr.mkApp (Constr.mkConstruct (locate_constructor c), Array.of_list (List.map aux dts))
+       Constr.mkApp (Constr.mkConstruct (locate_constructor c), Array.of_list (List.map (aux i) dts))
     | DTyVar x -> mkVar x
     | DApp (c, dts) ->
-       Constr.mkApp (aux c, Array.of_list (List.map aux dts))
+       Constr.mkApp (aux i c, Array.of_list (List.map (aux i) dts))
     | DNot dt -> failwith "Not" (* Constr.mkApp (Constr.mkVar (Id.of_string "negb"), [| aux dt |])*)
     | _ -> failwith "No holes allowed in constr_of_type"
     (*
     | DHole -> hole
                      *)
   in  
-  aux dep_type
+  aux (List.length ty_params) dep_type
   
 (*  let cexpr = gType ty_params dep_type in
   let env = Global.env () in
@@ -1067,12 +1070,13 @@ let declare_class_instance ?(global=true) ?(priority=42) instance_arguments inst
 let define_new_inductive (ty_ctr, ty_params, ctrs, typ) =
   let me_typename = Id.of_string (string_of_qualid ty_ctr) in
   msg_debug (str "constr_of_type: " ++ str (dep_type_to_string typ) ++ fnl ());
-  let me_arity = constr_of_type ty_params typ in
+  msg_debug (str "me_arity ty_ctr: " ++ str (string_of_qualid ty_ctr) ++ fnl ());  
+  let me_arity = constr_of_type (string_of_qualid ty_ctr) ty_params typ in
   let oie =
     { mind_entry_typename = me_typename
     ; mind_entry_arity = me_arity
     ; mind_entry_consnames = List.map (fun (c,_) -> Id.of_string (string_of_qualid c)) ctrs
-    ; mind_entry_lc = List.map (fun (_, t) -> constr_of_type ty_params t) ctrs
+    ; mind_entry_lc = List.map (fun (_, t) -> constr_of_type (string_of_qualid ty_ctr) ty_params t) ctrs
     } in
   msg_debug (str "oie done" ++ fnl ());
   let entry =
@@ -1089,7 +1093,9 @@ let define_new_inductive (ty_ctr, ty_params, ctrs, typ) =
   let uentry = Evd.univ_entry ~poly:false evd in
   let impls = [] in
   Flags.quiet := false;
-  msg_debug (str "About to declare: " ++ Constr.debug_print oie.mind_entry_arity ++ fnl ());
+  msg_debug (str "About to declare: " ++ fnl ());
+  msg_debug (str "me_arity: " ++ Constr.debug_print oie.mind_entry_arity ++ fnl ());
+  List.iteri (fun i c -> msg_debug (str "me_consname: " ++ int i ++ Constr.debug_print c ++ fnl ())) oie.mind_entry_lc;
   ignore (DeclareInd.declare_mutual_inductive_with_eliminations entry uentry impls) 
   
 (* List Utils. Probably should move to a util file instead *)
