@@ -78,8 +78,7 @@ Axiom defNumShrinks  : nat.
 Extract Constant defNumShrinks  => "1000".
 Axiom defSize        : nat.
 Extract Constant defSize        => "7".
-Axiom doAnalysis       : bool.
-Extract Constant doAnalysis       => "false".
+Definition doAnalysis       := false.
 
 Definition stdArgs := MkArgs None defNumTests defNumDiscards
                              defNumShrinks defSize true doAnalysis.

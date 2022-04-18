@@ -18,8 +18,8 @@ Delimit Scope string_scope with string.
 Record Time : Set := mkTime {time: nat}.
 Record AugmentedTime (A: Type) := 
   mkAugTime {
-    result    : A;
-    timeAux   : Time
+    aug_res    : A;
+    aug_time   : Time
   }.
 
 Definition newline := String "010" ""%string.
