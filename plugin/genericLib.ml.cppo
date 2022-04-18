@@ -757,10 +757,10 @@ let constr_of_type name ty_params dep_type =
     match dt with
     | DArrow (dt1, dt2) -> let t1 = aux i dt1 in
                            let t2 = aux (i+1) dt2 in
-                           Constr.mkLambda (Context.anonR, t1, t2)
+                           Constr.mkProd (Context.anonR, t1, t2)
     | DProd ((x,dt1), dt2) -> let t1 = aux i dt1 in
                               let t2 = aux (i+1) dt2 in 
-                              Constr.mkLambda (Context.nameR x, t1, t2)
+                              Constr.mkProd (Context.nameR x, t1, t2)
     | DTyParam tp -> Constr.mkVar tp
     | DTyCtr (c,dts) ->
        let cname = string_of_qualid c in
@@ -779,7 +779,7 @@ let constr_of_type name ty_params dep_type =
     | DHole -> hole
                      *)
   in  
-  aux (List.length ty_params) dep_type
+  aux (List.length ty_params + 1) dep_type
   
 (*  let cexpr = gType ty_params dep_type in
   let env = Global.env () in
@@ -1070,7 +1070,7 @@ let declare_class_instance ?(global=true) ?(priority=42) instance_arguments inst
 let define_new_inductive (ty_ctr, ty_params, ctrs, typ) =
   let me_typename = Id.of_string (string_of_qualid ty_ctr) in
   msg_debug (str "constr_of_type: " ++ str (dep_type_to_string typ) ++ fnl ());
-  msg_debug (str "me_arity ty_ctr: " ++ str (string_of_qualid ty_ctr) ++ fnl ());  
+  msg_debug (str "me_arity ty_ctr: " ++ str (string_of_qualid ty_ctr) ++ fnl ());
   let me_arity = constr_of_type (string_of_qualid ty_ctr) ty_params typ in
   let oie =
     { mind_entry_typename = me_typename
