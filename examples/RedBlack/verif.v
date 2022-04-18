@@ -1,6 +1,7 @@
 From mathcomp Require Import ssreflect ssrnat ssrbool eqtype.
 Require Import List String Lia.
 From QuickChick Require Import QuickChick.
+Local Open Scope set_scope.
 
 From QuickChick.RedBlack Require Import redblack testing.
 
