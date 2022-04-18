@@ -1,3 +1,5 @@
+Set Warnings "-notation-overridden,-parsing".
+
 Require Import mathcomp.ssreflect.ssreflect.
 From mathcomp Require Import ssrbool.
 Require Import QuickChick ZArith Strings.Ascii Strings.String.
@@ -11,22 +13,23 @@ Module ConsistencyCheck : QuickChickSig.
   Definition RandomSeed := RandomSeed.
 
   Definition G := @G.
-  Definition semGen := @semGen.
+  Definition semGen := @semProd G ProducerGen.
   Definition semGenSize := @semGenSize.
-  Definition Functor_G := Functor_G.
-  Definition Applicative_G := Applicative_G.
-  Definition Monad_G := Monad_G.
-  Definition bindGen' := @bindGen'.
-  Definition bindGenOpt := @bindGenOpt.
-  Definition run := @run.
-  Definition listOf := @listOf.
-  Definition vectorOf := @vectorOf.
-  Definition elems_ := @elems_.
-  Definition oneOf_ := @oneOf_.
+  Definition Functor_G := @Functor_Monad _ (@super _ ProducerGen). 
+  Definition Applicative_G :=
+    @Applicative_Monad _ (@super _ ProducerGen). 
+  Definition Monad_G := @super _ ProducerGen. 
+  Definition bindGen' := @bindPf G ProducerGen.
+  Definition bindGenOpt := @bindOpt G ProducerGen.
+  Definition run := @Generators.run.
+  Definition listOf := @listOf G ProducerGen.
+  Definition vectorOf := @vectorOf G ProducerGen.
+  Definition elems_ := @elems_ G ProducerGen.
+  Definition oneOf_ := @oneOf_ G ProducerGen.
   Definition freq_ := @freq_.
   Definition backtrack := @backtrack.
-  Definition resize := @resize.
-  Definition sized := @sized.
+  Definition resize := @resize G ProducerGen.
+  Definition sized := @sized G ProducerGen.
   Definition suchThatMaybe := @suchThatMaybe.
   Definition suchThatMaybeOpt := @suchThatMaybeOpt.
 
@@ -52,11 +55,10 @@ Module ConsistencyCheck : QuickChickSig.
        exists seed, fst (randomR (a1, a2) seed) = a)
   }.
 
-  Definition ChooseBool := ChooseBool.
   Definition ChooseNat := ChooseNat.
   Definition ChooseZ := ChooseZ.
 
-  Definition choose := @choose.
+  Definition choose := @choose G ProducerGen.
 
   Module QcDefaultNotation.
 (*
@@ -97,13 +99,13 @@ Module ConsistencyCheck : QuickChickSig.
 
     Notation "'do!' X <- A ; B" :=
       (bindGen A (fun X => B))
-      (at level 200, X ident, A at level 100, B at level 200).
+      (at level 200, X name, A at level 100, B at level 200).
     Notation "'do\'' X <- A ; B" :=
       (bindGen' A (fun X H => B))
-      (at level 200, X ident, A at level 100, B at level 200).
+      (at level 200, X name, A at level 100, B at level 200).
     Notation "'doM!' X <- A ; B" :=
       (bindGenOpt A (fun X => B))
-      (at level 200, X ident, A at level 100, B at level 200).
+      (at level 200, X name, A at level 100, B at level 200).
 
   End QcDoNotation.
 

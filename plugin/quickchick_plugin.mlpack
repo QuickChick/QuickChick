@@ -7,15 +7,13 @@ SetLib
 UnifyQC
 Weightmap
 ArbitrarySized
+EnumSized
 ArbitrarySizedST
+EnumSizedST
 SizeUtils
 Sized
-SizeSMon
-SizeMon
-SizeCorr
 SimplDriver
 CheckerSizedST
-SizedProofs
 DepDriver
 Driver
 QuickChick

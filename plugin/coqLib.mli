@@ -17,12 +17,14 @@ val gImpl : GenericLib.coq_expr -> GenericLib.coq_expr -> GenericLib.coq_expr
 val gForall :
   GenericLib.coq_expr -> GenericLib.coq_expr -> GenericLib.coq_expr
 val gProd : GenericLib.coq_expr -> GenericLib.coq_expr -> GenericLib.coq_expr
+val gLe  : GenericLib.coq_expr -> GenericLib.coq_expr -> GenericLib.coq_expr  
 val gLeq : GenericLib.coq_expr -> GenericLib.coq_expr -> GenericLib.coq_expr
 val gIsTrueLeq :
   GenericLib.coq_expr -> GenericLib.coq_expr -> GenericLib.coq_expr
 val gOrIntroL : GenericLib.coq_expr -> GenericLib.coq_expr
 val gOrIntroR : GenericLib.coq_expr -> GenericLib.coq_expr
 val gEqRefl : GenericLib.coq_expr -> GenericLib.coq_expr
+val gTt : GenericLib.coq_expr
 val gI : GenericLib.coq_expr
 val gT : GenericLib.coq_expr
 val gTrueb : GenericLib.coq_expr

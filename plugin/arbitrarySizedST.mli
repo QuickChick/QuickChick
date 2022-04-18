@@ -9,6 +9,7 @@ val instantiate_existential_methodST :
 val rec_method :
   GenericLib.coq_expr ->
   GenericLib.coq_expr ->
+  GenericLib.coq_expr ->
   int ->
   UnifyQC.unknown list option ->
   GenericLib.coq_expr list -> GenericLib.coq_expr
@@ -39,6 +40,7 @@ val construct_generators :
   generator_kind ->
   GenericLib.coq_expr ->
   GenericLib.coq_expr ->
+  GenericLib.coq_expr ->
   GenericLib.ty_ctr ->
   GenericLib.dep_type ->
   GenericLib.dep_ctr list ->
@@ -46,8 +48,9 @@ val construct_generators :
   UnifyQC.range list ->
   UnifyQC.range UnifyQC.UM.t ->
   GenericLib.dep_type UnifyQC.UM.t ->
-  UnifyQC.Unknown.t -> GenericLib.coq_expr list
+  UnifyQC.Unknown.t -> GenericLib.coq_expr list                               
 val base_gens :
+  GenericLib.coq_expr ->
   GenericLib.coq_expr ->
   GenericLib.coq_expr ->
   GenericLib.ty_ctr ->
@@ -61,6 +64,7 @@ val base_gens :
 val ind_gens :
   GenericLib.coq_expr ->
   GenericLib.coq_expr ->
+  GenericLib.coq_expr ->
   GenericLib.ty_ctr ->
   GenericLib.dep_type ->
   GenericLib.dep_ctr list ->
@@ -68,7 +72,7 @@ val ind_gens :
   UnifyQC.range list ->
   UnifyQC.range UnifyQC.UM.t ->
   GenericLib.dep_type UnifyQC.UM.t ->
-  UnifyQC.Unknown.t -> GenericLib.coq_expr list
+  UnifyQC.Unknown.t -> GenericLib.coq_expr list  
 val arbitrarySizedST :
   GenericLib.ty_ctr ->
   GenericLib.ty_param list ->

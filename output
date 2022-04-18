@@ -1,0 +1,1221 @@
+make -C examples tutorial
+make[1]: Entering directory '/home/lemonidas/QuickChick/QuickChick/examples'
+make -f Makefile.coq
+make[2]: Entering directory '/home/lemonidas/QuickChick/QuickChick/examples'
+make[3]: Nothing to be done for 'real-all'.
+make[2]: Leaving directory '/home/lemonidas/QuickChick/QuickChick/examples'
+make[1]: Leaving directory '/home/lemonidas/QuickChick/QuickChick/examples'
+cd examples/ifc-basic; make clean && make
+make[1]: Entering directory '/home/lemonidas/QuickChick/QuickChick/examples/ifc-basic'
+if [ -e Makefile.coq ]; then make -f Makefile.coq clean; fi
+make[2]: Entering directory '/home/lemonidas/QuickChick/QuickChick/examples/ifc-basic'
+CLEAN
+make[2]: Leaving directory '/home/lemonidas/QuickChick/QuickChick/examples/ifc-basic'
+rm -f Makefile.coq*
+make[1]: Leaving directory '/home/lemonidas/QuickChick/QuickChick/examples/ifc-basic'
+make[1]: Entering directory '/home/lemonidas/QuickChick/QuickChick/examples/ifc-basic'
+coq_makefile -f _CoqProject -o Makefile.coq
+make -f Makefile.coq
+make[2]: Entering directory '/home/lemonidas/QuickChick/QuickChick/examples/ifc-basic'
+COQDEP VFILES
+COQC Rules.v
+COQC Instructions.v
+COQC Machine.v
+File "./Machine.v", line 117, characters 0-132:
+Warning: grammar entry "ident" permitted "_" in addition to proper
+identifiers; this use is deprecated and its meaning will change in the
+future; use "name" instead. [deprecated-ident-entry,deprecated]
+File "./Machine.v", line 119, characters 0-140:
+Warning: grammar entry "ident" permitted "_" in addition to proper
+identifiers; this use is deprecated and its meaning will change in the
+future; use "name" instead. [deprecated-ident-entry,deprecated]
+COQC Indist.v
+File "./Indist.v", line 22, characters 0-215:
+Warning: The default value for instance locality is currently "local" in a
+section and "global" otherwise, but is scheduled to change in a future
+release. For the time being, adding instances outside of sections without
+specifying an explicit locality attribute is therefore deprecated. It is
+recommended to use "export" whenever possible. Use the attributes #[local],
+#[global] and #[export] depending on your choice. For example: "#[export]
+Instance Foo : Bar := baz." [deprecated-instance-without-locality,deprecated]
+File "./Indist.v", line 34, characters 0-82:
+Warning: The default value for instance locality is currently "local" in a
+section and "global" otherwise, but is scheduled to change in a future
+release. For the time being, adding instances outside of sections without
+specifying an explicit locality attribute is therefore deprecated. It is
+recommended to use "export" whenever possible. Use the attributes #[local],
+#[global] and #[export] depending on your choice. For example: "#[export]
+Instance Foo : Bar := baz." [deprecated-instance-without-locality,deprecated]
+File "./Indist.v", line 48, characters 0-321:
+Warning: The default value for instance locality is currently "local" in a
+section and "global" otherwise, but is scheduled to change in a future
+release. For the time being, adding instances outside of sections without
+specifying an explicit locality attribute is therefore deprecated. It is
+recommended to use "export" whenever possible. Use the attributes #[local],
+#[global] and #[export] depending on your choice. For example: "#[export]
+Instance Foo : Bar := baz." [deprecated-instance-without-locality,deprecated]
+File "./Indist.v", line 61, characters 0-517:
+Warning: The default value for instance locality is currently "local" in a
+section and "global" otherwise, but is scheduled to change in a future
+release. For the time being, adding instances outside of sections without
+specifying an explicit locality attribute is therefore deprecated. It is
+recommended to use "export" whenever possible. Use the attributes #[local],
+#[global] and #[export] depending on your choice. For example: "#[export]
+Instance Foo : Bar := baz." [deprecated-instance-without-locality,deprecated]
+File "./Indist.v", line 104, characters 0-53:
+Warning: The default value for instance locality is currently "local" in a
+section and "global" otherwise, but is scheduled to change in a future
+release. For the time being, adding instances outside of sections without
+specifying an explicit locality attribute is therefore deprecated. It is
+recommended to use "export" whenever possible. Use the attributes #[local],
+#[global] and #[export] depending on your choice. For example: "#[export]
+Instance Foo : Bar := baz." [deprecated-instance-without-locality,deprecated]
+COQC Mutate.v
+COQC Generation.v
+File "./Generation.v", line 90, characters 0-173:
+Warning: The default value for instance locality is currently "local" in a
+section and "global" otherwise, but is scheduled to change in a future
+release. For the time being, adding instances outside of sections without
+specifying an explicit locality attribute is therefore deprecated. It is
+recommended to use "export" whenever possible. Use the attributes #[local],
+#[global] and #[export] depending on your choice. For example: "#[export]
+Instance Foo : Bar := baz." [deprecated-instance-without-locality,deprecated]
+File "./Generation.v", line 100, characters 0-75:
+Warning: The default value for instance locality is currently "local" in a
+section and "global" otherwise, but is scheduled to change in a future
+release. For the time being, adding instances outside of sections without
+specifying an explicit locality attribute is therefore deprecated. It is
+recommended to use "export" whenever possible. Use the attributes #[local],
+#[global] and #[export] depending on your choice. For example: "#[export]
+Instance Foo : Bar := baz." [deprecated-instance-without-locality,deprecated]
+File "./Generation.v", line 117, characters 0-561:
+Warning: The default value for instance locality is currently "local" in a
+section and "global" otherwise, but is scheduled to change in a future
+release. For the time being, adding instances outside of sections without
+specifying an explicit locality attribute is therefore deprecated. It is
+recommended to use "export" whenever possible. Use the attributes #[local],
+#[global] and #[export] depending on your choice. For example: "#[export]
+Instance Foo : Bar := baz." [deprecated-instance-without-locality,deprecated]
+COQC Printing.v
+File "./Printing.v", line 13, characters 0-117:
+Warning: The default value for instance locality is currently "local" in a
+section and "global" otherwise, but is scheduled to change in a future
+release. For the time being, adding instances outside of sections without
+specifying an explicit locality attribute is therefore deprecated. It is
+recommended to use "export" whenever possible. Use the attributes #[local],
+#[global] and #[export] depending on your choice. For example: "#[export]
+Instance Foo : Bar := baz." [deprecated-instance-without-locality,deprecated]
+File "./Printing.v", line 22, characters 0-295:
+Warning: The default value for instance locality is currently "local" in a
+section and "global" otherwise, but is scheduled to change in a future
+release. For the time being, adding instances outside of sections without
+specifying an explicit locality attribute is therefore deprecated. It is
+recommended to use "export" whenever possible. Use the attributes #[local],
+#[global] and #[export] depending on your choice. For example: "#[export]
+Instance Foo : Bar := baz." [deprecated-instance-without-locality,deprecated]
+File "./Printing.v", line 45, characters 0-107:
+Warning: The default value for instance locality is currently "local" in a
+section and "global" otherwise, but is scheduled to change in a future
+release. For the time being, adding instances outside of sections without
+specifying an explicit locality attribute is therefore deprecated. It is
+recommended to use "export" whenever possible. Use the attributes #[local],
+#[global] and #[export] depending on your choice. For example: "#[export]
+Instance Foo : Bar := baz." [deprecated-instance-without-locality,deprecated]
+File "./Printing.v", line 52, characters 0-105:
+Warning: The default value for instance locality is currently "local" in a
+section and "global" otherwise, but is scheduled to change in a future
+release. For the time being, adding instances outside of sections without
+specifying an explicit locality attribute is therefore deprecated. It is
+recommended to use "export" whenever possible. Use the attributes #[local],
+#[global] and #[export] depending on your choice. For example: "#[export]
+Instance Foo : Bar := baz." [deprecated-instance-without-locality,deprecated]
+File "./Printing.v", line 57, characters 0-252:
+Warning: The default value for instance locality is currently "local" in a
+section and "global" otherwise, but is scheduled to change in a future
+release. For the time being, adding instances outside of sections without
+specifying an explicit locality attribute is therefore deprecated. It is
+recommended to use "export" whenever possible. Use the attributes #[local],
+#[global] and #[export] depending on your choice. For example: "#[export]
+Instance Foo : Bar := baz." [deprecated-instance-without-locality,deprecated]
+File "./Printing.v", line 69, characters 0-263:
+Warning: The default value for instance locality is currently "local" in a
+section and "global" otherwise, but is scheduled to change in a future
+release. For the time being, adding instances outside of sections without
+specifying an explicit locality attribute is therefore deprecated. It is
+recommended to use "export" whenever possible. Use the attributes #[local],
+#[global] and #[export] depending on your choice. For example: "#[export]
+Instance Foo : Bar := baz." [deprecated-instance-without-locality,deprecated]
+File "./Printing.v", line 88, characters 0-142:
+Warning: The default value for instance locality is currently "local" in a
+section and "global" otherwise, but is scheduled to change in a future
+release. For the time being, adding instances outside of sections without
+specifying an explicit locality attribute is therefore deprecated. It is
+recommended to use "export" whenever possible. Use the attributes #[local],
+#[global] and #[export] depending on your choice. For example: "#[export]
+Instance Foo : Bar := baz." [deprecated-instance-without-locality,deprecated]
+File "./Printing.v", line 95, characters 0-151:
+Warning: The default value for instance locality is currently "local" in a
+section and "global" otherwise, but is scheduled to change in a future
+release. For the time being, adding instances outside of sections without
+specifying an explicit locality attribute is therefore deprecated. It is
+recommended to use "export" whenever possible. Use the attributes #[local],
+#[global] and #[export] depending on your choice. For example: "#[export]
+Instance Foo : Bar := baz." [deprecated-instance-without-locality,deprecated]
+File "./Printing.v", line 102, characters 0-178:
+Warning: The default value for instance locality is currently "local" in a
+section and "global" otherwise, but is scheduled to change in a future
+release. For the time being, adding instances outside of sections without
+specifying an explicit locality attribute is therefore deprecated. It is
+recommended to use "export" whenever possible. Use the attributes #[local],
+#[global] and #[export] depending on your choice. For example: "#[export]
+Instance Foo : Bar := baz." [deprecated-instance-without-locality,deprecated]
+File "./Printing.v", line 111, characters 0-188:
+Warning: The default value for instance locality is currently "local" in a
+section and "global" otherwise, but is scheduled to change in a future
+release. For the time being, adding instances outside of sections without
+specifying an explicit locality attribute is therefore deprecated. It is
+recommended to use "export" whenever possible. Use the attributes #[local],
+#[global] and #[export] depending on your choice. For example: "#[export]
+Instance Foo : Bar := baz." [deprecated-instance-without-locality,deprecated]
+File "./Printing.v", line 125, characters 0-1368:
+Warning: The default value for instance locality is currently "local" in a
+section and "global" otherwise, but is scheduled to change in a future
+release. For the time being, adding instances outside of sections without
+specifying an explicit locality attribute is therefore deprecated. It is
+recommended to use "export" whenever possible. Use the attributes #[local],
+#[global] and #[export] depending on your choice. For example: "#[export]
+Instance Foo : Bar := baz." [deprecated-instance-without-locality,deprecated]
+File "./Printing.v", line 163, characters 0-355:
+Warning: The default value for instance locality is currently "local" in a
+section and "global" otherwise, but is scheduled to change in a future
+release. For the time being, adding instances outside of sections without
+specifying an explicit locality attribute is therefore deprecated. It is
+recommended to use "export" whenever possible. Use the attributes #[local],
+#[global] and #[export] depending on your choice. For example: "#[export]
+Instance Foo : Bar := baz." [deprecated-instance-without-locality,deprecated]
+File "./Printing.v", line 174, characters 0-125:
+Warning: The default value for instance locality is currently "local" in a
+section and "global" otherwise, but is scheduled to change in a future
+release. For the time being, adding instances outside of sections without
+specifying an explicit locality attribute is therefore deprecated. It is
+recommended to use "export" whenever possible. Use the attributes #[local],
+#[global] and #[export] depending on your choice. For example: "#[export]
+Instance Foo : Bar := baz." [deprecated-instance-without-locality,deprecated]
+COQC DerivedGen.v
+File "./DerivedGen.v", line 96, characters 0-61:
+Warning: The default value for instance locality is currently "local" in a
+section and "global" otherwise, but is scheduled to change in a future
+release. For the time being, adding instances outside of sections without
+specifying an explicit locality attribute is therefore deprecated. It is
+recommended to use "export" whenever possible. Use the attributes #[local],
+#[global] and #[export] depending on your choice. For example: "#[export]
+Instance Foo : Bar := baz." [deprecated-instance-without-locality,deprecated]
+File "./DerivedGen.v", line 115, characters 0-140:
+Warning: The default value for instance locality is currently "local" in a
+section and "global" otherwise, but is scheduled to change in a future
+release. For the time being, adding instances outside of sections without
+specifying an explicit locality attribute is therefore deprecated. It is
+recommended to use "export" whenever possible. Use the attributes #[local],
+#[global] and #[export] depending on your choice. For example: "#[export]
+Instance Foo : Bar := baz." [deprecated-instance-without-locality,deprecated]
+COQC GenExec.v
+File "./GenExec.v", line 84, characters 11-12:
+Warning: Unused variable i catches more than one case.
+[unused-pattern-matching-variable,pattern-matching]
+File "./GenExec.v", line 111, characters 0-174:
+Warning: The default value for instance locality is currently "local" in a
+section and "global" otherwise, but is scheduled to change in a future
+release. For the time being, adding instances outside of sections without
+specifying an explicit locality attribute is therefore deprecated. It is
+recommended to use "export" whenever possible. Use the attributes #[local],
+#[global] and #[export] depending on your choice. For example: "#[export]
+Instance Foo : Bar := baz." [deprecated-instance-without-locality,deprecated]
+File "./GenExec.v", line 121, characters 0-76:
+Warning: The default value for instance locality is currently "local" in a
+section and "global" otherwise, but is scheduled to change in a future
+release. For the time being, adding instances outside of sections without
+specifying an explicit locality attribute is therefore deprecated. It is
+recommended to use "export" whenever possible. Use the attributes #[local],
+#[global] and #[export] depending on your choice. For example: "#[export]
+Instance Foo : Bar := baz." [deprecated-instance-without-locality,deprecated]
+File "./GenExec.v", line 139, characters 0-606:
+Warning: The default value for instance locality is currently "local" in a
+section and "global" otherwise, but is scheduled to change in a future
+release. For the time being, adding instances outside of sections without
+specifying an explicit locality attribute is therefore deprecated. It is
+recommended to use "export" whenever possible. Use the attributes #[local],
+#[global] and #[export] depending on your choice. For example: "#[export]
+Instance Foo : Bar := baz." [deprecated-instance-without-locality,deprecated]
+COQC Driver.v
+QuickChecking (prop_SSNI default_table)
+12716 : (Discarded) "Store"
+4570 : "Store"
+1170 : "Load"
+873 : (Discarded) "Add"
+873 : "Add"
+741 : "Push 0"
+725 : "Push 1"
+679 : "BRet"
+650 : (Discarded) "Load"
+611 : (Discarded) "BRet"
+610 : (Discarded) "BCall 0"
+560 : "BCall 0"
+252 : "BCall 1"
+160 : "BCall 2"
+150 : "Nop"
+120 : (Discarded) "Push 0"
+120 : "BCall 3"
+102 : (Discarded) "Push 1"
+27 : (Discarded) "Nop"
+9 : (Discarded) "BCall 1"
++++ Passed 10000 tests (15718 discards)
+QuickChecking (prop_SSNI_derived default_table)
+11641 : (Discarded) "Store"
+4480 : "Store"
+1166 : "Load"
+860 : "BCall 0"
+807 : "Add"
+804 : "Push 0"
+787 : (Discarded) "Add"
+774 : "Push 1"
+709 : "BRet"
+472 : (Discarded) "BRet"
+457 : (Discarded) "Load"
+176 : "BCall 1"
+166 : "Nop"
+43 : "BCall 2"
+15 : "BCall 3"
+4 : (Discarded) "BCall 4"
++++ Passed 10000 tests (13401 discards)
+QuickChecking (prop_MSNI default_table)
+6796 : "Store"
+2831 : (Discarded) "Store"
+832 : "Store" , "Store"
+611 : (Discarded) "Store" , "Store"
+526 : (Discarded) "Load"
+413 : (Discarded) "Add"
+388 : "Add"
+382 : "BCall 0" , "BCall 0"
+361 : (Discarded) "Load" , "Load"
+315 : (Discarded) "Push 0"
+302 : (Discarded) "Push 1"
+298 : "BRet" , "BRet"
+267 : (Discarded) "Push 1" , "Push 1"
+252 : "Load"
+251 : (Discarded) "Push 0" , "Push 0"
+247 : "BRet"
+235 : "BCall 0"
+214 : (Discarded) "Add" , "Add"
+179 : "BCall 1" , "BCall 1"
+136 : (Discarded) "BRet"
+132 : (Discarded) "BCall 0"
+111 : "BRet" , "BRet" , "BRet"
+111 : "BCall 2" , "BCall 2"
+71 : "Add" , "Add"
+61 : "BCall 3" , "BCall 3"
+50 : (Discarded) "Nop" , "Nop"
+47 : (Discarded) "Nop"
+32 : "BRet" , "BRet" , "BRet" , "BRet"
+6 : (Discarded) "BCall 1"
+5 : "BRet" , "BRet" , "BRet" , "BRet" , "BRet"
++++ Passed 10000 tests (6462 discards)
+File "./Driver.v", line 195, characters 0-79:
+Warning: The default value for instance locality is currently "local" in a
+section and "global" otherwise, but is scheduled to change in a future
+release. For the time being, adding instances outside of sections without
+specifying an explicit locality attribute is therefore deprecated. It is
+recommended to use "export" whenever possible. Use the attributes #[local],
+#[global] and #[export] depending on your choice. For example: "#[export]
+Instance Foo : Bar := baz." [deprecated-instance-without-locality,deprecated]
+QuickChecking (fun t =>
+ forAllShrinkShow gen_variation_state (fun _ => nil) (fun _ => "") (SSNI t))
+Killed mutant 0 (1 frags)
+Killed mutant 1 (2 frags)
+Killed mutant 2 (3 frags)
+Killed mutant 3 (4 frags)
+Killed mutant 4 (5 frags)
+Killed mutant 5 (6 frags)
+Killed mutant 6 (7 frags)
+Killed mutant 7 (8 frags)
+Killed mutant 8 (9 frags)
+Killed mutant 9 (10 frags)
+Killed mutant 10 (11 frags)
+Killed mutant 11 (12 frags)
+Killed mutant 12 (13 frags)
+Killed mutant 13 (14 frags)
+Killed mutant 14 (15 frags)
+Killed mutant 15 (16 frags)
+Killed mutant 16 (17 frags)
+Killed mutant 17 (18 frags)
+Killed mutant 18 (19 frags)
+Killed mutant 19 (20 frags)
+Fighting 20 mutants(20,20)
+QuickChecking (fun t =>
+ forAllShrinkShow GenExec.gen_variation_state' (fun _ => nil) 
+   (fun _ => "") (MSNI 20 t))
+Killed mutant 0 (1 frags)
+Killed mutant 1 (2 frags)
+Killed mutant 2 (3 frags)
+Killed mutant 3 (4 frags)
+Killed mutant 4 (5 frags)
+Killed mutant 5 (6 frags)
+Killed mutant 6 (7 frags)
+Killed mutant 7 (8 frags)
+Killed mutant 8 (9 frags)
+Killed mutant 9 (10 frags)
+Killed mutant 10 (11 frags)
+Killed mutant 11 (12 frags)
+Killed mutant 12 (13 frags)
+Killed mutant 13 (14 frags)
+Killed mutant 14 (15 frags)
+Killed mutant 15 (16 frags)
+Killed mutant 16 (17 frags)
+Killed mutant 17 (18 frags)
+Killed mutant 18 (19 frags)
+Killed mutant 19 (20 frags)
+Fighting 20 mutants(20,20)
+QuickChecking (fun t =>
+ forAllShrinkShow gen_variation_state_derived (fun _ => nil) 
+   (fun _ => "")
+   (fun mv => match mv with
+              | Some v => SSNI t v
+              | None => checker tt
+              end))
+Killed mutant 0 (1 frags)
+Killed mutant 1 (2 frags)
+Killed mutant 2 (3 frags)
+Killed mutant 3 (4 frags)
+Killed mutant 4 (5 frags)
+Killed mutant 5 (6 frags)
+Killed mutant 6 (7 frags)
+Killed mutant 7 (8 frags)
+Killed mutant 8 (9 frags)
+Killed mutant 9 (10 frags)
+Killed mutant 10 (11 frags)
+Killed mutant 11 (12 frags)
+Killed mutant 12 (13 frags)
+Killed mutant 13 (14 frags)
+Killed mutant 14 (15 frags)
+Killed mutant 15 (16 frags)
+Killed mutant 16 (17 frags)
+Killed mutant 17 (18 frags)
+Killed mutant 18 (19 frags)
+Killed mutant 19 (20 frags)
+Fighting 20 mutants(20,20)
+make[2]: Leaving directory '/home/lemonidas/QuickChick/QuickChick/examples/ifc-basic'
+make[1]: Leaving directory '/home/lemonidas/QuickChick/QuickChick/examples/ifc-basic'
+make -C test
+make[1]: Entering directory '/home/lemonidas/QuickChick/QuickChick/test'
+cd mutation/; sh mutation.sh
+File "./mutation.v", line 17, characters 0-30:
+Warning: The extraction is currently set to bypass opacity, the following
+opaque constant bodies have been accessed
+: ssrnat.eqnP StringOT.StringOT.compare ssrbool.iffP ssrbool.idP
+  StringOT.AsciiOT.compare.
+ [extraction-opaque-accessed,extraction]
+/home/lemonidas/.opam/default/bin/ocamldep.opt -modules mutation.ml > mutation.ml.depends
+/home/lemonidas/.opam/default/bin/ocamldep.opt -modules mutation.mli > mutation.mli.depends
+/home/lemonidas/.opam/default/bin/ocamlc.opt -c -I /home/lemonidas/.opam/default/lib/zarith -o mutation.cmi mutation.mli
+/home/lemonidas/.opam/default/bin/ocamlopt.opt -c -I /home/lemonidas/.opam/default/lib/zarith -o mutation.cmx mutation.ml
++ /home/lemonidas/.opam/default/bin/ocamlopt.opt -c -I /home/lemonidas/.opam/default/lib/zarith -o mutation.cmx mutation.ml
+File "mutation.ml", line 95, characters 25-39:
+95 | let rec sub = fun n m -> Pervasives.max 0 (n-m)
+                              ^^^^^^^^^^^^^^
+Alert deprecated: module Stdlib.Pervasives
+Use Stdlib instead.
+
+If you need to stay compatible with OCaml < 4.07, you can use the 
+stdlib-shims library: https://github.com/ocaml/stdlib-shims
+File "mutation.ml", line 730, characters 10-25:
+730 |   if leq (Pervasives.succ m) n0 then m else n0
+                ^^^^^^^^^^^^^^^
+Alert deprecated: module Stdlib.Pervasives
+Use Stdlib instead.
+
+If you need to stay compatible with OCaml < 4.07, you can use the 
+stdlib-shims library: https://github.com/ocaml/stdlib-shims
+File "mutation.ml", line 1799, characters 28-43:
+1799 |   | Node (l, _, _, r, _) -> Pervasives.succ (add (cardinal l) (cardinal r))
+                                   ^^^^^^^^^^^^^^^
+Alert deprecated: module Stdlib.Pervasives
+Use Stdlib instead.
+
+If you need to stay compatible with OCaml < 4.07, you can use the 
+stdlib-shims library: https://github.com/ocaml/stdlib-shims
+File "mutation.ml", line 3010, characters 20-35:
+3010 |            (divn d (Pervasives.succ (Pervasives.succ (Pervasives.succ
+                           ^^^^^^^^^^^^^^^
+Alert deprecated: module Stdlib.Pervasives
+Use Stdlib instead.
+
+If you need to stay compatible with OCaml < 4.07, you can use the 
+stdlib-shims library: https://github.com/ocaml/stdlib-shims
+File "mutation.ml", line 3010, characters 37-52:
+3010 |            (divn d (Pervasives.succ (Pervasives.succ (Pervasives.succ
+                                            ^^^^^^^^^^^^^^^
+Alert deprecated: module Stdlib.Pervasives
+Use Stdlib instead.
+
+If you need to stay compatible with OCaml < 4.07, you can use the 
+stdlib-shims library: https://github.com/ocaml/stdlib-shims
+File "mutation.ml", line 3010, characters 54-69:
+3010 |            (divn d (Pervasives.succ (Pervasives.succ (Pervasives.succ
+                                                             ^^^^^^^^^^^^^^^
+Alert deprecated: module Stdlib.Pervasives
+Use Stdlib instead.
+
+If you need to stay compatible with OCaml < 4.07, you can use the 
+stdlib-shims library: https://github.com/ocaml/stdlib-shims
+File "mutation.ml", line 3011, characters 14-29:
+3011 |              (Pervasives.succ (Pervasives.succ (Pervasives.succ
+                     ^^^^^^^^^^^^^^^
+Alert deprecated: module Stdlib.Pervasives
+Use Stdlib instead.
+
+If you need to stay compatible with OCaml < 4.07, you can use the 
+stdlib-shims library: https://github.com/ocaml/stdlib-shims
+File "mutation.ml", line 3011, characters 31-46:
+3011 |              (Pervasives.succ (Pervasives.succ (Pervasives.succ
+                                      ^^^^^^^^^^^^^^^
+Alert deprecated: module Stdlib.Pervasives
+Use Stdlib instead.
+
+If you need to stay compatible with OCaml < 4.07, you can use the 
+stdlib-shims library: https://github.com/ocaml/stdlib-shims
+File "mutation.ml", line 3011, characters 48-63:
+3011 |              (Pervasives.succ (Pervasives.succ (Pervasives.succ
+                                                       ^^^^^^^^^^^^^^^
+Alert deprecated: module Stdlib.Pervasives
+Use Stdlib instead.
+
+If you need to stay compatible with OCaml < 4.07, you can use the 
+stdlib-shims library: https://github.com/ocaml/stdlib-shims
+File "mutation.ml", line 3012, characters 14-29:
+3012 |              (Pervasives.succ (Pervasives.succ (Pervasives.succ
+                     ^^^^^^^^^^^^^^^
+Alert deprecated: module Stdlib.Pervasives
+Use Stdlib instead.
+
+If you need to stay compatible with OCaml < 4.07, you can use the 
+stdlib-shims library: https://github.com/ocaml/stdlib-shims
+File "mutation.ml", line 3012, characters 31-46:
+3012 |              (Pervasives.succ (Pervasives.succ (Pervasives.succ
+                                      ^^^^^^^^^^^^^^^
+Alert deprecated: module Stdlib.Pervasives
+Use Stdlib instead.
+
+If you need to stay compatible with OCaml < 4.07, you can use the 
+stdlib-shims library: https://github.com/ocaml/stdlib-shims
+File "mutation.ml", line 3012, characters 48-63:
+3012 |              (Pervasives.succ (Pervasives.succ (Pervasives.succ
+                                                       ^^^^^^^^^^^^^^^
+Alert deprecated: module Stdlib.Pervasives
+Use Stdlib instead.
+
+If you need to stay compatible with OCaml < 4.07, you can use the 
+stdlib-shims library: https://github.com/ocaml/stdlib-shims
+File "mutation.ml", line 3013, characters 14-29:
+3013 |              (Pervasives.succ 0)))))))))))) a.maxSize
+                     ^^^^^^^^^^^^^^^
+Alert deprecated: module Stdlib.Pervasives
+Use Stdlib instead.
+
+If you need to stay compatible with OCaml < 4.07, you can use the 
+stdlib-shims library: https://github.com/ocaml/stdlib-shims
+File "mutation.ml", line 3017, characters 22-37:
+3017 |              (divn d (Pervasives.succ (Pervasives.succ (Pervasives.succ
+                             ^^^^^^^^^^^^^^^
+Alert deprecated: module Stdlib.Pervasives
+Use Stdlib instead.
+
+If you need to stay compatible with OCaml < 4.07, you can use the 
+stdlib-shims library: https://github.com/ocaml/stdlib-shims
+File "mutation.ml", line 3017, characters 39-54:
+3017 |              (divn d (Pervasives.succ (Pervasives.succ (Pervasives.succ
+                                              ^^^^^^^^^^^^^^^
+Alert deprecated: module Stdlib.Pervasives
+Use Stdlib instead.
+
+If you need to stay compatible with OCaml < 4.07, you can use the 
+stdlib-shims library: https://github.com/ocaml/stdlib-shims
+File "mutation.ml", line 3017, characters 56-71:
+3017 |              (divn d (Pervasives.succ (Pervasives.succ (Pervasives.succ
+                                                               ^^^^^^^^^^^^^^^
+Alert deprecated: module Stdlib.Pervasives
+Use Stdlib instead.
+
+If you need to stay compatible with OCaml < 4.07, you can use the 
+stdlib-shims library: https://github.com/ocaml/stdlib-shims
+File "mutation.ml", line 3018, characters 16-31:
+3018 |                (Pervasives.succ (Pervasives.succ (Pervasives.succ
+                       ^^^^^^^^^^^^^^^
+Alert deprecated: module Stdlib.Pervasives
+Use Stdlib instead.
+
+If you need to stay compatible with OCaml < 4.07, you can use the 
+stdlib-shims library: https://github.com/ocaml/stdlib-shims
+File "mutation.ml", line 3018, characters 33-48:
+3018 |                (Pervasives.succ (Pervasives.succ (Pervasives.succ
+                                        ^^^^^^^^^^^^^^^
+Alert deprecated: module Stdlib.Pervasives
+Use Stdlib instead.
+
+If you need to stay compatible with OCaml < 4.07, you can use the 
+stdlib-shims library: https://github.com/ocaml/stdlib-shims
+File "mutation.ml", line 3018, characters 50-65:
+3018 |                (Pervasives.succ (Pervasives.succ (Pervasives.succ
+                                                         ^^^^^^^^^^^^^^^
+Alert deprecated: module Stdlib.Pervasives
+Use Stdlib instead.
+
+If you need to stay compatible with OCaml < 4.07, you can use the 
+stdlib-shims library: https://github.com/ocaml/stdlib-shims
+File "mutation.ml", line 3019, characters 16-31:
+3019 |                (Pervasives.succ (Pervasives.succ (Pervasives.succ
+                       ^^^^^^^^^^^^^^^
+Alert deprecated: module Stdlib.Pervasives
+Use Stdlib instead.
+
+If you need to stay compatible with OCaml < 4.07, you can use the 
+stdlib-shims library: https://github.com/ocaml/stdlib-shims
+File "mutation.ml", line 3019, characters 33-48:
+3019 |                (Pervasives.succ (Pervasives.succ (Pervasives.succ
+                                        ^^^^^^^^^^^^^^^
+Alert deprecated: module Stdlib.Pervasives
+Use Stdlib instead.
+
+If you need to stay compatible with OCaml < 4.07, you can use the 
+stdlib-shims library: https://github.com/ocaml/stdlib-shims
+File "mutation.ml", line 3019, characters 50-65:
+3019 |                (Pervasives.succ (Pervasives.succ (Pervasives.succ
+                                                         ^^^^^^^^^^^^^^^
+Alert deprecated: module Stdlib.Pervasives
+Use Stdlib instead.
+
+If you need to stay compatible with OCaml < 4.07, you can use the 
+stdlib-shims library: https://github.com/ocaml/stdlib-shims
+File "mutation.ml", line 3020, characters 16-31:
+3020 |                (Pervasives.succ 0))))))))))))) a.maxSize
+                       ^^^^^^^^^^^^^^^
+Alert deprecated: module Stdlib.Pervasives
+Use Stdlib instead.
+
+If you need to stay compatible with OCaml < 4.07, you can use the 
+stdlib-shims library: https://github.com/ocaml/stdlib-shims
+File "mutation.ml", line 3050, characters 42-57:
+3050 |   then Success ((addn st.numSuccessTests (Pervasives.succ 0)),
+                                                 ^^^^^^^^^^^^^^^
+Alert deprecated: module Stdlib.Pervasives
+Use Stdlib instead.
+
+If you need to stay compatible with OCaml < 4.07, you can use the 
+stdlib-shims library: https://github.com/ocaml/stdlib-shims
+File "mutation.ml", line 3128, characters 31-46:
+3128 |                 addn (addn x0 (Pervasives.succ 0)) zero)) r'
+                                      ^^^^^^^^^^^^^^^
+Alert deprecated: module Stdlib.Pervasives
+Use Stdlib instead.
+
+If you need to stay compatible with OCaml < 4.07, you can use the 
+stdlib-shims library: https://github.com/ocaml/stdlib-shims
+File "mutation.ml", line 3130, characters 53-68:
+3130 |               (updTryShrinks st0 (fun x0 -> addn x0 (Pervasives.succ 0))) ts'
+                                                            ^^^^^^^^^^^^^^^
+Alert deprecated: module Stdlib.Pervasives
+Use Stdlib instead.
+
+If you need to stay compatible with OCaml < 4.07, you can use the 
+stdlib-shims library: https://github.com/ocaml/stdlib-shims
+File "mutation.ml", line 3132, characters 54-69:
+3132 |        localMin' (updTryShrinks st0 (fun x -> addn x (Pervasives.succ 0))) ts')
+                                                             ^^^^^^^^^^^^^^^
+Alert deprecated: module Stdlib.Pervasives
+Use Stdlib instead.
+
+If you need to stay compatible with OCaml < 4.07, you can use the 
+stdlib-shims library: https://github.com/ocaml/stdlib-shims
+File "mutation.ml", line 3172, characters 55-70:
+3172 |                  | Some k -> Map.add s_to_add (addn k (Pervasives.succ 0)) ls
+                                                              ^^^^^^^^^^^^^^^
+Alert deprecated: module Stdlib.Pervasives
+Use Stdlib instead.
+
+If you need to stay compatible with OCaml < 4.07, you can use the 
+stdlib-shims library: https://github.com/ocaml/stdlib-shims
+File "mutation.ml", line 3174, characters 50-65:
+3174 |                    Map.add s_to_add (addn res_cb (Pervasives.succ 0)) ls)
+                                                         ^^^^^^^^^^^^^^^
+Alert deprecated: module Stdlib.Pervasives
+Use Stdlib instead.
+
+If you need to stay compatible with OCaml < 4.07, you can use the 
+stdlib-shims library: https://github.com/ocaml/stdlib-shims
+File "mutation.ml", line 3178, characters 25-40:
+3178 |               (addn nst (Pervasives.succ 0)); numDiscardedTests = ndt;
+                                ^^^^^^^^^^^^^^^
+Alert deprecated: module Stdlib.Pervasives
+Use Stdlib instead.
+
+If you need to stay compatible with OCaml < 4.07, you can use the 
+stdlib-shims library: https://github.com/ocaml/stdlib-shims
+File "mutation.ml", line 3195, characters 40-55:
+3195 |                 (append (show0 showNat (Pervasives.succ nst))
+                                               ^^^^^^^^^^^^^^^
+Alert deprecated: module Stdlib.Pervasives
+Use Stdlib instead.
+
+If you need to stay compatible with OCaml < 4.07, you can use the 
+stdlib-shims library: https://github.com/ocaml/stdlib-shims
+File "mutation.ml", line 3205, characters 37-52:
+3205 |             then Success ((addn nst (Pervasives.succ 0)), ndt, (summary st),
+                                            ^^^^^^^^^^^^^^^
+Alert deprecated: module Stdlib.Pervasives
+Use Stdlib instead.
+
+If you need to stay compatible with OCaml < 4.07, you can use the 
+stdlib-shims library: https://github.com/ocaml/stdlib-shims
+File "mutation.ml", line 3207, characters 37-52:
+3207 |             else Failure ((addn nst (Pervasives.succ 0)), numShrinks, ndt, r,
+                                            ^^^^^^^^^^^^^^^
+Alert deprecated: module Stdlib.Pervasives
+Use Stdlib instead.
+
+If you need to stay compatible with OCaml < 4.07, you can use the 
+stdlib-shims library: https://github.com/ocaml/stdlib-shims
+File "mutation.ml", line 3222, characters 50-65:
+3222 |             | Some k -> Map.add s_to_add (addn k (Pervasives.succ 0)) ls
+                                                         ^^^^^^^^^^^^^^^
+Alert deprecated: module Stdlib.Pervasives
+Use Stdlib instead.
+
+If you need to stay compatible with OCaml < 4.07, you can use the 
+stdlib-shims library: https://github.com/ocaml/stdlib-shims
+File "mutation.ml", line 3223, characters 53-68:
+3223 |             | None -> Map.add s_to_add (addn res_cb (Pervasives.succ 0)) ls)
+                                                            ^^^^^^^^^^^^^^^
+Alert deprecated: module Stdlib.Pervasives
+Use Stdlib instead.
+
+If you need to stay compatible with OCaml < 4.07, you can use the 
+stdlib-shims library: https://github.com/ocaml/stdlib-shims
+File "mutation.ml", line 3227, characters 10-25:
+3227 |          (Pervasives.succ ndt); labels = ls'; expectedFailure = e;
+                 ^^^^^^^^^^^^^^^
+Alert deprecated: module Stdlib.Pervasives
+Use Stdlib instead.
+
+If you need to stay compatible with OCaml < 4.07, you can use the 
+stdlib-shims library: https://github.com/ocaml/stdlib-shims
+File "mutation.ml", line 3413, characters 27-42:
+3413 |     Magic.mutate (fun _ -> Pervasives.succ (Pervasives.succ (Pervasives.succ
+                                  ^^^^^^^^^^^^^^^
+Alert deprecated: module Stdlib.Pervasives
+Use Stdlib instead.
+
+If you need to stay compatible with OCaml < 4.07, you can use the 
+stdlib-shims library: https://github.com/ocaml/stdlib-shims
+File "mutation.ml", line 3413, characters 44-59:
+3413 |     Magic.mutate (fun _ -> Pervasives.succ (Pervasives.succ (Pervasives.succ
+                                                   ^^^^^^^^^^^^^^^
+Alert deprecated: module Stdlib.Pervasives
+Use Stdlib instead.
+
+If you need to stay compatible with OCaml < 4.07, you can use the 
+stdlib-shims library: https://github.com/ocaml/stdlib-shims
+File "mutation.ml", line 3413, characters 61-76:
+3413 |     Magic.mutate (fun _ -> Pervasives.succ (Pervasives.succ (Pervasives.succ
+                                                                    ^^^^^^^^^^^^^^^
+Alert deprecated: module Stdlib.Pervasives
+Use Stdlib instead.
+
+If you need to stay compatible with OCaml < 4.07, you can use the 
+stdlib-shims library: https://github.com/ocaml/stdlib-shims
+File "mutation.ml", line 3414, characters 7-22:
+3414 |       (Pervasives.succ (Pervasives.succ (Pervasives.succ (Pervasives.succ
+              ^^^^^^^^^^^^^^^
+Alert deprecated: module Stdlib.Pervasives
+Use Stdlib instead.
+
+If you need to stay compatible with OCaml < 4.07, you can use the 
+stdlib-shims library: https://github.com/ocaml/stdlib-shims
+File "mutation.ml", line 3414, characters 24-39:
+3414 |       (Pervasives.succ (Pervasives.succ (Pervasives.succ (Pervasives.succ
+                               ^^^^^^^^^^^^^^^
+Alert deprecated: module Stdlib.Pervasives
+Use Stdlib instead.
+
+If you need to stay compatible with OCaml < 4.07, you can use the 
+stdlib-shims library: https://github.com/ocaml/stdlib-shims
+File "mutation.ml", line 3414, characters 41-56:
+3414 |       (Pervasives.succ (Pervasives.succ (Pervasives.succ (Pervasives.succ
+                                                ^^^^^^^^^^^^^^^
+Alert deprecated: module Stdlib.Pervasives
+Use Stdlib instead.
+
+If you need to stay compatible with OCaml < 4.07, you can use the 
+stdlib-shims library: https://github.com/ocaml/stdlib-shims
+File "mutation.ml", line 3414, characters 58-73:
+3414 |       (Pervasives.succ (Pervasives.succ (Pervasives.succ (Pervasives.succ
+                                                                 ^^^^^^^^^^^^^^^
+Alert deprecated: module Stdlib.Pervasives
+Use Stdlib instead.
+
+If you need to stay compatible with OCaml < 4.07, you can use the 
+stdlib-shims library: https://github.com/ocaml/stdlib-shims
+File "mutation.ml", line 3415, characters 7-22:
+3415 |       (Pervasives.succ (Pervasives.succ (Pervasives.succ 0))))))))))
+              ^^^^^^^^^^^^^^^
+Alert deprecated: module Stdlib.Pervasives
+Use Stdlib instead.
+
+If you need to stay compatible with OCaml < 4.07, you can use the 
+stdlib-shims library: https://github.com/ocaml/stdlib-shims
+File "mutation.ml", line 3415, characters 24-39:
+3415 |       (Pervasives.succ (Pervasives.succ (Pervasives.succ 0))))))))))
+                               ^^^^^^^^^^^^^^^
+Alert deprecated: module Stdlib.Pervasives
+Use Stdlib instead.
+
+If you need to stay compatible with OCaml < 4.07, you can use the 
+stdlib-shims library: https://github.com/ocaml/stdlib-shims
+File "mutation.ml", line 3415, characters 41-56:
+3415 |       (Pervasives.succ (Pervasives.succ (Pervasives.succ 0))))))))))
+                                                ^^^^^^^^^^^^^^^
+Alert deprecated: module Stdlib.Pervasives
+Use Stdlib instead.
+
+If you need to stay compatible with OCaml < 4.07, you can use the 
+stdlib-shims library: https://github.com/ocaml/stdlib-shims
+File "mutation.ml", line 3416, characters 16-31:
+3416 |       (fun _ -> Pervasives.succ (Pervasives.succ (Pervasives.succ
+                       ^^^^^^^^^^^^^^^
+Alert deprecated: module Stdlib.Pervasives
+Use Stdlib instead.
+
+If you need to stay compatible with OCaml < 4.07, you can use the 
+stdlib-shims library: https://github.com/ocaml/stdlib-shims
+File "mutation.ml", line 3416, characters 33-48:
+3416 |       (fun _ -> Pervasives.succ (Pervasives.succ (Pervasives.succ
+                                        ^^^^^^^^^^^^^^^
+Alert deprecated: module Stdlib.Pervasives
+Use Stdlib instead.
+
+If you need to stay compatible with OCaml < 4.07, you can use the 
+stdlib-shims library: https://github.com/ocaml/stdlib-shims
+File "mutation.ml", line 3416, characters 50-65:
+3416 |       (fun _ -> Pervasives.succ (Pervasives.succ (Pervasives.succ
+                                                         ^^^^^^^^^^^^^^^
+Alert deprecated: module Stdlib.Pervasives
+Use Stdlib instead.
+
+If you need to stay compatible with OCaml < 4.07, you can use the 
+stdlib-shims library: https://github.com/ocaml/stdlib-shims
+File "mutation.ml", line 3417, characters 7-22:
+3417 |       (Pervasives.succ (Pervasives.succ (Pervasives.succ (Pervasives.succ
+              ^^^^^^^^^^^^^^^
+Alert deprecated: module Stdlib.Pervasives
+Use Stdlib instead.
+
+If you need to stay compatible with OCaml < 4.07, you can use the 
+stdlib-shims library: https://github.com/ocaml/stdlib-shims
+File "mutation.ml", line 3417, characters 24-39:
+3417 |       (Pervasives.succ (Pervasives.succ (Pervasives.succ (Pervasives.succ
+                               ^^^^^^^^^^^^^^^
+Alert deprecated: module Stdlib.Pervasives
+Use Stdlib instead.
+
+If you need to stay compatible with OCaml < 4.07, you can use the 
+stdlib-shims library: https://github.com/ocaml/stdlib-shims
+File "mutation.ml", line 3417, characters 41-56:
+3417 |       (Pervasives.succ (Pervasives.succ (Pervasives.succ (Pervasives.succ
+                                                ^^^^^^^^^^^^^^^
+Alert deprecated: module Stdlib.Pervasives
+Use Stdlib instead.
+
+If you need to stay compatible with OCaml < 4.07, you can use the 
+stdlib-shims library: https://github.com/ocaml/stdlib-shims
+File "mutation.ml", line 3417, characters 58-73:
+3417 |       (Pervasives.succ (Pervasives.succ (Pervasives.succ (Pervasives.succ
+                                                                 ^^^^^^^^^^^^^^^
+Alert deprecated: module Stdlib.Pervasives
+Use Stdlib instead.
+
+If you need to stay compatible with OCaml < 4.07, you can use the 
+stdlib-shims library: https://github.com/ocaml/stdlib-shims
+File "mutation.ml", line 3418, characters 7-22:
+3418 |       (Pervasives.succ (Pervasives.succ (Pervasives.succ (Pervasives.succ
+              ^^^^^^^^^^^^^^^
+Alert deprecated: module Stdlib.Pervasives
+Use Stdlib instead.
+
+If you need to stay compatible with OCaml < 4.07, you can use the 
+stdlib-shims library: https://github.com/ocaml/stdlib-shims
+File "mutation.ml", line 3418, characters 24-39:
+3418 |       (Pervasives.succ (Pervasives.succ (Pervasives.succ (Pervasives.succ
+                               ^^^^^^^^^^^^^^^
+Alert deprecated: module Stdlib.Pervasives
+Use Stdlib instead.
+
+If you need to stay compatible with OCaml < 4.07, you can use the 
+stdlib-shims library: https://github.com/ocaml/stdlib-shims
+File "mutation.ml", line 3418, characters 41-56:
+3418 |       (Pervasives.succ (Pervasives.succ (Pervasives.succ (Pervasives.succ
+                                                ^^^^^^^^^^^^^^^
+Alert deprecated: module Stdlib.Pervasives
+Use Stdlib instead.
+
+If you need to stay compatible with OCaml < 4.07, you can use the 
+stdlib-shims library: https://github.com/ocaml/stdlib-shims
+File "mutation.ml", line 3418, characters 58-73:
+3418 |       (Pervasives.succ (Pervasives.succ (Pervasives.succ (Pervasives.succ
+                                                                 ^^^^^^^^^^^^^^^
+Alert deprecated: module Stdlib.Pervasives
+Use Stdlib instead.
+
+If you need to stay compatible with OCaml < 4.07, you can use the 
+stdlib-shims library: https://github.com/ocaml/stdlib-shims
+File "mutation.ml", line 3419, characters 7-22:
+3419 |       (Pervasives.succ (Pervasives.succ (Pervasives.succ (Pervasives.succ
+              ^^^^^^^^^^^^^^^
+Alert deprecated: module Stdlib.Pervasives
+Use Stdlib instead.
+
+If you need to stay compatible with OCaml < 4.07, you can use the 
+stdlib-shims library: https://github.com/ocaml/stdlib-shims
+File "mutation.ml", line 3419, characters 24-39:
+3419 |       (Pervasives.succ (Pervasives.succ (Pervasives.succ (Pervasives.succ
+                               ^^^^^^^^^^^^^^^
+Alert deprecated: module Stdlib.Pervasives
+Use Stdlib instead.
+
+If you need to stay compatible with OCaml < 4.07, you can use the 
+stdlib-shims library: https://github.com/ocaml/stdlib-shims
+File "mutation.ml", line 3419, characters 41-56:
+3419 |       (Pervasives.succ (Pervasives.succ (Pervasives.succ (Pervasives.succ
+                                                ^^^^^^^^^^^^^^^
+Alert deprecated: module Stdlib.Pervasives
+Use Stdlib instead.
+
+If you need to stay compatible with OCaml < 4.07, you can use the 
+stdlib-shims library: https://github.com/ocaml/stdlib-shims
+File "mutation.ml", line 3419, characters 58-73:
+3419 |       (Pervasives.succ (Pervasives.succ (Pervasives.succ (Pervasives.succ
+                                                                 ^^^^^^^^^^^^^^^
+Alert deprecated: module Stdlib.Pervasives
+Use Stdlib instead.
+
+If you need to stay compatible with OCaml < 4.07, you can use the 
+stdlib-shims library: https://github.com/ocaml/stdlib-shims
+File "mutation.ml", line 3420, characters 7-22:
+3420 |       (Pervasives.succ (Pervasives.succ (Pervasives.succ (Pervasives.succ
+              ^^^^^^^^^^^^^^^
+Alert deprecated: module Stdlib.Pervasives
+Use Stdlib instead.
+
+If you need to stay compatible with OCaml < 4.07, you can use the 
+stdlib-shims library: https://github.com/ocaml/stdlib-shims
+File "mutation.ml", line 3420, characters 24-39:
+3420 |       (Pervasives.succ (Pervasives.succ (Pervasives.succ (Pervasives.succ
+                               ^^^^^^^^^^^^^^^
+Alert deprecated: module Stdlib.Pervasives
+Use Stdlib instead.
+
+If you need to stay compatible with OCaml < 4.07, you can use the 
+stdlib-shims library: https://github.com/ocaml/stdlib-shims
+File "mutation.ml", line 3420, characters 41-56:
+3420 |       (Pervasives.succ (Pervasives.succ (Pervasives.succ (Pervasives.succ
+                                                ^^^^^^^^^^^^^^^
+Alert deprecated: module Stdlib.Pervasives
+Use Stdlib instead.
+
+If you need to stay compatible with OCaml < 4.07, you can use the 
+stdlib-shims library: https://github.com/ocaml/stdlib-shims
+File "mutation.ml", line 3420, characters 58-73:
+3420 |       (Pervasives.succ (Pervasives.succ (Pervasives.succ (Pervasives.succ
+                                                                 ^^^^^^^^^^^^^^^
+Alert deprecated: module Stdlib.Pervasives
+Use Stdlib instead.
+
+If you need to stay compatible with OCaml < 4.07, you can use the 
+stdlib-shims library: https://github.com/ocaml/stdlib-shims
+File "mutation.ml", line 3421, characters 7-22:
+3421 |       (Pervasives.succ 0))))))))))))))))))))
+              ^^^^^^^^^^^^^^^
+Alert deprecated: module Stdlib.Pervasives
+Use Stdlib instead.
+
+If you need to stay compatible with OCaml < 4.07, you can use the 
+stdlib-shims library: https://github.com/ocaml/stdlib-shims
+File "mutation.ml", line 3427, characters 31-46:
+3427 |         Magic.mutate (fun _ -> Pervasives.succ 0) (fun _ -> Pervasives.succ
+                                      ^^^^^^^^^^^^^^^
+Alert deprecated: module Stdlib.Pervasives
+Use Stdlib instead.
+
+If you need to stay compatible with OCaml < 4.07, you can use the 
+stdlib-shims library: https://github.com/ocaml/stdlib-shims
+File "mutation.ml", line 3427, characters 60-75:
+3427 |         Magic.mutate (fun _ -> Pervasives.succ 0) (fun _ -> Pervasives.succ
+                                                                   ^^^^^^^^^^^^^^^
+Alert deprecated: module Stdlib.Pervasives
+Use Stdlib instead.
+
+If you need to stay compatible with OCaml < 4.07, you can use the 
+stdlib-shims library: https://github.com/ocaml/stdlib-shims
+File "mutation.ml", line 3428, characters 11-26:
+3428 |           (Pervasives.succ 0))
+                  ^^^^^^^^^^^^^^^
+Alert deprecated: module Stdlib.Pervasives
+Use Stdlib instead.
+
+If you need to stay compatible with OCaml < 4.07, you can use the 
+stdlib-shims library: https://github.com/ocaml/stdlib-shims
+File "mutation.ml", line 3430, characters 48-63:
+3430 |             ('f'::('o'::('o'::[]))))) (fun _ -> Pervasives.succ
+                                                       ^^^^^^^^^^^^^^^
+Alert deprecated: module Stdlib.Pervasives
+Use Stdlib instead.
+
+If you need to stay compatible with OCaml < 4.07, you can use the 
+stdlib-shims library: https://github.com/ocaml/stdlib-shims
+File "mutation.ml", line 3431, characters 9-24:
+3431 |         (Pervasives.succ (Pervasives.succ 0)))
+                ^^^^^^^^^^^^^^^
+Alert deprecated: module Stdlib.Pervasives
+Use Stdlib instead.
+
+If you need to stay compatible with OCaml < 4.07, you can use the 
+stdlib-shims library: https://github.com/ocaml/stdlib-shims
+File "mutation.ml", line 3431, characters 26-41:
+3431 |         (Pervasives.succ (Pervasives.succ 0)))
+                                 ^^^^^^^^^^^^^^^
+Alert deprecated: module Stdlib.Pervasives
+Use Stdlib instead.
+
+If you need to stay compatible with OCaml < 4.07, you can use the 
+stdlib-shims library: https://github.com/ocaml/stdlib-shims
+File "mutation.ml", line 3433, characters 16-31:
+3433 |       (fun _ -> Pervasives.succ (Pervasives.succ (Pervasives.succ
+                       ^^^^^^^^^^^^^^^
+Alert deprecated: module Stdlib.Pervasives
+Use Stdlib instead.
+
+If you need to stay compatible with OCaml < 4.07, you can use the 
+stdlib-shims library: https://github.com/ocaml/stdlib-shims
+File "mutation.ml", line 3433, characters 33-48:
+3433 |       (fun _ -> Pervasives.succ (Pervasives.succ (Pervasives.succ
+                                        ^^^^^^^^^^^^^^^
+Alert deprecated: module Stdlib.Pervasives
+Use Stdlib instead.
+
+If you need to stay compatible with OCaml < 4.07, you can use the 
+stdlib-shims library: https://github.com/ocaml/stdlib-shims
+File "mutation.ml", line 3433, characters 50-65:
+3433 |       (fun _ -> Pervasives.succ (Pervasives.succ (Pervasives.succ
+                                                         ^^^^^^^^^^^^^^^
+Alert deprecated: module Stdlib.Pervasives
+Use Stdlib instead.
+
+If you need to stay compatible with OCaml < 4.07, you can use the 
+stdlib-shims library: https://github.com/ocaml/stdlib-shims
+File "mutation.ml", line 3434, characters 7-22:
+3434 |       (Pervasives.succ 0))))
+              ^^^^^^^^^^^^^^^
+Alert deprecated: module Stdlib.Pervasives
+Use Stdlib instead.
+
+If you need to stay compatible with OCaml < 4.07, you can use the 
+stdlib-shims library: https://github.com/ocaml/stdlib-shims
+File "mutation.ml", line 3445, characters 41-56:
+3445 |             (decidable_eq_nat (add x y) (Pervasives.succ (Pervasives.succ
+                                                ^^^^^^^^^^^^^^^
+Alert deprecated: module Stdlib.Pervasives
+Use Stdlib instead.
+
+If you need to stay compatible with OCaml < 4.07, you can use the 
+stdlib-shims library: https://github.com/ocaml/stdlib-shims
+File "mutation.ml", line 3445, characters 58-73:
+3445 |             (decidable_eq_nat (add x y) (Pervasives.succ (Pervasives.succ
+                                                                 ^^^^^^^^^^^^^^^
+Alert deprecated: module Stdlib.Pervasives
+Use Stdlib instead.
+
+If you need to stay compatible with OCaml < 4.07, you can use the 
+stdlib-shims library: https://github.com/ocaml/stdlib-shims
+File "mutation.ml", line 3446, characters 15-30:
+3446 |               (Pervasives.succ (Pervasives.succ (Pervasives.succ
+                      ^^^^^^^^^^^^^^^
+Alert deprecated: module Stdlib.Pervasives
+Use Stdlib instead.
+
+If you need to stay compatible with OCaml < 4.07, you can use the 
+stdlib-shims library: https://github.com/ocaml/stdlib-shims
+File "mutation.ml", line 3446, characters 32-47:
+3446 |               (Pervasives.succ (Pervasives.succ (Pervasives.succ
+                                       ^^^^^^^^^^^^^^^
+Alert deprecated: module Stdlib.Pervasives
+Use Stdlib instead.
+
+If you need to stay compatible with OCaml < 4.07, you can use the 
+stdlib-shims library: https://github.com/ocaml/stdlib-shims
+File "mutation.ml", line 3446, characters 49-64:
+3446 |               (Pervasives.succ (Pervasives.succ (Pervasives.succ
+                                                        ^^^^^^^^^^^^^^^
+Alert deprecated: module Stdlib.Pervasives
+Use Stdlib instead.
+
+If you need to stay compatible with OCaml < 4.07, you can use the 
+stdlib-shims library: https://github.com/ocaml/stdlib-shims
+File "mutation.ml", line 3447, characters 15-30:
+3447 |               (Pervasives.succ (Pervasives.succ (Pervasives.succ
+                      ^^^^^^^^^^^^^^^
+Alert deprecated: module Stdlib.Pervasives
+Use Stdlib instead.
+
+If you need to stay compatible with OCaml < 4.07, you can use the 
+stdlib-shims library: https://github.com/ocaml/stdlib-shims
+File "mutation.ml", line 3447, characters 32-47:
+3447 |               (Pervasives.succ (Pervasives.succ (Pervasives.succ
+                                       ^^^^^^^^^^^^^^^
+Alert deprecated: module Stdlib.Pervasives
+Use Stdlib instead.
+
+If you need to stay compatible with OCaml < 4.07, you can use the 
+stdlib-shims library: https://github.com/ocaml/stdlib-shims
+File "mutation.ml", line 3447, characters 49-64:
+3447 |               (Pervasives.succ (Pervasives.succ (Pervasives.succ
+                                                        ^^^^^^^^^^^^^^^
+Alert deprecated: module Stdlib.Pervasives
+Use Stdlib instead.
+
+If you need to stay compatible with OCaml < 4.07, you can use the 
+stdlib-shims library: https://github.com/ocaml/stdlib-shims
+File "mutation.ml", line 3448, characters 15-30:
+3448 |               (Pervasives.succ (Pervasives.succ (Pervasives.succ 0)))))))))))))
+                      ^^^^^^^^^^^^^^^
+Alert deprecated: module Stdlib.Pervasives
+Use Stdlib instead.
+
+If you need to stay compatible with OCaml < 4.07, you can use the 
+stdlib-shims library: https://github.com/ocaml/stdlib-shims
+File "mutation.ml", line 3448, characters 32-47:
+3448 |               (Pervasives.succ (Pervasives.succ (Pervasives.succ 0)))))))))))))
+                                       ^^^^^^^^^^^^^^^
+Alert deprecated: module Stdlib.Pervasives
+Use Stdlib instead.
+
+If you need to stay compatible with OCaml < 4.07, you can use the 
+stdlib-shims library: https://github.com/ocaml/stdlib-shims
+File "mutation.ml", line 3448, characters 49-64:
+3448 |               (Pervasives.succ (Pervasives.succ (Pervasives.succ 0)))))))))))))
+                                                        ^^^^^^^^^^^^^^^
+Alert deprecated: module Stdlib.Pervasives
+Use Stdlib instead.
+
+If you need to stay compatible with OCaml < 4.07, you can use the 
+stdlib-shims library: https://github.com/ocaml/stdlib-shims
+/home/lemonidas/.opam/default/bin/ocamlopt.opt -I /home/lemonidas/.opam/default/lib/zarith /home/lemonidas/.opam/default/lib/zarith/zarith.cmxa mutation.cmx -o mutation.native
+Checking example...
++++ Passed 10000 tests (0 discards)
+
+Mutant test:mutation.ml:3422:65: Testing...
+Mutant test:mutation.ml:3422:65: Killed!
+Mutant test:bar: Testing...
+Mutant test:bar: Killed!
+Mutant test:mutation.ml:3432:67: Testing...
+Mutant test:mutation.ml:3432:67: Killed!
+Mutant test:foo: Testing...
+Mutant test:foo: Killed!
+cd plugin/; sh plugin.sh
+QuickChecking (arbitrary : G foo)
+[baz; bar 2 (bar 8 (bar 6 baz)); bar 8 (bar 5 baz); bar 7 baz; baz; bar 1 (bar 5 (bar 5 (bar 0 baz))); bar 2 (bar 1 baz); bar 2 (bar 3 baz); bar 1 (bar 0 baz); bar 1 baz; baz]
+QuickChecking a
+[1; 1; 1; 1; 1; 1; 1; 1; 1; 1; 1]
+QuickChecking b
+[1; 1; 1; 1; 1; 1; 1; 1; 1; 1; 1]
+QuickChecking (liftM Some a)
+[Some 1; Some 1; Some 1; Some 1; Some 1; Some 1; Some 1; Some 1; Some 1; Some 1; Some 1]
+File "./plugin.v", line 45, characters 0-50:
+Warning: Notation "_ + _" was already used in scope nat_scope.
+[notation-overridden,parsing]
+File "./plugin.v", line 45, characters 0-50:
+Warning: Notation "_ - _" was already used in scope nat_scope.
+[notation-overridden,parsing]
+File "./plugin.v", line 45, characters 0-50:
+Warning: Notation "_ <= _" was already used in scope nat_scope.
+[notation-overridden,parsing]
+File "./plugin.v", line 45, characters 0-50:
+Warning: Notation "_ < _" was already used in scope nat_scope.
+[notation-overridden,parsing]
+File "./plugin.v", line 45, characters 0-50:
+Warning: Notation "_ >= _" was already used in scope nat_scope.
+[notation-overridden,parsing]
+File "./plugin.v", line 45, characters 0-50:
+Warning: Notation "_ > _" was already used in scope nat_scope.
+[notation-overridden,parsing]
+File "./plugin.v", line 45, characters 0-50:
+Warning: Notation "_ <= _ <= _" was already used in scope nat_scope.
+[notation-overridden,parsing]
+File "./plugin.v", line 45, characters 0-50:
+Warning: Notation "_ < _ <= _" was already used in scope nat_scope.
+[notation-overridden,parsing]
+File "./plugin.v", line 45, characters 0-50:
+Warning: Notation "_ <= _ < _" was already used in scope nat_scope.
+[notation-overridden,parsing]
+File "./plugin.v", line 45, characters 0-50:
+Warning: Notation "_ < _ < _" was already used in scope nat_scope.
+[notation-overridden,parsing]
+File "./plugin.v", line 45, characters 0-50:
+Warning: Notation "_ * _" was already used in scope nat_scope.
+[notation-overridden,parsing]
+QuickChecking (fun (s : nat) (t : nat) => eqn (gcdn s t) (gcdn t s))
++++ Passed 10000 tests (0 discards)
+QuickChecking teh
++++ Passed 10000 tests (0 discards)
+make[1]: Leaving directory '/home/lemonidas/QuickChick/QuickChick/test'
+make -C examples/RedBlack test
+make[1]: Entering directory '/home/lemonidas/QuickChick/QuickChick/examples/RedBlack'
+coq_makefile -f _CoqProject -o Makefile.coq
+make -f Makefile.coq clean
+make[2]: Entering directory '/home/lemonidas/QuickChick/QuickChick/examples/RedBlack'
+CLEAN
+make[2]: Leaving directory '/home/lemonidas/QuickChick/QuickChick/examples/RedBlack'
+rm -f -r ../_qc_RedBlack.tmp Makefile.coq*
+time quickChick -color -top "QuickChick.RedBlack"
+[31m[43m[1mTesting base...[m
+make[2]: Entering directory '/home/lemonidas/QuickChick/QuickChick/examples/_qc_RedBlack.tmp'
+coq_makefile -f _CoqProject -o Makefile.coq
+make -f Makefile.coq
+make[3]: Entering directory '/home/lemonidas/QuickChick/QuickChick/examples/_qc_RedBlack.tmp'
+COQDEP VFILES
+COQC redblack.v
+File "./redblack.v", line 24, characters 10-11:
+Warning: Unused variable a catches more than one case.
+[unused-pattern-matching-variable,pattern-matching]
+COQC testing.v
+File "./testing.v", line 55, characters 0-97:
+Warning: Not a truly recursive fixpoint. [non-recursive,fixpoints]
+File "./testing.v", line 70, characters 0-144:
+Warning: The default value for instance locality is currently "local" in a
+section and "global" otherwise, but is scheduled to change in a future
+release. For the time being, adding instances outside of sections without
+specifying an explicit locality attribute is therefore deprecated. It is
+recommended to use "export" whenever possible. Use the attributes #[local],
+#[global] and #[export] depending on your choice. For example: "#[export]
+Instance Foo : Bar := baz." [deprecated-instance-without-locality,deprecated]
+File "./testing.v", line 122, characters 0-116:
+Warning: grammar entry "ident" permitted "_" in addition to proper
+identifiers; this use is deprecated and its meaning will change in the
+future; use "name" instead. [deprecated-ident-entry,deprecated]
+make[4]: *** No rule to make target 'verif.vo', needed by 'QuickChickTop.vo'.  Stop.
+make[3]: *** [Makefile.coq:387: all] Error 2
+make[3]: Leaving directory '/home/lemonidas/QuickChick/QuickChick/examples/_qc_RedBlack.tmp'
+make[2]: *** [Makefile:5: all] Error 2
+make[2]: Leaving directory '/home/lemonidas/QuickChick/QuickChick/examples/_qc_RedBlack.tmp'
+[37m[41m[1mCommand failed: EXIT 2[m
+Command exited with non-zero status 1
+1.01user 0.15system 0:01.23elapsed 94%CPU (0avgtext+0avgdata 481724maxresident)k
+0inputs+472outputs (0major+62294minor)pagefaults 0swaps
+make[1]: *** [Makefile:15: test] Error 1
+make[1]: Leaving directory '/home/lemonidas/QuickChick/QuickChick/examples/RedBlack'
+make: *** [Makefile:57: tests] Error 2

@@ -3,10 +3,7 @@ type derivable =
   | Show
   | GenSized
   | Sized
-  | CanonicalSized
-  | SizeMonotonic
-  | SizedMonotonic
-  | SizedCorrect
+  | EnumSized
 val derivable_to_string : derivable -> string
 val mk_instance_name : derivable -> string -> string
 val repeat_instance_name : derivable -> string -> string

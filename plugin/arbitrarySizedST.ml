@@ -28,9 +28,9 @@ let instantiate_existential_methodST (n : int) (pred : coq_expr) =
     ; pred
     ; hole (* Implicit instance *)]
 
-let rec_method (rec_name : coq_expr) (size : coq_expr) (n : int) (letbinds : unknown list option) (l : coq_expr list) =
+let rec_method (rec_name : coq_expr) (init_size : coq_expr) (size : coq_expr) (n : int) (letbinds : unknown list option) (l : coq_expr list) =
   (* TODO: use letbinds *)
-  gApp rec_name (size :: l)
+  gApp rec_name (init_size :: size :: l)
 
 let bind (opt : bool) (m : coq_expr) (x : string) (f : var -> coq_expr) =
   (if opt then bindGenOpt else bindGen) m x f
@@ -91,6 +91,7 @@ type generator_kind = Base_gen | Ind_gen
 (* hoisting out base and ind gen to be able to call them from proof generation *)
 let construct_generators
       (kind : generator_kind)
+      (init_size : coq_expr)
       (size : coq_expr)
       (full_gtyp : coq_expr)
       (gen_ctr : ty_ctr)
@@ -104,17 +105,21 @@ let construct_generators
   =
   (* partially applied handle_branch *)
   let handle_branch' =
-    handle_branch dep_type (fail_exp full_gtyp) (not_enough_fuel_exp full_gtyp) (ret_exp full_gtyp)
+    handle_branch ["GenSizedSuchThat"; "GenSuchThat"]
+      dep_type init_size (fail_exp full_gtyp) (not_enough_fuel_exp full_gtyp) (ret_exp full_gtyp)
       instantiate_existential_method instantiate_existential_methodST bind
-      (rec_method rec_name size) bind
+      (rec_method rec_name init_size size) bind
       stMaybe check_expr match_inp gLetIn gLetTupleIn
-      gen_ctr init_umap init_tmap input_ranges result
+      gen_ctr init_umap init_tmap input_ranges result 
   in
   let all_gens = List.map handle_branch' ctrs in
+  let padNone =
+    if List.exists (fun gb -> not (snd gb)) all_gens
+    then [not_enough_fuel_exp full_gtyp] else [] in
   match kind with
-  | Base_gen -> List.map fst (List.filter snd all_gens)
+  | Base_gen -> List.map fst (List.filter snd all_gens) @ padNone
   | Ind_gen  -> List.map fst all_gens
-
+              
 let base_gens = construct_generators Base_gen
 let ind_gens  = construct_generators Ind_gen              
               
@@ -144,18 +149,18 @@ let arbitrarySizedST
   (* The type of the dependent generator *)
   let gen_type = gGen (gOption full_gtyp) in
 
-  let aux_arb rec_name size vars =
+  let aux_arb rec_name init_size size vars =
     gMatch (gVar size)
       [ (injectCtr "O", [],
          fun _ ->
            uniform_backtracking
-             (base_gens (gVar size) full_gtyp gen_ctr dep_type ctrs rec_name
+             (base_gens init_size (gVar size) full_gtyp gen_ctr dep_type ctrs rec_name
                 input_ranges init_umap init_tmap result))
       ; (injectCtr "S", ["size'"],
          fun [size'] ->
            let weights = List.map (fun (c,_) -> Weightmap.lookup_weight c size') ctrs in
            backtracking (List.combine weights 
-                           (ind_gens (gVar size') full_gtyp gen_ctr dep_type ctrs rec_name
+                           (ind_gens init_size (gVar size') full_gtyp gen_ctr dep_type ctrs rec_name
                               input_ranges init_umap init_tmap result)))
       ]
   in
@@ -163,11 +168,14 @@ let arbitrarySizedST
   let generator_body : coq_expr =
     gRecFunInWithArgs
       ~assumType:(gen_type)
-      "aux_arb" (gArg ~assumName:(gVar (fresh_name "size")) () :: inputs) 
-      (fun (rec_name, size::vars) -> aux_arb (gVar rec_name) size vars)
+      "aux_arb"
+      (gArg ~assumName:(gVar (fresh_name "init_size")) () ::
+         gArg ~assumName:(gVar (fresh_name "size")) ()
+         :: inputs)
+      (fun (rec_name, init_size::size::vars) -> aux_arb (gVar rec_name) (gVar init_size) size vars)
       (fun rec_name -> gFun ["size"] 
           (fun [size] -> gApp (gVar rec_name) 
-              (gVar size :: List.map (fun i -> gVar (arg_to_var i)) inputs)
+              (gVar size :: gVar size :: List.map (fun i -> gVar (arg_to_var i)) inputs)
           ))
   in
 

@@ -14,63 +14,447 @@ From mathcomp Require Import
      ssrnat.
 From QuickChick Require Import
      Classes
-     GenLow
-     GenHigh
-     Sets.
+     Sets
+     Producer
+     Enumerators
+     Generators
+     Tactics.
 
-Import GenHigh
-       GenLow
-       ListNotations
-       QcDefaultNotation.
+Import ListNotations QcDefaultNotation.
+Open Scope qc_scope.
 
 Set Bullet Behavior "Strict Subproofs".
 
 (** Basic generator instances *)
-Global Instance genBoolSized : GenSized bool :=
-  {| arbitrarySized x := choose (false, true) |}.
+#[global] Instance genBoolSized : GenSized bool :=
+  {| arbitrarySized x := elems_ true [true; false] |}.
 
-Instance genNatSized : GenSized nat :=
+#[global] Instance genNatSized : GenSized nat :=
   {| arbitrarySized x := choose (0,x) |}.
 
-Global Instance genZSized : GenSized Z :=
+#[global] Instance genZSized : GenSized Z :=
   {| arbitrarySized x := let z := Z.of_nat x in
                          choose (-z, z)%Z |}.
 
-Global Instance genNSized : GenSized N :=
+#[global] Instance genNSized : GenSized N :=
   {| arbitrarySized x := let n := N.of_nat x in
                          choose (N0, n) |}.
 
-Global Instance genListSized {A : Type} `{GenSized A} : GenSized (list A) :=
-  {| arbitrarySized x := vectorOf x (arbitrarySized x) |}.
+#[global] Instance genListSized {A : Type} `{GenSized A} : GenSized (list A) :=
+  {| arbitrarySized x := listOf (arbitrarySized x) |}.
 
 (* [3] is a lower priority than [Classes.GenOfGenSized],
    avoiding an infinite loop in typeclass resolution. *)
 
-Global Instance genList {A : Type} `{Gen A} : Gen (list A) | 3 :=
+#[global] Instance genList {A : Type} `{Gen A} : Gen (list A) | 3 :=
   {| arbitrary := listOf arbitrary |}.
 
-Global Instance genOption {A : Type} `{Gen A} : Gen (option A) | 3 :=
-  {| arbitrary := freq [ (1, returnGen None)
-                       ; (7, liftGen Some arbitrary)] |}.
+#[global] Instance genOption {A : Type} `{Gen A} : Gen (option A) | 3 :=
+  {| arbitrary := freq [ (1, ret None)
+                       ; (7, liftM Some arbitrary)] |}.
 
-Global Instance genPairSized {A B : Type} `{GenSized A} `{GenSized B}
+#[global] Instance genPairSized {A B : Type} `{GenSized A} `{GenSized B}
 : GenSized (A*B) :=
   {| arbitrarySized x :=
-       liftGen2 pair (arbitrarySized x)
-                     (arbitrarySized x)
+       liftM2 pair (arbitrarySized x)
+                   (arbitrarySized x)
   |}.
 
-Global Instance genPair {A B : Type} `{Gen A} `{Gen B} : Gen (A * B) :=
-  {| arbitrary := liftGen2 pair arbitrary arbitrary |}.
+#[global] Instance genPair {A B : Type} `{Gen A} `{Gen B} : Gen (A * B) :=
+  {| arbitrary := liftM2 pair arbitrary arbitrary |}.
 
-(** Shrink Instances *)
-Global Instance shrinkBool : Shrink bool :=
+(* Enumerator #[global] Instances *)
+
+#[global] Instance enumBoolSized : EnumSized bool :=
+  {| enumSized x := elems_ true [true; false] |}.
+
+#[global] Instance enumNatSized : EnumSized nat :=
+  {| enumSized x := chooseEnum (0,x) |}.
+
+#[global] Instance enumZSized : EnumSized Z :=
+  {| enumSized x := let z := Z.of_nat x in
+                         chooseEnum (-z, z)%Z |}.
+
+#[global] Instance enumNSized : EnumSized N :=
+  {| enumSized x := let n := N.of_nat x in
+                         chooseEnum (N0, n) |}.
+
+#[global] Instance enumListSized {A : Type} `{Enum A} : EnumSized (list A) :=
+  {| enumSized x := bindEnum (choose (0,x)) (fun x => vectorOf x enum) |}.
+
+(* [3] is a lower priority than [Classes.EnumOfEnumSized],
+   avoiding an infinite loop in typeclass resolution. *)
+
+#[global] Instance enumList {A : Type} `{Enum A} : Enum (list A) | 3 :=
+  {| enum := listOf enum |}.
+
+#[global] Instance enumOption {A : Type} `{Enum A} : Enum (option A) | 3 :=
+  {| enum := oneOf [ (ret None)
+                   ; (liftM Some enum)] |}.
+
+#[global] Instance enumPairSized {A B : Type} `{EnumSized A} `{EnumSized B}
+: EnumSized (A*B) :=
+  {| enumSized x :=
+       liftM2 pair (enumSized x)
+                   (enumSized x)
+  |}.
+
+#[global] Instance enumPair {A B : Type} `{Enum A} `{Enum B} : Enum (A * B) :=
+  {| enum := liftM2 pair enum enum |}.
+
+
+#[global] Instance enumOpt {A} (H : Enum A) : Enum (option A) :=
+  {| enum :=
+       match enum with
+       | MkEnum f => MkEnum (fun n => LazyList.lcons None (fun _ => LazyList.mapLazyList Some (f n)))
+       end
+  |}.
+
+
+(** Shrink#[global] Instances *)
+#[global] Instance shrinkBool : Shrink bool :=
   {| shrink x :=
        match x with
          | false => nil
          | true  => cons false nil
        end
   |}.
+
+
+#[global] Instance enumOptCorrect A `{EnumCorrect A} :
+  Correct _ (@enum _ (enumOpt _)).
+Proof.
+  constructor.  
+  intros t; split; eauto.
+  - intros. exact I.
+  - intros _. 
+    simpl.
+    inv H. inv H0. unfold semProd. simpl.
+    destruct t.
+    + destruct (prodCorrect a).
+      destruct H3. now reflexivity.
+      inv H3. simpl in *.
+      eexists x. split. eassumption.
+      destruct H. simpl in *. destruct enum0.
+      unfold semEnumSize in *. simpl. right.
+      eapply LazyList.lazy_in_map_iff.
+      eexists. split. reflexivity.
+      eassumption.
+    + exists 0. split. reflexivity.
+      destruct H. simpl. destruct enum0.
+      unfold semEnumSize in *. simpl. left. reflexivity.
+Qed.       
+
+#[global] Instance enumOpt_SizeMonotonic A `{EnumMonotonic A} :
+  SizeMonotonic (@enum _ (enumOpt _)).
+Proof.
+  destruct H. destruct enum. simpl in *. 
+  intros s1 s2 Hleq [ x |]; simpl.
+  - eapply H0 in Hleq. simpl in *.
+    intros Hin.
+    unfold semEnumSize in *. simpl in *. right.
+    inv Hin; try congruence.
+    eapply LazyList.lazy_in_map_iff.
+    eexists. split. reflexivity.
+    eapply Hleq.
+    eapply LazyList.lazy_in_map_iff in H. destruct H.
+    inv H. inv H2. eassumption.
+  - unfold semEnumSize in *. simpl in *. firstorder.
+Qed.
+
+#[global] Instance enumOpt_SizeFP A `{Enum A} :
+  SizeFP (@enum _ (enumOpt _)).
+Proof.
+  destruct H. destruct enum. simpl in *.
+  
+  intros s1 s2 Hleq Hnin. simpl.
+  unfold semEnumSize in *. simpl in *. firstorder.
+Qed.
+
+
+#[global] Instance enumNatSized_CorrectSized :
+  CorrectSized (@enumSized _ enumNatSized).
+Proof.
+  constructor. 
+  intros t; split; eauto.
+  - intros. exact I.
+  - intros _. 
+    
+      assert (Hsize := @Enumerators.semChooseSize nat _).
+      simpl in *.
+      
+      exists t. exists t. split. exact I. eapply Hsize.
+      reflexivity. ssromega.
+Qed.       
+
+#[global] Instance enumNatSized_SizedMonotonic :
+  SizedMonotonic (@enumSized _ enumNatSized).
+Proof.
+  intros s s1 s2 Hleq. simpl.
+  intros x Hin.
+    
+  assert (Hsize := @Enumerators.semChooseSize nat _).
+  eapply Hsize in Hin; eauto.
+  simpl in Hin.
+  eapply Hsize.
+  reflexivity.
+  simpl.
+  ssromega.
+Qed.
+
+#[global] Instance enumNatSized_SizeMonotonic s:
+  SizeMonotonic (@enumSized _ enumNatSized s).
+Proof.
+  intros s1 s2 Hleq. simpl.
+  intros x Hin.
+
+  assert (Hsize := @Enumerators.semChooseSize nat _).
+  eapply Hsize in Hin; eauto.
+  simpl in Hin.
+  eapply Hsize. reflexivity. simpl.
+  ssromega.
+Qed.
+
+(* TODO. These case be derived automatically. Change the default definitions *)
+
+#[global] Instance enumListSized_SizedMonotonic A `{EnumMonotonic A} :
+  SizedMonotonic (@enumSized (list A) enumListSized).
+Proof.
+  intros s s1 s2 Hleq x Hin.
+  eapply semBindSizeEnum in Hin. destruct Hin as [a [Hin He]].
+  assert (Hvec := @semVectorOfSize E _ _). eapply Hvec in He. destruct He as [Heq Hin'].
+  eapply semBindSizeEnum. exists a. split.
+  eapply Enumerators.semChooseSize in Hin. simpl in *.
+  eapply Enumerators.semChooseSize. now eauto.
+  simpl. now ssromega. now eauto.
+  eapply Hvec. split; eauto.
+Qed. 
+ 
+
+#[global] Instance enumListSized_SizeMonotonic A `{EnumMonotonic A} s :
+  SizeMonotonic (@enumSized (list A) enumListSized s).
+Proof.
+  eapply bindMonotonic; eauto with typeclass_instances.
+Qed.
+
+
+#[global] Instance enumListSized_CorrectSized A `{EnumMonotonicCorrect A} :
+  CorrectSized (@enumSized (list A) enumListSized).
+Proof.
+  assert (Hvec := @semVectorOfSize E _ _).
+  constructor. intros l; induction l; simpl.
+  - split; intros Hin; simpl in *. now constructor.
+    eexists 0. eexists 0. split; eauto.
+    eapply semBindSizeEnum. eexists. split.
+    eapply Enumerators.semChooseSize. now eauto.
+    2:{ eapply Hvec. split. reflexivity. eapply sub0set. }
+    now eauto.
+  - split; intros Hin. now constructor.
+    destruct IHl as [_ IHl].
+    edestruct IHl as [x [s1 [Hin1 He]]]. now constructor.
+    eapply semBindSizeEnum in He.
+    destruct He as [y [Hen Hv]].
+    eapply Hvec in Hv; eauto with typeclass_instances. destruct Hv as [Heq Hinl].
+    subst.
+    eapply Enumerators.semChooseSize in Hen; eauto. simpl in *.
+
+    destruct H2. destruct H1. edestruct prodCorrect with (a := a).
+    edestruct H2 as [s2 [ _ Hin'] ]. reflexivity.
+      
+    eexists (x + 1). eexists (s1 + s2). split. reflexivity.
+    eapply semBindSizeEnum. exists (length l+1). split.
+    eapply Enumerators.semChooseSize; eauto. simpl in *. ssromega.
+    eapply Hvec. split. simpl. now ssromega.
+    eapply cons_subset.
+
+    eapply H0; [| eassumption ].  now ssromega.
+
+    eapply subset_trans. eassumption.
+    eapply H0. now ssromega. 
+Qed.
+
+#[global] Instance enumPairSized_SizedMonotonic A {_ : EnumSized A} { _ : SizedMonotonic (@enumSized A _)}
+  B {_ : EnumSized B} { _ : SizedMonotonic (@enumSized B _)}:
+  SizedMonotonic (@enumSized (A * B) enumPairSized).
+Proof.
+  intros s s1 s2 Hleq.
+  simpl. rewrite !semBindSizeEnum.
+  eapply incl_bigcup_compat; eauto.
+  intros x.
+  simpl. rewrite !semBindSizeEnum.
+  eapply incl_bigcup_compat; eauto.
+  intros y. eapply subset_refl.
+Qed.
+
+#[global] Instance enumPairSized_SizeMonotonic A {_ : EnumSized A} { _ : forall s, SizeMonotonic (@enumSized A _ s)}
+         B {_ : EnumSized B} { _ : forall s, SizeMonotonic (@enumSized B _ s)} s :
+  SizeMonotonic (@enumSized (A * B) enumPairSized s).
+Proof.
+  eapply bindMonotonic; eauto with typeclass_instances.
+  intros x.
+  eapply bindMonotonic; eauto with typeclass_instances.
+  intros y. eapply returnGenSizeMonotonic; eauto with typeclass_instances.  
+Qed.
+
+#[global] Instance enumPairSized_CorrectSized
+         A {_ : EnumSized A} { _ : forall s, SizeMonotonic (@enumSized A _ s)}
+         { _ : SizedMonotonic (@enumSized A _)} { _ : CorrectSized (@enumSized A _)}
+         B {_ : EnumSized B} { _ : forall s, SizeMonotonic (@enumSized B _ s)}
+         { _ : SizedMonotonic (@enumSized B _)} { _ : CorrectSized (@enumSized B _)}:
+  CorrectSized (@enumSized (A * B) enumPairSized).
+Proof.
+  constructor. split.
+  { intros. reflexivity. }
+  destruct a.
+  intros _.
+  destruct H1 as [[_ Hca]]. 
+  destruct H4 as [[_ Hcb]].
+  destruct Hca as [x1 [s1 [_ Hin1]]]. reflexivity.
+  destruct Hcb as [x2 [s2 [_ Hin2]]]. reflexivity.
+  eexists (x1 + x2). simpl. eexists (s1 + s2). split. reflexivity.
+  simpl. eapply semBindSizeEnum.
+  eexists. split.
+  eapply H0. 2:{ eapply H; [| eassumption ]. ssromega. }
+  ssromega.
+  eapply semBindSizeEnum.
+  eexists. split.
+  eapply H2. 2:{ eapply H3; [| eassumption ]. ssromega. }
+  ssromega.
+  eapply semReturnSizeEnum. reflexivity. 
+Qed.       
+
+
+#[global] Instance enumOption_SizeMonotonic A {_ : Enum A} { _ : SizeMonotonic (@enum A _)} :
+  SizeMonotonic (@enum (option A) enumOption).
+Proof.
+  simpl. eapply oneofMonotonic; eauto with typeclass_instances.
+  eapply returnGenSizeMonotonic; eauto with typeclass_instances.
+  eapply cons_subset.
+  eapply returnGenSizeMonotonic; eauto with typeclass_instances.
+  eapply cons_subset.
+  eapply bindMonotonic; eauto with typeclass_instances.
+  intros y. eapply returnGenSizeMonotonic; eauto with typeclass_instances.  
+  eapply sub0set.
+Qed.
+
+ 
+#[global] Instance enumOption_Correct A {_ : Enum A} { _ : Correct A (@enum A _)}:
+  Correct _ (@enum (option A) enumOption).
+Proof.
+  constructor. split. intros. reflexivity.
+  intros _.
+  simpl. destruct a.
+  - destruct H as [ [ _ Hc ] ]. destruct Hc as [x [H1 H2]]. reflexivity.
+    eexists x. split. reflexivity.
+    eapply semOneofSize. eauto with typeclass_instances.
+    eexists. split. right. left.
+    eexists. eapply semBindSizeEnum. eexists. split. eassumption.
+    eapply semReturnSizeEnum. reflexivity.
+  - exists 0. split. reflexivity.
+    eapply semOneofSize. eauto with typeclass_instances.
+    eexists. split. left. reflexivity.
+    eapply semReturnSizeEnum. reflexivity.
+Qed.       
+
+Lemma andb_len x1 x2 x3 x4 : 
+  (x1 <=? x2)%num && (x3 <=? x4)%num <-> (x1 <= x2)%num /\ (x3 <= x4)%num.
+Proof.
+  destruct (x1 <=? x2)%num eqn:Heq1; simpl; split; try easy;
+    destruct (x3 <=? x4)%num eqn:Heq2; simpl; try easy.
+  - eapply N.leb_le in Heq1. eapply N.leb_le in Heq2.
+    easy.
+  - intros [H1 H2]. eapply N.leb_nle in Heq2.
+    eauto.
+  - intros [H1 H2]. eapply N.leb_nle in Heq1. eauto.
+  - intros [H1 H2]. eapply N.leb_nle in Heq1. eauto.
+Qed.   
+
+#[global] Instance enumNSized_SizedMonotonic :
+  SizedMonotonic (@enumSized _ enumNSized).
+Proof. 
+  intros s s1 s2 Hleq. simpl.
+  intros x Hin.
+  assert (Hsize := @Enumerators.semChooseSize N _).
+  eapply Hsize in Hin; eauto.
+  simpl in Hin. 
+  eapply Hsize. simpl in *.
+  eapply N.leb_le. now lia. 
+  eapply andb_len in Hin. eapply andb_len. ssromega.
+  simpl. eapply N.leb_le. ssromega. 
+Qed. 
+
+#[global] Instance enumNSized_SizeMonotonic s:
+  SizeMonotonic (@enumSized _ enumNSized s).
+Proof.
+  intros s1 s2 Hleq. simpl.
+  intros x Hin.
+
+  assert (Hsize := @Enumerators.semChooseSize N _).
+  
+  eapply Hsize in Hin; eauto.
+  simpl in Hin.
+  eapply Hsize. simpl. eapply N.leb_le. ssromega.
+  eapply andb_len in Hin. eapply andb_len. split; ssromega.
+  eapply N.leb_le. ssromega.
+Qed.
+
+(* Lemma of_nat_bin t : *)
+(*   (N.of_nat (nat_of_bin t)) = t. *)
+(* Proof. *)
+(*   destruct t. reflexivity. *)
+(*   simpl. *)
+(*   induction p; simpl. *)
+(*   - admit. *)
+(*   -  *)
+  
+#[global] Instance enumNSized_CorrectSized :
+  CorrectSized (@enumSized _ enumNSized).
+Proof.
+  constructor. 
+  intros t; split; eauto.
+  - intros. exact I.
+  - intros _. 
+    
+      assert (Hsize := @Enumerators.semChooseSize N _).
+      simpl in *.
+      
+      exists (N.to_nat t). exists 0 . split. exact I. eapply Hsize.
+      eapply N.leb_le. ssromega.
+      eapply andb_len. split; ssromega.
+Qed.       
+  
+#[global] Instance enumBoolSized_SizeMonotonic s:
+  SizeMonotonic (@enumSized _ enumBoolSized s).
+Proof.
+  intros s1 s2 Hleq.
+  assert ( Heq := @semElementsSize E _ _).
+  simpl in *. rewrite Heq.
+  eapply subset_refl.
+Qed.
+
+#[global] Instance enumBoolSized_CorrectSized :
+  CorrectSized (@enumSized _ enumBoolSized).
+Proof.
+  constructor. 
+  intros t; split; eauto.
+  - intros. exact I.
+  - intros _. 
+    destruct t; exists 0; simpl;
+    eapply semElements; eauto with typeclass_instances.
+    now left.
+    right. now left.
+Qed.       
+
+
+#[global] Instance enumBoolSized_SizedMonotonic :
+  SizedMonotonic (@enumSized _ enumBoolSized).
+Proof.
+  intros s s1 s2 Hleq. simpl.
+  assert ( Heq := @semElementsSize E _ _).
+  simpl in *. rewrite Heq.
+  eapply subset_refl.
+Qed.
+
 
 (** Shrinking of nat starts to become annoying *)
 Function shrinkNatAux (x : nat) {measure (fun x => x) x} : list nat :=
@@ -88,7 +472,7 @@ Proof.
   destruct (Nat.divmod n 1 0 0) as [q u];  destruct u; simpl in *; lia.
 Defined.
 
-Global Instance shrinkNat : Shrink nat :=
+#[global] Instance shrinkNat : Shrink nat :=
   {| shrink := shrinkNatAux |}.
 
 (** Shrinking of Z is even more so *)
@@ -162,12 +546,12 @@ Proof.
       apply Nat.div_lt. apply Pos2Nat.is_pos. lia.
 Qed.
 
-Global Instance shrinkZ : Shrink Z :=
+#[global] Instance shrinkZ : Shrink Z :=
   {| shrink := shrinkZAux |}.
 
 Open Scope program_scope.
 
-Global Instance shrinkN : Shrink N :=
+#[global] Instance shrinkN : Shrink N :=
   {| shrink := map Z.to_N ∘ shrink ∘ Z.of_N |}.
 
 Definition shrinkListAux {A : Type} (shr : A -> list A) : list A -> list (list A) :=
@@ -179,17 +563,17 @@ Definition shrinkListAux {A : Type} (shr : A -> list A) : list A -> list (list A
          ++ map (fun x'  => cons x' xs) (shr x )
     end.
 
-Global Instance shrinkList {A : Type} `{Shrink A} : Shrink (list A) :=
+#[global] Instance shrinkList {A : Type} `{Shrink A} : Shrink (list A) :=
   {| shrink := shrinkListAux shrink |}.
 
-Global Instance shrinkPair {A B} `{Shrink A} `{Shrink B} : Shrink (A * B) :=
+#[global] Instance shrinkPair {A B} `{Shrink A} `{Shrink B} : Shrink (A * B) :=
   {|
     shrink := fun (p : A * B) =>
       let (a,b) := p in
       map (fun a' => (a',b)) (shrink a) ++ map (fun b' => (a,b')) (shrink b)
   |}.
 
-Global Instance shrinkOption {A : Type} `{Shrink A} : Shrink (option A) :=
+#[global] Instance shrinkOption {A : Type} `{Shrink A} : Shrink (option A) :=
   {| shrink m :=
        match m with
          | None => []
@@ -200,64 +584,74 @@ Global Instance shrinkOption {A : Type} `{Shrink A} : Shrink (option A) :=
 (** Arbitraries are derived automatically! *)
 
 
-(** Instance correctness *)
+(**#[global] Instance correctness *)
 
-Program Instance arbNatMon : SizeMonotonic (@arbitrary nat _).
+(* Needed to add this! *)
+Opaque semProdSize.
+
+#[global] Program Instance arbNatMon :
+  @SizeMonotonic nat G ProducerGen (@arbitrary nat _).
 Next Obligation.
   rewrite !semSizedSize !semChooseSize // => n /andP [/leP H1 /leP H2].
-  move : H => /leP => Hle. apply/andP. split; apply/leP; lia.
+  move : H => /leP => Hle. apply/andP.
+  split; apply/leP; ssromega.
 Qed.
 
 (** Correctness proof about built-in generators *)
 
-Instance boolSizeMonotonic : SizeMonotonic (@arbitrary bool _).
+#[global] Instance boolSizeMonotonic : SizeMonotonic (@arbitrary bool _).
 Proof.
   unfold arbitrary, GenOfGenSized.
   eapply sizedSizeMonotonic; unfold arbitrarySized, genBoolSized.
-  intros _. eauto with typeclass_instances.
-  intros n s1 s2 Hs. eapply subset_refl.
+  - eauto with typeclass_instances.
+  - intros; eauto with typeclass_instances.
+  - intros n s1 s2 Hs. eapply subset_refl.
 Qed.
 
-Instance boolSizedMonotonic : SizedMonotonic (@arbitrarySized bool _).
+#[global] Instance boolSizedMonotonic : SizedMonotonic (@arbitrarySized bool _).
 Proof.
   intros n s1 s2 Hs. eapply subset_refl.
 Qed.
 
-Instance boolCorrect : Correct bool arbitrary.
+#[global] Instance boolCorrect : Correct bool arbitrary.
 Proof.
   constructor. unfold arbitrary, GenOfGenSized.
   rewrite semSized.
   unfold arbitrarySized, genBoolSized.
   intros x. split; intros H; try now constructor.
   exists 0. split. constructor.
-  eapply semChooseSize; eauto.
-  destruct x; eauto.
+  eapply semElementsSize; eauto with typeclass_instances.
+  destruct x; try solve [left; auto]; right; left; auto.
 Qed.
 
+Local Open Scope set_scope.
+
 Lemma arbBool_correct:
-  semGen arbitrary <--> [set: bool].
+  semProd arbitrary <--> [set: bool].
 Proof.
 rewrite /arbitrary /arbitrarySized /genBoolSized /=.
 rewrite semSized => n; split=> // _.
 exists n; split=> //.
-apply semChooseSize => //=; case n => //.
+apply semElementsSize => //=;
+                           eauto with typeclass_instances.
+destruct n; repeat (try solve [left; auto]; right).
 Qed.
 
 Lemma arbNat_correct:
-  semGen arbitrary <--> [set: nat].
+  semProd arbitrary <--> [set: nat].
 Proof.
 rewrite /arbitrary /=.
 rewrite semSized => n; split=> // _; exists n; split=> //.
 by rewrite (semChooseSize _ _ _) /RandomQC.leq /=.
 Qed.
 
-Instance ArbNatGenCorrect : Correct nat arbitrary.
+#[global] Instance ArbNatGenCorrect : Correct nat arbitrary.
 Proof.
   constructor. now apply arbNat_correct.
 Qed.
 
 Lemma arbInt_correct s :
-  semGenSize arbitrary s <-->
+  semProdSize arbitrary s <-->
   [set z | (- Z.of_nat s <= z <= Z.of_nat s)%Z].
 Proof.
 rewrite semSizedSize semChooseSize.
@@ -268,19 +662,21 @@ exact/Zle_0_nat.
 Qed.
 
 Lemma arbBool_correctSize s :
-  semGenSize arbitrary s <--> [set: bool].
+  semProdSize arbitrary s <--> [set: bool].
 Proof.
 rewrite /arbitrary //=.
-rewrite semSizedSize semChooseSize //; split=> /RandomQC.leq _ //=; case a=> //=.
+rewrite semSizedSize semElementsSize //; split=> /RandomQC.leq _ //=; case a=> //=.
+repeat (try solve [left; auto]; right).
+repeat (try solve [left; auto]; right).
 Qed.
 
 Lemma arbNat_correctSize s :
-  semGenSize arbitrary s <--> [set n : nat | (n <= s)%coq_nat].
+  semProdSize arbitrary s <--> [set n : nat | (n <= s)%coq_nat].
 Proof.
 by rewrite semSizedSize semChooseSize // => n /=; case: leP.
 Qed.
 
-Lemma arbInt_correctSize : semGen arbitrary <--> [set: Z].
+Lemma arbInt_correctSize : semProd arbitrary <--> [set: Z].
 Proof.
 rewrite /arbitrarySized semSized => n; split=> // _; exists (Z.abs_nat n); split=> //.
 simpl.
@@ -293,55 +689,65 @@ Qed.
 
 Lemma arbList_correct:
   forall {A} `{H : Arbitrary A} (P : nat -> A -> Prop) s,
-    (semGenSize arbitrary s <--> P s) ->
-    (semGenSize arbitrary s <-->
+    (semProdSize arbitrary s <--> P s) ->
+    (semProdSize arbitrary s <-->
      (fun (l : list A) => length l <= s /\ (forall x, List.In x l -> P s x))).
 Proof.
-  move => A G S H P s Hgen l. rewrite !/arbitrary //=.
+  move => A G S H P s Hgen l.
+  rewrite !/arbitrary /genList.
   split.
   - move => /semListOfSize [Hl Hsize]. split => // x HIn //=. apply Hgen. auto.
-  - move => [Hl HP]. apply semListOfSize. split => // x HIn.
+  - move => [Hl HP].
+    apply semListOfSize; eauto with typeclass_instances.
+    split => // x HIn.
     apply Hgen. auto.
 Qed.
 
+Opaque ret.
+Opaque liftM.
 Lemma arbOpt_correct:
   forall {A} `{H : Arbitrary A} (P : nat -> A -> Prop) s,
-    (semGenSize arbitrary s <--> P s) ->
-    (semGenSize arbitrary s <-->
+    (semProdSize arbitrary s <--> P s) ->
+    (semProdSize arbitrary s <-->
      (fun (m : option A) =>
         match m with
           | None => true
           | Some x => P s x
         end)).
 Proof.
-  move => A G S Arb P s Hgen m. rewrite !/arbitrary //=; split.
-  - move => /semFrequencySize [[w g] H2]; simpl in *.
+  move => A G S Arb P s Hgen m. rewrite !/arbitrary /genOption; split.
+  - move => /semFrequencySize [[w g] H2].
     move: H2 => [[H2 | [H2 | H2]] H3];
     destruct m => //=; apply Hgen => //=;
-    inversion H2; subst; auto.
-    + apply semReturnSize in H3; inversion H3.
-    + apply semLiftGenSize in H3; inversion H3 as [x [H0 H1]].
+    inversion H2; subst; auto; simpl in *.
+    + apply (@semReturnSize Generators.G ProducerGen ProducerSemanticsGen (option A) _) in H3; inversion H3.
+    + apply semLiftProdSize in H3; eauto with typeclass_instances. inversion H3 as [x [H0 H1]].
       inversion H1; subst; auto.
   - destruct m eqn:Hm; simpl in *; move => HP; subst.
     + apply semFrequencySize; simpl.
-      exists (7, liftGen Some arbitrary); split; auto.
+      exists (7, liftM Some arbitrary); split; auto.
       * right; left; auto.
-      * simpl. apply semLiftGenSize; simpl.
+      * simpl. apply semLiftProdSize; simpl;
+                 eauto with typeclass_instances.
         apply imset_in; apply Hgen; auto.
     + apply semFrequencySize; simpl.
-      exists (1, returnGen None); split; auto.
+      exists (1, ret None); split; auto.
       * left; auto.
-      * simpl; apply semReturnSize. constructor.
+      * simpl.
+        apply (@semReturnSize Generators.G ProducerGen ProducerSemanticsGen). constructor.
 Qed.
 
 Lemma arbPair_correctSize
       {A B} `{Arbitrary A} `{Arbitrary B} (Sa : nat -> set A)
       (Sb : nat -> set B) s:
-    (semGenSize arbitrary s <--> Sa s) ->
-    (semGenSize arbitrary s <--> Sb s) ->
-    (semGenSize arbitrary s <--> setX (Sa s) (Sb s)).
+    (semProdSize arbitrary s <--> Sa s) ->
+    (semProdSize arbitrary s <--> Sb s) ->
+    (semProdSize arbitrary s <--> setX (Sa s) (Sb s)).
 Proof.
-  move => Hyp1 Hyp2 . rewrite semLiftGen2Size; move => [a b].
+  move => Hyp1 Hyp2 .
+  Opaque liftM2.
+  simpl.
+  rewrite semLiftProd2Size; move => [a b].
   split.
   by move => [[a' b'] [[/= /Hyp1 Ha /Hyp2 Hb] [Heq1 Heq2]]]; subst; split.
   move => [/Hyp1 Ha /Hyp2 Hb]. eexists; split; first by split; eauto.

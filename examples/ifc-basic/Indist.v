@@ -4,6 +4,8 @@ Require Import List.
 
 From QuickChick.ifcbasic Require Import Machine.
 
+(* Manual, handwritten indist instances *)
+
 Fixpoint forallb2 {A : Type} (f : A -> A -> bool) (l1 l2 :list A) : bool :=
   match l1, l2 with
     | nil, nil => true
@@ -71,4 +73,50 @@ Instance indist_state : Indist State :=
     if negb (indist stk1' stk2') then (* trace "Stack" *) false
     else true
 |}.
+
+(* Inductive versions *)
+
+Inductive IndistAtom : Atom -> Atom -> Prop :=
+| IAtom_Lo : forall x, IndistAtom (x@L) (x@L)
+| IAtom_Hi : forall x y, IndistAtom (x@H) (y@H).
+
+Derive DecOpt for (IndistAtom a1 a2).
+
+Inductive IndistMem : Mem -> Mem -> Prop :=
+| IMem_Nil  : IndistMem nil nil
+| IMem_Cons : forall a1 a2 m1 m2,
+    IndistAtom a1 a2 -> IndistMem  m1 m2 ->
+    IndistMem (cons a1 m1) (cons a2 m2).
+
+Derive DecOpt for (IndistMem m1 m2).
+
+Inductive IndistStack : Stack -> Stack -> Prop :=
+| IStack_Mty  : IndistStack Mty Mty
+| IStack_Cons : forall a1 a2 s1 s2,
+    IndistAtom a1 a2 -> IndistStack s1 s2 ->
+    IndistStack (Cons a1 s1) (Cons a2 s2)
+| IStack_RetCons : forall a1 a2 s1 s2,
+    IndistAtom a1 a2 -> IndistStack s1 s2 ->
+    IndistStack (RetCons a1 s1) (RetCons a2 s2).
+
+Derive DecOpt for (IndistStack s1 s2).
+
+Instance Label_DecEq (l1 l2 : Label) : Dec (l1 = l2).
+Proof. dec_eq. Defined.
+
+Inductive IndistState : State -> State -> Prop :=
+| IState_Low : forall im1 im2 m1 m2 s1 s2 pc1 pc2,
+    IndistAtom pc1 pc2 ->
+    IndistMem m1 m2 ->
+    pc_lab pc1 = L ->
+    IndistStack s1 s2 ->
+    IndistState (St im1 m1 s1 pc1) (St im2 m2 s2 pc2)
+| IState_High : forall im1 im2 m1 m2 s1 s2 pc1 pc2,
+    IndistAtom pc1 pc2 ->
+    IndistMem m1 m2 ->
+    pc_lab pc1 = H ->
+    IndistStack (cropTop s1) (cropTop s2) ->
+    IndistState (St im1 m1 s1 pc1) (St im2 m2 s2 pc2).
+
+Derive DecOpt for (IndistState s1 s2).
 

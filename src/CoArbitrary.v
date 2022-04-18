@@ -1,15 +1,18 @@
+Set Warnings "-notation-overridden, -parsing".
+
 Require Import PArith List ChoiceFacts Lia.
 Require Import mathcomp.ssreflect.ssreflect.
 From mathcomp Require Import ssrfun ssrbool.
 
-Require Import Classes RandomQC GenLow Sets.
-Import GenLow.
+Require Import Classes RandomQC Generators Sets.
 
 Import ListNotations.
 
 Set Implicit Arguments.
 Unset Strict Implicit.
 Unset Printing Implicit Defensive.
+
+
 
 (* LL: TODO: Add proof obligation that the result paths be prefix free? *)
 Class CoArbitrary (A : Type) : Type :=
@@ -19,7 +22,7 @@ Class CoArbitrary (A : Type) : Type :=
     coarbCorrect : forall a, coarbReverse (coarbitrary a) = Some a
   }.
 
-Instance coArbPos : CoArbitrary positive.
+#[global] Instance coArbPos : CoArbitrary positive.
 Proof.
 refine {|
     coarbitrary x := x;
@@ -35,7 +38,7 @@ Proof.
   rewrite Nat2Pos.id; auto.
 Qed.
 
-Instance coqArbNat : CoArbitrary nat.
+#[global] Instance coqArbNat : CoArbitrary nat.
 Proof.
 refine {|
     coarbitrary x := Pos.of_nat (S x);
@@ -517,13 +520,13 @@ rewrite coarbCorrect.
 reflexivity.
 Qed.
 
-Instance genFun {A B : Type} `{_ : CoArbitrary A} `{_ : Gen B} : Gen (A -> B) :=
+#[global] Instance genFun {A B : Type} `{_ : CoArbitrary A} `{_ : Gen B} : Gen (A -> B) :=
   {|
     arbitrary := 
       reallyUnsafePromote (fun a => variant (posToPath (coarbitrary a)) arbitrary);
   |}.
 
-Instance shrinkFunNil {A B : Type} : Shrink (A -> B) :=
+#[global] Instance shrinkFunNil {A B : Type} : Shrink (A -> B) :=
   {| shrink x := nil |}.
 
 Section arbFun_completeness.
@@ -531,6 +534,7 @@ Section arbFun_completeness.
 Variables A B : Type.
 Hypothesis choice : FunctionalChoice_on A RandomSeed.
 
+Local Open Scope set_scope.
 (* begin arbFunCorrect *)
 Theorem arbFunComplete `{CoArbitrary A, Arbitrary B} (max:A) (f:A-> B) (s:nat) :
   s = Pos.to_nat (coarbitrary max) -> (semGenSize arbitrary s <--> setT) ->

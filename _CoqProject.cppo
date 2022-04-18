@@ -22,10 +22,6 @@ plugin/genLib.mli
 plugin/unifyQC.mli
 plugin/sizeUtils.mli
 plugin/sized.mli
-plugin/sizeMon.mli
-plugin/sizeSMon.mli
-plugin/sizeCorr.mli
-plugin/sizedProofs.mli
 
 plugin/quickChick.mlg
 plugin/driver.mlg
@@ -41,26 +37,23 @@ plugin/semLib.ml
 plugin/coqLib.ml
 plugin/arbitrarySized.ml
 plugin/arbitrarySizedST.ml
+plugin/enumSized.ml
+plugin/enumSizedST.ml
 plugin/checkerSizedST.ml
 plugin/genLib.ml
 plugin/unifyQC.ml
 plugin/sizeUtils.ml
 plugin/sized.ml
-plugin/sizeMon.ml
-plugin/sizeSMon.ml
-plugin/sizeCorr.ml
-plugin/sizedProofs.ml
 
 src/Tactics.v
 src/Sets.v
 src/Nat_util.v
+src/LazyList.v
 src/RandomQC.v
 src/RoseTrees.v
-src/GenLowInterface.v
-src/GenLow.v
-src/GenHighInterface.v
-src/GenHighImpl.v
-src/GenHigh.v
+src/Producer.v
+src/Generators.v
+src/Enumerators.v
 src/Classes.v
 src/Instances.v
 src/CoArbitrary.v
@@ -78,3 +71,8 @@ src/MutateCheck.v
 src/DependentClasses.v
 src/Decidability.v
 src/ExtractionQC.v
+src/TacticsUtil.v
+src/CheckerProofs.v
+src/EnumProofs.v
+src/GenProofs.v
+src/Proofs.v

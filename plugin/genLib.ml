@@ -9,8 +9,28 @@ let bindGen cg xn cf =
   gApp (gInject "bindGen") [cg; gFun [xn] (fun [x] -> cf x)]
 
 let bindGenOpt cg xn cf = 
-  gApp (gInject "bindGenOpt") [cg; gFun [xn] (fun [x] -> cf x)]
+  gApp (gInject "bindOpt") [cg; gFun [xn] (fun [x] -> cf x)]
 
+(* Gen combinators *)
+let gEnum c = gApp (gInject "E") [c]
+
+let returnEnum c = gApp (gInject "returnEnum") [c]
+let bindEnum cg xn cf = 
+  gApp (gInject "bindEnum") [cg; gFun [xn] (fun [x] -> cf x)]
+let failEnum c =
+  gApp ~explicit:true (gInject "failEnum") [c]
+
+  
+let bindEnumOpt cg xn cf = 
+  gApp (gInject "bindOpt") [cg; gFun [xn] (fun [x] -> cf x)]
+
+let enumChecker cg xn cf sz = 
+  gApp (gInject "enumerating") [cg; gFun [xn] (fun [x] -> cf x); sz]
+
+let enumCheckerOpt cg xn cf sz = 
+  gApp (gInject "enumeratingOpt") [cg; gFun [xn] (fun [x] -> cf x); sz]
+
+  
 let oneof l =
   match l with
   | [] -> failwith "oneof used with empty list"
@@ -23,6 +43,10 @@ let frequency l =
   | [(_,c)] -> c
   | (_,c)::cs -> gApp (gInject "freq_") [c; gList (List.map gPair l)]
 
+let enumerating l =
+  gApp (gInject "enumerate") [gList l]
+
+               
 let backtracking l = gApp (gInject "backtrack") [gList (List.map gPair l)]
 let uniform_backtracking l = backtracking (List.combine (List.map (fun _ -> gInt 1) l) l)
 

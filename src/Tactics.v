@@ -8,7 +8,6 @@ From mathcomp Require Import ssrfun ssrbool ssrnat eqtype seq.
 
 Ltac inv H := inversion H; subst.
 
-
 (* lia for ssrnat, taken from https://github.com/pi8027/formalized-postscript/blob/master/stdlib_ext.v *)
 
 Ltac arith_hypo_ssrnat2coqnat :=

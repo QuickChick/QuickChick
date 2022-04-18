@@ -153,6 +153,7 @@ Proof.
   (try now apply Max.le_max_l); (try now apply Max.le_max_r); lia.
 Qed.
 
+(*
 Lemma gen_type_size_correctSize :
   forall (n s : nat),
     semGenSize (gen_type_size n) s <--> [set tau | type_size tau = n]. 
@@ -160,7 +161,7 @@ Proof.
   move => n s tau. elim : tau n s => [| tau1 IH1 tau2 IH2] n s.
   { split. 
     - destruct n as [| n]; move => H //=.
-      move : H => /semBindSize 
+      move : H => /semProdSize 
                    [m1 [/semChooseSize H1 H2]].
       move : H2 => /semLiftGen2Size [[tau1 tau2] [[/=  H3  H4] H]]. discriminate. 
     - move => H. destruct n as [| n]; simpl.
@@ -404,3 +405,4 @@ Proof.
     eexists; split. reflexivity. 
     eapply PeanoNat.Nat.max_le_iff. right. apply Max.le_max_l.
 Qed.
+*)

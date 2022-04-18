@@ -256,8 +256,8 @@ Inductive variation_state : State -> State -> Prop :=
 Derive ArbitrarySizedSuchThat for (fun st' => variation_state st st').
 
 Definition gen_variation_state_derived : G (option (@Variation State)) :=
-  bindGenOpt (genST (fun st => good_state st)) (fun st => 
-  bindGenOpt (genST (fun st' => variation_state st st')) (fun st' =>
+  bindOpt (genST (fun st => good_state st)) (fun st => 
+  bindOpt (genST (fun st' => variation_state st st')) (fun st' =>
   returnGen (Some (V st st')))).                                                            
 (*
   bindGen gen_state (fun st =>

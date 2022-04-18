@@ -11,7 +11,7 @@ Local Open Scope monad_scope.
 
 From SimpleIO Require Import SimpleIO.
 
-From QuickChick Require Import RoseTrees RandomQC GenLow GenHigh SemChecker.
+From QuickChick Require Import RoseTrees RandomQC Generators Producer SemChecker.
 From QuickChick Require Import Show Checker State Classes.
 
 Require Import Coq.Strings.Ascii.
@@ -22,8 +22,6 @@ Import ListNotations.
 Require Import Recdef.
 
 Require Import Arith.EqNat.
-
-Import GenLow GenHigh.
 
 Definition gte n m := Nat.leb m n.
 
@@ -360,7 +358,7 @@ Fixpoint showCollectStatistics (l : list (string * nat)) :=
       show n ++ " : " ++ s ++ newline ++ showCollectStatistics l'
   end.
 
-Instance showResult : Show Result := Build_Show _ (fun r =>
+#[global] Instance showResult : Show Result := Build_Show _ (fun r =>
   match r with
   | Success _ _ l s => showCollectStatistics l ++ s
   | GaveUp _ l s => showCollectStatistics l ++ s

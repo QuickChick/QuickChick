@@ -53,7 +53,7 @@ val convert_to_range : GenericLib.dep_type -> range option
 val is_fixed : range UM.t -> GenericLib.dep_type -> bool option
 val range_to_coq_expr : range UM.t -> range -> GenericLib.coq_expr
 val dt_to_coq_expr :
-  range UM.t -> GenericLib.dep_type -> GenericLib.coq_expr option
+  range UM.t -> GenericLib.dep_type -> GenericLib.coq_expr
 val is_dep_type : GenericLib.dep_type -> bool
 type check = (GenericLib.coq_expr -> GenericLib.coq_expr) * int
 module CMap : CMap.ExtS with type key = GenericLib.OrdDepType.t and module Set := Set.Make(GenericLib.OrdDepType)
@@ -61,6 +61,7 @@ module CMap : CMap.ExtS with type key = GenericLib.OrdDepType.t and module Set :
 type cmap = check list CMap.t
 val lookup_checks : CMap.key -> 'a CMap.t -> 'a option
 val handle_equalities :
+  GenericLib.coq_expr ->
   EqSet.t ->
   (GenericLib.coq_expr -> 'a -> 'a -> 'a -> 'a) -> 'a -> 'a -> 'a -> 'a
 type mode =
@@ -74,7 +75,9 @@ val mode_analysis :
 val isTyParam : GenericLib.dep_type -> bool
 val warn_uninstantiated_variables : ?loc:Loc.t -> GenericLib.var list -> unit
 val handle_branch :
+  string list ->
   GenericLib.dep_type ->
+  GenericLib.coq_expr ->
   'b ->
   'b ->
   (GenericLib.coq_expr -> 'b) ->
@@ -94,3 +97,4 @@ val handle_branch :
   range UM.t ->
   GenericLib.dep_type UM.t ->
   range list -> Unknown.t -> GenericLib.dep_ctr -> 'b * bool
+

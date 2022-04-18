@@ -1,5 +1,4 @@
 From QuickChick Require Import QuickChick.
-Import GenLow GenHigh.
 
 Require Import List. Import ListNotations.
 

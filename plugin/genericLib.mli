@@ -10,10 +10,14 @@ val debug_coq_expr : coq_expr -> unit
 
 type var
 val var_of_id : Id.t -> var   
+val id_of_var : var -> Id.t
 val var_to_string : var -> string
+val inject_var : string -> var 
 val gVar : var -> coq_expr
 
-val gInject : string -> coq_expr 
+val gInject : string -> coq_expr
+
+val gType0 : coq_expr   
 
 type ty_param 
 val ty_param_to_string : ty_param -> string
@@ -79,6 +83,7 @@ type dep_type =
   | DTyVar of var (* Use of a previously captured type variable *)
   | DApp of dep_type * dep_type list (* Type-level function applications *)
   | DNot of dep_type (* Negation as a toplevel *)
+  | DHole (* For adding holes *)
 
 module OrdDepType : sig
     type t = dep_type
@@ -125,13 +130,13 @@ val make_up_name : unit -> var
 (* Generic Combinators *)
 val gApp : ?explicit:bool -> coq_expr -> coq_expr list -> coq_expr 
 val gFun : string list -> (var list -> coq_expr) -> coq_expr
-val gRecFunIn : ?assumType:coq_expr -> string -> string list -> ((var * var list) -> coq_expr) -> (var -> coq_expr) -> coq_expr
+val gRecFunIn : ?structRec:(var option) -> ?assumType:coq_expr -> string -> string list -> ((var * var list) -> coq_expr) -> (var -> coq_expr) -> coq_expr
 
 val gLetIn : string -> coq_expr -> (var -> coq_expr) -> coq_expr
 (* TODO: HOAS-ify *)
 val gLetTupleIn : var -> var list -> coq_expr -> coq_expr
   
-val gMatch : coq_expr -> ?catchAll:(coq_expr option) -> ((constructor * string list * (var list -> coq_expr)) list) -> coq_expr
+val gMatch : coq_expr -> ?catchAll:(coq_expr option) -> ?params:(int) -> ((constructor * string list * (var list -> coq_expr)) list) -> coq_expr
 val gMatchReturn : coq_expr -> ?catchAll:(coq_expr option) -> string -> (var -> coq_expr) ->
   ((constructor * string list * (var list -> coq_expr)) list) -> coq_expr
 
@@ -140,7 +145,7 @@ val gRecord : (string * coq_expr) list -> coq_expr
 val gAnnot : coq_expr -> coq_expr -> coq_expr
 val gFunTyped : (string * coq_expr) list -> (var list -> coq_expr) -> coq_expr
 val gFunWithArgs : arg list -> ((var list) -> coq_expr) -> coq_expr
-val gRecFunInWithArgs : ?assumType:coq_expr -> string -> arg list -> ((var * var list) -> coq_expr) -> (var -> coq_expr) -> coq_expr
+val gRecFunInWithArgs : ?structRec:(var option) -> ?assumType:coq_expr -> string -> arg list -> ((var * var list) -> coq_expr) -> (var -> coq_expr) -> coq_expr
 
 val gProdWithArgs : arg list -> ((var list) -> coq_expr) -> coq_expr
 
@@ -245,3 +250,6 @@ val list_insert_nth : 'a -> 'a list -> int -> 'a list
 val sameTypeCtr  : ty_ctr -> coq_type -> bool
 val isBaseBranch : ty_ctr -> coq_type -> bool
                                                 
+val find_typeclass_bindings : string -> ty_ctr -> (bool list) list
+
+                                           

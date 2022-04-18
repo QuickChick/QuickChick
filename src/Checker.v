@@ -6,11 +6,9 @@ Require Import List.
 Require Import RoseTrees.
 Require Import Show.
 Require Import State.
-Require Import GenLow GenHigh.
+Require Import Producer Generators.
 Require Import Classes.
 Require Import DependentClasses.
-
-Import GenLow GenHigh.
 
 (* Note : Simple Callbacks fall under strict positivity of result... *)
 Inductive CallbackKind :=
@@ -117,7 +115,7 @@ Definition mapTotalResult {prop : Type} {_ : Checkable prop}
 Global Instance testResult : Checkable Result :=
   {|
     (* Left a protectResults out! *)
-    checker r := returnGen (MkProp (returnRose r))
+    checker r := ret (MkProp (returnRose r))
   |}.
 
 Global Instance testBool : Checkable bool :=
@@ -243,8 +241,8 @@ Definition forAllMaybe {A prop : Type} {_ : Checkable prop} `{Show A}
 
 
 Definition forAllProof {A prop : Type} {C : Checkable prop} `{S : Show A}
-           (gen : G A)  (pf : forall (x : A), semGen gen x -> prop) : Checker :=
-  bindGen' gen (fun x H => printTestCase (show x ++ newline) (pf x H)).
+           (gen : G A)  (pf : forall (x : A), semProd gen x -> prop) : Checker :=
+  @bindPf G ProducerGen _ _ gen (fun x H => printTestCase (show x ++ newline) (pf x H)).
 Arguments forAllProof {A} {prop} {C} {S} _ _.
 
 Definition forAllShrink {A prop : Type} {_ : Checkable prop} `{Show A}
@@ -321,13 +319,13 @@ Fixpoint conjAux (f : Result -> Result)
   end.
 
 Definition mapGen {A B} (f : A -> G B) (l : list A) : G (list B) :=
-  bindGen (foldGen (fun acc a =>
+  bindGen (foldProd (fun acc a =>
              bindGen (f a) (fun b => returnGen (cons b acc)))
           l nil) (fun l => returnGen (rev l)).
 
 Definition conjoin (l : list Checker) : Checker :=
 (*   trace ("Beginnning conjoin" ++ nl) ( *)
-  bindGen (mapGen (liftGen unProp) l) (fun rs =>
+  bindGen (mapGen (liftM unProp) l) (fun rs =>
           (returnGen (MkProp (let res := conjAux (fun x => x) rs in
                               let '(MkRose r _) := res in
                               (* debug_stamps "Conjoin result: " r *) res
@@ -376,7 +374,7 @@ Definition disjAux (p q : Rose Result) : Rose Result :=
   else returnRose expectFailureError)).
 
 Definition disjoin (l : list Checker) : Checker :=
-  bindGen (mapGen (liftGen unProp) l) (fun rs =>
+  bindGen (mapGen (liftM unProp) l) (fun rs =>
           (returnGen (MkProp (
                           fold_right disjAux (returnRose failed) rs
                         )))).
@@ -392,7 +390,7 @@ Module QcNotation.
   (* TODO: Figure out pretty printing too *)
   Notation "'FORALL' x : T , c" :=
     (forAllShrink (@arbitrary T _) shrink (fun x => c))
-    (at level 200, x ident, T at level 200, c at level 200, right associativity
+    (at level 200, x name, T at level 200, c at level 200, right associativity
      (* , format "'[' 'exists' '/ ' x .. y , '/ ' p ']'" *) )
     : type_scope.
 
@@ -401,6 +399,6 @@ Module QcNotation.
                                                     | Some x => c
                                                     | _ => checker tt
                                                     end))
-      (at level 200, x ident, P at level 200, c at level 200, right associativity)
+      (at level 200, x name, P at level 200, c at level 200, right associativity)
      : type_scope.
 End QcNotation.

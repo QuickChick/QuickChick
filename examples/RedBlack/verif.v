@@ -1,7 +1,6 @@
 From mathcomp Require Import ssreflect ssrnat ssrbool eqtype.
 Require Import List String Lia.
 From QuickChick Require Import QuickChick.
-Import GenLow GenHigh.
 
 From QuickChick.RedBlack Require Import redblack testing.
 
@@ -59,33 +58,43 @@ Proof.
 Qed.
 
 (* begin semColor *)
-Lemma semColor : semGen genColor <--> [set : color].
+Lemma semColor : semProd genColor <--> [set : color].
 (* end semColor *)
 Proof.
   rewrite /genColor. rewrite semElements.
   intros c. destruct c; simpl; unfold setT; tauto.
 Qed.
 
-Corollary genColor_correctSize': forall s, semGenSize genColor s <--> setT.
+Corollary genColor_correctSize': forall s, semProdSize genColor s <--> setT.
 Proof.
   move => s. rewrite unsized_alt_def. by apply semColor.
 Qed.
 
+Ltac returnSolver :=
+  try apply returnGenSizeMonotonic;
+  try apply ProducerSemanticsGen.
 Instance genRBTree_heightMonotonic p :
-  SizeMonotonic (genRBTree_height p).
+  @SizeMonotonic _ _ ProducerGen (genRBTree_height p).
 Proof.
   move : p.
   eapply (well_founded_induction well_founded_hc).
   move => [[|n] c] IH; rewrite genRBTree_height_eq.
-  - case : c {IH}; eauto with typeclass_instances.
-    apply oneofMonotonic; eauto with typeclass_instances.
-    move => t [H1 | [H2 | //]]; subst; eauto with typeclass_instances.
-  - case : c IH => IH. apply liftGen4Monotonic; eauto with typeclass_instances;
-    eapply IH; eauto; by constructor; lia.
-    apply bindMonotonic; eauto with typeclass_instances.
-    unfold genColor.
-    move => x /=. apply liftGen4Monotonic; eauto with typeclass_instances;
-    eapply IH; eauto; (case : x; [ by right | by left; lia]).
+  - case : c {IH}; returnSolver.
+    apply oneofMonotonic; returnSolver.
+    move => t [H1 | [H2 | //]]; subst; returnSolver.
+    eauto with typeclass_instances.
+    apply (@bindMonotonic _ ProducerGen _); eauto with typeclass_instances.
+    move => x; returnSolver.
+  - case : c IH => IH.
+    apply (@liftM4Monotonic); returnSolver.
+    + eapply IH; eauto; by constructor; lia.
+    + eauto with typeclass_instances.
+    + eapply IH; eauto; by constructor; lia.
+    + unfold genColor.
+      apply bindMonotonic; eauto with typeclass_instances.
+      move => x /=. apply liftM4Monotonic; returnSolver; eauto with typeclass_instances.
+      * eapply IH; eauto; (case : x; [ by right | by left; lia]).
+      * eapply IH; eauto; (case : x; [ by right | by left; lia]).      
 Qed.
 
 Instance genRBTreeMonotonic : SizeMonotonic genRBTree.
@@ -93,9 +102,10 @@ Proof.
   apply bindMonotonic; eauto with typeclass_instances.
 Qed.
 
+(*
 (* begin semGenRBTreeHeight *)
 Lemma semGenRBTreeHeight h c :
-  semGen (genRBTree_height (h, c)) <--> [set t | is_redblack' t c h ].
+  semProd (genRBTree_height (h, c)) <--> [set t | is_redblack' t c h ].
 (* end semGenRBTreeHeight *)
 Proof.
   replace c with (snd (h, c)); replace h with (fst (h, c)); try reflexivity.
@@ -105,9 +115,11 @@ Proof.
   - rewrite semReturn. split. move => <-. constructor.
     move => H. inversion H; subst; reflexivity.
   - rewrite semOneof. move => t. split.
-    move => [gen [[H1 | [H1 | // _]] H2]]; subst.
-    apply semThunkGen, semReturn in H2. rewrite - H2. constructor.
-    move : H2 => /semThunkGen /semBindSizeMonotonic.
+    + move => [gen [[H1 | [H1 | // _]] H2]]; subst.
+      apply @semReturn in H2.
+      * rewrite - H2. constructor.
+      * apply ProducerSemanticsGen.
+      * move : H2 => .
     move => [n [_ /semReturn <-]].
     constructor. constructor. constructor.
     move => H. inversion H; subst.
@@ -226,4 +238,5 @@ Proof.
   - move => n /=. apply forAllMonotonic;
       try by (try move => ? /=); auto with typeclass_instances.
 Qed.
+*)
 *)

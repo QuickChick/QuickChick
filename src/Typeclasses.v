@@ -5,32 +5,31 @@ Require Import mathcomp.ssreflect.ssreflect.
 From mathcomp Require Import ssreflect ssrfun ssrbool ssrnat eqtype seq.
 Require Import Classes DependentClasses Checker Show.
 
-Require Import GenLow GenHigh Sets.
-Import GenLow GenHigh.
+Require Import Producer Generators Sets.
+Local Open Scope set_scope.
 
 (* TODO: Derive these *)
-Instance arbST_eq {A} (a : A) : GenSuchThat A (fun x => x = a) :=
+#[global] Instance arbST_eq {A} (a : A) : GenSuchThat A (fun x => x = a) :=
   {| arbitraryST := returnGen (Some a) |}.
-Instance arbST_Correct {A} (a : A) 
-  : SuchThatCorrect (fun x => x = a) (genST (fun x => x = a)).
+
+#[global] Instance arbST_Correct {A} (a : A) 
+  : CorrectST (fun x => x = a) (genST (fun x => x = a)).
 Proof.
   constructor.
-  simpl; rewrite semReturn.
+  simpl; rewrite semReturnOpt.
   split; intros H. now firstorder.
-  destruct H as [x [Heq H]]. subst. inversion H. subst.
-  split; eauto.
+  subst. reflexivity.
 Defined.
 
-Instance arbST_eq' {A} (a : A) : GenSuchThat A (fun x => a = x) :=
+#[global] Instance arbST_eq' {A} (a : A) : GenSuchThat A (fun x => a = x) :=
   {| arbitraryST := returnGen (Some a) |}.
-Instance arbST_Correct' {A} (a : A) 
-  : SuchThatCorrect (fun x => a = x ) (genST (fun x => a = x)).
+
+#[global] Instance arbST_Correct' {A} (a : A) 
+  : CorrectST (fun x => a = x ) (genST (fun x => a = x)).
 Proof.
   constructor.
-  simpl; rewrite semReturn.
-  split; intros H. now firstorder.
-  destruct H as [x [Heq H]]. subst. inversion H. subst.
-  split; eauto.
+  simpl; rewrite semReturnOpt.
+  split; intros H. now firstorder. now firstorder.
 Defined.
 
 (* Typeclass instances that derive checkable from dependent generators *)
@@ -40,7 +39,7 @@ Defined.
 Axiom ignore_generator_proofs : False.
 Ltac ignore_gen_proofs := exfalso; apply ignore_generator_proofs.
 
-Global Instance testSuchThat {A : Type} {pre : A -> Prop} {prop : A -> Type}
+#[global] Instance testSuchThat {A : Type} {pre : A -> Prop} {prop : A -> Type}
        `{Show A} `{GenSuchThat A (fun x => pre x)}
        `{forall (x : A), Checkable (prop x)} :
   Checkable (forall x, pre x -> prop x).
@@ -51,7 +50,7 @@ refine
   ignore_gen_proofs.
 Defined.
 
-Global Instance testSuchThat2
+#[global] Instance testSuchThat2
        {A B : Type} {pre : A -> B -> Prop} {prop : A -> B -> Type}
        `{Show A} `{Show B} 
        `{GenSuchThat (A * B) (fun x => let (a,b) := x in pre a b)}
@@ -69,7 +68,7 @@ Defined.
 
 (*
 Definition t := forall x, x = 17 -> x = 17.
-Instance ct : Checkable t.
+#[global] Instance ct : Checkable t.
   eapply testSuchThat; eauto.
   Unshelve.
   
@@ -99,7 +98,7 @@ Proof.
   inversion Heq. subst. eassumption.
 Defined.     
 
-Global Instance testSuchThat2_1 {A B : Type} {pre : A -> B -> Prop} {prop : A -> B -> Type}
+#[global] Instance testSuchThat2_1 {A B : Type} {pre : A -> B -> Prop} {prop : A -> B -> Type}
        `{Show A} `{Show B} `{Arbitrary B}
        `{forall (b : B), GenSuchThat A (fun x => pre x b)}
        `{forall (b : B), SuchThatCorrect (fun x => pre x b) (genST (fun x => pre x b))}
@@ -132,7 +131,7 @@ Proof.
   inversion Heq. subst. eassumption.
 Defined.     
 
-Global Instance testSuchThat2_2 {A B : Type} {pre : A -> B -> Prop} {prop : A -> B -> Type}
+ #[global] Instance testSuchThat2_2 {A B : Type} {pre : A -> B -> Prop} {prop : A -> B -> Type}
        `{Show A} `{Show B} `{Arbitrary A}
        `{forall (a : A), GenSuchThat B (fun x => pre a x)}
        `{forall (a : A), SuchThatCorrect (fun x => pre a x) (genST (fun x => pre a x))}
@@ -165,14 +164,14 @@ Proof.
   inversion Heq. subst. eassumption.
 Defined.     
 
-Global Instance testSuchThat_swap {A B C : Type} {pre : A -> B -> Prop} 
+#[global] Instance testSuchThat_swap {A B C : Type} {pre : A -> B -> Prop} 
        {prop : A -> B -> C -> Type}
        `{Checkable (forall a b, pre a b -> forall c, prop a b c)} :
   Checkable (forall a b c, pre a b -> prop a b c) :=
   {| checker f := @checker (forall a b, pre a b -> forall c, prop a b c) _ _ |}. 
 Proof. intros; eauto. Defined.
 
-Global Instance GenSuchThatConj {A B : Type} (P : A -> Prop) (Q : B -> Prop)
+#[global] Instance GenSuchThatConj {A B : Type} (P : A -> Prop) (Q : B -> Prop)
        `{GenSuchThat A (fun x => P x)}
        `{GenSuchThat B (fun x => Q x)}
        : GenSuchThat (A * B) (fun xy => let (x,y) := xy in P x /\ Q y) :=
@@ -187,7 +186,7 @@ Global Instance GenSuchThatConj {A B : Type} (P : A -> Prop) (Q : B -> Prop)
 
 
 (*
-Global Instance GenSuchThatConjCorrect {A B : Type} (P : A -> Prop) (Q : B -> Prop)
+#[global] Instance GenSuchThatConjCorrect {A B : Type} (P : A -> Prop) (Q : B -> Prop)
        `{GA: GenSizedSuchThat A (fun x => P x)}
        `{GB: GenSizedSuchThat B (fun x => Q x)}
        `{SizedSuchThatCorrectSuchThatSizedCorrect A (fun x => P x) (@arbitraryST _ _ GA)}
