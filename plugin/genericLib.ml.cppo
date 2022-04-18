@@ -737,12 +737,19 @@ let gType ty_params dep_type =
 let locate_constant c = 
   match Nametab.locate c with GlobRef.ConstRef x -> x | _ -> failwith ("loc_const: " ^ string_of_qualid c)
  *)
-  
-let locate_ind c = 
-  match Nametab.locate c with GlobRef.IndRef x -> x | _ -> failwith ("loc_ind: " ^ string_of_qualid c)
+
+let locate_ind c =
+  begin
+      try begin match Nametab.locate c with
+          | GlobRef.IndRef x -> x
+          | _ -> failwith ("loc_ind: " ^ string_of_qualid c)
+          end
+      with Not_found -> failwith ("Locate_ind: " ^ string_of_qualid c)
+  end
 
 let locate_constructor c =
-  match Nametab.locate c with GlobRef.ConstructRef x -> x | _ -> failwith ("loc_constr: " ^ string_of_qualid c)
+  try (match Nametab.locate c with GlobRef.ConstructRef x -> x | _ -> failwith ("loc_constr: " ^ string_of_qualid c))
+  with Not_found -> failwith ("locate constr: " ^ string_of_qualid c)
                                                            
 (* Convert types back into constr *)
 let constr_of_type ty_params dep_type =
@@ -756,7 +763,8 @@ let constr_of_type ty_params dep_type =
                               Constr.mkLambda (Context.nameR x, t1, t2)
     | DTyParam tp -> Constr.mkVar tp
     | DTyCtr (c,dts) ->
-       Constr.mkApp (Constr.mkInd (locate_ind c), Array.of_list (List.map aux dts))
+       let c' = if string_of_qualid c = "Prop" then Constr.mkProp else Constr.mkInd (locate_ind c) in
+       Constr.mkApp (c', Array.of_list (List.map aux dts))
     | DCtr (c,dts) ->
        Constr.mkApp (Constr.mkConstruct (locate_constructor c), Array.of_list (List.map aux dts))
     | DTyVar x -> mkVar x
@@ -1057,12 +1065,16 @@ let declare_class_instance ?(global=true) ?(priority=42) instance_arguments inst
   msg_debug (str (Id.to_string cid) ++ fnl ())
 
 let define_new_inductive (ty_ctr, ty_params, ctrs, typ) =
+  let me_typename = Id.of_string (string_of_qualid ty_ctr) in
+  msg_debug (str "constr_of_type: " ++ str (dep_type_to_string typ) ++ fnl ());
+  let me_arity = constr_of_type ty_params typ in
   let oie =
-    { mind_entry_typename = Id.of_string (string_of_qualid ty_ctr)
-    ; mind_entry_arity = constr_of_type ty_params typ
+    { mind_entry_typename = me_typename
+    ; mind_entry_arity = me_arity
     ; mind_entry_consnames = List.map (fun (c,_) -> Id.of_string (string_of_qualid c)) ctrs
     ; mind_entry_lc = List.map (fun (_, t) -> constr_of_type ty_params t) ctrs
     } in
+  msg_debug (str "oie done" ++ fnl ());
   let entry =
     { mind_entry_record = None
     ; mind_entry_finite = Declarations.Finite

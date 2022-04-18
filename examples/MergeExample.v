@@ -7,8 +7,6 @@ Inductive Tree :=
 | Leaf : Tree
 | Node : nat -> Tree -> Tree -> Tree.
 
-Derive (Arbitrary, Show) for Tree. 
-
 Inductive bst : nat -> nat -> Tree -> Prop :=
 | bst_leaf : forall lo hi, bst lo hi Leaf
 | bst_node : forall lo hi x l r,
@@ -22,9 +20,19 @@ Inductive bal : nat -> Tree -> Prop :=
 | bal_node : forall n t1 t2 m,
     bal n t1 -> bal n t2 -> bal (S n) (Node m t1 t2).
 
+Inductive foo : nat -> Prop :=
+| Foo : foo 0.
+
 QuickChickDebug Debug On.
+Merge (fun n => foo n) With (fun t => bal n t)
+      As attemp.
+
 Merge (fun t => bst lo hi t) With (fun t => bal n t)
       As bstbalmerged.
+
+Derive (Arbitrary, Show) for Tree. 
+
+
 
 Inductive bstbal : nat -> nat -> nat -> Tree -> Prop :=
 | leafleaf0 : forall lo hi, bstbal lo hi 0 Leaf
