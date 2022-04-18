@@ -15,6 +15,13 @@ Export Coq.Strings.String.StringSyntax.
 (* This makes just the [%string] key available to [Derive Show]. *)
 Delimit Scope string_scope with string.
 
+Record Time : Set := mkTime {time: nat}.
+Record AugmentedTime (A: Type) := 
+  mkAugTime {
+    aug_res    : A;
+    aug_time   : Time
+  }.
+
 Definition newline := String "010" ""%string.
 
 Class Show (A : Type) : Type :=
@@ -214,9 +221,26 @@ Fixpoint contents {A : Type} (s : A -> string) (l : list A) : string :=
   show l := append "[" (append (contents show l) "]")
 |}.
 
+
+#[global] Instance show_time : Show Time :=
+{| 
+  show t := """time"": " ++ 
+  (
+    let s := (show (time t)) in
+    let len := length s in
+    """" ++ (substring 0 (len - 3) s) ++ "." ++ (substring (len-3) len s)  ++ "ms"""
+  ) 
+  
+|}.
+
+#[global] Instance show_augmented_time {A : Type} `{_ : Show A} : Show (AugmentedTime A) :=
+{|
+  show aut := match aut with mkAugTime _ res tAux => (show (res) ++ ", " ++  show (tAux))%string end
+|}.
+
 #[global] Instance showPair {A B : Type} `{_ : Show A} `{_ : Show B} : Show (A * B) :=
 {|
-  show p := match p with (a,b) => ("(" ++ show a ++ "," ++  show b ++ ")")%string end
+  show p := match p with (a,b) => ("(" ++ show a ++ ", " ++  show b ++ ")")%string end
 |}.
 
 #[global] Instance showOpt {A : Type} `{_ : Show A} : Show (option A) :=

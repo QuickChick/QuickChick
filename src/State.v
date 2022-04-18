@@ -24,16 +24,17 @@ Record State := MkState
 
   ; numSuccessShrinks : nat
   ; numTryShrinks     : nat
+  ; stDoAnalysis      : bool
   }.
 
 Definition updTryShrinks (st : State) (f : nat -> nat) : State :=
   match st with
-    | MkState mst mdt ms cs nst ndt ls e r nss nts =>
-      MkState mst mdt ms cs nst ndt ls e r nss (f nts)
+    | MkState mst mdt ms cs nst ndt ls e r nss nts ana =>
+      MkState mst mdt ms cs nst ndt ls e r nss (f nts) ana
   end.
 
 Definition updSuccessShrinks (st : State) (f : nat -> nat) : State :=
   match st with
-    | MkState mst mdt ms cs nst ndt ls e r nss nts =>
-      MkState mst mdt ms cs nst ndt ls e r (f nss) nts
+    | MkState mst mdt ms cs nst ndt ls e r nss nts ana =>
+      MkState mst mdt ms cs nst ndt ls e r (f nss) nts ana
   end.

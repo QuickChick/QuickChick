@@ -37,16 +37,22 @@ Record Args := MkArgs {
   maxDiscard : nat;
   maxShrinks : nat;
   maxSize    : nat;
-  chatty     : bool
+  chatty     : bool;
+  analysis   : bool
 }.
 
 Definition updMaxSize (a : Args) (x : nat) : Args := 
-  let '(MkArgs r msc md msh msz c) := a in 
-  MkArgs r msc md msh x c.
+  let '(MkArgs r msc md msh msz c an) := a in 
+  MkArgs r msc md msh x c an.
 
 Definition updMaxSuccess (a : Args) (x : nat) : Args := 
-  let '(MkArgs r msc md msh msz c) := a in 
-  MkArgs r x md msh msz c.
+  let '(MkArgs r msc md msh msz c an) := a in 
+  MkArgs r x md msh msz c an.
+
+Definition updAnalysis (a : Args) (b : bool) : Args := 
+  let '(MkArgs r msc md msh msz c an) := a in 
+  MkArgs r msc md msh msz c b.
+
 
 Inductive Result :=
   | Success : nat -> nat -> list (string * nat) -> string -> Result
@@ -70,9 +76,10 @@ Axiom defNumShrinks  : nat.
 Extract Constant defNumShrinks  => "1000".
 Axiom defSize        : nat.
 Extract Constant defSize        => "7".
+Definition doAnalysis       := false.
 
 Definition stdArgs := MkArgs None defNumTests defNumDiscards
-                             defNumShrinks defSize true.
+                             defNumShrinks defSize true doAnalysis.
 
 Definition roundTo n m := mult (Nat.div n m) m.
 
@@ -133,18 +140,29 @@ Definition summary (st : State) : list (string * nat) :=
 Definition doneTesting (st : State) (f : nat -> RandomSeed -> QProp) : Result :=
  if expectedFailure st then
     Success (numSuccessTests st + 1) (numDiscardedTests st) (summary st)
-            ("+++ Passed " ++ (show (numSuccessTests st)) ++ " tests (" ++ (show (numDiscardedTests st)) ++ " discards)")
+            (
+              if (stDoAnalysis st) 
+                then ("""result"": ""success"", ""passed"": " ++ (show (numSuccessTests st)) ++ ", ""discards"": " ++ (show (numDiscardedTests st)))
+                else ("+++ Passed " ++ (show (numSuccessTests st)) ++ " tests (" ++ (show (numDiscardedTests st)) ++ " discards)" ++ newline)
+            )
+
   else
     NoExpectedFailure (numSuccessTests st) (summary st)
-                      ("*** Failed! Passed " ++ (show (numSuccessTests st))
-                                             ++ " tests (expected Failure)").
+                  (
+                    if (stDoAnalysis st) 
+                      then ("result: expected_failure, passed " ++ (show (numSuccessTests st)))
+                      else ("*** Failed! Passed " ++ (show (numSuccessTests st))++ " tests (expected Failure)" ++ newline)
+                  ).
   (* TODO: success st - labels *)
 
 Definition giveUp (st : State) (_ : nat -> RandomSeed -> QProp) : Result :=
   GaveUp (numSuccessTests st) (summary st)
-         ("*** Gave up! Passed only " ++ (show (numSuccessTests st)) ++ " tests"
-          ++  newline ++ "Discarded: " ++ (show (numDiscardedTests st))).
-
+          (
+            if (stDoAnalysis st) 
+              then ("result: gave_up, passed:" ++ (show (numSuccessTests st)) ++ ", discards: " ++ (show (numDiscardedTests st)))
+              else ("*** Gave up! Passed only " ++ (show (numSuccessTests st)) ++ " tests" ++ 
+                    newline ++ "Discarded: " ++ (show (numDiscardedTests st)) ++ newline)
+          ).
 Definition callbackPostTest (st : State) (res : Checker.Result) : nat :=
   match res with
   | MkResult o e r i s c t =>
@@ -212,7 +230,7 @@ Fixpoint runATest (st : State) (f : nat -> RandomSeed -> QProp) (maxSteps : nat)
              else runATest st f maxSteps'
     in
     match st with
-    | MkState mst mdt ms cs nst ndt ls e r nss nts =>
+    | MkState mst mdt ms cs nst ndt ls e r nss nts ana =>
       match f size rnd1 with
       | MkProp (MkRose res ts) =>
         (* TODO: CallbackPostTest *)
@@ -240,19 +258,38 @@ Fixpoint runATest (st : State) (f : nat -> RandomSeed -> QProp) (maxSteps : nat)
                                     | Some k => Map.add stamp (k+1) stamps
                                     end
                                  ) s ls in*)
-            test (MkState mst mdt ms cs (nst + 1) ndt ls' e rnd2 nss nts)
+            test (MkState mst mdt ms cs (nst + 1) ndt ls' e rnd2 nss nts ana)
           else (* Failure *)
             let tag_text := 
                 match t with 
                 | Some s => "Tag: " ++ s ++ nl
                 | _ => "" 
                 end in 
-            let pre : string := (if expect res then "*** Failed "
-                                 else "+++ Failed (as expected) ")%string in
+            let pre : string := (
+                                  if ana 
+                                    then (
+                                      if expect res then "result: failed, "
+                                      else "+++ result: expected_failure "
+                                    )
+                                    else (
+                                      if expect res then "*** Failed "
+                                      else "+++ Failed (as expected) "
+                                    )
+                                 )%string in
             let (numShrinks, res') := localMin st (MkRose res ts) in
-            let suf := ("after " ++ (show (S nst)) ++ " tests and "
-                                 ++ (show numShrinks) ++ " shrinks. ("
-                                 ++ (show ndt) ++ " discards)")%string in
+            let suf := (
+                        if ana 
+                          then (
+                              "tests: " ++ (show (S nst)) ++ ", shrinks: "
+                              ++ (show numShrinks) ++ ", discards: "
+                              ++ (show ndt)
+                            )
+                          else (
+                              "after " ++ (show (S nst)) ++ " tests and "
+                              ++ (show numShrinks) ++ " shrinks. ("
+                              ++ (show ndt) ++ " discards)"
+                            )
+                        )%string in
             (* TODO: Output *)
             if (negb (expect res)) then
               Success (nst + 1) ndt (summary st) (tag_text ++ pre ++ suf)
@@ -272,7 +309,7 @@ Fixpoint runATest (st : State) (f : nat -> RandomSeed -> QProp) (maxSteps : nat)
                 | Some k => Map.add s_to_add (k+1) ls
                 end
               end in
-          test (MkState mst mdt ms cs nst ndt.+1 ls' e rnd2 nss nts)
+          test (MkState mst mdt ms cs nst ndt.+1 ls' e rnd2 nss nts ana)
         end
       end
     end
@@ -311,6 +348,7 @@ Definition quickCheckWith {prop : Type} {_ : Checkable prop}
                 rnd             (* randomSeed        *)
                 0               (* numSuccessShrinks *)
                 0               (* numTryShrinks     *)
+                (analysis a)  (* analysisFlag      *)
        ) (run (checker p)).
 
 Fixpoint showCollectStatistics (l : list (string * nat)) :=
@@ -326,7 +364,7 @@ Fixpoint showCollectStatistics (l : list (string * nat)) :=
   | GaveUp _ l s => showCollectStatistics l ++ s
   | Failure _ _ _ _ _ s l _ => showCollectStatistics l ++ s
   | NoExpectedFailure _ l s => showCollectStatistics l ++ s
-  end ++ newline).
+  end).
 
 Definition quickCheck {prop : Type} {_ : Checkable prop}
            (p : prop) : Result :=

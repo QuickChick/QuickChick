@@ -42,6 +42,7 @@ let ansi = ref false
 let fail_fast = ref false
 let excluded = ref []
 let nobase = ref false
+let analysis = ref false
 
 type mutant_id = Num of int | Tag of string
 let only_mutant = ref None
@@ -63,6 +64,7 @@ let speclist =
   ; ("-m", Arg.Int (fun n -> only_mutant := Some (Num n)), "Only test mutant number n")
   ; ("-N", Arg.Int (fun n -> maxSuccess := Some n), "Max number of successes")
   ; ("-tag", Arg.String (fun s -> only_mutant := Some (Tag s)), "Only test mutant number with a specific tag")
+  ; ("-analysis", Arg.Unit (fun _ -> analysis := true), "Change output string to JSON format data")
   ; ("-include", Arg.String (fun incl -> include_file := Some incl), "File containing list of files to be included.")
   ; ("-exclude", Arg.Rest (fun excl -> excluded := excl :: !excluded), "(Deprecated) Files to be excluded. Must be the last argument")
   ]
@@ -187,8 +189,14 @@ let test_out handle_section input =
 
 let quickCheckFunction () =
   match !maxSuccess with
-  | None -> "quickCheck"
-  | Some n -> "quickCheckWith (updMaxSuccess stdArgs " ^ string_of_int n ^ ")"
+  | None -> 
+    if !analysis 
+      then "quickCheckWith (updAnalysis stdArgs true)"
+      else "quickCheck" 
+  | Some n -> 
+    if !analysis 
+      then "quickCheckWith (updAnalysis (updMaxSuccess stdArgs " ^ string_of_int n ^ ") true)"
+      else "quickCheckWith (updMaxSuccess stdArgs " ^ string_of_int n ^ ")"
 
 (* Combine mutants with base.
    Receives a base mutant, plus a list of (optionally tagged) mutants.
@@ -432,7 +440,8 @@ let compile_and_run where e : unit =
        a . every once in a while, we'll need to change this so that they don't
        get buffered for too long: *)
     let e = input_line chan in
-    print_string e; print_newline();
+    let s_e = if !analysis then ("!![" ^ e ^ "]") else e in
+    print_string s_e; print_newline();
     begin if is_prefix "+++ Passed" e then
       (test_results.passed <- test_results.passed+1; found_result := true)
     else if is_prefix "+++ Failed (as expected)" e then
@@ -442,6 +451,7 @@ let compile_and_run where e : unit =
     process_otl_aux() in
   try process_otl_aux ()
   with End_of_file ->
+    if not !analysis then
     if not !found_result then begin
       highlight Failure "Test neither 'Passed' nor 'Failed'";
       test_results.inconclusive <- test_results.inconclusive + 1
@@ -767,14 +777,24 @@ let main =
     let imports = List.map (fun s -> (if !top = "" then "" else !top ^ ".") ^ (mk_import s)) all_vs in
 
     let (test_names, tests) =
+      let number_of_tests = List.length all_things_to_check in
       let make_test i (f, s) : string * string =
         let s = let s = trim s in String.sub s 0 (String.length s - 1) in
         let testname =
           (* Leo: better qualification *)
           trim (Filename.basename (Filename.chop_suffix f ".v")) ^ "." ^ s in
+        let structured_structured_output = (
+          Printf.sprintf "Definition test%d := print_extracted_coq_string (\"{\"\"name\"\": \"\"%s\"\", \"  ++ show (withTime(fun tt => %s %s)) ++ \"}" 
+          i testname (quickCheckFunction ()) testname 
+          ^ (if i == number_of_tests - 1 then "" else ", ")
+          ^ "\")%string.\n"
+          ) in
+        let readable_output = (
+          Printf.sprintf "Definition test%d := print_extracted_coq_string (\"Checking %s...\" ++ newline ++ show (%s %s))%%string.\n"
+          i testname (quickCheckFunction ()) testname
+          ) in
         (Printf.sprintf "test%d" i,
-         Printf.sprintf "Definition test%d := print_extracted_coq_string (\"Checking %s...\" ++ newline ++ show (%s %s))%%string.\n"
-           i testname (quickCheckFunction ()) testname) in
+        if !analysis then structured_structured_output else readable_output) in
       List.split (List.mapi make_test all_things_to_check) in
 
     let tmp_file_data =
@@ -827,10 +847,11 @@ let main =
         end)
       (List.rev dir_mutants)
   end;
-
-  if !something_failed then begin
-    highlight Failure
-      "At least one of the tests above produced an unexpected result.";
-    exit 1
-  end;
-  highlight Success "All tests produced the expected results"
+  if not !analysis then begin
+    if !something_failed then begin
+      highlight Failure
+        "At least one of the tests above produced an unexpected result.";
+      exit 1
+    end;
+    highlight Success "All tests produced the expected results"
+  end

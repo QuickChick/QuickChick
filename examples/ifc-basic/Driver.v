@@ -187,8 +187,8 @@ Definition prop_SSNI_derived t : Checker :=
 
 
 Definition myArgs : Args :=
-  let '(MkArgs rp mSuc md mSh mSz c) := stdArgs in
-  MkArgs rp numTests md mSh mSz c.
+  let '(MkArgs rp mSuc md mSh mSz c a) := stdArgs in
+  MkArgs rp numTests md mSh mSz c a.
 
 From QuickChick Require Import Mutate MutateCheck.
 
