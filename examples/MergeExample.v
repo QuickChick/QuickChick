@@ -21,7 +21,8 @@ Inductive bal : nat -> Tree -> Prop :=
     bal n t1 -> bal n t2 -> bal (S n) (Node m t1 t2).
 
 Inductive foo : nat -> Prop :=
-| Foo : foo O.
+| Foo1 : foo O
+| Foo2 : forall n, foo n -> foo (S n).
 
 QuickChickDebug Debug On.
 Merge (fun n => foo n) With (fun t => bal n t)
