@@ -743,6 +743,13 @@ Section ProducerHigh.
   
 End ProducerHigh.
 
+Module BindOptNotation.
+
+  Notation "x <-- c1 ;; c2" := (@bindOpt _ _ _ _ c1 (fun x => c2))
+    (at level 61, c1 at next level, right associativity) : monad_scope.
+
+End BindOptNotation.  
+
 Section ProducerHighProofs.
   Variable G  : Type -> Type.
   Context `{PG: Producer G}.
