@@ -22,18 +22,20 @@ Inductive bal : nat -> Tree -> Prop :=
 
 Inductive foo : nat -> Prop :=
 | Foo1 : foo O
-| Foo2 : forall n, foo n -> foo (S n).
+| Foo2 : forall n, foo n -> foo (S n)
+| Foo3 : forall n1 n2, foo 0 -> foo (S n1) -> foo (S n2).
 
 QuickChickDebug Debug On.
-Merge (fun n => foo n) With (fun t => bal n t)
+Merge (fun t => bst lo hi t) With (fun t => bal n t)
       As attemp.
+
+
+
 (*
 Merge (fun t => bst lo hi t) With (fun t => bal n t)
       As bstbalmerged.
 *)
 Derive (Arbitrary, Show) for Tree. 
-
-
 
 Inductive bstbal : nat -> nat -> nat -> Tree -> Prop :=
 | leafleaf0 : forall lo hi, bstbal lo hi 0 Leaf

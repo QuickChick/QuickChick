@@ -757,7 +757,8 @@ let constr_of_type name ty_params dep_type =
     match vars with
     | [] -> mkVar x
     (* TODO: Find DeBruijn equation *)
-    | y::ys -> if x = y then Constr.mkRel (i - j - 1) else find_index x i (j+1) ys
+    | y::ys -> if x = y then Constr.mkRel (i - j)
+               else find_index x i (j-1) ys
   in
   let rec aux vars i dt : Constr.t = 
     match dt with
@@ -776,7 +777,7 @@ let constr_of_type name ty_params dep_type =
        Constr.mkApp (c', Array.of_list (List.map (aux vars i) dts))
     | DCtr (c,dts) ->
        Constr.mkApp (Constr.mkConstruct (locate_constructor c), Array.of_list (List.map (aux vars i) dts))
-    | DTyVar x -> find_index x i 0 vars
+    | DTyVar x -> find_index x i (List.length vars) vars
     | DApp (c, dts) ->
        Constr.mkApp (aux vars i c, Array.of_list (List.map (aux vars i) dts))
     | DNot dt -> failwith "Not" (* Constr.mkApp (Constr.mkVar (Id.of_string "negb"), [| aux dt |])*)
