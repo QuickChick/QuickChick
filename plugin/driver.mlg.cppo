@@ -37,6 +37,7 @@ let class_assoc_opts = [ ("GenSized"                 , SimpleDer [SimplDriver.Ge
                        ; ("DecOpt"                   , DepDer DepDriver.DecOpt)
                        ; ("DecOptMon"                , DepDer DepDriver.DecOptMon)
                        ; ("ArbitrarySizedSuchThat"   , DepDer DepDriver.ArbitrarySizedSuchThat)
+                       ; ("GenSizedSuchThat"         , DepDer DepDriver.ArbitrarySizedSuchThat)                       
                        ; ("EnumSizedSuchThat"        , DepDer DepDriver.EnumSizedSuchThat)
                        
 (*                       ; ("SizeMonotonicSuchThatOpt" , DepDer DepDriver.GenSizedSuchThatMonotonicOpt)

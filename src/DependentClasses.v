@@ -59,7 +59,8 @@ Class GenSizedSuchThatCorrect (A : Type) (P : A -> Prop)
 Class GenSuchThat (A : Type) (P : A -> Prop) := { arbitraryST : G (option A) }.
 (* end genST_class *)
 
-Notation "'genST' x" := (@arbitraryST _ x _) (at level 70).
+Notation "'genSizedST' x" := ((@arbitrarySizeST _ x _)) (at level 10).
+Notation "'genST' x" := ((@arbitraryST _ x _)) (at level 10).
 
 (** * Monotonicity of denendent generators *)
 

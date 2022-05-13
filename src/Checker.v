@@ -386,7 +386,7 @@ Module QcNotation.
 
   Notation "x ==> y" := (implication x y) (at level 55, right associativity)
                            : Checker_scope.
-
+  
   (* TODO: Figure out pretty printing too *)
   Notation "'FORALL' x : T , c" :=
     (forAllShrink (@arbitrary T _) shrink (fun x => c))

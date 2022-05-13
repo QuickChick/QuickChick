@@ -280,7 +280,8 @@ Parameter choose :
     by providing only the predicate [P] that constraints the generation.
     The typeclass constraint is inferred. *)
 
-Notation "'genST' x" := (@arbitraryST _ x _) (at level 70).
+Notation "'genSizedST' x" := ((@arbitrarySizeST _ x _)) (at level 10).
+Notation "'genST' x" := ((@arbitraryST _ x _)) (at level 10).
 
 (* #################################################################### *)
 (** * Shrinking *)

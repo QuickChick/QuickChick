@@ -237,7 +237,4 @@ Module ConsistencyCheck : QuickChickSig.
         chatty     : bool
       }.
 
-
-  Notation "'genST' x" := (@arbitraryST _ x _) (at level 70).
-
 End ConsistencyCheck.

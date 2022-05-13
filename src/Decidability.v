@@ -239,9 +239,22 @@ Notation "P '?'" := (match (@dec P _) with
                        | right _ => false
                      end) (at level 100).
 
-Notation "P '??' n" := (checker (@decOpt P _ n))
-                         (at level 100).
+Notation "P '??' n" := (@decOpt P _ n) (at level 100).
 
+Definition implicationOpt (m : option bool) (p : unit -> option bool) : option bool :=
+  match m with
+  | Some true => p tt
+  | Some false => None
+  | None => None
+  end.
+
+Notation "x ?==>? y" :=
+  (implicationOpt (Some x) (fun tt => y))
+    (at level 55, right associativity).
+
+Notation "x ==>? y" :=
+  (implicationOpt x (fun tt => y))
+    (at level 55, right associativity).
 
 #[global] Hint Resolve Dec_eq_unit : eq_dec.
 #[global] Hint Resolve Dec_eq_bool : eq_dec.
