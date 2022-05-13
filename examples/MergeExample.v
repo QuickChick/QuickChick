@@ -20,22 +20,13 @@ Inductive bal : nat -> Tree -> Prop :=
 | bal_node : forall n t1 t2 m,
     bal n t1 -> bal n t2 -> bal (S n) (Node m t1 t2).
 
-Inductive foo : nat -> Prop :=
-| Foo1 : foo O
-| Foo2 : forall n, foo n -> foo (S n)
-| Foo3 : forall n1 n2, foo 0 -> foo (S n1) -> foo (S n2).
+Derive (Arbitrary, Show) for Tree.
 
-QuickChickDebug Debug On.
-Merge (fun t => bst lo hi t) With (fun t => bal n t)
-      As attemp.
-
-
-
-(*
-Merge (fun t => bst lo hi t) With (fun t => bal n t)
-      As bstbalmerged.
-*)
-Derive (Arbitrary, Show) for Tree. 
+Fixpoint size (t : Tree) : nat :=
+  match t with
+  | Leaf => 0
+  | Node x l r => 1 + max (size l) (size r)
+  end.
 
 Inductive bstbal : nat -> nat -> nat -> Tree -> Prop :=
 | leafleaf0 : forall lo hi, bstbal lo hi 0 Leaf
@@ -57,6 +48,8 @@ Definition Empty {A} (e : E A) (n : nat) : bool :=
 Derive DecOpt for (le x y).
 
 Derive ArbitrarySizedSuchThat for (fun x => le y x).
+
+QuickChickWeights [ (bst_leaf, 1) ; (bst_node, size) ].
 Derive ArbitrarySizedSuchThat for (fun t => bst lo hi t).
 
 Derive ArbitrarySizedSuchThat for (fun t => bstbal a b c t).
@@ -65,7 +58,7 @@ Sample (@arbitrarySizeST _ (fun t => bst 0 10 t) _ 5).
 
 Print GenSizedSuchThatbst.
 
-Sample (genST (fun t => bst 0 10 t)).
+Sample (@arbitrarySizeST _ (fun t => bst 0 42 t) _ 10).
 
 Derive DecOpt for (bst lo hi t).
 
@@ -75,14 +68,15 @@ Check GenSizedSuchThatbst.
 Compute (@decOpt (bal 0 Leaf) _ 5).
 
 Definition balBst_any_test :=
-  forAllMaybe (@arbitrarySizeST _ (fun t => bst 0 10 t) _ 5)
-              (fun t => if Empty (@enumSizeST _ (fun n => bal n t) _ 10) 10
-              then (checker true) else (checker tt)).
+  forAllMaybe (@arbitrarySizeST _ (fun t => bst 0 42 t) _ 10)
+              (fun t =>
+                 if Empty (@enumSizeST _ (fun n => bal n t) _ 10) 10
+                 then (collect (size t) (checker true)) else (checker tt)).
 
 QuickChick balBst_any_test.
 
 Definition balBst_merged :=
-  forAllMaybe (@arbitrarySizeST _ (fun t => bstbal 0 10 2 t) _ 5)
+  forAllMaybe (@arbitrarySizeST _ (fun t => bstbal 0 42 3 t) _ 10)
               (fun t => checker true).
 
 QuickChick balBst_merged.
@@ -90,3 +84,19 @@ QuickChick balBst_merged.
 (*An issue is that these two aren't really comparing the same thing.
 Ideally, we should generate trees for which all three parameters can be
 anything.*)
+
+Inductive foo : nat -> Prop :=
+| Foo1 : foo O
+| Foo2 : forall n, foo n -> foo (S n)
+| Foo3 : forall n1 n2, foo 0 -> foo (S n1) -> foo (S n2).
+
+QuickChickDebug Debug On.
+Merge (fun t => bst lo hi t) With (fun t => bal n t)
+      As attemp.
+
+
+
+(*
+Merge (fun t => bst lo hi t) With (fun t => bal n t)
+      As bstbalmerged.
+*)
