@@ -5,6 +5,8 @@ open GenericLib
 open Pp
 
 open Libnames (*I think this is where qualid is*)
+open Names (*I think this is where Id.t is*)
+open UnifyQC
 
 (*
  make clean
@@ -23,11 +25,8 @@ data Constructor = Constructor String [(String, [Term])] [([Term], Term)] [Term]
 data Relation = Relation String [Constructor] *)
 
 (*
-type jHole = qualid
-type jTerm = Term of (constructor * jTerm list) | Hole of (string * jHole) (*why do holes need strings?*)
-type jConstructor = Constructor of (constructor * (ty_ctr * (jTerm list)) list
- (jTerm list * jTerm) list * jTerm list * jTerm * var list)
-type jRelation = Relation of (ty_ctr * jConstructor list)
+The plan is that I will use vars directly instead of holes.
+genericLib already gives me vars where I need them, and they already have the exact behavior that I want.
 *)
 
 type ctr_data =
@@ -73,11 +72,72 @@ let convertBack (me : ty_ctr) ((vs , rs , os , outs) : ctr_data) : dep_type =
     in
     convertVars vs (convertRecCalls rs (convertOtherCalls os (DTyCtr (me, outs))))
 
+(*Is this how you make a (Map var dep_type) in ocaml?*)
+module IdMap = Map.Make(UnknownOrd)
+type sub = dep_type IdMap.t
 
-type colour = RGB of int * int * int
-let bla : colour = RGB (1, 2, 3)
+let rec sub_term (s : sub) (t : dep_type) : dep_type =
+  match t with
+  | DTyCtr (tc, dts) -> DTyCtr (tc, List.map (sub_term s) dts)
+  | DArrow (dt1, dt2) -> DArrow (sub_term s dt1, sub_term s dt2)
+  | DProd  ((v, dt1), dt2) -> DProd ((v , sub_term s dt1), sub_term s dt2)
+  | DTyParam tp -> DTyParam tp
+  | DCtr (c, dts) -> DCtr (c, List.map (sub_term s) dts)
+  | DTyVar v -> IdMap.find v s
+  | DApp (dt, dts) -> DApp (sub_term s dt, List.map (sub_term s) dts)
+  | DNot dt -> DNot (sub_term s dt)
+  | DHole -> DHole
 
-(* let toJRelation (ty_ctr, ty_params, ctrs, typ) :  *)
+let compose_sub  (sub1 : sub) (sub2 : sub) : sub =
+    IdMap.union (fun _ _ _ -> failwith "shouldn't get here") (IdMap.map (sub_term sub1) sub2) sub1
+
+let rec occurs (v : var) (t : dep_type) : bool =
+  match t with
+  | DTyCtr (tc, dts) -> List.exists (occurs v) dts
+  | DArrow (dt1, dt2) -> occurs v dt1 || occurs v dt2
+  | DProd  ((v, dt1), dt2) -> occurs v dt1 || occurs v dt2
+  | DTyParam tp -> false
+  | DCtr (c, dts) -> List.exists (occurs v) dts
+  | DTyVar v' -> v == v'
+  | DApp (dt, dts) -> occurs v dt || (List.exists (occurs v) dts)
+  | DNot dt -> occurs v dt
+  | DHole -> false
+
+let rec unify (t1 : dep_type) (t2 : dep_type) : sub option =
+  match t1, t2 with
+  | DTyVar v, _ -> if occurs v t2 then None else Some (IdMap.singleton v t2)
+  | DTyCtr (tc, dts), DTyCtr (tc', dts') -> unifys dts dts'
+  | DArrow (dt1, dt2), DArrow (dt1', dt2') ->
+      Option.bind (unify dt1 dt1') (fun sub1 ->
+      Option.bind (unify (sub_term sub1 dt2) (sub_term sub1 dt2')) (fun sub2 ->
+      Some (compose_sub sub1 sub2)))
+  | DProd  ((v, dt1), dt2), DProd ((v', dt1'), dt2') ->
+      Option.bind (unify dt1 dt1') (fun sub1 ->
+      Option.bind (unify (sub_term sub1 dt2) (sub_term sub1 dt2')) (fun sub2 ->
+      Some (compose_sub sub1 sub2)))
+  | DTyParam tp, DTyParam tp' -> Some IdMap.empty
+  | DCtr (c, dts), DCtr (c', dts') -> if not (c == c') then None
+      else unifys dts dts'
+  | DApp (dt, dts), DApp (dt', dts') -> 
+      Option.bind (unify dt dt') (fun sub1 ->
+      Option.bind (unifys (List.map (sub_term sub1) dts) (List.map (sub_term sub1) dts')) (fun sub2 ->
+      Some (compose_sub sub1 sub2)))
+  | DNot dt, DNot dt' -> unify dt dt'
+  | DHole, DHole -> Some IdMap.empty
+  | _, _ -> None
+
+and unifys (t1s : dep_type list) (t2s : dep_type list) : sub option =
+      match t1s, t2s with
+      | [], [] -> Some IdMap.empty
+      | (t1 :: t1s), (t2 :: t2s) -> 
+        Option.bind (unify t1 t2) (fun s ->
+          unifys (List.map (sub_term s) t1s) (List.map (sub_term s) t2s))
+      | _, _ -> failwith "error, shouldn't get here!"
+(*
+TODO: I should double check that my implementation of unify is correct.
+Shouldn't I apply the existing sub to terms before unifying?
+   *)
+
 
 (* P : c1 es | .... => P_ : c1_ es* .... *)
 let renamer (ty_ctr, ty_params, ctrs, typ) : dep_dt =
