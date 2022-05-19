@@ -38,3 +38,15 @@ Definition updSuccessShrinks (st : State) (f : nat -> nat) : State :=
     | MkState mst mdt ms cs nst ndt ls e r nss nts ana =>
       MkState mst mdt ms cs nst ndt ls e r (f nss) nts ana
   end.
+
+Definition updSuccTests st f :=
+  match st with
+    | MkState mst mdt ms cs nst     ndt ls e r nss nts ana =>
+      MkState mst mdt ms cs (f nst) ndt ls e r nss nts ana
+  end.
+
+Definition updDiscTests st f :=
+  match st with
+    | MkState mst mdt ms cs nst ndt     ls e r nss nts ana =>
+      MkState mst mdt ms cs nst (f ndt) ls e r nss nts ana
+  end.

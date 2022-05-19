@@ -137,7 +137,7 @@ Definition summary (st : State) : list (string * nat) :=
   let res := Map.fold (fun key elem acc => (key,elem) :: acc) (labels st) nil
   in insSortBy (fun x y => snd y <= snd x) res .
 
-Definition doneTesting (st : State) (f : nat -> RandomSeed -> QProp) : Result :=
+Definition doneTesting (st : State) : Result :=
  if expectedFailure st then
     Success (numSuccessTests st + 1) (numDiscardedTests st) (summary st)
             (
@@ -155,7 +155,7 @@ Definition doneTesting (st : State) (f : nat -> RandomSeed -> QProp) : Result :=
                   ).
   (* TODO: success st - labels *)
 
-Definition giveUp (st : State) (_ : nat -> RandomSeed -> QProp) : Result :=
+Definition giveUp (st : State) : Result :=
   GaveUp (numSuccessTests st) (summary st)
           (
             if (stDoAnalysis st) 
@@ -224,9 +224,9 @@ Fixpoint runATest (st : State) (f : nat -> RandomSeed -> QProp) (maxSteps : nat)
     let (rnd1, rnd2) := randomSplit (randomSeed st) in
     let test (st : State) :=
         if (gte (numSuccessTests st) (maxSuccessTests st)) then
-          doneTesting st f
+          doneTesting st
         else if (gte (numDiscardedTests st) (maxDiscardedTests st)) then
-               giveUp st f
+               giveUp st
              else runATest st f maxSteps'
     in
     match st with
@@ -313,13 +313,13 @@ Fixpoint runATest (st : State) (f : nat -> RandomSeed -> QProp) (maxSteps : nat)
         end
       end
     end
-  else giveUp st f.
+  else giveUp st.
 
 Definition test (st : State) (f : nat -> RandomSeed -> QProp) : Result :=
   if (gte (numSuccessTests st) (maxSuccessTests st)) then
-    doneTesting st f
+    doneTesting st
   else if (gte (numDiscardedTests st) (maxDiscardedTests st)) then
-         giveUp st f
+    giveUp st
   else
     let maxSteps := maxSuccessTests st + maxDiscardedTests st in
     runATest st f maxSteps.
@@ -397,3 +397,160 @@ Fixpoint testRunner (tests : list Test) : IO unit :=
 (* Actually run the tests. (Only meant for extraction.) *)
 Definition runTests (tests : list Test) : io_unit :=
   IO.unsafe_run (testRunner tests).
+
+(* Fuzzing parts *)
+
+Definition fuzzCheck {prop : Type} {_ : Checkable prop} (p : prop) : Result :=
+  quickCheckWith (MkArgs None 1 1 0 defSize true false) p.
+
+(* HACK! This will be implemented by appending it to the beginning of the file...*)
+Axiom withInstrumentation : (unit -> option bool) -> (option bool * (bool * nat)).
+Extract Constant withInstrumentation => "withInstrumentation".
+
+(* After this many random consecutive tests, control flow returns to saved seeds. *)
+Axiom random_fuel : nat.
+Extract Constant random_fuel => "1000".
+
+Fixpoint pick_next_aux pick_fuel {A} (gen : G A) (fuzz : A -> G A) fs ds fsq dsq randoms saved :=
+  match pick_fuel with
+  | O => (gen, fs, ds, fsq, dsq, randoms, saved)
+  | S pick_fuel =>
+    match fs with
+    (* First pick: something from the favorite queue.
+       If its weight is 0, try the next one. *)
+    | ((O, fav)::fs') =>
+      pick_next_aux pick_fuel gen fuzz fs' ds fsq dsq randoms saved
+    | ((S n, fav)::fs') =>
+      (fuzz fav, (n, fav)::fs', ds, fsq, dsq, randoms, saved)
+    | [] =>
+      (* Then: If no favorites exist, check if there are still favorites in the queue. *)
+      match fsq with
+      (* If not, go to the discards. *)
+      | [] => 
+        match ds with
+        (* If we have fuzzed this (discarded) seed to completion, randomly generate a new test. *)
+        | ((O, _)::ds') => (gen, fs, ds', fsq, dsq, randoms, saved)
+        | ((S n, dis)::ds') => (fuzz dis, fs, ((n, dis):: ds'), fsq, dsq, randoms, saved)
+        | [] =>
+          (* If no discards, look at the queue. *)
+          match dsq with
+          (* No queue -> Random generation *)
+          | [] =>
+            (* Check if we've exhausted the random fuel *)
+            match randoms with
+            (* If we run out of random fuel, try restoring the saved queue *)
+            | O => pick_next_aux pick_fuel gen fuzz saved [] [] [] random_fuel saved
+            | S randoms' => (gen, [], [], [], [], randoms', saved)
+            end
+          (* Discarded in queue: update queue. *)
+          | _  => pick_next_aux pick_fuel gen fuzz [] dsq [] [] randoms saved
+          end
+        end
+      (* If yes, updated the favored list. *)
+      | _ => pick_next_aux pick_fuel gen fuzz fsq ds [] dsq randoms saved
+      end
+    end
+  end.
+
+Definition pick_next := @pick_next_aux 7.
+
+Axiom printnvb : unit -> nat.
+Extract Constant printnvb => "(fun u -> Printf.printf ""%d\n"" (count_non_virgin_bytes u); 42)".
+Definition doneTestingFuzz (x : nat) st := doneTesting st.
+
+Axiom clear_queues : nat -> bool.
+Extract Constant clear_queues => "(fun n -> n land 1023 == 0)".
+
+(* Keep two lists for seeds: 
+   favored  : contains _successful_ runs and their energy.
+   discards : contains _discarded_ runs and their energy (lower priority)
+
+   Always fuzz a favored one if it exists.
+   If not, interleave fuzzing a discard or generating randomly.
+*)
+Fixpoint fuzzLoopAux {A} (fuel : nat) (st : State)
+         (favored : list (nat * A)) (discards : list (nat * A))
+         (favored_queue : list (nat * A)) (discard_queue : list (nat * A))
+         (randoms : nat) (saved : list (nat * A))
+         (gen : G A) (fuzz : A -> G A) (print : A -> string)
+         (prop : A -> option bool) : Result :=
+  match fuel with
+  | O => giveUp st 
+  | S fuel' => 
+    if (gte (numSuccessTests st) (maxSuccessTests st)) then
+      let x : nat := printnvb tt in
+      doneTestingFuzz (trace (show x) x) st
+    else if (gte (numDiscardedTests st) (maxDiscardedTests st)) then
+      giveUp st
+    else 
+    let size := (computeSize st) (numSuccessTests st) (numDiscardedTests st) in
+    let (rnd1, rnd2) := randomSplit (randomSeed st) in
+    (* How to decide between generation and fuzzing? *)
+    (* For now, if there is a succesful seed, use it.
+       If there is not, pick the first discarded one, fuzz it until
+       you run out of energy, and then generate a random test again.
+     *)
+    let '(g,favored',discards',favored_queue', discard_queue', randoms', saved') :=
+        pick_next gen fuzz favored discards favored_queue discard_queue randoms saved in
+    let a := run g size rnd1 in
+    (* TODO: These recursive calls are a place to hold depth/handicap information as well.*)
+    let '(res, (is_interesting, energy)) := withInstrumentation (fun _ : unit => prop a) in
+    let zero_0 := 0 in (* trace (show res ++ nl) 0 in*)
+    match res with                                                     
+    | Some true =>
+      match clear_queues fuel with
+      | true => fuzzLoopAux fuel' (updSuccTests st S) nil nil nil nil randoms' nil gen fuzz print prop
+      | _ => let is_interesting := true in
+        if is_interesting then
+          (* Successful and interesting, keep in favored queue and save! *)
+          fuzzLoopAux fuel' (updSuccTests st S) favored' discards' ((energy, a)::favored_queue') discard_queue' randoms' ((energy,a) :: saved') gen fuzz print prop
+        else
+          (* Successful but no new paths, don't keep. *)
+          fuzzLoopAux fuel' (updSuccTests st S) favored' discards' favored_queue' discard_queue' randoms' saved' gen fuzz print prop
+      end
+    | Some false =>
+        let '(MkState mst mdt ms cs nst ndt ls e r nss nts ana) := st in
+        let zero := trace (print a ++ nl) zero_0 in
+        let pre : string := "*** Failed " in
+        (* TODO: shrinking *)
+        (*         let (numShrinks, res') := localMin rnd1_copy st (MkRose res ts) in *)
+        let numShrinks := 0 in
+        let suf := ("after " ++ (show (S nst)) ++ " tests and "
+                                 ++ (show numShrinks) ++ " shrinks. ("
+                                 ++ (show ndt) ++ " discards)")%string in
+        Failure (nst + 1 + zero) numShrinks ndt r size (pre ++ suf) (summary st) "Falsified!"
+    | None =>
+      match clear_queues fuel with
+      | true => fuzzLoopAux fuel' (updDiscTests st S) nil nil nil nil randoms' nil gen fuzz print prop
+      | _ => let is_interesting := true in
+        if is_interesting then
+          (* Interesting (new path), but discard. Put in discard queue *)
+          fuzzLoopAux fuel' (updDiscTests st S) favored' discards' favored_queue' ((energy, a)::discard_queue') randoms' saved' gen fuzz print prop 
+          (* fuzzLoopAux fuel' (updDiscTests st S) favored' discards' favored_queue' discard_queue' gen fuzz print prop  *)
+        else
+          (* Not interesting + discard. Throw away. *)
+          fuzzLoopAux fuel' (updDiscTests st S) favored' discards' favored_queue' discard_queue' randoms' saved' gen fuzz print prop
+      end
+    end
+  end.
+
+Definition fuzzLoopWith {A} (a : Args)
+         (gen : G A) (fuzz : A -> G A) (print : A -> string)
+         (prop : A -> option bool) :=
+  let compFun maxSuccess maxSize n d := maxSize in
+  let (rnd, computeFun) := (newRandomSeed, compFun (maxSize a) (maxSuccess a)) in
+  let st := MkState (maxSuccess a)  (* maxSuccessTests   *)
+                    (maxDiscard a)  (* maxDiscardTests   *)
+                    (maxShrinks a)  (* maxShrinks        *)
+                    computeFun      (* computeSize       *)
+                    0               (* numSuccessTests   *)
+                    0               (* numDiscardTests   *)
+                    (Map.empty nat) (* labels            *)
+                    true            (* expectedFailure   *)
+                    rnd             (* randomSeed        *)
+                    0               (* numSuccessShrinks *)
+                    0               (* numTryShrinks     *)
+                    false           (* analysis          *)
+  in fuzzLoopAux (maxSuccess a + maxDiscard a) st [] [] [] [] random_fuel [] gen fuzz print prop.
+
+Definition fuzzLoop {A} := @fuzzLoopWith A stdArgs.

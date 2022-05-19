@@ -90,6 +90,8 @@ let gInjectTyCtr s =
   if s = "" then failwith "Called gInjectTyCtr with empty string";
   qualid_of_string s
 let gTyCtr = qualid_to_coq_expr
+let tyCtrToQualid x = x
+
 
 type arg = local_binder_expr
 let gArg ?assumName:(an=hole) ?assumType:(at=hole) ?assumImplicit:(ai=false) ?assumGeneralized:(ag=false) _ =
@@ -119,6 +121,11 @@ type coq_type =
   | Arrow of coq_type * coq_type
   | TyCtr of ty_ctr * coq_type list
   | TyParam of ty_param
+
+let rec coq_type_size ct =
+  match ct with
+  | Arrow (_,ct') -> 1 + coq_type_size ct'
+  | _ -> 0
 
 let rec coq_type_to_string ct = 
   match ct with

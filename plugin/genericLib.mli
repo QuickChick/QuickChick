@@ -27,6 +27,7 @@ type ty_ctr
 val ty_ctr_to_string : ty_ctr -> string
 val gInjectTyCtr : string -> ty_ctr
 val gTyCtr : ty_ctr -> coq_expr
+val tyCtrToQualid : ty_ctr -> Libnames.qualid
 
 type arg
 val gArg : ?assumName:coq_expr ->
@@ -44,6 +45,7 @@ type coq_type =
   | TyCtr of ty_ctr * coq_type list
   | TyParam of ty_param
 
+val coq_type_size : coq_type -> int
 val coq_type_to_string : coq_type -> string
 
 type constructor 
