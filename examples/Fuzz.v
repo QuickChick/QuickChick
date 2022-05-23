@@ -10,7 +10,8 @@ Definition fuzz (n : nat) : G nat :=
   x <- choose (1,3);;
   ret (n + x).
 
-Definition fuzzer := fuzzLoop gen fuzz show test_prop.
+Definition fuzzer :=
+  fun (u : unit) => fuzzLoop gen fuzz show test_prop.
 
 QuickChickDebug Debug On.
-FuzzChick test_prop fuzzer.
+FuzzChick test_prop (fuzzer tt).

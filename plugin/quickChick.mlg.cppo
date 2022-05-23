@@ -416,6 +416,7 @@ let qcFuzz_main prop_def temp_dir execn prop_mlf prop_mlif warnings prop fuzzLoo
   (* Add a main function to get some output *)
   let oc = open_out_gen [Open_append;Open_text] 0o666 mlf in
   Printf.fprintf oc "let _ = \n\
+    Printf.printf \"Entering main of qc_exec\\n\"; flush stdout;\n\
     setup_shm_aux ();\n\
 (*  Printexc.record_backtrace true;  *)\n\
     let toStr l = \n\
