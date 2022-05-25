@@ -11,7 +11,7 @@ open Ltac_plugin
 
 }
 
-DECLARE PLUGIN "quickchick_plugin"
+DECLARE PLUGIN "coq-quickchick.plugin"
 
 {
 #if COQ_VERSION >= (8, 15, 0)
