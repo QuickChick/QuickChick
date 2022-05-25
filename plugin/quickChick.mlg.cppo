@@ -203,7 +203,7 @@ let define_and_run c env evd =
        (*       let sed_cmd = Printf.sprintf "sed '2i   (name %s)' %s > %s" (Filename.chop_extension (Filename.basename mlf)) s (dir ^ "/" ^ s) in *)
        ignore (Sys.command awk_cmd);
        (* The command is just dune build *)
-       Printf.sprintf "cd %s && dune build --display=quiet > build.log 2> build.err" dir
+       Printf.sprintf "cd %s && dune build --root=. --display=quiet > build.log 2> build.err" dir
   in
   (* Overwrite execn in case of dune *)
   let execn =
