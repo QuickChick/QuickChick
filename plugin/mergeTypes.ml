@@ -134,9 +134,65 @@ and unifys (t1s : dep_type list) (t2s : dep_type list) : sub option =
           unifys (List.map (sub_term s) t1s) (List.map (sub_term s) t2s))
       | _, _ -> failwith "error, shouldn't get here!"
 (*
-TODO: I should double check that my implementation of unify is correct.
-Shouldn't I apply the existing sub to terms before unifying?
+For now, I'll just assume that the shared parameter is the last parameter.
+Later, I'll figure out how to actually get that input from the command.
    *)
+
+let rec remove (l : 'a list) (a : 'a) : 'a list option =
+  match l with
+  | [] -> None
+  | (x :: xs) -> if a == x then Some xs else Option.bind (remove xs a) (fun l -> Some (x :: l))
+
+(* Inputs two sets of recursive arguments, and outputs three lists of arguments:
+   combined arguments, arguments from 1 which were unmatched, and arguments from
+   2 which were unmatched respectively.*)
+let merge_recs (rs1 : dep_type list list) (rs2 : dep_type list list)
+  : dep_type list list * dep_type list list * dep_type list list =
+  List.fold_left (fun (both, just1, rs2) t ->
+    match remove rs2 t with
+    | None -> (both, t :: just1, rs2)
+    | Some rs2' -> (t :: both, just1, rs2')
+    )
+    ([],[], rs2) rs1
+
+let merge_ctrs (name1 : ty_ctr) (name2 : ty_ctr) (vs1, rs1, os1, outs1 : ctr_data)
+  (vs2, rs2, os2, outs2 : ctr_data) : ctr_data option =
+  let t1 = List.hd (List.rev outs1) in
+  let as1 = List.rev (List.tl (List.rev outs1)) in
+  let t2 = List.hd (List.rev outs2) in
+  let as2 = List.rev (List.tl (List.rev outs2)) in
+  Option.bind (unify t1 t2) (fun sub ->
+    let s = sub_term sub in
+    let rs1' = List.map (List.map s) rs1 in
+    let rs2' = List.map (List.map s) rs2 in
+    let os1' = List.map (fun (c, ts) -> (c, List.map s ts)) os1 in
+    let os2' = List.map (fun (c, ts) -> (c, List.map s ts)) os2 in
+    let t = s t1 in (*this should be equal to s t2*)
+    let as_ = List.append (List.map s as1) (List.map s as2) in
+    let (rs, more_os1, more_os2) = merge_recs rs1' rs2' in
+    let os = os1' @ os2' @ (List.map (fun args -> name1, args) more_os1)
+      @ (List.map (fun args -> name2, args) more_os2) in
+    let was_subbed = fun v -> IdMap.mem v sub in
+    let vs = List.filter (fun (v, _) -> was_subbed v) vs1 @ List.filter (fun (v, _) -> was_subbed v) vs2 in
+    Some (vs, rs, os, (List.rev (t :: (List.rev as_))))
+  )
+
+(*Note: I need to deal with if two constructors happen to have a forall bound variable
+   of the same name.*)
+
+type relation = (ty_ctr * ty_param list * dep_ctr list * dep_type)
+(* let merge_relations ((tyctr1, params1, ctr1, ty1) : relation)
+                    ((tyctr2, params2, ctr2, ty2) : relation)
+  : relation = *)
+
+  
+(*
+type ctr_data =
+  (var * dep_type) list (*forall variables*)
+  * dep_type list list (*recursive calls*)
+  * (ty_ctr * dep_type list) list (*nonrecursive calls*)
+  * dep_type list output parameters
+*)
 
 
 (* P : c1 es | .... => P_ : c1_ es* .... *)
