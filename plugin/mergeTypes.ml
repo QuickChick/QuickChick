@@ -40,7 +40,7 @@ let convertConstructor (me : ty_ctr) (ctr : dep_type) : ctr_data =
     match ctr with
     | DProd  ((v, dt1), dt2) -> convertConstructorAux dt2 me ((v , dt1) :: vs) rs os
     | DTyCtr (tc, dts) -> (vs , rs , os , dts)
-    | DArrow (DTyCtr (c , dts), dt2) -> if c == me then
+    | DArrow (DTyCtr (c , dts), dt2) -> if c = me then
       convertConstructorAux dt2 me vs (dts :: rs) os
       else
       convertConstructorAux dt2 me vs rs ((c , dts) :: os)
@@ -83,7 +83,9 @@ let rec sub_term (s : sub) (t : dep_type) : dep_type =
   | DProd  ((v, dt1), dt2) -> DProd ((v , sub_term s dt1), sub_term s dt2)
   | DTyParam tp -> DTyParam tp
   | DCtr (c, dts) -> DCtr (c, List.map (sub_term s) dts)
-  | DTyVar v -> IdMap.find v s
+  | DTyVar v -> (match IdMap.find_opt v s with
+                | None -> DTyVar v
+                | Some t -> t)
   | DApp (dt, dts) -> DApp (sub_term s dt, List.map (sub_term s) dts)
   | DNot dt -> DNot (sub_term s dt)
   | DHole -> DHole
@@ -98,7 +100,7 @@ let rec occurs (v : var) (t : dep_type) : bool =
   | DProd  ((v, dt1), dt2) -> occurs v dt1 || occurs v dt2
   | DTyParam tp -> false
   | DCtr (c, dts) -> List.exists (occurs v) dts
-  | DTyVar v' -> v == v'
+  | DTyVar v' -> v = v'
   | DApp (dt, dts) -> occurs v dt || (List.exists (occurs v) dts)
   | DNot dt -> occurs v dt
   | DHole -> false
@@ -106,7 +108,8 @@ let rec occurs (v : var) (t : dep_type) : bool =
 let rec unify (t1 : dep_type) (t2 : dep_type) : sub option =
   match t1, t2 with
   | DTyVar v, _ -> if occurs v t2 then None else Some (IdMap.singleton v t2)
-  | DTyCtr (tc, dts), DTyCtr (tc', dts') -> unifys dts dts'
+  | t, DTyVar v -> unify (DTyVar v) t
+  | DTyCtr (tc, dts), DTyCtr (tc', dts') -> if tc = tc' then unifys dts dts' else None
   | DArrow (dt1, dt2), DArrow (dt1', dt2') ->
       Option.bind (unify dt1 dt1') (fun sub1 ->
       Option.bind (unify (sub_term sub1 dt2) (sub_term sub1 dt2')) (fun sub2 ->
@@ -116,7 +119,7 @@ let rec unify (t1 : dep_type) (t2 : dep_type) : sub option =
       Option.bind (unify (sub_term sub1 dt2) (sub_term sub1 dt2')) (fun sub2 ->
       Some (compose_sub sub1 sub2)))
   | DTyParam tp, DTyParam tp' -> Some IdMap.empty
-  | DCtr (c, dts), DCtr (c', dts') -> if not (c == c') then None
+  | DCtr (c, dts), DCtr (c', dts') -> if not (constructor_to_string c = constructor_to_string c') then None
       else unifys dts dts'
   | DApp (dt, dts), DApp (dt', dts') -> 
       Option.bind (unify dt dt') (fun sub1 ->
@@ -141,7 +144,7 @@ Later, I'll figure out how to actually get that input from the command.
 let rec remove (l : 'a list) (a : 'a) : 'a list option =
   match l with
   | [] -> None
-  | (x :: xs) -> if a == x then Some xs else Option.bind (remove xs a) (fun l -> Some (x :: l))
+  | (x :: xs) -> if a = x then Some xs else Option.bind (remove xs a) (fun l -> Some (x :: l))
 
 (* Inputs two sets of recursive arguments, and outputs three lists of arguments:
    combined arguments, arguments from 1 which were unmatched, and arguments from
@@ -172,7 +175,7 @@ let merge_ctrs (name1 : ty_ctr) (name2 : ty_ctr) (vs1, rs1, os1, outs1 : ctr_dat
     let (rs, more_os1, more_os2) = merge_recs rs1' rs2' in
     let os = os1' @ os2' @ (List.map (fun args -> name1, args) more_os1)
       @ (List.map (fun args -> name2, args) more_os2) in
-    let was_subbed = fun v -> IdMap.mem v sub in
+    let was_subbed = fun v -> not (IdMap.mem v sub) in
     let vs = List.filter (fun (v, _) -> was_subbed v) vs1 @ List.filter (fun (v, _) -> was_subbed v) vs2 in
     Some (vs, rs, os, (List.rev (t :: (List.rev as_))))
   )
@@ -198,7 +201,8 @@ let merge_relations ((tyctr1, params1, ctrs1, ty1) : relation)
   (*TODO: in final version, this should not just assume that shared param is in last position*)
   let combine_lists = fun l1 l2 -> List.rev(List.hd (List.rev l1)
     :: (List.tl (List.rev l1)) @ (List.tl (List.rev l2))) in
-  let params = combine_lists params1 params2 in
+  (* let params = combine_lists params1 params2 in *)
+  let params = [] in
   let ty = convert_type_back (combine_lists (convert_type ty1) (convert_type ty2)) in
   let ctrs = List.fold_left (fun acc (name1, ctr1) -> (List.fold_left (fun acc (name2, ctr2) -> 
     match merge_ctrs tyctr1 tyctr2 (convertConstructor tyctr1 ctr1) (convertConstructor tyctr2 ctr2) with
@@ -207,7 +211,7 @@ let merge_relations ((tyctr1, params1, ctrs1, ty1) : relation)
         (new_name, new_ctr) :: acc
     | None -> acc
     ) acc ctrs2)) [] ctrs1 in
-  (tyctr, params, failwith "hole", ty)
+  (tyctr, params, ctrs, ty)
 
   
 (*
@@ -289,4 +293,5 @@ let merge ind1 ind2 ind =
   let rel1 = extract_relation ind1 in
   let rel2 = extract_relation ind2 in
   let rel = merge_relations rel1 rel2 in
+  (* msg_debug (str ("jacob 3" ^ (dep_dt_to_string rel))); *)
   define_new_inductive rel
