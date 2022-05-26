@@ -180,10 +180,34 @@ let merge_ctrs (name1 : ty_ctr) (name2 : ty_ctr) (vs1, rs1, os1, outs1 : ctr_dat
 (*Note: I need to deal with if two constructors happen to have a forall bound variable
    of the same name.*)
 
+let rec convert_type (ty : dep_type) : dep_type list =
+  match ty with
+  | DArrow (a, b) -> a :: convert_type b
+  | out -> []
+
+let rec convert_type_back (params : dep_type list) : dep_type =
+  match params with 
+  | [] -> DTyCtr (gInjectTyCtr "Prop", [])
+  | param :: params -> DArrow (param, convert_type_back params)
+
 type relation = (ty_ctr * ty_param list * dep_ctr list * dep_type)
-(* let merge_relations ((tyctr1, params1, ctr1, ty1) : relation)
-                    ((tyctr2, params2, ctr2, ty2) : relation)
-  : relation = *)
+let merge_relations ((tyctr1, params1, ctrs1, ty1) : relation)
+                    ((tyctr2, params2, ctrs2, ty2) : relation)
+  : relation =
+  let tyctr = gInjectTyCtr ((ty_ctr_to_string tyctr1) ^ (ty_ctr_to_string tyctr2)) in
+  (*TODO: in final version, this should not just assume that shared param is in last position*)
+  let combine_lists = fun l1 l2 -> List.rev(List.hd (List.rev l1)
+    :: (List.tl (List.rev l1)) @ (List.tl (List.rev l2))) in
+  let params = combine_lists params1 params2 in
+  let ty = convert_type_back (combine_lists (convert_type ty1) (convert_type ty2)) in
+  let ctrs = List.fold_left (fun acc (name1, ctr1) -> (List.fold_left (fun acc (name2, ctr2) -> 
+    match merge_ctrs tyctr1 tyctr2 (convertConstructor tyctr1 ctr1) (convertConstructor tyctr2 ctr2) with
+    | Some ctr -> let new_ctr = convertBack tyctr ctr in
+        let new_name = (injectCtr (constructor_to_string name1 ^ constructor_to_string name2)) in
+        (new_name, new_ctr) :: acc
+    | None -> acc
+    ) acc ctrs2)) [] ctrs1 in
+  (tyctr, params, failwith "hole", ty)
 
   
 (*
@@ -227,7 +251,7 @@ let renamer (ty_ctr, ty_params, ctrs, typ) : dep_dt =
   let typ' = rename_dt typ in
   (ty_ctr', ty_params, ctrs', typ')
 
-let merge ind1 ind2 ind = 
+(* let merge ind1 ind2 ind = 
 (* (fun id => body) *)  
   match ind1 with 
   | { CAst.v = CLambdaN ([CLocalAssum ([{ CAst.v = Names.Name id1; CAst.loc = _loc2 }], _kind, _type)], body1); _ } ->
@@ -244,4 +268,25 @@ let merge ind1 ind2 ind =
     in
     msg_debug (str (dep_dt_to_string (renamer dt1)) ++ fnl ());
     define_new_inductive (renamer dt1)
-  | _ -> qcfail "Merge/NotLam"
+  | _ -> qcfail "Merge/NotLam" *)
+
+let extract_relation ind : relation =
+  match ind with 
+  | { CAst.v = CLambdaN ([CLocalAssum ([{ CAst.v = Names.Name id1; CAst.loc = _loc2 }], _kind, _type)], body1); _ } ->
+    (* Extract (x1,x2,...) if any, P and arguments *)
+    let (p1, args1) =
+      match body1 with 
+      | { CAst.v = CApp (p, args); _ } -> (p, args)
+      | _ -> qcfail "Merge/Not App"
+    in     
+    match coerce_reference_to_dep_dt p1 with
+    | Some dt -> msg_debug (str (dep_dt_to_string dt) ++ fnl()); dt 
+    | None -> failwith "Not supported type"
+
+  
+
+let merge ind1 ind2 ind = 
+  let rel1 = extract_relation ind1 in
+  let rel2 = extract_relation ind2 in
+  let rel = merge_relations rel1 rel2 in
+  define_new_inductive rel
