@@ -105,6 +105,16 @@ let rec occurs (v : var) (t : dep_type) : bool =
   | DNot dt -> occurs v dt
   | DHole -> false
 
+(*merge_disjoint from stackoverflow:*)
+let merge_disjoint m1 m2 = 
+  IdMap.merge 
+    (fun k x0 y0 -> 
+       match x0, y0 with 
+         None, None -> None
+       | None, Some v | Some v, None -> Some v
+       | _, _ -> invalid_arg "merge_disjoint: maps are not disjoint")
+    m1 m2
+
 let rec unify (t1 : dep_type) (t2 : dep_type) : sub option =
   match t1, t2 with
   | DTyVar v, _ -> if occurs v t2 then None else Some (IdMap.singleton v t2)
@@ -134,17 +144,26 @@ and unifys (t1s : dep_type list) (t2s : dep_type list) : sub option =
       | [], [] -> Some IdMap.empty
       | (t1 :: t1s), (t2 :: t2s) -> 
         Option.bind (unify t1 t2) (fun s ->
-          unifys (List.map (sub_term s) t1s) (List.map (sub_term s) t2s))
+          Option.bind (unifys (List.map (sub_term s) t1s) (List.map (sub_term s) t2s)) (fun s2 ->
+          Some (merge_disjoint s s2)))
       | _, _ -> failwith "error, shouldn't get here!"
 (*
 For now, I'll just assume that the shared parameter is the last parameter.
 Later, I'll figure out how to actually get that input from the command.
    *)
 
-let rec remove (l : 'a list) (a : 'a) : 'a list option =
+(* let rec remove (l : 'a list) (a : 'a) : 'a list option = *)
+let rec remove (l : dep_type list list) (a : dep_type list) : (dep_type list * dep_type list list) option =
   match l with
   | [] -> None
-  | (x :: xs) -> if a = x then Some xs else Option.bind (remove xs a) (fun l -> Some (x :: l))
+  | (x :: xs) -> if (List.hd (List.rev a)) = (List.hd (List.rev x))
+      then Some (x , xs)
+      else Option.bind (remove xs a) (fun (params, l) -> Some (params, (x :: l)))
+(*TODO: here, once again, I make the assumption that the shared parameter is last. Need to fix this*)
+
+(*TODO: here as well*)
+let combine_params (params1 : dep_type list) (params2 : dep_type list) : dep_type list =
+  (List.rev (List.tl (List.rev params1))) @ (List.rev (List.tl (List.rev params2))) @ [(List.hd (List.rev params1))]
 
 (* Inputs two sets of recursive arguments, and outputs three lists of arguments:
    combined arguments, arguments from 1 which were unmatched, and arguments from
@@ -154,7 +173,7 @@ let merge_recs (rs1 : dep_type list list) (rs2 : dep_type list list)
   List.fold_left (fun (both, just1, rs2) t ->
     match remove rs2 t with
     | None -> (both, t :: just1, rs2)
-    | Some rs2' -> (t :: both, just1, rs2')
+    | Some (params, rs2') -> (combine_params t params :: both, just1, rs2')
     )
     ([],[], rs2) rs1
 
