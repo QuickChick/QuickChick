@@ -152,14 +152,13 @@ For now, I'll just assume that the shared parameter is the last parameter.
 Later, I'll figure out how to actually get that input from the command.
    *)
 
-(* let rec remove (l : 'a list) (a : 'a) : 'a list option = *)
+(* If a is in l, returns l with a removed *))
 let rec remove (l : dep_type list list) (a : dep_type list) : (dep_type list * dep_type list list) option =
   match l with
   | [] -> None
-  | (x :: xs) -> if (List.hd (List.rev a)) = (List.hd (List.rev x))
+  | (x :: xs) -> if (List.hd (List.rev a)) = (List.hd (List.rev x)) (* TODO: here, make assumption parameter at end*)
       then Some (x , xs)
       else Option.bind (remove xs a) (fun (params, l) -> Some (params, (x :: l)))
-(*TODO: here, once again, I make the assumption that the shared parameter is last. Need to fix this*)
 
 (*TODO: here as well*)
 let combine_params (params1 : dep_type list) (params2 : dep_type list) : dep_type list =
@@ -177,8 +176,8 @@ let merge_recs (rs1 : dep_type list list) (rs2 : dep_type list list)
     )
     ([],[], rs2) rs1
 
-(*returns a new version of vs2 with no names which are also in vs1*)
-let remove_duplicates (vs1 : (var * dep_type) list) (vs2 : (var * dep_type) list)
+(*returns a renaming for variables in vs2 which maps to names distinct from names in vs1*)
+let generate_distinct_names (vs1 : (var * dep_type) list) (vs2 : (var * dep_type) list)
   : var IdMap.t =
   let names = List.map (fun (v, _) -> var_to_string v) vs1 in
   let rec name_starting_with (s : string) : string =
@@ -188,23 +187,50 @@ let remove_duplicates (vs1 : (var * dep_type) list) (vs2 : (var * dep_type) list
   let pairs = List.map (fun (v, ty) -> (v, inject_var (name_starting_with (var_to_string v)))) vs2 in
   IdMap.of_seq (List.to_seq pairs)
 
+
+  
+(*
+type ctr_data =
+  (var * dep_type) list (*forall variables*)
+  * dep_type list list (*recursive calls*)
+  * (ty_ctr * dep_type list) list (*nonrecursive calls*)
+  * dep_type list output parameters
+*)
 let merge_ctrs (name1 : ty_ctr) (name2 : ty_ctr) (vs1, rs1, os1, outs1 : ctr_data)
   (vs2, rs2, os2, outs2 : ctr_data) : ctr_data option =
+  (* Get a renaming for variables in vs2. vs1 and vs2 should already be unique within themselves, but we can't
+     have names clash between them. *)
+  let var_renaming = generate_distinct_names vs1 vs2 in
+  let ren = fun v -> IdMap.find v var_renaming in
+  let var_sub = IdMap.map (fun t -> DTyVar t) var_renaming in
+  (* apply variable renaming to everything from second relation *)
+  let vs2 = List.map (fun (v, t) -> (ren v, t)) vs2 in
+  let rs2 = List.map (fun params -> (List.map (sub_term var_sub) params)) rs2 in
+  let os2 = List.map (fun (tctr, params) -> (tctr, List.map (sub_term var_sub) params)) os2 in
+  let outs2 = List.map (sub_term var_sub) outs2 in
+  (* split output parameters into shared value and others (TODO: fix this when I make shared value not always last) *)
   let t1 = List.hd (List.rev outs1) in
   let as1 = List.rev (List.tl (List.rev outs1)) in
   let t2 = List.hd (List.rev outs2) in
   let as2 = List.rev (List.tl (List.rev outs2)) in
+  (* Check if shared parameter of both constructors unify *)
   Option.bind (unify t1 t2) (fun sub ->
+    (* In the case where they do unify, apply the resulting substitution to everything: *)
     let s = sub_term sub in
     let rs1' = List.map (List.map s) rs1 in
     let rs2' = List.map (List.map s) rs2 in
     let os1' = List.map (fun (c, ts) -> (c, List.map s ts)) os1 in
     let os2' = List.map (fun (c, ts) -> (c, List.map s ts)) os2 in
+    (* Build the pieces of the resulting constructor by combining pieces from the two input constructors: *)
     let t = s t1 in (*this should be equal to s t2*)
     let as_ = List.append (List.map s as1) (List.map s as2) in
+    (* Any recursive arguments which match up should be combined, and other should be left as is: *)
     let (rs, more_os1, more_os2) = merge_recs rs1' rs2' in
+    (* Collect the other non-recursive arguments: *)
     let os = os1' @ os2' @ (List.map (fun args -> name1, args) more_os1)
       @ (List.map (fun args -> name2, args) more_os2) in
+    (* Collect new list of forall bound variables, which is the union of the lists of the inputs except with variables
+       which got substituted during unification removed *)
     let was_subbed = fun v -> not (IdMap.mem v sub) in
     let vs = List.filter (fun (v, _) -> was_subbed v) vs1 @ List.filter (fun (v, _) -> was_subbed v) vs2 in
     Some (vs, rs, os, (List.rev (t :: (List.rev as_))))
@@ -242,15 +268,6 @@ let merge_relations ((tyctr1, params1, ctrs1, ty1) : relation)
     | None -> acc
     ) acc ctrs2)) [] ctrs1 in
   (tyctr, params, ctrs, ty)
-
-  
-(*
-type ctr_data =
-  (var * dep_type) list (*forall variables*)
-  * dep_type list list (*recursive calls*)
-  * (ty_ctr * dep_type list) list (*nonrecursive calls*)
-  * dep_type list output parameters
-*)
 
 
 (* P : c1 es | .... => P_ : c1_ es* .... *)
@@ -330,10 +347,9 @@ let merge ind1 ind2 ind =
 
 TODO still:
 1) Make it so that it doesn't just assume that the shared parameter is the last one
-2) Make it deal with two constructors (one from one type and one from the other) happening
-  to have variables with the same name
 3) Add in the pass where it looks for constructors which don't change the shared value, and
   treat them separately
 4) Generate the mappings back and forth P as x /\ Q bs x <-> PQ as bs x
+5) Find out why falses and Context breaks things
    
 *)
