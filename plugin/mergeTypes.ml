@@ -117,7 +117,7 @@ let merge_disjoint m1 m2 =
 
 let rec unify (t1 : dep_type) (t2 : dep_type) : sub option =
   match t1, t2 with
-  | DTyVar v, _ -> if occurs v t2 then None else Some (IdMap.singleton v t2)
+  | DTyVar v, _ -> if t2 = DTyVar v then Some IdMap.empty else if occurs v t2 then None else Some (IdMap.singleton v t2)
   | t, DTyVar v -> unify (DTyVar v) t
   | DTyCtr (tc, dts), DTyCtr (tc', dts') -> if tc = tc' then unifys dts dts' else None
   | DArrow (dt1, dt2), DArrow (dt1', dt2') ->
@@ -177,6 +177,17 @@ let merge_recs (rs1 : dep_type list list) (rs2 : dep_type list list)
     )
     ([],[], rs2) rs1
 
+(*returns a new version of vs2 with no names which are also in vs1*)
+let remove_duplicates (vs1 : (var * dep_type) list) (vs2 : (var * dep_type) list)
+  : var IdMap.t =
+  let names = List.map (fun (v, _) -> var_to_string v) vs1 in
+  let rec name_starting_with (s : string) : string =
+    if List.mem s names then name_starting_with (s ^ "'") else s
+  in
+  (* List.map (fun (v, ty) -> (inject_var (name_starting_with (var_to_string v)), ty)) vs2 *)
+  let pairs = List.map (fun (v, ty) -> (v, inject_var (name_starting_with (var_to_string v)))) vs2 in
+  IdMap.of_seq (List.to_seq pairs)
+
 let merge_ctrs (name1 : ty_ctr) (name2 : ty_ctr) (vs1, rs1, os1, outs1 : ctr_data)
   (vs2, rs2, os2, outs2 : ctr_data) : ctr_data option =
   let t1 = List.hd (List.rev outs1) in
@@ -219,7 +230,7 @@ let merge_relations ((tyctr1, params1, ctrs1, ty1) : relation)
   let tyctr = gInjectTyCtr ((ty_ctr_to_string tyctr1) ^ (ty_ctr_to_string tyctr2)) in
   (*TODO: in final version, this should not just assume that shared param is in last position*)
   let combine_lists = fun l1 l2 -> List.rev(List.hd (List.rev l1)
-    :: (List.tl (List.rev l1)) @ (List.tl (List.rev l2))) in
+    :: (List.tl (List.rev l2)) @ (List.tl (List.rev l1))) in
   (* let params = combine_lists params1 params2 in *)
   let params = [] in
   let ty = convert_type_back (combine_lists (convert_type ty1) (convert_type ty2)) in
@@ -314,3 +325,15 @@ let merge ind1 ind2 ind =
   let rel = merge_relations rel1 rel2 in
   (* msg_debug (str ("jacob 3" ^ (dep_dt_to_string rel))); *)
   define_new_inductive rel
+
+(*
+
+TODO still:
+1) Make it so that it doesn't just assume that the shared parameter is the last one
+2) Make it deal with two constructors (one from one type and one from the other) happening
+  to have variables with the same name
+3) Add in the pass where it looks for constructors which don't change the shared value, and
+  treat them separately
+4) Generate the mappings back and forth P as x /\ Q bs x <-> PQ as bs x
+   
+*)
