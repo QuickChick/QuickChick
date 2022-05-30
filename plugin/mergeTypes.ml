@@ -29,19 +29,30 @@ The plan is that I will use vars directly instead of holes.
 genericLib already gives me vars where I need them, and they already have the exact behavior that I want.
 *)
 
+type rec_arg = dep_type list * dep_type (*arguments to a recursive call. Separate term is the shared parameter*)
 type ctr_data =
   (var * dep_type) list (*forall variables*)
-  * dep_type list list (*recursive calls*)
+  * rec_arg list (*recursive calls*)
   * (ty_ctr * dep_type list) list (*nonrecursive calls*)
-  * dep_type list (*output parameters*)
+  * rec_arg (*output parameters*)
+
+(* Separate out the shared parameter from a list of parameters *)
+(* TODO: in the future, make this actually use the position and not just assume last position *)
+let separate_shared (terms : 'a list) : 'a list * 'a = 
+  (List.rev (List.tl (List.rev terms)), List.hd (List.rev terms))
+
+
+(* The reverse of separate_shared *)
+let replace_shared ((terms, shared) : 'a list * 'a) : 'a list = 
+  terms @ [ shared ]
 
 let convertConstructor (me : ty_ctr) (ctr : dep_type) : ctr_data =
   let rec convertConstructorAux (ctr : dep_type) (me : ty_ctr) vs rs os : ctr_data =
     match ctr with
     | DProd  ((v, dt1), dt2) -> convertConstructorAux dt2 me ((v , dt1) :: vs) rs os
-    | DTyCtr (tc, dts) -> (vs , rs , os , dts)
+    | DTyCtr (tc, dts) -> (vs , rs , os , separate_shared dts)
     | DArrow (DTyCtr (c , dts), dt2) -> if c = me then
-      convertConstructorAux dt2 me vs (dts :: rs) os
+      convertConstructorAux dt2 me vs (separate_shared dts :: rs) os
       else
       convertConstructorAux dt2 me vs rs ((c , dts) :: os)
     | _ -> failwith ("convertConstructor: " ^ dep_type_to_string ctr)
@@ -63,14 +74,14 @@ let convertBack (me : ty_ctr) ((vs , rs , os , outs) : ctr_data) : dep_type =
     let rec convertRecCalls rs ty : dep_type =
       match rs with
       | [] -> ty
-      | (r :: rs) -> convertRecCalls rs (DArrow ((DTyCtr (me , r)), ty))
+      | (r :: rs) -> convertRecCalls rs (DArrow ((DTyCtr (me , replace_shared r)), ty))
     in
     let rec convertOtherCalls os ty : dep_type =
       match os with
       | [] -> ty
       | ((c, args) :: os) -> convertOtherCalls os (DArrow ((DTyCtr (c, args)), ty))
     in
-    convertVars vs (convertRecCalls rs (convertOtherCalls os (DTyCtr (me, outs))))
+    convertVars vs (convertRecCalls rs (convertOtherCalls os (DTyCtr (me, replace_shared outs))))
 
 (*Is this how you make a (Map var dep_type) in ocaml?*)
 module IdMap = Map.Make(UnknownOrd)
@@ -152,27 +163,25 @@ For now, I'll just assume that the shared parameter is the last parameter.
 Later, I'll figure out how to actually get that input from the command.
    *)
 
-(* If a is in l, returns l with a removed *))
-let rec remove (l : dep_type list list) (a : dep_type list) : (dep_type list * dep_type list list) option =
+(* TODO: move the type to be used in def of ctr_data *)
+(* If a is in l, returns l with a removed *)
+let rec remove (l : rec_arg list) (shared_param_match : dep_type) : (rec_arg * rec_arg list) option =
   match l with
   | [] -> None
-  | (x :: xs) -> if (List.hd (List.rev a)) = (List.hd (List.rev x)) (* TODO: here, make assumption parameter at end*)
-      then Some (x , xs)
-      else Option.bind (remove xs a) (fun (params, l) -> Some (params, (x :: l)))
-
-(*TODO: here as well*)
-let combine_params (params1 : dep_type list) (params2 : dep_type list) : dep_type list =
-  (List.rev (List.tl (List.rev params1))) @ (List.rev (List.tl (List.rev params2))) @ [(List.hd (List.rev params1))]
+  | ((params, shared_param) :: xs) -> if shared_param = shared_param_match (* TODO: here, make assumption parameter at end*)
+      then Some ((params, shared_param) , xs)
+      else Option.bind (remove xs shared_param_match) (fun (arg, l) -> Some (arg, ((params, shared_param) :: l)))
 
 (* Inputs two sets of recursive arguments, and outputs three lists of arguments:
    combined arguments, arguments from 1 which were unmatched, and arguments from
    2 which were unmatched respectively.*)
-let merge_recs (rs1 : dep_type list list) (rs2 : dep_type list list)
-  : dep_type list list * dep_type list list * dep_type list list =
-  List.fold_left (fun (both, just1, rs2) t ->
-    match remove rs2 t with
-    | None -> (both, t :: just1, rs2)
-    | Some (params, rs2') -> (combine_params t params :: both, just1, rs2')
+  
+let merge_recs (rs1 : rec_arg list) (rs2 : rec_arg list)
+  : (rec_arg list * rec_arg list * rec_arg list) =
+  List.fold_left (fun (both, just1, rs2) (params1, shared_1) ->
+    match remove rs2 shared_1 with
+    | None -> (both, (params1, shared_1) :: just1, rs2)
+    | Some ((params2, _), rs2') -> ((params1 @ params2, shared_1) :: both, just1, rs2')
     )
     ([],[], rs2) rs1
 
@@ -186,18 +195,9 @@ let generate_distinct_names (vs1 : (var * dep_type) list) (vs2 : (var * dep_type
   (* List.map (fun (v, ty) -> (inject_var (name_starting_with (var_to_string v)), ty)) vs2 *)
   let pairs = List.map (fun (v, ty) -> (v, inject_var (name_starting_with (var_to_string v)))) vs2 in
   IdMap.of_seq (List.to_seq pairs)
-
-
   
-(*
-type ctr_data =
-  (var * dep_type) list (*forall variables*)
-  * dep_type list list (*recursive calls*)
-  * (ty_ctr * dep_type list) list (*nonrecursive calls*)
-  * dep_type list output parameters
-*)
-let merge_ctrs (name1 : ty_ctr) (name2 : ty_ctr) (vs1, rs1, os1, outs1 : ctr_data)
-  (vs2, rs2, os2, outs2 : ctr_data) : ctr_data option =
+let merge_ctrs (name1 : ty_ctr) (name2 : ty_ctr) (vs1, rs1, os1, (as1, t1) : ctr_data)
+  (vs2, rs2, os2, (as2, t2) : ctr_data) : ctr_data option =
   (* Get a renaming for variables in vs2. vs1 and vs2 should already be unique within themselves, but we can't
      have names clash between them. *)
   let var_renaming = generate_distinct_names vs1 vs2 in
@@ -205,20 +205,17 @@ let merge_ctrs (name1 : ty_ctr) (name2 : ty_ctr) (vs1, rs1, os1, outs1 : ctr_dat
   let var_sub = IdMap.map (fun t -> DTyVar t) var_renaming in
   (* apply variable renaming to everything from second relation *)
   let vs2 = List.map (fun (v, t) -> (ren v, t)) vs2 in
-  let rs2 = List.map (fun params -> (List.map (sub_term var_sub) params)) rs2 in
+  let rs2 = List.map (fun (params, shared_param) -> (List.map (sub_term var_sub) params, sub_term var_sub shared_param)) rs2 in
   let os2 = List.map (fun (tctr, params) -> (tctr, List.map (sub_term var_sub) params)) os2 in
-  let outs2 = List.map (sub_term var_sub) outs2 in
+  let as2 = List.map (sub_term var_sub) as2 in
+  let t2 = sub_term var_sub t2 in
   (* split output parameters into shared value and others (TODO: fix this when I make shared value not always last) *)
-  let t1 = List.hd (List.rev outs1) in
-  let as1 = List.rev (List.tl (List.rev outs1)) in
-  let t2 = List.hd (List.rev outs2) in
-  let as2 = List.rev (List.tl (List.rev outs2)) in
   (* Check if shared parameter of both constructors unify *)
   Option.bind (unify t1 t2) (fun sub ->
     (* In the case where they do unify, apply the resulting substitution to everything: *)
     let s = sub_term sub in
-    let rs1' = List.map (List.map s) rs1 in
-    let rs2' = List.map (List.map s) rs2 in
+    let rs1' = List.map (fun (params, sh_param) -> (List.map s params, s sh_param)) rs1 in
+    let rs2' = List.map (fun (params, sh_param) -> (List.map s params, s sh_param)) rs2 in
     let os1' = List.map (fun (c, ts) -> (c, List.map s ts)) os1 in
     let os2' = List.map (fun (c, ts) -> (c, List.map s ts)) os2 in
     (* Build the pieces of the resulting constructor by combining pieces from the two input constructors: *)
@@ -227,13 +224,14 @@ let merge_ctrs (name1 : ty_ctr) (name2 : ty_ctr) (vs1, rs1, os1, outs1 : ctr_dat
     (* Any recursive arguments which match up should be combined, and other should be left as is: *)
     let (rs, more_os1, more_os2) = merge_recs rs1' rs2' in
     (* Collect the other non-recursive arguments: *)
-    let os = os1' @ os2' @ (List.map (fun args -> name1, args) more_os1)
-      @ (List.map (fun args -> name2, args) more_os2) in
+    (* TODO: when I make it so that replace_shared takes a parameter, need to pass the correct positions in the calls here*)
+    let os = os1' @ os2' @ (List.map (fun args -> name1, replace_shared args) more_os1)
+      @ (List.map (fun args -> name2, replace_shared args) more_os2) in
     (* Collect new list of forall bound variables, which is the union of the lists of the inputs except with variables
        which got substituted during unification removed *)
     let was_subbed = fun v -> not (IdMap.mem v sub) in
     let vs = List.filter (fun (v, _) -> was_subbed v) vs1 @ List.filter (fun (v, _) -> was_subbed v) vs2 in
-    Some (vs, rs, os, (List.rev (t :: (List.rev as_))))
+    Some (vs, rs, os, (as_, t))
   )
 
 (*Note: I need to deal with if two constructors happen to have a forall bound variable
