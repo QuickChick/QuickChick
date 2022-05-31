@@ -249,31 +249,40 @@ let rec convert_type_back (params : dep_type list) : dep_type =
 
 type relation = (ty_ctr * ty_param list * dep_ctr list * dep_type)
 
+let range (n : int) : int list =
+  let rec range_aux (n : int) (so_far : int list) : int list =
+    if n = 0 then so_far else range_aux (n - 1) (n :: so_far)
+  in range_aux n []
 
 (* inputs constructors from one type, and two parameters which tell it how to position the parameters in the output
    type: other_type_num_params is how many parameters the other type to be merged with has, and left_or_right
    is false if this type's params go on the left, or true if they go on the right.
    Outputs (unchanged constructors, irrelevant constructors adjusted for output type)*)
-let rec irrelevant_constructor_pass (ctrs : (GenericLib.constructor * ctr_data) list) (other_type_num_params : int) (left_or_right : bool)
+let rec irrelevant_constructor_pass (ctrs : (GenericLib.constructor * ctr_data) list) (other_type_params : dep_type list) (left_or_right : bool)
   : ((GenericLib.constructor * ctr_data) list * (GenericLib.constructor * ctr_data) list) =
   let ctr_irrelevant_try ((vs, rs, os, (params_out, shared_out)) : ctr_data) : ctr_data option =
     if List.length rs = 1
-      then let (r_params, r_shared) = List.nth rs 1 in
+      then let (r_params, r_shared) = List.nth rs 0 in
         if r_shared = shared_out
-          then let new_vars = failwith "hole" in
-              let new_r_params = if left_or_right then new_vars @ r_params else r_params @ new_vars in
-              let new_params_out = if left_or_right then new_vars @ params_out else params_out @ new_vars in
-              Some (vs @ new_vars, [ new_r_params, r_shared ], os, (new_params_out, shared_out))
+          then let new_vars = List.map (fun s -> inject_var ("x_generated_" ^ string_of_int s))
+                (range (List.length other_type_params)) in (* TODO: ask Leo how to get good unique names!*)
+              let new_vars_terms = List.map (fun v -> DTyVar v) new_vars in
+              let new_r_params = if left_or_right then new_vars_terms @ r_params else r_params @ new_vars_terms in
+              let new_params_out = if left_or_right then new_vars_terms @ params_out else params_out @ new_vars_terms in
+              Some (vs @ (List.combine new_vars other_type_params),
+                [ new_r_params, r_shared ],
+                os,
+                (new_params_out, shared_out))
           else None
       else None
   in
   match ctrs with
   | [] -> ([], [])
   | ((name, ctr) :: rest) ->
-    let (normal, irrelvant) = irrelevant_constructor_pass rest other_type_num_params left_or_right in
+    let (normal, irrelevant) = irrelevant_constructor_pass rest other_type_params left_or_right in
     match ctr_irrelevant_try ctr with
-    | None -> ((name, ctr) :: normal, rest)
-    | Some out_ctr -> (normal, (name, out_ctr) :: rest)
+    | None -> ((name, ctr) :: normal, irrelevant)
+    | Some out_ctr -> (normal, (injectCtr ((constructor_to_string name) ^ "'"), out_ctr) :: irrelevant)
 let merge_relations ((tyctr1, params1, ctrs1, ty1) : relation)
                     ((tyctr2, params2, ctrs2, ty2) : relation)
   : relation =
@@ -282,12 +291,12 @@ let merge_relations ((tyctr1, params1, ctrs1, ty1) : relation)
   let combine_lists = fun l1 l2 -> List.rev(List.hd (List.rev l1)
     :: (List.tl (List.rev l2)) @ (List.tl (List.rev l1))) in
   (* let params = combine_lists params1 params2 in *)
-  let params = [] in
+  let params = [] in (* TODO: need to fix this if want forall parameters on relations *)
   let ty = convert_type_back (combine_lists (convert_type ty1) (convert_type ty2)) in
   let (ctrs1_regular, ctrs1_irrelevant) = irrelevant_constructor_pass
-    (List.map (fun (name, ctr) -> (name, convertConstructor tyctr1 ctr)) ctrs1) (List.length ctrs2) false in
+    (List.map (fun (name, ctr) -> (name, convertConstructor tyctr1 ctr)) ctrs1) (fst (separate_shared (convert_type ty2))) false in
   let (ctrs2_regular, ctrs2_irrelevant) = irrelevant_constructor_pass
-    (List.map (fun (name, ctr) -> (name, convertConstructor tyctr2 ctr)) ctrs2) (List.length ctrs1) true in
+    (List.map (fun (name, ctr) -> (name, convertConstructor tyctr2 ctr)) ctrs2) (fst (separate_shared (convert_type ty1))) true in
   let ctrs_regular = List.fold_left (fun acc (name1, ctr1) -> (List.fold_left (fun acc (name2, ctr2) -> 
     match merge_ctrs tyctr1 tyctr2 ctr1 ctr2 with
     | Some ctr -> let new_ctr = convertBack tyctr ctr in
