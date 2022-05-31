@@ -248,6 +248,32 @@ let rec convert_type_back (params : dep_type list) : dep_type =
   | param :: params -> DArrow (param, convert_type_back params)
 
 type relation = (ty_ctr * ty_param list * dep_ctr list * dep_type)
+
+
+(* inputs constructors from one type, and two parameters which tell it how to position the parameters in the output
+   type: other_type_num_params is how many parameters the other type to be merged with has, and left_or_right
+   is false if this type's params go on the left, or true if they go on the right.
+   Outputs (unchanged constructors, irrelevant constructors adjusted for output type)*)
+let rec irrelevant_constructor_pass (ctrs : (GenericLib.constructor * ctr_data) list) (other_type_num_params : int) (left_or_right : bool)
+  : ((GenericLib.constructor * ctr_data) list * (GenericLib.constructor * ctr_data) list) =
+  let ctr_irrelevant_try ((vs, rs, os, (params_out, shared_out)) : ctr_data) : ctr_data option =
+    if List.length rs = 1
+      then let (r_params, r_shared) = List.nth rs 1 in
+        if r_shared = shared_out
+          then let new_vars = failwith "hole" in
+              let new_r_params = if left_or_right then new_vars @ r_params else r_params @ new_vars in
+              let new_params_out = if left_or_right then new_vars @ params_out else params_out @ new_vars in
+              Some (vs @ new_vars, [ new_r_params, r_shared ], os, (new_params_out, shared_out))
+          else None
+      else None
+  in
+  match ctrs with
+  | [] -> ([], [])
+  | ((name, ctr) :: rest) ->
+    let (normal, irrelvant) = irrelevant_constructor_pass rest other_type_num_params left_or_right in
+    match ctr_irrelevant_try ctr with
+    | None -> ((name, ctr) :: normal, rest)
+    | Some out_ctr -> (normal, (name, out_ctr) :: rest)
 let merge_relations ((tyctr1, params1, ctrs1, ty1) : relation)
                     ((tyctr2, params2, ctrs2, ty2) : relation)
   : relation =
@@ -258,13 +284,20 @@ let merge_relations ((tyctr1, params1, ctrs1, ty1) : relation)
   (* let params = combine_lists params1 params2 in *)
   let params = [] in
   let ty = convert_type_back (combine_lists (convert_type ty1) (convert_type ty2)) in
-  let ctrs = List.fold_left (fun acc (name1, ctr1) -> (List.fold_left (fun acc (name2, ctr2) -> 
-    match merge_ctrs tyctr1 tyctr2 (convertConstructor tyctr1 ctr1) (convertConstructor tyctr2 ctr2) with
+  let (ctrs1_regular, ctrs1_irrelevant) = irrelevant_constructor_pass
+    (List.map (fun (name, ctr) -> (name, convertConstructor tyctr1 ctr)) ctrs1) (List.length ctrs2) false in
+  let (ctrs2_regular, ctrs2_irrelevant) = irrelevant_constructor_pass
+    (List.map (fun (name, ctr) -> (name, convertConstructor tyctr2 ctr)) ctrs2) (List.length ctrs1) true in
+  let ctrs_regular = List.fold_left (fun acc (name1, ctr1) -> (List.fold_left (fun acc (name2, ctr2) -> 
+    match merge_ctrs tyctr1 tyctr2 ctr1 ctr2 with
     | Some ctr -> let new_ctr = convertBack tyctr ctr in
         let new_name = (injectCtr (constructor_to_string name1 ^ constructor_to_string name2)) in
         (new_name, new_ctr) :: acc
     | None -> acc
-    ) acc ctrs2)) [] ctrs1 in
+    ) acc ctrs2_regular)) [] ctrs1_regular in
+  let ctrs = (List.map (fun (name, ctr) -> (name, convertBack tyctr ctr)) ctrs1_irrelevant)
+    @ (List.map (fun (name, ctr) -> (name, convertBack tyctr ctr)) ctrs2_irrelevant) 
+    @ ctrs_regular in
   (tyctr, params, ctrs, ty)
 
 
