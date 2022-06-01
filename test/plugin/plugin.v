@@ -11,6 +11,11 @@ Inductive foo {A : Type} :=
 Derive (Arbitrary, Show) for foo.
 Sample (arbitrary : G foo).
 
+Variant goodFoo {A} : @foo A -> Prop :=
+  goodBaz : goodFoo baz.
+
+Fail Derive ArbitrarySizedSuchThat for (fun x => goodFoo x).
+
 Section Sanity.
 
   Inductive qux : Type :=
