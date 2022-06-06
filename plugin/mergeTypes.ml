@@ -370,6 +370,7 @@ let extract_relation ind : relation =
       | { CAst.v = CApp (p, args); _ } -> (p, args)
       | _ -> qcfail "Merge/Not App"
     in     
+    (* Find position of id1 in args1 to get parameter position *)
     match coerce_reference_to_dep_dt p1 with
     | Some dt -> msg_debug (str (dep_dt_to_string dt) ++ fnl()); dt 
     | None -> failwith "Not supported type"
@@ -387,9 +388,9 @@ let merge ind1 ind2 ind =
 
 TODO still:
 1) Make it so that it doesn't just assume that the shared parameter is the last one
-3) Add in the pass where it looks for constructors which don't change the shared value, and
-  treat them separately
 4) Generate the mappings back and forth P as x /\ Q bs x <-> PQ as bs x
 5) Find out why falses and Context breaks things
+6) name use With
+7) find out why stdlib le doesn't work
    
 *)
