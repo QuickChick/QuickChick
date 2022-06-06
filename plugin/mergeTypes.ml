@@ -285,8 +285,9 @@ let rec irrelevant_constructor_pass (ctrs : (GenericLib.constructor * ctr_data) 
     | Some out_ctr -> (normal, (injectCtr ((constructor_to_string name) ^ "'"), out_ctr) :: irrelevant)
 let merge_relations ((tyctr1, params1, ctrs1, ty1) : relation)
                     ((tyctr2, params2, ctrs2, ty2) : relation)
+                    tyctr
   : relation =
-  let tyctr = gInjectTyCtr ((ty_ctr_to_string tyctr1) ^ (ty_ctr_to_string tyctr2)) in
+  (* let tyctr = gInjectTyCtr ((ty_ctr_to_string tyctr1) ^ (ty_ctr_to_string tyctr2)) in *)
   (*TODO: in final version, this should not just assume that shared param is in last position*)
   let combine_lists = fun l1 l2 -> List.rev(List.hd (List.rev l1)
     :: (List.tl (List.rev l2)) @ (List.tl (List.rev l1))) in
@@ -375,12 +376,21 @@ let extract_relation ind : relation =
     | Some dt -> msg_debug (str (dep_dt_to_string dt) ++ fnl()); dt 
     | None -> failwith "Not supported type"
 
+let extract_tyctr ind : ty_ctr =
+  match ind with 
+  | { CAst.v =  CRef (r,_) ; _ } -> gInjectTyCtr (string_of_qualid r)
+    (* Extract (x1,x2,...) if any, P and arguments *)
+    (* Find position of id1 in args1 to get parameter position *)
+    (* match coerce_reference_to_dep_dt body1 with
+    | Some dt -> msg_debug (str (dep_dt_to_string r) ++ fnl()); r 
+    | None -> failwith "Not supported type" *)
+
   
 
 let merge ind1 ind2 ind = 
   let rel1 = extract_relation ind1 in
   let rel2 = extract_relation ind2 in
-  let rel = merge_relations rel1 rel2 in
+  let rel = merge_relations rel1 rel2 (extract_tyctr ind) in
   (* msg_debug (str ("jacob 3" ^ (dep_dt_to_string rel))); *)
   define_new_inductive rel
 
