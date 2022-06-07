@@ -37,22 +37,31 @@ type ctr_data =
   * rec_arg (*output parameters*)
 
 (* Separate out the shared parameter from a list of parameters *)
-(* TODO: in the future, make this actually use the position and not just assume last position *)
-let separate_shared (terms : 'a list) : 'a list * 'a = 
-  (List.rev (List.tl (List.rev terms)), List.hd (List.rev terms))
+let separate_shared (terms : 'a list) (param_pos : int) : 'a list * 'a = 
+  (* (List.rev (List.tl (List.rev terms)), List.hd (List.rev terms)) *)
+  let rec separate_shared_aux (terms : 'a list) (param_pos : int) (prefix : 'a list) : 'a list * 'a =
+    match terms with (term :: terms) ->
+      if param_pos = 0
+        then (prefix @ terms , term)
+        else separate_shared_aux terms (param_pos - 1) (term :: prefix)
+  in
+  separate_shared_aux terms param_pos []
 
 
-(* The reverse of separate_shared *)
-let replace_shared ((terms, shared) : 'a list * 'a) : 'a list = 
-  terms @ [ shared ]
+(* The reverse of separate_shared. param_pos should be the position where shared will end up in
+the resulting output list. *)
+let rec replace_shared ((terms, shared) : 'a list * 'a) (param_pos : int) : 'a list = 
+  if param_pos = 0
+    then shared :: terms
+    else match terms with (term :: terms) -> term :: replace_shared (terms, shared) (param_pos - 1)
 
-let convertConstructor (me : ty_ctr) (ctr : dep_type) : ctr_data =
+let convertConstructor (me : ty_ctr) (ctr : dep_type) (param_pos : int) : ctr_data =
   let rec convertConstructorAux (ctr : dep_type) (me : ty_ctr) vs rs os : ctr_data =
     match ctr with
     | DProd  ((v, dt1), dt2) -> convertConstructorAux dt2 me ((v , dt1) :: vs) rs os
-    | DTyCtr (tc, dts) -> (vs , rs , os , separate_shared dts)
+    | DTyCtr (tc, dts) -> (vs , rs , os , separate_shared dts param_pos)
     | DArrow (DTyCtr (c , dts), dt2) -> if c = me then
-      convertConstructorAux dt2 me vs (separate_shared dts :: rs) os
+      convertConstructorAux dt2 me vs (separate_shared dts param_pos :: rs) os
       else
       convertConstructorAux dt2 me vs rs ((c , dts) :: os)
     | _ -> failwith ("convertConstructor: " ^ dep_type_to_string ctr)
@@ -65,7 +74,7 @@ let convertConstructor (me : ty_ctr) (ctr : dep_type) : ctr_data =
   in
   convertConstructorAux ctr me [] [] []
 
-let convertBack (me : ty_ctr) ((vs , rs , os , outs) : ctr_data) : dep_type =
+let convertBack (me : ty_ctr) ((vs , rs , os , outs) : ctr_data) (param_pos : int) : dep_type =
     let rec convertVars vs ty : dep_type =
       match vs with
       | [] -> ty
@@ -74,14 +83,14 @@ let convertBack (me : ty_ctr) ((vs , rs , os , outs) : ctr_data) : dep_type =
     let rec convertRecCalls rs ty : dep_type =
       match rs with
       | [] -> ty
-      | (r :: rs) -> convertRecCalls rs (DArrow ((DTyCtr (me , replace_shared r)), ty))
+      | (r :: rs) -> convertRecCalls rs (DArrow ((DTyCtr (me , replace_shared r param_pos)), ty))
     in
     let rec convertOtherCalls os ty : dep_type =
       match os with
       | [] -> ty
       | ((c, args) :: os) -> convertOtherCalls os (DArrow ((DTyCtr (c, args)), ty))
     in
-    convertVars vs (convertRecCalls rs (convertOtherCalls os (DTyCtr (me, replace_shared outs))))
+    convertVars vs (convertRecCalls rs (convertOtherCalls os (DTyCtr (me, replace_shared outs param_pos))))
 
 (*Is this how you make a (Map var dep_type) in ocaml?*)
 module IdMap = Map.Make(UnknownOrd)
@@ -197,7 +206,9 @@ let generate_distinct_names (vs1 : (var * dep_type) list) (vs2 : (var * dep_type
   IdMap.of_seq (List.to_seq pairs)
   
 let merge_ctrs (name1 : ty_ctr) (name2 : ty_ctr) (vs1, rs1, os1, (as1, t1) : ctr_data)
-  (vs2, rs2, os2, (as2, t2) : ctr_data) : ctr_data option =
+  (vs2, rs2, os2, (as2, t2) : ctr_data)
+  (param_pos1 : int) (param_pos2 : int)
+  : ctr_data option =
   (* Get a renaming for variables in vs2. vs1 and vs2 should already be unique within themselves, but we can't
      have names clash between them. *)
   let var_renaming = generate_distinct_names vs1 vs2 in
@@ -225,8 +236,8 @@ let merge_ctrs (name1 : ty_ctr) (name2 : ty_ctr) (vs1, rs1, os1, (as1, t1) : ctr
     let (rs, more_os1, more_os2) = merge_recs rs1' rs2' in
     (* Collect the other non-recursive arguments: *)
     (* TODO: when I make it so that replace_shared takes a parameter, need to pass the correct positions in the calls here*)
-    let os = os1' @ os2' @ (List.map (fun args -> name1, replace_shared args) more_os1)
-      @ (List.map (fun args -> name2, replace_shared args) more_os2) in
+    let os = os1' @ os2' @ (List.map (fun args -> name1, replace_shared args param_pos1) more_os1)
+      @ (List.map (fun args -> name2, replace_shared args param_pos2) more_os2) in
     (* Collect new list of forall bound variables, which is the union of the lists of the inputs except with variables
        which got substituted during unification removed *)
     let was_subbed = fun v -> not (IdMap.mem v sub) in
@@ -284,85 +295,35 @@ let rec irrelevant_constructor_pass (ctrs : (GenericLib.constructor * ctr_data) 
     | None -> ((name, ctr) :: normal, irrelevant)
     | Some out_ctr -> (normal, (injectCtr ((constructor_to_string name) ^ "'"), out_ctr) :: irrelevant)
 let merge_relations ((tyctr1, params1, ctrs1, ty1) : relation)
+                    (param_pos1 : int)
                     ((tyctr2, params2, ctrs2, ty2) : relation)
+                    (param_pos2 : int)
                     tyctr
   : relation =
-  (* let tyctr = gInjectTyCtr ((ty_ctr_to_string tyctr1) ^ (ty_ctr_to_string tyctr2)) in *)
-  (*TODO: in final version, this should not just assume that shared param is in last position*)
-  let combine_lists = fun l1 l2 -> List.rev(List.hd (List.rev l1)
-    :: (List.tl (List.rev l2)) @ (List.tl (List.rev l1))) in
-  (* let params = combine_lists params1 params2 in *)
   let params = [] in (* TODO: need to fix this if want forall parameters on relations *)
-  let ty = convert_type_back (combine_lists (convert_type ty1) (convert_type ty2)) in
+  let converted_ty1 = separate_shared (convert_type ty1) param_pos1 in
+  let converted_ty2 = separate_shared (convert_type ty2) param_pos2 in
+  let ty = (convert_type_back ((fst converted_ty1) @ (fst converted_ty2) @ [ snd converted_ty1 ])) in
   let (ctrs1_regular, ctrs1_irrelevant) = irrelevant_constructor_pass
-    (List.map (fun (name, ctr) -> (name, convertConstructor tyctr1 ctr)) ctrs1) (fst (separate_shared (convert_type ty2))) false in
+    (List.map (fun (name, ctr) -> (name, convertConstructor tyctr1 ctr param_pos1)) ctrs1)
+    (fst converted_ty2) false in
   let (ctrs2_regular, ctrs2_irrelevant) = irrelevant_constructor_pass
-    (List.map (fun (name, ctr) -> (name, convertConstructor tyctr2 ctr)) ctrs2) (fst (separate_shared (convert_type ty1))) true in
+    (List.map (fun (name, ctr) -> (name, convertConstructor tyctr2 ctr param_pos2)) ctrs2)
+    (fst converted_ty1) true in
+  let param_pos = (List.length (convert_type ty) - 1) in
   let ctrs_regular = List.fold_left (fun acc (name1, ctr1) -> (List.fold_left (fun acc (name2, ctr2) -> 
-    match merge_ctrs tyctr1 tyctr2 ctr1 ctr2 with
-    | Some ctr -> let new_ctr = convertBack tyctr ctr in
+    match merge_ctrs tyctr1 tyctr2 ctr1 ctr2 param_pos1 param_pos2 with
+    | Some ctr -> let new_ctr = convertBack tyctr ctr param_pos in (*TODO: think here later*)
         let new_name = (injectCtr (constructor_to_string name1 ^ constructor_to_string name2)) in
         (new_name, new_ctr) :: acc
     | None -> acc
     ) acc ctrs2_regular)) [] ctrs1_regular in
-  let ctrs = (List.map (fun (name, ctr) -> (name, convertBack tyctr ctr)) ctrs1_irrelevant)
-    @ (List.map (fun (name, ctr) -> (name, convertBack tyctr ctr)) ctrs2_irrelevant) 
+  let ctrs = (List.map (fun (name, ctr) -> (name, convertBack tyctr ctr param_pos)) ctrs1_irrelevant)
+    @ (List.map (fun (name, ctr) -> (name, convertBack tyctr ctr param_pos)) ctrs2_irrelevant) 
     @ ctrs_regular in
   (tyctr, params, ctrs, ty)
 
-
-(* P : c1 es | .... => P_ : c1_ es* .... *)
-let renamer (ty_ctr, ty_params, ctrs, typ) : dep_dt =
-  let ty_ctr' = gInjectTyCtr ((ty_ctr_to_string ty_ctr) ^ "_j") in
-  let rec rename_dt = function
-      | DTyCtr (tc, dts) ->
-         if tc = ty_ctr then
-           DTyCtr (ty_ctr', List.map rename_dt dts)
-         else
-           DTyCtr (tc, List.map rename_dt dts)
-      | DArrow (dt1, dt2) ->
-          DArrow (rename_dt dt1, rename_dt dt2)
-      | DProd  ((v, dt1), dt2) ->
-         DProd ((v, rename_dt dt1), rename_dt dt2)
-      | DTyParam tp -> DTyParam tp
-      | DCtr (c, dts) ->
-         DCtr (c, List.map rename_dt dts)
-      | DTyVar v -> DTyVar v
-      | DApp (dt, dts) ->
-         DApp (rename_dt dt, List.map rename_dt dts)
-      | DNot dt -> DNot (rename_dt dt)
-      | DHole -> DHole
-  in
-  let rename_dep_ctr (c, dt) : dep_ctr =
-    let c' = injectCtr (constructor_to_string c ^ "_j") in
-    (c', rename_dt dt)
-  in
-  (* let ctrs' = List.map rename_dep_ctr ctrs in *)
-  let ctrs' = List.map (fun (c, dt) -> (injectCtr (constructor_to_string c ^ "_j")
-    , convertBack ty_ctr' (convertConstructor ty_ctr dt))) ctrs in
-  let typ' = rename_dt typ in
-  (ty_ctr', ty_params, ctrs', typ')
-
-(* let merge ind1 ind2 ind = 
-(* (fun id => body) *)  
-  match ind1 with 
-  | { CAst.v = CLambdaN ([CLocalAssum ([{ CAst.v = Names.Name id1; CAst.loc = _loc2 }], _kind, _type)], body1); _ } ->
-    (* Extract (x1,x2,...) if any, P and arguments *)
-    let (p1, args1) =
-      match body1 with 
-      | { CAst.v = CApp (p, args); _ } -> (p, args)
-      | _ -> qcfail "Merge/Not App"
-    in     
-    let dt1 : (ty_ctr * ty_param list * dep_ctr list * dep_type) = 
-      match coerce_reference_to_dep_dt p1 with
-      | Some dt -> msg_debug (str (dep_dt_to_string dt) ++ fnl()); dt 
-      | None -> failwith "Not supported type"
-    in
-    msg_debug (str (dep_dt_to_string (renamer dt1)) ++ fnl ());
-    define_new_inductive (renamer dt1)
-  | _ -> qcfail "Merge/NotLam" *)
-
-let extract_relation ind : relation =
+let extract_relation ind : relation * int =
   match ind with 
   | { CAst.v = CLambdaN ([CLocalAssum ([{ CAst.v = Names.Name id1; CAst.loc = _loc2 }], _kind, _type)], body1); _ } ->
     (* Extract (x1,x2,...) if any, P and arguments *)
@@ -371,26 +332,26 @@ let extract_relation ind : relation =
       | { CAst.v = CApp (p, args); _ } -> (p, args)
       | _ -> qcfail "Merge/Not App"
     in     
+    let rec find f lst = (*from stackoverflow*)
+    match lst with
+    | [] -> raise (failwith "Parameter bound parameter not in argument list")
+    | h :: t -> if f h then 0 else 1 + find f t in
     (* Find position of id1 in args1 to get parameter position *)
+    let param_pos = find (function | ({CAst.v = CRef (id,_) ; _} , _) -> qualid_basename id = id1) args1 in
+    (* let param_pos = List.find (function | Some (CRef (r,_) ; _, _) -> r = id1 | _ -> false) args1 in *)
+    msg_debug (str ("param_pos is :::::::::::::::::::: " ^ string_of_int param_pos));
     match coerce_reference_to_dep_dt p1 with
-    | Some dt -> msg_debug (str (dep_dt_to_string dt) ++ fnl()); dt 
+    | Some dt -> msg_debug (str (dep_dt_to_string dt) ++ fnl()); dt , param_pos
     | None -> failwith "Not supported type"
 
 let extract_tyctr ind : ty_ctr =
   match ind with 
   | { CAst.v =  CRef (r,_) ; _ } -> gInjectTyCtr (string_of_qualid r)
-    (* Extract (x1,x2,...) if any, P and arguments *)
-    (* Find position of id1 in args1 to get parameter position *)
-    (* match coerce_reference_to_dep_dt body1 with
-    | Some dt -> msg_debug (str (dep_dt_to_string r) ++ fnl()); r 
-    | None -> failwith "Not supported type" *)
-
-  
 
 let merge ind1 ind2 ind = 
-  let rel1 = extract_relation ind1 in
-  let rel2 = extract_relation ind2 in
-  let rel = merge_relations rel1 rel2 (extract_tyctr ind) in
+  let rel1, param_pos1 = extract_relation ind1 in
+  let rel2, param_pos2 = extract_relation ind2 in
+  let rel = merge_relations rel1 param_pos1 rel2 param_pos2 (extract_tyctr ind) in
   (* msg_debug (str ("jacob 3" ^ (dep_dt_to_string rel))); *)
   define_new_inductive rel
 
@@ -400,7 +361,6 @@ TODO still:
 1) Make it so that it doesn't just assume that the shared parameter is the last one
 4) Generate the mappings back and forth P as x /\ Q bs x <-> PQ as bs x
 5) Find out why falses and Context breaks things
-6) name use With
 7) find out why stdlib le doesn't work
    
 *)

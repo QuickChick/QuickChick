@@ -27,7 +27,7 @@ QuickChickDebug Debug On.
 Merge (fun t => bst lo hi t) With (fun t => bal n t)
       As attemp.
 
-Print bstbal.
+Print attemp.
 
 Fixpoint size (t : Tree) : nat :=
   match t with
