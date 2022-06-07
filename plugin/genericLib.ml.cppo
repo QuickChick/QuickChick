@@ -747,15 +747,26 @@ let locate_ind c =
       with Not_found -> failwith ("Locate_ind: " ^ string_of_qualid c)
   end
 
+let locate_constant_of_id (c : Id.t) : Constant.t option =
+  begin
+    begin match Nametab.locate (qualid_of_ident c) with
+          | GlobRef.ConstRef x -> Some x
+          | _ -> None
+    end
+  end
+  
 let locate_constructor c =
   try (match Nametab.locate c with GlobRef.ConstructRef x -> x | _ -> failwith ("loc_constr: " ^ string_of_qualid c))
   with Not_found -> failwith ("locate constr: " ^ string_of_qualid c)
                                                            
 (* Convert types back into constr *)
 let constr_of_type name ty_params dep_type =
-  let rec find_index x i j vars =
+  let rec find_index (x : Id.t) i j vars =
     match vars with
-    | [] -> mkVar x
+    | [] -> begin match locate_constant_of_id x with
+            | Some c -> Constr.mkConst c
+            | None -> Constr.mkVar x
+            end
     (* TODO: Find DeBruijn equation *)
     | y::ys -> if x = y then Constr.mkRel (i - j)
                else find_index x i (j-1) ys
