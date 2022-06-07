@@ -358,7 +358,6 @@ let merge ind1 ind2 ind =
 (*
 
 TODO still:
-1) Make it so that it doesn't just assume that the shared parameter is the last one
 4) Generate the mappings back and forth P as x /\ Q bs x <-> PQ as bs x
 5) Find out why falses and Context breaks things
 7) find out why stdlib le doesn't work
