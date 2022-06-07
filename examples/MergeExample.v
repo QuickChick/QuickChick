@@ -128,6 +128,8 @@ Inductive Q3 : naaat -> Prop:=.
 
 Merge (fun n => P3 n) With (fun n => Q3 n) As PQ3.
 
+Print PQ3.
+
 Inductive Term : Type :=
 | var : nat -> Term
 | app : Term -> Term -> Term
@@ -198,19 +200,6 @@ Inductive linear : list bool -> Term -> Prop :=
 | l_add : forall u1_ u2_ u3_ e1_ e2_, linear u1_ e1_ -> linear u2_ e2_
                                  -> combine u1_ u2_ u3_ -> linear u3_ (add e1_ e2_).
 
-Merge (fun t => typed gamma ty t) With (fun t => linear used ty t) As blabla.
-Print typedlinear.
+Merge (fun t => typed gamma ty t) With (fun t => linear used ty t) As typed_and_linear.
+Print typed_and_linear.
 
-(*
-Two issues:
-1) for some reason, if I try to define Context = list ty, then it gives and
-error. I've fixed for now by manually writing list ty in place of Context
-where it is used.
-
-2) But even when I get it to run, it still doesn't work: typedlinear has no
-constructors!
-
-
-One likely reason: issue with variable names clashing.
-This is definitely a problem, i'm not sure that it explains NO constructors though.
-*)

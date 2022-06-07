@@ -38,7 +38,6 @@ type ctr_data =
 
 (* Separate out the shared parameter from a list of parameters *)
 let separate_shared (terms : 'a list) (param_pos : int) : 'a list * 'a = 
-  (* (List.rev (List.tl (List.rev terms)), List.hd (List.rev terms)) *)
   let rec separate_shared_aux (terms : 'a list) (param_pos : int) (prefix : 'a list) : 'a list * 'a =
     match terms with (term :: terms) ->
       if param_pos = 0
@@ -338,8 +337,6 @@ let extract_relation ind : relation * int =
     | h :: t -> if f h then 0 else 1 + find f t in
     (* Find position of id1 in args1 to get parameter position *)
     let param_pos = find (function | ({CAst.v = CRef (id,_) ; _} , _) -> qualid_basename id = id1) args1 in
-    (* let param_pos = List.find (function | Some (CRef (r,_) ; _, _) -> r = id1 | _ -> false) args1 in *)
-    msg_debug (str ("param_pos is :::::::::::::::::::: " ^ string_of_int param_pos));
     match coerce_reference_to_dep_dt p1 with
     | Some dt -> msg_debug (str (dep_dt_to_string dt) ++ fnl()); dt , param_pos
     | None -> failwith "Not supported type"
@@ -352,7 +349,6 @@ let merge ind1 ind2 ind =
   let rel1, param_pos1 = extract_relation ind1 in
   let rel2, param_pos2 = extract_relation ind2 in
   let rel = merge_relations rel1 param_pos1 rel2 param_pos2 (extract_tyctr ind) in
-  (* msg_debug (str ("jacob 3" ^ (dep_dt_to_string rel))); *)
   define_new_inductive rel
 
 (*
