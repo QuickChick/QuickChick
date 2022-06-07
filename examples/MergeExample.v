@@ -118,8 +118,15 @@ Inductive Q : nat -> Prop :=
 Merge (fun n => P n) With (fun n => Q n) As doesntgetusedanyway.
 
 (*This should have a constructor!*)
-Print PQ.
+Print doesntgetusedanyway.
 
+(*Simple definition test*)
+Definition naaat := nat.
+
+Inductive P3 : naaat -> Prop:=.
+Inductive Q3 : naaat -> Prop:=.
+
+Merge (fun n => P3 n) With (fun n => Q3 n) As PQ3.
 
 Inductive Term : Type :=
 | var : nat -> Term
