@@ -200,6 +200,51 @@ Inductive linear : list bool -> Term -> Prop :=
 | l_add : forall u1_ u2_ u3_ e1_ e2_, linear u1_ e1_ -> linear u2_ e2_
                                  -> combine u1_ u2_ u3_ -> linear u3_ (add e1_ e2_).
 
-Merge (fun t => typed gamma ty t) With (fun t => linear used ty t) As typed_and_linear.
+Merge (fun t => typed gamma ty t) With (fun t => linear used t) As typed_and_linear.
 Print typed_and_linear.
 
+Axiom sub : Term -> Term -> Term.
+
+Inductive Even : nat -> Prop :=
+| Z_Even : Even 0
+| SS_Even : forall n, Even n -> Even (S (S n)).
+
+Inductive Odd : nat -> Prop :=
+| SZ_Odd : Odd 1
+| SS_Odd : forall n, Odd n -> Odd (S (S n)).
+
+Merge (fun n => Even n) With (fun n => Odd n) As EO.
+
+Print EO.
+
+Inductive step : Term -> Term -> Prop :=
+| beta_step : forall e1 e2,
+    step (app (lam e1) e2) (sub e1 e2).
+
+Print typed.
+
+Merge (fun t => typed gamma ty t) With (fun t => step t t2) As steptype.
+
+Print steptype.
+
+Inductive less : nat -> nat -> Prop :=
+| less_n : forall n, less n n
+| less_S : forall m n, less n m -> less n (S m).
+
+Merge (fun y => less x y) With (fun y => less y z) As between.
+Print between.
+
+
+(*I think this doesn't work because of parameters!*)
+
+Print le.
+
+Merge (fun y => le x y) With (fun y => le z y) As between2.
+
+(*Make sure that list works
+merge length and sorted*)
+
+(*red balck trees, 1) is red-black alternating
+2) bst*)
+
+(*write algorithm*)

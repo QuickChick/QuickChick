@@ -37,14 +37,12 @@ type ctr_data =
   * rec_arg (*output parameters*)
 
 (* Separate out the shared parameter from a list of parameters *)
-let separate_shared (terms : 'a list) (param_pos : int) : 'a list * 'a = 
-  let rec separate_shared_aux (terms : 'a list) (param_pos : int) (prefix : 'a list) : 'a list * 'a =
-    match terms with (term :: terms) ->
-      if param_pos = 0
-        then (prefix @ terms , term)
-        else separate_shared_aux terms (param_pos - 1) (term :: prefix)
-  in
-  separate_shared_aux terms param_pos []
+let rec separate_shared (terms : 'a list) (param_pos : int) : 'a list * 'a = 
+  match terms with
+  | term :: terms -> if param_pos = 0
+    then (terms, term)
+    else let (ts, t) = separate_shared terms (param_pos - 1) in
+         (term :: ts, t)
 
 
 (* The reverse of separate_shared. param_pos should be the position where shared will end up in
@@ -355,7 +353,9 @@ let merge ind1 ind2 ind =
 
 TODO still:
 4) Generate the mappings back and forth P as x /\ Q bs x <-> PQ as bs x
-5) Find out why falses and Context breaks things
 7) find out why stdlib le doesn't work
+8) Add error checks with useful error messages for
+  - shared parameter types are different
+  - number of arguments is not same as number that the type family actually takes
    
 *)
