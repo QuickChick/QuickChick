@@ -225,12 +225,14 @@ Proof.
     by rewrite semBindSize (eq_bigcupr _ (fun a => semReturnSize (f a) size)).
  Qed.
 
+#[global]
 Program Instance liftGenUnsized {A B} (f : A -> B) (g : G A) 
         `{Unsized _ g} : Unsized (liftGen f g).
 Next Obligation.
   by rewrite ! semLiftGenSize (unsized s1 s2).
 Qed.
 
+#[global]
 Program Instance liftGenMonotonic {A B} (f : A -> B) (g : G A) 
         `{SizeMonotonic _ g} : SizeMonotonic (liftGen f g).
 Next Obligation.
@@ -304,6 +306,7 @@ forall {A1 A2 A3 B} (f: A1 -> A2 -> A3 -> B)
                                        (f a1 a2 a3) = b)).
 Proof. solveLiftGenX. Qed.
 
+#[global]
 Program Instance liftGen2Unsized {A1 A2 B} (f : A1 -> A2 -> B) (g1 : G A1)
         `{Unsized _ g1} (g2 : G A2) `{Unsized _ g2} : Unsized (liftGen2 f g1 g2).
 Next Obligation.
@@ -311,6 +314,7 @@ Next Obligation.
   rewrite ! curry_imset2l. by setoid_rewrite (unsized s1 s2).
 Qed.
 
+#[global]
 Program Instance liftGen2Monotonic {A1 A2 B} (f : A1 -> A2 -> B) (g1 : G A1)
         `{SizeMonotonic _ g1} (g2 : G A2) `{SizeMonotonic _ g2} : 
   SizeMonotonic (liftGen2 f g1 g2).
@@ -377,6 +381,7 @@ Proof.
     eapply Nat.max_le_iff. by right. 
 Qed.
 
+#[global]
 Program Instance liftGen4Monotonic {A B C D E} 
         (f : A -> B -> C -> D -> E)
         (g1 : G A) (g2 : G B) (g3 : G C) (g4 : G D) 
@@ -494,6 +499,7 @@ Proof.
     by eapply unsized; eauto.
 Qed.
 
+#[global]
 Program Instance vectorOfUnsized {A} (k : nat) (g : G A) 
         `{Unsized _ g } : Unsized (vectorOf k g).
 Next Obligation.
@@ -501,6 +507,7 @@ Next Obligation.
   split; move => [H1 H2]; split => //; by rewrite unsized; eauto.
 Qed.
 
+#[global]
 Program Instance vectorOfMonotonic {A} (k : nat) (g : G A) 
         `{SizeMonotonic _ g } : SizeMonotonic (vectorOf k g).
 Next Obligation.
@@ -530,6 +537,7 @@ Proof.
     move => a /Hl [s [_ Ha]]. by eapply unsized; eauto.
 Qed.
 
+#[global]
 Program Instance listOfMonotonic {A} (g : G A) 
         `{SizeMonotonic _ g } : SizeMonotonic (listOf g).
 Next Obligation.
@@ -575,6 +583,7 @@ by case: l => [|g l]; rewrite 1?bigcupC; apply: eq_bigcupr => sz;
   apply: semOneofSize.
 Qed.
 
+#[global]
 Program Instance oneofMonotonic {A} (x : G A) (l : list (G A))
         `{ SizeMonotonic _ x} `(l \subset SizeMonotonic) 
 : SizeMonotonic (oneof x l). 
@@ -609,6 +618,7 @@ rewrite /semGen; setoid_rewrite semElementsSize; rewrite bigcup_const //.
 by do 2! constructor.
 Qed.
 
+#[global]
 Program Instance elementsUnsized {A} {def : A} (l : list A) : 
   Unsized (elements def l).
 Next Obligation.
@@ -867,6 +877,7 @@ Proof.
     subst. rewrite Hp. eassumption.
 Qed.
 
+#[global]
 Instance frequencySizeMonotonic_alt :
   forall {A : Type} (g0 : G A) (lg : seq (nat * G A)),
     SizeMonotonic g0 ->
@@ -1464,6 +1475,7 @@ Proof. by rewrite semOneof. Qed.
 Definition betterSized {A} (f : nat -> G A) :=
   sized (fun x => bindGen (choose (0, x)) f).
 
+#[global]
 Program Instance betterSizedIndeedBetter {A} (f : nat -> G A) 
         (H: forall s, SizeMonotonic (f s)) :
   SizeMonotonic (betterSized f).
@@ -1476,6 +1488,7 @@ Next Obligation.
 Qed.
 
 
+#[global]
 Instance bindOptMonotonicOpt
          {A B} (g : G (option A)) (f : A -> G (option B))
          `{SizeMonotonicOpt _ g} `{forall x, SizeMonotonicOpt (f x)} :
@@ -1493,6 +1506,7 @@ Proof.
   - apply semReturnSize in Hb; discriminate Hb.
 Qed.
 
+#[global]
 Instance bindOptMonotonic
          {A B} (g : G (option A)) (f : A -> G (option B))
          `{SizeMonotonic _ g} `{forall x, SizeMonotonic (f x)} :
@@ -1639,6 +1653,7 @@ Proof.
     rewrite Hp; split; auto; reflexivity.
 Qed.
 
+#[global]
 Instance Monotonic_retry {A} (n : nat) (g : G (option A)) :
   SizeMonotonic g ->
   SizeMonotonic (retry n g).
@@ -1647,6 +1662,7 @@ Proof.
   do 2 rewrite semSize_retry; auto.
 Qed.
 
+#[global]
 Instance MonotonicOpt_retry {A} (n : nat) (g : G (option A)) :
   SizeMonotonicOpt g ->
   SizeMonotonicOpt (retry n g).
@@ -1655,6 +1671,7 @@ Proof.
   do 2 rewrite semSizeOpt_retry; auto.
 Qed.
 
+#[global]
 Instance Monotonic_suchThatMaybe1
          {A : Type} (g : G A) (f : A -> bool) :
   SizeMonotonic g ->
@@ -1666,6 +1683,7 @@ Proof.
   apply imset_incl; auto.
 Qed.
 
+#[global]
 Instance MonotonicOpt_suchThatMaybe1
          {A : Type} (g : G A) (f : A -> bool) :
   SizeMonotonic g ->
@@ -1677,6 +1695,7 @@ Proof.
   apply Monotonic_suchThatMaybe1; auto.
 Qed.
 
+#[global]
 Instance Monotonic_suchThatMaybe
          {A : Type} (g : G A) (f : A -> bool) :
   SizeMonotonic g ->
@@ -1688,6 +1707,7 @@ Proof.
   apply Monotonic_suchThatMaybe1; auto.
 Qed.
 
+#[global]
 Instance MonotonicOpt_suchThatMaybe
          {A : Type} (g : G A) (f : A -> bool) :
   SizeMonotonic g ->
@@ -1699,6 +1719,7 @@ Proof.
   apply Monotonic_suchThatMaybe; auto.
 Qed.
 
+#[global]
 Instance MonotonicOpt_suchThatMaybeOpt
          {A : Type} (g : G (option A)) (f : A -> bool) :
   SizeMonotonicOpt g ->

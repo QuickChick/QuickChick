@@ -166,22 +166,27 @@ Class GenMonotonicCorrect (A : Type)
 
 (** Coercions *)
   
+#[global]
 Instance GenSizedMonotonicOfSizeMonotonic
          (A : Type) (Hgen : GenSized A) (Hmon : forall s, @SizeMonotonic A (arbitrarySized s))
 : @GenSizedMonotonic A Hgen Hmon := {}.
   
+#[global]
 Instance GenMonotonicOfSizeMonotonic
          (A : Type) (Hgen : Gen A) (Hmon : @SizeMonotonic A arbitrary)
 : @GenMonotonic A Hgen Hmon := {}.
 
+#[global]
 Instance GenSizedCorrectOfSizedCorrect
          (A : Type) (Hgen : GenSized A) `{Hcor : SizedCorrect A arbitrarySized}
 : @GenSizedCorrect A Hgen _ Hcor := {}.
 
+#[global]
 Instance GenCorrectOfCorrect
          (A : Type) (Hgen : Gen A) `{Hcor : Correct A arbitrary}
 : @GenCorrect A Hgen Hcor := {}.
 
+#[global]
 Instance GenSizedSizeMonotonicOfSizedMonotonic
          (A : Type) (Hgen : GenSized A) (Hmon : @SizedMonotonic A arbitrarySized)
 : @GenSizedSizeMonotonic A Hgen Hmon := {}.
@@ -194,12 +199,14 @@ Global Instance ArbitraryOfGenShrink {A} `{Gen A} `{Shrink A} : Arbitrary A := {
 
 Generalizable Variables PSized PMon PSMon PCorr.
 
+#[global]
 Instance GenMonotonicOfSized (A : Type)
          {H : GenSized A}
          `{@GenSizedMonotonic A H PMon}
          `{@GenSizedSizeMonotonic A H PSMon}
 : GenMonotonic A := {}.
 
+#[global]
 Instance GenCorrectOfSized (A : Type)
          {H : GenSized A}
          `{@GenSizedMonotonic A H PMon}

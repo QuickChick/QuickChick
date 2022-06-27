@@ -29,6 +29,7 @@ Set Bullet Behavior "Strict Subproofs".
 Global Instance genBoolSized : GenSized bool :=
   {| arbitrarySized x := choose (false, true) |}.
 
+#[global]
 Instance genNatSized : GenSized nat :=
   {| arbitrarySized x := choose (0,x) |}.
 
@@ -202,6 +203,7 @@ Global Instance shrinkOption {A : Type} `{Shrink A} : Shrink (option A) :=
 
 (** Instance correctness *)
 
+#[global]
 Program Instance arbNatMon : SizeMonotonic (@arbitrary nat _).
 Next Obligation.
   rewrite !semSizedSize !semChooseSize // => n /andP [/leP H1 /leP H2].
@@ -210,6 +212,7 @@ Qed.
 
 (** Correctness proof about built-in generators *)
 
+#[global]
 Instance boolSizeMonotonic : SizeMonotonic (@arbitrary bool _).
 Proof.
   unfold arbitrary, GenOfGenSized.
@@ -218,11 +221,13 @@ Proof.
   intros n s1 s2 Hs. eapply subset_refl.
 Qed.
 
+#[global]
 Instance boolSizedMonotonic : SizedMonotonic (@arbitrarySized bool _).
 Proof.
   intros n s1 s2 Hs. eapply subset_refl.
 Qed.
 
+#[global]
 Instance boolCorrect : Correct bool arbitrary.
 Proof.
   constructor. unfold arbitrary, GenOfGenSized.
@@ -251,6 +256,7 @@ rewrite semSized => n; split=> // _; exists n; split=> //.
 by rewrite (semChooseSize _ _ _) /RandomQC.leq /=.
 Qed.
 
+#[global]
 Instance ArbNatGenCorrect : Correct nat arbitrary.
 Proof.
   constructor. now apply arbNat_correct.

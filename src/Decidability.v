@@ -121,6 +121,7 @@ Proof.
   unfold decidable in D. assumption.
 Defined.
 
+#[global]
 Hint Resolve dec_if_dec_eq: eq_dec.
 
 Ltac dec_eq :=
@@ -183,7 +184,9 @@ Proof. dec_eq. Defined.
 Global Instance Dec_eq_list (A : Type) `{Dec_Eq A} : Dec_Eq (list A).
 Proof. dec_eq. Defined.
 
+#[global]
 Hint Resolve ascii_dec: eq_dec.
+#[global]
 Hint Resolve string_dec: eq_dec.
 
 Global Instance Dec_eq_ascii : Dec_Eq ascii.
@@ -226,14 +229,25 @@ Notation "P '?'" := (match (@dec P _) with
                        | right _ => false
                      end) (at level 100).
 
+#[global]
 Hint Resolve Dec_eq_unit : eq_dec.
+#[global]
 Hint Resolve Dec_eq_bool : eq_dec.
+#[global]
 Hint Resolve Dec_eq_nat : eq_dec.
+#[global]
 Hint Resolve Dec_eq_Z : eq_dec.
+#[global]
 Hint Resolve Dec_eq_N : eq_dec.
+#[global]
 Hint Resolve Dec_eq_opt : eq_dec.
+#[global]
 Hint Resolve Dec_eq_prod : eq_dec.
+#[global]
 Hint Resolve Dec_eq_sum : eq_dec.
+#[global]
 Hint Resolve Dec_eq_list : eq_dec.
+#[global]
 Hint Resolve Dec_eq_ascii : eq_dec.
+#[global]
 Hint Resolve Dec_eq_string : eq_dec.

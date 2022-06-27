@@ -11,6 +11,7 @@ Import ListNotations.
 (* Default mutateable instance for lists *)
 (* Priority 1, in case someone overrides the default to further mutate
    when the A's are mutateable *)
+#[global]
 Instance MutateableList (A : Type) : Mutateable (list A) | 1 :=
 {|
   mutate l :=

@@ -230,6 +230,7 @@ simpl in InPL.
 inversion InPL.
 Qed.
 
+#[global]
 Hint Resolve corrEmptyUndef corrNodeNonEmpty.
 
 Definition Direction_eq_dec : forall (d1 d2 : SplitDirection),
@@ -333,7 +334,9 @@ Lemma refineFunCorrect : forall f d p, f (d :: p) = (refineFunction f d) p.
 auto.
 Qed.
 
+#[global]
 Hint Rewrite refineFunCorrect.
+#[global]
 Hint Unfold  refineFunction  .
 Program Fixpoint addToTree (st : SeedTree) (p : SplitPath) (f : SplitPath -> RandomSeed)
         (l : list SplitPath)
@@ -690,6 +693,7 @@ Class OrdType (A: Type) :=
     antisym : antisymmetric leq
   }.
 
+#[global]
 Program Instance OrdBool : OrdType bool :=
   {
     leq b1 b2 := implb b1 b2
@@ -704,6 +708,7 @@ Next Obligation.
   by do 2! case.
 Qed.
 
+#[global]
 Program Instance OrdNat : OrdType nat :=
   {
     leq := ssrnat.leq;
@@ -712,6 +717,7 @@ Program Instance OrdNat : OrdType nat :=
     antisym := anti_leq
   }.
 
+#[global]
 Program Instance OrdZ : OrdType Z :=
   {
     leq := Z.leb;
@@ -726,6 +732,7 @@ move=> x y /andP[].
 exact: Zle_bool_antisym.
 Qed.
 
+#[global]
 Program Instance OrdN : OrdType N :=
   {
     leq := N.leb;
@@ -757,24 +764,28 @@ Class ChoosableFromInterval (A : Type)  :=
        exists seed, fst (randomR (a1, a2) seed) = a)
   }.
 
+#[global]
 Program Instance ChooseBool : ChoosableFromInterval bool :=
   {
     randomR := randomRBool;
     randomRCorrect := randomRBoolCorrect
   }.
 
+#[global]
 Instance ChooseNat : ChoosableFromInterval nat :=
   {
     randomR := randomRNat;
     randomRCorrect := randomRNatCorrect
   }.
 
+#[global]
 Instance ChooseZ : ChoosableFromInterval Z :=
   {
     randomR := randomRInt;
     randomRCorrect := randomRIntCorrect
   }.
 
+#[global]
 Instance ChooseN : ChoosableFromInterval N :=
   {
     randomR := randomRN;
