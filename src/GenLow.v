@@ -215,12 +215,15 @@ Module GenLow : GenLowInterface.Sig.
     rewrite codom_const; [ reflexivity | apply randomSeed_inhabited ].
   Qed.
   
+#[global]
   Instance unsizedReturn {A} (x : A) : Unsized (returnGen x).
   Proof. firstorder. Qed.
   
+#[global]
   Instance returnGenSizeMonotonic {A} (x : A) : SizeMonotonic (returnGen x).
   Proof. firstorder. Qed.
 
+#[global]
   Instance returnGenSizeMonotonicOpt {A} (x : option A) : SizeMonotonicOpt (returnGen x).
   Proof. firstorder. Qed.
   
@@ -279,6 +282,7 @@ Module GenLow : GenLowInterface.Sig.
     by apply eq_bigcupr => ?; rewrite !semBindSize ?bigcup_flatten.
   Qed.
 
+#[global]
   Instance bindUnsized
           {A B} (g : G A) (f : A -> G B) `{Unsized _ g} `{forall x, Unsized (f x)} : 
     Unsized (bindGen g f).
@@ -288,6 +292,7 @@ Module GenLow : GenLowInterface.Sig.
     split; move => [a [H1 H2]]; exists a; split => //; by eapply unsized; eauto.
   Qed.
   
+#[global]
   Instance bindMonotonic
           {A B} (g : G A) (f : A -> G B) `{SizeMonotonic _ g} `{forall x, SizeMonotonic (f x)} : 
     SizeMonotonic (bindGen g f).
@@ -297,6 +302,7 @@ Module GenLow : GenLowInterface.Sig.
     move => [a [H3 H4]]; exists a; split => //; eapply monotonic; eauto.
   Qed.
 
+#[global]
   Instance bindMonotonicOpt
           {A B} (g : G A) (f : A -> G (option B))
           `{SizeMonotonic _ g} `{forall x, SizeMonotonicOpt (f x)} : 
@@ -310,6 +316,7 @@ Module GenLow : GenLowInterface.Sig.
     eapply monotonicOpt; eauto; eexists; eauto.
   Qed.
 
+#[global]
   Instance bindMonotonicStrong
           {A B} (g : G A) (f : A -> G B) `{SizeMonotonic _ g}
           `{forall x, semGen g x -> SizeMonotonic (f x)} :
@@ -325,6 +332,7 @@ Module GenLow : GenLowInterface.Sig.
     eassumption.
   Qed.
   
+#[global]
   Instance bindMonotonicOptStrong
           {A B} (g : G A) (f : A -> G (option B)) `{SizeMonotonic _ g}
           `{forall x, semGen g x -> SizeMonotonicOpt (f x)} :
@@ -448,6 +456,7 @@ Module GenLow : GenLowInterface.Sig.
       by rewrite imset_bigcup /semGen (eq_bigcupr _ (semFmapSize _ _)).
   Qed.
   
+#[global]
   Instance fmapUnsized {A B} (f : A -> B) (g : G A) `{Unsized _ g} :
     Unsized (fmap f g).
   Proof.
@@ -456,6 +465,7 @@ Module GenLow : GenLowInterface.Sig.
       by split; move => [a [H1 <-]]; eexists; split; eauto => //; eapply unsized; eauto.
   Qed.
   
+#[global]
   Instance fmapMonotonic
           {A B} (f : A -> B) (g : G A) `{SizeMonotonic _ g} : 
     SizeMonotonic (fmap f g).
@@ -471,6 +481,7 @@ Module GenLow : GenLowInterface.Sig.
                        [set a | RandomQC.leq a1 a && RandomQC.leq a a2].
   Proof. by move=> /= le_a1a2 m n; rewrite (randomRCorrect n a1 a2). Qed.
   
+#[global]
   Instance chooseUnsized {A} `{RandomQC.ChoosableFromInterval A} (a1 a2 : A) :
     Unsized (choose (a1, a2)).
   Proof. by []. Qed.
@@ -564,6 +575,7 @@ Module GenLow : GenLowInterface.Sig.
       eapply (H n); try eassumption. ssromega.
   Qed.
 
+#[global]
   Instance sizedSizeMonotonic
            A (gen : nat -> G A) `{forall n, SizeMonotonic (gen n)} `{SizedMonotonic A gen} :
     SizeMonotonic (sized gen).
@@ -574,6 +586,7 @@ Module GenLow : GenLowInterface.Sig.
     eapply H0; eassumption.
   Qed.
 
+#[global]
   Instance sizedSizeMonotonicOpt
           A (gen : nat -> G (option A)) `{forall n, SizeMonotonic (gen n)} `{SizedMonotonicOpt A gen} :
     SizeMonotonicOpt (sized gen).
@@ -595,6 +608,7 @@ Module GenLow : GenLowInterface.Sig.
     semGenSize (resize n g) s <--> semGenSize g n.
   Proof. by case: g => g; rewrite /semGenSize. Qed.
   
+#[global]
   Instance unsizedResize {A} (g : G A) n :
     Unsized (resize n g).
   Proof. by case: g => g; rewrite /semGenSize. Qed.
@@ -606,15 +620,18 @@ Module GenLow : GenLowInterface.Sig.
     exists (run g s r); exists r; reflexivity.
   Qed.
 
+#[global]
   Instance Functor_G : Functor G := {
     fmap A B := fmap;
   }.
 
+#[global]
   Instance Applicative_G : Applicative G := {
     pure A := returnGen;
     ap A B := apGen;
   }.
 
+#[global]
   Instance Monad_G : Monad G := {
     ret A := returnGen;
     bind A B := bindGen;
@@ -635,6 +652,7 @@ Module GenLow : GenLowInterface.Sig.
     split; intros [r Hr]; exists r; simpl in *; assumption.
   Qed.
 
+#[global]
   Instance thunkGenUnsized {A} (f : unit -> G A)
           `{Unsized _ (f tt)} : Unsized (thunkGen f).
   Proof.
@@ -643,6 +661,7 @@ Module GenLow : GenLowInterface.Sig.
     apply unsized.
   Qed.
 
+#[global]
   Instance thunkGenSizeMonotonic {A} (f : unit -> G A)
           `{SizeMonotonic _ (f tt)} : SizeMonotonic (thunkGen f).
   Proof.
@@ -651,6 +670,7 @@ Module GenLow : GenLowInterface.Sig.
     by apply monotonic.
   Qed.
 
+#[global]
   Instance thunkGenSizeMonotonicOpt {A} (f : unit -> G (option A))
           `{SizeMonotonicOpt _ (f tt)} : SizeMonotonicOpt (thunkGen f).
   Proof.
@@ -659,6 +679,7 @@ Module GenLow : GenLowInterface.Sig.
     by apply monotonicOpt.
   Qed.
 
+#[global]
   Instance thunkGenSizeAntiMonotonicNone {A} (f : unit -> G (option A))
           `{SizeAntiMonotonicNone _ (f tt)} : SizeAntiMonotonicNone (thunkGen f).
   Proof.

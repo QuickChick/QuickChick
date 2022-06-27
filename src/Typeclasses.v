@@ -9,8 +9,10 @@ Require Import GenLow GenHigh Sets.
 Import GenLow GenHigh.
 
 (* TODO: Derive these *)
+#[global]
 Instance arbST_eq {A} (a : A) : GenSuchThat A (fun x => x = a) :=
   {| arbitraryST := returnGen (Some a) |}.
+#[global]
 Instance arbST_Correct {A} (a : A) 
   : SuchThatCorrect (fun x => x = a) (genST (fun x => x = a)).
 Proof.
@@ -21,8 +23,10 @@ Proof.
   split; eauto.
 Defined.
 
+#[global]
 Instance arbST_eq' {A} (a : A) : GenSuchThat A (fun x => a = x) :=
   {| arbitraryST := returnGen (Some a) |}.
+#[global]
 Instance arbST_Correct' {A} (a : A) 
   : SuchThatCorrect (fun x => a = x ) (genST (fun x => a = x)).
 Proof.

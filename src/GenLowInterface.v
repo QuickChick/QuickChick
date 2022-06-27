@@ -137,6 +137,7 @@ Module Type Sig.
     forall s, semGenSize g s <--> semGen g.
 
   (* begin unsizedMonotonic *)
+#[global]
   Declare Instance unsizedMonotonic : forall {A} (g : G A), Unsized g -> SizeMonotonic g.
   (* end unsizedMonotonic *)
   
@@ -148,8 +149,11 @@ Module Type Sig.
   Parameter semReturnSize :
     forall A (x : A) size, semGenSize (returnGen x) size <--> [set x].
   
+#[global]
   Declare Instance unsizedReturn {A} (x : A) : Unsized (returnGen x).
+#[global]
   Declare Instance returnGenSizeMonotonic {A} (x : A) : SizeMonotonic (returnGen x).
+#[global]
   Declare Instance returnGenSizeMonotonicOpt {A} (x : option A) : SizeMonotonicOpt (returnGen x).
 
   Parameter semBindSize :
@@ -182,26 +186,31 @@ Module Type Sig.
   
   (* I'm not sure how this universal quantifier will behave *)
   (* begin bindUnsized *)
+#[global]
   Declare Instance bindUnsized {A B} (g : G A) (f : A -> G B)
           `{Unsized _ g} `{forall x, Unsized (f x)} : Unsized (bindGen g f).
   (* end bindUnsized *)
 
   (* XXX these will always succeed and they have the same priority *)
+#[global]
   Declare Instance bindMonotonic
           {A B} (g : G A) (f : A -> G B)
           `{SizeMonotonic _ g} `{forall x, SizeMonotonic (f x)} : 
     SizeMonotonic (bindGen g f).
 
+#[global]
   Declare Instance bindMonotonicOpt
           {A B} (g : G A) (f : A -> G (option B))
           `{SizeMonotonic _ g} `{forall x, SizeMonotonicOpt (f x)} : 
     SizeMonotonicOpt (bindGen g f).
 
+#[global]
   Declare Instance bindMonotonicStrong
           {A B} (g : G A) (f : A -> G B)
           `{SizeMonotonic _ g} `{forall x, semGen g x -> SizeMonotonic (f x)} : 
     SizeMonotonic (bindGen g f).
 
+#[global]
   Declare Instance bindMonotonicOptStrong
           {A B} (g : G A) (f : A -> G (option B)) `{SizeMonotonic _ g}
           `{forall x, semGen g x -> SizeMonotonicOpt (f x)} :
@@ -242,9 +251,11 @@ Module Type Sig.
     forall A B (f : A -> B) (g : G A) (size : nat),
       semGenSize (fmap f g) size <--> f @: semGenSize g size.
 
+#[global]
   Declare Instance fmapUnsized {A B} (f : A -> B) (g : G A) `{Unsized _ g} : 
     Unsized (fmap f g).
 
+#[global]
   Declare Instance fmapMonotonic
           {A B} (f : A -> B) (g : G A) `{SizeMonotonic _ g} : 
     SizeMonotonic (fmap f g).
@@ -260,6 +271,7 @@ Module Type Sig.
       forall size, (semGenSize (choose (a1,a2)) size <-->
               [set a | RandomQC.leq a1 a && RandomQC.leq a a2]).
 
+#[global]
   Declare Instance chooseUnsized A `{RandomQC.ChoosableFromInterval A} (a1 a2 : A) :
     Unsized (choose (a1, a2)).
 
@@ -282,10 +294,12 @@ Module Type Sig.
     forall A (f : nat -> G (option A)) (H : forall n, SizeMonotonicOpt (f n)) (H' : SizedMonotonicOpt f),
       isSome :&: semGen (sized f) <--> isSome :&: \bigcup_n (semGen (f n)).
 
+#[global]
   Declare Instance sizedSizeMonotonic
           A (gen : nat -> G A) `{forall n, SizeMonotonic (gen n)} `{SizedMonotonic A gen} :
     SizeMonotonic (sized gen).
 
+#[global]
   Declare Instance sizedSizeMonotonicOpt
           A (gen : nat -> G (option A)) `{forall n, SizeMonotonic (gen n)} `{SizedMonotonicOpt A gen} :
     SizeMonotonicOpt (sized gen).
@@ -298,6 +312,7 @@ Module Type Sig.
     forall A (s n : nat) (g : G A),
       semGenSize (resize n g) s <--> semGenSize g n.
 
+#[global]
   Declare Instance unsizedResize {A} (g : G A) n : 
     Unsized (resize n g).
 
@@ -332,15 +347,18 @@ Module Type Sig.
       semGen (fmap f1 (bindGen g f2)) <-->
       semGen (bindGen g (fun x => fmap f1 (f2 x))).
 
+#[global]
   Instance Functor_G : Functor G := {
     fmap A B := fmap;
   }.
 
+#[global]
   Instance Applicative_G : Applicative G := {
     pure A := returnGen;
     ap A B := apGen;
   }.
 
+#[global]
   Instance Monad_G : Monad G := {
     ret A := returnGen;
     bind A B := bindGen;
@@ -356,15 +374,19 @@ Module Type Sig.
   Parameter semThunkGen : forall A (f : unit -> G A),
       semGen (thunkGen f) <--> semGen (f tt).
 
+#[global]
   Declare Instance thunkGenUnsized {A} (f : unit -> G A)
           `{Unsized _ (f tt)} : Unsized (thunkGen f).
 
+#[global]
   Declare Instance thunkGenSizeMonotonic {A} (f : unit -> G A)
           `{SizeMonotonic _ (f tt)} : SizeMonotonic (thunkGen f).
 
+#[global]
   Declare Instance thunkGenSizeMonotonicOpt {A} (f : unit -> G (option A))
           `{SizeMonotonicOpt _ (f tt)} : SizeMonotonicOpt (thunkGen f).
 
+#[global]
   Declare Instance thunkGenSizeAntiMonotonicNone {A} (f : unit -> G (option A))
           `{SizeAntiMonotonicNone _ (f tt)} : SizeAntiMonotonicNone (thunkGen f).
 
