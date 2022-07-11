@@ -433,7 +433,7 @@ induction p.
     * instantiate (1 := []). instantiate (1 := []). auto.
   - simpl. auto.
 + intros.
-  destruct st; destruct a; simpl; auto.
+  destruct st; destruct a; simpl.
   - rewrite refineFunCorrect.
     apply IHp.
   - rewrite refineFunCorrect; apply IHp.
