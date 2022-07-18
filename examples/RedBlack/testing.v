@@ -67,6 +67,7 @@ Fixpoint tree_to_string (t : tree) :=
                             ++ "(" ++ tree_to_string r ++ ")"
   end.
 
+#[global]
 Instance showTree {A : Type} `{_ : Show A} : Show tree :=
   {|
     show t := "" (* CH: tree_to_string t causes a 9x increase in runtime *)

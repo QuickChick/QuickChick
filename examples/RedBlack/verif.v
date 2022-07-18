@@ -71,6 +71,7 @@ Proof.
   move => s. rewrite unsized_alt_def. by apply semColor.
 Qed.
 
+#[global]
 Instance genRBTree_heightMonotonic p :
   SizeMonotonic (genRBTree_height p).
 Proof.
@@ -88,6 +89,7 @@ Proof.
     eapply IH; eauto; (case : x; [ by right | by left; lia]).
 Qed.
 
+#[global]
 Instance genRBTreeMonotonic : SizeMonotonic genRBTree.
 Proof.
   apply bindMonotonic; eauto with typeclass_instances.

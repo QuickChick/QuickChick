@@ -123,6 +123,7 @@ Inductive Color := Red | Green | Blue | Yellow.
     matching on colors. *)
 
 Require Import String. Open Scope string.
+#[global]
 Instance show_color : Show Color :=
   {| show c :=
        match c with
@@ -315,6 +316,7 @@ Arguments Node {A} _ _ _.
     declaration stems from the fact that Coq's typeclasses (unlike
     Haskell's) are not automatically recursive. *) 
 
+#[global]
 Instance showTree {A} `{_ : Show A} : Show (Tree A) :=
   {| show := 
        let fix aux t :=
@@ -573,9 +575,11 @@ Check sized.
 
     The [shrink] function is simply a shrinker like [shrinkTree]. *)
 
+#[global]
 Instance genTree {A} `{Gen A} : GenSized (Tree A) := 
   {| arbitrarySized n := genTreeSized n arbitrary |}.
 
+#[global]
 Instance shrTree {A} `{Shrink A} : Shrink (Tree A) := 
   {| shrink x := shrinkTree shrink x |}.
 

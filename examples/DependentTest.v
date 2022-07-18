@@ -373,6 +373,7 @@ Proof. reflexivity. Qed.
 Inductive goodFooNL : nat -> Foo -> Foo -> Prop :=
 | GoodNL : forall n foo, goodFooNL n (Foo2 foo) foo.
 
+#[global]
 Instance EqDecFoo (f1 f2 : Foo) : Dec (f1 = f2).
 dec_eq. Defined.
 
@@ -406,6 +407,7 @@ Inductive goodBar {A B : Type} (n : nat) : Bar A B -> Prop :=
 Inductive goodFooFalse : Foo -> Prop :=
 | GoodFalse : forall (x : False), goodFooFalse Foo1.
 
+#[global]
 Instance arbFalse : Gen False. Admitted.
 
 Set Warnings "+quickchick-uninstantiated-variables".
