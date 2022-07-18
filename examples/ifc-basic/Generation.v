@@ -87,6 +87,7 @@ Class Vary (A : Type) := {
   vary : A -> G A
 }.
 
+#[global]
 Instance vary_atom : Vary Atom :=
 {|
   vary a :=
@@ -97,6 +98,7 @@ Instance vary_atom : Vary Atom :=
     end
 |}.
 
+#[global]
 Instance vary_mem : Vary Mem :=
 {|
   vary m := sequenceGen (map vary m)
@@ -114,6 +116,7 @@ Fixpoint vary_stack (s : Stack) (isLow : bool) : G Stack :=
     | Mty => returnGen Mty
   end.
 
+#[global]
 Instance vary_state : Vary State :=
 {|
   vary st :=

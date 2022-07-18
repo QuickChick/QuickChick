@@ -96,6 +96,7 @@ Inductive typing' (e : env) : term -> type -> Prop :=
       typing' e (App t1 t2) tau2.
 
 Derive Arbitrary for type.
+#[global]
 Instance dec_type (t1 t2 : type) : Dec (t1 = t2).
 Proof. dec_eq. Defined.
 Derive ArbitrarySizedSuchThat for (fun x => bind env x tau).
@@ -345,6 +346,7 @@ Fixpoint show_type (tau : type) :=
       "(" ++ show_type tau1 ++ " -> " ++ show_type tau2 ++ ")"
   end.
 
+#[global]
 Instance showType : Show type := { show := show_type }.
 
 Fixpoint show_term (t : term) :=
@@ -357,4 +359,5 @@ Fixpoint show_term (t : term) :=
 
 Close Scope string.
 
+#[global]
 Instance showTerm : Show term := { show := show_term }.
