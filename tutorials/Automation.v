@@ -281,5 +281,34 @@ QuickChick prop_gen_balanced_is_balanced.
 Definition balanced_preserves_balanced (fuel n x : nat) (t : Tree nat) :=
   (balanced n t ?? fuel) ==>? (balanced n (insert x t) ?? fuel).
 
-(* We could try to test this property with the type based generators: *)
-QuickChick (balanced_preserves_balanced 10).
+(* We could try to test this property with the type based generators, for some height e.g. 5:
+*)
+QuickChick (balanced_preserves_balanced 10 5).
+
+(* ==>
+  QuickChecking (balanced_preserves_balanced 10 5)
+  *** Gave up! Passed only 0 tests
+  Discarded: 20000
+*)
+
+(* Naturally, no balanced trees of height 5 could even be generated!
+
+   However, we could use the derived constrained generators instead: *)
+
+Definition prop_balanced_preserves_balanced (n : nat) :=
+  let fuel := 10 in
+  (* Generate an arbitrary balanced tree of height n *)
+  forAllMaybe (genSizedST (fun t => balanced n t) fuel) (fun (t : Tree nat) =>
+  (* Generate an arbitrary integer x to insert *)
+  forAll (choose (0,10)) (fun x =>                  
+  balanced_preserves_balanced fuel n x t)).                                                       
+QuickChick (prop_balanced_preserves_balanced 5).
+(* ==>
+QuickChecking prop_balanced_preserves_balanced
+Node 4 (Node 0 (Node 5 (Node 3 (Node 4 Leaf Leaf) (Node 0 Leaf Leaf)) (Node 1 Leaf Leaf)) (Node 0 (Node 5 (Node 5 Leaf Leaf) Leaf) (Node 2 Leaf Leaf))) (Node 0 (Node 2 (Node 1 Leaf Leaf) (Node 0 Leaf (Node 0 Leaf Leaf))) (Node 0 (Node 3 Leaf (Node 5 Leaf Leaf)) (Node 1 (Node 4 Leaf Leaf) (Node 2 Leaf Leaf))))
+7
+*** Failed after 6 tests and 0 shrinks. (0 discards)
+*)
+
+(* We immediately get a balanced tree of height 5 that invalidates the property! *)
+
