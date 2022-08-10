@@ -88,7 +88,7 @@ Definition computeSize' (a : Args) (n : nat) (d : nat) : nat :=
       ((maxSuccess a) %% (maxSize a) + d %/ 10)) (maxSize a).
 
  Definition at0 (f : nat -> nat -> nat) (s : nat) (n d : nat) :=
-  if andb (beq_nat n 0) (beq_nat d 0) then s
+  if andb (Nat.eqb n 0) (Nat.eqb d 0) then s
   else f n d.
 
 Fixpoint prependToAll {A : Type} (sep : A) (ls : list A) : list A :=
