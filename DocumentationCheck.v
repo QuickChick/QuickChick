@@ -44,13 +44,14 @@ Module ConsistencyCheck : QuickChickSig.
 
   Class ChoosableFromInterval (A : Type)  :=
   {
-    super :> OrdType A;
+    super : OrdType A;
     randomR : A * A -> RandomSeed -> A * RandomSeed;
     randomRCorrect :
       forall (a a1 a2 : A), leq a1 a2 ->
       (leq a1 a && leq a a2 <->
        exists seed, fst (randomR (a1, a2) seed) = a)
   }.
+  #[global] Existing Instance super.
 
   Definition ChooseBool := ChooseBool.
   Definition ChooseNat := ChooseNat.

@@ -262,7 +262,7 @@ Proof.
     exists (max s1 s2). split; first by [].
     exists (a1,a2). split; last by []. split => /=;
     (eapply monotonic; last eassumption); 
-    apply/leP; solve [ apply Max.le_max_l | apply Max.le_max_r ].
+    apply/leP; solve [ apply Nat.le_max_l | apply Nat.le_max_r ].
 Qed.
 
 Lemma semLiftGen2Unsized1 {A1 A2 B} (f: A1 -> A2 -> B)
@@ -371,14 +371,7 @@ Proof.
     exists (max s1 (max s2 (max s3 s4))). 
     split; first by [].
     exists a1. exists a2. exists a3. exists a4. 
-    repeat split; (eapply monotonic; [ apply/leP | ]; last eassumption).
-    by eapply Max.le_max_l.
-    eapply Nat.max_le_iff. right. by eapply Max.le_max_l.
-    eapply Nat.max_le_iff. right.
-    eapply Nat.max_le_iff. right. by eapply Max.le_max_l.
-    eapply Nat.max_le_iff. right.
-    eapply Nat.max_le_iff. right.
-    eapply Nat.max_le_iff. by right. 
+    repeat split; (eapply monotonic; [ apply/leP | ]; last eassumption); lia.
 Qed.
 
 #[global]

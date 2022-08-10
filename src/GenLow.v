@@ -391,8 +391,8 @@ Module GenLow : GenLowInterface.Sig.
     - intros [a [[s1 [_ H1]] [s2 [_ H2]]]]. exists (max s1 s2).
       split; first (compute; by []).
       exists a. split.
-      eapply Hg; last eassumption. by apply/leP; apply Max.le_max_l.
-      eapply Hf; last eassumption. by apply/leP; apply Max.le_max_r.
+      eapply Hg; last eassumption. by apply/leP; apply Nat.le_max_l.
+      eapply Hf; last eassumption. by apply/leP; apply Nat.le_max_r.
   Qed.
   
   Lemma semBindSizeMonotonicIncl_r {A B} (g : G A) (f : A -> G (option B)) (s1 : set A) (s2 : A -> set B) :

@@ -48,14 +48,14 @@ Proof.
   rewrite Nat.div_mod with (y:=10); auto.
   rewrite Nat.add_cancel_r.
   replace 100 with (10*10) by auto.
-  rewrite <- mult_assoc_reverse.
+  rewrite Nat.mul_assoc.
   rewrite <- Nat.mul_add_distr_r.
-  rewrite mult_comm.
+  rewrite Nat.mul_comm.
   rewrite Nat.mul_cancel_l; auto.
   rewrite <- Nat.div_div; auto.
   rewrite (Nat.div_mod (n/10) 10) at 3; auto.
   rewrite Nat.add_cancel_r.
-  rewrite mult_comm.
+  rewrite Nat.mul_comm.
   rewrite Nat.mul_cancel_l; auto.
   rewrite Nat.mod_small; auto.
   rewrite Nat.div_div; auto.

@@ -231,7 +231,7 @@ inversion InPL.
 Qed.
 
 #[global]
-Hint Resolve corrEmptyUndef corrNodeNonEmpty.
+Hint Resolve corrEmptyUndef corrNodeNonEmpty : core.
 
 Definition Direction_eq_dec : forall (d1 d2 : SplitDirection),
                                 {d1 = d2} + {d1 <> d2}.
@@ -337,7 +337,7 @@ Qed.
 #[global]
 Hint Rewrite refineFunCorrect.
 #[global]
-Hint Unfold  refineFunction  .
+Hint Unfold  refineFunction : core.
 Program Fixpoint addToTree (st : SeedTree) (p : SplitPath) (f : SplitPath -> RandomSeed)
         (l : list SplitPath)
         (Corr : correspondingSeedTree l f st)
@@ -756,13 +756,15 @@ Qed.
 
 Class ChoosableFromInterval (A : Type)  :=
   {
-    super :> OrdType A;
+    super : OrdType A;
     randomR : A * A -> RandomSeed -> A * RandomSeed;
     randomRCorrect :
       forall (a a1 a2 : A), leq a1 a2 ->
       (leq a1 a && leq a a2 <->
        exists seed, fst (randomR (a1, a2) seed) = a)
   }.
+#[global]
+Existing Instance super.
 
 #[global]
 Program Instance ChooseBool : ChoosableFromInterval bool :=
