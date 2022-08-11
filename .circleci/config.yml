@@ -6,9 +6,7 @@ defaults: &defaults
     OPAMVERBOSE: 1
     OPAMYES: true
     TERM: xterm
-    SKIP_BUILD: |
-      coq-async-test
-      coq-http
+    SKIP_BUILD: ''
   parameters:
     coq:
       type: string
@@ -27,8 +25,6 @@ commands:
     - run:
         name: Install dependencies
         command: |
-            opam update
-            opam repo add coq-extra-dev https://coq.inria.fr/opam/extra-dev
             opam install --deps-only .
     - run:
         name: List installed packages
@@ -118,31 +114,34 @@ workflows:
     jobs:
       - opam:
           name: OPAM 8.11
-          coq: 8.11-ocaml-4.11-flambda
+          coq: '8.11'
       - dune:
           name: Dune 8.11
-          coq: 8.11-ocaml-4.11-flambda
+          coq: '8.11'
       - opam:
           name: OPAM 8.12
-          coq: 8.12-ocaml-4.11-flambda
+          coq: '8.12'
       - dune:
           name: Dune 8.12
-          coq: 8.12-ocaml-4.11-flambda
+          coq: '8.12'
       - opam:
           name: OPAM 8.13
-          coq: 8.13-ocaml-4.11-flambda
+          coq: '8.13'
       - dune:
           name: Dune 8.13
-          coq: 8.13-ocaml-4.11-flambda
+          coq: '8.13'
       - opam:
           name: OPAM 8.14
-          coq: 8.14-ocaml-4.12-flambda
+          coq: '8.14'
       - dune:
           name: Dune 8.14
-          coq: 8.14-ocaml-4.12-flambda
+          coq: '8.14'
+      - dune:
+          name: Dune latest
+          coq: latest
       - opam:
           name: OPAM dev
-          coq: dev-ocaml-4.11-flambda
+          coq: dev
       - dune:
           name: Dune dev
-          coq: dev-ocaml-4.11-flambda
+          coq: dev
