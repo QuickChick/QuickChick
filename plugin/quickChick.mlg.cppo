@@ -39,6 +39,10 @@ let extra_pkg : string list ref =
   Summary.ref ~name:"QC_ocaml_pkg" ["zarith"]
 let add_extra_pkg s = extra_pkg := s :: !extra_pkg
 
+let extract_dir : string option ref =
+  Summary.ref ~name:"QC_extract_dir" None
+let set_extract_dir s = extract_dir := Some s
+
 let dune_file : string option ref =
   Summary.ref ~name:"QC_dune_file" None
 let set_dune_file s = dune_file := Some s
@@ -58,10 +62,15 @@ let rec mkdir_ dname =
     cmd ()
 
 (* Interface with OCaml compiler *)
-let temp_dirname =
-  let dname = Filename.(concat (get_temp_dir_name ()) "QuickChick") in
-  mkdir_ dname;
-  dname
+let temp_dirname () =
+  match !extract_dir with
+  | None -> 
+    let dname = Filename.(concat (get_temp_dir_name ()) "QuickChick") in
+    mkdir_ dname;
+    dname
+  | Some s ->
+    mkdir_ s;
+    s
 
 (* Rewrite a file line by line *)
 let sed_file file f =
@@ -120,7 +129,7 @@ let define c env evd =
 let new_ml_file () : string =
   let tm = Unix.localtime (Unix.time ()) in
   let ts = Printf.sprintf "%02d%02d%02d" tm.Unix.tm_hour tm.Unix.tm_min tm.Unix.tm_sec in
-  let temp_dir = Filename.concat temp_dirname ts in
+  let temp_dir = Filename.concat (temp_dirname ()) ts in
   mkdir_ temp_dir;
   Filename.temp_file ~temp_dir "QuickChick" ".ml"
 
@@ -643,6 +652,9 @@ VERNAC COMMAND EXTEND FuzzQC CLASSIFIED AS SIDEFF
   | ["FuzzChick" constr(prop) constr(fuzzLoop) ] ->  { ignore (qcFuzz prop fuzzLoop) }
 END
 
+VERNAC COMMAND EXTEND QCExtractDir CLASSIFIED AS SIDEFF
+  | ["QCExtractDir" string(s)] -> { set_extract_dir s }
+END
 
 
 
