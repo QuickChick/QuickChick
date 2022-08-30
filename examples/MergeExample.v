@@ -25,9 +25,9 @@ Derive (Arbitrary, Show) for Tree.
 
 QuickChickDebug Debug On.
 Merge (fun t => bst lo hi t) With (fun t => bal n t)
-      As attemp.
+      As bst_bal.
 
-Print attemp.
+Print bst_bal.
 
 Fixpoint size (t : Tree) : nat :=
   match t with
