@@ -796,8 +796,13 @@ let constr_of_type name ty_params dep_type =
     (*
     | DHole -> hole
                      *)
-  in  
-  aux [] (List.length ty_params + 1) dep_type
+  in
+  let rec handle_ty_params ty_ps dt =
+    match ty_ps with
+    | [] -> dt
+    | p::ps -> Constr.mkProd (Context.nameR p, Constr.mkSet, handle_ty_params ps dt)
+  in 
+  handle_ty_params ty_params (aux [] (List.length ty_params + 1) dep_type)
   
 (*  let cexpr = gType ty_params dep_type in
   let env = Global.env () in
