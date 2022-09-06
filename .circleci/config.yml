@@ -113,29 +113,8 @@ workflows:
   build:
     jobs:
       - opam:
-          name: OPAM 8.11
-          coq: '8.11'
-      - dune:
-          name: Dune 8.11
-          coq: '8.11'
-      - opam:
-          name: OPAM 8.12
-          coq: '8.12'
-      - dune:
-          name: Dune 8.12
-          coq: '8.12'
-      - opam:
-          name: OPAM 8.13
-          coq: '8.13'
-      - dune:
-          name: Dune 8.13
-          coq: '8.13'
-      - opam:
-          name: OPAM 8.14
-          coq: '8.14'
-      - dune:
-          name: Dune 8.14
-          coq: '8.14'
+          name: OPAM 8.15
+          coq: '8.15'
       - dune:
           name: Dune latest
           coq: latest

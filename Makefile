@@ -112,3 +112,7 @@ bc:
 
 .merlin: Makefile.coq
 	make -f Makefile.coq .merlin
+
+publish%:
+	opam publish --packages-directory=released/packages \
+		--repo=coq/opam-coq-archive --tag=v$* -v $* QuickChick/QuickChick
