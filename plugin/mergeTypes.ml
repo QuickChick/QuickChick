@@ -176,7 +176,7 @@ Later, I'll figure out how to actually get that input from the command.
 let rec remove (l : rec_arg list) (shared_param_match : dep_type) : (rec_arg * rec_arg list) option =
   match l with
   | [] -> None
-  | ((params, shared_param) :: xs) -> if shared_param = shared_param_match (* TODO: here, make assumption parameter at end*)
+  | ((params, shared_param) :: xs) -> if shared_param = shared_param_match
       then Some ((params, shared_param) , xs)
       else Option.bind (remove xs shared_param_match) (fun (arg, l) -> Some (arg, ((params, shared_param) :: l)))
 
@@ -219,7 +219,7 @@ let merge_ctrs (name1 : ty_ctr) (name2 : ty_ctr) (vs1, rs1, os1, (as1, t1) : ctr
   let os2 = List.map (sub_term var_sub) os2 in
   let as2 = List.map (sub_term var_sub) as2 in
   let t2 = sub_term var_sub t2 in
-  (* split output parameters into shared value and others (TODO: fix this when I make shared value not always last) *)
+  (* split output parameters into shared value and others *)
   (* Check if shared parameter of both constructors unify *)
   Option.bind (unify t1 t2) (fun sub ->
     (* In the case where they do unify, apply the resulting substitution to everything: *)
@@ -234,7 +234,6 @@ let merge_ctrs (name1 : ty_ctr) (name2 : ty_ctr) (vs1, rs1, os1, (as1, t1) : ctr
     (* Any recursive arguments which match up should be combined, and other should be left as is: *)
     let (rs, more_os1, more_os2) = merge_recs rs1' rs2' in
     (* Collect the other non-recursive arguments: *)
-    (* TODO: when I make it so that replace_shared takes a parameter, need to pass the correct positions in the calls here*)
     let os = os1' @ os2' @ (List.map (fun args -> DTyCtr (name1, replace_shared args param_pos1)) more_os1)
       @ (List.map (fun args -> DTyCtr (name2, replace_shared args param_pos2)) more_os2) in
     (* Collect new list of forall bound variables, which is the union of the lists of the inputs except with variables
@@ -275,7 +274,7 @@ let rec irrelevant_constructor_pass (ctrs : (GenericLib.constructor * ctr_data) 
       then let (r_params, r_shared) = List.nth rs 0 in
         if r_shared = shared_out
           then let new_vars = List.map (fun s -> inject_var ("x_generated_" ^ string_of_int s))
-                (range (List.length other_type_params)) in (* TODO: ask Leo how to get good unique names!*)
+                (range (List.length other_type_params)) in
               let new_vars_terms = List.map (fun v -> DTyVar v) new_vars in
               let new_r_params = if left_or_right then new_vars_terms @ r_params else r_params @ new_vars_terms in
               let new_params_out = if left_or_right then new_vars_terms @ params_out else params_out @ new_vars_terms in
@@ -299,7 +298,7 @@ let merge_relations ((tyctr1, params1, ctrs1, ty1) : relation)
                     (param_pos2 : int)
                     tyctr
   : relation =
-  let params = [] in (* TODO: need to fix this if want forall parameters on relations *)
+  let params = params1 @ params2 in
   let converted_ty1 = separate_shared (convert_type ty1) param_pos1 in
   let converted_ty2 = separate_shared (convert_type ty2) param_pos2 in
   let ty = (convert_type_back ((fst converted_ty1) @ (fst converted_ty2) @ [ snd converted_ty1 ])) in
@@ -338,7 +337,9 @@ let extract_relation ind : relation * int =
     (* Find position of id1 in args1 to get parameter position *)
     let param_pos = find (function | ({CAst.v = CRef (id,_) ; _} , _) -> qualid_basename id = id1) args1 in
     match coerce_reference_to_dep_dt p1 with
-    | Some dt -> msg_debug (str (dep_dt_to_string dt) ++ fnl()); dt , param_pos
+    | Some dt -> msg_debug (str (dep_dt_to_string dt) ++ fnl());
+        let num_named_params = match dt with (_ , params , _ , _) -> List.length params in
+        dt , param_pos - num_named_params
     | None -> failwith "Not supported type"
 
 let extract_tyctr ind : ty_ctr =
@@ -349,6 +350,7 @@ let merge ind1 ind2 ind =
   let rel1, param_pos1 = extract_relation ind1 in
   let rel2, param_pos2 = extract_relation ind2 in
   let rel = merge_relations rel1 param_pos1 rel2 param_pos2 (extract_tyctr ind) in
+  (* failwith ("relation is: \n" ^ (dep_dt_to_string rel)) *)
   define_new_inductive rel
 
 (*
