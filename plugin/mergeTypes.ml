@@ -348,7 +348,7 @@ Inductive list (t : Type) : Type := ...
 *)
 
 let rec removeOuterForalls (ty : dep_type) (numToRemove : int) : dep_type =
-  if numToRemove == 0
+  if numToRemove = 0
     then ty
   else
     match ty with
@@ -356,13 +356,13 @@ let rec removeOuterForalls (ty : dep_type) (numToRemove : int) : dep_type =
     | _ -> failwith "if this is printed its a bug 1"
 
 let rec removeFirstArgsOfVar (var : ty_ctr) (num : int) (term : dep_type) =
-  let rec drop n l = if n == 0 then l else (drop (n - 1) (List.tl l)) in
+  let rec drop n l = if n = 0 then l else (drop (n - 1) (List.tl l)) in
   let recurse = removeFirstArgsOfVar var num in
   match term with 
   | DArrow (d1, d2) -> DArrow (recurse d1, recurse d2)
   | DProd  ((x,d1), d2) -> DProd ((x, recurse d1), recurse d2)
   | DTyCtr (ty_ctr, ds) ->
-    if ty_ctr == var then DTyCtr (ty_ctr, drop num ds) else DTyCtr (ty_ctr, ds)
+    if ty_ctr = var then DTyCtr (ty_ctr, drop num ds) else DTyCtr (ty_ctr, ds)
   | DCtr (ctr, ds) -> DCtr (ctr, List.map recurse ds)
   | DTyParam tp -> DTyParam tp
   | DTyVar tv -> DTyVar tv
@@ -380,7 +380,8 @@ let removeTypeParameters ((ty_ctr, params, ctrs, ty) : relation) : relation' * t
   ((ty_ctr
     , List.map
         (fun (name, ty) ->
-          (name, removeFirstArgsOfVar ty_ctr num_params (removeOuterForalls ty num_params)))
+          (* (name, removeFirstArgsOfVar ty_ctr num_params (removeOuterForalls ty num_params))) *)
+          (name, removeFirstArgsOfVar ty_ctr num_params ty))
         ctrs
     (* , removeOuterForalls ty num_params) *)
     , ty)
@@ -401,7 +402,7 @@ let rec replaceFirstArgsOfVar (var : ty_ctr) (names : ty_param list) (term : dep
   | DArrow (d1, d2) -> DArrow (recurse d1, recurse d2)
   | DProd  ((x,d1), d2) -> DProd ((x, recurse d1), recurse d2)
   | DTyCtr (ty_ctr, ds) ->
-    if ty_ctr == var then DTyCtr (ty_ctr, names_as_vars @ ds) else DTyCtr (ty_ctr, ds)
+    if ty_ctr = var then DTyCtr (ty_ctr, names_as_vars @ ds) else DTyCtr (ty_ctr, ds)
   | DCtr (ctr, ds) -> DCtr (ctr, List.map recurse ds)
   | DTyParam tp -> DTyParam tp
   | DTyVar tv -> DTyVar tv
@@ -416,9 +417,11 @@ let insertTypeParameters ((ty_ctr, ctrs, ty) : relation') (params : ty_param lis
   , params
   , List.map
       (fun (name, ty) ->
-        (name, replaceOuterForalls (replaceFirstArgsOfVar ty_ctr params ty) params))
+        (* (name, replaceOuterForalls (replaceFirstArgsOfVar ty_ctr params ty) params)) *)
+        (name, replaceFirstArgsOfVar ty_ctr params ty))
       ctrs
-  , replaceOuterForalls ty params)
+  (* , replaceOuterForalls ty params) *)
+  , ty)
 
 let merge ind1 ind2 ind = 
   let rel1, param_pos1 = extract_relation ind1 in
