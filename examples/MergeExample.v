@@ -7,6 +7,20 @@ Inductive Tree :=
 | Leaf : Tree
 | Node : nat -> Tree -> Tree -> Tree.
 
+Inductive Foo (A : Type) :=
+| Foo1 : Foo A
+| Foo2 : A -> Foo A -> Foo A -> Foo A.
+
+Arguments Foo1 {A}.
+Arguments Foo2 {A}.
+
+Inductive Good {A : Type} : Foo A -> Prop :=
+| Good1 : Good Foo1
+| Good2 : forall a f, Good (Foo2 a f f).
+
+QuickChickDebug Debug On.
+MergeTest (fun x => Good x).
+
 Inductive bst : nat -> nat -> Tree -> Prop :=
 | bst_leaf : forall lo hi, bst lo hi Leaf
 | bst_node : forall lo hi x l r,
@@ -23,7 +37,7 @@ Inductive bal : nat -> Tree -> Prop :=
 Derive (Arbitrary, Show) for Tree.
 
 
-QuickChickDebug Debug On.
+
 Merge (fun t => bst lo hi t) With (fun t => bal n t)
       As bst_bal.
 

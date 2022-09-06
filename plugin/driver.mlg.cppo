@@ -92,12 +92,20 @@ let dispatch cn ind name1 name2 =
 
 let merge ind1 ind2 ind3 =
   MergeTypes.merge ind1 ind2 ind3
+
+let merge_test ind1  =
+  MergeTypes.merge_test ind1
 }
 
   
 VERNAC COMMAND EXTEND Merge CLASSIFIED AS SIDEFF
  | ["Merge" constr(ind1) "With" constr(ind2) "As" constr(ind)] ->
     { merge ind1 ind2 ind }
+END
+
+VERNAC COMMAND EXTEND MergeTest CLASSIFIED AS SIDEFF
+ | ["MergeTest" constr(ind1)] ->
+    { merge_test ind1 }
 END
 
 VERNAC COMMAND EXTEND Derive CLASSIFIED AS SIDEFF
