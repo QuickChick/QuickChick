@@ -430,6 +430,40 @@ let merge ind1 ind2 ind =
   let params = params1 @ params2 in
   define_new_inductive (insertTypeParameters rel params)
 
+(* P : c1 es | .... => P_ : c1_ es* .... *)
+let renamer (ty_ctr, ty_params, ctrs, typ) : dep_dt =
+  let ty_ctr' = gInjectTyCtr ((ty_ctr_to_string ty_ctr) ^ "_") in
+  let rec rename_dt = function
+      | DTyCtr (tc, dts) ->
+         if tc = ty_ctr then
+           DTyCtr (ty_ctr', List.map rename_dt dts)
+         else
+           DTyCtr (tc, List.map rename_dt dts)
+      | DArrow (dt1, dt2) ->
+          DArrow (rename_dt dt1, rename_dt dt2)
+      | DProd  ((v, dt1), dt2) ->
+         DProd ((v, rename_dt dt1), rename_dt dt2)
+      | DTyParam tp -> DTyParam tp
+      | DCtr (c, dts) ->
+         DCtr (c, List.map rename_dt dts)
+      | DTyVar v -> DTyVar v
+      | DApp (dt, dts) ->
+         DApp (rename_dt dt, List.map rename_dt dts)
+      | DNot dt -> DNot (rename_dt dt)
+      | DHole -> DHole
+  in
+  let rename_dep_ctr (c, dt) : dep_ctr =
+    let c' = injectCtr (constructor_to_string c ^ "_") in
+    (c', rename_dt dt)
+  in
+  let ctrs' = List.map rename_dep_ctr ctrs in
+  let typ' = rename_dt typ in
+  (ty_ctr', ty_params, ctrs', typ')
+  
+let merge_test ind =
+  let rel, param = extract_relation ind in
+  define_new_inductive (renamer rel)
+    
 (*
 
 TODO still:
