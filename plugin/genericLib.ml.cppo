@@ -771,26 +771,26 @@ let constr_of_type name ty_params dep_type =
     | y::ys -> if x = y then Constr.mkRel (i - j)
                else find_index x i (j-1) ys
   in
-  let rec aux vars i dt : Constr.t = 
+  let rec aux vars ty_params i dt : Constr.t = 
     match dt with
-    | DArrow (dt1, dt2) -> let t1 = aux vars i dt1 in
-                           let t2 = aux (make_up_name () :: vars) (i+1) dt2 in
+    | DArrow (dt1, dt2) -> let t1 = aux vars ty_params i dt1 in
+                           let t2 = aux (make_up_name () :: vars) ty_params (i+1) dt2 in
                            Constr.mkProd (Context.anonR, t1, t2)
-    | DProd ((x,dt1), dt2) -> let t1 = aux vars i dt1 in
-                              let t2 = aux (x :: vars) (i+1) dt2 in 
+    | DProd ((x,dt1), dt2) -> let t1 = aux vars ty_params i dt1 in
+                              let t2 = aux (x :: vars) ty_params (i+1) dt2 in 
                               Constr.mkProd (Context.nameR x, t1, t2)
-    | DTyParam tp -> Constr.mkVar tp
+    | DTyParam tp -> find_index tp 1 0 ty_params 
     | DTyCtr (c,dts) ->
        let cname = string_of_qualid c in
        let c' = if cname = "Prop" then Constr.mkProp
                 else if cname = name then Constr.mkRel i
                 else Constr.mkInd (locate_ind c) in
-       Constr.mkApp (c', Array.of_list (List.map (aux vars i) dts))
+       Constr.mkApp (c', Array.of_list (List.map (aux vars ty_params i) dts))
     | DCtr (c,dts) ->
-       Constr.mkApp (Constr.mkConstruct (locate_constructor c), Array.of_list (List.map (aux vars i) dts))
+       Constr.mkApp (Constr.mkConstruct (locate_constructor c), Array.of_list (List.map (aux vars ty_params i) dts))
     | DTyVar x -> find_index x i (List.length vars) vars
     | DApp (c, dts) ->
-       Constr.mkApp (aux vars i c, Array.of_list (List.map (aux vars i) dts))
+       Constr.mkApp (aux vars ty_params i c, Array.of_list (List.map (aux vars ty_params i) dts))
     | DNot dt -> failwith "Not" (* Constr.mkApp (Constr.mkVar (Id.of_string "negb"), [| aux dt |])*)
     | _ -> failwith "No holes allowed in constr_of_type"
     (*
@@ -802,7 +802,7 @@ let constr_of_type name ty_params dep_type =
     | [] -> dt
     | p::ps -> Constr.mkProd (Context.nameR p, Constr.mkSet, handle_ty_params ps dt)
   in 
-  handle_ty_params ty_params (aux [] (List.length ty_params + 1) dep_type)
+  handle_ty_params ty_params (aux [] ty_params (List.length ty_params + 1) dep_type)
   
 (*  let cexpr = gType ty_params dep_type in
   let env = Global.env () in
