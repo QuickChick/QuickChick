@@ -4,30 +4,8 @@ open Error
 open GenericLib
 open Pp
 
-open Libnames (*I think this is where qualid is*)
-(* open Names (*I think this is where Id.t is*) *)
+open Libnames
 open UnifyQC
-
-(*
- make clean
- make install
- make -C ..
-
- emacs commands compile and recompile
-*)
-
-
-(*
-data Term = Term Ctr [Term] | Hole String Hole deriving (Eq, Show)
-
-data Constructor = Constructor String [(String, [Term])] [([Term], Term)] [Term] Term
---                              ^ other relations being called ^ recursive calls ^output As ^output T
-data Relation = Relation String [Constructor] *)
-
-(*
-The plan is that I will use vars directly instead of holes.
-genericLib already gives me vars where I need them, and they already have the exact behavior that I want.
-*)
 
 type rec_arg = dep_type list * dep_type (*arguments to a recursive call. Separate term is the shared parameter*)
 type ctr_data =
@@ -256,7 +234,11 @@ let rec convert_type_back (params : dep_type list) : dep_type =
   | [] -> DTyCtr (gInjectTyCtr "Prop", [])
   | param :: params -> DArrow (param, convert_type_back params)
 
-type relation = (ty_ctr * ty_param list * dep_ctr list * dep_type)
+(* an inductive relation, but with the parameters free *)
+type relation'
+  = ty_ctr (* The name of the relation *)
+  * dep_ctr list (* A list of constructors. Each constructor is a pair (name, type) *)
+  * dep_type (* The type of the relation *)
 
 let range (n : int) : int list =
   let rec range_aux (n : int) (so_far : int list) : int list =
@@ -292,16 +274,19 @@ let rec irrelevant_constructor_pass (ctrs : (GenericLib.constructor * ctr_data) 
     match ctr_irrelevant_try ctr with
     | None -> ((name, ctr) :: normal, irrelevant)
     | Some out_ctr -> (normal, (injectCtr ((constructor_to_string name) ^ "'"), out_ctr) :: irrelevant)
-let merge_relations ((tyctr1, params1, ctrs1, ty1) : relation)
+
+(* Merges the two relations *)
+let merge_relations ((tyctr1, ctrs1, ty1) : relation')
                     (param_pos1 : int)
-                    ((tyctr2, params2, ctrs2, ty2) : relation)
+                    ((tyctr2, ctrs2, ty2) : relation')
                     (param_pos2 : int)
                     tyctr
-  : relation =
-  let params = params1 @ params2 in
+  : relation' =
+  (* Separate out the shared parameter to be merged *)
   let converted_ty1 = separate_shared (convert_type ty1) param_pos1 in
   let converted_ty2 = separate_shared (convert_type ty2) param_pos2 in
   let ty = (convert_type_back ((fst converted_ty1) @ (fst converted_ty2) @ [ snd converted_ty1 ])) in
+  (* First identify the constructors which don't change the parameter *)
   let (ctrs1_regular, ctrs1_irrelevant) = irrelevant_constructor_pass
     (List.map (fun (name, ctr) -> (name, convertConstructor tyctr1 ctr param_pos1)) ctrs1)
     (fst converted_ty2) false in
@@ -309,6 +294,7 @@ let merge_relations ((tyctr1, params1, ctrs1, ty1) : relation)
     (List.map (fun (name, ctr) -> (name, convertConstructor tyctr2 ctr param_pos2)) ctrs2)
     (fst converted_ty1) true in
   let param_pos = (List.length (convert_type ty) - 1) in
+  (* Merge each pair of remaining constructors *)
   let ctrs_regular = List.fold_left (fun acc (name1, ctr1) -> (List.fold_left (fun acc (name2, ctr2) -> 
     match merge_ctrs tyctr1 tyctr2 ctr1 ctr2 param_pos1 param_pos2 with
     | Some ctr -> let new_ctr = convertBack tyctr ctr param_pos in (*TODO: think here later*)
@@ -319,7 +305,15 @@ let merge_relations ((tyctr1, params1, ctrs1, ty1) : relation)
   let ctrs = (List.map (fun (name, ctr) -> (name, convertBack tyctr ctr param_pos)) ctrs1_irrelevant)
     @ (List.map (fun (name, ctr) -> (name, convertBack tyctr ctr param_pos)) ctrs2_irrelevant) 
     @ ctrs_regular in
-  (tyctr, params, ctrs, ty)
+  (tyctr, ctrs, ty)
+
+(* This represents an inductive relation in coq, e.g. "Inductive IsSorted (t : Type) : list t -> Prop := ...".
+This tuple is the representation returned by leo's wrapper around the coq internals, in genericLib. *)
+type relation
+  = ty_ctr (* The name of the relation (e.g. IsSorted) *)
+  * ty_param list (* The list of type parameters (e.g. "t" in IsSorted) *)
+  * dep_ctr list (* A list of constructors. Each constructor is a pair (name, type) *)
+  * dep_type (* The type of the overall relation (e.g. "list t -> Prop") *)
 
 let extract_relation ind : relation * int =
   match ind with 
@@ -339,27 +333,130 @@ let extract_relation ind : relation * int =
     match coerce_reference_to_dep_dt p1 with
     | Some dt -> msg_debug (str (dep_dt_to_string dt) ++ fnl());
         let num_named_params = match dt with (_ , params , _ , _) -> List.length params in
-        dt , param_pos - num_named_params
+        dt , param_pos (* - num_named_params *)
     | None -> failwith "Not supported type"
 
 let extract_tyctr ind : ty_ctr =
   match ind with 
   | { CAst.v =  CRef (r,_) ; _ } -> gInjectTyCtr (string_of_qualid r)
 
+(*
+The following six functions provide an extra step that separates type parameters from a relation to
+make the relation (and the parameters) easier to work with.
+In case I come back and am confused by this code later, a type parameter is e.g. "t" in 
+Inductive list (t : Type) : Type := ...
+*)
+
+let rec removeOuterForalls (ty : dep_type) (numToRemove : int) : dep_type =
+  if numToRemove == 0
+    then ty
+  else
+    match ty with
+    | DProd  ((v, dt1), dt2) -> removeOuterForalls dt2 (numToRemove - 1)
+    | _ -> failwith "if this is printed its a bug 1"
+
+let rec removeFirstArgsOfVar (var : ty_ctr) (num : int) (term : dep_type) =
+  let rec drop n l = if n == 0 then l else (drop (n - 1) (List.tl l)) in
+  let recurse = removeFirstArgsOfVar var num in
+  match term with 
+  | DArrow (d1, d2) -> DArrow (recurse d1, recurse d2)
+  | DProd  ((x,d1), d2) -> DProd ((x, recurse d1), recurse d2)
+  | DTyCtr (ty_ctr, ds) ->
+    if ty_ctr == var then DTyCtr (ty_ctr, drop num ds) else DTyCtr (ty_ctr, ds)
+  | DCtr (ctr, ds) -> DCtr (ctr, List.map recurse ds)
+  | DTyParam tp -> DTyParam tp
+  | DTyVar tv -> DTyVar tv
+  | DApp (d, ds) -> DApp (recurse d, List.map recurse ds)
+  | DNot d -> DNot (recurse d)
+  | DHole -> DHole
+
+(* Inputs a dependent relation as outputted by genericLib, and removes the type parameters from all parts of
+the relation, so that they can be worked with as merely free variables. Specifically, this
+1) removes foralls from the front of ty
+2) removes foralls from the front of each constructor in ctrs
+3) removes the parameter arguments in each recursive reference to the relation in the constructors *)
+let removeTypeParameters ((ty_ctr, params, ctrs, ty) : relation) : relation' * ty_param list =
+  let num_params = List.length params in
+  ((ty_ctr
+    , List.map
+        (fun (name, ty) ->
+          (name, removeFirstArgsOfVar ty_ctr num_params (removeOuterForalls ty num_params)))
+        ctrs
+    (* , removeOuterForalls ty num_params) *)
+    , ty)
+  , params)
+
+let rec replaceOuterForalls (ty : dep_type) (names : ty_param list) =
+  match names with
+  | [] -> ty
+  | name :: names -> DProd (((inject_var (ty_param_to_string name))
+    ,(DTyCtr (gInjectTyCtr "Type", []))), replaceOuterForalls ty names)
+
+(* DTyCtr (injectCtr "Prop", []) *)
+
+let rec replaceFirstArgsOfVar (var : ty_ctr) (names : ty_param list) (term : dep_type) =
+  let recurse = replaceFirstArgsOfVar var names in
+  let names_as_vars = List.map (fun name -> DTyVar (inject_var (ty_param_to_string name))) names in
+  match term with 
+  | DArrow (d1, d2) -> DArrow (recurse d1, recurse d2)
+  | DProd  ((x,d1), d2) -> DProd ((x, recurse d1), recurse d2)
+  | DTyCtr (ty_ctr, ds) ->
+    if ty_ctr == var then DTyCtr (ty_ctr, names_as_vars @ ds) else DTyCtr (ty_ctr, ds)
+  | DCtr (ctr, ds) -> DCtr (ctr, List.map recurse ds)
+  | DTyParam tp -> DTyParam tp
+  | DTyVar tv -> DTyVar tv
+  | DApp (d, ds) -> DApp (recurse d, List.map recurse ds)
+  | DNot d -> DNot (recurse d)
+  | DHole -> DHole
+
+(* This function does the reverse of removeTypeParameters. It adds the foralls back onto the
+constructors and the type, as well as adding the parameters back as arguments to each recursive reference. *)
+let insertTypeParameters ((ty_ctr, ctrs, ty) : relation') (params : ty_param list) : relation =
+  (ty_ctr
+  , params
+  , List.map
+      (fun (name, ty) ->
+        (name, replaceOuterForalls (replaceFirstArgsOfVar ty_ctr params ty) params))
+      ctrs
+  , replaceOuterForalls ty params)
+
 let merge ind1 ind2 ind = 
   let rel1, param_pos1 = extract_relation ind1 in
   let rel2, param_pos2 = extract_relation ind2 in
-  let rel = merge_relations rel1 param_pos1 rel2 param_pos2 (extract_tyctr ind) in
+  let rel1', params1 = removeTypeParameters rel1 in
+  let rel2', params2 = removeTypeParameters rel2 in
+  let rel = merge_relations rel1' param_pos1 rel2' param_pos2 (extract_tyctr ind) in
   (* failwith ("relation is: \n" ^ (dep_dt_to_string rel)) *)
-  define_new_inductive rel
+  let params = params1 @ params2 in
+  define_new_inductive (insertTypeParameters rel params)
 
 (*
 
 TODO still:
 4) Generate the mappings back and forth P as x /\ Q bs x <-> PQ as bs x
-7) find out why stdlib le doesn't work
 8) Add error checks with useful error messages for
   - shared parameter types are different
   - number of arguments is not same as number that the type family actually takes
    
 *)
+
+
+(*
+
+The plan:
+
+- Inductive type
+
+- Inductive type with free vars instead of type parameters
+
+
+
+function removeTypeParameters - 
+- removes first n foralls from contructors
+- removes first n arguments from any recursive call
+
+function insertTypeParameters - 
+- insert n foralls with correct names on each constructor
+- insert n args on each recursive call
+
+ *)
