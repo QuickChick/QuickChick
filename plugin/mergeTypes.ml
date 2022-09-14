@@ -315,6 +315,14 @@ type relation
   * dep_ctr list (* A list of constructors. Each constructor is a pair (name, type) *)
   * dep_type (* The type of the overall relation (e.g. "list t -> Prop") *)
 
+(* let print_relation ((ty_ctr, ) : relation) =
+  msg_debug (str "printing a relation -------------------------------------------" ++ fnl ()) ;
+  List.iter (fun param -> msg_debug (str (ty_param_to_string param) ++ fnl ())) ty_params;
+  msg_debug (str "constr_of_type: " ++ str (dep_type_to_string typ) ++ fnl ());
+  (* msg_debug (str "me_arity ty_ctr: " ++ str (string_of_qualid ty_ctr) ++ fnl ()); *)
+  List.iter (fun (c, t) -> msg_debug (str "ctr: " ++ str (dep_ctr_to_string (c,t)) ++ fnl ())) ctrs;
+  () *)
+
 let extract_relation ind : relation * int =
   match ind with 
   | { CAst.v = CLambdaN ([CLocalAssum ([{ CAst.v = Names.Name id1; CAst.loc = _loc2 }], _kind, _type)], body1); _ } ->
@@ -347,7 +355,6 @@ In case I come back and am confused by this code later, a type parameter is e.g.
 Inductive list (t : Type) : Type := ...
 *)
 
-(*
 let rec removeOuterForalls (ty : dep_type) (numToRemove : int) : dep_type =
   if numToRemove = 0
     then ty
@@ -355,7 +362,6 @@ let rec removeOuterForalls (ty : dep_type) (numToRemove : int) : dep_type =
     match ty with
     | DProd  ((v, dt1), dt2) -> removeOuterForalls dt2 (numToRemove - 1)
     | _ -> failwith "if this is printed its a bug 1"
- *)
                                   
 let rec removeFirstArgsOfVar (var : ty_ctr) (num : int) (term : dep_type) =
   let rec drop n l = if n = 0 then l else (drop (n - 1) (List.tl l)) in
@@ -383,18 +389,20 @@ let removeTypeParameters ((ty_ctr, params, ctrs, ty) : relation) : relation' * t
     , List.map
         (fun (name, ty) ->
           (* (name, removeFirstArgsOfVar ty_ctr num_params (removeOuterForalls ty num_params))) *)
+          (* (name, removeOuterForalls ty num_params)) *)
+          (* (name, ty)) *)
           (name, removeFirstArgsOfVar ty_ctr num_params ty))
         ctrs
     (* , removeOuterForalls ty num_params) *)
     , ty)
   , params)
 
-(*let rec replaceOuterForalls (ty : dep_type) (names : ty_param list) =
+let rec replaceOuterForalls (ty : dep_type) (names : ty_param list) =
   match names with
   | [] -> ty
   | name :: names -> DProd (((inject_var (ty_param_to_string name))
     ,(DTyCtr (gInjectTyCtr "Type", []))), replaceOuterForalls ty names)
- *)
+
 (* DTyCtr (injectCtr "Prop", []) *)
 
 let rec replaceFirstArgsOfVar (var : ty_ctr) (names : ty_param list) (term : dep_type) =
@@ -417,13 +425,15 @@ constructors and the type, as well as adding the parameters back as arguments to
 let insertTypeParameters ((ty_ctr, ctrs, ty) : relation') (params : ty_param list) : relation =
   (ty_ctr
   , params
+  (* , [] *)
   , List.map
       (fun (name, ty) ->
-        (* (name, replaceOuterForalls (replaceFirstArgsOfVar ty_ctr params ty) params)) *)
-        (name, replaceFirstArgsOfVar ty_ctr params ty))
+        (name, replaceOuterForalls (replaceFirstArgsOfVar ty_ctr params ty) params))
+        (* (name, replaceFirstArgsOfVar ty_ctr params ty)) *)
       ctrs
   (* , replaceOuterForalls ty params) *)
   , ty)
+  (* , ty) *)
 
 let merge ind1 ind2 ind = 
   let rel1, param_pos1 = extract_relation ind1 in
@@ -431,8 +441,10 @@ let merge ind1 ind2 ind =
   let rel1', params1 = removeTypeParameters rel1 in
   let rel2', params2 = removeTypeParameters rel2 in
   let rel = merge_relations rel1' param_pos1 rel2' param_pos2 (extract_tyctr ind) in
-  (* failwith ("relation is: \n" ^ (dep_dt_to_string rel)) *)
   let params = params1 @ params2 in
+  msg_debug (str "------------ Relation to be outputted: --------------------");
+  msg_debug (str (dep_dt_to_string (insertTypeParameters rel params)));
+  msg_debug (str "--------------------------------");
   define_new_inductive (insertTypeParameters rel params)
 
 (* P : c1 es | .... => P_ : c1_ es* .... *)
