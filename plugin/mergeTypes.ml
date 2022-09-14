@@ -379,7 +379,7 @@ let merge_relations ((tyctr1, ctrs1, ty1) : relation')
                     ((tyctr2, ctrs2, ty2) : relation')
                     (param_pos2 : int)
                     tyctr
-  : relation' =
+  : relation' * sub_param =
   (* Separate out the shared parameter to be merged *)
   let converted_ty1 = separate_shared (convert_type ty1) param_pos1 in
   let converted_ty2 = separate_shared (convert_type ty2) param_pos2 in
@@ -389,7 +389,16 @@ let merge_relations ((tyctr1, ctrs1, ty1) : relation')
                   | None -> failwith "Shared parameters don't unify"
                   | Some sub -> sub
     in
-  (* First identify the constructors which don't change the parameter *)
+  msg_debug (str "OOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOO");
+  IdMap_param.iter (fun param t -> msg_debug (str ("in param_sub, params " ^ (ty_param_to_string param) ^ " subbed for " ^ (dep_type_to_string t)))) param_sub;
+  (* Apply the parameter substitution to everything *)
+  let s = sub_term_param param_sub in
+  let converted_ty1 = (List.map s (fst converted_ty1), s (snd converted_ty1)) in
+  let converted_ty2 = (List.map s (fst converted_ty2), s (snd converted_ty2)) in
+  let ctrs1 = List.map (fun (n, t) -> (n, s t)) ctrs1 in
+  let ctrs2 = List.map (fun (n, t) -> (n, s t)) ctrs2 in
+  let ty = s ty in
+  (* First identify the constructors which don't change the parameter, for the irrelevant constructor pass *)
   let (ctrs1_regular, ctrs1_irrelevant) = irrelevant_constructor_pass
     (List.map (fun (name, ctr) -> (name, convertConstructor tyctr1 ctr param_pos1)) ctrs1)
     (fst converted_ty2) false in
@@ -408,7 +417,7 @@ let merge_relations ((tyctr1, ctrs1, ty1) : relation')
   let ctrs = (List.map (fun (name, ctr) -> (name, convertBack tyctr ctr param_pos)) ctrs1_irrelevant)
     @ (List.map (fun (name, ctr) -> (name, convertBack tyctr ctr param_pos)) ctrs2_irrelevant) 
     @ ctrs_regular in
-  (tyctr, ctrs, ty)
+  ((tyctr, ctrs, ty) , param_sub)
 
 (* This represents an inductive relation in coq, e.g. "Inductive IsSorted (t : Type) : list t -> Prop := ...".
 This tuple is the representation returned by leo's wrapper around the coq internals, in genericLib. *)
@@ -551,12 +560,15 @@ let merge ind1 ind2 ind =
   let rel1' = map_over_relation' rel1' (postfix_all_params postfix1)  in
   let rel2' = map_over_relation' rel2' (postfix_all_params postfix2)  in
   (* Perform the merge *)
-  let rel = merge_relations rel1' param_pos1 rel2' param_pos2 (extract_tyctr ind) in
-  let params = params1 @ params2 in
+  let rel, param_sub = merge_relations rel1' param_pos1 rel2' param_pos2 (extract_tyctr ind) in
+  (* Get rid of substituted parameters *)
+  let params = List.filter (fun param -> not (IdMap_param.mem param param_sub)) (params1 @ params2) in
+  (* Re-insert the parameters *)
+  let rel = insertTypeParameters rel params in
   msg_debug (str "------------ Relation to be outputted: --------------------");
-  msg_debug (str (dep_dt_to_string (insertTypeParameters rel params)));
+  msg_debug (str (dep_dt_to_string rel));
   msg_debug (str "--------------------------------");
-  define_new_inductive (insertTypeParameters rel params)
+  define_new_inductive rel
 
 (* P : c1 es | .... => P_ : c1_ es* .... *)
 let renamer (ty_ctr, ty_params, ctrs, typ) : dep_dt =
