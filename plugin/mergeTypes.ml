@@ -22,6 +22,7 @@ let rec separate_shared (terms : 'a list) (param_pos : int) : 'a list * 'a =
     then (terms, term)
     else let (ts, t) = separate_shared terms (param_pos - 1) in
          (term :: ts, t)
+  | [] -> failwith ("shouldn't get here: param_pos invalid in separate_shared. Param_pos is: " ^ (string_of_int param_pos))
 
 
 (* The reverse of separate_shared. param_pos should be the position where shared will end up in
@@ -69,7 +70,7 @@ let convertBack (me : ty_ctr) ((vs , rs , os , outs) : ctr_data) (param_pos : in
     in
     convertVars vs (convertRecCalls rs (convertOtherCalls os (DTyCtr (me, replace_shared outs param_pos))))
 
-(*Is this how you make a (Map var dep_type) in ocaml?*)
+(* Variable unification *)
 module IdMap = Map.Make(UnknownOrd)
 type sub = dep_type IdMap.t
 
@@ -78,11 +79,11 @@ let rec sub_term (s : sub) (t : dep_type) : dep_type =
   | DTyCtr (tc, dts) -> DTyCtr (tc, List.map (sub_term s) dts)
   | DArrow (dt1, dt2) -> DArrow (sub_term s dt1, sub_term s dt2)
   | DProd  ((v, dt1), dt2) -> DProd ((v , sub_term s dt1), sub_term s dt2)
-  | DTyParam tp -> DTyParam tp
   | DCtr (c, dts) -> DCtr (c, List.map (sub_term s) dts)
   | DTyVar v -> (match IdMap.find_opt v s with
                 | None -> DTyVar v
                 | Some t -> t)
+  | DTyParam v -> DTyParam v
   | DApp (dt, dts) -> DApp (sub_term s dt, List.map (sub_term s) dts)
   | DNot dt -> DNot (sub_term s dt)
   | DHole -> DHole
@@ -94,7 +95,7 @@ let rec occurs (v : var) (t : dep_type) : bool =
   match t with
   | DTyCtr (tc, dts) -> List.exists (occurs v) dts
   | DArrow (dt1, dt2) -> occurs v dt1 || occurs v dt2
-  | DProd  ((v, dt1), dt2) -> occurs v dt1 || occurs v dt2
+  | DProd  ((_, dt1), dt2) -> occurs v dt1 || occurs v dt2
   | DTyParam tp -> false
   | DCtr (c, dts) -> List.exists (occurs v) dts
   | DTyVar v' -> v = v'
@@ -144,10 +145,100 @@ and unifys (t1s : dep_type list) (t2s : dep_type list) : sub option =
           Option.bind (unifys (List.map (sub_term s) t1s) (List.map (sub_term s) t2s)) (fun s2 ->
           Some (merge_disjoint s s2)))
       | _, _ -> failwith "error, shouldn't get here!"
-(*
-For now, I'll just assume that the shared parameter is the last parameter.
-Later, I'll figure out how to actually get that input from the command.
-   *)
+  
+(* This function appends the string to the end of all parameter names in the term *)
+let rec postfix_all_params (postfix : string) (t : dep_type) : dep_type =
+  let recurse  = postfix_all_params postfix in
+  match t with
+  | DTyCtr (tc, dts) -> DTyCtr (tc, List.map recurse dts)
+  | DArrow (dt1, dt2) -> DArrow (recurse dt1, recurse dt2)
+  | DProd  ((v, dt1), dt2) -> DProd ((v , recurse dt1), recurse dt2)
+  | DCtr (c, dts) -> DCtr (c, List.map recurse dts)
+  | DTyParam v -> DTyParam (inject_ty_param ((ty_param_to_string v) ^ postfix))
+  | DTyVar v -> DTyVar v
+  | DApp (dt, dts) -> DApp (recurse dt, List.map recurse dts)
+  | DNot dt -> DNot (recurse dt)
+  | DHole -> DHole
+
+(* Param unification *)
+module UnknownOrd2 = struct
+  type t = ty_param
+  let compare x y = compare (ty_param_to_string x) (ty_param_to_string y)
+end
+module IdMap_param = Map.Make(UnknownOrd2)
+type sub_param = dep_type IdMap_param.t
+
+let rec sub_term_param (s : sub_param) (t : dep_type) : dep_type =
+  match t with
+  | DTyCtr (tc, dts) -> DTyCtr (tc, List.map (sub_term_param s) dts)
+  | DArrow (dt1, dt2) -> DArrow (sub_term_param s dt1, sub_term_param s dt2)
+  | DProd  ((v, dt1), dt2) -> DProd ((v , sub_term_param s dt1), sub_term_param s dt2)
+  | DCtr (c, dts) -> DCtr (c, List.map (sub_term_param s) dts)
+  | DTyParam v -> (match IdMap_param.find_opt v s with
+                | None -> DTyParam v
+                | Some t -> t)
+  | DTyVar v -> DTyVar v
+  | DApp (dt, dts) -> DApp (sub_term_param s dt, List.map (sub_term_param s) dts)
+  | DNot dt -> DNot (sub_term_param s dt)
+  | DHole -> DHole
+
+let compose_sub_param  (sub1 : sub_param) (sub2 : sub_param) : sub_param =
+    IdMap_param.union (fun _ _ _ -> failwith "shouldn't get here") (IdMap_param.map (sub_term_param sub1) sub2) sub1
+
+let rec occurs_param (v : ty_param) (t : dep_type) : bool =
+  match t with
+  | DTyCtr (tc, dts) -> List.exists (occurs_param v) dts
+  | DArrow (dt1, dt2) -> occurs_param v dt1 || occurs_param v dt2
+  | DProd  ((_, dt1), dt2) -> occurs_param v dt1 || occurs_param v dt2
+  | DTyParam tp -> tp == v
+  | DCtr (c, dts) -> List.exists (occurs_param v) dts
+  | DTyVar v -> false
+  | DApp (dt, dts) -> occurs_param v dt || (List.exists (occurs_param v) dts)
+  | DNot dt -> occurs_param v dt
+  | DHole -> false
+
+(*merge_disjoint from stackoverflow:*)
+let merge_disjoint_param m1 m2 = 
+  IdMap_param.merge 
+    (fun k x0 y0 -> 
+       match x0, y0 with 
+         None, None -> None
+       | None, Some v | Some v, None -> Some v
+       | _, _ -> invalid_arg "merge_disjoint_param: maps are not disjoint")
+    m1 m2
+
+let rec unify_param (t1 : dep_type) (t2 : dep_type) : sub_param option =
+  match t1, t2 with
+  | DTyParam v, _ -> if t2 = DTyParam v then Some IdMap_param.empty else if occurs_param v t2 then None else Some (IdMap_param.singleton v t2)
+  | t, DTyParam v -> unify_param (DTyParam v) t
+  | DTyCtr (tc, dts), DTyCtr (tc', dts') -> if tc = tc' then unifys_param dts dts' else None
+  | DArrow (dt1, dt2), DArrow (dt1', dt2') ->
+      Option.bind (unify_param dt1 dt1') (fun sub1 ->
+      Option.bind (unify_param (sub_term_param sub1 dt2) (sub_term_param sub1 dt2')) (fun sub2 ->
+      Some (compose_sub_param sub1 sub2)))
+  | DProd  ((v, dt1), dt2), DProd ((v', dt1'), dt2') ->
+      Option.bind (unify_param dt1 dt1') (fun sub1 ->
+      Option.bind (unify_param (sub_term_param sub1 dt2) (sub_term_param sub1 dt2')) (fun sub2 ->
+      Some (compose_sub_param sub1 sub2)))
+  | DTyVar tp, DTyVar tp' -> Some IdMap_param.empty
+  | DCtr (c, dts), DCtr (c', dts') -> if not (constructor_to_string c = constructor_to_string c') then None
+      else unifys_param dts dts'
+  | DApp (dt, dts), DApp (dt', dts') -> 
+      Option.bind (unify_param dt dt') (fun sub1 ->
+      Option.bind (unifys_param (List.map (sub_term_param sub1) dts) (List.map (sub_term_param sub1) dts')) (fun sub2 ->
+      Some (compose_sub_param sub1 sub2)))
+  | DNot dt, DNot dt' -> unify_param dt dt'
+  | DHole, DHole -> Some IdMap_param.empty
+  | _, _ -> None
+
+and unifys_param (t1s : dep_type list) (t2s : dep_type list) : sub_param option =
+      match t1s, t2s with
+      | [], [] -> Some IdMap_param.empty
+      | (t1 :: t1s), (t2 :: t2s) -> 
+        Option.bind (unify_param t1 t2) (fun s ->
+          Option.bind (unifys_param (List.map (sub_term_param s) t1s) (List.map (sub_term_param s) t2s)) (fun s2 ->
+          Some (merge_disjoint_param s s2)))
+      | _, _ -> failwith "error, shouldn't get here!"
 
 (* TODO: move the type to be used in def of ctr_data *)
 (* If a is in l, returns l with a removed *)
@@ -240,6 +331,13 @@ type relation'
   * dep_ctr list (* A list of constructors. Each constructor is a pair (name, type) *)
   * dep_type (* The type of the relation *)
 
+let map_over_relation' ((ty_ctr, ctrs, typ) : relation') (f : dep_type -> dep_type) : relation' =
+  (
+    ty_ctr
+    , List.map (fun (n, t) -> (n, f t)) ctrs,
+    f typ 
+  )
+
 let range (n : int) : int list =
   let rec range_aux (n : int) (so_far : int list) : int list =
     if n = 0 then so_far else range_aux (n - 1) (n :: so_far)
@@ -286,6 +384,11 @@ let merge_relations ((tyctr1, ctrs1, ty1) : relation')
   let converted_ty1 = separate_shared (convert_type ty1) param_pos1 in
   let converted_ty2 = separate_shared (convert_type ty2) param_pos2 in
   let ty = (convert_type_back ((fst converted_ty1) @ (fst converted_ty2) @ [ snd converted_ty1 ])) in
+  (* Unify the shared types *)
+  let param_sub = match unify_param (snd converted_ty1) (snd converted_ty2) with
+                  | None -> failwith "Shared parameters don't unify"
+                  | Some sub -> sub
+    in
   (* First identify the constructors which don't change the parameter *)
   let (ctrs1_regular, ctrs1_irrelevant) = irrelevant_constructor_pass
     (List.map (fun (name, ctr) -> (name, convertConstructor tyctr1 ctr param_pos1)) ctrs1)
@@ -440,6 +543,14 @@ let merge ind1 ind2 ind =
   let rel2, param_pos2 = extract_relation ind2 in
   let rel1', params1 = removeTypeParameters rel1 in
   let rel2', params2 = removeTypeParameters rel2 in
+  (* Do renanmings of parameters to avoid name collisions *)
+  let postfix1 = "_generated1_" in
+  let postfix2 = "_generated2_" in
+  let params1 = List.map (fun s -> inject_ty_param ((ty_param_to_string s) ^ postfix1)) params1 in
+  let params2 = List.map (fun s -> inject_ty_param ((ty_param_to_string s) ^ postfix2)) params2 in
+  let rel1' = map_over_relation' rel1' (postfix_all_params postfix1)  in
+  let rel2' = map_over_relation' rel2' (postfix_all_params postfix2)  in
+  (* Perform the merge *)
   let rel = merge_relations rel1' param_pos1 rel2' param_pos2 (extract_tyctr ind) in
   let params = params1 @ params2 in
   msg_debug (str "------------ Relation to be outputted: --------------------");

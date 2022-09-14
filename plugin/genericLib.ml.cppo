@@ -82,6 +82,7 @@ let gType0 = CAst.make @@ CSort (Glob_term.UAnonymous {rigid = true})
          
 type ty_param = Id.t (* Opaque *)
 let ty_param_to_string (x : ty_param) = Id.to_string x
+let inject_ty_param (s : string) : ty_param = Id.of_string s
 
 let gTyParam = mkIdentC
 

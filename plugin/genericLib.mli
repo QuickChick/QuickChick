@@ -21,6 +21,7 @@ val gType0 : coq_expr
 
 type ty_param 
 val ty_param_to_string : ty_param -> string
+val inject_ty_param : string -> ty_param
 val gTyParam : ty_param -> coq_expr
 
 type ty_ctr
