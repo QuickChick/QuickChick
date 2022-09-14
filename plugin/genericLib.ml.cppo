@@ -771,7 +771,18 @@ let constr_of_type name ty_params dep_type =
     | y::ys -> if x = y then Constr.mkRel (i - j)
                else find_index x i (j-1) ys
   in
-  let rec aux vars ty_params i dt : Constr.t = 
+  let rec find_param (x : Id.t) i j params =
+    match params with
+    | [] -> failwith "Param not found"
+    | p::ps -> if p = x then Constr.mkRel (i - j)
+               else find_param x i (j+1) ps
+  in 
+  let rec aux vars ty_params i dt : Constr.t =
+    msg_debug (str "Calling aux with: " ++ str (dep_type_to_string dt) ++ int i ++ fnl ());
+    List.iter (fun v -> msg_debug (str (var_to_string v) ++ str " ")) vars;
+    msg_debug (fnl ());
+    List.iter (fun v -> msg_debug (str (var_to_string v) ++ str " ")) ty_params;
+    msg_debug (fnl ());    
     match dt with
     | DArrow (dt1, dt2) -> let t1 = aux vars ty_params i dt1 in
                            let t2 = aux (make_up_name () :: vars) ty_params (i+1) dt2 in
@@ -779,7 +790,11 @@ let constr_of_type name ty_params dep_type =
     | DProd ((x,dt1), dt2) -> let t1 = aux vars ty_params i dt1 in
                               let t2 = aux (x :: vars) ty_params (i+1) dt2 in 
                               Constr.mkProd (Context.nameR x, t1, t2)
-    | DTyParam tp -> find_index tp 1 0 ty_params 
+    | DTyParam tp ->
+       begin
+         msg_debug (str "Finding ty_param: " ++ str (ty_param_to_string tp) ++ str " with i: " ++ int i ++ fnl ());
+         find_param tp i 1 ty_params
+       end
     | DTyCtr (c,dts) ->
        let cname = string_of_qualid c in
        let c' = if cname = "Prop" then Constr.mkProp
@@ -788,7 +803,7 @@ let constr_of_type name ty_params dep_type =
        Constr.mkApp (c', Array.of_list (List.map (aux vars ty_params i) dts))
     | DCtr (c,dts) ->
        Constr.mkApp (Constr.mkConstruct (locate_constructor c), Array.of_list (List.map (aux vars ty_params i) dts))
-    | DTyVar x -> find_index x i (List.length vars) vars
+    | DTyVar x -> find_index x (i - List.length ty_params) (List.length vars) (vars)
     | DApp (c, dts) ->
        Constr.mkApp (aux vars ty_params i c, Array.of_list (List.map (aux vars ty_params i) dts))
     | DNot dt -> failwith "Not" (* Constr.mkApp (Constr.mkVar (Id.of_string "negb"), [| aux dt |])*)

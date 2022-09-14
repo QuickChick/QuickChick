@@ -332,7 +332,7 @@ let extract_relation ind : relation * int =
     let param_pos = find (function | ({CAst.v = CRef (id,_) ; _} , _) -> qualid_basename id = id1) args1 in
     match coerce_reference_to_dep_dt p1 with
     | Some dt -> msg_debug (str (dep_dt_to_string dt) ++ fnl());
-        let num_named_params = match dt with (_ , params , _ , _) -> List.length params in
+                 (*        let num_named_params = match dt with (_ , params , _ , _) -> List.length params in *)
         dt , param_pos (* - num_named_params *)
     | None -> failwith "Not supported type"
 
@@ -347,6 +347,7 @@ In case I come back and am confused by this code later, a type parameter is e.g.
 Inductive list (t : Type) : Type := ...
 *)
 
+(*
 let rec removeOuterForalls (ty : dep_type) (numToRemove : int) : dep_type =
   if numToRemove = 0
     then ty
@@ -354,7 +355,8 @@ let rec removeOuterForalls (ty : dep_type) (numToRemove : int) : dep_type =
     match ty with
     | DProd  ((v, dt1), dt2) -> removeOuterForalls dt2 (numToRemove - 1)
     | _ -> failwith "if this is printed its a bug 1"
-
+ *)
+                                  
 let rec removeFirstArgsOfVar (var : ty_ctr) (num : int) (term : dep_type) =
   let rec drop n l = if n = 0 then l else (drop (n - 1) (List.tl l)) in
   let recurse = removeFirstArgsOfVar var num in
@@ -387,12 +389,12 @@ let removeTypeParameters ((ty_ctr, params, ctrs, ty) : relation) : relation' * t
     , ty)
   , params)
 
-let rec replaceOuterForalls (ty : dep_type) (names : ty_param list) =
+(*let rec replaceOuterForalls (ty : dep_type) (names : ty_param list) =
   match names with
   | [] -> ty
   | name :: names -> DProd (((inject_var (ty_param_to_string name))
     ,(DTyCtr (gInjectTyCtr "Type", []))), replaceOuterForalls ty names)
-
+ *)
 (* DTyCtr (injectCtr "Prop", []) *)
 
 let rec replaceFirstArgsOfVar (var : ty_ctr) (names : ty_param list) (term : dep_type) =

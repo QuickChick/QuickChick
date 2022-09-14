@@ -1,4 +1,4 @@
- From QuickChick Require Import QuickChick.
+From QuickChick Require Import QuickChick.
 
 Require Import List. Import ListNotations.
 Require Import String. Open Scope string.
@@ -14,11 +14,16 @@ Inductive Foo (A : Type) :=
 Arguments Foo1 {A}.
 Arguments Foo2 {A}.
 
+Inductive NoParam : Foo nat -> Prop :=
+| NoParam1 : NoParam Foo1
+| NoParam2 : forall a f, NoParam f -> NoParam (Foo2 a f f).
+
 Inductive Good {A : Type} : Foo A -> Prop :=
 | Good1 : Good Foo1
 | Good2 : forall a f, Good (Foo2 a f f).
 
 QuickChickDebug Debug On.
+MergeTest (fun x => NoParam x).
 MergeTest (fun x => Good x).
 
 Inductive bst : nat -> nat -> Tree -> Prop :=
