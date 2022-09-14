@@ -798,6 +798,7 @@ let constr_of_type name ty_params dep_type =
     | DTyCtr (c,dts) ->
        let cname = string_of_qualid c in
        let c' = if cname = "Prop" then Constr.mkProp
+                else if cname = "Type" then Constr.mkType Univ.Universe.type1
                 else if cname = name then Constr.mkRel i
                 else Constr.mkInd (locate_ind c) in
        Constr.mkApp (c', Array.of_list (List.map (aux vars ty_params i) dts))
@@ -815,7 +816,7 @@ let constr_of_type name ty_params dep_type =
   let rec handle_ty_params ty_ps dt =
     match ty_ps with
     | [] -> dt
-    | p::ps -> Constr.mkProd (Context.nameR p, Constr.mkSet, handle_ty_params ps dt)
+    | p::ps -> Constr.mkProd (Context.nameR p, Constr.mkType (Univ.Universe.type1), handle_ty_params ps dt)
   in 
   handle_ty_params ty_params (aux [] ty_params (List.length ty_params + 1) dep_type)
   
@@ -934,7 +935,7 @@ let rec str_appends cs =
   | [c] -> c
   | c1::cs' -> str_append c1 (str_appends cs')
 let smart_paren c = gApp (gInject "QuickChick.Show.smart_paren") [c]
-
+                  
 (* Pair *)
 let gPair (c1, c2) = gApp (gInject "Coq.Init.Datatypes.pair") [c1;c2]
 let gProd (c1, c2) = gApp (gInject "Coq.Init.Datatypes.prod") [c1;c2]
