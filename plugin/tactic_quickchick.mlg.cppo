@@ -35,7 +35,9 @@ let quickchick_goal =
     Printf.printf "So far so good\n"; flush stdout;
     
     (* Externalize it *)
-#if COQ_VERSION >= (8, 12, 0)
+#if COQ_VERSION >= (8, 17, 0)
+    let ct = Constrextern.extern_constr e evd (EConstr.mkEvar (evar, SList.empty)) in
+#elif COQ_VERSION >= (8, 12, 0)
     let ct = Constrextern.extern_constr e evd (EConstr.mkEvar (evar, [])) in
 #else
     let ct = Constrextern.extern_constr false e evd (EConstr.mkEvar (evar, [||])) in
