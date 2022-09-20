@@ -474,7 +474,7 @@ let qcFuzz_main prop_def temp_dir execn prop_mlf prop_mlif warnings prop fuzzLoo
    *)
   let zarith = "-I $(opam var lib)/zarith $(opam var lib)/zarith/zarith.cmxa" in
   
-  let ocamlopt = "ocamlopt" in
+  let ocamlopt = "ocamlopt -ccopt -Wno-error=implicit-function-declaration" in
   let comp_mli_cmd instr_flag fn =
     Printf.sprintf "%s %s unix.cmxa %s -rectypes -w a -I %s %s" ocamlopt instr_flag zarith
       (Filename.dirname fn) fn
