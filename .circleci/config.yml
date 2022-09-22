@@ -5,6 +5,7 @@ defaults: &defaults
     OPAMJOBS: 2
     OPAMVERBOSE: 1
     OPAMYES: true
+    OPAMWITHTEST: true
     TERM: xterm
     SKIP_BUILD: ''
   parameters:
@@ -26,7 +27,6 @@ commands:
         name: Install dependencies
         command: |
             opam install --deps-only .
-            opam install ocamlbuild  # for tests
     - run:
         name: List installed packages
         command: |
