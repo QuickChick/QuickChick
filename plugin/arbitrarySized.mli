@@ -11,3 +11,5 @@ val shrink_decl :
   GenericLib.var list -> GenericLib.coq_expr
 val show_decl :
   GenericLib.ty_ctr -> GenericLib.ctr_rep list -> 'a -> GenericLib.coq_expr
+val shows_decl :
+  GenericLib.ty_ctr -> GenericLib.ctr_rep list -> 'a -> GenericLib.coq_expr

@@ -120,3 +120,65 @@ let show_decl ty_ctr ctrs _iargs =
   let show_fun = gFun ["x"] (fun [x] -> show_body x) in
   gRecord [("show", show_fun)]
           
+let shows_decl ty_ctr ctrs _iargs =
+    msg_debug (str "Deriving ShowS Information:" ++ fnl ());
+    msg_debug (str ("Type constructor is: " ^ ty_ctr_to_string ty_ctr) ++ fnl ());
+    msg_debug (str (str_lst_to_string "\n" (List.map ctr_rep_to_string ctrs)) ++ fnl());
+  
+    let isCurrentTyCtr = function
+      | TyCtr (ty_ctr', _) -> ty_ctr = ty_ctr'
+      | _ -> false in
+  
+    (* Create the function body by recursing on the structure of x *)
+    let shows_body x =
+
+      (* like `str_append` but applied to just one argument *)
+      (* TODO: impl *)
+      let str_append' : coq_expr -> coq_expr = _ in 
+      (* TODO: impl *)
+      (* `compose`-folds a list of function `coq_expr` *)
+      let gComps: coq_expr -> coq_expr list -> coq_expr = _ in
+      
+      (* str' is the string to postpend *)
+      let branch aux str' (ctr, ty) =
+        let body vs = 
+          match vs with 
+          (* OLD: from show
+          | [] -> gStr (constructor_to_string ctr) 
+          *)
+          | [] -> str_append' (gStr (constructor_to_string ctr))
+          (* OLD: from show
+          | _  -> 
+            str_append 
+              (gStr (constructor_to_string ctr ^ " "))
+              (fold_ty_vars
+                (fun _ v ty' -> smart_paren 
+                  (gApp 
+                    (if isCurrentTyCtr ty' then gVar aux else gInject "shows") 
+                    [gVar v]))                                    
+                (fun s1 s2 -> 
+                  if s2 = emptyString then 
+                    s1 
+                  else 
+                    str_appends [s1; gStr " "; s2]) 
+                emptyString ty vs)
+          *)
+          | _ ->
+            gComps (str_append' _) @@
+            _ (* insert spaces and parens *) @@ 
+            List.map
+              (fun v -> 
+                (* coq_expr: string -> string *)
+                
+              )
+              vs
+        in (ctr, generate_names_from_type "p" ty, body)
+      in
+      
+      gRecFunIn "aux" ["x'"; "str"]
+        (fun (aux, [x'; str']) -> gMatch (gVar x') (List.map (branch aux str') ctrs))
+        (fun aux -> gApp (gVar aux) [gVar x])
+    in
+    
+    let shows_fun = gFun ["x"] (fun [x] -> shows_body x) in
+    gRecord [("shows", shows_fun)]
