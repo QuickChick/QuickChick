@@ -142,7 +142,7 @@ Definition doneTesting (st : State) : Result :=
     Success (numSuccessTests st + 1) (numDiscardedTests st) (summary st)
             (
               if (stDoAnalysis st) 
-                then ("""result"": ""success"", ""passed"": " ++ (show (numSuccessTests st)) ++ ", ""discards"": " ++ (show (numDiscardedTests st)))
+                then ("""result"": ""success"", ""tests"": " ++ (show (numSuccessTests st)) ++ ", ""discards"": " ++ (show (numDiscardedTests st)))
                 else ("+++ Passed " ++ (show (numSuccessTests st)) ++ " tests (" ++ (show (numDiscardedTests st)) ++ " discards)" ++ newline)
             )
 
@@ -150,7 +150,7 @@ Definition doneTesting (st : State) : Result :=
     NoExpectedFailure (numSuccessTests st) (summary st)
                   (
                     if (stDoAnalysis st) 
-                      then ("result: expected_failure, passed " ++ (show (numSuccessTests st)))
+                      then ("""result"": ""expected_failure"", ""tests"": " ++ (show (numSuccessTests st)))
                       else ("*** Failed! Passed " ++ (show (numSuccessTests st))++ " tests (expected Failure)" ++ newline)
                   ).
   (* TODO: success st - labels *)
@@ -159,7 +159,7 @@ Definition giveUp (st : State) : Result :=
   GaveUp (numSuccessTests st) (summary st)
           (
             if (stDoAnalysis st) 
-              then ("result: gave_up, passed:" ++ (show (numSuccessTests st)) ++ ", discards: " ++ (show (numDiscardedTests st)))
+              then ("""result"": ""gave_up"", ""tests"":" ++ (show (numSuccessTests st)) ++ ", ""discards"": " ++ (show (numDiscardedTests st)))
               else ("*** Gave up! Passed only " ++ (show (numSuccessTests st)) ++ " tests" ++ 
                     newline ++ "Discarded: " ++ (show (numDiscardedTests st)) ++ newline)
           ).
@@ -268,8 +268,8 @@ Fixpoint runATest (st : State) (f : nat -> RandomSeed -> QProp) (maxSteps : nat)
             let pre : string := (
                                   if ana 
                                     then (
-                                      if expect res then "result: failed, "
-                                      else "+++ result: expected_failure "
+                                      if expect res then """result"": ""failed"", "
+                                      else """result"": ""expected_failure"" "
                                     )
                                     else (
                                       if expect res then "*** Failed "
@@ -280,8 +280,8 @@ Fixpoint runATest (st : State) (f : nat -> RandomSeed -> QProp) (maxSteps : nat)
             let suf := (
                         if ana 
                           then (
-                              "tests: " ++ (show (S nst)) ++ ", shrinks: "
-                              ++ (show numShrinks) ++ ", discards: "
+                              """tests"": " ++ (show (S nst)) ++ ", ""shrinks"": "
+                              ++ (show numShrinks) ++ ", ""discards"": "
                               ++ (show ndt)
                             )
                           else (
