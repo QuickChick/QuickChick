@@ -135,42 +135,33 @@ let shows_decl ty_ctr ctrs _iargs =
       (* like `str_append` but applied to just one argument *)
       (* TODO: impl *)
       let str_append' : coq_expr -> coq_expr = _ in 
+      
+      (* like `smart_paren`, but in ShowS continuation style *)
+      (* TODO: imp *)
+      let smart_paren': coq_expr = _ in
+      
       (* TODO: impl *)
       (* `compose`-folds a list of function `coq_expr` *)
       let gComps: coq_expr -> coq_expr list -> coq_expr = _ in
+      let gComp: coq_expr -> coq_expr -> coq_expr = _ in
       
       (* str' is the string to postpend *)
       let branch aux str' (ctr, ty) =
         let body vs = 
           match vs with 
-          (* OLD: from show
-          | [] -> gStr (constructor_to_string ctr) 
-          *)
           | [] -> str_append' (gStr (constructor_to_string ctr))
-          (* OLD: from show
-          | _  -> 
-            str_append 
-              (gStr (constructor_to_string ctr ^ " "))
-              (fold_ty_vars
-                (fun _ v ty' -> smart_paren 
+          | _ -> 
+            fold_ty_vars
+              (fun _ v ty' -> 
+                gComp
+                  smart_paren'
                   (gApp 
                     (if isCurrentTyCtr ty' then gVar aux else gInject "shows") 
-                    [gVar v]))                                    
-                (fun s1 s2 -> 
-                  if s2 = emptyString then 
-                    s1 
-                  else 
-                    str_appends [s1; gStr " "; s2]) 
-                emptyString ty vs)
-          *)
-          | _ ->
-            gComps (str_append' _) @@
-            _ (* insert spaces and parens *) @@ 
-            List.map
-              (fun v -> 
-                (* coq_expr: string -> string *)
-                
+                    [gVar v])
               )
+              gComp (* TODO: this may need to be flipped, depending on the order of folding *)
+              (str_append' (gStr (constructor_to_string ctr)))
+              ty
               vs
         in (ctr, generate_names_from_type "p" ty, body)
       in
