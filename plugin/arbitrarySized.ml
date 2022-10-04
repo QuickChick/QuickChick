@@ -134,16 +134,16 @@ let shows_decl ty_ctr ctrs _iargs =
 
       (* like `str_append` but applied to just one argument *)
       (* TODO: impl *)
-      let str_append' : coq_expr -> coq_expr = _ in 
+      let str_append' : coq_expr -> coq_expr = failwith "unimpl: str_append'" in 
       
       (* like `smart_paren`, but in ShowS continuation style *)
       (* TODO: imp *)
-      let smart_paren': coq_expr = _ in
+      let smart_paren': coq_expr = failwith "unimpl: smart_paren'" in
       
       (* TODO: impl *)
       (* `compose`-folds a list of function `coq_expr` *)
-      let gComps: coq_expr -> coq_expr list -> coq_expr = _ in
-      let gComp: coq_expr -> coq_expr -> coq_expr = _ in
+      (* let gComps: coq_expr -> coq_expr list -> coq_expr = failwith "unimpl: gComps'" in *)
+      let gComp: coq_expr -> coq_expr -> coq_expr = failwith "unimpl: gComp'" in
       
       (* str' is the string to postpend *)
       let branch aux str' (ctr, ty) =

@@ -2,6 +2,10 @@ From QuickChick Require Import QuickChick.
 Import QcDefaultNotation. Open Scope qc_scope.
 Open Scope string_scope.
 
+Inductive T := | A : T | B : T -> T.
+
+Derive (ShowS) for T.
+
 Class ShowS (A: Set): Type := {
   shows: A -> string -> string
 }.

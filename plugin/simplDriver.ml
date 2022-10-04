@@ -13,6 +13,7 @@ open ArbitrarySized
 type derivable =
     Shrink
   | Show
+  | ShowS
   | GenSized
   | Sized
   | CanonicalSized
@@ -23,6 +24,7 @@ type derivable =
 let derivable_to_string = function
   | Shrink -> "Shrink"
   | Show   -> "Show"
+  | ShowS  -> "ShowS"
   | GenSized -> "GenSized"
   | Sized -> "Sized"
   | CanonicalSized -> "CanonicalSized"
@@ -74,6 +76,7 @@ let derive (cn : derivable) (c : constr_expr) (instance_name : string) (name1 : 
     | Sized -> ["Sized"]
     | Shrink -> ["Shrink"]
     | Show -> ["Show"]
+    | ShowS -> ["ShowS"]
     | GenSized -> ["Gen"]
     | CanonicalSized -> ["CanonicalSized"]
     | SizeMonotonic -> ["GenMonotonic"]
@@ -83,6 +86,7 @@ let derive (cn : derivable) (c : constr_expr) (instance_name : string) (name1 : 
 
   let extra_arguments = match cn with
     | Show -> []
+    | ShowS -> []
     | Shrink -> []
     | Sized -> []
     | GenSized -> []
@@ -123,6 +127,7 @@ let derive (cn : derivable) (c : constr_expr) (instance_name : string) (name1 : 
     (* Copying code for Arbitrary, Sized from derive.ml *)
     match cn with
     | Show -> show_decl ty_ctr ctrs iargs 
+    | ShowS -> shows_decl ty_ctr ctrs iargs 
     | Shrink -> shrink_decl ty_ctr ctrs iargs
     | GenSized -> arbitrarySized_decl ty_ctr ctrs iargs
     | Sized -> sized_decl ty_ctr ctrs
