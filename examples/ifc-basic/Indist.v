@@ -19,6 +19,7 @@ Class Indist (A : Type) : Type :=
   indist : A -> A -> bool
 }.
 
+#[global]
 Instance indist_atom : Indist Atom :=
 {|
   indist a1 a2 :=
@@ -31,6 +32,7 @@ Instance indist_atom : Indist Atom :=
     end
 |}.
 
+#[global]
 Instance indist_mem : Indist Mem :=
 {|
   indist m1 m2 := forallb2 indist m1 m2
@@ -45,6 +47,7 @@ Fixpoint cropTop (s:Stack) : Stack :=
   end.
 
 (* Assumes stacks have been cropTopped! *)
+#[global]
 Instance indist_stack : Indist Stack :=
 {|
   indist s1 s2 :=
@@ -58,6 +61,7 @@ Instance indist_stack : Indist Stack :=
     in aux s1 s2
 |}.
 
+#[global]
 Instance indist_state : Indist State :=
 {|
   indist st1 st2 :=

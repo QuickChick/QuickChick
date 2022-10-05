@@ -5,11 +5,13 @@ Class liftable (A B : Type) :=
     lift_m : A -> B 
   }.
 
+Global
 Instance lift0 {A} : liftable (G A) (G A) :=
   { 
     lift_m := id 
   }.
 
+Global
 Instance liftN {A B R} `(liftable (G B) R) : liftable (G (A -> B)) (G A -> R):=
    { 
      lift_m f ga := 

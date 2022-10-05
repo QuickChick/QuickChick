@@ -433,7 +433,7 @@ induction p.
     * instantiate (1 := []). instantiate (1 := []). auto.
   - simpl. auto.
 + intros.
-  destruct st; destruct a; simpl; auto.
+  destruct st; destruct a; simpl.
   - rewrite refineFunCorrect.
     apply IHp.
   - rewrite refineFunCorrect; apply IHp.
@@ -752,7 +752,7 @@ Qed.
 
 Class ChoosableFromInterval (A : Type)  :=
   {
-    super :> OrdType A;
+    super : OrdType A;
     randomR : A * A -> RandomSeed -> A * RandomSeed;
     randomRCorrect :
       forall (a a1 a2 : A), leq a1 a2 ->
@@ -764,6 +764,8 @@ Class ChoosableFromInterval (A : Type)  :=
       (leq a1 a && leq a a2 <->
        In_ll a (enumR (a1,a2)))
   }.
+#[global]
+Existing Instance super.
 
 (* This is false. 
 #[global] Program Instance ChooseBool : ChoosableFromInterval bool :=

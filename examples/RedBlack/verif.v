@@ -98,6 +98,7 @@ Proof.
       * eapply IH; eauto; (case : x; [ by right | by left; lia]).      
 Qed.
 
+#[global]
 Instance genRBTreeMonotonic : SizeMonotonic genRBTree.
 Proof.
   apply bindMonotonic; eauto with typeclass_instances.

@@ -1,6 +1,7 @@
 type derivable =
     Shrink
   | Show
+  | ShowS
   | GenSized
   | Sized
   | EnumSized
