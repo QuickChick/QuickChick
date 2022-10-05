@@ -20,7 +20,7 @@ let mk_ref s = CAst.make @@ CRef (qualid_of_string s, None)
 
 (* Names corresponding to QuickChick's .v files *)
 let show = mk_ref "QuickChick.Show.show"
-let show = mk_ref "QuickChick.ShowS.shows"
+let shows = mk_ref "QuickChick.ShowS.shows"
 let quickCheck = mk_ref "QuickChick.Test.quickCheck"
 let quickCheckWith = mk_ref "QuickChick.Test.quickCheckWith"
 let mutateCheck = mk_ref "QuickChick.MutateCheck.mutateCheck"
