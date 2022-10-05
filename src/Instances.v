@@ -481,11 +481,11 @@ Proof.
   intros. destruct p.
     rewrite /Z.div2 /Pos.div2.
       rewrite /Z.abs_nat. rewrite Pos2Nat.inj_xI.
-      rewrite <- Nat.add_1_r. rewrite mult_comm.
+      rewrite <- Nat.add_1_r. rewrite Nat.mul_comm.
       rewrite Nat.div2_div. rewrite Nat.div_add_l; simpl; lia.
     rewrite /Z.div2 /Pos.div2.
       rewrite /Z.abs_nat. rewrite Pos2Nat.inj_xO.
-      rewrite mult_comm. rewrite Nat.div2_div. rewrite Nat.div_mul. reflexivity. lia.
+      rewrite Nat.mul_comm. rewrite Nat.div2_div. rewrite Nat.div_mul. reflexivity. lia.
   reflexivity.
 Qed.
 
@@ -521,10 +521,10 @@ Proof.
   intros. destruct p.
     left. rewrite /Z.div2 /Pos.div2.
       rewrite neg_succ. rewrite <- Zsucc_pred. rewrite /Z.abs_nat. rewrite Pos2Nat.inj_xI.
-      rewrite <- Nat.add_1_r. rewrite mult_comm.
+      rewrite <- Nat.add_1_r. rewrite Nat.mul_comm.
       rewrite Nat.div2_div. rewrite Nat.div_add_l; simpl; lia.
     right. rewrite /Z.div2 /Pos.div2.
-      rewrite Pos2Nat.inj_xO. rewrite mult_comm.
+      rewrite Pos2Nat.inj_xO. rewrite Nat.mul_comm.
       rewrite Nat.div2_div. rewrite Nat.div_mul. simpl.
       apply abs_succ_neg. lia.
   left. simpl. reflexivity.
@@ -542,7 +542,7 @@ Proof.
   move => ? p ?. subst. destruct (abs_succ_div2_neg p) as [H | H].
     rewrite {}H /Z.abs_nat. rewrite Nat.div2_div.
       apply Nat.div_lt. apply Pos2Nat.is_pos. lia.
-    rewrite {}H /Z.abs_nat. eapply le_lt_trans. apply le_pred_n. rewrite Nat.div2_div.
+    rewrite {}H /Z.abs_nat. eapply Nat.le_lt_trans. apply Nat.le_pred_l. rewrite Nat.div2_div.
       apply Nat.div_lt. apply Pos2Nat.is_pos. lia.
 Qed.
 

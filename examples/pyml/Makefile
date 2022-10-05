@@ -1,4 +1,4 @@
-QC=quickChick -color -ocamlbuild '-use-ocamlfind'
+QC=quickChick -color
 TMP_DIR=../_qc_pyml.tmp
 V=@
 

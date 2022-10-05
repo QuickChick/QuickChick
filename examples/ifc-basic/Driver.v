@@ -192,6 +192,7 @@ Definition myArgs : Args :=
 
 From QuickChick Require Import Mutate MutateCheck.
 
+#[global]
 Instance mutateable_table : Mutateable table :=
 {|
   mutate := mutate_table

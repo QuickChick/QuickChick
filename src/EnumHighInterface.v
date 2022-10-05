@@ -60,6 +60,7 @@ Parameter semLiftGenSize :
   forall {A B} (f: A -> B) (g: G A) size,
     semGenSize (liftGen f g) size <--> f @: semGenSize g size.
 
+#[global]
 Declare Instance liftGenUnsized {A B} (f : A -> B) (g : G A) 
         `{Unsized _ g} : Unsized (liftGen f g).
 
@@ -82,9 +83,11 @@ Parameter semLiftGen2SizeMonotonic :
          (g1 : G A1) (g2 : G A2) `{SizeMonotonic _ g1} `{SizeMonotonic _ g2},
   semGen (liftGen2 f g1 g2) <--> f @2: (semGen g1, semGen g2).
 
+#[global]
 Declare Instance liftGen2Unsized {A1 A2 B} (f : A1 -> A2 -> B) (g1 : G A1)
         `{Unsized _ g1} (g2 : G A2) `{Unsized _ g2} : Unsized (liftGen2 f g1 g2).
 
+#[global]
 Declare Instance liftGen2Monotonic {A1 A2 B} (f : A1 -> A2 -> B) (g1 : G A1)
         `{SizeMonotonic _ g1} (g2 : G A2) `{SizeMonotonic _ g2} : SizeMonotonic (liftGen2 f g1 g2).
 
@@ -113,6 +116,7 @@ Parameter semLiftGen4SizeMonotonic :
   [set b : B | exists a1 a2 a3 a4, semGen g1 a1 /\ semGen g2 a2 /\
                  semGen g3 a3 /\ semGen g4 a4 /\ f a1 a2 a3 a4 = b].
 
+#[global]
 Declare Instance liftGen4Monotonic {A B C D E} 
         (f : A -> B -> C -> D -> E)
         (g1 : G A) (g2 : G B) (g3 : G C) (g4 : G D) 
@@ -165,6 +169,7 @@ Parameter semOneofSize:
     (semGenSize (oneOf_ def l) s) <-->
       if l is nil then semGenSize def s else \bigcup_(x in l) semGenSize x s.
 
+#[global]
 Declare Instance oneofMonotonic {A} (x : G A) (l : list (G A))
         `{ SizeMonotonic _ x} `(l \subset SizeMonotonic) : SizeMonotonic (oneOf_ x l). 
 
@@ -181,6 +186,7 @@ Parameter frequencySizeMonotonic:
   List.Forall (fun p => SizeMonotonic (snd p)) lg ->
   SizeMonotonic (freq_ g0 lg).
 
+#[global]
 Declare Instance frequencySizeMonotonic_alt 
 : forall {A : Type} (g0 : G A) (lg : seq (nat * G A)),
     SizeMonotonic g0 ->
@@ -247,9 +253,11 @@ Parameter semVectorOfUnsized :
   forall {A} (g : G A) (k : nat) `{Unsized _ g}, 
     semGen (vectorOf k g) <--> [set l | length l = k /\ l \subset semGen g ]. 
 
+#[global]
 Declare Instance vectorOfUnsized {A} (k : nat) (g : G A) 
         `{Unsized _ g } : Unsized (vectorOf k g).
 
+#[global]
 Declare Instance vectorOfMonotonic {A} (k : nat) (g : G A) 
         `{SizeMonotonic _ g } : SizeMonotonic (vectorOf k g).
 
@@ -262,6 +270,7 @@ Parameter semListOfUnsized:
   forall {A} (g : G A) (k : nat) `{Unsized _ g}, 
     semGen (listOf g) <--> [set l | l \subset semGen g ]. 
 
+#[global]
 Declare Instance listOfMonotonic {A} (g : G A) 
         `{SizeMonotonic _ g } : SizeMonotonic (listOf g).
 
@@ -273,6 +282,7 @@ Parameter semElementsSize:
   forall {A} (l: list A) (def : A) s,
     (semGenSize (elems_ def l) s) <--> if l is nil then [set def] else l.
 
+#[global]
 Declare Instance elementsUnsized {A} {def : A} (l : list A)  : Unsized (elems_ def l).
 
 Definition genPair {A B : Type} (ga : G A) (gb : G B) : G (A * B) :=
@@ -344,12 +354,14 @@ Parameter semOneOfSize : forall A (g0 : G A) (gs : list (G A)) s,
 Parameter semOneOf : forall A (g0 : G A) (gs : list (G A)),
   semGen (oneOf (g0 ;; gs))  <--> \bigcup_(g in (g0 :: gs)) semGen g.
 
+#[global]
 Declare Instance bindOptMonotonic
         {A B} (g : G (option A)) (f : A -> G (option B)) :
   SizeMonotonic g ->
   (forall x, SizeMonotonic (f x)) ->
   SizeMonotonic (bindGenOpt g f).
 
+#[global]
 Declare Instance bindOptMonotonicOpt
         {A B} (g : G (option A)) (f : A -> G (option B)) :
   SizeMonotonicOpt g ->
@@ -378,6 +390,7 @@ Declare Instance bindOptMonotonicOpt
 
 Definition GOpt A := G (option A).
 
+#[global]
 Instance Monad_GOpt : Monad GOpt := {
   ret A x := returnGen (Some x);
   bind A B := bindGenOpt;
@@ -400,20 +413,24 @@ Parameter semSizeOpt_suchThatMaybeOpt :
     semGenSizeOpt (suchThatMaybeOpt g p) s <-->
     semGenSizeOpt g s :&: p.
 
+#[global]
 Declare Instance MonotonicOpt_retry {A} (n : nat) (g : G (option A)) :
   SizeMonotonicOpt g ->
   SizeMonotonicOpt (retry n g).
 
+#[global]
 Declare Instance MonotonicOpt_suchThatMaybe1
         {A : Type} (g : G A) (f : A -> bool) :
   SizeMonotonic g ->
   SizeMonotonicOpt (suchThatMaybe1 g f).
 
+#[global]
 Declare Instance MonotonicOpt_suchThatMaybe
         {A : Type} (g : G A) (f : A -> bool) :
   SizeMonotonic g ->
   SizeMonotonicOpt (suchThatMaybe g f).
 
+#[global]
 Declare Instance MonotonicOpt_suchThatMaybeOpt
         {A : Type} (g : G (option A)) (f : A -> bool) :
   SizeMonotonicOpt g ->

@@ -53,6 +53,9 @@ Definition show_int (n : int) : string :=
 Definition show_nat (n : nat) : string :=
   show_uint (Nat.to_uint n).
 
+Definition show_unit (u : unit) : string :=
+  "unit".
+
 Definition show_bool (b : bool) : string :=
   match b with
   | true => "true"
