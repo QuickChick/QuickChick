@@ -18,7 +18,8 @@ https://lemonidas.github.io/pdf/GeneratingGoodGenerators.pdf
 
 ## Tutorial
 
-[QuickChick: Property-Based Testing in Coq][sfqc] (Software Foundations, Volume 4)
+- Small tutorials on Basic Usage and Automation can be found under `tutorials/`
+- An extended introduction can be found in [QuickChick: Property-Based Testing in Coq][sfqc] (Software Foundations, Volume 4)
 
 [sfqc]: https://softwarefoundations.cis.upenn.edu/qc-current/index.html
 
@@ -75,6 +76,8 @@ The public API of QuickChick is summarized in `BasicInterface.v`.
 - `Derive Arbitrary for c`
 - `Derive Show for c`
 - `Derive ArbitrarySizedSuchThat for (fun x => p)`
+- `Derive DecOpt for p`
+- `Derive EnumSizedSuchThat for (fun x => p)`
 - `Derive ArbitrarySizedSuchThat for (fun x => let (x1,x2...) := x in p)`
 - `QuickCheckWith args c`
 - `MutateCheck c p`

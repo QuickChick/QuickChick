@@ -126,7 +126,7 @@ Require Import String. Open Scope string.
        end
   |}.
 
-(* You can safely ignore the "#[export] annotation for now, it signifies 
+(* You can safely ignore the "#[export]" annotation for now, it signifies 
 that this instance should be exported along with this module. *)
 
 Eval compute in (show Green).
@@ -709,4 +709,3 @@ Print ShrinkTree.
 Derive Show for Tree.
 (* ShowTree is defined *)
 Print ShowTree.
-

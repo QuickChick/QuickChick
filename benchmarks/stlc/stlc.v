@@ -210,7 +210,7 @@ Definition preservation (e : term) (t: type) : Checker :=
 
 Definition preservation_derived (e : term) (t: type) : Checker :=
   match step e with
-  | Some e' => typing nil e' t ?? 10
+  | Some e' => checker (typing nil e' t ?? 10)
   | None => checker true
   end.
 
