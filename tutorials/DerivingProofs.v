@@ -9,6 +9,9 @@ Require Import Coq.Strings.Ascii.
 Open Scope qc_scope.
 Open Scope nat_scope.
 
+(* First of all, we need to import the proof-related modules, as they
+   are not exported by default. *)
+From QuickChick Require Import EnumProofs CheckerProofs.
 
 (** Regexp Matching *)
 
@@ -112,7 +115,7 @@ About EnumSizedreg_exp.
 *)
 
 
-Instance EnumSizedreg_exp_SizedMonotonic T {_ : Enum T} :
+#[local] Instance EnumSizedreg_exp_SizedMonotonic T {_ : Enum T} :
   SizedMonotonic (@enumSized _ (@EnumSizedreg_exp T _)).
 Proof. derive_enum_SizedMonotonic. Qed. 
 
@@ -130,7 +133,7 @@ Proof. derive_enum_SizedMonotonic. Qed.
    [derive_enum_SizedMonotonic]. 
 *) 
 
-Instance EnumSizedreg_exp_SizeMonotonic T `{EnumMonotonic T}:
+#[local] Instance EnumSizedreg_exp_SizeMonotonic T `{EnumMonotonic T}:
   forall s, SizeMonotonic (@enumSized _ (@EnumSizedreg_exp T _) s).
 Proof. derive_enum_SizeMonotonic. Qed.
 
@@ -150,7 +153,7 @@ Proof. derive_enum_SizeMonotonic. Qed.
  *)
 
 
-Instance EnumSizedreg_expCorrect T `{EnumMonotonicCorrect T}:
+#[local] Instance EnumSizedreg_expCorrect T `{EnumMonotonicCorrect T}:
   CorrectSized (@enumSized _ EnumSizedreg_exp).
 Proof. derive_enum_Correct. Qed.
 
@@ -250,7 +253,7 @@ About DecOptexp_match.
 
  *)
 
-Instance DecOptexp_match_monotonic {T} `{_ : Dec_Eq T} `{_ : EnumMonotonic T} (m : list T) n :
+#[local] Instance DecOptexp_match_monotonic {T} `{_ : Dec_Eq T} `{_ : EnumMonotonic T} (m : list T) n :
   DecOptSizeMonotonic (exp_match m n).
 Proof. derive_mon. Qed.
 
@@ -276,11 +279,11 @@ Proof. derive_mon. Qed.
    Again, we derive these instances automatically. *)
 
 
-Instance DecOptexp_match_sound {T} `{_ : Dec_Eq T} `{_ : EnumMonotonicCorrect T} (m : list T) n :
+#[local] Instance DecOptexp_match_sound {T} `{_ : Dec_Eq T} `{_ : EnumMonotonicCorrect T} (m : list T) n :
   DecOptSoundPos (exp_match m n).
 Proof. derive_sound. Qed.
 
-Instance DecOptexp_match_complete {T} `{_ : Dec_Eq T} `{_ : EnumMonotonicCorrect T} (m : list T) n :
+#[local] Instance DecOptexp_match_complete {T} `{_ : Dec_Eq T} `{_ : EnumMonotonicCorrect T} (m : list T) n :
   DecOptCompletePos (exp_match m n).
 Proof. derive_complete. Qed. 
 
@@ -289,15 +292,15 @@ Proof. derive_complete. Qed.
 
 Derive EnumSizedSuchThat for (fun n => eq x n).
 
-Instance EnumSizedSuchThateq_SizedMonotonic X {_ : Enum X} {_ : Dec_Eq X} (n : X) :
+#[local] Instance EnumSizedSuchThateq_SizedMonotonic X {_ : Enum X} {_ : Dec_Eq X} (n : X) :
   SizedMonotonicOptFP (@enumSizeST _ _ (EnumSizedSuchThateq n)).
 Proof. derive_enumST_SizedMonotonicFP. Qed.
 
-Instance EnumSizedSuchThateq_SizeMonotonic X `{_ : EnumMonotonic X} {_ : Dec_Eq X} (n : X) :
+#[local] Instance EnumSizedSuchThateq_SizeMonotonic X `{_ : EnumMonotonic X} {_ : Dec_Eq X} (n : X) :
   forall s, SizeMonotonicOptFP (@enumSizeST _ _ (EnumSizedSuchThateq n) s).
 Proof. derive_enumST_SizeMonotonicFP. Qed.
 
-Instance EnumSizedSuchThateq_Correct X `{_ : EnumMonotonicCorrect X} `{_ : Dec_Eq X} (n : X) :
+#[local] Instance EnumSizedSuchThateq_Correct X `{_ : EnumMonotonicCorrect X} `{_ : Dec_Eq X} (n : X) :
   CorrectSizedST (fun m => eq n m) (@enumSizeST _ _ (EnumSizedSuchThateq n)).
 Proof. derive_enumST_Correct. Qed.
 
@@ -342,11 +345,11 @@ EnumSizedSuchThatexp_match :
 (* As with the simple enumeration, before deriving correctness, we need to derive
    monotonicity. *)
 
-Instance EnumSizedSuchThatexp_match_SizedMonotonic {T} `{_ : Dec_Eq T} `{_ : EnumMonotonic T} e:
+#[local] Instance EnumSizedSuchThatexp_match_SizedMonotonic {T} `{_ : Dec_Eq T} `{_ : EnumMonotonic T} e:
   SizedMonotonicOptFP (@enumSizeST _ _ (EnumSizedSuchThatexp_match e)).
 Proof. derive_enumST_SizedMonotonicFP. Qed.
 
-Instance EnumSizedSuchThatexp_match_SizeMonotonic {T} `{_ : Dec_Eq T} `{_ : EnumMonotonic T} e :
+#[local] Instance EnumSizedSuchThatexp_match_SizeMonotonic {T} `{_ : Dec_Eq T} `{_ : EnumMonotonic T} e :
   forall s, SizeMonotonicOptFP (@enumSizeST _ _ (EnumSizedSuchThatexp_match e) s).
 Proof. derive_enumST_SizeMonotonicFP. Qed.
 
@@ -364,7 +367,7 @@ Proof. derive_enumST_SizeMonotonicFP. Qed.
 
 *)
 
-Instance EnumSizedSuchThatexp_match_Correct {T} `{_ : Dec_Eq T} `{_ : EnumMonotonicCorrect T} e :
+#[local] Instance EnumSizedSuchThatexp_match_Correct {T} `{_ : Dec_Eq T} `{_ : EnumMonotonicCorrect T} e :
   CorrectSizedST (fun l => exp_match l e)  (@enumSizeST _ _ (EnumSizedSuchThatexp_match e)).
 Proof. derive_enumST_Correct. Qed.
 

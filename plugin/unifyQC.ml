@@ -1041,7 +1041,7 @@ let handle_branch
                 check_expr ctr_index
                   checker body_fail body_cont not_enough_fuel_exp
                 )
-           | _ -> failwith "TODO: ERR MSG. No Classes found."
+           | _ -> failwith ("No Checkers or Producers for relation: " ^ (ty_ctr_to_string c))
            end
         end
       end
