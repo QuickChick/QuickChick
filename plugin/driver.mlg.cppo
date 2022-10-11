@@ -28,6 +28,7 @@ let class_assoc_opts = [ ("GenSized"                 , SimpleDer [SimplDriver.Ge
                        ; ("EnumSized"                , SimpleDer [SimplDriver.EnumSized])                       
                        ; ("Shrink"                   , SimpleDer [SimplDriver.Shrink])
                        ; ("Arbitrary"                , SimpleDer [SimplDriver.GenSized; SimplDriver.Shrink])
+                       ; ("Fuzzy"                    , SimpleDer [SimplDriver.Fuzzy])
                        ; ("Show"                     , SimpleDer [SimplDriver.Show])
                        ; ("Sized"                    , SimpleDer [SimplDriver.Sized])
 (*                       ; ("CanonicalSized"           , SimpleDer [SimplDriver.CanonicalSized])
