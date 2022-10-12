@@ -57,6 +57,8 @@ Class Shrink (A : Type) :=
 Class Arbitrary (A : Type) `{Gen A} `{Shrink A}.
 
 Class Fuzzy (A : Type) := { fuzz : A -> G A }.
+
+Class Mutate (A : Type) := { mutate : A -> G A }.
   
 Class EnumSized (A : Type) := { enumSized : nat -> E A }.
   

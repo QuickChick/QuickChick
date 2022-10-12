@@ -3,7 +3,7 @@ open Util
 open GenericLib
 open GenLib
 open Error
-   
+
 (* Derivation of ArbitrarySized. Contains mostly code from derive.ml *)
 
 let rec replace v x = function
@@ -192,6 +192,60 @@ let fuzzy_decl ty_ctr ctrs iargs =
   in
   debug_coq_expr fuzzy_fun;
   gRecord [("fuzz", fuzzy_fun)]
+
+(* Mutator derivation *)
+let mutate_decl ty_ctr ctrs iargs = 
+  
+  (* TODO: let isCurrentTyCtr = function
+    | TyCtr (ty_ctr', _) -> ty_ctr = ty_ctr'
+    | _ -> false in *)
+
+  (* Keep just the type parameters, not the typeclass constraints *)
+  let tyParams = List.map gVar (list_keep_every 3 iargs) in
+  
+  let mutate_fun =
+  
+    let mutate_body x =
+
+      (*
+      mutation options:
+        - regenerate:
+          - weight is constant
+        - recombine:
+          - weight is constant (TODO: more inputs?)
+        - recurse:
+          - weight is a function of child size
+          - choose a constructor argument to mutate
+          - if the argument is of the same type then use aux else use arbitrary
+          - return input except with result of mutation
+      *)
+  
+      let create_branch aux_mutate (ctr, ty) =
+        (ctr, generate_names_from_type "p" ty,
+         fun (all_vars : var list) : coq_expr ->
+            (* TODO: tmp; returns what it was given *)
+            returnGen 
+              (gApp ~explicit:true 
+                (gCtr ctr) 
+                (tyParams @ List.map gVar all_vars))
+        )
+      in
+  
+      let aux_mutate_body rec_fun x' : coq_expr = 
+        gMatch (gVar x') (List.map (create_branch rec_fun) ctrs) 
+      in
+  
+      gRecFunIn "aux_mutate" ["x'"]
+        (fun (aux_mutate, [x']) -> aux_mutate_body aux_mutate x')
+        (fun aux_mutate -> gApp (gVar aux_mutate) [gVar x]) (* TODO: may need to unthunk *)
+    
+    in
+
+    gFun ["x"] (fun [x] -> mutate_body x)
+  
+  in
+  debug_coq_expr mutate_fun;
+  gRecord [("mutate", mutate_fun)]
 
 (** Shrinking Derivation *)
 let shrink_decl ty_ctr ctrs iargs =
