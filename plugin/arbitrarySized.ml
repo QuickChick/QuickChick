@@ -213,9 +213,16 @@ let mutate_decl ty_ctr ctrs iargs =
           - weight is constant
         - recombine:
           - weight is constant (TODO: more inputs?)
+          - choose a new constructor
+          - for each argument required by the new constructor, try (i.e. check
+            if it has a compatible type) to use a given argument or the entire 
+            input. This will yield a tree of branching choices. Givens can be
+            used non-linearly.
+          - if no givens were used, then backtrack. (TODO: or not?)
+          - return the new constructor applied to the new arguments.  
         - recurse:
           - weight is a function of child size
-          - choose a constructor argument to mutate
+          - choose a given argument to mutate
           - if the argument is of the same type then use aux else use arbitrary
           - return input except with result of mutation
       *)
@@ -223,11 +230,49 @@ let mutate_decl ty_ctr ctrs iargs =
       let create_branch aux_mutate (ctr, ty) =
         (ctr, generate_names_from_type "p" ty,
          fun (all_vars : var list) : coq_expr ->
-            (* TODO: tmp; returns what it was given *)
-            returnGen 
+            (* returnGen 
               (gApp ~explicit:true 
                 (gCtr ctr) 
-                (tyParams @ List.map gVar all_vars))
+                (tyParams @ List.map gVar all_vars)) *)
+
+            (* regenerations *)
+            let regs : coq_expr list = 
+              [gInject "arbitrary"] 
+            in
+            
+            (* recombines *)
+            let rcms : coq_expr list =
+              List.flatten @@
+              (* for each constructor ctr' *)
+              List.map 
+                (fun (ctr', ctr'_typ) ->
+                  let ctr_arg_typs : (coq_expr * coq_type) list = _ in
+                  let ctr'_typs : coq_type list = _ in
+                  (* for each argument type of ctr' *)
+                  List.map
+                    (fun ctr'_arg_typ ->
+                      (* TODO: separately handle type params via unification *)
+                      (* look for elem of ctr_arg_typs that fits *)
+                      _
+                    )
+                    ctr'_typs
+                ) 
+                ctrs            
+              (* List.map_i  
+                (fun i var ->
+                  (gApp ~explicit:true 
+                    (gCtr ctr) 
+                    (tyParams @ List.map gVar all_vars))) 
+                0 all_vars *)
+            in 
+            
+            (* recursions *)
+            let recs : coq_expr list = []
+            in
+
+            oneofT @@
+            List.map (fun e -> gFun ["_tt"] (fun _ -> e)) @@ (* thunk 'em, boys *) 
+            regs @ rcms @ recs
         )
       in
   
@@ -237,7 +282,7 @@ let mutate_decl ty_ctr ctrs iargs =
   
       gRecFunIn "aux_mutate" ["x'"]
         (fun (aux_mutate, [x']) -> aux_mutate_body aux_mutate x')
-        (fun aux_mutate -> gApp (gVar aux_mutate) [gVar x]) (* TODO: may need to unthunk *)
+        (fun aux_mutate -> gApp (gVar aux_mutate) [gVar x])
     
     in
 
