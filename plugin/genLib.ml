@@ -36,10 +36,12 @@ let oneof l =
   | [] -> failwith "oneof used with empty list"
   | [c] -> c
   | c::cs -> gApp (gInject "oneOf_") [c; gList l]
+
+(* oneOfT_ {A : Type} (def: unit -> G A) (gs : list (unit -> G A)) : G A *)
 let oneofT l =
   match l with
-  | [] -> failwith "oneof used with empty list"
-  | [c] -> c
+  | [] -> failwith "oneofT used with empty list"
+  | [c] -> gApp c [gTT] 
   | c::cs -> gApp (gInject "oneOfT_") [c; gList l]
 
            
@@ -48,6 +50,8 @@ let frequency l =
   | [] -> failwith "frequency used with empty list"
   | [(_,c)] -> c
   | (_,c)::cs -> gApp (gInject "freq_") [c; gList (List.map gPair l)]
+
+(* TODO: frequencyT i.e. frequency thunked *)
 
 let enumerating l =
   gApp (gInject "enumerate") [gList l]
