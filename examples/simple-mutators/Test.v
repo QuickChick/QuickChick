@@ -5,7 +5,10 @@ Inductive L : Set :=
   | Nil : L
   | Cons : nat -> L -> L.
 
+Derive (Show, Arbitrary) for L.
 QuickChickDebug Debug On.
-Derive Arbitrary for L.
-(* Derive Fuzzy for L. *)
 Derive Mutate for L.
+
+Check @mutate.
+Sample (mutate Nil).
+ 
