@@ -259,7 +259,8 @@ let mutate_decl ty_ctr (ctrs : ctr_rep list) (iargs : var list) =
             (* recombines *)
             let rcms : coq_expr list =
               List.map returnGen @@
-              List.flatten @@ List.map
+              List.flatten @@ 
+              List.map
                 (fun (ctr', ctr'_typ) -> 
                   let ctr'_prm_typs : coq_type list = 
                     fst (unfold_coq_type ctr'_typ) 
@@ -269,36 +270,34 @@ let mutate_decl ty_ctr (ctrs : ctr_rep list) (iargs : var list) =
                       (fun _ -> str ", ") 
                       (fun typ -> str (coq_type_to_string typ)) 
                       ctr'_prm_typs);
-                  (* for each ctr'_prm_typ *)
+                  List.map (gApp ~explicit:true (gCtr ctr')) @@
                   List.fold_right
-                    (fun ctr'_prm_typ neus ->
-                      (* !TODO: for some reason, its putting an argument in the wrong spot in one case (see Test.v) *)
-                      msg_debug (str "ctr'_prm_typ: " ++ str (coq_type_to_string ctr'_prm_typ));
+                    (fun ctr'_prm_typ argss ->
                       (* for each ctr_arg *)
-                      List.flatten @@ 
-                        (List.map_i
-                          (fun i typ -> 
+                      List.flatten @@
+                        List.map_i
+                          (fun i typ ->
                             (* try ctr_arg as arg *)
-                            if typ == ctr'_prm_typ then
+                            if typ == ctr'_prm_typ then begin
                               (* types match, so apply *)
-                              List.map 
-                                (fun neu -> gApp neu [List.nth ctr_args i]) 
-                                neus
-                            else 
+                              debug_coq_expr (List.nth ctr_args i);
+                              List.map (fun args -> List.nth ctr_args i :: args) argss
+                            end else 
                               (* types don't match, so skip *)
                               []
                           )
-                          0 ctr_arg_typs)
+                          0 ctr_arg_typs
                         @
                         (* also try input x' as arg *)
                         (* TODO: need to handle type args? *)
                         [if isCurrentTyCtr ctr'_prm_typ then
-                          List.map (fun neu -> gApp neu [x']) neus
+                          (* List.map (fun neu -> gApp neu [x']) neus *)
+                          List.map (fun args -> (x' :: args)) argss
                         else 
                           []]
                     )
                     ctr'_prm_typs
-                    [gApp ~explicit:true (gCtr ctr') tyParams]
+                    []
                 ) 
                 ctrs
             in 
@@ -327,7 +326,6 @@ let mutate_decl ty_ctr (ctrs : ctr_rep list) (iargs : var list) =
             (* TODO: should actually use freq, and so need to choose weights *)
             (* TODO: used thunked version *)
             oneof @@
-            (* List.map (fun e -> gFun ["_tt"] (fun _ -> e)) @@ (* thunk 'em, boys *) *) 
             regs @ rcms @ recs
         )
       in
