@@ -91,7 +91,7 @@ let derive (cn : derivable) (c : constr_expr) (instance_name : string) (name1 : 
     | Show -> ["Show"]
     | GenSized -> ["Gen"]
     | Fuzzy -> ["Gen"; "Fuzzy"]
-    | Mutate -> ["Gen"; "Mutate"]
+    | Mutate -> ["Gen"; "Sized"; "Mutate"]
     | EnumSized -> ["Enum"]                
                 (*
     | CanonicalSized -> ["CanonicalSized"]
