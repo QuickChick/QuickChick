@@ -1,35 +1,68 @@
 From QuickChick Require Import QuickChick.
 Import MonadNotation.
+Require Import List.
+Import ListNotations.
 
-(* List *)
+QuickChickDebug Debug On.
+
+(* List Nat *)
 
 Inductive L : Set :=
   | Nil : L
   | Cons : nat -> L -> L.
 
+Derive (Show, Sized, Arbitrary) for nat.
+QuickChickDebug Debug On.
 Derive Mutate for nat.
 
-Derive (Show, Arbitrary) for L.
-(* QuickChickDebug Debug On. *)
+Derive (Show, Sized, Arbitrary) for L.
 Derive Mutate for L.
 
 Sample (mutate Nil).
 Sample (mutate (Cons 1 (Cons 2 Nil))).
 
-(* Tree *)
+(* Tree Nat *)
 
 Inductive T : Set :=
   | Leaf : T
   | Node : nat -> T -> T -> T.
 
-Derive (Show, Arbitrary, Mutate) for T.
+Derive (Show, Sized, Arbitrary, Mutate) for T.
 
 Sample (mutate Leaf).
-Sample (mutate (Node 1 (Node 2 Leaf Leaf) (Node 3 Leaf Leaf))).
+Sample (mutate (Node 100 (Node 200 Leaf Leaf) (Node 300 Leaf Leaf))).
 
 (* Option *)
 
-Derive (Show, Arbitrary, Mutate) for option.
+Derive (Show, Arbitrary, Sized, Mutate) for option.
 
 Sample (mutate (None : option nat)).
-Sample (mutate (Some 1: option nat)).
+Sample (mutate (Some 100: option nat)).
+
+(* list *)
+
+Derive (Show, Arbitrary, Sized, Mutate) for list.
+
+Sample (mutate [100]).
+Sample (mutate [100; 200; 300; 400]).
+
+(* tree *)
+
+Print list.
+
+Inductive tree (A : Type) : Type :=
+  | leaf : tree A
+  | node : A -> tree A -> tree A -> tree A.
+
+(* TODO: all of these derives give this error
+The constructor leaf (in type tree) is expected to be applied to 1 argument 
+while it is actually applied to no arguments.
+
+Something wierd is wrong at bottom of deriving... special to QC2? This wasn't 
+broken before for sure.
+*)
+(* Derive (Show, Arbitrary, Sized, Mutate) for tree. *)
+(* Derive Show for tree. *)
+(* Derive Arbitrary for tree. *)
+(* Derive Sized for tree. *)
+(* Derive Mutate for tree. *)
