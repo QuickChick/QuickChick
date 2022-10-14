@@ -53,6 +53,12 @@ let frequency l =
 
 (* TODO: frequencyT i.e. frequency thunked *)
 
+let frequencyT l =
+  match l with 
+  | [] -> failwith "frequencyT used with empty list"
+  | [(_, c)] -> c
+  | (_,c)::cs -> gApp (gInject "freqT_") [c; gList (List.map gPair l)]
+
 let enumerating l =
   gApp (gInject "enumerate") [gList l]
 

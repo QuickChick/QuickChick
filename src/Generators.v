@@ -246,6 +246,15 @@ Fixpoint pick {A : Type} (def : G A) (xs : list (nat * G A)) n : nat * G A :=
       else pick def xs (n - k)
   end.
 
+Fixpoint pickT {A : Type} (def : unit -> G A) (xs : list (nat * (unit -> G A))) n : 
+    nat * (unit -> G A) :=
+  match xs with 
+  | nil => (0, def)
+  | (k, x) :: xs =>
+    if (n < k) then (k, x)
+    else pickT def xs (n - k)
+  end.
+
 (* This should use urns! *)
 Fixpoint pickDrop {A : Type} (xs : list (nat * G (option A))) n : nat * G (option A) * list (nat * G (option A)) :=
   match xs with
@@ -264,6 +273,13 @@ Definition freq_ {A : Type} (def : G A) (gs : list (nat * G A))
   let tot := sum_fst gs in
   bindGen (choose (0, tot-1)) (fun n =>
   @snd _ _ (pick def gs n)).
+
+Definition freqT_ {A : Type} (def : unit -> G A) 
+    (gs : list (nat * (unit -> G A))) : 
+    G A :=
+  let tot := sum_fst gs in
+  bindGen (choose (0, tot-1)) (fun n =>
+  @snd _ _ (pickT def gs n) tt).
 
 (*
 Definition frequency {A}:= 
