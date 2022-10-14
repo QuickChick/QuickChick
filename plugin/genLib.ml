@@ -56,7 +56,7 @@ let frequency l =
 let frequencyT l =
   match l with 
   | [] -> failwith "frequencyT used with empty list"
-  | [(_, c)] -> c
+  | [(_, c)] -> gApp c [gTT]
   | (_,c)::cs -> gApp (gInject "freqT_") [c; gList (List.map gPair l)]
 
 let enumerating l =
