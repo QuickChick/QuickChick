@@ -276,6 +276,7 @@ let generate_distinct_names (vs1 : (var * dep_type) list) (vs2 : (var * dep_type
 let merge_ctrs (name1 : ty_ctr) (name2 : ty_ctr) (vs1, rs1, os1, (as1, t1) : ctr_data)
   (vs2, rs2, os2, (as2, t2) : ctr_data)
   (param_pos1 : int) (param_pos2 : int)
+  (params1 : dep_type list) (params2 : dep_type list)
   : ctr_data option =
   (* Get a renaming for variables in vs2. vs1 and vs2 should already be unique within themselves, but we can't
      have names clash between them. *)
@@ -303,8 +304,9 @@ let merge_ctrs (name1 : ty_ctr) (name2 : ty_ctr) (vs1, rs1, os1, (as1, t1) : ctr
     (* Any recursive arguments which match up should be combined, and other should be left as is: *)
     let (rs, more_os1, more_os2) = merge_recs rs1' rs2' in
     (* Collect the other non-recursive arguments: *)
-    let os = os1' @ os2' @ (List.map (fun args -> DTyCtr (name1, replace_shared args param_pos1)) more_os1)
-      @ (List.map (fun args -> DTyCtr (name2, replace_shared args param_pos2)) more_os2) in
+    let os = os1' @ os2' @
+      (List.map (fun args -> DTyCtr (name1, params1 @ (replace_shared args param_pos1))) more_os1)
+      @ (List.map (fun args -> DTyCtr (name2, params2 @ (replace_shared args param_pos2))) more_os2) in
     (* Collect new list of forall bound variables, which is the union of the lists of the inputs except with variables
        which got substituted during unification removed *)
     let was_subbed = fun v -> not (IdMap.mem v sub) in
@@ -379,6 +381,7 @@ let merge_relations ((tyctr1, ctrs1, ty1) : relation')
                     ((tyctr2, ctrs2, ty2) : relation')
                     (param_pos2 : int)
                     tyctr
+                    (params1 : ty_param list) (params2 : ty_param list)
   : relation' * sub_param =
   (* Separate out the shared parameter to be merged *)
   let converted_ty1 = separate_shared (convert_type ty1) param_pos1 in
@@ -398,6 +401,8 @@ let merge_relations ((tyctr1, ctrs1, ty1) : relation')
   let ctrs1 = List.map (fun (n, t) -> (n, s t)) ctrs1 in
   let ctrs2 = List.map (fun (n, t) -> (n, s t)) ctrs2 in
   let ty = s ty in
+  let params1 = List.map (fun p -> s (DTyParam p)) params1 in
+  let params2 = List.map (fun p -> s (DTyParam p)) params2 in
   (* First identify the constructors which don't change the parameter, for the irrelevant constructor pass *)
   let (ctrs1_regular, ctrs1_irrelevant) = irrelevant_constructor_pass
     (List.map (fun (name, ctr) -> (name, convertConstructor tyctr1 ctr param_pos1)) ctrs1)
@@ -408,7 +413,7 @@ let merge_relations ((tyctr1, ctrs1, ty1) : relation')
   let param_pos = (List.length (convert_type ty) - 1) in
   (* Merge each pair of remaining constructors *)
   let ctrs_regular = List.fold_left (fun acc (name1, ctr1) -> (List.fold_left (fun acc (name2, ctr2) -> 
-    match merge_ctrs tyctr1 tyctr2 ctr1 ctr2 param_pos1 param_pos2 with
+    match merge_ctrs tyctr1 tyctr2 ctr1 ctr2 param_pos1 param_pos2 params1 params2 with
     | Some ctr -> let new_ctr = convertBack tyctr ctr param_pos in (*TODO: think here later*)
         let new_name = (injectCtr (constructor_to_string name1 ^ constructor_to_string name2)) in
         (new_name, new_ctr) :: acc
@@ -548,8 +553,36 @@ let insertTypeParameters ((ty_ctr, ctrs, ty) : relation') (params : ty_param lis
   , ty)
   (* , ty) *)
 
+let rec applyVarToTerms (var : ty_ctr) (terms : dep_type list) (term : dep_type) =
+  let recurse = applyVarToTerms var terms in
+  match term with 
+  | DArrow (d1, d2) -> DArrow (recurse d1, recurse d2)
+  | DProd  ((x,d1), d2) -> DProd ((x, recurse d1), recurse d2)
+  | DTyCtr (ty_ctr, ds) ->
+    if ty_ctr = var then DTyCtr (ty_ctr, terms @ ds) else DTyCtr (ty_ctr, ds)
+  | DCtr (ctr, ds) -> DCtr (ctr, List.map recurse ds)
+  | DTyParam tp -> DTyParam tp
+  | DTyVar tv -> DTyVar tv
+  | DApp (d, ds) -> DApp (recurse d, List.map recurse ds)
+  | DNot d -> DNot (recurse d)
+  | DHole -> DHole
+
+let applyFunToRelation ((ty_ctr, params, ctrs, ty) : relation) (f : dep_type -> dep_type) : relation =
+  (ty_ctr
+  , params
+  , List.map
+      (fun (name, ty) ->
+        (name, f ty)) 
+      ctrs
+  , f ty)
+
+let name_of_rel ((name, _, _, _) : relation) : ty_ctr = name
+
 let merge ind1 ind2 ind = 
   let rel1, param_pos1 = extract_relation ind1 in
+  msg_debug (str "------------ First relation inputted: --------------------");
+  msg_debug (str (dep_dt_to_string rel1));
+  msg_debug (str "--------------------------------");
   let rel2, param_pos2 = extract_relation ind2 in
   let rel1', params1 = removeTypeParameters rel1 in
   let rel2', params2 = removeTypeParameters rel2 in
@@ -561,11 +594,17 @@ let merge ind1 ind2 ind =
   let rel1' = map_over_relation' rel1' (postfix_all_params postfix1)  in
   let rel2' = map_over_relation' rel2' (postfix_all_params postfix2)  in
   (* Perform the merge *)
-  let rel, param_sub = merge_relations rel1' param_pos1 rel2' param_pos2 (extract_tyctr ind) in
+  let rel, param_sub = merge_relations rel1' param_pos1 rel2' param_pos2 (extract_tyctr ind) params1 params2 in
   (* Get rid of substituted parameters *)
   let params = List.filter (fun param -> not (IdMap_param.mem param param_sub)) (params1 @ params2) in
   (* Re-insert the parameters *)
+  let params1subbed = List.map (fun param -> sub_term_param param_sub (DTyParam param)) params1 in
+  let params2subbed = List.map (fun param -> sub_term_param param_sub (DTyParam param)) params2 in
   let rel = insertTypeParameters rel params in
+  (* let rel = applyFunToRelation rel (applyVarToTerms (name_of_rel rel1) params1subbed) in *)
+  (* let rel = applyFunToRelation rel (applyVarToTerms (name_of_rel rel2) params2subbed) in *)
+  (* BUG TO STILL FIX: if P = Q, then they have the same name. Instead, I should probably keep
+  the parameters in from the beggining and let them get subbed with everything else??? *)
   msg_debug (str "------------ Relation to be outputted: --------------------");
   msg_debug (str (dep_dt_to_string rel));
   msg_debug (str "--------------------------------");
