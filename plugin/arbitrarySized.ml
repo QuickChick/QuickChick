@@ -194,14 +194,23 @@ let fuzzy_decl ty_ctr ctrs iargs =
   gRecord [("fuzz", fuzzy_fun)]
 
 (* Mutator derivation *)
-let mutate_decl ty_ctr ctrs iargs = 
+let mutate_decl ty_ctr (ctrs : ctr_rep list) (iargs : var list) = 
   
-  (* TODO: let isCurrentTyCtr = function
+  let isCurrentTyCtr = function
     | TyCtr (ty_ctr', _) -> ty_ctr = ty_ctr'
-    | _ -> false in *)
+    | _ -> false in
 
   (* Keep just the type parameters, not the typeclass constraints *)
   let tyParams = List.map gVar (list_keep_every 3 iargs) in
+
+  let unfold_coq_type : coq_type -> coq_type list * coq_type =
+    let rec aux prm_typs (typ : coq_type) =
+      match typ with 
+      | Arrow (typ1, typ2) -> aux (typ1 :: prm_typs) typ2
+      | _ -> (List.rev prm_typs, typ)
+    in
+    aux []
+  in
   
   let mutate_fun =
   
@@ -227,14 +236,21 @@ let mutate_decl ty_ctr ctrs iargs =
           - return input except with result of mutation
       *)
   
-      let create_branch aux_mutate (ctr, ty) =
+      let create_branch 
+            (x' : coq_expr) (aux_mutate : var) 
+            ((ctr, ty) : constructor * coq_type) : 
+            constructor * pp_tag list * (var list -> coq_expr) =
         (ctr, generate_names_from_type "p" ty,
          fun (all_vars : var list) : coq_expr ->
-            (* returnGen 
-              (gApp ~explicit:true 
-                (gCtr ctr) 
-                (tyParams @ List.map gVar all_vars)) *)
+            let ctr_arg_typs : coq_type list = fst (unfold_coq_type ty) in
+            let ctr_args : coq_expr list = List.map gVar all_vars in
 
+            msg_debug (str "ctr_arg_typs: " ++ 
+              prlist_with_sep 
+                (fun _ -> str ", ") 
+                (fun typ -> str (coq_type_to_string typ)) 
+                ctr_arg_typs);
+            
             (* regenerations *)
             let regs : coq_expr list = 
               [gInject "arbitrary"] 
@@ -242,42 +258,82 @@ let mutate_decl ty_ctr ctrs iargs =
             
             (* recombines *)
             let rcms : coq_expr list =
-              List.flatten @@
-              (* for each constructor ctr' *)
-              List.map 
-                (fun (ctr', ctr'_typ) ->
-                  let ctr_arg_typs : (coq_expr * coq_type) list = _ in
-                  let ctr'_typs : coq_type list = _ in
-                  (* for each argument type of ctr' *)
-                  List.map
-                    (fun ctr'_arg_typ ->
-                      (* TODO: separately handle type params via unification *)
-                      (* look for elem of ctr_arg_typs that fits *)
-                      _
+              List.map returnGen @@
+              List.flatten @@ List.map
+                (fun (ctr', ctr'_typ) -> 
+                  let ctr'_prm_typs : coq_type list = 
+                    fst (unfold_coq_type ctr'_typ) 
+                  in
+                  msg_debug (str "ctr'_prm_typs: " ++ 
+                    prlist_with_sep 
+                      (fun _ -> str ", ") 
+                      (fun typ -> str (coq_type_to_string typ)) 
+                      ctr'_prm_typs);
+                  (* for each ctr'_prm_typ *)
+                  List.fold_right
+                    (fun ctr'_prm_typ neus ->
+                      (* !TODO: for some reason, its putting an argument in the wrong spot in one case (see Test.v) *)
+                      msg_debug (str "ctr'_prm_typ: " ++ str (coq_type_to_string ctr'_prm_typ));
+                      (* for each ctr_arg *)
+                      List.flatten @@ 
+                        (List.map_i
+                          (fun i typ -> 
+                            (* try ctr_arg as arg *)
+                            if typ == ctr'_prm_typ then
+                              (* types match, so apply *)
+                              List.map 
+                                (fun neu -> gApp neu [List.nth ctr_args i]) 
+                                neus
+                            else 
+                              (* types don't match, so skip *)
+                              []
+                          )
+                          0 ctr_arg_typs)
+                        @
+                        (* also try input x' as arg *)
+                        (* TODO: need to handle type args? *)
+                        [if isCurrentTyCtr ctr'_prm_typ then
+                          List.map (fun neu -> gApp neu [x']) neus
+                        else 
+                          []]
                     )
-                    ctr'_typs
+                    ctr'_prm_typs
+                    [gApp ~explicit:true (gCtr ctr') tyParams]
                 ) 
-                ctrs            
-              (* List.map_i  
-                (fun i var ->
-                  (gApp ~explicit:true 
-                    (gCtr ctr) 
-                    (tyParams @ List.map gVar all_vars))) 
-                0 all_vars *)
+                ctrs
             in 
             
             (* recursions *)
-            let recs : coq_expr list = []
+            let recs : coq_expr list =
+              List.map_i
+                (fun i arg_typ -> 
+                  if isCurrentTyCtr arg_typ then
+                    (* TODO: weight by function of size *)
+                    (* mutate child *)
+                    (* return input where child is replaced *)
+                    bindGen (gApp (gVar aux_mutate) [List.nth ctr_args i]) 
+                      (var_to_string (List.nth all_vars i)) (fun child' -> 
+                    returnGen (gApp ~explicit:true (gCtr ctr) 
+                      (tyParams @ List.assign ctr_args i (gVar child'))))
+                  else
+                    (* TODO: choose reasonable weight for non-inductive children *)
+                    bindGen (gApp (gInject "mutate") [List.nth ctr_args i])
+                      (var_to_string (List.nth all_vars i)) (fun child' ->
+                    returnGen (gApp ~explicit:true (gCtr ctr)
+                      (tyParams @ List.assign ctr_args i (gVar child'))))
+                )
+                0 ctr_arg_typs
             in
-
-            oneofT @@
-            List.map (fun e -> gFun ["_tt"] (fun _ -> e)) @@ (* thunk 'em, boys *) 
+            (* TODO: should actually use freq, and so need to choose weights *)
+            (* TODO: used thunked version *)
+            oneof @@
+            (* List.map (fun e -> gFun ["_tt"] (fun _ -> e)) @@ (* thunk 'em, boys *) *) 
             regs @ rcms @ recs
         )
       in
   
       let aux_mutate_body rec_fun x' : coq_expr = 
-        gMatch (gVar x') (List.map (create_branch rec_fun) ctrs) 
+        gMatch (gVar x') (List.map (create_branch (gVar x') rec_fun) ctrs) 
       in
   
       gRecFunIn "aux_mutate" ["x'"]
