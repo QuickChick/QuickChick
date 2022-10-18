@@ -68,7 +68,7 @@ let convertBack (me : ty_ctr) ((vs , rs , os , outs) : ctr_data) (param_pos : in
       | [] -> ty
       | (t :: os) -> convertOtherCalls os (DArrow (t, ty))
     in
-    convertVars vs (convertRecCalls rs (convertOtherCalls os (DTyCtr (me, replace_shared outs param_pos))))
+    convertVars vs (convertOtherCalls os (convertRecCalls rs (DTyCtr (me, replace_shared outs param_pos))))
 
 (* Variable unification *)
 module IdMap = Map.Make(UnknownOrd)

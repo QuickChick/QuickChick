@@ -239,7 +239,7 @@ Notation "P '?'" := (match (@dec P _) with
                        | right _ => false
                      end) (at level 100).
 
-Notation "P '??' n" := (checker (@decOpt P _ n))
+Notation "P '??' n" := (@decOpt P _ n)
                          (at level 100).
 
 
