@@ -142,6 +142,9 @@ let injectCtr s =
 let ty_ctr_to_ctr x = x
 let ctr_to_ty_ctr x = x
 
+let ctr_to_globref (c : constructor) =
+  Nametab.global c 
+                    
 let num_of_ctrs (c : constructor) =
   let env = Global.env () in
   let glob_ref = Nametab.global c in
