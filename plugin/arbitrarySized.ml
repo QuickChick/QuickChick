@@ -262,8 +262,10 @@ let mutate_decl ty_ctr (ctrs : ctr_rep list) (iargs : var list) =
             in
             
             (* recombines *)
+            (* LEO: Maybe, filter the "noop" mutation that comes out *)
             let rcms : (coq_expr * coq_expr) list =
               (* TODO: choose weighting for recombines *)
+              (* LEO: Put all options in a freq under the one freq *)
               List.map (fun e -> (weight_rcm, to_thunk @@ returnGen e)) @@
               List.flatten @@ 
               List.map
@@ -271,6 +273,9 @@ let mutate_decl ty_ctr (ctrs : ctr_rep list) (iargs : var list) =
                   let ctr'_prm_typs : coq_type list = 
                     fst (unfold_coq_type ctr'_typ) 
                   in
+                  (* Instead of this line, you need to 
+                     (1) bind arbitrary for all Nones
+                     (2) do the thing ... *)
                   List.map (gApp ~explicit:true (gCtr ctr')) @@
                   List.fold_right
                     (fun ctr'_prm_typ argss ->
@@ -284,6 +289,7 @@ let mutate_decl ty_ctr (ctrs : ctr_rep list) (iargs : var list) =
                               List.map (fun args -> List.nth ctr_args i :: args) argss
                             end else 
                               (* types don't match, so skip *)
+                          (* List.map (fun args -> None :: args) argss *)
                               []
                           )
                           0 ctr_arg_typs
@@ -298,8 +304,10 @@ let mutate_decl ty_ctr (ctrs : ctr_rep list) (iargs : var list) =
                     []
                 ) 
                 ctrs
-            in 
-            
+            in
+
+            msg_debug (int (List.length rcms) ++ fnl ()); 
+
             (* recursions *)
             let recs : (coq_expr * coq_expr) list =
               List.map_i
