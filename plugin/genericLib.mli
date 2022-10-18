@@ -67,6 +67,7 @@ module type Ord_ctr_type = sig
   end
 module Ord_ctr : Ord_ctr_type
 
+val ctr_to_globref : constructor -> GlobRef.t
 val num_of_ctrs : constructor -> int
 
 type ctr_rep = constructor * coq_type 

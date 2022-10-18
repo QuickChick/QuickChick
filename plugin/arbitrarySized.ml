@@ -406,8 +406,15 @@ let show_decl ty_ctr ctrs _iargs =
   let show_body x =
     
     let branch aux (ctr,ty) =
-      
-      (ctr, generate_names_from_type "p" ty,
+
+(*      let g = ctr_to_globref ctr in
+      let all_args_len = List.length (Impargs.positions_of_implicits (Impargs.implicits_of_global g)) in *)
+      let to_gen = generate_names_from_type "p" ty in
+(*      let rec add_params i acc =
+        if i <= 0 then acc
+        else add_params (i-1) ((Printf.sprintf "unusedParam%d" i)::acc) in 
+      msg_debug (int (List.length (Impargs.implicits_of_global g)) ++ fnl ()); *)
+      (ctr, to_gen, (*  add_params (all_args_len - List.length to_gen) to_gen, *)
        fun vs -> match vs with 
                  | [] -> gStr (constructor_to_string ctr) 
                  |_ -> str_append (gStr (constructor_to_string ctr ^ " "))
