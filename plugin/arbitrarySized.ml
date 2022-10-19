@@ -260,12 +260,20 @@ let mutate_decl ty_ctr (ctrs : ctr_rep list) (iargs : var list) =
             debug_istr 0 @@ "ctr = " ^ constructor_to_string ctr;
             let ctr_arg_typs : coq_type list = fst (unfold_coq_type ty) in
             let ctr_args : coq_expr list = List.map gVar all_vars in
+            let ctr_env : (coq_expr * (coq_type -> bool)) list =  
+              (x', isCurrentTyCtr) ::
+              List.map_i 
+                (fun i ty -> (List.nth ctr_args i, (fun ty' -> ty == ty'))) 
+                0 ctr_arg_typs
+            in
 
             (* regenerate *)
             let regs : (coq_expr * coq_expr) list = 
               (* TODO: choose weighting for regenerate *)
               [(weight_reg, coq_expr_to_thunk @@ gInject "arbitrary")] 
             in
+
+            debug_istr 0 @@ "length regs = " ^ string_of_int (List.length regs);
             
             (* recombines *)
             (* LEO: Maybe, filter the "noop" mutation that comes out *)
@@ -279,13 +287,13 @@ let mutate_decl ty_ctr (ctrs : ctr_rep list) (iargs : var list) =
               List.flatten @@ 
               List.map
                 (fun (ctr', ctr'_typ) ->
-                  debug_istr 1 @@ "[next ctr']";
-                  debug_istr 1 @@ "ctr' = " ^ constructor_to_string ctr';
-                  debug_istr 1 @@ "ctr'_typ = " ^ coq_type_to_string ctr'_typ;
+                  debug_istr 0 @@ "[next ctr']";
+                  debug_istr 0 @@ "ctr' = " ^ constructor_to_string ctr';
+                  debug_istr 0 @@ "ctr'_typ = " ^ coq_type_to_string ctr'_typ;
                   let ctr'_prm_typs : coq_type list = 
                     fst (unfold_coq_type ctr'_typ) 
                   in
-                  debug_istr 1 @@ "ctr'_prm_typs = " ^ String.concat ", " (List.map coq_type_to_string ctr'_prm_typs);
+                  debug_istr 0 @@ "ctr'_prm_typs = " ^ String.concat ", " (List.map coq_type_to_string ctr'_prm_typs);
                   (* convert lists of lists of (optional) arguments into
                      applications, complete with any arguments that were None
                      and so need to be arbitrarily generated. *)
@@ -310,7 +318,40 @@ let mutate_decl ty_ctr (ctrs : ctr_rep list) (iargs : var list) =
                       f args [] 0
                     )
                   @@
-                  List.fold_right
+                  (fun argss -> 
+                    debug_istr 0 @@ "length argss = " ^ string_of_int (List.length argss);
+                    List.iter 
+                      (fun args -> 
+                        debug_istr 0 @@ "args = [";
+                        (* String.concat ", " (List.map  _) *)
+                        List.iter 
+                          (function
+                          | None -> debug_istr 0 "arbitrary"
+                          | Some e -> debug_coq_expr e)
+                          args;
+                        debug_istr 0 @@ "]"
+                      )
+                      argss;
+                    argss
+                  ) @@
+                  List.fold_right 
+                    (fun ctr'_prm_ty argss ->
+                      let opt_args : coq_expr option list =
+                        None ::
+                        List.filter_map
+                          (fun (e, is_ty) -> 
+                            if is_ty ctr'_prm_ty 
+                              then Some (Some e) 
+                              else None)
+                          ctr_env in
+                      List.map_append
+                        (fun opt_arg -> 
+                          List.map (fun args -> opt_arg :: args) argss)
+                          opt_args
+                    )
+                    ctr'_prm_typs
+                    [[]]
+                  (* List.fold_right
                     (fun ctr'_prm_typ argss ->
                       (* for each ctr_arg *)
                       List.flatten @@
@@ -328,12 +369,12 @@ let mutate_decl ty_ctr (ctrs : ctr_rep list) (iargs : var list) =
                         0 ctr_arg_typs
                       @
                       (* also try input x' as arg *)
-                      [ if isCurrentTyCtr ctr'_prm_typ
-                        then List.map (fun args -> Some x' :: args) argss
-                        else [] ]
+                      if isCurrentTyCtr ctr'_prm_typ
+                        then [List.map (fun args -> Some x' :: args) argss]
+                        else []
                     )
                     ctr'_prm_typs
-                    [[]]
+                    [[]] *)
                 ) 
                 ctrs
             in
