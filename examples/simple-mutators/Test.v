@@ -15,6 +15,8 @@ Derive (Show, Sized, Arbitrary) for nat.
 QuickChickDebug Debug On.
 Derive Mutate for nat.
 
+Sample (mutate 100).
+
 Derive (Show, Sized, Arbitrary) for L.
 Derive Mutate for L.
 
@@ -53,6 +55,9 @@ Print list.
 Inductive tree (A : Type) : Type :=
   | leaf : tree A
   | node : A -> tree A -> tree A -> tree A.
+
+Arguments leaf {A}.
+Arguments node {A}.
 
 (* TODO: all of these derives give this error
 The constructor leaf (in type tree) is expected to be applied to 1 argument 
