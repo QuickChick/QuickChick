@@ -214,7 +214,7 @@ let mutate_decl ty_ctr (ctrs : ctr_rep list) (iargs : var list) =
   in
 
   let coq_expr_to_thunk (e : coq_expr) : coq_expr = gFun ["_tt"] (fun [_] -> e) in
-  (* let from_thunk (e : coq_expr) : coq_expr = gApp e [gTT] in *) (* TODO: unnecessary *)
+  (* let coq_expr_of_thunk (e : coq_expr) : coq_expr = gApp e [gTT] in *) (* TODO: unnecessary *)
   
   let mutate_fun =
   
@@ -240,10 +240,17 @@ let mutate_decl ty_ctr (ctrs : ctr_rep list) (iargs : var list) =
           - return input except with result of mutation
       *)
 
-      let weight_reg : coq_expr = gInt 1 in 
-      let weight_rcm : coq_expr = gInt 1 in
-      let weight_rec_ind (size : coq_expr) : coq_expr = gApp (gInject "Nat.pow") [size; gInt 2] in
-      let weight_rec_nonind : coq_expr = gInt 1 in
+      let weight_reg : coq_expr = 
+        gInt 1 
+      in 
+      let weight_rcm (n_preserved : int) : coq_expr = 
+        gApp (gInject "Nat.pow") [gInt 2; gInt n_preserved] 
+      in
+      let weight_rec_ind (e_size : coq_expr) : coq_expr = 
+        gApp (gInject "Nat.pow") [gInt 2; e_size] in
+      let weight_rec_nonind : coq_expr = 
+        gInt 1 
+      in
 
       let debug_istr i s =
         let rec f i = if i == 0 then s else "  " ^ f (i - 1) in
@@ -260,16 +267,15 @@ let mutate_decl ty_ctr (ctrs : ctr_rep list) (iargs : var list) =
             debug_istr 0 @@ "ctr = " ^ constructor_to_string ctr;
             let ctr_arg_typs : coq_type list = fst (unfold_coq_type ty) in
             let ctr_args : coq_expr list = List.map gVar all_vars in
-            let ctr_env : (coq_expr * (coq_type -> bool)) list =  
-              (x', isCurrentTyCtr) ::
+            let ctr_env : (int option * coq_expr * (coq_type -> bool)) list =  
+              (None, x', isCurrentTyCtr) ::
               List.map_i 
-                (fun i ty -> (List.nth ctr_args i, (fun ty' -> ty == ty'))) 
+                (fun i ty -> (Some i, List.nth ctr_args i, fun ty' -> ty == ty')) 
                 0 ctr_arg_typs
             in
 
             (* regenerate *)
             let regs : (coq_expr * coq_expr) list = 
-              (* TODO: choose weighting for regenerate *)
               [(weight_reg, coq_expr_to_thunk @@ gInject "arbitrary")] 
             in
 
@@ -278,14 +284,11 @@ let mutate_decl ty_ctr (ctrs : ctr_rep list) (iargs : var list) =
             (* recombines *)
             (* LEO: Maybe, filter the "noop" mutation that comes out *)
             let rcms : (coq_expr * coq_expr) list =
-              (* TODO: choose weighting for recombines *)
               (* all recombine options under nested freq *)
               (fun x -> [(gInt 1, coq_expr_to_thunk x)]) @@
               frequencyT @@
-              (* TODO: weight as a function of number of args kept (keep track of Somes and Nones) *)
-              List.map (fun e -> (weight_rcm, coq_expr_to_thunk e)) @@
-              List.flatten @@ 
-              List.map
+              List.map (fun (n_preserved, e) -> (weight_rcm n_preserved, coq_expr_to_thunk e)) @@
+              List.map_append
                 (fun (ctr', ctr'_typ) ->
                   debug_istr 0 @@ "[next ctr']";
                   debug_istr 0 @@ "ctr' = " ^ constructor_to_string ctr';
@@ -297,28 +300,42 @@ let mutate_decl ty_ctr (ctrs : ctr_rep list) (iargs : var list) =
                   (* convert lists of lists of (optional) arguments into
                      applications, complete with any arguments that were None
                      and so need to be arbitrarily generated. *)
-                  List.map
-                    (fun args ->
+                  List.map_append
+                    (fun opt_args ->
+                      (* references :( *)
+                      let n_preserved_ref = ref 0 in
+                      let diff = ref false in
                       let 
                         (* args : coq_expr option list 
                            args' : coq_expr list 
                            i : int *)
-                        rec f args args' i : coq_expr =
-                          match args with 
-                          | [] -> 
-                            returnGen @@ 
-                            gApp ~explicit:true (gCtr ctr') (List.rev args')
-                          | Some arg :: args -> 
-                            f args (arg :: args') (i + 1)
-                          | None :: args -> 
+                        rec f opt_args' args n_preserved i : coq_expr =
+                          match opt_args' with
+                          | [] ->
+                            n_preserved_ref := n_preserved;
+                            returnGen @@
+                              gApp ~explicit:true (gCtr ctr') (List.rev args)
+                          | Some (opt_i', arg) :: opt_args'' ->
+                            (* detect when there's a difference in args *)
+                            begin
+                              match opt_i' with
+                              | Some i' -> 
+                                if not !diff && i' != i then diff := true
+                              | None -> ()
+                            end;
+                            f opt_args'' (arg :: args) (n_preserved + 1) (i + 1)
+                          | None :: opt_args'' ->
                             bindGen (gInject "arbitrary") 
-                              ("recombineArg_" ^ string_of_int i) 
-                              (fun x -> f args (gVar x :: args') (i + 1))
+                              ("recombineArg_" ^ string_of_int i)
+                              (fun x -> f opt_args'' (gVar x :: args) n_preserved (i + 1))
                       in
-                      f args [] 0
+                      let res = f opt_args [] 0 0 in
+                      [!n_preserved_ref, res]
+                      (* is empty if exact match *)
                     )
                   @@
-                  (fun argss -> 
+                  (* debug *)
+                  (* (fun argss -> 
                     debug_istr 0 @@ "length argss = " ^ string_of_int (List.length argss);
                     List.iter 
                       (fun args -> 
@@ -332,17 +349,20 @@ let mutate_decl ty_ctr (ctrs : ctr_rep list) (iargs : var list) =
                       )
                       argss;
                     argss
-                  ) @@
+                  ) @@ *)
+                  (* compute all valid arrangements of arguments, including
+                     using arbitrary (via None) *)
                   List.fold_right 
                     (fun ctr'_prm_ty argss ->
-                      let opt_args : coq_expr option list =
+                      let opt_args : (int option * coq_expr) option list =
                         None ::
                         List.filter_map
-                          (fun (e, is_ty) -> 
-                            if is_ty ctr'_prm_ty 
-                              then Some (Some e) 
+                          (fun (opt_i, arg, is_ty) -> 
+                            if is_ty ctr'_prm_ty
+                              then Some (Some (opt_i, arg))
                               else None)
-                          ctr_env in
+                          ctr_env 
+                      in
                       List.map_append
                         (fun opt_arg -> 
                           List.map (fun args -> opt_arg :: args) argss)
