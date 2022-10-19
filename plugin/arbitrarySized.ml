@@ -213,7 +213,7 @@ let mutate_decl ty_ctr (ctrs : ctr_rep list) (iargs : var list) =
     aux []
   in
 
-  let to_thunk (e : coq_expr) : coq_expr = gFun ["_tt"] (fun [_] -> e) in
+  let coq_expr_to_thunk (e : coq_expr) : coq_expr = gFun ["_tt"] (fun [_] -> e) in
   (* let from_thunk (e : coq_expr) : coq_expr = gApp e [gTT] in *) (* TODO: unnecessary *)
   
   let mutate_fun =
@@ -244,69 +244,101 @@ let mutate_decl ty_ctr (ctrs : ctr_rep list) (iargs : var list) =
       let weight_rcm : coq_expr = gInt 1 in
       let weight_rec_ind (size : coq_expr) : coq_expr = gApp (gInject "Nat.pow") [size; gInt 2] in
       let weight_rec_nonind : coq_expr = gInt 1 in
+
+      let debug_istr i s =
+        let rec f i = if i == 0 then s else "  " ^ f (i - 1) in
+        msg_debug @@ str @@ f i
+      in
       
-  
       let create_branch 
             (x' : coq_expr) (aux_mutate : var) 
             ((ctr, ty) : constructor * coq_type) : 
             constructor * pp_tag list * (var list -> coq_expr) =
         (ctr, generate_names_from_type "p" ty,
          fun (all_vars : var list) : coq_expr ->
+            debug_istr 0 @@ "[next ctr]";
+            debug_istr 0 @@ "ctr = " ^ constructor_to_string ctr;
             let ctr_arg_typs : coq_type list = fst (unfold_coq_type ty) in
             let ctr_args : coq_expr list = List.map gVar all_vars in
 
             (* regenerate *)
             let regs : (coq_expr * coq_expr) list = 
               (* TODO: choose weighting for regenerate *)
-              [(weight_reg, to_thunk @@ gInject "arbitrary")] 
+              [(weight_reg, coq_expr_to_thunk @@ gInject "arbitrary")] 
             in
             
             (* recombines *)
             (* LEO: Maybe, filter the "noop" mutation that comes out *)
             let rcms : (coq_expr * coq_expr) list =
               (* TODO: choose weighting for recombines *)
-              (* LEO: Put all options in a freq under the one freq *)
-              List.map (fun e -> (weight_rcm, to_thunk @@ returnGen e)) @@
+              (* all recombine options under nested freq *)
+              (fun x -> [(gInt 1, coq_expr_to_thunk x)]) @@
+              frequencyT @@
+              (* TODO: weight as a function of number of args kept (keep track of Somes and Nones) *)
+              List.map (fun e -> (weight_rcm, coq_expr_to_thunk e)) @@
               List.flatten @@ 
               List.map
-                (fun (ctr', ctr'_typ) -> 
+                (fun (ctr', ctr'_typ) ->
+                  debug_istr 1 @@ "[next ctr']";
+                  debug_istr 1 @@ "ctr' = " ^ constructor_to_string ctr';
+                  debug_istr 1 @@ "ctr'_typ = " ^ coq_type_to_string ctr'_typ;
                   let ctr'_prm_typs : coq_type list = 
                     fst (unfold_coq_type ctr'_typ) 
                   in
-                  (* Instead of this line, you need to 
-                     (1) bind arbitrary for all Nones
-                     (2) do the thing ... *)
-                  List.map (gApp ~explicit:true (gCtr ctr')) @@
+                  debug_istr 1 @@ "ctr'_prm_typs = " ^ String.concat ", " (List.map coq_type_to_string ctr'_prm_typs);
+                  (* convert lists of lists of (optional) arguments into
+                     applications, complete with any arguments that were None
+                     and so need to be arbitrarily generated. *)
+                  List.map
+                    (fun args ->
+                      let 
+                        (* args : coq_expr option list 
+                           args' : coq_expr list 
+                           i : int *)
+                        rec f args args' i : coq_expr =
+                          match args with 
+                          | [] -> 
+                            returnGen @@ 
+                            gApp ~explicit:true (gCtr ctr') (List.rev args')
+                          | Some arg :: args -> 
+                            f args (arg :: args') (i + 1)
+                          | None :: args -> 
+                            bindGen (gInject "arbitrary") 
+                              ("recombineArg_" ^ string_of_int i) 
+                              (fun x -> f args (gVar x :: args') (i + 1))
+                      in
+                      f args [] 0
+                    )
+                  @@
                   List.fold_right
                     (fun ctr'_prm_typ argss ->
                       (* for each ctr_arg *)
                       List.flatten @@
-                        List.map_i
-                          (fun i typ ->
-                            (* try ctr_arg as arg *)
-                            if typ == ctr'_prm_typ then begin
-                              (* types match, so apply *)
-                              List.map (fun args -> List.nth ctr_args i :: args) argss
-                            end else 
-                              (* types don't match, so skip *)
-                          (* List.map (fun args -> None :: args) argss *)
-                              []
-                          )
-                          0 ctr_arg_typs
-                        @
-                        (* also try input x' as arg *)
-                        [if isCurrentTyCtr ctr'_prm_typ then
-                          List.map (fun args -> (x' :: args)) argss
-                        else 
-                          []]
+                      List.map_i
+                        (fun i typ ->
+                          (* try ctr_arg as arg *)
+                          if typ == ctr'_prm_typ then begin
+                            (* types match, so use Just arg *)
+                            List.map (fun args -> Some (List.nth ctr_args i) :: args) argss
+                          end else 
+                            (* types don't match, so use None 
+                               (which eventually uses `arbitrary`) *)
+                            List.map (fun args -> None :: args) argss
+                        )
+                        0 ctr_arg_typs
+                      @
+                      (* also try input x' as arg *)
+                      [ if isCurrentTyCtr ctr'_prm_typ
+                        then List.map (fun args -> Some x' :: args) argss
+                        else [] ]
                     )
                     ctr'_prm_typs
-                    []
+                    [[]]
                 ) 
                 ctrs
             in
 
-            msg_debug (int (List.length rcms) ++ fnl ()); 
+            debug_istr 0 @@ "length rcms = " ^ string_of_int (List.length rcms);
 
             (* recursions *)
             let recs : (coq_expr * coq_expr) list =
@@ -319,7 +351,7 @@ let mutate_decl ty_ctr (ctrs : ctr_rep list) (iargs : var list) =
                     (* return input where child is replaced *)
                     (* TODO: choose weighting function of size for inductive children *)
                     ( weight_rec_ind (gApp (gInject "size") [ctr_arg]),
-                      to_thunk @@
+                      coq_expr_to_thunk @@
                       bindGen (gApp (gVar aux_mutate) [ctr_arg]) 
                         (var_to_string (List.nth all_vars i) ^ "'") (fun child' -> 
                       returnGen (gApp ~explicit:true (gCtr ctr) 
@@ -327,7 +359,7 @@ let mutate_decl ty_ctr (ctrs : ctr_rep list) (iargs : var list) =
                   else
                     (* TODO: choose reasonable weight for non-inductive children *)
                     ( weight_rec_nonind,
-                      to_thunk @@
+                      coq_expr_to_thunk @@
                       bindGen (gApp (gInject "mutate") [ctr_arg])
                         (var_to_string (List.nth all_vars i) ^ "'") (fun child' ->
                       returnGen (gApp ~explicit:true (gCtr ctr)
