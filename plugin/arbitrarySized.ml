@@ -334,22 +334,6 @@ let mutate_decl ty_ctr (ctrs : ctr_rep list) (iargs : var list) =
                       (* is empty if exact match *)
                     )
                   @@
-                  (* debug *)
-                  (* (fun argss -> 
-                    debug_istr 0 @@ "length argss = " ^ string_of_int (List.length argss);
-                    List.iter 
-                      (fun args -> 
-                        debug_istr 0 @@ "args = [";
-                        List.iter 
-                          (function
-                          | None -> debug_istr 0 "arbitrary"
-                          | Some e -> debug_coq_expr e)
-                          args;
-                        debug_istr 0 @@ "]"
-                      )
-                      argss;
-                    argss
-                  ) @@ *)
                   (* compute all valid arrangements of arguments, including
                      using arbitrary (via None) *)
                   List.fold_right 
