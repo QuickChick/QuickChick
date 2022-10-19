@@ -323,7 +323,6 @@ let mutate_decl ty_ctr (ctrs : ctr_rep list) (iargs : var list) =
                     List.iter 
                       (fun args -> 
                         debug_istr 0 @@ "args = [";
-                        (* String.concat ", " (List.map  _) *)
                         List.iter 
                           (function
                           | None -> debug_istr 0 "arbitrary"
@@ -351,30 +350,6 @@ let mutate_decl ty_ctr (ctrs : ctr_rep list) (iargs : var list) =
                     )
                     ctr'_prm_typs
                     [[]]
-                  (* List.fold_right
-                    (fun ctr'_prm_typ argss ->
-                      (* for each ctr_arg *)
-                      List.flatten @@
-                      List.map_i
-                        (fun i typ ->
-                          (* try ctr_arg as arg *)
-                          if typ == ctr'_prm_typ then begin
-                            (* types match, so use Just arg *)
-                            List.map (fun args -> Some (List.nth ctr_args i) :: args) argss
-                          end else 
-                            (* types don't match, so use None 
-                               (which eventually uses `arbitrary`) *)
-                            List.map (fun args -> None :: args) argss
-                        )
-                        0 ctr_arg_typs
-                      @
-                      (* also try input x' as arg *)
-                      if isCurrentTyCtr ctr'_prm_typ
-                        then [List.map (fun args -> Some x' :: args) argss]
-                        else []
-                    )
-                    ctr'_prm_typs
-                    [[]] *)
                 ) 
                 ctrs
             in
