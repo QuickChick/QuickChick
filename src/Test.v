@@ -495,7 +495,8 @@ Fixpoint fuzzLoopAux {A} (fuel : nat) (st : State)
     let a := run g size rnd1 in
     (* TODO: These recursive calls are a place to hold depth/handicap information as well.*)
     let '(res, (is_interesting, energy)) := withInstrumentation (fun _ : unit => prop a) in
-    let zero_0 := 0 in (* trace (show res ++ nl) 0 in*)
+    let zero_0 := 0 in 
+    let zero_0 := trace (print a ++ nl) 0 in 
     match res with                                                     
     | Some true =>
       match clear_queues fuel with
@@ -537,7 +538,7 @@ Fixpoint fuzzLoopAux {A} (fuel : nat) (st : State)
 Definition fuzzLoopWith {A} (a : Args)
          (gen : G A) (fuzz : A -> G A) (print : A -> string)
          (prop : A -> option bool) :=
-  let compFun maxSuccess maxSize n d := maxSize in
+  let compFun maxSuccess maxSize n d := computeSize' a n d in
   let (rnd, computeFun) := (newRandomSeed, compFun (maxSize a) (maxSuccess a)) in
   let st := MkState (maxSuccess a)  (* maxSuccessTests   *)
                     (maxDiscard a)  (* maxDiscardTests   *)

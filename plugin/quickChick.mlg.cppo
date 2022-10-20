@@ -447,12 +447,14 @@ let qcFuzz_main prop_def temp_dir execn prop_mlf prop_mlif warnings prop fuzzLoo
   ignore (Sys.command echo_cmd);
 
   (* HORRIBLE. HORRIBLE. Perl hack to ensure tail recursion... *)
+  (*
   (* First copy them over from contrib... *)
   ignore (Sys.command (Printf.sprintf "cp %s/cmdprefix.pl %s" user_contrib temp_dir));
   ignore (Sys.command (Printf.sprintf "cp %s/cmdsuffix.pl %s" user_contrib temp_dir));
   (* ... then execute them ... *)
   ignore (Sys.command (Printf.sprintf "%s/cmdprefix.pl %s" temp_dir mlf));
   ignore (Sys.command (Printf.sprintf "%s/cmdsuffix.pl %s" temp_dir mlf));
+   *)
   
   (* Copy fuzz-related files to temp directory *)
   ignore (Sys.command (Printf.sprintf "cp %s/alloc-inl.h %s" user_contrib temp_dir));
