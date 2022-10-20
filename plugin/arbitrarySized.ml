@@ -162,7 +162,7 @@ let fuzzy_decl ty_ctr ctrs iargs =
               let fuzz_options = 
                 if isCurrentTyCtr ty1 then
                   (* Recursive argument. Fuzz with aux, or keep *)
-                  [ liftNth (gApp (gVar aux_fuzz) [gVar v; gTT])
+                  [ liftNth (gApp (gVar aux_fuzz) [gVar v])
                   ; returnGen (gVar v)
                   ]
                 else
@@ -185,7 +185,7 @@ let fuzzy_decl ty_ctr ctrs iargs =
 
       gRecFunIn "aux_fuzz" ["x'"]
         (fun (aux_fuzz, [x']) -> aux_fuzz_body aux_fuzz x')
-        (fun aux_fuzz -> gApp (gVar aux_fuzz) [gVar x; gTT])
+        (fun aux_fuzz -> gApp (gVar aux_fuzz) [gVar x])
     in
     (* Create the function body by recursing on the structure of x *)
     gFun ["x"] (fun [x] -> fuzzy_body x)
