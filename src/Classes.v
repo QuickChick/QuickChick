@@ -56,9 +56,17 @@ Class Shrink (A : Type) :=
 (** Arbitrary Class *)
 Class Arbitrary (A : Type) `{Gen A} `{Shrink A}.
 
+Class Fuzzy (A : Type) := { fuzz : A -> G A }.
+
+(* TODO: should be able to fail? i.e. outputs G (option A) instead *)
+Class Mutate (A : Type) := { mutate : A -> G A }.
+  
 Class EnumSized (A : Type) := { enumSized : nat -> E A }.
   
 Class Enum (A : Type) := { enum : E A }.
+
+Class Sized (A : Type) :=
+  { size : A -> nat }.
 
 (* ZP: This is not longer usefull *) 
 (* 

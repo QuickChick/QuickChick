@@ -17,6 +17,8 @@ type derivable =
     Shrink
   | Show
   | GenSized
+  | Fuzzy
+  | Mutate
   | Sized
   | EnumSized
   (*
@@ -30,6 +32,8 @@ let derivable_to_string = function
   | Shrink -> "Shrink"
   | Show   -> "Show"
   | GenSized -> "GenSized"
+  | Fuzzy -> "Fuzzy"
+  | Mutate -> "Mutate"
   | EnumSized -> "EnumSized"              
   | Sized -> "Sized"
            (*
@@ -86,6 +90,8 @@ let derive (cn : derivable) (c : constr_expr) (instance_name : string) (name1 : 
     | Shrink -> ["Shrink"]
     | Show -> ["Show"]
     | GenSized -> ["Gen"]
+    | Fuzzy -> ["Gen"; "Fuzzy"]
+    | Mutate -> ["Gen"; "Sized"; "Mutate"]
     | EnumSized -> ["Enum"]                
                 (*
     | CanonicalSized -> ["CanonicalSized"]
@@ -99,6 +105,8 @@ let derive (cn : derivable) (c : constr_expr) (instance_name : string) (name1 : 
     | Shrink -> []
     | Sized -> []
     | GenSized -> []
+    | Fuzzy -> []
+    | Mutate -> []
     | EnumSized -> []                
                 (*
     | CanonicalSized -> []
@@ -142,6 +150,8 @@ let derive (cn : derivable) (c : constr_expr) (instance_name : string) (name1 : 
     | Show -> show_decl ty_ctr ctrs iargs 
     | Shrink -> shrink_decl ty_ctr ctrs iargs
     | GenSized -> arbitrarySized_decl ty_ctr ctrs iargs
+    | Fuzzy -> fuzzy_decl ty_ctr ctrs iargs
+    | Mutate -> mutate_decl ty_ctr ctrs iargs
     | EnumSized -> enumSized_decl ty_ctr ctrs iargs                
     | Sized -> sized_decl ty_ctr ctrs
              (*
