@@ -1,7 +1,7 @@
 (library
  (name quickchick_plugin)
  (public_name coq-quickchick.plugin)
- (flags :standard -rectypes -warn-error -3 -w -8-27+40)
+ (flags :standard -rectypes -warn-error -3 -w -8-9-27-40)
  (modules :standard \ genSTCorrect genSizedSTMonotonic genSizedSTSizeMonotonic)
  (libraries unix str
   (select void_for_linking-plugin-extraction from
@@ -27,6 +27,37 @@
  (targets weightmap.ml)
  (deps (:pp-file weightmap.mlg))
  (action (run coqpp %{pp-file})))
+
+(rule
+ (targets depDriver.ml)
+ (deps (:pp-file depDriver.ml.cppo))
+ (action  (run %{bin:cppo} -V OCAML:%{ocaml_version} -V COQ:8.15.2 %{deps} -n -o %{targets})))
+
+(rule
+ (targets genericLib.ml)
+ (deps (:pp-file genericLib.ml.cppo))
+ (action  (run %{bin:cppo} -V OCAML:%{ocaml_version} -V COQ:8.15.2 %{deps} -n -o %{targets})))
+
+(rule
+ (targets tactic_quickchick.mlg)
+ (deps (:pp-file tactic_quickchick.mlg.cppo))
+ (action  (run %{bin:cppo} -V OCAML:%{ocaml_version} -V COQ:8.15.2 %{deps} -n -o %{targets})))
+
+(rule
+ (targets driver.mlg)
+ (deps (:pp-file driver.mlg.cppo))
+ (action  (run %{bin:cppo} -V OCAML:%{ocaml_version} -V COQ:8.15.2 %{deps} -n -o %{targets})))
+
+(rule
+ (targets weightmap.mlg)
+ (deps (:pp-file weightmap.mlg.cppo))
+ (action  (run %{bin:cppo} -V OCAML:%{ocaml_version} -V COQ:8.15.2 %{deps} -n -o %{targets})))
+
+(rule
+ (targets quickChick.mlg)
+ (deps (:pp-file quickChick.mlg.cppo))
+ (action  (run %{bin:cppo} -V OCAML:%{ocaml_version} -V COQ:8.15.2 %{deps} -n -o %{targets})))
+
 
 (rule
  (action (write-file void_for_linking-plugin-extraction.empty "")))
