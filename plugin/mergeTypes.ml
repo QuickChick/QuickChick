@@ -349,7 +349,9 @@ let range (n : int) : int list =
    type: other_type_num_params is how many parameters the other type to be merged with has, and left_or_right
    is false if this type's params go on the left, or true if they go on the right.
    Outputs (unchanged constructors, irrelevant constructors adjusted for output type)*)
-let rec irrelevant_constructor_pass (ctrs : (GenericLib.constructor * ctr_data) list) (other_type_params : dep_type list) (left_or_right : bool)
+let rec irrelevant_constructor_pass
+  (name_postfix : string)
+  (ctrs : (GenericLib.constructor * ctr_data) list) (other_type_params : dep_type list) (left_or_right : bool)
   : ((GenericLib.constructor * ctr_data) list * (GenericLib.constructor * ctr_data) list) =
   let ctr_irrelevant_try ((vs, rs, os, (params_out, shared_out)) : ctr_data) : ctr_data option =
     if List.length rs = 1
@@ -370,10 +372,10 @@ let rec irrelevant_constructor_pass (ctrs : (GenericLib.constructor * ctr_data) 
   match ctrs with
   | [] -> ([], [])
   | ((name, ctr) :: rest) ->
-    let (normal, irrelevant) = irrelevant_constructor_pass rest other_type_params left_or_right in
+    let (normal, irrelevant) = irrelevant_constructor_pass name_postfix rest other_type_params left_or_right in
     match ctr_irrelevant_try ctr with
     | None -> ((name, ctr) :: normal, irrelevant)
-    | Some out_ctr -> (normal, (injectCtr ((constructor_to_string name) ^ "'"), out_ctr) :: irrelevant)
+    | Some out_ctr -> (normal, (injectCtr ((constructor_to_string name) ^ name_postfix), out_ctr) :: irrelevant)
 
 (* Merges the two relations *)
 let merge_relations ((tyctr1, ctrs1, ty1) : relation')
@@ -404,10 +406,10 @@ let merge_relations ((tyctr1, ctrs1, ty1) : relation')
   let params1 = List.map (fun p -> s (DTyParam p)) params1 in
   let params2 = List.map (fun p -> s (DTyParam p)) params2 in
   (* First identify the constructors which don't change the parameter, for the irrelevant constructor pass *)
-  let (ctrs1_regular, ctrs1_irrelevant) = irrelevant_constructor_pass
+  let (ctrs1_regular, ctrs1_irrelevant) = irrelevant_constructor_pass "'1"
     (List.map (fun (name, ctr) -> (name, convertConstructor tyctr1 ctr param_pos1)) ctrs1)
     (fst converted_ty2) false in
-  let (ctrs2_regular, ctrs2_irrelevant) = irrelevant_constructor_pass
+  let (ctrs2_regular, ctrs2_irrelevant) = irrelevant_constructor_pass "'2"
     (List.map (fun (name, ctr) -> (name, convertConstructor tyctr2 ctr param_pos2)) ctrs2)
     (fst converted_ty1) true in
   let param_pos = (List.length (convert_type ty) - 1) in
