@@ -513,14 +513,17 @@ Fixpoint fuzzLoopAux {A} (fuel : nat) (st : State)
     | Some false =>
         let '(MkState mst mdt ms cs nst ndt ls e r nss nts ana) := st in
         let zero := trace (print a ++ nl) zero_0 in
-        let pre : string := "*** Failed " in
         (* TODO: shrinking *)
         (*         let (numShrinks, res') := localMin rnd1_copy st (MkRose res ts) in *)
         let numShrinks := 0 in
-        let suf := ("after " ++ (show (S nst)) ++ " tests and "
+        let message := if stDoAnalysis st 
+                        then
+                          ("""result"": ""failed"", ""tests"": " ++ (show (S nst)) ++ ", ""shrinks"": " ++ (show numShrinks) ++ ", ""discards"": " ++ (show ndt))%string
+                        else
+                          ("*** Failed right after " ++ (show (S nst)) ++ " tests and "
                                  ++ (show numShrinks) ++ " shrinks. ("
                                  ++ (show ndt) ++ " discards)")%string in
-        Failure (nst + 1 + zero) numShrinks ndt r size (pre ++ suf) (summary st) "Falsified!"
+        Failure (nst + 1 + zero) numShrinks ndt r size message (summary st) "Falsified!"
     | None =>
       match clear_queues fuel with
       | true => fuzzLoopAux fuel' (updDiscTests st S) nil nil nil nil randoms' nil gen fuzz print prop
@@ -552,7 +555,7 @@ Definition fuzzLoopWith {A} (a : Args)
                     rnd             (* randomSeed        *)
                     0               (* numSuccessShrinks *)
                     0               (* numTryShrinks     *)
-                    false           (* analysis          *)
+                    (analysis a)    (* analysis          *)
   in fuzzLoopAux (maxSuccess a + maxDiscard a) st [] [] [] [] random_fuel [] gen fuzz print prop.
 
 Definition fuzzLoop {A} := @fuzzLoopWith A stdArgs.
