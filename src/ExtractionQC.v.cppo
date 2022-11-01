@@ -100,7 +100,9 @@ Extract Constant randomRNat  =>
 #if OCAML_VERSION >= (4, 13, 0)
   "(fun (x,y) r -> if y < x then failwith ""choose called with unordered arguments"" else  (x + (Random.State.full_int r (y - x + 1)), r))".
 #else
-  "(fun (x,y) r -> if y < x then failwith ""choose called with unordered arguments"" else  (x + (Random.State.int r (y - x + 1)), r))".
+  "(fun (x,y) r -> if y < x then failwith ""choose called with unordered arguments"" 
+                  else if y - x + 1 > (2 lsl 29) then (x + (Random.State.int r (2 lsl 25)), r)
+                  else  (x + (Random.State.int r (y - x + 1)), r))".
 #endif
 Extract Constant randomRBool => "(fun _ r -> Random.State.bool r, r)".
 Extract Constant randomRInt  =>
