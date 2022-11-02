@@ -474,30 +474,30 @@ let warn_uninstantiated_variables =
       ++ fnl ())
        
 let handle_branch
-      (type a) (type b) (* I've started to love ocaml again because of this *)
+      (*      (type a) (type b) (* I've started to love ocaml again because of this *) *)
       (prod_class_names : string list)
       (_dep_type : dep_type)
       (init_size : coq_expr)
-      (fail_exp : b)
-      (not_enough_fuel_exp : b)
-      (ret_exp : coq_expr -> b)
-      (instantiate_existential_method : a)
-      (instantiate_existential_methodST : int -> coq_expr (* pred *) -> a)
-      (ex_bind : bool (* opt *) -> a -> string -> (var -> b) -> b)
-      (rec_method : int -> unknown list option -> coq_expr list -> a)
-      (rec_bind : bool (* opt *) -> a -> string -> (var -> b) -> b)
-      (stMaybe : bool (* opt *) -> a -> string -> ((coq_expr -> coq_expr) * int) list -> a)
-      (check_expr : int -> coq_expr -> b -> b -> b -> b)
-      (match_inp : var -> matcher_pat -> b -> b -> b)
-      (let_in_expr : string -> coq_expr -> (var -> b) -> b)
-      (let_tuple_in_expr : var -> var list -> b -> b)
+      (fail_exp : coq_expr)
+      (not_enough_fuel_exp : coq_expr)
+      (ret_exp : coq_expr -> coq_expr)
+      (instantiate_existential_method : coq_expr)
+      (instantiate_existential_methodST : int -> coq_expr (* pred *) -> coq_expr)
+      (ex_bind : bool (* opt *) -> coq_expr -> string -> (var -> coq_expr) -> coq_expr)
+      (rec_method : int -> unknown list option -> coq_expr list -> coq_expr)
+      (rec_bind : bool (* opt *) -> coq_expr -> string -> (var -> coq_expr) -> coq_expr)
+      (stMaybe : bool (* opt *) -> coq_expr -> string -> ((coq_expr -> coq_expr) * int) list -> coq_expr)
+      (check_expr : int -> coq_expr -> coq_expr -> coq_expr -> coq_expr -> coq_expr)
+      (match_inp : var -> matcher_pat -> coq_expr -> coq_expr -> coq_expr)
+      (let_in_expr : string -> coq_expr -> (var -> coq_expr) -> coq_expr)
+      (let_tuple_in_expr : var -> var list -> coq_expr -> coq_expr)
       (gen_ctr : ty_ctr)
       (init_umap : range UM.t)
       (init_tmap : dep_type UM.t)
       (input_ranges : range list)
       (result : Unknown.t)
       (c : dep_ctr)
-    : (b * bool) =
+    : (coq_expr * bool) =
 
   (* ************************ *)
   (* Step 0 : Initializations *)
@@ -605,7 +605,7 @@ let handle_branch
   (* When instantiating a single unknown, see if it must satisfy any additional predicates. *)
   (* Old comment: Process check map. XXX generator specific *)
 
-  let process_checks bind x opt g (cont : var -> b) : b =
+  let process_checks bind x opt g (cont : var -> coq_expr) : coq_expr =
     msg_debug (str ("Processing checks for variable: " ^ (Unknown.to_string x)) ++ fnl ());
     match lookup_checks (DTyVar x) !cmap with
     | Some checks -> 
@@ -626,7 +626,7 @@ let handle_branch
   
   (* Function to instantiate a single range; uses the input check-map for additional checks. 
      Takes a continuation that receives the (instantiated) range to produce a result. *)
-  let rec instantiate_range_cont (parent : unknown) r (cont : range -> b) =
+  let rec instantiate_range_cont (parent : unknown) r (cont : range -> coq_expr) =
     msg_debug (str ("Calling instantiate_range_cont with : " ^ range_to_string r) ++ fnl ());
     match r with 
     | Ctr (c,rs) ->
@@ -648,7 +648,7 @@ let handle_branch
 
   (* Function that operates on multiple top-level ranges at once, mapping the above over a list *)
   and instantiate_toplevel_ranges_cont (rs : range list) (acc : range list)
-            (cont : range list -> b) : b =
+            (cont : range list -> coq_expr) : coq_expr =
     match rs with
     | r ::rs' ->
        (* For each range r, we need to recursively call instantiate_range with the 
@@ -672,7 +672,7 @@ let handle_branch
      The input datatypes are range-convertible apart from any function calls.
    *)
   (* For your sanity, ask someone to explain this function before tweaking anything. *)
-  let rec instantiate_function_calls_cont dts (acc : dep_type list) (cont : dep_type list -> b) : b =
+  let rec instantiate_function_calls_cont dts (acc : dep_type list) (cont : dep_type list -> coq_expr) : coq_expr =
     match dts with 
     | [] -> cont (List.rev acc)
     | dt::dts' -> 
@@ -937,10 +937,12 @@ let handle_branch
            instantiate_toplevel_ranges_cont (List.map (fun (x,_t) -> Unknown x) unknowns_for_mode) [] (fun _ranges ->
            (* TODO: Need filtering. *)
 
-           let unknown_to_generate_for =
+           let (unknown_to_generate_for, letbinds) =
              match need_filtering, unknown_gen with
-             | None, [(u, dt, i)] -> u
-             | Some (eqs, unks, pat, i), [] -> unk_provider.next_unknown ()
+             | None, [(u, dt, i)] -> (u, [])
+             | Some (eqs, unks, pat, i), [] -> (unk_provider.next_unknown (), [])
+             | None, udtis -> (unk_provider.next_unknown (),
+                               List.rev (List.map (fun (u,_,_) -> u) udtis))
              | _, _ -> failwith "Simultaneous Some/None/1" 
            in
            let ranges_for_pred =
@@ -948,14 +950,28 @@ let handle_branch
              match need_filtering with
              | Some (_,_,_,i) -> List.mapi (fun j x -> if i = j then gVar unknown_to_generate_for else x) rs
              | _ -> rs 
-           in 
+           in
            let pred_result = gApp ~explicit:true (gTyCtr c) ranges_for_pred in
            let pred = (* predicate we are generating for *)
-             gFun [var_to_string unknown_to_generate_for] (fun _ -> pred_result)
-           in
+             match letbinds with
+             | [] -> gFun [var_to_string unknown_to_generate_for] (fun _ -> pred_result)
+             | _  ->
+                (* TODO: Type Params: What happens to gType below? *)
+                let unknown_type = dtTupleType (List.map (fun (_,dt,_) -> dt) unknown_gen) in
+                gFunTyped [(var_to_string unknown_to_generate_for, gType [] unknown_type)]
+                  (fun _ ->  gLetTupleIn (unknown_to_generate_for) letbinds pred_result)
+           in 
 
            (* Need to add the unknown in the map. The type as it will be fixed soon. *)
-           umap := UM.add unknown_to_generate_for (Undef DHole) !umap;
+           let unknown_range =
+             match letbinds with
+             | [] -> Undef DHole
+             | _ -> listToPairAux
+                      (fun (acc, x) -> Ctr (injectCtr "Coq.Init.Datatypes.pair", [acc; x]))
+                      (List.map (fun u -> Unknown u) letbinds)
+           in
+
+           umap := UM.add unknown_to_generate_for unknown_range !umap;
 
            process_checks ex_bind unknown_to_generate_for true (instantiate_existential_methodST ctr_index pred) 
              (fun _x' ->
@@ -977,21 +993,29 @@ let handle_branch
                         ; init_size]
                     in
                     check_expr ctr_index checker (construct_eqs eqs') fail_exp not_enough_fuel_exp
-               in 
-               match need_filtering with
-               | None -> cont ()
-               | Some (eqs, unks, pat, i) ->
-                  msg_debug (str (Printf.sprintf "0/Before matching %s with %s..." (Unknown.to_string unknown_to_generate_for) (matcher_pat_to_string pat)) ++ fnl ());
-                  msg_debug (str (Printf.sprintf "About to fix: %s" (String.concat " " (List.map (fun (x,_) -> Unknown.to_string x) unks))) ++ fnl ());
-                  UM.iter (fun x r -> msg_debug (str ("Bound: " ^ (var_to_string x) ^ " to Range: " ^ (range_to_string r)) ++ fnl ())) !umap;
-                  List.iter (fun (u,_) -> umap := fixVariable u !umap) unks;
-                  List.iter (fun (u,_) -> umap := fixVariable u !umap) eqs;                  
-                  umap := UM.add unknown_to_generate_for (matcher_pat_to_range pat) !umap;
-                  msg_debug (str "After matching..." ++ fnl ());
-                  UM.iter (fun x r -> msg_debug (str ("Bound: " ^ (var_to_string x) ^ " to Range: " ^ (range_to_string r)) ++ fnl ())) !umap;
-                  match_inp unknown_to_generate_for pat (construct_eqs eqs) fail_exp
+               in
+               let finalizer () = 
+                 match need_filtering with
+                 | None -> cont ()
+                 | Some (eqs, unks, pat, i) ->
+                    msg_debug (str (Printf.sprintf "0/Before matching %s with %s..." (Unknown.to_string unknown_to_generate_for) (matcher_pat_to_string pat)) ++ fnl ());
+                    msg_debug (str (Printf.sprintf "About to fix: %s" (String.concat " " (List.map (fun (x,_) -> Unknown.to_string x) unks))) ++ fnl ());
+                    UM.iter (fun x r -> msg_debug (str ("Bound: " ^ (var_to_string x) ^ " to Range: " ^ (range_to_string r)) ++ fnl ())) !umap;
+                    List.iter (fun (u,_) -> umap := fixVariable u !umap) unks;
+                    List.iter (fun (u,_) -> umap := fixVariable u !umap) eqs;                  
+                    umap := UM.add unknown_to_generate_for (matcher_pat_to_range pat) !umap;
+                    msg_debug (str "After matching..." ++ fnl ());
+                    UM.iter (fun x r -> msg_debug (str ("Bound: " ^ (var_to_string x) ^ " to Range: " ^ (range_to_string r)) ++ fnl ())) !umap;
+                    match_inp unknown_to_generate_for pat (construct_eqs eqs) fail_exp
+               in
+               match letbinds with
+               | [] -> finalizer ()
+               | _  ->
+                  begin
+                    List.iter (fun u -> umap := fixVariable u !umap) letbinds;
+                    gLetTupleIn (unknown_to_generate_for) letbinds (finalizer ())
+                  end
              )
-           
            )
         | _ ->
            begin match checker_classes with
@@ -1082,13 +1106,25 @@ let handle_branch
         let unknowns_for_mode = UM.bindings uts in
         (* Instantiate any unknowns that need to be for the mode to work. *)
         instantiate_toplevel_ranges_cont (List.map (fun (x,_t) -> Unknown x) unknowns_for_mode) [] (fun _ranges ->
-        let unknown_to_generate_for =
+        let (unknown_to_generate_for, letbinds) =
           match need_filtering, unknown_gen with
-          | None, [(u, dt, i)] -> u
-          | Some (eqs, unks, pat, i), [] -> unk_provider.next_unknown ()
-          | _, _ -> failwith "Simultaneous Some/None/2" 
+          | None, [(u, dt, i)] -> (u, [])
+          | Some (eqs, unks, pat, i), [] -> (unk_provider.next_unknown (), [])
+          | None, udtis -> (unk_provider.next_unknown (),
+                            List.rev (List.map (fun (u,_,_) -> u) udtis))
+          | _, _ -> failwith "Simultaneous Some/None/2"                         
         in
-        umap := UM.add unknown_to_generate_for (Undef DHole) !umap;
+
+        (* Need to add the unknown in the map. The type as it will be fixed soon. *)
+        let unknown_range =
+          match letbinds with
+          | [] -> Undef DHole
+          | _ -> listToPairAux
+                   (fun (acc, x) -> Ctr (injectCtr "Coq.Init.Datatypes.pair", [acc; x]))
+                   (List.map (fun u -> Unknown u) letbinds)
+        in
+        umap := UM.add unknown_to_generate_for unknown_range !umap;
+
         msg_debug (str (Printf.sprintf "Unknown to generate for: %s\n" (Unknown.to_string (unknown_to_generate_for))) ++ fnl ());
         
         let inputs_for_rec_method =
@@ -1096,9 +1132,9 @@ let handle_branch
           List.map fst (List.filter (fun (r,b) -> not b) (List.combine rs rec_bs))
         in 
 
-        let letbinds = None in
+        (* TODO: refactor, letbinds not used by recmethod *)
         process_checks rec_bind unknown_to_generate_for true
-          (rec_method ctr_index letbinds inputs_for_rec_method)
+          (rec_method ctr_index (Some letbinds) inputs_for_rec_method)
           (fun _shouldletthis ->
                let cont (_ : unit) = recurse_type (ctr_index + 1) dt' in
                let rec construct_eqs = function
@@ -1112,19 +1148,28 @@ let handle_branch
                         ; init_size]
                     in
                     check_expr ctr_index checker (construct_eqs eqs') fail_exp not_enough_fuel_exp
-               in 
-               match need_filtering with
-               | None -> cont ()
-               | Some (eqs, unks, pat, i) ->
-                  msg_debug (str (Printf.sprintf "1/Before matching %s with %s..." (Unknown.to_string unknown_to_generate_for) (matcher_pat_to_string pat)) ++ fnl ());
-                  msg_debug (str (Printf.sprintf "About to fix: %s" (String.concat " " (List.map (fun (x,_) -> Unknown.to_string x) unks))) ++ fnl ());
-                  UM.iter (fun x r -> msg_debug (str ("Bound: " ^ (var_to_string x) ^ " to Range: " ^ (range_to_string r)) ++ fnl ())) !umap;
-                  List.iter (fun (u,_) -> umap := fixVariable u !umap) eqs;                  
-                  List.iter (fun (u,_) -> umap := fixVariable u !umap) unks;
-                  umap := UM.add unknown_to_generate_for (matcher_pat_to_range pat) !umap;
-                  msg_debug (str "After matching..." ++ fnl ());
-                  UM.iter (fun x r -> msg_debug (str ("Bound: " ^ (var_to_string x) ^ " to Range: " ^ (range_to_string r)) ++ fnl ())) !umap; 
-                  match_inp unknown_to_generate_for pat (construct_eqs eqs) fail_exp
+               in
+               let finalizer (_ : unit) = 
+                 match need_filtering with
+                 | None -> cont ()
+                 | Some (eqs, unks, pat, i) ->
+                    msg_debug (str (Printf.sprintf "1/Before matching %s with %s..." (Unknown.to_string unknown_to_generate_for) (matcher_pat_to_string pat)) ++ fnl ());
+                    msg_debug (str (Printf.sprintf "About to fix: %s" (String.concat " " (List.map (fun (x,_) -> Unknown.to_string x) unks))) ++ fnl ());
+                    UM.iter (fun x r -> msg_debug (str ("Bound: " ^ (var_to_string x) ^ " to Range: " ^ (range_to_string r)) ++ fnl ())) !umap;
+                    List.iter (fun (u,_) -> umap := fixVariable u !umap) eqs;                  
+                    List.iter (fun (u,_) -> umap := fixVariable u !umap) unks;
+                    umap := UM.add unknown_to_generate_for (matcher_pat_to_range pat) !umap;
+                    msg_debug (str "After matching..." ++ fnl ());
+                    UM.iter (fun x r -> msg_debug (str ("Bound: " ^ (var_to_string x) ^ " to Range: " ^ (range_to_string r)) ++ fnl ())) !umap; 
+                    match_inp unknown_to_generate_for pat (construct_eqs eqs) fail_exp
+               in
+               match letbinds with
+               | [] -> finalizer ()
+               | _  ->
+                  begin
+                    List.iter (fun u -> umap := fixVariable u !umap) letbinds;
+                    gLetTupleIn (unknown_to_generate_for) letbinds (finalizer ())
+                  end
           )
         )
         end
@@ -1622,7 +1667,7 @@ let handle_branch
          else failwith "Negation / application"
  *)
     (* Dispatcher for constraints *)
-    and handle_dt (n : int) pos dt1 dt2 : b = 
+    and handle_dt (n : int) pos dt1 dt2 : coq_expr = 
       match dt1 with 
       | DTyCtr (c,dts) -> 
         handle_TyCtr n pos c dts dt2
@@ -1635,7 +1680,7 @@ let handle_branch
       | _ -> failwith "Constraints should be type constructors/negations"
 
     (* Iterate through constraints *)
-    and recurse_type (n : int) dt : b =
+    and recurse_type (n : int) dt : coq_expr =
       msg_debug (str ("Recursing on type: " ^ dep_type_to_string dt) ++ fnl ());
       match dt with 
       | DProd (_, dt) -> (* Only introduces variables, doesn't constrain them *)
