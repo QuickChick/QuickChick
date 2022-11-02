@@ -78,23 +78,23 @@ val handle_branch :
   string list ->
   GenericLib.dep_type ->
   GenericLib.coq_expr ->
-  'b ->
-  'b ->
-  (GenericLib.coq_expr -> 'b) ->
-  'a ->
-  (int -> GenericLib.coq_expr -> 'a) ->
-  (bool -> 'a -> string -> (GenericLib.var -> 'b) -> 'b) ->
-  (int -> unknown list option -> GenericLib.coq_expr list -> 'a) ->
-  (bool -> 'a -> string -> (GenericLib.var -> 'b) -> 'b) ->
+  GenericLib.coq_expr ->
+  GenericLib.coq_expr ->
+  (GenericLib.coq_expr -> GenericLib.coq_expr) ->
+  GenericLib.coq_expr ->
+  (int -> GenericLib.coq_expr -> GenericLib.coq_expr) ->
+  (bool -> GenericLib.coq_expr -> string -> (GenericLib.var -> GenericLib.coq_expr) -> GenericLib.coq_expr) ->
+  (int -> unknown list option -> GenericLib.coq_expr list -> GenericLib.coq_expr) ->
+  (bool -> GenericLib.coq_expr -> string -> (GenericLib.var -> GenericLib.coq_expr) -> GenericLib.coq_expr) ->
   (bool ->
-   'a ->
-   string -> ((GenericLib.coq_expr -> GenericLib.coq_expr) * int) list -> 'a) ->
-  (int -> GenericLib.coq_expr -> 'b -> 'b -> 'b -> 'b) ->
-  (GenericLib.var -> GenericLib.matcher_pat -> 'b -> 'b -> 'b) ->
-  (string -> GenericLib.coq_expr -> (GenericLib.var -> 'b) -> 'b) ->
-  (GenericLib.var -> GenericLib.var list -> 'b -> 'b) ->
+   GenericLib.coq_expr ->
+   string -> ((GenericLib.coq_expr -> GenericLib.coq_expr) * int) list -> GenericLib.coq_expr) ->
+  (int -> GenericLib.coq_expr -> GenericLib.coq_expr -> GenericLib.coq_expr -> GenericLib.coq_expr -> GenericLib.coq_expr) ->
+  (GenericLib.var -> GenericLib.matcher_pat -> GenericLib.coq_expr -> GenericLib.coq_expr -> GenericLib.coq_expr) ->
+  (string -> GenericLib.coq_expr -> (GenericLib.var -> GenericLib.coq_expr) -> GenericLib.coq_expr) ->
+  (GenericLib.var -> GenericLib.var list -> GenericLib.coq_expr -> GenericLib.coq_expr) ->
   GenericLib.ty_ctr ->
   range UM.t ->
   GenericLib.dep_type UM.t ->
-  range list -> Unknown.t -> GenericLib.dep_ctr -> 'b * bool
+  range list -> Unknown.t -> GenericLib.dep_ctr -> GenericLib.coq_expr * bool
 

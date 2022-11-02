@@ -1280,6 +1280,30 @@ let find_typeclass_bindings typeclass_name ctr =
                 else ()
               end
             else ()
+         | PLambda (name, t, PCase (_, arr, _, [n, ns, PApp (PRef gctr, res_args)])) ->
+            let gctr_qualid = Nametab.shortest_qualid_of_global Id.Set.empty gctr in
+            if qualid_eq gctr_qualid ctr then begin
+                msg_debug (str "Found a match!" ++ fnl ());
+                msg_debug (str ("Conclusion is Application of:" ^
+                                  (string_of_qualid (Nametab.shortest_qualid_of_global Id.Set.empty gctr)))
+                           ++ fnl ());
+                let standard = ref true in
+                let res = List.map (fun p ->
+                              match p with
+                              | PMeta (Some id) -> false 
+(*                                 if not (Name.equal (Name id) name)
+                                 then false
+                                 else failwith "FTB/How is this true" *)
+                              | PRef _ -> false 
+                              | PRel _ -> true
+                              | PApp _ -> standard := false; true                                        
+                              | _ -> debug_pattern "FTB/0" p
+                            ) (Array.to_list res_args) in
+                if !standard then 
+                  result := res :: !result
+                else ()
+              end
+            else ()
          | PMeta (Some id) -> () (* failwith (Id.to_string id) *)
          | PProd _ -> ()
          | _ -> debug_pattern "FTB/1" args.(arg_index)
