@@ -406,10 +406,10 @@ let merge_relations ((tyctr1, ctrs1, ty1) : relation')
   let params1 = List.map (fun p -> s (DTyParam p)) params1 in
   let params2 = List.map (fun p -> s (DTyParam p)) params2 in
   (* First identify the constructors which don't change the parameter, for the irrelevant constructor pass *)
-  let (ctrs1_regular, ctrs1_irrelevant) = irrelevant_constructor_pass "'1"
+  let (ctrs1_regular, ctrs1_irrelevant) = irrelevant_constructor_pass ("'1" ^ ty_ctr_to_string tyctr1 ^ ty_ctr_to_string tyctr2)
     (List.map (fun (name, ctr) -> (name, convertConstructor tyctr1 ctr param_pos1)) ctrs1)
     (fst converted_ty2) false in
-  let (ctrs2_regular, ctrs2_irrelevant) = irrelevant_constructor_pass "'2"
+  let (ctrs2_regular, ctrs2_irrelevant) = irrelevant_constructor_pass ("'2" ^ ty_ctr_to_string tyctr2 ^ ty_ctr_to_string tyctr2)
     (List.map (fun (name, ctr) -> (name, convertConstructor tyctr2 ctr param_pos2)) ctrs2)
     (fst converted_ty1) true in
   let param_pos = (List.length (convert_type ty) - 1) in
