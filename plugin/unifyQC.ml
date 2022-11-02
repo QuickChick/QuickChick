@@ -886,7 +886,7 @@ let handle_branch
                    
       let uts = ref UM.empty in
       let need_filtering = ref None in
-      let unknown_gen    = ref None in
+      let unknown_gen    = ref [] in
       let add_to_map u dt =
         try
           if UM.find u !uts = dt then ()
@@ -901,7 +901,7 @@ let handle_branch
            List.iter (fun (u,dt) -> add_to_map u dt) unks
         | ModeFixed, true -> raise Incompatible_mode
         | ModeUndefUnknown (u,dt), true ->
-           unknown_gen := Some (u, dt, i)
+           unknown_gen := (u, dt, i) :: !unknown_gen
         | ModePartlyDef (eqs,unks,pat), true ->
            need_filtering := Some (eqs, unks, pat, i)
       in
@@ -939,8 +939,8 @@ let handle_branch
 
            let unknown_to_generate_for =
              match need_filtering, unknown_gen with
-             | None, Some (u, dt, i) -> u
-             | Some (eqs, unks, pat, i), None -> unk_provider.next_unknown ()
+             | None, [(u, dt, i)] -> u
+             | Some (eqs, unks, pat, i), [] -> unk_provider.next_unknown ()
              | _, _ -> failwith "Simultaneous Some/None/1" 
            in
            let ranges_for_pred =
@@ -1084,8 +1084,8 @@ let handle_branch
         instantiate_toplevel_ranges_cont (List.map (fun (x,_t) -> Unknown x) unknowns_for_mode) [] (fun _ranges ->
         let unknown_to_generate_for =
           match need_filtering, unknown_gen with
-          | None, Some (u, dt, i) -> u
-          | Some (eqs, unks, pat, i), None -> unk_provider.next_unknown ()
+          | None, [(u, dt, i)] -> u
+          | Some (eqs, unks, pat, i), [] -> unk_provider.next_unknown ()
           | _, _ -> failwith "Simultaneous Some/None/2" 
         in
         umap := UM.add unknown_to_generate_for (Undef DHole) !umap;
@@ -1197,8 +1197,8 @@ let handle_branch
 
            let unknown_to_generate_for =
              match need_filtering, unknown_gen with
-             | None, Some (u, dt, i) -> u
-             | Some (eqs, unks, pat, i), None -> unk_provider.next_unknown ()
+             | None, [(u, dt, i)] -> u
+             | Some (eqs, unks, pat, i), [] -> unk_provider.next_unknown ()
              | _, _ -> failwith "Simultaneous Some/None/3" 
            in
            let ranges_for_pred =
