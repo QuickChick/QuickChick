@@ -3,7 +3,21 @@ Import MonadNotation.
 Require Import List.
 Import ListNotations.
 
-QuickChickDebug Debug On.
+(* QuickChickDebug Debug On. *)
+
+(* bool *)
+
+Derive (Show, Sized, Arbitrary) for bool.
+Derive Mutate for bool.
+
+Sample (mutate true).
+
+(* nat *)
+
+Derive (Show, Sized, Arbitrary) for nat.
+Derive Mutate for nat.
+
+Sample (mutate 100).
 
 (* List Nat *)
 
@@ -11,11 +25,7 @@ Inductive L : Set :=
   | Nil : L
   | Cons : nat -> L -> L.
 
-Derive (Show, Sized, Arbitrary) for nat.
-QuickChickDebug Debug On.
-Derive Mutate for nat.
 
-Sample (mutate 100).
 
 Derive (Show, Sized, Arbitrary) for L.
 Derive Mutate for L.
