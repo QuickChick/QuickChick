@@ -25,8 +25,6 @@ Inductive L : Set :=
   | Nil : L
   | Cons : nat -> L -> L.
 
-
-
 Derive (Show, Sized, Arbitrary) for L.
 Derive Mutate for L.
 
