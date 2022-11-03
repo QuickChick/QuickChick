@@ -21,7 +21,7 @@ Sample (mutate 100).
 
 (* List Nat *)
 
-Inductive L : Set :=
+(* Inductive L : Set :=
   | Nil : L
   | Cons : nat -> L -> L.
 
@@ -29,18 +29,34 @@ Derive (Show, Sized, Arbitrary) for L.
 Derive Mutate for L.
 
 Sample (mutate Nil).
-Sample (mutate (Cons 1 (Cons 2 Nil))).
+Sample (mutate (Cons 1 (Cons 2 Nil))). *)
 
 (* Tree Nat *)
 
-Inductive T : Set :=
+(* Inductive T : Set :=
   | Leaf : T
   | Node : nat -> T -> T -> T.
 
 Derive (Show, Sized, Arbitrary, Mutate) for T.
 
 Sample (mutate Leaf).
-Sample (mutate (Node 100 (Node 200 Leaf Leaf) (Node 300 Leaf Leaf))).
+Sample (mutate (Node 100 (Node 200 Leaf Leaf) (Node 300 Leaf Leaf))). *)
+
+(* from RedBlackTree/Impl.v *)
+
+Require Import ZArith.
+
+Derive (Arbitrary, Sized, Show, Mutate) for positive.
+Derive (Arbitrary, Sized, Show, Mutate) for Z.
+
+Inductive Color := R | B.
+Derive (Arbitrary, Sized, Show, Mutate) for Color.
+
+Inductive Tree :=
+    | E : Tree
+    | T : Color -> Tree -> Z -> Z -> Tree -> Tree.
+
+Derive (Arbitrary, Sized, Show, Mutate) for Tree.
 
 (* Option *)
 
