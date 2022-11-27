@@ -234,7 +234,7 @@ Module GenLow : GenLowInterface.Sig.
   (* end semBindSize *)
   Proof.
     rewrite /semGenSize /bindGen /= bigcup_codom -curry_codom2l.
-      by rewrite -[codom (prod_curry _)]imsetT -randomSplit_codom -codom_comp.
+      by rewrite -[codom (uncurry _)]imsetT -randomSplit_codom -codom_comp.
   Qed.
   
   Lemma semBindSize_subset_compat {A B : Type} (g g' : G A) (f f' : A -> G B) :
