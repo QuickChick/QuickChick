@@ -95,9 +95,9 @@ Definition imset {T U} (f : T -> U) A := bigcup A (fun x => set1 (f x)).
 Definition setX T U (A : set T) (B : set U) := [set x | x.1 \in A /\ x.2 \in B].
 
 Definition imset2 T U V (f : T -> U -> V) A1 A2 :=
-  imset (prod_curry f) (setX A1 A2).
+  imset (uncurry f) (setX A1 A2).
 
-Definition codom2 T U V (f : T -> U -> V) := codom (prod_curry f).
+Definition codom2 T U V (f : T -> U -> V) := codom (uncurry f).
 
 Notation "[ 'set' a ]" := (set1 a)
   (at level 0, a at level 99, format "[ 'set'  a ]") : set_scope.
@@ -372,7 +372,7 @@ Lemma curry_imset2r T U V (f : T -> U -> V) A1 A2 :
 Proof. by rewrite curry_imset2l bigcupC. Qed.
 
 Lemma curry_codom2l T U V (f : T -> U -> V) :
-  codom (prod_curry f) <--> \bigcup_x1 codom (f x1).
+  codom (uncurry f) <--> \bigcup_x1 codom (f x1).
 Proof.
 rewrite -imsetT -setXT -/(imset2 f _ _) curry_imset2l.
 by apply: eq_bigcupr => x; rewrite imsetT.
