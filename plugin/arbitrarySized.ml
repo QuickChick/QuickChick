@@ -285,7 +285,6 @@ let mutate_decl ty_ctr (ctrs : ctr_rep list) (iargs : var list) =
             in
 
             (* recombines *)
-            (* LEO: Maybe, filter the "noop" mutation that comes out *)
             let rcms : (coq_expr * coq_expr) list =
               (* all recombine options under nested freq *)
               (fun xs -> 
@@ -294,8 +293,6 @@ let mutate_decl ty_ctr (ctrs : ctr_rep list) (iargs : var list) =
                 else
                   [(gInt 1, coq_expr_to_thunk (frequencyT xs))]
               ) @@
-              (* (fun x -> [(gInt 1, coq_expr_to_thunk x)]) @@
-              frequencyT @@ *)
               List.map (fun (n_preserved, e) -> (weight_rcm n_preserved, coq_expr_to_thunk e)) @@
               List.map_append
                 (fun (ctr', ctr'_typ) ->
