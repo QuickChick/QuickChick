@@ -280,8 +280,13 @@ let mutate_decl ty_ctr (ctrs : ctr_rep list) (iargs : var list) =
             in
 
             (* regenerate *)
-            let regs : (coq_expr * coq_expr) list = 
-              [(weight_reg, coq_expr_to_thunk @@ gInject "arbitrary")] 
+            (* replace the expr with a new expr with a size within twice the
+               size of the original expr *)
+            ((let regs : (coq_expr * coq_expr) list = 
+              [(weight_reg, coq_expr_to_thunk ~label:"_regenerate" @@
+                  let size = gApp (gInject "size") [x'] in
+                  gApp (gInject "arbitrarySized")
+                    [gApp (gInject "Nat.mul") [gInt 2; size]])]
             in
 
             (* recombines *)
