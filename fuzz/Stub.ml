@@ -45,7 +45,10 @@ let calc_energy time size result =
        else update_energy input average energy params'
   in
   
+  (* Taken from AFL's ideas *)
+
   let time_params =
+    (* (input multiplier, average multiplied, (>) or (<), output multiplier) *)
     [ (1, 10, true, 0.1) 
     ; (1, 4,  true, 0.25 )
     ; (1, 2,  true, 0.5 )
@@ -58,6 +61,7 @@ let calc_energy time size result =
   (* Adjust score based on bitmap size. The working theory is that better
      coverage translates to better targets. Multiplier from 0.25x to 3x. *)
   let size_params =
+    (* (input multiplier, average multiplied, (>) or (<), output multiplier) *)
     [ (3, 10, true, 3.0)
     ; (1, 2,  true, 2.0)
     ; (3, 4,  true, 1.5)
@@ -159,3 +163,9 @@ let withInstrumentation f =
   end
   else
     (result, (false, 0))
+
+(*
+result: result of property check (None means discard)
+is_interesting: afl decides whether or not interesting
+energy: how long to fuzz (number of iters)
+*)
