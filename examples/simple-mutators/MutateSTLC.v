@@ -209,8 +209,6 @@ Definition mtypeCheck (e: option Expr) (t: Typ) : bool :=
     | None => true
     end.
 
-
-
 Definition prop_SinglePreserve (e: Expr) : option bool :=
   isJust (mt e) -=> 
     t' <- (mt e) ;;
@@ -281,33 +279,17 @@ QuickChickDebug Debug On.
 
 Definition make_fuzzer_fuzz {A} `{Gen A} `{Fuzzy A} `{Show A} prop (_ : unit) := 
     @fuzzLoop A arbitrary fuzz show prop.
+Definition make_fuzzer_mutate {A} `{Gen A} `{Mutate A} `{Show A} prop (_ : unit) := 
+    @fuzzLoop A arbitrary mutate show prop.
 
 Definition prop_tmp (b : bool) := Some b.
 
-(* #1 *)
-(* FuzzChick prop_SinglePreserve (make_fuzzer_fuzz prop_tmp tt). *)
-(* [SUCCESS]
-*** Failed right after 1 tests and 0 shrinks. (0 discards)Calling /var/folders/zv/937myc8545gdhn5p2xgkwbn80000gn/T/QuickChick/095226/qc_exec...
-Found failure!
-*)
-
-Check prop_SinglePreserve.
-(* prop_SinglePreserve : Expr -> option bool *)
-(* #2 *)
-FuzzChick prop_SinglePreserve (make_fuzzer_fuzz prop_SinglePreserve tt).
-(* [FAILURE]
-...
-Call Goal()
-coqtop-stdout:cat $(opam var lib)/coq/user-contrib/QuickChick/Stub.ml | cat - /var/folders/zv/937myc8545gdhn5p2xgkwbn80000gn/T/QuickChick/095305/QuickChick502013.ml > temp && mv temp /var/folders/zv/937myc8545gdhn5p2xgkwbn80000gn/T/QuickChick/095305/QuickChick502013.ml
-
-coqtop-stderr: File "/var/folders/zv/937myc8545gdhn5p2xgkwbn80000gn/T/QuickChick/095305/QuickChick502013.mli", line 4365, characters 20-40:
-4365 |   val coq_ShowTyp : QuickChick1c807d.typ show
-                           ^^^^^^^^^^^^^^^^^^^^
-Error: Unbound type constructor QuickChick1c807d.typ
-*)
+(* fuzzing: prop_SinglePreserve *)
+(* FuzzChick prop_SinglePreserve (make_fuzzer_fuzz prop_SinglePreserve tt). *)
+FuzzChick prop_SinglePreserve (make_fuzzer_mutate prop_SinglePreserve tt).
 
 (* Definition fuzzer :=
     fun (_ : unit) => fuzzLoop arbitrary mutate show prop_MultiPreserve.
 
-FuzzChick prop_MultiPreserve (fuzzer tt).
+FuzzChick prop_MultiPreserve (make_fuzzer_mutate prop_MultiPreserve tt).
 *)
