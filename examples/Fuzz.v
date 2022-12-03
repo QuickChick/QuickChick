@@ -82,16 +82,15 @@ Definition fuzz (n : nat) : G nat :=
   ret (n + x).
  *)
 
-QuickChick prop.
+(* QuickChick prop. *)
 
 ManualExtract Tree.
-Definition fuzzer :=
-  fun (u : unit) => fuzzLoop arbitrary mutate show prop.
-
-FuzzChick prop (fuzzer tt).
 QuickChickDebug Debug On.
 
-Definition fuzz_fuzzer :=
-  fun (u : unit) => fuzzLoop arbitrary fuzz show prop.
+Definition fuzzer :=
+  fun (u : unit) => fuzzLoop arbitrary mutate show prop.
+FuzzChick prop (fuzzer tt).
 
-(* FuzzChick prop (fuzz_fuzzer tt). *)
+(* Definition fuzz_fuzzer :=
+  fun (u : unit) => fuzzLoop arbitrary fuzz show prop.
+FuzzChick prop (fuzz_fuzzer tt). *)
