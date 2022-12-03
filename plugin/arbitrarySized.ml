@@ -225,7 +225,7 @@ let mutate_decl ty_ctr (ctrs : ctr_rep list) (iargs : var list) =
     | None -> def
   in
 
-  let coq_expr_to_thunk (e : coq_expr) : coq_expr = gFun ["_tt"] (fun [_] -> e) in
+  let coq_expr_to_thunk ?(label:string = "_tt") (e : coq_expr) : coq_expr = gFun [label] (fun [_] -> e) in
   (* let coq_expr_of_thunk (e : coq_expr) : coq_expr = gApp e [gTT] in *) (* TODO: unnecessary *)
   
   let mutate_fun =
@@ -233,7 +233,7 @@ let mutate_decl ty_ctr (ctrs : ctr_rep list) (iargs : var list) =
     let mutate_body x =
 
       (*
-      mutation options:
+      mutation organization:
         - regenerate:
           - weight is constant
         - recombine:
@@ -252,17 +252,30 @@ let mutate_decl ty_ctr (ctrs : ctr_rep list) (iargs : var list) =
           - return input except with result of mutation
       *)
 
-      let weight_reg : coq_expr = 
-        gInt 1
-      in 
+      (* weight of the regeneration mutation *)
+      let weight_reg : coq_expr = gInt 1 in 
+      (* size of abitrarily-regenerated expr, in terms of the original size *)
+      let size_reg (size_orig : coq_expr) : coq_expr = 
+        gApp (gInject "Nat.mul") [gInt 2; size_orig]
+      in
+      
+      (* weight of a recombination mutation where `n_preserved` is the number of
+         arguments that the recombination preserves *)
       let weight_rcm (n_preserved : int) : coq_expr = 
         gApp (gInject "Nat.pow") [gInt 2; gInt n_preserved] 
       in
-      let weight_rec_ind (e_size : coq_expr) : coq_expr = 
-        gApp (gInject "Nat.pow") [gInt 2; e_size] in
-      let weight_rec_nonind : coq_expr = 
-        gInt 1 
+      
+      (* weight of a recursion mutation with an inductive child where `e_size`
+         is the `size` of the inductive child *)
+      (* IDEA: instead of just 2^n, do a sort of weighting that is
+         inversely-proportional to the sizes of the preserved children *)
+        (* TODO: is adding 1 to the power induced by the number of inductive children right? *)
+      let weight_rec_ind (n_ind_children : int) (e_size : coq_expr) : coq_expr = 
+        gApp (gInject "Nat.pow") [gInt (n_ind_children + 1); e_size] 
       in
+      
+      (* weight of a recursion mutation with a non-inductive child *)
+      let weight_rec_nonind : coq_expr = gInt 1 in
 
       let create_branch 
             (x' : coq_expr) (aux_mutate : var) 
@@ -279,14 +292,13 @@ let mutate_decl ty_ctr (ctrs : ctr_rep list) (iargs : var list) =
                 0 ctr_arg_typs
             in
 
-            (* regenerate *)
+            (* regenerations *)
             (* replace the expr with a new expr with a size within twice the
                size of the original expr *)
             ((let regs : (coq_expr * coq_expr) list = 
               [(weight_reg, coq_expr_to_thunk ~label:"_regenerate" @@
-                  let size = gApp (gInject "size") [x'] in
-                  gApp (gInject "arbitrarySized")
-                    [gApp (gInject "Nat.mul") [gInt 2; size]])]
+                  gApp (gInject "arbitrarySized") 
+                    [size_reg (gApp (gInject "size") [x'])])]
             in
 
             (* recombines *)
@@ -296,9 +308,9 @@ let mutate_decl ty_ctr (ctrs : ctr_rep list) (iargs : var list) =
                 if List.length xs == 0 then
                   []
                 else
-                  [(gInt 1, coq_expr_to_thunk (frequencyT xs))]
+                  [(gInt 1, coq_expr_to_thunk ~label:"_recombines" (frequencyT xs))]
               ) @@
-              List.map (fun (n_preserved, e) -> (weight_rcm n_preserved, coq_expr_to_thunk e)) @@
+              List.map (fun (n_preserved, e) -> (weight_rcm n_preserved, coq_expr_to_thunk ~label:"_recombine" e)) @@
               List.map_append
                 (fun (ctr', ctr'_typ) ->
                   let ctr'_prm_typs : coq_type list = 
@@ -368,16 +380,17 @@ let mutate_decl ty_ctr (ctrs : ctr_rep list) (iargs : var list) =
 
             (* recursions *)
             let recs : (coq_expr * coq_expr) list =
+              let n_ind_children: int = 
+                List.length (List.filter isCurrentTyCtr ctr_arg_typs) 
+              in
               List.map_i
                 (fun i arg_typ -> 
                   let ctr_arg = List.nth ctr_args i in
                   if isCurrentTyCtr arg_typ then
-                    (* TODO: weight by function of size *)
                     (* mutate child *)
                     (* return input where child is replaced *)
-                    (* TODO: choose weighting function of size for inductive children *)
-                    ( weight_rec_ind (gApp (gInject "size") [ctr_arg]),
-                      coq_expr_to_thunk @@
+                    ( weight_rec_ind n_ind_children (gApp (gInject "size") [ctr_arg]),
+                      coq_expr_to_thunk ~label:"_recurse_inductive" @@
                       bindGen (gApp (gVar aux_mutate) [ctr_arg]) 
                         (var_to_string (List.nth all_vars i) ^ "'") (fun child' -> 
                       returnGen (gApp ~explicit:true (gCtr ctr) 
@@ -385,7 +398,7 @@ let mutate_decl ty_ctr (ctrs : ctr_rep list) (iargs : var list) =
                   else
                     (* TODO: choose reasonable weight for non-inductive children *)
                     ( weight_rec_nonind,
-                      coq_expr_to_thunk @@
+                      coq_expr_to_thunk ~label:"_recurse_noninductive" @@
                       bindGen (gApp (gInject "mutate") [ctr_arg])
                         (var_to_string (List.nth all_vars i) ^ "'") (fun child' ->
                       returnGen (gApp ~explicit:true (gCtr ctr)
@@ -397,7 +410,7 @@ let mutate_decl ty_ctr (ctrs : ctr_rep list) (iargs : var list) =
             (* TODO: used thunked version *)
             frequencyT @@
             regs @ rcms @ recs
-        )
+        )))
       in
   
       let aux_mutate_body rec_fun x' : coq_expr = 
