@@ -271,11 +271,12 @@ let mutate_decl ty_ctr (ctrs : ctr_rep list) (iargs : var list) =
          inversely-proportional to the sizes of the preserved children *)
         (* TODO: is adding 1 to the power induced by the number of inductive children right? *)
       let weight_rec_ind (n_ind_children : int) (e_size : coq_expr) : coq_expr = 
-        gApp (gInject "Nat.pow") [gInt (n_ind_children + 1); e_size] 
+        (* gApp (gInject "Nat.pow") [gInt (n_ind_children + 1); e_size]  *)
+        gApp (gInject "Nat.pow") [gInt 2; e_size]
       in
       
       (* weight of a recursion mutation with a non-inductive child *)
-      let weight_rec_nonind : coq_expr = gInt 1 in
+      let weight_rec_nonind : coq_expr = gInt 16 in
 
       let create_branch 
             (x' : coq_expr) (aux_mutate : var) 
