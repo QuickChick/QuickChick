@@ -291,10 +291,6 @@ Definition test_prop_MultiPreserve :=
 
 (* fuzzing *)
 
-Print GenSized.
-Sample (@arbitrarySized nat _ 100).
-Check Nat.mul.
-
 ManualExtract Typ.
 ManualExtract Expr.
 QuickChickDebug Debug On.
@@ -309,20 +305,11 @@ Definition prop_tmp (b : bool) := Some b.
 (* fuzzing: prop_SinglePreserve *)
 
 (* FuzzChick prop_SinglePreserve (make_fuzzer_fuzz prop_SinglePreserve tt). *)
-(* ==> 1. Passed 10000 tests (11719 discards) *)
-(* ==> 2. Passed 10000 tests (12769 discards) *)
-(* ==> 3. Passed 10000 tests (11145 discards) *)
+(* ==> Passed 10000 tests (11719 discards) *)
+(* ==> Passed 10000 tests (12769 discards) *)
+(* ==> Passed 10000 tests (11145 discards) *)
 
 FuzzChick prop_SinglePreserve (make_fuzzer_mutate prop_SinglePreserve tt).
-(* ==> 1. Passed 10000 tests (19549 discards) *)
-(* ==> 2. Passed 10000 tests (19341 discards) *)
-(* ==> 3. Passed only 9996 tests; Discarded: 20000 *)
-(* ==> 3. Passed 10000 tests (19541 discards) *)
-(* ==> 3.1 Passed 10000 tests (19525 discards) // weight_rec_ind = 2^size *)
-(* ==> 3.2 Passed 10000 tests (18934 discards) // weight_rec_ind = 4^size *)
-(* ==> 3.3 Passed 10000 tests (18840 discards) // weight_rec_ind = 8^size *)
-(* ==> 3.4 Passed 10000 tests (18289 discards) // weight_rec_ind = 2^size; weight_rec_nonind = 16 *)
-
 
 (* Definition fuzzer :=
     fun (_ : unit) => fuzzLoop arbitrary mutate show prop_MultiPreserve.
