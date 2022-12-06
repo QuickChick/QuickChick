@@ -28,7 +28,7 @@ let count_ones arr =
 (* TODO: Measure time from beginning of generation. *)
 
 let calc_energy time size result =
-  let energy0 = 100.0 in
+  let energy0 = 1000.0 in
   let avg_time = !total_time / !total_time_cnt in
   let avg_size = !total_bitmap_size / !total_bitmap_cnt in
   
