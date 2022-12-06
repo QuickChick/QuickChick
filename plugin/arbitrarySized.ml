@@ -235,18 +235,17 @@ let mutate_decl ty_ctr (ctrs : ctr_rep list) (iargs : var list) =
       (*
       mutation organization:
         - regenerate:
-          - weight is constant
+          - use arbitrarySized to generate new term
         - recombine:
-          - weight is constant (TODO: more inputs?)
           - choose a new constructor
           - for each argument required by the new constructor, try (i.e. check
             if it has a compatible type) to use a given argument or the entire 
             input. This will yield a tree of branching choices. Givens can be
-            used non-linearly.
-          - if no givens were used, then backtrack. (TODO: or not?)
+            used non-linearly. For any arguments that are not constructed from
+            terms in nodes in context, generate using arbitrary.
+          - TODO: if no givens were used, then backtrack
           - return the new constructor applied to the new arguments.  
         - recurse:
-          - weight is a function of child size
           - choose a given argument to mutate
           - if the argument is of the same type then use aux else use arbitrary
           - return input except with result of mutation
@@ -256,7 +255,13 @@ let mutate_decl ty_ctr (ctrs : ctr_rep list) (iargs : var list) =
       let weight_reg : coq_expr = gInt 1 in 
       (* size of abitrarily-regenerated expr, in terms of the original size *)
       let size_reg (size_orig : coq_expr) : coq_expr = 
-        gApp (gInject "Nat.mul") [gInt 2; size_orig]
+        (* gApp (gInject "Nat.mul") [gInt 2; size_orig] *)
+        (* size_orig *)
+        gInt 0
+      in
+      
+      let weight_rcms (weights : coq_expr list) : coq_expr = 
+        List.fold_right (fun a b -> gApp (gInject "Nat.add") [a; b]) weights (gInt 0)
       in
       
       (* weight of a recombination mutation where `n_preserved` is the number of
@@ -272,11 +277,12 @@ let mutate_decl ty_ctr (ctrs : ctr_rep list) (iargs : var list) =
         (* TODO: is adding 1 to the power induced by the number of inductive children right? *)
       let weight_rec_ind (n_ind_children : int) (e_size : coq_expr) : coq_expr = 
         (* gApp (gInject "Nat.pow") [gInt (n_ind_children + 1); e_size]  *)
-        gApp (gInject "Nat.pow") [gInt 2; e_size]
+        gApp (gInject "Nat.pow") [gInt 4; e_size]
       in
       
       (* weight of a recursion mutation with a non-inductive child *)
-      let weight_rec_nonind : coq_expr = gInt 16 in
+      (* let weight_rec_nonind : coq_expr = gInt 16 in *)
+      let weight_rec_nonind : coq_expr = gInt 8 in
 
       let create_branch 
             (x' : coq_expr) (aux_mutate : var) 
@@ -309,7 +315,10 @@ let mutate_decl ty_ctr (ctrs : ctr_rep list) (iargs : var list) =
                 if List.length xs == 0 then
                   []
                 else
-                  [(gInt 1, coq_expr_to_thunk ~label:"_recombines" (frequencyT xs))]
+                  [(
+                    weight_rcms (List.map fst xs),
+                    coq_expr_to_thunk ~label:"_recombines" (frequencyT xs)
+                  )]
               ) @@
               List.map (fun (n_preserved, e) -> (weight_rcm n_preserved, coq_expr_to_thunk ~label:"_recombine" e)) @@
               List.map_append
@@ -344,6 +353,9 @@ let mutate_decl ty_ctr (ctrs : ctr_rep list) (iargs : var list) =
                             diff := true;
                           f opt_args'' (arg :: args) (n_preserved + 1) (i + 1)
                         | None :: opt_args'' ->
+                          (* TODO: use arbitrarySized, which requires knowing
+                             about the size of the term that used to be at this
+                             positions *)
                           if not !diff then diff := true;
                           bindGen (gInject "arbitrary") 
                             ("recombineArg_" ^ string_of_int i)
@@ -382,7 +394,7 @@ let mutate_decl ty_ctr (ctrs : ctr_rep list) (iargs : var list) =
             (* recursions *)
             let recs : (coq_expr * coq_expr) list =
               let n_ind_children: int = 
-                List.length (List.filter isCurrentTyCtr ctr_arg_typs) 
+                List.length (List.filter isCurrentTyCtr ctr_arg_typs)
               in
               List.map_i
                 (fun i arg_typ -> 
@@ -407,8 +419,6 @@ let mutate_decl ty_ctr (ctrs : ctr_rep list) (iargs : var list) =
                 )
                 0 ctr_arg_typs
             in
-            (* TODO: should actually use freq, and so need to choose weights *)
-            (* TODO: used thunked version *)
             frequencyT @@
             regs @ rcms @ recs
         )))
