@@ -321,8 +321,11 @@ let parse_constructors nparams param_names result_ty oib : ctr_rep list option =
         end 
       end
       else if isInd ty then begin
-        let ((mind, mindidx),_) = destInd ty in
-        Some (TyCtr (qualid_of_ident (Label.to_id (MutInd.label mind)), []))
+        let ((mind, midx),_) = destInd ty in
+        let env = Global.env () in
+        let mib = Environ.lookup_mind mind env in
+        let id = mib.mind_packets.(midx).mind_typename in
+        Some (TyCtr (qualid_of_ident id, []))
       end
       else if isConst ty then begin
         let (c,_) = destConst ty in 
@@ -442,10 +445,8 @@ let parse_dependent_type i nparams ty oib arg_names =
       let ((mind, midx),_) = destInd ty in
       let mib = Environ.lookup_mind mind env in
       let id = mib.mind_packets.(midx).mind_typename in
-      (*
-      msg_debug (str (Printf.sprintf "LOOK HERE: %s - %s - %s" (MutInd.to_string mind) (Label.to_string (MutInd.label mind)) 
-                                                            (Id.to_string (Label.to_id (MutInd.label mind)))) ++ fnl ());
-                                                            *)
+      (* msg_debug (str (Printf.sprintf "LOOK HERE: %s - %s - %s" (MutInd.to_string mind) (Label.to_string (MutInd.label mind)) 
+                                                            (Id.to_string (Label.to_id (MutInd.label mind)))) ++ fnl ());*)
       Some (DTyCtr (qualid_of_ident id, []))
     end
     else if isConstruct ty then begin
