@@ -321,7 +321,7 @@ let parse_constructors nparams param_names result_ty oib : ctr_rep list option =
         end 
       end
       else if isInd ty then begin
-        let ((mind,_),_) = destInd ty in
+        let ((mind, mindidx),_) = destInd ty in
         Some (TyCtr (qualid_of_ident (Label.to_id (MutInd.label mind)), []))
       end
       else if isConst ty then begin
@@ -439,10 +439,14 @@ let parse_dependent_type i nparams ty oib arg_names =
       | None -> CErrors.user_err (str "Aux failed?" ++ fnl ())
     end
     else if isInd ty then begin
-      let ((mind,_),_) = destInd ty in
+      let ((mind, midx),_) = destInd ty in
+      let mib = Environ.lookup_mind mind env in
+      let id = mib.mind_packets.(midx).mind_typename in
+      (*
       msg_debug (str (Printf.sprintf "LOOK HERE: %s - %s - %s" (MutInd.to_string mind) (Label.to_string (MutInd.label mind)) 
                                                             (Id.to_string (Label.to_id (MutInd.label mind)))) ++ fnl ());
-      Some (DTyCtr (qualid_of_ident (Label.to_id (MutInd.label mind)), []))
+                                                            *)
+      Some (DTyCtr (qualid_of_ident id, []))
     end
     else if isConstruct ty then begin
       let (((mind, midx), idx),_) = destConstruct ty in                               
