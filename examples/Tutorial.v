@@ -56,12 +56,13 @@ Definition removeP (x : nat) (l : list nat) :=
 
 QuickChick removeP.
 
-(** Internally, the code is extracted to OCaml, compiled and ran to
-obtain the output:
+(** Internally, the code is extracted to OCaml, compiled, and run.  The
+following output is presented in your terminal, CoqIDE [Messages] pane, or
+Visual Studio Code [Info] pulldown menu tab:
 <<
     0
 
-    [ 0, 0 ]
+    [0; 0]
 
     Failed! After 17 tests and 12 shrinks
 >>
