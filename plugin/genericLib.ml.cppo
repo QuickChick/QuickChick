@@ -94,11 +94,7 @@ let gArg ?assumName:(an=hole) ?assumType:(at=hole) ?assumImplicit:(ai=false) ?as
     | { CAst.v = CRef (qid, _); loc } -> (loc,Name (qualid_basename qid))
     | { CAst.v = CHole _; loc } -> (loc,Anonymous)
     | _a -> failwith "This expression should be a name" in
-#if COQ_VERSION >= (8, 12, 0)
   let max_implicit = Glob_term.MaxImplicit in
-#else
-  let max_implicit = Glob_term.Implicit in
-#endif
   CLocalAssum ( [CAst.make ?loc:(fst n) @@ snd n],
                   (if ag then Generalized (max_implicit, false)
                    else if ai then Default max_implicit else Default Glob_term.Explicit),
@@ -872,14 +868,7 @@ let dtTupleType =
 let nat_scope ast = CAst.make @@ CDelimiters ("nat", ast)
 let gInt n =
   let number =
-#if COQ_VERSION >= (8, 13, 0)
     Number (NumTok.Signed.of_int_string (string_of_int n))
-#elif COQ_VERSION >= (8, 12, 0)
-    Numeral (NumTok.Signed.of_int_string (string_of_int n))
-#else
-    if n >= 0 then Numeral (SPlus, NumTok.int (string_of_int n))
-    else Numeral (SMinus, NumTok.int (string_of_int (-n)))
-#endif
   in nat_scope (CAst.make @@ CPrim number)
 let gSucc x = gApp (gInject "Coq.Init.Datatypes.S") [x]
 let rec maximum = function
