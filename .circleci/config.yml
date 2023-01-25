@@ -114,12 +114,6 @@ workflows:
   build:
     jobs:
       - dune:
-          name: Dune 8.11
-          coq: '8.11'
-      - dune:
-          name: Dune 8.12
-          coq: '8.12'
-      - dune:
           name: Dune 8.13
           coq: '8.13'
       - dune:
