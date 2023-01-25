@@ -84,7 +84,7 @@ Section Lemmas.
     assert (Hin : [set : B] x0) by reflexivity.
     eapply Hc in Hin. inv Hin. inv H.
     exists x1, (Nat.max x2 x3). split. reflexivity.
-    eapply (@semBindSize G _ _ B A).
+    eapply (@semBindSize G ProducerGen _ B A).
     eexists. split.
 
     eapply Hs1 > [ | eassumption ]. now ssromega.
@@ -117,7 +117,7 @@ Section Lemmas.
     
     split. reflexivity.
     
-    eapply (@semBindSize G _ _ B A).
+    eapply (@semBindSize G ProducerGen _ B A).
 
     eexists. split.
     eapply Hs > [ | eapply Hs' > [ | eassumption ] ]. ssromega. ssromega.
@@ -173,7 +173,7 @@ Section Lemmas.
     assert (Hin : [set : B] z) by reflexivity.
     eapply Hc in Hin. inv Hin. inv H.
     exists x0, (Nat.max x1 x2). split. reflexivity.
-    eapply (@semBindSize G _ _ B).
+    eapply (@semBindSize G ProducerGen _ B).
     eexists. split.
 
     eapply Hs1 > [ | eassumption ]. now ssromega.
