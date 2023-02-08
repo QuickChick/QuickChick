@@ -38,7 +38,11 @@ let make_up_name () : Id.t =
   cnt := !cnt + 1;
   id
        
+#if COQ_VERSION >= (8, 18, 0)
+let hole = CAst.make @@ CHole (None, Namegen.IntroAnonymous)
+#else
 let hole = CAst.make @@ CHole (None, Namegen.IntroAnonymous, None)
+#endif
 
 let id_of_name n = 
   match n with 
@@ -88,7 +92,7 @@ type arg = local_binder_expr
 let gArg ?assumName:(an=hole) ?assumType:(at=hole) ?assumImplicit:(ai=false) ?assumGeneralized:(ag=false) _ =
   let n = match an with
     | { CAst.v = CRef (qid, _); loc } -> (loc,Name (qualid_basename qid))
-    | { CAst.v = CHole (_v,_,_); loc } -> (loc,Anonymous)
+    | { CAst.v = CHole _; loc } -> (loc,Anonymous)
     | _a -> failwith "This expression should be a name" in
 #if COQ_VERSION >= (8, 12, 0)
   let max_implicit = Glob_term.MaxImplicit in
