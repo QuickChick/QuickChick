@@ -49,6 +49,10 @@ Definition updMaxSuccess (a : Args) (x : nat) : Args :=
   let '(MkArgs r msc md msh msz c an) := a in 
   MkArgs r x md msh msz c an.
 
+Definition updMaxDiscard (a : Args) (x : nat) : Args := 
+  let '(MkArgs r msc md msh msz c an) := a in 
+  MkArgs r msc x msh msz c an.
+
 Definition updAnalysis (a : Args) (b : bool) : Args := 
   let '(MkArgs r msc md msh msz c an) := a in 
   MkArgs r msc md msh msz c b.
@@ -453,7 +457,7 @@ Fixpoint pick_next_aux pick_fuel {A} (gen : G A) (fuzz : A -> G A) fs ds fsq dsq
     end
   end.
 
-Definition pick_next := @pick_next_aux 7.
+Definition pick_next := @pick_next_aux 10000.
 
 Axiom printnvb : unit -> nat.
 Extract Constant printnvb => "(fun u -> Printf.printf ""%d\n"" (count_non_virgin_bytes u); 42)".
@@ -469,6 +473,14 @@ Extract Constant clear_queues => "(fun n -> n land 1023 == 0)".
    Always fuzz a favored one if it exists.
    If not, interleave fuzzing a discard or generating randomly.
 *)
+
+Fixpoint printListNatA {A} (l: list (nat * A)) (pf : A -> string) := 
+    match l with
+    | nil => nl
+    | (n, a) :: rest => show n ++ ", " ++ pf a ++ "; " ++ printListNatA rest pf
+    end.
+
+
 Fixpoint fuzzLoopAux {A} (fuel : nat) (st : State)
          (favored : list (nat * A)) (discards : list (nat * A))
          (favored_queue : list (nat * A)) (discard_queue : list (nat * A))
@@ -497,12 +509,14 @@ Fixpoint fuzzLoopAux {A} (fuel : nat) (st : State)
     (* TODO: These recursive calls are a place to hold depth/handicap information as well.*)
     let '(res, (is_interesting, energy)) := withInstrumentation (fun _ : unit => prop a) in
     let zero_0 := 0 in 
-    let zero_0 := trace (print a ++ nl) 0 in 
+    (* let zero_0 := trace (print a ++ nl) 0 in 
+    let zero_0 := if is_interesting then trace ("interesting: " ++ show energy ++ nl) zero_0 else 0 in
+    let zero_0 := trace (show (printListNatA favored' print, printListNatA favored_queue' print, printListNatA discards' print, printListNatA discard_queue' print) ++ nl) zero_0 in *)
     match res with                                                     
     | Some true =>
       match clear_queues fuel with
       | true => fuzzLoopAux fuel' (updSuccTests st S) nil nil nil nil randoms' nil gen fuzz print prop
-      | _ => 
+      | _ =>
         if is_interesting then
           (* Successful and interesting, keep in favored queue and save! *)
           fuzzLoopAux fuel' (updSuccTests st S) favored' discards' ((energy, a)::favored_queue') discard_queue' randoms' ((energy,a) :: saved') gen fuzz print prop
