@@ -31,7 +31,7 @@ documentation-check: plugin
 
 TEMPFILE := $(shell mktemp)
 
-install: all
+install: quickChickTool plugin
 	$(V)$(MAKE) -f Makefile.coq install > $(TEMPFILE)
 # Manually copying the remaining files
 	$(V)cp $(QCTOOL_DIR)/$(QCTOOL_EXE) $(INSTALLDIR)/quickChick
