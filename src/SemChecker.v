@@ -330,7 +330,8 @@ Instance implicationUnsized
   UnsizedChecker (implication b c) :=
   {| unsizedChecker := implication_unsized C H b c HC |}.
 
-Obligation Tactic := intros.
+
+Opaque semProdSize.
 
 #[global]
 Program Instance implicationMonotonic
@@ -640,7 +641,6 @@ Proof.
   intros. destruct b; auto.
 Qed.
 
-Opaque semProdSize.
 
 Lemma semCheckableBoolSize (b : bool) size : semCheckableSize b size <-> b.
 Proof.
