@@ -29,7 +29,8 @@ Set Bullet Behavior "Strict Subproofs".
 #[global] Instance genBoolSized : GenSized bool :=
   {| arbitrarySized x := elems_ true [true; false] |}.
 
-#[global] Instance genNatSized : GenSized nat :=
+#[global]
+Instance genNatSized : GenSized nat :=
   {| arbitrarySized x := choose (0,x) |}.
 
 #[global] Instance genZSized : GenSized Z :=
@@ -481,11 +482,11 @@ Proof.
   intros. destruct p.
     rewrite /Z.div2 /Pos.div2.
       rewrite /Z.abs_nat. rewrite Pos2Nat.inj_xI.
-      rewrite <- Nat.add_1_r. rewrite mult_comm.
+      rewrite <- Nat.add_1_r. rewrite Nat.mul_comm.
       rewrite Nat.div2_div. rewrite Nat.div_add_l; simpl; lia.
     rewrite /Z.div2 /Pos.div2.
       rewrite /Z.abs_nat. rewrite Pos2Nat.inj_xO.
-      rewrite mult_comm. rewrite Nat.div2_div. rewrite Nat.div_mul. reflexivity. lia.
+      rewrite Nat.mul_comm. rewrite Nat.div2_div. rewrite Nat.div_mul. reflexivity. lia.
   reflexivity.
 Qed.
 
@@ -521,10 +522,10 @@ Proof.
   intros. destruct p.
     left. rewrite /Z.div2 /Pos.div2.
       rewrite neg_succ. rewrite <- Zsucc_pred. rewrite /Z.abs_nat. rewrite Pos2Nat.inj_xI.
-      rewrite <- Nat.add_1_r. rewrite mult_comm.
+      rewrite <- Nat.add_1_r. rewrite Nat.mul_comm.
       rewrite Nat.div2_div. rewrite Nat.div_add_l; simpl; lia.
     right. rewrite /Z.div2 /Pos.div2.
-      rewrite Pos2Nat.inj_xO. rewrite mult_comm.
+      rewrite Pos2Nat.inj_xO. rewrite Nat.mul_comm.
       rewrite Nat.div2_div. rewrite Nat.div_mul. simpl.
       apply abs_succ_neg. lia.
   left. simpl. reflexivity.
@@ -542,7 +543,7 @@ Proof.
   move => ? p ?. subst. destruct (abs_succ_div2_neg p) as [H | H].
     rewrite {}H /Z.abs_nat. rewrite Nat.div2_div.
       apply Nat.div_lt. apply Pos2Nat.is_pos. lia.
-    rewrite {}H /Z.abs_nat. eapply le_lt_trans. apply le_pred_n. rewrite Nat.div2_div.
+    rewrite {}H /Z.abs_nat. eapply Nat.le_lt_trans. apply Nat.le_pred_l. rewrite Nat.div2_div.
       apply Nat.div_lt. apply Pos2Nat.is_pos. lia.
 Qed.
 
@@ -589,7 +590,8 @@ Definition shrinkListAux {A : Type} (shr : A -> list A) : list A -> list (list A
 (* Needed to add this! *)
 Opaque semProdSize.
 
-#[global] Program Instance arbNatMon :
+#[global]
+Program Instance arbNatMon :
   @SizeMonotonic nat G ProducerGen (@arbitrary nat _).
 Next Obligation.
   rewrite !semSizedSize !semChooseSize // => n /andP [/leP H1 /leP H2].
@@ -599,7 +601,8 @@ Qed.
 
 (** Correctness proof about built-in generators *)
 
-#[global] Instance boolSizeMonotonic : SizeMonotonic (@arbitrary bool _).
+#[global]
+Instance boolSizeMonotonic : SizeMonotonic (@arbitrary bool _).
 Proof.
   unfold arbitrary, GenOfGenSized.
   eapply sizedSizeMonotonic; unfold arbitrarySized, genBoolSized.
@@ -608,12 +611,14 @@ Proof.
   - intros n s1 s2 Hs. eapply subset_refl.
 Qed.
 
-#[global] Instance boolSizedMonotonic : SizedMonotonic (@arbitrarySized bool _).
+#[global]
+Instance boolSizedMonotonic : SizedMonotonic (@arbitrarySized bool _).
 Proof.
   intros n s1 s2 Hs. eapply subset_refl.
 Qed.
 
-#[global] Instance boolCorrect : Correct bool arbitrary.
+#[global]
+Instance boolCorrect : Correct bool arbitrary.
 Proof.
   constructor. unfold arbitrary, GenOfGenSized.
   rewrite semSized.
@@ -645,7 +650,8 @@ rewrite semSized => n; split=> // _; exists n; split=> //.
 by rewrite (semChooseSize _ _ _) /RandomQC.leq /=.
 Qed.
 
-#[global] Instance ArbNatGenCorrect : Correct nat arbitrary.
+#[global]
+Instance ArbNatGenCorrect : Correct nat arbitrary.
 Proof.
   constructor. now apply arbNat_correct.
 Qed.

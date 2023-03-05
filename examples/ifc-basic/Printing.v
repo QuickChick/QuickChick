@@ -10,6 +10,7 @@ Require Import Coq.Strings.String.
 
 Local Open Scope string.
 
+#[global]
 Instance show_label : Show Label :=
 {|
   show lab :=
@@ -19,6 +20,7 @@ Instance show_label : Show Label :=
     end
 |}.
 
+#[global]
 Instance show_instruction : Show Instruction :=
 {|
   show x :=
@@ -42,6 +44,7 @@ Fixpoint numed_contents {A : Type} (s : A -> string) (l : list A) (n : nat)
 
 Definition par (s : string) := "( " ++ s ++ " )".
 
+#[global]
 Instance show_atom : Show Atom :=
 {|
   show a :=
@@ -49,11 +52,13 @@ Instance show_atom : Show Atom :=
     show v ++ " @ " ++ show l
 |}.
 
+#[global]
 Instance show_list {A : Type} `{_ : Show A} : Show (list A) :=
 {|
   show l := numed_contents show l 0
 |}.
 
+#[global]
 Instance show_stack : Show Stack :=
 {|
   show s :=
@@ -66,6 +71,7 @@ Instance show_stack : Show Stack :=
     in aux s
 |}.
 
+#[global]
 Instance show_state : Show State :=
 {|
   show st :=
@@ -85,6 +91,7 @@ Class ShowPair (A : Type) : Type :=
 Definition show_variation (s1 s2 : string) :=
   "{ " ++ s1 ++ " / " ++ s2 ++ " }".
 
+#[global]
 Instance show_int_pair : ShowPair Z :=
 {|
   show_pair v1 v2 :=
@@ -92,6 +99,7 @@ Instance show_int_pair : ShowPair Z :=
     else show_variation (show v1) (show v2)
 |}.
 
+#[global]
 Instance show_label_pair : ShowPair Label :=
 {|
   show_pair l1 l2 :=
@@ -99,6 +107,7 @@ Instance show_label_pair : ShowPair Label :=
     else show_variation (show l1) (show l2)
 |}.
 
+#[global]
 Instance show_atom_pair : ShowPair Atom :=
 {|
   show_pair a1 a2 :=
@@ -108,6 +117,7 @@ Instance show_atom_pair : ShowPair Atom :=
     ++ show_pair l1 l2
 |}.
 
+#[global]
 Instance show_mem_pair : ShowPair Mem :=
 {|
   show_pair m1 m2 :=
@@ -122,6 +132,7 @@ Fixpoint total_stack_length s :=
     | _ => O
   end.
 
+#[global]
 Instance show_stack_pair : ShowPair Stack :=
 {|
   show_pair s1 s2 :=
@@ -160,6 +171,7 @@ Instance show_stack_pair : ShowPair Stack :=
     in prefix ++ "Common part: " ++ nl ++ aux s1 s2
 |}.
 
+#[global]
 Instance show_state_pair : ShowPair State :=
 {|
   show_pair st1 st2 :=
@@ -171,6 +183,7 @@ Instance show_state_pair : ShowPair State :=
     "PC: " ++ show_pair pc1 pc2 ++ nl
 |}.
 
+#[global]
 Instance show_var {A} `{_ :ShowPair A} : Show (@Variation A) :=
 {|
   show x :=

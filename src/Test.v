@@ -93,7 +93,7 @@ Definition computeSize' (a : Args) (n : nat) (d : nat) : nat :=
       ((maxSuccess a) %% (maxSize a) + d %/ 10)) (maxSize a).
 
  Definition at0 (f : nat -> nat -> nat) (s : nat) (n d : nat) :=
-  if andb (beq_nat n 0) (beq_nat d 0) then s
+  if andb (Nat.eqb n 0) (Nat.eqb d 0) then s
   else f n d.
 
 Fixpoint prependToAll {A : Type} (sep : A) (ls : list A) : list A :=
@@ -358,7 +358,8 @@ Fixpoint showCollectStatistics (l : list (string * nat)) :=
       show n ++ " : " ++ s ++ newline ++ showCollectStatistics l'
   end.
 
-#[global] Instance showResult : Show Result := Build_Show _ (fun r =>
+#[global]
+Instance showResult : Show Result := Build_Show _ (fun r =>
   match r with
   | Success _ _ l s => showCollectStatistics l ++ s
   | GaveUp _ l s => showCollectStatistics l ++ s
@@ -500,7 +501,7 @@ Fixpoint fuzzLoopAux {A} (fuel : nat) (st : State)
     | Some true =>
       match clear_queues fuel with
       | true => fuzzLoopAux fuel' (updSuccTests st S) nil nil nil nil randoms' nil gen fuzz print prop
-      | _ => let is_interesting := true in
+      | _ => 
         if is_interesting then
           (* Successful and interesting, keep in favored queue and save! *)
           fuzzLoopAux fuel' (updSuccTests st S) favored' discards' ((energy, a)::favored_queue') discard_queue' randoms' ((energy,a) :: saved') gen fuzz print prop
@@ -522,7 +523,7 @@ Fixpoint fuzzLoopAux {A} (fuel : nat) (st : State)
     | None =>
       match clear_queues fuel with
       | true => fuzzLoopAux fuel' (updDiscTests st S) nil nil nil nil randoms' nil gen fuzz print prop
-      | _ => let is_interesting := true in
+      | _ => 
         if is_interesting then
           (* Interesting (new path), but discard. Put in discard queue *)
           fuzzLoopAux fuel' (updDiscTests st S) favored' discards' favored_queue' ((energy, a)::discard_queue') randoms' saved' gen fuzz print prop 

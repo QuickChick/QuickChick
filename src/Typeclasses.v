@@ -9,10 +9,12 @@ Require Import Producer Generators Sets.
 Local Open Scope set_scope.
 
 (* TODO: Derive these *)
-#[global] Instance arbST_eq {A} (a : A) : GenSuchThat A (fun x => x = a) :=
+#[global]
+Instance arbST_eq {A} (a : A) : GenSuchThat A (fun x => x = a) :=
   {| arbitraryST := returnGen (Some a) |}.
 
-#[global] Instance arbST_Correct {A} (a : A) 
+#[global]
+Instance arbST_Correct {A} (a : A) 
   : CorrectST (fun x => x = a) (genST (fun x => x = a)).
 Proof.
   constructor.

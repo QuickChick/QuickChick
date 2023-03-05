@@ -233,7 +233,8 @@ simpl in InPL.
 inversion InPL.
 Qed.
 
-#[local] Hint Resolve corrEmptyUndef corrNodeNonEmpty : core.
+#[local]
+Hint Resolve corrEmptyUndef corrNodeNonEmpty : core.
 
 Definition Direction_eq_dec : forall (d1 d2 : SplitDirection),
                                 {d1 = d2} + {d1 <> d2}.
@@ -336,8 +337,11 @@ Lemma refineFunCorrect : forall f d p, f (d :: p) = (refineFunction f d) p.
 auto.
 Qed.
 
-#[local] Hint Rewrite refineFunCorrect : core.
-#[local] Hint Unfold  refineFunction   : core.
+#[local]
+Hint Rewrite refineFunCorrect : core.
+#[local]
+Hint Unfold  refineFunction   : core.
+
 Program Fixpoint addToTree (st : SeedTree) (p : SplitPath) (f : SplitPath -> RandomSeed)
         (l : list SplitPath)
         (Corr : correspondingSeedTree l f st)
@@ -433,7 +437,7 @@ induction p.
     * instantiate (1 := []). instantiate (1 := []). auto.
   - simpl. auto.
 + intros.
-  destruct st; destruct a; simpl; auto.
+  destruct st; destruct a; simpl.
   - rewrite refineFunCorrect.
     apply IHp.
   - rewrite refineFunCorrect; apply IHp.
@@ -693,7 +697,8 @@ Class OrdType (A: Type) :=
     antisym : antisymmetric leq
   }.
 
-#[global] Program Instance OrdBool : OrdType bool :=
+#[global]
+Program Instance OrdBool : OrdType bool :=
   {
     leq b1 b2 := implb b1 b2
   }.
@@ -707,7 +712,8 @@ Next Obligation.
   by do 2! case.
 Qed.
 
-#[global] Program Instance OrdNat : OrdType nat :=
+#[global]
+Program Instance OrdNat : OrdType nat :=
   {
     leq := ssrnat.leq;
     refl := leqnn;
@@ -715,7 +721,8 @@ Qed.
     antisym := anti_leq
   }.
 
-#[global] Program Instance OrdZ : OrdType Z :=
+#[global]
+Program Instance OrdZ : OrdType Z :=
   {
     leq := Z.leb;
     refl := Z.leb_refl
@@ -729,7 +736,8 @@ move=> x y /andP[].
 exact: Zle_bool_antisym.
 Qed.
 
-#[global] Program Instance OrdN : OrdType N :=
+#[global]
+Program Instance OrdN : OrdType N :=
   {
     leq := N.leb;
     refl := N.leb_refl
@@ -752,7 +760,7 @@ Qed.
 
 Class ChoosableFromInterval (A : Type)  :=
   {
-    super :> OrdType A;
+    super : OrdType A;
     randomR : A * A -> RandomSeed -> A * RandomSeed;
     randomRCorrect :
       forall (a a1 a2 : A), leq a1 a2 ->
@@ -764,9 +772,12 @@ Class ChoosableFromInterval (A : Type)  :=
       (leq a1 a && leq a a2 <->
        In_ll a (enumR (a1,a2)))
   }.
+#[global]
+Existing Instance super.
 
 (* This is false. 
-#[global] Program Instance ChooseBool : ChoosableFromInterval bool :=
+#[global]
+Program Instance ChooseBool : ChoosableFromInterval bool :=
   {
     randomR := randomRBool;
     randomRCorrect := randomRBoolCorrect
@@ -775,7 +786,6 @@ Class ChoosableFromInterval (A : Type)  :=
 
 Definition enumRNat (p : nat * nat) :=
   lazy_seq S (fst p) (S (snd p - fst p)).
-
 
 Lemma enumRNatCorrect : 
   forall (a a1 a2 : nat),
@@ -805,7 +815,8 @@ Proof.
       simpl in *. eapply IHn in H; now ssromega.
 Qed.
   
-#[global] Instance ChooseNat : ChoosableFromInterval nat :=
+#[global]
+Instance ChooseNat : ChoosableFromInterval nat :=
   {
     randomR := randomRNat;
     randomRCorrect := randomRNatCorrect;
@@ -823,7 +834,8 @@ Lemma enumRZCorrect :
 Proof. 
 Admitted.
 
-#[global] Instance ChooseZ : ChoosableFromInterval Z :=
+#[global]
+Instance ChooseZ : ChoosableFromInterval Z :=
   {
     randomR := randomRInt;
     randomRCorrect := randomRIntCorrect;
@@ -831,7 +843,6 @@ Admitted.
     enumRCorrect := enumRZCorrect
   }.
 
-(* Needed? *)
 Definition enumRN (p : N * N) :=
   lazy_seq N.succ N.one (S (N.to_nat (snd p - fst p))).
 
@@ -841,7 +852,8 @@ Lemma enumRNCorrect :
        In_ll a (enumRN (a1,a2))).
 Admitted.
 
-#[global] Instance ChooseN : ChoosableFromInterval N :=
+#[global]
+Instance ChooseN : ChoosableFromInterval N :=
   {
     randomR := randomRN;
     randomRCorrect := randomRNCorrect;

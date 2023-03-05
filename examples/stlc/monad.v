@@ -25,6 +25,7 @@ Definition liftM2 {M : Type -> Type} `{monad M} {A1 A2 B : Type} (f : A1 -> A2 -
   n2 <- m2 ;;
   ret (f n1 n2).
 
+#[global]
 Instance optionMonad : monad option :=
   {
     ret A x := Some x;
@@ -38,6 +39,7 @@ Instance optionMonad : monad option :=
 
 Definition State (St : Type) (A: Type) := St -> (A * St)%type.
 
+#[global]
 Instance stateMonad {St : Type} : monad (State St) :=
   {
     ret A x := fun s => (x, s);

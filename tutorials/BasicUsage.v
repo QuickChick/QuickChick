@@ -49,12 +49,13 @@ Definition removeP (x : nat) (l : list nat) : bool :=
 
 QuickChick removeP.
 
-(** Internally, the code is extracted to OCaml, compiled and ran to
-obtain the output:
+(** Internally, the code is extracted to OCaml, compiled, and run.  The
+following output is presented in your terminal, CoqIDE [Messages] pane, or
+Visual Studio Code [Info] pulldown menu tab:
 <<
     0
 
-    [ 0, 0 ]
+    [0; 0]
 
     Failed! After 17 tests and 12 shrinks
 >>
@@ -116,7 +117,8 @@ Inductive Color := Red | Green | Blue | Yellow.
     matching on colors. *)
 
 Require Import String. Open Scope string.
-#[export] Instance show_color : Show Color :=
+#[global]
+Instance show_color : Show Color :=
   {| show c :=
        match c with
          | Red    => "Red"
@@ -311,7 +313,8 @@ Arguments Node {A} _ _ _.
     declaration stems from the fact that Coq's typeclasses (unlike
     Haskell's) are not automatically recursive. *) 
 
-#[export] Instance showTree {A} `{_ : Show A} : Show (Tree A) :=
+#[global]
+Instance showTree {A} `{_ : Show A} : Show (Tree A) :=
   {| show := 
        let fix aux t :=
          match t with
@@ -568,10 +571,12 @@ Check sized.
 
     The [shrink] function is simply a shrinker like [shrinkTree]. *)
 
-#[export] Instance genTree {A} `{Gen A} : GenSized (Tree A) := 
+#[global]
+Instance genTree {A} `{Gen A} : GenSized (Tree A) := 
   {| arbitrarySized n := genTreeSized n arbitrary |}.
 
-#[export] Instance shrTree {A} `{Shrink A} : Shrink (Tree A) := 
+#[global]
+Instance shrTree {A} `{Shrink A} : Shrink (Tree A) := 
   {| shrink x := shrinkTree shrink x |}.
 
 (** With this [Arbitrary] instance we can once again use the toplevel

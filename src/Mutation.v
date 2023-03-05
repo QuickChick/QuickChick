@@ -139,7 +139,8 @@ Class section : Type := current_section_ : string.
 Definition current_section `{section} : ocaml_string :=
   to_ostring current_section_.
 
-#[global] Instance default_section : section | 9 := ""%string.
+#[global]
+Instance default_section : section | 9 := ""%string.
 
 End Mutant.
 

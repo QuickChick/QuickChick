@@ -23,7 +23,7 @@ module Unknown = struct
   let from_var x = x
   let from_id x = var_of_id x                 
 
-  let undefined = fresh_name "Ireallywantundefinedherebutwedonthavelaziness"
+  let undefined = var_of_id (Names.Id.of_string_soft "I@reallywantundefinedherebutwedonthavelaziness")
 
 end
 

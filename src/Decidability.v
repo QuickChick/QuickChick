@@ -130,7 +130,8 @@ Proof.
   unfold decidable in D. assumption.
 Defined.
 
-#[global] Hint Resolve dec_if_dec_eq: eq_dec.
+#[global]
+Hint Resolve dec_if_dec_eq: eq_dec.
 
 Ltac dec_eq :=
   repeat match goal with
@@ -195,9 +196,10 @@ Proof. dec_eq. Defined.
 #[global] Instance list_Dec_Eq X (_ : Dec_Eq X) : Dec_Eq (list X).
 Proof. dec_eq. Defined.
 
-
-#[global] Hint Resolve ascii_dec: eq_dec.
-#[global] Hint Resolve string_dec: eq_dec.
+#[global]
+Hint Resolve ascii_dec: eq_dec.
+#[global]
+Hint Resolve string_dec: eq_dec.
 
 #[global] Instance Dec_eq_ascii : Dec_Eq ascii.
 Proof. dec_eq. Defined.
@@ -256,14 +258,26 @@ Notation "x ==>? y" :=
   (implicationOpt x (fun tt => y))
     (at level 55, right associativity).
 
-#[global] Hint Resolve Dec_eq_unit : eq_dec.
-#[global] Hint Resolve Dec_eq_bool : eq_dec.
-#[global] Hint Resolve Dec_eq_nat : eq_dec.
-#[global] Hint Resolve Dec_eq_Z : eq_dec.
-#[global] Hint Resolve Dec_eq_N : eq_dec.
-#[global] Hint Resolve Dec_eq_opt : eq_dec.
-#[global] Hint Resolve Dec_eq_prod : eq_dec.
-#[global] Hint Resolve Dec_eq_sum : eq_dec.
-#[global] Hint Resolve Dec_eq_list : eq_dec.
-#[global] Hint Resolve Dec_eq_ascii : eq_dec.
-#[global] Hint Resolve Dec_eq_string : eq_dec.
+#[global]
+Hint Resolve Dec_eq_unit : eq_dec.
+#[global]
+Hint Resolve Dec_eq_bool : eq_dec.
+#[global]
+Hint Resolve Dec_eq_nat : eq_dec.
+#[global]
+Hint Resolve Dec_eq_Z : eq_dec.
+#[global]
+Hint Resolve Dec_eq_N : eq_dec.
+#[global]
+Hint Resolve Dec_eq_opt : eq_dec.
+#[global]
+Hint Resolve Dec_eq_prod : eq_dec.
+#[global]
+Hint Resolve Dec_eq_sum : eq_dec.
+#[global]
+Hint Resolve Dec_eq_list : eq_dec.
+#[global]
+Hint Resolve Dec_eq_ascii : eq_dec.
+#[global]
+Hint Resolve Dec_eq_string : eq_dec.
+

@@ -5,6 +5,7 @@ defaults: &defaults
     OPAMJOBS: 2
     OPAMVERBOSE: 1
     OPAMYES: true
+    OPAMWITHTEST: true
     TERM: xterm
     SKIP_BUILD: ''
   parameters:

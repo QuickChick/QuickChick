@@ -29,13 +29,14 @@ let quickchick_goal =
     let evd = Evd.from_env e in
 
     (* Make an evar with the goal as the type *)
-    let evar_info = Evd.make_evar (Environ.named_context_val e) c in
-    let evd, evar = Evd.new_evar evd evar_info in
+    let evd, evar = Evarutil.new_pure_evar (Environ.named_context_val e) evd c in
 
     Printf.printf "So far so good\n"; flush stdout;
     
     (* Externalize it *)
-#if COQ_VERSION >= (8, 12, 0)
+#if COQ_VERSION >= (8, 17, 0)
+    let ct = Constrextern.extern_constr e evd (EConstr.mkEvar (evar, SList.empty)) in
+#elif COQ_VERSION >= (8, 12, 0)
     let ct = Constrextern.extern_constr e evd (EConstr.mkEvar (evar, [])) in
 #else
     let ct = Constrextern.extern_constr false e evd (EConstr.mkEvar (evar, [||])) in
