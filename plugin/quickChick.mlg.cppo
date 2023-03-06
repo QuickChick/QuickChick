@@ -234,6 +234,7 @@ let define_and_run c env evd =
 
   (* Run the test *)
   else
+    let execn = "time " ^ execn in 
     (* Should really be shared across this and the tool *)
     let (p_out, _, p_err) as process = Unix.open_process_full execn (Unix.environment ()) in
     let rec process_otl_aux () =
@@ -251,6 +252,32 @@ let define_and_run c env evd =
          | Unix.WSIGNALED i -> err (Printf.sprintf "Killed (%d)" i)
          | Unix.WSTOPPED i -> err (Printf.sprintf "Stopped (%d)" i)
          end
+(*
+let (p_out, _, p_err) as process = Unix.open_process_full execn (Unix.environment ()) in
+    let process_out () =
+      let rec process_err_aux () =
+        let e = input_line p_err in
+        Feedback.msg_info (Pp.str e);
+        process_err_aux() in
+      let rec process_otl_aux () =
+        let e = input_line p_out in
+        Feedback.msg_info (Pp.str e);
+        process_otl_aux() in
+      try process_otl_aux ()
+      with End_of_file ->
+            try process_err_aux ()
+            with End_of_file -> 
+              let err_msg = read_all p_err in
+              let err descr = CErrors.user_err (str (execn ^ ": " ^ descr) ++ fnl () ++ fnl () ++ str err_msg ++ fnl ()) in
+              let stat = Unix.close_process_full process in
+              begin match stat with
+              | Unix.WEXITED 0 -> ()
+              | Unix.WEXITED i -> err (Printf.sprintf "Exited with status %d" i)
+              | Unix.WSIGNALED i -> err (Printf.sprintf "Killed (%d)" i)
+              | Unix.WSTOPPED i -> err (Printf.sprintf "Stopped (%d)" i)
+              end
+    in process_out ()
+*)
 
 (*
     (** If we want to print the time spent in tests *)

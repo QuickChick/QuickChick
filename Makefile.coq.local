@@ -1,0 +1,6 @@
+OCAMLWARN=-w -8 -warn-error +a-3
+COQ_VERSION=$(word 1, $(shell coqc -print-version))
+
+ifeq ($(shell expr $(COQ_VERSION) \>= "8.16"), 1)
+CAMLPKGS+= -package coq-core.plugins.extraction
+endif

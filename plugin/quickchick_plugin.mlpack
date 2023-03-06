@@ -15,6 +15,7 @@ Sized
 SimplDriver
 CheckerSizedST
 DepDriver
+MergeTypes
 Driver
 QuickChick
 Tactic_quickchick

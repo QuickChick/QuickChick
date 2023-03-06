@@ -6,9 +6,10 @@ MAKE SURE TO EDIT THE .cppo SOURCE OF THIS FILE RATHER THAN THE GENERATED RESULT
 
 *)
 
-
-open Ltac_plugin
-
+  open Stdarg
+  open Ltac_plugin
+  open Error
+  open Pp
 }
 
 DECLARE PLUGIN "coq-quickchick.plugin"
@@ -20,6 +21,74 @@ let capp (x, y) = Constrexpr.CApp (x, y)
 let capp (x, y) = Constrexpr.CApp ((None, x), y)
 #endif
 
+let merge_sound =
+  let rec get_hyps (s : Evd.evar_map) (c : EConstr.constr) =
+    if EConstr.isProd s c then
+      let (x,t1,t2) = EConstr.destProd s c in
+      (x,t1) :: get_hyps s t2
+    else []
+  in 
+  Proofview.Goal.enter begin fun gl ->
+    let c = Proofview.Goal.concl gl in
+    let s = Proofview.Goal.sigma gl in
+    let to_intro = get_hyps s c in
+    let rec calc_ids acc opts =
+      match opts with
+      | [] -> begin match acc with
+              | to_ind::rest -> (to_ind, List.rev acc)
+              | _ -> failwith "No product/merge_sound"
+              end
+      | (nb,_) :: nbs ->
+         begin match Context.binder_name nb with
+         | Names.Name id -> calc_ids (id :: acc) nbs
+         | Names.Anonymous -> calc_ids (Names.Id.of_string "H" :: acc) nbs
+         end in
+    match calc_ids [] to_intro with
+    | (_to_induct, opts) ->
+       Tactics.intros_using_then opts (fun ids ->
+           Tacticals.tclTHENLIST
+             [ Tacticals.onLastHyp Tactics.simplest_elim
+             ; Tactics.intros 
+         ])
+  end;;
+
+let remember_induct h =
+  Proofview.Goal.enter begin fun gl ->
+    let s = Proofview.Goal.sigma gl in
+    let env = Proofview.Goal.env gl in
+    let cn = EConstr.mkVar h in
+    Tacticals.tclTYPEOFTHEN cn (fun evm ct -> 
+        msg_debug (str "Here: " ++ Printer.pr_constr_env env s (EConstr.to_constr s ct) ++ fnl());
+        let to_remember = 
+          if EConstr.isApp s ct then begin
+              let (ctr, cs) = EConstr.destApp s ct in
+              let to_remember = ref [] in
+              Array.iter (fun cx ->
+                  if EConstr.isApp s cx then
+                    to_remember := cx :: !to_remember
+                  else if EConstr.isConstruct s cx then
+                    to_remember := cx :: !to_remember
+                  else msg_debug (str "All good" ++ fnl ())) cs;
+              !to_remember
+            end
+          else failwith "Not App" in
+        let eqpat = CAst.make @@ Namegen.IntroAnonymous in 
+        let cl =
+          { Locus.onhyps = None
+          ; Locus.concl_occs = Locus.AllOccurrences } in 
+        let rec do_remembers (pats : EConstr.constr list) =
+          match pats with
+          | [] ->
+             Tactics.induction false None cn None None
+          | p :: ps ->
+             Tacticals.tclTHEN
+                   (Tactics.letin_pat_tac false (Some (true, eqpat)) (Names.Name.Anonymous) (s, p) cl)
+                   (do_remembers ps) in
+        msg_debug (int (List.length to_remember) ++ fnl ());
+        do_remembers to_remember
+      )
+    end 
+                
 let quickchick_goal =
   Proofview.Goal.enter begin fun gl ->
 
@@ -163,4 +232,12 @@ let quickchick_goal =
 
 TACTIC EXTEND quickchick
   | ["quickchick"] -> { quickchick_goal }
+END
+
+TACTIC EXTEND merge_sound_core
+  | ["merge_sound_core"] -> { merge_sound }
+END
+
+TACTIC EXTEND remember_induct
+  | ["remember_induct" ident(h)] -> { remember_induct h }
 END

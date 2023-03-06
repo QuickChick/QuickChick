@@ -258,26 +258,14 @@ Notation "x ==>? y" :=
   (implicationOpt x (fun tt => y))
     (at level 55, right associativity).
 
-#[global]
-Hint Resolve Dec_eq_unit : eq_dec.
-#[global]
-Hint Resolve Dec_eq_bool : eq_dec.
-#[global]
-Hint Resolve Dec_eq_nat : eq_dec.
-#[global]
-Hint Resolve Dec_eq_Z : eq_dec.
-#[global]
-Hint Resolve Dec_eq_N : eq_dec.
-#[global]
-Hint Resolve Dec_eq_opt : eq_dec.
-#[global]
-Hint Resolve Dec_eq_prod : eq_dec.
-#[global]
-Hint Resolve Dec_eq_sum : eq_dec.
-#[global]
-Hint Resolve Dec_eq_list : eq_dec.
-#[global]
-Hint Resolve Dec_eq_ascii : eq_dec.
-#[global]
-Hint Resolve Dec_eq_string : eq_dec.
-
+#[global] Hint Resolve Dec_eq_unit : eq_dec.
+#[global] Hint Resolve Dec_eq_bool : eq_dec.
+#[global] Hint Resolve Dec_eq_nat : eq_dec.
+#[global] Hint Resolve Dec_eq_Z : eq_dec.
+#[global] Hint Resolve Dec_eq_N : eq_dec.
+#[global] Hint Resolve Dec_eq_opt : eq_dec.
+#[global] Hint Resolve Dec_eq_prod : eq_dec.
+#[global] Hint Resolve Dec_eq_sum : eq_dec.
+#[global] Hint Resolve Dec_eq_list : eq_dec.
+#[global] Hint Resolve Dec_eq_ascii : eq_dec.
+#[global] Hint Resolve Dec_eq_string : eq_dec.
