@@ -1,11 +1,4 @@
 {
-(*
-
-THIS FILE IS PREPROCESSED USING cppo
-MAKE SURE TO EDIT THE .cppo SOURCE OF THIS FILE RATHER THAN THE GENERATED RESULT
-
-*)
-
 open Pp
 open Names
 open Declare
@@ -293,12 +286,7 @@ let runTest c env evd : unit =
   (* [c] is a constr_expr representing the test to run,
      so we first build a new constr_expr representing
      show c **)
-  let c = CAst.make @@
-#if COQ_VERSION >= (8, 15, 0)
-    CApp (show, [(c, None)])
-#else
-    CApp ((None, show), [(c, None)])
-#endif
+  let c = CAst.make @@ CApp (show, [(c, None)])
   in
   (* Build the kernel term from the const_expr *)
 
@@ -324,13 +312,7 @@ let run f args =
   | None -> failwith "run called with no arguments"
   end;
   let args = List.map (fun x -> (x,None)) args in
-  let c = CAst.make @@
-#if COQ_VERSION >= (8, 15, 0)
-    CApp (f, args)
-#else
-    CApp ((None, f), args)
-#endif
-  in
+  let c = CAst.make @@ CApp (f, args) in
   runTest c env evd
 
 let set_debug_flag (flag_name : string) (mode : string) =

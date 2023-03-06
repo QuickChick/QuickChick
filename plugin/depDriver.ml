@@ -1,10 +1,3 @@
-(*
-
-THIS FILE IS PREPROCESSED USING cppo
-MAKE SURE TO EDIT THE .cppo SOURCE OF THIS FILE RATHER THAN THE GENERATED RESULT
-
-*)
-
 open Pp
 open Libnames
 open Util
@@ -252,12 +245,6 @@ let create_t_and_u_maps explicit_args dep_type actual_args : (range UM.t * dep_t
       ) !tmap in
   (!umap, tmap')
 
-#if COQ_VERSION >= (8, 15, 0)
-let compat_fromCApp1 x = x
-#else
-let compat_fromCApp1 (_, x) = x
-#endif
-
 (* Assumption: 
    - generator-based classes include a "fun x => P ...." or "fun x => let (x1,x2,...) := x in P ..."
      where "..." are bound names (to be generated), unbound names (implicitly quantified arguments) 
@@ -274,11 +261,11 @@ let dep_dispatch ind class_name : unit =
     (* Extract (x1,x2,...) if any, P and arguments *)
     let (letbindsM, constructor, args) =
       match body with 
-      | { CAst.v = CApp (constructor, args); _ } -> (None, compat_fromCApp1 constructor, args)
+      | { CAst.v = CApp (constructor, args); _ } -> (None, constructor, args)
       | { CAst.v = CLetTuple (name_list, _,
                               _shouldbeid,
                               { CAst.v = CApp (constructor, args); _ } ); _} ->
-         ( Some (List.map (function { CAst.v = name; _ } -> name ) name_list), compat_fromCApp1 constructor, args )
+         ( Some (List.map (function { CAst.v = name; _ } -> name ) name_list), constructor, args )
     in
 
     (* Parse the constructor's information into the more convenient generic-lib representation *)
@@ -421,8 +408,6 @@ let dep_dispatch ind class_name : unit =
       input_names input_ranges
       (ty_ctr, ty_params, ctrs, dep_type) letbinds idu 
   | { CAst.v = CApp (constructor, args); _ } ->
-    let constructor = compat_fromCApp1 constructor in
-
      msg_debug (str "Parsing constructor information for checker" ++ fnl ());
      
     (* Parse the constructor's information into the more convenient generic-lib representation *)

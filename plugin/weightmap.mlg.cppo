@@ -39,21 +39,11 @@ let register_weights (l : (constructor * weight_ast) list) =
 
 let convert_constr_to_weight c = 
   match c.CAst.v with
-#if COQ_VERSION >= (8, 12, 0)
-#if COQ_VERSION >= (8, 13, 0)
   | CPrim (Number (NumTok.SPlus, i)) ->
-#else
-  | CPrim (Numeral (NumTok.SPlus, i)) ->
-#endif
       (match NumTok.Unsigned.to_nat i with
       | Some n -> WNum (int_of_string n)
       | None -> failwith "QC: Numeric weights should be positive integers."
       )
-#else
-
-  | CPrim (Constrexpr.Numeral (Constrexpr.SPlus, NumTok.{int=n;frac="";exp=""})) ->
-      WNum (int_of_string n)
-#endif
   | CRef (r, _) ->
      if string_of_qualid r = "size" then WSize
      else failwith "QC: Expected number or 'size'."
@@ -61,11 +51,7 @@ let convert_constr_to_weight c =
 
 let convert_constr_to_cw_pair c : (constructor * weight_ast) = 
   match c.CAst.v with
-#if COQ_VERSION >= (8, 12, 0)
   | CNotation (_, _, ([a],[[b]],_,_)) ->
-#else
-  | CNotation (_, ([a],[[b]],_,_)) ->
-#endif
       let ctr = 
         match a with 
         | { CAst.v = CRef (r, _); _ } -> injectCtr (string_of_qualid r)
@@ -105,11 +91,7 @@ VERNAC COMMAND EXTEND QuickChickWeights CLASSIFIED AS SIDEFF
      {
        let weight_assocs = 
          match c.CAst.v with
-#if COQ_VERSION >= (8, 12, 0)
          | CNotation (_, _, ([a],[b],_,_)) ->
-#else
-         | CNotation (_, ([a],[b],_,_)) ->
-#endif
              let c = convert_constr_to_cw_pair a in
              let cs = List.map convert_constr_to_cw_pair b in
              c :: cs

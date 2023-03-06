@@ -1,10 +1,3 @@
-(*
-
-THIS FILE IS PREPROCESSED USING cppo
-MAKE SURE TO EDIT THE .cppo SOURCE OF THIS FILE RATHER THAN THE GENERATED RESULT
-
-*)
-
 open Entries
 open Pp
 open Constr
@@ -105,11 +98,7 @@ let gArg ?assumName:(an=hole) ?assumType:(at=hole) ?assumImplicit:(ai=false) ?as
     | { CAst.v = CRef (qid, _); loc } -> (loc,Name (qualid_basename qid))
     | { CAst.v = CHole _; loc } -> (loc,Anonymous)
     | _a -> failwith "This expression should be a name" in
-#if COQ_VERSION >= (8, 12, 0)
   let max_implicit = Glob_term.MaxImplicit in
-#else
-  let max_implicit = Glob_term.Implicit in
-#endif
   CLocalAssum ( [CAst.make ?loc:(fst n) @@ snd n],
                   (if ag then Generalized (max_implicit, false)
                    else if ai then Default max_implicit else Default Glob_term.Explicit),
@@ -594,12 +583,7 @@ let coerce_reference_to_dep_dt c =
 let gApp ?explicit:(expl=false) c cs =
   if expl then
     let f c = match c with
-    | CRef (r,_) ->
-#if COQ_VERSION >= (8, 15, 0)
-        Constrexpr.CAppExpl((r, None), cs)
-#else
-        Constrexpr.CAppExpl((None, r, None), cs)
-#endif
+    | CRef (r,_) -> Constrexpr.CAppExpl((r, None), cs)
     | _ -> failwith "invalid argument to gApp"
     in CAst.map f c
   else mkAppC (c, cs)
@@ -711,13 +695,6 @@ let gMatchReturn (discr : coq_expr)
 
 let gRecord names_and_bodies =
   CAst.make @@ CRecord (List.map (fun (n,b) -> (qualid_of_ident @@ Id.of_string n, b)) names_and_bodies)
-
-let gAnnot (p : coq_expr) (tau : coq_expr) =
-#if COQ_VERSION >= (8, 15, 0)
-  CAst.make @@ CCast (p, DEFAULTcast, tau)
-#else
-  CAst.make @@ CCast (p, Glob_term.CastConv tau)
-#endif
 
 (* Convert types back into coq *)
 let gType ty_params dep_type = 
