@@ -1,11 +1,7 @@
 open Pp
 open Loc
 open Names
-#if COQ_VERSION >= (8, 15, 0)
 open Tacmach.Old
-#else
-open Tacmach
-#endif
 open Entries
 open Declarations
 open Declare

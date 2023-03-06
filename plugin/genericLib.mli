@@ -146,7 +146,6 @@ val gMatchReturn : coq_expr -> ?catchAll:(coq_expr option) -> string -> (var -> 
 
 val gRecord : (string * coq_expr) list -> coq_expr 
 
-val gAnnot : coq_expr -> coq_expr -> coq_expr
 val gFunTyped : (string * coq_expr) list -> (var list -> coq_expr) -> coq_expr
 val gFunWithArgs : arg list -> ((var list) -> coq_expr) -> coq_expr
 val gRecFunInWithArgs : ?structRec:(var option) -> ?assumType:coq_expr -> string -> arg list -> ((var * var list) -> coq_expr) -> (var -> coq_expr) -> coq_expr
