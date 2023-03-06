@@ -544,7 +544,7 @@ Notation "P '?'" := (match (@dec P _) with
 
 (** Automation and conversions for Dec. *)
 #[global]
-Declare Instance Eq__Dec {A} `{H : Dec_Eq A} (x y : A) : Dec (x = y).
+Declare Instance Dec_Eq_implies_DecEq {A} `{H : Dec_Eq A} (x y : A) : Dec (x = y).
 
 (** Since deciding equalities is a very common requirement in testing,
     QuickChick provides a tactic that can define instances of the form

@@ -153,7 +153,7 @@ Fixpoint insert {A} (x : A) (t : Tree A) : Tree A :=
    over simply-typed first-order data, levering the typeclass 
    infrastructure we've seen! *)
 
-Derive DecOpt for (balanced n t).
+Derive Checker for (balanced n t).
 (* ==> DecOptbalanced is defined *)
 
 (* This Derive command produces an instance of the DecOpt typeclass for 
@@ -206,7 +206,7 @@ QuickChick all_trees_are_balanced.
 (* Sure enough, not all trees are balanced. But how would we go about generating 
    balanced trees for testing purposes? Another `Derive` command to the rescue! *)
 
-Derive GenSizedSuchThat for (fun t => balanced n t).
+Derive Generator for (fun t => balanced n t).
 (* ==> GenSizedSuchThatbalanced is defined *)
 
 (* This Derive command produces an instance of the GenSizedSuchThat typeclass,

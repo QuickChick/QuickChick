@@ -187,7 +187,7 @@ Module ConsistencyCheck : QuickChickSig.
                        end) (at level 100).
 
   Definition dec_if_dec_eq := @dec_if_dec_eq.
-  Definition Eq__Dec     := @Eq__Dec.
+  Definition Dec_Eq_implies_DecEq := @Dec_Eq_implies_DecEq.
   Definition Dec_eq_unit   := @Dec_eq_unit.
   Definition Dec_eq_bool   := @Dec_eq_bool.
   Definition Dec_eq_nat    := @Dec_eq_nat.

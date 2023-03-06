@@ -151,13 +151,13 @@ Ltac dec_eq :=
            end
          end.
 
-#[global] Instance Eq__Dec {A} `{H : Dec_Eq A} (x y : A) : Dec (x = y).
+#[global] Instance Dec_Eq_implies_DecEq {A} `{H : Dec_Eq A} (x y : A) : Dec (x = y).
 Proof.
 constructor.
 dec_eq.
 Defined.
 
-#[global] Instance Eq__RelDec {A} `{Dec_Eq A} : RelDec (@eq A) :=
+#[global] Instance Dec_Eq_implies_RelDecEq {A} `{Dec_Eq A} : RelDec (@eq A) :=
   {| rel_dec x y :=
        match dec_eq x y with
        | left  _ => true

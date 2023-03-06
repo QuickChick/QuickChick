@@ -34,6 +34,9 @@ let class_assoc_opts = [ ("GenSized"                 , SimpleDer [SimplDriver.Ge
                        ; ("ArbitrarySizedSuchThat"   , DepDer DepDriver.GenSizedSuchThat)
                        ; ("GenSizedSuchThat"         , DepDer DepDriver.GenSizedSuchThat)                       
                        ; ("EnumSizedSuchThat"        , DepDer DepDriver.EnumSizedSuchThat)
+                       ; ("Generator"                , DepDer DepDriver.GenSizedSuchThat)
+                       ; ("Enumerator"               , DepDer DepDriver.EnumSizedSuchThat)
+                       ; ("Checker"                  , DepDer DepDriver.DecOpt)
                        ]
 
 let class_assoc_table =
