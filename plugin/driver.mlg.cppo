@@ -30,20 +30,10 @@ let class_assoc_opts = [ ("GenSized"                 , SimpleDer [SimplDriver.Ge
                        ; ("Arbitrary"                , SimpleDer [SimplDriver.GenSized; SimplDriver.Shrink])
                        ; ("Show"                     , SimpleDer [SimplDriver.Show])
                        ; ("Sized"                    , SimpleDer [SimplDriver.Sized])
-(*                       ; ("CanonicalSized"           , SimpleDer [SimplDriver.CanonicalSized])
-                       ; ("SizeMonotonic"            , SimpleDer [SimplDriver.SizeMonotonic])
-                       ; ("SizedMonotonic"           , SimpleDer [SimplDriver.SizedMonotonic])
-                       ; ("SizedCorrect"             , SimpleDer [SimplDriver.SizedCorrect]) *)
                        ; ("DecOpt"                   , DepDer DepDriver.DecOpt)
-                       ; ("DecOptMon"                , DepDer DepDriver.DecOptMon)
-                       ; ("ArbitrarySizedSuchThat"   , DepDer DepDriver.ArbitrarySizedSuchThat)
-                       ; ("GenSizedSuchThat"         , DepDer DepDriver.ArbitrarySizedSuchThat)                       
+                       ; ("ArbitrarySizedSuchThat"   , DepDer DepDriver.GenSizedSuchThat)
+                       ; ("GenSizedSuchThat"         , DepDer DepDriver.GenSizedSuchThat)                       
                        ; ("EnumSizedSuchThat"        , DepDer DepDriver.EnumSizedSuchThat)
-                       
-(*                       ; ("SizeMonotonicSuchThatOpt" , DepDer DepDriver.GenSizedSuchThatMonotonicOpt)
-                       ; ("SizedProofEqs"            , DepDer DepDriver.SizedProofEqs) 
-                       ; ("GenSizedSuchThatCorrect"  , DepDer DepDriver.GenSizedSuchThatCorrect)
-                       ; ("GenSizedSuchThatSizeMonotonicOpt", DepDer DepDriver.GenSizedSuchThatSizeMonotonicOpt) *)
                        ]
 
 let class_assoc_table =

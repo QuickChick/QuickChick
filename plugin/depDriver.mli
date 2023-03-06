@@ -1,11 +1,7 @@
 type derivable =
   DecOpt
-| DecOptMon
-| ArbitrarySizedSuchThat
+| GenSizedSuchThat
 | EnumSizedSuchThat
-| GenSizedSuchThatMonotonicOpt
-| GenSizedSuchThatSizeMonotonicOpt
-| GenSizedSuchThatCorrect
 val derivable_to_string : derivable -> string
 val mk_instance_name : derivable -> string -> string
 val derive_dependent :

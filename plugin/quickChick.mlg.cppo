@@ -325,11 +325,11 @@ let extract_manually : qualid list ref =
 let add_manual_extract cs =
   let convert_reference_to_qualid c : qualid =
     match c with
-    | {CAst.v = CRef (r, _)} -> r 
+    | {CAst.v = CRef (r, _) ; _ } -> r 
     | _ -> failwith "Usage: Extract Manually failed." in
   let refs : qualid list =
     match cs with
-    | { CAst.v = CNotation (_,_,([a],[b],_,_)) } -> begin
+    | { CAst.v = CNotation (_,_,([a],[b],_,_)) ; _ } -> begin
          let q = convert_reference_to_qualid a in
          let qs = List.map convert_reference_to_qualid b in
          q :: qs
@@ -360,7 +360,7 @@ let qcFuzz_main prop_def temp_dir execn prop_mlf prop_mlif warnings prop fuzzLoo
   let prop_name = qualify (Id.to_string prop_def) in
   let prop_ref =
     match prop with
-    | { CAst.v = CRef (r,_) } -> r
+    | { CAst.v = CRef (r,_) ; _ } -> r
     | _ -> failwith "Not a reference"
   in
   Extraction_plugin.Table.extract_constant_inline false prop_ref [] prop_name;
