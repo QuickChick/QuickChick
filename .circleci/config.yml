@@ -120,8 +120,14 @@ workflows:
           name: Dune 8.14
           coq: '8.14'
       - dune:
-          name: Dune latest
-          coq: latest
+          name: Dune 8.15
+          coq: '8.15'
+      - dune:
+          name: Dune 8.16
+          coq: '8.16'
+      - dune:
+          name: Dune 8.17
+          coq: '8.17'
       - opam:
           name: OPAM dev
           coq: dev
