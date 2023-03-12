@@ -1216,8 +1216,10 @@ let find_typeclass_bindings typeclass_name ctr =
     String.equal (MutInd.to_string (fst i)) ("QuickChick.Decidability." ^ typeclass_name)  in    
   let handle_hint b hint =
     msg_debug (str "Processing... (" ++ str typeclass_name ++ str ")"  ++ Hints.FullHint.print env evd hint ++ fnl ());
-    begin match Hints.FullHint.pattern hint with
-    | Some (PApp (PRef g, args)) ->
+    begin match Hints.FullHint.repr hint with
+    | Extern (Some (PApp (PRef g, args)), _) ->
+    (* begin match Hints.FullHint.pattern hint with
+    | Some (PApp (PRef g, args)) -> *)
        begin
          let arg_index = if b then 1 else 0 in 
 (*         msg_debug (str ("Hint for :" ^ (string_of_qualid (Nametab.shortest_qualid_of_global Id.Set.empty g))) ++ fnl ());
