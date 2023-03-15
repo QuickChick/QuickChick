@@ -1,4 +1,3 @@
-plugin/META.coq-quickchick.in
 -R src QuickChick
 -I plugin
 
