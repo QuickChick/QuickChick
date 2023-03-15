@@ -291,10 +291,8 @@ Qed.
          B {_ : EnumSized B} { _ : forall s, SizeMonotonic (@enumSized B _ s)} s :
   SizeMonotonic (@enumSized (A * B) enumPairSized s).
 Proof.
-  eapply bindMonotonic; eauto with typeclass_instances.
-  intros x.
-  eapply bindMonotonic; eauto with typeclass_instances.
-  intros y. eapply returnGenSizeMonotonic; eauto with typeclass_instances.  
+  do 2 (eapply bindMonotonic; [ eauto with typeclass_instances .. | intros ? ]).
+  eapply returnGenSizeMonotonic; eauto with typeclass_instances.
 Qed.
 
 #[global] Instance enumPairSized_CorrectSized
@@ -328,14 +326,15 @@ Qed.
 #[global] Instance enumOption_SizeMonotonic A {_ : Enum A} { _ : SizeMonotonic (@enum A _)} :
   SizeMonotonic (@enum (option A) enumOption).
 Proof.
-  simpl. eapply oneofMonotonic; eauto with typeclass_instances.
-  eapply returnGenSizeMonotonic; eauto with typeclass_instances.
-  eapply cons_subset.
-  eapply returnGenSizeMonotonic; eauto with typeclass_instances.
-  eapply cons_subset.
-  eapply bindMonotonic; eauto with typeclass_instances.
-  intros y. eapply returnGenSizeMonotonic; eauto with typeclass_instances.  
-  eapply sub0set.
+  simpl. eapply oneofMonotonic.
+  - eauto with typeclass_instances.
+  - eapply returnGenSizeMonotonic; eauto with typeclass_instances.
+  - eapply cons_subset.
+    eapply returnGenSizeMonotonic; eauto with typeclass_instances.
+    eapply cons_subset.
+    + eapply bindMonotonic; [ eauto with typeclass_instances .. | intros y ].
+      eapply returnGenSizeMonotonic; eauto with typeclass_instances.
+    + eapply sub0set.
 Qed.
 
  
