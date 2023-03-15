@@ -1217,7 +1217,7 @@ let find_typeclass_bindings typeclass_name ctr =
   let handle_hint b hint =
     msg_debug (str "Processing... (" ++ str typeclass_name ++ str ")"  ++ Hints.FullHint.print env evd hint ++ fnl ());
     begin match Hints.FullHint.repr hint with
-    | Extern (Some (PApp (PRef g, args)), _) ->
+    | Hints.Extern (Some (PApp (PRef g, args)), _) ->
     (* begin match Hints.FullHint.pattern hint with
     | Some (PApp (PRef g, args)) -> *)
        begin
