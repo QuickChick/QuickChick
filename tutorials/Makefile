@@ -1,5 +1,4 @@
-include ../Makefile
-
 tutorials: Makefile.coq
 	$(MAKE) -f $<
 
+include ../Makefile
