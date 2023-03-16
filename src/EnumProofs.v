@@ -467,7 +467,7 @@ Ltac2 rec enum_size_correct (_ : unit) :=
       end
     | (* bind rec *)
       match! goal with
-      | [|- exists z, semProd (bindEnum (&_aux_enum z) _) _  ] =>
+      | [|- exists z, semProd (bindEnum (_ z) _) _  ] =>
         eapply exists_bind_Sized_alt >
         [ tci
         | now find_size_mon_inst ()
