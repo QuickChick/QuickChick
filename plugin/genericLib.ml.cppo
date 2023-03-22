@@ -1217,6 +1217,25 @@ let find_typeclass_bindings typeclass_name ctr =
   let handle_hint b hint =
     msg_debug (str "Processing... (" ++ str typeclass_name ++ str ")"  ++ Hints.FullHint.print env evd hint ++ fnl ());
     begin match Hints.FullHint.repr hint with
+    | Hints.Res_pf h ->
+       let (_,ec) = Hints.hint_as_term h in
+       let c = EConstr.to_constr evd ec in
+       let cst = Constr.destConst c in
+       let (typ,_constraints) = Environ.constant_type env cst in
+       let rec find_concl typ =
+         if Constr.isLambda typ then
+           let (_binder,_binder_type,typ') = Constr.destLambda typ in
+           find_concl typ'
+         else if Constr.isProd typ then
+           let (_binder,_binder_type,typ') = Constr.destProd typ in
+           find_concl typ'
+         else if Constr.isApp typ then
+           typ
+         else failwith "FindConcl"
+       in
+       let typ_concl = Constr.destApp (find_concl typ) in
+       msg_debug (Constr.debug_print (find_concl typ))
+       (* TODO: Replicate pattern-based behavior from below in constr form *)
     | Hints.Extern (Some (PApp (PRef g, args)), _) ->
     (* begin match Hints.FullHint.pattern hint with
     | Some (PApp (PRef g, args)) -> *)
@@ -1298,7 +1317,11 @@ let find_typeclass_bindings typeclass_name ctr =
          | PProd _ -> ()
          | _ -> debug_pattern "FTB/1" args.(arg_index)
        end
-    | _ -> failwith "FTB/2"
+    | Hints.Extern _ -> failwith "FTB/Apply"      
+    | Hints.ERes_pf _ -> failwith "FTB/EApply"
+    | Hints.Give_exact _ -> failwith "FTB/Ge"
+    | Hints.Res_pf_THEN_trivial_fail _ -> failwith "FTB/Imm"
+    | Hints.Unfold_nth _ -> failwith "FTB/Unf"
     end in
   Hints.Hint_db.iter (fun go hm hints ->
       begin match go with
