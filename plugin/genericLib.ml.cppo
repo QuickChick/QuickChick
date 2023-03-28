@@ -1205,7 +1205,8 @@ let debug_pattern s p =
   | PArray _ -> failwith (s ^ "ARRAY")
   | PProd _ -> failwith (s ^ "PROD")
   
-let find_typeclass_bindings typeclass_name ctr =  
+let find_typeclass_bindings typeclass_name ctr =
+  msg_debug (str ("Finding typeclass bindings for:" ^ string_of_qualid ctr) ++ fnl());
   let env = Global.env () in
   let evd = Evd.from_env env in
   let db = Hints.searchtable_map "typeclass_instances" in
@@ -1218,10 +1219,12 @@ let find_typeclass_bindings typeclass_name ctr =
     msg_debug (str "Processing... (" ++ str typeclass_name ++ str ")"  ++ Hints.FullHint.print env evd hint ++ fnl ());
     begin match Hints.FullHint.repr hint with
     | Hints.Res_pf h ->
+       (* Go from the hint to the type of its constant *)
        let (_,ec) = Hints.hint_as_term h in
        let c = EConstr.to_constr evd ec in
        let cst = Constr.destConst c in
        let (typ,_constraints) = Environ.constant_type env cst in
+       (* Ignore the type's parameters *)
        let rec find_concl typ =
          if Constr.isLambda typ then
            let (_binder,_binder_type,typ') = Constr.destLambda typ in
@@ -1233,8 +1236,52 @@ let find_typeclass_bindings typeclass_name ctr =
            typ
          else failwith "FindConcl"
        in
-       let typ_concl = Constr.destApp (find_concl typ) in
-       msg_debug (Constr.debug_print (find_concl typ))
+       let (typ_cl, typ_args) = Constr.destApp (find_concl typ) in
+       (* Check if it matches a producer class of the appropriate name *)
+       msg_debug (Constr.debug_print (find_concl typ));
+       let matches_producer = try 
+         if Constr.isLambda typ_args.(1) then begin
+           let (_binder, _binder_type, typ') = Constr.destLambda typ_args.(1) in
+           if Constr.isApp typ' then begin
+               let (cln, clargs) = Constr.destApp typ' in
+               msg_debug (str "Found a hint for: " ++ Constr.debug_print cln ++ fnl ());
+               if Constr.isInd cln then begin 
+                 (* TODO: Search for Mutual inductives properly *)
+                 let ((mind,_),_) = Constr.destInd cln in
+                 let mind_id = Label.to_id (MutInd.label mind) in
+                 let ctr_id = qualid_basename ctr in
+                 if Id.equal mind_id ctr_id then (
+                   msg_debug (str "Producer Match Found: " ++ Id.print ctr_id ++ fnl ());
+                   let standard = ref true in
+                   (* Calculate mode as list of booleans: *)
+                   let res = List.map (fun arg ->
+                                 if Constr.isMeta arg then
+                                   true (* Check not equal id name *)
+                                 else if Constr.isRef arg then
+                                   false
+                                 else if Constr.isRel arg then
+                                   true
+                                 else if Constr.isApp arg then
+                                   begin standard := false; true end
+                                 else failwith "New FTB/0"
+                               ) (Array.to_list clargs) in
+                   if !standard then begin
+                       List.iter (fun b -> msg_debug (bool b ++ str " ")) res;
+                       msg_debug (fnl ());
+                       result := res :: !result
+                     end
+                   else ()
+                 )
+                 else 
+                   msg_debug (str "Not Ind" ++ fnl ())
+                 end
+               else ()
+             end
+           else ()
+           end
+           with _ -> () in
+           ignore (matches_producer)
+
        (* TODO: Replicate pattern-based behavior from below in constr form *)
     | Hints.Extern (Some (PApp (PRef g, args)), _) ->
     (* begin match Hints.FullHint.pattern hint with
