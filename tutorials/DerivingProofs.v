@@ -202,10 +202,17 @@ Inductive exp_match {T: Type} : list T -> reg_exp T -> Prop :=
 
 (* First, we can generate a checker for [exp_match]. *)
 
+(*
 Instance EnumTest (y : nat) : EnumSizedSuchThat _ (fun x => eq x y).
 Admitted.
 
+Instance Dec (x y : nat) : DecOpt (x = y).
+Admitted.
+ *)
+
 QuickChickDebug Debug On.
+
+Search Dec_Eq.
 Derive DecOpt for (exp_match l e).
 (* DecOptexp_match is defined *)
 

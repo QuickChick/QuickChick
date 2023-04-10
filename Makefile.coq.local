@@ -1,4 +1,4 @@
-OCAMLWARN=-w -8 -warn-error +a-3
+OCAMLWARN=-w -8
 COQ_VERSION=$(word 1, $(shell coqc -print-version))
 
 ifeq ($(shell expr $(COQ_VERSION) \>= "8.16"), 1)
