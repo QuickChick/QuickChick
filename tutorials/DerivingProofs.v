@@ -210,9 +210,6 @@ Instance Dec (x y : nat) : DecOpt (x = y).
 Admitted.
  *)
 
-QuickChickDebug Debug On.
-
-Search Dec_Eq.
 Derive DecOpt for (exp_match l e).
 (* DecOptexp_match is defined *)
 

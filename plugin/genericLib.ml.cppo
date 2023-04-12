@@ -1283,6 +1283,8 @@ let find_typeclass_bindings typeclass_name ctr =
            else msg_debug (str "First arg not lambda" ++ fnl ()))
          )
          else if not b then (
+           if Id.to_string (qualid_basename ctr) = "eq" then ()
+           else
            if isApp typ_args.(0) then (
                msg_debug (str "Entering checker app" ++ fnl ());               
                let (cln, clargs) = Constr.destApp typ_args.(0) in               
@@ -1416,7 +1418,8 @@ let find_typeclass_bindings typeclass_name ctr =
       | Some (GlobRef.IndRef i) when prod_check i ->
          List.iter (handle_hint true ) hints
       | Some (GlobRef.IndRef i) when dec_check i ->
-         List.iter (handle_hint false) hints
+         if Id.to_string (qualid_basename ctr) = "eq" then result := [[false; false; false]]
+         else List.iter (handle_hint false) hints
       | _ -> ()
       end
     ) db;
