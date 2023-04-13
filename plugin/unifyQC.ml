@@ -904,6 +904,7 @@ let handle_branch
            unknown_gen := (u, dt, i) :: !unknown_gen
         | ModePartlyDef (eqs,unks,pat), true ->
            need_filtering := Some (eqs, unks, pat, i)
+        | _, _ -> ()
       in
       let rec walk_mbs i ms bs =
         match ms, bs with

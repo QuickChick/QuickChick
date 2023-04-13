@@ -105,7 +105,7 @@ Inductive IndistStack : Stack -> Stack -> Prop :=
 
 Derive DecOpt for (IndistStack s1 s2).
 
-Instance Label_DecEq (l1 l2 : Label) : Dec (l1 = l2).
+#[global] Instance Label_DecEq (l1 l2 : Label) : Dec (l1 = l2).
 Proof. dec_eq. Defined.
 
 Inductive IndistState : State -> State -> Prop :=

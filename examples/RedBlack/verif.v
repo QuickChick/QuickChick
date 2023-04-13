@@ -84,9 +84,9 @@ Proof.
   - case : c {IH}; returnSolver.
     apply oneofMonotonic; returnSolver.
     move => t [H1 | [H2 | //]]; subst; returnSolver.
-    eauto with typeclass_instances.
-    apply (@bindMonotonic _ ProducerGen _); eauto with typeclass_instances.
-    move => x; returnSolver.
+    eauto with typeclass_instances;
+    apply (@bindMonotonic _ ProducerGen _); eauto with typeclass_instances;
+    move => x; returnSolver. 
   - case : c IH => IH.
     apply (@liftM4Monotonic); returnSolver.
     + eapply IH; eauto; by constructor; lia.

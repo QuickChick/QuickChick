@@ -1214,118 +1214,131 @@ let find_typeclass_bindings typeclass_name ctr =
   let prod_check i =
     String.equal (MutInd.to_string (fst i)) ("QuickChick.DependentClasses." ^ typeclass_name)  in    
   let dec_check i =
-    String.equal (MutInd.to_string (fst i)) ("QuickChick.Decidability." ^ typeclass_name)  in    
-  let handle_hint b hint =
-    msg_debug (str "Processing... (" ++ str typeclass_name ++ str ")"  ++ Hints.FullHint.print env evd hint ++ fnl ());
-    begin match Hints.FullHint.repr hint with
-    | Hints.Res_pf h ->
+    String.equal (MutInd.to_string (fst i)) ("QuickChick.Decidability." ^ typeclass_name)  in
+  let type_of_hint h = 
        (* Go from the hint to the type of its constant *)
        let (_,ec) = Hints.hint_as_term h in
        let c = EConstr.to_constr evd ec in
        let cst = Constr.destConst c in
        let (typ,_constraints) = Environ.constant_type env cst in
-       (* Ignore the type's parameters *)
-       let rec find_concl typ =
-         if Constr.isLambda typ then
-           let (_binder,_binder_type,typ') = Constr.destLambda typ in
-           find_concl typ'
-         else if Constr.isProd typ then
-           let (_binder,_binder_type,typ') = Constr.destProd typ in
-           find_concl typ'
-         else if Constr.isApp typ then
-           typ
-         else failwith "FindConcl"
-       in
-       let (typ_cl, typ_args) = Constr.destApp (find_concl typ) in
-       (* Check if it matches a producer class of the appropriate name *)
-       msg_debug (str "Conclusion of current hint is: " ++ fnl ());
-       msg_debug (Constr.debug_print (find_concl typ));
-       let matches_producer = try
-         msg_debug (str "Boolean: " ++ bool b ++ str " Arg length: " ++ int (Array.length typ_args) ++ fnl ());
-         if b then (
-           if Constr.isLambda typ_args.(1) then (
-           msg_debug (str "Entering producer lambda" ++ fnl ());
-           let (_binder, _binder_type, typ') = Constr.destLambda typ_args.(1) in
-           if Constr.isApp typ' then (
-               let (cln, clargs) = Constr.destApp typ' in
-               msg_debug (str "Found a hint for: " ++ Constr.debug_print cln ++ fnl ());
-               if Constr.isInd cln then ( 
-                 (* TODO: Search for Mutual inductives properly *)
-                 let ((mind,_),_) = Constr.destInd cln in
-                 let mind_id = Label.to_id (MutInd.label mind) in
-                 let ctr_id = qualid_basename ctr in
-                 if Id.equal mind_id ctr_id then (
-                   msg_debug (str "Producer Match Found: " ++ Id.print ctr_id ++ fnl ());
-                   let standard = ref true in
-                   (* Calculate mode as list of booleans: *)
-                   let res = List.map (fun arg ->
-                                 if Constr.isMeta arg then
-                                   false (* Check not equal id name *)
-                                 else if Constr.isRef arg then
-                                   false
-                                 else if Constr.isRel arg then
-                                   true
-                                 else if Constr.isApp arg then
-                                   begin standard := false; true end
-                                 else failwith "New FTB/0"
-                               ) (Array.to_list clargs) in
-                   if !standard then begin
-                       List.iter (fun b -> msg_debug (bool b ++ str " ")) res;
-                       msg_debug (fnl ());
-                       result := res :: !result
-                     end
-                   else msg_debug (str "not standard/producer" ++ fnl ())
-                 )
-                 else 
-                   msg_debug (str "Not equal: " ++ Id.print ctr_id ++ str " " ++ Id.print mind_id ++ fnl ()))
-               else msg_debug (str "Not Ind" ++ fnl ())
-           )
-           else msg_debug (str "First arg not lambda" ++ fnl ()))
-         )
-         else if not b then (
-           if Id.to_string (qualid_basename ctr) = "eq" then ()
-           else
-           if isApp typ_args.(0) then (
-               msg_debug (str "Entering checker app" ++ fnl ());               
-               let (cln, clargs) = Constr.destApp typ_args.(0) in               
-               (* TODO: Search for Mutual inductives properly *)
-               let ((mind,_),_) = Constr.destInd cln in
-               let mind_id = Label.to_id (MutInd.label mind) in
-               let ctr_id = qualid_basename ctr in
-               msg_debug (str "In checker/app for: " ++ Id.print ctr_id ++ str " " ++ Id.print mind_id ++ fnl ());
-               
-               if Id.equal mind_id ctr_id then (
-                   msg_debug (str "Checker Match Found: " ++ Id.print ctr_id ++ fnl ());
-                   let standard = ref true in
-                   (* Calculate mode as list of booleans: *)
-                   let res = List.map (fun arg ->
-                                 if Constr.isMeta arg then
-                                   false (* Check not equal id name *)
-                                 else if Constr.isRef arg then
-                                   false
-                                 else if Constr.isRel arg then
-                                   true
-                                 else if Constr.isApp arg then
-                                   begin standard := false; true end
-                                 else failwith "New FTB/0"
-                               ) (Array.to_list clargs) in
-                   if !standard then begin
-                       List.iter (fun b -> msg_debug (bool b ++ str " ")) res;
-                       msg_debug (fnl ());
-                       result := res :: !result
-                     end
-                   else msg_debug (str "not standard/checker" ++ fnl ())
-               )
-               else
-                 msg_debug (str "not equal/checker/isApp" ++ fnl ());
-           )
-           else msg_debug (str "not isApp 0" ++ fnl ())
-         )
-         else msg_debug (str "not b and not not b" ++ fnl ())
-       with _ -> msg_debug (str "exception?" ++ fnl ()) in
-       ignore (matches_producer)
-
-       (* TODO: Replicate pattern-based behavior from below in constr form *)
+       typ in
+  (* Find the conclusion of a type *)
+  let rec find_concl typ =
+      if Constr.isLambda typ then
+        let (_binder,_binder_type,typ') = Constr.destLambda typ in
+        find_concl typ'
+      else if Constr.isProd typ then
+        let (_binder,_binder_type,typ') = Constr.destProd typ in
+        find_concl typ'
+      else if Constr.isApp typ then
+        typ
+      else failwith "FindConcl"
+  in
+  let handle_producer_hint lambda = 
+    if Constr.isLambda lambda then (
+      msg_debug (str "Entering producer lambda" ++ fnl ());
+      let (_binder, _binder_type, typ') = Constr.destLambda lambda in
+      if Constr.isApp typ' then (
+        let (cln, clargs) = Constr.destApp typ' in
+        msg_debug (str "Found a hint for: " ++ Constr.debug_print cln ++ fnl ());
+        if Constr.isInd cln then ( 
+          (* TODO: Search for Mutual inductives properly *)
+          let ((mind,_),_) = Constr.destInd cln in
+          let mind_id = Label.to_id (MutInd.label mind) in
+          let ctr_id = qualid_basename ctr in
+          if Id.equal mind_id ctr_id then (
+            msg_debug (str "Producer Match Found: " ++ Id.print ctr_id ++ fnl ());
+            let standard = ref true in
+            (* Calculate mode as list of booleans: *)
+            let res = List.map (fun arg ->
+                          if Constr.isMeta arg then
+                            false (* Check not equal id name *)
+                          else if Constr.isRef arg then
+                            false
+                          (* Bound by the last lambda means it's output *)
+                          else if Constr.isRelN 1 arg then
+                            true
+                          else if Constr.isRel arg then
+                            false
+                          else if Constr.isApp arg then
+                            begin standard := false; true end
+                          else failwith "New FTB/0"
+                        ) (Array.to_list clargs) in
+            if !standard then begin
+                List.iter (fun b -> msg_debug (bool b ++ str " ")) res;
+                msg_debug (fnl ());
+                result := res :: !result
+              end
+            else msg_debug (str "not standard/producer" ++ fnl ())
+          )
+          else 
+            msg_debug (str "Not equal: " ++ Id.print ctr_id ++ str " " ++ Id.print mind_id ++ fnl ()))
+        else msg_debug (str "Not Ind" ++ fnl ())
+      )
+      else msg_debug (str "First arg not lambda" ++ fnl ())
+    ) in
+  let handle_checker_hint app = 
+    if Id.to_string (qualid_basename ctr) = "eq" then ()
+    else if isApp app then (
+      msg_debug (str "Entering checker app" ++ fnl ());               
+      let (cln, clargs) = Constr.destApp app in               
+      (* TODO: Search for Mutual inductives properly *)
+      let ((mind,_),_) = Constr.destInd cln in
+      let mind_id = Label.to_id (MutInd.label mind) in
+      let ctr_id = qualid_basename ctr in
+      msg_debug (str "In checker/app for: " ++ Id.print ctr_id ++ str " " ++ Id.print mind_id ++ fnl ());
+      
+      if Id.equal mind_id ctr_id then (
+        msg_debug (str "Checker Match Found: " ++ Id.print ctr_id ++ fnl ());
+        let standard = ref true in
+        (* Calculate mode as list of booleans: *)
+        (* For checking, mode is alsways false *)
+        let res = List.map (fun arg -> 
+                      if Constr.isMeta arg then
+                        false (* Check not equal id name *)
+                      else if Constr.isRef arg then
+                        false
+                      else if Constr.isRel arg then
+                        false
+                      else if Constr.isApp arg then
+                        begin standard := false; true end
+                      else failwith "New FTB/0"
+                    ) (Array.to_list clargs) in
+        if !standard then begin
+            List.iter (fun b -> msg_debug (bool b ++ str " ")) res;
+            msg_debug (fnl ());
+            result := res :: !result
+          end
+        else msg_debug (str "not standard/checker" ++ fnl ())
+      )
+      else
+        msg_debug (str "not equal/checker/isApp" ++ fnl ());
+    )
+    else msg_debug (str "not isApp 0" ++ fnl ())
+    in
+  
+  let handle_hint_repr b h =
+    let typ = type_of_hint h in
+    let (typ_cl, typ_args) = Constr.destApp (find_concl typ) in
+    msg_debug (str "Conclusion of current hint is: " ++ fnl ());
+    msg_debug (Constr.debug_print (find_concl typ));
+    try 
+    if b then
+      (* For producer, check the second argument (the first is the type of the lambda) *)
+      handle_producer_hint typ_args.(1)
+    else
+      (* For checker, check the first argument. *)
+      handle_checker_hint typ_args.(0)
+    with _ -> msg_debug (str "exception?" ++ fnl ())
+  in
+  let handle_hint b hint =
+    msg_debug (str "Processing... (" ++ str typeclass_name ++ str ")"  ++ Hints.FullHint.print env evd hint ++ fnl ());
+    begin match Hints.FullHint.repr hint with
+    | Hints.Res_pf h ->
+       handle_hint_repr b h
+    | Hints.Give_exact h ->
+       handle_hint_repr b h
+    (* TODO: Replicate pattern-based behavior from below in constr form *)
     | Hints.Extern (Some (PApp (PRef g, args)), _) ->
     (* begin match Hints.FullHint.pattern hint with
     | Some (PApp (PRef g, args)) -> *)
@@ -1409,7 +1422,6 @@ let find_typeclass_bindings typeclass_name ctr =
        end
     | Hints.Extern _ -> failwith "FTB/Apply"      
     | Hints.ERes_pf _ -> failwith "FTB/EApply"
-    | Hints.Give_exact _ -> failwith "FTB/Ge"
     | Hints.Res_pf_THEN_trivial_fail _ -> failwith "FTB/Imm"
     | Hints.Unfold_nth _ -> failwith "FTB/Unf"
     end in
