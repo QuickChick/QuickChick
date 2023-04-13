@@ -250,10 +250,11 @@ let define_and_run c env evd =
     let start = Unix.gettimeofday () in
     let (p_out, _, p_err) as process = Unix.open_process_full execn (Unix.environment ()) in
     let process_out () =
-      let rec process_err_aux () =
+(*      let rec process_err_aux () =
         let e = input_line p_err in
         Feedback.msg_info (Pp.str e);
         process_err_aux() in
+*)        
       let rec process_otl_aux () =
         let e = input_line p_out in
         Feedback.msg_info (Pp.str e);
