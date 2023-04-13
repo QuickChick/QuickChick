@@ -263,8 +263,8 @@ let define_and_run c env evd =
              let stop = Unix.gettimeofday () in
              let timeElapsed = stop -. start in
              Feedback.msg_info (Pp.str (Printf.sprintf "Time Elapsed: %fs\n" timeElapsed));
-            (* try process_err_aux ()
-            with End_of_file ->  *)
+            try process_err_aux ()
+            with End_of_file ->
               let err_msg = read_all p_err in
               let err descr = CErrors.user_err (str (execn ^ ": " ^ descr) ++ fnl () ++ fnl () ++ str err_msg ++ fnl ()) in
               let stat = Unix.close_process_full process in
