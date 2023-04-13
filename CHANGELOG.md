@@ -4,6 +4,11 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](http://keepachangelog.com/en/1.0.0/)
 and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html).
 
+## [1.6.5] - 2022-04-13
+
+- Support Coq 8.17
+- No longer support Coq 8.11 and 8.12
+
 ## [1.6.4] - 2022-08-14
 
 - Future proofing (internal changes, resolve warnings, keep up with the times)
