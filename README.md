@@ -40,7 +40,7 @@ Dependencies are listed in [`coq-quickchick.opam`](./coq-quickchick.opam).
     # To get the dependencies, add the Coq opam repository if you haven't already
     opam repo add coq-released https://coq.inria.fr/opam/released
     opam update
-    opam install --deps-only
+    opam install . --deps-only
 
 #### Build using Make
 
@@ -88,8 +88,10 @@ The public API of QuickChick is summarized in `BasicInterface.v`.
 ### More resources
 
 Here is some more reading material:
-  - Our POPL 2018 paper on [Generating Good Generators for Inductive Relations][mechanism for automatically deriving generators for inductive relations]
+  - Our PLDI 2022 paper on [a mechanism for automatically deriving generators, enumerators, and checkers for inductive relations](https://lemonidas.github.io/pdf/ComputingCorrectly.pdf)
+  - Our POPL 2018 paper on [a mechanism for automatically deriving generators for inductive relations](https://lemonidas.github.io/pdf/GeneratingGoodGenerators.pdf)
   - Our ITP 2015 paper on [Foundational Property-Based Testing](http://prosecco.gforge.inria.fr/personal/hritcu/publications/foundational-pbt.pdf)
+  - Our PLDI 2023 paper on [a mechanism for merging multiple inductive relations into one](https://lemonidas.github.io/pdf/MergingInductiveRelations.pdf)
   - Leo's invited talk at CLA on [Random Testing in the Coq Proof Assistant](https://lemonidas.github.io/pdf/InvitedCLA.pdf)
   - Catalin's [internship topic proposals for 2015](http://prosecco.gforge.inria.fr/personal/hritcu/students/topics/2015/quick-chick.pdf)
   - Catalin's [presentation at CoqPL 2015 workshop (2015-01-18)](http://prosecco.gforge.inria.fr/personal/hritcu/talks/QuickChick-Verified-Testing-CoqPL.pdf)
