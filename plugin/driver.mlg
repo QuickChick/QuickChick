@@ -1,5 +1,4 @@
 {
-
 open Libnames
 open Util
 open Constrexpr

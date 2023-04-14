@@ -33,7 +33,7 @@
   (ocaml (>= 4.07))
   (menhir :build)
   (cppo (and :build (>= 1.6.8)))
-  (coq (>= 8.11~))
+  (coq (>= 8.13~))
   coq-ext-lib
   coq-mathcomp-ssreflect
   coq-simple-io

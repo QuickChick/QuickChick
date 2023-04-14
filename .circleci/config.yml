@@ -114,15 +114,22 @@ workflows:
   build:
     jobs:
       - dune:
-          name: Dune 8.15
-          coq: '8.15-ocaml-4.07-flambda'
-          # Do test an old ocaml ^
+          name: Dune 8.13
+          coq: '8.13'
       - dune:
-          name: Dune latest
-          coq: latest
-      - make:
-          # The make build also builds tests
-          name: Make latest
+          name: Dune 8.14
+          coq: '8.14'
+      - dune:
+          name: Dune 8.15
+          coq: '8.15'
+      - dune:
+          name: Dune 8.16
+          coq: '8.16'
+      - dune:
+          name: Dune 8.17
+          coq: '8.17'
+      - opam:
+          name: OPAM dev
           coq: dev
       - dune:
           name: Dune dev
