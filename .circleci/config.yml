@@ -45,8 +45,8 @@ commands:
         command: make -j`nproc`
     - run:
         name: Testing Tutorial
-        working_directory: examples
-        command: make tutorial
+        working_directory: tutorials
+        command: make tutorials
     - run:
         name: Testing IFC
         working_directory: examples/ifc-basic
@@ -106,7 +106,7 @@ jobs:
     - run: opam pin -n add coq-quickchick .
     - run: make compat && dune build
     - run: dune install coq-quickchick
-    # - test
+    - test
     - run: dune uninstall coq-quickchick
 
 workflows:
