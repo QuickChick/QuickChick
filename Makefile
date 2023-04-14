@@ -64,7 +64,7 @@ $(QCTOOL_DIR)/$(QCTOOL_EXE): $(QCTOOL_SRC)
 	cd $(QCTOOL_DIR); ocamlbuild -use-ocamlfind -pkg str -pkg unix -use-ocamlfind $(QCTOOL_EXE)
 
 tests:
-	$(MAKE) -C tutorials tutorials
+	$(MAKE) -C tutorials
 	$(MAKE) -C test
 	cd benchmarks/stlc; make clean && make
 	cd benchmarks/BST; make clean && make
