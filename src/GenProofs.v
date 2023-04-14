@@ -420,7 +420,7 @@ Ltac2 rec gen_size_correct (_ : unit) :=
       end
     | (* bind rec *)
       match! goal with
-      | [|- exists z, semProd (bindGen (&_aux_gen z) _) _  ] =>
+      | [|- exists z, semProd (bindGen (_ _) _) _  ] =>
         eapply exists_bind_Sized_alt >
         [ tci
         | now find_size_mon_inst ()

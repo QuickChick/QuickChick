@@ -76,7 +76,11 @@ let remember_induct h =
              Tactics.induction false None cn None None
           | p :: ps ->
              Tacticals.tclTHEN
+#if COQ_VERSION >= (8, 18, 0)             
+                   (Tactics.letin_pat_tac false (Some (true, eqpat)) (Names.Name.Anonymous) (Some s, p) cl)
+#else
                    (Tactics.letin_pat_tac false (Some (true, eqpat)) (Names.Name.Anonymous) (s, p) cl)
+#endif                 
                    (do_remembers ps) in
         msg_debug (int (List.length to_remember) ++ fnl ());
         do_remembers to_remember
