@@ -28,12 +28,12 @@ depends: [
   "ocaml" {>= "4.07"}
   "menhir" {build}
   "cppo" {build & >= "1.6.8"}
-  "coq" {>= "8.13~"}
+  "coq" {>= "8.15~"}
   "coq-ext-lib"
   "coq-mathcomp-ssreflect"
   "coq-simple-io"
   "ocamlfind"
-  "ocamlbuild" {with-test}
+  "ocamlbuild" 
   "odoc" {with-doc}
 ]
 dev-repo: "git+https://github.com/QuickChick/QuickChick.git"
