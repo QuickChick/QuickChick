@@ -4,6 +4,41 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](http://keepachangelog.com/en/1.0.0/)
 and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html).
 
+## [2.0.0] - 2022-04-13
+
+Major 2.0 Release of QuickChick
+
+- Introduce the notion of `Producer`, a typeclass that abstracts both generators and enumerators.
+- No longer support a Monad instance for `G (option A)`. 
+- bind notation for optional generators can be obtained by importing `BindOptNotation`,
+  `x <-- c1 ;; c2` with a double arrow, resolving typeclass resolution issues.
+- Include support for deriving checkers for inductive relations based on 
+  [PLDI 2022](https://lemonidas.github.io/pdf/ComputingCorrectly.pdf). 
+  
+  `Derive Checker for (P x1 x2 ... xn)` 
+  
+  Defines an instance of the `DecOpt` typeclass that can be access using `??` notation.
+- Introduce an enumeration monad `E`, with the same API as generators. Automatic 
+  type-based enumerators for an inductive `T` can be derived using `Derive` notation:
+  
+  `Derive EnumSized for T.`
+  
+- Introduce the `EnumSizedSuchThat` typeclass for constrained enumeration, similar to 
+  `GenSizedSuchThat`. Include support for deriving enumerators for inductive relations based on 
+  [PLDI 2022](https://lemonidas.github.io/pdf/ComputingCorrectly.pdf). 
+  
+  `Derive EnumSizedSuchThat for (fun y => P x1 ... xn y xm ...).`
+  
+- Introduce convenient notation for deriving constrained generators:
+
+  `Derive Generator for (fun y => P x1 x2 ... y ... xm ...)`
+  
+- Introduce a mechanism for [Merging Inductive Relations](https://lemonidas.github.io/pdf/MergingInductiveRelations.pdf).
+
+  `Merge P with Q as R.`
+
+- No longer support Coq 8.13 and 8.14
+
 ## [1.6.5] - 2022-04-13
 
 - Support Coq 8.17
