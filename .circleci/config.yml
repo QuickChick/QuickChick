@@ -90,7 +90,7 @@ commands:
         name: Removing QuickChick
         command: opam remove .
 jobs:
-  make:
+  opam:
     <<: *defaults
     steps:
     - startup
