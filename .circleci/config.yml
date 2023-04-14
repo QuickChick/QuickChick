@@ -134,6 +134,3 @@ workflows:
       - dune:
           name: Dune dev
           coq: dev
-      - make:
-          name: Make dev
-          coq: dev
