@@ -33,7 +33,7 @@ depends: [
   "coq-mathcomp-ssreflect"
   "coq-simple-io"
   "ocamlfind"
-  "ocamlbuild" 
+  "ocamlbuild"
   "odoc" {with-doc}
 ]
 dev-repo: "git+https://github.com/QuickChick/QuickChick.git"
