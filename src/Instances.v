@@ -306,8 +306,8 @@ Proof.
   { intros. reflexivity. }
   destruct a.
   intros _.
-  destruct H1 as [[_ Hca]]. 
-  destruct H4 as [[_ Hcb]].
+  edestruct H1 as [[_ Hca]].
+  edestruct H4 as [[_ Hcb]].
   destruct Hca as [x1 [s1 [_ Hin1]]]. reflexivity.
   destruct Hcb as [x2 [s2 [_ Hin2]]]. reflexivity.
   eexists (x1 + x2). simpl. eexists (s1 + s2). split. reflexivity.
@@ -344,7 +344,7 @@ Proof.
   constructor. split. intros. reflexivity.
   intros _.
   simpl. destruct a.
-  - destruct H as [ [ _ Hc ] ]. destruct Hc as [x [H1 H2]]. reflexivity.
+  - edestruct H as [ [ _ Hc ] ]. destruct Hc as [x [H1 H2]]. reflexivity.
     eexists x. split. reflexivity.
     eapply semOneofSize. eauto with typeclass_instances.
     eexists. split. right. left.
