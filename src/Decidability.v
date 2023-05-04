@@ -300,6 +300,9 @@ Notation "A ==? B" := (poly_eqb A B) (at level 199, left associativity).
   fun a b =>
     a =? b.
 
+#[global] Instance z_eqb : PolymorphicEquality Z :=
+fun a b =>
+  Zeq_bool a b.
 
 #[global] Instance option_eqb {A} `{PolymorphicEquality A} : PolymorphicEquality (option A) :=
   fun o1 o2 =>
