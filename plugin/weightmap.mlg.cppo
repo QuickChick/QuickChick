@@ -1,3 +1,5 @@
+DECLARE PLUGIN "coq-quickchick.plugin"
+
 {
 (*
 
