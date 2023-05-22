@@ -463,9 +463,11 @@ let isTyParam = function
   | DTyParam _ -> true
   | _ -> false 
 
+let quickchick_cat = CWarnings.create_category ~name:"quickchick" ()
+
 let warn_uninstantiated_variables =
   CWarnings.create ~name:"quickchick-uninstantiated-variables"
-    ~category:"quickchick"
+    ~category:quickchick_cat
     ~default:CWarnings.Enabled
     (fun allUnknowns ->
       str "After proccessing all constraints, there are still uninstantiated variables: "
