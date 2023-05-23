@@ -50,6 +50,7 @@ plugin/tactic_quickchick.ml
 plugin/tactic_quickchick.mlg
 plugin/weightmap.ml
 plugin/weightmap.mlg
+plugin/unifyQC.ml
 src/ExtractionQC.v
 *.pyc
 __pycache__
