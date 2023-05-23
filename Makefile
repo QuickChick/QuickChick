@@ -76,7 +76,15 @@ tests:
 #	coqc examples/BSTTest.v
 	coqc examples/DependentTest.v
 
-COMPATFILES:=plugin/depDriver.ml plugin/genericLib.ml plugin/tactic_quickchick.mlg plugin/weightmap.mlg src/ExtractionQC.v src/QuickChick.v _CoqProject
+COMPATFILES:= \
+	plugin/depDriver.ml \
+	plugin/genericLib.ml \
+	plugin/unifyQC.ml \
+	plugin/tactic_quickchick.mlg \
+	plugin/weightmap.mlg \
+	src/ExtractionQC.v \
+	src/QuickChick.v \
+	_CoqProject
 
 compat: $(COMPATFILES)
 
