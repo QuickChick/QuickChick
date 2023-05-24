@@ -323,7 +323,11 @@ let parse_constructors nparams param_names result_ty oib : ctr_rep list option =
           with _ -> CErrors.user_err (str "nth failed: " ++ int (i + nparams - db - 1) ++ fnl ())
       end 
       else if isApp ty then begin
-        let (ctr, tms) = decompose_app ty in 
+#if COQ_VERSION >= (8, 18, 0)
+        let (ctr, tms) = decompose_app_list ty in
+#else
+        let (ctr, tms) = decompose_app ty in
+#endif
         foldM (fun acc ty -> 
                aux i ty >>= fun ty' -> Some (ty' :: acc)
               ) (Some []) tms >>= fun tms' ->
@@ -435,7 +439,11 @@ let parse_dependent_type i nparams ty oib arg_names =
         end
     end 
     else if isApp ty then begin
-      let (ctr, tms) = decompose_app ty in 
+#if COQ_VERSION >= (8, 18, 0)
+      let (ctr, tms) = decompose_app_list ty in
+#else
+      let (ctr, tms) = decompose_app ty in
+#endif
       foldM (fun acc ty -> 
              aux i ty >>= fun ty' -> Some (ty' :: acc)
             ) (Some []) tms >>= fun tms' ->
