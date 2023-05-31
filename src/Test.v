@@ -515,7 +515,7 @@ Fixpoint fuzzLoopAux {A} (fuzz_fuel : nat) (st : State)
     | Some true =>
       match clear_queues fuzz_fuel with
       | true => fuzzLoopAux fuzz_fuel' (updSuccTests st S) nil nil nil nil randoms' nil gen fuzz print prop
-      | _ =>
+      | _ => let is_interesting := true in
         if is_interesting then
           (* Successful and interesting, keep in favored queue and save! *)
           fuzzLoopAux fuzz_fuel' (updSuccTests st S) favored' discards' ((energy, a)::favored_queue') discard_queue' randoms' ((energy,a) :: saved') gen fuzz print prop
@@ -540,7 +540,7 @@ Fixpoint fuzzLoopAux {A} (fuzz_fuel : nat) (st : State)
     | None =>
       match clear_queues fuzz_fuel with
       | true => fuzzLoopAux fuzz_fuel' (updDiscTests st S) nil nil nil nil randoms' nil gen fuzz print prop
-      | _ =>
+      | _ => let is_interesting := true in
         if is_interesting then
           (* Interesting (new path), but discard. Put in discard queue *)
           fuzzLoopAux fuzz_fuel' (updDiscTests st S) favored' discards' favored_queue' ((energy, a)::discard_queue') randoms' saved' gen fuzz print prop 
@@ -555,7 +555,7 @@ Fixpoint fuzzLoopAux {A} (fuzz_fuel : nat) (st : State)
 Definition fuzzLoopWith {A} (a : Args)
          (gen : G A) (fuzz : A -> G A) (print : A -> string)
          (prop : A -> option bool) :=
-  let compFun maxSuccess maxSize n d := computeSize' a n d in
+  let compFun maxSuccess maxSize n d := maxSize in
   let (rnd, computeFun) := (newRandomSeed, compFun (maxSize a) (maxSuccess a)) in
   let st := MkState (maxSuccess a)  (* maxSuccessTests   *)
                     (maxDiscard a)  (* maxDiscardTests   *)
