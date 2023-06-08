@@ -421,7 +421,7 @@ let rec dep_arrowify terminal names types =
    nparams : number of <Type> parameters in the beginning
    arg_names : argument names (type parameters, pattern specific variables 
  *)
-let parse_dependent_type i nparams ty oib arg_names = 
+let parse_dependent_type_internal i nparams ty oibopt arg_names =
   let rec aux i ty =
     let env = Global.env () in
     let sigma = Evd.from_env env in
@@ -431,7 +431,7 @@ let parse_dependent_type i nparams ty oib arg_names =
   (*        msgerr (int (i + nparams) ++ str " Rel " ++ int (destRel ty) ++ fnl ()); *)
       let db = destRel ty in
       if i + nparams = db then (* Current inductive, no params *)
-        Some (DTyCtr (qualid_of_ident oib.mind_typename, []))
+        Some (DTyCtr (qualid_of_ident (let Some oib = oibopt in oib.mind_typename), []))
       else begin (* [i + nparams - db]th parameter *) 
         msg_debug (str (Printf.sprintf "Non-self-rel: %s" (dep_type_to_string (List.nth arg_names (i + nparams - db - 1)))) ++ fnl ());
         try Some (List.nth arg_names (i + nparams - db - 1))
@@ -506,6 +506,9 @@ let parse_dependent_type i nparams ty oib arg_names =
     ) in
   aux i ty
 
+let parse_dependent_type ty =
+  parse_dependent_type_internal 0 0 ty None [] 
+  
 let dep_parse_type nparams param_names arity_ctxt oib =
   let len = List.length arity_ctxt in
   (* Only type parameters can be used - no dependencies on the types *)
@@ -519,8 +522,8 @@ let dep_parse_type nparams param_names arity_ctxt oib =
            match n with
            | Name id -> (* Check if it is a parameter to add its type / name *)
               if is_Type t then Some acc 
-              else parse_dependent_type i nparams t oib arg_names >>= fun dt -> Some ((n,dt) :: acc)
-           | _ ->  parse_dependent_type i nparams t oib arg_names >>= fun dt -> Some ((n,dt) :: acc)
+              else parse_dependent_type_internal i nparams t (Some oib) arg_names >>= fun dt -> Some ((n,dt) :: acc)
+           | _ ->  parse_dependent_type_internal i nparams t (Some oib) arg_names >>= fun dt -> Some ((n,dt) :: acc)
         ) (Some []) (List.mapi (fun i x -> (len - nparams - i, x)) arity_ctxt) >>= fun nts ->
   let (names, types) = List.split nts in
   Some (dep_arrowify (DTyCtr (injectCtr "Prop", [])) names types)
@@ -551,10 +554,10 @@ let dep_parse_constructors nparams param_names oib : dep_ctr list option =
                ) pat_names in 
 
 (*     msgerr (str "Calculating result type" ++ fnl ()); *)
-    parse_dependent_type (1 + (List.length ctr_pats)) nparams result oib arg_names >>= fun result_ty ->
+    parse_dependent_type_internal (1 + (List.length ctr_pats)) nparams result (Some oib) arg_names >>= fun result_ty ->
 
 (*     msgerr (str "Calculating types" ++ fnl ()); *)
-    sequenceM (fun x -> x) (List.mapi (fun i ty -> parse_dependent_type i nparams ty oib arg_names) (List.map (Vars.lift (-1)) pat_types)) >>= fun types ->
+    sequenceM (fun x -> x) (List.mapi (fun i ty -> parse_dependent_type_internal i nparams ty (Some oib) arg_names) (List.map (Vars.lift (-1)) pat_types)) >>= fun types ->
     Some (ctr_id, dep_arrowify result_ty pat_names types)
   in
 

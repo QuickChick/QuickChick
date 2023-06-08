@@ -125,6 +125,8 @@ val qualid_to_mib : Libnames.qualid -> mutual_inductive_body
 val dt_rep_from_mib : mutual_inductive_body -> dt_rep option
 val coerce_reference_to_dt_rep : constr_expr -> dt_rep option
 
+val parse_dependent_type : Constr.constr -> dep_type option
+  
 val dep_dt_from_mib : mutual_inductive_body -> dep_dt option
 val coerce_reference_to_dep_dt : constr_expr -> dep_dt option
 

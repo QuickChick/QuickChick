@@ -94,7 +94,24 @@ let quickchick_goal =
     let c = Proofview.Goal.concl gl in
     let e = Proofview.Goal.env gl in
     let evd = Evd.from_env e in
+(*
+    (* Make an evar with the goal as the type *)
+    let evd, evar = Evarutil.new_pure_evar (Environ.named_context_val e) evd c in
+    
+    (* Externalize it *)
+#if COQ_VERSION >= (8, 17, 0)
+    let ct = Constrextern.extern_constr e evd (EConstr.mkEvar (evar, SList.empty)) in
+#else
+    let ct = Constrextern.extern_constr e evd (EConstr.mkEvar (evar, [])) in
+#endif
+ *)  
+    match GenericLib.parse_dependent_type (EConstr.to_constr evd c) with
+    | Some dt ->
+       Tacticals.tclIDTAC
+    | None -> failwith "Failed to Parse type"
+  end
 
+(*    
     (* Make an evar with the goal as the type *)
     let evd, evar = Evarutil.new_pure_evar (Environ.named_context_val e) evd c in
 
@@ -131,7 +148,7 @@ let quickchick_goal =
     (* TODO: This whole block doesn't look very monadic... *)
     Tacticals.tclIDTAC
   end
-
+ *)
     (*
     (* Admit a constant with that type *)
     let tmpid = QuickChick.fresh_name "temporary_constant" in
