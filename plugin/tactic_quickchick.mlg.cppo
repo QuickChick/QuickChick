@@ -107,7 +107,12 @@ let quickchick_goal =
  *)  
     match GenericLib.parse_dependent_type (EConstr.to_constr evd c) with
     | Some dt ->
-       Tacticals.tclIDTAC
+       begin
+         msg_debug (str (GenericLib.dep_type_to_string dt) ++ fnl ());
+         let checker = GenericLib.g_true in
+         GenericLib.debug_coq_expr checker;
+         Tacticals.tclIDTAC
+       end
     | None -> failwith "Failed to Parse type"
   end
 

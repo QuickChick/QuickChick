@@ -507,7 +507,21 @@ let parse_dependent_type_internal i nparams ty oibopt arg_names =
   aux i ty
 
 let parse_dependent_type ty =
-  parse_dependent_type_internal 0 0 ty None [] 
+
+    let (ctr_pats, result) = if isConst ty then ([],ty) else Term.decompose_prod ty in
+
+    let pat_names, pat_types = List.split (List.rev ctr_pats) in
+
+    let pat_names = List.map (fun n -> n.binder_name) pat_names in
+    let arg_names = 
+      List.map (fun n -> match n with
+                         | Name x -> DTyVar x 
+                         | Anonymous -> DTyVar (make_up_name ()) (* Make up a name, but probably can't be used *)
+               ) pat_names in 
+
+    parse_dependent_type_internal (1 + (List.length ctr_pats)) 0 result None arg_names >>= fun result_ty ->
+    sequenceM (fun x -> x) (List.mapi (fun i ty -> parse_dependent_type_internal i 0 ty None arg_names) (List.map (Vars.lift (-1)) pat_types)) >>= fun types ->
+    Some (dep_arrowify result_ty pat_names types)
   
 let dep_parse_type nparams param_names arity_ctxt oib =
   let len = List.length arity_ctxt in
