@@ -39,7 +39,7 @@ Dependencies are listed in [`coq-quickchick.opam`](./coq-quickchick.opam).
     # To get the dependencies, add the Coq opam repository if you haven't already
     opam repo add coq-released https://coq.inria.fr/opam/released
     opam update
-    opam install --deps-only
+    opam install . --deps-only
 
 #### Build using Make
 
