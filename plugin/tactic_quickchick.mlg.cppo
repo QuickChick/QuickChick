@@ -73,7 +73,11 @@ let remember_induct h =
         let rec do_remembers (pats : EConstr.constr list) =
           match pats with
           | [] ->
-             Tactics.induction false None cn None None
+#if COQ_VERSION >= (8, 19, 0)
+            Induction.induction false None cn None None
+#else
+            Tactics.induction false None cn None None
+#endif
           | p :: ps ->
              Tacticals.tclTHEN
 #if COQ_VERSION >= (8, 18, 0)             
