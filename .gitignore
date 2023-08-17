@@ -60,3 +60,4 @@ plugin/compat.ml
 src/ExtractionQCCompat.v
 src/QuickChick.v
 _CoqProject
+META
