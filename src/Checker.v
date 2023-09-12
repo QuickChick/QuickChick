@@ -95,6 +95,39 @@ Class Checkable (A : Type) : Type :=
     checker : A -> Checker
   }.
 
+  Inductive Ctx :=
+| EmptyCtx
+| CtxBind : Type -> Ctx -> Ctx.
+
+Fixpoint interpCtx (C : Ctx) : Type :=
+  match C with
+  | EmptyCtx => unit
+  | CtxBind t C => t * interpCtx C
+  end.
+  
+Inductive CProp : Ctx -> Type :=
+| ForAll : forall A C,
+    (interpCtx C -> G A) ->
+    CProp (CtxBind A C) -> CProp C
+| Predicate : forall C,
+    (interpCtx C -> Checker) -> CProp C.
+
+Axiom arb : G nat.
+Axiom gen : nat -> G bool.
+Axiom test : nat -> bool -> Checker.
+
+Definition example :=
+@ForAll _ EmptyCtx (fun tt => arb) (
+@ForAll _ (CtxBind nat EmptyCtx)
+          (fun '(x, tt) => gen x) (
+@Predicate (CtxBind bool (CtxBind nat EmptyCtx)) (fun '(y, (x, tt)) => test x y))).
+
+Fixpoint run {A: Ctx} (cprop: CProp A) : Checker :=
+match cprop with
+| Predicate C p => (p (interpCtx C))
+| ForAll _ _ _ cprop' => run cprop' 
+end
+.
 (* mapping and lifting functions *)
 
 Definition liftBool (b : bool) : Result :=
