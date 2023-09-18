@@ -95,49 +95,6 @@ Class Checkable (A : Type) : Type :=
     checker : A -> Checker
   }.
 
-Inductive Ctx :=
-| EmptyCtx
-| CtxBind : Type -> Ctx -> Ctx.
-
-Fixpoint interpCtx (C : Ctx) : Type :=
-  match C with
-  | EmptyCtx => unit
-  | CtxBind t C => t * interpCtx C
-  end.
-
-Inductive CProp : Ctx -> Type :=
-| ForAll : forall A C,
-    (interpCtx C -> G A) ->
-    CProp (CtxBind A C) -> CProp C
-| Predicate : forall C,
-    (interpCtx C -> option bool) -> CProp C.
-
-Definition liftBool (b : bool) : Result :=
-  if b then succeeded else updReason failed "Falsifiable".
-
-Definition arb : G nat := choose (0,10).
-Definition gen (n : nat) : G nat := choose (0, n).
-Definition test (x y : nat) : option bool :=
-  Some (Nat.ltb y x).
-  
-Definition example :=
-  @ForAll _ EmptyCtx (fun tt => arb) (
-  @ForAll _ (CtxBind nat EmptyCtx)
-          (fun '(x, tt) => gen x) (
-  @Predicate (CtxBind nat (CtxBind nat EmptyCtx))
-             (fun '(y, (x, tt)) => test x y))).
-
-Fixpoint run (C: Ctx) (env : interpCtx C)
-         (cprop: CProp C) : G (option bool).
-  induction cprop.
-  - refine (bindGen _ _).
-    + exact (g env).
-    + intro x.
-      apply IHcprop.
-      exact (x, env).
-  - exact (returnGen (o env)).
-Defined.
-
 (* mapping and lifting functions *)
 
 Definition liftBool (b : bool) : Result :=
