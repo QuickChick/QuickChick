@@ -16,7 +16,7 @@ Fixpoint interpCtx (C : Ctx) : Type :=
   | CtxBind t C => t * interpCtx C
   end.
 
-  Inductive CProp : Ctx -> Type :=
+Inductive CProp : Ctx -> Type :=
   | ForAll : forall A C,
       (interpCtx C -> G A) ->
       (interpCtx C -> A -> G A) ->
@@ -25,7 +25,6 @@ Fixpoint interpCtx (C : Ctx) : Type :=
       CProp (CtxBind A C) -> CProp C
   | Predicate : forall C,
       (interpCtx C -> option bool) -> CProp C.
-
 
 Definition arb : G nat := choose (0,10).
 Definition gen (n : nat) : G nat := choose (0, n).
@@ -38,7 +37,7 @@ Definition example :=
   @Predicate (CtxBind nat (CtxBind nat EmptyCtx))
              (fun '(y, (x, tt)) => test x y))).
 
-Fixpoint run (C: Ctx) (env : interpCtx C)
+Fixpoint genAndTest (C: Ctx) (env : interpCtx C)
          (cprop: CProp C) : G (option bool).
   induction cprop.
   - refine (bindGen _ _).
@@ -49,11 +48,29 @@ Fixpoint run (C: Ctx) (env : interpCtx C)
   - exact (returnGen (o env)).
 Defined.
 
-
-Definition emptyEnv : interpCtx EmptyCtx.
-  simpl.
-  constructor.
+Fixpoint finalCtx (C : Ctx) 
+         (cprop : CProp C) : Ctx.
+  induction cprop.
+  - exact (finalCtx (CtxBind A C) cprop).
+  - exact C.
 Defined.
+
+Definition emptyEnv : interpCtx EmptyCtx := tt.
+
+Compute (finalCtx EmptyCtx example).
+
+Fixpoint print (C : Ctx) (cprop : CProp C)
+         (env : interpCtx (finalCtx C cprop))
+  : list string
+         
+
+         (env : interpCtx C)
+         (cprop: CProp C) : list string.
+
+
+
+
+
 
 Inductive Result (A: Type) :=
 | BugFound : A -> Result A
