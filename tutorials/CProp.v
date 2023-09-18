@@ -32,8 +32,8 @@ Definition test (x y : nat) : option bool :=
   Some (Nat.ltb y x).
   
 Definition example :=
-  @ForAll _ EmptyCtx (fun tt => arb) (fun tt n => arb) (fun tt n => nil) (fun tt n => ""%string) (
-  @ForAll _ (CtxBind nat EmptyCtx) (fun '(x, tt) => gen x) (fun tt n => arb) (fun tt n => nil) (fun tt n => ""%string) (
+  @ForAll _ EmptyCtx (fun tt => arb) (fun tt n => arb) (fun tt n => nil) (fun tt n => show n) (
+  @ForAll _ (CtxBind nat EmptyCtx) (fun '(x, tt) => gen x) (fun tt n => arb) (fun tt n => nil) (fun tt n => show n) (
   @Predicate (CtxBind nat (CtxBind nat EmptyCtx))
              (fun '(y, (x, tt)) => test x y))).
 
@@ -53,6 +53,19 @@ Fixpoint finalCtx (C : Ctx)
   induction cprop.
   - exact (CtxBind A (finalCtx (CtxBind A C) cprop)).
   - exact EmptyCtx.
+Defined.
+
+Fixpoint genAndTestResult (C: Ctx) (env : interpCtx C)
+         (cprop: CProp C) : G (interpCtx (finalCtx C cprop) * option bool).
+  induction cprop; simpl in *.
+  - refine (bindGen _ _).
+    + exact (g env).
+    + intro a.
+      specialize (IHcprop (a, env)).
+      refine (bindGen IHcprop _).
+      intros [c b].
+      refine (returnGen ((a,c), b)).
+  - exact (returnGen (tt, o env)).
 Defined.
 
 Definition emptyEnv : interpCtx EmptyCtx := tt.
