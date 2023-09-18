@@ -125,6 +125,8 @@ val qualid_to_mib : Libnames.qualid -> mutual_inductive_body
 val dt_rep_from_mib : mutual_inductive_body -> dt_rep option
 val coerce_reference_to_dt_rep : constr_expr -> dt_rep option
 
+val parse_dependent_type : Constr.constr -> dep_type option
+
 val dep_dt_from_mib : mutual_inductive_body -> dep_dt option
 val coerce_reference_to_dep_dt : constr_expr -> dep_dt option
 
@@ -209,12 +211,26 @@ val g_true  : coq_expr
 val g_false : coq_expr               
 val decToBool : coq_expr -> coq_expr
 val gBool  : coq_expr
+val gIf : coq_expr -> coq_expr -> coq_expr -> coq_expr
+
+(* list *)
 
 (* unit *)
 val gUnit : coq_expr
 val gTT   : coq_expr
-  
+
+(* dec *)
+val g_dec : coq_expr -> coq_expr
+
+(* checker *)
+
+val g_checker : coq_expr -> coq_expr
+
+
 (* (\* Gen combinators *\) *)
+val g_forAll : coq_expr -> coq_expr -> coq_expr
+val g_arbitrary : coq_expr
+
 (* val gGen : coq_expr -> coq_expr *)
 (* val returnGen  : coq_expr -> coq_expr  *)
 (* val bindGen    : coq_expr -> string -> (var -> coq_expr) -> coq_expr  *)
