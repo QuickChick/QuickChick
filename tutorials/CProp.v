@@ -51,8 +51,8 @@ Defined.
 Fixpoint finalCtx (C : Ctx) 
          (cprop : CProp C) : Ctx.
   induction cprop.
-  - exact (finalCtx (CtxBind A C) cprop).
-  - exact C.
+  - exact (CtxBind A (finalCtx (CtxBind A C) cprop)).
+  - exact EmptyCtx.
 Defined.
 
 Definition emptyEnv : interpCtx EmptyCtx := tt.
@@ -60,23 +60,19 @@ Definition emptyEnv : interpCtx EmptyCtx := tt.
 Compute (finalCtx EmptyCtx example).
 
 Fixpoint print (C : Ctx) (cprop : CProp C)
-         (env : interpCtx (finalCtx C cprop))
-  : list string
-         
+         (cenv : interpCtx C)
+         (fenv : interpCtx (finalCtx C cprop))
+         {struct cprop}
+  : list string.
+  induction cprop; simpl in *.
+  - destruct fenv as [a fenv'] eqn:H.
+    apply cons.
+    + exact (s cenv a).
+    + apply (print _ cprop (a, cenv) fenv'). 
+  - exact nil.
+Defined.
 
-         (env : interpCtx C)
-         (cprop: CProp C) : list string.
-
-
-
-
-
-
-Inductive Result (A: Type) :=
-| BugFound : A -> Result A
-| DiscardsExhausted : Result A
-| TestsExhausted: Result A. 
-
+Compute (print EmptyCtx example tt (3,(4,tt))).
 
 (* 
 
