@@ -32,8 +32,8 @@ Definition test (x y : nat) : option bool :=
   Some (Nat.ltb y x).
   
 Definition example :=
-  @ForAll _ EmptyCtx (fun tt => arb) (fun tt n => arb) (fun tt n => nil) (fun tt n => show n) (
-  @ForAll _ (CtxBind nat EmptyCtx) (fun '(x, tt) => gen x) (fun tt n => arb) (fun tt n => nil) (fun tt n => show n) (
+  @ForAll _ EmptyCtx (fun tt => arb) (fun tt n => arb) (fun tt n => shrink n) (fun tt n => show n) (
+  @ForAll _ (CtxBind nat EmptyCtx) (fun '(x, tt) => gen x) (fun tt n => arb) (fun tt n => shrink n) (fun tt n => show n) (
   @Predicate (CtxBind nat (CtxBind nat EmptyCtx))
              (fun '(y, (x, tt)) => test x y))).
 
@@ -103,6 +103,60 @@ Defined.
 
 Compute (runAndTest EmptyCtx example tt (3,(4,tt))).
 Compute (runAndTest EmptyCtx example tt (4,(3,tt))).
+
+Fixpoint shrinkOnTheFly
+  (C : Ctx) (cprop : CProp C)
+  (cenv : interpCtx C)
+  (fenv : interpCtx (finalCtx C cprop))
+  {struct cprop}
+  : option (interpCtx (finalCtx C cprop)).
+Proof.
+  induction cprop; simpl in *.
+  - destruct fenv as [a fenv'].
+    (* Recurse through the list of shrinks *)
+    induction (l cenv a).
+    (* No more shrinks - try the next element of the property *)
+    + destruct (shrinkOnTheFly _ cprop (a,cenv) fenv') eqn:M.
+      * exact (Some (a, i)).
+      * exact None.
+    (* More shrinks - run the property on the shrunk possibility. *)
+    + destruct (runAndTest _ cprop (a0,cenv) fenv') eqn:T.
+      * destruct b.
+        (* Test succeeded - recurse down the list. *)
+        -- apply IHl0.
+        (* Test failed - end with current result. *)
+        -- exact (Some (a0, fenv')).
+      * (* Test discarded - recurse down the list. *)
+        apply IHl0.
+  - exact None.
+Defined.
+
+Fixpoint shrinkLoop (fuel : nat)
+  (cprop: CProp EmptyCtx) (counterexample : interpCtx (finalCtx EmptyCtx cprop)) :
+  interpCtx (finalCtx EmptyCtx cprop) :=
+  match fuel with
+  | O => counterexample
+  | S fuel' =>
+      match shrinkOnTheFly EmptyCtx cprop tt counterexample with
+      | Some c' => shrinkLoop fuel' cprop c'
+      | None => counterexample
+      end
+  end.
+
+Fixpoint shrinkLoopLog (fuel : nat)
+  (cprop: CProp EmptyCtx) (counterexample : interpCtx (finalCtx EmptyCtx cprop)) :
+  list (interpCtx (finalCtx EmptyCtx cprop)) :=
+  match fuel with
+  | O => [counterexample]
+  | S fuel' =>
+      match shrinkOnTheFly EmptyCtx cprop tt counterexample with
+      | Some c' => (counterexample :: shrinkLoopLog fuel' cprop c')
+      | None => [counterexample]
+      end
+  end.
+
+Compute (shrinkLoopLog 10  example (3,(4,tt))).
+
 
     (* 
 
