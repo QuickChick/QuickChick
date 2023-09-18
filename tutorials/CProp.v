@@ -87,7 +87,24 @@ Defined.
 
 Compute (print EmptyCtx example tt (3,(4,tt))).
 
-(* 
+Fixpoint runAndTest (C:Ctx) (cprop : CProp C)
+         (cenv : interpCtx C)
+         (fenv : interpCtx (finalCtx C cprop))
+         {struct cprop}
+  : option bool.
+Proof.
+  induction cprop; simpl in *.
+  - destruct fenv as [a fenv'] eqn:H.
+    apply IHcprop.
+    + exact (a, cenv).
+    + exact fenv'.
+  - exact (o cenv).
+Defined.
+
+Compute (runAndTest EmptyCtx example tt (3,(4,tt))).
+Compute (runAndTest EmptyCtx example tt (4,(3,tt))).
+
+    (* 
 
 Runner Loop:
 
