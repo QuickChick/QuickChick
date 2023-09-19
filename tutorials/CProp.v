@@ -37,6 +37,7 @@ Definition example :=
   @Predicate (CtxBind nat (CtxBind nat EmptyCtx))
              (fun '(y, (x, tt)) => test x y))).
 
+
 Fixpoint genAndTest (C: Ctx) (env : interpCtx C)
          (cprop: CProp C) : G (option bool).
   induction cprop.
@@ -47,6 +48,16 @@ Fixpoint genAndTest (C: Ctx) (env : interpCtx C)
       exact (x, env).
   - exact (returnGen (o env)).
 Defined.
+
+(* replace genAndTest with this *)
+Fixpoint genAndRun (C : Ctx) (cprop : CProp C) : interpCtx C -> G (option bool) :=
+  match cprop with
+  | ForAll A C gen fuzz shrink print cprop' =>
+      fun env => a <- gen env;; genAndRun (CtxBind A C) cprop' (a,env) 
+  | Predicate C prop =>
+      fun env => ret (prop env)
+  end.
+
 
 Fixpoint finalCtx (C : Ctx) 
          (cprop : CProp C) : Ctx.
