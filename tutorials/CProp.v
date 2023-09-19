@@ -42,13 +42,13 @@ Definition test (x y : nat) : option bool :=
   Some (Nat.ltb y x).
   
 Definition example :=
-  @ForAll _ EmptyCtx (fun tt => arb) (fun tt n => arb) (fun tt n => shrink n) (fun tt n => show n) (
-  @ForAll _ (CtxBind nat EmptyCtx) (fun '(x, tt) => gen x) (fun tt n => arb) (fun tt n => shrink n) (fun tt n => show n) (
-  @Predicate (CtxBind nat (CtxBind nat EmptyCtx))
+  @ForAll _ ∅ (fun tt => arb) (fun tt n => arb) (fun tt n => shrink n) (fun tt n => show n) (
+  @ForAll _ (nat · ∅) (fun '(x, tt) => gen x) (fun tt n => arb) (fun tt n => shrink n) (fun tt n => show n) (
+  @Predicate (nat · (nat · ∅))
              (fun '(y, (x, tt)) => test x y))).
 
 
-Fixpoint genAndTest (C: Ctx) (env : interpCtx C)
+Fixpoint genAndTest (C: Ctx) (env : ⟦C⟧)
          (cprop: CProp C) : G (option bool).
   induction cprop.
   - refine (bindGen _ _).
@@ -70,16 +70,17 @@ Fixpoint genAndRun {C : Ctx} (cprop : CProp C)
   | Predicate C prop =>
       fun env => ret (prop env)
   end.
+ 
 
 Fixpoint finalCtx (C : Ctx) 
          (cprop : CProp C) : Ctx.
   induction cprop.
-  - exact (CtxBind A (finalCtx (CtxBind A C) cprop)).
-  - exact EmptyCtx.
+  - exact (A · (finalCtx (A · C) cprop)).
+  - exact ∅.
 Defined.
 
-Fixpoint genAndTestResult (C: Ctx) (env : interpCtx C)
-         (cprop: CProp C) : G (interpCtx (finalCtx C cprop) * option bool).
+Fixpoint genAndTestResult (C: Ctx) (env :  ⟦C⟧)
+         (cprop: CProp C) : G (⟦finalCtx C cprop⟧ * option bool).
   induction cprop; simpl in *.
   - refine (bindGen _ _).
     + exact (g env).
@@ -91,13 +92,13 @@ Fixpoint genAndTestResult (C: Ctx) (env : interpCtx C)
   - exact (returnGen (tt, o env)).
 Defined.
 
-Definition emptyEnv : interpCtx EmptyCtx := tt.
+Definition emptyEnv : ⟦∅⟧ := tt.
 
-Compute (finalCtx EmptyCtx example).
+Compute (finalCtx ∅ example).
 
 Fixpoint print (C : Ctx) (cprop : CProp C)
-         (cenv : interpCtx C)
-         (fenv : interpCtx (finalCtx C cprop))
+         (cenv :  ⟦C⟧)
+         (fenv :  ⟦finalCtx C cprop⟧)
          {struct cprop}
   : list string.
   induction cprop; simpl in *.
@@ -108,11 +109,11 @@ Fixpoint print (C : Ctx) (cprop : CProp C)
   - exact nil.
 Defined.
 
-Compute (print EmptyCtx example tt (3,(4,tt))).
+Compute (print ∅ example tt (3,(4,tt))).
 
 Fixpoint runAndTest (C:Ctx) (cprop : CProp C)
-         (cenv : interpCtx C)
-         (fenv : interpCtx (finalCtx C cprop))
+         (cenv : ⟦C⟧)
+         (fenv :  ⟦finalCtx C cprop⟧)
          {struct cprop}
   : option bool.
 Proof.
@@ -124,15 +125,15 @@ Proof.
   - exact (o cenv).
 Defined.
 
-Compute (runAndTest EmptyCtx example tt (3,(4,tt))).
-Compute (runAndTest EmptyCtx example tt (4,(3,tt))).
+Compute (runAndTest ∅ example tt (3,(4,tt))).
+Compute (runAndTest ∅ example tt (4,(3,tt))).
 
 Fixpoint shrinkOnTheFly
   (C : Ctx) (cprop : CProp C)
-  (cenv : interpCtx C)
-  (fenv : interpCtx (finalCtx C cprop))
+  (cenv :  ⟦C⟧)
+  (fenv :  ⟦finalCtx C cprop⟧)
   {struct cprop}
-  : option (interpCtx (finalCtx C cprop)).
+  : option ⟦finalCtx C cprop⟧.
 Proof.
   induction cprop; simpl in *.
   - destruct fenv as [a fenv'].
@@ -155,24 +156,24 @@ Proof.
 Defined.
 
 Fixpoint shrinkLoop (fuel : nat)
-  (cprop: CProp EmptyCtx) (counterexample : interpCtx (finalCtx EmptyCtx cprop)) :
-  interpCtx (finalCtx EmptyCtx cprop) :=
+  (cprop: CProp ∅) (counterexample : ⟦finalCtx ∅ cprop⟧) :
+  ⟦finalCtx ∅ cprop⟧ :=
   match fuel with
   | O => counterexample
   | S fuel' =>
-      match shrinkOnTheFly EmptyCtx cprop tt counterexample with
+      match shrinkOnTheFly ∅ cprop tt counterexample with
       | Some c' => shrinkLoop fuel' cprop c'
       | None => counterexample
       end
   end.
 
 Fixpoint shrinkLoopLog (fuel : nat)
-  (cprop: CProp EmptyCtx) (counterexample : interpCtx (finalCtx EmptyCtx cprop)) :
-  list (interpCtx (finalCtx EmptyCtx cprop)) :=
+  (cprop: CProp ∅) (counterexample : ⟦finalCtx ∅ cprop⟧) :
+  list  ⟦finalCtx ∅ cprop⟧ :=
   match fuel with
   | O => [counterexample]
   | S fuel' =>
-      match shrinkOnTheFly EmptyCtx cprop tt counterexample with
+      match shrinkOnTheFly ∅ cprop tt counterexample with
       | Some c' => (counterexample :: shrinkLoopLog fuel' cprop c')
       | None => [counterexample]
       end
@@ -181,44 +182,41 @@ Fixpoint shrinkLoopLog (fuel : nat)
 Compute (shrinkLoopLog 10  example (3,(4,tt))).
 
 Fixpoint runLoop1 (fuel: nat)
-         (cprop: CProp EmptyCtx) : G (list string) :=
+         (cprop: CProp ∅) : G (list string) :=
   match fuel with
   | 0 => returnGen []
   | S fuel' =>
-      bindGen (genAndTestResult EmptyCtx emptyEnv cprop)
+      bindGen (genAndTestResult ∅ emptyEnv cprop)
               (fun res =>
-                  returnGen (print EmptyCtx cprop tt (fst res)))
+                  returnGen (print ∅ cprop tt (fst res)))
                
   end.
 
 Fixpoint runLoop2 (fuel: nat)
-         (cprop: CProp EmptyCtx) : G (list string) :=
+         (cprop: CProp ∅) : G (list string) :=
   match fuel with
   | 0 => returnGen []
   | S fuel' =>
-      bindGen (genAndTestResult EmptyCtx emptyEnv cprop)
+      bindGen (genAndTestResult ∅ emptyEnv cprop)
               (fun res =>
                  match res with
                  | (variables, result) =>
                      match result with
                      | Some false =>
                                 let shrinked := shrinkLoop 10 cprop (fst res) in
-                                 returnGen (print EmptyCtx cprop tt shrinked)
+                                 returnGen (print ∅ cprop tt shrinked)
                      | None | Some true => runLoop2 fuel' cprop
                      end
-                 end
-                   
-                 
-                  )
+                 end)
                
   end.
 
 Fixpoint genAndTestLoop (fuel: nat)
-         (cprop: CProp EmptyCtx) : G (option (interpCtx (finalCtx EmptyCtx cprop))) :=
+         (cprop: CProp ∅) : G (option ⟦finalCtx ∅ cprop⟧) :=
   match fuel with
   | 0 => returnGen None
   | S fuel' =>
-      bindGen (genAndTestResult EmptyCtx emptyEnv cprop)
+      bindGen (genAndTestResult ∅ emptyEnv cprop)
               (fun res =>
                  match res with
                  | (variables, result) =>
@@ -231,31 +229,16 @@ Fixpoint genAndTestLoop (fuel: nat)
   end.
 
 Fixpoint runLoop3 (fuel: nat)
-         (cprop: CProp EmptyCtx) : G (list string) :=
+         (cprop: CProp ∅) : G (list string) :=
   generationResult <- genAndTestLoop fuel cprop ;;
   match generationResult with
   | None => returnGen []
   | Some variables =>
       let shrinkingResult := shrinkLoop 10 cprop variables in
-      let printingResult := print EmptyCtx cprop tt shrinkingResult in
+      let printingResult := print ∅ cprop tt shrinkingResult in
       returnGen printingResult
   end
 .
 
 
-
 Sample (runLoop3 10 example).
-
-Print runLoop.
-
-
-
-
-
-Definition result :list (option bool) := 
-  sample (run EmptyCtx emptyEnv example).
-
-QuickChick (runLoop 10 example).
-
-QuickChick (run EmptyCtx emptyEnv example).
-Sample (run EmptyCtx emptyEnv example).
