@@ -180,45 +180,71 @@ Fixpoint shrinkLoopLog (fuel : nat)
 
 Compute (shrinkLoopLog 10  example (3,(4,tt))).
 
+Fixpoint runLoop1 (fuel: nat)
+         (cprop: CProp EmptyCtx) : G (list string) :=
+  match fuel with
+  | 0 => returnGen []
+  | S fuel' =>
+      bindGen (genAndTestResult EmptyCtx emptyEnv cprop)
+              (fun res =>
+                  returnGen (print EmptyCtx cprop tt (fst res)))
+               
+  end.
 
-    (* 
+Fixpoint runLoop2 (fuel: nat)
+         (cprop: CProp EmptyCtx) : G (list string) :=
+  match fuel with
+  | 0 => returnGen []
+  | S fuel' =>
+      bindGen (genAndTestResult EmptyCtx emptyEnv cprop)
+              (fun res =>
+                 match res with
+                 | (variables, result) =>
+                     match result with
+                     | Some false =>
+                                let shrinked := shrinkLoop 10 cprop (fst res) in
+                                 returnGen (print EmptyCtx cprop tt shrinked)
+                     | None | Some true => runLoop2 fuel' cprop
+                     end
+                 end
+                   
+                 
+                  )
+               
+  end.
 
-Runner Loop:
+Fixpoint genAndTestLoop (fuel: nat)
+         (cprop: CProp EmptyCtx) : G (option (interpCtx (finalCtx EmptyCtx cprop))) :=
+  match fuel with
+  | 0 => returnGen None
+  | S fuel' =>
+      bindGen (genAndTestResult EmptyCtx emptyEnv cprop)
+              (fun res =>
+                 match res with
+                 | (variables, result) =>
+                     match result with
+                     | Some false => returnGen (Some variables)
+                     | None | Some true => genAndTestLoop fuel' cprop
+                     end
+                 end)
+               
+  end.
 
-- Generate a test case
-- Depending on some state, you may choose to mutate it
-- Run the test case
-- Update the state based on the test case
-- If the test case fails
-  + Shrink the case by repeatedly running it
-  + If the case is minimal, return it
-- If the test case passes
-  + Check if you exhausted your fuel or you have too many discards
-  + If so, return "not found"
-  + Otherwise, go back to generating a new test case
+Fixpoint runLoop3 (fuel: nat)
+         (cprop: CProp EmptyCtx) : G (list string) :=
+  generationResult <- genAndTestLoop fuel cprop ;;
+  match generationResult with
+  | None => returnGen []
+  | Some variables =>
+      let shrinkingResult := shrinkLoop 10 cprop variables in
+      let printingResult := print EmptyCtx cprop tt shrinkingResult in
+      returnGen printingResult
+  end
+.
 
 
-Problems:
-- I want shrinking and printing to be an after-thought. We should have a pipeline
 
-  1. Run tests, collect metrics if applicable.
-  2. Get result, shrink if applicable.
-  3. Print result
-
-  The problem is that I haven't found a good way of integrating the metric collection
-  because data types are not present in the higher level interface. The first option
-  is to use printing for serialization. 
-
- *)
-
-Fixpoint runLoop (f: nat) () (cprop: CProp EmptyCtx) : G Result.
-  induction f.
-  - refine (returnGen _).
-    refine (MkResult None false ""%string false nil nil None).
-  - refine (bindGen _ _).
-    + apply IHf.
-    + intros. apply IHf.
-Defined.
+Sample (runLoop3 10 example).
 
 Print runLoop.
 
