@@ -10,21 +10,31 @@ Inductive Ctx :=
 | EmptyCtx
 | CtxBind : Type -> Ctx -> Ctx.
 
+Declare Scope prop_scope.
+Notation "'∅'" := EmptyCtx : prop_scope.
+Notation " A '·' C " :=
+  (CtxBind A C) (at level 70) : prop_scope.
+
+Local Open Scope prop_scope.
+
 Fixpoint interpCtx (C : Ctx) : Type :=
   match C with
-  | EmptyCtx => unit
-  | CtxBind t C => t * interpCtx C
+  | ∅ => unit
+  | T·C => T * interpCtx C
   end.
 
+Notation "'⟦' C '⟧'" := (interpCtx C) : prop_scope.
+
 Inductive CProp : Ctx -> Type :=
-  | ForAll : forall A C,
-      (interpCtx C -> G A) ->
-      (interpCtx C -> A -> G A) ->
-      (interpCtx C -> A -> list A) ->
-      (interpCtx C -> A -> string) ->
-      CProp (CtxBind A C) -> CProp C
+| ForAll : forall A C,
+    (* TODO: Name these? *)
+      (⟦C⟧ -> G A) ->
+      (⟦C⟧ -> A -> G A) ->
+      (⟦C⟧ -> A -> list A) -> 
+      (⟦C⟧ -> A -> string) ->
+      CProp (A · C) -> CProp C
   | Predicate : forall C,
-      (interpCtx C -> option bool) -> CProp C.
+      (⟦C⟧ -> option bool) -> CProp C.
 
 Definition arb : G nat := choose (0,10).
 Definition gen (n : nat) : G nat := choose (0, n).
@@ -50,14 +60,16 @@ Fixpoint genAndTest (C: Ctx) (env : interpCtx C)
 Defined.
 
 (* replace genAndTest with this *)
-Fixpoint genAndRun (C : Ctx) (cprop : CProp C) : interpCtx C -> G (option bool) :=
+Fixpoint genAndRun {C : Ctx} (cprop : CProp C)
+  : ⟦C⟧ -> G (option bool) :=
   match cprop with
-  | ForAll A C gen fuzz shrink print cprop' =>
-      fun env => a <- gen env;; genAndRun (CtxBind A C) cprop' (a,env) 
+  | ForAll A C gen mut shr pri cprop' =>
+      fun env =>
+        a <- gen env;;
+        genAndRun cprop' (a,env) 
   | Predicate C prop =>
       fun env => ret (prop env)
   end.
-
 
 Fixpoint finalCtx (C : Ctx) 
          (cprop : CProp C) : Ctx.
