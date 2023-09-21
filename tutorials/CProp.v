@@ -25,91 +25,92 @@ Fixpoint interpCtx (C : Ctx) : Type :=
 
 Notation "'⟦' C '⟧'" := (interpCtx C) : prop_scope.
 
-Inductive CProp : Ctx -> Type :=
-| ForAll : forall A C,
-    (* TODO: Name these? *)
-      (⟦C⟧ -> G A) ->
-      (⟦C⟧ -> A -> G A) ->
-      (⟦C⟧ -> A -> list A) -> 
-      (⟦C⟧ -> A -> string) ->
-      CProp (A · C) -> CProp C
-  | Predicate : forall C,
-      (⟦C⟧ -> option bool) -> CProp C.
+Inductive CProp : Ctx -> Type -> Type :=
+| ForAll : forall A C F
+      (name: string)
+      (generator : ⟦C⟧ -> G A)
+      (mutator   : ⟦C⟧ -> A -> G A)
+      (shrinker  : ⟦C⟧ -> A -> list A)
+      (printer   : ⟦C⟧ -> A -> string),
+      CProp (A · C) F -> CProp C F
+  | Predicate : forall C F,
+      (⟦C⟧ -> option bool * option F) -> CProp C F.
+
+Fixpoint inputTypes {C : Ctx} {F : Type}
+         (cprop : CProp C F) : Ctx :=
+  match cprop with
+  | ForAll A C _ _ _ _ _ _ cprop' =>
+      A · (inputTypes cprop')
+  | Predicate _ _ _ => ∅
+  end.
+
+Notation "'⦗' c '⦘'" := (@inputTypes _ _ c).
 
 Definition arb : G nat := choose (0,10).
 Definition gen (n : nat) : G nat := choose (0, n).
 Definition test (x y : nat) : option bool :=
   Some (Nat.ltb y x).
-  
+
+Local Open Scope string.
+
 Definition example :=
-  @ForAll _ ∅ (fun tt => arb) (fun tt n => arb) (fun tt n => shrink n) (fun tt n => show n) (
-  @ForAll _ (nat · ∅) (fun '(x, tt) => gen x) (fun tt n => arb) (fun tt n => shrink n) (fun tt n => show n) (
-  @Predicate (nat · (nat · ∅))
-             (fun '(y, (x, tt)) => test x y))).
+  @ForAll _ ∅ _ "x" (fun tt => arb) (fun tt n => arb) (fun tt n => shrink n) (fun tt n => show n) (
+  @ForAll _ (nat · ∅) _ "y" (fun '(x, tt) => gen x) (fun tt n => arb) (fun tt n => shrink n) (fun tt n => show n) (
+  @Predicate (nat · (nat · ∅)) unit
+             (fun '(y, (x, tt)) => (test x y, None)))).
 
+Compute ⦗example⦘. 
 
-Fixpoint genAndTest (C: Ctx) (env : ⟦C⟧)
-         (cprop: CProp C) : G (option bool).
-  induction cprop.
-  - refine (bindGen _ _).
-    + exact (g env).
-    + intro x.
-      apply IHcprop.
-      exact (x, env).
-  - exact (returnGen (o env)).
-Defined.
-
-(* replace genAndTest with this *)
-Fixpoint genAndRun {C : Ctx} (cprop : CProp C)
-  : ⟦C⟧ -> G (option bool) :=
+Fixpoint genAndRun {C : Ctx} {F : Type}
+         (cprop : CProp C F)
+  : ⟦C⟧ -> G (⟦⦗cprop⦘⟧ * (option bool * option F)) :=
   match cprop with
-  | ForAll A C gen mut shr pri cprop' =>
+  | ForAll A C F _ gen mut shr pri cprop' =>
       fun env =>
         a <- gen env;;
-        genAndRun cprop' (a,env) 
-  | Predicate C prop =>
-      fun env => ret (prop env)
+        res <- genAndRun cprop' (a,env);;
+        let '(env', (truth, instr)) := res in
+        ret ((a,env'), (truth, instr))
+  | Predicate C F prop =>
+      fun env => returnGen (tt, prop env)
   end.
- 
 
-Fixpoint finalCtx (C : Ctx) 
-         (cprop : CProp C) : Ctx.
-  induction cprop.
-  - exact (A · (finalCtx (A · C) cprop)).
-  - exact ∅.
-Defined.
+Fixpoint print {C : Ctx} {F} (cprop : CProp C F)
+  : ⟦C⟧ -> ⟦⦗ cprop ⦘⟧ -> list (string * string) :=
+  match cprop with
+  | ForAll A C F name gen mut shr pr cprop' =>
+      fun env '(a,inps') =>
+        (name, pr env a) :: (print cprop' (a, env) inps')
+  | Predicate C F prop =>
+      fun _ _ => nil
+  end.
 
-Fixpoint genAndTestResult (C: Ctx) (env :  ⟦C⟧)
-         (cprop: CProp C) : G (⟦finalCtx C cprop⟧ * option bool).
-  induction cprop; simpl in *.
-  - refine (bindGen _ _).
-    + exact (g env).
-    + intro a.
-      specialize (IHcprop (a, env)).
-      refine (bindGen IHcprop _).
-      intros [c b].
-      refine (returnGen ((a,c), b)).
-  - exact (returnGen (tt, o env)).
-Defined.
-
-Definition emptyEnv : ⟦∅⟧ := tt.
-
-Compute (finalCtx ∅ example).
-
-Fixpoint print (C : Ctx) (cprop : CProp C)
-         (cenv :  ⟦C⟧)
-         (fenv :  ⟦finalCtx C cprop⟧)
-         {struct cprop}
-  : list string.
-  induction cprop; simpl in *.
-  - destruct fenv as [a fenv'] eqn:H.
-    apply cons.
-    + exact (s cenv a).
-    + apply (print _ cprop (a, cenv) fenv'). 
-  - exact nil.
-Defined.
-
-Compute (print ∅ example tt (3,(4,tt))).
+Fixpoint generalizedTargeting (fuel : nat) {C} {F}
+         (cprop: CProp C F)
+    (* TODO : better data structure for seed pool *)
+         (seed_pool : data structure ⟦⦗C⦘⟧)
+         {Agg : Type}
+         (agg : Agg)
+         (update_agg : Agg -> F -> ⟦⦗C⦘⟧ -> Agg)
+         (is_waypoint: Agg -> F -> bool)
+         (priority : Agg -> F -> nat)
+         :=
+  match fuel with 
+  | O => _
+  | S fuel' =>
+      (* Zero: Decide how to generate based on seed_pool *)
+      (* This is just random *)
+      res <- genAndRun cprop ∅;;
+      let '(inputs, (truth, feedback)) := res in
+      (* First: Check truth.. *)
+      ....
+      (* Second: Check feedback *)
+      if is_waypoint agg feedback then
+        let agg' := update_agg agg feedback inputs in
+        let seed_pool := ... in
+        generalizedTargeting ....                            else
+        generalizedTargeting ....     
+                         end. 
 
 Fixpoint runAndTest (C:Ctx) (cprop : CProp C)
          (cenv : ⟦C⟧)
