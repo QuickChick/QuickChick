@@ -85,16 +85,90 @@ Fixpoint print {C : Ctx} {F} (cprop : CProp C F)
       fun _ _ => nil
   end.
 
+Definition SeedPool := list.
+
+
+Inductive Domain {K V A: Type} :=
+| D : forall
+            (a0: A)  
+            (reducer: (A * V) -> A),
+            Domain.
+
+Definition a0 {K V A: Type} (d: @Domain K V A) : A :=
+  match d with
+  | D a0 _ => a0
+  end.
+
+
+Inductive Dsf (K V: Type) := 
+| l: list (K * V) -> Dsf K V
+.
+
+Axiom find : forall {K V: Type} (dsf: Dsf K V) (k: K), V.
+
+Definition apply_reducer {K V A: Type} (d: @Domain K V A) (agg: A) (k: K) (feedback: Dsf K V) : A :=
+  match d with
+  | D _ reducer => reducer (agg, find feedback k)
+  end.
+  
+  
+Fixpoint aggregate_feedback {K V A: Type} (d: Domain) (k: K) (feedback_list: list (Dsf K V)) : A :=
+  match feedback_list with
+  | [] => a0 d
+  | (cons h t) => apply_reducer d (aggregate_feedback d k t) k h
+  end.
+
+Axiom eq_agg : forall {K V A: Type} {d: @Domain K V A} (a1 a2: A), bool.
+
+(* 
+
+Definitions:
+
+  A(S,k,d) = a0 |> dsf_i1(k) |> dsf_i2(k) |> ... |> dsf_in(k), where d =(K,V,A,a0,|>)
+
+  is_waypoint(i,S,d) = ∃k ∈K :A(S,k,d),A(S ∪ {i},k,d),whered =(K,V,A,a0,|>)
+
+Observation;
+
+  A(S,k,d) = a0 |> dsf_i1(k) |> dsf_i2(k) |> ... |> dsf_in(k)
+  => A(S ∪ {i},k,d) = A(S,k,d) |> dsf_i(k)
+
+  dsf_i = feedback(i)
+
+  
+  A(S,k,d) ~~> A(DSF,k,d)
+    where DSF = {dsf_i1, dsf_i2, ..., dsf_in}
+
+
+
+
+*)
+
+(* Definition is_waypoint_for_key {K V A: Type} (k: K) (d: @Domain K V A) (agg: A) (feedback: (dsf K V)) : bool :=
+    let augmented_agg := apply_reducer d agg k feedback in
+    if (eq_agg augmented_agg agg) then false else true. *)
+
+Axiom is_waypoint_for_key : forall {K V A: Type} (k: K) (d: @Domain K V A) (agg: A) (feedback: (Dsf K V)), bool.
+
+    
+Definition is_waypoint {K V A: Type} (d: @Domain K V A) (agg: A) (feedback: (Dsf K V)) : bool :=
+  match feedback with
+  | l  _ _ feedback_list => 
+    let results := map (fun kv => (is_waypoint_for_key (fst kv) d agg feedback)) feedback_list in 
+    fold_left orb results false
+  end.
+
+
+
 Fixpoint generalizedTargeting (fuel : nat) {C} {F}
          (cprop: CProp C F)
     (* TODO : better data structure for seed pool *)
-         (seed_pool : data structure ⟦⦗C⦘⟧)
-         {Agg : Type}
-         (agg : Agg)
-         (update_agg : Agg -> F -> ⟦⦗C⦘⟧ -> Agg)
+         (seed_pool : SeedPool ⟦C⟧)
+         {K V Agg : Type}
+         {d: @Domain K V Agg}
+         (update_agg : Agg -> F -> ⟦C⟧ -> Agg)
          (is_waypoint: Agg -> F -> bool)
-         (priority : Agg -> F -> nat)
-         :=
+         (priority : Agg -> F -> nat) : G option bool :=
   match fuel with 
   | O => _
   | S fuel' =>
@@ -103,14 +177,19 @@ Fixpoint generalizedTargeting (fuel : nat) {C} {F}
       res <- genAndRun cprop ∅;;
       let '(inputs, (truth, feedback)) := res in
       (* First: Check truth.. *)
-      ....
-      (* Second: Check feedback *)
-      if is_waypoint agg feedback then
-        let agg' := update_agg agg feedback inputs in
-        let seed_pool := ... in
-        generalizedTargeting ....                            else
-        generalizedTargeting ....     
-                         end. 
+      match truth with
+      | None => generalizedTargeting ....
+      | Some true => 
+        (* Second: Check feedback *)
+        if is_waypoint agg feedback then
+          let agg' := update_agg agg feedback inputs in
+          let seed_pool := ... in
+          generalizedTargeting ....                            
+        else
+          generalizedTargeting ....
+      | Some false =>
+          generalizedTargeting ....
+      end
 
 Fixpoint runAndTest (C:Ctx) (cprop : CProp C)
          (cenv : ⟦C⟧)
