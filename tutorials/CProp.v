@@ -34,7 +34,7 @@ Inductive CProp : Ctx -> Type -> Type :=
       (printer   : ⟦C⟧ -> A -> string),
       CProp (A · C) F -> CProp C F
   | Predicate : forall C F,
-      (⟦C⟧ -> option bool * option F) -> CProp C F.
+      (⟦C⟧ -> option bool * F) -> CProp C F.
 
 Fixpoint inputTypes {C : Ctx} {F : Type}
          (cprop : CProp C F) : Ctx :=
@@ -57,13 +57,13 @@ Definition example :=
   @ForAll _ ∅ _ "x" (fun tt => arb) (fun tt n => arb) (fun tt n => shrink n) (fun tt n => show n) (
   @ForAll _ (nat · ∅) _ "y" (fun '(x, tt) => gen x) (fun tt n => arb) (fun tt n => shrink n) (fun tt n => show n) (
   @Predicate (nat · (nat · ∅)) unit
-             (fun '(y, (x, tt)) => (test x y, None)))).
+             (fun '(y, (x, tt)) => (test x y, tt)))).
 
 Compute ⦗example⦘. 
 
 Fixpoint genAndRun {C : Ctx} {F : Type}
          (cprop : CProp C F)
-  : ⟦C⟧ -> G (⟦⦗cprop⦘⟧ * (option bool * option F)) :=
+  : ⟦C⟧ -> G (⟦⦗cprop⦘⟧ * (option bool * F)) :=
   match cprop with
   | ForAll A C F _ gen mut shr pri cprop' =>
       fun env =>
@@ -85,9 +85,98 @@ Fixpoint print {C : Ctx} {F} (cprop : CProp C F)
       fun _ _ => nil
   end.
 
-Definition SeedPool := list.
+Local Open Scope Z.
+
+Axiom SeedPool : Type -> Type.
+Axiom insertSeed :
+  forall {A : Type}, A -> SeedPool A -> SeedPool A.
+Axiom sampleSeed :
+  forall {A : Type}, SeedPool A ->
+                     option A * SeedPool A.
+Class WithEnergy (A : Type) :=
+  { withEnergy : A -> Z }.
+
+Global Instance WithEnergyPairZ {A} :
+  WithEnergy (A * Z) :=
+  { withEnergy := snd }.
+
+Definition hillClimbingUtility
+           {I}
+           (i : I) (s : SeedPool (I * Z))
+           (best feed : Z)
+  : option (SeedPool (I * Z))
+  :=
+  if best <? feed then
+    Some (insertSeed (i,feed) s)
+  else None.
+
+Axiom nextSample :
+  forall {A}, G A -> (A -> G A) -> SeedPool A -> G A.
+  
+
+Fixpoint targetLoop (fuel : nat)
+         (cprop : CProp ∅ Z)
+         (seeds : SeedPool (⟦⦗cprop⦘⟧ * Z))
+         (best  : Z) 
+  : G (list (string * string)) :=
+  match fuel with
+  | O => ret []
+  | S fuel' => 
+      res <- genAndRun cprop tt;;
+      let '(input, (truth, feedback)) := res in
+      match truth with
+      | Some false =>
+          (* Counterexample *)
+          (* TODO: Shrinking here. *)
+          ret (print cprop tt input)
+      | Some true =>
+          (* Passes *)
+          match hillClimbingUtility input seeds best feedback with
+          | Some seeds' =>
+              targetLoop fuel' cprop seeds' feedback
+          | None =>
+              targetLoop fuel' cprop seeds  best
+          end
+      | None => 
+          (* Discard *)
+          targetLoop fuel' cprop seeds  best          
+      end
+  end.
+
+Fixpoint generalizedTargeting (fuel : nat) {C} {F}
+         (cprop: CProp C F)
+    (* TODO : better data structure for seed pool *)
+         (seed_pool : SeedPool ⟦C⟧)
+         {K V Agg : Type}
+         {d: @Domain K V Agg}
+         (update_agg : Agg -> F -> ⟦C⟧ -> Agg)
+         (is_waypoint: Agg -> F -> bool)
+         (priority : Agg -> F -> nat) : G option bool :=
+  match fuel with 
+  | O => _
+  | S fuel' =>
+      (* Zero: Decide how to generate based on seed_pool *)
+      (* This is just random *)
+      res <- genAndRun cprop ∅;;
+      let '(inputs, (truth, feedback)) := res in
+      (* First: Check truth.. *)
+      match truth with
+      | None => generalizedTargeting ....
+      | Some true => 
+        (* Second: Check feedback *)
+        if is_waypoint agg feedback then
+          let agg' := update_agg agg feedback inputs in
+          let seed_pool := ... in
+          generalizedTargeting ....                            
+        else
+          generalizedTargeting ....
+      | Some false =>
+          generalizedTargeting ....
+      end
 
 
+
+(*
 Inductive Domain {K V A: Type} :=
 | D : forall
             (a0: A)  
@@ -157,39 +246,7 @@ Definition is_waypoint {K V A: Type} (d: @Domain K V A) (agg: A) (feedback: (Dsf
     let results := map (fun kv => (is_waypoint_for_key (fst kv) d agg feedback)) feedback_list in 
     fold_left orb results false
   end.
-
-
-
-Fixpoint generalizedTargeting (fuel : nat) {C} {F}
-         (cprop: CProp C F)
-    (* TODO : better data structure for seed pool *)
-         (seed_pool : SeedPool ⟦C⟧)
-         {K V Agg : Type}
-         {d: @Domain K V Agg}
-         (update_agg : Agg -> F -> ⟦C⟧ -> Agg)
-         (is_waypoint: Agg -> F -> bool)
-         (priority : Agg -> F -> nat) : G option bool :=
-  match fuel with 
-  | O => _
-  | S fuel' =>
-      (* Zero: Decide how to generate based on seed_pool *)
-      (* This is just random *)
-      res <- genAndRun cprop ∅;;
-      let '(inputs, (truth, feedback)) := res in
-      (* First: Check truth.. *)
-      match truth with
-      | None => generalizedTargeting ....
-      | Some true => 
-        (* Second: Check feedback *)
-        if is_waypoint agg feedback then
-          let agg' := update_agg agg feedback inputs in
-          let seed_pool := ... in
-          generalizedTargeting ....                            
-        else
-          generalizedTargeting ....
-      | Some false =>
-          generalizedTargeting ....
-      end
+*)
 
 Fixpoint runAndTest (C:Ctx) (cprop : CProp C)
          (cenv : ⟦C⟧)
