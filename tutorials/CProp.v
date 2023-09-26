@@ -110,8 +110,8 @@ Definition hillClimbingUtility
     Some (insertSeed (i,feed) s)
   else None.
 
-Axiom nextSample :
-  forall {A}, G A -> (A -> G A) -> SeedPool A -> G A.
+Definition nextSample {A} (generator: G A) (mutator : A -> G A) (seed_pool: SeedPool A) : G A :=
+  
   
 
 Fixpoint targetLoop (fuel : nat)
