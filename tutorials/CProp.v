@@ -95,22 +95,18 @@ Fixpoint justGen {C : Ctx} {F : Type}
       fun env => ret tt
   end.
 
-
-Definition mutAll {C : Ctx} {F : Type}
-  (cprop : CProp C F) (seed: ⟦⦗cprop⦘⟧) : ⟦C⟧ -> (G (⟦⦗cprop⦘⟧)).
-  Proof.
-  induction cprop.
-  - intros.
-    simpl in *.
-    destruct seed.
-    refine (bindGen (mutator X a) _).
-    intros.
-    exact (returnGen (X0, i)).
-  - intros.
-    simpl in *.
-    exact (returnGen tt).
-  Defined.
-
+Fixpoint mutAll {C : Ctx} {F : Type}
+         (cprop : CProp C F)
+  : ⟦⦗cprop⦘⟧ -> ⟦C⟧ -> (G (⟦⦗cprop⦘⟧)) :=
+  match cprop with
+  | ForAll A C F name gen mut shr pri cprop' =>
+      fun '(x,xs) env =>
+        x'  <- mut env x;;
+        xs' <- mutAll cprop' xs (x', env);;
+        ret (x', xs')
+  | Predicate C F prop =>
+      fun _ _ => ret tt
+  end.
 
 Fixpoint print {C : Ctx} {F} (cprop : CProp C F)
   : ⟦C⟧ -> ⟦⦗ cprop ⦘⟧ -> list (string * string) :=
