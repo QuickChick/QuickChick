@@ -46,6 +46,13 @@ Fixpoint inputTypes {C : Ctx} {F : Type}
 
 Notation "'⦗' c '⦘'" := (@inputTypes _ _ c).
 
+Definition typeHead {C : Ctx} {F : Type}
+         (cprop : CProp C F) : Type :=
+  match cprop with
+  | ForAll A C _ _ _ _ _ _ cprop' => A
+  | Predicate _ _ _ => unit
+  end.
+
 Definition arb : G nat := choose (0,10).
 Definition gen (n : nat) : G nat := choose (0, n).
 Definition test (x y : nat) : option bool :=
@@ -65,15 +72,45 @@ Fixpoint genAndRun {C : Ctx} {F : Type}
          (cprop : CProp C F)
   : ⟦C⟧ -> G (⟦⦗cprop⦘⟧ * (option bool * F)) :=
   match cprop with
-  | ForAll A C F _ gen mut shr pri cprop' =>
+  | ForAll _ _ _ _ gen mut shr pri cprop' =>
       fun env =>
         a <- gen env;;
         res <- genAndRun cprop' (a,env);;
-        let '(env', (truth, instr)) := res in
-        ret ((a,env'), (truth, instr))
+        let '(env', (truth, feedback)) := res in
+        ret ((a,env'), (truth, feedback))
   | Predicate C F prop =>
       fun env => returnGen (tt, prop env)
   end.
+
+Fixpoint justGen {C : Ctx} {F : Type}
+         (cprop : CProp C F)
+  : ⟦C⟧ -> G (⟦⦗cprop⦘⟧) :=
+  match cprop with
+  | ForAll _ _ _ _ gen mut shr pri cprop' =>
+      fun env =>
+        a <- gen env;;
+        env <- justGen cprop' (a,env);;
+        ret (a,env)
+  | Predicate C F prop =>
+      fun env => ret tt
+  end.
+
+
+Definition mutAll {C : Ctx} {F : Type}
+  (cprop : CProp C F) (seed: ⟦⦗cprop⦘⟧) : ⟦C⟧ -> (G (⟦⦗cprop⦘⟧)).
+  Proof.
+  induction cprop.
+  - intros.
+    simpl in *.
+    destruct seed.
+    refine (bindGen (mutator X a) _).
+    intros.
+    exact (returnGen (X0, i)).
+  - intros.
+    simpl in *.
+    exact (returnGen tt).
+  Defined.
+
 
 Fixpoint print {C : Ctx} {F} (cprop : CProp C F)
   : ⟦C⟧ -> ⟦⦗ cprop ⦘⟧ -> list (string * string) :=
@@ -88,11 +125,15 @@ Fixpoint print {C : Ctx} {F} (cprop : CProp C F)
 Local Open Scope Z.
 
 Axiom SeedPool : Type -> Type.
+
 Axiom insertSeed :
   forall {A : Type}, A -> SeedPool A -> SeedPool A.
+
 Axiom sampleSeed :
   forall {A : Type}, SeedPool A ->
                      option A * SeedPool A.
+
+
 Class WithEnergy (A : Type) :=
   { withEnergy : A -> Z }.
 
@@ -111,24 +152,31 @@ Definition hillClimbingUtility
   else None.
 
 Definition nextSample {A} (generator: G A) (mutator : A -> G A) (seed_pool: SeedPool A) : G A :=
-  
+
+  match sampleSeed seed_pool with
+  | (None, seed_pool') => generator
+  | (Some seed, seed_pool') => mutator seed
+  end.
   
 
 Fixpoint targetLoop (fuel : nat)
          (cprop : CProp ∅ Z)
          (seeds : SeedPool (⟦⦗cprop⦘⟧ * Z))
-         (best  : Z) 
+         (best  : Z)
+         (power_schedule : WithEnergy (⟦⦗cprop⦘⟧ * Z))
   : G (list (string * string)) :=
   match fuel with
   | O => ret []
   | S fuel' => 
-      res <- genAndRun cprop tt;;
+      seed <- nextSample (justGen) (mutAll) seeds;;
+      res <- runAndTest cprop seed;;
       let '(input, (truth, feedback)) := res in
       match truth with
       | Some false =>
-          (* Counterexample *)
-          (* TODO: Shrinking here. *)
-          ret (print cprop tt input)
+          (* Fails *)
+          let shrinkingResult := shrinkLoop 10 cprop inputs in
+          let printingResult := print ∅ cprop tt shrinkingResult in
+          returnGen printingResult
       | Some true =>
           (* Passes *)
           match hillClimbingUtility input seeds best feedback with
