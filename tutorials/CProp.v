@@ -53,20 +53,19 @@ Definition typeHead {C : Ctx} {F : Type}
   | Predicate _ _ _ => unit
   end.
 
-Definition arb : G nat := choose (0,10).
+Definition arb : G nat := choose (0,1000).
 Definition gen (n : nat) : G nat := choose (0, n).
+Definition mut (n : nat) : G nat := choose (n - 10, n + 10).
 Definition test (x y : nat) : option bool :=
   Some (Nat.ltb y x).
 
 Local Open Scope string.
 
 Definition example :=
-  @ForAll _ ∅ _ "x" (fun tt => arb) (fun tt n => arb) (fun tt n => shrink n) (fun tt n => show n) (
-  @ForAll _ (nat · ∅) _ "y" (fun '(x, tt) => gen x) (fun tt n => arb) (fun tt n => shrink n) (fun tt n => show n) (
+  @ForAll _ ∅ _ "x" (fun tt => arb) (fun tt n => mut n) (fun tt n => shrink n) (fun tt n => show n) (
+  @ForAll _ (nat · ∅) _ "y" (fun '(x, tt) => gen x) (fun tt n => mut n) (fun tt n => shrink n) (fun tt n => show n) (
   @Predicate (nat · (nat · ∅)) unit
              (fun '(y, (x, tt)) => (test x y, tt)))).
-
-Compute ⦗example⦘. 
 
 Fixpoint genAndRun {C : Ctx} {F : Type}
          (cprop : CProp C F)
@@ -108,8 +107,22 @@ Fixpoint mutAll {C : Ctx} {F : Type}
       fun _ _ => ret tt
   end.
 
-
-Compute (mutAll example tt).
+Fixpoint mutSome {C : Ctx} {F : Type}
+  (cprop : CProp C F)
+: ⟦C⟧ -> ⟦⦗cprop⦘⟧ -> (G (⟦⦗cprop⦘⟧)) :=
+  match cprop with
+  | ForAll A C F name gen mut shr pri cprop' =>
+    fun env '(x,xs) =>
+    mut_oracle <- choose (0, 3);;
+    x' <- mut env x;;
+    xs' <- mutSome cprop' (x', env) xs;;
+    match mut_oracle with
+    | 0 => ret (x', xs')
+    | _ => ret (x, xs')
+    end
+  | Predicate C F prop =>
+  fun _ _ => ret tt
+end.
 
 Fixpoint print {C : Ctx} {F} (cprop : CProp C F)
   : ⟦C⟧ -> ⟦⦗ cprop ⦘⟧ -> list (string * string) :=
@@ -176,7 +189,7 @@ Definition hillClimbingUtility
     Some (insertHighPrioritySeed (i,feed) s)
   else None.
 
-Definition nextSample {A} (generator: G A) (mutator : A -> G A) (seed_pool: SeedPool) : G A :=
+Definition nextSample {A E} `{OrdType E} (generator: G A) (mutator : A -> G A) (seed_pool: SeedPool) : G A :=
   match sampleSeed seed_pool with
   | (None, seed_pool') => generator
   | (Some seed, seed_pool') => mutator seed
@@ -195,8 +208,6 @@ Proof.
     + exact fenv'.
   - exact (p cenv).
 Defined.
-
-(* Compute (runAndTest example tt (3%nat, (4%nat, tt))). *)
 
 
 Fixpoint shrinkOnTheFly
@@ -248,7 +259,7 @@ Fixpoint targetLoop (fuel : nat)
   match fuel with
   | O => ret []
   | S fuel' => 
-      seed <- nextSample (justGen cprop tt) (mutAll cprop tt) seeds;;
+      seed <- @nextSample ⟦⦗cprop⦘⟧ Z OrdZ (justGen cprop tt) (mutSome cprop tt) seeds;;
       let res := runAndTest cprop tt seed in
       let '(truth, feedback) := res in
       match truth with
@@ -263,14 +274,69 @@ Fixpoint targetLoop (fuel : nat)
           | Some seeds' =>
               targetLoop fuel' cprop seeds' feedback
           | None =>
-              targetLoop fuel' cprop seeds  best
+              targetLoop fuel' cprop seeds best
           end
       | None => 
           (* Discard *)
-          targetLoop fuel' cprop seeds  best          
+          targetLoop fuel' cprop seeds best          
       end
   end.
 
+Definition test2 (x y : nat) : option bool :=
+  Some (negb (Nat.eqb y  x)).
+
+
+Definition example2 :=
+  @ForAll _ ∅ _ "x" (fun tt => arb) (fun tt n => mut n) (fun tt n => shrink n) (fun tt n => show n) (
+  @ForAll _ (nat · ∅) _ "y" (fun '(x, tt) => gen x) (fun tt n => mut n) (fun tt n => shrink n) (fun tt n => show n) (
+  @Predicate (nat · (nat · ∅)) Z
+              (fun '(y, (x, tt)) => (test2 x y, 0)))).
+
+Definition example3 :=
+  @ForAll _ ∅ _ "x" (fun tt => arb) (fun tt n => mut n) (fun tt n => shrink n) (fun tt n => show n) (
+  @ForAll _ (nat · ∅) _ "y" (fun '(x, tt) => gen x) (fun tt n => mut n) (fun tt n => shrink n) (fun tt n => show n) (
+  @Predicate (nat · (nat · ∅)) Z
+              (fun '(y, (x, tt)) => (test2 x y, (2000 - Z.of_nat(x - y) - Z.of_nat(y - x)))))).
+              
+Sample (targetLoop 1000 example2 (mkSeedPool [] []) 0).
+Sample (targetLoop 1000 example3 (mkSeedPool [] []) 0).
+
+Fixpoint targetLoopLogged (fuel : nat)
+         (cprop : CProp ∅ Z)
+         (seeds : @SeedPool ⟦⦗cprop⦘⟧ Z)
+         (best  : Z)
+         (log   : list ((list (string * string)) * Z))
+         (* (power_schedule : WithEnergy (⟦⦗cprop⦘⟧ * Z)) *)
+  : G (list ((list (string * string)) * Z)) :=
+  match fuel with
+  | O => ret log
+  | S fuel' => 
+      seed <- @nextSample ⟦⦗cprop⦘⟧ Z OrdZ (justGen cprop tt) (mutSome cprop tt) seeds;;
+      let res := runAndTest cprop tt seed in
+      let '(truth, feedback) := res in
+      let printingResult := print cprop tt seed in
+      let log := (printingResult, feedback) :: log in
+      match truth with
+      | Some false =>
+          (* Fails *)
+          ret log
+      | Some true =>
+          (* Passes *)
+          match hillClimbingUtility seed seeds best feedback with
+          | Some seeds' =>
+            targetLoopLogged fuel' cprop seeds' feedback log
+          | None =>
+            targetLoopLogged fuel' cprop seeds best log
+          end
+      | None => 
+          (* Discard *)
+          targetLoopLogged fuel' cprop seeds best log
+      end
+  end.
+
+Sample (targetLoopLogged 10 example3 (mkSeedPool [] []) 0 nil).
+
+(*
 
 Fixpoint generalizedTargeting (fuel : nat) {C} {F}
          (cprop: CProp C F)
@@ -470,3 +536,4 @@ Fixpoint runLoop3 (fuel: nat)
 
 
 Sample (runLoop3 10 example).
+*)
