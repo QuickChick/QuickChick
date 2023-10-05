@@ -97,16 +97,19 @@ Fixpoint justGen {C : Ctx} {F : Type}
 
 Fixpoint mutAll {C : Ctx} {F : Type}
          (cprop : CProp C F)
-  : ⟦⦗cprop⦘⟧ -> ⟦C⟧ -> (G (⟦⦗cprop⦘⟧)) :=
+  : ⟦C⟧ -> ⟦⦗cprop⦘⟧ -> (G (⟦⦗cprop⦘⟧)) :=
   match cprop with
   | ForAll A C F name gen mut shr pri cprop' =>
-      fun '(x,xs) env =>
-        x'  <- mut env x;;
-        xs' <- mutAll cprop' xs (x', env);;
+      fun env '(x,xs) =>
+        x' <- mut env x;;
+        xs' <- mutAll cprop' (x', env) xs;;
         ret (x', xs')
   | Predicate C F prop =>
       fun _ _ => ret tt
   end.
+
+
+Compute (mutAll example tt).
 
 Fixpoint print {C : Ctx} {F} (cprop : CProp C F)
   : ⟦C⟧ -> ⟦⦗ cprop ⦘⟧ -> list (string * string) :=
@@ -120,14 +123,39 @@ Fixpoint print {C : Ctx} {F} (cprop : CProp C F)
 
 Local Open Scope Z.
 
-Axiom SeedPool : Type -> Type.
+Record SeedPool {A E : Type} := {
+  hpq: list (A * E);
+  lpq: list (A * E);
+}.
 
-Axiom insertSeed :
-  forall {A : Type}, A -> SeedPool A -> SeedPool A.
+Definition mkSeedPool {A E : Type} (hpq: list (A * E)) (lpq: list (A * E)) : SeedPool :=
+  {| hpq := hpq; lpq := lpq |}.
 
-Axiom sampleSeed :
-  forall {A : Type}, SeedPool A ->
-                     option A * SeedPool A.
+Definition insertHighPrioritySeed {A E: Type} (seed: (A * E)) (pool: SeedPool) : SeedPool :=
+  mkSeedPool (seed :: (hpq pool)) (lpq pool).
+
+Definition insertLowPrioritySeed {A E: Type} (seed: (A * E)) (pool: SeedPool) : SeedPool :=
+  mkSeedPool (hpq pool) (seed :: (lpq pool)).
+
+
+
+Fixpoint maxSeed {A E: Type} `{OrdType E} (cmax: option (A * E)) (q: list (A * E)) : option A :=
+  match q with
+  | [] => match cmax with
+          | None => None
+          | Some (a, e) => Some a
+          end
+  | (h :: t) => match cmax with
+                | None => maxSeed (Some h) t
+                | Some (a, e) => if leq e (snd h) then maxSeed (Some h) t else maxSeed (Some (a, e)) t
+                end
+  end.
+
+Definition sampleSeed {A E : Type} `{OrdType E} (pool: SeedPool) : option A * SeedPool :=
+  match (hpq pool) with
+  | []  => (maxSeed None (lpq pool), pool)
+  | _   => (maxSeed None (hpq pool), pool)
+  end.
 
 
 Class WithEnergy (A : Type) :=
@@ -138,52 +166,38 @@ Global Instance WithEnergyPairZ {A} :
   { withEnergy := snd }.
 
 Definition hillClimbingUtility
-           {I}
-           (i : I) (s : SeedPool (I * Z))
-           (best feed : Z)
-  : option (SeedPool (I * Z))
+           {A E}
+           (i : A) (s : SeedPool)
+           (best feed : E)
+            `{OrdType E}
+  : option (SeedPool)
   :=
-  if best <? feed then
-    Some (insertSeed (i,feed) s)
+  if leq best feed then
+    Some (insertHighPrioritySeed (i,feed) s)
   else None.
 
-Definition nextSample {A} (generator: G A) (mutator : A -> G A) (seed_pool: SeedPool A) : G A :=
+Definition nextSample {A} (generator: G A) (mutator : A -> G A) (seed_pool: SeedPool) : G A :=
   match sampleSeed seed_pool with
   | (None, seed_pool') => generator
   | (Some seed, seed_pool') => mutator seed
   end.
   
-Definition getPredicate {C: Ctx}  {F : Type}
-  (cenv : ⟦C⟧)
-  (cprop : CProp C F) 
-  (fenv :  ⟦⦗cprop⦘⟧)
-  : (option bool * F).
+Fixpoint runAndTest {C:Ctx} {F : Type} (cprop : CProp C F)
+         (cenv : ⟦C⟧)
+         (fenv :  ⟦⦗cprop⦘⟧)
+         {struct cprop}
+  : option bool * F.
 Proof.
-  induction cprop.
-  - destruct fenv as [a fenv'].
-    simpl in *.
-    intros.
+  induction cprop; simpl in *.
+  - destruct fenv as [a fenv'] eqn:H.
     apply IHcprop.
     + exact (a, cenv).
     + exact fenv'.
-  - simpl in *.
-    intros.
-    apply p.
-    apply cenv.
+  - exact (p cenv).
 Defined.
 
-Compute (@getPredicate ∅ unit tt example (3%nat, (4%nat, tt))).
+(* Compute (runAndTest example tt (3%nat, (4%nat, tt))). *)
 
-
-Definition runAndTest {F : Type}
-         (cprop : CProp ∅ F)
-         (seed: ⟦⦗cprop⦘⟧)
-  : (option bool * F) :=
-  let prop := @getPredicate ∅ F tt cprop in
-  prop seed.
-
-Compute (runAndTest example (3%nat, (4%nat, tt))).
-  
 
 Fixpoint shrinkOnTheFly
   {C : Ctx} {F: Type}
@@ -196,30 +210,30 @@ Proof.
   induction cprop; simpl in *.
   - destruct fenv as [a fenv']. 
     (* Recurse through the list of shrinks *)
-    induction (l cenv a).
+    induction (shrinker cenv a).
     (* No more shrinks - try the next element of the property *)
-    + destruct (shrinkOnTheFly _ cprop (a,cenv) fenv') eqn:M.
+    + destruct (shrinkOnTheFly _ _ cprop (a,cenv) fenv') eqn:M.
       * exact (Some (a, i)).
       * exact None.
     (* More shrinks - run the property on the shrunk possibility. *)
-    + destruct (runAndTest _ cprop (a0,cenv) fenv') eqn:T.
+    + destruct (runAndTest cprop (a0,cenv) fenv') eqn:T. destruct o.
       * destruct b.
         (* Test succeeded - recurse down the list. *)
-        -- apply IHl0.
+        -- apply IHl.
         (* Test failed - end with current result. *)
-        -- exact (Some (a0, fenv')).
+        -- exact (Some (a0, fenv')).     
       * (* Test discarded - recurse down the list. *)
-        apply IHl0.
+        apply IHl.
   - exact None.
 Defined.
 
-Fixpoint shrinkLoop (fuel : nat)
-  (cprop: CProp ∅) (counterexample : ⟦finalCtx ∅ cprop⟧) :
-  ⟦finalCtx ∅ cprop⟧ :=
+Fixpoint shrinkLoop {F: Type} (fuel : nat)
+  (cprop: CProp ∅ F) (counterexample : ⟦⦗cprop⦘⟧) :
+  ⟦⦗cprop⦘⟧ :=
   match fuel with
   | O => counterexample
   | S fuel' =>
-      match shrinkOnTheFly ∅ cprop tt counterexample with
+      match shrinkOnTheFly cprop tt counterexample with
       | Some c' => shrinkLoop fuel' cprop c'
       | None => counterexample
       end
@@ -227,25 +241,25 @@ Fixpoint shrinkLoop (fuel : nat)
   
 Fixpoint targetLoop (fuel : nat)
          (cprop : CProp ∅ Z)
-         (seeds : SeedPool (⟦⦗cprop⦘⟧ * Z))
+         (seeds : @SeedPool ⟦⦗cprop⦘⟧ Z)
          (best  : Z)
-         (power_schedule : WithEnergy (⟦⦗cprop⦘⟧ * Z))
+         (* (power_schedule : WithEnergy (⟦⦗cprop⦘⟧ * Z)) *)
   : G (list (string * string)) :=
   match fuel with
   | O => ret []
   | S fuel' => 
-      seed <- nextSample (justGen) (mutAll) seeds;;
-      res <- runAndTest cprop seed;;
-      let '(input, (truth, feedback)) := res in
+      seed <- nextSample (justGen cprop tt) (mutAll cprop tt) seeds;;
+      let res := runAndTest cprop tt seed in
+      let '(truth, feedback) := res in
       match truth with
       | Some false =>
           (* Fails *)
-          let shrinkingResult := shrinkLoop 10 cprop inputs in
-          let printingResult := print ∅ cprop tt shrinkingResult in
-          returnGen printingResult
+          let shrinkingResult := shrinkLoop 10 cprop seed in
+          let printingResult := print cprop tt shrinkingResult in
+          ret printingResult
       | Some true =>
           (* Passes *)
-          match hillClimbingUtility input seeds best feedback with
+          match hillClimbingUtility seed seeds best feedback with
           | Some seeds' =>
               targetLoop fuel' cprop seeds' feedback
           | None =>
@@ -256,6 +270,7 @@ Fixpoint targetLoop (fuel : nat)
           targetLoop fuel' cprop seeds  best          
       end
   end.
+
 
 Fixpoint generalizedTargeting (fuel : nat) {C} {F}
          (cprop: CProp C F)
