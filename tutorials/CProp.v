@@ -148,13 +148,83 @@ Definition hillClimbingUtility
   else None.
 
 Definition nextSample {A} (generator: G A) (mutator : A -> G A) (seed_pool: SeedPool A) : G A :=
-
   match sampleSeed seed_pool with
   | (None, seed_pool') => generator
   | (Some seed, seed_pool') => mutator seed
   end.
   
+Definition getPredicate {C: Ctx}  {F : Type}
+  (cenv : ⟦C⟧)
+  (cprop : CProp C F) 
+  (fenv :  ⟦⦗cprop⦘⟧)
+  : (option bool * F).
+Proof.
+  induction cprop.
+  - destruct fenv as [a fenv'].
+    simpl in *.
+    intros.
+    apply IHcprop.
+    + exact (a, cenv).
+    + exact fenv'.
+  - simpl in *.
+    intros.
+    apply p.
+    apply cenv.
+Defined.
 
+Compute (@getPredicate ∅ unit tt example (3%nat, (4%nat, tt))).
+
+
+Definition runAndTest {F : Type}
+         (cprop : CProp ∅ F)
+         (seed: ⟦⦗cprop⦘⟧)
+  : (option bool * F) :=
+  let prop := @getPredicate ∅ F tt cprop in
+  prop seed.
+
+Compute (runAndTest example (3%nat, (4%nat, tt))).
+  
+
+Fixpoint shrinkOnTheFly
+  {C : Ctx} {F: Type}
+  (cprop : CProp C F)
+  (cenv :  ⟦C⟧)
+  (fenv :  ⟦⦗cprop⦘⟧)
+  {struct cprop}
+  : option ⟦⦗cprop⦘⟧.
+Proof.
+  induction cprop; simpl in *.
+  - destruct fenv as [a fenv']. 
+    (* Recurse through the list of shrinks *)
+    induction (l cenv a).
+    (* No more shrinks - try the next element of the property *)
+    + destruct (shrinkOnTheFly _ cprop (a,cenv) fenv') eqn:M.
+      * exact (Some (a, i)).
+      * exact None.
+    (* More shrinks - run the property on the shrunk possibility. *)
+    + destruct (runAndTest _ cprop (a0,cenv) fenv') eqn:T.
+      * destruct b.
+        (* Test succeeded - recurse down the list. *)
+        -- apply IHl0.
+        (* Test failed - end with current result. *)
+        -- exact (Some (a0, fenv')).
+      * (* Test discarded - recurse down the list. *)
+        apply IHl0.
+  - exact None.
+Defined.
+
+Fixpoint shrinkLoop (fuel : nat)
+  (cprop: CProp ∅) (counterexample : ⟦finalCtx ∅ cprop⟧) :
+  ⟦finalCtx ∅ cprop⟧ :=
+  match fuel with
+  | O => counterexample
+  | S fuel' =>
+      match shrinkOnTheFly ∅ cprop tt counterexample with
+      | Some c' => shrinkLoop fuel' cprop c'
+      | None => counterexample
+      end
+  end.
+  
 Fixpoint targetLoop (fuel : nat)
          (cprop : CProp ∅ Z)
          (seeds : SeedPool (⟦⦗cprop⦘⟧ * Z))
@@ -309,44 +379,6 @@ Defined.
 Compute (runAndTest ∅ example tt (3,(4,tt))).
 Compute (runAndTest ∅ example tt (4,(3,tt))).
 
-Fixpoint shrinkOnTheFly
-  (C : Ctx) (cprop : CProp C)
-  (cenv :  ⟦C⟧)
-  (fenv :  ⟦finalCtx C cprop⟧)
-  {struct cprop}
-  : option ⟦finalCtx C cprop⟧.
-Proof.
-  induction cprop; simpl in *.
-  - destruct fenv as [a fenv'].
-    (* Recurse through the list of shrinks *)
-    induction (l cenv a).
-    (* No more shrinks - try the next element of the property *)
-    + destruct (shrinkOnTheFly _ cprop (a,cenv) fenv') eqn:M.
-      * exact (Some (a, i)).
-      * exact None.
-    (* More shrinks - run the property on the shrunk possibility. *)
-    + destruct (runAndTest _ cprop (a0,cenv) fenv') eqn:T.
-      * destruct b.
-        (* Test succeeded - recurse down the list. *)
-        -- apply IHl0.
-        (* Test failed - end with current result. *)
-        -- exact (Some (a0, fenv')).
-      * (* Test discarded - recurse down the list. *)
-        apply IHl0.
-  - exact None.
-Defined.
-
-Fixpoint shrinkLoop (fuel : nat)
-  (cprop: CProp ∅) (counterexample : ⟦finalCtx ∅ cprop⟧) :
-  ⟦finalCtx ∅ cprop⟧ :=
-  match fuel with
-  | O => counterexample
-  | S fuel' =>
-      match shrinkOnTheFly ∅ cprop tt counterexample with
-      | Some c' => shrinkLoop fuel' cprop c'
-      | None => counterexample
-      end
-  end.
 
 Fixpoint shrinkLoopLog (fuel : nat)
   (cprop: CProp ∅) (counterexample : ⟦finalCtx ∅ cprop⟧) :
