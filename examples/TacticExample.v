@@ -9,6 +9,7 @@ Definition to_be_generated :=
   else checker tt)).
 
 QuickChickDebug Debug On.
-Theorem foo : forall (x y: nat) , x = y -> x = 0.
+Theorem foo : forall (x y: nat) , x = y -> x <> 0.
 Proof.
   quickchick.
+Abort.

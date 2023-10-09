@@ -113,20 +113,39 @@ let quickchick_goal =
     | Some dt ->
       begin
         msg_debug (str (GenericLib.dep_type_to_string dt) ++ fnl ());
-        let decide prop = GenericLib.decToBool (GenericLib.g_dec prop) in
-        let checker = GenericLib.g_forAll GenericLib.g_arbitrary (GenericLib.gFun ["x"] (fun [x] -> 
-              GenericLib.g_forAll GenericLib.g_arbitrary (GenericLib.gFun ["y"] (fun [y] -> 
-                GenericLib.gIf (decide (GenericLib.gEq (GenericLib.gVar x) (GenericLib.gVar y))) 
-                              (GenericLib.g_checker (decide (GenericLib.gEq (GenericLib.gVar x) (GenericLib.gInt 0)))) 
-                               (GenericLib.g_checker GenericLib.gTT)
+        let open GenericLib in 
+        let decide prop = decOptToBool (g_decOpt prop (gInt 1000)) in
+        let rec mkProperty = function
+          | DProd ((var, _),body) -> 
+              g_forAll g_arbitrary (gFun [var_to_string var] (fun [_] ->
+                mkProperty body
+                )) 
+          | DArrow (x,y) -> gIf (decide (gType' [] x)) (mkProperty y) (g_checker gTT)
+          | p -> g_checker (decide (gType' [] p)) 
+              in
+          
+     (*     | DArrow (DTyCtr (tyctr, args), y) -> gIf (decide )
+          | DTyParam typaram -> gTyParam typaram
+          | DTyCtr (tyctr, args) -> gApp (gTyCtr tyctr) (List.map mkProperty args)
+          | DCtr (ctr, args) -> gApp (gCtr ctr) (List.map mkProperty args)
+          | DTyVar var -> gVar var
+          | DApp (f, args) -> gApp (mkProperty f) (List.map mkProperty args)
+          | DNot p -> *)
+(*Use decOpt, for every arrow, assume instacne exists and match on it *)
+        let checker = g_forAll g_arbitrary (gFun ["x"] (fun [x] -> 
+            g_forAll g_arbitrary (gFun ["y"] (fun [y] -> 
+              gIf (decide (gEq (gVar x) (gVar y))) 
+                  (g_checker (decide (gEq (gVar x) (gInt 0)))) 
+                  (g_checker gTT)
                ))        
              )) in
+        GenericLib.debug_coq_expr (mkProperty dt);
         GenericLib.debug_coq_expr checker;
         Tacticals.tclIDTAC
       end
     | None -> failwith "Failed to Parse type"
   end
-
+(*Create dependency graph, anything that lacks a dependency, print becuase we need it to *)
 (*    
     (* Make an evar with the goal as the type *)
     let evd, evar = Evarutil.new_pure_evar (Environ.named_context_val e) evd c in

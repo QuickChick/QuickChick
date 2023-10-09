@@ -103,6 +103,7 @@ val dep_dt_to_string : dep_dt -> string
 
 val constr_of_type : string -> ty_param list -> dep_type -> Constr.t
 val gType : ty_param list -> dep_type -> coq_expr
+val gType' : ty_param list -> dep_type -> coq_expr
 val get_type : Id.t -> unit
 val is_inductive : constructor -> bool
 val is_inductive_dt : dep_type -> bool
@@ -210,6 +211,7 @@ val gNot   : coq_expr -> coq_expr
 val g_true  : coq_expr
 val g_false : coq_expr               
 val decToBool : coq_expr -> coq_expr
+val decOptToBool : coq_expr -> coq_expr
 val gBool  : coq_expr
 val gIf : coq_expr -> coq_expr -> coq_expr -> coq_expr
 
@@ -221,6 +223,7 @@ val gTT   : coq_expr
 
 (* dec *)
 val g_dec : coq_expr -> coq_expr
+val g_decOpt : coq_expr -> coq_expr -> coq_expr
 
 (* checker *)
 

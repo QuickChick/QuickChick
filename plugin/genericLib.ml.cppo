@@ -751,6 +751,26 @@ let gType ty_params dep_type =
     | DNot dt -> gApp (gInject "Coq.Init.Datatypes.negb") [aux dt]
   in 
   aux dep_type
+  
+let gType' ty_params dep_type = 
+  let rec aux dt : coq_expr = 
+    match dt with
+    | DArrow (dt1, dt2) -> let t1 = aux dt1 in
+                           let t2 = aux dt2 in 
+                           gFunWithArgs [gArg ~assumType:t1 ()] (fun _ -> t2)
+    | DProd ((x,dt1), dt2) -> let t1 = aux dt1 in
+                              let t2 = aux dt2 in 
+                              gProdWithArgs [gArg ~assumName:(gVar x) ~assumType:t1 ()] (fun _ -> t2)
+    | DTyParam tp -> gTyParam tp
+    | DTyCtr (c,dts) -> gApp (gTyCtr c) (List.map aux dts)
+    | DCtr (c, dts) -> gApp (gCtr c) (List.map aux dts)
+    | DTyVar x -> gVar x 
+    | DApp (c, dts) -> gApp (aux c) (List.map aux dts) 
+    | DHole -> hole
+    | DNot dt -> gApp (gInject "Coq.Init.Logic.not") [aux dt]
+  in 
+  aux dep_type
+  
 (*    
   match ty_params with 
   | [] -> aux dep_type 
@@ -1066,6 +1086,11 @@ let decToBool c =
            ; (injectCtr "Coq.Init.Specif.right", ["neq"], fun _ -> g_false)
     ]
 
+let decOptToBool c = 
+  gMatch c [ (injectCtr "Coq.Init.Datatypes.Some", ["typ";"res"], fun [typ;res] -> gVar res)
+           ; (injectCtr "Coq.Init.Datatypes.None",       ["typ"], fun [typ] -> g_false)
+  ]
+
 (* Unit *)
 let gUnit = gInject "Coq.Init.Datatypes.unit"
 let gTT   = gInject "Coq.Init.Datatypes.tt"
@@ -1073,6 +1098,7 @@ let gTT   = gInject "Coq.Init.Datatypes.tt"
 (* dec *)
 
 let g_dec typ = gApp ?explicit:(Some true) (gInject "QuickChick.dec") [typ]
+let g_decOpt typ n = gApp ?explicit:(Some true) (gInject "QuickChick.decOpt") [typ; n]
 
 (* checker *)
 
