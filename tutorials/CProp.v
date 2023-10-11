@@ -136,21 +136,23 @@ Fixpoint print {C : Ctx} {F} (cprop : CProp C F)
 
 Local Open Scope Z.
 
-Record SeedPool {A E : Type} := {
+Class SeedPool {A E Pool: Type} := {
+  mkSeedPool : unit -> Pool;
+  insertSeed : (A * E) -> Pool -> Pool;
+  sampleSeed : Pool -> option A * Pool;
+}.
+
+
+Record DoubleQueuePool {A E : Type} := {
   hpq: list (A * E);
   lpq: list (A * E);
 }.
 
-Definition mkSeedPool {A E : Type} (hpq: list (A * E)) (lpq: list (A * E)) : SeedPool :=
-  {| hpq := hpq; lpq := lpq |}.
+Definition insertHighPrioritySeed {A E: Type} (seed: (A * E)) (pool: DoubleQueuePool) : DoubleQueuePool :=
+  {| hpq := (seed :: (hpq pool)) ; lpq := (lpq pool) |}.
 
-Definition insertHighPrioritySeed {A E: Type} (seed: (A * E)) (pool: SeedPool) : SeedPool :=
-  mkSeedPool (seed :: (hpq pool)) (lpq pool).
-
-Definition insertLowPrioritySeed {A E: Type} (seed: (A * E)) (pool: SeedPool) : SeedPool :=
-  mkSeedPool (hpq pool) (seed :: (lpq pool)).
-
-
+Definition insertLowPrioritySeed {A E: Type} (seed: (A * E)) (pool: DoubleQueuePool) : DoubleQueuePool :=
+  {| hpq := (hpq pool) ; lpq := (seed :: (lpq pool)) |} .
 
 Fixpoint maxSeed {A E: Type} `{OrdType E} (cmax: option (A * E)) (q: list (A * E)) : option A :=
   match q with
@@ -164,11 +166,23 @@ Fixpoint maxSeed {A E: Type} `{OrdType E} (cmax: option (A * E)) (q: list (A * E
                 end
   end.
 
-Definition sampleSeed {A E : Type} `{OrdType E} (pool: SeedPool) : option A * SeedPool :=
+Definition sampleSeedDQP {A E : Type} `{OrdType E} (pool: DoubleQueuePool) : option A * DoubleQueuePool :=
   match (hpq pool) with
   | []  => (maxSeed None (lpq pool), pool)
   | _   => (maxSeed None (hpq pool), pool)
   end.
+
+
+  #[global] Instance SeedPoolDQP {A E : Type} `{OrdType E} : @SeedPool A E (@DoubleQueuePool A E) :=
+  {| mkSeedPool _ := {| hpq := []; lpq := [] |};
+     insertSeed seed pool := {| hpq := seed :: (hpq pool); lpq := lpq pool |};
+     sampleSeed pool :=
+       match (hpq pool) with
+       | []  => (maxSeed None (lpq pool), pool)
+       | _   => (maxSeed None (hpq pool), pool)
+       end
+  |}.
+
 
 
 Class WithEnergy (A : Type) :=
@@ -179,17 +193,19 @@ Global Instance WithEnergyPairZ {A} :
   { withEnergy := snd }.
 
 Definition hillClimbingUtility
-           {A E}
-           (i : A) (s : SeedPool)
+           {A E Pool}
+           `{SeedPool A E Pool}
+           (i : A) (s : Pool)
            (best feed : E)
             `{OrdType E}
-  : option (SeedPool)
+  : option Pool
   :=
   if leq best feed then
-    Some (insertHighPrioritySeed (i,feed) s)
+    Some (insertSeed (i,feed) s)
   else None.
 
-Definition nextSample {A E} `{OrdType E} (generator: G A) (mutator : A -> G A) (seed_pool: SeedPool) : G A :=
+Definition nextSample {A E Pool} `{SeedPool A E Pool} `{OrdType E} 
+  (generator: G A) (mutator : A -> G A) (seed_pool: Pool) : G A :=
   match sampleSeed seed_pool with
   | (None, seed_pool') => generator
   | (Some seed, seed_pool') => mutator seed
@@ -252,14 +268,17 @@ Fixpoint shrinkLoop {F: Type} (fuel : nat)
   
 Fixpoint targetLoop (fuel : nat)
          (cprop : CProp ∅ Z)
-         (seeds : @SeedPool ⟦⦗cprop⦘⟧ Z)
+         (Pool : Type)
+         `{SeedPool ⟦⦗cprop⦘⟧ Z Pool}
+         `{OrdType Z}
+         (seeds : Pool)
          (best  : Z)
          (* (power_schedule : WithEnergy (⟦⦗cprop⦘⟧ * Z)) *)
   : G (list (string * string)) :=
   match fuel with
   | O => ret []
   | S fuel' => 
-      seed <- @nextSample ⟦⦗cprop⦘⟧ Z OrdZ (justGen cprop tt) (mutSome cprop tt) seeds;;
+      seed <- nextSample (justGen cprop tt) (mutSome cprop tt) seeds;;
       let res := runAndTest cprop tt seed in
       let '(truth, feedback) := res in
       match truth with
@@ -272,13 +291,13 @@ Fixpoint targetLoop (fuel : nat)
           (* Passes *)
           match hillClimbingUtility seed seeds best feedback with
           | Some seeds' =>
-              targetLoop fuel' cprop seeds' feedback
+              targetLoop fuel' cprop Pool seeds' feedback
           | None =>
-              targetLoop fuel' cprop seeds best
+              targetLoop fuel' cprop Pool seeds best
           end
       | None => 
           (* Discard *)
-          targetLoop fuel' cprop seeds best          
+          targetLoop fuel' cprop Pool seeds best          
       end
   end.
 
@@ -298,12 +317,14 @@ Definition example3 :=
   @Predicate (nat · (nat · ∅)) Z
               (fun '(y, (x, tt)) => (test2 x y, (2000 - Z.of_nat(x - y) - Z.of_nat(y - x)))))).
               
-Sample (targetLoop 1000 example2 (mkSeedPool [] []) 0).
-Sample (targetLoop 1000 example3 (mkSeedPool [] []) 0).
+Sample (targetLoop 1000 example2 DoubleQueuePool (mkSeedPool tt) 0).
+Sample (targetLoop 1000 example3 DoubleQueuePool (mkSeedPool tt) 0).
 
 Fixpoint targetLoopLogged (fuel : nat)
          (cprop : CProp ∅ Z)
-         (seeds : @SeedPool ⟦⦗cprop⦘⟧ Z)
+         {Pool}
+         `{SeedPool ⟦⦗cprop⦘⟧ Z Pool }
+         (seeds : Pool)
          (best  : Z)
          (log   : list ((list (string * string)) * Z))
          (* (power_schedule : WithEnergy (⟦⦗cprop⦘⟧ * Z)) *)
@@ -311,7 +332,7 @@ Fixpoint targetLoopLogged (fuel : nat)
   match fuel with
   | O => ret log
   | S fuel' => 
-      seed <- @nextSample ⟦⦗cprop⦘⟧ Z OrdZ (justGen cprop tt) (mutSome cprop tt) seeds;;
+      seed <- nextSample (justGen cprop tt) (mutSome cprop tt) seeds;;
       let res := runAndTest cprop tt seed in
       let '(truth, feedback) := res in
       let printingResult := print cprop tt seed in
@@ -334,7 +355,9 @@ Fixpoint targetLoopLogged (fuel : nat)
       end
   end.
 
-Sample (targetLoopLogged 10 example3 (mkSeedPool [] []) 0 nil).
+Compute (mkSeedPool tt).
+
+Sample (targetLoopLogged 10 example3 (mkSeedPoolDP tt) 0 nil).
 
 (*
 
