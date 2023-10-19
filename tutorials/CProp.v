@@ -29,7 +29,7 @@ Inductive CProp : Ctx -> Type -> Type :=
 | ForAll : forall A C F
       (name: string)
       (generator : ⟦C⟧ -> G A)
-      (mutator   : ⟦C⟧ -> A -> G A)
+      (mutator   : ⟦C⟧ -> nat -> A -> G A)
       (shrinker  : ⟦C⟧ -> A -> list A)
       (printer   : ⟦C⟧ -> A -> string),
       CProp (A · C) F -> CProp C F
@@ -55,7 +55,8 @@ Definition typeHead {C : Ctx} {F : Type}
 
 Definition arb : G nat := choose (0,1000).
 Definition gen (n : nat) : G nat := choose (0, n).
-Definition mut (n : nat) : G nat := choose (n - 10, n + 10).
+Definition mut (k n : nat) : G nat :=
+  choose (n - (5 + k), n + (5 + k)).
 Definition test (x y : nat) : option bool :=
   Some (Nat.ltb y x).
 
@@ -95,27 +96,27 @@ Fixpoint justGen {C : Ctx} {F : Type}
   end.
 
 Fixpoint mutAll {C : Ctx} {F : Type}
-         (cprop : CProp C F)
+         (cprop : CProp C F) (t: nat)
   : ⟦C⟧ -> ⟦⦗cprop⦘⟧ -> (G (⟦⦗cprop⦘⟧)) :=
   match cprop with
   | ForAll A C F name gen mut shr pri cprop' =>
       fun env '(x,xs) =>
-        x' <- mut env x;;
-        xs' <- mutAll cprop' (x', env) xs;;
+        x' <- mut env t x;;
+        xs' <- mutAll cprop' t (x', env) xs;;
         ret (x', xs')
   | Predicate C F prop =>
       fun _ _ => ret tt
   end.
 
 Fixpoint mutSome {C : Ctx} {F : Type}
-  (cprop : CProp C F)
+  (cprop : CProp C F) (t: nat)
 : ⟦C⟧ -> ⟦⦗cprop⦘⟧ -> (G (⟦⦗cprop⦘⟧)) :=
   match cprop with
   | ForAll A C F name gen mut shr pri cprop' =>
     fun env '(x,xs) =>
-    mut_oracle <- choose (0, 3);;
-    x' <- mut env x;;
-    xs' <- mutSome cprop' (x', env) xs;;
+    mut_oracle <- choose (0, 1);;
+    x' <- mut env t x;;
+    xs' <- mutSome cprop' t (x', env) xs;;
     match mut_oracle with
     | 0 => ret (x', xs')
     | _ => ret (x, xs')
@@ -134,15 +135,155 @@ Fixpoint print {C : Ctx} {F} (cprop : CProp C F)
       fun _ _ => nil
   end.
 
+Fixpoint showElemList (l: list (string * string)) : string :=
+  match l with
+  | [] => ""
+  | ((k, v) :: []) => (k ++ ": " ++ v) 
+  | ((k, v) :: t) => (k ++ ": " ++ v ++ ", " ++ showElemList t)
+  end.
+
 Local Open Scope Z.
 
-Class SeedPool {A E Pool: Type} := {
-  mkSeedPool : unit -> Pool;
-  insertSeed : (A * E) -> Pool -> Pool;
-  sampleSeed : Pool -> option A * Pool;
+Record Seed {A F: Type} := {
+  input: A;
+  feedback: F;
+  energy: Z;
+}.
+
+Definition mkSeed {A F: Type} (a: A) (f: F) (e: Z): Seed := {| input := a; feedback := f; energy := e |}.
+
+Definition Temperature := Z.
+
+Inductive Directive {A F: Type} :=
+| Generate : Directive
+| Mutate : @Seed A F -> Temperature -> Directive
+.
+
+#[global] Instance showDirective {A F: Type} : Show (@Directive A F) :=
+{|
+  show d := match d with
+            | Generate => "Generate"
+            | Mutate _ t => "Mutate(" ++ show t ++ ")"
+            end
+|}.
+
+
+Class SeedPool {A F Pool: Type} := {
+  (* Creates an empty pool. *)
+  mkPool  : unit -> Pool;
+  (* Adds a useful seed into the pool. *)
+  invest  : (A * F) -> Pool -> Pool;
+  (* Decreases the energy of a seed after a useless trial. *)
+  revise  : Pool -> A -> (A * F) -> Pool;
+  (* Samples the pool for an input. *)
+  sample  : Pool -> @Directive A F;
+  (* Returns the best seed in the pool. *)
+  best    : Pool -> option (@Seed A F);
 }.
 
 
+
+Class Utility {A F Pool: Type} `{SeedPool A F Pool} := {
+  (* Returns true if the feedback is interesting. *)
+  useful  : Pool -> F -> bool;
+  (* Returns a metric of how interesting the feedback is. *)
+  utility : Pool -> F -> Z;
+}.
+
+Class Scalar (A : Type) :=
+  { scale : A -> Z }.
+
+#[global] Instance ScalarZ : Scalar Z :=
+  {| scale := fun x => x |}.
+
+
+(* Class Scheduler {A F Pool: Type} `{SeedPool A F Pool} := {
+  invest  : (A * F) -> Pool -> Pool;
+  revise  : Pool -> A -> (A * F) -> Pool;
+}. *)
+
+Record SingletonPool {A F: Type} := {
+  seed: option (@Seed A F);
+}.
+
+#[global] Instance StaticSingletonPool {A F: Type} `{Dec_Eq A} `{Scalar F} : @SeedPool A F (@SingletonPool A F) :=
+  {| mkPool _ := {| seed := None |};
+     invest seed pool := match seed with 
+                         | (a, f) => {| seed := Some (mkSeed a f 1) |}
+                         end ;
+     revise pool a _ := pool ;
+     sample pool := match seed pool with
+                    | None => Generate
+                    | Some seed => Mutate seed 1
+                    end ;
+     best pool := seed pool
+  |}.
+
+#[global] Instance DynamicMonotonicSingletonPool {A F: Type} `{Dec_Eq A} `{Scalar F} : @SeedPool A F (@SingletonPool A F) :=
+  {| mkPool _ := {| seed := None |};
+    invest seed pool := match seed with 
+                        | (a, f) => {| seed := Some (mkSeed a f 100) |}
+                        end ;
+    revise pool a _ := match seed pool with
+                       | None => pool
+                       | Some seed => 
+                        let a' := input seed in
+                        let f := feedback seed in
+                        let n := energy seed in
+                        if (a = a')? then {| seed := Some (mkSeed a f (n - 1)) |} else pool
+                        end ;               
+    sample pool := match seed pool with
+                   | None => Generate
+                   | Some seed => if (energy seed =? 0) 
+                                    then Generate
+                                    else if (energy seed >=? 93) then Mutate seed (energy seed - 50)
+                                    else Mutate seed (100 - energy seed)
+
+                   end ;
+    best pool := seed pool
+|}.
+
+#[global] Instance DynamicResettingSingletonPool {A F: Type} `{Dec_Eq A} `{Scalar F} : @SeedPool A F (@SingletonPool A F) :=
+  {| mkPool _ := {| seed := None |};
+    invest seed pool := match seed with 
+                        | (a, f) => {| seed := Some (mkSeed a f 100) |}
+                        end ;
+    revise pool a _ := match seed pool with
+                       | None => pool
+                       | Some seed => 
+                        let a' := input seed in
+                        let f := feedback seed in
+                        let n := energy seed in
+                        if (a = a')? then {| seed := Some (mkSeed a f (n - 1)) |} else pool
+                        end ;               
+    sample pool := match seed pool with
+                   | None => Generate
+                   | Some seed => if (energy seed =? 0) 
+                                    then Generate
+                                    else if (energy seed >=? 96) then Mutate seed (energy seed - 50)
+                                    else Mutate seed (100 - energy seed)
+                   end ;
+    best pool := match seed pool with
+                 | None => None
+                 | Some seed => if (energy seed =? 0) then None else Some seed
+                 end
+|}.
+
+
+#[global] Instance HillClimbingUtility {A F Pool} `{SeedPool A F Pool} `{Scalar F} 
+: Utility := 
+{|
+  useful  := fun pool feedback' => match best pool with
+                                  | None => true
+                                  | Some seed => (scale feedback') >? (scale (feedback seed))
+                                  end;
+  utility := fun pool feedback' => match best pool with
+                                  | None => scale feedback'
+                                  | Some seed => scale feedback' - (scale (feedback seed))
+                                  end
+|}.
+
+(* 
 Record DoubleQueuePool {A E : Type} := {
   hpq: list (A * E);
   lpq: list (A * E);
@@ -174,43 +315,18 @@ Definition sampleSeedDQP {A E : Type} `{OrdType E} (pool: DoubleQueuePool) : opt
 
 
   #[global] Instance SeedPoolDQP {A E : Type} `{OrdType E} : @SeedPool A E (@DoubleQueuePool A E) :=
-  {| mkSeedPool _ := {| hpq := []; lpq := [] |};
-     insertSeed seed pool := {| hpq := seed :: (hpq pool); lpq := lpq pool |};
-     sampleSeed pool :=
+  {| mkPool _ := {| hpq := []; lpq := [] |};
+     schedule pool seed := pool;
+     insert seed pool := {| hpq := seed :: (hpq pool); lpq := lpq pool |};
+     sample pool :=
        match (hpq pool) with
        | []  => (maxSeed None (lpq pool), pool)
        | _   => (maxSeed None (hpq pool), pool)
        end
-  |}.
+  |}. *)
 
 
 
-Class WithEnergy (A : Type) :=
-  { withEnergy : A -> Z }.
-
-Global Instance WithEnergyPairZ {A} :
-  WithEnergy (A * Z) :=
-  { withEnergy := snd }.
-
-Definition hillClimbingUtility
-           {A E Pool}
-           `{SeedPool A E Pool}
-           (i : A) (s : Pool)
-           (best feed : E)
-            `{OrdType E}
-  : option Pool
-  :=
-  if leq best feed then
-    Some (insertSeed (i,feed) s)
-  else None.
-
-Definition nextSample {A E Pool} `{SeedPool A E Pool} `{OrdType E} 
-  (generator: G A) (mutator : A -> G A) (seed_pool: Pool) : G A :=
-  match sampleSeed seed_pool with
-  | (None, seed_pool') => generator
-  | (Some seed, seed_pool') => mutator seed
-  end.
-  
 Fixpoint runAndTest {C:Ctx} {F : Type} (cprop : CProp C F)
          (cenv : ⟦C⟧)
          (fenv :  ⟦⦗cprop⦘⟧)
@@ -265,20 +381,26 @@ Fixpoint shrinkLoop {F: Type} (fuel : nat)
       | None => counterexample
       end
   end.
+
+Definition generator (cprop: CProp ∅ Z) (directive: @Directive ⟦⦗cprop⦘⟧ Z) :=
+  match directive with
+  | Generate => justGen cprop tt
+  | Mutate seed t => mutAll cprop (Z.to_nat t) tt (input seed)
+  end.
+
   
 Fixpoint targetLoop (fuel : nat)
          (cprop : CProp ∅ Z)
-         (Pool : Type)
-         `{SeedPool ⟦⦗cprop⦘⟧ Z Pool}
-         `{OrdType Z}
+         {Pool : Type}
          (seeds : Pool)
-         (best  : Z)
-         (* (power_schedule : WithEnergy (⟦⦗cprop⦘⟧ * Z)) *)
+         (poolType: @SeedPool (⟦⦗cprop⦘⟧) Z Pool)
+         (utility: Utility)
   : G (list (string * string)) :=
   match fuel with
   | O => ret []
   | S fuel' => 
-      seed <- nextSample (justGen cprop tt) (mutSome cprop tt) seeds;;
+      let directive := sample seeds in
+      seed <- generator cprop directive;;
       let res := runAndTest cprop tt seed in
       let '(truth, feedback) := res in
       match truth with
@@ -289,15 +411,20 @@ Fixpoint targetLoop (fuel : nat)
           ret printingResult
       | Some true =>
           (* Passes *)
-          match hillClimbingUtility seed seeds best feedback with
-          | Some seeds' =>
-              targetLoop fuel' cprop Pool seeds' feedback
-          | None =>
-              targetLoop fuel' cprop Pool seeds best
+          match useful seeds feedback with
+          | true =>
+              let seeds' := invest (seed, feedback) seeds in
+              targetLoop fuel' cprop seeds' poolType utility
+          | false =>
+              let seeds' := match directive with
+                            | Generate => seeds
+                            | Mutate source _ => revise seeds (input source) (seed, feedback)
+                            end in
+              targetLoop fuel' cprop seeds' poolType utility
           end
       | None => 
           (* Discard *)
-          targetLoop fuel' cprop Pool seeds best          
+          targetLoop fuel' cprop seeds poolType utility
       end
   end.
 
@@ -317,47 +444,71 @@ Definition example3 :=
   @Predicate (nat · (nat · ∅)) Z
               (fun '(y, (x, tt)) => (test2 x y, (2000 - Z.of_nat(x - y) - Z.of_nat(y - x)))))).
               
-Sample (targetLoop 1000 example2 DoubleQueuePool (mkSeedPool tt) 0).
-Sample (targetLoop 1000 example3 DoubleQueuePool (mkSeedPool tt) 0).
+
+    
+(* Sample (targetLoop 1000 example2 (mkPool tt) StaticSingletonPool HillClimbingUtility).
+Sample (targetLoop 1000 example3 (mkPool tt) StaticSingletonPool HillClimbingUtility).
+Sample (targetLoop 1000 example2 (mkPool tt) DynamicSingletonPool HillClimbingUtility).
+Sample (targetLoop 1000 example3 (mkPool tt) DynamicSingletonPool HillClimbingUtility). *)
+
+
+Definition Log := list (string).
+
+Definition printSeed (cprop : CProp ∅ Z ) (seed: @Seed ⟦⦗cprop⦘⟧ Z) : string :=
+   showElemList (print cprop tt (input seed)) ++ ", feedback: " ++ show (feedback seed) ++ ", energy: " ++ show (energy seed).
+
+#[local] Instance showListNL {A: Type} `{Show A} : Show (list A) :=
+  {| show l := String.concat nl (map show l) |}.
+
 
 Fixpoint targetLoopLogged (fuel : nat)
          (cprop : CProp ∅ Z)
-         {Pool}
-         `{SeedPool ⟦⦗cprop⦘⟧ Z Pool }
+         {Pool : Type}
          (seeds : Pool)
-         (best  : Z)
-         (log   : list ((list (string * string)) * Z))
-         (* (power_schedule : WithEnergy (⟦⦗cprop⦘⟧ * Z)) *)
-  : G (list ((list (string * string)) * Z)) :=
+         (poolType: @SeedPool (⟦⦗cprop⦘⟧) Z Pool)
+         (utility: Utility)
+         (log   : Log)
+  : G Log :=
   match fuel with
-  | O => ret log
+  | O => ret (rev log)
   | S fuel' => 
-      seed <- nextSample (justGen cprop tt) (mutSome cprop tt) seeds;;
+      let directive := sample seeds in
+      seed <- generator cprop directive;;
       let res := runAndTest cprop tt seed in
       let '(truth, feedback) := res in
-      let printingResult := print cprop tt seed in
-      let log := (printingResult, feedback) :: log in
+      let printedSeed := showElemList (print cprop tt seed) in
+      
+      let printedSource := match directive with 
+                           | Generate => "None"
+                           | Mutate seed _ => printSeed cprop seed
+                           end in
+      let log := ("source: [" ++ printedSource ++ "], seed: [" ++ printedSeed ++ ", feedback: " ++ show feedback ++ "], truth: " ++ show truth ++ ", fuel: " ++ show fuel ++ ", directive:" ++ show directive) :: log in
       match truth with
       | Some false =>
           (* Fails *)
-          ret log
+          ret (rev log)
       | Some true =>
           (* Passes *)
-          match hillClimbingUtility seed seeds best feedback with
-          | Some seeds' =>
-            targetLoopLogged fuel' cprop seeds' feedback log
-          | None =>
-            targetLoopLogged fuel' cprop seeds best log
+          match useful seeds feedback with
+          | true =>
+              let seeds' := invest (seed, feedback) seeds in
+              targetLoopLogged fuel' cprop seeds' poolType utility log
+          | false =>
+              let seeds' := match directive with
+                          | Generate => seeds
+                          | Mutate source _ => revise seeds (input source) (seed, feedback)
+                          end in
+              targetLoopLogged fuel' cprop seeds' poolType utility log
           end
       | None => 
           (* Discard *)
-          targetLoopLogged fuel' cprop seeds best log
+          targetLoopLogged fuel' cprop seeds poolType utility log
       end
   end.
 
-Compute (mkSeedPool tt).
-
-Sample (targetLoopLogged 10 example3 (mkSeedPoolDP tt) 0 nil).
+Sample1 (targetLoopLogged 1000 example3 (mkPool tt) StaticSingletonPool HillClimbingUtility nil).
+Sample1 (targetLoopLogged 1000 example3 (mkPool tt) DynamicMonotonicSingletonPool HillClimbingUtility nil).
+Sample1 (targetLoopLogged 1000 example3 (mkPool tt) DynamicResettingSingletonPool HillClimbingUtility nil).
 
 (*
 
