@@ -84,6 +84,7 @@ COMPATFILES:= \
 	plugin/weightmap.mlg \
 	src/ExtractionQC.v \
 	src/QuickChick.v \
+	src/TacticsUtil.v \
 	_CoqProject
 
 compat: $(COMPATFILES)
