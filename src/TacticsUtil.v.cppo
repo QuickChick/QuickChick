@@ -54,7 +54,11 @@ Ltac2 print_kind (p : constr) :=
   | Constr.Unsafe.Case _ _ _ _ _ => print_string "Case"
   | Constr.Unsafe.Fix _ _ _ _ => print_string "fix"
   | Constr.Unsafe.CoFix _ _ _ => print_string "Cofix"
+#if COQ_VERSION >= (8, 19, 0)
   | Constr.Unsafe.Proj _ _ _ => print_string "Proj"
+#else
+  | Constr.Unsafe.Proj _ _ => print_string "Proj"
+#endif
   | Constr.Unsafe.Uint63 _ => print_string "Uint63"
   | Constr.Unsafe.Float _ => print_string "Float"
   | Constr.Unsafe.Array _ _ _ _ =>print_string "Array" 
