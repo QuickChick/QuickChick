@@ -1,7 +1,6 @@
 From QuickChick Require Import QuickChick.
 
 Require Import ZArith.
-Require Import NPeano.
 Require Import List.
 Import ListNotations.
 From QuickChick.ifcbasic Require Import Machine Printing Generation.

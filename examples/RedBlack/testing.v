@@ -1,5 +1,5 @@
 From QuickChick Require Import QuickChick Generators.
-Require Import NPeano Lia.
+Require Import Lia.
 
 From mathcomp Require Import ssreflect ssrnat ssrbool eqtype.
 

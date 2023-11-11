@@ -1,7 +1,6 @@
 From QuickChick Require Import QuickChick.
 
 Require Import ZArith.
-Require Import NPeano.
 Require Import List.
 Import ListNotations.
 From QuickChick.ifcbasic Require Import Machine.
@@ -41,7 +40,7 @@ Definition ainstr (st : State) : G Instruction :=
   freq_ (returnGen Nop) [
               (1, returnGen Nop);
               (10, liftGen Push gen_Z);
-              (10, liftGen BCall (if beq_nat sl 0 then returnGen 0
+              (10, liftGen BCall (if Nat.eqb sl 0 then returnGen 0
                                   else choose (0, Z.of_nat sl-1))%Z);
               (if containsRet stk then 10 else 0, returnGen BRet);
               (10, returnGen Add);

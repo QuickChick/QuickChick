@@ -35,7 +35,7 @@ Import ListNotations.
 Fixpoint remove (x : nat) (l : list nat) : list nat :=
   match l with
     | []   => []
-    | h::t => if beq_nat h x then t else h :: remove x t
+    | h::t => if Nat.eqb h x then t else h :: remove x t
   end.
 
 Definition removeP (x : nat) (l : list nat) : bool := 
@@ -452,7 +452,7 @@ Fixpoint eq_tree (t1 t2 : Tree nat) : bool :=
   match t1, t2 with
     | Leaf, Leaf => true
     | Node x1 l1 r1, Node x2 l2 r2 =>
-      beq_nat x1 x2 && eq_tree l1 l2 && eq_tree r1 r2
+      Nat.eqb x1 x2 && eq_tree l1 l2 && eq_tree r1 r2
     | _, _ => false
   end.
 
