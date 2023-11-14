@@ -116,7 +116,7 @@ let define c env evd =
   let fn = fresh_name "quickchick" in
   (* TODO: Maxime - which of the new internal flags should be used here? The names aren't as clear :) *)
   let _ : Constant.t = declare_constant ~name:fn ~kind:Decls.(IsDefinition Definition)
-      (DefinitionEntry (definition_entry ~univs (EConstr.to_constr evd c))) in
+      (DefinitionEntry (definition_entry ~univs (EConstr.to_constr ~abort_on_undefined_evars:false evd c))) in
   fn
 
 (* [$TMP/QuickChick/$TIME/QuickChick.ml],

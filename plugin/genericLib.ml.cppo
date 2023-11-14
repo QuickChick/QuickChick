@@ -48,6 +48,8 @@ let id_of_name n =
 
 type coq_expr = constr_expr (* Opaque *)
 
+let interp_open_coq_expr env evd e = fst (Constrintern.interp_constr env evd e)
+
 let debug_coq_expr (c : coq_expr) : unit =
   let env = Global.env () in
   let sigma = Evd.from_env env in
@@ -753,6 +755,7 @@ let gType ty_params dep_type =
   aux dep_type
   
 let gType' ty_params dep_type = 
+  msg_debug (str "Calling gType' with: " ++ str (dep_type_to_string dep_type) ++ fnl ());
   let rec aux dt : coq_expr = 
     match dt with
     | DArrow (dt1, dt2) -> let t1 = aux dt1 in
@@ -762,14 +765,14 @@ let gType' ty_params dep_type =
                               let t2 = aux dt2 in 
                               gProdWithArgs [gArg ~assumName:(gVar x) ~assumType:t1 ()] (fun _ -> t2)
     | DTyParam tp -> gTyParam tp
-    | DTyCtr (c,dts) -> gApp (gTyCtr c) (List.map aux dts)
+    | DTyCtr (c,dts) -> gApp ~explicit:true (gTyCtr c) (List.map aux dts)
     | DCtr (c, dts) -> gApp (gCtr c) (List.map aux dts)
     | DTyVar x -> gVar x 
     | DApp (c, dts) -> gApp (aux c) (List.map aux dts) 
     | DHole -> hole
     | DNot dt -> gApp (gInject "Coq.Init.Logic.not") [aux dt]
   in 
-  aux dep_type
+  debug_coq_expr (aux dep_type); aux dep_type
   
 (*    
   match ty_params with 
@@ -1068,9 +1071,12 @@ let glt x y = gle (gApp (gInject "Coq.Init.Datatypes.S") [x]) y
 let gEq x y = gApp (gInject "Coq.Init.Logic.eq") [x; y]
             
 (* option type in Coq *)
-let gNone typ = gApp ~explicit:true (gInject "Coq.Init.Datatypes.None") [typ]
-let gSome typ c = gApp ~explicit:true (gInject "Coq.Init.Datatypes.Some") [typ; c]
-              
+let gNone typ = gApp ?explicit:(Some true) (gInject "Coq.Init.Datatypes.None") [typ]
+let gSome typ c = gApp ?explicit:(Some true) (gInject "Coq.Init.Datatypes.Some") [typ; c]
+        
+let gNone' = gInject "Coq.Init.Datatypes.None"
+let gSome' c = gApp (gInject "Coq.Init.Datatypes.Some") [c]
+
 let gOption c = gApp (gInject "Coq.Init.Datatypes.option") [c]
 
 (* Boolean *)
@@ -1087,8 +1093,8 @@ let decToBool c =
     ]
 
 let decOptToBool c = 
-  gMatch c [ (injectCtr "Coq.Init.Datatypes.Some", ["typ";"res"], fun [typ;res] -> gVar res)
-           ; (injectCtr "Coq.Init.Datatypes.None",       ["typ"], fun [typ] -> g_false)
+  gMatch c [ (injectCtr "Coq.Init.Datatypes.Some", ["res"], fun [res] -> gVar res)
+           ; (injectCtr "Coq.Init.Datatypes.None",       [], fun [] -> g_false)
   ]
 
 (* Unit *)
@@ -1097,18 +1103,23 @@ let gTT   = gInject "Coq.Init.Datatypes.tt"
 
 (* dec *)
 
-let g_dec typ = gApp ?explicit:(Some true) (gInject "QuickChick.dec") [typ]
-let g_decOpt typ n = gApp ?explicit:(Some true) (gInject "QuickChick.decOpt") [typ; n]
+let g_dec typ = gApp ?explicit:(Some true) (gInject "QuickChick.Decidability.dec") [typ]
+let g_decOpt typ n = gApp ?explicit:(Some true) (gInject "QuickChick.Decidability.decOpt") [typ; hole; n]
+let g_dec_decOpt = gInject "QuickChick.Decidability.dec_decOpt"
 
 (* checker *)
 
-let g_checker toCheck = gApp (gInject "QuickChick.checker") [toCheck]
+let g_checker toCheck = gApp (gInject "QuickChick.Checker.checker") [toCheck]
 
 (* Gen combinators *)
 
-let g_forAll gen prop = gApp (gInject "QuickChick.forAll") [gen; prop]
+let g_forAll gen prop = gApp (gInject "QuickChick.Checker.forAll") [gen; prop]
 
-let g_arbitrary = gInject "QuickChick.arbitrary"
+let g_arbitrary = gInject "QuickChick.Classes.arbitrary"
+
+let g_quickCheck p = gApp (gInject "QuickChick.Test.quickCheck") [p]
+
+let g_show typ = gApp (gInject "QuickChick.Show.show") [typ]
 
 (* Recursion combinators / fold *)
 (* fold_ty : ( a -> coq_type -> a ) -> ( ty_ctr * coq_type list -> a ) -> ( ty_param -> a ) -> coq_type -> a *)

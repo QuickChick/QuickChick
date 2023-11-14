@@ -4,6 +4,9 @@ open Constrexpr
 
 type coq_expr
 
+val interp_open_coq_expr : Environ.env -> Evd.evar_map -> 
+  coq_expr -> EConstr.constr
+
 val hole : coq_expr
 
 val debug_coq_expr : coq_expr -> unit
@@ -205,6 +208,9 @@ val gEq : coq_expr -> coq_expr -> coq_expr
 val gOption : coq_expr -> coq_expr
 val gNone : coq_expr -> coq_expr
 val gSome : coq_expr -> coq_expr -> coq_expr
+val gNone' : coq_expr
+val gSome' : coq_expr -> coq_expr
+
 
 (* boolean *)
 val gNot   : coq_expr -> coq_expr
@@ -224,6 +230,7 @@ val gTT   : coq_expr
 (* dec *)
 val g_dec : coq_expr -> coq_expr
 val g_decOpt : coq_expr -> coq_expr -> coq_expr
+val g_dec_decOpt : coq_expr
 
 (* checker *)
 
@@ -233,6 +240,8 @@ val g_checker : coq_expr -> coq_expr
 (* (\* Gen combinators *\) *)
 val g_forAll : coq_expr -> coq_expr -> coq_expr
 val g_arbitrary : coq_expr
+val g_quickCheck : coq_expr -> coq_expr
+val g_show : coq_expr -> coq_expr
 
 (* val gGen : coq_expr -> coq_expr *)
 (* val returnGen  : coq_expr -> coq_expr  *)

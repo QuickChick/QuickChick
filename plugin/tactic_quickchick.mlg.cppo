@@ -10,6 +10,7 @@ MAKE SURE TO EDIT THE .cppo SOURCE OF THIS FILE RATHER THAN THE GENERATED RESULT
   open Ltac_plugin
   open Error
   open Pp
+  open QuickChick
 }
 
 DECLARE PLUGIN "coq-quickchick.plugin"
@@ -120,7 +121,7 @@ let quickchick_goal =
               g_forAll g_arbitrary (gFun [var_to_string var] (fun [_] ->
                 mkProperty body
                 )) 
-          | DArrow (x,y) -> gIf (decide (gType' [] x)) (mkProperty y) (g_checker gTT)
+          | DArrow (x,y) -> GenericLib.debug_coq_expr (gType' [] x); gIf (decide (gType' [] x)) (mkProperty y) (g_checker gTT)
           | p -> g_checker (decide (gType' [] p)) 
               in
           
@@ -139,8 +140,15 @@ let quickchick_goal =
                   (g_checker gTT)
                ))        
              )) in
+            
         GenericLib.debug_coq_expr (mkProperty dt);
         GenericLib.debug_coq_expr checker;
+        (*run the generator called checker using QuickCheck.*)
+        (*failwith "OUch!";*)
+        let to_run = GenericLib.interp_open_coq_expr e evd (g_show (g_quickCheck (mkProperty dt))) in
+        (*failwith "Oucher!";*)
+        QuickChick.define_and_run to_run e evd;
+        
         Tacticals.tclIDTAC
       end
     | None -> failwith "Failed to Parse type"
