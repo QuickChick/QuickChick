@@ -29,7 +29,8 @@ Set Bullet Behavior "Strict Subproofs".
 #[global] Instance genBoolSized : GenSized bool :=
   {| arbitrarySized x := elems_ true [true; false] |}.
 
-#[global] Instance genNatSized : GenSized nat :=
+#[global]
+Instance genNatSized : GenSized nat :=
   {| arbitrarySized x := choose (0,x) |}.
 
 #[global] Instance genZSized : GenSized Z :=
@@ -290,10 +291,8 @@ Qed.
          B {_ : EnumSized B} { _ : forall s, SizeMonotonic (@enumSized B _ s)} s :
   SizeMonotonic (@enumSized (A * B) enumPairSized s).
 Proof.
-  eapply bindMonotonic; eauto with typeclass_instances.
-  intros x.
-  eapply bindMonotonic; eauto with typeclass_instances.
-  intros y. eapply returnGenSizeMonotonic; eauto with typeclass_instances.  
+  do 2 (eapply bindMonotonic; [ eauto with typeclass_instances .. | intros ? ]).
+  eapply returnGenSizeMonotonic; eauto with typeclass_instances.
 Qed.
 
 #[global] Instance enumPairSized_CorrectSized
@@ -307,8 +306,8 @@ Proof.
   { intros. reflexivity. }
   destruct a.
   intros _.
-  destruct H1 as [[_ Hca]]. 
-  destruct H4 as [[_ Hcb]].
+  edestruct H1 as [[_ Hca]].
+  edestruct H4 as [[_ Hcb]].
   destruct Hca as [x1 [s1 [_ Hin1]]]. reflexivity.
   destruct Hcb as [x2 [s2 [_ Hin2]]]. reflexivity.
   eexists (x1 + x2). simpl. eexists (s1 + s2). split. reflexivity.
@@ -327,14 +326,15 @@ Qed.
 #[global] Instance enumOption_SizeMonotonic A {_ : Enum A} { _ : SizeMonotonic (@enum A _)} :
   SizeMonotonic (@enum (option A) enumOption).
 Proof.
-  simpl. eapply oneofMonotonic; eauto with typeclass_instances.
-  eapply returnGenSizeMonotonic; eauto with typeclass_instances.
-  eapply cons_subset.
-  eapply returnGenSizeMonotonic; eauto with typeclass_instances.
-  eapply cons_subset.
-  eapply bindMonotonic; eauto with typeclass_instances.
-  intros y. eapply returnGenSizeMonotonic; eauto with typeclass_instances.  
-  eapply sub0set.
+  simpl. eapply oneofMonotonic.
+  - eauto with typeclass_instances.
+  - eapply returnGenSizeMonotonic; eauto with typeclass_instances.
+  - eapply cons_subset.
+    eapply returnGenSizeMonotonic; eauto with typeclass_instances.
+    eapply cons_subset.
+    + eapply bindMonotonic; [ eauto with typeclass_instances .. | intros y ].
+      eapply returnGenSizeMonotonic; eauto with typeclass_instances.
+    + eapply sub0set.
 Qed.
 
  
@@ -344,7 +344,7 @@ Proof.
   constructor. split. intros. reflexivity.
   intros _.
   simpl. destruct a.
-  - destruct H as [ [ _ Hc ] ]. destruct Hc as [x [H1 H2]]. reflexivity.
+  - edestruct H as [ [ _ Hc ] ]. destruct Hc as [x [H1 H2]]. reflexivity.
     eexists x. split. reflexivity.
     eapply semOneofSize. eauto with typeclass_instances.
     eexists. split. right. left.
@@ -481,11 +481,11 @@ Proof.
   intros. destruct p.
     rewrite /Z.div2 /Pos.div2.
       rewrite /Z.abs_nat. rewrite Pos2Nat.inj_xI.
-      rewrite <- Nat.add_1_r. rewrite mult_comm.
+      rewrite <- Nat.add_1_r. rewrite Nat.mul_comm.
       rewrite Nat.div2_div. rewrite Nat.div_add_l; simpl; lia.
     rewrite /Z.div2 /Pos.div2.
       rewrite /Z.abs_nat. rewrite Pos2Nat.inj_xO.
-      rewrite mult_comm. rewrite Nat.div2_div. rewrite Nat.div_mul. reflexivity. lia.
+      rewrite Nat.mul_comm. rewrite Nat.div2_div. rewrite Nat.div_mul. reflexivity. lia.
   reflexivity.
 Qed.
 
@@ -521,10 +521,10 @@ Proof.
   intros. destruct p.
     left. rewrite /Z.div2 /Pos.div2.
       rewrite neg_succ. rewrite <- Zsucc_pred. rewrite /Z.abs_nat. rewrite Pos2Nat.inj_xI.
-      rewrite <- Nat.add_1_r. rewrite mult_comm.
+      rewrite <- Nat.add_1_r. rewrite Nat.mul_comm.
       rewrite Nat.div2_div. rewrite Nat.div_add_l; simpl; lia.
     right. rewrite /Z.div2 /Pos.div2.
-      rewrite Pos2Nat.inj_xO. rewrite mult_comm.
+      rewrite Pos2Nat.inj_xO. rewrite Nat.mul_comm.
       rewrite Nat.div2_div. rewrite Nat.div_mul. simpl.
       apply abs_succ_neg. lia.
   left. simpl. reflexivity.
@@ -542,7 +542,7 @@ Proof.
   move => ? p ?. subst. destruct (abs_succ_div2_neg p) as [H | H].
     rewrite {}H /Z.abs_nat. rewrite Nat.div2_div.
       apply Nat.div_lt. apply Pos2Nat.is_pos. lia.
-    rewrite {}H /Z.abs_nat. eapply le_lt_trans. apply le_pred_n. rewrite Nat.div2_div.
+    rewrite {}H /Z.abs_nat. eapply Nat.le_lt_trans. apply Nat.le_pred_l. rewrite Nat.div2_div.
       apply Nat.div_lt. apply Pos2Nat.is_pos. lia.
 Qed.
 
@@ -589,7 +589,8 @@ Definition shrinkListAux {A : Type} (shr : A -> list A) : list A -> list (list A
 (* Needed to add this! *)
 Opaque semProdSize.
 
-#[global] Program Instance arbNatMon :
+#[global]
+Program Instance arbNatMon :
   @SizeMonotonic nat G ProducerGen (@arbitrary nat _).
 Next Obligation.
   rewrite !semSizedSize !semChooseSize // => n /andP [/leP H1 /leP H2].
@@ -599,7 +600,8 @@ Qed.
 
 (** Correctness proof about built-in generators *)
 
-#[global] Instance boolSizeMonotonic : SizeMonotonic (@arbitrary bool _).
+#[global]
+Instance boolSizeMonotonic : SizeMonotonic (@arbitrary bool _).
 Proof.
   unfold arbitrary, GenOfGenSized.
   eapply sizedSizeMonotonic; unfold arbitrarySized, genBoolSized.
@@ -608,12 +610,14 @@ Proof.
   - intros n s1 s2 Hs. eapply subset_refl.
 Qed.
 
-#[global] Instance boolSizedMonotonic : SizedMonotonic (@arbitrarySized bool _).
+#[global]
+Instance boolSizedMonotonic : SizedMonotonic (@arbitrarySized bool _).
 Proof.
   intros n s1 s2 Hs. eapply subset_refl.
 Qed.
 
-#[global] Instance boolCorrect : Correct bool arbitrary.
+#[global]
+Instance boolCorrect : Correct bool arbitrary.
 Proof.
   constructor. unfold arbitrary, GenOfGenSized.
   rewrite semSized.
@@ -645,7 +649,8 @@ rewrite semSized => n; split=> // _; exists n; split=> //.
 by rewrite (semChooseSize _ _ _) /RandomQC.leq /=.
 Qed.
 
-#[global] Instance ArbNatGenCorrect : Correct nat arbitrary.
+#[global]
+Instance ArbNatGenCorrect : Correct nat arbitrary.
 Proof.
   constructor. now apply arbNat_correct.
 Qed.

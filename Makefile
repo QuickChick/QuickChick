@@ -31,7 +31,7 @@ documentation-check: plugin
 
 TEMPFILE := $(shell mktemp)
 
-install: all
+install: quickChickTool plugin
 	$(V)$(MAKE) -f Makefile.coq install > $(TEMPFILE)
 # Manually copying the remaining files
 	$(V)cp $(QCTOOL_DIR)/$(QCTOOL_EXE) $(INSTALLDIR)/quickChick
@@ -61,21 +61,30 @@ uninstall:
 quickChickTool: $(QCTOOL_DIR)/$(QCTOOL_EXE)
 
 $(QCTOOL_DIR)/$(QCTOOL_EXE): $(QCTOOL_SRC)
-	cd $(QCTOOL_DIR); ocamlbuild -pkg str -pkg unix -use-ocamlfind $(QCTOOL_EXE)
+	cd $(QCTOOL_DIR); ocamlbuild -use-ocamlfind -pkg str -pkg unix -use-ocamlfind $(QCTOOL_EXE)
 
 tests:
-	$(MAKE) -C examples tutorial
-	cd examples/ifc-basic; make clean && make
+	$(MAKE) -C tutorials tutorials
 	$(MAKE) -C test
+	cd benchmarks/stlc; make clean && make
+	cd benchmarks/BST; make clean && make
+	cd examples/ifc-basic; make clean && make
 	$(MAKE) -C examples/RedBlack test
-	cd examples/stlc; make clean && make
 	$(MAKE) -C examples/multifile-mutation test
 # This takes too long. 
 #	$(MAKE) -C examples/c-mutation test
 #	coqc examples/BSTTest.v
 	coqc examples/DependentTest.v
 
-COMPATFILES:=plugin/depDriver.ml plugin/driver.mlg plugin/genericLib.ml plugin/quickChick.mlg plugin/tactic_quickchick.mlg plugin/weightmap.mlg src/ExtractionQC.v src/QuickChick.v _CoqProject
+COMPATFILES:= \
+	plugin/depDriver.ml \
+	plugin/genericLib.ml \
+	plugin/unifyQC.ml \
+	plugin/tactic_quickchick.mlg \
+	plugin/weightmap.mlg \
+	src/ExtractionQC.v \
+	src/QuickChick.v \
+	_CoqProject
 
 compat: $(COMPATFILES)
 

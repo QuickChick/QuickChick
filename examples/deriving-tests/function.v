@@ -28,3 +28,7 @@ Example sq_2 :
   @decOpt (square_of 2 5) _ 42 = Some false.
 Proof. reflexivity. Qed.
 
+Inductive correct_prod : (prod nat bool) -> Prop :=
+    | CorrectR1 : forall (p : prod nat bool) (n : nat), correct_prod (pair n (snd p)).
+
+Derive ArbitrarySizedSuchThat for (fun x => correct_prod x).

@@ -9,6 +9,7 @@ plugin/driver.mli
 plugin/tactic_quickchick.mli
 plugin/weightmap.mli
 plugin/genericLib.mli
+plugin/mergeTypes.mli
 plugin/error.mli
 plugin/simplDriver.mli
 plugin/depDriver.mli
@@ -32,6 +33,7 @@ plugin/genericLib.ml
 plugin/error.ml
 plugin/simplDriver.ml
 plugin/depDriver.ml
+plugin/mergeTypes.ml
 plugin/setLib.ml
 plugin/semLib.ml
 plugin/coqLib.ml

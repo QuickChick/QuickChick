@@ -33,14 +33,24 @@ End Failures.
 Import MonadNotation.
 
 Definition a : G nat :=
-  returnGen 1.
+  ret 1.
 Definition b : G nat :=
   v <- a ;;
-  returnGen v.
+  ret v.
+
+Import BindOptNotation.
+
+Definition c : G (option nat) :=
+  ret (Some 42).
+Definition d : G (option nat) :=
+  v <-- c;;
+  ret (Some v).
 
 Sample a.
 Sample b.
 Sample (liftM Some a).
+Sample c.
+Sample d.
 
 From mathcomp Require Import ssreflect ssrnat div.
 

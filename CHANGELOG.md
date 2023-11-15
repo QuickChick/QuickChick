@@ -4,7 +4,59 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](http://keepachangelog.com/en/1.0.0/)
 and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [2.0.0] - 2022-04-13
+
+Major 2.0 Release of QuickChick
+
+- Introduce the notion of `Producer`, a typeclass that abstracts both generators and enumerators.
+- No longer support a Monad instance for `G (option A)`. 
+- bind notation for optional generators can be obtained by importing `BindOptNotation`,
+  `x <-- c1 ;; c2` with a double arrow, resolving typeclass resolution issues.
+- Include support for deriving checkers for inductive relations based on 
+  [PLDI 2022](https://lemonidas.github.io/pdf/ComputingCorrectly.pdf). 
+  
+  `Derive Checker for (P x1 x2 ... xn)` 
+  
+  Defines an instance of the `DecOpt` typeclass that can be access using `??` notation.
+- Introduce an enumeration monad `E`, with the same API as generators. Automatic 
+  type-based enumerators for an inductive `T` can be derived using `Derive` notation:
+  
+  `Derive EnumSized for T.`
+  
+- Introduce the `EnumSizedSuchThat` typeclass for constrained enumeration, similar to 
+  `GenSizedSuchThat`. Include support for deriving enumerators for inductive relations based on 
+  [PLDI 2022](https://lemonidas.github.io/pdf/ComputingCorrectly.pdf). 
+  
+  `Derive EnumSizedSuchThat for (fun y => P x1 ... xn y xm ...).`
+  
+- Introduce convenient notation for deriving constrained generators:
+
+  `Derive Generator for (fun y => P x1 x2 ... y ... xm ...)`
+  
+- Introduce a mechanism for [Merging Inductive Relations](https://lemonidas.github.io/pdf/MergingInductiveRelations.pdf).
+
+  `Merge P with Q as R.`
+
+- No longer support Coq 8.13 and 8.14
+
+## [1.6.5] - 2022-04-13
+
+- Support Coq 8.17
+- No longer support Coq 8.11 and 8.12
+
+## [1.6.4] - 2022-08-14
+
+- Future proofing (internal changes, resolve warnings, keep up with the times)
+
+## [1.6.3] - 2022-05-25
+
+- Add `-use-ocamlfind` to invocations of `ocamlbuild`
+- Add `--root=.` to invocations of `dune`, fixing tests using Dune
+  without a `dune-project` file
+
+## [1.6.2] - 2022-04-08
+- Fix Windows compatibility: pass on environment when running test executable
+  This fixes QuickChick in a Coq Platform "compiled from source" environment. (issue #269)
 
 ## [1.6.1] - 2022-03-03
 - Add Windows compatibility
@@ -138,7 +190,15 @@ These changes are not included in [1.3.0].
 ### Added
 - OPAM package `coq-quickchick` on [coq-released](https://coq.inria.fr/opam/www/).
 
-[Unreleased]: https://github.com/QuickChick/QuickChick/compare/v1.3.2...master
+[1.6.5]: https://github.com/QuickChick/QuickChick/compare/v1.6.4...v1.6.5
+[1.6.4]: https://github.com/QuickChick/QuickChick/compare/v1.6.3...v1.6.4
+[1.6.3]: https://github.com/QuickChick/QuickChick/compare/v1.6.2...v1.6.3
+[1.6.2]: https://github.com/QuickChick/QuickChick/compare/v1.6.1...v1.6.2
+[1.6.1]: https://github.com/QuickChick/QuickChick/compare/v1.6.0...v1.6.1
+[1.6.0]: https://github.com/QuickChick/QuickChick/compare/v1.5.1...v1.6.0
+[1.5.1]: https://github.com/QuickChick/QuickChick/compare/v1.5.0...v1.5.1
+[1.5.0]: https://github.com/QuickChick/QuickChick/compare/v1.4.0...v1.5.0
+[1.4.0]: https://github.com/QuickChick/QuickChick/compare/v1.3.2...v1.4.0
 [1.3.2]: https://github.com/QuickChick/QuickChick/compare/v1.3.1...v1.3.2
 [1.3.1]: https://github.com/QuickChick/QuickChick/compare/v1.3.0...v1.3.1
 [1.3.0]: https://github.com/QuickChick/QuickChick/compare/v1.2.1...v1.3.0

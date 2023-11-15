@@ -74,6 +74,7 @@ Qed.
 Ltac returnSolver :=
   try apply returnGenSizeMonotonic;
   try apply ProducerSemanticsGen.
+#[global]
 Instance genRBTree_heightMonotonic p :
   @SizeMonotonic _ _ ProducerGen (genRBTree_height p).
 Proof.
@@ -83,9 +84,9 @@ Proof.
   - case : c {IH}; returnSolver.
     apply oneofMonotonic; returnSolver.
     move => t [H1 | [H2 | //]]; subst; returnSolver.
-    eauto with typeclass_instances.
-    apply (@bindMonotonic _ ProducerGen _); eauto with typeclass_instances.
-    move => x; returnSolver.
+    eauto with typeclass_instances;
+    apply (@bindMonotonic _ ProducerGen _); eauto with typeclass_instances;
+    move => x; returnSolver. 
   - case : c IH => IH.
     apply (@liftM4Monotonic); returnSolver.
     + eapply IH; eauto; by constructor; lia.
@@ -98,6 +99,7 @@ Proof.
       * eapply IH; eauto; (case : x; [ by right | by left; lia]).      
 Qed.
 
+#[global]
 Instance genRBTreeMonotonic : SizeMonotonic genRBTree.
 Proof.
   apply bindMonotonic; eauto with typeclass_instances.

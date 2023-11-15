@@ -1,11 +1,6 @@
+DECLARE PLUGIN "coq-quickchick.plugin"
+
 {
-(*
-
-THIS FILE IS PREPROCESSED USING cppo
-MAKE SURE TO EDIT THE .cppo SOURCE OF THIS FILE RATHER THAN THE GENERATED RESULT
-
-*)
-
 open Pp
 open Names
 open Declare
@@ -206,14 +201,14 @@ let define_and_run c env evd =
   in
   let exec_command =
     match !dune_file with
-    | None -> "cd " ^ dir ^ " && ocamlbuild " ^ packages ^ " -lib unix -cflags \"-w -3\" " ^ Filename.basename execn ^ " -verbose 8 > build.log 2> build.err"
+    | None -> "cd " ^ dir ^ " && ocamlbuild -use-ocamlfind " ^ packages ^ " -lib unix -cflags \"-w -3\" " ^ Filename.basename execn ^ " -quiet > build.log 2> build.err"
     | Some s ->
        (* Modify the dune file to add the executable name and put it in the output dir *) 
        let awk_cmd = Printf.sprintf "awk -v n=2 -v s=\"   (name %s)\" 'NR == n {print s} {print}' %s > %s" (Filename.chop_extension (Filename.basename mlf)) s (dir ^ "/" ^ s) in
        (*       let sed_cmd = Printf.sprintf "sed '2i   (name %s)' %s > %s" (Filename.chop_extension (Filename.basename mlf)) s (dir ^ "/" ^ s) in *)
        ignore (Sys.command awk_cmd);
        (* The command is just dune build *)
-       Printf.sprintf "cd %s && dune build --display=quiet > build.log 2> build.err" dir
+       Printf.sprintf "cd %s && dune build --root=. --display=quiet > build.log 2> build.err" dir
   in
   (* Overwrite execn in case of dune *)
   let execn =
@@ -234,8 +229,10 @@ let define_and_run c env evd =
 
   (* Run the test *)
   else
+    let execn = "time " ^ execn in 
     (* Should really be shared across this and the tool *)
-    let (p_out, _, p_err) as process = Unix.open_process_full execn [||] in
+    (*
+    let (p_out, _, p_err) as process = Unix.open_process_full execn (Unix.environment ()) in
     let rec process_otl_aux () =
       let e = input_line p_out in
       Feedback.msg_info (Pp.str e);
@@ -251,6 +248,36 @@ let define_and_run c env evd =
          | Unix.WSIGNALED i -> err (Printf.sprintf "Killed (%d)" i)
          | Unix.WSTOPPED i -> err (Printf.sprintf "Stopped (%d)" i)
          end
+     *)
+    let start = Unix.gettimeofday () in
+    let (p_out, _, p_err) as process = Unix.open_process_full execn (Unix.environment ()) in
+    let process_out () =
+(*      let rec process_err_aux () =
+        let e = input_line p_err in
+        Feedback.msg_info (Pp.str e);
+        process_err_aux() in
+*)        
+      let rec process_otl_aux () =
+        let e = input_line p_out in
+        Feedback.msg_info (Pp.str e);
+        process_otl_aux() in
+      try process_otl_aux ()
+      with End_of_file ->
+             let stop = Unix.gettimeofday () in
+             let timeElapsed = stop -. start in
+             Feedback.msg_info (Pp.str (Printf.sprintf "Time Elapsed: %fs\n" timeElapsed));
+            (* try process_err_aux ()
+            with End_of_file ->  *)
+              let err_msg = read_all p_err in
+              let err descr = CErrors.user_err (str (execn ^ ": " ^ descr) ++ fnl () ++ fnl () ++ str err_msg ++ fnl ()) in
+              let stat = Unix.close_process_full process in
+              begin match stat with
+              | Unix.WEXITED 0 -> ()
+              | Unix.WEXITED i -> err (Printf.sprintf "Exited with status %d" i)
+              | Unix.WSIGNALED i -> err (Printf.sprintf "Killed (%d)" i)
+              | Unix.WSTOPPED i -> err (Printf.sprintf "Stopped (%d)" i)
+              end
+    in process_out ()
 
 (*
     (** If we want to print the time spent in tests *)
@@ -266,12 +293,7 @@ let runTest c env evd : unit =
   (* [c] is a constr_expr representing the test to run,
      so we first build a new constr_expr representing
      show c **)
-  let c = CAst.make @@
-#if COQ_VERSION >= (8, 15, 0)
-    CApp (show, [(c, None)])
-#else
-    CApp ((None, show), [(c, None)])
-#endif
+  let c = CAst.make @@ CApp (show, [(c, None)])
   in
   (* Build the kernel term from the const_expr *)
 
@@ -297,13 +319,7 @@ let run f args =
   | None -> failwith "run called with no arguments"
   end;
   let args = List.map (fun x -> (x,None)) args in
-  let c = CAst.make @@
-#if COQ_VERSION >= (8, 15, 0)
-    CApp (f, args)
-#else
-    CApp ((None, f), args)
-#endif
-  in
+  let c = CAst.make @@ CApp (f, args) in
   runTest c env evd
 
 let set_debug_flag (flag_name : string) (mode : string) =
@@ -325,11 +341,11 @@ let extract_manually : qualid list ref =
 let add_manual_extract cs =
   let convert_reference_to_qualid c : qualid =
     match c with
-    | {CAst.v = CRef (r, _)} -> r 
+    | {CAst.v = CRef (r, _) ; _ } -> r 
     | _ -> failwith "Usage: Extract Manually failed." in
   let refs : qualid list =
     match cs with
-    | { CAst.v = CNotation (_,_,([a],[b],_,_)) } -> begin
+    | { CAst.v = CNotation (_,_,([a],[b],_,_)) ; _ } -> begin
          let q = convert_reference_to_qualid a in
          let qs = List.map convert_reference_to_qualid b in
          q :: qs
@@ -360,7 +376,7 @@ let qcFuzz_main prop_def temp_dir execn prop_mlf prop_mlif warnings prop fuzzLoo
   let prop_name = qualify (Id.to_string prop_def) in
   let prop_ref =
     match prop with
-    | { CAst.v = CRef (r,_) } -> r
+    | { CAst.v = CRef (r,_) ; _ } -> r
     | _ -> failwith "Not a reference"
   in
   Extraction_plugin.Table.extract_constant_inline false prop_ref [] prop_name;

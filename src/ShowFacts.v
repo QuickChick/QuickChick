@@ -2,7 +2,7 @@ Require Import List.
 Import ListNotations.
 Require Import Coq.Strings.String.
 Require Import Coq.Strings.Ascii.
-Require Import ZArith.
+Require Import Lia Arith.
 
 Require Import QuickChick.Show.
 
@@ -18,8 +18,7 @@ Proof.
   unfold unit_digit in e.
   apply (f_equal nat_of_ascii) in e.
   rewrite nat_ascii_embedding in e.
-  intuition.
-  intuition.
+  all: lia.
 Qed.
 
 Lemma unit_digit_ascii :
@@ -35,9 +34,9 @@ Proof.
   replace (n mod 10 + 48 <=? 57) with true.
   rewrite Nat.add_sub.
   auto.
-  { symmetry. apply leb_correct. intuition. }
-  { symmetry. apply leb_correct. intuition. }
-  { intuition. }
+  { symmetry. apply leb_correct. lia. }
+  { symmetry. apply leb_correct. lia. }
+  { lia. }
 Qed.
 
 Lemma decimal_thousand : forall n,
@@ -48,27 +47,20 @@ Proof.
   rewrite Nat.div_mod with (y:=10); auto.
   rewrite Nat.add_cancel_r.
   replace 100 with (10*10) by auto.
-  rewrite <- mult_assoc_reverse.
+  rewrite Nat.mul_assoc.
   rewrite <- Nat.mul_add_distr_r.
-  rewrite mult_comm.
+  rewrite Nat.mul_comm.
   rewrite Nat.mul_cancel_l; auto.
   rewrite <- Nat.div_div; auto.
   rewrite (Nat.div_mod (n/10) 10) at 3; auto.
   rewrite Nat.add_cancel_r.
-  rewrite mult_comm.
+  rewrite Nat.mul_comm.
   rewrite Nat.mul_cancel_l; auto.
   rewrite Nat.mod_small; auto.
   rewrite Nat.div_div; auto.
   simpl.
   rewrite (Nat.div_lt_upper_bound n 100 9); auto.
-  intuition.
-Qed.
-
-Lemma ascii_256 : forall c, nat_of_ascii c < 256.
-Proof.
-  intros.
-  destruct c as [b0 b1 b2 b3 b4 b5 b6 b7].
-  destruct b0, b1, b2, b3, b4, b5, b6, b7; simpl; compute; intuition.
+  lia.
 Qed.
 
 Lemma unthree_three_digit (c : ascii) :
@@ -81,7 +73,7 @@ Proof.
   do 3 rewrite unit_digit_ascii.
   rewrite decimal_thousand.
   auto.
-  apply ascii_256.
+  apply nat_ascii_bounded.
 Qed.
 
 Lemma read_show_quoted_string : forall (s : string),
@@ -121,23 +113,23 @@ Proof.
       simpl.
       destruct (ascii_dec _ "n") as [is_n2 | isn_n2].
       { apply not_digit_when in is_n2. contradict is_n2.
-        compute. right. intuition.
+        compute. right. lia.
       }
       destruct (ascii_dec _ "r") as [is_r2 | isn_r2].
       { apply not_digit_when in is_r2. contradict is_r2.
-        compute. right. intuition.
+        compute. right. lia.
       }
       destruct (ascii_dec _ "t") as [is_t2 | isn_t2].
       { apply not_digit_when in is_t2. contradict is_t2.
-        compute. right. intuition.
+        compute. right. lia.
       }
       destruct (ascii_dec _ "\") as [is_bs2 | isn_bs2].
       { apply not_digit_when in is_bs2. contradict is_bs2.
-        compute. right; intuition.
+        compute. right; lia.
       }
       destruct (ascii_dec _ """") as [is_dq2 | isn_dq2].
       { apply not_digit_when in is_dq2. contradict is_dq2.
-        compute. left; intuition.
+        compute. left; lia.
       }
       fold (Nat.div (nat_of_ascii a) 100).
       fold (Nat.div (nat_of_ascii a) 10).

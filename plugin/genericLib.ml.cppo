@@ -1,10 +1,4 @@
-(*
-
-THIS FILE IS PREPROCESSED USING cppo
-MAKE SURE TO EDIT THE .cppo SOURCE OF THIS FILE RATHER THAN THE GENERATED RESULT
-
-*)
-
+open Entries
 open Pp
 open Constr
 open Names
@@ -39,7 +33,11 @@ let make_up_name () : Id.t =
   cnt := !cnt + 1;
   id
        
+#if COQ_VERSION >= (8, 18, 0)
+let hole = CAst.make @@ CHole (None, Namegen.IntroAnonymous)
+#else
 let hole = CAst.make @@ CHole (None, Namegen.IntroAnonymous, None)
+#endif
 
 let id_of_name n = 
   match n with 
@@ -77,10 +75,15 @@ let gInject s =
   if s = "" then failwith "Called gInject with empty string";
   CAst.make @@ CRef (qualid_of_string s, None)
 
+#if COQ_VERSION >= (8, 19, 0)
+let gType0 = CAst.make @@ CSort (Glob_term.UAnonymous {rigid = UnivRigid})
+#else
 let gType0 = CAst.make @@ CSort (Glob_term.UAnonymous {rigid = true})
-         
+#endif
+
 type ty_param = Id.t (* Opaque *)
 let ty_param_to_string (x : ty_param) = Id.to_string x
+let inject_ty_param (s : string) : ty_param = Id.of_string s
 
 let gTyParam = mkIdentC
 
@@ -97,13 +100,9 @@ type arg = local_binder_expr
 let gArg ?assumName:(an=hole) ?assumType:(at=hole) ?assumImplicit:(ai=false) ?assumGeneralized:(ag=false) _ =
   let n = match an with
     | { CAst.v = CRef (qid, _); loc } -> (loc,Name (qualid_basename qid))
-    | { CAst.v = CHole (_v,_,_); loc } -> (loc,Anonymous)
+    | { CAst.v = CHole _; loc } -> (loc,Anonymous)
     | _a -> failwith "This expression should be a name" in
-#if COQ_VERSION >= (8, 12, 0)
   let max_implicit = Glob_term.MaxImplicit in
-#else
-  let max_implicit = Glob_term.Implicit in
-#endif
   CLocalAssum ( [CAst.make ?loc:(fst n) @@ snd n],
                   (if ag then Generalized (max_implicit, false)
                    else if ai then Default max_implicit else Default Glob_term.Explicit),
@@ -331,7 +330,11 @@ let parse_constructors nparams param_names result_ty oib : ctr_rep list option =
           with _ -> CErrors.user_err (str "nth failed: " ++ int (i + nparams - db - 1) ++ fnl ())
       end 
       else if isApp ty then begin
-        let (ctr, tms) = decompose_app ty in 
+#if COQ_VERSION >= (8, 18, 0)
+        let (ctr, tms) = decompose_app_list ty in
+#else
+        let (ctr, tms) = decompose_app ty in
+#endif
         foldM (fun acc ty -> 
                aux i ty >>= fun ty' -> Some (ty' :: acc)
               ) (Some []) tms >>= fun tms' ->
@@ -443,7 +446,11 @@ let parse_dependent_type i nparams ty oib arg_names =
         end
     end 
     else if isApp ty then begin
-      let (ctr, tms) = decompose_app ty in 
+#if COQ_VERSION >= (8, 18, 0)
+      let (ctr, tms) = decompose_app_list ty in
+#else
+      let (ctr, tms) = decompose_app ty in
+#endif
       foldM (fun acc ty -> 
              aux i ty >>= fun ty' -> Some (ty' :: acc)
             ) (Some []) tms >>= fun tms' ->
@@ -591,12 +598,7 @@ let coerce_reference_to_dep_dt c =
 let gApp ?explicit:(expl=false) c cs =
   if expl then
     let f c = match c with
-    | CRef (r,_) ->
-#if COQ_VERSION >= (8, 15, 0)
-        Constrexpr.CAppExpl((r, None), cs)
-#else
-        Constrexpr.CAppExpl((None, r, None), cs)
-#endif
+    | CRef (r,_) -> Constrexpr.CAppExpl((r, None), cs)
     | _ -> failwith "invalid argument to gApp"
     in CAst.map f c
   else mkAppC (c, cs)
@@ -710,7 +712,9 @@ let gRecord names_and_bodies =
   CAst.make @@ CRecord (List.map (fun (n,b) -> (qualid_of_ident @@ Id.of_string n, b)) names_and_bodies)
 
 let gAnnot (p : coq_expr) (tau : coq_expr) =
-#if COQ_VERSION >= (8, 15, 0)
+#if COQ_VERSION >= (8, 18, 0)
+  CAst.make @@ CCast (p, Some DEFAULTcast, tau)
+#elif COQ_VERSION >= (8, 15, 0)
   CAst.make @@ CCast (p, DEFAULTcast, tau)
 #else
   CAst.make @@ CCast (p, Glob_term.CastConv tau)
@@ -728,9 +732,11 @@ let gType ty_params dep_type =
                               gProdWithArgs [gArg ~assumName:(gVar x) ~assumType:t1 ()] (fun _ -> t2)
     | DTyParam tp -> gTyParam tp
     | DTyCtr (c,dts) -> gApp (gTyCtr c) (List.map aux dts)
+    | DCtr (c, dts) -> gApp (gCtr c) (List.map aux dts)
     | DTyVar x -> gVar x 
     | DApp (c, dts) -> gApp (aux c) (List.map aux dts) 
     | DHole -> hole
+    | DNot dt -> gApp (gInject "Coq.Init.Datatypes.negb") [aux dt]
   in 
   aux dep_type
 (*    
@@ -740,6 +746,128 @@ let gType ty_params dep_type =
                         (fun _ -> aux dep_type)
  *)
 
+(*
+let locate_constant c = 
+  match Nametab.locate c with GlobRef.ConstRef x -> x | _ -> failwith ("loc_const: " ^ string_of_qualid c)
+ *)
+
+let locate_ind c =
+  begin
+      try begin match Nametab.locate c with
+          | GlobRef.IndRef x -> x
+          | _ -> failwith ("loc_ind: " ^ string_of_qualid c)
+          end
+      with Not_found -> failwith ("Locate_ind: " ^ string_of_qualid c)
+  end
+
+let locate_constant_of_id (c : Id.t) : Constant.t option =
+  begin
+    begin
+      try match Nametab.locate (qualid_of_ident c) with
+          | GlobRef.ConstRef x -> Some x
+          | _ -> None
+      with Not_found -> None (* failwith ("locate constant: " ^ (Id.to_string c))*)
+    end
+  end
+  
+let locate_constructor c =
+  try (match Nametab.locate c with GlobRef.ConstructRef x -> x | _ -> failwith ("loc_constr: " ^ string_of_qualid c))
+  with Not_found -> failwith ("locate constr: " ^ string_of_qualid c)
+                                                           
+(* Convert types back into constr *)
+let constr_of_type name ty_params dep_type =
+  let rec find_param (x : Id.t) i j params =
+    msg_debug (str "Finding param: " ++ str (Id.to_string x) ++ str " " ++ int i ++ str " " ++ int j ++ fnl ());
+    match params with
+    | [] -> failwith "Param not found"
+    | p::ps -> if p = x then Constr.mkRel (i - j)
+               else find_param x i (j+1) ps
+  in
+  let rec find_index (x : Id.t) i j vars params =
+    msg_debug (str "Finding index: " ++ str (Id.to_string x) ++ str " " ++ int i ++ str " " ++ int j ++ fnl ());
+    match vars with
+    | [] -> begin match locate_constant_of_id x with
+            | Some c -> Constr.mkConst c
+            | None -> find_param x (List.length params + i) 1 params
+            end
+    (* TODO: Find DeBruijn equation *)
+    | y::ys -> if x = y then Constr.mkRel (i - j)
+               else find_index x i (j-1) ys params
+  in  
+  let rec aux vars ty_params i dt : Constr.t =
+    msg_debug (str "Calling aux with: " ++ str (dep_type_to_string dt) ++ str "  " ++ int i ++ fnl ());
+    List.iter (fun v -> msg_debug (str (var_to_string v) ++ str " ")) vars;
+    msg_debug (fnl ());
+    List.iter (fun v -> msg_debug (str (var_to_string v) ++ str " ")) ty_params;
+    msg_debug (fnl ());
+    msg_debug (str "End preamble aux" ++ fnl ());
+    match dt with
+    | DArrow (dt1, dt2) ->
+       begin
+         msg_debug (str "In DArrow" ++ fnl ());
+         let t1 = aux vars ty_params i dt1 in
+         let t2 = aux (make_up_name () :: vars) ty_params (i+1) dt2 in
+         Constr.mkProd (Context.anonR, t1, t2)
+       end
+    | DProd ((x,dt1), dt2) ->
+       begin
+         msg_debug (str "In DProd" ++ fnl ());
+         let t1 = aux vars ty_params i dt1 in
+         let t2 = aux (x :: vars) ty_params (i+1) dt2 in 
+         Constr.mkProd (Context.nameR x, t1, t2)
+       end
+    | DTyParam tp ->
+       begin
+         msg_debug (str "In DTyParam" ++ fnl ());
+         msg_debug (str "Finding ty_param: " ++ str (ty_param_to_string tp) ++ str " with i: " ++ int i ++ fnl ());
+         find_param tp i 1 ty_params
+       end
+    | DTyCtr (c,dts) ->
+       begin
+         msg_debug (str "In DTyCtr" ++ fnl ());
+         let cname = string_of_qualid c in
+         let c' = if cname = "Prop" then Constr.mkProp
+                  else if cname = "Type" then Constr.mkType Univ.Universe.type1
+                  else if cname = name then Constr.mkRel i
+                  else Constr.mkInd (locate_ind c) in
+         Constr.mkApp (c', Array.of_list (List.map (aux vars ty_params i) dts))
+       end
+    | DCtr (c,dts) ->
+       begin
+         msg_debug (str "In DCtr" ++ fnl ());
+         Constr.mkApp (Constr.mkConstruct (locate_constructor c), Array.of_list (List.map (aux vars ty_params i) dts))
+       end
+    | DTyVar x ->
+       begin
+         msg_debug (str "In DTyVar" ++ fnl ());
+         find_index x (i - List.length ty_params) (List.length vars) (vars) ty_params
+       end
+    | DApp (c, dts) ->
+       begin
+         msg_debug (str "In DApp" ++ fnl ());
+         Constr.mkApp (aux vars ty_params i c, Array.of_list (List.map (aux vars ty_params i) dts))
+       end
+    | DNot dt -> failwith "Not" (* Constr.mkApp (Constr.mkVar (Id.of_string "negb"), [| aux dt |])*)
+    | _ -> failwith "No holes allowed in constr_of_type"
+    (*
+    | DHole -> hole
+                     *)
+  in
+  let rec handle_ty_params ty_ps dt =
+    match ty_ps with
+    | [] -> dt
+    | p::ps -> Constr.mkProd (Context.nameR p, Constr.mkType (Univ.Universe.type1), handle_ty_params ps dt)
+  in 
+  handle_ty_params ty_params (aux [] ty_params (List.length ty_params + 1) dep_type)
+  
+(*  let cexpr = gType ty_params dep_type in
+  let env = Global.env () in
+  let evd = Evd.from_env env in
+
+  let _,_ec = Constrintern.interp_open_constr env evd cexpr in
+  failwith "Reaching here" *)
+  (*  EConstr.Unsafe.to_constr es *)
+  
 (* Lookup the type of an identifier *)
 let get_type (id : Id.t) = 
   msg_debug (str ("Trying to global:" ^ Id.to_string id) ++ fnl ());
@@ -847,7 +975,7 @@ let rec str_appends cs =
   | [c] -> c
   | c1::cs' -> str_append c1 (str_appends cs')
 let smart_paren c = gApp (gInject "QuickChick.Show.smart_paren") [c]
-
+                  
 (* Pair *)
 let gPair (c1, c2) = gApp (gInject "Coq.Init.Datatypes.pair") [c1;c2]
 let gProd (c1, c2) = gApp (gInject "Coq.Init.Datatypes.prod") [c1;c2]
@@ -893,14 +1021,7 @@ let dtTupleType =
 let nat_scope ast = CAst.make @@ CDelimiters ("nat", ast)
 let gInt n =
   let number =
-#if COQ_VERSION >= (8, 13, 0)
     Number (NumTok.Signed.of_int_string (string_of_int n))
-#elif COQ_VERSION >= (8, 12, 0)
-    Numeral (NumTok.Signed.of_int_string (string_of_int n))
-#else
-    if n >= 0 then Numeral (SPlus, NumTok.int (string_of_int n))
-    else Numeral (SMinus, NumTok.int (string_of_int (-n)))
-#endif
   in nat_scope (CAst.make @@ CPrim number)
 let gSucc x = gApp (gInject "Coq.Init.Datatypes.S") [x]
 let rec maximum = function
@@ -1018,6 +1139,37 @@ let declare_class_instance ?(global=true) ?(priority=42) instance_arguments inst
   in
   msg_debug (str (Id.to_string cid) ++ fnl ())
 
+let define_new_inductive (ty_ctr, ty_params, ctrs, typ) =
+  let me_typename = Id.of_string (string_of_qualid ty_ctr) in
+  msg_debug (str "constr_of_type: " ++ str (dep_type_to_string typ) ++ fnl ());
+  msg_debug (str "me_arity ty_ctr: " ++ str (string_of_qualid ty_ctr) ++ fnl ());
+  let me_arity = constr_of_type (string_of_qualid ty_ctr) ty_params typ in
+  let oie =
+    { mind_entry_typename = me_typename
+    ; mind_entry_arity = me_arity
+    ; mind_entry_consnames = List.map (fun (c,_) -> Id.of_string (string_of_qualid c)) ctrs
+    ; mind_entry_lc = List.map (fun (_, t) -> constr_of_type (string_of_qualid ty_ctr) ty_params t) ctrs
+    } in
+  msg_debug (str "oie done" ++ fnl ());
+  let entry =
+    { mind_entry_record = None
+    ; mind_entry_finite = Declarations.Finite
+    ; mind_entry_params = []
+    ; mind_entry_inds = [ oie ]
+    ; mind_entry_universes = Entries.Monomorphic_ind_entry 
+    ; mind_entry_variance  = None
+    ; mind_entry_private   = None
+    } in
+  let env = Global.env () in
+  let evd = Evd.from_env env in
+  let uentry = Evd.univ_entry ~poly:false evd in
+  let impls = [] in
+  Flags.quiet := false;
+  msg_debug (str "About to declare: " ++ fnl ());
+  msg_debug (str "me_arity: " ++ Constr.debug_print oie.mind_entry_arity ++ fnl ());
+  List.iteri (fun i c -> msg_debug (str "me_consname: " ++ int i ++ Constr.debug_print c ++ fnl ())) oie.mind_entry_lc;
+  ignore (DeclareInd.declare_mutual_inductive_with_eliminations entry uentry impls) 
+  
 (* List Utils. Probably should move to a util file instead *)
 let list_last l = List.nth l (List.length l - 1)
 let list_init l = List.rev (List.tl (List.rev l))
@@ -1076,7 +1228,8 @@ let debug_pattern s p =
   | PArray _ -> failwith (s ^ "ARRAY")
   | PProd _ -> failwith (s ^ "PROD")
   
-let find_typeclass_bindings typeclass_name ctr =  
+let find_typeclass_bindings typeclass_name ctr =
+  msg_debug (str ("Finding typeclass bindings for:" ^ string_of_qualid ctr) ++ fnl());
   let env = Global.env () in
   let evd = Evd.from_env env in
   let db = Hints.searchtable_map "typeclass_instances" in
@@ -1084,11 +1237,134 @@ let find_typeclass_bindings typeclass_name ctr =
   let prod_check i =
     String.equal (MutInd.to_string (fst i)) ("QuickChick.DependentClasses." ^ typeclass_name)  in    
   let dec_check i =
-    String.equal (MutInd.to_string (fst i)) ("QuickChick.Decidability." ^ typeclass_name)  in    
+    String.equal (MutInd.to_string (fst i)) ("QuickChick.Decidability." ^ typeclass_name)  in
+  let type_of_hint h = 
+       (* Go from the hint to the type of its constant *)
+       let (_,ec) = Hints.hint_as_term h in
+       let c = EConstr.to_constr evd ec in
+       let cst = Constr.destConst c in
+       let (typ,_constraints) = Environ.constant_type env cst in
+       typ in
+  (* Find the conclusion of a type *)
+  let rec find_concl typ =
+      if Constr.isLambda typ then
+        let (_binder,_binder_type,typ') = Constr.destLambda typ in
+        find_concl typ'
+      else if Constr.isProd typ then
+        let (_binder,_binder_type,typ') = Constr.destProd typ in
+        find_concl typ'
+      else if Constr.isApp typ then
+        typ
+      else failwith "FindConcl"
+  in
+  let handle_producer_hint lambda = 
+    if Constr.isLambda lambda then (
+      msg_debug (str "Entering producer lambda" ++ fnl ());
+      let (_binder, _binder_type, typ') = Constr.destLambda lambda in
+      if Constr.isApp typ' then (
+        let (cln, clargs) = Constr.destApp typ' in
+        msg_debug (str "Found a hint for: " ++ Constr.debug_print cln ++ fnl ());
+        if Constr.isInd cln then ( 
+          (* TODO: Search for Mutual inductives properly *)
+          let ((mind,_),_) = Constr.destInd cln in
+          let mind_id = Label.to_id (MutInd.label mind) in
+          let ctr_id = qualid_basename ctr in
+          if Id.equal mind_id ctr_id then (
+            msg_debug (str "Producer Match Found: " ++ Id.print ctr_id ++ fnl ());
+            let standard = ref true in
+            (* Calculate mode as list of booleans: *)
+            let res = List.map (fun arg ->
+                          if Constr.isMeta arg then
+                            false (* Check not equal id name *)
+                          else if Constr.isRef arg then
+                            false
+                          (* Bound by the last lambda means it's output *)
+                          else if Constr.isRelN 1 arg then
+                            true
+                          else if Constr.isRel arg then
+                            false
+                          else if Constr.isApp arg then
+                            begin standard := false; true end
+                          else failwith "New FTB/0"
+                        ) (Array.to_list clargs) in
+            if !standard then begin
+                List.iter (fun b -> msg_debug (bool b ++ str " ")) res;
+                msg_debug (fnl ());
+                result := res :: !result
+              end
+            else msg_debug (str "not standard/producer" ++ fnl ())
+          )
+          else 
+            msg_debug (str "Not equal: " ++ Id.print ctr_id ++ str " " ++ Id.print mind_id ++ fnl ()))
+        else msg_debug (str "Not Ind" ++ fnl ())
+      )
+      else msg_debug (str "First arg not lambda" ++ fnl ())
+    ) in
+  let handle_checker_hint app = 
+    if Id.to_string (qualid_basename ctr) = "eq" then ()
+    else if isApp app then (
+      msg_debug (str "Entering checker app" ++ fnl ());               
+      let (cln, clargs) = Constr.destApp app in               
+      (* TODO: Search for Mutual inductives properly *)
+      let ((mind,_),_) = Constr.destInd cln in
+      let mind_id = Label.to_id (MutInd.label mind) in
+      let ctr_id = qualid_basename ctr in
+      msg_debug (str "In checker/app for: " ++ Id.print ctr_id ++ str " " ++ Id.print mind_id ++ fnl ());
+      
+      if Id.equal mind_id ctr_id then (
+        msg_debug (str "Checker Match Found: " ++ Id.print ctr_id ++ fnl ());
+        let standard = ref true in
+        (* Calculate mode as list of booleans: *)
+        (* For checking, mode is alsways false *)
+        let res = List.map (fun arg -> 
+                      if Constr.isMeta arg then
+                        false (* Check not equal id name *)
+                      else if Constr.isRef arg then
+                        false
+                      else if Constr.isRel arg then
+                        false
+                      else if Constr.isApp arg then
+                        begin standard := false; true end
+                      else failwith "New FTB/0"
+                    ) (Array.to_list clargs) in
+        if !standard then begin
+            List.iter (fun b -> msg_debug (bool b ++ str " ")) res;
+            msg_debug (fnl ());
+            result := res :: !result
+          end
+        else msg_debug (str "not standard/checker" ++ fnl ())
+      )
+      else
+        msg_debug (str "not equal/checker/isApp" ++ fnl ());
+    )
+    else msg_debug (str "not isApp 0" ++ fnl ())
+    in
+  
+  let handle_hint_repr b h =
+    let typ = type_of_hint h in
+    let (typ_cl, typ_args) = Constr.destApp (find_concl typ) in
+    msg_debug (str "Conclusion of current hint is: " ++ fnl ());
+    msg_debug (Constr.debug_print (find_concl typ));
+    try 
+    if b then
+      (* For producer, check the second argument (the first is the type of the lambda) *)
+      handle_producer_hint typ_args.(1)
+    else
+      (* For checker, check the first argument. *)
+      handle_checker_hint typ_args.(0)
+    with _ -> msg_debug (str "exception?" ++ fnl ())
+  in
   let handle_hint b hint =
     msg_debug (str "Processing... (" ++ str typeclass_name ++ str ")"  ++ Hints.FullHint.print env evd hint ++ fnl ());
-    begin match Hints.FullHint.pattern hint with
-    | Some (PApp (PRef g, args)) ->
+    begin match Hints.FullHint.repr hint with
+    | Hints.Res_pf h ->
+       handle_hint_repr b h
+    | Hints.Give_exact h ->
+       handle_hint_repr b h
+    (* TODO: Replicate pattern-based behavior from below in constr form *)
+    | Hints.Extern (Some (PApp (PRef g, args)), _) ->
+    (* begin match Hints.FullHint.pattern hint with
+    | Some (PApp (PRef g, args)) -> *)
        begin
          let arg_index = if b then 1 else 0 in 
 (*         msg_debug (str ("Hint for :" ^ (string_of_qualid (Nametab.shortest_qualid_of_global Id.Set.empty g))) ++ fnl ());
@@ -1139,18 +1415,46 @@ let find_typeclass_bindings typeclass_name ctr =
                 else ()
               end
             else ()
+         | PLambda (name, t, PCase (_, arr, _, [n, ns, PApp (PRef gctr, res_args)])) ->
+            let gctr_qualid = Nametab.shortest_qualid_of_global Id.Set.empty gctr in
+            if qualid_eq gctr_qualid ctr then begin
+                msg_debug (str "Found a match!" ++ fnl ());
+                msg_debug (str ("Conclusion is Application of:" ^
+                                  (string_of_qualid (Nametab.shortest_qualid_of_global Id.Set.empty gctr)))
+                           ++ fnl ());
+                let standard = ref true in
+                let res = List.map (fun p ->
+                              match p with
+                              | PMeta (Some id) -> false 
+(*                                 if not (Name.equal (Name id) name)
+                                 then false
+                                 else failwith "FTB/How is this true" *)
+                              | PRef _ -> false 
+                              | PRel _ -> true
+                              | PApp _ -> standard := false; true                                        
+                              | _ -> debug_pattern "FTB/0" p
+                            ) (Array.to_list res_args) in
+                if !standard then 
+                  result := res :: !result
+                else ()
+              end
+            else ()
          | PMeta (Some id) -> () (* failwith (Id.to_string id) *)
          | PProd _ -> ()
          | _ -> debug_pattern "FTB/1" args.(arg_index)
        end
-    | _ -> failwith "FTB/2"
+    | Hints.Extern _ -> failwith "FTB/Apply"      
+    | Hints.ERes_pf _ -> failwith "FTB/EApply"
+    | Hints.Res_pf_THEN_trivial_fail _ -> failwith "FTB/Imm"
+    | Hints.Unfold_nth _ -> failwith "FTB/Unf"
     end in
   Hints.Hint_db.iter (fun go hm hints ->
       begin match go with
       | Some (GlobRef.IndRef i) when prod_check i ->
          List.iter (handle_hint true ) hints
       | Some (GlobRef.IndRef i) when dec_check i ->
-         List.iter (handle_hint false) hints
+         if Id.to_string (qualid_basename ctr) = "eq" then result := [[false; false; false]]
+         else List.iter (handle_hint false) hints
       | _ -> ()
       end
     ) db;

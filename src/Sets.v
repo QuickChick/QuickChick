@@ -234,13 +234,15 @@ Proof. exact: imset_id. Qed.
 Lemma setXT T U : setX [set: T] [set: U] <--> [set: T * U].
 Proof. by case. Qed.
 
-#[global] Instance set_incl_Proper T U :
+#[global]
+Instance set_incl_Proper T U :
   Proper (@eq (T -> U) ==> set_incl ==> set_incl) imset.
 Proof.
 by move=> f ? <- A B subAB y [x [Ax fx]]; exists x; split=> //; apply: subAB.
 Qed.
 
-#[global] Instance set_eq_Proper T U : Proper (@eq (T -> U) ==> set_eq ==> set_eq) imset.
+#[global]
+Instance set_eq_Proper T U : Proper (@eq (T -> U) ==> set_eq ==> set_eq) imset.
 Proof.
 by move=> f ? <- A B /subset_eqP[subAB subBA] y; split; apply: set_incl_Proper.
 Qed.
@@ -422,19 +424,22 @@ Proof.
   intros H b [x []]; eapply H; eauto.
 Qed.
 
-#[global] Instance proper_set_incl A :
+#[global]
+Instance proper_set_incl A :
   Morphisms.Proper (set_eq ==> set_eq ==> Basics.impl) (@set_incl A).
 Proof. firstorder. Qed.
 
 (** Lemmas about [setU] and [setI] *)
 
-#[global] Instance eq_setU U : Proper (set_eq ==> set_eq ==> set_eq) (@setU U).
+#[global]
+Instance eq_setU U : Proper (set_eq ==> set_eq ==> set_eq) (@setU U).
 Proof.
   move=> A B eqAB F G eqFG a.
   split; by move => [H1 | H2]; firstorder.
 Qed.
 
-#[global] Instance eq_setI U : Proper (set_eq ==> set_eq ==> set_eq) (@setI U).
+#[global]
+Instance eq_setI U : Proper (set_eq ==> set_eq ==> set_eq) (@setI U).
 Proof.
   move=> A B eqAB F G eqFG a.
   by split; move => [H1 H2]; firstorder.
@@ -609,7 +614,8 @@ Proof.
 Qed.
 
 
-#[global] Instance eq_bigcap T U : Proper (set_eq ==> pointwise_relation T (@set_eq U) ==> set_eq) bigcap.
+#[global]
+Instance eq_bigcap T U : Proper (set_eq ==> pointwise_relation T (@set_eq U) ==> set_eq) bigcap.
 Proof.
   move=> A B eqAB F G eqFG a. apply: (@set_eq_trans _ (\bigcap_(i in A) G i)).
   exact: eq_bigcapr.
@@ -1085,7 +1091,8 @@ Proof.
   intro b; split; intros [a Ha]; eexists a; auto.
 Qed.
 
-#[global] Instance proper_somes A : Morphisms.Proper (set_eq ==> set_eq) (@somes A).
+#[global]
+Instance proper_somes A : Morphisms.Proper (set_eq ==> set_eq) (@somes A).
 Proof. firstorder. Qed.
 
 Lemma bigcup_setI {T U} (s1 : set T) (s2 : set U) F :

@@ -5,6 +5,7 @@ defaults: &defaults
     OPAMJOBS: 2
     OPAMVERBOSE: 1
     OPAMYES: true
+    OPAMWITHTEST: true
     TERM: xterm
     SKIP_BUILD: ''
   parameters:
@@ -44,8 +45,8 @@ commands:
         command: make -j`nproc`
     - run:
         name: Testing Tutorial
-        working_directory: examples
-        command: make tutorial
+        working_directory: tutorials
+        command: make tutorials
     - run:
         name: Testing IFC
         working_directory: examples/ifc-basic
@@ -112,12 +113,18 @@ workflows:
   version: 2
   build:
     jobs:
-      - opam:
-          name: OPAM 8.15
+      - dune:
+          name: Dune 8.15
           coq: '8.15'
       - dune:
-          name: Dune latest
-          coq: latest
+          name: Dune 8.16
+          coq: '8.16'
+      - dune:
+          name: Dune 8.17
+          coq: '8.17'
+      - dune:
+          name: Dune 8.18
+          coq: '8.18'
       - opam:
           name: OPAM dev
           coq: dev

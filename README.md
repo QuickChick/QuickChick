@@ -18,7 +18,8 @@ https://lemonidas.github.io/pdf/GeneratingGoodGenerators.pdf
 
 ## Tutorial
 
-[QuickChick: Property-Based Testing in Coq][sfqc] (Software Foundations, Volume 4)
+- Small tutorials on Basic Usage and Automation can be found under `tutorials/`
+- An extended introduction can be found in [QuickChick: Property-Based Testing in Coq][sfqc] (Software Foundations, Volume 4)
 
 [sfqc]: https://softwarefoundations.cis.upenn.edu/qc-current/index.html
 
@@ -75,6 +76,8 @@ The public API of QuickChick is summarized in `BasicInterface.v`.
 - `Derive Arbitrary for c`
 - `Derive Show for c`
 - `Derive ArbitrarySizedSuchThat for (fun x => p)`
+- `Derive DecOpt for p`
+- `Derive EnumSizedSuchThat for (fun x => p)`
 - `Derive ArbitrarySizedSuchThat for (fun x => let (x1,x2...) := x in p)`
 - `QuickCheckWith args c`
 - `MutateCheck c p`
@@ -85,8 +88,10 @@ The public API of QuickChick is summarized in `BasicInterface.v`.
 ### More resources
 
 Here is some more reading material:
-  - Our POPL 2018 paper on [Generating Good Generators for Inductive Relations][mechanism for automatically deriving generators for inductive relations]
+  - Our PLDI 2022 paper on [a mechanism for automatically deriving generators, enumerators, and checkers for inductive relations](https://lemonidas.github.io/pdf/ComputingCorrectly.pdf)
+  - Our POPL 2018 paper on [a mechanism for automatically deriving generators for inductive relations](https://lemonidas.github.io/pdf/GeneratingGoodGenerators.pdf)
   - Our ITP 2015 paper on [Foundational Property-Based Testing](http://prosecco.gforge.inria.fr/personal/hritcu/publications/foundational-pbt.pdf)
+  - Our PLDI 2023 paper on [a mechanism for merging multiple inductive relations into one](https://lemonidas.github.io/pdf/MergingInductiveRelations.pdf)
   - Leo's invited talk at CLA on [Random Testing in the Coq Proof Assistant](https://lemonidas.github.io/pdf/InvitedCLA.pdf)
   - Catalin's [internship topic proposals for 2015](http://prosecco.gforge.inria.fr/personal/hritcu/students/topics/2015/quick-chick.pdf)
   - Catalin's [presentation at CoqPL 2015 workshop (2015-01-18)](http://prosecco.gforge.inria.fr/personal/hritcu/talks/QuickChick-Verified-Testing-CoqPL.pdf)

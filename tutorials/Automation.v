@@ -34,7 +34,11 @@ ShowTree is defined
    proof that P holds or does not hold.
 *)
 
+(* Importing ssreflect yields a bunch of "notation overridden" warnings, which 
+   we can suppress with the following line. *)
+Set Warnings "-notation-overridden,-parsing".
 From mathcomp Require Import ssrbool.
+
 Check decidable.
 (* ==> 
 fun P : Prop => {P} + {~ P}
@@ -82,7 +86,7 @@ tactic for using the Coq-provided `decide equality` tactic in
 conjunction with existing Dec_Eq instances, to automate its
 construction. For example, for our Tree example we can invoke `dec_eq`, assuming our type A is also testable for equality --- note the "Defined" to close the proof.
  *)
-Instance Dec_Eq_Tree {A} `{Dec_Eq A} : Dec_Eq (Tree A).
+#[global] Instance Dec_Eq_Tree {A} `{Dec_Eq A} : Dec_Eq (Tree A).
 Proof. dec_eq. Defined.
 
 
@@ -149,7 +153,7 @@ Fixpoint insert {A} (x : A) (t : Tree A) : Tree A :=
    over simply-typed first-order data, levering the typeclass 
    infrastructure we've seen! *)
 
-Derive DecOpt for (balanced n t).
+Derive Checker for (balanced n t).
 (* ==> DecOptbalanced is defined *)
 
 (* This Derive command produces an instance of the DecOpt typeclass for 
@@ -202,7 +206,7 @@ QuickChick all_trees_are_balanced.
 (* Sure enough, not all trees are balanced. But how would we go about generating 
    balanced trees for testing purposes? Another `Derive` command to the rescue! *)
 
-Derive GenSizedSuchThat for (fun t => balanced n t).
+Derive Generator for (fun t => balanced n t).
 (* ==> GenSizedSuchThatbalanced is defined *)
 
 (* This Derive command produces an instance of the GenSizedSuchThat typeclass,

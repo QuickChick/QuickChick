@@ -21,6 +21,7 @@ val gType0 : coq_expr
 
 type ty_param 
 val ty_param_to_string : ty_param -> string
+val inject_ty_param : string -> ty_param
 val gTyParam : ty_param -> coq_expr
 
 type ty_ctr
@@ -101,6 +102,7 @@ val dep_ctr_to_string : dep_ctr -> string
 type dep_dt = ty_ctr * ty_param list * dep_ctr list * dep_type
 val dep_dt_to_string : dep_dt -> string
 
+val constr_of_type : string -> ty_param list -> dep_type -> Constr.t
 val gType : ty_param list -> dep_type -> coq_expr
 val get_type : Id.t -> unit
 val is_inductive : constructor -> bool
@@ -242,6 +244,8 @@ val declare_class_instance
   : ?global:bool -> ?priority:int
   -> arg list -> string -> (var list -> coq_expr) -> (var list -> coq_expr)
   -> unit
+
+val define_new_inductive : dep_dt -> unit
 
 (* List utils *)
 val list_last : 'a list -> 'a 

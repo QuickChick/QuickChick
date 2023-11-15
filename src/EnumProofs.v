@@ -77,7 +77,7 @@ Section Lemmas.
     assert (Hin : [set : B] x0) by reflexivity.
     eapply Hc in Hin. inv Hin. inv H.
     exists x1, (Nat.max x2 x3). split. reflexivity.
-    eapply (@semBindSize E _ _ B A).
+    eapply (@semBindSize E ProducerEnum _ B A).
     eexists. split.
 
     eapply Hs1 > [ | eassumption ]. now ssromega.
@@ -110,7 +110,7 @@ Section Lemmas.
     
     split. reflexivity.
     
-    eapply (@semBindSize E _ _ B A).
+    eapply (@semBindSize E ProducerEnum _ B A).
 
     eexists. split.
     eapply Hs > [ | eapply Hs' > [ | eassumption ] ]. ssromega. ssromega.
@@ -166,7 +166,7 @@ Section Lemmas.
     assert (Hin : [set : B] z) by reflexivity.
     eapply Hc in Hin. inv Hin. inv H.
     exists x0, (Nat.max x1 x2). split. reflexivity.
-    eapply (@semBindSize E _ _ B).
+    eapply (@semBindSize E ProducerEnum _ B).
     eexists. split.
 
     eapply Hs1 > [ | eassumption ]. now ssromega.
@@ -467,7 +467,7 @@ Ltac2 rec enum_size_correct (_ : unit) :=
       end
     | (* bind rec *)
       match! goal with
-      | [|- exists z, semProd (bindEnum (&_aux_enum z) _) _  ] =>
+      | [|- exists z, semProd (bindEnum (_ _) _) _  ] =>
         eapply exists_bind_Sized_alt >
         [ tci
         | now find_size_mon_inst ()

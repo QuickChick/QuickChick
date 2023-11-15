@@ -30,7 +30,7 @@ Declare ML Module "depDriver".
 Declare ML Module "driver".
 *)
 #if COQ_VERSION >= (8, 16, 0)
-Declare ML Module "quickchick_plugin:coq-quickchick.plugin".
+Declare ML Module "coq-quickchick.plugin".
 #else
 Declare ML Module "quickchick_plugin".
 #endif

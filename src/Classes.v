@@ -214,20 +214,24 @@ Class EnumMonotonicCorrect (A : Type)
   
 (** Coercions *)
   
-#[global] Instance GenSizedMonotonicOfSizeMonotonic
+#[global]
+Instance GenSizedMonotonicOfSizeMonotonic
          (A : Type) (Hgen : GenSized A) (Hmon : forall s, @SizeMonotonic A G ProducerGen (arbitrarySized s))
 : @GenSizedMonotonic A Hgen Hmon := {}.
   
-#[global] Instance GenMonotonicOfSizeMonotonic
+#[global]
+Instance GenMonotonicOfSizeMonotonic
          (A : Type) (Hgen : Gen A) (Hmon : @SizeMonotonic A G ProducerGen arbitrary)
 : @GenMonotonic A Hgen Hmon := {}.
 
-#[global] Instance GenSizedCorrectOfSizedCorrect
+#[global]
+Instance GenSizedCorrectOfSizedCorrect
          (A : Type) (Hgen : GenSized A)
          `{Hcor : @CorrectSized A G ProducerGen arbitrarySized}
 : @GenSizedCorrect A Hgen Hcor := {}.
 
-#[global] Instance GenMonotonicCorrectOfMonotnicCorrect
+#[global]
+Instance GenMonotonicCorrectOfMonotnicCorrect
          (A : Type) (Hgen : Gen A)
          (Hmon : @SizeMonotonic A G ProducerGen arbitrary)
          `{Hcor : @Correct A G ProducerGen arbitrary}
@@ -235,7 +239,8 @@ Class EnumMonotonicCorrect (A : Type)
 
 
 
-#[global] Instance GenSizedSizeMonotonicOfSizedMonotonic
+#[global]
+Instance GenSizedSizeMonotonicOfSizedMonotonic
          (A : Type) (Hgen : GenSized A) (Hmon : @SizedMonotonic A G ProducerGen arbitrarySized)
 : @GenSizedSizeMonotonic A Hgen ProducerGen Hmon := {}.
 
@@ -256,7 +261,8 @@ Generalizable Variables PSized PMon PSMon PCorr.
                                        (@arbitrarySized A H)
                                        PMon PSMon) := {}.
 
-#[global] Instance GenCorrectOfSized (A : Type)
+#[global]
+Instance GenCorrectOfSized (A : Type)
          {H : GenSized A}
          `{@GenSizedMonotonic A H PMon}
          `{@GenSizedSizeMonotonic A H ProducerGen PSMon}

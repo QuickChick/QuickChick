@@ -22,7 +22,8 @@ Class CoArbitrary (A : Type) : Type :=
     coarbCorrect : forall a, coarbReverse (coarbitrary a) = Some a
   }.
 
-#[global] Instance coArbPos : CoArbitrary positive.
+#[global]
+Instance coArbPos : CoArbitrary positive.
 Proof.
 refine {|
     coarbitrary x := x;
@@ -38,7 +39,8 @@ Proof.
   rewrite Nat2Pos.id; auto.
 Qed.
 
-#[global] Instance coqArbNat : CoArbitrary nat.
+#[global]
+Instance coqArbNat : CoArbitrary nat.
 Proof.
 refine {|
     coarbitrary x := Pos.of_nat (S x);
@@ -520,13 +522,15 @@ rewrite coarbCorrect.
 reflexivity.
 Qed.
 
-#[global] Instance genFun {A B : Type} `{_ : CoArbitrary A} `{_ : Gen B} : Gen (A -> B) :=
+#[global]
+Instance genFun {A B : Type} `{_ : CoArbitrary A} `{_ : Gen B} : Gen (A -> B) :=
   {|
     arbitrary := 
       reallyUnsafePromote (fun a => variant (posToPath (coarbitrary a)) arbitrary);
   |}.
 
-#[global] Instance shrinkFunNil {A B : Type} : Shrink (A -> B) :=
+#[global]
+Instance shrinkFunNil {A B : Type} : Shrink (A -> B) :=
   {| shrink x := nil |}.
 
 Section arbFun_completeness.

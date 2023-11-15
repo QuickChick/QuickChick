@@ -26,18 +26,26 @@ Module Type QuickChickSig.
 *)
 
 (** Here are some [Show] instances for some basic types: *)
-#[global] Declare Instance showNat    : Show nat.
-#[global] Declare Instance showBool   : Show bool.
-#[global] Declare Instance showZ      : Show Z.
-#[global] Declare Instance showString : Show string.
+#[global]
+Declare Instance showNat    : Show nat.
+#[global]
+Declare Instance showBool   : Show bool.
+#[global]
+Declare Instance showZ      : Show Z.
+#[global]
+Declare Instance showString : Show string.
 
-#[global] Declare Instance showList :
+#[global]
+Declare Instance showList :
   forall {A : Type} `{Show A}, Show (list A).
-#[global] Declare Instance showPair :
+#[global]
+Declare Instance showPair :
   forall {A B : Type} `{Show A} `{Show B}, Show (A * B).
-#[global] Declare Instance showOpt :
+#[global]
+Declare Instance showOpt :
   forall {A : Type} `{Show A}, Show (option A).
-#[global] Declare Instance showEx :
+#[global]
+Declare Instance showEx :
   forall {A} `{Show A} P, Show ({x : A | P x}).
 
 (** When defining [Show] instance for your own datatypes, you sometimes need to
@@ -70,9 +78,12 @@ Parameter run  : forall {A : Type}, G A -> nat -> RandomSeed -> A.
     [Functor], [Applicative], [Foldable], and [Traversable] modules in
     the [ExtLib.Structures] library from [coq-ext-lib]. *)
 
-#[global] Declare Instance Monad_G : Monad G.
-#[global] Declare Instance Functor_G : Functor G.
-#[global] Declare Instance Applicative_G : Applicative G.
+#[global]
+Declare Instance Monad_G : Monad G.
+#[global]
+Declare Instance Functor_G : Functor G.
+#[global]
+Declare Instance Applicative_G : Applicative G.
 
 
 (** A variant of bind for the [(G (option --))] monad.  Useful for
@@ -189,9 +200,12 @@ End QcDefaultNotation.
 
 Existing Class OrdType.
 
-#[global] Declare Instance OrdBool : OrdType bool.
-#[global] Declare Instance OrdNat  : OrdType nat.
-#[global] Declare Instance OrdZ    : OrdType Z.
+#[global]
+Declare Instance OrdBool : OrdType bool.
+#[global]
+Declare Instance OrdNat  : OrdType nat.
+#[global]
+Declare Instance OrdZ    : OrdType Z.
 
 (** We also expect the random function to be able to pick every element in any
     given interval. *)
@@ -200,9 +214,15 @@ Existing Class ChoosableFromInterval.
 
 (** QuickChick has provided some instances for ordered data types that are
     choosable from intervals, including [bool], [nat], and [Z]. *)
-(* #[global] Declare Instance ChooseBool : ChoosableFromInterval bool. *)
-#[global] Declare Instance ChooseNat : ChoosableFromInterval nat.
-#[global] Declare Instance ChooseZ : ChoosableFromInterval Z.
+
+(*
+#[global]
+Declare Instance ChooseBool : ChoosableFromInterval bool.
+*)
+#[global]
+Declare Instance ChooseNat : ChoosableFromInterval nat.
+#[global]
+Declare Instance ChooseZ : ChoosableFromInterval Z.
 
 (** [choose l r] generates a value between [l] and [r], inclusive the two
     extremes. It causes a runtime error if [r < l]. *)
@@ -223,22 +243,31 @@ Parameter choose :
 
 (** Given an instance of [GenSized], we can convert it to [Gen] automatically,
     using [sized] function. *)
-#[global] Declare Instance GenOfGenSized {A} `{GenSized A} : Gen A.
+#[global]
+Declare Instance GenOfGenSized {A} `{GenSized A} : Gen A.
 
 (** Here are some basic instances for generators: *)
-#[global] Declare Instance genBoolSized : GenSized bool.
-#[global] Declare Instance genNatSized  : GenSized nat.
-#[global] Declare Instance genZSized    : GenSized Z.
+#[global]
+Declare Instance genBoolSized : GenSized bool.
+#[global]
+Declare Instance genNatSized  : GenSized nat.
+#[global]
+Declare Instance genZSized    : GenSized Z.
 
-#[global] Declare Instance genListSized :
+#[global]
+Declare Instance genListSized :
   forall {A : Type} `{GenSized A}, GenSized (list A).
-#[global] Declare Instance genList :
+#[global]
+Declare Instance genList :
   forall {A : Type} `{Gen A}, Gen (list A).
-#[global] Declare Instance genOption :
+#[global]
+Declare Instance genOption :
   forall {A : Type} `{Gen A}, Gen (option A).
-#[global] Declare Instance genPairSized :
+#[global]
+Declare Instance genPairSized :
   forall {A B : Type} `{GenSized A} `{GenSized B}, GenSized (A*B).
-#[global] Declare Instance genPair :
+#[global]
+Declare Instance genPair :
   forall {A B : Type} `{Gen A} `{Gen B}, Gen (A * B).
 
 (* #################################################################### *)
@@ -300,13 +329,19 @@ Notation "'genST' x" := ((@arbitraryST _ x _)) (at level 10).
 *)
 
 (** Default shrinkers for some basic datatypes: *)
-#[global] Declare Instance shrinkBool : Shrink bool.
-#[global] Declare Instance shrinkNat : Shrink nat.
-#[global] Declare Instance shrinkZ : Shrink Z.
+#[global]
+Declare Instance shrinkBool : Shrink bool.
+#[global]
+Declare Instance shrinkNat : Shrink nat.
+#[global]
+Declare Instance shrinkZ : Shrink Z.
 
-#[global] Declare Instance shrinkList {A : Type} `{Shrink A} : Shrink (list A).
-#[global] Declare Instance shrinkPair {A B} `{Shrink A} `{Shrink B} : Shrink (A * B).
-#[global] Declare Instance shrinkOption {A : Type} `{Shrink A} : Shrink (option A).
+#[global]
+Declare Instance shrinkList {A : Type} `{Shrink A} : Shrink (list A).
+#[global]
+Declare Instance shrinkPair {A B} `{Shrink A} `{Shrink B} : Shrink (A * B).
+#[global]
+Declare Instance shrinkOption {A : Type} `{Shrink A} : Shrink (option A).
 
 (* #################################################################### *)
 (** ** The [Arbitrary] Typeclass *)
@@ -334,7 +369,8 @@ Notation "'genST' x" := ((@arbitraryST _ x _)) (at level 10).
 
 (** If a type has a [Gen] and a [Shrink] instance, it automatically gets
     an [Arbitrary] one. *)
-#[global] Declare Instance ArbitraryOfGenShrink :
+#[global]
+Declare Instance ArbitraryOfGenShrink :
   forall {A} `{Gen A} `{Shrink A}, Arbitrary A.
 
 (* #################################################################### *)
@@ -355,12 +391,14 @@ Parameter Checker : Type.
 *)
 
 (** Boolean checkers always pass or always fail. *)
-#[global] Declare Instance testBool : Checkable bool.
+#[global]
+Declare Instance testBool : Checkable bool.
 
 (** The unit checker is always discarded (that is, it represents a
     useless test).  It is used, for example, in the implementation of
     the "implication [Checker]" combinator [==>]. *)
-#[global] Declare Instance testUnit : Checkable unit.
+#[global]
+Declare Instance testUnit : Checkable unit.
 
 (** Given a generator for showable [A]s, construct a [Checker]. *)
 Parameter forAll :
@@ -378,18 +416,21 @@ Parameter forAllShrink :
     possible to write (for some example property [foo := fun x => x >?
     0], say) [QuickChick foo] instead of [QuickChick (forAllShrink
     arbitrary shrink foo)]. *)
-#[global] Declare Instance testFun :
+#[global]
+Declare Instance testFun :
   forall {A prop : Type} `{Show A} `{Arbitrary A} `{Checkable prop},
     Checkable (A -> prop).
 
 (** Lift products similarly. *)
-#[global] Declare Instance testProd :
+#[global]
+Declare Instance testProd :
   forall {A : Type} {prop : A -> Type} `{Show A} `{Arbitrary A}
          `{forall x : A, Checkable (prop x)},
     Checkable (forall (x : A), prop x).
 
 (** Lift polymorphic functions by instantiating to 'nat'. :-) *)
-#[global] Declare Instance testPolyFun :
+#[global]
+Declare Instance testPolyFun :
   forall {prop : Type -> Type} `{Checkable (prop nat)},
     Checkable (forall T, prop T).
 
@@ -473,12 +514,16 @@ End QcNotation.
 *)
 
 (** Decidable properties are Checkable. *)
-#[global] Declare Instance testDec {P} `{H : Dec P} : Checkable P.
+#[global]
+Declare Instance testDec {P} `{H : Dec P} : Checkable P.
 
 (** Logic Combinator instances. *)
-#[global] Declare Instance Dec_neg {P} {H : Dec P} : Dec (~ P).
-#[global] Declare Instance Dec_conj {P Q} {H : Dec P} {I : Dec Q} : Dec (P /\ Q).
-#[global] Declare Instance Dec_disj {P Q} {H : Dec P} {I : Dec Q} : Dec (P \/ Q).
+#[global]
+Declare Instance Dec_neg {P} {H : Dec P} : Dec (~ P).
+#[global]
+Declare Instance Dec_conj {P Q} {H : Dec P} {I : Dec Q} : Dec (P /\ Q).
+#[global]
+Declare Instance Dec_disj {P Q} {H : Dec P} {I : Dec Q} : Dec (P \/ Q).
 
 (* SOONER: We had discussed changing this to the partial decision procedure at some point. *)
 (** A convenient notation for coercing a decidable proposition to a [bool]. *)
@@ -498,7 +543,8 @@ Notation "P '?'" := (match (@dec P _) with
 *)
 
 (** Automation and conversions for Dec. *)
-#[global] Declare Instance Eq__Dec {A} `{H : Dec_Eq A} (x y : A) : Dec (x = y).
+#[global]
+Declare Instance Dec_Eq_implies_DecEq {A} `{H : Dec_Eq A} (x y : A) : Dec (x = y).
 
 (** Since deciding equalities is a very common requirement in testing,
     QuickChick provides a tactic that can define instances of the form
@@ -510,21 +556,32 @@ Notation "P '?'" := (match (@dec P _) with
 *)
 
 (** QuickChick also lifts common decidable instances to the [Dec] typeclass. *)
-#[global] Declare Instance Dec_eq_unit   : Dec_Eq unit.
-#[global] Declare Instance Dec_eq_bool   : Dec_Eq bool.
-#[global] Declare Instance Dec_eq_nat    : Dec_Eq nat.
-#[global] Declare Instance Dec_eq_Z      : Dec_Eq Z.
-#[global] Declare Instance Dec_eq_N      : Dec_Eq N.
-#[global] Declare Instance Dec_eq_ascii  : Dec_Eq ascii.
-#[global] Declare Instance Dec_eq_string : Dec_Eq string.
+#[global]
+Declare Instance Dec_eq_unit   : Dec_Eq unit.
+#[global]
+Declare Instance Dec_eq_bool   : Dec_Eq bool.
+#[global]
+Declare Instance Dec_eq_nat    : Dec_Eq nat.
+#[global]
+Declare Instance Dec_eq_Z      : Dec_Eq Z.
+#[global]
+Declare Instance Dec_eq_N      : Dec_Eq N.
+#[global]
+Declare Instance Dec_eq_ascii  : Dec_Eq ascii.
+#[global]
+Declare Instance Dec_eq_string : Dec_Eq string.
 
-#[global] Declare Instance Dec_eq_opt  (A : Type)
+#[global]
+Declare Instance Dec_eq_opt  (A : Type)
         `{Dec_Eq A}             : Dec_Eq (option A).
-#[global] Declare Instance Dec_eq_prod (A B : Type)
+#[global]
+Declare Instance Dec_eq_prod (A B : Type)
         `{Dec_Eq A} `{Dec_Eq B} : Dec_Eq (A * B).
-#[global] Declare Instance Dec_eq_sum  (A B : Type)
+#[global]
+Declare Instance Dec_eq_sum  (A B : Type)
         `{Dec_Eq A} `{Dec_Eq B} : Dec_Eq (A + B).
-#[global] Declare Instance Dec_eq_list (A : Type)
+#[global]
+Declare Instance Dec_eq_list (A : Type)
         `{Dec_Eq A}             : Dec_Eq (list A).
 
 (* #################################################################### *)

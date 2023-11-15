@@ -93,6 +93,7 @@ Definition ainstr (st : State) : G Instruction :=
 Inductive contains_ret : Stack -> Prop := 
   | RetHere  : forall pc s, contains_ret (RetCons pc s)
   | RetLater : forall a  s, contains_ret s -> contains_ret (a :: s).
+#[global]
 Instance dec_contains_ret (s : Stack) : Dec (contains_ret s).
 Proof.
   dec_eq.
@@ -112,6 +113,7 @@ Derive ArbitrarySizedSuchThat for (fun n => stack_length s n).
 
 Inductive between (x y : Z) (z : nat) : Prop :=
 | Bet : (x < y -> y < Z.of_nat z -> between x y z)%Z.
+#[global]
 Instance genST_bet x z : GenSizedSuchThat Z (fun y => between x y z) := 
 {|
   arbitrarySizeST n := liftGen Some (choose (x, Z.of_nat z))

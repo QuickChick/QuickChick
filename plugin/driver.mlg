@@ -1,12 +1,6 @@
+DECLARE PLUGIN "coq-quickchick.plugin"
+
 {
-
-(*
-
-THIS FILE IS PREPROCESSED USING cppo
-MAKE SURE TO EDIT THE .cppo SOURCE OF THIS FILE RATHER THAN THE GENERATED RESULT
-
-*)
-
 open Libnames
 open Util
 open Constrexpr
@@ -32,20 +26,13 @@ let class_assoc_opts = [ ("GenSized"                 , SimpleDer [SimplDriver.Ge
                        ; ("Mutate"                   , SimpleDer [SimplDriver.Mutate])
                        ; ("Show"                     , SimpleDer [SimplDriver.Show])
                        ; ("Sized"                    , SimpleDer [SimplDriver.Sized])
-(*                       ; ("CanonicalSized"           , SimpleDer [SimplDriver.CanonicalSized])
-                       ; ("SizeMonotonic"            , SimpleDer [SimplDriver.SizeMonotonic])
-                       ; ("SizedMonotonic"           , SimpleDer [SimplDriver.SizedMonotonic])
-                       ; ("SizedCorrect"             , SimpleDer [SimplDriver.SizedCorrect]) *)
                        ; ("DecOpt"                   , DepDer DepDriver.DecOpt)
-                       ; ("DecOptMon"                , DepDer DepDriver.DecOptMon)
-                       ; ("ArbitrarySizedSuchThat"   , DepDer DepDriver.ArbitrarySizedSuchThat)
-                       ; ("GenSizedSuchThat"         , DepDer DepDriver.ArbitrarySizedSuchThat)                       
+                       ; ("ArbitrarySizedSuchThat"   , DepDer DepDriver.GenSizedSuchThat)
+                       ; ("GenSizedSuchThat"         , DepDer DepDriver.GenSizedSuchThat)                       
                        ; ("EnumSizedSuchThat"        , DepDer DepDriver.EnumSizedSuchThat)
-                       
-(*                       ; ("SizeMonotonicSuchThatOpt" , DepDer DepDriver.GenSizedSuchThatMonotonicOpt)
-                       ; ("SizedProofEqs"            , DepDer DepDriver.SizedProofEqs) 
-                       ; ("GenSizedSuchThatCorrect"  , DepDer DepDriver.GenSizedSuchThatCorrect)
-                       ; ("GenSizedSuchThatSizeMonotonicOpt", DepDer DepDriver.GenSizedSuchThatSizeMonotonicOpt) *)
+                       ; ("Generator"                , DepDer DepDriver.GenSizedSuchThat)
+                       ; ("Enumerator"               , DepDer DepDriver.EnumSizedSuchThat)
+                       ; ("Checker"                  , DepDer DepDriver.DecOpt)
                        ]
 
 let class_assoc_table =
@@ -59,11 +46,7 @@ let dispatch cn ind name1 name2 =
     | {CAst.v = CRef (r, _) ; _} -> string_of_qualid r
     | _ -> failwith "Usage: Derive <class_name> for <inductive_name> OR  Derive (<class_name>, ... , <class_name>) for <inductive_name>" in
   let ss = match cn.CAst.v with
-#if COQ_VERSION >= (8, 12, 0)
      | CNotation (_, _, ([a],[b],_,_)) ->
-#else
-     | CNotation (_, ([a],[b],_,_)) ->
-#endif
          let c = convert_reference_to_string a in
          let cs = List.map convert_reference_to_string b in
          c :: cs
@@ -91,8 +74,25 @@ let dispatch cn ind name1 name2 =
   match class_names with
   | SimpleDer classes -> simpl_dispatch ind classes name1 name2
   | DepDer class_name -> DepDriver.dep_dispatch ind class_name
+;;                       
 
+let merge ind1 ind2 ind3 =
+  MergeTypes.merge ind1 ind2 ind3
+
+let merge_test ind1  =
+  MergeTypes.merge_test ind1
 }
+
+  
+VERNAC COMMAND EXTEND Merge CLASSIFIED AS SIDEFF
+ | ["Merge" constr(ind1) "With" constr(ind2) "As" constr(ind)] ->
+    { merge ind1 ind2 ind }
+END
+
+VERNAC COMMAND EXTEND MergeTest CLASSIFIED AS SIDEFF
+ | ["MergeTest" constr(ind1)] ->
+    { merge_test ind1 }
+END
 
 VERNAC COMMAND EXTEND Derive CLASSIFIED AS SIDEFF
    | ["Derive" constr(class_name) "for" constr(inductive)] ->

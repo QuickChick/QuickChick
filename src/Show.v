@@ -65,32 +65,38 @@ Definition show_Z (n : Z) : string :=
 Definition show_N : N -> string :=
   show_Z ∘ Z.of_N.
 
-#[global] Instance showUint : Show uint :=
+#[global]
+Instance showUint : Show uint :=
 {|
   show := show_uint
 |}.
 
-#[global] Instance showInt : Show int :=
+#[global]
+Instance showInt : Show int :=
 {|
   show := show_int
 |}.
 
-#[global] Instance showNat : Show nat :=
+#[global]
+Instance showNat : Show nat :=
 {|
   show := show_nat
 |}.
 
-#[global] Instance showBool : Show bool :=
+#[global]
+Instance showBool : Show bool :=
 {|
   show := show_bool
 |}.
 
-#[global] Instance showZ : Show Z :=
+#[global]
+Instance showZ : Show Z :=
 {|
   show := show_Z
 |}.
 
-#[global] Instance showN : Show N :=
+#[global]
+Instance showN : Show N :=
 {|
   show := show_N
 |}.
@@ -148,7 +154,8 @@ Fixpoint show_quoted_string (s:string) : string :=
       String c quoted_s'
   end.
 
-#[global] Instance showString : Show string :=
+#[global]
+Instance showString : Show string :=
 {|
   show s := String """" (show_quoted_string s)
 |}.
@@ -216,11 +223,11 @@ Fixpoint contents {A : Type} (s : A -> string) (l : list A) : string :=
     | cons h t => append (append (s h) "; ") (contents s t)
   end.
 
-#[global] Instance showList {A : Type} `{_ : Show A} : Show (list A) :=
+#[global]
+Instance showList {A : Type} `{_ : Show A} : Show (list A) :=
 {|
   show l := append "[" (append (contents show l) "]")
 |}.
-
 
 #[global] Instance show_time : Show Time :=
 {| 
@@ -238,12 +245,14 @@ Fixpoint contents {A : Type} (s : A -> string) (l : list A) : string :=
   show aut := match aut with mkAugTime _ res tAux => (show (res) ++ ", " ++  show (tAux))%string end
 |}.
 
-#[global] Instance showPair {A B : Type} `{_ : Show A} `{_ : Show B} : Show (A * B) :=
+#[global]
+Instance showPair {A B : Type} `{_ : Show A} `{_ : Show B} : Show (A * B) :=
 {|
   show p := match p with (a,b) => ("(" ++ show a ++ ", " ++  show b ++ ")")%string end
 |}.
 
-#[global] Instance showOpt {A : Type} `{_ : Show A} : Show (option A) :=
+#[global]
+Instance showOpt {A : Type} `{_ : Show A} : Show (option A) :=
 {|
   show x := match x with
               | Some x => "Some " ++ (show x)
@@ -251,12 +260,14 @@ Fixpoint contents {A : Type} (s : A -> string) (l : list A) : string :=
             end
 |}.
 
-#[global] Instance showType : Show Type :=
+#[global]
+Instance showType : Show Type :=
 {|
   show x := "nat :-)"
 |}.
 
-#[global] Instance showEx {A} `{_ : Show A} P : Show ({x : A | P x}) :=
+#[global]
+Instance showEx {A} `{_ : Show A} P : Show ({x : A | P x}) :=
   {|
     show ex := let '(exist _ x _) := ex in show x
   |}.
@@ -280,16 +291,20 @@ Module ShowFunctions.
 Class ReprSubset (A : Type) :=
   { representatives : list A }.
 
-#[global] Instance repr_bool : ReprSubset bool :=
+#[global]
+Instance repr_bool : ReprSubset bool :=
   {| representatives := [ true; false ] |}.
 
-#[global] Instance repr_nat : ReprSubset nat :=
+#[global]
+Instance repr_nat : ReprSubset nat :=
   {| representatives := [ 0 ; 1 ; 2 ; 17 ; 42 ] |}.
 
-#[global] Instance repr_option {A} `{_ : ReprSubset A} : ReprSubset (option A) :=
+#[global]
+Instance repr_option {A} `{_ : ReprSubset A} : ReprSubset (option A) :=
   {| representatives := None :: map Some representatives |}.
 
-#[global] Instance repr_list {A} `{_ : ReprSubset A} : ReprSubset (list A) :=
+#[global]
+Instance repr_list {A} `{_ : ReprSubset A} : ReprSubset (list A) :=
   {| representatives :=
        [] :: map (fun x => [x]) representatives
           ++ flat_map (fun x : A =>
@@ -297,7 +312,8 @@ Class ReprSubset (A : Type) :=
                       ) representatives
   |}%list.
 
-#[global] Instance repr_prod {A B} `{_ : ReprSubset A} `{_ : ReprSubset B} :
+#[global]
+Instance repr_prod {A B} `{_ : ReprSubset A} `{_ : ReprSubset B} :
   ReprSubset (A * B) :=
   {| representatives :=
        flat_map (fun x : A =>
@@ -320,7 +336,8 @@ Definition intersperse {A : Type} (a : A) (l : list A) :=
 Definition string_concat (l : list string) : string :=
   fold_left (fun a b => a ++ b) l "".
 
-#[global] Instance show_fun {A B} `{_ : Show A} `{_ : ReprSubset A}
+#[global]
+Instance show_fun {A B} `{_ : Show A} `{_ : ReprSubset A}
          `{_ : Show B} : Show (A -> B) :=
   {| show f :=
        "{ " ++ string_concat (intersperse " , "

@@ -130,7 +130,8 @@ Proof.
   unfold decidable in D. assumption.
 Defined.
 
-#[global] Hint Resolve dec_if_dec_eq: eq_dec.
+#[global]
+Hint Resolve dec_if_dec_eq: eq_dec.
 
 Ltac dec_eq :=
   repeat match goal with
@@ -150,13 +151,13 @@ Ltac dec_eq :=
            end
          end.
 
-#[global] Instance Eq__Dec {A} `{H : Dec_Eq A} (x y : A) : Dec (x = y).
+#[global] Instance Dec_Eq_implies_DecEq {A} `{H : Dec_Eq A} (x y : A) : Dec (x = y).
 Proof.
 constructor.
 dec_eq.
 Defined.
 
-#[global] Instance Eq__RelDec {A} `{Dec_Eq A} : RelDec (@eq A) :=
+#[global] Instance Dec_Eq_implies_RelDecEq {A} `{Dec_Eq A} : RelDec (@eq A) :=
   {| rel_dec x y :=
        match dec_eq x y with
        | left  _ => true
@@ -195,9 +196,10 @@ Proof. dec_eq. Defined.
 #[global] Instance list_Dec_Eq X (_ : Dec_Eq X) : Dec_Eq (list X).
 Proof. dec_eq. Defined.
 
-
-#[global] Hint Resolve ascii_dec: eq_dec.
-#[global] Hint Resolve string_dec: eq_dec.
+#[global]
+Hint Resolve ascii_dec: eq_dec.
+#[global]
+Hint Resolve string_dec: eq_dec.
 
 #[global] Instance Dec_eq_ascii : Dec_Eq ascii.
 Proof. dec_eq. Defined.
