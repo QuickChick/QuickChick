@@ -67,7 +67,7 @@ If successful, you should see "success" at the end.
 
 ## Documentation
 
-The public API of QuickChick is summarized in `BasicInterface.v`.
+The public API of QuickChick is summarized in `QuickChickInterface.v`.
 
 ### Top-level Commands
 
