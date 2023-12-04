@@ -125,6 +125,7 @@ Theorem rev_injective : forall (l1 l2 : natlist),
   rev l1 = rev l2 -> l1 = l2.
 Proof. quickchick. Admitted.
 
+
 End NatList.
 
 (*From Coq Require Import Strings.String.*)
@@ -145,6 +146,7 @@ Inductive tm : Type :=
   | tm_true  : tm
   | tm_false : tm
   | tm_if    : tm -> tm -> tm -> tm.
+
 
 Declare Custom Entry stlc.
 Notation "<{ e }>" := e (e custom stlc at level 99).
@@ -177,7 +179,6 @@ Definition z : string := "z".
 #[local] Hint Unfold y : core.
 #[local] Hint Unfold z : core.
 
-
 Inductive value : tm -> Prop :=
   | v_abs : forall x T2 t1,
       value <{\x:T2, t1}>
@@ -189,8 +190,19 @@ Inductive value : tm -> Prop :=
 (*Derive show and Arbitrary*)
 Derive Show for ty.
 Derive Arbitrary for ty.
-Derive Show for tm.
+Check elems_.
+#[export] Instance Gen_var : Gen string :=
+  {arbitrary := elems_ x (cons x (cons y (cons z nil)))}.
+
+#[export] Instance shrink_var : Shrink string :=
+  {shrink := fun s => match s with
+                      | "x"%string => cons y (cons z nil)
+                      | "y"%string => cons z nil
+                      | _ => nil
+                      end}.
+
 Derive Arbitrary for tm.
+Derive Show for (value).
 Derive Show for value.
 Derive Arbitrary for value.
 
