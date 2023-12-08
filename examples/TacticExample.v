@@ -81,55 +81,53 @@ Fixpoint nat_to_bin (n:nat) : bin :=
 Theorem nat_bin_nat : forall n, bin_to_nat (nat_to_bin n) = n.
 Proof. quickchick. Admitted.
 (* ################################################################# *)
-Module NatList.
 
 Inductive natlist : Type :=
-  | nil
-  | cons (n : nat) (l : natlist).
+  | nil'
+  | cons' (n : nat) (l : natlist).
 
 Derive Show for natlist.
 Derive Arbitrary for natlist.
 #[global] Instance Dec_eq_natlist (l l' : natlist) : Dec (l = l').
 Proof. dec_eq. Defined.
 
-Fixpoint app (l l' : natlist) : natlist :=
+Fixpoint app' (l l' : natlist) : natlist :=
   match l with
-  | nil => l'
-  | cons h l => cons h (app l l')
+  | nil' => l'
+  | cons' h l => cons' h (app' l l')
   end.
 
-Fixpoint rev (l:natlist) : natlist :=
+Fixpoint rev' (l:natlist) : natlist :=
   match l with
-  | nil    => nil
-  | cons h t => app (rev t) (cons h nil)
+  | nil'    => nil'
+  | cons' h t => app' (rev' t) (cons' h nil')
   end.
 
-Fixpoint length (l : natlist) : nat :=
+Fixpoint length' (l : natlist) : nat :=
   match l with
-  | nil => 0
-  | cons _ t => S (length t)
+  | nil' => 0
+  | cons' _ t => S (length' t)
   end.
 
 Theorem app_length : forall l1 l2 : natlist,
-  length (app l1 l2) = ((length l1) + (length l2)).
+  length' (app' l1 l2) = ((length' l1) + (length' l2)).
 Proof. quickchick. Admitted.
 
 Theorem rev_app_distr: forall l1 l2 : natlist,
-  rev (app l1 l2) = app (rev l2) (rev l1).
+  rev' (app' l1 l2) = app' (rev' l2) (rev' l1).
 Proof. quickchick. Admitted.
 Theorem rev_involutive : forall l : natlist,
-  rev (rev l) = l.
+  rev' (rev' l) = l.
 Proof. quickchick. Admitted.
 
 Theorem rev_injective : forall (l1 l2 : natlist),
-  rev l1 = rev l2 -> l1 = l2.
+  rev' l1 = rev' l2 -> l1 = l2.
 Proof. quickchick. Admitted.
 
 
-End NatList.
 
 (*From Coq Require Import Strings.String.*)
-Module STLC.
+
 
 (* ================================================================= *)
 
@@ -202,7 +200,7 @@ Check elems_.
                       end}.
 
 Derive Arbitrary for tm.
-Derive Show for (value).
+Derive Show for .
 Derive Show for value.
 Derive Arbitrary for value.
 
@@ -364,7 +362,6 @@ Theorem unique_types : forall Gamma e T T',
   T = T'.
 Proof. quickchick. Admitted.
 
-End STLC.
 
 (* 2023-08-23 11:31 *)
  (* 2023-10-03 16:40 *)
