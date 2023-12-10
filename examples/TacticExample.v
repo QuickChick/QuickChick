@@ -183,7 +183,15 @@ Inductive value : tm -> Prop :=
   | v_true :
       value <{true}>
   | v_false :
-      value <{false}>.
+    value <{false}>.
+
+Inductive value_set : tm -> Set :=
+  | vs_abs : forall x T2 t1,
+    value_set <{\x : T2, t1}>
+  | vs_true : value_set <{true}>
+  | vs_false : value_set <{false}>
+.
+
 
 (*Derive show and Arbitrary*)
 Derive Show for ty.
@@ -200,9 +208,7 @@ Check elems_.
                       end}.
 
 Derive Arbitrary for tm.
-Derive Show for .
-Derive Show for value.
-Derive Arbitrary for value.
+Derive Show for tm.
 
 (*Create Dec eq instances*)
 #[global] Instance Dec_eq_ty (T T' : ty) : Dec (T = T').
@@ -211,7 +217,11 @@ Proof. dec_eq. Defined.
 #[global] Instance Dec_eq_tm (t t' : tm) : Dec (t = t').
 Proof. dec_eq. Defined.
 
-Hint Constructors value : core.
+#[export] Instance Dec_value (t : tm) : Dec (value t).
+Proof. destruct t; dec_eq; try (right; intros c; inversion c; fail); left; constructor; constructor.
+ Defined.
+
+#[global] Hint Constructors value : core.
 
 (* ================================================================= *)
 
@@ -263,15 +273,79 @@ Inductive substi (s : tm) (x : string) : tm -> tm -> Prop :=
       substi s x (tm_if b t f) (tm_if b' t' f')
 .
 
-Hint Constructors substi : core.
+#[global] Hint Constructors substi : core.
 
 (*Derive show and arbitrary*)
-Derive Show for substi.
-Derive Arbitrary for substi.
 
-Theorem substi_correct : forall s x t t',
-  <{ [x:=s]t }> = t' <-> substi s x t t'.
-Proof. quickchick. Admitted.
+Ltac gen x := generalize dependent x.
+
+#[export] Instance Dec_Eq_tm : Dec_Eq tm.
+Proof. dec_eq. Defined.
+
+Theorem substi_exists : forall s x t,  { t' | substi s x t t'}.
+Proof.
+  intros s x0 t; induction t; intros; eauto.
+  - destruct (dec_eq x0 s0); subst; eauto.
+  - destruct IHt1, IHt2; eauto.
+  - destruct (dec_eq x0 s0), IHt; subst; eauto.
+  - destruct IHt1, IHt2, IHt3; eauto.
+Qed.
+Theorem substi_uniq : forall s x t t' t'', substi s x t t' -> substi s x t t'' -> t' = t''.
+Proof.
+  intros s x t. induction t; intros; inversion H0; inversion H; subst; eauto;
+    try (exfalso; eauto; fail).
+  - f_equal.
+    + apply IHt1; auto.
+    + apply IHt2; auto.
+  - f_equal; apply IHt; auto.
+  - f_equal.
+    + apply IHt1; auto.
+    + apply IHt2; auto.
+    + apply IHt3; auto.
+Qed. 
+  
+#[export] Instance Dec_substi (s : tm) (x : string) (t t' : tm) : Dec (substi s x t t').
+Proof with try (right; intros c; inversion c; subst; eauto; fail).
+  dec_eq.
+  gen t'. gen x. gen s. induction t; intros; try (right; intros c; inversion c; fail).
+  - destruct (dec_eq x0 s).
+    + subst. destruct (dec_eq s0 t'); subst...
+      left; constructor.
+    + destruct (dec_eq (tm_var s) t'); subst...
+      left; constructor; auto.
+  - destruct (substi_exists s x0 t1), (substi_exists s x0 t2).
+    destruct (dec_eq (tm_app x1 x2) t').
+    + subst. auto.
+    + right. intros c. assert (substi s x0 <{t1 t2}> <{x1 x2}>) by (econstructor; eauto).
+      eapply substi_uniq in H; eauto.
+  - destruct (dec_eq x0 s).
+    + subst. destruct (dec_eq (<{ \ s : t, t0 }>) t'); subst...
+      left; constructor.
+    + destruct (substi_exists s0 x0 t0). destruct (dec_eq <{ \s : t, x1 }> t'); subst; auto.
+      right. intros c.
+      assert (substi s0 x0 <{\s : t, t0}> <{\s : t, x1}>) by (econstructor; eauto).
+      eapply substi_uniq in H; eauto.
+  - destruct (dec_eq tm_true t'); subst... left; auto.
+  - destruct (dec_eq tm_false t'); subst... left; auto.
+  - destruct (substi_exists s x0 t1), (substi_exists s x0 t2), (substi_exists s x0 t3).
+    destruct (dec_eq (tm_if x1 x2 x3) t').
+    + subst; auto.
+    + right; intros c;
+        assert (substi s x0 (tm_if t1 t2 t3) (tm_if x1 x2 x3)) by (econstructor; eauto).
+      eapply substi_uniq in H; eauto.
+ Defined.
+
+Theorem substi_correct_l : forall s x (ts t' : tm),
+  subst x s ts = t' -> substi s x ts t'.
+Proof.
+  quickchick. Admitted.
+
+Theorem substi_correct_r : forall s x (ts t' : tm),
+  substi s x ts t' -> subst x s ts = t'.
+Proof.
+  quickchick. Admitted.
+
+
 
 (* ================================================================= *)
 
@@ -298,17 +372,67 @@ Inductive step : tm -> tm -> Prop :=
       <{if t1 then t2 else t3}> --> <{if t1' then t2 else t3}>
 
 where "t '-->' t'" := (step t t').
+(*
+Theorem step_or_wont : forall t, ({t' | step t t'}) + (forall t',  ~(step t t')).
+Proof.
+  induction t.
+  - right. intros. intros c. inversion c; subst.
+  - destruct IHt1, IHt2.
+    + destruct s, s0. left. exists (tm_app x0 t2). apply ST_App1; auto.
+    + destruct s. left. exists (tm_app x0 t2). apply ST_App1; auto.
+    + destruct s. destruct ((@dec (value t1))).
+      * apply Dec_value.
+      * left; exists (tm_app t1 x0); constructor; auto.
+      * right. intros t' c. inversion c; subst.
+        -- apply n0; constructor.
+        -- apply (n t1'), H2.
+        -- apply (n0 H1).
+    + destruct ((@dec (value t1))).
+      * apply Dec_value.
+      * destruct v.
+        -- destruct ((@dec (value t2) (Dec_value _))).
+           ++ left; eexists. constructor; auto.
+           ++ right. intros t' c. inversion c; subst; eauto.
+              ** inversion H4.
+              ** apply (H0 _ H5).
+        -- right. intros t' c; inversion c; subst; eauto.
+           ++ inversion H4.
+           ++ apply (H0 _ H5).
+        -- right. intros t' c; inversion c; subst; eauto.
+           ++ inversion H4.
+           ++ apply (H0 _ H5).
+      * right. intros t' c. inversion c; subst; eauto. apply (H _ H4).
+  - right; intros t' c. inversion c; subst.
+  - right; intros t' c. inversion c; subst.
+  - right; intros t' c. inversion c; subst.
+  - destruct IHt1.
+    + destruct H. left. eexists; constructor; eauto.
+    + destruct (dec_eq t1 tm_true).
+      * subst. left. eexists; econstructor; eauto.
+      * destruct (dec_eq t1 tm_false).
+        -- subst. left; eexists; econstructor; eauto.
+        -- right. intros t' c; inversion c; subst; eauto.
+           apply (H _ H4).
+Qed.*)
+
+Derive DecOpt for (step t t').
 
 Reserved Notation "Gamma '|--' t '\in' T"
             (at level 101,
              t custom stlc, T custom stlc at level 0).
- Print Grammar constr.
-Inductive has_type : (tm -> option ty) -> tm -> ty -> Prop :=
+Print Grammar constr.
+
+Definition t_update (Gamma : string -> option ty) (x : string) (T : ty) (x' : string) : option ty :=
+  if (x = x')? then Some T else Gamma x'.
+
+(*Fixpoint lookup (Gamma : []*)
+  
+Inductive has_type : (string -> option ty) -> tm -> ty -> Prop :=
   | T_Var : forall Gamma x T1,
       Gamma x = Some T1 ->
       Gamma |-- x \in T1
   | T_Abs : forall Gamma x T1 T2 t1,
-      x |-> T2 ; Gamma |-- t1 \in T1 ->
+      t_update Gamma x T2 |-- t1 \in T1 ->
       Gamma |-- \x:T2, t1 \in (T2 -> T1)
   | T_App : forall T1 T2 Gamma t1 t2,
       Gamma |-- t1 \in (T2 -> T1) ->
@@ -326,7 +450,7 @@ Inductive has_type : (tm -> option ty) -> tm -> ty -> Prop :=
 
 where "Gamma '|--' t '\in' T" := (has_type Gamma t T).
 
-
+Derive DecOpt for (has_type Gamma t T).
 
 Hint Constructors has_type : core.
 
