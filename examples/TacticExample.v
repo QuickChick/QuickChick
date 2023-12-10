@@ -454,10 +454,6 @@ Derive DecOpt for (has_type Gamma t T).
 
 Hint Constructors has_type : core.
 
-(*Derive show and arbitrary*)
-Derive Show for has_type.
-Derive Arbitrary for has_type.
-
 Lemma canonical_forms_bool : forall t,
   empty |-- t \in Bool ->
   value t ->
