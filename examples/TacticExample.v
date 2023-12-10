@@ -211,7 +211,22 @@ Derive Arbitrary for tm.
 Derive Show for tm.
 
 (*Create Dec eq instances*)
-#[global] Instance Dec_eq_ty (T T' : ty) : Dec (T = T').
+#[export] Instance Dec_eq_ty (T T' : ty) : Dec (T = T').
+Proof.
+  constructor; generalize dependent T'; induction T; intros.
+  - destruct T'.
+    + left; auto.
+    + right; intros c; inversion c.
+  - destruct T'.
+    + right; intros c; inversion c.
+    + destruct (IHT1 T'1), (IHT2 T'2); subst. { left; auto. }
+      all: right; intros c; inversion c; auto.
+Defined.
+
+#[export] Instance Dec_Eq_ty : Dec_Eq ty.
+Proof. constructor. intros. apply Dec_eq_ty. Defined.
+
+#[global] Instance Dec_eq_option {X} `{Dec_Eq X} (x x' : option X) : Dec (x = x').
 Proof. dec_eq. Defined.
 
 #[global] Instance Dec_eq_tm (t t' : tm) : Dec (t = t').
@@ -417,6 +432,9 @@ Qed.*)
 
 Derive DecOpt for (step t t').
 
+Compute @decOpt (step tm_true tm_true) _.
+                  
+
 Reserved Notation "Gamma '|--' t '\in' T"
             (at level 101,
              t custom stlc, T custom stlc at level 0).
@@ -449,39 +467,136 @@ Inductive has_type : (string -> option ty) -> tm -> ty -> Prop :=
        Gamma |-- if t1 then t2 else t3 \in T1
 
 where "Gamma '|--' t '\in' T" := (has_type Gamma t T).
+Print tm.
 
-Derive DecOpt for (has_type Gamma t T).
+Definition bindop {A B} (ma : option A) (f : A -> option B) : option B :=
+  match ma with
+  | None => None
+  | Some a => f a
+  end.
+Print ty.
+Fixpoint type_eqb (T T' : ty) : bool :=
+  match T, T' with
+  | Ty_Bool, Ty_Bool => true
+  | Ty_Arrow l r, Ty_Arrow l' r' => (type_eqb l l') && (type_eqb r r')
+  | _, _ => false
+  end.
 
-Hint Constructors has_type : core.
+Theorem type_eq_eqb : forall T T',  type_eqb T T' = true <-> T = T'.
+Proof.
+  induction T; intros; destruct T'; simpl in *;
+    split; intros; auto; try discriminate. 
+  - rewrite Bool.andb_true_iff in H. destruct H. apply IHT1 in H.
+    apply IHT2 in H0. subst; auto.
+  - injection H as H. subst; simpl; auto.
+    assert (forall T, type_eqb T T = true).
+    + induction T; simpl; auto. rewrite IHT3, IHT4; auto.
+    + do 2 rewrite H. auto.
+  Qed.
+  
+Fixpoint type_of (Gamma : string -> option ty) (t : tm) : option ty :=
+  match t with
+  | tm_var s => Gamma s
+  | tm_abs x T e => bindop (type_of (t_update Gamma x T) e)
+                      (fun T' => Some <{T -> T'}>)
+  | tm_app f e =>
+      bindop (type_of Gamma f) (fun T21 =>
+       match T21 with
+       | <{T2 -> T1}> =>
+           bindop (type_of Gamma e) (fun T2' =>
+               if type_eqb T2 T2' then Some T1 else None
+             )
+       | _ => None                                   
+       end
+        )
+  | tm_true | tm_false => Some Ty_Bool
+  | tm_if b t f =>
+      bindop (type_of Gamma b) (fun Tb =>
+      bindop (type_of Gamma t) (fun Tt =>
+      bindop (type_of Gamma f) (fun Tf =>
+       if andb (type_eqb Tb Ty_Bool) (type_eqb Tt Tf) then
+         Some Tt
+       else
+         None
+      )))
+  end.                                                            
 
-Lemma canonical_forms_bool : forall t,
-  empty |-- t \in Bool ->
-  value t ->
-  (t = <{true}>) \/ (t = <{false}>).
+Theorem type_of_correct : forall Gamma t T,
+    type_of Gamma t = Some T -> has_type Gamma t T.
+Proof.
+  intros. gen Gamma; gen T. induction t; intros; simpl 1 in *.
+  - constructor; auto.
+  - destruct (type_of Gamma t1) eqn: E.
+    + simpl in H. rewrite E in H. simpl in H.
+      destruct t; try discriminate. 
+      destruct (type_of Gamma t2) eqn: E'; try discriminate. 
+      simpl in *.  destruct (type_eqb t3 t) eqn: E''; try discriminate.
+      injection H as H. subst. apply type_eq_eqb in E''. subst.
+      apply IHt2 in E'. apply IHt1 in E.
+      econstructor; eauto.
+    + simpl in H. rewrite E in *. discriminate.
+  - simpl in *. unfold bindop in H.
+    destruct (type_of (t_update Gamma s t) t0) eqn: E; try discriminate.
+    injection H as H; subst. constructor.
+    apply IHt. apply E.
+  - injection H as H; subst. constructor.
+  - injection H as H; subst; constructor.
+  - simpl in H. destruct (type_of Gamma t1) eqn: E;
+      destruct (type_of Gamma t2) eqn: E';
+      destruct (type_of Gamma t3) eqn: E''; simpl in H; try discriminate.
+    apply IHt1 in E. apply IHt2 in E'. apply IHt3 in E''.
+    destruct (type_eqb t <{ Bool }> && type_eqb t0 t4)%bool eqn: E''';
+      try discriminate.
+    injection H as H; subst. apply Bool.andb_true_iff in E'''.
+    destruct E'''. apply type_eq_eqb in H, H0. subst.
+    constructor; auto.  
+Qed.
+      
+Definition decopt_has_type (Gamma : string -> option ty) (t : tm) (T : ty) (n : nat) : option bool := bindop (type_of Gamma t) (fun T' => Some ((T = T')?)).
+
+#[export] Instance DecOpt_has_type (Gamma : string -> option ty) (t : tm) (T : ty) : DecOpt (has_type Gamma t T).
+Proof.
+  constructor. apply decopt_has_type; auto.
+  Defined.
+
+#[global] Hint Constructors has_type : core.
+
+Definition empty_env : string -> option ty := fun _ => None.
+
+Lemma canonical_forms_bool : forall term,
+  empty_env |-- term \in Bool ->
+  value term ->
+  (term = <{true}>) \/ (term = <{false}>).
 Proof. quickchick. Admitted.
 
-Lemma weakening_empty : forall Gamma t T,
-     empty |-- t \in T  ->
-     Gamma |-- t \in T.
+(* Quantifying over the type string -> option for Gamma causes bug.
+   "Failure("id_of_name called with anonymous").
+Lemma weakening_empty : forall Gamma e T,
+     empty_env |-- e \in T  ->
+     has_type Gamma e T.
+Proof. quickchick. Admitted.
+*)
+
+(* Dep case not handled yet for exists 
+Theorem progress : forall e T,
+  empty_env |-- e \in T ->
+  value e \/ exists e', e --> e'.
+Proof. quickchick. Admitted.
+ *)
+
+Theorem preservation : forall e e' T,
+  empty_env |-- e \in T  ->
+  e --> e'  ->
+  empty_env |-- e' \in T.
 Proof. quickchick. Admitted.
 
-Theorem progress : forall t T,
-  empty |-- t \in T ->
-  value t \/ exists t', t --> t'.
-Proof. quickchick. Admitted.
-
-Theorem preservation : forall t t' T,
-  empty |-- t \in T  ->
-  t --> t'  ->
-  empty |-- t' \in T.
-Proof. quickchick. Admitted.
-
+(* Quantifying over Gamma causes error: id_of_name called with anonymous."
 Theorem unique_types : forall Gamma e T T',
   Gamma |-- e \in T ->
   Gamma |-- e \in T' ->
   T = T'.
 Proof. quickchick. Admitted.
-
+*)
 
 (* 2023-08-23 11:31 *)
  (* 2023-10-03 16:40 *)
