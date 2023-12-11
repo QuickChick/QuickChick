@@ -213,7 +213,12 @@ Derive Show for tm.
 (*Create Dec eq instances*)
 #[export] Instance Dec_eq_ty (T T' : ty) : Dec (T = T').
 Proof.
-  constructor; generalize dependent T'; induction T; intros.
+  constructor.
+  unfold ssrbool.decidable.
+  decide equality.
+Defined.
+(*
+constructor; generalize dependent T'; induction T; intros.
   - destruct T'.
     + left; auto.
     + right; intros c; inversion c.
@@ -222,6 +227,7 @@ Proof.
     + destruct (IHT1 T'1), (IHT2 T'2); subst. { left; auto. }
       all: right; intros c; inversion c; auto.
 Defined.
+ *)
 
 #[export] Instance Dec_Eq_ty : Dec_Eq ty.
 Proof. constructor. intros. apply Dec_eq_ty. Defined.
@@ -387,6 +393,7 @@ Inductive step : tm -> tm -> Prop :=
       <{if t1 then t2 else t3}> --> <{if t1' then t2 else t3}>
 
 where "t '-->' t'" := (step t t').
+
 (*
 Theorem step_or_wont : forall t, ({t' | step t t'}) + (forall t',  ~(step t t')).
 Proof.
@@ -432,8 +439,7 @@ Qed.*)
 
 Derive DecOpt for (step t t').
 
-Compute @decOpt (step tm_true tm_true) _.
-                  
+Compute @decOpt (step tm_true tm_true) _ 42. 
 
 Reserved Notation "Gamma '|--' t '\in' T"
             (at level 101,
@@ -590,29 +596,3 @@ Theorem preservation : forall e e' T,
   empty_env |-- e' \in T.
 Proof. quickchick. Admitted.
 
-(* Quantifying over Gamma causes error: id_of_name called with anonymous."
-Theorem unique_types : forall Gamma e T T',
-  Gamma |-- e \in T ->
-  Gamma |-- e \in T' ->
-  T = T'.
-Proof. quickchick. Admitted.
-*)
-
-(* 2023-08-23 11:31 *)
- (* 2023-10-03 16:40 *)
-  
- (*
-Create a new file, lots of tests: trees, numbers, lists, etc.
-
-Also do preservation in a separate file STLC. 
-
-ADD THIS FILE TO QUICKCHICK TEST SUITE
-add the test file to the makefile.
-
-Push to master
-
-Create baseline.
-
-Create a new tactic that prints info about evarmaps environ, relcontext
-
-*)
