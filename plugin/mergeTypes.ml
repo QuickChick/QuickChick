@@ -444,7 +444,7 @@ type relation
 
 let extract_relation ind : relation * int =
   match ind with 
-  | { CAst.v = CLambdaN ([CLocalAssum ([{ CAst.v = Names.Name id1; CAst.loc = _loc2 }], _kind, _type)], body1); _ } ->
+  | { CAst.v = CLambdaN ([CLocalAssum ([{ CAst.v = Names.Name id1; CAst.loc = _loc2 }], _, _kind, _type)], body1); _ } ->
     (* Extract (x1,x2,...) if any, P and arguments *)
     let (p1, args1) =
       match body1 with 

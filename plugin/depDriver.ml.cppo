@@ -260,7 +260,11 @@ let compat_fromCApp1 (_, x) = x
  *)
 let dep_dispatch ind class_name : unit =
   match ind with 
-  | { CAst.v = CLambdaN ([CLocalAssum ([{ CAst.v = Names.Name id; CAst.loc = _loc2 }], _kind, _type)], body); _ } -> (* {CAst.v = CApp ((_flag, constructor), args) }) } -> *)
+#if COQ_VERSION >= (8, 20, 0)
+  | { CAst.v = CLambdaN ([CLocalAssum ([{ CAst.v = Names.Name id; CAst.loc = _loc2 }], _, _kind, _type)], body); _ } -> (* {CAst.v = CApp ((_flag, constructor), args) }) } -> *)
+#else
+  | { CAst.v = CLambdaN ([CLocalAssum ([{ CAst.v = Names.Name id; CAst.loc = _loc2 }], _, _kind, _type)], body); _ } -> (* {CAst.v = CApp ((_flag, constructor), args) }) } -> *)
+#endif
 
     let idu = Unknown.from_string (Names.Id.to_string id ^ "_") in
      
