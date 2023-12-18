@@ -4,11 +4,7 @@ Set Warnings "-notation-overridden,-parsing".
 From QuickChick Require Import QuickChick.
 From Coq Require Import Nat.
 From Coq Require Import Arith.Arith.
-(*From Coq Require Import Bool.Bool.*)
-(*Require Export Coq.Strings.String.*)
 From Coq Require Import Logic.FunctionalExtensionality.
-(*From Coq Require Import Lists.List.*)
-(*Import ListNotations.*)
 Set Default Goal Selector "!".
 
 Definition to_be_generated :=
@@ -217,17 +213,6 @@ Proof.
   unfold ssrbool.decidable.
   decide equality.
 Defined.
-(*
-constructor; generalize dependent T'; induction T; intros.
-  - destruct T'.
-    + left; auto.
-    + right; intros c; inversion c.
-  - destruct T'.
-    + right; intros c; inversion c.
-    + destruct (IHT1 T'1), (IHT2 T'2); subst. { left; auto. }
-      all: right; intros c; inversion c; auto.
-Defined.
- *)
 
 #[export] Instance Dec_Eq_ty : Dec_Eq ty.
 Proof. constructor. intros. apply Dec_eq_ty. Defined.
@@ -394,52 +379,7 @@ Inductive step : tm -> tm -> Prop :=
 
 where "t '-->' t'" := (step t t').
 
-(*
-Theorem step_or_wont : forall t, ({t' | step t t'}) + (forall t',  ~(step t t')).
-Proof.
-  induction t.
-  - right. intros. intros c. inversion c; subst.
-  - destruct IHt1, IHt2.
-    + destruct s, s0. left. exists (tm_app x0 t2). apply ST_App1; auto.
-    + destruct s. left. exists (tm_app x0 t2). apply ST_App1; auto.
-    + destruct s. destruct ((@dec (value t1))).
-      * apply Dec_value.
-      * left; exists (tm_app t1 x0); constructor; auto.
-      * right. intros t' c. inversion c; subst.
-        -- apply n0; constructor.
-        -- apply (n t1'), H2.
-        -- apply (n0 H1).
-    + destruct ((@dec (value t1))).
-      * apply Dec_value.
-      * destruct v.
-        -- destruct ((@dec (value t2) (Dec_value _))).
-           ++ left; eexists. constructor; auto.
-           ++ right. intros t' c. inversion c; subst; eauto.
-              ** inversion H4.
-              ** apply (H0 _ H5).
-        -- right. intros t' c; inversion c; subst; eauto.
-           ++ inversion H4.
-           ++ apply (H0 _ H5).
-        -- right. intros t' c; inversion c; subst; eauto.
-           ++ inversion H4.
-           ++ apply (H0 _ H5).
-      * right. intros t' c. inversion c; subst; eauto. apply (H _ H4).
-  - right; intros t' c. inversion c; subst.
-  - right; intros t' c. inversion c; subst.
-  - right; intros t' c. inversion c; subst.
-  - destruct IHt1.
-    + destruct H. left. eexists; constructor; eauto.
-    + destruct (dec_eq t1 tm_true).
-      * subst. left. eexists; econstructor; eauto.
-      * destruct (dec_eq t1 tm_false).
-        -- subst. left; eexists; econstructor; eauto.
-        -- right. intros t' c; inversion c; subst; eauto.
-           apply (H _ H4).
-Qed.*)
-
 Derive DecOpt for (step t t').
-
-Compute @decOpt (step tm_true tm_true) _ 42. 
 
 Reserved Notation "Gamma '|--' t '\in' T"
             (at level 101,
