@@ -516,7 +516,7 @@ Lemma canonical_forms_bool : forall term,
 Proof. quickchick. Admitted.
 
 (* Quantifying over the type string -> option for Gamma causes bug.
-   "Failure("id_of_name called with anonymous").
+   Failure(id_of_name called with anonymous).
 Lemma weakening_empty : forall Gamma e T,
      empty_env |-- e \in T  ->
      has_type Gamma e T.
