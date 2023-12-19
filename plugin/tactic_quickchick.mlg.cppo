@@ -6,11 +6,10 @@ MAKE SURE TO EDIT THE .cppo SOURCE OF THIS FILE RATHER THAN THE GENERATED RESULT
 
 *)
 
-  open Stdarg
   open Ltac_plugin
   open Error
   open Pp
-  open QuickChick
+
 }
 
 DECLARE PLUGIN "coq-quickchick.plugin"
@@ -133,16 +132,8 @@ let quickchick_goal =
           | DApp (f, args) -> gApp (mkProperty f) (List.map mkProperty args)
           | DNot p -> *)
 (*Use decOpt, for every arrow, assume instacne exists and match on it *)
-        let checker = g_forAll g_arbitrary (gFun ["x"] (fun [x] -> 
-            g_forAll g_arbitrary (gFun ["y"] (fun [y] -> 
-              gIf (decide (gEq (gVar x) (gVar y))) 
-                  (g_checker (decide (gEq (gVar x) (gInt 0)))) 
-                  (g_checker gTT)
-               ))        
-             )) in
             
         GenericLib.debug_coq_expr (mkProperty dt);
-        GenericLib.debug_coq_expr checker;
         (*run the generator called checker using QuickCheck.*)
         (*failwith "OUch!";*)
         let to_run = GenericLib.interp_open_coq_expr e evd (g_show (g_quickCheck (mkProperty dt))) in
