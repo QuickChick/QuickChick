@@ -33,7 +33,9 @@ let make_up_name () : Id.t =
   cnt := !cnt + 1;
   id
        
-#if COQ_VERSION >= (8, 18, 0)
+#if COQ_VERSION >= (8, 19, 0)
+let hole = CAst.make @@ CHole None
+#elif COQ_VERSION >= (8, 18, 0)
 let hole = CAst.make @@ CHole (None, Namegen.IntroAnonymous)
 #else
 let hole = CAst.make @@ CHole (None, Namegen.IntroAnonymous, None)
@@ -1000,7 +1002,11 @@ let rec gList = function
   | x::xs -> gCons x (gList xs)
 
 (* Generic String Manipulations *)
+#if COQ_VERSION >= (8, 19, 0)
+let string_scope ast = CAst.make @@ CDelimiters (DelimUnboundedScope, "string", ast)
+#else
 let string_scope ast = CAst.make @@ CDelimiters ("string", ast)
+#endif
 let gStr s = string_scope (CAst.make @@ CPrim (String s))
 let emptyString = gInject "Coq.Strings.String.EmptyString"
 let str_append c1 c2 = gApp (gInject "Coq.Strings.String.append") [c1; c2]
@@ -1053,7 +1059,11 @@ let dtTupleType =
 
 (* Int *)
 
+#if COQ_VERSION >= (8, 19, 0)
+let nat_scope ast = CAst.make @@ CDelimiters (DelimUnboundedScope, "nat", ast)
+#else
 let nat_scope ast = CAst.make @@ CDelimiters ("nat", ast)
+#endif
 let gInt n =
   let number =
     Number (NumTok.Signed.of_int_string (string_of_int n))
