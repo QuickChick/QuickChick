@@ -276,7 +276,7 @@ let quickchick_goal =
 TACTIC EXTEND quickchick
   | ["quickchick"] -> { quickchick_goal }
 END
-(*
+
 TACTIC EXTEND merge_sound_core
   | ["merge_sound_core"] -> { merge_sound }
 END
@@ -284,4 +284,3 @@ END
 TACTIC EXTEND remember_induct
   | ["remember_induct" ident(h)] -> { remember_induct h }
 END
-*)
