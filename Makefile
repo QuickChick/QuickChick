@@ -75,6 +75,7 @@ tests:
 #	$(MAKE) -C examples/c-mutation test
 #	coqc examples/BSTTest.v
 	coqc examples/DependentTest.v
+	coqc examples/TacticExample.v
 
 COMPATFILES:= \
 	plugin/depDriver.ml \

@@ -6,10 +6,11 @@ MAKE SURE TO EDIT THE .cppo SOURCE OF THIS FILE RATHER THAN THE GENERATED RESULT
 
 *)
 
-  open Stdarg
   open Ltac_plugin
   open Error
   open Pp
+  open Stdarg
+
 }
 
 DECLARE PLUGIN "coq-quickchick.plugin"
@@ -98,7 +99,54 @@ let quickchick_goal =
     let c = Proofview.Goal.concl gl in
     let e = Proofview.Goal.env gl in
     let evd = Evd.from_env e in
-
+(*
+    (* Make an evar with the goal as the type *)
+    let evd, evar = Evarutil.new_pure_evar (Environ.named_context_val e) evd c in
+    
+    (* Externalize it *)
+#if COQ_VERSION >= (8, 17, 0)
+    let ct = Constrextern.extern_constr e evd (EConstr.mkEvar (evar, SList.empty)) in
+#else
+    let ct = Constrextern.extern_constr e evd (EConstr.mkEvar (evar, [])) in
+#endif
+ *)  
+  match GenericLib.parse_dependent_type (EConstr.to_constr evd c) with
+    | Some dt ->
+      begin
+        msg_debug (str (GenericLib.dep_type_to_string dt) ++ fnl ());
+        let open GenericLib in 
+        let decide prop = decOptToBool (g_decOpt prop (gInt 1000)) in
+        let rec mkProperty = function
+          | DProd ((var, _),body) -> 
+              g_forAll g_arbitrary (gFun [var_to_string var] (fun [_] ->
+                mkProperty body
+                )) 
+          | DArrow (x,y) -> GenericLib.debug_coq_expr (gType' [] x); gIf (decide (gType' [] x)) (mkProperty y) (g_checker gTT)
+          | p -> g_checker (decide (gType' [] p)) 
+              in
+          
+     (*     | DArrow (DTyCtr (tyctr, args), y) -> gIf (decide )
+          | DTyParam typaram -> gTyParam typaram
+          | DTyCtr (tyctr, args) -> gApp (gTyCtr tyctr) (List.map mkProperty args)
+          | DCtr (ctr, args) -> gApp (gCtr ctr) (List.map mkProperty args)
+          | DTyVar var -> gVar var
+          | DApp (f, args) -> gApp (mkProperty f) (List.map mkProperty args)
+          | DNot p -> *)
+(*Use decOpt, for every arrow, assume instacne exists and match on it *)
+            
+        GenericLib.debug_coq_expr (mkProperty dt);
+        (*run the generator called checker using QuickCheck.*)
+        (*failwith "OUch!";*)
+        let to_run = GenericLib.interp_open_coq_expr e evd (g_show (g_quickCheck (mkProperty dt))) in
+        (*failwith "Oucher!";*)
+        QuickChick.define_and_run to_run e evd;
+        
+        Tacticals.tclIDTAC
+      end
+    | None -> failwith "Failed to Parse type"
+  end
+(*Create dependency graph, anything that lacks a dependency, print becuase we need it to *)
+(*    
     (* Make an evar with the goal as the type *)
     let evd, evar = Evarutil.new_pure_evar (Environ.named_context_val e) evd c in
 
@@ -224,8 +272,8 @@ let quickchick_goal =
   end
  *)
 
+*)
 }
-
 TACTIC EXTEND quickchick
   | ["quickchick"] -> { quickchick_goal }
 END

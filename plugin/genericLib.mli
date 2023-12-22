@@ -4,6 +4,9 @@ open Constrexpr
 
 type coq_expr
 
+val interp_open_coq_expr : Environ.env -> Evd.evar_map -> 
+  coq_expr -> EConstr.constr
+
 val hole : coq_expr
 
 val debug_coq_expr : coq_expr -> unit
@@ -103,6 +106,7 @@ val dep_dt_to_string : dep_dt -> string
 
 val constr_of_type : string -> ty_param list -> dep_type -> Constr.t
 val gType : ty_param list -> dep_type -> coq_expr
+val gType' : ty_param list -> dep_type -> coq_expr
 val get_type : Id.t -> unit
 val is_inductive : constructor -> bool
 val is_inductive_dt : dep_type -> bool
@@ -124,6 +128,8 @@ val sequenceM : ('a -> 'b option) -> 'a list -> 'b list option
 val qualid_to_mib : Libnames.qualid -> mutual_inductive_body
 val dt_rep_from_mib : mutual_inductive_body -> dt_rep option
 val coerce_reference_to_dt_rep : constr_expr -> dt_rep option
+
+val parse_dependent_type : Constr.constr -> dep_type option
 
 val dep_dt_from_mib : mutual_inductive_body -> dep_dt option
 val coerce_reference_to_dep_dt : constr_expr -> dep_dt option
@@ -202,19 +208,41 @@ val gEq : coq_expr -> coq_expr -> coq_expr
 val gOption : coq_expr -> coq_expr
 val gNone : coq_expr -> coq_expr
 val gSome : coq_expr -> coq_expr -> coq_expr
+val gNone' : coq_expr
+val gSome' : coq_expr -> coq_expr
+
 
 (* boolean *)
 val gNot   : coq_expr -> coq_expr
 val g_true  : coq_expr
 val g_false : coq_expr               
 val decToBool : coq_expr -> coq_expr
+val decOptToBool : coq_expr -> coq_expr
 val gBool  : coq_expr
+val gIf : coq_expr -> coq_expr -> coq_expr -> coq_expr
+
+(* list *)
 
 (* unit *)
 val gUnit : coq_expr
 val gTT   : coq_expr
-  
+
+(* dec *)
+val g_dec : coq_expr -> coq_expr
+val g_decOpt : coq_expr -> coq_expr -> coq_expr
+val g_dec_decOpt : coq_expr
+
+(* checker *)
+
+val g_checker : coq_expr -> coq_expr
+
+
 (* (\* Gen combinators *\) *)
+val g_forAll : coq_expr -> coq_expr -> coq_expr
+val g_arbitrary : coq_expr
+val g_quickCheck : coq_expr -> coq_expr
+val g_show : coq_expr -> coq_expr
+
 (* val gGen : coq_expr -> coq_expr *)
 (* val returnGen  : coq_expr -> coq_expr  *)
 (* val bindGen    : coq_expr -> string -> (var -> coq_expr) -> coq_expr  *)
