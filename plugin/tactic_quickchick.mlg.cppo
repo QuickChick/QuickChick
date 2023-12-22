@@ -9,6 +9,7 @@ MAKE SURE TO EDIT THE .cppo SOURCE OF THIS FILE RATHER THAN THE GENERATED RESULT
   open Ltac_plugin
   open Error
   open Pp
+  open Stdarg
 
 }
 
