@@ -411,7 +411,11 @@ let qcFuzz_main prop_def temp_dir execn prop_mlf prop_mlif warnings prop fuzzLoo
   let unit_type =
     CAst.make @@ CRef (qualid_of_string "Coq.Init.Datatypes.unit", None) in
   let unit_arg =
+#if COQ_VERSION >= (8, 20, 0)
+    CLocalAssum ( [ CAst.make (Name (fresh_name "x")) ], None, Default Glob_term.Explicit, unit_type ) in
+#else
     CLocalAssum ( [ CAst.make (Name (fresh_name "x")) ], Default Glob_term.Explicit, unit_type ) in
+#endif
   let pair_ctr =
     CAst.make @@ CRef (qualid_of_string "Coq.Init.Datatypes.pair", None) in
   let show_expr cexpr =

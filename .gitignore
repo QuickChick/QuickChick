@@ -42,6 +42,7 @@ _build/
 quickChickTool.byte
 plugin/depDriver.ml
 plugin/genericLib.ml
+plugin/mergeTypes.ml
 plugin/driver.ml
 plugin/driver.mlg
 plugin/quickChick.ml
@@ -58,6 +59,7 @@ __pycache__
 .lia.cache
 plugin/compat.ml
 src/ExtractionQCCompat.v
+src/TacticsUtil.v
 src/QuickChick.v
 _CoqProject
 META

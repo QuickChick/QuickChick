@@ -108,13 +108,20 @@ let gArg ?assumName:(an=hole) ?assumType:(at=hole) ?assumImplicit:(ai=false) ?as
     | _a -> failwith "This expression should be a name" in
   let max_implicit = Glob_term.MaxImplicit in
   CLocalAssum ( [CAst.make ?loc:(fst n) @@ snd n],
+#if COQ_VERSION >= (8, 20, 0)
+                  None,
+#endif
                   (if ag then Generalized (max_implicit, false)
                    else if ai then Default max_implicit else Default Glob_term.Explicit),
                   at )
 
 let arg_to_var (x : arg) =
   match x with
+#if COQ_VERSION >= (8, 20, 0)
+  | CLocalAssum ([{CAst.v = id; _}], _, _ ,_ ) -> id_of_name id
+#else
   | CLocalAssum ([{CAst.v = id; _}], _ ,_ ) -> id_of_name id
+#endif
   | _ -> qcfail "arg_to_var must be named"
   
 let str_lst_to_string sep (ss : string list) = 
@@ -622,7 +629,11 @@ let gApp ?explicit:(expl=false) c cs =
   else mkAppC (c, cs)
 
 let gProdWithArgs args f_body =
+#if COQ_VERSION >= (8, 20, 0)
+  let xvs = List.map (fun (CLocalAssum ([{CAst.v = n;_}], _, _, _)) ->
+#else
   let xvs = List.map (fun (CLocalAssum ([{CAst.v = n;_}], _, _)) ->
+#endif
                       match n with
                       | Name x -> x
                       | _ -> make_up_name ()
@@ -631,7 +642,11 @@ let gProdWithArgs args f_body =
   mkCProdN args fun_body
 
 let gFunWithArgs args f_body =
+#if COQ_VERSION >= (8, 20, 0)
+  let xvs = List.map (fun (CLocalAssum ([{CAst.v = n;_}], _, _, _)) ->
+#else
   let xvs = List.map (fun (CLocalAssum ([{CAst.v = n;_}], _, _)) ->
+#endif
                       match n with
                       | Name x -> x
                       | _ -> make_up_name ()
@@ -647,7 +662,11 @@ let gFun xss (f_body : var list -> coq_expr) =
   | _ ->
   let xvs = List.map (fun x -> fresh_name x) xss in
   (* TODO: optional argument types for xss *)
+#if COQ_VERSION >= (8, 20, 0)
+  let binder_list = List.map (fun x -> CLocalAssum ([CAst.make @@ Name x], None, Default Glob_term.Explicit, hole)) xvs in
+#else
   let binder_list = List.map (fun x -> CLocalAssum ([CAst.make @@ Name x], Default Glob_term.Explicit, hole)) xvs in
+#endif
   let fun_body = f_body xvs in
   mkCLambdaN binder_list fun_body 
 
@@ -657,14 +676,22 @@ let gFunTyped xts (f_body : var list -> coq_expr) =
   | _ ->
   let xvs = List.map (fun (x,t) -> (fresh_name x,t)) xts in
   (* TODO: optional argument types for xss *)
+#if COQ_VERSION >= (8, 20, 0)
+  let binder_list = List.map (fun (x,t) -> CLocalAssum ([CAst.make @@ Name x], None, Default Glob_term.Explicit, t)) xvs in
+#else
   let binder_list = List.map (fun (x,t) -> CLocalAssum ([CAst.make @@ Name x], Default Glob_term.Explicit, t)) xvs in
+#endif
   let fun_body = f_body (List.map fst xvs) in
   mkCLambdaN binder_list fun_body 
 
 (* with Explicit/Implicit annotations *)  
 let gRecFunInWithArgs ?structRec:(rec_id=None) ?assumType:(typ=hole) (fs : string) args (f_body : (var * var list) -> coq_expr) (let_body : var -> coq_expr) = 
   let fv  = fresh_name fs in
+#if COQ_VERSION >= (8, 20, 0)
+  let xvs = List.map (fun (CLocalAssum ([{CAst.v = n;_}], _, _, _)) ->
+#else
   let xvs = List.map (fun (CLocalAssum ([{CAst.v = n;_}], _, _)) ->
+#endif
                       match n with
                       | Name x -> x
                       | _ -> make_up_name ()
@@ -674,7 +701,11 @@ let gRecFunInWithArgs ?structRec:(rec_id=None) ?assumType:(typ=hole) (fs : strin
     | None -> None
     | Some id -> Some (CAst.make @@ CStructRec (CAst.make id)) in
   CAst.make @@ CLetIn (CAst.make @@ Name fv,
+#if COQ_VERSION >= (8, 20, 0)
+    CAst.make @@ CFix(CAst.make fv,[(CAst.make fv, None, rec_wf, args, typ, fix_body)]), None,
+#else
     CAst.make @@ CFix(CAst.make fv,[(CAst.make fv, rec_wf, args, typ, fix_body)]), None,
+#endif
     let_body fv)
              
 let gRecFunIn ?structRec:(rec_id=None) ?assumType:(typ = hole) (fs : string) (xss : string list) (f_body : (var * var list) -> coq_expr) (let_body : var -> coq_expr) =
@@ -1183,11 +1214,19 @@ let defineTypedConstant s c typ =
 (* Declare an instance *)
 let create_names_for_anon a =
   match a with 
+#if COQ_VERSION >= (8, 20, 0)
+  | CLocalAssum ([{CAst.v = n; loc}], r, x, y) ->
+#else
   | CLocalAssum ([{CAst.v = n; loc}], x, y) ->
+#endif
      begin match n with
            | Name x -> (x, a)
            | Anonymous -> let n = make_up_name () in
+#if COQ_VERSION >= (8, 20, 0)
+                          (n, CLocalAssum ([CAst.make ?loc:loc @@ Names.Name n], r, x, y))
+#else
                           (n, CLocalAssum ([CAst.make ?loc:loc @@ Names.Name n], x, y))
+#endif
      end
   | _ -> failwith "Non RawAssum in create_names"
     
