@@ -80,6 +80,8 @@ tests:
 COMPATFILES:= \
 	plugin/depDriver.ml \
 	plugin/genericLib.ml \
+	plugin/mergeTypes.ml \
+	plugin/quickChick.mlg \
 	plugin/unifyQC.ml \
 	plugin/tactic_quickchick.mlg \
 	plugin/weightmap.mlg \
