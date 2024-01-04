@@ -725,21 +725,21 @@ Proof.
     move: H2 => [[H2 | [H2 | H2]] H3];
     destruct m => //=; apply Hgen => //=;
     inversion H2; subst; auto; simpl in *.
-    + apply (@semReturnSize Generators.G ProducerGen ProducerSemanticsGen (option A) _) in H3; inversion H3.
-    + apply semLiftProdSize in H3; eauto with typeclass_instances. inversion H3 as [x [H0 H1]].
+    + apply (@semReturnSize Generators.G ProducerGen ProducerSemanticsGen (option A) None s (Some a)) in H3; inversion H3.
+    + apply (@semLiftProdSize _ ProducerGen _ _ _ Some (@arbitrary _ G) s (Some a)) in H3; eauto with typeclass_instances. inversion H3 as [x [H0 H1]].
       inversion H1; subst; auto.
   - destruct m eqn:Hm; simpl in *; move => HP; subst.
     + apply semFrequencySize; simpl.
       exists (7, liftM Some arbitrary); split; auto.
       * right; left; auto.
-      * simpl. apply semLiftProdSize; simpl;
+      * simpl. apply (@semLiftProdSize _ ProducerGen _ _ _ Some (@arbitrary _ G) s (Some a)); simpl;
                  eauto with typeclass_instances.
         apply imset_in; apply Hgen; auto.
     + apply semFrequencySize; simpl.
       exists (1, ret None); split; auto.
       * left; auto.
       * simpl.
-        apply (@semReturnSize Generators.G ProducerGen ProducerSemanticsGen). constructor.
+        apply (@semReturnSize Generators.G ProducerGen ProducerSemanticsGen (option A) None s None). constructor.
 Qed.
 
 Lemma arbPair_correctSize
