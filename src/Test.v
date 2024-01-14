@@ -230,7 +230,7 @@ Fixpoint runATest (st : State) (f : nat -> RandomSeed -> QProp) (maxSteps : nat)
              else runATest st f maxSteps'
     in
     match st with
-    | MkState mst mdt ms cs nst ndt ls e r nss nts ana =>
+    | MkState mst mdt ms cs nst ndt ls e r nss nts ana stime =>
       match f size rnd1 with
       | MkProp (MkRose res ts) =>
         (* TODO: CallbackPostTest *)
@@ -258,7 +258,7 @@ Fixpoint runATest (st : State) (f : nat -> RandomSeed -> QProp) (maxSteps : nat)
                                     | Some k => Map.add stamp (k+1) stamps
                                     end
                                  ) s ls in*)
-            test (MkState mst mdt ms cs (nst + 1) ndt ls' e rnd2 nss nts ana)
+            test (MkState mst mdt ms cs (nst + 1) ndt ls' e rnd2 nss nts ana stime)
           else (* Failure *)
             let tag_text := 
                 match t with 
@@ -309,7 +309,7 @@ Fixpoint runATest (st : State) (f : nat -> RandomSeed -> QProp) (maxSteps : nat)
                 | Some k => Map.add s_to_add (k+1) ls
                 end
               end in
-          test (MkState mst mdt ms cs nst ndt.+1 ls' e rnd2 nss nts ana)
+          test (MkState mst mdt ms cs nst ndt.+1 ls' e rnd2 nss nts ana stime)
         end
       end
     end
@@ -326,6 +326,9 @@ Definition test (st : State) (f : nat -> RandomSeed -> QProp) : Result :=
 
 Require Import ZArith.
 
+Axiom getCurrentTime : unit -> Z.
+Extract Constant getCurrentTime => "(fun tt -> let start = Unix.gettimeofday () in Big_int_Z.big_int_of_int (Float.to_int start))".
+
 (* ZP: This was quickCheckResult before but since we always return result
        return result there is no reason for such distinction *)
 Definition quickCheckWith {prop : Type} {_ : Checkable prop}
@@ -337,6 +340,7 @@ Definition quickCheckWith {prop : Type} {_ : Checkable prop}
         | None          => (newRandomSeed, computeSize' a)
         (* make it more random...? need IO action *)
       end in
+  let start_time := getCurrentTime tt in
   test (MkState (maxSuccess a)  (* maxSuccessTests   *)
                 (maxDiscard a)  (* maxDiscardTests   *)
                 (maxShrinks a)  (* maxShrinks        *)
@@ -349,6 +353,7 @@ Definition quickCheckWith {prop : Type} {_ : Checkable prop}
                 0               (* numSuccessShrinks *)
                 0               (* numTryShrinks     *)
                 (analysis a)  (* analysisFlag      *)
+                start_time
        ) (run (checker p)).
 
 Fixpoint showCollectStatistics (l : list (string * nat)) :=
@@ -510,7 +515,7 @@ Fixpoint fuzzLoopAux {A} (fuel : nat) (st : State)
           fuzzLoopAux fuel' (updSuccTests st S) favored' discards' favored_queue' discard_queue' randoms' saved' gen fuzz print prop
       end
     | Some false =>
-        let '(MkState mst mdt ms cs nst ndt ls e r nss nts ana) := st in
+        let '(MkState mst mdt ms cs nst ndt ls e r nss nts ana stime) := st in
         let zero := trace (print a ++ nl) zero_0 in
         let pre : string := "*** Failed " in
         (* TODO: shrinking *)
@@ -540,6 +545,7 @@ Definition fuzzLoopWith {A} (a : Args)
          (prop : A -> option bool) :=
   let compFun maxSuccess maxSize n d := maxSize in
   let (rnd, computeFun) := (newRandomSeed, compFun (maxSize a) (maxSuccess a)) in
+  let start_time := getCurrentTime tt in
   let st := MkState (maxSuccess a)  (* maxSuccessTests   *)
                     (maxDiscard a)  (* maxDiscardTests   *)
                     (maxShrinks a)  (* maxShrinks        *)
@@ -552,6 +558,7 @@ Definition fuzzLoopWith {A} (a : Args)
                     0               (* numSuccessShrinks *)
                     0               (* numTryShrinks     *)
                     false           (* analysis          *)
+                    start_time
   in fuzzLoopAux (maxSuccess a + maxDiscard a) st [] [] [] [] random_fuel [] gen fuzz print prop.
 
 Definition fuzzLoop {A} := @fuzzLoopWith A stdArgs.
