@@ -4,7 +4,7 @@
 (name coq-quickchick)
 (version dev)
 
-(generate_opam_files true)
+(generate_opam_files false)
 
 (source (github QuickChick/QuickChick))
 (license MIT)
