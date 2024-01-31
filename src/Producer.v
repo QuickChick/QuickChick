@@ -31,7 +31,7 @@ Import ListNotations.
 (* Rename? *)
 Class Producer (G : Type -> Type) :=
   {
-  super :> Monad G;
+  super : Monad G;
 
   sample : forall {A}, G A -> list A;
   
@@ -57,6 +57,7 @@ Class Producer (G : Type -> Type) :=
       (forall (a : A), (a \in semProd g) -> G B) -> G B;
   
   }.
+#[global] Existing Instance super.
 
 Lemma semProdOpt_equiv {A} {G} `{PG: Producer G}
       (g : G (option A)) :
@@ -128,14 +129,19 @@ Class SizedAntimonotonicNone {A} {G} `{Producer G}
 (** FP + SizeMon *)
 Class SizeMonotonicOptFP {A} {G} {H : Producer G}
       (g : G (option A)) :=
-  { IsMon :> @SizeMonotonicOpt _ _ H g;
-    IsFP  :> @SizeFP _ _ H g }.
+  { IsMon : @SizeMonotonicOpt _ _ H g;
+    IsFP  : @SizeFP _ _ H g }.
+#[global] Existing Instance IsMon.
+#[global] Existing Instance IsFP.
 
 Class SizedMonotonicOptFP {A} {G} {H : Producer G}
       (g : nat -> G (option A)) :=
-  { IsMonSized :> @SizedMonotonicOpt _ _ H g;
-    IsFPSized  :> @SizedFP _ _ H g;
-    IsAntimon  :> @SizedAntimonotonicNone _ _ _ g }.
+  { IsMonSized : @SizedMonotonicOpt _ _ H g;
+    IsFPSized  : @SizedFP _ _ H g;
+    IsAntimon  : @SizedAntimonotonicNone _ _ _ g }.
+#[global] Existing Instance IsMonSized.
+#[global] Existing Instance IsFPSized.
+#[global] Existing Instance IsAntimon.
 
 #[global] Instance SizeMonotonicOptFP_FP {A} {G}
        (g : G (option A))
