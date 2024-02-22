@@ -91,7 +91,8 @@ Extract Constant randomRN =>
     let range_Z = Big_int_Z.succ_big_int (Big_int_Z.sub_big_int y x) in
     let range_int = Big_int_Z.int_of_big_int range_Z in
     (Big_int_Z.add_big_int x (Big_int_Z.big_int_of_int (Random.State.int r range_int)), r))".
-Extract Constant newRandomSeed => "(Random.State.make_self_init ())".
+ (* Extract Constant newRandomSeed => "(Random.State.make_self_init ())". *)
+ Extract Constant newRandomSeed => "if Array.length Sys.argv <= 2 then Random.State.make_self_init () else Random.State.make (Array.init 10 (fun _ -> int_of_string (Sys.argv.(2))))".
 
 Extract Inductive Lazy => "Lazy.t" [lazy].
 Extract Constant force => "Lazy.force".

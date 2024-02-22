@@ -100,15 +100,15 @@ let calc_energy time size result =
    *)
 
   (* If the result is discarded, fuzz less. *)
-  let energy3 =
+  (* let energy3 =
     match result with
     | Some _ -> energy2
     | None -> energy2 *. 0.33
   in 
-  
+   *)
   (* Make sure that we don't go over limit. *)
 
-  let energy_pre_cap = energy3 in
+  let energy_pre_cap = energy2 in
   let energy_capped_top =
     if energy_pre_cap > havoc_max_mult *. 100.0 then
       havoc_max_mult *. 100.0 else energy_pre_cap 
