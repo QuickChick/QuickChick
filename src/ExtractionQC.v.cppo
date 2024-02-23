@@ -138,7 +138,7 @@ Extract Constant print_extracted_coq_string =>
    let s = Bytes.create (List.length l) in
    let rec copy i = function
     | [] -> s
-    | c :: l -> s.[i] <- c; copy (i+1) l
+    | c :: l -> Bytes.set s i c; copy (i+1) l
    in Bytes.to_string (copy 0 l))".
 
 Axiom withTime : forall {A}, (unit -> A) -> AugmentedTime A.
