@@ -123,8 +123,9 @@ let define c env evd =
    where [$TIME] is the current time in format [HHMMSS]. *)
 let new_ml_file () : string =
   let tm = Unix.localtime (Unix.time ()) in
-  let ts = Printf.sprintf "%02d%02d%02d" tm.Unix.tm_hour tm.Unix.tm_min tm.Unix.tm_sec in
-  let temp_dir = Filename.concat (temp_dirname ()) ts in
+  let ts = Printf.sprintf "%02d%02d%02d_" tm.Unix.tm_hour tm.Unix.tm_min tm.Unix.tm_sec in
+  let base_tmp_dir = temp_dirname () in
+  let temp_dir = CUnix.mktemp_dir ~temp_dir:base_tmp_dir ts "" in
   mkdir_ temp_dir;
   Filename.temp_file ~temp_dir "QuickChick" ".ml"
 
