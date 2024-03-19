@@ -24,7 +24,7 @@ license: "MIT"
 homepage: "https://github.com/QuickChick/QuickChick"
 bug-reports: "https://github.com/QuickChick/QuickChick/issues"
 depends: [
-  "dune" {>= "2.8"}
+  "dune" {>= "3.7"}
   "ocaml" {>= "4.07"}
   "menhir" {build}
   "cppo" {build & >= "1.6.8"}

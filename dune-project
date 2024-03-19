@@ -1,5 +1,5 @@
-(lang dune 2.8)
-(using coq 0.3)
+(lang dune 3.7)
+(using coq 0.7)
 (using menhir 2.0)
 (name coq-quickchick)
 (version dev)

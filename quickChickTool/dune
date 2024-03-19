@@ -1,6 +1,7 @@
 (executable
  (package coq-quickchick)
  (name quickChickTool)
+ (flags :standard -rectypes -warn-error -3 -w -32)
  (public_name quickChick)
  (libraries unix str))
 
