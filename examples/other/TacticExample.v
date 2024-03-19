@@ -27,7 +27,6 @@ Proof. quickchick. Admitted.
 
 Local Open Scope nat_scope.
 
-Search (nat -> nat -> bool).
 Theorem plus_leb_compat_l : forall (n m p : nat),
   (Nat.leb n m = true) -> (((p + n) <=? (p + m)) = true).
 Proof. quickchick. Admitted.
