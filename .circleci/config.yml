@@ -36,15 +36,18 @@ commands:
     steps:
     - run:
         name: Building QuickChick
-        command: opam pin coq-quickchick .
+        command: |
+          make compat
+          dune build
   test:
     steps:
     - run:
-        name: Main tests
-        command: dune build
-    - run:
-        name: Extra tests
-        command: dune runtest
+        name: Test
+        command: |
+          dune runtest --stop-on-first-error -j1
+          dune build @install
+          dune install coq-quickchick   # Make quickChick tool available on path
+          dune build @cram
     - run:
         name: Test dependants
         no_output_timeout: 20m
@@ -62,45 +65,47 @@ commands:
     steps:
     - run:
         name: Removing QuickChick
-        command: opam remove .
+        command: dune uninstall coq-quickchick
+
 jobs:
-  opam:
+  test:
     <<: *defaults
     steps:
     - startup
     - prepare
     - build
+    - test
     - remove
-  dune:
+  opam-install:
     <<: *defaults
     steps:
     - startup
     - prepare
-    - run: opam pin -n add coq-quickchick .
-    - run: make compat && dune build -p coq-quickchick
-    - run: dune install coq-quickchick
-    - test
-    - run: dune uninstall coq-quickchick
+    - run: opam pin coq-quickchick .
+    - run: opam remove .
 
 workflows:
   version: 2
   build:
     jobs:
-      - dune:
-          name: Dune 8.15
+      - test:
+          name: Coq 8.15
           coq: '8.15'
-      - dune:
-          name: Dune 8.16
+      - test:
+          name: Coq 8.16
           coq: '8.16'
-      - dune:
-          name: Dune 8.17
+      - test:
+          name: Coq 8.17
           coq: '8.17'
-      - dune:
-          name: Dune 8.18
+      - test:
+          name: Coq 8.18
           coq: '8.18'
-      - opam:
-          name: OPAM dev
+      - test:
+          name: Coq 8.19
+          coq: '8.19'
+      - test:
+          name: Coq dev
           coq: dev
-      - dune:
-          name: Dune dev
-          coq: dev
+      - opam-install:
+          name: Install and test
+          coq: '8.19'

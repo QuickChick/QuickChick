@@ -1,0 +1,3 @@
+(alias
+  (name default)
+  (deps (package coq-quickchick)))

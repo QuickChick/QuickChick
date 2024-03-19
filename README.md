@@ -45,15 +45,16 @@ Dependencies are listed in [`coq-quickchick.opam`](./coq-quickchick.opam).
 ### Build
 
     make compat
-    dune build -p coq-quickchick
+    dune build
 
 ## Run tests
 
-    dune build && dune runtest
+    dune runtest
 
-`dune build` runs most tests via QuickChick commands when compiling `.v` files.
-`dune runtest` runs tests for the `quickChick` tool, and tests with code
-extracted not via QuickChick.
+### Run extra tests for quickChick tool
+
+    dune install coq-quickchick  # Makes QuickChick available globally
+    dune build @cram
 
 ## Simple Examples
 

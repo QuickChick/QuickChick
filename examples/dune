@@ -1,4 +1,16 @@
-; TODO: fix this test, then remove this dune file
+(alias
+  (name runtest)
+  (deps (alias_rec all)))
+
+(cram
+  (deps
+     (package coq-quickchick))
+  ; These cram tests require a global installation of QuickChick
+  ; available to the quickChick tool, so we don't run them by default.
+  (runtest_alias false)
+  (alias cram))
+
+; TODO: fix this test, then remove this stanza
 (cram
   (applies_to python-io)
   (enabled_if false))
