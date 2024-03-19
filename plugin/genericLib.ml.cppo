@@ -80,7 +80,7 @@ let gInject s =
   CAst.make @@ CRef (qualid_of_string s, None)
 
 #if COQ_VERSION >= (8, 19, 0)
-let gType0 = CAst.make @@ CSort (Glob_term.UAnonymous {rigid = UnivRigid})
+let gType0 = CAst.make @@ CSort (Glob_term.UAnonymous {rigid = UState.UnivRigid})
 #else
 let gType0 = CAst.make @@ CSort (Glob_term.UAnonymous {rigid = true})
 #endif
