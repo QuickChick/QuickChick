@@ -190,8 +190,7 @@ let define_and_run c env evd =
    *)
 
   (* Copy over the contents of the ocaml directory *)
-  let ocaml_dir_cps = List.map (fun s -> Printf.sprintf "cp -r %s %s" s dir) !extra_dir
-  in 
+  let ocaml_dir_cps = List.map (fun s -> Printf.sprintf "cp -rL %s %s" s dir) !extra_dir in
   List.iter print_endline ocaml_dir_cps;
   List.iter (fun cmd -> ignore (Sys.command cmd)) ocaml_dir_cps;
 
