@@ -6,7 +6,11 @@
  (libraries unix str
   (select void_for_linking-plugin-extraction from
    (coq-core.plugins.extraction -> void_for_linking-plugin-extraction.empty)
-   (coq.plugins.extraction -> void_for_linking-plugin-extraction.empty))))
+   (coq.plugins.extraction -> void_for_linking-plugin-extraction.empty))
+  (select void_for_linking-plugin-ltac from
+   (coq-core.plugins.ltac -> void_for_linking-plugin-ltac.empty)
+   (coq.plugins.ltac -> void_for_linking-plugin-ltac.empty))
+  ))
 
 (rule
  (targets driver.ml)
@@ -28,5 +32,5 @@
  (deps (:pp-file weightmap.mlg))
  (action (run coqpp %{pp-file})))
 
-(rule
- (action (write-file void_for_linking-plugin-extraction.empty "")))
+(rule (action (write-file void_for_linking-plugin-extraction.empty "")))
+(rule (action (write-file void_for_linking-plugin-ltac.empty "")))
