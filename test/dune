@@ -1,3 +1,8 @@
+(coq.theory
+  (name QuickChick.Testing)
+  (theories QuickChick)
+  (modules plugin))
+
 (coq.extraction
   (prelude mutation)
   (extracted_modules mutation))
