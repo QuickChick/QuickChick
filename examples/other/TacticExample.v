@@ -9,7 +9,7 @@ Extract Constant Test.defNumTests => "1000".
 
 Definition to_be_generated :=
   forAll arbitrary (fun x =>
-  forAll arbitrary (fun y =>                      
+  forAll arbitrary (fun y =>
   if (x = y)? then checker ((x = 0)?)
   else checker tt)).
 
@@ -274,7 +274,7 @@ Inductive substi (s : tm) (x : string) : tm -> tm -> Prop :=
   | s_if : forall b b' t t' f f',
       substi s x b b' ->
       substi s x t t' ->
-      substi s x f f' -> 
+      substi s x f f' ->
       substi s x (tm_if b t f) (tm_if b' t' f')
 .
 
@@ -307,8 +307,8 @@ Proof.
     + apply IHt1; auto.
     + apply IHt2; auto.
     + apply IHt3; auto.
-Qed. 
-  
+Qed.
+
 #[export] Instance Dec_substi (s : tm) (x : string) (t t' : tm) : Dec (substi s x t t').
 Proof with try (right; intros c; inversion c; subst; eauto; fail).
   dec_eq.
@@ -432,7 +432,7 @@ Fixpoint type_eqb (T T' : ty) : bool :=
 Theorem type_eq_eqb : forall T T',  type_eqb T T' = true <-> T = T'.
 Proof.
   induction T; intros; destruct T'; simpl in *;
-    split; intros; auto; try discriminate. 
+    split; intros; auto; try discriminate.
   - rewrite Bool.andb_true_iff in H. destruct H. apply IHT1 in H.
     apply IHT2 in H0. subst; auto.
   - injection H as H. subst; simpl; auto.
@@ -440,7 +440,7 @@ Proof.
     + induction T; simpl; auto. rewrite IHT3, IHT4; auto.
     + do 2 rewrite H. auto.
   Qed.
-  
+
 Fixpoint type_of (Gamma : string -> option ty) (t : tm) : option ty :=
   match t with
   | tm_var s => Gamma s
@@ -453,7 +453,7 @@ Fixpoint type_of (Gamma : string -> option ty) (t : tm) : option ty :=
            bindop (type_of Gamma e) (fun T2' =>
                if type_eqb T2 T2' then Some T1 else None
              )
-       | _ => None                                   
+       | _ => None
        end
         )
   | tm_true | tm_false => Some Ty_Bool
@@ -466,7 +466,7 @@ Fixpoint type_of (Gamma : string -> option ty) (t : tm) : option ty :=
        else
          None
       )))
-  end.                                                            
+  end.
 
 Theorem type_of_correct : forall Gamma t T,
     type_of Gamma t = Some T -> has_type Gamma t T.
@@ -475,8 +475,8 @@ Proof.
   - constructor; auto.
   - destruct (type_of Gamma t1) eqn: E.
     + simpl in H. rewrite E in H. simpl in H.
-      destruct t; try discriminate. 
-      destruct (type_of Gamma t2) eqn: E'; try discriminate. 
+      destruct t; try discriminate.
+      destruct (type_of Gamma t2) eqn: E'; try discriminate.
       simpl in *.  destruct (type_eqb t3 t) eqn: E''; try discriminate.
       injection H as H. subst. apply type_eq_eqb in E''. subst.
       apply IHt2 in E'. apply IHt1 in E.
@@ -496,9 +496,9 @@ Proof.
       try discriminate.
     injection H as H; subst. apply Bool.andb_true_iff in E'''.
     destruct E'''. apply type_eq_eqb in H, H0. subst.
-    constructor; auto.  
+    constructor; auto.
 Qed.
-      
+
 Definition decopt_has_type (Gamma : string -> option ty) (t : tm) (T : ty) (n : nat) : option bool := bindop (type_of Gamma t) (fun T' => Some ((T = T')?)).
 
 #[export] Instance DecOpt_has_type (Gamma : string -> option ty) (t : tm) (T : ty) : DecOpt (has_type Gamma t T).
@@ -524,7 +524,7 @@ Lemma weakening_empty : forall Gamma e T,
 Proof. quickchick. Admitted.
 *)
 
-(* Dep case not handled yet for exists 
+(* Dep case not handled yet for exists
 Theorem progress : forall e T,
   empty_env |-- e \in T ->
   value e \/ exists e', e --> e'.
