@@ -40,5 +40,5 @@ dev-repo: "git+https://github.com/QuickChick/QuickChick.git"
 build: [
   [make "compat"]
   ["dune" "subst"] {pinned}
-  ["dune" "build" "-p" name "-j" jobs "@install" "@runtest" {with-test} "@doc" {with-doc}]
+  ["dune" "build" "-p" name "-j" jobs "@install" "@all" {with-test} "@runtest" {with-test} "@doc" {with-doc}]
 ]
