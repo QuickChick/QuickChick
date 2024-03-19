@@ -13,7 +13,7 @@
     PluginTest
     ProofGen
     ; Reflection  ; slow
-    ; TacticExample  ; slow
+    TacticExample
     tagging
     ; zoo  ; broken
     ))

@@ -5,6 +5,8 @@ From QuickChick Require Import QuickChick.
 From Coq Require Import Nat Arith.
 Set Default Goal Selector "!".
 
+Extract Constant Test.defNumTests => "1000".
+
 Definition to_be_generated :=
   forAll arbitrary (fun x =>
   forAll arbitrary (fun y =>                      
@@ -337,7 +339,11 @@ Proof with try (right; intros c; inversion c; subst; eauto; fail).
     + right; intros c;
         assert (substi s x0 (tm_if t1 t2 t3) (tm_if x1 x2 x3)) by (econstructor; eauto).
       eapply substi_uniq in H; eauto.
- Defined.
+Defined.
+
+(* In the test suite we mainly care that this runs at all, so we lower Test.defNumTests to not waste 5 sec per test. *)
+(* Even though most of the tests are discarded. *)
+Extract Constant Test.defNumTests => "100".
 
 Theorem substi_correct_l : forall s x (ts t' : tm),
   subst x s ts = t' -> substi s x ts t'.
