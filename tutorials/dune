@@ -1,0 +1,8 @@
+(coq.theory
+  (name QuickChick.Tutorials)
+  (theories QuickChick)
+  (modules
+    BasicUsage
+    Automation
+    DerivingProofs
+  ))
