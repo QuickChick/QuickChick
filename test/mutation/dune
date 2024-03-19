@@ -1,0 +1,9 @@
+(coq.extraction
+  (prelude mutation)
+  (extracted_modules mutation))
+
+(test
+  (name mutation)
+  (modules mutation)
+  (flags :standard -w -39-67)
+  (libraries zarith))
