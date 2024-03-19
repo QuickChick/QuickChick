@@ -1,6 +1,5 @@
 From QuickChick Require Import QuickChick.
 From mathcomp Require Import ssreflect ssrbool.
-Require Import String. (* ?? *)
 From QuickChick.stlc Require Import monad lambda.
 
 

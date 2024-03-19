@@ -1,6 +1,0 @@
--Q . QuickChick.RedBlack
--arg -w
--arg -notation-overridden
-redblack.v
-testing.v
-verif.v
