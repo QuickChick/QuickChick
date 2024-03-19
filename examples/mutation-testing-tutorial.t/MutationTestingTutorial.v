@@ -1,15 +1,9 @@
+From Coq Require Import Arith.
+
 From QuickChick Require Import QuickChick Tactics.
-Require Import String. Open Scope string.
 
+Set Warnings "-notation-overridden".
 From mathcomp Require Import ssreflect ssrfun ssrbool ssrnat eqtype seq.
-
-Import GenLow GenHigh.
-Require Import List.
-Import ListNotations.
-Import QcDefaultNotation. Open Scope qc_scope.
-Import QcDoNotation.
-
-Require Import Arith.
 
 Set Bullet Behavior "Strict Subproofs".
 
