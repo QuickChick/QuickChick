@@ -42,18 +42,18 @@ Dependencies are listed in [`coq-quickchick.opam`](./coq-quickchick.opam).
     opam update
     opam install . --deps-only
 
-#### Build using Make
-
-    make
-
-    # To install the package:
-    # (proceed with caution: this will clobber your `.opam` directory)
-    make install
-
-### Build using Dune
+### Build
 
     make compat
-    dune build
+    dune build -p coq-quickchick
+
+## Run tests
+
+    dune build && dune runtest
+
+`dune build` runs most tests via QuickChick commands when compiling `.v` files.
+`dune runtest` runs tests for the `quickChick` tool, and tests with code
+extracted not via QuickChick.
 
 ## Simple Examples
 

@@ -40,37 +40,11 @@ commands:
   test:
     steps:
     - run:
-        name: Unit testing
-        working_directory: test
-        command: make -j`nproc`
+        name: Main tests
+        command: dune build
     - run:
-        name: Testing Tutorial
-        working_directory: tutorials
-        command: make tutorials
-    - run:
-        name: Testing IFC
-        working_directory: examples/ifc-basic
-        command: make -j`nproc`
-    - run:
-        name: Testing Red-black tree
-        working_directory: examples/RedBlack
-        command: make -j`nproc`
-    - run:
-        name: Testing STLC
-        working_directory: examples/stlc
-        command: make -j`nproc`
-    - run:
-        name: Testing Multifile Mutation
-        working_directory: examples/multifile-mutation
-        command: make -j`nproc` test
-    - run:
-        name: Testing C Mutation
-        working_directory: examples/c-mutation
-        command: make -j`nproc` lesstest
-    - run:
-        name: Testing Python I/O
-        working_directory: examples/python-io
-        command: make -j`nproc`
+        name: Extra tests
+        command: dune runtest
     - run:
         name: Test dependants
         no_output_timeout: 20m
@@ -96,7 +70,6 @@ jobs:
     - startup
     - prepare
     - build
-    - test
     - remove
   dune:
     <<: *defaults
@@ -104,7 +77,7 @@ jobs:
     - startup
     - prepare
     - run: opam pin -n add coq-quickchick .
-    - run: make compat && dune build
+    - run: make compat && dune build -p coq-quickchick
     - run: dune install coq-quickchick
     - test
     - run: dune uninstall coq-quickchick
