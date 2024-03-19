@@ -4,25 +4,19 @@ Require Import List.
 
 From mathcomp Require Import ssreflect ssrfun ssrbool ssrnat eqtype seq.
 
-Import GenLow GenHigh .
-
 Import ListNotations.
 Import QcDefaultNotation. Open Scope qc_scope.
 
 Set Bullet Behavior "Strict Subproofs".
 
-Typeclasses eauto := debug.
+(* Typeclasses eauto := debug. *)
 
 Require Import DependentTest.
 
 (* XXX these instances should be present *)
 Existing Instance GenSizedFoo.
 Existing Instance ShrinkFoo.
-Derive Sized for Foo.
-Derive SizeMonotonic for Foo using GenSizedFoo.
-Derive SizedMonotonic for Foo using GenSizedFoo.
-Derive CanonicalSized for Foo.
-Derive SizedCorrect for Foo using GenSizedFoo and SizeMonotonicFoo.
+Derive GenSized for Foo.
 
 Inductive tree : Type :=
 | Leaf : tree

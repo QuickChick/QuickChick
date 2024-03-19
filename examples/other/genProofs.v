@@ -86,4 +86,3 @@ Proof. derive_genST_Correct (). Qed.
 Instance GenSizedSuchThatbst_Correct n m :
   CorrectSizedST (bst n m) (@arbitrarySizeST _ _ (@GenSizedSuchThatbst n m)).
 Proof. derive_genST_Correct (). Qed.
-

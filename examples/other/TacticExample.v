@@ -2,9 +2,7 @@ Set Warnings "-extraction-opaque-accessed,-extraction".
 Set Warnings "-notation-overridden,-parsing".
 
 From QuickChick Require Import QuickChick.
-From Coq Require Import Nat.
-From Coq Require Import Arith.Arith.
-From Coq Require Import Logic.FunctionalExtensionality.
+From Coq Require Import Nat Arith.
 Set Default Goal Selector "!".
 
 Definition to_be_generated :=
@@ -13,7 +11,7 @@ Definition to_be_generated :=
   if (x = y)? then checker ((x = 0)?)
   else checker tt)).
 
-QuickChickDebug Debug On.
+(* QuickChickDebug Debug On. *)
 Theorem foo : forall (x y : nat) , x < 8.
 Proof. quickchick. Admitted.
 
@@ -384,13 +382,11 @@ Derive DecOpt for (step t t').
 Reserved Notation "Gamma '|--' t '\in' T"
             (at level 101,
              t custom stlc, T custom stlc at level 0).
-Print Grammar constr.
+(* Print Grammar constr. *)
 
 Definition t_update (Gamma : string -> option ty) (x : string) (T : ty) (x' : string) : option ty :=
   if (x = x')? then Some T else Gamma x'.
 
-(*Fixpoint lookup (Gamma : []*)
-  
 Inductive has_type : (string -> option ty) -> tm -> ty -> Prop :=
   | T_Var : forall Gamma x T1,
       Gamma x = Some T1 ->
@@ -535,4 +531,3 @@ Theorem preservation : forall e e' T,
   e --> e'  ->
   empty_env |-- e' \in T.
 Proof. quickchick. Admitted.
-

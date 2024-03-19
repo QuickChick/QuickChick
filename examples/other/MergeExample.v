@@ -22,7 +22,7 @@ Inductive Good {A : Type} : Foo A -> Prop :=
 | Good1 : Good Foo1
 | Good2 : forall a f, Good (Foo2 a f f).
 
-QuickChickDebug Debug On.
+(* QuickChickDebug Debug On. *)
 MergeTest (fun x => NoParam x).
 MergeTest (fun x => Good x).
 
@@ -252,5 +252,3 @@ Inductive less : nat -> nat -> Prop :=
 
 Merge (fun y => less x y) With (fun y => less y z) As between.
 Print between.
-
-

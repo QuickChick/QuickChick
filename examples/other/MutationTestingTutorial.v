@@ -51,5 +51,3 @@ Definition propPlus x := x <? plus1 x.
 (*!
 QuickChick propPlus.
 *)
-
-

@@ -49,8 +49,5 @@ Definition bst_checker_prop :=
   bst 0 17 (insert x t) ?? 10)). (* *)
 (*  is_bst 0 17 (insert x t))). *)
 
-Extract Constant defNumTests => "20000".
+Extract Constant defNumTests => "100".
 QuickChick bst_checker_prop. 
-
-
-

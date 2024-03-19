@@ -438,4 +438,3 @@ Derive ArbitrarySizedSuchThat for (fun a => goodFun a).
 
 Definition success := "success".
 Print success.
-

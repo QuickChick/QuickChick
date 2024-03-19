@@ -73,4 +73,3 @@ Proof. derive_enumST_SizeMonotonic (). Qed.
 Instance EnumSizedSuchThatnot_In_Correct l :
     CorrectSizedST (fun n => not_In n l) (@enumSizeST _ _ (EnumSizedSuchThatnot_In l)).
 Proof. derive_enumST_Correct (). Qed.
-

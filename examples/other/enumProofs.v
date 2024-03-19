@@ -91,5 +91,3 @@ Inductive goodTree : nat -> tree nat  -> Prop :=
       goodTree m t2 ->
       goodTree m t1 ->
       goodTree (S n) (Node nat k t1 t2).
-
-

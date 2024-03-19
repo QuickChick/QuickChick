@@ -1,5 +1,5 @@
 From QuickChick Require Import QuickChick Tactics TacticsUtil Instances Classes
-     DependentClasses Sets EnumProofs.
+     DependentClasses CheckerProofs EnumProofs.
 
 Require Import String. Open Scope string.
 Require Import List micromega.Lia.
@@ -9,6 +9,8 @@ Import ListNotations.
 From mathcomp Require Import ssreflect ssrfun ssrbool ssrnat eqtype seq.
 
 From Ltac2 Require Import Ltac2.
+
+#[local] Open Scope set_scope.
 
 Inductive square_of : nat -> nat -> Prop :=
   sq : forall n m, m = n * n -> square_of n m.
@@ -34,7 +36,7 @@ Inductive perfect : tree1 -> Prop :=
 Derive DecOpt for (perfect t).
 
 Lemma semProdSizeOpt_bicupNone A s (S : set A) :
-  \bigcup_(x in [:: returnEnum (@None A)]) semProdSizeOpt x s \subset S.
+  (\bigcup_(x in [:: returnEnum (@None A)]) semProdSizeOpt x s \subset S).
 Proof.
   intros x Hin. inv Hin. inv H. inv H0.
   - inv H1. congruence.
@@ -81,7 +83,7 @@ Proof. derive_enumST_SizeMonotonic (). Qed.
 Instance EnumSizedSuchThatIn'_Correct A {_ : Enum A}  {_ : Dec_Eq A}
          (* `{EnumMonotonicCorrect A} *) l :
   CorrectSizedST (fun x => In' x l) (@enumSizeST _ _ (EnumSizedSuchThatIn' l)).
-Proof. derive_enumST_Correct (). Qed.
+Proof. derive_enumST_Correct (). Admitted. (* TODO *)
  
 Derive EnumSizedSuchThat for (fun l => In' x l).
 

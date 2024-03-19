@@ -1,0 +1,19 @@
+(coq.theory
+  (name QuickChick.Examples.Other)
+  (theories QuickChick)
+  (modules
+    BSTTest
+    DependentTest
+    ; dependentProofs  ; broken
+    enumProofs
+    ; enumSTProofs  ; broken
+    ; Fuzz  ; broken
+    ; genProofs  ; broken
+    MergeExample
+    PluginTest
+    ProofGen
+    ; Reflection  ; slow
+    ; TacticExample  ; slow
+    tagging
+    ; zoo  ; broken
+    ))

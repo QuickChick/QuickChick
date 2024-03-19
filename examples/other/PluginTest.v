@@ -28,7 +28,7 @@ Instance test_coercion A B (P : A -> B -> Prop) `{Gen B}
   GenSuchThat _ (fun p : A * B => let (x,y) := p in P x y) :=
   {| arbitraryST :=
       bindGen arbitrary (fun y =>
-      bindGenOpt (@arbitraryST _ (fun x : A => P x y) _) (fun x => 
+      bindOpt (@arbitraryST _ (fun x : A => P x y) _) (fun x => 
       returnGen (Some (x,y)))) |}.
 
 Definition foo : G (option (nat * nat)) :=
