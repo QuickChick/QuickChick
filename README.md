@@ -44,7 +44,6 @@ Dependencies are listed in [`coq-quickchick.opam`](./coq-quickchick.opam).
 
 ### Build
 
-    make compat
     dune build
 
 ## Run tests

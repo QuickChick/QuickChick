@@ -2,3 +2,23 @@
  (name QuickChick)
  (package coq-quickchick)
  (plugins coq-quickchick.plugin))
+
+(rule
+  (alias compat)
+  (target Compat.v)
+  (action (run %{exe:../scripts/mycppo} %{dep:Compat.v.cppo} %{target})))
+
+(rule
+  (alias compat)
+  (target ExtractionQC.v)
+  (action (run %{exe:../scripts/mycppo} %{dep:ExtractionQC.v.cppo} %{target})))
+
+(rule
+  (alias compat)
+  (target QuickChick.v)
+  (action (run %{exe:../scripts/mycppo} %{dep:QuickChick.v.cppo} %{target})))
+
+(rule
+  (alias compat)
+  (target TacticsUtil.v)
+  (action (run %{exe:../scripts/mycppo} %{dep:TacticsUtil.v.cppo} %{target})))
