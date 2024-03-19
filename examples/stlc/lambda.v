@@ -153,7 +153,7 @@ Proof.
 Qed.
 
 (* Small step CBV semantics *)
-Fixpoint is_value (t : term) : bool :=
+Definition is_value (t : term) : bool :=
   match t with
     | Const _ | Abs _ => true
     | _ => false

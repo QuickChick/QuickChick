@@ -52,6 +52,7 @@ Sample (liftM Some a).
 Sample c.
 Sample d.
 
+Set Warnings "-notation-overridden".
 From mathcomp Require Import ssreflect ssrnat div.
 
 QuickChick

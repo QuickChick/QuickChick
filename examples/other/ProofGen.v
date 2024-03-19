@@ -1,6 +1,7 @@
 From QuickChick Require Import QuickChick Tactics.
 Require Import String. Open Scope string.
 
+Set Warnings "-notation-overridden".
 From mathcomp Require Import ssreflect ssrfun ssrbool ssrnat eqtype seq.
 
 Require Import List.

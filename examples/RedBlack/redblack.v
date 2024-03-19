@@ -1,3 +1,4 @@
+Set Warnings "-notation-overridden".
 From mathcomp Require Import ssreflect ssrnat ssrbool eqtype.
 
 (* Formalization inspired from
@@ -21,7 +22,7 @@ Definition balance rb t1 k t2 :=
           Node Red (Node Black a x b) y (Node Black c k t2)
         | Node Red a x (Node Red b y c) =>
           Node Red (Node Black a x b) y (Node Black c k t2)
-        | a => match t2 with
+        | _ => match t2 with
                  | Node Red (Node Red b y c) z d =>
                    Node Red (Node Black t1 k b) y (Node Black c z d)
                  | Node Red b y (Node Red c z d) =>

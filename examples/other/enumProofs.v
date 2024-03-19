@@ -9,6 +9,7 @@ From Ltac2 Require Import Ltac2.
 
 Import ListNotations.
 Import QcDefaultNotation. Open Scope qc_scope.
+Set Warnings "-notation-overridden".
 From mathcomp Require Import ssreflect ssrfun ssrbool ssrnat eqtype seq.
 
 Set Bullet Behavior "Strict Subproofs".
