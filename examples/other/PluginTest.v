@@ -22,7 +22,7 @@ Derive ArbitrarySizedSuchThat for (fun p => let (m,tr) := p in checker_test m tr
 
 Derive ArbitrarySizedSuchThat for (fun tr => recursion_test m tr).
 
-
+#[local]
 Instance test_coercion A B (P : A -> B -> Prop) `{Gen B}
          {_ : forall y, GenSuchThat _ (fun x => P x y)} :
   GenSuchThat _ (fun p : A * B => let (x,y) := p in P x y) :=
