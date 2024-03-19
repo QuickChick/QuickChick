@@ -1,6 +1,4 @@
-#if COQ_VERSION >= (8, 16, 0)
 plugin/META.coq-quickchick.in
-#endif
 -R src QuickChick
 -I plugin
 
