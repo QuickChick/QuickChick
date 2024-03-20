@@ -1,6 +1,7 @@
 From QuickChick Require Import QuickChick Generators.
 Require Import Lia.
 
+Set Warnings "-notation-overridden".
 From mathcomp Require Import ssreflect ssrnat ssrbool eqtype.
 
 From QuickChick.RedBlack Require Import redblack.
@@ -52,7 +53,7 @@ Definition is_redblack_bool (t : tree) : bool :=
   is_black_balanced t && has_no_red_red Red t.
 (* end is_redblack_bool *)
 
-Fixpoint showColor (c : color) :=
+Definition showColor (c : color) :=
   match c with
     | Red => "Red"
     | Black => "Black"

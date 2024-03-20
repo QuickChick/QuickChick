@@ -47,6 +47,7 @@ plugin/unifyQC.ml
 plugin/sizeUtils.ml
 plugin/sized.ml
 
+src/Compat.v
 src/Tactics.v
 src/Sets.v
 src/Nat_util.v

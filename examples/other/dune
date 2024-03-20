@@ -1,0 +1,25 @@
+(coq.theory
+  (name QuickChick.Examples.Other)
+  (theories QuickChick)
+  (modules
+    BSTTest
+    DependentTest
+    ; dependentProofs  ; broken
+    enumProofs
+    ; enumSTProofs  ; broken
+    ; Fuzz  ; broken
+    ; genProofs  ; broken
+    MergeExample
+    PluginTest
+    ProofGen
+    ; Reflection  ; slow
+    TacticExampleX
+    tagging
+    ; zoo  ; broken
+    ))
+
+(rule
+  (alias compat)
+  (target TacticExampleX.v)
+  (action (run %{exe:../../scripts/mycppo} %{dep:TacticExampleX.v.cppo} %{target}))
+  (deps TacticExample.v))

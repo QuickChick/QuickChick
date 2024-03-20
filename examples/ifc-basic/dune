@@ -1,0 +1,16 @@
+(coq.theory
+  (name QuickChick.ifcbasic)
+  (theories QuickChick)
+  (modules
+    Indist
+    Instructions
+    Machine
+    Mutate
+    Printing
+    Generation
+    DerivedGen
+    GenExec
+    Rules
+    Driver
+  ))
+

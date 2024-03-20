@@ -1,0 +1,9 @@
+(coq.theory
+ (name QuickChick.stlc)
+ (theories QuickChick)
+ (modules
+  monad
+  lambda
+  test_progress
+  verif
+ ))

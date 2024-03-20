@@ -1,8 +1,10 @@
 Set Warnings "-extraction-opaque-accessed,-extraction".
-Set Warnings "-notation-overridden,-parsing".
 
-Require Import mathcomp.ssreflect.ssreflect.
-From mathcomp Require Import ssrnat ssrbool eqtype div.
+From Coq Require Import ZArith Ascii String List.
+Import ListNotations.
+
+Set Warnings "-notation-overridden,-parsing".
+From mathcomp Require Import ssreflect ssrnat ssrbool eqtype div.
 
 From ExtLib Require Import
      Structures.Monad.
@@ -13,15 +15,6 @@ From SimpleIO Require Import SimpleIO.
 
 From QuickChick Require Import RoseTrees RandomQC Generators Producer SemChecker.
 From QuickChick Require Import Show Checker State Classes.
-
-Require Import Coq.Strings.Ascii.
-Require Import Coq.Strings.String.
-Require Import List.
-Import ListNotations.
-
-Require Import Recdef.
-
-Require Import Arith.EqNat.
 
 Definition gte n m := Nat.leb m n.
 
@@ -323,8 +316,6 @@ Definition test (st : State) (f : nat -> RandomSeed -> QProp) : Result :=
   else
     let maxSteps := maxSuccessTests st + maxDiscardedTests st in
     runATest st f maxSteps.
-
-Require Import ZArith.
 
 (* ZP: This was quickCheckResult before but since we always return result
        return result there is no reason for such distinction *)

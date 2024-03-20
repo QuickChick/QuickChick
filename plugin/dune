@@ -6,7 +6,11 @@
  (libraries unix str
   (select void_for_linking-plugin-extraction from
    (coq-core.plugins.extraction -> void_for_linking-plugin-extraction.empty)
-   (coq.plugins.extraction -> void_for_linking-plugin-extraction.empty))))
+   (coq.plugins.extraction -> void_for_linking-plugin-extraction.empty))
+  (select void_for_linking-plugin-ltac from
+   (coq-core.plugins.ltac -> void_for_linking-plugin-ltac.empty)
+   (coq.plugins.ltac -> void_for_linking-plugin-ltac.empty))
+  ))
 
 (rule
  (targets driver.ml)
@@ -28,5 +32,34 @@
  (deps (:pp-file weightmap.mlg))
  (action (run coqpp %{pp-file})))
 
+(rule (action (write-file void_for_linking-plugin-extraction.empty "")))
+(rule (action (write-file void_for_linking-plugin-ltac.empty "")))
+
 (rule
- (action (write-file void_for_linking-plugin-extraction.empty "")))
+  (alias compat)
+  (target depDriver.ml)
+  (action (run %{exe:../scripts/mycppo} %{dep:depDriver.ml.cppo} %{target})))
+(rule
+  (alias compat)
+  (target genericLib.ml)
+  (action (run %{exe:../scripts/mycppo} %{dep:genericLib.ml.cppo} %{target})))
+(rule
+  (alias compat)
+  (target mergeTypes.ml)
+  (action (run %{exe:../scripts/mycppo} %{dep:mergeTypes.ml.cppo} %{target})))
+(rule
+  (alias compat)
+  (target quickChick.mlg)
+  (action (run %{exe:../scripts/mycppo} %{dep:quickChick.mlg.cppo} %{target})))
+(rule
+  (alias compat)
+  (target tactic_quickchick.mlg)
+  (action (run %{exe:../scripts/mycppo} %{dep:tactic_quickchick.mlg.cppo} %{target})))
+(rule
+  (alias compat)
+  (target unifyQC.ml)
+  (action (run %{exe:../scripts/mycppo} %{dep:unifyQC.ml.cppo} %{target})))
+(rule
+  (alias compat)
+  (target weightmap.mlg)
+  (action (run %{exe:../scripts/mycppo} %{dep:weightmap.mlg.cppo} %{target})))

@@ -1,0 +1,26 @@
+From Coq Require Import Arith.
+Module Nat.
+#if COQ_VERSION >= (8, 17, 0)
+Notation div_div := Nat.Div0.div_div.
+Notation div_lt_upper_bound := Nat.Div0.div_lt_upper_bound.
+#else
+Lemma div_0_l : forall a : nat, 0 / a = 0.
+Proof. intros []; reflexivity. Qed.
+
+Lemma div_div : forall a b c : nat, (a/b)/c = a/(b*c).
+Proof.
+  intros a b c. destruct (Nat.eq_dec b 0) as [->|Hb].
+  - apply div_0_l.
+  - destruct (Nat.eq_dec c 0) as [->|Hc].
+    + rewrite Nat.mul_0_r. reflexivity.
+    + now apply Nat.div_div.
+Qed.
+
+Lemma div_lt_upper_bound : forall a b q : nat, a < b*q -> a/b < q.
+Proof.
+  intros a b q. destruct (Nat.eq_dec b 0) as [->|Hb].
+  - cbn. intros H; contradiction (Nat.nlt_0_r a H).
+  - now apply Nat.div_lt_upper_bound.
+Qed.
+#endif
+End Nat.

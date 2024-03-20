@@ -1,3 +1,4 @@
+Set Warnings "-notation-overridden".
 From mathcomp Require Import ssreflect ssrbool ssrnat eqtype.
 Require Import String. (* I don't know why we need this.. Probably I am forgetting something *)
 From QuickChick Require Import QuickChick.

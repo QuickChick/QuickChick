@@ -463,17 +463,16 @@ let isTyParam = function
   | DTyParam _ -> true
   | _ -> false 
 
+let quickchick_cat =
 #if COQ_VERSION >= (8, 18, 0)
-let quickchick_cat = CWarnings.create_category ~name:"quickchick" ()
+  CWarnings.create_category ~name:"quickchick" ()
+#else
+  "quickchick"
 #endif
 
 let warn_uninstantiated_variables =
   CWarnings.create ~name:"quickchick-uninstantiated-variables"
-#if COQ_VERSION >= (8, 18, 0)
     ~category:quickchick_cat
-#else
-    ~category:"quickchick"
-#endif
     ~default:CWarnings.Enabled
     (fun allUnknowns ->
       str "After proccessing all constraints, there are still uninstantiated variables: "

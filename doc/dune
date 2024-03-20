@@ -1,0 +1,4 @@
+(coq.theory
+  (name QuickChick.Doc)
+  (theories QuickChick)
+  (modules QuickChickInterface DocumentationCheck))

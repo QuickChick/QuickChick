@@ -5,6 +5,7 @@ Class monad (mon : Type -> Type) :=
   }.
 
 
+Declare Scope monad_scope.
 Delimit Scope monad_scope with monad.
 
 Notation "x >>= f" := (bind x f) (at level 50, left associativity) : monad_scope.

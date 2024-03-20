@@ -1,0 +1,12 @@
+(alias
+  (name runtest)
+  (deps (alias_rec all)))
+
+(coq.theory
+  (name QuickChick.Tutorials)
+  (theories QuickChick)
+  (modules
+    BasicUsage
+    Automation
+    DerivingProofs
+  ))

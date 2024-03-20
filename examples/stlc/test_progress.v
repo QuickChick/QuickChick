@@ -1,6 +1,5 @@
 From QuickChick Require Import QuickChick.
 From mathcomp Require Import ssreflect ssrbool.
-Require Import String. (* ?? *)
 From QuickChick.stlc Require Import monad lambda.
 
 
@@ -27,7 +26,7 @@ Fixpoint term_size (t : term) : nat :=
 QuickCheck (forAll gen_type (fun tau => forAll (gen_term tau) (fun t
   => (collect (append "size " (show (term_size t))) (has_progress t))))).
 
-Fixpoint step_bug (t : term) : option term :=
+Definition step_bug (t : term) : option term :=
   match t with
     | Const _ | Id _ => None | Abs x => None
     | App t1 t2 =>

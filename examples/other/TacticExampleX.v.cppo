@@ -1,0 +1,5 @@
+#if COQ_VERSION >= (8,16,0)
+#include "TacticExample.v"
+#else
+(* This example does not work with Coq 8.15 *)
+#endif

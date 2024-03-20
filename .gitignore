@@ -58,8 +58,10 @@ __pycache__
 .nfs*
 .lia.cache
 plugin/compat.ml
+src/Compat.v
 src/ExtractionQCCompat.v
 src/TacticsUtil.v
 src/QuickChick.v
 _CoqProject
 META
+examples/other/TacticExampleX.v

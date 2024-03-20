@@ -36,41 +36,17 @@ commands:
     steps:
     - run:
         name: Building QuickChick
-        command: opam pin coq-quickchick .
+        command: |
+          dune build
   test:
     steps:
     - run:
-        name: Unit testing
-        working_directory: test
-        command: make -j`nproc`
-    - run:
-        name: Testing Tutorial
-        working_directory: tutorials
-        command: make tutorials
-    - run:
-        name: Testing IFC
-        working_directory: examples/ifc-basic
-        command: make -j`nproc`
-    - run:
-        name: Testing Red-black tree
-        working_directory: examples/RedBlack
-        command: make -j`nproc`
-    - run:
-        name: Testing STLC
-        working_directory: examples/stlc
-        command: make -j`nproc`
-    - run:
-        name: Testing Multifile Mutation
-        working_directory: examples/multifile-mutation
-        command: make -j`nproc` test
-    - run:
-        name: Testing C Mutation
-        working_directory: examples/c-mutation
-        command: make -j`nproc` lesstest
-    - run:
-        name: Testing Python I/O
-        working_directory: examples/python-io
-        command: make -j`nproc`
+        name: Test
+        command: |
+          dune runtest --stop-on-first-error -j1
+          dune build @install
+          dune install coq-quickchick   # Make quickChick tool available on path
+          dune build @cram
     - run:
         name: Test dependants
         no_output_timeout: 20m
@@ -88,9 +64,10 @@ commands:
     steps:
     - run:
         name: Removing QuickChick
-        command: opam remove .
+        command: dune uninstall coq-quickchick
+
 jobs:
-  opam:
+  test:
     <<: *defaults
     steps:
     - startup
@@ -98,36 +75,36 @@ jobs:
     - build
     - test
     - remove
-  dune:
+  opam-install:
     <<: *defaults
     steps:
     - startup
     - prepare
-    - run: opam pin -n add coq-quickchick .
-    - run: make compat && dune build
-    - run: dune install coq-quickchick
-    - test
-    - run: dune uninstall coq-quickchick
+    - run: opam pin coq-quickchick .
+    - run: opam remove .
 
 workflows:
   version: 2
   build:
     jobs:
-      - dune:
-          name: Dune 8.15
+      - test:
+          name: Coq 8.15
           coq: '8.15'
-      - dune:
-          name: Dune 8.16
+      - test:
+          name: Coq 8.16
           coq: '8.16'
-      - dune:
-          name: Dune 8.17
+      - test:
+          name: Coq 8.17
           coq: '8.17'
-      - dune:
-          name: Dune 8.18
+      - test:
+          name: Coq 8.18
           coq: '8.18'
-      - opam:
-          name: OPAM dev
+      - test:
+          name: Coq 8.19
+          coq: '8.19'
+      - test:
+          name: Coq dev
           coq: dev
-      - dune:
-          name: Dune dev
-          coq: dev
+      - opam-install:
+          name: Install and test
+          coq: '8.19'

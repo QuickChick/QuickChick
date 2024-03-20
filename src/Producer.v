@@ -59,6 +59,8 @@ Class Producer (G : Type -> Type) :=
   }.
 #[global] Existing Instance super.
 
+Arguments bindPf {G Producer A B} g.
+
 Lemma semProdOpt_equiv {A} {G} `{PG: Producer G}
       (g : G (option A)) :
     semProdOpt g <--> \bigcup_s semProdSizeOpt g s.
