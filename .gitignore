@@ -46,6 +46,7 @@ plugin/mergeTypes.ml
 plugin/driver.ml
 plugin/driver.mlg
 plugin/quickChick.ml
+plugin/quickChick.mli
 plugin/quickChick.mlg
 plugin/tactic_quickchick.ml
 plugin/tactic_quickchick.mlg

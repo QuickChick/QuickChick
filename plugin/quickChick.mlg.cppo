@@ -131,7 +131,11 @@ let new_ml_file () : string =
 
 let tmp_int_re = Str.regexp "type int =[ ]*int"
 
+#if COQ_VERSION >= (8, 20, 0)
+let define_and_run ~opaque_access c env evd =
+#else
 let define_and_run c env evd =
+#endif
   (* Extract the term and its dependencies *)
   let main = define c env evd in
   let mlf   : string = new_ml_file () in
@@ -141,7 +145,11 @@ let define_and_run c env evd =
   let warnings = CWarnings.get_flags () in
   let mute_extraction = warnings ^ (if warnings = "" then "" else ",") ^ "-extraction-opaque-accessed" in
   CWarnings.set_flags mute_extraction;
+#if COQ_VERSION >= (8, 20, 0)
+  Flags.silently (Extraction_plugin.Extract_env.full_extraction ~opaque_access (Some mlf)) [qualid_of_ident main];
+#else
   Flags.silently (Extraction_plugin.Extract_env.full_extraction (Some mlf)) [qualid_of_ident main];
+#endif
   CWarnings.set_flags warnings;
   (* Add a main function to get some output *)
   let oc = open_out_gen [Open_append;Open_text] 0o666 mlf in
@@ -289,7 +297,11 @@ let define_and_run c env evd =
 ;;
 
 (* TODO: clean leftover files *)
+#if COQ_VERSION >= (8, 20, 0)
+let runTest ~opaque_access c env evd : unit =
+#else
 let runTest c env evd : unit =
+#endif
   (* [c] is a constr_expr representing the test to run,
      so we first build a new constr_expr representing
      show c **)
@@ -302,14 +314,22 @@ let runTest c env evd : unit =
   let (c,_evd) = interp_constr env evd c in
 
   (* Printf.printf "So far so good?\n"; flush stdout; *)
+#if COQ_VERSION >= (8, 20, 0)
+  define_and_run ~opaque_access c env evd
+#else
   define_and_run c env evd
+#endif
 
 let rec last = function
   | [] -> None
   | x :: [] -> Some x
   | _ :: xs -> last xs
 
+#if COQ_VERSION >= (8, 20, 0)
+let run ~opaque_access f args =
+#else
 let run f args =
+#endif
   let env = Global.env () in
   let evd = Evd.from_env env in
   begin match last args with
@@ -320,7 +340,11 @@ let run f args =
   end;
   let args = List.map (fun x -> (x,None)) args in
   let c = CAst.make @@ CApp (f, args) in
+#if COQ_VERSION >= (8,20, 0)
+  runTest ~opaque_access c env evd
+#else
   runTest c env evd
+#endif
 
 let set_debug_flag (flag_name : string) (mode : string) =
   let toggle =
@@ -353,7 +377,11 @@ let add_manual_extract cs =
     | _ -> [convert_reference_to_qualid cs] in 
   extract_manually := refs @ !extract_manually
 
+#if COQ_VERSION >= (8, 20, 0)
+let extract_prop_and_deps ~opaque_access prop =
+#else
 let extract_prop_and_deps prop =
+#endif
   let env = Global.env () in
   let evd = Evd.from_env env in
   let (prop_expr, evd') = interp_constr env evd prop in
@@ -365,11 +393,19 @@ let extract_prop_and_deps prop =
   let warnings = CWarnings.get_flags () in
   let mute_extraction = warnings ^ (if warnings = "" then "" else ",") ^ "-extraction-opaque-accessed" in
   CWarnings.set_flags mute_extraction;
+#if COQ_VERSION >= (8, 20, 0)
+  Flags.silently (Extraction_plugin.Extract_env.full_extraction ~opaque_access (Some prop_mlf)) [qualid_of_ident prop_def];
+#else
   Flags.silently (Extraction_plugin.Extract_env.full_extraction (Some prop_mlf)) [qualid_of_ident prop_def];
+#endif
   CWarnings.set_flags warnings;
   (prop_def, temp_dir, execn, prop_mlf, prop_mlif, warnings)
 
+#if COQ_VERSION >= (8, 20, 0)
+let qcFuzz_main ~opaque_access prop_def temp_dir execn prop_mlf prop_mlif warnings prop fuzzLoop =
+#else
 let qcFuzz_main prop_def temp_dir execn prop_mlf prop_mlif warnings prop fuzzLoop =
+#endif
 
   (* Override extraction to use the new, instrumented property *)
   let qualify s = Printf.sprintf "%s.%s" (Filename.basename execn) s in
@@ -440,7 +476,11 @@ let qcFuzz_main prop_def temp_dir execn prop_mlf prop_mlif warnings prop fuzzLoo
   let mlif = execn ^ ".mli" in
   let mute_extraction = warnings ^ (if warnings = "" then "" else ",") ^ "-extraction-opaque-accessed" in
   CWarnings.set_flags mute_extraction;
+#if COQ_VERSION >= (8, 20, 0)
+  Flags.silently (Extraction_plugin.Extract_env.full_extraction ~opaque_access (Some mlf)) [qualid_of_ident show_and_c_fun_def];
+#else
   Flags.silently (Extraction_plugin.Extract_env.full_extraction (Some mlf)) [qualid_of_ident show_and_c_fun_def];
+#endif
 
   (* Add a main function to get some output *)
   let oc = open_out_gen [Open_append;Open_text] 0o666 mlf in
@@ -595,40 +635,71 @@ let qcFuzz_main prop_def temp_dir execn prop_mlf prop_mlif warnings prop fuzzLoo
     ) !extra_files;
    *)
 
+#if COQ_VERSION >= (8, 20, 0)
+let qcFuzz ~opaque_access prop fuzzLoop =
+  let (prop_def, temp_dir, execn, prop_mlf, prop_mlif, warnings) =
+    extract_prop_and_deps ~opaque_access prop in
+  qcFuzz_main ~opaque_access prop_def temp_dir execn prop_mlf prop_mlif warnings prop fuzzLoop
+#else
 let qcFuzz prop fuzzLoop =
   let (prop_def, temp_dir, execn, prop_mlf, prop_mlif, warnings) =
     extract_prop_and_deps prop in
   qcFuzz_main prop_def temp_dir execn prop_mlf prop_mlif warnings prop fuzzLoop
+#endif
 
 }
 
 
+#if COQ_VERSION >= (8, 20, 0)
+VERNAC COMMAND EXTEND QuickCheck CLASSIFIED AS SIDEFF STATE opaque_access
+#else
 VERNAC COMMAND EXTEND QuickCheck CLASSIFIED AS SIDEFF
+#endif
   | ["QuickCheck" constr(c)] ->     {run quickCheck [c]}
   | ["QuickCheckWith" constr(c1) constr(c2)] ->     {run quickCheckWith [c1;c2]}
 END
 
+#if COQ_VERSION >= (8, 20, 0)
+VERNAC COMMAND EXTEND QuickChick CLASSIFIED AS SIDEFF STATE opaque_access
+#else
 VERNAC COMMAND EXTEND QuickChick CLASSIFIED AS SIDEFF
+#endif
   | ["QuickChick" constr(c)] ->     {run quickCheck [c]}
   | ["QuickChickWith" constr(c1) constr(c2)] ->     {run quickCheckWith [c1;c2]}
 END
 
+#if COQ_VERSION >= (8, 20, 0)
+VERNAC COMMAND EXTEND MutateCheck CLASSIFIED AS SIDEFF STATE opaque_access
+#else
 VERNAC COMMAND EXTEND MutateCheck CLASSIFIED AS SIDEFF
+#endif
   | ["MutateCheck" constr(c1) constr(c2)] ->     {run mutateCheck [c1;c2]}
   | ["MutateCheckWith" constr(c1) constr(c2) constr(c3)] ->     {run mutateCheckWith [c1;c2;c3]}
 END
 
+#if COQ_VERSION >= (8, 20, 0)
+VERNAC COMMAND EXTEND MutateChick CLASSIFIED AS SIDEFF STATE opaque_access
+#else
 VERNAC COMMAND EXTEND MutateChick CLASSIFIED AS SIDEFF
+#endif
   | ["MutateChick" constr(c1) constr(c2)] ->     {run mutateCheck [c1;c2]}
   | ["MutateChickWith" constr(c1) constr(c2) constr(c3)] ->     {run mutateCheckWith [c1;c2;c3]}
 END
 
+#if COQ_VERSION >= (8, 20, 0)
+VERNAC COMMAND EXTEND MutateCheckMany CLASSIFIED AS SIDEFF STATE opaque_access
+#else
 VERNAC COMMAND EXTEND MutateCheckMany CLASSIFIED AS SIDEFF
+#endif
   | ["MutateCheckMany" constr(c1) constr(c2)] ->     {run mutateCheckMany [c1;c2]}
   | ["MutateCheckManyWith" constr(c1) constr(c2) constr(c3)] ->     {run mutateCheckManyWith [c1;c2;c3]}
 END
 
+#if COQ_VERSION >= (8, 20, 0)
+VERNAC COMMAND EXTEND MutateChickMany CLASSIFIED AS SIDEFF STATE opaque_access
+#else
 VERNAC COMMAND EXTEND MutateChickMany CLASSIFIED AS SIDEFF
+#endif
   | ["MutateChickMany" constr(c1) constr(c2)] ->     {run mutateCheckMany [c1;c2]}
   | ["MutateChickManyWith" constr(c1) constr(c2) constr(c3)] ->     {run mutateCheckManyWith [c1;c2;c3]}
 END
@@ -640,11 +711,19 @@ VERNAC COMMAND EXTEND QuickChickDebug CLASSIFIED AS SIDEFF
        set_debug_flag s1' s2' }
 END
 
+#if COQ_VERSION >= (8, 20, 0)
+VERNAC COMMAND EXTEND Sample CLASSIFIED AS SIDEFF STATE opaque_access
+#else
 VERNAC COMMAND EXTEND Sample CLASSIFIED AS SIDEFF
+#endif
   | ["Sample" constr(c)] -> {run sample [c]}
 END
 
+#if COQ_VERSION >= (8, 20, 0)
+VERNAC COMMAND EXTEND Sample1 CLASSIFIED AS SIDEFF STATE opaque_access
+#else
 VERNAC COMMAND EXTEND Sample1 CLASSIFIED AS SIDEFF
+#endif
   | ["Sample1" constr(c)] -> {run sample1 [c]}
 END
 
@@ -668,9 +747,16 @@ VERNAC COMMAND EXTEND ManualExtract CLASSIFIED AS SIDEFF
    | ["ManualExtract" constr(inductives) ] -> { add_manual_extract inductives }
 END
 
+#if COQ_VERSION >= (8, 20, 0)
+VERNAC COMMAND EXTEND FuzzQC CLASSIFIED AS SIDEFF STATE opaque_access
+| ["FuzzChick" constr(prop) constr(fuzzLoop) ] ->  { fun ~opaque_access ->
+       ignore (qcFuzz prop ~opaque_access fuzzLoop) }
+END
+#else
 VERNAC COMMAND EXTEND FuzzQC CLASSIFIED AS SIDEFF
   | ["FuzzChick" constr(prop) constr(fuzzLoop) ] ->  { ignore (qcFuzz prop fuzzLoop) }
 END
+#endif
 
 VERNAC COMMAND EXTEND QCExtractDir CLASSIFIED AS SIDEFF
   | ["QCExtractDir" string(s)] -> { set_extract_dir s }
