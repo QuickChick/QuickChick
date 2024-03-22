@@ -1,3 +1,7 @@
 val quickCheck : Constrexpr.constr_expr_r CAst.t
 val show : Constrexpr.constr_expr_r CAst.t
+#if COQ_VERSION >= (8, 20, 0)
+val define_and_run : opaque_access:Global.indirect_accessor -> EConstr.constr -> Environ.env -> Evd.evar_map -> unit
+#else
 val define_and_run : EConstr.constr -> Environ.env -> Evd.evar_map -> unit
+#endif
