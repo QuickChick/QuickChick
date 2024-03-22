@@ -1,2 +1,2 @@
 Mutation Testing Tutorial
-  $ quickChick -s PropPlus > log || (cat log ; exit 1)
+  $ quickChick -s PropPlus > log 2>&1 || (cat log ; exit 1)
