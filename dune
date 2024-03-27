@@ -1,3 +1,5 @@
 (alias
   (name default)
   (deps (package coq-quickchick)))
+
+(dirs :standard \ opam)
