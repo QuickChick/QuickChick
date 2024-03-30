@@ -23,11 +23,11 @@ Proof. unfold lt; tauto. Qed.
 Theorem lt_not_eq : forall x y : bool, lt x y -> ~ eq x y.
 Proof. unfold lt, eq; intuition; congruence. Qed.
 
-Theorem compare : forall x y : bool, Compare lt eq x y.
+Definition compare : forall x y : bool, Compare lt eq x y.
 Proof.
   unfold lt, eq; repeat (let b := fresh in intros b; destruct b);
   [apply EQ | apply GT | apply LT | apply EQ]; auto.
-Qed.
+Defined.
 
 End BoolOT.
 
@@ -54,7 +54,7 @@ Proof.
   generalize dependent eq'; apply N.lt_neq; assumption.
 Qed.
 
-Theorem compare : forall c d : t, Compare lt eq c d.
+Definition compare : forall c d : t, Compare lt eq c d.
 Proof.
   unfold lt, eq; intros;
   remember (N_of_ascii c ?= N_of_ascii d)%N as C; symmetry in HeqC; destruct C;
@@ -66,7 +66,7 @@ Proof.
   | apply LT
   | apply GT; apply N.gt_lt];
   assumption.
-Qed.
+Defined.
 
 End AsciiOT.
 
@@ -174,6 +174,6 @@ Proof.
         reflexivity.
         unfold AsciiOT.eq in *; subst; not_ascii_lt_refl.
         do_ascii_lt_trans; not_ascii_lt_refl.
-Qed.
+Defined.
 
 End StringOT.
