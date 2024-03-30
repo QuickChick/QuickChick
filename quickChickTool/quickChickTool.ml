@@ -798,7 +798,6 @@ let main =
       List.split (List.mapi make_test all_things_to_check) in
 
     let tmp_file_data =
-      "Set Warnings \"-extraction-opaque-accessed,-extraction\".\n\n" ^
       "Require Import String.\n"^
       "From QuickChick Require Import QuickChick.\n\n"^
       (if imports <> [] then "Require " ^ (String.concat " " imports) ^ ".\n\n" else "")^
