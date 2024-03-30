@@ -4,7 +4,6 @@
    tries to follow this code organization/abstraction. We need to
    expose quite a bit on the proof side for this to work though. *)
 
-Set Warnings "-extraction-opaque-accessed,-extraction".
 Set Warnings "-notation-overridden,-parsing".
 
 Require Import ZArith List Lia.
@@ -38,7 +37,7 @@ Class Producer (G : Type -> Type) :=
   sized  : forall {A: Type}, (nat -> G A) -> G A;
   resize : forall {A: Type}, nat -> G A -> G A;
 
-  choose : forall {A : Type} `{ChoosableFromInterval A}, (A * A) -> G A;
+  choose : forall {A : Type} {le} `{ChoosableFromInterval A le}, (A * A) -> G A;
   
   semProdSize :
     forall {A : Type}, G A -> nat -> set A;
@@ -204,15 +203,15 @@ Class ProducerSemantics G `{Producer G} :=
                   \bigcup_(a in semProdSize g size) semProdSize (f a) size;
 
   semChoose :
-    forall A `{RandomQC.ChoosableFromInterval A} (a1 a2 : A),
-      RandomQC.leq a1 a2 ->
-      (semProd (choose (a1,a2)) <--> [set a | RandomQC.leq a1 a && RandomQC.leq a a2]);
+    forall A {le} `{RandomQC.ChoosableFromInterval A le} (a1 a2 : A),
+      le a1 a2 ->
+      (semProd (choose (a1,a2)) <--> [set a | le a1 a /\ le a a2]);
 
   semChooseSize :
-    forall A `{RandomQC.ChoosableFromInterval A} (a1 a2 : A),
-      RandomQC.leq a1 a2 ->
+    forall A le `{RandomQC.ChoosableFromInterval A le} (a1 a2 : A),
+      le a1 a2 ->
       forall size, (semProdSize (choose (a1,a2)) size <-->
-              [set a | RandomQC.leq a1 a && RandomQC.leq a a2]);
+              [set a | le a1 a /\ le a a2]);
 
   (* semChooseSizeEmpty : *)
   (*   forall A `{RandomQC.ChoosableFromInterval A} (a1 a2 : A), *)
@@ -1066,13 +1065,36 @@ Next Obligation.
   move => l [H1 H2]; split => // a Ha. by eapply (monotonic H0); eauto.
 Qed.
 
+Lemma lele_coq_ssr i j k : (i <= j /\ j <= k)%coq_nat <-> (i <= j) && (j <= k).
+Proof.
+  split.
+  - move => [/leP Hij /leP Hjk]. by apply /andP.
+  - move /andP => [/leP Hij /leP Hjk]. done.
+Qed.
+
+Lemma semChooseNat (a1 a2 : nat) : a1 <= a2 ->
+      (semProd (choose (a1,a2)) <--> [set a | a1 <= a <= a2]).
+Proof.
+  move => /leP H.
+  rewrite (semChoose (A := nat) (H0 := ChooseNat) H).
+  intros a. apply lele_coq_ssr.
+Qed.
+
+Lemma semChooseSizeNat (a1 a2 : nat) : a1 <= a2 ->
+      forall size, (semProdSize (choose (a1,a2)) size <--> [set a | a1 <= a <= a2]).
+Proof.
+  move => /leP H size.
+  rewrite (semChooseSize (H0 := ChooseNat) H).
+  intros a. apply lele_coq_ssr.
+Qed.
 
 Lemma semListOfSize {A : Type} (g : G A) size :
   semProdSize (listOf g) size <-->
   [set l | length l <= size /\ l \subset (semProdSize g size)].
 Proof.
 rewrite /listOf semSizedSize semBindSize; setoid_rewrite semVectorOfSize.
-rewrite semChooseSize // => l; split=> [[n [/andP [_ ?] [-> ?]]]| [? ?]] //.
+assert (Hsiz : Nat.le 0 size) by lia.
+rewrite semChooseSizeNat // => l; split=> [[n [/andP [? ?] [-> ?]]]| [? ?]] //.
 by exists (length l).
 Qed.
 
@@ -1126,12 +1148,12 @@ Lemma semOneofSize {A} (l : list (G A)) (def : G A) s : semProdSize (oneOf_ def 
   <--> if l is nil then semProdSize def s else \bigcup_(x in l) semProdSize x s.
 Proof.
 case: l => [|g l].
-  rewrite semBindSize semChooseSize //.
-  rewrite (eq_bigcupl [set 0]) ?bigcup_set1 // => a; split=> [/andP [? ?]|<-] //.
-  by apply/antisym/andP.
-rewrite semBindSize semChooseSize //.
-set X := (fun a : nat => is_true (_ && _)).
-by rewrite (reindex_bigcup (nth def (g :: l)) X) // /X subn1 nth_imset.
+- rewrite semBindSize semChooseSizeNat //.
+  rewrite (eq_bigcupl [set 0]) ?bigcup_set1 // => a; split=> [/andP [? w]|<-] //.
+  change (length [] - 1) with 0 in w. rewrite leqn0 in w. by move: w => /eqP.
+- rewrite semBindSize semChooseSizeNat //.
+  set X := (fun a : nat => is_true (_ && _)).
+  by rewrite (reindex_bigcup (nth def (g :: l)) X) // /X subn1 nth_imset.
 Qed.
 
 Lemma semOneof {A} (l : list (G A)) (def : G A) :
@@ -1160,7 +1182,7 @@ Lemma semElementsSize {A} (l: list A) (def : A) s :
 Proof.
 rewrite semBindSize.
 setoid_rewrite semReturnSize.
-rewrite semChooseSize //=.
+rewrite semChooseSizeNat //=.
 setoid_rewrite nthE. (* SLOW *)
 case: l => [|x l] /=.
   rewrite (eq_bigcupl [set 0]) ?bigcup_set1 // => n.

@@ -1,16 +1,10 @@
-Set Warnings "-extraction-opaque-accessed,-extraction".
 Set Warnings "-notation-overridden,-parsing".
 
-Require Import ZArith List.
-Require Import mathcomp.ssreflect.ssreflect.
-From mathcomp Require Import ssrfun ssrbool ssrnat.
-Require Import Numbers.BinNums.
-Require Import Classes.RelationClasses.
+From Coq Require Import ZArith List RelationClasses ssreflect ssrfun ssrbool.
+From mathcomp Require Import ssrnat.
 
 From ExtLib.Structures Require Export
-     Monads.
-From ExtLib.Structures Require Import
-     Functor Applicative.
+     Functor Applicative Monad.
 Import MonadNotation.
 Open Scope monad_scope.
 
@@ -57,7 +51,7 @@ Definition resizeEnum {A : Type} (n : nat) (g : E A) : E A :=
 
 Definition semEnumSize {A : Type} (g : E A) (s : nat) : set A := fun x => In_ll x (run g s).
 
-Definition chooseEnum {A : Type} `{ChoosableFromInterval A} (range : A * A) : E A :=
+Definition chooseEnum {A : Type} {le} `{ChoosableFromInterval A le} (range : A * A) : E A :=
     MkEnum (fun _ => enumR range). 
 
 Definition sampleEnum (A : Type) (g : E A) : list A :=
@@ -197,57 +191,40 @@ Proof.
       eassumption. eapply semReturnSizeEnum. reflexivity.
 Qed. 
 
-
-Lemma semChooseSize A `{ChoosableFromInterval A} (a1 a2 : A) :
-    RandomQC.leq a1 a2 ->
+Lemma semChooseSizeEnum A {le} `{ChoosableFromInterval A le} (a1 a2 : A) :
+    le a1 a2 ->
     forall size, semProdSize (choose (a1,a2)) size <-->
-                       [set a | RandomQC.leq a1 a && RandomQC.leq a a2].
+                       [set a | le a1 a /\ le a a2].
 Proof.
   move=> /= le_a1a2 m n //=;
   rewrite (enumRCorrect n a1 a2) //=.
 Qed.
-  
-#[global] Instance chooseUnsized {A} `{RandomQC.ChoosableFromInterval A} (a1 a2 : A) :
+
+Lemma semChooseSizeEnumNat (a1 a2 : nat) : a1 <= a2 -> forall size,
+  semProdSize (choose (a1,a2)) size <--> [set a | a1 <= a <= a2].
+Proof.
+  move => /leP H size. rewrite (semChooseSizeEnum nat _ _ H).
+  intros a; apply lele_coq_ssr.
+Qed.
+
+#[global] Instance chooseUnsized {A} {le} `{RandomQC.ChoosableFromInterval A le} (a1 a2 : A) :
     Unsized (choose (a1, a2)).
 Proof. by []. Qed.
   
-Lemma semChoose A `{RandomQC.ChoosableFromInterval A} (a1 a2 : A) :
-    RandomQC.leq a1 a2 ->
-    (semProd (choose (a1,a2)) <--> [set a | RandomQC.leq a1 a && RandomQC.leq a a2]).
+Lemma semChooseEnum A {le} `{RandomQC.ChoosableFromInterval A le} (a1 a2 : A) :
+    le a1 a2 ->
+    (semProd (choose (a1,a2)) <--> [set a | le a1 a /\ le a a2]).
 Proof.
   move=> /= le_a1a2. rewrite <- (unsized_alt_def 1).
   move => m /=. rewrite (enumRCorrect m a1 a2) //.
 Qed.
 
-
-Lemma semChooseEnum A `{RandomQC.ChoosableFromInterval A} (a1 a2 : A) :
-    RandomQC.leq a1 a2 ->
-    (semProd (choose (a1,a2)) <--> [set a | RandomQC.leq a1 a && RandomQC.leq a a2]).
+Lemma semChooseEnumNat (a1 a2 : nat) : a1 <= a2 ->
+  semProd (choose (a1,a2)) <--> [set a | a1 <= a <= a2].
 Proof.
-  move=> /= le_a1a2. rewrite <- (unsized_alt_def 1).
-  move => m /=. rewrite (enumRCorrect m a1 a2) //.
+  move => /leP H. rewrite (semChooseEnum nat (H := ChooseNat) _ _ H).
+  intros a; apply lele_coq_ssr.
 Qed.
-  
-Lemma semChooseSizeEnum A `{ChoosableFromInterval A} (a1 a2 : A) :
-    RandomQC.leq a1 a2 ->
-    forall size, semEnumSize (choose (a1,a2)) size <-->
-                       [set a | RandomQC.leq a1 a && RandomQC.leq a a2].
-Proof. by move=> /= le_a1a2 m n; rewrite (enumRCorrect n a1 a2). Qed.
-
-Lemma  semChooseSizeEmptyEnum :
-    forall A `{RandomQC.ChoosableFromInterval A} (a1 a2 : A),
-      ~ (RandomQC.leq a1 a2) ->
-      forall size, (semProdSize (choose (a1,a2)) size <-->
-                                set0).
-Proof.
-  intros.
-  simpl. intros x; split; intros H1; try now inv H1.
-  unfold semEnumSize, chooseEnum in H1.
-  exfalso. simpl in *. eapply H0.
-  (* This is not provable with the current spec of choose,
-     but maybe is not needed *) 
-Abort.  
-
 
 Lemma semSizedEnum A (f : nat -> E A) :
     semProd (sized f) <--> \bigcup_n semEnumSize (f n) n.
@@ -746,5 +723,3 @@ Proof.
   unfold semProdSize in *. simpl in *.
   unfold semEnumSize in *. simpl in *. eassumption. 
 Qed.
-
-

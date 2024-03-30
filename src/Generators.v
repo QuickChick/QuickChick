@@ -1,18 +1,8 @@
-Set Warnings "-extraction-opaque-accessed,-extraction".
 Set Warnings "-notation-overridden,-parsing".
 
-From Coq Require Import String List ZArith Lia.
-Require Import mathcomp.ssreflect.ssreflect.
-From mathcomp Require Import ssrfun ssrbool ssrnat eqtype seq.
+From Coq Require Import String List ZArith Lia ssreflect ssrfun ssrbool.
+From mathcomp Require Import ssrnat eqtype seq.
 
-(*From ExtLib.Structures Require Export
-     Monads.
-From ExtLib.Structures Require Import
-     Functor Applicative.
-*)
-(* Import MonadNotation.
-Open Scope monad_scope.
-*)
 From QuickChick Require Import
      RandomQC RoseTrees Sets Tactics Producer.
 
@@ -81,7 +71,7 @@ Definition resizeGen {A : Type} (n : nat) (g : G A) : G A :=
 
 Definition semGenSize {A : Type} (g : G A) (s : nat) : set A := codom (run g s).
 
-Definition chooseGen {A : Type} `{ChoosableFromInterval A} (range : A * A) : G A :=
+Definition chooseGen {A : Type} {le} `{ChoosableFromInterval A le} (range : A * A) : G A :=
     MkGen (fun _ r => fst (randomR range r)).
 
 #[global] Program Instance ProducerGen : Producer G :=
@@ -171,24 +161,35 @@ Lemma runPromote A (m : Rose (G A)) seed size :
     run (promote m) seed size = fmapRose (fun (g : G A) => run g seed size) m.
 Proof. by []. Qed.
 
-
 (* Generator specific - choose and its semantics. *)
-Lemma semChooseSize A `{ChoosableFromInterval A} (a1 a2 : A) :
-    RandomQC.leq a1 a2 ->
+Lemma semChooseSizeGen A {le} `{ChoosableFromInterval A le} (a1 a2 : A) :
+    le a1 a2 ->
     forall size, semProdSize (choose (a1,a2)) size <-->
-                       [set a | RandomQC.leq a1 a && RandomQC.leq a a2].
+                       [set a | le a1 a /\ le a a2].
 Proof. by move=> /= le_a1a2 m n; rewrite (randomRCorrect n a1 a2). Qed.
   
-#[global] Instance chooseUnsized {A} `{RandomQC.ChoosableFromInterval A} (a1 a2 : A) :
+#[global] Instance chooseUnsized {A} {le} `{RandomQC.ChoosableFromInterval A le} (a1 a2 : A) :
     Unsized (choose (a1, a2)).
 Proof. by []. Qed.
   
-Lemma semChoose A `{RandomQC.ChoosableFromInterval A} (a1 a2 : A) :
-    RandomQC.leq a1 a2 ->
-    (semProd (choose (a1,a2)) <--> [set a | RandomQC.leq a1 a && RandomQC.leq a a2]).
+Lemma semChooseGen A {le} `{RandomQC.ChoosableFromInterval A le} (a1 a2 : A) :
+    le a1 a2 ->
+    (semProd (choose (a1,a2)) <--> [set a | le a1 a /\ le a a2]).
 Proof.
   move=> /= le_a1a2. rewrite <- (unsized_alt_def 1).
   move => m /=. rewrite (randomRCorrect m a1 a2) //.
+Qed.
+
+Lemma semChooseSizeGenNat (a1 a2 : nat) : a1 <= a2 -> forall size,
+    (semProdSize (choose (a1,a2)) size <--> [set a | a1 <= a <= a2]).
+Proof.
+  move => /leP H0 size. rewrite (semChooseSizeGen (H := ChooseNat) H0). intros a; apply lele_coq_ssr.
+Qed.
+
+Lemma semChooseGenNat (a1 a2 : nat) : a1 <= a2 ->
+    (semProd (choose (a1,a2)) <--> [set a | a1 <= a <= a2]).
+Proof.
+  move => /leP H0. rewrite (semChooseGen (H := ChooseNat) H0). intros a; apply lele_coq_ssr.
 Qed.
 
   Definition thunkGen {A} (f : unit -> G A) : G A :=
@@ -361,29 +362,6 @@ Proof.
     by rewrite -[codom (uncurry _)]imsetT -randomSplit_codom -codom_comp.
 Qed.
 
-Lemma semChooseGen A `{RandomQC.ChoosableFromInterval A} (a1 a2 : A) :
-    RandomQC.leq a1 a2 ->
-    (semProd (choose (a1,a2)) <--> [set a | RandomQC.leq a1 a && RandomQC.leq a a2]).
-Proof.
-  move=> /= le_a1a2. rewrite <- (unsized_alt_def 1).
-  move => m /=. rewrite (randomRCorrect m a1 a2) //.
-Qed.
-
-  
-Lemma semChooseSizeGen A `{ChoosableFromInterval A} (a1 a2 : A) :
-    RandomQC.leq a1 a2 ->
-    forall size, semGenSize (choose (a1,a2)) size <-->
-                       [set a | RandomQC.leq a1 a && RandomQC.leq a a2].
-Proof. by move=> /= le_a1a2 m n; rewrite (randomRCorrect n a1 a2). Qed.
-
-Lemma  semChooseSizeEmptyGen :
-    forall A `{RandomQC.ChoosableFromInterval A} (a1 a2 : A),
-      ~ (RandomQC.leq a1 a2) ->
-      forall size, (semProdSize (choose (a1,a2)) size <-->
-                                set0).
-Admitted.  
-
-
 Lemma semSizedGen A (f : nat -> G A) :
     semProd (sized f) <--> \bigcup_n semGenSize (f n) n.
 Proof. by []. Qed.
@@ -408,7 +386,6 @@ Proof. by case: g => g; rewrite /semGenSize. Qed.
   semBindSize   := @semBindSizeGen;
   semChoose     := @semChooseGen;
   semChooseSize := @semChooseSizeGen;
-  (* semChooseSizeEmpty := @semChooseSizeEmptyGen; *)
   semSized      := @semSizedGen;
   semSizedSize  := @semSizedSizeGen;
   semResize     := @semResizeGen;
@@ -648,7 +625,7 @@ Lemma semFrequencySize {A}
       \bigcup_(x in l') semProdSize x.2 size.
 (* end semFrequencySize *)
 Proof.
-rewrite semBindSize semChooseSize //=.
+rewrite semBindSize semChooseSizeGenNat //=.
 case lsupp: {1}[seq x <- l | x.1 != 0] => [|[n g] gs].
 move/sum_fst_eq0P: lsupp => suml; rewrite suml.
   rewrite (@eq_bigcupl _ _ _ [set 0]) ?bigcup_set1 ?pick_def // ?leqn0 ?suml //.
@@ -685,14 +662,13 @@ Proof.
   - eauto with typeclass_instances.
   - apply unsizedMonotonic.
     apply chooseUnsized.
-  - intros x Heq. eapply semChoose in Heq; eauto.  
+  - intros x Heq. eapply semChooseGenNat in Heq; eauto.
   move : Heq => /andP [Hep1 Heq2]. 
   destruct (sum_fst lg) eqn:Heq.
   + rewrite pick_def. eassumption.
     subst. ssromega.
   + edestruct (pick_exists lg x g0) as [[[n' g] [Hin [Hp Hg]]] H2].
-    rewrite Heq. unfold leq, RandomQC.super, ChooseNat, OrdNat in Hep1, Heq2.
-    ssromega.
+    rewrite Heq. ssromega.
     eapply List.Forall_forall in Hall; [ | ].
     eassumption.
     subst. rewrite Hp. eassumption.
@@ -739,11 +715,9 @@ Proof.
       inv H2.
   - intros x; split; intros Hin.
     + with_strategy opaque [pickDrop] (simpl in Hin). 
-      
       eapply Hbind in Hin.
       inv Hin. inv H.
-      
-      eapply semChooseSize in H0; eauto. simpl in *.
+      eapply semChooseSizeGen in H0; eauto. simpl in *.
       
     (*   destruct (pickDrop_exists l x). simpl in *. destruct H4.       *)
 

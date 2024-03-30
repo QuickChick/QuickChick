@@ -124,6 +124,10 @@ Extract Constant Nat.eqb => "(=)".
 Extract Constant Coq.Init.Nat.eqb => "(=)".
 Extract Constant Nat.div => "(fun x -> function 0 -> 0 | y -> x / y)".
 Extract Constant Coq.Init.Nat.div => "(fun x -> function 0 -> 0 | y -> x / y)".
+Extract Constant Nat.min => "min".
+Extract Constant Nat.max => "max".
+Extract Constant Nat.modulo => "(fun x -> function 0 -> x | y -> x mod y)".
+Extract Constant Nat.leb => "(<=)".
 
 Axiom print_extracted_coq_string : string -> unit.
 Extract Constant print_extracted_coq_string =>

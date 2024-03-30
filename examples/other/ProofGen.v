@@ -17,5 +17,5 @@ Program Definition gen_ty (p : nat) :  G (ty p) :=
   bindPf (choose (0, p)) (fun m H =>
   returnGen (pi p m  _) ).
 Next Obligation.
-  apply semChoose in H; auto.
+  apply semChooseGen in H; lia.
 Defined.
