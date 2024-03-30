@@ -4,12 +4,7 @@
 
 From QuickChick Require Import QuickChick.
 Open Scope qc_scope.
-Set Warnings "-extraction-opaque-accessed,-extraction".
-Set Warnings "-notation-overridden,-parsing".
-
-Require Import List ZArith. Import ListNotations.
-
-From mathcomp Require Import seq ssreflect ssrbool ssrnat eqtype.
+From Coq Require Import List ZArith. Import ListNotations.
 
 (** ** Introduction *)
      
@@ -37,8 +32,8 @@ Fixpoint remove (x : nat) (l : list nat) : list nat :=
     | h::t => if beq_nat h x then t else h :: remove x t
   end.
 
-Definition removeP (x : nat) (l : list nat) := 
-  (~~ (existsb (fun y => beq_nat y x) (remove x l))).
+Definition removeP (x : nat) (l : list nat) : bool :=
+  (negb (existsb (fun y => beq_nat y x) (remove x l))).
 
 (** For this simple example, it is not hard to "spot" the bug by
     inspection. We will use QuickChick to find out what is wrong.

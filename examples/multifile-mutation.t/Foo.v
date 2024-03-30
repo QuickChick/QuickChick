@@ -1,6 +1,3 @@
-Set Warnings "-extraction-opaque-accessed,-extraction".
-Set Warnings "-notation-overridden,-parsing".
-
 From QuickChick Require Import QuickChick.
 Require Import Arith.
 

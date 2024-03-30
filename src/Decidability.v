@@ -1,4 +1,3 @@
-Set Warnings "-extraction-opaque-accessed,-extraction".
 Set Warnings "-notation-overridden,-parsing".
 
 From ExtLib Require Import
@@ -62,9 +61,6 @@ Definition checker_backtrack (l : list (unit -> option bool)) : option bool :=
       | nil => if b then None else Some false
       end
   in aux l false.
-
-(* BCP: If I understand correctly, removing "Global" everywhere would
-   change nothing... Or? *)
 
 (* Additional Checkable instance *)
 #[global] Instance testDec {P} `{H : Dec P} : Checkable P.

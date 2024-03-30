@@ -1,9 +1,8 @@
-Set Warnings "-extraction-opaque-accessed,-extraction".
 Set Warnings "-notation-overridden,-parsing".
 
-Require Import mathcomp.ssreflect.ssreflect.
-From mathcomp Require Import ssrbool ssrnat eqtype.
-Require Import Show Sets Generators Producer RoseTrees Checker Classes.
+From Coq Require Import ssreflect ssrbool.
+From mathcomp Require Import ssrnat eqtype.
+From QuickChick Require Import Show Sets Generators Producer RoseTrees Checker Classes.
 
 Import QcDefaultNotation.
 Local Open Scope set_scope.

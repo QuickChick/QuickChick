@@ -1,8 +1,5 @@
 From QuickChick Require Import QuickChick.
 
-(* begin hide *)
-Set Warnings "-extraction-opaque-accessed,-extraction".
-(* end hide *)
 QCInclude ".".
 
 Parameter plus' : nat -> nat -> nat.

@@ -1,5 +1,4 @@
 From QuickChick Require Import QuickChick.
-Set Warnings "-extraction-opaque-accessed,-extraction".
 
 (* TODO: better naming *)
 

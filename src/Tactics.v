@@ -1,10 +1,7 @@
-Set Warnings "-extraction-opaque-accessed,-extraction".
 Set Warnings "-notation-overridden,-parsing".
 
-From Coq Require Import
-  ZArith Lia.
-Require Import mathcomp.ssreflect.ssreflect.
-From mathcomp Require Import ssrfun ssrbool ssrnat eqtype seq.
+From Coq Require Import ZArith Lia ssreflect ssrfun ssrbool.
+From mathcomp Require Import ssrnat eqtype seq.
 
 Ltac inv H := inversion H; subst.
 

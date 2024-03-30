@@ -1,9 +1,5 @@
-Set Warnings "-extraction-opaque-accessed,-extraction".
-Set Warnings "-notation-overridden,-parsing".
-
 From QuickChick Require Import QuickChick.
 From Coq Require Import Nat Arith.
-Set Default Goal Selector "!".
 
 Extract Constant Test.defNumTests => "1000".
 
