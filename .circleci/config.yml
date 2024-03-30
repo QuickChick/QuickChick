@@ -26,6 +26,7 @@ commands:
     - run:
         name: Install dependencies
         command: |
+            opam update
             opam install --deps-only .
     - run:
         name: List installed packages
