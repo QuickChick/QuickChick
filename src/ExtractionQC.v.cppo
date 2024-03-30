@@ -5,7 +5,6 @@ MAKE SURE TO EDIT THE .cppo SOURCE OF THIS FILE RATHER THAN THE GENERATED RESULT
 
 *)
 
-Set Warnings "-extraction-opaque-accessed,-extraction".
 Set Warnings "-notation-overridden,-parsing".
 
 Require Import ZArith.
@@ -107,8 +106,6 @@ Extract Constant trace =>
     | [] -> s
     | c :: l -> Bytes.set s i c; copy (i+1) l
    in Bytes.to_string (copy 0 l)); flush stdout; fun y -> y)".
-
-Set Extraction AccessOpaque.
 
 Require Import mathcomp.ssreflect.ssreflect.
 From mathcomp Require Import ssreflect ssrnat ssrbool div eqtype.

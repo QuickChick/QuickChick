@@ -30,6 +30,7 @@ Require Export Mutation.
 
 Global Unset Asymmetric Patterns.
 Global Set Bullet Behavior "Strict Subproofs".
+Global Set Warnings "-extraction-reserved-identifier".
 
 (* TODO: Figure out better place for these *)
 (* String and Ascii Instances *)

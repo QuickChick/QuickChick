@@ -1,11 +1,7 @@
-Set Warnings "-extraction-opaque-accessed,-extraction".
 Set Warnings "-notation-overridden,-parsing".
 
-Require Import mathcomp.ssreflect.ssreflect.
 From mathcomp Require Import ssreflect ssrfun ssrbool ssrnat eqtype seq.
-Require Import Classes DependentClasses Checker Show.
-
-Require Import Producer Generators Sets.
+From QuickChick Require Import Classes DependentClasses Checker Show Producer Generators Sets.
 Local Open Scope set_scope.
 
 (* TODO: Derive these *)

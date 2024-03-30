@@ -5,7 +5,6 @@ Require Export Basics.
 From QuickChick Require Import QuickChick.
 Import QcDefaultNotation. Open Scope qc_scope.
 Import GenLow GenHigh.
-Set Warnings "-extraction-opaque-accessed,-extraction".
 Require Import List ZArith.
 Import ListNotations.
 (* 

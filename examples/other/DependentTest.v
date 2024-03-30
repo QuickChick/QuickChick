@@ -1,10 +1,5 @@
-Set Warnings "-extraction-opaque-accessed,-extraction".
-Set Warnings "-notation-overridden,-parsing".
-
 From QuickChick Require Import QuickChick Tactics.
 Require Import String. Open Scope string.
-
-From mathcomp Require Import ssreflect ssrfun ssrbool ssrnat eqtype seq.
 
 Require Import List.
 Import ListNotations.
@@ -197,14 +192,14 @@ Definition genGoodMatch (n : nat) :=
 (* begin good_foo_match_gen *)
   match n with
   | 0 => ret (Some Foo1)
-  | _.+1 => ret None
+  | S _ => ret None
   end
 (* end good_foo_match_gen *)
                         )]
     | S _ => backtrack [(1,
            match n with
            | 0 => ret (Some Foo1)
-           | _.+1 => ret None
+           | S _ => ret None
            end)]
     end
   in fun sz => aux_arb sz sz n.
@@ -256,7 +251,7 @@ Definition DecOptgoodFooPrec_manual (n_ : nat) (foo_ : Foo) :=
           | _ => Some false
           end
          ); fun u:unit => None]
-     | size'.+1 =>
+     | S size' =>
        checker_backtrack
          [(fun u:unit =>
           match foo_0 with
@@ -327,7 +322,7 @@ Definition goodFooNarrow_decOpt (n_ : nat) (foo_ : Foo) :=
              | _ => Some false
              end)
           ; (fun _ : unit => None)]
-      | size'.+1 =>
+      | S size' =>
         checker_backtrack
           [(fun _ : unit =>
              match foo_0 with

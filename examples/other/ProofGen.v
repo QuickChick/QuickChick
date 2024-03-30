@@ -1,14 +1,9 @@
 From QuickChick Require Import QuickChick Tactics.
-Require Import String. Open Scope string.
-
-Set Warnings "-notation-overridden".
-From mathcomp Require Import ssreflect ssrfun ssrbool ssrnat eqtype seq.
-
-Require Import List.
+From Coq Require Import Arith Lia List String.
 Import ListNotations.
-Import QcDefaultNotation. Open Scope qc_scope.
-
-Set Bullet Behavior "Strict Subproofs".
+Import QcDefaultNotation.
+Open Scope string.
+Open Scope qc_scope.
 
 Inductive ty : nat -> Type :=
 | pi : forall n i , i <= n -> ty n.
