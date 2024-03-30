@@ -1,11 +1,5 @@
-Set Warnings "-extraction-opaque-accessed,-extraction".
-Set Warnings "-notation-overridden,-parsing".
-
-Require Import mathcomp.ssreflect.ssreflect.
-From mathcomp Require Import ssrfun ssrbool ssrnat eqtype.
-Require Import ZArith.
-
-Require Import LazyList Tactics.
+From Coq Require Import Relations RelationClasses BoolOrder ssreflect ssrfun Lia ZArith NArith.
+From QuickChick Require Import LazyList Tactics.
 Set Bullet Behavior "Strict Subproofs".
 
 (* We axiomatize a random number generator
@@ -647,9 +641,9 @@ Qed.
    assumptions about them *)
 Axiom randomRBool : bool * bool -> RandomSeed -> bool * RandomSeed.
 Axiom randomRBoolCorrect :
-  forall b b1 b2, implb b1 b2 ->
-    (implb b1 b && implb b b2 <->
-    exists seed, (fst (randomRBool (b1, b2) seed)) = b).
+  forall b b1 b2, Bool.le b1 b2 ->
+    Bool.le b1 b /\ Bool.le b b2 <->
+    exists seed, (fst (randomRBool (b1, b2) seed)) = b.
 Axiom randomRNat  : nat  * nat -> RandomSeed -> nat * RandomSeed.
 Axiom randomRNatCorrect:
   forall n n1 n2, n1 <= n2 ->
@@ -657,14 +651,14 @@ Axiom randomRNatCorrect:
     exists seed, (fst (randomRNat (n1, n2) seed)) = n).
 Axiom randomRInt  : Z * Z    -> RandomSeed -> Z * RandomSeed.
 Axiom randomRIntCorrect:
-  forall z z1 z2, Z.leb z1 z2 ->
-    (Z.leb z1 z && Z.leb z z2 <->
+  forall z z1 z2, Z.le z1 z2 ->
+    (Z.le z1 z /\ Z.le z z2 <->
     exists seed, (fst (randomRInt (z1, z2) seed)) = z).
 Axiom randomRN    : N * N    -> RandomSeed -> N * RandomSeed.
 Axiom randomRNCorrect:
   forall n n1 n2,
-    N.leb n1 n2 ->
-    N.leb n1 n && N.leb n n2 <->
+    N.le n1 n2 ->
+    N.le n1 n /\ N.le n n2 <->
     exists seed, fst (randomRN (n1, n2) seed) = n.
 
 (* A small experiment showing that infinite random trees
@@ -689,91 +683,19 @@ End InfiniteTrees.
 
 (* Type class machinery for generating things in intervals *)
 
-Class OrdType (A: Type) :=
+Class ChoosableFromInterval (A : Type) (le : relation A) : Type :=
   {
-    leq     : A -> A -> bool;
-    refl    : reflexive leq;
-    trans   : transitive leq;
-    antisym : antisymmetric leq
-  }.
-
-#[global]
-Program Instance OrdBool : OrdType bool :=
-  {
-    leq b1 b2 := implb b1 b2
-  }.
-Next Obligation.
-  by case.
-Qed.
-Next Obligation.
-  by do 3! case.
-Qed.
-Next Obligation.
-  by do 2! case.
-Qed.
-
-#[global]
-Program Instance OrdNat : OrdType nat :=
-  {
-    leq := ssrnat.leq;
-    refl := leqnn;
-    trans := leq_trans;
-    antisym := anti_leq
-  }.
-
-#[global]
-Program Instance OrdZ : OrdType Z :=
-  {
-    leq := Z.leb;
-    refl := Z.leb_refl
-  }.
-Next Obligation.
-move=> x y z le_yx le_xz.
-exact: (Zle_bool_trans y x z).
-Qed.
-Next Obligation.
-move=> x y /andP[].
-exact: Zle_bool_antisym.
-Qed.
-
-#[global]
-Program Instance OrdN : OrdType N :=
-  {
-    leq := N.leb;
-    refl := N.leb_refl
-  }.
-Next Obligation.
-  move=> x y z le_yx le_xz.
-  unfold is_true in *.
-  apply N.leb_le in le_yx.
-  apply N.leb_le in le_xz.
-  apply N.leb_le.
-  eapply N.le_trans; eauto.
-Qed.
-Next Obligation.
-  move=> x y /andP[].
-  unfold is_true.
-  repeat rewrite N.leb_le.
-  intros.
-  apply N.le_antisymm; auto.
-Qed.
-
-Class ChoosableFromInterval (A : Type)  :=
-  {
-    super : OrdType A;
     randomR : A * A -> RandomSeed -> A * RandomSeed;
     randomRCorrect :
-      forall (a a1 a2 : A), leq a1 a2 ->
-      (leq a1 a && leq a a2 <->
+      forall (a a1 a2 : A), le a1 a2 ->
+      (le a1 a /\ le a a2 <->
        exists seed, fst (randomR (a1, a2) seed) = a);
     enumR : A * A -> LazyList A;
     enumRCorrect :
-      forall (a a1 a2 : A), leq a1 a2 -> 
-      (leq a1 a && leq a a2 <->
+      forall (a a1 a2 : A), le a1 a2 ->
+      (le a1 a /\ le a a2 <->
        In_ll a (enumR (a1,a2)))
   }.
-#[global]
-Existing Instance super.
 
 (* This is false. 
 #[global]
@@ -787,36 +709,26 @@ Program Instance ChooseBool : ChoosableFromInterval bool :=
 Definition enumRNat (p : nat * nat) :=
   lazy_seq S (fst p) (S (snd p - fst p)).
 
+Lemma iter_S : forall n m, Nat.iter n S m = n + m.
+Proof.
+  induction n; cbn; [ reflexivity | intros; f_equal; apply IHn ].
+Qed.
+
 Lemma enumRNatCorrect : 
   forall (a a1 a2 : nat),
     a1 <= a2 ->
-    (a1 <= a  <= a2 <->
+    (a1 <= a <= a2 <->
      In_ll a (enumRNat (a1,a2))).
 Proof.
-  unfold enumRNat. intros a a1 a2. 
-  replace (a1, a2).1  with a1 by reflexivity.
-  replace ((a1, a2).2 - a1).+1 with ((a2 - a1).+1) by reflexivity.
-  intros Hleq1. simpl in Hleq1. 
-
-  assert ((a2 - a1).+1 > 0) by ssromega.
-  assert (a2 = ((a2 - a1).+1 - 1) + a1) by ssromega.
-  revert H H0. 
-  generalize ((a2 - a1).+1) as n. intros n Hlt Heq.
-  rewrite Heq. clear Heq Hleq1 a2.
-  simpl. revert a1 a. induction n; intros a1 a.
-  - ssromega.
-  - simpl in *. split.
-    + intros Hleq.
-      destruct (Nat.eq_dec a1 a); eauto.
-      right. eapply IHn; ssromega.
-    + intros Hin. destruct Hin. subst. ssromega.
-      destruct n.
-      simpl in *. contradiction.
-      simpl in *. eapply IHn in H; now ssromega.
+  unfold enumRNat. intros a a1 a2 Hleq1. cbn [fst snd].
+  rewrite lazy_seq_spec.
+  split.
+  - intros. exists (a - a1). rewrite iter_S. lia.
+  - intros (i & Hi & Ha). rewrite iter_S in Ha. lia.
 Qed.
-  
+
 #[global]
-Instance ChooseNat : ChoosableFromInterval nat :=
+Instance ChooseNat : ChoosableFromInterval nat Nat.le :=
   {
     randomR := randomRNat;
     randomRCorrect := randomRNatCorrect;
@@ -825,17 +737,27 @@ Instance ChooseNat : ChoosableFromInterval nat :=
   }.
 
 Definition enumRZ (p : Z * Z) :=
-  lazy_seq (Z.add 1%Z) (fst p) (S (Z.to_nat (snd p - fst p))).
+  lazy_seq Z.succ (fst p) (S (Z.to_nat (snd p - fst p))).
 
-Lemma enumRZCorrect : 
-      forall (a a1 a2 : Z), leq a1 a2 ->
-      (leq a1 a && leq a a2 <->
-       In_ll a (enumRZ (a1,a2))).
-Proof. 
-Admitted.
+Lemma iter_Zsucc : forall n m, Nat.iter n Z.succ m = (Z.of_nat n + m)%Z.
+Proof.
+  induction n; cbn [Nat.iter nat_rect]; [ reflexivity | intros ].
+  rewrite Nat2Z.inj_succ Z.add_succ_l. f_equal. apply IHn.
+Qed.
+
+Lemma enumRZCorrect :
+      forall (a a1 a2 : Z), (a1 <= a2 ->
+      a1 <= a <= a2 <-> In_ll a (enumRZ (a1,a2)))%Z.
+Proof.
+  unfold enumRZ. intros a a1 a2 Hleq1. cbn [fst snd].
+  rewrite lazy_seq_spec.
+  split.
+  - intros. exists (Z.to_nat (a - a1))%Z. rewrite iter_Zsucc. lia.
+  - intros (i & Hi & Ha). rewrite iter_Zsucc in Ha. lia.
+Qed.
 
 #[global]
-Instance ChooseZ : ChoosableFromInterval Z :=
+Instance ChooseZ : ChoosableFromInterval Z Z.le :=
   {
     randomR := randomRInt;
     randomRCorrect := randomRIntCorrect;
@@ -844,16 +766,27 @@ Instance ChooseZ : ChoosableFromInterval Z :=
   }.
 
 Definition enumRN (p : N * N) :=
-  lazy_seq N.succ N.one (S (N.to_nat (snd p - fst p))).
+  lazy_seq N.succ (fst p) (S (N.to_nat (snd p - fst p))).
 
-Lemma enumRNCorrect : 
-      forall (a a1 a2 : N), leq a1 a2 ->
-      (leq a1 a && leq a a2 <->
-       In_ll a (enumRN (a1,a2))).
-Admitted.
+Lemma iter_Nsucc : forall n m, Nat.iter n N.succ m = (N.of_nat n + m)%N.
+Proof.
+  induction n; cbn [Nat.iter nat_rect]; [ reflexivity | intros ].
+  rewrite Nat2N.inj_succ N.add_succ_l. f_equal. apply IHn.
+Qed.
+
+Lemma enumRNCorrect :
+      forall (a a1 a2 : N), (a1 <= a2 ->
+      a1 <= a <= a2 <-> In_ll a (enumRN (a1,a2)))%N.
+Proof.
+  unfold enumRN. intros a a1 a2 Hleq1. cbn [fst snd].
+  rewrite lazy_seq_spec.
+  split.
+  - intros. exists (N.to_nat (a - a1))%N. rewrite iter_Nsucc. lia.
+  - intros (i & Hi & Ha). rewrite iter_Nsucc in Ha. lia.
+Qed.
 
 #[global]
-Instance ChooseN : ChoosableFromInterval N :=
+Instance ChooseN : ChoosableFromInterval N N.le :=
   {
     randomR := randomRN;
     randomRCorrect := randomRNCorrect;

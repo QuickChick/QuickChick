@@ -1,7 +1,6 @@
+From Coq Require Import Arith.
 From ExtLib.Structures Require Export
-     Monads.
-From ExtLib.Structures Require Import
-     Functor Applicative.
+     Functor Applicative Monad.
 Require Import List.
 Import ListNotations.
 
@@ -124,12 +123,11 @@ Fixpoint All_ll {A : Type} (P : A -> Prop) (l : LazyList A) : Prop :=
   | lcons h ts => P h /\ All_ll P (ts tt)
   end.
 
-From Coq Require Import ssreflect.
 Lemma lazy_in_map_iff :
   forall (A B : Type) (f : A -> B) (l : LazyList A) (y : B),
   In_ll y (mapLazyList f l) <-> (exists x : A, f x = y /\ In_ll x l).
 Proof.
-  move => A B f l; induction l => y; split => [HIn | [x [Hfx HIn]]].
+  intros A B f l; induction l; intros y; (split; [ intros HIn | intros [x [Hfx HIn] ] ]).
   - inversion HIn.
   - inversion HIn.
   - simpl in *.
@@ -286,6 +284,33 @@ Fixpoint lazy_seq {A : Type}
   | O => lnil
   | S len' => lcons lo (fun tt => lazy_seq s (s lo) len')
   end.
+
+(* Only in stdlib since 8.18 *)
+Lemma iter_succ {A : Type} (s : A -> A) (lo : A) (n : nat)
+  : Nat.iter n s (s lo) = s (Nat.iter n s lo).
+Proof.
+  revert lo; induction n; simpl; intros lo.
+  - reflexivity.
+  - f_equal; apply IHn.
+Qed.
+
+Lemma lazy_seq_spec {A : Type} (s : A -> A) (lo : A) (n : nat) (x : A)
+  : In_ll x (lazy_seq s lo n) <-> exists i, i < n /\ x = Nat.iter i s lo.
+Proof.
+  revert lo x; induction n; cbn.
+  - split; [ contradiction | intros (i & ? & ?); contradiction (Nat.nlt_0_r i) ].
+  - intros lo x; split.
+    + intros [ -> | Hx ].
+      * exists 0. split; [ apply Nat.lt_0_succ | reflexivity ].
+      * apply IHn in Hx. destruct Hx as (i & Hi & Hx).
+        exists (S i). split.
+        { apply (Nat.succ_lt_mono i n); auto. }
+        { rewrite iter_succ in Hx. auto. }
+    + intros (i & Hi & Hx). destruct i; simpl in Hx; auto.
+      right. apply IHn. exists i. split.
+      * apply Nat.succ_lt_mono; auto.
+      * rewrite iter_succ; auto.
+Qed.
 
 Definition mapLazyListProof {A B : Type}
          (l : LazyList A)          

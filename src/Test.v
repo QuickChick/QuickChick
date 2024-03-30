@@ -1,10 +1,5 @@
-Set Warnings "-extraction-opaque-accessed,-extraction".
-
-From Coq Require Import ZArith Ascii String List.
+From Coq Require Import Bool ZArith Ascii String List.
 Import ListNotations.
-
-Set Warnings "-notation-overridden,-parsing".
-From mathcomp Require Import ssreflect ssrnat ssrbool eqtype div.
 
 From ExtLib Require Import
      Structures.Monad.
@@ -74,18 +69,23 @@ Definition doAnalysis       := false.
 Definition stdArgs := MkArgs None defNumTests defNumDiscards
                              defNumShrinks defSize true doAnalysis.
 
-Definition roundTo n m := mult (Nat.div n m) m.
+Definition roundTo n m := (n / m) * m.
+
+(* This matches the formula in Haskell QuickCheck *)
+Definition computeSize'' (maxSize_ maxSuccess_ n d : nat) : nat :=
+  if (roundTo n maxSize_ + maxSize_ <=? maxSuccess_)
+  || (maxSuccess_ <=? n)
+  || (maxSuccess_ mod maxSize_ =? 0)
+  then
+    min (n mod maxSize_ + d / 10) maxSize_
+  else
+    min ((n mod maxSize_) * maxSize_ /
+      (maxSuccess_ mod maxSize_ + d / 10)) maxSize_.
 
 Definition computeSize' (a : Args) (n : nat) (d : nat) : nat :=
-  if (roundTo n (maxSize a) <= maxSuccess a) || (n >= maxSuccess a)
-     || (maxSuccess a %| (maxSize a))
-  then
-    minn (n %% (maxSize a) + d %/ 10) (maxSize a)
-  else
-    minn ((n %% (maxSize a)) * maxSize a %/
-      ((maxSuccess a) %% (maxSize a) + d %/ 10)) (maxSize a).
+  computeSize'' (maxSize a) (maxSuccess a) n d.
 
- Definition at0 (f : nat -> nat -> nat) (s : nat) (n d : nat) :=
+Definition at0 (f : nat -> nat -> nat) (s : nat) (n d : nat) :=
   if andb (Nat.eqb n 0) (Nat.eqb d 0) then s
   else f n d.
 
@@ -119,16 +119,15 @@ Fixpoint insSortBy A (compare : A -> A -> bool) (l : list A) : list A :=
     | h :: t => insertBy compare h (insSortBy compare t)
   end.
 
-Local Open Scope string.
 Fixpoint concatStr (l : list string) : string :=
   match l with
     | nil => ""
     | (h :: t) => h ++ concatStr t
-  end.
+  end%string.
 
 Definition summary (st : State) : list (string * nat) :=
   let res := Map.fold (fun key elem acc => (key,elem) :: acc) (labels st) nil
-  in insSortBy (fun x y => snd y <= snd x) res .
+  in insSortBy (fun x y => snd y <=? snd x) res.
 
 Definition doneTesting (st : State) : Result :=
  if expectedFailure st then
@@ -212,7 +211,8 @@ Fixpoint localMin (st : State) (r : Rose Checker.Result)
   end.
 
 Fixpoint runATest (st : State) (f : nat -> RandomSeed -> QProp) (maxSteps : nat) :=
-  if maxSteps is maxSteps'.+1 then
+  match maxSteps with
+  | S maxSteps' =>
     let size := (computeSize st) (numSuccessTests st) (numDiscardedTests st) in
     let (rnd1, rnd2) := randomSplit (randomSeed st) in
     let test (st : State) :=
@@ -302,11 +302,12 @@ Fixpoint runATest (st : State) (f : nat -> RandomSeed -> QProp) (maxSteps : nat)
                 | Some k => Map.add s_to_add (k+1) ls
                 end
               end in
-          test (MkState mst mdt ms cs nst ndt.+1 ls' e rnd2 nss nts ana)
+          test (MkState mst mdt ms cs nst (S ndt) ls' e rnd2 nss nts ana)
         end
       end
     end
-  else giveUp st.
+  | 0 => giveUp st
+  end%string.
 
 Definition test (st : State) (f : nat -> RandomSeed -> QProp) : Result :=
   if (gte (numSuccessTests st) (maxSuccessTests st)) then
@@ -342,7 +343,7 @@ Definition quickCheckWith {prop : Type} {_ : Checkable prop}
                 (analysis a)  (* analysisFlag      *)
        ) (run (checker p)).
 
-Fixpoint showCollectStatistics (l : list (string * nat)) :=
+Fixpoint showCollectStatistics (l : list (string * nat)) : string :=
   match l with
     | nil => ""
     | cons (s,n) l' =>
@@ -356,7 +357,7 @@ Instance showResult : Show Result := Build_Show _ (fun r =>
   | GaveUp _ l s => showCollectStatistics l ++ s
   | Failure _ _ _ _ _ s l _ => showCollectStatistics l ++ s
   | NoExpectedFailure _ l s => showCollectStatistics l ++ s
-  end).
+  end)%string.
 
 Definition quickCheck {prop : Type} {_ : Checkable prop}
            (p : prop) : Result :=
@@ -384,7 +385,7 @@ Fixpoint testRunner (tests : list Test) : IO unit :=
     print_endline ("Checking " ++ name ++ "...");;
     print_endline (show (quickCheckWith args test));;
     testRunner tests
-  end.
+  end%string.
 
 (* Actually run the tests. (Only meant for extraction.) *)
 Definition runTests (tests : list Test) : io_unit :=
@@ -524,7 +525,7 @@ Fixpoint fuzzLoopAux {A} (fuel : nat) (st : State)
           fuzzLoopAux fuel' (updDiscTests st S) favored' discards' favored_queue' discard_queue' randoms' saved' gen fuzz print prop
       end
     end
-  end.
+  end%string.
 
 Definition fuzzLoopWith {A} (a : Args)
          (gen : G A) (fuzz : A -> G A) (print : A -> string)

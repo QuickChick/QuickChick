@@ -7,10 +7,10 @@ From Coq Require Import
      List
      Recdef
      ZArith
-     Lia.
-From mathcomp Require Import
-     ssrbool
+     Lia
      ssreflect
+     ssrbool.
+From mathcomp Require Import
      ssrnat.
 From QuickChick Require Import
      Classes
@@ -180,21 +180,18 @@ Proof.
   intros t; split; eauto.
   - intros. exact I.
   - intros _. 
-    
-      assert (Hsize := @Enumerators.semChooseSize nat _).
+      assert (Hsize := @Enumerators.semChooseSizeEnumNat).
       simpl in *.
-      
       exists t. exists t. split. exact I. eapply Hsize.
       reflexivity. ssromega.
-Qed.       
+Qed.
 
 #[global] Instance enumNatSized_SizedMonotonic :
   SizedMonotonic (@enumSized _ enumNatSized).
 Proof.
   intros s s1 s2 Hleq. simpl.
   intros x Hin.
-    
-  assert (Hsize := @Enumerators.semChooseSize nat _).
+  assert (Hsize := @Enumerators.semChooseSizeEnumNat).
   eapply Hsize in Hin; eauto.
   simpl in Hin.
   eapply Hsize.
@@ -208,8 +205,7 @@ Qed.
 Proof.
   intros s1 s2 Hleq. simpl.
   intros x Hin.
-
-  assert (Hsize := @Enumerators.semChooseSize nat _).
+  assert (Hsize := @Enumerators.semChooseSizeEnumNat).
   eapply Hsize in Hin; eauto.
   simpl in Hin.
   eapply Hsize. reflexivity. simpl.
@@ -225,8 +221,8 @@ Proof.
   eapply semBindSizeEnum in Hin. destruct Hin as [a [Hin He]].
   assert (Hvec := @semVectorOfSize E _ _). eapply Hvec in He. destruct He as [Heq Hin'].
   eapply semBindSizeEnum. exists a. split.
-  eapply Enumerators.semChooseSize in Hin. simpl in *.
-  eapply Enumerators.semChooseSize. now eauto.
+  eapply Enumerators.semChooseSizeEnumNat in Hin. simpl in *.
+  eapply Enumerators.semChooseSizeEnumNat. now eauto.
   simpl. now ssromega. now eauto.
   eapply Hvec. split; eauto.
 Qed. 
@@ -247,7 +243,7 @@ Proof.
   - split; intros Hin; simpl in *. now constructor.
     eexists 0. eexists 0. split; eauto.
     eapply semBindSizeEnum. eexists. split.
-    eapply Enumerators.semChooseSize. now eauto.
+    eapply Enumerators.semChooseSizeEnum. now eauto.
     2:{ eapply Hvec. split. reflexivity. eapply sub0set. }
     now eauto.
   - split; intros Hin. now constructor.
@@ -257,14 +253,14 @@ Proof.
     destruct He as [y [Hen Hv]].
     eapply Hvec in Hv; eauto with typeclass_instances. destruct Hv as [Heq Hinl].
     subst.
-    eapply Enumerators.semChooseSize in Hen; eauto. simpl in *.
+    eapply Enumerators.semChooseSizeEnumNat in Hen; eauto. simpl in *.
 
     destruct H2. destruct H1. edestruct prodCorrect with (a := a).
     edestruct H2 as [s2 [ _ Hin'] ]. reflexivity.
       
     eexists (x + 1). eexists (s1 + s2). split. reflexivity.
     eapply semBindSizeEnum. exists (length l+1). split.
-    eapply Enumerators.semChooseSize; eauto. simpl in *. ssromega.
+    eapply Enumerators.semChooseSizeEnumNat; eauto. simpl in *. ssromega.
     eapply Hvec. split. simpl. now ssromega.
     eapply cons_subset.
 
@@ -374,13 +370,9 @@ Qed.
 Proof. 
   intros s s1 s2 Hleq. simpl.
   intros x Hin.
-  assert (Hsize := @Enumerators.semChooseSize N _).
-  eapply Hsize in Hin; eauto.
-  simpl in Hin. 
-  eapply Hsize. simpl in *.
-  eapply N.leb_le. now lia. 
-  eapply andb_len in Hin. eapply andb_len. ssromega.
-  simpl. eapply N.leb_le. ssromega. 
+  assert (Hsize := Enumerators.semChooseSizeEnum N).
+  apply Hsize in Hin; [ | lia ].
+  apply Hsize; lia.
 Qed. 
 
 #[global] Instance enumNSized_SizeMonotonic s:
@@ -388,14 +380,9 @@ Qed.
 Proof.
   intros s1 s2 Hleq. simpl.
   intros x Hin.
-
-  assert (Hsize := @Enumerators.semChooseSize N _).
-  
-  eapply Hsize in Hin; eauto.
-  simpl in Hin.
-  eapply Hsize. simpl. eapply N.leb_le. ssromega.
-  eapply andb_len in Hin. eapply andb_len. split; ssromega.
-  eapply N.leb_le. ssromega.
+  assert (Hsize := Enumerators.semChooseSizeEnum N).
+  eapply Hsize in Hin; eauto; [ | lia].
+  apply Hsize; lia.
 Qed.
 
 (* Lemma of_nat_bin t : *)
@@ -414,14 +401,9 @@ Proof.
   intros t; split; eauto.
   - intros. exact I.
   - intros _. 
-    
-      assert (Hsize := @Enumerators.semChooseSize N _).
-      simpl in *.
-      
-      exists (N.to_nat t). exists 0 . split. exact I. eapply Hsize.
-      eapply N.leb_le. ssromega.
-      eapply andb_len. split; ssromega.
-Qed.       
+    assert (Hsize := Enumerators.semChooseSizeEnum N).
+    exists (N.to_nat t). exists 0. split. exact I. eapply Hsize; lia.
+Qed.
   
 #[global] Instance enumBoolSized_SizeMonotonic s:
   SizeMonotonic (@enumSized _ enumBoolSized s).
@@ -593,7 +575,7 @@ Opaque semProdSize.
 Program Instance arbNatMon :
   @SizeMonotonic nat G ProducerGen (@arbitrary nat _).
 Next Obligation.
-  rewrite !semSizedSize !semChooseSize // => n /andP [/leP H1 /leP H2].
+  rewrite !semSizedSize !semChooseSizeNat // => n /andP [/leP H1 /leP H2].
   move : H => /leP => Hle. apply/andP.
   split; apply/leP; ssromega.
 Qed.
@@ -646,7 +628,7 @@ Lemma arbNat_correct:
 Proof.
 rewrite /arbitrary /=.
 rewrite semSized => n; split=> // _; exists n; split=> //.
-by rewrite (semChooseSize _ _ _) /RandomQC.leq /=.
+by rewrite (semChooseSizeNat _ _ _) /=.
 Qed.
 
 #[global]
@@ -660,17 +642,14 @@ Lemma arbInt_correct s :
   [set z | (- Z.of_nat s <= z <= Z.of_nat s)%Z].
 Proof.
 rewrite semSizedSize semChooseSize.
-  by move=> n; split=> [/andP|] [? ?]; [|apply/andP]; split; apply/Zle_is_le_bool.
-apply/(Zle_bool_trans _ 0%Z); apply/Zle_is_le_bool.
-  exact/Z.opp_nonpos_nonneg/Zle_0_nat.
-exact/Zle_0_nat.
+  by move=> n; split=> [|] [? ?]. ssromega.
 Qed.
 
 Lemma arbBool_correctSize s :
   semProdSize arbitrary s <--> [set: bool].
 Proof.
 rewrite /arbitrary //=.
-rewrite semSizedSize semElementsSize //; split=> /RandomQC.leq _ //=; case a=> //=.
+rewrite semSizedSize semElementsSize //; split=> _ //=; case a=> //=.
 repeat (try solve [left; auto]; right).
 repeat (try solve [left; auto]; right).
 Qed.
@@ -678,18 +657,14 @@ Qed.
 Lemma arbNat_correctSize s :
   semProdSize arbitrary s <--> [set n : nat | (n <= s)%coq_nat].
 Proof.
-by rewrite semSizedSize semChooseSize // => n /=; case: leP.
+by rewrite semSizedSize semChooseSizeNat // => n /=; case: leP.
 Qed.
 
 Lemma arbInt_correctSize : semProd arbitrary <--> [set: Z].
 Proof.
 rewrite /arbitrarySized semSized => n; split=> // _; exists (Z.abs_nat n); split=> //.
 simpl.
-rewrite Nat2Z.inj_abs_nat (semChooseSize _ _ _).
-  by case: n => //= p; rewrite !Z.leb_refl.
-apply/(Zle_bool_trans _ 0%Z); apply/Zle_is_le_bool.
-  exact/Z.opp_nonpos_nonneg/Z.abs_nonneg.
-exact/Z.abs_nonneg.
+rewrite Nat2Z.inj_abs_nat (semChooseSize _ _ _); ssromega.
 Qed.
 
 Lemma arbList_correct:
@@ -750,7 +725,6 @@ Lemma arbPair_correctSize
     (semProdSize arbitrary s <--> setX (Sa s) (Sb s)).
 Proof.
   move => Hyp1 Hyp2 .
-  Opaque liftM2.
   simpl.
   rewrite semLiftProd2Size; move => [a b].
   split.

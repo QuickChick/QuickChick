@@ -1,11 +1,9 @@
-Set Warnings "-extraction-opaque-accessed,-extraction".
 Set Warnings "-notation-overridden,-parsing".
 
-Require Import List ZArith Tactics.
+From mathcomp Require Import ssreflect ssrnat eqtype seq.
+From Coq Require Import List ZArith ssreflect ssrfun ssrbool Lia.
+From QuickChick Require Import Tactics.
 Import ListNotations.
-
-Require Import mathcomp.ssreflect.ssreflect.
-From mathcomp Require Import ssreflect ssrfun ssrbool ssrnat eqtype seq.
 
 (* TODO rename this file to util.v -- not only for nats *)
 
