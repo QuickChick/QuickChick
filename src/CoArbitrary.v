@@ -1,5 +1,3 @@
-Set Warnings "-notation-overridden, -parsing".
-
 From Coq Require Import PArith List ChoiceFacts Lia ssreflect ssrbool ssrfun.
 
 From QuickChick Require Import Compat Classes RandomQC Generators Sets.

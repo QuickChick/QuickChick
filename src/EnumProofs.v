@@ -1,18 +1,14 @@
-Require Import String micromega.Lia List.
-
-Require Import Tactics TacticsUtil Instances Classes DependentClasses Sets
-        Producer Enumerators Checker Decidability CheckerProofs.
-
+From Coq Require Import String Lia List ssreflect ssrbool ssrfun.
 Import ListNotations.
-
 From Ltac2 Require Import Ltac2.
 
 Set Warnings "-notation-overwritten, -parsing".
-From mathcomp Require Import ssreflect ssrfun ssrbool ssrnat eqtype seq.
-
-Local Open Scope set_scope.
-
+From mathcomp Require Import ssrnat eqtype seq.
 Set Bullet Behavior "Strict Subproofs".
+
+From QuickChick Require Import Tactics TacticsUtil Instances Classes DependentClasses Sets
+        Producer Enumerators Checker Decidability CheckerProofs.
+Local Open Scope set_scope.
 
 Section Lemmas. 
 
@@ -120,7 +116,7 @@ Section Lemmas.
 
   Lemma semProd_mon {A} (g : nat -> E A) {_ : SizedMonotonic g} :
     forall s1 s2,
-      (s1 <= s2)%coq_nat -> 
+      (s1 <= s2)%coq_nat ->
       semProd (g s1) \subset semProd (g s2).
   Proof.
     intros s1 s2 Hleq.

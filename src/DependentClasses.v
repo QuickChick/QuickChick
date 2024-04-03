@@ -1,10 +1,5 @@
-Set Warnings "-notation-overridden,-parsing".
-
-Require Import String List.
-
-From mathcomp Require Import ssreflect ssrfun ssrbool ssrnat eqtype seq.
-
-Require Import Producer Generators Enumerators Tactics Sets Classes.
+From Coq Require Import String List ssreflect ssrbool.
+From QuickChick Require Import Producer Generators Enumerators Tactics Sets Classes.
 Import ListNotations.
 Import QcDefaultNotation.
 
@@ -478,4 +473,4 @@ Proof.
   induction l; intros b Heq; simpl in *.
   - destruct b; congruence.
   - destruct a; eauto. destruct (ch a) as [ [| ] | ] eqn:Heq'; eauto.
-Qed.    
+Qed.
