@@ -36,16 +36,12 @@ val gIsTrue : GenericLib.coq_expr -> GenericLib.coq_expr
 val gIsTrueTrue : GenericLib.coq_expr
 val false_ind :
   GenericLib.coq_expr -> GenericLib.coq_expr -> GenericLib.coq_expr
-val gfalse : GenericLib.coq_expr
 val discriminate : GenericLib.coq_expr -> GenericLib.coq_expr
 val rewrite :
   GenericLib.coq_expr ->
   GenericLib.coq_expr -> GenericLib.coq_expr -> GenericLib.coq_expr
 val rewrite_sym :
   GenericLib.coq_expr ->
-  GenericLib.coq_expr -> GenericLib.coq_expr -> GenericLib.coq_expr
-val eq_symm : GenericLib.coq_expr -> GenericLib.coq_expr
-val rewrite_symm :
   GenericLib.coq_expr -> GenericLib.coq_expr -> GenericLib.coq_expr
 val lt0_False : GenericLib.coq_expr -> GenericLib.coq_expr
 val nat_ind :
