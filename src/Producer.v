@@ -710,23 +710,23 @@ Section ProducerHigh.
   Definition liftProd4 {A1 A2 A3 A4 R}
              (F : A1 -> A2 -> A3 -> A4 -> R)
              (m1 : G A1) (m2 : G A2) (m3 : G A3) (m4: G A4)
-    : G R := nosimpl(
-                 x1 <- m1;;
-                 x2 <- m2;;
-                 x3 <- m3;;
-                 x4 <- m4;;
-                 ret (F x1 x2 x3 x4)).
+    : G R :=
+    x1 <- m1;;
+    x2 <- m2;;
+    x3 <- m3;;
+    x4 <- m4;;
+    ret (F x1 x2 x3 x4).
 
   Definition liftProd5 {A1 A2 A3 A4 A5 R}
            (F : A1 -> A2 -> A3 -> A4 -> A5 -> R)
            (m1 : G A1) (m2 : G A2) (m3 : G A3) (m4: G A4) (m5 : G A5)
-    : G R := nosimpl(
-                 x1 <- m1;;
-                 x2 <- m2;;
-                 x3 <- m3;;
-                 x4 <- m4;;
-                 x5 <- m5;;
-                 ret (F x1 x2 x3 x4 x5)).
+    : G R :=
+    x1 <- m1;;
+    x2 <- m2;;
+    x3 <- m3;;
+    x4 <- m4;;
+    x5 <- m5;;
+    ret (F x1 x2 x3 x4 x5).
 
   Definition sequenceProd {A : Type} (ms : list (G A)) : G (list A) :=
     foldr (fun m m' => x <- m;;
@@ -734,11 +734,11 @@ Section ProducerHigh.
                        ret (x :: xs)) (ret nil) ms. 
 
   Fixpoint foldProd {A B : Type} (f : A -> B -> G A) (l : list B) (a : A)
-    : G A := nosimpl(
-                 match l with
-                 | nil => ret a
-                 | (x :: xs) => bind (f a x) (foldProd f xs)
-                 end).
+    : G A :=
+    match l with
+    | nil => ret a
+    | (x :: xs) => bind (f a x) (foldProd f xs)
+    end.
 
   Definition bindOpt {A B}
              (g : G (option A)) (f : A -> G (option B)) : G (option B) :=
