@@ -36,7 +36,7 @@
   (coq (>= 8.15~))
   coq-ext-lib
   coq-mathcomp-ssreflect
-  coq-simple-io
+  (coq-simple-io (>= 1.6.0))
   ocamlfind
   ocamlbuild)
 )
