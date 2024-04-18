@@ -1015,7 +1015,7 @@ Ltac2 rec enumST_sound (ty : constr) (ih : ident) :=
     destruct $n; try (now eapply semProdOpt_failEnum in $h; inv $h); enumST_sound ty ih
   (* return Some *)   
   | [ h : semProdOpt (returnEnum (Some _)) _ |- _ ] =>
-    eapply (@semReturnOpt E _ _) in $h; inv $h; first [ now eauto using $ty | now eauto 20 using $ty ]
+    eapply (@semReturnOpt E _ _) in $h; inv $h; first [ now (pose $ty; eauto) | now (pose $ty; eauto 20) ]
   (* return None*)   
   | [ h : semProdOpt (returnEnum (@None ?a)) _ |- _ ] =>
     eapply (@semProdOpt_return_None $a) in $h; inv $h
