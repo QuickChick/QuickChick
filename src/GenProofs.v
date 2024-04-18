@@ -787,7 +787,7 @@ Ltac2 rec genST_sound (ty : constr) (ih : ident) :=
     destruct $n; try (now eapply (@semReturnOpt_None G _ _) in $h; inv $h); genST_sound ty ih
   | (* return *)
     [ h : semProdOpt (returnGen _) _ |- _ ] =>
-    eapply (@semReturnOpt G _ _) in $h; inv $h;  now eauto 20 using $ty
+    eapply (@semReturnOpt G _ _) in $h; inv $h;  now (pose $ty; eauto 20)
   | (* bindOpt *)
     [ h : semProdOpt (bindOpt _ _) _ |- _ ] =>
     eapply (@semOptBindOpt G _ _) in $h >
