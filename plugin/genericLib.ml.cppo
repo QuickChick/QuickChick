@@ -258,6 +258,19 @@ let rec dep_type_len = function
   | DProd (_, dt') -> 1 + dep_type_len dt'
   | _ -> 0
 
+let rec dep_type_variables = function
+  | DProd ((x,_),dt) -> x :: dep_type_variables dt
+  | _ -> []
+
+let rec dep_type_one_relation_variables = function
+  | DTyCtr (_, ds) -> List.concat (List.map dep_type_one_relation_variables ds)
+  | DTyVar x -> [x]
+  | _ -> (*error all args must be abstract*) CErrors.user_err (str "dep_type_one_relation_variables: Not a type variable" ++ fnl())
+
+let rec dep_type_var_types = function
+  | DProd ((x,t),dt) -> (x,t) :: dep_type_var_types dt
+  | _ -> []
+
 (* Option monad *)
 let option_map f ox =
   match ox with
@@ -962,6 +975,93 @@ let is_inductive_dt dt =
   | DTyCtr (c, dts) -> is_inductive c
   | _ -> false
 
+let rec dep_type_relations' i = function
+  | DProd (_,dt2) -> dep_type_relations' i dt2
+  | DArrow (dt1, dt2) -> if is_inductive_dt dt1 then (i,dt1) :: dep_type_relations' (i + 1) dt2 else dep_type_relations' (i + 1) dt2
+  | _ -> []
+  
+let dep_type_relations dt = dep_type_relations' 1 dt
+
+(*Given an inductive type without any arrows or products inside, find the variables within*)
+let rec dep_type_inductive_vars = function
+  | DCtr (_, ds) -> List.concat (List.map dep_type_inductive_vars ds)
+  | DTyCtr (_, ds) -> List.concat (List.map dep_type_inductive_vars ds)
+  | DTyVar x -> [x]
+  | _ -> []
+
+let dep_type_relation_variables (dt :dep_type): (int * var list) list =
+  List.map (fun (i, dt) -> (i, dep_type_inductive_vars dt)) (dep_type_relations dt)
+
+let rec update_key_once (k : 'a) (f : 'b -> 'b) (m : ('a * 'b) list) : ('a * 'b) list = 
+  match m with
+  | [] -> []
+  | (k',v)::m' -> if k = k' then (k, f v) :: m' else (k',v) :: update_key_once k f m'
+  
+
+(*Given a dep_type, construct a map from the variables it binds to the relations that use them*)
+let dep_type_var_relation_uses dt : (var * (int * int) list) list =
+  let tyvars : var list = dep_type_variables dt in
+  let tyrels : (int * dep_type) list = dep_type_relations dt in
+  let tyrelvars : (int * var list) list = List.map (fun (i, dt) -> (i, dep_type_inductive_vars dt)) tyrels in
+  let assoc_cons_aux_aux (index : int) (var_rel_uses : (var * (int * int) list) list) ((arg_index, used_var) : int * var) : (var * (int * int) list) list  = 
+    update_key_once used_var (fun rel_uses -> rel_uses @ [(index, arg_index)]) var_rel_uses in
+  let assoc_cons_aux (var_rel_uses : (var * (int * int) list) list) (index , used_vars) : (var * (int * int) list) list = 
+    List.fold_left (assoc_cons_aux_aux index) var_rel_uses (List.mapi (fun i x -> (i + 1, x)) used_vars) in
+  List.fold_left assoc_cons_aux (List.map (fun (x : var) -> (x, [])) tyvars) tyrelvars
+
+let rec dep_type_hyps_and_concl dt : dep_type list * dep_type = 
+  match dt with
+  | DArrow (dt1, dt2) -> let (hyps, concl) = dep_type_hyps_and_concl dt2 in
+                         (dt1 :: hyps, concl)
+  | DProd ((x,dt1), dt2) -> let (hyps, concl) = dep_type_hyps_and_concl dt2 in
+                            (dt1 :: hyps, concl)
+  | dt -> ([], dt)
+
+let rec permutations (l : 'a list) : 'a list list =
+  let rec insert_everywhere (x : 'a) (l : 'a list) : 'a list list =
+    match l with
+    | [] -> [[x]]
+    | y::ys -> (x::y::ys) :: (List.map (fun l' -> y::l') (insert_everywhere x ys)) in
+  match l with
+  | [] -> [[]]
+  | x::xs -> List.concat (List.map (fun l' -> insert_everywhere x l') (permutations xs))
+
+let delete_int (i : int) (m : (var * int list) list) : (var * int list) list =
+  List.map (fun (x, inds) -> (x, List.filter (fun i' -> i' <> i) inds)) m
+
+let clear_var (x : var) (m : (var * int list) list) : (var * int list) list =
+  List.map (fun (x', inds) -> if x = x' then (x', []) else (x', inds)) m
+
+let safe_assoc (i : 'a) (m : ('a * 'b) list) : 'b =
+  try List.assoc i m with Not_found -> []
+
+
+
+
+let remove_dependencies (i : int) (var_idx : int) (x : var) (var_deps : (var * (int * int) list) list) (ind_deps : (int * var list) list) : ((var * (int * int) list) list) * ((int * var list) list) =
+  let depends = safe_assoc i ind_deps in
+  let new_deps = List.map (fun (i',xs) -> (i', List.filter (fun x' -> x' <> x) xs)) (List.remove_assoc i ind_deps) in
+  let new_var_deps = List.map (fun (x', inds) -> if x = x' then (x, [(i,var_idx)]) else if List.mem x' depends then (x', []) else (x', inds)) var_deps in
+  (new_var_deps, new_deps)
+
+
+(*F |- e : T *)
+
+(*dependency_cost finds how many variables must be universally instantiated to generate this variable for this inductive now*)
+let dependency_cost (i : int) (x : var) (ind_deps : (int * var list) list) : int =
+  let depends = safe_assoc i ind_deps in
+  List.length depends - 1
+
+
+
+
+(* let rec dependency_ord (m : (int * var list) list) (x y : var) : option int = *)
+
+
+
+
+(*let rec select_all_*)
+  
 (* Specialized match *)
 type matcher_pat = 
   | MatchCtr of constructor * matcher_pat list
@@ -1162,6 +1262,8 @@ let g_forAll gen prop = gApp (gInject "QuickChick.Checker.forAll") [gen; prop]
 
 let g_arbitrary = gInject "QuickChick.Classes.arbitrary"
 
+let g_arbitraryST prop = gApp ?explicit:(Some true) (gInject "QuickChick.DependentClasses.arbitraryST") [hole; prop; hole]
+
 let g_quickCheck p = gApp (gInject "QuickChick.Test.quickCheck") [p]
 
 let g_show typ = gApp (gInject "QuickChick.Show.show") [typ]
@@ -1253,7 +1355,8 @@ let declare_class_instance ?(global=true) ?(priority=42) instance_arguments inst
               (true, instance_record_vars) (* TODO: true or false? *)
               { Typeclasses.hint_priority = Some priority; hint_pattern = None }
   in
-  msg_debug (str (Id.to_string cid) ++ fnl ())
+  msg_debug (str (Id.to_string cid) ++ fnl ());
+  cid
 
 let define_new_inductive (ty_ctr, ty_params, ctrs, typ) =
   let me_typename = Id.of_string (string_of_qualid ty_ctr) in
@@ -1570,4 +1673,125 @@ let find_typeclass_bindings typeclass_name ctr =
     ) db;
     !result
 
-    
+(*has_nondep_typeclass_instance *)
+
+(* Given a dep_type, if it is an inductive, extract its name and call find_typeclass_bindings *)
+let find_typeclass_bindings_dep_type (typ_class : string) (dt : dep_type) : (bool list) list =
+  match dt with
+  | DTyCtr (c, dts) -> find_typeclass_bindings typ_class (constructor_to_string c |> injectCtr |> ctr_to_ty_ctr)
+  | _ -> []
+
+let find_arbitrary (dt : dep_type) : coq_expr option =
+  match find_typeclass_bindings_dep_type "Arbitrary" dt with
+  | [] -> None
+  | _ -> Some g_arbitrary
+
+let make_bool_sig (idx : int) (dt : dep_type) : bool list =
+  let len = dep_type_len dt in
+  List.init len (fun i -> i = idx)
+
+let rec freshen_names_in_prop (dt : dep_type) : dep_type =
+  match dt with
+  | DTyCtr (c, dts) -> DTyCtr (c, List.map freshen_names_in_prop dts)
+  | DCtr (c, dts) -> DCtr (c, List.map freshen_names_in_prop dts)
+  | DTyVar x -> DTyVar (fresh_name (var_to_string x))
+
+
+let find_arbitrary_st (x_dt : dep_type) (dt : dep_type) (idx : int) : coq_expr option =
+  match find_typeclass_bindings_dep_type "GenSizedSuchThat" dt with
+  | [] -> None
+  | bindings ->
+     let bool_sig = make_bool_sig idx dt in
+     let freshen_names = freshen_names_in_prop dt in
+     let output_var_name = try List.nth (dep_type_one_relation_variables (freshen_names)) (idx - 1) with _ -> CErrors.user_err (str (dep_type_to_string (freshen_names)) ++ str "\n" ++ str "dep_typ_vars freshname1" ++ str "nth failed: " ++ int (idx - 1) ++ fnl ())
+    in
+     if List.mem bool_sig bindings then Some (g_arbitraryST (gFunWithArgs [gArg ~assumName:(gVar output_var_name) ()] (fun [v] -> gType' [] freshen_names)))
+     else None
+
+let derive_arbitrary dt = g_arbitrary
+
+let derive_arbitrary_st x_dt dt idx =
+  let freshen_names = freshen_names_in_prop dt in
+  let output_var_name = try List.nth (dep_type_one_relation_variables (freshen_names)) (idx - 1) with _ -> CErrors.user_err (str "dep_typ_vars freshname2" ++ str "nth failed: " ++ int (idx - 1) ++ fnl ())
+in
+  g_arbitraryST (gFunWithArgs [gArg ~assumName:(gVar output_var_name) ()] (fun [v] -> gType' [] freshen_names))
+
+let derive_or_find_arbitrary (x_dt : dep_type) : coq_expr =
+  match find_arbitrary x_dt with
+  | Some c -> c
+  | None -> derive_arbitrary x_dt
+  
+let derive_or_find_arbitrary_st (x_dt : dep_type) (dt : dep_type) (idx : int) : coq_expr =
+  match find_arbitrary_st x_dt dt idx with
+  | Some c -> c
+  | None -> derive_arbitrary_st x_dt dt idx
+
+let derive_or_find_generators (x, x_dt, opt_dt) : var * coq_expr * bool =
+  match opt_dt with
+  | None -> (x, derive_or_find_arbitrary x_dt, false)
+  | Some (dt, idx) -> (x, derive_or_find_arbitrary_st x_dt dt idx, true)
+  
+  (*forall (a : nat) b c, P (S a) b -> Q c b -> R c*)
+
+let bindForAlls (generators : (var * coq_expr * bool) list) (concl : coq_expr) : coq_expr =
+  List.fold_right (fun (x,g,hasInductive) acc -> 
+    (*If hasInductive, then I want to generate a pattern match on the variable x as an option, and if it is Some x, then return the acc, else return g_checker gTT*)
+
+    let body = if hasInductive then 
+      construct_match (gVar x) ~catch_all:(Some (g_checker gTT)) [(MatchCtr (injectCtr "Coq.Init.Datatypes.Some", [MatchParameter (inject_ty_param "_"); MatchU x]), acc)]
+               else acc 
+        in 
+    g_forAll g (gFunWithArgs [gArg ~assumName:(gVar x) ()] (fun [_] -> body))) generators concl
+
+let check_remaining_inductives (inductives : dep_type list) (concl : coq_expr) : coq_expr =
+  let decide prop = decOptToBool (g_decOpt prop (gInt 1000)) in
+  List.fold_right (fun ind acc -> gIf (decide (gType' [] ind)) acc (g_checker gTT)) inductives concl
+
+let rec fold_right_manip_remaining (f : 'a -> 'a list -> 'b -> ('b * 'a list)) (l : 'a list) (acc : 'b) : 'b =
+  match l with
+  | [] -> acc
+  | x :: xs -> let (acc', remaining) = f x xs acc in fold_right_manip_remaining f remaining acc'
+
+(*Each element of the list is a triple (variable, variable_type, inductive_relation_binding_the_variable_and_the_index_of_variable_use) *)
+let makeBindings (theorem : dep_type) : ((var * dep_type * (dep_type * int) option) list) * dep_type list =
+  let type_vars = dep_type_var_types theorem in
+  let variable_uses = dep_type_var_relation_uses theorem in
+  let ind_vars = dep_type_relation_variables theorem in
+  let theorem_relations = dep_type_relations theorem in
+  let choose_inductive_binding (v : var) var_uses : (dep_type * int * int) option =
+    match List.assoc_opt v var_uses with
+    | Some ((idx, var_idx) :: _) ->
+      let relation = List.assoc idx theorem_relations in
+      Some (relation, idx, var_idx) 
+    | Some [] -> None
+    | _ -> failwith "makeBindings: variable not found in variable uses"
+    in 
+  let aux (v,t) typed_vars (acc, var_uses, ind_vars) = 
+    match choose_inductive_binding v var_uses with
+    | Some (rel,idx,var_idx) -> 
+      let depends = safe_assoc idx ind_vars in
+      let different_depends = List.filter (fun v' -> v' <> v) depends in
+      let (variables_to_arb,remaining_typed_vars) = List.partition (fun (v',_) -> (List.mem v' different_depends)) typed_vars in
+      let variables_to_arb' = List.map (fun (v',t') -> (v',t',None)) variables_to_arb in
+      let (var_uses', ind_vars') = remove_dependencies idx var_idx v var_uses ind_vars in
+        ((variables_to_arb' @ (v,t,Some (rel,var_idx)) :: acc, var_uses', ind_vars'), remaining_typed_vars)
+    | None -> (((v,t,None) :: acc, var_uses, ind_vars), typed_vars)
+    in
+  let (result, _, ind_vars') = (fold_right_manip_remaining aux type_vars ([], variable_uses, ind_vars)) in
+  (result, List.map (fun (i, _) -> try List.assoc i theorem_relations with _ -> failwith "makeBindings: index not found in theorem relations") ind_vars')
+  (* List.map (fun (v,t) -> (v,t,choose_inductive_binding v)) type_vars *)
+
+
+
+
+  
+  (*Given an association, and the original dep_type, for each variable take... remember to emit variabl deptype pairs at the end of the list*)
+let construct_constrained_generator' (bindings : (var * dep_type * (dep_type * int) option) list) (checked_inductives : dep_type list) (concl : dep_type) : coq_expr =
+  let bound_generators : (var * coq_expr * bool) list = List.map derive_or_find_generators bindings in
+  let decide prop = decOptToBool (g_decOpt prop (gInt 1000)) in
+  bindForAlls bound_generators (check_remaining_inductives checked_inductives (g_checker (decide (gType' [] concl))))
+
+let construct_constrained_generator (theorem : dep_type) : coq_expr =
+  let (bindings, checked_inductives) = makeBindings theorem in
+  let (_,concl) = dep_type_hyps_and_concl theorem in
+  construct_constrained_generator' bindings checked_inductives concl

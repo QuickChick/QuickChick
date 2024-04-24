@@ -10,6 +10,7 @@ MAKE SURE TO EDIT THE .cppo SOURCE OF THIS FILE RATHER THAN THE GENERATED RESULT
   open Error
   open Pp
   open Stdarg
+  open DepDriver
 
 }
 
@@ -91,7 +92,84 @@ let remember_induct h =
         do_remembers to_remember
       )
     end 
-                
+
+  let grab_dependencies = 
+    Proofview.Goal.enter begin fun gl ->
+      
+      (* Convert goal to a constr_expr *)
+      let c = Proofview.Goal.concl gl in
+      let e = Proofview.Goal.env gl in
+      let evd = Evd.from_env e in
+
+      match GenericLib.parse_dependent_type (EConstr.to_constr evd c) with
+      | Some dt ->
+        begin
+          msg_debug (str (GenericLib.dep_type_to_string dt) ++ fnl ());
+          let open GenericLib in
+          let rec printlist : (var * (int * int) list) list -> unit = function
+            | [] -> ()
+            | (var, rels) :: rest ->
+              let tuple_to_string (i,j) = "(" ^ string_of_int i ^ ", " ^ string_of_int j ^ ")" in
+              msg_debug (str (var_to_string var) ++ str " : " ++ str (String.concat ", " (List.map (fun i -> (tuple_to_string i)) rels)) ++ fnl ());
+              printlist rest
+          in
+          printlist (dep_type_var_relation_uses dt);          
+          Tacticals.tclIDTAC
+        end
+      | None -> failwith "Failed to Parse type"
+    end
+
+  let print_typeclass_bindings d c =
+    let open GenericLib in
+    let string_of_bool' = function
+      | true -> "true"
+      | false -> "false" in
+    let the_type = c |> Names.Id.to_string |> injectCtr |> ctr_to_ty_ctr in
+    let the_typeclass = Names.Id.to_string d in
+    let bindings = find_typeclass_bindings the_typeclass the_type in
+    let show_bindings = List.map (List.map string_of_bool') bindings 
+                     |> List.map (String.concat "; ") 
+                     |> List.map (fun s -> "[" ^ s ^ "]")
+                     |> (String.concat ", ") in
+    let bracket_bindings = "{" ^ show_bindings ^ "}" in
+    msg_debug (str bracket_bindings ++ fnl ());
+    Tacticals.tclIDTAC
+  
+  let derive_and_quickchick = 
+    Proofview.Goal.enter begin fun gl ->
+      let c = Proofview.Goal.concl gl in
+      let e = Proofview.Goal.env gl in
+      let evd = Evd.from_env e in
+      
+      match GenericLib.parse_dependent_type (EConstr.to_constr evd c) with
+      | Some dt -> 
+        begin
+          msg_debug (str (GenericLib.dep_type_to_string dt) ++ fnl ());
+          let open GenericLib in 
+          let decide prop = decOptToBool (g_decOpt prop (gInt 1000)) in
+          let rec mkProperty = function
+            | DProd ((var, _),body) -> 
+                g_forAll g_arbitrary (gFun [var_to_string var] (fun [_] ->
+                  mkProperty body
+                  )) 
+            | DArrow (x,y) ->
+              GenericLib.debug_coq_expr (gType' [] x); gIf (decide (gType' [] x)) (mkProperty y) (g_checker gTT)
+            | p -> g_checker (decide (gType' [] p)) 
+                in
+          GenericLib.debug_coq_expr (construct_constrained_generator dt);
+          (* failwith "Ouch!"; *)
+          GenericLib.debug_coq_expr (mkProperty dt);
+          (*run the generator called checker using QuickCheck.*)
+          (*failwith "OUch!";*)
+          let to_run = GenericLib.interp_open_coq_expr e evd (g_show (g_quickCheck (  (construct_constrained_generator dt)))) in
+          (*failwith "Oucher!";*)
+          QuickChick.define_and_run to_run e evd;
+          
+          Tacticals.tclIDTAC
+        end
+      | None -> failwith "Failed to Parse type"
+    end
+    
 let quickchick_goal =
   Proofview.Goal.enter begin fun gl ->
 
@@ -99,6 +177,8 @@ let quickchick_goal =
     let c = Proofview.Goal.concl gl in
     let e = Proofview.Goal.env gl in
     let evd = Evd.from_env e in
+    
+
 (*
     (* Make an evar with the goal as the type *)
     let evd, evar = Evarutil.new_pure_evar (Environ.named_context_val e) evd c in
@@ -121,7 +201,9 @@ let quickchick_goal =
               g_forAll g_arbitrary (gFun [var_to_string var] (fun [_] ->
                 mkProperty body
                 )) 
-          | DArrow (x,y) -> GenericLib.debug_coq_expr (gType' [] x); gIf (decide (gType' [] x)) (mkProperty y) (g_checker gTT)
+          | DArrow (x,y) ->
+                
+            GenericLib.debug_coq_expr (gType' [] x); gIf (decide (gType' [] x)) (mkProperty y) (g_checker gTT)
           | p -> g_checker (decide (gType' [] p)) 
               in
           
@@ -278,6 +360,10 @@ TACTIC EXTEND quickchick
   | ["quickchick"] -> { quickchick_goal }
 END
 
+TACTIC EXTEND derive_and_quickchick
+  | ["derive_and_quickchick"] -> { derive_and_quickchick }
+END
+
 TACTIC EXTEND merge_sound_core
   | ["merge_sound_core"] -> { merge_sound }
 END
@@ -285,3 +371,16 @@ END
 TACTIC EXTEND remember_induct
   | ["remember_induct" ident(h)] -> { remember_induct h }
 END
+
+TACTIC EXTEND grab_dependencies
+  | ["grab_dependencies"] -> { grab_dependencies }
+END
+
+TACTIC EXTEND tc_bindings
+  | ["tc_bindings" ident(d) ident(c)] -> { 
+     print_typeclass_bindings d c
+     
+    }
+END
+
+

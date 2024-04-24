@@ -117,6 +117,17 @@ val dep_type_len : dep_type -> int
 
 val dep_result_type : dep_type -> dep_type
 
+val dep_type_variables : dep_type -> var list
+val dep_type_var_types : dep_type -> (var * dep_type) list
+val dep_type_relations : dep_type -> (int * dep_type) list
+val dep_type_relation_variables : dep_type -> (int * var list) list
+val dep_type_var_relation_uses : dep_type -> (var * (int * int) list) list
+
+val dep_type_hyps_and_concl : dep_type -> (dep_type list * dep_type)
+
+val permutations : 'a list -> 'a list list
+val construct_constrained_generator : dep_type -> coq_expr
+
 (* option type helpers *)
 val option_map : ('a -> 'b) -> 'a option -> 'b option
 val (>>=) : 'a option -> ('a -> 'b option) -> 'b option                                   
@@ -240,6 +251,7 @@ val g_checker : coq_expr -> coq_expr
 (* (\* Gen combinators *\) *)
 val g_forAll : coq_expr -> coq_expr -> coq_expr
 val g_arbitrary : coq_expr
+val g_arbitraryST : coq_expr -> coq_expr 
 val g_quickCheck : coq_expr -> coq_expr
 val g_show : coq_expr -> coq_expr
 
@@ -270,7 +282,7 @@ val fold_ty_vars : (var list -> var -> coq_type -> 'a) -> ('a -> 'a -> 'a) -> 'a
 val declare_class_instance
   : ?global:bool -> ?priority:int
   -> arg list -> string -> (var list -> coq_expr) -> (var list -> coq_expr)
-  -> unit
+  -> Names.Id.t
 
 val define_new_inductive : dep_dt -> unit
 

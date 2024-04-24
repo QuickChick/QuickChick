@@ -9,9 +9,28 @@ Definition to_be_generated :=
   if (x = y)? then checker ((x = 0)?)
   else checker tt)).
 
-(* QuickChickDebug Debug On. *)
-Theorem foo : forall (x y : nat) , x < 8.
-Proof. quickchick. Admitted.
+QuickChickDebug Debug On.
+
+Inductive fooo : nat -> nat -> Prop :=
+| A : fooo 0 0
+| B n : fooo n n -> fooo (S n) n.
+
+Derive DecOpt for (fooo n m).
+
+Derive GenSizedSuchThat for (fun x => fooo x m).
+Derive GenSizedSuchThat for (fun k => fooo x k).
+
+Theorem foo : forall (x y : nat) , fooo x y -> fooo x x -> fooo y x -> fooo 0 x -> x < 8.
+Proof. grab_dependencies. derive_and_quickchick. tc_bindings GenSizedSuchThat fooo. quickchick. Admitted.
+
+Inductive PL : nat -> bool -> Prop :=
+| wg n b : PL n b
+.
+
+Derive ArbitrarySizedSuchThat for (fun n => PL n b).
+Derive ArbitrarySizedSuchThat for (fun b => PL n b).
+
+QuickCheck foo.
 
 Theorem add_comm : forall n m : nat,
   n + m = m + n.
@@ -31,7 +50,8 @@ Proof. quickchick. Admitted.
 
 Inductive bin : Type :=
   | Z
-  | B0 (n : bin)
+| B0 (n : bin)
+     
   | B1 (n : bin)
 .
 
@@ -113,7 +133,7 @@ Proof. quickchick. Admitted.
 
 Theorem rev_injective : forall (l1 l2 : natlist),
   rev' l1 = rev' l2 -> l1 = l2.
-Proof. quickchick. Admitted.
+Proof. grab_dependencies. quickchick. Admitted.
 
 
 
@@ -346,9 +366,9 @@ Proof.
   quickchick. Admitted.
 
 Theorem substi_correct_r : forall s x (ts t' : tm),
-  substi s x ts t' -> subst x s ts = t'.
+  substi s x ts t' -> substi s x ts ts -> subst x s ts = t'.
 Proof.
-  quickchick. Admitted.
+  grab_dependencies. quickchick. Admitted.
 
 
 

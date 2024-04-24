@@ -13,10 +13,10 @@ val derive_dependent :
   UnifyQC.range list ->
   GenericLib.ty_ctr * GenericLib.ty_param list * GenericLib.dep_ctr list *
   GenericLib.dep_type ->
-  GenericLib.var list option -> UnifyQC.unknown -> unit
+  GenericLib.var list option -> UnifyQC.unknown -> Names.Id.t
 val create_t_and_u_maps :
   GenericLib.dep_type option UnifyQC.UM.t ->
   GenericLib.dep_type ->
   (Constrexpr.constr_expr_r CAst.t * 'a) list ->
   UnifyQC.range UnifyQC.UM.t * GenericLib.dep_type UnifyQC.UM.t
-val dep_dispatch : Constrexpr.constr_expr_r CAst.t -> derivable -> unit
+val dep_dispatch : Constrexpr.constr_expr_r CAst.t -> derivable -> Names.Id.t

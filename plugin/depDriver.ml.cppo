@@ -258,7 +258,7 @@ let compat_fromCApp1 (_, x) = x
    - checker-based classes only include the name of the predicate "P". All arguments to P will
      be considered Fixed inputs
  *)
-let dep_dispatch ind class_name : unit =
+let dep_dispatch ind class_name : Names.Id.t =
   match ind with 
 #if COQ_VERSION >= (8, 20, 0)
   | { CAst.v = CLambdaN ([CLocalAssum ([{ CAst.v = Names.Name id; CAst.loc = _loc2 }], _, _kind, _type)], body); _ } -> (* {CAst.v = CApp ((_flag, constructor), args) }) } -> *)
