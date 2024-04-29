@@ -2,7 +2,7 @@
 (using coq 0.3)
 (using menhir 2.0)
 (name coq-quickchick)
-(version dev)
+(version v.2.0+beta.16-53-g1f5a3a2-dirty)
 
 (generate_opam_files true)
 

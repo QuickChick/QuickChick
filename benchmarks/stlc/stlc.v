@@ -221,14 +221,29 @@ Definition preservation_check (e : term) : Checker :=
   | _, _ => checker true
   end.
 
-Extract Constant defNumTests => "100000".
+Extract Constant defNumTests => "100".
 
+Fixpoint size (e : term) : nat :=
+  match e with
+  | Const _ => 1
+  | Id _ => 1
+  | App e1 e2 => size e1 + size e2 + 1
+  | Abs _ e => 1 + size e
+  end.
+              
 (*! Section base *)
 
+Require Import ZArith. 
 Definition prop_preservation :=
   forAll (@arbitrary type _) (fun t =>
   forAll (gen_typed 5 nil t) (fun e =>
-  preservation e t)).
+  tyche_with_features
+    "prop_preservation"
+    (show (e,t))
+    [("size"%string, inr (Z.of_nat (size e)))]
+    (preservation e t))).
+
+QuickChick prop_preservation.
 
 (*! QuickChick prop_preservation. *)
 

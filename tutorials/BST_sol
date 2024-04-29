@@ -1,0 +1,148 @@
+Require Import Arith Bool List ZArith. Import ListNotations.
+From QuickChick Require Import QuickChick. Import QcNotation.
+
+(* Suppress some annoying warnings: *)
+Set Warnings "-extraction-opaque-accessed,-extraction".
+
+Require Export ExtLib.Structures.Monads.
+Export MonadNotation. Open Scope monad_scope.
+
+(* ================================================================= *)
+(** ** Another Precondition: Binary Search Trees *)
+
+(* Let's revisit once again our favorite datatype, binary trees: *)
+
+Inductive Tree A :=
+| Leaf : Tree A
+| Node : A -> Tree A -> Tree A -> Tree A.
+
+Arguments Leaf {A}.
+Arguments Node {A} _ _ _.
+
+Derive (Arbitrary, Show) for Tree.
+(* ==> 
+GenSizedTree is defined
+ShrinkTree is defined 
+ShowTree is defined 
+*)
+
+
+(** Let's look at another precondition: _binary search trees_.
+
+    The [isBST] predicate characterizes trees with elements between
+    [low] and [high]. *)
+
+Fixpoint isBST (low high: nat) (t : Tree nat) := 
+  match t with 
+  | Leaf => true
+  | Node x l r => (low <? x) && (x <? high)
+                  && (isBST low x l) && (isBST x high r)
+  end.
+
+(** Here is a (faulty?) insertion function for binary search trees. *)
+
+Fixpoint insertBST (x : nat) (t : Tree nat) :=
+  match t with 
+  | Leaf => Node x Leaf Leaf
+  | Node x' l r => if x <? x' then Node x' (insertBST x l) r
+                   else Node x' l (insertBST x r)
+  end.
+
+(** We would expect that if we insert an element that is within 
+    the bounds [low] and [high] into a binary search tree, then
+    the result is also a binary search tree. *)
+
+Check implication.
+(* 
+
+     ===> implication : bool -> Checker -> Checker
+*)
+
+(**
+   The _implication_ function takes a boolean (the precondition) and a
+   Checker (the conclusion of the property); if the boolean is true,
+   it tests the Checker, otherwise, it rejects the current test. The _==>_ notation is in _Checker_scope_. 
+
+ *)
+Open Scope Checker_scope.
+
+Definition insertBST_spec (low high : nat) (x : nat) (t : Tree nat) :=
+  (low <? x) ==> 
+  (x <? high) ==> 
+  (isBST low high t) ==> 
+  isBST low high (insertBST x t).                         
+(*
+QuickChick insertBST_spec.
+
+    
+
+    ===> 
+      QuickChecking insertBST_spec
+      0
+      5
+      4
+      Node (4) (Leaf) (Leaf)
+      *** Failed after 85 tests and 1 shrinks. (1274 discards) 
+*)
+
+(** We can see that a bug exists when inserting an element into a
+    [Node] with the same payload: if the element already exists in the
+    binary search tree, we should not change it. *)
+  
+(** However we are wasting too much testing effort.  Indeed, if we fix the
+    bug ... *)
+
+Fixpoint insertBST' (x : nat) (t : Tree nat) :=
+  match t with 
+  | Leaf => Node x Leaf Leaf
+  | Node x' l r => if x <? x' then Node x' (insertBST' x l) r
+                   else if x' <? x then Node x' l (insertBST' x r)
+                   else t
+  end.
+
+Definition insertBST_spec' (low high : nat) (x : nat) (t : Tree nat) :=
+  (low <? x) ==> (x <? high) ==> (isBST low high t) ==> 
+  isBST low high (insertBST' x t).                         
+
+(** ... and try again... *)
+
+(* QuickChick insertBST_spec'.
+
+     ===> 
+     QuickChecking insertBST_spec'
+     *** Gave up! Passed only 1281 tests
+     Discarded: 20000 
+*)
+(** ... we see that 90%% of tests are being discarded. *)
+
+(** **** Exercise: 4 stars, standard (gen_bst)
+
+    Write a generator that produces binary search trees directly, so
+    that you run 10000 tests with 0 discards. *)
+
+(* TOGETHER! *)
+(* SOLUTION: *)
+Fixpoint genBST (low high size : nat) := 
+  match size with 
+  | O => ret Leaf
+  | S size' => 
+    if high - 1 <? low + 1 then ret Leaf
+    else freq [ (1, ret Leaf)
+              ; (size, x <- choose (low+1, high-1);;
+                       l <- genBST low x size';;
+                       r <- genBST x high size';;
+                       ret (Node x l r)) ]
+  end.
+
+Definition bst_checker := 
+  forAllShrink arbitrary shrink (fun low =>
+  forAll (choose (low+5, low + 10)) (fun high => 
+  forAll (choose (low+1, high-1)) (fun x => 
+  forAll (genBST low high 5) (fun t => 
+  isBST low high (insertBST' x t))))).                                
+
+(* QuickChick bst_checker.
+
+    [] *)
+
+(* 2023-01-15 09:18 *)
