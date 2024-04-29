@@ -79,7 +79,9 @@ let gInject s =
   if s = "" then failwith "Called gInject with empty string";
   CAst.make @@ CRef (qualid_of_string s, None)
 
-#if COQ_VERSION >= (8, 19, 0)
+#if COQ_VERSION >= (8, 20, 0)
+let gType0 = CAst.make @@ CSort Constrexpr_ops.expr_Type_sort
+#elif COQ_VERSION >= (8, 19, 0)
 let gType0 = CAst.make @@ CSort (Glob_term.UAnonymous {rigid = UState.UnivRigid})
 #else
 let gType0 = CAst.make @@ CSort (Glob_term.UAnonymous {rigid = true})
