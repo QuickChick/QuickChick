@@ -251,6 +251,11 @@ let compat_fromCApp1 x = x
 let compat_fromCApp1 (_, x) = x
 #endif
 
+let debug_constr_expr c : unit =
+  let env = Global.env () in
+  let sigma = Evd.from_env env in
+  CErrors.anomaly (Pp.str "debug_constr_expr: " ++ Ppconstr.pr_constr_expr env sigma c)
+
 (* Assumption: 
    - generator-based classes include a "fun x => P ...." or "fun x => let (x1,x2,...) := x in P ..."
      where "..." are bound names (to be generated), unbound names (implicitly quantified arguments) 
@@ -267,15 +272,21 @@ let dep_dispatch ind class_name : Names.Id.t =
 #endif
 
     let idu = Unknown.from_string (Names.Id.to_string id ^ "_") in
+
+    let f = function
+      | CAppExpl ((constructor,k), args) -> CRef (constructor,k)
+    in 
      
     (* Extract (x1,x2,...) if any, P and arguments *)
     let (letbindsM, constructor, args) =
       match body with 
       | { CAst.v = CApp (constructor, args); _ } -> (None, compat_fromCApp1 constructor, args)
+      | { CAst.v = CAppExpl ((constructor,k), args); _ } -> (None,  CAst.map f body, List.map (fun x -> (x,None)) args)
       | { CAst.v = CLetTuple (name_list, _,
                               _shouldbeid,
                               { CAst.v = CApp (constructor, args); _ } ); _} ->
          ( Some (List.map (function { CAst.v = name; _ } -> name ) name_list), compat_fromCApp1 constructor, args )
+      | _ -> debug_constr_expr body; failwith "Not supported"
     in
 
     (* Parse the constructor's information into the more convenient generic-lib representation *)
@@ -522,4 +533,5 @@ let dep_dispatch ind class_name : Names.Id.t =
     derive_dependent class_name constructor !umap !tmap input_names input_ranges
       (ty_ctr, ty_params, ctrs, dep_type) None result
   | _ -> qcfail "wrongformat/driver.mlg"
+
 
