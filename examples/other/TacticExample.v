@@ -17,11 +17,70 @@ Inductive fooo : nat -> nat -> Prop :=
 
 Derive DecOpt for (fooo n m).
 
-Derive GenSizedSuchThat for (fun x => fooo x m).
-Derive GenSizedSuchThat for (fun k => fooo x k).
+(*Derive GenSizedSuchThat for (fun x => fooo x m).
+Derive GenSizedSuchThat for (fun k => fooo x k).*)
 
-Theorem foo : forall (x y : nat) , fooo x y -> fooo x x -> fooo y x -> fooo 0 x -> x < 8.
-Proof. grab_dependencies. derive_and_quickchick. tc_bindings GenSizedSuchThat fooo. quickchick. Admitted.
+Theorem foo : forall (x y z : nat) , fooo x z -> fooo x y -> fooo y x -> fooo 0 x -> z < 8.
+Proof. grab_dependencies. tc_bindings GenSizedSuchThat fooo.
+       derive_and_quickchick.
+       derive_and_quickchick.
+
+       tc_bindings GenSizedSuchThat fooo. derived_quickchick. Check GenSizedSuchThatfooo. derive_and_quickchick. Check GenSizedSuchThatfooo. Admitted.
+
+
+Definition bar := 
+      (QuickChick.Checker.forAll QuickChick.Classes.arbitrary
+         (fun y =>
+          QuickChick.Checker.forAll (@QuickChick.DependentClasses.arbitraryST _ (fun x => @fooo x y) _)
+            (fun x =>
+             match x with
+             | @Coq.Init.Datatypes.Some _ x =>
+                 if
+                  match @QuickChick.Decidability.decOpt (@fooo x x) _ 1000%nat with
+                  | Coq.Init.Datatypes.Some res => res
+                  | Coq.Init.Datatypes.None => Coq.Init.Datatypes.false
+                  end
+                 then
+                  if
+                   match @QuickChick.Decidability.decOpt (@fooo y x) _ 1000%nat with
+                   | Coq.Init.Datatypes.Some res => res
+                   | Coq.Init.Datatypes.None => Coq.Init.Datatypes.false
+                   end
+                  then
+                   if
+                    match @QuickChick.Decidability.decOpt (@fooo (Coq.Init.Datatypes.O) x) _ 1000%nat with
+                    | Coq.Init.Datatypes.Some res => res
+                    | Coq.Init.Datatypes.None => Coq.Init.Datatypes.false
+                    end
+                   then
+                    QuickChick.Checker.checker
+                      match
+                        @QuickChick.Decidability.decOpt
+                          (lt x
+                             (Coq.Init.Datatypes.S
+                                (Coq.Init.Datatypes.S
+                                   (Coq.Init.Datatypes.S
+                                      (Coq.Init.Datatypes.S
+                                         (Coq.Init.Datatypes.S
+                                            (Coq.Init.Datatypes.S (Coq.Init.Datatypes.S (Coq.Init.Datatypes.S (Coq.Init.Datatypes.O))))))))))
+                          _ 1000%nat
+                      with
+                      | Coq.Init.Datatypes.Some res => res
+                      | Coq.Init.Datatypes.None => Coq.Init.Datatypes.false
+                      end
+                   else QuickChick.Checker.checker Coq.Init.Datatypes.tt
+                  else QuickChick.Checker.checker Coq.Init.Datatypes.tt
+                 else QuickChick.Checker.checker Coq.Init.Datatypes.tt
+             | _ => QuickChick.Checker.checker Coq.Init.Datatypes.tt
+             end))).
+
+QuickCheck bar.
+
+
+
+Check GenSizedSuchThatfooo.
+Sample (@arbitraryST _ (fun x => fooo x 0) _).
+       tc_bindings GenSizedSuchThat fooo. quickchick. Admitted.
 
 Inductive PL : nat -> bool -> Prop :=
 | wg n b : PL n b

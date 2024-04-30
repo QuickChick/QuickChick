@@ -203,12 +203,12 @@ let remember_induct h =
   let bindForAlls (generators : (var * coq_expr * bool) list) (concl : coq_expr) : coq_expr =
     List.fold_right (fun (x,g,hasInductive) acc -> 
       (*If hasInductive, then I want to generate a pattern match on the variable x as an option, and if it is Some x, then return the acc, else return g_checker gTT*)
-  
+      msg_debug (str "GENERATOR: " ++ str (var_to_string x) ++ str " : " ++ pp_coq_expr g ++ fnl ());
       let body = if hasInductive then 
         construct_match (gVar x) ~catch_all:(Some (g_checker gTT)) [(MatchCtr (injectCtr "Coq.Init.Datatypes.Some", [MatchParameter (inject_ty_param "_"); MatchU x]), acc)]
                  else acc 
           in 
-      g_forAll g (gFunWithArgs [gArg ~assumName:(gVar x) ()] (fun [_] -> body))) generators concl
+      g_forAll g (gFunWithArgs [gArg ~assumName:(gVar x) ()] (fun [_] -> body))) (List.rev generators) concl
   
   let check_remaining_inductives (inductives : dep_type list) (concl : coq_expr) : coq_expr =
     let decide prop = decOptToBool (g_decOpt prop (gInt 1000)) in
@@ -241,7 +241,7 @@ let remember_induct h =
         let (variables_to_arb,remaining_typed_vars) = List.partition (fun (v',_) -> (List.mem v' different_depends)) typed_vars in
         let variables_to_arb' = List.map (fun (v',t') -> (v',t',None)) variables_to_arb in
         let (var_uses', ind_vars') = GenericLib.remove_dependencies idx var_idx v var_uses ind_vars in
-          ((variables_to_arb' @ (v,t,Some (rel,var_idx)) :: acc, var_uses', ind_vars'), remaining_typed_vars)
+          (((v,t,Some (rel,var_idx)) :: variables_to_arb' @ acc, var_uses', ind_vars'), remaining_typed_vars)
       | None -> (((v,t,None) :: acc, var_uses, ind_vars), typed_vars)
       in
     let (result, _, ind_vars') = (fold_right_manip_remaining aux type_vars ([], variable_uses, ind_vars)) in
@@ -279,6 +279,7 @@ let remember_induct h =
           QuickChick.define_and_run to_run e evd; *)
           let e' = Global.env () in
           let constrained_gen = construct_constrained_generator e' dt in
+          debug_coq_expr constrained_gen;
           let updated_env = Global.env () in
           let updated_evd = Evd.from_env updated_env in
           let to_run = GenericLib.interp_open_coq_expr updated_env updated_evd (g_show (g_quickCheck constrained_gen)) in

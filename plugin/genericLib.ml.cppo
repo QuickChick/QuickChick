@@ -59,6 +59,11 @@ let debug_coq_expr (c : coq_expr) : unit =
   let sigma = Evd.from_env env in
   msg_debug (pr_constr_expr env sigma c)
 
+let pp_coq_expr (c : coq_expr) : Pp.t = 
+  let env = Global.env () in
+  let sigma = Evd.from_env env in
+  pr_constr_expr env sigma c
+
 let debug_constr env sigma (c : constr) : unit = 
   msg_debug (Printer.safe_pr_constr_env env sigma c ++ fnl ())
 

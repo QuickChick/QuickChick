@@ -303,4 +303,4 @@ val isBaseBranch : ty_ctr -> coq_type -> bool
                                                 
 val find_typeclass_bindings : ?env_opt:Environ.env option -> string -> ty_ctr -> (bool list) list
 
-                                           
+val pp_coq_expr : coq_expr -> Pp.t                                          
