@@ -2,9 +2,9 @@ Set Warnings "-notation-overridden,-parsing".
 
 Require Import mathcomp.ssreflect.ssreflect.
 From mathcomp Require Import ssrbool.
-From Coq Require Import ZArith Strings.Ascii Strings.String.
-From QuickChick Require Import QuickChick.
-Require Import QuickChickInterface.
+From Coq Require Import Relations ZArith Strings.Ascii Strings.String.
+From QuickChick Require Import LazyList QuickChick.
+From doc Require Import QuickChickInterface.
 
 
 (* This module is just to keep the BasicInterface up-to-date with the implementation. *)
@@ -34,29 +34,23 @@ Module ConsistencyCheck : QuickChickSig.
   Definition suchThatMaybe := @suchThatMaybe.
   Definition suchThatMaybeOpt := @suchThatMaybeOpt.
 
-  Class OrdType (A: Type) :=
-    {
-      leq     : A -> A -> bool;
-      refl    : reflexive leq;
-      trans   : transitive leq;
-      antisym : antisymmetric leq
-    }.
-
-  Definition OrdBool := OrdBool.
-  Definition OrdNat := OrdNat.
-  Definition OrdZ := OrdZ.
-
-  Class ChoosableFromInterval (A : Type)  :=
+  Class ChoosableFromInterval (A : Type) (le : relation A) : Type :=
   {
-    super : OrdType A;
     randomR : A * A -> RandomSeed -> A * RandomSeed;
     randomRCorrect :
-      forall (a a1 a2 : A), leq a1 a2 ->
-      (leq a1 a && leq a a2 <->
-       exists seed, fst (randomR (a1, a2) seed) = a)
+      forall (a a1 a2 : A), le a1 a2 ->
+      (le a1 a /\ le a a2 <->
+       exists seed, fst (randomR (a1, a2) seed) = a);
+    enumR : A * A -> LazyList A;
+    enumRCorrect :
+      forall (a a1 a2 : A), le a1 a2 ->
+      (le a1 a /\ le a a2 <->
+       In_ll a (enumR (a1,a2)))
   }.
+
   #[global] Existing Instance super.
 
+  Definition ChooseN := ChooseN.
   Definition ChooseNat := ChooseNat.
   Definition ChooseZ := ChooseZ.
 

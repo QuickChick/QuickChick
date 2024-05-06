@@ -26,8 +26,8 @@ plugin: compat Makefile.coq
 	$(MAKE) -f Makefile.coq 
 
 documentation-check: plugin
-	coqc -R src QuickChick -I plugin QuickChickInterface.v
-	coqc -R src QuickChick -I plugin DocumentationCheck.v
+	coqc -R src QuickChick -Q doc doc -I plugin doc/QuickChickInterface.v
+	coqc -R src QuickChick -Q doc doc -I plugin doc/DocumentationCheck.v
 
 TEMPFILE := $(shell mktemp)
 
