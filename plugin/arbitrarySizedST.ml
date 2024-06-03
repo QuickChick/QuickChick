@@ -115,10 +115,10 @@ let construct_generators
   let all_gens = List.map handle_branch' ctrs in
   let padNone =
     if List.exists (fun gb -> not (snd gb)) all_gens
-    then [not_enough_fuel_exp full_gtyp] else [] in
+    then [(not_enough_fuel_exp full_gtyp, true)] else [] in
   match kind with
-  | Base_gen -> List.map fst (List.filter snd all_gens) @ padNone
-  | Ind_gen  -> List.map fst all_gens
+  | Base_gen -> (List.filter snd all_gens) @ padNone 
+  | Ind_gen  -> all_gens
               
 let base_gens = construct_generators Base_gen
 let ind_gens  = construct_generators Ind_gen              
@@ -153,15 +153,15 @@ let arbitrarySizedST
     gMatch (gVar size)
       [ (injectCtr "O", [],
          fun _ ->
-           uniform_backtracking
-             (base_gens init_size (gVar size) full_gtyp gen_ctr dep_type ctrs rec_name
-                input_ranges init_umap init_tmap result))
+           let opts = base_gens init_size (gVar size) full_gtyp gen_ctr dep_type ctrs rec_name
+                        input_ranges init_umap init_tmap result in
+           uniform_backtracking (List.map fst opts))
       ; (injectCtr "S", ["size'"],
          fun [size'] ->
-           let weights = List.map (fun (c,_) -> Weightmap.lookup_weight c size') ctrs in
-           backtracking (List.combine weights 
-                           (ind_gens init_size (gVar size') full_gtyp gen_ctr dep_type ctrs rec_name
-                              input_ranges init_umap init_tmap result)))
+           let opts = ind_gens init_size (gVar size') full_gtyp gen_ctr dep_type ctrs rec_name
+                        input_ranges init_umap init_tmap result in
+           let weights = List.map (fun ((c,_),(_,b)) -> Weightmap.lookup_weight b c size') (List.combine ctrs opts) in
+           backtracking (List.combine weights (List.map fst opts)))
       ]
   in
 

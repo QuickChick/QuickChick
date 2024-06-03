@@ -30,6 +30,8 @@ let enumChecker cg xn cf sz =
 let enumCheckerOpt cg xn cf sz = 
   gApp (gInject "enumeratingOpt") [cg; gFun [xn] (fun [x] -> cf x); sz]
 
+let thunkify g =
+  gApp (gInject "thunkGen") [gFun ["tt"] (fun [_] -> g)]
   
 let oneof l =
   match l with
@@ -37,11 +39,23 @@ let oneof l =
   | [c] -> c
   | c::cs -> gApp (gInject "oneOf_") [c; gList l]
 
+let oneofThunked l =
+  match l with
+  | [] -> failwith "oneof used with empty list"
+  | [c] -> c
+  | c::cs -> gApp (gInject "oneOf_") [c; gList (List.map thunkify l)]
+
 let frequency l =
   match l with
   | [] -> failwith "frequency used with empty list"
   | [(_,c)] -> c
   | (_,c)::cs -> gApp (gInject "freq_") [c; gList (List.map gPair l)]
+
+let frequencyThunked l =
+  match l with
+  | [] -> failwith "frequency used with empty list"
+  | [(_,c)] -> c
+  | (_,c)::cs -> gApp (gInject "freq_") [c; gList (List.map (fun (w,g) -> gPair (w, thunkify g)) l)]
 
 let enumerating l =
   gApp (gInject "enumerate") [gList l]
