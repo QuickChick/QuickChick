@@ -155,13 +155,13 @@ let arbitrarySizedST
          fun _ ->
            let opts = base_gens init_size (gVar size) full_gtyp gen_ctr dep_type ctrs rec_name
                         input_ranges init_umap init_tmap result in
-           uniform_backtracking (List.map fst opts))
+           uniform_backtracking (List.map thunkify (List.map fst opts)))
       ; (injectCtr "S", ["size'"],
          fun [size'] ->
            let opts = ind_gens init_size (gVar size') full_gtyp gen_ctr dep_type ctrs rec_name
                         input_ranges init_umap init_tmap result in
            let weights = List.map (fun ((c,_),(_,b)) -> Weightmap.lookup_weight b c size') (List.combine ctrs opts) in
-           backtracking (List.combine weights (List.map fst opts)))
+           backtracking (List.combine weights (List.map thunkify (List.map fst opts))))
       ]
   in
 
