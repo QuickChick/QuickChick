@@ -188,19 +188,19 @@ Derive ArbitrarySizedSuchThat for (fun foo => goodFooMatch n foo).
 Definition genGoodMatch (n : nat) :=
   let fix aux_arb init_size size n := 
     match size with 
-    | 0   => backtrack [(1, 
+    | 0   => backtrack [(1, thunkGen (fun _ =>
 (* begin good_foo_match_gen *)
   match n with
   | 0 => ret (Some Foo1)
   | S _ => ret None
-  end
+  end)
 (* end good_foo_match_gen *)
                         )]
-    | S _ => backtrack [(1,
+    | S _ => backtrack [(1, thunkGen (fun _ =>
            match n with
            | 0 => ret (Some Foo1)
            | S _ => ret None
-           end)]
+           end))]
     end
   in fun sz => aux_arb sz sz n.
 
@@ -221,10 +221,11 @@ Derive ArbitrarySizedSuchThat for (fun foo => goodFooRec n foo).
 Definition genGoodRec (n : nat) :=
   let fix aux_arb (init_size size : nat) n : G (option Foo) := 
     match size with 
-    | 0 => backtrack [(1, ret (Some Foo1)); (1, ret None)]
-    | S size' => backtrack [ (1, ret (Some Foo1))
-                           ; (1, bindOpt (aux_arb init_size size' 0) (fun foo => 
-                                 ret (Some (Foo2 foo)))) ]
+    | 0 => backtrack [(1, thunkGen (fun _ => ret (Some Foo1)))
+                     ;(1, thunkGen (fun _ => ret None))]
+    | S size' => backtrack [ (1, thunkGen (fun _ => ret (Some Foo1)))
+                           ; (S size',thunkGen (fun _ => bindOpt (aux_arb init_size size' 0) (fun foo => 
+                                 ret (Some (Foo2 foo))))) ]
     end
   in fun sz => aux_arb sz sz n.
 (* end gen_good_rec *)
@@ -280,22 +281,22 @@ Definition genGoodPrec (n : nat) : nat -> G (option (Foo)):=
    fix aux_arb init_size size (n : nat) : G (option (Foo)) :=
      match size with
      | O => 
-         backtrack [ (1, ret (Some Foo1))
-                     ; (1, match @decOpt (goodFooPrec O Foo1) _ init_size with
+         backtrack [ (1, thunkGen (fun _ => ret (Some Foo1)))
+                   ; (1, thunkGen (fun _ => match @decOpt (goodFooPrec O Foo1) _ init_size with
                            | Some true => foo <- arbitrary;;
                                           ret (Some foo)
                            | _ => ret None
-                           end)
+                           end))
            ]
 
      | S size' =>
-         backtrack [ (1, ret (Some Foo1))
-                     ; (1, match @decOpt (goodFooPrec O Foo1) _ init_size with
+         backtrack [ (1, thunkGen (fun _ => ret (Some Foo1)))
+                   ; (1, thunkGen (fun _ => match @decOpt (goodFooPrec O Foo1) _ init_size with
                            | Some true => foo <- arbitrary;;
                                           ret (Some foo)
                            | _ => ret None
                            end
-                     )]
+                     ))]
      end in fun sz => aux_arb sz sz n.
 
 Lemma genGoodPrec_equality n : 
@@ -353,15 +354,15 @@ Definition genGoodNarrow (n : nat) : nat -> G (option (Foo)) :=
  let
    fix aux_arb init_size size (n : nat) : G (option (Foo)) :=
      match size with
-     | O => backtrack [(1, ret (Some Foo1)); (1, ret None)]
+     | O => backtrack [(1, thunkGen (fun _ => ret (Some Foo1))); (1, thunkGen (fun _ => ret None))]
      | S size' =>
-         backtrack [ (1, ret (Some Foo1))
-                   ; (1, bindOpt (aux_arb init_size size' 0) (fun foo =>
+         backtrack [ (1, thunkGen (fun _ => ret (Some Foo1)))
+                   ; (S size', thunkGen (fun _ => bindOpt (aux_arb init_size size' 0) (fun foo =>
                          match @decOpt (goodFooNarrow 1 foo) _  init_size with
                          | Some true => ret (Some foo)
                          | _ => ret None
                          end
-                     ))]
+                     )))]
      end in fun sz => aux_arb sz sz n.
 
 Lemma genGoodNarrow_equality n : 
