@@ -27,7 +27,6 @@ commands:
     - run:
         name: Install dependencies
         command: |
-            opam update
             opam install --deps-only .
         no_output_timeout: 30m
     - run:
