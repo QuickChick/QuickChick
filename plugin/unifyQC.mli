@@ -30,11 +30,11 @@ val umfind : UM.key -> 'a UM.t -> 'a
 val lookup : unknown -> umap -> range option
 module OrdTSS :
   sig type t = unknown * unknown val compare : 'a -> 'a -> int end
-module EqSet : Set.S with type elt = OrdTSS.t
+module EqSet : CSet.ExtS with type elt = OrdTSS.t
 val eq_set_add : unknown -> unknown -> EqSet.t -> EqSet.t
 module OrdTyp :
   sig type t = GenericLib.dep_type val compare : 'a -> 'a -> int end
-module ArbSet : Set.S with type elt = OrdTyp.t
+module ArbSet : CSet.ExtS with type elt = OrdTyp.t
 type unknown_provider = { next_unknown : unit -> Unknown.t; }
 val unk_provider : unknown_provider
 val raiseMatch :
