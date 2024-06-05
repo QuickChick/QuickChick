@@ -25,9 +25,13 @@ val enumCheckerOpt :
   GenericLib.coq_expr ->
   string -> (GenericLib.var -> GenericLib.coq_expr) ->
   GenericLib.coq_expr -> GenericLib.coq_expr
-  
+
+val thunkify : GenericLib.coq_expr -> GenericLib.coq_expr
 val oneof : GenericLib.coq_expr list -> GenericLib.coq_expr
+val oneofThunked : GenericLib.coq_expr list -> GenericLib.coq_expr
 val frequency :
+  (GenericLib.coq_expr * GenericLib.coq_expr) list -> GenericLib.coq_expr
+val frequencyThunked :
   (GenericLib.coq_expr * GenericLib.coq_expr) list -> GenericLib.coq_expr
 val backtracking :
   (GenericLib.coq_expr * GenericLib.coq_expr) list -> GenericLib.coq_expr
