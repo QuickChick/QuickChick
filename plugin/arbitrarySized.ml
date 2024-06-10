@@ -1,25 +1,27 @@
 open Util
 open GenericLib
 open GenLib
-open Error
 
-let arbitrarySized_decl (types : (ty_ctr * ctr_rep list) list) : (ty_ctr -> var list -> coq_expr) * ((var * (var * coq_expr) list * var * coq_expr * coq_expr) list) =
+let arbitrarySized_decl (types : (ty_ctr * ty_param list * ctr_rep list) list) : (ty_ctr -> var list -> coq_expr) * ((var * arg list * var * coq_expr * coq_expr) list) =
   let impl_function_names : (ty_ctr * var) list =
-    List.map (fun (ty, _) -> 
+    List.map (fun (ty, _, _) ->
       let type_name = ty_ctr_to_string ty in
       let function_name = fresh_name ("arbitrarySized_impl_" ^ type_name) in
 
       (ty, function_name)
     ) types in
 
-  let generate_arbitrarySized_function ((ty, ctors) : (ty_ctr * ctr_rep list)) : var * (var * coq_expr) list * var * coq_expr * coq_expr =
+  let generate_arbitrarySized_function ((ty, ty_params, ctors) : (ty_ctr * ty_param list * ctr_rep list)) : var * arg list * var * coq_expr * coq_expr =
     let function_name = List.assoc ty impl_function_names in
+
+    let coqTyParams = List.map gTyParam ty_params in
+    let full_type = gApp ~explicit:true (gTyCtr ty) coqTyParams in
 
     let arg = fresh_name "size" in
     let arg_type = (gInject "Coq.Init.Datatypes.nat") in
 
     (* G ty *)
-    let return_type = gApp (gInject "QuickChick.Generators.G") [gTyCtr ty] in
+    let return_type = gApp (gInject "QuickChick.Generators.G") [full_type] in
 
     let find_ty_ctr = function
     | TyCtr (ty_ctr', _) -> List.assoc_opt ty_ctr' impl_function_names
@@ -31,10 +33,6 @@ let arbitrarySized_decl (types : (ty_ctr * ctr_rep list) list) : (ty_ctr -> var 
     let base_branches =
       List.filter (fun (_, ty) -> is_base_branch ty) ctors in
 
-    (* TODO: implement this back *)
-    (* let tyParams = [List.map gVar (list_drop_every 2 iargs)] in *)
-    let tyParams = [] in
-
     let create_for_branch size (ctr, ty) =
       let rec aux i acc ty : coq_expr =
         match ty with
@@ -45,7 +43,7 @@ let arbitrarySized_decl (types : (ty_ctr * ctr_rep list) list) : (ty_ctr -> var 
                 | None -> gInject "arbitrary")
               (Printf.sprintf "p%d" i)
               (fun pi -> aux (i+1) ((gVar pi) :: acc) ty2)
-        | _ -> returnGen (gApp ~explicit:true (gCtr ctr) (tyParams @ List.rev acc))
+        | _ -> returnGen (gApp ~explicit:true (gCtr ctr) (coqTyParams @ List.rev acc))
       in aux 0 [] ty in
     let body = gMatch (gVar arg) [
       (
@@ -62,18 +60,19 @@ let arbitrarySized_decl (types : (ty_ctr * ctr_rep list) list) : (ty_ctr -> var 
     ] in
     debug_coq_expr body;
 
-    (function_name, [(arg, arg_type)], arg, return_type, body) in
+    (function_name, [gArg ~assumName:(gVar arg) ~assumType:arg_type ()], arg, return_type, body) in
 
   let functions = List.map generate_arbitrarySized_function types in
 
-  (* returns {| arbitrarySized := arbitrarySized_impl_... |} *)
+  (* returns {| arbitrarySized := @arbitrarySized_impl_... |} *)
   let instance_record ty_ctr ivars : coq_expr =
-    if List.length ivars > 0 then
-      (* This might be a regression compared to the version without support for mutual induction. *)
-      qcfail "Not implemented";
-
     let impl_function_name = List.assoc ty_ctr impl_function_names in
-    gRecord [("arbitrarySized", gVar impl_function_name)] in
+    let implicit_arguments = List.map gVar ivars in
+
+    gRecord [
+      ("arbitrarySized",
+        gApp ~explicit:true (gVar impl_function_name) implicit_arguments)
+    ] in
   
   (instance_record, functions)
 
@@ -83,23 +82,26 @@ let rec replace v x = function
       then x::ys
       else y::(replace v x ys)
 
-let shrink_decl (types : (ty_ctr * ctr_rep list) list) : (ty_ctr -> var list -> coq_expr) * ((var * (var * coq_expr) list * var * coq_expr * coq_expr) list) =
+let shrink_decl (types : (ty_ctr * ty_param list * ctr_rep list) list) : (ty_ctr -> var list -> coq_expr) * ((var * arg list * var * coq_expr * coq_expr) list) =
   let impl_function_names : (ty_ctr * var) list =
-    List.map (fun (ty, _) -> 
+    List.map (fun (ty, _, _) -> 
       let type_name = ty_ctr_to_string ty in
       let function_name = fresh_name ("shrink_impl_" ^ type_name) in
 
       (ty, function_name)
     ) types in
 
-  let generate_show_function ((ty, ctors) : (ty_ctr * ctr_rep list)) : var * (var * coq_expr) list * var * coq_expr * coq_expr =
+  let generate_shrink_function ((ty, ty_params, ctors) : (ty_ctr * ty_param list * ctr_rep list)) : var * arg list * var * coq_expr * coq_expr =
     let function_name = List.assoc ty impl_function_names in
 
-    let arg = fresh_name "x" in
-    let arg_type = gTyCtr ty in
+    let coqTyParams = List.map gTyParam ty_params in
+    let full_type = gApp ~explicit:true (gTyCtr ty) coqTyParams in
 
-    (* ty list *)
-    let return_type = gApp (gInject "Coq.Init.Datatypes.list") [gTyCtr ty] in
+    let arg = fresh_name "x" in
+    let arg_type = full_type in
+
+    (* full_type list *)
+    let return_type = gApp (gInject "Coq.Init.Datatypes.list") [full_type] in
 
     let is_current_ty_crt = function
     | TyCtr (ty_ctr', _) -> ty = ty_ctr'
@@ -109,10 +111,6 @@ let shrink_decl (types : (ty_ctr * ctr_rep list) list) : (ty_ctr -> var list -> 
     | TyCtr (ty_ctr', _) -> List.assoc_opt ty_ctr' impl_function_names
     | _ -> None in
 
-    (* TODO: implement this back *)
-    (* let tyParams = [List.map gVar (list_drop_every 2 iargs)] in *)
-    let tyParams = [] in
-
     let create_branch (ctr, ty) = (
       ctr,
       generate_names_from_type "p" ty,
@@ -121,7 +119,7 @@ let shrink_decl (types : (ty_ctr * ctr_rep list) list) : (ty_ctr -> var list -> 
           let liftNth =
             gFun ["shrunk"]
             (fun [shrunk] ->
-              gApp ~explicit:true (gCtr ctr) (tyParams @ (replace (gVar v) (gVar shrunk) (List.map gVar allParams))))
+              gApp ~explicit:true (gCtr ctr) (coqTyParams @ (replace (gVar v) (gVar shrunk) (List.map gVar allParams))))
           in
 
           lst_appends (match find_ty_ctr ty' with
@@ -139,35 +137,39 @@ let shrink_decl (types : (ty_ctr * ctr_rep list) list) : (ty_ctr -> var list -> 
     let body = gMatch (gVar arg) (List.map create_branch ctors) in
     debug_coq_expr body;
 
-    (function_name, [(arg, arg_type)], arg, return_type, body) in
+    (function_name, [gArg ~assumName:(gVar arg) ~assumType:arg_type ()], arg, return_type, body) in
 
-  let functions = List.map generate_show_function types in
+  let functions = List.map generate_shrink_function types in
 
-  (* returns {| shrink := show_impl_... |} *)
+  (* returns {| shrink := @show_impl_... |} *)
   let instance_record ty_ctr ivars : coq_expr =
-    if List.length ivars > 0 then
-      (* This might be a regression compared to the version without support for mutual induction. *)
-      qcfail "Not implemented";
-
     let impl_function_name = List.assoc ty_ctr impl_function_names in
-    gRecord [("shrink", gVar impl_function_name)] in
+    let implicit_arguments = List.map gVar ivars in
+
+    gRecord [
+      ("shrink",
+        gApp ~explicit:true (gVar impl_function_name) implicit_arguments)
+    ] in
   
   (instance_record, functions)
 
-let show_decl (types : (ty_ctr * ctr_rep list) list) : (ty_ctr -> var list -> coq_expr) * ((var * (var * coq_expr) list * var * coq_expr * coq_expr) list) =
+let show_decl (types : (ty_ctr * ty_param list * ctr_rep list) list) : (ty_ctr -> var list -> coq_expr) * ((var * arg list * var * coq_expr * coq_expr) list) =
   let impl_function_names : (ty_ctr * var) list =
-    List.map (fun (ty, _) -> 
+    List.map (fun (ty, _, _) -> 
       let type_name = ty_ctr_to_string ty in
       let function_name = fresh_name ("show_impl_" ^ type_name) in
 
       (ty, function_name)
     ) types in
 
-  let generate_show_function ((ty, ctors) : (ty_ctr * ctr_rep list)) : var * (var * coq_expr) list * var * coq_expr * coq_expr =
+  let generate_show_function ((ty, ty_params, ctors) : (ty_ctr * ty_param list * ctr_rep list)) : var * arg list * var * coq_expr * coq_expr =
     let function_name = List.assoc ty impl_function_names in
 
+    let coqTyParams = List.map gTyParam ty_params in
+    let full_type = gApp ~explicit:true (gTyCtr ty) coqTyParams in
+
     let arg = fresh_name "x" in
-    let arg_type = gTyCtr ty in
+    let arg_type = full_type in
 
     let return_type = gInject "Coq.Strings.String.string" in
 
@@ -197,7 +199,7 @@ let show_decl (types : (ty_ctr * ctr_rep list) list) : (ty_ctr -> var list -> co
     (* match x with | Ctr p0 p1 ... pn -> "Ctr " ++ (...) ++ " " ++ (...) *)
     let body = gMatch (gVar arg) (List.map branch ctors) in
 
-    (function_name, [(arg, arg_type)], arg, return_type, body) in
+    (function_name, [gArg ~assumName:(gVar arg) ~assumType:arg_type ()], arg, return_type, body) in
 
   let functions = List.map generate_show_function types in
 
