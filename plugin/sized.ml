@@ -10,30 +10,68 @@ let sizeM = gInject "QuickChick.Classes.size"
 let succ_zero x = false_ind hole (succ_neq_zero_app hole x)
 let base_ctrs ty_ctr ctrs = List.filter (fun (_, ty) -> isBaseBranch ty_ctr ty) ctrs
 
-(* Produces the record of the sized typeclass *)                          
-let sized_decl ty_ctr ctrs =
-  let sizeOf_body x =
-    (* For each constructor ctr of type ty: *)
-    let create_branch rec_name (ctr, ty) =
-      (ctr, generate_names_from_type "p" ty,
-       (* if the constructor is not recursive, then it doesn't contribute to the depth *)
-       if isBaseBranch ty_ctr ty then fun _ -> gInt 0
-       (* Otherwise we recursively calculate the size of each recursive argument *)
-       else
-         fun vs ->
-           let opts = fold_ty_vars (fun _ v ty' ->
-               if sameTypeCtr ty_ctr ty' then [(gApp (gVar rec_name) [gVar v])]
-               else []) (fun l1 l2 -> l1 @ l2) [] ty vs
-           in
-           (* And compute the maximum *)
-           gApp (gInject "S") [maximum opts])
-    in
-    gRecFunIn "aux_size" ["x'"]
-      (fun (aux_size, [x']) -> gMatch (gVar x') (List.map (create_branch aux_size) ctrs))
-      (fun aux_size -> gApp (gVar aux_size) [gVar x])
-  in
-  gRecord [("size", gFun ["x"] (fun [x] -> sizeOf_body x))]
-                          
+(* Produces the record of the sized typeclass *)
+let sized_decl (types : (ty_ctr * ctr_rep list) list) : (ty_ctr -> var list -> coq_expr) * ((var * (var * coq_expr) list * var * coq_expr * coq_expr) list) =
+  let impl_function_names : (ty_ctr * var) list =
+    List.map (fun (ty, _) -> 
+      let type_name = ty_ctr_to_string ty in
+      let function_name = fresh_name ("size_impl_" ^ type_name) in
+
+      (ty, function_name)
+    ) types in
+
+  let generate_size_function ((ty, ctors) : (ty_ctr * ctr_rep list)) : var * (var * coq_expr) list * var * coq_expr * coq_expr =
+    let function_name = List.assoc ty impl_function_names in
+
+    let arg = fresh_name "x" in
+    let arg_type = gTyCtr ty in
+
+    let return_type = gInject "Coq.Init.Datatypes.nat" in
+
+    let is_current_ty_crt = function
+    | TyCtr (ty_ctr', _) -> ty = ty_ctr'
+    | _ -> false in
+
+    (* Note: the size of an object do not take into consideration the size of
+        other objetcts it might contain, besides objects of its own type.
+        
+        So actually we don't even need a fixpoint... but for now, we'll create one anyway
+        for simplicity. *)
+
+    let is_base_branch ty =
+      fold_ty' (fun b ty' -> b && not (is_current_ty_crt ty')) true ty in
+
+    let create_branch (ctr, ty) = (
+        ctr,
+        generate_names_from_type "p" ty,
+
+        if is_base_branch ty
+        then fun _ -> gInt 0
+        else fun vs ->
+          let opts = fold_ty_vars (fun _ v ty' ->
+                if is_current_ty_crt ty'
+                then [ gApp (gVar function_name) [gVar v] ]
+                else []
+              )
+              (fun l1 l2 -> l1 @ l2)
+              [] ty vs
+          in
+          gApp (gInject "S") [maximum opts]
+      ) in
+    let body = gMatch (gVar arg) (List.map create_branch ctors) in
+    debug_coq_expr body;
+
+    (function_name, [(arg, arg_type)], arg, return_type, body) in
+
+  let functions = List.map generate_size_function types in
+
+  (* returns {| size := size_impl_... |} *)
+  let instance_record ty_ctr _ivars : coq_expr =
+    let impl_function_name = List.assoc ty_ctr impl_function_names in
+    gRecord [("size", gVar impl_function_name)] in
+  
+  (instance_record, functions)
+
 let rec gen_args cty c_ctr n =
   match cty with
   | Arrow (ty1, ty2) ->

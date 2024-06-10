@@ -422,7 +422,7 @@ let qcFuzz_main prop_def temp_dir execn prop_mlf prop_mlif warnings prop fuzzLoo
                                        ((match qualid_of_reference x with {CAst.v = q; _} -> q)))) !extract_manually;
                                        *)      
   List.iter (fun r ->
-      match GenericLib.dt_rep_from_mib (GenericLib.qualid_to_mib r) with
+      match GenericLib.sdt_rep_from_mib (GenericLib.qualid_to_mib r) with
       | Some (ty_ctr, ty_params, ctrs) -> begin
           (*          print_endline "Extracting inductive..."; *)
           let ty_ctr_name = qualify (String.uncapitalize_ascii (GenericLib.ty_ctr_to_string ty_ctr)) in

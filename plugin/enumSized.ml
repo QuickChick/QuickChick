@@ -1,121 +1,75 @@
-open Pp
 open Util
 open GenericLib
 open GenLib
 open Error
-   
-(* Derivation of EnumSized. Contains mostly code from derive.ml *)
 
-let rec replace v x = function
-  | [] -> []
-  | y::ys -> if y = v then x::ys else y::(replace v x ys)
+let enumSized_decl (types : (ty_ctr * ctr_rep list) list) : (ty_ctr -> var list -> coq_expr) * ((var * (var * coq_expr) list * var * coq_expr * coq_expr) list) =
+  let impl_function_names : (ty_ctr * var) list =
+    List.map (fun (ty, _) -> 
+      let type_name = ty_ctr_to_string ty in
+      let function_name = fresh_name ("enumSized_impl_" ^ type_name) in
 
-let enumSized_body (ty_ctr : ty_ctr) (ctrs : ctr_rep list) iargs = 
+      (ty, function_name)
+    ) types in
+
+  let generate_enumSized_function ((ty, ctors) : (ty_ctr * ctr_rep list)) : var * (var * coq_expr) list * var * coq_expr * coq_expr =
+    let function_name = List.assoc ty impl_function_names in
+
+    let arg = fresh_name "size" in
+    let arg_type = (gInject "Coq.Init.Datatypes.nat") in
+
+    (* E ty *)
+    let return_type = gApp (gInject "QuickChick.Enumerators.E") [gTyCtr ty] in
+
+    let find_ty_ctr = function
+    | TyCtr (ty_ctr', _) -> List.assoc_opt ty_ctr' impl_function_names
+    | _ -> None in
+
+    (* a base branch is a constructor that doesn't require our ty_ctr to be used *)
+    let is_base_branch ty =
+      fold_ty' (fun b ty' -> b && (None = (find_ty_ctr ty'))) true ty in
+    let base_branches =
+      List.filter (fun (_, ty) -> is_base_branch ty) ctors in
+
+    (* TODO: implement this back *)
+    (* let tyParams = [List.map gVar (list_drop_every 2 iargs)] in *)
+    let tyParams = [] in
+
+    let create_for_branch size (ctr, ty) =
+      let rec aux i acc ty : coq_expr =
+        match ty with
+        | Arrow (ty1, ty2) ->
+            bindEnum
+              (match find_ty_ctr ty1 with
+                | Some name -> gApp (gVar name) [gVar size]
+                | None -> gInject "enum")
+              (Printf.sprintf "p%d" i)
+              (fun pi -> aux (i+1) ((gVar pi) :: acc) ty2)
+        | _ -> returnEnum (gApp ~explicit:true (gCtr ctr) (tyParams @ List.rev acc))
+      in aux 0 [] ty in
+    let body = gMatch (gVar arg) [
+      (
+        injectCtr "O", [],
+        fun _ -> oneof (List.map (create_for_branch arg) base_branches)
+      );
+      (
+        injectCtr "S", ["size'"],
+        fun [size'] -> oneof (List.map (create_for_branch size') ctors)
+      )
+    ] in
+    debug_coq_expr body;
+
+    (function_name, [(arg, arg_type)], arg, return_type, body) in
+
+  let functions = List.map generate_enumSized_function types in
+
+  (* returns {| enumSized := enumSized_impl_... |} *)
+  let instance_record ty_ctr ivars : coq_expr =
+    if List.length ivars > 0 then
+      (* This might be a regression compared to the version without support for mutual induction. *)
+      qcfail "Not implemented";
+
+    let impl_function_name = List.assoc ty_ctr impl_function_names in
+    gRecord [("enumSized", gVar impl_function_name)] in
   
-  let isCurrentTyCtr = function
-    | TyCtr (ty_ctr', _) -> ty_ctr = ty_ctr'
-    | _ -> false in
-  let isBaseBranch ty = fold_ty' (fun b ty' -> b && not (isCurrentTyCtr ty')) true ty in
-
-  let tyParams = List.map gVar (list_drop_every 2 iargs) in
-
-  (* Need reverse fold for this *)
-  let create_for_branch tyParams rec_name size (ctr, ty) =
-    let rec aux i acc ty : coq_expr =
-      match ty with
-      | Arrow (ty1, ty2) ->
-         bindEnum (if isCurrentTyCtr ty1 then
-                     gApp (gVar rec_name) [gVar size]
-                  else gInject "enum")
-           (Printf.sprintf "p%d" i)
-           (fun pi -> aux (i+1) ((gVar pi) :: acc) ty2)
-      | _ -> returnEnum (gApp ~explicit:true (gCtr ctr) (tyParams @ List.rev acc))
-    in aux 0 [] ty in
-  
-  let bases = List.filter (fun (_, ty) -> isBaseBranch ty) ctrs in
-
-  gRecFunInWithArgs
-    "enum_aux" [gArg ~assumName:(gInject "size") ()]
-    (fun (aux_arb, [size]) ->
-      gMatch (gVar size)
-        [(injectCtr "O", [],
-          fun _ -> oneof (List.map (create_for_branch tyParams aux_arb size) bases))
-        ;(injectCtr "S", ["size'"],
-          fun [size'] ->
-          oneof (List.map (create_for_branch tyParams aux_arb size') ctrs))
-    ])
-    (fun x -> gVar x)
-  
-let enumSized_decl ty_ctr ctrs iargs =
-
-  let arb_body = enumSized_body ty_ctr ctrs iargs in
-  let enum_decl = gFun ["s"] (fun [s] -> gApp arb_body [gVar s]) in
-
-  gRecord [("enumSized", enum_decl)]
-
-
-(** Shrinking Derivation *)
-let shrink_decl ty_ctr ctrs iargs =
-
-  let isCurrentTyCtr = function
-    | TyCtr (ty_ctr', _) -> ty_ctr = ty_ctr'
-    | _ -> false in
-
-  let tyParams = List.map gVar (list_drop_every 2 iargs) in
-
-  let shrink_fun = 
-    let shrink_body x =
-      let create_branch aux_shrink (ctr, ty) =
-        (ctr, generate_names_from_type "p" ty,
-         fold_ty_vars (fun allParams v ty' ->
-             let liftNth = gFun ["shrunk"]
-                 (fun [shrunk] -> gApp ~explicit:true (gCtr ctr)
-                     (tyParams @ (replace (gVar v) (gVar shrunk) (List.map gVar allParams)))) in
-             lst_appends (if isCurrentTyCtr ty' then
-                            [ gList [gVar v] ; gApp (gInject "List.map") [liftNth; gApp (gVar aux_shrink) [gVar v]]]
-                          else
-                            [ gApp (gInject "List.map") [liftNth; gApp (gInject "shrink") [gVar v]]]))
-           lst_append list_nil ty) in
-
-      let aux_shrink_body rec_fun x' = gMatch (gVar x') (List.map (create_branch rec_fun) ctrs) in
-
-      gRecFunIn "aux_shrink" ["x'"]
-        (fun (aux_shrink, [x']) -> aux_shrink_body aux_shrink x')
-        (fun aux_shrink -> gApp (gVar aux_shrink) [gVar x])
-    in
-    (* Create the function body by recursing on the structure of x *)
-    gFun ["x"] (fun [x] -> shrink_body x)
-  in
-  debug_coq_expr shrink_fun;
-  gRecord [("shrink", shrink_fun)]
-
-let show_decl ty_ctr ctrs _iargs =
-  msg_debug (str "Deriving Show Information:" ++ fnl ());
-  msg_debug (str ("Type constructor is: " ^ ty_ctr_to_string ty_ctr) ++ fnl ());
-  msg_debug (str (str_lst_to_string "\n" (List.map ctr_rep_to_string ctrs)) ++ fnl());
-
-  let isCurrentTyCtr = function
-    | TyCtr (ty_ctr', _) -> ty_ctr = ty_ctr'
-    | _ -> false in
-
-  (* Create the function body by recursing on the structure of x *)
-  let show_body x =
-    
-    let branch aux (ctr,ty) =
-      
-      (ctr, generate_names_from_type "p" ty,
-       fun vs -> match vs with 
-                 | [] -> gStr (constructor_to_string ctr) 
-                 |_ -> str_append (gStr (constructor_to_string ctr ^ " "))
-                                  (fold_ty_vars (fun _ v ty' -> smart_paren (gApp (if isCurrentTyCtr ty' then gVar aux else gInject "show") [gVar v]))
-                                                (fun s1 s2 -> if s2 = emptyString then s1 else str_appends [s1; gStr " "; s2]) emptyString ty vs))
-    in
-    
-    gRecFunIn "aux" ["x'"]
-              (fun (aux, [x']) -> gMatch (gVar x') (List.map (branch aux) ctrs))
-              (fun aux -> gApp (gVar aux) [gVar x])
-  in
-  
-  let show_fun = gFun ["x"] (fun [x] -> show_body x) in
-  gRecord [("show", show_fun)]
-          
+  (instance_record, functions)
