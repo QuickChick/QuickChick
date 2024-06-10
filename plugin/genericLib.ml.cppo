@@ -1049,6 +1049,7 @@ let remove_dependencies (i : int) (var_idx : int) (x : var) (var_deps : (var * (
   let depends = safe_assoc i ind_deps in
   let new_deps = List.map (fun (i',xs) -> (i', List.filter (fun x' -> x' <> x) xs)) (List.remove_assoc i ind_deps) in
   let new_var_deps = List.map (fun (x', inds) -> if x = x' then (x, [(i,var_idx)]) else if List.mem x' depends then (x', []) else (x', inds)) var_deps in
+  let new_var_deps = List.remove_assoc x new_var_deps in
   (new_var_deps, new_deps)
 
 

@@ -128,6 +128,8 @@ val dep_type_one_relation_variables : dep_type -> var list
 
 val remove_dependencies : int -> int -> var -> (var * (int * int) list) list -> (int * var list) list -> (var * (int * int) list) list * (int * var list) list
 
+
+
 val dep_type_hyps_and_concl : dep_type -> (dep_type list * dep_type)
 
 val permutations : 'a list -> 'a list list
