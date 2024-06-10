@@ -50,17 +50,17 @@ let repeat_instance_name der tn =
   (prefix ^ strip_last tn)
 
 (* Generic derivation function *)
-let derive (cn : derivable) (c : constr_expr) (instance_name : string) (name1 : string) (name2 : string) =
-
-  let (ty_ctr, ty_params, ctrs) =
-    match coerce_reference_to_dt_rep c with
+let derive (cn : derivable) (c : constr_expr) (name1 : string) (name2 : string) =
+  let dt = match coerce_reference_to_dt_rep c with
     | Some dt -> dt
     | None -> failwith "Not supported type"  in
 
-  let coqTyCtr = gTyCtr ty_ctr in
-  let coqTyParams = List.map gTyParam ty_params in
+  let coqTyCtr = List.map (fun (ty_ctr, _, _) -> gTyCtr ty_ctr) dt in
+  let coqTyParams = List.map (fun (_, ty_params, _) -> List.map gTyParam ty_params) dt in
 
-  let full_dt = gApp ~explicit:true coqTyCtr coqTyParams in
+  let full_dt = List.map2
+    (fun coqTyCtr coqTyParams -> gApp ~explicit:true coqTyCtr coqTyParams)
+    coqTyCtr coqTyParams in
 
 (*
   let ind_name = match c with
@@ -109,20 +109,23 @@ let derive (cn : derivable) (c : constr_expr) (instance_name : string) (name1 : 
   in
 
   (* Generate typeclass constraints. For each type parameter "A" we need `{_ : <Class Name> A} *)
-  let instance_arguments =
-    let params =
-      (List.concat (List.map (fun tp ->
-                                ((gArg ~assumName:tp ~assumImplicit:true ()) ::
-                                (List.map (fun name -> gArg ~assumType:(gApp (gInject name) [tp]) ~assumGeneralized:true ()) param_class_names))
-                             ) coqTyParams))
+  let instance_arguments : (arg list) list = List.map (fun coqTyParams ->
+    let params = List.concat @@
+      List.map (fun tp -> (gArg ~assumName:tp ~assumImplicit:true ()) ::
+        (List.map (fun name -> gArg ~assumType:(gApp (gInject name) [tp]) ~assumGeneralized:true ()) param_class_names)
+      ) coqTyParams
     in
-    let args = (List.map (fun (name, typ) -> gArg ~assumName:name ~assumType:typ ()) extra_arguments) in
+
+    let args = List.map
+      (fun (name, typ) -> gArg ~assumName:name ~assumType:typ ())
+      extra_arguments in
+
     (* Add extra instance arguments *)
-    params @ args
+    params @ args) coqTyParams
   in
 
   (* The instance type *)
-  let instance_type iargs =
+  let instance_type full_dt iargs =
     (*
     match cn with
     | SizeMonotonic ->
@@ -135,15 +138,21 @@ let derive (cn : derivable) (c : constr_expr) (instance_name : string) (name1 : 
         [full_dt; hole; gInject ("arbitrarySized")]
     | _ -> *) gApp (gInject class_name) [full_dt]
   in
+
+  let inductive_types : (ty_ctr * ctr_rep list) list =
+    List.map (fun (ty_ctr, _, ctrs) -> (ty_ctr, ctrs)) dt
+  in
   (* Create the instance record. Only need to extend this for extra instances *)
-  let instance_record iargs =
+  let (instance_record, functions_to_mutually_define) :
+      (ty_ctr -> var list -> coq_expr)
+      * (var * (var * coq_expr) list * var * coq_expr * coq_expr) list =
     (* Copying code for Arbitrary, Sized from derive.ml *)
     match cn with
-    | Show -> show_decl ty_ctr ctrs iargs 
-    | Shrink -> shrink_decl ty_ctr ctrs iargs
-    | GenSized -> arbitrarySized_decl ty_ctr ctrs iargs
-    | EnumSized -> enumSized_decl ty_ctr ctrs iargs                
-    | Sized -> sized_decl ty_ctr ctrs
+    | Show -> show_decl inductive_types
+    | Shrink -> shrink_decl inductive_types
+    | GenSized -> arbitrarySized_decl inductive_types
+    | EnumSized -> enumSized_decl inductive_types
+    | Sized -> sized_decl inductive_types
              (*
     | CanonicalSized ->
       let ind_scheme =  gInject ((ty_ctr_to_string ty_ctr) ^ "_ind") in
@@ -161,7 +170,24 @@ let derive (cn : derivable) (c : constr_expr) (instance_name : string) (name1 : 
               *)
   in
 
-  (* msg_debug (str "Defined record" ++ fnl ()); *)
-  (* debug_coq_expr (instance_record []); *)
+  define_new_fixpoint functions_to_mutually_define;
 
-  declare_class_instance instance_arguments instance_name instance_type instance_record
+  let rec iter3 f l1 l2 l3 =
+    match (l1, l2, l3) with
+    | x1 :: l1, x2 :: l2, x3 :: l3 ->
+        f x1 x2 x3;
+        iter3 f l1 l2 l3
+    | [], [], [] -> ()
+    | _ -> raise (Invalid_argument "iter3")
+  in
+
+  iter3
+    (fun instance_arguments (ty_ctr, _, _) full_dt ->
+      let ind_name = ty_ctr_to_string ty_ctr in
+      let instance_name = mk_instance_name cn ind_name in
+
+      (* msg_debug (str "Defined record" ++ fnl ()); *)
+      (* debug_coq_expr (instance_record []); *)
+      declare_class_instance instance_arguments instance_name
+        (instance_type full_dt) (instance_record ty_ctr))
+    instance_arguments dt full_dt

@@ -12,11 +12,7 @@ type derivation = SimpleDer of SimplDriver.derivable list
                 | DepDer of DepDriver.derivable
 
 let simpl_dispatch ind classes name1 name2 =
-  let ind_name = match ind with
-    | { CAst.v = CRef (r, _); _ } -> string_of_qualid r
-    | _ -> failwith "Implement me for functions"
-  in
-  List.iter (fun cn -> SimplDriver.derive cn ind (SimplDriver.mk_instance_name cn ind_name) name1 name2) classes
+  List.iter (fun cn -> SimplDriver.derive cn ind name1 name2) classes
 
 let class_assoc_opts = [ ("GenSized"                 , SimpleDer [SimplDriver.GenSized])
                        ; ("EnumSized"                , SimpleDer [SimplDriver.EnumSized])                       

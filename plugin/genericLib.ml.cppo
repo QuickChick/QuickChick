@@ -191,12 +191,16 @@ type ctr_rep = constructor * coq_type
 let ctr_rep_to_string (ctr, ct) = 
   Printf.sprintf "%s : %s" (constructor_to_string ctr) (coq_type_to_string ct)
 
-type dt_rep = ty_ctr * ty_param list * ctr_rep list
-let dt_rep_to_string (ty_ctr, ty_params, ctrs) = 
+type sdt_rep = ty_ctr * ty_param list * ctr_rep list
+type dt_rep = sdt_rep list
+let sdt_rep_to_string (ty_ctr, ty_params, ctrs) = 
   Printf.sprintf "%s %s :=\n%s" (ty_ctr_to_string ty_ctr) 
                                 (str_lst_to_string " "  (List.map ty_param_to_string ty_params))
                                 (str_lst_to_string "\n" (List.map ctr_rep_to_string  ctrs))
-                                 
+  
+let dt_rep_to_string r =
+  String.concat "\n" (List.map sdt_rep_to_string r)
+
 (* Supertype of coq_type handling potentially dependent stuff - TODO : merge *)
 type dep_type = 
   | DArrow of dep_type * dep_type (* Unnamed arrows *)
@@ -318,6 +322,13 @@ let rec arrowify terminal l =
   | [] -> terminal
   | x::xs -> Arrow (x, arrowify terminal xs)
 
+let qualid_to_mib (r : qualid) : mutual_inductive_body =
+  let (mind, _) = Nametab.global_inductive r in
+  let env = Global.env () in
+  let mib = Environ.lookup_mind mind env in
+
+  mib
+
 (* Receives number of type parameters and one_inductive_body.
    -> Possibly ty_param list as well? 
    Returns list of constructor representations 
@@ -361,11 +372,10 @@ let parse_constructors nparams param_names result_ty oib : ctr_rep list option =
         end 
       end
       else if isInd ty then begin
-        let ((mind, midx),_) = destInd ty in
-        let env = Global.env () in
-        let mib = Environ.lookup_mind mind env in
-        let id = mib.mind_packets.(midx).mind_typename in
-        Some (TyCtr (qualid_of_ident id, []))
+        let ((mind, i), _) = destInd ty in
+        let mib = qualid_to_mib @@ qualid_of_ident (Label.to_id (MutInd.label mind)) in
+        let oib = mib.mind_packets.(i) in
+        Some (TyCtr (qualid_of_ident @@ (oib.mind_typename), []))
       end
       else if isConst ty then begin
         let (c,_) = destConst ty in 
@@ -378,22 +388,27 @@ let parse_constructors nparams param_names result_ty oib : ctr_rep list option =
        Some (ctr_id, arrowify result_ty types)
   in
 
-  let cns = List.map qualid_of_ident (Array.to_list oib.mind_consnames) in
+  let (cns : qualid list) = List.map qualid_of_ident (Array.to_list oib.mind_consnames) in
   let map (ctx, t) = Term.it_mkProd_or_LetIn t ctx in
   let lc = Array.map_to_list map oib.mind_nf_lc in
   sequenceM parse_constructor (List.combine cns lc)
 
 (* Convert mutual_inductive_body to this representation, if possible *)
-let dt_rep_from_mib mib = 
-  if Array.length mib.mind_packets > 1 then begin
-    CErrors.user_err (str "Mutual inductive types not supported yet." ++ fnl())
-  end else 
-    let oib = mib.mind_packets.(0) in
-    let ty_ctr = oib.mind_typename in 
+let dt_rep_from_mib (mib : mutual_inductive_body) : dt_rep option = 
+  let dt_rep_from_oib (oib : one_inductive_body) : sdt_rep option =
+    let ty_ctr = oib.mind_typename in
     parse_type_params oib.mind_arity_ctxt >>= fun ty_params ->
     let result_ctr = TyCtr (qualid_of_ident ty_ctr, List.map (fun x -> TyParam x) ty_params) in
     parse_constructors mib.mind_nparams ty_params result_ctr oib >>= fun ctr_reps ->
     Some (qualid_of_ident ty_ctr, ty_params, ctr_reps)
+  in
+
+  Array.fold_left
+    (fun dt oib -> dt >>= fun (dt : sdt_rep list) ->
+      dt_rep_from_oib oib >>=
+      fun (sdt : sdt_rep) -> Some (sdt::dt))
+    (Some [])
+    mib.mind_packets
 
 let qualid_to_mib r =
   let env = Global.env () in
@@ -404,14 +419,20 @@ let qualid_to_mib r =
 
   mib
 
-    
-let coerce_reference_to_dt_rep c = 
+(* Legacy dt_rep_from_mib that fails on mutually inductive definitions *)
+let sdt_rep_from_mib (mib : mutual_inductive_body) : sdt_rep option =
+  if Array.length mib.mind_packets > 1 then
+    CErrors.user_err (str "Mutual inductive types not supported yet." ++ fnl())
+  else
+    dt_rep_from_mib mib >>= fun dt -> Some (List.hd dt)
+
+let coerce_reference_to_dt_rep (c : constr_expr) : dt_rep option = 
   let r = match c with
     | { CAst.v = CRef (r,_);_ } -> r
     | _ -> failwith "Not a reference"
   in
 
-  let mib = qualid_to_mib r in
+  let mib : mutual_inductive_body = qualid_to_mib r in
   
   dt_rep_from_mib mib
 
@@ -1297,7 +1318,38 @@ let define_new_inductive (ty_ctr, ty_params, ctrs, typ) =
   msg_debug (str "me_arity: " ++ Constr.debug_print oie.mind_entry_arity ++ fnl ());
   List.iteri (fun i c -> msg_debug (str "me_consname: " ++ int i ++ Constr.debug_print c ++ fnl ())) oie.mind_entry_lc;
   ignore (DeclareInd.declare_mutual_inductive_with_eliminations entry uentry impls) 
-  
+ 
+(* Declares a new Fixpoint function.
+
+  functions is a list of tuples that are, in this order:
+   - the function name
+   - the list of parameters, given as (parameter name, type) tuples
+   - the function argument to use to prove that the function terminates
+   - the return type
+   - the function body
+ *)
+let define_new_fixpoint (functions : (var * (var * coq_expr) list * var * coq_expr * coq_expr) list) =
+  let open Vernacexpr in
+  let open Glob_term in
+
+  let fixpoint_exprs : fixpoint_expr list = List.map
+    (fun (name, arguments, structural_wf_variable, return, body) ->
+      {
+        fname = CAst.make name;
+        univs = None;
+        rec_order = Some(CAst.make @@ CStructRec (CAst.make @@ structural_wf_variable));
+        binders = List.map (fun (name, ty) -> 
+          CLocalAssum ([CAst.make @@ Names.Name.mk_name @@ name], Default Explicit, ty)
+        ) arguments;
+        rtype = return;
+        body_def = Some body;
+        notations = []
+      }
+    ) functions in
+
+  ComFixpoint.do_fixpoint ~poly:false fixpoint_exprs
+
+
 (* List Utils. Probably should move to a util file instead *)
 let list_last l = List.nth l (List.length l - 1)
 let list_init l = List.rev (List.tl (List.rev l))
