@@ -282,7 +282,7 @@ val declare_class_instance
 val define_new_inductive : dep_dt -> unit
 
 val define_new_fixpoint :
-  (var * (var * coq_expr) list * var * coq_expr * coq_expr) list -> unit
+  (var * arg list * var * coq_expr * coq_expr) list -> unit
 
 (* List utils *)
 val list_last : 'a list -> 'a 

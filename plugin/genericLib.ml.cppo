@@ -1323,14 +1323,13 @@ let define_new_inductive (ty_ctr, ty_params, ctrs, typ) =
 
   functions is a list of tuples that are, in this order:
    - the function name
-   - the list of parameters, given as (parameter name, type) tuples
+   - the list of arguments
    - the function argument to use to prove that the function terminates
    - the return type
    - the function body
  *)
-let define_new_fixpoint (functions : (var * (var * coq_expr) list * var * coq_expr * coq_expr) list) =
+let define_new_fixpoint (functions : (var * arg list * var * coq_expr * coq_expr) list) =
   let open Vernacexpr in
-  let open Glob_term in
 
   let fixpoint_exprs : fixpoint_expr list = List.map
     (fun (name, arguments, structural_wf_variable, return, body) ->
@@ -1338,9 +1337,7 @@ let define_new_fixpoint (functions : (var * (var * coq_expr) list * var * coq_ex
         fname = CAst.make name;
         univs = None;
         rec_order = Some(CAst.make @@ CStructRec (CAst.make @@ structural_wf_variable));
-        binders = List.map (fun (name, ty) -> 
-          CLocalAssum ([CAst.make @@ Names.Name.mk_name @@ name], Default Explicit, ty)
-        ) arguments;
+        binders = arguments;
         rtype = return;
         body_def = Some body;
         notations = []

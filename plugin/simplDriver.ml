@@ -139,20 +139,17 @@ let derive (cn : derivable) (c : constr_expr) (name1 : string) (name2 : string) 
     | _ -> *) gApp (gInject class_name) [full_dt]
   in
 
-  let inductive_types : (ty_ctr * ctr_rep list) list =
-    List.map (fun (ty_ctr, _, ctrs) -> (ty_ctr, ctrs)) dt
-  in
   (* Create the instance record. Only need to extend this for extra instances *)
   let (instance_record, functions_to_mutually_define) :
       (ty_ctr -> var list -> coq_expr)
-      * (var * (var * coq_expr) list * var * coq_expr * coq_expr) list =
+      * (var * arg list * var * coq_expr * coq_expr) list =
     (* Copying code for Arbitrary, Sized from derive.ml *)
     match cn with
-    | Show -> show_decl inductive_types
-    | Shrink -> shrink_decl inductive_types
-    | GenSized -> arbitrarySized_decl inductive_types
-    | EnumSized -> enumSized_decl inductive_types
-    | Sized -> sized_decl inductive_types
+    | Show -> show_decl dt
+    | Shrink -> shrink_decl dt
+    | GenSized -> arbitrarySized_decl dt
+    | EnumSized -> enumSized_decl dt
+    | Sized -> sized_decl dt
              (*
     | CanonicalSized ->
       let ind_scheme =  gInject ((ty_ctr_to_string ty_ctr) ^ "_ind") in
@@ -170,7 +167,11 @@ let derive (cn : derivable) (c : constr_expr) (name1 : string) (name2 : string) 
               *)
   in
 
-  define_new_fixpoint functions_to_mutually_define;
+  define_new_fixpoint @@ List.map (fun ((function_name, arguments, arg, return_type, body), instance_arguments) ->
+    let arguments = instance_arguments @ arguments in
+
+    (function_name, arguments, arg, return_type, body))
+    (List.combine functions_to_mutually_define instance_arguments);
 
   let rec iter3 f l1 l2 l3 =
     match (l1, l2, l3) with
@@ -186,8 +187,6 @@ let derive (cn : derivable) (c : constr_expr) (name1 : string) (name2 : string) 
       let ind_name = ty_ctr_to_string ty_ctr in
       let instance_name = mk_instance_name cn ind_name in
 
-      (* msg_debug (str "Defined record" ++ fnl ()); *)
-      (* debug_coq_expr (instance_record []); *)
       declare_class_instance instance_arguments instance_name
         (instance_type full_dt) (instance_record ty_ctr))
     instance_arguments dt full_dt

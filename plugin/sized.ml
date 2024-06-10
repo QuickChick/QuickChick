@@ -11,20 +11,23 @@ let succ_zero x = false_ind hole (succ_neq_zero_app hole x)
 let base_ctrs ty_ctr ctrs = List.filter (fun (_, ty) -> isBaseBranch ty_ctr ty) ctrs
 
 (* Produces the record of the sized typeclass *)
-let sized_decl (types : (ty_ctr * ctr_rep list) list) : (ty_ctr -> var list -> coq_expr) * ((var * (var * coq_expr) list * var * coq_expr * coq_expr) list) =
+let sized_decl (types : (ty_ctr * ty_param list * ctr_rep list) list) : (ty_ctr -> var list -> coq_expr) * ((var * arg list * var * coq_expr * coq_expr) list) =
   let impl_function_names : (ty_ctr * var) list =
-    List.map (fun (ty, _) -> 
+    List.map (fun (ty, _, _) -> 
       let type_name = ty_ctr_to_string ty in
       let function_name = fresh_name ("size_impl_" ^ type_name) in
 
       (ty, function_name)
     ) types in
 
-  let generate_size_function ((ty, ctors) : (ty_ctr * ctr_rep list)) : var * (var * coq_expr) list * var * coq_expr * coq_expr =
+  let generate_size_function ((ty, ty_params, ctors) : (ty_ctr * ty_param list * ctr_rep list)) : var * arg list * var * coq_expr * coq_expr =
     let function_name = List.assoc ty impl_function_names in
 
+    let coqTyParams = List.map gTyParam ty_params in
+    let full_type = gApp ~explicit:true (gTyCtr ty) coqTyParams in
+
     let arg = fresh_name "x" in
-    let arg_type = gTyCtr ty in
+    let arg_type = full_type in
 
     let return_type = gInject "Coq.Init.Datatypes.nat" in
 
@@ -61,7 +64,7 @@ let sized_decl (types : (ty_ctr * ctr_rep list) list) : (ty_ctr -> var list -> c
     let body = gMatch (gVar arg) (List.map create_branch ctors) in
     debug_coq_expr body;
 
-    (function_name, [(arg, arg_type)], arg, return_type, body) in
+    (function_name, [gArg ~assumName:(gVar arg) ~assumType:arg_type ()], arg, return_type, body) in
 
   let functions = List.map generate_size_function types in
 
