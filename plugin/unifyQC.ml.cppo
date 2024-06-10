@@ -610,23 +610,37 @@ let handle_branch
 
   
   (* When instantiating a single unknown, see if it must satisfy any additional predicates. *)
-  (* Old comment: Process check map. XXX generator specific *)
-
   let process_checks bind x opt g (cont : var -> coq_expr) : coq_expr =
     msg_debug (str ("Processing checks for variable: " ^ (Unknown.to_string x)) ++ fnl ());
+
+    let continuation x' =
+      (* Fix the original variable *)
+      umap := fixVariable x !umap;
+      (* If the new variable is qualified then, update mapping. *)
+      if not (var_eq x x') then begin
+          (* Grab x binding *)
+          let r = umfind x !umap in
+          (* Make x' point to it *)
+          umap := UM.add x' r !umap;
+          (* Update x to point to x' for future solvings. *)
+          umap := UM.add x (Unknown x') !umap;
+      end;
+      cont x' in
+
     match lookup_checks (DTyVar x) !cmap with
     | Some checks -> 
        (* Remove checks from cmap *)
-       msg_debug (str "Actual checks needed" ++ fnl ());
+       qcfail "Internal Error: constraint map non-empty."
+(* 
        cmap := CMap.remove (DTyVar x) !cmap;
        umap := fixVariable x !umap;
        bind true
          (stMaybe opt g (var_to_string x) checks)
          (var_to_string x)
-         (fun x -> cont x)
+         (fun x -> cont x) 
+*)
     | None ->
-       umap := fixVariable x !umap;
-       bind opt g (var_to_string x) (fun x -> cont x)
+       bind opt g (var_to_string x) continuation
   in
 
   (* Two mutually recursive functions follow for instantiating ranges. *)

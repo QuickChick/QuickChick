@@ -17,6 +17,7 @@ val id_of_var : var -> Id.t
 val var_to_string : var -> string
 val inject_var : string -> var 
 val gVar : var -> coq_expr
+val var_eq : var -> var -> bool
 
 val gInject : string -> coq_expr
 
