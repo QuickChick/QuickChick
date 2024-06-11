@@ -267,13 +267,13 @@ let define_and_run c env evd =
 *)        
       let rec process_otl_aux () =
         let e = input_line p_out in
-        Feedback.msg_info (Pp.str e);
+        Feedback.msg_notice (Pp.str e);
         process_otl_aux() in
       try process_otl_aux ()
       with End_of_file ->
              let stop = Unix.gettimeofday () in
              let timeElapsed = stop -. start in
-             Feedback.msg_info (Pp.str (Printf.sprintf "Time Elapsed: %fs\n" timeElapsed));
+             Feedback.msg_notice (Pp.str (Printf.sprintf "Time Elapsed: %fs\n" timeElapsed));
             (* try process_err_aux ()
             with End_of_file ->  *)
               let err_msg = read_all p_err in
@@ -335,7 +335,7 @@ let run f args =
   begin match last args with
   | Some qc_text ->
     let msg = "QuickChecking " ^ Pp.string_of_ppcmds (Ppconstr.pr_constr_expr env evd qc_text) in
-    Feedback.msg_info (Pp.str msg)
+    Feedback.msg_notice (Pp.str msg)
   | None -> failwith "run called with no arguments"
   end;
   let args = List.map (fun x -> (x,None)) args in
