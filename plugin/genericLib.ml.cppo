@@ -1347,7 +1347,8 @@ let define_new_fixpoint (functions : (var * arg list * var * coq_expr * coq_expr
 #if COQ_VERSION >= (8, 16, 0)
   ComFixpoint.do_fixpoint ~poly:false fixpoint_exprs
 #else
-  ComFixpoint.do_fixpoint ~scope:Locality.default_scope ~poly:false fixpoint_exprs
+  let default_scope = Locality.Global Locality.ImportDefaultBehavior in
+  ComFixpoint.do_fixpoint ~scope:default_scope ~poly:false fixpoint_exprs
 #endif
 
 
