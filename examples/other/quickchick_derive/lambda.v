@@ -60,9 +60,10 @@ Inductive typing' (e : env) : term -> type -> Prop :=
       typing' (tau1 :: e) t tau2 ->
       typing' e (Abs t) (Arrow tau1 tau2)
 | TApp' :
-    forall t1 t2 tau1 tau2,
-      typing' e t1 (Arrow tau1 tau2) ->
+    forall t1 t2 tau tau1 tau2,
       typing' e t2 tau1 ->
+      typing' e t1 tau ->
+      tau = Arrow tau1 tau2 ->
       typing' e (App t1 t2) tau2.
 
 
@@ -99,6 +100,10 @@ Derive DecOpt for (bind env x tau).
 (*Derive DecOpt for (typing' env e tau).*)
 
 Search Enum.
+
+QuickChickDebug Debug On.
+Derive EnumSized for type.
+Derive EnumSizedSuchThat for (fun typ => bind env x typ).
 Derive EnumSizedSuchThat for (fun typ => typing' env e typ).
 Derive DecOpt for (typing' env e tau).
 
@@ -132,7 +137,7 @@ Derive DecOpt for (step e e').
 
 QuickChick a. *)
 
-Definition decopt_step e_ e'_ := (let
+(*Definition decopt_step e_ e'_ := (let
 fix aux_arb init_size size (e_ : term) (e'_ : term) {struct size} :
     Coq.Init.Datatypes.option (Coq.Init.Datatypes.bool) :=
   match size with
@@ -330,8 +335,8 @@ fix aux_arb init_size size (e_ : term) (e'_ : term) {struct size} :
                         (Coq.Init.Datatypes.bool) Coq.Init.Datatypes.false
                   end) Coq.Lists.List.nil)))
   end in
-                                                fun size => aux_arb size size e_ e'_).
-Check decopt_step.
+                                                fun size => aux_arb size size e_ e'_).*)
+(*Check decopt_step.
 Compute decopt_step (Const 1) (Const 2) 1000.
 
 Definition a := (QuickChick.Checker.forAll QuickChick.Classes.arbitrary
@@ -347,7 +352,7 @@ Definition a := (QuickChick.Checker.forAll QuickChick.Classes.arbitrary
            QuickChick.Checker.checker true
          else
            QuickChick.Checker.checker false
-                ))).
+                ))).*)
 
 (*Definition b := (QuickChick.Checker.forAll QuickChick.Classes.arbitrary
    (fun e =>
@@ -364,7 +369,7 @@ Definition a := (QuickChick.Checker.forAll QuickChick.Classes.arbitrary
            QuickChick.Checker.checker Coq.Init.Datatypes.tt
        ))).*)
 
-QuickChick a.
+(* QuickChick a.
 
 
 Definition a' := (QuickChick.Checker.forAll QuickChick.Classes.arbitrary
@@ -399,13 +404,9 @@ Check a'.
 
 Check checker. Print Checker.
 
-QuickChick a'.
+QuickChick a'. *)
 
-(*Check (forAll arbitrary (fun e => checker ( true))).
-
-QuickChick (forAll arbitrary (fun e => checker (true))).
-
-QuickChick a'.
+(* QuickChick a'.
 
 Compute @decOpt (@typing' [] (Const 0) (Arrow N N)) _ 1000.
 
@@ -433,15 +434,15 @@ Definition b := (QuickChick.Checker.forAll QuickChick.Classes.arbitrary
           | _ => QuickChick.Checker.checker Coq.Init.Datatypes.tt
           end)))).
 
-QuickChick b.
+QuickChick b. *)
 
 Theorem preservation : forall e e' Gamma tau,
     typing' Gamma e tau ->
     step e e' ->
     typing' Gamma e' tau.
 Proof.
- grab_dependencies. print_all_bindings. derive_and_quickchick. quickchick. derive_and_quickchick. quickchick.
-Admitted.*)
+ grab_dependencies. print_all_bindings. derive_and_quickchick. quickchick.
+Admitted.
 
 (*  
 Open Scope string.
