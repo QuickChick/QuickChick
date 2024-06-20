@@ -162,6 +162,11 @@ let num_of_ctrs (c : constructor) =
   let mib = Environ.lookup_mind mind env in
   Array.length (mib.mind_packets.(n).mind_consnames)
 
+let belongs_to_inductive (c : constructor) =
+  (* let env = Global.env () in *)
+  let glob_ref = Nametab.global c in
+  Globnames.isIndRef glob_ref
+
 module type Ord_ty_ctr_type = sig
   type t = ty_ctr 
   val compare : t -> t -> int
