@@ -72,6 +72,7 @@ module type Ord_ctr_type = sig
 module Ord_ctr : Ord_ctr_type
 
 val num_of_ctrs : constructor -> int
+val belongs_to_inductive : constructor -> bool
 
 type ctr_rep = constructor * coq_type 
 val ctr_rep_to_string : ctr_rep -> string

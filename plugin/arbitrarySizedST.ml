@@ -70,14 +70,16 @@ let check_expr (n : int) (scrut : coq_expr) (left : coq_expr) (right : coq_expr)
     ]
 
 let match_inp (inp : var) (pat : matcher_pat) (left : coq_expr) (right  : coq_expr) =
+  msg_debug (str (Printf.sprintf "Calling match inp with %s %s\n" (var_to_string inp) (matcher_pat_to_string pat)) ++ fnl ());
   let ret v left right =
     construct_match (gVar v) ~catch_all:(Some right) [(pat, left)]
   in
   let catch_case = 
     match pat with 
-    | MatchCtr (c, ls) -> 
+    | MatchCtr (c, ls) ->
+       msg_debug (str (Printf.sprintf "In catch case: %s : %s\n" (matcher_pat_to_string pat) (string_of_int (num_of_ctrs c))) ++ fnl ());
        (* Leo: This is a hack totality check for unary matches *)
-       if num_of_ctrs c = 1 && List.for_all (fun x -> match x with MatchU _ -> true | MatchCtr _ -> false) ls 
+       if num_of_ctrs c = 1 && List.for_all (fun x -> match x with MatchU _ -> true | MatchParameter _ -> true | MatchCtr (c',_) -> belongs_to_inductive c') ls 
        then None
        else Some right
     | _ -> failwith "Toplevel match not a constructor?"
