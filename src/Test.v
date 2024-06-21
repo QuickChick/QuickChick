@@ -37,6 +37,10 @@ Definition updMaxSuccess (a : Args) (x : nat) : Args :=
   let '(MkArgs r msc md msh msz c an) := a in 
   MkArgs r x md msh msz c an.
 
+Definition updMaxDiscard (a : Args) (x : nat) : Args := 
+  let '(MkArgs r msc md msh msz c an) := a in 
+  MkArgs r msc x msh msz c an.
+
 Definition updAnalysis (a : Args) (b : bool) : Args := 
   let '(MkArgs r msc md msh msz c an) := a in 
   MkArgs r msc md msh msz c b.
