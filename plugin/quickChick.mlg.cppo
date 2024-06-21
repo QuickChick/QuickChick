@@ -499,7 +499,7 @@ let qcFuzz_main prop_def temp_dir execn prop_mlf prop_mlif warnings prop fuzzLoo
   close_out oc;
 
   (* Append the appropriate definitions in the beginning *)
-  let user_contrib = "$(opam var lib)/coq/user-contrib/QuickChick" in
+  let user_contrib = "$(opam var share)/coq-quickchick" in
   (* Add preamble *)
   let echo_cmd =
     Printf.sprintf "cat %s/Stub.ml | cat - %s > temp && mv temp %s" user_contrib mlf mlf in
