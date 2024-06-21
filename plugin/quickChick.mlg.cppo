@@ -503,7 +503,7 @@ let qcFuzz_main prop_def temp_dir execn prop_mlf prop_mlif warnings prop fuzzLoo
   (* Add preamble *)
   let echo_cmd =
     Printf.sprintf "cat %s/Stub.ml | cat - %s > temp && mv temp %s" user_contrib mlf mlf in
-  print_endline echo_cmd;
+  print_endline echo_cmd; flush stdout;
   ignore (Sys.command echo_cmd);
 
   (* HORRIBLE. HORRIBLE. Perl hack to ensure tail recursion... *)

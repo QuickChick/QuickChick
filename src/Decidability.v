@@ -260,3 +260,27 @@ Notation "x ==>? y" :=
 #[global] Hint Resolve Dec_eq_list : eq_dec.
 #[global] Hint Resolve Dec_eq_ascii : eq_dec.
 #[global] Hint Resolve Dec_eq_string : eq_dec.
+
+(* Implications between option/non-option bools *)
+
+Class Implies (A B : Type) := implies : A -> B -> option bool.
+Notation "A -=> B" := (implies A B) (at level 199, left associativity).
+
+#[global] Instance impliesOO : Implies (option bool) (option bool) :=
+    fun p1 p2 => 
+        match p1 with
+        | None | Some false => None
+        | Some true => p2
+        end.
+
+#[global] Instance impliesBB : Implies bool bool := 
+    fun p1 p2 => 
+        impliesOO (Some p1) (Some p2).
+
+#[global] Instance impliesOB : Implies (option bool) bool := 
+    fun p1 p2 =>
+        impliesOO p1 (Some p2).
+
+#[global] Instance impliesBO : Implies bool (option bool) :=
+    fun p1 p2 =>
+        impliesOO (Some p1) p2.

@@ -19,6 +19,7 @@ type derivable =
   | GenSized
   | Sized
   | EnumSized
+  | Fuzzy
   (*
   | CanonicalSized
   | SizeMonotonic
@@ -32,6 +33,7 @@ let derivable_to_string = function
   | GenSized -> "GenSized"
   | EnumSized -> "EnumSized"              
   | Sized -> "Sized"
+  | Fuzzy -> "Fuzzy"
            (*
   | CanonicalSized -> "CanonicalSized"
   | SizeMonotonic -> "SizeMonotonic"
@@ -86,6 +88,7 @@ let derive (cn : derivable) (c : constr_expr) (instance_name : string) (name1 : 
     | Shrink -> ["Shrink"]
     | Show -> ["Show"]
     | GenSized -> ["Gen"]
+    | Fuzzy -> ["Gen"; "Fuzzy"]
     | EnumSized -> ["Enum"]                
                 (*
     | CanonicalSized -> ["CanonicalSized"]
@@ -99,6 +102,7 @@ let derive (cn : derivable) (c : constr_expr) (instance_name : string) (name1 : 
     | Shrink -> []
     | Sized -> []
     | GenSized -> []
+    | Fuzzy -> []
     | EnumSized -> []                
                 (*
     | CanonicalSized -> []
@@ -142,6 +146,7 @@ let derive (cn : derivable) (c : constr_expr) (instance_name : string) (name1 : 
     | Show -> show_decl ty_ctr ctrs iargs 
     | Shrink -> shrink_decl ty_ctr ctrs iargs
     | GenSized -> arbitrarySized_decl ty_ctr ctrs iargs
+    | Fuzzy -> fuzzy_decl ty_ctr ctrs iargs
     | EnumSized -> enumSized_decl ty_ctr ctrs iargs                
     | Sized -> sized_decl ty_ctr ctrs
              (*

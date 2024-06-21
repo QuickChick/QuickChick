@@ -1307,6 +1307,12 @@ let list_drop_every n l =
     | x::xs -> if i == n then aux 1 xs else x::aux (i+1) xs
   in aux 1 l
 
+let list_keep_every n l =
+  let rec aux i = function
+    | [] -> []
+    | x::xs -> if i == n then x :: aux 1 xs else aux (i+1) xs
+  in aux n l
+
 let rec take_last l acc =
   match l with
   | [x] -> (List.rev acc, x)
