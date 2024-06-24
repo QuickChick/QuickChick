@@ -61,5 +61,9 @@
   (action (run %{exe:../scripts/mycppo} %{dep:unifyQC.ml.cppo} %{target})))
 (rule
   (alias compat)
+  (target unifyQC.mli)
+  (action (run %{exe:../scripts/mycppo} %{dep:unifyQC.mli.cppo} %{target})))
+(rule
+  (alias compat)
   (target weightmap.mlg)
   (action (run %{exe:../scripts/mycppo} %{dep:weightmap.mlg.cppo} %{target})))

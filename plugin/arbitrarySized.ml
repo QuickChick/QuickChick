@@ -39,10 +39,10 @@ let arbitrarySized_body (ty_ctr : ty_ctr) (ctrs : ctr_rep list) iargs =
     (fun (aux_arb, [size]) ->
       gMatch (gVar size)
         [(injectCtr "O", [],
-          fun _ -> oneof (List.map (create_for_branch tyParams aux_arb size) bases))
+          fun _ -> oneofThunked (List.map (create_for_branch tyParams aux_arb size) bases))
         ;(injectCtr "S", ["size'"],
-          fun [size'] -> frequency (List.map (fun (ctr,ty') ->
-                                        (Weightmap.lookup_weight ctr size',
+          fun [size'] -> frequencyThunked (List.map (fun (ctr,ty') ->
+                                        (Weightmap.lookup_weight (isBaseBranch ty') ctr size',
                                          create_for_branch tyParams aux_arb size' (ctr,ty'))) ctrs))
     ])
     (fun x -> gVar x)

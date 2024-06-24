@@ -48,7 +48,7 @@ val construct_generators :
   UnifyQC.range list ->
   UnifyQC.range UnifyQC.UM.t ->
   GenericLib.dep_type UnifyQC.UM.t ->
-  UnifyQC.Unknown.t -> GenericLib.coq_expr list                               
+  UnifyQC.Unknown.t -> (GenericLib.coq_expr * bool) list                               
 val base_gens :
   GenericLib.coq_expr ->
   GenericLib.coq_expr ->
@@ -60,7 +60,7 @@ val base_gens :
   UnifyQC.range list ->
   UnifyQC.range UnifyQC.UM.t ->
   GenericLib.dep_type UnifyQC.UM.t ->
-  UnifyQC.Unknown.t -> GenericLib.coq_expr list
+  UnifyQC.Unknown.t -> (GenericLib.coq_expr * bool) list
 val ind_gens :
   GenericLib.coq_expr ->
   GenericLib.coq_expr ->
@@ -72,7 +72,7 @@ val ind_gens :
   UnifyQC.range list ->
   UnifyQC.range UnifyQC.UM.t ->
   GenericLib.dep_type UnifyQC.UM.t ->
-  UnifyQC.Unknown.t -> GenericLib.coq_expr list  
+  UnifyQC.Unknown.t -> (GenericLib.coq_expr * bool) list  
 val arbitrarySizedST :
   GenericLib.ty_ctr ->
   GenericLib.ty_param list ->

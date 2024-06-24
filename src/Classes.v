@@ -1,15 +1,5 @@
-Set Warnings "-notation-overridden,-parsing".
-
-Require Import Coq.Classes.Morphisms.
-Require Import mathcomp.ssreflect.ssreflect.
-From mathcomp Require Import ssrbool ssrnat.
-Require Import Sets Tactics.
-Require Import Recdef.
-Require Import List.
-
-Require Import ZArith ZArith.Znat Arith.
-
-Require Import Producer Generators Enumerators.
+From Coq Require Import List Morphisms Recdef ZArith ZArith.Znat Arith.
+From QuickChick  Require Import Sets Tactics Producer Generators Enumerators.
 
 Set Bullet Behavior "Strict Subproofs".
 
@@ -481,7 +471,7 @@ Qed.
 Lemma enumeratingOpt_monotonic A (e : E (option A))
       {Hc : SizeMonotonicOpt e} {Hfp : SizeFP e}
       ch1 ch2 s1 s2 b :
-  (s1 <= s2)%coq_nat ->
+  s1 <= s2 ->
   (forall x, ch1 x = Some b -> ch2 x = Some b) ->
   enumeratingOpt e ch1 s1 = Some b ->
   enumeratingOpt e ch2 s2 = Some b.
@@ -518,4 +508,4 @@ Proof.
     eapply Hs2. eassumption. eassumption.
 
     intros Hc. eapply H0. eapply Hs2. eassumption. eassumption.
-Qed. 
+Qed.

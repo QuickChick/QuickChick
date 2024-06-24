@@ -1,8 +1,5 @@
-Require Import List.
+From Coq Require Import List String Ascii Lia Arith.
 Import ListNotations.
-Require Import Coq.Strings.String.
-Require Import Coq.Strings.Ascii.
-Require Import Lia Arith.
 
 From QuickChick Require Import Compat Show.
 

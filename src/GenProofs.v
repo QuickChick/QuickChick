@@ -1,20 +1,14 @@
-Require Import String micromega.Lia List.
-
-Require Import Tactics TacticsUtil Instances Classes DependentClasses Sets
-        Producer Generators EnumProofs Checker Decidability CheckerProofs.
-
+From Coq Require Import String Lia List ssreflect ssrfun ssrbool.
 Import ListNotations.
-
-Set Warnings "-notation-overwritten, -parsing".
-From mathcomp Require Import ssreflect ssrfun ssrbool ssrnat eqtype seq.
-
-Local Open Scope set_scope.
-
 From Ltac2 Require Import Ltac2.
 
-
+Set Warnings "-notation-overwritten, -parsing".
+From mathcomp Require Import ssrnat eqtype seq.
 Set Bullet Behavior "Strict Subproofs".
 
+From QuickChick Require Import Tactics TacticsUtil Instances Classes DependentClasses Sets
+        Producer Generators EnumProofs Checker Decidability CheckerProofs.
+Local Open Scope set_scope.
 
 Section Lemmas. 
 
@@ -127,7 +121,7 @@ Section Lemmas.
 
   Lemma semProd_mon {A} (g : nat -> G A) {_ : SizedMonotonic g} :
     forall s1 s2,
-      (s1 <= s2)%coq_nat -> 
+      (s1 <= s2)%coq_nat ->
       semProd (g s1) \subset semProd (g s2).
   Proof.
     intros s1 s2 Hleq.
@@ -137,7 +131,7 @@ Section Lemmas.
     destruct (leqP s1 s2); eauto.
   Qed.
 
-  
+
   Lemma exists_gen_hd A (g : nat -> G (option A)) (gs : nat -> list (nat * G (option A))) x n : 
     (exists s, semProdOpt (g s) x) ->
     exists s, semProdOpt (backtrack ((S n, g s) :: gs s)) x.
@@ -754,7 +748,7 @@ Ltac2 mon_expr (tapp : constr) (inst : constr) :=
         
         (* print_constr (mon '1 '2 '3 '4); set (s := ltac2:(let t := mon '1 '2 '3 '4 in exact $t)); () *)
                                                                                       
-        assert (_Hmons : forall (s1 s2 s2' s1' s: nat), (s1 <= s2)%coq_nat -> (s1' <= s2')%coq_nat -> 
+        assert (_Hmons : forall (s1 s2 s2' s1' s: nat), (s1 <= s2)%coq_nat -> (s1' <= s2')%coq_nat ->
                                                        ltac2:(let s1 := Control.hyp @s1 in
                                                               let s1' := Control.hyp @s1' in
                                                               let s2 := Control.hyp @s2 in
@@ -793,7 +787,7 @@ Ltac2 rec genST_sound (ty : constr) (ih : ident) :=
     destruct $n; try (now eapply (@semReturnOpt_None G _ _) in $h; inv $h); genST_sound ty ih
   | (* return *)
     [ h : semProdOpt (returnGen _) _ |- _ ] =>
-    eapply (@semReturnOpt G _ _) in $h; inv $h;  now eauto 20 using $ty
+    eapply (@semReturnOpt G _ _) in $h; inv $h;  now (pose $ty; eauto 20)
   | (* bindOpt *)
     [ h : semProdOpt (bindOpt _ _) _ |- _ ] =>
     eapply (@semOptBindOpt G _ _) in $h >

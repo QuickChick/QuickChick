@@ -61,7 +61,10 @@ Ltac2 print_kind (p : constr) :=
 #endif
   | Constr.Unsafe.Uint63 _ => print_string "Uint63"
   | Constr.Unsafe.Float _ => print_string "Float"
-  | Constr.Unsafe.Array _ _ _ _ =>print_string "Array" 
+#if COQ_VERSION >= (8, 20, 0)
+  | Constr.Unsafe.String _ => print_string "String" 
+#endif
+  | Constr.Unsafe.Array _ _ _ _ => print_string "Array" 
   end.
 
 

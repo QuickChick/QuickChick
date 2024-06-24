@@ -188,19 +188,19 @@ Derive ArbitrarySizedSuchThat for (fun foo => goodFooMatch n foo).
 Definition genGoodMatch (n : nat) :=
   let fix aux_arb init_size size n := 
     match size with 
-    | 0   => backtrack [(1, 
+    | 0   => backtrack [(1, thunkGen (fun _ =>
 (* begin good_foo_match_gen *)
   match n with
   | 0 => ret (Some Foo1)
   | S _ => ret None
-  end
+  end)
 (* end good_foo_match_gen *)
                         )]
-    | S _ => backtrack [(1,
+    | S _ => backtrack [(1, thunkGen (fun _ =>
            match n with
            | 0 => ret (Some Foo1)
            | S _ => ret None
-           end)]
+           end))]
     end
   in fun sz => aux_arb sz sz n.
 
@@ -221,10 +221,11 @@ Derive ArbitrarySizedSuchThat for (fun foo => goodFooRec n foo).
 Definition genGoodRec (n : nat) :=
   let fix aux_arb (init_size size : nat) n : G (option Foo) := 
     match size with 
-    | 0 => backtrack [(1, ret (Some Foo1)); (1, ret None)]
-    | S size' => backtrack [ (1, ret (Some Foo1))
-                           ; (1, bindOpt (aux_arb init_size size' 0) (fun foo => 
-                                 ret (Some (Foo2 foo)))) ]
+    | 0 => backtrack [(1, thunkGen (fun _ => ret (Some Foo1)))
+                     ;(1, thunkGen (fun _ => ret None))]
+    | S size' => backtrack [ (1, thunkGen (fun _ => ret (Some Foo1)))
+                           ; (S size',thunkGen (fun _ => bindOpt (aux_arb init_size size' 0) (fun foo => 
+                                 ret (Some (Foo2 foo))))) ]
     end
   in fun sz => aux_arb sz sz n.
 (* end gen_good_rec *)
@@ -280,22 +281,22 @@ Definition genGoodPrec (n : nat) : nat -> G (option (Foo)):=
    fix aux_arb init_size size (n : nat) : G (option (Foo)) :=
      match size with
      | O => 
-         backtrack [ (1, ret (Some Foo1))
-                     ; (1, match @decOpt (goodFooPrec O Foo1) _ init_size with
+         backtrack [ (1, thunkGen (fun _ => ret (Some Foo1)))
+                   ; (1, thunkGen (fun _ => match @decOpt (goodFooPrec O Foo1) _ init_size with
                            | Some true => foo <- arbitrary;;
                                           ret (Some foo)
                            | _ => ret None
-                           end)
+                           end))
            ]
 
      | S size' =>
-         backtrack [ (1, ret (Some Foo1))
-                     ; (1, match @decOpt (goodFooPrec O Foo1) _ init_size with
+         backtrack [ (1, thunkGen (fun _ => ret (Some Foo1)))
+                   ; (1, thunkGen (fun _ => match @decOpt (goodFooPrec O Foo1) _ init_size with
                            | Some true => foo <- arbitrary;;
                                           ret (Some foo)
                            | _ => ret None
                            end
-                     )]
+                     ))]
      end in fun sz => aux_arb sz sz n.
 
 Lemma genGoodPrec_equality n : 
@@ -353,15 +354,15 @@ Definition genGoodNarrow (n : nat) : nat -> G (option (Foo)) :=
  let
    fix aux_arb init_size size (n : nat) : G (option (Foo)) :=
      match size with
-     | O => backtrack [(1, ret (Some Foo1)); (1, ret None)]
+     | O => backtrack [(1, thunkGen (fun _ => ret (Some Foo1))); (1, thunkGen (fun _ => ret None))]
      | S size' =>
-         backtrack [ (1, ret (Some Foo1))
-                   ; (1, bindOpt (aux_arb init_size size' 0) (fun foo =>
+         backtrack [ (1, thunkGen (fun _ => ret (Some Foo1)))
+                   ; (S size', thunkGen (fun _ => bindOpt (aux_arb init_size size' 0) (fun foo =>
                          match @decOpt (goodFooNarrow 1 foo) _  init_size with
                          | Some true => ret (Some foo)
                          | _ => ret None
                          end
-                     ))]
+                     )))]
      end in fun sz => aux_arb sz sz n.
 
 Lemma genGoodNarrow_equality n : 
@@ -430,6 +431,73 @@ Inductive goodFun : Foo -> Prop :=
                                         goodFun a.
 
 Derive ArbitrarySizedSuchThat for (fun a => goodFun a).
+
+Inductive Foo_and : (bool * bool) -> bool -> Prop :=
+  | Foo_andtt : Foo_and (true, true) true.
+
+Inductive Foo_rel : nat -> bool -> Prop :=
+  | R1 : forall n,
+       Foo_rel n true
+  | R2' : forall a1 l1 a2 l2 l,
+       Foo_and (l1, l2) l ->
+       Foo_rel a1 l1 ->
+       Foo_rel a2 l2 ->
+       Foo_rel a1 l.
+
+Derive Generator for (fun l12 => Foo_and l12 l).
+Derive Generator for (fun a => Foo_rel a b).
+
+Definition gen_foo_and (l : bool) : nat -> G (option (bool * bool)) :=
+    let
+      fix aux_arb (init_size size : nat) (l_0 : bool) {struct size} : G (option (bool * bool)) :=
+        match size with
+        | 0 | _ =>
+            backtrack
+              [(1,
+                thunkGen
+                  (fun _ : unit => if l_0 then returnGen (Some (true, true)) else returnGen None))]
+        end in
+    fun size : nat => aux_arb size size l.
+
+Lemma gen_foo_and_equality l : 
+  gen_foo_and l = @arbitrarySizeST _ (fun l12 => Foo_and l12 l) _. 
+Proof. reflexivity. Qed. 
+
+Definition gen_foo_rel (b_ : bool) : nat -> G (option nat) :=
+    let
+      fix aux_arb (init_size size : nat) (b_0 : bool) {struct size} : G (option nat) :=
+        match size with
+        | 0 =>
+            backtrack
+              [(1,
+                thunkGen
+                  (fun _ : unit =>
+                   if b_0
+                   then bindGen arbitrary (fun n : nat => returnGen (Some n))
+                   else returnGen None)); (1, thunkGen (fun _ : unit => returnGen None))]
+        | S size' =>
+            backtrack
+              [(1,
+                thunkGen
+                  (fun _ : unit =>
+                   if b_0
+                   then bindGen arbitrary (fun n : nat => returnGen (Some n))
+                   else returnGen None));
+               (S size',
+                thunkGen
+                  (fun _ : unit =>
+                   bindOpt (genST (fun unkn_11_ : bool * bool => Foo_and unkn_11_ b_0))
+                     (fun unkn_11_ : bool * bool =>
+                      let (l1, l2) := unkn_11_ in
+                      bindOpt (aux_arb init_size size' l1)
+                        (fun a_ : nat =>
+                         bindOpt (aux_arb init_size size' l2) (fun _ : nat => returnGen (Some a_))))))]
+        end in
+    fun size : nat => aux_arb size size b_.
+
+Lemma gen_foo_rel_equality b : 
+  gen_foo_rel b = @arbitrarySizeST _ (fun l => Foo_rel l b) _. 
+Proof. reflexivity. Qed. 
 
 Definition success := "success".
 Print success.

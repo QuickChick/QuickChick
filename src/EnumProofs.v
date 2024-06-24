@@ -1,18 +1,14 @@
-Require Import String micromega.Lia List.
-
-Require Import Tactics TacticsUtil Instances Classes DependentClasses Sets
-        Producer Enumerators Checker Decidability CheckerProofs.
-
+From Coq Require Import String Lia List ssreflect ssrbool ssrfun.
 Import ListNotations.
-
 From Ltac2 Require Import Ltac2.
 
 Set Warnings "-notation-overwritten, -parsing".
-From mathcomp Require Import ssreflect ssrfun ssrbool ssrnat eqtype seq.
-
-Local Open Scope set_scope.
-
+From mathcomp Require Import ssrnat eqtype seq.
 Set Bullet Behavior "Strict Subproofs".
+
+From QuickChick Require Import Tactics TacticsUtil Instances Classes DependentClasses Sets
+        Producer Enumerators Checker Decidability CheckerProofs.
+Local Open Scope set_scope.
 
 Section Lemmas. 
 
@@ -120,7 +116,7 @@ Section Lemmas.
 
   Lemma semProd_mon {A} (g : nat -> E A) {_ : SizedMonotonic g} :
     forall s1 s2,
-      (s1 <= s2)%coq_nat -> 
+      (s1 <= s2)%coq_nat ->
       semProd (g s1) \subset semProd (g s2).
   Proof.
     intros s1 s2 Hleq.
@@ -1019,7 +1015,7 @@ Ltac2 rec enumST_sound (ty : constr) (ih : ident) :=
     destruct $n; try (now eapply semProdOpt_failEnum in $h; inv $h); enumST_sound ty ih
   (* return Some *)   
   | [ h : semProdOpt (returnEnum (Some _)) _ |- _ ] =>
-    eapply (@semReturnOpt E _ _) in $h; inv $h; first [ now eauto using $ty | now eauto 20 using $ty ]
+    eapply (@semReturnOpt E _ _) in $h; inv $h; first [ now (pose $ty; eauto) | now (pose $ty; eauto 20) ]
   (* return None*)   
   | [ h : semProdOpt (returnEnum (@None ?a)) _ |- _ ] =>
     eapply (@semProdOpt_return_None $a) in $h; inv $h

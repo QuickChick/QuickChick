@@ -78,8 +78,6 @@ let gIsTrueTrue =
 let false_ind x1 x2 =
   gApp (gInject "False_ind") [x1; x2]
 
-let gfalse = gInject "False"
-
 (* TODO extend gMatch to write the return type? *)
 let discriminate h =
   false_ind hole
@@ -92,13 +90,6 @@ let rewrite pred h hin =
 
 let rewrite_sym typ h hin =
   gApp (gInject "eq_ind_r") [typ; hin; h]
-
-let eq_symm p =
-  gApp (gInject "eq_symm") [hole; hole; p]
-
-(* TODO replace with the above *)
-let rewrite_symm h hin =
-  gMatch (eq_symm h) [(injectCtr "erefl", [], fun [] -> hin)]
 
 let lt0_False hlt =
   gApp (gInject "lt0_False") [hlt]

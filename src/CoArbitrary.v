@@ -1,10 +1,6 @@
-Set Warnings "-notation-overridden, -parsing".
+From Coq Require Import PArith List ChoiceFacts Lia ssreflect ssrbool ssrfun.
 
-Require Import PArith List ChoiceFacts Lia.
-Require Import mathcomp.ssreflect.ssreflect.
-From mathcomp Require Import ssrfun ssrbool.
-
-Require Import Classes RandomQC Generators Sets.
+From QuickChick Require Import Compat Classes RandomQC Generators Sets.
 
 Import ListNotations.
 
@@ -207,14 +203,14 @@ induction p.
 + inversion IHp as [n Hyp]; clear IHp.
   simpl.
   exists (S n).
-  rewrite app_length. 
+  rewrite length_app.
   rewrite Hyp.
   simpl.
   lia.
 + inversion IHp as [n Hyp]; clear IHp.
   simpl.
   exists (S n).
-  rewrite app_length. 
+  rewrite length_app.
   rewrite Hyp.
   simpl.
   lia.

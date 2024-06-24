@@ -1,4 +1,5 @@
-From Coq Require Import Arith.
+From Coq Require Import List Arith.
+
 Module Nat.
 #if COQ_VERSION >= (8, 17, 0)
 Notation div_div := Nat.Div0.div_div.
@@ -24,3 +25,10 @@ Proof.
 Qed.
 #endif
 End Nat.
+
+#if COQ_VERSION < (8, 20, 0)
+Lemma length_app (A : Type) (xs ys : list A) : length (xs ++ ys) = length xs + length ys.
+Proof.
+  apply app_length.
+Qed.
+#endif

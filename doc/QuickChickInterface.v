@@ -194,18 +194,9 @@ End QcDefaultNotation.
     choose from an interval without writing down all the possible
     values.
 
-    Such intervals can be defined on ordered data types, instances of
-    [OrdType], whose ordering [leq] satisfies reflexive, transitive,
+    Such intervals can be defined on ordered data types,
+    whose ordering [leq] satisfies reflexive, transitive,
     and antisymmetric predicates. *)
-
-Existing Class OrdType.
-
-#[global]
-Declare Instance OrdBool : OrdType bool.
-#[global]
-Declare Instance OrdNat  : OrdType nat.
-#[global]
-Declare Instance OrdZ    : OrdType Z.
 
 (** We also expect the random function to be able to pick every element in any
     given interval. *)
@@ -213,16 +204,14 @@ Declare Instance OrdZ    : OrdType Z.
 Existing Class ChoosableFromInterval.
 
 (** QuickChick has provided some instances for ordered data types that are
-    choosable from intervals, including [bool], [nat], and [Z]. *)
+    choosable from intervals, including [N], [nat], and [Z]. *)
 
-(*
 #[global]
-Declare Instance ChooseBool : ChoosableFromInterval bool.
-*)
+Declare Instance ChooseN : ChoosableFromInterval N N.le.
 #[global]
-Declare Instance ChooseNat : ChoosableFromInterval nat.
+Declare Instance ChooseNat : ChoosableFromInterval nat Nat.le.
 #[global]
-Declare Instance ChooseZ : ChoosableFromInterval Z.
+Declare Instance ChooseZ : ChoosableFromInterval Z Z.le.
 
 (** [choose l r] generates a value between [l] and [r], inclusive the two
     extremes. It causes a runtime error if [r < l]. *)

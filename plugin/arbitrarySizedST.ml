@@ -70,14 +70,16 @@ let check_expr (n : int) (scrut : coq_expr) (left : coq_expr) (right : coq_expr)
     ]
 
 let match_inp (inp : var) (pat : matcher_pat) (left : coq_expr) (right  : coq_expr) =
+  msg_debug (str (Printf.sprintf "Calling match inp with %s %s\n" (var_to_string inp) (matcher_pat_to_string pat)) ++ fnl ());
   let ret v left right =
     construct_match (gVar v) ~catch_all:(Some right) [(pat, left)]
   in
   let catch_case = 
     match pat with 
-    | MatchCtr (c, ls) -> 
+    | MatchCtr (c, ls) ->
+       msg_debug (str (Printf.sprintf "In catch case: %s : %s\n" (matcher_pat_to_string pat) (string_of_int (num_of_ctrs c))) ++ fnl ());
        (* Leo: This is a hack totality check for unary matches *)
-       if num_of_ctrs c = 1 && List.for_all (fun x -> match x with MatchU _ -> true | MatchCtr _ -> false) ls 
+       if num_of_ctrs c = 1 && List.for_all (fun x -> match x with MatchU _ -> true | MatchParameter _ -> true | MatchCtr (c',_) -> belongs_to_inductive c') ls 
        then None
        else Some right
     | _ -> failwith "Toplevel match not a constructor?"
@@ -115,10 +117,10 @@ let construct_generators
   let all_gens = List.map handle_branch' ctrs in
   let padNone =
     if List.exists (fun gb -> not (snd gb)) all_gens
-    then [not_enough_fuel_exp full_gtyp] else [] in
+    then [(not_enough_fuel_exp full_gtyp, true)] else [] in
   match kind with
-  | Base_gen -> List.map fst (List.filter snd all_gens) @ padNone
-  | Ind_gen  -> List.map fst all_gens
+  | Base_gen -> (List.filter snd all_gens) @ padNone 
+  | Ind_gen  -> all_gens
               
 let base_gens = construct_generators Base_gen
 let ind_gens  = construct_generators Ind_gen              
@@ -153,15 +155,15 @@ let arbitrarySizedST
     gMatch (gVar size)
       [ (injectCtr "O", [],
          fun _ ->
-           uniform_backtracking
-             (base_gens init_size (gVar size) full_gtyp gen_ctr dep_type ctrs rec_name
-                input_ranges init_umap init_tmap result))
+           let opts = base_gens init_size (gVar size) full_gtyp gen_ctr dep_type ctrs rec_name
+                        input_ranges init_umap init_tmap result in
+           uniform_backtracking (List.map thunkify (List.map fst opts)))
       ; (injectCtr "S", ["size'"],
          fun [size'] ->
-           let weights = List.map (fun (c,_) -> Weightmap.lookup_weight c size') ctrs in
-           backtracking (List.combine weights 
-                           (ind_gens init_size (gVar size') full_gtyp gen_ctr dep_type ctrs rec_name
-                              input_ranges init_umap init_tmap result)))
+           let opts = ind_gens init_size (gVar size') full_gtyp gen_ctr dep_type ctrs rec_name
+                        input_ranges init_umap init_tmap result in
+           let weights = List.map (fun ((c,_),(_,b)) -> Weightmap.lookup_weight b c size') (List.combine ctrs opts) in
+           backtracking (List.combine weights (List.map thunkify (List.map fst opts))))
       ]
   in
 

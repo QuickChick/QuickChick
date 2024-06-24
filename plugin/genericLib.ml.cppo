@@ -86,7 +86,9 @@ let gInject s =
   if s = "" then failwith "Called gInject with empty string";
   CAst.make @@ CRef (qualid_of_string s, None)
 
-#if COQ_VERSION >= (8, 19, 0)
+#if COQ_VERSION >= (8, 20, 0)
+let gType0 = CAst.make @@ CSort Constrexpr_ops.expr_Type_sort
+#elif COQ_VERSION >= (8, 19, 0)
 let gType0 = CAst.make @@ CSort (Glob_term.UAnonymous {rigid = UState.UnivRigid})
 #else
 let gType0 = CAst.make @@ CSort (Glob_term.UAnonymous {rigid = true})
@@ -166,6 +168,11 @@ let num_of_ctrs (c : constructor) =
   let ((mind,n),_) = Globnames.destConstructRef glob_ref in
   let mib = Environ.lookup_mind mind env in
   Array.length (mib.mind_packets.(n).mind_consnames)
+
+let belongs_to_inductive (c : constructor) =
+  (* let env = Global.env () in *)
+  let glob_ref = Nametab.global c in
+  Globnames.isIndRef glob_ref
 
 module type Ord_ty_ctr_type = sig
   type t = ty_ctr 
@@ -376,8 +383,11 @@ let parse_constructors nparams param_names result_ty oib : ctr_rep list option =
         end 
       end
       else if isInd ty then begin
-        let ((mind,_),_) = destInd ty in
-        Some (TyCtr (qualid_of_ident (Label.to_id (MutInd.label mind)), []))
+        let ((mind, midx),_) = destInd ty in
+        let env = Global.env () in
+        let mib = Environ.lookup_mind mind env in
+        let id = mib.mind_packets.(midx).mind_typename in
+        Some (TyCtr (qualid_of_ident id, []))
       end
       else if isConst ty then begin
         let (c,_) = destConst ty in 
@@ -498,10 +508,12 @@ let parse_dependent_type_internal i nparams ty oibopt arg_names =
       | None -> CErrors.user_err (str "Aux failed?" ++ fnl ())
     end
     else if isInd ty then begin
-      let ((mind,_),_) = destInd ty in
-      msg_debug (str (Printf.sprintf "LOOK HERE: %s - %s - %s" (MutInd.to_string mind) (Label.to_string (MutInd.label mind)) 
-                                                            (Id.to_string (Label.to_id (MutInd.label mind)))) ++ fnl ());
-      Some (DTyCtr (qualid_of_ident (Label.to_id (MutInd.label mind)), []))
+      let ((mind, midx),_) = destInd ty in
+      let mib = Environ.lookup_mind mind env in
+      let id = mib.mind_packets.(midx).mind_typename in
+      (* msg_debug (str (Printf.sprintf "LOOK HERE: %s - %s - %s" (MutInd.to_string mind) (Label.to_string (MutInd.label mind)) 
+                                                            (Id.to_string (Label.to_id (MutInd.label mind)))) ++ fnl ());*)
+      Some (DTyCtr (qualid_of_ident id, []))
     end
     else if isConstruct ty then begin
       let (((mind, midx), idx),_) = destConstruct ty in                               

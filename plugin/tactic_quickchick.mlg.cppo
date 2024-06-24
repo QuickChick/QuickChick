@@ -539,8 +539,14 @@ let quickchick_goal =
         (*failwith "OUch!";*)
         let to_run = GenericLib.interp_open_coq_expr e evd (g_show (g_quickCheck (mkProperty dt))) in
         (*failwith "Oucher!";*)
+#if COQ_VERSION >= (8, 20, 0)
+        (* FRAGILE probably won't be allowed in the future? *)
+        let opaque_access = Library.indirect_accessor[@@warning "-3"] in
+        QuickChick.define_and_run ~opaque_access to_run e evd;
+#else
         QuickChick.define_and_run to_run e evd;
-        
+#endif
+
         Tacticals.tclIDTAC
       end
     | None -> failwith "Failed to Parse type"

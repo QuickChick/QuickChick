@@ -700,6 +700,8 @@ Ltac2 handle_checker_match_sound (ih : ident) (heq : ident) :=
       end
     ].
 
+Ltac2 eauto_using t :=
+  ltac1:(t |- eauto using t) (Ltac1.of_constr t).
 
 Ltac2 rec base_case_sound (heq : ident) (ty : constr) :=
   match! goal with
@@ -709,8 +711,8 @@ Ltac2 rec base_case_sound (heq : ident) (ty : constr) :=
   | [h : List.In _ (Datatypes.cons ?g ?gs) |- _ ] =>
     let h := Control.hyp h in
     let hdummy := Fresh.in_goal (id_of_string "Hdummy") in
-    (destruct $h > [ subst; repeat (handle_checker_match_sound hdummy heq); subst; first [ eauto using $ty
-                                                                                         | now (eauto 20 using $ty) ]
+    (destruct $h > [ subst; repeat (handle_checker_match_sound hdummy heq); subst; first [ eauto_using ty
+                                                                                         | now (pose $ty; eauto 20) ]
                    | base_case_sound heq ty ])
   end.
 
@@ -719,8 +721,8 @@ Ltac2 rec ind_case_sound (ih : ident) (heq : ident) (ty : constr) :=
   | [h : List.In _ Datatypes.nil |- _ ] => let h := Control.hyp h in destruct $h
   | [h : List.In _ (Datatypes.cons ?g ?gs) |- _ ] =>
     let h := Control.hyp h in
-    (destruct $h > [ subst; repeat (handle_checker_match_sound ih heq); subst; first [ eauto using $ty
-                                                                                     | now (eauto 20 using $ty) ]
+    (destruct $h > [ subst; repeat (handle_checker_match_sound ih heq); subst; first [ eauto_using ty
+                                                                                     | now (pose $ty; eauto 20) ]
                    | ind_case_sound ih heq ty ])
   end.
 

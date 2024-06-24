@@ -80,11 +80,11 @@ let register_weights_object =
 
 let add_weights w = Lib.add_anonymous_leaf (register_weights_object w)
 #endif
-let lookup_weight ctr size_var = 
+let lookup_weight b ctr size_var = 
   try match CtrMap.find ctr !weight_env with
       | WNum n -> gInt n
       | WSize  -> gSucc (gVar (size_var))
-  with Not_found -> gInt 1
+  with Not_found -> if b then gInt 1 else gSucc (gVar (size_var))
 
 }
 
