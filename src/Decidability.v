@@ -284,3 +284,4 @@ Notation "A -=> B" := (implies A B) (at level 199, left associativity).
 #[global] Instance impliesBO : Implies bool (option bool) :=
     fun p1 p2 =>
         impliesOO (Some p1) p2.
+

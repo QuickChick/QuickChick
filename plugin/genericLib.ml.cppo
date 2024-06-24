@@ -525,7 +525,14 @@ let parse_dependent_type_internal i nparams ty oibopt arg_names =
     else if isConst ty then begin 
       let (x,_) = destConst ty in 
       Some (DTyVar (Label.to_id (Constant.label x)))
-    end
+      end
+(*    else if isLambda ty then begin
+        let (n, t1, t2) = destLambda ty in
+        aux i t1 >>= fun t1' ->
+        aux i t2 >>= fun t2' ->
+        Some (DProd ((id_of_name n.binder_name, t1'), t2'))
+      end
+*)
     else (
       let env = Global.env() in
       let sigma = Evd.from_env env in
@@ -549,7 +556,7 @@ let parse_dependent_type ty =
     parse_dependent_type_internal (1 + (List.length ctr_pats)) 0 result None arg_names >>= fun result_ty ->
     sequenceM (fun x -> x) (List.mapi (fun i ty -> parse_dependent_type_internal i 0 ty None arg_names) (List.map (Vars.lift (-1)) pat_types)) >>= fun types ->
     Some (dep_arrowify result_ty pat_names types)
-  
+
 let dep_parse_type nparams param_names arity_ctxt oib =
   let len = List.length arity_ctxt in
   (* Only type parameters can be used - no dependencies on the types *)
@@ -1588,4 +1595,76 @@ let find_typeclass_bindings typeclass_name ctr =
     ) db;
     !result
 
-    
+let deepen_prop id id_new =
+  let mkForall x k =
+    gApp (gInject "ForAll") [ (gStr (Id.to_string x))
+                            ; gFun ["_ctx"] (fun _ -> gInject "arbitrary")
+                            ; gFun ["_ctx"] (fun _ -> gInject "fuzz")
+                            ; gFun ["_ctx"] (fun _ -> gInject "shrink")
+                            ; gFun ["_ctx"] (fun _ -> gInject "show")
+                            ; k
+      ]
+  in
+  let rec mkPattern (ctx : Id.t) vars vs body =
+    match vars with
+    | [] ->
+       gApp body (List.map gVar vs)
+    | v::vars' ->
+       gMatch (gVar ctx) [(qualid_of_string "Coq.Init.Datatypes.pair", [Id.to_string v; "ctx"], fun [v'; ctx'] -> mkPattern ctx' vars' (v'::vs) body)]
+  in 
+  let rec make_deep_prop env sigma ty vars wholedef type_of_ctx =
+    if isLambda ty then begin
+        let (n, ty_n, ty') = destLambda ty in
+        mkForall (id_of_name n.binder_name) (make_deep_prop env sigma ty' ((id_of_name n.binder_name)::vars) wholedef type_of_ctx)
+      end
+    else
+      let wholedef_as_coq_expr = Constrextern.extern_constr env sigma (EConstr.of_constr wholedef) in 
+      gApp (gInject "Check") [ type_of_ctx
+                             ; gFun ["ctx"] (fun [ctx] -> mkPattern ctx vars [] wholedef_as_coq_expr)]
+  in 
+  
+  msg_debug (str "Parsing type of: " ++ str (Id.to_string id) ++ fnl ());
+  (* Ty is assumed to be a simple `A -> B -> C ... -> Result` type *)
+  let rec mkCtxType ty acc =
+    match ty with
+    (* T1 -> T2 case *)
+    | {CAst.v = CNotation (_, _, ([t1;t2],[],[],[]));_} ->
+       mkCtxType t2 (gApp (gInject "CtxBind") [t1; acc])
+    | _ -> acc
+       
+(*    | {CAst.v = CProdN (_, _);_} -> failwith "PN"
+    | {CAst.v = CLambdaN (_, _);_} -> failwith "LN"
+    | {CAst.v = CAppExpl (_, _);_} -> failwith "APP"
+    | {CAst.v = CArray (_,_,_,_);_} -> failwith "arr"
+    | _ -> failwith "..." *)
+  in 
+  try
+    let env = Global.env () in
+    let sigma = Evd.from_env env in
+    let c = Nametab.locate_constant (qualid_of_ident id) in
+    let cb = Environ.lookup_constant c env in
+    begin match cb.const_body with
+    | Def def ->
+
+       msg_debug (str "Definition found:" ++ fnl ());
+       debug_constr env sigma cb.const_type;
+       let type_of_ctx = mkCtxType (Constrextern.extern_constr env sigma (EConstr.of_constr cb.const_type)) (gInject "EmptyCtx") in
+       debug_constr env sigma def;
+       let c = make_deep_prop env sigma def [] def type_of_ctx in
+       debug_coq_expr c;
+
+
+
+       (* Try declare *)
+       let interned = interp_open_coq_expr env sigma c in
+       let int_typ = interp_open_coq_expr env sigma (gApp (gInject "CProp") [(gInject "EmptyCtx")]) in
+       let cinfo = Declare.CInfo.make ~name:(Id.of_string id_new) ~typ:(Some int_typ) () in
+       let info = Declare.Info.make ~poly:false () in
+       ignore (Declare.declare_definition ~info ~cinfo ~opaque:false ~body:interned sigma)
+
+    | _ ->
+       failwith ("Internal error: parse_id_type: not a definition: " ^ (Id.to_string id))
+    end
+  with
+    Not_found ->
+    failwith ("Internal error: parse_id_type: not a constant: " ^ (Id.to_string id))
