@@ -148,6 +148,7 @@ val qualid_to_mib : Libnames.qualid -> mutual_inductive_body
 val dt_rep_from_mib : mutual_inductive_body -> dt_rep option
 val coerce_reference_to_dt_rep : constr_expr -> dt_rep option
 
+val deepen_prop : Id.t -> string -> unit
 val parse_dependent_type : Constr.constr -> dep_type option
 
 val dep_dt_from_mib : mutual_inductive_body -> dep_dt option
@@ -301,6 +302,7 @@ val define_new_inductive : dep_dt -> unit
 val list_last : 'a list -> 'a 
 val list_init : 'a list -> 'a list 
 val list_drop_every : int -> 'a list -> 'a list
+val list_keep_every : int -> 'a list -> 'a list
 val take_last : 'a list -> 'a list -> ('a list * 'a)
 val list_insert_nth : 'a -> 'a list -> int -> 'a list
 

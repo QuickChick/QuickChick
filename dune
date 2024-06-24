@@ -1,3 +1,20 @@
 (alias
   (name default)
   (deps (package coq-quickchick)))
+
+(install
+ (section share)
+ (files
+  (fuzz/C.ml as C.ml)
+  (fuzz/Fuzz.ml as Fuzz.ml)
+  (fuzz/Main.ml as Main.ml)
+  (fuzz/SHM.c as SHM.c)
+  (fuzz/Stub.ml as Stub.ml)
+  (fuzz/alloc-inl.h as alloc-inl.h)
+  (fuzz/cmdprefix.pl as cmdprefix.pl)
+  (fuzz/cmdsuffix.pl as cmdsuffix.pl)
+  (fuzz/compile.sh as compile.sh)
+  (fuzz/config.h as config.h)
+  (fuzz/debug.h as debug.h)
+  (fuzz/types.h as types.h)))
+

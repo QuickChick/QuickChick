@@ -22,6 +22,7 @@ let class_assoc_opts = [ ("GenSized"                 , SimpleDer [SimplDriver.Ge
                        ; ("EnumSized"                , SimpleDer [SimplDriver.EnumSized])                       
                        ; ("Shrink"                   , SimpleDer [SimplDriver.Shrink])
                        ; ("Arbitrary"                , SimpleDer [SimplDriver.GenSized; SimplDriver.Shrink])
+                       ; ("Fuzzy"                    , SimpleDer [SimplDriver.Fuzzy])
                        ; ("Show"                     , SimpleDer [SimplDriver.Show])
                        ; ("Sized"                    , SimpleDer [SimplDriver.Sized])
                        ; ("Nullary"                , SimpleDer [SimplDriver.Nullary])
@@ -80,9 +81,9 @@ let merge ind1 ind2 ind3 =
 
 let merge_test ind1  =
   MergeTypes.merge_test ind1
+
 }
 
-  
 VERNAC COMMAND EXTEND Merge CLASSIFIED AS SIDEFF
  | ["Merge" constr(ind1) "With" constr(ind2) "As" constr(ind)] ->
     { merge ind1 ind2 ind }
@@ -110,4 +111,9 @@ VERNAC COMMAND EXTEND QCDerive CLASSIFIED AS SIDEFF
      { dispatch class_name inductive (Id.to_string genInst) ""}
    | ["QCDerive" constr(class_name) "for" constr(inductive) "using" ident(genInst) "and" ident(monInst) ] ->
      { dispatch class_name inductive (Id.to_string genInst) (Id.to_string monInst)}
+END
+
+VERNAC COMMAND EXTEND DeriveProp CLASSIFIED AS SIDEFF
+   | ["Derive" "Property" ident(def) ] ->
+     { GenericLib.deepen_prop def (Id.to_string def ^ "_prop") }
 END
