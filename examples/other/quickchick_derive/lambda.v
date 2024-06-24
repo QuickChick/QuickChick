@@ -123,6 +123,7 @@ Inductive step : term -> term -> Prop :=
 
 (*Derive DecOpt for (step e e').*)
 Derive GenSizedSuchThat for (fun e' => step e e').
+Derive ArbitrarySizedSuchThat for (fun e => typing' env e tau).
 Derive Show for type.
 Derive Show for term.
 
@@ -441,7 +442,9 @@ Theorem preservation : forall e e' Gamma tau,
     step e e' ->
     typing' Gamma e' tau.
 Proof.
- grab_dependencies. print_all_bindings. derive_and_quickchick. quickchick.
+  grab_dependencies. print_all_bindings. derive_and_quickchick_index 6.
+
+  derive_and_quickchick_index 2. quickchick.
 Admitted.
 
 (*  

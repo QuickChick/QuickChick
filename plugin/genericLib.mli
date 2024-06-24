@@ -262,6 +262,9 @@ val g_arbitraryST : coq_expr -> coq_expr
 val g_quickCheck : coq_expr -> coq_expr
 val g_show : coq_expr -> coq_expr
 
+
+val gSet : coq_expr
+
 (* val gGen : coq_expr -> coq_expr *)
 (* val returnGen  : coq_expr -> coq_expr  *)
 (* val bindGen    : coq_expr -> string -> (var -> coq_expr) -> coq_expr  *)

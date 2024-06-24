@@ -272,6 +272,8 @@ let rec dep_type_variables = function
 let rec dep_type_one_relation_variables = function
   | DTyCtr (_, ds) -> List.concat (List.map dep_type_one_relation_variables ds)
   | DTyVar x -> [x]
+  | DCtr (_, ds) -> List.concat (List.map dep_type_one_relation_variables ds)
+  | DApp (d, ds) -> List.concat (List.map dep_type_one_relation_variables (d :: ds))
   | _ -> (*error all args must be abstract*) CErrors.user_err (str "dep_type_one_relation_variables: Not a type variable" ++ fnl())
 
 let rec dep_type_var_types = function
@@ -830,7 +832,9 @@ let gType' ty_params dep_type =
     | DNot dt -> gApp (gInject "Coq.Init.Logic.not") [aux dt]
   in 
   debug_coq_expr (aux dep_type); aux dep_type
-  
+
+let gSet = gInject "Set"
+
 (*    
   match ty_params with 
   | [] -> aux dep_type 

@@ -1,0 +1,52 @@
+{
+(*
+
+THIS FILE IS PREPROCESSED USING cppo
+MAKE SURE TO EDIT THE .cppo SOURCE OF THIS FILE RATHER THAN THE GENERATED RESULT
+
+*)
+
+  open Ltac_plugin
+  open Error
+  open Pp
+  open Stdarg
+  (* open DepDriver *)
+  open GenericLib
+
+}
+
+DECLARE PLUGIN "coq-quickchick.plugin"
+
+{
+
+
+
+
+let create_nullary_inductive' ind_name =
+  match dep_dt_from_mib (qualid_to_mib ind_name) with
+  | None -> failwith ("Could not find inductive type " ^ Libnames.string_of_qualid ind_name)
+  | Some (ind_ty_ctr_name, ty_params, ctr_reps, result_ty) ->
+    let fresh_ty_ctr n = gInjectTyCtr (var_to_string (fresh_name (ty_ctr_to_string n ^ "\'"))) in
+    let fresh_ind_name = fresh_ty_ctr ind_ty_ctr_name in
+    let nullary_ctr_reps = List.map (fun (ctr_name, ctr_ty) -> (ty_ctr_to_ctr (fresh_ty_ctr (ctr_to_ty_ctr ctr_name)), DTyCtr (fresh_ind_name,[]))) ctr_reps in
+    let new_dep_dt = (fresh_ind_name, [], nullary_ctr_reps, result_ty) in
+    GenericLib.define_new_inductive new_dep_dt;
+    (fresh_ind_name, List.map fst ctr_reps)
+
+let create_nullary_inductive ind_name =
+  ignore (create_nullary_inductive' ind_name); Tacticals.tclIDTAC
+
+let nullary_decl ty_ctr ctrs =
+  msg_debug (str "Deriving Nullary Information:" ++ fnl ());
+  msg_debug (str ("Type constructor is: " ^ ty_ctr_to_string ty_ctr) ++ fnl ());
+  msg_debug (str (str_lst_to_string "\n" (List.map ctr_rep_to_string ctrs)) ++ fnl());
+
+  let (nullary_type, nullary_ctrs) = create_nullary_inductive' (tyCtrToQualid ty_ctr) in
+
+  gRecord [("nullType", gTyCtr nullary_type); ("nullConstructors", gList (List.map (fun x -> gCtr (x)) nullary_ctrs))]
+
+}
+
+TACTIC EXTEND nullary
+| [ "nullary" ident(ind) ] -> { create_nullary_inductive (Libnames.qualid_of_ident ind) }
+END

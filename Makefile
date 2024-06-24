@@ -77,7 +77,10 @@ tests:
 	coqc examples/DependentTest.v
 	coqc examples/TacticExample.v
 
+# plugin/tactic_inductive_tags.mlg 
+
 COMPATFILES:= \
+  plugin/tactic_inductive_tags.mlg \
 	plugin/depDriver.ml \
 	plugin/genericLib.ml \
 	plugin/mergeTypes.ml \

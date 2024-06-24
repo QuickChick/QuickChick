@@ -19,3 +19,4 @@ MergeTypes
 Driver
 QuickChick
 Tactic_quickchick
+Tactic_inductive_tags

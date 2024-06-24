@@ -59,6 +59,8 @@ Class EnumSized (A : Type) := { enumSized : nat -> E A }.
   
 Class Enum (A : Type) := { enum : E A }.
 
+Class Nullary (A : Type) := { nullType : Type; nullConstructors : list nullType }.
+
 (* ZP: This is not longer usefull *) 
 (* 
 (** * Sizes of types *)

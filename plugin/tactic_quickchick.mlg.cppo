@@ -158,6 +158,8 @@ let rec freshen_names_in_prop (dt : dep_type) : dep_type =
   | DTyCtr (c, dts) -> DTyCtr (c, List.map freshen_names_in_prop dts)
   | DCtr (c, dts) -> DCtr (c, List.map freshen_names_in_prop dts)
   | DTyVar x -> DTyVar (fresh_name (var_to_string x))
+  | DApp (f, args) -> DApp (freshen_names_in_prop f, List.map freshen_names_in_prop args)
+  | _ -> failwith ("FRESHEN FAILED WITH: " ^ dep_type_to_string dt)
 
 
 let find_arbitrary_st env (x_dt : dep_type) (dt : dep_type) (idx : int) : coq_expr option =
@@ -167,7 +169,8 @@ let find_arbitrary_st env (x_dt : dep_type) (dt : dep_type) (idx : int) : coq_ex
       let bool_sig = make_bool_sig idx dt in
       msg_debug (str "BOOLSIG: [" ++ str (List.map string_of_bool bool_sig |> String.concat ", ") ++ str "]" ++ fnl ());
       let freshen_names = freshen_names_in_prop dt in
-      let output_var_name = try List.nth (dep_type_one_relation_variables (freshen_names)) (idx - 1) with _ -> CErrors.user_err (str (dep_type_to_string (freshen_names)) ++ str "\n" ++ str "dep_typ_vars freshname1" ++ str "nth failed: " ++ int (idx - 1) ++ fnl ())
+      let names_list = dep_type_one_relation_variables freshen_names in
+      let output_var_name = try List.nth names_list (idx - 1) with _ -> CErrors.user_err (str (dep_type_to_string (freshen_names)) ++ str "\n" ++ str "dep_typ_vars freshname1" ++ str "nth failed: " ++ int (idx - 1) ++ fnl ())
     in
       if List.mem bool_sig bindings then Some (g_arbitraryST (gFunWithArgs [gArg ~assumName:(gVar output_var_name) ()] (fun [v] -> gType' [] freshen_names)))
       else None
@@ -176,7 +179,8 @@ let derive_arbitrary dt = g_arbitrary
 
 let derive_arbitrary_st x_dt dt idx =
   let freshen_names = freshen_names_in_prop dt in
-  let output_var_name = try List.nth (dep_type_one_relation_variables (freshen_names)) (idx - 1) with _ -> CErrors.user_err (str "dep_typ_vars freshname2" ++ str "nth failed: " ++ int (idx - 1) ++ fnl ())
+  let names_list = dep_type_one_relation_variables freshen_names in
+  let output_var_name = try List.nth names_list (idx - 1) with _ -> CErrors.user_err (str "dep_typ_vars freshname2" ++ str "nth failed: " ++ int (idx - 1) ++ fnl ())
   in
   let ind = gFunWithArgs [gArg ~assumName:(gVar output_var_name) ()] (fun [v] -> gType' [] freshen_names) in
   let id = (DepDriver.dep_dispatch (unsafe_coq_expr_to_constr_expr ind) GenSizedSuchThat) in
@@ -210,8 +214,10 @@ let bindForAlls (generators : (var * coq_expr * bool) list) (concl : coq_expr) :
         in 
     g_forAll g (gFunWithArgs [gArg ~assumName:(gVar x) ()] (fun [_] -> body))) (List.rev generators) concl
 
+let decoptfuel = 3
+
 let check_remaining_inductives (inductives : dep_type list) (concl : coq_expr) : coq_expr =
-  let decide prop = decOptToBool (g_decOpt prop (gInt 1000)) in
+  let decide prop = decOptToBool (g_decOpt prop (gInt decoptfuel)) in
   List.fold_right (fun ind acc -> gIf (decide (gType' [] ind)) acc (g_checker gTT)) inductives concl
 
 let rec fold_right_manip_remaining (f : 'a -> 'a list -> 'b -> ('b * 'a list)) (l : 'a list) (acc : 'b) : 'b =
@@ -287,8 +293,8 @@ let print_all_bindings' bindings : unit =
     let string_of_option f = function
       | None -> "None"
       | Some x -> "Some" ^ (f x) in
-    List.iter (fun (b, i) ->
-        msg_debug (str "Bindings: " ++ fnl ());
+    List.iteri (fun j (b, i) ->
+        msg_debug (str "Bindings: " ++ str (string_of_int j) ++ fnl ());
       List.iter (fun (v, t, opt) ->
           msg_debug (str (var_to_string v) ++ str " : " ++ str (dep_type_to_string t) ++ str " : " ++ str (string_of_option (fun (r, i) -> dep_type_to_string r ^ " " ^ string_of_int i) opt) ++ fnl ())
       ) b;
@@ -353,43 +359,6 @@ let rec binding_options ((ind_vars, var_uses) : dep_type_var_map_views) (typed_v
     let unused_theorems = List.map snd (List.filter (fun (_,thm) -> not (List.mem thm used_theorems)) theorem_relations) in
     (var_uses_typed_list_to_option, unused_theorems)
   ) options 
-
-
-
-    
-    
-      
-    
-(*     
-
-let rec binding_options ((ind_vars, var_uses) : dep_type_var_map_views) (typed_vars : (var * dep_type) list) theorem_relations : ((var * dep_type * (dep_type * int) option) list * dep_type list) list =
-  (*Print out the size of the var_uses*)
-  (* msg_debug (str "Size of var_uses: " ++ int (List.length var_uses) ++ fnl ()); *)
-  print_dep_type_var_map_views (ind_vars, var_uses);
-  list_bind var_uses (fun (var, uses) -> 
-    let ty = try List.assoc var typed_vars with _ -> failwith "binding_options: variable not found in typed_vars" in
-    if uses = [] then
-      let ind_vars' = List.map (fun (i, vs) -> (i, List.filter (fun v -> v <> var) vs)) ind_vars in
-      let var_uses' = List.remove_assoc var var_uses in
-      msg_debug (str "DOING A BIND" ++ fnl ());
-      let (recurse,rem) = binding_options (ind_vars', var_uses') typed_vars theorem_relations in
-      list_bind (use_and_give ([] :: recurse, rem) print_all_bindings' ) (fun (bindings, remaining_inds) -> 
-        (* print_all_bindings' bindings; *)
-        [((var, ty, None) :: bindings, remaining_inds)])
-    else
-      list_bind uses (fun (idx, var_idx) -> 
-        let relation = List.assoc idx theorem_relations in
-        let depends = safe_assoc idx ind_vars in
-        let different_depends = List.filter (fun v' -> v' <> var) depends in
-        let (variables_to_arb,remaining_typed_vars) = List.partition (fun (v',_) -> (List.mem v' different_depends)) typed_vars in
-        let variables_to_arb' = List.map (fun (v',t') -> (v',t',None)) variables_to_arb in
-        let (var_uses', ind_vars') = GenericLib.remove_dependencies idx var_idx var var_uses ind_vars in
-        list_bind ([] :: (binding_options (ind_vars', var_uses') typed_vars theorem_relations) )
-          (fun (bindings, remaining_inds) -> 
-            [(((var, ty, Some (relation, var_idx)) :: (List.map (fun (v',t') -> (v',t',None)) variables_to_arb)) @ bindings, remaining_inds)]
-          )
-      )
-  ) *)
   
 (*Each element of the list is a triple (variable, variable_type, inductive_relation_binding_the_variable_and_the_index_of_variable_use) *)
 let makeBindings (theorem : dep_type) : ((var * dep_type * (dep_type * int) option) list) * dep_type list =
@@ -400,15 +369,17 @@ let makeBindings (theorem : dep_type) : ((var * dep_type * (dep_type * int) opti
   let (result, _, ind_vars') = fold_right_manip_remaining (bind_variable_to_relation theorem_relations) type_vars ([], variable_uses, ind_vars) in
   (result, List.map (fun (i, _) -> try List.assoc i theorem_relations with _ -> failwith "makeBindings: index not found in theorem relations") ind_vars')
 
+(*Remove duplicates from list*)
+let rec remove_duplicates = function
+  | [] -> []
+  | x :: xs -> x :: remove_duplicates (List.filter (fun y -> x <> y) xs)
+
 let makeAllBindings (theorem : dep_type) : (((var * dep_type * (dep_type * int) option) list) * dep_type list) list =
   let type_vars = dep_type_var_types theorem in
   let variable_uses = dep_type_var_relation_uses theorem in
   let ind_vars = dep_type_relation_variables theorem in
   let theorem_relations = dep_type_relations theorem in
-  binding_options (ind_vars, variable_uses) type_vars theorem_relations
-
-
-
+  remove_duplicates (binding_options (ind_vars, variable_uses) type_vars theorem_relations)
 
 let print_all_bindings (theorem : dep_type) : unit =
   let bindings = makeAllBindings theorem in
@@ -432,13 +403,30 @@ let print_bindings_tactic =
 (*Given an association, and the original dep_type, for each variable take... remember to emit variabl deptype pairs at the end of the list*)
 let construct_constrained_generator' env (bindings : (var * dep_type * (dep_type * int) option) list) (checked_inductives : dep_type list) (concl : dep_type) : coq_expr =
   let bound_generators : (var * coq_expr * bool) list = List.map (derive_or_find_generators env) bindings in
-  let decide prop = decOptToBool (g_decOpt prop (gInt 1000)) in
-  bindForAlls bound_generators (check_remaining_inductives checked_inductives (g_checker (decide (gType' [] concl))))
+  let decide prop = decOptToBool (g_decOpt prop (gInt decoptfuel)) in
+  let a = bindForAlls bound_generators (check_remaining_inductives checked_inductives (g_checker (decide (gType' [] concl)))) in
+  msg_debug (str "Constructed constrained generator" ++ fnl ());
+  a
 
 let construct_constrained_generator env (theorem : dep_type) : coq_expr =
   let (bindings, checked_inductives) = makeBindings theorem in
   let (_,concl) = dep_type_hyps_and_concl theorem in
   construct_constrained_generator' env bindings checked_inductives concl
+
+let construct_constrained_generators_for_all_bindings env (all_bindings : ((var * dep_type * (dep_type * int) option) list * dep_type list) list) (concl : dep_type) : coq_expr list =
+  List.map (fun (bindings, checked_inductives) -> construct_constrained_generator' env bindings checked_inductives concl) all_bindings
+
+let construct_constrained_generators env (theorem : dep_type) : coq_expr list =
+  let all_bindings = makeAllBindings theorem in
+  let (_,concl) = dep_type_hyps_and_concl theorem in
+  construct_constrained_generators_for_all_bindings env all_bindings concl
+
+let construct_constrained_generator_idx env (theorem : dep_type) (idx : int) : coq_expr =
+  let all_bindings = (makeAllBindings theorem) in
+  let (_,concl) = dep_type_hyps_and_concl theorem in
+  match List.nth_opt all_bindings idx with
+  | None -> failwith "Index out of bounds"
+  | Some (bindings, checked_inductives) -> construct_constrained_generator' env bindings checked_inductives concl
 
 let derive_and_quickchick = 
   Proofview.Goal.enter_one begin fun gl ->
@@ -469,6 +457,36 @@ let derive_and_quickchick =
       end
     | None -> failwith "Failed to Parse type"
   end
+
+(*Create a version of derive_and_quickchick that takes an index and chooses the generator indexed by that number.*)
+let derive_and_quickchick_index i =
+  Proofview.Goal.enter_one begin fun gl ->
+    let c = Proofview.Goal.concl gl in
+    let e = Proofview.Goal.env gl in
+    let evd = Evd.from_env e in
+    
+    match GenericLib.parse_dependent_type (EConstr.to_constr evd c) with
+    | Some dt -> 
+      begin
+        msg_debug (str (GenericLib.dep_type_to_string dt) ++ fnl ());
+        let open GenericLib in 
+        msg_debug (str "Checking for generators" ++ fnl ());
+        let e' = Global.env () in
+        let constrained_gen = construct_constrained_generator_idx e' dt i in
+        debug_coq_expr constrained_gen;
+        msg_debug (str "After constrained generator" ++ fnl ());
+        let updated_env = Global.env () in
+        let updated_evd = Evd.from_env updated_env in
+        msg_debug (str "Running QuickCheck" ++ fnl ());
+        let to_run = GenericLib.interp_open_coq_expr updated_env updated_evd (g_show (g_quickCheck constrained_gen)) in
+        let updated_env' = Global.env () in
+        let updated_evd' = Evd.from_env updated_env' in
+        QuickChick.define_and_run to_run updated_env' updated_evd';
+        Tacticals.tclIDTAC
+      end
+    | None -> failwith "Failed to Parse type"
+  end
+
     
 let quickchick_goal =
   Proofview.Goal.enter begin fun gl ->
@@ -495,7 +513,7 @@ let quickchick_goal =
       begin
         msg_debug (str (GenericLib.dep_type_to_string dt) ++ fnl ());
         let open GenericLib in 
-        let decide prop = decOptToBool (g_decOpt prop (gInt 1000)) in
+        let decide prop = decOptToBool (g_decOpt prop (gInt decoptfuel)) in
         let rec mkProperty = function
           | DProd ((var, _),body) -> 
               g_forAll g_arbitrary (gFun [var_to_string var] (fun [_] ->
@@ -666,6 +684,10 @@ END
 
 TACTIC EXTEND derive_and_quickchick
   | ["derive_and_quickchick"] -> { derive_and_quickchick }
+END
+
+TACTIC EXTEND derive_and_quickchick_index
+  | ["derive_and_quickchick_index" int(i)] -> { derive_and_quickchick_index i }
 END
 
 TACTIC EXTEND merge_sound_core
