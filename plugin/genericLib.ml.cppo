@@ -1055,12 +1055,12 @@ let rec permutations (l : 'a list) : 'a list list =
   match l with
   | [] -> [[]]
   | x::xs -> List.concat (List.map (fun l' -> insert_everywhere x l') (permutations xs))
-
+(* 
 let delete_int (i : int) (m : (var * int list) list) : (var * int list) list =
   List.map (fun (x, inds) -> (x, List.filter (fun i' -> i' <> i) inds)) m
 
 let clear_var (x : var) (m : (var * int list) list) : (var * int list) list =
-  List.map (fun (x', inds) -> if x = x' then (x', []) else (x', inds)) m
+  List.map (fun (x', inds) -> if x = x' then (x', []) else (x', inds)) m *)
 
 let safe_assoc (i : 'a) (m : ('a * 'b) list) : 'b =
   try List.assoc i m with Not_found -> []
@@ -1077,13 +1077,13 @@ let remove_dependencies (i : int) (var_idx : int) (x : var) (var_deps : (var * (
 
 
 (*F |- e : T *)
-
+(* 
 (*dependency_cost finds how many variables must be universally instantiated to generate this variable for this inductive now*)
 let dependency_cost (i : int) (x : var) (ind_deps : (int * var list) list) : int =
   let depends = safe_assoc i ind_deps in
   List.length depends - 1
 
-
+ *)
 
 
 (* let rec dependency_ord (m : (int * var list) list) (x y : var) : option int = *)

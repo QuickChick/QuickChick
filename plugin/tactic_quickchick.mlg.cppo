@@ -248,11 +248,11 @@ let bind_variable_to_relation theorem_relations (v,t) typed_vars (acc, var_uses,
   
 type dep_type_var_map_views =  ((int * var list) list) * ((var * (int * int) list) list)
 
-let dep_type_var_map theorem : dep_type_var_map_views =
+(* let dep_type_var_map theorem : dep_type_var_map_views =
     let type_vars = dep_type_var_types theorem in
     let variable_uses = dep_type_var_relation_uses theorem in
     let ind_vars = dep_type_relation_variables theorem in
-    (ind_vars, variable_uses)
+    (ind_vars, variable_uses) *)
 
 
 let list_bind (l : 'a list) (f : 'a -> 'b list) : 'b list =
@@ -275,7 +275,7 @@ let list_bind (l : 'a list) (f : 'a -> 'b list) : 'b list =
     let 
 *)    
 
-let print_dep_type_var_map_views (ind_vars, var_uses) = 
+(* let print_dep_type_var_map_views (ind_vars, var_uses) = 
   msg_debug (str "Printing dep_type_var_map_views" ++ fnl ());
   let string_of_option f = function
     | None -> "None"
@@ -283,7 +283,7 @@ let print_dep_type_var_map_views (ind_vars, var_uses) =
   List.iter (fun (i, vs) -> msg_debug (str (string_of_int i) ++ str " : " ++ str (String.concat ", " (List.map var_to_string vs)) ++ fnl ())) ind_vars;
   List.iter (fun (v, uses) -> 
     msg_debug (str (var_to_string v) ++ str " : " ++ str (String.concat ", " (List.map (fun (i, j) -> "(" ^ string_of_int i ^ ", " ^ string_of_int j ^ ")") uses)) ++ fnl ())) var_uses
-
+ *)
 
 
 
@@ -292,7 +292,7 @@ let print_all_bindings' bindings : unit =
   else
     let string_of_option f = function
       | None -> "None"
-      | Some x -> "Some" ^ (f x) in
+      | Some x -> "Some " ^ (f x) in
     List.iteri (fun j (b, i) ->
         msg_debug (str "Bindings: " ++ str (string_of_int j) ++ fnl ());
       List.iter (fun (v, t, opt) ->
@@ -302,9 +302,9 @@ let print_all_bindings' bindings : unit =
     ) bindings  
     
     
-let use_and_give (x : 'a) (f : 'a -> unit) : 'a =
+(* let use_and_give (x : 'a) (f : 'a -> unit) : 'a =
   f x;
-  x
+  x *)
     
 let list_pair_with_rest l =
   let rec aux before current =
@@ -313,17 +313,12 @@ let list_pair_with_rest l =
     | now :: after -> (before @ after, now) :: aux (now :: before) after in
   aux [] l
     
-let rec assoc_update (k, v) l =
-  match l with
-  | [] -> [(k, v)]
-  | (k', v') :: rest -> if k = k' then (k, v) :: rest else (k', v') :: assoc_update (k, v) rest
     
 let rec assoc_remove_all_in_set k_set l =
   match l with
   | [] -> []
   | (k, v) :: rest -> if List.mem k k_set then assoc_remove_all_in_set k_set rest else (k, v) :: assoc_remove_all_in_set k_set rest 
     
-let (>>=) m f = List.concat_map f m
     
 let rec binding_options' ((ind_vars, var_uses) : dep_type_var_map_views) (typed_vars : (var * dep_type) list) : ((var * (int * int) list) list) list =
   msg_debug (str "Size of typed_vars: " ++ int (List.length typed_vars) ++ fnl ());
@@ -349,7 +344,7 @@ let rec binding_options' ((ind_vars, var_uses) : dep_type_var_map_views) (typed_
   list_bind (list_bind var_to_bind_options (fun (_,(var, ty)) -> bind_variable_to_relations var ty)) ((fun (dtvm_views, typed_vars) -> binding_options' dtvm_views typed_vars))
   end
         
-let rec binding_options ((ind_vars, var_uses) : dep_type_var_map_views) (typed_vars : (var * dep_type) list) theorem_relations 
+let binding_options ((ind_vars, var_uses) : dep_type_var_map_views) (typed_vars : (var * dep_type) list) theorem_relations 
   : ((var * dep_type * (dep_type * int) option) list * dep_type list) list =
   let options = binding_options' (ind_vars, var_uses) typed_vars in
   List.map (fun var_uses' ->
@@ -413,13 +408,13 @@ let construct_constrained_generator env (theorem : dep_type) : coq_expr =
   let (_,concl) = dep_type_hyps_and_concl theorem in
   construct_constrained_generator' env bindings checked_inductives concl
 
-let construct_constrained_generators_for_all_bindings env (all_bindings : ((var * dep_type * (dep_type * int) option) list * dep_type list) list) (concl : dep_type) : coq_expr list =
-  List.map (fun (bindings, checked_inductives) -> construct_constrained_generator' env bindings checked_inductives concl) all_bindings
+(* let construct_constrained_generators_for_all_bindings env (all_bindings : ((var * dep_type * (dep_type * int) option) list * dep_type list) list) (concl : dep_type) : coq_expr list =
+  List.map (fun (bindings, checked_inductives) -> construct_constrained_generator' env bindings checked_inductives concl) all_bindings *)
 
-let construct_constrained_generators env (theorem : dep_type) : coq_expr list =
+(* let construct_constrained_generators env (theorem : dep_type) : coq_expr list =
   let all_bindings = makeAllBindings theorem in
   let (_,concl) = dep_type_hyps_and_concl theorem in
-  construct_constrained_generators_for_all_bindings env all_bindings concl
+  construct_constrained_generators_for_all_bindings env all_bindings concl *)
 
 let construct_constrained_generator_idx env (theorem : dep_type) (idx : int) : coq_expr =
   let all_bindings = (makeAllBindings theorem) in

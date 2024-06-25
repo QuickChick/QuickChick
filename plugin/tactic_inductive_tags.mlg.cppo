@@ -19,9 +19,6 @@ DECLARE PLUGIN "coq-quickchick.plugin"
 
 {
 
-
-
-
 let create_nullary_inductive' ind_name =
   match dep_dt_from_mib (qualid_to_mib ind_name) with
   | None -> failwith ("Could not find inductive type " ^ Libnames.string_of_qualid ind_name)
@@ -31,7 +28,7 @@ let create_nullary_inductive' ind_name =
     let nullary_ctr_reps = List.map (fun (ctr_name, ctr_ty) -> (ty_ctr_to_ctr (fresh_ty_ctr (ctr_to_ty_ctr ctr_name)), DTyCtr (fresh_ind_name,[]))) ctr_reps in
     let new_dep_dt = (fresh_ind_name, [], nullary_ctr_reps, result_ty) in
     GenericLib.define_new_inductive new_dep_dt;
-    (fresh_ind_name, List.map fst ctr_reps)
+    (fresh_ind_name, List.map fst nullary_ctr_reps)
 
 let create_nullary_inductive ind_name =
   ignore (create_nullary_inductive' ind_name); Tacticals.tclIDTAC
@@ -43,7 +40,7 @@ let nullary_decl ty_ctr ctrs =
 
   let (nullary_type, nullary_ctrs) = create_nullary_inductive' (tyCtrToQualid ty_ctr) in
 
-  gRecord [("nullType", gTyCtr nullary_type); ("nullConstructors", gList (List.map (fun x -> gCtr (x)) nullary_ctrs))]
+  gRecord [("nullType", gTyCtr nullary_type); ("nullConstructors", gList (List.map gCtr nullary_ctrs))]
 
 }
 

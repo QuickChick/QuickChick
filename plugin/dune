@@ -28,6 +28,11 @@
  (action (run coqpp %{pp-file})))
 
 (rule
+ (targets tactic_inductive_tags.ml)
+ (deps (:pp-file tactic_inductive_tags.mlg))
+ (action (run coqpp %{pp-file})))
+
+(rule
  (targets weightmap.ml)
  (deps (:pp-file weightmap.mlg))
  (action (run coqpp %{pp-file})))
@@ -55,6 +60,10 @@
   (alias compat)
   (target tactic_quickchick.mlg)
   (action (run %{exe:../scripts/mycppo} %{dep:tactic_quickchick.mlg.cppo} %{target})))
+(rule
+  (alias compat)
+  (target tactic_inductive_tags.mlg)
+  (action (run %{exe:../scripts/mycppo} %{dep:tactic_inductive_tags.mlg.cppo} %{target})))  
 (rule
   (alias compat)
   (target unifyQC.ml)
