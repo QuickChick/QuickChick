@@ -4,8 +4,8 @@ val base_ctrs :
   GenericLib.ty_ctr ->
   ('a * GenericLib.coq_type) list -> ('a * GenericLib.coq_type) list
 val sized_decl :
-  GenericLib.ty_ctr ->
-  (GenericLib.constructor * GenericLib.coq_type) list -> GenericLib.coq_expr
+  (GenericLib.ty_ctr * GenericLib.ty_param list * GenericLib.ctr_rep list) list ->
+  (GenericLib.ty_ctr -> GenericLib.var list -> GenericLib.coq_expr) * ((GenericLib.var * GenericLib.arg list * GenericLib.var * GenericLib.coq_expr * GenericLib.coq_expr) list)
 val gen_args :
   GenericLib.coq_type ->
   GenericLib.ty_ctr -> int -> string list * string list
