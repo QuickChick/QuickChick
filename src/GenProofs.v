@@ -437,7 +437,7 @@ Ltac2 derive_gen_Correct (_ : unit) :=
   | [ |- @CorrectSized ?typ _ _ ?en ] =>  
     simpl_enumSized ();
     match! goal with
-    | [ |- @CorrectSized _ _ _ [eta ?gen_simpl] ] =>
+    | [ |- @CorrectSized _ _ _ ?gen_simpl ] =>
       (* get the enum body *)
       set (_aux_gen := ltac2:(exact $gen_simpl));
       let hsize := Fresh.in_goal (id_of_string "Hsize") in
