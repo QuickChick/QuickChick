@@ -84,6 +84,7 @@ COMPATFILES:= \
 	plugin/quickChick.mli \
 	plugin/quickChick.mlg \
 	plugin/unifyQC.ml \
+	plugin/unifyQC.mli \
 	plugin/tactic_quickchick.mlg \
 	plugin/weightmap.mlg \
 	src/Compat.v \
