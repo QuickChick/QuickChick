@@ -377,8 +377,10 @@ let add_manual_extract cs =
     | _ -> failwith "Usage: Extract Manually failed." in
   let refs : qualid list =
     match cs with
-    | { CAst.v = CNotation (_,_,([a],[b],_,_)) ; _ } -> begin
+    | { CAst.v = CNotation (_, _, [NtnTypeArg (NtnTypeArgConstr a); NtnTypeArgList b]) ; _ }
+        when List.for_all (function (NtnTypeArg (NtnTypeArgConstr _)) -> true | _ -> false) b -> begin
          let q = convert_reference_to_qualid a in
+         let b = List.map (function (NtnTypeArg (NtnTypeArgConstr b)) -> b | _ -> assert false) b in
          let qs = List.map convert_reference_to_qualid b in
          q :: qs
        end

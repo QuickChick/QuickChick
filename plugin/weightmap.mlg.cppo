@@ -53,7 +53,7 @@ let convert_constr_to_weight c =
 
 let convert_constr_to_cw_pair c : (constructor * weight_ast) = 
   match c.CAst.v with
-  | CNotation (_, _, ([a],[[b]],_,_)) ->
+  | CNotation (_, _, [NtnTypeArg (NtnTypeArgConstr a); NtnTypeArgList [NtnTypeArg (NtnTypeArgConstr b)]]) ->
       let ctr = 
         match a with 
         | { CAst.v = CRef (r, _); _ } -> injectCtr (string_of_qualid r)
@@ -93,8 +93,10 @@ VERNAC COMMAND EXTEND QuickChickWeights CLASSIFIED AS SIDEFF
      {
        let weight_assocs = 
          match c.CAst.v with
-         | CNotation (_, _, ([a],[b],_,_)) ->
+         | CNotation (_, _, [NtnTypeArg (NtnTypeArgConstr a); NtnTypeArgList b])
+           when List.for_all (function (NtnTypeArg (NtnTypeArgConstr _)) -> true | _ -> false) b ->
              let c = convert_constr_to_cw_pair a in
+             let b = List.map (function (NtnTypeArg (NtnTypeArgConstr b)) -> b | _ -> assert false) b in
              let cs = List.map convert_constr_to_cw_pair b in
              c :: cs
          | _ -> failwith "QC: Expected list of constructor -> weights"
