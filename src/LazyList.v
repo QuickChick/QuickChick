@@ -344,7 +344,7 @@ Fixpoint filter_LazyList {A} (p : A -> bool) (l : LazyList A) :=
                  else filter_LazyList p (t tt)
   end.
 
-Require Import Coq.Logic.ClassicalFacts.
+From Coq.Logic Require Import ClassicalFacts.
 
 Axiom EM : excluded_middle.
 

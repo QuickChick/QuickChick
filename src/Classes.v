@@ -1,4 +1,4 @@
-From Coq Require Import List Morphisms Recdef ZArith ZArith.Znat Arith.
+From Coq Require Import List Morphisms Recdef ZArith Znat Arith.
 From QuickChick  Require Import Sets Tactics Producer Generators Enumerators.
 
 Set Bullet Behavior "Strict Subproofs".

@@ -158,7 +158,11 @@ Proof.
   apply wf_lexprod. now apply Wf_nat.lt_wf. intros _; now apply well_foulded_ltColor.
 Qed.
 
-Require Import Program.Wf. Import WfExtensionality.
+#if COQ_VERSION >= (8, 21, 0)
+From Stdlib.Program Require Import Wf WfExtensionality. Import WfExtensionality.
+#else
+From Coq.Program Require Import Wf. Import WfExtensionality.
+#endif
 Require Import FunctionalExtensionality.
 
 (* begin genRBTree_height *)
