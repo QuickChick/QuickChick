@@ -13,7 +13,11 @@ From Ltac2 Require Import Ltac2.
 From Ltac2 Require Import Message.
 From Ltac2 Require Import Constr.
 
+#if COQ_VERSION >= (8, 21, 0)
+Ltac2 ltac1_congruence () := Ltac1.run (Ltac1.ref [ident:(Stdlib); ident:(Init); ident:(Prelude); ident:(congruence)]).
+#else
 Ltac2 ltac1_congruence () := Ltac1.run (Ltac1.ref [ident:(Coq); ident:(Init); ident:(Prelude); ident:(congruence)]).
+#endif
 Ltac2 Notation "congruence" := ltac1_congruence ().
 
 (* From https://github.com/tchajed/coq-ltac2-experiments/blob/master/src/Ltac2Lib.v *)
