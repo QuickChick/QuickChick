@@ -1,7 +1,6 @@
-#!/bin/sh
-# Usage: mycppo input.v.cppo output.v
+# sh mk-mycppo generates the script mycppo
+# Usage: sh mycppo input.v.cppo output.v
 
 COQVER=$(coqc -print-version)
 COQVER=${COQVER%% *}
-printf "#!/bin/sh\ncppo -V OCAML:$(ocamlc -version) -V COQ:$COQVER -n \$1 -o \$2" > mycppo
-chmod u+x mycppo
+printf "cppo -V OCAML:$(ocamlc -version) -V COQ:$COQVER -n \$1 -o \$2" > mycppo
