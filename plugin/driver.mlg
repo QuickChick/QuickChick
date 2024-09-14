@@ -92,7 +92,7 @@ VERNAC COMMAND EXTEND MergeTest CLASSIFIED AS SIDEFF
     { merge_test ind1 }
 END
 
-VERNAC COMMAND EXTEND Derive CLASSIFIED AS SIDEFF
+VERNAC COMMAND EXTEND QuickChickDerive CLASSIFIED AS SIDEFF
    | ["Derive" constr(class_name) "for" constr(inductive)] ->
      { dispatch class_name inductive "" "" }
    | ["Derive" constr(class_name) "for" constr(inductive) "using" ident(genInst)] ->
