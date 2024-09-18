@@ -30,7 +30,7 @@ val umfind : UM.key -> 'a UM.t -> 'a
 val lookup : unknown -> umap -> range option
 module OrdTSS :
   sig type t = unknown * unknown val compare : 'a -> 'a -> int end
-#if COQ_VERSION >= (8, 20, 0)
+#if COQ_VERSION >= (8, 21, 0)
 module EqSet : CSet.ExtS with type elt = OrdTSS.t
 #else
 module EqSet : Set.S with type elt = OrdTSS.t
@@ -38,7 +38,7 @@ module EqSet : Set.S with type elt = OrdTSS.t
 val eq_set_add : unknown -> unknown -> EqSet.t -> EqSet.t
 module OrdTyp :
   sig type t = GenericLib.dep_type val compare : 'a -> 'a -> int end
-#if COQ_VERSION >= (8, 20, 0)
+#if COQ_VERSION >= (8, 21, 0)
 module ArbSet : CSet.ExtS with type elt = OrdTyp.t
 #else
 module ArbSet : Set.S with type elt = OrdTyp.t
