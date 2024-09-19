@@ -247,6 +247,13 @@ val gIf : coq_expr -> coq_expr -> coq_expr -> coq_expr
 val gUnit : coq_expr
 val gTT   : coq_expr
 
+(* Either + *)
+val g_inr : coq_expr -> coq_expr
+val g_inl : coq_expr -> coq_expr
+
+(* Z *)
+val g_Z_of_nat : coq_expr -> coq_expr
+
 (* dec *)
 val g_dec : coq_expr -> coq_expr
 val g_decOpt : coq_expr -> coq_expr -> coq_expr
@@ -263,7 +270,8 @@ val g_arbitrary : coq_expr
 val g_arbitraryST : coq_expr -> coq_expr 
 val g_quickCheck : coq_expr -> coq_expr
 val g_show : coq_expr -> coq_expr
-
+val g_size : coq_expr -> coq_expr
+val g_tyche_with_features : coq_expr -> coq_expr -> coq_expr -> coq_expr -> coq_expr
 
 val gSet : coq_expr
 

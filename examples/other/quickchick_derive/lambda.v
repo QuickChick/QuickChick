@@ -66,7 +66,7 @@ Inductive typing' (e : env) : term -> type -> Prop :=
       tau = Arrow tau1 tau2 ->
       typing' e (App t1 t2) tau2.
 
-
+Check typing'.
 
 Derive Arbitrary for type.
 Derive Arbitrary for term.
@@ -133,210 +133,8 @@ Extract Constant segev_fuel_nat => "1000".
 
 Derive DecOpt for (step e e').
 
-(* Definition a := QuickChick.Checker.forAll QuickChick.Classes.arbitrary
-   (fun e => QuickChick.Checker.checker Coq.Init.Datatypes.tt).
 
-QuickChick a. *)
 
-(*Definition decopt_step e_ e'_ := (let
-fix aux_arb init_size size (e_ : term) (e'_ : term) {struct size} :
-    Coq.Init.Datatypes.option (Coq.Init.Datatypes.bool) :=
-  match size with
-  | O =>
-      checker_backtrack
-        (Coq.Lists.List.cons
-           (fun _unit =>
-            match e_ as s with
-            | @App (@Abs t) t2 =>
-                match @decOpt (@value t2) _ init_size as s with
-                | Some res_b =>
-                    match res_b with
-                    | true =>
-                        match
-                          @decOpt
-                            (@subst (@Coq.Init.Datatypes.O) t2 t e'_) _
-                            init_size as s
-                        with
-                        | Some res_b =>
-                            match res_b with
-                            | true =>
-                                @Coq.Init.Datatypes.Some
-                                  (Coq.Init.Datatypes.bool)
-                                  (@Coq.Init.Datatypes.true)
-                            | false =>
-                                @Coq.Init.Datatypes.Some
-                                  (Coq.Init.Datatypes.bool)
-                                  Coq.Init.Datatypes.false
-                            end
-                        | None =>
-                            @Coq.Init.Datatypes.None
-                              (Coq.Init.Datatypes.bool)
-                        end
-                    | false =>
-                        @Coq.Init.Datatypes.Some
-                          (Coq.Init.Datatypes.bool)
-                          Coq.Init.Datatypes.false
-                    end
-                | None =>
-                    @Coq.Init.Datatypes.None (Coq.Init.Datatypes.bool)
-                end
-            | _ =>
-                @Coq.Init.Datatypes.Some (Coq.Init.Datatypes.bool)
-                  Coq.Init.Datatypes.false
-            end)
-           (Coq.Lists.List.cons
-              (fun _unit =>
-               @Coq.Init.Datatypes.None Coq.Init.Datatypes.bool)
-              Coq.Lists.List.nil))
-  | S size' =>
-      checker_backtrack
-        (Coq.Lists.List.cons
-           (fun _unit =>
-            match e_ as s with
-            | @App (@Abs t) t2 =>
-                match @decOpt (@value t2) _ init_size as s with
-                | Some res_b =>
-                    match res_b with
-                    | true =>
-                        match
-                          @decOpt
-                            (@subst (@Coq.Init.Datatypes.O) t2 t e'_) _
-                            init_size as s
-                        with
-                        | Some res_b =>
-                            match res_b with
-                            | true =>
-                                @Coq.Init.Datatypes.Some
-                                  (Coq.Init.Datatypes.bool)
-                                  (@Coq.Init.Datatypes.true)
-                            | false =>
-                                @Coq.Init.Datatypes.Some
-                                  (Coq.Init.Datatypes.bool)
-                                  Coq.Init.Datatypes.false
-                            end
-                        | None =>
-                            @Coq.Init.Datatypes.None
-                              (Coq.Init.Datatypes.bool)
-                        end
-                    | false =>
-                        @Coq.Init.Datatypes.Some
-                          (Coq.Init.Datatypes.bool)
-                          Coq.Init.Datatypes.false
-                    end
-                | None =>
-                    @Coq.Init.Datatypes.None (Coq.Init.Datatypes.bool)
-                end
-            | _ =>
-                @Coq.Init.Datatypes.Some (Coq.Init.Datatypes.bool)
-                  Coq.Init.Datatypes.false
-            end)
-           (Coq.Lists.List.cons
-              (fun _unit =>
-               match e'_ as s with
-               | @App t1' unkn_24_ =>
-                   match e_ as s with
-                   | @App t1 t2 =>
-                       match
-                         @decOpt (Logic.eq t2 unkn_24_) _ init_size as s
-                       with
-                       | Some res_b =>
-                           match res_b with
-                           | true =>
-                               match aux_arb init_size size' t1 t1' with
-                               | Some res_b =>
-                                   match res_b with
-                                   | true =>
-                                       @Coq.Init.Datatypes.Some
-                                         (Coq.Init.Datatypes.bool)
-                                         (@Coq.Init.Datatypes.true)
-                                   | false =>
-                                       @Coq.Init.Datatypes.Some _
-                                         Coq.Init.Datatypes.false
-                                   end
-                               | None => @Coq.Init.Datatypes.None _
-                               end
-                           | false =>
-                               @Coq.Init.Datatypes.Some
-                                 (Coq.Init.Datatypes.bool)
-                                 Coq.Init.Datatypes.false
-                           end
-                       | None =>
-                           @Coq.Init.Datatypes.None
-                             (Coq.Init.Datatypes.bool)
-                       end
-                   | _ =>
-                       @Coq.Init.Datatypes.Some
-                         (Coq.Init.Datatypes.bool)
-                         Coq.Init.Datatypes.false
-                   end
-               | _ =>
-                   @Coq.Init.Datatypes.Some (Coq.Init.Datatypes.bool)
-                     Coq.Init.Datatypes.false
-               end)
-              (Coq.Lists.List.cons
-                 (fun _unit =>
-                  match e'_ as s with
-                  | @App unkn_26_ t2' =>
-                      match e_ as s with
-                      | @App t1 t2 =>
-                          match
-                            @decOpt (Logic.eq t1 unkn_26_) _ init_size as
-                            s
-                          with
-                          | Some res_b =>
-                              match res_b with
-                              | true =>
-                                  match
-                                    @decOpt (@value t1) _ init_size as s
-                                  with
-                                  | Some res_b =>
-                                      match res_b with
-                                      | true =>
-                                          match
-                                            aux_arb init_size size' t2 t2'
-                                          with
-                                          | Some res_b =>
-                                              match res_b with
-                                              | true =>
-                                              @Coq.Init.Datatypes.Some
-                                              (Coq.Init.Datatypes.bool)
-                                              (@Coq.Init.Datatypes.true)
-                                              | false =>
-                                              @Coq.Init.Datatypes.Some _
-                                              Coq.Init.Datatypes.false
-                                              end
-                                          | None =>
-                                              @Coq.Init.Datatypes.None _
-                                          end
-                                      | false =>
-                                          @Coq.Init.Datatypes.Some
-                                            (Coq.Init.Datatypes.bool)
-                                            Coq.Init.Datatypes.false
-                                      end
-                                  | None =>
-                                      @Coq.Init.Datatypes.None
-                                        (Coq.Init.Datatypes.bool)
-                                  end
-                              | false =>
-                                  @Coq.Init.Datatypes.Some
-                                    (Coq.Init.Datatypes.bool)
-                                    Coq.Init.Datatypes.false
-                              end
-                          | None =>
-                              @Coq.Init.Datatypes.None
-                                (Coq.Init.Datatypes.bool)
-                          end
-                      | _ =>
-                          @Coq.Init.Datatypes.Some
-                            (Coq.Init.Datatypes.bool)
-                            Coq.Init.Datatypes.false
-                      end
-                  | _ =>
-                      @Coq.Init.Datatypes.Some
-                        (Coq.Init.Datatypes.bool) Coq.Init.Datatypes.false
-                  end) Coq.Lists.List.nil)))
-  end in
-                                                fun size => aux_arb size size e_ e'_).*)
 (*Check decopt_step.
 Compute decopt_step (Const 1) (Const 2) 1000.
 
@@ -437,12 +235,131 @@ Definition b := (QuickChick.Checker.forAll QuickChick.Classes.arbitrary
 
 QuickChick b. *)
 
+From QuickChick Require Import Tyche.
+Check size.
+Locate size. Check size.
+
+Derive Sized for term.
+Derive Sized for type.
+Derive Sized for list.
+
+Extract Constant defNumTests => "10000".
+
+Definition a := 3.
+
+Definition prop := (QuickChick.Checker.forAll QuickChick.Classes.arbitrary
+   (fun e =>
+    QuickChick.Checker.forAll QuickChick.Classes.arbitrary
+      (fun e' =>
+       QuickChick.Checker.forAll QuickChick.Classes.arbitrary
+         (fun Gamma =>
+          QuickChick.Checker.forAll QuickChick.Classes.arbitrary
+            (fun tau =>
+             if
+              match @QuickChick.Decidability.decOpt (@typing' Gamma e tau) _ a with
+              | Coq.Init.Datatypes.Some res => res
+              | Coq.Init.Datatypes.None => Coq.Init.Datatypes.false
+              end
+             then
+              if
+               match @QuickChick.Decidability.decOpt (@step e e') _ 1 with
+               | Coq.Init.Datatypes.Some res => res
+               | Coq.Init.Datatypes.None => Coq.Init.Datatypes.false
+               end
+              then
+               QuickChick.Tyche.tyche_with_features "test"%string
+                 (QuickChick.Show.show
+                    (Coq.Init.Datatypes.pair
+                       (Coq.Init.Datatypes.pair (Coq.Init.Datatypes.pair (QuickChick.Show.show tau) (QuickChick.Show.show Gamma))
+                          (QuickChick.Show.show e')) (QuickChick.Show.show e)))
+                 (Coq.Lists.List.cons
+                    (Coq.Init.Datatypes.pair "tau-size"%string
+                       (Coq.Init.Datatypes.inr (Coq.ZArith.BinInt.Z.of_nat (QuickChick.Classes.size tau))))
+                    (Coq.Lists.List.cons
+                       (Coq.Init.Datatypes.pair "Gamma-size"%string
+                          (Coq.Init.Datatypes.inr (Coq.ZArith.BinInt.Z.of_nat (QuickChick.Classes.size Gamma))))
+                       (Coq.Lists.List.cons
+                          (Coq.Init.Datatypes.pair "e'-size"%string
+                             (Coq.Init.Datatypes.inr (Coq.ZArith.BinInt.Z.of_nat (QuickChick.Classes.size e'))))
+                          (Coq.Lists.List.cons
+                             (Coq.Init.Datatypes.pair "e-size"%string
+                                (Coq.Init.Datatypes.inr (Coq.ZArith.BinInt.Z.of_nat (QuickChick.Classes.size e)))) Coq.Lists.List.nil))))
+                 (QuickChick.Checker.checker
+                    match @QuickChick.Decidability.decOpt (@typing' Gamma e' tau) _ 1 with
+                    | Coq.Init.Datatypes.Some res => res
+                    | Coq.Init.Datatypes.None => Coq.Init.Datatypes.false
+                    end)
+              else QuickChick.Checker.checker Coq.Init.Datatypes.tt
+             else QuickChick.Checker.checker Coq.Init.Datatypes.tt)))))
+.
+
+Definition prop' := (QuickChick.Checker.forAll QuickChick.Classes.arbitrary
+   (fun e =>
+    QuickChick.Checker.forAll QuickChick.Classes.arbitrary
+      (fun e' =>
+       QuickChick.Checker.forAll QuickChick.Classes.arbitrary
+         (fun Gamma =>
+          QuickChick.Checker.forAll QuickChick.Classes.arbitrary
+            (fun tau =>
+             if
+              match @QuickChick.Decidability.decOpt (@typing' Gamma e tau) _ a with
+              | Coq.Init.Datatypes.Some res => res
+              | Coq.Init.Datatypes.None => Coq.Init.Datatypes.false
+              end
+             then
+              if
+               match @QuickChick.Decidability.decOpt (@step e e') _ a with
+               | Coq.Init.Datatypes.Some res => res
+               | Coq.Init.Datatypes.None => Coq.Init.Datatypes.false
+               end
+              then
+               
+                 (QuickChick.Checker.checker
+                    match @QuickChick.Decidability.decOpt (@typing' Gamma e' tau) _ a with
+                    | Coq.Init.Datatypes.Some res => res
+                    | Coq.Init.Datatypes.None => Coq.Init.Datatypes.false
+                    end)
+              else QuickChick.Checker.checker Coq.Init.Datatypes.tt
+             else QuickChick.Checker.checker Coq.Init.Datatypes.tt)))))
+.
+
+Compute @decOpt (@typing' [] (Const 0) N) _ 1000.
+
+QuickCheck prop'.
+Check @arbitraryST.
+
+Definition prop'' := 
+  forAll arbitrary (fun tau =>
+  (* forAll arbitrary (fun Gamma =>   *)
+  forAll (@arbitraryST _ (fun e => typing' [] e tau) _) (fun e =>
+    match e with 
+    | Some e => 
+      forAll (@arbitraryST _ (fun e' => step e e') _) (fun e' =>
+        match e' with
+        | Some e' =>
+          checker (match @decOpt (@typing' [] e' tau) _ 1000 with
+                   | Some res => res
+                   | None => false
+                   end)
+        | None => checker tt
+        end)
+    | None => checker tt
+    end)).
+
+QuickCheck prop''.
+
+
+
+
+
+
+
 Theorem preservation : forall e e' Gamma tau,
     typing' Gamma e tau ->
     step e e' ->
     typing' Gamma e' tau.
 Proof.
-  grab_dependencies. print_all_bindings. derive_and_quickchick_index 6.
+  grab_dependencies. print_all_bindings. derive_and_quickchick_index 9.
 
   derive_and_quickchick_index 2. quickchick.
 Admitted.

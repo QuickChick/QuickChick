@@ -1277,6 +1277,13 @@ let decOptToBool c =
 let gUnit = gInject "Coq.Init.Datatypes.unit"
 let gTT   = gInject "Coq.Init.Datatypes.tt"
 
+(* + *)
+let g_inr c = gApp (gInject "Coq.Init.Datatypes.inr") [c]
+let g_inl c = gApp (gInject "Coq.Init.Datatypes.inl") [c]
+
+(* Z *)
+let g_Z_of_nat c = gApp (gInject "Coq.ZArith.BinInt.Z.of_nat") [c]
+
 (* dec *)
 
 let g_dec typ = gApp ?explicit:(Some true) (gInject "QuickChick.Decidability.dec") [typ]
@@ -1298,6 +1305,11 @@ let g_arbitraryST prop = gApp ?explicit:(Some true) (gInject "QuickChick.Depende
 let g_quickCheck p = gApp (gInject "QuickChick.Test.quickCheck") [p]
 
 let g_show typ = gApp (gInject "QuickChick.Show.show") [typ]
+
+let g_size typ = gApp (gInject "QuickChick.Classes.size") [typ]
+
+let g_tyche_with_features name shown features prop = 
+  gApp (gInject "QuickChick.Tyche.tyche_with_features") [name; shown; features; prop]
 
 (* Recursion combinators / fold *)
 (* fold_ty : ( a -> coq_type -> a ) -> ( ty_ctr * coq_type list -> a ) -> ( ty_param -> a ) -> coq_type -> a *)

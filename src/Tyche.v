@@ -1,5 +1,5 @@
 Require Import State Test Checker Show.
-From JSON Require Import Printer.
+From JSON Require Import Printer. 
 Import ListNotations. Open Scope list_scope.
 Set Warnings "-extraction".
 

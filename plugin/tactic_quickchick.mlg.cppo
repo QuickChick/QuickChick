@@ -94,6 +94,84 @@ let remember_induct h =
       )
     end 
 
+
+type ind = ty_ctr * coq_type list
+type constrained_arg =
+  | Constrained of ty_param list
+  | Unconstrained of ty_param
+type constrained_ind =  ty_ctr * constrained_arg list 
+
+type rule = ty_ctr * constructor * constrained_ind list * constrained_ind
+
+let constrain_check_ind ((ind_ctr, ind_args) : ind) : constrained_ind =
+  let collect_vars (ct : coq_type) : ty_param list =
+    match ct with
+    | TyParam p -> [p]
+    | TyCtr (c, args) -> List.concat_map collect_vars args
+    | _ -> failwith "Inductive arguments must be constructors or params." in
+
+  let check_constraints (ct : coq_type) : constrained_arg =
+    match ct with
+    | TyParam p -> Unconstrained p
+    | TyCtr (c, args) -> Constrained (List.concat_map collect_vars args) in
+
+  (ind_ctr, List.map check_constraints ind_args)
+
+
+(*Take in a dt_rep, and collect the hypotheses and conclusions*)
+let rule_of_ctr_rep ind_name (ctr : ctr_rep) : rule =
+  let (name, ctr_typ) = ctr in
+  let rec hyp_conc = function
+    | Arrow (TyCtr ind, y) -> 
+      let (hyps, conc) = hyp_conc y in
+      (ind :: hyps, conc)
+    | TyCtr ind -> ([], ind)
+    | _ -> failwith "Rule hypotheses and conclusions must be inductive."
+  let (hyps, conc) = hyp_conc ctr_typ in
+  (ind_name, name, List.map constrain_check_ind hyps, constrain_check_ind conc)
+
+let dt_rep_rules ((ind_name, params, rules) : dt_rep) : rule list =
+  List.map (rule_of_ctr_rep ind_name) rules
+
+type rule_density = 
+  | Empty
+  | Partial
+
+type output_index = int
+
+let is_output_constrained_in_hypothesis ((ind_name, ctr_name, hyps, conc) : rule) (oi : output_index) : bool =
+  let recursive_hyps = List.filter (fun (ind, args) -> ind = ind_name) hyps in
+  let output_index_hyps = List.map (fun (ind, args) -> List.nth args oi) recursive_hyps in
+  List.exists (fun arg -> match arg with
+    | Constrained _ -> true
+    | Unconstrained _ -> false) output_index_hyps
+
+let rec has_duplicates (lst : 'a list) : bool =
+  match lst with
+  | [] -> false
+  | x :: xs -> List.mem x xs || has_duplicates xs
+
+let is_output_hyps_require_unification ((ind_name, ctr_name, hyps, conc) : rule) (oi : output_index) : bool =
+  let recursive_hyps = List.filter (fun (ind, args) -> ind = ind_name) hyps in
+  let output_index_hyps = List.map (fun (ind, args) -> List.nth args oi) recursive_hyps in
+  has_duplicates output_index_hyps
+    
+let analyze_rule (r : rule) oi : rule_density =
+  if is_output_constrained_in_hypothesis r oi || is_output_hyps_require_unification r oi 
+    then Empty else Partial
+
+ 
+let is_input_conclusion_require_unification ((ind_name, ctr_name, hyps, conc) : rule) (oi : output_index) : bool =
+  let conclusion_args = snd conc in
+  let remove_nth lst n = List.take n lst @ List.drop (n + 1) lst in
+  let input_conc_args = remove_nth conclusion_args oi in
+  has_duplicates input_conc_args
+
+let examine_inductive_relation_tactic (ind : Names.inductive) : tactic =
+  examine_inductive_relation ind; Proofview.tclIDTAC
+
+
+  
 let grab_dependencies = 
   Proofview.Goal.enter begin fun gl ->
     
@@ -214,7 +292,7 @@ let bindForAlls (generators : (var * coq_expr * bool) list) (concl : coq_expr) :
         in 
     g_forAll g (gFunWithArgs [gArg ~assumName:(gVar x) ()] (fun [_] -> body))) (List.rev generators) concl
 
-let decoptfuel = 3
+let decoptfuel = 100
 
 let check_remaining_inductives (inductives : dep_type list) (concl : coq_expr) : coq_expr =
   let decide prop = decOptToBool (g_decOpt prop (gInt decoptfuel)) in
@@ -369,12 +447,21 @@ let rec remove_duplicates = function
   | [] -> []
   | x :: xs -> x :: remove_duplicates (List.filter (fun y -> x <> y) xs)
 
+(*Sort bindings so all vars that are associated with a None option come before Some associated vars, and for None associated vars the vars are sorted in alphabetical order*)
+let sort_bindings (bindings : ((var * dep_type * (dep_type * int) option) list) * dep_type list) : ((var * dep_type * (dep_type * int) option) list) * dep_type list =
+  let (vars, theorems) = bindings in
+  let (none_bindings, some_bindings) = List.partition (fun (_,_,opt) -> opt = None) vars in
+  let sorted_none_bindings = List.sort (fun (v1,_,_) (v2,_,_) -> compare v1 v2) none_bindings in
+  (some_bindings @ sorted_none_bindings, theorems)
+
+(*Given a dep_type, return a list of all possible bindings*)
+
 let makeAllBindings (theorem : dep_type) : (((var * dep_type * (dep_type * int) option) list) * dep_type list) list =
   let type_vars = dep_type_var_types theorem in
   let variable_uses = dep_type_var_relation_uses theorem in
   let ind_vars = dep_type_relation_variables theorem in
   let theorem_relations = dep_type_relations theorem in
-  remove_duplicates (binding_options (ind_vars, variable_uses) type_vars theorem_relations)
+  remove_duplicates (List.map sort_bindings (binding_options (ind_vars, variable_uses) type_vars theorem_relations))
 
 let print_all_bindings (theorem : dep_type) : unit =
   let bindings = makeAllBindings theorem in
@@ -396,17 +483,21 @@ let print_bindings_tactic =
   end
     
 (*Given an association, and the original dep_type, for each variable take... remember to emit variabl deptype pairs at the end of the list*)
-let construct_constrained_generator' env (bindings : (var * dep_type * (dep_type * int) option) list) (checked_inductives : dep_type list) (concl : dep_type) : coq_expr =
+let construct_constrained_generator' name env (bindings : (var * dep_type * (dep_type * int) option) list) (checked_inductives : dep_type list) (concl : dep_type) : coq_expr =
   let bound_generators : (var * coq_expr * bool) list = List.map (derive_or_find_generators env) bindings in
   let decide prop = decOptToBool (g_decOpt prop (gInt decoptfuel)) in
-  let a = bindForAlls bound_generators (check_remaining_inductives checked_inductives (g_checker (decide (gType' [] concl)))) in
+  let show_vars = g_show (gTuple (List.map (fun (v,_,_) -> g_show (gVar v)) bound_generators)) in
+  let var_sizes = gList (List.map (fun (v,_,_) -> gPair (gStr (var_to_string v ^ "-size"), g_inr (g_Z_of_nat (g_size (gVar v))))) bound_generators) in
+  let check_concl = g_checker (decide (gType' [] concl)) in
+  let tyche_checked_concl = g_tyche_with_features (gStr name) show_vars var_sizes check_concl in
+  let a = bindForAlls bound_generators (check_remaining_inductives checked_inductives tyche_checked_concl) in
   msg_debug (str "Constructed constrained generator" ++ fnl ());
   a
 
 let construct_constrained_generator env (theorem : dep_type) : coq_expr =
   let (bindings, checked_inductives) = makeBindings theorem in
   let (_,concl) = dep_type_hyps_and_concl theorem in
-  construct_constrained_generator' env bindings checked_inductives concl
+  construct_constrained_generator' "test" env bindings checked_inductives concl
 
 (* let construct_constrained_generators_for_all_bindings env (all_bindings : ((var * dep_type * (dep_type * int) option) list * dep_type list) list) (concl : dep_type) : coq_expr list =
   List.map (fun (bindings, checked_inductives) -> construct_constrained_generator' env bindings checked_inductives concl) all_bindings *)
@@ -421,7 +512,7 @@ let construct_constrained_generator_idx env (theorem : dep_type) (idx : int) : c
   let (_,concl) = dep_type_hyps_and_concl theorem in
   match List.nth_opt all_bindings idx with
   | None -> failwith "Index out of bounds"
-  | Some (bindings, checked_inductives) -> construct_constrained_generator' env bindings checked_inductives concl
+  | Some (bindings, checked_inductives) -> construct_constrained_generator' "test" env bindings checked_inductives concl
 
 let derive_and_quickchick = 
   Proofview.Goal.enter_one begin fun gl ->
@@ -447,7 +538,9 @@ let derive_and_quickchick =
         let to_run = GenericLib.interp_open_coq_expr updated_env updated_evd (g_show (g_quickCheck constrained_gen)) in
         let updated_env' = Global.env () in
         let updated_evd' = Evd.from_env updated_env' in
+        msg_debug (str "No really, we're running it" ++ fnl ());
         QuickChick.define_and_run to_run updated_env' updated_evd';
+        msg_debug (str "Done running QuickCheck" ++ fnl ());
         Tacticals.tclIDTAC
       end
     | None -> failwith "Failed to Parse type"
@@ -710,4 +803,6 @@ TACTIC EXTEND tc_bindings
     }
 END
 
-
+TACTIC EXTEND examine_inductive_relation
+  | ["examine_inductive_relation" ident(ind)] -> { examine_inductive_relation_tactic ind }
+END
