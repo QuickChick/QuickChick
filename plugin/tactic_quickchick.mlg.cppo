@@ -155,20 +155,29 @@ let is_output_hyps_require_unification ((ind_name, ctr_name, hyps, conc) : rule)
   let recursive_hyps = List.filter (fun (ind, args) -> ind = ind_name) hyps in
   let output_index_hyps = List.map (fun (ind, args) -> List.nth args oi) recursive_hyps in
   has_duplicates output_index_hyps
-    
-let analyze_rule (r : rule) oi : rule_density =
-  if is_output_constrained_in_hypothesis r oi || is_output_hyps_require_unification r oi 
-    then Empty else Partial
 
- 
 let is_input_conclusion_require_unification ((ind_name, ctr_name, hyps, conc) : rule) (oi : output_index) : bool =
   let conclusion_args = snd conc in
   let remove_nth lst n = List.take n lst @ List.drop (n + 1) lst in
   let input_conc_args = remove_nth conclusion_args oi in
-  has_duplicates input_conc_args
+  let collect_vars = function
+    | Constrained args -> args
+    | Unconstrained arg -> [arg] in
+  let all_input_conc_vars = List.concat_map collect_vars input_conc_args in
+  has_duplicates all_input_conc_vars
+    
+let analyze_rule (r : rule) oi : rule_density =
+  if is_output_constrained_in_hypothesis r oi 
+    || is_output_hyps_require_unification r oi 
+    || is_input_conclusion_require_unification r oi
+    then Empty else Partial
 
-let examine_inductive_relation_tactic (ind : Names.inductive) : tactic =
-  examine_inductive_relation ind; Proofview.tclIDTAC
+(*Derive everything for a particular inductive, figure out empty/nomepty and then run it check discards*)
+(*Never miss bad cases how do we prove that?*)
+(*Handle mutual inductives*)
+
+ 
+
 
 
   
