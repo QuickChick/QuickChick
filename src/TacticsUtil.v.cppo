@@ -27,7 +27,7 @@ Ltac2 Notation "inv" h(ident) := inv_tac h.
 Local Ltac2 exfalso_tac () := ltac1:(exfalso).
 Ltac2 Notation "exfalso" := exfalso_tac ().
 
-Local Ltac2 lia_ltac1 () := ltac1:(micromega.Lia.lia).
+Local Ltac2 lia_ltac1 () := ltac1:(Lia.lia).
 Ltac2 Notation "lia" := lia_ltac1 ().
 
 Ltac2 inv := fun (h : ident) =>  inversion h; subst.

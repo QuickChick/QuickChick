@@ -6,3 +6,8 @@
     testing
     verif
   ))
+
+(rule
+  (alias testing)
+  (target testing.v)
+  (action (run sh %{dep:../../scripts/mycppo} %{dep:testing.v.cppo} %{target})))
