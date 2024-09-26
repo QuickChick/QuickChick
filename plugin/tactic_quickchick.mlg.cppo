@@ -12,6 +12,7 @@ MAKE SURE TO EDIT THE .cppo SOURCE OF THIS FILE RATHER THAN THE GENERATED RESULT
   open Stdarg
   open DepDriver
   open GenericLib
+  (* open MergeTypes *)
 
 }
 
@@ -95,7 +96,7 @@ let remember_induct h =
     end 
 
 
-type ind = ty_ctr * coq_type list
+type ind = ty_ctr * dep_type list
 type constrained_arg =
   | Constrained of ty_param list
   | Unconstrained of ty_param
@@ -103,35 +104,139 @@ type constrained_ind =  ty_ctr * constrained_arg list
 
 type rule = ty_ctr * constructor * constrained_ind list * constrained_ind
 
+type ind_type = ty_ctr * list rule 
+
 let constrain_check_ind ((ind_ctr, ind_args) : ind) : constrained_ind =
-  let collect_vars (ct : coq_type) : ty_param list =
+  let rec collect_vars (ct : dep_type) : ty_param list =
     match ct with
-    | TyParam p -> [p]
-    | TyCtr (c, args) -> List.concat_map collect_vars args
+    | DTyParam p -> [p]
+    | DTyVar p -> [p |> var_to_string |> inject_ty_param]
+    | DTyCtr (c, args) -> List.concat_map collect_vars args
+    | DCtr (c, args) -> List.concat_map collect_vars args
+    | DApp (f, args) -> collect_vars f @ List.concat_map collect_vars args
     | _ -> failwith "Inductive arguments must be constructors or params." in
 
-  let check_constraints (ct : coq_type) : constrained_arg =
+  let check_constraints (ct : dep_type) : constrained_arg =
     match ct with
-    | TyParam p -> Unconstrained p
-    | TyCtr (c, args) -> Constrained (List.concat_map collect_vars args) in
+    | DTyParam p -> Unconstrained p
+    | DTyVar p -> Unconstrained (p |> var_to_string |> inject_ty_param) 
+    | DTyCtr (c, args) -> Constrained (List.concat_map collect_vars args)
+    | DCtr (c, args) -> Constrained (List.concat_map collect_vars args)
+    | DApp (f, args) -> Constrained (collect_vars f @ List.concat_map collect_vars args) 
+    | _ -> (*print then fail*) failwith ("can't support" ^ dep_type_to_string ct) in
+  
 
   (ind_ctr, List.map check_constraints ind_args)
 
 
 (*Take in a dt_rep, and collect the hypotheses and conclusions*)
-let rule_of_ctr_rep ind_name (ctr : ctr_rep) : rule =
+let rule_of_dep_ctr ind_name (ctr : dep_ctr) : rule =
   let (name, ctr_typ) = ctr in
   let rec hyp_conc = function
-    | Arrow (TyCtr ind, y) -> 
+    | DProd ((_, _), t2) -> hyp_conc t2 (*ignore the quantifications.*)
+    | DArrow (DTyCtr (ind, args), y) -> 
       let (hyps, conc) = hyp_conc y in
-      (ind :: hyps, conc)
-    | TyCtr ind -> ([], ind)
-    | _ -> failwith "Rule hypotheses and conclusions must be inductive."
+      ((ind,args) :: hyps, conc)
+    | DTyCtr ((ind,args)) -> ([], (ind,args))
+    | _ -> failwith "Rule hypotheses and conclusions must be inductive." in 
   let (hyps, conc) = hyp_conc ctr_typ in
   (ind_name, name, List.map constrain_check_ind hyps, constrain_check_ind conc)
 
-let dt_rep_rules ((ind_name, params, rules) : dt_rep) : rule list =
-  List.map (rule_of_ctr_rep ind_name) rules
+let dep_dt_rules ((ind_name, params, rules, overall_type) : dep_dt) : rule list =
+  List.map (rule_of_dep_ctr ind_name) rules
+
+let dep_dt_ind_type ((ind_name, params, rules, overall_type) : dep_dt) : ind_type =
+  (ind_name, dep_dt_rules (ind_name, params, rules, overall_type))
+
+let remove_duplicates l =
+  let rec remove_duplicates' l acc =
+    match l with
+    | [] -> acc
+    | x :: xs -> if List.mem x acc then remove_duplicates' xs acc else remove_duplicates' xs (x :: acc) in
+  remove_duplicates' l []
+
+let extract_used_inductive_names ((name, rules) : ind_type) : ty_ctr list =
+  let extract_from_rule ((_, _, hyps, cons) : rule) : ty_ctr list =
+    List.map (fun (ind, _) -> ind) (cons :: hyps) in
+  remove_duplicates (name :: List.concat_map extract_from_rule rules)
+
+let rec seek_all_ind_types root_ind_name : ind_type list =
+  let rec seek_ind_types ind_name visited acc =
+    if List.mem ind_name visited then
+      acc
+    else
+      let ind_type = 
+        match (coerce_reference_to_dep_dt ind_name) with
+        | None -> failwith "Inductive not found"
+        | Some dep_dt -> dep_dt_ind_type dep_dt in
+      let used_inds = extract_used_inductive_names ind_type in
+      let new_visited = ind_name :: visited in
+      let new_acc = ind_type :: acc in
+      List.fold_left (fun acc ind -> seek_ind_types ind new_visited acc) new_acc used_inds
+  in
+  seek_ind_types root_ind_name [] []
+
+type pattern =
+| PCtr of constructor * pattern list
+| PWild of var
+
+(*Type of search trees*)
+type pattern_coverage_tree =
+  | CoveredLeaf of pattern
+  | UncoveredLeaf of pattern
+  | PatternNode of pattern * int list * (constructor * pattern_coverage_tree) list (*The int list represents the path to the current wildcard thats being split*)
+
+
+(*  C True (Cons 0 _) False   *)
+
+(* [C _ _ _; C True _ _; C True (Cons _ _) _; C True (Cons 0 _) _; C True (Cons 0 _) False]*)
+
+
+
+(*  C True (Cons 0 _) False   *)
+(*  C 3 [0]; True 0 [0;0]; Cons 2 [0;1]; Zero 0 [0;1;0]; False 0 [0;2] *)
+
+
+let rec decompose_pattern_path (p : pattern) (path : int list): (constructor * int * int list) list =
+  match p with
+  | PCtr (c, ps) -> 
+    [(c, List.length ps, path)] :: List.concat_map (fun (p, i) -> decompose_pattern_path p (path @ [i])) (List.mapi (fun i p -> (p, i)) ps)
+  | PWild _ -> []
+
+let decompose_pattern (p : pattern) : (constructor * int * int list) list =
+  decompose_pattern_path p [0]
+
+let apply_at (f : 'a -> 'a) (i : int) (l : 'a list) : 'a list =
+  match l, i with
+  | [], _ -> []
+  | x :: xs, 0 -> f x :: xs 
+  | x :: xs, i -> x :: apply_at f (i - 1) xs
+
+let rec recompose_pattern (dec : (constructor * int * int list) list) (p : pattern) : pattern =
+  match dec with
+  | [] -> p
+  | (c, n, path) :: rest ->
+    let rec make_wilds n = if n = 0 then [] else PWild (fresh_name "wild") :: make_wilds (n - 1) in
+    let wilds = make_wilds n in
+    let rec insert_at_path (p : pattern) (path : int list) (c : constructor) : pattern =
+      match path with
+      | [] -> PCtr (c, wilds)
+      | i :: is -> 
+        match p with
+        | PCtr (c', ps) -> PCtr (c', apply_at (fun p' -> insert_at_path p' is c) i ps)
+        | PWild _ -> failwith "Path is too long" in
+    recompose_pattern rest (insert_at_path p path c)
+
+let rec cover_decomposed_pattern (dec : (constructor * int * int list) list) (p : pattern_coverage_tree) (types : ind_type list) : pattern_coverage_tree =
+  match dec with
+  | [] -> p
+  | (c, n, path) :: rest ->
+    let rec make_wilds n = if n = 0 then [] else PWild (fresh_name "wild") :: make_wilds (n - 1) in
+    let wilds = make_wilds n in
+
+
+
+
 
 type rule_density = 
   | Empty
@@ -156,9 +261,21 @@ let is_output_hyps_require_unification ((ind_name, ctr_name, hyps, conc) : rule)
   let output_index_hyps = List.map (fun (ind, args) -> List.nth args oi) recursive_hyps in
   has_duplicates output_index_hyps
 
+let rec take n lst =
+  if n = 0 then [] else
+  match lst with
+  | [] -> []
+  | x :: xs -> x :: take (n - 1) xs
+
+let rec drop n lst =
+  if n = 0 then lst else
+  match lst with
+  | [] -> []
+  | x :: xs -> drop (n - 1) xs
+
 let is_input_conclusion_require_unification ((ind_name, ctr_name, hyps, conc) : rule) (oi : output_index) : bool =
   let conclusion_args = snd conc in
-  let remove_nth lst n = List.take n lst @ List.drop (n + 1) lst in
+  let remove_nth lst n = take n lst @ drop (n + 1) lst in
   let input_conc_args = remove_nth conclusion_args oi in
   let collect_vars = function
     | Constrained args -> args
@@ -172,13 +289,38 @@ let analyze_rule (r : rule) oi : rule_density =
     || is_input_conclusion_require_unification r oi
     then Empty else Partial
 
+
+
+    
+let analyze_rules (rs : rule list) oi : rule_density list =
+  List.map (fun r -> analyze_rule r oi) rs
+
+let print_rule_densities (rs : rule_density list) : unit =
+  let string_of_density = function
+    | Empty -> "Empty"
+    | Partial -> "Partial" in
+  List.iter (fun d -> Feedback.msg_notice (str (string_of_density d) ++ fnl ())) rs
+
+
+let analyze_inductive_rules ind oi =
+  match (coerce_reference_to_dep_dt ind) with
+  | None -> failwith "Inductive not found"
+  | Some dep_dt -> 
+    let (name, _, _, _) = dep_dt in
+    Feedback.msg_notice (str (ty_ctr_to_string name ^ " " ^ string_of_int oi) ++ fnl ());
+    print_rule_densities (analyze_rules (dep_dt_rules dep_dt) oi)
+
+
 (*Derive everything for a particular inductive, figure out empty/nomepty and then run it check discards*)
 (*Never miss bad cases how do we prove that?*)
 (*Handle mutual inductives*)
 
  
 
+(*Given an oi, extract the list of patterns in the conclusion at that oi. Also extract the type of the oi. 
 
+Then, given a list of dep_types, first filter them into coq_types (because they should just be constructors applied
+to variables, else error), look up the inductive definition of the type at the oi*)
 
   
 let grab_dependencies = 
@@ -812,6 +954,11 @@ TACTIC EXTEND tc_bindings
     }
 END
 
-TACTIC EXTEND examine_inductive_relation
-  | ["examine_inductive_relation" ident(ind)] -> { examine_inductive_relation_tactic ind }
+(* TACTIC EXTEND analyze_inductive
+  | ["analyze_inductive" constr(ind) int(oi)] -> { analyze_inductive_rules ind oi }
+END *)
+
+VERNAC COMMAND EXTEND DeriveDensity CLASSIFIED AS SIDEFF
+   | ["Derive" "Density" constr(ind) int(oi)] ->
+    { analyze_inductive_rules ind oi }
 END
