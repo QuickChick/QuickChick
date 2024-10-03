@@ -178,13 +178,13 @@ let rec seek_all_ind_types root_ind_name : ind_type list =
 
 type pattern =
 | PCtr of constructor * pattern list
-| PWild of var
+| PWild
 
 (*Type of search trees*)
 type pattern_coverage_tree =
-  | CoveredLeaf of pattern
-  | UncoveredLeaf of pattern
-  | PatternNode of pattern * int list * (constructor * pattern_coverage_tree) list (*The int list represents the path to the current wildcard thats being split*)
+  | PatternLeaf of pattern * constructor list 
+    (*the pattern describes the least granular space needed to describe coverage at this point, and the list of rules which provide coverage to it, if any.*)
+  | PatternNode of pattern * constructor list * int list * (constructor * pattern_coverage_tree) list (*The int list represents the path to the current wildcard thats being split*)
 
 
 (*  C True (Cons 0 _) False   *)
@@ -195,48 +195,95 @@ type pattern_coverage_tree =
 
 (*  C True (Cons 0 _) False   *)
 (*  C 3 [0]; True 0 [0;0]; Cons 2 [0;1]; Zero 0 [0;1;0]; False 0 [0;2] *)
+(*  Node _ [] 0 
+      [ (C, Leaf (C _ _ _) []);
+        (B, Leaf (B _ _) []);
+        (A, )
+
+
+      ]                         *)
 
 
 let rec decompose_pattern_path (p : pattern) (path : int list): (constructor * int * int list) list =
   match p with
   | PCtr (c, ps) -> 
-    [(c, List.length ps, path)] :: List.concat_map (fun (p, i) -> decompose_pattern_path p (path @ [i])) (List.mapi (fun i p -> (p, i)) ps)
-  | PWild _ -> []
+    (c, List.length ps, path) :: List.concat_map (fun (p, i) -> decompose_pattern_path p (path @ [i])) (List.mapi (fun i p -> (p, i)) ps)
+  | PWild -> []
 
 let decompose_pattern (p : pattern) : (constructor * int * int list) list =
-  decompose_pattern_path p [0]
+  decompose_pattern_path p []
 
-let apply_at (f : 'a -> 'a) (i : int) (l : 'a list) : 'a list =
+let rec apply_at (f : 'a -> 'a) (i : int) (l : 'a list) : 'a list =
   match l, i with
   | [], _ -> []
   | x :: xs, 0 -> f x :: xs 
   | x :: xs, i -> x :: apply_at f (i - 1) xs
 
+let rec apply_lookup (f : 'a -> 'a) (i : 'i) (l : ('i * 'a) list) : ('i * 'a) list =
+  match l with
+  | [] -> []
+  | (i', x) :: xs -> if i = i' then (i, f x) :: xs else (i', x) :: apply_lookup f i xs
+
+let rec insert_at_path (p : pattern) (path : int list) (c : constructor) wilds : pattern =
+  match path with
+  | [] -> PCtr (c, wilds)
+  | i :: is -> 
+    match p with
+    | PCtr (c', ps) -> PCtr (c', apply_at (fun p' -> insert_at_path p' is c wilds) i ps)
+    | PWild -> failwith "Path is too long" in
+
 let rec recompose_pattern (dec : (constructor * int * int list) list) (p : pattern) : pattern =
   match dec with
   | [] -> p
   | (c, n, path) :: rest ->
-    let rec make_wilds n = if n = 0 then [] else PWild (fresh_name "wild") :: make_wilds (n - 1) in
+    let rec make_wilds n = if n = 0 then [] else PWild :: make_wilds (n - 1) in
     let wilds = make_wilds n in
-    let rec insert_at_path (p : pattern) (path : int list) (c : constructor) : pattern =
-      match path with
-      | [] -> PCtr (c, wilds)
-      | i :: is -> 
-        match p with
-        | PCtr (c', ps) -> PCtr (c', apply_at (fun p' -> insert_at_path p' is c) i ps)
-        | PWild _ -> failwith "Path is too long" in
-    recompose_pattern rest (insert_at_path p path c)
+    recompose_pattern rest (insert_at_path p path c wilds)
 
-let rec cover_decomposed_pattern (dec : (constructor * int * int list) list) (p : pattern_coverage_tree) (types : ind_type list) : pattern_coverage_tree =
+let types_to_constructor_lookup (types : ind_type list) : (constructor * constructor list) list =
+  let collect_constructors ((_,ind_rules) : ind_type) : constructor list =
+    List.map (fun (_, ctr, _, _) -> ctr) ind_rules in
+  let constructor_to_constructors_map (a : 'a list) : ('a * 'a list) list =
+    List.map (fun x -> (x, a)) a in
+  List.concat_map (fun (_, ind_rules) -> constructor_to_constructors_map (collect_constructors (ind_rules))) types
+
+type constructor_map = (constructor * constructor list) list
+
+let find_type (c : constructor) (types : constructor_map) : constructor list =
+  match List.assoc_opt c types with
+  | None -> failwith "Constructor not found"
+  | Some cs -> cs
+
+(* let rec label_branch label c branches : (constructor * pattern_coverage_tree) list =  *)
+
+
+let rec cover_single_pattern_layer (rule_name : constructor option) (con : constructor) (arity : int) 
+                                   (path : int list) (pat_so_far : pattern) (p : pattern_coverage_tree) 
+                                   (types : constructor_map) : pattern_coverage_tree =
+  match p with
+  | PatternLeaf (p, rules) -> 
+    let constructors = find_type con types in
+    let new_rules = match rule_name with
+      | None -> rules
+      | Some r -> r :: rules in
+    let new_pattern_leaves = List.map (fun c -> (c,PatternLeaf ((insert_at_path p path c (List.make arity PWild)),new_rules))) constructors in
+    PatternNode (p, rules, path, new_pattern_leaves)
+  | PatternNode (p, rules, path', branches) ->
+    if path = path' then
+      match rule_name with
+      | None -> p
+      | Some r_name -> PatternNode (p, rules, path', label_branch r_name con branches)
+    else
+      match pattern_at_path path' pat_so_far with
+      | PWild -> PatternNode (p, rules, path', List.map (fun (c, p') -> (c, cover_single_pattern_layer rule_name con arity path pat_so_far p' types)) branches)
+      | PCtr (c, _) -> PatternNode (p, rules, path', apply_lookup (fun p' -> cover_single_pattern_layer rule_name con arity path pat_so_far p' types) c branches)
+
+let rec cover_decomposed_pattern (rule_name : constructor) (pat_so_far : pattern) (dec : (constructor * int * int list) list) (p : pattern_coverage_tree) (types : ind_type list) : pattern_coverage_tree =
   match dec with
   | [] -> p
   | (c, n, path) :: rest ->
-    let rec make_wilds n = if n = 0 then [] else PWild (fresh_name "wild") :: make_wilds (n - 1) in
-    let wilds = make_wilds n in
-
-
-
-
+    let new_p = cover_single_pattern_layer (Some rule_name) c n path pat_so_far p (types_to_constructor_lookup types) in
+    cover_decomposed_pattern rule_name (insert_at_path pat_so_far path c (List.make n PWild)) rest new_p types
 
 type rule_density = 
   | Empty
