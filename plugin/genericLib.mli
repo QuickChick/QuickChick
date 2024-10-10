@@ -153,6 +153,7 @@ val parse_dependent_type : Constr.constr -> dep_type option
 
 val dep_dt_from_mib : mutual_inductive_body -> dep_dt option
 val coerce_reference_to_dep_dt : constr_expr -> dep_dt option
+val qualid_to_dep_dt : Libnames.qualid -> dep_dt option
 
 val fresh_name : string -> var 
 val make_up_name : unit -> var

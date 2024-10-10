@@ -661,6 +661,15 @@ let coerce_reference_to_dep_dt c =
   
   dep_dt_from_mib mib
                   
+let qualid_to_dep_dt r =
+  let env = Global.env () in
+  
+  let glob_ref = Nametab.global r in
+  let (mind,_) = Globnames.destIndRef glob_ref in
+  let mib = Environ.lookup_mind mind env in
+
+  dep_dt_from_mib mib
+
 let gApp ?explicit:(expl=false) c cs =
   if expl then
     let f c = match c with

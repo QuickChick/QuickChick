@@ -102,9 +102,18 @@ type constrained_arg =
   | Unconstrained of ty_param
 type constrained_ind =  ty_ctr * constrained_arg list 
 
-type rule = ty_ctr * constructor * constrained_ind list * constrained_ind
+type arity = int
 
-type ind_type = ty_ctr * list rule 
+type rule = ty_ctr * constructor * arity * constrained_ind list * constrained_ind
+
+type ind_type = ty_ctr * rule list 
+
+let dep_dt_arity ((ind_name, params, rules, overall_type) : dep_dt) : int =
+  let rec dep_type_arity = function
+    | DProd ((_, _), t2) -> 1 + dep_type_arity t2
+    | DArrow (_, y) -> 1 + dep_type_arity y
+    | _ -> 0 in
+  dep_type_arity overall_type
 
 let constrain_check_ind ((ind_ctr, ind_args) : ind) : constrained_ind =
   let rec collect_vars (ct : dep_type) : ty_param list =
@@ -129,18 +138,20 @@ let constrain_check_ind ((ind_ctr, ind_args) : ind) : constrained_ind =
   (ind_ctr, List.map check_constraints ind_args)
 
 
-(*Take in a dt_rep, and collect the hypotheses and conclusions*)
+(*Take in an inductive name and a dep_ctr (a dependent constructor), and collect the hypotheses and conclusions*)
 let rule_of_dep_ctr ind_name (ctr : dep_ctr) : rule =
   let (name, ctr_typ) = ctr in
   let rec hyp_conc = function
-    | DProd ((_, _), t2) -> hyp_conc t2 (*ignore the quantifications.*)
+    | DProd ((_, _), t2) -> 
+      let (hyps, conc, arity) = hyp_conc t2 in
+      (hyps, conc, arity + 1)
     | DArrow (DTyCtr (ind, args), y) -> 
-      let (hyps, conc) = hyp_conc y in
-      ((ind,args) :: hyps, conc)
-    | DTyCtr ((ind,args)) -> ([], (ind,args))
+      let (hyps, conc, arity) = hyp_conc y in
+      ((ind,args) :: hyps, conc, arity)
+    | DTyCtr ((ind,args)) -> ([], (ind,args), 0)
     | _ -> failwith "Rule hypotheses and conclusions must be inductive." in 
-  let (hyps, conc) = hyp_conc ctr_typ in
-  (ind_name, name, List.map constrain_check_ind hyps, constrain_check_ind conc)
+  let (hyps, conc, arity) = hyp_conc ctr_typ in
+  (ind_name, name, arity, List.map constrain_check_ind hyps, constrain_check_ind conc)
 
 let dep_dt_rules ((ind_name, params, rules, overall_type) : dep_dt) : rule list =
   List.map (rule_of_dep_ctr ind_name) rules
@@ -154,31 +165,104 @@ let remove_duplicates l =
     | [] -> acc
     | x :: xs -> if List.mem x acc then remove_duplicates' xs acc else remove_duplicates' xs (x :: acc) in
   remove_duplicates' l []
-
+(* 
 let extract_used_inductive_names ((name, rules) : ind_type) : ty_ctr list =
-  let extract_from_rule ((_, _, hyps, cons) : rule) : ty_ctr list =
+  let extract_from_rule ((_, _, _, hyps, cons) : rule) : ty_ctr list =
     List.map (fun (ind, _) -> ind) (cons :: hyps) in
-  remove_duplicates (name :: List.concat_map extract_from_rule rules)
+  remove_duplicates (name :: List.concat_map extract_from_rule rules) *)
 
-let rec seek_all_ind_types root_ind_name : ind_type list =
-  let rec seek_ind_types ind_name visited acc =
-    if List.mem ind_name visited then
-      acc
+let is_inductive' (ty_name : ty_ctr) : bool =
+  is_inductive (injectCtr (ty_ctr_to_string ty_name))
+
+let rec extract_names_dep_type (dt : dep_type) : ty_ctr list =
+  match dt with
+  | DProd ((_, DTyCtr (c,_)), ty2) -> 
+    if is_inductive' c then
+      c :: extract_names_dep_type ty2
     else
-      let ind_type = 
-        match (coerce_reference_to_dep_dt ind_name) with
-        | None -> failwith "Inductive not found"
-        | Some dep_dt -> dep_dt_ind_type dep_dt in
-      let used_inds = extract_used_inductive_names ind_type in
-      let new_visited = ind_name :: visited in
-      let new_acc = ind_type :: acc in
-      List.fold_left (fun acc ind -> seek_ind_types ind new_visited acc) new_acc used_inds
-  in
-  seek_ind_types root_ind_name [] []
+      failwith "Rule hypotheses and conclusions must be inductive."
+  | DArrow (DTyCtr (c,_), ty2) -> 
+    if is_inductive' c then
+      c :: extract_names_dep_type ty2
+    else
+      failwith "Rule hypotheses and conclusions must be inductive."
+  | DTyCtr (_, _) -> []
+  | _ -> failwith "Rule hypotheses and conclusions must be inductive." 
+
+
+let overall_type_inductive_names ((ind_name, params, rules, overall_type) : dep_dt) : ty_ctr list =
+  extract_names_dep_type overall_type
+
+let constructors_used_inductive_names ((ind_name, params, rules, overall_type) : dep_dt) : ty_ctr list =
+  remove_duplicates (List.concat_map (fun (cons, typ) -> extract_names_dep_type typ) rules)
+
+let ty_ctr_to_dep_dt (tycon : ty_ctr) =
+  match qualid_to_dep_dt (tyCtrToQualid tycon) with
+  | None -> failwith ("Inductive not found: " ^ ty_ctr_to_string tycon)
+  | Some dt -> dt
+  
+let seek_ind_types_from_overall_type root : ty_ctr list =
+  let rec seek_ind_types ind_name visited : ty_ctr list =
+    if List.mem ind_name visited then
+      visited 
+    else
+      let dep_dt = ty_ctr_to_dep_dt ind_name in
+      let used_inds = constructors_used_inductive_names dep_dt in
+      List.fold_left (fun visited' ind_name' -> seek_ind_types ind_name' visited') (ind_name :: visited) used_inds
+    in
+  let dep_dt = ty_ctr_to_dep_dt root in
+  let used_inds = overall_type_inductive_names dep_dt in
+  
+  List.fold_left (fun visited' ind_name' -> seek_ind_types ind_name' visited') [root] used_inds
+
+let seek_all_ind_types root_ind_name : ind_type list =
+  List.map (fun name -> dep_dt_ind_type (ty_ctr_to_dep_dt name)) (seek_ind_types_from_overall_type root_ind_name)
+
+let print_type_names (inds : ty_ctr list) : unit =
+  List.iter (fun ind -> msg_debug (str (ty_ctr_to_string ind) ++ fnl ())) inds
 
 type pattern =
 | PCtr of constructor * pattern list
 | PWild
+
+let tuple_name = injectCtr "Tuple_"
+
+(*Gets patterns from conclusion of constructor*)
+let pattern_of_dep_ctr (ctr : dep_ctr) : constructor * pattern =
+  let rec pattern_args = function
+    | DCtr (c, args) -> PCtr (c, List.map pattern_args args)
+    | DTyVar _ -> PWild
+    | DTyParam _ -> PWild
+    | _ -> failwith "Patterns should only consist of constructors and variables" in
+  let rec pattern_of_dep_type = function
+    | DProd ((_, _), t2) -> pattern_of_dep_type t2
+    | DArrow (_, y) -> pattern_of_dep_type y
+    | DTyCtr (ind, args) -> PCtr (tuple_name, List.map pattern_args args)
+    | _ -> failwith "Rule hypotheses and conclusions must be inductive." in
+  let (name, ctr_typ) = ctr in
+  (name, pattern_of_dep_type ctr_typ)
+
+type output_index = int
+
+let rec take n lst =
+  if n = 0 then [] else
+  match lst with
+  | [] -> []
+  | x :: xs -> x :: take (n - 1) xs
+
+let rec drop n lst =
+  if n = 0 then lst else
+  match lst with
+  | [] -> []
+  | x :: xs -> drop (n - 1) xs
+
+let input_pattern_of_dep_ctr (ctr : dep_ctr) (oi : output_index) : constructor * pattern =
+  let (cons, PCtr (_,patterns)) = pattern_of_dep_ctr ctr in
+  let remove_index i l = take i l @ drop (i + 1) l in
+  (cons, PCtr (tuple_name, remove_index oi patterns))
+
+let input_patterns_of_dep_dt ((ind_name, params, rules, overall_type) : dep_dt) (oi : output_index) : (constructor * pattern) list =
+  List.map (fun ctr -> input_pattern_of_dep_ctr ctr oi) rules
 
 (*Type of search trees*)
 type pattern_coverage_tree =
@@ -204,13 +288,13 @@ type pattern_coverage_tree =
       ]                         *)
 
 
-let rec decompose_pattern_path (p : pattern) (path : int list): (constructor * int * int list) list =
+let rec decompose_pattern_path (p : pattern) (path : int list): (constructor option * int * int list) list =
   match p with
   | PCtr (c, ps) -> 
-    (c, List.length ps, path) :: List.concat_map (fun (p, i) -> decompose_pattern_path p (path @ [i])) (List.mapi (fun i p -> (p, i)) ps)
-  | PWild -> []
+      (Some c, List.length ps, path) :: List.concat_map (fun (p, i) -> decompose_pattern_path p (path @ [i])) (List.mapi (fun i p -> (p, i)) ps)
+  | PWild -> [(None, 0, path)]
 
-let decompose_pattern (p : pattern) : (constructor * int * int list) list =
+let decompose_pattern (p : pattern) : (constructor option * int * int list) list =
   decompose_pattern_path p []
 
 let rec apply_at (f : 'a -> 'a) (i : int) (l : 'a list) : 'a list =
@@ -228,70 +312,163 @@ let rec insert_at_path (p : pattern) (path : int list) (c : constructor) wilds :
   match path with
   | [] -> PCtr (c, wilds)
   | i :: is -> 
-    match p with
-    | PCtr (c', ps) -> PCtr (c', apply_at (fun p' -> insert_at_path p' is c wilds) i ps)
-    | PWild -> failwith "Path is too long" in
+      match p with
+      | PCtr (c', ps) -> PCtr (c', apply_at (fun p' -> insert_at_path p' is c wilds) i ps)
+      | PWild -> failwith "Path is too long"
 
-let rec recompose_pattern (dec : (constructor * int * int list) list) (p : pattern) : pattern =
+(* let rec recompose_pattern (dec : (constructor option * int * int list) list) (p : pattern) : pattern =
   match dec with
   | [] -> p
-  | (c, n, path) :: rest ->
-    let rec make_wilds n = if n = 0 then [] else PWild :: make_wilds (n - 1) in
-    let wilds = make_wilds n in
-    recompose_pattern rest (insert_at_path p path c wilds)
+  | (Some c, n, path) :: rest ->
+      let rec make_wilds n = if n = 0 then [] else PWild :: make_wilds (n - 1) in
+      let wilds = make_wilds n in
+      recompose_pattern rest (insert_at_path p path c wilds)
+  | (None, _, _) :: rest -> recompose_pattern rest p *)
 
-let types_to_constructor_lookup (types : ind_type list) : (constructor * constructor list) list =
-  let collect_constructors ((_,ind_rules) : ind_type) : constructor list =
-    List.map (fun (_, ctr, _, _) -> ctr) ind_rules in
-  let constructor_to_constructors_map (a : 'a list) : ('a * 'a list) list =
-    List.map (fun x -> (x, a)) a in
-  List.concat_map (fun (_, ind_rules) -> constructor_to_constructors_map (collect_constructors (ind_rules))) types
+let types_to_constructor_lookup (types : ind_type list) : (constructor * (constructor * arity) list) list =
+  let collect_constructors ((_,ind_rules) : ind_type) : (constructor * arity) list =
+    List.map (fun (_, ctr, arity, _, _) -> (ctr, arity)) ind_rules in
+  let constructor_to_constructors_map (a : ('a * 'b) list) : ('a * ('a * 'b) list) list =
+    List.map (fun (x,_) -> (x, a)) a in
+  List.concat_map (fun ind_rules -> constructor_to_constructors_map (collect_constructors ind_rules)) types
 
-type constructor_map = (constructor * constructor list) list
+type constructor_map = (constructor * (constructor * arity) list) list
 
-let find_type (c : constructor) (types : constructor_map) : constructor list =
+let find_type (c : constructor) (types : constructor_map) : (constructor * arity) list =
   match List.assoc_opt c types with
   | None -> failwith "Constructor not found"
-  | Some cs -> cs
+  | Some cs -> cs 
+    
+let rec make_wilds n =
+  if n > 0 then PWild :: make_wilds (n - 1)
+  else [] 
+        
+        
+let rec label_tree label ptree : pattern_coverage_tree =
+  match ptree with
+  | PatternLeaf (p, rules) -> PatternLeaf (p, label :: rules)
+  | PatternNode (p, rules, path, branches) -> PatternNode (p, label :: rules, path, List.map (fun (c, p') -> (c, label_tree label p')) branches) 
 
-(* let rec label_branch label c branches : (constructor * pattern_coverage_tree) list =  *)
+let label_branch label c branches : (constructor * pattern_coverage_tree) list =
+  List.map (fun (c', p) -> if c = c' then (c, label_tree label p) else (c', p)) branches
 
+let rec pattern_at_path (path : int list) (p : pattern) : pattern =
+  match path with
+  | [] -> p
+  | i :: is ->
+      match p with
+      | PCtr (c, ps) -> pattern_at_path is (List.nth ps i)
+      | PWild -> PWild
 
-let rec cover_single_pattern_layer (rule_name : constructor option) (con : constructor) (arity : int) 
-                                   (path : int list) (pat_so_far : pattern) (p : pattern_coverage_tree) 
-                                   (types : constructor_map) : pattern_coverage_tree =
-  match p with
-  | PatternLeaf (p, rules) -> 
-    let constructors = find_type con types in
-    let new_rules = match rule_name with
-      | None -> rules
-      | Some r -> r :: rules in
-    let new_pattern_leaves = List.map (fun c -> (c,PatternLeaf ((insert_at_path p path c (List.make arity PWild)),new_rules))) constructors in
-    PatternNode (p, rules, path, new_pattern_leaves)
-  | PatternNode (p, rules, path', branches) ->
-    if path = path' then
-      match rule_name with
-      | None -> p
-      | Some r_name -> PatternNode (p, rules, path', label_branch r_name con branches)
-    else
-      match pattern_at_path path' pat_so_far with
-      | PWild -> PatternNode (p, rules, path', List.map (fun (c, p') -> (c, cover_single_pattern_layer rule_name con arity path pat_so_far p' types)) branches)
-      | PCtr (c, _) -> PatternNode (p, rules, path', apply_lookup (fun p' -> cover_single_pattern_layer rule_name con arity path pat_so_far p' types) c branches)
+let rec cover_single_pattern_layer (rule_name : constructor option) (con_or_wild : constructor option) (arity : int) 
+    (path : int list) (pat_so_far : pattern) (p : pattern_coverage_tree) 
+    (types : constructor_map) : pattern_coverage_tree =
+  match p, con_or_wild with
+  | PatternLeaf (p, rules), Some con -> 
+      let constructors = find_type con types in
+      let new_rules = match rule_name with
+        | None -> rules
+        | Some r -> r :: rules in
+      let new_pattern_leaves = List.map (fun (c, arity) -> (c,PatternLeaf ((insert_at_path p path c (make_wilds arity)),if c = con then new_rules else rules))) constructors in
+      PatternNode (p, rules, path, new_pattern_leaves)
+  | PatternNode (p, rules, path', branches), Some con ->
+      if path = path' then
+        match rule_name with
+        | None -> PatternNode (p, rules, path', branches)
+        | Some r_name -> PatternNode (p, rules, path', label_branch r_name con branches)
+      else
+        (match pattern_at_path path' pat_so_far with
+        | PWild -> PatternNode (p, rules, path', List.map (fun (c, p') -> (c, cover_single_pattern_layer rule_name (Some con) arity path pat_so_far p' types)) branches)
+        | PCtr (c, _) -> PatternNode (p, rules, path', apply_lookup (fun p' -> cover_single_pattern_layer rule_name (Some con) arity path pat_so_far p' types) c branches))
+  | PatternLeaf (p, rules), None -> 
+      (match rule_name with 
+      | None -> PatternLeaf (p, rules)
+      | Some r_name -> PatternLeaf (p, r_name :: rules))
+  | PatternNode (p, rules, path', branches), None ->
+      if path = path' then
+        match rule_name with
+        | None -> PatternNode (p, rules, path', branches)
+        | Some r_name -> PatternNode (p, rules, path', List.map (fun (c, p') -> (c, label_tree r_name p')) branches)
+      else
+        match pattern_at_path path' pat_so_far with
+        | PWild -> PatternNode (p, rules, path', List.map (fun (c, p') -> (c, cover_single_pattern_layer rule_name None arity path pat_so_far p' types)) branches)
+        | PCtr (c, _) -> PatternNode (p, rules, path', apply_lookup (fun p' -> cover_single_pattern_layer rule_name None arity path pat_so_far p' types) c branches)
 
-let rec cover_decomposed_pattern (rule_name : constructor) (pat_so_far : pattern) (dec : (constructor * int * int list) list) (p : pattern_coverage_tree) (types : ind_type list) : pattern_coverage_tree =
+let rec cover_decomposed_pattern (rule_name : constructor) (pat_so_far : pattern) (dec : (constructor option * int * int list) list) (p : pattern_coverage_tree) (types : constructor_map) : pattern_coverage_tree =
   match dec with
   | [] -> p
   | (c, n, path) :: rest ->
-    let new_p = cover_single_pattern_layer (Some rule_name) c n path pat_so_far p (types_to_constructor_lookup types) in
-    cover_decomposed_pattern rule_name (insert_at_path pat_so_far path c (List.make n PWild)) rest new_p types
+      let orule_name = match rest with [] -> Some rule_name | _ -> None in
+      let new_p = cover_single_pattern_layer orule_name c n path pat_so_far p (types) in
+      match c with
+      | None -> cover_decomposed_pattern rule_name pat_so_far rest new_p types
+      | Some c -> cover_decomposed_pattern rule_name (insert_at_path pat_so_far path c (make_wilds n)) rest new_p types
+
+let pattern_tree_root : pattern_coverage_tree = PatternLeaf (PWild, [])
+
+(* let cover_pattern (rule_name : constructor) (p : pattern) (types : constructor_map) : pattern_coverage_tree =
+  let dec = decompose_pattern p in
+  cover_decomposed_pattern rule_name PWild dec pattern_tree_root types *)
+
+let cover_pattern' (rule_name : constructor) (p : pattern) (types : constructor_map) (ptree : pattern_coverage_tree) : pattern_coverage_tree =
+  let dec = decompose_pattern p in
+  cover_decomposed_pattern rule_name PWild dec ptree types
+
+let cover_patterns (ps : (constructor * pattern) list) (types : constructor_map) root : pattern_coverage_tree =
+  List.fold_left (fun ptree (c, p) -> cover_pattern' c p types ptree) root ps
+
+(* let cover_pattern_n (ps : pattern list) (types : constructor_map) : pattern_coverage_tree =
+  cover_patterns (List.mapi (fun i p -> (injectCtr (string_of_int i), p)) ps) types pattern_tree_root *)
+
+(* let tuple_root arity = PatternLeaf (PCtr (tuple_name, (make_wilds arity)), []) *)
+
+let tuple_types arity = (tuple_name,[tuple_name,arity])
+
+(* let tuple_cover ps arity types = cover_patterns (List.mapi (fun i p -> (injectCtr (string_of_int i), p)) ps) ((tuple_name,[tuple_name,arity]) :: types) (tuple_root arity)   *)
+
+let cover_tuple_patterns ps arity types = cover_patterns ps (tuple_types arity :: types) pattern_tree_root
+
+
+(* let list_bool_nat_cmap : constructor_map =
+  List.map (fun (x,xs) -> (injectCtr x, List.map (fun (a,b) -> injectCtr a, b) xs)) [ ("True") , ["True", 0; "False", 0];
+    ("False"), ["True", 0; "False", 0];
+    ("O"), ["O", 0; "S", 1];
+    ("S"), ["O", 0; "S", 1];
+    ("Cons"), ["Cons", 2; "Nil", 0];
+    ("Nil"), ["Cons", 2; "Nil", 0]] *)
+
+let rec collect_leaves (tree : pattern_coverage_tree) : (pattern * constructor list) list =
+  match tree with
+  | PatternLeaf (p, cs) -> [(p,cs)]
+  | PatternNode (_, _, _, branches) ->
+      List.concat_map (fun (_, subtree) -> collect_leaves subtree) branches
+
+let print_pattern_leaves (tree : pattern_coverage_tree) : unit =
+  let rec string_of_pattern = 
+    function
+    | PCtr (c, []) -> constructor_to_string c
+    | PCtr (c, ps) -> constructor_to_string c ^ "(" ^ List.fold_left (fun acc p -> acc ^ ", " ^ string_of_pattern p) "" ps ^ ")"
+    | PWild -> "_" in
+  let string_of_constructors = function
+    | [] -> "[]"
+    | c :: cs -> "[" ^ constructor_to_string c ^ List.fold_left (fun acc c -> acc ^ "; " ^ constructor_to_string c) "" cs ^ "]" in
+  let string_of_pattern_leaf (p, cs) = string_of_pattern p ^ " : " ^ string_of_constructors cs in
+  List.iter (fun (p, cs) -> msg_debug (str (string_of_pattern_leaf (p, cs)) ++ fnl ())) (collect_leaves tree)
+
+(* let print_cover p = print_pattern_leaves (cover_pattern (injectCtr "r1") p list_bool_nat_cmap)
+
+let tree_covers ps = cover_pattern_n ps list_bool_nat_cmap
+  
+let print_covers ps = print_pattern_leaves (cover_pattern_n ps list_bool_nat_cmap) *)
+
+
 
 type rule_density = 
   | Empty
   | Partial
 
-type output_index = int
 
-let is_output_constrained_in_hypothesis ((ind_name, ctr_name, hyps, conc) : rule) (oi : output_index) : bool =
+let is_output_constrained_in_hypothesis ((ind_name, ctr_name, arity, hyps, conc) : rule) (oi : output_index) : bool =
   let recursive_hyps = List.filter (fun (ind, args) -> ind = ind_name) hyps in
   let output_index_hyps = List.map (fun (ind, args) -> List.nth args oi) recursive_hyps in
   List.exists (fun arg -> match arg with
@@ -303,24 +480,12 @@ let rec has_duplicates (lst : 'a list) : bool =
   | [] -> false
   | x :: xs -> List.mem x xs || has_duplicates xs
 
-let is_output_hyps_require_unification ((ind_name, ctr_name, hyps, conc) : rule) (oi : output_index) : bool =
+let is_output_hyps_require_unification ((ind_name, ctr_name, arity, hyps, conc) : rule) (oi : output_index) : bool =
   let recursive_hyps = List.filter (fun (ind, args) -> ind = ind_name) hyps in
   let output_index_hyps = List.map (fun (ind, args) -> List.nth args oi) recursive_hyps in
   has_duplicates output_index_hyps
 
-let rec take n lst =
-  if n = 0 then [] else
-  match lst with
-  | [] -> []
-  | x :: xs -> x :: take (n - 1) xs
-
-let rec drop n lst =
-  if n = 0 then lst else
-  match lst with
-  | [] -> []
-  | x :: xs -> drop (n - 1) xs
-
-let is_input_conclusion_require_unification ((ind_name, ctr_name, hyps, conc) : rule) (oi : output_index) : bool =
+let is_input_conclusion_require_unification ((ind_name, ctr_name, arity, hyps, conc) : rule) (oi : output_index) : bool =
   let conclusion_args = snd conc in
   let remove_nth lst n = take n lst @ drop (n + 1) lst in
   let input_conc_args = remove_nth conclusion_args oi in
@@ -356,6 +521,8 @@ let analyze_inductive_rules ind oi =
     let (name, _, _, _) = dep_dt in
     Feedback.msg_notice (str (ty_ctr_to_string name ^ " " ^ string_of_int oi) ++ fnl ());
     print_rule_densities (analyze_rules (dep_dt_rules dep_dt) oi)
+
+
 
 
 (*Derive everything for a particular inductive, figure out empty/nomepty and then run it check discards*)
@@ -1008,4 +1175,28 @@ END *)
 VERNAC COMMAND EXTEND DeriveDensity CLASSIFIED AS SIDEFF
    | ["Derive" "Density" constr(ind) int(oi)] ->
     { analyze_inductive_rules ind oi }
+END
+
+VERNAC COMMAND EXTEND DeriveUsedInds CLASSIFIED AS SIDEFF
+   | ["Derive" "Used" "Inds" constr(ind)] ->
+    { match coerce_reference_to_dep_dt ind with
+      | Some (ind_name,_,_,_) ->
+        print_type_names (seek_ind_types_from_overall_type ind_name) 
+      | None -> failwith "Failed to parse inductive type"  
+    }
+END
+
+VERNAC COMMAND EXTEND DerivePatternCoverage CLASSIFIED AS SIDEFF
+   | ["Derive" "Pattern" "Coverage" constr(ind) int(oi)] ->
+    { match coerce_reference_to_dep_dt ind with
+      | Some dt ->
+        let (ind_name,_,_,_) = dt in
+        let arity = dep_dt_arity dt in
+        let types = seek_all_ind_types ind_name in
+        let con_map = types_to_constructor_lookup types in
+        let ps = input_patterns_of_dep_dt dt oi in
+        let coverage_tree = cover_tuple_patterns ps (arity - 1) con_map in
+        print_pattern_leaves coverage_tree 
+      | None -> failwith "Failed to parse inductive type"  
+    }
 END
