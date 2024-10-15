@@ -92,6 +92,8 @@ let remember_induct h =
       )
     end 
 
+let decOpt_fuel = 1000
+
 let quickchick_goal =
   Proofview.Goal.enter begin fun gl ->
 
@@ -115,7 +117,7 @@ let quickchick_goal =
       begin
         msg_debug (str (GenericLib.dep_type_to_string dt) ++ fnl ());
         let open GenericLib in 
-        let decide prop = decOptToBool (g_decOpt prop (gInt 1000)) in
+        let decide prop = decOptToBool (g_decOpt prop (gInt decOpt_fuel)) in
         let rec mkProperty = function
           | DProd ((var, _),body) -> 
               g_forAll g_arbitrary (gFun [var_to_string var] (fun [_] ->
@@ -123,22 +125,10 @@ let quickchick_goal =
                 )) 
           | DArrow (x,y) -> GenericLib.debug_coq_expr (gType' [] x); gIf (decide (gType' [] x)) (mkProperty y) (g_checker gTT)
           | p -> g_checker (decide (gType' [] p)) 
-              in
-          
-     (*     | DArrow (DTyCtr (tyctr, args), y) -> gIf (decide )
-          | DTyParam typaram -> gTyParam typaram
-          | DTyCtr (tyctr, args) -> gApp (gTyCtr tyctr) (List.map mkProperty args)
-          | DCtr (ctr, args) -> gApp (gCtr ctr) (List.map mkProperty args)
-          | DTyVar var -> gVar var
-          | DApp (f, args) -> gApp (mkProperty f) (List.map mkProperty args)
-          | DNot p -> *)
-(*Use decOpt, for every arrow, assume instacne exists and match on it *)
-            
+              in     
         GenericLib.debug_coq_expr (mkProperty dt);
         (*run the generator called checker using QuickCheck.*)
-        (*failwith "OUch!";*)
         let to_run = GenericLib.interp_open_coq_expr e evd (g_show (g_quickCheck (mkProperty dt))) in
-        (*failwith "Oucher!";*)
 #if COQ_VERSION >= (8, 20, 0)
         (* FRAGILE probably won't be allowed in the future? *)
         let opaque_access = Library.indirect_accessor[@@warning "-3"] in
