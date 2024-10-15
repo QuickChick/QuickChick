@@ -11,6 +11,7 @@ plugin/weightmap.mli
 plugin/genericLib.mli
 plugin/mergeTypes.mli
 plugin/error.mli
+plugin/tactic_inductive_tags.mli
 plugin/simplDriver.mli
 plugin/depDriver.mli
 plugin/setLib.mli
@@ -25,6 +26,7 @@ plugin/sizeUtils.mli
 plugin/sized.mli
 
 plugin/quickChick.mlg
+plugin/tactic_inductive_tags.mlg
 plugin/driver.mlg
 plugin/tactic_quickchick.mlg
 plugin/weightmap.mlg

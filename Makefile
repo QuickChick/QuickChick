@@ -86,6 +86,7 @@ COMPATFILES:= \
 	plugin/unifyQC.ml \
 	plugin/unifyQC.mli \
 	plugin/tactic_quickchick.mlg \
+	plugin/tactic_inductive_tags.mlg \
 	plugin/weightmap.mlg \
 	src/Compat.v \
 	src/ExtractionQC.v \

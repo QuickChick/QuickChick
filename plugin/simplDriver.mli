@@ -4,6 +4,7 @@ type derivable =
   | GenSized
   | Sized
   | EnumSized
+  | Nullary
 val derivable_to_string : derivable -> string
 val mk_instance_name : derivable -> string -> string
 val repeat_instance_name : derivable -> string -> string

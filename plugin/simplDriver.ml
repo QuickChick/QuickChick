@@ -12,6 +12,7 @@ open SizeCorr
 
 open EnumSized
 open ArbitrarySized
+open Tactic_inductive_tags
 
 type derivable =
     Shrink
@@ -19,6 +20,7 @@ type derivable =
   | GenSized
   | Sized
   | EnumSized
+  | Nullary
   (*
   | CanonicalSized
   | SizeMonotonic
@@ -32,6 +34,7 @@ let derivable_to_string = function
   | GenSized -> "GenSized"
   | EnumSized -> "EnumSized"              
   | Sized -> "Sized"
+  | Nullary -> "Nullary"
            (*
   | CanonicalSized -> "CanonicalSized"
   | SizeMonotonic -> "SizeMonotonic"
@@ -86,7 +89,8 @@ let derive (cn : derivable) (c : constr_expr) (instance_name : string) (name1 : 
     | Shrink -> ["Shrink"]
     | Show -> ["Show"]
     | GenSized -> ["Gen"]
-    | EnumSized -> ["Enum"]                
+    | EnumSized -> ["Enum"]
+    | Nullary -> ["Nullary"]                
                 (*
     | CanonicalSized -> ["CanonicalSized"]
     | SizeMonotonic -> ["GenMonotonic"]
@@ -99,7 +103,8 @@ let derive (cn : derivable) (c : constr_expr) (instance_name : string) (name1 : 
     | Shrink -> []
     | Sized -> []
     | GenSized -> []
-    | EnumSized -> []                
+    | EnumSized -> []   
+    | Nullary -> []             
                 (*
     | CanonicalSized -> []
     | SizeMonotonic -> [(gInject "s", gInject "nat")]
@@ -144,6 +149,7 @@ let derive (cn : derivable) (c : constr_expr) (instance_name : string) (name1 : 
     | GenSized -> arbitrarySized_decl ty_ctr ctrs iargs
     | EnumSized -> enumSized_decl ty_ctr ctrs iargs                
     | Sized -> sized_decl ty_ctr ctrs
+    | Nullary -> nullary_decl ty_ctr ctrs
              (*
     | CanonicalSized ->
       let ind_scheme =  gInject ((ty_ctr_to_string ty_ctr) ^ "_ind") in
