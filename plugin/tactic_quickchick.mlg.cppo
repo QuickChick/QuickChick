@@ -10,6 +10,7 @@ MAKE SURE TO EDIT THE .cppo SOURCE OF THIS FILE RATHER THAN THE GENERATED RESULT
   open Error
   open Pp
   open Stdarg
+  open GenericLib
 
 }
 
@@ -93,6 +94,127 @@ let remember_induct h =
     end 
 
 let decOpt_fuel = 1000
+
+(* variable v, type of v, if None then 
+                             unbound 
+                          else 
+                             (bound inductive, index of binding argument)*)
+type binding = var * dep_type * (dep_type * int) option
+
+type bindings_and_unbound = binding list * dep_type list 
+type relation_variables = (int * var list) list
+type var_uses_in_relations = (var * (int * int) list) list
+type dep_type_var_map_views = relation_variables * var_uses_in_relations
+
+(* 1. list of bindings
+   2. list of unbound inductives  *)
+
+let list_pair_with_rest l =
+  let rec aux before current =
+    match current with
+    | [] -> []
+    | now :: after -> (before @ after, now) :: aux (now :: before) after in
+  aux [] l
+
+let safe_assoc i l = try List.assoc i l with _ -> []
+
+let rec assoc_remove_all_in_set k_set l =
+  match l with
+  | [] -> []
+  | (k, v) :: rest -> if List.mem k k_set then assoc_remove_all_in_set k_set rest else (k, v) :: assoc_remove_all_in_set k_set rest
+
+let list_bind (l : 'a list) (f : 'a -> 'b list) : 'b list =
+  List.concat (List.map f l)
+
+let print_all_bindings' (bindings : bindings_and_unbound list) : unit =
+  if bindings = [] then msg_debug (str "No bindings found" ++ fnl ())
+  else
+    let string_of_option f = function
+      | None -> "None"
+      | Some x -> "Some " ^ (f x) in
+    List.iteri (fun j (b, i) ->
+        msg_debug (str "Bindings: " ++ str (string_of_int j) ++ fnl ());
+      List.iter (fun (v, t, opt) ->
+          msg_debug (str (var_to_string v) ++ str " : " ++ str (dep_type_to_string t) ++ str " : " ++ str (string_of_option (fun (r, i) -> dep_type_to_string r ^ " " ^ string_of_int i) opt) ++ fnl ())
+      ) b;
+      List.iter (fun i -> msg_debug (str (dep_type_to_string i) ++ fnl ())) i
+    ) bindings  
+
+let rec binding_options' ((ind_vars, var_uses) : dep_type_var_map_views) (typed_vars : (var * dep_type) list) : var_uses_in_relations list =
+  msg_debug (str "Size of typed_vars: " ++ int (List.length typed_vars) ++ fnl ());
+  if typed_vars = [] then [var_uses] else begin
+  let var_to_bind_options = list_pair_with_rest typed_vars in
+  let bind_variable_to_relation var ty idx_var_idx_opt : dep_type_var_map_views * (var * dep_type) list =
+    match idx_var_idx_opt with
+    | None -> 
+        let ind_vars' = List.map (fun (i, vs) -> (i, List.filter (fun v -> v <> var) vs)) ind_vars in
+        let var_uses' = (var, []) :: List.remove_assoc var var_uses in
+        let typed_vars' = List.remove_assoc var typed_vars in
+        ((ind_vars', var_uses'), typed_vars')
+    | Some (idx, var_idx) -> 
+        let ind_uses : var list = safe_assoc idx ind_vars in
+        let ind_uses' = List.filter (fun v -> v <> var) ind_uses in
+        let var_uses' = (var, [(idx, var_idx)]) :: (List.map (fun v -> (v,[])) ind_uses') @ (assoc_remove_all_in_set ind_uses var_uses) in
+        let typed_vars' = assoc_remove_all_in_set ind_uses typed_vars in
+        let ind_vars' = List.map (fun (i, vs) -> (i, List.filter (fun v -> not (List.mem v ind_uses)) vs)) ind_vars in
+            ((ind_vars', var_uses'), typed_vars') in
+  let bind_variable_to_relations var ty : (dep_type_var_map_views * (var * dep_type) list) list =
+    let uses = None :: List.map (fun x -> Some x) (safe_assoc var var_uses) in
+    List.map (fun idx_var_idx_opt -> bind_variable_to_relation var ty idx_var_idx_opt) uses in
+  list_bind (list_bind var_to_bind_options (fun (_,(var, ty)) -> bind_variable_to_relations var ty)) ((fun (dtvm_views, typed_vars) -> binding_options' dtvm_views typed_vars))
+  end
+        
+let binding_options ((ind_vars, var_uses) : dep_type_var_map_views) (typed_vars : (var * dep_type) list) theorem_relations 
+  : bindings_and_unbound list =
+  let options = binding_options' (ind_vars, var_uses) typed_vars in
+  List.map (fun var_uses' ->
+    let var_uses_typed = List.map (fun (v, uses) -> (v, List.assoc v typed_vars, List.map (fun (idx, var_idx) -> (List.assoc idx theorem_relations,var_idx)) uses)) var_uses' in
+    let var_uses_typed_list_to_option = List.map (fun (v, ty, uses) -> (v, ty, match uses with [] -> None | [x] -> Some x | _ -> failwith "binding_options: multiple uses")) var_uses_typed in
+    let used_theorems = List.fold_right (fun (_, _, opt) acc -> match opt with None -> acc | Some (r, _) -> r :: acc) var_uses_typed_list_to_option [] in
+    let unused_theorems = List.map snd (List.filter (fun (_,thm) -> not (List.mem thm used_theorems)) theorem_relations) in
+    (var_uses_typed_list_to_option, unused_theorems)
+  ) options 
+
+let remove_duplicates l =
+  let rec remove_duplicates' l acc =
+    match l with
+    | [] -> acc
+    | x :: xs -> if List.mem x acc then remove_duplicates' xs acc else remove_duplicates' xs (x :: acc) in
+  remove_duplicates' l []
+
+(*Sort bindings so all vars that are associated with a None option come before Some associated vars, and for None associated vars the vars are sorted in alphabetical order*)
+let sort_bindings (bindings : ((var * dep_type * (dep_type * int) option) list) * dep_type list) : ((var * dep_type * (dep_type * int) option) list) * dep_type list =
+  let (vars, theorems) = bindings in
+  let (none_bindings, some_bindings) = List.partition (fun (_,_,opt) -> opt = None) vars in
+  let sorted_none_bindings = List.sort (fun (v1,_,_) (v2,_,_) -> compare v1 v2) none_bindings in
+  (some_bindings @ sorted_none_bindings, theorems)
+
+let makeAllBindings (theorem : dep_type) : bindings_and_unbound list =
+  let type_vars = dep_type_quantified theorem in
+  let variable_uses = dep_type_var_relation_uses theorem in
+  let ind_vars = dep_type_relation_variables theorem in
+  let theorem_relations = dep_type_relations theorem in
+  remove_duplicates (List.map sort_bindings (binding_options (ind_vars, variable_uses) type_vars theorem_relations))
+
+
+let print_all_bindings (theorem : dep_type) : unit =
+  let bindings_and_unbound = makeAllBindings theorem in
+  msg_debug (str "Printing all bindings" ++ fnl ());
+  print_all_bindings' bindings_and_unbound
+
+let print_bindings_tactic =
+  Proofview.Goal.enter begin fun gl ->
+    let c = Proofview.Goal.concl gl in
+    let e = Proofview.Goal.env gl in
+    let evd = Evd.from_env e in
+    match GenericLib.parse_dependent_type (EConstr.to_constr evd c) with
+    | Some dt -> 
+      begin
+        print_all_bindings dt;
+        Tacticals.tclIDTAC
+      end
+    | None -> failwith "Failed to Parse type"
+  end
 
 let quickchick_goal =
   Proofview.Goal.enter begin fun gl ->
@@ -272,6 +394,10 @@ let quickchick_goal =
 }
 TACTIC EXTEND quickchick
   | ["quickchick"] -> { quickchick_goal }
+END
+
+TACTIC EXTEND print_all_bindings 
+  | ["print_all_bindings"] -> { print_bindings_tactic }
 END
 
 TACTIC EXTEND merge_sound_core

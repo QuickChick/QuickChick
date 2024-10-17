@@ -974,6 +974,55 @@ let is_inductive_dt dt =
   | DTyCtr (c, dts) -> is_inductive c
   | _ -> false
 
+(* let rec dep_type_quantified_vars dt : var list = 
+  match dt with 
+  | DProd ((x, _), dt2) -> x :: dep_type_quantified_vars dt2
+  | _ -> [] *)
+
+let rec dep_type_quantified : dep_type -> (var * dep_type) list = function
+  | DProd ((x, dt1), dt2) -> (x, dt1) :: dep_type_quantified dt2
+  | _ -> []
+
+(*Given an inductive type without any arrows or products inside, find the variables within*)
+let rec dep_type_inductive_vars = function
+  | DCtr (_, ds) -> List.concat (List.map dep_type_inductive_vars ds)
+  | DTyCtr (_, ds) -> List.concat (List.map dep_type_inductive_vars ds)
+  | DTyVar x -> [x]
+  | _ -> []
+
+let rec dep_type_relations' i = function
+  | DProd (_,dt2) -> dep_type_relations' i dt2
+  | DArrow (dt1, dt2) -> if is_inductive_dt dt1 then (i,dt1) :: dep_type_relations' (i + 1) dt2 else dep_type_relations' (i + 1) dt2
+  | _ -> []
+  
+let dep_type_relations dt = dep_type_relations' 1 dt
+
+let dep_type_relation_variables (dt :dep_type): (int * var list) list =
+  List.map (fun (i, dt) -> (i, dep_type_inductive_vars dt)) (dep_type_relations dt)
+
+let rec dep_type_variables = function
+  | DProd ((x,_),dt) -> x :: dep_type_variables dt
+  | _ -> []
+
+let rec update_key_once (k : 'a) (f : 'b -> 'b) (m : ('a * 'b) list) : ('a * 'b) list = 
+  match m with
+  | [] -> []
+  | (k',v)::m' -> if k = k' then (k, f v) :: m' else (k',v) :: update_key_once k f m'
+  
+
+let dep_type_var_relation_uses dt : (var * (int * int) list) list =
+  let tyvars : var list = dep_type_variables dt in
+  let tyrels : (int * dep_type) list = dep_type_relations dt in
+  let tyrelvars : (int * var list) list = List.map (fun (i, dt) -> (i, dep_type_inductive_vars dt)) tyrels in
+  let assoc_cons_aux_aux (index : int) (var_rel_uses : (var * (int * int) list) list) ((arg_index, used_var) : int * var) : (var * (int * int) list) list  = 
+    update_key_once used_var (fun rel_uses -> rel_uses @ [(index, arg_index)]) var_rel_uses in
+  let assoc_cons_aux (var_rel_uses : (var * (int * int) list) list) (index , used_vars) : (var * (int * int) list) list = 
+    List.fold_left (assoc_cons_aux_aux index) var_rel_uses (List.mapi (fun i x -> (i + 1, x)) used_vars) in
+  List.fold_left assoc_cons_aux (List.map (fun (x : var) -> (x, [])) tyvars) tyrelvars
+
+
+
+
 (* Specialized match *)
 type matcher_pat = 
   | MatchCtr of constructor * matcher_pat list
