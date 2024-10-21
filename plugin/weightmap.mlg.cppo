@@ -66,9 +66,9 @@ let convert_constr_to_cw_pair c : (constructor * weight_ast) =
 #if COQ_VERSION >= (8, 16, 0)
 let register_weights_object =
   Libobject.declare_object
-    {(Libobject.default_object ("QC_register_weights")) with
-      Libobject.cache_function = (fun ws -> register_weights ws);
-      Libobject.load_function = (fun _ ws -> register_weights ws)}
+    (Libobject.superglobal_object_nodischarge "QC_register_weights"
+      ~cache:(fun ws -> register_weights ws)
+      ~subst:None (* XXX should this be substitutive? why are we using qualid instead of Names.constructor? *))
 
 let add_weights w = Lib.add_leaf (register_weights_object w)
 #else
