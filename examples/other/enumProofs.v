@@ -2,7 +2,7 @@ From QuickChick Require Import QuickChick Tactics TacticsUtil Instances
      Classes DependentClasses Sets EnumProofs.
 
 Require Import String. Open Scope string.
-Require Import List micromega.Lia.
+From Coq Require Import List Lia.
 
 
 From Ltac2 Require Import Ltac2.
