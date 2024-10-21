@@ -72,7 +72,7 @@ let dispatch cn ind name1 name2 =
 
   match class_names with
   | SimpleDer classes -> simpl_dispatch ind classes name1 name2
-  | DepDer class_name -> DepDriver.dep_dispatch ind class_name
+  | DepDer class_name -> let _ = DepDriver.dep_dispatch ind class_name in ()
 ;;                       
 
 let merge ind1 ind2 ind3 =

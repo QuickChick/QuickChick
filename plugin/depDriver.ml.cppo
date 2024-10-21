@@ -252,7 +252,7 @@ let create_t_and_u_maps explicit_args dep_type actual_args : (range UM.t * dep_t
    - checker-based classes only include the name of the predicate "P". All arguments to P will
      be considered Fixed inputs
  *)
-let dep_dispatch ind class_name : unit =
+let dep_dispatch ind class_name : Names.Id.t =
   match ind with 
 #if COQ_VERSION >= (8, 20, 0)
   | { CAst.v = CLambdaN ([CLocalAssum ([{ CAst.v = Names.Name id; CAst.loc = _loc2 }], _, _kind, _type)], body); _ } -> (* {CAst.v = CApp ((_flag, constructor), args) }) } -> *)
@@ -261,11 +261,16 @@ let dep_dispatch ind class_name : unit =
 #endif
 
     let idu = Unknown.from_string (Names.Id.to_string id ^ "_") in
-     
+    
+    let f = function
+      | CAppExpl ((constructor,k), args) -> CRef (constructor,k)
+    in 
+
     (* Extract (x1,x2,...) if any, P and arguments *)
     let (letbindsM, constructor, args) =
       match body with 
       | { CAst.v = CApp (constructor, args); _ } -> (None, constructor, args)
+      | { CAst.v = CAppExpl ((constructor,k), args); _ } -> (None,  CAst.map f body, List.map (fun x -> (x,None)) args)
       | { CAst.v = CLetTuple (name_list, _,
                               _shouldbeid,
                               { CAst.v = CApp (constructor, args); _ } ); _} ->

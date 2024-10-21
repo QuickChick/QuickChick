@@ -52,10 +52,17 @@ type coq_expr = constr_expr (* Opaque *)
 
 let interp_open_coq_expr env evd e = fst (Constrintern.interp_constr env evd e)
 
+let unsafe_coq_expr_to_constr_expr (c : coq_expr) : constr_expr = c
+
 let debug_coq_expr (c : coq_expr) : unit =
   let env = Global.env () in
   let sigma = Evd.from_env env in
   msg_debug (pr_constr_expr env sigma c)
+
+let pp_coq_expr (c : coq_expr) : Pp.t = 
+  let env = Global.env () in
+  let sigma = Evd.from_env env in
+  pr_constr_expr env sigma c
 
 let debug_constr env sigma (c : constr) : unit = 
   msg_debug (Printer.safe_pr_constr_env env sigma c ++ fnl ())
@@ -264,6 +271,14 @@ let rec dep_type_len = function
   | DArrow (_, dt') 
   | DProd (_, dt') -> 1 + dep_type_len dt'
   | _ -> 0
+
+let rec dep_type_hyps_and_concl dt : dep_type list * dep_type = 
+  match dt with
+  | DArrow (dt1, dt2) -> let (hyps, concl) = dep_type_hyps_and_concl dt2 in
+                         (dt1 :: hyps, concl)
+  | DProd ((x,dt1), dt2) -> let (hyps, concl) = dep_type_hyps_and_concl dt2 in
+                            (dt1 :: hyps, concl)
+  | dt -> ([], dt)
 
 (* Option monad *)
 let option_map f ox =
@@ -997,7 +1012,14 @@ let rec dep_type_relations' i = function
   
 let dep_type_relations dt = dep_type_relations' 1 dt
 
-let dep_type_relation_variables (dt :dep_type): (int * var list) list =
+let rec dep_type_one_relation_variables = function
+  | DTyCtr (_, ds) -> List.concat (List.map dep_type_one_relation_variables ds)
+  | DTyVar x -> [x]
+  | DCtr (_, ds) -> List.concat (List.map dep_type_one_relation_variables ds)
+  | DApp (d, ds) -> List.concat (List.map dep_type_one_relation_variables (d :: ds))
+  | _ -> (*error all args must be abstract*) CErrors.user_err (str "dep_type_one_relation_variables: Not a type variable" ++ fnl())
+
+let dep_type_relation_variables (dt : dep_type) : (int * var list) list =
   List.map (fun (i, dt) -> (i, dep_type_inductive_vars dt)) (dep_type_relations dt)
 
 let rec dep_type_variables = function
@@ -1009,7 +1031,7 @@ let rec update_key_once (k : 'a) (f : 'b -> 'b) (m : ('a * 'b) list) : ('a * 'b)
   | [] -> []
   | (k',v)::m' -> if k = k' then (k, f v) :: m' else (k',v) :: update_key_once k f m'
   
-
+(*May want to update this to (var * (int * int list) list) list because you might have T a (C b c) d, so to identify c you need [1;1] and b [1;0] and a [0]*)
 let dep_type_var_relation_uses dt : (var * (int * int) list) list =
   let tyvars : var list = dep_type_variables dt in
   let tyrels : (int * dep_type) list = dep_type_relations dt in
@@ -1018,9 +1040,7 @@ let dep_type_var_relation_uses dt : (var * (int * int) list) list =
     update_key_once used_var (fun rel_uses -> rel_uses @ [(index, arg_index)]) var_rel_uses in
   let assoc_cons_aux (var_rel_uses : (var * (int * int) list) list) (index , used_vars) : (var * (int * int) list) list = 
     List.fold_left (assoc_cons_aux_aux index) var_rel_uses (List.mapi (fun i x -> (i + 1, x)) used_vars) in
-  List.fold_left assoc_cons_aux (List.map (fun (x : var) -> (x, [])) tyvars) tyrelvars
-
-
+  List.fold_left assoc_cons_aux (List.map (fun (x : var) -> (x, [])) tyvars) (List.map (fun (i,l) -> i,List.filter (fun v -> List.mem v tyvars) l) tyrelvars)
 
 
 (* Specialized match *)
@@ -1223,9 +1243,15 @@ let g_forAll gen prop = gApp (gInject "QuickChick.Checker.forAll") [gen; prop]
 
 let g_arbitrary = gInject "QuickChick.Classes.arbitrary"
 
+let g_arbitraryST prop_fun = gApp ?explicit:(Some true) (gInject "QuickChick.DependentClasses.arbitraryST") [hole; prop_fun; hole]
+
 let g_quickCheck p = gApp (gInject "QuickChick.Test.quickCheck") [p]
 
 let g_show typ = gApp (gInject "QuickChick.Show.show") [typ]
+
+let g_size a = gApp (gInject "QuickChick.Classes.size") [a]
+
+let g_collect a prop = gApp (gInject "QuickChick.Checker.collect") [a; prop]
 
 (* Recursion combinators / fold *)
 (* fold_ty : ( a -> coq_type -> a ) -> ( ty_ctr * coq_type list -> a ) -> ( ty_param -> a ) -> coq_type -> a *)
@@ -1314,7 +1340,8 @@ let declare_class_instance ?(global=true) ?(priority=42) instance_arguments inst
               (true, instance_record_vars) (* TODO: true or false? *)
               { Typeclasses.hint_priority = Some priority; hint_pattern = None }
   in
-  msg_debug (str (Id.to_string cid) ++ fnl ())
+  msg_debug (str (Id.to_string cid) ++ fnl ());
+  cid
 
 let define_new_inductive (ty_ctr, ty_params, ctrs, typ) =
   let me_typename = Id.of_string (string_of_qualid ty_ctr) in
@@ -1399,9 +1426,9 @@ let debug_pattern s p =
   | PArray _ -> failwith (s ^ "ARRAY")
   | PProd _ -> failwith (s ^ "PROD")
   
-let find_typeclass_bindings typeclass_name ctr =
+let find_typeclass_bindings ?env_opt:(default_env = None) typeclass_name ctr =
   msg_debug (str ("Finding typeclass bindings for:" ^ string_of_qualid ctr) ++ fnl());
-  let env = Global.env () in
+  let env = match default_env with None -> Global.env () | Some env' -> env' in
   let evd = Evd.from_env env in
   let db = Hints.searchtable_map "typeclass_instances" in
   let result = ref [] in
@@ -1529,6 +1556,7 @@ let find_typeclass_bindings typeclass_name ctr =
     msg_debug (str "Processing... (" ++ str typeclass_name ++ str ")"  ++ Hints.FullHint.print env evd hint ++ fnl ());
     begin match Hints.FullHint.repr hint with
     | Hints.Res_pf h ->
+       msg_debug (str "Res_pf" ++ fnl ());
        handle_hint_repr b h
     | Hints.Give_exact h ->
        handle_hint_repr b h
