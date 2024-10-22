@@ -405,6 +405,8 @@ Theorem preservation : forall e e' Gamma tau,
     typing' Gamma e' tau.
 Proof.
   typeclass_bindings GenSizedSuchThat typing'.
+  Derive Used Inds typing'.
+  Derive Used Inds step.
   print_all_bindings. derive_index 3.
   typeclass_bindings GenSizedSuchThat typing'.
   Extract Constant defSize        => "2".

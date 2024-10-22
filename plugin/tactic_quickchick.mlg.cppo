@@ -91,7 +91,65 @@ let remember_induct h =
         msg_debug (int (List.length to_remember) ++ fnl ());
         do_remembers to_remember
       )
-    end 
+    end
+
+let print_type_names (inds : ty_ctr list) : unit =
+  List.iter (fun ind -> msg_debug (str (ty_ctr_to_string ind) ++ fnl ())) inds
+
+let remove_duplicates l =
+  let rec remove_duplicates' l acc =
+    match l with
+    | [] -> acc
+    | x :: xs -> if List.mem x acc then remove_duplicates' xs acc else remove_duplicates' xs (x :: acc) in
+  remove_duplicates' l []
+    
+let is_inductive' (ty_name : ty_ctr) : bool =
+  is_inductive (injectCtr (ty_ctr_to_string ty_name))
+
+let rec extract_names_dep_type (dt : dep_type) : ty_ctr list =
+  match dt with
+  | DProd ((_, DTyCtr (c,_)), ty2) -> 
+    if is_inductive' c then
+      c :: extract_names_dep_type ty2
+    else
+      failwith "Rule hypotheses and conclusions must be inductive 1."
+  | DProd ((_, DTyVar _), ty2) -> extract_names_dep_type ty2
+  | DProd ((_, DTyParam _), ty2) -> extract_names_dep_type ty2
+  | DArrow (DTyCtr (c,_), ty2) -> 
+    if is_inductive' c then
+      c :: extract_names_dep_type ty2
+    else
+      failwith "Rule hypotheses and conclusions must be inductive 2."
+  | DArrow (_, ty2) -> extract_names_dep_type ty2
+  | DTyCtr (_, _) -> []
+  | _ -> failwith ("Rule hypotheses and conclusions must be inductive 3. " ^ dep_type_to_string dt)
+
+
+let overall_type_inductive_names ((ind_name, params, rules, overall_type) : dep_dt) : ty_ctr list =
+  extract_names_dep_type overall_type
+
+let constructors_used_inductive_names ((ind_name, params, rules, overall_type) : dep_dt) : ty_ctr list =
+  remove_duplicates (List.concat_map (fun (cons, typ) -> extract_names_dep_type typ) rules)
+
+let ty_ctr_to_dep_dt (tycon : ty_ctr) =
+  match qualid_to_dep_dt (tyCtrToQualid tycon) with
+  | None -> failwith ("Inductive not found: " ^ ty_ctr_to_string tycon)
+  | Some dt -> dt
+  
+let seek_ind_types_from_overall_type root : ty_ctr list =
+  let rec seek_ind_types ind_name visited : ty_ctr list =
+    if List.mem ind_name visited then
+      visited 
+    else
+      let dep_dt = ty_ctr_to_dep_dt ind_name in
+      let used_inds = constructors_used_inductive_names dep_dt in
+      List.fold_left (fun visited' ind_name' -> seek_ind_types ind_name' visited') (ind_name :: visited) used_inds
+    in
+  let dep_dt = ty_ctr_to_dep_dt root in
+  let used_inds = overall_type_inductive_names dep_dt in
+  
+  List.fold_left (fun visited' ind_name' -> seek_ind_types ind_name' visited') [root] used_inds
+
 
 let decOpt_fuel = 7
 
@@ -629,4 +687,13 @@ END
 
 TACTIC EXTEND remember_induct
   | ["remember_induct" ident(h)] -> { remember_induct h }
+END
+
+VERNAC COMMAND EXTEND DeriveUsedInds CLASSIFIED AS SIDEFF
+   | ["Derive" "Used" "Inds" constr(ind)] ->
+    { match coerce_reference_to_dep_dt ind with
+      | Some (ind_name,_,_,_) ->
+        print_type_names (seek_ind_types_from_overall_type ind_name) 
+      | None -> failwith "Failed to parse inductive type"  
+    }
 END
