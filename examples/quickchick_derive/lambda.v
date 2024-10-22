@@ -404,7 +404,9 @@ Theorem preservation : forall e e' Gamma tau,
     step e e' ->
     typing' Gamma e' tau.
 Proof.
-  (*grab_dependencies.*) print_all_bindings. derive_index 3.
+  typeclass_bindings GenSizedSuchThat typing'.
+  print_all_bindings. derive_index 3.
+  typeclass_bindings GenSizedSuchThat typing'.
   Extract Constant defSize        => "2".
   QuickCheck (QuickChick.Checker.forAll QuickChick.Classes.arbitrary
    (fun tau =>

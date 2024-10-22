@@ -582,6 +582,22 @@ let theorem_dependencies =
     | None -> failwith "Failed to Parse type"
   end
 
+let print_typeclass_bindings d c =
+  let open GenericLib in
+  let string_of_bool' = function
+    | true -> "true"
+    | false -> "false" in
+  let the_type = c |> Names.Id.to_string |> injectCtr |> ctr_to_ty_ctr in
+  let the_typeclass = Names.Id.to_string d in
+  let bindings = find_typeclass_bindings the_typeclass the_type in
+  let show_bindings = List.map (List.map string_of_bool') bindings 
+                    |> List.map (String.concat "; ") 
+                    |> List.map (fun s -> "[" ^ s ^ "]")
+                    |> (String.concat ", ") in
+  let bracket_bindings = "{" ^ show_bindings ^ "}" in
+  msg_debug (str bracket_bindings ++ fnl ());
+  Tacticals.tclIDTAC
+
 }
 TACTIC EXTEND quickchick
   | ["quickchick"] -> { quickchick_goal }
@@ -589,6 +605,10 @@ END
 
 TACTIC EXTEND print_all_bindings 
   | ["print_all_bindings"] -> { print_bindings_tactic }
+END
+
+TACTIC EXTEND typeclass_bindings
+  | ["typeclass_bindings" ident(d) ident(c)] -> { print_typeclass_bindings d c }
 END
 
 TACTIC EXTEND derive_and_quickchick_index
