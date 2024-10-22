@@ -433,7 +433,7 @@ Proof.
                 end)))))).
 
 
-  derive_and_quickchick_index 8. derive_index 5. Search typing'.
+  derive_and_quickchick_index 8. theorem_dependencies. derive_index 5. Search typing'.
   Search step. Check @decOpt. Print term. Compute (@decOpt (step (App (Abs (Id 0)) (Const 0)) (Const 0)) _ 7).
   derive_and_quickchick_index 9.
 

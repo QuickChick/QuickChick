@@ -555,6 +555,33 @@ let quickchick_goal =
  *)
 
 *)
+
+let theorem_dependencies = 
+  Proofview.Goal.enter begin fun gl ->
+    
+    (* Convert goal to a constr_expr *)
+    let c = Proofview.Goal.concl gl in
+    let e = Proofview.Goal.env gl in
+    let evd = Evd.from_env e in
+
+    match GenericLib.parse_dependent_type (EConstr.to_constr evd c) with
+    | Some dt ->
+      begin
+        msg_debug (str (GenericLib.dep_type_to_string dt) ++ fnl ());
+        let open GenericLib in
+        let rec printlist : (var * (int * int) list) list -> unit = function
+          | [] -> ()
+          | (var, rels) :: rest ->
+            let tuple_to_string (i,j) = "(" ^ string_of_int i ^ ", " ^ string_of_int j ^ ")" in
+            msg_debug (str (var_to_string var) ++ str " : " ++ str (String.concat ", " (List.map (fun i -> (tuple_to_string i)) rels)) ++ fnl ());
+            printlist rest
+        in
+        printlist (dep_type_var_relation_uses dt);          
+        Tacticals.tclIDTAC
+      end
+    | None -> failwith "Failed to Parse type"
+  end
+
 }
 TACTIC EXTEND quickchick
   | ["quickchick"] -> { quickchick_goal }
@@ -570,6 +597,10 @@ END
 
 TACTIC EXTEND derive_index
   | ["derive_index" int(i)] -> { derive_index i }
+END
+
+TACTIC EXTEND theorem_dependencies
+  | ["theorem_dependencies"] -> { theorem_dependencies }
 END
 
 TACTIC EXTEND merge_sound_core
