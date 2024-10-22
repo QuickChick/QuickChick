@@ -398,12 +398,42 @@ Derive Sized for option.
 
 QuickCheck prop_testing_decopt_step.*)
 
+
 Theorem preservation : forall e e' Gamma tau,
     typing' Gamma e tau ->
     step e e' ->
     typing' Gamma e' tau.
 Proof.
-  (*grab_dependencies.*) print_all_bindings. derive_and_quickchick_index 4. derive_index 5. Search typing'.
+  (*grab_dependencies.*) print_all_bindings. derive_index 3.
+  Extract Constant defSize        => "2".
+  QuickCheck (QuickChick.Checker.forAll QuickChick.Classes.arbitrary
+   (fun tau =>
+    QuickChick.Checker.collect (Coq.Init.Datatypes.pair "tau-size"%string (QuickChick.Classes.size tau))
+      (QuickChick.Checker.forAll QuickChick.Classes.arbitrary
+         (fun Gamma =>
+          QuickChick.Checker.collect (Coq.Init.Datatypes.pair "Gamma-size"%string (QuickChick.Classes.size Gamma))
+            (QuickChick.Checker.forAll (@QuickChick.DependentClasses.arbitraryST _ (fun e => @typing' Gamma e tau) _)
+               (fun e =>
+                match e with
+                | @Coq.Init.Datatypes.Some _ e =>
+                    QuickChick.Checker.collect (Coq.Init.Datatypes.pair "e-size"%string (QuickChick.Classes.size e))
+                      (QuickChick.Checker.forAll (@QuickChick.DependentClasses.arbitraryST _ (fun e' => @step e e') _)
+                         (fun e' =>
+                          match e' with
+                          | @Coq.Init.Datatypes.Some _ e' =>
+                              QuickChick.Checker.collect (Coq.Init.Datatypes.pair "e'-size"%string (QuickChick.Classes.size e'))
+                                (QuickChick.Checker.checker
+                                   match @QuickChick.Decidability.decOpt (@typing' Gamma e' tau) _ 7%nat with
+                                   | Coq.Init.Datatypes.Some res => res
+                                   | Coq.Init.Datatypes.None => Coq.Init.Datatypes.false
+                                   end)
+                          | _ => QuickChick.Checker.checker Coq.Init.Datatypes.tt
+                          end))
+                | _ => QuickChick.Checker.checker Coq.Init.Datatypes.tt
+                end)))))).
+
+
+  derive_and_quickchick_index 8. derive_index 5. Search typing'.
   Search step. Check @decOpt. Print term. Compute (@decOpt (step (App (Abs (Id 0)) (Const 0)) (Const 0)) _ 7).
   derive_and_quickchick_index 9.
 
