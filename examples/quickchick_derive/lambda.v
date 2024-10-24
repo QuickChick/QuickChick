@@ -5,7 +5,7 @@ From QuickChick Require Import QuickChick.
 
 Import ListNotations.
 
-QuickChickDebug Debug On.
+(*QuickChickDebug Debug On.*)
 
 Inductive type : Type :=
 | N : type
@@ -54,8 +54,10 @@ Derive Density bind 1. *)
 
 
 Inductive Duct : bool -> nat -> bool -> nat -> Prop :=
-| DA a b : Duct b a true 0
+| DA a b : Duct b a b 0
 | DB a : Duct true 0 false a.
+
+Derive Density Duct   1 .
 
 (* Derive Pattern Coverage Duct 1. *)
 
@@ -72,9 +74,9 @@ Inductive typing' (e : list type) : term -> type -> Prop :=
       typing' (tau1 :: e) t tau2 ->
       typing' e (Abs t) (Arrow tau1 tau2)
 | TApp' :
-    forall t1 t2 tau1 tau2,
-      typing' e t2 tau1 ->
+  forall t1 t2 tau1 tau2,
       typing' e t1 (Arrow tau1 tau2) ->
+      typing' e t2 tau1 ->
       typing' e (App t1 t2) tau2.
 
 (* Derive Pattern Coverage typing' 2.
@@ -122,7 +124,7 @@ Search Enum.
 QuickChickDebug Debug On.
 Derive EnumSized for type.
 Derive EnumSizedSuchThat for (fun typ => bind env x typ).
-Derive EnumSizedSuchThat for (fun typ => typing' env e typ).
+(*Derive EnumSizedSuchThat for (fun typ => typing' env e typ).*)
 Derive DecOpt for (typing' env e tau).
 
 Inductive step : term -> term -> Prop :=
@@ -398,6 +400,8 @@ Derive Sized for option.
 
 QuickCheck prop_testing_decopt_step.*)
 
+QuickChickDebug Debug Off.
+
 
 Theorem preservation : forall e e' Gamma tau,
     typing' Gamma e tau ->
@@ -407,6 +411,9 @@ Proof.
   typeclass_bindings GenSizedSuchThat typing'.
   Derive Used Inds typing'.
   Derive Used Inds step.
+  Derive Density step 0. Print step. Print typing'. Print subst.
+  Derive Density typing' 2. Derive Density bind 2. Derive Density app_free 0.
+  QuickChickDebug Debug On.
   print_all_bindings. derive_index 3.
   typeclass_bindings GenSizedSuchThat typing'.
   Extract Constant defSize        => "2".
