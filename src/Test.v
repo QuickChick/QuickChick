@@ -510,13 +510,17 @@ Fixpoint fuzzLoopAux {A} (fuzz_fuel : nat) (st : State)
     | Some false =>
         let '(MkState mst mdt ms cs nst ndt ls e r nss nts ana) := st in
         let zero := trace (print a ++ nl) zero_0 in
-        let pre : string := "*** Failed " in
+        let pre : string := if ana then """result"": ""failed"", " else "*** Failed " in
         (* TODO: shrinking *)
         (*         let (numShrinks, res') := localMin rnd1_copy st (MkRose res ts) in *)
         let numShrinks := 0 in
-        let suf := ("after " ++ (show (S nst)) ++ " tests and "
-                                 ++ (show numShrinks) ++ " shrinks. ("
-                                 ++ (show ndt) ++ " discards)")%string in
+        let suf := (if ana 
+                      then ("""tests"": " ++ (show (S nst)) 
+                            ++ ", ""shrinks"": "++ (show numShrinks) 
+                            ++ ", ""discards"": "++ (show ndt))
+                      else ("after " ++ (show (S nst)) ++ " tests and "
+                            ++ (show numShrinks) ++ " shrinks. ("
+                            ++ (show ndt) ++ " discards)"))%string in
         Failure (nst + 1 + zero) numShrinks ndt r size (pre ++ suf) (summary st) "Falsified!"
     | None =>
       match clear_queues fuzz_fuel with
