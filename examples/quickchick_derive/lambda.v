@@ -49,8 +49,9 @@ Inductive bind : list type -> nat -> type -> Prop :=
 
 Derive Sized for term.
 
-(* Derive Pattern Coverage bind 0. 
-Derive Density bind 1. *)
+Derive Density bind 2.
+Derive Density bind 0.
+Derive Density bind 1. 
 
 
 Inductive Duct : bool -> nat -> bool -> nat -> Prop :=
@@ -59,7 +60,7 @@ Inductive Duct : bool -> nat -> bool -> nat -> Prop :=
 
 Derive Density Duct   1 .
 
-(* Derive Pattern Coverage Duct 1. *)
+(* Derive Density Duct 1. *)
 
 Inductive typing' (e : list type) : term -> type -> Prop :=
 | TId' :
@@ -79,8 +80,8 @@ Inductive typing' (e : list type) : term -> type -> Prop :=
       typing' e t2 tau1 ->
       typing' e (App t1 t2) tau2.
 
-(* Derive Pattern Coverage typing' 2.
-Derive Density typing' 2. *)
+Derive Density typing' 1.
+Derive Density typing' 2. 
 Check typing'.
 
 Derive Arbitrary for type.
@@ -96,7 +97,7 @@ Inductive value : term -> Prop :=
 | ValueAbs : forall t, value (Abs t)
 .
 
-(*Derive Pattern Coverage value 0.*)
+(*Derive Density value 0.*)
 
 Derive DecOpt for (value t).
 
@@ -113,8 +114,8 @@ Inductive subst (y : nat) (t1 : term) : term -> term -> Prop :=
     subst y t1 (Abs t) (Abs t').
 
 
-(* Derive Pattern Coverage subst 3.
-Derive Pattern Coverage eq 1. Check eq. Print eq. *)
+Derive Density subst 3.
+Derive Density eq 2.
 Derive DecOpt for (subst y t1 t2 t2').
 Derive DecOpt for (bind env x tau).
 (*Derive DecOpt for (typing' env e tau).*)
@@ -136,19 +137,33 @@ Inductive step : term -> term -> Prop :=
     step t2 t2' ->
     step (App t1 t2) (App t1 t2')
 | StepAppAbs : forall t t' t2,
-    value t2 ->
+   (* value t2 ->*)
     subst 0 t2 t t' ->
-    step (App (Abs t) t2) t'
+    value t2 -> 
+    step (App (Abs t) (t2)) t'
 .
 
-(* Derive Pattern Coverage step 0. *)
+QuickChickDebug Debug Off.
 
+Derive Density step 1  .
+
+Derive Density typing' 1 2 .
+
+Derive Density eq 2.
+
+Inductive AD {p : bool} : nat -> Prop :=
+| AD_r : AD 0.
+
+Derive Density step 0 .
+
+Derive GenSizedSuchThat for (fun x => eq x y).
+
+Print eq.
 (*Derive DecOpt for (step e e').*)
 (*Derive GenSizedSuchThat for (fun e' => step e e').*)
 (*Derive ArbitrarySizedSuchThat for (fun e => typing' env e tau).*)
 Derive Show for type.
 Derive Show for term.
-
 Axiom segev_fuel_nat : nat.
 
 Extract Constant segev_fuel_nat => "10".

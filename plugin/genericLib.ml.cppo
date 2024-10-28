@@ -154,6 +154,7 @@ let rec coq_type_to_string ct =
 
 type constructor = qualid (* Opaque *)
 let constructor_to_string (x : constructor) = string_of_qualid x
+let constructor_to_qualid x = x
 let gCtr id = qualid_to_coq_expr id
 let injectCtr s = 
   if s = "" then failwith "Called gInject with empty string";

@@ -56,6 +56,7 @@ val coq_type_to_string : coq_type -> string
 
 type constructor 
 val constructor_to_string : constructor -> string
+val constructor_to_qualid : constructor -> Libnames.qualid
 val gCtr : constructor -> coq_expr
 val injectCtr : string -> constructor
 val ty_ctr_to_ctr : ty_ctr -> constructor
