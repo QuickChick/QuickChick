@@ -668,18 +668,18 @@ let rec assoc_remove_all_in_set k_set l =
 let list_bind (l : 'a list) (f : 'a -> 'b list) : 'b list =
   List.concat (List.map f l)
 
-let print_all_bindings' (bindings : bindings_and_unbound list) : unit =
-  if bindings = [] then msg_debug (str "No bindings found" ++ fnl ())
+let print_all_bindings' (bindings : (int * bindings_and_unbound) list) : unit =
+  if bindings = [] then Feedback.msg_notice (str "No bindings found" ++ fnl ())
   else
     let string_of_option f = function
-      | None -> "None"
-      | Some x -> "Some " ^ (f x) in
-    List.iteri (fun j (b, i) ->
-        msg_debug (str "Bindings: " ++ str (string_of_int j) ++ fnl ());
+      | None -> "Gen"
+      | Some x -> "GenST: " ^ f x in
+    List.iter (fun (idx, (b, i)) ->
+        Feedback.msg_notice (str "Bindings: " ++ str (string_of_int idx) ++ fnl ());
       List.iter (fun (v, t, opt) ->
-          msg_debug (str (var_to_string v) ++ str " : " ++ str (dep_type_to_string t) ++ str " : " ++ str (string_of_option (fun (r, i) -> dep_type_to_string r ^ " " ^ string_of_int i) opt) ++ fnl ())
+          Feedback.msg_notice (str "(" ++ str (var_to_string v) ++ str " : " ++ str (dep_type_to_string t) ++ str ") => " ++ str (string_of_option (fun (r, i) -> dep_type_to_string r ^ ", output index: " ^ string_of_int (i - 1)) opt) ++ fnl ())
       ) b;
-      List.iter (fun i -> msg_debug (str (dep_type_to_string i) ++ fnl ())) i
+      List.iter (fun i -> Feedback.msg_notice (str (dep_type_to_string i) ++ fnl ())) i
     ) bindings  
 
 let rec binding_options' ((ind_vars, var_uses) : dep_type_var_map_views) (typed_vars : (var * dep_type) list) : var_uses_in_relations list =
@@ -735,8 +735,8 @@ let makeAllBindings (theorem : dep_type) : bindings_and_unbound list =
 
 let print_all_bindings (theorem : dep_type) : unit =
   let bindings_and_unbound = makeAllBindings theorem in
-  msg_debug (str "Printing all bindings" ++ fnl ());
-  print_all_bindings' bindings_and_unbound
+  Feedback.msg_notice (str "Printing all bindings" ++ fnl ());
+  print_all_bindings' (List.mapi (fun i x -> i,x) bindings_and_unbound)
 
 let print_bindings_tactic =
   Proofview.Goal.enter begin fun gl ->
@@ -749,6 +749,33 @@ let print_bindings_tactic =
         print_all_bindings dt;
         Tacticals.tclIDTAC
       end
+    | None -> failwith "Failed to Parse type"
+  end
+
+let is_binding_selection_valid ((bindings,unbound) : bindings_and_unbound) : bool =
+  let is_binding_valid (v, ty, opt) : bool =
+    match opt with
+    | None -> true
+    | Some (DTyCtr (ind,_), i) ->
+      let ind_density = final_density (ty_ctr_to_dep_dt ind) [i - 1] false in
+      ind_density = Partial
+    | _ -> failwith "is_binding_selection_valid: Binding relation should have DTyCtr at toplevel" in
+  List.for_all is_binding_valid bindings
+
+let valid_bindings =
+  Proofview.Goal.enter begin fun gl ->
+    let c = Proofview.Goal.concl gl in
+    let e = Proofview.Goal.env gl in
+    let evd = Evd.from_env e in
+    match GenericLib.parse_dependent_type (EConstr.to_constr evd c) with
+    | Some dt -> 
+      begin
+        let bindings_and_unbound = makeAllBindings dt in
+        let valid_bindings_and_unbound = List.filter (fun (i, bu) -> is_binding_selection_valid bu) (List.mapi (fun i bu -> i, bu) bindings_and_unbound) in
+        Feedback.msg_notice (str "Printing all bindings" ++ fnl ());
+        print_all_bindings' valid_bindings_and_unbound;
+        Tacticals.tclIDTAC
+      end 
     | None -> failwith "Failed to Parse type"
   end
 
@@ -1140,6 +1167,10 @@ END
 
 TACTIC EXTEND print_all_bindings 
   | ["print_all_bindings"] -> { print_bindings_tactic }
+END
+
+TACTIC EXTEND valid_bindings
+  | ["valid_bindings"] -> { valid_bindings }
 END
 
 TACTIC EXTEND typeclass_bindings

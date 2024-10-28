@@ -5,7 +5,7 @@ From QuickChick Require Import QuickChick.
 
 Import ListNotations.
 
-(*QuickChickDebug Debug On.*)
+QuickChickDebug Debug On.
 
 Inductive type : Type :=
 | N : type
@@ -21,6 +21,25 @@ Inductive term : Type :=
 | Id : nat -> term
 | App : term -> term -> term
 | Abs : term -> term.
+(*
+Fixpoint subst' (x : nat) (s : term) (t : term) :=
+  match t with
+  | Const n => Const n
+  | Id y => if Nat.eqb x y then s else t
+  | App ef ex =>
+      App (subst' x s ef) (subst' x s ex)
+  | Abs e =>
+      Abs (subst' (S x) s e)
+  end.
+
+Inductive bigstep : term -> term -> Prop :=
+| bs_const n : bigstep (Const n) (Const n)
+| bs_id x : bigstep (Id x) (Id x)
+| bs_abs e : bigstep (Abs e) (Abs e)
+| bs_app ef ex e : bigstep ef (Abs e) -> bigstep (App ef ex) (subst' 0 ex e)
+.
+
+Derive Density bigstep.*)
 
 #[global] Instance dec_term (t1 t2 : term) : Dec (t1 = t2).
 Proof. dec_eq. Defined.
@@ -415,7 +434,7 @@ Derive Sized for option.
 
 QuickCheck prop_testing_decopt_step.*)
 
-QuickChickDebug Debug Off.
+QuickChickDebug Debug On.
 
 
 Theorem preservation : forall e e' Gamma tau,
@@ -423,13 +442,24 @@ Theorem preservation : forall e e' Gamma tau,
     step e e' ->
     typing' Gamma e' tau.
 Proof.
+  Extract Constant defSize => "3".
   typeclass_bindings GenSizedSuchThat typing'.
   Derive Used Inds typing'.
   Derive Used Inds step.
   Derive Density step 0. Print step. Print typing'. Print subst.
   Derive Density typing' 2. Derive Density bind 2. Derive Density app_free 0.
+
+  print_all_bindings.
+  valid_bindings.
+  derive_index 3.
+  derive_and_quickchick_index 2.
+  Derive Density step 0.
+  Derive Density typing' 1.
+  Derive GenSizedSuchThat for (fun x2 => subst x0 x1 x2 x3).
+  Derive GenSizedSuchThat for (fun x0 => value x0).
+  derive_index 3.
   QuickChickDebug Debug On.
-  print_all_bindings. derive_index 3.
+  derive_and_quickchick_index 3.
   typeclass_bindings GenSizedSuchThat typing'.
   Extract Constant defSize        => "2".
   QuickCheck (QuickChick.Checker.forAll QuickChick.Classes.arbitrary
