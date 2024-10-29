@@ -20,42 +20,36 @@ Inductive term : Type :=
 | Const : nat -> term
 | Id : nat -> term
 | App : term -> term -> term
-| Abs : term -> term.
-(*
+| Abs : type -> term -> term.
+
 Fixpoint subst' (x : nat) (s : term) (t : term) :=
   match t with
   | Const n => Const n
   | Id y => if Nat.eqb x y then s else t
   | App ef ex =>
       App (subst' x s ef) (subst' x s ex)
-  | Abs e =>
-      Abs (subst' (S x) s e)
+  | Abs t e =>
+      Abs t (subst' (S x) s e)
   end.
 
-Inductive bigstep : term -> term -> Prop :=
-| bs_const n : bigstep (Const n) (Const n)
-| bs_id x : bigstep (Id x) (Id x)
-| bs_abs e : bigstep (Abs e) (Abs e)
-| bs_app ef ex e : bigstep ef (Abs e) -> bigstep (App ef ex) (subst' 0 ex e)
-.
-
-Derive Density bigstep.*)
-
 #[global] Instance dec_term (t1 t2 : term) : Dec (t1 = t2).
+Proof. dec_eq. Defined.
+
+#[global] Instance dec_type (t t' : type) : Dec (t = t').
 Proof. dec_eq. Defined.
 
 (* Terms that do not have applications *)
 Inductive app_free : term -> Prop :=
 | ConsNoApp : forall n, app_free (Const n)
 | IdNoApp : forall x, app_free (Id x)
-| AbsNoApp : forall (t : term),
-               app_free t -> app_free (Abs t).
+| AbsNoApp : forall (e : term) t,
+               app_free e -> app_free (Abs t e).
 
 (* Number of applications in a term *)
 Fixpoint app_no (t : term) : nat :=
   match t with
     | Const _ | Id _ => 0
-    | Abs t => app_no t
+    | Abs t e => app_no e
     | App t1 t2 => 1 + (app_no t1 + app_no t2)
   end.
 
@@ -92,12 +86,21 @@ Inductive typing' (e : list type) : term -> type -> Prop :=
 | TAbs' :
     forall t tau1 tau2,
       typing' (tau1 :: e) t tau2 ->
-      typing' e (Abs t) (Arrow tau1 tau2)
+      typing' e (Abs tau1 t) (Arrow tau1 tau2)
 | TApp' :
   forall t1 t2 tau1 tau2,
       typing' e t1 (Arrow tau1 tau2) ->
       typing' e t2 tau1 ->
       typing' e (App t1 t2) tau2.
+
+Derive Enumerator for (fun tau => bind e x tau).
+Derive Checker for (bind e x tau).
+Derive EnumSized for type.
+Derive Checker for (typing' env e tau).
+
+Derive Enumerator for (fun tau => typing' env e tau).
+
+
 
 Derive Density typing' 1.
 Derive Density typing' 2. 
@@ -105,15 +108,13 @@ Check typing'.
 
 Derive Arbitrary for type.
 Derive Arbitrary for term.
-#[global]
-Instance dec_type (t1 t2 : type) : Dec (t1 = t2).
-Proof. dec_eq. Defined.
+
 (*Derive ArbitrarySizedSuchThat for (fun x => bind env x tau).*)
 (*Derive ArbitrarySizedSuchThat for (fun t => typing' env t tau).*)
 
 Inductive value : term -> Prop :=
 | ValueConst : forall n, value (Const n)
-| ValueAbs : forall t, value (Abs t)
+| ValueAbs : forall t e, value (Abs t e)
 .
 
 (*Derive Density value 0.*)
@@ -128,9 +129,9 @@ Inductive subst (y : nat) (t1 : term) : term -> term -> Prop :=
     subst y t1 t t' ->
     subst y t1 t'' t''' ->
     subst y t1 (App t t'') (App t' t''')
-| SubstAbs : forall t t',
-    subst (S y) t1 t t' ->
-    subst y t1 (Abs t) (Abs t').
+| SubstAbs : forall t e e',
+    subst (S y) t1 e e' ->
+    subst y t1 (Abs t e) (Abs t e').
 
 
 Derive Density subst 3.
@@ -138,6 +139,61 @@ Derive Density eq 2.
 Derive DecOpt for (subst y t1 t2 t2').
 Derive DecOpt for (bind env x tau).
 (*Derive DecOpt for (typing' env e tau).*)
+
+
+Inductive bigstep : term -> term -> Prop :=
+| bs_const n : bigstep (Const n) (Const n)
+| bs_id x : bigstep (Id x) (Id x)
+| bs_abs t e : bigstep (Abs t e) (Abs t e)
+| bs_app ef ex t e e' : bigstep ef (Abs t e) -> subst 0 ex e e' -> bigstep (App ef ex) e'
+.
+
+Derive Density bigstep 1.
+
+Inductive bigstep' : term -> term -> Prop :=
+| bs_const' n : bigstep' (Const n) (Const n)
+| bs_id' x : bigstep' (Id x) (Id x)
+| bs_abs' t e : bigstep' (Abs t e) (Abs t e)
+| bs_app' ef ex t e : bigstep' ef (Abs t e) -> bigstep' (App ef ex) (subst' 0 ex e)
+.
+
+Derive Density bigstep' 1.
+
+Derive (Show, Sized, Shrink) for type.
+Derive Sized for list.
+Derive Show for term.
+Derive EnumSized for term.
+Derive DecOpt for (bigstep' e e').
+
+Theorem preservation : forall env' e e' t,
+    typing' env' e t ->
+    bigstep' e e' ->
+    typing' env' e' t.
+Proof.
+  print_all_bindings.
+  valid_bindings.
+  Extract Constant defSize        => "2".
+  derive_and_quickchick_index 6.
+  Admitted.
+
+  Inductive A : nat -> Prop :=
+  | Aone : A 1
+  .
+
+  Inductive B : nat -> Prop :=
+  | Btwo : B 2.
+  Derive DecOpt for (B n).
+  Derive Sized for nat.
+  
+  Theorem awg : forall n, A n -> B n.
+  Proof.
+    print_all_bindings.
+    valid_bindings.
+    derive_and_quickchick_index 0.
+ 
+Derive GenSizedSuchThat for (fun e' =>  bigstep e e').
+
+Derive Density 
 
 Search Enum.
 

@@ -153,8 +153,10 @@ let seek_ind_types_from_overall_type root : ty_ctr list =
 let seek_all_dep_dt root_ind_name : dep_dt list =
   List.map (fun name -> ty_ctr_to_dep_dt name) (seek_ind_types_from_overall_type root_ind_name)
 
+type constraint_type = FunConstraint | ConConstraint | FunConConstraint
+
 type constrained_arg =
-  | Constrained of ty_param list
+  | Constrained of ty_param list * constraint_type
   | Unconstrained of ty_param
 
 type ind = ty_ctr * dep_type list
@@ -171,16 +173,32 @@ let constrain_check_ind ((ind_ctr, ind_args) : ind) : constrained_ind =
     | DApp (f, args) -> collect_vars f @ List.concat_map collect_vars args
     | _ -> failwith "Inductive arguments must be constructors or params." in
 
+  let rec contains_constructor = function
+    | DTyCtr (_, _) | DCtr (_, _) -> true
+    | DApp (f, args) -> contains_constructor f || List.exists contains_constructor args
+    | _ -> false in
+
+  let rec contains_application = function
+    | DTyCtr (_, args) -> List.exists contains_application args
+    | DCtr (_, args) -> List.exists contains_application args
+    | DApp (_, _) -> true
+    | _ -> false in
+
   let check_constraints (ct : dep_type) : constrained_arg =
     match ct with
     | DTyParam p -> Unconstrained p
     | DTyVar p -> Unconstrained (p |> var_to_string |> inject_ty_param) 
-    | DTyCtr (c, args) -> Constrained (List.concat_map collect_vars args)
-    | DCtr (c, args) -> Constrained (List.concat_map collect_vars args)
-    | DApp (f, args) -> Constrained (collect_vars f @ List.concat_map collect_vars args) 
-    | _ -> (*print then fail*) failwith ("can't support" ^ dep_type_to_string ct) in
-  
-
+    | _ ->
+      let contains_constructor = contains_constructor ct in
+      let contains_application = contains_application ct in
+      if contains_constructor && contains_application then
+        Constrained (collect_vars ct, FunConConstraint)
+      else if contains_constructor then
+        Constrained (collect_vars ct, ConConstraint)
+      else if contains_application then
+        Constrained (collect_vars ct, FunConstraint)
+      else
+        failwith ("Inductive arguments must be constructors or params. This is not: " ^ dep_type_to_string ct) in
   (ind_ctr, List.map check_constraints ind_args)
 
 type arity = int
@@ -249,9 +267,11 @@ let rec map_maybe f = function
 let pattern_of_dep_ctr (ctr : dep_ctr) : constructor * pattern =
   let rec pattern_args = function
     | DCtr (c, args) -> Some (PCtr (c, map_maybe pattern_args args))
+    | DApp (DTyVar f, args) -> Some PWild
     | DTyVar _ -> Some PWild
     | DTyParam _ -> Some PWild
-    | _ -> None in
+    | DTyCtr (_,_) -> None (*Type argument*)
+    | a -> failwith ("Argument to " ^ constructor_to_string (fst ctr) ^ " must be constructors or function applications or variables. Found: " ^ dep_type_to_string a) in
   let rec pattern_of_dep_type = function
     | DProd ((_, _), t2) -> pattern_of_dep_type t2
     | DArrow (_, y) -> pattern_of_dep_type y
@@ -375,6 +395,7 @@ let rec label_subpatterns (rule_name : constructor) (pat : pattern) (pt : patter
   match pt with
   | PatternLeaf (p, rules) -> if subpattern p pat then PatternLeaf (p, rule_name :: rules) else pt
   | PatternNode (p, rules, path, branches) ->
+    msg_debug (str (constructor_to_string rule_name) ++ fnl ());
     if subpattern p pat then label_tree rule_name pt else
     if compatible_pattern p pat then
       PatternNode (p, rules, path, List.map (fun (c, p') -> (c, label_subpatterns rule_name pat p')) branches)
@@ -459,6 +480,7 @@ let dep_dt_rules ((ind_name, params, rules, overall_type) : dep_dt) : rule list 
 
 type rule_density = 
   | Empty
+  | Backtracking
   | Partial
 
 let rec collect_leaves (tree : pattern_coverage_tree) : (pattern * constructor list) list =
@@ -477,6 +499,7 @@ let print_pattern_leaves (ind : ty_ctr) (tree : pattern_coverage_tree) (ois : ou
     | PWild -> "_" in
   let density_to_string = function
     | Empty -> "Empty"
+    | Backtracking -> "Backtracking"
     | Partial -> "Partial" in
   let string_of_constructors = function
     | [] -> "[]"
@@ -490,6 +513,7 @@ let print_pattern_leaves (ind : ty_ctr) (tree : pattern_coverage_tree) (ois : ou
 let print_rule_densities (rs : (constructor * rule_density) list) : unit =
   let string_of_density = function
     | Empty -> "Empty"
+    | Backtracking -> "Backtracking"
     | Partial -> "Partial" in
   List.iter (fun (c,d) -> Feedback.msg_notice (str (  constructor_to_string c ^ ": " ^ string_of_density d) ++ fnl ())) rs
 
@@ -523,6 +547,11 @@ let split_indices xs idxs =
     in
   go xs idxs 0
 
+let density_to_string = function
+  | Empty -> "Empty"
+  | Backtracking -> "Backtracking"
+  | Partial -> "Partial"
+
 (*Three heuristics detecting difficult to generate rules*)
 let rec is_output_constrained_in_hypothesis ((ind_name, ctr_name, arity, hyps, conc) : rule) (ois : output_index list) : bool =
   let recursive_hyps = List.filter (fun (ind, args) -> ind = ind_name) hyps in
@@ -534,21 +563,35 @@ let rec is_output_constrained_in_hypothesis ((ind_name, ctr_name, arity, hyps, c
 
 and is_output_hyps_require_unification ((ind_name, ctr_name, arity, hyps, conc) : rule) (ois : output_index list) : bool =
   let recursive_hyps = List.filter (fun (ind, args) -> ind = ind_name) hyps in
-  let output_index_hyps : constrained_arg list list = List.map (fun (ind,args) -> fst (split_indices args ois)) recursive_hyps in
+  let collect_vars = function
+    | Constrained (args,_) -> args
+    | Unconstrained arg -> [arg] in
+  let output_index_hyps : ty_param list list = List.map (fun (ind,args) -> List.concat_map collect_vars (fst (split_indices args ois))) recursive_hyps in
   if not_pairwise_disjoint output_index_hyps then (Feedback.msg_notice (str (constructor_to_string ctr_name ^ ": output hyps require unification") ++ fnl ()); true) else false
 
 and is_input_conclusion_require_unification ((ind_name, ctr_name, arity, hyps, conc) : rule) (ois : output_index list) : bool =
   let conclusion_args = snd conc in
   let (_,input_conc_args) = split_indices conclusion_args ois in
   let collect_vars = function
-    | Constrained args -> args
+    | Constrained (args,_) -> args
     | Unconstrained arg -> [arg] in
   let all_input_conc_vars = List.concat_map collect_vars input_conc_args in
   if has_duplicates all_input_conc_vars then (Feedback.msg_notice (str (constructor_to_string ctr_name ^ ": input conc requires unification") ++ fnl ()); true) else false
 
+and are_functions_constraining_conclusion_inputs_or_hyp_outputs ((ind_name, ctr_name, arity, hyps, conc) : rule) (ois : output_index list) : bool =
+  let conclusion_args = snd conc in
+  let (_,input_conc_args) = split_indices conclusion_args ois in
+  let fun_constrained = function
+    | Constrained (args, FunConstraint) | Constrained (args, FunConConstraint) -> true
+    | _ -> false in
+  if List.exists fun_constrained input_conc_args then (Feedback.msg_notice (str (constructor_to_string ctr_name ^ ": functions constrain conclusion inputs") ++ fnl ()); true) else
+  let recursive_hyps = List.filter (fun (ind, args) -> ind = ind_name) hyps in
+  let output_index_hyps : constrained_arg list list = List.map (fun (ind, args) -> fst (split_indices args ois)) recursive_hyps in
+  if List.exists (fun args -> List.exists fun_constrained args) output_index_hyps then (Feedback.msg_notice (str (constructor_to_string ctr_name ^ ": functions constrain hypothesis outputs") ++ fnl ()); true) else false
+
 and nonrecursive_disjoint_strictly_output_vars ((ind_name, ctr_name, arity, hyps, conc) : rule) (ois : output_index list) : (ty_ctr * (output_index * ty_param) list) list =
   let (conclusion_output_args,conclusion_input_args) = split_indices (snd conc) ois in
-  let args_to_vars arg_list = List.concat_map (function Constrained args -> args | Unconstrained arg -> [arg]) arg_list in
+  let args_to_vars arg_list = List.concat_map (function Constrained (args,_) -> args | Unconstrained arg -> [arg]) arg_list in
   let conclusion_output_vars = args_to_vars conclusion_output_args in
   let conclusion_input_vars = args_to_vars conclusion_input_args in
   let (nonrecursive_hyps, recursive_hyps) = List.partition (fun (ind, args) -> ind <> ind_name) hyps in
@@ -565,22 +608,28 @@ and nonrecursive_disjoint_strictly_output_vars ((ind_name, ctr_name, arity, hyps
 and filter_nonrecursive_empty_densities (nonrecurse : (ty_ctr * (output_index * ty_param) list)) =
   let (ind, output_vars) = nonrecurse in
   let dep_dt = ty_ctr_to_dep_dt ind in
-  let filtered_ovars = List.filter (fun (oi,_) ->
+  let filtered_ovars = List.filter_map (fun (oi,l) ->
     let density = final_density dep_dt [oi] false in
     match density with
-    | Empty -> false
-    | Partial -> true) output_vars in
+    | Empty -> None
+    | Backtracking | Partial -> Some (oi,l, density)) output_vars in
   ind,filtered_ovars
 
-and nonrecursive_binding (nonrecursives : (ty_ctr * (output_index * ty_param) list) list) : ((ty_ctr * output_index * ty_param) list) option =
+and nonrecursive_binding (nonrecursives : (ty_ctr * (output_index * ty_param * rule_density) list) list) : ((ty_ctr * output_index * ty_param * rule_density) list) option =
   match nonrecursives with
   | [] -> Some []
   | (ind, []) :: rest -> None
-  | (ind, (oi, v) :: ovars) :: rest ->
-    let updated_rest = List.map (fun (ind, ovars) -> (ind, List.filter (fun (_,v') -> v' <> v) ovars)) rest in
+  | (ind, (oi, v,Partial) :: ovars) :: rest ->
+    let updated_rest = List.map (fun (ind, ovars) -> (ind, List.filter (fun (_,v',_) -> v' <> v) ovars)) rest in
     (match nonrecursive_binding updated_rest with
     | None -> nonrecursive_binding ((ind, ovars) :: rest)
-    | Some bindings -> Some ((ind, oi, v) :: bindings))
+    | Some bindings -> Some ((ind, oi, v, Partial) :: bindings))
+  | (ind, (oi, v,Backtracking) :: ovars) :: rest -> 
+    let updated_rest = List.map (fun (ind, ovars) -> (ind, List.filter (fun (_,v',_) -> v' <> v) ovars)) rest in
+    (match nonrecursive_binding ((ind,ovars) :: rest) with
+     | Some ((ind',oi',v',Partial) :: bindings) -> Some ((ind', oi', v', Partial) :: bindings)
+     | _ -> (match nonrecursive_binding updated_rest with | None -> None | Some bindings -> Some ((ind, oi, v, Backtracking) :: bindings)) 
+    )
     
 and is_nonrecursive_checked_or_overlapping_or_empty ((ind_name, ctr_name, arity, hyps, conc) : rule) (ois : output_index list) : bool =
   let nonrecursive_output_vars = nonrecursive_disjoint_strictly_output_vars (ind_name, ctr_name, arity, hyps, conc) ois in
@@ -591,16 +640,21 @@ and is_nonrecursive_checked_or_overlapping_or_empty ((ind_name, ctr_name, arity,
   | Some (b :: bindings) -> 
     let bindings = b :: bindings in
     Feedback.msg_notice (str "Printing nonrecursive bindings for: " ++ str (constructor_to_string ctr_name) ++ fnl ()); 
-    List.iter (fun (ind, oi, v) -> Feedback.msg_notice (str (ty_ctr_to_string ind ^ " argument #: " ^ string_of_int oi ^ "; var name: " ^ ty_param_to_string v) ++ fnl ())) bindings;
+    List.iter (fun (ind, oi, v, density) -> Feedback.msg_notice (str (ty_ctr_to_string ind ^ " argument #: " ^ string_of_int oi ^ "; var name: " ^ ty_param_to_string v ^ "; density: " ^ density_to_string density) ++ fnl ())) bindings;
     false (*In the future these bindings should be output and prederived.*)
 
 and analyze_rule (r : rule) (ois : output_index list) : rule_density =
   msg_debug (str (List.fold_left (fun acc oi -> acc ^ " " ^ string_of_int oi) "" ois) ++ fnl ());
-  if is_output_constrained_in_hypothesis r ois
-    || is_output_hyps_require_unification r ois 
+  if is_output_hyps_require_unification r ois 
     || is_input_conclusion_require_unification r ois
+    || are_functions_constraining_conclusion_inputs_or_hyp_outputs r ois
     || is_nonrecursive_checked_or_overlapping_or_empty r ois 
-    then Empty else Partial
+  then 
+    Empty 
+  else if is_output_constrained_in_hypothesis r ois then
+    Backtracking
+  else 
+    Partial
 
 and analyze_rules (rs : rule list) ois : (constructor * rule_density) list =
   List.map (fun (ind, cons, arity, hyps, conc) -> (cons, analyze_rule (ind, cons, arity, hyps, conc) ois)) rs
@@ -612,8 +666,10 @@ and final_density (dt : dep_dt) ois (should_print : bool): rule_density =
   let densities = analyze_rules (dep_dt_rules dt) ois in
   if should_print then (Feedback.msg_notice (str ("Rule densities for: " ^ ty_ctr_to_string ind_name ^ " with output indices: " ^ List.fold_left (fun acc oi -> acc ^ " " ^ string_of_int oi) "" ois) ++ fnl ());
   print_rule_densities densities);
-  let filter_empty_constructors = List.map (fun (p, cs) -> p, List.filter (fun c -> List.assoc c densities = Partial) cs) covered_patterns in
-  let any_uncovered = List.exists (fun (p,cs) -> cs = []) filter_empty_constructors in 
+  let filter_empty_constructors = List.map (fun (p, cs) -> p, List.filter (fun c -> match List.assoc c densities with | Empty -> false | Partial | Backtracking -> true) cs) covered_patterns in
+  let any_uncovered = List.exists (fun (p,cs) -> cs = []) filter_empty_constructors in
+  let all_has_partial = List.for_all (fun (p,cs) -> List.exists (fun c -> List.assoc c densities = Partial) cs) filter_empty_constructors in
+  let result = if any_uncovered then Empty else if all_has_partial then Partial else Backtracking in
   if should_print then (Feedback.msg_notice (str "Rule pattern coverage tree:" ++ fnl ());
                         print_coverage_tree ind_name tree ois; Feedback.msg_notice (fnl ());
                         Feedback.msg_notice (str "Set of patterns and densities of their covering rules:" ++ fnl ());
@@ -621,8 +677,8 @@ and final_density (dt : dep_dt) ois (should_print : bool): rule_density =
                         Feedback.msg_notice (str ("Inductive relation " ^ ty_ctr_to_string ind_name ^ " with output indices:"
                                                   ^ List.fold_left (fun acc oi -> acc ^ " " ^ string_of_int oi) "" ois 
                                                   ^ " has overall density: " 
-                                                  ^ (if any_uncovered then "Empty" else "Partial")) ++ fnl ()));
-  if any_uncovered then Empty else Partial
+                                                  ^ (density_to_string result)) ++ fnl ()));
+  result
 
 (* let analyze_inductive_rules ind ois =
   match (coerce_reference_to_dep_dt ind) with
@@ -678,6 +734,20 @@ let print_all_bindings' (bindings : (int * bindings_and_unbound) list) : unit =
         Feedback.msg_notice (str "Bindings: " ++ str (string_of_int idx) ++ fnl ());
       List.iter (fun (v, t, opt) ->
           Feedback.msg_notice (str "(" ++ str (var_to_string v) ++ str " : " ++ str (dep_type_to_string t) ++ str ") => " ++ str (string_of_option (fun (r, i) -> dep_type_to_string r ^ ", output index: " ^ string_of_int (i - 1)) opt) ++ fnl ())
+      ) b;
+      List.iter (fun i -> Feedback.msg_notice (str (dep_type_to_string i) ++ fnl ())) i
+    ) bindings  
+
+let print_all_bindings_density bindings : unit =
+  if bindings = [] then Feedback.msg_notice (str "No bindings found" ++ fnl ())
+  else
+    let string_of_option f = function
+      | None -> "Gen"
+      | Some x -> "GenST: " ^ f x in
+    List.iter (fun (idx, (b, i)) ->
+        Feedback.msg_notice (str "Bindings: " ++ str (string_of_int idx) ++ fnl ());
+      List.iter (fun (v, t, opt, d) ->
+          Feedback.msg_notice (str "(" ++ str (var_to_string v) ++ str " : " ++ str (dep_type_to_string t) ++ str ") => " ++ str (string_of_option (fun (r, i) -> dep_type_to_string r ^ ", output index: " ^ string_of_int (i - 1)) opt) ++ str ("; Density: " ^ density_to_string d) ++ fnl ())
       ) b;
       List.iter (fun i -> Feedback.msg_notice (str (dep_type_to_string i) ++ fnl ())) i
     ) bindings  
@@ -752,15 +822,29 @@ let print_bindings_tactic =
     | None -> failwith "Failed to Parse type"
   end
 
-let is_binding_selection_valid ((bindings,unbound) : bindings_and_unbound) : bool =
-  let is_binding_valid (v, ty, opt) : bool =
+let rec traverse (f : 'a -> 'b option) (l : 'a list) : 'b list option =
+  match l with
+  | [] -> Some []
+  | x :: xs -> 
+    match f x with
+    | None -> None
+    | Some y -> 
+      match traverse f xs with
+      | None -> None
+      | Some ys -> Some (y :: ys)
+
+let is_binding_selection_valid i ((bindings,unbound) : bindings_and_unbound) =
+  let is_binding_valid (v, ty, opt) =
     match opt with
-    | None -> true
+    | None -> Some (v,ty,opt, Partial)
     | Some (DTyCtr (ind,_), i) ->
-      let ind_density = final_density (ty_ctr_to_dep_dt ind) [i - 1] false in
-      ind_density = Partial
+      (match final_density (ty_ctr_to_dep_dt ind) [i - 1] false with
+      | Empty -> None
+      | d -> Some (v, ty, opt, d))
     | _ -> failwith "is_binding_selection_valid: Binding relation should have DTyCtr at toplevel" in
-  List.for_all is_binding_valid bindings
+  match traverse is_binding_valid bindings with
+  | None -> None
+  | Some bs -> Some (i, (bs, unbound))
 
 let valid_bindings =
   Proofview.Goal.enter begin fun gl ->
@@ -771,9 +855,9 @@ let valid_bindings =
     | Some dt -> 
       begin
         let bindings_and_unbound = makeAllBindings dt in
-        let valid_bindings_and_unbound = List.filter (fun (i, bu) -> is_binding_selection_valid bu) (List.mapi (fun i bu -> i, bu) bindings_and_unbound) in
+        let valid_bindings_and_unbound = List.filter_map (fun (i, bu) -> is_binding_selection_valid i bu) (List.mapi (fun i bu -> i, bu) bindings_and_unbound) in
         Feedback.msg_notice (str "Printing all bindings" ++ fnl ());
-        print_all_bindings' valid_bindings_and_unbound;
+        print_all_bindings_density valid_bindings_and_unbound;
         Tacticals.tclIDTAC
       end 
     | None -> failwith "Failed to Parse type"
@@ -889,6 +973,7 @@ let rec fully_generalised (dt : dep_type) : bool =
   | DArrow (x,y) -> fully_generalised x && fully_generalised y
   | DCtr (_,_) -> false
   | DTyCtr (_, ds) -> List.for_all fully_generalised ds
+  | DApp (_, _) -> false
   | _ -> true
 
 (*Create a version of derive_and_quickchick that takes an index and chooses the generator indexed by that number.*)
