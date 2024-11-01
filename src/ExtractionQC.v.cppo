@@ -135,5 +135,31 @@ Extract Constant print_extracted_coq_string =>
     | c :: l -> Bytes.set s i c; copy (i+1) l
    in Bytes.to_string (copy 0 l))".
 
-Axiom withTime : forall {A}, (unit -> A) -> AugmentedTime A.
-Extract Constant withTime => "(fun f -> let start = Unix.gettimeofday () in let res = f () in let ending = Unix.gettimeofday () in { aug_res = res; aug_time = ((Float.to_int ((ending -. start) *. 1000000.0))) } )".
+
+Parameter OCamlFloat : Type.
+Extract Constant OCamlFloat => "float".
+
+Axiom showOCamlFloat' : OCamlFloat -> string.
+Extract Constant showOCamlFloat' => "(fun f -> Printf.sprintf ""%.9f"" f |> String.to_seq |> List.of_seq)".
+
+#[global] Instance showOCamlFloat : Show OCamlFloat := {| show := showOCamlFloat' |}.
+
+Inductive TimedResult {A: Type} :=
+| TResult (result: A) (time: OCamlFloat) (start: OCamlFloat) (ending: OCamlFloat).
+
+Local Open Scope string_scope.
+
+#[global] Instance showTimedResult {A: Type} `{Show A} : Show (@TimedResult A) := {|
+  show result := 
+    let '(TResult result time start ending) := result in
+    show result ++ ", ""time"": " ++ show time ++ ", ""start"": " ++ show start ++ ", ""ending"": " ++ show ending 
+|}.
+
+
+Axiom withTime : forall {A}, (unit -> A) -> @TimedResult A.
+Extract Constant withTime => "
+  (fun f -> 
+    let start = Unix.gettimeofday () in 
+    let res = f () in 
+    let ending = Unix.gettimeofday () in
+    TResult (res, (ending -. start), start, ending))".
