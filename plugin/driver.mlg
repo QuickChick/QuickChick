@@ -10,6 +10,7 @@ open Error
 
 type derivation = SimpleDer of SimplDriver.derivable list
                 | DepDer of DepDriver.derivable
+                | NEW of DepDriver.derivable
 
 let simpl_dispatch ind classes name1 name2 =
   let ind_name = match ind with
@@ -31,6 +32,7 @@ let class_assoc_opts = [ ("GenSized"                 , SimpleDer [SimplDriver.Ge
                        ; ("Generator"                , DepDer DepDriver.GenSizedSuchThat)
                        ; ("Enumerator"               , DepDer DepDriver.EnumSizedSuchThat)
                        ; ("Checker"                  , DepDer DepDriver.DecOpt)
+                       ; ("Testing"                  , NEW DepDriver.GenSizedSuchThat)
                        ]
 
 let class_assoc_table =
@@ -42,7 +44,12 @@ let dispatch cn ind name1 name2 =
   let convert_reference_to_string c =
     match c with
     | {CAst.v = CRef (r, _) ; _} -> string_of_qualid r
-    | _ -> failwith "Usage: Derive <class_name> for <inductive_name> OR  Derive (<class_name>, ... , <class_name>) for <inductive_name>" in
+    | _ ->
+       failwith "Usage: Derive <class_name> for <inductive_name> OR  Derive (<class_name>, ... , <class_name>) for <inductive_name>" in
+
+  (* Match on the class name. It should either be:
+     - A reference (treated as a String: Generator/Enumerator/etc.)
+     - A tuple, which is parsed as Notation (Arbitrary, Show...) *)
   let ss = match cn.CAst.v with
      | CNotation (_, _, ([a],[b],_,_)) ->
          let c = convert_reference_to_string a in
@@ -72,7 +79,7 @@ let dispatch cn ind name1 name2 =
   match class_names with
   | SimpleDer classes -> simpl_dispatch ind classes name1 name2
   | DepDer class_name -> DepDriver.dep_dispatch ind class_name
-;;                       
+  | NEW class_name -> NewDepDriver.dep_dispatch ind class_name
 
 let merge ind1 ind2 ind3 =
   MergeTypes.merge ind1 ind2 ind3
@@ -80,7 +87,6 @@ let merge ind1 ind2 ind3 =
 let merge_test ind1  =
   MergeTypes.merge_test ind1
 }
-
   
 VERNAC COMMAND EXTEND Merge CLASSIFIED AS SIDEFF
  | ["Merge" constr(ind1) "With" constr(ind2) "As" constr(ind)] ->

@@ -1,0 +1,564 @@
+open Constrexpr
+(*
+open Pp
+open Libnames
+open Util
+open Constrexpr
+open GenericLib
+open ArbitrarySizedST
+open EnumSizedST   
+open CheckerSizedST
+
+open Error
+open UnifyQC
+ *)
+
+(* Assumption: 
+   - generator-based classes include a "fun x => P ...." or "fun '(x,y,...) => P ..."
+   - checker-based classes are "P ..."
+   * In both cases "..." are bound names (to be generated), unbound names (implicitly quantified arguments) 
+     or Constructors applied to such stuff.
+ *)
+let dep_dispatch ind class_name : unit =
+  match ind with 
+#if COQ_VERSION >= (8, 20, 0)
+  | { CAst.v = CLambdaN ([CLocalAssum ([{ CAst.v = Names.Name id; CAst.loc = _loc2 }], _, _kind, _type)], body); _ } ->
+#else
+  | { CAst.v = CLambdaN ([CLocalAssum ([{ CAst.v = Names.Name id; CAst.loc = _loc2 }], _kind, _type)], body); _ } ->
+#endif
+  (* Singleton case.
+     id: holds the variable to be generated 
+     body: inductive relation applied to stuff
+   *)
+     failwith "HERE"
+  | { CAst.v = CLambdaN ([CLocalPattern cpe], body); _} ->
+  (* Multary case.
+     ids: hold the variables to be generated 
+     body: inductive relation applied to stuff
+   *)
+     let cpe_kind cpe = 
+       match cpe.CAst.v with
+       | CPatAlias _ -> failwith "1"
+       | CPatCstr _ -> failwith "2"
+       | CPatAtom _ -> failwith "3"
+       | CPatOr _ -> failwith "4"
+       | CPatNotation _ -> failwith "5"
+       | CPatPrim _ -> failwith "6"
+       | CPatRecord _ -> failwith "7"
+       | CPatDelimiters _ -> failwith "8"
+       | CPatCast _ -> failwith "9"
+     in
+     begin match cpe.CAst.v with
+     | CPatNotation (_,_,_,cpes) ->
+        failwith (string_of_int (List.length cpes))
+     | _ -> failwith "Actual fail"
+     end
+  | _ -> failwith "Not a function"
+
+(*
+(** Derivable classes *)
+type derivable =
+  | DecOpt
+  | GenSizedSuchThat
+  | EnumSizedSuchThat  
+
+let derivable_to_string = function
+  | DecOpt -> "DecOpt"
+  | GenSizedSuchThat -> "GenSizedSuchThat"
+  | EnumSizedSuchThat -> "EnumSizedSuchThat"                            
+
+(** Name of the instance to be generated *)
+let mk_instance_name der tn =
+  var_to_string (fresh_name ((derivable_to_string der) ^ tn))
+
+let derive_dependent
+                     (class_name : derivable)
+                     (constructor : constr_expr)
+                     (umap : range UM.t)
+                     (tmap : dep_type UM.t)
+                     (input_names : var list)
+                     (input_ranges : range list)
+                     (ty_ctr, ty_params, ctrs, dep_type)
+                     (letbinds : var list option)
+                     (result : unknown) =
+  let ctr_name = 
+    match constructor with 
+    | { CAst.v = CRef (r,_); _ } -> string_of_qualid r
+  in
+  let instance_name = mk_instance_name class_name ctr_name in
+
+  (* type constructor *)
+  let coqTyCtr = gTyCtr ty_ctr in
+  (* parameters of the type constructor *)
+  let coqTyParams = List.map gTyParam ty_params in
+
+  (* Fully applied type constructor *)
+  let full_dt = gApp ~explicit:true coqTyCtr coqTyParams in
+
+  (* Type parameters as arguments *)
+  (* TODO: Needed?
+  let params = List.map (fun tp -> gArg ~assumName:(gTyParam tp)
+                                        ~assumType:gType0
+                                     ()) ty_params in
+  *)
+
+  (* List of input unknowns *)
+  let actual_input_list =
+    List.filter (fun u -> UM.find u umap == FixedInput) input_names in
+
+  (* Inputs as arguments *)
+  let actual_input_args = 
+    List.map (fun u -> gArg ~assumName:(gVar u) ~assumType:(gType ty_params (UM.find u tmap)) ())
+      actual_input_list 
+  in
+
+  (* Typeclass arguments - depends on the class *)
+  let param_class_names = match class_name with
+    | DecOpt -> ["Dec_Eq"; "Enum"]
+    | EnumSizedSuchThat -> ["Dec_Eq"; "Enum"]
+    | GenSizedSuchThat -> ["Dec_Eq"; "Gen"; "Enum"]
+  in
+  
+  let typeclass_args =
+    List.concat (List.map (fun tp ->
+                     ((gArg ~assumName:tp ~assumImplicit:true ()) ::
+                        (List.map (fun name -> gArg ~assumType:(gApp (gInject name) [tp])
+                                                    ~assumGeneralized:true ()) param_class_names))
+                   ) coqTyParams) in
+  
+  (* The type we are generating for -- not the predicate! *)
+  let _full_gtyp = gType ty_params (UM.find result tmap) in
+
+  let _gen_needed = [] in
+  let _dec_needed = [] in
+
+  (* The dependent generator  *)
+  let gen () =
+    arbitrarySizedST ty_ctr ty_params ctrs dep_type input_names
+      input_ranges umap tmap actual_input_args result coqTyCtr
+  in
+
+  (* Generate typeclass constraints. For each type parameter "A" we need `{_ : <Class Name> A} *)
+  (* TODO: Params? *)
+  let instance_arguments = match class_name with
+    | DecOpt -> (* params @ *) typeclass_args @ actual_input_args
+    | EnumSizedSuchThat ->
+       (* params @ *) typeclass_args @ actual_input_args
+    | GenSizedSuchThat ->
+       (* params @ *) typeclass_args
+      @ actual_input_args
+  in
+
+  (* Fully applied predicate (parameters and constructors) *)
+  let full_pred inputs =
+    match letbinds with
+    | None -> 
+       gFun [Unknown.to_string result]
+         (fun _ -> gApp (full_dt) (List.map gVar inputs))
+    | Some letbinds ->
+       gFun [Unknown.to_string result]
+         (fun [result_var] ->
+           gLetTupleIn result_var letbinds (gApp (gInject ctr_name) (List.map gVar inputs)))
+  in
+
+  
+  (* TODO: Easy solution : add Arbitrary/DecOpt as a requirement for all type parameters. *)
+  (*
+  let self_dec = [] in 
+  (*     (* Maybe somethign about type paramters here *)
+     if !need_dec then [gArg ~assumType:(gApp (gInject (Printf.sprintf "DepDec%n" (dep_type_len dep_type))) [gTyCtr ty_ctr]) 
+                            ~assumGeneralized:true ()] 
+     else [] in
+   *)
+
+  (* The type of the dependent generator *)
+  let gen_type = gGen (gOption full_gtyp) in
+
+
+  (* Generate arbitrary parameters *)
+  let arb_needed = 
+    let rec extract_params = function
+      | DTyParam tp -> ArbSet.singleton (DTyParam tp)
+      | DTyVar _ -> ArbSet.empty
+      | DTyCtr (_, dts) -> List.fold_left (fun acc dt -> ArbSet.union acc (extract_params dt)) ArbSet.empty dts
+      | _ -> failwith "Unhandled / arb_needed"  in
+    let tps = ArbSet.fold (fun dt acc -> ArbSet.union acc (extract_params dt)) !arbitraries ArbSet.empty in
+    ArbSet.fold
+      (fun dt acc ->
+        (gArg ~assumType:(gApp (gInject "Arbitrary") [gType ty_params dt]) ~assumGeneralized:true ()) :: acc
+      ) tps []
+  in
+
+  (* Generate typeclass constraints. For each type parameter "A" we need `{_ : <Class Name> A} *)
+  let instance_arguments = match cn with
+    | ArbitrarySizedSuchThat ->
+      params
+      @ gen_needed
+      @ dec_needed
+      @ self_dec
+      @ arb_needed
+      @ inputs
+    | GenSizedSuchThatMonotonicOpt -> params 
+    | SizedProofEqs -> params @ inputs
+    | GenSizedSuchThatCorrect -> params @ inputs
+    | GenSizedSuchThatSizeMonotonicOpt -> params @ inputs
+  in
+
+   *)  
+  (* The instance type *)
+  let instance_type iargs = match class_name with
+    | GenSizedSuchThat ->
+       gApp (gInject (derivable_to_string class_name))
+         [gType ty_params (UM.find result tmap);
+          full_pred input_names]
+    | EnumSizedSuchThat ->
+       gApp (gInject (derivable_to_string class_name))
+         [gType ty_params (UM.find result tmap);
+          full_pred input_names]
+    | DecOpt ->
+       gApp (gInject (derivable_to_string class_name))
+         [ gApp (full_dt) (List.map gVar input_names) ]
+  in
+
+
+  let instance_record iargs =
+    match class_name with
+    | GenSizedSuchThat -> gen ()
+    | EnumSizedSuchThat ->
+       enumSizedST ty_ctr ty_params ctrs dep_type input_names
+         input_ranges umap tmap actual_input_args result coqTyCtr
+    | DecOpt ->
+       checkerSizedST ty_ctr ty_params ctrs dep_type input_names
+         input_ranges umap tmap actual_input_args result coqTyCtr
+  in
+
+  msg_debug (str "Instance Type: " ++ fnl ());
+  debug_coq_expr (instance_type [gInject "input0"; gInject "input1"]);
+
+  declare_class_instance instance_arguments instance_name instance_type instance_record
+;;
+
+(* Creates the initial t and u maps. *)
+let create_t_and_u_maps explicit_args dep_type actual_args : (range UM.t * dep_type UM.t) =
+
+  msg_debug (str ("create_t_u_maps for: " ^ dep_type_to_string dep_type) ++ fnl ());
+  
+  (* Local references - the maps to be generated *)
+  let umap = ref UM.empty in
+  let tmap = ref explicit_args in
+
+  let rec populate_maps dep_type args =
+    (* Recurse down the unnamed arrow arguments *)
+    match dep_type,args with
+    | DProd ((_, dt1), dt2), arg::args' 
+    | DArrow (dt1, dt2), arg::args' ->
+       msg_debug (str ("populating with: " ^ dep_type_to_string dt1) ++ fnl ());
+       begin match arg with
+       | ({ CAst.v = CRef (r,_); _ }, _) ->
+          begin 
+            let current_r = Unknown.from_string (string_of_qualid r ^ "_") in
+            (* Lookup if the reference is meant to be generated *)
+            try begin match UM.find current_r !tmap with
+            | None ->
+               (* First occurence, update tmap and umap *)
+               tmap := UM.add current_r (Some  dt1) !tmap;
+               umap := UM.add current_r (Undef dt1) !umap
+            | Some dt' ->
+               (* Check if the existing binding still typechecks *)
+               if not (dt1 == dt') then qcfail "Ill-typed application in derivation"
+            end
+            with Not_found ->
+              (* Logging the type in the tmap is ok, because we don't
+                 update the umap in the "Some dt'" case above *)
+              tmap := UM.add current_r (Some dt1) !tmap;
+              umap := UM.add current_r FixedInput !umap;
+          end
+       (* TODO: If this is constructor applications, we need more type-checking machinery here *)
+       | _ -> qcfail "Non-variable patterns not implemented"
+       end;
+       populate_maps dt2 args'
+    (* Not an arrow -> Finalizer (TODO: add explicit fail?) *)
+    | _ -> ()
+  in 
+  populate_maps dep_type actual_args;
+
+  (* Remove the option from the type map and ensure all are exercised *)
+  let tmap'=
+    UM.mapi (fun u mt ->
+        match mt with
+        | Some t -> t
+        | None -> failwith (Printf.sprintf "Pattern not exercised: %s\n" (var_to_string u))
+      ) !tmap in
+  (!umap, tmap')
+
+(* Assumption: 
+   - generator-based classes include a "fun x => P ...." or "fun x => let (x1,x2,...) := x in P ..."
+     where "..." are bound names (to be generated), unbound names (implicitly quantified arguments) 
+     or Constructors applied to such stuff.
+   - checker-based classes only include the name of the predicate "P". All arguments to P will
+     be considered Fixed inputs
+ *)
+let dep_dispatch ind class_name : unit =
+  match ind with 
+#if COQ_VERSION >= (8, 20, 0)
+  | { CAst.v = CLambdaN ([CLocalAssum ([{ CAst.v = Names.Name id; CAst.loc = _loc2 }], _, _kind, _type)], body); _ } -> (* {CAst.v = CApp ((_flag, constructor), args) }) } -> *)
+#else
+  | { CAst.v = CLambdaN ([CLocalAssum ([{ CAst.v = Names.Name id; CAst.loc = _loc2 }], _kind, _type)], body); _ } -> (* {CAst.v = CApp ((_flag, constructor), args) }) } -> *)
+#endif
+
+    let idu = Unknown.from_string (Names.Id.to_string id ^ "_") in
+     
+    (* Extract (x1,x2,...) if any, P and arguments *)
+    let (letbindsM, constructor, args) =
+      match body with 
+      | { CAst.v = CApp (constructor, args); _ } -> (None, constructor, args)
+      | { CAst.v = CLetTuple (name_list, _,
+                              _shouldbeid,
+                              { CAst.v = CApp (constructor, args); _ } ); _} ->
+         ( Some (List.map (function { CAst.v = name; _ } -> name ) name_list), constructor, args )
+    in
+
+    (* Parse the constructor's information into the more convenient generic-lib representation *)
+    (*    let (ty_ctr, ty_params, ctrs, dep_type) : (ty_ctr * (ty_param list) * (dep_ctr list) * dep_type) = *)
+    let dt : (ty_ctr * (ty_param list) * (dep_ctr list) * dep_type) = 
+      match coerce_reference_to_dep_dt constructor with
+      | Some dt -> msg_debug (str (dep_dt_to_string dt) ++ fnl()); dt 
+      | None -> failwith "Not supported type"
+    in
+
+    let (ty_ctr, ty_params, ctrs, dep_type) = dt in
+
+    let (letbinds, init_umap, init_tmap) : (unknown list option * range UM.t * dep_type UM.t) =
+      (* Create a temporary typing map for either the let binds/variable to be generated *)
+      let letbinds =
+        match letbindsM with
+        | Some binds -> Some (List.map (fun (Names.Name id) -> Unknown.from_string (Names.Id.to_string id ^ "_")) binds)
+        | None -> None
+      in 
+      
+      let explicit_args =
+        match letbinds with
+        | Some binds -> 
+           List.fold_left (fun map u -> UM.add u None map) UM.empty binds
+        | None -> UM.singleton idu None
+      in
+
+      (* Call the actual creation function *)
+      let (umap, tmap) = create_t_and_u_maps explicit_args dep_type args in
+
+      (* Update with the toplevel variable as necessary *)
+      match letbinds with
+      | Some binds ->
+         (* Still need to package together the tuple *)
+         let bind_types = List.map (fun u ->
+                              try UM.find u tmap
+                              with Not_found -> failwith "All patterns should be exercised"
+                            ) binds
+         in
+         let tmap' = UM.add idu (dtTupleType bind_types) tmap in
+         let umap' =
+           let pair_ctr = injectCtr "Coq.Init.Datatypes.pair" in
+           let range = listToPairAux (fun (r1, r2) -> Ctr (pair_ctr, [RangeHole; RangeHole; r1; r2])) (List.map (fun u -> Unknown u) binds) in
+           UM.add idu range umap in
+         (letbinds, umap', tmap')
+         
+      | None -> (letbinds, umap, tmap)
+    in
+
+    (* Print map *)
+    msg_debug (str "Initial map: " ++ fnl ());
+    UM.iter (fun x r -> msg_debug (str ("Bound: " ^ (var_to_string x) ^ " to Range: " ^ (range_to_string r)) ++ fnl ())) init_umap;
+
+    let umap = ref init_umap in
+    let tmap = ref init_tmap in
+    (* Rewrite the function applications in constructors. *)
+    let rewrite_ct ct =
+      let new_eqs = ref [] in
+      (* Check if a datatype contains an application *)
+      let rec contains_app dt =
+        match dt with
+        | DApp _ -> true
+        | DCtr (ctr, dts) -> List.exists contains_app dts
+        | _ -> false in
+
+      (* Rewrite the datatypes *)
+      let rec traverse_and_rewrite dts top_dt : dep_type list =
+        msg_debug (str (String.concat " " (List.map dep_type_to_string dts) ^ " vs " ^ (dep_type_to_string top_dt)) ++ fnl ());
+        match dts, top_dt with
+        | (DTyParam _)::dts', _ -> traverse_and_rewrite dts' top_dt
+        | [], _ -> []
+        | dt::dts', DArrow (dt1,dt2) when not (contains_app dt) ->
+           dt :: (traverse_and_rewrite dts' dt2)
+        | dt::dts', DProd ((_,dt1),dt2) when not (contains_app dt) ->
+           dt :: (traverse_and_rewrite dts' dt2)
+        | dt::dts', DProd ((_,dt1),dt2) when (contains_app dt) ->
+           begin
+             (* Create a fresh name *)
+             let x = make_up_name () in
+             new_eqs := (dt, x, dt1) :: !new_eqs;
+(*             tmap := UM.add x dt1 !tmap;
+               umap := UM.add x (Undef dt1) !umap; *)
+             DTyVar x :: (traverse_and_rewrite dts' dt2)
+           end
+        | dt::dts', DArrow (dt1,dt2) when (contains_app dt) ->
+           begin
+             (* Create a fresh name *)
+             let x = make_up_name () in
+             new_eqs := (dt, x, dt1) :: !new_eqs;
+(*             tmap := UM.add x dt1 !tmap;
+               umap := UM.add x (Undef dt1) !umap; *)
+             DTyVar x :: (traverse_and_rewrite dts' dt2)
+           end
+        | _, _ -> failwith (String.concat " " (List.map dep_type_to_string dts) ^ " vs " ^ (dep_type_to_string top_dt))
+      in 
+
+      let rec construct_eqs eqs dt =
+        match eqs with
+        | [] -> dt
+        | (dteq, x, dtx)::eqs' -> 
+           DArrow (DTyCtr (ctr_to_ty_ctr (injectCtr "eq"), [DHole; dteq; DTyVar x]),
+                   construct_eqs eqs' dt)
+        in 
+      
+      (* - Find the result of the constructor
+         - Traverse its arguments, rewriting if necessary 
+       *)
+      let rec recurse_to_result ct =
+        match ct with
+        | DProd ((x, ct1), ct2) ->
+           DProd ((x, ct1), recurse_to_result ct2)
+        | DArrow (ct1, ct2) ->
+           DArrow (ct1, recurse_to_result ct2)
+        | DTyCtr (ty_ctr, dts) ->
+           (* TODO: While recursing dts need top level dep-type for map. *)
+           let dts' = traverse_and_rewrite dts dep_type in
+           construct_eqs !new_eqs (DTyCtr (ty_ctr, dts'))
+        | _ -> failwith ("Not a result: " ^ dep_type_to_string ct)
+      in
+
+      let rec add_bindings ct eqs =
+        msg_debug (str "Adding bindings..." ++ fnl ());
+        match eqs with 
+        | [] -> ct
+        | (_,x,dt)::eqs' -> DProd ((x,dt), add_bindings ct eqs')
+      in 
+      let rewritten_result = recurse_to_result ct in
+      let rewritten  = add_bindings rewritten_result !new_eqs in
+      msg_debug (str ("Rewritten from: " ^ dep_type_to_string ct ^ " to " ^ dep_type_to_string rewritten) ++ fnl ());
+      rewritten
+    in            
+    let ctrs = List.map (fun (ctr, ct) -> (ctr, rewrite_ct ct)) ctrs in
+    
+    (* When we add constructors to the ranges, this needs to change *)
+    let input_names = List.map (fun ({CAst.v = CRef (r, _); _},_) -> fresh_name (string_of_qualid r ^ "_")) args in
+    let input_ranges = List.map (fun v -> Unknown v) input_names in
+    
+    (* Call the derivation dispatcher *)
+    derive_dependent class_name constructor !umap !tmap (* init_umap init_tmap *)
+      input_names input_ranges
+      (ty_ctr, ty_params, ctrs, dep_type) letbinds idu 
+  | { CAst.v = CApp (constructor, args); _ } ->
+     msg_debug (str "Parsing constructor information for checker" ++ fnl ());
+     
+    (* Parse the constructor's information into the more convenient generic-lib representation *)
+    let (ty_ctr, ty_params, ctrs, dep_type) : (ty_ctr * (ty_param list) * (dep_ctr list) * dep_type) =
+      match coerce_reference_to_dep_dt constructor with
+      | Some dt -> msg_debug (str (dep_dt_to_string dt) ++ fnl()); dt 
+      | None -> failwith "Not supported type"
+    in
+
+    (* When we add constructors to the ranges, this needs to change *)
+    let input_names = List.map (fun ({CAst.v = CRef (r, _); _},_) -> fresh_name (string_of_qualid r ^ "_")) args in
+    let input_ranges = List.map (fun v -> Unknown v) input_names in
+
+    (* Call the actual creation function *)
+    let explicit_args = UM.empty (* No arguments to be generated *) in
+    let (umap, tmap) = create_t_and_u_maps explicit_args dep_type args in
+
+    let result = fresh_name "_result_bool" in
+    let umap = ref (UM.add result (Ctr (injectCtr "Coq.Init.Datatypes.true", [])) umap) in
+    let tmap = ref (UM.add result (DTyCtr (ctr_to_ty_ctr (injectCtr "Coq.Init.Datatypes.bool"), [])) tmap) in
+
+(*     let umap = ref init_umap in
+    let tmap = ref init_tmap in *)
+    (* Rewrite the function applications in constructors. *)
+    let rewrite_ct ct =
+      let new_eqs = ref [] in
+      (* Check if a datatype contains an application *)
+      let rec contains_app dt =
+        match dt with
+        | DApp _ -> true
+        | DCtr (ctr, dts) -> List.exists contains_app dts
+        | _ -> false in
+
+      (* Rewrite the datatypes *)
+      let rec traverse_and_rewrite dts top_dt : dep_type list =
+        match dts, top_dt with
+        | (DTyParam _)::dts', _ -> traverse_and_rewrite dts' top_dt
+        | [], _ -> []
+        | dt::dts', DArrow (dt1,dt2) when not (contains_app dt) ->
+           dt :: (traverse_and_rewrite dts' dt2)
+        | dt::dts', DProd ((_,dt1),dt2) when not (contains_app dt) ->
+           dt :: (traverse_and_rewrite dts' dt2)
+        | dt::dts', DProd ((_,dt1),dt2) when (contains_app dt) ->
+           begin
+             (* Create a fresh name *)
+             let x = make_up_name () in
+             new_eqs := (dt, x, dt1) :: !new_eqs;
+(*              tmap := UM.add x dt1 !tmap;
+               umap := UM.add x (Undef dt1) !umap; *)
+             DTyVar x :: (traverse_and_rewrite dts' dt2)
+           end
+        | dt::dts', DArrow (dt1,dt2) when (contains_app dt) ->
+           begin
+             (* Create a fresh name *)
+             let x = make_up_name () in
+             new_eqs := (dt, x, dt1) :: !new_eqs;
+(*              tmap := UM.add x dt1 !tmap;
+             umap := UM.add x (Undef dt1) !umap; *)
+             DTyVar x :: (traverse_and_rewrite dts' dt2)
+           end
+      in 
+
+      let rec construct_eqs eqs dt =
+        match eqs with
+        | [] -> dt
+        | (dteq, x, _)::eqs' -> 
+           DArrow (DTyCtr (ctr_to_ty_ctr (injectCtr "eq"), [DHole; dteq; DTyVar x]),
+                   construct_eqs eqs' dt) 
+        in 
+      
+      (* - Find the result of the constructor
+         - Traverse its arguments, rewriting if necessary 
+       *)
+      let rec recurse_to_result ct =
+        match ct with
+        | DProd ((x, ct1), ct2) ->
+           DProd ((x, ct1), recurse_to_result ct2)
+        | DArrow (ct1, ct2) ->
+           DArrow (ct1, recurse_to_result ct2)
+        | DTyCtr (ty_ctr, dts) ->
+           (* TODO: While recursing dts need top level dep-type for map. *)
+           let dts' = traverse_and_rewrite dts dep_type in
+           construct_eqs !new_eqs (DTyCtr (ty_ctr, dts'))
+        | _ -> failwith ("Not a result: " ^ dep_type_to_string ct)
+      in
+
+      let rec add_bindings ct eqs =
+        msg_debug (str "Adding bindings..." ++ fnl ());
+        match eqs with 
+        | [] -> ct
+        | (_,x,dt)::eqs' -> DProd ((x,dt), add_bindings ct eqs')
+      in 
+      let rewritten_result = recurse_to_result ct in
+      let rewritten  = add_bindings rewritten_result !new_eqs in      
+      msg_debug (str ("Rewritten from: " ^ dep_type_to_string ct ^ " to " ^ dep_type_to_string rewritten) ++ fnl ());
+      rewritten
+    in            
+    let ctrs = List.map (fun (ctr, ct) -> (ctr, rewrite_ct ct)) ctrs in
+    
+    derive_dependent class_name constructor !umap !tmap input_names input_ranges
+      (ty_ctr, ty_params, ctrs, dep_type) None result
+  | _ -> qcfail "wrongformat/driver.mlg"
+
+ *)

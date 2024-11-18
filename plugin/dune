@@ -1,7 +1,7 @@
 (library
  (name quickchick_plugin)
  (public_name coq-quickchick.plugin)
- (flags :standard -rectypes -warn-error -3 -w -8-27+40)
+ (flags :standard -rectypes -warn-error -3 -warn-error -26 -w -8-27+40)
  (modules :standard \ genSTCorrect genSizedSTMonotonic genSizedSTSizeMonotonic)
  (libraries unix str
   (select void_for_linking-plugin-extraction from
@@ -39,6 +39,10 @@
   (alias compat)
   (target depDriver.ml)
   (action (run sh %{dep:../scripts/mycppo} %{dep:depDriver.ml.cppo} %{target})))
+(rule
+  (alias compat)
+  (target newDepDriver.ml)
+  (action (run sh %{dep:../scripts/mycppo} %{dep:newDepDriver.ml.cppo} %{target})))
 (rule
   (alias compat)
   (target genericLib.ml)
