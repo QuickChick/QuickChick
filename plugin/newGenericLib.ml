@@ -85,8 +85,7 @@ let qualid_to_rocq_relations (r : Libnames.qualid) : (int * rocq_relation * rocq
                                         | _ -> false) lookup_results in
     match first_ind with
       | Names.GlobRef.IndRef ind ->
-         None 
-      (*         Environ.lookup_mind (fst ind) (Global.env ()) *)
+         failwith "Found something" (* Environ.lookup_mind (fst ind) (Global.env ()) *)
       | _ -> failwith ("No Inductives named: " ^ Libnames.string_of_qualid r)
     end
   with
