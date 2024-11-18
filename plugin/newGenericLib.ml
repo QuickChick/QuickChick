@@ -98,9 +98,33 @@ let ind_reference_to_rocq_relations (c : Constrexpr.constr_expr) : (int * rocq_r
   in
   qualid_to_rocq_relations r
 
+(* Patterns in language that derivations target *)
+type pat =
+  | PCtr of constructor * pat list
+  | PVar of var
+  | PParam (* Type parameter *)
 
-
-
+(* TODO: Weights? *)
+(* Deep AST of Language that derivations target *)
+type mexp =
+  | MBind    of mexp * var * mexp
+    (* bind m1 (fun id => m2) *)
+  | MBindOpt of mexp * var * mexp
+    (* bindOpt m1 (fun id => m2) *)
+  | MRet  of mexp
+    (* ret m *)
+  | MFail      (* Signifies failure *) 
+  | MOutOfFuel (* Signifies failure due to fuel *)
+  | MId of var
+  | MApp of mexp * mexp list
+  | MCtr of constructor * mexp list
+  | MConst of string
+  | MEscape of Constrexpr.constr_expr
+  | MMatch of mexp * (pat * mexp) list 
+  | MHole 
+  | MLet of var * mexp * mexp 
+  | MBacktrack of (mexp * mexp) list
+  | MFun of pat list * mexp
 
 (*
 open Names
