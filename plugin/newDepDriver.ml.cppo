@@ -13,6 +13,12 @@ open Error
 open UnifyQC
  *)
 
+let invoke (ids : Names.Id.t list) class_name (body : constr_expr) =
+  match body.CAst.v with
+  | CApp (ctr, args) ->
+     ignore (NewGenericLib.ind_reference_to_rocq_relations ctr)
+  | _ -> failwith "TODO ERRMSG"
+
 (* Assumption: 
    - generator-based classes include a "fun x => P ...." or "fun '(x,y,...) => P ..."
    - checker-based classes are "P ..."
@@ -30,13 +36,30 @@ let dep_dispatch ind class_name : unit =
      id: holds the variable to be generated 
      body: inductive relation applied to stuff
    *)
-     failwith "HERE"
+    invoke [id] class_name body 
   | { CAst.v = CLambdaN ([CLocalPattern cpe], body); _} ->
   (* Multary case.
      ids: hold the variables to be generated 
      body: inductive relation applied to stuff
    *)
-     let cpe_kind cpe = 
+     begin match cpe.CAst.v with
+     | CPatNotation (_,_,(l1,l2,l3),_) ->
+        let extract_CPatAtom cpe =
+          match cpe.CAst.v with
+          | CPatAtom (Some q) -> q
+          | _ -> failwith "Not a CPatAtom"
+        in 
+        let qs = List.map extract_CPatAtom l1 @ List.map extract_CPatAtom (List.hd l2) in
+        let ids = List.map Libnames.qualid_basename qs in
+        invoke ids class_name body
+     | _ -> failwith "Actual fail"
+     end
+  | { CAst.v = CApp (_constructor, _args); _ } ->
+     invoke [] class_name ind
+  | _ -> failwith "Not a function"
+
+(*
+         let cpe_kind cpe = 
        match cpe.CAst.v with
        | CPatAlias _ -> failwith "1"
        | CPatCstr _ -> failwith "2"
@@ -48,13 +71,7 @@ let dep_dispatch ind class_name : unit =
        | CPatDelimiters _ -> failwith "8"
        | CPatCast _ -> failwith "9"
      in
-     begin match cpe.CAst.v with
-     | CPatNotation (_,_,_,cpes) ->
-        failwith (string_of_int (List.length cpes))
-     | _ -> failwith "Actual fail"
-     end
-  | _ -> failwith "Not a function"
-
+ *)
 (*
 (** Derivable classes *)
 type derivable =
