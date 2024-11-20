@@ -42,12 +42,22 @@ Fixpoint app_no (t : term) : nat :=
 
 Definition env := list type.
 
-Inductive bind : env -> nat -> type -> Prop :=
-| BindNow   : forall tau env, bind (tau :: env) 0 tau
+Inductive bind : list type -> nat -> type -> Prop :=
+| BindNow   : forall tau env, bind (tau :: env) O tau
 | BindLater : forall tau tau' x env,
     bind env x tau -> bind (tau' :: env) (S x) tau.
 
-Inductive typing' (e : env) : term -> type -> Prop :=
+Derive Pattern Coverage bind 1. 
+Derive Density bind 1.
+
+
+Inductive Duct : bool -> nat -> bool -> nat -> Prop :=
+| DA a b : Duct b a true 0
+| DB a : Duct true 0 false a.
+
+Derive Pattern Coverage Duct 1.
+
+Inductive typing' (e : list type) : term -> type -> Prop :=
 | TId' :
     forall x tau,
       bind e x tau ->
@@ -60,12 +70,13 @@ Inductive typing' (e : env) : term -> type -> Prop :=
       typing' (tau1 :: e) t tau2 ->
       typing' e (Abs t) (Arrow tau1 tau2)
 | TApp' :
-    forall t1 t2 tau tau1 tau2,
+    forall t1 t2 tau1 tau2,
       typing' e t2 tau1 ->
-      typing' e t1 tau ->
-      tau = Arrow tau1 tau2 ->
+      typing' e t1 (Arrow tau1 tau2) ->
       typing' e (App t1 t2) tau2.
 
+Derive Pattern Coverage typing' 1.
+Derive Density typing' 2.
 Check typing'.
 
 Derive Arbitrary for type.
@@ -81,6 +92,8 @@ Inductive value : term -> Prop :=
 | ValueAbs : forall t, value (Abs t)
 .
 
+Derive Pattern Coverage value 0.
+
 Derive DecOpt for (value t).
 
 Inductive subst (y : nat) (t1 : term) : term -> term -> Prop :=
@@ -95,6 +108,9 @@ Inductive subst (y : nat) (t1 : term) : term -> term -> Prop :=
     subst (S y) t1 t t' ->
     subst y t1 (Abs t) (Abs t').
 
+
+Derive Pattern Coverage subst 1.
+Derive Pattern Coverage eq 100. Check eq. Print eq.
 Derive DecOpt for (subst y t1 t2 t2').
 Derive DecOpt for (bind env x tau).
 (*Derive DecOpt for (typing' env e tau).*)
@@ -120,6 +136,10 @@ Inductive step : term -> term -> Prop :=
     subst 0 t2 t t' ->
     step (App (Abs t) t2) t'
 .
+
+(*Merge (fun e => typing' G e t) With (fun e => step e e') As Comb.*)
+
+Derive Pattern Coverage step 1.
 
 (*Derive DecOpt for (step e e').*)
 Derive GenSizedSuchThat for (fun e' => step e e').
