@@ -61,7 +61,7 @@ Inductive typing (G : env) : term -> type -> Prop :=
     forall e1 e2 t1 t2,
       typing G e2 t1 ->
       typing G e1 (Arrow t1 t2) ->
-      typing G (App e1 e2) t2.
+      typing G (App (Abs N e1) e2) t2.
 
 Fixpoint typeOf G e : option type :=
   match e with

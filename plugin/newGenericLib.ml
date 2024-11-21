@@ -104,13 +104,20 @@ type pat =
   | PVar of var
   | PParam (* Type parameter *)
 
+type monad_sort =
+  | MG 
+  | MGOpt
+  | ME
+  | MEOpt
+  | MC
+  | MId
+
 (* TODO: Weights? *)
 (* Deep AST of Language that derivations target *)
+(* Continuation of mexp is always going to be of a particular monad sort.*)
 type mexp =
-  | MBind    of mexp * var * mexp
+  | MBind of monad_sort * mexp * var * mexp
     (* bind m1 (fun id => m2) *)
-  | MBindOpt of mexp * var * mexp
-    (* bindOpt m1 (fun id => m2) *)
   | MRet  of mexp
     (* ret m *)
   | MFail      (* Signifies failure *) 
@@ -125,6 +132,15 @@ type mexp =
   | MLet of var * mexp * mexp 
   | MBacktrack of (mexp * mexp) list
   | MFun of pat list * mexp
+
+type producer_sort = PS_E | PS_G
+
+type schedule_step =
+  | Bind_prod_unconstrained of var * dep_type * producer_sort
+  | Bind_prod_constrained of (var * dep_type * producer_sort * int) list * dep_type
+  | Bind_checker of dep_type
+
+type schedule = (var * pattern) list * schedule_step list * dep_type
 
 (*
 open Names
