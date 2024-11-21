@@ -1,3 +1,11 @@
+(* option type helpers *)
+val option_map : ('a -> 'b) -> 'a option -> 'b option
+val (>>=) : 'a option -> ('a -> 'b option) -> 'b option                                   
+val isSome : 'a option -> bool
+val cat_maybes : 'a option list -> 'a list
+val foldM : ('b -> 'a -> 'b option) -> 'b option -> 'a list -> 'b option
+val sequenceM : ('a -> 'b option) -> 'a list -> 'b list option
+
 (* vars and type parameters will always be "local", constructors should be global *)
 type var = Names.Id.t
 type ty_param = Names.Id.t
@@ -44,8 +52,8 @@ val rocq_relation_to_string : rocq_relation -> string
    any other relations mutually defined with it. *)
 val constr_to_rocq_constr : Constr.constr -> rocq_constr option
 
-val qualid_to_rocq_relations : Libnames.qualid -> (int * rocq_relation * rocq_relation list) option
-val ind_reference_to_rocq_relations : Constrexpr.constr_expr -> (int * rocq_relation * rocq_relation list) option
+val qualid_to_rocq_relations : Libnames.qualid -> (int * rocq_relation list) option
+val ind_reference_to_rocq_relations : Constrexpr.constr_expr -> (int * rocq_relation list) option
 
 
 
