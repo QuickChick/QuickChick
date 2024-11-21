@@ -10,16 +10,17 @@ Derive Show for Foo.
 
 Set Printing All.
 
+(*
 Definition f :=
   let fix f (x : Foo) :=
     match x with
     | A => 42
     | B => 0
     end in f A.
-
-Inductive Fooish : Foo -> Foo -> Prop :=
-| AS : Fooish A A
-| BS : Fooish B B.
+*)
+Inductive Fooish {T} : Foo T -> Foo T -> Prop :=
+| AS : forall x, Fooish (A x) (A x)
+| BS : forall x y, Fooish (B x) (B y).
 
 (*
 Instance GenSizedSuchThat_foo :

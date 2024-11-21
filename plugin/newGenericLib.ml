@@ -1,3 +1,33 @@
+(* Option monad - should probably be separated out*)
+let option_map f ox =
+  match ox with
+  | Some x -> Some (f x)
+  | None -> None
+ 
+let (>>=) m f = 
+  match m with
+  | Some x -> f x 
+  | None -> None
+ 
+let isSome m = 
+  match m with 
+  | Some _ -> true
+  | None   -> false
+              
+let rec cat_maybes = function 
+  | [] -> []
+  | (Some x :: mxs) -> x :: cat_maybes mxs
+  | None :: mxs -> cat_maybes mxs
+ 
+let foldM f b l = List.fold_left (fun accm x -> 
+                                  accm >>= fun acc ->
+                                  f acc x
+                    ) b l
+ 
+let sequenceM f l = 
+  (foldM (fun acc x -> f x >>= fun x' -> Some (x' :: acc)) (Some []) l) >>= fun l -> Some (List.rev l)
+
+
 (* vars and type parameters will always be "local", constructors should be global *)
 type var = Names.Id.t
 type ty_param = Names.Id.t
@@ -74,7 +104,10 @@ let rocq_relation_to_string (ty_ctr, ty_params, ctrs, rc) =
 let constr_to_rocq_constr (c : Constr.constr) : rocq_constr option =
   None
 
-let qualid_to_rocq_relations (r : Libnames.qualid) : (int * rocq_relation * rocq_relation list) option =
+let oib_to_rocq_relation (oib : Declarations.one_inductive_body) : rocq_relation option =
+  None
+
+let qualid_to_rocq_relations (r : Libnames.qualid) : (int * rocq_relation list) option =
   (* Locate all returns _all_ definitions with this suffix *)
   let lookup_results = Nametab.locate_all r in
   (* We look for the first one that is an inductive *)
@@ -84,14 +117,18 @@ let qualid_to_rocq_relations (r : Libnames.qualid) : (int * rocq_relation * rocq
                                         | Names.GlobRef.IndRef _ -> true
                                         | _ -> false) lookup_results in
     match first_ind with
-      | Names.GlobRef.IndRef ind ->
-         failwith "Found something" (* Environ.lookup_mind (fst ind) (Global.env ()) *)
+    | Names.GlobRef.IndRef (mind,ix) ->
+       (* Lookup the mutual inductive body in the _global_ environment. *)
+       let mib = Environ.lookup_mind mind (Global.env ()) in
+       (* Parse each `one_inductive_body` into a rocq relation. All should succeed. *)
+       let rs = sequenceM oib_to_rocq_relation (Array.to_list mib.mind_packets) in
+       option_map (fun r -> (ix, r)) rs
       | _ -> failwith ("No Inductives named: " ^ Libnames.string_of_qualid r)
     end
   with
     Not_found -> failwith "BETTER MESG"
 
-let ind_reference_to_rocq_relations (c : Constrexpr.constr_expr) : (int * rocq_relation * rocq_relation list) option =
+let ind_reference_to_rocq_relations (c : Constrexpr.constr_expr) : (int * rocq_relation list) option =
   let r = match c with
     | { CAst.v = Constrexpr.CRef (r,_);_ } -> r
     | _ -> failwith "Not a reference"
