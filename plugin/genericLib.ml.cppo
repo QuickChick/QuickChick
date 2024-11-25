@@ -158,9 +158,10 @@ let ctr_to_ty_ctr x = x
 let num_of_ctrs (c : constructor) =
   let env = Global.env () in
   let glob_ref = Nametab.global c in
-  let ((mind,n),_) = Globnames.destConstructRef glob_ref in
-  let mib = Environ.lookup_mind mind env in
-  Array.length (mib.mind_packets.(n).mind_consnames)
+  try let ((mind,n),_) = Globnames.destConstructRef glob_ref in
+      let mib = Environ.lookup_mind mind env in
+      Some (Array.length (mib.mind_packets.(n).mind_consnames))
+  with _ -> None
 
 let belongs_to_inductive (c : constructor) =
   (* let env = Global.env () in *)
@@ -984,6 +985,15 @@ let rec matcher_pat_to_string = function
   | MatchU u -> var_to_string u
   | MatchCtr (c, ms) -> constructor_to_string c ^ " " ^ str_lst_to_string " " (List.map matcher_pat_to_string ms)
   | MatchParameter p -> ty_param_to_string p
+
+(* Checks if a given pattern is total. *)
+let rec is_total_match (mp : matcher_pat) : bool =
+  msg_debug (str ("Calling total match with: " ^ (matcher_pat_to_string mp)) ++ fnl ());
+  match mp with
+  | MatchCtr (c,ls) ->
+     belongs_to_inductive c || (num_of_ctrs c = Some 1 && List.for_all is_total_match ls)
+  | MatchU _ -> true
+  | MatchParameter _ -> true
 
 let construct_match c ?catch_all:(mdef=None) alts = 
   let rec aux = function 

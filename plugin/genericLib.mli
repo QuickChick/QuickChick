@@ -71,7 +71,7 @@ module type Ord_ctr_type = sig
   end
 module Ord_ctr : Ord_ctr_type
 
-val num_of_ctrs : constructor -> int
+val num_of_ctrs : constructor -> int option
 val belongs_to_inductive : constructor -> bool
 
 type ctr_rep = constructor * coq_type 
@@ -168,6 +168,7 @@ type matcher_pat =
   | MatchParameter of ty_param (* Should become hole in pattern, so no binding *)
                     
 val matcher_pat_to_string : matcher_pat -> string 
+val is_total_match : matcher_pat -> bool
 
 val construct_match : coq_expr -> ?catch_all:(coq_expr option) -> (matcher_pat * coq_expr) list -> coq_expr 
 val construct_match_with_return : coq_expr -> ?catch_all:(coq_expr option) ->
