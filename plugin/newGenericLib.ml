@@ -35,9 +35,12 @@ type ty_ctr = Libnames.qualid
 type constructor = Libnames.qualid
 
 let var_to_string x = Names.Id.to_string x
+let var_of_string x = Names.Id.of_string x
 let ty_param_to_string x = Names.Id.to_string x
 let ty_ctr_to_string x = Libnames.string_of_qualid x
+let ty_ctr_of_string x = Libnames.qualid_of_string x
 let constructor_to_string x = Libnames.string_of_qualid x
+let constructor_of_string x = Libnames.qualid_of_string x
 
 (* Wrapper around constr that we use to represent the types of
    inductives and theorems that we plan to derive for or quickcheck *)
@@ -173,11 +176,130 @@ type mexp =
 type producer_sort = PS_E | PS_G
 
 type schedule_step =
-  | Bind_prod_unconstrained of var * dep_type * producer_sort
-  | Bind_prod_constrained of (var * dep_type * producer_sort * int) list * dep_type
-  | Bind_checker of dep_type
+  | S_UC of var * rocq_constr * producer_sort
+  | S_ST of (var * rocq_constr * producer_sort * int list) list * rocq_constr
+  | S_Check of rocq_constr
 
-type schedule = (var * pattern) list * schedule_step list * dep_type
+type schedule = schedule_step list * rocq_constr * monad_sort
+
+module ScheduleExamples = struct
+  (* let var = var_of_string
+  let ctr = constructor_of_string
+  let ty_ctr = ty_ctr_of_string
+
+
+  (* forall Gamma e tau e', typing' Gamma e tau -> bigstep' e e' -> typing' Gamma e' tau*)
+  let thm_schedule =
+    [
+      S_UC (var "Gamma", DTyCtr (ty_ctr "list", [DTyCtr (ty_ctr "type",[])]), PS_G);
+      S_UC (var "tau", DTyCtr (ty_ctr "type", []), PS_G);
+      S_ST ([(var "e", DTyCtr (ty_ctr "term", []), PS_G, [1])], DTyCtr (ty_ctr "typing'", [DTyVar (var "Gamma"); DTyVar (var "e"); DTyVar (var "tau")]));
+      S_ST ([(var "e'", DTyCtr (ty_ctr "term", []), PS_G, [1])], DTyCtr (ty_ctr "bigstep'", [DTyVar (var "e"); DTyVar (var "e'")]));
+    ]
+
+  (*
+  Inductive typing (G : env) : term -> type -> Prop :=
+  | TId :
+      forall x t,
+        bind G x t ->
+        typing G (Id x) t
+  | TConst :
+      forall n,
+        typing G (Const n) N
+  | TAbs :
+      forall e t1 t2,
+        typing (t1 :: G) e t2 ->
+        typing G (Abs t1 e) (Arrow t1 t2)
+  | TApp :
+      forall e1 e2 t1 t2,
+        typing G e2 t1 ->
+        typing G e1 (Arrow t1 t2) ->
+        typing G (App e1 e2) t2.
+  *)
+
+(* typing G (Abs t1 e) ty
+
+  Inductive typing (G : env) : term -> type -> Prop :=
+  | TAbs :
+      forall e t1 t2,
+        typing (t1 :: G) e t2 ->
+        typing G (Abs t1 e) (Arrow t1 t2)
+
+*)
+
+(* typing (t' :: G_) e' t2_
+
+  Inductive typing (G : env) : term -> type -> Prop :=
+  | TId :
+      forall x t,
+        bind G x t ->
+        typing G (Id x) t
+  | TConst :
+      forall n,
+        typing G (Const n) N
+  | TAbs :
+        typing (t1_ :: t :: G_) e t2_ ->
+        typing (t :: G_) (Abs t1_ e) (Arrow t1_ t2_)
+  | TApp :
+        typing (t :: G_) e2 t1 ->
+        typing (t :: G_) e1 (Arrow t1 t2_) ->
+        typing (t :: G_) (App e1 e2) t2_.
+
+
+*)
+
+
+
+
+  let schedule_gen_iio_TId _G _x =
+    [
+      S_ST ([(var "t", DTyCtr (ty_ctr "type", []), PS_G, [2])], DTyCtr (ty_ctr "bind", [_G; _x; DTyVar (var "t")]));
+    ]
+  
+  let schedule_gen_iio_TConst _G _n =
+    [
+
+    ]
+  
+  let schedule_gen_iio_TAbs _G _t1 _e =
+    [
+      S_ST ([(var "t2", DTyCtr (ty_ctr "type", []), PS_G, [2])], DTyCtr (ty_ctr "typing", [DCtr (ctr "cons",[_t1; _G]); _e; DCtr (ctr "Arrow",[_t1; DTyVar (var "t2")])]))
+    ]
+
+  let schedule_gen_iio_TApp _G _e1 _e2 =
+    [
+      S_ST ([(var "t1", DTyCtr (ty_ctr "type", []), PS_G, [2])], DTyCtr (ty_ctr "typing", [_G; _e2; DTyVar (var "t1")]));
+      S_ST ([(var "t2", DTyCtr (ty_ctr "type", []), PS_G, [2;1])], DTyCtr (ty_ctr "typing", [_G; _e1; DTyCtr (ty_ctr "Arrow", [DTyVar (var "t1"); DTyVar (var "t2")])]));
+    ]
+
+  (*Now the generator for typing G e (Arrow t1 t2)*)
+  let schedule_gen_arrows_TId _G _x _t1 =
+    [
+      S_ST ([(var "t2", DTyCtr (ty_ctr "type", []), PS_G, [2;1])], DTyCtr (ty_ctr "bind", [_G; _x; DCtr (ctr "Arrow",[_t1;DTyVar (var "t2")])]));
+    ]
+
+  let schedule_gen_arrows_TConst _G _n = None (* N incompatible with Arrow t1 t2 *)
+
+  let schedule_gen_arrows_TAbs _G _t1 _t1' _e = (*_t1 is the type from the abstration matched on, _t1' is the t1 from (Arrow t1 t2), must be equal*)
+    [ 
+      S_Check (DTyCtr (ty_ctr "eq", [DTyCtr (ty_ctr "type", []); _t1; _t1']));
+      S_ST ([(var "t2", DTyCtr (ty_ctr "type", []), PS_G, [2;1])], DTyCtr (ty_ctr "typing", [DCtr (ctr "cons",[_t1; _G]); _e; DCtr (ctr "Arrow",[_t1; DTyVar (var "t2")])]))
+    ]
+
+  (*  | TApp_specialized :
+    forall e1 e2 t1' t1 t2,
+      typing G e2 t1' ->
+      typing G e1 (Arrow t1' (Arrow t1 t2)) ->
+      typing G (App e1 e2) (Arrow t1 t2).
+*)
+
+  let schedule_gen_arrows_TApp _G _e1 _e2 _t1 =
+    [
+      S_ST ([(var "t1'", DTyCtr (ty_ctr "type", []), PS_G, [2])], DTyCtr (ty_ctr "typing", [_G; _e2; DTyVar (var "t1'")]));
+      S_ST ([(var "t2", DTyCtr (ty_ctr "type", []), PS_G, [2;1;1])], DTyCtr (ty_ctr "typing", [_G; _e1; DTyCtr (ty_ctr "Arrow", [DTyVar (var "t1'"); DTyCtr (ty_ctr "Arrow", [_t1; DTyVar (var "t2")])])]));
+    ] *)
+  end 
+(* let rec schedule_to_mexp (steps, concl, m_sort) : mexp = *)
 
 (*
 open Names
