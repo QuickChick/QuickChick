@@ -1,3 +1,27 @@
+open Pp
+open Error
+
+let cnt = ref 0 
+
+let fresh_name n : Names.Id.t =
+    let base = Names.Id.of_string n in
+
+  (* [is_visible_name id] returns [true] if [id] is already
+     used on the Coq side. *)
+    let is_visible_name id =
+      try
+        ignore (Nametab.locate (Libnames.qualid_of_ident id));
+        true
+      with Not_found -> false
+    in
+    (* Safe fresh name generation. *)
+    Namegen.next_ident_away_from base is_visible_name
+
+let make_up_name () : Names.Id.t =
+  let id = fresh_name (Printf.sprintf "mu%d_" (!cnt)) in
+  cnt := !cnt + 1;
+  id
+
 (* Option monad - should probably be separated out*)
 let option_map f ox =
   match ox with
@@ -27,6 +51,10 @@ let foldM f b l = List.fold_left (fun accm x ->
 let sequenceM f l = 
   (foldM (fun acc x -> f x >>= fun x' -> Some (x' :: acc)) (Some []) l) >>= fun l -> Some (List.rev l)
 
+let debug_constr (c : Constr.constr) =
+  let env = Global.env () in
+  let sigma = Evd.from_env env in
+  Printer.safe_pr_constr_env env sigma c
 
 (* vars and type parameters will always be "local", constructors should be global *)
 type var = Names.Id.t
@@ -102,14 +130,205 @@ let rocq_relation_to_string (ty_ctr, ty_params, ctrs, rc) =
                                     (String.concat "\n" (List.map rocq_ctr_to_string  ctrs))
                                     (rocq_constr_to_string rc)
 
-(* Given the name of an inductive, lookup its definition and 
-   any other relations mutually defined with it. *)
-let constr_to_rocq_constr (c : Constr.constr) : rocq_constr option =
+(* Input : arity_ctxt [Name, Body (option) {expected None}, Type] 
+   In reverse order.
+   ASSUME: all type parameters are first
+   Output: all type parameters (named arguments of type : Type) in correct order 
+*)
+let dep_parse_type_params arity_ctxt =
+  let param_names =
+    foldM (fun acc decl -> 
+           match Context.Rel.Declaration.get_name decl with
+           | Names.Name id -> 
+              (* Actual parameters are named of type Type with some universe *)
+              if Constr.is_Type (Context.Rel.Declaration.get_type decl) then Some (id :: acc) else Some acc
+           | _ -> (* Ignore *) Some acc
+          ) (Some []) arity_ctxt in
+  param_names
+
+let rec dep_arrowify terminal names types = 
+  match names, types with
+  | [], [] -> terminal
+  | (Names.Name x)::ns , t::ts -> DProd ((x,t), dep_arrowify terminal ns ts)
+  | Names.Anonymous::ns, t::ts -> DArrow (t, dep_arrowify terminal ns ts)
+  | _, _ -> failwith "Invalid argument to dep_arrowify"
+
+(* parse a type into a dep_type option 
+   i : index of product (for DeBruijn)
+   nparams : number of <Type> parameters in the beginning
+   arg_names : argument names (type parameters, pattern specific variables 
+ *)
+let parse_dependent_type_internal i nparams ty oibopt arg_names =
+  let rec aux i ty =
+    let env = Global.env () in
+    let sigma = Evd.from_env env in
+    msg_debug (str "Calling aux with: " ++ int i ++ str " "
+               ++ Printer.pr_constr_env env sigma ty ++ fnl()); 
+    if Constr.isRel ty then begin 
+  (*        msgerr (int (i + nparams) ++ str " Rel " ++ int (destRel ty) ++ fnl ()); *)
+      let db = Constr.destRel ty in
+      if i + nparams = db then (* Current inductive, no params *)
+        Some (DTyCtr (Libnames.qualid_of_ident (let Some oib = oibopt in oib.Declarations.mind_typename), []))
+      else begin (* [i + nparams - db]th parameter *) 
+        msg_debug (str (Printf.sprintf "Non-self-rel: %s" (rocq_constr_to_string (List.nth arg_names (i + nparams - db - 1)))) ++ fnl ());
+        try Some (List.nth arg_names (i + nparams - db - 1))
+        with _ -> CErrors.user_err (str "nth failed: " ++ int i ++ str " " ++ int nparams ++ str " " ++ int db ++ str " " ++ int (i + nparams - db - 1) ++ fnl ())
+        end
+    end 
+    else if Constr.isApp ty then begin
+      let (ctr, tms) = Constr.decompose_app_list ty in
+      foldM (fun acc ty -> 
+             aux i ty >>= fun ty' -> Some (ty' :: acc)
+            ) (Some []) tms >>= fun tms' ->
+      match aux i ctr with
+      | Some (DTyCtr (c, _)) -> Some (DTyCtr (c, List.rev tms'))
+      | Some (DCtr (c, _)) -> Some (DCtr (c, List.rev tms'))
+      | Some (DTyVar x) -> 
+         let xs = var_to_string x in 
+         if xs = "Coq.Init.Logic.not" || xs = "not" then 
+           match tms' with 
+           | [c] -> Some (DNot c)
+           | _   -> failwith "Not a valid negation"
+         else Some (DApp (DTyVar x, List.rev tms'))
+      | Some wat -> CErrors.user_err (str ("WAT: " ^ rocq_constr_to_string wat) ++ fnl ())
+      | None -> CErrors.user_err (str "Aux failed?" ++ fnl ())
+    end
+    else if Constr.isInd ty then begin
+      let ((mind, midx),_) = Constr.destInd ty in
+      let mib = Environ.lookup_mind mind env in
+      let id = mib.mind_packets.(midx).mind_typename in
+      (* msg_debug (str (Printf.sprintf "LOOK HERE: %s - %s - %s" (MutInd.to_string mind) (Label.to_string (MutInd.label mind)) 
+                                                            (Id.to_string (Label.to_id (MutInd.label mind)))) ++ fnl ());*)
+      Some (DTyCtr (Libnames.qualid_of_ident id, []))
+    end
+    else if Constr.isConstruct ty then begin
+      let (((mind, midx), idx),_) = Constr.destConstruct ty in                               
+
+      (* Lookup the inductive *)
+      let env = Global.env () in
+      let mib = Environ.lookup_mind mind env in
+
+(*      let (mp, _dn, _) = MutInd.repr3 mind in *)
+
+      (* HACKY: figure out better way to qualify constructors *)
+      let names = String.split_on_char '.' (Names.MutInd.to_string mind) in
+      let prefix = List.rev (List.tl (List.rev names)) in
+      let qual = String.concat "." prefix in
+      msg_debug (str (Printf.sprintf "CONSTR: %s %s" qual (Names.DirPath.to_string (Lib.cwd ()))) ++ fnl ());
+
+      (* Constructor name *)
+      let cname = Names.Id.to_string (mib.mind_packets.(midx).mind_consnames.(idx - 1)) in
+      let cid = Libnames.qualid_of_string (if (qual = "") || (qual = Names.DirPath.to_string (Lib.cwd ()))
+                             then cname else qual ^ "." ^ cname) in
+      Some (DCtr (cid, []))
+    end
+    else if Constr.isProd ty then begin
+      let (n, t1, t2) = Constr.destProd ty in
+      (* Are the 'i's correct? *)
+      aux i t1 >>= fun t1' -> 
+      aux i t2 >>= fun t2' ->
+      (match n.Context.binder_name with
+       | Names.Name x -> Some (DProd ((x, t1'), t2'))
+       | Names.Anonymous ->
+          CErrors.user_err (str "Anonymous product encountered: " ++ (debug_constr ty) ++ fnl ())
+      )
+    end
+    (* Rel, App, Ind, Construct, Prod *)
+    else if Constr.isConst ty then begin 
+      let (x,_) = Constr.destConst ty in 
+      Some (DTyVar (Names.Label.to_id (Names.Constant.label x)))
+    end
+    else (
+      let env = Global.env() in
+      let sigma = Evd.from_env env in
+      CErrors.user_err (str "Dep Case Not Handled: " ++ Printer.pr_constr_env env sigma ty ++ fnl())
+    ) in
+  aux i ty
+
+let parse_dependent_type ty =
+
+    let (ctr_pats, result) = if Constr.isConst ty then ([],ty) else Term.decompose_prod ty in
+
+    let pat_names, pat_types = List.split (List.rev ctr_pats) in
+
+    let pat_names = List.map (fun n -> n.Context.binder_name) pat_names in
+    let arg_names = 
+      List.map (fun n -> match n with
+                         | Names.Name x -> DTyVar x 
+                         | Names.Anonymous -> DTyVar (make_up_name ()) (* Make up a name, but probably can't be used *)
+               ) pat_names in 
+
+    parse_dependent_type_internal (1 + (List.length ctr_pats)) 0 result None arg_names >>= fun result_ty ->
+    sequenceM (fun x -> x) (List.mapi (fun i ty -> parse_dependent_type_internal i 0 ty None arg_names) (List.map (Vars.lift (-1)) pat_types)) >>= fun types ->
+    Some (dep_arrowify result_ty pat_names types)
+  
+let dep_parse_type nparams param_names arity_ctxt oib =
+  let len = List.length arity_ctxt in
+  (* Only type parameters can be used - no dependencies on the types *)
+  let arg_names = List.map (fun x -> DTyParam x) param_names in
+  foldM (fun acc (i, decl) -> 
+           let n = Context.Rel.Declaration.get_name decl in
+           let t = Context.Rel.Declaration.get_type decl in
+           msg_debug (debug_constr t ++ fnl ());
+           match n with
+           | Names.Name id -> (* Check if it is a parameter to add its type / name *)
+              if Constr.is_Type t then Some acc 
+              else parse_dependent_type_internal i nparams t (Some oib) arg_names >>= fun dt -> Some ((n,dt) :: acc)
+           | _ ->  parse_dependent_type_internal i nparams t (Some oib) arg_names >>= fun dt -> Some ((n,dt) :: acc)
+        ) (Some []) (List.mapi (fun i x -> (len - nparams - i, x)) arity_ctxt) >>= fun nts ->
+  let (names, types) = List.split nts in
+  Some (dep_arrowify (DTyCtr (constructor_of_string "Prop", [])) names types)
+
+(* Dependent version: 
+   nparams is numver of Type parameters 
+   param_names are type parameters (length = nparams)
+
+   Returns list of constructor representations 
+ *)
+let dep_parse_constructors nparams param_names oib : rocq_ctr list option =
+  
+  let parse_constructor branch : rocq_ctr option =
+    let (ctr_id, ty_ctr) = branch in
+
+    let (_, ty) = Term.decompose_prod_n nparams ty_ctr in
+    
+    let (ctr_pats, result) = if Constr.isConst ty then ([],ty) else Term.decompose_prod ty in
+
+    let pat_names, pat_types = List.split (List.rev ctr_pats) in
+
+    let pat_names = List.map (fun n -> n.Context.binder_name) pat_names in
+    let arg_names = 
+      List.map (fun x -> DTyParam x) param_names @ 
+      List.map (fun n -> match n with
+                         | Names.Name x -> DTyVar x 
+                         | Names.Anonymous -> DTyVar (make_up_name ()) (* Make up a name, but probably can't be used *)
+               ) pat_names in 
+
+(*     msgerr (str "Calculating result type" ++ fnl ()); *)
+    parse_dependent_type_internal (1 + (List.length ctr_pats)) nparams result (Some oib) arg_names >>= fun result_ty ->
+
+(*     msgerr (str "Calculating types" ++ fnl ()); *)
+    sequenceM (fun x -> x) (List.mapi (fun i ty -> parse_dependent_type_internal i nparams ty (Some oib) arg_names) (List.map (Vars.lift (-1)) pat_types)) >>= fun types ->
+    Some (ctr_id, dep_arrowify result_ty pat_names types)
+  in
+
+  let cns = List.map Libnames.qualid_of_ident (Array.to_list oib.Declarations.mind_consnames) in
+  let lc =  List.map (fun (ctx, t) -> Term.it_mkProd_or_LetIn t ctx) (Array.to_list oib.Declarations.mind_nf_lc) in
+  sequenceM parse_constructor (List.combine cns lc)
+
+(* Given a Coq constr corresponding to the type of an inductive 
+   with n arguments, convert it to our representation. *)
+let constr_to_rocq_constr  (c : Constr.constr) : rocq_constr option =
   None
 
 let oib_to_rocq_relation (oib : Declarations.one_inductive_body) : rocq_relation option =
-  None
-
+    let ty_ctr = oib.Declarations.mind_typename in 
+    dep_parse_type_params oib.Declarations.mind_arity_ctxt >>= fun ty_params ->
+    List.iter (fun tp -> msg_debug (str (ty_param_to_string tp) ++ fnl ())) ty_params;
+    dep_parse_constructors (List.length ty_params) ty_params oib >>= fun ctr_reps ->
+    dep_parse_type (List.length ty_params) ty_params oib.Declarations.mind_arity_ctxt oib >>= fun result_ty -> 
+    Some (Libnames.qualid_of_ident ty_ctr, ty_params, ctr_reps, result_ty)
+    
 let qualid_to_rocq_relations (r : Libnames.qualid) : (int * rocq_relation list) option =
   (* Locate all returns _all_ definitions with this suffix *)
   let lookup_results = Nametab.locate_all r in
@@ -124,7 +343,7 @@ let qualid_to_rocq_relations (r : Libnames.qualid) : (int * rocq_relation list) 
        (* Lookup the mutual inductive body in the _global_ environment. *)
        let mib = Environ.lookup_mind mind (Global.env ()) in
        (* Parse each `one_inductive_body` into a rocq relation. All should succeed. *)
-       let rs = sequenceM oib_to_rocq_relation (Array.to_list mib.mind_packets) in
+       let rs = sequenceM oib_to_rocq_relation (Array.to_list mib.Declarations.mind_packets) in
        option_map (fun r -> (ix, r)) rs
       | _ -> failwith ("No Inductives named: " ^ Libnames.string_of_qualid r)
     end

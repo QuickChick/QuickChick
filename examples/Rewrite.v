@@ -29,6 +29,7 @@ Instance GenSizedSuchThat_foo :
 
 Sample (@arbitraryST _ (fun '(x,y) => Fooish x y) _).
  *)
+QuickChickDebug Debug On.
 Derive Testing for (fun '(x,y,z,w) => Fooish x y z). 
 Derive Testing for (Fooish x y). 
 Derive Testing for (fun x => Fooish x y). 
