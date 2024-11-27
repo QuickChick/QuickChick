@@ -19,6 +19,8 @@ let invoke (ids : Names.Id.t list) class_name (body : constr_expr) =
   | CApp (ctr, args) ->
      begin match NewGenericLib.ind_reference_to_rocq_relations ctr with
      | Some (i, rs) ->
+        msg_debug (str "Succesfully parsed " ++ int i ++ str "-th of:" ++ fnl ());
+        List.iter (fun r -> msg_debug (str (NewGenericLib.rocq_relation_to_string r) ++ fnl ())) rs;
         failwith "TODO: Implement me"
      | None ->
         msg_error (str "Failed to parse: " ++ Ppconstr.pr_simpleconstr body ++ fnl ())
