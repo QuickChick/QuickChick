@@ -17,6 +17,10 @@ val ty_param_to_string : ty_param -> string
 val ty_ctr_to_string : ty_ctr -> string
 val constructor_to_string : constructor -> string
 
+val var_of_string : string -> var
+val ty_ctr_of_string : string -> ty_ctr
+val constructor_of_string : string -> constructor
+
 (* Wrapper around constr that we use to represent the types of
    inductives and theorems that we plan to derive for or quickcheck *)
 type rocq_constr = 
