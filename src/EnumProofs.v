@@ -492,7 +492,7 @@ Ltac2 derive_enum_Correct (_ : unit) :=
   | [ |- @CorrectSized ?typ _ _ ?en ] =>  
     simpl_enumSized ();
     match! goal with
-    | [ |- @CorrectSized _ _ _ [eta ?en_simpl] ] =>
+    | [ |- @CorrectSized _ _ _ ?en_simpl ] =>
       (* get the enum body *)
       set (_aux_enum := ltac2:(exact $en_simpl));
       let hsize := Fresh.in_goal (id_of_string "Hsize") in
