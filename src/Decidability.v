@@ -249,6 +249,12 @@ Notation "x ==>? y" :=
   (implicationOpt x (fun tt => y))
     (at level 55, right associativity).
 
+Definition andBind (a b : option bool) : option bool :=
+  match a with
+  | Some true => b
+  | _ => a
+  end.
+
 #[global] Hint Resolve Dec_eq_unit : eq_dec.
 #[global] Hint Resolve Dec_eq_bool : eq_dec.
 #[global] Hint Resolve Dec_eq_nat : eq_dec.
