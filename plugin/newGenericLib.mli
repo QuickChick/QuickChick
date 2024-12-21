@@ -59,8 +59,82 @@ val constr_to_rocq_constr : Constr.constr -> rocq_constr option
 val qualid_to_rocq_relations : Libnames.qualid -> (int * rocq_relation list) option
 val ind_reference_to_rocq_relations : Constrexpr.constr_expr -> (int * rocq_relation list) option
 
+type producer_sort = PS_E | PS_G
 
+type rocq_type = rocq_constr
 
+(* Patterns in language that derivations target *)
+type pat =
+  | PCtr of constructor * pat list
+  | PVar of var
+  | PParam (* Type parameter *)
+  | PWild
+
+type source = 
+  | SrcNonrec of rocq_type
+  | SrcRec of var * rocq_constr list
+
+type schedule_step =
+  | S_UC of var * source * producer_sort
+  | S_ST of (var * rocq_type (*** (int list) list*)) list * source * producer_sort (* the (int list) list for each var means the list of all occurences of the same variable
+                                                                                        that we wish to produce, any other instance of the var is an input *)
+  | S_Check of source 
+  | S_Match of var * pat
+
+type schedule_sort = ProducerSchedule of bool * producer_sort * rocq_constr (* tuple of produced outputs from conclusion of constructor *)
+                   | CheckerSchedule (* checkers need not bother with conclusion of constructor, only hypotheses need be checked and conclusion of constructor follows *)
+                   | TheoremSchedule of rocq_constr (* conclusion of theorem to be checked *)
+
+type schedule = schedule_step list * schedule_sort
+
+type monad_sort =
+  | MG 
+  | MGOpt
+  | ME
+  | MEOpt
+  | MC
+  | MId
+
+(* TODO: Weights? *)
+(* Deep AST of Language that derivations target *)
+(* Continuation of mexp is always going to be of a particular monad sort.*)
+type mexp =
+  | MBind of monad_sort * mexp * var list * mexp
+    (* bind m1 (fun id => m2) *)
+  | MRet  of mexp
+    (* ret m *)
+  | MFail      (* Signifies failure *) 
+  | MOutOfFuel (* Signifies failure due to fuel *)
+  | MId of var
+  | MApp of mexp * mexp list
+  | MCtr of constructor * mexp list
+  | MTyCtr of ty_ctr * mexp list
+  | MConst of string
+  | MEscape of Constrexpr.constr_expr
+  | MMatch of mexp * (pat * mexp) list 
+  | MHole 
+  | MLet of var * mexp * mexp 
+  | MBacktrack of mexp list
+  | MFun of (pat * mexp option) list * mexp (*var list is a tuple, if you want multiple args do nested MFuns.*)
+  | MFix of var * (var * mexp) list * mexp
+
+type derive_sort = D_Gen | D_Enum | D_Check | D_Thm
+
+val schedule_to_mexp : schedule -> mexp
+
+val mexp_to_constr_expr : mexp -> derive_sort -> Constrexpr.constr_expr
+
+type inductive_schedule = string * (var * mexp) list * (schedule * (var * pat) list) list * (schedule * (var * pat) list) list 
+
+val inductive_schedule_to_constr_expr : inductive_schedule -> derive_sort -> Constrexpr.constr_expr
+
+val debug_constr_expr : Constrexpr.constr_expr -> unit
+
+module ScheduleExamples : sig
+  val thm_schedule : schedule
+  val check_typing_inductive_schedule : inductive_schedule
+  val ind_schd_bind_gen_ioo : inductive_schedule
+end
 
 
 

@@ -1,5 +1,6 @@
 open Pp
 open Error
+open Constrexpr_ops
 
 let cnt = ref 0 
 
@@ -357,11 +358,20 @@ let ind_reference_to_rocq_relations (c : Constrexpr.constr_expr) : (int * rocq_r
   in
   qualid_to_rocq_relations r
 
+open Constrexpr
+
+let debug_constr_expr (c : constr_expr) : unit =
+  let env = Global.env () in
+  let sigma = Evd.from_env env in
+  msg_debug (str "lol");
+  Feedback.msg_notice (Ppconstr.pr_constr_expr env sigma c)
+
 (* Patterns in language that derivations target *)
 type pat =
   | PCtr of constructor * pat list
   | PVar of var
   | PParam (* Type parameter *)
+  | PWild
 
 type monad_sort =
   | MG 
@@ -375,7 +385,7 @@ type monad_sort =
 (* Deep AST of Language that derivations target *)
 (* Continuation of mexp is always going to be of a particular monad sort.*)
 type mexp =
-  | MBind of monad_sort * mexp * var * mexp
+  | MBind of monad_sort * mexp * var list * mexp
     (* bind m1 (fun id => m2) *)
   | MRet  of mexp
     (* ret m *)
@@ -384,37 +394,483 @@ type mexp =
   | MId of var
   | MApp of mexp * mexp list
   | MCtr of constructor * mexp list
+  | MTyCtr of ty_ctr * mexp list
   | MConst of string
   | MEscape of Constrexpr.constr_expr
   | MMatch of mexp * (pat * mexp) list 
   | MHole 
   | MLet of var * mexp * mexp 
-  | MBacktrack of (mexp * mexp) list
-  | MFun of pat list * mexp
+  | MBacktrack of mexp list
+  | MFun of (pat * mexp option) list * mexp 
+  | MFix of var * (var * mexp) list * mexp 
+  
+let m_arbitrary ty = MApp (MConst "QuickChick.Classes.arbitrary", [ty; MHole])
+
+let m_arbitraryST prop = MApp (MConst "QuickChick.DependentClasses.arbitraryST", [MHole; prop; MHole])
+
+let m_enum ty = MApp (MConst "QuickChick.Classes.enum", [ty; MHole])
+
+let m_enumSuchThat prop = MApp (MConst "QuickChick.DependentClasses.enumSuchThat", [MHole; prop; MHole])
+
+let m_fuel = MConst "QuickChick.Decidability.checkable_size_limit"
+
+let m_decOpt prop fuel = MApp (MConst "QuickChick.Decidability.decOpt", [prop; MHole; fuel])
+
+let m_thunkGen gen = MApp (MConst "QuickChick.Generators.thunkGen", [MHole; gen])
 
 type producer_sort = PS_E | PS_G
 
+type rocq_type = rocq_constr
+
+type source = 
+  | SrcNonrec of rocq_type
+  | SrcRec of var * rocq_constr list
+
 type schedule_step =
-  | S_UC of var * rocq_constr * producer_sort
-  | S_ST of (var * rocq_constr * producer_sort * int list) list * rocq_constr
-  | S_Check of rocq_constr
+  | S_UC of var * source * producer_sort
+  | S_ST of (var * rocq_type (*** (int list) list*)) list * source * producer_sort (* the (int list) list for each var means the list of all occurences of the same variable
+                                                                                        that we wish to produce, any other instance of the var is an input *)
+  | S_Check of source
+  | S_Match of var * pat (* Used when you decompose a constructor constrained arg into a fresh variable followed by a pattern match.*)
 
-type schedule = schedule_step list * rocq_constr * monad_sort
+type is_constrained = bool
 
+type schedule_sort = ProducerSchedule of is_constrained * producer_sort * rocq_constr (* tuple of produced outputs from conclusion of constructor *)
+                   | CheckerSchedule (* checkers need not bother with conclusion of constructor, only hypotheses need be checked and conclusion of constructor follows *)
+                   | TheoremSchedule of rocq_constr (* conclusion of theorem to be checked *)
+
+type schedule = schedule_step list * schedule_sort
+
+let rec product_free_rocq_type_to_mexp (rt : rocq_type) : mexp =
+  match rt with
+  | DArrow (_,_) -> failwith "Not a product_free type"
+  | DProd (_,_) -> failwith "Not a product-free type"
+  | DTyParam p -> MId p
+  | DTyCtr (c, ds) -> MTyCtr (c, List.map product_free_rocq_type_to_mexp ds)
+  | DCtr (c, ds) -> MCtr (c, List.map product_free_rocq_type_to_mexp ds)
+  | DTyVar v -> MId v
+  | DApp (d, ds) -> MApp (product_free_rocq_type_to_mexp d, List.map product_free_rocq_type_to_mexp ds)
+  | DNot d -> MTyCtr (ty_ctr_of_string "Coq.Init.Logic.not", [product_free_rocq_type_to_mexp d])
+  | DHole -> MHole
+
+
+let match_optbool mb some_t some_f none : mexp =
+  MMatch (mb, 
+          [
+            (PCtr (constructor_of_string "Some", [PParam; PCtr (constructor_of_string "true", [])]), some_t);
+            (PCtr (constructor_of_string "Some", [PParam; PCtr (constructor_of_string "false", [])]), some_f);
+            (PCtr (constructor_of_string "None", [PParam]), none)
+          ])
+
+(* Maybe this should do checks? *)
+let cInject s : constr_expr = 
+  if s = "" then failwith "Called gInject with empty string";
+  CAst.make @@ CRef (Libnames.qualid_of_string s, None)
+
+let c_var v : constr_expr =
+  CAst.make @@ CRef (Libnames.qualid_of_ident v, None)
+
+let c_constructor c : constr_expr =
+  CAst.make @@ CRef (c, None)
+
+let c_ty_ctr c : constr_expr =
+  CAst.make @@ CRef (c, None)
+
+let c_hole = CAst.make @@ CHole None
+
+let tuple_of_list (pair : 'a -> 'a -> 'a) (xs : 'a list) : 'a = (*Maybe need to convert to pattern pair?*)
+  match xs with
+  | [] -> failwith "No empty tuples"
+  | [x] -> x
+  | x::xs -> List.fold_left pair x xs
+
+let c_pat (p : pat) : Constrexpr.cases_pattern_expr =
+  let rec aux p =
+    match p with
+    | PCtr (c, ps) -> CAst.make @@ CPatCstr (c, Some (List.map aux ps),[])
+    | PVar v -> CAst.make @@ CPatAtom (Some (Libnames.qualid_of_ident v))
+    | PParam -> CAst.make @@ CPatAtom None
+    | PWild -> CAst.make @@ CPatAtom None
+  in aux p
+
+let rec pat_vars (p : pat) : var list =
+  match p with
+  | PCtr (_, ps) -> List.concat (List.map pat_vars ps)
+  | PVar v -> [v]
+  | PParam -> []
+  | PWild -> []
+
+let arg_of_pat (p : pat) (ty : constr_expr option) =
+  match p, ty with
+  | PVar v, Some ty -> CLocalAssum ([CAst.make @@ Names.Name v], None, Default Glob_term.Explicit, ty)
+  | _, _ -> CLocalPattern (c_pat p)
+
+let c_fun (pat_args : (pat * constr_expr option) list) (f_body : var list -> constr_expr) : constr_expr =
+  let args = List.concat (List.map (fun (p,_) -> pat_vars p) pat_args) in
+  let local_patterns = List.map (fun (p,ty) -> arg_of_pat p ty) pat_args in
+  mkLambdaCN local_patterns (f_body args)
+
+let c_app ?explicit:(expl=true) c cs : constr_expr =
+  if expl then
+    let f c = match c with
+    | CRef (r,_) -> Constrexpr.CAppExpl((r, None), cs)
+    | _ -> failwith "invalid argument to gApp"
+    in CAst.map f c
+  else mkAppC (c, cs)
+
+let c_pair x y = c_app (cInject "Coq.Init.Datatypes.pair") [c_hole; c_hole; x; y]
+
+let c_tuple_of_list xs = tuple_of_list c_pair xs
+
+let pat_tuple_of_list xs = tuple_of_list (fun x y -> PCtr (constructor_of_string "Coq.Init.Datatypes.pair", [PWild; PWild; x; y])) xs
+
+let c_pat_tuple_of_List xs = c_pat (pat_tuple_of_list xs)
+
+let c_match discr ?catchAll:(body=None) (branches : (pat * constr_expr) list) : constr_expr =
+  CAst.make @@ CCases (RegularStyle,
+          None (* return *), 
+          [(discr, None, None)], (* single discriminee, no as/in *)
+          (List.map (fun (p, bf) -> 
+                      CAst.make ([[c_pat p]], bf)
+                   ) branches) @ match body with
+                                 | None -> []
+                                 | Some c' -> [CAst.make ([[CAst.make @@ CPatAtom None]], c')])
+
+let c_let v c1 c2 : constr_expr =
+  CAst.make @@ CLetIn (CAst.make @@ Names.Name v, c1, None, c2)
+
+(*  (a,b,c)  => pair (pair (pair a b) c) d  *)
+(* 
+
+let c_match discr ?catchAll:(body=None) ?params:(holes=0) (branches : (constructor * string list * (var list -> coq_expr)) list) : constr_expr =
+  CAst.make @@ CCases (RegularStyle,
+          None (* return *), 
+          [(discr, None, None)], (* single discriminee, no as/in *)
+          (List.map (fun (c, cs, bf) -> 
+                      let cvs : Id.t list = List.map fresh_name cs in
+                      CAst.make ([[CAst.make @@ CPatCstr (c,
+                                      None,
+                                      List.init holes (fun _ -> CAst.make @@ CPatAtom None) @
+                                      List.map (fun s -> CAst.make @@ CPatAtom (Some (qualid_of_ident s))) cvs (* Constructor applied to patterns *)
+                                    )
+                           ]],
+                       bf cvs)
+                   ) branches) @ match body with
+                                 | None -> []
+                                 | Some c' -> [CAst.make ([[CAst.make @@ CPatAtom None]], c')]) *)
+
+type derive_sort = D_Gen | D_Enum | D_Check | D_Thm
+
+let c_bindGen gen k = c_app (cInject "QuickChick.Generators.bindGen") [c_hole; c_hole; gen; k]
+
+let c_bindOpt prod k = c_app (cInject "QuickChick.Producer.bindOpt") [c_hole; c_hole; c_hole; c_hole; prod; k]
+
+let c_andBind check k = c_app (cInject "QuickChick.Decidability.andBind") [check; k] 
+  (*Not a real function, either add or preprocess these binds into matches in rocq_constr to mexp conversion*)
+
+let c_bindEnum enum k = c_app (cInject "QuickChick.Enumerators.bindEnum") [c_hole; c_hole; enum; k]
+
+let c_enumerating enum k init_size = c_app (cInject "QuickChick.Enumerators.enumerating") [c_hole; enum; k; init_size]
+
+let c_enumeratingOpt enum k init_size = c_app (cInject "QuickChick.Enumerators.enumeratingOpt") [c_hole; enum; k; init_size]
+
+let c_forAll check k = c_app (cInject "QuickChick.Checker.forAll") [c_hole; c_hole; c_hole; c_hole; check; k]
+
+let c_forAllMaybe check k = c_app (cInject "QuickChick.Checker.forAllMaybe") [c_hole; c_hole; c_hole; c_hole; check; k]
+ 
+let c_checker c = c_app (cInject "QuickChick.Checker.checker") [c_hole; c_hole; c]
+
+let c_tt = cInject "Coq.Init.Datatypes.tt"
+
+let c_None ty = c_app (cInject "Coq.Init.Datatypes.None") [ty]
+
+let c_Some ty x = c_app (cInject "Coq.Init.Datatypes.Some") [ty; x]
+
+let c_nil ty = c_app (cInject "Coq.Init.Datatypes.nil") [ty]
+
+let c_cons ty x xs = c_app (cInject "Coq.Init.Datatypes.cons") [ty; x; xs]
+
+let rec c_list ty = function
+  | [] -> c_nil ty
+  | x::xs -> c_cons ty x (c_list ty xs)
+
+let derive_sort_to_string (ds : derive_sort) : string =
+  match ds with
+  | D_Gen -> "Gen"
+  | D_Enum -> "Enum"
+  | D_Check -> "Check"
+  | D_Thm -> "Thm"
+
+let monad_sort_to_string (ms : monad_sort) : string =
+  match ms with
+  | MG -> "Gen"
+  | MGOpt -> "GenOpt"
+  | ME -> "Enum"
+  | MEOpt -> "EnumOpt"
+  | MC -> "Check"
+  | MId -> "Id"
+
+let c_bind (ms : monad_sort) (ds : derive_sort) (m1 : constr_expr) (vs : var list) (m2 : constr_expr) : constr_expr =
+  let args = match vs with
+    | [] -> []
+    | _ -> [pat_tuple_of_list (List.map (fun v -> PVar v) vs), None] in
+  let k = c_fun args (fun _ -> m2) in
+  match ds, ms with
+  | D_Gen, MG -> c_bindGen m1 k
+  | D_Gen, MGOpt -> c_bindOpt m1 k
+  | D_Gen, MC -> c_andBind m1 k
+  | D_Enum, ME -> c_bindEnum m1 k
+  | D_Enum, MEOpt -> c_bindOpt m1 k
+  | D_Enum, MC -> c_andBind m1 k
+  | D_Check, MC -> c_andBind m1 k
+  | D_Check, ME -> c_enumerating m1 k (c_var (var_of_string "init_size"))
+  | D_Check, MEOpt -> c_enumeratingOpt m1 k (c_var (var_of_string "init_size"))
+  | D_Thm, MC -> c_andBind m1 k
+  | D_Thm, MG -> c_forAll m1 k
+  | D_Thm, MGOpt -> c_forAllMaybe m1 k
+  | _, _ -> failwith ("Invalid bind for derive_sort" ^ derive_sort_to_string ds ^ " and monad_sort " ^ monad_sort_to_string ms)
+
+let c_ret (ds : derive_sort) (m : constr_expr) : constr_expr =
+  match ds with
+  | D_Gen -> c_app (cInject "QuickChick.Generators.returnGen") [c_hole; m]
+  | D_Enum -> c_app (cInject "QuickChick.Enumerators.returnEnum") [c_hole; m]
+  | D_Check -> m
+  | D_Thm -> c_checker m
+
+let c_fail (ds : derive_sort) : constr_expr =
+  match ds with
+  | D_Gen -> c_ret D_Gen (c_None c_hole)
+  | D_Enum -> c_app (cInject "QuickChick.Enumerators.failEnum") [c_hole]
+  | D_Check -> c_None c_hole
+  | D_Thm -> c_checker c_tt
+
+let c_out_of_fuel (ds : derive_sort) : constr_expr =
+  match ds with
+  | D_Gen -> c_fail D_Gen
+  | D_Enum -> c_ret D_Enum (c_None c_hole)
+  | D_Check -> c_None c_hole
+  | D_Thm -> c_checker c_tt
+
+let c_backtrack (ds : derive_sort) (ms : constr_expr list) : constr_expr =
+  match ds with
+  | D_Gen -> c_app (cInject "QuickChick.Generators.backtrack") [c_hole; c_list c_hole @@ ms] (* ms : list (nat * G (option A)) *)
+  | D_Enum -> c_app (cInject "QuickChick.Enumerators.enumerate") [c_hole; c_list c_hole @@ ms] (* ms : list (E (option A))*)
+  | D_Check -> c_app (cInject "QuickChick.Decidability.checker_backtrack") [c_list c_hole @@ ms] (* ms : list (unit -> option A)*)
+  | D_Thm -> failwith "Backtrack not supported for theorems."
+
+let rec mexp_to_constr_expr (me : mexp) (ds : derive_sort) : constr_expr =
+  match me with
+  | MBind (ms, m, vs, k) -> c_bind ms ds (mexp_to_constr_expr m ds) vs (mexp_to_constr_expr k ds)
+  | MRet m -> c_ret ds (mexp_to_constr_expr m ds)
+  | MFail -> c_fail ds
+  | MOutOfFuel -> c_out_of_fuel ds
+  | MId v -> c_var v
+  | MApp (m, ms) -> c_app (mexp_to_constr_expr m ds) (List.map (fun m -> mexp_to_constr_expr m ds) ms)
+  | MCtr (c, ms) -> c_app (c_constructor c) (List.map (fun m -> mexp_to_constr_expr m ds) ms)
+  | MTyCtr (c, ms) -> c_app (c_ty_ctr c) (List.map (fun m -> mexp_to_constr_expr m ds) ms)
+  | MConst s -> cInject s
+  | MEscape e -> e
+  | MMatch (m, pms) -> c_match (mexp_to_constr_expr m ds) (List.map (fun (p,m) -> (p, mexp_to_constr_expr m ds)) pms)
+  | MHole -> c_hole
+  | MLet (v, m1, m2) -> c_let v (mexp_to_constr_expr m1 ds) (mexp_to_constr_expr m2 ds)
+  | MBacktrack ms -> c_backtrack ds (List.map (fun case -> mexp_to_constr_expr case ds) ms)
+  | MFun (vs, m) -> c_fun (List.map (fun (v,ty) -> v, option_map (fun ty -> mexp_to_constr_expr ty ds) ty) vs) (fun _ -> (mexp_to_constr_expr m ds))
+  | MFix (f, vs, m) ->
+    let lid = CAst.make f in
+    let args = List.map (fun (v,ty) -> CLocalAssum ([CAst.make @@ Names.Name v], None, Default Glob_term.Explicit, mexp_to_constr_expr ty ds)) vs in
+    CAst.make @@ CFix (lid, [(lid,None,None,args,c_hole, mexp_to_constr_expr m ds)])
+
+
+let prod_sort_to_monad_sort (ps : producer_sort) : monad_sort =
+  match ps with
+  | PS_E -> ME
+  | PS_G -> MG
+
+let prod_sort_to_monad_opt_sort (ps : producer_sort) : monad_sort =
+  match ps with
+  | PS_E -> MEOpt
+  | PS_G -> MGOpt
+(* 
+let rename_rocq_type_vars (rt : rocq_type) (v : var) (locations : int list list) : rocq_type =
+  let other_v = fresh_name (var_to_string v) in
+  let rec aux loc rt = 
+    match rt with
+    | DTyParam p -> DTyParam p
+    | DTyCtr (c, ds) -> DTyCtr (c, List.mapi (fun i d -> aux (loc @ [i]) d) ds)
+    | DCtr (c, ds) -> DCtr (c, List.mapi (fun i d -> aux (loc @ [i]) d) ds)
+    | DTyVar x -> if x = v then DTyVar (if List.mem loc locations then v else other_v) else DTyVar x
+    | DApp (d, ds) -> DApp (d, List.mapi (fun i d -> aux (loc @ [i]) d) ds)
+    | DNot d -> DNot (aux (loc @ [0]) d)
+    | DHole -> DHole
+  in
+  aux [] rt *)
+
+let unconstrained_producer (ps : producer_sort) ty =
+  match ps with
+  | PS_E -> m_enum ty
+  | PS_G -> m_arbitrary ty
+
+let such_that_producer (ps : producer_sort) vars p =
+  let p_vars = List.map (fun v -> PVar v) vars in
+  let arg_tuple = pat_tuple_of_list p_vars in
+  let p_with_args = MFun ([arg_tuple,None], p) in
+  match ps with
+  | PS_E -> m_enumSuchThat p_with_args
+  | PS_G -> m_arbitraryST p_with_args
+  
+let num_of_ctrs (c : constructor) =
+  let env = Global.env () in
+  let glob_ref = Nametab.global c in
+  let ((mind,n),_) = Globnames.destConstructRef glob_ref in
+  let mib = Environ.lookup_mind mind env in
+  Array.length (mib.mind_packets.(n).mind_consnames)
+
+let is_singleton (c : constructor) : bool =
+  num_of_ctrs c = 1
+
+let rec total_pat (p : pat) : bool =
+  match p with
+  | PCtr (c, ps) -> 
+    is_singleton c && List.for_all total_pat ps
+  | PParam | PWild | PVar _ -> true
+
+let rec_call r args =
+  MApp (MId r, MId (var_of_string "init_size") :: MId (var_of_string "size'") :: List.map product_free_rocq_type_to_mexp args)
+
+let schedule_step_to_mexp (step : schedule_step) : mexp -> mexp = fun k ->
+  match step with
+  | S_UC (v, prod, ps) -> 
+    let producer = (match prod with
+      | SrcNonrec ty -> unconstrained_producer ps (product_free_rocq_type_to_mexp ty)
+      | SrcRec (rec_f, args) -> rec_call rec_f args) in
+    MBind (prod_sort_to_monad_sort ps, producer, [v], k)
+  | S_ST (vars_tys, prod, ps) -> 
+    let producer = (match prod with
+      | SrcNonrec ty -> such_that_producer ps (List.map fst vars_tys) (product_free_rocq_type_to_mexp ty)
+      | SrcRec (rec_f, args) -> rec_call rec_f args) in
+    let vars = List.map fst vars_tys in
+    MBind (prod_sort_to_monad_opt_sort ps, producer, vars, k)
+  | S_Check src -> 
+    let checker = (match src with
+      | SrcNonrec ty -> m_decOpt (product_free_rocq_type_to_mexp ty) m_fuel
+      | SrcRec (rec_f, args) -> rec_call rec_f args) in
+    MBind (MC, checker, [], k)
+  | S_Match (v, p) -> 
+    if total_pat p then
+      MMatch (MId v, [(p, k)])
+    else
+      MMatch (MId v, [(p, k); (PWild, MFail)])
+
+(* Theorem = producer composed with a checker *)
+
+let m_Some ty x = MApp (MConst "Coq.Init.Datatypes.Some", [ty; x])
+
+let m_None ty = MApp (MConst "Coq.Init.Datatypes.None", [ty])
+
+let m_bool = MConst "Coq.Init.Datatypes.bool"
+
+let m_true = MConst "Coq.Init.Datatypes.true"
+
+let m_false = MConst "Coq.Init.Datatypes.false"
+
+(* Maybe start this by checking that all the variables used/produced in the conclusion are actually created in the steps?*)
+(* let schedule_to_mexp ((steps, s_sort) : schedule) : mexp =
+  let rec aux steps k =
+    match steps with
+    | [] -> k
+    | step :: steps' -> aux steps' (schedule_step_to_mexp step k)
+  in
+  let finally = match s_sort with
+    | ProducerSchedule (ps, concl_outputs) -> MRet (product_free_rocq_type_to_mexp concl_outputs)
+    | CheckerSchedule -> MRet (m_Some m_bool m_true)
+    | TheoremSchedule concl -> match_optbool (m_decOpt (product_free_rocq_type_to_mexp concl) m_fuel) (MRet (m_Some m_bool m_true)) (MRet (m_Some m_bool m_false)) MOutOfFuel
+  in *)
+  (* aux steps finally    *)
+
+(* Rewrite the above schedule_to_mexp as a fold*)
+let schedule_to_mexp ((steps, s_sort) : schedule) : mexp =
+  let finally = match s_sort with
+    | ProducerSchedule (is_constrained, ps, concl_outputs) -> MRet ((if is_constrained then m_Some MHole else (fun x -> x)) @@ product_free_rocq_type_to_mexp concl_outputs)
+    | CheckerSchedule -> MRet (m_Some m_bool m_true)
+    | TheoremSchedule concl -> match_optbool (m_decOpt (product_free_rocq_type_to_mexp concl) m_fuel) (MRet (m_Some m_bool m_true)) (MRet (m_Some m_bool m_false)) MOutOfFuel
+  in
+  List.fold_right schedule_step_to_mexp steps finally
+
+let schedule_to_constr_expr (s : schedule) (ds : derive_sort) : constr_expr =
+  mexp_to_constr_expr (schedule_to_mexp s) ds
+
+module VarOrd = struct
+  type t = var
+  let compare x y = compare (var_to_string x) (var_to_string y)
+end
+
+module VM = Map.Make(VarOrd)
+(* module US = Set.Make(UnknownOrd) *)
+          
+(* Maps input variables to patterns *)
+type pat_map = pat VM.t
+
+type inductive_schedule = string * (var * mexp) list * (schedule * (var * pat) list) list * (schedule * (var * pat) list) list 
+  (*Name string, fixed input variable/type list, list of base schedules, and a list non base schedules paired with how they match on those variables*)
+
+type rec_or_base = Base | Rec
+
+let backtrack_decoration (ds : derive_sort) (rec_or_base : rec_or_base) (m : mexp) : mexp =
+  match ds with
+  | D_Gen -> 
+    let weight = (match rec_or_base with 
+                 | Rec -> MId (var_of_string "size")
+                 | Base -> MConst "Coq.Init.Nat.one") in
+    MCtr (constructor_of_string "Coq.Init.Datatypes.pair", [MHole; MHole; weight; m_thunkGen (MFun ([PWild,None], m))])
+  | D_Enum -> m
+  | D_Check -> MFun ([PWild, None], m)
+  | D_Thm -> failwith "Backtrack not supported for theorems."
+
+let inductive_schedule_to_mexp (is : inductive_schedule) (ds : derive_sort) : mexp =
+  let (name, inputs, base_scheds, rec_scheds) = is in
+  let nat_ty = MConst "Coq.Init.Datatypes.nat" in
+  let prelude base_k all_k = MFix (var_of_string "rec", (var_of_string "init_size", nat_ty) :: (var_of_string "size", nat_ty) :: inputs, 
+    MMatch (MId (var_of_string "size"), 
+            [
+              (PCtr (constructor_of_string "Coq.Init.Datatypes.O", []), 
+                base_k);
+              (PCtr (constructor_of_string "Coq.Init.Datatypes.S", [PVar (var_of_string "size'")]), 
+                all_k);
+            ])) in
+  let match_pats inp_pats (k : mexp) =
+    List.fold_left (fun acc (v, pat) -> 
+      MMatch (MId v, (pat, acc) :: (if total_pat pat then [] else [(PWild, MFail)]))
+    ) k inp_pats in
+  let base_backtrack = List.map (fun (s, inp_pats) -> 
+    backtrack_decoration ds Base (match_pats inp_pats (schedule_to_mexp s))) base_scheds in
+  let rec_backtrack = List.map (fun (s, inp_pats) ->
+    backtrack_decoration ds Rec (match_pats inp_pats (schedule_to_mexp s))) rec_scheds in
+  let all_backtrack = base_backtrack @ rec_backtrack in
+  let fun_name = var_of_string (name ^ derive_sort_to_string ds) in
+  let final_let fixp = 
+    MLet (fun_name, 
+          fixp, 
+          MFun ([PVar (var_of_string "size"), Some (MConst "Coq.Init.Datatypes.nat")], 
+            MApp (MId fun_name,
+                  [MId (var_of_string "size"); MId (var_of_string "size")]))) in
+  final_let (prelude (MBacktrack base_backtrack) (MBacktrack all_backtrack))
+
+let inductive_schedule_to_constr_expr (is : inductive_schedule) (ds : derive_sort) : constr_expr =
+  mexp_to_constr_expr (inductive_schedule_to_mexp is ds) ds
+  
 module ScheduleExamples = struct
-  (* let var = var_of_string
+  let var = var_of_string
   let ctr = constructor_of_string
   let ty_ctr = ty_ctr_of_string
 
-
   (* forall Gamma e tau e', typing' Gamma e tau -> bigstep' e e' -> typing' Gamma e' tau*)
-  let thm_schedule =
+  let thm_schedule = 
     [
-      S_UC (var "Gamma", DTyCtr (ty_ctr "list", [DTyCtr (ty_ctr "type",[])]), PS_G);
-      S_UC (var "tau", DTyCtr (ty_ctr "type", []), PS_G);
-      S_ST ([(var "e", DTyCtr (ty_ctr "term", []), PS_G, [1])], DTyCtr (ty_ctr "typing'", [DTyVar (var "Gamma"); DTyVar (var "e"); DTyVar (var "tau")]));
-      S_ST ([(var "e'", DTyCtr (ty_ctr "term", []), PS_G, [1])], DTyCtr (ty_ctr "bigstep'", [DTyVar (var "e"); DTyVar (var "e'")]));
-    ]
+      S_UC (var "Gamma", SrcNonrec (DTyCtr (ty_ctr "list", [DTyCtr (ty_ctr "type",[])])), PS_G);
+      S_UC (var "tau", SrcNonrec (DTyCtr (ty_ctr "type", [])), PS_G);
+      S_ST ([(var "e", DTyCtr (ty_ctr "term", []))], SrcNonrec (DTyCtr (ty_ctr "typing'", [DTyVar (var "Gamma"); DTyVar (var "e"); DTyVar (var "tau")])), PS_G);
+      S_ST ([(var "e'", DTyCtr (ty_ctr "term", []))], SrcNonrec (DTyCtr (ty_ctr "bigstep'", [DTyVar (var "e"); DTyVar (var "e'")])), PS_G);
+    ], TheoremSchedule (DTyCtr (ty_ctr "typing'", [DTyVar (var "Gamma"); DTyVar (var "e'"); DTyVar (var "tau")]))
 
   (*
   Inductive typing (G : env) : term -> type -> Prop :=
@@ -467,43 +923,88 @@ module ScheduleExamples = struct
 
 *)
 
+  let check_typing_TId _G _x _t =
+    [
+      S_Check (SrcNonrec (DTyCtr (ty_ctr "bind", [_G; _x; _t])))
+    ], CheckerSchedule
+
+  let check_typing_TConst _G _n =
+    [
+
+    ], CheckerSchedule
+
+  let check_typing_TAbs _G _t1 _t1' _t2 _e =
+    [
+      S_Check (SrcNonrec (DTyCtr ((ty_ctr "eq"), [DTyCtr (ty_ctr "type", []); _t1; _t1'])));
+      S_Check (SrcRec ((var "rec"),[DCtr (ctr "cons",[DHole; _t1; _G]); _e; _t2]))
+    ], CheckerSchedule
+
+  let check_typing_TApp _G _e1 _e2 _t2 =
+    [
+      S_ST ([(var "t1", DTyCtr (ty_ctr "type", []))], SrcNonrec (DTyCtr (ty_ctr "typing", [_G; _e2; DTyVar (var "t1")])), PS_E);
+      S_Check (SrcRec ((var "rec"), [_G; _e1; DTyCtr (ty_ctr "Arrow", [DTyVar (var "t1"); _t2])]))
+    ], CheckerSchedule
+
+  let check_typing_inductive_schedule : inductive_schedule =
+    let list_ty = MTyCtr (ty_ctr "list", [MTyCtr (ty_ctr "type", [])]) in
+    let term = MTyCtr (ty_ctr "term", []) in
+    let ty = MTyCtr (ty_ctr "type", []) in
+    let inputs = [var "G", list_ty; var "e", term; var "tau", ty] in
+    let base_scheds = [(check_typing_TId (DTyVar (var "G")) (DTyVar (var "x")) (DTyVar (var "t")), 
+                        [(var "e", PCtr (ctr "Id", [PVar (var "x")]));
+                         (var "tau", PVar (var "t"))]);
+                       (check_typing_TConst (DTyVar (var "G")) (DTyVar (var "n")),
+                        [(var "e", PCtr (ctr "Const", [PVar (var "n")]));
+                         (var "tau", PCtr (ctr "N", []))]
+                       )
+                      ] in
+    let rec_scheds = [(check_typing_TAbs (DTyVar (var "G")) (DTyVar (var "t1")) (DTyVar (var "t1'")) (DTyVar (var "t2")) (DTyVar (var "e")),
+                        [(var "e", PCtr (ctr "Abs", [PVar (var "t1"); PVar (var "e")]));
+                        (var "tau", PCtr (ctr "Arrow", [PVar (var "t1'"); PVar (var "t2")]))]
+                      );
+                      (check_typing_TApp (DTyVar (var "G")) (DTyVar (var "e1")) (DTyVar (var "e2")) (DTyVar (var "t2")),
+                        [(var "e", PCtr (ctr "App", [PVar (var "e1"); PVar (var "e2")]));
+                        (var "tau", PVar (var "t2"))]
+                      )
+                      ] in
+    ("typing_iii", inputs, base_scheds, rec_scheds)
 
 
-
+(* 
   let schedule_gen_iio_TId _G _x =
     [
-      S_ST ([(var "t", DTyCtr (ty_ctr "type", []), PS_G, [2])], DTyCtr (ty_ctr "bind", [_G; _x; DTyVar (var "t")]));
-    ]
+      S_ST ([(var "t", DTyCtr (ty_ctr "type", []))], SrcNonrec (DTyCtr (ty_ctr "bind", [_G; _x; DTyVar (var "t")])), PS_G);
+    ], ProducerSchedule (true, PS_G, (DTyVar (var "t")))
   
   let schedule_gen_iio_TConst _G _n =
     [
 
-    ]
+    ], ProducerSchedule (true, PS_G, (DTyCtr (ty_ctr "N", [])))
   
   let schedule_gen_iio_TAbs _G _t1 _e =
     [
-      S_ST ([(var "t2", DTyCtr (ty_ctr "type", []), PS_G, [2])], DTyCtr (ty_ctr "typing", [DCtr (ctr "cons",[_t1; _G]); _e; DCtr (ctr "Arrow",[_t1; DTyVar (var "t2")])]))
-    ]
+      S_ST ([(var "t2", DTyCtr (ty_ctr "type", []))], DTyCtr (ty_ctr "typing", [DCtr (ctr "cons",[DHole; _t1; _G]); _e; DCtr (ctr "Arrow",[_t1; DTyVar (var "t2")])]), PS_G)
+    ], ProducerSchedule (true, PS_G, (DTyCtr (ty_ctr "Arrow", [_t1; DTyVar (var "t2")])))
 
   let schedule_gen_iio_TApp _G _e1 _e2 =
     [
-      S_ST ([(var "t1", DTyCtr (ty_ctr "type", []), PS_G, [2])], DTyCtr (ty_ctr "typing", [_G; _e2; DTyVar (var "t1")]));
-      S_ST ([(var "t2", DTyCtr (ty_ctr "type", []), PS_G, [2;1])], DTyCtr (ty_ctr "typing", [_G; _e1; DTyCtr (ty_ctr "Arrow", [DTyVar (var "t1"); DTyVar (var "t2")])]));
-    ]
+      S_ST ([(var "t1", DTyCtr (ty_ctr "type", []))], DTyCtr (ty_ctr "typing", [_G; _e2; DTyVar (var "t1")]), PS_G);
+      S_ST ([(var "t2", DTyCtr (ty_ctr "type", []))], DTyCtr (ty_ctr "typing", [_G; _e1; DTyCtr (ty_ctr "Arrow", [DTyVar (var "t1"); DTyVar (var "t2")])]), PS_G);
+    ], ProducerSchedule (true, PS_G, (DTyVar (var "t2")))
 
   (*Now the generator for typing G e (Arrow t1 t2)*)
   let schedule_gen_arrows_TId _G _x _t1 =
     [
-      S_ST ([(var "t2", DTyCtr (ty_ctr "type", []), PS_G, [2;1])], DTyCtr (ty_ctr "bind", [_G; _x; DCtr (ctr "Arrow",[_t1;DTyVar (var "t2")])]));
-    ]
+      S_ST ([(var "t2", DTyCtr (ty_ctr "type", []))], DTyCtr (ty_ctr "bind", [_G; _x; DCtr (ctr "Arrow",[_t1;DTyVar (var "t2")])]), PS_G);
+    ], ProducerSchedule (true, PS_G, (DCtr (ctr "Arrow",[_t1; DTyVar (var "t2")])))
 
   let schedule_gen_arrows_TConst _G _n = None (* N incompatible with Arrow t1 t2 *)
 
   let schedule_gen_arrows_TAbs _G _t1 _t1' _e = (*_t1 is the type from the abstration matched on, _t1' is the t1 from (Arrow t1 t2), must be equal*)
     [ 
       S_Check (DTyCtr (ty_ctr "eq", [DTyCtr (ty_ctr "type", []); _t1; _t1']));
-      S_ST ([(var "t2", DTyCtr (ty_ctr "type", []), PS_G, [2;1])], DTyCtr (ty_ctr "typing", [DCtr (ctr "cons",[_t1; _G]); _e; DCtr (ctr "Arrow",[_t1; DTyVar (var "t2")])]))
-    ]
+      S_ST ([(var "t2", DTyCtr (ty_ctr "type", []))], DTyCtr (ty_ctr "typing", [DCtr (ctr "cons",[DHole; _t1; _G]); _e; DCtr (ctr "Arrow",[_t1; DTyVar (var "t2")])]), PS_G)
+    ], ProducerSchedule (true, PS_G, (DTyCtr (ty_ctr "Arrow", [_t1; DTyVar (var "t2")])))
 
   (*  | TApp_specialized :
     forall e1 e2 t1' t1 t2,
@@ -514,9 +1015,43 @@ module ScheduleExamples = struct
 
   let schedule_gen_arrows_TApp _G _e1 _e2 _t1 =
     [
-      S_ST ([(var "t1'", DTyCtr (ty_ctr "type", []), PS_G, [2])], DTyCtr (ty_ctr "typing", [_G; _e2; DTyVar (var "t1'")]));
-      S_ST ([(var "t2", DTyCtr (ty_ctr "type", []), PS_G, [2;1;1])], DTyCtr (ty_ctr "typing", [_G; _e1; DTyCtr (ty_ctr "Arrow", [DTyVar (var "t1'"); DTyCtr (ty_ctr "Arrow", [_t1; DTyVar (var "t2")])])]));
-    ] *)
+      S_ST ([(var "t1'", DTyCtr (ty_ctr "type", []))], DTyCtr (ty_ctr "typing", [_G; _e2; DTyVar (var "t1'")]), PS_G);
+      S_ST ([(var "t2", DTyCtr (ty_ctr "type", []))], DTyCtr (ty_ctr "typing", [_G; _e1; DTyCtr (ty_ctr "Arrow", [DTyVar (var "t1'"); DTyCtr (ty_ctr "Arrow", [_t1; DTyVar (var "t2")])])]), PS_G);
+    ], ProducerSchedule (true, PS_G, (DTyCtr (ty_ctr "Arrow", [_t1; DTyVar (var "t2")])))
+ *)
+
+
+  (* 
+  Inductive bind : list type -> nat -> type -> Prop :=
+  | BindNow   : forall tau env, bind (tau :: env) O tau
+  | BindLater : forall tau tau' x env,
+    bind env x tau -> bind (tau' :: env) (S x) tau.
+  *)
+
+  let shcd_bindNow_gen_ioo _tau _env =
+    [
+    ], ProducerSchedule (true, PS_G, (DTyCtr (ty_ctr "pair", [DHole; DHole; DTyCtr (ty_ctr "O", []); _tau])))
+
+  let schd_bindLater_gen_ioo _tau' _env =
+    [
+      S_ST ([(var "x", DTyCtr (ty_ctr "nat", [])); (var "tau", DTyCtr (ty_ctr "type", []))], SrcRec ((var "rec"), [_env]), PS_G)
+    ], ProducerSchedule (true, PS_G, (DTyCtr (ty_ctr "pair", [DHole; DHole; DTyCtr (ty_ctr "S", [DTyVar (var "x")]); DTyVar (var "tau")])))
+
+  let ind_schd_bind_gen_ioo =
+    let list_ty = MTyCtr (ty_ctr "list", [MTyCtr (ty_ctr "type", [])]) in
+    let inputs = [var "env",list_ty] in
+
+    let base_scheds = [
+      shcd_bindNow_gen_ioo (DTyVar (var "tau")) (DTyVar (var "env")),
+        [(var "env", PCtr (ctr "cons", [PWild; PVar (var "tau"); PVar (var "env")]))]
+    ] in
+
+    let rec_scheds = [
+      schd_bindLater_gen_ioo (DTyVar (var "tau'")) (DTyVar (var "env")),
+        [(var "env", PCtr (ctr "cons", [PWild; PVar (var "tau'"); PVar (var "env")]))]
+    ] in
+
+    ("bind_ioo",inputs, base_scheds, rec_scheds)
   end 
 (* let rec schedule_to_mexp (steps, concl, m_sort) : mexp = *)
 
