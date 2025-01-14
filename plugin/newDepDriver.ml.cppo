@@ -23,8 +23,9 @@ let invoke (ids : Names.Id.t list) class_name (body : constr_expr) =
         List.iter (fun r -> msg_debug (str (NewGenericLib.rocq_relation_to_string r) ++ fnl ())) rs;
         NewGenericLib.debug_constr_expr (NewGenericLib.mexp_to_constr_expr (NewGenericLib.schedule_to_mexp NewGenericLib.ScheduleExamples.thm_schedule) NewGenericLib.D_Thm);
         let open NewGenericLib in
-        debug_constr_expr (inductive_schedule_to_constr_expr ScheduleExamples.check_typing_inductive_schedule D_Check);
-        debug_constr_expr (inductive_schedule_to_constr_expr ScheduleExamples.ind_schd_bind_gen_ioo D_Gen);
+        debug_constr_expr (inductive_schedule_to_constr_expr ScheduleExamples.check_typing_inductive_schedule D_Check false);
+        debug_constr_expr (inductive_schedule_to_constr_expr ScheduleExamples.ind_schd_bind_gen_ioo D_Gen true);
+        debug_constr_expr (inductive_schedule_to_constr_expr ScheduleExamples.gen_term_inductive_schedule D_Gen false);
         msg_debug (str "TODO: Implement me")
      | None ->
         msg_error (str "Failed to parse: " ++ Ppconstr.pr_simpleconstr body ++ fnl ())

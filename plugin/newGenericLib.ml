@@ -363,8 +363,103 @@ open Constrexpr
 let debug_constr_expr (c : constr_expr) : unit =
   let env = Global.env () in
   let sigma = Evd.from_env env in
-  msg_debug (str "lol");
   Feedback.msg_notice (Ppconstr.pr_constr_expr env sigma c)
+
+let relation_unconstrained_variables (relation_type : rocq_constr) : (var * int) list =
+  let collect_tyvars i = function
+    | DTyVar x -> [(x, i)]
+    | _ -> []
+  in
+  match relation_type with
+  | DTyCtr (_, ds) -> List.mapi collect_tyvars ds |> List.concat
+  | _ -> []
+
+(*Takes an instance of a relation in a type, like P a (C b) c, and returns 
+  [(a, [0]); (b, [1;0]); (c, [2])], the list of variables and their locations*)
+let relation_instance_variables (relation_type : rocq_constr) : (var * int list) list =
+  let rec collect_tyvars path = function
+    | DTyVar x -> [(x, path)]
+    | DCtr (_, ds) -> List.concat (List.mapi (fun i d -> collect_tyvars (path @ [i]) d) ds)
+    | DApp (d, ds) -> List.concat (List.mapi (fun i d -> collect_tyvars (path @ [i]) d) (d :: ds))
+    | _ -> []
+  in
+  match relation_type with
+  | DTyCtr (_, ds) -> List.concat (List.mapi (fun i d -> collect_tyvars [i] d) ds)
+  | _ -> failwith "relation_instance_variables works on type constructors only"
+
+let relation_instance_variables' (relation_type : rocq_constr) : (var * int list list) list =
+  let vars = relation_instance_variables relation_type in
+  let rec insert (v, path) var_paths =
+    match var_paths with
+    | [] -> [(v, [path])]
+    | (v', paths) :: var_paths' -> 
+      if v = v' then 
+        (v, path :: paths) :: var_paths' 
+      else 
+        (v', paths) :: insert (v, path) var_paths'
+    in
+  List.fold_right insert vars []
+
+let rec dep_type_relations' i = function
+  | DProd (_,dt2) -> dep_type_relations' i dt2
+  | DArrow (dt1, dt2) ->
+    (match dt1 with
+    | DTyCtr _ -> (i,dt1) :: dep_type_relations' (i + 1) dt2 
+    | _ -> dep_type_relations' (i + 1) dt2)
+  | _ -> []
+  
+let dep_type_relations dt = dep_type_relations' 0 dt
+
+let theorem_relations_unconstrained_variables dt : (int * (var * int) list) list =
+  List.map (fun (i, dt) -> i,relation_unconstrained_variables dt) (dep_type_relations dt)
+
+let theorem_variable_uses rocq_thm : (int * (var * int list) list) list =
+  List.map (fun (i, dt) -> i,relation_instance_variables dt) (dep_type_relations rocq_thm)
+
+let theorem_variable_uses' rocq_thm : (int * (var * int list list) list) list =
+  List.map (fun (i, dt) -> i,relation_instance_variables' dt) (dep_type_relations rocq_thm)
+
+let rec dep_type_one_relation_variables = function
+  | DTyCtr (_, ds) -> List.concat (List.map dep_type_one_relation_variables ds)
+  | DTyVar x -> [x]
+  | DCtr (_, ds) -> List.concat (List.map dep_type_one_relation_variables ds)
+  | DApp (d, ds) -> List.concat (List.map dep_type_one_relation_variables (d :: ds))
+  | _ -> (*error all args must be abstract*) CErrors.user_err (str "dep_type_one_relation_variables: Not a type variable" ++ fnl())
+
+
+let rec dep_type_variables = function
+  | DProd ((x,_),dt) -> x :: dep_type_variables dt
+  | _ -> []
+
+let dep_type_var_relation_uses dt : (var * (int * int) list) list =
+  let ty_vars = dep_type_variables dt in
+  let theorem_unconstrained_variables : (int * (var * int) list) list = theorem_relations_unconstrained_variables dt 
+in 
+  (*for every quantified variable in dt, look in the map from relation indices to lists of associated unconstrained variables, and collect a list of
+    relation index and the argument index associated with the variable.*)
+  List.map (
+    fun v ->
+      v, List.concat_map 
+          (fun (rel_index, var_indices) ->
+            List.filter_map 
+              (fun (var, arg_index) -> if v = var then Some (rel_index, arg_index) else None) 
+              var_indices) 
+          theorem_unconstrained_variables
+  ) ty_vars
+
+let dep_type_var_relation_uses' dt : (var * (int * int list list) list) list =
+  let ty_vars = dep_type_variables dt in
+  let theorem_var_uses : (int * (var * int list list) list) list = theorem_variable_uses' dt in
+
+  List.map (
+    fun v ->
+      v, List.concat_map 
+          (fun (rel_index, var_uses) ->
+            List.filter_map 
+              (fun (var, arg_indices) -> if v = var then Some (rel_index, arg_indices) else None) 
+              var_uses) 
+          theorem_var_uses
+  ) ty_vars
 
 (* Patterns in language that derivations target *)
 type pat =
@@ -400,7 +495,7 @@ type mexp =
   | MMatch of mexp * (pat * mexp) list 
   | MHole 
   | MLet of var * mexp * mexp 
-  | MBacktrack of mexp list
+  | MBacktrack of mexp * mexp list * bool
   | MFun of (pat * mexp option) list * mexp 
   | MFix of var * (var * mexp) list * mexp 
   
@@ -408,9 +503,17 @@ let m_arbitrary ty = MApp (MConst "QuickChick.Classes.arbitrary", [ty; MHole])
 
 let m_arbitraryST prop = MApp (MConst "QuickChick.DependentClasses.arbitraryST", [MHole; prop; MHole])
 
+let m_arbitrarySized ty size = MApp (MConst "QuickChick.Classes.arbitrarySized", [ty; MHole; size])
+
+let m_arbitrarySizeST prop size = MApp (MConst "QuickChick.DependentClasses.arbitrarySizeST", [MHole; prop; MHole; size])
+
 let m_enum ty = MApp (MConst "QuickChick.Classes.enum", [ty; MHole])
 
 let m_enumSuchThat prop = MApp (MConst "QuickChick.DependentClasses.enumSuchThat", [MHole; prop; MHole])
+
+let m_enumSized ty size = MApp (MConst "QuickChick.Classes.enumSized", [ty; MHole; size])
+
+let m_enumSizeST prop size = MApp (MConst "QuickChick.DependentClasses.enumSizeST", [MHole; prop; MHole; size])
 
 let m_fuel = MConst "QuickChick.Decidability.checkable_size_limit"
 
@@ -651,12 +754,14 @@ let c_out_of_fuel (ds : derive_sort) : constr_expr =
   | D_Check -> c_None c_hole
   | D_Thm -> c_checker c_tt
 
-let c_backtrack (ds : derive_sort) (ms : constr_expr list) : constr_expr =
-  match ds with
-  | D_Gen -> c_app (cInject "QuickChick.Generators.backtrack") [c_hole; c_list c_hole @@ ms] (* ms : list (nat * G (option A)) *)
-  | D_Enum -> c_app (cInject "QuickChick.Enumerators.enumerate") [c_hole; c_list c_hole @@ ms] (* ms : list (E (option A))*)
-  | D_Check -> c_app (cInject "QuickChick.Decidability.checker_backtrack") [c_list c_hole @@ ms] (* ms : list (unit -> option A)*)
-  | D_Thm -> failwith "Backtrack not supported for theorems."
+let c_backtrack (ds : derive_sort) (is_constrained : bool) (first : constr_expr) (ms : constr_expr list) : constr_expr =
+  match ds, is_constrained with
+  | D_Gen, true -> c_app (cInject "QuickChick.Generators.backtrack") [c_hole; c_list c_hole @@ ms] (* ms : list (nat * G (option A)) *)
+  | D_Gen, false -> c_app (cInject "QuickChick.Generators.freq_") [c_hole; first; c_list c_hole @@ ms]
+  | D_Enum, true -> c_app (cInject "QuickChick.Enumerators.enumerate") [c_hole; c_list c_hole @@ ms] (* ms : list (E (option A))*)
+  | D_Enum, false -> c_app (cInject "QuickChick.Producer.oneOf_") [c_hole; first; c_list c_hole @@ ms]
+  | D_Check, _ -> c_app (cInject "QuickChick.Decidability.checker_backtrack") [c_list c_hole @@ ms] (* ms : list (unit -> option A)*)
+  | D_Thm, _ -> failwith "Backtrack not supported for theorems."
 
 let rec mexp_to_constr_expr (me : mexp) (ds : derive_sort) : constr_expr =
   match me with
@@ -673,7 +778,7 @@ let rec mexp_to_constr_expr (me : mexp) (ds : derive_sort) : constr_expr =
   | MMatch (m, pms) -> c_match (mexp_to_constr_expr m ds) (List.map (fun (p,m) -> (p, mexp_to_constr_expr m ds)) pms)
   | MHole -> c_hole
   | MLet (v, m1, m2) -> c_let v (mexp_to_constr_expr m1 ds) (mexp_to_constr_expr m2 ds)
-  | MBacktrack ms -> c_backtrack ds (List.map (fun case -> mexp_to_constr_expr case ds) ms)
+  | MBacktrack (default, ms, is_constrained) -> c_backtrack ds is_constrained (mexp_to_constr_expr default ds) (List.map (fun case -> mexp_to_constr_expr case ds) ms)
   | MFun (vs, m) -> c_fun (List.map (fun (v,ty) -> v, option_map (fun ty -> mexp_to_constr_expr ty ds) ty) vs) (fun _ -> (mexp_to_constr_expr m ds))
   | MFix (f, vs, m) ->
     let lid = CAst.make f in
@@ -707,16 +812,16 @@ let rename_rocq_type_vars (rt : rocq_type) (v : var) (locations : int list list)
 
 let unconstrained_producer (ps : producer_sort) ty =
   match ps with
-  | PS_E -> m_enum ty
-  | PS_G -> m_arbitrary ty
+  | PS_E -> m_enumSized ty (MId (var_of_string "init_size"))
+  | PS_G -> m_arbitrarySized ty (MId (var_of_string "init_size"))
 
 let such_that_producer (ps : producer_sort) vars p =
   let p_vars = List.map (fun v -> PVar v) vars in
   let arg_tuple = pat_tuple_of_list p_vars in
   let p_with_args = MFun ([arg_tuple,None], p) in
   match ps with
-  | PS_E -> m_enumSuchThat p_with_args
-  | PS_G -> m_arbitraryST p_with_args
+  | PS_E -> m_enumSizeST p_with_args (MId (var_of_string "init_size"))
+  | PS_G -> m_arbitrarySizeST p_with_args (MId (var_of_string "init_size"))
   
 let num_of_ctrs (c : constructor) =
   let env = Global.env () in
@@ -826,7 +931,7 @@ let backtrack_decoration (ds : derive_sort) (rec_or_base : rec_or_base) (m : mex
   | D_Check -> MFun ([PWild, None], m)
   | D_Thm -> failwith "Backtrack not supported for theorems."
 
-let inductive_schedule_to_mexp (is : inductive_schedule) (ds : derive_sort) : mexp =
+let inductive_schedule_to_mexp (is : inductive_schedule) (ds : derive_sort) (is_constrained : bool) : mexp =
   let (name, inputs, base_scheds, rec_scheds) = is in
   let nat_ty = MConst "Coq.Init.Datatypes.nat" in
   let prelude base_k all_k = MFix (var_of_string "rec", (var_of_string "init_size", nat_ty) :: (var_of_string "size", nat_ty) :: inputs, 
@@ -853,10 +958,14 @@ let inductive_schedule_to_mexp (is : inductive_schedule) (ds : derive_sort) : me
           MFun ([PVar (var_of_string "size"), Some (MConst "Coq.Init.Datatypes.nat")], 
             MApp (MId fun_name,
                   [MId (var_of_string "size"); MId (var_of_string "size")]))) in
-  final_let (prelude (MBacktrack base_backtrack) (MBacktrack all_backtrack))
+  let first = 
+    match base_scheds with
+    | [] -> failwith "TODO: handle empty inductives"
+    | (s, inp_pats) :: _ -> match_pats inp_pats (schedule_to_mexp s) in
+  final_let (prelude (MBacktrack (first, base_backtrack, is_constrained)) (MBacktrack (first, all_backtrack, is_constrained)))
 
-let inductive_schedule_to_constr_expr (is : inductive_schedule) (ds : derive_sort) : constr_expr =
-  mexp_to_constr_expr (inductive_schedule_to_mexp is ds) ds
+let inductive_schedule_to_constr_expr (is : inductive_schedule) (ds : derive_sort) (is_constrained : bool) : constr_expr =
+  mexp_to_constr_expr (inductive_schedule_to_mexp is ds is_constrained) ds
   
 module ScheduleExamples = struct
   let var = var_of_string
@@ -901,6 +1010,42 @@ module ScheduleExamples = struct
         typing G (Abs t1 e) (Arrow t1 t2)
 
 *)
+
+
+(*Inductive term :=
+| Const (n : nat)
+| App (f x : term)
+| Abs (ty : type) (e : term)
+| Id (x : nat)
+.*)
+
+  let gen_const_schedule = 
+    [
+      S_UC (var "n", SrcNonrec (DTyCtr (ty_ctr "nat", [])), PS_G)
+    ], ProducerSchedule (false, PS_G, DCtr (ctr "Const", [DTyVar (var "n")]))
+
+  let gen_id_schedule = 
+    [
+      S_UC (var "x", SrcNonrec (DTyCtr (ty_ctr "nat", [])), PS_G)
+    ], ProducerSchedule (false, PS_G, DCtr (ctr "Id", [DTyVar (var "x")]))
+
+  let gen_app_schedule = 
+    [
+      S_UC (var "f", SrcRec (var "rec",[]), PS_G);
+      S_UC (var "x", SrcRec (var "rec",[]), PS_G)
+    ], ProducerSchedule (false, PS_G, DCtr (ctr "App", [DTyVar (var "f"); DTyVar (var "x")]))
+
+  let gen_abs_schedule = 
+    [
+      S_UC (var "ty", SrcNonrec (DTyCtr (ty_ctr "type", [])), PS_G);
+      S_UC (var "e", SrcRec (var "rec",[]), PS_G)
+    ], ProducerSchedule (false, PS_G, DCtr (ctr "Abs", [DTyVar (var "ty"); DTyVar (var "e")]))
+
+  let gen_term_inductive_schedule : inductive_schedule = 
+    "term" , [] , [gen_const_schedule, []; gen_id_schedule, []] , [gen_app_schedule, []; gen_abs_schedule, []]
+  
+
+  
 
 (* typing (t' :: G_) e' t2_
 
