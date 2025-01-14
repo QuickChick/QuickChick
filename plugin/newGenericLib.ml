@@ -857,7 +857,55 @@ let inductive_schedule_to_mexp (is : inductive_schedule) (ds : derive_sort) : me
 
 let inductive_schedule_to_constr_expr (is : inductive_schedule) (ds : derive_sort) : constr_expr =
   mexp_to_constr_expr (inductive_schedule_to_mexp is ds) ds
-  
+
+let find_typeclass_bindings typeclass_name ctr =
+  msg_debug (str ("Finding typeclass bindings for:" ^ Libnames.string_of_qualid ctr) ++ fnl());
+  let env = Global.env () in
+  let evd = Evd.from_env env in
+  let db = Hints.searchtable_map "typeclass_instances" in
+  let result = ref [] in
+
+  (* Add comment here *)
+  let prod_check i =
+    String.equal (Names.MutInd.to_string (fst i)) ("QuickChick.DependentClasses." ^ typeclass_name)  in    
+  let dec_check i =
+    String.equal (Names.MutInd.to_string (fst i)) ("QuickChick.Decidability." ^ typeclass_name)  in
+
+  let handle_hint b hint =
+    msg_debug (str "Processing... (" ++ str typeclass_name ++ str ")"  ++ Hints.FullHint.print env evd hint ++ fnl ());
+    begin match Hints.FullHint.repr hint with
+    | Hints.Res_pf h ->
+       msg_debug (str "ResPF" ++ fnl ());
+    | Hints.Give_exact h ->
+       msg_debug (str "GiveExact" ++ fnl ());
+    | _ ->
+       msg_debug (str "..." ++ fnl ());
+(*    let (co, c) = Hints.hint_as_term hint in
+    msg_debug (Ppconstr.pr_constr env evd c ++ fnl ());
+ *************)
+(*               
+    match Hints.FullHint.pattern hint with
+    | Some p -> 
+       msg_debug (Ppconstr.pr_constr_pattern_expr env evd (Constrextern.extern_constr_pattern [] evd p) ++ fnl ())
+    | _ ->
+       msg_debug (str "Not an Option" ++ fnl ())
+ *)
+    end
+  in 
+
+  (* Iterate through all of the hints *)
+  Hints.Hint_db.iter (fun go hm hints ->
+      begin match go with
+      | Some (Names.GlobRef.IndRef i) when prod_check i ->
+         List.iter (handle_hint true ) hints
+      | Some (Names.GlobRef.IndRef i) when dec_check i ->
+         (* eq hack          if Names.Id.to_string (qualid_basename ctr) = "eq" then result := [[false; false; false]]
+         else *) List.iter (handle_hint false) hints
+      | _ -> ()
+      end
+    ) db;
+  []
+
 module ScheduleExamples = struct
   let var = var_of_string
   let ctr = constructor_of_string

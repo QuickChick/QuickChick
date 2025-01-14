@@ -258,7 +258,8 @@ Definition prop_preservation_naive_gen :=
 
 (*! QuickChick prop_preservation_naive_gen. *)
 
-
+QuickChickDebug Debug On.
+Derive Testing for (fun '(e,t) => typing g e t).
 
 
 
