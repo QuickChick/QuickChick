@@ -21,11 +21,15 @@ let invoke (ids : Names.Id.t list) class_name (body : constr_expr) =
      | Some (i, rs) ->
         msg_debug (str "Succesfully parsed " ++ int i ++ str "-th of:" ++ fnl ());
         List.iter (fun r -> msg_debug (str (NewGenericLib.rocq_relation_to_string r) ++ fnl ())) rs;
-        NewGenericLib.debug_constr_expr (NewGenericLib.mexp_to_constr_expr (NewGenericLib.schedule_to_mexp NewGenericLib.ScheduleExamples.thm_schedule) NewGenericLib.D_Thm);
+(*        NewGenericLib.debug_constr_expr (NewGenericLib.mexp_to_constr_expr (NewGenericLib.schedule_to_mexp NewGenericLib.ScheduleExamples.thm_schedule) NewGenericLib.D_Thm);
         let open NewGenericLib in
         debug_constr_expr (inductive_schedule_to_constr_expr ScheduleExamples.check_typing_inductive_schedule D_Check);
         debug_constr_expr (inductive_schedule_to_constr_expr ScheduleExamples.ind_schd_bind_gen_ioo D_Gen);
-        msg_debug (str "TODO: Implement me")
+ *)
+        let bss = NewGenericLib.find_typeclass_bindings "DecOpt" (NewGenericLib.ty_ctr_of_string "Fooish") in
+        List.iter (fun bs ->
+            msg_debug (str (String.concat " , " (List.map (fun b -> if b then "T" else "F") bs)) ++ fnl ())
+          ) bss 
      | None ->
         msg_error (str "Failed to parse: " ++ Ppconstr.pr_simpleconstr body ++ fnl ())
      end

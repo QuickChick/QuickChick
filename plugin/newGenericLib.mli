@@ -128,6 +128,9 @@ type inductive_schedule = string * (var * mexp) list * (schedule * (var * pat) l
 
 val inductive_schedule_to_constr_expr : inductive_schedule -> derive_sort -> Constrexpr.constr_expr
 
+val find_typeclass_bindings : string -> Libnames.qualid -> (bool list) list
+
+
 val debug_constr_expr : Constrexpr.constr_expr -> unit
 
 module ScheduleExamples : sig
