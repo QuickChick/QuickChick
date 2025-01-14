@@ -4,6 +4,12 @@ Inductive Foo (X : Type) :=
 | A : X -> Foo X
 | B : X -> Foo X.
 
+Derive GenSized for Foo. Print GenSizedFoo. Check @freq_. 
+Derive EnumSized for Foo. Print EnumSizedFoo. Locate oneOf_.
+Check @oneOf_.
+
+Check @freq_. 
+
 Arguments A {X}.
 Arguments B {X}.
 Derive Show for Foo.
@@ -17,10 +23,18 @@ Definition f :=
     | A => 42
     | B => 0
     end in f A.
-*)
+ *)
+
+Locate oneof.
+
+Derive GenSized for nat.
+Print GenSizednat.
+
 Inductive Fooish {T} : Foo T -> Foo T -> Prop :=
 | AS : forall x, Fooish (A x) (A x)
 | BS : forall x y, Fooish (B x) (B y).
+
+
 
 (* 
 Instance GenSizedSuchThat_foo :

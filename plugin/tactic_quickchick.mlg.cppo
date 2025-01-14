@@ -279,9 +279,41 @@ let quickchick_goal =
  *)
 
 *)
+
+let theorem_dependencies = 
+  Proofview.Goal.enter begin fun gl ->
+    
+    (* Convert goal to a constr_expr *)
+    let c = Proofview.Goal.concl gl in
+    let e = Proofview.Goal.env gl in
+    let evd = Evd.from_env e in
+
+    match NewGenericLib.parse_dependent_type (EConstr.to_constr evd c) with
+    | Some dt ->
+      begin
+        msg_debug (str (NewGenericLib.rocq_constr_to_string dt) ++ fnl ());
+        let open NewGenericLib in
+        let rec printlist : (var * (int * int list list) list) list -> unit = function
+          | [] -> ()
+          | (var, rels) :: rest ->
+            let path_to_string (is : int list) = "[" ^ String.concat ", " (List.map string_of_int is) ^ "]" in
+            let paths_to_string (iss : int list list) = "{" ^ String.concat "; " (List.map path_to_string iss) ^ "}" in
+            let tuple_to_string ((i : int), (j : int list list)) = "(" ^ string_of_int i ^ ", " ^ paths_to_string j ^ ")" in
+            msg_debug (str (var_to_string var) ++ str " : " ++ str (String.concat ", " (List.map (fun (i, j) -> (tuple_to_string (i, j))) rels)) ++ fnl ()); 
+            printlist rest in
+        
+        printlist (NewGenericLib.dep_type_var_relation_uses' dt);          
+        Tacticals.tclIDTAC
+      end
+    | None -> failwith "Failed to Parse type"
+  end
 }
 TACTIC EXTEND quickchick
   | ["quickchick"] -> { quickchick_goal }
+END
+
+TACTIC EXTEND theorem_dependencies
+  | ["theorem_dependencies"] -> { theorem_dependencies }
 END
 
 TACTIC EXTEND merge_sound_core

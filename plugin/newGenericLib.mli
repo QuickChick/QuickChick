@@ -59,9 +59,13 @@ val constr_to_rocq_constr : Constr.constr -> rocq_constr option
 val qualid_to_rocq_relations : Libnames.qualid -> (int * rocq_relation list) option
 val ind_reference_to_rocq_relations : Constrexpr.constr_expr -> (int * rocq_relation list) option
 
+val parse_dependent_type : Constr.constr -> rocq_constr option
+
 type producer_sort = PS_E | PS_G
 
 type rocq_type = rocq_constr
+
+val dep_type_var_relation_uses' : rocq_constr -> (var * (int * int list list) list) list
 
 (* Patterns in language that derivations target *)
 type pat =
@@ -114,7 +118,7 @@ type mexp =
   | MMatch of mexp * (pat * mexp) list 
   | MHole 
   | MLet of var * mexp * mexp 
-  | MBacktrack of mexp list
+  | MBacktrack of mexp * mexp list * bool
   | MFun of (pat * mexp option) list * mexp (*var list is a tuple, if you want multiple args do nested MFuns.*)
   | MFix of var * (var * mexp) list * mexp
 
@@ -126,7 +130,7 @@ val mexp_to_constr_expr : mexp -> derive_sort -> Constrexpr.constr_expr
 
 type inductive_schedule = string * (var * mexp) list * (schedule * (var * pat) list) list * (schedule * (var * pat) list) list 
 
-val inductive_schedule_to_constr_expr : inductive_schedule -> derive_sort -> Constrexpr.constr_expr
+val inductive_schedule_to_constr_expr : inductive_schedule -> derive_sort -> bool -> Constrexpr.constr_expr
 
 val debug_constr_expr : Constrexpr.constr_expr -> unit
 
@@ -134,6 +138,7 @@ module ScheduleExamples : sig
   val thm_schedule : schedule
   val check_typing_inductive_schedule : inductive_schedule
   val ind_schd_bind_gen_ioo : inductive_schedule
+  val gen_term_inductive_schedule : inductive_schedule
 end
 
 
