@@ -32,9 +32,14 @@ Print GenSizednat.
 
 Inductive Fooish {T} : Foo T -> Foo T -> Prop :=
 | AS : forall x, Fooish (A x) (A x)
-| BS : forall x y, Fooish (B x) (B y).
+| BS : forall x y, Fooish (B x) (B y). Locate GenSized.
+ Locate EnumSizedSuchThat.
+Derive Checker for (Fooish a b).
 
+Check @DecOptFooish. Search Dec. Print GenSized.
 
+Instance GenSizedSuchThat_Fooish : GenSizedSuchThat _ (fun '(x,y) => Fooish x y) :=
+  { arbitrarySizeST := fun n => returnGen (Some (A 0, B 0)) }.
 
 (* 
 Instance GenSizedSuchThat_foo :
@@ -301,7 +306,11 @@ Definition gen_bind' := (let bind_iooGen :=
 Check gen_bind'. Locate nat.
 
 QuickChickDebug Debug On.
-Derive Testing for (fun '(x,y,z,w) => Fooish x y z). 
+
+Print Typeclasses for Fooish.
+
+       
+Derive Testing for (fun '(x,y,z,w) => Fooish x y z). Locate Dec_Eq.
 Derive Testing for (Fooish x y). 
 Derive Testing for (fun x => Fooish x y). 
 
