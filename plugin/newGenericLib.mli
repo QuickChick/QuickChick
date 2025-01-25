@@ -21,16 +21,25 @@ val var_of_string : string -> var
 val ty_ctr_of_string : string -> ty_ctr
 val constructor_of_string : string -> constructor
 
+(* Patterns in language that derivations target *)
+type pat =
+  | PCtr of constructor * pat list
+  | PVar of var
+  | PParam (* Type parameter *)
+  | PWild
+
 (* Wrapper around constr that we use to represent the types of
    inductives and theorems that we plan to derive for or quickcheck *)
 type rocq_constr = 
   | DArrow of rocq_constr * rocq_constr (* Unnamed arrows *)
+  | DLambda of ty_param * rocq_constr * rocq_constr
   | DProd  of (var * rocq_constr) * rocq_constr (* Binding arrows *)
   | DTyParam of ty_param (* Type parameters - for simplicity *)
   | DTyCtr of ty_ctr * rocq_constr list (* Type Constructor *)
   | DCtr of constructor * rocq_constr list (* Type Constructor *)
   | DTyVar of var (* Use of a previously captured type variable *)
   | DApp of rocq_constr * rocq_constr list (* Type-level function applications *)
+  | DMatch of rocq_constr * (pat * rocq_constr) list
   | DNot of rocq_constr (* Negation as a toplevel *)
   | DHole (* For adding holes *)
 val rocq_constr_to_string : rocq_constr -> string
@@ -66,13 +75,6 @@ type producer_sort = PS_E | PS_G
 type rocq_type = rocq_constr
 
 val dep_type_var_relation_uses' : rocq_constr -> (var * (int * int list list) list) list
-
-(* Patterns in language that derivations target *)
-type pat =
-  | PCtr of constructor * pat list
-  | PVar of var
-  | PParam (* Type parameter *)
-  | PWild
 
 type source = 
   | SrcNonrec of rocq_type
@@ -132,8 +134,14 @@ type inductive_schedule = string * (var * mexp) list * (schedule * (var * pat) l
 
 val inductive_schedule_to_constr_expr : inductive_schedule -> derive_sort -> bool -> Constrexpr.constr_expr
 
-val find_typeclass_bindings : string -> Libnames.qualid -> (bool list) list
+type parsed_classes = {gen : rocq_constr list; 
+                        enum : rocq_constr list;
+                        genST : (var list * rocq_constr) list; 
+                        enumST : (var list * rocq_constr) list;
+                        checker : rocq_constr list;
+                        decEq : rocq_constr list}
 
+val find_typeclass_bindings : Libnames.qualid -> parsed_classes
 
 val debug_constr_expr : Constrexpr.constr_expr -> unit
 

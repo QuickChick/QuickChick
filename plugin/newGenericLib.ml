@@ -71,23 +71,44 @@ let ty_ctr_of_string x = Libnames.qualid_of_string x
 let constructor_to_string x = Libnames.string_of_qualid x
 let constructor_of_string x = Libnames.qualid_of_string x
 
+(* Patterns in language that derivations target *)
+type pat =
+  | PCtr of constructor * pat list
+  | PVar of var
+  | PParam (* Type parameter *)
+  | PWild
+
 (* Wrapper around constr that we use to represent the types of
    inductives and theorems that we plan to derive for or quickcheck *)
 type rocq_constr = 
   | DArrow of rocq_constr * rocq_constr (* Unnamed arrows *)
+  | DLambda of var * rocq_constr * rocq_constr (* Named arrows *)
   | DProd  of (var * rocq_constr) * rocq_constr (* Binding arrows *)
   | DTyParam of ty_param (* Type parameters - for simplicity *)
   | DTyCtr of ty_ctr * rocq_constr list (* Type Constructor *)
   | DCtr of constructor * rocq_constr list (* Type Constructor *)
   | DTyVar of var (* Use of a previously captured type variable *)
   | DApp of rocq_constr * rocq_constr list (* Type-level function applications *)
+  | DMatch of rocq_constr * (pat * rocq_constr) list (* Pattern matching *)
   | DNot of rocq_constr (* Negation as a toplevel *)
   | DHole (* For adding holes *)
+
+let pat_to_string p =
+  let rec aux p =
+    match p with
+    | PCtr (c, ps) -> Printf.sprintf "%s %s" (constructor_to_string c) (String.concat " " (List.map aux ps))
+    | PVar v -> var_to_string v
+    | PParam -> "Param"
+    | PWild -> "_"
+  in
+  aux p
 
 let rec rocq_constr_to_string (rc : rocq_constr) : string =
   match rc with 
   | DArrow (rc1, rc2) ->
      Printf.sprintf "%s -> %s" (rocq_constr_to_string rc1) (rocq_constr_to_string rc2)
+  | DLambda (x, rc1, rc2) ->
+     Printf.sprintf "fun (%s : %s) => %s" (var_to_string x) (rocq_constr_to_string rc1) (rocq_constr_to_string rc2)
   | DProd  ((x,rc1), rc2) ->
      Printf.sprintf "(%s : %s) -> %s" (var_to_string x) (rocq_constr_to_string rc1) (rocq_constr_to_string rc2)
   | DTyCtr (ty_ctr, []) ->
@@ -104,6 +125,9 @@ let rec rocq_constr_to_string (rc : rocq_constr) : string =
      var_to_string tv
   | DApp (d, ds) ->
      Printf.sprintf "(%s $ %s)" (rocq_constr_to_string d) (String.concat " " (List.map rocq_constr_to_string ds))
+  | DMatch (rc, pats) ->
+     Printf.sprintf "match %s with %s" (rocq_constr_to_string rc) 
+                    (String.concat " | " (List.map (fun (pat, rc) -> Printf.sprintf "%s -> %s" (pat_to_string pat) (rocq_constr_to_string rc)) pats))
   | DNot d ->
      Printf.sprintf "~ ( %s )" (rocq_constr_to_string d)
   | DHole -> "_"
@@ -160,28 +184,40 @@ let rec dep_arrowify terminal names types =
    arg_names : argument names (type parameters, pattern specific variables 
  *)
 let parse_dependent_type_internal i nparams ty oibopt arg_names =
-  let rec aux i ty =
+  let rec aux locals i ty =
     let env = Global.env () in
     let sigma = Evd.from_env env in
     msg_debug (str "Calling aux with: " ++ int i ++ str " "
                ++ Printer.pr_constr_env env sigma ty ++ fnl()); 
-    if Constr.isRel ty then begin 
-  (*        msgerr (int (i + nparams) ++ str " Rel " ++ int (destRel ty) ++ fnl ()); *)
+    if Constr.isRel ty then begin
+      msg_debug (str "Rel: " ++ debug_constr ty ++ fnl ());
       let db = Constr.destRel ty in
-      if i + nparams = db then (* Current inductive, no params *)
-        Some (DTyCtr (Libnames.qualid_of_ident (let Some oib = oibopt in oib.Declarations.mind_typename), []))
-      else begin (* [i + nparams - db]th parameter *) 
-        msg_debug (str (Printf.sprintf "Non-self-rel: %s" (rocq_constr_to_string (List.nth arg_names (i + nparams - db - 1)))) ++ fnl ());
-        try Some (List.nth arg_names (i + nparams - db - 1))
-        with _ -> CErrors.user_err (str "nth failed: " ++ int i ++ str " " ++ int nparams ++ str " " ++ int db ++ str " " ++ int (i + nparams - db - 1) ++ fnl ())
-        end
-    end 
+      let num_local = List.length locals in
+      if num_local > 0 && db <= num_local then
+        (* It's a locally bound variable. De Bruijn 1 => local_binders.(0) *)
+        (msg_debug (str "db: " ++ int db ++ str " num_local: " ++ int num_local ++ fnl());
+        (match List.nth locals (db - 1) with
+        | Names.Name name -> Some (DTyVar name)
+        | _ -> CErrors.user_err (str "Anonymous Rel encountered: " ++ (debug_constr ty) ++ fnl ())))
+      else
+        let db_global = db - num_local in
+        match oibopt with
+        | Some oib when i + nparams = db_global ->
+            (* Inductive itself. *)
+            Some (DTyCtr (Libnames.qualid_of_ident (oib.Declarations.mind_typename), []))
+        | _ ->
+            try
+              Some (List.nth arg_names (i + nparams - db_global - 1))
+            with _ ->
+              CErrors.user_err (str "nth failed (Rel): " ++ (debug_constr ty) ++ fnl ())
+      end
     else if Constr.isApp ty then begin
+      msg_debug (str "App: " ++ debug_constr ty ++ fnl ());
       let (ctr, tms) = Constr.decompose_app_list ty in
       foldM (fun acc ty -> 
-             aux i ty >>= fun ty' -> Some (ty' :: acc)
+             aux locals i ty >>= fun ty' -> Some (ty' :: acc)
             ) (Some []) tms >>= fun tms' ->
-      match aux i ctr with
+      match aux locals i ctr with
       | Some (DTyCtr (c, _)) -> Some (DTyCtr (c, List.rev tms'))
       | Some (DCtr (c, _)) -> Some (DCtr (c, List.rev tms'))
       | Some (DTyVar x) -> 
@@ -195,6 +231,7 @@ let parse_dependent_type_internal i nparams ty oibopt arg_names =
       | None -> CErrors.user_err (str "Aux failed?" ++ fnl ())
     end
     else if Constr.isInd ty then begin
+      msg_debug (str "Ind: " ++ debug_constr ty ++ fnl ());
       let ((mind, midx),_) = Constr.destInd ty in
       let mib = Environ.lookup_mind mind env in
       let id = mib.mind_packets.(midx).mind_typename in
@@ -203,10 +240,12 @@ let parse_dependent_type_internal i nparams ty oibopt arg_names =
       Some (DTyCtr (Libnames.qualid_of_ident id, []))
     end
     else if Constr.isConstruct ty then begin
+      msg_debug (str "Construct: " ++ debug_constr ty ++ fnl ());
       let (((mind, midx), idx),_) = Constr.destConstruct ty in                               
 
       (* Lookup the inductive *)
       let env = Global.env () in
+      msg_debug (str (Printf.sprintf "ACONSTR: %s" (Names.MutInd.to_string mind)) ++ fnl ());
       let mib = Environ.lookup_mind mind env in
 
 (*      let (mp, _dn, _) = MutInd.repr3 mind in *)
@@ -218,33 +257,97 @@ let parse_dependent_type_internal i nparams ty oibopt arg_names =
       msg_debug (str (Printf.sprintf "CONSTR: %s %s" qual (Names.DirPath.to_string (Lib.cwd ()))) ++ fnl ());
 
       (* Constructor name *)
+      msg_debug (int (mib.mind_ntypes) ++ fnl ());
       let cname = Names.Id.to_string (mib.mind_packets.(midx).mind_consnames.(idx - 1)) in
       let cid = Libnames.qualid_of_string (if (qual = "") || (qual = Names.DirPath.to_string (Lib.cwd ()))
                              then cname else qual ^ "." ^ cname) in
       Some (DCtr (cid, []))
     end
     else if Constr.isProd ty then begin
+      msg_debug (str "Prod: " ++ debug_constr ty ++ fnl ());
       let (n, t1, t2) = Constr.destProd ty in
       (* Are the 'i's correct? *)
-      aux i t1 >>= fun t1' -> 
-      aux i t2 >>= fun t2' ->
+      aux locals i t1 >>= fun t1' -> 
+      aux (n.Context.binder_name :: locals) i t2 >>= fun t2' ->
       (match n.Context.binder_name with
        | Names.Name x -> Some (DProd ((x, t1'), t2'))
-       | Names.Anonymous ->
-          CErrors.user_err (str "Anonymous product encountered: " ++ (debug_constr ty) ++ fnl ())
+       | Names.Anonymous -> Some (DArrow (t1', t2'))
+          (* CErrors.user_err (str "Anonymous product encountered: " ++ (debug_constr ty) ++ fnl ()) *)
       )
+    end
+    else if Constr.isLambda ty then begin
+      msg_debug (str "Lambda: " ++ debug_constr ty ++ fnl ());
+      let (x, t, e) = Constr.destLambda ty in
+      aux locals i t >>= fun t' ->
+      aux (x.Context.binder_name :: locals) i e >>= fun e' ->
+      (match x.Context.binder_name with
+      | Names.Name x -> Some (DLambda (x, t', e'))
+      | Names.Anonymous ->
+          CErrors.user_err (str "Anonymous lambda encountered: " ++ (debug_constr ty) ++ fnl ())
+      )
+    end 
+    else if Constr.isCase ty then begin
+      (* Constructs a destructor of inductive type.
+
+    [mkCase us ci params p c ac] stand for match [c] as [x] in [I args] return [p] with [ac]
+    presented as describe in [ci].
+
+
+    [p] structure is [args x |- "return clause"]
+
+    [ac]{^ ith} element is ith constructor case presented as
+    {e construct_args |- case_term } *)
+      let (case_info, _univs, _params, _ret_clause, _iv, discriminee, branches) = Constr.destCase ty in
+      msg_debug (str "Case: " ++ debug_constr discriminee ++ fnl ());
+      let inductive = case_info.Constr.ci_ind in
+      let branches_list = List.mapi (fun idx ((bindings_arr : (Names.Name.t,Sorts.relevance) Context.pbinder_annot array), branch) ->
+        let bindings  = Array.to_list ( bindings_arr) in
+        let branch_local_bindings : ty_param list = List.map (fun decl -> match decl.Context.binder_name with 
+                                                                          | Names.Name x -> x
+                                                                          | _ -> failwith "Anonymous binding in branch") bindings in
+        let param_count = case_info.Constr.ci_npar in
+        let arg_names = List.map (fun x -> PVar x) branch_local_bindings in
+        let constructor = Constr.mkConstructUi ((UVars.in_punivs inductive), idx + 1) in
+        let constructor_name = 
+          (match aux locals i constructor with
+          | Some (DCtr (c, [])) -> c
+          | _ -> failwith "Not a constructor")
+        in 
+        let wilds = List.init param_count (fun _ -> PWild) in
+        let pattern = PCtr (constructor_name, wilds @ arg_names) in
+        let branch_local_names : Names.Name.t list = List.map (fun name -> Names.Name.mk_name  name) branch_local_bindings in
+        let branch_rocq = 
+          (match aux (List.rev branch_local_names @ locals) i branch with
+          | Some x -> x
+          | _ -> failwith "Branch not parsed")
+        in
+        (pattern, branch_rocq))
+        (Array.to_list branches)
+      in 
+      (match aux locals i discriminee with
+      | Some discriminee_rocq -> Some (DMatch (discriminee_rocq, branches_list))
+      | _ -> failwith "Discriminee not parsed")
     end
     (* Rel, App, Ind, Construct, Prod *)
     else if Constr.isConst ty then begin 
+      msg_debug (str "Const: " ++ debug_constr ty ++ fnl ());
       let (x,_) = Constr.destConst ty in 
       Some (DTyVar (Names.Label.to_id (Names.Constant.label x)))
     end
+    else if Constr.isSort ty then begin
+      if Constr.is_Prop ty then
+        Some (DTyCtr (ty_ctr_of_string "Prop", []))
+      else if Constr.is_Type ty then
+        Some (DTyCtr (ty_ctr_of_string "Type", []))
+      else
+        CErrors.user_err (str "Sort not handled: " ++ (debug_constr ty) ++ fnl ())
+      end
     else (
       let env = Global.env() in
       let sigma = Evd.from_env env in
       CErrors.user_err (str "Dep Case Not Handled: " ++ Printer.pr_constr_env env sigma ty ++ fnl())
     ) in
-  aux i ty
+  aux [] i ty
 
 let parse_dependent_type ty =
 
@@ -461,12 +564,12 @@ let dep_type_var_relation_uses' dt : (var * (int * int list list) list) list =
           theorem_var_uses
   ) ty_vars
 
-(* Patterns in language that derivations target *)
+(* Patterns in language that derivations target
 type pat =
   | PCtr of constructor * pat list
   | PVar of var
   | PParam (* Type parameter *)
-  | PWild
+  | PWild *)
 
 type monad_sort =
   | MG 
@@ -967,53 +1070,512 @@ let inductive_schedule_to_mexp (is : inductive_schedule) (ds : derive_sort) (is_
 let inductive_schedule_to_constr_expr (is : inductive_schedule) (ds : derive_sort) (is_constrained : bool) : constr_expr =
   mexp_to_constr_expr (inductive_schedule_to_mexp is ds is_constrained) ds
 
-let find_typeclass_bindings typeclass_name ctr =
+type parsed_classes = {gen : rocq_constr list; 
+                        enum : rocq_constr list;
+                        genST : (var list * rocq_constr) list; 
+                        enumST : (var list * rocq_constr) list;
+                        checker : rocq_constr list;
+                        decEq : rocq_constr list}
+
+let print_parsed_classes parsed =
+  let print_list name l = 
+    Feedback.msg_notice (str (name ^ ": ") ++ fnl());
+    List.iter (fun c -> Feedback.msg_notice (str (rocq_constr_to_string c) ++ fnl())) l in
+  let print_list_fun name class_name l = 
+    Feedback.msg_notice (str (name ^ ": ") ++ fnl());
+    List.iter (fun (vs, c) -> 
+      (match vs with
+      | [] -> Feedback.msg_notice (str (class_name ^ " () => " ^ rocq_constr_to_string c) ++ fnl())
+      | [v] -> Feedback.msg_notice (str (class_name ^ " (fun " ^ (var_to_string v) ^ " => " ^ rocq_constr_to_string c ^ ")") ++ fnl())
+      | vs -> Feedback.msg_notice (str (class_name ^ " (fun '(" ^ (String.concat ", " (List.map var_to_string vs)) ^ ") => " ^ rocq_constr_to_string c ^ ")") ++ fnl()))) l in
+  print_list "Gen" parsed.gen;
+  print_list "Enum" parsed.enum;
+  print_list_fun "GenST" "GenSizedSuchThat" parsed.genST;
+  print_list_fun "EnumST" "EnumSizedSuchThat" parsed.enumST;
+  print_list "Checker" parsed.checker;
+  print_list "DecEq" parsed.decEq
+  
+let find_typeclass_bindings ctr =
+  msg_debug (str ("Finding typeclass bindings for:" ^ Libnames.string_of_qualid ctr) ++ fnl());
+  let env = Global.env () in
+  let evd = Evd.from_env env in
+  let db = Hints.searchtable_map "typeclass_instances" in
+(* 
+  let prod_check i =
+    String.equal (Names.MutInd.to_string (fst i)) ("QuickChick.DependentClasses." ^ typeclass_name)
+    || String.equal (Names.MutInd.to_string (fst i)) ("QuickChick.Classes." ^ typeclass_name)  in    
+  let dec_check i =
+    String.equal (Names.MutInd.to_string (fst i)) ("QuickChick.Decidability." ^ typeclass_name)  in *)
+
+  let type_of_hint hint =
+    (* Go from the hint to the type of its constant *)
+    let (co, ec) = Hints.hint_as_term hint in
+    let c = EConstr.to_constr evd ec in
+    match Constr.kind c with
+    | Constr.Const cst -> 
+      let (typ,_constraints) = Environ.constant_type env cst in
+        typ 
+    | _ -> failwith ("hint not a constant in search for " ^ Libnames.string_of_qualid ctr)
+    in
+
+  let rec find_concl (typ : rocq_constr) : rocq_constr = 
+    match typ with
+    | DProd (v, t) -> find_concl t
+    | DArrow (v, t) -> find_concl t
+    | DApp _ -> typ
+  in
+
+  let rocq_eq_to_alpha (a : rocq_constr) (b : rocq_constr) : bool = 
+    let rec aux (a : rocq_constr) (b : rocq_constr) (m : (var, var) Hashtbl.t) : bool =
+      try
+      match a, b with
+      | DTyParam p1, DTyParam p2 -> String.equal (var_to_string p1) (var_to_string p2)
+      | DTyCtr (c1, ds1), DTyCtr (c2, ds2) -> 
+        String.equal (ty_ctr_to_string c1) (ty_ctr_to_string c2) && List.for_all2 (fun d1 d2 -> aux d1 d2 m) ds1 ds2
+      | DCtr (c1, ds1), DCtr (c2, ds2) -> 
+        String.equal (constructor_to_string c1) (constructor_to_string c2) && List.for_all2 (fun d1 d2 -> aux d1 d2 m) ds1 ds2
+      | DTyVar v1, DTyVar v2 -> 
+        (try 
+          let v2' = Hashtbl.find m v1 in
+          String.equal (var_to_string v2) (var_to_string v2')
+        with Not_found -> 
+          Hashtbl.add m v1 v2;
+          true)
+      | DApp (d1, ds1), DApp (d2, ds2) -> 
+        aux d1 d2 m && List.for_all2 (fun d1 d2 -> aux d1 d2 m) ds1 ds2
+      | DNot d1, DNot d2 -> aux d1 d2 m
+      | DHole, DHole -> true
+      | DArrow _, DArrow _ | DProd _, DProd _ | DMatch _, DMatch _ -> failwith ("equality not supported for arrows and products: " ^ rocq_constr_to_string a ^ " =? " ^ rocq_constr_to_string b)
+      | _ -> false
+      with Invalid_argument _ -> false
+    in
+    aux a b (Hashtbl.create 10)
+  in 
+
+  let rec parse_pair_matches (ins : var list) (matches : rocq_constr) : (var list * rocq_constr) option =
+    match matches with
+    | DMatch (DTyVar disc, [(PCtr (pair_c, [_;_;PVar x;PVar y]), next_match)]) when String.equal (constructor_to_string pair_c) "Coq.Init.Datatypes.pair" -> 
+      let remove_disc = List.filter (fun v -> not (String.equal (var_to_string v) (ty_param_to_string disc))) ins in
+      parse_pair_matches (y :: x :: remove_disc) next_match
+    | DTyCtr (ind_relation, args) as concl -> Some (List.rev ins, concl)
+    | _ -> None 
+  in
+
+  let ty_ctr_eq (a : ty_ctr) (b : ty_ctr) : bool =
+    String.equal (ty_ctr_to_string a) (ty_ctr_to_string b) 
+  in
+
+  let rec add_class (parsed : parsed_classes) (class_instance : rocq_constr) (ind_name : ty_ctr) : parsed_classes =
+    match class_instance with
+    | DTyCtr (c, [DTyCtr (ind_relation, args)]) when ty_ctr_eq ind_relation ind_name -> 
+      msg_debug (str "Processing instance of " ++ str (ty_ctr_to_string ind_name) ++ fnl ());
+      (match ty_ctr_to_string c with
+      | "QuickChick.Classes.GenSized" | "GenSized" -> {parsed with gen = class_instance :: parsed.gen}
+      | "QuickChick.Classes.EnumSized" | "EnumSized" -> {parsed with enum = class_instance :: parsed.enum}
+      | "QuickChick.Decidability.DecOpt" | "QuickChick.Decidability.Dec" | "DecOpt" | "Dec" -> {parsed with checker = class_instance :: parsed.checker}
+      | "QuickChick.Decidability.Dec_Eq" | "Dec_Eq" -> {parsed with decEq = class_instance :: parsed.decEq}
+      | _ -> msg_debug (str "Unknown non such that class: " ++ 
+                        str (ty_ctr_to_string c) ++ str " for constr: " ++ 
+                        str (rocq_constr_to_string class_instance) ++ fnl ()); 
+             parsed  
+      )
+    | DTyCtr (c, [DTyCtr (ind_relation,args)]) -> 
+      msg_debug ( str "Skipping instance of " ++ str (ty_ctr_to_string ind_relation) ++ fnl ());
+      parsed
+    | DTyCtr (c, [typ; DLambda (v, ty, e)]) ->
+      (match parse_pair_matches [v] e with
+      | Some ((ins, DTyCtr (ind_relation, args)) as instance) when ty_ctr_eq ind_relation ind_name -> 
+        (match ty_ctr_to_string c with
+        | "QuickChick.DependentClasses.GenSizedSuchThat" | "GenSizedSuchThat" -> {parsed with genST = instance :: parsed.genST}
+        | "QuickChick.DependentClasses.EnumSizedSuchThat" | "EnumSizedSuchThat" -> {parsed with enumST = instance :: parsed.enumST}
+        | _ -> msg_debug (str "Unknown such that class: " ++ 
+                          str (ty_ctr_to_string c) ++ str " for constr: " ++ 
+                          str (rocq_constr_to_string class_instance) ++ fnl ()); 
+               parsed
+        )
+      | Some ((_, DTyCtr (ind,_))) -> msg_debug (str "Instance inductive does not match: " ++ 
+                                str (ty_ctr_to_string ind) ++ str " =? " ++ 
+                                str (ty_ctr_to_string ind_name) ++ fnl ());
+                                 parsed
+      | None -> msg_debug (str "Failed to parse such that class: " ++ 
+                          str (ty_ctr_to_string c) ++ str " for constr: " ++ 
+                          str (rocq_constr_to_string class_instance) ++ fnl ()); 
+               parsed
+      )
+    | DArrow (_, t) -> add_class parsed t ind_name
+    | DProd (_, t) -> add_class parsed t ind_name
+    | _ -> msg_debug (str "Incorrect class Instance structure: " ++ 
+                      str (rocq_constr_to_string class_instance) ++ fnl ()); 
+             parsed
+  in
+
+  let handle_hint hint parsed hint_sort ind_name =
+    let typ = type_of_hint hint in
+    let env = Global.env () in
+    let evd = Evd.from_env env in
+    msg_debug (str "Type: " ++ Constr.debug_print typ ++ fnl ());
+    msg_debug (str "Type2: " ++ Ppconstr.pr_constr_expr env evd (Constrextern.extern_constr env evd (EConstr.of_constr typ)) ++ fnl ());
+    match parse_dependent_type typ with
+    | Some rocq -> 
+      let rocq_str = rocq_constr_to_string rocq in
+      msg_debug (str hint_sort ++ str rocq_str ++ fnl ());
+      add_class parsed rocq ind_name
+    | None ->
+      msg_debug (str hint_sort ++ str " Failed to parse" ++ fnl ());
+      parsed
+    in
+
+  let init_parsed = {gen = []; enum = []; genST = []; enumST = []; checker = []; decEq = []} in
+
+  let handle_full_hint full_hint parsed =
+    (* Feedback.msg_notice (str "Processing Hint: " ++ Hints.FullHint.print env evd full_hint ++ fnl ()); *)
+    match Hints.FullHint.repr full_hint with
+    | Hints.Res_pf h -> handle_hint h parsed "ResPF" ctr
+    | Hints.Give_exact h -> handle_hint h parsed "GiveExact" ctr
+    | _ -> (*Feedback.msg_notice (str "Hints.FullHint.repr unrecognized" ++ fnl ()); *)
+    parsed
+    in
+
+  (* let handle_full_hint b hint =
+    msg_debug (str "Processing... (" ++ str typeclass_name ++ str ")"  ++ Hints.FullHint.print env evd hint ++ fnl ());
+    begin match Hints.FullHint.repr hint with
+    | Hints.Res_pf h ->
+      let typ = type_of_hint h in
+      let env = Global.env () in
+      let evd = Evd.from_env env in
+      msg_debug (str "Type: " ++ Constr.debug_print typ ++ fnl ());
+      msg_debug (str "Type2: " ++ Ppconstr.pr_constr_expr env evd (Constrextern.extern_constr env evd (EConstr.of_constr typ)) ++ fnl ());
+      (match parse_dependent_type typ with
+      | Some rocq -> 
+        let rocq_str = rocq_constr_to_string rocq in
+        msg_debug (str "ResPF: " ++ str rocq_str ++ fnl ());
+        
+        [rocq] 
+      | None ->
+        msg_debug (str "ResPF: " ++ str "Failed to parse" ++ fnl ());
+        []
+      )
+    | Hints.Give_exact h ->
+      let typ = type_of_hint h in
+      let env = Global.env () in
+      let evd = Evd.from_env env in
+      msg_debug (str "Type: " ++ Constr.debug_print typ ++ fnl ());
+      msg_debug (str "Type2: " ++ Ppconstr.pr_constr_expr env evd (Constrextern.extern_constr env evd (EConstr.of_constr typ)) ++ fnl ());
+      (match parse_dependent_type typ with
+      | Some rocq -> 
+        let rocq_str = rocq_constr_to_string rocq in
+        msg_debug (str "GiveExact: " ++ str rocq_str ++ fnl ());
+        
+        [rocq] 
+      | None ->
+        msg_debug (str "GiveExact: " ++ str "Failed to parse" ++ fnl ());
+       [])
+    | _ ->
+       msg_debug (str "..." ++ fnl ()); []
+
+    end
+  in  *)
+  let quickchick_prefix_check = function
+    | "QuickChick.DependentClasses.GenSizedSuchThat"
+    | "QuickChick.DependentClasses.EnumSizedSuchThat" 
+    | "QuickChick.Classes.GenSized"
+    | "QuickChick.Classes.EnumSized"
+    | "QuickChick.Decidability.DecOpt"
+    | "QuickChick.Decidability.Dec"
+    | "QuickChick.Decidability.Dec_Eq" -> true
+    | _ -> false in
+  (* Iterate through all of the hints *)
+  let parsed_final = Hints.Hint_db.fold (fun go hm hints parsed ->
+    begin match go with
+    | Some (Names.GlobRef.IndRef i) when quickchick_prefix_check (Names.MutInd.to_string (fst i)) ->
+        msg_debug (str "Found a QuickChick hint:" ++ str (Names.MutInd.to_string (fst i)) ++ fnl ());
+        List.fold_left (fun acc hint ->
+          (* Feedback.msg_notice (str "Processing Hint: " ++ Hints.FullHint.print env evd hint ++ fnl ()); *)
+          handle_full_hint hint acc) parsed hints
+    | Some (Names.GlobRef.IndRef i) ->
+      msg_debug (str "Not a QuickChick hint:" ++ str (Names.MutInd.to_string (fst i)) ++ fnl ());
+      parsed
+    | _ -> 
+      (* List.iter (fun hint -> Feedback.msg_notice (str "Not QuickChick: " ++ Hints.FullHint.print env evd hint ++ fnl ())) hints; *)
+      parsed
+    end
+      (* begin match go with
+      | Some (Names.GlobRef.IndRef i) when prod_check i ->
+         msg_debug (str "Found a producer hint" ++ str (Names.MutInd.to_string (fst i)) ++ fnl ());
+         List.fold_left (fun acc hint -> handle_hint true hint @ acc) acc hints
+      | Some (Names.GlobRef.IndRef i) when dec_check i ->
+         (* eq hack          if Names.Id.to_string (qualid_basename ctr) = "eq" then result := [[false; false; false]]
+         else *) List.fold_left (fun acc hint -> handle_hint false hint @ acc) acc hints
+      | _ -> acc
+      end *)
+    ) db init_parsed
+    in 
+    print_parsed_classes parsed_final;
+    parsed_final
+  
+(* 
+let find_typeclass_bindings' typeclass_name ctr =
   msg_debug (str ("Finding typeclass bindings for:" ^ Libnames.string_of_qualid ctr) ++ fnl());
   let env = Global.env () in
   let evd = Evd.from_env env in
   let db = Hints.searchtable_map "typeclass_instances" in
   let result = ref [] in
-
-  (* Add comment here *)
   let prod_check i =
     String.equal (Names.MutInd.to_string (fst i)) ("QuickChick.DependentClasses." ^ typeclass_name)  in    
   let dec_check i =
     String.equal (Names.MutInd.to_string (fst i)) ("QuickChick.Decidability." ^ typeclass_name)  in
+  let type_of_hint h = 
+    (* Go from the hint to the type of its constant *)
+    let (_,ec) = Hints.hint_as_term h in
+    let c = EConstr.to_constr evd ec in
+    match Constr.kind c with
+    | Constr.Const cst -> 
+      let (typ,_constraints) = Environ.constant_type env cst in
+        typ 
+    | _ -> failwith ("hint not a constant in search for " ^ Libnames.string_of_qualid ctr)
+    in
+  (* Find the conclusion of a type *)
+  let rec find_concl typ =
+    match Constr.kind typ with
+    | Constr.Lambda (_binder,_binder_type,typ') -> find_concl typ'
+    | Constr.Prod (_binder,_binder_type,typ') -> find_concl typ'
+    | Constr.App _ -> typ
+    | _ -> failwith ("FindConcl can't handle: " ^ Pp.string_of_ppcmds (Printer.pr_constr_env env evd typ))
+  in
+  let handle_producer_hint lambda =
+    match Constr.kind lambda with
+    | Constr.Lambda (_binder,_binder_type,Constr.App (Constr.Ind ((mind,_),_) as cln,clargs)) ->
+      msg_debug (str "Entering producer lambda" ++ fnl ());
+      msg_debug (str "Found a hint for: " ++ Constr.debug_print cln ++ fnl ());
+      let mind_id = Label.to_id (MutInd.label mind) in
+      let ctr_id = qualid_basename ctr in
+      if Id.equal mind_id ctr_id then begin
+        msg_debug (str "Producer Match Found: " ++ Id.print ctr_id ++ fnl ());
+        let standard = ref true in
+        (* Calculate mode as list of booleans: *)
+        let res = 
+          List.map (fun arg ->
+            if Constr.isMeta arg then
+              false (* Check not equal id name *)
+            else if Constr.isRef arg then
+              false
+            (* Bound by the last lambda means it's output *)
+            else if Constr.isRelN 1 arg then
+              true
+            else if Constr.isRel arg then
+              false
+            else if Constr.isApp arg then
+              begin standard := false; true end
+            else failwith "New FTB/0"
+          ) (Array.to_list clargs) in
+        if !standard then begin
+            List.iter (fun b -> msg_debug (bool b ++ str " ")) res;
+            msg_debug (fnl ());
+            result := res :: !result
+          end
+        else msg_debug (str "not standard/producer" ++ fnl ())
+        end 
+      else 
+        msg_debug (str "Function Applied in the lambda's body not desired ty_ctr: " ++ Id.print ctr_id ++ str " " ++ Id.print mind_id ++ fnl ())
+    | Constr.Lambda (_,_,Constr.App _) -> msg_debug (str "First arg is lambda but its body isn't an applied inductive" ++ fnl ())
+    | Constr.Lambda _ -> msg_debug (str "First arg is lambda but its body isn't an application at all" ++ fnl ())
+    | _ -> msg_debug (str "First arg not lambda" ++ fnl ())
+  in
+  let handle_checker_hint app =
+    if Id.to_string (qualid_basename ctr) = "eq" then ()
+    else match Constr.kind app with
+    | Constr.App (Constr.Ind ((mind,_),_) as cln,clargs) ->
+      let mind_id = Label.to_id (MutInd.label mind) in
+      let ctr_id = qualid_basename ctr in
+      msg_debug (str "In checker/app for: " ++ Id.print ctr_id ++ str " " ++ Id.print mind_id ++ fnl ());
+      if Id.equal mind_id ctr_id then (
+        msg_debug (str "Checker Match Found: " ++ Id.print ctr_id ++ fnl ());
+        let standard = ref true in
+        (* Calculate mode as list of booleans: *)
+        (* For checking, mode is alsways false *)
+        let res = List.map (fun arg -> 
+                      if Constr.isMeta arg then
+                        false (* Check not equal id name *)
+                      else if Constr.isRef arg then
+                        false
+                      else if Constr.isRel arg then
+                        false
+                      else if Constr.isApp arg then
+                        begin standard := false; true end
+                      else failwith "New FTB/0"
+                    ) (Array.to_list clargs) in
+        if !standard then begin
+            List.iter (fun b -> msg_debug (bool b ++ str " ")) res;
+            msg_debug (fnl ());
+            result := res :: !result
+          end
+        else msg_debug (str "not standard/checker" ++ fnl ())
+      )
+      else
+        msg_debug (str "not equal/checker/isApp" ++ fnl ())
+    | _ -> msg_debug (str "not an applied inductive" ++ fnl ())
+      in
 
+  let handle_checker_hint app = 
+    if Id.to_string (qualid_basename ctr) = "eq" then ()
+    else if isApp app then (
+      msg_debug (str "Entering checker app" ++ fnl ());               
+      let (cln, clargs) = Constr.destApp app in               
+      (* TODO: Search for Mutual inductives properly *)
+      let ((mind,_),_) = Constr.destInd cln in
+      let mind_id = Label.to_id (Names.MutInd.label mind) in
+      let ctr_id = qualid_basename ctr in
+      msg_debug (str "In checker/app for: " ++ Id.print ctr_id ++ str " " ++ Id.print mind_id ++ fnl ());
+      
+      if Id.equal mind_id ctr_id then (
+        msg_debug (str "Checker Match Found: " ++ Id.print ctr_id ++ fnl ());
+        let standard = ref true in
+        (* Calculate mode as list of booleans: *)
+        (* For checking, mode is alsways false *)
+        let res = List.map (fun arg -> 
+                      if Constr.isMeta arg then
+                        false (* Check not equal id name *)
+                      else if Constr.isRef arg then
+                        false
+                      else if Constr.isRel arg then
+                        false
+                      else if Constr.isApp arg then
+                        begin standard := false; true end
+                      else failwith "New FTB/0"
+                    ) (Array.to_list clargs) in
+        if !standard then begin
+            List.iter (fun b -> msg_debug (bool b ++ str " ")) res;
+            msg_debug (fnl ());
+            result := res :: !result
+          end
+        else msg_debug (str "not standard/checker" ++ fnl ())
+      )
+      else
+        msg_debug (str "not equal/checker/isApp" ++ fnl ());
+    )
+    else msg_debug (str "not isApp 0" ++ fnl ())
+    in
+  
+  let handle_hint_repr b h =
+    let typ = type_of_hint h in
+    let (typ_cl, typ_args) = Constr.destApp (find_concl typ) in
+    msg_debug (str "Conclusion of current hint is: " ++ fnl ());
+    msg_debug (Constr.debug_print (find_concl typ));
+    try 
+    if b then
+      (* For producer, check the second argument (the first is the type of the lambda) *)
+      handle_producer_hint typ_args.(1)
+    else
+      (* For checker, check the first argument. *)
+      handle_checker_hint typ_args.(0)
+    with _ -> msg_debug (str "exception?" ++ fnl ())
+  in
   let handle_hint b hint =
     msg_debug (str "Processing... (" ++ str typeclass_name ++ str ")"  ++ Hints.FullHint.print env evd hint ++ fnl ());
     begin match Hints.FullHint.repr hint with
     | Hints.Res_pf h ->
-       msg_debug (str "ResPF" ++ fnl ());
+       handle_hint_repr b h
     | Hints.Give_exact h ->
-       msg_debug (str "GiveExact" ++ fnl ());
-    | _ ->
-       msg_debug (str "..." ++ fnl ());
-(*    let (co, c) = Hints.hint_as_term hint in
-    msg_debug (Ppconstr.pr_constr env evd c ++ fnl ());
- *************)
-(*               
-    match Hints.FullHint.pattern hint with
-    | Some p -> 
-       msg_debug (Ppconstr.pr_constr_pattern_expr env evd (Constrextern.extern_constr_pattern [] evd p) ++ fnl ())
-    | _ ->
-       msg_debug (str "Not an Option" ++ fnl ())
- *)
-    end
-  in 
-
-  (* Iterate through all of the hints *)
+       handle_hint_repr b h
+    (* TODO: Replicate pattern-based behavior from below in constr form *)
+    | Hints.Extern (Some (PApp (PRef g, args)), _) ->
+    (* begin match Hints.FullHint.pattern hint with
+    | Some (PApp (PRef g, args)) -> *)
+       begin
+         let arg_index = if b then 1 else 0 in 
+(*         msg_debug (str ("Hint for :" ^ (string_of_qualid (Nametab.shortest_qualid_of_global Id.Set.empty g))) ++ fnl ());
+         msg_debug (str (Printf.sprintf "Arg Length: %d. Arg index: %d\n" (Array.length args) arg_index) ++ fnl ());*)
+         match args.(arg_index) with
+         | PLambda (name, t, PApp (PRef gctr, res_args)) ->
+            let gctr_qualid = Nametab.shortest_qualid_of_global Id.Set.empty gctr in
+            if qualid_eq gctr_qualid ctr then begin
+                msg_debug (str "Found a match!" ++ fnl ());
+                msg_debug (str ("Conclusion is Application of:" ^
+                                  (Libnames.string_of_qualid (Nametab.shortest_qualid_of_global Id.Set.empty gctr)))
+                           ++ fnl ());
+                let standard = ref true in
+                let res = List.map (fun p ->
+                              match p with
+                              | PMeta (Some id) ->
+                                 if not (Name.equal (Name id) name)
+                                 then false
+                                 else failwith "FTB/How is this true"
+                              | PRef _ -> false 
+                              | PRel _ -> true
+                              | PApp _ -> standard := false; true                                        
+                              | _ -> debug_pattern "FTB/0" p
+                            ) (Array.to_list res_args) in
+                if !standard then 
+                  result := res :: !result
+                else ()
+              end
+            else ()
+         | PApp (PRef gctr, res_args) ->
+            let gctr_qualid = Nametab.shortest_qualid_of_global Id.Set.empty gctr in
+            if qualid_eq gctr_qualid ctr then begin
+                msg_debug (str "Found a match!" ++ fnl ());
+                msg_debug (str ("Conclusion is Application of:" ^
+                                  (Libnames.string_of_qualid (Nametab.shortest_qualid_of_global Id.Set.empty gctr)))
+                           ++ fnl ());
+                let standard = ref true in
+                let res = List.map (fun p ->
+                              match p with
+                              | PMeta (Some id) -> false
+                              | PRef _ -> false 
+                              | PRel _ -> true
+                              | PApp _ -> standard := false; true                                        
+                              | _ -> debug_pattern "FTB/00" p
+                            ) (Array.to_list res_args) in
+                if !standard then 
+                  result := res :: !result
+                else ()
+              end
+            else ()
+         | PLambda (name, t, PCase (_, arr, _, [n, ns, PApp (PRef gctr, res_args)])) ->
+            let gctr_qualid = Nametab.shortest_qualid_of_global Id.Set.empty gctr in
+            if qualid_eq gctr_qualid ctr then begin
+                msg_debug (str "Found a match!" ++ fnl ());
+                msg_debug (str ("Conclusion is Application of:" ^
+                                  (Libnames.string_of_qualid (Nametab.shortest_qualid_of_global Id.Set.empty gctr)))
+                           ++ fnl ());
+                let standard = ref true in
+                let res = List.map (fun p ->
+                              match p with
+                              | PMeta (Some id) -> false 
+(*                                 if not (Name.equal (Name id) name)
+                                 then false
+                                 else failwith "FTB/How is this true" *)
+                              | PRef _ -> false 
+                              | PRel _ -> true
+                              | PApp _ -> standard := false; true                                        
+                              | _ -> debug_pattern "FTB/0" p
+                            ) (Array.to_list res_args) in
+                if !standard then 
+                  result := res :: !result
+                else ()
+              end
+            else ()
+         | PMeta (Some id) -> () (* failwith (Id.to_string id) *)
+         | PProd _ -> ()
+         | _ -> debug_pattern "FTB/1" args.(arg_index)
+       end
+    | Hints.Extern _ -> failwith "FTB/Apply"      
+    | Hints.ERes_pf _ -> failwith "FTB/EApply"
+    | Hints.Res_pf_THEN_trivial_fail _ -> failwith "FTB/Imm"
+    | Hints.Unfold_nth _ -> failwith "FTB/Unf"
+    end in
   Hints.Hint_db.iter (fun go hm hints ->
       begin match go with
-      | Some (Names.GlobRef.IndRef i) when prod_check i ->
+      | Some (GlobRef.IndRef i) when prod_check i ->
          List.iter (handle_hint true ) hints
-      | Some (Names.GlobRef.IndRef i) when dec_check i ->
-         (* eq hack          if Names.Id.to_string (qualid_basename ctr) = "eq" then result := [[false; false; false]]
-         else *) List.iter (handle_hint false) hints
+      | Some (GlobRef.IndRef i) when dec_check i ->
+         if Id.to_string (qualid_basename ctr) = "eq" then result := [[false; false; false]]
+         else List.iter (handle_hint false) hints
       | _ -> ()
       end
     ) db;
-  []
+    !result *)
+
 
 module ScheduleExamples = struct
   let var = var_of_string

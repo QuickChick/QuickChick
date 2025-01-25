@@ -316,6 +316,12 @@ TACTIC EXTEND theorem_dependencies
   | ["theorem_dependencies"] -> { theorem_dependencies }
 END
 
+VERNAC COMMAND EXTEND Print CLASSIFIED AS SIDEFF
+ | ["Print" "Typeclasses" "for" ident(ind)] ->
+    { let ind' = Libnames.qualid_of_ident ind in 
+      ignore (NewGenericLib.find_typeclass_bindings ind') }
+END
+
 TACTIC EXTEND merge_sound_core
   | ["merge_sound_core"] -> { merge_sound }
 END
