@@ -1331,20 +1331,28 @@ let define_new_inductive (ty_ctr, ty_params, ctrs, typ) =
 let define_new_fixpoint (functions : (var * arg list * var * coq_expr * coq_expr) list) =
   let open Vernacexpr in
 
-  let fixpoint_exprs : fixpoint_expr list = List.map
+  let fixpoint_exprs = List.map
     (fun (name, arguments, structural_wf_variable, return, body) ->
       {
+#if COQ_VERSION < (9, 0, 0)
+        rec_order = Some (CAst.make @@ CStructRec (CAst.make @@ structural_wf_variable));
+#endif
         fname = CAst.make name;
         univs = None;
-        rec_order = Some(CAst.make @@ CStructRec (CAst.make @@ structural_wf_variable));
         binders = arguments;
         rtype = return;
         body_def = Some body;
         notations = []
       }
     ) functions in
-
-#if COQ_VERSION >= (8, 20, 0)
+#if COQ_VERSION >= (9, 0, 0)
+  let rec_orders = List.map
+    (fun (_, _, structural_wf_variable, _, _) ->
+      Some (CAst.make @@ CStructRec (CAst.make @@ structural_wf_variable)))
+    functions in
+  let kind = Decls.(IsDefinition Fixpoint) in
+  ignore (ComFixpoint.do_mutually_recursive ~poly:false ~kind ~program_mode:false (CFixRecOrder rec_orders, fixpoint_exprs))
+#elif COQ_VERSION >= (8, 20, 0)
   ignore (ComFixpoint.do_fixpoint ~poly:false fixpoint_exprs)
 #elif COQ_VERSION >= (8, 16, 0)
   ComFixpoint.do_fixpoint ~poly:false fixpoint_exprs
