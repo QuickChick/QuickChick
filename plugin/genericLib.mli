@@ -77,7 +77,11 @@ val belongs_to_inductive : constructor -> bool
 type ctr_rep = constructor * coq_type 
 val ctr_rep_to_string : ctr_rep -> string
 
-type dt_rep = ty_ctr * ty_param list * ctr_rep list
+(* single dt_rep *)
+type sdt_rep = ty_ctr * ty_param list * ctr_rep list   
+type dt_rep = sdt_rep list
+ 
+val sdt_rep_to_string : sdt_rep -> string
 val dt_rep_to_string : dt_rep -> string
 
 (* Supertype of coq_type handling potentially dependent stuff - TODO : merge *)
@@ -125,6 +129,8 @@ val isSome : 'a option -> bool
 val cat_maybes : 'a option list -> 'a list
 val foldM : ('b -> 'a -> 'b option) -> 'b option -> 'a list -> 'b option
 val sequenceM : ('a -> 'b option) -> 'a list -> 'b list option
+(* legacy function which fails on mutually inductive definitions *)
+val sdt_rep_from_mib : mutual_inductive_body -> sdt_rep option
 
 val qualid_to_mib : Libnames.qualid -> mutual_inductive_body
 val dt_rep_from_mib : mutual_inductive_body -> dt_rep option
@@ -274,6 +280,9 @@ val declare_class_instance
   -> unit
 
 val define_new_inductive : dep_dt -> unit
+
+val define_new_fixpoint :
+  (var * arg list * var * coq_expr * coq_expr) list -> unit
 
 (* List utils *)
 val list_last : 'a list -> 'a 
