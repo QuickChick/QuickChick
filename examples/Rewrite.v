@@ -114,7 +114,16 @@ Inductive bind : list type -> nat -> type -> Prop :=
         typing G e1 (Arrow t1 t2) ->
         typing G (App e1 e2) t2.
 
+Print Typeclasses for typing.
 
+Theorem wgwrg : forall g e n t, typing (t :: g) e t -> bind g n t -> True.
+Proof.
+  theorem_dependencies.
+  schedules.
+Abort.
+  
+  
+  
 #[global] Instance Dec_Eqtype (t t' : type) : Dec (t = t').
 Proof. dec_eq. Defined.
 Derive DecOpt for (bind env x t).

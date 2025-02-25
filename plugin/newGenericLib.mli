@@ -5,6 +5,8 @@ val isSome : 'a option -> bool
 val cat_maybes : 'a option list -> 'a list
 val foldM : ('b -> 'a -> 'b option) -> 'b option -> 'a list -> 'b option
 val sequenceM : ('a -> 'b option) -> 'a list -> 'b list option
+val remove_duplicates : 'a list -> 'a list
+val filter_mapi : (int -> 'a -> 'b option) -> 'a list -> 'b list
 
 (* vars and type parameters will always be "local", constructors should be global *)
 type var = Names.Id.t
@@ -15,6 +17,8 @@ type constructor = Libnames.qualid
 val var_to_string : var -> string
 val ty_param_to_string : ty_param -> string
 val ty_ctr_to_string : ty_ctr -> string
+val ty_ctr_basename : ty_ctr -> var
+val ty_ctr_to_ctr : ty_ctr -> constructor
 val constructor_to_string : constructor -> string
 
 val var_of_string : string -> var
@@ -27,6 +31,8 @@ type pat =
   | PVar of var
   | PParam (* Type parameter *)
   | PWild
+
+val pat_to_string : pat -> string
 
 (* Wrapper around constr that we use to represent the types of
    inductives and theorems that we plan to derive for or quickcheck *)
@@ -43,6 +49,18 @@ type rocq_constr =
   | DNot of rocq_constr (* Negation as a toplevel *)
   | DHole (* For adding holes *)
 val rocq_constr_to_string : rocq_constr -> string
+val rocq_constr_tuple_of_list : rocq_constr list -> rocq_constr
+
+type rocq_type = rocq_constr
+
+val type_info : rocq_type -> (ty_param * rocq_type) list * rocq_type list * rocq_type
+                              (*typed vars                    hyps             concl*)
+
+val variables_in_hypothesis : rocq_type -> var list
+
+val ty_ctr_eq : ty_ctr -> ty_ctr -> bool
+
+val (>>=:) : 'a list -> ('a -> 'b list) -> 'b list
 
 module OrdRocqConstr : sig
     type t = rocq_constr
@@ -66,15 +84,15 @@ val rocq_relation_to_string : rocq_relation -> string
 val constr_to_rocq_constr : Constr.constr -> rocq_constr option
 
 val qualid_to_rocq_relations : Libnames.qualid -> (int * rocq_relation list) option
+val ty_ctr_to_rocq_relations : ty_ctr -> (int * rocq_relation list) option
+val oib_to_rocq_relation :  Declarations.one_inductive_body -> rocq_relation option
 val ind_reference_to_rocq_relations : Constrexpr.constr_expr -> (int * rocq_relation list) option
 
 val parse_dependent_type : Constr.constr -> rocq_constr option
 
 type producer_sort = PS_E | PS_G
 
-type rocq_type = rocq_constr
-
-val dep_type_var_relation_uses' : rocq_constr -> (var * (int * int list list) list) list
+val rocq_constr_var_relation_uses' : rocq_constr -> (var * (int * int list list) list) list
 
 type source = 
   | SrcNonrec of rocq_type
@@ -92,6 +110,17 @@ type schedule_sort = ProducerSchedule of bool * producer_sort * rocq_constr (* t
                    | TheoremSchedule of rocq_constr (* conclusion of theorem to be checked *)
 
 type schedule = schedule_step list * schedule_sort
+
+type derive_sort = D_Gen | D_Enum | D_Check | D_Thm
+
+val possible_schedules : (ty_param * rocq_type) list ->
+  rocq_type list ->
+  ty_param list -> constructor * int list ->
+  derive_sort -> schedule_step list list
+
+val schedule_step_to_string : schedule_step -> string
+val schedule_sort_to_string : schedule_sort -> string
+val schedule_to_string : schedule -> string
 
 type monad_sort =
   | MG 
@@ -124,7 +153,7 @@ type mexp =
   | MFun of (pat * mexp option) list * mexp (*var list is a tuple, if you want multiple args do nested MFuns.*)
   | MFix of var * (var * mexp) list * mexp
 
-type derive_sort = D_Gen | D_Enum | D_Check | D_Thm
+val product_free_rocq_type_to_mexp : rocq_type -> mexp
 
 val schedule_to_mexp : schedule -> mexp
 
@@ -133,6 +162,10 @@ val mexp_to_constr_expr : mexp -> derive_sort -> Constrexpr.constr_expr
 type inductive_schedule = string * (var * mexp) list * (schedule * (var * pat) list) list * (schedule * (var * pat) list) list 
 
 val inductive_schedule_to_constr_expr : inductive_schedule -> derive_sort -> bool -> Constrexpr.constr_expr
+
+val inductive_schedule_to_string : inductive_schedule -> string
+
+val compile_and_pp_schedule : schedule -> derive_sort -> Pp.t
 
 type parsed_classes = {gen : rocq_constr list; 
                         enum : rocq_constr list;
@@ -144,6 +177,7 @@ type parsed_classes = {gen : rocq_constr list;
 val find_typeclass_bindings : Libnames.qualid -> parsed_classes
 
 val debug_constr_expr : Constrexpr.constr_expr -> unit
+val constr_expr_to_string : Constrexpr.constr_expr -> string
 
 module ScheduleExamples : sig
   val thm_schedule : schedule
@@ -152,7 +186,11 @@ module ScheduleExamples : sig
   val gen_term_inductive_schedule : inductive_schedule
 end
 
-
+val fresh_name : string -> var 
+val make_up_name : unit -> var
+val make_up_name_str : string -> var
+val var_of_id : Names.Id.t -> var 
+val str_lst_to_string : string -> string list -> string
 
 (*
 open Names
@@ -169,7 +207,7 @@ val hole : coq_expr
 val debug_coq_expr : coq_expr -> unit
 
 type var
-val var_of_id : Id.t -> var   
+  
 val id_of_var : var -> Id.t
 val var_to_string : var -> string
 val inject_var : string -> var 
@@ -199,7 +237,7 @@ val gArg : ?assumName:coq_expr ->
 
 val arg_to_var : arg -> var
   
-val str_lst_to_string : string -> string list -> string
+
 
 type coq_type = 
   | Arrow of coq_type * coq_type
@@ -238,26 +276,26 @@ type dt_rep = ty_ctr * ty_param list * ctr_rep list
 val dt_rep_to_string : dt_rep -> string
 
 
-val dep_type_to_string : dep_type -> string
+val rocq_constr_to_string : rocq_constr -> string
 
-type dep_ctr = constructor * dep_type
+type dep_ctr = constructor * rocq_constr
 val dep_ctr_to_string : dep_ctr -> string
 
-type dep_dt = ty_ctr * ty_param list * dep_ctr list * dep_type
+type dep_dt = ty_ctr * ty_param list * dep_ctr list * rocq_constr
 val dep_dt_to_string : dep_dt -> string
 
-val constr_of_type : string -> ty_param list -> dep_type -> Constr.t
-val gType : ty_param list -> dep_type -> coq_expr
-val gType' : ty_param list -> dep_type -> coq_expr
+val constr_of_type : string -> ty_param list -> rocq_constr -> Constr.t
+val gType : ty_param list -> rocq_constr -> coq_expr
+val gType' : ty_param list -> rocq_constr -> coq_expr
 val get_type : Id.t -> unit
 val is_inductive : constructor -> bool
-val is_inductive_dt : dep_type -> bool
+val is_inductive_dt : rocq_constr -> bool
 
-val nthType : int -> dep_type -> dep_type
+val nthType : int -> rocq_constr -> rocq_constr
 
-val dep_type_len : dep_type -> int
+val rocq_constr_len : rocq_constr -> int
 
-val dep_result_type : dep_type -> dep_type
+val dep_result_type : rocq_constr -> rocq_constr
 
 (* option type helpers *)
 val option_map : ('a -> 'b) -> 'a option -> 'b option
@@ -271,13 +309,12 @@ val qualid_to_mib : Libnames.qualid -> mutual_inductive_body
 val dt_rep_from_mib : mutual_inductive_body -> dt_rep option
 val coerce_reference_to_dt_rep : constr_expr -> dt_rep option
 
-val parse_dependent_type : Constr.constr -> dep_type option
+val parse_dependent_type : Constr.constr -> rocq_constr option
 
 val dep_dt_from_mib : mutual_inductive_body -> dep_dt option
 val coerce_reference_to_dep_dt : constr_expr -> dep_dt option
 
-val fresh_name : string -> var 
-val make_up_name : unit -> var
+
 
 (* Generic Combinators *)
 val gApp : ?explicit:bool -> coq_expr -> coq_expr list -> coq_expr 
@@ -334,7 +371,7 @@ val gProd : coq_expr * coq_expr -> coq_expr
 val listToPairAux : (('a *'a) -> 'a) -> ('a list) -> 'a
 val gTuple      : coq_expr list -> coq_expr
 val gTupleType  : coq_expr list -> coq_expr
-val dtTupleType : dep_type list -> dep_type
+val dtTupleType : rocq_constr list -> rocq_constr
 
 (* Int *)
 val gInt : int -> coq_expr
@@ -399,9 +436,9 @@ val g_show : coq_expr -> coq_expr
 val fold_ty  : ('a -> coq_type -> 'a) -> (ty_ctr * coq_type list -> 'a) -> (ty_param -> 'a) -> coq_type -> 'a
 val fold_ty' : ('a -> coq_type -> 'a) -> 'a -> coq_type -> 'a 
 
-val dep_fold_ty  : ('a -> dep_type -> 'a) -> ('a -> var -> dep_type -> 'a) ->
-                   (ty_ctr * dep_type list -> 'a) -> (constructor * dep_type list -> 'a) -> 
-                   (ty_param -> 'a) -> (var -> 'a) -> dep_type -> 'a
+val dep_fold_ty  : ('a -> rocq_constr -> 'a) -> ('a -> var -> rocq_constr -> 'a) ->
+                   (ty_ctr * rocq_constr list -> 'a) -> (constructor * rocq_constr list -> 'a) -> 
+                   (ty_param -> 'a) -> (var -> 'a) -> rocq_constr -> 'a
 
 (* Generate Type Names *)
 val generate_names_from_type : string -> coq_type -> string list 
