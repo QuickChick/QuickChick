@@ -252,6 +252,16 @@ Definition forAllShrink {A prop : Type} {_ : Checkable prop} `{Show A}
                  shrinking shrinker x (fun x' =>
                                          printTestCase (show x' ++ newline) (pf x'))).
 
+Definition forAllShrinkMaybe {A prop : Type} {_ : Checkable prop} `{Show A}
+           (gen : G (option A)) (shrinker : A -> list A) (pf : A -> prop) : Checker :=
+  bindGen gen (fun mx =>
+                 match mx with
+                 | Some x => shrinking shrinker x (fun x' =>
+                                         printTestCase (show x' ++ newline) (pf x'))
+                 | None => checker tt
+                 end
+              ).
+
 Definition forAllShrinkNonDet {A prop : Type} {_ : Checkable prop} `{Show A}
            (n : nat) (gen : G A) (shrinker : A -> list A) (pf : A -> prop) : Checker :=
 

@@ -1,6 +1,6 @@
 open Pp
 open Util
-open GenericLib
+open NewGenericLib
 open Error
 
 (* TODO : move to utils or smth *)
@@ -36,7 +36,7 @@ type unknown = Unknown.t
 
 type range = Ctr of constructor * range list
            | Unknown of unknown
-           | Undef of dep_type
+           | Undef of rocq_constr
            | FixedInput
            | Parameter of ty_param
            | RangeHole
@@ -49,18 +49,12 @@ let is_parameter r =
 let rec range_to_string = function
   | Ctr (c, rs) -> constructor_to_string c ^ " " ^ str_lst_to_string " " (List.map range_to_string rs)
   | Unknown u -> Unknown.to_string u
-  | Undef dt -> Printf.sprintf "Undef (%s)" (dep_type_to_string dt)
+  | Undef dt -> Printf.sprintf "Undef (%s)" (rocq_constr_to_string dt)
   | FixedInput -> "FixedInput"
   | RangeHole  -> "_"
   | Parameter p -> ty_param_to_string p
 
 let ranges_to_string rs = String.concat " " (List.map range_to_string rs)
-
-let rec matcher_pat_to_range m =
-  match m with
-  | MatchCtr (c,ms) -> Ctr (c, List.map matcher_pat_to_range ms)
-  | MatchU u -> Unknown u
-  | MatchParameter p -> Parameter p
 
 module UM = Map.Make(UnknownOrd)
 (* module US = Set.Make(UnknownOrd) *)
@@ -88,7 +82,7 @@ let eq_set_add u1 u2 eqs =
   EqSet.add (u1', u2') eqs
 
 module OrdTyp = struct 
-  type t = dep_type
+  type t = rocq_constr
   let compare = compare
 end
 
@@ -107,7 +101,7 @@ let unk_provider =
    we need to create a fresh unknown, bind it to the other unknown and 
    raise an equality check *)
 let rec raiseMatch (k : umap) (c : constructor) (rs : range list) (eqs: EqSet.t) 
-        : (umap * matcher_pat * EqSet.t) option = 
+        : (umap * NewGenericLib.pat * EqSet.t) option = 
   (foldM (fun (k, l, eqs) r ->
          match r with 
          | Ctr (c', rs') ->
@@ -118,10 +112,10 @@ let rec raiseMatch (k : umap) (c : constructor) (rs : range list) (eqs: EqSet.t)
               lookup u k >>= fun r' ->
               begin match r' with 
               | Undef _ -> (* The unknown should now be fixed *)
-                 Some (UM.add u FixedInput k, (MatchU u)::l, eqs)
+                 Some (UM.add u FixedInput k, (PVar u)::l, eqs)
               | FixedInput -> (* The unknown is already fixed, raise an eq check *)
                  let u' = unk_provider.next_unknown () in
-                 Some (UM.add u' (Unknown u) k, (MatchU u')::l, eq_set_add u' u eqs)
+                 Some (UM.add u' (Unknown u) k, (PVar u')::l, eq_set_add u' u eqs)
               | Ctr (c', rs') ->
                  raiseMatch k c' rs' eqs >>= fun (k', m, eqs') ->
                  Some (k', m :: l, eqs')
@@ -130,10 +124,10 @@ let rec raiseMatch (k : umap) (c : constructor) (rs : range list) (eqs: EqSet.t)
               | Parameter _p -> failwith "QC Internal: Does this occur (Parameter in match)?"
               end
             in go u
-         | Parameter p -> Some (k, MatchParameter p :: l, eqs)
-         | _ -> failwith "Toplevel ranges should be Unknowns or constructors"
+         | Parameter _ -> Some (k, NewGenericLib.PParam :: l, eqs)
+         | _ -> failwith "RM: Toplevel ranges should be Unknowns or constructors"
         ) (Some (k, [], eqs)) rs) >>= fun (k', l, eqs') ->
-  Some (k', MatchCtr (c, List.rev l), eqs')
+  Some (k', PCtr (c, List.rev l), eqs')
 
 (* Invariants: 
    -- Everything has a binding, even if just Undef 
@@ -143,10 +137,10 @@ let rec raiseMatch (k : umap) (c : constructor) (rs : range list) (eqs: EqSet.t)
    -- Only unknowns can be bound to Undef/FixedInput
 *)
 let rec unify (k : umap) (r1 : range) (r2 : range) (eqs : EqSet.t)
-        : (umap * range * EqSet.t * (unknown * matcher_pat) list) option =
+        : (umap * range * EqSet.t * (unknown * NewGenericLib.pat) list) option =
   msg_debug (str (Printf.sprintf "Calling unify with %s %s" (range_to_string r1) (range_to_string r2)) ++ fnl ());
   match r1, r2 with
-  | Unknown u1, Unknown u2 ->
+  | Unknown u1, Unknown u2 -> 
      if u1 = u2 then Some (k, Unknown u1, eqs, []) else
      lookup u1 k >>= fun r1 -> 
      lookup u2 k >>= fun r2 ->
@@ -186,11 +180,9 @@ let rec unify (k : umap) (r1 : range) (r2 : range) (eqs : EqSet.t)
                                          (String.concat " " (List.map range_to_string rs2)))
                          ++ fnl ());
         if c1 = c2 then 
-          foldM (fun b a -> let (r1, r2) = a in 
-                            let (k, l, eqs, ms) = b in 
-                            unify k r1 r2 eqs >>= fun res ->
-                            let (k', r', eqs', ms') = res in 
-                            Some (k', r'::l, eqs', ms @ ms')
+          foldM (fun (k, l, eqs, ms) (r1, r2) -> 
+                  unify k r1 r2 eqs >>= fun (k', r', eqs', ms') ->
+                  Some (k', r'::l, eqs', ms @ ms')
                 ) (Some (k, [], eqs, [])) (List.combine rs1 rs2) >>= fun (k', rs', eqs', ms) ->
           Some (k', Ctr (c1, List.rev rs'), eqs', ms)
         else None
@@ -214,11 +206,9 @@ let rec unify (k : umap) (r1 : range) (r2 : range) (eqs : EqSet.t)
                                          (String.concat " " (List.map range_to_string rs2)))
                          ++ fnl ());
       if c1 = c2 then 
-        foldM (fun b a -> let (r1, r2) = a in 
-                          let (k, l, eqs, ms) = b in 
-                          unify k r1 r2 eqs >>= fun res ->
-                          let (k', r', eqs', ms') = res in 
-                          Some (k', r'::l, eqs', ms @ ms')
+        foldM (fun (k, l, eqs, ms) (r1, r2) -> 
+                unify k r1 r2 eqs >>= fun (k', r', eqs', ms') ->
+                Some (k', r'::l, eqs', ms @ ms')
               ) (Some (k, [], eqs, [])) (List.combine rs1 rs2) >>= fun (k', rs', eqs', ms) ->
         Some (k', Ctr (c1, List.rev rs'), eqs', ms)
       else None
@@ -253,7 +243,7 @@ let rec unify (k : umap) (r1 : range) (r2 : range) (eqs : EqSet.t)
       if p = q then Some (k, Parameter p, eqs, []) else None
    | _, _ -> failwith "QC Internal: TopLevel ranges should be Unknowns or Constructors"
 
-let rec fixRange u r k = 
+let rec fixRange (u : unknown) (r : range) (k : umap) : umap = 
     match r with 
     | FixedInput -> k
     | Undef _ -> UM.add u FixedInput k 
@@ -266,7 +256,7 @@ let rec fixRange u r k =
     | Parameter _p -> k
     | RangeHole -> failwith "QC Internal: RangeHole in fixrange"
 
-let fixVariable x k =
+let fixVariable (x : unknown) (k : umap) : umap =
   try fixRange x (UM.find x k) k
   with Not_found -> UM.add x FixedInput k
 
@@ -292,7 +282,7 @@ let rec is_fixed_range k = function
        
 let is_fixed k dt = 
   option_map (is_fixed_range k) (convert_to_range dt)
-
+(* 
 (* convert a range to a coq expression *)
 let rec range_to_coq_expr k r = 
   match r with 
@@ -332,26 +322,26 @@ let rec dt_to_coq_expr k dt =
   | DApp (dt, dts) ->
      gApp ~explicit:true (dt_to_coq_expr k dt) (List.map (dt_to_coq_expr k) dts)
   | DHole -> hole
-  | _ -> failwith "QC Internal: dt_to_coq_expr"
+  | _ -> failwith "QC Internal: dt_to_coq_expr" *)
   
-let rec is_dep_type = function
-  | DArrow (dt1, dt2) -> is_dep_type dt1 || is_dep_type dt2 
-  | DProd ((_, dt1), dt2) -> is_dep_type dt1 || is_dep_type dt2 
+let rec is_rocq_constr = function
+  | DArrow (dt1, dt2) -> is_rocq_constr dt1 || is_rocq_constr dt2 
+  | DProd ((_, dt1), dt2) -> is_rocq_constr dt1 || is_rocq_constr dt2 
   | DTyParam _ -> false
   | DTyVar _ -> true
   | DCtr _ -> true
-  | DTyCtr (_, dts) -> List.exists is_dep_type dts
-  | DApp (dt, dts) -> List.exists is_dep_type (dt::dts)
-  | DNot dt -> is_dep_type dt
+  | DTyCtr (_, dts) -> List.exists is_rocq_constr dts
+  | DApp (dt, dts) -> List.exists is_rocq_constr (dt::dts)
+  | DNot dt -> is_rocq_constr dt
   | DHole -> false
-
-type check = (coq_expr -> coq_expr) * int
-
+(* 
+type check = (coq_expr -> coq_expr) * int *)
+(* 
 module CMap = Map.Make(OrdDepType)
-type cmap = (check list) CMap.t
-
+type cmap = (check list) CMap.t *)
+(* 
 let lookup_checks k m = try Some (CMap.find k m) with Not_found -> None
-
+(*  *)
 (* TODO: When handling parameters, this might need to add additional arguments *)
 (** Takes an equality map and two coq expressions [cleft] and [cright]. [cleft]
     is returned if all of the equalities hold, otherwise [cright] is
@@ -366,19 +356,19 @@ let handle_equalities init_size eqs (check_expr : coq_expr -> 'a -> 'a -> 'a -> 
                    ; init_size]
                in
                check_expr checker c cright cfuel
-             ) eqs cleft
-
-type mode = Recursive of (Unknown.t * dep_type) list
-                       * (Unknown.t * dep_type) list
+             ) eqs cleft *)
+(* 
+type mode = Recursive of (Unknown.t * rocq_constr) list
+                       * (Unknown.t * rocq_constr) list
                        * range list
-          | NonRecursive of (Unknown.t * dep_type) list (* List of all unknowns that are still undefined *)
-
+          | NonRecursive of (Unknown.t * rocq_constr) list List of all unknowns that are still undefined
+(*  *)
 type range_mode =
   | ModeFixed
-  | ModeUndefUnknown of (Unknown.t * dep_type)
-  | ModePartlyDef of ((Unknown.t * Unknown.t) list * (Unknown.t * dep_type) list * matcher_pat)
-  | ModeParameter
-
+  | ModeUndefUnknown of (Unknown.t * rocq_constr)
+  | ModePartlyDef of ((Unknown.t * Unknown.t) list * (Unknown.t * rocq_constr) list * matcher_pat)
+  | ModeParameter *)
+(* 
 let range_mode_to_string = function
   | ModeFixed -> "Fixed"
   | ModeParameter -> "Param"
@@ -463,12 +453,12 @@ let isTyParam = function
   | DTyParam _ -> true
   | _ -> false 
 
-let quickchick_cat =
+(* let quickchick_cat =
 #if COQ_VERSION >= (8, 18, 0)
   CWarnings.create_category ~name:"quickchick" ()
 #else
   "quickchick"
-#endif
+(* #endif *)
 
 let warn_uninstantiated_variables =
   CWarnings.create ~name:"quickchick-uninstantiated-variables"
@@ -477,13 +467,13 @@ let warn_uninstantiated_variables =
     (fun allUnknowns ->
       str "After proccessing all constraints, there are still uninstantiated variables: "
       ++ prlist_with_sep (fun _ -> strbrk " , ") str (List.map var_to_string allUnknowns)
-      ++ str ". Proceeding with caution..."
+      (* ++ str ". Proceeding with caution..."
       ++ fnl ())
-       
+        *)
 let handle_branch
       (*      (type a) (type b) (* I've started to love ocaml again because of this *) *)
       (prod_class_names : string list)
-      (_dep_type : dep_type)
+      (_rocq_constr : rocq_constr)
       (init_size : coq_expr)
       (fail_exp : coq_expr)
       (not_enough_fuel_exp : coq_expr)
@@ -500,8 +490,8 @@ let handle_branch
       (let_tuple_in_expr : var -> var list -> coq_expr -> coq_expr)
       (gen_ctr : ty_ctr)
       (init_umap : range UM.t)
-      (init_tmap : dep_type UM.t)
-      (input_ranges : range list)
+      (init_tmap : rocq_constr UM.t)
+      (input_ranges : range list) *)
       (result : Unknown.t)
       (c : dep_ctr)
     : (coq_expr * bool) =
@@ -534,7 +524,7 @@ let handle_branch
   register_unknowns typ;
 
   msg_debug (str "Debug branch" ++ fnl ());
-  msg_debug (str ("Calculating ranges: " ^ dep_type_to_string (dep_result_type typ)) ++ fnl ());
+  msg_debug (str ("Calculating ranges: " ^ rocq_constr_to_string (dep_result_type typ)) ++ fnl ());
 
   (* !! Possibility of failure: 
      The conclusion of each constructor must not contain function calls.
@@ -549,17 +539,17 @@ let handle_branch
        begin match sequenceM convert_to_range (List.filter (fun dt -> not (isTyParam dt)) dts) with
        | Some ranges -> ranges
        | None ->
-          qcfail (Printf.sprintf "Arguments to result of constructor %s can only be variables or constructors applied to variables: %s" (constructor_to_string ctr) (dep_type_to_string res))
+          qcfail (Printf.sprintf "Arguments to result of constructor %s can only be variables or constructors applied to variables: %s" (constructor_to_string ctr) (rocq_constr_to_string res))
        end
     | res ->
-       qcfail (Printf.sprintf "Result type of constructor %s is not a type constructor applied to arguments: %s" (constructor_to_string ctr) (dep_type_to_string res))
+       qcfail (Printf.sprintf "Result type of constructor %s is not a type constructor applied to arguments: %s" (constructor_to_string ctr) (rocq_constr_to_string res))
   in 
 
   (* Debugging init map *)
-  msg_debug (str ("Handling branch: " ^ dep_type_to_string typ) ++ fnl ());
+  msg_debug (str ("Handling branch: " ^ rocq_constr_to_string typ) ++ fnl ());
   UM.iter (fun x r -> msg_debug (str ("Bound: " ^ (var_to_string x) ^ " to Range: " ^ (range_to_string r)) ++ fnl ())) !umap;
-  dep_fold_ty (fun _ dt1 -> msg_debug (str (Printf.sprintf "%s : %b\n" (dep_type_to_string dt1) (is_dep_type dt1)) ++ fnl()))
-    (fun _ _ dt1 -> msg_debug (str (Printf.sprintf "%s : %b\n" (dep_type_to_string dt1) (is_dep_type dt1)) ++ fnl()))
+  dep_fold_ty (fun _ dt1 -> msg_debug (str (Printf.sprintf "%s : %b\n" (rocq_constr_to_string dt1) (is_rocq_constr dt1)) ++ fnl()))
+    (fun _ _ dt1 -> msg_debug (str (Printf.sprintf "%s : %b\n" (rocq_constr_to_string dt1) (is_rocq_constr dt1)) ++ fnl()))
     (fun _ -> ()) (fun _ -> ()) (fun _ -> ()) (fun _ -> ()) typ;
   (* End debugging *)
 
@@ -673,13 +663,13 @@ let handle_branch
   (* Another helper function that ensures no function calls are left in the representation.
      Traverses the representation of each datatype and whenever it encounters a 
      function call, it evaluates it after potentially instantiating its arguments, 
-     binds the result to a fresh unknown, and creates a new dep_type.
+     binds the result to a fresh unknown, and creates a new rocq_constr.
 
      Assumes: 
      The input datatypes are range-convertible apart from any function calls.
    *)
   (* For your sanity, ask someone to explain this function before tweaking anything. *)
-  let rec instantiate_function_calls_cont dts (acc : dep_type list) (cont : dep_type list -> coq_expr) : coq_expr =
+  let rec instantiate_function_calls_cont dts (acc : rocq_constr list) (cont : rocq_constr list -> coq_expr) : coq_expr =
     match dts with 
     | [] -> cont (List.rev acc)
     | dt::dts' -> 
@@ -729,7 +719,7 @@ let handle_branch
        | DHole ->
           (* Just continue along instantiating the rest of the function calls *)
           instantiate_function_calls_cont dts' (DHole :: acc) cont
-       | _ -> failwith ("Not a type! " ^ (dep_type_to_string dt))
+       | _ -> failwith ("Not a type! " ^ (rocq_constr_to_string dt))
        end
   in 
 
@@ -752,12 +742,12 @@ let handle_branch
      
    *)
   let rec handle_TyCtr (ctr_index : int) (is_pos : bool) (c : ty_ctr)
-            (dts : dep_type list) (dt' : dep_type) =
+            (dts : rocq_constr list) (dt' : rocq_constr) =
 
-    (* First instantiate the function calls in the dep_type list *)
+    (* First instantiate the function calls in the rocq_constr list *)
     instantiate_function_calls_cont dts [] (fun dts' ->
 
-    (* Convert the modified dep_types to ranges *)
+    (* Convert the modified rocq_constrs to ranges *)
     let ranges = match sequenceM convert_to_range dts' with
       | Some ranges -> ranges
       | None -> qcfail "Internal: After instantiating function calls, datatypes should be convertible to ranges."
@@ -1332,8 +1322,8 @@ let handle_branch
     | Recursive (unknowns_for_mode, remaining_unknowns, actual_inputs) ->
 
        msg_debug (str "Mode analysis: Recursive." ++ fnl ());
-       let ums = String.concat " " (List.map (fun (u,t) -> Unknown.to_string u ^ " : " ^ dep_type_to_string t) unknowns_for_mode) in
-       let rus = String.concat " " (List.map (fun (u,t) -> Unknown.to_string u ^ " : " ^ dep_type_to_string t) remaining_unknowns) in
+       let ums = String.concat " " (List.map (fun (u,t) -> Unknown.to_string u ^ " : " ^ rocq_constr_to_string t) unknowns_for_mode) in
+       let rus = String.concat " " (List.map (fun (u,t) -> Unknown.to_string u ^ " : " ^ rocq_constr_to_string t) remaining_unknowns) in
        let ais = String.concat " " (List.map range_to_string actual_inputs) in
        msg_debug (str (ums ^ " - " ^ rus ^ " - " ^ ais) ++ fnl ());
        (* Mark recursiveness of branch *)
@@ -1408,7 +1398,7 @@ let handle_branch
 
        (* Calculate arguments *)
        let args =
-         msg_debug (str ("Calculating arguments with: " ^ (String.concat " " (List.map dep_type_to_string dts))) ++ fnl ());
+         msg_debug (str ("Calculating arguments with: " ^ (String.concat " " (List.map rocq_constr_to_string dts))) ++ fnl ());
          List.map (dt_to_coq_expr !umap) dts
 (*         match sequenceM (dt_to_coq_expr !umap) dts with
          | Some rs -> rs
@@ -1522,7 +1512,7 @@ let handle_branch
             | _ -> CMap.add (DTyVar x) [(new_check, m)] cmap in
           recurse_type (m + 1) k cmap' dt2
         end
-      | [(i, dt) ] -> failwith ("Internal error: not a variable to be generated for" ^ (dep_type_to_string dt)) 
+      | [(i, dt) ] -> failwith ("Internal error: not a variable to be generated for" ^ (rocq_constr_to_string dt)) 
 
       (* Multiple arguments to be generated for. Generalized arbitrarySizeST? *)
       | filtered -> if pos then begin
@@ -1587,7 +1577,7 @@ let handle_branch
 
              (* TODO: Special handling for equality? *)
              
-(*          | _ -> failwith (Printf.sprintf "Mode failure: %s\n" (String.concat " " (List.map (fun (i,d) -> Printf.sprintf "(%d, %s)" i (dep_type_to_string d)) filtered))) *)
+(*          | _ -> failwith (Printf.sprintf "Mode failure: %s\n" (String.concat " " (List.map (fun (i,d) -> Printf.sprintf "(%d, %s)" i (rocq_constr_to_string d)) filtered))) *)
                              end
         else failwith "TODO: Negation with many things to be generated"
       in 
@@ -1622,8 +1612,8 @@ let handle_branch
       instantiate_function_calls_cont k cmap numbered_dts []
  *)
 (*    
-    and handle_app m (pos : bool) (f : dep_type) (xs : dep_type list)
-                   (k : umap) (cmap : cmap) (dt2 : dep_type) =
+    and handle_app m (pos : bool) (f : rocq_constr) (xs : rocq_constr list)
+                   (k : umap) (cmap : cmap) (dt2 : rocq_constr) =
       (* Construct the checker for the current application *)
       let checker args = 
         gApp ~explicit:true (gInject "dec") 
@@ -1689,12 +1679,12 @@ let handle_branch
 
     (* Iterate through constraints *)
     and recurse_type (n : int) dt : coq_expr =
-      msg_debug (str ("Recursing on type: " ^ dep_type_to_string dt) ++ fnl ());
+      msg_debug (str ("Recursing on type: " ^ rocq_constr_to_string dt) ++ fnl ());
       match dt with 
       | DProd (_, dt) -> (* Only introduces variables, doesn't constrain them *)
         recurse_type n dt
       | DArrow (dt1, dt2) ->
-        msg_debug (str ("Darrowing: " ^ ((dep_type_to_string dt1))) ++ fnl ());
+        msg_debug (str ("Darrowing: " ^ ((rocq_constr_to_string dt1))) ++ fnl ());
         handle_dt n true dt1 dt2
       | DTyCtr _ -> (* result *) 
          (* Instantiate result *)
@@ -1745,4 +1735,187 @@ let handle_branch
   (* debug_coq_expr branch_gen;  *)
   (* End debugging *)
 
-  (branch_gen ,!is_base)
+  (branch_gen ,!is_base) *)
+
+let rec evaluate_range (umap : umap) (r : range) : rocq_constr option =
+  match r with
+  | Ctr (c, args) ->
+    sequenceM (evaluate_range umap) args >>= fun args' ->
+      Some (DCtr (c, args'))
+  | Unknown u -> 
+    (match evaluate_var umap u with
+    | None -> Some (DTyVar u)
+    | Some x -> Some x)
+  | Undef _ -> None
+  | FixedInput -> None
+  | Parameter p -> Some (DTyParam p)
+  | RangeHole -> Some DHole
+
+(*PREC : NO UNKNOWN CYCLES IN UMAP*)
+and evaluate_var (umap : umap) (v : unknown) : rocq_constr option = 
+  lookup v umap >>= function
+  | Undef _ -> Some (DTyVar v)
+  | FixedInput -> Some (DTyVar v)
+  | Unknown u -> 
+    (match evaluate_var umap u with
+    | None -> Some (DTyVar u)
+    | Some x -> Some x)
+  | Parameter p -> Some (DTyParam p)
+  | RangeHole -> Some DHole
+  | Ctr (c, args) ->
+    sequenceM (evaluate_range umap) args >>= fun args' ->
+      Some (DCtr (c, args'))
+
+let get_schedule_sort (concl : rocq_constr) (output_vars : unknown list) (ctr_name : ty_ctr option) (umap : umap) (ds : derive_sort) (opt : bool) : schedule_sort option =
+  match ds with
+  | D_Check -> Some CheckerSchedule 
+  | D_Thm -> Some (TheoremSchedule concl)
+  | D_Gen | D_Enum ->
+    Feedback.msg_debug (str ("SCHEDSORT output_vars " ^ String.concat ", " (List.map Unknown.to_string output_vars)) ++ fnl ());
+    sequenceM (evaluate_var umap) output_vars >>= fun output_values ->
+      let producer_type = (match ds with D_Gen -> PS_G | D_Enum -> PS_E | _ -> failwith "impossible") in
+      let conclusion = 
+        if opt then 
+          rocq_constr_tuple_of_list output_values
+        else
+          (match ctr_name with
+          | Some ctr_name -> DTyCtr (ctr_name, output_values)
+          | None -> failwith "No constructor name given for Non theorem schedule.")
+      in
+      Some (ProducerSchedule (opt, producer_type, conclusion))
+
+let rec correct_var (umap : umap) (v : unknown) : unknown =
+  match lookup v umap with
+  | Some (Unknown u) -> correct_var umap u
+  | _ -> v
+
+let rec correct_rocq_constr (umap : umap) (c : rocq_constr) : rocq_constr =
+  match c with
+  | DTyVar v -> DTyVar (correct_var umap v)
+  | DTyParam p -> DTyParam p
+  | DHole -> DHole
+  | DCtr (c, args) ->
+    DCtr (c, List.map (correct_rocq_constr umap) args)
+  | DTyCtr (c, args) ->
+    DTyCtr (c, List.map (correct_rocq_constr umap) args)
+  | DNot c -> DNot (correct_rocq_constr umap c)
+  | DApp (c, args) ->
+    DApp (correct_rocq_constr umap c, List.map (correct_rocq_constr umap) args)
+  | DProd (v, c) ->
+    DProd (v, correct_rocq_constr umap c)
+  | DArrow (c1, c2) ->
+    DArrow (correct_rocq_constr umap c1, correct_rocq_constr umap c2)
+
+let rec correct_pat (umap : umap) (p : pat) : pat =
+  match p with
+  | PVar v -> PVar (correct_var umap v)
+  | PCtr (c, args) ->
+    PCtr (c, List.map (correct_pat umap) args)
+  | PParam -> PParam
+  | PWild -> PWild
+
+let correct_src (umap : umap) (src : source) : source =
+  match src with
+  | SrcNonrec ty -> SrcNonrec (correct_rocq_constr umap ty)
+  | SrcRec (r, tys) -> SrcRec (r,List.map (correct_rocq_constr umap) tys)
+
+let rec correct_variables (umap : umap) (scd : schedule_step list) : schedule_step list =
+  match scd with
+  | [] -> []
+  | S_Match (u, p) :: scd' ->
+    S_Match (correct_var umap u, correct_pat umap p) :: correct_variables umap scd'
+  | S_UC (u, src, dst) :: scd' ->
+    S_UC (correct_var umap u, correct_src umap src, dst) :: correct_variables umap scd'
+  | S_ST (uts, src, dst) :: scd' ->
+    S_ST (List.map (fun (v,t) -> correct_var umap v, t) uts, correct_src umap src, dst) :: correct_variables umap scd'
+  | S_Check src :: scd' ->
+    S_Check (correct_src umap src) :: correct_variables umap scd'
+
+
+let type_to_schedules (typ : rocq_constr) (ind_name : ty_ctr option) (ctr_name : ty_ctr option) (result_vars : (var * rocq_constr) list) (output_vars : var list) (ds : derive_sort) opt : (schedule * (var * pat) list * (var * var) list) list = 
+
+  let vars, hyps, concl = type_info typ in
+
+  let add_all vars range_f umap = List.fold_left (fun umap v -> UM.add v (range_f v) umap) umap vars in
+
+  let init_umap' : umap = List.fold_left (fun umap (v, ty) ->
+    if List.mem v output_vars then 
+      UM.add v (Undef ty) umap 
+    else
+      UM.add v FixedInput umap) UM.empty result_vars in
+  let init_umap = List.fold_left (fun umap (v, ty) -> UM.add v (Undef ty) umap) init_umap' vars in
+  
+  let rec unify_range_lists (dt_args : range list) (concl_args : range list)
+    (umap : umap) (eqs : EqSet.t) matches : (umap * EqSet.t * (unknown * NewGenericLib.pat) list) option =
+    (* Unify the two ranges, updating the mapping and equation set as necessary. *)
+    Feedback.msg_debug (str ("Unifying range lists: " ^ String.concat ", " (List.map range_to_string dt_args) ^ " with " ^ String.concat ", " (List.map range_to_string concl_args)) ++ fnl ());
+    match dt_args, concl_args with
+    | [], [] -> Some (umap, eqs, matches)
+    | r1 :: rs, r2 :: rs' ->
+      Feedback.msg_debug (str ("Unifying " ^ range_to_string r1 ^ " with " ^ range_to_string r2) ++ fnl ());
+      begin match unify umap r1 r2 eqs with
+      | Some (umap', _unified_range, eqs', matcher_list) ->
+          let matches' = matcher_list @ matches in
+          unify_range_lists rs rs' umap' eqs' matches'
+      | None -> failwith "Failed to unify unify_range_lists"
+      end
+    | _ -> failwith "Mismatched lengths in unify_range_lists" in
+
+  let result_ranges = List.map (fun (v, _) -> Unknown v) result_vars in
+
+  Feedback.msg_debug (str ("Result ranges: " ^ String.concat ", " (List.map range_to_string result_ranges)) ++ fnl ());
+
+  let state = 
+      match ds, concl with
+      | D_Thm, _ -> Some (init_umap, EqSet.empty, [])
+      | _, DTyCtr (c, args) ->
+        sequenceM convert_to_range args >>= fun args_ranges ->
+        unify_range_lists args_ranges result_ranges init_umap EqSet.empty []
+      | _, _ -> failwith "Conclusion is not a TyCtr"
+  in
+
+  let rec is_range_fixed umap = function
+    | FixedInput -> true
+    | Undef _ -> false
+    | Unknown u -> 
+      (match lookup u umap with
+      | None -> false
+      | Some r -> is_range_fixed umap r)
+    | Ctr (_, args) -> List.for_all (is_range_fixed umap) args
+    | r -> failwith ("Unexpected case in is_range_fixed" ^ range_to_string r) in
+
+  let eq_check (u1,u2) : schedule_step =
+    S_Check (SrcNonrec (DTyCtr (constructor_of_string "Coq.Init.Logic.eq", [DTyVar u1; DTyVar u2]))) in
+
+  let output_indices = filter_mapi (fun i (v,_) -> if List.mem v output_vars then Some i else None) result_vars in
+
+  let is_fixed umap v = is_range_fixed umap (Unknown v) in
+
+  match state with
+  | Some (umap, eqs, matches) ->
+    (match get_schedule_sort concl (if opt then output_vars else List.map fst vars) ctr_name umap ds opt with
+    | Some sort -> 
+      let fixed_vars = List.filter_map (fun (v,_) -> if is_fixed umap v then Some v else None) vars in
+      let eq_checks = EqSet.elements eqs in
+      let rec_name = match ind_name with Some n -> n | _ -> ty_ctr_of_string "nonsense" in
+      Feedback.msg_debug (str ("Fixed vars: " ^ String.concat ", " (List.map var_to_string fixed_vars)) ++ fnl ());
+      List.map (fun schedule_steps -> ((correct_variables umap schedule_steps, sort), matches, eq_checks)) 
+        (possible_schedules vars hyps fixed_vars (rec_name, output_indices) ds)
+    | None -> failwith "Failed to construct schedule sort")
+  | None -> failwith "Failed to construct state"
+
+let match_schedule_to_string ((sch,fin) : schedule) (ms : (unknown * pat) list) (eqs : (unknown * unknown) list) : string =
+  let open NewGenericLib in
+  (* let print_match (uk, m) = Printf.sprintf "let %s = %s in" (Unknown.to_string uk) (pat_to_string m) in
+  let print_matches = String.concat "\n" (List.map print_match ms) in
+  print_matches ^ "\n" ^ (schedule_to_string sch) *)
+  let check_eq (u1,u2) = S_Check (SrcNonrec (DTyCtr (constructor_of_string "Coq.Init.Logic.eq", [DTyVar u1; DTyVar u2]))) in
+  schedule_to_string (List.map (fun (u,p) -> S_Match (u,p)) ms @ List.map check_eq eqs @ sch, fin)
+
+  (* let schedules_str = List.mapi (fun i sch -> string_of_int i ^ ":\n" ^ schedule_to_string sch) schedules_sorted in
+  Feedback.msg_notice (str (String.concat "\n\n===================\n" schedules_str)); *)
+
+let match_schedule_as_pp_constr_expr ((sch,fin) : schedule) (ms : (unknown * pat) list) (eq_checks : (unknown * unknown) list) ds : Pp.t =
+  let check_eq (u1,u2) = S_Check (SrcNonrec (DTyCtr (constructor_of_string "Coq.Init.Logic.eq", [DTyVar u1; DTyVar u2]))) in
+  NewGenericLib.compile_and_pp_schedule (List.map (fun (u,p) -> S_Match (u,p)) ms @ List.map check_eq eq_checks @ sch, fin) ds
+

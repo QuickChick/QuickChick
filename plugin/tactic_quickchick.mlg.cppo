@@ -92,8 +92,8 @@ let remember_induct h =
       )
     end 
 
-let quickchick_goal =
-  Proofview.Goal.enter begin fun gl ->
+let quickchick_goal = Tacticals.tclIDTAC;;
+ (* Proofview.Goal.enter begin fun gl ->
 
     (* Convert goal to a constr_expr *)
     let c = Proofview.Goal.concl gl in
@@ -110,18 +110,18 @@ let quickchick_goal =
     let ct = Constrextern.extern_constr e evd (EConstr.mkEvar (evar, [])) in
 #endif
  *)  
-  match GenericLib.parse_dependent_type (EConstr.to_constr evd c) with
+  match NewGenericLib.parse_dependent_type (EConstr.to_constr evd c) with
     | Some dt ->
       begin
-        msg_debug (str (GenericLib.dep_type_to_string dt) ++ fnl ());
-        let open GenericLib in 
+        msg_debug (str (NewGenericLib.rocq_constr_to_string dt) ++ fnl ());
+        let open NewGenericLib in 
         let decide prop = decOptToBool (g_decOpt prop (gInt 1000)) in
         let rec mkProperty = function
           | DProd ((var, _),body) -> 
               g_forAll g_arbitrary (gFun [var_to_string var] (fun [_] ->
                 mkProperty body
                 )) 
-          | DArrow (x,y) -> GenericLib.debug_coq_expr (gType' [] x); gIf (decide (gType' [] x)) (mkProperty y) (g_checker gTT)
+          | DArrow (x,y) -> NewGenericLib.debug_coq_expr (gType' [] x); gIf (decide (gType' [] x)) (mkProperty y) (g_checker gTT)
           | p -> g_checker (decide (gType' [] p)) 
               in
           
@@ -134,10 +134,10 @@ let quickchick_goal =
           | DNot p -> *)
 (*Use decOpt, for every arrow, assume instacne exists and match on it *)
             
-        GenericLib.debug_coq_expr (mkProperty dt);
+        NewGenericLib.debug_coq_expr (mkProperty dt);
         (*run the generator called checker using QuickCheck.*)
         (*failwith "OUch!";*)
-        let to_run = GenericLib.interp_open_coq_expr e evd (g_show (g_quickCheck (mkProperty dt))) in
+        let to_run = NewGenericLib.interp_open_coq_expr e evd (g_show (g_quickCheck (mkProperty dt))) in
         (*failwith "Oucher!";*)
 #if COQ_VERSION >= (8, 20, 0)
         (* FRAGILE probably won't be allowed in the future? *)
@@ -150,7 +150,7 @@ let quickchick_goal =
         Tacticals.tclIDTAC
       end
     | None -> failwith "Failed to Parse type"
-  end
+  end*)
 (*Create dependency graph, anything that lacks a dependency, print becuase we need it to *)
 (*    
     (* Make an evar with the goal as the type *)
@@ -280,6 +280,924 @@ let quickchick_goal =
 
 *)
 
+open NewGenericLib
+
+let is_inductive' (ty_name : ty_ctr) : bool =
+  let locate_result = Nametab.locate_all (ty_name) in
+  List.exists (function
+               | Names.GlobRef.IndRef _ -> true
+               | _ -> false) locate_result
+
+let get_inductive_name name : Names.inductive option =
+  let locate_result = Nametab.locate_all (name) in
+  List.find_map (function
+  | Names.GlobRef.IndRef ind -> Some ind
+  | Names.GlobRef.ConstructRef constructor -> Some (Names.inductive_of_constructor constructor)
+  | _ -> None) locate_result
+  
+let rec extract_inductives_from_type (typ : rocq_constr) : Names.inductive list =
+  match typ with
+  | DTyCtr (c, args) | DCtr (c, args)->
+    (match get_inductive_name c with
+    | Some ind -> ind :: List.concat_map extract_inductives_from_type args
+    | None -> msg_debug (str ("Inductive not found: " ^ ty_ctr_to_string c)); [])
+  | DApp (f, args) -> extract_inductives_from_type f @ List.concat_map extract_inductives_from_type args
+  | _ -> []
+
+let rec extract_inductives_rocq_constr (dt : rocq_constr) : Names.inductive list =
+  match dt with
+  | DProd ((_, t), dt) -> extract_inductives_from_type t @ extract_inductives_rocq_constr dt
+  | DArrow (t, dt) -> extract_inductives_from_type t @ extract_inductives_rocq_constr dt
+  | DTyCtr _ -> extract_inductives_from_type dt
+  | _ -> failwith "Rule hypotheses and conclusions must be inductive."
+
+let rec extract_names_rocq_constr (dt : rocq_constr) : ty_ctr list =
+  match dt with
+  | DProd ((_, DTyCtr (c,_)), ty2) -> 
+    if is_inductive' c then
+      c :: extract_names_rocq_constr ty2
+    else
+      failwith ("Rule hypotheses and conclusions must be inductive 1. Found: " ^ ty_ctr_to_string c ^ " " ^ rocq_constr_to_string dt)
+  | DProd ((_, DTyVar _), ty2) -> extract_names_rocq_constr ty2
+  | DProd ((_, DTyParam _), ty2) -> extract_names_rocq_constr ty2
+  | DArrow (DTyCtr (c,_), ty2) -> 
+    if is_inductive' c then
+      c :: extract_names_rocq_constr ty2
+    else
+      failwith ("Rule hypotheses and conclusions must be inductive 2. Found: " ^ ty_ctr_to_string c ^ " " ^ rocq_constr_to_string dt)
+  | DArrow (_, ty2) -> extract_names_rocq_constr ty2
+  | DTyCtr (_, _) -> []
+  | _ -> failwith ("Rule hypotheses and conclusions must be inductive 3. " ^ rocq_constr_to_string dt)
+
+let overall_type_inductive_names ((ind_name, params, rules, overall_type) : rocq_relation) : ty_ctr list =
+  extract_names_rocq_constr overall_type
+
+let constructors_used_inductive_names ((ind_name, params, rules, overall_type) : rocq_relation) : ty_ctr list =
+  remove_duplicates (List.concat_map (fun (cons, typ) -> extract_names_rocq_constr typ) rules)
+
+let rocq_relation_used_inductives' ((ind_name, params, rules, overall_type) : rocq_relation) : Names.Indset.t =
+  Names.Indset.of_list (extract_inductives_rocq_constr overall_type @ List.concat_map (fun (_,typ) -> extract_inductives_rocq_constr typ) rules)
+
+let inductive_to_rocq_relation ((mind,ix) : Names.inductive) : rocq_relation =
+  (* Lookup the mutual inductive body in the _global_ environment. *)
+  let mib = Environ.lookup_mind mind (Global.env ()) in
+  (* Parse each `one_inductive_body` into a rocq relation. All should succeed. *)
+  let rs = sequenceM oib_to_rocq_relation (Array.to_list mib.Declarations.mind_packets) in
+  match rs with
+  | None -> failwith ("Inductive not found: " ^ Names.MutInd.to_string mind)
+  | Some rs -> List.nth rs ix
+
+let inductives_used_in_inductive (ind : Names.inductive) : Names.Indset.t =
+  let rocq_relation = inductive_to_rocq_relation ind in
+  Names.Indset.add ind (rocq_relation_used_inductives' rocq_relation)
+
+let ty_ctr_to_rocq_relation (tycon : ty_ctr) =
+  match ty_ctr_to_rocq_relations tycon with
+  | None -> failwith ("Inductive not found: " ^ ty_ctr_to_string tycon)
+  | Some (idx, rels) -> try (List.nth rels idx) with _ -> failwith ("Inductive not found (nth failed in ty_ctr_to_rocq_relation): " ^ ty_ctr_to_string tycon)
+  
+let seek_ind_types_from_overall_type root : ty_ctr list =
+  let rec seek_ind_types ind_name visited : ty_ctr list =
+    if List.mem ind_name visited then
+      visited 
+    else
+      let rocq_relation = ty_ctr_to_rocq_relation ind_name in
+      let used_inds = constructors_used_inductive_names rocq_relation in
+      List.fold_left (fun visited' ind_name' -> seek_ind_types ind_name' visited') (ind_name :: visited) used_inds
+    in
+  let rocq_relation = ty_ctr_to_rocq_relation root in
+  let used_inds = overall_type_inductive_names rocq_relation in
+  
+  List.fold_left (fun visited' ind_name' -> seek_ind_types ind_name' visited') [root] used_inds
+
+let seek_rocq_relations root : rocq_relation list =
+  let rec seek_ind_types ind_name visited : rocq_relation Names.Indmap.t =
+    if Names.Indmap.mem ind_name visited then
+      visited 
+    else
+      let rocq_relation = inductive_to_rocq_relation ind_name in
+      let used_inds = rocq_relation_used_inductives' rocq_relation in
+      Names.Indset.fold (fun ind_name' visited'  -> seek_ind_types ind_name' visited') used_inds (Names.Indmap.add ind_name rocq_relation visited)
+    in
+  let map = seek_ind_types root Names.Indmap.empty in
+  List.map snd (Names.Indmap.bindings map)
+
+let print_type_names (inds : ty_ctr list) : unit =
+  List.iter (fun ind -> msg_debug (str (ty_ctr_to_string ind) ++ fnl ())) inds
+
+let seek_all_rocq_relation root_ind_name : rocq_relation list =
+  List.map (fun name -> ty_ctr_to_rocq_relation name) (seek_ind_types_from_overall_type root_ind_name)
+
+type constraint_type = FunConstraint | ConConstraint | FunConConstraint
+
+type constrained_arg =
+  | Constrained of var list * constraint_type
+  | Unconstrained of var
+
+type ind = ty_ctr * rocq_constr list
+  
+type constrained_ind =  ty_ctr * constrained_arg list 
+
+let constrain_check_ind ((ind_ctr, ind_args) : ind) : constrained_ind =
+  let rec collect_vars (ct : rocq_constr) : var list =
+    match ct with
+    | DTyParam p -> [p]
+    | DTyVar p -> [p]
+    | DTyCtr (c, args) -> List.concat_map collect_vars args
+    | DCtr (c, args) -> List.concat_map collect_vars args
+    | DApp (f, args) -> collect_vars f @ List.concat_map collect_vars args
+    | _ -> failwith "Inductive arguments must be constructors or params." in
+
+  let rec contains_constructor = function
+    | DTyCtr (_, _) | DCtr (_, _) -> true
+    | DApp (f, args) -> contains_constructor f || List.exists contains_constructor args
+    | _ -> false in
+
+  let rec contains_application = function
+    | DTyCtr (_, args) -> List.exists contains_application args
+    | DCtr (_, args) -> List.exists contains_application args
+    | DApp (_, _) -> true
+    | _ -> false in
+
+  let check_constraints (ct : rocq_constr) : constrained_arg =
+    match ct with
+    | DTyParam p | DTyVar p -> Unconstrained p 
+    | _ ->
+      let contains_constructor = contains_constructor ct in
+      let contains_application = contains_application ct in
+      if contains_constructor && contains_application then
+        Constrained (collect_vars ct, FunConConstraint)
+      else if contains_constructor then
+        Constrained (collect_vars ct, ConConstraint)
+      else if contains_application then
+        Constrained (collect_vars ct, FunConstraint)
+      else
+        failwith ("Inductive arguments must be constructors or params. This is not: " ^ rocq_constr_to_string ct) in
+  (ind_ctr, List.map check_constraints ind_args)
+
+type arity = int
+
+type output_index = int
+
+type rule = ty_ctr * constructor * arity * constrained_ind list * constrained_ind
+
+let rec rocq_constr_arity = function
+  | DProd ((_, _), t2) -> 1 + rocq_constr_arity t2
+  | DArrow (_, y) -> 1 + rocq_constr_arity y
+  | _ -> 0
+
+let rocq_relation_arity ((ind_name, params, rules, overall_type) : rocq_relation) : int =
+  match rules with
+  | [] -> rocq_constr_arity overall_type
+  | (cname, ctype) :: xs -> 
+    (match type_info ctype with
+    | (_,_,DTyCtr (ind, args)) -> List.length args
+    | _ -> failwith "Rule hypotheses and conclusions must be inductive.")
+
+let types_to_constructor_lookup (types : rocq_relation list) : (constructor * (constructor * arity) list) list =
+  let rocq_relation_collect_constructors ((ind_name, params, rules, overall_type) : rocq_relation) : (constructor * arity) list =
+    List.map (fun (name, typ) -> (name, rocq_constr_arity typ)) rules in
+  let constructor_to_constructors_map (a : ('a * 'b) list) : ('a * ('a * 'b) list) list =
+    List.map (fun (x,_) -> (x, a)) a in
+  List.concat_map (fun ind_rules -> constructor_to_constructors_map (rocq_relation_collect_constructors ind_rules)) types
+
+type constructor_map = (constructor * (constructor * arity) list) list
+
+let eq_basename c1 c2 = Libnames.qualid_basename c1 = Libnames.qualid_basename c2
+let eq_tyctr_basename c1 c2 = ty_ctr_basename c1 = ty_ctr_basename c2
+
+let find_type (c : constructor) (types : constructor_map) : (constructor * arity) list =
+  let rec assoc_opt_eq c l eq = match l with
+    | [] -> None
+    | (a, b) :: l -> if eq a c then Some b else assoc_opt_eq c l eq in 
+  match assoc_opt_eq c types eq_basename with
+  | None -> failwith ("Constructor not found: " ^ constructor_to_string c ^ " map: " ^ List.fold_left (fun acc (c, _) -> acc ^ ", " ^ constructor_to_string c) "" types)
+  | Some cs ->
+    msg_debug (str (List.fold_right (fun (c, a) acc -> constructor_to_string c ^ " " ^ string_of_int a ^ ", " ^ acc) cs "") ++ fnl ());
+      cs 
+
+type pattern =
+| PCtr of constructor * pattern list
+| PWild
+
+let rec string_of_pattern = 
+  function
+  | PCtr (c, []) -> constructor_to_string c
+  | PCtr (c, p :: ps) -> 
+    let cstr = constructor_to_string c in
+    (if cstr = "Tuple_" then "" else cstr) ^ "(" ^ string_of_pattern p ^ List.fold_left (fun acc p -> acc ^ ", " ^ string_of_pattern p) "" ps ^ ")"
+  | PWild -> "_"
+
+let tuple_name = ty_ctr_of_string "Tuple_"
+
+let rec map_maybe f = function
+  | [] -> []
+  | x :: xs -> 
+    (match f x with
+    | None -> map_maybe f xs
+    | Some y -> y :: map_maybe f xs)
+
+(*Gets patterns from conclusion of constructor*)
+let pattern_of_rocq_ctr (ctr : rocq_ctr) : constructor * pattern =
+  let rec pattern_args = function
+    | DCtr (c, args) -> Some (PCtr (c, map_maybe pattern_args args))
+    | DApp (DTyVar f, args) -> Some PWild
+    | DTyVar _ -> Some PWild
+    | DTyParam _ -> Some PWild
+    | DTyCtr (_,_) -> None (*Type argument*)
+    | a -> failwith ("Argument to " ^ constructor_to_string (fst ctr) ^ " must be constructors or function applications or variables. Found: " ^ rocq_constr_to_string a) in
+  let rec pattern_of_rocq_constr = function
+    | DProd ((_, _), t2) -> pattern_of_rocq_constr t2
+    | DArrow (_, y) -> pattern_of_rocq_constr y
+    | DTyCtr (ind, args) -> PCtr (tuple_name, map_maybe pattern_args args)
+    | a -> failwith ("Rule hypotheses and conclusions must be inductive: " ^ rocq_constr_to_string a) in
+  let (name, ctr_typ) = ctr in
+  msg_debug (str (rocq_constr_to_string ctr_typ) ++ fnl ());
+  (name, pattern_of_rocq_constr ctr_typ)
+
+let input_pattern_of_rocq_ctr (ctr : rocq_ctr) (ois : output_index list) : constructor * pattern =
+  let (cons, PCtr (_,patterns)) = pattern_of_rocq_ctr ctr in
+  let wildcard_indices ois patterns = List.mapi (fun i p -> if List.mem i ois then PWild else p) patterns in
+  (cons, PCtr (tuple_name, wildcard_indices ois patterns))
+
+let input_patterns_of_rocq_relation ((ind_name, params, rules, overall_type) : rocq_relation) (ois : output_index list) : (constructor * pattern) list =
+  List.map (fun ctr -> input_pattern_of_rocq_ctr ctr ois) rules
+
+(*Type of search trees*)
+type pattern_coverage_tree =
+  | PatternLeaf of pattern * constructor list 
+    (*the pattern describes the least granular space needed to describe coverage at this point, and the list of rules which provide coverage to it, if any.*)
+  | PatternNode of pattern * constructor list * int list * (constructor * pattern_coverage_tree) list (*The int list represents the path to the current wildcard thats being split*)
+
+let print_decomposed_pattern (dec : (constructor * int * int list) list) : unit =
+  msg_debug (str "Printing Decomposed Pattern" ++ fnl ());
+  let string_of_dec (c, n, path) = constructor_to_string c ^ " " ^ string_of_int n ^ " :" ^ List.fold_left (fun acc i -> acc ^ ", " ^ string_of_int i) "" path in 
+  List.iter (fun d -> msg_debug (str (string_of_dec d) ++ fnl ())) dec;
+  msg_debug (str "Finished Decomposed Pattern" ++ fnl ())
+
+let enumerate_list = List.mapi (fun i p -> p,i)
+
+let rec decompose_pattern_path (p : pattern) (path : int list): (constructor * int * int list) list =
+  match p with
+  | PCtr (c, ps) -> 
+      (c, List.length ps, path) :: List.concat_map (fun (p, i) -> decompose_pattern_path p (path @ [i])) (enumerate_list ps)
+  | PWild -> []
+
+let decompose_pattern (p : pattern) : (constructor * int * int list) list =
+  let dec = decompose_pattern_path p [] in print_decomposed_pattern dec; msg_debug (fnl ()); dec
+
+let rec apply_at (f : 'a -> 'a) (i : int) (l : 'a list) : 'a list =
+  match l, i with
+  | [], _ -> []
+  | x :: xs, 0 -> f x :: xs 
+  | x :: xs, i -> x :: apply_at f (i - 1) xs
+
+let rec apply_lookup eq (f : 'a -> 'a) (i : 'i) (l : ('i * 'a) list) : ('i * 'a) list =
+  match l with
+  | [] -> []
+  | (i', x) :: xs -> if eq i i' then (i', f x) :: xs else (i', x) :: apply_lookup eq f i xs
+
+let rec insert_at_path (p : pattern) (path : int list) (c : constructor) wilds : pattern =
+  match path with
+  | [] -> PCtr (c, wilds)
+  | i :: is -> 
+      match p with
+      | PCtr (c', ps) -> PCtr (c', apply_at (fun p' -> insert_at_path p' is c wilds) i ps)
+      | PWild -> failwith "Path is too long"
+
+let rec make_wilds n =
+  if n > 0 then PWild :: make_wilds (n - 1)
+  else [] 
+
+let rec label_tree label ptree : pattern_coverage_tree =
+  match ptree with
+  | PatternLeaf (p, rules) -> PatternLeaf (p, label :: rules)
+  | PatternNode (p, rules, path, branches) -> PatternNode (p, label :: rules, path, List.map (fun (c, p') -> (c, label_tree label p')) branches) 
+
+let rec pattern_at_path (path : int list) (p : pattern) : pattern =
+  match path with
+  | [] -> p
+  | i :: is ->
+      match p with
+      | PCtr (c, ps) -> pattern_at_path is (List.nth ps i)
+      | PWild -> PWild  
+
+let rec cover_single_pattern_layer (con : constructor)
+    (path : int list) (pat_so_far : pattern) (p : pattern_coverage_tree) 
+    (types : constructor_map) : pattern_coverage_tree =
+  match p with
+  | PatternLeaf (pat, rules)-> 
+      let constructors = find_type con types in
+      let new_pattern c arity = insert_at_path pat path c (make_wilds arity) in
+      let new_pattern_leaves = List.map (fun (c, arity) -> c, PatternLeaf (new_pattern c arity, rules)) constructors in
+      PatternNode (pat, rules, path, new_pattern_leaves)
+  | PatternNode (pat, rules, path', branches)->
+      if path = path' then 
+        PatternNode (pat, rules, path', branches)
+      else
+        begin match pattern_at_path path' pat_so_far with
+        | PWild -> 
+            PatternNode (pat, rules, path', 
+                         List.map (fun (c, p') -> (c, cover_single_pattern_layer con path pat_so_far p' types)) branches
+                        )
+        | PCtr (c, _) -> 
+            PatternNode (pat, rules, path', 
+                         apply_lookup eq_basename (fun p' -> cover_single_pattern_layer con path pat_so_far p' types) c branches
+                        )
+        end
+
+let rec subpattern (sub : pattern) (pat : pattern) : bool =
+  msg_debug (str ("sub: " ^ string_of_pattern sub ^ " | sup: " ^ string_of_pattern pat) ++ fnl ());
+  match sub, pat with
+  | _, PWild -> true
+  | PWild, PCtr (c, ps) -> false
+  | PCtr (subc, subps), PCtr (c, ps) -> 
+    if eq_basename subc c then
+      try (List.for_all2 (fun sub sup -> subpattern sub sup) subps ps) with Invalid_argument _ -> failwith "Patterns with same constructor have different argument count: subpattern"
+    else false
+
+let rec compatible_pattern (sub : pattern) (pat : pattern) : bool =
+  match sub, pat with
+  | _, PWild -> true
+  | PWild, PCtr (c, ps) -> true
+  | PCtr (subc, subps), PCtr (c, ps) ->
+    if eq_basename subc c then
+      try (List.for_all2 (fun sub sup -> compatible_pattern sub sup) subps ps) with Invalid_argument _ -> failwith "Patterns with same constructor have different argument count: compatible_pattern"
+    else false
+
+let rec label_subpatterns (rule_name : constructor) (pat : pattern) (pt : pattern_coverage_tree) : pattern_coverage_tree =
+  match pt with
+  | PatternLeaf (p, rules) -> if subpattern p pat then PatternLeaf (p, rule_name :: rules) else pt
+  | PatternNode (p, rules, path, branches) ->
+    msg_debug (str (constructor_to_string rule_name) ++ fnl ());
+    if subpattern p pat then label_tree rule_name pt else
+    if compatible_pattern p pat then
+      PatternNode (p, rules, path, List.map (fun (c, p') -> (c, label_subpatterns rule_name pat p')) branches)
+    else pt 
+
+let rec cover_decomposed_pattern (pat_so_far : pattern) (dec : (constructor * int * int list) list) (p : pattern_coverage_tree) (types : constructor_map) : pattern_coverage_tree =
+  match dec with
+  | [] -> p
+  | (c, n, path) :: rest ->
+      let new_p = cover_single_pattern_layer c path pat_so_far p types in 
+      let pat_so_far' = insert_at_path pat_so_far path c (make_wilds n) in
+      cover_decomposed_pattern pat_so_far' rest new_p types
+
+let pattern_tree_root : pattern_coverage_tree = PatternLeaf (PWild, [])
+
+let cover_pattern' (rule_name : constructor) (p : pattern) (types : constructor_map) (ptree : pattern_coverage_tree) : pattern_coverage_tree =
+  let dec = decompose_pattern p in
+  label_subpatterns rule_name p (cover_decomposed_pattern PWild dec ptree types)
+
+let cover_patterns (ps : (constructor * pattern) list) (types : constructor_map) root : pattern_coverage_tree =
+  List.fold_left (fun ptree (c, p) -> cover_pattern' c p types ptree) root ps
+
+let tuple_types arity = (tuple_name,[tuple_name,arity])
+
+let cover_tuple_patterns ps arity types = cover_patterns ps (tuple_types arity :: types) pattern_tree_root
+
+let rec map_patterns (f : pattern -> pattern) (tree : pattern_coverage_tree) : pattern_coverage_tree =
+  let f' = function
+    | PWild -> PWild
+    | a -> f a in
+  match tree with
+  | PatternLeaf (p, cs) -> PatternLeaf (f' p, cs)
+  | PatternNode (p, cs, path, branches) -> PatternNode (f' p, cs, path, List.map (fun (c, subtree) -> (c, map_patterns f' subtree)) branches) 
+
+let print_coverage_tree (ind : ty_ctr) (tree : pattern_coverage_tree) (ois : output_index list) = 
+  let replace_at_indices is x l = List.mapi (fun i y -> if List.mem i is then x else y) l in
+  let insert_output_in_leaf (PCtr (c, ps)) = PCtr (c, replace_at_indices ois (PCtr (constructor_of_string "OUT",[])) ps) in
+  let tree' = map_patterns insert_output_in_leaf tree in
+  let rec string_of_pattern = 
+    function
+    | PCtr (c, []) -> constructor_to_string c
+    | PCtr (c, p :: ps) -> 
+      let cstr = constructor_to_string c in
+      (if cstr = "Tuple_" then ty_ctr_to_string ind else cstr) ^ "(" ^ string_of_pattern p ^ List.fold_left (fun acc p -> acc ^ ", " ^ string_of_pattern p) "" ps ^ ")"
+    | PWild -> "_" in
+  let string_of_constructors = function
+    | [] -> "[]"
+    | c :: cs -> "[" ^ constructor_to_string c ^ List.fold_left (fun acc c -> acc ^ "; " ^ constructor_to_string c) "" cs ^ "]" in
+  let string_of_pattern_leaf (p, cs) = string_of_pattern p ^ " : " ^ string_of_constructors cs in
+  let rec print_tree indent = function
+    | PatternLeaf (p, cs) -> Feedback.msg_notice (str (String.make indent ' ' ^ string_of_pattern_leaf (p, cs)) ++ fnl ())
+    | PatternNode (p, cs, path, branches) -> 
+      Feedback.msg_notice (str (String.make indent ' ' ^ string_of_pattern p ^ " : " ^ string_of_constructors cs ) ++ fnl ());
+      List.iter (fun (c, subtree) -> print_tree (indent + 2) subtree) branches
+    in
+  print_tree 0 tree'
+
+
+(*Take in an inductive name and a rocq_ctr (a dependent constructor), and collect the hypotheses and conclusions*)
+let rule_of_rocq_ctr ind_name (ctr : rocq_ctr) : rule =
+  let (name, ctr_typ) = ctr in
+  let rec hyp_conc = function
+    | DProd ((_, _), t2) -> 
+      let (hyps, conc, arity) = hyp_conc t2 in
+      (hyps, conc, arity + 1)
+    | DArrow (DTyCtr (ind, args), y) -> 
+      let (hyps, conc, arity) = hyp_conc y in
+      ((ind,args) :: hyps, conc, arity)
+    | DArrow (DNot (DTyCtr (ind,args)),y) when eq_tyctr_basename ind (ty_ctr_of_string "Coq.Init.Logic.eq") ->  (* a <> b as a hypothesis affects the density little, 
+                                                                                                     assuming a and b are independently generated.
+                                                                                                     need to check for that later, for now, we just
+                                                                                                     drop any <> hypothesis regardless of its args.*)
+      let (hyps, conc, arity) = hyp_conc y in
+      (hyps, conc, arity)
+    | DTyCtr ((ind,args)) -> ([], (ind,args), 0)
+    | _ -> failwith "Rule hypotheses and conclusions must be inductive." in 
+  let (hyps, conc, arity) = hyp_conc ctr_typ in
+  (ind_name, name, arity, List.map constrain_check_ind hyps, constrain_check_ind conc)
+
+let rocq_relation_rules ((ind_name, params, rules, overall_type) : rocq_relation) : rule list =
+  List.map (rule_of_rocq_ctr ind_name) rules
+
+type rule_density = 
+  | Checking
+  | Backtracking
+  | Partial
+  | Total
+
+let rec collect_leaves (tree : pattern_coverage_tree) : (pattern * constructor list) list =
+  match tree with
+  | PatternLeaf (p, cs) -> [(p,cs)]
+  | PatternNode (_, _, _, branches) ->
+      List.concat_map (fun (_, subtree) -> collect_leaves subtree) branches
+
+let print_pattern_leaves (ind : ty_ctr) (tree : pattern_coverage_tree) (ois : output_index list) (densities : (constructor * rule_density) list) : unit =
+  let rec string_of_pattern = 
+    function
+    | PCtr (c, []) -> constructor_to_string c
+    | PCtr (c, p :: ps) -> 
+      let cstr = constructor_to_string c in
+      (if cstr = "Tuple_" then ty_ctr_to_string ind else cstr) ^ "(" ^ string_of_pattern p ^ List.fold_left (fun acc p -> acc ^ ", " ^ string_of_pattern p) "" ps ^ ")"
+    | PWild -> "_" in
+  let density_to_string = function
+    | Checking -> "Checking"
+    | Backtracking -> "Backtracking"
+    | Partial -> "Partial" in
+  let string_of_constructors = function
+    | [] -> "[]"
+    | (c,d) :: cs -> "[" ^ constructor_to_string c ^ ": " ^ density_to_string d ^ List.fold_left (fun acc (c,d) -> acc ^ "; " ^ constructor_to_string c ^ ": " ^ density_to_string d) "" cs ^ "]" in
+  let string_of_pattern_leaf (p, cs) = string_of_pattern p ^ " : " ^ string_of_constructors cs in
+  let replace_at_indices is x l = List.mapi (fun i y -> if List.mem i is then x else y) l in
+  let insert_output_in_leaf (PCtr (c, ps), cs) = (PCtr (c, replace_at_indices ois (PCtr (constructor_of_string "OUT",[])) ps), cs) in
+  let annotate_densities (p, cs) = (p, List.map (fun c -> (c, List.assoc c densities)) cs) in
+  List.iter (fun (p, cs) -> Feedback.msg_notice (str (string_of_pattern_leaf (annotate_densities (insert_output_in_leaf (p, cs)))) ++ fnl ())) (collect_leaves tree)
+
+let print_rule_densities (rs : (constructor * rule_density) list) : unit =
+  let string_of_density = function
+    | Checking -> "Checking"
+    | Backtracking -> "Backtracking"
+    | Partial -> "Partial" in
+  List.iter (fun (c,d) -> Feedback.msg_notice (str (  constructor_to_string c ^ ": " ^ string_of_density d) ++ fnl ())) rs
+
+let rec has_duplicates (lst : 'a list) : bool =
+  match lst with
+  | [] -> false
+  | x :: xs -> List.mem x xs || has_duplicates xs
+
+let remove_duplicates l =
+  let rec remove_duplicates' l acc =
+    match l with
+    | [] -> acc
+    | x :: xs -> if List.mem x acc then remove_duplicates' xs acc else remove_duplicates' xs (x :: acc) in
+  remove_duplicates' l []
+
+let print_duplicates lst  : string =
+  Feedback.msg_notice (str (String.concat ", " (List.map var_to_string lst)) ++ fnl ());
+  let rec print_duplicates' lst acc =
+    match lst with
+    | [] -> acc
+    | x :: xs -> if List.mem x xs then print_duplicates' xs (acc ^ ", " ^ var_to_string x) else print_duplicates' xs acc in
+  print_duplicates' lst ""
+
+let not_pairwise_disjoint (xss : 'a list list) : bool =
+  let sets = List.map remove_duplicates xss in
+  if 
+  has_duplicates (List.concat sets) 
+  then
+    (Feedback.msg_notice (str "Not pairwise disjoint: " ++ str (print_duplicates (List.concat sets)) ++ fnl ()); true)
+  else false
+
+let split_indices xs idxs =
+  let rec go xs idxs i =
+    match xs with
+    | [] -> ([], [])
+    | x :: xs -> 
+      if List.mem i idxs then 
+        let (inidx, outidx) = go xs idxs (i + 1) in
+        (x :: inidx, outidx)
+      else 
+        let (ys, zs) = go xs idxs (i + 1) in
+        (ys, x :: zs) 
+    in
+  go xs idxs 0
+
+let density_to_string = function
+  | Checking -> "Checking"
+  | Backtracking -> "Backtracking"
+  | Partial -> "Partial"
+  | Total -> "Total"
+
+let subsets (xs : 'a list) : 'a list list =
+  let rec subsets' xs acc =
+    match xs with
+    | [] -> acc
+    | x :: xs -> subsets' xs (List.map (fun ys -> x :: ys) acc @ acc) in
+  subsets' xs [[]]
+
+let has_intersection (xs : 'a list) (ys : 'a list) : bool =
+  List.exists (fun x -> List.mem x ys) xs
+
+module RelationInstOrd = struct
+  type t = ty_ctr * output_index list
+  let compare (ty, args) (ty', args') =
+    match compare (ty_ctr_to_string ty) (ty_ctr_to_string ty') with
+    | 0 -> compare args args'
+    | c -> c
+end
+
+module RelationInstMap = Map.Make(RelationInstOrd)
+
+let density_memo : rule_density RelationInstMap.t ref = ref RelationInstMap.empty
+
+(*Three heuristics detecting difficult to generate rules*)
+let rec is_output_constrained_in_hypothesis ((ind_name, ctr_name, arity, hyps, conc) : rule) (ois : output_index list) : bool =
+  let recursive_hyps = List.filter (fun (ind, args) -> ind = ind_name) hyps in
+  let output_index_hyps = List.concat_map (fun (ind, args) -> fst (split_indices args ois)) recursive_hyps in
+  if List.exists (fun arg -> match arg with
+    | Constrained _ -> true
+    | Unconstrained _ -> false) output_index_hyps
+    then (Feedback.msg_notice (str (constructor_to_string ctr_name ^ ": output constrained in hypothesis") ++ fnl ()); true) else false
+
+and is_output_hyps_require_unification ((ind_name, ctr_name, arity, hyps, conc) : rule) (ois : output_index list) : bool =
+  let recursive_hyps = List.filter (fun (ind, args) -> ind = ind_name) hyps in
+  let collect_vars = function
+    | Constrained (args,_) -> args
+    | Unconstrained arg -> [arg] in
+  let output_index_hyps : ty_param list list = List.map (fun (ind,args) -> List.concat_map collect_vars (fst (split_indices args ois))) recursive_hyps in
+  Feedback.msg_notice (str (String.concat ", " (List.map string_of_int ois)) ++ fnl ());
+  if not_pairwise_disjoint output_index_hyps then (Feedback.msg_notice (str (constructor_to_string ctr_name ^ ": output hyps require unification") ++ fnl ()); true) else false
+
+and is_input_conclusion_require_unification ((ind_name, ctr_name, arity, hyps, conc) : rule) (ois : output_index list) : bool =
+  let conclusion_args = snd conc in
+  let (_,input_conc_args) = split_indices conclusion_args ois in
+  let collect_vars = function
+    | Constrained (args,_) -> args
+    | Unconstrained arg -> [arg] in
+  let all_input_conc_vars = List.concat_map collect_vars input_conc_args in
+  if has_duplicates all_input_conc_vars then (Feedback.msg_notice (str (constructor_to_string ctr_name ^ ": input conc requires unification") ++ fnl ()); true) else false
+
+and are_functions_constraining_conclusion_inputs_or_hyp_outputs ((ind_name, ctr_name, arity, hyps, conc) : rule) (ois : output_index list) : bool =
+  let conclusion_args = snd conc in
+  let (_,input_conc_args) = split_indices conclusion_args ois in
+  let fun_constrained = function
+    | Constrained (args, FunConstraint) | Constrained (args, FunConConstraint) -> true
+    | _ -> false in
+  if List.exists fun_constrained input_conc_args then (Feedback.msg_notice (str (constructor_to_string ctr_name ^ ": functions constrain conclusion inputs") ++ fnl ()); true) else
+  let recursive_hyps = List.filter (fun (ind, args) -> ind = ind_name) hyps in
+  let output_index_hyps : constrained_arg list list = List.map (fun (ind, args) -> fst (split_indices args ois)) recursive_hyps in
+  if List.exists (fun args -> List.exists fun_constrained args) output_index_hyps then (Feedback.msg_notice (str (constructor_to_string ctr_name ^ ": functions constrain hypothesis outputs") ++ fnl ()); true) else false
+
+and nonrecursive_disjoint_strictly_output_vars ((ind_name, ctr_name, arity, hyps, conc) : rule) (ois : output_index list) : (ty_ctr * (output_index * ty_param) list) list =
+  let (conclusion_output_args,conclusion_input_args) = split_indices (snd conc) ois in
+  let args_to_vars arg_list = List.concat_map (function Constrained (args,_) -> args | Unconstrained arg -> [arg]) arg_list in
+  let conclusion_output_vars = args_to_vars conclusion_output_args in
+  let conclusion_input_vars = args_to_vars conclusion_input_args in
+  let (nonrecursive_hyps, recursive_hyps) = List.partition (fun (ind, args) -> ind <> ind_name) hyps in
+  let recursive_output_vars = List.concat_map (fun (ind, args) -> args_to_vars (fst (split_indices args ois))) recursive_hyps in
+  let nonrecursive_output_vars = List.map (fun (ind, args) -> 
+    let numbered_args = List.mapi (fun i arg -> (i, arg)) args in
+    let unconstrained_vars = List.concat_map (function (n,Unconstrained arg) -> [(n,arg)] | _ -> []) numbered_args in
+    let unconstrained_output_vars = List.filter (fun (_,v) -> List.mem v conclusion_output_vars) unconstrained_vars in
+    let unconstrained_output_noninput_vars = List.filter (fun (_,v) -> not (List.mem v conclusion_input_vars)) unconstrained_output_vars in
+    let unconstrained_disjoint_output_noninput_vars = List.filter (fun (_,v) -> not (List.mem v recursive_output_vars)) unconstrained_output_noninput_vars in
+    ind,unconstrained_disjoint_output_noninput_vars) nonrecursive_hyps in
+  nonrecursive_output_vars
+  
+and filter_nonrecursive_empty_densities (nonrecurse : (ty_ctr * (output_index * ty_param) list)) =
+  let (ind, output_vars) = nonrecurse in
+  let rocq_relation = ty_ctr_to_rocq_relation ind in
+  let output_subsets = subsets output_vars in
+  let filtered_ovars = List.filter_map (fun ois_vars ->
+    let density = final_density rocq_relation (List.map fst ois_vars) false in
+    match density with
+    | Checking -> None
+    | Backtracking | Partial | Total -> Some (ois_vars, density)) output_subsets in
+  ind,filtered_ovars
+
+and nonrecursive_binding (nonrecursives : (ty_ctr * ((output_index * ty_param) list * rule_density) list) list) : ((ty_ctr * (output_index * ty_param) list * rule_density) list) option =
+  match nonrecursives with
+  | [] -> Some []
+  | (ind, []) :: rest -> None
+  | (ind, (oi_vs,Partial) :: ovars) :: rest ->
+    let updated_rest = List.map (fun (ind, ovars) -> (ind, List.filter (fun (oi_vs',_) -> not (has_intersection oi_vs oi_vs')) ovars)) rest in
+    (match nonrecursive_binding updated_rest with
+    | None -> nonrecursive_binding ((ind, ovars) :: rest)
+    | Some bindings -> Some ((ind, oi_vs, Partial) :: bindings))
+  | (ind, (oi_vs,Backtracking) :: ovars) :: rest -> 
+    let updated_rest = List.map (fun (ind, ovars) -> (ind, List.filter (fun (oi_vs',_) -> not (has_intersection oi_vs oi_vs')) ovars)) rest in
+    (match nonrecursive_binding ((ind,ovars) :: rest) with
+     | Some ((ind',oi_vs',Partial) :: bindings) -> Some ((ind', oi_vs', Partial) :: bindings)
+     | _ -> (match nonrecursive_binding updated_rest with | None -> None | Some bindings -> Some ((ind, oi_vs, Backtracking) :: bindings)) 
+    )
+    
+and is_nonrecursive_checked_or_overlapping_or_empty ((ind_name, ctr_name, arity, hyps, conc) : rule) (ois : output_index list) : bool =
+  let nonrecursive_output_vars = nonrecursive_disjoint_strictly_output_vars (ind_name, ctr_name, arity, hyps, conc) ois in
+  let filtered_nonrecursive_output_vars = List.map filter_nonrecursive_empty_densities nonrecursive_output_vars in
+  match nonrecursive_binding filtered_nonrecursive_output_vars with
+  | None -> (Feedback.msg_notice (str (constructor_to_string ctr_name ^ ": >= 1 nonrecursive bindings must be checked") ++ fnl ()) ; true)
+  | Some [] -> false
+  | Some bindings -> 
+    Feedback.msg_notice (str "Printing nonrecursive bindings for: " ++ str (constructor_to_string ctr_name) ++ fnl ()); 
+    List.iter (fun (ind, oi_vs, density) -> Feedback.msg_notice (str (ty_ctr_to_string ind ^ " argument #s: " ^ String.concat "," (List.map (fun (o,_) -> string_of_int o) oi_vs) ^ "; var names: " ^ String.concat "," (List.map (fun (_,v) -> ty_param_to_string v) oi_vs) ^ "; density: " ^ density_to_string density) ++ fnl ())) bindings;
+    false (*In the future these bindings should be output and prederived.*)
+
+and analyze_rule (r : rule) (ois : output_index list) : rule_density =
+  msg_debug (str (List.fold_left (fun acc oi -> acc ^ " " ^ string_of_int oi) "" ois) ++ fnl ());
+  if is_output_hyps_require_unification r ois 
+    || is_input_conclusion_require_unification r ois
+    || are_functions_constraining_conclusion_inputs_or_hyp_outputs r ois
+    || is_nonrecursive_checked_or_overlapping_or_empty r ois 
+  then 
+    Checking 
+  else if is_output_constrained_in_hypothesis r ois then
+    Backtracking
+  else 
+    Partial
+
+and analyze_rules (rs : rule list) ois : (constructor * rule_density) list =
+  List.map (fun (ind, cons, arity, hyps, conc) -> (cons, analyze_rule (ind, cons, arity, hyps, conc) ois)) rs
+
+and final_density (dt : rocq_relation) ois (should_print : bool): rule_density =
+  let (ind_name, _, _, _) = dt in
+  if RelationInstMap.mem (ind_name, ois) !density_memo then RelationInstMap.find (ind_name, ois) !density_memo
+  else
+  let inductive = (match get_inductive_name ind_name with | Some i -> i | None -> failwith "final_density: not an inductive type") in
+  let tree = cover_tuple_patterns (input_patterns_of_rocq_relation dt ois) (rocq_relation_arity dt) (types_to_constructor_lookup (seek_rocq_relations inductive)) in
+  let covered_patterns = collect_leaves tree in
+  let densities = analyze_rules (rocq_relation_rules dt) ois in
+  if should_print then (Feedback.msg_notice (str ("Rule densities for: " ^ ty_ctr_to_string ind_name ^ " with output indices: " ^ List.fold_left (fun acc oi -> acc ^ " " ^ string_of_int oi) "" ois) ++ fnl ());
+  print_rule_densities densities);
+  (* let filter_empty_constructors = List.map (fun (p, cs) -> p, List.filter (fun c -> match List.assoc c densities with | Checking -> false | Partial | Backtracking -> true) cs) covered_patterns in
+  let any_uncovered = List.exists (fun (p,cs) -> cs = []) filter_empty_constructors in
+  let all_has_partial = List.for_all (fun (p,cs) -> List.exists (fun c -> List.assoc c densities = Partial) cs) filter_empty_constructors in
+  let result = if any_uncovered then Checking else if all_has_partial then Partial else Backtracking in *)
+  let filter_uncovered_patterns = List.filter (fun (p, cs) -> match cs with | [] -> false | _ -> true) covered_patterns in
+  let all_covered_has_nonempty = List.for_all (fun (p,cs) -> List.exists (fun c -> List.assoc c densities <> Checking) cs) filter_uncovered_patterns in
+  let result = if not all_covered_has_nonempty then 
+                Checking 
+               else if List.for_all (fun (p,cs) -> List.exists (fun c -> List.assoc c densities = Partial) cs) filter_uncovered_patterns 
+               then 
+                Partial 
+               else 
+                Backtracking in
+  density_memo := RelationInstMap.add (ind_name, ois) result !density_memo;
+  if should_print then (Feedback.msg_notice (str "Rule pattern coverage tree:" ++ fnl ());
+                        print_coverage_tree ind_name tree ois; Feedback.msg_notice (fnl ());
+                        Feedback.msg_notice (str "Set of patterns and densities of their covering rules:" ++ fnl ());
+                        print_pattern_leaves ind_name tree ois densities; 
+                        Feedback.msg_notice (str ("Inductive relation " ^ ty_ctr_to_string ind_name ^ " with output indices:"
+                                                  ^ List.fold_left (fun acc oi -> acc ^ " " ^ string_of_int oi) "" ois 
+                                                  ^ " has overall density: " 
+                                                  ^ (density_to_string result)) ++ fnl ()));
+  result
+
+let rec traverse (f : 'a -> 'b option) (l : 'a list) : 'b list option =
+  match l with
+  | [] -> Some []
+  | x :: xs -> 
+    match f x with
+    | None -> None
+    | Some y -> 
+      match traverse f xs with
+      | None -> None
+      | Some ys -> Some (y :: ys)
+
+type schedule_with_density = (schedule_step * rule_density) list * schedule_sort
+
+let are_schedule_steps_valid i ((steps, sort) : schedule_with_density) : bool = true
+
+let num_source_variables (s : source) : int =
+  match s with
+  | SrcNonrec (hyp) -> List.length (variables_in_hypothesis hyp)
+  | SrcRec (_, args) -> List.length (List.concat_map variables_in_hypothesis args)
+
+let get_schedule_score ((steps, sort) : schedule_with_density) : float =
+  let step_score (step, density) = 
+    let num_variables_bound = float_of_int (match step with
+      | S_UC _ -> 1
+      | S_Check _ -> 0
+      | S_ST (output_var_tys, _, _) -> List.length output_var_tys
+      | S_Match _ -> 1) in
+    let num_variables = float_of_int (match step with (* a + b    --> a - b *)
+      | S_UC _ -> 1
+      | S_Check src -> num_source_variables src
+      | S_ST (_, src, _) -> num_source_variables src
+      | S_Match _ -> 1) in
+    let density_weight = float_of_int (match density with
+      | Checking -> -2
+      | Backtracking -> -1
+      | Partial -> 1 
+      | Total -> 2) in
+    ( (num_variables -. (2. *. num_variables_bound)) *.  density_weight) in
+  List.fold_right (fun (step, density) acc -> acc +. step_score (step, density)) steps 0.
+
+let schedule_density schedule : schedule_with_density =
+  let step_density (step : schedule_step) ds : rule_density =
+    match step with
+    | S_UC _  -> Total (* For enumerations during a checker should unconstrained be empty? *)
+    | S_Check _  -> Checking
+    | S_ST (_, SrcRec _, _) -> (match ds with D_Gen | D_Thm -> Total | D_Check | D_Enum -> Checking) 
+    | S_Match _ -> Backtracking
+    | S_ST (output_var_tys, SrcNonrec (DTyCtr (ind,args)), _) -> 
+      let output_vars = List.map fst output_var_tys in
+      let rec is_output i = (function
+        | DTyVar j -> List.mem j output_vars
+        | DCtr (_, args) -> List.exists (is_output i) args
+        | _ -> false) in
+      let output_indices = filter_mapi (fun i arg -> if is_output i arg then Some i else None) args in
+      (match final_density (ty_ctr_to_rocq_relation ind) output_indices false with
+      | Checking -> Feedback.msg_notice (str ("Relation " ^ ty_ctr_to_string ind ^ " with ois: " ^ List.fold_left (fun acc oi -> acc ^ " " ^ string_of_int oi) "" output_indices ^ " is checking") ++ fnl ()); Checking
+      | d -> d)
+    | S_ST (_, SrcNonrec _, _) -> failwith "is_schedule_valid: Nonrecursive source should have DTyCtr at toplevel" 
+  in
+  let (steps, sort) = schedule in
+  let ds = match sort with
+    | TheoremSchedule _ -> D_Thm
+    | ProducerSchedule (_,PS_E,_) -> D_Enum
+    | ProducerSchedule (_,PS_G,_) -> D_Gen
+    | CheckerSchedule -> D_Check in
+  let step_densities = List.map (fun step -> (step, step_density step ds)) steps in
+  (step_densities, sort)
+
+(* let does_schedule_satisfy_heuristics ((steps, sort) : schedule) =
+  let rec aux (ois : output_index list) (outputs : var list) (inputs : var list) =
+    (* Need *)
+
+   *)
+
+(* let is_binding_selection_valid i ((bindings,unbound) : bindings_and_unbound) =
+  let is_binding_valid (v, ty, opt) =
+    match opt with
+    | None -> Some (v,ty,opt, Partial)
+    | Some (DTyCtr (ind,_), i) ->
+      (match final_density (ty_ctr_to_dep_dt ind) [i] false with
+      | Checking -> None
+      | d -> Some (v, ty, opt, d))
+    | _ -> failwith "is_binding_selection_valid: Binding relation should have DTyCtr at toplevel" in
+  match traverse is_binding_valid bindings with
+  | None -> None
+  | Some bs -> Some (i, (bs, unbound)) *)
+
+let schedule_with_densities_to_string (s : schedule_with_density) =
+  let (steps, sort) = s in
+  Printf.sprintf "do %s \n=> %s\n" (String.concat " ;\n " (List.map (fun (step, density) -> schedule_step_to_string step ^ " " ^ density_to_string density) steps)) (schedule_sort_to_string sort)
+
+(* Create a map from types * outputs => inductive_schedules which can be reused and referenced. *)
+
+(** There will always exist at least one partial schedule for producers, b/c you can just arb all variables and check all hyps.*)
+
+let constructor_valid_schedules (ind_name : ty_ctr) (ctr : rocq_ctr) (result_vars : (var * rocq_constr) list) (output_vars : var list) (ds : derive_sort) (opt : bool) : (int * schedule_with_density) list =
+  let (ctr_name, typ) = ctr in
+  let schedule_matches = NewUnifyQC.type_to_schedules typ (Some ind_name) (Some ctr_name) result_vars output_vars ds opt in
+  let check_eq (u1,u2) = S_Check (SrcNonrec (DTyCtr (ty_ctr_of_string "Coq.Init.Logic.eq", [DTyVar u1; DTyVar u2]))) in
+  let schedules = List.mapi (fun i ((steps, sort), ms, eqs) -> i,(List.map (fun (v,p) -> S_Match (v,p)) ms @ List.map check_eq eqs @ steps, sort)) schedule_matches in
+  let schedule_densities = List.map (fun (i,schd) -> i, schedule_density schd) schedules in
+  List.filter (fun (i,schd) -> are_schedule_steps_valid i schd) schedule_densities
+
+let select_best_schedule (schedules : (int * schedule_with_density) list) (ds : derive_sort) : (int * schedule) option =
+  (* let compare_checks_then_length_then_backtracks (_, steps, _) (_, steps', _) =
+    let checks_length_and_backtracks steps = List.fold_left (fun (c,l,b) (step,d) ->
+      let c' = match step, ds with S_Check _, D_Check -> c | S_UC _, D_Check | S_Check _, _ -> c + 1 | _ -> c in
+      let l' = l + 1 in
+      let b' = match d with | Backtracking -> b + 1 | _ -> b in
+      (c',l',b')) (0,0,0) steps in
+    let (c,l,b) = checks_length_and_backtracks steps in
+    let (c',l',b') = checks_length_and_backtracks steps' in
+    match compare c c' with
+    | 0 -> (match compare l l' with
+            | 0 -> compare b b'
+            | rl -> rl)
+    | rc -> rc in *)
+  let compare_scores (_, schd) (_, schd') = 
+    let sign = (match ds with
+    | D_Check | D_Enum -> 1
+    | D_Gen | D_Thm -> -1) in
+    sign * compare (get_schedule_score schd) (get_schedule_score schd') in
+  match List.sort compare_scores schedules with
+  | [] -> None
+  | (i, (steps, sort)) :: _ -> Some (i, (List.map fst steps, sort))
+
+let constructor_best_valid_schedule (ind_name : ty_ctr) (ctr : rocq_ctr) (result_vars : (var * rocq_constr) list) (output_vars : var list) (ds : derive_sort) (opt : bool) : ty_ctr * (int * schedule) option =
+  fst ctr, select_best_schedule (constructor_valid_schedules ind_name ctr result_vars output_vars ds opt) ds
+
+let inductive_best_valid_schedule (rel : rocq_relation) (output_idxs : int list) (ds : derive_sort) (opt : bool) : inductive_schedule =
+  let (ind_name, params, ctrs, result_typ) = rel in
+  Feedback.msg_notice (str "Inductive name: " 
+  ++ str (ty_ctr_to_string ind_name)
+  ++ str "\n Parameters: "
+  ++ str (String.concat ", " (List.map ty_param_to_string params)) 
+  ++ str "\n Result Type: "
+  ++ str (rocq_constr_to_string result_typ) 
+  ++ str "\n Output indices: "
+  ++ str (String.concat ", " (List.map string_of_int output_idxs)) 
+  ++ str "\n\n");
+
+  let rec get_result_vars = function
+  | DProd ((v,t), b) ->
+    let v = make_up_name_str ("v_" ^ var_to_string v) in
+    (v,t) :: get_result_vars b
+  | DArrow (t1, t2) ->
+    let v = make_up_name_str "v" in
+    (v,t1) :: get_result_vars t2
+  | _ -> [] in
+
+  let result_vars = get_result_vars result_typ in
+
+  let rec remake_result vars result = 
+  match vars, result with
+  | [], _ -> result
+  | (v,t) :: rest, DProd  (_, t') 
+  | (v,t) :: rest, DArrow (_, t') -> DProd ((v,t), remake_result rest t')
+  | _ -> failwith "remake_result failed" in
+
+  let output_vars = List.map fst (List.filteri (fun i _ -> List.mem i output_idxs) result_vars) in
+
+  let constructor_schedules = List.filter_map (fun ctr -> 
+    match constructor_best_valid_schedule ind_name ctr result_vars output_vars ds opt with
+    | (ctr_name, None) -> failwith ("Should be at least one partial schedule for all constructors including this one: " ^ constructor_to_string ctr_name)
+    | (ctr_name, Some (i, schd)) -> Some schd) ctrs in
+
+  let is_recursive (steps,sort) = 
+    List.exists (function | S_UC (_,SrcRec _,_) | S_ST (_,SrcRec _, _) | S_Check (SrcRec _) -> true | _ -> false) steps 
+  in
+
+  let (nonrecursive, recursive) = List.partition is_recursive constructor_schedules in
+
+  let modestring = String.init (List.length result_vars) (fun i -> if List.mem i output_idxs then 'O' else 'I') in
+
+  let typeclass_name = function
+    | (D_Check, _) -> "DecOpt"
+    | (D_Thm, _) -> failwith "Inductives cannot make theorems"
+    | (D_Gen, false) -> "GenSized" 
+    | (D_Gen, true) -> "GenSizedSuchThat" 
+    | (D_Enum, false) -> "EnumSized"
+    | (D_Enum, true) -> "EnumSizedSuchThat" in
+
+  let schedule_name = Printf.sprintf "%s%s_%s" (typeclass_name (ds, opt)) (ty_ctr_to_string ind_name) modestring in
+
+  let result_vars_mexps = filter_mapi (fun i (v,t) -> if List.mem i output_idxs then None else Some (v, NewGenericLib.product_free_rocq_type_to_mexp t)) result_vars in 
+
+  let inductive_schedule : inductive_schedule =
+    (schedule_name, result_vars_mexps, List.map (fun c -> (c, [])) recursive, List.map (fun c -> (c, [])) nonrecursive) 
+  in
+  inductive_schedule
+
+
+
+
+let valid_schedules =
+  Proofview.Goal.enter begin fun gl ->
+    let c = Proofview.Goal.concl gl in
+    let e = Proofview.Goal.env gl in
+    let evd = Evd.from_env e in
+    match NewGenericLib.parse_dependent_type (EConstr.to_constr evd c) with
+    | Some dt -> 
+      begin
+        density_memo := RelationInstMap.empty;
+        let schedules = NewUnifyQC.type_to_schedules dt None None [] [] D_Thm false in
+        let check_eq (u1,u2) = S_Check (SrcNonrec (DTyCtr (ty_ctr_of_string "Coq.Init.Logic.eq", [DTyVar u1; DTyVar u2]))) in
+        let schedules' = List.map (fun ((steps, sort), ms, eqs) -> (List.map (fun (v,p) -> S_Match (v,p)) ms @ List.map check_eq eqs @ steps, sort)) schedules in
+        Feedback.msg_notice (str "Printing all bindings" ++ fnl ());
+        (* List.iteri (fun i (steps, sort) ->
+          Feedback.msg_notice (str (string_of_int i ^ ":\nAnalysis" ) ++ fnl ());
+          let (steps_ds, sort) = schedule_density (steps, sort) in
+          let schedule_score = get_schedule_score (steps_ds, sort) in
+          Feedback.msg_notice (str ("Schedule Score: " ^ string_of_float schedule_score ^ "\n") ++
+                              str (schedule_with_densities_to_string (steps_ds, sort) ^ "\n") ++                                           
+                              str "\nconstrexpr: \n" ++ 
+                              NewUnifyQC.match_schedule_as_pp_constr_expr (List.map fst steps_ds, sort) [] [] D_Gen
+                                                          ++ str "\n==============================================\n")) schedules'; *)
+
+        let schedules_w_densities = List.map schedule_density schedules' in
+        let schedules_scored = List.map (fun schd -> schd, get_schedule_score schd) schedules_w_densities in
+        let schedules_sorted = List.sort (fun (_,s) (_,s') -> - (compare s s')) schedules_scored in
+        List.iteri (fun i ((steps_ds, sort), schedule_score) ->
+          Feedback.msg_notice (str (string_of_int i ^ ":\n" ) ++ fnl ());
+          (*let (steps_ds, sort) = schedule_density (steps, sort) in
+          let schedule_score = get_schedule_score (steps_ds, sort) in *)
+          Feedback.msg_notice (str ("Schedule Score: " ^ string_of_float schedule_score ^ "\n") ++
+                              str (schedule_with_densities_to_string (steps_ds, sort) ^ "\n") ++                                           
+                              str "\nconstrexpr: \n" ++ 
+                              NewUnifyQC.match_schedule_as_pp_constr_expr (List.map fst steps_ds, sort) [] [] D_Thm
+                                                          ++ str "\n==============================================\n")) schedules_sorted;                                                  
+        Tacticals.tclIDTAC
+      end 
+    | None -> failwith "Failed to Parse type"
+  end
+
 let theorem_dependencies = 
   Proofview.Goal.enter begin fun gl ->
     
@@ -302,24 +1220,293 @@ let theorem_dependencies =
             msg_debug (str (var_to_string var) ++ str " : " ++ str (String.concat ", " (List.map (fun (i, j) -> (tuple_to_string (i, j))) rels)) ++ fnl ()); 
             printlist rest in
         
-        printlist (NewGenericLib.dep_type_var_relation_uses' dt);          
+        printlist (NewGenericLib.rocq_constr_var_relation_uses' dt);          
         Tacticals.tclIDTAC
       end
     | None -> failwith "Failed to Parse type"
   end
+
+  let schedules =
+    Proofview.Goal.enter begin fun gl ->
+    
+      (* Convert goal to a constr_expr *)
+      let c = Proofview.Goal.concl gl in
+      let e = Proofview.Goal.env gl in
+      let evd = Evd.from_env e in
+  
+      match NewGenericLib.parse_dependent_type (EConstr.to_constr evd c) with
+      | Some dt ->
+        begin
+          density_memo := RelationInstMap.empty;
+          msg_debug (str (NewGenericLib.rocq_constr_to_string dt) ++ fnl ());
+          let scheds = (NewUnifyQC.type_to_schedules dt None None [] [] D_Thm false) in
+
+          List.iteri (fun i (sch,ms,eqs) -> Feedback.msg_notice (str (string_of_int i) 
+                                                          ++ str ":\n" 
+                                                          ++ str (NewUnifyQC.match_schedule_to_string sch ms eqs) 
+                                                          ++ str "\nconstrexpr: \n"
+                                                          ++ (NewUnifyQC.match_schedule_as_pp_constr_expr sch ms eqs D_Thm)
+                                                          ++ str "\n\n===================\n" 
+                                                          ++ fnl ())) scheds;
+          
+          Tacticals.tclIDTAC
+        end
+      | None -> failwith "Failed to Parse type"
+    end
+
 }
 TACTIC EXTEND quickchick
   | ["quickchick"] -> { quickchick_goal }
+END
+
+TACTIC EXTEND schedules 
+  | ["schedules"] -> { schedules }
 END
 
 TACTIC EXTEND theorem_dependencies
   | ["theorem_dependencies"] -> { theorem_dependencies }
 END
 
+TACTIC EXTEND valid_schedules
+  | ["valid_schedules"] -> { valid_schedules }
+END
+
 VERNAC COMMAND EXTEND Print CLASSIFIED AS SIDEFF
  | ["Print" "Typeclasses" "for" ident(ind)] ->
     { let ind' = Libnames.qualid_of_ident ind in 
       ignore (NewGenericLib.find_typeclass_bindings ind') }
+END
+
+(*type rocq_relation
+  = ty_ctr        (* The name of the relation (e.g. IsSorted) *)
+  * ty_param list (* The list of type parameters (e.g. "t" in IsSorted) *)
+  * rocq_ctr list (* A list of constructors. Each constructor is a pair (name, type) *)
+  * rocq_constr   (* The type of the overall relation (e.g. "list t -> Prop") *)*)
+
+VERNAC COMMAND EXTEND DeriveSchedules CLASSIFIED AS SIDEFF
+   | ["Derive" "Schedules" constr(ind) int_list(ois) "consnum" int(ctr_idx) "derive" string(ds)] ->
+    { match NewGenericLib.ind_reference_to_rocq_relations ind with
+    | Some (idx, rs) -> 
+      let open NewGenericLib in
+      let (ind_name, params, constructors, result_typ) = List.nth rs idx in
+
+      Feedback.msg_notice (str "Inductive name: " 
+                        ++ str (ty_ctr_to_string ind_name)
+                        ++ str "\n Parameters: "
+                        ++ str (String.concat ", " (List.map ty_param_to_string params)) 
+                        ++ str "\n Result Type: "
+                        ++ str (rocq_constr_to_string result_typ) 
+                        ++ str "\n Output indices: "
+                        ++ str (String.concat ", " (List.map string_of_int ois)) 
+                        ++ str ("\n Derive Sort: " ^ ds) 
+                        ++ str "\n\n");
+
+      let ds = (match ds with
+      | "Check" -> D_Check
+      | "Gen" -> D_Gen
+      | "Thm" -> D_Thm
+      | "Enum" -> D_Enum
+      | _ -> failwith ("Invalid derive sort " ^ ds)) in
+
+
+      let rec get_result_vars = function
+      | DProd ((v,t), b) ->
+        let v = make_up_name_str ("v_" ^ var_to_string v) in
+        (v,t) :: get_result_vars b
+      | DArrow (t1, t2) ->
+        let v = make_up_name_str "v" in
+        (v,t1) :: get_result_vars t2
+      | _ -> [] in
+
+      let result_vars = get_result_vars result_typ in
+
+      let rec remake_result vars result = 
+        match vars, result with
+        | [], _ -> result
+        | (v,t) :: rest, DProd  (_, t') 
+        | (v,t) :: rest, DArrow (_, t') -> DProd ((v,t), remake_result rest t')
+        | _ -> failwith "remake_result failed" in
+
+      let (ctr, constructor) = List.nth constructors ctr_idx in
+
+      let output_vars = List.map fst (List.filteri (fun i _ -> List.mem i ois) result_vars) in
+
+      let scheds = NewUnifyQC.type_to_schedules constructor (Some ind_name) (Some ctr) result_vars output_vars ds true in
+      
+      let rec take n l =
+        if n <= 0 then [] else
+        match l with
+        | [] -> []
+        | x :: xs -> x :: take (n - 1) xs in
+
+      Feedback.msg_notice (str "Inductive name: " 
+                        ++ str (ty_ctr_to_string ind_name) 
+                        ++ str "\n Constructor Name: " 
+                        ++ str (ty_ctr_to_string ctr)
+                        ++ str "\n Parameters: "
+                        ++ str (String.concat ", " (List.map ty_param_to_string params))
+                        ++ str "\n Constructor Type: "
+                        ++ str (NewGenericLib.rocq_constr_to_string constructor)
+                        ++ str "\n Result Type: "
+                        ++ str (NewGenericLib.rocq_constr_to_string (remake_result result_vars result_typ))
+                        ++ str "\n Output indices: "
+                        ++ str (String.concat ", " (List.map string_of_int ois)) 
+                        ++ str "\n\n");
+
+      List.iteri (fun i (sch,ms,eqs) -> Feedback.msg_notice (str (string_of_int i) 
+                                                          ++ str ":\n" 
+                                                          ++ str (NewUnifyQC.match_schedule_to_string sch ms eqs) 
+                                                          ++ str "\nconstrexpr: \n"
+                                                          ++ (NewUnifyQC.match_schedule_as_pp_constr_expr sch ms eqs ds)
+                                                          ++ str "\n\n===================\n" 
+                                                          ++ fnl ())) (take 300 scheds) 
+    | None -> failwith "Failed to parse inductive type" 
+    }
+END
+
+VERNAC COMMAND EXTEND DeriveValidSchedules CLASSIFIED AS SIDEFF
+   | ["Derive" "Valid" "Schedules" constr(ind) int_list(ois) "consnum" int(ctr_idx) "derive" string(ds)] ->
+    { match NewGenericLib.ind_reference_to_rocq_relations ind with
+    | Some (idx, rs) -> 
+      let open NewGenericLib in
+      let (ind_name, params, constructors, result_typ) = List.nth rs idx in
+
+      Feedback.msg_notice (str "Inductive name: " 
+                        ++ str (ty_ctr_to_string ind_name)
+                        ++ str "\n Parameters: "
+                        ++ str (String.concat ", " (List.map ty_param_to_string params)) 
+                        ++ str "\n Result Type: "
+                        ++ str (rocq_constr_to_string result_typ) 
+                        ++ str "\n Output indices: "
+                        ++ str (String.concat ", " (List.map string_of_int ois))
+                        ++ str ("\n Derive Sort: " ^ ds) 
+                        ++ str "\n\n");
+
+      let ds = (match ds with
+      | "Check" -> D_Check
+      | "Gen" -> D_Gen
+      | "Thm" -> D_Thm
+      | "Enum" -> D_Enum
+      | _ -> failwith ("Invalid derive sort " ^ ds)) in
+
+      let rec get_result_vars = function
+      | DProd ((v,t), b) ->
+        let v = make_up_name_str ("v_" ^ var_to_string v) in
+        (v,t) :: get_result_vars b
+      | DArrow (t1, t2) ->
+        let v = make_up_name_str "v" in
+        (v,t1) :: get_result_vars t2
+      | _ -> [] in
+
+      let result_vars = get_result_vars result_typ in
+
+      let rec remake_result vars result = 
+        match vars, result with
+        | [], _ -> result
+        | (v,t) :: rest, DProd  (_, t') 
+        | (v,t) :: rest, DArrow (_, t') -> DProd ((v,t), remake_result rest t')
+        | _ -> failwith "remake_result failed" in
+
+      let (ctr, constructor) = List.nth constructors ctr_idx in
+
+      let output_vars = List.map fst (List.filteri (fun i _ -> List.mem i ois) result_vars) in
+
+      let scheds = NewUnifyQC.type_to_schedules constructor (Some ind_name) (Some ctr) result_vars output_vars ds true in
+
+      let rec take n l =
+        if n <= 0 then [] else
+        match l with
+        | [] -> []
+        | x :: xs -> x :: take (n - 1) xs in
+
+      let check_eq (u1,u2) = S_Check (SrcNonrec (DTyCtr (ty_ctr_of_string "Coq.Init.Logic.eq", [DTyVar u1; DTyVar u2]))) in
+
+      Feedback.msg_notice (str "Inductive name: " 
+                        ++ str (ty_ctr_to_string ind_name) 
+                        ++ str "\n Constructor Name: " 
+                        ++ str (ty_ctr_to_string ctr)
+                        ++ str "\n Parameters: "
+                        ++ str (String.concat ", " (List.map ty_param_to_string params))
+                        ++ str "\n Constructor Type: "
+                        ++ str (NewGenericLib.rocq_constr_to_string constructor)
+                        ++ str "\n Result Type: "
+                        ++ str (NewGenericLib.rocq_constr_to_string (remake_result result_vars result_typ))
+                        ++ str "\n Output indices: "
+                        ++ str (String.concat ", " (List.map string_of_int ois)) 
+                        ++ str "\n\n");
+
+      density_memo := RelationInstMap.empty;
+      let schedules = take 300 scheds in
+      let schedules' = List.map (fun ((steps, sort), ms, eqs) -> (List.map (fun (v,p) -> S_Match (v,p)) ms @ List.map check_eq eqs @ steps, sort)) schedules in
+      Feedback.msg_notice (str "Printing all bindings" ++ fnl ());
+      let schedules_w_densities = List.map schedule_density schedules' in
+      let schedules_scored = List.map (fun schd -> schd, get_schedule_score schd) schedules_w_densities in
+      let schedules_sorted = List.sort (fun (_,s) (_,s') -> - (compare s s')) schedules_scored in
+      List.iteri (fun i ((steps_ds, sort), schedule_score) ->
+        Feedback.msg_notice (str (string_of_int i ^ ":\n" ) ++ fnl ());
+        (*let (steps_ds, sort) = schedule_density (steps, sort) in
+        let schedule_score = get_schedule_score (steps_ds, sort) in *)
+        Feedback.msg_notice (str ("Schedule Score: " ^ string_of_float schedule_score ^ "\n") ++
+                             str (schedule_with_densities_to_string (steps_ds, sort) ^ "\n") ++                                           
+                             str "\nconstrexpr: \n" ++ 
+                             NewUnifyQC.match_schedule_as_pp_constr_expr (List.map fst steps_ds, sort) [] [] ds
+                                                        ++ str "\n==============================================\n")) schedules_sorted
+        (* match get_schedule_score i (steps_ds, sort) with
+        | Some (i, steps_ds, sort) -> Feedback.msg_notice (str ("Schedule Valid:\n" ^ schedule_with_densities_to_string (steps_ds, sort))                                          
+                                                        ++ str "\nconstrexpr: \n"
+                                                        ++ NewUnifyQC.match_schedule_as_pp_constr_expr (List.map fst steps_ds, sort) [] D_Gen
+                                                        ++ str "\n==============================================\n")
+        | None -> Feedback.msg_notice (str ( "Schedule Invalid\n==============================================") ++ fnl ())) schedules'
+
+     *)
+    | None -> failwith "Failed to parse inductive type" 
+    }
+END
+
+      
+
+VERNAC COMMAND EXTEND DeriveUsedInds CLASSIFIED AS SIDEFF
+   | ["Derive" "Used" "Inds" constr(ind)] ->
+    { match NewGenericLib.ind_reference_to_rocq_relations ind with
+    | Some (idx, rs) ->
+        let (ind_name, params, constructors, result_typ) = List.nth rs idx in
+        (match get_inductive_name ind_name with
+        | Some i -> print_type_names (List.map (fun (n,_,_,_) -> n) (seek_rocq_relations i))
+        | None -> failwith "Failed to get inductive name")
+    | None -> failwith "Failed to parse inductive type"  
+    }
+END
+
+VERNAC COMMAND EXTEND DeriveDensity CLASSIFIED AS SIDEFF
+   | ["Derive" "Density" constr(ind) int_list(ois)] ->
+    { match NewGenericLib.ind_reference_to_rocq_relations ind with
+    | Some (idx, rs) ->
+      density_memo := RelationInstMap.empty;
+      ignore (final_density (List.nth rs idx) ois true)
+    | None -> failwith "Failed to parse inductive type" 
+    }
+END
+
+VERNAC COMMAND EXTEND DeriveInductiveSchedule CLASSIFIED AS SIDEFF
+   | ["Derive" "Inductive" "Schedule" constr(ind) int_list(ois) "derive" string(ds) "opt" string(opt)] ->
+    { match NewGenericLib.ind_reference_to_rocq_relations ind with
+    | Some (idx, rs) ->
+      let (ind_name, params, constructors, result_typ) = List.nth rs idx in
+      let ds = (match ds with
+      | "Check" -> D_Check
+      | "Gen" -> D_Gen
+      | "Enum" -> D_Enum
+      | _ -> failwith "Can only derive inductive schedules for Check, Gen, or Enum") in
+      let opt = (match opt with
+      | "true" -> true
+      | "false" -> false
+      | _ -> failwith "Opt must be true or false") in
+      let inductive_schedule = inductive_best_valid_schedule (ind_name, params, constructors, result_typ) ois ds opt in
+      Feedback.msg_notice (str "Inductive Schedule:\n" ++ str (inductive_schedule_to_string inductive_schedule) ++ fnl ());
+      let constr_expr = inductive_schedule_to_constr_expr inductive_schedule ds opt in
+      Feedback.msg_notice (str "Inductive Schedule ConstrExpr:\n" ++ str (NewGenericLib.constr_expr_to_string constr_expr) ++ fnl ())
+    | None -> failwith "Failed to parse inductive type " 
+    }
 END
 
 TACTIC EXTEND merge_sound_core

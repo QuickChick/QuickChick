@@ -21,6 +21,7 @@ plugin/arbitrarySizedST.mli
 plugin/checkerSizedST.mli
 plugin/genLib.mli
 plugin/unifyQC.mli
+plugin/newUnifyQC.mli
 plugin/sizeUtils.mli
 plugin/sized.mli
 
@@ -44,6 +45,7 @@ plugin/enumSizedST.ml
 plugin/checkerSizedST.ml
 plugin/genLib.ml
 plugin/unifyQC.ml
+plugin/newUnifyQC.ml
 plugin/sizeUtils.ml
 plugin/sized.ml
 
