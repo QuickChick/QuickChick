@@ -4,6 +4,23 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](http://keepachangelog.com/en/1.0.0/)
 and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html).
 
+## [2.1.0] - 2025-02-28
+
+- Add compatibility with Rocq 9.
+- Extend deriving for simple mutually inductive types.
+- Fix a file system race that could happen when multiple `QuickChick` commands
+  run in the same directory.
+
+## [2.0.5] - 2024-12-05
+
+- Fix `mycppo` script for Windows.
+
+## [2.0.4] - 2024-09-18
+
+- Add compatibility with Coq 8.20.
+- Fix exponential blow up in derived generators and other deriving bugs.
+- Rename `Derive` command to `QuickChickDerive` to disambiguate from Equation's `Derive` command.
+
 ## [2.0.3] - 2024-04-05
 
 - Add compatiblity with Coq 8.19
