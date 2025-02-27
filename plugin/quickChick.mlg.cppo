@@ -165,7 +165,7 @@ let define_and_run c env evd =
   close_out oc;
 
   (* Add any modules that have been marked "open" *)
-  let open_cmd s = Printf.sprintf "awk -v n=1 -v s=\"open %s\" 'NR == n {print s} {print}' %s > __qc_tmp && mv __qc_tmp %s" s mlf mlf in
+  let open_cmd s = Printf.sprintf "awk -v n=1 -v s=\"open %s\" 'NR == n {print s} {print}' %s > %s/__qc_tmp && mv %s/__qc_tmp %s" s mlf dir dir mlf in
   List.iter (fun s -> ignore (Sys.command (open_cmd s))) !modules_to_open;
   
   (* Before compiling, fix stupid cyclic dependencies like "type int = int".
