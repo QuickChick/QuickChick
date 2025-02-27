@@ -13,7 +13,7 @@ defaults: &defaults
     coq:
       type: string
   docker:
-    - image: coqorg/coq:<<parameters.coq>>
+    - image: <<parameters.coq>>
 
 commands:
   startup:
@@ -92,25 +92,25 @@ workflows:
     jobs:
       - test:
           name: Coq 8.15
-          coq: '8.15'
+          coq: 'coqorg/coq:8.15'
       - test:
           name: Coq 8.16
-          coq: '8.16'
+          coq: 'coqorg/coq:8.16'
       - test:
           name: Coq 8.17
-          coq: '8.17'
+          coq: 'coqorg/coq:8.17'
       - test:
           name: Coq 8.18
-          coq: '8.18'
+          coq: 'coqorg/coq:8.18'
       - test:
           name: Coq 8.19
-          coq: '8.19'
+          coq: 'coqorg/coq:8.19'
       - test:
           name: Coq 8.20
-          coq: '8.20'
+          coq: 'coqorg/coq:8.20'
       - test:
           name: Coq dev
-          coq: dev
+          coq: 'rocq/rocq-prover:dev'
       - opam-install:
           name: Install and test
-          coq: '8.19'
+          coq: 'coqorg/coq:8.19'
