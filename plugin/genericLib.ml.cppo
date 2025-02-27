@@ -1286,6 +1286,9 @@ let declare_class_instance ?(global=true) ?(priority=42) instance_arguments inst
               (true, instance_record_vars) (* TODO: true or false? *)
               { Typeclasses.hint_priority = Some priority; hint_pattern = None }
   in
+#if COQ_VERSION >= (9, 1, 0)
+  let cid = cid.CAst.v in
+#endif
   msg_debug (str (Id.to_string cid) ++ fnl ())
 
 let define_new_inductive (ty_ctr, ty_params, ctrs, typ) =
