@@ -32,6 +32,8 @@ type pat =
   | PParam (* Type parameter *)
   | PWild
 
+val pat_vars : pat -> var list
+
 val pat_to_string : pat -> string
 
 (* Wrapper around constr that we use to represent the types of
@@ -97,12 +99,13 @@ val rocq_constr_var_relation_uses' : rocq_constr -> (var * (int * int list list)
 type source = 
   | SrcNonrec of rocq_type
   | SrcRec of var * rocq_constr list
+  | SrcMutrec of var * rocq_constr list
 
 type schedule_step =
   | S_UC of var * source * producer_sort
   | S_ST of (var * rocq_type (*** (int list) list*)) list * source * producer_sort (* the (int list) list for each var means the list of all occurences of the same variable
                                                                                         that we wish to produce, any other instance of the var is an input *)
-  | S_Check of source 
+  | S_Check of source * bool
   | S_Match of var * pat
 
 type schedule_sort = ProducerSchedule of bool * producer_sort * rocq_constr (* tuple of produced outputs from conclusion of constructor *)
@@ -152,10 +155,12 @@ type mexp =
   | MBacktrack of mexp * mexp list * bool
   | MFun of (pat * mexp option) list * mexp (*var list is a tuple, if you want multiple args do nested MFuns.*)
   | MFix of var * (var * mexp) list * mexp
+  | MMutFix of (ty_param * (ty_param * mexp) list * mexp * derive_sort) list *
+  ty_param
 
 val product_free_rocq_type_to_mexp : rocq_type -> mexp
 
-val schedule_to_mexp : schedule -> mexp
+val schedule_to_mexp : schedule -> mexp -> mexp
 
 val mexp_to_constr_expr : mexp -> derive_sort -> Constrexpr.constr_expr
 
@@ -163,7 +168,15 @@ type inductive_schedule = string * (var * mexp) list * (schedule * (var * pat) l
 
 val inductive_schedule_to_constr_expr : inductive_schedule -> derive_sort -> bool -> Constrexpr.constr_expr
 
+val inductive_schedule_with_dependencies_to_constr_expr : (inductive_schedule * derive_sort * bool) list -> string -> Constrexpr.constr_expr
+
 val inductive_schedule_to_string : inductive_schedule -> string
+
+val inductive_schedule_dependents : inductive_schedule -> (rocq_constr * int list * derive_sort * bool) list
+
+val schedule_with_dependents : schedule ->
+  (schedule_step * (rocq_type * int list * derive_sort * bool) option) list *
+  (schedule_sort * (rocq_type * int list * derive_sort * bool) option)
 
 val compile_and_pp_schedule : schedule -> derive_sort -> Pp.t
 

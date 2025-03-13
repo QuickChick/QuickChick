@@ -38,7 +38,7 @@ Inductive eval : exp -> nat -> nat -> res -> Prop :=
     eval e2 x y r ->
     eval (ite e e1 e2) x y r
 | Eval_T : forall x y, eval T x y (B true)
-| Eval_F : forall x y, eval T x y (B false)                            
+| Eval_F : forall x y, eval F x y (B false)                            
 (* | Eval_Not : forall x y e b,
    eval e x y (B b) ->
    eval (Not e) x y (B (negb b)) *) 
@@ -54,9 +54,18 @@ Inductive eval : exp -> nat -> nat -> res -> Prop :=
     eval (Lt e1 e2) x y (B false).
 
 Derive Show for res.
-Derive (Arbitrary, Show) for exp.
-Derive Generator for (fun y => le x y).
-Derive Generator for (fun e => eval e x y r).
+
+QuickChickDebug Debug Off.
+
+(*Derive Valid Schedules eval 0 consnum 8 derive "Gen".*)
+
+Derive Inductive Schedule eval 0 derive "Gen" opt "true".
+
+Print GenSizedSuchThateval_OIII.
+
+Derive ( Show) for exp.
+(*Derive Generator for (fun y => le x y).
+Derive Generator for (fun e => eval e x y r).*)
 
 (*
 QuickChickDebug Debug On.
@@ -118,8 +127,8 @@ Compute (stuck (ite X X Y)).
 
 Definition shrinker e := if stuck e then [] else [partial_eval e].
 
-Definition g :=
-  genSizedST (fun e => eval e 2 4 (N 4)).
+(*Definition g :=
+  genSizedST (fun e => eval e 2 4 (N 4)).*)
 
 Instance DecEqRes : Dec_Eq res.
 Proof. dec_eq. Defined.
@@ -136,271 +145,140 @@ Definition forAllShrinkMaybe {A prop : Type} {_ : Checkable prop} `{Show A}
                  end
               ).
 
+Derive Inductive Schedule eval derive "Check" opt "true".
+
+Check DecOpteval_IIII.
+
 Definition prop (ts : list (nat * nat * res)) :=
   let genSize := 5 in
   let defElemIgnore := (0,0, N 0) in
   forAll (elems_ defElemIgnore ts) (fun '(x,y,r) =>
-  forAllShrinkMaybe (genSizedST (fun e => eval e x y r) genSize) shrinker (fun e => 
+  forAllShrinkMaybe (GenSizedSuchThateval_OIII genSize x y r) shrinker (fun e => 
   negb (forallb (fun '(x,y,r) => 
-  match evalc e x y with
-  | Some r' => (r = r')?
+  match DecOpteval_IIII 10 e x y r
+                with
+  | Some true => true
   | _ => false
   end) ts))).
 
 Definition test_cases : list (nat * nat * res) :=
   [ (4,2,N 4);(2,5,N 5);(1,1,N 1) ].
 
-Extract Constant defNumTests => "100000". (*
+Extract Constant defNumTests => "100000". 
 QuickChick (prop test_cases).
+
+Print DecOpteval_IIII.
+
+Derive Inductive Schedule eval 3 derive "Enum" opt "true".
+
+
+Compute (DecOpteval_IIII 10 ( (Lt One Zero)) 4 2 (B false)).
+Compute (DecOpteval_IIII 10 ( (T)) 4 2 (B false)).
+Print andBind.
+
+Inductive EVAL : res -> res -> exp -> Prop :=
+  | Eval_Lt_FEval_Lt_F : forall  (e1' e2' : exp) (n1' n2' n1 n2 : nat),
+                         n2' <= n1' ->
+                         n2 <= n1 ->
+                         EVAL (N n2) (N n2') e2' ->
+                         EVAL (N n1) (N n1') e1' -> EVAL (B false) (B false) (Lt e1' e2')
+  | Eval_Lt_FEval_Lt_T : forall  (e1' e2' : exp) (n1' n2' n1 n2 : nat),
+                         S n1' <= n2' ->
+                         n2 <= n1 ->
+                         EVAL (N n2) (N n2') e2' ->
+                         EVAL (N n1) (N n1') e1' -> EVAL (B false) (B true) (Lt e1' e2')
+  | Eval_Lt_TEval_Lt_F : forall  (e1' e2' : exp) (n1' n2' n1 n2 : nat),
+                         n2' <= n1' ->
+                         S n1 <= n2 ->
+                         EVAL (N n2)  (N n2') e2' ->
+                         EVAL (N n1)  (N n1') e1' -> EVAL (B true) (B false) (Lt e1' e2')
+  | Eval_Lt_TEval_Lt_T : forall (e1' e2' : exp) (n1' n2' n1 n2 : nat),
+                         S n1' <= n2' ->
+                         S n1 <= n2 ->
+                         EVAL (N n2) (N n2') e2' ->
+                         EVAL (N n1) (N n1') e1' -> EVAL (B true) (B true) (Lt e1' e2')
+  | Eval_FEval_F : EVAL (B false) (B false) F
+  | Eval_TEval_T : EVAL (B true)  (B true) T 
+ (** | Eval_ITE_FEval_ITE_F : forall (e' e1' e2' : exp) (r' : res) (r : res),
+                           EVAL r r' e2' -> EVAL (B false) (B false) e' -> EVAL r r' (ite e' e1' e2')
+  | Eval_ITE_FEval_ITE_T : forall (e' e1' e2' : exp) (r' : res) (r : res),
+                           eval e1' r' ->
+                           eval e2' x y r -> EVAL x y (B false) x' y' (B true) e' -> EVAL x y r x' y' r' (ite e' e1' e2')
+  | Eval_ITE_TEval_ITE_F : forall (x' y' : nat) (e' e1' e2' : exp) (r' : res) (x y : nat) (r : res),
+                           eval e2' x' y' r' ->
+                           eval e1' x y r -> EVAL x y (B true) x' y' (B false) e' -> EVAL x y r x' y' r' (ite e' e1' e2')
+  | Eval_ITE_TEval_ITE_T : forall (x' y' : nat) (e' e1' e2' : exp) (r' : res) (x y : nat) (r : res),
+                           EVAL x y r x' y' r' e1' -> EVAL x y (B true) x' y' (B true) e' -> EVAL x y r x' y' r' (ite e' e1' e2')**)
+  | Eval_1Eval_1 :  EVAL (N 1) (N 1) One
+| Eval_0Eval_0 :  EVAL  (N 0) (N 0) Zero .
+
+Derive  Schedules EVAL 2 consnum 2 derive "Gen".
+
+Derive Inductive Schedule le 0 1 derive "Gen" opt "true". Print GenSizedSuchThatle_OO.
+
+
+
+
+Derive Inductive Schedule EVAL 2 derive "Gen" opt "true".
+
+
+
+Inductive EVAL : nat -> nat -> res -> nat -> nat -> res -> exp -> Prop :=
+(*  | Eval_Lt_FEval_Lt_F : forall (x' y' : nat) (e1' e2' : exp) (n1' n2' x y n1 n2 : nat),
+                         n2' <= n1' ->
+                         n2 <= n1 ->
+                         EVAL x y (N n2) x' y' (N n2') e2' ->
+                         EVAL x y (N n1) x' y' (N n1') e1' -> EVAL x y (B false) x' y' (B false) (Lt e1' e2')
+  | Eval_Lt_FEval_Lt_T : forall (x' y' : nat) (e1' e2' : exp) (n1' n2' x y n1 n2 : nat),
+                         S n1' <= n2' ->
+                         n2 <= n1 ->
+                         EVAL x y (N n2) x' y' (N n2') e2' ->
+                         EVAL x y (N n1) x' y' (N n1') e1' -> EVAL x y (B false) x' y' (B true) (Lt e1' e2')
+  | Eval_Lt_TEval_Lt_F : forall (x' y' : nat) (e1' e2' : exp) (n1' n2' x y n1 n2 : nat),
+                         n2' <= n1' ->
+                         S n1 <= n2 ->
+                         EVAL x y (N n2) x' y' (N n2') e2' ->
+                         EVAL x y (N n1) x' y' (N n1') e1' -> EVAL x y (B true) x' y' (B false) (Lt e1' e2')
+  | Eval_Lt_TEval_Lt_T : forall (x' y' : nat) (e1' e2' : exp) (n1' n2' x y n1 n2 : nat),
+                         S n1' <= n2' ->
+                         S n1 <= n2 ->
+                         EVAL x y (N n2) x' y' (N n2') e2' ->
+                         EVAL x y (N n1) x' y' (N n1') e1' -> EVAL x y (B true) x' y' (B true) (Lt e1' e2') *)
+  | Eval_FEval_F : forall x' y' x y : nat, EVAL x y (B false) x' y' (B false) F
+  | Eval_TEval_T : forall x' y' x y : nat, EVAL x y (B true) x' y' (B true) T 
+  | Eval_ITE_FEval_ITE_F : forall (x' y' : nat) (e' e1' e2' : exp) (r' : res) (x y : nat) (r : res),
+                           EVAL x y r x' y' r' e2' -> EVAL x y (B false) x' y' (B false) e' -> EVAL x y r x' y' r' (ite e' e1' e2')
+  | Eval_ITE_FEval_ITE_T : forall (x' y' : nat) (e' e1' e2' : exp) (r' : res) (x y : nat) (r : res),
+                           eval e1' x' y' r' ->
+                           eval e2' x y r -> EVAL x y (B false) x' y' (B true) e' -> EVAL x y r x' y' r' (ite e' e1' e2')
+  | Eval_ITE_TEval_ITE_F : forall (x' y' : nat) (e' e1' e2' : exp) (r' : res) (x y : nat) (r : res),
+                           eval e2' x' y' r' ->
+                           eval e1' x y r -> EVAL x y (B true) x' y' (B false) e' -> EVAL x y r x' y' r' (ite e' e1' e2')
+  | Eval_ITE_TEval_ITE_T : forall (x' y' : nat) (e' e1' e2' : exp) (r' : res) (x y : nat) (r : res),
+                           EVAL x y r x' y' r' e1' -> EVAL x y (B true) x' y' (B true) e' -> EVAL x y r x' y' r' (ite e' e1' e2')
+  | Eval_1Eval_1 : forall x' y' x y : nat, EVAL x y (N 1) x' y' (N 1) One
+  | Eval_0Eval_0 : forall x' y' x y : nat, EVAL x y (N 0) x' y' (N 0) Zero 
+  | Eval_YEval_Y : forall x' y' x y : nat, EVAL x y (N y) x' y' (N y') Y
+  | Eval_XEval_X : forall x' y' x y : nat, EVAL x y (N x) x' y' (N x') X .
+
+Derive Inductive Schedule EVAL 6  derive "Enum" opt "true".
+
+Check EnumSizedSuchThatEVAL_IIIIIIO.
+
+Compute (EnumSizedSuchThatEVAL_IIIIIIO 30 2 4 (B true) 3 5 (B false)).
+
+Merge (fun e => eval e x1 y1 r1) With (fun e => eval e x2 y2 r2) As EVAL.
+
+Print EVAL.
+
+
+Compute (EnumSizedSuchThateval_IIIO 3 (LT One Zero)
+
+Compute (DecOpteval_IIII 10 (ite (Lt One Zero) (Or One (ite T (Or F X) One)) (ite T Y X)) 4 2 (N 4)).
 QuickChick (prop [(1,1,B true); (3,3,B true); (0,1,B false); (0,2,B false); (0,0,B true); (2,0,B false)]).
-*)
+
 Derive Inductive Schedule eval 3 derive "Gen" opt "true".
 
-Check ((let GenSizedSuchThateval_IIIOGen :=
-   fix rec (init_size : Coq.Init.Datatypes.nat) (size : Coq.Init.Datatypes.nat) (v10_ : @exp) (v11_ : @nat) (v12_ : @nat) :=
-     match size with
-     | @Coq.Init.Datatypes.O =>
-         @QuickChick.Generators.backtrack _
-           (@Coq.Init.Datatypes.cons _
-              (@Coq.Init.Datatypes.pair _ _ Coq.Init.Nat.one
-                 (@QuickChick.Generators.thunkGen _
-                    (fun '_ =>
-                     match v10_ with
-                     | @X => @QuickChick.Generators.returnGen _ (@Coq.Init.Datatypes.Some _ (@N v11_))
-                     | _ => @QuickChick.Generators.returnGen _ (@Coq.Init.Datatypes.None _)
-                     end)))
-              (@Coq.Init.Datatypes.cons _
-                 (@Coq.Init.Datatypes.pair _ _ Coq.Init.Nat.one
-                    (@QuickChick.Generators.thunkGen _
-                       (fun '_ =>
-                        match v10_ with
-                        | @Y => @QuickChick.Generators.returnGen _ (@Coq.Init.Datatypes.Some _ (@N v12_))
-                        | _ => @QuickChick.Generators.returnGen _ (@Coq.Init.Datatypes.None _)
-                        end)))
-                 (@Coq.Init.Datatypes.cons _
-                    (@Coq.Init.Datatypes.pair _ _ Coq.Init.Nat.one
-                       (@QuickChick.Generators.thunkGen _
-                          (fun '_ =>
-                           match v10_ with
-                           | @Zero => @QuickChick.Generators.returnGen _ (@Coq.Init.Datatypes.Some _ (@N (@Coq.Init.Datatypes.O)))
-                           | _ => @QuickChick.Generators.returnGen _ (@Coq.Init.Datatypes.None _)
-                           end)))
-                    (@Coq.Init.Datatypes.cons _
-                       (@Coq.Init.Datatypes.pair _ _ Coq.Init.Nat.one
-                          (@QuickChick.Generators.thunkGen _
-                             (fun '_ =>
-                              match v10_ with
-                              | @One =>
-                                  @QuickChick.Generators.returnGen _
-                                    (@Coq.Init.Datatypes.Some _ (@N (@Coq.Init.Datatypes.S (@Coq.Init.Datatypes.O))))
-                              | _ => @QuickChick.Generators.returnGen _ (@Coq.Init.Datatypes.None _)
-                              end)))
-                       (@Coq.Init.Datatypes.cons _
-                          (@Coq.Init.Datatypes.pair _ _ Coq.Init.Nat.one
-                             (@QuickChick.Generators.thunkGen _
-                                (fun '_ =>
-                                 match v10_ with
-                                 | @T => @QuickChick.Generators.returnGen _ (@Coq.Init.Datatypes.Some _ (@B (@Coq.Init.Datatypes.true)))
-                                 | _ => @QuickChick.Generators.returnGen _ (@Coq.Init.Datatypes.None _)
-                                 end)))
-                          (@Coq.Init.Datatypes.cons _
-                             (@Coq.Init.Datatypes.pair _ _ Coq.Init.Nat.one
-                                (@QuickChick.Generators.thunkGen _
-                                   (fun '_ =>
-                                    match v10_ with
-                                    | @T =>
-                                        @QuickChick.Generators.returnGen _ (@Coq.Init.Datatypes.Some _ (@B (@Coq.Init.Datatypes.false)))
-                                    | _ => @QuickChick.Generators.returnGen _ (@Coq.Init.Datatypes.None _)
-                                    end)))
-                             (@Coq.Init.Datatypes.cons _
-                                (@Coq.Init.Datatypes.pair _ _ Coq.Init.Nat.one
-                                   (@QuickChick.Generators.thunkGen _
-                                      (fun '_ =>
-                                       match v10_ with
-                                       | @Lt e1 e2 =>
-                                           @QuickChick.Generators.bindGen _ _ (@QuickChick.Classes.arbitrarySized (@nat) _ init_size)
-                                             (fun 'n1 =>
-                                              if
-                                               @QuickChick.Decidability.decOpt (@eval e1 v11_ v12_ (@N n1)) _
-                                                 QuickChick.Decidability.checkable_size_limit
-                                              then
-                                               @QuickChick.Producer.bindOpt _ _ _ _
-                                                 (@QuickChick.DependentClasses.arbitrarySizeST _
-                                                    (fun 'n2 => @le (@Coq.Init.Datatypes.S n1) n2) _ init_size)
-                                                 (fun 'n2 =>
-                                                  if
-                                                   @QuickChick.Decidability.decOpt (@eval e2 v11_ v12_ (@N n2)) _
-                                                     QuickChick.Decidability.checkable_size_limit
-                                                  then
-                                                   @QuickChick.Generators.returnGen _
-                                                     (@Coq.Init.Datatypes.Some _ (@B (@Coq.Init.Datatypes.true)))
-                                                  else @QuickChick.Generators.returnGen _ (@Coq.Init.Datatypes.None _))
-                                              else @QuickChick.Generators.returnGen _ (@Coq.Init.Datatypes.None _))
-                                       | _ => @QuickChick.Generators.returnGen _ (@Coq.Init.Datatypes.None _)
-                                       end)))
-                                (@Coq.Init.Datatypes.cons _
-                                   (@Coq.Init.Datatypes.pair _ _ Coq.Init.Nat.one
-                                      (@QuickChick.Generators.thunkGen _
-                                         (fun '_ =>
-                                          match v10_ with
-                                          | @Lt e1 e2 =>
-                                              @QuickChick.Generators.bindGen _ _ (@QuickChick.Classes.arbitrarySized (@nat) _ init_size)
-                                                (fun 'n1 =>
-                                                 if
-                                                  @QuickChick.Decidability.decOpt (@eval e1 v11_ v12_ (@N n1)) _
-                                                    QuickChick.Decidability.checkable_size_limit
-                                                 then
-                                                  @QuickChick.Producer.bindOpt _ _ _ _
-                                                    (@QuickChick.DependentClasses.arbitrarySizeST _ (fun 'n2 => @le n2 n1) _ init_size)
-                                                    (fun 'n2 =>
-                                                     if
-                                                      @QuickChick.Decidability.decOpt (@eval e2 v11_ v12_ (@N n2)) _
-                                                        QuickChick.Decidability.checkable_size_limit
-                                                     then
-                                                      @QuickChick.Generators.returnGen _
-                                                        (@Coq.Init.Datatypes.Some _ (@B (@Coq.Init.Datatypes.false)))
-                                                     else @QuickChick.Generators.returnGen _ (@Coq.Init.Datatypes.None _))
-                                                 else @QuickChick.Generators.returnGen _ (@Coq.Init.Datatypes.None _))
-                                          | _ => @QuickChick.Generators.returnGen _ (@Coq.Init.Datatypes.None _)
-                                          end))) (@Coq.Init.Datatypes.nil _)))))))))
-     | @Coq.Init.Datatypes.S size' =>
-         @QuickChick.Generators.backtrack _
-           (@Coq.Init.Datatypes.cons _
-              (@Coq.Init.Datatypes.pair _ _ Coq.Init.Nat.one
-                 (@QuickChick.Generators.thunkGen _
-                    (fun '_ =>
-                     match v10_ with
-                     | @X => @QuickChick.Generators.returnGen _ (@Coq.Init.Datatypes.Some _ (@N v11_))
-                     | _ => @QuickChick.Generators.returnGen _ (@Coq.Init.Datatypes.None _)
-                     end)))
-              (@Coq.Init.Datatypes.cons _
-                 (@Coq.Init.Datatypes.pair _ _ Coq.Init.Nat.one
-                    (@QuickChick.Generators.thunkGen _
-                       (fun '_ =>
-                        match v10_ with
-                        | @Y => @QuickChick.Generators.returnGen _ (@Coq.Init.Datatypes.Some _ (@N v12_))
-                        | _ => @QuickChick.Generators.returnGen _ (@Coq.Init.Datatypes.None _)
-                        end)))
-                 (@Coq.Init.Datatypes.cons _
-                    (@Coq.Init.Datatypes.pair _ _ Coq.Init.Nat.one
-                       (@QuickChick.Generators.thunkGen _
-                          (fun '_ =>
-                           match v10_ with
-                           | @Zero => @QuickChick.Generators.returnGen _ (@Coq.Init.Datatypes.Some _ (@N (@Coq.Init.Datatypes.O)))
-                           | _ => @QuickChick.Generators.returnGen _ (@Coq.Init.Datatypes.None _)
-                           end)))
-                    (@Coq.Init.Datatypes.cons _
-                       (@Coq.Init.Datatypes.pair _ _ Coq.Init.Nat.one
-                          (@QuickChick.Generators.thunkGen _
-                             (fun '_ =>
-                              match v10_ with
-                              | @One =>
-                                  @QuickChick.Generators.returnGen _
-                                    (@Coq.Init.Datatypes.Some _ (@N (@Coq.Init.Datatypes.S (@Coq.Init.Datatypes.O))))
-                              | _ => @QuickChick.Generators.returnGen _ (@Coq.Init.Datatypes.None _)
-                              end)))
-                       (@Coq.Init.Datatypes.cons _
-                          (@Coq.Init.Datatypes.pair _ _ Coq.Init.Nat.one
-                             (@QuickChick.Generators.thunkGen _
-                                (fun '_ =>
-                                 match v10_ with
-                                 | @T => @QuickChick.Generators.returnGen _ (@Coq.Init.Datatypes.Some _ (@B (@Coq.Init.Datatypes.true)))
-                                 | _ => @QuickChick.Generators.returnGen _ (@Coq.Init.Datatypes.None _)
-                                 end)))
-                          (@Coq.Init.Datatypes.cons _
-                             (@Coq.Init.Datatypes.pair _ _ Coq.Init.Nat.one
-                                (@QuickChick.Generators.thunkGen _
-                                   (fun '_ =>
-                                    match v10_ with
-                                    | @T =>
-                                        @QuickChick.Generators.returnGen _ (@Coq.Init.Datatypes.Some _ (@B (@Coq.Init.Datatypes.false)))
-                                    | _ => @QuickChick.Generators.returnGen _ (@Coq.Init.Datatypes.None _)
-                                    end)))
-                             (@Coq.Init.Datatypes.cons _
-                                (@Coq.Init.Datatypes.pair _ _ Coq.Init.Nat.one
-                                   (@QuickChick.Generators.thunkGen _
-                                      (fun '_ =>
-                                       match v10_ with
-                                       | @Lt e1 e2 =>
-                                           @QuickChick.Generators.bindGen _ _ (@QuickChick.Classes.arbitrarySized (@nat) _ init_size)
-                                             (fun 'n1 =>
-                                              if
-                                               @QuickChick.Decidability.decOpt (@eval e1 v11_ v12_ (@N n1)) _
-                                                 QuickChick.Decidability.checkable_size_limit
-                                              then
-                                               @QuickChick.Producer.bindOpt _ _ _ _
-                                                 (@QuickChick.DependentClasses.arbitrarySizeST _
-                                                    (fun 'n2 => @le (@Coq.Init.Datatypes.S n1) n2) _ init_size)
-                                                 (fun 'n2 =>
-                                                  if
-                                                   @QuickChick.Decidability.decOpt (@eval e2 v11_ v12_ (@N n2)) _
-                                                     QuickChick.Decidability.checkable_size_limit
-                                                  then
-                                                   @QuickChick.Generators.returnGen _
-                                                     (@Coq.Init.Datatypes.Some _ (@B (@Coq.Init.Datatypes.true)))
-                                                  else @QuickChick.Generators.returnGen _ (@Coq.Init.Datatypes.None _))
-                                              else @QuickChick.Generators.returnGen _ (@Coq.Init.Datatypes.None _))
-                                       | _ => @QuickChick.Generators.returnGen _ (@Coq.Init.Datatypes.None _)
-                                       end)))
-                                (@Coq.Init.Datatypes.cons _
-                                   (@Coq.Init.Datatypes.pair _ _ Coq.Init.Nat.one
-                                      (@QuickChick.Generators.thunkGen _
-                                         (fun '_ =>
-                                          match v10_ with
-                                          | @Lt e1 e2 =>
-                                              @QuickChick.Generators.bindGen _ _ (@QuickChick.Classes.arbitrarySized (@nat) _ init_size)
-                                                (fun 'n1 =>
-                                                 if
-                                                  @QuickChick.Decidability.decOpt (@eval e1 v11_ v12_ (@N n1)) _
-                                                    QuickChick.Decidability.checkable_size_limit
-                                                 then
-                                                  @QuickChick.Producer.bindOpt _ _ _ _
-                                                    (@QuickChick.DependentClasses.arbitrarySizeST _ (fun 'n2 => @le n2 n1) _ init_size)
-                                                    (fun 'n2 =>
-                                                     if
-                                                      @QuickChick.Decidability.decOpt (@eval e2 v11_ v12_ (@N n2)) _
-                                                        QuickChick.Decidability.checkable_size_limit
-                                                     then
-                                                      @QuickChick.Generators.returnGen _
-                                                        (@Coq.Init.Datatypes.Some _ (@B (@Coq.Init.Datatypes.false)))
-                                                     else @QuickChick.Generators.returnGen _ (@Coq.Init.Datatypes.None _))
-                                                 else @QuickChick.Generators.returnGen _ (@Coq.Init.Datatypes.None _))
-                                          | _ => @QuickChick.Generators.returnGen _ (@Coq.Init.Datatypes.None _)
-                                          end)))
-                                   (@Coq.Init.Datatypes.cons _
-                                      (@Coq.Init.Datatypes.pair _ _ size
-                                         (@QuickChick.Generators.thunkGen _
-                                            (fun '_ =>
-                                             match v10_ with
-                                             | @ite e e1 e2 =>
-                                                 if
-                                                  @QuickChick.Decidability.decOpt (@eval e v11_ v12_ (@B (@Coq.Init.Datatypes.true))) _
-                                                    QuickChick.Decidability.checkable_size_limit
-                                                 then
-                                                  @QuickChick.Producer.bindOpt _ _ _ _ (@rec init_size size' e1 v11_ v12_)
-                                                    (fun 'v13_ => @QuickChick.Generators.returnGen _ (@Coq.Init.Datatypes.Some _ v13_))
-                                                 else @QuickChick.Generators.returnGen _ (@Coq.Init.Datatypes.None _)
-                                             | _ => @QuickChick.Generators.returnGen _ (@Coq.Init.Datatypes.None _)
-                                             end)))
-                                      (@Coq.Init.Datatypes.cons _
-                                         (@Coq.Init.Datatypes.pair _ _ size
-                                            (@QuickChick.Generators.thunkGen _
-                                               (fun '_ =>
-                                                match v10_ with
-                                                | @ite e e1 e2 =>
-                                                    if
-                                                     @QuickChick.Decidability.decOpt
-                                                       (@eval e v11_ v12_ (@B (@Coq.Init.Datatypes.false))) _
-                                                       QuickChick.Decidability.checkable_size_limit
-                                                    then
-                                                     @QuickChick.Producer.bindOpt _ _ _ _ (@rec init_size size' e2 v11_ v12_)
-                                                       (fun 'v13_ =>
-                                                        @QuickChick.Generators.returnGen _ (@Coq.Init.Datatypes.Some _ v13_))
-                                                    else @QuickChick.Generators.returnGen _ (@Coq.Init.Datatypes.None _)
-                                                | _ => @QuickChick.Generators.returnGen _ (@Coq.Init.Datatypes.None _)
-                                                end))) (@Coq.Init.Datatypes.nil _)))))))))))
-     end in
- fun size : Coq.Init.Datatypes.nat => @GenSizedSuchThateval_IIIOGen size size)).
 
 Derive Valid Schedules eval 3 consnum 8.
 

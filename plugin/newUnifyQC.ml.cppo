@@ -40,6 +40,7 @@ type range = Ctr of constructor * range list
            | FixedInput
            | Parameter of ty_param
            | RangeHole
+           (* | Fun of unknown * range list *)
 
 let is_parameter r =
   match r with
@@ -95,6 +96,17 @@ let unk_provider =
   { next_unknown = fun () -> Unknown.from_string (np.next_name ()) }
 
 
+let is_inductive ty_name : bool =
+  let locate_result = Nametab.locate_all ty_name in
+  List.exists (function
+               | Names.GlobRef.IndRef _ -> true
+               | _ -> false) locate_result
+
+let make_types_wild_in_pat p =
+  match p with
+  | PCtr (c, ps) when is_inductive c -> PWild
+  | _ -> p
+
 (* Match a constructor/ranges list to a fixed input *)
 (* Range list is toplevel, so it's mostly unifications.
    If any of the unknowns in rs is "FixedInput", then 
@@ -106,7 +118,7 @@ let rec raiseMatch (k : umap) (c : constructor) (rs : range list) (eqs: EqSet.t)
          match r with 
          | Ctr (c', rs') ->
             raiseMatch k c' rs' eqs >>= fun (k', m, eqs') ->
-            Some (k', m::l, eqs')
+            Some (k', make_types_wild_in_pat m::l, eqs')
          | Unknown u ->
             let rec go u = 
               lookup u k >>= fun r' ->
@@ -1771,7 +1783,7 @@ let get_schedule_sort (concl : rocq_constr) (output_vars : unknown list) (ctr_na
   | D_Check -> Some CheckerSchedule 
   | D_Thm -> Some (TheoremSchedule concl)
   | D_Gen | D_Enum ->
-    Feedback.msg_debug (str ("SCHEDSORT output_vars " ^ String.concat ", " (List.map Unknown.to_string output_vars)) ++ fnl ());
+    Error.msg_debug (str ("SCHEDSORT output_vars " ^ String.concat ", " (List.map Unknown.to_string output_vars)) ++ fnl ());
     sequenceM (evaluate_var umap) output_vars >>= fun output_values ->
       let producer_type = (match ds with D_Gen -> PS_G | D_Enum -> PS_E | _ -> failwith "impossible") in
       let conclusion = 
@@ -1818,6 +1830,7 @@ let correct_src (umap : umap) (src : source) : source =
   match src with
   | SrcNonrec ty -> SrcNonrec (correct_rocq_constr umap ty)
   | SrcRec (r, tys) -> SrcRec (r,List.map (correct_rocq_constr umap) tys)
+  | SrcMutrec (r, tys) -> SrcMutrec (r,List.map (correct_rocq_constr umap) tys)
 
 let rec correct_variables (umap : umap) (scd : schedule_step list) : schedule_step list =
   match scd with
@@ -1828,31 +1841,39 @@ let rec correct_variables (umap : umap) (scd : schedule_step list) : schedule_st
     S_UC (correct_var umap u, correct_src umap src, dst) :: correct_variables umap scd'
   | S_ST (uts, src, dst) :: scd' ->
     S_ST (List.map (fun (v,t) -> correct_var umap v, t) uts, correct_src umap src, dst) :: correct_variables umap scd'
-  | S_Check src :: scd' ->
-    S_Check (correct_src umap src) :: correct_variables umap scd'
+  | S_Check (src,pol) :: scd' ->
+    S_Check (correct_src umap src, pol) :: correct_variables umap scd'
 
 
 let type_to_schedules (typ : rocq_constr) (ind_name : ty_ctr option) (ctr_name : ty_ctr option) (result_vars : (var * rocq_constr) list) (output_vars : var list) (ds : derive_sort) opt : (schedule * (var * pat) list * (var * var) list) list = 
-
+  (*TODO: handle parameters, need to distinguish them from remainder of result_vars*)
   let vars, hyps, concl = type_info typ in
 
   let add_all vars range_f umap = List.fold_left (fun umap v -> UM.add v (range_f v) umap) umap vars in
+
+  let is_Type ty = match ty with DTyCtr (c,_) -> ty_ctr_eq c (ty_ctr_of_string "Type") 
+                                              || ty_ctr_eq c (ty_ctr_of_string "Prop") 
+                                              || ty_ctr_eq c (ty_ctr_of_string "Set") 
+                                | DHole -> true
+                                | _ -> false in
 
   let init_umap' : umap = List.fold_left (fun umap (v, ty) ->
     if List.mem v output_vars then 
       UM.add v (Undef ty) umap 
     else
       UM.add v FixedInput umap) UM.empty result_vars in
-  let init_umap = List.fold_left (fun umap (v, ty) -> UM.add v (Undef ty) umap) init_umap' vars in
+  let init_umap = List.fold_left (fun umap (v, ty) -> if is_Type ty then UM.add v (Parameter v) umap else UM.add v (Undef ty) umap) init_umap' vars in
+
+  (* let rec remove_conclusion *)
   
   let rec unify_range_lists (dt_args : range list) (concl_args : range list)
     (umap : umap) (eqs : EqSet.t) matches : (umap * EqSet.t * (unknown * NewGenericLib.pat) list) option =
     (* Unify the two ranges, updating the mapping and equation set as necessary. *)
-    Feedback.msg_debug (str ("Unifying range lists: " ^ String.concat ", " (List.map range_to_string dt_args) ^ " with " ^ String.concat ", " (List.map range_to_string concl_args)) ++ fnl ());
+    Error.msg_debug (str ("Unifying range lists: " ^ String.concat ", " (List.map range_to_string dt_args) ^ " with " ^ String.concat ", " (List.map range_to_string concl_args)) ++ fnl ());
     match dt_args, concl_args with
     | [], [] -> Some (umap, eqs, matches)
     | r1 :: rs, r2 :: rs' ->
-      Feedback.msg_debug (str ("Unifying " ^ range_to_string r1 ^ " with " ^ range_to_string r2) ++ fnl ());
+      Error.msg_debug (str ("Unifying " ^ range_to_string r1 ^ " with " ^ range_to_string r2) ++ fnl ());
       begin match unify umap r1 r2 eqs with
       | Some (umap', _unified_range, eqs', matcher_list) ->
           let matches' = matcher_list @ matches in
@@ -1861,9 +1882,12 @@ let type_to_schedules (typ : rocq_constr) (ind_name : ty_ctr option) (ctr_name :
       end
     | _ -> failwith "Mismatched lengths in unify_range_lists" in
 
-  let result_ranges = List.map (fun (v, _) -> Unknown v) result_vars in
+  let result_ranges = List.map (fun (v, ty) -> 
+    if is_Type ty then 
+      (Feedback.msg_notice (str ("Type variable: " ^ var_to_string v));
+      Parameter v) else (Unknown v)) result_vars in
 
-  Feedback.msg_debug (str ("Result ranges: " ^ String.concat ", " (List.map range_to_string result_ranges)) ++ fnl ());
+  Error.msg_debug (str ("Result ranges: " ^ String.concat ", " (List.map range_to_string result_ranges)) ++ fnl ());
 
   let state = 
       match ds, concl with
@@ -1885,7 +1909,7 @@ let type_to_schedules (typ : rocq_constr) (ind_name : ty_ctr option) (ctr_name :
     | r -> failwith ("Unexpected case in is_range_fixed" ^ range_to_string r) in
 
   let eq_check (u1,u2) : schedule_step =
-    S_Check (SrcNonrec (DTyCtr (constructor_of_string "Coq.Init.Logic.eq", [DTyVar u1; DTyVar u2]))) in
+    S_Check (SrcNonrec (DTyCtr (constructor_of_string "Coq.Init.Logic.eq", [DTyVar u1; DTyVar u2])), true) in
 
   let output_indices = filter_mapi (fun i (v,_) -> if List.mem v output_vars then Some i else None) result_vars in
 
@@ -1898,7 +1922,7 @@ let type_to_schedules (typ : rocq_constr) (ind_name : ty_ctr option) (ctr_name :
       let fixed_vars = List.filter_map (fun (v,_) -> if is_fixed umap v then Some v else None) vars in
       let eq_checks = EqSet.elements eqs in
       let rec_name = match ind_name with Some n -> n | _ -> ty_ctr_of_string "nonsense" in
-      Feedback.msg_debug (str ("Fixed vars: " ^ String.concat ", " (List.map var_to_string fixed_vars)) ++ fnl ());
+      Error.msg_debug (str ("Fixed vars: " ^ String.concat ", " (List.map var_to_string fixed_vars)) ++ fnl ());
       List.map (fun schedule_steps -> ((correct_variables umap schedule_steps, sort), matches, eq_checks)) 
         (possible_schedules vars hyps fixed_vars (rec_name, output_indices) ds)
     | None -> failwith "Failed to construct schedule sort")
@@ -1909,13 +1933,13 @@ let match_schedule_to_string ((sch,fin) : schedule) (ms : (unknown * pat) list) 
   (* let print_match (uk, m) = Printf.sprintf "let %s = %s in" (Unknown.to_string uk) (pat_to_string m) in
   let print_matches = String.concat "\n" (List.map print_match ms) in
   print_matches ^ "\n" ^ (schedule_to_string sch) *)
-  let check_eq (u1,u2) = S_Check (SrcNonrec (DTyCtr (constructor_of_string "Coq.Init.Logic.eq", [DTyVar u1; DTyVar u2]))) in
+  let check_eq (u1,u2) = S_Check (SrcNonrec (DTyCtr (constructor_of_string "Coq.Init.Logic.eq", [DHole; DTyVar u1; DTyVar u2])), true) in
   schedule_to_string (List.map (fun (u,p) -> S_Match (u,p)) ms @ List.map check_eq eqs @ sch, fin)
 
   (* let schedules_str = List.mapi (fun i sch -> string_of_int i ^ ":\n" ^ schedule_to_string sch) schedules_sorted in
   Feedback.msg_notice (str (String.concat "\n\n===================\n" schedules_str)); *)
 
 let match_schedule_as_pp_constr_expr ((sch,fin) : schedule) (ms : (unknown * pat) list) (eq_checks : (unknown * unknown) list) ds : Pp.t =
-  let check_eq (u1,u2) = S_Check (SrcNonrec (DTyCtr (constructor_of_string "Coq.Init.Logic.eq", [DTyVar u1; DTyVar u2]))) in
+  let check_eq (u1,u2) = S_Check (SrcNonrec (DTyCtr (constructor_of_string "Coq.Init.Logic.eq", [DHole; DTyVar u1; DTyVar u2])), true) in
   NewGenericLib.compile_and_pp_schedule (List.map (fun (u,p) -> S_Match (u,p)) ms @ List.map check_eq eq_checks @ sch, fin) ds
 

@@ -255,6 +255,13 @@ Definition andBind (a b : option bool) : option bool :=
   | _ => a
   end.
 
+Definition negbOpt (a : option bool) : option bool :=
+  match a with
+  | Some true => Some false
+  | Some false => Some true
+  | None => None
+  end.
+
 #[global] Hint Resolve Dec_eq_unit : eq_dec.
 #[global] Hint Resolve Dec_eq_bool : eq_dec.
 #[global] Hint Resolve Dec_eq_nat : eq_dec.

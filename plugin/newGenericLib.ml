@@ -550,7 +550,7 @@ let variables_in_hypothesis (hyp : rocq_constr) : var list =
   let rec collect_tyvars = function
     | DTyVar x -> [x]
     | DCtr (_, ds) -> List.concat (List.map collect_tyvars ds)
-    | DApp (d, ds) -> List.concat (List.map collect_tyvars (d :: ds))
+    | DApp (_, ds) -> List.concat (List.map collect_tyvars (ds))
     | DTyCtr (_, ds) -> List.concat (List.map collect_tyvars ds)
     | _ -> []
   in
@@ -632,6 +632,8 @@ type monad_sort =
   | MC
   | MId
 
+type derive_sort = D_Gen | D_Enum | D_Check | D_Thm
+
 (* TODO: Weights? *)
 (* Deep AST of Language that derivations target *)
 (* Continuation of mexp is always going to be of a particular monad sort.*)
@@ -653,7 +655,8 @@ type mexp =
   | MLet of var * mexp * mexp 
   | MBacktrack of mexp * mexp list * bool
   | MFun of (pat * mexp option) list * mexp 
-  | MFix of var * (var * mexp) list * mexp 
+  | MFix of var * (var * mexp) list * mexp
+  | MMutFix of (var * (var * mexp) list * mexp * derive_sort) list * var 
   
 let m_arbitrary ty = MApp (MConst "QuickChick.Classes.arbitrary", [ty; MHole])
 
@@ -684,23 +687,25 @@ type rocq_type = rocq_constr
 type source = 
   | SrcNonrec of rocq_type
   | SrcRec of var * rocq_constr list
+  | SrcMutrec of var * rocq_constr list
+
+let source_to_string = function
+  | SrcNonrec t -> rocq_constr_to_string t
+  | SrcRec (v, cs) -> Printf.sprintf "(%s %s)" (var_to_string v) (String.concat " " (List.map rocq_constr_to_string cs))
+  | SrcMutrec (v, cs) -> Printf.sprintf "(%s %s)" (var_to_string v) (String.concat " " (List.map rocq_constr_to_string cs))
 
 type schedule_step =
   | S_UC of var * source * producer_sort
   | S_ST of (var * rocq_type (*** (int list) list*)) list * source * producer_sort (* the (int list) list for each var means the list of all occurences of the same variable
                                                                                         that we wish to produce, any other instance of the var is an input *)
-  | S_Check of source
+  | S_Check of source * bool (* Source and polarity (true or negated)*)
   | S_Match of var * pat (* Used when you decompose a constructor constrained arg into a fresh variable followed by a pattern match.*)
 
 let schedule_step_to_string (s : schedule_step) =
-  let source_to_string = function
-    | SrcNonrec t -> rocq_constr_to_string t
-    | SrcRec (v, cs) -> Printf.sprintf "(%s %s)" (var_to_string v) (String.concat " " (List.map rocq_constr_to_string cs))
-  in
   match s with
   | S_UC (v, s, ps) -> Printf.sprintf "%s <-%s %s" (var_to_string v) (match ps with PS_E -> "E" | PS_G -> "G") (source_to_string s) 
   | S_ST (vs, s, ps) -> Printf.sprintf "(%s) <-%s %s" (String.concat ", " (List.map (fun (v, t) -> Printf.sprintf "%s : %s" (var_to_string v) (rocq_constr_to_string t)) vs)) (match ps with PS_E -> "E" | PS_G -> "G") (source_to_string s) 
-  | S_Check s -> Printf.sprintf "check %s" (source_to_string s)
+  | S_Check (s,pol) -> Printf.sprintf "check %s%s" (if pol then "" else "~ ")(source_to_string s)
   | S_Match (v, p) -> Printf.sprintf "let %s = %s" (pat_to_string p) (var_to_string v)
 
 type is_constrained = bool
@@ -715,7 +720,7 @@ let schedule_sort_to_string = function
   | ProducerSchedule (true, ps, c) -> Printf.sprintf "return%s (Some %s)" (match ps with PS_E -> "Enum" | PS_G -> "Gen") (rocq_constr_to_string c)
   | ProducerSchedule (false, ps, c) -> Printf.sprintf "return%s %s" (match ps with PS_E -> "Enum" | PS_G -> "Gen") (rocq_constr_to_string c)
   | CheckerSchedule -> "relation satisfied"
-  | TheoremSchedule c -> Printf.sprintf "check conclusion: %s" (rocq_constr_to_string c)
+  | TheoremSchedule concl -> Printf.sprintf "check conclusion: %s" (rocq_constr_to_string concl)
 
 let schedule_to_string (s : schedule) =
   let (steps, sort) = s in
@@ -843,13 +848,11 @@ let c_match discr ?catchAll:(body=None) ?params:(holes=0) (branches : (construct
                                  | None -> []
                                  | Some c' -> [CAst.make ([[CAst.make @@ CPatAtom None]], c')]) *)
 
-type derive_sort = D_Gen | D_Enum | D_Check | D_Thm
-
 let c_bindGen gen k = c_app (cInject "QuickChick.Generators.bindGen") [c_hole; c_hole; gen; k]
 
 let c_bindOpt prod k = c_app (cInject "QuickChick.Producer.bindOpt") [c_hole; c_hole; c_hole; c_hole; prod; k]
 
-let c_andBind check k = c_app (cInject "QuickChick.Decidability.andBind") [c_hole; check; k]
+let c_andBind check k = c_app (cInject "QuickChick.Decidability.andBind") [check; k]
 
 let c_checker c = c_app (cInject "QuickChick.Checker.checker") [c_hole; c_hole; c]
 
@@ -858,6 +861,8 @@ let c_None ty = c_app (cInject "Coq.Init.Datatypes.None") [ty]
 let c_Some ty x = c_app (cInject "Coq.Init.Datatypes.Some") [ty; x]
 
 let c_tt = cInject "Coq.Init.Datatypes.tt"
+
+let c_false = cInject "Coq.Init.Datatypes.false"
 
 let c_ret (ds : derive_sort) (m : constr_expr) : constr_expr =
   match ds with
@@ -870,10 +875,12 @@ let c_fail (ds : derive_sort) : constr_expr =
   match ds with
   | D_Gen -> c_ret D_Gen (c_None c_hole)
   | D_Enum -> c_app (cInject "QuickChick.Enumerators.failEnum") [c_hole]
-  | D_Check -> c_None c_hole
+  | D_Check -> c_Some c_hole c_false
   | D_Thm -> c_checker c_tt
 
-let c_guard check k (ds : derive_sort) = c_if check k (c_fail ds)
+let c_guard check k (ds : derive_sort) = c_match ?catchAll:(Some (Some (c_fail ds))) check [(PCtr (constructor_of_string "Coq.Init.Datatypes.Some", [PWild; PCtr (constructor_of_string "Coq.Init.Datatypes.true",[])]), k)]
+  
+  (* c_if check k (c_fail ds) *)
 
 let c_bindEnum enum k = c_app (cInject "QuickChick.Enumerators.bindEnum") [c_hole; c_hole; enum; k]
 
@@ -941,7 +948,7 @@ let c_backtrack (ds : derive_sort) (is_constrained : bool) (first : constr_expr)
   | D_Gen, true -> c_app (cInject "QuickChick.Generators.backtrack") [c_hole; c_list c_hole @@ ms] (* ms : list (nat * G (option A)) *)
   | D_Gen, false -> c_app (cInject "QuickChick.Generators.freq_") [c_hole; first; c_list c_hole @@ ms]
   | D_Enum, true -> c_app (cInject "QuickChick.Enumerators.enumerate") [c_hole; c_list c_hole @@ ms] (* ms : list (E (option A))*)
-  | D_Enum, false -> c_app (cInject "QuickChick.Producer.oneOf_") [c_hole; first; c_list c_hole @@ ms]
+  | D_Enum, false -> c_app (cInject "QuickChick.Producer.oneOf_") [c_hole; c_hole; c_hole; first; c_list c_hole @@ ms]
   | D_Check, _ -> c_app (cInject "QuickChick.Decidability.checker_backtrack") [c_list c_hole @@ ms] (* ms : list (unit -> option A)*)
   | D_Thm, _ -> failwith "Backtrack not supported for theorems."
 
@@ -966,6 +973,12 @@ let rec mexp_to_constr_expr (me : mexp) (ds : derive_sort) : constr_expr =
     let lid = CAst.make f in
     let args = List.map (fun (v,ty) -> CLocalAssum ([CAst.make @@ Names.Name v], None, Default Glob_term.Explicit, mexp_to_constr_expr ty ds)) vs in
     CAst.make @@ CFix (lid, [(lid,None,None,args,c_hole, mexp_to_constr_expr m ds)])
+  | MMutFix (funs, v) ->
+    let funs = List.map (fun (f, vs, m, ds) -> 
+      let lid = CAst.make f in
+      let args = List.map (fun (v,ty) -> CLocalAssum ([CAst.make @@ Names.Name v], None, Default Glob_term.Explicit, mexp_to_constr_expr ty ds) ) vs in
+      (lid, None, None, args, c_hole, mexp_to_constr_expr m ds)) funs in
+    CAst.make @@ CFix (CAst.make v, funs)
 
 let rec mexp_to_string (me : mexp) : string =
   match me with
@@ -1045,24 +1058,32 @@ let rec total_pat (p : pat) : bool =
 let rec_call r args =
   MApp (MId r, MId (var_of_string "init_size") :: MId (var_of_string "size'") :: List.map product_free_rocq_type_to_mexp args)
 
-let schedule_step_to_mexp (step : schedule_step) : mexp -> mexp = fun k ->
+let mut_rec_call fuel r args =
+  MApp (MId r, fuel :: List.map product_free_rocq_type_to_mexp args)
+
+let m_negb_opt x = MApp (MConst "QuickChick.Decidability.negbOpt", [x])
+
+let schedule_step_to_mexp (step : schedule_step) (fuel : mexp) : mexp -> mexp = fun k ->
   match step with
   | S_UC (v, prod, ps) -> 
     let producer = (match prod with
       | SrcNonrec ty -> unconstrained_producer ps (product_free_rocq_type_to_mexp ty)
-      | SrcRec (rec_f, args) -> rec_call rec_f args) in
+      | SrcRec (rec_f, args) -> rec_call rec_f args
+      | SrcMutrec (rec_f, args) -> mut_rec_call fuel rec_f args) in
     MBind (prod_sort_to_monad_sort ps, producer, [v], k)
   | S_ST (vars_tys, prod, ps) -> 
     let producer = (match prod with
       | SrcNonrec ty -> such_that_producer ps (List.map fst vars_tys) (product_free_rocq_type_to_mexp ty)
-      | SrcRec (rec_f, args) -> rec_call rec_f args) in
+      | SrcRec (rec_f, args) -> rec_call rec_f args
+      | SrcMutrec (rec_f, args) -> mut_rec_call fuel rec_f args) in
     let vars = List.map fst vars_tys in
     MBind (prod_sort_to_monad_opt_sort ps, producer, vars, k)
-  | S_Check src -> 
+  | S_Check (src,pol) -> 
     let checker = (match src with
       | SrcNonrec ty -> m_decOpt (product_free_rocq_type_to_mexp ty) m_fuel
-      | SrcRec (rec_f, args) -> rec_call rec_f args) in
-    MBind (MC, checker, [], k)
+      | SrcRec (rec_f, args) -> rec_call rec_f args
+      | SrcMutrec (rec_f, args) -> mut_rec_call fuel rec_f args) in
+    MBind (MC, (if pol then checker else m_negb_opt checker), [], k)
   | S_Match (v, p) -> 
     if total_pat p then
       MMatch (MId v, [(p, k)])
@@ -1096,16 +1117,19 @@ let m_false = MConst "Coq.Init.Datatypes.false"
   (* aux steps finally    *)
 
 (* Rewrite the above schedule_to_mexp as a fold*)
-let schedule_to_mexp ((steps, s_sort) : schedule) : mexp =
+let schedule_to_mexp ((steps, s_sort) : schedule) (fuel : mexp) : mexp =
   let finally = match s_sort with
     | ProducerSchedule (is_constrained, ps, concl_outputs) -> MRet ((if is_constrained then m_Some MHole else (fun x -> x)) @@ product_free_rocq_type_to_mexp concl_outputs)
     | CheckerSchedule -> MRet (m_Some m_bool m_true)
     | TheoremSchedule concl -> match_optbool (m_decOpt (product_free_rocq_type_to_mexp concl) m_fuel) (MRet (m_Some m_bool m_true)) (MRet (m_Some m_bool m_false)) MOutOfFuel
   in
-  List.fold_right schedule_step_to_mexp steps finally
+  List.fold_right (fun schd acc -> schedule_step_to_mexp schd fuel acc) steps finally
+
+let fuel_zero = MConst "Coq.Init.Datatypes.O"
+let fuel_size = MId (var_of_string "sizem")
 
 let schedule_to_constr_expr (s : schedule) (ds : derive_sort) : constr_expr =
-  mexp_to_constr_expr (schedule_to_mexp s) ds
+  mexp_to_constr_expr (schedule_to_mexp s (MId (var_of_string "size"))) ds
 
 let compile_and_print_schedule (s : schedule) (ds : derive_sort) : unit =
   let ce = schedule_to_constr_expr s ds in
@@ -1137,6 +1161,57 @@ type pat_map = pat VM.t
 type inductive_schedule = string * (var * mexp) list * (schedule * (var * pat) list) list * (schedule * (var * pat) list) list 
   (*Name string, fixed input variable/type list, list of base schedules, and a list non base schedules paired with how they match on those variables*)
 
+type mutual_inductive_chain = inductive_schedule list list
+
+type inductive_schedule_with_dependencies = inductive_schedule list * string
+
+let filter_mapi (f : int -> 'a -> 'b option) (l : 'a list) : 'b list =
+  let rec aux i l =
+    match l with
+    | [] -> []
+    | now :: after -> 
+      match f i now with
+      | Some x -> x :: aux (i + 1) after
+      | None -> aux (i + 1) after in
+  aux 0 l
+
+let schedule_step_dependence (s : schedule_step) : (rocq_constr * int list * derive_sort * bool) option =
+  match s with 
+  | S_UC (v, SrcNonrec t, ps) -> Some (t, [], (match ps with PS_E -> D_Enum | PS_G -> D_Gen), false)
+  | S_ST (vs, SrcNonrec (DTyCtr (ind, args)), ps) -> 
+    let output_vars = List.map fst vs in
+    let arg_vars = List.map (fun arg -> variables_in_hypothesis arg) args in 
+    let output_idxs = filter_mapi (fun i arg_vars -> if List.exists (fun v -> List.mem v arg_vars) output_vars then Some i else None) arg_vars in
+    Some (DTyCtr (ind, args), output_idxs, (match ps with PS_E -> D_Enum | PS_G -> D_Gen), true)
+  | S_Check (SrcNonrec t, pol) -> Some (t, [], D_Check, true)
+  | S_Match _ | S_UC _ 
+  | S_ST    _ | S_Check _ -> None
+
+let schedule_dependents ((steps, final) : schedule) : (rocq_constr * int list * derive_sort * bool) list =
+  let final_depends = match final with
+  | TheoremSchedule t -> [(t, [], D_Check, true)] 
+  | _ -> [] in
+  final_depends @ List.filter_map schedule_step_dependence steps
+
+let schedule_with_dependents (s : schedule) : (schedule_step * (rocq_constr * int list * derive_sort * bool) option) list * (schedule_sort * (rocq_constr * int list * derive_sort * bool) option) =
+  let (steps, final) = s in
+  let final_depends = match final with
+  | TheoremSchedule t -> final, Some (t, [], D_Check, true)
+  | _ -> final, None in
+
+  let step_depends = List.map (fun step -> (step, schedule_step_dependence step)) steps in
+
+  step_depends, final_depends
+
+let inductive_schedule_dependents (is : inductive_schedule) : (rocq_constr * int list * derive_sort * bool) list =
+  let (_, _, base_scheds, rec_scheds) = is in
+  List.concat (List.map (fun (schd,_) -> schedule_dependents schd) (base_scheds @ rec_scheds))
+
+let inductive_schedule_with_dependents (is : inductive_schedule) =
+  let (name, vars, base_scheds, rec_scheds) = is in
+  let match_schd_deps = List.map (fun (schd,matches) -> schedule_with_dependents schd, matches) in
+  name, vars, match_schd_deps base_scheds, match_schd_deps rec_scheds
+
 type rec_or_base = Base | Rec
 
 let backtrack_decoration (ds : derive_sort) (rec_or_base : rec_or_base) (m : mexp) : mexp =
@@ -1166,10 +1241,12 @@ let inductive_schedule_to_mexp (is : inductive_schedule) (ds : derive_sort) (is_
       MMatch (MId v, (pat, acc) :: (if total_pat pat then [] else [(PWild, MFail)]))
     ) k inp_pats in
   let base_backtrack = List.map (fun (s, inp_pats) -> 
-    backtrack_decoration ds Base (match_pats inp_pats (schedule_to_mexp s))) base_scheds in
+    backtrack_decoration ds Base (match_pats inp_pats (schedule_to_mexp s fuel_size))) base_scheds in
+  let base_backtrack_for_all = List.map (fun (s, inp_pats) -> 
+    backtrack_decoration ds Base (match_pats inp_pats (schedule_to_mexp s fuel_size))) base_scheds in (*TODO: FIX FUEL SIZE*)
   let rec_backtrack = List.map (fun (s, inp_pats) ->
-    backtrack_decoration ds Rec (match_pats inp_pats (schedule_to_mexp s))) rec_scheds in
-  let all_backtrack = base_backtrack @ rec_backtrack in
+    backtrack_decoration ds Rec (match_pats inp_pats (schedule_to_mexp s fuel_size))) rec_scheds in
+  let all_backtrack = base_backtrack_for_all @ rec_backtrack in
   let fun_name = var_of_string (name ^ derive_sort_to_string ds) in
   let final_let fixp = 
     MLet (fun_name, 
@@ -1180,8 +1257,42 @@ let inductive_schedule_to_mexp (is : inductive_schedule) (ds : derive_sort) (is_
   let first = 
     match base_scheds with
     | [] -> failwith "TODO: handle empty inductives"
-    | (s, inp_pats) :: _ -> match_pats inp_pats (schedule_to_mexp s) in
+    | (s, inp_pats) :: _ -> match_pats inp_pats (schedule_to_mexp s fuel_size) in
   final_let (prelude (MBacktrack (first, base_backtrack, is_constrained)) (MBacktrack (first, all_backtrack, is_constrained)))
+
+let inductive_schedule_with_dependencies_to_mexp (ind_schds : (inductive_schedule * derive_sort * is_constrained) list) (output_ind_schd_name : string) : mexp =
+  let match_pats inp_pats (k : mexp) =
+    List.fold_left (fun acc (v, pat) -> 
+      MMatch (MId v, (pat, acc) :: (if total_pat pat then [] else [(PWild, MFail)]))
+    ) k inp_pats in
+  let prelude base_k all_k = 
+  MMatch (MId (var_of_string "sizem"), 
+          [
+            (PCtr (constructor_of_string "Coq.Init.Datatypes.O", []), 
+              base_k);
+            (PCtr (constructor_of_string "Coq.Init.Datatypes.S", [PVar (var_of_string "sizem")]), 
+              all_k);
+          ]) in
+  let dependency_mexp ((ind_schd_name,inputs,base_scheds,_) as is, ds, is_constrained) = 
+    Feedback.msg_notice (str ("Compiling inductive schedule: " ^ ind_schd_name) ++ str " " ++ str (derive_sort_to_string ds) ++ str " " ++ str (if is_constrained then "constrained" else "unconstrained") ++ fnl());
+    let first = 
+      match base_scheds with
+      | [] -> failwith "TODO: handle empty inductives"
+      | (s, inp_pats) :: _ -> match_pats inp_pats (schedule_to_mexp s fuel_zero) in
+    let out_of_fuel =
+      (match ds, is_constrained with
+      | D_Gen, true | D_Enum, true | D_Check, _ -> MOutOfFuel
+      | _ -> first) in
+    let mexp = 
+      (match inductive_schedule_to_mexp is ds is_constrained with
+      | MLet (fun_name, fixp, MFun (_,body)) -> MLet (var_of_string "size", MId (var_of_string "sizem"), MLet (fun_name, fixp, body))
+      | m -> failwith "Expected a let binding") in
+    (var_of_string ind_schd_name, [(var_of_string "sizem"), (MConst "Coq.Init.Datatypes.nat")], prelude (MFun (List.map (fun (x,t) -> PVar x, Some t) inputs, out_of_fuel)) mexp, ds)
+  in
+  MMutFix (List.map dependency_mexp ind_schds, var_of_string output_ind_schd_name)
+
+let inductive_schedule_with_dependencies_to_constr_expr (ind_schds : (inductive_schedule * derive_sort * is_constrained) list) (output_ind_schd_name : string) : constr_expr =
+  mexp_to_constr_expr (inductive_schedule_with_dependencies_to_mexp ind_schds output_ind_schd_name) D_Gen (*D_Anything works, ds is irrelevant*)
 
 let inductive_schedule_to_constr_expr (is : inductive_schedule) (ds : derive_sort) (is_constrained : bool) : constr_expr =
   mexp_to_constr_expr (inductive_schedule_to_mexp is ds is_constrained) ds
@@ -1737,43 +1848,24 @@ let list_bindi (l : 'a list) (f : int -> 'a -> 'b list) : 'b list =
 
 let (>>=:+) = list_bindi
 
-let filter_mapi (f : int -> 'a -> 'b option) (l : 'a list) : 'b list =
-  let rec aux i l =
-    match l with
-    | [] -> []
-    | now :: after -> 
-      match f i now with
-      | Some x -> x :: aux (i + 1) after
-      | None -> aux (i + 1) after in
-  aux 0 l
-
 let guard (b : bool) : unit list =
   if b then [()] else []
 
 let (>>:) (l : 'a list) (next : 'b list) : 'b list =
   l >>=: (fun _ -> next)
 
-let schedule_step_dependence (s : schedule_step) : (rocq_constr * int list * derive_sort * bool) option =
-  match s with 
-  | S_UC (v, SrcNonrec t, ps) -> Some (t, [], (match ps with PS_E -> D_Enum | PS_G -> D_Gen), false)
-  | S_ST (vs, SrcNonrec (DTyCtr (ind, args)), ps) -> 
-    let output_vars = List.map fst vs in
-    let arg_vars = List.map (fun arg -> variables_in_hypothesis arg) args in 
-    let output_idxs = filter_mapi (fun i arg_vars -> if List.exists (fun v -> List.mem v arg_vars) output_vars then Some i else None) arg_vars in
-    Some (DTyCtr (ind, args), output_idxs, (match ps with PS_E -> D_Enum | PS_G -> D_Gen), false)
-  | S_Check (SrcNonrec t) -> Some (t, [], D_Check, true)
-  | S_Match _ | S_UC _ 
-  | S_ST    _ | S_Check _ -> None
-
-let schedule_dependents ((steps, final) : schedule) : (rocq_constr * int list * derive_sort * bool) list =
-  let final_depends = match final with
-  | TheoremSchedule t -> [(t, [], D_Check, true)] 
-  | _ -> [] in
-  final_depends @ List.filter_map schedule_step_dependence steps
-
 let possible_schedules (variables : (var * rocq_type) list) (hypotheses : rocq_constr list) (fixed : var list) (rec_call : ty_ctr * int list) (ds : derive_sort) : schedule_step list list =
-  let hypothesis_variables = List.map (fun h -> (h, variables_in_hypothesis h)) hypotheses in
-  let sorted_hypotheses = List.sort (fun (_,v1) (_,v2) -> compare (List.length v1) (List.length v2)) hypothesis_variables in
+  (* Feedback.msg_debug (str (ty_ctr_to_string (fst rec_call)) ++ str " " ++ str (String.concat " " (List.map string_of_int (snd rec_call))) ++ fnl ()); *)
+  let rec hyp_polarity (h : rocq_constr) : rocq_constr * bool =
+    match h with
+    | DNot h -> let (h', p) = hyp_polarity h in (h', not p)
+    | DTyCtr (ind, args) -> (DTyCtr (ind, args), true)
+    | _ -> failwith @@ "Hypothesis is not a type constructor 0" ^ rocq_constr_to_string h in
+
+  let hypothesis_variables = List.map (fun h -> 
+    let (h, p) = hyp_polarity h in
+    (h, variables_in_hypothesis h, p)) hypotheses in
+  let sorted_hypotheses = List.sort (fun (_,v1,_) (_,v2,_) -> compare (List.length v1) (List.length v2)) hypothesis_variables in
 
   let is_rec_call (binding : var list) (h : rocq_constr) : bool =
     match h with
@@ -1785,18 +1877,18 @@ let possible_schedules (variables : (var * rocq_type) list) (hypotheses : rocq_c
         else None) args in
     
       ty_ctr_eq ind (fst rec_call) && List.sort compare (snd rec_call) = List.sort compare output_pos
-    | _ -> failwith "Hypothesis is not a type constructor" in
+    | _ -> failwith @@ "Hypothesis is not a type constructor 1" ^ rocq_constr_to_string h in
 
-  let collect_check_steps (bound_vars : var list) (checked_hypotheses : int list) (sorted_hypotheses : (rocq_constr * var list) list) : (int * source) list =
-    filter_mapi (fun i (h, vs) -> 
+  let collect_check_steps (bound_vars : var list) (checked_hypotheses : int list) (sorted_hypotheses : (rocq_constr * var list * bool) list) : (int * (source * bool)) list =
+    filter_mapi (fun i (h, vs, polarity) -> 
       if not (List.mem i checked_hypotheses) && List.for_all (fun v -> List.mem v bound_vars) vs then 
         let src = if ds = D_Check && snd rec_call = [] then
           (match h with
           | DTyCtr (ind, args) when ty_ctr_eq (fst rec_call) ind -> SrcRec (var_of_string "rec", args)
           | DTyCtr (ind, args) -> SrcNonrec h
-          | _ -> failwith "Hypothesis is not a type constructor") 
+          | _ -> failwith @@ "Hypothesis is not a type constructor 2" ^ rocq_constr_to_string h) 
         else SrcNonrec h in
-        Some (i, src) 
+        Some (i, (src, polarity)) 
       else None) sorted_hypotheses 
   in
 
@@ -1812,11 +1904,26 @@ let possible_schedules (variables : (var * rocq_type) list) (hypotheses : rocq_c
   let outputs_inputs_not_under_same_constructor (hyp : rocq_constr) (output_vars : var list) : bool =
     match hyp with
     | DTyCtr (ind, args) ->
-      Feedback.msg_notice (str "Checking if outputs and inputs are not under the same constructor of " ++ str (ty_ctr_to_string ind) ++ fnl ());
+      (* Feedback.msg_notice (str "Checking if outputs and inputs are not under the same constructor of " ++ str (ty_ctr_to_string ind) ++ fnl ()); *)
       not @@ List.exists (fun arg ->
         let variables = variables_in_hypothesis arg in 
         List.exists (fun v -> List.mem v output_vars) variables && List.exists (fun v -> not (List.mem v output_vars)) variables) args
-    | _ -> failwith "Hypothesis is not a type constructor" in
+    | _ -> failwith @@ "Hypothesis is not a type constructor 3" ^ rocq_constr_to_string hyp in
+
+  let outputs_not_constrained_by_function_application (hyp : rocq_constr) (output_vars : var list) : bool =
+    match hyp with
+    | DTyCtr (ind, args) ->
+      not @@ List.exists (fun arg ->
+        let rec check b arg =
+          match arg with
+          | DCtr (ctr_name, args) -> List.exists (check b) args
+          | DTyCtr (ind, args) -> List.exists (check b) args
+          | DApp (_, args) -> List.exists (check true) args
+          | DTyVar v when b -> List.mem v output_vars
+          | _ -> false in
+        check false arg) args
+    | _ -> failwith @@ "Hypothesis is not a type constructor 3" ^ rocq_constr_to_string hyp in
+
 
   let handle_constrained_outputs hyp output_vars : schedule_step list * rocq_constr * var list =
     match hyp with
@@ -1825,14 +1932,23 @@ let possible_schedules (variables : (var * rocq_type) list) (hypotheses : rocq_c
         let variables = variables_in_hypothesis arg in
         match arg with
         | DCtr (ctr_name,_) when List.for_all (fun v -> List.mem v output_vars) variables -> 
-          let new_name = make_up_name_str (String.concat "_" (List.map var_to_string variables)) in
+          let new_name = make_up_name_str ("v" ^ String.concat "_" (List.map var_to_string variables)) in
           let new_match = S_Match (new_name, rocq_constr_to_pat arg) in
           (Some new_match, DTyVar new_name, Some new_name)
         | DTyVar v when List.mem v output_vars -> (None, arg, Some v)
         | _ -> (None, arg, None)
         ) args) in
       (List.filter_map (fun x -> x) matches, DTyCtr (ind, args'), List.filter_map (fun x -> x) new_outputs)
-    | _ -> failwith "Hypothesis is not a type constructor" in
+    | _ -> failwith @@ "Hypothesis is not a type constructor 4" ^ rocq_constr_to_string hyp in
+
+  let normalize_schedule (steps : schedule_step list) : schedule_step list =
+    let rec normalize steps u_block =
+      match steps with
+      | [] -> List.sort compare u_block
+      | S_UC (v, src, ps) :: steps -> normalize steps (S_UC (v, src, ps) :: u_block)
+      | step :: steps -> List.sort compare u_block @ step :: normalize steps [] in
+    normalize steps []
+    in 
 
   let rec dfs (bound_vars : var list) (remaining_vars : var list) 
               (checked_hypotheses : int list) (schedule_so_far : schedule_step list)
@@ -1849,15 +1965,16 @@ let possible_schedules (variables : (var * rocq_type) list) (hypotheses : rocq_c
           (match ty with
           | DTyCtr (ind, args) when ty_ctr_eq ind (fst rec_call) -> SrcRec (var_of_string "rec", args)
           | DTyCtr (ind, args) -> SrcNonrec ty
-          | _ -> failwith "Variable is not a type constructor") in
+         (* | DTyParam _ -> SrcNonrec ty (*TODO: Will need to add a typeclass constraint for this*)*)
+          | _ -> failwith ("Variable type is not a type constructor: " ^ rocq_constr_to_string ty)) in
         let unconstrained_prod_step = S_UC (v, src, prod_sort) in
-        let checks = List.rev @@ List.map (fun i -> S_Check i) new_checked_hyps in
+        let checks = List.rev @@ List.map (fun (src,pol) -> S_Check (src,pol)) new_checked_hyps in
         dfs (v :: bound_vars) remaining_vars' (new_checked_idxs @ checked_hypotheses) (checks @ unconstrained_prod_step :: schedule_so_far))
       in
       let remaining_hypotheses = filter_mapi (fun i hyp -> if List.mem i checked_hypotheses then None else Some (i, hyp)) sorted_hypotheses in
       (* msg_debug (str "Remaining Hypotheses: " ++ str (String.concat ", " (List.map (fun (i, h) -> string_of_int i) remaining_hypotheses)) ++ fnl ()); *)
-      let constrained_prod_paths = remaining_hypotheses >>=: (fun (i, (hyp, hyp_vars)) ->
-
+      let constrained_prod_paths = remaining_hypotheses >>=: (fun (i, (hyp, hyp_vars, pol)) ->
+        guard pol >>=: fun _ -> (* Negated hypotheses cannot be generated such that, only checked *)
         guard (not (List.mem i checked_hypotheses)) >>=: fun _ -> 
         let rem_var_set = VS.of_list remaining_vars in
         let hyp_var_set = VS.of_list hyp_vars in
@@ -1866,6 +1983,7 @@ let possible_schedules (variables : (var * rocq_type) list) (hypotheses : rocq_c
         let output_vars = (VS.elements output_set) in
         guard (output_vars <> []) >>=: fun _ -> ( (*guard should never trigger*)
         guard (outputs_inputs_not_under_same_constructor hyp output_vars) >>=: fun _ -> 
+        guard (outputs_not_constrained_by_function_application hyp output_vars) >>=: fun _ ->
         let (new_matches, hyp', new_outputs) = handle_constrained_outputs hyp output_vars in 
         let typed_outputs = List.map (fun v -> (v, try List.assoc v variables with Not_found -> DHole)) new_outputs in
         let constraining_relation = 
@@ -1876,11 +1994,11 @@ let possible_schedules (variables : (var * rocq_type) list) (hypotheses : rocq_c
             SrcRec (var_of_string "rec", input_args)
           | DTyCtr (_, _) ->
             SrcNonrec hyp'
-          | _ -> failwith "Hypothesis is not a type constructor"
+          | _ -> failwith @@ "Hypothesis is not a type constructor " ^ rocq_constr_to_string hyp'
           ) in  
         let constrained_prod_step = S_ST (typed_outputs, constraining_relation, prod_sort) in
         let (new_checked_idxs,new_checked_hyps) = List.split @@ collect_check_steps (output_vars @ bound_vars) (i :: checked_hypotheses) sorted_hypotheses in
-        let checks = List.rev @@ List.map (fun i -> S_Check i) new_checked_hyps in
+        let checks = List.rev @@ List.map (fun (src,pol) -> S_Check (src,pol)) new_checked_hyps in
         dfs (output_vars @ bound_vars) remaining_vars' (i :: new_checked_idxs @ checked_hypotheses) (checks @ new_matches @ constrained_prod_step :: schedule_so_far)))
       in 
       (* msg_debug (str "Unconstrained: " ++ int (List.length unconstrained_prod_paths) ++ str " Constrained: " ++ int (List.length constrained_prod_paths) ++ fnl ()); *)
@@ -1890,20 +2008,20 @@ let possible_schedules (variables : (var * rocq_type) list) (hypotheses : rocq_c
   in
   let remaining_vars = List.filter (fun v -> not (List.mem v fixed)) (List.map fst variables) in
   let (new_checked_idxs, new_checked_hyps) = List.split @@ collect_check_steps fixed [] sorted_hypotheses in
-  let first_checks = List.rev @@ List.map (fun i -> S_Check i) new_checked_hyps in
+  let first_checks = List.rev @@ List.map (fun (src,pol) -> S_Check (src,pol)) new_checked_hyps in
   let schedules = dfs fixed remaining_vars new_checked_idxs first_checks in
-  let compare_checks_then_length (s1 : schedule_step list) (s2 : schedule_step list) : int =
+  let schedules_normalized = List.map normalize_schedule schedules in
+  let schedules_sorted_deduplicated = List.sort_uniq compare schedules_normalized in
+  let schedules_sorted_length = List.sort (fun s1 s2 -> List.length s1 - List.length s2) schedules_sorted_deduplicated in
+  (* let compare_checks_then_length (s1 : schedule_step list) (s2 : schedule_step list) : int =
     let count_checks (s : schedule_step list) : int =
       List.length (List.filter (function S_Check _ -> true | _ -> false) s) in
     let checks1 = count_checks s1 in
     let checks2 = count_checks s2 in
     if checks1 = checks2 then List.length s1 - List.length s2 else checks1 - checks2 in
-  let schedules_sorted = List.sort compare_checks_then_length schedules in
+  let schedules_sorted = List.sort compare_checks_then_length schedules in *)
   (*print schedules*)
-  let schedule_to_string' (schedule : schedule_step list) : string =
-    "do " ^ String.concat " \n " (List.map schedule_step_to_string schedule)
-  in
-  schedules_sorted
+  schedules_sorted_length
 
 
 (* typing g e t -> step e e' -> typing g e' t *)
@@ -2144,7 +2262,7 @@ module ScheduleExamples = struct
 
   let check_typing_TId _G _x _t =
     [
-      S_Check (SrcNonrec (DTyCtr (ty_ctr "bind", [_G; _x; _t])))
+      S_Check (SrcNonrec (DTyCtr (ty_ctr "bind", [_G; _x; _t])), true)
     ], CheckerSchedule
 
   let check_typing_TConst _G _n =
@@ -2154,14 +2272,14 @@ module ScheduleExamples = struct
 
   let check_typing_TAbs _G _t1 _t1' _t2 _e =
     [
-      S_Check (SrcNonrec (DTyCtr ((ty_ctr "eq"), [DTyCtr (ty_ctr "type", []); _t1; _t1'])));
-      S_Check (SrcRec ((var "rec"),[DCtr (ctr "cons",[DHole; _t1; _G]); _e; _t2]))
+      S_Check (SrcNonrec (DTyCtr ((ty_ctr "eq"), [DTyCtr (ty_ctr "type", []); _t1; _t1'])), true);
+      S_Check (SrcRec ((var "rec"),[DCtr (ctr "cons",[DHole; _t1; _G]); _e; _t2]), true)
     ], CheckerSchedule
 
   let check_typing_TApp _G _e1 _e2 _t2 =
     [
       S_ST ([(var "t1", DTyCtr (ty_ctr "type", []))], SrcNonrec (DTyCtr (ty_ctr "typing", [_G; _e2; DTyVar (var "t1")])), PS_E);
-      S_Check (SrcRec ((var "rec"), [_G; _e1; DTyCtr (ty_ctr "Arrow", [DTyVar (var "t1"); _t2])]))
+      S_Check (SrcRec ((var "rec"), [_G; _e1; DTyCtr (ty_ctr "Arrow", [DTyVar (var "t1"); _t2])]), true)
     ], CheckerSchedule
 
   let check_typing_inductive_schedule : inductive_schedule =
