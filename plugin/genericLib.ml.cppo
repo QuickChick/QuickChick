@@ -527,11 +527,16 @@ let parse_dependent_type_internal i nparams ty oibopt arg_names =
       let names = String.split_on_char '.' (MutInd.to_string mind) in
       let prefix = List.rev (List.tl (List.rev names)) in
       let qual = String.concat "." prefix in
-      msg_debug (str (Printf.sprintf "CONSTR: %s %s" qual (DirPath.to_string (Lib.cwd ()))) ++ fnl ());
+#if COQ_VERSION >= (9, 1, 0)
+      let cwd_string = Libnames.string_of_path (Lib.cwd()) in
+#else
+      let cwd_string = (DirPath.to_string (Lib.cwd ())) in
+#endif
+      msg_debug (str (Printf.sprintf "CONSTR: %s %s" qual cwd_string) ++ fnl ());
 
       (* Constructor name *)
       let cname = Id.to_string (mib.mind_packets.(midx).mind_consnames.(idx - 1)) in
-      let cid = qualid_of_string (if (qual = "") || (qual = DirPath.to_string (Lib.cwd ()))
+      let cid = qualid_of_string (if (qual = "") || (qual = cwd_string)
                              then cname else qual ^ "." ^ cname) in
       Some (DCtr (cid, []))
     end
