@@ -109,7 +109,10 @@ workflows:
           name: Coq 8.20
           coq: 'coqorg/coq:8.20'
       - test:
-          name: Coq dev
+          name: Rocq 9.0
+          coq: 'rocq/rocq-prover:9.0'
+      - test:
+          name: Rocq dev
           coq: 'rocq/rocq-prover:dev'
       - opam-install:
           name: Install and test
