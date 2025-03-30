@@ -1781,7 +1781,7 @@ and evaluate_var (umap : umap) (v : unknown) : rocq_constr option =
 let get_schedule_sort (concl : rocq_constr) (output_vars : unknown list) (ctr_name : ty_ctr option) (umap : umap) (ds : derive_sort) (opt : bool) : schedule_sort option =
   match ds with
   | D_Check -> Some CheckerSchedule 
-  | D_Thm -> Some (TheoremSchedule concl)
+  | D_Thm -> Some (TheoremSchedule (concl, true))
   | D_Gen | D_Enum ->
     Error.msg_debug (str ("SCHEDSORT output_vars " ^ String.concat ", " (List.map Unknown.to_string output_vars)) ++ fnl ());
     sequenceM (evaluate_var umap) output_vars >>= fun output_values ->
@@ -1831,6 +1831,7 @@ let correct_src (umap : umap) (src : source) : source =
   | SrcNonrec ty -> SrcNonrec (correct_rocq_constr umap ty)
   | SrcRec (r, tys) -> SrcRec (r,List.map (correct_rocq_constr umap) tys)
   | SrcMutrec (r, tys) -> SrcMutrec (r,List.map (correct_rocq_constr umap) tys)
+  | SrcDef (r, tys) -> SrcDef (r,List.map (correct_rocq_constr umap) tys)
 
 let rec correct_variables (umap : umap) (scd : schedule_step list) : schedule_step list =
   match scd with

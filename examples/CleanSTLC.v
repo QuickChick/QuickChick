@@ -77,6 +77,7 @@ Inductive bigstep : term -> term -> Prop :=
   bigstep e2 v ->
   bigstep (subst x v body) v' ->
   bigstep (App e1 e2) v'
+| big_app2 e1 v1 e2 : bigstep e1 v1 -> bigstep (App e1 e2) v1
 | big_const : forall n, bigstep (Const n) (Const n)
 .
 
@@ -97,30 +98,41 @@ Inductive bind_typ : list (nat * typ) -> nat -> typ -> Prop :=
 | bind_later : forall env v t v' t', v <> v' -> bind_typ env v t -> bind_typ ((v',t') :: env) v t 
 .
 
-Inductive typing (g : list (nat * typ)) : term -> typ -> Prop :=
-| typ_var : forall x ty, bind_typ g x ty ->
+Inductive typing : list (nat * typ) -> term -> typ -> Prop :=
+| typ_var : forall x ty g, bind_typ g x ty ->
                          typing g (Var x) ty
-| typ_abs : forall x t body tbody, typing ((x,t) :: g) body tbody ->
+| typ_abs : forall x t body tbody g, typing ((x,t) :: g) body tbody ->
                                    typing g (Abs x t body) (TArrow t tbody)
-| typ_app : forall fe xe tfrom tto, typing g fe (TArrow tfrom tto) ->
+| typ_app : forall fe xe tfrom tto g, typing g fe (TArrow tfrom tto) ->
                                     typing g xe tfrom ->
                                     typing g (App fe xe) tto
-| typ_const : forall n, typing g (Const n) TNat
+| typ_const : forall n g, typing g (Const n) TNat
 .
 
 From QuickChick Require Import QuickChick.
 
 QuickChickDebug Debug On.
 
+Instance DecEq_typ : Dec_Eq typ. dec_eq. Defined.
+Instance DeqEq_term : Dec_Eq term. dec_eq. Defined.
+Derive Show for typ.
+Derive Show for term.
+
 Theorem bigstep_deterministic : forall e v1 v2,
   bigstep e v1 -> bigstep e v2 -> v1 = v2.
 Proof.
+  quickchick.
+ (* QuickChick (sized (fun n => theorem (n + 2))).*)
   theorem_dependencies.
   Derive Used Inds smallstep.
   Derive Used Inds typing.
   Derive Density typing derive "Gen".
-  Abort. 
+  Abort.
 
+  
+Theorem preservation : forall g e e' t, typing g e t -> bigstep e e' -> typing g e' t.
+Proof.
+  quickchick.
 
 Theorem typ_abs' :  forall g x t body tbody, typing ((x,t) :: g) body tbody ->
                                              typing g (Abs x t body) (TArrow t tbody).
