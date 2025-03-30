@@ -1359,7 +1359,11 @@ let define_new_fixpoint (functions : (var * arg list * var * coq_expr * coq_expr
       Some (CAst.make @@ CStructRec (CAst.make @@ structural_wf_variable)))
     functions in
   let kind = Decls.(IsDefinition Fixpoint) in
-  ignore (ComFixpoint.do_mutually_recursive ~poly:false ~kind ~program_mode:false (CFixRecOrder rec_orders, fixpoint_exprs))
+  ignore (ComFixpoint.do_mutually_recursive
+#if COQ_VERSION >= (9, 1, 0)
+  ~refine:false
+#endif
+  ~poly:false ~kind ~program_mode:false (CFixRecOrder rec_orders, fixpoint_exprs))
 #elif COQ_VERSION >= (8, 20, 0)
   ignore (ComFixpoint.do_fixpoint ~poly:false fixpoint_exprs)
 #elif COQ_VERSION >= (8, 16, 0)
