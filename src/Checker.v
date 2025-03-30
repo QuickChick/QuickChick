@@ -239,6 +239,19 @@ Definition forAllMaybe {A prop : Type} {_ : Checkable prop} `{Show A}
                  end
               ).
 
+Definition forAllChecker {A : Type} `{Show A}
+           (gen : G A)  (pf : A -> Checker) : Checker :=
+  bindGen gen (fun x =>
+                 printTestCase (show x ++ newline) (pf x)).
+
+Definition forAllMaybeChecker {A : Type} `{Show A}
+           (gen : G (option A))  (pf : A -> Checker) : Checker :=
+  bindGen gen (fun mx =>
+                 match mx with
+                 | Some x => printTestCase (show x ++ newline) (pf x)
+                 | None => checker tt
+                 end
+              ).
 
 Definition forAllProof {A prop : Type} {C : Checkable prop} `{S : Show A}
            (gen : G A)  (pf : forall (x : A), semProd gen x -> prop) : Checker :=
