@@ -730,6 +730,7 @@ let rocq_relation_rules ((ind_name, params, rules, overall_type) : rocq_relation
 type rule_density = 
   | Checking
   | Backtracking
+  | Neutral
   | Partial
   | Total
 
@@ -739,6 +740,13 @@ let rec collect_leaves (tree : pattern_coverage_tree) : (pattern * constructor l
   | PatternNode (_, _, _, branches) ->
       List.concat_map (fun (_, subtree) -> collect_leaves subtree) branches
 
+let density_to_string = function
+  | Checking -> "Checking"
+  | Backtracking -> "Backtracking"
+  | Neutral -> "Neutral"
+  | Partial -> "Partial"
+  | Total -> "Total"
+
 let print_pattern_leaves (ind : ty_ctr) (tree : pattern_coverage_tree) (ois : output_index list) (densities : (constructor * rule_density) list) : unit =
   let rec string_of_pattern = 
     function
@@ -747,10 +755,6 @@ let print_pattern_leaves (ind : ty_ctr) (tree : pattern_coverage_tree) (ois : ou
       let cstr = constructor_to_string c in
       (if cstr = "Tuple_" then ty_ctr_to_string ind else cstr) ^ "(" ^ string_of_pattern p ^ List.fold_left (fun acc p -> acc ^ ", " ^ string_of_pattern p) "" ps ^ ")"
     | PWild -> "_" in
-  let density_to_string = function
-    | Checking -> "Checking"
-    | Backtracking -> "Backtracking"
-    | Partial -> "Partial" in
   let string_of_constructors = function
     | [] -> "[]"
     | (c,d) :: cs -> "[" ^ constructor_to_string c ^ ": " ^ density_to_string d ^ List.fold_left (fun acc (c,d) -> acc ^ "; " ^ constructor_to_string c ^ ": " ^ density_to_string d) "" cs ^ "]" in
@@ -761,11 +765,7 @@ let print_pattern_leaves (ind : ty_ctr) (tree : pattern_coverage_tree) (ois : ou
   List.iter (fun (p, cs) -> Feedback.msg_notice (str (string_of_pattern_leaf (annotate_densities (insert_output_in_leaf (p, cs)))) ++ fnl ())) (collect_leaves tree)
 
 let print_rule_densities (rs : (constructor * rule_density) list) : unit =
-  let string_of_density = function
-    | Checking -> "Checking"
-    | Backtracking -> "Backtracking"
-    | Partial -> "Partial" in
-  List.iter (fun (c,d) -> Feedback.msg_notice (str (  constructor_to_string c ^ ": " ^ string_of_density d) ++ fnl ())) rs
+  List.iter (fun (c,d) -> Feedback.msg_notice (str (  constructor_to_string c ^ ": " ^ density_to_string d) ++ fnl ())) rs
 
 let rec has_duplicates (lst : 'a list) : bool =
   match lst with
@@ -812,6 +812,7 @@ let split_indices xs idxs =
 let density_to_string = function
   | Checking -> "Checking"
   | Backtracking -> "Backtracking"
+  | Neutral -> "Neutral"
   | Partial -> "Partial"
   | Total -> "Total"
 
@@ -908,7 +909,7 @@ and filter_nonrecursive_empty_densities (nonrecurse : (ty_ctr * (output_index * 
     let density = final_density rocq_relation (List.map fst ois_vars) false D_Gen in
     match density with
     | Checking -> None
-    | Backtracking | Partial | Total -> Some (ois_vars, density)) output_subsets in
+    | Backtracking | Partial | Neutral | Total -> Some (ois_vars, density)) output_subsets in
   ind,filtered_ovars
 
 and nonrecursive_binding (nonrecursives : (ty_ctr * ((output_index * ty_param) list * rule_density) list) list) : ((ty_ctr * (output_index * ty_param) list * rule_density) list) option =
@@ -1001,34 +1002,6 @@ let rec traverse (f : 'a -> 'b option) (l : 'a list) : 'b list option =
 
 type schedule_with_density = (schedule_step * rule_density) list * schedule_sort
 
-let densest (schedule : schedule_with_density) : rule_density =
-  let (steps, sort) = schedule in
-  let densities = List.map snd steps in
-  let max_dense a b =
-    match a,b with
-    | Checking, _ -> Checking
-    | _, Checking -> Checking
-    | Backtracking, _ -> Backtracking
-    | _, Backtracking -> Backtracking
-    | Partial, _ -> Partial
-    | _, Partial -> Partial
-    | Total, Total -> Total in
-  List.fold_left (fun acc d -> max_dense acc d) Total densities
-
-let sparsest (schedule : schedule_with_density) : rule_density =
-  let (steps, _) = schedule in
-  let densities = List.map snd steps in
-  let min_dense a b =
-    match a,b with
-    | Total, _ -> Total
-    | _, Total -> Total
-    | Partial, _ -> Partial
-    | _, Partial -> Partial
-    | Backtracking, _ -> Backtracking
-    | _, Backtracking -> Backtracking
-    | Checking, Checking -> Checking in
-  List.fold_left (fun acc d -> min_dense acc d) Checking densities
-
 let are_schedule_steps_valid i ((steps, sort) : schedule_with_density) : bool = true
 
 let num_source_variables (s : source) : int =
@@ -1051,14 +1024,17 @@ let add_bound_vars env step =
   | S_Check _ -> env
   | S_ST (vs,_,_) -> List.map fst vs @ env
   | S_Match (_, pat) -> pat_vars pat @ env
+  | S_Let (v, _) -> v :: env
 
-let get_schedule_score ((steps, sort) : schedule_with_density) : int =
+let get_num_var_uses ((steps, sort) : schedule_with_density) : int =
   let get_step_score env (step, density) =
     match step with
     | S_UC (_,s,_) -> num_source_bound_vars env s
     | S_Check (s,_) -> num_source_bound_vars env s
     | S_ST (_, s, _) -> num_source_bound_vars env s
-    | S_Match (v, _) -> (if List.mem v env then 1 else 0) in
+    | S_Match (v, _) -> (if List.mem v env then 1 else 0)
+    | S_Let (_, c) -> num_source_bound_vars env (SrcNonrec c)  (*Using srcnonrec because equivalent behavior, and it is always nonrecursive source.*)
+  in
   
   let rec aux env = function
     | [] -> 0
@@ -1114,9 +1090,51 @@ let rec arrows_to_products typ =
   | DProd ((name, t1), t2) -> DProd ((name, t1), arrows_to_products t2)
   | _ -> typ
 
-let rec schedule_density schedule : schedule_with_density =
+let sort_schedules_by_density_and_var_uses (schedules : (int * schedule_with_density) list) (ds : derive_sort) : (schedule_with_density * rule_density * int * int) list =
+  
+  match ds with
+  | D_Gen | D_Thm ->
+    (*Maximize worst density, minimize var_uses*)
+    let compare_gen (_,d,uses,_) (_,d',uses',_) =
+      match compare d d' with
+      | 0 -> compare uses uses'
+      | c -> - c 
+    in
+
+    let get_min = function
+    | (_,x) :: _ -> x
+    | [] -> Total
+    in 
+
+    List.sort compare_gen @@ List.map (fun (i, (schd_steps,schd_sort)) ->
+      let min_density = get_min @@ List.sort (fun (_,d) (_,d') -> compare d d') schd_steps in
+      let num_var_uses = get_num_var_uses (schd_steps,schd_sort) in 
+      ((schd_steps,schd_sort), min_density, num_var_uses, i)) schedules
+
+  (* | D_Thm -> failwith "ow" *)
+  | D_Enum | D_Check ->    
+    (*Minimize best density, minimize var_uses (for check maximize var_uses?)*)
+    let compare_enum (_,d,uses,_) (_,d',uses',_) =
+      match compare d d' with
+      | 0 -> compare uses uses'
+      | c -> c 
+    in
+
+    let get_max = function
+    | (_,x) :: _ -> x
+    | [] -> Checking
+    in
+
+    List.sort compare_enum @@ List.map (fun (i, (schd_steps,schd_sort)) ->
+      let max_density = get_max @@ List.sort (fun (_,d) (_,d') -> - (compare d d')) schd_steps in
+      let num_var_uses = get_num_var_uses (schd_steps,schd_sort) in
+      ((schd_steps,schd_sort), max_density, num_var_uses, i)) schedules
+
+let rec schedule_density neutral_prelude_steps schedule : schedule_with_density =
   let step_density (step : schedule_step) ds : rule_density =
     match step with
+    | S_UC (v, SrcNonrec (DTyParam param), ps) ->
+      Neutral (* If we have a type parameter we want to generate for, we can't know its density since it is abstracted, hence Neutral. *) 
     | S_UC (v,SrcNonrec ty,ps) ->
       (ignore (best_inductive_schedule_from_instance ty [] (producer_sort_to_derive_sort ps) false);
       Total) (* For enumerations during a checker should unconstrained be empty? *)
@@ -1142,6 +1160,7 @@ let rec schedule_density schedule : schedule_with_density =
     | S_ST (_, SrcDef _, _)
     | S_UC (_,SrcDef _, _)
     | S_Check (SrcDef _, _) -> failwith "is_schedule_valid: Defined source should not be used at density calculation time, but inserted later."
+    | S_Let (_,_) -> Total
   in
 
   let (steps, sort) = schedule in
@@ -1156,7 +1175,7 @@ let rec schedule_density schedule : schedule_with_density =
     | ProducerSchedule (_,PS_G,_) -> D_Gen
     | CheckerSchedule -> D_Check in
 
-  let step_densities = List.map (fun step -> (step, step_density step ds)) steps in
+  let step_densities = List.map (fun step -> (step, match ds with D_Thm | D_Gen -> Total | D_Check | D_Enum -> Checking)) neutral_prelude_steps @ List.map (fun step -> (step, step_density step ds)) steps in
   (* Check for unifications and heuristics! *)
 
   
@@ -1191,59 +1210,21 @@ and constructor_valid_schedules (ind_name : ty_ctr) (ctr : rocq_ctr) (result_var
   let (ctr_name, typ) = ctr in
   let typ = if opt then typ else arrows_to_products typ in
   let schedule_matches = NewUnifyQC.type_to_schedules typ (Some ind_name) (Some ctr_name) result_vars output_vars ds opt in
-  let schedules = List.mapi (fun i ((steps, sort), ms, eqs) -> i,(List.map (fun (v,p) -> S_Match (v,p)) ms @ List.map check_eq eqs @ steps, sort)) schedule_matches in
-  let schedule_densities = List.map (fun (i,schd) -> i, schedule_density schd) schedules in
+  let schedules = List.mapi (fun i ((steps, sort), ms, eqs) -> i, (List.map (fun (v,p) -> S_Match (v,p)) ms), ((List.map check_eq eqs @ steps), sort)) schedule_matches in
+  let schedule_densities = List.map (fun (i,ms_steps,schd) -> i, schedule_density ms_steps schd) schedules in
   List.filter (fun (i,schd) -> are_schedule_steps_valid i schd) schedule_densities
 
-and select_best_schedule (schedules : (int * schedule_with_density) list) (ds : derive_sort) : (int * schedule ) option =
-  (* let compare_checks_then_length_then_backtracks (_, steps, _) (_, steps', _) =
-    let checks_length_and_backtracks steps = List.fold_left (fun (c,l,b) (step,d) ->
-      let c' = match step, ds with S_Check _, D_Check -> c | S_UC _, D_Check | S_Check _, _ -> c + 1 | _ -> c in
-      let l' = l + 1 in
-      let b' = match d with | Backtracking -> b + 1 | _ -> b in
-      (c',l',b')) (0,0,0) steps in
-    let (c,l,b) = checks_length_and_backtracks steps in
-    let (c',l',b') = checks_length_and_backtracks steps' in
-    match compare c c' with
-    | 0 -> (match compare l l' with
-            | 0 -> compare b b'
-            | rl -> rl)
-    | rc -> rc in *)
-
-    
-  let density_dense = function
-    | Checking -> 0
-    | Backtracking -> 1
-    | Partial -> 2
-    | Total -> 3 in
-
-  let density_sparse = function
-    | Total -> 0
-    | Partial -> 1
-    | Backtracking -> 2
-    | Checking -> 3 in
-
-  let compare_scores (_, schd) (_, schd') =
-    match ds with
-    | D_Check | D_Enum ->
-      (match compare (density_dense (sparsest schd)) (density_dense (sparsest schd')) with
-          | 0 -> - compare (get_schedule_score schd) (get_schedule_score schd')
-          | c -> c)
-    | D_Gen | D_Thm -> 
-      (match compare (density_sparse (densest schd)) (density_sparse (densest schd')) with
-          | 0 -> compare (get_schedule_score schd) (get_schedule_score schd')
-          | c -> c) in
-  match List.sort compare_scores schedules with
+and select_best_schedule (schedules : (int * schedule_with_density) list) (ds : derive_sort) : (int * schedule * rule_density) option =
+  match sort_schedules_by_density_and_var_uses schedules ds with
   | [] -> None
-  | (i, (steps, sort)) :: _ -> Some (i, (List.map fst steps, sort))
+  | ((schd_steps_density,schd_sort), density, num_var_uses, id) :: _ -> Some (id, (List.map fst schd_steps_density,schd_sort), density)
 
-and constructor_best_valid_schedule (ind_name : ty_ctr) (ctr : rocq_ctr) (result_vars : (var * rocq_constr) list) (output_vars : var list) (ds : derive_sort) (opt : bool) : ty_ctr * (int * schedule) option =
+and constructor_best_valid_schedule (ind_name : ty_ctr) (ctr : rocq_ctr) (result_vars : (var * rocq_constr) list) (output_vars : var list) (ds : derive_sort) (opt : bool) : ty_ctr * (int * schedule * rule_density) option =
   fst ctr, select_best_schedule (constructor_valid_schedules ind_name ctr result_vars output_vars ds opt) ds
 
 and inductive_best_valid_schedule (rel : rocq_relation) (output_idxs : int list) (ds : derive_sort) (opt : bool) : inductive_schedule * rule_density =
   let (ind_name, params, ctrs, result_typ) = rel in
-  msg_debug (str "SEEHERE Inductive name: " ++ str (ty_ctr_to_string ind_name) ++ fnl ());
-  if RelationInstMap.mem (ind_name, output_idxs, ds) !density_inductive_memo then (msg_debug (str (ty_ctr_to_string ind_name ^ " found")); RelationInstMap.find (ind_name, output_idxs, ds) !density_inductive_memo)
+  if RelationInstMap.mem (ind_name, output_idxs, ds) !density_inductive_memo then RelationInstMap.find (ind_name, output_idxs, ds) !density_inductive_memo
   else begin
   Feedback.msg_notice (str "Inductive name: " 
   ++ str (ty_ctr_to_string ind_name)
@@ -1287,12 +1268,18 @@ and inductive_best_valid_schedule (rel : rocq_relation) (output_idxs : int list)
 
   let schedule_name = Printf.sprintf "%s_%s_%s" (typeclass_name (ds, opt)) (ty_ctr_to_string ind_name) modestring in
 
-  density_inductive_memo := RelationInstMap.add (ind_name, output_idxs, ds) ((schedule_name,[],[],[]), Partial) !density_inductive_memo;
+  let init_density = match ds with
+    | D_Check | D_Enum -> Checking
+    | D_Gen | D_Thm -> if opt then Partial else Total in
 
-  let constructor_schedules = List.filter_map (fun ctr -> 
+  density_inductive_memo := RelationInstMap.add (ind_name, output_idxs, ds) ((schedule_name,[],[],[]), init_density) !density_inductive_memo;
+
+  let constructor_schedules_with_density = List.filter_map (fun ctr -> 
     match constructor_best_valid_schedule ind_name ctr result_vars output_vars ds opt with
     | (ctr_name, None) -> failwith ("Should be at least one partial schedule for all constructors including this one: " ^ constructor_to_string ctr_name)
-    | (ctr_name, Some (i, schd)) -> Some schd) ctrs in
+    | (ctr_name, Some (i, schd, density)) -> Some (schd,(ctr_name,density))) ctrs in
+
+  let (constructor_schedules, densities) = List.split constructor_schedules_with_density in
 
   let is_recursive (steps,sort) = 
     List.exists (function | S_UC (_,SrcRec _,_) | S_ST (_,SrcRec _, _) | S_Check (SrcRec _,_) -> true | _ -> false) steps 
@@ -1305,9 +1292,70 @@ and inductive_best_valid_schedule (rel : rocq_relation) (output_idxs : int list)
   let inductive_schedule : inductive_schedule =
     (schedule_name, result_vars_mexps, List.map (fun c -> (c, [])) recursive, List.map (fun c -> (c, [])) nonrecursive) 
   in
-  density_inductive_memo := RelationInstMap.add (ind_name, output_idxs, ds) (inductive_schedule, Partial) !density_inductive_memo;
-  Feedback.msg_notice (str (Printf.sprintf "%s: %s Done\n" (schedule_name) (String.concat ", " (List.map string_of_int output_idxs)))); 
-  inductive_schedule, Partial
+
+  let fold_left1 f acc l =
+    match l with
+    | [] -> acc
+    | x :: xs -> List.fold_left f x xs in
+
+  let sparsest densities =
+    (* let min_dense a b =
+      match a,b with
+      | Total, _ -> Total
+      | _, Total -> Total
+      | Partial, _ -> Partial
+      | _, Partial -> Partial
+      | Backtracking, _ -> Backtracking
+      | _, Backtracking -> Backtracking
+      | Checking, Checking -> Checking in *)
+    fold_left1 (fun acc d -> if d > acc then d else acc) Checking densities in
+
+  let densest densities =
+    (* let max_dense a b =
+      match a,b with
+      | Checking, _ -> Checking
+      | _, Checking -> Checking
+      | Backtracking, _ -> Backtracking
+      | _, Backtracking -> Backtracking
+      | Partial, _ -> Partial
+      | _, Partial -> Partial
+      | Total, Total -> Total in *)
+    fold_left1 (fun acc d -> if d < acc then d else acc) Total densities in
+
+  let best_density densities = 
+    match ds with
+    | D_Check | D_Enum -> densest densities
+    | D_Gen | D_Thm -> sparsest densities in
+
+  let worst_density densities = 
+    match ds with
+    | D_Check | D_Enum -> sparsest densities
+    | D_Gen | D_Thm -> densest densities in
+
+  let tree = cover_tuple_patterns (input_patterns_of_rocq_relation rel output_idxs) (rocq_relation_arity rel) (types_to_constructor_lookup (seek_all_rocq_relation ind_name)) in
+  let covered_patterns = collect_leaves tree in
+  (* if should_print then (Feedback.msg_notice (str ("Rule densities for: " ^ ty_ctr_to_string ind_name ^ " with output indices: " ^ List.fold_left (fun acc oi -> acc ^ " " ^ string_of_int oi) "" ois) ++ fnl ()); *)
+  (* print_rule_densities densities); *)
+  (* let filter_empty_constructors = List.map (fun (p, cs) -> p, List.filter (fun c -> match List.assoc c densities with | Checking -> false | Partial | Backtracking -> true) cs) covered_patterns in
+  let any_uncovered = List.exists (fun (p,cs) -> cs = []) filter_empty_constructors in
+  let all_has_partial = List.for_all (fun (p,cs) -> List.exists (fun c -> List.assoc c densities = Partial) cs) filter_empty_constructors in
+  let result = if any_uncovered then Checking else if all_has_partial then Partial else Backtracking in *)
+  let filter_uncovered_patterns = List.filter (fun (p, cs) -> match cs with | [] -> false | _ -> true) covered_patterns in
+  let best_density_in_patterns = List.map (fun (p, cs) -> worst_density (List.map (fun c -> List.assoc c densities) cs)) filter_uncovered_patterns in
+  let overall_density = worst_density best_density_in_patterns in
+
+  (Feedback.msg_notice (str "Rule pattern coverage tree:" ++ fnl ());
+                        print_coverage_tree ind_name tree output_idxs; Feedback.msg_notice (fnl ());
+                        Feedback.msg_notice (str "Set of patterns and densities of their covering rules:" ++ fnl ());
+                        print_pattern_leaves ind_name tree output_idxs densities; 
+                        Feedback.msg_notice (str ("Inductive relation " ^ ty_ctr_to_string ind_name ^ " with output indices:"
+                                                  ^ List.fold_left (fun acc oi -> acc ^ " " ^ string_of_int oi) "" output_idxs 
+                                                  ^ " has overall density: " 
+                                                  ^ (density_to_string overall_density)) ++ fnl ()));
+
+  density_inductive_memo := RelationInstMap.add (ind_name, output_idxs, ds) (inductive_schedule, overall_density) !density_inductive_memo;
+  Feedback.msg_notice (str (Printf.sprintf "%s: %s Done, Density: %s\n" (schedule_name) (String.concat ", " (List.map string_of_int output_idxs)) (density_to_string overall_density))); 
+  inductive_schedule, overall_density
 end
 
 and best_inductive_schedule_from_instance (ind_instance : rocq_type) (output_vars : var list) (ds : derive_sort) (opt : bool) : inductive_schedule * rule_density =
@@ -1316,16 +1364,18 @@ and best_inductive_schedule_from_instance (ind_instance : rocq_type) (output_var
     let output_idxs = filter_mapi (fun i -> function | DTyVar v -> if List.mem v output_vars then Some i else None | _ -> None) args in
     (* Feedback.msg_debug (str (ty_ctr_to_string ind_name ^ " with output indices: " ^ String.concat "," (List.map string_of_int output_idxs)) ++ fnl ()); *)
     inductive_best_valid_schedule (ty_ctr_to_rocq_relation ind_name) output_idxs ds opt
+  | DNot (DTyCtr (ind_name, args)) when ds = D_Check ->
+    inductive_best_valid_schedule (ty_ctr_to_rocq_relation ind_name) [] ds opt
   | _ -> failwith "best_inductive_schedule_from_instance: not a DTyCtr"
 
 let best_theorem_schedule (thm : rocq_type) : schedule =
   let schedule_matches = NewUnifyQC.type_to_schedules thm None None [] [] D_Thm true in
-  let schedules = List.mapi (fun i ((steps, sort), ms, eqs) -> i,(List.map (fun (v,p) -> S_Match (v,p)) ms @ List.map check_eq eqs @ steps, sort)) schedule_matches in
-  let schedule_densities = List.map (fun (i,schd) -> i, schedule_density schd) schedules in
+  let schedules = List.mapi (fun i ((steps, sort), ms, eqs) -> i,List.map (fun (v,p) -> S_Match (v,p)) ms, ((List.map check_eq eqs @ steps), sort)) schedule_matches in
+  let schedule_densities = List.map (fun (i,ms_steps,schd) -> i, schedule_density ms_steps schd) schedules in
   let valid_schedules = List.filter (fun (i,schd) -> are_schedule_steps_valid i schd) schedule_densities in
   match select_best_schedule valid_schedules D_Thm with
   | None -> failwith "best_theorem_schedule: No valid schedules found"
-  | Some (i, schedule) -> schedule
+  | Some (i, schedule, _) -> schedule
 
 let collect_inductive_dependents (instance : rocq_constr * int list * derive_sort * bool) : (rocq_constr * int list * derive_sort * bool) list =
   let (ind_instance, output_idxs, ds, opt) = instance in
@@ -1333,13 +1383,14 @@ let collect_inductive_dependents (instance : rocq_constr * int list * derive_sor
   | DTyCtr (ind_name,_) -> 
     let (inductive_schd, density) = RelationInstMap.find (ind_name, output_idxs, ds) !density_inductive_memo in
     inductive_schedule_dependents inductive_schd
-  | DTyVar v -> failwith "collect_inductive_dependents: Need to handle instances of parameter type variables, like A in list A"
+  | DTyParam param -> []
+    (* failwith "collect_inductive_dependents: Need to handle instances of parameter type variables, like A in list A" *)
   | _ -> failwith "collect_inductive_dependents: not a DTyCtr or DTyVar"
 
 let lookup_and_remove_inductive_schedule (instance : rocq_constr * int list * derive_sort * bool) (to_remove : bool) : (inductive_schedule * derive_sort * bool) option =
   let (ind_instance, output_idxs, ds, opt) = instance in
   match ind_instance with
-  | DTyCtr (ind_name,_) -> 
+  | DTyCtr (ind_name,_)  | DNot (DTyCtr (ind_name, _)) ->
     (try (let (inductive_schd, density) = RelationInstMap.find (ind_name, output_idxs, ds) !density_inductive_memo in
     if to_remove then density_inductive_memo := RelationInstMap.remove (ind_name, output_idxs, ds) !density_inductive_memo;
     Some (inductive_schd, ds, opt)) with Not_found -> None)
@@ -1352,6 +1403,7 @@ let update_source step src =
   | S_Check (_,pol) -> S_Check (src, pol)
   | S_ST (vs,_,ps) -> S_ST (vs, src, ps)
   | S_Match (v,pat) -> S_Match (v, pat)
+  | S_Let (v,c) -> S_Let (v,c)
 
 let nonrec_to_mutrec_call name ois ty opt : source =
   match ty with
@@ -1366,10 +1418,14 @@ let nonrecursive_type step =
   | S_ST (_,SrcNonrec ty,_) 
   | S_Check (SrcNonrec ty,_) -> ty
   | S_Match _ -> failwith "nonrecursive_type: step must not be a match"
+  | S_Let _ -> failwith "nonrecursive_type: step must not be a let"
   | _ -> failwith "nonrecursive_type: step must have nonrecursive source"
 
 let insert_mutrec_call name ois step opt =
   update_source step (nonrec_to_mutrec_call name ois (nonrecursive_type step) opt)
+
+let rocq_constr_negb_opt (rocq_constr : rocq_constr) : rocq_constr =
+  DApp (DTyVar (var_of_string "QuickChick.Decidability.negbOpt"), [rocq_constr])
 
 let insert_mutrec_calls ((schedule,matches) : schedule * (var * pat) list) : schedule * (var * pat) list =
   let (schedule_steps_deps,schd_sort_dep) = schedule_with_dependents schedule in
@@ -1391,6 +1447,11 @@ let insert_mutrec_calls ((schedule,matches) : schedule * (var * pat) list) : sch
         let input_args = filter_mapi (fun i arg -> if List.mem i ois then None else Some arg) args in
         let fuel_arg = DTyVar (var_of_string "size") in
         let new_conclusion = DApp (DTyVar (var_of_string schd_name), fuel_arg :: input_args) in
+        TheoremSchedule (new_conclusion, false)
+      | DNot (DTyCtr (_, args)) ->
+        let input_args = filter_mapi (fun i arg -> if List.mem i ois then None else Some arg) args in
+        let fuel_arg = DTyVar (var_of_string "size") in
+        let new_conclusion = DNot (DApp (DTyVar (var_of_string schd_name), fuel_arg :: input_args)) in
         TheoremSchedule (new_conclusion, false)
       | _ -> failwith "insert_mutrec_calls: TheoremSchedule must have DTyCtr at toplevel"))
     | (schd_sort,_) -> schd_sort in
@@ -1505,8 +1566,10 @@ let collect_all_used_inductive_schd_names ind_schd_name : string list * (((induc
     let parse_dependent (rocq, output_idxs, ds, opt) =
       match rocq with
       | DTyCtr (ind_name, args) -> ind_name, List.length args, output_idxs, ds, opt
-      | DTyVar v -> failwith "collect_all_used_inductives: Need to handle instances of parameter type variables, like A in list A"
-      | _ -> failwith "collect_all_used_inductives: not a DTyCtr" in
+      | DNot (DTyCtr (ind_name, args)) -> ind_name, List.length args, output_idxs, ds, opt
+      | DTyParam v -> 
+        failwith "collect_all_used_inductive_schd_names: Need to handle instances of parameter type variables, like A in list A"
+      | _ -> failwith "collect_all_used_inductive_schd_names: not a DTyCtr" in
 
     match StringMap.find_opt ind_schd_name !inductive_dependency_map with
     | Some _ -> []
@@ -1676,30 +1739,21 @@ let valid_schedules =
       begin
         density_memo := RelationInstMap.empty;
         let schedules = NewUnifyQC.type_to_schedules dt None None [] [] D_Thm false in
-        let schedules' = List.map (fun ((steps, sort), ms, eqs) -> (List.map (fun (v,p) -> S_Match (v,p)) ms @ List.map check_eq eqs @ steps, sort)) schedules in
+        let schedules' = List.map (fun ((steps, sort), ms, eqs) -> (List.map (fun (v,p) -> S_Match (v,p)) ms, (List.map check_eq eqs @ steps, sort))) schedules in
         Feedback.msg_notice (str "Printing all bindings" ++ fnl ());
-        (* List.iteri (fun i (steps, sort) ->
-          Feedback.msg_notice (str (string_of_int i ^ ":\nAnalysis" ) ++ fnl ());
-          let (steps_ds, sort) = schedule_density (steps, sort) in
-          let schedule_score = get_schedule_score (steps_ds, sort) in
-          Feedback.msg_notice (str ("Schedule Score: " ^ string_of_float schedule_score ^ "\n") ++
-                              str (schedule_with_densities_to_string (steps_ds, sort) ^ "\n") ++                                           
-                              str "\nconstrexpr: \n" ++ 
-                              NewUnifyQC.match_schedule_as_pp_constr_expr (List.map fst steps_ds, sort) [] [] D_Gen
-                                                          ++ str "\n==============================================\n")) schedules'; *)
 
-        let schedules_w_densities = List.map schedule_density schedules' in
-        let schedules_scored = List.map (fun schd -> schd, get_schedule_score schd) schedules_w_densities in
-        let schedules_sorted = List.sort (fun (_,s) (_,s') -> - (compare s s')) schedules_scored in
-        List.iteri (fun i ((steps_ds, sort), schedule_score) ->
-          Feedback.msg_notice (str (string_of_int i ^ ":\n" ) ++ fnl ());
-          (*let (steps_ds, sort) = schedule_density (steps, sort) in
-          let schedule_score = get_schedule_score (steps_ds, sort) in *)
-          Feedback.msg_notice (str ("Schedule Score: " ^ string_of_int schedule_score ^ "\n") ++
+
+        let schedules_w_densities = List.mapi (fun i (ms_steps, schd) -> i, schedule_density ms_steps schd) schedules' in
+        let sorted = sort_schedules_by_density_and_var_uses schedules_w_densities D_Thm in
+
+
+        List.iter (fun ((steps_ds, sort), density, num_var_uses, id) ->
+          Feedback.msg_notice (str (string_of_int id ^ ":\n" ) ++ fnl ());
+          Feedback.msg_notice (str ("# var uses: " ^ string_of_int num_var_uses ^ "density:" ^ density_to_string density ^ "\n") ++
                               str (schedule_with_densities_to_string (steps_ds, sort) ^ "\n") ++                                           
                               str "\nconstrexpr: \n" ++ 
                               NewUnifyQC.match_schedule_as_pp_constr_expr (List.map fst steps_ds, sort) [] [] D_Thm
-                                                          ++ str "\n==============================================\n")) schedules_sorted;                                                  
+                                                          ++ str "\n==============================================\n")) sorted;
         Tacticals.tclIDTAC
       end 
     | None -> failwith "Failed to Parse type"
@@ -1761,7 +1815,53 @@ let theorem_dependencies =
       | None -> failwith "Failed to Parse type"
     end
 
-let defined_set = ref StringSet.empty
+module VarSet = Set.Make(struct type t = var let compare = compare end)
+  
+let defined_set = ref VarSet.empty
+
+let define c name env evd =
+  if VarSet.mem name !defined_set then
+    Feedback.msg_notice (str (var_to_string name ^ " is already defined") ++ fnl ())
+  else if name = var_of_string "theorem" then begin
+    let fresh_thm_name = fresh_name "theorem" in
+    let (c_constr, univ_info) = (Constrintern.interp_constr env evd c) in
+    let univ_entry = UState.univ_entry ~poly:false univ_info in
+    let constr = (EConstr.to_constr ~abort_on_undefined_evars:false evd c_constr) in
+
+    let cinfo = Declare.CInfo.make ~name:fresh_thm_name ~typ:None () in
+    let info = Declare.Info.make ~poly:false () in
+    ignore (Declare.declare_definition ~info ~cinfo ~opaque:false ~body:c_constr evd)
+  end else
+    begin
+    defined_set := VarSet.add name !defined_set;
+  (* let fn = fresh_name ind_schd_name in *)
+  (* TODO: Maxime - which of the new internal flags should be used here? The names aren't as clear :) *)
+    let (c_constr, univ_info) = (Constrintern.interp_constr env evd c) in
+    let univ_entry = UState.univ_entry ~poly:false univ_info in
+    let constr = (EConstr.to_constr ~abort_on_undefined_evars:false evd c_constr) in
+
+    let cinfo = Declare.CInfo.make ~name:name ~typ:None () in
+    let info = Declare.Info.make ~poly:false () in
+    ignore (Declare.declare_definition ~info ~cinfo ~opaque:false ~body:c_constr evd)
+  end 
+
+let define_all schedule_pieces =
+  List.iter (function
+  | [] -> failwith "Empty piece"
+  | [(name, constr)] -> 
+    let e' = Global.env () in
+    let evd' = Evd.from_env e' in
+    Feedback.msg_notice (str ("Defining " ^ var_to_string name) ++ fnl ());
+    Feedback.msg_notice (str ("Defining " ^ constr_expr_to_string constr) ++ fnl ());
+    ignore (define constr name e' evd')
+  | pieces -> 
+    let e' = Global.env () in
+    let evd' = Evd.from_env e' in
+    List.iter (fun (name, constr) -> 
+      Feedback.msg_notice (str ("Defining " ^ var_to_string name) ++ fnl ());
+      Feedback.msg_notice (str ("Defining " ^ constr_expr_to_string constr) ++ fnl ());
+      ignore (define constr name e' evd')) pieces
+        ) schedule_pieces
 
 let quickchick_it =
   Proofview.Goal.enter_one begin fun gl ->
@@ -1818,66 +1918,18 @@ let quickchick_it =
         Feedback.msg_notice (str "Pieces: " ++ fnl ());
         List.iter (List.iter (fun (name, constr) -> msg_debug (str (var_to_string name ^ ": ") ++ str (constr_expr_to_string constr) ++ fnl ()))) schedules_pieces;
 
-          
-        let define c name env evd =
-          (* let fn = fresh_name ind_schd_name in *)
-          (* TODO: Maxime - which of the new internal flags should be used here? The names aren't as clear :) *)
-          let (c_constr, univ_info) = (Constrintern.interp_constr env evd c) in
-          let univ_entry = UState.univ_entry ~poly:false univ_info in
-          let constr = (EConstr.to_constr ~abort_on_undefined_evars:false evd c_constr) in
-
-          let cinfo = Declare.CInfo.make ~name:name ~typ:None () in
-          let info = Declare.Info.make ~poly:false () in
-          Declare.declare_definition ~info ~cinfo ~opaque:false ~body:c_constr evd
-
-          (* Declare.declare_definition ~kind:Decls.(IsDefinition Definition) fn (constr,univ_entry) *)
 
 
-          (*val declare_definition : info:Info.t -> cinfo:EConstr.t option CInfo.t -> opaque:bool -> body:EConstr.t -> ?using:Vernacexpr.section_subset_expr -> Evd.evar_map -> Names.GlobRef.t
-  Declares a non-interactive constant; body and types will be normalized w.r.t. the passed evar_map sigma. Universes should be handled properly, including minimization and restriction. Note that sigma is checked for unresolved evars, thus you should be careful not to submit open terms
-
-  val declare_mutual_definitions : info:Info.t -> cinfo:Constr.t CInfo.t list -> opaque:bool -> uctx:UState.t -> bodies:(Constr.t list * Sorts.relevance list) -> possible_guard:Pretyping.possible_guard -> ?using:Vernacexpr.section_subset_expr -> unit -> Names.GlobRef.t list
-  Declaration of interactive constan*)
-
-          (* let _ : Names.Constant.t = Declare.declare_constant ~name:fn ~kind:Decls.(IsDefinition Definition)
-              (DefinitionEntry (Declare.definition_entry (EConstr.to_constr ~abort_on_undefined_evars:false evd c_constr))) in
-          fn *)
-        in
-
-        let mut_define (names : var list) cs env evd =
-          (* let fresh_names = List.map fresh_name names in *)
-
-          (* Print cs*)
-          List.iter (fun c -> Feedback.msg_notice (str (constr_expr_to_string c) ++ fnl ())) cs;
-
-          let uctx = UState.from_env env in
-          let (c_constrs, typs) = List.split (List.map (fun c -> 
-            let c_econstr = fst (Constrintern.interp_constr env evd c) in
-            let constr = (EConstr.to_constr ~abort_on_undefined_evars:false evd c_econstr) in
-            let typ = Retyping.get_type_of_constr env ~uctx constr in
-            (constr, typ)
-            ) cs) in
-
-          let info = Declare.Info.make ~poly:false () in
-          let cinfo = List.map2 (fun n ty -> Declare.CInfo.make ~name:n ~typ:ty ()) names typs in
-
-          let bodies = List.split (List.map (fun c -> (c, Sorts.Relevant)) c_constrs) in
-
-          let possible_guard = {Pretyping.possibly_cofix=false;Pretyping.possible_fix_indices = []} in
-
-          Declare.declare_mutual_definitions ~info ~cinfo ~opaque:false ~uctx ~bodies ~possible_guard ()
-        in
-
-        let is_defined s : bool =
+        (* let is_defined s : bool =
           begin
             begin
               try match Nametab.locate_extended_all (Libnames.qualid_of_ident s) with
                   | [] -> false
                   | _ -> true
               with Not_found -> false (* failwith ("locate constant: " ^ (Id.to_string c))*)
-            end
+            (* end
           end
-        in
+        in *)
 
         List.iter (function
           | [] -> failwith "Empty piece"
@@ -1892,14 +1944,16 @@ let quickchick_it =
               if is_defined name then
                 Feedback.msg_notice (str (var_to_string name ^ " is already defined") ++ fnl ())
               else
-              ignore (define constr name e' evd')) pieces) schedules_pieces;
+              ignore (define constr name e' evd')) pieces) schedules_pieces; *)
+
+        define_all schedules_pieces;
 
             (* let (names, constrs) = List.split pieces in ignore (mut_define names constrs e' evd')) schedules_pieces; *)
 
         Feedback.msg_notice (int (List.length schedules_pieces) ++ str " Pieces defined" ++ fnl ());
 
 
-          
+        defined_set := VarSet.empty;  
 
         (* let env = Global.env () in
         let evd = Evd.from_env env in *)
@@ -1910,14 +1964,23 @@ let quickchick_it =
         Feedback.msg_notice (str "We shouldn't have a constant");
         (* ignore (define schedules_constr e evd); *)
 
-        (* msg_debug (str "After constrained generator" ++ fnl ());
+        
+
+        (* msg_debug (str "After constrained generator" ++ fnl ());*)
         let updated_env = Global.env () in
         let updated_evd = Evd.from_env updated_env in
         msg_debug (str "Running QuickCheck" ++ fnl ());
-        let to_run = GenericLib.interp_open_coq_expr updated_env updated_evd (g_show (g_quickCheck constrained_gen)) in
+        let to_run = fst (Constrintern.interp_constr updated_env updated_evd (c_show (c_quickCheck (c_sized c_theorem)))) in
         let updated_env' = Global.env () in
         let updated_evd' = Evd.from_env updated_env' in
-        QuickChick.define_and_run to_run updated_env' updated_evd'; *)
+        #if COQ_VERSION >= (8, 20, 0)
+          (* FRAGILE probably won't be allowed in the future? *)
+          let opaque_access = Library.indirect_accessor[@@warning "-3"] in
+          QuickChick.define_and_run ~opaque_access to_run updated_env' updated_evd';
+  #else
+          QuickChick.define_and_run to_run updated_env' updated_evd';
+  #endif
+        (* let _ = (QuickChick.define_and_run  to_run updated_env' updated_evd') in *)
         Tacticals.tclIDTAC
         (* end  *)
       end
@@ -2119,28 +2182,20 @@ VERNAC COMMAND EXTEND DeriveValidSchedules CLASSIFIED AS SIDEFF
 
       density_memo := RelationInstMap.empty;
       let schedules = take 300 scheds in
-      let schedules' = List.map (fun ((steps, sort), ms, eqs) -> (List.map (fun (v,p) -> S_Match (v,p)) ms @ List.map check_eq eqs @ steps, sort)) schedules in
+      let schedules' = List.map (fun ((steps, sort), ms, eqs) -> (List.map (fun (v,p) -> S_Match (v,p)) ms, (List.map check_eq eqs @ steps, sort))) schedules in
       Feedback.msg_notice (str "Printing all bindings" ++ fnl ());
-      let schedules_w_densities = List.map schedule_density schedules' in
-      let schedules_scored = List.map (fun schd -> schd, get_schedule_score schd) schedules_w_densities in
-      let schedules_sorted = List.sort (fun (_,s) (_,s') -> (compare s s')) schedules_scored in
-      List.iteri (fun i ((steps_ds, sort), schedule_score) ->
-        Feedback.msg_notice (str (string_of_int i ^ ":\n" ) ++ fnl ());
-        (*let (steps_ds, sort) = schedule_density (steps, sort) in
-        let schedule_score = get_schedule_score (steps_ds, sort) in *)
-        Feedback.msg_notice (str ("Schedule Score: " ^  string_of_int schedule_score ^ "\n") ++
-                             str (schedule_with_densities_to_string (steps_ds, sort) ^ "\n") ++                                           
-                             str "\nconstrexpr: \n" ++ 
-                             NewUnifyQC.match_schedule_as_pp_constr_expr (List.map fst steps_ds, sort) [] [] ds
-                                                        ++ str "\n==============================================\n")) schedules_sorted
-        (* match get_schedule_score i (steps_ds, sort) with
-        | Some (i, steps_ds, sort) -> Feedback.msg_notice (str ("Schedule Valid:\n" ^ schedule_with_densities_to_string (steps_ds, sort))                                          
-                                                        ++ str "\nconstrexpr: \n"
-                                                        ++ NewUnifyQC.match_schedule_as_pp_constr_expr (List.map fst steps_ds, sort) [] D_Gen
-                                                        ++ str "\n==============================================\n")
-        | None -> Feedback.msg_notice (str ( "Schedule Invalid\n==============================================") ++ fnl ())) schedules'
+      let schedules_w_densities = List.mapi (fun i (ms_steps, schd) -> i, schedule_density ms_steps schd) schedules' in
+      let sorted = sort_schedules_by_density_and_var_uses schedules_w_densities ds in
 
-     *)
+      List.iter (fun ((steps_ds, sort), density, num_var_uses, id) ->
+
+        Feedback.msg_notice (str (string_of_int id ^ ":\n" ) ++ fnl ());
+        Feedback.msg_notice (str ("# var uses: " ^ string_of_int num_var_uses ^ "density:" ^ density_to_string density ^ "\n") ++
+                            str (schedule_with_densities_to_string (steps_ds, sort) ^ "\n") ++                                           
+                            str "\nconstrexpr: \n" ++ 
+                            NewUnifyQC.match_schedule_as_pp_constr_expr (List.map fst steps_ds, sort) [] [] ds
+                                                        ++ str "\n==============================================\n")) sorted
+
     | None -> failwith "Failed to parse inductive type" 
     }
 END
@@ -2163,13 +2218,27 @@ VERNAC COMMAND EXTEND DeriveDensity CLASSIFIED AS SIDEFF
    | ["Derive" "Density" constr(ind) int_list(ois) "derive" string(ds)] ->
     { match NewGenericLib.ind_reference_to_rocq_relations ind with
     | Some (idx, rs) ->
-      density_memo := RelationInstMap.empty;
+      (* density_memo := RelationInstMap.empty;
       let ds = (match ds with
       | "Check" -> D_Check
       | "Gen" -> D_Gen
       | "Thm" -> D_Thm
       | "Enum" -> D_Enum) in
-      ignore (final_density (List.nth rs idx) ois true ds)
+      ignore (final_density (List.nth rs idx) ois true ds) *)
+      density_inductive_memo := init_density_inductive_memo;
+      inductive_set := inductive_set_init;
+      rocq_relation_memo := TyCtrMap.empty;
+      (* inductive_dependency_map := StringMap.empty; *)
+      let (ind_name, params, constructors, result_typ) = List.nth rs idx in
+      let ds = (match ds with
+      | "Check" -> D_Check
+      | "Gen" -> D_Gen
+      | "Enum" -> D_Enum
+      | _ -> failwith "Can only derive inductive schedules for Check, Gen, or Enum") in
+      let (inductive_schedule, density) = inductive_best_valid_schedule (ind_name, params, constructors, result_typ) ois ds true in
+      (* Feedback.msg_notice (str "Inductive Schedule:\n" ++ str (inductive_schedule_to_string inductive_schedule) ++ fnl ()); *)
+      Feedback.msg_notice (str "Density: " ++ str (density_to_string density) ++ fnl ())
+
     | None -> failwith "Failed to parse inductive type" 
     }
 END
@@ -2205,7 +2274,7 @@ VERNAC COMMAND EXTEND DeriveInductiveSchedule CLASSIFIED AS SIDEFF
 
       let schedules_pieces = inductive_schedules_to_def_constr_exprs components ind_schd_name in
 
-      let define c name env evd =
+      (* let define c name env evd =
         let (c_constr, univ_info) = (Constrintern.interp_constr env evd c) in
         let univ_entry = UState.univ_entry ~poly:false univ_info in
         let constr = (EConstr.to_constr ~abort_on_undefined_evars:false evd c_constr) in
@@ -2259,12 +2328,12 @@ VERNAC COMMAND EXTEND DeriveInductiveSchedule CLASSIFIED AS SIDEFF
             if is_defined name then
               Feedback.msg_notice (str (var_to_string name ^ " is already defined") ++ fnl ())
             else
-            ignore (define constr name e' evd')) pieces) schedules_pieces;
+            ignore (define constr name e' evd')) pieces) schedules_pieces; *)
 
-
+      define_all schedules_pieces;
           (* let (names, constrs) = List.split pieces in ignore (mut_define names constrs e' evd')) schedules_pieces; *)
 
-      Feedback.msg_notice (int (List.length schedules_pieces) ++ str " Pieces defined" ++ fnl ());
+      Feedback.msg_notice (int (List.length schedules_pieces) ++ str " Pieces defined" ++ fnl ())
 
 
 

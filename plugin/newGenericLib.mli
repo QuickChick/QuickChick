@@ -108,6 +108,7 @@ type schedule_step =
                                                                                         that we wish to produce, any other instance of the var is an input *)
   | S_Check of source * bool
   | S_Match of var * pat
+  | S_Let of var * rocq_constr
 
 type schedule_sort = ProducerSchedule of bool * producer_sort * rocq_constr (* tuple of produced outputs from conclusion of constructor *)
                    | CheckerSchedule (* checkers need not bother with conclusion of constructor, only hypotheses need be checked and conclusion of constructor follows *)
@@ -164,6 +165,14 @@ val schedule_to_mexp : schedule -> mexp -> mexp -> mexp
 
 val mexp_to_constr_expr : mexp -> derive_sort -> Constrexpr.constr_expr
 
+val c_show : Constrexpr.constr_expr -> Constrexpr.constr_expr
+
+val c_quickCheck : Constrexpr.constr_expr -> Constrexpr.constr_expr
+
+val c_sized : Constrexpr.constr_expr -> Constrexpr.constr_expr
+
+val c_theorem : Constrexpr.constr_expr
+
 type inductive_schedule = string * (var * mexp) list * (schedule * (var * pat) list) list * (schedule * (var * pat) list) list 
 
 val inductive_schedule_to_constr_expr : inductive_schedule -> derive_sort -> bool -> Constrexpr.constr_expr
@@ -174,7 +183,7 @@ val inductive_schedule_with_dependencies_to_constr_expr :
   string -> 
   Constrexpr.constr_expr
 
-val inductive_schedules_to_constr_expr : (inductive_schedule * derive_sort * bool) list list -> string -> Constrexpr.constr_expr
+(* val inductive_schedules_to_constr_expr : (inductive_schedule * derive_sort * bool) list list -> string -> Constrexpr.constr_expr *)
 
 val inductive_schedules_to_def_mexps : (inductive_schedule * derive_sort * bool) list list -> string -> (var * mexp * derive_sort) list list 
 
