@@ -282,7 +282,8 @@ let rec convert_to_range dt =
      option_map (fun dts' -> Ctr (ty_ctr_to_ctr c, dts')) (sequenceM convert_to_range dts)
   | DTyParam param -> Some (Parameter param)
   | DHole -> Some RangeHole
-  | _ -> None
+  | _ -> Feedback.msg_notice (str (Printf.sprintf "convert_to_range: %s" (rocq_constr_to_string dt)) ++ fnl ());
+    None
 
 let rec is_fixed_range k = function
     | Undef _ -> false
@@ -1789,7 +1790,7 @@ let get_schedule_sort (concl : rocq_constr) (output_vars : unknown list) (ctr_na
       let conclusion = 
         if opt then 
           rocq_constr_tuple_of_list output_values
-        else
+        else 
           (match ctr_name with
           | Some ctr_name -> DTyCtr (ctr_name, output_values)
           | None -> failwith "No constructor name given for Non theorem schedule.")
@@ -1844,10 +1845,14 @@ let rec correct_variables (umap : umap) (scd : schedule_step list) : schedule_st
     S_ST (List.map (fun (v,t) -> correct_var umap v, t) uts, correct_src umap src, dst) :: correct_variables umap scd'
   | S_Check (src,pol) :: scd' ->
     S_Check (correct_src umap src, pol) :: correct_variables umap scd'
+  | S_Let (v, c) :: scd' ->
+    S_Let (correct_var umap v, correct_rocq_constr umap c) :: correct_variables umap scd'
 
 
 let type_to_schedules (typ : rocq_constr) (ind_name : ty_ctr option) (ctr_name : ty_ctr option) (result_vars : (var * rocq_constr) list) (output_vars : var list) (ds : derive_sort) opt : (schedule * (var * pat) list * (var * var) list) list = 
   (*TODO: handle parameters, need to distinguish them from remainder of result_vars*)
+  Feedback.msg_debug (str ("Type to schedules: " ^ rocq_constr_to_string typ) ++ fnl ());
+  Feedback.msg_debug (str ("Result vars: " ^ String.concat ", " (List.map (fun (v, ty) -> var_to_string v ^ ": " ^ rocq_constr_to_string ty) result_vars)) ++ fnl ());
   let vars, hyps, concl = type_info typ in
 
   let add_all vars range_f umap = List.fold_left (fun umap v -> UM.add v (range_f v) umap) umap vars in

@@ -16,6 +16,29 @@ Inductive exp :=
 | Or (e1 e2 : exp)
 | Lt (e1 e2 : exp).
 
+Inductive even : nat -> Prop :=
+| even0 : even 0
+| evenS n : odd n -> even (S n)
+with odd : nat -> Prop :=
+| odd1 : odd 1
+| oddS n : even n -> odd (S n)
+.
+
+Derive Inductive Schedule even 0 derive "Gen" opt "true".
+
+Print GenSizedSuchThat_even_O.
+Print sizedGen. Print run.
+
+Theorem even_SS : forall n, even n -> even (S (S n)).
+quickchick.
+Print theorem.
+
+Print DecOpt_even_I.
+QuickChick (sized (fun n => theorem (S (S n)))).
+
+
+Sample (sized (fun n => GenSizedSuchThat_even_O (4 * (n + 10)))).
+
 Inductive res :=
 | N (n : nat)
 | B (b : bool).
