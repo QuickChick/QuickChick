@@ -1,6 +1,6 @@
 From Coq Require Import Init.Nat Lia List.
 From QuickChick Require Import QuickChick.
-From mathcomp Require Import ssreflect ssreflect.eqtype ssrnat.
+From mathcomp Require Import ssreflect eqtype ssrnat.
 Import QcNotation. Import QcDefaultNotation.
 Import ListNotations.
 

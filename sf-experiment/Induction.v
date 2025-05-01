@@ -7,13 +7,12 @@ Import QcDefaultNotation. Open Scope qc_scope.
 Import GenLow GenHigh.
 Require Import List ZArith.
 Import ListNotations.
-(* 
-Require Import mathcomp.ssreflect.ssreflect.
-From mathcomp Require Import seq ssreflect ssrbool ssrnat eqtype.
+(*
+From mathcomp Require Import ssreflect ssrfun ssrbool.
+From mathcomp Require Import seq ssrnat eqtype.
 *)
 
 Definition plus_n_O (n:nat) :=
   n =? n + 0.
 
 (*! QuickChick plus_n_O. *)
-

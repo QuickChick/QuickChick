@@ -7,8 +7,7 @@
 Set Warnings "-notation-overridden,-parsing".
 
 Require Import ZArith List Lia.
-Require Import mathcomp.ssreflect.ssreflect.
-From mathcomp Require Import ssrfun ssrbool ssrnat seq eqtype.
+From mathcomp Require Import ssreflect ssrfun ssrbool ssrnat seq eqtype.
 
 From ExtLib.Structures Require Export
      Functor Applicative Monads.
