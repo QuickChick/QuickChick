@@ -1,6 +1,6 @@
 From Coq Require Import Init.Nat Lia List.
 From QuickChick Require Import QuickChick CheckerProofs EnumProofs.
-From mathcomp Require Import ssreflect ssreflect.eqtype.
+From mathcomp Require Import ssreflect eqtype.
 
 Import ListNotations.
 

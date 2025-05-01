@@ -1,7 +1,7 @@
 Set Warnings "-notation-overridden,-parsing".
 
-From Coq Require Import Classes.RelationClasses Classes.Morphisms List ssreflect.
-From mathcomp Require Import ssrfun ssrbool seq.
+From Coq Require Import Classes.RelationClasses Classes.Morphisms List.
+From mathcomp Require Import ssreflect ssrfun ssrbool seq.
 From QuickChick Require Import Tactics.
 
 Import ListNotations.

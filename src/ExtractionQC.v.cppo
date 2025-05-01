@@ -107,8 +107,7 @@ Extract Constant trace =>
     | c :: l -> Bytes.set s i c; copy (i+1) l
    in Bytes.to_string (copy 0 l)); flush stdout; fun y -> y)".
 
-Require Import mathcomp.ssreflect.ssreflect.
-From mathcomp Require Import ssreflect ssrnat ssrbool div eqtype.
+From mathcomp Require Import ssreflect ssrfun ssrbool ssrnat div eqtype.
 Extract Constant divn => "(fun m -> function 0 -> 0 | d -> m / d)".
 Extract Constant modn => "(fun m -> function 0 -> m | d -> m mod d)".
 Extract Constant eqn => "(==)".

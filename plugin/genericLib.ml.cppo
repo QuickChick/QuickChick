@@ -1147,7 +1147,7 @@ let rec maximum = function
   | [c] -> c
   | (c::cs) -> gApp (gInject "Coq.Init.Peano.max") [c; maximum cs]
 
-let gle x y = gApp (gInject "mathcomp.ssreflect.ssrnat.leq") [x; y]
+let gle x y = gApp (gInject "ssrnat.leq") [x; y]
 let glt x y = gle (gApp (gInject "Coq.Init.Datatypes.S") [x]) y
 
 

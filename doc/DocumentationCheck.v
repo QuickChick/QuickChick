@@ -1,7 +1,6 @@
 Set Warnings "-notation-overridden,-parsing".
 
-Require Import mathcomp.ssreflect.ssreflect.
-From mathcomp Require Import ssrbool.
+From mathcomp Require Import ssreflect ssrfun ssrbool.
 From Coq Require Import Relations ZArith Strings.Ascii Strings.String.
 From QuickChick Require Import LazyList QuickChick.
 From doc Require Import QuickChickInterface.

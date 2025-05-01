@@ -1,6 +1,7 @@
 (* Lazy Rose Trees *)
 
-Require Import List mathcomp.ssreflect.ssreflect.
+From Coq Require Import List.
+From mathcomp Require Import ssreflect.
 Set Implicit Arguments.
 
 Record Lazy (T : Type) := lazy { force : T }.
