@@ -884,7 +884,20 @@ let c_fail (ds : derive_sort) : constr_expr =
   | D_Check -> c_Some c_hole c_false
   | D_Thm -> c_checker c_tt
 
-let c_guard check k (ds : derive_sort) = c_match ?catchAll:(Some (Some (c_fail ds))) check [(PCtr (constructor_of_string "Coq.Init.Datatypes.Some", [PWild; PCtr (constructor_of_string "Coq.Init.Datatypes.true",[])]), k)]
+let c_out_of_fuel (ds : derive_sort) : constr_expr =
+  match ds with
+  | D_Gen -> c_fail D_Gen
+  | D_Enum -> c_ret D_Enum (c_None c_hole)
+  | D_Check -> c_None c_hole
+  | D_Thm -> c_checker c_tt
+
+let c_guard check k (ds : derive_sort) = 
+  c_match 
+    (* ?catchAll:(Some (Some (c_fail ds)))  *)
+    check 
+    [(PCtr (constructor_of_string "Coq.Init.Datatypes.Some", [PWild; PCtr (constructor_of_string "Coq.Init.Datatypes.true",[])]), k);
+     (PCtr (constructor_of_string "Coq.Init.Datatypes.Some", [PWild; PCtr (constructor_of_string "Coq.Init.Datatypes.false",[])]), c_fail ds);
+     (PCtr (constructor_of_string "Coq.Init.Datatypes.None", [PWild]), c_out_of_fuel ds)]
   
   (* c_if check k (c_fail ds) *)
 
@@ -953,13 +966,6 @@ let c_bind (ms : monad_sort) (ds : derive_sort) (m1 : constr_expr) (vs : var lis
   | D_Thm, MG -> c_forAllChecker m1 k
   | D_Thm, MGOpt -> c_forAllMaybeChecker m1 k
   | _, _ -> failwith ("Invalid bind for derive_sort" ^ derive_sort_to_string ds ^ " and monad_sort " ^ monad_sort_to_string ms)
-
-let c_out_of_fuel (ds : derive_sort) : constr_expr =
-  match ds with
-  | D_Gen -> c_fail D_Gen
-  | D_Enum -> c_ret D_Enum (c_None c_hole)
-  | D_Check -> c_None c_hole
-  | D_Thm -> c_checker c_tt
 
 let c_backtrack (ds : derive_sort) (is_constrained : bool) (first : constr_expr) (ms : constr_expr list) : constr_expr =
   match ds, is_constrained with
@@ -1310,8 +1316,8 @@ let inductive_schedule_to_mexp (is : inductive_schedule) (ds : derive_sort) (is_
     ) k inp_pats in
   let base_backtrack = 
     let add_on = if is_constrained && (ds = D_Check || ds = D_Enum && rec_scheds <> []) then [backtrack_decoration ds Base (MOutOfFuel)] else [] in
-    add_on @ List.map (fun (s, inp_pats) -> 
-    backtrack_decoration ds Base (match_pats inp_pats (schedule_to_mexp s fuel_sizem fuel_init_size))) base_scheds in
+    List.map (fun (s, inp_pats) -> 
+    backtrack_decoration ds Base (match_pats inp_pats (schedule_to_mexp s fuel_sizem fuel_init_size))) base_scheds @ add_on in
   let base_backtrack_for_all = List.map (fun (s, inp_pats) -> 
     backtrack_decoration ds Base (match_pats inp_pats (schedule_to_mexp s fuel_sizem fuel_init_size))) base_scheds in (*TODO: FIX FUEL SIZE*)
   let rec_backtrack = List.map (fun (s, inp_pats) ->
@@ -1390,7 +1396,7 @@ let inductive_schedule_with_dependencies_to_mexp unconstrained_inds (ind_schds :
   unconstrained_ind_mexp (MLet (var_of_string output_ind_schd_name, MMutFix (List.map dependency_mexp ind_schds, var_of_string output_ind_schd_name), 
     MFun ([PVar (var_of_string "size"), Some (MConst "Coq.Init.Datatypes.nat")], 
       MApp (MId (var_of_string output_ind_schd_name),
-        [MConst "QuickChick.Decidability.checkable_size_limit"; MId (var_of_string "size"); MId (var_of_string "size")]))))
+        [MConst "QuickChick.Decidability.mutual_fuel"; MId (var_of_string "size"); MId (var_of_string "size")]))))
   
 
 let turn_def_calls_into_mutrec_calls (ind_schd : inductive_schedule) names : inductive_schedule =

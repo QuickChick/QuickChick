@@ -1851,8 +1851,8 @@ let rec correct_variables (umap : umap) (scd : schedule_step list) : schedule_st
 
 let type_to_schedules (typ : rocq_constr) (ind_name : ty_ctr option) (ctr_name : ty_ctr option) (result_vars : (var * rocq_constr) list) (output_vars : var list) (ds : derive_sort) opt : (schedule * (var * pat) list * (var * var) list) list = 
   (*TODO: handle parameters, need to distinguish them from remainder of result_vars*)
-  Feedback.msg_debug (str ("Type to schedules: " ^ rocq_constr_to_string typ) ++ fnl ());
-  Feedback.msg_debug (str ("Result vars: " ^ String.concat ", " (List.map (fun (v, ty) -> var_to_string v ^ ": " ^ rocq_constr_to_string ty) result_vars)) ++ fnl ());
+  (* Feedback.msg_debug (str ("Type to schedules: " ^ rocq_constr_to_string typ) ++ fnl ()); *)
+  (* Feedback.msg_debug (str ("Result vars: " ^ String.concat ", " (List.map (fun (v, ty) -> var_to_string v ^ ": " ^ rocq_constr_to_string ty) result_vars)) ++ fnl ()); *)
   let vars, hyps, concl = type_info typ in
 
   let add_all vars range_f umap = List.fold_left (fun umap v -> UM.add v (range_f v) umap) umap vars in

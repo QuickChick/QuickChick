@@ -22,6 +22,7 @@ Class DecOpt (P : Prop) := { decOpt : nat -> option bool }.
 
 Axiom checkable_size_limit : nat.
 Extract Constant checkable_size_limit => "10000".
+Definition mutual_fuel : nat := 10000.
 
 (* Discard tests that run further than the limit *)
 (* For proofs, the size parameter will need to be taken into account
