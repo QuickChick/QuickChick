@@ -101,6 +101,7 @@ Inductive typing : env -> term -> typ -> Prop :=
 
 Instance DecEq_typ : Dec_Eq typ. dec_eq. Defined.
 Instance DeqEq_term : Dec_Eq term. dec_eq. Defined.
+
 Derive Show for typ.
 Derive Show for term.
 Derive Show for env.
