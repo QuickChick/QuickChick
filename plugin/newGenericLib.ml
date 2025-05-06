@@ -1143,6 +1143,13 @@ let m_true = MConst "Coq.Init.Datatypes.true"
 
 let m_false = MConst "Coq.Init.Datatypes.false"
 
+let m_mul x y = MApp (MConst "Coq.Init.Nat.mul", [x; y])
+
+let m_three = MConst "Coq.Init.Nat.S (Coq.Init.Nat.S (Coq.Init.Nat.S Coq.Init.Datatypes.O))"
+
+let m_theorem_check_fuel mfuel = 
+  m_mul m_three mfuel
+
 (* Maybe start this by checking that all the variables used/produced in the conclusion are actually created in the steps?*)
 (* let schedule_to_mexp ((steps, s_sort) : schedule) : mexp =
   let rec aux steps k =
@@ -1162,7 +1169,7 @@ let schedule_to_mexp ((steps, s_sort) : schedule) (mfuel : mexp) (def_fuel : mex
   let finally = match s_sort with
     | ProducerSchedule (is_constrained, ps, concl_outputs) -> MRet ((if is_constrained then m_Some MHole else (fun x -> x)) @@ product_free_rocq_type_to_mexp concl_outputs)
     | CheckerSchedule -> MRet (m_Some m_bool m_true)
-    | TheoremSchedule (DNot concl, true) -> match_optbool (m_negb_opt @@ m_decOpt (product_free_rocq_type_to_mexp concl) m_fuel) (MRet (m_Some m_bool m_true)) (MRet (m_Some m_bool m_false)) MOutOfFuel
+    | TheoremSchedule (DNot concl, true) -> match_optbool (m_negb_opt @@ m_decOpt (product_free_rocq_type_to_mexp concl) (m_theorem_check_fuel m_fuel)) (MRet (m_Some m_bool m_true)) (MRet (m_Some m_bool m_false)) MOutOfFuel
     | TheoremSchedule (DNot concl, false) -> match_optbool (m_negb_opt @@ product_free_rocq_type_to_mexp concl) (MRet (m_Some m_bool m_true)) (MRet (m_Some m_bool m_false)) MOutOfFuel
     | TheoremSchedule (concl, true) -> match_optbool (m_decOpt (product_free_rocq_type_to_mexp concl) m_fuel) (MRet (m_Some m_bool m_true)) (MRet (m_Some m_bool m_false)) MOutOfFuel
     | TheoremSchedule (concl, false) -> match_optbool (product_free_rocq_type_to_mexp concl) (MRet (m_Some m_bool m_true)) (MRet (m_Some m_bool m_false)) MOutOfFuel
