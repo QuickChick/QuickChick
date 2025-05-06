@@ -1454,11 +1454,12 @@ let nonrecursive_type step =
 let insert_mutrec_call name ois step opt =
   update_source step (nonrec_to_mutrec_call name ois (nonrecursive_type step) opt)
 
-let rocq_constr_negb_opt (rocq_constr : rocq_constr) : rocq_constr =
-  DApp (DTyVar (var_of_string "QuickChick.Decidability.negbOpt"), [rocq_constr])
-
 let insert_mutrec_calls ((schedule,matches) : schedule * (var * pat) list) : schedule * (var * pat) list =
   let (schedule_steps_deps,schd_sort_dep) = schedule_with_dependents schedule in
+  let zero = DCtr (constructor_of_string "Coq.Init.Datatypes.O", []) in
+  let succ n = DCtr (constructor_of_string "Coq.Init.Datatypes.S", [n]) in 
+  let three = succ (succ (succ zero)) in
+  let mul n m = DCtr (constructor_of_string "Coq.Init.Nat.mul", [n; m]) in (*TODO: Add Constants to the language so I don't have to apply functions as if they are constructors.*)
   let updated_steps = List.map (fun (step,depopt) -> 
                                     (match (depopt >>= fun dep -> lookup_and_remove_inductive_schedule dep false) with
                                     | None -> step
@@ -1475,12 +1476,12 @@ let insert_mutrec_calls ((schedule,matches) : schedule * (var * pat) list) : sch
       (match t with
       | DTyCtr (_, args) -> 
         let input_args = filter_mapi (fun i arg -> if List.mem i ois then None else Some arg) args in
-        let fuel_arg = DTyVar (var_of_string "size") in
+        let fuel_arg = mul three (DTyVar (var_of_string "size")) in
         let new_conclusion = DApp (DTyVar (var_of_string schd_name), fuel_arg :: input_args) in
         TheoremSchedule (new_conclusion, false)
       | DNot (DTyCtr (_, args)) ->
         let input_args = filter_mapi (fun i arg -> if List.mem i ois then None else Some arg) args in
-        let fuel_arg = DTyVar (var_of_string "size") in
+        let fuel_arg = mul three (DTyVar (var_of_string "size")) in
         let new_conclusion = DNot (DApp (DTyVar (var_of_string schd_name), fuel_arg :: input_args)) in
         TheoremSchedule (new_conclusion, false)
       | _ -> failwith "insert_mutrec_calls: TheoremSchedule must have DTyCtr at toplevel"))

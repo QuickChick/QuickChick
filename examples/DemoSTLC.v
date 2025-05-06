@@ -87,6 +87,7 @@ Inductive bind_typ : env -> nat -> typ -> Prop :=
 | bind_later : forall env v t v' t', v <> v' -> bind_typ env v t -> bind_typ (econs v' t' env) v t 
 .
 
+
 Inductive typing : env -> term -> typ -> Prop :=
 | typ_var : forall x ty g, bind_typ g x ty ->
                          typing g (Var x) ty
@@ -104,18 +105,22 @@ Instance DeqEq_term : Dec_Eq term. dec_eq. Defined.
 
 Derive Show for typ.
 Derive Show for term.
-Derive Show for env.
+Derive Show for env. Check prod.
 
-Theorem preservation : forall g e ty e', typing g e ty -> bigstep e e' -> typing g e' ty.
+Derive GenSized for prod.
+
+Inductive blah  (A : Type) : list A -> Prop :=
+  | blah_1 : forall l a, blah A (a :: l).
+
+(*Derive Inductive Schedule blah 1 derive "Gen" opt "true".*)
+
+
+Theorem preservation : forall e ty e', typing enil e ty -> bigstep e e' -> typing enil e' ty.
 Proof.
 QuickChickDebug Debug On.  
 schedules.
-valid_schedules.
+valid_schedules. 
 quickchick.
-
-
-
-
-
-(*
-Derive Inductive Schedule typing 1 2 derive "Gen" opt "true". Derive Density typing 1 2 derive "Gen". Derive Valid Schedules bind_typ 1 consnum 0 derive "Gen". Locate sized. Check @quickCheck.*)
+(*QuickChick (theorem 5).
+QuickChick (sized theorem).*)
+Abort.
