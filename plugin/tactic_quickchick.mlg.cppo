@@ -1371,7 +1371,7 @@ and inductive_best_valid_schedule (rel : rocq_relation) (output_idxs : int list)
   let all_has_partial = List.for_all (fun (p,cs) -> List.exists (fun c -> List.assoc c densities = Partial) cs) filter_empty_constructors in
   let result = if any_uncovered then Checking else if all_has_partial then Partial else Backtracking in *)
   let filter_uncovered_patterns = List.filter (fun (p, cs) -> match cs with | [] -> false | _ -> true) covered_patterns in
-  let best_density_in_patterns = List.map (fun (p, cs) -> worst_density (List.map (fun c -> List.assoc c densities) cs)) filter_uncovered_patterns in
+  let best_density_in_patterns = List.map (fun (p, cs) -> best_density (List.map (fun c -> List.assoc c densities) cs)) filter_uncovered_patterns in
   let overall_density = worst_density best_density_in_patterns in
 
   (Error.msg_debug (str "Rule pattern coverage tree:" ++ fnl ());
