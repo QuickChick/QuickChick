@@ -1015,15 +1015,15 @@ let num_source_variables (s : source) : int =
 let density_score density ds =
   let how_sparse = 
   match density with
-  | Checking -> 0
-  | Backtracking -> 1
-  | Neutral -> 2
-  | Partial -> 3
-  | Total -> 4
+  | Checking -> 1
+  | Backtracking -> 2
+  | Neutral -> 3
+  | Partial -> 4
+  | Total -> 5
   in
   match ds with
   | D_Gen | D_Thm -> how_sparse
-  | D_Check | D_Enum -> 4 - how_sparse
+  | D_Check | D_Enum -> 5 - how_sparse
 
 let num_source_bound_vars env (s : source) ds : int =
   let variables =
@@ -1034,7 +1034,7 @@ let num_source_bound_vars env (s : source) ds : int =
     | SrcDef (_, args) -> List.concat_map variables_in_hypothesis args in
   List.fold_right (fun v acc ->
     match List.assoc_opt v env with
-    | Some density -> density_score density ds + acc
+    | Some density -> (*density_score density ds*) 1 + acc
     | None -> acc) variables 0
 
 (* let num_source_bound_vars env (s : source) : int =
@@ -1239,8 +1239,8 @@ let rec schedule_density neutral_prelude_steps schedule : schedule_with_density 
 
 and constructor_valid_schedules (ind_name : ty_ctr) (ctr : rocq_ctr) (result_vars : (var * rocq_constr) list) (output_vars : var list) (ds : derive_sort) (opt : bool) : (int * schedule_with_density) list =
   let (ctr_name, typ) = ctr in
-  Feedback.msg_debug (str "Constructor name: " ++ str (constructor_to_string ctr_name) ++ fnl ());
-  Feedback.msg_debug (str "Constructor type: " ++ str (rocq_constr_to_string typ) ++ fnl ());
+  Error.msg_debug (str "Constructor name: " ++ str (constructor_to_string ctr_name) ++ fnl ());
+  Error.msg_debug (str "Constructor type: " ++ str (rocq_constr_to_string typ) ++ fnl ());
   let typ = if opt then typ else arrows_to_products typ in
   let schedule_matches = NewUnifyQC.type_to_schedules typ (Some ind_name) (Some ctr_name) result_vars output_vars ds opt in
   let schedules = List.mapi (fun i ((steps, sort), ms, eqs) -> i, (List.map (fun (v,p) -> S_Match (v,p)) ms), ((List.map check_eq eqs @ steps), sort)) schedule_matches in
@@ -1788,7 +1788,7 @@ let valid_schedules =
 
         List.iter (fun ((steps_ds, sort), density, num_var_uses, id) ->
           Feedback.msg_notice (str (string_of_int id ^ ":\n" ) ++ fnl ());
-          Feedback.msg_notice (str ("# var uses: " ^ string_of_int num_var_uses ^ "density:" ^ density_to_string density ^ "\n") ++
+          Feedback.msg_notice (str ("# var uses: " ^ string_of_int num_var_uses ^ "; density:" ^ density_to_string density ^ "\n") ++
                               str (schedule_with_densities_to_string (steps_ds, sort) ^ "\n") ++                                           
                               str "\nconstrexpr: \n" ++ 
                               NewUnifyQC.match_schedule_as_pp_constr_expr (List.map fst steps_ds, sort) [] [] D_Thm
@@ -1989,7 +1989,7 @@ let quickchick_it =
 
             (* let (names, constrs) = List.split pieces in ignore (mut_define names constrs e' evd')) schedules_pieces; *)
 
-        Feedback.msg_notice (int (List.length schedules_pieces) ++ str " Pieces defined" ++ fnl ());
+        (*Feedback.msg_notice (int (List.length schedules_pieces) ++ str " Pieces defined containing a total of " *)
 
 
         defined_set := VarSet.empty;  
@@ -2000,7 +2000,6 @@ let quickchick_it =
 
         (* let constr_expr = inductive_schedule_to_constr_expr inductive_schedule ds opt in *)
         (* Feedback.msg_notice (str "Inductive Schedule ConstrExpr:\n" ++ str (NewGenericLib.constr_expr_to_string schedules_constr) ++ fnl ()); *)
-        Feedback.msg_notice (str "We shouldn't have a constant");
         (* ignore (define schedules_constr e evd); *)
 
         
