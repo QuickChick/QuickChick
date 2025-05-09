@@ -456,12 +456,15 @@ let constr_to_rocq_constr  (c : Constr.constr) : rocq_constr option =
   None
 
 let oib_to_rocq_relation (oib : Declarations.one_inductive_body) : rocq_relation option =
+    let dtype = DTyCtr (ty_ctr_of_string "Type", []) in
     let ty_ctr = oib.Declarations.mind_typename in 
     dep_parse_type_params oib.Declarations.mind_arity_ctxt >>= fun ty_params ->
     List.iter (fun tp -> msg_debug (str (ty_param_to_string tp) ++ fnl ())) ty_params;
     dep_parse_constructors (List.length ty_params) ty_params oib >>= fun ctr_reps ->
+    let ctr_reps' = List.map (fun (ctr_name, ty) -> 
+      ctr_name, dep_arrowify ty (List.map (fun n -> Names.Name n) ty_params) (List.init (List.length ty_params) (fun _ -> dtype))) ctr_reps in
     dep_parse_type (List.length ty_params) ty_params oib.Declarations.mind_arity_ctxt oib >>= fun result_ty -> 
-    Some (Libnames.qualid_of_ident ty_ctr, ty_params, ctr_reps, result_ty)
+    Some (Libnames.qualid_of_ident ty_ctr, ty_params, ctr_reps', result_ty)
     
 let qualid_to_rocq_relations (r : Libnames.qualid) : (int * rocq_relation list) option =
   (* Locate all returns _all_ definitions with this suffix *)
@@ -659,6 +662,8 @@ type mexp =
   | MFun of (pat * mexp option) list * mexp 
   | MFix of var * (var * mexp) list * mexp * derive_sort
   | MMutFix of (var * (var * mexp) list * mexp * derive_sort) list * var 
+  | MArrow of mexp * mexp
+  | MProd of (var * mexp) list * mexp
   
 let m_arbitrary ty = MApp (MConst "QuickChick.Classes.arbitrary", [ty; MHole])
 
@@ -809,6 +814,8 @@ let c_app ?explicit:(expl=true) c cs : constr_expr =
     | _ -> failwith "invalid argument to gApp"
     in CAst.map f c
   else mkAppC (c, cs)
+
+let c_Type = CAst.make @@ Constrexpr.CSort expr_Set_sort
 
 let c_pair x y = c_app (cInject "Coq.Init.Datatypes.pair") [c_hole; c_hole; x; y]
 
@@ -985,6 +992,7 @@ let rec mexp_to_constr_expr (me : mexp) (ds : derive_sort) : constr_expr =
   | MId v -> c_var v
   | MApp (m, ms) -> c_app (mexp_to_constr_expr m ds) (List.map (fun m -> mexp_to_constr_expr m ds) ms)
   | MCtr (c, ms) -> c_app (c_constructor c) (List.map (fun m -> mexp_to_constr_expr m ds) ms)
+  | MTyCtr (c, []) when c = ty_ctr_of_string "Type" -> c_Type 
   | MTyCtr (c, ms) -> c_app (c_ty_ctr c) (List.map (fun m -> mexp_to_constr_expr m ds) ms)
   | MConst s -> cInject s
   | MEscape e -> e
@@ -1215,16 +1223,17 @@ type var_set = VS.t
 (* Maps input variables to patterns *)
 type pat_map = pat VM.t
 
-type inductive_schedule = string * (var * mexp) list * (schedule * (var * pat) list) list * (schedule * (var * pat) list) list 
-  (*Name string, fixed input variable/type list, list of base schedules, and a list non base schedules paired with how they match on those variables*)
+type inductive_schedule = string * (var * mexp) list * (var * mexp list) list * (schedule * (var * pat) list) list * (schedule * (var * pat) list) list 
+  (*Name string, fixed input variable/type list, type variable/required typeclasses, list of base schedules, and a list non base schedules paired with how they match on those variables*)
 
 type mutual_inductive_chain = inductive_schedule list list
 
 type inductive_schedule_with_dependencies = inductive_schedule list * string
 
 let inductive_schedule_to_string (is : inductive_schedule) : string =
-  let (name, inputs, base_scheds, rec_scheds) = is in
+  let (name, inputs, param_deps, base_scheds, rec_scheds) = is in
   let inputs_str = String.concat ", " (List.map (fun (v, ty) -> var_to_string v ^ " : " ^ mexp_to_string ty) inputs) in
+  let param_deps_str = String.concat ", " (List.map (fun (v, ty) -> var_to_string v ^ " : " ^ String.concat ", " (List.map mexp_to_string ty)) param_deps) in
   let base_scheds_str = String.concat " \n|\n\n " (List.map (fun (s, inp_pats) -> schedule_to_string s) base_scheds) in
   let rec_scheds_str = String.concat " \n|\n\n " (List.map (fun (s, inp_pats) -> schedule_to_string s) rec_scheds) in
   Printf.sprintf "Inductive %s (%s) :=\n  Base:\n %s\n  Rec: %s" name inputs_str base_scheds_str rec_scheds_str
@@ -1241,13 +1250,15 @@ let filter_mapi (f : int -> 'a -> 'b option) (l : 'a list) : 'b list =
 
 let schedule_step_dependence (s : schedule_step) : (rocq_constr * int list * derive_sort * bool) option =
   match s with
-  | S_UC (v, SrcNonrec (DTyParam param), ps) -> None (* We wanna handle parameters separately *) 
+  | S_UC (v, SrcNonrec (DTyParam param), ps) -> None (*Parameters handled elsewhere*)
   | S_UC (v, SrcNonrec t, ps) -> Some (t, [], (match ps with PS_E -> D_Enum | PS_G -> D_Gen), false)
   | S_ST (vs, SrcNonrec (DTyCtr (ind, args)), ps) -> 
     let output_vars = List.map fst vs in
     let arg_vars = List.map (fun arg -> variables_in_hypothesis arg) args in 
     let output_idxs = filter_mapi (fun i arg_vars -> if List.exists (fun v -> List.mem v arg_vars) output_vars then Some i else None) arg_vars in
     Some (DTyCtr (ind, args), output_idxs, (match ps with PS_E -> D_Enum | PS_G -> D_Gen), true)
+  | S_Check (SrcNonrec (DTyCtr (c, [DTyParam _;_;_])), pol) when c = constructor_of_string "Coq.Init.Datatypes.eq" -> 
+    None (*Parameters handled elsewhere*)
   | S_Check (SrcNonrec t, pol) -> Some (t, [], D_Check, true)
   | S_Match _ | S_UC _ 
   | S_ST    _ | S_Check _ 
@@ -1270,12 +1281,14 @@ let schedule_with_dependents (s : schedule) : (schedule_step * (rocq_constr * in
 
   step_depends, final_depends
 
+(* let parameter_dependents_from_ind_sched =  *)
+
 let inductive_schedule_dependents (is : inductive_schedule) : (rocq_constr * int list * derive_sort * bool) list =
-  let (_, _, base_scheds, rec_scheds) = is in
+  let (_, _, param_deps, base_scheds, rec_scheds) = is in
   List.concat (List.map (fun (schd,_) -> schedule_dependents schd) (base_scheds @ rec_scheds))
 
 let inductive_schedule_with_dependents (is : inductive_schedule) =
-  let (name, vars, base_scheds, rec_scheds) = is in
+  let (name, vars, param_deps, base_scheds, rec_scheds) = is in
   let match_schd_deps = List.map (fun (schd,matches) -> schedule_with_dependents schd, matches) in
   name, vars, match_schd_deps base_scheds, match_schd_deps rec_scheds
 
@@ -1293,7 +1306,7 @@ let backtrack_decoration (ds : derive_sort) (rec_or_base : rec_or_base) (m : mex
   | D_Thm -> failwith ("Backtrack not supported for theorems: " ^ mexp_to_string m)
 
 let inductive_schedule_to_mexp (is : inductive_schedule) (ds : derive_sort) (is_constrained : bool) : mexp =
-  let (name, inputs, base_scheds, rec_scheds) = is in
+  let (name, inputs, param_deps, base_scheds, rec_scheds) = is in
   Feedback.msg_notice (str ("Compiling inductive schedule: " ^ name) ++ fnl());
   if ds = D_Thm && name = "theorem" then begin
     let thm_mexp = 
@@ -1307,7 +1320,9 @@ let inductive_schedule_to_mexp (is : inductive_schedule) (ds : derive_sort) (is_
   let nat_ty = MConst "Coq.Init.Datatypes.nat" in
   let prelude base_k all_k rec_scheds = 
     match rec_scheds with
-    | [] -> MFun ([PVar (var_of_string "size'"), Some (MConst "Coq.Init.Datatypes.nat"); PVar (var_of_string "init_size"), Some (MConst "Coq.Init.Datatypes.nat")] @ List.map (fun (i,ty) -> PVar i, None) inputs,base_k)
+    | [] -> MFun ([PVar (var_of_string "size'"), Some (MConst "Coq.Init.Datatypes.nat"); PVar (var_of_string "init_size"), Some (MConst "Coq.Init.Datatypes.nat")] 
+                    @ List.map (fun (i,ty) -> PVar i, Some ty) inputs,
+                  base_k)
     | _ -> 
       MFix (var_of_string "rec", (var_of_string "init_size", nat_ty) :: (var_of_string "size", nat_ty) :: inputs, 
         MMatch (MId (var_of_string "size"), 
@@ -1358,7 +1373,7 @@ let inductive_schedule_with_dependencies_to_mexp unconstrained_inds (ind_schds :
             (PCtr (constructor_of_string "Coq.Init.Datatypes.S", [PVar (var_of_string "sizem")]), 
               all_k);
           ]) in
-  let dependency_mexp ((ind_schd_name,inputs,base_scheds,_) as is, ds, is_constrained) = 
+  let dependency_mexp ((ind_schd_name,inputs,param_deps,base_scheds,_) as is, ds, is_constrained) = 
     Feedback.msg_notice (str ("Compiling inductive schedule: " ^ ind_schd_name) ++ str " " ++ str (derive_sort_to_string ds) ++ str " " ++ str (if is_constrained then "constrained" else "unconstrained") ++ fnl());
     let first = 
       match base_scheds with
@@ -1396,7 +1411,7 @@ let inductive_schedule_with_dependencies_to_mexp unconstrained_inds (ind_schds :
     (var_of_string ind_schd_name, List.map (fun v -> (var_of_string v), (MConst "Coq.Init.Datatypes.nat")) ["sizem";"init_size";"size'"], prelude (MFun (List.map (fun (x,t) -> PVar x, Some t) inputs, out_of_fuel)) mexp, ds)
   in
 
-  let unconstrained_ind_mexp k = List.fold_left (fun acc ((ind_schd_name,_,_,_) as is, ds, is_constrained) -> 
+  let unconstrained_ind_mexp k = List.fold_left (fun acc ((ind_schd_name,_,_,_,_) as is, ds, is_constrained) -> 
     let mexp = inductive_schedule_to_mexp is ds is_constrained in
     MLet (var_of_string ind_schd_name, mexp, acc)) k unconstrained_inds in
 
@@ -1409,7 +1424,7 @@ let inductive_schedule_with_dependencies_to_mexp unconstrained_inds (ind_schds :
 let turn_def_calls_into_mutrec_calls (ind_schd : inductive_schedule) names : inductive_schedule =
   Feedback.msg_notice (str "Turning def calls into mutrec calls with names: " ++ str (String.concat ", " names) ++ fnl());
   Feedback.msg_notice (str "Inductive schedule: " ++ str (inductive_schedule_to_string ind_schd) ++ fnl());
-  let (name, inputs, base_scheds, rec_scheds) = ind_schd in
+  let (name, inputs, param_deps, base_scheds, rec_scheds) = ind_schd in
 
   let update_source (src : source) : source =
     match src with
@@ -1442,7 +1457,7 @@ let turn_def_calls_into_mutrec_calls (ind_schd : inductive_schedule) names : ind
     | a -> false) steps) (new_scheds base_scheds)
   in
 
-  name, inputs, new_base_scheds, new_rec_scheds @ new_mutrec_scheds
+  name, inputs, [], new_base_scheds, new_rec_scheds @ new_mutrec_scheds
 
 
 (* let inductive_schedules_to_mexp (components : (inductive_schedule * derive_sort * is_constrained) list list) (output_ind_schd_name : string) : mexp =
@@ -1470,11 +1485,11 @@ let inductive_schedules_to_def_mexps (components : (inductive_schedule * derive_
     msg_debug (int (List.length comp) ++ fnl());
     match comp with
     | [(is, ds, is_constrained)] -> 
-      let name = match is with (n,_,_,_) -> n in
+      let name = match is with (n,_,_,_,_) -> n in
       let body = inductive_schedule_to_mexp is ds is_constrained in
       [var_of_string name, body, ds]
     | _ -> 
-      let names = List.map (fun (is,_,_) -> match is with (n,_,_,_) -> n) comp in
+      let names = List.map (fun (is,_,_) -> match is with (n,_,_,_,_) -> n) comp in
       let comp = List.map (fun (is, ds, is_constrained) -> turn_def_calls_into_mutrec_calls is names, ds, is_constrained) comp in
       let mut_body = inductive_schedule_with_dependencies_to_mexp [] comp "placeholder" in 
       (* let bodies = match mut_body with MMutFix (funs, _) -> funs | _ -> failwith "Expected a MMutFix" in *)
@@ -2440,7 +2455,7 @@ module ScheduleExamples = struct
     ], ProducerSchedule (false, PS_G, DCtr (ctr "Abs", [DTyVar (var "ty"); DTyVar (var "e")]))
 
   let gen_term_inductive_schedule : inductive_schedule = 
-    "term" , [] , [gen_const_schedule, []; gen_id_schedule, []] , [gen_app_schedule, []; gen_abs_schedule, []]
+    "term" , [] , [], [gen_const_schedule, []; gen_id_schedule, []] , [gen_app_schedule, []; gen_abs_schedule, []]
   
 
   
@@ -2510,7 +2525,7 @@ module ScheduleExamples = struct
                         (var "tau", PVar (var "t2"))]
                       )
                       ] in
-    ("typing_iii", inputs, base_scheds, rec_scheds)
+    ("typing_iii", inputs, [], base_scheds, rec_scheds)
 
 
 (* 
@@ -2581,7 +2596,7 @@ module ScheduleExamples = struct
       S_ST ([(var "x", DTyCtr (ty_ctr "nat", [])); (var "tau", DTyCtr (ty_ctr "type", []))], SrcRec ((var "rec"), [_env]), PS_G)
     ], ProducerSchedule (true, PS_G, (DTyCtr (ty_ctr "pair", [DHole; DHole; DTyCtr (ty_ctr "S", [DTyVar (var "x")]); DTyVar (var "tau")])))
 
-  let ind_schd_bind_gen_ioo =
+  let ind_schd_bind_gen_ioo : inductive_schedule =
     let list_ty = MTyCtr (ty_ctr "list", [MTyCtr (ty_ctr "type", [])]) in
     let inputs = [var "env",list_ty] in
 
@@ -2595,7 +2610,7 @@ module ScheduleExamples = struct
         [(var "env", PCtr (ctr "cons", [PWild; PVar (var "tau'"); PVar (var "env")]))]
     ] in
 
-    ("bind_ioo",inputs, base_scheds, rec_scheds)
+    ("bind_ioo",inputs, [], base_scheds, rec_scheds)
   end 
 (* let rec schedule_to_mexp (steps, concl, m_sort) : mexp = *)
 

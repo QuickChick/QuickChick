@@ -316,6 +316,7 @@ let rec extract_inductives_rocq_constr (dt : rocq_constr) : Names.inductive list
 
 let rec extract_names_rocq_constr (dt : rocq_constr) : ty_ctr list =
   match dt with
+  | DProd ((_, DTyCtr (c, _)), ty2) when c = ty_ctr_of_string "Type" -> extract_names_rocq_constr ty2
   | DProd ((_, DTyCtr (c,_)), ty2) -> 
     if is_inductive' c then
       c :: extract_names_rocq_constr ty2
@@ -1238,6 +1239,8 @@ let rec schedule_density neutral_prelude_steps schedule : schedule_with_density 
 
 and constructor_valid_schedules (ind_name : ty_ctr) (ctr : rocq_ctr) (result_vars : (var * rocq_constr) list) (output_vars : var list) (ds : derive_sort) (opt : bool) : (int * schedule_with_density) list =
   let (ctr_name, typ) = ctr in
+  Feedback.msg_debug (str "Constructor name: " ++ str (constructor_to_string ctr_name) ++ fnl ());
+  Feedback.msg_debug (str "Constructor type: " ++ str (rocq_constr_to_string typ) ++ fnl ());
   let typ = if opt then typ else arrows_to_products typ in
   let schedule_matches = NewUnifyQC.type_to_schedules typ (Some ind_name) (Some ctr_name) result_vars output_vars ds opt in
   let schedules = List.mapi (fun i ((steps, sort), ms, eqs) -> i, (List.map (fun (v,p) -> S_Match (v,p)) ms), ((List.map check_eq eqs @ steps), sort)) schedule_matches in
@@ -1275,7 +1278,9 @@ and inductive_best_valid_schedule (rel : rocq_relation) (output_idxs : int list)
     (v,t1) :: get_result_vars t2
   | _ -> [] in
 
-  let result_vars = List.map (fun p -> (p, DHole)) params @ get_result_vars result_typ in
+  let dtype = (DTyCtr (ty_ctr_of_string "Type", [])) in
+
+  let result_vars = List.map (fun p -> (p, dtype)) params @ get_result_vars result_typ in
 
   let rec remake_result vars result = 
   match vars, result with
@@ -1302,7 +1307,7 @@ and inductive_best_valid_schedule (rel : rocq_relation) (output_idxs : int list)
     | D_Check | D_Enum -> Checking
     | D_Gen | D_Thm -> if opt then Partial else Total in
 
-  density_inductive_memo := RelationInstMap.add (ind_name, output_idxs, ds) ((schedule_name,[],[],[]), init_density) !density_inductive_memo;
+  density_inductive_memo := RelationInstMap.add (ind_name, output_idxs, ds) ((schedule_name,[],[],[],[]), init_density) !density_inductive_memo;
 
   let constructor_schedules_with_density = List.filter_map (fun ctr -> 
     match constructor_best_valid_schedule ind_name ctr result_vars output_vars ds opt with
@@ -1320,7 +1325,7 @@ and inductive_best_valid_schedule (rel : rocq_relation) (output_idxs : int list)
   let result_vars_mexps = filter_mapi (fun i (v,t) -> if List.mem i output_idxs then None else Some (v, NewGenericLib.product_free_rocq_type_to_mexp t)) result_vars in 
 
   let inductive_schedule : inductive_schedule =
-    (schedule_name, result_vars_mexps, List.map (fun c -> (c, [])) recursive, List.map (fun c -> (c, [])) nonrecursive) 
+    (schedule_name, result_vars_mexps, [], List.map (fun c -> (c, [])) recursive, List.map (fun c -> (c, [])) nonrecursive) 
   in
 
   let fold_left1 f acc l =
@@ -1463,7 +1468,10 @@ let insert_mutrec_calls ((schedule,matches) : schedule * (var * pat) list) : sch
   let updated_steps = List.map (fun (step,depopt) -> 
                                     (match (depopt >>= fun dep -> lookup_and_remove_inductive_schedule dep false) with
                                     | None -> step
-                                    | Some ((ind_schd_name,_,_,_),ds,opt) -> 
+                                    | Some ((ind_schd_name,_,_,_,_),ds,opt) -> (*TODO: use the info from this inductive schedule to determine whether any 
+                                                                               arguments of Dec_Eq or Show or Gen are needed*)
+                                                                             (* Likely adding this explicitly to the definition of an inductive schedule
+                                                                                for ease of access.*)
                                       let Some (_,ois,_,_) = depopt in insert_mutrec_call ind_schd_name ois step opt)) 
                         schedule_steps_deps in 
           
@@ -1472,7 +1480,7 @@ let insert_mutrec_calls ((schedule,matches) : schedule * (var * pat) list) : sch
       Error.msg_debug (str ("Inserting mutrec calls for theorem: " ^ rocq_constr_to_string ctr) ++ fnl ()); 
       (match lookup_and_remove_inductive_schedule (ctr, ois, ds, opt) false with
       | None -> TheoremSchedule (t,true)
-      | Some ((schd_name,_,_,_), _, _) ->
+      | Some ((schd_name,_,_,_,_), _, _) ->
       (match t with
       | DTyCtr (_, args) -> 
         let input_args = filter_mapi (fun i arg -> if List.mem i ois then None else Some arg) args in
@@ -1490,23 +1498,23 @@ let insert_mutrec_calls ((schedule,matches) : schedule * (var * pat) list) : sch
   (updated_steps, updated_sort), matches
 
 let insert_mutrec_calls_inductive_schedule (is : inductive_schedule) : inductive_schedule =
-  let (name, result_vars, nonrecursive_hyps, recursive_hyps) = is in
+  let (name, result_vars, param_deps, nonrecursive_hyps, recursive_hyps) = is in
   Error.msg_debug (str ("Inserting mutrec calls for inductive schedule: " ^ name) ++ fnl ());
   let updated_nonrecursive_hyps = List.map insert_mutrec_calls nonrecursive_hyps in
   let updated_recursive_hyps = List.map insert_mutrec_calls recursive_hyps in
-  (name, result_vars, updated_nonrecursive_hyps, updated_recursive_hyps)
+  (name, result_vars, [], updated_nonrecursive_hyps, updated_recursive_hyps)
 
 module InductiveSchedSet = Set.Make(struct type t = inductive_schedule * derive_sort * bool let compare = compare end)
 
 module InductiveSchedMap = Map.Make(struct type t = inductive_schedule * derive_sort * bool 
-  let compare ((ind_name, _,_,_), ds1, opt1) ((ind_name, _,_,_), ds2, opt2) =
+  let compare ((ind_name,_,_,_,_), ds1, opt1) ((ind_name,_,_,_,_), ds2, opt2) =
     match compare ind_name ind_name with
     | 0 -> (match compare ds1 ds2 with
             | 0 -> compare opt1 opt2
             | r -> r)
     | r -> r end)
 
-let dec_eq_sched_phony = ("DecOpt_eq_III", [], [(([],CheckerSchedule),[])], [(([],CheckerSchedule),[])])
+let dec_eq_sched_phony = ("DecOpt_eq_III", [], [], [(([],CheckerSchedule),[])], [(([],CheckerSchedule),[])])
    
 let init_density_inductive_memo = RelationInstMap.add (ty_ctr_of_string "Coq.Init.Logic.eq", [], D_Check) (dec_eq_sched_phony, Checking) RelationInstMap.empty
 
@@ -1717,7 +1725,7 @@ let tarjan_schedules_by_name (schedules : string list) inductive_dependency_map
 
 
     (* Process each dependent of v *)
-    Error.msg_debug (str ("Processing " ^ (let ((vn,_,_,_),_,_) = v in vn) ^ " with dependents: " ^ String.concat ", " dependent_names) ++ fnl ());
+    Error.msg_debug (str ("Processing " ^ (let ((vn,_,_,_,_),_,_) = v in vn) ^ " with dependents: " ^ String.concat ", " dependent_names) ++ fnl ());
     List.iter (fun w_name ->
       if not (StringMap.mem w_name !vertex_indices) then (
         strong_connect w_name;
@@ -1738,7 +1746,7 @@ let tarjan_schedules_by_name (schedules : string list) inductive_dependency_map
         match !stack with
         | [] -> failwith "strong_connect: stack should not be empty"
         | w :: rest ->
-            let w_name = let ((name,_,_,_),_,_) = w in name in
+            let w_name = let ((name,_,_,_,_),_,_) = w in name in
             Error.msg_debug (str ("Popping " ^ w_name) ++ fnl ());
             stack := rest;
             (* Feedback.msg_notice (str ("Popping " ^ w_name) ++ fnl ()); *)
@@ -1749,7 +1757,7 @@ let tarjan_schedules_by_name (schedules : string list) inductive_dependency_map
             else pop_until acc'
       in
       let component = pop_until [] in
-      Error.msg_debug (str ("Adding component: " ^ String.concat ", " (List.map (fun ((name,_,_,_),_,_) -> name) component)) ++ fnl ());
+      Error.msg_debug (str ("Adding component: " ^ String.concat ", " (List.map (fun ((name,_,_,_,_),_,_) -> name) component)) ++ fnl ());
       components := component :: !components
     )
     end
@@ -1918,7 +1926,7 @@ let quickchick_it =
         Feedback.msg_notice (str "Theorem Schedule:\n" ++ str (schedule_to_string theorem_schedule) ++ fnl ());
 
         (* Register theorem as a phony inductive schedule *)
-        let phony_theorem_ind_schd = ("theorem", [], [theorem_schedule,[]],[]) in
+        let phony_theorem_ind_schd = ("theorem", [], [],[theorem_schedule,[]],[]) in
         density_inductive_memo := RelationInstMap.add (ty_ctr_of_string "theorem", [], D_Thm) (phony_theorem_ind_schd, Checking) !density_inductive_memo;
 
         density_inductive_memo := RelationInstMap.remove (ty_ctr_of_string "eq", [], D_Check) !density_inductive_memo;
@@ -2084,7 +2092,9 @@ VERNAC COMMAND EXTEND DeriveSchedules CLASSIFIED AS SIDEFF
         (v,t1) :: get_result_vars t2
       | _ -> [] in
 
-      let result_vars = List.map (fun p -> (p, DHole)) params @ get_result_vars result_typ in
+      let dtype = DTyCtr (ty_ctr_of_string "Type", []) in
+
+      let result_vars = List.map (fun p -> (p, dtype)) params @ get_result_vars result_typ in
 
       let rec remake_result vars result = 
         match vars, result with
@@ -2299,7 +2309,7 @@ VERNAC COMMAND EXTEND DeriveInductiveSchedule CLASSIFIED AS SIDEFF
       msg_debug (str "LOOOK HERE Density: " ++ str (density_to_string density) ++ fnl ());
       density_inductive_memo := RelationInstMap.remove (ty_ctr_of_string "eq", [], D_Check) !density_inductive_memo;
 
-      let ind_schd_name = match inductive_schedule with (n,_,_,_) -> n in
+      let ind_schd_name = match inductive_schedule with (n,_,_,_,_) -> n in
       let dependents, inductive_dependency_map = collect_all_used_inductive_schd_names ind_schd_name in
 
       let components = tarjan_schedules_by_name dependents inductive_dependency_map in
