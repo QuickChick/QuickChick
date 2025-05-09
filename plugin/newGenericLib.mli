@@ -158,6 +158,8 @@ type mexp =
   | MFun of (pat * mexp option) list * mexp (*var list is a tuple, if you want multiple args do nested MFuns.*)
   | MFix of var * (var * mexp) list * mexp * derive_sort
   | MMutFix of (var * (var * mexp) list * mexp * derive_sort) list * var
+  | MArrow of mexp * mexp
+  | MProd of (ty_param * mexp) list * mexp
 
 val product_free_rocq_type_to_mexp : rocq_type -> mexp
 
@@ -173,7 +175,7 @@ val c_sized : Constrexpr.constr_expr -> Constrexpr.constr_expr
 
 val c_theorem : Constrexpr.constr_expr
 
-type inductive_schedule = string * (var * mexp) list * (schedule * (var * pat) list) list * (schedule * (var * pat) list) list 
+type inductive_schedule = string * (var * mexp) list * (var * mexp list) list * (schedule * (var * pat) list) list * (schedule * (var * pat) list) list 
 
 val inductive_schedule_to_constr_expr : inductive_schedule -> derive_sort -> bool -> Constrexpr.constr_expr
 

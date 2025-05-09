@@ -1912,6 +1912,7 @@ let type_to_schedules (typ : rocq_constr) (ind_name : ty_ctr option) (ctr_name :
       | None -> false
       | Some r -> is_range_fixed umap r)
     | Ctr (_, args) -> List.for_all (is_range_fixed umap) args
+    | Parameter _ -> true
     | r -> failwith ("Unexpected case in is_range_fixed" ^ range_to_string r) in
 
   let eq_check (u1,u2) : schedule_step =
