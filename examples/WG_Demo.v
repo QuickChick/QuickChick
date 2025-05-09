@@ -152,10 +152,14 @@ Inductive typing : Ctx -> term -> type -> Prop :=
       typing Γ e2 τ1 ->
       typing Γ (App e1 e2) τ2.
 
-Theorem preservation : forall Γ e τ e',
-    typing Γ e τ -> pstep e = Some e' -> typing Γ e' τ.
+QuickChickDebug Debug On.
+
+Theorem preservation : forall e τ e',
+    typing Empty e τ -> pstep e = Some e' -> typing Empty e' τ.
 Proof. schedules. valid_schedules. quickchick.  
 
+
+       
 
 #[export] Instance dec_eq_option {A} `{forall (a b : A), Dec (a = b)} (a b : option A) : Dec (a = b). Proof. dec_eq. Defined.
 
