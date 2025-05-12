@@ -1902,7 +1902,7 @@ let define_all schedule_pieces =
       ignore (define constr name e' evd')) pieces
         ) schedule_pieces
 
-let quickchick_it =
+let quickchick_it size =
   Proofview.Goal.enter_one begin fun gl ->
     let c = Proofview.Goal.concl gl in
     let e = Proofview.Goal.env gl in
@@ -2007,8 +2007,17 @@ let quickchick_it =
         (* msg_debug (str "After constrained generator" ++ fnl ());*)
         let updated_env = Global.env () in
         let updated_evd = Evd.from_env updated_env in
+        let rec int_to_num i = 
+          if i = 0 then c_zero
+          else c_succ (int_to_num (i - 1))
+        in
         msg_debug (str "Running QuickCheck" ++ fnl ());
-        let to_run = fst (Constrintern.interp_constr updated_env updated_evd (c_show (c_quickCheck (c_sized c_theorem)))) in
+        let size_thm =
+          begin match size with
+          | Some s -> c_app c_theorem [int_to_num s]
+          | None -> c_sized c_theorem
+          end  in 
+        let to_run = fst (Constrintern.interp_constr updated_env updated_evd (c_show (c_quickCheck size_thm))) in
         let updated_env' = Global.env () in
         let updated_evd' = Evd.from_env updated_env' in
         #if COQ_VERSION >= (8, 20, 0)
@@ -2029,7 +2038,10 @@ let quickchick_it =
  
 }
 TACTIC EXTEND quickchick
-  | ["quickchick"] -> { quickchick_it }
+  | ["quickchick" int_list(ois)] -> { 
+    match ois with
+    | x :: _ -> quickchick_it (Some x)
+    | [] -> quickchick_it None}
 END
 
 TACTIC EXTEND schedules 
