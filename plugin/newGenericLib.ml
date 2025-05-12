@@ -877,6 +877,12 @@ let c_tt = cInject "Coq.Init.Datatypes.tt"
 
 let c_false = cInject "Coq.Init.Datatypes.false"
 
+let c_succ x = c_app (cInject "Coq.Init.Datatypes.S") [x]
+
+let c_zero =  (cInject "Coq.Init.Datatypes.O")
+
+
+
 let c_ret (ds : derive_sort) (m : constr_expr) : constr_expr =
   match ds with
   | D_Gen -> c_app (cInject "QuickChick.Generators.returnGen") [c_hole; m]

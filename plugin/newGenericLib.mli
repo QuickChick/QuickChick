@@ -167,11 +167,17 @@ val schedule_to_mexp : schedule -> mexp -> mexp -> mexp
 
 val mexp_to_constr_expr : mexp -> derive_sort -> Constrexpr.constr_expr
 
+val c_app : ?explicit:bool -> Constrexpr.constr_expr -> Constrexpr.constr_expr list -> Constrexpr.constr_expr
+
 val c_show : Constrexpr.constr_expr -> Constrexpr.constr_expr
 
 val c_quickCheck : Constrexpr.constr_expr -> Constrexpr.constr_expr
 
 val c_sized : Constrexpr.constr_expr -> Constrexpr.constr_expr
+
+val c_zero : Constrexpr.constr_expr
+
+val c_succ : Constrexpr.constr_expr -> Constrexpr.constr_expr
 
 val c_theorem : Constrexpr.constr_expr
 
