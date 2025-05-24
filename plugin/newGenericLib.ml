@@ -1159,7 +1159,7 @@ let m_false = MConst "Coq.Init.Datatypes.false"
 
 let m_mul x y = MApp (MConst "Coq.Init.Nat.mul", [x; y])
 
-let m_three = MConst "Coq.Init.Nat.S (Coq.Init.Nat.S (Coq.Init.Nat.S Coq.Init.Datatypes.O))"
+let m_three = MApp (MConst "Coq.Init.Nat.S", [MApp (MConst "Coq.Init.Nat.S", [MApp (MConst "Coq.Init.Nat.S", [MConst "Coq.Init.Datatypes.O"])])])
 
 let m_theorem_check_fuel mfuel = 
   m_mul m_three mfuel
