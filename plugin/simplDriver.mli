@@ -2,6 +2,8 @@ type derivable =
     Shrink
   | Show
   | GenSized
+  | Fuzzy
+  | Mutate
   | Sized
   | EnumSized
 val derivable_to_string : derivable -> string

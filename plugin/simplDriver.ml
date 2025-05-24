@@ -17,6 +17,8 @@ type derivable =
     Shrink
   | Show
   | GenSized
+  | Fuzzy
+  | Mutate
   | Sized
   | EnumSized
   (*
@@ -30,6 +32,8 @@ let derivable_to_string = function
   | Shrink -> "Shrink"
   | Show   -> "Show"
   | GenSized -> "GenSized"
+  | Fuzzy -> "Fuzzy"
+  | Mutate -> "Mutate"
   | EnumSized -> "EnumSized"              
   | Sized -> "Sized"
            (*
@@ -86,6 +90,8 @@ let derive (cn : derivable) (c : constr_expr) (name1 : string) (name2 : string) 
     | Shrink -> ["Shrink"]
     | Show -> ["Show"]
     | GenSized -> ["Gen"]
+    | Fuzzy -> ["Gen"; "Fuzzy"]
+    | Mutate -> ["Gen"; "Sized"; "Mutate"]
     | EnumSized -> ["Enum"]                
                 (*
     | CanonicalSized -> ["CanonicalSized"]
@@ -99,6 +105,8 @@ let derive (cn : derivable) (c : constr_expr) (name1 : string) (name2 : string) 
     | Shrink -> []
     | Sized -> []
     | GenSized -> []
+    | Fuzzy -> []
+    | Mutate -> []
     | EnumSized -> []                
                 (*
     | CanonicalSized -> []
@@ -150,6 +158,12 @@ let derive (cn : derivable) (c : constr_expr) (name1 : string) (name2 : string) 
     | GenSized -> arbitrarySized_decl dt
     | EnumSized -> enumSized_decl dt
     | Sized -> sized_decl dt
+    | Fuzzy | Mutate ->
+        let legacy_decl = match cn with Fuzzy -> fuzzy_decl | _ -> mutate_decl in
+        (match dt with
+         | [(ty_ctr, _, ctrs)] ->
+             ((fun _ iargs -> legacy_decl ty_ctr ctrs iargs), [])
+         | _ -> failwith "Fuzzy and Mutate derivation do not support mutually inductive types")
              (*
     | CanonicalSized ->
       let ind_scheme =  gInject ((ty_ctr_to_string ty_ctr) ^ "_ind") in
@@ -167,7 +181,7 @@ let derive (cn : derivable) (c : constr_expr) (name1 : string) (name2 : string) 
               *)
   in
 
-  define_new_fixpoint @@ List.map (fun ((function_name, arguments, arg, return_type, body), instance_arguments) ->
+  if functions_to_mutually_define <> [] then define_new_fixpoint @@ List.map (fun ((function_name, arguments, arg, return_type, body), instance_arguments) ->
     let arguments = instance_arguments @ arguments in
 
     (function_name, arguments, arg, return_type, body))

@@ -7,3 +7,6 @@ val shrink_decl :
 val show_decl :
   (GenericLib.ty_ctr * GenericLib.ty_param list * GenericLib.ctr_rep list) list ->
   (GenericLib.ty_ctr -> GenericLib.var list -> GenericLib.coq_expr) * ((GenericLib.var * GenericLib.arg list * GenericLib.var * GenericLib.coq_expr * GenericLib.coq_expr) list)
+
+val fuzzy_decl : GenericLib.ty_ctr -> GenericLib.ctr_rep list -> GenericLib.var list -> GenericLib.coq_expr
+val mutate_decl : GenericLib.ty_ctr -> GenericLib.ctr_rep list -> GenericLib.var list -> GenericLib.coq_expr

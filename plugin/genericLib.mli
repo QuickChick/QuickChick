@@ -71,6 +71,7 @@ module type Ord_ctr_type = sig
   end
 module Ord_ctr : Ord_ctr_type
 
+val ctr_to_globref : constructor -> GlobRef.t
 val num_of_ctrs : constructor -> int
 val belongs_to_inductive : constructor -> bool
 
@@ -288,6 +289,7 @@ val define_new_fixpoint :
 val list_last : 'a list -> 'a 
 val list_init : 'a list -> 'a list 
 val list_drop_every : int -> 'a list -> 'a list
+val list_keep_every : int -> 'a list -> 'a list  
 val take_last : 'a list -> 'a list -> ('a list * 'a)
 val list_insert_nth : 'a -> 'a list -> int -> 'a list
 
