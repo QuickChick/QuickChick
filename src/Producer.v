@@ -702,6 +702,9 @@ Section ProducerHigh.
   Definition oneOf_ {A : Type} (def: G A) (gs : list (G A)) : G A :=
     bind (choose (0, length gs - 1)) (nth def gs).
 
+  Definition oneOfT_ {A : Type} (def: unit -> G A) (gs : list (unit -> G A)) : G A :=
+    bind (choose (0, length gs - 1)) (fun i => nth def gs i tt).
+  
   Definition elems_ {A : Type} (def : A) (l : list A) :=
     let n := length l in
     bind (choose (0, n - 1)) (fun n' =>
