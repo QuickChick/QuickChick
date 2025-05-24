@@ -38,8 +38,8 @@ Definition shift  (d: Z) (ex: term) : term :=
         match e with 
         | Var n =>
             (*! *)
-            if n <? Z.to_nat c then Var n
-            else Var (Z.to_nat ((Z.of_nat n) + d))
+         (*   if n <? Z.to_nat c then Var n
+            else Var (Z.to_nat ((Z.of_nat n) + d)) *)
             (*!! shift_var_none *)
             (*!
             Var n
@@ -49,11 +49,10 @@ Definition shift  (d: Z) (ex: term) : term :=
             Var (Z.to_nat (Z.of_nat n + d))
             *)
             (*!! shift_var_leq *)
-            (*!
+            (*! *)
             if (Z.leb (Z.of_nat n) c) then Var n
             else Var (Z.to_nat (Z.of_nat n + d)) 
-            *)
-           
+          (*  *)
         | Bool b => 
             Bool b
         | Abs t e =>
@@ -66,9 +65,7 @@ Definition shift  (d: Z) (ex: term) : term :=
         | (App e1 e2) => 
             App (go c e1) (go c e2)
         end in
-    go 0%Z ex
-.
-
+    go 0%Z ex.
 
 Fixpoint subst  (n: nat) (s: term) (e: term) : term :=
     match n, s, e with 
@@ -87,11 +84,9 @@ Fixpoint subst  (n: nat) (s: term) (e: term) : term :=
     | _, _, (Bool b) => Bool b
     | n, s, (Abs t e) =>
         (*! *)
-        Abs t (subst (n + 1) (shift 1 s) e)
+(*        Abs t (subst (n + 1) (shift 1 s) e)  *)
         (*!! subst_abs_no_shift *)
-        (*!
         Abs t (subst (n + 1) s e)
-        *)
         (*!! subst_abs_no_incr *)
         (*!
         Abs t (subst n (shift 1 s) e)
@@ -101,9 +96,9 @@ Fixpoint subst  (n: nat) (s: term) (e: term) : term :=
 
 Definition substTop (s: term) (e: term) : term :=
     (*! *)
-    shift (-1) (subst 0 (shift 1 s) e)
+    shift (-1) (subst 0 (shift 1 s) e) 
     (*!! substTop_no_shift *)
-    (*!
+    (*! 
     subst 0 s e
     *)
     (*!! substTop_no_shift_back *)
@@ -121,12 +116,13 @@ Fixpoint pstep  (e: term) : option term :=
         e1' <- pstep e1;;
         e2' <- pstep e2;;
         Some (substTop e2' e1')
+    | App (Bool _) _ => None             
     | App e1 e2 =>
         e1' <- pstep e1;;
         e2' <- pstep e2;;
         Some (App e1' e2')
     | Var _ => Some e
-    | _ => None
+    | Bool b => Some (Bool b)
     end.
 
 Inductive bind : Ctx -> nat -> type -> Prop :=
@@ -152,26 +148,15 @@ Inductive typing : Ctx -> term -> type -> Prop :=
       typing Γ e2 τ1 ->
       typing Γ (App e1 e2) τ2.
 
-QuickChickDebug Debug On.
+Inductive isSome A : option A -> Prop :=
+| isSomeSome a : isSome A (Some a).
 
-Theorem preservation : forall e τ e',
-    typing Empty e τ -> pstep e = Some e' -> typing Empty e' τ.
-Proof. schedules. valid_schedules. quickchick.  
-
-
-       
-
-#[export] Instance dec_eq_option {A} `{forall (a b : A), Dec (a = b)} (a b : option A) : Dec (a = b). Proof. dec_eq. Defined.
-
-Compute (Some (Var 0) = Some (Var 0) ?? 1).
-
-Definition eq_gen_iio := let funn := (fun (size' : Coq.Init.Datatypes.nat) (init_size : Coq.Init.Datatypes.nat) (A : typee) (v_x357_ : A) =>
-   @QuickChick.Generators.backtrack _
-     (@Coq.Init.Datatypes.cons _
-        (@Coq.Init.Datatypes.pair _ _ Coq.Init.Nat.one
-           (@QuickChick.Generators.thunkGen _ (fun '_ => @QuickChick.Generators.returnGen _ (@Coq.Init.Datatypes.Some _ v_x357_))))
-        (@Coq.Init.Datatypes.nil _))) in
-                         fun size : Coq.Init.Datatypes.nat => @funn size size.
+Theorem checker_backtrack_one : forall p, checker_backtrack [p] = p tt.
+Proof. intros. unfold checker_backtrack. destruct (p tt); auto. destruct b; auto. Qed.
 
   
-  
+Theorem preservation : forall g e τ e',
+    typing g e τ -> pstep e = Some e' ->
+    typing g e' τ.
+Proof. quickchick.
+  schedules. valid_schedules. 
