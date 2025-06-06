@@ -13,6 +13,7 @@ From QuickChick Require Import Show Checker State Classes.
 
 Definition gte n m := Nat.leb m n.
 
+
 Set Implicit Arguments.
 Unset Strict Implicit.
 Unset Printing Implicit Defensive.
@@ -465,13 +466,6 @@ Extract Constant clear_queues => "(fun n -> n land 1023 == 0)".
    Always fuzz a favored one if it exists.
    If not, interleave fuzzing a discard or generating randomly.
 *)
-
-Fixpoint printListNatA {A} (l: list (nat * A)) (pf : A -> string) := 
-    match l with
-    | nil => nl
-    | (n, a) :: rest => show n ++ ", " ++ pf a ++ "; " ++ printListNatA rest pf
-    end.
-
 
 Fixpoint fuzzLoopAux {A} (fuzz_fuel : nat) (st : State)
          (favored : list (nat * A)) (discards : list (nat * A))
