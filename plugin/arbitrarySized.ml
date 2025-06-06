@@ -176,7 +176,7 @@ let fuzzy_decl ty_ctr ctrs iargs =
                  just generate an arbitrary thing *)
               begin match opts with
               | [] -> gInject "arbitrary"
-              | _  -> oneofT (List.map (fun x -> (gFunTyped [("_tt", gUnit)] (fun _ -> x))) opts)
+              | _  -> oneofThunked (List.map (fun x -> (gFunTyped [("_tt", gUnit)] (fun _ -> x))) opts)
               end
          in aux opts_base ty all_vars)
       in
@@ -289,7 +289,7 @@ let mutate_decl ty_ctr (ctrs : ctr_rep list) (iargs : var list) =
             let rcms : (coq_expr * coq_expr) list =
               (* all recombine options under nested freq *)
               (fun x -> [(gInt 1, coq_expr_to_thunk x)]) @@
-              frequencyT @@
+              frequencyThunked @@
               List.map (fun (n_preserved, e) -> (weight_rcm n_preserved, coq_expr_to_thunk e)) @@
               List.map_append
                 (fun (ctr', ctr'_typ) ->
@@ -387,7 +387,7 @@ let mutate_decl ty_ctr (ctrs : ctr_rep list) (iargs : var list) =
             in
             (* TODO: should actually use freq, and so need to choose weights *)
             (* TODO: used thunked version *)
-            frequencyT @@
+            frequencyThunked @@
             regs @ rcms @ recs
         )
       in
