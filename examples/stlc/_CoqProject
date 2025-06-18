@@ -1,0 +1,3 @@
+-R ../../_build/default/src QuickChick
+-R ../../_build/default/examples/stlc QuickChick.stlc
+-w deprecated-since-9.0,deprecated-since-mathcomp-2.3.0

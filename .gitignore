@@ -64,6 +64,6 @@ src/Compat.v
 src/ExtractionQCCompat.v
 src/TacticsUtil.v
 src/QuickChick.v
-_CoqProject
+/_CoqProject
 META
 examples/other/TacticExampleX.v

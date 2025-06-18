@@ -1,6 +1,7 @@
 (coq.theory
  (name QuickChick.stlc)
  (theories QuickChick)
+ (flags :standard -w -deprecated-since-9.0,-deprecated-since-mathcomp-2.3.0)
  (modules
   monad
   lambda
