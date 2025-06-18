@@ -37,6 +37,7 @@
   (coq (>= 8.15~))
   coq-ext-lib
   coq-mathcomp-ssreflect
+  (dune-configurator (< 3.19))
   (coq-simple-io (>= 1.6.0))
   ocamlfind
   ocamlbuild)

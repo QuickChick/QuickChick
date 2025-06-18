@@ -2,7 +2,7 @@ version: 2.1
 
 defaults: &defaults
   environment:
-    OPAMJOBS: 2
+    OPAMJOBS: 4
     OPAMVERBOSE: 1
     OPAMYES: true
     OPAMWITHTEST: true
@@ -14,6 +14,7 @@ defaults: &defaults
       type: string
   docker:
     - image: <<parameters.coq>>
+  resource_class: large
 
 commands:
   startup:
@@ -61,7 +62,7 @@ commands:
              echo $SKIP_BUILD | tr ' ' '\n' | grep ^$PACKAGE$ > /dev/null &&
                echo Skip $PACKAGE && continue
              opam install --deps-only $PACKAGE || DEPS_FAILED=true
-             [ $DEPS_FAILED == true ] || opam install -t $PACKAGE
+             [ $DEPS_FAILED == true ] || opam install -t $PACKAGE -j1
           done
   remove:
     steps:

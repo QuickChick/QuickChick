@@ -1,6 +1,7 @@
 (coq.theory
  (name QuickChick)
  (package coq-quickchick)
+ (flags :standard -w -deprecated-since-9.0)
  (plugins coq-quickchick.plugin))
 
 (rule

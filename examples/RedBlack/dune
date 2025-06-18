@@ -1,6 +1,7 @@
 (coq.theory
   (name QuickChick.RedBlack)
   (theories QuickChick)
+  (flags :standard -w -deprecated-since-9.0)
   (modules
     redblack
     testing

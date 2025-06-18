@@ -5,6 +5,7 @@
 (coq.theory
   (name QuickChick.Tutorials)
   (theories QuickChick)
+  (flags :standard -w -deprecated-since-9.0)
   (modules
     BasicUsage
     Automation
