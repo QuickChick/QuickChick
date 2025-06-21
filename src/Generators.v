@@ -16,7 +16,6 @@ Import ListNotations.
 
 (* Low-level Generators *)
 
-Local Open Scope fun_scope.
 Local Open Scope set_scope.
 
 Inductive GenType (A:Type) : Type := MkGen : (nat -> RandomSeed -> A) -> GenType A.
