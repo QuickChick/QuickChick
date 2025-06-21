@@ -2,7 +2,7 @@ version: 2.1
 
 defaults: &defaults
   environment:
-    OPAMJOBS: 2
+    OPAMJOBS: 1
     OPAMVERBOSE: 1
     OPAMYES: true
     OPAMWITHTEST: true
