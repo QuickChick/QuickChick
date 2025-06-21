@@ -93,12 +93,12 @@ Extract Constant randomRN =>
 Extract Constant newRandomSeed => "(Random.State.make_self_init ())".
 
 Extract Inductive Lazy => "Lazy.t" [lazy].
-Extract Constant force => "Lazy.force".
+Extract Inlined Constant force => "Lazy.force".
 
 (* Extract Constant Test.ltAscii => "(<=)". *)
 (* Extract Constant Test.strEq   => "(=)". *)
-Extract Constant Test.gte => "(>=)".
-Extract Constant le_gt_dec => "(<=)".
+Extract Inlined Constant Test.gte => "(>=)".
+Extract Inlined Constant le_gt_dec => "(<=)".
 Extract Constant trace =>
   "(fun l -> print_string (
    let s = Bytes.create (List.length l) in
@@ -110,20 +110,20 @@ Extract Constant trace =>
 From mathcomp Require Import ssreflect ssrfun ssrbool ssrnat div eqtype.
 Extract Constant divn => "(fun m -> function 0 -> 0 | d -> m / d)".
 Extract Constant modn => "(fun m -> function 0 -> m | d -> m mod d)".
-Extract Constant eqn => "(==)".
+Extract Inlined Constant eqn => "(=)".
 
-Extract Constant Nat.add => "(+)".
-Extract Constant Nat.mul => "( * )".
-Extract Constant Nat.sub => "(-)".
+Extract Inlined Constant Nat.add => "(+)".
+Extract Inlined Constant Nat.mul => "( * )".
+Extract Inlined Constant Nat.sub => "(-)".
 Extract Constant Nat.log2 => "(let rec log2 x = if x <= 1 then 0 else 1 + log2 (x / 2) in log2)".
-Extract Constant Nat.eqb => "(=)".
-Extract Constant Coq.Init.Nat.eqb => "(=)".
+Extract Inlined Constant Nat.eqb => "(=)".
+Extract Inlined Constant Coq.Init.Nat.eqb => "(=)".
 Extract Constant Nat.div => "(fun x -> function 0 -> 0 | y -> x / y)".
 Extract Constant Coq.Init.Nat.div => "(fun x -> function 0 -> 0 | y -> x / y)".
-Extract Constant Nat.min => "min".
-Extract Constant Nat.max => "max".
+Extract Inlined Constant Nat.min => "min".
+Extract Inlined Constant Nat.max => "max".
 Extract Constant Nat.modulo => "(fun x -> function 0 -> x | y -> x mod y)".
-Extract Constant Nat.leb => "(<=)".
+Extract Inlined Constant Nat.leb => "(<=)".
 
 Axiom print_extracted_coq_string : string -> unit.
 Extract Constant print_extracted_coq_string =>
