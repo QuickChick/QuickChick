@@ -6,11 +6,12 @@ defaults: &defaults
     OPAMVERBOSE: 1
     OPAMYES: true
     OPAMWITHTEST: true
-    OPAMIGNORECONSTRAINTS: dune  # ignore upper bound from coq-simple-io.dev which is a workaround to pass opam CI
     TERM: xterm
-    SKIP_BUILD: ''
+    SKIP_BUILD: <<parameters.skip>>
   parameters:
     coq:
+      type: string
+    skip:
       type: string
   docker:
     - image: <<parameters.coq>>
@@ -93,27 +94,36 @@ workflows:
       - test:
           name: Coq 8.15
           coq: 'coqorg/coq:8.15'
+          skip: ''
       - test:
           name: Coq 8.16
           coq: 'coqorg/coq:8.16'
+          skip: ''
       - test:
           name: Coq 8.17
           coq: 'coqorg/coq:8.17'
+          skip: ''
       - test:
           name: Coq 8.18
           coq: 'coqorg/coq:8.18'
+          skip: ''
       - test:
           name: Coq 8.19
           coq: 'coqorg/coq:8.19'
+          skip: ''
       - test:
           name: Coq 8.20
           coq: 'coqorg/coq:8.20'
+          skip: ''
       - test:
           name: Rocq 9.0
           coq: 'rocq/rocq-prover:9.0'
+          skip: 'rocq-vellvm'
       - test:
           name: Rocq dev
           coq: 'rocq/rocq-prover:dev'
+          skip: 'rocq-vellvm'
       - opam-install:
           name: Install and test
           coq: 'coqorg/coq:8.19'
+          skip: ''
