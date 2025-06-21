@@ -1,6 +1,5 @@
 (lang dune 3.12)
 (using coq 0.7)
-(warnings (deprecated_coq_lang_lt_08 disabled))
 (using menhir 2.0)
 (name coq-quickchick)
 (version dev)
