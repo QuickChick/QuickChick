@@ -1890,7 +1890,7 @@ let type_to_schedules (typ : rocq_constr) (ind_name : ty_ctr option) (ctr_name :
 
   let result_ranges = List.map (fun (v, ty) -> 
     if is_Type ty then 
-      (Feedback.msg_notice (str ("Type variable: " ^ var_to_string v));
+      (Error.msg_debug (str ("Type variable: " ^ var_to_string v));
       Parameter v) else (Unknown v)) result_vars in
 
   Error.msg_debug (str ("Result ranges: " ^ String.concat ", " (List.map range_to_string result_ranges)) ++ fnl ());
@@ -1922,6 +1922,12 @@ let type_to_schedules (typ : rocq_constr) (ind_name : ty_ctr option) (ctr_name :
 
   let is_fixed umap v = is_range_fixed umap (Unknown v) in
 
+  let rec take n lst = 
+    match lst with
+    | [] -> []
+    | x :: xs -> if n <= 0 then [] else x :: take (n - 1) xs in
+    
+
   match state with
   | Some (umap, eqs, matches) ->
     (match get_schedule_sort concl (if opt then output_vars else List.map fst vars) ctr_name umap ds opt with
@@ -1930,8 +1936,8 @@ let type_to_schedules (typ : rocq_constr) (ind_name : ty_ctr option) (ctr_name :
       let eq_checks = EqSet.elements eqs in
       let rec_name = match ind_name with Some n -> n | _ -> ty_ctr_of_string "nonsense" in
       Error.msg_debug (str ("Fixed vars: " ^ String.concat ", " (List.map var_to_string fixed_vars)) ++ fnl ());
-      List.map (fun schedule_steps -> ((correct_variables umap schedule_steps, sort), matches, eq_checks)) 
-        (possible_schedules vars hyps fixed_vars (rec_name, output_indices) ds)
+       (List.map (fun schedule_steps -> ((correct_variables umap schedule_steps, sort), matches, eq_checks)) 
+        (possible_schedules vars hyps fixed_vars (rec_name, output_indices) ds))
     | None -> failwith "Failed to construct schedule sort")
   | None -> failwith "Failed to construct state"
 

@@ -218,15 +218,15 @@ let parse_dependent_type_internal i nparams ty oibopt arg_names =
   let rec aux locals i ty =
     let env = Global.env () in
     let sigma = Evd.from_env env in
-    msg_debug (str "Calling aux with: " ++ int i ++ str " "
+    Error.msg_debug (str "Calling aux with: " ++ int i ++ str " "
                ++ Printer.pr_constr_env env sigma ty ++ fnl()); 
     if Constr.isRel ty then begin
-      msg_debug (str "Rel: " ++ debug_constr ty ++ fnl ());
+      Error.msg_debug (str "Rel: " ++ debug_constr ty ++ fnl ());
       let db = Constr.destRel ty in
       let num_local = List.length locals in
       if num_local > 0 && db <= num_local then
         (* It's a locally bound variable. De Bruijn 1 => local_binders.(0) *)
-        (msg_debug (str "db: " ++ int db ++ str " num_local: " ++ int num_local ++ fnl());
+        (Error.msg_debug (str "db: " ++ int db ++ str " num_local: " ++ int num_local ++ fnl());
         (match List.nth locals (db - 1) with
         | Names.Name name -> Some (DTyVar name)
         | _ -> CErrors.user_err (str "Anonymous Rel encountered: " ++ (debug_constr ty) ++ fnl ())))
@@ -243,7 +243,7 @@ let parse_dependent_type_internal i nparams ty oibopt arg_names =
               CErrors.user_err (str "nth failed (Rel): " ++ (debug_constr ty) ++ fnl ())
       end
     else if Constr.isApp ty then begin
-      msg_debug (str "App: " ++ debug_constr ty ++ fnl ());
+      Error.msg_debug (str "App: " ++ debug_constr ty ++ fnl ());
       let (ctr, tms) = Constr.decompose_app_list ty in
       foldM (fun acc ty -> 
              aux locals i ty >>= fun ty' -> Some (ty' :: acc)
@@ -262,7 +262,7 @@ let parse_dependent_type_internal i nparams ty oibopt arg_names =
       | None -> CErrors.user_err (str "Aux failed?" ++ fnl ())
     end
     else if Constr.isInd ty then begin
-      msg_debug (str "Ind: " ++ debug_constr ty ++ fnl ());
+      Error.msg_debug (str "Ind: " ++ debug_constr ty ++ fnl ());
       let ((mind, midx),_) = Constr.destInd ty in
       let mib = Environ.lookup_mind mind env in
       let id = mib.mind_packets.(midx).mind_typename in
@@ -271,12 +271,12 @@ let parse_dependent_type_internal i nparams ty oibopt arg_names =
       Some (DTyCtr (Libnames.qualid_of_ident id, []))
     end
     else if Constr.isConstruct ty then begin
-      msg_debug (str "Construct: " ++ debug_constr ty ++ fnl ());
+      Error.msg_debug (str "Construct: " ++ debug_constr ty ++ fnl ());
       let (((mind, midx), idx),_) = Constr.destConstruct ty in                               
 
       (* Lookup the inductive *)
       let env = Global.env () in
-      msg_debug (str (Printf.sprintf "ACONSTR: %s" (Names.MutInd.to_string mind)) ++ fnl ());
+      Error.msg_debug (str (Printf.sprintf "ACONSTR: %s" (Names.MutInd.to_string mind)) ++ fnl ());
       let mib = Environ.lookup_mind mind env in
 
 (*      let (mp, _dn, _) = MutInd.repr3 mind in *)
@@ -284,16 +284,16 @@ let parse_dependent_type_internal i nparams ty oibopt arg_names =
       let names = String.split_on_char '.' (Names.MutInd.to_string mind) in
       let prefix = List.rev (List.tl (List.rev names)) in
       let qual = String.concat "." prefix in
-      msg_debug (str (Printf.sprintf "CONSTR: %s %s" qual (Names.DirPath.to_string (Lib.cwd ()))) ++ fnl ());
+      Error.msg_debug (str (Printf.sprintf "CONSTR: %s %s" qual (Names.DirPath.to_string (Lib.cwd ()))) ++ fnl ());
       (* Constructor name *)
-      msg_debug (int (mib.mind_ntypes) ++ fnl ());
+      Error.msg_debug (int (mib.mind_ntypes) ++ fnl ());
       let cname = Names.Id.to_string (mib.mind_packets.(midx).mind_consnames.(idx - 1)) in
       let cid = Libnames.qualid_of_string (if (qual = "") || (qual = Names.DirPath.to_string (Lib.cwd ()))
                              then cname else qual ^ "." ^ cname) in
       Some (DCtr (cid, []))
     end
     else if Constr.isProd ty then begin
-      msg_debug (str "Prod: " ++ debug_constr ty ++ fnl ());
+      Error.msg_debug (str "Prod: " ++ debug_constr ty ++ fnl ());
       let (n, t1, t2) = Constr.destProd ty in
       (* Are the 'i's correct? *)
       aux locals i t1 >>= fun t1' -> 
@@ -306,7 +306,7 @@ let parse_dependent_type_internal i nparams ty oibopt arg_names =
       )
     end
     else if Constr.isLambda ty then begin
-      msg_debug (str "Lambda: " ++ debug_constr ty ++ fnl ());
+      Error.msg_debug (str "Lambda: " ++ debug_constr ty ++ fnl ());
       let (x, t, e) = Constr.destLambda ty in
       aux locals i t >>= fun t' ->
       aux (x.Context.binder_name :: locals) i e >>= fun e' ->
@@ -328,7 +328,7 @@ let parse_dependent_type_internal i nparams ty oibopt arg_names =
     [ac]{^ ith} element is ith constructor case presented as
     {e construct_args |- case_term } *)
       let (case_info, _univs, _params, _ret_clause, _iv, discriminee, branches) = Constr.destCase ty in
-      msg_debug (str "Case: " ++ debug_constr discriminee ++ fnl ());
+      Error.msg_debug (str "Case: " ++ debug_constr discriminee ++ fnl ());
       let inductive = case_info.Constr.ci_ind in
       let branches_list = List.mapi (fun idx ((bindings_arr : (Names.Name.t,Sorts.relevance) Context.pbinder_annot array), branch) ->
         let bindings  = Array.to_list ( bindings_arr) in
@@ -360,7 +360,7 @@ let parse_dependent_type_internal i nparams ty oibopt arg_names =
     end
     (* Rel, App, Ind, Construct, Prod *)
     else if Constr.isConst ty then begin 
-      msg_debug (str "Const: " ++ debug_constr ty ++ fnl ());
+      Error.msg_debug (str "Const: " ++ debug_constr ty ++ fnl ());
       let (x,_) = Constr.destConst ty in 
       Some (DTyVar (Names.Label.to_id (Names.Constant.label x)))
     end
@@ -403,7 +403,7 @@ let dep_parse_type nparams param_names arity_ctxt oib =
   foldM (fun acc (i, decl) -> 
            let n = Context.Rel.Declaration.get_name decl in
            let t = Context.Rel.Declaration.get_type decl in
-           msg_debug (debug_constr t ++ fnl ());
+           Error.msg_debug (debug_constr t ++ fnl ());
            match n with
            | Names.Name id -> (* Check if it is a parameter to add its type / name *)
               if Constr.is_Type t then Some acc 
@@ -1074,18 +1074,18 @@ let rename_rocq_type_vars (rt : rocq_type) (v : var) (locations : int list list)
   in
   aux [] rt *)
 
-let unconstrained_producer (ps : producer_sort) ty =
+let unconstrained_producer (ps : producer_sort) ty fuel =
   match ps with
-  | PS_E -> m_enumSized ty (MId (var_of_string "init_size"))
-  | PS_G -> m_arbitrarySized ty (MId (var_of_string "init_size"))
+  | PS_E -> m_enumSized ty fuel
+  | PS_G -> m_arbitrarySized ty fuel
 
-let such_that_producer (ps : producer_sort) vars p =
+let such_that_producer (ps : producer_sort) vars p fuel =
   let p_vars = List.map (fun v -> PVar v) vars in
   let arg_tuple = pat_tuple_of_list p_vars in
   let p_with_args = MFun ([arg_tuple,None], p) in
   match ps with
-  | PS_E -> m_enumSizeST p_with_args (MId (var_of_string "init_size"))
-  | PS_G -> m_arbitrarySizeST p_with_args (MId (var_of_string "init_size"))
+  | PS_E -> m_enumSizeST p_with_args fuel
+  | PS_G -> m_arbitrarySizeST p_with_args fuel
   
 let num_of_ctrs (c : constructor) =
   let env = Global.env () in
@@ -1118,14 +1118,14 @@ let schedule_step_to_mexp (step : schedule_step) mfuel (def_fuel : mexp) : mexp 
   match step with
   | S_UC (v, prod, ps) -> 
     let producer = (match prod with
-      | SrcNonrec ty -> unconstrained_producer ps (product_free_rocq_type_to_mexp ty)
+      | SrcNonrec ty -> unconstrained_producer ps (product_free_rocq_type_to_mexp ty) def_fuel
       | SrcRec (rec_f, args) -> rec_call rec_f args
       | SrcMutrec (rec_f, args) -> mut_rec_call mfuel rec_f args
       | SrcDef (def_f, args) -> def_call def_fuel def_f args) in
     MBind (prod_sort_to_monad_sort ps, producer, [v], k)
   | S_ST (vars_tys, prod, ps) -> 
     let producer = (match prod with
-      | SrcNonrec ty -> such_that_producer ps (List.map fst vars_tys) (product_free_rocq_type_to_mexp ty)
+      | SrcNonrec ty -> such_that_producer ps (List.map fst vars_tys) (product_free_rocq_type_to_mexp ty) def_fuel
       | SrcRec (rec_f, args) -> rec_call rec_f args
       | SrcMutrec (rec_f, args) -> mut_rec_call mfuel rec_f args
       | SrcDef (def_f, args) -> def_call def_fuel def_f args) in
@@ -1257,7 +1257,7 @@ let filter_mapi (f : int -> 'a -> 'b option) (l : 'a list) : 'b list =
 let schedule_step_dependence (s : schedule_step) : (rocq_constr * int list * derive_sort * bool) option =
   match s with
   | S_UC (v, SrcNonrec (DTyParam param), ps) -> None (*Parameters handled elsewhere*)
-  | S_UC (v, SrcNonrec t, ps) -> Some (t, [], (match ps with PS_E -> D_Enum | PS_G -> D_Gen), false)
+  | S_UC (v, SrcNonrec t, ps) -> (*Some (t, [], (match ps with PS_E -> D_Enum | PS_G -> D_Gen), false)*) None
   | S_ST (vs, SrcNonrec (DTyCtr (ind, args)), ps) -> 
     let output_vars = List.map fst vs in
     let arg_vars = List.map (fun arg -> variables_in_hypothesis arg) args in 
@@ -1313,7 +1313,7 @@ let backtrack_decoration (ds : derive_sort) (rec_or_base : rec_or_base) (m : mex
 
 let inductive_schedule_to_mexp (is : inductive_schedule) (ds : derive_sort) (is_constrained : bool) : mexp =
   let (name, inputs, param_deps, base_scheds, rec_scheds) = is in
-  Feedback.msg_notice (str ("Compiling inductive schedule: " ^ name) ++ fnl());
+  Error.msg_debug (str ("Compiling inductive schedule: " ^ name) ++ fnl());
   if ds = D_Thm && name = "theorem" then begin
     let thm_mexp = 
       (match base_scheds with
@@ -1323,14 +1323,22 @@ let inductive_schedule_to_mexp (is : inductive_schedule) (ds : derive_sort) (is_
     end 
   else begin
 
+  Error.msg_debug (str ("inputs " ^ String.concat ", " (List.map (fun (v, ty) -> var_to_string v ^ " : " ^ mexp_to_string ty) inputs)) ++ fnl());
+  Error.msg_debug (str ("param deps" ^ String.concat ", " (List.map mexp_to_string (List.concat_map snd param_deps))) ++ fnl()); 
+  (* let param_deps = [var_of_string "x", [MHole]] in *)
   let nat_ty = MConst "Coq.Init.Datatypes.nat" in
   let prelude base_k all_k rec_scheds = 
     match rec_scheds with
     | [] -> MFun ([PVar (var_of_string "size'"), Some (MConst "Coq.Init.Datatypes.nat"); PVar (var_of_string "init_size"), Some (MConst "Coq.Init.Datatypes.nat")] 
-                    @ List.map (fun (i,ty) -> PVar i, Some ty) inputs,
+                    @ List.map (fun (i,ty) -> PVar i, Some ty) inputs @ 
+                    List.concat_map (fun (v, typeclasses) -> 
+                      List.map (fun ty -> PVar (fresh_name ("H" ^ var_to_string v)), Some ty) typeclasses) param_deps,
                   base_k)
     | _ -> 
-      MFix (var_of_string "rec", (var_of_string "init_size", nat_ty) :: (var_of_string "size", nat_ty) :: inputs, 
+      MFix (var_of_string "rec", (var_of_string "init_size", nat_ty) :: (var_of_string "size", nat_ty) :: inputs @ 
+        List.concat_map (fun (v, typeclasses) -> 
+          List.map (fun ty -> fresh_name ("H" ^ var_to_string v), ty) typeclasses) param_deps,
+      
         MMatch (MId (var_of_string "size"), 
                 [
                   (PCtr (constructor_of_string "Coq.Init.Datatypes.O", []), 
@@ -1364,7 +1372,7 @@ let inductive_schedule_to_mexp (is : inductive_schedule) (ds : derive_sort) (is_
     | (s, inp_pats) :: _ -> match_pats inp_pats (schedule_to_mexp s fuel_sizem fuel_init_size) in
   
   final_let (prelude (MBacktrack (first, base_backtrack, is_constrained, ds)) (MBacktrack (first, all_backtrack, is_constrained, ds)) rec_scheds)
-  end
+ end
 
 let inductive_schedule_with_dependencies_to_mexp unconstrained_inds (ind_schds : (inductive_schedule * derive_sort * is_constrained) list) (output_ind_schd_name : string) : mexp =
   let match_pats inp_pats (k : mexp) =
@@ -1414,7 +1422,8 @@ let inductive_schedule_with_dependencies_to_mexp unconstrained_inds (ind_schds :
    
       | m -> failwith "Expected a let binding") in
 
-    (var_of_string ind_schd_name, List.map (fun v -> (var_of_string v), (MConst "Coq.Init.Datatypes.nat")) ["sizem";"init_size";"size'"], prelude (MFun (List.map (fun (x,t) -> PVar x, Some t) inputs, out_of_fuel)) mexp, ds)
+    (var_of_string ind_schd_name, List.map (fun v -> (var_of_string v), (MConst "Coq.Init.Datatypes.nat")) ["sizem";"init_size";"size'"], prelude (MFun (List.map (fun (x,t) -> PVar x, Some t) inputs @ List.concat_map (fun (v, typeclasses) -> 
+      List.map (fun ty -> PWild, Some ty) typeclasses) param_deps, out_of_fuel)) mexp, ds)
   in
 
   let unconstrained_ind_mexp k = List.fold_left (fun acc ((ind_schd_name,_,_,_,_) as is, ds, is_constrained) -> 
@@ -1463,7 +1472,7 @@ let turn_def_calls_into_mutrec_calls (ind_schd : inductive_schedule) names : ind
     | a -> false) steps) (new_scheds base_scheds)
   in
 
-  name, inputs, [], new_base_scheds, new_rec_scheds @ new_mutrec_scheds
+  name, inputs, param_deps, new_base_scheds, new_rec_scheds @ new_mutrec_scheds
 
 
 (* let inductive_schedules_to_mexp (components : (inductive_schedule * derive_sort * is_constrained) list list) (output_ind_schd_name : string) : mexp =
@@ -2362,6 +2371,37 @@ module ScheduleExamples = struct
       S_ST ([(var "e'", DTyCtr (ty_ctr "term", []))], SrcNonrec (DTyCtr (ty_ctr "bigstep'", [DTyVar (var "e"); DTyVar (var "e'")])), PS_G);
     ], TheoremSchedule (DTyCtr (ty_ctr "typing'", [DTyVar (var "Gamma"); DTyVar (var "e'"); DTyVar (var "tau")]), true)
 
+(* vars: 
+hypotheses: 
+
+Gamma <- list type, []
+e <- term, Gamma 
+v <- value
+Arrow tin tout <- typing Gamma e (Arrow tin tout)
+
+tin_tout <- typing Gamma e tin_out
+match tin_tout with Arrow tin tout -> ... | _ -> discard 
+
+e' <- bigstep e e'
+v <- value
+
+
+[[Gamma, e], [tau] <- ST typing Gamma e tau, []]  env    
+[[], e' <- ST bigstep e e' , []]
+
+[UCvars, STvars <- ST H, [Check]], env
+
+UCvars U STvars subset H
+
+UCvars U STvars = H - env
+
+type density = Checking | Backtracking | Partial | Total
+
+Check ( (x = y))  -> Checking *)
+
+
+
+
   (*
   Inductive typing (G : env) : term -> type -> Prop :=
   | TId :
@@ -2592,6 +2632,7 @@ module ScheduleExamples = struct
     bind env x tau -> bind (tau' :: env) (S x) tau.
   *)
 
+  
 
   let shcd_bindNow_gen_ioo _tau _env =
     [
