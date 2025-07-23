@@ -138,7 +138,7 @@ Definition doneTesting (st : State) : Result :=
     Success (numSuccessTests st + 1) (numDiscardedTests st) (summary st)
             (
               if (stDoAnalysis st) 
-                then ("""result"": ""success"", ""tests"": " ++ (show (numSuccessTests st)) ++ ", ""discards"": " ++ (show (numDiscardedTests st)))
+                then ("""result"": ""Finished"", ""tests"": " ++ (show (numSuccessTests st)) ++ ", ""discards"": " ++ (show (numDiscardedTests st)))
                 else ("+++ Passed " ++ (show (numSuccessTests st)) ++ " tests (" ++ (show (numDiscardedTests st)) ++ " discards)" ++ newline)
             )
 
@@ -146,7 +146,7 @@ Definition doneTesting (st : State) : Result :=
     NoExpectedFailure (numSuccessTests st) (summary st)
                   (
                     if (stDoAnalysis st) 
-                      then ("""result"": ""expected_failure"", ""tests"": " ++ (show (numSuccessTests st)))
+                      then ("""result"": ""ExpectedFailure"", ""tests"": " ++ (show (numSuccessTests st)))
                       else ("*** Failed! Passed " ++ (show (numSuccessTests st))++ " tests (expected Failure)" ++ newline)
                   ).
   (* TODO: success st - labels *)
@@ -155,7 +155,7 @@ Definition giveUp (st : State) : Result :=
   GaveUp (numSuccessTests st) (summary st)
           (
             if (stDoAnalysis st) 
-              then ("""result"": ""gave_up"", ""tests"":" ++ (show (numSuccessTests st)) ++ ", ""discards"": " ++ (show (numDiscardedTests st)))
+              then ("""result"": ""GaveUp"", ""tests"":" ++ (show (numSuccessTests st)) ++ ", ""discards"": " ++ (show (numDiscardedTests st)))
               else ("*** Gave up! Passed only " ++ (show (numSuccessTests st)) ++ " tests" ++ 
                     newline ++ "Discarded: " ++ (show (numDiscardedTests st)) ++ newline)
           ).
@@ -347,6 +347,52 @@ Definition quickCheckWith {prop : Type} {_ : Checkable prop}
                 (analysis a)  (* analysisFlag      *)
        ) (run (checker p)).
 
+
+Parameter OCamlFloat : Type.
+Extract Constant OCamlFloat => "float".
+
+Axiom showOCamlFloat' : OCamlFloat -> string.
+Extract Constant showOCamlFloat' => "(fun f -> Printf.sprintf ""%.9fs"" f |> String.to_seq |> List.of_seq)".
+
+#[global] Instance showOCamlFloat : Show OCamlFloat := {| show := showOCamlFloat' |}.
+
+Inductive TimedResult {A: Type} :=
+| TResult (result: A) (time: OCamlFloat) (start: OCamlFloat) (ending: OCamlFloat).
+
+Axiom withTime : forall {A}, (unit -> A) -> @TimedResult A.
+
+Extract Constant withTime => "
+  (fun f -> 
+    let start = Unix.gettimeofday () in 
+    let res = f () in 
+    let ending = Unix.gettimeofday () in
+    TResult (res, (ending -. start), start, ending))".
+
+Local Open Scope string_scope.
+
+#[global] Instance showTimedResult {A: Type} `{Show A} : Show (@TimedResult A) := {|
+  show result := 
+    let '(TResult result time start ending) := result in
+     """time"": """ ++ show time ++ """, " ++ show result
+|}.
+
+Local Close Scope string_scope.
+
+
+Definition quickSample {A} `{Show A}
+  (a : Args) (g : G A) : list (@TimedResult A) :=
+  let numTests := maxSuccess a in
+  let fix aux n cnt acc rnd : list (@TimedResult A) :=
+    match n with
+    | 0 => @rev (@TimedResult A) acc
+    | S n' =>
+        let size := computeSize' a cnt 0 in 
+        let (rnd1, rnd2) := randomSplit rnd in
+        let x := @withTime A (fun tt => run g size rnd1) in
+        aux n' (S cnt) (cons x acc) rnd2
+    end in
+  aux (maxSuccess a) 0 nil newRandomSeed.
+
 Fixpoint showCollectStatistics (l : list (string * nat)) : string :=
   match l with
     | nil => ""
@@ -510,7 +556,7 @@ Fixpoint fuzzLoopAux {A} (fuzz_fuel : nat) (st : State)
     | Some false =>
         let '(MkState mst mdt ms cs nst ndt ls e r nss nts ana) := st in
         let zero := trace (print a ++ nl) zero_0 in
-        let pre : string := if ana then """result"": ""failed"", " else "*** Failed " in
+        let pre : string := if ana then """result"": ""Failed"", " else "*** Failed " in
         (* TODO: shrinking *)
         (*         let (numShrinks, res') := localMin rnd1_copy st (MkRose res ts) in *)
         let numShrinks := 0 in
