@@ -228,10 +228,77 @@ Proof. dec_eq. Defined.
 (*#[export] Instance Dec_eq_Dec_Eq A : (forall (x y : A), Dec (x = y)) -> Dec_Eq A.
 Proof. intros. dec_eq. Defined.*)
 
+Class Size (A : Type) : Type := { size : A -> nat }.
+
+Instance SizeType : Size type :=
+  {size := (fix aux t :=
+              match t with
+              | TBool => 1
+              | TFun i o => S (max (aux i) (aux o))
+              end)}.
+
+Instance SizeTerm : Size term :=
+  {size := (fix aux e :=
+              match e with
+              | Var _ => 1
+              | Bool _ => 1
+              | Abs t e' => S (aux e')
+              | App e1 e2 => S (max (aux e1) (aux e2))
+              end)}.
+
+Instance SizeEnv : Size (list type) :=
+  {size := @length _}.
+
 Theorem preservation : forall g e τ e',
     typing g e τ -> pstep e = Some e' ->
     typing g e' τ.
-Proof. QuickChickDebug Debug Off. valid_schedules. quickchick_idx 0. quickchick_idx 1. try_all_quickchick_schedules. quickchick_idx 40.
+Proof. QuickChickDebug Debug Off.
+
+       Extract Constant defNumTests => "10".
+       valid_schedules. quickchick_idx 0.
+       Extract Constant defNumTests => "100000".
+       QuickChick (sized (fun size' : nat =>
+forAllMaybeChecker (GenSizedSuchThat_typing_OOO size')
+  (fun '(g, e, τ) =>
+   forAllMaybeChecker (GenSizedSuchThat_eq_IIO size' (option term) (pstep e) GenSizedoption (Dec_Eq_option term))
+     (fun ve'1945_ : option term =>
+      match ve'1945_ with
+      | Some e' =>
+          (collect (size e')
+          match DecOpt_typing_III (3 * size') g e' τ with
+          | Some true =>  checker (Some true)
+          | Some false => checker (Some false)
+          | None => checker tt
+          end)
+      | None => checker tt
+      end)) ) ).
+Extract Constant defNumTests => "10".
+
+
+
+quickchick_idx 1.
+       Extract Constant defNumTests => "100000".
+QuickChick (sized (fun size' : nat =>
+forAllChecker (arbitrarySized size')
+  (fun g : list type =>
+   forAllMaybeChecker (GenSizedSuchThat_typing_IOO size' g)
+     (fun '(e, τ) =>
+      forAllMaybeChecker (GenSizedSuchThat_eq_IIO size' (option term) (pstep e) GenSizedoption (Dec_Eq_option term))
+        (fun ve'3991_ : option term =>
+         match ve'3991_ with
+         | Some e' =>
+             collect (size e')
+            ( match DecOpt_typing_III (3 * size') g e' τ with
+             | Some true => checker (Some true)
+             | Some false => checker (Some false)
+             | None => checker tt
+             end)
+         | None => checker tt
+         end))))).
+
+
+
+try_all_quickchick_schedules. quickchick_idx 40.
                                                                   
   schedules. valid_schedules. Abort.
 

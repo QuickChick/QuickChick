@@ -1373,7 +1373,8 @@ and inductive_best_valid_schedule (rel : rocq_relation) (output_idxs : int list)
     | D_Check | D_Enum -> sparsest densities
     | D_Gen | D_Thm -> densest densities in
 
-  let tree = cover_tuple_patterns (input_patterns_of_rocq_relation rel output_idxs) (rocq_relation_arity rel) (types_to_constructor_lookup (seek_all_rocq_relation ind_name)) in
+  let inductive = (match get_inductive_name ind_name with | Some i -> i | None -> failwith "final_density: not an inductive type") in
+  let tree = cover_tuple_patterns (input_patterns_of_rocq_relation rel output_idxs) (rocq_relation_arity rel) (types_to_constructor_lookup (seek_rocq_relations inductive)) in
   let covered_patterns = collect_leaves tree in
   (* if should_print then (Feedback.msg_notice (str ("Rule densities for: " ^ ty_ctr_to_string ind_name ^ " with output indices: " ^ List.fold_left (fun acc oi -> acc ^ " " ^ string_of_int oi) "" ois) ++ fnl ()); *)
   (* print_rule_densities densities); *)
@@ -1527,17 +1528,18 @@ let insert_mutrec_calls ((schedule,matches) : schedule * (var * pat) list) : sch
       Error.msg_debug (str ("Inserting mutrec calls for theorem: " ^ rocq_constr_to_string ctr) ++ fnl ()); 
       (match lookup_and_remove_inductive_schedule (ctr, ois, ds, opt) false with
       | None -> TheoremSchedule (t,true)
-      | Some ((schd_name,_,_,_,_), _, _) ->
+      | Some ((schd_name,_,param_typeclasses,_,_), _, _) ->
+        let typeclass_holes = List.init (List.length (List.concat_map snd param_typeclasses)) (fun _ -> DHole) in
       (match t with
       | DTyCtr (_, args) -> 
         let input_args = filter_mapi (fun i arg -> if List.mem i ois then None else Some arg) args in
         let fuel_arg = mul three (DTyVar (var_of_string "size")) in
-        let new_conclusion = DApp (DTyVar (var_of_string schd_name), fuel_arg :: input_args) in
+        let new_conclusion = DApp (DTyVar (var_of_string schd_name), fuel_arg :: input_args @ typeclass_holes) in
         TheoremSchedule (new_conclusion, false)
       | DNot (DTyCtr (_, args)) ->
         let input_args = filter_mapi (fun i arg -> if List.mem i ois then None else Some arg) args in
         let fuel_arg = mul three (DTyVar (var_of_string "size")) in
-        let new_conclusion = DNot (DApp (DTyVar (var_of_string schd_name), fuel_arg :: input_args)) in
+        let new_conclusion = DNot (DApp (DTyVar (var_of_string schd_name), fuel_arg :: input_args @ typeclass_holes)) in
         TheoremSchedule (new_conclusion, false)
       | _ -> failwith "insert_mutrec_calls: TheoremSchedule must have DTyCtr at toplevel"))
     | (schd_sort,_) -> schd_sort in
@@ -2101,7 +2103,7 @@ let quickchick_it size idx =
           | Some s -> c_app ~explicit:false c_theorem [int_to_num s]
           | None -> c_sized c_theorem
           end  in 
-        Feedback.msg_notice (str "added size" ++ fnl ());
+        (* Feedback.msg_notice (str "added size" ++ fnl ()); *)
         let to_run = fst (Constrintern.interp_constr updated_env updated_evd (c_show (c_quickCheck size_thm))) in
         let updated_env' = Global.env () in
         let updated_evd' = Evd.from_env updated_env' in
