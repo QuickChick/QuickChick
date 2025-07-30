@@ -142,5 +142,4 @@ Extract Constant print_extracted_coq_string =>
     | c :: l -> Bytes.set s i c; copy (i+1) l
    in Bytes.to_string (copy 0 l))".
 
-Axiom withTime : forall {A}, (unit -> A) -> AugmentedTime A.
 Extract Constant withTime => "(fun f -> let start = Unix.gettimeofday () in let res = f () in let ending = Unix.gettimeofday () in { aug_res = res; aug_time = ((Float.to_int ((ending -. start) *. 1000000.0))) } )".

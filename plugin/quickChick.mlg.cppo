@@ -22,6 +22,7 @@ let mutateCheckWith = mk_ref "QuickChick.MutateCheck.mutateCheckWith"
 let mutateCheckMany = mk_ref "QuickChick.MutateCheck.mutateCheckMany"
 let mutateCheckManyWith = mk_ref "QuickChick.MutateCheck.mutateCheckManyWith"
 let sample = mk_ref "QuickChick.Generators.sampleGen"
+let quickSample = mk_ref "QuickChick.Test.quickSample"
 let sample1 = mk_ref "QuickChick.Generators.sample1"
 
 (* Handle extra ocaml directory to be copied *)
@@ -720,6 +721,15 @@ VERNAC COMMAND EXTEND Sample CLASSIFIED AS SIDEFF
 #endif
   | ["Sample" constr(c)] -> {run sample [c]}
 END
+
+#if COQ_VERSION >= (8, 20, 0)
+VERNAC COMMAND EXTEND QuickSample CLASSIFIED AS SIDEFF STATE opaque_access
+#else
+VERNAC COMMAND EXTEND QuickSample CLASSIFIED AS SIDEFF
+#endif
+  | ["QuickSample" constr(a) constr(c)] -> {run quickSample [a;c]}
+END
+
 
 #if COQ_VERSION >= (8, 20, 0)
 VERNAC COMMAND EXTEND Sample1 CLASSIFIED AS SIDEFF STATE opaque_access
