@@ -21,6 +21,7 @@ Record AugmentedTime (A: Type) :=
     aug_res    : A;
     aug_time   : Time
   }.
+Axiom withTime : forall {A}, (unit -> A) -> AugmentedTime A.
 
 Definition newline := String "010" ""%string.
 

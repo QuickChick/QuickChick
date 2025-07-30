@@ -348,6 +348,20 @@ Definition quickCheckWith {prop : Type} {_ : Checkable prop}
                 (analysis a)  (* analysisFlag      *)
        ) (run (checker p)).
 
+Definition quickSample {A} `{Show A}
+  (a : Args) (g : G A) : list (AugmentedTime A) :=
+  let numTests := maxSuccess a in
+  let fix aux n cnt acc rnd : list (AugmentedTime A) :=
+    match n with
+    | 0 => @rev (AugmentedTime A) acc
+    | S n' =>
+        let size := computeSize' a cnt 0 in 
+        let (rnd1, rnd2) := randomSplit rnd in
+        let x := @withTime A (fun tt => run g size rnd1) in
+        aux n' (S cnt) (cons x acc) rnd2
+    end in
+  aux (maxSuccess a) 0 nil newRandomSeed.
+
 Fixpoint showCollectStatistics (l : list (string * nat)) : string :=
   match l with
     | nil => ""

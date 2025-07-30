@@ -69,10 +69,10 @@ Definition shift  (d: Z) (ex: term) : term :=
             Var (Z.to_nat (Z.of_nat n + d))
             *)
             (*!! shift_var_leq *)
-            (*! *)
-           (* if (Z.leb (Z.of_nat n) c) then Var n
-            else Var (Z.to_nat (Z.of_nat n + d)) *)
-          (*  *)
+            (*!
+            if (Z.leb (Z.of_nat n) c) then Var n
+            else Var (Z.to_nat (Z.of_nat n + d)) 
+            *)
         | Bool b => 
             Bool b
         | Abs t e =>
