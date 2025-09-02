@@ -54,12 +54,12 @@ The public API of QuickChick is summarized in `QuickChickInterface.v`.
 
 - `QuickCheck c`
 - `Sample g`
-- `Derive Arbitrary for c`
-- `Derive Show for c`
-- `Derive ArbitrarySizedSuchThat for (fun x => p)`
-- `Derive DecOpt for p`
-- `Derive EnumSizedSuchThat for (fun x => p)`
-- `Derive ArbitrarySizedSuchThat for (fun x => let (x1,x2...) := x in p)`
+- `QCDerive Arbitrary for c`
+- `QCDerive Show for c`
+- `QCDerive ArbitrarySizedSuchThat for (fun x => p)`
+- `QCDerive DecOpt for p`
+- `QCDerive EnumSizedSuchThat for (fun x => p)`
+- `QCDerive ArbitrarySizedSuchThat for (fun x => let (x1,x2...) := x in p)`
 - `QuickCheckWith args c`
 - `MutateCheck c p`
 - `MutateCheckWith args c p`

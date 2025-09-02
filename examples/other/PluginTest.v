@@ -4,23 +4,23 @@ Inductive Tree :=
 | Leaf : Tree
 | Node : nat -> Tree -> Tree -> Tree.
 
-Derive Arbitrary for Tree.
+Derive Instance Arbitrary for Tree.
 
 Inductive recursion_test : nat -> Tree -> Prop :=
 | RecLeaf : forall n, recursion_test n Leaf 
 | RecNode : forall m l r, recursion_test m l -> recursion_test m (Node m l r).
 
-Derive ArbitrarySizedSuchThat for (fun p => let (m,tr) := p in recursion_test m tr).
+Derive Instance ArbitrarySizedSuchThat for (fun p => let (m,tr) := p in recursion_test m tr).
 
 Inductive checker_test : nat -> Tree -> Prop :=
 | CheckerLeaf : forall n, checker_test n Leaf
 | CheckerNode : forall n t, checker_test O Leaf -> checker_test n t.
 
-Derive DecOpt for (checker_test n t).
+Derive Instance DecOpt for (checker_test n t).
 
-Derive ArbitrarySizedSuchThat for (fun p => let (m,tr) := p in checker_test m tr).
+Derive Instance ArbitrarySizedSuchThat for (fun p => let (m,tr) := p in checker_test m tr).
 
-Derive ArbitrarySizedSuchThat for (fun tr => recursion_test m tr).
+Derive Instance ArbitrarySizedSuchThat for (fun tr => recursion_test m tr).
 
 #[local]
 Instance test_coercion A B (P : A -> B -> Prop) `{Gen B}

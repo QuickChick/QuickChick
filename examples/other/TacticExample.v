@@ -35,7 +35,7 @@ Inductive bin : Type :=
   | B1 (n : bin)
 .
 
-Derive (Arbitrary, Show) for bin.
+Derive Instance (Arbitrary, Show) for bin.
 
 Fixpoint bineq (n m : bin) : bool :=
   match n, m with
@@ -77,8 +77,8 @@ Inductive natlist : Type :=
   | nil'
   | cons' (n : nat) (l : natlist).
 
-Derive Show for natlist.
-Derive Arbitrary for natlist.
+Derive Instance Show for natlist.
+Derive Instance Arbitrary for natlist.
 #[global] Instance Dec_eq_natlist (l l' : natlist) : Dec (l = l').
 Proof. dec_eq. Defined.
 
@@ -185,8 +185,8 @@ Inductive value_set : tm -> Set :=
 
 
 (*Derive show and Arbitrary*)
-Derive Show for ty.
-Derive Arbitrary for ty.
+Derive Instance Show for ty.
+Derive Instance Arbitrary for ty.
 Check elems_.
 #[export] Instance Gen_var : Gen string :=
   {arbitrary := elems_ x (cons x (cons y (cons z nil)))}.
@@ -198,8 +198,8 @@ Check elems_.
                       | _ => nil
                       end}.
 
-Derive Arbitrary for tm.
-Derive Show for tm.
+Derive Instance Arbitrary for tm.
+Derive Instance Show for tm.
 
 (*Create Dec eq instances*)
 #[export] Instance Dec_eq_ty (T T' : ty) : Dec (T = T').
@@ -378,7 +378,7 @@ Inductive step : tm -> tm -> Prop :=
 
 where "t '-->' t'" := (step t t').
 
-Derive DecOpt for (step t t').
+Derive Instance DecOpt for (step t t').
 
 Reserved Notation "Gamma '|--' t '\in' T"
             (at level 101,

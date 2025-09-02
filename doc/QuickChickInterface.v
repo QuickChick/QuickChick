@@ -579,7 +579,7 @@ Declare Instance Dec_eq_list (A : Type)
 (** QuickChick allows the automatic derivation of typeclass instances
     for simple types:
 [[
-       Derive <class> for T.
+       Derive Instance <class> for T.
 ]]
     Here [<class>] must be one of [GenSized], [Shrink], [Arbitrary],
     or [Show], and [T] must be an inductive defined datatype (think
@@ -587,15 +587,15 @@ Declare Instance Dec_eq_list (A : Type)
 
     To derive multiple classes at once, write:
 [[
-       Derive (<class>,...,<class>) for T.
+       Derive Instance (<class>,...,<class>) for T.
 ]]
 *)
 
 (** QuickChick also allows for the automatic derivation of generators
     satisfying preconditions in the form of inductive relations:
-
-     Derive ArbitrarySizedSuchThat for (fun x => P x1 ... x .... xn).
-
+[[
+     Derive Instance ArbitrarySizedSuchThat for (fun x => P x1 ... x .... xn).
+]]
     <P> must be an inductively defined relation.
     <x> is the function to be generated.
     <x1...xn> are (implicitly universally quantified) variable names.

@@ -7,7 +7,7 @@ Inductive foo :=
 (* | B : string -> foo *)
 | C : foo -> foo -> foo.
 
-Derive (Arbitrary, Show) for foo.
+Derive Instance (Arbitrary, Show) for foo.
 
 Extract Inductive foo => "Foo.foo" [ "Foo.A" "Foo.C" ].
 
