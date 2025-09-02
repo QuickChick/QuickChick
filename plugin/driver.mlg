@@ -38,7 +38,7 @@ let dispatch cn ind name1 name2 =
   let convert_reference_to_string c =
     match c with
     | {CAst.v = CRef (r, _) ; _} -> string_of_qualid r
-    | _ -> failwith "Usage: Derive <class_name> for <inductive_name> OR  Derive (<class_name>, ... , <class_name>) for <inductive_name>" in
+    | _ -> failwith "Usage: Derive Instance <class_name> for <inductive_name> OR  Derive Instance (<class_name>, ... , <class_name>) for <inductive_name>" in
   let ss = match cn.CAst.v with
      | CNotation (_, _, ([a],[b],_,_)) ->
          let c = convert_reference_to_string a in
@@ -88,12 +88,13 @@ VERNAC COMMAND EXTEND MergeTest CLASSIFIED AS SIDEFF
     { merge_test ind1 }
 END
 
+(* To disambiguate from the stdlib's Derive plugin *)
 VERNAC COMMAND EXTEND QuickChickDerive CLASSIFIED AS SIDEFF
-   | ["Derive" constr(class_name) "for" constr(inductive)] ->
+   | ["Derive" "Instance" constr(class_name) "for" constr(inductive)] ->
      { dispatch class_name inductive "" "" }
-   | ["Derive" constr(class_name) "for" constr(inductive) "using" ident(genInst)] ->
+   | ["Derive" "Instance" constr(class_name) "for" constr(inductive) "using" ident(genInst)] ->
      { dispatch class_name inductive (Id.to_string genInst) ""}
-   | ["Derive" constr(class_name) "for" constr(inductive) "using" ident(genInst) "and" ident(monInst) ] ->
+   | ["Derive" "Instance" constr(class_name) "for" constr(inductive) "using" ident(genInst) "and" ident(monInst) ] ->
      { dispatch class_name inductive (Id.to_string genInst) (Id.to_string monInst)}
 END
 

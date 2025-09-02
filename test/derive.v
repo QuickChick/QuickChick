@@ -7,8 +7,8 @@ with b :=
   | B1 : b
   | B2 : a -> b.
 
-Derive GenSized for a.
-Derive EnumSized for a.
-Derive Shrink for a.
-Derive Arbitrary for a.
-Derive Show for a.
+Derive Instance GenSized for a.
+Derive Instance EnumSized for a.
+Derive Instance Shrink for a.
+Derive Instance Arbitrary for a.
+Derive Instance Show for a.
