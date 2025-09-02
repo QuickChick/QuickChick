@@ -14,14 +14,14 @@ Arguments Leaf {A}.
 Arguments Node {A} _ _ _.
 
 (* Instead of writing a generator, shrinker, and printer for trees, we
-   could simply derive them using the `Derive` command. 
+   could simply derive them using the `Derive Instance` command.
 
    This command takes two parameters:
    - the name (or names) of the typeclass to be derived 
    - the datatype to derive it for
  *)
 
-Derive (Arbitrary, Show) for Tree.
+Derive Instance (Arbitrary, Show) for Tree.
 (* ==> 
 GenSizedTree is defined
 ShrinkTree is defined 
@@ -153,10 +153,10 @@ Fixpoint insert {A} (x : A) (t : Tree A) : Tree A :=
    over simply-typed first-order data, levering the typeclass 
    infrastructure we've seen! *)
 
-Derive Checker for (balanced n t).
+Derive Instance Checker for (balanced n t).
 (* ==> DecOptbalanced is defined *)
 
-(* This Derive command produces an instance of the DecOpt typeclass for 
+(* This Derive Instance command produces an instance of the DecOpt typeclass for
    the proposition `Balanced n t` for arbitrary parameters n and t. *)
 
 Check DecOptbalanced.
@@ -204,12 +204,12 @@ QuickChick all_trees_are_balanced.
    Failed after 5 tests and 11 shrinks.
 *)
 (* Sure enough, not all trees are balanced. But how would we go about generating 
-   balanced trees for testing purposes? Another `Derive` command to the rescue! *)
+   balanced trees for testing purposes? Another `Derive Instance` command to the rescue! *)
 
-Derive Generator for (fun t => balanced n t).
+Derive Instance Generator for (fun t => balanced n t).
 (* ==> GenSizedSuchThatbalanced is defined *)
 
-(* This Derive command produces an instance of the GenSizedSuchThat typeclass,
+(* This `Derive Instance` command produces an instance of the GenSizedSuchThat typeclass,
    which produces trees t such that t is balanced---for a given input argument
    n. That is, the anonymous function arguments set what the argument to generate
    for is, and the rest of the names are assumed to be universally quantified. *)

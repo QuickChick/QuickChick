@@ -14,7 +14,7 @@ Inductive exp : Type :=
   | AMinus : exp -> exp -> exp
   | AMult : exp -> exp -> exp.
 
-Derive Show for exp.
+Derive Instance Show for exp.
 (* Print Showexp. *)
 (*
 Showexp = 
@@ -42,7 +42,7 @@ show := fun x : exp =>
  *)
 
 (* We can also derive a generator for expressions. *)
-Derive Arbitrary for exp.
+Derive Instance Arbitrary for exp.
 
 (* Sample (@arbitrary exp _). *)
 

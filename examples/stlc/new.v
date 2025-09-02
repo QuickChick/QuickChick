@@ -96,11 +96,11 @@ Inductive typing' (e : env) : term -> type -> Prop :=
       tau12 = Arrow tau1 tau2 ->      
       typing' e (App t1 t2) tau2.
 
-Derive Arbitrary for type.
+Derive Instance Arbitrary for type.
 Instance dec_type (t1 t2 : type) : Dec (t1 = t2).
 Proof. dec_eq. Defined.
-Derive ArbitrarySizedSuchThat for (fun x => bind env x tau).
-Derive ArbitrarySizedSuchThat for (fun t => typing' env t tau).
+Derive Instance ArbitrarySizedSuchThat for (fun x => bind env x tau).
+Derive Instance ArbitrarySizedSuchThat for (fun t => typing' env t tau).
 
 Instance ESST_A2 (t t1 : type) : EnumSizedSuchThat _ (fun t2 => t = Arrow t1 t2) :=
   { enumSizeST := fun _ => match t with
@@ -111,13 +111,13 @@ Instance ESST_A2 (t t1 : type) : EnumSizedSuchThat _ (fun t2 => t = Arrow t1 t2)
                            | _ => returnEnum None
                            end }.
 
-Derive EnumSized for type.
-Derive EnumSizedSuchThat for (fun tau => bind env x tau).
-Derive EnumSizedSuchThat for
+Derive Instance EnumSized for type.
+Derive Instance EnumSizedSuchThat for (fun tau => bind env x tau).
+Derive Instance EnumSizedSuchThat for
        (fun tau => typing' env t tau).
 
-Derive DecOpt for (bind env t tau).
-Derive DecOpt for (typing' env t tau).
+Derive Instance DecOpt for (bind env t tau).
+Derive Instance DecOpt for (typing' env t tau).
 
 
 
