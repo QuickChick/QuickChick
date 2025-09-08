@@ -375,16 +375,15 @@ let add_manual_extract cs =
     match c with
     | {CAst.v = CRef (r, _) ; _ } -> r 
     | _ -> failwith "Usage: Extract Manually failed." in
+  let error () = assert false in
   let refs : qualid list =
-    match cs with
-    | { CAst.v = CNotation (_, _, [NtnTypeArg (NtnTypeArgConstr a); NtnTypeArgList b]) ; _ }
-        when List.for_all (function (NtnTypeArg (NtnTypeArgConstr _)) -> true | _ -> false) b -> begin
+    match Compat.unCNotation11 cs error with
+    | Some ((a, b)) -> begin
          let q = convert_reference_to_qualid a in
-         let b = List.map (function (NtnTypeArg (NtnTypeArgConstr b)) -> b | _ -> assert false) b in
          let qs = List.map convert_reference_to_qualid b in
          q :: qs
        end
-    | _ -> [convert_reference_to_qualid cs] in 
+    | None -> [convert_reference_to_qualid cs] in
   extract_manually := refs @ !extract_manually
 
 #if COQ_VERSION >= (8, 20, 0)

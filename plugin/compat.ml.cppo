@@ -1,0 +1,12 @@
+open Constrexpr
+
+let unCNotation11 cs error = match cs.CAst.v with
+#if COQ_VERSION >= (9, 2, 0)
+  | CNotation (_, _, [NtnTypeArg (NtnTypeArgConstr a); NtnTypeArgList b]) ->
+    let b = List.map (function (NtnTypeArg (NtnTypeArgConstr b)) -> b | _ -> error ()) in
+#else
+  | CNotation (_, _, ([a], [b], _, _)) ->
+#endif
+    Some ((a, b))
+  | _ -> None
+

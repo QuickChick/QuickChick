@@ -67,3 +67,7 @@
   (alias compat)
   (target weightmap.mlg)
   (action (run sh %{dep:../scripts/mycppo} %{dep:weightmap.mlg.cppo} %{target})))
+(rule
+  (alias compat)
+  (target compat.ml)
+  (action (run sh %{dep:../scripts/mycppo} %{dep:compat.ml.cppo} %{target})))
