@@ -52,8 +52,9 @@ let convert_constr_to_weight c =
   | _ -> failwith "QC: match failure."
 
 let convert_constr_to_cw_pair c : (constructor * weight_ast) = 
-  match c.CAst.v with
-  | CNotation (_, _, [NtnTypeArg (NtnTypeArgConstr a); NtnTypeArgList [NtnTypeArg (NtnTypeArgConstr b)]]) ->
+  let error () = failwith "Not a pair?" in
+  match Compat.unCNotation11 c error with
+  | Some ((a, [b])) ->
       let ctr = 
         match a with 
         | { CAst.v = CRef (r, _); _ } -> injectCtr (string_of_qualid r)
@@ -61,7 +62,7 @@ let convert_constr_to_cw_pair c : (constructor * weight_ast) =
       in 
       let w = convert_constr_to_weight b in
       (ctr,w)
-  | _ -> failwith "Not a pair?"
+  | Some _ | None -> error ()
 
 #if COQ_VERSION >= (8, 16, 0)
 let register_weights_object =
@@ -91,15 +92,14 @@ let lookup_weight b ctr size_var =
 VERNAC COMMAND EXTEND QuickChickWeights CLASSIFIED AS SIDEFF
   | ["QuickChickWeights" constr(c)] -> 
      {
+       let error () = failwith "QC: Expected list of constructor -> weights" in
        let weight_assocs = 
-         match c.CAst.v with
-         | CNotation (_, _, [NtnTypeArg (NtnTypeArgConstr a); NtnTypeArgList b])
-           when List.for_all (function (NtnTypeArg (NtnTypeArgConstr _)) -> true | _ -> false) b ->
+         match Compat.unCNotation11 c error with
+         | Some ((a, b)) ->
              let c = convert_constr_to_cw_pair a in
-             let b = List.map (function (NtnTypeArg (NtnTypeArgConstr b)) -> b | _ -> assert false) b in
              let cs = List.map convert_constr_to_cw_pair b in
              c :: cs
-         | _ -> failwith "QC: Expected list of constructor -> weights"
+         | None -> error ()
        in 
        msg_debug (str "Current weights: " ++ fnl ());
        msg_debug (str (weight_env_to_string ()) ++ fnl ());

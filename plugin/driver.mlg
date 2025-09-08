@@ -35,17 +35,17 @@ let class_assoc_table =
   h
 
 let dispatch cn ind name1 name2 =
+  let error () = failwith "Usage: Derive <class_name> for <inductive_name> OR  Derive (<class_name>, ... , <class_name>) for <inductive_name>" in
   let convert_reference_to_string c =
     match c with
     | {CAst.v = CRef (r, _) ; _} -> string_of_qualid r
-    | _ -> failwith "Usage: Derive <class_name> for <inductive_name> OR  Derive (<class_name>, ... , <class_name>) for <inductive_name>" in
-  let ss = match cn.CAst.v with
-     | CNotation (_, _, [NtnTypeArg (NtnTypeArgConstr a); NtnTypeArgList b]) ->
+    | _ -> error () in
+  let ss = match Compat.unCNotation11 cn error with
+     | Some ((a, b)) ->
          let c = convert_reference_to_string a in
-         let b = List.map (function (NtnTypeArg (NtnTypeArgConstr b)) -> b | _ -> failwith "Usage: Derive <class_name> for <inductive_name> OR  Derive (<class_name>, ... , <class_name>) for <inductive_name>") b in
          let cs = List.map convert_reference_to_string b in
          c :: cs
-     | _ -> [convert_reference_to_string cn]
+     | None -> [convert_reference_to_string cn]
   in
 
   let get_class_names s =
