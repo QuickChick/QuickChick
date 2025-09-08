@@ -29,7 +29,11 @@ commands:
         name: Install dependencies
         command: |
             opam update
-            opam install --deps-only .
+            if $(opam repo|grep -q extra-dev) ; then
+              opam install --deps-only . rocq-mathcomp-ssreflect.dev
+            else
+              opam install --deps-only .
+            fi
         no_output_timeout: 30m
     - run:
         name: List installed packages
