@@ -55,7 +55,11 @@ let interp_open_coq_expr env evd e = fst (Constrintern.interp_constr env evd e)
 let debug_coq_expr (c : coq_expr) : unit =
   let env = Global.env () in
   let sigma = Evd.from_env env in
-  msg_debug (pr_constr_expr env sigma c)
+  msg_debug (pr_constr_expr
+#if COQ_VERSION >= (9, 2, 0)
+    ~flags:(Ppconstr.current_flags())
+#endif
+ env sigma c)
 
 let debug_constr env sigma (c : constr) : unit = 
   msg_debug (Printer.safe_pr_constr_env env sigma c ++ fnl ())
