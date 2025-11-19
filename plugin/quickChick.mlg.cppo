@@ -334,7 +334,11 @@ let run f args =
   let evd = Evd.from_env env in
   begin match last args with
   | Some qc_text ->
-    let msg = "QuickChecking " ^ Pp.string_of_ppcmds (Ppconstr.pr_constr_expr env evd qc_text) in
+    let msg = "QuickChecking " ^ Pp.string_of_ppcmds (Ppconstr.pr_constr_expr
+#if COQ_VERSION >= (9, 2, 0)
+    ~flags:(Ppconstr.current_flags())
+#endif
+ env evd qc_text) in
     Feedback.msg_notice (Pp.str msg)
   | None -> failwith "run called with no arguments"
   end;
