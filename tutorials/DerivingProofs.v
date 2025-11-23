@@ -29,7 +29,7 @@ Inductive reg_exp (T : Type) : Type :=
   | Star (r : reg_exp T).
 
 (* We can then derive an enumerator for inhabitants of this data type *) 
-Derive EnumSized for reg_exp.
+Derive Instance EnumSized for reg_exp.
 
 (* Prints: EnumSizedreg_exp is defined *)
 
@@ -210,10 +210,10 @@ Instance Dec (x y : nat) : DecOpt (x = y).
 Admitted.
  *)
 
-Derive DecOpt for (exp_match l e).
+Derive Instance DecOpt for (exp_match l e).
 (* DecOptexp_match is defined *)
 
-Derive EnumSizedSuchThat for (fun l => exp_match l e). 
+Derive Instance EnumSizedSuchThat for (fun l => exp_match l e).
 
 About DecOptexp_match.
 (* DecOptexp_match :
@@ -298,7 +298,7 @@ Proof. derive_complete. Qed.
 
 (* Enumeration for the Eq predicate (TODO move) (required by [exp_match]) *)
 
-Derive EnumSizedSuchThat for (fun n => eq x n).
+Derive Instance EnumSizedSuchThat for (fun n => eq x n).
 
 #[local] Instance EnumSizedSuchThateq_SizedMonotonic X {_ : Enum X} {_ : Dec_Eq X} (n : X) :
   SizedMonotonicOptFP (@enumSizeST _ _ (EnumSizedSuchThateq n)).
@@ -319,7 +319,7 @@ Proof. derive_enumST_Correct. Qed.
 
  *)
 
-Derive EnumSizedSuchThat for (fun l => exp_match l e). 
+Derive Instance EnumSizedSuchThat for (fun l => exp_match l e).
 (* EnumSizedSuchThatexp_match is defined. *)
 
 About EnumSizedSuchThatexp_match.
@@ -387,5 +387,5 @@ Proof. derive_enumST_Correct. Qed.
    and the output is the regular expression)
  *)
 
-Derive EnumSizedSuchThat for (fun e => exp_match l e). 
+Derive Instance EnumSizedSuchThat for (fun e => exp_match l e).
 

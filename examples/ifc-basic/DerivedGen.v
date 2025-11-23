@@ -15,20 +15,20 @@ Inductive good_Z : Z -> Prop :=
   | GoodZ0 : good_Z 0
   | GoodZ1 : good_Z 1.
 
-Derive ArbitrarySizedSuchThat for (fun z => good_Z z).
+Derive Instance ArbitrarySizedSuchThat for (fun z => good_Z z).
 
 (* Definition gen_label := elements L [L; H]. *)
-Derive Arbitrary for Label.
+Derive Instance Arbitrary for Label.
 
 (* Definition gen_atom := liftGen2 Atm gen_Z gen_label. *)
 Inductive good_atom : Atom -> Prop :=
   | GoodAtom : forall z l, good_Z z -> good_atom (Atm z l).
-Derive ArbitrarySizedSuchThat for (fun a => good_atom a).
+Derive Instance ArbitrarySizedSuchThat for (fun a => good_atom a).
 
 (* Definition gen_memory := vectorOf 2 gen_atom. *)
 Inductive good_mem : Mem -> Prop :=
   | GoodMem : forall a1 a2, good_atom a1 -> good_atom a2 -> good_mem [a1 ; a2].
-Derive ArbitrarySizedSuchThat for (fun m => good_mem m).
+Derive Instance ArbitrarySizedSuchThat for (fun m => good_mem m).
 
 Definition is_atom_low (a : Atom) :=
   match a with
@@ -61,7 +61,7 @@ Inductive good_stack : nat -> Stack -> Prop :=
 | GoodStackRet  : forall n pc s, good_atom pc -> good_stack n s -> good_stack (S n) (RetCons pc s).
 
 QuickChickWeights [(GoodStackCons, 10); (GoodStackRet, 4)].
-Derive ArbitrarySizedSuchThat for (fun s => good_stack n s).
+Derive Instance ArbitrarySizedSuchThat for (fun s => good_stack n s).
 
 (*
 Definition ainstr (st : State) : G Instruction :=
@@ -108,7 +108,7 @@ Inductive stack_length : Stack -> nat -> Prop :=
 | LenMty  : stack_length Mty 0
 | LenRet  : forall pc s, stack_length (pc :: s) 0
 | LenCons : forall a s n, stack_length s n -> stack_length (a :: s) (S n).
-Derive ArbitrarySizedSuchThat for (fun n => stack_length s n).
+Derive Instance ArbitrarySizedSuchThat for (fun n => stack_length s n).
 
 Inductive between (x y : Z) (z : nat) : Prop :=
 | Bet : (x < y -> y < Z.of_nat z -> between x y z)%Z.
@@ -137,7 +137,7 @@ QuickChickWeights [ (GoodNop, 1)
                   ; (GoodAdd, 10)
                   ; (GoodLoad, 10)
                   ; (GoodStore, 100) ].
-Derive ArbitrarySizedSuchThat for (fun i => good_instr stk i). 
+Derive Instance ArbitrarySizedSuchThat for (fun i => good_instr stk i).
 
 (*
 Definition gen_state : G State :=
@@ -156,7 +156,7 @@ Inductive good_state : State -> Prop :=
         good_stack 4 stk ->
         good_instr stk i ->
         good_state (St [i;i] m stk pc).
-Derive ArbitrarySizedSuchThat for (fun st => good_state st).        
+Derive Instance ArbitrarySizedSuchThat for (fun st => good_state st).
 
 (* Sample (@arbitrarySizeST _ (fun st => good_state st) _ 10).*)
 
@@ -180,7 +180,7 @@ Instance vary_atom : Vary Atom :=
 Inductive variation_atom : Atom -> Atom -> Prop :=
 | VaryAtomL : forall x  , variation_atom (x @ L) (x @ L)
 | VaryAtomH : forall x y, good_Z y -> variation_atom (x @ H) (y @ H).
-Derive ArbitrarySizedSuchThat for (fun y => variation_atom x y).
+Derive Instance ArbitrarySizedSuchThat for (fun y => variation_atom x y).
 
 (*
 Instance vary_mem : Vary Mem :=
@@ -193,7 +193,7 @@ Inductive variation_mem : Mem -> Mem -> Prop :=
 | VaryMemCons : forall a a' m m', variation_atom a a' ->
                                    variation_mem m m'  ->
                                    variation_mem (cons a m) (cons a' m').
-Derive ArbitrarySizedSuchThat for (fun m2 => variation_mem m1 m2).    
+Derive Instance ArbitrarySizedSuchThat for (fun m2 => variation_mem m1 m2).
 
 (*
 Fixpoint vary_stack (s : Stack) (isLow : bool) : G Stack :=
@@ -216,7 +216,7 @@ Inductive variation_stack : Stack -> Stack -> Prop :=
   | VaryStkRet  : forall a a' s s', variation_atom a a' ->
                                     variation_stack s s' ->
                                     variation_stack (RetCons a s) (RetCons a' s').
-Derive ArbitrarySizedSuchThat for (fun s2 => variation_stack s1 s2).
+Derive Instance ArbitrarySizedSuchThat for (fun s2 => variation_stack s1 s2).
 
 (*
 Instance vary_state : Vary State :=
@@ -246,7 +246,7 @@ Inductive variation_high_stack : Atom -> Stack -> Stack -> Prop :=
                        variation_stack stk stk' ->
                        good_atom a ->
                        variation_high_stack (pcx @ H) stk (a :: stk').
-Derive ArbitrarySizedSuchThat for (fun stk' => variation_high_stack pc stk stk').
+Derive Instance ArbitrarySizedSuchThat for (fun stk' => variation_high_stack pc stk stk').
 
 Inductive variation_state : State -> State -> Prop :=
   | VaryState : forall imem mem stk pc mem' stk' pc',
@@ -254,7 +254,7 @@ Inductive variation_state : State -> State -> Prop :=
       variation_atom pc pc' ->
       variation_high_stack pc stk stk' ->
       variation_state (St imem mem stk pc) (St imem mem' stk' pc').
-Derive ArbitrarySizedSuchThat for (fun st' => variation_state st st').
+Derive Instance ArbitrarySizedSuchThat for (fun st' => variation_state st st').
 
 Definition gen_variation_state_derived : G (option (@Variation State)) :=
   bindOpt (genST (fun st => good_state st)) (fun st => 

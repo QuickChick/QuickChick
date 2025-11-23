@@ -84,7 +84,7 @@ Inductive IndistAtom : Atom -> Atom -> Prop :=
 | IAtom_Lo : forall x, IndistAtom (x@L) (x@L)
 | IAtom_Hi : forall x y, IndistAtom (x@H) (y@H).
 
-Derive DecOpt for (IndistAtom a1 a2).
+Derive Instance DecOpt for (IndistAtom a1 a2).
 
 Inductive IndistMem : Mem -> Mem -> Prop :=
 | IMem_Nil  : IndistMem nil nil
@@ -92,7 +92,7 @@ Inductive IndistMem : Mem -> Mem -> Prop :=
     IndistAtom a1 a2 -> IndistMem  m1 m2 ->
     IndistMem (cons a1 m1) (cons a2 m2).
 
-Derive DecOpt for (IndistMem m1 m2).
+Derive Instance DecOpt for (IndistMem m1 m2).
 
 Inductive IndistStack : Stack -> Stack -> Prop :=
 | IStack_Mty  : IndistStack Mty Mty
@@ -103,7 +103,7 @@ Inductive IndistStack : Stack -> Stack -> Prop :=
     IndistAtom a1 a2 -> IndistStack s1 s2 ->
     IndistStack (RetCons a1 s1) (RetCons a2 s2).
 
-Derive DecOpt for (IndistStack s1 s2).
+Derive Instance DecOpt for (IndistStack s1 s2).
 
 #[global] Instance Label_DecEq (l1 l2 : Label) : Dec (l1 = l2).
 Proof. dec_eq. Defined.
@@ -122,5 +122,5 @@ Inductive IndistState : State -> State -> Prop :=
     IndistStack (cropTop s1) (cropTop s2) ->
     IndistState (St im1 m1 s1 pc1) (St im2 m2 s2 pc2).
 
-Derive DecOpt for (IndistState s1 s2).
+Derive Instance DecOpt for (IndistState s1 s2).
 

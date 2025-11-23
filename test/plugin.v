@@ -1,13 +1,16 @@
 From QuickChick Require Import QuickChick.
+From Coq Require Import Derive.
 
-(* TODO: better naming *)
+(* Check that this [Derive] still works *)
+Derive X SuchThat (X = 1) As eqX.
+Abort.
 
 Inductive foo {A : Type} :=
 | bar : A -> foo -> foo
 | baz : foo
 .
 
-Derive (Arbitrary, Show) for foo.
+Derive Instance (Arbitrary, Show) for foo.
 Sample (arbitrary : G foo).
 
 Section Sanity.

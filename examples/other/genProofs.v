@@ -21,7 +21,7 @@ Inductive tree A : Type :=
 | Node : A -> tree A -> tree A -> tree A.
 
 
-Derive GenSized for tree.
+Derive Instance GenSized for tree.
 
 
 Instance GenTree_SizedMonotonic A {_ : Gen A} :
@@ -51,12 +51,12 @@ Inductive bst : nat -> nat -> tree1 -> Prop :=
     bst min max (Node1 n t1 t2).
 
 
-Derive EnumSizedSuchThat for (fun m => le n m).
-Derive ArbitrarySizedSuchThat for (fun m => le n m).
+Derive Instance EnumSizedSuchThat for (fun m => le n m).
+Derive Instance ArbitrarySizedSuchThat for (fun m => le n m).
 
-Derive DecOpt for (bst min max t).
-Derive EnumSizedSuchThat for (fun t => bst min max t).
-Derive ArbitrarySizedSuchThat for (fun t => bst min max t).
+Derive Instance DecOpt for (bst min max t).
+Derive Instance EnumSizedSuchThat for (fun t => bst min max t).
+Derive Instance ArbitrarySizedSuchThat for (fun t => bst min max t).
 
 Instance GenSizedSuchThatbst_SizedMonotonic min max :
   SizedMonotonicOpt (@arbitrarySizeST _ _ (@GenSizedSuchThatbst min max)).

@@ -11,7 +11,7 @@ Open Scope monad_scope.
 
 Set Bullet Behavior "Strict Subproofs".
 
-Derive ArbitrarySizedSuchThat for (fun x => eq x y).
+Derive Instance ArbitrarySizedSuchThat for (fun x => eq x y).
 
 Definition GenSizedSuchThateq_manual {A} (y_ : A) :=
   let fix aux_arb (init_size size : nat) (y_0 : A) {struct size} : G (option A) :=
@@ -31,8 +31,8 @@ Inductive Foo :=
 | Foo3 : nat -> Foo -> Foo.
 
 QuickChickWeights [(Foo1, 1); (Foo2, size); (Foo3, size)].
-Derive (Arbitrary, Show) for Foo.
-Derive EnumSized for Foo.
+Derive Instance (Arbitrary, Show) for Foo.
+Derive Instance EnumSized for Foo.
 
 (* Use custom formatting of generated code, and prove them equal (by reflexivity) *)
 
@@ -87,8 +87,8 @@ Inductive goodFoo : nat -> Foo -> Prop :=
 | GoodFoo : forall n foo,  goodFoo n foo.
 (* end good_foo *)
 
-Derive ArbitrarySizedSuchThat for (fun foo => goodFoo n foo).
-Derive EnumSizedSuchThat for (fun foo => goodFoo n foo).
+Derive Instance ArbitrarySizedSuchThat for (fun foo => goodFoo n foo).
+Derive Instance EnumSizedSuchThat for (fun foo => goodFoo n foo).
 
 (* Need to write it as 'fun x => goodFoo 0 x'. Sadly, 'goodFoo 0' doesn't work *)
 Definition g : G (option Foo) := @arbitrarySizeST _ (fun x => goodFoo 0 x) _ 4.
@@ -135,7 +135,7 @@ Inductive goodFooUnif : nat -> Foo -> Prop :=
 | GoodUnif : forall n, goodFooUnif n Foo1.
 (* end good_unif *)
 
-Derive ArbitrarySizedSuchThat for (fun foo => goodFooUnif n foo).
+Derive Instance ArbitrarySizedSuchThat for (fun foo => goodFooUnif n foo).
 
 Definition genGoodUnif (n : nat) :=
   let fix aux_arb init_size size n := 
@@ -159,7 +159,7 @@ Inductive goodFooCombo : nat -> Foo -> Prop :=
 | GoodCombo : forall n foo, goodFooCombo n (Foo2 foo).
 (* end good_foo_combo *)
 
-Derive ArbitrarySizedSuchThat for (fun foo => goodFooCombo n foo).
+Derive Instance ArbitrarySizedSuchThat for (fun foo => goodFooCombo n foo).
 
 Definition genGoodCombo `{_ : Arbitrary Foo} (n : nat) :=
   let fix aux_arb init_size size n := 
@@ -183,7 +183,7 @@ Inductive goodFooMatch : nat -> Foo -> Prop :=
 | GoodMatch : goodFooMatch 0 Foo1.
 (* end good_input_match *)
 
-Derive ArbitrarySizedSuchThat for (fun foo => goodFooMatch n foo).
+Derive Instance ArbitrarySizedSuchThat for (fun foo => goodFooMatch n foo).
 
 Definition genGoodMatch (n : nat) :=
   let fix aux_arb init_size size n := 
@@ -215,7 +215,7 @@ Inductive goodFooRec : nat -> Foo -> Prop :=
 | GoodRec : forall n foo, goodFooRec 0 foo -> goodFooRec n (Foo2 foo).
 (* end good_foo_rec *)
 
-Derive ArbitrarySizedSuchThat for (fun foo => goodFooRec n foo).
+Derive Instance ArbitrarySizedSuchThat for (fun foo => goodFooRec n foo).
 
 (* begin gen_good_rec *)
 Definition genGoodRec (n : nat) :=
@@ -239,7 +239,7 @@ Inductive goodFooPrec : nat -> Foo -> Prop :=
 | GoodPrecBase : forall n, goodFooPrec n Foo1
 | GoodPrec : forall n foo, goodFooPrec 0 Foo1 -> goodFooPrec n foo.
 
-Derive DecOpt for (goodFooPrec n foo).
+Derive Instance DecOpt for (goodFooPrec n foo).
 
 Definition DecOptgoodFooPrec_manual (n_ : nat) (foo_ : Foo) := 
  let fix aux_arb (init_size size0 n_0 : nat) (foo_0 : Foo) {struct size0} : option bool :=
@@ -274,7 +274,7 @@ Theorem DecOptgoodFooPrec_proof n foo :
   DecOptgoodFooPrec_manual n foo = @decOpt (goodFooPrec n foo) _.
 Proof. reflexivity. Qed.
 
-Derive ArbitrarySizedSuchThat for (fun foo => goodFooPrec n foo).
+Derive Instance ArbitrarySizedSuchThat for (fun foo => goodFooPrec n foo).
 
 Definition genGoodPrec (n : nat) : nat -> G (option (Foo)):=
  let
@@ -310,7 +310,7 @@ Inductive goodFooNarrow : nat -> Foo -> Prop :=
                         goodFooNarrow 1 foo -> 
                         goodFooNarrow n foo.
 
-Derive DecOpt for (goodFooNarrow n foo).
+Derive Instance DecOpt for (goodFooNarrow n foo).
 
 Definition goodFooNarrow_decOpt (n_ : nat) (foo_ : Foo) :=
   let fix aux_arb (init_size size0 n_0 : nat) (foo_0 : Foo) : option bool :=
@@ -348,7 +348,7 @@ Lemma goodFooNarrow_decOpt_correct n foo :
   goodFooNarrow_decOpt n foo = @decOpt (goodFooNarrow n foo) _.
 Proof. reflexivity. Qed. 
 
-Derive ArbitrarySizedSuchThat for (fun foo => goodFooNarrow n foo).
+Derive Instance ArbitrarySizedSuchThat for (fun foo => goodFooNarrow n foo).
 
 Definition genGoodNarrow (n : nat) : nat -> G (option (Foo)) :=
  let
@@ -377,8 +377,8 @@ Inductive goodFooNL : nat -> Foo -> Foo -> Prop :=
 Instance EqDecFoo (f1 f2 : Foo) : Dec (f1 = f2).
 Proof. dec_eq. Defined.
 
-Derive ArbitrarySizedSuchThat for (fun foo => goodFooNL n m foo).
-Derive DecOpt for (goodFooNL n m foo).
+Derive Instance ArbitrarySizedSuchThat for (fun foo => goodFooNL n m foo).
+Derive Instance DecOpt for (goodFooNL n m foo).
 
 (* Parameters don't work yet :)  *)
 
@@ -411,7 +411,7 @@ Inductive goodFooFalse : Foo -> Prop :=
 Instance arbFalse : Gen False. Admitted.
 
 Set Warnings "+quickchick-uninstantiated-variables".
-Fail Derive ArbitrarySizedSuchThat for (fun foo => goodFooFalse foo).
+Fail Derive Instance ArbitrarySizedSuchThat for (fun foo => goodFooFalse foo).
 Set Warnings "quickchick-uninstantiated-variables".
 
 Definition addFoo2 (x : Foo) := Foo2 x.
@@ -424,13 +424,13 @@ Fixpoint foo_depth f :=
   end.
 
 
-Derive ArbitrarySizedSuchThat for (fun n => goodFooPrec n x).
+Derive Instance ArbitrarySizedSuchThat for (fun n => goodFooPrec n x).
 
 Inductive goodFun : Foo -> Prop :=
 | GoodFun : forall (n : nat) (a : Foo), goodFooPrec n (addFoo2 a) ->
                                         goodFun a.
 
-Derive ArbitrarySizedSuchThat for (fun a => goodFun a).
+Derive Instance ArbitrarySizedSuchThat for (fun a => goodFun a).
 
 Inductive Foo_and : (bool * bool) -> bool -> Prop :=
   | Foo_andtt : Foo_and (true, true) true.
@@ -444,8 +444,8 @@ Inductive Foo_rel : nat -> bool -> Prop :=
        Foo_rel a2 l2 ->
        Foo_rel a1 l.
 
-Derive Generator for (fun l12 => Foo_and l12 l).
-Derive Generator for (fun a => Foo_rel a b).
+Derive Instance Generator for (fun l12 => Foo_and l12 l).
+Derive Instance Generator for (fun a => Foo_rel a b).
 
 Definition gen_foo_and (l : bool) : nat -> G (option (bool * bool)) :=
     let

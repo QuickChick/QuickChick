@@ -15,36 +15,36 @@ Inductive Zoo (A : Type) {B : Type}: Type :=
 | Zoo4 : Zoo A.
 
 (** Generators for type  *)
-Derive Arbitrary for Zoo.
+Derive Instance Arbitrary for Zoo.
 (* 
 genSZoo is defined
 shrZoo is defined
 *)
 
 (** Size of type *)
-Derive Sized for Zoo.
+Derive Instance Sized for Zoo.
 (*
 SizedZoo is defined
 *)
 
 (** Size equations *)
-Derive CanonicalSized for Zoo.
+Derive Instance CanonicalSized for Zoo.
 (*
 CanonicalSizedZoo is defined
  *)
 
-Derive SizeMonotonic for Zoo using genSZoo.
+Derive Instance SizeMonotonic for Zoo using genSZoo.
 (*
 SizeMonotonicZoo is defined
  *)
 
-Derive SizedMonotonic for Zoo.
+Derive Instance SizedMonotonic for Zoo.
 
 (*
 SizedMonotonicZoo is defined
 *)
 
-Derive SizedCorrect for Zoo using genSZoo and SizeMonotonicZoo.
+Derive Instance SizedCorrect for Zoo using genSZoo and SizeMonotonicZoo.
 (*
 SizedCorrectZoo is defined
 *)
