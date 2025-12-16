@@ -1271,7 +1271,14 @@ let create_names_for_anon a =
 #endif
      end
   | _ -> failwith "Non RawAssum in create_names"
-    
+
+let default_poly =
+#if COQ_VERSION >= (9, 2, 0)
+  PolyFlags.default
+#else
+  false
+#endif
+
 let declare_class_instance ?(global=true) ?(priority=42) instance_arguments instance_name instance_type instance_record =
   msg_debug (str "Declaring class instance..." ++ fnl ());
   msg_debug (str (Printf.sprintf "Total arguments: %d" (List.length instance_arguments)) ++ fnl ());
@@ -1289,7 +1296,7 @@ let declare_class_instance ?(global=true) ?(priority=42) instance_arguments inst
 #else
       ~global
 #endif
-              ~poly:false
+              ~poly:default_poly
               (CAst.make @@ Name (Id.of_string instance_name), None) iargs
               instance_type_vars
               (true, instance_record_vars) (* TODO: true or false? *)
@@ -1323,7 +1330,7 @@ let define_new_inductive (ty_ctr, ty_params, ctrs, typ) =
     } in
   let env = Global.env () in
   let evd = Evd.from_env env in
-  let uentry = Evd.univ_entry ~poly:false evd in
+  let uentry = Evd.univ_entry ~poly:default_poly evd in
   let impls = [] in
   Flags.quiet := false;
   msg_debug (str "About to declare: " ++ fnl ());
@@ -1367,14 +1374,14 @@ let define_new_fixpoint (functions : (var * arg list * var * coq_expr * coq_expr
 #if COQ_VERSION >= (9, 1, 0)
   ~refine:false
 #endif
-  ~poly:false ~kind ~program_mode:false (CFixRecOrder rec_orders, fixpoint_exprs))
+  ~poly:default_poly ~kind ~program_mode:false (CFixRecOrder rec_orders, fixpoint_exprs))
 #elif COQ_VERSION >= (8, 20, 0)
-  ignore (ComFixpoint.do_fixpoint ~poly:false fixpoint_exprs)
+  ignore (ComFixpoint.do_fixpoint ~poly:default_poly fixpoint_exprs)
 #elif COQ_VERSION >= (8, 16, 0)
-  ComFixpoint.do_fixpoint ~poly:false fixpoint_exprs
+  ComFixpoint.do_fixpoint ~poly:default_poly fixpoint_exprs
 #else
   let default_scope = Locality.Global Locality.ImportDefaultBehavior in
-  ComFixpoint.do_fixpoint ~scope:default_scope ~poly:false fixpoint_exprs
+  ComFixpoint.do_fixpoint ~scope:default_scope ~poly:default_poly fixpoint_exprs
 #endif
 
 
