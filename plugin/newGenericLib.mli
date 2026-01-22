@@ -118,9 +118,26 @@ type schedule = schedule_step list * schedule_sort
 
 type derive_sort = D_Gen | D_Enum | D_Check | D_Thm
 
-val possible_schedules : (ty_param * rocq_type) list ->
+val debug_mode : bool ref
+
+val possible_schedules : (var * rocq_type) list ->
   rocq_type list ->
-  ty_param list -> constructor * int list ->
+  var list -> constructor * int list ->
+  derive_sort -> schedule_step list list
+
+  (* val possible_schedules_lazy : (var * rocq_type) list ->
+    rocq_type list ->
+    var list -> constructor * int list ->
+    derive_sort -> schedule_step list Seq.t *)
+
+(* val possible_schedules_pruned : ?max_schedules:int -> (var * rocq_type) list ->
+  rocq_type list ->
+  var list -> constructor * int list ->
+  derive_sort -> schedule_step list list *)
+
+val possible_schedules_with_advanced_pruning : ?max_schedules:int -> (var * rocq_type) list ->
+  rocq_type list ->
+  var list -> constructor * int list ->
   derive_sort -> schedule_step list list
 
 val schedule_step_to_string : schedule_step -> string
