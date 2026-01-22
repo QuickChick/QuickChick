@@ -225,7 +225,13 @@ Definition eq_gen_iio := let funn := (fun (size' : Coq.Init.Datatypes.nat) (init
         (@Coq.Init.Datatypes.nil _))) in
                          fun size : Coq.Init.Datatypes.nat => @funn size size.
 
-  
+Derive GenSized for Typ.
+Derive GenSized for Expr.
+Derive GenSized for Ctx. 
+Derive GenSized for option.
+
+Instance DecEq_Expr : Dec_Eq Expr. dec_eq. Defined.
+Instance DecEq_Typ : Dec_Eq Typ. dec_eq. Defined.
   
 Theorem preservation : forall g e t e', typing g e t -> pstep e = Some e' -> typing g e' t.
 Proof. schedules. valid_schedules. quickchick.  

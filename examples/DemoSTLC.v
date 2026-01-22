@@ -108,6 +108,9 @@ Derive Show for term.
 Derive Show for env. Check prod.
 
 Derive GenSized for prod.
+Derive GenSized for typ.
+Derive GenSized for term.
+Derive GenSized for env.
 
 Inductive blah  (A : Type) : list A -> Prop :=
   | blah_1 : forall l a, blah A (a :: l).

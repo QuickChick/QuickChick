@@ -15,7 +15,7 @@ Inductive exp :=
 | And (e1 e2 : exp)
 | Or (e1 e2 : exp)
 | Lt (e1 e2 : exp).
-
+Derive (Arbitrary, Show) for exp.
 Inductive even : nat -> Prop :=
 | even0 : even 0
 | evenS n : odd n -> even (S n)
@@ -30,15 +30,16 @@ Print GenSizedSuchThat_even_O.
 Print sizedGen. Print run.
 
 Theorem even_SS : forall n, even n -> even (S (S n)).
-quickchick.
-Print theorem.
+(*quickchick.*)
+(*Print theorem.
 
 Print DecOpt_even_I.
 QuickChick (sized (fun n => theorem (S (S n)))).
 
 
 Sample (sized (fun n => GenSizedSuchThat_even_O (4 * (n + 10)))).
-
+ *)
+Abort.
 Inductive res :=
 | N (n : nat)
 | B (b : bool).
@@ -53,8 +54,8 @@ QuickChickDebug Debug On.
 Theorem plus_is_positive : forall n m npm, plus n m npm -> npm <= m.
 Proof.
  (* quickchick.
-  QuickChick (sized theorem).*)
-  Extract Constant defNumTests => "100000".
+  QuickChick (sized theorem).
+  Extract Constant defNumTests => "100000".*)
   Abort.
 
 Print checker.
@@ -108,11 +109,20 @@ Derive Inductive Schedule eval 0 derive "Gen" opt "true".
 
 Derive Inductive Schedule eval 1 derive "Gen" opt "true".
 
-Sample (sized (fun n => GenSizedSuchThat_le_IO n 100)).
-
 Derive Show for exp.
 
-Sample (sized (fun n => GenSizedSuchThat_eval_OIII n 1 3 (N 4))).
+
+
+Sample ( GenSizedSuchThat_eval_OIII (1) 1 3 (N 4)).
+
+
+Definition test_cases : list (nat * nat * res) :=
+  [ (4,2,N 4);(2,5,N 5);(1,1,N 1) ].
+
+Inductive Elem {A} : A -> list A -> Prop :=
+| Elem_Now : forall x l, Elem x (cons x l)
+| Elem_Lat : forall x y l, Elem x l -> Elem x (cons y l).
+                                          
 
 
 Print GenSizedSuchThat_le_IO.
@@ -239,7 +249,7 @@ Definition prop (ts : list (nat * nat * res)) :=
   | _ => false
   end) ts))).
 
-Definition test_cases : list (nat * nat * res) :=
+Definition test_cases' : list (nat * nat * res) :=
   [ (4,2,N 4);(2,5,N 5);(1,1,N 1) ].
 
 Extract Constant defNumTests => "100000". 
@@ -257,6 +267,8 @@ Print andBind.*)
 Merge (fun e => eval e x y r) With (fun e => eval e x' y' r') As EVAL.
 
 Derive Inductive Schedule EVAL 6 derive "Gen" opt "true".
+
+Sample (GenSizedSuchThat_EVAL_IIIIIIO 3 1 0 (N 1) 1 2 (N 2)).
 
 (*Inductive EVAL : res -> res -> exp -> Prop :=
   | Eval_Lt_FEval_Lt_F : forall  (e1' e2' : exp) (n1' n2' n1 n2 : nat),
@@ -304,7 +316,7 @@ Derive Inductive Schedule le 0 1 derive "Gen" opt "true". Print GenSizedSuchThat
 Derive Inductive Schedule EVAL 2 derive "Gen" opt "true".*)
 
 
-
+(*
 Inductive EVAL : nat -> nat -> res -> nat -> nat -> res -> exp -> Prop :=
   | Eval_Lt_FEval_Lt_F : forall (x' y' : nat) (e1' e2' : exp) (n1' n2' x y n1 n2 : nat),
                          n2' <= n1' ->
@@ -341,67 +353,51 @@ Inductive EVAL : nat -> nat -> res -> nat -> nat -> res -> exp -> Prop :=
   | Eval_1Eval_1 : forall x' y' x y : nat, EVAL x y (N 1) x' y' (N 1) One
   | Eval_0Eval_0 : forall x' y' x y : nat, EVAL x y (N 0) x' y' (N 0) Zero 
   | Eval_YEval_Y : forall x' y' x y : nat, EVAL x y (N y) x' y' (N y') Y
-| Eval_XEval_X : forall x' y' x y : nat, EVAL x y (N x) x' y' (N x') X .
+| Eval_XEval_X : forall x' y' x y : nat, EVAL x y (N x) x' y' (N x') X .*)
 
 Merge (fun e => EVAL x y r x' y' r' e) With (fun e => eval e x'' y'' r'') As EVAL'.
 
 Print EVAL'.
 
-Time Derive Inductive Schedule EVAL 6  derive "Enum" opt "true".
+Derive EnumSized for exp.
 
+Time Derive Inductive Schedule EVAL' 9  derive "Gen" opt "true".
 
+Sample (GenSizedSuchThat_EVAL'_IIIIIIIIIO 5 1 0 (N 1) 1 2 (N 2) 0 5 (N 5)).
 
-Check EnumSizedSuchThatEVAL_IIIIIIO.
-
-Compute (EnumSizedSuchThatEVAL_IIIIIIO 2 4 2 (N 4) 3 5 (N 5)).
-
-Print EnumSizedSuchThatEVAL_IIIIIIO.
-
-Time Derive Inductive Schedule EVAL 6  derive "Gen" opt "true".
-
-
-
-Check GenSizedSuchThatEVAL_IIIIIIO.
-
-Sample (GenSizedSuchThatEVAL_IIIIIIO 2 4 2 (N 4) 3 5 (N 5)).
+Derive Inductive Schedule eval derive "Check" opt "true".
 
 Definition prop' (ts : list (nat * nat * res)) :=
   let genSize := 5 in
   let defElemIgnore := (0,0, N 0) in
   forAll (elems_ defElemIgnore ts) (fun '(x,y,r) =>
   forAll (elems_ defElemIgnore ts) (fun '(x',y',r') =>
+  forAll (elems_ defElemIgnore ts) (fun '(x'',y'',r'') =>                                                                      
                                                                           
-  forAllShrinkMaybe (GenSizedSuchThatEVAL_IIIIIIO genSize x y r x' y' r') shrinker (fun e => 
+  forAllShrinkMaybe (GenSizedSuchThat_EVAL'_IIIIIIIIIO genSize x y r x' y' r' x'' y'' r'') shrinker (fun e => 
   negb (forallb (fun '(x,y,r) => 
-  match DecOpteval_IIII 10 e x y r
+  match DecOpt_eval_IIII 10 e x y r
                 with
   | Some true => true
   | _ => false
-  end) ts)))).
+  end) ts))))).
 
-Definition test_cases' : list (nat * nat * res) :=
-  [ (4,2,N 4);(2,5,N 1);(1,1,N 1) ].
+Definition test_cases'' : list (nat * nat * res) :=
+  [ (4,2,N 4);(2,5,N 1);(1,1,N 1); (0,0,N 0) ].
 
 Extract Constant defNumTests => "100000". 
-QuickChick (prop' test_cases').
+QuickChick (prop' test_cases'').
 
 
-Merge (fun e => eval e x1 y1 r1) With (fun e => eval e x2 y2 r2) As EVAL.
+Compute (DecOpt_eval_IIII 10 (ite (Lt One Zero) (Or One (ite T (Or F X) One)) (ite T Y X)) 4 2 (N 4)).
+(*QuickChick (prop' [(1,1,B true); (3,3,B true); (0,1,B false); (0,2,B false); (0,0,B true); (2,0,B false)]).*)
 
-Print EVAL.
-
-
-Compute (EnumSizedSuchThateval_IIIO 3 (LT One Zero)
-
-Compute (DecOpteval_IIII 10 (ite (Lt One Zero) (Or One (ite T (Or F X) One)) (ite T Y X)) 4 2 (N 4)).
-QuickChick (prop [(1,1,B true); (3,3,B true); (0,1,B false); (0,2,B false); (0,0,B true); (2,0,B false)]).
-
-Derive Inductive Schedule eval 3 derive "Gen" opt "true".
+Derive Inductive Schedule eval 1 2 3 derive "Gen" opt "true".
 
 
-Derive Valid Schedules eval 3 consnum 8.
+Derive Valid Schedules EVAL' 9 consnum 8 derive "Gen".
 
-Derive Density eval 0.
+Derive Density EVAL 6 derive "Gen".
 
 Compute (evalc (ite (Lt X Y) Y X) 1 1).
 Definition eqe x y := ite (Lt x y) F (ite (Lt y x) F T).

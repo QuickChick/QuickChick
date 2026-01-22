@@ -17,3 +17,9 @@
   (modules mutation)
   (flags :standard -w -39-67)
   (libraries zarith))
+
+(test
+  (name test_dependency_ordering)
+  (modules test_dependency_ordering)
+  (flags :standard -rectypes)
+  (libraries coq-quickchick.plugin))

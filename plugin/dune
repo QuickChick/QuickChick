@@ -1,9 +1,9 @@
 (library
  (name quickchick_plugin)
  (public_name coq-quickchick.plugin)
- (flags :standard -rectypes -warn-error -3-26-32-34-37 -w -8-27+40)
- (modules :standard \ genSTCorrect genSizedSTMonotonic genSizedSTSizeMonotonic)
- (libraries unix str
+ (flags :standard -rectypes -warn-error -3-26-32-34-37-39 -w -8-27+40)
+ (modules :standard \ genSTCorrect genSizedSTMonotonic genSizedSTSizeMonotonic test_dep_ordering)
+ (libraries unix str coq-core.kernel coq-core.library
   (select void_for_linking-plugin-extraction from
    (coq-core.plugins.extraction -> void_for_linking-plugin-extraction.empty)
    (coq.plugins.extraction -> void_for_linking-plugin-extraction.empty))
@@ -11,6 +11,13 @@
    (coq-core.plugins.ltac -> void_for_linking-plugin-ltac.empty)
    (coq.plugins.ltac -> void_for_linking-plugin-ltac.empty))
   ))
+
+(executable
+ (name test_dep_ordering)
+ (flags :standard -rectypes -w -8-27+40 -warn-error -3-26-32-34-37-39)
+ (modules test_dep_ordering)
+ (libraries quickchick_plugin unix str coq-core.kernel coq-core.library)
+ (public_name test_dep_ordering))
 
 (rule
  (targets driver.ml)
@@ -36,46 +43,50 @@
 (rule (action (write-file void_for_linking-plugin-ltac.empty "")))
 
 (rule
-  (alias compat)
-  (target depDriver.ml)
-  (action (run sh %{dep:../scripts/mycppo} %{dep:depDriver.ml.cppo} %{target})))
+ (target depDriver.ml)
+ (deps ../scripts/mycppo depDriver.ml.cppo)
+ (action (run sh %{dep:../scripts/mycppo} %{dep:depDriver.ml.cppo} %{target})))
 (rule
-  (alias compat)
-  (target newDepDriver.ml)
-  (action (run sh %{dep:../scripts/mycppo} %{dep:newDepDriver.ml.cppo} %{target})))
+ (target newDepDriver.ml)
+ (deps ../scripts/mycppo newDepDriver.ml.cppo)
+ (action (run sh %{dep:../scripts/mycppo} %{dep:newDepDriver.ml.cppo} %{target})))
 (rule
-  (alias compat)
-  (target genericLib.ml)
-  (action (run sh %{dep:../scripts/mycppo} %{dep:genericLib.ml.cppo} %{target})))
+ (target genericLib.ml)
+ (deps ../scripts/mycppo genericLib.ml.cppo)
+ (action (run sh %{dep:../scripts/mycppo} %{dep:genericLib.ml.cppo} %{target})))
 (rule
-  (alias compat)
-  (target mergeTypes.ml)
-  (action (run sh %{dep:../scripts/mycppo} %{dep:mergeTypes.ml.cppo} %{target})))
+ (target mergeTypes.ml)
+ (deps ../scripts/mycppo mergeTypes.ml.cppo)
+ (action (run sh %{dep:../scripts/mycppo} %{dep:mergeTypes.ml.cppo} %{target})))
 (rule
-  (alias compat)
-  (target quickChick.mlg)
-  (action (run sh %{dep:../scripts/mycppo} %{dep:quickChick.mlg.cppo} %{target})))
+ (target quickChick.mlg)
+ (deps ../scripts/mycppo quickChick.mlg.cppo)
+ (action (run sh %{dep:../scripts/mycppo} %{dep:quickChick.mlg.cppo} %{target})))
 (rule
-  (alias compat)
-  (target tactic_quickchick.mlg)
-  (action (run sh %{dep:../scripts/mycppo} %{dep:tactic_quickchick.mlg.cppo} %{target})))
+ (target quickChick.mli)
+ (deps ../scripts/mycppo quickChick.mli.cppo)
+ (action (run sh %{dep:../scripts/mycppo} %{dep:quickChick.mli.cppo} %{target})))
 (rule
-  (alias compat)
-  (target unifyQC.ml)
-  (action (run sh %{dep:../scripts/mycppo} %{dep:unifyQC.ml.cppo} %{target})))
+ (target tactic_quickchick.mlg)
+ (deps ../scripts/mycppo tactic_quickchick.mlg.cppo)
+ (action (run sh %{dep:../scripts/mycppo} %{dep:tactic_quickchick.mlg.cppo} %{target})))
 (rule
-  (alias compat)
-  (target unifyQC.mli)
-  (action (run sh %{dep:../scripts/mycppo} %{dep:unifyQC.mli.cppo} %{target})))
+ (target unifyQC.ml)
+ (deps ../scripts/mycppo unifyQC.ml.cppo)
+ (action (run sh %{dep:../scripts/mycppo} %{dep:unifyQC.ml.cppo} %{target})))
 (rule
-  (alias compat)
-  (target newUnifyQC.ml)
-  (action (run sh %{dep:../scripts/mycppo} %{dep:newUnifyQC.ml.cppo} %{target})))
+ (target unifyQC.mli)
+ (deps ../scripts/mycppo unifyQC.mli.cppo)
+ (action (run sh %{dep:../scripts/mycppo} %{dep:unifyQC.mli.cppo} %{target})))
 (rule
-  (alias compat)
-  (target newUnifyQC.mli)
-  (action (run sh %{dep:../scripts/mycppo} %{dep:newUnifyQC.mli.cppo} %{target})))
+ (target newUnifyQC.ml)
+ (deps ../scripts/mycppo newUnifyQC.ml.cppo)
+ (action (run sh %{dep:../scripts/mycppo} %{dep:newUnifyQC.ml.cppo} %{target})))
 (rule
-  (alias compat)
-  (target weightmap.mlg)
-  (action (run sh %{dep:../scripts/mycppo} %{dep:weightmap.mlg.cppo} %{target})))
+ (target newUnifyQC.mli)
+ (deps ../scripts/mycppo newUnifyQC.mli.cppo)
+ (action (run sh %{dep:../scripts/mycppo} %{dep:newUnifyQC.mli.cppo} %{target})))
+(rule
+ (target weightmap.mlg)
+ (deps ../scripts/mycppo weightmap.mlg.cppo)
+ (action (run sh %{dep:../scripts/mycppo} %{dep:weightmap.mlg.cppo} %{target})))
