@@ -1,5 +1,14 @@
 version: 2.1
 
+# Fixed: parameters section moved outside defaults to support parameter references
+parameters:
+  coq:
+    type: string
+    default: "coqorg/coq:8.15"
+  skip:
+    type: string
+    default: ""
+
 defaults: &defaults
   environment:
     OPAMJOBS: 2
@@ -7,14 +16,9 @@ defaults: &defaults
     OPAMYES: true
     OPAMWITHTEST: true
     TERM: xterm
-    SKIP_BUILD: <<parameters.skip>>
-  parameters:
-    coq:
-      type: string
-    skip:
-      type: string
+    SKIP_BUILD: ""
   docker:
-    - image: <<parameters.coq>>
+    - image: coqorg/coq:8.15
 
 commands:
   startup:
@@ -52,7 +56,7 @@ commands:
           dune install coq-quickchick   # Make quickChick tool available on path
           dune build @cram
     - run:
-        name: Test dependants
+        name: Test dependents
         no_output_timeout: 20m
         command: |
           PINS=$(echo `opam list -s --pinned --columns=package` | sed 's/ /,/g')
