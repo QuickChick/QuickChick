@@ -1,5 +1,14 @@
 version: 2.1
 
+# Parameters must be at the top level (outside defaults) for CircleCI 2.1
+parameters:
+  coq:
+    type: string
+    default: "coqorg/coq:8.15"
+  skip:
+    type: string
+    default: ""
+
 defaults: &defaults
   environment:
     OPAMJOBS: 2
@@ -8,11 +17,6 @@ defaults: &defaults
     OPAMWITHTEST: true
     TERM: xterm
     SKIP_BUILD: <<parameters.skip>>
-  parameters:
-    coq:
-      type: string
-    skip:
-      type: string
   docker:
     - image: <<parameters.coq>>
 
@@ -52,11 +56,11 @@ commands:
           dune install coq-quickchick   # Make quickChick tool available on path
           dune build @cram
     - run:
-        name: Test dependants
+        name: Test dependents
         no_output_timeout: 20m
         command: |
           PINS=$(echo `opam list -s --pinned --columns=package` | sed 's/ /,/g')
-          PACKAGES=`opam list -s --depends-on coq-quickchick --coinstallable-with $PINS`
+          PACKAGES=`opam list -s --depends-on coq-quickchick --installable-with $PINS`
           for PACKAGE in $PACKAGES
           do DEPS_FAILED=false
              echo $SKIP_BUILD | tr ' ' '\n' | grep ^$PACKAGE$ > /dev/null &&
@@ -91,39 +95,6 @@ workflows:
   version: 2
   build:
     jobs:
-      - test:
-          name: Coq 8.15
-          coq: 'coqorg/coq:8.15'
-          skip: ''
-      - test:
-          name: Coq 8.16
-          coq: 'coqorg/coq:8.16'
-          skip: ''
-      - test:
-          name: Coq 8.17
-          coq: 'coqorg/coq:8.17'
-          skip: ''
-      - test:
-          name: Coq 8.18
-          coq: 'coqorg/coq:8.18'
-          skip: ''
-      - test:
-          name: Coq 8.19
-          coq: 'coqorg/coq:8.19'
-          skip: ''
-      - test:
-          name: Coq 8.20
-          coq: 'coqorg/coq:8.20'
-          skip: ''
-      - test:
-          name: Rocq 9.0
-          coq: 'rocq/rocq-prover:9.0'
-          skip: 'rocq-vellvm'
-      - test:
-          name: Rocq dev
-          coq: 'rocq/rocq-prover:dev'
-          skip: 'rocq-vellvm'
-      - opam-install:
-          name: Install and test
-          coq: 'coqorg/coq:8.19'
-          skip: ''
+      # Reference jobs defined above by name only - don't redefine them inline
+      - test
+      - opam-install
