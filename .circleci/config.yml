@@ -1,5 +1,14 @@
 version: 2.1
 
+# Parameters must be at the top level (outside defaults) for CircleCI 2.1
+parameters:
+  coq:
+    type: string
+    default: "coqorg/coq:8.15"
+  skip:
+    type: string
+    default: ""
+
 defaults: &defaults
   environment:
     OPAMJOBS: 2
@@ -8,11 +17,6 @@ defaults: &defaults
     OPAMWITHTEST: true
     TERM: xterm
     SKIP_BUILD: <<parameters.skip>>
-  parameters:
-    coq:
-      type: string
-    skip:
-      type: string
   docker:
     - image: <<parameters.coq>>
 
@@ -52,7 +56,7 @@ commands:
           dune install coq-quickchick   # Make quickChick tool available on path
           dune build @cram
     - run:
-        name: Test dependants
+        name: Test dependents
         no_output_timeout: 20m
         command: |
           PINS=$(echo `opam list -s --pinned --columns=package` | sed 's/ /,/g')
