@@ -46,6 +46,15 @@ let modules_to_open : string list ref =
   Summary.ref ~name:"QC_modules_to_open" empty_slist
 let add_module_to_open s = modules_to_open := s :: !modules_to_open  
 
+(* Shell command to run on extracted file before compilation.
+   The shell command should read the extracted file as the variable
+   [%{inputfile}] and write the result as [%{outputfile}].
+   Example value: [sed "s/foo/bar/" %{inputfile} > %{outputfile}].
+   Set to empty string "" to skip. *)
+let preprocess_script : string ref =
+  Summary.ref ~name:"QC_preprocess_script" ""
+let set_preprocess_script s = preprocess_script := s
+
 (* [mkdir -p]: recursively make the parent directories if they do not exist. *)
 let rec mkdir_ dname =
   let cmd () = Unix.mkdir dname 0o755 in
@@ -108,6 +117,22 @@ let fresh_name n =
     in
     (* Safe fresh name generation. *)
     Namegen.next_ident_away_from base is_visible_name
+
+let preprocess_re = Str.regexp "%{inputfile}\\|%{outputfile}"
+
+(* Preprocess file in-place *)
+let preprocess file =
+  if !preprocess_script <> "" then
+    let tmp = file ^ ".tmp" in
+    let f s = match Str.matched_string s with
+      | "%{inputfile}" -> file
+      | "%{outputfile}" -> tmp
+      | s -> assert false in
+    let script = Str.global_substitute preprocess_re f !preprocess_script in
+    match Sys.command script with
+    | 0 -> ignore (Sys.command (Printf.sprintf "mv %s %s" tmp file))
+    | _ -> failwith "Preprocessing failed."
+;;
 
 (** [define c] introduces a fresh constant name for the term [c]. *)
 let define c env evd =
@@ -180,6 +205,9 @@ let define_and_run c env evd =
     if Str.string_match tmp_int_re line 0 then
       "type tmptmptmp = int;; type int = tmptmptmp"
     else line);
+
+  preprocess mlf;
+
   (* Compile the extracted code *)
   (* Extraction sometimes produces ML code that does not implement its interface.
      We circumvent this problem by erasing the interface. **)
@@ -770,10 +798,6 @@ VERNAC COMMAND EXTEND QCExtractDir CLASSIFIED AS SIDEFF
   | ["QCExtractDir" string(s)] -> { set_extract_dir s }
 END
 
-
-
-
-
-
-
-
+VERNAC COMMAND EXTEND QCPreprocess CLASSIFIED AS SIDEFF
+  | ["QCPreprocess" string(s)] -> { set_preprocess_script s }
+END
