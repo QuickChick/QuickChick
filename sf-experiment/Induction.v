@@ -10,6 +10,7 @@ Import ListNotations.
 (*
 From mathcomp Require Import ssreflect ssrfun ssrbool.
 From mathcomp Require Import seq ssrnat eqtype.
+Set SsrOldRewriteGoalsOrder.  (* change Set to Unset when porting the file, then remove the line when requiring MathComp >= 2.6 *)
 *)
 
 Definition plus_n_O (n:nat) :=

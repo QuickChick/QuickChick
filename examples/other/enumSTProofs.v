@@ -7,6 +7,7 @@ Require Import enumProofs.
 
 Import ListNotations.
 From mathcomp Require Import ssreflect ssrfun ssrbool ssrnat eqtype seq.
+Set SsrOldRewriteGoalsOrder.  (* change Set to Unset when porting the file, then remove the line when requiring MathComp >= 2.6 *)
 
 From Ltac2 Require Import Ltac2.
 

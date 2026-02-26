@@ -5,6 +5,7 @@ From QuickChick Require Import QuickChick.
 Require Import Arith List Lia.
 From QuickChick.stlc Require Import lambda.
 Require Import Wellfounded.
+Set SsrOldRewriteGoalsOrder.  (* change Set to Unset when porting the file, then remove the line when requiring MathComp >= 2.6 *)
 
 Open Scope coq_nat.
 

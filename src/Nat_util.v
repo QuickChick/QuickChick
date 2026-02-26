@@ -4,6 +4,7 @@ From mathcomp Require Import ssreflect ssrnat eqtype seq.
 From Coq Require Import List ZArith ssreflect ssrfun ssrbool Lia.
 From QuickChick Require Import Tactics.
 Import ListNotations.
+Set SsrOldRewriteGoalsOrder.  (* change Set to Unset when porting the file, then remove the line when requiring MathComp >= 2.6 *)
 
 (* TODO rename this file to util.v -- not only for nats *)
 

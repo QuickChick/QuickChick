@@ -1,6 +1,7 @@
 From Coq Require Import PArith List ChoiceFacts Lia ssreflect ssrbool ssrfun.
 
 From QuickChick Require Import Compat Classes RandomQC Generators Sets.
+Set SsrOldRewriteGoalsOrder.  (* change Set to Unset when porting the file, then remove the line when requiring MathComp >= 2.6 *)
 
 Import ListNotations.
 

@@ -3,6 +3,7 @@ From mathcomp Require Import ssreflect ssrnat ssrbool eqtype.
 Require Import List String Lia.
 From QuickChick Require Import QuickChick.
 Local Open Scope set_scope.
+Set SsrOldRewriteGoalsOrder.  (* change Set to Unset when porting the file, then remove the line when requiring MathComp >= 2.6 *)
 
 From QuickChick.RedBlack Require Import redblack testing.
 

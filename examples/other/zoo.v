@@ -2,6 +2,7 @@ From QuickChick Require Import QuickChick Tactics.
 Require Import String List. Open Scope string.
 
 From mathcomp Require Import ssreflect ssrfun ssrbool ssrnat eqtype seq.
+Set SsrOldRewriteGoalsOrder.  (* change Set to Unset when porting the file, then remove the line when requiring MathComp >= 2.6 *)
 
 Import Classes QcDefaultNotation ListNotations.
 (* XXX this is required because there is a name clash with
