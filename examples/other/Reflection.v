@@ -1,6 +1,7 @@
 From Coq Require Import Init.Nat Lia List.
 From QuickChick Require Import QuickChick CheckerProofs EnumProofs.
 From mathcomp Require Import ssreflect eqtype.
+Set SsrOldRewriteGoalsOrder.  (* change Set to Unset when porting the file, then remove the line when requiring MathComp >= 2.6 *)
 
 Import ListNotations.
 

@@ -3,6 +3,7 @@ Require Import Arith List String Lia.
 Require Import Program Relations Wellfounded Lexicographic_Product.
 From QuickChick Require Import QuickChick.
 From QuickChick.stlc Require Import monad.
+Set SsrOldRewriteGoalsOrder.  (* change Set to Unset when porting the file, then remove the line when requiring MathComp >= 2.6 *)
 
 Import ListNotations.
 

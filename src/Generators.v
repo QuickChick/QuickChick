@@ -2,6 +2,7 @@ Set Warnings "-notation-overridden,-parsing".
 
 From Coq Require Import String List ZArith Lia ssreflect ssrfun ssrbool.
 From mathcomp Require Import ssrnat eqtype seq.
+Set SsrOldRewriteGoalsOrder.  (* change Set to Unset when porting the file, then remove the line when requiring MathComp >= 2.6 *)
 
 From QuickChick Require Import
      RandomQC RoseTrees Sets Tactics Producer.

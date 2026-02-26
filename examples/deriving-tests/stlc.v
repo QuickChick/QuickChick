@@ -2,6 +2,7 @@ From mathcomp Require Import ssreflect ssrbool eqtype.
 Require Import Arith List String Lia.
 From QuickChick Require Import QuickChick.
 Import ListNotations.
+Set SsrOldRewriteGoalsOrder.  (* change Set to Unset when porting the file, then remove the line when requiring MathComp >= 2.6 *)
 
 (* Types *)
 

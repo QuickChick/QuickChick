@@ -3,6 +3,7 @@ Set Warnings "-notation-overridden,-parsing".
 From Coq Require Import ssreflect ssrbool.
 From mathcomp Require Import ssrnat eqtype.
 From QuickChick Require Import Show Sets Generators Producer RoseTrees Checker Classes.
+Set SsrOldRewriteGoalsOrder.  (* change Set to Unset when porting the file, then remove the line when requiring MathComp >= 2.6 *)
 
 Import QcDefaultNotation.
 Local Open Scope set_scope.

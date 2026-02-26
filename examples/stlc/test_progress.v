@@ -1,6 +1,7 @@
 From QuickChick Require Import QuickChick.
 From mathcomp Require Import ssreflect ssrbool.
 From QuickChick.stlc Require Import monad lambda.
+Set SsrOldRewriteGoalsOrder.  (* change Set to Unset when porting the file, then remove the line when requiring MathComp >= 2.6 *)
 
 
 (* Note : In general we would need a type checking/inferring function for this.

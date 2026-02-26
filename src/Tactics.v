@@ -2,6 +2,7 @@ Set Warnings "-notation-overridden,-parsing".
 
 From Coq Require Import ZArith Lia ssreflect ssrfun ssrbool.
 From mathcomp Require Import ssrnat eqtype seq.
+Set SsrOldRewriteGoalsOrder.  (* change Set to Unset when porting the file, then remove the line when requiring MathComp >= 2.6 *)
 
 Ltac inv H := inversion H; subst.
 

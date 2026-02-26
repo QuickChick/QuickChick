@@ -5,6 +5,7 @@ From Ltac2 Require Import Ltac2.
 Set Warnings "-notation-overwritten, -parsing".
 From mathcomp Require Import ssrnat eqtype seq.
 Set Bullet Behavior "Strict Subproofs".
+Set SsrOldRewriteGoalsOrder.  (* change Set to Unset when porting the file, then remove the line when requiring MathComp >= 2.6 *)
 
 From QuickChick Require Import Tactics TacticsUtil Instances Classes DependentClasses Sets
         Producer Generators EnumProofs Checker Decidability CheckerProofs.

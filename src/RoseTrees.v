@@ -3,6 +3,7 @@
 From Coq Require Import List.
 From mathcomp Require Import ssreflect.
 Set Implicit Arguments.
+Set SsrOldRewriteGoalsOrder.  (* change Set to Unset when porting the file, then remove the line when requiring MathComp >= 2.6 *)
 
 Record Lazy (T : Type) := lazy { force : T }.
 

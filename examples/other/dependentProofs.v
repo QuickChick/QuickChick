@@ -3,6 +3,7 @@ Require Import String. Open Scope string.
 Require Import List.
 
 From mathcomp Require Import ssreflect ssrfun ssrbool ssrnat eqtype seq.
+Set SsrOldRewriteGoalsOrder.  (* change Set to Unset when porting the file, then remove the line when requiring MathComp >= 2.6 *)
 
 Import ListNotations.
 Import QcDefaultNotation. Open Scope qc_scope.
