@@ -38,6 +38,7 @@ ShowTree is defined
    we can suppress with the following line. *)
 Set Warnings "-notation-overridden,-parsing".
 From mathcomp Require Import ssrbool.
+Set SsrOldRewriteGoalsOrder.  (* change Set to Unset when porting the file, then remove the line when requiring MathComp >= 2.6 *)
 
 Check decidable.
 (* ==> 

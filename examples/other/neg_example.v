@@ -3,6 +3,7 @@ From QuickChick Require Import QuickChick.
 From mathcomp Require Import ssreflect eqtype ssrnat.
 Import QcNotation. Import QcDefaultNotation.
 Import ListNotations.
+Set SsrOldRewriteGoalsOrder.  (* change Set to Unset when porting the file, then remove the line when requiring MathComp >= 2.6 *)
 
 Require Import QuickChick.TacticsUtil ExtLib.Structures.Monads.
 Open Scope monad_scope.

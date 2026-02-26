@@ -3,6 +3,7 @@ Set Warnings "-notation-overridden,-parsing".
 From mathcomp Require Import ssreflect ssrfun ssrbool ssrnat eqtype seq.
 From QuickChick Require Import Classes DependentClasses Checker Show Producer Generators Sets.
 Local Open Scope set_scope.
+Set SsrOldRewriteGoalsOrder.  (* change Set to Unset when porting the file, then remove the line when requiring MathComp >= 2.6 *)
 
 (* TODO: Derive these *)
 #[global]

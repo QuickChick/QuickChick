@@ -4,6 +4,7 @@ From QuickChick Require Import QuickChick Tactics.
 
 Set Warnings "-notation-overridden".
 From mathcomp Require Import ssreflect ssrfun ssrbool ssrnat eqtype seq.
+Set SsrOldRewriteGoalsOrder.  (* change Set to Unset when porting the file, then remove the line when requiring MathComp >= 2.6 *)
 
 Set Bullet Behavior "Strict Subproofs".
 

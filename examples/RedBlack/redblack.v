@@ -1,5 +1,6 @@
 Set Warnings "-notation-overridden".
 From mathcomp Require Import ssreflect ssrnat ssrbool eqtype.
+Set SsrOldRewriteGoalsOrder.  (* change Set to Unset when porting the file, then remove the line when requiring MathComp >= 2.6 *)
 
 (* Formalization inspired from
    https://www.cs.princeton.edu/~appel/papers/redblack.pdf *)
