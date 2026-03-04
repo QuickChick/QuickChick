@@ -315,13 +315,13 @@ let runTest c env evd : unit =
 
   (*  Printf.printf "Before interp constr\n"; flush stdout; *)
 
-  let (c,_evd) = interp_constr env evd c in
+  let (evd',c) = interp_constr_evars env evd c in
 
   (* Printf.printf "So far so good?\n"; flush stdout; *)
 #if COQ_VERSION >= (8, 20, 0)
-  define_and_run ~opaque_access c env evd
+  define_and_run ~opaque_access c env evd'
 #else
-  define_and_run c env evd
+  define_and_run c env evd'
 #endif
 
 let rec last = function
@@ -392,8 +392,8 @@ let extract_prop_and_deps prop =
 #endif
   let env = Global.env () in
   let evd = Evd.from_env env in
-  let (prop_expr, evd') = interp_constr env evd prop in
-  let prop_def = define prop_expr env evd in
+  let (evd', prop_expr) = interp_constr_evars env evd prop in
+  let prop_def = define prop_expr env evd' in
   let prop_mlf = new_ml_file () in
   let temp_dir = Filename.dirname prop_mlf in
   let execn = Filename.chop_extension prop_mlf in
@@ -476,9 +476,9 @@ let qcFuzz_main prop_def temp_dir execn prop_mlf prop_mlif warnings prop fuzzLoo
     (* Build the kernel term from the const_expr *)
   let env = Global.env () in
   let evd = Evd.from_env env in
-  let (show_and_c_fun, evd') = interp_constr env evd show_and_c_fun in
+  let (evd', show_and_c_fun) = interp_constr_evars env evd show_and_c_fun in
 
-  let show_and_c_fun_def = define show_and_c_fun env evd in
+  let show_and_c_fun_def = define show_and_c_fun env evd' in
   let mlf = Filename.temp_file ~temp_dir "QuickChick" ".ml" in
   let execn = Filename.chop_extension mlf in
   let mlif = execn ^ ".mli" in
