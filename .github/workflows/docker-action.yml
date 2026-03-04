@@ -38,7 +38,6 @@ jobs:
           custom_image: ${{ matrix.image }}
           before_install: |
             startGroup "Setup and print opam config"
-              opam repo -a --set-default add coq-extra-dev https://coq.inria.fr/opam/extra-dev
               opam config list; opam repo list; opam list
             endGroup
           after_script: |
