@@ -15,5 +15,5 @@
 (test
   (name mutation)
   (modules mutation)
-  (flags :standard -w -39-67)
+  (flags :standard -w -39-67 -alert --deprecated)
   (libraries zarith))
