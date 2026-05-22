@@ -5,9 +5,11 @@
  (modules :standard \ genSTCorrect genSizedSTMonotonic genSizedSTSizeMonotonic)
  (libraries unix str
   (select void_for_linking-plugin-extraction from
+   (rocq-runtime.plugins.extraction -> void_for_linking-plugin-extraction.empty)
    (coq-core.plugins.extraction -> void_for_linking-plugin-extraction.empty)
    (coq.plugins.extraction -> void_for_linking-plugin-extraction.empty))
   (select void_for_linking-plugin-ltac from
+   (rocq-runtime.plugins.ltac -> void_for_linking-plugin-ltac.empty)
    (coq-core.plugins.ltac -> void_for_linking-plugin-ltac.empty)
    (coq.plugins.ltac -> void_for_linking-plugin-ltac.empty))
   ))
