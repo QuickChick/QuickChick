@@ -7,8 +7,8 @@ with b :=
   | B1 : b
   | B2 : a -> b.
 
-Derive Instance GenSized for a.
-Derive Instance EnumSized for a.
-Derive Instance Shrink for a.
-Derive Instance Arbitrary for a.
-Derive Instance Show for a.
+QCDerive GenSized for a.
+QCDerive EnumSized for a.
+QCDerive Shrink for a.
+QCDerive Arbitrary for a.
+QCDerive Show for a.

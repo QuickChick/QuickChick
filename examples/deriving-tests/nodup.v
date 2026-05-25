@@ -6,10 +6,10 @@ Inductive In' (A:Type) : A -> list A -> Prop :=
 | In_tl :
     forall x y l, In' A x l -> In' A x (cons y l).
 
-Derive Instance DecOpt for (In' a l).
-Derive Instance ArbitrarySizedSuchThat for (fun x => In' x l).
-Derive Instance EnumSizedSuchThat for (fun x => In' x l).
-Derive Instance EnumSizedSuchThat for (fun l => In' x l).
+QCDerive DecOpt for (In' a l).
+QCDerive ArbitrarySizedSuchThat for (fun x => In' x l).
+QCDerive EnumSizedSuchThat for (fun x => In' x l).
+QCDerive EnumSizedSuchThat for (fun l => In' x l).
 
 Inductive NoDup {A:Type} : list A -> Prop :=
   | NoDup_nil : NoDup nil
@@ -22,15 +22,15 @@ Inductive NoDup {A:Type} : list A -> Prop :=
 
 (* XXX LEO Error: Anomaly "Uncaught exception Failure("Simultaneous Some/None")." *)
 (* Error: Anomaly "Uncaught exception Failure("Incompatible modes/1")." *)
-Derive Instance DecOpt for (NoDup l).
-Derive Instance EnumSizedSuchThat for (fun l => NoDup l).
-Derive Instance ArbitrarySizedSuchThat for (fun l => NoDup l).
+QCDerive DecOpt for (NoDup l).
+QCDerive EnumSizedSuchThat for (fun l => NoDup l).
+QCDerive ArbitrarySizedSuchThat for (fun l => NoDup l).
 
 Inductive repeats {X:Type} : list X -> Prop :=
   | rep_here : forall a l, In' X a l -> repeats (a::l)
   | rep_later : forall a l, repeats l -> repeats (a::l).
 
-Derive Instance DecOpt for (repeats l).
-Derive Instance ArbitrarySizedSuchThat for (fun l => repeats l).
-Derive Instance EnumSizedSuchThat for (fun l => repeats l).
+QCDerive DecOpt for (repeats l).
+QCDerive ArbitrarySizedSuchThat for (fun l => repeats l).
+QCDerive EnumSizedSuchThat for (fun l => repeats l).
 

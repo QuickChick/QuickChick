@@ -7,7 +7,7 @@ Inductive foo :=
 (* | B : string -> foo *)
 | C : foo -> foo -> foo.
 
-Derive Instance (Arbitrary, Show) for foo.
+QCDerive (Arbitrary, Show) for foo.
 
 Extract Inductive foo => "Foo.foo" [ "Foo.A" "Foo.C" ].
 

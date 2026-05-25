@@ -16,8 +16,8 @@ Module NatList.
 
 Inductive natprod : Type :=
 | pair : nat -> nat -> natprod.
-Derive Instance Arbitrary for natprod.
-Derive Instance Show for natprod.
+QCDerive Arbitrary for natprod.
+QCDerive Show for natprod.
 Instance natprod_eq (x y : natprod) : Dec (x = y).
 constructor. unfold ssrbool.decidable. repeat (decide equality). Defined.
 
@@ -51,8 +51,8 @@ Definition surjective_pairing (p : natprod) :=
 Inductive natlist : Type :=
   | nil  : natlist
   | cons : nat -> natlist -> natlist.
-Derive Instance Arbitrary for natlist.
-Derive Instance Show for natlist.
+QCDerive Arbitrary for natlist.
+QCDerive Show for natlist.
 Instance natlist_eq (x y : natlist) : Dec (x = y).
 constructor. unfold ssrbool.decidable. repeat (decide equality). Defined.
 
@@ -174,8 +174,8 @@ Inductive snoc_of : natlist -> nat -> natlist -> Prop :=
   | snoc_of_cons : forall x h t t',
       snoc_of t x t' -> snoc_of (h::t) x (h::t').
 
-Derive Instance ArbitrarySizedSuchThat for (fun h  => snoc_of t h t').
-Derive Instance ArbitrarySizedSuchThat for (fun t' => snoc_of t h t').
+QCDerive ArbitrarySizedSuchThat for (fun h  => snoc_of t h t').
+QCDerive ArbitrarySizedSuchThat for (fun t' => snoc_of t h t').
 
 Inductive reverse_of : natlist -> natlist -> Prop :=
   | reverse_of_nil : reverse_of [] []
@@ -184,15 +184,15 @@ Inductive reverse_of : natlist -> natlist -> Prop :=
       snoc_of t' h t'' ->
       reverse_of (h::t) t''.
 
-Derive Instance ArbitrarySizedSuchThat for (fun l => reverse_of l l').
-Derive Instance ArbitrarySizedSuchThat for (fun l => reverse_of l' l).
+QCDerive ArbitrarySizedSuchThat for (fun l => reverse_of l l').
+QCDerive ArbitrarySizedSuchThat for (fun l => reverse_of l' l).
 
 Inductive equal_reverses : (natlist * natlist)%type -> Prop :=
   | eqrev : forall l1 l2 l,
       reverse_of l1 l -> reverse_of l2 l ->
       equal_reverses (Coq.Init.Datatypes.pair l1 l2).
 
-Derive Instance ArbitrarySizedSuchThat for (fun l1l2 => equal_reverses l1l2).
+QCDerive ArbitrarySizedSuchThat for (fun l1l2 => equal_reverses l1l2).
 
 (* Need to actual write decidability if we want to use it 
 Instance equal_reverses_dec l1l2 : Dec (equal_reverses l1l2).
@@ -224,8 +224,8 @@ Fixpoint nth_bad (l:natlist) (n:nat) : nat :=
 Inductive natoption : Type :=
   | Some : nat -> natoption
   | None : natoption.
-Derive Instance Arbitrary for natoption.
-Derive Instance Show for natoption.
+QCDerive Arbitrary for natoption.
+QCDerive Show for natoption.
 Instance natoption_eq (x y : natoption) : Dec (x = y).
 constructor. unfold ssrbool.decidable. repeat (decide equality). Defined.
 
@@ -247,8 +247,8 @@ End NatList.
 
 Inductive id : Type :=
   | Id : nat -> id.
-Derive Instance Arbitrary for id.
-Derive Instance Show for id.
+QCDerive Arbitrary for id.
+QCDerive Show for id.
 Instance id_eq (x y : id) : Dec (x = y).
 constructor. unfold ssrbool.decidable. repeat (decide equality). Defined.
 
@@ -266,8 +266,8 @@ Export NatList.
 Inductive partial_map : Type :=
   | empty  : partial_map
   | record : id -> nat -> partial_map -> partial_map.
-Derive Instance Arbitrary for partial_map.
-Derive Instance Show for partial_map.
+QCDerive Arbitrary for partial_map.
+QCDerive Show for partial_map.
 Instance partial_map_eq (x y : partial_map) : Dec (x = y).
 constructor. unfold ssrbool.decidable. repeat (decide equality). Defined.
 

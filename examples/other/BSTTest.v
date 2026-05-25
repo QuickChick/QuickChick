@@ -7,7 +7,7 @@ Inductive Tree :=
 | Leaf : Tree
 | Node : nat -> Tree -> Tree -> Tree.
 
-Derive Instance (Arbitrary, Show) for Tree.
+QCDerive (Arbitrary, Show) for Tree.
 
 Inductive bst : nat -> nat -> Tree -> Prop :=
 | bst_leaf : forall lo hi, bst lo hi Leaf
@@ -16,12 +16,12 @@ Inductive bst : nat -> nat -> Tree -> Prop :=
     bst lo x l -> bst x hi r ->
     bst lo hi (Node x l r).
 
-Derive Instance DecOpt for (le x y).
+QCDerive DecOpt for (le x y).
 
-Derive Instance ArbitrarySizedSuchThat for (fun x => le y x).
-Derive Instance ArbitrarySizedSuchThat for (fun t => bst lo hi t).
+QCDerive ArbitrarySizedSuchThat for (fun x => le y x).
+QCDerive ArbitrarySizedSuchThat for (fun t => bst lo hi t).
 
-Derive Instance DecOpt for (bst lo hi t).
+QCDerive DecOpt for (bst lo hi t).
 
 Fixpoint is_bst (lo hi : nat) (t : Tree) :=
   match t with

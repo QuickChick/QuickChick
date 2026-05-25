@@ -23,7 +23,7 @@ Inductive tree A : Type :=
 | Node : A -> tree A -> tree A -> tree A.
 
 
-Derive Instance EnumSized for tree.
+QCDerive EnumSized for tree.
 
 #[local]
 Instance EnumTree_SizedMonotonic A {_ : Enum A} :
@@ -43,7 +43,7 @@ Proof. derive_enum_Correct (). Qed.
 Inductive Foo : Type :=
 | Bar.
 
-Derive Instance EnumSized for Foo.
+QCDerive EnumSized for Foo.
 
 #[local]
 Instance EnumFoo_SizedMonotonic :
@@ -66,7 +66,7 @@ Inductive Foo2 A : Type :=
 | Bar2 : A -> Foo2 A.
 
 
-Derive Instance EnumSized for Foo2.
+QCDerive EnumSized for Foo2.
 
 #[local]
 Instance EnumFoo2_SizedMonotonic A {_ : Enum A} :
