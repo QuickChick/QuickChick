@@ -704,12 +704,12 @@ A lot fewer terms have small sizes, allowing us to explore larger terms*)
     [QuickChick] provides some automation in deriving such instances
     for _plain_ datatypes automatically. *)
 
-Derive Instance Arbitrary for Tree.
+QCDerive Arbitrary for Tree.
 (* GenSizedTree is defined *)
 (* ShrinkTree is defined *)
 Print GenSizedTree.
 Print ShrinkTree.
 
-Derive Instance Show for Tree.
+QCDerive Show for Tree.
 (* ShowTree is defined *)
 Print ShowTree.

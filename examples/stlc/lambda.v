@@ -96,12 +96,12 @@ Inductive typing' (e : env) : term -> type -> Prop :=
       typing' e t2 tau1 ->
       typing' e (App t1 t2) tau2.
 
-Derive Instance Arbitrary for type.
+QCDerive Arbitrary for type.
 #[global]
 Instance dec_type (t1 t2 : type) : Dec (t1 = t2).
 Proof. dec_eq. Defined.
-Derive Instance ArbitrarySizedSuchThat for (fun x => bind env x tau).
-Derive Instance ArbitrarySizedSuchThat for (fun t => typing' env t tau).
+QCDerive ArbitrarySizedSuchThat for (fun x => bind env x tau).
+QCDerive ArbitrarySizedSuchThat for (fun t => typing' env t tau).
 
 Inductive option_le : option nat -> option nat -> Prop :=
     | opt_le_1 : option_le None None
