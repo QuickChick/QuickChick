@@ -801,8 +801,13 @@ let gMatchReturn (discr : coq_expr)
          )
 
 
+#if COQ_VERSION >= (9, 3, 0)
+let gRecord names_and_bodies =
+  CAst.make @@ CRecord (None, List.map (fun (n,b) -> (qualid_of_ident @@ Id.of_string n, b)) names_and_bodies)
+#else
 let gRecord names_and_bodies =
   CAst.make @@ CRecord (List.map (fun (n,b) -> (qualid_of_ident @@ Id.of_string n, b)) names_and_bodies)
+#endif
 
 let gAnnot (p : coq_expr) (tau : coq_expr) =
 #if COQ_VERSION >= (8, 18, 0)
