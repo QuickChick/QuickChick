@@ -18,6 +18,24 @@ open Libnames
 
 module CtrMap = Map.Make(Ord_ctr)
 
+#if COQ_VERSION >= (9, 4, 0)
+module SummaryRef =
+struct
+  type 'a t = 'a Summary.Ref.t
+  let ref ~name v = Summary.ref ~name v
+  let (!) = Summary.Ref.get
+  let (:=) = Summary.Ref.set
+end
+#else
+module SummaryRef =
+struct
+  type 'a t = 'a ref
+  let ref ~name v = Summary.ref ~name v
+  let (!) = Stdlib.(!)
+  let (:=) = Stdlib.(:=)
+end
+#endif
+
 type weight_ast = 
   | WNum of int
   | WSize 
@@ -26,17 +44,18 @@ let weight_ast_to_string = function
   | WNum n -> string_of_int n
   | WSize  -> "size"
   
-let weight_env : weight_ast CtrMap.t ref =
-  Summary.ref ~name:"QC_weight_environ" CtrMap.empty
+let weight_env : weight_ast CtrMap.t SummaryRef.t =
+  SummaryRef.ref ~name:"QC_weight_environ" CtrMap.empty
 
 let weight_env_to_string () =
   let all = CtrMap.fold (fun ctr w acc -> (Printf.sprintf "%s : %s\n" 
                                                           (constructor_to_string ctr) 
                                                           (weight_ast_to_string w))::acc) 
-                        !weight_env [] in
+                        SummaryRef.(!weight_env) [] in
   String.concat "" all
 
 let register_weights (l : (constructor * weight_ast) list) =
+  let open SummaryRef in
   List.iter (fun (c,w) -> weight_env := CtrMap.add c w !weight_env) l
 
 let convert_constr_to_weight c = 
@@ -81,7 +100,7 @@ let register_weights_object =
 let add_weights w = Lib.add_anonymous_leaf (register_weights_object w)
 #endif
 let lookup_weight b ctr size_var = 
-  try match CtrMap.find ctr !weight_env with
+  try match CtrMap.find ctr SummaryRef.(!weight_env) with
       | WNum n -> gInt n
       | WSize  -> gSucc (gVar (size_var))
   with Not_found -> if b then gInt 1 else gSucc (gVar (size_var))

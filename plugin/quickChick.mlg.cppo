@@ -8,8 +8,25 @@ open Libnames
 open Util
 open Constrintern
 open Constrexpr
-open Error
 open Stdarg
+
+#if COQ_VERSION >= (9, 4, 0)
+module SummaryRef =
+struct
+  type 'a t = 'a Summary.Ref.t
+  let ref ~name v = Summary.ref ~name v
+  let (!) = Summary.Ref.get
+  let (:=) = Summary.Ref.set
+end
+#else
+module SummaryRef =
+struct
+  type 'a t = 'a ref
+  let ref ~name v = Summary.ref ~name v
+  let (!) = Stdlib.(!)
+  let (:=) = Stdlib.(:=)
+end
+#endif
 
 let mk_ref s = CAst.make @@ CRef (qualid_of_string s, None)
 
@@ -26,25 +43,35 @@ let sample1 = mk_ref "QuickChick.Generators.sample1"
 
 (* Handle extra ocaml directory to be copied *)
 let empty_slist : string list = []           
-let extra_dir : string list ref =
-  Summary.ref ~name:"QC_ocaml_dir" empty_slist
-let add_extra_dir s = extra_dir := s :: !extra_dir
+let extra_dir : string list SummaryRef.t =
+  SummaryRef.ref ~name:"QC_ocaml_dir" empty_slist
+let add_extra_dir s =
+  let open SummaryRef in
+  extra_dir := s :: !extra_dir
 
-let extra_pkg : string list ref =
-  Summary.ref ~name:"QC_ocaml_pkg" ["zarith"]
-let add_extra_pkg s = extra_pkg := s :: !extra_pkg
+let extra_pkg : string list SummaryRef.t =
+  SummaryRef.ref ~name:"QC_ocaml_pkg" ["zarith"]
+let add_extra_pkg s =
+  let open SummaryRef in
+  extra_pkg := s :: !extra_pkg
 
-let extract_dir : string option ref =
-  Summary.ref ~name:"QC_extract_dir" None
-let set_extract_dir s = extract_dir := Some s
+let extract_dir : string option SummaryRef.t =
+  SummaryRef.ref ~name:"QC_extract_dir" None
+let set_extract_dir s =
+  let open SummaryRef in
+  extract_dir := Some s
 
-let dune_file : string option ref =
-  Summary.ref ~name:"QC_dune_file" None
-let set_dune_file s = dune_file := Some s
+let dune_file : string option SummaryRef.t =
+  SummaryRef.ref ~name:"QC_dune_file" None
+let set_dune_file s =
+  let open SummaryRef in
+  dune_file := Some s
 
-let modules_to_open : string list ref =
-  Summary.ref ~name:"QC_modules_to_open" empty_slist
-let add_module_to_open s = modules_to_open := s :: !modules_to_open  
+let modules_to_open : string list SummaryRef.t =
+  SummaryRef.ref ~name:"QC_modules_to_open" empty_slist
+let add_module_to_open s =
+  let open SummaryRef in
+  modules_to_open := s :: !modules_to_open  
 
 (* [mkdir -p]: recursively make the parent directories if they do not exist. *)
 let rec mkdir_ dname =
@@ -58,6 +85,7 @@ let rec mkdir_ dname =
 
 (* Interface with OCaml compiler *)
 let temp_dirname () =
+  let open SummaryRef in
   match !extract_dir with
   | None -> 
     let dname = Filename.(concat (get_temp_dir_name ()) "QuickChick") in
@@ -170,7 +198,7 @@ let define_and_run c env evd =
 
   (* Add any modules that have been marked "open" *)
   let open_cmd s = Printf.sprintf "awk -v n=1 -v s=\"open %s\" 'NR == n {print s} {print}' %s > %s/__qc_tmp && mv %s/__qc_tmp %s" s mlf dir dir mlf in
-  List.iter (fun s -> ignore (Sys.command (open_cmd s))) !modules_to_open;
+  List.iter (fun s -> ignore (Sys.command (open_cmd s))) SummaryRef.(!modules_to_open);
   
   (* Before compiling, fix stupid cyclic dependencies like "type int = int".
      Introduced by "Definition int := int." possibly inside a module, so just
@@ -202,17 +230,17 @@ let define_and_run c env evd =
    *)
 
   (* Copy over the contents of the ocaml directory *)
-  let ocaml_dir_cps = List.map (fun s -> Printf.sprintf "cp -rL %s %s" s dir) !extra_dir in
+  let ocaml_dir_cps = List.map (fun s -> Printf.sprintf "cp -rL %s %s" s dir) SummaryRef.(!extra_dir) in
   List.iter print_endline ocaml_dir_cps;
   List.iter (fun cmd -> ignore (Sys.command cmd)) ocaml_dir_cps;
 
   let packages =
-    match !extra_pkg with
+    match SummaryRef.(!extra_pkg) with
     | [] -> ""
     | x -> "-pkgs '" ^ (String.concat "," x) ^ "'"
   in
   let exec_command =
-    match !dune_file with
+    match SummaryRef.(!dune_file) with
     | None -> "cd " ^ dir ^ " && ocamlbuild -use-ocamlfind " ^ packages ^ " -lib unix -cflags \"-w -3\" " ^ Filename.basename execn ^ " -quiet > build.log 2> build.err"
     | Some s ->
        (* Modify the dune file to add the executable name and put it in the output dir *) 
@@ -225,7 +253,7 @@ let define_and_run c env evd =
   (* Overwrite execn in case of dune *)
   let execn =
     let (</>) = Filename.concat in
-    match !dune_file with
+    match SummaryRef.(!dune_file) with
     | None -> Filename.dirname execn </> "_build" </> Filename.basename execn
     | Some _ -> dir ^ "/_build/default/" ^ (Filename.chop_extension (Filename.basename execn)) ^ ".exe" in
 
@@ -354,6 +382,10 @@ let run f args =
   runTest c env evd
 #endif
 
+let flag_debug = SummaryRef.ref ~name:"QC_flag_debug" false
+
+let () = Error.get_flag_debug := (fun () -> SummaryRef.(!) flag_debug)
+
 let set_debug_flag (flag_name : string) (mode : string) =
   let toggle =
     match mode with
@@ -366,11 +398,13 @@ let set_debug_flag (flag_name : string) (mode : string) =
 (*    | "Warn"  -> flag_warn
     | "Error" -> flag_error *)
   in
+  let open SummaryRef in
   reference := toggle 
 
-let extract_manually : qualid list ref =
-  Summary.ref ~name:"QC_manual_extracts" []
+let extract_manually : qualid list SummaryRef.t =
+  SummaryRef.ref ~name:"QC_manual_extracts" []
 let add_manual_extract cs =
+  let open SummaryRef in
   let convert_reference_to_qualid c : qualid =
     match c with
     | {CAst.v = CRef (r, _) ; _ } -> r 
@@ -427,7 +461,7 @@ let qcFuzz_main prop_def temp_dir execn prop_mlf prop_mlif warnings prop fuzzLoo
 
 (*
   List.iter (fun x -> print_endline (string_of_qualid
-                                       ((match qualid_of_reference x with {CAst.v = q; _} -> q)))) !extract_manually;
+                                       ((match qualid_of_reference x with {CAst.v = q; _} -> q)))) SummaryRef.(!extract_manually);
                                        *)      
   List.iter (fun r ->
       match GenericLib.sdt_rep_from_mib (GenericLib.qualid_to_mib r) with
@@ -449,7 +483,7 @@ let qcFuzz_main prop_def temp_dir execn prop_mlf prop_mlif warnings prop fuzzLoo
             None
         end
       | None -> failwith "Can't be represented..."
-    ) !extract_manually;
+    ) SummaryRef.(!extract_manually);
 
   (* Define fuzzLoop applied appropriately *)
   let unit_type =
