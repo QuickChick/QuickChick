@@ -47,6 +47,7 @@ Inductive eval : exp -> nat -> nat -> res -> Prop :=
 
 Derive Show for res.
 Derive Show for exp.
+Derive GenSized for exp.
 #[export] Instance dec_res (r1 r2 : res) : Dec (r1 = r2).
 Proof. dec_eq. Defined.
 #[export] Instance dec_exp (e1 e2 : exp) : Dec (e1 = e2).
@@ -60,7 +61,7 @@ Theorem foo :
             eval e 2 5 (N 5) ->
             eval e 1 1 (N 1) ->
             e = X.
-Extract Constant defNumTests => "1".
+Extract Constant defNumTests => "1000000".
 quickchick.
 Extract Constant defNumTests => "1000000".
 QuickChick (theorem 2).

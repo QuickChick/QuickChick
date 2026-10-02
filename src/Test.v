@@ -84,8 +84,8 @@ Definition computeSize'' (maxSize_ maxSuccess_ n d : nat) : nat :=
   then
     min (n mod maxSize_ + d / 10) maxSize_
   else
-    min ((n mod maxSize_) * maxSize_ /
-      (maxSuccess_ mod maxSize_ + d / 10)) maxSize_.
+    min (((n mod maxSize_) * maxSize_ /
+      (maxSuccess_ mod maxSize_)) + d / 10) maxSize_.
 
 Definition computeSize' (a : Args) (n : nat) (d : nat) : nat :=
   computeSize'' (maxSize a) (maxSuccess a) n d.

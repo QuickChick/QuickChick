@@ -1955,4 +1955,3 @@ let match_schedule_to_string ((sch,fin) : schedule) (ms : (unknown * pat) list) 
 let match_schedule_as_pp_constr_expr ((sch,fin) : schedule) (ms : (unknown * pat) list) (eq_checks : (unknown * unknown) list) ds : Pp.t =
   let check_eq (u1,u2) = S_Check (SrcNonrec (DTyCtr (constructor_of_string "Coq.Init.Logic.eq", [DHole; DTyVar u1; DTyVar u2])), true) in
   NewGenericLib.compile_and_pp_schedule (List.map (fun (u,p) -> S_Match (u,p)) ms @ List.map check_eq eq_checks @ sch, fin) ds
-

@@ -20,6 +20,8 @@ QCDerive DecOpt for (le x y).
 
 QCDerive ArbitrarySizedSuchThat for (fun x => le y x).
 QCDerive ArbitrarySizedSuchThat for (fun t => bst lo hi t).
+Derive Valid Schedules bst 2 consnum 1 derive "Gen".
+Derive Inductive Schedule bst 2 derive "Gen" opt "true".
 
 QCDerive DecOpt for (bst lo hi t).
 
