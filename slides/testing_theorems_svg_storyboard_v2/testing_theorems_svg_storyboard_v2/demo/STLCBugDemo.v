@@ -2,7 +2,7 @@ From QuickChick Require Import QuickChick.
 From Coq Require Import Bool ZArith List.
 Import ListNotations.
 
-(* A small, de Bruijn-indexed simply typed lambda calculus. *)
+(* A small de Bruijn-indexed simply typed lambda calculus. *)
 
 Inductive typ :=
 | TBool : typ
@@ -58,8 +58,7 @@ Proof. dec_eq. Defined.
 
 Definition context := list typ.
 
-(* This implementation contains the demo mutation. Keep the editor at the
-   theorem below until after QuickChick has produced its counterexample. *)
+(* Deliberately buggy shift for the live demo. *)
 Definition shift (d : Z) (ex : term) : term :=
   let fix go (cutoff : Z) (e : term) :=
       match e with
@@ -141,7 +140,7 @@ Extract Constant defNumDiscards => "50000".
 QuickChickDebug Debug Off.
 
 (* ---------------------------------------------------------------------- *)
-(* LIVE DEMO: start here. Nothing above needs to be shown before the run.  *)
+(* Live demo starts here. *)
 
 Theorem preservation : forall e e' t,
     typing [] e t ->
