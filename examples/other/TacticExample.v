@@ -10,8 +10,8 @@ Definition to_be_generated :=
   else checker tt)).
 
 (* QuickChickDebug Debug On. *)
-Theorem foo : forall (x y : nat) , x < 8.
-Proof. quickchick. Admitted.
+Theorem foo : forall (x y : nat) , x <= 8.
+Proof. quickchick 10. Admitted.
 
 Theorem add_comm : forall n m : nat,
   n + m = m + n.
