@@ -1,8 +1,6 @@
 (* Test suite for dependency-aware ordering *)
 (* Since the implementation is internal to newGenericLib, we test it indirectly *)
 
-open Quickchick_plugin.GenLib
-
 let test_basic_schedule_generation () =
   Printf.printf "Test 1: Basic schedule generation works\n";
   (* For now, just verify that the module loads correctly *)
