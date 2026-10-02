@@ -97,6 +97,18 @@ Dependencies are listed in [`coq-quickchick.opam`](./coq-quickchick.opam).
 
     dune build
 
+### Install from a checkout
+
+For a local checkout, install the dependencies and package into the active opam
+switch with:
+
+    opam install . --deps-only
+    dune build @install
+    dune install coq-quickchick
+
+For a normal user installation, `opam install .` performs the dependency
+installation, build, and package installation together.
+
 ## Run tests
 
     dune runtest
