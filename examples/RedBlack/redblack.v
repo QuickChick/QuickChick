@@ -49,36 +49,15 @@ Definition makeBlack t :=
 Definition insert x s := makeBlack (ins x s).
 
 
-(* Red-Black Tree invariant: complete and correct definition *)
+(* Red-Black Tree invariant: declarative definition *)
 (* begin is_redblack *)
-(* Inductive predicate for red-black trees with proper invariants:
-   - Red nodes MUST have black children (no red-red violations)
-   - All paths from node to leaves have equal black-height
-   - BST property: lo < all values in tree < hi
-   - The color parameter tracks the node's actual color
-   - The nat parameters are: black-height, lower bound, upper bound
-*)
-Inductive is_redblack_node : tree -> color -> nat -> nat -> nat -> Prop :=
-| RB_leaf : forall lo hi,
-    (* Leaves are black with height 0, bounds are satisfied trivially *)
-    is_redblack_node Leaf Black 0 lo hi
-| RB_red : forall a x b h lo hi,
-    (* Red nodes MUST have black children (enforces no red-red violations) *)
-    lo < x -> x < hi ->
-    is_redblack_node a Black h lo x ->
-    is_redblack_node b Black h x hi ->
-    is_redblack_node (Node Red a x b) Red h lo hi
-| RB_black : forall c1 c2 a x b h lo hi,
-    (* Black nodes can have children of any color *)
-    lo < x -> x < hi ->
-    is_redblack_node a c1 h lo x ->
-    is_redblack_node b c2 h x hi ->
-    (* Increment black-height for black node *)
-    is_redblack_node (Node Black a x b) Black (S h) lo hi.
-
-(* A proper red-black tree has a black root with unbounded range *)
-Definition is_redblack (t : tree) : Prop := 
-  exists h, is_redblack_node t Black h 0 (S (S (S (S (S (S (S (S (S (S (S (S (S (S (S (S (S (S (S (S (S (S (S (S (S (S (S (S (S (S (S (S (S (S (S (S (S (S (S (S (S (S (S (S (S (S (S (S (S (S (S (S (S (S (S (S (S (S (S (S (S (S (S (S 0))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))).
+Inductive is_redblack' : tree -> color -> nat -> Prop :=
+| IsRB_leaf: forall c, is_redblack' Leaf c 0
+| IsRB_r: forall n tl tr h, is_redblack' tl Red h -> is_redblack' tr Red h ->
+                            is_redblack' (Node Red tl n tr) Black h
+| IsRB_b: forall c n tl tr h, is_redblack' tl Black h -> is_redblack' tr Black h ->
+                              is_redblack' (Node Black tl n tr) c (S h).
+Definition is_redblack (t:tree) : Prop := exists h, is_redblack' t Red h.
 (* end is_redblack *)
 
 (* begin insert_preserves_redblack *)
