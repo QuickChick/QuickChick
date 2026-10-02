@@ -5,12 +5,6 @@ open Quickchick_plugin.GenLib
 
 let test_basic_schedule_generation () =
   Printf.printf "Test 1: Basic schedule generation works\n";
-  (* Create a simple variable and hypothesis *)
-  let var1 = "x" in
-  let var2 = "y" in
-  let variables = [(var1, Quickchick_plugin.Rocq_constr.DTyVar "nat"); 
-                   (var2, Quickchick_plugin.Rocq_constr.DTyVar "bool")] in
-  
   (* For now, just verify that the module loads correctly *)
   Printf.printf "✓ Module loaded successfully\n"
 
