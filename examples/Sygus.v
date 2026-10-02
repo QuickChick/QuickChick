@@ -53,17 +53,28 @@ QuickChickDebug Debug On.
 
 Theorem plus_is_positive : forall n m npm, plus n m npm -> npm <= m.
 Proof.
- (* quickchick.
-  QuickChick (sized theorem).
+  quickchick.
+ (* QuickChick (sized theorem).
   Extract Constant defNumTests => "100000".*)
   Abort.
 
-Print checker.
-
-QuickChick checker.
-
 (*Derive Inductive Schedule plus 2 derive "Enum" opt "true".*)
 
+Inductive notR : bool -> bool -> Prop :=
+| notT : notR true false
+| notF : notR false true.
+
+Inductive andR : bool -> bool -> bool -> Prop :=
+| andBoth : andR true true true
+| andFL b : andR false b false
+| andFR b : andR b false false
+.
+
+Inductive orR : bool -> bool -> bool -> Prop :=
+| orTL b : orR true b true
+| orTR b : orR b true true
+| orNeither : orR false false false
+.
 
 Inductive eval : exp -> nat -> nat -> res -> Prop :=
 | Eval_X : forall x y, eval X x y (N x)
@@ -85,9 +96,10 @@ Inductive eval : exp -> nat -> nat -> res -> Prop :=
     eval (ite e e1 e2) x y r
 | Eval_T : forall x y, eval T x y (B true)
 | Eval_F : forall x y, eval F x y (B false)                            
-(* | Eval_Not : forall x y e b,
+| Eval_Not : forall x y e b b',
    eval e x y (B b) ->
-   eval (Not e) x y (B (negb b)) *) 
+   notR b b' ->
+   eval (Not e) x y (B b') 
 | Eval_Lt_T : forall x y e1 e2 n1 n2,
     le (S n1) n2 -> 
     eval e1 x y (N n1) ->
@@ -97,13 +109,35 @@ Inductive eval : exp -> nat -> nat -> res -> Prop :=
     le n2 n1 ->     
     eval e1 x y (N n1) ->
     eval e2 x y (N n2) ->
-    eval (Lt e1 e2) x y (B false).
+    eval (Lt e1 e2) x y (B false)
+| Eval_And e1 e2 x y bl br ba :
+    andR bl br ba ->
+    eval e1 x y (B bl) ->
+    eval e2 x y (B br) ->
+    eval (And e1 e2) x y (B ba)
+| Eval_Or e1 e2 x y bl br ba :
+    orR bl br ba ->
+    eval e1 x y (B bl) ->
+    eval e2 x y (B br) ->
+    eval (Or e1 e2) x y (B ba).
+       
 
 Derive Show for res.
 
 QuickChickDebug Debug Off.
 
-Derive Valid Schedules eval 0 consnum 6 derive "Gen".
+Derive Valid Schedules eval 0 consnum 11 derive "Gen".
+Derive Generator for (fun p => plus n m p).
+Derive Checker for (plus n m p).
+Derive Checker for (notR n m).
+Derive Generator for (fun m => le n m).
+Derive Generator for (fun n => le n m).
+Derive Checker for (le n m).
+Derive Checker for (andR a b c).
+Derive Checker for (orR a b c).
+Derive Checker for (eval a b c d).
+
+Derive Inductive Schedule eval derive "Check" opt "true".
 
 Derive Inductive Schedule eval 0 derive "Gen" opt "true".
 
@@ -113,7 +147,7 @@ Derive Show for exp.
 
 
 
-Sample ( GenSizedSuchThat_eval_OIII (1) 1 3 (N 4)).
+Sample ( GenSizedSuchThat_eval_OIII (3) 0 0 (N 4)).
 
 
 Definition test_cases : list (nat * nat * res) :=
@@ -158,9 +192,22 @@ Fixpoint evalc (e : exp) (x y : nat) : option res :=
       | Some (N n1), Some (N n2) => Some (N (n1 + n2))
       | _, _ => None
       end
-  | _ => None
+  | And e1 e2 =>
+      match evalc e1 x y, evalc e2 x y with
+      | Some (B n1), Some (B n2) => Some (B (andb n1 n2))
+      | _, _ => None
+      end
+  | Or e1 e2 =>
+      match evalc e1 x y, evalc e2 x y with
+      | Some (B n1), Some (B n2) => Some (B (orb n1 n2))
+      | _, _ => None
+      end
+  | Not e =>
+      match evalc e x y with
+      | Some (B b) => Some (B (negb b))
+      | _ => None
+      end
   end.
-
 
 Instance DecEqRes : Dec_Eq res.
 Proof. dec_eq. Defined.
@@ -168,6 +215,8 @@ Proof. dec_eq. Defined.
 Instance DecEqexp : Dec_Eq exp. dec_eq. Defined.
 
 Check (fun ( e : exp) => e = e ?).
+
+Definition exp_eq (e e' : exp)  : bool := e = e' ?.
   
 
 Fixpoint partial_eval (e : exp) : exp :=
@@ -186,20 +235,19 @@ Fixpoint partial_eval (e : exp) : exp :=
   | F => F
   | Lt e1 e2 =>
       match partial_eval e1, partial_eval e2 with
-      | Zero, Zero => F
+      | _, Zero => F
       | Zero, One => T
-      | One, Zero => F
       | One, One => F
       | P One x, P One y => Lt x y
       | P x One, P One y => Lt x y
       | P x One, P y One => Lt x y
       | P One x, P y One => Lt x y
-    (*  | P One x, y => (if (x = y) ? then F else Lt (P One x) y)
-      | P x One, y => (if (x = y) ? then F else Lt (P x One) y)
-      | x, P One y => (if (x = y) ? then T else Lt x (P One y))
-      | x, P y One => (if (x = y) ? then T else Lt x (P y One))
-      | e1', e2' => (if (e1' = e2') ? then F else Lt e1' e2')*)
-      | e1', e2' => Lt e1' e2'
+      | P One x, y => (if exp_eq x y then F else Lt (P One x) y)
+      | P x One, y => (if exp_eq x y then F else Lt (P x One) y)
+      | x, P One y => (if exp_eq x y then T else Lt x (P One y))
+      | x, P y One => (if exp_eq x y then T else Lt x (P y One))
+      | e1', e2' => (if exp_eq e1' e2' then F else Lt e1' e2')
+      (*| e1', e2' => Lt e1' e2'*)
       end
   | P e1 e2 =>
       match partial_eval e1, partial_eval e2 with
@@ -207,14 +255,37 @@ Fixpoint partial_eval (e : exp) : exp :=
       | e1', Zero => e1'
       | e1', e2' => P e1' e2'
       end
-  | _ => e
+  | Not e =>
+      match partial_eval e with
+      | T => F
+      | F => T
+      | e' => Not e'
+      end
+  | And l r =>
+      match partial_eval l, partial_eval r with
+      | T, r' => r'
+      | l', T => l'
+      | F, _ => F
+      | _, F => F
+      | l',r' => And l' r'
+      end
+  | Or l r =>
+      match partial_eval l, partial_eval r with
+      | F, r' => r'
+      | l', F => l'
+      | T, _ => T
+      | _, T => T
+      | l',r' => Or l' r'
+      end
   end.
 
-Print partial_eval.
+Theorem partial_eval_correct : forall e x y r, eval e x y r -> eval (partial_eval e) x y r.
+quickchick.
 
+Compute partial_eval ((Lt One (P One Y))).
 Definition stuck (e : exp) : bool := (e = (partial_eval e)) ? . 
 
-Compute (stuck (ite X X Y)).
+Compute (stuck (ite T X Y)).
 
 Definition shrinker e := if stuck e then [] else [partial_eval e].
 
@@ -236,24 +307,37 @@ Definition forAllShrinkMaybe {A prop : Type} {_ : Checkable prop} `{Show A}
 
 Derive Inductive Schedule eval derive "Check" opt "true".
 
-Derive Show for exp. 
+Derive Show for exp.
+
 Definition prop (ts : list (nat * nat * res)) :=
   let genSize := 5 in
   let defElemIgnore := (0,0, N 0) in
   forAll (elems_ defElemIgnore ts) (fun '(x,y,r) =>
   forAllShrinkMaybe (GenSizedSuchThat_eval_OIII genSize x y r) shrinker (fun e => 
   negb (forallb (fun '(x,y,r) => 
-  match DecOpt_eval_IIII 10 e x y r
+   match DecOpt_eval_IIII 100000 e x y r
                 with
   | Some true => true
-  | _ => false
+  | Some false => false
+  | None => false          
   end) ts))).
 
 Definition test_cases' : list (nat * nat * res) :=
-  [ (4,2,N 4);(2,5,N 5);(1,1,N 1) ].
+  [ (4,2,N 4);(2,5,N 5);(1,1,N 1); (3,6,N 3) ].
+
+Definition max_examples := [(4,2, N 4); (2,5,N 5);(7,1,N 7)].
 
 Extract Constant defNumTests => "100000". 
-QuickChick (prop test_cases).
+QuickChick (prop max_examples).
+
+Print test_cases.
+
+Compute partial_eval (ite (Lt (P (P X One) (P One X)) (P X (P (P X X) One))) X Y
+
+  ).
+
+Compute evalc (ite (Lt (P (P X One) (P One X)) (P X (P (P X X) One))) X Y) 6 7.
+
 
 Print DecOpt_eval_IIII.
 
@@ -267,93 +351,11 @@ Print andBind.*)
 Merge (fun e => eval e x y r) With (fun e => eval e x' y' r') As EVAL.
 
 Derive Inductive Schedule EVAL 6 derive "Gen" opt "true".
-
+Check shrinking.
 Sample (GenSizedSuchThat_EVAL_IIIIIIO 3 1 0 (N 1) 1 2 (N 2)).
 
-(*Inductive EVAL : res -> res -> exp -> Prop :=
-  | Eval_Lt_FEval_Lt_F : forall  (e1' e2' : exp) (n1' n2' n1 n2 : nat),
-                         n2' <= n1' ->
-                         n2 <= n1 ->
-                         EVAL (N n2) (N n2') e2' ->
-                         EVAL (N n1) (N n1') e1' -> EVAL (B false) (B false) (Lt e1' e2')
-  | Eval_Lt_FEval_Lt_T : forall  (e1' e2' : exp) (n1' n2' n1 n2 : nat),
-                         S n1' <= n2' ->
-                         n2 <= n1 ->
-                         EVAL (N n2) (N n2') e2' ->
-                         EVAL (N n1) (N n1') e1' -> EVAL (B false) (B true) (Lt e1' e2')
-  | Eval_Lt_TEval_Lt_F : forall  (e1' e2' : exp) (n1' n2' n1 n2 : nat),
-                         n2' <= n1' ->
-                         S n1 <= n2 ->
-                         EVAL (N n2)  (N n2') e2' ->
-                         EVAL (N n1)  (N n1') e1' -> EVAL (B true) (B false) (Lt e1' e2')
-  | Eval_Lt_TEval_Lt_T : forall (e1' e2' : exp) (n1' n2' n1 n2 : nat),
-                         S n1' <= n2' ->
-                         S n1 <= n2 ->
-                         EVAL (N n2) (N n2') e2' ->
-                         EVAL (N n1) (N n1') e1' -> EVAL (B true) (B true) (Lt e1' e2')
-  | Eval_FEval_F : EVAL (B false) (B false) F
-  | Eval_TEval_T : EVAL (B true)  (B true) T 
- (** | Eval_ITE_FEval_ITE_F : forall (e' e1' e2' : exp) (r' : res) (r : res),
-                           EVAL r r' e2' -> EVAL (B false) (B false) e' -> EVAL r r' (ite e' e1' e2')
-  | Eval_ITE_FEval_ITE_T : forall (e' e1' e2' : exp) (r' : res) (r : res),
-                           eval e1' r' ->
-                           eval e2' x y r -> EVAL x y (B false) x' y' (B true) e' -> EVAL x y r x' y' r' (ite e' e1' e2')
-  | Eval_ITE_TEval_ITE_F : forall (x' y' : nat) (e' e1' e2' : exp) (r' : res) (x y : nat) (r : res),
-                           eval e2' x' y' r' ->
-                           eval e1' x y r -> EVAL x y (B true) x' y' (B false) e' -> EVAL x y r x' y' r' (ite e' e1' e2')
-  | Eval_ITE_TEval_ITE_T : forall (x' y' : nat) (e' e1' e2' : exp) (r' : res) (x y : nat) (r : res),
-                           EVAL x y r x' y' r' e1' -> EVAL x y (B true) x' y' (B true) e' -> EVAL x y r x' y' r' (ite e' e1' e2')**)
-  | Eval_1Eval_1 :  EVAL (N 1) (N 1) One
-| Eval_0Eval_0 :  EVAL  (N 0) (N 0) Zero .
-
-Derive  Schedules EVAL 2 consnum 2 derive "Gen".
-
-Derive Inductive Schedule le 0 1 derive "Gen" opt "true". Print GenSizedSuchThatle_OO.
-
-
-
-
-Derive Inductive Schedule EVAL 2 derive "Gen" opt "true".*)
-
-
-(*
-Inductive EVAL : nat -> nat -> res -> nat -> nat -> res -> exp -> Prop :=
-  | Eval_Lt_FEval_Lt_F : forall (x' y' : nat) (e1' e2' : exp) (n1' n2' x y n1 n2 : nat),
-                         n2' <= n1' ->
-                         n2 <= n1 ->
-                         EVAL x y (N n2) x' y' (N n2') e2' ->
-                         EVAL x y (N n1) x' y' (N n1') e1' -> EVAL x y (B false) x' y' (B false) (Lt e1' e2')
-  | Eval_Lt_FEval_Lt_T : forall (x' y' : nat) (e1' e2' : exp) (n1' n2' x y n1 n2 : nat),
-                         S n1' <= n2' ->
-                         n2 <= n1 ->
-                         EVAL x y (N n2) x' y' (N n2') e2' ->
-                         EVAL x y (N n1) x' y' (N n1') e1' -> EVAL x y (B false) x' y' (B true) (Lt e1' e2')
-  | Eval_Lt_TEval_Lt_F : forall (x' y' : nat) (e1' e2' : exp) (n1' n2' x y n1 n2 : nat),
-                         n2' <= n1' ->
-                         S n1 <= n2 ->
-                         EVAL x y (N n2) x' y' (N n2') e2' ->
-                         EVAL x y (N n1) x' y' (N n1') e1' -> EVAL x y (B true) x' y' (B false) (Lt e1' e2')
-  | Eval_Lt_TEval_Lt_T : forall (x' y' : nat) (e1' e2' : exp) (n1' n2' x y n1 n2 : nat),
-                         S n1' <= n2' ->
-                         S n1 <= n2 ->
-                         EVAL x y (N n2) x' y' (N n2') e2' ->
-                         EVAL x y (N n1) x' y' (N n1') e1' -> EVAL x y (B true) x' y' (B true) (Lt e1' e2') 
-  | Eval_FEval_F : forall x' y' x y : nat, EVAL x y (B false) x' y' (B false) F
-  | Eval_TEval_T : forall x' y' x y : nat, EVAL x y (B true) x' y' (B true) T 
-  | Eval_ITE_FEval_ITE_F : forall (x' y' : nat) (e' e1' e2' : exp) (r' : res) (x y : nat) (r : res),
-                           EVAL x y r x' y' r' e2' -> EVAL x y (B false) x' y' (B false) e' -> EVAL x y r x' y' r' (ite e' e1' e2')
-  | Eval_ITE_FEval_ITE_T : forall (x' y' : nat) (e' e1' e2' : exp) (r' : res) (x y : nat) (r : res),
-                           eval e1' x' y' r' ->
-                           eval e2' x y r -> EVAL x y (B false) x' y' (B true) e' -> EVAL x y r x' y' r' (ite e' e1' e2')
-  | Eval_ITE_TEval_ITE_F : forall (x' y' : nat) (e' e1' e2' : exp) (r' : res) (x y : nat) (r : res),
-                           eval e2' x' y' r' ->
-                           eval e1' x y r -> EVAL x y (B true) x' y' (B false) e' -> EVAL x y r x' y' r' (ite e' e1' e2')
-  | Eval_ITE_TEval_ITE_T : forall (x' y' : nat) (e' e1' e2' : exp) (r' : res) (x y : nat) (r : res),
-                           EVAL x y r x' y' r' e1' -> EVAL x y (B true) x' y' (B true) e' -> EVAL x y r x' y' r' (ite e' e1' e2')
-  | Eval_1Eval_1 : forall x' y' x y : nat, EVAL x y (N 1) x' y' (N 1) One
-  | Eval_0Eval_0 : forall x' y' x y : nat, EVAL x y (N 0) x' y' (N 0) Zero 
-  | Eval_YEval_Y : forall x' y' x y : nat, EVAL x y (N y) x' y' (N y') Y
-| Eval_XEval_X : forall x' y' x y : nat, EVAL x y (N x) x' y' (N x') X .*)
+Derive Valid  Schedules EVAL 6 consnum 5 derive "Gen".
+ 
 
 Merge (fun e => EVAL x y r x' y' r' e) With (fun e => eval e x'' y'' r'') As EVAL'.
 
@@ -363,12 +365,12 @@ Derive EnumSized for exp.
 
 Time Derive Inductive Schedule EVAL' 9  derive "Gen" opt "true".
 
-Sample (GenSizedSuchThat_EVAL'_IIIIIIIIIO 5 1 0 (N 1) 1 2 (N 2) 0 5 (N 5)).
+Sample (GenSizedSuchThat_EVAL'_IIIIIIIIIO 3 4 2 (N 4) 2 5 (N 5) 1 1 (N 1)).
 
 Derive Inductive Schedule eval derive "Check" opt "true".
 
 Definition prop' (ts : list (nat * nat * res)) :=
-  let genSize := 5 in
+  let genSize := 3 in
   let defElemIgnore := (0,0, N 0) in
   forAll (elems_ defElemIgnore ts) (fun '(x,y,r) =>
   forAll (elems_ defElemIgnore ts) (fun '(x',y',r') =>
@@ -376,20 +378,20 @@ Definition prop' (ts : list (nat * nat * res)) :=
                                                                           
   forAllShrinkMaybe (GenSizedSuchThat_EVAL'_IIIIIIIIIO genSize x y r x' y' r' x'' y'' r'') shrinker (fun e => 
   negb (forallb (fun '(x,y,r) => 
-  match DecOpt_eval_IIII 10 e x y r
+  match DecOpt_eval_IIII 100 e x y r
                 with
   | Some true => true
   | _ => false
   end) ts))))).
 
 Definition test_cases'' : list (nat * nat * res) :=
-  [ (4,2,N 4);(2,5,N 1);(1,1,N 1); (0,0,N 0) ].
+  [ (4,2,N 4);(2,5,N 5);(1,1,N 1); (0,0,N 0) ].
 
 Extract Constant defNumTests => "100000". 
-QuickChick (prop' test_cases'').
+QuickChick ( (prop' test_cases'')).
 
 
-Compute (DecOpt_eval_IIII 10 (ite (Lt One Zero) (Or One (ite T (Or F X) One)) (ite T Y X)) 4 2 (N 4)).
+Time Compute (DecOpt_eval_IIII 10000 (ite (Lt One Zero) (Or One (ite T (Or F X) One)) (ite T Y X)) 4 2 (N 4)).
 (*QuickChick (prop' [(1,1,B true); (3,3,B true); (0,1,B false); (0,2,B false); (0,0,B true); (2,0,B false)]).*)
 
 Derive Inductive Schedule eval 1 2 3 derive "Gen" opt "true".

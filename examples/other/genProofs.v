@@ -1,5 +1,5 @@
 From QuickChick Require Import QuickChick Tactics TacticsUtil Instances
-     Classes DependentClasses Sets.
+     Classes DependentClasses Sets Proofs.
 
 Require Import String. Open Scope string.
 Require Import List micromega.Lia.

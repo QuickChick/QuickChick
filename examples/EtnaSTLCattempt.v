@@ -191,6 +191,16 @@ Fixpoint pstep  (e: Expr) : option Expr :=
     | _ => None
     end.
 
+Fixpoint multistep (f : nat) (e : Expr) : option Expr :=
+  match f with
+  | 0 => None
+  | S f =>
+      match pstep e with
+      | None => Some e
+      | Some e => multistep f e
+      end
+  end.
+
 Inductive bind : Ctx -> nat -> Typ -> Prop :=
 | BindNow   : forall tau env, bind (ccons tau env) 0 tau
 | BindLater : forall tau tau' x env,
@@ -232,6 +242,6 @@ Derive GenSized for option.
 
 Instance DecEq_Expr : Dec_Eq Expr. dec_eq. Defined.
 Instance DecEq_Typ : Dec_Eq Typ. dec_eq. Defined.
-  
-Theorem preservation : forall g e t e', typing g e t -> pstep e = Some e' -> typing g e' t.
+QuickChickDebug Debug On.  
+Theorem preservation : forall g e t e', typing g e t -> multistep 1000 e = Some e' -> typing g e' t.
 Proof. schedules. valid_schedules. quickchick.  

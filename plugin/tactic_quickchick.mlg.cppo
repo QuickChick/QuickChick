@@ -1083,7 +1083,7 @@ let get_num_var_uses ((steps, sort) : schedule_with_density) ds : int =
     match step with
     | S_UC _  -> Total (* For enumerations during a checker should unconstrained be empty? *)
     | S_Check _  -> Checking
-    | S_ST (_, SrcRec _, _) -> (match ds with D_Gen | D_Thm -> Total | D_Check | D_Enum -> Checking) 
+    | S_ST (_, SrcRec _, _) -> (match ds with D_Gen | D_Thm -> Partial | D_Check | D_Enum -> Checking)
     | S_Match _ -> Backtracking
     | S_ST (output_var_tys, SrcNonrec (DTyCtr (ind,args)), _) -> 
       let output_vars = List.map fst output_var_tys in
@@ -1125,45 +1125,210 @@ let rec arrows_to_products typ =
   | DProd ((name, t1), t2) -> DProd ((name, t1), arrows_to_products t2)
   | _ -> typ
 
+type schedule_ranking_policy =
+  | RankDensityThenVars
+  | RankDensityOnly
+  | RankVarsThenDensity
+  | RankVarsOnly
+
+let schedule_ranking_policy () =
+  match Sys.getenv_opt "QC_SCHEDULE_RANKING" with
+  | Some "density_then_vars" | Some "density-vars" | Some "density-first" -> RankDensityThenVars
+  | Some "density_only" | Some "density-only" -> RankDensityOnly
+  | Some "var_density" | Some "vars_density" | Some "vars_then_density" | Some "vars-density" | Some "vars-first" -> RankVarsThenDensity
+  | Some "var_only" | Some "vars_only" | Some "vars-only" -> RankVarsOnly
+  | _ -> RankDensityThenVars
+
+let schedule_ranking_policy_to_string = function
+  | RankDensityThenVars -> "density_then_vars"
+  | RankDensityOnly -> "density_only"
+  | RankVarsThenDensity -> "vars_then_density"
+  | RankVarsOnly -> "vars_only"
+
+let schedule_rank_derive_sort_to_string = function
+  | D_Gen -> "Gen"
+  | D_Enum -> "Enum"
+  | D_Check -> "Check"
+  | D_Thm -> "Thm"
+
+let schedule_tie_report_enabled () =
+  match Sys.getenv_opt "QC_SCHEDULE_TIE_REPORT" with
+  | Some "1" | Some "true" | Some "yes" -> true
+  | _ -> false
+
+let schedule_trace_enabled () =
+  match Sys.getenv_opt "QC_SCHEDULE_TRACE" with
+  | Some "1" | Some "true" | Some "yes" -> true
+  | _ -> false
+
+let schedule_tie_report_limit () =
+  match Sys.getenv_opt "QC_SCHEDULE_TIE_LIMIT" with
+  | Some s -> (try max 0 (int_of_string s) with Failure _ -> 3)
+  | None -> 3
+
 let sort_schedules_by_density_and_var_uses (schedules : (int * schedule_with_density) list) (ds : derive_sort) : (schedule_with_density * rule_density * int * int) list =
-  
-  match ds with
-  | D_Gen | D_Thm ->
-    (*Maximize worst density, minimize var_uses*)
-    let compare_gen (_,d,uses,_) (_,d',uses',_) =
-      match compare d d' with
-      | 0 -> compare uses uses'
-      | c -> - c 
+  let rec take_local n l =
+    if n <= 0 then [] else
+    match l with
+    | [] -> []
+    | x :: xs -> x :: take_local (n - 1) xs
+  in
+  let density_compare =
+    match ds with
+    | D_Gen | D_Thm -> fun d d' -> - (compare d d')
+    | D_Enum | D_Check -> fun d d' -> compare d d'
+  in
+  let density_rank = function
+    | Checking -> 0
+    | Backtracking -> 1
+    | Neutral -> 2
+    | Partial -> 3
+    | Total -> 4
+  in
+  let representative_density (schd_steps, _) =
+    match ds with
+    | D_Gen | D_Thm ->
+      (match List.sort (fun (_,d) (_,d') -> compare d d') schd_steps with
+       | (_,x) :: _ -> x
+       | [] -> Total)
+    | D_Enum | D_Check ->
+      (match List.sort (fun (_,d) (_,d') -> - (compare d d')) schd_steps with
+       | (_,x) :: _ -> x
+       | [] -> Checking)
+  in
+  let entries = List.map (fun (i, (schd_steps,schd_sort)) ->
+    let density = representative_density (schd_steps,schd_sort) in
+    let num_var_uses = get_num_var_uses (schd_steps,schd_sort) ds in
+    ((schd_steps,schd_sort), density, num_var_uses, i)) schedules
+  in
+  let policy = schedule_ranking_policy () in
+  let compare_entry ((_,d,v,i) as a) ((_,d',v',i') as b) =
+    match policy with
+    | RankDensityThenVars ->
+      (match density_compare d d' with
+       | 0 -> (match compare v v' with 0 -> compare i i' | c -> c)
+       | c -> c)
+    | RankDensityOnly ->
+      (match density_compare d d' with
+       | 0 -> compare i i'
+       | c -> c)
+    | RankVarsThenDensity ->
+      (match compare v v' with
+       | 0 -> (match density_compare d d' with 0 -> compare i i' | c -> c)
+       | c -> c)
+    | RankVarsOnly ->
+      (match compare v v' with 0 -> compare i i' | c -> c)
+  in
+  let sorted = List.sort compare_entry entries in
+  if schedule_trace_enabled () then begin
+    match sorted with
+    | [] ->
+      Feedback.msg_notice
+        (str (Printf.sprintf
+          "[schedule-ranking] policy=%s derive=%s candidates=0 selected=none\n"
+          (schedule_ranking_policy_to_string policy)
+          (schedule_rank_derive_sort_to_string ds)))
+    | ((steps_ds, sort), density, num_var_uses, id) :: _ ->
+      Feedback.msg_notice
+        (str (Printf.sprintf
+          "[schedule-ranking] policy=%s derive=%s candidates=%d selected-id=%d selected-density=%s selected-var-uses=%d\n"
+          (schedule_ranking_policy_to_string policy)
+          (schedule_rank_derive_sort_to_string ds)
+          (List.length entries)
+          id
+          (density_to_string density)
+          num_var_uses)
+         ++ str (schedule_with_densities_to_string (steps_ds, sort)))
+  end;
+  if schedule_tie_report_enabled () && List.length entries > 1 then begin
+    let primary_key =
+      match policy with
+      | RankDensityThenVars | RankDensityOnly -> fun (_,d,_,_) -> density_to_string d
+      | RankVarsThenDensity | RankVarsOnly -> fun (_,_,v,_) -> string_of_int v
     in
-
-    let get_min = function
-    | (_,x) :: _ -> x
-    | [] -> Total
-    in 
-
-    List.sort compare_gen @@ List.map (fun (i, (schd_steps,schd_sort)) ->
-      let min_density = get_min @@ List.sort (fun (_,d) (_,d') -> compare d d') schd_steps in
-      let num_var_uses = get_num_var_uses (schd_steps,schd_sort) ds in 
-      ((schd_steps,schd_sort), min_density, num_var_uses, i)) schedules
-
-  (* | D_Thm -> failwith "ow" *)
-  | D_Enum | D_Check ->    
-    (*Minimize best density, minimize var_uses (for check maximize var_uses?)*)
-    let compare_enum (_,d,uses,_) (_,d',uses',_) =
-      match compare d d' with
-      | 0 -> compare uses uses'
-      | c -> c 
+    let secondary_report es =
+      match policy with
+      | RankDensityThenVars ->
+        let vars = List.map (fun (_,_,v,_) -> v) es in
+        let min_v = List.fold_left min max_int vars in
+        let max_v = List.fold_left max min_int vars in
+        let delta = max_v - min_v in
+        (delta > 0,
+         delta,
+         Printf.sprintf "secondary=var_uses min=%d max=%d delta=%d" min_v max_v delta)
+      | RankVarsThenDensity ->
+        let densities = List.map (fun (_,d,_,_) -> d) es in
+        let sorted_densities = List.sort_uniq density_compare densities in
+        let ranks = List.map density_rank densities in
+        let min_r = List.fold_left min max_int ranks in
+        let max_r = List.fold_left max min_int ranks in
+        let delta = max_r - min_r in
+        let best =
+          match sorted_densities with
+          | d :: _ -> density_to_string d
+          | [] -> "none"
+        in
+        let worst =
+          match List.rev sorted_densities with
+          | d :: _ -> density_to_string d
+          | [] -> "none"
+        in
+        (List.length sorted_densities > 1,
+         delta,
+         Printf.sprintf "secondary=density best=%s worst=%s distinct=%d rank_delta=%d"
+           best worst (List.length sorted_densities) delta)
+      | RankDensityOnly ->
+        (false, 0, "secondary=none")
+      | RankVarsOnly ->
+        (false, 0, "secondary=none")
     in
-
-    let get_max = function
-    | (_,x) :: _ -> x
-    | [] -> Checking
+    let groups =
+      List.fold_left (fun acc e ->
+        let k = primary_key e in
+        match acc with
+        | (k', es) :: rest when k = k' -> (k', e :: es) :: rest
+        | _ -> (k, [e]) :: acc
+      ) [] (List.sort (fun e e' -> compare (primary_key e) (primary_key e')) entries)
     in
-
-    List.sort compare_enum @@ List.map (fun (i, (schd_steps,schd_sort)) ->
-      let max_density = get_max @@ List.sort (fun (_,d) (_,d') -> - (compare d d')) schd_steps in
-      let num_var_uses = get_num_var_uses (schd_steps,schd_sort) ds in
-      ((schd_steps,schd_sort), max_density, num_var_uses, i)) schedules
+    let tie_groups = List.filter (fun (_, es) -> List.length es > 1) groups in
+    let choose2 n = n * (n - 1) / 2 in
+    let tie_pairs = List.fold_left (fun acc (_, es) -> acc + choose2 (List.length es)) 0 tie_groups in
+    let secondary_deciding_groups = List.filter (fun (_, es) -> let broken, _, _ = secondary_report es in broken) tie_groups in
+    let unresolved_tie_groups = List.length tie_groups - List.length secondary_deciding_groups in
+    let max_secondary_delta =
+      List.fold_left (fun acc (_, es) ->
+        let _, delta, _ = secondary_report es in
+        max acc delta) 0 tie_groups
+    in
+    if tie_groups <> [] then begin
+      Feedback.msg_notice
+        (str (Printf.sprintf
+          "[schedule-ranking] policy=%s derive=%s candidates=%d primary-tie-groups=%d primary-tie-pairs=%d secondary-deciding-groups=%d unresolved-tie-groups=%d max-secondary-delta=%d\n"
+          (schedule_ranking_policy_to_string policy)
+          (schedule_rank_derive_sort_to_string ds)
+          (List.length entries)
+          (List.length tie_groups)
+          tie_pairs
+          (List.length secondary_deciding_groups)
+          unresolved_tie_groups
+          max_secondary_delta));
+      let limit = schedule_tie_report_limit () in
+      let show_group (k, es) =
+        let broken, _, secondary_summary = secondary_report es in
+        let es = List.sort compare_entry es in
+        let es = if limit = 0 then es else take_local limit es in
+        Feedback.msg_notice (str (Printf.sprintf "[schedule-ranking] tied derive=%s primary=%s broken=%s %s showing=%d contender(s)\n"
+          (schedule_rank_derive_sort_to_string ds)
+          k (if broken then "yes" else "no") secondary_summary (List.length es)));
+        List.iter (fun ((steps_ds, sort), density, num_var_uses, id) ->
+          Feedback.msg_notice
+            (str (Printf.sprintf "  id=%d density=%s var_uses=%d\n" id (density_to_string density) num_var_uses)
+             ++ str (schedule_with_densities_to_string (steps_ds, sort)))) es
+      in
+      List.iter show_group (if limit = 0 then tie_groups else take_local limit tie_groups)
+    end
+  end;
+  sorted
 
 let rec take n l =
   if n <= 0 then [] else
@@ -1184,7 +1349,7 @@ let rec schedule_density neutral_prelude_steps schedule : schedule_with_density 
       (ignore (best_inductive_schedule_from_instance ty [] D_Check true);
       if pol then Checking else Partial)
     | S_Check (SrcRec _, pol) -> if pol then Checking else Partial
-    | S_ST (_, SrcRec _, _) -> (match ds with D_Gen | D_Thm -> Total | D_Check | D_Enum -> Checking) 
+    | S_ST (_, SrcRec _, _) -> (match ds with D_Gen | D_Thm -> Partial | D_Check | D_Enum -> Checking)
     | S_ST (output_var_tys, SrcNonrec (DTyCtr (ind,args)), ps) -> 
       let output_vars = List.map fst output_var_tys in
       let rec is_output i = (function
@@ -1767,8 +1932,9 @@ let tarjan_schedules_by_name (schedules : string list) inductive_dependency_map
   let components = ref [] in
   let dep_count = List.length schedules in
   let in_stack = Array.make dep_count false in
-  let vertex_indices = ref (StringMap.add "DecOpt_Coq.Init.Logic.eq_III" (~-0) 
-                            (StringMap.singleton "DecOpt_eq_III" ~-0)) in
+  let eq_sentinel_index = -1 in
+  let vertex_indices = ref (StringMap.add "DecOpt_Coq.Init.Logic.eq_III" eq_sentinel_index
+                            (StringMap.singleton "DecOpt_eq_III" eq_sentinel_index)) in
   let vertex_lowlinks = ref StringMap.empty in
 
   Error.msg_debug (str "Tarjan's algorithm for schedules: " ++ str (String.concat ", " schedules) ++ fnl ());
@@ -1795,11 +1961,12 @@ let tarjan_schedules_by_name (schedules : string list) inductive_dependency_map
         let low_w = StringMap.find w_name !vertex_lowlinks in
         vertex_lowlinks := StringMap.add v_name (min low_v low_w) !vertex_lowlinks
       )
-      else if in_stack.(StringMap.find w_name !vertex_indices) then (
-        let low_v = StringMap.find v_name !vertex_lowlinks in
+      else
         let idx_w = StringMap.find w_name !vertex_indices in
+        if idx_w >= 0 && idx_w < Array.length in_stack && in_stack.(idx_w) then (
+        let low_v = StringMap.find v_name !vertex_lowlinks in
         vertex_lowlinks := StringMap.add v_name (min low_v idx_w) !vertex_lowlinks
-      )
+        )
     ) dependent_names;
 
     (* If v is a root node, pop the stack to form an SCC *)
@@ -1841,20 +2008,19 @@ let valid_schedules =
         density_memo := RelationInstMap.empty;
         let schedules = NewUnifyQC.type_to_schedules dt None None [] [] D_Thm false in
         let schedules' = List.map (fun ((steps, sort), ms, eqs) -> (List.map (fun (v,p) -> S_Match (v,p)) ms, (List.map check_eq eqs @ steps, sort))) schedules in
-        Feedback.msg_notice (str "Printing all bindings" ++ fnl ());
-
-
         let schedules_w_densities = List.mapi (fun i (ms_steps, schd) -> i, schedule_density ms_steps schd) schedules' in
         let sorted = sort_schedules_by_density_and_var_uses schedules_w_densities D_Thm in
 
-
-        List.iteri (fun i ((steps_ds, sort), density, num_var_uses, id) ->
-          Feedback.msg_notice (str ("sorted id: " ^ string_of_int i ^ " orig id: " ^ string_of_int id ^ ":\n" ) ++ fnl ());
-          Feedback.msg_notice (str ("# var uses: " ^ string_of_int num_var_uses ^ "; density:" ^ density_to_string density ^ "\n") ++
-                              str (schedule_with_densities_to_string (steps_ds, sort) ^ "\n") (*++  *)                                         
-                              (* str "\nconstrexpr: \n" ++  *)
-                              (* NewUnifyQC.match_schedule_as_pp_constr_expr (List.map fst steps_ds, sort) [] [] D_Thm *)
-                                                          ++ str "\n==============================================\n")) sorted;
+        if !NewGenericLib.debug_mode then begin
+          Feedback.msg_notice (str "Printing all bindings" ++ fnl ());
+          List.iteri (fun i ((steps_ds, sort), density, num_var_uses, id) ->
+            Feedback.msg_notice (str ("sorted id: " ^ string_of_int i ^ " orig id: " ^ string_of_int id ^ ":\n" ) ++ fnl ());
+            Feedback.msg_notice (str ("# var uses: " ^ string_of_int num_var_uses ^ "; density:" ^ density_to_string density ^ "\n") ++
+                                str (schedule_with_densities_to_string (steps_ds, sort) ^ "\n") (*++  *)
+                                (* str "\nconstrexpr: \n" ++  *)
+                                (* NewUnifyQC.match_schedule_as_pp_constr_expr (List.map fst steps_ds, sort) [] [] D_Thm *)
+                                                            ++ str "\n==============================================\n")) sorted
+        end;
         Tacticals.tclIDTAC
       end 
     | None -> failwith "Failed to Parse type"
@@ -2036,7 +2202,7 @@ let quickchick_it size idx =
         let schedules_pieces = inductive_schedules_to_def_constr_exprs components ind_schd_name in
 
         Feedback.msg_notice (str "Pieces: " ++ fnl ());
-        List.iter (List.iter (fun (name, constr) -> msg_debug (str (var_to_string name ^ ": ") ++ str (constr_expr_to_string constr) ++ fnl ()))) schedules_pieces;
+        List.iter (List.iter (fun (name, constr) -> Error.msg_debug (str (var_to_string name ^ ": ") ++ str (constr_expr_to_string constr) ++ fnl ()))) schedules_pieces;
 
         let theorem_constr = 
           begin match List.find_opt (function [(name, _)] -> name = var_of_string "theorem" | _ -> false) schedules_pieces with
@@ -2488,7 +2654,7 @@ VERNAC COMMAND EXTEND DeriveInductiveSchedule CLASSIFIED AS SIDEFF
       | _ -> failwith "Opt must be true or false") in
       msg_debug (str "Deriving inductive schedule for " ++ str (ty_ctr_to_string ind_name) ++ fnl ());
       let (inductive_schedule, density) = inductive_best_valid_schedule (ind_name, params, constructors, result_typ) ois ds opt in
-      Feedback.msg_notice (str "Inductive Schedule:\n" ++ str (inductive_schedule_to_string inductive_schedule) ++ fnl ());
+      Error.msg_debug (str "Inductive Schedule:\n" ++ str (inductive_schedule_to_string inductive_schedule) ++ fnl ());
       msg_debug (str "Density: " ++ str (density_to_string density) ++ fnl ());
       density_inductive_memo := RelationInstMap.remove (ty_ctr_of_string "eq", [], D_Check) !density_inductive_memo;
 

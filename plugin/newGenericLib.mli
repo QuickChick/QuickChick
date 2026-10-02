@@ -180,7 +180,7 @@ type mexp =
 
 val product_free_rocq_type_to_mexp : rocq_type -> mexp
 
-val schedule_to_mexp : schedule -> mexp -> mexp -> mexp
+val schedule_to_mexp : schedule -> mexp -> mexp -> mexp -> mexp
 
 val mexp_to_constr_expr : mexp -> derive_sort -> Constrexpr.constr_expr
 
