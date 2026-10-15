@@ -7,10 +7,10 @@ Inductive elaboration_accepts (A : Type) : A -> Prop :=
 Derive Inductive Schedule elaboration_accepts derive "Check" opt "true".
 
 Example accepts_bool :
-  DecOpt_elaboration_accepts_II 3 bool true _ _ = Some true.
+  DecOpt_elaboration_accepts_II 3 bool true = Some true.
 Proof. reflexivity. Qed.
 Example accepts_nat :
-  DecOpt_elaboration_accepts_II 3 nat 2 _ _ = Some true.
+  DecOpt_elaboration_accepts_II 3 nat 2 = Some true.
 Proof. reflexivity. Qed.
 
 (* Exercise theorem declaration and extraction through the tactic. *)

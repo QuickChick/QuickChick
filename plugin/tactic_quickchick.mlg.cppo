@@ -1336,6 +1336,227 @@ let rec take n l =
   | [] -> []
   | x :: xs -> x :: take (n - 1) xs
 
+(* The proof context is borrowed only while preparing one test. Global
+   declarations may grow during that preparation, so refresh the base environment. *)
+let schedule_locals = ref []
+let schedule_universes = ref None
+
+let schedule_env () =
+  List.fold_right Environ.push_named !schedule_locals (Global.env ())
+
+let schedule_sigma env =
+  let sigma = Evd.from_env env in
+  match !schedule_universes with
+  | None -> sigma
+  | Some universes -> Evd.merge_universe_context sigma universes
+
+let with_schedule_context env sigma f =
+  let global_ids = List.map Context.Named.Declaration.get_id
+    (Environ.named_context (Global.env ())) in
+  let previous = !schedule_locals in
+  let previous_universes = !schedule_universes in
+  let locals = List.filter (fun d ->
+    not (List.mem (Context.Named.Declaration.get_id d) global_ids)) (Environ.named_context env) in
+  let normalize c = EConstr.to_constr sigma (EConstr.of_constr c) in
+  let locals = List.map (Context.Named.Declaration.map_constr normalize) locals in
+  schedule_locals := locals;
+  schedule_universes := Some (Evd.evar_universe_context sigma);
+  Fun.protect ~finally:(fun () ->
+    schedule_locals := previous; schedule_universes := previous_universes) f
+
+let inline_schedule_definitions sigma term =
+  List.fold_left (fun term -> function
+    | Context.Named.Declaration.LocalDef (name, body, _) ->
+        EConstr.Vars.replace_vars sigma [Context.binder_name name, EConstr.of_constr body] term
+    | Context.Named.Declaration.LocalAssum _ -> term) term !schedule_locals
+
+(* Keep lookup variables rigid after elaboration. In particular, type parameters
+   are bindings, not unification holes that a concrete instance may specialize. *)
+let schedule_inputs = ref []
+
+let with_schedule_inputs inputs f =
+  let previous = !schedule_inputs in
+  schedule_inputs := inputs;
+  Fun.protect ~finally:(fun () -> schedule_inputs := previous) f
+
+let rec obligation_variables = function
+  | DTyVar v | DTyParam v -> [v]
+  | DTyCtr (_, args) | DCtr (_, args) -> List.concat_map obligation_variables args
+  | DApp (head, args) -> List.concat_map obligation_variables (head :: args)
+  | DNot p -> obligation_variables p
+  | DHole -> []
+  | _ -> CErrors.user_err (str "QuickChick cannot infer a dependency containing a binder.")
+
+let distinct_variables xs =
+  List.fold_left (fun acc v -> if List.mem v acc then acc else acc @ [v]) [] xs
+
+let schedule_obligation relation outputs ds constrained =
+  let open NewGenericLib in
+  let relation = match relation with DNot p when ds = D_Check -> p | p -> p in
+  let term = product_free_rocq_type_to_mexp relation in
+  let class_name, args = match ds, constrained with
+  | D_Check, _ -> "QuickChick.Decidability.DecOpt", [term]
+  | D_Gen, false -> "QuickChick.Classes.GenSized", [term]
+  | D_Enum, false -> "QuickChick.Classes.EnumSized", [term]
+  | (D_Gen | D_Enum), true ->
+      let pattern, annotation = match outputs with
+      | [] -> PWild, Some (MConst "Coq.Init.Datatypes.unit")
+      | v :: vs -> List.fold_left (fun p v ->
+          PCtr (constructor_of_string "Coq.Init.Datatypes.pair", [PWild; PWild; p; PVar v])) (PVar v) vs, None in
+      (if ds = D_Gen then "QuickChick.DependentClasses.GenSizedSuchThat"
+       else "QuickChick.DependentClasses.EnumSizedSuchThat"),
+      [MHole; MFun ([pattern, annotation], term)]
+  | D_Thm, _ -> assert false in
+  MTyCtr (ty_ctr_of_string class_name, args)
+
+let elaborate_schedule_expression variables outputs ds expression =
+  let env = schedule_env () in
+  let in_env v = List.exists (fun d -> Names.Id.equal v
+    (Context.Named.Declaration.get_id d)) (Environ.named_context env) in
+  let inputs = List.filter (fun (v, _) -> not (List.mem v outputs)) !schedule_inputs in
+  let bound = List.map fst inputs in
+  let vars = distinct_variables variables |> List.filter (fun v ->
+    not (in_env v || List.mem v outputs || List.mem v bound)) in
+  let binders = inputs @ List.map (fun v -> v, MHole) vars in
+  let expression = mexp_to_constr_expr
+    (MFun (List.map (fun (v,t) -> NewGenericLib.PVar v, Some t) binders, expression)) ds in
+  let expression = match expression.CAst.v with
+    | Constrexpr.CLambdaN (binders, body) -> CAst.make (Constrexpr.CProdN (binders, body))
+    | _ -> expression in
+  Error.msg_debug (str "Instance obligation: " ++ str (constr_expr_to_string expression));
+  let sigma, goal = Constrintern.interp_constr_evars env (schedule_sigma env) expression in
+  let rec introduce env names goal =
+    match EConstr.kind sigma goal with
+    | Constr.Prod (name, ty, body) ->
+        if Evarutil.has_undefined_evars sigma ty then
+          CErrors.user_err (str "QuickChick could not determine a dependency argument's type.");
+        let original = match Context.binder_name name with Names.Name id -> id | _ -> make_up_name_str "qc_arg" in
+        let occupied = List.exists (fun d -> Names.Id.equal original
+          (Context.Named.Declaration.get_id d)) (Environ.named_context env) in
+        let id = if occupied then make_up_name_str "qc_bound" else original in
+        let decl = Context.Named.Declaration.LocalAssum
+          (Context.make_annot id Sorts.Relevant, EConstr.to_constr sigma ty) in
+        introduce (Environ.push_named decl env) ((original, id) :: names)
+          (EConstr.Vars.subst1 (EConstr.mkVar id) body)
+    | _ -> env, sigma, goal, names in
+  introduce env [] goal
+
+let elaborate_obligation relation outputs ds constrained =
+  elaborate_schedule_expression (obligation_variables relation) outputs ds
+    (schedule_obligation relation outputs ds constrained)
+
+let resolve_schedule_obligation env sigma goal =
+  try Some (Typeclasses.resolve_one_typeclass env sigma goal)
+  with Not_found ->
+    let bounded = match Goptions.get_option_value ["Typeclasses"; "Depth"] with
+      | Some get -> (match get () with Goptions.IntValue (Some _) -> true | _ -> false)
+      | None -> false in
+    if bounded then CErrors.user_err (str
+      "QuickChick could not resolve an instance with the current Typeclasses Depth limit. Increase or unset that limit before automatic derivation.");
+    None
+
+(* Find premises of applicable registered instances, preserving complete class
+   applications. This is requirement discovery, not a replacement resolver:
+   the resulting context is checked by Coq's resolver and used again at emission.
+   Concrete missing instances are never turned into generic assumptions. *)
+let instance_requirements env sigma goal names =
+  let goal = Reductionops.nf_betaiotazeta env sigma goal in
+  let allowed = List.map (fun (v,_) ->
+    try List.assoc v names with Not_found -> v) !schedule_inputs in
+  let abstract_types = List.filter_map (fun d ->
+    let id = Context.Named.Declaration.get_id d in
+    if List.mem id allowed && Constr.isSort (Context.Named.Declaration.get_type d)
+    then Some id else None) (Environ.named_context env) in
+  let variables sigma term =
+    let ids = ref Names.Id.Set.empty in
+    let rec visit t =
+      (match EConstr.kind sigma t with Constr.Var id -> ids := Names.Id.Set.add id !ids | _ -> ());
+      EConstr.iter sigma visit t in
+    visit term; Names.Id.Set.elements !ids in
+  let can_abstract sigma ty =
+    not (Evarutil.has_undefined_evars sigma ty) &&
+    let vars = variables sigma ty in
+    List.exists (fun v -> List.mem v abstract_types) vars &&
+    List.for_all (fun v -> List.mem v allowed) vars &&
+    (* Missing checkers are derivation work, not assumptions about propositions.
+       Type requirements may still contain fixed term indices, e.g. C (vec A n). *)
+    let (_, args) = Typeclasses.dest_class_app env sigma ty in
+    List.for_all (fun arg ->
+      let sigma, arg_type = Typing.type_of env sigma (EConstr.of_constr arg) in
+      not (Constr.is_Prop (EConstr.to_constr sigma
+        (Reductionops.whd_all env sigma arg_type)))) args in
+  let rec discover seen sigma goal =
+    match resolve_schedule_obligation env sigma goal with
+    | Some (sigma, _) -> Some (sigma, [])
+    | None when List.exists (EConstr.eq_constr sigma goal) seen -> None
+    | None ->
+      let seen = goal :: seen in
+      let ((cls, _), _) = Typeclasses.dest_class_app env sigma goal in
+      let instances = Stdlib.Option.value ~default:[] (Typeclasses.instances cls.Typeclasses.cl_impl) in
+      let priority i = Stdlib.Option.value ~default:1000 (Typeclasses.hint_priority i) in
+      let instances = List.stable_sort (fun a b -> compare (priority a) (priority b)) instances in
+      let rec candidates = function
+        | [] -> if can_abstract sigma goal then Some (sigma, [goal]) else None
+        | inst :: rest ->
+          let attempt =
+            let sigma, head = Evd.fresh_global env sigma (Typeclasses.instance_impl inst) in
+            let sigma, typ = Typing.type_of env sigma head in
+            let rec apply sigma premises typ =
+              match EConstr.kind sigma (Reductionops.whd_all env sigma typ) with
+              | Constr.Prod (_, dom, body) ->
+                let sigma, arg = Evarutil.new_evar env sigma dom in
+                let premises = if Typeclasses.is_class_type sigma dom then dom :: premises else premises in
+                apply sigma premises (EConstr.Vars.subst1 arg body)
+              | _ -> sigma, List.rev premises, typ in
+            let sigma, premises, conclusion = apply sigma [] typ in
+            let unified = try Some (Evarconv.unify env sigma Conversion.CONV conclusion goal)
+              with Pretype_errors.PretypeError _ -> None in
+            match unified with
+            | None -> None
+            | Some sigma ->
+              let rec solve sigma needed = function
+                | [] -> Some (sigma, needed)
+                | ty :: rest ->
+                  let ty = Evarutil.nf_evar sigma ty in
+                  if Evarutil.has_undefined_evars sigma ty then None else
+                  match discover seen sigma ty with
+                  | None -> None
+                  | Some (sigma, requirements) ->
+                    solve sigma (needed @ requirements) rest in
+              solve sigma [] premises in
+          match attempt with
+          | None -> candidates rest
+          | Some (sigma, requirements) ->
+            let candidate_env = List.fold_left (fun env ty ->
+              Environ.push_named (Context.Named.Declaration.LocalAssum
+                (Context.make_annot (make_up_name_str "qc_premise") Sorts.Relevant,
+                 EConstr.to_constr sigma ty)) env) env requirements in
+            (match resolve_schedule_obligation candidate_env sigma goal with
+             | Some _ -> attempt | None -> candidates rest) in
+      candidates instances in
+  match discover [] sigma goal with
+  | None -> None
+  | Some (sigma, requirements) ->
+    let requirements = List.fold_left (fun acc ty ->
+      let ty = Evarutil.nf_evar sigma ty in
+      if List.exists (EConstr.eq_constr sigma ty) acc then acc else acc @ [ty]) [] requirements in
+    let env' = List.fold_left (fun env ty ->
+      Environ.push_named (Context.Named.Declaration.LocalAssum
+        (Context.make_annot (make_up_name_str "qc_requirement") Sorts.Relevant,
+         EConstr.to_constr sigma ty)) env) env requirements in
+    match resolve_schedule_obligation env' sigma goal with
+    | None -> None
+    | Some _ -> Some (List.map (fun ty ->
+        let expression = Flags.without_option Constrextern.print_universes
+          (Constrextern.extern_constr env sigma) ty in
+        let original_names = List.fold_left (fun map (original, fresh) ->
+          Names.Id.Map.add fresh original map) Names.Id.Map.empty names in
+        MEscape (Constrexpr_ops.replace_vars_constr_expr original_names expression)) requirements)
+
+let has_schedule_instance relation outputs ds constrained =
+  let env, sigma, goal, names = elaborate_obligation relation outputs ds constrained in
+  match instance_requirements env sigma goal names with Some _ -> true | None -> false
+
 let rec schedule_density neutral_prelude_steps schedule : schedule_with_density =
   let step_density (step : schedule_step) ds : rule_density =
     match step with
@@ -1357,7 +1578,9 @@ let rec schedule_density neutral_prelude_steps schedule : schedule_with_density 
         | DCtr (_, args) -> List.exists (is_output i) args
         | _ -> false) in
       let output_indices = filter_mapi (fun i arg -> if is_output i arg then Some i else None) args in
-      snd (inductive_best_valid_schedule (ty_ctr_to_rocq_relation ind) output_indices (producer_sort_to_derive_sort ps) true)
+      if has_schedule_instance (DTyCtr (ind,args)) output_vars (producer_sort_to_derive_sort ps) true then
+        (match ps with PS_G -> Partial | PS_E -> Checking)
+      else snd (inductive_best_valid_schedule (ty_ctr_to_rocq_relation ind) output_indices (producer_sort_to_derive_sort ps) true)
     | S_ST (_, SrcNonrec _, _) -> failwith "is_schedule_valid: Nonrecursive source should have DTyCtr at toplevel" 
     | S_Match _ -> Backtracking
     | S_ST (_, SrcMutrec _, _)
@@ -1444,18 +1667,32 @@ and inductive_best_valid_schedule (rel : rocq_relation) (output_idxs : int list)
   ++ str (String.concat ", " (List.map string_of_int output_idxs)) 
   ++ str "\n\n");
 
-  let rec get_result_vars = function
+  (* Result binders must be distinct from constructor binders. Substitute each
+     renaming into subsequent types, including dependent indices. *)
+  let rec rename names = function
+    | DTyVar v -> DTyVar (try List.assoc v names with Not_found -> v)
+    | DTyCtr (c, args) -> DTyCtr (c, List.map (rename names) args)
+    | DCtr (c, args) -> DCtr (c, List.map (rename names) args)
+    | DApp (f, args) -> DApp (rename names f, List.map (rename names) args)
+    | DNot p -> DNot (rename names p)
+    | DArrow (a,b) -> DArrow (rename names a, rename names b)
+    | DProd ((v,t), b) -> DProd ((v, rename names t), rename (List.remove_assoc v names) b)
+    | DLambda (v,t,b) -> DLambda (v, rename names t, rename (List.remove_assoc v names) b)
+    | DMatch (t, branches) -> DMatch (rename names t, List.map (fun (pat, body) ->
+        pat, rename (List.filter (fun (v,_) -> not (List.mem v (NewGenericLib.pat_vars pat))) names) body) branches)
+    | (DTyParam _ | DHole) as t -> t in
+  let rec get_result_vars names = function
   | DProd ((v,t), b) ->
-    let v = make_up_name_str ("v_" ^ var_to_string v) in
-    (v,t) :: get_result_vars b
+    let fresh = make_up_name_str ("v_" ^ var_to_string v) in
+    (fresh, rename names t) :: get_result_vars ((v, fresh) :: names) b
   | DArrow (t1, t2) ->
     let v = make_up_name_str "v" in
-    (v,t1) :: get_result_vars t2
+    (v, rename names t1) :: get_result_vars names t2
   | _ -> [] in
 
   let dtype = (DTyCtr (ty_ctr_of_string "Type", [])) in
 
-  let result_vars = List.map (fun p -> (p, dtype)) params @ get_result_vars result_typ in
+  let result_vars = List.map (fun p -> (p, dtype)) params @ get_result_vars [] result_typ in
 
   let rec remake_result vars result = 
   match vars, result with
@@ -1464,6 +1701,7 @@ and inductive_best_valid_schedule (rel : rocq_relation) (output_idxs : int list)
   | (v,t) :: rest, DArrow (_, t') -> DProd ((v,t), remake_result rest t')
   | _ -> failwith "remake_result failed" in
 
+  with_schedule_inputs (List.map (fun (v,t) -> v, product_free_rocq_type_to_mexp t) result_vars) (fun () ->
   let output_vars = List.map fst (List.filteri (fun i _ -> List.mem i output_idxs) result_vars) in
 
   let modestring = String.init (List.length result_vars) (fun i -> if List.mem i output_idxs then 'O' else 'I') in
@@ -1482,12 +1720,9 @@ and inductive_best_valid_schedule (rel : rocq_relation) (output_idxs : int list)
     | D_Check | D_Enum -> Checking
     | D_Gen | D_Thm -> if opt then Partial else Total in
 
-  let mexp_GenSized a = MTyCtr (ty_ctr_of_string "GenSized", [a]) in
-  let mexp_Dec_Eq a = MTyCtr (ty_ctr_of_string "Dec_Eq", [a]) in
-
   Error.msg_debug (str "Params are: " ++ str (String.concat ", " (List.map ty_param_to_string params)) ++ fnl ());
 
-  let parameters_classes = List.map (fun p -> p, [mexp_GenSized (MId p); mexp_Dec_Eq (MId p)]) params in
+  let parameters_classes = [] in
 
   Error.msg_debug (str "Parameters classes are: " ++ str (String.concat ", " (List.map (fun (p,cs) -> ty_param_to_string p ^ ": " ^ String.concat ", " (List.map mexp_to_string cs)) parameters_classes)) ++ fnl ());
 
@@ -1562,16 +1797,20 @@ and inductive_best_valid_schedule (rel : rocq_relation) (output_idxs : int list)
 
   density_inductive_memo := RelationInstMap.add (ind_name, output_idxs, ds) (inductive_schedule, overall_density) !density_inductive_memo;
   Error.msg_debug (str (Printf.sprintf "%s: %s Done, Density: %s\n" (schedule_name) (String.concat ", " (List.map string_of_int output_idxs)) (density_to_string overall_density))); 
-  inductive_schedule, overall_density
+  inductive_schedule, overall_density)
 end
 
 and best_inductive_schedule_from_instance (ind_instance : rocq_type) (output_vars : var list) (ds : derive_sort) (opt : bool) : inductive_schedule * rule_density =
+  if has_schedule_instance ind_instance output_vars ds opt then
+    (("resolved_instance", [], [], [], []),
+     if ds = D_Check || ds = D_Enum then Checking else if opt then Partial else Total)
+  else
   let rec instantiate_applied_types (ty : rocq_type) : unit =
     match ty with
     | DTyCtr (ind_name, args) ->
       List.iter (function
       | DTyCtr (applied_ind_name, applied_args) ->
-        ignore (inductive_best_valid_schedule (ty_ctr_to_rocq_relation applied_ind_name) [] (match ds with | D_Gen | D_Thm -> D_Gen | D_Check | D_Enum -> D_Enum) false);
+        ignore (best_inductive_schedule_from_instance (DTyCtr (applied_ind_name, applied_args)) [] (match ds with | D_Gen | D_Thm -> D_Gen | D_Check | D_Enum -> D_Enum) false);
         List.iter instantiate_applied_types applied_args
       | _ -> ()) args
     | _ -> () in
@@ -1614,6 +1853,14 @@ let collect_inductive_dependents (instance : rocq_constr * int list * derive_sor
   | DTyParam param -> []
     (* failwith "collect_inductive_dependents: Need to handle instances of parameter type variables, like A in list A" *)
   | _ -> failwith "collect_inductive_dependents: not a DTyCtr or DTyVar"
+
+let resolved_dependency (relation, output_indices, ds, constrained) =
+  let args = match relation with
+    | DTyCtr (_, args) | DNot (DTyCtr (_, args)) -> args
+    | _ -> [] in
+  let outputs = List.concat (filter_mapi (fun i arg ->
+    if List.mem i output_indices then Some (variables_in_hypothesis arg) else None) args) in
+  has_schedule_instance relation outputs ds constrained
 
 let lookup_and_remove_inductive_schedule (instance : rocq_constr * int list * derive_sort * bool) (to_remove : bool) : (inductive_schedule * derive_sort * bool) option =
   let (ind_instance, output_idxs, ds, opt) = instance in
@@ -1672,14 +1919,18 @@ let nonrecursive_type step =
 let insert_mutrec_call name ois step opt param_typeclasses =
   update_source step (nonrec_to_mutrec_call name ois (nonrecursive_type step) opt param_typeclasses)
 
-let insert_mutrec_calls ((schedule,matches) : schedule * (var * pat) list) : schedule * (var * pat) list =
+let insert_mutrec_calls ?within ((schedule,matches) : schedule * (var * pat) list) : schedule * (var * pat) list =
   let (schedule_steps_deps,schd_sort_dep) = schedule_with_dependents schedule in
   let zero = DCtr (constructor_of_string "Coq.Init.Datatypes.O", []) in
   let succ n = DCtr (constructor_of_string "Coq.Init.Datatypes.S", [n]) in 
   let three = succ (succ (succ zero)) in
   let mul n m = DCtr (constructor_of_string "Coq.Init.Nat.mul", [n; m]) in (*TODO: Add Constants to the language so I don't have to apply functions as if they are constructors.*)
   let updated_steps = List.map (fun (step,depopt) -> 
-                                    (match (depopt >>= fun dep -> lookup_and_remove_inductive_schedule dep false) with
+                                    (match (depopt >>= fun dep -> if resolved_dependency dep then None else
+                                      (match lookup_and_remove_inductive_schedule dep false with
+                                       | Some ((name,_,_,_,_),_,_) as found ->
+                                           (match within with Some names when not (List.mem name names) -> None | _ -> found)
+                                       | None -> None)) with
                                     | None -> step
                                     | Some ((ind_schd_name,_,param_typeclasses,_,_),ds,opt) -> (*TODO: use the info from this inductive schedule to determine whether any 
                                                                                arguments of Dec_Eq or Show or Gen are needed*)
@@ -1691,7 +1942,11 @@ let insert_mutrec_calls ((schedule,matches) : schedule * (var * pat) list) : sch
   let updated_sort = match schd_sort_dep with
     | (TheoremSchedule (t,true), Some (ctr, ois, ds, opt)) ->
       Error.msg_debug (str ("Inserting mutrec calls for theorem: " ^ rocq_constr_to_string ctr) ++ fnl ()); 
-      (match lookup_and_remove_inductive_schedule (ctr, ois, ds, opt) false with
+      (match (if resolved_dependency (ctr, ois, ds, opt) then None else
+        (match lookup_and_remove_inductive_schedule (ctr, ois, ds, opt) false with
+         | Some ((name,_,_,_,_),_,_) as found ->
+             (match within with Some names when not (List.mem name names) -> None | _ -> found)
+         | None -> None)) with
       | None -> TheoremSchedule (t,true)
       | Some ((schd_name,_,param_typeclasses,_,_), _, _) ->
         let typeclass_holes = List.init (List.length (List.concat_map snd param_typeclasses)) (fun _ -> DHole) in
@@ -1711,12 +1966,13 @@ let insert_mutrec_calls ((schedule,matches) : schedule * (var * pat) list) : sch
 
   (updated_steps, updated_sort), matches
 
-let insert_mutrec_calls_inductive_schedule (is : inductive_schedule) : inductive_schedule =
+let insert_mutrec_calls_inductive_schedule ?within (is : inductive_schedule) : inductive_schedule =
   let (name, result_vars, param_deps, nonrecursive_hyps, recursive_hyps) = is in
   Error.msg_debug (str ("Inserting mutrec calls for inductive schedule: " ^ name) ++ fnl ());
-  let updated_nonrecursive_hyps = List.map insert_mutrec_calls nonrecursive_hyps in
-  let updated_recursive_hyps = List.map (fun h -> rec_calls_add_typeclass_holes (insert_mutrec_calls h) param_deps) recursive_hyps in
-  (name, result_vars, param_deps, updated_nonrecursive_hyps, updated_recursive_hyps)
+  with_schedule_inputs result_vars (fun () ->
+  let updated_nonrecursive_hyps = List.map (insert_mutrec_calls ?within) nonrecursive_hyps in
+  let updated_recursive_hyps = List.map (fun h -> rec_calls_add_typeclass_holes (insert_mutrec_calls ?within h) param_deps) recursive_hyps in
+  (name, result_vars, param_deps, updated_nonrecursive_hyps, updated_recursive_hyps))
 
 module InductiveSchedSet = Set.Make(struct type t = inductive_schedule * derive_sort * bool let compare = compare end)
 
@@ -1846,11 +2102,13 @@ let collect_all_used_inductive_schd_names ind_schd_name : string list * (((induc
         let dependents = List.concat_map extract_type_applications @@ inductive_schedule_dependents ind_schd in
         let deduplicate_dependents = List.sort_uniq compare dependents in
 
-        let dependents_names = List.map construct_ind_schd_name deduplicate_dependents in
+        let dependents_names = List.filter_map (fun ((ind, _, ois, ds, _) as dep) ->
+          if RelationInstMap.mem (ind, ois, ds) !density_inductive_memo then
+            Some (construct_ind_schd_name dep) else None) deduplicate_dependents in
 
         Error.msg_debug (str ("Dependent's names: " ^ String.concat ", " dependents_names) ++ fnl ());
 
-        let replace_nonrecursives = insert_mutrec_calls_inductive_schedule ind_schd in
+        let replace_nonrecursives = ind_schd in
 
         inductive_dependency_map := StringMap.add ind_schd_name ((replace_nonrecursives, ds, opt), dependents_names) !inductive_dependency_map;
 
@@ -1925,6 +2183,73 @@ let rec take_while (p : 'a -> bool) (l : 'a list) : ('a list) * ('a list) =
     (a :: start, rest)
   | _ -> ([], l)
 
+(* Propagate complete premises, with the dependency's formal arguments replaced
+   by the actual call arguments. Keep raw schedules until this fixed point is
+   reached: recursive call dictionaries depend on the final signatures. *)
+let propagate_schedule_requirements components =
+  let open NewGenericLib in
+  let all = ref (List.concat components) in
+  let same_requirement a b = Constrexpr_ops.constr_expr_eq
+    (mexp_to_constr_expr a D_Check) (mexp_to_constr_expr b D_Check) in
+  let requirements_of ((name, inputs, _, base, recursive), ds, _) =
+    if ds = D_Thm then [] else
+    with_schedule_inputs inputs (fun () ->
+      let add acc requirement =
+        if List.exists (fun r -> same_requirement r requirement) acc
+        then acc else acc @ [requirement] in
+      let from_obligation relation outputs sort constrained =
+        let env, sigma, goal, names = elaborate_obligation relation outputs sort constrained in
+        match instance_requirements env sigma goal names with Some requirements -> requirements | None -> [] in
+      let from_dependency relation outputs sort constrained =
+        let existing = from_obligation relation outputs sort constrained in
+        if has_schedule_instance relation outputs sort constrained then existing else
+        let relation = match relation with DNot p -> p | p -> p in
+        match relation with
+        | DTyCtr (ind, args) ->
+          let output_indices = filter_mapi (fun i arg ->
+            if List.exists (fun v -> List.mem v outputs) (obligation_variables arg) then Some i else None) args in
+          let dependency_name = construct_ind_schd_name (ind, List.length args, output_indices, sort, constrained) in
+          (match List.find_opt (fun ((n,_,_,_,_),_,_) -> n = dependency_name) !all with
+          | None -> existing
+          | Some ((_, dep_inputs, requirements, _, _), _, _) ->
+            let actuals = filter_mapi (fun i arg -> if List.mem i output_indices then None
+              else Some (product_free_rocq_type_to_mexp arg)) args in
+            List.concat_map (fun requirement ->
+              let fn = mexp_to_constr_expr (MFun (List.map (fun (v,t) -> PVar v, Some t) dep_inputs, requirement)) sort in
+              let expression = MEscape (Constrexpr_ops.mkAppC
+                (fn, List.map (fun arg -> mexp_to_constr_expr arg sort) actuals)) in
+              let env, sigma, goal, names = elaborate_schedule_expression
+                (obligation_variables relation) [] sort expression in
+              match instance_requirements env sigma goal names with
+              | Some needed -> needed
+              | None -> CErrors.user_err (str ("QuickChick cannot propagate a dependency requirement into " ^ name)))
+              (List.concat_map snd requirements))
+        | _ -> existing in
+      let step_requirements = function
+        | S_UC (_, SrcNonrec ty, ps) ->
+          from_dependency ty [] (producer_sort_to_derive_sort ps) false
+        | S_ST (outputs, SrcNonrec relation, ps) ->
+          from_dependency relation (List.map fst outputs) (producer_sort_to_derive_sort ps) true
+        | S_Check (SrcNonrec relation, _) -> from_dependency relation [] D_Check true
+        | _ -> [] in
+      List.fold_left add [] (List.concat_map (fun ((steps,_),_) ->
+        List.concat_map step_requirements steps) (base @ recursive))) in
+  let rec fixed_point () =
+    let changed = ref false in
+    let updated = List.map (fun (((name, inputs, previous, base, recursive), ds, constrained) as entry) ->
+      let needed = requirements_of entry in
+      let old = List.concat_map snd previous in
+      let needed = List.fold_left (fun acc ty ->
+        if List.exists (fun t -> same_requirement t ty) acc then acc else acc @ [ty]) old needed in
+      if List.length needed <> List.length old then changed := true;
+      let requirements = if needed = [] then [] else [var_of_string "requirement", needed] in
+      (name, inputs, requirements, base, recursive), ds, constrained) !all in
+    all := updated;
+    if !changed then fixed_point () in
+  fixed_point ();
+  List.map (List.map (fun ((name,_,_,_,_),_,_) ->
+    List.find (fun ((n,_,_,_,_),_,_) -> name = n) !all)) components
+
 let tarjan_schedules_by_name (schedules : string list) inductive_dependency_map
     : (inductive_schedule * derive_sort * bool) list list =
   let index = ref 0 in
@@ -1995,7 +2320,17 @@ let tarjan_schedules_by_name (schedules : string list) inductive_dependency_map
   List.iter strong_connect schedules;
   let component_sizes = List.map List.length !components in
   msg_debug (str "Component sizes: " ++ str (String.concat ", " (List.map string_of_int component_sizes)) ++ fnl ());
-  List.rev !components
+  List.map (fun component ->
+    let names = List.map (fun ((name,_,_,_,_),_,_) -> name) component in
+    List.map (fun (schedule, ds, constrained) ->
+      insert_mutrec_calls_inductive_schedule ~within:names schedule, ds, constrained) component)
+    (let components = propagate_schedule_requirements (List.rev !components) in
+     List.iter (List.iter (fun ((name,_,_,_,_) as schedule, ds, constrained) ->
+       let ind, outputs, _, _ = parse_ind_schd_name name in
+       let density = match RelationInstMap.find_opt (ind, outputs, ds) !density_inductive_memo with
+         | Some (_, density) -> density | None -> Checking in
+       density_inductive_memo := RelationInstMap.add (ind, outputs, ds) (schedule, density) !density_inductive_memo)) components;
+     components)
 
 let valid_schedules =
   Proofview.Goal.enter begin fun gl ->
@@ -2110,24 +2445,27 @@ let is_defined_local (id : Names.Id.t) env : bool =
 let is_name_in_use (id : Names.Id.t) env : bool =
   is_defined_local id env || is_defined_global id
 
-let definition_poly =
+let definition_poly () =
 #if COQ_VERSION >= (9, 2, 0)
   PolyFlags.default
 #else
-  false
+  Attributes.is_universe_polymorphism ()
 #endif
 
-let define c name env evd =
+let define c name _env _evd =
+  let env = schedule_env () in
+  let evd = schedule_sigma env in
   let declare name =
     let (evd, body) = Constrintern.interp_constr_evars env evd c in
+    let body = inline_schedule_definitions evd body in
     let cinfo = Declare.CInfo.make ~name ~typ:None () in
-    let info = Declare.Info.make ~poly:definition_poly () in
+    let info = Declare.Info.make ~poly:(definition_poly ()) () in
     ignore (Declare.declare_definition ~info ~cinfo ~opaque:false ~body evd)
   in
   if name = var_of_string "theorem" then
     declare (fresh_name "theorem")
   else if is_name_in_use name env then
-    Feedback.msg_notice (str (var_to_string name ^ " is already defined") ++ fnl ())
+    CErrors.user_err (str ("QuickChick cannot declare " ^ var_to_string name ^ ": the name is already in use."))
   else begin
     declare name;
     defined_set := VarSet.add name !defined_set
@@ -2151,12 +2489,70 @@ let define_all schedule_pieces =
       ignore (define constr name e' evd')) pieces
         ) schedule_pieces
 
+(* Register the class represented by each compiled schedule. The helper keeps
+   its size-first interface; the instance moves size into the class method. *)
+let register_schedule_instances ~local components =
+  let open NewGenericLib in
+  List.iter (List.iter (fun ((name, inputs, param_deps, _, _), ds, constrained) ->
+    if ds <> D_Thm then begin
+      let ind, output_indices, _, _ = parse_ind_schd_name name in
+      let dependencies = List.concat_map (fun (_, classes) ->
+        List.map (fun ty -> make_up_name_str "qc_instance_arg", ty) classes) param_deps in
+      let binders = inputs @ dependencies in
+      let method_size = make_up_name_str "qc_size" in
+      let method_body = MFun ([PVar method_size, Some (MConst "Coq.Init.Datatypes.nat")],
+        MApp (MConst name, MId method_size :: List.map (fun (v, _) -> MId v) binders)) in
+      let constructor, class_args = match ds, constrained with
+      | D_Check, _ ->
+          let predicate = MTyCtr (ind, List.map (fun (v, _) -> MId v) inputs) in
+          "QuickChick.Decidability.Build_DecOpt", [predicate]
+      | (D_Gen | D_Enum), false ->
+          let ty = MTyCtr (ind, List.map (fun (v, _) -> MId v) inputs) in
+          let cls = if ds = D_Gen then "GenSized" else "EnumSized" in
+          "QuickChick.Classes.Build_" ^ cls, [ty]
+      | (D_Gen | D_Enum), true ->
+          let remaining_inputs = ref inputs in
+          let outputs = ref [] in
+          let arguments = List.init (List.length inputs + List.length output_indices) (fun i ->
+            if List.mem i output_indices then begin
+              let v = make_up_name_str "qc_output" in
+              outputs := !outputs @ [v]; MId v
+            end else match !remaining_inputs with
+            | (v, _) :: rest -> remaining_inputs := rest; MId v
+            | [] -> CErrors.anomaly (str "Missing schedule input")) in
+          let pattern, annotation = match !outputs with
+          | [] -> PWild, Some (MConst "Coq.Init.Datatypes.unit")
+          | first :: rest ->
+              List.fold_left (fun p v -> PCtr (constructor_of_string "Coq.Init.Datatypes.pair",
+                [PWild; PWild; p; PVar v])) (PVar first) rest, None in
+          let predicate = MFun ([pattern, annotation], MTyCtr (ind, arguments)) in
+          let cls = if ds = D_Gen then "GenSizedSuchThat" else "EnumSizedSuchThat" in
+          "QuickChick.DependentClasses.Build_" ^ cls, [MHole; predicate]
+      | D_Thm, _ -> assert false in
+      let body = MFun (List.map (fun (v, ty) -> PVar v, Some ty) binders,
+        MApp (MConst constructor, class_args @ [method_body])) in
+      let instance_name = fresh_name (name ^ "_instance") in
+      let env = Global.env () in
+      define (mexp_to_constr_expr body ds) instance_name env (Evd.from_env env);
+      let reference = Nametab.locate (Libnames.qualid_of_ident instance_name) in
+      Classes.existing_instance (if local then Hints.Local else Hints.SuperGlobal)
+        reference (Some { Typeclasses.hint_priority = Some 42; hint_pattern = None })
+    end)) components
+
+(* Dependencies precede their consumers. Register each SCC before elaborating
+   the next one so external calls use the ordinary class projections. *)
+let define_schedule_components ~local components pieces =
+  List.iter2 (fun component definitions ->
+    define_all [definitions];
+    register_schedule_instances ~local [component]) components pieces
+
 let quickchick_it size idx =
   Proofview.Goal.enter_one begin fun gl ->
     let c = Proofview.Goal.concl gl in
     let e = Proofview.Goal.env gl in
-    let evd = Evd.from_env e in
+    let evd = Proofview.Goal.sigma gl in
     
+    with_schedule_context e evd (fun () ->
     match NewGenericLib.parse_dependent_type (EConstr.to_constr evd c) with
     | Some dt -> 
       begin
@@ -2229,7 +2625,7 @@ let quickchick_it size idx =
               else
               ignore (define constr name e' evd')) pieces) schedules_pieces; *)
 
-        define_all schedules_pieces;
+        define_schedule_components ~local:true components schedules_pieces;
 
             (* let (names, constrs) = List.split pieces in ignore (mut_define names constrs e' evd')) schedules_pieces; *)
 
@@ -2249,8 +2645,8 @@ let quickchick_it size idx =
         
         let c_theorem = theorem_constr in
         (* msg_debug (str "After constrained generator" ++ fnl ());*)
-        let updated_env = Global.env () in
-        let updated_evd = Evd.from_env updated_env in
+        let updated_env = schedule_env () in
+        let updated_evd = schedule_sigma updated_env in
         let rec int_to_num i = 
           if i = 0 then c_zero
           else c_succ (int_to_num (i - 1))
@@ -2265,6 +2661,7 @@ let quickchick_it size idx =
         let (run_evd, to_run) =
           Constrintern.interp_constr_evars updated_env updated_evd
             (c_show (c_quickCheck size_thm)) in
+        let to_run = inline_schedule_definitions run_evd to_run in
         #if COQ_VERSION >= (8, 20, 0)
           (* FRAGILE probably won't be allowed in the future? *)
           let opaque_access = Library.indirect_accessor[@@warning "-3"] in
@@ -2276,7 +2673,7 @@ let quickchick_it size idx =
         Tacticals.tclIDTAC
         (* end  *)
       end
-    | None -> failwith "Failed to Parse type"
+    | None -> failwith "Failed to Parse type")
   end
 
 (*This tactic uses the quickchick_it tactic to run all possible indices with size None, capturing the Message output and putting it into a file in the 
@@ -2657,7 +3054,7 @@ VERNAC COMMAND EXTEND DeriveInductiveSchedule CLASSIFIED AS SIDEFF
 
       let schedules_pieces = inductive_schedules_to_def_constr_exprs components ind_schd_name in
 
-      define_all schedules_pieces;
+      define_schedule_components ~local:false components schedules_pieces;
       Feedback.msg_notice (int (List.length schedules_pieces) ++ str " Pieces defined" ++ fnl ())
 
     | None -> failwith "Failed to parse inductive type " 

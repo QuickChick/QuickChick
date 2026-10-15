@@ -608,6 +608,43 @@ Declare Instance Dec_eq_list (A : Type)
     <x1...xn> are (implicitly universally quantified) variable names.
 *)
 
+(** ** Scheduled instances
+
+   The schedule engine registers the class represented by each generated helper:
+   [DecOpt], [GenSized], [EnumSized], [GenSizedSuchThat], or
+   [EnumSizedSuchThat], according to the selected mode. For example:
+[[
+   Inductive accepted : bool -> Prop := Accepted : accepted true.
+   Derive Inductive Schedule accepted derive "Check" opt "true".
+   Example accepts_true : decOpt (P := accepted true) 3 = Some true.
+   Proof. reflexivity. Qed.
+]]
+
+   Automatic testing resolves existing instances before deriving dependencies.
+   It respects local instances and their priorities. Explicit schedule commands
+   create persistent declarations; a repeated command with the same generated
+   name reports a name collision.
+
+   A polymorphic helper receives the class arguments required by its selected
+   schedule and dependencies. For example, a supplied checker requiring
+   [C (list B)] passes that requirement to its caller, with the actual type
+   arguments substituted. It does not impose [C A] on an unrelated parameter
+   [A]. Requirements propagate through mutually recursive groups as well.
+   Generated helper signatures no longer include unconditional [GenSized] and
+   [Dec_Eq] arguments for every type parameter. Prefer the class methods when
+   calling a derived generator, enumerator, or checker.
+
+   Calls within a recursive group use the group's helper functions. Other
+   dependency calls use class methods, with instance selection performed when
+   the helper is elaborated. Registering another instance later does not change
+   an already compiled helper.
+
+   Helpers and instances created by [quickchick] remain available for reuse
+   inside the current proof and are removed when it ends. Testing does not prove
+   the goal. If lookup fails with a finite [Typeclasses Depth] limit, increase
+   or unset the limit before requesting automatic derivation.
+*)
+
 (** QuickChick also allows automatic derivations of proofs of
     correctness of its derived generators! For more, look
     at:

@@ -422,8 +422,12 @@ let parse_dependent_type ty =
   
 let dep_parse_type nparams param_names arity_ctxt oib =
   let len = List.length arity_ctxt in
-  (* Only type parameters can be used - no dependencies on the types *)
-  let arg_names = List.map (fun x -> DTyParam x) param_names in
+  (* Types of later indices can mention earlier indices as well as parameters.
+     The de Bruijn offset below indexes the complete, declaration-order context. *)
+  let arg_names = List.rev arity_ctxt |> List.map (fun decl ->
+    let id = match Context.Rel.Declaration.get_name decl with
+      | Names.Name id -> id | Names.Anonymous -> make_up_name () in
+    if List.mem id param_names then DTyParam id else DTyVar id) in
   foldM (fun acc (i, decl) -> 
            let n = Context.Rel.Declaration.get_name decl in
            let t = Context.Rel.Declaration.get_type decl in
@@ -858,7 +862,7 @@ let c_app ?explicit:(expl=true) c cs : constr_expr =
     in CAst.map f c
   else mkAppC (c, cs)
 
-let c_Type = CAst.make @@ Constrexpr.CSort expr_Set_sort
+let c_Type = CAst.make @@ Constrexpr.CSort expr_Type_sort
 
 let c_pair x y = c_app (cInject "Coq.Init.Datatypes.pair") [c_hole; c_hole; x; y]
 
@@ -1332,7 +1336,7 @@ let filter_mapi (f : int -> 'a -> 'b option) (l : 'a list) : 'b list =
 let schedule_step_dependence (s : schedule_step) : (rocq_constr * int list * derive_sort * bool) option =
   match s with
   | S_UC (v, SrcNonrec (DTyParam param), ps) -> None (*Parameters handled elsewhere*)
-  | S_UC (v, SrcNonrec t, ps) -> (*Some (t, [], (match ps with PS_E -> D_Enum | PS_G -> D_Gen), false)*) None
+  | S_UC (_, SrcNonrec t, ps) -> Some (t, [], (match ps with PS_E -> D_Enum | PS_G -> D_Gen), false)
   | S_ST (vs, SrcNonrec (DTyCtr (ind, args)), ps) -> 
     let output_vars = List.map fst vs in
     let arg_vars = List.map (fun arg -> variables_in_hypothesis arg) args in 
