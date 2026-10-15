@@ -144,3 +144,18 @@ Inductive any_pair (A : Type) : A -> A -> Prop :=
 Derive Inductive Schedule any_pair 1 2 derive "Gen" opt "true".
 Definition pair_generic (A : Type) (g : GenSized A) :
   GenSizedSuchThat (A * A) (fun '(x, y) => any_pair A x y) := ltac:(typeclasses eauto).
+
+
+(* Wrapper arguments are implicit, including trailing class arguments. Helpers
+   keep their explicit dictionaries. These uses fail if metadata is discarded. *)
+Definition implicit_box (A : Type) `{GenSized A} : GenSized (box A) :=
+  GenSized_box_I_instance.
+Definition implicit_enum_box (A : Type) `{EnumSized A} : EnumSized (box A) :=
+  EnumSized_box_I_instance.
+Definition implicit_pair (A : Type) `{GenSized A} :
+  GenSizedSuchThat (A * A) (fun '(x, y) => any_pair A x y) :=
+  GenSizedSuchThat_any_pair_IOO_instance.
+Definition implicit_checker (A : Type) `{Marker A} (x : A) : DecOpt (parent A x) :=
+  DecOpt_parent_II_instance x.
+Definition explicit_box_dictionary (A : Type) (g : GenSized A) : GenSized (box A) :=
+  @GenSized_box_I_instance A g.

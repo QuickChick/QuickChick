@@ -634,6 +634,13 @@ Declare Instance Dec_eq_list (A : Type)
    [Dec_Eq] arguments for every type parameter. Prefer the class methods when
    calling a derived generator, enumerator, or checker.
 
+   Instance wrappers make type parameters and class arguments implicit; ordinary
+   value inputs remain explicit. Use [@] to supply dictionaries explicitly.
+   Helpers retain their explicit, size-first arguments. Requirements cross mode
+   boundaries: if a generator calls a checker whose dependency needs [EnumSized A],
+   the generator also requires [EnumSized A]. A [GenSized A] instance cannot
+   satisfy that requirement.
+
    Calls within a recursive group use the group's helper functions. Other
    dependency calls use class methods, with instance selection performed when
    the helper is elaborated. Registering another instance later does not change

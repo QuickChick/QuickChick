@@ -1459,7 +1459,7 @@ let resolve_schedule_obligation env sigma goal =
    applications. This is requirement discovery, not a replacement resolver:
    the resulting context is checked by Coq's resolver and used again at emission.
    Concrete missing instances are never turned into generic assumptions. *)
-let instance_requirements env sigma goal names =
+let instance_requirements ?(allow_root=false) env sigma goal names =
   let goal = Reductionops.nf_betaiotazeta env sigma goal in
   let allowed = List.map (fun (v,_) ->
     try List.assoc v names with Not_found -> v) !schedule_inputs in
@@ -1485,7 +1485,7 @@ let instance_requirements env sigma goal names =
       let sigma, arg_type = Typing.type_of env sigma (EConstr.of_constr arg) in
       not (Constr.is_Prop (EConstr.to_constr sigma
         (Reductionops.whd_all env sigma arg_type)))) args in
-  let rec discover seen sigma goal =
+  let rec discover allow_abstract seen sigma goal =
     match resolve_schedule_obligation env sigma goal with
     | Some (sigma, _) -> Some (sigma, [])
     | None when List.exists (EConstr.eq_constr sigma goal) seen -> None
@@ -1496,7 +1496,7 @@ let instance_requirements env sigma goal names =
       let priority i = Stdlib.Option.value ~default:1000 (Typeclasses.hint_priority i) in
       let instances = List.stable_sort (fun a b -> compare (priority a) (priority b)) instances in
       let rec candidates = function
-        | [] -> if can_abstract sigma goal then Some (sigma, [goal]) else None
+        | [] -> if allow_abstract && can_abstract sigma goal then Some (sigma, [goal]) else None
         | inst :: rest ->
           let attempt =
             let sigma, head = Evd.fresh_global env sigma (Typeclasses.instance_impl inst) in
@@ -1519,7 +1519,7 @@ let instance_requirements env sigma goal names =
                 | ty :: rest ->
                   let ty = Evarutil.nf_evar sigma ty in
                   if Evarutil.has_undefined_evars sigma ty then None else
-                  match discover seen sigma ty with
+                  match discover true seen sigma ty with
                   | None -> None
                   | Some (sigma, requirements) ->
                     solve sigma (needed @ requirements) rest in
@@ -1534,7 +1534,7 @@ let instance_requirements env sigma goal names =
             (match resolve_schedule_obligation candidate_env sigma goal with
              | Some _ -> attempt | None -> candidates rest) in
       candidates instances in
-  match discover [] sigma goal with
+  match discover allow_root [] sigma goal with
   | None -> None
   | Some (sigma, requirements) ->
     let requirements = List.fold_left (fun acc ty ->
@@ -1555,7 +1555,8 @@ let instance_requirements env sigma goal names =
 
 let has_schedule_instance relation outputs ds constrained =
   let env, sigma, goal, names = elaborate_obligation relation outputs ds constrained in
-  match instance_requirements env sigma goal names with Some _ -> true | None -> false
+  match instance_requirements ~allow_root:(match relation with DTyParam _ -> true | _ -> false)
+    env sigma goal names with Some _ -> true | None -> false
 
 let rec schedule_density neutral_prelude_steps schedule : schedule_with_density =
   let step_density (step : schedule_step) ds : rule_density =
@@ -2189,17 +2190,26 @@ let rec take_while (p : 'a -> bool) (l : 'a list) : ('a list) * ('a list) =
 let propagate_schedule_requirements components =
   let open NewGenericLib in
   let all = ref (List.concat components) in
-  let same_requirement a b = Constrexpr_ops.constr_expr_eq
-    (mexp_to_constr_expr a D_Check) (mexp_to_constr_expr b D_Check) in
+  let same_requirement inputs a b =
+    (* Kernel conversion ignores bound-variable spelling. Comparing printed
+       syntax can grow the fixed point forever when predicates are alpha-renamed. *)
+    let close body = mexp_to_constr_expr
+      (MFun (List.map (fun (v,t) -> PVar v, Some t) inputs, body)) D_Check in
+    let env = schedule_env () in
+    let sigma, a = Constrintern.interp_constr_evars env (schedule_sigma env) (close a) in
+    let sigma, b = Constrintern.interp_constr_evars env sigma (close b) in
+    try ignore (Evarconv.unify env sigma Conversion.CONV a b); true
+    with Pretype_errors.PretypeError _ -> false in
   let requirements_of ((name, inputs, _, base, recursive), ds, _) =
     if ds = D_Thm then [] else
     with_schedule_inputs inputs (fun () ->
       let add acc requirement =
-        if List.exists (fun r -> same_requirement r requirement) acc
+        if List.exists (fun r -> same_requirement inputs r requirement) acc
         then acc else acc @ [requirement] in
       let from_obligation relation outputs sort constrained =
         let env, sigma, goal, names = elaborate_obligation relation outputs sort constrained in
-        match instance_requirements env sigma goal names with Some requirements -> requirements | None -> [] in
+        match instance_requirements ~allow_root:(match relation with DTyParam _ -> true | _ -> false)
+          env sigma goal names with Some requirements -> requirements | None -> [] in
       let from_dependency relation outputs sort constrained =
         let existing = from_obligation relation outputs sort constrained in
         if has_schedule_instance relation outputs sort constrained then existing else
@@ -2212,15 +2222,16 @@ let propagate_schedule_requirements components =
           (match List.find_opt (fun ((n,_,_,_,_),_,_) -> n = dependency_name) !all with
           | None -> existing
           | Some ((_, dep_inputs, requirements, _, _), _, _) ->
-            let actuals = filter_mapi (fun i arg -> if List.mem i output_indices then None
-              else Some (product_free_rocq_type_to_mexp arg)) args in
+            let input_args = filter_mapi (fun i arg -> if List.mem i output_indices then None
+              else Some arg) args in
+            let actuals = List.map product_free_rocq_type_to_mexp input_args in
             List.concat_map (fun requirement ->
               let fn = mexp_to_constr_expr (MFun (List.map (fun (v,t) -> PVar v, Some t) dep_inputs, requirement)) sort in
               let expression = MEscape (Constrexpr_ops.mkAppC
                 (fn, List.map (fun arg -> mexp_to_constr_expr arg sort) actuals)) in
               let env, sigma, goal, names = elaborate_schedule_expression
-                (obligation_variables relation) [] sort expression in
-              match instance_requirements env sigma goal names with
+                (List.concat_map obligation_variables input_args) [] sort expression in
+              match instance_requirements ~allow_root:true env sigma goal names with
               | Some needed -> needed
               | None -> CErrors.user_err (str ("QuickChick cannot propagate a dependency requirement into " ^ name)))
               (List.concat_map snd requirements))
@@ -2240,7 +2251,7 @@ let propagate_schedule_requirements components =
       let needed = requirements_of entry in
       let old = List.concat_map snd previous in
       let needed = List.fold_left (fun acc ty ->
-        if List.exists (fun t -> same_requirement t ty) acc then acc else acc @ [ty]) old needed in
+        if List.exists (fun t -> same_requirement inputs t ty) acc then acc else acc @ [ty]) old needed in
       if List.length needed <> List.length old then changed := true;
       let requirements = if needed = [] then [] else [var_of_string "requirement", needed] in
       (name, inputs, requirements, base, recursive), ds, constrained) !all in
@@ -2452,13 +2463,14 @@ let definition_poly () =
   Attributes.is_universe_polymorphism ()
 #endif
 
-let define c name _env _evd =
+let define ?(implicit_binders=false) c name _env _evd =
   let env = schedule_env () in
   let evd = schedule_sigma env in
   let declare name =
-    let (evd, body) = Constrintern.interp_constr_evars env evd c in
+    let evd, (body, impargs) = Constrintern.interp_constr_evars_impls env evd c in
     let body = inline_schedule_definitions evd body in
-    let cinfo = Declare.CInfo.make ~name ~typ:None () in
+    let cinfo = Declare.CInfo.make ~name ~typ:None
+      ?impargs:(if implicit_binders then Some impargs else None) () in
     let info = Declare.Info.make ~poly:(definition_poly ()) () in
     ignore (Declare.declare_definition ~info ~cinfo ~opaque:false ~body evd)
   in
@@ -2529,11 +2541,36 @@ let register_schedule_instances ~local components =
           let cls = if ds = D_Gen then "GenSizedSuchThat" else "EnumSizedSuchThat" in
           "QuickChick.DependentClasses.Build_" ^ cls, [MHole; predicate]
       | D_Thm, _ -> assert false in
-      let body = MFun (List.map (fun (v, ty) -> PVar v, Some ty) binders,
-        MApp (MConst constructor, class_args @ [method_body])) in
+      let binder kind (v, ty) =
+        Constrexpr.CLocalAssum ([CAst.make (Names.Name v)],
+#if COQ_VERSION >= (8, 20, 0)
+          None,
+#endif
+          kind, mexp_to_constr_expr ty ds) in
+      (* Classify inputs from the elaborated helper type, not their spelling.
+         This also handles class dictionaries that are parameters of the relation. *)
+      let env = Global.env () in
+      let sigma, helper = Evd.fresh_global env (Evd.from_env env)
+        (Nametab.locate (Libnames.qualid_of_string name)) in
+      let sigma, helper_type = Typing.type_of env sigma helper in
+      let rec input_kinds count typ =
+        if count = 0 then [] else match EConstr.kind sigma typ with
+        | Constr.Prod (_, dom, body) ->
+          let kind = if Typeclasses.is_class_type sigma dom then
+              Constrexpr.Generalized (Glob_term.MaxImplicit, false)
+            else Constrexpr.Default
+              (if EConstr.isSort sigma dom then Glob_term.MaxImplicit else Glob_term.Explicit) in
+          kind :: input_kinds (count - 1) body
+        | _ -> CErrors.anomaly (str "Missing scheduled helper argument") in
+      let kinds = List.tl (input_kinds (1 + List.length inputs) helper_type) in
+      let class_binder = binder (Constrexpr.Generalized (Glob_term.MaxImplicit, false)) in
+      let body = mexp_to_constr_expr
+        (MApp (MConst constructor, class_args @ [method_body])) ds in
+      let binders = List.map2 binder kinds inputs @ List.map class_binder dependencies in
+      let body = if binders = [] then body else CAst.make (Constrexpr.CLambdaN (binders, body)) in
       let instance_name = fresh_name (name ^ "_instance") in
       let env = Global.env () in
-      define (mexp_to_constr_expr body ds) instance_name env (Evd.from_env env);
+      define ~implicit_binders:true body instance_name env (Evd.from_env env);
       let reference = Nametab.locate (Libnames.qualid_of_ident instance_name) in
       Classes.existing_instance (if local then Hints.Local else Hints.SuperGlobal)
         reference (Some { Typeclasses.hint_priority = Some 42; hint_pattern = None })
