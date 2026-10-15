@@ -2,6 +2,21 @@ open Pp
 open Error
 open Constrexpr_ops
 
+(* Keep printer and module-path APIs aligned with GenericLib. *)
+let pr_constr_expr env sigma c =
+  Ppconstr.pr_constr_expr
+#if COQ_VERSION >= (9, 2, 0)
+    ~flags:(Ppconstr.current_flags ())
+#endif
+    env sigma c
+
+let cwd_string () =
+#if COQ_VERSION >= (9, 1, 0)
+  Libnames.string_of_path (Lib.cwd ())
+#else
+  Names.DirPath.to_string (Lib.cwd ())
+#endif
+
 let cnt = ref 0 
 
 let fresh_name n : Names.Id.t =
@@ -286,11 +301,11 @@ let parse_dependent_type_internal i nparams ty oibopt arg_names =
       let names = String.split_on_char '.' (Names.MutInd.to_string mind) in
       let prefix = List.rev (List.tl (List.rev names)) in
       let qual = String.concat "." prefix in
-      Error.msg_debug (str (Printf.sprintf "CONSTR: %s %s" qual (Names.DirPath.to_string (Lib.cwd ()))) ++ fnl ());
+      Error.msg_debug (str (Printf.sprintf "CONSTR: %s %s" qual (cwd_string ())) ++ fnl ());
       (* Constructor name *)
       Error.msg_debug (int (mib.mind_ntypes) ++ fnl ());
       let cname = Names.Id.to_string (mib.mind_packets.(midx).mind_consnames.(idx - 1)) in
-      let cid = Libnames.qualid_of_string (if (qual = "") || (qual = Names.DirPath.to_string (Lib.cwd ()))
+      let cid = Libnames.qualid_of_string (if (qual = "") || (qual = cwd_string ())
                              then cname else qual ^ "." ^ cname) in
       Some (DCtr (cid, []))
     end
@@ -332,14 +347,21 @@ let parse_dependent_type_internal i nparams ty oibopt arg_names =
       let (case_info, _univs, _params, _ret_clause, _iv, discriminee, branches) = Constr.destCase ty in
       Error.msg_debug (str "Case: " ++ debug_constr discriminee ++ fnl ());
       let inductive = case_info.Constr.ci_ind in
-      let branches_list = List.mapi (fun idx ((bindings_arr : (Names.Name.t,Sorts.relevance) Context.pbinder_annot array), branch) ->
+      let branches_list = List.mapi (fun idx (bindings_arr, branch) ->
         let bindings  = Array.to_list ( bindings_arr) in
         let branch_local_bindings : ty_param list = List.map (fun decl -> match decl.Context.binder_name with 
                                                                           | Names.Name x -> x
                                                                           | _ -> failwith "Anonymous binding in branch") bindings in
         let param_count = case_info.Constr.ci_npar in
         let arg_names = List.map (fun x -> PVar x) branch_local_bindings in
-        let constructor = Constr.mkConstructUi ((UVars.in_punivs inductive), idx + 1) in
+        let empty_instance =
+#if COQ_VERSION >= (8, 19, 0)
+          UVars.Instance.empty
+#else
+          Univ.Instance.empty
+#endif
+        in
+        let constructor = Constr.mkConstructU ((inductive, idx + 1), empty_instance) in
         let constructor_name = 
           (match aux locals i constructor with
           | Some (DCtr (c, [])) -> c
@@ -504,12 +526,12 @@ open Constrexpr
 let debug_constr_expr (c : constr_expr) : unit =
   let env = Global.env () in
   let sigma = Evd.from_env env in
-  Feedback.msg_notice (Ppconstr.pr_constr_expr env sigma c)
+  Feedback.msg_notice (pr_constr_expr env sigma c)
 
 let constr_expr_to_string (c : constr_expr) : string =
   let env = Global.env () in
   let sigma = Evd.from_env env in
-  Ppconstr.pr_constr_expr env sigma c |> Pp.string_of_ppcmds
+  pr_constr_expr env sigma c |> Pp.string_of_ppcmds
 
 let relation_unconstrained_variables (relation_type : rocq_constr) : (var * int) list =
   let collect_tyvars i = function
@@ -781,7 +803,13 @@ let c_constructor c : constr_expr =
 let c_ty_ctr c : constr_expr =
   CAst.make @@ CRef (c, None)
 
+#if COQ_VERSION >= (8, 19, 0)
 let c_hole = CAst.make @@ CHole None
+#elif COQ_VERSION >= (8, 18, 0)
+let c_hole = CAst.make @@ CHole (None, Namegen.IntroAnonymous)
+#else
+let c_hole = CAst.make @@ CHole (None, Namegen.IntroAnonymous, None)
+#endif
 
 let tuple_of_list (pair : 'a -> 'a -> 'a) (xs : 'a list) (def : 'a option) : 'a = (*Maybe need to convert to pattern pair?*)
   match xs with
@@ -805,9 +833,16 @@ let rec pat_vars (p : pat) : var list =
   | PParam -> []
   | PWild -> []
 
+let c_assum v ty =
+#if COQ_VERSION >= (8, 20, 0)
+  CLocalAssum ([CAst.make @@ Names.Name v], None, Default Glob_term.Explicit, ty)
+#else
+  CLocalAssum ([CAst.make @@ Names.Name v], Default Glob_term.Explicit, ty)
+#endif
+
 let arg_of_pat (p : pat) (ty : constr_expr option) =
   match p, ty with
-  | PVar v, Some ty -> CLocalAssum ([CAst.make @@ Names.Name v], None, Default Glob_term.Explicit, ty)
+  | PVar v, Some ty -> c_assum v ty
   | _, _ -> CLocalPattern (c_pat p)
 
 let c_fun (pat_args : (pat * constr_expr option) list) (f_body : var list -> constr_expr) : constr_expr =
@@ -834,7 +869,7 @@ let pat_tuple_of_list xs = tuple_of_list (fun x y -> PCtr (constructor_of_string
 let c_pat_tuple_of_List xs = c_pat (pat_tuple_of_list xs)
 
 let c_match discr ?catchAll:(body=None) (branches : (pat * constr_expr) list) : constr_expr =
-  CAst.make @@ CCases (RegularStyle,
+  CAst.make @@ CCases (MatchStyle,
           None (* return *), 
           [(discr, None, None)], (* single discriminee, no as/in *)
           (List.map (fun (p, bf) -> 
@@ -853,7 +888,7 @@ let c_let v c1 c2 : constr_expr =
 (* 
 
 let c_match discr ?catchAll:(body=None) ?params:(holes=0) (branches : (constructor * string list * (var list -> coq_expr)) list) : constr_expr =
-  CAst.make @@ CCases (RegularStyle,
+  CAst.make @@ CCases (MatchStyle,
           None (* return *), 
           [(discr, None, None)], (* single discriminee, no as/in *)
           (List.map (fun (c, cs, bf) -> 
@@ -1027,12 +1062,12 @@ let rec mexp_to_constr_expr (me : mexp) (ds : derive_sort) : constr_expr =
   | MFun (vs, m) -> c_fun (List.map (fun (v,ty) -> v, option_map (fun ty -> mexp_to_constr_expr ty ds) ty) vs) (fun _ -> (mexp_to_constr_expr m ds))
   | MFix (f, vs, m, ds) ->
     let lid = CAst.make f in
-    let args = List.map (fun (v,ty) -> CLocalAssum ([CAst.make @@ Names.Name v], None, Default Glob_term.Explicit, mexp_to_constr_expr ty ds)) vs in
+    let args = List.map (fun (v,ty) -> c_assum v (mexp_to_constr_expr ty ds)) vs in
     CAst.make @@ CFix (lid, [(lid,None,None,args,c_hole, mexp_to_constr_expr m ds)])
   | MMutFix (funs, v) ->
     let funs = List.map (fun (f, vs, m, ds) -> 
       let lid = CAst.make f in
-      let args = List.map (fun (v,ty) -> CLocalAssum ([CAst.make @@ Names.Name v], None, Default Glob_term.Explicit, mexp_to_constr_expr ty ds) ) vs in
+      let args = List.map (fun (v,ty) -> c_assum v (mexp_to_constr_expr ty ds) ) vs in
       (lid, None, None, args, c_hole, mexp_to_constr_expr m ds)) funs in
     CAst.make @@ CFix (CAst.make v, funs)
 
@@ -1246,13 +1281,13 @@ let compile_and_print_schedule (s : schedule) (ds : derive_sort) : unit =
   let ce = schedule_to_constr_expr s ds in
   let env = Global.env () in
   let sigma = Evd.from_env env in
-  Feedback.msg_notice (Ppconstr.pr_constr_expr env sigma ce ++ fnl())
+  Feedback.msg_notice (pr_constr_expr env sigma ce ++ fnl())
 
 let compile_and_pp_schedule (s : schedule) (ds : derive_sort) : Pp.t =
   let ce = schedule_to_constr_expr s ds in
   let env = Global.env () in
   let sigma = Evd.from_env env in
-  (Ppconstr.pr_constr_expr env sigma ce ++ fnl())
+  (pr_constr_expr env sigma ce ++ fnl())
 
 module VarOrd = struct
   type t = var
@@ -1752,7 +1787,7 @@ let find_typeclass_bindings ctr =
     let env = Global.env () in
     let evd = Evd.from_env env in
     msg_debug (str "Type: " ++ Constr.debug_print typ ++ fnl ());
-    msg_debug (str "Type2: " ++ Ppconstr.pr_constr_expr env evd (Constrextern.extern_constr env evd (EConstr.of_constr typ)) ++ fnl ());
+    msg_debug (str "Type2: " ++ pr_constr_expr env evd (Constrextern.extern_constr env evd (EConstr.of_constr typ)) ++ fnl ());
     match parse_dependent_type typ with
     | Some rocq -> 
       let rocq_str = rocq_constr_to_string rocq in
@@ -1782,7 +1817,7 @@ let find_typeclass_bindings ctr =
       let env = Global.env () in
       let evd = Evd.from_env env in
       msg_debug (str "Type: " ++ Constr.debug_print typ ++ fnl ());
-      msg_debug (str "Type2: " ++ Ppconstr.pr_constr_expr env evd (Constrextern.extern_constr env evd (EConstr.of_constr typ)) ++ fnl ());
+      msg_debug (str "Type2: " ++ pr_constr_expr env evd (Constrextern.extern_constr env evd (EConstr.of_constr typ)) ++ fnl ());
       (match parse_dependent_type typ with
       | Some rocq -> 
         let rocq_str = rocq_constr_to_string rocq in
@@ -1798,7 +1833,7 @@ let find_typeclass_bindings ctr =
       let env = Global.env () in
       let evd = Evd.from_env env in
       msg_debug (str "Type: " ++ Constr.debug_print typ ++ fnl ());
-      msg_debug (str "Type2: " ++ Ppconstr.pr_constr_expr env evd (Constrextern.extern_constr env evd (EConstr.of_constr typ)) ++ fnl ());
+      msg_debug (str "Type2: " ++ pr_constr_expr env evd (Constrextern.extern_constr env evd (EConstr.of_constr typ)) ++ fnl ());
       (match parse_dependent_type typ with
       | Some rocq -> 
         let rocq_str = rocq_constr_to_string rocq in

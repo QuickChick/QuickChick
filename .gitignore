@@ -67,3 +67,5 @@ src/QuickChick.v
 _CoqProject
 META
 examples/other/TacticExampleX.v
+
+plugin/newGenericLib.ml

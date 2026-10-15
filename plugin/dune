@@ -92,3 +92,8 @@
  (target weightmap.mlg)
  (deps ../scripts/mycppo weightmap.mlg.cppo)
  (action (run sh %{dep:../scripts/mycppo} %{dep:weightmap.mlg.cppo} %{target})))
+
+(rule
+ (target newGenericLib.ml)
+ (deps ../scripts/mycppo newGenericLib.ml.cppo)
+ (action (run sh %{dep:../scripts/mycppo} %{dep:newGenericLib.ml.cppo} %{target})))

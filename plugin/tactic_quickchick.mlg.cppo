@@ -2110,36 +2110,28 @@ let is_defined_local (id : Names.Id.t) env : bool =
 let is_name_in_use (id : Names.Id.t) env : bool =
   is_defined_local id env || is_defined_global id
 
+let definition_poly =
+#if COQ_VERSION >= (9, 2, 0)
+  PolyFlags.default
+#else
+  false
+#endif
+
 let define c name env evd =
-  
-  (* Check if the name is already defined in the set *)
-  (* if VarSet.mem name !defined_set then *)
-    (* Feedback.msg_notice (str (var_to_string name ^ " is already defined") ++ fnl ()) *)
- if name = var_of_string "theorem" then begin
-    let fresh_thm_name = fresh_name "theorem" in
-    let (c_constr, univ_info) = (Constrintern.interp_constr env evd c) in
-    let univ_entry = UState.univ_entry ~poly:false univ_info in
-    let constr = (EConstr.to_constr ~abort_on_undefined_evars:false evd c_constr) in
-
-    let cinfo = Declare.CInfo.make ~name:fresh_thm_name ~typ:None () in
-    let info = Declare.Info.make ~poly:false () in
-    ignore (Declare.declare_definition ~info ~cinfo ~opaque:false ~body:c_constr evd)
-  end else if is_name_in_use name env then
+  let declare name =
+    let (evd, body) = Constrintern.interp_constr_evars env evd c in
+    let cinfo = Declare.CInfo.make ~name ~typ:None () in
+    let info = Declare.Info.make ~poly:definition_poly () in
+    ignore (Declare.declare_definition ~info ~cinfo ~opaque:false ~body evd)
+  in
+  if name = var_of_string "theorem" then
+    declare (fresh_name "theorem")
+  else if is_name_in_use name env then
     Feedback.msg_notice (str (var_to_string name ^ " is already defined") ++ fnl ())
-  else 
-  
-    begin
-    defined_set := VarSet.add name !defined_set;
-  (* let fn = fresh_name ind_schd_name in *)
-  (* TODO: Maxime - which of the new internal flags should be used here? The names aren't as clear :) *)
-    let (c_constr, univ_info) = (Constrintern.interp_constr env evd c) in
-    let univ_entry = UState.univ_entry ~poly:false univ_info in
-    let constr = (EConstr.to_constr ~abort_on_undefined_evars:false evd c_constr) in
-
-    let cinfo = Declare.CInfo.make ~name:name ~typ:None () in
-    let info = Declare.Info.make ~poly:false () in
-    ignore (Declare.declare_definition ~info ~cinfo ~opaque:false ~body:c_constr evd)
-  end 
+  else begin
+    declare name;
+    defined_set := VarSet.add name !defined_set
+  end
 
 let define_all schedule_pieces =
   List.iter (function
@@ -2270,17 +2262,17 @@ let quickchick_it size idx =
           | None -> c_sized c_theorem
           end  in 
         (* Feedback.msg_notice (str "added size" ++ fnl ()); *)
-        let to_run = fst (Constrintern.interp_constr updated_env updated_evd (c_show (c_quickCheck size_thm))) in
-        let updated_env' = Global.env () in
-        let updated_evd' = Evd.from_env updated_env' in
+        let (run_evd, to_run) =
+          Constrintern.interp_constr_evars updated_env updated_evd
+            (c_show (c_quickCheck size_thm)) in
         #if COQ_VERSION >= (8, 20, 0)
           (* FRAGILE probably won't be allowed in the future? *)
           let opaque_access = Library.indirect_accessor[@@warning "-3"] in
-          QuickChick.define_and_run ~opaque_access to_run updated_env' updated_evd';
+          QuickChick.define_and_run ~opaque_access to_run updated_env run_evd;
   #else
-          QuickChick.define_and_run to_run updated_env' updated_evd';
+          QuickChick.define_and_run to_run updated_env run_evd;
   #endif
-        (* let _ = (QuickChick.define_and_run  to_run updated_env' updated_evd') in *)
+        (* let _ = (QuickChick.define_and_run  to_run updated_env run_evd) in *)
         Tacticals.tclIDTAC
         (* end  *)
       end

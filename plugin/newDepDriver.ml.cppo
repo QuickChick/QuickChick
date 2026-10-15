@@ -32,7 +32,7 @@ let invoke (ids : Names.Id.t list) class_name (body : constr_expr) =
         (* msg_debug (str "Found typeclass bindings:" ++ fnl ()); *)
         (* List.iter (fun r -> msg_debug (str (NewGenericLib.rocq_constr_to_string r) ++ fnl ())) rocq_constrs; *)
      | None ->
-        msg_error (str "Failed to parse: " ++ Ppconstr.pr_simpleconstr body ++ fnl ())
+        msg_error (str "Failed to parse: " ++ str (NewGenericLib.constr_expr_to_string body) ++ fnl ())
      end
   | _ -> failwith "TODO ERRMSG"
 
@@ -60,7 +60,11 @@ let dep_dispatch ind class_name : unit =
      body: inductive relation applied to stuff
    *)
      begin match cpe.CAst.v with
-     | CPatNotation (_,_,(l1,l2,l3),_) ->
+#if COQ_VERSION >= (8, 19, 0)
+     | CPatNotation (_,_,(l1,l2,_),_) ->
+#else
+     | CPatNotation (_,_,(l1,l2),_) ->
+#endif
         let extract_CPatAtom cpe =
           match cpe.CAst.v with
           | CPatAtom (Some q) -> q
