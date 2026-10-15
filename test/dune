@@ -5,7 +5,7 @@
 (coq.theory
   (name QuickChick.Testing)
   (theories QuickChick)
-  (modules plugin derive extraction))
+  (modules plugin derive extraction rebase_compat))
 
 (coq.extraction
   (prelude mutation)

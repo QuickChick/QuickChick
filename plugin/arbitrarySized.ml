@@ -422,7 +422,7 @@ let mutate_decl ty_ctr (ctrs : ctr_rep list) (iargs : var list) =
       let create_branch 
             (x' : coq_expr) (aux_mutate : var) 
             ((ctr, ty) : constructor * coq_type) : 
-            constructor * pp_tag list * (var list -> coq_expr) =
+            constructor * string list * (var list -> coq_expr) =
         (ctr, generate_names_from_type "p" ty,
          fun (all_vars : var list) : coq_expr ->
             let ctr_arg_typs : coq_type list = fst (unfold_coq_type ty) in

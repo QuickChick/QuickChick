@@ -3,7 +3,7 @@
  (public_name coq-quickchick.plugin)
  (flags :standard -rectypes -warn-error -3-26-32-34-37-39 -w -8-27+40)
  (modules :standard \ genSTCorrect genSizedSTMonotonic genSizedSTSizeMonotonic test_dep_ordering)
- (libraries unix str coq-core.kernel coq-core.library
+ (libraries unix str
   (select void_for_linking-plugin-extraction from
    (rocq-runtime.plugins.extraction -> void_for_linking-plugin-extraction.empty)
    (coq-core.plugins.extraction -> void_for_linking-plugin-extraction.empty)
@@ -18,7 +18,7 @@
  (name test_dep_ordering)
  (flags :standard -rectypes -w -8-27+40 -warn-error -3-26-32-34-37-39)
  (modules test_dep_ordering)
- (libraries quickchick_plugin unix str coq-core.kernel coq-core.library)
+ (libraries quickchick_plugin unix str)
  (public_name test_dep_ordering))
 
 (rule
