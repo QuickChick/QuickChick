@@ -484,6 +484,14 @@ let constr_to_rocq_constr  (c : Constr.constr) : rocq_constr option =
   None
 
 let oib_to_rocq_relation (oib : Declarations.one_inductive_body) : rocq_relation option =
+    (* An anonymous type input (Type -> ...) still binds a parameter used by
+       constructor types. Give it a name before building the de Bruijn map. *)
+    let oib = { oib with Declarations.mind_arity_ctxt =
+      List.map (fun decl ->
+        match Context.Rel.Declaration.get_name decl with
+        | Names.Anonymous when Constr.is_Type (Context.Rel.Declaration.get_type decl) ->
+          Context.Rel.Declaration.set_name (Names.Name (make_up_name ())) decl
+        | _ -> decl) oib.Declarations.mind_arity_ctxt } in
     let dtype = DTyCtr (ty_ctr_of_string "Type", []) in
     let ty_ctr = oib.Declarations.mind_typename in 
     dep_parse_type_params oib.Declarations.mind_arity_ctxt >>= fun ty_params ->
