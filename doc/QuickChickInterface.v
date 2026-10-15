@@ -647,7 +647,22 @@ Declare Instance Dec_eq_list (A : Type)
    an already compiled helper.
 
    Helpers and instances created by [quickchick] remain available for reuse
-   inside the current proof and are removed when it ends. Testing does not prove
+   as local definitions in the current proof context. They follow undo and
+   backtracking and are removed when that context ends. The prepared test is
+   named [theorem], or a fresh variant if that name is taken:
+[[
+   Goal forall n : nat, n = n.
+     quickchick 2.
+     pose (saved_test := theorem).
+     QuickChick (saved_test 4).
+     QuickChickWith (updMaxSuccess stdArgs 10) (saved_test 3).
+     intros; reflexivity.
+   Qed.
+]]
+   Rerunning a saved test performs no derivation. It retains the original
+   property, schedule, and selected instances even if the goal or context
+   changes. Run [quickchick] again to prepare a new test. Local computational
+   assumptions need concrete values for extraction. Testing does not prove
    the goal. If lookup fails with a finite [Typeclasses Depth] limit, increase
    or unset the limit before requesting automatic derivation.
 *)

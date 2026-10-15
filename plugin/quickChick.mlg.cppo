@@ -345,6 +345,12 @@ let runTest c env evd : unit =
   (*  Printf.printf "Before interp constr\n"; flush stdout; *)
 
   let (evd',c) = interp_constr_evars env evd c in
+  let c = List.fold_left (fun term -> function
+    | Context.Named.Declaration.LocalDef (name, body, _) ->
+        EConstr.Vars.replace_vars evd'
+          [Context.binder_name name, EConstr.of_constr body] term
+    | Context.Named.Declaration.LocalAssum _ -> term)
+    c (Environ.named_context env) in
 
   (* Printf.printf "So far so good?\n"; flush stdout; *)
 #if COQ_VERSION >= (8, 20, 0)
@@ -359,12 +365,13 @@ let rec last = function
   | _ :: xs -> last xs
 
 #if COQ_VERSION >= (8, 20, 0)
-let run ~opaque_access f args =
+let run ~opaque_access ?context f args =
 #else
-let run f args =
+let run ?context f args =
 #endif
-  let env = Global.env () in
-  let evd = Evd.from_env env in
+  let evd, env = match context with
+    | Some context -> context
+    | None -> let env = Global.env () in Evd.from_env env, env in
   begin match last args with
   | Some qc_text ->
     let msg = "QuickChecking " ^ Pp.string_of_ppcmds (Ppconstr.pr_constr_expr
@@ -381,6 +388,20 @@ let run f args =
   runTest ~opaque_access c env evd
 #else
   runTest c env evd
+#endif
+
+(* Testing commands are queries: replaying them as global side effects loses
+   proof-scoped test helpers. Extraction's temporary declarations must not leak. *)
+#if COQ_VERSION >= (8, 20, 0)
+let run_query ~opaque_access f args =
+  let context = try Some (Vernacstate.Declare.get_current_context ())
+    with Vernacstate.Declare.NoCurrentProof -> None in
+  Vernacstate.System.protect (fun () -> run ~opaque_access ?context f args) ()
+#else
+let run_query f args =
+  let context = try Some (Vernacstate.Declare.get_current_context ())
+    with Vernacstate.Declare.NoCurrentProof -> None in
+  Vernacstate.System.protect (fun () -> run ?context f args) ()
 #endif
 
 let flag_debug = SummaryRef.ref ~name:"QC_flag_debug" false
@@ -696,21 +717,21 @@ let qcFuzz prop fuzzLoop =
 
 
 #if COQ_VERSION >= (8, 20, 0)
-VERNAC COMMAND EXTEND QuickCheck CLASSIFIED AS SIDEFF STATE opaque_access
+VERNAC COMMAND EXTEND QuickCheck CLASSIFIED AS QUERY STATE opaque_access
 #else
-VERNAC COMMAND EXTEND QuickCheck CLASSIFIED AS SIDEFF
+VERNAC COMMAND EXTEND QuickCheck CLASSIFIED AS QUERY
 #endif
-  | ["QuickCheck" constr(c)] ->     {run quickCheck [c]}
-  | ["QuickCheckWith" constr(c1) constr(c2)] ->     {run quickCheckWith [c1;c2]}
+  | ["QuickCheck" constr(c)] ->     {run_query quickCheck [c]}
+  | ["QuickCheckWith" constr(c1) constr(c2)] ->     {run_query quickCheckWith [c1;c2]}
 END
 
 #if COQ_VERSION >= (8, 20, 0)
-VERNAC COMMAND EXTEND QuickChick CLASSIFIED AS SIDEFF STATE opaque_access
+VERNAC COMMAND EXTEND QuickChick CLASSIFIED AS QUERY STATE opaque_access
 #else
-VERNAC COMMAND EXTEND QuickChick CLASSIFIED AS SIDEFF
+VERNAC COMMAND EXTEND QuickChick CLASSIFIED AS QUERY
 #endif
-  | ["QuickChick" constr(c)] ->     {run quickCheck [c]}
-  | ["QuickChickWith" constr(c1) constr(c2)] ->     {run quickCheckWith [c1;c2]}
+  | ["QuickChick" constr(c)] ->     {run_query quickCheck [c]}
+  | ["QuickChickWith" constr(c1) constr(c2)] ->     {run_query quickCheckWith [c1;c2]}
 END
 
 #if COQ_VERSION >= (8, 20, 0)

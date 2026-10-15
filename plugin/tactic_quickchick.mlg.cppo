@@ -2463,6 +2463,10 @@ let definition_poly () =
   Attributes.is_universe_polymorphism ()
 #endif
 
+(* During tactic preparation, collect declarations to move into the proof's
+   local context. Explicit derivations leave this unset and remain global. *)
+let proof_definitions = ref None
+
 let define ?(implicit_binders=false) c name _env _evd =
   let env = schedule_env () in
   let evd = schedule_sigma env in
@@ -2472,10 +2476,16 @@ let define ?(implicit_binders=false) c name _env _evd =
     let cinfo = Declare.CInfo.make ~name ~typ:None
       ?impargs:(if implicit_binders then Some impargs else None) () in
     let info = Declare.Info.make ~poly:(definition_poly ()) () in
-    ignore (Declare.declare_definition ~info ~cinfo ~opaque:false ~body evd)
+    let reference = Declare.declare_definition ~info ~cinfo ~opaque:false ~body evd in
+    match !proof_definitions with
+    | None -> ()
+    | Some (definitions, universes) ->
+        definitions := (name, reference) :: !definitions;
+        universes := Univ.ContextSet.union !universes (Evd.universe_context_set evd)
   in
   if name = var_of_string "theorem" then
-    declare (fresh_name "theorem")
+    declare (Namegen.next_ident_away_from (Names.Id.of_string "theorem")
+      (fun id -> is_name_in_use id env))
   else if is_name_in_use name env then
     CErrors.user_err (str ("QuickChick cannot declare " ^ var_to_string name ^ ": the name is already in use."))
   else begin
@@ -2589,7 +2599,9 @@ let quickchick_it size idx =
     let e = Proofview.Goal.env gl in
     let evd = Proofview.Goal.sigma gl in
     
-    with_schedule_context e evd (fun () ->
+    let definitions = ref [] in
+    let universes = ref Univ.ContextSet.empty in
+    let prepare () = with_schedule_context e evd (fun () ->
     match NewGenericLib.parse_dependent_type (EConstr.to_constr evd c) with
     | Some dt -> 
       begin
@@ -2710,7 +2722,35 @@ let quickchick_it size idx =
         Tacticals.tclIDTAC
         (* end  *)
       end
-    | None -> failwith "Failed to Parse type")
+    | None -> failwith "Failed to Parse type") in
+    let previous = !proof_definitions in
+    let sigma, definitions = Vernacstate.System.protect (fun () ->
+      Fun.protect ~finally:(fun () -> proof_definitions := previous) (fun () ->
+        proof_definitions := Some (definitions, universes);
+        ignore (prepare ());
+        let env = Global.env () in
+        let constants = List.filter_map (fun (_, reference) -> match reference with
+          | Names.GlobRef.ConstRef c -> Some c | _ -> None) !definitions in
+        (* Expand only this preparation's constants, including dependencies.
+           Local lets then carry no references to discarded global declarations. *)
+        let rec expand term = match Constr.kind term with
+          | Constr.Const (c, u) when List.exists (Names.Constant.equal c) constants ->
+              expand (Environ.constant_value_in env (c, u))
+          | _ -> Constr.map expand term in
+        let new_levels = Univ.Level.Set.diff
+          (Univ.ContextSet.levels !universes) (UGraph.domain (Evd.universes evd)) in
+        let universe_context = Univ.ContextSet.add_constraints
+          (Univ.ContextSet.constraints !universes) (Univ.ContextSet.of_set new_levels) in
+        List.fold_left (fun (sigma, acc) (name, reference) ->
+          let sigma, term = Evd.fresh_global env sigma reference in
+          let body = expand (EConstr.to_constr sigma term) in
+          sigma, acc @ [name, EConstr.of_constr body])
+          (Evd.merge_context_set Evd.univ_rigid evd universe_context, [])
+          (List.rev !definitions))) () in
+    Proofview.tclTHEN (Proofview.Unsafe.tclEVARS sigma)
+      (List.fold_left (fun tactic (name, body) ->
+        Proofview.tclTHEN tactic (Tactics.pose_tac (Names.Name name) body))
+        Tacticals.tclIDTAC definitions)
   end
 
 (*This tactic uses the quickchick_it tactic to run all possible indices with size None, capturing the Message output and putting it into a file in the 
