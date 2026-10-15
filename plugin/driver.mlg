@@ -93,16 +93,6 @@ VERNAC COMMAND EXTEND MergeTest CLASSIFIED AS SIDEFF
     { merge_test ind1 }
 END
 
-(* Compatibility alias for existing QuickChick developments. *)
-VERNAC COMMAND EXTEND QuickChickDerive CLASSIFIED AS SIDEFF
-   | ["Derive" constr(class_name) "for" constr(inductive)] ->
-     { dispatch class_name inductive "" "" }
-   | ["Derive" constr(class_name) "for" constr(inductive) "using" ident(genInst)] ->
-     { dispatch class_name inductive (Id.to_string genInst) ""}
-   | ["Derive" constr(class_name) "for" constr(inductive) "using" ident(genInst) "and" ident(monInst) ] ->
-     { dispatch class_name inductive (Id.to_string genInst) (Id.to_string monInst)}
-END
-
 (* To disambiguate from Derive in other plugins like Equations *)
 VERNAC COMMAND EXTEND QCDerive CLASSIFIED AS SIDEFF
    | ["QCDerive" constr(class_name) "for" constr(inductive)] ->

@@ -69,3 +69,6 @@ META
 examples/other/TacticExampleX.v
 
 plugin/newGenericLib.ml
+
+src/LegacyDerive.v
+plugin/legacy/legacy_derive.ml

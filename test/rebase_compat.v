@@ -1,4 +1,4 @@
-From QuickChick Require Import QuickChick.
+From QuickChick Require Import LegacyDerive.
 
 Inductive legacy_tree :=
 | LegacyLeaf
@@ -44,3 +44,16 @@ Definition right_shrinker : Shrink right_tree := ltac:(typeclasses eauto).
 Definition right_enumerator : EnumSized right_tree := ltac:(typeclasses eauto).
 Definition right_printer : Show right_tree := ltac:(typeclasses eauto).
 Definition right_size : Sized right_tree := ltac:(typeclasses eauto).
+
+(* Keep the single-class and using forms available through the legacy import. *)
+Inductive legacy_named_tree := LegacyNamedLeaf | LegacyNamedNode : legacy_named_tree -> legacy_named_tree.
+Derive Show for legacy_named_tree using legacy_hint.
+Derive Sized for legacy_named_tree using legacy_hint and legacy_other_hint.
+Definition legacy_printer : Show legacy_named_tree := ltac:(typeclasses eauto).
+Definition legacy_size : Sized legacy_named_tree := ltac:(typeclasses eauto).
+
+Inductive legacy_accepts : bool -> Prop := LegacyAccepts : legacy_accepts true.
+Derive DecOpt for (legacy_accepts b).
+Definition legacy_checker : DecOpt (legacy_accepts false) := ltac:(typeclasses eauto).
+Example legacy_checker_rejects : decOpt (P := legacy_accepts false) 3 = Some false.
+Proof. reflexivity. Qed.

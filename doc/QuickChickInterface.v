@@ -589,6 +589,13 @@ Declare Instance Dec_eq_list (A : Type)
 [[
        QCDerive (<class>,...,<class>) for T.
 ]]
+
+   Older files using bare [Derive] must import
+   [From QuickChick Require Import LegacyDerive.]
+   This enables a compatibility spelling for the same engine, including [using]
+   clauses. It can conflict with Stdlib and other plugins' [Derive] commands.
+   Prefer [QCDerive] with the normal [QuickChick] import.
+   The schedule-specific [Derive] commands do not require the compatibility import.
 *)
 
 (** QuickChick also allows for the automatic derivation of generators

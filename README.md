@@ -66,6 +66,23 @@ The public API of QuickChick is summarized in `QuickChickInterface.v`.
 - `MutateCheckMany c ps`
 - `MutateCheckManyWith args c ps`
 
+### Older `Derive` commands
+
+Use `QCDerive` with the usual `From QuickChick Require Import QuickChick.`
+import. It avoids a parser conflict with Stdlib's `Derive` command.
+
+To keep bare `Derive` commands in an older file, replace that import with:
+
+```coq
+From QuickChick Require Import LegacyDerive.
+```
+
+This compatibility import enables the old spelling, including class lists and
+`using` clauses. It uses the same derivation engine as `QCDerive`. It can still
+conflict with other plugins' `Derive` commands, so prefer `QCDerive` when combining
+plugins. `Derive Inductive Schedule` and `Derive Valid Schedules` remain available
+with the normal import.
+
 ### More resources
 
 Here is some more reading material:

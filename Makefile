@@ -80,6 +80,7 @@ tests:
 COMPATFILES:= \
 	plugin/depDriver.ml \
 	plugin/genericLib.ml \
+	plugin/newGenericLib.ml \
 	plugin/mergeTypes.ml \
 	plugin/quickChick.mli \
 	plugin/quickChick.mlg \
@@ -92,6 +93,7 @@ COMPATFILES:= \
 	src/Compat.v \
 	src/ExtractionQC.v \
 	src/QuickChick.v \
+	src/LegacyDerive.v \
 	src/TacticsUtil.v \
 	_CoqProject
 

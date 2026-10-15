@@ -3,6 +3,7 @@ plugin/META.coq-quickchick.in
 #endif
 -R src QuickChick
 -I plugin
+-I plugin/legacy
 
 plugin/quickChick.mli
 plugin/driver.mli
@@ -30,6 +31,8 @@ plugin/driver.mlg
 plugin/tactic_quickchick.mlg
 plugin/weightmap.mlg
 plugin/quickchick_plugin.mlpack
+plugin/legacy/legacy_derive.mlg
+plugin/legacy/quickchick_legacy_plugin.mlpack
 plugin/genericLib.ml
 plugin/error.ml
 plugin/simplDriver.ml
@@ -72,6 +75,7 @@ src/Test.v
 src/Mutation.v
 src/Typeclasses.v
 src/QuickChick.v
+src/LegacyDerive.v
 src/MutateCheck.v
 src/DependentClasses.v
 src/Decidability.v
