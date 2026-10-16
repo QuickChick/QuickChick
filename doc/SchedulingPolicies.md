@@ -36,10 +36,14 @@ surviving candidates; it is not a guarantee of the global optimum under any of
 the four ranking policies.
 
 The comparison refactor preserves this behavior. A complete modular scoring
-interface must align pruning bounds with the selected policy, or offer a search
-mode that disables score-based pruning. It must retain dependency and validity
-checks. Small exhaustive comparisons are needed before claiming policy-safe
-pruning; a candidate cap must remain visible in any optimality claim.
+interface must give each selected policy an admissible bound: the bound at a
+search node must be no worse than every reachable completed score. Custom
+policies should retain score-based pruning through that contract. Dominance
+memoization needs a separate condition; a lexicographically better prefix need
+not remain better under a common extension containing maxima. Dependency and
+validity checks remain independent. Small exhaustive searches provide a test
+oracle for bounds, rather than a default execution mode for custom policies.
+A candidate cap must remain visible in any optimality claim.
 
 At pinned Specimen revision `121cf234`, scoring bundles explicitly associate
 comparison and aggregation with pruning strategy, including a no-pruning option.
