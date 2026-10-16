@@ -23,3 +23,9 @@
   (modules test_dependency_ordering)
   (flags :standard -rectypes)
   (libraries coq-quickchick.plugin))
+
+(test
+  (name test_schedule_ranking)
+  (modules test_schedule_ranking)
+  (flags :standard -rectypes)
+  (libraries coq-quickchick.plugin))
