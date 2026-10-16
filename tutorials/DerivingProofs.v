@@ -1,3 +1,5 @@
+(* These proof scripts recognize the legacy engine's generated terms.
+   Use QCDeriveLegacy explicitly until proofs for scheduled derivations exist. *)
 From Coq Require Import Init.Nat List.
 Import ListNotations.
 
@@ -29,7 +31,7 @@ Inductive reg_exp (T : Type) : Type :=
   | Star (r : reg_exp T).
 
 (* We can then derive an enumerator for inhabitants of this data type *) 
-QCDerive EnumSized for reg_exp.
+QCDeriveLegacy EnumSized for reg_exp.
 
 (* Prints: EnumSizedreg_exp is defined *)
 
@@ -210,10 +212,10 @@ Instance Dec (x y : nat) : DecOpt (x = y).
 Admitted.
  *)
 
-QCDerive DecOpt for (exp_match l e).
+QCDeriveLegacy DecOpt for (exp_match l e).
 (* DecOptexp_match is defined *)
 
-QCDerive EnumSizedSuchThat for (fun l => exp_match l e).
+QCDeriveLegacy EnumSizedSuchThat for (fun l => exp_match l e).
 
 About DecOptexp_match.
 (* DecOptexp_match :
@@ -298,7 +300,7 @@ Proof. derive_complete. Qed.
 
 (* Enumeration for the Eq predicate (TODO move) (required by [exp_match]) *)
 
-QCDerive EnumSizedSuchThat for (fun n => eq x n).
+QCDeriveLegacy EnumSizedSuchThat for (fun n => eq x n).
 
 #[local] Instance EnumSizedSuchThateq_SizedMonotonic X {_ : Enum X} {_ : Dec_Eq X} (n : X) :
   SizedMonotonicOptFP (@enumSizeST _ _ (EnumSizedSuchThateq n)).
@@ -319,7 +321,7 @@ Proof. derive_enumST_Correct. Qed.
 
  *)
 
-QCDerive EnumSizedSuchThat for (fun l => exp_match l e).
+QCDeriveLegacy EnumSizedSuchThat for (fun l => exp_match l e).
 (* EnumSizedSuchThatexp_match is defined. *)
 
 About EnumSizedSuchThatexp_match.
@@ -387,5 +389,5 @@ Proof. derive_enumST_Correct. Qed.
    and the output is the regular expression)
  *)
 
-QCDerive EnumSizedSuchThat for (fun e => exp_match l e).
+QCDeriveLegacy EnumSizedSuchThat for (fun e => exp_match l e).
 

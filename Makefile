@@ -81,6 +81,7 @@ COMPATFILES:= \
 	plugin/depDriver.ml \
 	plugin/genericLib.ml \
 	plugin/newGenericLib.ml \
+	plugin/publicDerive.ml \
 	plugin/mergeTypes.ml \
 	plugin/quickChick.mli \
 	plugin/quickChick.mlg \

@@ -1,0 +1,199 @@
+(* Compatibility at the public command boundary. There is deliberately no
+   global reverse instance from Gen to GenSized (or Enum to EnumSized). *)
+let publish ~mode ~constrained (sigma, bodies) =
+  let enumerator = mode = "Enum" in
+  let env = Global.env () in
+  let sigma = ref sigma in
+  let global name =
+    let next, term = Evd.fresh_global env !sigma
+      (Nametab.locate (Libnames.qualid_of_string name)) in
+    sigma := next; EConstr.to_constr next term in
+  let class_prefix = "QuickChick.Classes." in
+  let sized_name, impl_prefix =
+    if enumerator then "EnumSized", "enumSized_impl_"
+    else "GenSized", "arbitrarySized_impl_" in
+  let class_kind term =
+    List.find_opt (fun (sized, _, _) ->
+      match Constr.kind term, Nametab.locate (Libnames.qualid_of_string (class_prefix ^ sized)) with
+      | Constr.Ind (ind, _), Names.GlobRef.IndRef expected -> Names.Ind.CanOrd.equal ind expected
+      | _ -> false) ["GenSized", "Gen", "arbitrary"; "EnumSized", "Enum", "enum"] in
+  let rec adapt term = match Constr.kind term with
+    | Constr.Lambda (name, domain, body) ->
+        let head, args = Constr.decompose_app domain in
+        (match class_kind head with
+        | Some (sized_name, plain_name, method_name) when Array.length args = 1 ->
+          let ty = args.(0) in
+          let domain = Constr.mkApp (global (class_prefix ^ plain_name), [|ty|]) in
+          let value = Constr.mkApp (global (class_prefix ^ method_name),
+            [| Vars.lift 2 ty; Constr.mkRel 2 |]) in
+          let method_body = Constr.mkLambda
+            (Context.make_annot Names.Anonymous Sorts.Relevant,
+             global "Coq.Init.Datatypes.nat", value) in
+          let bridge = Constr.mkApp (global (class_prefix ^ "Build_" ^ sized_name),
+            [| Vars.lift 1 ty; method_body |]) in
+          let body = Vars.subst1 bridge (Vars.liftn 1 2 body) in
+          Constr.mkLambda (name, domain, adapt body)
+        | _ -> Constr.mkLambda (name, domain, adapt body))
+    | _ -> term in
+  let rec implicits term = match Constr.kind term with
+    | Constr.Lambda (name, domain, body) ->
+        let implicit = Constr.isSort domain ||
+          Typeclasses.is_class_type !sigma (EConstr.of_constr domain) in
+        CAst.make (if implicit then Some (Context.binder_name name, true) else None)
+          :: implicits body
+    | _ -> [] in
+  let declare name body =
+    let body = EConstr.of_constr body in
+    let next, _ = Typing.type_of env !sigma body in
+    sigma := next;
+    let cinfo = Declare.CInfo.make ~name ~typ:None
+      ~impargs:(implicits (EConstr.to_constr next body)) () in
+    let poly =
+#if COQ_VERSION >= (9, 2, 0)
+      PolyFlags.default
+#else
+      Attributes.is_universe_polymorphism ()
+#endif
+    in
+    let info = Declare.Info.make ~poly () in
+    Declare.declare_definition ~info ~cinfo ~opaque:false ~body next in
+  List.iter (fun (root, body) ->
+    let body = adapt (EConstr.to_constr !sigma body) in
+    let prefix = if mode = "Check" then "DecOpt"
+      else sized_name ^ (if constrained then "SuchThat" else "") in
+    let instance_name = NewGenericLib.fresh_name (prefix ^ Names.Id.to_string root) in
+    let reference = declare instance_name body in
+    Classes.existing_instance Hints.SuperGlobal reference None;
+    if not constrained then begin
+    (* Preserve the traditional implementation name and size-last interface. *)
+    (* The result type is inferred below instead of guessing its parameters. *)
+    let rec method_body env body = match Constr.kind body with
+      | Constr.Lambda (name, domain, rest) ->
+          let inner = Environ.push_rel (Context.Rel.Declaration.LocalAssum (name, domain)) env in
+          Constr.mkLambda (name, domain, method_body inner rest)
+      | _ ->
+          let next, ty = Typing.type_of env !sigma (EConstr.of_constr body) in
+          sigma := next;
+          let _, args = Constr.decompose_app (EConstr.to_constr next ty) in
+          let projection = if enumerator then "enumSized" else "arbitrarySized" in
+          Constr.mkApp (global (class_prefix ^ projection), [| args.(0); body |]) in
+    let helper_name = NewGenericLib.fresh_name (impl_prefix ^ Names.Id.to_string root) in
+    ignore (declare helper_name (method_body env body))
+    end) bodies
+
+let derive_simple ~enumerator ind =
+  let mode = if enumerator then "Enum" else "Gen" in
+  publish ~mode ~constrained:false
+    (Tactic_quickchick.compile_public ~mode ~outputs:[] ~constrained:false ~all_mutual:true ind)
+
+(* Resolve implicit type arguments before deciding which relation positions are
+   outputs. Unbound input names in the public syntax are schematic binders. *)
+let dependent_target ~mode expression =
+  let open Constrexpr in
+  let env = Global.env () in
+  let free = Constrexpr_ops.free_vars_of_constr_expr expression
+    |> Names.Id.Set.elements
+    |> List.filter (fun id ->
+        try ignore (Nametab.locate (Libnames.qualid_of_ident id)); false
+        with Not_found -> true) in
+  let binder id = CLocalAssum ([CAst.make (Names.Name id)],
+#if COQ_VERSION >= (8, 20, 0)
+      None,
+#endif
+      Default Glob_term.Explicit, NewGenericLib.mexp_to_constr_expr NewGenericLib.MHole NewGenericLib.D_Check) in
+  let binders, body = if mode = "Check" then [], expression else
+    match expression.CAst.v with
+    | CLambdaN (binders, body) -> binders, body
+    | _ -> CErrors.user_err (Pp.str "Use a lambda to select the generated argument.") in
+  let tuple_names names = List.map (fun n -> match n.CAst.v with
+    | Names.Name id -> id
+    | Names.Anonymous -> CErrors.user_err (Pp.str "Name each tuple output.")) names in
+  let rec pattern_names pattern = match pattern.CAst.v with
+    | CPatAtom (Some q) when Libnames.qualid_is_ident q -> [Libnames.qualid_basename q]
+    | CPatNotation (_, (_, key), (patterns, repeated, []), [])
+      when key = "( _ , _ )" || key = "( _ , _ , .. , _ )" ->
+        List.concat_map pattern_names (patterns @ List.concat repeated)
+    | CPatCstr (q, None, patterns) when
+        Nametab.locate q = Nametab.locate (Libnames.qualid_of_string "Coq.Init.Datatypes.pair") ->
+        List.concat_map pattern_names patterns
+    | _ -> CErrors.user_err (Pp.str "Use named variables or a pair of named variables as outputs.") in
+  (* The traditional tuple-output form is a lambda followed by a tuple let. *)
+  let binders, body = match binders, body.CAst.v with
+    | [CLocalAssum ([{ CAst.v = Names.Name id; _ }],
+#if COQ_VERSION >= (8, 20, 0)
+        _,
+#endif
+        _, _)], CLetTuple (names, (_, None), { CAst.v = CRef (q, _); _ }, inner)
+      when Libnames.qualid_is_ident q && Names.Id.equal id (Libnames.qualid_basename q) ->
+        List.map binder (tuple_names names), inner
+    | [CLocalAssum ([{ CAst.v = Names.Name id; _ }],
+#if COQ_VERSION >= (8, 20, 0)
+        _,
+#endif
+        _, _)], CCases (_, None, [({ CAst.v = CRef (q, _); _ }, _, _)],
+          [{ CAst.v = ([[pattern]], inner); _ }])
+      when Libnames.qualid_is_ident q && Names.Id.equal id (Libnames.qualid_basename q) ->
+        List.map binder (pattern_names pattern), inner
+    | _ -> List.concat_map (function
+        | CLocalPattern pattern -> List.map binder (pattern_names pattern)
+        | b -> [b]) binders, body in
+  let output_names = List.concat_map (function
+    | CLocalAssum (names,
+#if COQ_VERSION >= (8, 20, 0)
+        _,
+#endif
+        _, _) -> List.map (fun n -> match n.CAst.v with
+          | Names.Name id -> id
+          | Names.Anonymous -> CErrors.user_err (Pp.str "Name each generated argument.")) names
+    | _ -> CErrors.user_err (Pp.str "Unsupported output binder; use QCDeriveLegacy for this form.")) binders in
+  let all_binders = List.map binder free @ binders in
+  let wrapped = if all_binders = [] then body else CAst.make (CLambdaN (all_binders, body)) in
+  let sigma, term = Constrintern.interp_constr_evars env (Evd.from_env env) wrapped in
+  let rec strip env context term = match EConstr.kind sigma term with
+    | Constr.Lambda (name, domain, rest) ->
+        let env = EConstr.push_rel (Context.Rel.Declaration.LocalAssum (name, domain)) env in
+        strip env (Context.binder_name name :: context) rest
+    | _ -> env, context, term in
+  let argument_env, context, term = strip env [] term in
+  let head, args = EConstr.decompose_app sigma term in
+  let relation = match EConstr.kind sigma head with
+    | Constr.Ind (ind, _) -> Nametab.shortest_qualid_of_global Names.Id.Set.empty (Names.GlobRef.IndRef ind)
+    | _ -> CErrors.user_err (Pp.str "Expected an inductive predicate application.") in
+  let output_positions = List.map (fun id ->
+    let positions = List.mapi (fun i arg ->
+      match EConstr.kind sigma arg with
+      | Constr.Rel n when List.nth context (n - 1) = Names.Name id -> Some i
+      | _ -> None) (Array.to_list args) |> List.filter_map Fun.id in
+    match positions with
+    | [position] -> position
+    | _ -> CErrors.user_err (Pp.str "Each output must occur once as a whole predicate argument.")) output_names in
+  let seen_inputs = ref [] in
+  Array.iteri (fun position argument ->
+    if not (List.mem position output_positions) then begin
+      let sigma, ty = Typing.type_of argument_env sigma argument in
+      let ty = Reductionops.whd_all argument_env sigma ty in
+      if not (EConstr.isSort sigma ty || Typeclasses.is_class_type sigma ty) then
+        match EConstr.kind sigma argument with
+        | Constr.Rel n when not (List.mem n !seen_inputs) -> seen_inputs := n :: !seen_inputs
+        | _ -> CErrors.user_err (Pp.str
+            "Use distinct variables for predicate inputs; fixed or repeated inputs require QCDeriveLegacy.")
+    end) args;
+  if output_positions <> List.sort compare output_positions then
+    CErrors.user_err (Pp.str "Output order must match predicate argument order; use QCDeriveLegacy for this form.");
+  CAst.make (CRef (relation, None)), output_positions
+
+let derive_dependent ~mode expression =
+  let ind, outputs = dependent_target ~mode expression in
+  publish ~mode ~constrained:true
+    (Tactic_quickchick.compile_public ~mode ~outputs ~constrained:true ~all_mutual:false ind)
+
+let warn_legacy =
+  let category =
+#if COQ_VERSION >= (8, 18, 0)
+    CWarnings.create_category ~name:"quickchick-derivation" ()
+#else
+    "quickchick"
+#endif
+  in
+  CWarnings.create ~name:"quickchick-legacy-derive" ~category
+    (fun () -> Pp.str "The legacy derivation engine is deprecated. Prefer QCDerive.")

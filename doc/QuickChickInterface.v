@@ -581,7 +581,7 @@ Declare Instance Dec_eq_list (A : Type)
 [[
        QCDerive <class> for T.
 ]]
-    Here [<class>] must be one of [GenSized], [Shrink], [Arbitrary],
+    Here [<class>] must be one of [GenSized], [EnumSized], [Sized], [Shrink], [Arbitrary],
     or [Show], and [T] must be an inductive defined datatype (think
     Haskell/OCaml).
 
@@ -596,6 +596,18 @@ Declare Instance Dec_eq_list (A : Type)
    clauses. It can conflict with Stdlib and other plugins' [Derive] commands.
    Prefer [QCDerive] with the normal [QuickChick] import.
    The schedule-specific [Derive] commands do not require the compatibility import.
+
+   [QCDerive] uses the scheduled engine for generation, enumeration, and
+   checking, including [DecOpt] and its [Checker] alias. The old engines remain
+   available through [QCDeriveLegacy] and [DeriveLegacy], which issue a
+   deprecation warning. Correctness tactics written for the old generated terms
+   require these legacy commands; see the DerivingProofs tutorial.
+
+   Public wrappers preserve [Gen A] and [Enum A] prerequisites and default
+   instance names. Repeated explicit commands create fresh names. Type and
+   class arguments are implicit, and requirements reflect actual dependencies;
+   old explicit helper applications may need adjustment. These wrappers add
+   no global reverse conversion to the sized classes.
 *)
 
 (** QuickChick also allows for the automatic derivation of generators
@@ -604,8 +616,13 @@ Declare Instance Dec_eq_list (A : Type)
      QCDerive ArbitrarySizedSuchThat for (fun x => P x1 ... x .... xn).
 ]]
     <P> must be an inductively defined relation.
-    <x> is the function to be generated.
+    <x> is the value to be generated.
     <x1...xn> are (implicitly universally quantified) variable names.
+    Implicit type arguments are elaborated before outputs are selected.
+    Term inputs must be distinct variables; outputs must occur once as whole
+    arguments, in predicate order. Fixed or repeated inputs and reordered
+    outputs require the legacy command. See doc/DerivationDispatch.md for
+    examples and compatibility details.
 *)
 
 (** ** Scheduled instances

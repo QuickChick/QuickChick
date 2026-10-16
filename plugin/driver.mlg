@@ -12,8 +12,11 @@ type derivation = SimpleDer of SimplDriver.derivable list
                 | DepDer of DepDriver.derivable
                 | NEW of DepDriver.derivable
 
-let simpl_dispatch ind classes name1 name2 =
-  List.iter (fun cn -> SimplDriver.derive cn ind name1 name2) classes
+let simpl_dispatch ~legacy ind classes name1 name2 =
+  List.iter (fun cn -> match legacy, cn with
+    | false, SimplDriver.GenSized -> PublicDerive.derive_simple ~enumerator:false ind
+    | false, SimplDriver.EnumSized -> PublicDerive.derive_simple ~enumerator:true ind
+    | _ -> SimplDriver.derive cn ind name1 name2) classes
 
 let class_assoc_opts = [ ("GenSized"                 , SimpleDer [SimplDriver.GenSized])
                        ; ("EnumSized"                , SimpleDer [SimplDriver.EnumSized])                       
@@ -38,7 +41,7 @@ let class_assoc_table =
   List.iter (fun (kwd, tok) -> Hashtbl.add h kwd tok) class_assoc_opts;
   h
 
-let dispatch cn ind name1 name2 =
+let dispatch_with ~legacy cn ind name1 name2 =
   let convert_reference_to_string c =
     match c with
     | {CAst.v = CRef (r, _) ; _} -> string_of_qualid r
@@ -72,9 +75,20 @@ let dispatch cn ind name1 name2 =
     | _ -> qcfail "At least one class name expected" in
 
   match class_names with
-  | SimpleDer classes -> simpl_dispatch ind classes name1 name2
-  | DepDer class_name -> DepDriver.dep_dispatch ind class_name
+  | SimpleDer classes -> simpl_dispatch ~legacy ind classes name1 name2
+  | DepDer class_name ->
+      if legacy then DepDriver.dep_dispatch ind class_name else
+      let mode = match class_name with
+        | DepDriver.DecOpt -> "Check"
+        | DepDriver.GenSizedSuchThat -> "Gen"
+        | DepDriver.EnumSizedSuchThat -> "Enum" in
+      PublicDerive.derive_dependent ~mode ind
   | NEW class_name -> NewDepDriver.dep_dispatch ind class_name
+
+let dispatch = dispatch_with ~legacy:false
+let dispatch_legacy cn ind name1 name2 =
+  PublicDerive.warn_legacy ();
+  dispatch_with ~legacy:true cn ind name1 name2
 
 let merge ind1 ind2 ind3 =
   MergeTypes.merge ind1 ind2 ind3
@@ -101,4 +115,22 @@ VERNAC COMMAND EXTEND QCDerive CLASSIFIED AS SIDEFF
      { dispatch class_name inductive (Id.to_string genInst) ""}
    | ["QCDerive" constr(class_name) "for" constr(inductive) "using" ident(genInst) "and" ident(monInst) ] ->
      { dispatch class_name inductive (Id.to_string genInst) (Id.to_string monInst)}
+END
+
+VERNAC COMMAND EXTEND QCDeriveLegacy CLASSIFIED AS SIDEFF
+   | ["QCDeriveLegacy" constr(class_name) "for" constr(inductive)] ->
+     { dispatch_legacy class_name inductive "" "" }
+   | ["QCDeriveLegacy" constr(class_name) "for" constr(inductive) "using" ident(genInst)] ->
+     { dispatch_legacy class_name inductive (Id.to_string genInst) "" }
+   | ["QCDeriveLegacy" constr(class_name) "for" constr(inductive) "using" ident(genInst) "and" ident(monInst)] ->
+     { dispatch_legacy class_name inductive (Id.to_string genInst) (Id.to_string monInst) }
+END
+
+VERNAC COMMAND EXTEND DeriveLegacy CLASSIFIED AS SIDEFF
+   | ["DeriveLegacy" constr(class_name) "for" constr(inductive)] ->
+     { dispatch_legacy class_name inductive "" "" }
+   | ["DeriveLegacy" constr(class_name) "for" constr(inductive) "using" ident(genInst)] ->
+     { dispatch_legacy class_name inductive (Id.to_string genInst) "" }
+   | ["DeriveLegacy" constr(class_name) "for" constr(inductive) "using" ident(genInst) "and" ident(monInst)] ->
+     { dispatch_legacy class_name inductive (Id.to_string genInst) (Id.to_string monInst) }
 END

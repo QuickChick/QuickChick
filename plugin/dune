@@ -97,3 +97,8 @@
  (target newGenericLib.ml)
  (deps ../scripts/mycppo newGenericLib.ml.cppo)
  (action (run sh %{dep:../scripts/mycppo} %{dep:newGenericLib.ml.cppo} %{target})))
+
+(rule
+ (target publicDerive.ml)
+ (deps ../scripts/mycppo publicDerive.ml.cppo)
+ (action (run sh %{dep:../scripts/mycppo} %{dep:publicDerive.ml.cppo} %{target})))
