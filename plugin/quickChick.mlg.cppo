@@ -169,8 +169,20 @@ let define_and_run ~opaque_access c env evd =
 #else
 let define_and_run c env evd =
 #endif
-  (* Extract the term and its dependencies *)
-  let main = define c env evd in
+  (* Keep the output call in the extracted term. A handwritten reference to
+     [main] would miss module qualification and extraction's own renaming. *)
+  let evd, typ = Typing.type_of env evd c in
+  let emit = define (EConstr.mkLambda
+    (Context.make_annot Anonymous EConstr.ERelevance.relevant, typ, EConstr.mkRel 1)) env evd in
+  let print_result =
+    "(fun l -> let s = Stdlib.Bytes.create (Stdlib.List.length l) in " ^
+    "let rec copy i = function " ^
+    "| [] -> s | c :: l -> Stdlib.Bytes.set s i c; copy (i+1) l in " ^
+    "Stdlib.print_string (Stdlib.Bytes.to_string (copy 0 l)); l)" in
+  Extraction_plugin.Table.extract_constant_inline true (qualid_of_ident emit) [] print_result;
+  let evd, emit = Evd.fresh_global (Global.env ()) evd
+    (Nametab.locate (qualid_of_ident emit)) in
+  let main = define (EConstr.mkApp (emit, [|c|])) (Global.env ()) evd in
   let mlf   : string = new_ml_file () in
   let execn : string = Filename.chop_extension mlf ^ ".native" in
   let mlif  : string = Filename.chop_extension mlf ^ ".mli"    in
@@ -184,19 +196,6 @@ let define_and_run c env evd =
   Flags.silently (Extraction_plugin.Extract_env.full_extraction (Some mlf)) [qualid_of_ident main];
 #endif
   CWarnings.set_flags warnings;
-  (* Add a main function to get some output *)
-  let oc = open_out_gen [Open_append;Open_text] 0o666 mlf in
-  let for_output =
-    "\nlet _ = print_string (\n" ^
-    "let l = (" ^ (Id.to_string main) ^ ") in\n"^
-    "let s = Bytes.create (List.length l) in\n" ^
-    "let rec copy i = function\n" ^
-    "| [] -> s\n" ^
-    "| c :: l -> Bytes.set s i c; copy (i+1) l\n" ^
-    "in Bytes.to_string (copy 0 l))" in
-  Printf.fprintf oc "%s" for_output;
-  close_out oc;
-
   (* Add any modules that have been marked "open" *)
   let open_cmd s = Printf.sprintf "awk -v n=1 -v s=\"open %s\" 'NR == n {print s} {print}' %s > %s/__qc_tmp && mv %s/__qc_tmp %s" s mlf dir dir mlf in
   List.iter (fun s -> ignore (Sys.command (open_cmd s))) SummaryRef.(!modules_to_open);
@@ -298,8 +297,10 @@ let define_and_run c env evd =
         Feedback.msg_notice (Pp.str e);
         process_err_aux() in
 *)        
+      let received_output = ref false in
       let rec process_otl_aux () =
         let e = input_line p_out in
+        received_output := true;
         Feedback.msg_notice (Pp.str e);
         process_otl_aux() in
       try process_otl_aux ()
@@ -313,6 +314,8 @@ let define_and_run c env evd =
               let err descr = CErrors.user_err (str (execn ^ ": " ^ descr) ++ fnl () ++ fnl () ++ str err_msg ++ fnl ()) in
               let stat = Unix.close_process_full process in
               begin match stat with
+              | Unix.WEXITED 0 when not !received_output ->
+                  err "No test output; testing inside an unapplied module functor is unsupported"
               | Unix.WEXITED 0 -> ()
               | Unix.WEXITED i -> err (Printf.sprintf "Exited with status %d" i)
               | Unix.WSIGNALED i -> err (Printf.sprintf "Killed (%d)" i)

@@ -30,3 +30,7 @@ Fail Check reflexivity_test.
     [quickchick] again to prepare a test for the changed goal or context; both
     tests can coexist under different names. Local computational assumptions
     still need concrete values before extraction can execute a test. *)
+
+(** Testing and saved-test reruns work inside ordinary and nested modules.
+    Tests inside an unapplied module functor cannot run. Instantiate the functor
+    first, then test its exported property from outside the functor. *)
