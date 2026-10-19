@@ -60,6 +60,33 @@ exhaustive searches serve as the validation oracle.
 The counted-density policy currently ranks completed candidates only; its
 histogram is not used as a partial-node pruning bound.
 
+`test/pruning_bounds.v` proves the candidate prefix bounds for both density
+directions and the counted-density key. Under a committed prefix with finalized
+step grades, every completed descendant appends nonnegative grade counts;
+generation's worst grade can only worsen, and checking's can only worsen in
+its comparison direction. The file also proves that a stateful nonnegative
+variable-use scan cannot reduce its accumulated count. Candidate identifiers
+are excluded from the bound, so equal scores must remain searchable.
+The proof also shows that a strictly better incumbent remains better than any
+completion whose score is componentwise above the node bound.
+It also proves a conservative bound with unresolved recursive grades: treat
+each such call as the best possible density (`Total` for generation,
+`Checking` for checking) and count it in no histogram bucket. Once the
+dependency's grade is known, replace that optimistic contribution with its
+actual grade. This keeps the bound admissible, though it may be too weak to
+prune before dependency resolution.
+
+For plain positive direct-variable relations, the proof additionally gives
+`committed checks + max(0, remaining hypotheses - unbound variables)` as a
+lower bound on check count: each remaining non-check consumes at least one
+fresh variable. This stronger formula needs a separate typed certificate before
+use with indexed arguments, forced bindings, negative premises, or rewriting.
+The current plugin is not formally verified against the proof's assumptions:
+converted prefix steps and recursive dependency grades must remain unchanged
+in descendants. A typed exhaustive fixture checks the counted key against
+every descendant, but that is evidence for the fixture, not a replacement for
+the adapter proof. No public score pruning is enabled.
+
 At pinned Specimen revision `121cf234`, scoring bundles explicitly associate
 comparison and aggregation with pruning strategy, including a no-pruning option.
 QuickChick does not yet provide that bundle interface or arbitrary Rocq scorers.

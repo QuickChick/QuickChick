@@ -1,4 +1,5 @@
 module N = Quickchick_plugin.NewGenericLib
+module Ranking = Quickchick_plugin.ScheduleRanking
 
 let v = N.var_of_string
 let relation name vars =
@@ -462,6 +463,40 @@ let () =
   assert (List.length maximal_candidates = 120);
   assert (List.length maximal_reduced = 16);
   assert (List.length (unique_owners maximal_candidates) = 16);
+  (* Give each typed relation mode a fixed synthetic recursive-call grade.
+     The proof in test/pruning_bounds.v then predicts that the committed
+     density/count/use key is no worse than every completed descendant. *)
+  let counted_key schedule =
+    let modes, unconstrained = mode_signature schedule in
+    assert (unconstrained = []);
+    let grades = List.map (fun (name, outputs) ->
+      if outputs = [] then 0
+      else if name = "D" then 3
+      else 4) modes in
+    let worst = List.fold_left min 4 grades in
+    let c, b, n, p, t = Ranking.histogram_of_ranks grades in
+    [4 - worst; c; b; n; p; t; variable_uses schedule] in
+  let counted_observations = ref [] in
+  ignore (N.possible_schedules_with_advanced_pruning
+    ~max_schedules:100000 ~reduce_orderings:false ~maximal_outputs:true
+    ~on_prefix:(fun path terminal schedule ->
+      counted_observations :=
+        (path, terminal, counted_key schedule) :: !counted_observations)
+    variables hypotheses [] rec_call N.D_Gen);
+  let counted_leaves = List.filter (fun (_, terminal, _) -> terminal)
+    !counted_observations in
+  let counted_nodes = ref 0 in
+  List.iter (fun (path, terminal, bound) ->
+    if not terminal then begin
+      incr counted_nodes;
+      let descendants = List.filter (fun (leaf_path, _, _) ->
+        is_path_prefix path leaf_path) counted_leaves in
+      assert (descendants <> []);
+      List.iter (fun (_, _, completed) ->
+        assert (Stdlib.compare bound completed <= 0)) descendants
+    end) !counted_observations;
+  Printf.printf "typed counted-density bounds: nodes=%d leaves=%d\n"
+    !counted_nodes (List.length counted_leaves);
   Printf.printf "distinct orders=%d, candidates/class min=%d max=%d, orders/class min=%d max=%d\n"
     (List.length (distinct_orders complete))
     (List.fold_left min max_int class_sizes)
