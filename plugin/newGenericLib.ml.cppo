@@ -3205,7 +3205,7 @@ module VarListMap = Map.Make(struct
 end)
 
 (* Helper: Process a single choice of outputs for a hypothesis - corresponds to Lean's processChoice *)
-let process_choice_helper (idx : int)
+let process_choice_helper ?(eager_checks=true) (idx : int)
                          (hyp : rocq_constr)
                          (polarity : bool)
                          (out : var list list)
@@ -3232,13 +3232,17 @@ let process_choice_helper (idx : int)
       List.for_all (fun v -> List.mem v env) cls.always_bound &&
       List.for_all (fun var_list -> List.for_all (fun v -> List.mem v env) var_list) cls.potential_indices
     in
-    let (pre_checks, to_be_satisfied) = List.partition (needs_checking new_env) rest in
+    let (pre_checks, to_be_satisfied) =
+      if eager_checks then List.partition (needs_checking new_env) rest
+      else ([], rest) in
     
     let out_vars = List.concat out in
     let final_env_set = List.fold_left (fun s v -> VS.add v s) new_env_set out_vars in
     let final_env = out_vars @ new_env in
     
-    let (post_checks, to_be_satisfied') = List.partition (needs_checking final_env) to_be_satisfied in
+    let (post_checks, to_be_satisfied') =
+      if eager_checks then List.partition (needs_checking final_env) to_be_satisfied
+      else ([], to_be_satisfied) in
     
     let produce_step = PS_Produce (out_vars, (idx, hyp, polarity)) in
     let new_sched = prune_empties [
@@ -3250,6 +3254,59 @@ let process_choice_helper (idx : int)
     
     Some (new_sched, to_be_satisfied', final_env, final_env_set)
   end
+
+(* Complete typed prefix explorer. Every next hypothesis and every currently
+   supported output mode is considered. A transition commits its steps, so
+   future score bounds can be stated over actual descendants. This reference
+   path deliberately does not use the old checks/length heuristic or its
+   environment-only dominance memo. *)
+let enum_schedules_prefix_complete_classified
+    (variables : (var * rocq_type) list)
+    (matchable_vars : var list)
+    (hypotheses : (int * hypothesis_classification) list)
+    (initial_env : var list)
+    : ((int * rocq_constr * bool) pre_schedule_step list) Seq.t =
+  let var_names = List.map fst variables in
+  let matchable_set = VS.of_list matchable_vars in
+  let rec visit env env_set reversed_steps remaining =
+    match remaining with
+    | [] ->
+      let unbound = List.filter (fun v -> not (VS.mem v env_set)) var_names in
+      Seq.return (List.rev reversed_steps @ prune_empties [PS_InstVars unbound])
+    | _ ->
+      let rec choose before = function
+        | [] -> Seq.empty
+        | (idx, cls) :: after ->
+          let rest = List.rev_append before after in
+          let (hyp, polarity) = cls.hyp in
+          let (some_bound, all_unbound) =
+            List.partition (fun group ->
+              List.exists (fun v -> VS.mem v env_set && not (VS.mem v matchable_set)) group
+              || List.for_all (fun v -> VS.mem v matchable_set) group)
+              cls.potential_indices
+          in
+          let rec subsets = function
+            | [] -> [[]]
+            | group :: tail ->
+              let rest = subsets tail in
+              rest @ List.map (fun selected -> group :: selected) rest
+          in
+          let output_choices = if polarity then subsets all_unbound else [[]] in
+          let branch =
+            List.to_seq output_choices
+            |> Seq.filter_map (fun out ->
+              let bound = List.filter (fun group -> not (List.mem group out)) all_unbound in
+              process_choice_helper ~eager_checks:false idx hyp polarity out bound some_bound
+                cls.always_bound rest env env_set)
+            |> Seq.flat_map (fun (steps, rest', next_env, next_env_set) ->
+              visit next_env next_env_set
+                (List.rev_append steps reversed_steps) rest')
+          in
+          Seq.append branch (choose ((idx, cls) :: before) after)
+      in
+      choose [] remaining
+  in
+  visit initial_env (VS.of_list initial_env) [] hypotheses
 
 (* Translation of Lean's enumSchedulesChunkedWithPruning - version with proper memoization and pruning *)
 let enum_schedules_chunked_with_pruning_classified (variables : (var * rocq_type) list)
@@ -3497,7 +3554,7 @@ let enum_schedules_chunked_with_pruning_classified (variables : (var * rocq_type
   go hyp_components env [] num_hyps
   |> Seq.map fst
 
-let possible_schedules_with_advanced_pruning ?(max_schedules=100000) (variables : (var * rocq_type) list) (hypotheses : rocq_constr list) (fixed : var list) (rec_call : ty_ctr * int list) (ds : derive_sort) : schedule_step list list =
+let possible_schedules_with_legacy_pruning ?(max_schedules=100000) (variables : (var * rocq_type) list) (hypotheses : rocq_constr list) (fixed : var list) (rec_call : ty_ctr * int list) (ds : derive_sort) : schedule_step list list =
   (* Extract type variables (those with Sort/Type/Prop types) *)
   let type_vars = List.filter_map (fun (v, ty) ->
     match ty with
@@ -3595,6 +3652,52 @@ let possible_schedules_with_advanced_pruning ?(max_schedules=100000) (variables 
   |> Seq.map normalize_schedule_advanced
   |> seq_take max_schedules
   |> List.of_seq
+  |> List.sort_uniq compare
+
+let possible_schedules_with_advanced_pruning ?(max_schedules=100000)
+    (variables : (var * rocq_type) list)
+    (hypotheses : rocq_constr list)
+    (fixed : var list)
+    (rec_call : ty_ctr * int list)
+    (ds : derive_sort) : schedule_step list list =
+  let type_vars = List.filter_map (fun (v, ty) ->
+    match ty with
+    | DTyCtr (c, _) when ty_ctr_eq c (ty_ctr_of_string "Type")
+                      || ty_ctr_eq c (ty_ctr_of_string "Prop")
+                      || ty_ctr_eq c (ty_ctr_of_string "Set") -> Some v
+    | _ -> None) variables in
+  let sorted_hypotheses =
+    List.map (fun h ->
+      let (h, polarity) = hyp_polarity h in
+      (h, variables_in_hypothesis h, polarity)) hypotheses
+    |> List.sort (fun (_, left, _) (_, right, _) ->
+      compare (List.length left) (List.length right))
+  in
+  let classified =
+    filter_mapi (fun idx (hyp, flat_vars, polarity) ->
+      let groups = match hyp with
+        | DTyCtr (_, args) -> List.map variables_in_hypothesis args
+        | _ -> [flat_vars] in
+      Some (idx, construct_hypothesis type_vars hyp groups polarity))
+      sorted_hypotheses
+  in
+  let prod_sort = match ds with
+    | D_Check | D_Enum -> PS_E
+    | D_Gen | D_Thm -> PS_G in
+  let pre_to_schedule =
+    pre_to_schedule_advanced variables type_vars rec_call ds prod_sort in
+  let candidate_stream =
+    enum_schedules_prefix_complete_classified variables type_vars classified fixed
+    |> Seq.map pre_to_schedule
+    |> Seq.map normalize_schedule_advanced in
+  let peek_limit = if max_schedules = max_int then max_int else max_schedules + 1 in
+  let candidates = candidate_stream |> seq_take peek_limit |> List.of_seq in
+  if List.length candidates > max_schedules then
+    Feedback.msg_warning (str (Printf.sprintf
+      "Schedule search reached its %d-candidate limit; ranking may omit better schedules"
+      max_schedules));
+  candidates
+  |> List.filteri (fun idx _ -> idx < max_schedules)
   |> List.sort_uniq compare
 
 let possible_schedules = possible_schedules_with_advanced_pruning ~max_schedules:1000
