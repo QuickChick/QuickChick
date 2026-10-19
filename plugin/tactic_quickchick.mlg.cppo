@@ -2042,6 +2042,23 @@ let dec_eq_sched_phony = ("DecOpt_eq_III", [], [], [(([],CheckerSchedule),[])], 
    
 let init_density_inductive_memo = InductiveScheduleKeyMap.add (ty_ctr_of_string "Coq.Init.Logic.eq", [], D_Check, true) (DensityDone (dec_eq_sched_phony, Checking)) InductiveScheduleKeyMap.empty
 
+(* Diagnostic scoring must not consume or leave behind entries from another
+   proof context. Normal derivation commands establish their own memo state. *)
+let with_fresh_density_memo f =
+  let old_inductive = !density_inductive_memo in
+  let old_rule = !density_memo in
+  let old_relations = !rocq_relation_memo in
+  Fun.protect
+    ~finally:(fun () ->
+      density_inductive_memo := old_inductive;
+      density_memo := old_rule;
+      rocq_relation_memo := old_relations)
+    (fun () ->
+      density_inductive_memo := init_density_inductive_memo;
+      density_memo := RelationInstMap.empty;
+      rocq_relation_memo := TyCtrMap.empty;
+      f ())
+
 let inductive_set_init = InductiveSchedSet.singleton (dec_eq_sched_phony, D_Check, false)
 
 let inductive_set = ref inductive_set_init
@@ -2403,11 +2420,11 @@ let valid_schedules =
   Proofview.Goal.enter begin fun gl ->
     let c = Proofview.Goal.concl gl in
     let e = Proofview.Goal.env gl in
-    let evd = Evd.from_env e in
+    let evd = Proofview.Goal.sigma gl in
+    with_schedule_context e evd (fun () -> with_fresh_density_memo (fun () ->
     match NewGenericLib.parse_dependent_type (EConstr.to_constr evd c) with
     | Some dt -> 
       begin
-        density_memo := RelationInstMap.empty;
         let schedules = NewUnifyQC.type_to_schedules dt None None [] [] D_Thm false in
         let schedules' = List.map (fun ((steps, sort), ms, eqs) -> (List.map (fun (v,p) -> S_Match (v,p)) ms, (List.map check_eq eqs @ steps, sort))) schedules in
         let schedules_w_densities = List.mapi (fun i (ms_steps, schd) -> i, schedule_density ms_steps schd) schedules' in
@@ -2425,7 +2442,7 @@ let valid_schedules =
         end;
         Tacticals.tclIDTAC
       end 
-    | None -> failwith "Failed to Parse type"
+    | None -> failwith "Failed to Parse type"))
   end
 
 let theorem_dependencies = 
