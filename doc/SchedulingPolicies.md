@@ -11,6 +11,7 @@ The existing `QC_SCHEDULE_RANKING` environment setting is preserved:
 | Value | Primary criterion | Secondary criterion |
 | --- | --- | --- |
 | `density_then_vars` (default) | Density | Fewer uses of previously bound variables |
+| `density_counts_then_vars` | Density | Fewer steps at each worse density, then fewer variable uses |
 | `density_only` | Density | None |
 | `vars_then_density` | Fewer uses of previously bound variables | Density |
 | `vars_only` | Fewer uses of previously bound variables | None |
@@ -23,10 +24,21 @@ an empty checker or enumerator schedule is Checking. Candidate identifiers break
 remaining ties, preserving deterministic selection from the generated list.
 Existing aliases and unknown-value fallback to the default are unchanged.
 
+The opt-in `density_counts_then_vars` policy breaks a worst-density tie by
+counting annotated steps at each density, starting with the worst grade for the
+derivation direction. It counts a recursive dependency's computed density once
+at the call site; it does not expand the dependency's internal schedule. Thus
+the count is bounded by the selected schedule's steps. This is a measure of the
+chosen calls, not a count of underlying constraints. It uses the scheduler's
+current recursive density annotations, including its existing treatment of
+recursive cycles.
+
 `QC_SCHEDULE_TRACE=1` reports the selected policy, candidate count, identifier,
 density, and variable-use count. `QC_SCHEDULE_TIE_REPORT=1` enables tie diagnostics;
 `QC_SCHEDULE_TIE_LIMIT` limits their output (default 3; 0 means no limit).
 These are existing diagnostic environment settings, not new Rocq options.
+The trace also prints `selected-counts=Checking,Backtracking,Neutral,Partial,Total`
+for the counted-density policy (as five integers).
 
 ## Search limits
 
@@ -45,6 +57,8 @@ test, but public derivation does not use it. Recursive dependency scores need
 stable full-mode keys before density can safely prune. Custom policies should
 retain score-based pruning through the same admissibility contract. Small
 exhaustive searches serve as the validation oracle.
+The counted-density policy currently ranks completed candidates only; its
+histogram is not used as a partial-node pruning bound.
 
 At pinned Specimen revision `121cf234`, scoring bundles explicitly associate
 comparison and aggregation with pruning strategy, including a no-pruning option.

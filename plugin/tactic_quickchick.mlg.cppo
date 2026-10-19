@@ -1149,6 +1149,7 @@ let rec arrows_to_products typ =
 
 type schedule_ranking_policy = ScheduleRanking.policy =
   | RankDensityThenVars
+  | RankDensityCountsThenVars
   | RankDensityOnly
   | RankVarsThenDensity
   | RankVarsOnly
@@ -1213,8 +1214,18 @@ let sort_schedules_by_density_and_var_uses (schedules : (int * schedule_with_den
     ((schd_steps,schd_sort), density, num_var_uses, i)) schedules
   in
   let policy = schedule_ranking_policy () in
+  let count_by_id = Hashtbl.create (List.length entries) in
+  if policy = RankDensityCountsThenVars then
+    List.iter (fun ((steps, _), _, _, id) ->
+      Hashtbl.add count_by_id id
+        (ScheduleRanking.histogram_of_ranks
+           (List.map (fun (_, density) -> density_rank density) steps))) entries;
+  let counts id =
+    if policy = RankDensityCountsThenVars then Hashtbl.find count_by_id id
+    else ScheduleRanking.histogram_of_ranks [] in
   let features (_, density, variable_uses, candidate_id) =
-    { ScheduleRanking.density_rank = density_rank density; variable_uses; candidate_id } in
+    { ScheduleRanking.density_rank = density_rank density;
+      density_counts = counts candidate_id; variable_uses; candidate_id } in
   let prefer_dense = ds = D_Gen || ds = D_Thm in
   let compare_entry a b =
     ScheduleRanking.compare ~prefer_dense policy (features a) (features b) in
@@ -1230,23 +1241,32 @@ let sort_schedules_by_density_and_var_uses (schedules : (int * schedule_with_den
     | ((steps_ds, sort), density, num_var_uses, id) :: _ ->
       Feedback.msg_notice
         (str (Printf.sprintf
-          "[schedule-ranking] policy=%s derive=%s candidates=%d selected-id=%d selected-density=%s selected-var-uses=%d\n"
+          "[schedule-ranking] policy=%s derive=%s candidates=%d selected-id=%d selected-density=%s selected-var-uses=%d%s\n"
           (schedule_ranking_policy_to_string policy)
           (schedule_rank_derive_sort_to_string ds)
           (List.length entries)
           id
           (density_to_string density)
-          num_var_uses)
+          num_var_uses
+          (if policy = RankDensityCountsThenVars then
+             " selected-counts=" ^ ScheduleRanking.histogram_to_string (counts id)
+           else ""))
          ++ str (schedule_with_densities_to_string (steps_ds, sort)))
   end;
   if schedule_tie_report_enabled () && List.length entries > 1 then begin
     let primary_key =
       match policy with
-      | RankDensityThenVars | RankDensityOnly -> fun (_,d,_,_) -> density_to_string d
+      | RankDensityThenVars | RankDensityCountsThenVars | RankDensityOnly -> fun (_,d,_,_) -> density_to_string d
       | RankVarsThenDensity | RankVarsOnly -> fun (_,_,v,_) -> string_of_int v
     in
     let secondary_report es =
       match policy with
+      | RankDensityCountsThenVars ->
+        let histograms = List.map (fun (_,_,_,id) -> counts id) es in
+        let distinct = List.sort_uniq Stdlib.compare histograms in
+        (List.length distinct > 1,
+         List.length distinct - 1,
+         Printf.sprintf "secondary=density_counts distinct=%d" (List.length distinct))
       | RankDensityThenVars ->
         let vars = List.map (fun (_,_,v,_) -> v) es in
         let min_v = List.fold_left min max_int vars in
@@ -1321,7 +1341,11 @@ let sort_schedules_by_density_and_var_uses (schedules : (int * schedule_with_den
           k (if broken then "yes" else "no") secondary_summary (List.length es)));
         List.iter (fun ((steps_ds, sort), density, num_var_uses, id) ->
           Feedback.msg_notice
-            (str (Printf.sprintf "  id=%d density=%s var_uses=%d\n" id (density_to_string density) num_var_uses)
+            (str (Printf.sprintf "  id=%d density=%s var_uses=%d%s\n"
+               id (density_to_string density) num_var_uses
+               (if policy = RankDensityCountsThenVars then
+                  " counts=" ^ ScheduleRanking.histogram_to_string (counts id)
+                else ""))
              ++ str (schedule_with_densities_to_string (steps_ds, sort)))) es
       in
       List.iter show_group (if limit = 0 then tie_groups else take_local limit tie_groups)

@@ -1,21 +1,35 @@
 open Quickchick_plugin.ScheduleRanking
 
-let policies = [RankDensityThenVars; RankDensityOnly; RankVarsThenDensity; RankVarsOnly]
+let policies =
+  [RankDensityThenVars; RankDensityCountsThenVars; RankDensityOnly;
+   RankVarsThenDensity; RankVarsOnly]
 
-(* Independent lexicographic model of the public ranking contract. *)
+(* Independent lexicographic model of the completed-schedule ranking. *)
 let key prefer_dense policy f =
   let density = if prefer_dense then -f.density_rank else f.density_rank in
+  let c, b, n, p, t = f.density_counts in
+  let counts = if prefer_dense then [c;b;n;p;t] else [t;p;n;b;c] in
   match policy with
-  | RankDensityThenVars -> density, f.variable_uses, f.candidate_id
-  | RankDensityOnly -> density, 0, f.candidate_id
-  | RankVarsThenDensity -> f.variable_uses, density, f.candidate_id
-  | RankVarsOnly -> f.variable_uses, 0, f.candidate_id
+  | RankDensityThenVars -> [density; f.variable_uses; f.candidate_id]
+  | RankDensityCountsThenVars -> [density] @ counts @ [f.variable_uses; f.candidate_id]
+  | RankDensityOnly -> [density; f.candidate_id]
+  | RankVarsThenDensity -> [f.variable_uses; density; f.candidate_id]
+  | RankVarsOnly -> [f.variable_uses; f.candidate_id]
 
 let () =
+  assert (histogram_of_ranks [0;0;3;4;3] = (2,0,0,2,1));
+  assert (histogram_to_string (histogram_of_ranks [0;0;3;4;3]) = "2,0,0,2,1");
+  assert (try ignore (histogram_of_ranks [5]); false with Invalid_argument _ -> true);
+  let histograms =
+    List.map histogram_of_ranks
+      [[]; [0]; [0;3]; [0;3;3]; [0;0;3]; [0;0;3;4];
+       [4]; [4;3]; [4;3;3]; [4;4;3]] in
   let fixtures = List.concat_map (fun density_rank ->
-    List.concat_map (fun variable_uses ->
-      List.init 3 (fun candidate_id -> {density_rank; variable_uses; candidate_id}))
-      [0;1;2;3]) [0;1;2;3;4] in
+    List.concat_map (fun density_counts ->
+      List.concat_map (fun variable_uses ->
+        List.init 3 (fun candidate_id ->
+          {density_rank; density_counts; variable_uses; candidate_id}))
+        [0;1;2;3]) histograms) [0;1;2;3;4] in
   List.iter (fun policy ->
     assert (of_string (to_string policy) = policy);
     List.iter (fun prefer_dense ->
@@ -29,7 +43,9 @@ let () =
       assert (ordered = List.sort (fun a b -> Stdlib.compare
         (key prefer_dense policy a) (key prefer_dense policy b)) unique)) [true;false]) policies;
   List.iter (fun (name, expected) -> assert (of_string name = expected))
-    ["density-first", RankDensityThenVars; "density-only", RankDensityOnly;
+    ["density-first", RankDensityThenVars;
+     "density-counts-then-vars", RankDensityCountsThenVars;
+     "density-only", RankDensityOnly;
      "var_density", RankVarsThenDensity; "vars_density", RankVarsThenDensity;
      "vars-first", RankVarsThenDensity; "var_only", RankVarsOnly;
      "vars-only", RankVarsOnly; "unknown", RankDensityThenVars]
