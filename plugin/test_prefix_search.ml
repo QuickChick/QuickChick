@@ -419,6 +419,14 @@ let () =
     unconstrained = [] && check [] (source_order schedule) in
   let maximal_candidates = List.filter maximal_simple complete in
   let maximal_reduced = List.filter maximal_simple reduced in
+  let maximal_search = N.possible_schedules_with_advanced_pruning
+    ~max_schedules:100000 ~reduce_orderings:false ~maximal_outputs:true
+    variables hypotheses [] rec_call N.D_Gen in
+  let maximal_por = N.possible_schedules_with_advanced_pruning
+    ~max_schedules:100000 ~maximal_outputs:true
+    variables hypotheses [] rec_call N.D_Gen in
+  assert (maximal_search = maximal_candidates);
+  assert (maximal_por = maximal_reduced);
   Printf.printf "maximal direct-variable candidates=%d classes=%d\n"
     (List.length maximal_candidates)
     (List.length (unique_owners maximal_candidates));
@@ -447,6 +455,11 @@ let () =
       [v "x"] rec_call N.D_Check in
   let orders = List.map source_order fixed_checks |> List.sort_uniq compare in
   assert (orders = [["F"; "G"]; ["G"; "F"]]);
+  let fixed_maximal = N.possible_schedules_with_advanced_pruning
+      ~reduce_orderings:false ~maximal_outputs:true
+      [v "x", nat] [relation "F" ["x"]; relation "G" ["x"]]
+      [v "x"] rec_call N.D_Check in
+  assert (List.map source_order fixed_maximal |> List.sort_uniq compare = orders);
   let independent_names =
     List.init 10 (fun i -> "I" ^ string_of_int i) in
   let independent_variables =
@@ -472,6 +485,13 @@ let () =
   let typed_orders = List.map source_order typed_dependency
     |> List.sort_uniq compare in
   assert (typed_orders = [["H"; "J"]; ["J"; "H"]]);
+  let typed_dependency_maximal = N.possible_schedules_with_advanced_pruning
+      ~maximal_outputs:true
+      [v "x", x_type; v "y", nat]
+      [relation "H" ["x"]; relation "J" ["y"]]
+      [] rec_call N.D_Gen in
+  assert (List.map source_order typed_dependency_maximal
+    |> List.sort_uniq compare = typed_orders);
   let nested = N.DTyCtr (N.ty_ctr_of_string "K", [
     N.DCtr (N.constructor_of_string "Wrap", [N.DTyVar (v "x")])]) in
   let nonplain = N.possible_schedules_with_advanced_pruning

@@ -1,8 +1,10 @@
 # Schedule ranking and constructor weights
 
-Complete schedules are ranked separately from candidate generation. The
-`ScheduleRanking` OCaml module compares measured features; the scheduler collects
-those features. This boundary permits testing ranking without running derivation.
+Complete schedules are ranked by the `ScheduleRanking` OCaml module. The active
+scheduler constructs candidates lazily and chooses every eligible unbound
+output of a selected positive hypothesis. It also removes redundant orders of
+independent plain hypotheses. `QC_SCHEDULE_POR=0` disables that order reduction
+for diagnosis; it does not change output selection.
 
 The existing `QC_SCHEDULE_RANKING` environment setting is preserved:
 
@@ -28,22 +30,21 @@ These are existing diagnostic environment settings, not new Rocq options.
 
 ## Search limits
 
-The earlier search uses a different score: fewer checks, then shorter schedules,
-then fewer unconstrained instantiations. It prunes with lower bounds and an
-environment memo before final ranking. The current path also takes at most 1000
-candidates before deduplication. Final ranking therefore selects among the
-surviving candidates; it is not a guarantee of the global optimum under any of
-the four ranking policies.
+The active search branches over the next hypothesis, commits its typed steps,
+and skips orders that differ only by a certified independent swap. It does not
+yet use a score bound or an environment-dominance memo. It stops after 1000
+candidates before deduplication and warns on truncation. Final ranking selects
+among those candidates, so a capped run has no global-optimality guarantee.
+Order reduction can change candidate identifiers; indexed alternatives refer
+to the reduced candidate list.
 
-The comparison refactor preserves this behavior. A complete modular scoring
-interface must give each selected policy an admissible bound: the bound at a
-search node must be no worse than every reachable completed score. Custom
-policies should retain score-based pruning through that contract. Dominance
-memoization needs a separate condition; a lexicographically better prefix need
-not remain better under a common extension containing maxima. Dependency and
-validity checks remain independent. Small exhaustive searches provide a test
-oracle for bounds, rather than a default execution mode for custom policies.
-A candidate cap must remain visible in any optimality claim.
+Policy-driven branch-and-bound is still being developed. A policy bound must
+be no worse than every completed descendant of the actual typed search node.
+The internal prefix-pruning callback is exercised by a narrow variable-use
+test, but public derivation does not use it. Recursive dependency scores need
+stable full-mode keys before density can safely prune. Custom policies should
+retain score-based pruning through the same admissibility contract. Small
+exhaustive searches serve as the validation oracle.
 
 At pinned Specimen revision `121cf234`, scoring bundles explicitly associate
 comparison and aggregation with pruning strategy, including a no-pruning option.

@@ -3280,6 +3280,7 @@ let empty_prefix_search_stats () =
    this whole state without assuming that earlier steps will be rebuilt. *)
 let enum_schedules_prefix_classified
     ~(reduce_orderings : bool)
+    ~(maximal_outputs : bool)
     ~(stats : prefix_search_stats option)
     ~(on_prefix : (((int * var list list) list -> bool ->
       (int * rocq_constr * bool) pre_schedule_step list -> unit) option))
@@ -3375,7 +3376,10 @@ let enum_schedules_prefix_classified
               let rest = subsets tail in
               rest @ List.map (fun selected -> group :: selected) rest
           in
-          let output_choices = if polarity then subsets all_unbound else [[]] in
+          let output_choices =
+            if not polarity then [[]]
+            else if maximal_outputs then [all_unbound]
+            else subsets all_unbound in
           let branch =
             List.to_seq output_choices
             |> Seq.filter_map (fun out ->
@@ -3768,6 +3772,7 @@ let possible_schedules_with_legacy_pruning ?(max_schedules=100000) (variables : 
 
 let possible_schedules_with_advanced_pruning ?(max_schedules=100000)
     ?(reduce_orderings=true)
+    ?(maximal_outputs=false)
     ?stats
     ?on_prefix
     ?should_prune_prefix
@@ -3811,7 +3816,7 @@ let possible_schedules_with_advanced_pruning ?(max_schedules=100000)
     let converted = pre_to_schedule pre_steps in
     prune path (normalize_schedule_advanced converted)) should_prune_prefix in
   let candidate_stream =
-    enum_schedules_prefix_classified ~reduce_orderings ~stats
+    enum_schedules_prefix_classified ~reduce_orderings ~maximal_outputs ~stats
       ~on_prefix:observe_prefix ~should_prune:prune_prefix
       variables type_vars classified fixed
     |> Seq.map pre_to_schedule
@@ -3828,6 +3833,7 @@ let possible_schedules_with_advanced_pruning ?(max_schedules=100000)
 
 let possible_schedules variables hypotheses fixed rec_call ds =
   possible_schedules_with_advanced_pruning ~max_schedules:1000
+    ~maximal_outputs:true
     ~reduce_orderings:(ScheduleRanking.preserves_independent_swaps
       (ScheduleRanking.current ()))
     variables hypotheses fixed rec_call ds

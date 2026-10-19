@@ -146,6 +146,7 @@ val empty_prefix_search_stats : unit -> prefix_search_stats
 (* Internal search probes. should_prune_prefix is for certified policy bounds;
    callers must establish that it holds for every descendant of the prefix. *)
 val possible_schedules_with_advanced_pruning : ?max_schedules:int -> ?reduce_orderings:bool ->
+  ?maximal_outputs:bool ->
   ?stats:prefix_search_stats ->
   ?on_prefix:((int * var list list) list -> bool -> schedule_step list -> unit) ->
   ?should_prune_prefix:((int * var list list) list -> schedule_step list -> bool) ->
