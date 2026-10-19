@@ -3281,6 +3281,8 @@ let empty_prefix_search_stats () =
 let enum_schedules_prefix_classified
     ~(reduce_orderings : bool)
     ~(stats : prefix_search_stats option)
+    ~(on_prefix : (((int * var list list) list -> bool ->
+      (int * rocq_constr * bool) pre_schedule_step list -> unit) option))
     (variables : (var * rocq_type) list)
     (matchable_vars : var list)
     (hypotheses : (int * hypothesis_classification) list)
@@ -3321,9 +3323,15 @@ let enum_schedules_prefix_classified
         stats.completed_prefixes <- stats.completed_prefixes + 1) stats;
       let unbound = List.filter (fun v ->
         not (VS.mem v state.prefix_env_set)) var_names in
-      Seq.return (List.rev state.prefix_steps_rev @
-        prune_empties [PS_InstVars unbound]) ()
+      let complete = List.rev state.prefix_steps_rev @
+        prune_empties [PS_InstVars unbound] in
+      Option.iter (fun observe ->
+        observe (List.rev state.prefix_decisions_rev) true complete) on_prefix;
+      Seq.return complete ()
     | _ ->
+      Option.iter (fun observe ->
+        observe (List.rev state.prefix_decisions_rev) false
+          (List.rev state.prefix_steps_rev)) on_prefix;
       (* A hypothesis commuting with every remaining one can be moved to the
          front of any completion. Force the first such hypothesis, instead of
          visiting every subset of independent prefixes as a sleep set would. *)
@@ -3754,6 +3762,7 @@ let possible_schedules_with_legacy_pruning ?(max_schedules=100000) (variables : 
 let possible_schedules_with_advanced_pruning ?(max_schedules=100000)
     ?(reduce_orderings=true)
     ?stats
+    ?on_prefix
     (variables : (var * rocq_type) list)
     (hypotheses : rocq_constr list)
     (fixed : var list)
@@ -3785,8 +3794,14 @@ let possible_schedules_with_advanced_pruning ?(max_schedules=100000)
     | D_Gen | D_Thm -> PS_G in
   let pre_to_schedule =
     pre_to_schedule_advanced variables type_vars rec_call ds prod_sort in
+  (* Observation is test-only. Conversion is stepwise; appending to an open
+     unconstrained block preserves the order of its already sorted members. *)
+  let observe_prefix = Option.map (fun observe path terminal pre_steps ->
+    let converted = pre_to_schedule pre_steps in
+    observe path terminal (normalize_schedule_advanced converted)) on_prefix in
   let candidate_stream =
     enum_schedules_prefix_classified ~reduce_orderings ~stats
+      ~on_prefix:observe_prefix
       variables type_vars classified fixed
     |> Seq.map pre_to_schedule
     |> Seq.map normalize_schedule_advanced in

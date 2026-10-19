@@ -81,16 +81,59 @@ let same_variable_uses_per_signature key schedules =
       |> List.sort_uniq compare in
     List.length scores = 1) keys
 
+let check_prefix_use_bounds observations =
+  let is_prefix prefix path =
+    let rec loop prefix path = match prefix, path with
+      | [], _ -> true
+      | x :: xs, y :: ys when x = y -> loop xs ys
+      | _ -> false in
+    loop prefix path in
+  let leaves = List.filter (fun (_, terminal, _) -> terminal) observations in
+  let first_leaf_score =
+    match List.find_opt (fun (_, terminal, _) -> terminal)
+      (List.rev observations) with
+    | Some (_, _, score) -> score
+    | None -> assert false in
+  let checked = ref 0 in
+  let tight = ref 0 in
+  let positive = ref 0 in
+  let beats_first = ref 0 in
+  let total_gap = ref 0 in
+  List.iter (fun (path, terminal, bound) ->
+    if not terminal then begin
+      let descendants = List.filter (fun (leaf_path, _, _) ->
+        is_prefix path leaf_path) leaves in
+      assert (descendants <> []);
+      incr checked;
+      if bound > 0 then incr positive;
+      let minimum = List.fold_left (fun acc (_, _, completed_uses) ->
+        min acc completed_uses) max_int descendants in
+      if bound = minimum then incr tight;
+      if bound > first_leaf_score then incr beats_first;
+      total_gap := !total_gap + minimum - bound;
+      List.iter (fun (_, _, completed_uses) ->
+        assert (bound <= completed_uses)) descendants
+    end) observations;
+  !checked, !tight, !positive, !beats_first, !total_gap,
+  first_leaf_score
+
 let test_small_footprints nat rec_call =
   let variables = List.map (fun x -> (v x, nat)) ["x"; "y"; "z"] in
   let vars_of_mask mask =
     List.filteri (fun i _ -> mask land (1 lsl i) <> 0) ["x"; "y"; "z"] in
-  let check_case footprints =
+  let check_case ?(verify_bounds=false) footprints =
     let hypotheses = List.map (fun (name, vars) ->
       relation name vars) footprints in
+    let observations = ref [] in
+    let observer = if verify_bounds then
+      Some (fun path terminal stable -> observations :=
+        (path, terminal, variable_uses stable) :: !observations)
+      else None in
     let complete = N.possible_schedules_with_advanced_pruning
       ~max_schedules:100000 ~reduce_orderings:false
+      ?on_prefix:observer
       variables hypotheses [] rec_call N.D_Gen in
+    if verify_bounds then ignore (check_prefix_use_bounds !observations);
     let reduced = N.possible_schedules_with_advanced_pruning
       ~max_schedules:100000 variables hypotheses [] rec_call N.D_Gen in
     assert (quotient_signatures_for footprints complete =
@@ -105,7 +148,7 @@ let test_small_footprints nat rec_call =
       for c = 1 to 7 do
         let footprints = ["A", vars_of_mask a; "B", vars_of_mask b;
                           "C", vars_of_mask c] in
-        check_case footprints;
+        check_case ~verify_bounds:true footprints;
         incr cases
       done
     done
@@ -137,13 +180,38 @@ let () =
   let variables = List.map (fun x -> (v x, nat)) ["x"; "y"; "z"] in
   let rec_call = (N.ty_ctr_of_string "Never", []) in
   let complete_stats = N.empty_prefix_search_stats () in
+  let complete_observations = ref [] in
   let complete = N.possible_schedules_with_advanced_pruning
       ~max_schedules:100000 ~reduce_orderings:false ~stats:complete_stats
+      ~on_prefix:(fun path terminal stable ->
+        complete_observations :=
+          (path, terminal, variable_uses stable) :: !complete_observations)
       variables hypotheses [] rec_call N.D_Gen in
   let reduced_stats = N.empty_prefix_search_stats () in
+  let reduced_observations = ref [] in
   let reduced = N.possible_schedules_with_advanced_pruning
       ~max_schedules:100000 ~stats:reduced_stats
+      ~on_prefix:(fun path terminal stable ->
+        reduced_observations :=
+          (path, terminal, variable_uses stable) :: !reduced_observations)
       variables hypotheses [] rec_call N.D_Gen in
+  let all_bound_counts = check_prefix_use_bounds !complete_observations in
+  let por_bound_counts = check_prefix_use_bounds !reduced_observations in
+  let show_counts label (checked, tight, positive, beats_first, total_gap, first_leaf) =
+    Printf.printf "%s variable-use bounds: checked=%d tight=%d positive=%d first=%d prunable=%d mean-gap=%.2f\n"
+      label checked tight positive first_leaf beats_first
+      (float_of_int total_gap /. float_of_int checked) in
+  show_counts "exhaustive" all_bound_counts;
+  show_counts "POR" por_bound_counts;
+  let leaf_uses observations =
+    List.filter_map (fun (_, terminal, score) ->
+      if terminal then Some score else None) observations
+    |> List.sort_uniq compare in
+  Printf.printf "completed variable-use values: exhaustive=%s POR=%s\n"
+    (String.concat "," (List.map string_of_int
+      (leaf_uses !complete_observations)))
+    (String.concat "," (List.map string_of_int
+      (leaf_uses !reduced_observations)));
   let wanted = ["B"; "E"; "C"; "A"; "D"] in
   let legacy = N.possible_schedules_with_legacy_pruning
       ~max_schedules:100000 variables hypotheses [] rec_call N.D_Gen in
@@ -197,6 +265,27 @@ let () =
   let canonical_candidates =
     List.filter (fun schedule ->
       List.mem (source_order schedule) canonical_orders) complete in
+  let maximal_simple schedule =
+    let modes, unconstrained = mode_signature schedule in
+    let rec check bound = function
+      | [] -> true
+      | name :: rest ->
+        let expected = List.filter (fun var -> not (List.mem var bound))
+          (match name with
+           | "A" -> ["x"] | "B" -> ["y"] | "C" -> ["x"; "z"]
+           | "D" -> ["x"; "y"] | "E" -> ["y"; "z"]
+           | _ -> []) |> List.sort compare in
+        let actual = List.assoc name modes in
+        expected = actual && check (actual @ bound) rest in
+    unconstrained = [] && check [] (source_order schedule) in
+  let maximal_candidates = List.filter maximal_simple complete in
+  let maximal_reduced = List.filter maximal_simple reduced in
+  Printf.printf "maximal direct-variable candidates=%d classes=%d\n"
+    (List.length maximal_candidates)
+    (List.length (unique_owners maximal_candidates));
+  assert (List.length maximal_candidates = 120);
+  assert (List.length maximal_reduced = 16);
+  assert (List.length (unique_owners maximal_candidates) = 16);
   Printf.printf "distinct orders=%d, candidates/class min=%d max=%d, orders/class min=%d max=%d\n"
     (List.length (distinct_orders complete))
     (List.fold_left min max_int class_sizes)
@@ -205,6 +294,8 @@ let () =
     (List.fold_left max 0 order_class_sizes);
   Printf.printf "canonical-order candidates=%d\n"
     (List.length canonical_candidates);
+  Printf.printf "maximal-output candidates=%d exhaustive, %d POR\n"
+    (List.length maximal_candidates) (List.length maximal_reduced);
   Printf.printf "sleep-set candidates=%d, distinct orders=%d\n"
     (List.length reduced)
     (List.length (distinct_orders reduced));
