@@ -422,8 +422,9 @@ let () =
   let maximal_search = N.possible_schedules_with_advanced_pruning
     ~max_schedules:100000 ~reduce_orderings:false ~maximal_outputs:true
     variables hypotheses [] rec_call N.D_Gen in
+  let maximal_stats = N.empty_prefix_search_stats () in
   let maximal_por = N.possible_schedules_with_advanced_pruning
-    ~max_schedules:100000 ~maximal_outputs:true
+    ~max_schedules:100000 ~maximal_outputs:true ~stats:maximal_stats
     variables hypotheses [] rec_call N.D_Gen in
   assert (maximal_search = maximal_candidates);
   assert (maximal_por = maximal_reduced);
@@ -443,6 +444,9 @@ let () =
     (List.length canonical_candidates);
   Printf.printf "maximal-output candidates=%d exhaustive, %d POR\n"
     (List.length maximal_candidates) (List.length maximal_reduced);
+  Printf.printf "maximal-output POR work: nodes=%d leaves=%d modes=%d\n"
+    maximal_stats.visited_nodes maximal_stats.completed_prefixes
+    maximal_stats.processed_mode_choices;
   Printf.printf "sleep-set candidates=%d, distinct orders=%d\n"
     (List.length reduced)
     (List.length (distinct_orders reduced));
