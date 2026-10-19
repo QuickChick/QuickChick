@@ -447,6 +447,53 @@ let () =
   Printf.printf "maximal-output POR work: nodes=%d leaves=%d modes=%d\n"
     maximal_stats.visited_nodes maximal_stats.completed_prefixes
     maximal_stats.processed_mode_choices;
+  (* Model the checker's max-aggregated density cost with mode-dependent
+     dependency scores. D is costly only when asked to produce. This
+     checks the bound against real typed search descendants, without claiming
+     that these synthetic dependency costs are plugin memo results. *)
+  let mode_cost name outputs =
+    if name = "D" then
+      (match List.length outputs with 0 -> 0 | 1 -> 2 | _ -> 3)
+    else 0 in
+  let density_cost schedule =
+    let modes, _ = mode_signature schedule in
+    List.fold_left (fun worst (name, outputs) ->
+      max worst (mode_cost name outputs)) 0 modes in
+  let density_observations = ref [] in
+  let observed_maximal = N.possible_schedules_with_advanced_pruning
+    ~max_schedules:100000 ~maximal_outputs:true ~reduce_orderings:false
+    ~on_prefix:(fun path terminal schedule ->
+      density_observations :=
+        (path, terminal, density_cost schedule) :: !density_observations)
+    variables hypotheses [] rec_call N.D_Check in
+  assert (List.length observed_maximal = List.length maximal_search);
+  ignore (check_prefix_use_bounds !density_observations);
+  let exact_optimum = List.fold_left (fun best schedule ->
+    min best (density_cost schedule)) max_int observed_maximal in
+  let density_incumbent = ref None in
+  let density_stats = N.empty_prefix_search_stats () in
+  let density_bounded = N.possible_schedules_with_advanced_pruning
+    ~max_schedules:100000 ~maximal_outputs:true ~stats:density_stats
+    ~on_prefix:(fun _ terminal schedule ->
+      if terminal then
+        let cost = density_cost schedule in
+        density_incumbent := Some (match !density_incumbent with
+          | None -> cost | Some old -> min old cost))
+    ~should_prune_prefix:(fun _ schedule ->
+      match !density_incumbent with
+      | None -> false
+      | Some best -> best < density_cost schedule)
+    variables hypotheses [] rec_call N.D_Check in
+  assert (!density_incumbent = Some exact_optimum);
+  assert (density_stats.visited_nodes < maximal_stats.visited_nodes);
+  assert (density_stats.completed_prefixes < maximal_stats.completed_prefixes);
+  let optimal_modes schedules =
+    List.filter (fun schedule -> density_cost schedule = exact_optimum) schedules
+    |> List.map mode_signature |> List.sort_uniq compare in
+  assert (optimal_modes maximal_por = optimal_modes density_bounded);
+  Printf.printf "maximal-output checker density model: optimum=%d bounded nodes=%d leaves=%d cuts=%d\n"
+    exact_optimum density_stats.visited_nodes density_stats.completed_prefixes
+    (List.length maximal_por - List.length density_bounded);
   Printf.printf "sleep-set candidates=%d, distinct orders=%d\n"
     (List.length reduced)
     (List.length (distinct_orders reduced));
