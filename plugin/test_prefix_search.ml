@@ -44,6 +44,32 @@ let () =
     |> List.sort_uniq compare in
   assert (List.length (unique_owners complete) = 16);
   assert (List.length (unique_owners legacy) < 16);
+  let distinct_orders schedules =
+    List.map source_order schedules |> List.sort_uniq compare in
+  let class_sizes =
+    List.map (fun key ->
+      List.length (List.filter (fun schedule ->
+        owner_key (source_order schedule) = key) complete))
+      (unique_owners complete) in
+  let order_class_sizes =
+    List.map (fun key ->
+      List.length (List.filter (fun order -> owner_key order = key)
+        (distinct_orders complete))) (unique_owners complete) in
+  let canonical_orders =
+    List.map (fun key ->
+      List.find (fun order -> owner_key order = key)
+        (distinct_orders complete)) (unique_owners complete) in
+  let canonical_candidates =
+    List.filter (fun schedule ->
+      List.mem (source_order schedule) canonical_orders) complete in
+  Printf.printf "distinct orders=%d, candidates/class min=%d max=%d, orders/class min=%d max=%d\n"
+    (List.length (distinct_orders complete))
+    (List.fold_left min max_int class_sizes)
+    (List.fold_left max 0 class_sizes)
+    (List.fold_left min max_int order_class_sizes)
+    (List.fold_left max 0 order_class_sizes);
+  Printf.printf "canonical-order candidates=%d\n"
+    (List.length canonical_candidates);
   Printf.printf "typed five-hypothesis schedule retained (%d candidates, %d owner maps; legacy %d)\n"
     (List.length complete) (List.length (unique_owners complete))
     (List.length (unique_owners legacy));
