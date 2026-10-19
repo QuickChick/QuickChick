@@ -860,8 +860,18 @@ module InductiveScheduleKeyMap = Map.Make(struct
     if c = 0 then Stdlib.compare constrained constrained' else c
 end)
 
+(* A recursive lookup deliberately sees the seed score used by the existing
+   heuristic. Keep that value marked as provisional: it is not a certified
+   bound for descendants of a search node. *)
+type inductive_density_entry =
+  | DensityInProgress of (inductive_schedule * rule_density)
+  | DensityDone of (inductive_schedule * rule_density)
+
+let inductive_density_value = function
+  | DensityInProgress value | DensityDone value -> value
+
 let density_inductive_memo :
-  (inductive_schedule * rule_density) InductiveScheduleKeyMap.t ref =
+  inductive_density_entry InductiveScheduleKeyMap.t ref =
   ref InductiveScheduleKeyMap.empty
 
 (*Three heuristics detecting difficult to generate rules*)
@@ -1682,7 +1692,7 @@ and constructor_best_valid_schedule (ind_name : ty_ctr) (ctr : rocq_ctr) (result
 
 and inductive_best_valid_schedule (rel : rocq_relation) (output_idxs : int list) (ds : derive_sort) (opt : bool) : inductive_schedule * rule_density =
   let (ind_name, params, ctrs, result_typ) = rel in
-  if InductiveScheduleKeyMap.mem (ind_name, output_idxs, ds, opt) !density_inductive_memo then InductiveScheduleKeyMap.find (ind_name, output_idxs, ds, opt) !density_inductive_memo
+  if InductiveScheduleKeyMap.mem (ind_name, output_idxs, ds, opt) !density_inductive_memo then inductive_density_value (InductiveScheduleKeyMap.find (ind_name, output_idxs, ds, opt) !density_inductive_memo)
   else begin
   Error.msg_debug (str "Inductive name: " 
   ++ str (ty_ctr_to_string ind_name)
@@ -1753,7 +1763,7 @@ and inductive_best_valid_schedule (rel : rocq_relation) (output_idxs : int list)
 
   Error.msg_debug (str "Parameters classes are: " ++ str (String.concat ", " (List.map (fun (p,cs) -> ty_param_to_string p ^ ": " ^ String.concat ", " (List.map mexp_to_string cs)) parameters_classes)) ++ fnl ());
 
-  density_inductive_memo := InductiveScheduleKeyMap.add (ind_name, output_idxs, ds, opt) ((schedule_name,[],parameters_classes,[],[]), init_density) !density_inductive_memo;
+  density_inductive_memo := InductiveScheduleKeyMap.add (ind_name, output_idxs, ds, opt) (DensityInProgress ((schedule_name,[],parameters_classes,[],[]), init_density)) !density_inductive_memo;
 
   let constructor_schedules_with_density = List.filter_map (fun ctr -> 
     match constructor_best_valid_schedule ind_name ctr result_vars output_vars ds opt with
@@ -1822,7 +1832,7 @@ and inductive_best_valid_schedule (rel : rocq_relation) (output_idxs : int list)
                                                   ^ " has overall density: " 
                                                   ^ (density_to_string overall_density)) ++ fnl ()));
 
-  density_inductive_memo := InductiveScheduleKeyMap.add (ind_name, output_idxs, ds, opt) (inductive_schedule, overall_density) !density_inductive_memo;
+  density_inductive_memo := InductiveScheduleKeyMap.add (ind_name, output_idxs, ds, opt) (DensityDone (inductive_schedule, overall_density)) !density_inductive_memo;
   Error.msg_debug (str (Printf.sprintf "%s: %s Done, Density: %s\n" (schedule_name) (String.concat ", " (List.map string_of_int output_idxs)) (density_to_string overall_density))); 
   inductive_schedule, overall_density)
 end
@@ -1892,7 +1902,7 @@ let collect_inductive_dependents (instance : rocq_constr * int list * derive_sor
   let (ind_instance, output_idxs, ds, opt) = instance in
   match ind_instance with
   | DTyCtr (ind_name,_) -> 
-    let (inductive_schd, density) = InductiveScheduleKeyMap.find (ind_name, output_idxs, ds, opt) !density_inductive_memo in
+    let (inductive_schd, density) = inductive_density_value (InductiveScheduleKeyMap.find (ind_name, output_idxs, ds, opt) !density_inductive_memo) in
     inductive_schedule_dependents inductive_schd
   | DTyParam param -> []
     (* failwith "collect_inductive_dependents: Need to handle instances of parameter type variables, like A in list A" *)
@@ -1910,7 +1920,7 @@ let lookup_and_remove_inductive_schedule (instance : rocq_constr * int list * de
   let (ind_instance, output_idxs, ds, opt) = instance in
   match ind_instance with
   | DTyCtr (ind_name,_)  | DNot (DTyCtr (ind_name, _)) ->
-    (try (let (inductive_schd, density) = InductiveScheduleKeyMap.find (ind_name, output_idxs, ds, opt) !density_inductive_memo in
+    (try (let (inductive_schd, density) = inductive_density_value (InductiveScheduleKeyMap.find (ind_name, output_idxs, ds, opt) !density_inductive_memo) in
     if to_remove then density_inductive_memo := InductiveScheduleKeyMap.remove (ind_name, output_idxs, ds, opt) !density_inductive_memo;
     Some (inductive_schd, ds, opt)) with Not_found -> None)
   | DTyVar v -> failwith "lookup_and_remove_inductive_schedule: Need to handle instances of parameter type variables, like A in list A"
@@ -2030,7 +2040,7 @@ module InductiveSchedMap = Map.Make(struct type t = inductive_schedule * derive_
 
 let dec_eq_sched_phony = ("DecOpt_eq_III", [], [], [(([],CheckerSchedule),[])], [(([],CheckerSchedule),[])])
    
-let init_density_inductive_memo = InductiveScheduleKeyMap.add (ty_ctr_of_string "Coq.Init.Logic.eq", [], D_Check, true) (dec_eq_sched_phony, Checking) InductiveScheduleKeyMap.empty
+let init_density_inductive_memo = InductiveScheduleKeyMap.add (ty_ctr_of_string "Coq.Init.Logic.eq", [], D_Check, true) (DensityDone (dec_eq_sched_phony, Checking)) InductiveScheduleKeyMap.empty
 
 let inductive_set_init = InductiveSchedSet.singleton (dec_eq_sched_phony, D_Check, false)
 
@@ -2381,9 +2391,12 @@ let tarjan_schedules_by_name (schedules : string list) inductive_dependency_map
     (let components = propagate_schedule_requirements (List.rev !components) in
      List.iter (List.iter (fun ((name,_,_,_,_) as schedule, ds, constrained) ->
        let ind, outputs, _, _ = parse_ind_schd_name name in
-       let density = match InductiveScheduleKeyMap.find_opt (ind, outputs, ds, constrained) !density_inductive_memo with
-         | Some (_, density) -> density | None -> Checking in
-       density_inductive_memo := InductiveScheduleKeyMap.add (ind, outputs, ds, constrained) (schedule, density) !density_inductive_memo)) components;
+       let entry = match InductiveScheduleKeyMap.find_opt (ind, outputs, ds, constrained) !density_inductive_memo with
+         | Some (DensityDone (_, density)) -> DensityDone (schedule, density)
+         | Some (DensityInProgress (_, density)) ->
+           DensityInProgress (schedule, density)
+         | None -> DensityDone (schedule, Checking) in
+       density_inductive_memo := InductiveScheduleKeyMap.add (ind, outputs, ds, constrained) entry !density_inductive_memo)) components;
      components)
 
 let valid_schedules =
@@ -2758,7 +2771,7 @@ let quickchick_it size idx =
 
         (* Register theorem as a phony inductive schedule *)
         let phony_theorem_ind_schd = ("theorem", [], [],[selected_schedule,[]],[]) in
-        density_inductive_memo := InductiveScheduleKeyMap.add (ty_ctr_of_string "theorem", [], D_Thm, true) (phony_theorem_ind_schd, Checking) !density_inductive_memo;
+        density_inductive_memo := InductiveScheduleKeyMap.add (ty_ctr_of_string "theorem", [], D_Thm, true) (DensityDone (phony_theorem_ind_schd, Checking)) !density_inductive_memo;
 
         density_inductive_memo := InductiveScheduleKeyMap.remove (ty_ctr_of_string "eq", [], D_Check, true) !density_inductive_memo;
         (* let (unconstrained_inductives, mut_used_inductives) = collect_all_used_inductives_theorem theorem_schedule in *)
