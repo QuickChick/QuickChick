@@ -3283,6 +3283,8 @@ let enum_schedules_prefix_classified
     ~(stats : prefix_search_stats option)
     ~(on_prefix : (((int * var list list) list -> bool ->
       (int * rocq_constr * bool) pre_schedule_step list -> unit) option))
+    ~(should_prune : (((int * var list list) list ->
+      (int * rocq_constr * bool) pre_schedule_step list -> bool) option))
     (variables : (var * rocq_type) list)
     (matchable_vars : var list)
     (hypotheses : (int * hypothesis_classification) list)
@@ -3332,6 +3334,11 @@ let enum_schedules_prefix_classified
       Option.iter (fun observe ->
         observe (List.rev state.prefix_decisions_rev) false
           (List.rev state.prefix_steps_rev)) on_prefix;
+      if (match should_prune with
+          | None -> false
+          | Some prune ->
+            prune (List.rev state.prefix_decisions_rev)
+              (List.rev state.prefix_steps_rev)) then Seq.empty () else
       (* A hypothesis commuting with every remaining one can be moved to the
          front of any completion. Force the first such hypothesis, instead of
          visiting every subset of independent prefixes as a sleep set would. *)
@@ -3763,6 +3770,7 @@ let possible_schedules_with_advanced_pruning ?(max_schedules=100000)
     ?(reduce_orderings=true)
     ?stats
     ?on_prefix
+    ?should_prune_prefix
     (variables : (var * rocq_type) list)
     (hypotheses : rocq_constr list)
     (fixed : var list)
@@ -3799,9 +3807,12 @@ let possible_schedules_with_advanced_pruning ?(max_schedules=100000)
   let observe_prefix = Option.map (fun observe path terminal pre_steps ->
     let converted = pre_to_schedule pre_steps in
     observe path terminal (normalize_schedule_advanced converted)) on_prefix in
+  let prune_prefix = Option.map (fun prune path pre_steps ->
+    let converted = pre_to_schedule pre_steps in
+    prune path (normalize_schedule_advanced converted)) should_prune_prefix in
   let candidate_stream =
     enum_schedules_prefix_classified ~reduce_orderings ~stats
-      ~on_prefix:observe_prefix
+      ~on_prefix:observe_prefix ~should_prune:prune_prefix
       variables type_vars classified fixed
     |> Seq.map pre_to_schedule
     |> Seq.map normalize_schedule_advanced in

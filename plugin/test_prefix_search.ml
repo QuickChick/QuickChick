@@ -40,15 +40,35 @@ let quotient_signatures schedules =
     owner_key (source_order schedule), mode_signature schedule) schedules
   |> List.sort_uniq compare
 
+let owner_key_for footprints order =
+  List.map (fun variable ->
+    List.find_opt (fun name ->
+      List.mem variable (List.assoc name footprints)) order)
+    ["x"; "y"; "z"]
+
 let quotient_signatures_for footprints schedules =
-  let owner_key order =
-    List.map (fun variable ->
-      List.find_opt (fun name ->
-        List.mem variable (List.assoc name footprints)) order)
-      ["x"; "y"; "z"] in
   List.map (fun schedule ->
-    owner_key (source_order schedule), mode_signature schedule) schedules
+    owner_key_for footprints (source_order schedule), mode_signature schedule) schedules
   |> List.sort_uniq compare
+
+let canonical_order_for_key footprints key =
+  let names = List.map fst footprints in
+  let edges = List.concat_map (fun (variable, owner) ->
+    match owner with
+    | None -> []
+    | Some first ->
+      List.filter_map (fun (name, vars) ->
+        if name <> first && List.mem variable vars then
+          Some (first, name) else None) footprints)
+    (List.combine ["x"; "y"; "z"] key) in
+  let rec build prefix remaining = match remaining with
+    | [] -> List.rev prefix
+    | _ ->
+      let ready = List.find (fun name ->
+        not (List.exists (fun (before, after) ->
+          after = name && List.mem before remaining) edges)) remaining in
+      build (ready :: prefix) (List.filter ((<>) ready) remaining) in
+  build [] names
 
 let variable_uses schedule =
   let source_vars = function
@@ -71,6 +91,26 @@ let variable_uses schedule =
       here + visit (added @ bound) rest in
   visit [] schedule
 
+(* Test-only certificate for plain, nonrecursive relation calls whose arguments
+   are distinct direct variables. Source rewriting invalidates this shortcut. *)
+let direct_variable_use_bound footprints schedule =
+  let processed = source_order schedule in
+  let remaining = List.filter (fun (name, _) ->
+    not (List.mem name processed)) footprints in
+  let bound = List.concat_map (function
+    | N.S_UC (var, _, _) -> [N.var_to_string var]
+    | N.S_ST (outputs, _, _) ->
+      List.map (fun (var, _) -> N.var_to_string var) outputs
+    | N.S_Match (_, pat) -> List.map N.var_to_string (N.pat_vars pat)
+    | N.S_Let (var, _) -> [N.var_to_string var]
+    | N.S_Check _ -> []) schedule in
+  variable_uses schedule +
+  List.fold_left (fun total variable ->
+    let mentions = List.fold_left (fun count (_, vars) ->
+      if List.mem variable vars then count + 1 else count) 0 remaining in
+    total + if List.mem variable bound then mentions
+      else max 0 (mentions - 1)) 0 ["x"; "y"; "z"]
+
 let same_variable_uses_per_signature key schedules =
   let groups = List.map (fun schedule ->
     key schedule, variable_uses schedule) schedules in
@@ -81,13 +121,14 @@ let same_variable_uses_per_signature key schedules =
       |> List.sort_uniq compare in
     List.length scores = 1) keys
 
+let is_path_prefix prefix path =
+  let rec loop prefix path = match prefix, path with
+    | [], _ -> true
+    | x :: xs, y :: ys when x = y -> loop xs ys
+    | _ -> false in
+  loop prefix path
+
 let check_prefix_use_bounds observations =
-  let is_prefix prefix path =
-    let rec loop prefix path = match prefix, path with
-      | [], _ -> true
-      | x :: xs, y :: ys when x = y -> loop xs ys
-      | _ -> false in
-    loop prefix path in
   let leaves = List.filter (fun (_, terminal, _) -> terminal) observations in
   let first_leaf_score =
     match List.find_opt (fun (_, terminal, _) -> terminal)
@@ -102,7 +143,7 @@ let check_prefix_use_bounds observations =
   List.iter (fun (path, terminal, bound) ->
     if not terminal then begin
       let descendants = List.filter (fun (leaf_path, _, _) ->
-        is_prefix path leaf_path) leaves in
+        is_path_prefix path leaf_path) leaves in
       assert (descendants <> []);
       incr checked;
       if bound > 0 then incr positive;
@@ -117,6 +158,26 @@ let check_prefix_use_bounds observations =
   !checked, !tight, !positive, !beats_first, !total_gap,
   first_leaf_score
 
+let simulate_strict_pruning observations =
+  let incumbent = ref None in
+  let pruned_paths = ref [] in
+  let visited = ref 0 in
+  let scored_leaves = ref 0 in
+  List.iter (fun (path, terminal, bound) ->
+    if not (List.exists (fun pruned -> is_path_prefix pruned path)
+      !pruned_paths) then begin
+      incr visited;
+      if terminal then begin
+        incr scored_leaves;
+        incumbent := Some (match !incumbent with
+          | None -> bound | Some old -> min old bound)
+      end else match !incumbent with
+        | Some old when old < bound ->
+          pruned_paths := path :: !pruned_paths
+        | _ -> ()
+    end) (List.rev observations);
+  !visited, !scored_leaves, List.length !pruned_paths, !incumbent
+
 let test_small_footprints nat rec_call =
   let variables = List.map (fun x -> (v x, nat)) ["x"; "y"; "z"] in
   let vars_of_mask mask =
@@ -125,19 +186,37 @@ let test_small_footprints nat rec_call =
     let hypotheses = List.map (fun (name, vars) ->
       relation name vars) footprints in
     let observations = ref [] in
+    let structural_observations = ref [] in
     let observer = if verify_bounds then
-      Some (fun path terminal stable -> observations :=
-        (path, terminal, variable_uses stable) :: !observations)
+      Some (fun path terminal stable ->
+        observations :=
+          (path, terminal, variable_uses stable) :: !observations;
+        structural_observations :=
+          (path, terminal,
+           if terminal then variable_uses stable else
+             direct_variable_use_bound footprints stable)
+          :: !structural_observations)
       else None in
     let complete = N.possible_schedules_with_advanced_pruning
       ~max_schedules:100000 ~reduce_orderings:false
       ?on_prefix:observer
       variables hypotheses [] rec_call N.D_Gen in
-    if verify_bounds then ignore (check_prefix_use_bounds !observations);
+    if verify_bounds then begin
+      ignore (check_prefix_use_bounds !observations);
+      ignore (check_prefix_use_bounds !structural_observations)
+    end;
     let reduced = N.possible_schedules_with_advanced_pruning
       ~max_schedules:100000 variables hypotheses [] rec_call N.D_Gen in
     assert (quotient_signatures_for footprints complete =
             quotient_signatures_for footprints reduced);
+    let keys = List.map (fun schedule ->
+      owner_key_for footprints (source_order schedule)) complete
+      |> List.sort_uniq compare in
+    let canonical_orders = List.map (canonical_order_for_key footprints) keys in
+    let canonical = List.filter (fun schedule ->
+      List.mem (source_order schedule) canonical_orders) complete in
+    assert (quotient_signatures_for footprints complete =
+            quotient_signatures_for footprints canonical);
     let signature schedule =
       let key = quotient_signatures_for footprints [schedule] in
       List.hd key in
@@ -159,8 +238,9 @@ let test_small_footprints nat rec_call =
     for b = 1 to 7 do
       for c = 1 to 7 do
         for d = 1 to 7 do
-          check_case ["A", vars_of_mask a; "B", vars_of_mask b;
-                      "C", vars_of_mask c; "D", vars_of_mask d];
+          check_case ~verify_bounds:true
+            ["A", vars_of_mask a; "B", vars_of_mask b;
+             "C", vars_of_mask c; "D", vars_of_mask d];
           incr four_cases
         done
       done
@@ -179,30 +259,82 @@ let () =
   let nat = N.DTyCtr (N.ty_ctr_of_string "nat", []) in
   let variables = List.map (fun x -> (v x, nat)) ["x"; "y"; "z"] in
   let rec_call = (N.ty_ctr_of_string "Never", []) in
+  let direct_footprints =
+    ["A", ["x"]; "B", ["y"]; "C", ["x"; "z"];
+     "D", ["x"; "y"]; "E", ["y"; "z"]] in
   let complete_stats = N.empty_prefix_search_stats () in
   let complete_observations = ref [] in
+  let complete_structural_bounds = ref [] in
   let complete = N.possible_schedules_with_advanced_pruning
       ~max_schedules:100000 ~reduce_orderings:false ~stats:complete_stats
       ~on_prefix:(fun path terminal stable ->
         complete_observations :=
-          (path, terminal, variable_uses stable) :: !complete_observations)
+          (path, terminal, variable_uses stable) :: !complete_observations;
+        complete_structural_bounds :=
+          (path, terminal,
+           if terminal then variable_uses stable else
+             direct_variable_use_bound direct_footprints stable)
+          :: !complete_structural_bounds)
       variables hypotheses [] rec_call N.D_Gen in
   let reduced_stats = N.empty_prefix_search_stats () in
   let reduced_observations = ref [] in
+  let reduced_structural_bounds = ref [] in
   let reduced = N.possible_schedules_with_advanced_pruning
       ~max_schedules:100000 ~stats:reduced_stats
       ~on_prefix:(fun path terminal stable ->
         reduced_observations :=
-          (path, terminal, variable_uses stable) :: !reduced_observations)
+          (path, terminal, variable_uses stable) :: !reduced_observations;
+        reduced_structural_bounds :=
+          (path, terminal,
+           if terminal then variable_uses stable else
+             direct_variable_use_bound direct_footprints stable)
+          :: !reduced_structural_bounds)
       variables hypotheses [] rec_call N.D_Gen in
   let all_bound_counts = check_prefix_use_bounds !complete_observations in
   let por_bound_counts = check_prefix_use_bounds !reduced_observations in
+  let all_structural_counts =
+    check_prefix_use_bounds !complete_structural_bounds in
+  let por_structural_counts =
+    check_prefix_use_bounds !reduced_structural_bounds in
   let show_counts label (checked, tight, positive, beats_first, total_gap, first_leaf) =
     Printf.printf "%s variable-use bounds: checked=%d tight=%d positive=%d first=%d prunable=%d mean-gap=%.2f\n"
       label checked tight positive first_leaf beats_first
       (float_of_int total_gap /. float_of_int checked) in
   show_counts "exhaustive" all_bound_counts;
   show_counts "POR" por_bound_counts;
+  show_counts "exhaustive structural" all_structural_counts;
+  show_counts "POR structural" por_structural_counts;
+  let all_pruning = simulate_strict_pruning !complete_structural_bounds in
+  let por_pruning = simulate_strict_pruning !reduced_structural_bounds in
+  let show_pruning label (visited, leaves, pruned, optimum) =
+    Printf.printf "%s simulated strict pruning: nodes=%d leaves=%d cuts=%d optimum=%s\n"
+      label visited leaves pruned
+      (match optimum with None -> "none" | Some score -> string_of_int score) in
+  show_pruning "exhaustive" all_pruning;
+  show_pruning "POR" por_pruning;
+  assert (let _, _, _, optimum = all_pruning in optimum = Some 5);
+  assert (let _, _, _, optimum = por_pruning in optimum = Some 5);
+  let incumbent = ref None in
+  let bounded_stats = N.empty_prefix_search_stats () in
+  let bounded = N.possible_schedules_with_advanced_pruning
+    ~max_schedules:100000 ~stats:bounded_stats
+    ~on_prefix:(fun _ terminal schedule ->
+      if terminal then
+        let score = variable_uses schedule in
+        incumbent := Some (match !incumbent with
+          | None -> score | Some old -> min old score))
+    ~should_prune_prefix:(fun _ schedule ->
+      match !incumbent with
+      | None -> false
+      | Some score -> score < direct_variable_use_bound
+          direct_footprints schedule)
+    variables hypotheses [] rec_call N.D_Gen in
+  assert (!incumbent = Some 5);
+  assert (bounded_stats.visited_nodes = 71);
+  assert (bounded_stats.completed_prefixes = 16);
+  assert (List.length bounded = 16);
+  Printf.printf "actual variable-only bounded search: nodes=%d leaves=%d\n"
+    bounded_stats.visited_nodes bounded_stats.completed_prefixes;
   let leaf_uses observations =
     List.filter_map (fun (_, terminal, score) ->
       if terminal then Some score else None) observations
@@ -262,6 +394,13 @@ let () =
     List.map (fun key ->
       List.find (fun order -> owner_key order = key)
         (distinct_orders complete)) (unique_owners complete) in
+  let owner_graph_orders =
+    List.map (canonical_order_for_key direct_footprints)
+      (unique_owners complete) in
+  let owner_graph_candidates = List.filter (fun schedule ->
+    List.mem (source_order schedule) owner_graph_orders) complete in
+  assert (quotient_signatures complete =
+          quotient_signatures owner_graph_candidates);
   let canonical_candidates =
     List.filter (fun schedule ->
       List.mem (source_order schedule) canonical_orders) complete in
