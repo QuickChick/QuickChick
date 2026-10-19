@@ -111,6 +111,24 @@ let direct_variable_use_bound footprints schedule =
     total + if List.mem variable bound then mentions
       else max 0 (mentions - 1)) 0 ["x"; "y"; "z"]
 
+let positive_checks schedule =
+  List.fold_left (fun count -> function
+    | N.S_Check (_, true) -> count + 1
+    | _ -> count) 0 schedule
+
+(* Plain positive relations only: each future producer consumes a distinct
+   variable, so no more than the remaining unbound variables can produce. *)
+let check_count_bound footprints schedule =
+  let processed = source_order schedule |> List.length in
+  let modes, unconstrained = mode_signature schedule in
+  let bound_vars = unconstrained @ List.concat_map snd modes
+    |> List.sort_uniq compare in
+  let mentioned = List.concat_map snd footprints |> List.sort_uniq compare in
+  let unbound = List.length (List.filter (fun var ->
+    not (List.mem var bound_vars)) mentioned) in
+  positive_checks schedule +
+    max 0 (List.length footprints - processed - unbound)
+
 let same_variable_uses_per_signature key schedules =
   let groups = List.map (fun schedule ->
     key schedule, variable_uses schedule) schedules in
@@ -203,7 +221,17 @@ let test_small_footprints nat rec_call =
       variables hypotheses [] rec_call N.D_Gen in
     if verify_bounds then begin
       ignore (check_prefix_use_bounds !observations);
-      ignore (check_prefix_use_bounds !structural_observations)
+      ignore (check_prefix_use_bounds !structural_observations);
+      let check_observations = ref [] in
+      ignore (N.possible_schedules_with_advanced_pruning
+        ~max_schedules:100000 ~maximal_outputs:true ~reduce_orderings:false
+        ~on_prefix:(fun path terminal schedule ->
+          check_observations := (path, terminal,
+            if terminal then positive_checks schedule
+            else check_count_bound footprints schedule)
+            :: !check_observations)
+        variables hypotheses [] rec_call N.D_Gen);
+      ignore (check_prefix_use_bounds !check_observations)
     end;
     let reduced = N.possible_schedules_with_advanced_pruning
       ~max_schedules:100000 variables hypotheses [] rec_call N.D_Gen in
@@ -494,6 +522,45 @@ let () =
   Printf.printf "maximal-output checker density model: optimum=%d bounded nodes=%d leaves=%d cuts=%d\n"
     exact_optimum density_stats.visited_nodes density_stats.completed_prefixes
     (List.length maximal_por - List.length density_bounded);
+  (* Counting positive checks distinguishes schedules whose worst generator
+     density is already Checking. Every remaining producer must bind at least
+     one distinct variable, so at most the number of unbound variables can
+     avoid becoming a check. This fixture has only plain positive relations. *)
+  let check_observations = ref [] in
+  let counted_exhaustive = N.possible_schedules_with_advanced_pruning
+    ~max_schedules:100000 ~maximal_outputs:true ~reduce_orderings:false
+    ~on_prefix:(fun path terminal schedule ->
+      check_observations :=
+        (path, terminal,
+         if terminal then positive_checks schedule
+         else check_count_bound direct_footprints schedule) :: !check_observations)
+    variables hypotheses [] rec_call N.D_Gen in
+  assert (counted_exhaustive = maximal_search);
+  ignore (check_prefix_use_bounds !check_observations);
+  let best_checks = List.fold_left (fun best schedule ->
+    min best (positive_checks schedule)) max_int counted_exhaustive in
+  let check_incumbent = ref None in
+  let check_stats = N.empty_prefix_search_stats () in
+  let check_bounded = N.possible_schedules_with_advanced_pruning
+    ~max_schedules:100000 ~maximal_outputs:true ~stats:check_stats
+    ~on_prefix:(fun _ terminal schedule ->
+      if terminal then
+        let checks = positive_checks schedule in
+        check_incumbent := Some (match !check_incumbent with
+          | None -> checks | Some old -> min old checks))
+    ~should_prune_prefix:(fun _ schedule ->
+      match !check_incumbent with
+      | None -> false
+      | Some best -> best < check_count_bound direct_footprints schedule)
+    variables hypotheses [] rec_call N.D_Gen in
+  assert (!check_incumbent = Some best_checks);
+  assert (best_checks = 2);
+  assert (List.map mode_signature
+    (List.filter (fun schedule -> positive_checks schedule = best_checks)
+      maximal_por) |> List.sort_uniq compare =
+    (List.map mode_signature check_bounded |> List.sort_uniq compare));
+  Printf.printf "maximal-output check-count bound: optimum=%d nodes=%d leaves=%d\n"
+    best_checks check_stats.visited_nodes check_stats.completed_prefixes;
   Printf.printf "sleep-set candidates=%d, distinct orders=%d\n"
     (List.length reduced)
     (List.length (distinct_orders reduced));
