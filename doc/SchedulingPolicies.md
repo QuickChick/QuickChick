@@ -86,6 +86,13 @@ converted prefix steps and recursive dependency grades must remain unchanged
 in descendants. A typed exhaustive fixture checks the counted key against
 every descendant, but that is evidence for the fixture, not a replacement for
 the adapter proof. No public score pruning is enabled.
+In particular, completed scoring sorts a candidate's steps before discovering
+recursive dependencies. Adding a future step can change which dependency is
+encountered first, including the provisional grade used for a cycle. A prefix
+bound must therefore treat a nonrecursive producer call as unresolved unless
+its grade is certified independently of the remaining steps. Direct checks,
+matches, unconstrained bindings, lets, and direct recursive calls have fixed
+grades under the current scorer; this is the first useful certified subset.
 
 At pinned Specimen revision `121cf234`, scoring bundles explicitly associate
 comparison and aggregation with pruning strategy, including a no-pruning option.
