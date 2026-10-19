@@ -135,7 +135,16 @@ val possible_schedules : (var * rocq_type) list ->
   var list -> constructor * int list ->
   derive_sort -> schedule_step list list *)
 
-val possible_schedules_with_advanced_pruning : ?max_schedules:int -> (var * rocq_type) list ->
+type prefix_search_stats = {
+  mutable visited_nodes : int;
+  mutable completed_prefixes : int;
+  mutable processed_mode_choices : int;
+}
+
+val empty_prefix_search_stats : unit -> prefix_search_stats
+
+val possible_schedules_with_advanced_pruning : ?max_schedules:int -> ?reduce_orderings:bool ->
+  ?stats:prefix_search_stats -> (var * rocq_type) list ->
   rocq_type list ->
   var list -> constructor * int list ->
   derive_sort -> schedule_step list list

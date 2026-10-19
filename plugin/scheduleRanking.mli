@@ -13,5 +13,9 @@ val of_string : string -> policy
 val current : unit -> policy
 val to_string : policy -> string
 
+(** Whether independent typed steps preserve the policy's score features.
+    Candidate-ID tie-breaking is applied to retained representatives. *)
+val preserves_independent_swaps : policy -> bool
+
 (** Smaller results rank first; candidate id breaks all feature ties. *)
 val compare : prefer_dense:bool -> policy -> features -> features -> int

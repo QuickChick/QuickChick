@@ -26,6 +26,19 @@ let to_string = function
   | RankVarsThenDensity -> "vars_then_density"
   | RankVarsOnly -> "vars_only"
 
+(* The four built-in feature policies ignore the order of independent steps:
+   density is an extremum of step densities, and variable uses count inputs
+   bound before each step. The typed scheduler only commutes plain relation
+   steps whose unbound footprints, including variable-type dependencies, are
+   disjoint. A future policy observing step order must return false here unless
+   it supplies its own commutation law. Candidate IDs are assigned after POR. *)
+let preserves_independent_swaps = function
+  | RankDensityThenVars | RankDensityOnly
+  | RankVarsThenDensity | RankVarsOnly ->
+    (match Sys.getenv_opt "QC_SCHEDULE_POR" with
+     | Some ("0" | "false" | "no") -> false
+     | _ -> true)
+
 let compare ~prefer_dense policy a b =
   let density () =
     if prefer_dense then Stdlib.compare b.density_rank a.density_rank

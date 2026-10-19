@@ -3255,12 +3255,32 @@ let process_choice_helper ?(eager_checks=true) (idx : int)
     Some (new_sched, to_be_satisfied', final_env, final_env_set)
   end
 
-(* Complete typed prefix explorer. Every next hypothesis and every currently
-   supported output mode is considered. A transition commits its steps, so
-   future score bounds can be stated over actual descendants. This reference
-   path deliberately does not use the old checks/length heuristic or its
-   environment-only dominance memo. *)
-let enum_schedules_prefix_complete_classified
+(* The decision path is a stable tie key even if a future best-first queue
+   explores nodes in a different order. Sleep sets use the fixed sibling
+   order, rather than wall-clock exploration order. *)
+type classified_prefix_state = {
+  prefix_env : var list;
+  prefix_env_set : VS.t;
+  prefix_steps_rev : (int * rocq_constr * bool) pre_schedule_step list;
+  prefix_decisions_rev : (int * var list list) list;
+  prefix_remaining : (int * hypothesis_classification) list;
+  prefix_sleeping : int list;
+}
+
+type prefix_search_stats = {
+  mutable visited_nodes : int;
+  mutable completed_prefixes : int;
+  mutable processed_mode_choices : int;
+}
+
+let empty_prefix_search_stats () =
+  { visited_nodes = 0; completed_prefixes = 0; processed_mode_choices = 0 }
+
+(* Each child commits its steps. A future branch-and-bound policy can bound
+   this whole state without assuming that earlier steps will be rebuilt. *)
+let enum_schedules_prefix_classified
+    ~(reduce_orderings : bool)
+    ~(stats : prefix_search_stats option)
     (variables : (var * rocq_type) list)
     (matchable_vars : var list)
     (hypotheses : (int * hypothesis_classification) list)
@@ -3268,20 +3288,69 @@ let enum_schedules_prefix_complete_classified
     : ((int * rocq_constr * bool) pre_schedule_step list) Seq.t =
   let var_names = List.map fst variables in
   let matchable_set = VS.of_list matchable_vars in
-  let rec visit env env_set reversed_steps remaining =
-    match remaining with
+  let rec add_type_dependencies seen v =
+    if VS.mem v seen then seen else
+    let seen = VS.add v seen in
+    match List.assoc_opt v variables with
+    | None -> seen
+    | Some ty ->
+      List.fold_left add_type_dependencies seen
+        (variables_in_hypothesis ty) in
+  let footprint (_, cls) =
+    List.fold_left add_type_dependencies VS.empty
+      (cls.always_bound @ List.concat cls.potential_indices)
+    |> VS.elements in
+  let plain_relation (_, cls) =
+    match fst cls.hyp with
+    | DTyCtr (_, args) ->
+      List.for_all (function DTyVar _ | DHole -> true | _ -> false) args
+    | _ -> false in
+  let metadata = List.map (fun ((idx, _) as h) ->
+    idx, (footprint h, plain_relation h)) hypotheses in
+  let independent env_set (left_idx, _) (right_idx, _) =
+    let left, left_plain = List.assoc left_idx metadata in
+    let right, right_plain = List.assoc right_idx metadata in
+    left_plain && right_plain &&
+    not (List.exists (fun v ->
+      not (VS.mem v env_set) && List.mem v right) left) in
+  let rec visit state () =
+    Option.iter (fun stats -> stats.visited_nodes <- stats.visited_nodes + 1) stats;
+    match state.prefix_remaining with
     | [] ->
-      let unbound = List.filter (fun v -> not (VS.mem v env_set)) var_names in
-      Seq.return (List.rev reversed_steps @ prune_empties [PS_InstVars unbound])
+      Option.iter (fun stats ->
+        stats.completed_prefixes <- stats.completed_prefixes + 1) stats;
+      let unbound = List.filter (fun v ->
+        not (VS.mem v state.prefix_env_set)) var_names in
+      Seq.return (List.rev state.prefix_steps_rev @
+        prune_empties [PS_InstVars unbound]) ()
     | _ ->
-      let rec choose before = function
-        | [] -> Seq.empty
-        | (idx, cls) :: after ->
+      (* A hypothesis commuting with every remaining one can be moved to the
+         front of any completion. Force the first such hypothesis, instead of
+         visiting every subset of independent prefixes as a sleep set would. *)
+      let universally_independent =
+        if reduce_orderings then
+          List.find_opt (fun selected ->
+            List.for_all (fun other ->
+              fst selected = fst other ||
+              independent state.prefix_env_set selected other)
+              state.prefix_remaining) state.prefix_remaining
+        else None in
+      let rec choose before explored remaining () =
+        match remaining with
+        | [] -> Seq.empty ()
+        | ((idx, cls) as selected) :: after ->
+          if (reduce_orderings && List.mem idx state.prefix_sleeping) ||
+             (match universally_independent with
+              | Some (forced_idx, _) -> idx <> forced_idx
+              | None -> false) then
+            choose (selected :: before) explored after ()
+          else
           let rest = List.rev_append before after in
           let (hyp, polarity) = cls.hyp in
           let (some_bound, all_unbound) =
             List.partition (fun group ->
-              List.exists (fun v -> VS.mem v env_set && not (VS.mem v matchable_set)) group
+              List.exists (fun v -> VS.mem v state.prefix_env_set &&
+                not (VS.mem v matchable_set)) group
               || List.for_all (fun v -> VS.mem v matchable_set) group)
               cls.potential_indices
           in
@@ -3295,18 +3364,46 @@ let enum_schedules_prefix_complete_classified
           let branch =
             List.to_seq output_choices
             |> Seq.filter_map (fun out ->
+              Option.iter (fun stats ->
+                stats.processed_mode_choices <-
+                  stats.processed_mode_choices + 1) stats;
               let bound = List.filter (fun group -> not (List.mem group out)) all_unbound in
-              process_choice_helper ~eager_checks:false idx hyp polarity out bound some_bound
-                cls.always_bound rest env env_set)
-            |> Seq.flat_map (fun (steps, rest', next_env, next_env_set) ->
-              visit next_env next_env_set
-                (List.rev_append steps reversed_steps) rest')
+              Option.map (fun result -> out, result)
+                (process_choice_helper ~eager_checks:false idx hyp polarity out bound some_bound
+                  cls.always_bound rest state.prefix_env state.prefix_env_set))
+            |> Seq.flat_map (fun (out, (steps, rest', next_env, next_env_set)) ->
+              let child_sleep =
+                if reduce_orderings then
+                  List.filter (fun sleeping_idx ->
+                    match List.find_opt (fun (other_idx, _) ->
+                      other_idx = sleeping_idx) rest with
+                    | Some other -> independent state.prefix_env_set selected other
+                    | None -> false)
+                    (state.prefix_sleeping @ explored)
+                else [] in
+              visit {
+                prefix_env = next_env;
+                prefix_env_set = next_env_set;
+                prefix_steps_rev =
+                  List.rev_append steps state.prefix_steps_rev;
+                prefix_decisions_rev = (idx, out) :: state.prefix_decisions_rev;
+                prefix_remaining = rest';
+                prefix_sleeping = child_sleep;
+              })
           in
-          Seq.append branch (choose ((idx, cls) :: before) after)
+          Seq.append branch
+            (choose (selected :: before) (idx :: explored) after) ()
       in
-      choose [] remaining
+      choose [] [] state.prefix_remaining ()
   in
-  visit initial_env (VS.of_list initial_env) [] hypotheses
+  visit {
+    prefix_env = initial_env;
+    prefix_env_set = VS.of_list initial_env;
+    prefix_steps_rev = [];
+    prefix_decisions_rev = [];
+    prefix_remaining = hypotheses;
+    prefix_sleeping = [];
+  }
 
 (* Translation of Lean's enumSchedulesChunkedWithPruning - version with proper memoization and pruning *)
 let enum_schedules_chunked_with_pruning_classified (variables : (var * rocq_type) list)
@@ -3655,6 +3752,8 @@ let possible_schedules_with_legacy_pruning ?(max_schedules=100000) (variables : 
   |> List.sort_uniq compare
 
 let possible_schedules_with_advanced_pruning ?(max_schedules=100000)
+    ?(reduce_orderings=true)
+    ?stats
     (variables : (var * rocq_type) list)
     (hypotheses : rocq_constr list)
     (fixed : var list)
@@ -3687,7 +3786,8 @@ let possible_schedules_with_advanced_pruning ?(max_schedules=100000)
   let pre_to_schedule =
     pre_to_schedule_advanced variables type_vars rec_call ds prod_sort in
   let candidate_stream =
-    enum_schedules_prefix_complete_classified variables type_vars classified fixed
+    enum_schedules_prefix_classified ~reduce_orderings ~stats
+      variables type_vars classified fixed
     |> Seq.map pre_to_schedule
     |> Seq.map normalize_schedule_advanced in
   let peek_limit = if max_schedules = max_int then max_int else max_schedules + 1 in
@@ -3700,7 +3800,11 @@ let possible_schedules_with_advanced_pruning ?(max_schedules=100000)
   |> List.filteri (fun idx _ -> idx < max_schedules)
   |> List.sort_uniq compare
 
-let possible_schedules = possible_schedules_with_advanced_pruning ~max_schedules:1000
+let possible_schedules variables hypotheses fixed rec_call ds =
+  possible_schedules_with_advanced_pruning ~max_schedules:1000
+    ~reduce_orderings:(ScheduleRanking.preserves_independent_swaps
+      (ScheduleRanking.current ()))
+    variables hypotheses fixed rec_call ds
 
 (* typing g e t -> step e e' -> typing g e' t *)
 
