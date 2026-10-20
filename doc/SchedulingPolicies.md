@@ -205,6 +205,17 @@ shown to reduce end-to-end derivation time. The extra leaf and prefix scoring
 can cost more than the cuts save. Keep the switch internal until wider
 correspondence and performance tests justify enabling it by default.
 
+The reduced SemGuS fixture merges `eval` with itself and merges the result
+with `eval` again. Its final generator diagnostic has 12 candidates; the
+unpruned, verified, and pruned runs select the same candidate. Verification
+finds no descendant below a checked prefix bound. The pruned run makes 464
+cuts in recursive dependency searches. The final `Valid Schedules` diagnostic
+does not emit a pruning trace, so this experiment does not show that the
+12-candidate root search itself was bounded.
+In one local run, pruning took 4.7 seconds versus 3.5 seconds unpruned, and
+verification took 10 seconds. This stresses recursive score resolution and
+shows why cuts alone are not a useful performance measure.
+
 `test/prefix_adapter_laws.v` proves the list-level adapter rule: stepwise
 conversion distributes over appended choices, and sorting unconstrained
 blocks preserves an earlier prefix when that prefix ends in a producer, check,
