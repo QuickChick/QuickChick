@@ -405,6 +405,14 @@ Proof.
   unfold checker_worst. lia.
 Qed.
 
+(* A cycle-dependent Partial grade cannot be certified when the completed
+   traversal may instead give the same call Total. The concrete scheduler
+   fixtures in test/scoring_cycles exhibit both grades for one memo key. *)
+Example cycle_dependent_partial_is_not_a_generator_bound :
+  lex_compare (generator_certified_key [Some 3] [])
+    (generator_counted_key [4] []) = Gt.
+Proof. reflexivity. Qed.
+
 Fixpoint producer_count (steps : list bool) : nat :=
   match steps with
   | [] => 0

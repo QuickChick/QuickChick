@@ -116,6 +116,16 @@ source-to-model correspondence test is still needed before the marker enables
 production pruning. A cycle-dependent result remains uncertified by this
 argument.
 
+`test/scoring_cycles` demonstrates why that distinction matters. For the same
+generator memo key, resolving one side of an asymmetric mutual relation first
+gives `Partial`, while resolving the other side first gives `Total`. A connected
+parent derivation reaches both results in separate candidate-local scoring
+passes. A prefix bound that treated the earlier `Partial` as permanent could
+prune a completion whose call is `Total`; `test/pruning_bounds.v` computes the
+resulting bound reversal. This is a cycle-order effect, not an applied-argument
+cache collision. The public scheduler still ranks with its existing heuristic;
+it does not prune from these partial grades.
+
 `test/prefix_adapter_laws.v` proves the list-level adapter rule: stepwise
 conversion distributes over appended choices, and sorting unconstrained
 blocks preserves an earlier prefix when that prefix ends in a producer, check,

@@ -1886,7 +1886,7 @@ and inductive_best_valid_schedule (rel : rocq_relation) (output_idxs : int list)
 
   let cycle_independent = !density_uncertainty_events = uncertainty_at_start in
   density_inductive_memo := InductiveScheduleKeyMap.add (ind_name, output_idxs, ds, opt) (DensityDone ((inductive_schedule, overall_density), cycle_independent)) !density_inductive_memo;
-  Error.msg_debug (str (Printf.sprintf "%s: %s Done, Density: %s\n" (schedule_name) (String.concat ", " (List.map string_of_int output_idxs)) (density_to_string overall_density))); 
+  Error.msg_debug (str (Printf.sprintf "%s: %s Done, Density: %s, cycle-independent: %b\n" (schedule_name) (String.concat ", " (List.map string_of_int output_idxs)) (density_to_string overall_density) cycle_independent));
   inductive_schedule, overall_density)
 end
 
