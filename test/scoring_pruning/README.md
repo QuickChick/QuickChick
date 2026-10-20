@@ -22,6 +22,8 @@ selection is unchanged across modes, and the bound makes no cuts. Score probes
 suspend nested experimental pruning to avoid re-entering dependency searches.
 The fixture checks the merged relation's ten-argument type and constructs a
 single expression `X` that evaluates under three distinct input pairs.
+Pruned ranking reuses completed-leaf scores and rescores only the winner to
+recover its dependency memo. Verification keeps an independent final rescore.
 The legacy `Merge` command emits a large debug log, so this test captures its
 output in temporary files. This is a stress test for bound correctness, and
 currently exposes a substantial performance cost.

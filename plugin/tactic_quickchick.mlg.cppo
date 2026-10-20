@@ -1751,6 +1751,16 @@ and constructor_valid_schedules (ind_name : ty_ctr) (ctr : rocq_ctr) (result_var
   let checked_prefixes = ref 0 in
   let pruned_prefixes = ref 0 in
   let bound_grade_cache = Hashtbl.create 32 in
+  let leaf_score_cache = Hashtbl.create 32 in
+  let bound_cache_hits = ref 0 in
+  let bound_cache_misses = ref 0 in
+  let leaf_cache_hits = ref 0 in
+  let bound_cpu = ref 0. in
+  let leaf_cpu = ref 0. in
+  let final_cpu = ref 0. in
+  let timed total f =
+    let before = Sys.time () in
+    Fun.protect ~finally:(fun () -> total := !total +. Sys.time () -. before) f in
   let rec path_prefix prefix path = match prefix, path with
     | [], _ -> true
     | x :: xs, y :: ys when x = y -> path_prefix xs ys
@@ -1758,10 +1768,12 @@ and constructor_valid_schedules (ind_name : ty_ctr) (ctr : rocq_ctr) (result_var
   let materialize ((steps, sort), ms, eqs) =
     let match_steps = List.map (fun (v,p) -> S_Match (v,p)) ms in
     match_steps, (List.map check_eq eqs @ steps, sort) in
-  let leaf_score triple = with_temporary_density_state (fun () ->
+  let leaf_score triple = timed leaf_cpu (fun () -> with_temporary_density_state (fun () ->
     let match_steps, schedule = materialize triple in
-    scored_schedule_features ds 0 (schedule_density match_steps schedule)) in
-  let bound_score triple = with_temporary_density_state (fun () ->
+    let scored = schedule_density match_steps schedule in
+    Hashtbl.replace leaf_score_cache triple scored;
+    scored_schedule_features ds 0 scored)) in
+  let bound_score triple = timed bound_cpu (fun () -> with_temporary_density_state (fun () ->
     let match_steps, (steps, sort) = materialize triple in
     let neutral = match ds with
       | D_Gen | D_Thm -> Total
@@ -1773,8 +1785,9 @@ and constructor_valid_schedules (ind_name : ty_ctr) (ctr : rocq_ctr) (result_var
         | Some grade -> Some (density_rank grade)
         | None ->
           (match Hashtbl.find_opt bound_grade_cache (step, sort) with
-           | Some cached -> cached
+           | Some cached -> incr bound_cache_hits; cached
            | None ->
+             incr bound_cache_misses;
              let before = !density_uncertainty_events in
              let scored = schedule_density [] ([step], sort) in
              let grade = match scored with
@@ -1785,7 +1798,7 @@ and constructor_valid_schedules (ind_name : ty_ctr) (ctr : rocq_ctr) (result_var
              grade)) steps in
     let annotations = List.map (fun step -> step, Total) (match_steps @ steps) in
     ScheduleRanking.prefix_bound ~prefer_dense ~known_grades
-      ~variable_uses:(get_num_var_uses (annotations, sort) ds)) in
+      ~variable_uses:(get_num_var_uses (annotations, sort) ds))) in
   let on_prefix = if score_pruning_mode <> `Off then Some (fun path terminal triple ->
     if terminal then begin
       incr scored_leaves;
@@ -1825,23 +1838,64 @@ and constructor_valid_schedules (ind_name : ty_ctr) (ctr : rocq_ctr) (result_var
       (constructor_to_string ctr_name)
       (match score_pruning_mode with `Prune -> "prune" | `Verify -> "verify" | `Off -> "off")
       !checked_prefixes !scored_leaves !pruned_prefixes));
-  let schedules = List.mapi (fun i ((steps, sort), ms, eqs) -> i, (List.map (fun (v,p) -> S_Match (v,p)) ms), ((List.map check_eq eqs @ steps), sort)) schedule_matches in
+  let schedules = List.mapi (fun i triple ->
+    let ms_steps, schd = materialize triple in
+    i, triple, ms_steps, schd) schedule_matches in
   let initial_inductive_memo = !density_inductive_memo in
   let initial_density_memo = !density_memo in
-  let schedule_densities = Fun.protect
+  let schedule_densities = timed final_cpu (fun () -> Fun.protect
     ~finally:(fun () ->
       density_inductive_memo := initial_inductive_memo;
       density_memo := initial_density_memo)
-    (fun () -> List.filter_map (fun (i, ms_steps, schd) ->
+    (fun () ->
+    let entries = List.filter_map (fun (i, triple, ms_steps, schd) ->
       density_inductive_memo := initial_inductive_memo;
       density_memo := initial_density_memo;
-      let scored = with_score_pruning_suspended (fun () ->
-        schedule_density ms_steps schd) in
+      let scored = match score_pruning_mode,
+        Hashtbl.find_opt leaf_score_cache triple with
+        | `Prune, Some cached -> incr leaf_cache_hits; cached
+        | _ -> with_score_pruning_suspended (fun () ->
+            schedule_density ms_steps schd) in
       let inductive_memo = !density_inductive_memo in
       let density_memo_after = !density_memo in
       if are_schedule_steps_valid i scored then
         Some (i, scored, inductive_memo, density_memo_after)
-      else None) schedules) in
+      else None) schedules in
+    (* Ranking needs only the cached annotations. Recompute the winner to
+       recover its dependency memo for code generation, and check its score. *)
+    if score_pruning_mode <> `Prune then entries else
+      let better a b =
+        let (i, scored, _, _) = a in
+        let (j, other, _, _) = b in
+        ScheduleRanking.compare ~prefer_dense policy
+          (scored_schedule_features ds i scored)
+          (scored_schedule_features ds j other) < 0 in
+      let best = List.fold_left (fun best entry -> match best with
+        | None -> Some entry
+        | Some previous -> Some (if better entry previous then entry else previous))
+        None entries in
+      match best with
+      | None -> entries
+      | Some (best_id, cached, _, _) ->
+        let (_, _, ms_steps, schd) =
+          List.find (fun (i, _, _, _) -> i = best_id) schedules in
+        density_inductive_memo := initial_inductive_memo;
+        density_memo := initial_density_memo;
+        let rescored = with_score_pruning_suspended (fun () ->
+          schedule_density ms_steps schd) in
+        if scored_schedule_features ds best_id cached <>
+           scored_schedule_features ds best_id rescored then
+          failwith "cached leaf score differs from selected candidate scoring";
+        let best_entry = (best_id, rescored, !density_inductive_memo,
+                          !density_memo) in
+        List.map (fun ((i, _, _, _) as entry) ->
+          if i = best_id then best_entry else entry) entries)) in
+  if score_pruning_mode <> `Off && schedule_trace_enabled () then
+    Feedback.msg_notice (str (Printf.sprintf
+      "[schedule-pruning-work] constructor=%s bound-cache-hits=%d bound-cache-misses=%d leaf-cache-hits=%d bound-cpu=%.3f leaf-cpu=%.3f final-cpu=%.3f\n"
+      (constructor_to_string ctr_name) !bound_cache_hits !bound_cache_misses
+      !leaf_cache_hits
+      !bound_cpu !leaf_cpu !final_cpu));
   if score_pruning_mode = `Verify then begin
     let observed = List.sort_uniq Stdlib.compare !observed_leaf_scores in
     let rescored = List.map (fun (_, scored, _, _) ->

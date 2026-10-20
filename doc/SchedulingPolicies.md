@@ -213,9 +213,14 @@ violation, and selects the same candidate as the unpruned run. It makes zero
 cuts. Score probes suspend nested experimental pruning while resolving
 dependencies; otherwise verification repeatedly re-enters those searches and
 multiplies the work without improving the root bound. In one local run, the
-unpruned, verified, and pruned diagnostics took 1.2, 18.3, and 18.1 seconds.
-The bound is sound on this case but too weak to help it, and recursive score
-resolution remains expensive.
+unpruned, verified, and pruned diagnostics took 1.2, 18.1, and 9.5 seconds.
+The bound-grade cache had 26 hits and 3 misses, consuming 0.34 seconds of CPU
+time. Completed-leaf scoring cost 7.8 seconds. The pruning path now reuses
+those leaf annotations for ranking, then rescores only the selected candidate
+to recover its dependency memo; final scoring fell from 9.1 to 0.7 seconds.
+The verifier still independently rescores all candidates. The bound is
+admissible on this case but too weak to cut, and recursive score resolution
+remains expensive.
 
 `test/prefix_adapter_laws.v` proves the list-level adapter rule: stepwise
 conversion distributes over appended choices, and sorting unconstrained

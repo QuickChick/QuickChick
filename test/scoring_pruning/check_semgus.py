@@ -21,6 +21,11 @@ PRUNING = re.compile(
     r"^\[schedule-pruning\] constructor=(\S+) mode=(\w+) "
     r"prefixes=(\d+) leaves=(\d+) cuts=(\d+)"
 )
+WORK = re.compile(
+    r"^\[schedule-pruning-work\] constructor=(\S+) "
+    r"bound-cache-hits=(\d+) bound-cache-misses=(\d+) "
+    r"leaf-cache-hits=(\d+)"
+)
 
 
 def run(mode, directory):
@@ -47,27 +52,34 @@ def run(mode, directory):
         raise AssertionError(f"SemGuS {mode} failed; see {log}")
     rankings = []
     root_searches = []
+    work = []
     for line in log.open(errors="replace"):
         if match := RANKING.match(line):
             rankings.append(match.groups())
         if match := PRUNING.match(line):
             root_searches.append(match.groups())
+        if match := WORK.match(line):
+            work.append(match.groups())
     assert rankings, (mode, "missing ranking trace")
-    return rankings[-1], root_searches, time.monotonic() - started
+    return rankings[-1], root_searches, work, time.monotonic() - started
 
 
 with tempfile.TemporaryDirectory() as temporary:
     directory = Path(temporary)
-    baseline, off_searches, off_seconds = run("off", directory)
-    verified, verify_searches, verify_seconds = run("verify", directory)
-    bounded, prune_searches, prune_seconds = run("1", directory)
+    baseline, off_searches, off_work, off_seconds = run("off", directory)
+    verified, verify_searches, verify_work, verify_seconds = run("verify", directory)
+    bounded, prune_searches, prune_work, prune_seconds = run("1", directory)
     assert baseline == verified == bounded, (baseline, verified, bounded)
     assert baseline[0] == "12", baseline
     assert not off_searches, off_searches
+    assert not off_work, off_work
     assert len(verify_searches) == len(prune_searches) == 1
+    assert len(verify_work) == len(prune_work) == 1
     verify_root, prune_root = verify_searches[0], prune_searches[0]
     assert verify_root[1:] == ("verify", "25", "12", "0"), verify_root
     assert prune_root[1:] == ("prune", "25", "12", "0"), prune_root
+    assert int(prune_work[0][1]) > 0 and int(prune_work[0][2]) > 0
+    assert prune_work[0][3] == "12", prune_work
     print(f"double self-merge: 12 root leaves verified over 25 prefixes; "
           f"same winner, zero cuts; seconds off/verify/prune: "
           f"{off_seconds:.1f}/{verify_seconds:.1f}/{prune_seconds:.1f}")
