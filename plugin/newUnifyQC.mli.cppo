@@ -107,6 +107,7 @@ val handle_branch :
   range list -> Unknown.t -> NewGenericLib.dep_ctr -> NewGenericLib.coq_expr * bool *)
 
 val type_to_schedules :
+            ?on_prepared:(NewGenericLib.var list -> unit) ->
             ?on_prefix:((int * NewGenericLib.var list list) list -> bool ->
               (NewGenericLib.schedule * (unknown * NewGenericLib.pat) list *
                 (unknown * unknown) list) -> unit) ->

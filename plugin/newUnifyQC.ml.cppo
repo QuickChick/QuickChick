@@ -1849,7 +1849,7 @@ let rec correct_variables (umap : umap) (scd : schedule_step list) : schedule_st
     S_Let (correct_var umap v, correct_rocq_constr umap c) :: correct_variables umap scd'
 
 
-let type_to_schedules ?on_prefix ?on_prefix_with_floor
+let type_to_schedules ?on_prepared ?on_prefix ?on_prefix_with_floor
     ?should_prune_prefix ?should_prune_prefix_with_floor
     (typ : rocq_constr) (ind_name : ty_ctr option) (ctr_name : ty_ctr option)
     (result_vars : (var * rocq_constr) list) (output_vars : var list)
@@ -1938,6 +1938,9 @@ let type_to_schedules ?on_prefix ?on_prefix_with_floor
     (match get_schedule_sort concl (if opt then output_vars else List.map fst vars) ctr_name umap ds opt with
     | Some sort -> 
       let fixed_vars = List.filter_map (fun (v,_) -> if is_fixed umap v then Some v else None) vars in
+      Option.iter (fun observe ->
+        observe (List.map (correct_var umap) fixed_vars |> List.sort_uniq compare))
+        on_prepared;
       let eq_checks = EqSet.elements eqs in
       let rec_name = match ind_name with Some n -> n | _ -> ty_ctr_of_string "nonsense" in
       Error.msg_debug (str ("Fixed vars: " ^ String.concat ", " (List.map var_to_string fixed_vars)) ++ fnl ());

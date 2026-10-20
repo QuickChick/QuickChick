@@ -2,7 +2,7 @@
  (name quickchick_plugin)
  (public_name coq-quickchick.plugin)
  (flags :standard -rectypes -warn-error -3-26-32-34-37-39 -w -8-27+40)
- (modules :standard \ genSTCorrect genSizedSTMonotonic genSizedSTSizeMonotonic test_dep_ordering test_prefix_search)
+ (modules :standard \ genSTCorrect genSizedSTMonotonic genSizedSTSizeMonotonic test_dep_ordering test_prefix_search test_budget_aware_score)
  (libraries unix str
   (select void_for_linking-plugin-extraction from
    (rocq-runtime.plugins.extraction -> void_for_linking-plugin-extraction.empty)
@@ -27,9 +27,19 @@
  (modules test_prefix_search)
  (libraries quickchick_plugin unix str))
 
+(executable
+ (name test_budget_aware_score)
+ (flags :standard -rectypes)
+ (modules test_budget_aware_score)
+ (libraries quickchick_plugin unix str))
+
 (rule
  (alias runtest)
  (action (run %{exe:test_prefix_search.exe})))
+
+(rule
+ (alias runtest)
+ (action (run %{exe:test_budget_aware_score.exe})))
 
 (rule
  (targets driver.ml)

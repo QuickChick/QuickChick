@@ -158,6 +158,19 @@ fabrication bound. This deliberately weakens pruning until the mutual group
 has a stable scoring rule. Do not replace the bound with a provisional memo
 grade merely because the call has returned during one traversal.
 
+A separate completed-score library now mirrors the pinned Specimen
+`BudgetAwareScore` on concrete QuickChick steps. Fifteen differential cases
+match the Lean reference, including all six coordinates, finite-pinning
+analysis, recursive locality, fabrication propagated from an enumerator,
+and coverage aggregation; see `test/budget_aware`. The scorer also accepts
+real scheduler candidates, including their match and equality preludes.
+The unifier exposes prepared fixed inputs and dependency requests retain
+applied type arguments. This does not activate BudgetAware ranking. Production
+use still needs context-aware completed dependency scores and Rocq relation
+metadata; the search bound must be built and checked separately.
+Unsupported QuickChick-only `let` and defined-source
+steps return an error rather than silently receiving an approximate score.
+
 The internal ranking module now builds this conservative prefix key from
 certified call-site grades, unresolved calls, and a lower bound on committed
 variable uses. It compares an incumbent with that key without candidate IDs
