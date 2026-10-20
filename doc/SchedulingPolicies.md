@@ -158,6 +158,32 @@ fabrication bound. This deliberately weakens pruning until the mutual group
 has a stable scoring rule. Do not replace the bound with a provisional memo
 grade merely because the call has returned during one traversal.
 
+The internal ranking module now builds this conservative prefix key from
+certified call-site grades, unresolved calls, and a lower bound on committed
+variable uses. It compares an incumbent with that key without candidate IDs
+and prunes only on a strict improvement. The ranked-key test checks every
+resolution of up to two unknown grades, every possible appended grade, both
+density directions, and all built-in policies. The typed prefix-search test
+compares each bound with every descendant of a five-premise fixture and
+checks that callback pruning retains its optimal modes. With a deliberately
+unknown producer dependency, checker counted-density search visits 53 nodes
+and 13 leaves versus 61 nodes and 16 leaves without score pruning; the other
+built-in policies make no cuts on this fixture. These grades are synthetic;
+the production scorer is not yet connected to this callback. Its next adapter
+must derive the exact completed incumbent from the same scoring session,
+certify each acyclic dependency grade, include post-unification and prelude
+steps, and leave mutual-cycle grades unresolved. Public derivation still runs
+without score-based pruning.
+
+`NewUnifyQC.type_to_schedules` now forwards optional observation and pruning
+callbacks after its variable correction, together with the fixed match and
+equality preludes. The ordinary command path supplies neither callback and
+keeps its previous search behavior. A typed test checks that observed terminal
+schedules equal the returned candidates, that open corrected prefixes remain
+prefixes of their descendants, and that a nonempty match prelude is visible
+at this boundary. The callbacks do not yet score those preludes; that remains
+part of the production scorer adapter.
+
 `test/prefix_adapter_laws.v` proves the list-level adapter rule: stepwise
 conversion distributes over appended choices, and sorting unconstrained
 blocks preserves an earlier prefix when that prefix ends in a producer, check,

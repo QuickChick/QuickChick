@@ -48,4 +48,37 @@ let () =
      "density-only", RankDensityOnly;
      "var_density", RankVarsThenDensity; "vars_density", RankVarsThenDensity;
      "vars-first", RankVarsThenDensity; "var_only", RankVarsOnly;
-     "vars-only", RankVarsOnly; "unknown", RankDensityThenVars]
+     "vars-only", RankVarsOnly; "unknown", RankDensityThenVars];
+  let grades = [0;1;2;3;4] in
+  let possibilities = [None; Some 0; Some 1; Some 2; Some 3; Some 4] in
+  List.iter (fun policy -> List.iter (fun prefer_dense ->
+    List.iter (fun first -> List.iter (fun second ->
+      let prefix = [first; second] in
+      let bound = prefix_bound ~prefer_dense ~known_grades:prefix
+        ~variable_uses:2 in
+      let resolutions = function
+        | Some grade -> [grade]
+        | None -> grades in
+      List.iter (fun a -> List.iter (fun b ->
+        List.iter (fun suffix ->
+          let completed_grades = [a;b;suffix] in
+          let completed =
+            { density_rank = List.fold_left
+                (if prefer_dense then min else max)
+                (if prefer_dense then 4 else 0) completed_grades;
+              density_counts = histogram_of_ranks completed_grades;
+              variable_uses = 2 + suffix mod 3;
+              candidate_id = 17 } in
+          assert (not (can_prune ~prefer_dense policy
+            ~incumbent:completed ~bound));
+          assert (can_prune ~prefer_dense policy
+            ~incumbent:bound ~bound:completed =
+            (Stdlib.compare
+               (key prefer_dense policy bound)
+               (key prefer_dense policy {completed with candidate_id = 0}) < 0))) grades)
+        (resolutions second)) (resolutions first)) possibilities)
+      possibilities) [true;false]) policies;
+  let equal = prefix_bound ~prefer_dense:true
+    ~known_grades:[None] ~variable_uses:0 in
+  assert (not (can_prune ~prefer_dense:true RankDensityCountsThenVars
+    ~incumbent:{equal with candidate_id = -1} ~bound:equal))

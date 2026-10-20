@@ -1849,7 +1849,11 @@ let rec correct_variables (umap : umap) (scd : schedule_step list) : schedule_st
     S_Let (correct_var umap v, correct_rocq_constr umap c) :: correct_variables umap scd'
 
 
-let type_to_schedules (typ : rocq_constr) (ind_name : ty_ctr option) (ctr_name : ty_ctr option) (result_vars : (var * rocq_constr) list) (output_vars : var list) (ds : derive_sort) opt : (schedule * (var * pat) list * (var * var) list) list = 
+let type_to_schedules ?on_prefix ?should_prune_prefix
+    (typ : rocq_constr) (ind_name : ty_ctr option) (ctr_name : ty_ctr option)
+    (result_vars : (var * rocq_constr) list) (output_vars : var list)
+    (ds : derive_sort) opt :
+    (schedule * (var * pat) list * (var * var) list) list =
   (*TODO: handle parameters, need to distinguish them from remainder of result_vars*)
   (* Feedback.msg_debug (str ("Type to schedules: " ^ rocq_constr_to_string typ) ++ fnl ()); *)
   (* Feedback.msg_debug (str ("Result vars: " ^ String.concat ", " (List.map (fun (v, ty) -> var_to_string v ^ ": " ^ rocq_constr_to_string ty) result_vars)) ++ fnl ()); *)
@@ -1936,8 +1940,24 @@ let type_to_schedules (typ : rocq_constr) (ind_name : ty_ctr option) (ctr_name :
       let eq_checks = EqSet.elements eqs in
       let rec_name = match ind_name with Some n -> n | _ -> ty_ctr_of_string "nonsense" in
       Error.msg_debug (str ("Fixed vars: " ^ String.concat ", " (List.map var_to_string fixed_vars)) ++ fnl ());
-       (List.map (fun schedule_steps -> ((correct_variables umap schedule_steps, sort), matches, eq_checks)) 
-        (possible_schedules vars hyps fixed_vars (rec_name, output_indices) ds))
+       let corrected steps =
+         (correct_variables umap steps, sort), matches, eq_checks in
+       let on_prefix = Option.map (fun observe path terminal steps ->
+         observe path terminal (corrected steps)) on_prefix in
+       let should_prune_prefix = Option.map (fun prune path steps ->
+         prune path (corrected steps)) should_prune_prefix in
+       let schedules = match on_prefix, should_prune_prefix with
+         | None, None ->
+           possible_schedules vars hyps fixed_vars
+             (rec_name, output_indices) ds
+         | _ ->
+           possible_schedules_with_advanced_pruning ~max_schedules:1000
+             ~maximal_outputs:true
+             ~reduce_orderings:(ScheduleRanking.preserves_independent_swaps
+               (ScheduleRanking.current ()))
+             ?on_prefix ?should_prune_prefix
+             vars hyps fixed_vars (rec_name, output_indices) ds in
+       List.map corrected schedules
     | None -> failwith "Failed to construct schedule sort")
   | None -> failwith "Failed to construct state"
 

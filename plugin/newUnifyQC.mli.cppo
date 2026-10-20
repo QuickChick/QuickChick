@@ -106,7 +106,14 @@ val handle_branch :
   NewGenericLib.rocq_constr UM.t ->
   range list -> Unknown.t -> NewGenericLib.dep_ctr -> NewGenericLib.coq_expr * bool *)
 
-val type_to_schedules : NewGenericLib.rocq_constr ->
+val type_to_schedules :
+            ?on_prefix:((int * NewGenericLib.var list list) list -> bool ->
+              (NewGenericLib.schedule * (unknown * NewGenericLib.pat) list *
+                (unknown * unknown) list) -> unit) ->
+            ?should_prune_prefix:((int * NewGenericLib.var list list) list ->
+              (NewGenericLib.schedule * (unknown * NewGenericLib.pat) list *
+                (unknown * unknown) list) -> bool) ->
+            NewGenericLib.rocq_constr ->
             NewGenericLib.ty_ctr option ->
             NewGenericLib.ty_ctr option ->
             (unknown * NewGenericLib.rocq_constr) list ->

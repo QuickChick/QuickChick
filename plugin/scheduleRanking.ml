@@ -71,7 +71,7 @@ let preserves_independent_swaps = function
      | Some ("0" | "false" | "no") -> false
      | _ -> true)
 
-let compare ~prefer_dense policy a b =
+let compare_without_id ~prefer_dense policy a b =
   let density () =
     if prefer_dense then Stdlib.compare b.density_rank a.density_rank
     else Stdlib.compare a.density_rank b.density_rank in
@@ -85,4 +85,25 @@ let compare ~prefer_dense policy a b =
     | RankDensityOnly -> density ()
     | RankVarsThenDensity -> then_compare (variables ()) density
     | RankVarsOnly -> variables () in
-  then_compare result (fun () -> Stdlib.compare a.candidate_id b.candidate_id)
+  result
+
+let compare ~prefer_dense policy a b =
+  let result = compare_without_id ~prefer_dense policy a b in
+  if result = 0 then Stdlib.compare a.candidate_id b.candidate_id else result
+
+(* None is a call whose grade has not been certified. Give it the best rank
+   for this derivation direction and no histogram count. Committed variable
+   uses are already incurred; future steps can only add to them. *)
+let prefix_bound ~prefer_dense ~known_grades ~variable_uses =
+  let floor = if prefer_dense then 4 else 0 in
+  let grades = List.filter_map Fun.id known_grades in
+  let density_rank = List.fold_left
+    (if prefer_dense then min else max) floor grades in
+  { density_rank;
+    density_counts = histogram_of_ranks grades;
+    variable_uses;
+    candidate_id = 0 }
+
+(* Strict comparison preserves equal-score candidates and their ID tie order. *)
+let can_prune ~prefer_dense policy ~incumbent ~bound =
+  compare_without_id ~prefer_dense policy incumbent bound < 0

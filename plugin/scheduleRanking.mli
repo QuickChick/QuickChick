@@ -32,3 +32,14 @@ val preserves_independent_swaps : policy -> bool
 
 (** Smaller results rank first; candidate id breaks all feature ties. *)
 val compare : prefer_dense:bool -> policy -> features -> features -> int
+
+(** Conservative append-only bound. [None] is an unresolved call: it takes
+    the best density rank and contributes no histogram count. The use count
+    includes only uses already incurred by committed steps. *)
+val prefix_bound : prefer_dense:bool -> known_grades:int option list ->
+  variable_uses:int -> features
+
+(** Prune only when a completed incumbent is strictly better than the bound;
+    candidate IDs are deliberately excluded from this comparison. *)
+val can_prune : prefer_dense:bool -> policy -> incumbent:features ->
+  bound:features -> bool

@@ -1,4 +1,5 @@
 module N = Quickchick_plugin.NewGenericLib
+module U = Quickchick_plugin.NewUnifyQC
 module Ranking = Quickchick_plugin.ScheduleRanking
 
 let v = N.var_of_string
@@ -92,6 +93,25 @@ let variable_uses schedule =
       here + visit (added @ bound) rest in
   visit [] schedule
 
+(* A small mode-dependent dependency model. D's producing mode is treated as
+   cycle-dependent in the prefix bound; its grade is known at completed leaves.
+   Other grades stand in for certified direct or acyclic call summaries. *)
+let model_step_grade ~prefer_dense = function
+  | N.S_UC _ | N.S_Let _ -> 4
+  | N.S_Check _ -> 0
+  | N.S_Match _ -> 1
+  | N.S_ST (_, N.SrcRec _, _) -> 3
+  | N.S_ST (_, source, _) ->
+    (match name_of_source source with
+     | Some "D" -> 3
+     | Some ("A" | "C") when not prefer_dense -> 2
+     | Some _ when not prefer_dense -> 1
+     | _ -> 4)
+
+let model_known_grade ~prefer_dense = function
+  | N.S_ST (_, source, _) when name_of_source source = Some "D" -> None
+  | step -> Some (model_step_grade ~prefer_dense step)
+
 (* Test-only certificate for plain, nonrecursive relation calls whose arguments
    are distinct direct variables. Source rewriting invalidates this shortcut. *)
 let direct_variable_use_bound footprints schedule =
@@ -111,6 +131,24 @@ let direct_variable_use_bound footprints schedule =
       if List.mem variable vars then count + 1 else count) 0 remaining in
     total + if List.mem variable bound then mentions
       else max 0 (mentions - 1)) 0 ["x"; "y"; "z"]
+
+let model_features ~prefer_dense ~terminal ~footprints schedule =
+  let grades = List.map
+    (if terminal then fun step -> Some (model_step_grade ~prefer_dense step)
+     else model_known_grade ~prefer_dense) schedule in
+  Ranking.prefix_bound ~prefer_dense ~known_grades:grades
+    ~variable_uses:(if terminal then variable_uses schedule
+      else direct_variable_use_bound footprints schedule)
+
+let best_features ~prefer_dense ~footprints policy schedules =
+  match schedules with
+  | [] -> failwith "empty schedule set"
+  | first :: rest ->
+    List.fold_left (fun best schedule ->
+      let score = model_features ~prefer_dense ~terminal:true ~footprints schedule in
+      if Ranking.compare ~prefer_dense policy score best < 0 then score
+      else best)
+      (model_features ~prefer_dense ~terminal:true ~footprints first) rest
 
 let positive_checks schedule =
   List.fold_left (fun count -> function
@@ -287,6 +325,56 @@ let simulate_strict_pruning observations =
         | _ -> ()
     end) (List.rev observations);
   !visited, !scored_leaves, List.length !pruned_paths, !incumbent
+
+let test_unifier_prefix_boundary nat =
+  let x = v "unify_x" and y = v "unify_y" in
+  let rx = v "result_x" and ry = v "result_y" in
+  let root = N.DTyCtr (N.ty_ctr_of_string "PrefixRoot",
+    [N.DTyVar x; N.DTyVar y]) in
+  let typ = N.DProd ((x,nat), N.DProd ((y,nat),
+    N.DArrow (relation "P" ["unify_x"],
+      N.DArrow (relation "Q" ["unify_x";"unify_y"], root)))) in
+  let observations = ref [] in
+  let candidates = U.type_to_schedules
+    ~on_prefix:(fun path terminal triple ->
+      observations := (path, terminal, triple) :: !observations)
+    typ (Some (N.ty_ctr_of_string "PrefixRoot"))
+    (Some (N.ty_ctr_of_string "PrefixCtor"))
+    [rx,nat;ry,nat] [rx;ry] N.D_Gen true in
+  assert (candidates <> []);
+  let views = List.map (fun (path, terminal, ((steps,_), matches, eqs)) ->
+    assert (List.for_all (fun ((_,_), ms, es) ->
+      ms = matches && es = eqs) candidates);
+    path, terminal, steps) !observations in
+  check_converted_prefixes views;
+  let terminal_steps = List.filter_map (function
+    | _, true, steps -> Some (alpha_normalize_schedule steps)
+    | _ -> None) views |> List.sort_uniq compare in
+  let returned_steps = List.map (fun ((steps,_),_,_) ->
+    alpha_normalize_schedule steps) candidates |> List.sort_uniq compare in
+  assert (terminal_steps = returned_steps);
+  let matched = N.DTyCtr (N.ty_ctr_of_string "PrefixRoot", [
+    N.DCtr (N.constructor_of_string "Coq.Init.Datatypes.S", [N.DTyVar x]);
+    N.DTyVar x]) in
+  let matched_observations = ref [] in
+  let matched_candidates = U.type_to_schedules
+    ~on_prefix:(fun path terminal triple ->
+      matched_observations := (path, terminal, triple) :: !matched_observations)
+    (N.DProd ((x,nat), matched))
+    (Some (N.ty_ctr_of_string "PrefixRoot"))
+    (Some (N.ty_ctr_of_string "MatchedCtor"))
+    [rx,nat;ry,nat] [ry] N.D_Gen true in
+  assert (matched_candidates <> []);
+  assert (List.exists (fun (_, matches, _) -> matches <> []) matched_candidates);
+  assert (List.for_all (fun (_, _, (_, matches, eqs)) ->
+    List.exists (fun (_, candidate_matches, candidate_eqs) ->
+      matches = candidate_matches && eqs = candidate_eqs)
+      matched_candidates) !matched_observations);
+  check_converted_prefixes
+    (List.map (fun (path, terminal, ((steps,_),_,_)) ->
+      path, terminal, steps) !matched_observations);
+  Printf.printf "post-unification prefix correspondence: leaves=%d; match prelude present\n"
+    (List.length terminal_steps)
 
 let test_small_footprints nat rec_call =
   let variables = List.map (fun x -> (v x, nat)) ["x"; "y"; "z"] in
@@ -562,6 +650,73 @@ let () =
   assert (List.length maximal_candidates = 120);
   assert (List.length maximal_reduced = 16);
   assert (List.length (unique_owners maximal_candidates) = 16);
+  let check_conservative_model prefer_dense ds =
+  List.iter (fun policy ->
+    let observations = ref [] in
+    let oracle = N.possible_schedules_with_advanced_pruning
+      ~max_schedules:100000 ~reduce_orderings:false ~maximal_outputs:true
+      ~on_prefix:(fun path terminal schedule ->
+        observations := (path, terminal, schedule) :: !observations)
+      variables hypotheses [] rec_call ds in
+    let leaves = List.filter (fun (_, terminal, _) -> terminal)
+      !observations in
+    List.iter (fun (path, terminal, schedule) ->
+      if not terminal then begin
+        let bound = model_features ~prefer_dense ~terminal:false
+          ~footprints:direct_footprints schedule in
+        List.iter (fun (leaf_path, _, completed) ->
+          if is_path_prefix path leaf_path then
+            let actual = model_features ~prefer_dense ~terminal:true
+              ~footprints:direct_footprints completed in
+            assert (not (Ranking.can_prune ~prefer_dense policy
+              ~incumbent:actual ~bound))) leaves
+      end) !observations;
+    let incumbent = ref None in
+    let stats = N.empty_prefix_search_stats () in
+    let bounded = N.possible_schedules_with_advanced_pruning
+      ~max_schedules:100000 ~maximal_outputs:true ~stats
+      ~on_prefix:(fun _ terminal schedule ->
+        if terminal then begin
+          let score = model_features ~prefer_dense ~terminal:true
+            ~footprints:direct_footprints schedule in
+          incumbent := Some (match !incumbent with
+            | None -> score
+            | Some old when Ranking.compare ~prefer_dense policy score old < 0 -> score
+            | Some old -> old)
+        end)
+      ~should_prune_prefix:(fun _ schedule ->
+        match !incumbent with
+        | None -> false
+        | Some best -> Ranking.can_prune ~prefer_dense policy
+            ~incumbent:best
+            ~bound:(model_features ~prefer_dense ~terminal:false
+              ~footprints:direct_footprints schedule))
+      variables hypotheses [] rec_call ds in
+    let optimum = best_features ~prefer_dense
+      ~footprints:direct_footprints policy oracle in
+    let matches_optimum schedule =
+      let score = model_features ~prefer_dense ~terminal:true
+        ~footprints:direct_footprints schedule in
+      not (Ranking.can_prune ~prefer_dense policy ~incumbent:score ~bound:optimum)
+      && not (Ranking.can_prune ~prefer_dense policy ~incumbent:optimum ~bound:score) in
+    assert (match !incumbent with Some _ -> true | None -> false);
+    assert (List.sort_uniq compare
+      (List.map mode_signature (List.filter matches_optimum
+        (if prefer_dense then maximal_reduced else oracle))) =
+      List.sort_uniq compare
+      (List.map mode_signature (List.filter matches_optimum bounded)));
+    Printf.printf "conservative typed bound %s %s: oracle=%d bounded=%d nodes=%d\n"
+      (if prefer_dense then "generator" else "checker")
+      (Ranking.to_string policy) (List.length oracle)
+      (List.length bounded)
+      stats.visited_nodes) [
+      Ranking.RankDensityThenVars;
+      Ranking.RankDensityCountsThenVars;
+      Ranking.RankDensityOnly;
+      Ranking.RankVarsThenDensity;
+      Ranking.RankVarsOnly] in
+  check_conservative_model true N.D_Gen;
+  check_conservative_model false N.D_Check;
   (* Give each typed relation mode a fixed synthetic recursive-call grade.
      The proof in test/pruning_bounds.v then predicts that the committed
      density/count/use key is no worse than every completed descendant. *)
@@ -786,6 +941,7 @@ let () =
   assert (List.exists (fun schedule ->
     List.length (List.filter (function N.S_Match _ -> true | _ -> false)
       schedule) = 2) double_schedules);
+  test_unifier_prefix_boundary nat;
   test_small_footprints nat rec_call;
   Printf.printf "converted prefix pairs=%d alpha-renamed=%d\n"
     !converted_prefix_pairs !alpha_only_prefix_pairs;
