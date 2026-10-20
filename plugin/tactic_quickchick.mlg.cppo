@@ -1207,6 +1207,24 @@ let schedule_tie_report_limit () =
   | Some s -> (try max 0 (int_of_string s) with Failure _ -> 3)
   | None -> 3
 
+let density_rank = function
+  | Checking -> 0
+  | Backtracking -> 1
+  | Neutral -> 2
+  | Partial -> 3
+  | Total -> 4
+
+let scored_schedule_features ds candidate_id ((steps, _) as scored) =
+  let prefer_dense = ds = D_Gen || ds = D_Thm in
+  let ranks = List.map (fun (_, grade) -> density_rank grade) steps in
+  let density_rank = List.fold_left
+    (if prefer_dense then min else max)
+    (if prefer_dense then 4 else 0) ranks in
+  { ScheduleRanking.density_rank;
+    density_counts = ScheduleRanking.histogram_of_ranks ranks;
+    variable_uses = get_num_var_uses scored ds;
+    candidate_id }
+
 let sort_schedules_by_density_and_var_uses (schedules : (int * schedule_with_density) list) (ds : derive_sort) : (schedule_with_density * rule_density * int * int) list =
   let rec take_local n l =
     if n <= 0 then [] else
@@ -1218,13 +1236,6 @@ let sort_schedules_by_density_and_var_uses (schedules : (int * schedule_with_den
     match ds with
     | D_Gen | D_Thm -> fun d d' -> - (compare d d')
     | D_Enum | D_Check -> fun d d' -> compare d d'
-  in
-  let density_rank = function
-    | Checking -> 0
-    | Backtracking -> 1
-    | Neutral -> 2
-    | Partial -> 3
-    | Total -> 4
   in
   let representative_density (schd_steps, _) =
     match ds with
@@ -1610,6 +1621,19 @@ let has_schedule_instance relation outputs ds constrained =
   match instance_requirements ~allow_root:(match relation with DTyParam _ -> true | _ -> false)
     env sigma goal names with Some _ -> true | None -> false
 
+(* Prefix probes must not choose a dependency schedule or leave a provisional
+   grade in the memo used to score completed constructor candidates. *)
+let with_temporary_density_state f =
+  let saved_inductive = !density_inductive_memo in
+  let saved_rule = !density_memo in
+  let saved_relations = !rocq_relation_memo in
+  let saved_uncertainty = !density_uncertainty_events in
+  Fun.protect ~finally:(fun () ->
+    density_inductive_memo := saved_inductive;
+    density_memo := saved_rule;
+    rocq_relation_memo := saved_relations;
+    density_uncertainty_events := saved_uncertainty) f
+
 let rec schedule_density neutral_prelude_steps schedule : schedule_with_density =
   let fixed step ds = match fixed_step_density ds step with
     | Some grade -> grade
@@ -1704,7 +1728,93 @@ and constructor_valid_schedules (ind_name : ty_ctr) (ctr : rocq_ctr) (result_var
   Error.msg_debug (str "Constructor name: " ++ str (constructor_to_string ctr_name) ++ fnl ());
   Error.msg_debug (str "Constructor type: " ++ str (rocq_constr_to_string typ) ++ fnl ());
   let typ = if opt then typ else arrows_to_products typ in
-  let schedule_matches = NewUnifyQC.type_to_schedules typ (Some ind_name) (Some ctr_name) result_vars output_vars ds opt in
+  let score_pruning_mode = match Sys.getenv_opt "QC_SCHEDULE_SCORE_PRUNING" with
+    | Some ("1" | "true" | "yes") -> `Prune
+    | Some "verify" -> `Verify
+    | _ -> `Off in
+  let prefer_dense = ds = D_Gen || ds = D_Thm in
+  let policy = schedule_ranking_policy () in
+  let incumbent = ref None in
+  let observed_leaf_scores = ref [] in
+  let observed_bounds = ref [] in
+  let scored_leaves = ref 0 in
+  let checked_prefixes = ref 0 in
+  let pruned_prefixes = ref 0 in
+  let bound_grade_cache = Hashtbl.create 32 in
+  let rec path_prefix prefix path = match prefix, path with
+    | [], _ -> true
+    | x :: xs, y :: ys when x = y -> path_prefix xs ys
+    | _ -> false in
+  let materialize ((steps, sort), ms, eqs) =
+    let match_steps = List.map (fun (v,p) -> S_Match (v,p)) ms in
+    match_steps, (List.map check_eq eqs @ steps, sort) in
+  let leaf_score triple = with_temporary_density_state (fun () ->
+    let match_steps, schedule = materialize triple in
+    scored_schedule_features ds 0 (schedule_density match_steps schedule)) in
+  let bound_score triple = with_temporary_density_state (fun () ->
+    let match_steps, (steps, sort) = materialize triple in
+    let neutral = match ds with
+      | D_Gen | D_Thm -> Total
+      | D_Check | D_Enum -> Checking in
+    let known_grades =
+      List.map (fun _ -> Some (density_rank neutral)) match_steps @
+      List.map (fun step ->
+        match fixed_step_density ds step with
+        | Some grade -> Some (density_rank grade)
+        | None ->
+          (match Hashtbl.find_opt bound_grade_cache (step, sort) with
+           | Some cached -> cached
+           | None ->
+             let before = !density_uncertainty_events in
+             let scored = schedule_density [] ([step], sort) in
+             let grade = match scored with
+               | ([( _, grade)], _) when !density_uncertainty_events = before ->
+                 Some (density_rank grade)
+               | _ -> None in
+             Hashtbl.add bound_grade_cache (step, sort) grade;
+             grade)) steps in
+    let annotations = List.map (fun step -> step, Total) (match_steps @ steps) in
+    ScheduleRanking.prefix_bound ~prefer_dense ~known_grades
+      ~variable_uses:(get_num_var_uses (annotations, sort) ds)) in
+  let on_prefix = if score_pruning_mode <> `Off then Some (fun path terminal triple ->
+    if terminal then begin
+      incr scored_leaves;
+      let score = leaf_score triple in
+      if score_pruning_mode = `Verify then
+        observed_leaf_scores := score :: !observed_leaf_scores;
+      if score_pruning_mode = `Verify then
+        List.iter (fun (ancestor, bound) ->
+          if path_prefix ancestor path &&
+             ScheduleRanking.can_prune ~prefer_dense policy
+               ~incumbent:score ~bound then
+            failwith "schedule score prefix bound exceeded a completed descendant")
+          !observed_bounds;
+      incumbent := Some (match !incumbent with
+        | None -> score
+        | Some best when ScheduleRanking.compare ~prefer_dense policy score best < 0 -> score
+        | Some best -> best)
+    end) else None in
+  let should_prune_prefix = if score_pruning_mode <> `Off then Some (fun path triple ->
+    incr checked_prefixes;
+    if score_pruning_mode = `Verify then begin
+      observed_bounds := (path, bound_score triple) :: !observed_bounds;
+      false
+    end else match !incumbent with
+      | None -> false
+      | Some best ->
+        let cut = ScheduleRanking.can_prune ~prefer_dense policy
+          ~incumbent:best ~bound:(bound_score triple) in
+        if cut then incr pruned_prefixes;
+        cut) else None in
+  let schedule_matches = NewUnifyQC.type_to_schedules
+    ?on_prefix ?should_prune_prefix typ (Some ind_name) (Some ctr_name)
+    result_vars output_vars ds opt in
+  if score_pruning_mode <> `Off && schedule_trace_enabled () then
+    Feedback.msg_notice (str (Printf.sprintf
+      "[schedule-pruning] constructor=%s mode=%s prefixes=%d leaves=%d cuts=%d\n"
+      (constructor_to_string ctr_name)
+      (match score_pruning_mode with `Prune -> "prune" | `Verify -> "verify" | `Off -> "off")
+      !checked_prefixes !scored_leaves !pruned_prefixes));
   let schedules = List.mapi (fun i ((steps, sort), ms, eqs) -> i, (List.map (fun (v,p) -> S_Match (v,p)) ms), ((List.map check_eq eqs @ steps), sort)) schedule_matches in
   let initial_inductive_memo = !density_inductive_memo in
   let initial_density_memo = !density_memo in
@@ -1721,6 +1831,14 @@ and constructor_valid_schedules (ind_name : ty_ctr) (ctr : rocq_ctr) (result_var
       if are_schedule_steps_valid i scored then
         Some (i, scored, inductive_memo, density_memo_after)
       else None) schedules) in
+  if score_pruning_mode = `Verify then begin
+    let observed = List.sort_uniq Stdlib.compare !observed_leaf_scores in
+    let rescored = List.map (fun (_, scored, _, _) ->
+      scored_schedule_features ds 0 scored) schedule_densities
+      |> List.sort_uniq Stdlib.compare in
+    if observed <> rescored then
+      failwith "schedule score leaf probe differs from final candidate scoring"
+  end;
   schedule_densities
 
 and select_best_schedule (schedules : (int * schedule_with_density) list) (ds : derive_sort) : (int * schedule * rule_density) option =

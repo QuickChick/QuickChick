@@ -169,11 +169,7 @@ checks that callback pruning retains its optimal modes. With a deliberately
 unknown producer dependency, checker counted-density search visits 53 nodes
 and 13 leaves versus 61 nodes and 16 leaves without score pruning; the other
 built-in policies make no cuts on this fixture. These grades are synthetic;
-the production scorer is not yet connected to this callback. Its next adapter
-must derive the exact completed incumbent from the same scoring session,
-certify each acyclic dependency grade, include post-unification and prelude
-steps, and leave mutual-cycle grades unresolved. Public derivation still runs
-without score-based pruning.
+the real-scorer results below are the evidence for the production adapter.
 
 `NewUnifyQC.type_to_schedules` now forwards optional observation and pruning
 callbacks after its variable correction, together with the fixed match and
@@ -181,8 +177,33 @@ equality preludes. The ordinary command path supplies neither callback and
 keeps its previous search behavior. A typed test checks that observed terminal
 schedules equal the returned candidates, that open corrected prefixes remain
 prefixes of their descendants, and that a nonempty match prelude is visible
-at this boundary. The callbacks do not yet score those preludes; that remains
-part of the production scorer adapter.
+at this boundary.
+
+The constructor scorer now uses those callbacks when the internal
+`QC_SCHEDULE_SCORE_PRUNING` environment switch is set. It scores completed
+leaves with the ordinary scorer in a temporary memo session. For a committed
+step with a fixed grade it uses that grade; for a nonrecursive producer it
+resolves the dependency on demand and uses its grade only if the computation
+never read a provisional or cycle-dependent memo entry. Other calls keep the
+optimistic grade. The bound includes fixed match and equality preludes and
+the committed variable-use count. Temporary scoring restores memo and
+uncertainty state before final candidate scoring. Per-constructor bound probes
+cache a call-site result by corrected step and schedule mode, so repeated
+prefixes do not rederive the same dependency merely to bound it.
+
+`QC_SCHEDULE_SCORE_PRUNING=verify` enumerates all leaves and checks each
+bound against every completed descendant, then compares the scores seen at
+the leaves with final candidate rescoring. Setting it to `1` enables strict
+cuts. The default is off. The maintained three-premise fixture scores four
+root candidates without cuts and three with the switch on, selecting the
+same best density and variable-use score under default and counted-density
+ranking. The connected mutual-cycle and public derivation fixtures pass the
+verification mode; see `test/scoring_pruning`. The five-premise saturation
+fixture makes no real-score cuts under either ranking. This adapter has not
+yet been proved sound for all typed unification and source rewrites, nor
+shown to reduce end-to-end derivation time. The extra leaf and prefix scoring
+can cost more than the cuts save. Keep the switch internal until wider
+correspondence and performance tests justify enabling it by default.
 
 `test/prefix_adapter_laws.v` proves the list-level adapter rule: stepwise
 conversion distributes over appended choices, and sorting unconstrained
