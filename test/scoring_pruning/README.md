@@ -9,8 +9,11 @@ to `1` enables strict pruning. Both are internal experiments; unset is the
 unchanged public behavior.
 
 The three-premise fixture has four unpruned root candidates. Under both the
-default and counted-density rankings, the bounded run scores three and keeps
+default and counted-density rankings, the bounded run scores one and keeps
 the same winner. The script also verifies the connected mutual-cycle fixture.
+The added floor counts unprocessed positive hypotheses whose variables are
+already bound, since they can only become checks. The typed scheduler test
+checks that count against every descendant of exhaustive and nested cases.
 These cases are evidence for the adapter, not a proof for every typed source
 rewrite or proof context.
 
@@ -24,8 +27,11 @@ dependencies and step-multiset grades. The ordinary diagnostic shares
 dependency memo state across candidates and is faster, so its timing is not
 a like-for-like pruning comparison. The diagnostic
 has 12 root candidates over 25 prefixes. The root verifier runs directly,
-selection is unchanged across modes, and the bound makes no cuts. Score probes
+selection is unchanged across modes, and the bound makes no cuts: all 12
+candidates have the same scored density, histogram, and variable uses. Score probes
 suspend nested experimental pruning to avoid re-entering dependency searches.
+The verifier records each leaf with the internal `QC_SCHEDULE_TRACE_BOUNDS=1`
+trace and asserts that exact tie.
 The fixture checks the merged relation's ten-argument type and constructs a
 single expression `X` that evaluates under three distinct input pairs.
 Pruned ranking reuses completed-leaf scores and rescores only the winner to

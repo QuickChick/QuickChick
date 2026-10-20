@@ -171,6 +171,14 @@ and 13 leaves versus 61 nodes and 16 leaves without score pruning; the other
 built-in policies make no cuts on this fixture. These grades are synthetic;
 the real-scorer results below are the evidence for the production adapter.
 
+The prefix search also exposes the number of unprocessed positive hypotheses
+whose variables are all bound. Each must become a check: the environment only
+grows, and maximal-output scheduling cannot select an already bound output.
+Eager checking is disabled here, so none has appeared in the prefix steps.
+The bound adds one `Checking` grade per such hypothesis. Negative hypotheses
+are excluded because their check grade differs. Exhaustive typed search checks
+this floor against every descendant, including a nested-argument case.
+
 `NewUnifyQC.type_to_schedules` now forwards optional observation and pruning
 callbacks after its variable correction, together with the fixed match and
 equality preludes. The ordinary command path supplies neither callback and
@@ -190,12 +198,14 @@ the committed variable-use count. Temporary scoring restores memo and
 uncertainty state before final candidate scoring. Per-constructor bound probes
 cache a call-site result by corrected step and schedule mode, so repeated
 prefixes do not rederive the same dependency merely to bound it.
+The forced-check floor comes from the scheduler's environment before variable
+names are corrected for display; it does not infer bindings from renamed steps.
 
 `QC_SCHEDULE_SCORE_PRUNING=verify` enumerates all leaves and checks each
 bound against every completed descendant, then compares the scores seen at
 the leaves with final candidate rescoring. Setting it to `1` enables strict
 cuts. The default is off. The maintained three-premise fixture scores four
-root candidates without cuts and three with the switch on, selecting the
+root candidates without cuts and one with the switch on, selecting the
 same best density and variable-use score under default and counted-density
 ranking. The connected mutual-cycle and public derivation fixtures pass the
 verification mode; see `test/scoring_pruning`. The five-premise saturation
@@ -229,9 +239,13 @@ across 12 leaves, which had only two distinct step multisets. Pruned ranking
 reuses completed-leaf annotations and rescores only the winner to recover its
 dependency memo. In the reused run, bound, leaf, and final scoring cost 0.28,
 1.26, and 0.57 seconds of CPU time.
-The verifier still independently rescores all candidates. The bound is
-admissible on this case but too weak to cut, and recursive score resolution
-remains expensive.
+The verifier still independently rescores all candidates. All 12 leaves have
+the same density, counted-density histogram, and variable-use score:
+`Checking`, `(1,0,0,3,0)`, and one use. Strict score pruning cannot discard
+those ties while candidate IDs come from the final sorted candidate list.
+This fixture stresses recursive score resolution, not discrimination between
+schedules; the bound makes no cuts. Recursive score resolution remains
+expensive.
 
 `test/prefix_adapter_laws.v` proves the list-level adapter rule: stepwise
 conversion distributes over appended choices, and sorting unconstrained

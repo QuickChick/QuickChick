@@ -61,11 +61,11 @@ with tempfile.TemporaryDirectory() as temporary:
                                   destination / "Probe.vo")
         assert baseline[0] == verified[0] == bounded[0] == ranking
         assert baseline[1] == verified[1] == "4", (baseline, verified)
-        assert bounded[1] == "3", bounded
+        assert bounded[1] == "1", bounded
         assert baseline[3:] == verified[3:] == bounded[3:], (
             baseline, verified, bounded)
         assert verify_work == ("verify", "8", "4", "0"), verify_work
-        assert prune_work == ("prune", "8", "3", "1"), prune_work
+        assert prune_work == ("prune", "7", "1", "3"), prune_work
 
     # This fixture has a cycle-dependent score. The verifier must leave its
     # provisional grade out of every bound and match final candidate scoring.
@@ -81,4 +81,4 @@ with tempfile.TemporaryDirectory() as temporary:
     assert cold[1] == warm[1] == verified[1]
     assert cold[3:] == warm[3:] == verified[3:] == bounded[3:]
 
-print("real scorer: four leaves verified, one safely pruned; mutual cycle verified")
+print("real scorer: four leaves verified, three safely pruned; mutual cycle verified")

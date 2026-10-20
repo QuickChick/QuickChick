@@ -144,12 +144,18 @@ type prefix_search_stats = {
 val empty_prefix_search_stats : unit -> prefix_search_stats
 
 (* Internal search probes. should_prune_prefix is for certified policy bounds;
-   callers must establish that it holds for every descendant of the prefix. *)
+   callers must establish that it holds for every descendant of the prefix.
+   The floor variants also pass the number of remaining positive hypotheses
+   whose arguments are already bound and therefore must become checks. *)
 val possible_schedules_with_advanced_pruning : ?max_schedules:int -> ?reduce_orderings:bool ->
   ?maximal_outputs:bool ->
   ?stats:prefix_search_stats ->
   ?on_prefix:((int * var list list) list -> bool -> schedule_step list -> unit) ->
+  ?on_prefix_with_floor:((int * var list list) list -> bool -> int ->
+    schedule_step list -> unit) ->
   ?should_prune_prefix:((int * var list list) list -> schedule_step list -> bool) ->
+  ?should_prune_prefix_with_floor:((int * var list list) list -> int ->
+    schedule_step list -> bool) ->
   (var * rocq_type) list ->
   rocq_type list ->
   var list -> constructor * int list ->

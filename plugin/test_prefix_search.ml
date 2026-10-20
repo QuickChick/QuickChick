@@ -478,8 +478,12 @@ let () =
   let complete_observations = ref [] in
   let complete_converted_observations = ref [] in
   let complete_structural_bounds = ref [] in
+  let check_floor_observations = ref [] in
   let complete = N.possible_schedules_with_advanced_pruning
       ~max_schedules:100000 ~reduce_orderings:false ~stats:complete_stats
+      ~on_prefix_with_floor:(fun path terminal floor stable ->
+        check_floor_observations :=
+          (path, terminal, floor, stable) :: !check_floor_observations)
       ~on_prefix:(fun path terminal stable ->
         complete_converted_observations :=
           (path, terminal, stable) :: !complete_converted_observations;
@@ -492,6 +496,19 @@ let () =
           :: !complete_structural_bounds)
       variables hypotheses [] rec_call N.D_Gen in
   check_converted_prefixes !complete_converted_observations;
+  let completed_checks = List.filter_map (fun (path, terminal, _, stable) ->
+    if terminal then Some (path, positive_checks stable) else None)
+    !check_floor_observations in
+  let useful_floors = ref 0 in
+  List.iter (fun (path, terminal, floor, stable) ->
+    if not terminal then begin
+      if floor > 0 then incr useful_floors;
+      List.iter (fun (leaf_path, checks) ->
+        if is_path_prefix path leaf_path then
+          assert (positive_checks stable + floor <= checks))
+        completed_checks
+    end) !check_floor_observations;
+  assert (!useful_floors > 0);
   let reduced_stats = N.empty_prefix_search_stats () in
   let reduced_observations = ref [] in
   let reduced_structural_bounds = ref [] in
@@ -941,6 +958,24 @@ let () =
   assert (List.exists (fun schedule ->
     List.length (List.filter (function N.S_Match _ -> true | _ -> false)
       schedule) = 2) double_schedules);
+  let nested_floors = ref [] in
+  ignore (N.possible_schedules_with_advanced_pruning
+    ~reduce_orderings:false
+    ~on_prefix_with_floor:(fun path terminal floor stable ->
+      nested_floors := (path, terminal, floor, stable) :: !nested_floors)
+    [v "x", nat; v "y", nat]
+    [relation "Bind" ["x"; "y"]; double_nested]
+    [] rec_call N.D_Gen);
+  let nested_leaves = List.filter_map (fun (path, terminal, _, stable) ->
+    if terminal then Some (path, positive_checks stable) else None)
+    !nested_floors in
+  assert (List.exists (fun (_, terminal, floor, _) ->
+    not terminal && floor > 0) !nested_floors);
+  List.iter (fun (path, terminal, floor, stable) ->
+    if not terminal then List.iter (fun (leaf_path, checks) ->
+      if is_path_prefix path leaf_path then
+        assert (positive_checks stable + floor <= checks)) nested_leaves)
+    !nested_floors;
   test_unifier_prefix_boundary nat;
   test_small_footprints nat rec_call;
   Printf.printf "converted prefix pairs=%d alpha-renamed=%d\n"

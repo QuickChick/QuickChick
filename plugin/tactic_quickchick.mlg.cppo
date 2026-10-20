@@ -1776,6 +1776,15 @@ and constructor_valid_schedules (ind_name : ty_ctr) (ctr : rocq_ctr) (result_var
   let scored_leaves = ref 0 in
   let checked_prefixes = ref 0 in
   let pruned_prefixes = ref 0 in
+  let trace_bounds = schedule_trace_enabled () &&
+    Sys.getenv_opt "QC_SCHEDULE_TRACE_BOUNDS" = Some "1" in
+  let trace_score kind path (score : ScheduleRanking.features) =
+    if trace_bounds then Feedback.msg_notice (str (Printf.sprintf
+      "[schedule-bound-detail] kind=%s path=%s density=%d counts=%s uses=%d\n"
+      kind (String.concat "," (List.map (fun (i, _) -> string_of_int i) path))
+      score.ScheduleRanking.density_rank
+      (ScheduleRanking.histogram_to_string score.ScheduleRanking.density_counts)
+      score.ScheduleRanking.variable_uses)) in
   let bound_grade_cache = Hashtbl.create 32 in
   let leaf_score_cache = Hashtbl.create 32 in
   let mode_grade_cache = Hashtbl.create 32 in
@@ -1835,7 +1844,7 @@ and constructor_valid_schedules (ind_name : ty_ctr) (ctr : rocq_ctr) (result_var
       match_steps schedule in
     Hashtbl.replace leaf_score_cache triple scored;
     scored_schedule_features ds 0 scored)) in
-  let bound_score triple = timed bound_cpu (fun () -> with_shared_temporary_density_state (fun () ->
+  let bound_score check_floor triple = timed bound_cpu (fun () -> with_shared_temporary_density_state (fun () ->
     let match_steps, (steps, sort) = materialize triple in
     let neutral = match ds with
       | D_Gen | D_Thm -> Total
@@ -1857,16 +1866,22 @@ and constructor_valid_schedules (ind_name : ty_ctr) (ctr : rocq_ctr) (result_var
                  Some (density_rank grade)
                | _ -> None in
              Hashtbl.add bound_grade_cache (step, sort) grade;
-             grade)) steps in
+             grade)) steps @
+      (* Remaining positive hypotheses with all arguments bound must become
+         checks, whose fixed density rank is Checking = 0. *)
+      List.init check_floor (fun _ -> Some 0) in
     let annotations = List.map (fun step -> step, Total) (match_steps @ steps) in
     ScheduleRanking.prefix_bound ~prefer_dense ~known_grades
       ~variable_uses:(get_num_var_uses (annotations, sort) ds))) in
   let on_prefix = if score_pruning_mode = `Baseline then
     Some (fun _ terminal _ -> if terminal then incr scored_leaves)
-  else if score_pruning_mode <> `Off then Some (fun path terminal triple ->
+  else None in
+  let on_prefix_with_floor = if score_pruning_mode = `Prune ||
+    score_pruning_mode = `Verify then Some (fun path terminal _ triple ->
     if terminal then begin
       incr scored_leaves;
       let score = leaf_score triple in
+      trace_score "leaf" path score;
       if score_pruning_mode = `Verify then
         observed_leaf_scores := score :: !observed_leaf_scores;
       if score_pruning_mode = `Verify then
@@ -1881,20 +1896,25 @@ and constructor_valid_schedules (ind_name : ty_ctr) (ctr : rocq_ctr) (result_var
         | Some best when ScheduleRanking.compare ~prefer_dense policy score best < 0 -> score
         | Some best -> best)
     end) else None in
-  let should_prune_prefix = if score_pruning_mode = `Verify || score_pruning_mode = `Prune then Some (fun path triple ->
+  let should_prune_prefix_with_floor = if score_pruning_mode = `Verify || score_pruning_mode = `Prune then Some (fun path check_floor triple ->
     incr checked_prefixes;
     if score_pruning_mode = `Verify then begin
-      observed_bounds := (path, bound_score triple) :: !observed_bounds;
+      let bound = bound_score check_floor triple in
+      trace_score "bound" path bound;
+      observed_bounds := (path, bound) :: !observed_bounds;
       false
     end else match !incumbent with
       | None -> false
       | Some best ->
+        let bound = bound_score check_floor triple in
+        trace_score "bound" path bound;
         let cut = ScheduleRanking.can_prune ~prefer_dense policy
-          ~incumbent:best ~bound:(bound_score triple) in
+          ~incumbent:best ~bound in
         if cut then incr pruned_prefixes;
         cut) else None in
   let schedule_matches = NewUnifyQC.type_to_schedules
-    ?on_prefix ?should_prune_prefix typ (Some ind_name) (Some ctr_name)
+    ?on_prefix ?on_prefix_with_floor ?should_prune_prefix_with_floor
+    typ (Some ind_name) (Some ctr_name)
     result_vars output_vars ds opt in
   if score_pruning_mode <> `Off && schedule_trace_enabled () then
     Feedback.msg_notice (str (Printf.sprintf

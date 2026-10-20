@@ -110,7 +110,15 @@ val type_to_schedules :
             ?on_prefix:((int * NewGenericLib.var list list) list -> bool ->
               (NewGenericLib.schedule * (unknown * NewGenericLib.pat) list *
                 (unknown * unknown) list) -> unit) ->
+            ?on_prefix_with_floor:((int * NewGenericLib.var list list) list ->
+              bool -> int ->
+              (NewGenericLib.schedule * (unknown * NewGenericLib.pat) list *
+                (unknown * unknown) list) -> unit) ->
             ?should_prune_prefix:((int * NewGenericLib.var list list) list ->
+              (NewGenericLib.schedule * (unknown * NewGenericLib.pat) list *
+                (unknown * unknown) list) -> bool) ->
+            ?should_prune_prefix_with_floor:((int * NewGenericLib.var list list) list ->
+              int ->
               (NewGenericLib.schedule * (unknown * NewGenericLib.pat) list *
                 (unknown * unknown) list) -> bool) ->
             NewGenericLib.rocq_constr ->

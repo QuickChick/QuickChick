@@ -27,12 +27,18 @@ WORK = re.compile(
     r"leaf-cache-hits=(\d+) mode-cache-hits=(\d+) "
     r"stable-cache-entries=(\d+)"
 )
+LEAF = re.compile(
+    r"^\[schedule-bound-detail\] kind=leaf path=[\d,]+ "
+    r"density=(\d+) counts=([\d,]+) uses=(\d+)"
+)
 
 
 def run(mode, directory, reuse=True):
     environment = os.environ.copy()
     environment["QC_SCHEDULE_TRACE"] = "1"
     environment["QC_SCHEDULE_RANKING"] = "density_then_vars"
+    if mode == "verify":
+        environment["QC_SCHEDULE_TRACE_BOUNDS"] = "1"
     environment.pop("QC_SCHEDULE_SCORE_PRUNING", None)
     if mode != "off":
         environment["QC_SCHEDULE_SCORE_PRUNING"] = mode
@@ -56,6 +62,7 @@ def run(mode, directory, reuse=True):
     rankings = []
     root_searches = []
     work = []
+    leaves = []
     for line in log.open(errors="replace"):
         if match := RANKING.match(line):
             rankings.append(match.groups())
@@ -63,20 +70,23 @@ def run(mode, directory, reuse=True):
             root_searches.append(match.groups())
         if match := WORK.match(line):
             work.append(match.groups())
+        if match := LEAF.match(line):
+            leaves.append(match.groups())
     assert rankings, (mode, "missing ranking trace")
-    return rankings[-1], root_searches, work, time.monotonic() - started
+    return rankings[-1], root_searches, work, leaves, time.monotonic() - started
 
 
 with tempfile.TemporaryDirectory() as temporary:
     directory = Path(temporary)
-    ordinary, off_searches, off_work, off_seconds = run("off", directory)
-    cold, cold_searches, cold_work, cold_seconds = run("baseline", directory, False)
-    baseline, baseline_searches, baseline_work, baseline_seconds = run("baseline", directory)
-    verified, verify_searches, verify_work, verify_seconds = run("verify", directory)
-    bounded, prune_searches, prune_work, prune_seconds = run("1", directory)
+    ordinary, off_searches, off_work, _, off_seconds = run("off", directory)
+    cold, cold_searches, cold_work, _, cold_seconds = run("baseline", directory, False)
+    baseline, baseline_searches, baseline_work, _, baseline_seconds = run("baseline", directory)
+    verified, verify_searches, verify_work, leaves, verify_seconds = run("verify", directory)
+    bounded, prune_searches, prune_work, _, prune_seconds = run("1", directory)
     assert ordinary == cold == baseline == verified == bounded, (
         ordinary, cold, baseline, verified, bounded)
     assert baseline[0] == "12", baseline
+    assert len(leaves) == 12 and set(leaves) == {("0", "1,0,0,3,0", "1")}, leaves
     assert not off_searches, off_searches
     assert not off_work, off_work
     assert len(cold_searches) == len(baseline_searches) == len(verify_searches) == len(prune_searches) == 1
