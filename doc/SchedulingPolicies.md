@@ -126,6 +126,38 @@ resulting bound reversal. This is a cycle-order effect, not an applied-argument
 cache collision. The public scheduler still ranks with its existing heuristic;
 it does not prune from these partial grades.
 
+Exact scores for a mutual group cannot be read from the provisional memo
+entry. A possible context-based scorer would first fix the proof context,
+available instances, full applied relation and mode keys, and the candidate
+schedules for each member. It would then score every candidate symbolically in
+terms of the other members' scores and solve the group together. Acyclic calls
+keep their existing exact on-demand scores. For a cyclic group, the scoring
+policy must also say what a cycle means: equations such as `A = B` and `B = A`
+have several solutions even on the five-grade density scale. Choosing the
+first DFS seed is not a context-only answer. A direct recursive-call grade,
+or an explicitly chosen fixed-point convention with a termination/productivity
+interpretation, can make the meaning deterministic. Either choice may change
+the present ranking and needs separate compatibility review.
+
+The five-grade density component admits a finite SCC analysis once its mode
+alternatives and aggregation are fixed. It does not follow that the whole
+BudgetAware score has a finite exact fixed point: additive fabrication and
+dependency counts can yield equations such as `x = 1 + x`. Lexicographic
+selection among candidate schedules also requires checking whether its
+equations are monotone before using iteration. A practical first probe should
+enumerate the small asymmetric mutual fixture's complete mode graph, solve
+its density equations under a stated cycle rule, and compare every selected
+constructor and parent score with the current order-dependent results. For the
+current pruning work, use the optimistic grade for a cycle-dependent call and
+the exact grade only for a certified cycle-independent call. In generator
+minimization the optimistic density is `Total`; in checker/enumerator
+minimization it is `Checking`. A prefix bound must also give unresolved calls
+the best possible values for every earlier lexicographic coordinate; an
+optimistic density alone cannot rescue an overestimated selectivity or
+fabrication bound. This deliberately weakens pruning until the mutual group
+has a stable scoring rule. Do not replace the bound with a provisional memo
+grade merely because the call has returned during one traversal.
+
 `test/prefix_adapter_laws.v` proves the list-level adapter rule: stepwise
 conversion distributes over appended choices, and sorting unconstrained
 blocks preserves an earlier prefix when that prefix ends in a producer, check,
