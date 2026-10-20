@@ -92,11 +92,15 @@ resolve that dependency then, using its actual mode and applied relation. It
 should not postpone all dependency work until a leaf. Completed scoring sorts
 the candidate's steps before discovering dependencies, however. Adding a future
 step can change which dependency encounters a provisional cycle grade first.
-The scorer now records whether a completed memo entry read such a grade. A
-cycle-independent result can be used by a future bound only after the full
-applied relation, proof context, and policy are part of its certification; the
-current memo key does not provide that guarantee. Until then, the proved
-optimistic grade is used for that call. Direct checks, matches, unconstrained
+The scorer now records whether a completed memo entry read such a grade. For
+the current heuristic, an applied relation is checked for an existing instance
+before its generic declaration is scored; omitted applied arguments alone do
+not show that this generic score changes within one derivation. The unresolved
+bound question is whether a cycle-dependent grade computed from a partial
+candidate remains valid after other calls are discovered. A future policy that
+scores applied calls directly will also need a full applied/context key. Until
+these cases are established, the proved optimistic grade is used for an
+uncertified call. Direct checks, matches, unconstrained
 bindings, lets, and direct recursive calls have fixed local grades. Some of
 these steps still trigger dependency discovery for code generation, but their
 own grade is fixed.
