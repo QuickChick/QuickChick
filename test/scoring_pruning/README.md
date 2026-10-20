@@ -16,7 +16,11 @@ rewrite or proof context.
 
 `python3 test/scoring_pruning/check_semgus.py` runs a reduced version of
 `examples/Sygus.v` with `eval` merged with itself twice. It compares the
-unpruned, verified, and pruned runs using the local plugin. The diagnostic
+ordinary, comparable `baseline`, verified, and pruned runs using the local
+plugin. `baseline` activates the same scheduler and candidate-isolated scoring
+as pruning without calculating bounds. The ordinary diagnostic shares
+dependency memo state across candidates and is faster, so its timing is not
+a like-for-like pruning comparison. The diagnostic
 has 12 root candidates over 25 prefixes. The root verifier runs directly,
 selection is unchanged across modes, and the bound makes no cuts. Score probes
 suspend nested experimental pruning to avoid re-entering dependency searches.

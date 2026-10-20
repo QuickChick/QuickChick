@@ -66,20 +66,24 @@ def run(mode, directory):
 
 with tempfile.TemporaryDirectory() as temporary:
     directory = Path(temporary)
-    baseline, off_searches, off_work, off_seconds = run("off", directory)
+    ordinary, off_searches, off_work, off_seconds = run("off", directory)
+    baseline, baseline_searches, baseline_work, baseline_seconds = run("baseline", directory)
     verified, verify_searches, verify_work, verify_seconds = run("verify", directory)
     bounded, prune_searches, prune_work, prune_seconds = run("1", directory)
-    assert baseline == verified == bounded, (baseline, verified, bounded)
+    assert ordinary == baseline == verified == bounded, (
+        ordinary, baseline, verified, bounded)
     assert baseline[0] == "12", baseline
     assert not off_searches, off_searches
     assert not off_work, off_work
-    assert len(verify_searches) == len(prune_searches) == 1
-    assert len(verify_work) == len(prune_work) == 1
+    assert len(baseline_searches) == len(verify_searches) == len(prune_searches) == 1
+    assert len(baseline_work) == len(verify_work) == len(prune_work) == 1
+    assert baseline_searches[0][1:] == ("baseline", "0", "12", "0")
     verify_root, prune_root = verify_searches[0], prune_searches[0]
     assert verify_root[1:] == ("verify", "25", "12", "0"), verify_root
     assert prune_root[1:] == ("prune", "25", "12", "0"), prune_root
     assert int(prune_work[0][1]) > 0 and int(prune_work[0][2]) > 0
     assert prune_work[0][3] == "12", prune_work
     print(f"double self-merge: 12 root leaves verified over 25 prefixes; "
-          f"same winner, zero cuts; seconds off/verify/prune: "
-          f"{off_seconds:.1f}/{verify_seconds:.1f}/{prune_seconds:.1f}")
+          f"same winner, zero cuts; seconds off/baseline/verify/prune: "
+          f"{off_seconds:.1f}/{baseline_seconds:.1f}/"
+          f"{verify_seconds:.1f}/{prune_seconds:.1f}")

@@ -1739,6 +1739,7 @@ and constructor_valid_schedules (ind_name : ty_ctr) (ctr : rocq_ctr) (result_var
   let typ = if opt then typ else arrows_to_products typ in
   let score_pruning_mode = match !score_pruning_suspended,
     Sys.getenv_opt "QC_SCHEDULE_SCORE_PRUNING" with
+    | false, Some "baseline" -> `Baseline
     | false, Some ("1" | "true" | "yes") -> `Prune
     | false, Some "verify" -> `Verify
     | _ -> `Off in
@@ -1799,7 +1800,9 @@ and constructor_valid_schedules (ind_name : ty_ctr) (ctr : rocq_ctr) (result_var
     let annotations = List.map (fun step -> step, Total) (match_steps @ steps) in
     ScheduleRanking.prefix_bound ~prefer_dense ~known_grades
       ~variable_uses:(get_num_var_uses (annotations, sort) ds))) in
-  let on_prefix = if score_pruning_mode <> `Off then Some (fun path terminal triple ->
+  let on_prefix = if score_pruning_mode = `Baseline then
+    Some (fun _ terminal _ -> if terminal then incr scored_leaves)
+  else if score_pruning_mode <> `Off then Some (fun path terminal triple ->
     if terminal then begin
       incr scored_leaves;
       let score = leaf_score triple in
@@ -1817,7 +1820,7 @@ and constructor_valid_schedules (ind_name : ty_ctr) (ctr : rocq_ctr) (result_var
         | Some best when ScheduleRanking.compare ~prefer_dense policy score best < 0 -> score
         | Some best -> best)
     end) else None in
-  let should_prune_prefix = if score_pruning_mode <> `Off then Some (fun path triple ->
+  let should_prune_prefix = if score_pruning_mode = `Verify || score_pruning_mode = `Prune then Some (fun path triple ->
     incr checked_prefixes;
     if score_pruning_mode = `Verify then begin
       observed_bounds := (path, bound_score triple) :: !observed_bounds;
@@ -1836,7 +1839,8 @@ and constructor_valid_schedules (ind_name : ty_ctr) (ctr : rocq_ctr) (result_var
     Feedback.msg_notice (str (Printf.sprintf
       "[schedule-pruning] constructor=%s mode=%s prefixes=%d leaves=%d cuts=%d\n"
       (constructor_to_string ctr_name)
-      (match score_pruning_mode with `Prune -> "prune" | `Verify -> "verify" | `Off -> "off")
+      (match score_pruning_mode with `Prune -> "prune" | `Verify -> "verify"
+       | `Baseline -> "baseline" | `Off -> "off")
       !checked_prefixes !scored_leaves !pruned_prefixes));
   let schedules = List.mapi (fun i triple ->
     let ms_steps, schd = materialize triple in
@@ -3399,7 +3403,7 @@ VERNAC COMMAND EXTEND DeriveValidSchedules CLASSIFIED AS SIDEFF
       Feedback.msg_notice (str "Printing all bindings" ++ fnl ());
       let schedules_w_densities =
         match Sys.getenv_opt "QC_SCHEDULE_SCORE_PRUNING" with
-        | Some ("1" | "true" | "yes" | "verify") ->
+        | Some ("1" | "true" | "yes" | "verify" | "baseline") ->
           constructor_valid_schedules ind_name (ctr, constructor)
             result_vars output_vars ds true
           |> List.map (fun (i, scored, _, _) -> i, scored)

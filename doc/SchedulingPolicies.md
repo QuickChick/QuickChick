@@ -212,8 +212,13 @@ The verifier checks all 12 root leaves over 25 prefixes, finds no bound
 violation, and selects the same candidate as the unpruned run. It makes zero
 cuts. Score probes suspend nested experimental pruning while resolving
 dependencies; otherwise verification repeatedly re-enters those searches and
-multiplies the work without improving the root bound. In one local run, the
-unpruned, verified, and pruned diagnostics took 1.2, 18.1, and 9.5 seconds.
+multiplies the work without improving the root bound. The ordinary diagnostic
+shares dependency memo state across candidate scores and took 1.3 seconds in
+one local run. A comparable internal `baseline` uses the same bound-aware
+search and candidate-isolated scoring as pruning, but does no bound or leaf
+probe work; it took 8.4 seconds. Verification and pruning took 19.2 and 9.8
+seconds. The ordinary diagnostic's 1.3-second time therefore must not be
+treated as the cost of the same search without pruning.
 The bound-grade cache had 26 hits and 3 misses, consuming 0.34 seconds of CPU
 time. Completed-leaf scoring cost 7.8 seconds. The pruning path now reuses
 those leaf annotations for ranking, then rescores only the selected candidate
