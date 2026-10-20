@@ -738,6 +738,25 @@ type rule_density =
   | Partial
   | Total
 
+(* These grades do not depend on recursive dependency discovery. A prefix
+   bound may use them even before the rest of the candidate is known.
+   Nonrecursive producer calls need a separate dependency certificate. *)
+let fixed_step_density ds (step : schedule_step) : rule_density option =
+  match step with
+  | S_UC (_, (SrcNonrec _ | SrcRec _), _) -> Some Total
+  | S_Check ((SrcNonrec _ | SrcRec _), polarity) ->
+    Some (if polarity then Checking else Partial)
+  | S_ST (_, SrcRec _, _) ->
+    Some (match ds with
+      | D_Gen | D_Thm -> Partial
+      | D_Check | D_Enum -> Checking)
+  | S_Match _ -> Some Backtracking
+  | S_Let _ -> Some Total
+  | S_ST (_, SrcNonrec _, _) -> None
+  | S_ST (_, (SrcMutrec _ | SrcDef _), _)
+  | S_UC (_, (SrcMutrec _ | SrcDef _), _)
+  | S_Check ((SrcMutrec _ | SrcDef _), _) -> None
+
 let rec collect_leaves (tree : pattern_coverage_tree) : (pattern * constructor list) list =
   match tree with
   | PatternLeaf (p, cs) -> [(p,cs)]
@@ -865,10 +884,19 @@ end)
    bound for descendants of a search node. *)
 type inductive_density_entry =
   | DensityInProgress of (inductive_schedule * rule_density)
-  | DensityDone of (inductive_schedule * rule_density)
+  | DensityDone of (inductive_schedule * rule_density) * bool
+
+(* A completed entry is cycle-independent only if its computation never read
+   a provisional or cycle-dependent grade. This says nothing about whether
+   the memo key captures a different applied type or proof context. *)
+let density_uncertainty_events = ref 0
 
 let inductive_density_value = function
-  | DensityInProgress value | DensityDone value -> value
+  | DensityInProgress value ->
+    incr density_uncertainty_events; value
+  | DensityDone (value, cycle_independent) ->
+    if not cycle_independent then incr density_uncertainty_events;
+    value
 
 let density_inductive_memo :
   inductive_density_entry InductiveScheduleKeyMap.t ref =
@@ -1582,19 +1610,18 @@ let has_schedule_instance relation outputs ds constrained =
     env sigma goal names with Some _ -> true | None -> false
 
 let rec schedule_density neutral_prelude_steps schedule : schedule_with_density =
+  let fixed step ds = match fixed_step_density ds step with
+    | Some grade -> grade
+    | None -> assert false in
   let step_density (step : schedule_step) ds : rule_density =
     match step with
-    | S_UC (v, SrcNonrec (DTyParam param), ps) ->
-      Total (* If we have a type parameter we want to generate for, we can't know its density since it is abstracted, hence Neutral. *) 
-    | S_UC (v,SrcNonrec ty,ps) ->
+    | S_UC (_, SrcNonrec (DTyParam _), _) -> fixed step ds
+    | S_UC (_, SrcNonrec ty, ps) ->
       (ignore (best_inductive_schedule_from_instance ty [] (producer_sort_to_derive_sort ps) false);
-      Total) (* For enumerations during a checker should unconstrained be empty? *)
-    | S_UC (_,SrcRec _,_) -> Total
-    | S_Check (SrcNonrec ty,pol) ->
+      fixed step ds)
+    | S_Check (SrcNonrec ty, _) ->
       (ignore (best_inductive_schedule_from_instance ty [] D_Check true);
-      if pol then Checking else Partial)
-    | S_Check (SrcRec _, pol) -> if pol then Checking else Partial
-    | S_ST (_, SrcRec _, _) -> (match ds with D_Gen | D_Thm -> Partial | D_Check | D_Enum -> Checking)
+      fixed step ds)
     | S_ST (output_var_tys, SrcNonrec (DTyCtr (ind,args)), ps) -> 
       let output_vars = List.map fst output_var_tys in
       let rec is_output i = (function
@@ -1606,14 +1633,13 @@ let rec schedule_density neutral_prelude_steps schedule : schedule_with_density 
         (match ps with PS_G -> Partial | PS_E -> Checking)
       else snd (inductive_best_valid_schedule (ty_ctr_to_rocq_relation ind) output_indices (producer_sort_to_derive_sort ps) true)
     | S_ST (_, SrcNonrec _, _) -> failwith "is_schedule_valid: Nonrecursive source should have DTyCtr at toplevel" 
-    | S_Match _ -> Backtracking
     | S_ST (_, SrcMutrec _, _)
     | S_UC (_,SrcMutrec _, _)
     | S_Check (SrcMutrec _, _) -> failwith "is_schedule_valid: Mutually recursive source should not be used at density calculation time, but inserted later."
     | S_ST (_, SrcDef _, _)
     | S_UC (_,SrcDef _, _)
     | S_Check (SrcDef _, _) -> failwith "is_schedule_valid: Defined source should not be used at density calculation time, but inserted later."
-    | S_Let (_,_) -> Total
+    | _ -> fixed step ds
   in
 
   let (steps, sort) = schedule in
@@ -1718,6 +1744,7 @@ and inductive_best_valid_schedule (rel : rocq_relation) (output_idxs : int list)
   let (ind_name, params, ctrs, result_typ) = rel in
   if InductiveScheduleKeyMap.mem (ind_name, output_idxs, ds, opt) !density_inductive_memo then inductive_density_value (InductiveScheduleKeyMap.find (ind_name, output_idxs, ds, opt) !density_inductive_memo)
   else begin
+  let uncertainty_at_start = !density_uncertainty_events in
   Error.msg_debug (str "Inductive name: " 
   ++ str (ty_ctr_to_string ind_name)
   ++ str "\n Parameters: "
@@ -1856,7 +1883,8 @@ and inductive_best_valid_schedule (rel : rocq_relation) (output_idxs : int list)
                                                   ^ " has overall density: " 
                                                   ^ (density_to_string overall_density)) ++ fnl ()));
 
-  density_inductive_memo := InductiveScheduleKeyMap.add (ind_name, output_idxs, ds, opt) (DensityDone (inductive_schedule, overall_density)) !density_inductive_memo;
+  let cycle_independent = !density_uncertainty_events = uncertainty_at_start in
+  density_inductive_memo := InductiveScheduleKeyMap.add (ind_name, output_idxs, ds, opt) (DensityDone ((inductive_schedule, overall_density), cycle_independent)) !density_inductive_memo;
   Error.msg_debug (str (Printf.sprintf "%s: %s Done, Density: %s\n" (schedule_name) (String.concat ", " (List.map string_of_int output_idxs)) (density_to_string overall_density))); 
   inductive_schedule, overall_density)
 end
@@ -2064,7 +2092,7 @@ module InductiveSchedMap = Map.Make(struct type t = inductive_schedule * derive_
 
 let dec_eq_sched_phony = ("DecOpt_eq_III", [], [], [(([],CheckerSchedule),[])], [(([],CheckerSchedule),[])])
    
-let init_density_inductive_memo = InductiveScheduleKeyMap.add (ty_ctr_of_string "Coq.Init.Logic.eq", [], D_Check, true) (DensityDone (dec_eq_sched_phony, Checking)) InductiveScheduleKeyMap.empty
+let init_density_inductive_memo = InductiveScheduleKeyMap.add (ty_ctr_of_string "Coq.Init.Logic.eq", [], D_Check, true) (DensityDone ((dec_eq_sched_phony, Checking), true)) InductiveScheduleKeyMap.empty
 
 (* Diagnostic scoring must not consume or leave behind entries from another
    proof context. Normal derivation commands establish their own memo state. *)
@@ -2433,10 +2461,11 @@ let tarjan_schedules_by_name (schedules : string list) inductive_dependency_map
      List.iter (List.iter (fun ((name,_,_,_,_) as schedule, ds, constrained) ->
        let ind, outputs, _, _ = parse_ind_schd_name name in
        let entry = match InductiveScheduleKeyMap.find_opt (ind, outputs, ds, constrained) !density_inductive_memo with
-         | Some (DensityDone (_, density)) -> DensityDone (schedule, density)
+         | Some (DensityDone ((_, density), cycle_independent)) ->
+           DensityDone ((schedule, density), cycle_independent)
          | Some (DensityInProgress (_, density)) ->
            DensityInProgress (schedule, density)
-         | None -> DensityDone (schedule, Checking) in
+         | None -> DensityDone ((schedule, Checking), false) in
        density_inductive_memo := InductiveScheduleKeyMap.add (ind, outputs, ds, constrained) entry !density_inductive_memo)) components;
      components)
 
@@ -2812,7 +2841,7 @@ let quickchick_it size idx =
 
         (* Register theorem as a phony inductive schedule *)
         let phony_theorem_ind_schd = ("theorem", [], [],[selected_schedule,[]],[]) in
-        density_inductive_memo := InductiveScheduleKeyMap.add (ty_ctr_of_string "theorem", [], D_Thm, true) (DensityDone (phony_theorem_ind_schd, Checking)) !density_inductive_memo;
+        density_inductive_memo := InductiveScheduleKeyMap.add (ty_ctr_of_string "theorem", [], D_Thm, true) (DensityDone ((phony_theorem_ind_schd, Checking), true)) !density_inductive_memo;
 
         density_inductive_memo := InductiveScheduleKeyMap.remove (ty_ctr_of_string "eq", [], D_Check, true) !density_inductive_memo;
         (* let (unconstrained_inductives, mut_used_inductives) = collect_all_used_inductives_theorem theorem_schedule in *)

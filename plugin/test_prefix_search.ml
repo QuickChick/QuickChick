@@ -147,6 +147,97 @@ let is_path_prefix prefix path =
     | _ -> false in
   loop prefix path
 
+let is_schedule_prefix prefix schedule =
+  let rec loop prefix schedule = match prefix, schedule with
+    | [], _ -> true
+    | x :: xs, y :: ys when x = y -> loop xs ys
+    | _ -> false in
+  loop prefix schedule
+
+(* Converting a constrained output allocates a fresh match variable each
+   time. Prefix observation and leaf conversion therefore differ only by
+   alpha-renaming of these variables, even when the typed steps are stable. *)
+let alpha_normalize_schedule schedule =
+  let match_variables = List.filter_map (function
+    | N.S_Match (name, _) -> Some name
+    | _ -> None) schedule in
+  let renaming = List.mapi (fun index name ->
+    name, v ("qc_alpha_" ^ string_of_int index)) match_variables in
+  let rename name = match List.assoc_opt name renaming with
+    | Some canonical -> canonical | None -> name in
+  let rec rename_pat = function
+    | N.PCtr (ctor, args) -> N.PCtr (ctor, List.map rename_pat args)
+    | N.PVar name -> N.PVar (rename name)
+    | N.PParam -> N.PParam
+    | N.PWild -> N.PWild in
+  let rec rename_term = function
+    | N.DArrow (a, b) -> N.DArrow (rename_term a, rename_term b)
+    | N.DLambda (name, ty, body) ->
+      N.DLambda (rename name, rename_term ty, rename_term body)
+    | N.DProd ((name, ty), body) ->
+      N.DProd ((rename name, rename_term ty), rename_term body)
+    | N.DTyParam name -> N.DTyParam name
+    | N.DTyCtr (ctor, args) -> N.DTyCtr (ctor, List.map rename_term args)
+    | N.DCtr (ctor, args) -> N.DCtr (ctor, List.map rename_term args)
+    | N.DTyVar name -> N.DTyVar (rename name)
+    | N.DApp (head, args) ->
+      N.DApp (rename_term head, List.map rename_term args)
+    | N.DMatch (scrutinee, branches) ->
+      N.DMatch (rename_term scrutinee,
+        List.map (fun (pat, body) -> rename_pat pat, rename_term body) branches)
+    | N.DNot body -> N.DNot (rename_term body)
+    | N.DHole -> N.DHole in
+  let rename_source = function
+    | N.SrcNonrec ty -> N.SrcNonrec (rename_term ty)
+    | N.SrcRec (name, args) ->
+      N.SrcRec (rename name, List.map rename_term args)
+    | N.SrcMutrec (name, args) ->
+      N.SrcMutrec (rename name, List.map rename_term args)
+    | N.SrcDef (name, args) ->
+      N.SrcDef (rename name, List.map rename_term args) in
+  List.map (function
+    | N.S_UC (name, source, sort) ->
+      N.S_UC (rename name, rename_source source, sort)
+    | N.S_ST (outputs, source, sort) ->
+      N.S_ST (List.map (fun (name, ty) -> rename name, rename_term ty) outputs,
+        rename_source source, sort)
+    | N.S_Check (source, polarity) ->
+      N.S_Check (rename_source source, polarity)
+    | N.S_Match (name, pat) -> N.S_Match (rename name, rename_pat pat)
+    | N.S_Let (name, body) -> N.S_Let (rename name, rename_term body)) schedule
+
+let converted_prefix_pairs = ref 0
+let alpha_only_prefix_pairs = ref 0
+
+let check_converted_prefixes observations =
+  let leaves = List.filter (fun (_, terminal, _) -> terminal) observations in
+  List.iter (fun (path, terminal, prefix) ->
+    if not terminal then begin
+      (match List.rev prefix with
+       | [] | (N.S_ST _ | N.S_Check _ | N.S_Match _ | N.S_Let _) :: _ -> ()
+       | N.S_UC _ :: _ ->
+         failwith "converted open prefix ends in an unconstrained step");
+      let descendants = List.filter (fun (leaf_path, _, _) ->
+        is_path_prefix path leaf_path) leaves in
+      assert (descendants <> []);
+      List.iter (fun (_, _, completed) ->
+        incr converted_prefix_pairs;
+        if not (is_schedule_prefix prefix completed) then begin
+          assert (variable_uses prefix =
+            variable_uses (alpha_normalize_schedule prefix));
+          assert (variable_uses completed =
+            variable_uses (alpha_normalize_schedule completed));
+          incr alpha_only_prefix_pairs;
+        end;
+        if not (is_schedule_prefix
+          (alpha_normalize_schedule prefix)
+          (alpha_normalize_schedule completed)) then
+          failwith (Printf.sprintf "converted prefix changed: path=%d prefix=[%s] complete=[%s]"
+            (List.length path)
+            (String.concat "; " (List.map N.schedule_step_to_string prefix))
+            (String.concat "; " (List.map N.schedule_step_to_string completed)))) descendants
+    end) observations
+
 let check_prefix_use_bounds observations =
   let leaves = List.filter (fun (_, terminal, _) -> terminal) observations in
   let first_leaf_score =
@@ -206,8 +297,11 @@ let test_small_footprints nat rec_call =
       relation name vars) footprints in
     let observations = ref [] in
     let structural_observations = ref [] in
+    let converted_observations = ref [] in
     let observer = if verify_bounds then
       Some (fun path terminal stable ->
+        converted_observations :=
+          (path, terminal, stable) :: !converted_observations;
         observations :=
           (path, terminal, variable_uses stable) :: !observations;
         structural_observations :=
@@ -221,6 +315,7 @@ let test_small_footprints nat rec_call =
       ?on_prefix:observer
       variables hypotheses [] rec_call N.D_Gen in
     if verify_bounds then begin
+      check_converted_prefixes !converted_observations;
       ignore (check_prefix_use_bounds !observations);
       ignore (check_prefix_use_bounds !structural_observations);
       let check_observations = ref [] in
@@ -293,10 +388,13 @@ let () =
      "D", ["x"; "y"]; "E", ["y"; "z"]] in
   let complete_stats = N.empty_prefix_search_stats () in
   let complete_observations = ref [] in
+  let complete_converted_observations = ref [] in
   let complete_structural_bounds = ref [] in
   let complete = N.possible_schedules_with_advanced_pruning
       ~max_schedules:100000 ~reduce_orderings:false ~stats:complete_stats
       ~on_prefix:(fun path terminal stable ->
+        complete_converted_observations :=
+          (path, terminal, stable) :: !complete_converted_observations;
         complete_observations :=
           (path, terminal, variable_uses stable) :: !complete_observations;
         complete_structural_bounds :=
@@ -305,6 +403,7 @@ let () =
              direct_variable_use_bound direct_footprints stable)
           :: !complete_structural_bounds)
       variables hypotheses [] rec_call N.D_Gen in
+  check_converted_prefixes !complete_converted_observations;
   let reduced_stats = N.empty_prefix_search_stats () in
   let reduced_observations = ref [] in
   let reduced_structural_bounds = ref [] in
@@ -602,10 +701,14 @@ let () =
   Printf.printf "typed five-hypothesis schedule retained (%d candidates, %d owner maps; legacy %d)\n"
     (List.length complete) (List.length (unique_owners complete))
     (List.length (unique_owners legacy));
+  let fixed_prefixes = ref [] in
   let fixed_checks = N.possible_schedules_with_advanced_pruning
       ~reduce_orderings:false
+      ~on_prefix:(fun path terminal schedule ->
+        fixed_prefixes := (path, terminal, schedule) :: !fixed_prefixes)
       [v "x", nat] [relation "F" ["x"]; relation "G" ["x"]]
       [v "x"] rec_call N.D_Check in
+  check_converted_prefixes !fixed_prefixes;
   let orders = List.map source_order fixed_checks |> List.sort_uniq compare in
   assert (orders = [["F"; "G"]; ["G"; "F"]]);
   let fixed_maximal = N.possible_schedules_with_advanced_pruning
@@ -631,10 +734,14 @@ let () =
   assert (independent_stats.visited_nodes = 11);
   assert (independent_stats.processed_mode_choices = 10);
   let x_type = N.DTyCtr (N.ty_ctr_of_string "T", [N.DTyVar (v "y")]) in
+  let typed_prefixes = ref [] in
   let typed_dependency = N.possible_schedules_with_advanced_pruning
+      ~on_prefix:(fun path terminal schedule ->
+        typed_prefixes := (path, terminal, schedule) :: !typed_prefixes)
       [v "x", x_type; v "y", nat]
       [relation "H" ["x"]; relation "J" ["y"]]
       [] rec_call N.D_Gen in
+  check_converted_prefixes !typed_prefixes;
   let typed_orders = List.map source_order typed_dependency
     |> List.sort_uniq compare in
   assert (typed_orders = [["H"; "J"]; ["J"; "H"]]);
@@ -647,9 +754,39 @@ let () =
     |> List.sort_uniq compare = typed_orders);
   let nested = N.DTyCtr (N.ty_ctr_of_string "K", [
     N.DCtr (N.constructor_of_string "Wrap", [N.DTyVar (v "x")])]) in
+  let nested_prefixes = ref [] in
   let nonplain = N.possible_schedules_with_advanced_pruning
+      ~on_prefix:(fun path terminal schedule ->
+        nested_prefixes := (path, terminal, schedule) :: !nested_prefixes)
       [v "x", nat; v "y", nat]
       [nested; relation "J" ["y"]] [] rec_call N.D_Gen in
+  check_converted_prefixes !nested_prefixes;
   assert (List.length (List.map source_order nonplain
     |> List.sort_uniq compare) = 2);
-  test_small_footprints nat rec_call
+  let negative_prefixes = ref [] in
+  let negative = N.possible_schedules_with_advanced_pruning
+      ~on_prefix:(fun path terminal schedule ->
+        negative_prefixes := (path, terminal, schedule) :: !negative_prefixes)
+      [v "x", nat]
+      [N.DNot (relation "NotH" ["x"]); relation "PosH" ["x"]]
+      [v "x"] rec_call N.D_Check in
+  check_converted_prefixes !negative_prefixes;
+  assert (negative <> []);
+  let double_nested = N.DTyCtr (N.ty_ctr_of_string "K2", [
+    N.DCtr (N.constructor_of_string "Wrap", [N.DTyVar (v "x")]);
+    N.DCtr (N.constructor_of_string "Wrap", [N.DTyVar (v "y")])]) in
+  let double_prefixes = ref [] in
+  let double_schedules = N.possible_schedules_with_advanced_pruning
+      ~on_prefix:(fun path terminal schedule ->
+        double_prefixes := (path, terminal, schedule) :: !double_prefixes)
+      [v "x", nat; v "y", nat]
+      [double_nested] [] rec_call N.D_Gen in
+  check_converted_prefixes !double_prefixes;
+  assert (double_schedules <> []);
+  assert (List.exists (fun schedule ->
+    List.length (List.filter (function N.S_Match _ -> true | _ -> false)
+      schedule) = 2) double_schedules);
+  test_small_footprints nat rec_call;
+  Printf.printf "converted prefix pairs=%d alpha-renamed=%d\n"
+    !converted_prefix_pairs !alpha_only_prefix_pairs;
+  assert (!alpha_only_prefix_pairs > 0)

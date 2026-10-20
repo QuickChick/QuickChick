@@ -73,8 +73,9 @@ It also proves a conservative bound with unresolved recursive grades: treat
 each such call as the best possible density (`Total` for generation,
 `Checking` for checking) and count it in no histogram bucket. Once the
 dependency's grade is known, replace that optimistic contribution with its
-actual grade. This keeps the bound admissible, though it may be too weak to
-prune before dependency resolution.
+actual grade. The proof shows that resolving a call can only tighten or
+preserve the bound in either density direction. This keeps the bound admissible,
+though it may be too weak to prune before dependency resolution.
 
 For plain positive direct-variable relations, the proof additionally gives
 `committed checks + max(0, remaining hypotheses - unbound variables)` as a
@@ -86,13 +87,31 @@ converted prefix steps and recursive dependency grades must remain unchanged
 in descendants. A typed exhaustive fixture checks the counted key against
 every descendant, but that is evidence for the fixture, not a replacement for
 the adapter proof. No public score pruning is enabled.
-In particular, completed scoring sorts a candidate's steps before discovering
-recursive dependencies. Adding a future step can change which dependency is
-encountered first, including the provisional grade used for a cycle. A prefix
-bound must therefore treat a nonrecursive producer call as unresolved unless
-its grade is certified independently of the remaining steps. Direct checks,
-matches, unconstrained bindings, lets, and direct recursive calls have fixed
-grades under the current scorer; this is the first useful certified subset.
+When a committed producer call needs a dependency grade, the bound should
+resolve that dependency then, using its actual mode and applied relation. It
+should not postpone all dependency work until a leaf. Completed scoring sorts
+the candidate's steps before discovering dependencies, however. Adding a future
+step can change which dependency encounters a provisional cycle grade first.
+The scorer now records whether a completed memo entry read such a grade. A
+cycle-independent result can be used by a future bound only after the full
+applied relation, proof context, and policy are part of its certification; the
+current memo key does not provide that guarantee. Until then, the proved
+optimistic grade is used for that call. Direct checks, matches, unconstrained
+bindings, lets, and direct recursive calls have fixed local grades. Some of
+these steps still trigger dependency discovery for code generation, but their
+own grade is fixed.
+
+`test/prefix_adapter_laws.v` proves the list-level adapter rule: stepwise
+conversion distributes over appended choices, and sorting unconstrained
+blocks preserves an earlier prefix when that prefix ends in a producer, check,
+or match. It also proves variable-use counts are unchanged by an injective
+renaming of binders and occurrences. The actual converter allocates new names
+for constrained-output matches on each call, so equality of observed prefixes
+must be checked up to that renaming. The typed oracle checked 711,239
+prefix–descendant pairs across small footprints and focused fixed, indexed,
+negative, and nested-pattern cases; one pair required alpha-renaming. This is
+an adapter model and executable correspondence check, not a formal
+verification of the OCaml converter.
 
 At pinned Specimen revision `121cf234`, scoring bundles explicitly associate
 comparison and aggregation with pruning strategy, including a no-pruning option.

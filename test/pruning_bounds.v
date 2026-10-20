@@ -328,6 +328,83 @@ Proof.
   lia.
 Qed.
 
+(* Resolving a needed dependency is useful immediately: replacing an unknown
+   grade by its exact value can only tighten the partial bound. *)
+Definition grade_refines (old new : option nat) : Prop :=
+  match old with None => True | Some grade => new = Some grade end.
+
+Lemma refined_generator_grades : forall old new,
+  Forall2 grade_refines old new ->
+  Forall (fun candidate => match candidate with
+          | Some grade => grade <= 4 | None => True end) new ->
+  Forall2 le (map optimistic_generator_grade new)
+    (map optimistic_generator_grade old).
+Proof.
+  intros old new Href.
+  induction Href as [|old new olds news Hstep Hrest IH];
+    intro Hrange; inversion Hrange; subst; simpl; constructor; auto.
+  destruct old as [old|], new as [new|]; simpl in *;
+    try discriminate; try lia; inversion Hstep; subst; lia.
+Qed.
+
+Lemma refined_checker_grades : forall old new,
+  Forall2 grade_refines old new ->
+  Forall2 le (map optimistic_checker_grade old)
+    (map optimistic_checker_grade new).
+Proof.
+  intros old new Href.
+  induction Href as [|old new olds news Hstep Hrest IH];
+    simpl; constructor; auto.
+  destruct old as [old|], new as [new|]; simpl in *;
+    try discriminate; try lia; inversion Hstep; subst; lia.
+Qed.
+
+Lemma refined_grade_count : forall grade old new,
+  Forall2 grade_refines old new ->
+  known_grade_count grade old <= known_grade_count grade new.
+Proof.
+  intros grade old new Href.
+  induction Href as [|old new olds news Hstep Hrest IH]; simpl; auto.
+  destruct old as [old|], new as [new|]; simpl in *;
+    try discriminate; try lia; inversion Hstep; subst; lia.
+Qed.
+
+Theorem resolving_generator_dependency_tightens_bound :
+  forall old new uses,
+  Forall2 grade_refines old new ->
+  Forall (fun candidate => match candidate with
+          | Some grade => grade <= 4 | None => True end) new ->
+  Forall2 le (generator_certified_key old uses)
+    (generator_certified_key new uses).
+Proof.
+  intros old new uses Href Hrange.
+  unfold generator_certified_key.
+  repeat constructor;
+    try (apply refined_grade_count; exact Href);
+    try apply Nat.le_refl.
+  pose proof (refined_generator_grades _ _ Href Hrange) as Hpoint.
+  pose proof (fold_min_monotone _ _ Hpoint 4 4 (le_n 4)) as Hmin.
+  pose proof (fold_min_le_start (map optimistic_generator_grade old) 4).
+  pose proof (fold_min_le_start (map optimistic_generator_grade new) 4).
+  unfold generator_worst. lia.
+Qed.
+
+Theorem resolving_checker_dependency_tightens_bound :
+  forall old new uses,
+  Forall2 grade_refines old new ->
+  Forall2 le (checker_certified_key old uses)
+    (checker_certified_key new uses).
+Proof.
+  intros old new uses Href.
+  unfold checker_certified_key.
+  repeat constructor;
+    try (apply refined_grade_count; exact Href);
+    try apply Nat.le_refl.
+  pose proof (refined_checker_grades _ _ Href) as Hpoint.
+  pose proof (fold_max_monotone _ _ Hpoint 0 0 (le_n 0)) as Hmax.
+  unfold checker_worst. lia.
+Qed.
+
 Fixpoint producer_count (steps : list bool) : nat :=
   match steps with
   | [] => 0
