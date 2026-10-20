@@ -206,15 +206,16 @@ can cost more than the cuts save. Keep the switch internal until wider
 correspondence and performance tests justify enabling it by default.
 
 The reduced SemGuS fixture merges `eval` with itself and merges the result
-with `eval` again. Its final generator diagnostic has 12 candidates; the
-unpruned, verified, and pruned runs select the same candidate. Verification
-finds no descendant below a checked prefix bound. The pruned run makes 464
-cuts in recursive dependency searches. The final `Valid Schedules` diagnostic
-does not emit a pruning trace, so this experiment does not show that the
-12-candidate root search itself was bounded.
-In one local run, pruning took 4.7 seconds versus 3.5 seconds unpruned, and
-verification took 10 seconds. This stresses recursive score resolution and
-shows why cuts alone are not a useful performance measure.
+with `eval` again. With the internal switch set, `Valid Schedules` now sends
+its selected constructor through the same bound-aware scheduler as derivation.
+The verifier checks all 12 root leaves over 25 prefixes, finds no bound
+violation, and selects the same candidate as the unpruned run. It makes zero
+cuts. Score probes suspend nested experimental pruning while resolving
+dependencies; otherwise verification repeatedly re-enters those searches and
+multiplies the work without improving the root bound. In one local run, the
+unpruned, verified, and pruned diagnostics took 1.2, 18.3, and 18.1 seconds.
+The bound is sound on this case but too weak to help it, and recursive score
+resolution remains expensive.
 
 `test/prefix_adapter_laws.v` proves the list-level adapter rule: stepwise
 conversion distributes over appended choices, and sorting unconstrained

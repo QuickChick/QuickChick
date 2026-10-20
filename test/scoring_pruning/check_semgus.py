@@ -4,6 +4,7 @@ import os
 import re
 import subprocess
 import tempfile
+import time
 from pathlib import Path
 
 
@@ -37,6 +38,7 @@ def run(mode, directory):
         str(HERE / "SemgusMerge.v"),
     ]
     log = directory / f"{mode}.log"
+    started = time.monotonic()
     with log.open("w") as stream:
         result = subprocess.run(command, cwd=ROOT, env=environment,
                                 stdout=stream, stderr=subprocess.STDOUT,
@@ -44,23 +46,28 @@ def run(mode, directory):
     if result.returncode:
         raise AssertionError(f"SemGuS {mode} failed; see {log}")
     rankings = []
-    cuts = 0
+    root_searches = []
     for line in log.open(errors="replace"):
         if match := RANKING.match(line):
             rankings.append(match.groups())
         if match := PRUNING.match(line):
-            cuts += int(match.group(5))
+            root_searches.append(match.groups())
     assert rankings, (mode, "missing ranking trace")
-    return rankings[-1], cuts
+    return rankings[-1], root_searches, time.monotonic() - started
 
 
 with tempfile.TemporaryDirectory() as temporary:
     directory = Path(temporary)
-    baseline, _ = run("off", directory)
-    verified, _ = run("verify", directory)
-    bounded, cuts = run("1", directory)
+    baseline, off_searches, off_seconds = run("off", directory)
+    verified, verify_searches, verify_seconds = run("verify", directory)
+    bounded, prune_searches, prune_seconds = run("1", directory)
     assert baseline == verified == bounded, (baseline, verified, bounded)
     assert baseline[0] == "12", baseline
-    assert cuts > 0, cuts
-    print(f"double self-merge: {baseline[0]} root candidates; "
-          f"same winner in all modes; {cuts} dependency-search cuts")
+    assert not off_searches, off_searches
+    assert len(verify_searches) == len(prune_searches) == 1
+    verify_root, prune_root = verify_searches[0], prune_searches[0]
+    assert verify_root[1:] == ("verify", "25", "12", "0"), verify_root
+    assert prune_root[1:] == ("prune", "25", "12", "0"), prune_root
+    print(f"double self-merge: 12 root leaves verified over 25 prefixes; "
+          f"same winner, zero cuts; seconds off/verify/prune: "
+          f"{off_seconds:.1f}/{verify_seconds:.1f}/{prune_seconds:.1f}")

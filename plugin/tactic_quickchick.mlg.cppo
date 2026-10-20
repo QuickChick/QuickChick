@@ -1622,7 +1622,15 @@ let has_schedule_instance relation outputs ds constrained =
     env sigma goal names with Some _ -> true | None -> false
 
 (* Prefix probes must not choose a dependency schedule or leave a provisional
-   grade in the memo used to score completed constructor candidates. *)
+   grade in the memo used to score completed constructor candidates. Nested
+   probes would also rerun the experimental search for every dependency. *)
+let score_pruning_suspended = ref false
+
+let with_score_pruning_suspended f =
+  let previous = !score_pruning_suspended in
+  score_pruning_suspended := true;
+  Fun.protect ~finally:(fun () -> score_pruning_suspended := previous) f
+
 let with_temporary_density_state f =
   let saved_inductive = !density_inductive_memo in
   let saved_rule = !density_memo in
@@ -1632,7 +1640,8 @@ let with_temporary_density_state f =
     density_inductive_memo := saved_inductive;
     density_memo := saved_rule;
     rocq_relation_memo := saved_relations;
-    density_uncertainty_events := saved_uncertainty) f
+    density_uncertainty_events := saved_uncertainty)
+    (fun () -> with_score_pruning_suspended f)
 
 let rec schedule_density neutral_prelude_steps schedule : schedule_with_density =
   let fixed step ds = match fixed_step_density ds step with
@@ -1728,9 +1737,10 @@ and constructor_valid_schedules (ind_name : ty_ctr) (ctr : rocq_ctr) (result_var
   Error.msg_debug (str "Constructor name: " ++ str (constructor_to_string ctr_name) ++ fnl ());
   Error.msg_debug (str "Constructor type: " ++ str (rocq_constr_to_string typ) ++ fnl ());
   let typ = if opt then typ else arrows_to_products typ in
-  let score_pruning_mode = match Sys.getenv_opt "QC_SCHEDULE_SCORE_PRUNING" with
-    | Some ("1" | "true" | "yes") -> `Prune
-    | Some "verify" -> `Verify
+  let score_pruning_mode = match !score_pruning_suspended,
+    Sys.getenv_opt "QC_SCHEDULE_SCORE_PRUNING" with
+    | false, Some ("1" | "true" | "yes") -> `Prune
+    | false, Some "verify" -> `Verify
     | _ -> `Off in
   let prefer_dense = ds = D_Gen || ds = D_Thm in
   let policy = schedule_ranking_policy () in
@@ -1825,7 +1835,8 @@ and constructor_valid_schedules (ind_name : ty_ctr) (ctr : rocq_ctr) (result_var
     (fun () -> List.filter_map (fun (i, ms_steps, schd) ->
       density_inductive_memo := initial_inductive_memo;
       density_memo := initial_density_memo;
-      let scored = schedule_density ms_steps schd in
+      let scored = with_score_pruning_suspended (fun () ->
+        schedule_density ms_steps schd) in
       let inductive_memo = !density_inductive_memo in
       let density_memo_after = !density_memo in
       if are_schedule_steps_valid i scored then
@@ -3304,8 +3315,6 @@ VERNAC COMMAND EXTEND DeriveValidSchedules CLASSIFIED AS SIDEFF
 
       let output_vars = List.map fst (List.filteri (fun i _ -> List.mem i ois) result_vars) in
 
-      let scheds = NewUnifyQC.type_to_schedules constructor (Some ind_name) (Some ctr) result_vars output_vars ds true in
-
       let rec take n l =
         if n <= 0 then [] else
         match l with
@@ -3333,10 +3342,23 @@ VERNAC COMMAND EXTEND DeriveValidSchedules CLASSIFIED AS SIDEFF
                         ++ str "\n\n");
 
       density_memo := RelationInstMap.empty;
-      let schedules = take 300 scheds in
-      let schedules' = List.map (fun ((steps, sort), ms, eqs) -> (List.map (fun (v,p) -> S_Match (v,p)) ms, (List.map check_eq eqs @ steps, sort))) schedules in
       Feedback.msg_notice (str "Printing all bindings" ++ fnl ());
-      let schedules_w_densities = List.mapi (fun i (ms_steps, schd) -> i, schedule_density ms_steps schd) schedules' in
+      let schedules_w_densities =
+        match Sys.getenv_opt "QC_SCHEDULE_SCORE_PRUNING" with
+        | Some ("1" | "true" | "yes" | "verify") ->
+          constructor_valid_schedules ind_name (ctr, constructor)
+            result_vars output_vars ds true
+          |> List.map (fun (i, scored, _, _) -> i, scored)
+          |> take 300
+        | _ ->
+          let scheds = NewUnifyQC.type_to_schedules constructor
+            (Some ind_name) (Some ctr) result_vars output_vars ds true in
+          let schedules = take 300 scheds in
+          let schedules' = List.map (fun ((steps, sort), ms, eqs) ->
+            (List.map (fun (v,p) -> S_Match (v,p)) ms,
+             (List.map check_eq eqs @ steps, sort))) schedules in
+          List.mapi (fun i (ms_steps, schd) ->
+            i, schedule_density ms_steps schd) schedules' in
       let sorted = sort_schedules_by_density_and_var_uses schedules_w_densities ds in
 
       List.iter (fun ((steps_ds, sort), density, num_var_uses, id) ->

@@ -29,17 +29,6 @@ Inductive plus : nat -> nat -> nat -> Prop :=
 | plusS n m npm : plus n m npm -> plus (S n) m (S npm)
 .
 
-QuickChickDebug Debug On.
-
-Theorem plus_is_positive : forall n m npm, plus n m npm -> npm <= m.
-Proof.
-  quickchick.
- (* QuickChick (sized theorem).
-  Extract Constant defNumTests => "100000".*)
-  Abort.
-
-(*Derive Inductive Schedule plus 2 derive "Enum" opt "true".*)
-
 Inductive notR : bool -> bool -> Prop :=
 | notT : notR true false
 | notF : notR false true.
@@ -105,4 +94,12 @@ Inductive eval : exp -> nat -> nat -> res -> Prop :=
 
 Merge (fun e => eval e x y r) With (fun e => eval e x' y' r') As EVAL.
 Merge (fun e => EVAL x y r x' y' r' e) With (fun e => eval e x'' y'' r'') As EVAL'.
+
+Check (EVAL' : nat -> nat -> res -> nat -> nat -> res ->
+               nat -> nat -> res -> exp -> Prop).
+
+Example same_expr_on_three_inputs :
+  EVAL' 1 0 (N 1) 2 0 (N 2) 3 0 (N 3) X.
+Proof. constructor. Qed.
+
 Derive Valid Schedules EVAL' 9 consnum 8 derive "Gen".

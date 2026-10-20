@@ -17,8 +17,11 @@ rewrite or proof context.
 `python3 test/scoring_pruning/check_semgus.py` runs a reduced version of
 `examples/Sygus.v` with `eval` merged with itself twice. It compares the
 unpruned, verified, and pruned runs using the local plugin. The diagnostic
-has 12 root candidates. Selection is unchanged across modes, while pruning
-cuts search in recursive dependencies. `Valid Schedules` does not emit a pruning
-trace for the root diagnostic. The legacy `Merge` command emits a large
-debug log, so this test captures its output in temporary files. It is a
-stress test for bound correctness; it does not establish a speedup.
+has 12 root candidates over 25 prefixes. The root verifier runs directly,
+selection is unchanged across modes, and the bound makes no cuts. Score probes
+suspend nested experimental pruning to avoid re-entering dependency searches.
+The fixture checks the merged relation's ten-argument type and constructs a
+single expression `X` that evaluates under three distinct input pairs.
+The legacy `Merge` command emits a large debug log, so this test captures its
+output in temporary files. This is a stress test for bound correctness, and
+currently exposes a substantial performance cost.
