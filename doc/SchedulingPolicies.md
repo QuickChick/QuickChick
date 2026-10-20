@@ -105,6 +105,17 @@ bindings, lets, and direct recursive calls have fixed local grades. Some of
 these steps still trigger dependency discovery for code generation, but their
 own grade is fixed.
 
+`test/dependency_cycle_laws.v` states the relevant graph argument precisely.
+If evaluating a key has visited every dependency it may score, a later unseen
+key cannot newly become part of a cycle with that completed key. For an
+acyclic dependency graph, deterministic score equations have a unique result,
+regardless of evaluation order. The current constructor scorer visits every
+generated candidate and its step dependencies before marking a key done;
+candidate-local memo snapshots make the cycle marker conservative. A direct
+source-to-model correspondence test is still needed before the marker enables
+production pruning. A cycle-dependent result remains uncertified by this
+argument.
+
 `test/prefix_adapter_laws.v` proves the list-level adapter rule: stepwise
 conversion distributes over appended choices, and sorting unconstrained
 blocks preserves an earlier prefix when that prefix ends in a producer, check,

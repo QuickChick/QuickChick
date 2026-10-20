@@ -887,8 +887,9 @@ type inductive_density_entry =
   | DensityDone of (inductive_schedule * rule_density) * bool
 
 (* A completed entry is cycle-independent only if its computation never read
-   a provisional or cycle-dependent grade. This says nothing about whether
-   the memo key captures a different applied type or proof context. *)
+   a provisional or cycle-dependent grade. Under fixed scoring inputs, later
+   roots cannot introduce a new cycle into such a completed dependency.
+   The flag is not portable across proof contexts or scoring policies. *)
 let density_uncertainty_events = ref 0
 
 let inductive_density_value = function
