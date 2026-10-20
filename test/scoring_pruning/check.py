@@ -23,13 +23,15 @@ WORK = re.compile(
 )
 
 
-def run(mode, ranking, source, destination):
+def run(mode, ranking, source, destination, reuse=True):
     environment = os.environ.copy()
     environment["QC_SCHEDULE_TRACE"] = "1"
     environment["QC_SCHEDULE_RANKING"] = ranking
     environment.pop("QC_SCHEDULE_SCORE_PRUNING", None)
     if mode != "off":
         environment["QC_SCHEDULE_SCORE_PRUNING"] = mode
+    if not reuse:
+        environment["QC_SCHEDULE_REUSE_STABLE"] = "0"
     command = [
         COQC,
         "-I", str(BUILD / "install/default/lib"),
@@ -68,6 +70,15 @@ with tempfile.TemporaryDirectory() as temporary:
     # This fixture has a cycle-dependent score. The verifier must leave its
     # provisional grade out of every bound and match final candidate scoring.
     cycle = ROOT / "test/scoring_cycles/Connected.v"
-    run("verify", "density_then_vars", cycle, destination / "Connected.vo")
+    cold, _ = run("baseline", "density_then_vars", cycle,
+                  destination / "Connected.vo", reuse=False)
+    warm, _ = run("baseline", "density_then_vars", cycle,
+                  destination / "Connected.vo")
+    verified, _ = run("verify", "density_then_vars", cycle,
+                      destination / "Connected.vo")
+    bounded, _ = run("1", "density_then_vars", cycle,
+                     destination / "Connected.vo")
+    assert cold[1] == warm[1] == verified[1]
+    assert cold[3:] == warm[3:] == verified[3:] == bounded[3:]
 
 print("real scorer: four leaves verified, one safely pruned; mutual cycle verified")

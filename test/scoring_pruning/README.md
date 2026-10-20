@@ -18,7 +18,9 @@ rewrite or proof context.
 `examples/Sygus.v` with `eval` merged with itself twice. It compares the
 ordinary, comparable `baseline`, verified, and pruned runs using the local
 plugin. `baseline` activates the same scheduler and candidate-isolated scoring
-as pruning without calculating bounds. The ordinary diagnostic shares
+as pruning without calculating bounds. The test also runs `baseline` with
+`QC_SCHEDULE_REUSE_STABLE=0` to compare cold scoring against shared completed
+dependencies and step-multiset grades. The ordinary diagnostic shares
 dependency memo state across candidates and is faster, so its timing is not
 a like-for-like pruning comparison. The diagnostic
 has 12 root candidates over 25 prefixes. The root verifier runs directly,
@@ -27,7 +29,9 @@ suspend nested experimental pruning to avoid re-entering dependency searches.
 The fixture checks the merged relation's ten-argument type and constructs a
 single expression `X` that evaluates under three distinct input pairs.
 Pruned ranking reuses completed-leaf scores and rescores only the winner to
-recover its dependency memo. Verification keeps an independent final rescore.
+recover its dependency memo. Verification keeps an independent final rescore
+and checks repeated step-multiset grades. Cycle-dependent entries are never
+shared merely by their dependency key.
 The legacy `Merge` command emits a large debug log, so this test captures its
 output in temporary files. This is a stress test for bound correctness, and
-currently exposes a substantial performance cost.
+currently exposes the cost of cold recursive scoring and the gain from reuse.

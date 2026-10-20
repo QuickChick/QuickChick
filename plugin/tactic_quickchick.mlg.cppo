@@ -1745,6 +1745,31 @@ and constructor_valid_schedules (ind_name : ty_ctr) (ctr : rocq_ctr) (result_var
     | _ -> `Off in
   let prefer_dense = ds = D_Gen || ds = D_Thm in
   let policy = schedule_ranking_policy () in
+  let reuse_stable = score_pruning_mode <> `Off &&
+    match Sys.getenv_opt "QC_SCHEDULE_REUSE_STABLE" with
+    | Some ("0" | "false" | "no") -> false
+    | _ -> true in
+  let initial_inductive_memo = !density_inductive_memo in
+  let stable_dependencies = ref InductiveScheduleKeyMap.empty in
+  (* Share only completed entries whose dependency walk read no provisional
+     or cycle-dependent grade. Keep the caller's in-progress entries intact. *)
+  let add_stable memo = if not reuse_stable then memo else
+    InductiveScheduleKeyMap.fold (fun key entry current ->
+      if InductiveScheduleKeyMap.mem key current then current
+      else InductiveScheduleKeyMap.add key entry current)
+      !stable_dependencies memo in
+  let collect_stable () = if reuse_stable then
+    InductiveScheduleKeyMap.iter (fun key entry -> match entry with
+      | DensityDone (_, true) when
+          not (InductiveScheduleKeyMap.mem key initial_inductive_memo) ->
+        stable_dependencies := InductiveScheduleKeyMap.add key entry !stable_dependencies
+      | _ -> ()) !density_inductive_memo in
+  let with_shared_temporary_density_state f =
+    with_temporary_density_state (fun () ->
+      density_inductive_memo := add_stable !density_inductive_memo;
+      let result = f () in
+      collect_stable ();
+      result) in
   let incumbent = ref None in
   let observed_leaf_scores = ref [] in
   let observed_bounds = ref [] in
@@ -1753,9 +1778,11 @@ and constructor_valid_schedules (ind_name : ty_ctr) (ctr : rocq_ctr) (result_var
   let pruned_prefixes = ref 0 in
   let bound_grade_cache = Hashtbl.create 32 in
   let leaf_score_cache = Hashtbl.create 32 in
+  let mode_grade_cache = Hashtbl.create 32 in
   let bound_cache_hits = ref 0 in
   let bound_cache_misses = ref 0 in
   let leaf_cache_hits = ref 0 in
+  let mode_cache_hits = ref 0 in
   let bound_cpu = ref 0. in
   let leaf_cpu = ref 0. in
   let final_cpu = ref 0. in
@@ -1769,12 +1796,46 @@ and constructor_valid_schedules (ind_name : ty_ctr) (ctr : rocq_ctr) (result_var
   let materialize ((steps, sort), ms, eqs) =
     let match_steps = List.map (fun (v,p) -> S_Match (v,p)) ms in
     match_steps, (List.map check_eq eqs @ steps, sort) in
-  let leaf_score triple = timed leaf_cpu (fun () -> with_temporary_density_state (fun () ->
+  (* schedule_density traverses steps in sorted order. Equal multisets thus
+     share mode grades within this constructor's fixed recursion context;
+     restore each candidate's order for variable-use scoring. Duplicate steps
+     are scored afresh because their occurrence grades need not be identical. *)
+  let score_schedule ~use_cache neutral_steps ((steps, sort) as schedule) =
+    if score_pruning_mode = `Off then schedule_density neutral_steps schedule else
+    let ordered = List.sort Stdlib.compare steps in
+    let cacheable = List.length ordered =
+      List.length (List.sort_uniq Stdlib.compare ordered) in
+    let key = ordered, sort in
+    match (if use_cache && cacheable then Hashtbl.find_opt mode_grade_cache key
+           else None) with
+    | Some canonical ->
+      incr mode_cache_hits;
+      let neutral = match ds with
+        | D_Gen | D_Thm -> Total | D_Check | D_Enum -> Checking in
+      (List.map (fun step -> step, neutral) neutral_steps @
+       List.map (fun step -> step, List.assoc step canonical) steps), sort
+    | None ->
+      let scored = schedule_density neutral_steps schedule in
+      if cacheable then begin
+        let graded_steps = List.filteri
+          (fun i _ -> i >= List.length neutral_steps) (fst scored) in
+        let canonical = List.sort (fun (left, _) (right, _) ->
+          Stdlib.compare left right) graded_steps in
+        (match Hashtbl.find_opt mode_grade_cache key with
+         | Some previous when score_pruning_mode = `Verify &&
+             previous <> canonical ->
+           failwith "same step multiset received different dependency grades"
+         | _ -> ());
+        Hashtbl.replace mode_grade_cache key canonical
+      end;
+      scored in
+  let leaf_score triple = timed leaf_cpu (fun () -> with_shared_temporary_density_state (fun () ->
     let match_steps, schedule = materialize triple in
-    let scored = schedule_density match_steps schedule in
+    let scored = score_schedule ~use_cache:(score_pruning_mode = `Prune && reuse_stable)
+      match_steps schedule in
     Hashtbl.replace leaf_score_cache triple scored;
     scored_schedule_features ds 0 scored)) in
-  let bound_score triple = timed bound_cpu (fun () -> with_temporary_density_state (fun () ->
+  let bound_score triple = timed bound_cpu (fun () -> with_shared_temporary_density_state (fun () ->
     let match_steps, (steps, sort) = materialize triple in
     let neutral = match ds with
       | D_Gen | D_Thm -> Total
@@ -1845,7 +1906,12 @@ and constructor_valid_schedules (ind_name : ty_ctr) (ctr : rocq_ctr) (result_var
   let schedules = List.mapi (fun i triple ->
     let ms_steps, schd = materialize triple in
     i, triple, ms_steps, schd) schedule_matches in
-  let initial_inductive_memo = !density_inductive_memo in
+  let distinct_step_multisets = if not (schedule_trace_enabled ()) then 0 else
+    schedules
+    |> List.map (fun (_, _, _, (steps, sort)) ->
+         List.sort Stdlib.compare steps, sort)
+    |> List.sort_uniq Stdlib.compare
+    |> List.length in
   let initial_density_memo = !density_memo in
   let schedule_densities = timed final_cpu (fun () -> Fun.protect
     ~finally:(fun () ->
@@ -1853,13 +1919,15 @@ and constructor_valid_schedules (ind_name : ty_ctr) (ctr : rocq_ctr) (result_var
       density_memo := initial_density_memo)
     (fun () ->
     let entries = List.filter_map (fun (i, triple, ms_steps, schd) ->
-      density_inductive_memo := initial_inductive_memo;
+      density_inductive_memo := add_stable initial_inductive_memo;
       density_memo := initial_density_memo;
       let scored = match score_pruning_mode,
         Hashtbl.find_opt leaf_score_cache triple with
         | `Prune, Some cached -> incr leaf_cache_hits; cached
         | _ -> with_score_pruning_suspended (fun () ->
-            schedule_density ms_steps schd) in
+            score_schedule ~use_cache:(score_pruning_mode = `Baseline && reuse_stable)
+              ms_steps schd) in
+      collect_stable ();
       let inductive_memo = !density_inductive_memo in
       let density_memo_after = !density_memo in
       if are_schedule_steps_valid i scored then
@@ -1867,7 +1935,8 @@ and constructor_valid_schedules (ind_name : ty_ctr) (ctr : rocq_ctr) (result_var
       else None) schedules in
     (* Ranking needs only the cached annotations. Recompute the winner to
        recover its dependency memo for code generation, and check its score. *)
-    if score_pruning_mode <> `Prune then entries else
+    if score_pruning_mode <> `Prune &&
+       (score_pruning_mode <> `Baseline || not reuse_stable) then entries else
       let better a b =
         let (i, scored, _, _) = a in
         let (j, other, _, _) = b in
@@ -1883,10 +1952,11 @@ and constructor_valid_schedules (ind_name : ty_ctr) (ctr : rocq_ctr) (result_var
       | Some (best_id, cached, _, _) ->
         let (_, _, ms_steps, schd) =
           List.find (fun (i, _, _, _) -> i = best_id) schedules in
-        density_inductive_memo := initial_inductive_memo;
+        density_inductive_memo := add_stable initial_inductive_memo;
         density_memo := initial_density_memo;
         let rescored = with_score_pruning_suspended (fun () ->
           schedule_density ms_steps schd) in
+        collect_stable ();
         if scored_schedule_features ds best_id cached <>
            scored_schedule_features ds best_id rescored then
           failwith "cached leaf score differs from selected candidate scoring";
@@ -1896,10 +1966,11 @@ and constructor_valid_schedules (ind_name : ty_ctr) (ctr : rocq_ctr) (result_var
           if i = best_id then best_entry else entry) entries)) in
   if score_pruning_mode <> `Off && schedule_trace_enabled () then
     Feedback.msg_notice (str (Printf.sprintf
-      "[schedule-pruning-work] constructor=%s bound-cache-hits=%d bound-cache-misses=%d leaf-cache-hits=%d bound-cpu=%.3f leaf-cpu=%.3f final-cpu=%.3f\n"
+      "[schedule-pruning-work] constructor=%s bound-cache-hits=%d bound-cache-misses=%d leaf-cache-hits=%d mode-cache-hits=%d stable-cache-entries=%d step-multisets=%d bound-cpu=%.3f leaf-cpu=%.3f final-cpu=%.3f\n"
       (constructor_to_string ctr_name) !bound_cache_hits !bound_cache_misses
-      !leaf_cache_hits
-      !bound_cpu !leaf_cpu !final_cpu));
+      !leaf_cache_hits !mode_cache_hits
+      (InductiveScheduleKeyMap.cardinal !stable_dependencies)
+      distinct_step_multisets !bound_cpu !leaf_cpu !final_cpu));
   if score_pruning_mode = `Verify then begin
     let observed = List.sort_uniq Stdlib.compare !observed_leaf_scores in
     let rescored = List.map (fun (_, scored, _, _) ->

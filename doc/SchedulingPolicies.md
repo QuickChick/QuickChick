@@ -213,16 +213,22 @@ violation, and selects the same candidate as the unpruned run. It makes zero
 cuts. Score probes suspend nested experimental pruning while resolving
 dependencies; otherwise verification repeatedly re-enters those searches and
 multiplies the work without improving the root bound. The ordinary diagnostic
-shares dependency memo state across candidate scores and took 1.3 seconds in
-one local run. A comparable internal `baseline` uses the same bound-aware
-search and candidate-isolated scoring as pruning, but does no bound or leaf
-probe work; it took 8.4 seconds. Verification and pruning took 19.2 and 9.8
-seconds. The ordinary diagnostic's 1.3-second time therefore must not be
-treated as the cost of the same search without pruning.
-The bound-grade cache had 26 hits and 3 misses, consuming 0.34 seconds of CPU
-time. Completed-leaf scoring cost 7.8 seconds. The pruning path now reuses
-those leaf annotations for ranking, then rescores only the selected candidate
-to recover its dependency memo; final scoring fell from 9.1 to 0.7 seconds.
+shares dependency memo state across candidate scores and took 1.2 seconds in
+one local run. A comparable internal `baseline` uses the same search as
+pruning but no bounds. With all candidate reuse disabled it took 8.3 seconds.
+The scorer now shares completed, cycle-independent dependency entries across
+candidates. It also caches grades for equal multisets of scoring steps:
+`schedule_density` visits those steps in a fixed sorted order, then the cache
+restores each candidate's original order for ranking. Multisets with duplicate
+steps are scored afresh. Verification recomputes these scores independently
+and checks for disagreement. With reuse, the baseline took 2.3 seconds,
+verification 15.4 seconds, and pruning 2.5 seconds. The ordinary diagnostic's
+time is not a like-for-like pruning comparison.
+The bound-grade cache had 26 hits and 3 misses; the mode cache hit 10 times
+across 12 leaves, which had only two distinct step multisets. Pruned ranking
+reuses completed-leaf annotations and rescores only the winner to recover its
+dependency memo. In the reused run, bound, leaf, and final scoring cost 0.28,
+1.26, and 0.57 seconds of CPU time.
 The verifier still independently rescores all candidates. The bound is
 admissible on this case but too weak to cut, and recursive score resolution
 remains expensive.

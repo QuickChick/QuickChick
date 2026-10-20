@@ -24,17 +24,20 @@ PRUNING = re.compile(
 WORK = re.compile(
     r"^\[schedule-pruning-work\] constructor=(\S+) "
     r"bound-cache-hits=(\d+) bound-cache-misses=(\d+) "
-    r"leaf-cache-hits=(\d+)"
+    r"leaf-cache-hits=(\d+) mode-cache-hits=(\d+) "
+    r"stable-cache-entries=(\d+)"
 )
 
 
-def run(mode, directory):
+def run(mode, directory, reuse=True):
     environment = os.environ.copy()
     environment["QC_SCHEDULE_TRACE"] = "1"
     environment["QC_SCHEDULE_RANKING"] = "density_then_vars"
     environment.pop("QC_SCHEDULE_SCORE_PRUNING", None)
     if mode != "off":
         environment["QC_SCHEDULE_SCORE_PRUNING"] = mode
+    if not reuse:
+        environment["QC_SCHEDULE_REUSE_STABLE"] = "0"
     command = [
         COQC,
         "-I", str(BUILD / "install/default/lib"),
@@ -42,7 +45,7 @@ def run(mode, directory):
         "-noglob", "-o", str(directory / "SemgusMerge.vo"),
         str(HERE / "SemgusMerge.v"),
     ]
-    log = directory / f"{mode}.log"
+    log = directory / f"{mode}-{'warm' if reuse else 'cold'}.log"
     started = time.monotonic()
     with log.open("w") as stream:
         result = subprocess.run(command, cwd=ROOT, env=environment,
@@ -67,23 +70,28 @@ def run(mode, directory):
 with tempfile.TemporaryDirectory() as temporary:
     directory = Path(temporary)
     ordinary, off_searches, off_work, off_seconds = run("off", directory)
+    cold, cold_searches, cold_work, cold_seconds = run("baseline", directory, False)
     baseline, baseline_searches, baseline_work, baseline_seconds = run("baseline", directory)
     verified, verify_searches, verify_work, verify_seconds = run("verify", directory)
     bounded, prune_searches, prune_work, prune_seconds = run("1", directory)
-    assert ordinary == baseline == verified == bounded, (
-        ordinary, baseline, verified, bounded)
+    assert ordinary == cold == baseline == verified == bounded, (
+        ordinary, cold, baseline, verified, bounded)
     assert baseline[0] == "12", baseline
     assert not off_searches, off_searches
     assert not off_work, off_work
-    assert len(baseline_searches) == len(verify_searches) == len(prune_searches) == 1
-    assert len(baseline_work) == len(verify_work) == len(prune_work) == 1
+    assert len(cold_searches) == len(baseline_searches) == len(verify_searches) == len(prune_searches) == 1
+    assert len(cold_work) == len(baseline_work) == len(verify_work) == len(prune_work) == 1
+    assert cold_searches[0][1:] == ("baseline", "0", "12", "0")
     assert baseline_searches[0][1:] == ("baseline", "0", "12", "0")
+    assert cold_work[0][4:] == ("0", "0"), cold_work
+    assert int(baseline_work[0][4]) > 0, baseline_work
+    assert int(baseline_work[0][5]) > 0, baseline_work
     verify_root, prune_root = verify_searches[0], prune_searches[0]
     assert verify_root[1:] == ("verify", "25", "12", "0"), verify_root
     assert prune_root[1:] == ("prune", "25", "12", "0"), prune_root
     assert int(prune_work[0][1]) > 0 and int(prune_work[0][2]) > 0
     assert prune_work[0][3] == "12", prune_work
     print(f"double self-merge: 12 root leaves verified over 25 prefixes; "
-          f"same winner, zero cuts; seconds off/baseline/verify/prune: "
-          f"{off_seconds:.1f}/{baseline_seconds:.1f}/"
+          f"same winner, zero cuts; seconds off/cold/warm/verify/prune: "
+          f"{off_seconds:.1f}/{cold_seconds:.1f}/{baseline_seconds:.1f}/"
           f"{verify_seconds:.1f}/{prune_seconds:.1f}")
