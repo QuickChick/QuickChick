@@ -108,6 +108,27 @@ let finite_pins_of_relation ((_, _, ctors, _) : rocq_relation) =
   | Some flags -> List.filter_map (fun (i, flag) ->
       if flag then Some i else None) (List.mapi (fun i flag -> i, flag) flags)
 
+(* Cache only for the lifetime of one derivation. A process-wide cache could
+   retain declarations across Rocq undo/backtracking. Missing or unsupported
+   relations have no pins, as in Specimen's analysis-failure fallback. *)
+let finite_pins_with_lookup find_relation =
+  let cache = Hashtbl.create 16 in
+  fun name -> match Hashtbl.find_opt cache name with
+    | Some pins -> pins
+    | None ->
+      let pins = try match find_relation name with
+        | Some relation -> finite_pins_of_relation relation
+        | None -> []
+      with _ -> [] in
+      Hashtbl.add cache name pins;
+      pins
+
+let finite_pins_from_environment () =
+  finite_pins_with_lookup (fun name ->
+    match ty_ctr_to_rocq_relations name with
+    | None -> None
+    | Some (index, relations) -> List.nth_opt relations index)
+
 let source_args = function
   | SrcNonrec (DTyCtr (_, args)) -> Ok args
   | SrcNonrec (DTyParam _) -> Ok []

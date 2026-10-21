@@ -30,6 +30,20 @@ let pinned_relation : N.rocq_relation =
         [N.DCtr (N.constructor_of_string "O", [])])])],
    N.DTyCtr (N.ty_ctr_of_string "nat", []))
 let pinned_positions = B.finite_pins_of_relation pinned_relation
+let check_pin_lookup () =
+  let calls = ref 0 in
+  let pinned = N.ty_ctr_of_string "Pinned" in
+  let missing = N.ty_ctr_of_string "Missing" in
+  let lookup = B.finite_pins_with_lookup (fun name ->
+    incr calls;
+    if N.ty_ctr_eq name pinned then Some pinned_relation else None) in
+  assert (lookup pinned = [0]);
+  assert (lookup pinned = [0]);
+  assert (lookup missing = []);
+  assert (lookup missing = []);
+  assert (!calls = 2);
+  let failing = B.finite_pins_with_lookup (fun _ -> failwith "unavailable") in
+  assert (failing pinned = [])
 let unpinned_positions =
   let name = N.ty_ctr_of_string "Unpinned" in
   B.finite_pins_of_relation (name, [],
@@ -146,6 +160,7 @@ let check_candidate_preludes () =
     | Error message -> failwith ("matched candidate: " ^ message)) candidates
 
 let () =
+  check_pin_lookup ();
   check_scheduler_adapter ();
   check_applied_dependencies ();
   check_candidate_preludes ();

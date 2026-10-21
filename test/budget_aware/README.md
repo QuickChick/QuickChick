@@ -5,7 +5,12 @@ at revision `121cf23435a17d93f1dde283daa62d2899628a8b`. It scores concrete
 QuickChick schedule steps and combines constructor scores across coverage
 leaves. Its caller supplies the original input variables, completed dependency
 scores, and finite-pinned positions. The latter can be computed from a
-translated Rocq relation with `finite_pins_of_relation`.
+translated Rocq relation with `finite_pins_of_relation`. The
+`finite_pins_from_environment` callback looks up the relevant member of a
+mutual inductive and caches its result for one derivation. An unavailable or
+untranslatable relation gives no pinned positions, matching Specimen's
+conservative fallback. The analysis intentionally stops at ground constructor
+conclusions; it does not infer finite ranges from premises.
 
 `SpecimenParity.lean` runs the reference scorer on matching schedules. The
 OCaml test checks the values in `expected.txt`; `check_parity.py` reruns both

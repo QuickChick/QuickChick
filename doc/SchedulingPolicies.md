@@ -171,6 +171,13 @@ metadata; the search bound must be built and checked separately.
 Unsupported QuickChick-only `let` and defined-source
 steps return an error rather than silently receiving an approximate score.
 
+Finite pinning follows Specimen's ground-constructor rule. The environment
+lookup selects the requested member of a mutual inductive, intersects ground
+argument positions across its constructors, and returns no pins if translation
+fails. It caches only within a derivation, so undo cannot retain stale metadata.
+No deeper finite-domain inference is planned without evidence that it improves
+selected schedules.
+
 The internal ranking module now builds this conservative prefix key from
 certified call-site grades, unresolved calls, and a lower bound on committed
 variable uses. It compares an incumbent with that key without candidate IDs
