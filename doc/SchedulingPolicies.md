@@ -281,7 +281,20 @@ verification of the OCaml converter.
 
 At pinned Specimen revision `121cf234`, scoring bundles explicitly associate
 comparison and aggregation with pruning strategy, including a no-pruning option.
-QuickChick does not yet provide that bundle interface or arbitrary Rocq scorers.
+QuickChick now has an experimental `QuickChick.SchedulingPolicy` Rocq module.
+It defines a typed score across steps, complete schedules, coverage leaves,
+and inductive summaries. A policy also supplies an ordering and a partial-node
+bound; strict pruning keeps ties. The scheduler view includes applied symbolic
+terms, scoped local ids, dependency states, finite-pin metadata, leaf patterns,
+and search decisions.
+`test/scoring_policy.v` computes examples with a user-defined record score and
+a bound that reads search state. This is an interface test, not a selected
+derivation. The plugin's first quotation stage converts scheduler terms and
+patterns to the corresponding symbolic view. It preserves shadowed binders and
+applied arguments, and rejects unresolved holes; a test uses a real scheduler
+candidate. The remaining bridge must resolve global names, quote complete
+typed schedules as Rocq terms, evaluate a selected policy, and feed its bound
+back into search. Existing ranking and settings remain active.
 
 ## Constructor weighting
 
