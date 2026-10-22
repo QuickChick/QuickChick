@@ -407,25 +407,26 @@ let supplied_context_expression ~global scope relation result_vars local_types
        | Error _ as error, _ | _, (Error _ as error) -> error) in
   let inputs = List.map fst result_vars
     |> List.filter (fun name -> not (List.mem name outputs)) in
+  let root_output_indices = List.filter_map (fun (index, (name, _)) ->
+    if List.mem name outputs then Some index else None)
+    (List.mapi (fun index entry -> index, entry) result_vars) in
   let rec quote_supplied acc = function
     | [] -> Ok (List.rev acc)
     | (application, outputs, mode, constrained) :: rest ->
       (match spec_expression ~global scope application outputs mode constrained with
        | Ok spec -> quote_supplied (spec :: acc) rest
        | Error _ as error -> error) in
-  match spec_expression ~global scope application
-      (List.filter_map (fun (index, (name, _)) ->
-        if List.mem name outputs then Some index else None)
-        (List.mapi (fun index entry -> index, entry) result_vars))
+  if List.length root_output_indices <> List.length outputs then
+    Error "SchedulingPolicy: an output is missing from the root telescope"
+  else match spec_expression ~global scope application root_output_indices
       mode constrained,
-    collect_ids scope outputs, collect_ids scope inputs,
-    quote_locals [] local_types, quote_supplied [] supplied with
-  | Ok spec, Ok _, Ok inputs, Ok locals, Ok supplied ->
+    collect_ids scope inputs, quote_locals [] local_types,
+    quote_supplied [] supplied with
+  | Ok spec, Ok inputs, Ok locals, Ok supplied ->
     Ok (spec, GenericLib.gList locals, int_list inputs,
       GenericLib.gList supplied)
-  | Error _ as error, _, _, _, _ | _, (Error _ as error), _, _, _
-  | _, _, (Error _ as error), _, _ | _, _, _, (Error _ as error), _
-  | _, _, _, _, (Error _ as error) -> error
+  | Error _ as error, _, _, _ | _, (Error _ as error), _, _
+  | _, _, (Error _ as error), _ | _, _, _, (Error _ as error) -> error
 
 let score_one_schedule_expression scorer (spec, locals, inputs, supplied)
     schedule =
