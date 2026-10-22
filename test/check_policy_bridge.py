@@ -82,6 +82,7 @@ with tempfile.TemporaryDirectory() as temporary:
     record = compile_probe(
         output,
         QC_POLICY_RECORD_PROBE="policy_quote_record_scorer",
+        QC_SCHEDULE_TRACE="1",
     )
     assert (
         "[policy-record] constructor=QuoteZero "
@@ -99,6 +100,7 @@ with tempfile.TemporaryDirectory() as temporary:
         in record
     ), record
     assert "[policy-record] constructor=QuoteMissing " not in record, record
+    assert "policy_quote_missing(_, OUT) : [QuoteMissing: Total]" in record, record
 
     record_compared = compile_probe(
         output,

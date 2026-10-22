@@ -359,7 +359,9 @@ separate typed memo described in the scoring design.
 The regression also derives `policy_quote_missing A`, whose generator needs
 `GenSized A` from its eventual caller. It receives no supplied-instance score
 notice, while concrete `nat` and `list nat` sources do. The diagnostic uses
-the elaborated class-obligation lookup, not declaration-name existence. When
+direct resolution of the elaborated class obligation in the current context,
+without adding hypothetical typeclass premises. Parameter sources are checked
+by the same rule. When
 every candidate is eligible, the probe applies the record's `compare_scores`
 to their typed Rocq scores. It preserves candidate order on ties. The
 four-candidate fixture supplies all needed generator and checker modes, then

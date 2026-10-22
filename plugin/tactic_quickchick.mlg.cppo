@@ -1621,6 +1621,14 @@ let has_schedule_instance relation outputs ds constrained =
   match instance_requirements ~allow_root:(match relation with DTyParam _ -> true | _ -> false)
     env sigma goal names with Some _ -> true | None -> false
 
+(* A policy score may call a dependency SuppliedInstance only when the
+   obligation resolves in the current context, without invented premises. *)
+let has_supplied_schedule_instance relation outputs ds constrained =
+  let env, sigma, goal, _ = elaborate_obligation relation outputs ds constrained in
+  match resolve_schedule_obligation env sigma goal with
+  | Some (sigma, _) -> not (Evd.has_undefined sigma)
+  | None -> false
+
 (* Prefix probes must not choose a dependency schedule or leave a provisional
    grade in the memo used to score completed constructor candidates. Nested
    probes would also rerun the experimental search for every dependency. *)
@@ -2104,7 +2112,11 @@ and constructor_valid_schedules (ind_name : ty_ctr) (ctr : rocq_ctr) (result_var
            (match step with
             | S_Match _ | S_Let _ -> collect acc rest
             | _ ->
-              match schedule_step_dependence step with
+              let request = match step with
+                | S_UC (_, SrcNonrec (DTyParam _ as parameter), ps) ->
+                  Some (parameter, [], producer_sort_to_derive_sort ps, false)
+                | _ -> schedule_step_dependence step in
+              match request with
               | None -> None
               | Some ((relation, indices, mode, constrained) as request) ->
                 let args = match relation with
@@ -2113,7 +2125,7 @@ and constructor_valid_schedules (ind_name : ty_ctr) (ctr : rocq_ctr) (result_var
                 let outputs = List.filteri
                   (fun index _ -> List.mem index indices) args
                   |> List.concat_map variables_in_hypothesis in
-                if has_schedule_instance relation outputs mode constrained
+                if has_supplied_schedule_instance relation outputs mode constrained
                 then collect
                   (if List.mem request acc then acc else request :: acc) rest
                 else None) in
