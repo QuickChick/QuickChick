@@ -266,6 +266,11 @@ let parse_dependent_type_internal i nparams ty oibopt arg_names =
              aux locals i ty >>= fun ty' -> Some (ty' :: acc)
             ) (Some []) tms >>= fun tms' ->
       match aux locals i ctr with
+      (* [not] is a constant, but must retain its logical scheduling form. *)
+      | Some (DTyCtr (c, _)) when ty_ctr_to_string c = "Coq.Init.Logic.not" ->
+          (match List.rev tms' with
+           | [predicate] -> Some (DNot predicate)
+           | _ -> failwith "Not a valid negation")
       | Some (DTyCtr (c, _)) -> Some (DTyCtr (c, List.rev tms'))
       | Some (DCtr (c, _)) -> Some (DCtr (c, List.rev tms'))
       | Some (DTyVar x) -> 
@@ -386,7 +391,8 @@ let parse_dependent_type_internal i nparams ty oibopt arg_names =
     else if Constr.isConst ty then begin 
       Error.msg_debug (str "Const: " ++ debug_constr ty ++ fnl ());
       let (x,_) = Constr.destConst ty in 
-      Some (DTyVar (Names.Label.to_id (Names.Constant.label x)))
+      (* Keep the qualified reference: a bare label may be mistaken for a binder. *)
+      Some (DTyCtr (ty_ctr_of_string (Names.Constant.to_string x), []))
     end
     else if Constr.isSort ty then begin
       if Constr.is_Prop ty then
