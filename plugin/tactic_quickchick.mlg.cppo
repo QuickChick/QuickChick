@@ -2094,6 +2094,70 @@ and constructor_valid_schedules (ind_name : ty_ctr) (ctr : rocq_ctr) (result_var
    | None, Some _, _ ->
      failwith "SchedulingPolicy: comparator probe requires a scorer probe"
    | _ -> ());
+  (match Sys.getenv_opt "QC_POLICY_RECORD_PROBE" with
+   | None -> ()
+   | Some scorer ->
+     let supplied_dependencies steps =
+       let rec collect acc = function
+         | [] -> Some (List.rev acc)
+         | (step, _) :: rest ->
+           (match step with
+            | S_Match _ | S_Let _ -> collect acc rest
+            | _ ->
+              match schedule_step_dependence step with
+              | None -> None
+              | Some ((relation, indices, mode, constrained) as request) ->
+                let args = match relation with
+                  | DTyCtr (_, args) | DNot (DTyCtr (_, args)) -> args
+                  | _ -> [] in
+                let outputs = List.filteri
+                  (fun index _ -> List.mem index indices) args
+                  |> List.concat_map variables_in_hypothesis in
+                if has_schedule_instance relation outputs mode constrained
+                then collect
+                  (if List.mem request acc then acc else request :: acc) rest
+                else None) in
+       collect [] steps in
+     (match List.find_map (fun (_, ((steps, sort) as schedule), _, _) ->
+       let local_types = List.fold_left (fun locals (step, _) ->
+         let outputs = match step with
+           | S_UC (name, SrcNonrec typ, _) -> [name, typ]
+           | S_ST (outputs, _, _) -> outputs
+           | _ -> [] in
+         List.fold_left (fun locals (name, typ) ->
+           if List.mem_assoc name locals then locals else locals @ [name, typ])
+           locals outputs) result_vars steps in
+       let known_locals = List.map fst local_types in
+       let complete_telescope =
+         List.for_all (fun (_, typ) -> typ <> DHole) local_types &&
+         List.for_all (fun (step, _) ->
+           List.for_all (fun name -> List.mem name known_locals)
+             (ScoringView.step_variables step)) steps in
+       match sort, complete_telescope, supplied_dependencies steps with
+       | ProducerSchedule (constrained, _, result), true, Some supplied ->
+         Some (schedule, constrained, result, local_types, supplied)
+       | _ -> None) schedule_densities with
+      | None -> ()
+      | Some (((steps, _) as schedule), constrained, result,
+          local_types, supplied) ->
+        let names = List.map fst result_vars @
+          List.concat_map (fun (step, _) -> ScoringView.step_variables step) steps @
+          ScoringView.free_vars_term result |> List.sort_uniq Stdlib.compare in
+        let scope = ScoringView.scope names in
+        let context = match ScoringView.supplied_context_expression
+          ~global:ScoringView.global_name scope ind_name result_vars local_types
+          output_vars ds constrained supplied with
+          | Ok context -> context
+          | Error message -> failwith message in
+        let expression = ScoringView.score_one_schedule_expression scorer
+          context (policy_schedule_expression schedule) in
+        (match ScoringView.evaluate_term_in (Global.env ())
+          (Evd.from_env (Global.env ())) expression with
+         | Error message -> failwith message
+         | Ok (sigma, value, _) ->
+           Feedback.msg_notice (str ("[policy-record] score=" ^
+             Pp.string_of_ppcmds
+               (Printer.pr_econstr_env (Global.env ()) sigma value))))));
   if score_pruning_mode <> `Off && schedule_trace_enabled () then
     Feedback.msg_notice (str (Printf.sprintf
       "[schedule-pruning-work] constructor=%s bound-cache-hits=%d bound-cache-misses=%d leaf-cache-hits=%d mode-cache-hits=%d stable-cache-entries=%d step-multisets=%d bound-cpu=%.3f leaf-cpu=%.3f final-cpu=%.3f\n"

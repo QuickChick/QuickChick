@@ -91,6 +91,43 @@ Definition policy_quote_compare_cost (left right : quote_cost) : comparison :=
 
 Definition policy_quote_bad_compare (_ _ : quote_cost) : nat := 0.
 
+Definition policy_quote_name_ends (name suffix : string) : bool :=
+  String.eqb
+    (String.substring (String.length name - String.length suffix)
+       (String.length suffix) name)
+    suffix.
+
+Definition policy_quote_is_list_nat
+    (entry : spec_view * dependency_state quote_cost) : bool :=
+  match spec_application (fst entry) with
+  | TApply (TGlobal list_name) [TGlobal nat_name] =>
+      andb (policy_quote_name_ends list_name "list")
+           (policy_quote_name_ends nat_name "nat")
+  | _ => false
+  end.
+
+Definition policy_quote_record_scorer : scorer quote_cost := {|
+  score_step := fun _ step _ =>
+    {| quote_depth := match step with
+       | Unconstrained _ _ _ => 2
+       | SuchThat _ _ _ => 3
+       | _ => 1
+       end;
+       quote_weight := 1 |};
+  score_schedule := fun context _ scores =>
+    {| quote_depth := List.fold_left
+         (fun total score => total + quote_depth score) scores 0;
+       quote_weight := List.length (locals context) +
+         List.length (original_inputs context) +
+         List.length (spec_outputs (current_spec context)) +
+         List.length (dependencies context) +
+         (if List.existsb policy_quote_is_list_nat (dependencies context)
+          then 10 else 0) |};
+  score_leaf := fun _ _ _ => {| quote_depth := 0; quote_weight := 0 |};
+  score_inductive := fun _ _ _ => {| quote_depth := 0; quote_weight := 0 |};
+  compare_scores := policy_quote_compare_cost
+|}.
+
 Definition policy_quote_first_source (schedule : schedule_view) : term_view :=
   match schedule_steps schedule with
   | (SuchThat _ source _, _) :: _ => source_application source
@@ -100,12 +137,6 @@ Definition policy_quote_first_source (schedule : schedule_view) : term_view :=
   end.
 
 Definition policy_quote_equal_sources (_ _ : term_view) : comparison := Eq.
-
-Definition policy_quote_name_ends (name suffix : string) : bool :=
-  String.eqb
-    (String.substring (String.length name - String.length suffix)
-       (String.length suffix) name)
-    suffix.
 
 Definition policy_quote_order_sensitive_cost
     (schedule : schedule_view) : quote_cost :=
@@ -148,6 +179,11 @@ Inductive policy_quote_generated : nat -> Prop :=
 | QuoteGenerated : forall n, policy_quote_generated n.
 
 Derive Inductive Schedule policy_quote_generated 0 derive "Gen" opt "true".
+
+Inductive policy_quote_list : list nat -> Prop :=
+| QuoteList : forall xs, policy_quote_list xs.
+
+Derive Inductive Schedule policy_quote_list 0 derive "Gen" opt "true".
 
 Inductive policy_quote_premise : nat -> Prop :=
 | QuoteFromPremise : forall n, policy_quote_probe n -> policy_quote_premise n.

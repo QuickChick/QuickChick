@@ -377,17 +377,76 @@ let schedule_expression ~global ~finite_pins ~grade_expression scope
          [GenericLib.gList steps; result])
      | Error _ as error -> error)
 
+let derive_mode_expression = function
+  | D_Gen -> constructor "Generate" []
+  | D_Enum -> constructor "Enumerate" []
+  | D_Check -> constructor "Check" []
+  | D_Thm -> constructor "TestTheorem" []
+
+let spec_expression ~global scope application outputs mode constrained =
+  match quote_term ~global scope application with
+  | Error _ as error -> error
+  | Ok (application, _) ->
+    Ok (constructor "Build_spec_view"
+      [term_expression application; int_list outputs;
+       derive_mode_expression mode;
+       if constrained then GenericLib.g_true else GenericLib.g_false])
+
+(* The caller must resolve every listed dependency through typeclass search.
+   A pending derived dependency cannot be represented by this path. *)
+let supplied_context_expression ~global scope relation result_vars local_types
+    outputs mode constrained supplied =
+  let application = DTyCtr (relation,
+    List.map (fun (name, _) -> DTyVar name) result_vars) in
+  let rec quote_locals acc = function
+    | [] -> Ok (List.rev acc)
+    | (name, typ) :: rest ->
+      (match local_id scope name, quote_term ~global scope typ with
+       | Ok id, Ok (typ, _) ->
+         quote_locals (local_expression id typ :: acc) rest
+       | Error _ as error, _ | _, (Error _ as error) -> error) in
+  let inputs = List.map fst result_vars
+    |> List.filter (fun name -> not (List.mem name outputs)) in
+  let rec quote_supplied acc = function
+    | [] -> Ok (List.rev acc)
+    | (application, outputs, mode, constrained) :: rest ->
+      (match spec_expression ~global scope application outputs mode constrained with
+       | Ok spec -> quote_supplied (spec :: acc) rest
+       | Error _ as error -> error) in
+  match spec_expression ~global scope application
+      (List.filter_map (fun (index, (name, _)) ->
+        if List.mem name outputs then Some index else None)
+        (List.mapi (fun index entry -> index, entry) result_vars))
+      mode constrained,
+    collect_ids scope outputs, collect_ids scope inputs,
+    quote_locals [] local_types, quote_supplied [] supplied with
+  | Ok spec, Ok _, Ok inputs, Ok locals, Ok supplied ->
+    Ok (spec, GenericLib.gList locals, int_list inputs,
+      GenericLib.gList supplied)
+  | Error _ as error, _, _, _, _ | _, (Error _ as error), _, _, _
+  | _, _, (Error _ as error), _, _ | _, _, _, (Error _ as error), _
+  | _, _, _, _, (Error _ as error) -> error
+
+let score_one_schedule_expression scorer (spec, locals, inputs, supplied)
+    schedule =
+  GenericLib.gApp
+    (GenericLib.gInject "QuickChick.SchedulingPolicy.score_with_supplied_dependencies")
+    [GenericLib.gInject scorer; spec; locals; inputs; supplied; schedule]
+
 (* The result remains a typed Rocq term: the plugin need not know a user's
    score representation. The returned sigma carries elaboration constraints. *)
-let evaluate_expression_in env sigma function_name argument =
-  let expression = GenericLib.gApp
-    (GenericLib.gInject function_name) [argument] in
+let evaluate_term_in env sigma expression =
   let sigma, term = GenericLib.interp_coq_expr_evars env sigma expression in
   if Evd.has_undefined sigma then
     Error "SchedulingPolicy: the selected scorer left unresolved evars"
   else
     let sigma, typ = Typing.type_of env sigma term in
     Ok (sigma, Vnorm.cbv_vm env sigma term typ, typ)
+
+let evaluate_expression_in env sigma function_name argument =
+  let expression = GenericLib.gApp
+    (GenericLib.gInject function_name) [argument] in
+  evaluate_term_in env sigma expression
 
 let evaluate_expression env function_name argument =
   evaluate_expression_in env (Evd.from_env env) function_name argument

@@ -245,6 +245,8 @@ val inductive_schedules_to_def_constr_exprs : (inductive_schedule * derive_sort 
 
 val inductive_schedule_to_string : inductive_schedule -> string
 
+val schedule_step_dependence : schedule_step ->
+  (rocq_constr * int list * derive_sort * bool) option
 val schedule_dependents : schedule -> (rocq_constr * int list * derive_sort * bool) list
 val inductive_schedule_dependents : inductive_schedule -> (rocq_constr * int list * derive_sort * bool) list
 

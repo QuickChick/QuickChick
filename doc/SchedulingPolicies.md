@@ -345,6 +345,18 @@ The comparator fixture also uses a polymorphic record parameterized by
 `list nat`; scores from separate callback evaluations remain type-compatible
 when the plugin applies their Rocq comparator. A wrong result type is rejected.
 
+A further internal `QC_POLICY_RECORD_PROBE` accepts a named Rocq `scorer`
+record. It invokes both `score_step` and `score_schedule` on the first candidate
+whose source obligations all resolve to existing instances. Its context quotes
+the root application and output positions, original inputs, typed result and
+producer locals, and each supplied dependency's full application. The `list
+nat` fixture distinguishes that dependency from an unparameterized `list` and
+checks the step score contributes to the schedule score. Candidates with a
+pending derived or recursive dependency, an unknown local type, or an
+unrepresented match-bound local are skipped. This is a diagnostic subset;
+general `Completed` dependency scores and policy selection still need the
+separate typed memo described in the scoring design.
+
 ## Constructor weighting
 
 Scheduled generation currently gives base constructors weight 1 and recursive

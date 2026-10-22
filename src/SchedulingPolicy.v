@@ -175,6 +175,19 @@ Definition score_one_schedule {S} (p : scorer S) (ctx : score_context S)
     (map (fun '(step, grade) => score_step p ctx step grade)
       (schedule_steps schedule)).
 
+(* For a candidate whose every source dependency resolves to an existing
+   instance. General candidates need a typed policy score memo. *)
+Definition score_with_supplied_dependencies {S} (p : scorer S)
+    (spec : spec_view) (local_types : list local_view)
+    (inputs : list nat) (supplied : list spec_view)
+    (schedule : schedule_view) : S :=
+  score_one_schedule p {|
+    current_spec := spec;
+    locals := local_types;
+    original_inputs := inputs;
+    dependencies := map (fun dep => (dep, SuppliedInstance)) supplied
+  |} schedule.
+
 Definition score_one_inductive {S} (p : scorer S) (ctx : score_context S)
     (inductive : inductive_view) : S :=
   let constructors := map (fun c =>

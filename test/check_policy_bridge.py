@@ -20,6 +20,7 @@ def run_probe(destination: Path, **probes: str) -> subprocess.CompletedProcess:
         "QC_POLICY_STEP_PROBE",
         "QC_POLICY_SCHEDULE_PROBE",
         "QC_POLICY_COMPARE_PROBE",
+        "QC_POLICY_RECORD_PROBE",
         "QC_SCHEDULE_TRACE",
     ):
         environment.pop(name, None)
@@ -77,6 +78,23 @@ with tempfile.TemporaryDirectory() as temporary:
     assert (
         "[policy-compare] candidates=4 best=3 lt=2 eq=1 gt=0" in polymorphic
     ), polymorphic
+
+    record = compile_probe(
+        output,
+        QC_POLICY_RECORD_PROBE="policy_quote_record_scorer",
+    )
+    assert (
+        "[policy-record] score={| quote_depth := 0; quote_weight := 2 |}"
+        in record
+    ), record
+    assert (
+        "[policy-record] score={| quote_depth := 2; quote_weight := 3 |}"
+        in record
+    ), record
+    assert (
+        "[policy-record] score={| quote_depth := 2; quote_weight := 14 |}"
+        in record
+    ), record
 
     rejected = run_probe(
         output,
