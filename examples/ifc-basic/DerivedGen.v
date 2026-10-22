@@ -137,8 +137,7 @@ QuickChickWeights [ (GoodNop, 1)
                   ; (GoodAdd, 10)
                   ; (GoodLoad, 10)
                   ; (GoodStore, 100) ].
-(* The scheduled dependency walk does not yet handle Z.lt inside [between]. *)
-QCDeriveLegacy ArbitrarySizedSuchThat for (fun i => good_instr stk i).
+QCDerive ArbitrarySizedSuchThat for (fun i => good_instr stk i).
 
 (*
 Definition gen_state : G State :=
@@ -157,7 +156,7 @@ Inductive good_state : State -> Prop :=
         good_stack 4 stk ->
         good_instr stk i ->
         good_state (St [i;i] m stk pc).
-QCDeriveLegacy ArbitrarySizedSuchThat for (fun st => good_state st).
+QCDerive ArbitrarySizedSuchThat for (fun st => good_state st).
 
 (* Sample (@arbitrarySizeST _ (fun st => good_state st) _ 10).*)
 

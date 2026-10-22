@@ -359,12 +359,18 @@ let inductives_used_in_inductive (ind : Names.inductive) : Names.Indset.t =
 
 module TyCtrMap = Map.Make(struct type t = ty_ctr let compare = compare end)
 
+(* A failed dependency mode rejects this candidate, not the enclosing search:
+   another hypothesis order may bind enough inputs to use an existing instance. *)
+exception Noninductive_dependency of ty_ctr
+exception Unavailable_mode of string
+
 let rocq_relation_memo : rocq_relation TyCtrMap.t ref = ref TyCtrMap.empty
 
 let ty_ctr_to_rocq_relation (tycon : ty_ctr) =
   match TyCtrMap.find_opt tycon !rocq_relation_memo with
   | Some r -> r
   | None -> begin
+    if not (is_inductive' tycon) then raise (Noninductive_dependency tycon);
     match ty_ctr_to_rocq_relations tycon with
     | None -> failwith ("Inductive not found: " ^ ty_ctr_to_string tycon)
     | Some (idx, rels) -> 
@@ -1914,38 +1920,45 @@ and constructor_valid_schedules (ind_name : ty_ctr) (ctr : rocq_ctr) (result_var
     score_pruning_mode = `Verify then Some (fun path terminal _ triple ->
     if terminal then begin
       incr scored_leaves;
-      let score = leaf_score triple in
-      trace_score "leaf" path score;
-      if score_pruning_mode = `Verify then
-        observed_leaf_scores := score :: !observed_leaf_scores;
-      if score_pruning_mode = `Verify then
-        List.iter (fun (ancestor, bound) ->
-          if path_prefix ancestor path &&
-             ScheduleRanking.can_prune ~prefer_dense policy
-               ~incumbent:score ~bound then
-            failwith "schedule score prefix bound exceeded a completed descendant")
-          !observed_bounds;
-      incumbent := Some (match !incumbent with
-        | None -> score
-        | Some best when ScheduleRanking.compare ~prefer_dense policy score best < 0 -> score
-        | Some best -> best)
+      let score = try Some (leaf_score triple) with
+        | Noninductive_dependency _ | Unavailable_mode _ -> None in
+      Option.iter (fun score ->
+        trace_score "leaf" path score;
+        if score_pruning_mode = `Verify then
+          observed_leaf_scores := score :: !observed_leaf_scores;
+        if score_pruning_mode = `Verify then
+          List.iter (fun (ancestor, bound) ->
+            if path_prefix ancestor path &&
+               ScheduleRanking.can_prune ~prefer_dense policy
+                 ~incumbent:score ~bound then
+              failwith "schedule score prefix bound exceeded a completed descendant")
+            !observed_bounds;
+        incumbent := Some (match !incumbent with
+          | None -> score
+          | Some best when ScheduleRanking.compare ~prefer_dense policy score best < 0 -> score
+          | Some best -> best)) score
     end) else None in
   let should_prune_prefix_with_floor = if score_pruning_mode = `Verify || score_pruning_mode = `Prune then Some (fun path check_floor triple ->
     incr checked_prefixes;
     if score_pruning_mode = `Verify then begin
-      let bound = bound_score check_floor triple in
-      trace_score "bound" path bound;
-      observed_bounds := (path, bound) :: !observed_bounds;
+      let bound = try Some (bound_score check_floor triple) with
+        | Noninductive_dependency _ | Unavailable_mode _ -> None in
+      Option.iter (fun bound ->
+        trace_score "bound" path bound;
+        observed_bounds := (path, bound) :: !observed_bounds) bound;
       false
     end else match !incumbent with
       | None -> false
       | Some best ->
-        let bound = bound_score check_floor triple in
-        trace_score "bound" path bound;
-        let cut = ScheduleRanking.can_prune ~prefer_dense policy
-          ~incumbent:best ~bound in
-        if cut then incr pruned_prefixes;
-        cut) else None in
+        (match try Some (bound_score check_floor triple) with
+          | Noninductive_dependency _ | Unavailable_mode _ -> None with
+        | None -> false
+        | Some bound ->
+          trace_score "bound" path bound;
+          let cut = ScheduleRanking.can_prune ~prefer_dense policy
+            ~incumbent:best ~bound in
+          if cut then incr pruned_prefixes;
+          cut)) else None in
   let prepared_inputs = ref [] in
   let schedule_matches = NewUnifyQC.type_to_schedules
     ~on_prepared:(fun inputs -> prepared_inputs := inputs)
@@ -1997,18 +2010,22 @@ and constructor_valid_schedules (ind_name : ty_ctr) (ctr : rocq_ctr) (result_var
     let entries = List.filter_map (fun (i, triple, ms_steps, schd) ->
       density_inductive_memo := add_stable initial_inductive_memo;
       density_memo := initial_density_memo;
-      let scored = match score_pruning_mode,
+      let scored = try Some (match score_pruning_mode,
         Hashtbl.find_opt leaf_score_cache triple with
         | `Prune, Some cached -> incr leaf_cache_hits; cached
         | _ -> with_score_pruning_suspended (fun () ->
             score_schedule ~use_cache:(score_pruning_mode = `Baseline && reuse_stable)
-              ms_steps schd) in
-      collect_stable ();
-      let inductive_memo = !density_inductive_memo in
-      let density_memo_after = !density_memo in
-      if are_schedule_steps_valid i scored then
-        Some (i, scored, inductive_memo, density_memo_after)
-      else None) schedules in
+              ms_steps schd)) with
+        | Noninductive_dependency _ | Unavailable_mode _ -> None in
+      match scored with
+      | None -> None
+      | Some scored ->
+        collect_stable ();
+        let inductive_memo = !density_inductive_memo in
+        let density_memo_after = !density_memo in
+        if are_schedule_steps_valid i scored then
+          Some (i, scored, inductive_memo, density_memo_after)
+        else None) schedules in
     (* Ranking needs only the cached annotations. Recompute the winner to
        recover its dependency memo for code generation, and check its score. *)
     if score_pruning_mode <> `Prune &&
@@ -2413,7 +2430,7 @@ and inductive_best_valid_schedule (rel : rocq_relation) (output_idxs : int list)
 
   let constructor_schedules_with_density = List.filter_map (fun ctr ->
     match constructor_best_valid_schedule ind_name ctr result_vars output_vars ds opt with
-    | (ctr_name, None) -> failwith ("Should be at least one partial schedule for all constructors including this one: " ^ constructor_to_string ctr_name)
+    | (ctr_name, None) -> raise (Unavailable_mode (constructor_to_string ctr_name))
     | (ctr_name, Some ((i, schd, density), binders)) ->
       Some ((schd, [], binders), (ctr_name, density))) ctrs in
 
@@ -3348,7 +3365,15 @@ let derive_schedule ind ois ds opt =
       (* inductive_dependency_map := StringMap.empty; *)
       let (ind_name, params, constructors, result_typ) = List.nth rs idx in
       msg_debug (str "Deriving inductive schedule for " ++ str (ty_ctr_to_string ind_name) ++ fnl ());
-      let (inductive_schedule, density) = inductive_best_valid_schedule (ind_name, params, constructors, result_typ) ois ds opt in
+      let (inductive_schedule, density) = try
+        inductive_best_valid_schedule (ind_name, params, constructors, result_typ) ois ds opt
+      with
+      | Noninductive_dependency name ->
+        CErrors.user_err (str ("No scheduled instance can use the defined relation " ^
+          ty_ctr_to_string name ^ " in this mode."))
+      | Unavailable_mode constructor ->
+        CErrors.user_err (str ("No usable scheduled mode for constructor " ^ constructor ^
+          "; check the required dependency instances.")) in
       Error.msg_debug (str "Inductive Schedule:\n" ++ str (inductive_schedule_to_string inductive_schedule) ++ fnl ());
       msg_debug (str "Density: " ++ str (density_to_string density) ++ fnl ());
       density_inductive_memo := InductiveScheduleKeyMap.remove (ty_ctr_of_string "eq", [], D_Check, true) !density_inductive_memo;
