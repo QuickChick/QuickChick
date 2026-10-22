@@ -298,9 +298,9 @@ an indexed polymorphic relation and a user-defined record score. Quotation
 resolves global names to qualified paths and represents `Type`, `Prop`, and
 `Set` as sorts. The probe is enabled only by `QC_POLICY_QUOTE_PROBE=1`, with
 `QC_POLICY_SCORE_PROBE` naming the Rocq function; it does not select a policy.
-The remaining bridge must quote complete typed schedules, retain scores across
-dependency calls, compare them through the policy, and feed policy bounds into
-search. Existing ranking and settings remain active.
+The remaining bridge must retain scores across dependency calls, compare them
+through the policy, and feed policy bounds into search. Existing ranking and
+settings remain active.
 
 The diagnostic also quotes real `Check`, unconstrained, and relation-producer
 steps and evaluates a Rocq callback named by `QC_POLICY_STEP_PROBE`. The
@@ -309,9 +309,16 @@ output, a finite-pinned output, and a relation with a separate input. Rocq
 sees the output count, bound-source input count, and finite-pin count as
 `(0,2,0)`, `(1,0,0)`, `(1,0,0)`, `(1,0,1)`, and `(1,1,0)` respectively in
 those cases. Recursive helper references use a distinct generated-name node.
-This path inspects only the first candidate of each constructor. It rejects
-match and let steps until their binders and types are represented accurately;
-it does not score or rank a complete schedule.
+This step probe inspects the first candidate of each constructor. A separate
+`QC_POLICY_SCHEDULE_PROBE` callback receives the first fully scored candidate
+as a Rocq `schedule_view`, including ordered steps, density annotations, and
+the result when present. On a nested-output derivation, the callback confirms
+that the producer's output ID is the subsequent match input, the matched
+payload ID is the result, and the grades are one `Partial` and one
+`Backtracking`. Synthetic output types that the scheduler stores as `DHole`
+are represented as `TOpaque` with the same local ID. `LetStep` likewise has an
+opaque local type; it has no real derivation fixture yet. The probe does not
+rank candidates or certify a policy bound.
 
 ## Constructor weighting
 

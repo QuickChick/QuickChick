@@ -1,4 +1,6 @@
 From QuickChick Require Import SchedulingPolicy QuickChick.
+From Coq Require Import List.
+Import ListNotations.
 
 Inductive policy_quote_probe : nat -> Prop :=
 | QuoteZero : policy_quote_probe 0
@@ -41,6 +43,39 @@ Definition policy_quote_step_fields (step : step_view) : nat * nat * nat :=
   | _ => (0, 0, 0)
   end.
 
+Definition policy_quote_schedule_score (schedule : schedule_view)
+    : nat * nat :=
+  (List.length (schedule_steps schedule),
+   match schedule_result schedule with Some _ => 1 | None => 0 end).
+
+Definition policy_quote_match_links (schedule : schedule_view)
+    : bool * bool :=
+  match schedule_steps schedule, schedule_result schedule with
+  | (SuchThat (output :: nil) _ _, _) ::
+      (MatchStep input (PConstructor _ (PLocal payload :: nil)), _) :: _,
+      Some (TLocal result) =>
+      (Nat.eqb input (local_id output), Nat.eqb payload result)
+  | _, _ => (false, false)
+  end.
+
+Definition policy_quote_schedule_view (schedule : schedule_view) := schedule.
+
+Fixpoint policy_quote_grade_counts
+    (steps : list (step_view * density)) : nat * nat :=
+  match steps with
+  | [] => (0, 0)
+  | (_, grade) :: rest =>
+      let '(backtracking, partial) := policy_quote_grade_counts rest in
+      match grade with
+      | Backtracking => (S backtracking, partial)
+      | Partial => (backtracking, S partial)
+      | _ => (backtracking, partial)
+      end
+  end.
+
+Definition policy_quote_schedule_grades (schedule : schedule_view) :=
+  policy_quote_grade_counts (schedule_steps schedule).
+
 Derive Inductive Schedule policy_quote_probe derive "Check" opt "true".
 
 Inductive policy_quote_param (A : Type) : list A -> Prop :=
@@ -75,3 +110,9 @@ Inductive policy_quote_with_input : nat -> nat -> Prop :=
     policy_quote_indexed x y -> policy_quote_with_input x y.
 
 Derive Inductive Schedule policy_quote_with_input 1 derive "Gen" opt "true".
+
+Inductive policy_quote_nested : nat -> Prop :=
+| QuoteNested : forall n,
+    policy_quote_probe (S n) -> policy_quote_nested n.
+
+Derive Inductive Schedule policy_quote_nested 0 derive "Gen" opt "true".

@@ -1,5 +1,5 @@
-(* First stage of quoting scheduler terms to QuickChick.SchedulingPolicy.
-   This representation is lossless for the supported symbolic fragment. *)
+(* Quote scheduler terms to QuickChick.SchedulingPolicy. Unknown local types
+   remain opaque; names and binder identities are preserved. *)
 open NewGenericLib
 
 type pattern_view =
@@ -61,6 +61,25 @@ let rec quote_pattern ~global scope (pattern : NewGenericLib.pat) =
          | Error _ as error -> error
          | Ok (view, scope) -> loop scope (view :: acc) rest) in
     loop scope [] arguments
+
+(* A completed schedule already gives every local a unique name. Pattern
+   variables refer to those ids, including in steps following a match. *)
+let rec quote_existing_pattern ~global scope = function
+  | NewGenericLib.PWild -> Ok PWild
+  | NewGenericLib.PParam -> Ok PParameter
+  | NewGenericLib.PVar name ->
+    (match lookup scope name with
+     | Ok (TLocal id) -> Ok (PLocal id)
+     | Ok _ -> assert false
+     | Error _ as error -> error)
+  | NewGenericLib.PCtr (name, arguments) ->
+    let rec loop acc = function
+      | [] -> Ok (PConstructor (global name, List.rev acc))
+      | pattern :: rest ->
+        (match quote_existing_pattern ~global scope pattern with
+         | Ok view -> loop (view :: acc) rest
+         | Error _ as error -> error) in
+    loop [] arguments
 
 let rec quote_term ~global scope term =
   let rec quote_list scope acc = function
@@ -305,16 +324,56 @@ let step_expression ~global ~finite_pins scope step =
        let rec quote_outputs acc = function
          | [] -> Ok (List.rev acc)
          | (name, typ) :: rest ->
-           (match local_id scope name, quote_term ~global scope typ with
-            | Ok id, Ok (typ, _) ->
+           let quoted_type = match typ with
+             | DHole ->
+               (match local_id scope name with
+                | Ok id -> Ok (TOpaque id)
+                | Error _ as error -> error)
+             | _ ->
+               (match quote_term ~global scope typ with
+                | Ok (view, _) -> Ok view
+                | Error _ as error -> error) in
+           (match local_id scope name, quoted_type with
+            | Ok id, Ok typ ->
               quote_outputs (local_expression id typ :: acc) rest
             | Error _ as error, _ | _, (Error _ as error) -> error) in
        (match quote_outputs [] outputs with
         | Ok outputs -> Ok (constructor "SuchThat"
             [GenericLib.gList outputs; src_view; producer_expression mode])
         | Error _ as error -> error))
-  | S_Match _ | S_Let _ ->
-    Error "SchedulingPolicy: match and let steps need binder-aware quotation"
+  | S_Match (name, pattern) ->
+    (match local_id scope name, quote_existing_pattern ~global scope pattern with
+     | Ok id, Ok pattern -> Ok (constructor "MatchStep"
+         [GenericLib.gInt id; pattern_expression pattern])
+     | Error _ as error, _ | _, (Error _ as error) -> error)
+  | S_Let (name, value) ->
+    (match local_id scope name, quote_term ~global scope value with
+     | Ok id, Ok (value, _) -> Ok (constructor "LetStep"
+         [local_expression id (TOpaque id); term_expression value])
+     | Error _ as error, _ | _, (Error _ as error) -> error)
+
+let schedule_expression ~global ~finite_pins ~grade_expression scope
+    steps result =
+  let rec quote_steps acc = function
+    | [] -> Ok (List.rev acc)
+    | (step, grade) :: rest ->
+      (match step_expression ~global ~finite_pins scope step with
+       | Ok view -> quote_steps
+           (GenericLib.gPair (view, grade_expression grade) :: acc) rest
+       | Error _ as error -> error) in
+  match quote_steps [] steps with
+  | Error _ as error -> error
+  | Ok steps ->
+    let result = match result with
+      | None -> Ok GenericLib.gNone'
+      | Some term ->
+        (match quote_term ~global scope term with
+         | Ok (view, _) -> Ok (GenericLib.gSome' (term_expression view))
+         | Error _ as error -> error) in
+    (match result with
+     | Ok result -> Ok (constructor "Build_schedule_view"
+         [GenericLib.gList steps; result])
+     | Error _ as error -> error)
 
 (* The result remains a typed Rocq term: the plugin need not know a user's
    score representation. The returned sigma carries elaboration constraints. *)

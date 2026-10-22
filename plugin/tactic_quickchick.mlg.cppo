@@ -2024,6 +2024,36 @@ and constructor_valid_schedules (ind_name : ty_ctr) (ctr : rocq_ctr) (result_var
                           !density_memo) in
         List.map (fun ((i, _, _, _) as entry) ->
           if i = best_id then best_entry else entry) entries)) in
+  (match Sys.getenv_opt "QC_POLICY_SCHEDULE_PROBE", schedule_densities with
+   | Some scorer, (_, (steps, sort), _, _) :: _ ->
+     let result = match sort with
+       | ProducerSchedule (_, _, result) | TheoremSchedule (result, _) ->
+         Some result
+       | CheckerSchedule -> None in
+     let names = List.map fst result_vars @
+       List.concat_map (fun (step, _) -> ScoringView.step_variables step) steps @
+       (match result with None -> [] | Some term -> ScoringView.free_vars_term term)
+       |> List.sort_uniq Stdlib.compare in
+     let scope = ScoringView.scope names in
+     let grade_expression = function
+       | Checking -> ScoringView.constructor "Checking" []
+       | Backtracking -> ScoringView.constructor "Backtracking" []
+       | Neutral -> ScoringView.constructor "Neutral" []
+       | Partial -> ScoringView.constructor "Partial" []
+       | Total -> ScoringView.constructor "Total" [] in
+     let expression = match ScoringView.schedule_expression
+       ~global:ScoringView.global_name
+       ~finite_pins:(BudgetAwareScore.finite_pins_from_environment ())
+       ~grade_expression scope steps result with
+       | Ok expression -> expression
+       | Error message -> failwith message in
+     (match ScoringView.evaluate_expression (Global.env ()) scorer expression with
+      | Error message -> failwith message
+      | Ok (sigma, value, _) ->
+        Feedback.msg_notice (str ("[policy-schedule] score=" ^
+          Pp.string_of_ppcmds
+            (Printer.pr_econstr_env (Global.env ()) sigma value))))
+   | _ -> ());
   if score_pruning_mode <> `Off && schedule_trace_enabled () then
     Feedback.msg_notice (str (Printf.sprintf
       "[schedule-pruning-work] constructor=%s bound-cache-hits=%d bound-cache-misses=%d leaf-cache-hits=%d mode-cache-hits=%d stable-cache-entries=%d step-multisets=%d bound-cpu=%.3f leaf-cpu=%.3f final-cpu=%.3f\n"
