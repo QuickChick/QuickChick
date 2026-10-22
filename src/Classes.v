@@ -38,6 +38,16 @@ Class GenSized (A : Type) :=
 Class Gen (A : Type) := { arbitrary : G A }.
 (* end gen_class *)
 
+(* Theorem tests accept either sized generators or existing unsized ones.
+   Keep this bridge separate from GenSized to avoid a reverse instance cycle. *)
+Class TheoremGen (A : Type) := { theoremArbitrarySized : nat -> G A }.
+
+#[global] Instance TheoremGenOfGenSized {A} `{GenSized A} : TheoremGen A | 10 :=
+  {| theoremArbitrarySized := arbitrarySized |}.
+
+#[global] Instance TheoremGenOfGen {A} `{Gen A} : TheoremGen A | 20 :=
+  {| theoremArbitrarySized := fun _ => arbitrary |}.
+
 (** Shrink class *)
 Class Shrink (A : Type) :=
   { shrink : A -> list A }.

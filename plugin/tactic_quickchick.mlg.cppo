@@ -1635,6 +1635,16 @@ let has_supplied_schedule_instance relation outputs ds constrained =
   | Some (sigma, _) -> not (Evd.has_undefined sigma)
   | None -> false
 
+let has_theorem_generator ty =
+  let expression = MTyCtr
+    (ty_ctr_of_string "QuickChick.Classes.TheoremGen",
+     [product_free_rocq_type_to_mexp ty]) in
+  let env, sigma, goal, _ = elaborate_schedule_expression
+    (obligation_variables ty) [] D_Thm expression in
+  match resolve_schedule_obligation env sigma goal with
+  | Some (sigma, _) -> not (Evd.has_undefined sigma)
+  | None -> false
+
 (* Prefix probes must not choose a dependency schedule or leave a provisional
    grade in the memo used to score completed constructor candidates. Nested
    probes would also rerun the experimental search for every dependency. *)
@@ -1665,7 +1675,8 @@ let rec schedule_density neutral_prelude_steps schedule : schedule_with_density 
     match step with
     | S_UC (_, SrcNonrec (DTyParam _), _) -> fixed step ds
     | S_UC (_, SrcNonrec ty, ps) ->
-      (ignore (best_inductive_schedule_from_instance ty [] (producer_sort_to_derive_sort ps) false);
+      (if ds <> D_Thm || ps <> PS_G || not (has_theorem_generator ty) then
+         ignore (best_inductive_schedule_from_instance ty [] (producer_sort_to_derive_sort ps) false);
       fixed step ds)
     | S_Check (SrcNonrec ty, _) ->
       (ignore (best_inductive_schedule_from_instance ty [] D_Check true);

@@ -713,6 +713,8 @@ let m_arbitraryST prop = MApp (MConst "QuickChick.DependentClasses.arbitraryST",
 
 let m_arbitrarySized ty size = MApp (MConst "QuickChick.Classes.arbitrarySized", [ty; MHole; size])
 
+let m_theoremArbitrarySized ty size = MApp (MConst "QuickChick.Classes.theoremArbitrarySized", [ty; MHole; size])
+
 let m_arbitrarySizeST prop size = MApp (MConst "QuickChick.DependentClasses.arbitrarySizeST", [MHole; prop; MHole; size])
 
 let m_enum ty = MApp (MConst "QuickChick.Classes.enum", [ty; MHole])
@@ -1274,7 +1276,12 @@ let schedule_to_mexp ((steps, s_sort) : schedule) (mfuel : mexp) (def_fuel : mex
     | TheoremSchedule (concl, true) -> match_optbool (m_decOpt (product_free_rocq_type_to_mexp concl) m_fuel) (MRet (m_Some m_bool m_true)) (MRet (m_Some m_bool m_false)) MOutOfFuel
     | TheoremSchedule (concl, false) -> match_optbool (product_free_rocq_type_to_mexp concl) (MRet (m_Some m_bool m_true)) (MRet (m_Some m_bool m_false)) MOutOfFuel
   in
-  List.fold_right (fun schd acc -> schedule_step_to_mexp schd mfuel def_fuel child_sz acc) steps finally
+  List.fold_right (fun schd acc ->
+    match s_sort, schd with
+    | TheoremSchedule _, S_UC (v, SrcNonrec ty, PS_G) ->
+        let producer = m_theoremArbitrarySized (product_free_rocq_type_to_mexp ty) def_fuel in
+        MBind (prod_sort_to_monad_sort PS_G, producer, [v], acc)
+    | _ -> schedule_step_to_mexp schd mfuel def_fuel child_sz acc) steps finally
 
 (* let type_of_schedule (ischd_name, inps, nonrec_schds, rec_schds : inductive_schedule) (ds : derive_sort) (is_constrained : bool) : mexp = *)
 
