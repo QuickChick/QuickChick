@@ -1737,6 +1737,26 @@ and constructor_valid_schedules (ind_name : ty_ctr) (ctr : rocq_ctr) (result_var
   Error.msg_debug (str "Constructor name: " ++ str (constructor_to_string ctr_name) ++ fnl ());
   Error.msg_debug (str "Constructor type: " ++ str (rocq_constr_to_string typ) ++ fnl ());
   let typ = if opt then typ else arrows_to_products typ in
+  if Sys.getenv_opt "QC_POLICY_QUOTE_PROBE" = Some "1" then begin
+    let view = match ScoringView.quote_term
+      ~global:ScoringView.global_name (ScoringView.scope []) typ with
+      | Ok (view, _) -> view
+      | Error message -> failwith message in
+    let env = Global.env () in
+    ignore (GenericLib.interp_open_coq_expr env (Evd.from_env env)
+      (ScoringView.term_expression view));
+    let report = match Sys.getenv_opt "QC_POLICY_SCORE_PROBE" with
+      | None -> "checked Rocq term view"
+      | Some scorer ->
+        (match ScoringView.evaluate env scorer view with
+         | Error message -> failwith message
+         | Ok (sigma, value, typ) ->
+           match ScoringView.nat_of_value env sigma typ value with
+           | Some n -> Printf.sprintf "Rocq score=%d" n
+           | None -> "Rocq score=" ^
+             Pp.string_of_ppcmds (Printer.pr_econstr_env env sigma value)) in
+    Feedback.msg_notice (str ("[policy-quote] " ^ report))
+  end;
   let score_pruning_mode = match !score_pruning_suspended,
     Sys.getenv_opt "QC_SCHEDULE_SCORE_PRUNING" with
     | false, Some "baseline" -> `Baseline

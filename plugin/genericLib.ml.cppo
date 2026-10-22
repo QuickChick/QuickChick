@@ -52,6 +52,9 @@ type coq_expr = constr_expr (* Opaque *)
 
 let interp_open_coq_expr env evd e = fst (Constrintern.interp_constr env evd e)
 
+let interp_coq_expr_evars env evd e =
+  Constrintern.interp_constr_evars env evd e
+
 let debug_coq_expr (c : coq_expr) : unit =
   let env = Global.env () in
   let sigma = Evd.from_env env in

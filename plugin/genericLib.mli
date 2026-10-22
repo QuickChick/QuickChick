@@ -7,6 +7,9 @@ type coq_expr
 val interp_open_coq_expr : Environ.env -> Evd.evar_map -> 
   coq_expr -> EConstr.constr
 
+val interp_coq_expr_evars : Environ.env -> Evd.evar_map ->
+  coq_expr -> Evd.evar_map * EConstr.constr
+
 val hole : coq_expr
 
 val debug_coq_expr : coq_expr -> unit

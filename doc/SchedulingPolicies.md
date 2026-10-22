@@ -292,9 +292,15 @@ a bound that reads search state. This is an interface test, not a selected
 derivation. The plugin's first quotation stage converts scheduler terms and
 patterns to the corresponding symbolic view. It preserves shadowed binders and
 applied arguments, and rejects unresolved holes; a test uses a real scheduler
-candidate. The remaining bridge must resolve global names, quote complete
-typed schedules as Rocq terms, evaluate a selected policy, and feed its bound
-back into search. Existing ranking and settings remain active.
+candidate. An internal diagnostic now elaborates that view as a Rocq term and
+evaluates a Rocq-defined function with VM reduction. The derivation probe covers
+an indexed polymorphic relation and a user-defined record score. Quotation
+resolves global names to qualified paths and represents `Type`, `Prop`, and
+`Set` as sorts. The probe is enabled only by `QC_POLICY_QUOTE_PROBE=1`, with
+`QC_POLICY_SCORE_PROBE` naming the Rocq function; it does not select a policy.
+The remaining bridge must quote complete typed schedules, retain scores across
+dependency calls, compare them through the policy, and feed policy bounds into
+search. Existing ranking and settings remain active.
 
 ## Constructor weighting
 
