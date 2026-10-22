@@ -785,10 +785,13 @@ let schedule_to_string (s : schedule) =
   let (steps, sort) = s in
   Printf.sprintf "do %s \n=> %s\n" (String.concat " ;\n " (List.map schedule_step_to_string steps)) (schedule_sort_to_string sort)
 
+(* Preserve binder types when quoting scheduled dependencies. *)
 let rec product_free_rocq_type_to_mexp (rt : rocq_type) : mexp =
   match rt with
-  | DArrow (_,_) -> failwith "Not a product_free type"
-  | DProd (_,_) -> failwith "Not a product-free type"
+  | DArrow (domain, codomain) ->
+      MArrow (product_free_rocq_type_to_mexp domain, product_free_rocq_type_to_mexp codomain)
+  | DProd ((name, domain), codomain) ->
+      MProd ([name, product_free_rocq_type_to_mexp domain], product_free_rocq_type_to_mexp codomain)
   | DMatch _ -> failwith "Not a product-free type: Matches contain bindings"
   | DLambda _ -> failwith "Not a product-free type: Lambdas contain bindings"
   | DTyParam p -> MId p
@@ -1078,6 +1081,12 @@ let rec mexp_to_constr_expr (me : mexp) (ds : derive_sort) : constr_expr =
   | MLet (v, m1, m2) -> c_let v (mexp_to_constr_expr m1 ds) (mexp_to_constr_expr m2 ds)
   | MBacktrack (default, ms, is_constrained, ds) -> c_backtrack ds is_constrained (mexp_to_constr_expr default ds) (List.map (fun case -> mexp_to_constr_expr case ds) ms)
   | MFun (vs, m) -> c_fun (List.map (fun (v,ty) -> v, option_map (fun ty -> mexp_to_constr_expr ty ds) ty) vs) (fun _ -> (mexp_to_constr_expr m ds))
+  | MArrow (domain, codomain) ->
+    CAst.make @@ CProdN ([c_assum (make_up_name_str "qc_arrow") (mexp_to_constr_expr domain ds)],
+      mexp_to_constr_expr codomain ds)
+  | MProd (binders, body) ->
+    CAst.make @@ CProdN (List.map (fun (v, ty) -> c_assum v (mexp_to_constr_expr ty ds)) binders,
+      mexp_to_constr_expr body ds)
   | MFix (f, vs, m, ds) ->
     let lid = CAst.make f in
     let args = List.map (fun (v,ty) -> c_assum v (mexp_to_constr_expr ty ds)) vs in
@@ -1109,6 +1118,11 @@ let rec mexp_to_string (me : mexp) : string =
     (match ty with 
     | None -> ""
     | Some ty -> Printf.sprintf " : %s" (mexp_to_string ty)))) vs)) (mexp_to_string m)
+  | MArrow (domain, codomain) -> Printf.sprintf "(%s -> %s)" (mexp_to_string domain) (mexp_to_string codomain)
+  | MProd (binders, body) -> Printf.sprintf "(forall %s, %s)"
+      (String.concat " " (List.map (fun (v, ty) ->
+        Printf.sprintf "(%s : %s)" (var_to_string v) (mexp_to_string ty)) binders))
+      (mexp_to_string body)
   (* | MFix (f, vs, m, ds) -> Printf.sprintf "fix %s %s = %s in %s" (var_to_string f) (String.concat " " (List.map (fun (v,ty) -> Printf.sprintf "%s%s" (pat_to_string v) (
     (match ty with 
     | None -> ""
@@ -1161,7 +1175,8 @@ let such_that_producer (ps : producer_sort) vars p fuel =
 let num_of_ctrs (c : constructor) =
   let env = Global.env () in
   let glob_ref = Nametab.global c in
-  let ((mind,n),_) = Globnames.destConstructRef glob_ref in
+  let ((mind,n),_) = try Globnames.destConstructRef glob_ref with Failure _ ->
+    CErrors.user_err (str ("QuickChick expected a constructor pattern, found " ^ constructor_to_string c)) in
   let mib = Environ.lookup_mind mind env in
   Array.length (mib.mind_packets.(n).mind_consnames)
 
@@ -1322,8 +1337,10 @@ type var_set = VS.t
 (* Maps input variables to patterns *)
 type pat_map = pat VM.t
 
-type inductive_schedule = string * (var * mexp) list * (var * mexp list) list * (schedule * (var * pat) list) list * (schedule * (var * pat) list) list 
-  (*Name string, fixed input variable/type list, type variable/required typeclasses, list of base schedules, and a list non base schedules paired with how they match on those variables*)
+(* A selected constructor rule retains its local binder types for later
+   dependency resolution. The binder names belong only to this rule. *)
+type rule_schedule = schedule * (var * pat) list * (var * mexp) list
+type inductive_schedule = string * (var * mexp) list * (var * mexp list) list * rule_schedule list * rule_schedule list
 
 type mutual_inductive_chain = inductive_schedule list list
 
@@ -1333,8 +1350,8 @@ let inductive_schedule_to_string (is : inductive_schedule) : string =
   let (name, inputs, param_deps, base_scheds, rec_scheds) = is in
   let inputs_str = String.concat ", " (List.map (fun (v, ty) -> var_to_string v ^ " : " ^ mexp_to_string ty) inputs) in
   let param_deps_str = String.concat ", " (List.map (fun (v, ty) -> var_to_string v ^ " : " ^ String.concat ", " (List.map mexp_to_string ty)) param_deps) in
-  let base_scheds_str = String.concat " \n|\n\n " (List.map (fun (s, inp_pats) -> schedule_to_string s) base_scheds) in
-  let rec_scheds_str = String.concat " \n|\n\n " (List.map (fun (s, inp_pats) -> schedule_to_string s) rec_scheds) in
+  let base_scheds_str = String.concat " \n|\n\n " (List.map (fun (s, _, _) -> schedule_to_string s) base_scheds) in
+  let rec_scheds_str = String.concat " \n|\n\n " (List.map (fun (s, _, _) -> schedule_to_string s) rec_scheds) in
   Printf.sprintf "Inductive %s (%s) :=\n  Base:\n %s\n  Rec: %s" name inputs_str base_scheds_str rec_scheds_str
 
 let filter_mapi (f : int -> 'a -> 'b option) (l : 'a list) : 'b list =
@@ -1384,7 +1401,7 @@ let schedule_with_dependents (s : schedule) : (schedule_step * (rocq_constr * in
 
 let inductive_schedule_dependents (is : inductive_schedule) : (rocq_constr * int list * derive_sort * bool) list =
   let (_, _, param_deps, base_scheds, rec_scheds) = is in
-  List.concat (List.map (fun (schd,_) -> schedule_dependents schd) (base_scheds @ rec_scheds))
+  List.concat (List.map (fun (schd,_,_) -> schedule_dependents schd) (base_scheds @ rec_scheds))
 
 let rec_count_step = function
   | S_UC (_, SrcRec _, _)
@@ -1400,7 +1417,7 @@ let rec_count_schedule ((steps, _) : schedule) =
 
 let inductive_schedule_with_dependents (is : inductive_schedule) =
   let (name, vars, param_deps, base_scheds, rec_scheds) = is in
-  let match_schd_deps = List.map (fun (schd,matches) -> schedule_with_dependents schd, matches) in
+  let match_schd_deps = List.map (fun (schd,matches,_) -> schedule_with_dependents schd, matches) in
   name, vars, match_schd_deps base_scheds, match_schd_deps rec_scheds
 
 type rec_or_base = Base | Rec
@@ -1427,7 +1444,7 @@ let inductive_schedule_to_mexp (is : inductive_schedule) (ds : derive_sort) (is_
   if ds = D_Thm && name = "theorem" then begin
     let thm_mexp = 
       (match base_scheds with
-      | [(s, inp_pats)] -> schedule_to_mexp s fuel_max fuel_size fuel_size
+      | [(s, _, _)] -> schedule_to_mexp s fuel_max fuel_size fuel_size
       | _ -> failwith "Expected a single base schedule for the theorem") in
     MFun ([PVar (var_of_string "size"), Some (MConst "Coq.Init.Datatypes.nat")], thm_mexp) 
     end 
@@ -1463,15 +1480,15 @@ let inductive_schedule_to_mexp (is : inductive_schedule) (ds : derive_sort) (is_
   let rec_count = rec_count_schedule in
   let base_backtrack = 
     let add_on = if is_constrained && (ds = D_Check || ds = D_Enum) && rec_scheds <> [] then [backtrack_decoration ds Base (MOutOfFuel)] else [] in
-    List.map (fun ((s, inp_pats) as sched) -> 
+    List.map (fun (s, inp_pats, _) ->
       let k = rec_count s in
       let sz' = child_size (MId (var_of_string "size")) k in
       backtrack_decoration ds Base (match_pats inp_pats (MLet (var_of_string "size'", sz', schedule_to_mexp s (MId fuel_var) fuel_init_size sz')))) base_scheds @ add_on in
-  let base_backtrack_for_all = List.map (fun ((s, inp_pats) as sched) -> 
+  let base_backtrack_for_all = List.map (fun (s, inp_pats, _) ->
     let k = rec_count s in
     let sz' = child_size (MId (var_of_string "size")) k in
     backtrack_decoration ds Base (match_pats inp_pats (MLet (var_of_string "size'", sz', schedule_to_mexp s (MId fuel_var) fuel_init_size sz')))) base_scheds in
-  let rec_backtrack = List.map (fun ((s, inp_pats) as sched) ->
+  let rec_backtrack = List.map (fun (s, inp_pats, _) ->
     let k = rec_count s in
     let sz' = child_size (MId (var_of_string "size")) k in
     backtrack_decoration ds Rec (match_pats inp_pats (MLet (var_of_string "size'", sz', schedule_to_mexp s fuel_sizem fuel_init_size sz')))) rec_scheds in
@@ -1486,7 +1503,7 @@ let inductive_schedule_to_mexp (is : inductive_schedule) (ds : derive_sort) (is_
   let first = 
     match base_scheds with
     | [] -> schedule_failure ds is_constrained
-    | (s, inp_pats) :: _ -> 
+    | (s, inp_pats, _) :: _ ->
       let k = rec_count s in
       let sz' = child_size (MId (var_of_string "size")) k in
       match_pats inp_pats (MLet (var_of_string "size'", sz', schedule_to_mexp s (MId fuel_var) fuel_init_size sz')) in
@@ -1512,7 +1529,7 @@ let inductive_schedule_with_dependencies_to_mexp unconstrained_inds (ind_schds :
     let first = 
       match base_scheds with
       | [] -> schedule_failure ds is_constrained
-      | (s, inp_pats) :: _ -> 
+      | (s, inp_pats, _) :: _ ->
         let k = rec_count_schedule s in
         let sz' = child_size (MId (var_of_string "size")) k in
         match_pats inp_pats (MLet (var_of_string "size'", sz', schedule_to_mexp s fuel_zero fuel_init_size sz')) in
@@ -1583,12 +1600,12 @@ let turn_def_calls_into_mutrec_calls (ind_schd : inductive_schedule) names : ind
     let new_steps = List.map turn_def_calls_step steps in
     new_steps, final in
 
-  let new_scheds scheds = List.map (fun (s, inp_pats) -> turn_def_calls_sched s, inp_pats) scheds in
+  let new_scheds scheds = List.map (fun (s, inp_pats, binders) -> turn_def_calls_sched s, inp_pats, binders) scheds in
 
   let new_rec_scheds = new_scheds rec_scheds in
 
   let (new_mutrec_scheds, new_base_scheds) = List.partition 
-    (fun ((steps,_),_) -> List.exists (function
+    (fun ((steps,_),_,_) -> List.exists (function
     | S_UC (_, SrcMutrec _, _)
     | S_ST (_, SrcMutrec _, _)
     | S_Check (SrcMutrec _, _) -> true
@@ -4124,7 +4141,7 @@ Check ( (x = y))  -> Checking *)
     ], ProducerSchedule (false, PS_G, DCtr (ctr "Abs", [DTyVar (var "ty"); DTyVar (var "e")]))
 
   let gen_term_inductive_schedule : inductive_schedule = 
-    "term" , [] , [], [gen_const_schedule, []; gen_id_schedule, []] , [gen_app_schedule, []; gen_abs_schedule, []]
+    "term" , [] , [], [gen_const_schedule, [], []; gen_id_schedule, [], []] , [gen_app_schedule, [], []; gen_abs_schedule, [], []]
   
 
   
@@ -4179,19 +4196,19 @@ Check ( (x = y))  -> Checking *)
     let inputs = [var "G", list_ty; var "e", term; var "tau", ty] in
     let base_scheds = [(check_typing_TId (DTyVar (var "G")) (DTyVar (var "x")) (DTyVar (var "t")), 
                         [(var "e", PCtr (ctr "Id", [PVar (var "x")]));
-                         (var "tau", PVar (var "t"))]);
+                         (var "tau", PVar (var "t"))], []);
                        (check_typing_TConst (DTyVar (var "G")) (DTyVar (var "n")),
                         [(var "e", PCtr (ctr "Const", [PVar (var "n")]));
-                         (var "tau", PCtr (ctr "N", []))]
+                         (var "tau", PCtr (ctr "N", []))], []
                        )
                       ] in
     let rec_scheds = [(check_typing_TAbs (DTyVar (var "G")) (DTyVar (var "t1")) (DTyVar (var "t1'")) (DTyVar (var "t2")) (DTyVar (var "e")),
                         [(var "e", PCtr (ctr "Abs", [PVar (var "t1"); PVar (var "e")]));
-                        (var "tau", PCtr (ctr "Arrow", [PVar (var "t1'"); PVar (var "t2")]))]
+                        (var "tau", PCtr (ctr "Arrow", [PVar (var "t1'"); PVar (var "t2")]))], []
                       );
                       (check_typing_TApp (DTyVar (var "G")) (DTyVar (var "e1")) (DTyVar (var "e2")) (DTyVar (var "t2")),
                         [(var "e", PCtr (ctr "App", [PVar (var "e1"); PVar (var "e2")]));
-                        (var "tau", PVar (var "t2"))]
+                        (var "tau", PVar (var "t2"))], []
                       )
                       ] in
     ("typing_iii", inputs, [], base_scheds, rec_scheds)
@@ -4272,12 +4289,12 @@ Check ( (x = y))  -> Checking *)
 
     let base_scheds = [
       shcd_bindNow_gen_ioo (DTyVar (var "tau")) (DTyVar (var "env")),
-        [(var "env", PCtr (ctr "cons", [PWild; PVar (var "tau"); PVar (var "env")]))]
+        [(var "env", PCtr (ctr "cons", [PWild; PVar (var "tau"); PVar (var "env")]))], []
     ] in
 
     let rec_scheds = [
       schd_bindLater_gen_ioo (DTyVar (var "tau'")) (DTyVar (var "env")),
-        [(var "env", PCtr (ctr "cons", [PWild; PVar (var "tau'"); PVar (var "env")]))]
+        [(var "env", PCtr (ctr "cons", [PWild; PVar (var "tau'"); PVar (var "env")]))], []
     ] in
 
     ("bind_ioo",inputs, [], base_scheds, rec_scheds)

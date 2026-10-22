@@ -378,7 +378,7 @@ Inductive step : tm -> tm -> Prop :=
 
 where "t '-->' t'" := (step t t').
 
-QCDerive DecOpt for (step t t').
+QCDeriveLegacy DecOpt for (step before after).
 
 Reserved Notation "Gamma '|--' t '\in' T"
             (at level 101,

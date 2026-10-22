@@ -227,7 +227,9 @@ val c_succ : Constrexpr.constr_expr -> Constrexpr.constr_expr
 
 val c_theorem : Constrexpr.constr_expr
 
-type inductive_schedule = string * (var * mexp) list * (var * mexp list) list * (schedule * (var * pat) list) list * (schedule * (var * pat) list) list 
+(* Schedule, input matches, and constructor-local binder types. *)
+type rule_schedule = schedule * (var * pat) list * (var * mexp) list
+type inductive_schedule = string * (var * mexp) list * (var * mexp list) list * rule_schedule list * rule_schedule list
 
 val inductive_schedule_to_constr_expr : inductive_schedule -> derive_sort -> bool -> Constrexpr.constr_expr
 
