@@ -22,6 +22,8 @@ https://lemonidas.github.io/pdf/GeneratingGoodGenerators.pdf
 ## Tutorial
 
 - Small tutorials on Basic Usage and Automation can be found under `tutorials/`
+- [Testing a theorem inside a proof](tutorials/ProofScopedTests.v) shows how to
+  prepare and rerun a test without leaving global helpers behind.
 - An extended introduction can be found in [QuickChick: Property-Based Testing in Coq][sfqc] (Software Foundations, Volume 4)
 
 [sfqc]: https://softwarefoundations.cis.upenn.edu/qc-current/index.html
@@ -38,6 +40,25 @@ https://lemonidas.github.io/pdf/GeneratingGoodGenerators.pdf
 
 ## Simple Examples
 
+Test the current goal before proving it:
+
+```coq
+From QuickChick Require Import QuickChick.
+Goal forall n : nat, n = n.
+  quickchick 2.
+  QuickChick (theorem 4).
+  intros; reflexivity.
+Qed.
+```
+
+`quickchick` prepares a proof-local test called `theorem` and runs it at size 2.
+`QuickChick (theorem 4)` reruns that test at size 4 without deriving it again.
+The goal remains open after testing. The helpers disappear when the proof ends.
+The compiled [proof-scoped tutorial](tutorials/ProofScopedTests.v) also shows
+how to name a saved test and change execution settings.
+
+Other examples:
+
   - `examples/Tutorial.v`
   - `examples/RedBlack`
   - `examples/stlc`
@@ -48,7 +69,10 @@ If successful, you should see "success" at the end.
 
 ## Documentation
 
-The public API of QuickChick is summarized in `QuickChickInterface.v`.
+The public API is summarized in [QuickChickInterface.v](doc/QuickChickInterface.v).
+See the [derivation commands](doc/DerivationDispatch.md) and
+[3.0 migration guide](doc/3.0Migration.md) for the scheduled engine and legacy
+commands.
 
 ### Top-level Commands
 

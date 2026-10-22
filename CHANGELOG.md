@@ -4,6 +4,24 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](http://keepachangelog.com/en/1.0.0/)
 and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html).
 
+## [Unreleased] — 3.0 candidate
+
+- `QCDerive` uses the scheduled engine for generators, enumerators, and
+  checkers, and registers their typeclass instances. `QCDeriveLegacy` and
+  `DeriveLegacy` explicitly select the deprecated engines.
+- Bare `Derive` is available through `QuickChick.LegacyDerive`; the normal
+  import leaves Stdlib's `Derive` syntax alone.
+- The `quickchick` proof tactic keeps its generated test and helpers local to
+  the proof. A saved test can be rerun before the proof ends.
+- Testing works inside ordinary and nested modules and on properties exported
+  by applied functors. An unapplied functor cannot run a test.
+- The scheduled engine still rejects some fixed/repeated inputs, reordered
+  outputs, and constructor applications. See the
+  [migration guide](doc/3.0Migration.md) for the explicit legacy path.
+
+This section describes the candidate branch; its version support and final
+release scope have not been validated yet.
+
 ## [2.2.0] - 2026-05-26
 
 - Remove `Derive` in favor of `QCDerive` to avoid clash with Stdlib and Equations
