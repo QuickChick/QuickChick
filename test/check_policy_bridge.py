@@ -20,6 +20,7 @@ def run_probe(destination: Path, **probes: str) -> subprocess.CompletedProcess:
         "QC_POLICY_STEP_PROBE",
         "QC_POLICY_SCHEDULE_PROBE",
         "QC_POLICY_COMPARE_PROBE",
+        "QC_SCHEDULE_TRACE",
     ):
         environment.pop(name, None)
     environment.update(probes)
@@ -77,5 +78,11 @@ with tempfile.TemporaryDirectory() as temporary:
     assert "comparator must return comparison" in (
         rejected.stdout + rejected.stderr
     ), rejected.stdout + rejected.stderr
+
+    default = compile_probe(output, QC_SCHEDULE_TRACE="1")
+    assert (
+        "policy=density_then_vars derive=Gen candidates=4 selected-id=0"
+        in default
+    ), default
 
 print("Rocq policy bridge: scoped views, pins, match links, and record comparison")

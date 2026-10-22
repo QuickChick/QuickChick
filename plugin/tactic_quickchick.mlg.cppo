@@ -2024,6 +2024,7 @@ and constructor_valid_schedules (ind_name : ty_ctr) (ctr : rocq_ctr) (result_var
                           !density_memo) in
         List.map (fun ((i, _, _, _) as entry) ->
           if i = best_id then best_entry else entry) entries)) in
+  let policy_finite_pins = lazy (BudgetAwareScore.finite_pins_from_environment ()) in
   let policy_schedule_expression (steps, sort) =
      let result = match sort with
        | ProducerSchedule (_, _, result) | TheoremSchedule (result, _) ->
@@ -2042,7 +2043,7 @@ and constructor_valid_schedules (ind_name : ty_ctr) (ctr : rocq_ctr) (result_var
        | Total -> ScoringView.constructor "Total" [] in
      let expression = match ScoringView.schedule_expression
        ~global:ScoringView.global_name
-       ~finite_pins:(BudgetAwareScore.finite_pins_from_environment ())
+       ~finite_pins:(Lazy.force policy_finite_pins)
        ~grade_expression scope steps result with
        | Ok expression -> expression
        | Error message -> failwith message in

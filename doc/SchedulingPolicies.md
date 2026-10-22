@@ -336,7 +336,10 @@ Run `python3 test/check_policy_bridge.py` with the local validation `coqc` on
 diagnostics enabled and checks record evaluation, source inputs and pins,
 match/result binder links, and four-candidate comparison. The scorer compares
 the final segment of a qualified name so the test works under both Dune and
-direct `coqc` module paths. The ordinary Dune theory build does not enable
+direct `coqc` module paths. It also checks that default ranking still selects
+candidate 0 while the diagnostic Rocq comparator prefers candidate 3. The
+first-candidate and all-candidate diagnostics share one finite-pin lookup cache
+per constructor. The ordinary Dune theory build does not enable
 these diagnostic callbacks.
 
 ## Constructor weighting
