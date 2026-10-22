@@ -185,6 +185,11 @@ Inductive policy_quote_list : list nat -> Prop :=
 
 Derive Inductive Schedule policy_quote_list 0 derive "Gen" opt "true".
 
+Inductive policy_quote_missing (A : Type) : A -> Prop :=
+| QuoteMissing : forall value, policy_quote_missing A value.
+
+Derive Inductive Schedule policy_quote_missing 1 derive "Gen" opt "true".
+
 Inductive policy_quote_premise : nat -> Prop :=
 | QuoteFromPremise : forall n, policy_quote_probe n -> policy_quote_premise n.
 

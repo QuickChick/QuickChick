@@ -84,17 +84,21 @@ with tempfile.TemporaryDirectory() as temporary:
         QC_POLICY_RECORD_PROBE="policy_quote_record_scorer",
     )
     assert (
-        "[policy-record] score={| quote_depth := 0; quote_weight := 2 |}"
+        "[policy-record] constructor=QuoteZero "
+        "score={| quote_depth := 0; quote_weight := 2 |}"
         in record
     ), record
     assert (
-        "[policy-record] score={| quote_depth := 2; quote_weight := 3 |}"
+        "[policy-record] constructor=QuoteGenerated "
+        "score={| quote_depth := 2; quote_weight := 3 |}"
         in record
     ), record
     assert (
-        "[policy-record] score={| quote_depth := 2; quote_weight := 14 |}"
+        "[policy-record] constructor=QuoteList "
+        "score={| quote_depth := 2; quote_weight := 14 |}"
         in record
     ), record
+    assert "[policy-record] constructor=QuoteMissing " not in record, record
 
     rejected = run_probe(
         output,

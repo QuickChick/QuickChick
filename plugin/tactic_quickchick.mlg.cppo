@@ -2155,7 +2155,8 @@ and constructor_valid_schedules (ind_name : ty_ctr) (ctr : rocq_ctr) (result_var
           (Evd.from_env (Global.env ())) expression with
          | Error message -> failwith message
          | Ok (sigma, value, _) ->
-           Feedback.msg_notice (str ("[policy-record] score=" ^
+           Feedback.msg_notice (str ("[policy-record] constructor=" ^
+             constructor_to_string ctr_name ^ " score=" ^
              Pp.string_of_ppcmds
                (Printer.pr_econstr_env (Global.env ()) sigma value))))));
   if score_pruning_mode <> `Off && schedule_trace_enabled () then
