@@ -39,6 +39,9 @@ let () =
     V.TMatch (V.TLocal 0, [
       V.PConstructor ("Some", [V.PLocal 1]), V.TLocal 1;
       V.PWild, V.TLocal 0]));
+  assert (V.free_vars_term branches = [x; x]);
+  assert (V.free_vars_term (N.DMatch (variable "x", [
+    N.PVar (v "y"), variable "y"])) = [x]);
   (match V.quote_term ~global scope N.DHole with
    | Error _ -> ()
    | Ok _ -> failwith "an unresolved hole was silently quoted");

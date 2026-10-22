@@ -207,7 +207,9 @@ let rec free_vars_term = function
   | DProd ((name, domain), body) | DLambda (name, domain, body) ->
     free_vars_term domain @ List.filter ((<>) name) (free_vars_term body)
   | DMatch (head, branches) ->
-    free_vars_term head @ List.concat_map (fun (_, body) -> free_vars_term body) branches
+    free_vars_term head @ List.concat_map (fun (pattern, body) ->
+      List.filter (fun name -> not (List.mem name (pat_vars pattern)))
+        (free_vars_term body)) branches
   | DNot body -> free_vars_term body
   | DHole -> []
 
