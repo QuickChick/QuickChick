@@ -82,3 +82,61 @@ let () =
     ~known_grades:[None] ~variable_uses:0 in
   assert (not (can_prune ~prefer_dense:true RankDensityCountsThenVars
     ~incumbent:{equal with candidate_id = -1} ~bound:equal))
+
+(* Group combinations: compare against brute force over every combination,
+   using the independent [key] model on complete features. Each complete
+   schedule also carries shared steps scored as one more fixed group. *)
+let () =
+  let state = ref 12345 in
+  let next bound =
+    state := (!state * 1103515245 + 12345) land 0x3fffffff;
+    !state mod bound in
+  let random_group () =
+    let ranks = List.init (next 3) (fun _ -> next 5) in
+    { group_density = 0; group_counts = histogram_of_ranks ranks;
+      group_uses = next 4 }, ranks in
+  let with_density prefer_dense (g, ranks) =
+    { g with group_density = List.fold_left
+        (if prefer_dense then min else max)
+        (if prefer_dense then 4 else 0) ranks } in
+  let complete prefer_dense parts =
+    let ranks = List.concat_map snd parts in
+    { density_rank = List.fold_left (if prefer_dense then min else max)
+        (if prefer_dense then 4 else 0) ranks;
+      density_counts = histogram_of_ranks ranks;
+      variable_uses = List.fold_left (fun n (g, _) -> n + g.group_uses) 0 parts;
+      candidate_id = 0 } in
+  let rec product = function
+    | [] -> [[]]
+    | xs :: rest -> List.concat_map (fun x ->
+        List.map (fun tail -> x :: tail) (product rest)) xs in
+  let checked = ref 0 in
+  for _ = 1 to 4000 do
+    let groups = List.init (1 + next 3) (fun _ ->
+      List.init (1 + next 4) (fun _ ->
+        if next 6 = 0 then None else Some (random_group ()))) in
+    let shared = random_group () in
+    List.iter (fun policy -> List.iter (fun prefer_dense ->
+      let parts = List.map (List.map (Option.map (fun g ->
+        with_density prefer_dense g, snd g))) groups in
+      let shared = with_density prefer_dense shared, snd shared in
+      let feature_lists = List.map (List.map (Option.map fst)) parts in
+      let chosen = select_group_combinations ~prefer_dense policy feature_lists in
+      let usable = List.map (fun group ->
+        List.mapi (fun i x -> i, x) group
+        |> List.filter_map (fun (i, x) -> Option.map (fun x -> i, x) x)) parts in
+      let score choice =
+        key prefer_dense policy (complete prefer_dense
+          (shared :: List.map2 (fun group i -> List.assoc i group) usable choice)) in
+      let all = product (List.map (List.map fst) usable) in
+      (match all with
+       | [] -> assert (chosen = [])
+       | _ ->
+         let best = List.fold_left (fun b c -> min b (score c)) (score (List.hd all)) all in
+         assert (chosen <> []);
+         assert (List.length chosen <= 5);
+         assert (List.for_all (fun c -> List.mem c all) chosen);
+         assert (List.exists (fun c -> score c = best) chosen));
+      incr checked) [true; false]) policies
+  done;
+  Printf.printf "group combinations: %d brute-force comparisons\n" !checked

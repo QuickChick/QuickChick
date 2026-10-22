@@ -50,6 +50,27 @@ among those candidates, so a capped run has no global-optimality guarantee.
 Order reduction can change candidate identifiers; indexed alternatives refer
 to the reduced candidate list.
 
+### Independent hypothesis groups
+
+When a constructor's hypotheses split into groups that share no unbound
+variables (after unification aliasing, and including variables named in other
+variables' types), constructor derivation searches each group separately. A
+group's local schedules are scored on their own. Density combines across
+groups by its extremum and the other ranking fields add, so a group's single
+best schedule is not always part of the best combination. Each group therefore
+keeps every candidate not dominated in both density and the remaining fields.
+A dynamic program over combined density then yields at most five combinations,
+which are ranked as ordinary candidates. The best complete score is unchanged.
+
+Combinations place groups one after another, so ties between equal-scoring
+schedules can select a different order of independent steps than the joint
+search. `QC_SCHEDULE_GROUPS=0` restores the joint search;
+`QC_SCHEDULE_GROUPS=verify` runs both and fails if the best score differs or a
+grouped candidate is not one the joint search produces without order
+reduction, up to fresh-name renaming. `QC_SCHEDULE_GROUPS_LOG=<file>` appends
+one line per verified constructor search. Theorem testing (`quickchick`) and
+the prefix score-pruning modes still use the joint search.
+
 Policy-driven branch-and-bound is still being developed. A policy bound must
 be no worse than every completed descendant of the actual typed search node.
 The internal prefix-pruning callback is exercised by a narrow variable-use

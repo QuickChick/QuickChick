@@ -43,3 +43,25 @@ val prefix_bound : prefer_dense:bool -> known_grades:int option list ->
     candidate IDs are deliberately excluded from this comparison. *)
 val can_prune : prefer_dense:bool -> policy -> incumbent:features ->
   bound:features -> bool
+
+(** Features of one independent hypothesis group, scored on its own. *)
+type group_features = {
+  group_density : int;
+  group_counts : density_histogram;
+  group_uses : int;
+}
+
+val group_features_of : features -> group_features
+
+(** [dominates a b]: combining with [a] is never worse than with [b], under
+    every context of other groups and shared steps. *)
+val dominates : prefer_dense:bool -> policy -> group_features ->
+  group_features -> bool
+
+(** For per-group candidate features ([None] marks an unusable candidate),
+    return candidate index combinations, one index per group, that include a
+    combination achieving the best complete score. At most one combination
+    is returned per combined density value. Ties between equal-scoring
+    combinations are broken by the lowest indices, not global candidate ids. *)
+val select_group_combinations : prefer_dense:bool -> policy ->
+  group_features option list list -> int list list

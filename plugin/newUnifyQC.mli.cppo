@@ -106,8 +106,12 @@ val handle_branch :
   NewGenericLib.rocq_constr UM.t ->
   range list -> Unknown.t -> NewGenericLib.dep_ctr -> NewGenericLib.coq_expr * bool *)
 
+(** [select_groups] receives each independent hypothesis group's local
+    schedules, after unification renaming, and selects index combinations.
+    It is used only when no prefix callback is supplied. *)
 val type_to_schedules :
             ?on_prepared:(NewGenericLib.var list -> unit) ->
+            ?select_groups:(NewGenericLib.schedule list list -> int list list) ->
             ?on_prefix:((int * NewGenericLib.var list list) list -> bool ->
               (NewGenericLib.schedule * (unknown * NewGenericLib.pat) list *
                 (unknown * unknown) list) -> unit) ->

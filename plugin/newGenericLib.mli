@@ -120,7 +120,14 @@ type derive_sort = D_Gen | D_Enum | D_Check | D_Thm
 
 val debug_mode : bool ref
 
-val possible_schedules : (var * rocq_type) list ->
+(** With [select_groups], a constructor whose hypotheses split into two or
+    more footprint-disjoint groups is searched group by group. The callback
+    receives each group's completed local schedules and returns index
+    combinations, one per group; only those combinations become candidates.
+    [canon] maps a variable to its unification representative. *)
+val possible_schedules : ?canon:(var -> var) ->
+  ?select_groups:(schedule_step list list list -> int list list) ->
+  (var * rocq_type) list ->
   rocq_type list ->
   var list -> constructor * int list ->
   derive_sort -> schedule_step list list
@@ -150,6 +157,8 @@ val empty_prefix_search_stats : unit -> prefix_search_stats
 val possible_schedules_with_advanced_pruning : ?max_schedules:int -> ?reduce_orderings:bool ->
   ?maximal_outputs:bool ->
   ?stats:prefix_search_stats ->
+  ?canon:(var -> var) ->
+  ?select_groups:(schedule_step list list list -> int list list) ->
   ?on_prefix:((int * var list list) list -> bool -> schedule_step list -> unit) ->
   ?on_prefix_with_floor:((int * var list list) list -> bool -> int ->
     schedule_step list -> unit) ->

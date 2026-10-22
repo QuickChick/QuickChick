@@ -1970,9 +1970,24 @@ and constructor_valid_schedules (ind_name : ty_ctr) (ctr : rocq_ctr) (result_var
             ~incumbent:best ~bound in
           if cut then incr pruned_prefixes;
           cut)) else None in
+  let group_mode = match Sys.getenv_opt "QC_SCHEDULE_GROUPS" with
+    | Some ("0" | "false" | "no") -> `Off
+    | Some "verify" -> `Verify
+    | _ -> `On in
+  (* Independent hypothesis groups are scored alone; ScheduleRanking keeps
+     only combinations that can reach the best complete score. Prefix-pruning
+     modes still search jointly. *)
+  let select_groups = if group_mode = `Off || score_pruning_mode <> `Off then None
+    else Some (fun groups ->
+      let features = List.map (List.map (fun schedule ->
+        try with_temporary_density_state (fun () ->
+          Some (ScheduleRanking.group_features_of
+            (scored_schedule_features ds 0 (schedule_density [] schedule))))
+        with Noninductive_dependency _ | Unavailable_mode _ -> None)) groups in
+      ScheduleRanking.select_group_combinations ~prefer_dense policy features) in
   let prepared_inputs = ref [] in
   let schedule_matches = NewUnifyQC.type_to_schedules
-    ~on_prepared:(fun inputs -> prepared_inputs := inputs)
+    ~on_prepared:(fun inputs -> prepared_inputs := inputs) ?select_groups
     ?on_prefix ?on_prefix_with_floor ?should_prune_prefix_with_floor
     typ (Some ind_name) (Some ctr_name)
     result_vars output_vars ds opt in
@@ -2068,6 +2083,81 @@ and constructor_valid_schedules (ind_name : ty_ctr) (ctr : rocq_ctr) (result_var
                           !density_memo) in
         List.map (fun ((i, _, _, _) as entry) ->
           if i = best_id then best_entry else entry) entries)) in
+  if group_mode = `Verify && select_groups <> None then begin
+    let joint = NewUnifyQC.type_to_schedules typ (Some ind_name) (Some ctr_name)
+      result_vars output_vars ds opt in
+    (* Every grouped candidate must be an ordering the joint search admits
+       when it does not merge swap-equivalent orderings. *)
+    let unreduced =
+      let previous = Sys.getenv_opt "QC_SCHEDULE_POR" in
+      Unix.putenv "QC_SCHEDULE_POR" "0";
+      Fun.protect ~finally:(fun () ->
+        Unix.putenv "QC_SCHEDULE_POR" (Stdlib.Option.value ~default:"" previous))
+        (fun () -> NewUnifyQC.type_to_schedules typ (Some ind_name) (Some ctr_name)
+          result_vars output_vars ds opt) in
+    (* Conversion draws fresh names from a global counter; compare schedules
+       up to a consistent renaming of generated names, by first occurrence. *)
+    let canonical (schedule, ms, eqs) =
+      let text = NewUnifyQC.match_schedule_to_string schedule ms eqs in
+      let names = Hashtbl.create 8 in
+      Str.global_substitute (Str.regexp "v[A-Za-z0-9_]*[0-9]+_\\|unkn_[0-9]+_") (fun whole ->
+        let name = Str.matched_string whole in
+        match Hashtbl.find_opt names name with
+        | Some n -> n
+        | None ->
+          let n = Printf.sprintf "#%d" (Hashtbl.length names) in
+          Hashtbl.add names name n; n) text in
+    let unreduced_canonical = List.map canonical unreduced in
+    List.iter (fun triple ->
+      if not (List.mem (canonical triple) unreduced_canonical) then
+        (failwith ("grouped schedule search produced a schedule outside the joint search for constructor "
+          ^ constructor_to_string ctr_name ^ "\n grouped: " ^ canonical triple
+          ^ String.concat "" (List.map (fun t -> "\n joint: " ^ t) unreduced_canonical)))) schedule_matches;
+    let scored_joint = with_temporary_density_state (fun () ->
+      List.mapi (fun i triple ->
+        density_inductive_memo := initial_inductive_memo;
+        density_memo := initial_density_memo;
+        let ms_steps, schd = materialize triple in
+        try Some (i, triple, scored_schedule_features ds i (schedule_density ms_steps schd))
+        with Noninductive_dependency _ | Unavailable_mode _ -> None) joint
+      |> List.filter_map Fun.id) in
+    let scored_grouped = List.map (fun (i, scored, _, _) ->
+      let _, triple, _, _ = List.find (fun (j, _, _, _) -> i = j) schedules in
+      i, triple, scored_schedule_features ds i scored) schedule_densities in
+    let best entries = List.fold_left (fun best ((_, _, f) as entry) ->
+      match best with
+      | Some (_, _, g) when ScheduleRanking.compare ~prefer_dense policy g f <= 0 -> best
+      | _ -> Some entry) None entries in
+    let without_id (f : ScheduleRanking.features) = { f with ScheduleRanking.candidate_id = 0 } in
+    let changed_selection = match best scored_joint, best scored_grouped with
+      | None, None -> None
+      | Some (_, joint_triple, j), Some (_, grouped_triple, g) ->
+        if ScheduleRanking.compare ~prefer_dense policy (without_id j) (without_id g) <> 0 then
+          (let show (f : ScheduleRanking.features) ((steps, _), ms, eqs) =
+             Printf.sprintf "density=%d counts=%s uses=%d steps=%s" f.ScheduleRanking.density_rank
+               (ScheduleRanking.histogram_to_string f.ScheduleRanking.density_counts)
+               f.ScheduleRanking.variable_uses
+               (String.concat " ; " (List.map schedule_step_to_string steps)) in
+           failwith ("grouped schedule search changed the best score for constructor "
+            ^ constructor_to_string ctr_name ^ "\n joint: " ^ show j joint_triple
+            ^ "\n grouped: " ^ show g grouped_triple));
+        if canonical joint_triple = canonical grouped_triple then None
+        else Some (canonical joint_triple, canonical grouped_triple)
+      | _ -> failwith ("grouped schedule search changed candidate availability for constructor "
+            ^ constructor_to_string ctr_name) in
+    match Sys.getenv_opt "QC_SCHEDULE_GROUPS_LOG" with
+    | None -> ()
+    | Some path ->
+      let oc = open_out_gen [Open_append; Open_creat] 0o644 path in
+      Printf.fprintf oc "%s\t%s\t%s\tjoint=%d\tgrouped=%d\tsame_selection=%b\n"
+        (ty_ctr_to_string ind_name) (constructor_to_string ctr_name)
+        (schedule_rank_derive_sort_to_string ds)
+        (List.length joint) (List.length schedule_matches) (changed_selection = None);
+      Stdlib.Option.iter (fun (joint_text, grouped_text) ->
+        Printf.fprintf oc "  joint selection:\n%s\n  grouped selection:\n%s\n"
+          joint_text grouped_text) changed_selection;
+      close_out oc
+  end;
   (match Sys.getenv_opt "QC_BUDGET_AWARE_DEMO" with
    | Some target when target <> "" &&
        String.ends_with ~suffix:target (ty_ctr_to_string ind_name) ->

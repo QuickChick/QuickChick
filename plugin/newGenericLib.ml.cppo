@@ -3306,6 +3306,20 @@ type prefix_search_stats = {
 let empty_prefix_search_stats () =
   { visited_nodes = 0; completed_prefixes = 0; processed_mode_choices = 0 }
 
+let rec add_type_dependencies variables seen v =
+  if VS.mem v seen then seen else
+  let seen = VS.add v seen in
+  match List.assoc_opt v variables with
+  | None -> seen
+  | Some ty ->
+    List.fold_left (add_type_dependencies variables) seen
+      (variables_in_hypothesis ty)
+
+(* Variables a hypothesis may read or bind, closed under variable types. *)
+let hypothesis_footprint variables (_, cls) =
+  List.fold_left (add_type_dependencies variables) VS.empty
+    (cls.always_bound @ List.concat cls.potential_indices)
+
 (* Each child commits its steps. A future branch-and-bound policy can bound
    this whole state without assuming that earlier steps will be rebuilt. *)
 let enum_schedules_prefix_classified
@@ -3327,18 +3341,7 @@ let enum_schedules_prefix_classified
     : ((int * rocq_constr * bool) pre_schedule_step list) Seq.t =
   let var_names = List.map fst variables in
   let matchable_set = VS.of_list matchable_vars in
-  let rec add_type_dependencies seen v =
-    if VS.mem v seen then seen else
-    let seen = VS.add v seen in
-    match List.assoc_opt v variables with
-    | None -> seen
-    | Some ty ->
-      List.fold_left add_type_dependencies seen
-        (variables_in_hypothesis ty) in
-  let footprint (_, cls) =
-    List.fold_left add_type_dependencies VS.empty
-      (cls.always_bound @ List.concat cls.potential_indices)
-    |> VS.elements in
+  let footprint h = VS.elements (hypothesis_footprint variables h) in
   let plain_relation (_, cls) =
     match fst cls.hyp with
     | DTyCtr (_, args) ->
@@ -3827,10 +3830,44 @@ let possible_schedules_with_legacy_pruning ?(max_schedules=100000) (variables : 
   |> List.of_seq
   |> List.sort_uniq compare
 
+(* Connected components of the footprint-sharing relation, after mapping
+   variables through [canon] (unification aliases) and excluding fixed
+   inputs. A variable outside every footprint joins the groups its type
+   mentions, since its instantiation reads their variables. Hypotheses keep
+   their input order. Returns each group's canonical variables and members. *)
+let independent_hypothesis_groups ~canon variables hypotheses fixed =
+  let fixed_set = VS.of_list (List.map canon fixed) in
+  let canonical vs = VS.fold (fun v acc ->
+    let v = canon v in if VS.mem v fixed_set then acc else VS.add v acc) vs VS.empty in
+  let merge groups vars members =
+    let touching, rest = List.partition (fun (vs, _) ->
+      not (VS.is_empty (VS.inter vs vars))) groups in
+    (List.fold_left (fun acc (vs, _) -> VS.union acc vs) vars touching,
+     members @ List.concat_map snd touching) :: rest in
+  let groups = List.fold_left (fun groups h ->
+    merge groups (canonical (hypothesis_footprint variables h)) [h])
+    [] hypotheses in
+  let groups = List.fold_left (fun groups (v, _) ->
+    let cv = canon v in
+    if VS.mem cv fixed_set || List.exists (fun (vs, _) -> VS.mem cv vs) groups
+    then groups else
+    let deps = canonical (add_type_dependencies variables VS.empty v) in
+    if List.exists (fun (vs, _) -> not (VS.is_empty (VS.inter vs deps))) groups
+    then merge groups deps [] else groups) groups variables in
+  let position (idx, _) = idx in
+  List.map (fun (vs, members) ->
+    vs, List.filter (fun h -> List.memq h members) hypotheses) groups
+  |> List.filter (fun (_, members) -> members <> [])
+  |> List.sort (fun (_, a) (_, b) ->
+       compare (List.fold_left min max_int (List.map position a))
+         (List.fold_left min max_int (List.map position b)))
+
 let possible_schedules_with_advanced_pruning ?(max_schedules=100000)
     ?(reduce_orderings=true)
     ?(maximal_outputs=false)
     ?stats
+    ?(canon=fun v -> v)
+    ?select_groups
     ?on_prefix
     ?on_prefix_with_floor
     ?should_prune_prefix
@@ -3882,6 +3919,58 @@ let possible_schedules_with_advanced_pruning ?(max_schedules=100000)
     let converted = pre_to_schedule pre_steps in
     prune path floor (normalize_schedule_advanced converted))
     should_prune_prefix_with_floor in
+  let warn_limit () =
+    Feedback.msg_warning (str (Printf.sprintf
+      "Schedule search reached its %d-candidate limit; ranking may omit better schedules"
+      max_schedules)) in
+  let take_limited stream =
+    let peek_limit = if max_schedules = max_int then max_int else max_schedules + 1 in
+    let candidates = stream |> seq_take peek_limit |> List.of_seq in
+    if List.length candidates > max_schedules then warn_limit ();
+    List.filteri (fun idx _ -> idx < max_schedules) candidates in
+  let groups = match select_groups, on_prefix, on_prefix_with_floor,
+    should_prune_prefix, should_prune_prefix_with_floor with
+    | Some select, None, None, None, None ->
+      (match independent_hypothesis_groups ~canon variables classified fixed with
+       | _ :: _ :: _ as groups -> Some (select, groups)
+       | _ -> None)
+    | _ -> None in
+  match groups with
+  | Some (select, groups) ->
+    (* Each group is searched with only its own variables, so its completion
+       instantiates only them. Combined candidates concatenate group cores and
+       instantiate every remaining variable at the end, as the joint search does. *)
+    let group_variables vars =
+      List.filter (fun (v, _) -> VS.mem (canon v) vars || List.mem v fixed) variables in
+    let searched = List.map (fun (vars, members) ->
+      enum_schedules_prefix_classified ~reduce_orderings ~maximal_outputs
+        ~stats:None ~on_prefix:None ~on_prefix_with_floor:None
+        ~should_prune:None ~should_prune_with_floor:None
+        (group_variables vars) type_vars members fixed
+      |> take_limited) groups in
+    let local = List.map (List.map (fun pre ->
+      normalize_schedule_advanced (pre_to_schedule pre))) searched in
+    (* Only the trailing instantiation is the completion; earlier ones bind
+       variables that a later check in the group needs. *)
+    let split_completion pre = match List.rev pre with
+      | PS_InstVars vs :: rest -> List.rev rest, vs
+      | _ -> pre, [] in
+    let core pre = fst (split_completion pre) in
+    let left_unbound pre = snd (split_completion pre) in
+    let grouped_vars = List.fold_left (fun acc (vars, _) -> VS.union acc vars)
+      VS.empty groups in
+    select local
+    |> List.map (fun choice ->
+      let parts = List.map2 (fun options i -> List.nth options i) searched choice in
+      let unbound = List.concat_map left_unbound parts in
+      let remaining = List.filter (fun (v, _) ->
+        not (List.mem v fixed) &&
+        (List.mem v unbound || not (VS.mem (canon v) grouped_vars))) variables
+        |> List.map fst in
+      List.concat_map core parts @ prune_empties [PS_InstVars remaining]
+      |> pre_to_schedule |> normalize_schedule_advanced)
+    |> List.sort_uniq compare
+  | None ->
   let candidate_stream =
     enum_schedules_prefix_classified ~reduce_orderings ~maximal_outputs ~stats
       ~on_prefix:observe_prefix ~on_prefix_with_floor:observe_prefix_with_floor
@@ -3890,19 +3979,11 @@ let possible_schedules_with_advanced_pruning ?(max_schedules=100000)
       variables type_vars classified fixed
     |> Seq.map pre_to_schedule
     |> Seq.map normalize_schedule_advanced in
-  let peek_limit = if max_schedules = max_int then max_int else max_schedules + 1 in
-  let candidates = candidate_stream |> seq_take peek_limit |> List.of_seq in
-  if List.length candidates > max_schedules then
-    Feedback.msg_warning (str (Printf.sprintf
-      "Schedule search reached its %d-candidate limit; ranking may omit better schedules"
-      max_schedules));
-  candidates
-  |> List.filteri (fun idx _ -> idx < max_schedules)
-  |> List.sort_uniq compare
+  take_limited candidate_stream |> List.sort_uniq compare
 
-let possible_schedules variables hypotheses fixed rec_call ds =
+let possible_schedules ?canon ?select_groups variables hypotheses fixed rec_call ds =
   possible_schedules_with_advanced_pruning ~max_schedules:1000
-    ~maximal_outputs:true
+    ~maximal_outputs:true ?canon ?select_groups
     ~reduce_orderings:(ScheduleRanking.preserves_independent_swaps
       (ScheduleRanking.current ()))
     variables hypotheses fixed rec_call ds
