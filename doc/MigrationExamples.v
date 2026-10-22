@@ -13,6 +13,13 @@ Inductive legacy_box (A : Type) := LegacyBox : A -> legacy_box A.
 Derive GenSized for legacy_box.
 
 Extract Constant defNumTests => "3".
+
+Module ModuleDemo.
+  Inductive light := On | Off.
+  QCDerive (GenSized, Shrink, Show) for light.
+  QuickChick (fun x : light => match x with On | Off => true end).
+End ModuleDemo.
+
 Goal forall n : nat, n = n.
   quickchick 2.
   QuickChick (theorem 4).
