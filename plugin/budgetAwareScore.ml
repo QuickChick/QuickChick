@@ -35,6 +35,18 @@ let density_rank = function
 let locality_rank = function
   | Internal -> 0 | External -> 1 | SameIndExt -> 2
 
+let to_string score =
+  let density = match score.density with
+    | Total -> "Total" | Partial -> "Partial"
+    | Backtracking -> "Backtracking" | Checking -> "Checking" in
+  let locality = match score.locality with
+    | Internal -> "Internal" | External -> "External"
+    | SameIndExt -> "SameIndExt" in
+  Printf.sprintf
+    "selectivity=%d density=%s fabrication=%d locality=%s inputCheckDeps=%d varDeps=%d"
+    score.selectivity density score.fabrication locality
+    score.input_check_deps score.var_deps
+
 let max_density a b = if density_rank a >= density_rank b then a else b
 let max_locality a b = if locality_rank a >= locality_rank b then a else b
 

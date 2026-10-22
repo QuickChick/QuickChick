@@ -1946,7 +1946,9 @@ and constructor_valid_schedules (ind_name : ty_ctr) (ctr : rocq_ctr) (result_var
           ~incumbent:best ~bound in
         if cut then incr pruned_prefixes;
         cut) else None in
+  let prepared_inputs = ref [] in
   let schedule_matches = NewUnifyQC.type_to_schedules
+    ~on_prepared:(fun inputs -> prepared_inputs := inputs)
     ?on_prefix ?on_prefix_with_floor ?should_prune_prefix_with_floor
     typ (Some ind_name) (Some ctr_name)
     result_vars output_vars ds opt in
@@ -2038,6 +2040,89 @@ and constructor_valid_schedules (ind_name : ty_ctr) (ctr : rocq_ctr) (result_var
                           !density_memo) in
         List.map (fun ((i, _, _, _) as entry) ->
           if i = best_id then best_entry else entry) entries)) in
+  (match Sys.getenv_opt "QC_BUDGET_AWARE_DEMO" with
+   | Some target when target <> "" &&
+       String.ends_with ~suffix:target (ty_ctr_to_string ind_name) ->
+     let module B = BudgetAwareScore in
+     let finite_pins = B.finite_pins_from_environment () in
+     let rec selected_dependency memo seen request =
+       let key = request.B.key in
+       if List.mem key seen then None else
+       let entry = match InductiveScheduleKeyMap.find_opt
+         (key.B.relation, key.B.output_indices, key.B.derive_sort, true) memo with
+         | Some entry -> Some entry
+         | None -> InductiveScheduleKeyMap.find_opt
+             (key.B.relation, key.B.output_indices, key.B.derive_sort, false) memo in
+       match entry with
+       | Some (DensityDone (((_, inputs, _, base, recursive), _), true)) ->
+         (match base @ recursive with
+          | [((steps, _), _, _)] ->
+            let dependencies = B.required_dependencies key steps in
+            let resolved = List.map (fun dependency ->
+              dependency, selected_dependency memo (key :: seen) dependency)
+              dependencies in
+            if List.exists (fun (_, score) -> score = None) resolved then None
+            else
+              let context : B.context = {
+                B.input_vars = List.map fst inputs;
+                B.finite_pins = finite_pins;
+                B.completed_dependency = (fun dependency ->
+                  match List.assoc_opt dependency resolved with
+                  | Some score -> score | None -> None) } in
+              (match B.score_schedule context key steps with
+               | Ok score -> Some score | Error _ -> None)
+          | _ -> None)
+       | _ -> None in
+     let output_indices = List.mapi (fun i (name, _) -> i, name) result_vars
+       |> List.filter_map (fun (i, name) ->
+            if List.mem name output_vars then Some i else None) in
+     let key : B.key = { relation = ind_name; output_indices; derive_sort = ds } in
+     let complete = ref [] in
+     List.iter (fun (id, _, memo, _) ->
+       let _, triple, _, _ = List.find (fun (candidate_id, _, _, _) ->
+         candidate_id = id) schedules in
+       let dependencies = B.required_candidate_dependencies key triple in
+       let resolved = List.map (fun dependency ->
+         dependency, selected_dependency memo [key] dependency) dependencies in
+       if List.exists (fun (_, score) -> score = None) resolved then
+         Feedback.msg_notice (str (Printf.sprintf
+           "[budget-aware] constructor=%s candidate=%d unavailable: unresolved dependency score"
+           (constructor_to_string ctr_name) id))
+       else
+         let context : B.context = {
+           B.input_vars = !prepared_inputs;
+           B.finite_pins = finite_pins;
+           B.completed_dependency = (fun dependency ->
+             match List.assoc_opt dependency resolved with
+             | Some score -> score | None -> None) } in
+         match B.score_candidate context key triple with
+         | Ok score ->
+           complete := (id, score) :: !complete;
+           Feedback.msg_notice (str (Printf.sprintf
+             "[budget-aware] constructor=%s candidate=%d %s\n  steps: %s"
+             (constructor_to_string ctr_name) id (B.to_string score)
+             (B.candidate_steps triple |> List.map schedule_step_to_string
+              |> String.concat " ; ")))
+         | Error message ->
+           Feedback.msg_notice (str (Printf.sprintf
+             "[budget-aware] constructor=%s candidate=%d unavailable: %s"
+             (constructor_to_string ctr_name) id message))) schedule_densities;
+     if !complete <> [] && List.length !complete = List.length schedule_densities then begin
+       let ordered = List.sort (fun (left, _) (right, _) ->
+         Stdlib.compare left right) !complete in
+       let best_id, _ = List.fold_left (fun ((best_id, best_score) as best)
+         (id, score) ->
+           if B.compare score best_score < 0 then id, score else best)
+         (List.hd ordered) (List.tl ordered) in
+       let selected = select_best_schedule
+         (List.map (fun (id, scored, _, _) -> id, scored) schedule_densities)
+         ds in
+       Feedback.msg_notice (str (Printf.sprintf
+         "[budget-aware] constructor=%s best=%d built-in-selected=%s"
+         (constructor_to_string ctr_name) best_id
+         (match selected with None -> "none" | Some (id, _, _) -> string_of_int id)))
+     end
+   | _ -> ());
   let policy_finite_pins = lazy (BudgetAwareScore.finite_pins_from_environment ()) in
   let policy_schedule_expression (steps, sort) =
      let result = match sort with

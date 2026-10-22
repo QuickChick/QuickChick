@@ -25,8 +25,17 @@ after unification. `score_candidate` prepends the match and equality steps
 that compilation uses. Dependency requests retain full applied arguments,
 so callers can distinguish applications of one relation to different types.
 
-This library is not connected to QuickChick's ranking or recursive dependency
-derivation yet. `S_Let` and `SrcDef` have no counterparts in the pinned
+`doc/BudgetAwareDemo.v` is a live diagnostic over two real constructor
+schedules. With `QC_BUDGET_AWARE_DEMO=budget_root`, the plugin prints each
+completed six-field score and the schedule that received it. For this
+monomorphic, acyclic fixture it resolves the selected dependency modes from
+the completed scheduler memo; an unavailable dependency is reported instead
+of silently receiving a score. The finite producer has selectivity zero, and
+the loose producer followed by a finite check has selectivity one. This
+diagnostic does not change public ranking or provide a search bound.
+
+The library is not connected to production BudgetAware selection or general
+recursive dependency derivation yet. `S_Let` and `SrcDef` have no counterparts in the pinned
 Specimen schedule syntax and return an error instead of an invented score.
 The callback must supply completed scores in the correct applied context;
 cycle-dependent or provisional grades are not safe substitutes. The public
