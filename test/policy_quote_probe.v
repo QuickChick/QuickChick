@@ -151,6 +151,15 @@ Definition policy_quote_order_sensitive_cost
   {| quote_depth := priority;
      quote_weight := List.length (schedule_steps schedule) |}.
 
+Definition policy_quote_order_scorer : scorer quote_cost := {|
+  score_step := fun _ _ _ => {| quote_depth := 0; quote_weight := 0 |};
+  score_schedule := fun _ schedule _ =>
+    policy_quote_order_sensitive_cost schedule;
+  score_leaf := fun _ _ _ => {| quote_depth := 0; quote_weight := 0 |};
+  score_inductive := fun _ _ _ => {| quote_depth := 0; quote_weight := 0 |};
+  compare_scores := policy_quote_compare_cost
+|}.
+
 Polymorphic Record quote_poly_cost (A : Type) := {
   quote_poly_payload : A;
   quote_poly_rank : nat
@@ -223,6 +232,17 @@ Inductive policy_compare_b : nat -> nat -> Prop :=
 | CompareB : forall x y, policy_compare_b x y.
 Inductive policy_compare_c : nat -> nat -> Prop :=
 | CompareC : forall y z, policy_compare_c y z.
+
+Derive Inductive Schedule policy_compare_a 0 derive "Gen" opt "true".
+Derive Inductive Schedule policy_compare_a derive "Check" opt "true".
+Derive Inductive Schedule policy_compare_b 0 1 derive "Gen" opt "true".
+Derive Inductive Schedule policy_compare_b 0 derive "Gen" opt "true".
+Derive Inductive Schedule policy_compare_b 1 derive "Gen" opt "true".
+Derive Inductive Schedule policy_compare_b derive "Check" opt "true".
+Derive Inductive Schedule policy_compare_c 0 1 derive "Gen" opt "true".
+Derive Inductive Schedule policy_compare_c 0 derive "Gen" opt "true".
+Derive Inductive Schedule policy_compare_c 1 derive "Gen" opt "true".
+Derive Inductive Schedule policy_compare_c derive "Check" opt "true".
 
 Inductive policy_compare_root : nat -> nat -> nat -> Prop :=
 | CompareRoot : forall x y z,

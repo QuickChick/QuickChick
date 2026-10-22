@@ -100,6 +100,15 @@ with tempfile.TemporaryDirectory() as temporary:
     ), record
     assert "[policy-record] constructor=QuoteMissing " not in record, record
 
+    record_compared = compile_probe(
+        output,
+        QC_POLICY_RECORD_PROBE="policy_quote_order_scorer",
+    )
+    assert (
+        "[policy-record-compare] candidates=4 best=3 lt=2 eq=1 gt=0"
+        in record_compared
+    ), record_compared
+
     rejected = run_probe(
         output,
         QC_POLICY_SCHEDULE_PROBE="policy_quote_candidate_cost",

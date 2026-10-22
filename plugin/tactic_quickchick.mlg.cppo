@@ -2118,7 +2118,7 @@ and constructor_valid_schedules (ind_name : ty_ctr) (ctr : rocq_ctr) (result_var
                   (if List.mem request acc then acc else request :: acc) rest
                 else None) in
        collect [] steps in
-     (match List.find_map (fun (_, ((steps, sort) as schedule), _, _) ->
+     let eligible = List.filter_map (fun (id, ((steps, sort) as schedule), _, _) ->
        let local_types = List.fold_left (fun locals (step, _) ->
          let outputs = match step with
            | S_UC (name, SrcNonrec typ, _) -> [name, typ]
@@ -2135,30 +2135,55 @@ and constructor_valid_schedules (ind_name : ty_ctr) (ctr : rocq_ctr) (result_var
              (ScoringView.step_variables step)) steps in
        match sort, complete_telescope, supplied_dependencies steps with
        | ProducerSchedule (constrained, _, result), true, Some supplied ->
-         Some (schedule, constrained, result, local_types, supplied)
-       | _ -> None) schedule_densities with
-      | None -> ()
-      | Some (((steps, _) as schedule), constrained, result,
-          local_types, supplied) ->
-        let names = List.map fst result_vars @
-          List.concat_map (fun (step, _) -> ScoringView.step_variables step) steps @
-          ScoringView.free_vars_term result |> List.sort_uniq Stdlib.compare in
-        let scope = ScoringView.scope names in
-        let context = match ScoringView.supplied_context_expression
-          ~global:ScoringView.global_name scope ind_name result_vars local_types
-          output_vars ds constrained supplied with
-          | Ok context -> context
-          | Error message -> failwith message in
-        let expression = ScoringView.score_one_schedule_expression scorer
-          context (policy_schedule_expression schedule) in
-        (match ScoringView.evaluate_term_in (Global.env ())
-          (Evd.from_env (Global.env ())) expression with
-         | Error message -> failwith message
-         | Ok (sigma, value, _) ->
-           Feedback.msg_notice (str ("[policy-record] constructor=" ^
-             constructor_to_string ctr_name ^ " score=" ^
-             Pp.string_of_ppcmds
-               (Printer.pr_econstr_env (Global.env ()) sigma value))))));
+         Some (id, schedule, constrained, result, local_types, supplied)
+       | _ -> None) schedule_densities in
+     let env = Global.env () in
+     let sigma = ref (Evd.from_env env) in
+     let scores = List.map (fun (id, ((steps, _) as schedule), constrained,
+         result, local_types, supplied) ->
+       let names = List.map fst result_vars @
+         List.concat_map (fun (step, _) -> ScoringView.step_variables step) steps @
+         ScoringView.free_vars_term result |> List.sort_uniq Stdlib.compare in
+       let scope = ScoringView.scope names in
+       let context = match ScoringView.supplied_context_expression
+         ~global:ScoringView.global_name scope ind_name result_vars local_types
+         output_vars ds constrained supplied with
+         | Ok context -> context
+         | Error message -> failwith message in
+       let expression = ScoringView.score_one_schedule_expression scorer
+         context (policy_schedule_expression schedule) in
+       match ScoringView.evaluate_term_in env !sigma expression with
+       | Error message -> failwith message
+       | Ok (next_sigma, value, _) ->
+         sigma := next_sigma;
+         id, value) eligible in
+     (match scores with
+      | [] -> ()
+      | (_, value) :: _ ->
+        Feedback.msg_notice (str ("[policy-record] constructor=" ^
+          constructor_to_string ctr_name ^ " score=" ^
+          Pp.string_of_ppcmds (Printer.pr_econstr_env env !sigma value)));
+     if List.length eligible = List.length schedule_densities &&
+        List.length scores > 1 then begin
+       let orders = ref [] in
+       let best = List.fold_left (fun best (id, value) -> match best with
+         | None -> Some (id, value)
+         | Some (_, best_value) as current ->
+           (match ScoringView.compare_record_scores env !sigma scorer
+             value best_value with
+            | Error message -> failwith message
+            | Ok (next_sigma, order) ->
+              sigma := next_sigma;
+              orders := order :: !orders;
+              if order < 0 then Some (id, value) else current)) None scores in
+       match best with
+       | None -> assert false
+       | Some (id, _) ->
+         let count order = List.length (List.filter ((=) order) !orders) in
+         Feedback.msg_notice (str (Printf.sprintf
+           "[policy-record-compare] candidates=%d best=%d lt=%d eq=%d gt=%d"
+           (List.length scores) id (count (-1)) (count 0) (count 1)))
+     end));
   if score_pruning_mode <> `Off && schedule_trace_enabled () then
     Feedback.msg_notice (str (Printf.sprintf
       "[schedule-pruning-work] constructor=%s bound-cache-hits=%d bound-cache-misses=%d leaf-cache-hits=%d mode-cache-hits=%d stable-cache-entries=%d step-multisets=%d bound-cpu=%.3f leaf-cpu=%.3f final-cpu=%.3f\n"

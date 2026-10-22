@@ -452,9 +452,9 @@ let evaluate_expression_in env sigma function_name argument =
 let evaluate_expression env function_name argument =
   evaluate_expression_in env (Evd.from_env env) function_name argument
 
-let compare_values env sigma function_name left right =
+let compare_values_expression env sigma comparator_expression left right =
   let sigma, comparator = GenericLib.interp_coq_expr_evars env sigma
-    (GenericLib.gInject function_name) in
+    comparator_expression in
   let application = EConstr.mkApp (comparator, [|left; right|]) in
   let sigma, typ = Typing.type_of env sigma application in
   if Evd.has_undefined sigma then
@@ -482,6 +482,16 @@ let compare_values env sigma function_name left right =
          else Error "SchedulingPolicy: comparator returned another constructor"
        | _ -> Error "SchedulingPolicy: comparator did not reduce to a result")
     | _ -> Error "SchedulingPolicy: comparator must return comparison"
+
+let compare_values env sigma function_name left right =
+  compare_values_expression env sigma (GenericLib.gInject function_name)
+    left right
+
+let compare_record_scores env sigma scorer left right =
+  let comparator = GenericLib.gApp
+    (GenericLib.gInject "QuickChick.SchedulingPolicy.compare_scores")
+    [GenericLib.gInject scorer] in
+  compare_values_expression env sigma comparator left right
 
 let evaluate env function_name view =
   evaluate_expression env function_name (term_expression view)

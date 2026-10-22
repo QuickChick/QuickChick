@@ -346,7 +346,7 @@ The comparator fixture also uses a polymorphic record parameterized by
 when the plugin applies their Rocq comparator. A wrong result type is rejected.
 
 A further internal `QC_POLICY_RECORD_PROBE` accepts a named Rocq `scorer`
-record. It invokes both `score_step` and `score_schedule` on the first candidate
+record. It invokes both `score_step` and `score_schedule` on every candidate
 whose source obligations all resolve to existing instances. Its context quotes
 the root application and output positions, original inputs, typed result and
 producer locals, and each supplied dependency's full application. The
@@ -359,7 +359,13 @@ separate typed memo described in the scoring design.
 The regression also derives `policy_quote_missing A`, whose generator needs
 `GenSized A` from its eventual caller. It receives no supplied-instance score
 notice, while concrete `nat` and `list nat` sources do. The diagnostic uses
-the elaborated class-obligation lookup, not declaration-name existence.
+the elaborated class-obligation lookup, not declaration-name existence. When
+every candidate is eligible, the probe applies the record's `compare_scores`
+to their typed Rocq scores. It preserves candidate order on ties. The
+four-candidate fixture supplies all needed generator and checker modes, then
+selects candidate 3 with two strict improvements and one tie. If any candidate
+is ineligible, no best-candidate notice is emitted. This comparison remains
+diagnostic; it is not used for policy search or pruning.
 
 ## Constructor weighting
 
