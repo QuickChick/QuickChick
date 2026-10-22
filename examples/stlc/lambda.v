@@ -100,8 +100,9 @@ QCDerive Arbitrary for type.
 #[global]
 Instance dec_type (t1 t2 : type) : Dec (t1 = t2).
 Proof. dec_eq. Defined.
-QCDerive ArbitrarySizedSuchThat for (fun x => bind env x tau).
-QCDerive ArbitrarySizedSuchThat for (fun t => typing' env t tau).
+(* These declarations use the legacy implicit input-variable syntax. *)
+QCDeriveLegacy ArbitrarySizedSuchThat for (fun x => bind env x tau).
+QCDeriveLegacy ArbitrarySizedSuchThat for (fun t => typing' env t tau).
 
 Inductive option_le : option nat -> option nat -> Prop :=
     | opt_le_1 : option_le None None

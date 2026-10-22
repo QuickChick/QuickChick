@@ -23,7 +23,8 @@ Inductive tree A : Type :=
 | Node : A -> tree A -> tree A -> tree A.
 
 
-QCDerive EnumSized for tree.
+(* These correctness tactics currently inspect the legacy enumerator term. *)
+QCDeriveLegacy EnumSized for tree.
 
 #[local]
 Instance EnumTree_SizedMonotonic A {_ : Enum A} :
@@ -43,7 +44,7 @@ Proof. derive_enum_Correct (). Qed.
 Inductive Foo : Type :=
 | Bar.
 
-QCDerive EnumSized for Foo.
+QCDeriveLegacy EnumSized for Foo.
 
 #[local]
 Instance EnumFoo_SizedMonotonic :
@@ -66,7 +67,7 @@ Inductive Foo2 A : Type :=
 | Bar2 : A -> Foo2 A.
 
 
-QCDerive EnumSized for Foo2.
+QCDeriveLegacy EnumSized for Foo2.
 
 #[local]
 Instance EnumFoo2_SizedMonotonic A {_ : Enum A} :
