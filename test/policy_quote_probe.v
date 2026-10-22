@@ -89,6 +89,8 @@ Definition policy_quote_compare_cost (left right : quote_cost) : comparison :=
   | order => order
   end.
 
+Definition policy_quote_bad_compare (_ _ : quote_cost) : nat := 0.
+
 Definition policy_quote_first_source (schedule : schedule_view) : term_view :=
   match schedule_steps schedule with
   | (SuchThat _ source _, _) :: _ => source_application source

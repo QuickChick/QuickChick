@@ -12,7 +12,7 @@ COQC = os.environ.get("COQC", "coqc")
 SOURCE = ROOT / "test/policy_quote_probe.v"
 
 
-def compile_probe(destination: Path, **probes: str) -> str:
+def run_probe(destination: Path, **probes: str) -> subprocess.CompletedProcess:
     environment = os.environ.copy()
     for name in (
         "QC_POLICY_QUOTE_PROBE",
@@ -31,6 +31,11 @@ def compile_probe(destination: Path, **probes: str) -> str:
     ]
     result = subprocess.run(command, cwd=ROOT, env=environment,
                             text=True, capture_output=True)
+    return result
+
+
+def compile_probe(destination: Path, **probes: str) -> str:
+    result = run_probe(destination, **probes)
     if result.returncode:
         raise AssertionError(result.stdout + result.stderr)
     return result.stdout + result.stderr
@@ -62,5 +67,15 @@ with tempfile.TemporaryDirectory() as temporary:
     assert (
         "[policy-compare] candidates=4 best=3 lt=2 eq=1 gt=0" in compared
     ), compared
+
+    rejected = run_probe(
+        output,
+        QC_POLICY_SCHEDULE_PROBE="policy_quote_candidate_cost",
+        QC_POLICY_COMPARE_PROBE="policy_quote_bad_compare",
+    )
+    assert rejected.returncode != 0, "invalid comparator was accepted"
+    assert "comparator must return comparison" in (
+        rejected.stdout + rejected.stderr
+    ), rejected.stdout + rejected.stderr
 
 print("Rocq policy bridge: scoped views, pins, match links, and record comparison")
