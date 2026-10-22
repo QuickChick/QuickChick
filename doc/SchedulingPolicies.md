@@ -302,6 +302,17 @@ The remaining bridge must quote complete typed schedules, retain scores across
 dependency calls, compare them through the policy, and feed policy bounds into
 search. Existing ranking and settings remain active.
 
+The diagnostic also quotes real `Check`, unconstrained, and relation-producer
+steps and evaluates a Rocq callback named by `QC_POLICY_STEP_PROBE`. The
+focused fixture covers a polymorphic checker, a generated output, a relation
+output, a finite-pinned output, and a relation with a separate input. Rocq
+sees the output count, bound-source input count, and finite-pin count as
+`(0,2,0)`, `(1,0,0)`, `(1,0,0)`, `(1,0,1)`, and `(1,1,0)` respectively in
+those cases. Recursive helper references use a distinct generated-name node.
+This path inspects only the first candidate of each constructor. It rejects
+match and let steps until their binders and types are represented accurately;
+it does not score or rank a complete schedule.
+
 ## Constructor weighting
 
 Scheduled generation currently gives base constructors weight 1 and recursive

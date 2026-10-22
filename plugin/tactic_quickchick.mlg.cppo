@@ -1946,6 +1946,26 @@ and constructor_valid_schedules (ind_name : ty_ctr) (ctr : rocq_ctr) (result_var
   let schedules = List.mapi (fun i triple ->
     let ms_steps, schd = materialize triple in
     i, triple, ms_steps, schd) schedule_matches in
+  (match Sys.getenv_opt "QC_POLICY_STEP_PROBE", schedules with
+   | Some scorer, (_, _, _, (steps, _)) :: _ ->
+     let names = List.map fst result_vars @
+       List.concat_map ScoringView.step_variables steps
+       |> List.sort_uniq Stdlib.compare in
+     let scope = ScoringView.scope names in
+     let finite_pins = BudgetAwareScore.finite_pins_from_environment () in
+     List.iteri (fun index step ->
+       let expression = match ScoringView.step_expression
+         ~global:ScoringView.global_name ~finite_pins scope step with
+         | Ok expression -> expression
+         | Error message -> failwith message in
+       match ScoringView.evaluate_expression (Global.env ()) scorer expression with
+       | Error message -> failwith message
+       | Ok (sigma, value, _) ->
+         Feedback.msg_notice (str (Printf.sprintf
+           "[policy-step] step=%d score=%s" index
+           (Pp.string_of_ppcmds
+             (Printer.pr_econstr_env (Global.env ()) sigma value))))) steps
+   | _ -> ());
   let distinct_step_multisets = if not (schedule_trace_enabled ()) then 0 else
     schedules
     |> List.map (fun (_, _, _, (steps, sort)) ->
