@@ -69,6 +69,15 @@ with tempfile.TemporaryDirectory() as temporary:
         "[policy-compare] candidates=4 best=3 lt=2 eq=1 gt=0" in compared
     ), compared
 
+    polymorphic = compile_probe(
+        output,
+        QC_POLICY_SCHEDULE_PROBE="policy_quote_poly_score",
+        QC_POLICY_COMPARE_PROBE="policy_quote_poly_compare",
+    )
+    assert (
+        "[policy-compare] candidates=4 best=3 lt=2 eq=1 gt=0" in polymorphic
+    ), polymorphic
+
     rejected = run_probe(
         output,
         QC_POLICY_SCHEDULE_PROBE="policy_quote_candidate_cost",

@@ -341,6 +341,9 @@ candidate 0 while the diagnostic Rocq comparator prefers candidate 3. The
 first-candidate and all-candidate diagnostics share one finite-pin lookup cache
 per constructor. The ordinary Dune theory build does not enable
 these diagnostic callbacks.
+The comparator fixture also uses a polymorphic record parameterized by
+`list nat`; scores from separate callback evaluations remain type-compatible
+when the plugin applies their Rocq comparator. A wrong result type is rejected.
 
 ## Constructor weighting
 

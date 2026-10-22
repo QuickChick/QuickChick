@@ -120,6 +120,22 @@ Definition policy_quote_order_sensitive_cost
   {| quote_depth := priority;
      quote_weight := List.length (schedule_steps schedule) |}.
 
+Polymorphic Record quote_poly_cost (A : Type) := {
+  quote_poly_payload : A;
+  quote_poly_rank : nat
+}.
+Arguments quote_poly_payload {A} _.
+Arguments quote_poly_rank {A} _.
+
+Definition policy_quote_poly_score (schedule : schedule_view)
+    : quote_poly_cost (list nat) :=
+  {| quote_poly_payload := [List.length (schedule_steps schedule)];
+     quote_poly_rank := quote_depth (policy_quote_order_sensitive_cost schedule) |}.
+
+Definition policy_quote_poly_compare
+    (left right : quote_poly_cost (list nat)) : comparison :=
+  Nat.compare (quote_poly_rank left) (quote_poly_rank right).
+
 Derive Inductive Schedule policy_quote_probe derive "Check" opt "true".
 
 Inductive policy_quote_param (A : Type) : list A -> Prop :=
