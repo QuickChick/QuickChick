@@ -99,14 +99,19 @@ Definition policy_quote_first_source (schedule : schedule_view) : term_view :=
 
 Definition policy_quote_equal_sources (_ _ : term_view) : comparison := Eq.
 
+Definition policy_quote_name_ends (name suffix : string) : bool :=
+  String.eqb
+    (String.substring (String.length name - String.length suffix)
+       (String.length suffix) name)
+    suffix.
+
 Definition policy_quote_order_sensitive_cost
     (schedule : schedule_view) : quote_cost :=
   let priority := match policy_quote_first_source schedule with
     | TApply (TGlobal name) _ =>
-      if String.eqb name "QuickChick.Testing.policy_quote_probe.policy_compare_c"
+      if policy_quote_name_ends name "policy_compare_c"
       then 0
-      else if String.eqb name
-        "QuickChick.Testing.policy_quote_probe.policy_compare_b"
+      else if policy_quote_name_ends name "policy_compare_b"
       then 1 else 2
     | _ => 3
     end in

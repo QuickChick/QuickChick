@@ -331,6 +331,14 @@ score context is connected yet. `TImplicitHole` is distinct from `TOpaque`:
 the former is a source-level implicit placeholder, while the latter marks
 metadata the scheduler did not retain.
 
+Run `python3 test/check_policy_bridge.py` with the local validation `coqc` on
+`PATH` after building `@install`. It recompiles the focused Rocq fixture with
+diagnostics enabled and checks record evaluation, source inputs and pins,
+match/result binder links, and four-candidate comparison. The scorer compares
+the final segment of a qualified name so the test works under both Dune and
+direct `coqc` module paths. The ordinary Dune theory build does not enable
+these diagnostic callbacks.
+
 ## Constructor weighting
 
 Scheduled generation currently gives base constructors weight 1 and recursive
