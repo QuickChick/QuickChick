@@ -2024,8 +2024,7 @@ and constructor_valid_schedules (ind_name : ty_ctr) (ctr : rocq_ctr) (result_var
                           !density_memo) in
         List.map (fun ((i, _, _, _) as entry) ->
           if i = best_id then best_entry else entry) entries)) in
-  (match Sys.getenv_opt "QC_POLICY_SCHEDULE_PROBE", schedule_densities with
-   | Some scorer, (_, (steps, sort), _, _) :: _ ->
+  let policy_schedule_expression (steps, sort) =
      let result = match sort with
        | ProducerSchedule (_, _, result) | TheoremSchedule (result, _) ->
          Some result
@@ -2047,12 +2046,52 @@ and constructor_valid_schedules (ind_name : ty_ctr) (ctr : rocq_ctr) (result_var
        ~grade_expression scope steps result with
        | Ok expression -> expression
        | Error message -> failwith message in
-     (match ScoringView.evaluate_expression (Global.env ()) scorer expression with
+     expression in
+  (match Sys.getenv_opt "QC_POLICY_SCHEDULE_PROBE",
+    Sys.getenv_opt "QC_POLICY_COMPARE_PROBE", schedule_densities with
+   | Some scorer, None, (_, schedule, _, _) :: _ ->
+     (match ScoringView.evaluate_expression (Global.env ()) scorer
+       (policy_schedule_expression schedule) with
       | Error message -> failwith message
       | Ok (sigma, value, _) ->
         Feedback.msg_notice (str ("[policy-schedule] score=" ^
           Pp.string_of_ppcmds
             (Printer.pr_econstr_env (Global.env ()) sigma value))))
+   | Some scorer, Some comparator, _ :: _ ->
+     let env = Global.env () in
+     let sigma = ref (Evd.from_env env) in
+     let scores = List.map (fun (id, schedule, _, _) ->
+       match ScoringView.evaluate_expression_in env !sigma scorer
+         (policy_schedule_expression schedule) with
+       | Error message -> failwith message
+       | Ok (next_sigma, value, _) ->
+         sigma := next_sigma;
+         id, value) schedule_densities in
+     if List.length scores > 1 then
+       Feedback.msg_notice (str ("[policy-compare] values=" ^
+         String.concat "; " (List.map (fun (id, value) ->
+           Printf.sprintf "%d:%s" id
+             (Pp.string_of_ppcmds (Printer.pr_econstr_env env !sigma value)))
+           scores)));
+     let orders = ref [] in
+     let best = List.fold_left (fun best (id, value) -> match best with
+       | None -> Some (id, value)
+       | Some (_, best_value) as current ->
+         (match ScoringView.compare_values env !sigma comparator value best_value with
+          | Error message -> failwith message
+          | Ok (next_sigma, order) ->
+            sigma := next_sigma;
+            orders := order :: !orders;
+            if order < 0 then Some (id, value) else current)) None scores in
+     (match best with
+      | None -> assert false
+      | Some (id, _) ->
+        let count order = List.length (List.filter ((=) order) !orders) in
+        Feedback.msg_notice (str (Printf.sprintf
+          "[policy-compare] candidates=%d best=%d lt=%d eq=%d gt=%d"
+          (List.length scores) id (count (-1)) (count 0) (count 1))))
+   | None, Some _, _ ->
+     failwith "SchedulingPolicy: comparator probe requires a scorer probe"
    | _ -> ());
   if score_pruning_mode <> `Off && schedule_trace_enabled () then
     Feedback.msg_notice (str (Printf.sprintf

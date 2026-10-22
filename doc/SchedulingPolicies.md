@@ -291,7 +291,7 @@ and search decisions.
 a bound that reads search state. This is an interface test, not a selected
 derivation. The plugin's first quotation stage converts scheduler terms and
 patterns to the corresponding symbolic view. It preserves shadowed binders and
-applied arguments, and rejects unresolved holes; a test uses a real scheduler
+applied arguments, and exposes implicit type holes as `TImplicitHole`; a test uses a real scheduler
 candidate. An internal diagnostic now elaborates that view as a Rocq term and
 evaluates a Rocq-defined function with VM reduction. The derivation probe covers
 an indexed polymorphic relation and a user-defined record score. Quotation
@@ -319,6 +319,17 @@ payload ID is the result, and the grades are one `Partial` and one
 are represented as `TOpaque` with the same local ID. `LetStep` likewise has an
 opaque local type; it has no real derivation fixture yet. The probe does not
 rank candidates or certify a policy bound.
+
+`QC_POLICY_COMPARE_PROBE` names a Rocq function of type `S -> S -> comparison`
+when `QC_POLICY_SCHEDULE_PROBE` names a function from `schedule_view` to `S`.
+The plugin keeps each result as a typed Rocq term and asks Rocq to compare
+them. On a four-candidate relation, a record-valued policy preferring the
+first `policy_compare_c` source chooses candidate 3; the observed comparison
+results are two `Lt` and one `Eq`. This is diagnostic only. It does not replace
+the default completed-schedule ranker, and no bound callback or recursive
+score context is connected yet. `TImplicitHole` is distinct from `TOpaque`:
+the former is a source-level implicit placeholder, while the latter marks
+metadata the scheduler did not retain.
 
 ## Constructor weighting
 

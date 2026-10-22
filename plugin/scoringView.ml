@@ -13,6 +13,7 @@ type term_view =
   | TGlobal of string
   | TSort of string
   | TGenerated of string
+  | TImplicitHole
   | TApply of term_view * term_view list
   | TArrow of term_view * term_view
   | TProduct of int * term_view * term_view
@@ -154,7 +155,7 @@ let rec quote_term ~global scope term =
     (match quote_term ~global scope body with
      | Error _ as error -> error
      | Ok (body, scope) -> Ok (TNot body, scope))
-  | DHole -> Error "SchedulingPolicy: cannot quote an unresolved hole"
+  | DHole -> Ok (TImplicitHole, scope)
 
 (* Build a Rocq expression for the symbolic view. Constructor applications
    are elaborated and checked in the current proof environment by the caller. *)
@@ -176,6 +177,7 @@ let rec term_expression = function
   | TGlobal name -> constructor "TGlobal" [GenericLib.gStr name]
   | TSort name -> constructor "TSort" [GenericLib.gStr name]
   | TGenerated name -> constructor "TGenerated" [GenericLib.gStr name]
+  | TImplicitHole -> constructor "TImplicitHole" []
   | TApply (head, args) ->
     constructor "TApply"
       [term_expression head; GenericLib.gList (List.map term_expression args)]
@@ -377,16 +379,49 @@ let schedule_expression ~global ~finite_pins ~grade_expression scope
 
 (* The result remains a typed Rocq term: the plugin need not know a user's
    score representation. The returned sigma carries elaboration constraints. *)
-let evaluate_expression env function_name argument =
+let evaluate_expression_in env sigma function_name argument =
   let expression = GenericLib.gApp
     (GenericLib.gInject function_name) [argument] in
-  let sigma, term = GenericLib.interp_coq_expr_evars env (Evd.from_env env)
-    expression in
+  let sigma, term = GenericLib.interp_coq_expr_evars env sigma expression in
   if Evd.has_undefined sigma then
     Error "SchedulingPolicy: the selected scorer left unresolved evars"
   else
-    let typ = Retyping.get_type_of env sigma term in
+    let sigma, typ = Typing.type_of env sigma term in
     Ok (sigma, Vnorm.cbv_vm env sigma term typ, typ)
+
+let evaluate_expression env function_name argument =
+  evaluate_expression_in env (Evd.from_env env) function_name argument
+
+let compare_values env sigma function_name left right =
+  let sigma, comparator = GenericLib.interp_coq_expr_evars env sigma
+    (GenericLib.gInject function_name) in
+  let application = EConstr.mkApp (comparator, [|left; right|]) in
+  let sigma, typ = Typing.type_of env sigma application in
+  if Evd.has_undefined sigma then
+    Error "SchedulingPolicy: the selected comparator left unresolved evars"
+  else
+    let comparison = match Nametab.locate
+      (Libnames.qualid_of_string "Coq.Init.Datatypes.comparison") with
+      | Names.GlobRef.IndRef ind -> ind
+      | _ -> failwith "SchedulingPolicy: comparison is not an inductive" in
+    match EConstr.kind sigma typ with
+    | Constr.Ind (ind, _) when Environ.QInd.equal env ind comparison ->
+      let value = Vnorm.cbv_vm env sigma application typ in
+      let constructor name = match Nametab.locate
+        (Libnames.qualid_of_string ("Coq.Init.Datatypes." ^ name)) with
+        | Names.GlobRef.ConstructRef constructor -> constructor
+        | _ -> failwith ("SchedulingPolicy: " ^ name ^ " is not a constructor") in
+      (match EConstr.kind sigma value with
+       | Constr.Construct (actual, _) ->
+         if Environ.QConstruct.equal env actual (constructor "Lt") then
+           Ok (sigma, -1)
+         else if Environ.QConstruct.equal env actual (constructor "Eq") then
+           Ok (sigma, 0)
+         else if Environ.QConstruct.equal env actual (constructor "Gt") then
+           Ok (sigma, 1)
+         else Error "SchedulingPolicy: comparator returned another constructor"
+       | _ -> Error "SchedulingPolicy: comparator did not reduce to a result")
+    | _ -> Error "SchedulingPolicy: comparator must return comparison"
 
 let evaluate env function_name view =
   evaluate_expression env function_name (term_expression view)

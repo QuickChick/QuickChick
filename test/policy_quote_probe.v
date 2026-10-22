@@ -1,6 +1,7 @@
 From QuickChick Require Import SchedulingPolicy QuickChick.
-From Coq Require Import List.
+From Coq Require Import List String.
 Import ListNotations.
+Open Scope string_scope.
 
 Inductive policy_quote_probe : nat -> Prop :=
 | QuoteZero : policy_quote_probe 0
@@ -76,6 +77,42 @@ Fixpoint policy_quote_grade_counts
 Definition policy_quote_schedule_grades (schedule : schedule_view) :=
   policy_quote_grade_counts (schedule_steps schedule).
 
+Definition policy_quote_candidate_cost (schedule : schedule_view) : quote_cost :=
+  let '(backtracking, partial) :=
+    policy_quote_grade_counts (schedule_steps schedule) in
+  {| quote_depth := backtracking;
+     quote_weight := partial + List.length (schedule_steps schedule) |}.
+
+Definition policy_quote_compare_cost (left right : quote_cost) : comparison :=
+  match Nat.compare (quote_depth left) (quote_depth right) with
+  | Eq => Nat.compare (quote_weight left) (quote_weight right)
+  | order => order
+  end.
+
+Definition policy_quote_first_source (schedule : schedule_view) : term_view :=
+  match schedule_steps schedule with
+  | (SuchThat _ source _, _) :: _ => source_application source
+  | (Unconstrained _ source _, _) :: _ => source_application source
+  | (CheckStep source _, _) :: _ => source_application source
+  | _ => TImplicitHole
+  end.
+
+Definition policy_quote_equal_sources (_ _ : term_view) : comparison := Eq.
+
+Definition policy_quote_order_sensitive_cost
+    (schedule : schedule_view) : quote_cost :=
+  let priority := match policy_quote_first_source schedule with
+    | TApply (TGlobal name) _ =>
+      if String.eqb name "QuickChick.Testing.policy_quote_probe.policy_compare_c"
+      then 0
+      else if String.eqb name
+        "QuickChick.Testing.policy_quote_probe.policy_compare_b"
+      then 1 else 2
+    | _ => 3
+    end in
+  {| quote_depth := priority;
+     quote_weight := List.length (schedule_steps schedule) |}.
+
 Derive Inductive Schedule policy_quote_probe derive "Check" opt "true".
 
 Inductive policy_quote_param (A : Type) : list A -> Prop :=
@@ -116,3 +153,16 @@ Inductive policy_quote_nested : nat -> Prop :=
     policy_quote_probe (S n) -> policy_quote_nested n.
 
 Derive Inductive Schedule policy_quote_nested 0 derive "Gen" opt "true".
+
+Inductive policy_compare_a : nat -> Prop := CompareA : forall x, policy_compare_a x.
+Inductive policy_compare_b : nat -> nat -> Prop :=
+| CompareB : forall x y, policy_compare_b x y.
+Inductive policy_compare_c : nat -> nat -> Prop :=
+| CompareC : forall y z, policy_compare_c y z.
+
+Inductive policy_compare_root : nat -> nat -> nat -> Prop :=
+| CompareRoot : forall x y z,
+    policy_compare_a x -> policy_compare_b x y ->
+    policy_compare_c y z -> policy_compare_root x y z.
+
+Derive Inductive Schedule policy_compare_root 0 1 2 derive "Gen" opt "true".

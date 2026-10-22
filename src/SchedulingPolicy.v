@@ -18,6 +18,7 @@ Inductive term_view :=
 | TGlobal (name : string)
 | TSort (name : string)
 | TGenerated (name : string)
+| TImplicitHole
 | TApply (head : term_view) (arguments : list term_view)
 | TArrow (domain codomain : term_view)
 | TProduct (binder : nat) (domain body : term_view)
