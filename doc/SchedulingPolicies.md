@@ -361,13 +361,23 @@ The regression also derives `policy_quote_missing A`, whose generator needs
 notice, while concrete `nat` and `list nat` sources do. The diagnostic uses
 direct resolution of the elaborated class obligation in the current context,
 without adding hypothetical typeclass premises. Parameter sources are checked
-by the same rule. When
-every candidate is eligible, the probe applies the record's `compare_scores`
+by the same rule. Recursive helper sources are explicitly excluded: their
+rewritten syntax no longer contains a complete applied dependency key.
+When every candidate is eligible, the probe applies the record's `compare_scores`
 to their typed Rocq scores. It preserves candidate order on ties. The
 four-candidate fixture supplies all needed generator and checker modes, then
 selects candidate 3 with two strict improvements and one tie. If any candidate
 is ineligible, no best-candidate notice is emitted. This comparison remains
 diagnostic; it is not used for policy search or pruning.
+
+`QC_POLICY_RECORD_PENDING_PROBE` uses the same Rocq `scorer` interface but
+includes unresolved nonrecursive requests as `Pending` in the context. A
+Rocq-defined scorer observes one pending `GenSized A` dependency in
+`policy_quote_missing A` and one supplied dependency in `policy_quote_list`.
+It still skips recursive helper sources until their full request can be
+carried through rewriting. The older supplied-only Rocq helper remains
+available; both helpers produce the same score when every dependency is
+supplied. Neither probe selects a production schedule.
 
 ## Constructor weighting
 

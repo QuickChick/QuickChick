@@ -2102,15 +2102,24 @@ and constructor_valid_schedules (ind_name : ty_ctr) (ctr : rocq_ctr) (result_var
    | None, Some _, _ ->
      failwith "SchedulingPolicy: comparator probe requires a scorer probe"
    | _ -> ());
-  (match Sys.getenv_opt "QC_POLICY_RECORD_PROBE" with
-   | None -> ()
-   | Some scorer ->
-     let supplied_dependencies steps =
+  (match Sys.getenv_opt "QC_POLICY_RECORD_PROBE",
+    Sys.getenv_opt "QC_POLICY_RECORD_PENDING_PROBE" with
+   | None, None -> ()
+   | Some _, Some _ ->
+     failwith "SchedulingPolicy: choose one record probe"
+   | (Some scorer, None) | (None, Some scorer) ->
+     let include_pending = Sys.getenv_opt "QC_POLICY_RECORD_PENDING_PROBE" <> None in
+     let record_label = if include_pending then "policy-record-pending"
+       else "policy-record" in
+     let collect_dependencies steps =
        let rec collect acc = function
          | [] -> Some (List.rev acc)
          | (step, _) :: rest ->
            (match step with
             | S_Match _ | S_Let _ -> collect acc rest
+            | S_UC (_, (SrcRec _ | SrcMutrec _ | SrcDef _), _)
+            | S_ST (_, (SrcRec _ | SrcMutrec _ | SrcDef _), _)
+            | S_Check ((SrcRec _ | SrcMutrec _ | SrcDef _), _) -> None
             | _ ->
               let request = match step with
                 | S_UC (_, SrcNonrec (DTyParam _ as parameter), ps) ->
@@ -2125,10 +2134,13 @@ and constructor_valid_schedules (ind_name : ty_ctr) (ctr : rocq_ctr) (result_var
                 let outputs = List.filteri
                   (fun index _ -> List.mem index indices) args
                   |> List.concat_map variables_in_hypothesis in
-                if has_supplied_schedule_instance relation outputs mode constrained
-                then collect
-                  (if List.mem request acc then acc else request :: acc) rest
-                else None) in
+                let status =
+                  if has_supplied_schedule_instance relation outputs mode constrained
+                  then ScoringView.Supplied else ScoringView.Pending in
+                if status = ScoringView.Pending && not include_pending then None
+                else collect
+                  (if List.exists (fun (key, _) -> key = request) acc
+                   then acc else (request, status) :: acc) rest) in
        collect [] steps in
      let eligible = List.filter_map (fun (id, ((steps, sort) as schedule), _, _) ->
        let local_types = List.fold_left (fun locals (step, _) ->
@@ -2145,21 +2157,21 @@ and constructor_valid_schedules (ind_name : ty_ctr) (ctr : rocq_ctr) (result_var
          List.for_all (fun (step, _) ->
            List.for_all (fun name -> List.mem name known_locals)
              (ScoringView.step_variables step)) steps in
-       match sort, complete_telescope, supplied_dependencies steps with
-       | ProducerSchedule (constrained, _, result), true, Some supplied ->
-         Some (id, schedule, constrained, result, local_types, supplied)
+       match sort, complete_telescope, collect_dependencies steps with
+       | ProducerSchedule (constrained, _, result), true, Some dependencies ->
+         Some (id, schedule, constrained, result, local_types, dependencies)
        | _ -> None) schedule_densities in
      let env = Global.env () in
      let sigma = ref (Evd.from_env env) in
      let scores = List.map (fun (id, ((steps, _) as schedule), constrained,
-         result, local_types, supplied) ->
+         result, local_types, dependencies) ->
        let names = List.map fst result_vars @
          List.concat_map (fun (step, _) -> ScoringView.step_variables step) steps @
          ScoringView.free_vars_term result |> List.sort_uniq Stdlib.compare in
        let scope = ScoringView.scope names in
-       let context = match ScoringView.supplied_context_expression
+       let context = match ScoringView.dependency_context_expression
          ~global:ScoringView.global_name scope ind_name result_vars local_types
-         output_vars ds constrained supplied with
+         output_vars ds constrained dependencies with
          | Ok context -> context
          | Error message -> failwith message in
        let expression = ScoringView.score_one_schedule_expression scorer
@@ -2172,7 +2184,7 @@ and constructor_valid_schedules (ind_name : ty_ctr) (ctr : rocq_ctr) (result_var
      (match scores with
       | [] -> ()
       | (_, value) :: _ ->
-        Feedback.msg_notice (str ("[policy-record] constructor=" ^
+        Feedback.msg_notice (str ("[" ^ record_label ^ "] constructor=" ^
           constructor_to_string ctr_name ^ " score=" ^
           Pp.string_of_ppcmds (Printer.pr_econstr_env env !sigma value)));
      if List.length eligible = List.length schedule_densities &&
@@ -2193,8 +2205,9 @@ and constructor_valid_schedules (ind_name : ty_ctr) (ctr : rocq_ctr) (result_var
        | Some (id, _) ->
          let count order = List.length (List.filter ((=) order) !orders) in
          Feedback.msg_notice (str (Printf.sprintf
-           "[policy-record-compare] candidates=%d best=%d lt=%d eq=%d gt=%d"
-           (List.length scores) id (count (-1)) (count 0) (count 1)))
+           "[%s-compare] candidates=%d best=%d lt=%d eq=%d gt=%d"
+           record_label (List.length scores) id
+           (count (-1)) (count 0) (count 1)))
      end));
   if score_pruning_mode <> `Off && schedule_trace_enabled () then
     Feedback.msg_notice (str (Printf.sprintf

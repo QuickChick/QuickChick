@@ -175,18 +175,25 @@ Definition score_one_schedule {S} (p : scorer S) (ctx : score_context S)
     (map (fun '(step, grade) => score_step p ctx step grade)
       (schedule_steps schedule)).
 
-(* For a candidate whose every source dependency resolves to an existing
-   instance. General candidates need a typed policy score memo. *)
-Definition score_with_supplied_dependencies {S} (p : scorer S)
+Definition score_with_dependency_states {S} (p : scorer S)
     (spec : spec_view) (local_types : list local_view)
-    (inputs : list nat) (supplied : list spec_view)
+    (inputs : list nat) (deps : list (spec_view * dependency_state S))
     (schedule : schedule_view) : S :=
   score_one_schedule p {|
     current_spec := spec;
     locals := local_types;
     original_inputs := inputs;
-    dependencies := map (fun dep => (dep, SuppliedInstance)) supplied
+    dependencies := deps
   |} schedule.
+
+(* Compatibility helper for candidates whose source obligations all resolve
+   to existing instances. General candidates need a typed policy score memo. *)
+Definition score_with_supplied_dependencies {S} (p : scorer S)
+    (spec : spec_view) (local_types : list local_view)
+    (inputs : list nat) (supplied : list spec_view)
+    (schedule : schedule_view) : S :=
+  score_with_dependency_states p spec local_types inputs
+    (map (fun dep => (dep, SuppliedInstance)) supplied) schedule.
 
 Definition score_one_inductive {S} (p : scorer S) (ctx : score_context S)
     (inductive : inductive_view) : S :=

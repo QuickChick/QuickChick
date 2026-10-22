@@ -21,6 +21,7 @@ def run_probe(destination: Path, **probes: str) -> subprocess.CompletedProcess:
         "QC_POLICY_SCHEDULE_PROBE",
         "QC_POLICY_COMPARE_PROBE",
         "QC_POLICY_RECORD_PROBE",
+        "QC_POLICY_RECORD_PENDING_PROBE",
         "QC_SCHEDULE_TRACE",
     ):
         environment.pop(name, None)
@@ -101,6 +102,8 @@ with tempfile.TemporaryDirectory() as temporary:
     ), record
     assert "[policy-record] constructor=QuoteMissing " not in record, record
     assert "policy_quote_missing(_, OUT) : [QuoteMissing: Total]" in record, record
+    assert "[policy-record] constructor=QuoteSucc " not in record, record
+    assert "policy_quote_probe(OUT) : [QuoteSucc:" in record, record
 
     record_compared = compile_probe(
         output,
@@ -110,6 +113,27 @@ with tempfile.TemporaryDirectory() as temporary:
         "[policy-record-compare] candidates=4 best=3 lt=2 eq=1 gt=0"
         in record_compared
     ), record_compared
+
+    pending = compile_probe(
+        output,
+        QC_POLICY_RECORD_PENDING_PROBE="policy_quote_state_scorer",
+    )
+    assert (
+        "[policy-record-pending] constructor=QuoteMissing "
+        "score={| quote_depth := 1; quote_weight := 10 |}"
+        in pending
+    ), pending
+    assert (
+        "[policy-record-pending] constructor=QuoteFromPremise "
+        "score={| quote_depth := 1; quote_weight := 0 |}"
+        in pending
+    ), pending
+    assert (
+        "[policy-record-pending] constructor=QuoteList "
+        "score={| quote_depth := 0; quote_weight := 1 |}"
+        in pending
+    ), pending
+    assert "[policy-record-pending] constructor=QuoteSucc " not in pending, pending
 
     rejected = run_probe(
         output,
@@ -127,4 +151,4 @@ with tempfile.TemporaryDirectory() as temporary:
         in default
     ), default
 
-print("Rocq policy bridge: scoped views, pins, match links, and record comparison")
+print("Rocq policy bridge: scoped views, dependency states, and record comparison")

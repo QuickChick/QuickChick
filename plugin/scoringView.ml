@@ -392,10 +392,10 @@ let spec_expression ~global scope application outputs mode constrained =
        derive_mode_expression mode;
        if constrained then GenericLib.g_true else GenericLib.g_false])
 
-(* The caller must resolve every listed dependency through typeclass search.
-   A pending derived dependency cannot be represented by this path. *)
-let supplied_context_expression ~global scope relation result_vars local_types
-    outputs mode constrained supplied =
+type dependency_status = Supplied | Pending
+
+let dependency_context_expression ~global scope relation result_vars local_types
+    outputs mode constrained dependencies =
   let application = DTyCtr (relation,
     List.map (fun (name, _) -> DTyVar name) result_vars) in
   let rec quote_locals acc = function
@@ -410,29 +410,33 @@ let supplied_context_expression ~global scope relation result_vars local_types
   let root_output_indices = List.filter_map (fun (index, (name, _)) ->
     if List.mem name outputs then Some index else None)
     (List.mapi (fun index entry -> index, entry) result_vars) in
-  let rec quote_supplied acc = function
+  let rec quote_dependencies acc = function
     | [] -> Ok (List.rev acc)
-    | (application, outputs, mode, constrained) :: rest ->
+    | ((application, outputs, mode, constrained), status) :: rest ->
       (match spec_expression ~global scope application outputs mode constrained with
-       | Ok spec -> quote_supplied (spec :: acc) rest
+       | Ok spec ->
+         let state = match status with
+           | Supplied -> constructor "SuppliedInstance" []
+           | Pending -> constructor "Pending" [] in
+         quote_dependencies (GenericLib.gPair (spec, state) :: acc) rest
        | Error _ as error -> error) in
   if List.length root_output_indices <> List.length outputs then
     Error "SchedulingPolicy: an output is missing from the root telescope"
   else match spec_expression ~global scope application root_output_indices
       mode constrained,
     collect_ids scope inputs, quote_locals [] local_types,
-    quote_supplied [] supplied with
-  | Ok spec, Ok inputs, Ok locals, Ok supplied ->
+    quote_dependencies [] dependencies with
+  | Ok spec, Ok inputs, Ok locals, Ok dependencies ->
     Ok (spec, GenericLib.gList locals, int_list inputs,
-      GenericLib.gList supplied)
+      GenericLib.gList dependencies)
   | Error _ as error, _, _, _ | _, (Error _ as error), _, _
   | _, _, (Error _ as error), _ | _, _, _, (Error _ as error) -> error
 
-let score_one_schedule_expression scorer (spec, locals, inputs, supplied)
+let score_one_schedule_expression scorer (spec, locals, inputs, dependencies)
     schedule =
   GenericLib.gApp
-    (GenericLib.gInject "QuickChick.SchedulingPolicy.score_with_supplied_dependencies")
-    [GenericLib.gInject scorer; spec; locals; inputs; supplied; schedule]
+    (GenericLib.gInject "QuickChick.SchedulingPolicy.score_with_dependency_states")
+    [GenericLib.gInject scorer; spec; locals; inputs; dependencies; schedule]
 
 (* The result remains a typed Rocq term: the plugin need not know a user's
    score representation. The returned sigma carries elaboration constraints. *)

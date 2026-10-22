@@ -128,6 +128,40 @@ Definition policy_quote_record_scorer : scorer quote_cost := {|
   compare_scores := policy_quote_compare_cost
 |}.
 
+Definition policy_quote_dependency_counts
+    (entries : list (spec_view * dependency_state quote_cost)) : quote_cost :=
+  List.fold_left (fun total entry =>
+    match snd entry with
+    | Pending => {| quote_depth := S (quote_depth total);
+                    quote_weight := quote_weight total |}
+    | SuppliedInstance => {| quote_depth := quote_depth total;
+                            quote_weight := S (quote_weight total) |}
+    | InProgress => {| quote_depth := 100 + quote_depth total;
+                      quote_weight := quote_weight total |}
+    | Completed _ => {| quote_depth := quote_depth total;
+                       quote_weight := quote_weight total |}
+    end) entries {| quote_depth := 0; quote_weight := 0 |}.
+
+Definition policy_quote_pending_parameter
+    (entry : spec_view * dependency_state quote_cost) : bool :=
+  match snd entry, spec_application (fst entry) with
+  | Pending, TLocal _ => true
+  | _, _ => false
+  end.
+
+Definition policy_quote_state_scorer : scorer quote_cost := {|
+  score_step := fun _ _ _ => {| quote_depth := 0; quote_weight := 0 |};
+  score_schedule := fun context _ _ =>
+    let counts := policy_quote_dependency_counts (dependencies context) in
+    {| quote_depth := quote_depth counts;
+       quote_weight := quote_weight counts +
+         (if List.existsb policy_quote_pending_parameter
+           (dependencies context) then 10 else 0) |};
+  score_leaf := fun _ _ _ => {| quote_depth := 0; quote_weight := 0 |};
+  score_inductive := fun _ _ _ => {| quote_depth := 0; quote_weight := 0 |};
+  compare_scores := policy_quote_compare_cost
+|}.
+
 Definition policy_quote_first_source (schedule : schedule_view) : term_view :=
   match schedule_steps schedule with
   | (SuchThat _ source _, _) :: _ => source_application source

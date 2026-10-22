@@ -77,6 +77,13 @@ Example user_defined_score_is_typed :
     {| failures := 1; work := 1 |}.
 Proof. vm_compute. reflexivity. Qed.
 
+Example supplied_helper_matches_explicit_state :
+  score_with_supplied_dependencies demo_scorer demo_spec [] [0]
+    [demo_spec] checked =
+  score_with_dependency_states demo_scorer demo_spec [] [0]
+    [(demo_spec, SuppliedInstance)] checked.
+Proof. reflexivity. Qed.
+
 Example whole_schedule_can_inspect_steps :
   score_one_schedule demo_scorer demo_context matched =
     {| failures := 3; work := 2 |}.
