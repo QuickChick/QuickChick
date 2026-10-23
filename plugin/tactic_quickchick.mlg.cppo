@@ -1667,6 +1667,11 @@ let with_temporary_density_state f =
     density_uncertainty_events := saved_uncertainty)
     (fun () -> with_score_pruning_suspended f)
 
+let schedule_group_mode () = match Sys.getenv_opt "QC_SCHEDULE_GROUPS" with
+  | Some ("0" | "false" | "no") -> `Off
+  | Some "verify" -> `Verify
+  | _ -> `On
+
 let rec schedule_density neutral_prelude_steps schedule : schedule_with_density =
   let fixed step ds = match fixed_step_density ds step with
     | Some grade -> grade
@@ -1756,6 +1761,19 @@ let rec schedule_density neutral_prelude_steps schedule : schedule_with_density 
 (* Create a map from types * outputs => inductive_schedules which can be reused and referenced. *)
 
 (** There will always exist at least one partial schedule for producers, b/c you can just arb all variables and check all hyps.*)
+
+(* Independent hypothesis groups are scored alone in a temporary density
+   state; ScheduleRanking keeps only combinations that can reach the best
+   complete score. *)
+and schedule_group_selector ds groups =
+  let prefer_dense = ds = D_Gen || ds = D_Thm in
+  let features = List.map (List.map (fun schedule ->
+    try with_temporary_density_state (fun () ->
+      Some (ScheduleRanking.group_features_of
+        (scored_schedule_features ds 0 (schedule_density [] schedule))))
+    with Noninductive_dependency _ | Unavailable_mode _ -> None)) groups in
+  ScheduleRanking.select_group_combinations ~prefer_dense
+    (schedule_ranking_policy ()) features
 
 and constructor_valid_schedules (ind_name : ty_ctr) (ctr : rocq_ctr) (result_vars : (var * rocq_constr) list) (output_vars : var list) (ds : derive_sort) (opt : bool) =
   let (ctr_name, typ) = ctr in
@@ -1970,21 +1988,10 @@ and constructor_valid_schedules (ind_name : ty_ctr) (ctr : rocq_ctr) (result_var
             ~incumbent:best ~bound in
           if cut then incr pruned_prefixes;
           cut)) else None in
-  let group_mode = match Sys.getenv_opt "QC_SCHEDULE_GROUPS" with
-    | Some ("0" | "false" | "no") -> `Off
-    | Some "verify" -> `Verify
-    | _ -> `On in
-  (* Independent hypothesis groups are scored alone; ScheduleRanking keeps
-     only combinations that can reach the best complete score. Prefix-pruning
-     modes still search jointly. *)
+  let group_mode = schedule_group_mode () in
+  (* Prefix-pruning modes still search jointly. *)
   let select_groups = if group_mode = `Off || score_pruning_mode <> `Off then None
-    else Some (fun groups ->
-      let features = List.map (List.map (fun schedule ->
-        try with_temporary_density_state (fun () ->
-          Some (ScheduleRanking.group_features_of
-            (scored_schedule_features ds 0 (schedule_density [] schedule))))
-        with Noninductive_dependency _ | Unavailable_mode _ -> None)) groups in
-      ScheduleRanking.select_group_combinations ~prefer_dense policy features) in
+    else Some (schedule_group_selector ds) in
   let prepared_inputs = ref [] in
   let schedule_matches = NewUnifyQC.type_to_schedules
     ~on_prepared:(fun inputs -> prepared_inputs := inputs) ?select_groups
@@ -2095,18 +2102,36 @@ and constructor_valid_schedules (ind_name : ty_ctr) (ctr : rocq_ctr) (result_var
         Unix.putenv "QC_SCHEDULE_POR" (Stdlib.Option.value ~default:"" previous))
         (fun () -> NewUnifyQC.type_to_schedules typ (Some ind_name) (Some ctr_name)
           result_vars output_vars ds opt) in
-    (* Conversion draws fresh names from a global counter; compare schedules
-       up to a consistent renaming of generated names, by first occurrence. *)
+    (* Conversion and unification draw fresh names from global counters;
+       compare schedules up to a consistent renaming of generated identifiers
+       (v..N_ and unkn_N_), by first occurrence. *)
     let canonical (schedule, ms, eqs) =
       let text = NewUnifyQC.match_schedule_to_string schedule ms eqs in
       let names = Hashtbl.create 8 in
-      Str.global_substitute (Str.regexp "v[A-Za-z0-9_]*[0-9]+_\\|unkn_[0-9]+_") (fun whole ->
-        let name = Str.matched_string whole in
-        match Hashtbl.find_opt names name with
-        | Some n -> n
-        | None ->
-          let n = Printf.sprintf "#%d" (Hashtbl.length names) in
-          Hashtbl.add names name n; n) text in
+      let ident c = c = '_' || ('a' <= c && c <= 'z') || ('A' <= c && c <= 'Z')
+                    || ('0' <= c && c <= '9') in
+      let generated w =
+        let n = String.length w in
+        let digit i = i >= 0 && '0' <= w.[i] && w.[i] <= '9' in
+        n >= 3 && w.[n - 1] = '_' && digit (n - 2) &&
+        (w.[0] = 'v' || String.starts_with ~prefix:"unkn_" w) in
+      let out = Buffer.create (String.length text) in
+      let rec scan i =
+        if i < String.length text then
+          if ident text.[i] then begin
+            let j = ref i in
+            while !j < String.length text && ident text.[!j] do incr j done;
+            let w = String.sub text i (!j - i) in
+            Buffer.add_string out (if not (generated w) then w else
+              match Hashtbl.find_opt names w with
+              | Some n -> n
+              | None ->
+                let n = Printf.sprintf "#%d" (Hashtbl.length names) in
+                Hashtbl.add names w n; n);
+            scan !j
+          end else (Buffer.add_char out text.[i]; scan (i + 1)) in
+      scan 0;
+      Buffer.contents out in
     let unreduced_canonical = List.map canonical unreduced in
     List.iter (fun triple ->
       if not (List.mem (canonical triple) unreduced_canonical) then
@@ -2629,40 +2654,56 @@ and best_inductive_schedule_from_instance (ind_instance : rocq_type) (output_var
     inductive_best_valid_schedule (ty_ctr_to_rocq_relation ind_name) [] ds opt
   | _ -> failwith "best_inductive_schedule_from_instance: not a DTyCtr"
 
+let grouped_selector ds = match schedule_group_mode () with
+  | `Off -> None
+  | `On | `Verify -> Some (schedule_group_selector ds)
+
+(* Ranked theorem schedules. With grouped search, indices and the try-all
+   tactic range over the grouped combinations, not every joint ordering. *)
 let all_theorem_schedules (thm : rocq_type) =
-  let schedule_matches = NewUnifyQC.type_to_schedules thm None None [] [] D_Thm true in
-  let schedules = List.mapi (fun i ((steps, sort), ms, eqs) -> i,List.map (fun (v,p) -> S_Match (v,p)) ms, ((List.map check_eq eqs @ steps), sort)) schedule_matches in
-  let initial_inductive_memo = !density_inductive_memo in
-  let initial_density_memo = !density_memo in
-  let scored = Fun.protect
-    ~finally:(fun () ->
-      density_inductive_memo := initial_inductive_memo;
-      density_memo := initial_density_memo)
-    (fun () -> List.filter_map (fun (i, ms_steps, schd) ->
-      density_inductive_memo := initial_inductive_memo;
-      density_memo := initial_density_memo;
-      let result = schedule_density ms_steps schd in
-      let inductive_memo = !density_inductive_memo in
-      let density_memo_after = !density_memo in
-      if are_schedule_steps_valid i result then
-        Some (i, result, inductive_memo, density_memo_after)
-      else None) schedules) in
-  let ranked = sort_schedules_by_density_and_var_uses
-    (List.map (fun (i, result, _, _) -> i, result) scored) D_Thm in
-  List.map (fun ((schd_steps_density, schd_sort), density, num_var_uses, id) ->
-    let (_, _, inductive_memo, density_memo_after) =
-      List.find (fun (i, _, _, _) -> i = id) scored in
-    (List.map fst schd_steps_density, schd_sort), density, num_var_uses,
-    inductive_memo, density_memo_after) ranked
+  let rank schedule_matches =
+    let schedules = List.mapi (fun i ((steps, sort), ms, eqs) -> i,List.map (fun (v,p) -> S_Match (v,p)) ms, ((List.map check_eq eqs @ steps), sort)) schedule_matches in
+    let initial_inductive_memo = !density_inductive_memo in
+    let initial_density_memo = !density_memo in
+    let scored = Fun.protect
+      ~finally:(fun () ->
+        density_inductive_memo := initial_inductive_memo;
+        density_memo := initial_density_memo)
+      (fun () -> List.filter_map (fun (i, ms_steps, schd) ->
+        density_inductive_memo := initial_inductive_memo;
+        density_memo := initial_density_memo;
+        let result = schedule_density ms_steps schd in
+        let inductive_memo = !density_inductive_memo in
+        let density_memo_after = !density_memo in
+        if are_schedule_steps_valid i result then
+          Some (i, result, inductive_memo, density_memo_after)
+        else None) schedules) in
+    let ranked = sort_schedules_by_density_and_var_uses
+      (List.map (fun (i, result, _, _) -> i, result) scored) D_Thm in
+    List.map (fun ((schd_steps_density, schd_sort) as scored_schedule, density, num_var_uses, id) ->
+      let (_, _, inductive_memo, density_memo_after) =
+        List.find (fun (i, _, _, _) -> i = id) scored in
+      scored_schedule,
+      ((List.map fst schd_steps_density, schd_sort), density, num_var_uses,
+       inductive_memo, density_memo_after)) ranked in
+  let matches select_groups =
+    NewUnifyQC.type_to_schedules ?select_groups thm None None [] [] D_Thm true in
+  let ranked = rank (matches (grouped_selector D_Thm)) in
+  if schedule_group_mode () = `Verify then begin
+    let best entries = match entries with
+      | (scored, _) :: _ -> Some { (scored_schedule_features D_Thm 0 scored)
+                                   with ScheduleRanking.candidate_id = 0 }
+      | [] -> None in
+    let joint = rank (matches None) in
+    if best joint <> best ranked then
+      failwith "grouped theorem schedule search changed the best score"
+  end;
+  List.map snd ranked
 
 let best_theorem_schedule (thm : rocq_type) : schedule =
-  let schedule_matches = NewUnifyQC.type_to_schedules thm None None [] [] D_Thm true in
-  let schedules = List.mapi (fun i ((steps, sort), ms, eqs) -> i,List.map (fun (v,p) -> S_Match (v,p)) ms, ((List.map check_eq eqs @ steps), sort)) schedule_matches in
-  let schedule_densities = List.map (fun (i,ms_steps,schd) -> i, schedule_density ms_steps schd) schedules in
-  let valid_schedules = List.filter (fun (i,schd) -> are_schedule_steps_valid i schd) schedule_densities in
-  match select_best_schedule valid_schedules D_Thm with
-  | None -> failwith "best_theorem_schedule: No valid schedules found"
-  | Some (i, schedule, _) -> schedule
+  match all_theorem_schedules thm with
+  | (schedule, _, _, _, _) :: _ -> schedule
+  | [] -> failwith "best_theorem_schedule: No valid schedules found"
 
 let collect_inductive_dependents (instance : rocq_constr * int list * derive_sort * bool) : (rocq_constr * int list * derive_sort * bool) list =
   let (ind_instance, output_idxs, ds, opt) = instance in
@@ -3199,7 +3240,8 @@ let valid_schedules =
     match NewGenericLib.parse_dependent_type (EConstr.to_constr evd c) with
     | Some dt -> 
       begin
-        let schedules = NewUnifyQC.type_to_schedules dt None None [] [] D_Thm false in
+        let schedules = NewUnifyQC.type_to_schedules ?select_groups:(grouped_selector D_Thm)
+          dt None None [] [] D_Thm false in
         let schedules' = List.map (fun ((steps, sort), ms, eqs) -> (List.map (fun (v,p) -> S_Match (v,p)) ms, (List.map check_eq eqs @ steps, sort))) schedules in
         let schedules_w_densities = List.mapi (fun i (ms_steps, schd) -> i, schedule_density ms_steps schd) schedules' in
         let sorted = sort_schedules_by_density_and_var_uses schedules_w_densities D_Thm in
@@ -3260,7 +3302,8 @@ let theorem_dependencies =
         begin
           density_memo := RelationInstMap.empty;
           msg_debug (str (NewGenericLib.rocq_constr_to_string dt) ++ fnl ());
-          let scheds = (NewUnifyQC.type_to_schedules dt None None [] [] D_Thm false) in
+          let scheds = NewUnifyQC.type_to_schedules ?select_groups:(grouped_selector D_Thm)
+            dt None None [] [] D_Thm false in
 
           List.iteri (fun i (sch,ms,eqs) -> Feedback.msg_notice (str (string_of_int i) 
                                                           ++ str ":\n" 
@@ -3563,7 +3606,10 @@ let quickchick_it size idx =
             density_inductive_memo := inductive_memo;
             density_memo := density_memo_after;
             schd
-          | None -> failwith ("quickchick: Only " ^ string_of_int (List.length theorem_schedules) ^ " theorem schedules available, but index " ^ string_of_int idx ^ " was requested")) in
+          | None -> CErrors.user_err (str (Printf.sprintf
+              "quickchick: schedule index %d was requested, but only %d theorem schedule%s available."
+              idx (List.length theorem_schedules)
+              (if List.length theorem_schedules = 1 then " is" else "s are")))) in
 
         (* let theorem_schedule = best_theorem_schedule dt in *)
         Feedback.msg_notice (str "Theorem Schedule:\n" ++ str (schedule_to_string selected_schedule) ++ fnl ());
@@ -3827,7 +3873,7 @@ VERNAC COMMAND EXTEND DeriveSchedules CLASSIFIED AS SIDEFF
 
       let output_vars = List.map fst (List.filteri (fun i _ -> List.mem i ois) result_vars) in
 
-      let scheds = NewUnifyQC.type_to_schedules constructor (Some ind_name) (Some ctr) result_vars output_vars ds true in
+      let scheds = NewUnifyQC.type_to_schedules ?select_groups:(grouped_selector ds) constructor (Some ind_name) (Some ctr) result_vars output_vars ds true in
       
       let rec take n l =
         if n <= 0 then [] else
@@ -3950,8 +3996,8 @@ VERNAC COMMAND EXTEND DeriveValidSchedules CLASSIFIED AS SIDEFF
           |> List.map (fun (i, scored, _, _) -> i, scored)
           |> take 300
         | _ ->
-          let scheds = NewUnifyQC.type_to_schedules constructor
-            (Some ind_name) (Some ctr) result_vars output_vars ds true in
+          let scheds = NewUnifyQC.type_to_schedules ?select_groups:(grouped_selector ds)
+            constructor (Some ind_name) (Some ctr) result_vars output_vars ds true in
           let schedules = take 300 scheds in
           let schedules' = List.map (fun ((steps, sort), ms, eqs) ->
             (List.map (fun (v,p) -> S_Match (v,p)) ms,

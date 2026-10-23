@@ -68,8 +68,59 @@ search. `QC_SCHEDULE_GROUPS=0` restores the joint search;
 `QC_SCHEDULE_GROUPS=verify` runs both and fails if the best score differs or a
 grouped candidate is not one the joint search produces without order
 reduction, up to fresh-name renaming. `QC_SCHEDULE_GROUPS_LOG=<file>` appends
-one line per verified constructor search. Theorem testing (`quickchick`) and
-the prefix score-pruning modes still use the joint search.
+one line per verified constructor search. The prefix score-pruning modes
+still use the joint search.
+
+Theorem testing uses the same grouped search. In `quickchick n i`, `n` is the
+test size and `i` a schedule index; `quickchick_idx i` keeps the default size.
+Indices, `try_all_quickchick_schedules`, and the `schedules`,
+`valid_schedules`, `Derive Schedules` and `Derive Valid Schedules` listings range over the
+grouped combinations, not every joint ordering, so a theorem can offer fewer
+schedules than before. An out-of-range index is a user error.
+`QC_SCHEDULE_GROUPS=0` restores the full list. Under `verify`, theorem testing
+also checks that the best score matches the joint search.
+
+#### Policy contract
+
+`GroupedScore` implements the group search for any score type. A policy gives
+a unit, a `combine` function and a lexicographic list of fields, each declared
+`Additive` or `Extremal`. Two laws make the search exact:
+
+1. Separability. A schedule built from footprint-disjoint groups and the
+   shared steps (constructor matches and equality checks) scores as the
+   `combine` of their separate scores, in any order. `combine` is
+   associative and commutative, with the unit as identity.
+2. Field order. Each field combines on its own. Combining both sides with the
+   same score preserves an `Additive` field's strict order and its ties, as a
+   sum does. It preserves an `Extremal` field's non-strict order only, as max
+   or min do.
+
+From these, a candidate dominates another when, field by field, an additive
+field is strictly better, or equal with the rest dominating; or an extremal
+field is no worse and the rest dominate. Each group keeps its undominated
+candidates. States with equal extremal fields receive the same future
+combinations, under which additive fields keep their order, so the dynamic
+program keeps one state per class of extremal values.
+
+Declaring a max field `Additive` is unsound: it treats a lead that combination
+can absorb as decisive. `GroupedScore.check_laws` tests the field and
+combination laws on sample scores. It cannot test separability, which depends
+on the scorer.
+
+The built-in rankings are instances: density is extremal; the histogram and
+variable uses are additive. BudgetAware is also an instance
+(`BudgetAwareScore.group_policy`). Selectivity, fabrication and both dependency
+counts are additive; density and locality are extremal. Its scorer is
+separable because each step naming a variable lies in that variable's group,
+so selectivity's per-variable sets do not overlap, and the shared steps
+produce no variable and pin none. BudgetAware is not yet used for selection.
+The test `plugin/test_grouped_score.ml` checks the generic search against
+brute force on random policies, BudgetAware's laws and exactness, and
+separability on fixture schedules.
+
+Custom Rocq policies have no grouped instance yet. A policy that inspects the
+whole schedule, or whose score depends on the order of independent steps,
+must declare its laws or keep the joint search.
 
 Policy-driven branch-and-bound is still being developed. A policy bound must
 be no worse than every completed descendant of the actual typed search node.
