@@ -3181,6 +3181,34 @@ let is_rec_call_advanced (binding : var list)
     ty_ctr_eq ctor (fst rec_call) && List.sort compare output_positions = List.sort compare (snd rec_call)
   | _ -> false
 
+(* A self-recursive step keeps only its input arguments. Its full request is
+   recovered by placing the step's outputs, in order, at the recursive
+   output positions: handle_constrained_outputs_advanced leaves exactly one
+   output variable at each such position. Checkers keep every argument. *)
+let recursive_request ((relation, output_positions) : ty_ctr * int list) step =
+  let rebuild outputs inputs =
+    let arity = List.length outputs + List.length inputs in
+    let rec go i outputs inputs =
+      if i = arity then Some [] else
+      if List.mem i output_positions then
+        (match outputs with
+         | o :: rest -> Option.map (fun tail -> DTyVar o :: tail) (go (i + 1) rest inputs)
+         | [] -> None)
+      else match inputs with
+        | a :: rest -> Option.map (fun tail -> a :: tail) (go (i + 1) outputs rest)
+        | [] -> None in
+    Option.map (fun args -> DTyCtr (relation, args)) (go 0 outputs inputs) in
+  match step with
+  | S_ST (outputs, SrcRec (_, inputs), _) -> rebuild (List.map fst outputs) inputs
+  | S_Check (SrcRec (_, args), _) | S_UC (_, SrcRec (_, args), _) ->
+    Some (DTyCtr (relation, args))
+  | _ -> None
+
+let check_recursive_requests =
+  match Sys.getenv_opt "QC_CHECK_RECURSIVE_REQUESTS" with
+  | Some ("1" | "true" | "yes") -> true
+  | _ -> false
+
 (* Helper: Convert pre-schedule to schedule for advanced pruning *)
 let pre_to_schedule_advanced (variables : (var * rocq_type) list)
                              (type_vars : var list)
@@ -3224,8 +3252,12 @@ let pre_to_schedule_advanced (variables : (var * rocq_type) list)
             SrcRec (var_of_string "rec", input_args)
           | _ -> SrcNonrec hyp')
         else SrcNonrec hyp' in
+        let step = S_ST (typed_outputs, src, prod_sort) in
+        if check_recursive_requests && is_rec &&
+           recursive_request rec_call step <> Some hyp' then
+          failwith ("recursive request reconstruction differs for " ^ rocq_constr_to_string hyp');
         (* Producer must come before matches - generate variable first, then match on it *)
-        [S_ST (typed_outputs, src, prod_sort)] @ matches
+        [step] @ matches
     ) pre_steps
 
 (* Helper: Memoization map type for environment states *)

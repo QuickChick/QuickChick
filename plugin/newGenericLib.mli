@@ -120,6 +120,10 @@ type derive_sort = D_Gen | D_Enum | D_Check | D_Thm
 
 val debug_mode : bool ref
 
+(** The full applied relation of a self-recursive step, whose source keeps
+    only input arguments, given the derivation's relation and output positions. *)
+val recursive_request : constructor * int list -> schedule_step -> rocq_constr option
+
 (** With [select_groups], a constructor whose hypotheses split into two or
     more footprint-disjoint groups is searched group by group. The callback
     receives each group's completed local schedules and returns index

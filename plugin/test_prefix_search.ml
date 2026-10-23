@@ -981,3 +981,20 @@ let () =
   Printf.printf "converted prefix pairs=%d alpha-renamed=%d\n"
     !converted_prefix_pairs !alpha_only_prefix_pairs;
   assert (!alpha_only_prefix_pairs > 0)
+
+(* Self-recursive steps keep only inputs; the full request interleaves the
+   step's outputs back at the derivation's output positions. *)
+let () =
+  let rel = N.ty_ctr_of_string "R" in
+  let var x = N.DTyVar (v x) in
+  let nat = N.DTyCtr (N.ty_ctr_of_string "nat", []) in
+  let producer = N.S_ST ([v "o1", nat; v "o2", nat],
+    N.SrcRec (v "rec", [var "a"; var "b"]), N.PS_G) in
+  assert (N.recursive_request (rel, [1; 3]) producer =
+          Some (N.DTyCtr (rel, [var "a"; var "o1"; var "b"; var "o2"])));
+  assert (N.recursive_request (rel, [0]) producer = None);
+  let checker = N.S_Check (N.SrcRec (v "rec", [var "a"; var "b"]), true) in
+  assert (N.recursive_request (rel, []) checker =
+          Some (N.DTyCtr (rel, [var "a"; var "b"])));
+  let other = N.S_ST ([v "o1", nat], N.SrcNonrec (N.DTyCtr (rel, [var "o1"])), N.PS_G) in
+  assert (N.recursive_request (rel, [0]) other = None)
