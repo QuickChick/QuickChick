@@ -296,3 +296,20 @@ let score_schedule context key steps =
 
 let score_candidate context key candidate =
   score_schedule context key (candidate_steps candidate)
+
+(* Grouped search: selectivity, fabrication and both dependency counts add;
+   density and locality take the worse value. Scoring footprint-disjoint
+   groups separately is separable because every step naming a variable lies
+   in that variable's group, so selectivity's per-variable sets do not
+   overlap; shared match and equality steps produce or pin no group variable. *)
+let group_policy : score GroupedScore.policy =
+  let open GroupedScore in
+  let field kind project = kind, (fun a b -> Stdlib.compare (project a) (project b)) in
+  { unit = empty; combine;
+    fields = [
+      field Additive (fun s -> s.selectivity);
+      field Extremal (fun s -> density_rank s.density);
+      field Additive (fun s -> s.fabrication);
+      field Extremal (fun s -> locality_rank s.locality);
+      field Additive (fun s -> s.input_check_deps);
+      field Additive (fun s -> s.var_deps) ] }

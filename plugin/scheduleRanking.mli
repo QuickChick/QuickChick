@@ -53,6 +53,9 @@ type group_features = {
 
 val group_features_of : features -> group_features
 
+(** The ranking as a grouped policy over separately scored groups. *)
+val group_policy : prefer_dense:bool -> policy -> group_features GroupedScore.policy
+
 (** [dominates a b]: combining with [a] is never worse than with [b], under
     every context of other groups and shared steps. *)
 val dominates : prefer_dense:bool -> policy -> group_features ->
