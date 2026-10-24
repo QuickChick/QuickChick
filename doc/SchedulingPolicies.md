@@ -38,7 +38,11 @@ such constructors with different head constructors are alternatives. A filter
 (a check, a refutable match on a produced value, or a producer fed generated
 inputs) has acceptance admitted/reaching as a class; a variable nested under
 a constructor in a checked argument is admitted only by the relation's
-constructors with that head there. The score counts filters with acceptance
+constructors with that head there. A check is also bounded by its scarcest
+generated variable's conditional count: how many values that variable can
+take when everything else in the relation is fixed, from the relation's
+definition (a variable also occurring elsewhere in the conclusion is fixed;
+one pinned by a hypothesis takes that hypothesis's count). The score counts filters with acceptance
 `1/exp`, then `1/poly`, then unknown, then constant; lower is better, and
 candidate identifiers break ties. A candidate whose free generation of a type
 lacks an instance is excluded. Score pruning does not apply yet, so the

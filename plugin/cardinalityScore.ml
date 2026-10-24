@@ -80,7 +80,19 @@ type context = {
   (* Each constructor of a completed mode: its conclusion arguments and its
      solution count. *)
   mode_shapes : ty_ctr -> int list -> derive_sort -> (rocq_constr list * cls) list option;
+  (* How many values the variable at argument [i], under constructor path
+     [path], can take when everything else in the relation is fixed. *)
+  conditional : ty_ctr -> int -> (constructor * int) list -> cls option;
 }
+
+(* Paths to the occurrences of [v] in a term, through constructor arguments. *)
+let rec occurrences v = function
+  | DTyVar w when w = v -> [[]]
+  | DCtr (c, args) ->
+    List.concat (List.mapi (fun k a ->
+      List.map (fun path -> (c, k) :: path) (occurrences v a)) args)
+  | _ -> []
+
 
 let derive_sort_of = function PS_G -> D_Gen | PS_E -> D_Enum
 
@@ -126,6 +138,13 @@ let rec pattern_variables = function
   | _ -> []
 
 type acceptance = Const | Inverse_poly | Inverse_exp | Unknown
+
+(* The worse of two known acceptances; Unknown only when both are. *)
+let worst a b = match a, b with
+  | Inverse_exp, _ | _, Inverse_exp -> Inverse_exp
+  | Inverse_poly, _ | _, Inverse_poly -> Inverse_poly
+  | Const, _ | _, Const -> Const
+  | Unknown, Unknown -> Unknown
 
 let acceptance admitted reaching = match admitted, reaching with
   | None, _ | _, None -> Unknown
@@ -229,6 +248,21 @@ let score_schedule ctx (steps : schedule_step list) =
            | Some rel -> check_mode rel gen
            | None -> None in
          let acc = acceptance admitted reach in
+         (* Each generated variable must be one of the values the relation
+            allows it given everything else; the scarcest one bounds the
+            check's acceptance. *)
+         let conditional = match rel with
+           | None -> Unknown
+           | Some rel ->
+             List.fold_left (fun acc v ->
+               if not (generated v) then acc else
+               let per_occurrence = List.concat (List.mapi (fun i a ->
+                 List.map (fun path -> i, path) (occurrences v a)) args) in
+               match per_occurrence with
+               | (i, path) :: _ ->
+                 worst acc (acceptance (ctx.conditional rel i path) (Hashtbl.find produced v))
+               | [] -> acc) Unknown (List.sort_uniq Stdlib.compare (List.concat_map term_vars args)) in
+         let acc = if conditional = Unknown then acc else worst acc conditional in
          let acc = if polarity then acc else (match acc with Unknown -> Unknown | _ -> Const) in
          record score acc))
     empty steps

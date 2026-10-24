@@ -1222,6 +1222,101 @@ let cardinality_constructor c =
   | _ -> None
   | exception Not_found -> None
 
+(* How many values the subterm at argument [i] and constructor [path] of a
+   relation can take when everything else in the relation is fixed, from the
+   relation's definition. Per constructor: a conclusion whose structure
+   disagrees with the path cannot match; variables of the target subterm that
+   also occur elsewhere in the conclusion are fixed; a variable that a
+   positive hypothesis pins down from fixed variables takes that hypothesis's
+   conditional count (a recursive call to the same slot recurses on a smaller
+   structure and counts one); any other variable is free and takes its type's
+   class. Constructors are alternatives. *)
+let cardinality_conditional_memo = Hashtbl.create 64
+
+let rec cardinality_conditional rel i path =
+  let open CardinalityScore in
+  let key = (ty_ctr_to_string rel, i,
+             List.map (fun (c, k) -> constructor_to_string c, k) path) in
+  match Hashtbl.find_opt cardinality_conditional_memo key with
+  | Some c -> c
+  | None ->
+    Hashtbl.replace cardinality_conditional_memo key (Some One);
+    let result = try
+      let (_, _, ctrs, _) = ty_ctr_to_rocq_relation rel in
+      let counts = List.filter_map (fun (_, ty) -> cardinality_conditional_constructor ty i path) ctrs in
+      (match counts with
+       | [] -> Some One
+       | c :: cs -> List.fold_left (fun acc c -> match acc, c with
+           | Some a, Some b -> Some (plus a b) | _ -> None) c cs)
+    with Noninductive_dependency _ | Failure _ | Not_found -> None in
+    Hashtbl.replace cardinality_conditional_memo key result;
+    result
+
+(* None when the constructor cannot match the path; Some count otherwise. *)
+and cardinality_conditional_constructor ty i path =
+  let open CardinalityScore in
+  let rec parts = function
+    | DProd ((v, t), body) -> let bs, hs, c = parts body in (v, t) :: bs, hs, c
+    | DArrow (h, body) -> let bs, hs, c = parts body in bs, h :: hs, c
+    | DTyCtr (_, args) -> [], [], Some args
+    | _ -> [], [], None in
+  let binders, hyps, conclusion = parts ty in
+  match conclusion with
+  | None -> Some None
+  | Some args ->
+    let rec follow term path = match path, term with
+      | [], t -> `Term t
+      | (c, k) :: rest, DCtr (c', sub) ->
+        if constructor_to_string c = constructor_to_string c' then
+          (match List.nth_opt sub k with Some t -> follow t rest | None -> `Mismatch)
+        else `Mismatch
+      | _ :: _, DTyVar w -> `Term (DTyVar w)
+      | _ -> `Mismatch in
+    let rec replace term path = match path, term with
+      | [], _ -> DHole
+      | (_, k) :: rest, DCtr (c', sub) ->
+        DCtr (c', List.mapi (fun j t -> if j = k then replace t rest else t) sub)
+      | _, t -> if path = [] then DHole else (match t with DTyVar _ -> DHole | t -> t) in
+    match List.nth_opt args i with
+    | None -> Some None
+    | Some arg ->
+      match follow arg path with
+      | `Mismatch -> None
+      | `Term target ->
+        let others = List.mapi (fun j a -> if j = i then replace a path else a) args in
+        let known = ref (List.concat_map CardinalityScore.term_vars others) in
+        let target_vars = List.sort_uniq Stdlib.compare (CardinalityScore.term_vars target) in
+        let unknown = List.filter (fun v -> not (List.mem v !known)) target_vars in
+        let counts = Hashtbl.create 8 in
+        let positive = List.filter_map (function
+          | DTyCtr (r, a) -> Some (r, a) | _ -> None) hyps in
+        let progress = ref true in
+        while !progress do
+          progress := false;
+          List.iter (fun (r, a) ->
+            let vars = List.sort_uniq Stdlib.compare (List.concat_map CardinalityScore.term_vars a) in
+            match List.filter (fun v -> not (List.mem v !known)) vars with
+            | [u] ->
+              let occurrence = List.concat (List.mapi (fun j t ->
+                List.map (fun p -> j, p) (CardinalityScore.occurrences u t)) a) in
+              (match occurrence with
+               | (j, p) :: _ ->
+                 Hashtbl.replace counts u (cardinality_conditional r j p);
+                 known := u :: !known;
+                 progress := true
+               | [] -> ())
+            | _ -> ()) positive
+        done;
+        let count = List.fold_left (fun acc v ->
+          let c = match Hashtbl.find_opt counts v with
+            | Some c -> c
+            | None -> (match List.assoc_opt v binders with
+                | Some t -> cardinality_type_class t
+                | None -> None) in
+          match acc, c with
+          | Some a, Some b -> Some (times a b) | _ -> None) (Some One) unknown in
+        Some count
+
 (* Solution counts of completed modes, by relation, output positions and sort. *)
 let cardinality_counts : (string * int list * derive_sort, CardinalityScore.cls) Hashtbl.t =
   Hashtbl.create 64
@@ -1254,7 +1349,8 @@ let cardinality_context recursive_count = {
   mode_count = cardinality_mode_count;
   recursive_count;
   constructor = cardinality_constructor;
-  mode_shapes = cardinality_mode_shapes }
+  mode_shapes = cardinality_mode_shapes;
+  conditional = cardinality_conditional }
 
 let rec conclusion_arguments = function
   | DProd (_, body) | DArrow (_, body) -> conclusion_arguments body
@@ -3214,6 +3310,10 @@ and inductive_best_valid_schedule (rel : rocq_relation) (output_idxs : int list)
     let count = CardinalityScore.mode_count_of context ds steps in
     match cardinality_count_key ind_name output_idxs ds with
     | Some key ->
+      if Sys.getenv_opt "QC_CARDINALITY_TRACE" <> None then
+        Feedback.msg_notice (str (Printf.sprintf "[cardinality-count] %s|%s|%s %s\n"
+          (ty_ctr_to_string ind_name) (String.concat "," (List.map string_of_int output_idxs))
+          (schedule_rank_derive_sort_to_string ds) (CardinalityScore.cls_to_string count)));
       Hashtbl.replace cardinality_counts key count;
       if List.length ctrs = List.length steps then
         Hashtbl.replace cardinality_shapes key (List.map2 (fun (_, ty) steps ->
@@ -3537,6 +3637,7 @@ let init_density_inductive_memo = InductiveScheduleKeyMap.add (ty_ctr_of_string 
 let reset_density_inductive_memo () =
   Hashtbl.reset cardinality_counts;
   Hashtbl.reset cardinality_shapes;
+  Hashtbl.reset cardinality_conditional_memo;
   Hashtbl.reset cardinality_type_cache;
   Hashtbl.reset stable_closures;
   clear_inductive_name_cache ();
