@@ -63,7 +63,9 @@ let publish ~mode ~constrained (sigma, bodies) =
       else sized_name ^ (if constrained then "SuchThat" else "") in
     let instance_name = NewGenericLib.fresh_name (prefix ^ Names.Id.to_string root) in
     let reference = declare instance_name body in
-    Classes.existing_instance Hints.SuperGlobal reference None;
+    (* The legacy engine's priority: user instances keep precedence. *)
+    Classes.existing_instance Hints.SuperGlobal reference
+      (Some { Typeclasses.hint_priority = Some 42; hint_pattern = None });
     if not constrained then begin
     (* Preserve the traditional implementation name and size-last interface. *)
     (* The result type is inferred below instead of guessing its parameters. *)
