@@ -1,0 +1,11 @@
+; Theories here are compiled with cardinality ranking selected.
+(env (_ (env-vars (QC_SCHEDULE_RANKING cardinality))))
+
+(alias
+  (name runtest)
+  (deps (alias_rec all)))
+
+(coq.theory
+  (name QuickChick.TestingCardinality)
+  (theories QuickChick)
+  (modules cardinality_selection))

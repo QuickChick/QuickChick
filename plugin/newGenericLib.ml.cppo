@@ -4069,8 +4069,16 @@ let possible_schedules_with_advanced_pruning ?(max_schedules=100000)
     if Hashtbl.mem seen schedule then false
     else (Hashtbl.add seen schedule (); true))
 
+(* QC_SCHEDULE_MAX_CANDIDATES overrides the unpruned search's candidate cap,
+   for diagnosis; 0 removes it. *)
+let unpruned_candidate_cap () =
+  match Stdlib.Option.bind (Sys.getenv_opt "QC_SCHEDULE_MAX_CANDIDATES") int_of_string_opt with
+  | Some 0 -> max_int
+  | Some n when n > 0 -> n
+  | _ -> 1000
+
 let possible_schedules ?canon ?select_groups variables hypotheses fixed rec_call ds =
-  possible_schedules_with_advanced_pruning ~max_schedules:1000
+  possible_schedules_with_advanced_pruning ~max_schedules:(unpruned_candidate_cap ())
     ~maximal_outputs:true ?canon ?select_groups
     ~reduce_orderings:(ScheduleRanking.preserves_independent_swaps
       (ScheduleRanking.current ()))

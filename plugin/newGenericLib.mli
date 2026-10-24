@@ -164,6 +164,8 @@ val empty_prefix_search_stats : unit -> prefix_search_stats
    callers must establish that it holds for every descendant of the prefix.
    The floor variants also pass the number of remaining positive hypotheses
    whose arguments are already bound and therefore must become checks. *)
+val unpruned_candidate_cap : unit -> int
+
 val possible_schedules_with_advanced_pruning : ?max_schedules:int -> ?reduce_orderings:bool ->
   ?maximal_outputs:bool ->
   ?stats:prefix_search_stats ->

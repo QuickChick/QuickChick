@@ -16,6 +16,7 @@ The existing `QC_SCHEDULE_RANKING` environment setting is preserved:
 | `vars_then_density` | Fewer uses of previously bound variables | Density |
 | `vars_only` | Fewer uses of previously bound variables | None |
 | `budget_aware` | Specimen's completed BudgetAware score | See below |
+| `cardinality` (experimental) | Filters by acceptance class | See below |
 
 Generation and theorem testing prefer higher density. Checking and enumeration
 prefer lower density. Densities, in ascending order, are Checking, Backtracking,
@@ -25,6 +26,27 @@ an empty checker or enumerator schedule is Checking. Candidate identifiers break
 remaining ties. They follow search order, so among equal scores the first
 schedule the search finds wins.
 Existing aliases and unknown-value fallback to the default are unchanged.
+
+### Cardinality ranking (experimental)
+
+`QC_SCHEDULE_RANKING=cardinality` reads a schedule as a query plan. Counts
+are growth classes in the size bound (`1 < fin < poly < exp`). Type classes
+come from the inductive definitions. Each completed relation mode records its
+solution count for given inputs, from its constructors' chosen schedules: a
+constructor that starts by matching an input recurses on smaller inputs, and
+such constructors with different head constructors are alternatives. A filter
+(a check, a refutable match on a produced value, or a producer fed generated
+inputs) has acceptance admitted/reaching as a class; a variable nested under
+a constructor in a checked argument is admitted only by the relation's
+constructors with that head there. The score counts filters with acceptance
+`1/exp`, then `1/poly`, then unknown, then constant; lower is better, and
+candidate identifiers break ties. A candidate whose free generation of a type
+lacks an instance is excluded. Score pruning does not apply yet, so the
+unpruned candidate cap does (`QC_SCHEDULE_MAX_CANDIDATES` overrides it for
+diagnosis; 0 removes it). `test/cardinality_ranking` checks the case that
+BudgetAware ties: inventing a list and then checking the relation that
+determines it. The prototype and Cedar measurements are in
+`audit/3.0-scoring/cardinality/`.
 
 ### BudgetAware ranking
 

@@ -1125,6 +1125,148 @@ let budget_dependency_score (request : BudgetAwareScore.dependency_request) =
   | _, Some (DensityDone (_, true, Some score)) -> Some score
   | _ -> None
 
+(* QC_SCHEDULE_RANKING=cardinality ranks constructor schedules by
+   CardinalityScore: filters counted by acceptance class. *)
+let cardinality_ranking () =
+  Sys.getenv_opt "QC_SCHEDULE_RANKING" = Some "cardinality"
+
+(* Growth class of an inductive type, given its parameters' classes. A
+   constructor argument of the same mutual block is a recursive occurrence;
+   any other argument contributes its own class. Without recursive
+   constructors the type is a finite sum of products; one recursive
+   constructor with one recursive argument and constant other arguments is
+   linear (POLY); any other recursion branches (EXP). *)
+let cardinality_type_cache = Hashtbl.create 64
+
+(* Class of a constructor argument type [arg], under [depth] binders of which
+   the first [np] are the parameters of inductive [ind], with classes
+   [params]. A type of [ind]'s own mutual block is a recursive occurrence. *)
+let rec cardinality_argument ind np params depth arg =
+  let head, args = Constr.decompose_app arg in
+  match Constr.kind head with
+  | Constr.Ind ((m, _), _) when Names.MutInd.CanOrd.equal m (fst ind) -> `Rec
+  | Constr.Ind (i, _) ->
+    let np' = (Environ.lookup_mind (fst i) (Global.env ())).Declarations.mind_nparams in
+    let ps = List.filteri (fun k _ -> k < np') (Array.to_list args) in
+    `Cls (cardinality_inductive_class i (List.map (fun a ->
+      match cardinality_argument ind np params depth a with
+      | `Cls c -> c | `Rec -> None) ps))
+  | Constr.Rel k ->
+    let binder = depth - k in
+    `Cls (if binder >= 0 && binder < np
+          then Stdlib.Option.join (List.nth_opt params binder) else None)
+  | _ -> `Cls None
+
+(* The argument classes of each constructor of [ind] given [params]: a list
+   of `Rec or `Cls per non-parameter argument. *)
+and cardinality_constructor_arguments ind params =
+  let mib = Environ.lookup_mind (fst ind) (Global.env ()) in
+  let np = mib.Declarations.mind_nparams in
+  let oib = mib.Declarations.mind_packets.(snd ind) in
+  let rec walk depth ty = match Constr.kind ty with
+    | Constr.Prod (_, _, body) when depth < np -> walk (depth + 1) body
+    | Constr.Prod (_, arg, body) ->
+      cardinality_argument ind np params depth arg :: walk (depth + 1) body
+    | Constr.LetIn (_, _, _, body) -> walk (depth + 1) body
+    | _ -> [] in
+  Array.to_list (Array.map (walk 0) oib.Declarations.mind_user_lc)
+
+and cardinality_inductive_class (ind : Names.inductive) params =
+  let open CardinalityScore in
+  let key = (Names.MutInd.to_string (fst ind), snd ind, params) in
+  match Hashtbl.find_opt cardinality_type_cache key with
+  | Some c -> c
+  | None ->
+    (* A nested occurrence under classification is unknown, not a loop. *)
+    Hashtbl.replace cardinality_type_cache key None;
+    let ctors = List.map (fun args ->
+      List.fold_left (fun (recs, rest) -> function
+        | `Rec -> recs + 1, rest
+        | `Cls c -> recs, times_opt rest c) (0, Some One) args)
+      (cardinality_constructor_arguments ind params) in
+    let result =
+      if List.exists (fun (_, rest) -> rest = None) ctors then None else
+      let rests = List.map (fun (_, rest) -> Stdlib.Option.get rest) ctors in
+      let recursive = List.filter (fun (recs, _) -> recs > 0) ctors in
+      if recursive = [] then
+        Some (match rests with [] -> One | r :: rs -> List.fold_left plus r rs)
+      else if List.length recursive >= 2 ||
+              List.exists (fun (recs, rest) -> recs >= 2 || rest <> Some One) recursive
+      then Some Exp else Some Poly in
+    Hashtbl.replace cardinality_type_cache key result;
+    result
+
+let rec cardinality_type_class (ty : rocq_constr) = match ty with
+  | DTyCtr (name, args) when is_inductive' name ->
+    (match get_inductive_name name with
+     | Some ind ->
+       let np = (Environ.lookup_mind (fst ind) (Global.env ())).Declarations.mind_nparams in
+       cardinality_inductive_class ind
+         (List.map cardinality_type_class (List.filteri (fun k _ -> k < np) args))
+     | None -> None)
+  | _ -> None
+
+(* A pattern does not record its type's parameters, so arguments whose type
+   mentions a parameter have unknown class. *)
+let cardinality_constructor c =
+  match Nametab.locate (Libnames.qualid_of_string (constructor_to_string c)) with
+  | Names.GlobRef.ConstructRef (ind, j) ->
+    let mib = Environ.lookup_mind (fst ind) (Global.env ()) in
+    let np = mib.Declarations.mind_nparams in
+    let oib = mib.Declarations.mind_packets.(snd ind) in
+    let args = List.nth (cardinality_constructor_arguments ind (List.init np (fun _ -> None))) (j - 1) in
+    let own = cardinality_inductive_class ind (List.init np (fun _ -> None)) in
+    Some { CardinalityScore.params = np;
+           arg_classes = List.map (function `Cls c -> c | `Rec -> own) args;
+           single = Array.length oib.Declarations.mind_consnames = 1 }
+  | _ -> None
+  | exception Not_found -> None
+
+(* Solution counts of completed modes, by relation, output positions and sort. *)
+let cardinality_counts : (string * int list * derive_sort, CardinalityScore.cls) Hashtbl.t =
+  Hashtbl.create 64
+
+let cardinality_shapes :
+  (string * int list * derive_sort, (rocq_constr list * CardinalityScore.cls) list) Hashtbl.t =
+  Hashtbl.create 64
+
+let cardinality_count_key rel outputs ds =
+  match get_inductive_name rel with
+  | Some ind -> Some (Names.MutInd.to_string (fst ind) ^ "#" ^ string_of_int (snd ind),
+                      List.sort_uniq Stdlib.compare outputs, ds)
+  | None -> None
+
+let cardinality_mode_count rel outputs ds =
+  if ty_ctr_to_string rel = "Coq.Init.Logic.eq" || ty_ctr_to_string rel = "eq" then
+    (if List.length outputs <= 1 then Some CardinalityScore.One else None)
+  else if ds = D_Check then Some CardinalityScore.One
+  else match cardinality_count_key rel outputs ds with
+    | Some key -> Hashtbl.find_opt cardinality_counts key
+    | None -> None
+
+let cardinality_mode_shapes rel outputs ds =
+  match cardinality_count_key rel outputs ds with
+  | Some key -> Hashtbl.find_opt cardinality_shapes key
+  | None -> None
+
+let cardinality_context recursive_count = {
+  CardinalityScore.type_class = cardinality_type_class;
+  mode_count = cardinality_mode_count;
+  recursive_count;
+  constructor = cardinality_constructor;
+  mode_shapes = cardinality_mode_shapes }
+
+let rec conclusion_arguments = function
+  | DProd (_, body) | DArrow (_, body) -> conclusion_arguments body
+  | DTyCtr (_, args) -> args
+  | _ -> []
+
+(* A self-recursive producer's fan-out is bounded by its output types. *)
+let cardinality_recursive_count result_vars output_vars =
+  List.fold_left (fun acc (v, ty) ->
+    if List.mem v output_vars then CardinalityScore.times_opt acc (cardinality_type_class ty)
+    else acc) (Some CardinalityScore.One) result_vars
+
 (*Three heuristics detecting difficult to generate rules*)
 let rec is_output_constrained_in_hypothesis ((ind_name, ctr_name, arity, hyps, conc) : rule) (ois : output_index list) : bool =
   let recursive_hyps = List.filter (fun (ind, args) -> ind = ind_name) hyps in
@@ -2100,7 +2242,7 @@ and constructor_valid_schedules (ind_name : ty_ctr) (ctr : rocq_ctr) (result_var
      comparison stays top-level. The bounds are for the density rankings;
      BudgetAware ranking has no pruning bounds yet, so it searches exhaustively. *)
   let score_pruning_mode = match !score_pruning_suspended,
-    (if budget_aware_ranking () then None
+    (if budget_aware_ranking () || cardinality_ranking () then None
      else Sys.getenv_opt "QC_SCHEDULE_SCORE_PRUNING") with
     | false, Some "baseline" -> `Baseline
     | _, Some ("1" | "true" | "yes") -> `Prune
@@ -2295,6 +2437,14 @@ and constructor_valid_schedules (ind_name : ty_ctr) (ctr : rocq_ctr) (result_var
      across footprint-disjoint groups. The unifier reports prepared inputs
      before it searches. *)
   let select_groups = if group_mode = `Off || score_pruning_mode <> `Off then None
+    else if cardinality_ranking () then Some (fun groups ->
+      let context = cardinality_context (cardinality_recursive_count result_vars output_vars) in
+      let scores = List.map (List.map (fun ((steps, _) as schedule) ->
+        try with_temporary_density_state (fun () ->
+          ignore (schedule_density [] schedule);
+          Some (CardinalityScore.score_schedule context steps))
+        with Noninductive_dependency _ | Unavailable_mode _ -> None)) groups in
+      GroupedScore.select_combinations CardinalityScore.group_policy scores)
     else if budget_aware_ranking () then Some (fun groups ->
       let context = budget_context !prepared_inputs in
       let key = budget_key ind_name result_vars output_vars ds in
@@ -2815,7 +2965,37 @@ and select_best_schedule (schedules : (int * schedule_with_density) list) (ds : 
 and constructor_best_valid_schedule (ind_name : ty_ctr) (ctr : rocq_ctr) (result_vars : (var * rocq_constr) list) (output_vars : var list) (ds : derive_sort) (opt : bool) : ty_ctr * ((int * schedule * rule_density) * (var * mexp) list) option * BudgetAwareScore.score option =
   let constructor_inputs, scored, prepared_inputs = constructor_valid_schedules ind_name ctr result_vars output_vars ds opt in
   let entry id = List.find (fun (i, _, _, _) -> i = id) scored in
-  let selected, budget = if not (budget_aware_ranking ()) then
+  let selected, budget = if cardinality_ranking () then begin
+      let context = cardinality_context (cardinality_recursive_count result_vars output_vars) in
+      (* A free generation of a type without a generator or enumerator
+         instance cannot be compiled. *)
+      let available (steps, _) = List.for_all (fun (step, _) -> match step with
+        | S_UC (_, SrcNonrec ty, ps) ->
+          has_schedule_instance ty [] (producer_sort_to_derive_sort ps) false
+        | _ -> true) steps in
+      let scored = List.filter (fun (_, schedule, _, _) -> available schedule) scored in
+      let ranked = List.map (fun (i, (steps, _), _, _) ->
+        let score = CardinalityScore.score_schedule context (List.map fst steps) in
+        if Sys.getenv_opt "QC_SCHEDULE_TRACE_CONSTRUCTOR" = Some (constructor_to_string (fst ctr)) then
+          Feedback.msg_notice (str (Printf.sprintf "[cardinality-candidate] id=%d %s\n" i
+            (CardinalityScore.to_string score)) ++
+            str (schedule_with_densities_to_string (List.assoc i
+              (List.map (fun (j, sch, _, _) -> j, sch) scored))));
+        i, score) scored in
+      match List.fold_left (fun best (i, score) -> match best with
+          | Some (_, best_score) when CardinalityScore.compare best_score score <= 0 -> best
+          | _ -> Some (i, score)) None ranked with
+      | None -> None, None
+      | Some (id, score) ->
+        let (_, ((steps, sort) as schedule), _, _) = entry id in
+        if schedule_trace_enabled () then
+          Feedback.msg_notice (str (Printf.sprintf
+            "[schedule-ranking] policy=cardinality derive=%s candidates=%d selected-id=%d %s\n"
+            (schedule_rank_derive_sort_to_string ds) (List.length ranked) id
+            (CardinalityScore.to_string score))
+            ++ str (schedule_with_densities_to_string schedule));
+        Some (id, (List.map fst steps, sort), representative_density ds schedule), None
+    end else if not (budget_aware_ranking ()) then
       select_best_schedule (List.map (fun (i, schedule, _, _) -> i, schedule) scored) ds, None
     else begin
       let context = budget_context prepared_inputs in
@@ -2827,7 +3007,15 @@ and constructor_best_valid_schedule (ind_name : ty_ctr) (ctr : rocq_ctr) (result
           density_inductive_memo := inductive_memo;
           density_memo := density_memo_after;
           match BudgetAwareScore.score_schedule context key (List.map fst steps) with
-          | Ok score -> i, score
+          | Ok score ->
+            (* QC_SCHEDULE_TRACE_CONSTRUCTOR=<name> prints every candidate's score. *)
+            if Sys.getenv_opt "QC_SCHEDULE_TRACE_CONSTRUCTOR" =
+               Some (constructor_to_string (fst ctr)) then
+              Feedback.msg_notice (str (Printf.sprintf "[budget-candidate] id=%d %s\n" i
+                (BudgetAwareScore.to_string score)) ++
+                str (schedule_with_densities_to_string (List.assoc i
+                  (List.map (fun (j, sch, _, _) -> j, sch) scored))));
+            i, score
           | Error message -> CErrors.user_err (str (Printf.sprintf
               "BudgetAware ranking cannot score constructor %s: %s"
               (constructor_to_string (fst ctr)) message))) scored) in
@@ -3020,6 +3208,18 @@ and inductive_best_valid_schedule (rel : rocq_relation) (output_idxs : int list)
     cycle_low := InductiveScheduleKeyMap.add memo_key !density_low_read !cycle_low;
   (* Specimen's inductive score: combine, over coverage leaves, the best
      score among the leaf's constructors; an uncovered leaf scores Partial. *)
+  if cardinality_ranking () then begin
+    let context = cardinality_context None in
+    let steps = List.map (fun ((steps, _), _, _) -> steps) constructor_schedules in
+    let count = CardinalityScore.mode_count_of context ds steps in
+    match cardinality_count_key ind_name output_idxs ds with
+    | Some key ->
+      Hashtbl.replace cardinality_counts key count;
+      if List.length ctrs = List.length steps then
+        Hashtbl.replace cardinality_shapes key (List.map2 (fun (_, ty) steps ->
+          conclusion_arguments ty, snd (CardinalityScore.constructor_count context steps)) ctrs steps)
+    | None -> ()
+  end;
   let budget_score = if not (budget_aware_ranking ()) then None else
     let score_of c = match List.assoc_opt c budget_scores with
       | Some (Some score) -> Some score | _ -> None in
@@ -3335,6 +3535,9 @@ let dec_eq_sched_phony = ("DecOpt_eq_III", [], [], [(([],CheckerSchedule),[],[])
 let init_density_inductive_memo = InductiveScheduleKeyMap.add (ty_ctr_of_string "Coq.Init.Logic.eq", [], D_Check, true) (DensityDone ((dec_eq_sched_phony, Checking), true, None)) InductiveScheduleKeyMap.empty
 
 let reset_density_inductive_memo () =
+  Hashtbl.reset cardinality_counts;
+  Hashtbl.reset cardinality_shapes;
+  Hashtbl.reset cardinality_type_cache;
   Hashtbl.reset stable_closures;
   clear_inductive_name_cache ();
   clear_schedule_instance_cache ();
