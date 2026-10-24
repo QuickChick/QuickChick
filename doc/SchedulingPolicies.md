@@ -73,6 +73,10 @@ outside itself are shared by all candidates of a top-level derivation; other
 entries are recomputed per candidate, so a candidate's score does not depend
 on which candidates were scored before it. `QC_SCHEDULE_REUSE_STABLE=0`
 disables the sharing for diagnosis. Theorem candidates share these entries too.
+A shared entry is copied without the entries added while it was derived, such
+as a mutually recursive relation that is cycle-dependent inside it; a later
+derivation rederives those on demand, and code generation, which finds a
+schedule's dependencies in the memo, first restores them.
 
 A cycle-dependent derivation is determined by its key and the memo entries it
 read from outside itself: the in-progress ancestors it saw and the completed
@@ -351,7 +355,8 @@ names are corrected for display; it does not infer bindings from renamed steps.
 bound against every completed descendant, then compares the scores seen at
 the leaves with final candidate rescoring. Setting it to `1` enables cuts.
 The default is off. BudgetAware ranking has no bounds yet and ignores the
-switch.
+switch. With pruning on, and in its verification mode, searches have no
+candidate cap; without pruning the 1000-candidate cap remains.
 
 Cuts are exact, not only optimal in score. Candidate identifiers follow
 search order, so the incumbent precedes every candidate of a node explored

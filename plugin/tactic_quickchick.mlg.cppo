@@ -994,11 +994,41 @@ let context_holds record =
       seen == now || (is_stable_entry seen && is_stable_entry now) || seen = now
     | Some seen, None -> is_stable_entry seen) record.context_reads
 
+(* The entries added while a shared entry was derived, such as a mutually
+   recursive relation that is cycle-dependent inside it. Sharing omits them,
+   so a later derivation rederives them on demand; code generation, which
+   finds a schedule's dependencies in the memo, restores them first. *)
+let stable_closures :
+  (InductiveScheduleKeyMap.key, (InductiveScheduleKeyMap.key * inductive_density_entry) list)
+  Hashtbl.t = Hashtbl.create 64
+
+let memo_delta memo_at_start =
+  InductiveScheduleKeyMap.fold (fun k entry acc ->
+    match InductiveScheduleKeyMap.find_opt k memo_at_start with
+    | Some before when before == entry -> acc
+    | _ -> (k, entry) :: acc) !density_inductive_memo []
+
 (* Add the shared completed entries to a memo, keeping its own bindings. *)
 let with_stable_entries memo =
   InductiveScheduleKeyMap.fold (fun key entry current ->
     if InductiveScheduleKeyMap.mem key current then current
     else InductiveScheduleKeyMap.add key entry current) !stable_density_entries memo
+
+(* Before code generation: add the closure of every entry in the memo, to a
+   fixed point, since a closure can hold shared entries with closures. *)
+let complete_stable_closures () =
+  let rec complete pending =
+    match pending with
+    | [] -> ()
+    | key :: rest ->
+      let added = List.filter_map (fun (k, entry) ->
+        if InductiveScheduleKeyMap.mem k !density_inductive_memo then None
+        else begin
+          density_inductive_memo := InductiveScheduleKeyMap.add k entry !density_inductive_memo;
+          Some k
+        end) (Stdlib.Option.value ~default:[] (Hashtbl.find_opt stable_closures key)) in
+      complete (added @ rest) in
+  complete (List.map fst (InductiveScheduleKeyMap.bindings !density_inductive_memo))
 
 (* Share the completed, cycle-independent entries derived since [before]. *)
 let collect_stable_entries before =
@@ -1030,10 +1060,7 @@ let enter_density_derivation key =
 let remember_contextual_derivation key frame memo_at_start value =
   let reads = Hashtbl.fold (fun k observed acc ->
     if k = key then acc else (k, observed) :: acc) frame [] in
-  let delta = InductiveScheduleKeyMap.fold (fun k entry acc ->
-    match InductiveScheduleKeyMap.find_opt k memo_at_start with
-    | Some before when before == entry -> acc
-    | _ -> (k, entry) :: acc) !density_inductive_memo [] in
+  let delta = memo_delta memo_at_start in
   let record = { context_reads = reads; context_delta = delta; context_value = value } in
   let previous = Stdlib.Option.value ~default:[] (Hashtbl.find_opt contextual_derivations key) in
   Hashtbl.replace contextual_derivations key
@@ -1813,10 +1840,51 @@ let instance_requirements ?(allow_root=false) env sigma goal names =
           Names.Id.Map.add fresh original map) Names.Id.Map.empty names in
         MEscape (Constrexpr_ops.replace_vars_constr_expr original_names expression)) requirements)
 
-let has_schedule_instance relation outputs ds constrained =
-  let env, sigma, goal, names = elaborate_obligation relation outputs ds constrained in
-  match instance_requirements ~allow_root:(match relation with DTyParam _ -> true | _ -> false)
-    env sigma goal names with Some _ -> true | None -> false
+(* The answer depends on the obligation, the scheduled inputs' types, the
+   proof-local context and universes, the global environment and the instance
+   database. Within a derivation the last two change only with a declaration;
+   derivation entry points clear the cache for changes between commands. *)
+let schedule_instance_cache = Hashtbl.create 256
+let schedule_instance_cache_context = ref None
+
+let clear_schedule_instance_cache () =
+  Hashtbl.reset schedule_instance_cache;
+  schedule_instance_cache_context := None
+
+let rec has_schedule_instance ?(cached = true) relation outputs ds constrained =
+  if not cached then begin
+    let env, sigma, goal, names = elaborate_obligation relation outputs ds constrained in
+    let answer = match instance_requirements
+        ~allow_root:(match relation with DTyParam _ -> true | _ -> false)
+        env sigma goal names with Some _ -> true | None -> false in
+    (if Sys.getenv_opt "QC_CHECK_INSTANCE_CACHE" <> None then
+       let key = (relation, outputs, ds, constrained, !schedule_inputs) in
+       match Hashtbl.find_opt schedule_instance_cache key with
+       | Some previous when previous <> answer ->
+         Feedback.msg_warning (str ("[instance-cache] stale answer for " ^
+           rocq_constr_to_string relation ^ ": cached " ^ string_of_bool previous ^
+           ", fresh " ^ string_of_bool answer))
+       | _ -> ());
+    answer
+  end else
+  let context = Global.env (), !schedule_locals, !schedule_universes in
+  (match !schedule_instance_cache_context with
+   | Some (env, locals, universes) when
+       env == (let e, _, _ = context in e) &&
+       locals == (let _, l, _ = context in l) &&
+       universes == (let _, _, u = context in u) -> ()
+   | _ -> Hashtbl.reset schedule_instance_cache;
+     schedule_instance_cache_context := Some context);
+  let key = (relation, outputs, ds, constrained, !schedule_inputs) in
+  match Hashtbl.find_opt schedule_instance_cache key with
+  | Some answer -> answer
+  | None ->
+    let env, sigma, goal, names = elaborate_obligation relation outputs ds constrained in
+    let answer = match instance_requirements
+        ~allow_root:(match relation with DTyParam _ -> true | _ -> false)
+        env sigma goal names with Some _ -> true | None -> false in
+    Hashtbl.add schedule_instance_cache key answer;
+    answer
 
 (* A policy score may call a dependency SuppliedInstance only when the
    obligation resolves in the current context, without invented premises. *)
@@ -2051,11 +2119,7 @@ and constructor_valid_schedules (ind_name : ty_ctr) (ctr : rocq_ctr) (result_var
   let stable_dependencies = stable_density_entries in
   (* Share only completed entries whose dependency walk read no provisional
      or cycle-dependent grade. Keep the caller's in-progress entries intact. *)
-  let add_stable memo = if not reuse_stable then memo else
-    InductiveScheduleKeyMap.fold (fun key entry current ->
-      if InductiveScheduleKeyMap.mem key current then current
-      else InductiveScheduleKeyMap.add key entry current)
-      !stable_dependencies memo in
+  let add_stable memo = if not reuse_stable then memo else with_stable_entries memo in
   let collect_stable () = if reuse_stable then
     InductiveScheduleKeyMap.iter (fun key entry -> match entry with
       | DensityDone (_, true, _) when
@@ -2963,7 +3027,10 @@ and inductive_best_valid_schedule (rel : rocq_relation) (output_idxs : int list)
       (List.map (fun (_, cs) -> List.filter_map score_of cs) covered_patterns)) in
   density_inductive_memo := InductiveScheduleKeyMap.add (ind_name, output_idxs, ds, opt) (DensityDone ((inductive_schedule, overall_density), cycle_independent, budget_score)) !density_inductive_memo;
   Error.msg_debug (str (Printf.sprintf "%s: %s Done, Density: %s, cycle-independent: %b\n" (schedule_name) (String.concat ", " (List.map string_of_int output_idxs)) (density_to_string overall_density) cycle_independent));
-  if not cycle_independent then
+  if cycle_independent then
+    Hashtbl.replace stable_closures memo_key
+      (List.filter (fun (k, _) -> k <> memo_key) (memo_delta memo_at_start))
+  else
     remember_contextual_derivation memo_key frame memo_at_start
       (inductive_schedule, overall_density);
   inductive_schedule, overall_density))
@@ -3132,7 +3199,9 @@ let resolved_dependency (relation, output_indices, ds, constrained) =
     | _ -> [] in
   let outputs = List.concat (filter_mapi (fun i arg ->
     if List.mem i output_indices then Some (variables_in_hypothesis arg) else None) args) in
-  has_schedule_instance relation outputs ds constrained
+  (* Code generation decides here whether a dependency is compiled; recheck
+     against the current context rather than a cached answer. *)
+  has_schedule_instance ~cached:false relation outputs ds constrained
 
 let lookup_and_remove_inductive_schedule (instance : rocq_constr * int list * derive_sort * bool) (to_remove : bool) : (inductive_schedule * derive_sort * bool) option =
   let (ind_instance, output_idxs, ds, opt) = instance in
@@ -3266,7 +3335,9 @@ let dec_eq_sched_phony = ("DecOpt_eq_III", [], [], [(([],CheckerSchedule),[],[])
 let init_density_inductive_memo = InductiveScheduleKeyMap.add (ty_ctr_of_string "Coq.Init.Logic.eq", [], D_Check, true) (DensityDone ((dec_eq_sched_phony, Checking), true, None)) InductiveScheduleKeyMap.empty
 
 let reset_density_inductive_memo () =
+  Hashtbl.reset stable_closures;
   clear_inductive_name_cache ();
+  clear_schedule_instance_cache ();
   stable_density_entries := InductiveScheduleKeyMap.empty;
   Hashtbl.reset contextual_derivations;
   density_inductive_memo := init_density_inductive_memo
@@ -3277,6 +3348,7 @@ let with_fresh_density_memo f =
   let old_inductive = !density_inductive_memo in
   let old_stable = !stable_density_entries in
   let old_contextual = Hashtbl.copy contextual_derivations in
+  let old_closures = Hashtbl.copy stable_closures in
   let old_rule = !density_memo in
   let old_relations = !rocq_relation_memo in
   Fun.protect
@@ -3285,6 +3357,8 @@ let with_fresh_density_memo f =
       stable_density_entries := old_stable;
       Hashtbl.reset contextual_derivations;
       Hashtbl.iter (Hashtbl.replace contextual_derivations) old_contextual;
+      Hashtbl.reset stable_closures;
+      Hashtbl.iter (Hashtbl.replace stable_closures) old_closures;
       density_memo := old_rule;
       rocq_relation_memo := old_relations)
     (fun () ->
@@ -3724,6 +3798,7 @@ let theorem_dependencies =
         begin
           density_memo := RelationInstMap.empty;
           clear_inductive_name_cache ();
+          clear_schedule_instance_cache ();
           msg_debug (str (NewGenericLib.rocq_constr_to_string dt) ++ fnl ());
           let scheds = NewUnifyQC.type_to_schedules ?select_groups:(grouped_selector D_Thm)
             dt None None [] [] D_Thm false in
@@ -3946,6 +4021,7 @@ let derive_schedule ind ois ds opt =
       density_inductive_memo := InductiveScheduleKeyMap.remove (ty_ctr_of_string "eq", [], D_Check, true) !density_inductive_memo;
 
       let ind_schd_name = match inductive_schedule with (n,_,_,_,_) -> n in
+      complete_stable_closures ();
       let dependents, inductive_dependency_map = collect_all_used_inductive_schd_names ind_schd_name in
 
       let components = tarjan_schedules_by_name dependents inductive_dependency_map in
@@ -4044,6 +4120,7 @@ let quickchick_it size idx =
 
         density_inductive_memo := InductiveScheduleKeyMap.remove (ty_ctr_of_string "eq", [], D_Check, true) !density_inductive_memo;
         (* let (unconstrained_inductives, mut_used_inductives) = collect_all_used_inductives_theorem theorem_schedule in *)
+        complete_stable_closures ();
         let dependents, inductive_dependency_map = collect_all_used_inductive_schd_names "theorem" in
         Error.msg_debug (str "Dependents: " ++ str (String.concat ", " dependents) ++ fnl ());
         let components = tarjan_schedules_by_name dependents inductive_dependency_map in
@@ -4412,6 +4489,7 @@ VERNAC COMMAND EXTEND DeriveValidSchedules CLASSIFIED AS SIDEFF
 
       density_memo := RelationInstMap.empty;
       clear_inductive_name_cache ();
+      clear_schedule_instance_cache ();
       Feedback.msg_notice (str "Printing all bindings" ++ fnl ());
       let schedules_w_densities =
         match Sys.getenv_opt "QC_SCHEDULE_SCORE_PRUNING" with
