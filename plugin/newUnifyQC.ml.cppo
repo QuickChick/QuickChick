@@ -1950,10 +1950,12 @@ let type_to_schedules ?on_prepared ?select_groups ?on_prefix ?on_prefix_with_flo
          observe path terminal (corrected steps)) on_prefix in
        let should_prune_prefix = Option.map (fun prune path steps ->
          prune path (corrected steps)) should_prune_prefix in
+       let corrected_floor floor = { floor with NewGenericLib.bound_argument_occurrences =
+         List.map (correct_var umap) floor.NewGenericLib.bound_argument_occurrences } in
        let on_prefix_with_floor = Option.map (fun observe path terminal floor steps ->
-         observe path terminal floor (corrected steps)) on_prefix_with_floor in
+         observe path terminal (corrected_floor floor) (corrected steps)) on_prefix_with_floor in
        let should_prune_prefix_with_floor = Option.map (fun prune path floor steps ->
-         prune path floor (corrected steps)) should_prune_prefix_with_floor in
+         prune path (corrected_floor floor) (corrected steps)) should_prune_prefix_with_floor in
        let schedules = match on_prefix, on_prefix_with_floor,
          should_prune_prefix, should_prune_prefix_with_floor with
          | None, None, None, None ->

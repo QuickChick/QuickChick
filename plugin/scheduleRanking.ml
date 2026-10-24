@@ -108,6 +108,11 @@ let prefix_bound ~prefer_dense ~known_grades ~variable_uses =
 let can_prune ~prefer_dense policy ~incumbent ~bound =
   compare_without_id ~prefer_dense policy incumbent bound < 0
 
+(* Candidate identifiers follow search order, so an incumbent precedes every
+   candidate of a node explored after it and wins any score tie with them. *)
+let can_prune_after ~prefer_dense policy ~incumbent ~bound =
+  compare_without_id ~prefer_dense policy incumbent bound <= 0
+
 (* Independent hypothesis groups contribute separable features: the density
    rank combines by min (dense) or max, while histograms and variable uses
    add. Histograms and uses form a translation-invariant lexicographic order,

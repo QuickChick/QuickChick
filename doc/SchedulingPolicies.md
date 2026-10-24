@@ -22,7 +22,8 @@ prefer lower density. Densities, in ascending order, are Checking, Backtracking,
 Neutral, Partial, and Total. A producer uses the lowest density among its steps;
 a checker or enumerator uses the highest. An empty producer schedule is Total;
 an empty checker or enumerator schedule is Checking. Candidate identifiers break
-remaining ties, preserving deterministic selection from the generated list.
+remaining ties. They follow search order, so among equal scores the first
+schedule the search finds wins.
 Existing aliases and unknown-value fallback to the default are unchanged.
 
 ### BudgetAware ranking
@@ -330,8 +331,23 @@ names are corrected for display; it does not infer bindings from renamed steps.
 
 `QC_SCHEDULE_SCORE_PRUNING=verify` enumerates all leaves and checks each
 bound against every completed descendant, then compares the scores seen at
-the leaves with final candidate rescoring. Setting it to `1` enables strict
-cuts. The default is off. The maintained three-premise fixture scores four
+the leaves with final candidate rescoring. Setting it to `1` enables cuts.
+The default is off. BudgetAware ranking has no bounds yet and ignores the
+switch.
+
+Cuts are exact, not only optimal in score. Candidate identifiers follow
+search order, so the incumbent precedes every candidate of a node explored
+after it; a node is cut when the incumbent is at least as good as its bound,
+and the incumbent also wins every tie. Each dependency derivation prunes
+against its own incumbent, at every nesting level. The variable-use bound adds
+uses that every completion must incur: a variable bound by a committed step
+counts once in each remaining positive hypothesis that mentions it, either in
+the step source or, inside a constrained output, in the equality check that
+replaces it; and an unbound variable that is a bare argument of k remaining
+positive hypotheses counts k - 1 times, since only one of them can produce it.
+`plugin/test_prefix_search.ml` checks these bounds against every completed
+descendant and checks that tie pruning selects the exhaustive winner for each
+built-in policy. The full test suite passes in verification mode. The maintained three-premise fixture scores four
 root candidates without cuts and one with the switch on, selecting the
 same best density and variable-use score under default and counted-density
 ranking. The connected mutual-cycle and public derivation fixtures pass the
@@ -347,9 +363,7 @@ with `eval` again. With the internal switch set, `Valid Schedules` now sends
 its selected constructor through the same bound-aware scheduler as derivation.
 The verifier checks all 12 root leaves over 25 prefixes, finds no bound
 violation, and selects the same candidate as the unpruned run. It makes zero
-cuts. Score probes suspend nested experimental pruning while resolving
-dependencies; otherwise verification repeatedly re-enters those searches and
-multiplies the work without improving the root bound. The ordinary diagnostic
+cuts. The ordinary diagnostic
 shares dependency memo state across candidate scores and took 1.2 seconds in
 one local run. A comparable internal `baseline` uses the same search as
 pruning but no bounds. With all candidate reuse disabled it took 8.3 seconds.
@@ -368,9 +382,7 @@ dependency memo. In the reused run, bound, leaf, and final scoring cost 0.28,
 1.26, and 0.57 seconds of CPU time.
 The verifier still independently rescores all candidates. All 12 leaves have
 the same density, counted-density histogram, and variable-use score:
-`Checking`, `(1,0,0,3,0)`, and one use. Strict score pruning cannot discard
-those ties while candidate IDs come from the final sorted candidate list.
-This fixture stresses recursive score resolution, not discrimination between
+`Checking`, `(1,0,0,3,0)`, and one use. This fixture stresses recursive score resolution, not discrimination between
 schedules; the bound makes no cuts. Recursive score resolution remains
 expensive.
 

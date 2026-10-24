@@ -502,13 +502,37 @@ let () =
   let useful_floors = ref 0 in
   List.iter (fun (path, terminal, floor, stable) ->
     if not terminal then begin
-      if floor > 0 then incr useful_floors;
+      if floor.N.forced_checks > 0 then incr useful_floors;
       List.iter (fun (leaf_path, checks) ->
         if is_path_prefix path leaf_path then
-          assert (positive_checks stable + floor <= checks))
+          assert (positive_checks stable + floor.N.forced_checks <= checks))
         completed_checks
     end) !check_floor_observations;
   assert (!useful_floors > 0);
+  (* Variables bound by committed steps stay bound; their occurrences in fully
+     bound arguments of remaining hypotheses are counted by every completion. *)
+  let step_bound schedule = List.concat_map (function
+    | N.S_UC (var, _, _) | N.S_Let (var, _) -> [var]
+    | N.S_ST (outputs, _, _) -> List.map fst outputs
+    | N.S_Match (_, pat) -> N.pat_vars pat
+    | N.S_Check _ -> []) schedule in
+  let completed_uses = List.filter_map (fun (path, terminal, uses) ->
+    if terminal then Some (path, uses) else None) !complete_observations in
+  let useful_lookahead = ref 0 in
+  let useful_future = ref 0 in
+  List.iter (fun (path, terminal, floor, stable) ->
+    if not terminal then begin
+      let bound = step_bound stable in
+      let future = List.length (List.filter (fun v -> List.mem v bound)
+        floor.N.bound_argument_occurrences) + floor.N.future_variable_uses in
+      if floor.N.future_variable_uses > 0 then incr useful_future;
+      if future > 0 then incr useful_lookahead;
+      List.iter (fun (leaf_path, uses) ->
+        if is_path_prefix path leaf_path then
+          assert (variable_uses stable + future <= uses)) completed_uses
+    end) !check_floor_observations;
+  assert (!useful_lookahead > 0);
+  assert (!useful_future > 0);
   let reduced_stats = N.empty_prefix_search_stats () in
   let reduced_observations = ref [] in
   let reduced_structural_bounds = ref [] in
@@ -722,6 +746,35 @@ let () =
         (if prefer_dense then maximal_reduced else oracle))) =
       List.sort_uniq compare
       (List.map mode_signature (List.filter matches_optimum bounded)));
+    (* Tie pruning: identifiers follow search order, so the first optimal
+       schedule of the pruned search is the exhaustive search's winner. *)
+    let ordered = N.possible_schedules_with_advanced_pruning
+      ~max_schedules:100000 ~maximal_outputs:true
+      variables hypotheses [] rec_call ds in
+    let tie_incumbent = ref None in
+    let tie_pruned = N.possible_schedules_with_advanced_pruning
+      ~max_schedules:100000 ~maximal_outputs:true
+      ~on_prefix:(fun _ terminal schedule ->
+        if terminal then begin
+          let score = model_features ~prefer_dense ~terminal:true
+            ~footprints:direct_footprints schedule in
+          tie_incumbent := Some (match !tie_incumbent with
+            | None -> score
+            | Some old when Ranking.compare ~prefer_dense policy score old < 0 -> score
+            | Some old -> old)
+        end)
+      ~should_prune_prefix:(fun _ schedule ->
+        match !tie_incumbent with
+        | None -> false
+        | Some best -> Ranking.can_prune_after ~prefer_dense policy
+            ~incumbent:best
+            ~bound:(model_features ~prefer_dense ~terminal:false
+              ~footprints:direct_footprints schedule))
+      variables hypotheses [] rec_call ds in
+    assert (List.find_opt matches_optimum ordered <> None);
+    assert (List.find_opt matches_optimum ordered =
+            List.find_opt matches_optimum tie_pruned);
+    assert (List.length tie_pruned <= List.length bounded);
     Printf.printf "conservative typed bound %s %s: oracle=%d bounded=%d nodes=%d\n"
       (if prefer_dense then "generator" else "checker")
       (Ranking.to_string policy) (List.length oracle)
@@ -970,11 +1023,11 @@ let () =
     if terminal then Some (path, positive_checks stable) else None)
     !nested_floors in
   assert (List.exists (fun (_, terminal, floor, _) ->
-    not terminal && floor > 0) !nested_floors);
+    not terminal && floor.N.forced_checks > 0) !nested_floors);
   List.iter (fun (path, terminal, floor, stable) ->
     if not terminal then List.iter (fun (leaf_path, checks) ->
       if is_path_prefix path leaf_path then
-        assert (positive_checks stable + floor <= checks)) nested_leaves)
+        assert (positive_checks stable + floor.N.forced_checks <= checks)) nested_leaves)
     !nested_floors;
   test_unifier_prefix_boundary nat;
   test_small_footprints nat rec_call;

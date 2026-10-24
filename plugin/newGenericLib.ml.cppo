@@ -3329,6 +3329,25 @@ type classified_prefix_state = {
   prefix_sleeping : int list;
 }
 
+(* Lower-bound facts about every completion of a prefix. [forced_checks] counts
+   remaining positive hypotheses whose arguments are all bound, which must become
+   checks. [bound_argument_occurrences] lists, per remaining positive
+   hypothesis, the distinct variables of its arguments. A variable already
+   bound when the hypothesis is scheduled is counted at least once: a fully
+   bound argument stays in the step source, and a bound variable inside a
+   constrained output moves into an equality check. [future_variable_uses] counts, for each unbound variable that
+   is a bare argument of k remaining positive hypotheses, k - 1 uses: it is
+   bound once, so at most one of them produces it and the others see it bound
+   in a fully bound argument. *)
+type prefix_floor = {
+  forced_checks : int;
+  bound_argument_occurrences : var list;
+  future_variable_uses : int;
+}
+
+let terminal_prefix_floor =
+  { forced_checks = 0; bound_argument_occurrences = []; future_variable_uses = 0 }
+
 type prefix_search_stats = {
   mutable visited_nodes : int;
   mutable completed_prefixes : int;
@@ -3360,11 +3379,11 @@ let enum_schedules_prefix_classified
     ~(stats : prefix_search_stats option)
     ~(on_prefix : (((int * var list list) list -> bool ->
       (int * rocq_constr * bool) pre_schedule_step list -> unit) option))
-    ~(on_prefix_with_floor : (((int * var list list) list -> bool -> int ->
+    ~(on_prefix_with_floor : (((int * var list list) list -> bool -> prefix_floor ->
       (int * rocq_constr * bool) pre_schedule_step list -> unit) option))
     ~(should_prune : (((int * var list list) list ->
       (int * rocq_constr * bool) pre_schedule_step list -> bool) option))
-    ~(should_prune_with_floor : (((int * var list list) list -> int ->
+    ~(should_prune_with_floor : (((int * var list list) list -> prefix_floor ->
       (int * rocq_constr * bool) pre_schedule_step list -> bool) option))
     (variables : (var * rocq_type) list)
     (matchable_vars : var list)
@@ -3394,6 +3413,23 @@ let enum_schedules_prefix_classified
     if polarity && List.for_all (fun v -> VS.mem v state.prefix_env_set)
       (variables_in_hypothesis hyp)
     then count + 1 else count) 0 state.prefix_remaining in
+  let bound_argument_occurrences state = List.concat_map (fun (_, cls) ->
+    match cls.hyp with
+    | DTyCtr (_, args), true ->
+      List.concat_map variables_in_hypothesis args |> remove_duplicates
+    | _ -> []) state.prefix_remaining in
+  let future_variable_uses state =
+    let bare = List.concat_map (fun (_, cls) ->
+      match cls.hyp with
+      | DTyCtr (_, args), true ->
+        remove_duplicates (List.filter_map (function
+          | DTyVar v when not (VS.mem v state.prefix_env_set)
+                       && List.mem v var_names -> Some v
+          | _ -> None) args)
+      | _ -> []) state.prefix_remaining in
+    List.fold_left (fun total v ->
+      total + max 0 (List.length (List.filter (( = ) v) bare) - 1))
+      0 (remove_duplicates bare) in
   let needs_check_floor = match on_prefix_with_floor,
     should_prune_with_floor with
     | None, None -> false
@@ -3411,14 +3447,18 @@ let enum_schedules_prefix_classified
       Option.iter (fun observe ->
         observe (List.rev state.prefix_decisions_rev) true complete) on_prefix;
       Option.iter (fun observe ->
-        observe (List.rev state.prefix_decisions_rev) true 0 complete)
+        observe (List.rev state.prefix_decisions_rev) true terminal_prefix_floor complete)
         on_prefix_with_floor;
       Seq.return complete ()
     | _ ->
       Option.iter (fun observe ->
         observe (List.rev state.prefix_decisions_rev) false
           (List.rev state.prefix_steps_rev)) on_prefix;
-      let check_floor = if needs_check_floor then forced_checks state else 0 in
+      let check_floor = if needs_check_floor then
+          { forced_checks = forced_checks state;
+            bound_argument_occurrences = bound_argument_occurrences state;
+            future_variable_uses = future_variable_uses state }
+        else terminal_prefix_floor in
       Option.iter (fun observe ->
         observe (List.rev state.prefix_decisions_rev) false check_floor
           (List.rev state.prefix_steps_rev)) on_prefix_with_floor;
@@ -3933,8 +3973,18 @@ let possible_schedules_with_advanced_pruning ?(max_schedules=100000)
   let prod_sort = match ds with
     | D_Check | D_Enum -> PS_E
     | D_Gen | D_Thm -> PS_G in
-  let pre_to_schedule =
-    pre_to_schedule_advanced variables type_vars rec_call ds prod_sort in
+  (* Conversion invents fresh names, so a prefix observed by a callback and
+     the same leaf in the candidate stream must share one conversion; leaf
+     scores cached by the callback are then found for the final candidates. *)
+  let conversions = Hashtbl.create 256 in
+  let pre_to_schedule pre =
+    match Hashtbl.find_opt conversions pre with
+    | Some converted -> converted
+    | None ->
+      let converted =
+        pre_to_schedule_advanced variables type_vars rec_call ds prod_sort pre in
+      Hashtbl.add conversions pre converted;
+      converted in
   (* Observation is test-only. Conversion is stepwise; appending to an open
      unconstrained block preserves the order of its already sorted members. *)
   let observe_prefix = Option.map (fun observe path terminal pre_steps ->
@@ -4011,7 +4061,13 @@ let possible_schedules_with_advanced_pruning ?(max_schedules=100000)
       variables type_vars classified fixed
     |> Seq.map pre_to_schedule
     |> Seq.map normalize_schedule_advanced in
-  take_limited candidate_stream |> List.sort_uniq compare
+  (* Candidate identifiers follow search order, so among equal scores the
+     first schedule found wins. Score pruning relies on this: an incumbent
+     always precedes the candidates of a node explored after it. *)
+  let seen = Hashtbl.create 64 in
+  take_limited candidate_stream |> List.filter (fun schedule ->
+    if Hashtbl.mem seen schedule then false
+    else (Hashtbl.add seen schedule (); true))
 
 let possible_schedules ?canon ?select_groups variables hypotheses fixed rec_call ds =
   possible_schedules_with_advanced_pruning ~max_schedules:1000

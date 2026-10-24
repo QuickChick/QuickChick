@@ -44,6 +44,12 @@ val prefix_bound : prefer_dense:bool -> known_grades:int option list ->
 val can_prune : prefer_dense:bool -> policy -> incumbent:features ->
   bound:features -> bool
 
+(** Prune when the incumbent is at least as good as the bound. Exact when
+    candidate IDs follow search order and the node is explored after the
+    incumbent was found, so the incumbent also wins every tie. *)
+val can_prune_after : prefer_dense:bool -> policy -> incumbent:features ->
+  bound:features -> bool
+
 (** Features of one independent hypothesis group, scored on its own. *)
 type group_features = {
   group_density : int;

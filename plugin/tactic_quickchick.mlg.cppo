@@ -1906,11 +1906,16 @@ and constructor_valid_schedules (ind_name : ty_ctr) (ctr : rocq_ctr) (result_var
              Pp.string_of_ppcmds (Printer.pr_econstr_env env sigma value)) in
     Feedback.msg_notice (str ("[policy-quote] " ^ report))
   end;
+  (* Each dependency derivation is a complete search with its own incumbent,
+     so pruning applies at every nesting level. Only the experimental baseline
+     comparison stays top-level. The bounds are for the density rankings;
+     BudgetAware ranking has no pruning bounds yet, so it searches exhaustively. *)
   let score_pruning_mode = match !score_pruning_suspended,
-    Sys.getenv_opt "QC_SCHEDULE_SCORE_PRUNING" with
+    (if budget_aware_ranking () then None
+     else Sys.getenv_opt "QC_SCHEDULE_SCORE_PRUNING") with
     | false, Some "baseline" -> `Baseline
-    | false, Some ("1" | "true" | "yes") -> `Prune
-    | false, Some "verify" -> `Verify
+    | _, Some ("1" | "true" | "yes") -> `Prune
+    | _, Some "verify" -> `Verify
     | _ -> `Off in
   let prefer_dense = ds = D_Gen || ds = D_Thm in
   let policy = schedule_ranking_policy () in
@@ -2041,10 +2046,17 @@ and constructor_valid_schedules (ind_name : ty_ctr) (ctr : rocq_ctr) (result_var
              grade)) steps @
       (* Remaining positive hypotheses with all arguments bound must become
          checks, whose fixed density rank is Checking = 0. *)
-      List.init check_floor (fun _ -> Some 0) in
+      List.init check_floor.NewGenericLib.forced_checks (fun _ -> Some 0) in
     let annotations = List.map (fun step -> step, Total) (match_steps @ steps) in
+    (* Variables bound by a committed step stay bound, so their occurrences in
+       the fully bound arguments of remaining hypotheses will be counted. *)
+    let step_bound = List.fold_left (fun env (step, density) ->
+      add_bound_vars env step density) [] annotations in
+    let future_uses = List.length (List.filter (fun v -> List.mem_assoc v step_bound)
+      check_floor.NewGenericLib.bound_argument_occurrences)
+      + check_floor.NewGenericLib.future_variable_uses in
     ScheduleRanking.prefix_bound ~prefer_dense ~known_grades
-      ~variable_uses:(get_num_var_uses (annotations, sort) ds))) in
+      ~variable_uses:(get_num_var_uses (annotations, sort) ds + future_uses))) in
   let on_prefix = if score_pruning_mode = `Baseline then
     Some (fun _ terminal _ -> if terminal then incr scored_leaves)
   else None in
@@ -2087,7 +2099,7 @@ and constructor_valid_schedules (ind_name : ty_ctr) (ctr : rocq_ctr) (result_var
         | None -> false
         | Some bound ->
           trace_score "bound" path bound;
-          let cut = ScheduleRanking.can_prune ~prefer_dense policy
+          let cut = ScheduleRanking.can_prune_after ~prefer_dense policy
             ~incumbent:best ~bound in
           if cut then incr pruned_prefixes;
           cut)) else None in

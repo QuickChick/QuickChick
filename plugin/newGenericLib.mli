@@ -146,6 +146,12 @@ val possible_schedules : ?canon:(var -> var) ->
   var list -> constructor * int list ->
   derive_sort -> schedule_step list list *)
 
+type prefix_floor = {
+  forced_checks : int;
+  bound_argument_occurrences : var list;
+  future_variable_uses : int;
+}
+
 type prefix_search_stats = {
   mutable visited_nodes : int;
   mutable completed_prefixes : int;
@@ -164,10 +170,10 @@ val possible_schedules_with_advanced_pruning : ?max_schedules:int -> ?reduce_ord
   ?canon:(var -> var) ->
   ?select_groups:(schedule_step list list list -> int list list) ->
   ?on_prefix:((int * var list list) list -> bool -> schedule_step list -> unit) ->
-  ?on_prefix_with_floor:((int * var list list) list -> bool -> int ->
+  ?on_prefix_with_floor:((int * var list list) list -> bool -> prefix_floor ->
     schedule_step list -> unit) ->
   ?should_prune_prefix:((int * var list list) list -> schedule_step list -> bool) ->
-  ?should_prune_prefix_with_floor:((int * var list list) list -> int ->
+  ?should_prune_prefix_with_floor:((int * var list list) list -> prefix_floor ->
     schedule_step list -> bool) ->
   (var * rocq_type) list ->
   rocq_type list ->
