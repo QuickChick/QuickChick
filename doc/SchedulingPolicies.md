@@ -72,7 +72,15 @@ Completed dependency entries whose derivation read no provisional grade from
 outside itself are shared by all candidates of a top-level derivation; other
 entries are recomputed per candidate, so a candidate's score does not depend
 on which candidates were scored before it. `QC_SCHEDULE_REUSE_STABLE=0`
-disables the sharing for diagnosis.
+disables the sharing for diagnosis. Theorem candidates share these entries too.
+
+A cycle-dependent derivation is determined by its key and the memo entries it
+read from outside itself: the in-progress ancestors it saw and the completed
+entries it used. It is recorded with those reads and the memo entries it
+added, and replayed wherever the same reads observe the same values and none
+of the keys it derived is in progress. `QC_SCHEDULE_CONTEXT_REUSE=0` disables
+this; over the full test suite the distinct selected schedules are identical
+either way.
 The trace also prints `selected-counts=Checking,Backtracking,Neutral,Partial,Total`
 for the counted-density policy (as five integers).
 
