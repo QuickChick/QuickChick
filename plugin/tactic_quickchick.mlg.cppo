@@ -293,12 +293,33 @@ let is_inductive' (ty_name : ty_ctr) : bool =
                | Names.GlobRef.IndRef _ -> true
                | _ -> false) locate_result
 
+(* Map keys compare relations by their resolved inductive, so this runs on
+   every comparison of the scheduler's memo maps. Within one derivation,
+   resolution changes only with a declaration, which makes a new global
+   environment. An Import between commands does not, so every derivation
+   entry point also clears the cache. *)
+let inductive_name_cache : (string, Names.inductive option) Hashtbl.t = Hashtbl.create 64
+let inductive_name_cache_env = ref None
+
+let clear_inductive_name_cache () =
+  Hashtbl.reset inductive_name_cache;
+  inductive_name_cache_env := None
+
 let get_inductive_name name : Names.inductive option =
-  let locate_result = Nametab.locate_all (name) in
-  List.find_map (function
-  | Names.GlobRef.IndRef ind -> Some ind
-  | Names.GlobRef.ConstructRef constructor -> Some (Names.inductive_of_constructor constructor)
-  | _ -> None) locate_result
+  let env = Global.env () in
+  (match !inductive_name_cache_env with
+   | Some cached when cached == env -> ()
+   | _ -> Hashtbl.reset inductive_name_cache; inductive_name_cache_env := Some env);
+  let key = Libnames.string_of_qualid name in
+  match Hashtbl.find_opt inductive_name_cache key with
+  | Some result -> result
+  | None ->
+    let result = List.find_map (function
+      | Names.GlobRef.IndRef ind -> Some ind
+      | Names.GlobRef.ConstructRef constructor -> Some (Names.inductive_of_constructor constructor)
+      | _ -> None) (Nametab.locate_all name) in
+    Hashtbl.add inductive_name_cache key result;
+    result
   
 let rec extract_inductives_from_type (typ : rocq_constr) : Names.inductive list =
   match typ with
@@ -2983,11 +3004,45 @@ let grouped_selector ds = match schedule_group_mode () with
 
 (* Ranked theorem schedules. With grouped search, indices and the try-all
    tactic range over the grouped combinations, not every joint ordering. *)
-let all_theorem_schedules (thm : rocq_type) =
-  let rank schedule_matches =
+(* Lazy scoring for selecting the best theorem schedule. Candidates are
+   visited in identifier order. A candidate's density is the minimum grade of
+   its steps and its variable uses are structural, so once the grades seen so
+   far bound it no better than the incumbent, which precedes it and wins ties,
+   it cannot be selected and its remaining dependency modes are not derived. *)
+let theorem_candidate_loses ~incumbent ms_steps ((steps, sort) : schedule) =
+  let policy = schedule_ranking_policy () in
+  let all_steps = ms_steps @ steps in
+  let variable_uses = get_num_var_uses
+    (List.map (fun step -> step, Total) all_steps, sort) D_Thm in
+  let fixed, derived = List.partition (fun step ->
+    fixed_step_density D_Thm step <> None) all_steps in
+  let rec visit known = function
+    | [] -> false
+    | step :: rest ->
+      let grade = match fixed_step_density D_Thm step with
+        | Some grade -> Some (density_rank grade)
+        | None ->
+          let before = !density_uncertainty_events in
+          (match schedule_density [] ([step], sort) with
+           | ([(_, grade)], _) when !density_uncertainty_events = before ->
+             Some (density_rank grade)
+           | _ -> None) in
+      let known = grade :: known in
+      ScheduleRanking.can_prune_after ~prefer_dense:true policy ~incumbent
+        ~bound:(ScheduleRanking.prefix_bound ~prefer_dense:true
+          ~known_grades:known ~variable_uses)
+      || visit known rest in
+  visit [] (fixed @ derived)
+
+let theorem_lazy_scoring () =
+  Sys.getenv_opt "QC_THEOREM_LAZY_SCORING" <> Some "0"
+
+let all_theorem_schedules ?(best_only = false) (thm : rocq_type) =
+  let rank ~lazy_best schedule_matches =
     let schedules = List.mapi (fun i ((steps, sort), ms, eqs) -> i,List.map (fun (v,p) -> S_Match (v,p)) ms, ((List.map check_eq eqs @ steps), sort)) schedule_matches in
     let initial_inductive_memo = !density_inductive_memo in
     let initial_density_memo = !density_memo in
+    let incumbent = ref None in
     let scored = Fun.protect
       ~finally:(fun () ->
         density_inductive_memo := initial_inductive_memo;
@@ -2995,7 +3050,28 @@ let all_theorem_schedules (thm : rocq_type) =
       (fun () -> List.filter_map (fun (i, ms_steps, schd) ->
         density_inductive_memo := with_stable_entries initial_inductive_memo;
         density_memo := initial_density_memo;
+        if lazy_best && (match !incumbent with
+            | Some best -> theorem_candidate_loses ~incumbent:best ms_steps schd
+            | None -> false)
+        then begin
+          collect_stable_entries initial_inductive_memo;
+          if schedule_trace_enabled () then
+            Feedback.msg_notice (str (Printf.sprintf "[theorem-lazy] candidate=%d skipped\n" i));
+          None
+        end else
         let result = schedule_density ms_steps schd in
+        if lazy_best then begin
+          let features = scored_schedule_features D_Thm i result in
+          if schedule_trace_enabled () then
+            Feedback.msg_notice (str (Printf.sprintf
+              "[theorem-lazy] candidate=%d scored density=%d uses=%d\n" i
+              features.ScheduleRanking.density_rank features.ScheduleRanking.variable_uses)
+              ++ str (schedule_to_string schd));
+          match !incumbent with
+          | Some best when ScheduleRanking.compare ~prefer_dense:true
+              (schedule_ranking_policy ()) features best >= 0 -> ()
+          | _ -> incumbent := Some features
+        end;
         collect_stable_entries initial_inductive_memo;
         let inductive_memo = !density_inductive_memo in
         let density_memo_after = !density_memo in
@@ -3012,7 +3088,18 @@ let all_theorem_schedules (thm : rocq_type) =
        inductive_memo, density_memo_after)) ranked in
   let matches select_groups =
     NewUnifyQC.type_to_schedules ?select_groups thm None None [] [] D_Thm true in
+  let lazy_best = best_only && theorem_lazy_scoring () in
+  let rank_exhaustive = rank ~lazy_best:false in
+  let rank = rank ~lazy_best in
   let ranked = rank (matches (grouped_selector D_Thm)) in
+  if lazy_best && Sys.getenv_opt "QC_SCHEDULE_SCORE_PRUNING" = Some "verify" then begin
+    let best entries = match entries with
+      | (scored, _) :: _ -> Some (scored_schedule_features D_Thm 0 scored)
+      | [] -> None in
+    let exhaustive = rank_exhaustive (matches (grouped_selector D_Thm)) in
+    if best exhaustive <> best ranked then
+      failwith "lazy theorem scoring changed the selected schedule"
+  end;
   if schedule_group_mode () = `Verify then begin
     let best entries = match entries with
       | (scored, _) :: _ -> Some { (scored_schedule_features D_Thm 0 scored)
@@ -3025,7 +3112,7 @@ let all_theorem_schedules (thm : rocq_type) =
   List.map snd ranked
 
 let best_theorem_schedule (thm : rocq_type) : schedule =
-  match all_theorem_schedules thm with
+  match all_theorem_schedules ~best_only:true thm with
   | (schedule, _, _, _, _) :: _ -> schedule
   | [] -> failwith "best_theorem_schedule: No valid schedules found"
 
@@ -3179,6 +3266,7 @@ let dec_eq_sched_phony = ("DecOpt_eq_III", [], [], [(([],CheckerSchedule),[],[])
 let init_density_inductive_memo = InductiveScheduleKeyMap.add (ty_ctr_of_string "Coq.Init.Logic.eq", [], D_Check, true) (DensityDone ((dec_eq_sched_phony, Checking), true, None)) InductiveScheduleKeyMap.empty
 
 let reset_density_inductive_memo () =
+  clear_inductive_name_cache ();
   stable_density_entries := InductiveScheduleKeyMap.empty;
   Hashtbl.reset contextual_derivations;
   density_inductive_memo := init_density_inductive_memo
@@ -3635,6 +3723,7 @@ let theorem_dependencies =
       | Some dt ->
         begin
           density_memo := RelationInstMap.empty;
+          clear_inductive_name_cache ();
           msg_debug (str (NewGenericLib.rocq_constr_to_string dt) ++ fnl ());
           let scheds = NewUnifyQC.type_to_schedules ?select_groups:(grouped_selector D_Thm)
             dt None None [] [] D_Thm false in
@@ -3932,7 +4021,8 @@ let quickchick_it size idx =
 
         let e' = Global.env () in
 
-        let theorem_schedules = all_theorem_schedules dt in
+        (* Index 0 needs only the best schedule; other indices need the full ranking. *)
+        let theorem_schedules = all_theorem_schedules ~best_only:(idx = 0) dt in
 
         let selected_schedule = 
           (match List.nth_opt theorem_schedules idx with
@@ -4321,6 +4411,7 @@ VERNAC COMMAND EXTEND DeriveValidSchedules CLASSIFIED AS SIDEFF
                         ++ str "\n\n");
 
       density_memo := RelationInstMap.empty;
+      clear_inductive_name_cache ();
       Feedback.msg_notice (str "Printing all bindings" ++ fnl ());
       let schedules_w_densities =
         match Sys.getenv_opt "QC_SCHEDULE_SCORE_PRUNING" with

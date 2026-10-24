@@ -81,6 +81,16 @@ added, and replayed wherever the same reads observe the same values and none
 of the keys it derived is in progress. `QC_SCHEDULE_CONTEXT_REUSE=0` disables
 this; over the full test suite the distinct selected schedules are identical
 either way.
+
+Selecting the best theorem schedule (`quickchick` with index 0) scores
+candidates lazily in identifier order. A candidate's density is the minimum
+grade of its steps and its variable uses are structural, so once the grades
+seen so far bound it no better than the incumbent, which precedes it and wins
+ties, its remaining dependency modes are not derived. Other indices, the
+listing tactics and `try_all_quickchick_schedules` rank every candidate.
+`QC_THEOREM_LAZY_SCORING=0` disables lazy scoring; under
+`QC_SCHEDULE_SCORE_PRUNING=verify` the lazy and exhaustive selections are
+compared.
 The trace also prints `selected-counts=Checking,Backtracking,Neutral,Partial,Total`
 for the counted-density policy (as five integers).
 
