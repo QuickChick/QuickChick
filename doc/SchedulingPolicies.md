@@ -15,6 +15,7 @@ The existing `QC_SCHEDULE_RANKING` environment setting is preserved:
 | `density_only` | Density | None |
 | `vars_then_density` | Fewer uses of previously bound variables | Density |
 | `vars_only` | Fewer uses of previously bound variables | None |
+| `budget_aware` | Specimen's completed BudgetAware score | See below |
 
 Generation and theorem testing prefer higher density. Checking and enumeration
 prefer lower density. Densities, in ascending order, are Checking, Backtracking,
@@ -23,6 +24,31 @@ a checker or enumerator uses the highest. An empty producer schedule is Total;
 an empty checker or enumerator schedule is Checking. Candidate identifiers break
 remaining ties, preserving deterministic selection from the generated list.
 Existing aliases and unknown-value fallback to the default are unchanged.
+
+### BudgetAware ranking
+
+`QC_SCHEDULE_RANKING=budget_aware` (or `budget-aware`) ranks each
+constructor's candidate schedules by `BudgetAwareScore`, the port of
+Specimen's completed six-field score (selectivity, density, fabrication,
+locality, input-check dependencies, variable dependencies), compared
+lexicographically. Ties keep the lowest candidate identifier. A candidate
+the scorer cannot represent, such as one with a `let` step, is a user error
+rather than a fallback to density ranking.
+
+A relation's score combines, over the same input-pattern coverage leaves the
+density ranking uses, the best score among each leaf's constructors; an
+uncovered leaf scores Partial, as in Specimen. It is stored with the
+relation's completed memo entry. A dependency contributes its stored score
+only when that entry is complete and cycle-independent. Self-recursive,
+mutually recursive in-progress and cycle-dependent calls, and existing
+instances without a measured schedule, are unknown and score as Partial with
+no fabrication. Constructor schedules are chosen per constructor, as in
+Specimen; this is not a joint optimum over the relation's aggregate.
+
+Grouped search uses BudgetAware's grouped policy in this mode, and
+`QC_SCHEDULE_GROUPS=verify` compares best BudgetAware scores with the joint
+search. Theorem testing still ranks by density. Score-based pruning is not
+used with BudgetAware yet.
 
 The opt-in `density_counts_then_vars` policy breaks a worst-density tie by
 counting annotated steps at each density, starting with the worst grade for the
@@ -113,7 +139,7 @@ variable uses are additive. BudgetAware is also an instance
 counts are additive; density and locality are extremal. Its scorer is
 separable because each step naming a variable lies in that variable's group,
 so selectivity's per-variable sets do not overlap, and the shared steps
-produce no variable and pin none. BudgetAware is not yet used for selection.
+produce no variable and pin none. It is used for selection under `QC_SCHEDULE_RANKING=budget_aware`.
 The test `plugin/test_grouped_score.ml` checks the generic search against
 brute force on random policies, BudgetAware's laws and exactness, and
 separability on fixture schedules.
@@ -237,9 +263,9 @@ analysis, recursive locality, fabrication propagated from an enumerator,
 and coverage aggregation; see `test/budget_aware`. The scorer also accepts
 real scheduler candidates, including their match and equality preludes.
 The unifier exposes prepared fixed inputs and dependency requests retain
-applied type arguments. This does not activate BudgetAware ranking. Production
-use still needs context-aware completed dependency scores and Rocq relation
-metadata; the search bound must be built and checked separately.
+applied type arguments. The `budget_aware` ranking above uses this library with
+completed dependency scores from the memo. The search bound must still be
+built and checked separately.
 Unsupported QuickChick-only `let` and defined-source
 steps return an error rather than silently receiving an approximate score.
 

@@ -890,7 +890,7 @@ end)
    bound for descendants of a search node. *)
 type inductive_density_entry =
   | DensityInProgress of (inductive_schedule * rule_density)
-  | DensityDone of (inductive_schedule * rule_density) * bool
+  | DensityDone of (inductive_schedule * rule_density) * bool * BudgetAwareScore.score option
 
 (* A completed entry is cycle-independent only if its computation never read
    a provisional or cycle-dependent grade. Under fixed scoring inputs, later
@@ -901,13 +901,35 @@ let density_uncertainty_events = ref 0
 let inductive_density_value = function
   | DensityInProgress value ->
     incr density_uncertainty_events; value
-  | DensityDone (value, cycle_independent) ->
+  | DensityDone (value, cycle_independent, _) ->
     if not cycle_independent then incr density_uncertainty_events;
     value
 
 let density_inductive_memo :
   inductive_density_entry InductiveScheduleKeyMap.t ref =
   ref InductiveScheduleKeyMap.empty
+
+(* QC_SCHEDULE_RANKING=budget_aware ranks constructor schedules by Specimen's
+   completed BudgetAware score instead of the density ranking. Other values
+   keep their existing meaning. *)
+let budget_aware_ranking () =
+  match Sys.getenv_opt "QC_SCHEDULE_RANKING" with
+  | Some ("budget_aware" | "budget-aware") -> true
+  | _ -> false
+
+(* A dependency's completed BudgetAware score in the current memo. Only a
+   completed, cycle-independent entry counts. Recursive, in-progress and
+   cycle-dependent calls, and existing instances with no measured schedule,
+   are unknown; the scorer then uses Specimen's Partial token. *)
+let budget_dependency_score (request : BudgetAwareScore.dependency_request) =
+  let key = request.BudgetAwareScore.key in
+  let find constrained = InductiveScheduleKeyMap.find_opt
+    (key.BudgetAwareScore.relation, key.BudgetAwareScore.output_indices,
+     key.BudgetAwareScore.derive_sort, constrained) !density_inductive_memo in
+  match find true, find false with
+  | Some (DensityDone (_, true, Some score)), _ -> Some score
+  | _, Some (DensityDone (_, true, Some score)) -> Some score
+  | _ -> None
 
 (*Three heuristics detecting difficult to generate rules*)
 let rec is_output_constrained_in_hypothesis ((ind_name, ctr_name, arity, hyps, conc) : rule) (ois : output_index list) : bool =
@@ -1231,6 +1253,18 @@ let scored_schedule_features ds candidate_id ((steps, _) as scored) =
     variable_uses = get_num_var_uses scored ds;
     candidate_id }
 
+(* The worst step density for the derivation direction. *)
+let representative_density ds ((schd_steps, _) : schedule_with_density) =
+  match ds with
+  | D_Gen | D_Thm ->
+    (match List.sort (fun (_,d) (_,d') -> compare d d') schd_steps with
+     | (_,x) :: _ -> x
+     | [] -> Total)
+  | D_Enum | D_Check ->
+    (match List.sort (fun (_,d) (_,d') -> - (compare d d')) schd_steps with
+     | (_,x) :: _ -> x
+     | [] -> Checking)
+
 let sort_schedules_by_density_and_var_uses (schedules : (int * schedule_with_density) list) (ds : derive_sort) : (schedule_with_density * rule_density * int * int) list =
   let rec take_local n l =
     if n <= 0 then [] else
@@ -1243,17 +1277,7 @@ let sort_schedules_by_density_and_var_uses (schedules : (int * schedule_with_den
     | D_Gen | D_Thm -> fun d d' -> - (compare d d')
     | D_Enum | D_Check -> fun d d' -> compare d d'
   in
-  let representative_density (schd_steps, _) =
-    match ds with
-    | D_Gen | D_Thm ->
-      (match List.sort (fun (_,d) (_,d') -> compare d d') schd_steps with
-       | (_,x) :: _ -> x
-       | [] -> Total)
-    | D_Enum | D_Check ->
-      (match List.sort (fun (_,d) (_,d') -> - (compare d d')) schd_steps with
-       | (_,x) :: _ -> x
-       | [] -> Checking)
-  in
+  let representative_density = representative_density ds in
   let entries = List.map (fun (i, (schd_steps,schd_sort)) ->
     let density = representative_density (schd_steps,schd_sort) in
     let num_var_uses = get_num_var_uses (schd_steps,schd_sort) ds in
@@ -1667,6 +1691,18 @@ let with_temporary_density_state f =
     density_uncertainty_events := saved_uncertainty)
     (fun () -> with_score_pruning_suspended f)
 
+let budget_key ind_name result_vars output_vars ds = {
+  BudgetAwareScore.relation = ind_name;
+  output_indices = filter_mapi (fun i (v, _) ->
+    if List.mem v output_vars then Some i else None) result_vars;
+  derive_sort = ds }
+
+(* Finite pins are cached for the lifetime of one context. *)
+let budget_context inputs = {
+  BudgetAwareScore.input_vars = inputs;
+  finite_pins = BudgetAwareScore.finite_pins_from_environment ();
+  completed_dependency = budget_dependency_score }
+
 let schedule_group_mode () = match Sys.getenv_opt "QC_SCHEDULE_GROUPS" with
   | Some ("0" | "false" | "no") -> `Off
   | Some "verify" -> `Verify
@@ -1829,7 +1865,7 @@ and constructor_valid_schedules (ind_name : ty_ctr) (ctr : rocq_ctr) (result_var
       !stable_dependencies memo in
   let collect_stable () = if reuse_stable then
     InductiveScheduleKeyMap.iter (fun key entry -> match entry with
-      | DensityDone (_, true) when
+      | DensityDone (_, true, _) when
           not (InductiveScheduleKeyMap.mem key initial_inductive_memo) ->
         stable_dependencies := InductiveScheduleKeyMap.add key entry !stable_dependencies
       | _ -> ()) !density_inductive_memo in
@@ -1989,10 +2025,24 @@ and constructor_valid_schedules (ind_name : ty_ctr) (ctr : rocq_ctr) (result_var
           if cut then incr pruned_prefixes;
           cut)) else None in
   let group_mode = schedule_group_mode () in
-  (* Prefix-pruning modes still search jointly. *)
-  let select_groups = if group_mode = `Off || score_pruning_mode <> `Off then None
-    else Some (schedule_group_selector ds) in
   let prepared_inputs = ref [] in
+  (* Prefix-pruning modes still search jointly. Under BudgetAware ranking,
+     groups are scored and combined by BudgetAware itself, which is separable
+     across footprint-disjoint groups. The unifier reports prepared inputs
+     before it searches. *)
+  let select_groups = if group_mode = `Off || score_pruning_mode <> `Off then None
+    else if budget_aware_ranking () then Some (fun groups ->
+      let context = budget_context !prepared_inputs in
+      let key = budget_key ind_name result_vars output_vars ds in
+      let scores = List.map (List.map (fun ((steps, _) as schedule) ->
+        try with_temporary_density_state (fun () ->
+          ignore (schedule_density [] schedule);
+          match BudgetAwareScore.score_schedule context key steps with
+          | Ok score -> Some score
+          | Error _ -> None)
+        with Noninductive_dependency _ | Unavailable_mode _ -> None)) groups in
+      GroupedScore.select_combinations BudgetAwareScore.group_policy scores)
+    else Some (schedule_group_selector ds) in
   let schedule_matches = NewUnifyQC.type_to_schedules
     ~on_prepared:(fun inputs -> prepared_inputs := inputs) ?select_groups
     ?on_prefix ?on_prefix_with_floor ?should_prune_prefix_with_floor
@@ -2154,7 +2204,38 @@ and constructor_valid_schedules (ind_name : ty_ctr) (ctr : rocq_ctr) (result_var
       | Some (_, _, g) when ScheduleRanking.compare ~prefer_dense policy g f <= 0 -> best
       | _ -> Some entry) None entries in
     let without_id (f : ScheduleRanking.features) = { f with ScheduleRanking.candidate_id = 0 } in
-    let changed_selection = match best scored_joint, best scored_grouped with
+    let budget_verify () =
+      let context = budget_context !prepared_inputs in
+      let key = budget_key ind_name result_vars output_vars ds in
+      let score steps = match BudgetAwareScore.score_schedule context key steps with
+        | Ok score -> Some score | Error _ -> None in
+      let best_budget = List.fold_left (fun best score -> match best, score with
+        | _, None -> best
+        | Some b, Some s when BudgetAwareScore.compare b s <= 0 -> best
+        | _, Some s -> Some s) None in
+      let joint_best = with_temporary_density_state (fun () -> best_budget
+        (List.map (fun triple ->
+          density_inductive_memo := initial_inductive_memo;
+          density_memo := initial_density_memo;
+          let ms_steps, schd = materialize triple in
+          try score (List.map fst (fst (schedule_density ms_steps schd)))
+          with Noninductive_dependency _ | Unavailable_mode _ -> None) joint)) in
+      let grouped_best = with_temporary_density_state (fun () -> best_budget
+        (List.map (fun (_, (steps, _), inductive_memo, density_memo_after) ->
+          density_inductive_memo := inductive_memo;
+          density_memo := density_memo_after;
+          score (List.map fst steps)) schedule_densities)) in
+      let same = match joint_best, grouped_best with
+        | None, None -> true
+        | Some j, Some g -> BudgetAwareScore.compare j g = 0
+        | _ -> false in
+      if not same then failwith ("grouped schedule search changed the best BudgetAware score for constructor "
+        ^ constructor_to_string ctr_name ^ ": joint "
+        ^ Stdlib.Option.fold ~none:"none" ~some:BudgetAwareScore.to_string joint_best
+        ^ ", grouped "
+        ^ Stdlib.Option.fold ~none:"none" ~some:BudgetAwareScore.to_string grouped_best) in
+    let changed_selection = if budget_aware_ranking () then (budget_verify (); None) else
+      match best scored_joint, best scored_grouped with
       | None, None -> None
       | Some (_, joint_triple, j), Some (_, grouped_triple, g) ->
         if ScheduleRanking.compare ~prefer_dense policy (without_id j) (without_id g) <> 0 then
@@ -2197,7 +2278,7 @@ and constructor_valid_schedules (ind_name : ty_ctr) (ctr : rocq_ctr) (result_var
          | None -> InductiveScheduleKeyMap.find_opt
              (key.B.relation, key.B.output_indices, key.B.derive_sort, false) memo in
        match entry with
-       | Some (DensityDone (((_, inputs, _, base, recursive), _), true)) ->
+       | Some (DensityDone (((_, inputs, _, base, recursive), _), true, _)) ->
          (match base @ recursive with
           | [((steps, _), _, _)] ->
             let dependencies = B.required_dependencies key steps in
@@ -2458,25 +2539,55 @@ and constructor_valid_schedules (ind_name : ty_ctr) (ctr : rocq_ctr) (result_var
     if observed <> rescored then
       failwith "schedule score leaf probe differs from final candidate scoring"
   end;
-  constructor_inputs, schedule_densities)
+  constructor_inputs, schedule_densities, !prepared_inputs)
 
 and select_best_schedule (schedules : (int * schedule_with_density) list) (ds : derive_sort) : (int * schedule * rule_density) option =
   match sort_schedules_by_density_and_var_uses schedules ds with
   | [] -> None
   | ((schd_steps_density,schd_sort), density, num_var_uses, id) :: _ -> Some (id, (List.map fst schd_steps_density,schd_sort), density)
 
-and constructor_best_valid_schedule (ind_name : ty_ctr) (ctr : rocq_ctr) (result_vars : (var * rocq_constr) list) (output_vars : var list) (ds : derive_sort) (opt : bool) : ty_ctr * ((int * schedule * rule_density) * (var * mexp) list) option =
-  let constructor_inputs, scored = constructor_valid_schedules ind_name ctr result_vars output_vars ds opt in
-  let selected = select_best_schedule
-    (List.map (fun (i, schedule, _, _) -> i, schedule) scored) ds in
+(* With BudgetAware ranking, the chosen candidate's completed score is also
+   returned, so the relation's score can aggregate it over coverage leaves. *)
+and constructor_best_valid_schedule (ind_name : ty_ctr) (ctr : rocq_ctr) (result_vars : (var * rocq_constr) list) (output_vars : var list) (ds : derive_sort) (opt : bool) : ty_ctr * ((int * schedule * rule_density) * (var * mexp) list) option * BudgetAwareScore.score option =
+  let constructor_inputs, scored, prepared_inputs = constructor_valid_schedules ind_name ctr result_vars output_vars ds opt in
+  let entry id = List.find (fun (i, _, _, _) -> i = id) scored in
+  let selected, budget = if not (budget_aware_ranking ()) then
+      select_best_schedule (List.map (fun (i, schedule, _, _) -> i, schedule) scored) ds, None
+    else begin
+      let context = budget_context prepared_inputs in
+      let key = budget_key ind_name result_vars output_vars ds in
+      let saved = !density_inductive_memo, !density_memo in
+      let ranked = Fun.protect ~finally:(fun () ->
+          density_inductive_memo := fst saved; density_memo := snd saved)
+        (fun () -> List.map (fun (i, (steps, _), inductive_memo, density_memo_after) ->
+          density_inductive_memo := inductive_memo;
+          density_memo := density_memo_after;
+          match BudgetAwareScore.score_schedule context key (List.map fst steps) with
+          | Ok score -> i, score
+          | Error message -> CErrors.user_err (str (Printf.sprintf
+              "BudgetAware ranking cannot score constructor %s: %s"
+              (constructor_to_string (fst ctr)) message))) scored) in
+      match List.fold_left (fun best (i, score) -> match best with
+          | Some (_, best_score) when BudgetAwareScore.compare best_score score <= 0 -> best
+          | _ -> Some (i, score)) None ranked with
+      | None -> None, None
+      | Some (id, score) ->
+        let (_, ((steps, sort) as schedule), _, _) = entry id in
+        if schedule_trace_enabled () then
+          Feedback.msg_notice (str (Printf.sprintf
+            "[schedule-ranking] policy=budget_aware derive=%s candidates=%d selected-id=%d %s\n"
+            (schedule_rank_derive_sort_to_string ds) (List.length ranked) id
+            (BudgetAwareScore.to_string score))
+            ++ str (schedule_with_densities_to_string schedule));
+        Some (id, (List.map fst steps, sort), representative_density ds schedule), Some score
+    end in
   (match selected with
    | None -> ()
    | Some (id, _, _) ->
-     let (_, _, inductive_memo, density_memo_after) =
-       List.find (fun (i, _, _, _) -> i = id) scored in
+     let (_, _, inductive_memo, density_memo_after) = entry id in
      density_inductive_memo := inductive_memo;
      density_memo := density_memo_after);
-  fst ctr, Option.map (fun chosen -> chosen, constructor_inputs) selected
+  fst ctr, Option.map (fun chosen -> chosen, constructor_inputs) selected, budget
 
 and inductive_best_valid_schedule (rel : rocq_relation) (output_idxs : int list) (ds : derive_sort) (opt : bool) : inductive_schedule * rule_density =
   let (ind_name, params, ctrs, result_typ) = rel in
@@ -2556,11 +2667,13 @@ and inductive_best_valid_schedule (rel : rocq_relation) (output_idxs : int list)
 
   let constructor_schedules_with_density = List.filter_map (fun ctr ->
     match constructor_best_valid_schedule ind_name ctr result_vars output_vars ds opt with
-    | (ctr_name, None) -> raise (Unavailable_mode (constructor_to_string ctr_name))
-    | (ctr_name, Some ((i, schd, density), binders)) ->
-      Some ((schd, [], binders), (ctr_name, density))) ctrs in
+    | (ctr_name, None, _) -> raise (Unavailable_mode (constructor_to_string ctr_name))
+    | (ctr_name, Some ((i, schd, density), binders), budget) ->
+      Some ((schd, [], binders), (ctr_name, density), (ctr_name, budget))) ctrs in
 
-  let (constructor_schedules, densities) = List.split constructor_schedules_with_density in
+  let constructor_schedules = List.map (fun (s, _, _) -> s) constructor_schedules_with_density in
+  let densities = List.map (fun (_, d, _) -> d) constructor_schedules_with_density in
+  let budget_scores = List.map (fun (_, _, b) -> b) constructor_schedules_with_density in
 
   let is_recursive ((steps,_),_,_) =
     List.exists (function | S_UC (_,SrcRec _,_) | S_ST (_,SrcRec _, _) | S_Check (SrcRec _,_) -> true | _ -> false) steps 
@@ -2623,7 +2736,14 @@ and inductive_best_valid_schedule (rel : rocq_relation) (output_idxs : int list)
                                                   ^ (density_to_string overall_density)) ++ fnl ()));
 
   let cycle_independent = !density_uncertainty_events = uncertainty_at_start in
-  density_inductive_memo := InductiveScheduleKeyMap.add (ind_name, output_idxs, ds, opt) (DensityDone ((inductive_schedule, overall_density), cycle_independent)) !density_inductive_memo;
+  (* Specimen's inductive score: combine, over coverage leaves, the best
+     score among the leaf's constructors; an uncovered leaf scores Partial. *)
+  let budget_score = if not (budget_aware_ranking ()) then None else
+    let score_of c = match List.assoc_opt c budget_scores with
+      | Some (Some score) -> Some score | _ -> None in
+    Some (BudgetAwareScore.inductive_score
+      (List.map (fun (_, cs) -> List.filter_map score_of cs) covered_patterns)) in
+  density_inductive_memo := InductiveScheduleKeyMap.add (ind_name, output_idxs, ds, opt) (DensityDone ((inductive_schedule, overall_density), cycle_independent, budget_score)) !density_inductive_memo;
   Error.msg_debug (str (Printf.sprintf "%s: %s Done, Density: %s, cycle-independent: %b\n" (schedule_name) (String.concat ", " (List.map string_of_int output_idxs)) (density_to_string overall_density) cycle_independent));
   inductive_schedule, overall_density)
 end
@@ -2852,7 +2972,7 @@ module InductiveSchedMap = Map.Make(struct type t = inductive_schedule * derive_
 
 let dec_eq_sched_phony = ("DecOpt_eq_III", [], [], [(([],CheckerSchedule),[],[])], [(([],CheckerSchedule),[],[])])
    
-let init_density_inductive_memo = InductiveScheduleKeyMap.add (ty_ctr_of_string "Coq.Init.Logic.eq", [], D_Check, true) (DensityDone ((dec_eq_sched_phony, Checking), true)) InductiveScheduleKeyMap.empty
+let init_density_inductive_memo = InductiveScheduleKeyMap.add (ty_ctr_of_string "Coq.Init.Logic.eq", [], D_Check, true) (DensityDone ((dec_eq_sched_phony, Checking), true, None)) InductiveScheduleKeyMap.empty
 
 (* Diagnostic scoring must not consume or leave behind entries from another
    proof context. Normal derivation commands establish their own memo state. *)
@@ -3223,11 +3343,11 @@ let tarjan_schedules_by_name (schedules : string list) inductive_dependency_map
      List.iter (List.iter (fun ((name,_,_,_,_) as schedule, ds, constrained) ->
        let ind, outputs, _, _ = parse_ind_schd_name name in
        let entry = match InductiveScheduleKeyMap.find_opt (ind, outputs, ds, constrained) !density_inductive_memo with
-         | Some (DensityDone ((_, density), cycle_independent)) ->
-           DensityDone ((schedule, density), cycle_independent)
+         | Some (DensityDone ((_, density), cycle_independent, budget)) ->
+           DensityDone ((schedule, density), cycle_independent, budget)
          | Some (DensityInProgress (_, density)) ->
            DensityInProgress (schedule, density)
-         | None -> DensityDone ((schedule, Checking), false) in
+         | None -> DensityDone ((schedule, Checking), false, None) in
        density_inductive_memo := InductiveScheduleKeyMap.add (ind, outputs, ds, constrained) entry !density_inductive_memo)) components;
      components)
 
@@ -3616,7 +3736,7 @@ let quickchick_it size idx =
 
         (* Register theorem as a phony inductive schedule *)
         let phony_theorem_ind_schd = ("theorem", [], [],[selected_schedule,[],[]],[]) in
-        density_inductive_memo := InductiveScheduleKeyMap.add (ty_ctr_of_string "theorem", [], D_Thm, true) (DensityDone ((phony_theorem_ind_schd, Checking), true)) !density_inductive_memo;
+        density_inductive_memo := InductiveScheduleKeyMap.add (ty_ctr_of_string "theorem", [], D_Thm, true) (DensityDone ((phony_theorem_ind_schd, Checking), true, None)) !density_inductive_memo;
 
         density_inductive_memo := InductiveScheduleKeyMap.remove (ty_ctr_of_string "eq", [], D_Check, true) !density_inductive_memo;
         (* let (unconstrained_inductives, mut_used_inductives) = collect_all_used_inductives_theorem theorem_schedule in *)
@@ -3991,7 +4111,7 @@ VERNAC COMMAND EXTEND DeriveValidSchedules CLASSIFIED AS SIDEFF
       let schedules_w_densities =
         match Sys.getenv_opt "QC_SCHEDULE_SCORE_PRUNING" with
         | Some ("1" | "true" | "yes" | "verify" | "baseline") ->
-          snd (constructor_valid_schedules ind_name (ctr, constructor)
+          (fun (_, scored, _) -> scored) (constructor_valid_schedules ind_name (ctr, constructor)
             result_vars output_vars ds true)
           |> List.map (fun (i, scored, _, _) -> i, scored)
           |> take 300

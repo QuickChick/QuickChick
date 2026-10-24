@@ -34,11 +34,11 @@ of silently receiving a score. The finite producer has selectivity zero, and
 the loose producer followed by a finite check has selectivity one. This
 diagnostic does not change public ranking or provide a search bound.
 
-The library is not connected to production BudgetAware selection or general
-recursive dependency derivation yet. `S_Let` and `SrcDef` have no counterparts in the pinned
-Specimen schedule syntax and return an error instead of an invented score.
-The callback must supply completed scores in the correct applied context;
-cycle-dependent or provisional grades are not safe substitutes. The public
-ranking and syntax remain unchanged. Production use still needs instance-aware
-recursive score derivation and relation metadata from Rocq for finite pinning.
+`QC_SCHEDULE_RANKING=budget_aware` uses the library to select constructor
+schedules; see `doc/SchedulingPolicies.md`. `S_Let` and `SrcDef` have no
+counterparts in the pinned Specimen schedule syntax and return an error
+instead of an invented score. Dependency scores come only from completed,
+cycle-independent memo entries; other calls score as Partial.
+`test/budget_aware_ranking` checks a fixture where BudgetAware and the
+default density ranking choose different schedules.
 Admissible bounds are a separate subsequent step.
