@@ -63,6 +63,15 @@ recursive cycles.
 density, and variable-use count. `QC_SCHEDULE_TIE_REPORT=1` enables tie diagnostics;
 `QC_SCHEDULE_TIE_LIMIT` limits their output (default 3; 0 means no limit).
 These are existing diagnostic environment settings, not new Rocq options.
+`QC_SCHEDULE_SELECTION_LOG=<file>` appends one line per selected constructor
+schedule (relation, output positions, mode, constructor, schedule), for
+comparing rankings across runs.
+
+Completed dependency entries whose derivation read no provisional grade from
+outside itself are shared by all candidates of a top-level derivation; other
+entries are recomputed per candidate, so a candidate's score does not depend
+on which candidates were scored before it. `QC_SCHEDULE_REUSE_STABLE=0`
+disables the sharing for diagnosis.
 The trace also prints `selected-counts=Checking,Backtracking,Neutral,Partial,Total`
 for the counted-density policy (as five integers).
 

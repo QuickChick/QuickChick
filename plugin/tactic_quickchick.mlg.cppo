@@ -905,6 +905,52 @@ let inductive_density_value = function
     if not cycle_independent then incr density_uncertainty_events;
     value
 
+(* Cycle independence is decided as in Tarjan's algorithm. Each derivation
+   records its nesting depth while in progress. A derivation is
+   cycle-independent when every provisional entry it read started at its own
+   depth or deeper: its result is then determined by its key alone. A
+   cycle-dependent entry keeps the lowest depth it read until the derivation
+   at that depth finishes; it is then permanently provisional. *)
+let density_depth = ref 0
+let density_low_read = ref max_int
+let in_progress_depth : int InductiveScheduleKeyMap.t ref =
+  ref InductiveScheduleKeyMap.empty
+let cycle_low : int InductiveScheduleKeyMap.t ref =
+  ref InductiveScheduleKeyMap.empty
+
+(* Completed, cycle-independent entries are determined by their key, so they
+   are shared by every candidate of one top-level derivation; only provisional
+   entries are isolated per candidate. Cleared with the top-level memo. *)
+let stable_density_entries : inductive_density_entry InductiveScheduleKeyMap.t ref =
+  ref InductiveScheduleKeyMap.empty
+
+let read_inductive_density key entry =
+  let low = match entry with
+    | DensityInProgress _ ->
+      Some (Stdlib.Option.value ~default:min_int
+        (InductiveScheduleKeyMap.find_opt key !in_progress_depth))
+    | DensityDone (_, false, _) ->
+      Some (Stdlib.Option.value ~default:min_int
+        (InductiveScheduleKeyMap.find_opt key !cycle_low))
+    | DensityDone (_, true, _) -> None in
+  Stdlib.Option.iter (fun low -> density_low_read := min !density_low_read low) low;
+  inductive_density_value entry
+
+let enter_density_derivation key =
+  let depth = !density_depth + 1 in
+  let saved_low = !density_low_read in
+  density_depth := depth;
+  density_low_read := max_int;
+  in_progress_depth := InductiveScheduleKeyMap.add key depth !in_progress_depth;
+  depth, saved_low
+
+let leave_density_derivation key depth saved_low =
+  in_progress_depth := InductiveScheduleKeyMap.remove key !in_progress_depth;
+  cycle_low := InductiveScheduleKeyMap.map (fun low ->
+    if low >= depth then min_int else low) !cycle_low;
+  density_depth := depth - 1;
+  density_low_read := min saved_low !density_low_read
+
 let density_inductive_memo :
   inductive_density_entry InductiveScheduleKeyMap.t ref =
   ref InductiveScheduleKeyMap.empty
@@ -1703,6 +1749,24 @@ let budget_context inputs = {
   finite_pins = BudgetAwareScore.finite_pins_from_environment ();
   completed_dependency = budget_dependency_score }
 
+(* QC_SCHEDULE_SELECTION_LOG=<file> appends one line per selected constructor
+   schedule, for comparing rankings across runs. *)
+let log_schedule_selection ind_name ctr result_vars output_vars ds opt schedule =
+  match Sys.getenv_opt "QC_SCHEDULE_SELECTION_LOG" with
+  | None | Some "" -> ()
+  | Some file ->
+    let key = budget_key ind_name result_vars output_vars ds in
+    let line = Printf.sprintf "%s|%s|%s|%b|%s|%s\n"
+      (ty_ctr_to_string ind_name)
+      (String.concat "," (List.map string_of_int key.BudgetAwareScore.output_indices))
+      (schedule_rank_derive_sort_to_string ds) opt
+      (constructor_to_string (fst ctr))
+      (String.concat " " (String.split_on_char '\n'
+         (schedule_with_densities_to_string schedule))) in
+    let channel = open_out_gen [Open_append; Open_creat] 0o644 file in
+    Fun.protect ~finally:(fun () -> close_out channel)
+      (fun () -> output_string channel line)
+
 let schedule_group_mode () = match Sys.getenv_opt "QC_SCHEDULE_GROUPS" with
   | Some ("0" | "false" | "no") -> `Off
   | Some "verify" -> `Verify
@@ -1850,12 +1914,15 @@ and constructor_valid_schedules (ind_name : ty_ctr) (ctr : rocq_ctr) (result_var
     | _ -> `Off in
   let prefer_dense = ds = D_Gen || ds = D_Thm in
   let policy = schedule_ranking_policy () in
-  let reuse_stable = score_pruning_mode <> `Off &&
+  (* A completed, cycle-independent dependency entry is determined by its key,
+     so candidates may share it. Without sharing, every candidate re-derives
+     every dependency, which multiplies along nested derivations. *)
+  let reuse_stable =
     match Sys.getenv_opt "QC_SCHEDULE_REUSE_STABLE" with
     | Some ("0" | "false" | "no") -> false
     | _ -> true in
   let initial_inductive_memo = !density_inductive_memo in
-  let stable_dependencies = ref InductiveScheduleKeyMap.empty in
+  let stable_dependencies = stable_density_entries in
   (* Share only completed entries whose dependency walk read no provisional
      or cycle-dependent grade. Keep the caller's in-progress entries intact. *)
   let add_stable memo = if not reuse_stable then memo else
@@ -2584,16 +2651,19 @@ and constructor_best_valid_schedule (ind_name : ty_ctr) (ctr : rocq_ctr) (result
   (match selected with
    | None -> ()
    | Some (id, _, _) ->
-     let (_, _, inductive_memo, density_memo_after) = entry id in
+     let (_, schedule, inductive_memo, density_memo_after) = entry id in
+     log_schedule_selection ind_name ctr result_vars output_vars ds opt schedule;
      density_inductive_memo := inductive_memo;
      density_memo := density_memo_after);
   fst ctr, Option.map (fun chosen -> chosen, constructor_inputs) selected, budget
 
 and inductive_best_valid_schedule (rel : rocq_relation) (output_idxs : int list) (ds : derive_sort) (opt : bool) : inductive_schedule * rule_density =
   let (ind_name, params, ctrs, result_typ) = rel in
-  if InductiveScheduleKeyMap.mem (ind_name, output_idxs, ds, opt) !density_inductive_memo then inductive_density_value (InductiveScheduleKeyMap.find (ind_name, output_idxs, ds, opt) !density_inductive_memo)
+  let memo_key = (ind_name, output_idxs, ds, opt) in
+  if InductiveScheduleKeyMap.mem memo_key !density_inductive_memo then read_inductive_density memo_key (InductiveScheduleKeyMap.find memo_key !density_inductive_memo)
   else begin
-  let uncertainty_at_start = !density_uncertainty_events in
+  let depth, saved_low = enter_density_derivation memo_key in
+  Fun.protect ~finally:(fun () -> leave_density_derivation memo_key depth saved_low) (fun () ->
   Error.msg_debug (str "Inductive name: " 
   ++ str (ty_ctr_to_string ind_name)
   ++ str "\n Parameters: "
@@ -2735,7 +2805,9 @@ and inductive_best_valid_schedule (rel : rocq_relation) (output_idxs : int list)
                                                   ^ " has overall density: " 
                                                   ^ (density_to_string overall_density)) ++ fnl ()));
 
-  let cycle_independent = !density_uncertainty_events = uncertainty_at_start in
+  let cycle_independent = !density_low_read >= depth in
+  if not cycle_independent then
+    cycle_low := InductiveScheduleKeyMap.add memo_key !density_low_read !cycle_low;
   (* Specimen's inductive score: combine, over coverage leaves, the best
      score among the leaf's constructors; an uncovered leaf scores Partial. *)
   let budget_score = if not (budget_aware_ranking ()) then None else
@@ -2745,7 +2817,7 @@ and inductive_best_valid_schedule (rel : rocq_relation) (output_idxs : int list)
       (List.map (fun (_, cs) -> List.filter_map score_of cs) covered_patterns)) in
   density_inductive_memo := InductiveScheduleKeyMap.add (ind_name, output_idxs, ds, opt) (DensityDone ((inductive_schedule, overall_density), cycle_independent, budget_score)) !density_inductive_memo;
   Error.msg_debug (str (Printf.sprintf "%s: %s Done, Density: %s, cycle-independent: %b\n" (schedule_name) (String.concat ", " (List.map string_of_int output_idxs)) (density_to_string overall_density) cycle_independent));
-  inductive_schedule, overall_density)
+  inductive_schedule, overall_density))
 end
 
 and best_inductive_schedule_from_instance (ind_instance : rocq_type) (output_vars : var list) (ds : derive_sort) (opt : bool) : inductive_schedule * rule_density =
@@ -2753,11 +2825,14 @@ and best_inductive_schedule_from_instance (ind_instance : rocq_type) (output_var
     (("resolved_instance", [], [], [], []),
      if ds = D_Check || ds = D_Enum then Checking else if opt then Partial else Total)
   else
+  (* Only arguments headed by an inductive type are types to instantiate. A
+     defined function applied to values, such as [f a x] in [R (f a x) y], is
+     a value argument and has no generator of its own. *)
   let rec instantiate_applied_types (ty : rocq_type) : unit =
     match ty with
     | DTyCtr (ind_name, args) ->
       List.iter (function
-      | DTyCtr (applied_ind_name, applied_args) ->
+      | DTyCtr (applied_ind_name, applied_args) when is_inductive' applied_ind_name ->
         ignore (best_inductive_schedule_from_instance (DTyCtr (applied_ind_name, applied_args)) [] (match ds with | D_Gen | D_Thm -> D_Gen | D_Check | D_Enum -> D_Enum) false);
         List.iter instantiate_applied_types applied_args
       | _ -> ()) args
@@ -2974,6 +3049,10 @@ let dec_eq_sched_phony = ("DecOpt_eq_III", [], [], [(([],CheckerSchedule),[],[])
    
 let init_density_inductive_memo = InductiveScheduleKeyMap.add (ty_ctr_of_string "Coq.Init.Logic.eq", [], D_Check, true) (DensityDone ((dec_eq_sched_phony, Checking), true, None)) InductiveScheduleKeyMap.empty
 
+let reset_density_inductive_memo () =
+  stable_density_entries := InductiveScheduleKeyMap.empty;
+  density_inductive_memo := init_density_inductive_memo
+
 (* Diagnostic scoring must not consume or leave behind entries from another
    proof context. Normal derivation commands establish their own memo state. *)
 let with_fresh_density_memo f =
@@ -2986,7 +3065,7 @@ let with_fresh_density_memo f =
       density_memo := old_rule;
       rocq_relation_memo := old_relations)
     (fun () ->
-      density_inductive_memo := init_density_inductive_memo;
+      reset_density_inductive_memo ();
       density_memo := RelationInstMap.empty;
       rocq_relation_memo := TyCtrMap.empty;
       f ())
@@ -3623,7 +3702,7 @@ let define_schedule_components ~local components pieces =
 let derive_schedule ind ois ds opt =
   match NewGenericLib.ind_reference_to_rocq_relations ind with
     | Some (idx, rs) ->
-      density_inductive_memo := init_density_inductive_memo;
+      reset_density_inductive_memo ();
       inductive_set := inductive_set_init;
       rocq_relation_memo := TyCtrMap.empty;
       (* inductive_dependency_map := StringMap.empty; *)
@@ -3712,7 +3791,7 @@ let quickchick_it size idx =
       begin
         msg_debug (str (NewGenericLib.rocq_constr_to_string dt) ++ fnl ());
         let open NewGenericLib in 
-        density_inductive_memo := init_density_inductive_memo;
+        reset_density_inductive_memo ();
         inductive_set := inductive_set_init;
         rocq_relation_memo := TyCtrMap.empty;
 
@@ -4039,7 +4118,7 @@ VERNAC COMMAND EXTEND DeriveValidSchedules CLASSIFIED AS SIDEFF
     | Some (idx, rs) -> 
       let open NewGenericLib in
       let (ind_name, params, constructors, result_typ) = List.nth rs idx in
-      density_inductive_memo := init_density_inductive_memo;
+      reset_density_inductive_memo ();
       Feedback.msg_notice (str "Inductive name: " 
                         ++ str (ty_ctr_to_string ind_name)
                         ++ str "\n Parameters: "
@@ -4164,7 +4243,7 @@ VERNAC COMMAND EXTEND DeriveDensity CLASSIFIED AS SIDEFF
       | "Thm" -> D_Thm
       | "Enum" -> D_Enum) in
       ignore (final_density (List.nth rs idx) ois true ds) *)
-      density_inductive_memo := init_density_inductive_memo;
+      reset_density_inductive_memo ();
       inductive_set := inductive_set_init;
       rocq_relation_memo := TyCtrMap.empty;
       (* inductive_dependency_map := StringMap.empty; *)
