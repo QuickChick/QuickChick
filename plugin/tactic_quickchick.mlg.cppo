@@ -1869,11 +1869,30 @@ let schedule_universes = ref None
 let schedule_env () =
   List.fold_right Environ.push_named !schedule_locals (Global.env ())
 
+(* Merging the proof's universe context costs time proportional to its size,
+   which grows with every test prepared in the proof. An evar map depends only
+   on the environment's universe graph and that context, so reuse the merge
+   until either changes. Helpers declared during preparation can already have
+   added some of the proof's levels to the global graph; declare only the
+   others, with all constraints. *)
+let schedule_sigma_cache = ref None
+
 let schedule_sigma env =
-  let sigma = Evd.from_env env in
   match !schedule_universes with
-  | None -> sigma
-  | Some universes -> Evd.merge_universe_context sigma universes
+  | None -> Evd.from_env env
+  | Some universes ->
+    let graph = Environ.universes env in
+    match !schedule_sigma_cache with
+    | Some (g, u, sigma) when g == graph && u == universes -> sigma
+    | _ ->
+      let context = UState.context_set universes in
+      let levels = Univ.Level.Set.diff
+        (Univ.ContextSet.levels context) (UGraph.domain graph) in
+      let context = Univ.ContextSet.add_constraints
+        (Univ.ContextSet.constraints context) (Univ.ContextSet.of_set levels) in
+      let sigma = Evd.merge_context_set Evd.univ_rigid (Evd.from_env env) context in
+      schedule_sigma_cache := Some (graph, universes, sigma);
+      sigma
 
 let with_schedule_context env sigma f =
   let global_ids = List.map Context.Named.Declaration.get_id
