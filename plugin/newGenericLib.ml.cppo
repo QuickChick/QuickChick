@@ -4035,9 +4035,10 @@ let possible_schedules_with_advanced_pruning ?(max_schedules=100000)
     let candidates = stream |> seq_take peek_limit |> List.of_seq in
     if List.length candidates > max_schedules then warn_limit ();
     List.filteri (fun idx _ -> idx < max_schedules) candidates in
-  let groups = match select_groups, on_prefix, on_prefix_with_floor,
-    should_prune_prefix, should_prune_prefix_with_floor with
-    | Some select, None, None, None, None ->
+  (* Several independent groups are searched separately, without score
+     pruning; a single group is searched jointly, where pruning applies. *)
+  let groups = match select_groups, on_prefix with
+    | Some select, None ->
       (match independent_hypothesis_groups ~canon variables classified fixed with
        | _ :: _ :: _ as groups -> Some (select, groups)
        | _ -> None)

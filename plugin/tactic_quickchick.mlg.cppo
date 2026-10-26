@@ -2715,11 +2715,14 @@ and constructor_valid_schedules (ind_name : ty_ctr) (ctr : rocq_ctr) (result_var
           cut)) else None in
   let group_mode = schedule_group_mode () in
   let prepared_inputs = ref [] in
-  (* Prefix-pruning modes still search jointly. Under BudgetAware ranking,
+  (* Verification and baseline modes search jointly. With pruning, several
+     independent groups are still searched separately and a single group is
+     pruned. Under BudgetAware ranking,
      groups are scored and combined by BudgetAware itself, which is separable
      across footprint-disjoint groups. The unifier reports prepared inputs
      before it searches. *)
-  let select_groups = if group_mode = `Off || score_pruning_mode <> `Off then None
+  let select_groups = if group_mode = `Off ||
+      (score_pruning_mode <> `Off && score_pruning_mode <> `Prune) then None
     else if cardinality_ranking () then Some (fun groups ->
       let context = cardinality_context (cardinality_recursive_count result_vars output_vars) in
       GroupedScore.select_combinations CardinalityScore.group_policy
