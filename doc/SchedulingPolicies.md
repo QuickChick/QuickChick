@@ -74,8 +74,20 @@ Specimen; this is not a joint optimum over the relation's aggregate.
 
 Grouped search uses BudgetAware's grouped policy in this mode, and
 `QC_SCHEDULE_GROUPS=verify` compares best BudgetAware scores with the joint
-search. Theorem testing still ranks by density. Score-based pruning is not
-used with BudgetAware yet.
+search. Theorem testing still ranks by density.
+
+Score pruning (`QC_SCHEDULE_SCORE_PRUNING`, below) also applies here. A
+prefix's bound is BudgetAware's own score of the committed steps, with an
+unstable dependency at its best score and a forced check at Checking
+density: a step's score does not depend on its position, and each variable
+is produced once, so no field improves when steps are added. Because the
+first fields often tie for every candidate, variable dependencies get the
+floor's look-ahead: a non-input variable the prefix binds is counted for each
+remaining hypothesis that mentions it, and an unbound variable that is a bare
+argument of k remaining hypotheses is counted k - 1 times. The bound is
+computed first without deriving dependencies, which is already admissible,
+and with them only when selectivity ties. `test/pruning_verify_budget`
+checks it in verification mode.
 
 The opt-in `density_counts_then_vars` policy breaks a worst-density tie by
 counting annotated steps at each density, starting with the worst grade for the
@@ -380,9 +392,12 @@ names are corrected for display; it does not infer bindings from renamed steps.
 `QC_SCHEDULE_SCORE_PRUNING=verify` enumerates all leaves and checks each
 bound against every completed descendant, then compares the scores seen at
 the leaves with final candidate rescoring. Setting it to `1` enables cuts.
-The default is off. BudgetAware ranking has no bounds yet and ignores the
-switch. With pruning on, and in its verification mode, searches have no
-candidate cap; without pruning the 1000-candidate cap remains.
+The default is off. Cardinality ranking ignores the switch. With pruning on,
+and in its verification mode, searches have no candidate cap; without pruning
+the 1000-candidate cap remains. With pruning on, a constructor whose
+hypotheses split into several independent groups is still searched group by
+group, without cuts; a single group is searched jointly and pruned.
+Verification mode always searches jointly.
 
 Cuts are exact, not only optimal in score. Candidate identifiers follow
 search order, so the incumbent precedes every candidate of a node explored
@@ -396,7 +411,16 @@ replaces it; and an unbound variable that is a bare argument of k remaining
 positive hypotheses counts k - 1 times, since only one of them can produce it.
 `plugin/test_prefix_search.ml` checks these bounds against every completed
 descendant and checks that tie pruning selects the exhaustive winner for each
-built-in policy. The full test suite passes in verification mode. The maintained three-premise fixture scores four
+built-in policy. The release audit proves them in Rocq
+(`audit/3.0-scoring/rocq-prototype/`): `DensityPrefixBound.v` shows the bound
+admissible and cuts exact for every built-in policy, `BudgetAwarePrefixBound.v`
+does the same for BudgetAware, including selectivity and the look-ahead's
+counting argument, and `DensityLookahead.v` applies that argument to the
+density bound. Their premises are what verification mode checks: committed
+steps and forced checks keep their grades in every completion, a variable is
+produced at most once, outputs are unbound when a hypothesis is scheduled,
+and a hypothesis's steps count each of its non-input, non-output variables.
+`test/pruning_verify` runs a fixture in that mode. The full test suite passes in verification mode. The maintained three-premise fixture scores four
 root candidates without cuts and one with the switch on, selecting the
 same best density and variable-use score under default and counted-density
 ranking. The connected mutual-cycle and public derivation fixtures pass the
