@@ -1388,7 +1388,7 @@ let cardinality_count_key rel outputs ds =
   | None -> None
 
 let cardinality_mode_count rel outputs ds =
-  if ty_ctr_to_string rel = "Coq.Init.Logic.eq" || ty_ctr_to_string rel = "eq" then
+  if NewGenericLib.is_rocq_path (ty_ctr_to_string rel) "Coq.Init.Logic.eq" || ty_ctr_to_string rel = "eq" then
     (if List.length outputs <= 1 then Some CardinalityScore.One else None)
   else if ds = D_Check then Some CardinalityScore.One
   else match cardinality_count_key rel outputs ds with
@@ -4861,7 +4861,11 @@ let capture_output tac : unit Proofview.tactic =
 
   let feedback_hook fb =
     match fb.contents with
+#if COQ_VERSION >= (9, 0, 0)
+    | Feedback.Message (_lvl, _, _, ppcmds) ->
+#else
     | Feedback.Message (_lvl, _, ppcmds) ->
+#endif
         let s = Pp.string_of_ppcmds ppcmds in
         output_string file (s ^ "\n"); flush file
     | _ -> () 
@@ -4883,7 +4887,11 @@ let try_all_quickchick_schedules : unit Proofview.tactic =
 
     let feedback_hook fb =
       match fb.contents with
-      | Feedback.Message (_lvl, _, ppcmds) ->
+  #if COQ_VERSION >= (9, 0, 0)
+    | Feedback.Message (_lvl, _, _, ppcmds) ->
+#else
+    | Feedback.Message (_lvl, _, ppcmds) ->
+#endif
           let s = Pp.string_of_ppcmds ppcmds in
           (*Print captured message to file*)
 

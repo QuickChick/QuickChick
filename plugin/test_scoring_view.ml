@@ -17,7 +17,7 @@ let () =
   let scope = V.scope [a] in
   let list_a = relation "Coq.Init.Datatypes.list" [N.DTyParam a] in
   assert (fst (quoted scope list_a) =
-    V.TApply (V.TGlobal "Coq.Init.Datatypes.list", [V.TLocal 0]));
+    V.TApply (V.TGlobal (N.rocq_path "Coq.Init.Datatypes.list"), [V.TLocal 0]));
   let x = v "x" in
   (try ignore (V.scope [x; x]);
        failwith "duplicate free locals were accepted"

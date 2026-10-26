@@ -22,6 +22,10 @@ val ty_ctr_to_ctr : ty_ctr -> constructor
 val constructor_to_string : constructor -> string
 
 val var_of_string : string -> var
+(* Standard library paths written with the Coq prefix, as the current
+   Rocq names them; [is_rocq_path s path] compares under that renaming. *)
+val rocq_path : string -> string
+val is_rocq_path : string -> string -> bool
 val ty_ctr_of_string : string -> ty_ctr
 val constructor_of_string : string -> constructor
 

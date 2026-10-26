@@ -81,10 +81,27 @@ let inject_var (s : string) : var =
 let qualid_to_coq_expr q = 
   mkRefC q
 
+(* Standard library paths written with the Coq prefix. Rocq 9 names the
+   prelude Corelib and the rest of the library Stdlib, and the Coq prefix
+   no longer resolves in references. *)
+let rocq_path s =
+#if COQ_VERSION >= (9, 0, 0)
+  let starts p = String.length s >= String.length p && String.sub s 0 (String.length p) = p in
+  let swap p q = q ^ String.sub s (String.length p) (String.length s - String.length p) in
+  if starts "Coq.Init." then swap "Coq." "Corelib."
+  else if starts "Coq.Lists." || starts "Coq.Strings." then swap "Coq." "Stdlib."
+  else s
+#else
+  s
+#endif
+
+(* Whether [s] names the library object written [path] with the Coq prefix. *)
+let is_rocq_path s path = s = path || s = rocq_path path
+
 (* Maybe this should do checks? *)
 let gInject s = 
   if s = "" then failwith "Called gInject with empty string";
-  CAst.make @@ CRef (qualid_of_string s, None)
+  CAst.make @@ CRef (qualid_of_string (rocq_path s), None)
 
 #if COQ_VERSION >= (8, 20, 0)
 let gType0 = CAst.make @@ CSort Constrexpr_ops.expr_Type_sort
@@ -104,7 +121,7 @@ type ty_ctr   = qualid (* Opaque *)
 let ty_ctr_to_string (x : ty_ctr) = string_of_qualid x
 let gInjectTyCtr s = 
   if s = "" then failwith "Called gInjectTyCtr with empty string";
-  qualid_of_string s
+  qualid_of_string (rocq_path s)
 let gTyCtr = qualid_to_coq_expr
 let tyCtrToQualid x = x
 
@@ -157,7 +174,7 @@ let constructor_to_string (x : constructor) = string_of_qualid x
 let gCtr id = qualid_to_coq_expr id
 let injectCtr s = 
   if s = "" then failwith "Called gInject with empty string";
-  qualid_of_string s
+  qualid_of_string (rocq_path s)
 
 let ty_ctr_to_ctr x = x
 let ctr_to_ty_ctr x = x
@@ -508,7 +525,7 @@ let parse_dependent_type_internal i nparams ty oibopt arg_names =
       | Some (DCtr (c, _)) -> Some (DCtr (c, List.rev tms'))
       | Some (DTyVar x) -> 
          let xs = var_to_string x in 
-         if xs = "Coq.Init.Logic.not" || xs = "not" then 
+         if is_rocq_path xs "Coq.Init.Logic.not" || xs = "not" then 
            match tms' with 
            | [c] -> Some (DNot c)
            | _   -> failwith "Not a valid negation"

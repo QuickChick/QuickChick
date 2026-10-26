@@ -94,10 +94,27 @@ let var_of_id x = x
 let ty_param_to_string x = Names.Id.to_string x
 let ty_ctr_to_string x = Libnames.string_of_qualid x
 let ty_ctr_basename (x : ty_ctr) = Libnames.qualid_basename x
-let ty_ctr_of_string x = Libnames.qualid_of_string x
+(* Standard library paths written with the Coq prefix. Rocq 9 names the
+   prelude Corelib and the rest of the library Stdlib, and the Coq prefix
+   no longer resolves in references. *)
+let rocq_path s =
+#if COQ_VERSION >= (9, 0, 0)
+  let starts p = String.length s >= String.length p && String.sub s 0 (String.length p) = p in
+  let swap p q = q ^ String.sub s (String.length p) (String.length s - String.length p) in
+  if starts "Coq.Init." then swap "Coq." "Corelib."
+  else if starts "Coq.Lists." || starts "Coq.Strings." then swap "Coq." "Stdlib."
+  else s
+#else
+  s
+#endif
+
+(* Whether [s] names the library object written [path] with the Coq prefix. *)
+let is_rocq_path s path = s = path || s = rocq_path path
+
+let ty_ctr_of_string x = Libnames.qualid_of_string (rocq_path x)
 let ty_ctr_to_ctr x = x
 let constructor_to_string x = Libnames.string_of_qualid x
-let constructor_of_string x = Libnames.qualid_of_string x
+let constructor_of_string x = Libnames.qualid_of_string (rocq_path x)
 
 (* Patterns in language that derivations target *)
 type pat =
@@ -267,7 +284,7 @@ let parse_dependent_type_internal i nparams ty oibopt arg_names =
             ) (Some []) tms >>= fun tms' ->
       match aux locals i ctr with
       (* [not] is a constant, but must retain its logical scheduling form. *)
-      | Some (DTyCtr (c, _)) when ty_ctr_to_string c = "Coq.Init.Logic.not" ->
+      | Some (DTyCtr (c, _)) when is_rocq_path (ty_ctr_to_string c) "Coq.Init.Logic.not" ->
           (match List.rev tms' with
            | [predicate] -> Some (DNot predicate)
            | _ -> failwith "Not a valid negation")
@@ -275,7 +292,7 @@ let parse_dependent_type_internal i nparams ty oibopt arg_names =
       | Some (DCtr (c, _)) -> Some (DCtr (c, List.rev tms'))
       | Some (DTyVar x) -> 
          let xs = var_to_string x in 
-         if xs = "Coq.Init.Logic.not" || xs = "not" then 
+         if is_rocq_path xs "Coq.Init.Logic.not" || xs = "not" then 
            match tms' with 
            | [c] -> Some (DNot c)
            | _   -> failwith "Not a valid negation"
@@ -815,7 +832,7 @@ let match_optbool mb some_t some_f none : mexp =
 (* Maybe this should do checks? *)
 let cInject s : constr_expr = 
   if s = "" then failwith "Called gInject with empty string";
-  CAst.make @@ CRef (Libnames.qualid_of_string s, None)
+  CAst.make @@ CRef (Libnames.qualid_of_string (rocq_path s), None)
 
 let c_var v : constr_expr =
   CAst.make @@ CRef (Libnames.qualid_of_ident v, None)
@@ -1773,7 +1790,7 @@ let find_typeclass_bindings ctr =
 
   let rec parse_pair_matches (ins : var list) (matches : rocq_constr) : (var list * rocq_constr) option =
     match matches with
-    | DMatch (DTyVar disc, [(PCtr (pair_c, [_;_;PVar x;PVar y]), next_match)]) when String.equal (constructor_to_string pair_c) "Coq.Init.Datatypes.pair" -> 
+    | DMatch (DTyVar disc, [(PCtr (pair_c, [_;_;PVar x;PVar y]), next_match)]) when is_rocq_path (constructor_to_string pair_c) "Coq.Init.Datatypes.pair" -> 
       let remove_disc = List.filter (fun v -> not (String.equal (var_to_string v) (ty_param_to_string disc))) ins in
       parse_pair_matches (y :: x :: remove_disc) next_match
     | DTyCtr (ind_relation, args) as concl -> Some (List.rev ins, concl)
