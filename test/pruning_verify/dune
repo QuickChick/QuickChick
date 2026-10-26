@@ -1,0 +1,13 @@
+; Theories here are compiled with score pruning in verification mode: every
+; prefix bound is checked against each completed descendant, and a violation
+; aborts the derivation. See audit/3.0-scoring/rocq-prototype/DensityPrefixBound.v.
+(env (_ (env-vars (QC_SCHEDULE_SCORE_PRUNING verify) (QC_SCHEDULE_MAX_CANDIDATES 0))))
+
+(alias
+  (name runtest)
+  (deps (alias_rec all)))
+
+(coq.theory
+  (name QuickChick.TestingPruningVerify)
+  (theories QuickChick)
+  (modules pruning_verify))
