@@ -35,7 +35,8 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
   `QC Scorer my_policy.` compiles it to native code once and loads it into the
   plugin; see `doc/SchedulingPolicies.md`. Compiling needs `ocamlfind`. A
   policy is pruned when it proves its bound admissible, and searched by groups
-  when it declares a grouping. `QuickChick.SchedulingPolicyLaws` builds
+  when it declares a grouping. It sees the scores of the dependencies already
+  derived, computed by its own leaf and relation scorers. `QuickChick.SchedulingPolicyLaws` builds
   policies from step scores with both proofs supplied.
 - Schedule selection is exact by default: score-based pruning, proved sound
   for the built-in rankings, replaces the 1,000-candidate cap. Set

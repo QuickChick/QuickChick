@@ -244,7 +244,7 @@ let quote_spec ~global scope application outputs mode constrained =
   Ok { spec_application = application; spec_outputs = outputs;
        spec_mode = derive_mode mode; spec_constrained = constrained }
 
-type dependency_status = Supplied | Pending
+type dependency_status = Supplied | Pending | InProgress | Completed of Obj.t
 
 (* The score context of a constructor of [relation], whose result arguments
    are [result_vars] and outputs [outputs]. *)
@@ -271,7 +271,9 @@ let quote_context ~global scope relation result_vars local_types
         let* spec = quote_spec ~global scope application outputs mode constrained in
         Ok (spec, match status with
           | Supplied -> PolicyViews.SuppliedInstance
-          | Pending -> PolicyViews.Pending)) dependencies in
+          | Pending -> PolicyViews.Pending
+          | InProgress -> PolicyViews.InProgress
+          | Completed score -> PolicyViews.Completed score)) dependencies in
     Ok { current_spec = spec; locals; original_inputs = inputs; dependencies }
 
 (* Render views as Rocq expressions, for a policy evaluated in Rocq.

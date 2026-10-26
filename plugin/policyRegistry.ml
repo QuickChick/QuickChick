@@ -9,6 +9,9 @@ type compiled = {
   score : score PolicyViews.score_context -> PolicyViews.schedule_view -> score;
   compare : score -> score -> PolicyViews.comparison;
   bound : score PolicyViews.score_context -> PolicyViews.search_node_view -> score;
+  leaf : score PolicyViews.score_context -> PolicyViews.leaf_view -> (char list * score) list -> score;
+  inductive : score PolicyViews.score_context -> PolicyViews.inductive_view ->
+    (PolicyViews.leaf_view * score) list -> score;
   grouping : score PolicyViews.grouping option;
   (* The policy proves its bound admissible, so the plugin prunes with it. *)
   proves_bound : bool;

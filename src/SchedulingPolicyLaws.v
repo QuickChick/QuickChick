@@ -37,18 +37,22 @@ Section FoldPolicy.
   Variable M : ordered_monoid S.
 
   (* A step's score may depend on the steps before it, as variable uses do,
-     and is never better than the unit. *)
+     and on the context. It is never better than the unit, and more
+     information in the context never makes it better: a pending dependency
+     scores optimistically. *)
   Record step_scorer := {
     step_score : score_context S -> list step_view -> step_view -> density -> S;
-    step_above_unit : forall ctx prev step grade, m_le M (m_unit M) (step_score ctx prev step grade)
+    step_above_unit : forall ctx prev step grade, m_le M (m_unit M) (step_score ctx prev step grade);
+    step_refines : forall ctx ctx' prev step grade, ctx_refines ctx ctx' ->
+      m_le M (step_score ctx prev step grade) (step_score ctx' prev step grade)
   }.
 
   (* Optionally, a score every positive check reaches, so that the remaining
      hypotheses which must become checks count in the bound. *)
   Record check_floor (f : step_scorer) := {
     floor_score : score_context S -> S;
-    floor_below_checks : forall ctx prev source grade,
-      m_le M (floor_score ctx) (step_score f ctx prev (CheckStep source true) grade)
+    floor_below_checks : forall ctx ctx' prev source grade, ctx_refines ctx ctx' ->
+      m_le M (floor_score ctx) (step_score f ctx' prev (CheckStep source true) grade)
   }.
 
   Variable f : step_scorer.
@@ -119,18 +123,18 @@ Section FoldPolicy.
   (* A kept step has its committed step's view and predecessors, and its
      grade when that is certain, so it scores no better than the bound
      assumes. *)
-  Lemma committed_no_better : forall ctx prev committed kept_steps,
-    Forall2 kept committed kept_steps ->
-    Forall2 (m_le M) (committed_scores ctx prev committed) (step_scores ctx prev kept_steps)
+  Lemma committed_no_better : forall ctx ctx' prev committed kept_steps,
+    ctx_refines ctx ctx' -> Forall2 kept committed kept_steps ->
+    Forall2 (m_le M) (committed_scores ctx prev committed) (step_scores ctx' prev kept_steps)
     /\ map fst kept_steps = map committed_view committed.
   Proof.
-    intros ctx prev committed kept_steps H. revert prev.
+    intros ctx ctx' prev committed kept_steps Href H. revert prev.
     induction H as [|c [step grade] committed kept_steps Hkept _ IH]; intros prev.
     - split; constructor.
     - destruct Hkept as [Hview Hgrade]. simpl in Hview, Hgrade. subst step. simpl.
       destruct (IH (prev ++ [committed_view c])) as [Hle Hmap].
       split; [|now rewrite Hmap]. constructor; [|exact Hle].
-      destruct (committed_certain c); [rewrite Hgrade by reflexivity; apply (m_refl M)|].
+      destruct (committed_certain c); [rewrite Hgrade by reflexivity; now apply (step_refines f)|].
       apply (step_above_unit f).
   Qed.
 
@@ -145,12 +149,13 @@ Section FoldPolicy.
 
   (* The extension's checks dominate the forced scores; its other steps only
      make the combination worse. *)
-  Lemma extension_no_better : forall ctx node extension prev a b,
+  Lemma extension_no_better : forall ctx ctx' node extension prev a b,
+    ctx_refines ctx ctx' ->
     node_forced_checks node <= count_checks extension -> m_le M a b ->
     m_le M (combine_all a (forced_scores ctx node))
-           (combine_all b (step_scores ctx prev extension)).
+           (combine_all b (step_scores ctx' prev extension)).
   Proof.
-    intros ctx node extension prev a b Hk Hab. unfold forced_scores.
+    intros ctx ctx' node extension prev a b Href Hk Hab. unfold forced_scores.
     destruct floor as [h|]; [|apply extension_worse; exact Hab].
     unfold count_checks, combine_all in *. revert prev a b Hk Hab.
     generalize (node_forced_checks node) as k.
@@ -159,17 +164,17 @@ Section FoldPolicy.
     - destruct (is_check step) eqn:Hcheck; simpl in Hk; [destruct k as [|k]|].
       + apply (IH 0); [lia|]. apply worse_with_step; [exact Hab | apply (step_above_unit f)].
       + simpl. apply IH; [exact (le_S_n _ _ Hk)|]. apply (m_mono M Hab).
-        destruct step as [| |source [|]| |]; try discriminate. apply (floor_below_checks f h).
+        destruct step as [| |source [|]| |]; try discriminate. now apply (floor_below_checks f h).
       + apply IH; [exact Hk|]. apply worse_with_step; [exact Hab | apply (step_above_unit f)].
   Qed.
 
   Theorem fold_bound_admissible : bound_admissible fold_scorer fold_bound.
   Proof.
-    intros ctx node s (kept_steps & extension & Hkept & Hsteps & Hforced & _).
+    intros ctx ctx' node s Href (kept_steps & extension & Hkept & Hsteps & Hforced & _).
     unfold score_one_schedule, fold_bound; simpl.
     rewrite Hsteps, step_scores_app. unfold combine_all at 3. rewrite fold_left_app.
-    destruct (committed_no_better ctx [] _ _ Hkept) as [Hle Hmap].
-    apply extension_no_better; [exact Hforced|].
+    destruct (committed_no_better ctx ctx' [] _ _ Href Hkept) as [Hle Hmap].
+    apply extension_no_better; [exact Href | exact Hforced|].
     apply combine_all_mono; [exact Hle | apply (m_refl M)].
   Qed.
 
@@ -189,13 +194,24 @@ Arguments fold_policy {S} M f floor kind.
 (* Pruning with an admissible bound is safe: if the best schedule found so
    far is no worse than a node's bound, it is no worse than every schedule
    below the node. *)
-Corollary prune_safe {S} (M : ordered_monoid S) (f : step_scorer S M) floor ctx node s incumbent :
-  completes node s ->
+Corollary prune_safe {S} (M : ordered_monoid S) (f : step_scorer S M) floor ctx ctx' node s incumbent :
+  ctx_refines ctx ctx' -> completes node s ->
   m_le M incumbent (fold_bound S M f floor ctx node) ->
-  m_le M incumbent (score_one_schedule (fold_scorer S M f) ctx s).
+  m_le M incumbent (score_one_schedule (fold_scorer S M f) ctx' s).
 Proof.
-  intros Hs Hb. exact (m_trans M Hb (fold_bound_admissible S M f floor ctx node s Hs)).
+  intros Href Hs Hb. exact (m_trans M Hb (fold_bound_admissible S M f floor ctx ctx' node s Href Hs)).
 Qed.
+
+(* A step scorer that reads only the specification of the context, so more
+   information never changes its scores. *)
+Definition spec_step_scorer {S} (M : ordered_monoid S)
+    (g : spec_view -> list step_view -> step_view -> density -> S)
+    (above : forall spec prev step grade, m_le M (m_unit M) (g spec prev step grade))
+    : step_scorer S M.
+Proof.
+  refine {| step_score := fun ctx => g (current_spec ctx); step_above_unit := fun ctx => above (current_spec ctx) |}.
+  intros ctx ctx' prev step grade (Hspec & _). rewrite Hspec. apply (m_refl M).
+Defined.
 
 Section Lex.
   Variables A B : Type.
@@ -215,6 +231,18 @@ Section Lex.
     original_inputs := original_inputs ctx;
     dependencies := map (fun '(spec, state) => (spec, map_state g state)) (dependencies ctx)
   |}.
+
+  Lemma map_refines {X Y} (g : X -> Y) (c d : score_context X) :
+    ctx_refines c d -> ctx_refines (map_context g c) (map_context g d).
+  Proof.
+    intros (Hspec & Hinputs & Hlocals & Hdeps). repeat split; simpl; auto.
+    intros spec state Hin. apply in_map_iff in Hin as ([spec0 state0] & Heq & Hin).
+    injection Heq as <- <-. destruct (Hdeps _ _ Hin) as (state' & Hin' & Hr).
+    exists (map_state g state'). split.
+    - apply in_map_iff. now exists (spec0, state').
+    - destruct Hr as [<- | (Hp & x & ->)]; [now left | right].
+      split; [destruct Hp as [-> | ->]; auto | now exists (g x)].
+  Qed.
 
   Definition lex_compare (ca : A -> A -> comparison) (cb : B -> B -> comparison)
       (x y : A * B) : comparison :=
@@ -249,9 +277,9 @@ Section Lex.
     bound_admissible p bp -> bound_admissible q bq ->
     bound_admissible lex_scorer lex_bound.
   Proof.
-    intros Hp Hq ctx node s Hs.
-    specialize (Hp (map_context fst ctx) node s Hs).
-    specialize (Hq (map_context snd ctx) node s Hs).
+    intros Hp Hq ctx ctx' node s Href Hs.
+    specialize (Hp (map_context fst ctx) (map_context fst ctx') node s (map_refines fst _ _ Href) Hs).
+    specialize (Hq (map_context snd ctx) (map_context snd ctx') node s (map_refines snd _ _ Href) Hs).
     unfold no_worse, score_one_schedule in *; simpl; unfold lex_compare, lex_bound; simpl.
     destruct (compare_scores p _ _); [exact Hq | discriminate | contradiction].
   Qed.
@@ -351,7 +379,7 @@ Section Uses.
 
   Theorem uses_bound_admissible : bound_admissible uses_scorer uses_bound.
   Proof.
-    intros ctx node s (kept_steps & extension & Hkept & Hsteps & _ & Hfuture).
+    intros ctx ctx' node s _ (kept_steps & extension & Hkept & Hsteps & _ & Hfuture).
     unfold no_worse, score_one_schedule, uses_bound, committed_uses; simpl.
     rewrite Hsteps, uses_after_app.
     destruct (kept_uses [] _ _ Hkept) as [Hu Hm]. rewrite Hu, Hm. simpl.

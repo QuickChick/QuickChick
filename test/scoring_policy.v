@@ -124,8 +124,8 @@ Definition demo_policy : policy := {|
 Example zero_bound_is_admissible :
   bound_admissible demo_scorer (fun _ _ => zero_cost).
 Proof.
-  intros ctx node s _. unfold no_worse.
-  generalize (score_one_schedule demo_scorer ctx s). intros [f w]. simpl.
+  intros ctx ctx' node s _ _. unfold no_worse.
+  generalize (score_one_schedule demo_scorer ctx' s). intros [f w]. simpl.
   destruct f; simpl; [destruct w|]; discriminate.
 Qed.
 

@@ -10,26 +10,24 @@ Require Import List Arith Lia. Import ListNotations.
 Definition grade_rank (d : density) : nat :=
   match d with Checking => 0 | Backtracking => 1 | Neutral => 2 | Partial => 3 | Total => 4 end.
 
-Definition prefers_dense (ctx : score_context nat) : bool :=
-  match spec_mode (current_spec ctx) with Generate | TestTheorem => true | _ => false end.
+Definition prefers_dense (spec : spec_view) : bool :=
+  match spec_mode spec with Generate | TestTheorem => true | _ => false end.
 
 (* Lower is better, so a producer's rank is flipped. A positive check is
    graded Checking; a negative check keeps its grade. *)
-Definition flipped (ctx : score_context nat) (d : density) : nat :=
-  if prefers_dense ctx then 4 - grade_rank d else grade_rank d.
+Definition flipped (spec : spec_view) (d : density) : nat :=
+  if prefers_dense spec then 4 - grade_rank d else grade_rank d.
 
-Definition grade_score : step_scorer nat nat_max.
-Proof.
-  refine {| step_score := fun ctx _ step d =>
-    match step with CheckStep _ true => flipped ctx Checking | _ => flipped ctx d end |}.
-  intros. nat_order.
-Defined.
+Definition grade_score : step_scorer nat nat_max :=
+  spec_step_scorer nat_max (fun spec _ step d =>
+    match step with CheckStep _ true => flipped spec Checking | _ => flipped spec d end)
+    (fun _ _ _ _ => ltac:(nat_order)).
 
 (* A forced check grades the schedule Checking. *)
 Definition forced_checks_count : check_floor nat nat_max grade_score.
 Proof.
-  refine {| floor_score := fun ctx => flipped ctx Checking |}.
-  intros. unfold grade_score; cbn [step_score]. nat_order.
+  refine {| floor_score := fun ctx => flipped (current_spec ctx) Checking |}.
+  intros ctx ctx' prev source grade (Hspec & _). cbn. rewrite Hspec. nat_order.
 Defined.
 
 Definition density_policy : policy :=

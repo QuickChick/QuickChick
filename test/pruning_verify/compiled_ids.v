@@ -12,8 +12,8 @@ Definition output_ids (step : step_view) : nat :=
   | _ => 0
   end.
 
-Definition ids_score : step_scorer nat nat_sum.
-Proof. refine {| step_score := fun _ _ step _ => output_ids step |}. intros. nat_order. Defined.
+Definition ids_score : step_scorer nat nat_sum :=
+  spec_step_scorer nat_sum (fun _ _ step _ => output_ids step) (fun _ _ _ _ => ltac:(nat_order)).
 
 Definition ids_policy : policy := fold_policy nat_sum ids_score None Additive.
 

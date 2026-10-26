@@ -7,18 +7,16 @@ Import ListNotations.
    pruning bound and a grouping, so QC Scorer compiles it and the plugin
    searches with pruning and by independent hypothesis groups. *)
 
-Definition checks_score : step_scorer nat nat_sum.
-Proof.
-  refine {| step_score := fun _ _ step _ => if is_check step then 1 else 0 |}.
-  intros. nat_order.
-Defined.
+Definition checks_score : step_scorer nat nat_sum :=
+  spec_step_scorer nat_sum (fun _ _ step _ => if is_check step then 1 else 0)
+    (fun _ _ _ _ => ltac:(nat_order)).
 
 (* A remaining hypothesis whose arguments are all bound must become a
    positive check, so each one counts in the bound. *)
 Definition forced_checks_cost : check_floor nat nat_sum checks_score.
 Proof.
   refine {| floor_score := fun _ => 1 |}.
-  intros. unfold checks_score; cbn [step_score]. simpl. nat_order.
+  intros. cbn. nat_order.
 Defined.
 
 Definition fewest_checks : policy :=

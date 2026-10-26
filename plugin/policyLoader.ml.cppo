@@ -70,6 +70,8 @@ let extract reference file =
       "qc_policy_score", app "QuickChick.SchedulingPolicy.score_one_schedule" [scorer];
       "qc_policy_compare", app "QuickChick.SchedulingPolicy.compare_scores" [scorer];
       "qc_policy_bound", app "QuickChick.SchedulingPolicy.lower_bound" [policy];
+      "qc_policy_leaf", app "QuickChick.SchedulingPolicy.score_leaf" [scorer];
+      "qc_policy_inductive", app "QuickChick.SchedulingPolicy.score_inductive" [scorer];
       "qc_policy_grouping", app "QuickChick.SchedulingPolicy.policy_grouping" [policy];
       "qc_policy_proves_bound", app "QuickChick.SchedulingPolicy.proves_bound" [policy];
     ] in
@@ -136,11 +138,16 @@ let load reference =
   let names = extract reference staging in
 #endif
   let code = read_file staging in
+  (* Extraction also writes the interface. Compiling with it fixes the types
+     of definitions that OCaml would otherwise leave weakly polymorphic, such
+     as a builder applied to a step scorer. *)
+  let staging_mli = Filename.chop_suffix staging ".ml" ^ ".mli" in
+  let interface = try Some (read_file staging_mli) with Sys_error _ -> None in
   Sys.remove staging;
-  (try Sys.remove (Filename.chop_suffix staging ".ml" ^ ".mli") with Sys_error _ -> ());
+  (try Sys.remove staging_mli with Sys_error _ -> ());
   let plugin = plugin_directory () in
   let plugin_digest = Digest.file (Filename.concat plugin "quickchick_plugin.cmxs") in
-  let key = Digest.to_hex (Digest.string (code ^ plugin_digest)) in
+  let key = Digest.to_hex (Digest.string (code ^ Option.default "" interface ^ plugin_digest)) in
   (match PolicyRegistry.find key with
    | Some _ -> ()
    | None ->
@@ -152,16 +159,23 @@ let load reference =
          "\nlet () = Quickchick_plugin.PolicyRegistry.register %S\n\
          \  { Quickchick_plugin.PolicyRegistry.score = Obj.magic %s;\n\
          \    compare = Obj.magic %s; bound = Obj.magic %s;\n\
+         \    leaf = Obj.magic %s; inductive = Obj.magic %s;\n\
          \    grouping = Obj.magic %s; proves_bound = %s }\n"
          key (entry "qc_policy_score") (entry "qc_policy_compare") (entry "qc_policy_bound")
+         (entry "qc_policy_leaf") (entry "qc_policy_inductive")
          (entry "qc_policy_grouping") (entry "qc_policy_proves_bound") in
        (* ExtrOcamlNatInt inlines Nat.compare with unqualified Eq, Lt and Gt;
           re-export them from the plugin's comparison type. *)
        let prelude = "type qc_comparison = Quickchick_plugin.PolicyViews.comparison = Eq | Lt | Gt\n" in
        write_file (base ^ ".ml") (prelude ^ code ^ registration);
+       Option.iter (fun mli ->
+         write_file (base ^ ".mli") mli;
+         run (Printf.sprintf "ocamlfind ocamlopt -c -opaque -rectypes -w a -I %s %s"
+           (Filename.quote plugin) (Filename.quote (base ^ ".mli")))) interface;
        run (Printf.sprintf
-         "ocamlfind ocamlopt -shared -opaque -rectypes -w a -I %s -o %s %s"
-         (Filename.quote plugin) (Filename.quote cmxs) (Filename.quote (base ^ ".ml")))
+         "ocamlfind ocamlopt -shared -opaque -rectypes -w a -I %s -I %s -o %s %s"
+         (Filename.quote plugin) (Filename.quote dir) (Filename.quote cmxs)
+         (Filename.quote (base ^ ".ml")))
      end;
      (try Dynlink.loadfile_private cmxs
       with Dynlink.Error e ->

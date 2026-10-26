@@ -244,12 +244,26 @@ Definition score_one_schedule {S} (p : scorer S) (ctx : score_context S)
 Definition no_worse {S} (p : scorer S) (a b : S) : Prop :=
   compare_scores p a b <> Gt.
 
+(* Contexts only gain information as the search goes on: a schedule below a
+   node is scored in a context with at least the node's locals and
+   dependencies, where a dependency that was pending or in progress may have
+   completed. The specification and inputs do not change. *)
+Definition refines {S} (a b : dependency_state S) : Prop :=
+  a = b \/ ((a = Pending \/ a = InProgress) /\ exists x, b = Completed x).
+
+Definition ctx_refines {S} (c d : score_context S) : Prop :=
+  current_spec d = current_spec c /\
+  original_inputs d = original_inputs c /\
+  incl (locals c) (locals d) /\
+  forall spec state, In (spec, state) (dependencies c) ->
+    exists state', In (spec, state') (dependencies d) /\ refines state state'.
+
 (* A bound is admissible when no complete schedule below a node scores
-   better than it. *)
+   better than it, however the context has refined since the node. *)
 Definition bound_admissible {S} (p : scorer S)
     (bound : score_context S -> search_node_view -> S) : Prop :=
-  forall ctx node s, completes node s ->
-    no_worse p (bound ctx node) (score_one_schedule p ctx s).
+  forall ctx ctx' node s, ctx_refines ctx ctx' -> completes node s ->
+    no_worse p (bound ctx node) (score_one_schedule p ctx' s).
 
 Record policy := {
   score_type : Type;

@@ -49,9 +49,13 @@ objects are cached in the system temporary directory, under
 
 The policy receives read-only views of each candidate: its steps with their
 sources, grades and patterns, the constructor's locals and original inputs,
-and each dependency request marked `SuppliedInstance` when an instance
-resolves in context and `Pending` otherwise. Recursive steps add no request;
-the policy sees their source category. `test/compiled_density.v` writes the
+and the state of each dependency request. A dependency already derived in
+this derivation is `Completed` with its score under the policy, computed by
+the policy's `score_leaf` over each coverage leaf's constructors and its
+`score_inductive` over the leaves. One being derived is `InProgress`; one an
+instance in context supplies is `SuppliedInstance`; any other is `Pending`.
+Recursive steps add no request; the policy sees their source category. A
+variable keeps its local id throughout a derivation. `test/compiled_density.v` writes the
 built-in `density_then_vars` ranking as a policy; on Cedar it makes the
 built-in's selection for all 862 constructor modes.
 
@@ -68,7 +72,11 @@ with it, since the capped joint search can miss the grouped winner. With
 A policy is pruned with its `lower_bound` when `policy_bound_sound` proves
 that bound admissible: no complete schedule below a search node scores better
 than the bound (`bound_admissible`, over `completes` in
-`src/SchedulingPolicy.v`). A search node lists its committed steps, each with
+`src/SchedulingPolicy.v`). The schedule below is scored in a context that
+may know more than the node's (`ctx_refines`): a pending or in-progress
+dependency may have completed. A step scorer must therefore score an unknown
+dependency no worse than any completed one (`step_refines`);
+`spec_step_scorer` builds scorers that read only the specification. A search node lists its committed steps, each with
 its grade and whether that grade is final, the remaining hypotheses, how
 many of them must become positive checks, and how many further variable uses
 every schedule below incurs (`step_uses` defines the engine's count). The plugin cuts a branch when the

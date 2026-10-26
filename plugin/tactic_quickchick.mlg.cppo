@@ -952,9 +952,14 @@ end)
 (* A recursive lookup deliberately sees the seed score used by the existing
    heuristic. Keep that value marked as provisional: it is not a certified
    bound for descendants of a search node. *)
+(* A completed relation mode's score under the selected score library. *)
+type relation_score =
+  | BudgetScore of BudgetAwareScore.score
+  | PolicyScore of PolicyRegistry.score
+
 type inductive_density_entry =
   | DensityInProgress of (inductive_schedule * rule_density)
-  | DensityDone of (inductive_schedule * rule_density) * bool * BudgetAwareScore.score option
+  | DensityDone of (inductive_schedule * rule_density) * bool * relation_score option
 
 (* A completed entry is cycle-independent only if its computation never read
    a provisional or cycle-dependent grade. Under fixed scoring inputs, later
@@ -1182,8 +1187,8 @@ let budget_dependency_score (request : BudgetAwareScore.dependency_request) =
     record_density_read memo_key entry;
     entry in
   match find true, find false with
-  | Some (DensityDone (_, true, Some score)), _ -> Some score
-  | _, Some (DensityDone (_, true, Some score)) -> Some score
+  | Some (DensityDone (_, true, Some (BudgetScore score))), _ -> Some score
+  | _, Some (DensityDone (_, true, Some (BudgetScore score))) -> Some score
   | _ -> None
 
 (* [QuickChick Scorer <policy>] ranks constructor schedules by a compiled
@@ -2405,10 +2410,29 @@ let compiled_context ind_name result_vars output_vars ds ~constrained steps term
         | _ -> [] in
       let outputs = List.filteri (fun index _ -> List.mem index indices) args
         |> List.concat_map variables_in_hypothesis in
+      (* A derived dependency's state comes from the memo; the read is
+         recorded, so a score that read an in-progress relation is not
+         shared as cycle-independent. *)
+      let memo_state = match relation with
+        | DTyCtr (name, _) ->
+          let find c =
+            let key = (name, indices, mode, c) in
+            let entry = InductiveScheduleKeyMap.find_opt key !density_inductive_memo in
+            record_density_read key entry;
+            entry in
+          (match find constrained with
+           | Some (DensityDone (_, true, Some (PolicyScore score))) -> Some (ScoringView.Completed score)
+           | Some (DensityInProgress _) -> Some ScoringView.InProgress
+           | _ -> None)
+        | _ -> None in
       (* An obligation that cannot even be elaborated is not supplied. *)
-      let supplied = try has_supplied_schedule_instance relation outputs mode constrained
-        with CErrors.UserError _ | Noninductive_dependency _ | Unavailable_mode _ -> false in
-      acc @ [request, if supplied then ScoringView.Supplied else ScoringView.Pending]
+      let status = match memo_state with
+        | Some state -> state
+        | None ->
+          let supplied = try has_supplied_schedule_instance relation outputs mode constrained
+            with CErrors.UserError _ | Noninductive_dependency _ | Unavailable_mode _ -> false in
+          if supplied then ScoringView.Supplied else ScoringView.Pending in
+      acc @ [request, status]
     | _ -> acc) [] steps in
   let context = ScoringView.quote_context ~global:ScoringView.global_name scope
     ind_name result_vars local_types output_vars ds constrained dependencies in
@@ -3602,7 +3626,7 @@ and select_best_schedule (schedules : (int * schedule_with_density) list) (ds : 
 
 (* With BudgetAware ranking, the chosen candidate's completed score is also
    returned, so the relation's score can aggregate it over coverage leaves. *)
-and constructor_best_valid_schedule (ind_name : ty_ctr) (ctr : rocq_ctr) (result_vars : (var * rocq_constr) list) (output_vars : var list) (ds : derive_sort) (opt : bool) : ty_ctr * ((int * schedule * rule_density) * (var * mexp) list) option * BudgetAwareScore.score option =
+and constructor_best_valid_schedule (ind_name : ty_ctr) (ctr : rocq_ctr) (result_vars : (var * rocq_constr) list) (output_vars : var list) (ds : derive_sort) (opt : bool) : ty_ctr * ((int * schedule * rule_density) * (var * mexp) list) option * relation_score option =
   let constructor_inputs, scored, prepared_inputs = constructor_valid_schedules ind_name ctr result_vars output_vars ds opt in
   let entry id = List.find (fun (i, _, _, _) -> i = id) scored in
   let selected, budget = if cardinality_ranking () then begin
@@ -3637,23 +3661,31 @@ and constructor_best_valid_schedule (ind_name : ty_ctr) (ctr : rocq_ctr) (result
         Some (id, (List.map fst steps, sort), representative_density ds schedule), None
     end else if compiled_ranking () <> None then begin
       let policy = Option.get (compiled_ranking ()) in
-      (* Lower is better; among equal scores the first candidate found wins. *)
-      let best = List.fold_left (fun best (i, schedule, _, _) ->
-        let score = compiled_schedule_score policy ind_name result_vars output_vars ds schedule in
-        match best with
-        | Some (_, best_score) when
-            policy.PolicyRegistry.compare score best_score <> PolicyViews.Lt -> best
-        | _ -> Some (i, score)) None scored in
+      (* Lower is better; among equal scores the first candidate found wins.
+         Each candidate is scored in the memo it was derived in, so it sees
+         the dependency scores it saw during the search. *)
+      let saved = !density_inductive_memo, !density_memo in
+      let best = Fun.protect ~finally:(fun () ->
+          density_inductive_memo := fst saved; density_memo := snd saved)
+        (fun () -> List.fold_left (fun best (i, schedule, inductive_memo, density_memo_after) ->
+          density_inductive_memo := inductive_memo;
+          density_memo := density_memo_after;
+          let score = compiled_schedule_score policy ind_name result_vars output_vars ds schedule in
+          match best with
+          | Some (_, best_score) when
+              policy.PolicyRegistry.compare score best_score <> PolicyViews.Lt -> best
+          | _ -> Some (i, score)) None scored) in
       match best with
       | None -> None, None
-      | Some (id, _) ->
+      | Some (id, score) ->
         let (_, ((steps, sort) as schedule), _, _) = entry id in
         if schedule_trace_enabled () then
           Feedback.msg_notice (str (Printf.sprintf
             "[schedule-ranking] policy=compiled derive=%s candidates=%d selected-id=%d\n"
             (schedule_rank_derive_sort_to_string ds) (List.length scored) id)
             ++ str (schedule_with_densities_to_string schedule));
-        Some (id, (List.map fst steps, sort), representative_density ds schedule), None
+        Some (id, (List.map fst steps, sort), representative_density ds schedule),
+        Some (PolicyScore score)
     end else if not (budget_aware_ranking ()) then
       select_best_schedule (List.map (fun (i, schedule, _, _) -> i, schedule) scored) ds, None
     else begin
@@ -3690,7 +3722,8 @@ and constructor_best_valid_schedule (ind_name : ty_ctr) (ctr : rocq_ctr) (result
             (schedule_rank_derive_sort_to_string ds) (List.length ranked) id
             (BudgetAwareScore.to_string score))
             ++ str (schedule_with_densities_to_string schedule));
-        Some (id, (List.map fst steps, sort), representative_density ds schedule), Some score
+        Some (id, (List.map fst steps, sort), representative_density ds schedule),
+        Some (BudgetScore score)
     end in
   (match selected with
    | None -> ()
@@ -3887,11 +3920,55 @@ and inductive_best_valid_schedule (rel : rocq_relation) (output_idxs : int list)
           conclusion_arguments ty, snd (CardinalityScore.constructor_count context steps)) ctrs steps)
     | None -> ()
   end;
-  let budget_score = if not (budget_aware_ranking ()) then None else
+  let budget_score = if budget_aware_ranking () then
     let score_of c = match List.assoc_opt c budget_scores with
-      | Some (Some score) -> Some score | _ -> None in
-    Some (BudgetAwareScore.inductive_score
-      (List.map (fun (_, cs) -> List.filter_map score_of cs) covered_patterns)) in
+      | Some (Some (BudgetScore score)) -> Some score | _ -> None in
+    Some (BudgetScore (BudgetAwareScore.inductive_score
+      (List.map (fun (_, cs) -> List.filter_map score_of cs) covered_patterns)))
+    else match compiled_ranking () with
+    | None -> None
+    (* A compiled policy scores each coverage leaf from its covering
+       constructors' scores, then the relation from its leaves. A relation it
+       cannot quote has no score; its dependents see it as pending. *)
+    | Some policy ->
+      let score_of c = match List.assoc_opt c budget_scores with
+        | Some (Some (PolicyScore score)) -> Some score | _ -> None in
+      let names = List.map fst result_vars @
+        List.concat_map (fun ((steps, _), _, _, _) ->
+          List.concat_map ScoringView.step_variables steps) constructor_schedules
+        |> List.sort_uniq Stdlib.compare in
+      let scope = policy_scope names in
+      let global = ScoringView.global_name in
+      let name c = ScoringView.chars (constructor_to_string c) in
+      let rec leaf_pattern = function
+        | PCtr (c, ps) -> PolicyViews.PConstructor (name c, List.map leaf_pattern ps)
+        | _ -> PolicyViews.PWild in
+      let leaves = List.map (fun (p, cs) ->
+        { PolicyViews.leaf_pattern = leaf_pattern p; leaf_covering = List.map name cs },
+        cs) covered_patterns in
+      let ( let* ) = Result.bind in
+      let quoted =
+        let* spec = ScoringView.quote_spec ~global scope
+          (DTyCtr (ind_name, List.map (fun (v, _) -> DTyVar v) result_vars)) output_idxs ds opt in
+        let* constructors = ScoringView.map_result (fun (((steps, sort), _, _, _) as schedule, (ctr_name, _)) ->
+          let result, _ = schedule_result_and_constrained sort in
+          let* view = ScoringView.quote_schedule ~global ~finite_pins:(derivation_finite_pins ())
+            ~grade:policy_grade scope (fst (schedule_density [] (steps, sort))) result in
+          Ok { PolicyViews.constructor_name = name ctr_name;
+               constructor_recursive = is_recursive schedule; constructor_schedule = view })
+          (List.combine constructor_schedules densities) in
+        Ok (spec, constructors) in
+      match (try quoted with Noninductive_dependency _ | Unavailable_mode _ -> Error "") with
+      | Error _ -> None
+      | Ok (spec, constructors) ->
+        let context = { PolicyViews.current_spec = spec; locals = []; original_inputs = [];
+                        dependencies = [] } in
+        let scored_leaves = List.map (fun (leaf, cs) ->
+          leaf, policy.PolicyRegistry.leaf context leaf
+            (List.filter_map (fun c -> Option.map (fun s -> name c, s) (score_of c)) cs)) leaves in
+        Some (PolicyScore (policy.PolicyRegistry.inductive context
+          { PolicyViews.inductive_spec = spec; inductive_constructors = constructors;
+            inductive_leaves = List.map fst leaves } scored_leaves)) in
   density_inductive_memo := InductiveScheduleKeyMap.add (ind_name, output_idxs, ds, opt) (DensityDone ((inductive_schedule, overall_density), cycle_independent, budget_score)) !density_inductive_memo;
   Error.msg_debug (str (Printf.sprintf "%s: %s Done, Density: %s, cycle-independent: %b\n" (schedule_name) (String.concat ", " (List.map string_of_int output_idxs)) (density_to_string overall_density) cycle_independent));
   if cycle_independent then
