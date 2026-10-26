@@ -691,6 +691,7 @@ type pat =
 type monad_sort =
   | MG 
   | MGOpt
+  | MGShrink (* a theorem test's unconstrained variable, shrunk on failure *)
   | ME
   | MEOpt
   | MC
@@ -1011,6 +1012,11 @@ let c_forAllMaybe check k = c_app (cInject "QuickChick.Checker.forAllMaybe") [c_
 
 let c_forAllMaybeChecker check k = c_app (cInject "QuickChick.Checker.forAllMaybeChecker") [c_hole; c_hole; check; k]
 
+let c_forAllShrinkChecker gen k =
+  c_app (cInject "QuickChick.Checker.forAllShrink")
+    [c_hole; c_hole; c_hole; c_hole; gen;
+     c_app (cInject "QuickChick.Classes.theoremShrink") [c_hole; c_hole]; k]
+
 let c_quickCheck p = c_app (cInject "QuickChick.Test.quickCheck") [c_hole; c_hole; p]
 
 let c_show typ = c_app (cInject "QuickChick.Show.show") [c_hole; c_hole; typ]
@@ -1048,6 +1054,7 @@ let monad_sort_to_string (ms : monad_sort) : string =
   match ms with
   | MG -> "Gen"
   | MGOpt -> "GenOpt"
+  | MGShrink -> "GenShrink"
   | ME -> "Enum"
   | MEOpt -> "EnumOpt"
   | MC -> "Check"
@@ -1071,6 +1078,7 @@ let c_bind (ms : monad_sort) (ds : derive_sort) (m1 : constr_expr) (vs : var lis
   | D_Thm, MC -> c_guard m1 k ds
   | D_Thm, MG -> c_forAllChecker m1 k
   | D_Thm, MGOpt -> c_forAllMaybeChecker m1 k
+  | D_Thm, MGShrink -> c_forAllShrinkChecker m1 k
   | _, _ -> failwith ("Invalid bind for derive_sort" ^ derive_sort_to_string ds ^ " and monad_sort " ^ monad_sort_to_string ms)
 
 let c_backtrack (ds : derive_sort) (is_constrained : bool) (first : constr_expr) (ms : constr_expr list) : constr_expr =
@@ -1297,7 +1305,7 @@ let schedule_to_mexp ((steps, s_sort) : schedule) (mfuel : mexp) (def_fuel : mex
     match s_sort, schd with
     | TheoremSchedule _, S_UC (v, SrcNonrec ty, PS_G) ->
         let producer = m_theoremArbitrarySized (product_free_rocq_type_to_mexp ty) def_fuel in
-        MBind (prod_sort_to_monad_sort PS_G, producer, [v], acc)
+        MBind (MGShrink, producer, [v], acc)
     | _ -> schedule_step_to_mexp schd mfuel def_fuel child_sz acc) steps finally
 
 (* let type_of_schedule (ischd_name, inps, nonrec_schds, rec_schds : inductive_schedule) (ds : derive_sort) (is_constrained : bool) : mexp = *)

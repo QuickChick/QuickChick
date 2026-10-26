@@ -52,6 +52,16 @@ Class TheoremGen (A : Type) := { theoremArbitrarySized : nat -> G A }.
 Class Shrink (A : Type) :=
   { shrink : A -> list A }.
 
+(* Theorem tests shrink an unconstrained variable with its Shrink instance,
+   or not at all when the type has none. *)
+Class TheoremShrink (A : Type) := { theoremShrink : A -> list A }.
+
+#[global] Instance TheoremShrinkOfShrink {A} `{Shrink A} : TheoremShrink A | 10 :=
+  {| theoremShrink := shrink |}.
+
+#[global] Instance TheoremShrinkNone {A} : TheoremShrink A | 100 :=
+  {| theoremShrink := fun _ => nil |}.
+
 (** Arbitrary Class *)
 Class Arbitrary (A : Type) `{Gen A} `{Shrink A}.
 

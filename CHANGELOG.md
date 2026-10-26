@@ -24,6 +24,10 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
 - `quickchick` on a goal over an abstract type, and derivation of a
   constructor whose premise is an implication or quantified statement,
   report what is unsupported instead of failing with an anomaly.
+- `quickchick` shrinks a counterexample's unconstrained variables with their
+  `Shrink` instances, and leaves a variable unshrunk when its type has none.
+  A shrunk value that breaks a later hypothesis is discarded. Variables
+  produced by a hypothesis are not yet shrunk.
 - Tested with Coq 8.20, Rocq 9.0 and Rocq 9.1. Rocq 9.2 and later need a release of
   `coq-simple-io` that supports them. During large derivations `coqc` has
   occasionally aborted with "stack smashing detected" on OCaml 5.2 and, more

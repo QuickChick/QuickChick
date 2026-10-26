@@ -199,6 +199,7 @@ val schedule_to_string : schedule -> string
 type monad_sort =
   | MG 
   | MGOpt
+  | MGShrink
   | ME
   | MEOpt
   | MC
