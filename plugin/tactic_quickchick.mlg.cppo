@@ -2183,6 +2183,34 @@ let with_temporary_density_state f =
     density_uncertainty_events := saved_uncertainty)
     (fun () -> with_score_pruning_suspended f)
 
+(* A completed, cycle-independent dependency entry is determined by its key,
+   so candidates may share it. Without sharing, every candidate re-derives
+   every dependency, which multiplies along nested derivations. *)
+let reuse_stable_entries () =
+  match Sys.getenv_opt "QC_SCHEDULE_REUSE_STABLE" with
+  | Some ("0" | "false" | "no") -> false
+  | _ -> true
+
+(* Scoring a candidate derives its dependencies in scratch memo state. Shared
+   stable entries are visible to it and new ones are kept; everything else
+   it derives is discarded. Rankings never manage memo state themselves. *)
+let with_candidate_density_state f =
+  with_temporary_density_state (fun () ->
+    let reuse = reuse_stable_entries () in
+    if reuse then density_inductive_memo := with_stable_entries !density_inductive_memo;
+    let before = !density_inductive_memo in
+    let result = f () in
+    if reuse then collect_stable_entries before;
+    result)
+
+(* Each candidate of each independent hypothesis group is derived on its own
+   by [derive] and scored by [score], which sees the schedule and its density
+   annotation. A candidate whose dependencies cannot be derived scores [None]. *)
+let score_group_candidates derive score groups =
+  List.map (List.map (fun schedule ->
+    try with_candidate_density_state (fun () -> score schedule (derive schedule))
+    with Noninductive_dependency _ | Unavailable_mode _ -> None)) groups
+
 let budget_key ind_name result_vars output_vars ds = {
   BudgetAwareScore.relation = ind_name;
   output_indices = filter_mapi (fun i (v, _) ->
@@ -2308,18 +2336,13 @@ let rec schedule_density neutral_prelude_steps schedule : schedule_with_density 
 
 (** There will always exist at least one partial schedule for producers, b/c you can just arb all variables and check all hyps.*)
 
-(* Independent hypothesis groups are scored alone in a temporary density
-   state; ScheduleRanking keeps only combinations that can reach the best
+(* ScheduleRanking keeps only group combinations that can reach the best
    complete score. *)
 and schedule_group_selector ds groups =
   let prefer_dense = ds = D_Gen || ds = D_Thm in
-  let features = List.map (List.map (fun schedule ->
-    try with_temporary_density_state (fun () ->
-      Some (ScheduleRanking.group_features_of
-        (scored_schedule_features ds 0 (schedule_density [] schedule))))
-    with Noninductive_dependency _ | Unavailable_mode _ -> None)) groups in
-  ScheduleRanking.select_group_combinations ~prefer_dense
-    (schedule_ranking_policy ()) features
+  ScheduleRanking.select_group_combinations ~prefer_dense (schedule_ranking_policy ())
+    (score_group_candidates (schedule_density []) (fun _ scored ->
+      Some (ScheduleRanking.group_features_of (scored_schedule_features ds 0 scored))) groups)
 
 and constructor_valid_schedules (ind_name : ty_ctr) (ctr : rocq_ctr) (result_vars : (var * rocq_constr) list) (output_vars : var list) (ds : derive_sort) (opt : bool) =
   let (ctr_name, typ) = ctr in
@@ -2365,13 +2388,7 @@ and constructor_valid_schedules (ind_name : ty_ctr) (ctr : rocq_ctr) (result_var
     | _ -> `Off in
   let prefer_dense = ds = D_Gen || ds = D_Thm in
   let policy = schedule_ranking_policy () in
-  (* A completed, cycle-independent dependency entry is determined by its key,
-     so candidates may share it. Without sharing, every candidate re-derives
-     every dependency, which multiplies along nested derivations. *)
-  let reuse_stable =
-    match Sys.getenv_opt "QC_SCHEDULE_REUSE_STABLE" with
-    | Some ("0" | "false" | "no") -> false
-    | _ -> true in
+  let reuse_stable = reuse_stable_entries () in
   let initial_inductive_memo = !density_inductive_memo in
   let stable_dependencies = stable_density_entries in
   (* Share only completed entries whose dependency walk read no provisional
@@ -2383,12 +2400,6 @@ and constructor_valid_schedules (ind_name : ty_ctr) (ctr : rocq_ctr) (result_var
           not (InductiveScheduleKeyMap.mem key initial_inductive_memo) ->
         stable_dependencies := InductiveScheduleKeyMap.add key entry !stable_dependencies
       | _ -> ()) !density_inductive_memo in
-  let with_shared_temporary_density_state f =
-    with_temporary_density_state (fun () ->
-      density_inductive_memo := add_stable !density_inductive_memo;
-      let result = f () in
-      collect_stable ();
-      result) in
   let incumbent = ref None in
   let observed_leaf_scores = ref [] in
   let observed_bounds = ref [] in
@@ -2457,13 +2468,13 @@ and constructor_valid_schedules (ind_name : ty_ctr) (ctr : rocq_ctr) (result_var
         Hashtbl.replace mode_grade_cache key canonical
       end;
       scored in
-  let leaf_score triple = timed leaf_cpu (fun () -> with_shared_temporary_density_state (fun () ->
+  let leaf_score triple = timed leaf_cpu (fun () -> with_candidate_density_state (fun () ->
     let match_steps, schedule = materialize triple in
     let scored = score_schedule ~use_cache:(score_pruning_mode = `Prune && reuse_stable)
       match_steps schedule in
     Hashtbl.replace leaf_score_cache triple scored;
     scored_schedule_features ds 0 scored)) in
-  let bound_score check_floor triple = timed bound_cpu (fun () -> with_shared_temporary_density_state (fun () ->
+  let bound_score check_floor triple = timed bound_cpu (fun () -> with_candidate_density_state (fun () ->
     let match_steps, (steps, sort) = materialize triple in
     let neutral = match ds with
       | D_Gen | D_Thm -> Total
@@ -2554,23 +2565,15 @@ and constructor_valid_schedules (ind_name : ty_ctr) (ctr : rocq_ctr) (result_var
   let select_groups = if group_mode = `Off || score_pruning_mode <> `Off then None
     else if cardinality_ranking () then Some (fun groups ->
       let context = cardinality_context (cardinality_recursive_count result_vars output_vars) in
-      let scores = List.map (List.map (fun ((steps, _) as schedule) ->
-        try with_temporary_density_state (fun () ->
-          ignore (schedule_density [] schedule);
-          Some (CardinalityScore.score_schedule context steps))
-        with Noninductive_dependency _ | Unavailable_mode _ -> None)) groups in
-      GroupedScore.select_combinations CardinalityScore.group_policy scores)
+      GroupedScore.select_combinations CardinalityScore.group_policy
+        (score_group_candidates (schedule_density []) (fun (steps, _) _ ->
+          Some (CardinalityScore.score_schedule context steps)) groups))
     else if budget_aware_ranking () then Some (fun groups ->
       let context = budget_context !prepared_inputs in
       let key = budget_key ind_name result_vars output_vars ds in
-      let scores = List.map (List.map (fun ((steps, _) as schedule) ->
-        try with_temporary_density_state (fun () ->
-          ignore (schedule_density [] schedule);
-          match BudgetAwareScore.score_schedule context key steps with
-          | Ok score -> Some score
-          | Error _ -> None)
-        with Noninductive_dependency _ | Unavailable_mode _ -> None)) groups in
-      GroupedScore.select_combinations BudgetAwareScore.group_policy scores)
+      GroupedScore.select_combinations BudgetAwareScore.group_policy
+        (score_group_candidates (schedule_density []) (fun (steps, _) _ ->
+          Result.to_option (BudgetAwareScore.score_schedule context key steps)) groups))
     else Some (schedule_group_selector ds) in
   let schedule_matches = NewUnifyQC.type_to_schedules
     ~on_prepared:(fun inputs -> prepared_inputs := inputs) ?select_groups
