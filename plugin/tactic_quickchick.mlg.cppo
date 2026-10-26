@@ -310,11 +310,22 @@ let inductive_name_cache : Names.inductive option QualidTbl.t = QualidTbl.create
 let inductive_name_cache_env = ref None
 
 let mutual_relation_cache = ref None
+let finite_pins_cache = ref None
 
 let clear_inductive_name_cache () =
   QualidTbl.reset inductive_name_cache;
   inductive_name_cache_env := None;
-  mutual_relation_cache := None
+  mutual_relation_cache := None;
+  finite_pins_cache := None
+
+let derivation_finite_pins () =
+  let env = Global.env () in
+  match !finite_pins_cache with
+  | Some (cached_env, pins) when cached_env == env -> pins
+  | _ ->
+    let pins = BudgetAwareScore.finite_pins_from_environment () in
+    finite_pins_cache := Some (env, pins);
+    pins
 
 let get_inductive_name name : Names.inductive option =
   let env = Global.env () in
@@ -2361,10 +2372,11 @@ let budget_key ind_name result_vars output_vars ds = {
     if List.mem v output_vars then Some i else None) result_vars;
   derive_sort = ds }
 
-(* Finite pins are cached for the lifetime of one context. *)
+(* Finite pins depend on relation definitions and naming, so they are shared
+   by every context of one derivation and reset with the name cache. *)
 let budget_context inputs = {
   BudgetAwareScore.input_vars = inputs;
-  finite_pins = BudgetAwareScore.finite_pins_from_environment ();
+  finite_pins = derivation_finite_pins ();
   completed_dependency = budget_dependency_score }
 
 (* QC_SCHEDULE_SELECTION_LOG=<file> appends one line per selected constructor
