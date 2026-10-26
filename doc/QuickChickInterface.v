@@ -682,6 +682,14 @@ Declare Instance Dec_eq_list (A : Type)
    assumptions need concrete values for extraction. Testing does not prove
    the goal. If lookup fails with a finite [Typeclasses Depth] limit, increase
    or unset the limit before requesting automatic derivation.
+
+   A failing test shrinks its counterexample. A variable that no hypothesis
+   produces shrinks with its type's [Shrink] instance; a shrunk value that
+   breaks a later hypothesis is discarded. The outputs of a producing
+   hypothesis shrink only when a checker for that hypothesis already exists,
+   for example from [QCDerive Checker], and each shrunk value must pass it.
+   Without a [Shrink] instance or such a checker, the value is reported
+   unshrunk.
 *)
 
 (** QuickChick also allows automatic derivations of proofs of
