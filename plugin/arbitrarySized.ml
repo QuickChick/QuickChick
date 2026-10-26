@@ -134,7 +134,7 @@ let shrink_decl (types : (ty_ctr * ty_param list * ctr_rep list) list) : (ty_ctr
         lst_append
         list_nil ty
     ) in
-    let body = gMatch (gVar arg) (List.map create_branch ctors) in
+    let body = gMatch (gVar arg) ~explicit_params:(List.length ty_params) (List.map create_branch ctors) in
     debug_coq_expr body;
 
     (function_name, [gArg ~assumName:(gVar arg) ~assumType:arg_type ()], arg, return_type, body) in
@@ -197,7 +197,7 @@ let show_decl (types : (ty_ctr * ty_param list * ctr_rep list) list) : (ty_ctr -
                     emptyString ty vs)
       ) in
     (* match x with | Ctr p0 p1 ... pn -> "Ctr " ++ (...) ++ " " ++ (...) *)
-    let body = gMatch (gVar arg) (List.map branch ctors) in
+    let body = gMatch (gVar arg) ~explicit_params:(List.length ty_params) (List.map branch ctors) in
 
     (function_name, [gArg ~assumName:(gVar arg) ~assumType:arg_type ()], arg, return_type, body) in
 

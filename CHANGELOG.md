@@ -30,6 +30,8 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
   generator when a partner member has one: at fuel zero it builds on the
   partner's base case. A type with no finite values, such as one whose only
   constructor takes itself, is rejected with an error naming the type.
+- Derived `Show` and `Shrink` work for types with explicit parameters,
+  including mixes of implicit and explicit ones and mutual types.
 - `quickchick` shrinks a counterexample's unconstrained variables with their
   `Shrink` instances, and leaves a variable unshrunk when its type has none.
   A shrunk value that breaks a later hypothesis is discarded. The outputs of
