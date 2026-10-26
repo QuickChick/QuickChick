@@ -4664,11 +4664,38 @@ let compile_public ~mode ~outputs ~constrained ~all_mutual ind =
         sigma, bodies @ [Libnames.qualid_basename root, body])
         (Evd.merge_context_set Evd.univ_rigid initial context, []) roots)) ()
 
+(* Testing needs concrete types: a goal quantified over a type, or mentioning
+   a variable whose type is a sort (such as a section variable), has no type
+   to generate values of. Say so instead of failing later in parsing. *)
+let reject_abstract_types env sigma goal =
+  let is_sort ty = EConstr.isSort sigma (Reductionops.whd_all env sigma ty) in
+  let fail kind name = CErrors.user_err (str ("QuickChick tests properties of concrete types, but the goal "
+    ^ kind ^ " the type " ^ Names.Id.to_string name
+    ^ ". State the property for a concrete type, for example by instantiating "
+    ^ Names.Id.to_string name ^ ".")) in
+  let rec binders env c = match EConstr.kind sigma c with
+    | Constr.Prod (name, ty, body) ->
+      (if is_sort ty then match Context.binder_name name with
+        | Names.Name id -> fail "quantifies over" id
+        | Names.Anonymous -> fail "quantifies over" (Names.Id.of_string "_"));
+      binders (EConstr.push_rel (Context.Rel.Declaration.LocalAssum (name, ty)) env) body
+    | _ -> () in
+  binders env goal;
+  let rec vars c = match EConstr.kind sigma c with
+    | Constr.Var id ->
+      (match Environ.lookup_named id env with
+       | Context.Named.Declaration.LocalAssum (_, ty) when is_sort (EConstr.of_constr ty) ->
+         fail "mentions" id
+       | _ -> ())
+    | _ -> EConstr.iter sigma vars c in
+  vars goal
+
 let quickchick_it size idx =
   Proofview.Goal.enter_one begin fun gl ->
     let c = Proofview.Goal.concl gl in
     let e = Proofview.Goal.env gl in
     let evd = Proofview.Goal.sigma gl in
+    reject_abstract_types e evd c;
     
     let definitions = ref [] in
     let universes = ref Univ.ContextSet.empty in
