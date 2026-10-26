@@ -26,6 +26,9 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
   report what is unsupported instead of failing with an anomaly.
 - `QuickChick` on a property with an unresolved instance, such as a missing
   `Show`, reports the instance instead of a kernel anomaly.
+- An unconstrained generator for a type, or mutual member, whose
+  constructors all take recursive arguments is rejected with an error naming
+  the type, instead of an elaboration failure in generated code.
 - `quickchick` shrinks a counterexample's unconstrained variables with their
   `Shrink` instances, and leaves a variable unshrunk when its type has none.
   A shrunk value that breaks a later hypothesis is discarded. The outputs of

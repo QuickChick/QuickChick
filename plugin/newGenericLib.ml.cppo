@@ -1497,9 +1497,25 @@ let backtrack_decoration ?(weight = WDefault) (ds : derive_sort) (rec_or_base : 
   | D_Check -> MFun ([PWild, None], m)
   | D_Thm -> failwith ("Backtrack not supported for theorems: " ^ mexp_to_string m)
 
-let schedule_failure (ds : derive_sort) (is_constrained : bool) : mexp =
+(* The value of a derivation that has no base constructor once its fuel
+   runs out. An unconstrained generator cannot fail, so it has none. *)
+let schedule_failure (name : string) (ds : derive_sort) (is_constrained : bool) : mexp =
   match ds, is_constrained with
   | D_Gen, true | D_Enum, true | D_Check, _ | D_Thm, true -> MOutOfFuel
+  | D_Gen, false ->
+    (* [name] is GenSized_<type>_<mode>; report the type. *)
+    let ty =
+      let prefix = "GenSized_" in
+      let n = String.length prefix in
+      let body = if String.length name > n && String.sub name 0 n = prefix
+        then String.sub name n (String.length name - n) else name in
+      match String.rindex_opt body '_' with
+      | Some i -> String.sub body 0 i
+      | None -> body in
+    CErrors.user_err
+      (str ("Cannot derive an unconstrained generator for " ^ ty
+            ^ ": it has no constructor without recursive arguments, so a"
+            ^ " generator has nothing to produce when its fuel runs out.") ++ fnl ())
   | _ -> MFail
 
 let inductive_schedule_to_mexp (is : inductive_schedule) (ds : derive_sort) (is_constrained : bool) : mexp =
@@ -1566,7 +1582,7 @@ let inductive_schedule_to_mexp (is : inductive_schedule) (ds : derive_sort) (is_
                   [fuel_max; MId (var_of_string "size"); MId (var_of_string "size")]))) in
   let first = 
     match base_scheds with
-    | [] -> schedule_failure ds is_constrained
+    | [] -> schedule_failure name ds is_constrained
     | (s, inp_pats, _, _) :: _ ->
       let k = rec_count s in
       let sz' = child_size (MId (var_of_string "size")) k in
@@ -1592,7 +1608,7 @@ let inductive_schedule_with_dependencies_to_mexp unconstrained_inds (ind_schds :
     Feedback.msg_notice (str ("Compiling inductive schedule: " ^ ind_schd_name) ++ str " " ++ str (derive_sort_to_string ds) ++ str " " ++ str (if is_constrained then "constrained" else "unconstrained") ++ fnl());
     let first = 
       match base_scheds with
-      | [] -> schedule_failure ds is_constrained
+      | [] -> schedule_failure ind_schd_name ds is_constrained
       | (s, inp_pats, _, _) :: _ ->
         let k = rec_count_schedule s in
         let sz' = child_size (MId (var_of_string "size")) k in
