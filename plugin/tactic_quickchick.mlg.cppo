@@ -2247,7 +2247,7 @@ let canonical_obligation_key bound relation outputs ds constrained inputs =
 let schedule_instance_canonical_cache = Hashtbl.create 256
 let schedule_instance_bound = ref (fun (_ : Names.Id.t) -> false)
 
-let rec has_schedule_instance ?(cached = true) relation outputs ds constrained =
+let has_schedule_instance ?(cached = true) relation outputs ds constrained =
   let decide () =
     let env, sigma, goal, names = elaborate_obligation relation outputs ds constrained in
     match instance_requirements

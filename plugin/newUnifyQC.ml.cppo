@@ -1847,11 +1847,6 @@ let correct_variables_with cv (scd : schedule_step list) : schedule_step list =
     | S_Check (src,pol) -> S_Check (correct_src_with cv src, pol)
     | S_Let (v, c) -> S_Let (cv v, correct_rocq_constr_with cv c)) scd
 
-let correct_rocq_constr (umap : umap) = correct_rocq_constr_with (correct_var umap)
-let correct_pat (umap : umap) = correct_pat_with (correct_var umap)
-let correct_src (umap : umap) = correct_src_with (correct_var umap)
-let correct_variables (umap : umap) = correct_variables_with (correct_var umap)
-
 (* Resolution through a fixed map, memoized for one search. *)
 let cached_correct_var (umap : umap) =
   let resolved = Hashtbl.create 64 in
