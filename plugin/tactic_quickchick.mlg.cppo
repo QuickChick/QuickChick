@@ -2536,7 +2536,7 @@ and constructor_valid_schedules (ind_name : ty_ctr) (ctr : rocq_ctr) (result_var
      comparison stays top-level. The bounds are for the density rankings;
      BudgetAware ranking has no pruning bounds yet, so it searches exhaustively. *)
   let score_pruning_mode = match !score_pruning_suspended,
-    (if budget_aware_ranking () || cardinality_ranking () then None
+    (if cardinality_ranking () then None
      else Sys.getenv_opt "QC_SCHEDULE_SCORE_PRUNING") with
     | false, Some "baseline" -> `Baseline
     | _, Some ("1" | "true" | "yes") -> `Prune
@@ -2558,6 +2558,16 @@ and constructor_valid_schedules (ind_name : ty_ctr) (ctr : rocq_ctr) (result_var
         stable_dependencies := InductiveScheduleKeyMap.add key entry !stable_dependencies
       | _ -> ()) !density_inductive_memo in
   let incumbent = ref None in
+  let prepared_inputs = ref [] in
+  (* BudgetAware pruning. A step's score does not depend on its position, its
+     dependency scores are final once stable, and each variable is produced
+     once, so the committed prefix's score never improves on extension, field
+     by field: selectivity counts only variables a completion keeps, density
+     and locality take maxima, the rest add. An unstable dependency is scored
+     at its best, and a forced check adds Checking density. *)
+  let budget_pruning = budget_aware_ranking () in
+  let budget_incumbent = ref None in
+  let observed_budget_bounds = ref [] in
   let observed_leaf_scores = ref [] in
   let observed_bounds = ref [] in
   let scored_leaves = ref 0 in
@@ -2667,11 +2677,73 @@ and constructor_valid_schedules (ind_name : ty_ctr) (ctr : rocq_ctr) (result_var
       + check_floor.NewGenericLib.future_variable_uses in
     ScheduleRanking.prefix_bound ~prefer_dense ~known_grades
       ~variable_uses:(get_num_var_uses (annotations, sort) ds + future_uses))) in
+  let budget_score ~optimistic steps =
+    let context = budget_context !prepared_inputs in
+    let context = if not optimistic then context else
+      { context with BudgetAwareScore.completed_dependency = (fun request ->
+          match budget_dependency_score request with
+          | Some score -> Some score
+          | None -> Some BudgetAwareScore.empty) } in
+    Result.to_option (BudgetAwareScore.score_schedule context
+      (budget_key ind_name result_vars output_vars ds) steps) in
+  let budget_leaf triple = with_candidate_density_state (fun () ->
+    let match_steps, schedule = materialize triple in
+    let scored = score_schedule ~use_cache:(score_pruning_mode = `Prune && reuse_stable)
+      match_steps schedule in
+    budget_score ~optimistic:false (List.map fst (fst scored))) in
+  (* A variable the prefix binds stays bound, so it is never an output of a
+     remaining hypothesis: each such non-input variable that the floor lists
+     for a remaining hypothesis is a variable dependency of its step, or of
+     the equality check its constrained output becomes, in every completion. *)
+  let budget_prefix_bound check_floor triple =
+    let match_steps, (steps, _) = materialize triple in
+    let committed = match_steps @ steps in
+    let bound_by_prefix = List.concat_map (function
+      | S_UC (v, _, _) | S_Let (v, _) -> [v]
+      | S_ST (outputs, _, _) -> List.map fst outputs
+      | S_Match (v, p) -> v :: pat_vars p
+      | S_Check _ -> []) committed in
+    (* An unbound variable that is a bare argument of k remaining hypotheses
+       is produced once, so the other k - 1 count it; the floor's
+       future_variable_uses sums these, over variables disjoint from the
+       bound ones above. *)
+    let future_var_deps = List.length (List.filter (fun v ->
+      List.mem v bound_by_prefix && not (List.mem v !prepared_inputs))
+      check_floor.NewGenericLib.bound_argument_occurrences)
+      + check_floor.NewGenericLib.future_variable_uses in
+    Option.map (fun score ->
+      let score = { score with BudgetAwareScore.var_deps =
+        score.BudgetAwareScore.var_deps + future_var_deps } in
+      if check_floor.NewGenericLib.forced_checks > 0 then
+        BudgetAwareScore.combine score
+          { BudgetAwareScore.empty with BudgetAwareScore.density = BudgetAwareScore.Checking }
+      else score)
+      (budget_score ~optimistic:true committed) in
+  (* Grading the prefix's steps derives their dependencies, so the bound
+     reads their scores instead of the optimistic default. *)
+  let budget_bound check_floor triple = with_candidate_density_state (fun () ->
+    ignore (bound_score check_floor triple);
+    budget_prefix_bound check_floor triple) in
   let on_prefix = if score_pruning_mode = `Baseline then
     Some (fun _ terminal _ -> if terminal then incr scored_leaves)
   else None in
   let on_prefix_with_floor = if score_pruning_mode = `Prune ||
     score_pruning_mode = `Verify then Some (fun path terminal _ triple ->
+    if terminal && budget_pruning then begin
+      incr scored_leaves;
+      match try budget_leaf triple with
+        | Noninductive_dependency _ | Unavailable_mode _ -> None with
+      | None -> ()
+      | Some score ->
+        if score_pruning_mode = `Verify then
+          List.iter (fun (ancestor, bound) ->
+            if path_prefix ancestor path && BudgetAwareScore.compare score bound < 0 then
+              failwith "BudgetAware prefix bound exceeded a completed descendant")
+            !observed_budget_bounds;
+        budget_incumbent := Some (match !budget_incumbent with
+          | Some best when BudgetAwareScore.compare best score <= 0 -> best
+          | _ -> score)
+    end else
     if terminal then begin
       incr scored_leaves;
       let score = try Some (leaf_score triple) with
@@ -2694,6 +2766,32 @@ and constructor_valid_schedules (ind_name : ty_ctr) (ctr : rocq_ctr) (result_var
     end) else None in
   let should_prune_prefix_with_floor = if score_pruning_mode = `Verify || score_pruning_mode = `Prune then Some (fun path check_floor triple ->
     incr checked_prefixes;
+    let budget_bound_of () = try budget_bound check_floor triple with
+      | Noninductive_dependency _ | Unavailable_mode _ -> None in
+    if budget_pruning then begin
+      if score_pruning_mode = `Verify then begin
+        Option.iter (fun bound ->
+          observed_budget_bounds := (path, bound) :: !observed_budget_bounds)
+          (budget_bound_of ());
+        false
+      end else match !budget_incumbent with
+        | None -> false
+        | Some best ->
+          (* The bound without derived dependencies is already admissible.
+             Deriving them cannot change selectivity, the first field, so it
+             is worth doing only when selectivity ties. *)
+          let cut bound = let c = BudgetAwareScore.compare best bound <= 0 in
+            if c then incr pruned_prefixes; c in
+          (match try budget_prefix_bound check_floor triple with
+             | Noninductive_dependency _ | Unavailable_mode _ -> None with
+           | None -> false
+           | Some cheap when cut cheap -> true
+           | Some cheap when cheap.BudgetAwareScore.selectivity
+                             < best.BudgetAwareScore.selectivity -> false
+           | Some _ -> (match budget_bound_of () with
+             | None -> false
+             | Some bound -> cut bound))
+    end else
     if score_pruning_mode = `Verify then begin
       let bound = try Some (bound_score check_floor triple) with
         | Noninductive_dependency _ | Unavailable_mode _ -> None in
@@ -2714,7 +2812,6 @@ and constructor_valid_schedules (ind_name : ty_ctr) (ctr : rocq_ctr) (result_var
           if cut then incr pruned_prefixes;
           cut)) else None in
   let group_mode = schedule_group_mode () in
-  let prepared_inputs = ref [] in
   (* Verification and baseline modes search jointly. With pruning, several
      independent groups are still searched separately and a single group is
      pruned. Under BudgetAware ranking,
@@ -3223,7 +3320,9 @@ and constructor_valid_schedules (ind_name : ty_ctr) (ctr : rocq_ctr) (result_var
       !leaf_cache_hits !mode_cache_hits
       (InductiveScheduleKeyMap.cardinal !stable_dependencies)
       distinct_step_multisets !bound_cpu !leaf_cpu !final_cpu));
-  if score_pruning_mode = `Verify then begin
+  (* Under BudgetAware the leaves carry BudgetAware scores, checked against
+     their ancestors' bounds as they complete. *)
+  if score_pruning_mode = `Verify && not budget_pruning then begin
     let observed = List.sort_uniq Stdlib.compare !observed_leaf_scores in
     let rescored = List.map (fun (_, scored, _, _) ->
       scored_schedule_features ds 0 scored) schedule_densities
