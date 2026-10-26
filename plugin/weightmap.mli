@@ -9,3 +9,6 @@ val convert_constr_to_cw_pair :
 val register_weights_object :
   (GenericLib.constructor * weight_ast) list -> Libobject.obj
 val lookup_weight : bool -> CtrMap.key -> GenericLib.var -> GenericLib.coq_expr
+
+(* The weight registered for the constructor of this name, if any. *)
+val find_weight : string -> weight_ast option

@@ -99,6 +99,21 @@ let register_weights_object =
 
 let add_weights w = Lib.add_anonymous_leaf (register_weights_object w)
 #endif
+(* The weight registered for the constructor named [name]: under that name,
+   else under the same basename, since a weight is usually written with the
+   constructor's short name. *)
+let find_weight name =
+  let env = SummaryRef.(!weight_env) in
+  match CtrMap.find_opt (injectCtr name) env with
+  | Some w -> Some w
+  | None ->
+    let base n = Libnames.qualid_basename (Libnames.qualid_of_string n) in
+    let target = base name in
+    CtrMap.fold (fun c w found -> match found with
+      | Some _ -> found
+      | None -> if Names.Id.equal (base (constructor_to_string c)) target then Some w else None)
+      env None
+
 let lookup_weight b ctr size_var = 
   try match CtrMap.find ctr SummaryRef.(!weight_env) with
       | WNum n -> gInt n

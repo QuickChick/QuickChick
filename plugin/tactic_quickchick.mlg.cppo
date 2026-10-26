@@ -3079,7 +3079,7 @@ and constructor_valid_schedules (ind_name : ty_ctr) (ctr : rocq_ctr) (result_var
        match entry with
        | Some (DensityDone (((_, inputs, _, base, recursive), _), true, _)) ->
          (match base @ recursive with
-          | [((steps, _), _, _)] ->
+          | [((steps, _), _, _, _)] ->
             let dependencies = B.required_dependencies key steps in
             let resolved = List.map (fun dependency ->
               dependency, selected_dependency memo (key :: seen) dependency)
@@ -3524,13 +3524,17 @@ and inductive_best_valid_schedule (rel : rocq_relation) (output_idxs : int list)
     match constructor_best_valid_schedule ind_name ctr result_vars output_vars ds opt with
     | (ctr_name, None, _) -> raise (Unavailable_mode (constructor_to_string ctr_name))
     | (ctr_name, Some ((i, schd, density), binders), budget) ->
-      Some ((schd, [], binders), (ctr_name, density), (ctr_name, budget))) ctrs in
+      let weight = match Weightmap.find_weight (constructor_to_string ctr_name) with
+        | Some (Weightmap.WNum n) -> NewGenericLib.WNum n
+        | Some Weightmap.WSize -> NewGenericLib.WSize
+        | None -> NewGenericLib.WDefault in
+      Some ((schd, [], binders, weight), (ctr_name, density), (ctr_name, budget))) ctrs in
 
   let constructor_schedules = List.map (fun (s, _, _) -> s) constructor_schedules_with_density in
   let densities = List.map (fun (_, d, _) -> d) constructor_schedules_with_density in
   let budget_scores = List.map (fun (_, _, b) -> b) constructor_schedules_with_density in
 
-  let is_recursive ((steps,_),_,_) =
+  let is_recursive ((steps,_),_,_,_) =
     List.exists (function | S_UC (_,SrcRec _,_) | S_ST (_,SrcRec _, _) | S_Check (SrcRec _,_) -> true | _ -> false) steps 
   in
 
@@ -3597,7 +3601,7 @@ and inductive_best_valid_schedule (rel : rocq_relation) (output_idxs : int list)
      score among the leaf's constructors; an uncovered leaf scores Partial. *)
   if cardinality_ranking () then begin
     let context = cardinality_context None in
-    let steps = List.map (fun ((steps, _), _, _) -> steps) constructor_schedules in
+    let steps = List.map (fun ((steps, _), _, _, _) -> steps) constructor_schedules in
     let count = CardinalityScore.mode_count_of context ds steps in
     match cardinality_count_key ind_name output_idxs ds with
     | Some key ->
@@ -3901,12 +3905,12 @@ let insert_mutrec_calls ?within ((schedule,matches) : schedule * (var * pat) lis
 let insert_mutrec_calls_inductive_schedule ?within (is : inductive_schedule) : inductive_schedule =
   let (name, result_vars, param_deps, nonrecursive_hyps, recursive_hyps) = is in
   Error.msg_debug (str ("Inserting mutrec calls for inductive schedule: " ^ name) ++ fnl ());
-  let update add_holes (schedule, matches, binders) =
+  let update add_holes (schedule, matches, binders, weight) =
     let local_binders = List.filter (fun (v, _) -> not (List.mem_assoc v result_vars)) binders in
     with_schedule_inputs (result_vars @ local_binders) (fun () ->
       let updated = insert_mutrec_calls ?within (schedule, matches) in
       let schedule, matches = if add_holes then rec_calls_add_typeclass_holes updated param_deps else updated in
-      schedule, matches, binders) in
+      schedule, matches, binders, weight) in
   let updated_nonrecursive_hyps = List.map (update false) nonrecursive_hyps in
   let updated_recursive_hyps = List.map (update true) recursive_hyps in
   (name, result_vars, param_deps, updated_nonrecursive_hyps, updated_recursive_hyps)
@@ -3921,7 +3925,7 @@ module InductiveSchedMap = Map.Make(struct type t = inductive_schedule * derive_
             | r -> r)
     | r -> r end)
 
-let dec_eq_sched_phony = ("DecOpt_eq_III", [], [], [(([],CheckerSchedule),[],[])], [(([],CheckerSchedule),[],[])])
+let dec_eq_sched_phony = ("DecOpt_eq_III", [], [], [(([],CheckerSchedule),[],[],WDefault)], [(([],CheckerSchedule),[],[],WDefault)])
    
 let init_density_inductive_memo = InductiveScheduleKeyMap.add (ty_ctr_of_string "Coq.Init.Logic.eq", [], D_Check, true) (DensityDone ((dec_eq_sched_phony, Checking), true, None)) InductiveScheduleKeyMap.empty
 
@@ -4218,7 +4222,7 @@ let propagate_schedule_requirements components =
           from_dependency relation (List.map fst outputs) (producer_sort_to_derive_sort ps) true
         | S_Check (SrcNonrec relation, _) -> from_dependency relation [] D_Check true
         | _ -> [] in
-      List.fold_left add [] (List.concat_map (fun ((steps,_),_,binders) ->
+      List.fold_left add [] (List.concat_map (fun ((steps,_),_,binders,_) ->
         let binders = List.filter (fun (v, _) -> not (List.mem_assoc v inputs)) binders in
         with_schedule_inputs (inputs @ binders) (fun () ->
           List.concat_map step_requirements steps)) (base @ recursive))) in
@@ -4754,7 +4758,7 @@ let quickchick_it size idx =
         Feedback.msg_notice (str "Theorem Schedule:\n" ++ str (schedule_to_string selected_schedule) ++ fnl ());
 
         (* Register theorem as a phony inductive schedule *)
-        let phony_theorem_ind_schd = ("theorem", [], [],[selected_schedule,[],[]],[]) in
+        let phony_theorem_ind_schd = ("theorem", [], [],[selected_schedule,[],[],WDefault],[]) in
         density_inductive_memo := InductiveScheduleKeyMap.add (ty_ctr_of_string "theorem", [], D_Thm, true) (DensityDone ((phony_theorem_ind_schd, Checking), true, None)) !density_inductive_memo;
 
         density_inductive_memo := InductiveScheduleKeyMap.remove (ty_ctr_of_string "eq", [], D_Check, true) !density_inductive_memo;

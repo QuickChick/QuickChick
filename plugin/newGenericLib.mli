@@ -253,7 +253,11 @@ val c_succ : Constrexpr.constr_expr -> Constrexpr.constr_expr
 val c_theorem : Constrexpr.constr_expr
 
 (* Schedule, input matches, and constructor-local binder types. *)
-type rule_schedule = schedule * (var * pat) list * (var * mexp) list
+(* A constructor's weight in a generator's choice: the QuickChickWeights
+   entry for it, if any, else 1 for a base and size + 1 for a recursive
+   constructor. *)
+type rule_weight = WDefault | WNum of int | WSize
+type rule_schedule = schedule * (var * pat) list * (var * mexp) list * rule_weight
 type inductive_schedule = string * (var * mexp) list * (var * mexp list) list * rule_schedule list * rule_schedule list
 
 val inductive_schedule_to_constr_expr : inductive_schedule -> derive_sort -> bool -> Constrexpr.constr_expr
