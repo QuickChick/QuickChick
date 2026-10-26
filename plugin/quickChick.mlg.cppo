@@ -733,17 +733,30 @@ let () = ScheduleRanking.selected := (fun () ->
   | Some scorer -> scorer
   | None -> ScheduleRanking.Feature ScheduleRanking.RankDensityThenVars)
 
-let select_scorer name =
-  let name = Libnames.string_of_qualid name in
+(* A built-in name selects that scorer; any other name must be a Rocq
+   policy, which is compiled and loaded once. *)
+#if COQ_VERSION >= (8, 20, 0)
+let select_scorer ~opaque_access reference =
+#else
+let select_scorer reference =
+#endif
+  let name = Libnames.string_of_qualid reference in
   match ScheduleRanking.scorer_of_name name with
+  | Some (ScheduleRanking.Compiled _) | None ->
+#if COQ_VERSION >= (8, 20, 0)
+    let key = PolicyLoader.load ~opaque_access reference in
+#else
+    let key = PolicyLoader.load reference in
+#endif
+    SummaryRef.(selected_scorer := ScheduleRanking.compiled_prefix ^ key)
   | Some _ -> SummaryRef.(selected_scorer := name)
-  | None -> CErrors.user_err Pp.(str "Unknown scorer " ++ str name
-      ++ str ". The scorers are: "
-      ++ prlist_with_sep (fun () -> str ", ") str (ScheduleRanking.scorer_names ())
-      ++ str ".")
 }
 
+#if COQ_VERSION >= (8, 20, 0)
+VERNAC COMMAND EXTEND QuickChickScorer CLASSIFIED AS SIDEFF STATE opaque_access
+#else
 VERNAC COMMAND EXTEND QuickChickScorer CLASSIFIED AS SIDEFF
+#endif
   | ["QuickChick" "Scorer" reference(name)] -> { select_scorer name }
   | ["QC" "Scorer" reference(name)] -> { select_scorer name }
 END

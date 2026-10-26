@@ -1,0 +1,150 @@
+(* Compile a Rocq scoring policy to native code and load it into the plugin.
+
+   The policy is a constant of type QuickChick.SchedulingPolicy.policy. Its
+   scorer, comparison and bound are extracted with the view types mapped onto
+   PolicyViews, compiled to a shared object against the plugin's interfaces,
+   and loaded with Dynlink; the loaded module registers them in
+   PolicyRegistry. Everything declared or set for the extraction is discarded
+   with the rest of the system state. Compiled objects are cached by a digest
+   of the extracted code and of the plugin itself. *)
+
+open Pp
+
+let policy_type = "QuickChick.SchedulingPolicy.policy"
+
+let error msg = CErrors.user_err msg
+
+let check_policy reference =
+  let env = Global.env () in
+  let sigma = Evd.from_env env in
+  let global = try Nametab.global reference
+    with Not_found -> error (str "Unknown scorer " ++ Libnames.pr_qualid reference
+      ++ str ". The built-in scorers are: "
+      ++ prlist_with_sep (fun () -> str ", ") str (ScheduleRanking.scorer_names ())
+      ++ str "; a Rocq scorer is a constant of type " ++ str policy_type ++ str ".") in
+  let sigma, term = Evd.fresh_global env sigma global in
+  let sigma, typ = Typing.type_of env sigma term in
+  let expected = Nametab.global (Libnames.qualid_of_string policy_type) in
+  let is_policy = match EConstr.kind sigma (Reductionops.whd_all env sigma typ) with
+    | Constr.Ind (ind, _) -> Names.GlobRef.(CanOrd.equal (IndRef ind) expected)
+    | _ -> false in
+  if not is_policy then
+    error (Libnames.pr_qualid reference ++ str " is not a scorer: its type is "
+      ++ Printer.pr_econstr_env env sigma typ ++ str ", not " ++ str policy_type ++ str ".")
+
+(* Declare [name := body], where [body] mentions the policy. *)
+let declare name body =
+  let env = Global.env () in
+  let sigma, body = Constrintern.interp_constr_evars env (Evd.from_env env) body in
+  let cinfo = Declare.CInfo.make ~name ~typ:None () in
+  let info = Declare.Info.make () in
+  ignore (Declare.declare_definition ~info ~cinfo ~opaque:false ~body sigma)
+
+let app f args =
+  let open Constrexpr in
+  CAst.make (CApp (CAst.make (CRef (Libnames.qualid_of_string f, None)),
+    List.map (fun a -> a, None) args))
+
+let set_view_extraction () =
+  List.iter (fun (rocq, ocaml, constructors, matcher) ->
+    let rocq = NewGenericLib.rocq_path rocq in
+    Extraction_plugin.Table.extract_inductive
+      (Libnames.qualid_of_string rocq) ocaml constructors matcher)
+    PolicyViews.extraction_table
+
+let plugin_directory () =
+  try Findlib.package_directory "coq-quickchick.plugin"
+  with Not_found | Findlib.No_such_package _ ->
+    error (str "Cannot locate the QuickChick plugin to compile a Rocq scorer.")
+
+(* Extract the three entry points of [reference] to [file]. *)
+#if COQ_VERSION >= (8, 20, 0)
+let extract ~opaque_access reference file =
+#else
+let extract reference file =
+#endif
+  Vernacstate.System.protect (fun () ->
+    let policy = CAst.make (Constrexpr.CRef (reference, None)) in
+    let scorer = app "QuickChick.SchedulingPolicy.policy_scorer" [policy] in
+    let entries = [
+      "qc_policy_score", app "QuickChick.SchedulingPolicy.score_one_schedule" [scorer];
+      "qc_policy_compare", app "QuickChick.SchedulingPolicy.compare_scores" [scorer];
+      "qc_policy_bound", app "QuickChick.SchedulingPolicy.lower_bound" [policy];
+    ] in
+    let names = List.map (fun (name, body) ->
+      let id = NewGenericLib.fresh_name name in
+      declare id body; (name, id)) entries in
+    set_view_extraction ();
+    let qualids = List.map (fun (_, id) -> Libnames.qualid_of_ident id) names in
+#if COQ_VERSION >= (8, 20, 0)
+    Flags.silently (Extraction_plugin.Extract_env.full_extraction ~opaque_access (Some file)) qualids;
+#else
+    Flags.silently (Extraction_plugin.Extract_env.full_extraction (Some file)) qualids;
+#endif
+    names) ()
+
+let read_file file =
+  let channel = open_in_bin file in
+  let text = really_input_string channel (in_channel_length channel) in
+  close_in channel; text
+
+let write_file file text =
+  let channel = open_out_bin file in
+  output_string channel text; close_out channel
+
+let cache_directory () =
+  let dir = Filename.concat (Filename.get_temp_dir_name ()) "QuickChick-scorers" in
+  (try Unix.mkdir dir 0o755 with Unix.Unix_error (Unix.EEXIST, _, _) -> ());
+  dir
+
+let run command =
+  match Sys.command command with
+  | 0 -> ()
+  | _ -> error (str "Compiling the Rocq scorer failed: " ++ str command)
+
+(* Compile and load [reference] if needed, and return its registry key. *)
+#if COQ_VERSION >= (8, 20, 0)
+let load ~opaque_access reference =
+#else
+let load reference =
+#endif
+  check_policy reference;
+  let dir = cache_directory () in
+  let staging = Filename.temp_file ~temp_dir:dir "qc_scorer" ".ml" in
+#if COQ_VERSION >= (8, 20, 0)
+  let names = extract ~opaque_access reference staging in
+#else
+  let names = extract reference staging in
+#endif
+  let code = read_file staging in
+  Sys.remove staging;
+  (try Sys.remove (Filename.chop_suffix staging ".ml" ^ ".mli") with Sys_error _ -> ());
+  let plugin = plugin_directory () in
+  let plugin_digest = Digest.file (Filename.concat plugin "quickchick_plugin.cmxs") in
+  let key = Digest.to_hex (Digest.string (code ^ plugin_digest)) in
+  (match PolicyRegistry.find key with
+   | Some _ -> ()
+   | None ->
+     let base = Filename.concat dir ("qc_scorer_" ^ key) in
+     let cmxs = base ^ ".cmxs" in
+     if not (Sys.file_exists cmxs) then begin
+       let entry name = Names.Id.to_string (List.assoc name names) in
+       let registration = Printf.sprintf
+         "\nlet () = Quickchick_plugin.PolicyRegistry.register %S\n\
+         \  { Quickchick_plugin.PolicyRegistry.score = Obj.magic %s;\n\
+         \    compare = Obj.magic %s; bound = Obj.magic %s }\n"
+         key (entry "qc_policy_score") (entry "qc_policy_compare") (entry "qc_policy_bound") in
+       (* ExtrOcamlNatInt inlines Nat.compare with unqualified Eq, Lt and Gt;
+          re-export them from the plugin's comparison type. *)
+       let prelude = "type qc_comparison = Quickchick_plugin.PolicyViews.comparison = Eq | Lt | Gt\n" in
+       write_file (base ^ ".ml") (prelude ^ code ^ registration);
+       run (Printf.sprintf
+         "ocamlfind ocamlopt -shared -opaque -rectypes -w a -I %s -o %s %s"
+         (Filename.quote plugin) (Filename.quote cmxs) (Filename.quote (base ^ ".ml")))
+     end;
+     (try Dynlink.loadfile_private cmxs
+      with Dynlink.Error e ->
+        error (str "Loading the compiled Rocq scorer failed: " ++ str (Dynlink.error_message e)));
+     if PolicyRegistry.find key = None then
+       error (str "The compiled Rocq scorer did not register itself."));
+  key

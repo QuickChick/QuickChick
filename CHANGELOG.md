@@ -31,6 +31,9 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
   such as `density` (the default), `budget_aware` or `cardinality`, for later
   derivations in the file. It replaces the `QC_SCHEDULE_RANKING` environment
   variable, which is removed. `Scorer` is now a keyword.
+- A scorer can be written in Rocq, as a `QuickChick.SchedulingPolicy.policy`.
+  `QC Scorer my_policy.` compiles it to native code once and loads it into the
+  plugin; see `doc/SchedulingPolicies.md`. Compiling needs `ocamlfind`.
 - Schedule selection is exact by default: score-based pruning, proved sound
   for the built-in rankings, replaces the 1,000-candidate cap. Set
   `QC_SCHEDULE_SCORE_PRUNING=0` to disable it. Cardinality ranking has no

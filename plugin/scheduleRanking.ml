@@ -42,6 +42,7 @@ type scorer =
   | Feature of policy
   | BudgetAware
   | Cardinality
+  | Compiled of string
 
 (* Built-in scorers by name, with the aliases the former environment setting
    accepted. The first name of each entry is the one reported. *)
@@ -56,7 +57,14 @@ let builtin_scorers = [
   ["cardinality"], Cardinality;
 ]
 
+(* A compiled Rocq scorer is selected by its registry key. *)
+let compiled_prefix = "compiled:"
+
 let scorer_of_name name =
+  let n = String.length compiled_prefix in
+  if String.length name > n && String.sub name 0 n = compiled_prefix then
+    Some (Compiled (String.sub name n (String.length name - n)))
+  else
   List.find_map (fun (names, scorer) ->
     if List.mem name names then Some scorer else None) builtin_scorers
 
@@ -73,7 +81,7 @@ let current_scorer () = !selected ()
 let current () =
   match current_scorer () with
   | Feature policy -> policy
-  | BudgetAware | Cardinality -> RankDensityThenVars
+  | BudgetAware | Cardinality | Compiled _ -> RankDensityThenVars
 
 let to_string = function
   | RankDensityThenVars -> "density_then_vars"

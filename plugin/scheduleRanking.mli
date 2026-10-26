@@ -26,8 +26,12 @@ type scorer =
   | Feature of policy
   | BudgetAware
   | Cardinality
+  | Compiled of string  (** a compiled Rocq policy, by registry key *)
 
-(** A built-in scorer by name or alias. *)
+(** The name under which a compiled scorer with this key is selected. *)
+val compiled_prefix : string
+
+(** A built-in scorer by name or alias, or a compiled one by prefixed key. *)
 val scorer_of_name : string -> scorer option
 
 (** The built-in scorer names, without aliases. *)

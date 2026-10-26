@@ -1,5 +1,6 @@
 module N = Quickchick_plugin.NewGenericLib
 module V = Quickchick_plugin.ScoringView
+module P = Quickchick_plugin.PolicyViews
 module U = Quickchick_plugin.NewUnifyQC
 
 let v = N.var_of_string
@@ -17,7 +18,7 @@ let () =
   let scope = V.scope [a] in
   let list_a = relation "Coq.Init.Datatypes.list" [N.DTyParam a] in
   assert (fst (quoted scope list_a) =
-    V.TApply (V.TGlobal (N.rocq_path "Coq.Init.Datatypes.list"), [V.TLocal 0]));
+    P.TApply (P.TGlobal (V.chars (N.rocq_path "Coq.Init.Datatypes.list")), [P.TLocal 0]));
   let x = v "x" in
   (try ignore (V.scope [x; x]);
        failwith "duplicate free locals were accepted"
@@ -25,8 +26,8 @@ let () =
   let shadowed = N.DProd ((x, nat),
     N.DProd ((x, nat), variable "x")) in
   assert (fst (quoted (V.scope []) shadowed) =
-    V.TProduct (0, V.TGlobal "nat",
-      V.TProduct (1, V.TGlobal "nat", V.TLocal 1)));
+    P.TProduct (0, P.TGlobal (V.chars "nat"),
+      P.TProduct (1, P.TGlobal (V.chars "nat"), P.TLocal 1)));
   let sibling = N.DApp (relation "Pair" [],
     [N.DProd ((x, nat), variable "x"); variable "x"]) in
   (match V.quote_term ~global (V.scope []) sibling with
@@ -36,13 +37,13 @@ let () =
     N.PCtr (N.constructor_of_string "Some", [N.PVar (v "y")]), variable "y";
     N.PWild, variable "x"]) in
   assert (fst (quoted (V.scope [x]) branches) =
-    V.TMatch (V.TLocal 0, [
-      V.PConstructor ("Some", [V.PLocal 1]), V.TLocal 1;
-      V.PWild, V.TLocal 0]));
+    P.TMatch (P.TLocal 0, [
+      P.PConstructor (V.chars "Some", [P.PLocal 1]), P.TLocal 1;
+      P.PWild, P.TLocal 0]));
   assert (V.free_vars_term branches = [x; x]);
   assert (V.free_vars_term (N.DMatch (variable "x", [
     N.PVar (v "y"), variable "y"])) = [x]);
-  assert (fst (quoted scope N.DHole) = V.TImplicitHole);
+  assert (fst (quoted scope N.DHole) = P.TImplicitHole);
   let output = v "out" in
   let result_x = v "result_x" and result_y = v "result_y" in
   let root = N.ty_ctr_of_string "ViewRoot" in
@@ -59,7 +60,8 @@ let () =
     List.iter (function
       | N.S_ST (_, N.SrcNonrec term, _) | N.S_Check (N.SrcNonrec term, _) ->
         (match V.quote_term ~global (V.scope [result_x; result_y]) term with
-         | Ok (V.TApply (V.TGlobal "ViewRel", [V.TLocal 0; V.TLocal 1]), _) ->
+         | Ok (P.TApply (P.TGlobal name, [P.TLocal 0; P.TLocal 1]), _)
+           when name = V.chars "ViewRel" ->
            saw_relation := true
          | Ok _ | Error _ -> ())
       | _ -> ()) steps) candidates;

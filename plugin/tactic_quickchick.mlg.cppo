@@ -1156,6 +1156,14 @@ let replay_contextual_derivation key record =
   record.context_value
 
 
+(* A step grade as a scoring policy sees it. *)
+let policy_grade = function
+  | Checking -> PolicyViews.Checking
+  | Backtracking -> PolicyViews.Backtracking
+  | Neutral -> PolicyViews.Neutral
+  | Partial -> PolicyViews.Partial
+  | Total -> PolicyViews.Total
+
 (* [QuickChick Scorer budget_aware] ranks constructor schedules by Specimen's
    completed BudgetAware score instead of the density ranking. *)
 let budget_aware_ranking () =
@@ -1176,6 +1184,16 @@ let budget_dependency_score (request : BudgetAwareScore.dependency_request) =
   match find true, find false with
   | Some (DensityDone (_, true, Some score)), _ -> Some score
   | _, Some (DensityDone (_, true, Some score)) -> Some score
+  | _ -> None
+
+(* [QuickChick Scorer <policy>] ranks constructor schedules by a compiled
+   Rocq policy. *)
+let compiled_ranking () =
+  match ScheduleRanking.current_scorer () with
+  | ScheduleRanking.Compiled key ->
+    (match PolicyRegistry.find key with
+     | Some policy -> Some policy
+     | None -> CErrors.user_err (str "The selected Rocq scorer is not loaded."))
   | _ -> None
 
 (* [QuickChick Scorer cardinality] ranks constructor schedules by
@@ -2157,9 +2175,15 @@ let instance_requirements ?(allow_root=false) env sigma goal names =
 let schedule_instance_cache = Hashtbl.create 256
 let schedule_instance_cache_context = ref None
 
+(* Answers of has_supplied_schedule_instance, for policy dependency states. *)
+let supplied_instance_cache = Hashtbl.create 256
+let supplied_instance_context = ref None
+
 let clear_schedule_instance_cache () =
   Hashtbl.reset schedule_instance_cache;
-  schedule_instance_cache_context := None
+  schedule_instance_cache_context := None;
+  Hashtbl.reset supplied_instance_cache;
+  supplied_instance_context := None
 
 (* Candidate schedules name their variables afresh, so the same instance
    obligation recurs as alpha-variants. Key the cache on the obligation with
@@ -2298,10 +2322,82 @@ let has_schedule_instance ?(cached = true) relation outputs ds constrained =
 (* A policy score may call a dependency SuppliedInstance only when the
    obligation resolves in the current context, without invented premises. *)
 let has_supplied_schedule_instance relation outputs ds constrained =
-  let env, sigma, goal, _ = elaborate_obligation relation outputs ds constrained in
-  match resolve_schedule_obligation env sigma goal with
-  | Some (sigma, _) -> not (Evd.has_undefined sigma)
-  | None -> false
+  (* Cached like has_schedule_instance: by the obligation and inputs, within
+     one environment, local context and universe state. *)
+  let context = Global.env (), !schedule_locals, !schedule_universes in
+  (match !supplied_instance_context with
+   | Some (env, locals, universes) when
+       env == (let e, _, _ = context in e) &&
+       locals == (let _, l, _ = context in l) &&
+       universes == (let _, _, u = context in u) -> ()
+   | _ ->
+     Hashtbl.reset supplied_instance_cache;
+     supplied_instance_context := Some context);
+  let key = (relation, outputs, ds, constrained, !schedule_inputs) in
+  match Hashtbl.find_opt supplied_instance_cache key with
+  | Some answer -> answer
+  | None ->
+    let answer =
+      let env, sigma, goal, _ = elaborate_obligation relation outputs ds constrained in
+      match resolve_schedule_obligation env sigma goal with
+      | Some (sigma, _) -> not (Evd.has_undefined sigma)
+      | None -> false in
+    Hashtbl.add supplied_instance_cache key answer;
+    answer
+
+(* Score a constructor candidate with a compiled Rocq policy. The context
+   lists the constructor's locals and the requests of its nonrecursive
+   sources, each SuppliedInstance when an instance resolves in context and
+   Pending otherwise. Recursive steps add no request; the policy sees their
+   source category in the schedule. *)
+let compiled_schedule_score (policy : PolicyRegistry.compiled) ind_name
+    result_vars output_vars ds ((steps, sort) : schedule_with_density) =
+  let result, constrained = match sort with
+    | ProducerSchedule (constrained, _, result) -> Some result, constrained
+    | TheoremSchedule (result, _) -> Some result, false
+    | CheckerSchedule -> None, false in
+  let names = List.map fst result_vars @
+    List.concat_map (fun (step, _) -> ScoringView.step_variables step) steps @
+    (match result with None -> [] | Some term -> ScoringView.free_vars_term term)
+    |> List.sort_uniq Stdlib.compare in
+  let scope = ScoringView.scope names in
+  let local_types = List.fold_left (fun locals (step, _) ->
+    let outputs = match step with
+      | S_UC (name, SrcNonrec typ, _) -> [name, typ]
+      | S_ST (outputs, _, _) -> outputs
+      | _ -> [] in
+    List.fold_left (fun locals (name, typ) ->
+      if List.mem_assoc name locals then locals else locals @ [name, typ])
+      locals outputs) result_vars steps in
+  let dependencies = List.fold_left (fun acc (step, _) ->
+    let request = match step with
+      | S_UC (_, SrcNonrec (DTyParam _ as parameter), ps) ->
+        Some (parameter, [], producer_sort_to_derive_sort ps, false)
+      | _ -> schedule_step_dependence step in
+    match request with
+    | Some ((relation, indices, mode, constrained) as request)
+      when not (List.mem_assoc request acc) ->
+      let args = match relation with
+        | DTyCtr (_, args) | DNot (DTyCtr (_, args)) -> args
+        | _ -> [] in
+      let outputs = List.filteri (fun index _ -> List.mem index indices) args
+        |> List.concat_map variables_in_hypothesis in
+      (* An obligation that cannot even be elaborated is not supplied. *)
+      let supplied = try has_supplied_schedule_instance relation outputs mode constrained
+        with CErrors.UserError _ | Noninductive_dependency _ | Unavailable_mode _ -> false in
+      acc @ [request, if supplied then ScoringView.Supplied else ScoringView.Pending]
+    | _ -> acc) [] steps in
+  let finite_pins = derivation_finite_pins () in
+  let quoted =
+    let ( let* ) = Result.bind in
+    let* context = ScoringView.quote_context ~global:ScoringView.global_name scope
+      ind_name result_vars local_types output_vars ds constrained dependencies in
+    let* schedule = ScoringView.quote_schedule ~global:ScoringView.global_name
+      ~finite_pins ~grade:policy_grade scope steps result in
+    Ok (context, schedule) in
+  match quoted with
+  | Ok (context, schedule) -> policy.PolicyRegistry.score context schedule
+  | Error message -> CErrors.user_err (str ("The Rocq scorer cannot see this schedule: " ^ message))
 
 let has_theorem_generator ty =
   let expression = MTyCtr
@@ -2543,14 +2639,14 @@ and constructor_valid_schedules (ind_name : ty_ctr) (ctr : rocq_ctr) (result_var
      comparison stays top-level. The bounds are for the density rankings;
      BudgetAware ranking has no pruning bounds yet, so it searches exhaustively. *)
   let score_pruning_mode = match !score_pruning_suspended,
-    (if cardinality_ranking () then None
+    (if cardinality_ranking () || compiled_ranking () <> None then None
      else Sys.getenv_opt "QC_SCHEDULE_SCORE_PRUNING") with
     | false, Some "baseline" -> `Baseline
     | _, Some "verify" -> `Verify
     | _, Some ("0" | "false" | "no" | "off") -> `Off
     (* Exact selection without a candidate cap needs pruning to stay bounded,
        so it is on unless disabled; cardinality ranking has no bounds. *)
-    | _, _ when cardinality_ranking () -> `Off
+    | _, _ when cardinality_ranking () || compiled_ranking () <> None -> `Off
     | _ -> `Prune in
   let prefer_dense = ds = D_Gen || ds = D_Thm in
   let policy = schedule_ranking_policy () in
@@ -2830,6 +2926,8 @@ and constructor_valid_schedules (ind_name : ty_ctr) (ctr : rocq_ctr) (result_var
      before it searches. *)
   let select_groups = if group_mode = `Off ||
       (score_pruning_mode <> `Off && score_pruning_mode <> `Prune) then None
+    (* A compiled Rocq policy declares no group structure yet: search jointly. *)
+    else if compiled_ranking () <> None then None
     else if cardinality_ranking () then Some (fun groups ->
       let context = cardinality_context (cardinality_recursive_count result_vars output_vars) in
       GroupedScore.select_combinations CardinalityScore.group_policy
@@ -3157,16 +3255,10 @@ and constructor_valid_schedules (ind_name : ty_ctr) (ctr : rocq_ctr) (result_var
        (match result with None -> [] | Some term -> ScoringView.free_vars_term term)
        |> List.sort_uniq Stdlib.compare in
      let scope = ScoringView.scope names in
-     let grade_expression = function
-       | Checking -> ScoringView.constructor "Checking" []
-       | Backtracking -> ScoringView.constructor "Backtracking" []
-       | Neutral -> ScoringView.constructor "Neutral" []
-       | Partial -> ScoringView.constructor "Partial" []
-       | Total -> ScoringView.constructor "Total" [] in
      let expression = match ScoringView.schedule_expression
        ~global:ScoringView.global_name
        ~finite_pins:(Lazy.force policy_finite_pins)
-       ~grade_expression scope steps result with
+       ~grade:policy_grade scope steps result with
        | Ok expression -> expression
        | Error message -> failwith message in
      expression in
@@ -3380,6 +3472,25 @@ and constructor_best_valid_schedule (ind_name : ty_ctr) (ctr : rocq_ctr) (result
             "[schedule-ranking] policy=cardinality derive=%s candidates=%d selected-id=%d %s\n"
             (schedule_rank_derive_sort_to_string ds) (List.length ranked) id
             (CardinalityScore.to_string score))
+            ++ str (schedule_with_densities_to_string schedule));
+        Some (id, (List.map fst steps, sort), representative_density ds schedule), None
+    end else if compiled_ranking () <> None then begin
+      let policy = Option.get (compiled_ranking ()) in
+      (* Lower is better; among equal scores the first candidate found wins. *)
+      let best = List.fold_left (fun best (i, schedule, _, _) ->
+        let score = compiled_schedule_score policy ind_name result_vars output_vars ds schedule in
+        match best with
+        | Some (_, best_score) when
+            policy.PolicyRegistry.compare score best_score <> PolicyViews.Lt -> best
+        | _ -> Some (i, score)) None scored in
+      match best with
+      | None -> None, None
+      | Some (id, _) ->
+        let (_, ((steps, sort) as schedule), _, _) = entry id in
+        if schedule_trace_enabled () then
+          Feedback.msg_notice (str (Printf.sprintf
+            "[schedule-ranking] policy=compiled derive=%s candidates=%d selected-id=%d\n"
+            (schedule_rank_derive_sort_to_string ds) (List.length scored) id)
             ++ str (schedule_with_densities_to_string schedule));
         Some (id, (List.map fst steps, sort), representative_density ds schedule), None
     end else if not (budget_aware_ranking ()) then

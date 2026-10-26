@@ -1,26 +1,14 @@
-(* Quote scheduler terms to QuickChick.SchedulingPolicy. Unknown local types
-   remain opaque; names and binder identities are preserved. *)
+(* Quote scheduler terms to QuickChick.SchedulingPolicy views. The views are
+   PolicyViews values: a compiled policy receives them directly, and the
+   renderers below turn them into Rocq terms for a policy evaluated in Rocq.
+   Unknown local types remain opaque; names and binder identities are
+   preserved. *)
 open NewGenericLib
+open PolicyViews
 
-type pattern_view =
-  | PWild
-  | PParameter
-  | PLocal of int
-  | PConstructor of string * pattern_view list
-
-type term_view =
-  | TLocal of int
-  | TGlobal of string
-  | TSort of string
-  | TGenerated of string
-  | TImplicitHole
-  | TApply of term_view * term_view list
-  | TArrow of term_view * term_view
-  | TProduct of int * term_view * term_view
-  | TLambda of int * term_view * term_view
-  | TMatch of term_view * (pattern_view * term_view) list
-  | TNot of term_view
-  | TOpaque of int
+(* Views hold strings as character lists, as Rocq extracts them. *)
+let chars s = List.init (String.length s) (String.get s)
+let string_of_chars cs = String.init (List.length cs) (List.nth cs)
 
 type scope = { names : (var * int) list; next : int }
 
@@ -47,6 +35,12 @@ let global_name name =
   Libnames.string_of_qualid
     (Libnames.qualid_of_path (Nametab.path_of_global reference))
 
+let ( let* ) = Result.bind
+
+let rec map_result f = function
+  | [] -> Ok []
+  | x :: rest -> let* y = f x in let* ys = map_result f rest in Ok (y :: ys)
+
 let rec quote_pattern ~global scope (pattern : NewGenericLib.pat) =
   match pattern with
   | NewGenericLib.PWild -> Ok (PWild, scope)
@@ -56,11 +50,10 @@ let rec quote_pattern ~global scope (pattern : NewGenericLib.pat) =
     Ok (PLocal id, scope)
   | NewGenericLib.PCtr (name, arguments) ->
     let rec loop scope acc = function
-      | [] -> Ok (PConstructor (global name, List.rev acc), scope)
+      | [] -> Ok (PConstructor (chars (global name), List.rev acc), scope)
       | pattern :: rest ->
-        (match quote_pattern ~global scope pattern with
-         | Error _ as error -> error
-         | Ok (view, scope) -> loop scope (view :: acc) rest) in
+        let* view, scope = quote_pattern ~global scope pattern in
+        loop scope (view :: acc) rest in
     loop scope [] arguments
 
 (* A completed schedule already gives every local a unique name. Pattern
@@ -74,129 +67,60 @@ let rec quote_existing_pattern ~global scope = function
      | Ok _ -> assert false
      | Error _ as error -> error)
   | NewGenericLib.PCtr (name, arguments) ->
-    let rec loop acc = function
-      | [] -> Ok (PConstructor (global name, List.rev acc))
-      | pattern :: rest ->
-        (match quote_existing_pattern ~global scope pattern with
-         | Ok view -> loop (view :: acc) rest
-         | Error _ as error -> error) in
-    loop [] arguments
+    let* args = map_result (quote_existing_pattern ~global scope) arguments in
+    Ok (PConstructor (chars (global name), args))
 
 let rec quote_term ~global scope term =
   let rec quote_list scope acc = function
     | [] -> Ok (List.rev acc, scope)
     | term :: rest ->
-      (match quote_term ~global scope term with
-       | Error _ as error -> error
-       | Ok (view, scope) -> quote_list scope (view :: acc) rest) in
+      let* view, scope = quote_term ~global scope term in
+      quote_list scope (view :: acc) rest in
   match term with
   | DTyVar name | DTyParam name ->
-    (match lookup scope name with
-     | Ok view -> Ok (view, scope)
-     | Error _ as error -> error)
+    let* view = lookup scope name in Ok (view, scope)
   | DTyCtr (name, args) | DCtr (name, args) ->
     (match quote_list scope [] args with
      | Error _ as error -> error
      | Ok ([], scope) when List.mem (Libnames.string_of_qualid name)
            ["Type"; "Prop"; "Set"] ->
-       Ok (TSort (Libnames.string_of_qualid name), scope)
-     | Ok ([], scope) -> Ok (TGlobal (global name), scope)
-     | Ok (args, scope) -> Ok (TApply (TGlobal (global name), args), scope))
+       Ok (TSort (chars (Libnames.string_of_qualid name)), scope)
+     | Ok ([], scope) -> Ok (TGlobal (chars (global name)), scope)
+     | Ok (args, scope) -> Ok (TApply (TGlobal (chars (global name)), args), scope))
   | DApp (head, args) ->
-    (match quote_term ~global scope head with
-     | Error _ as error -> error
-     | Ok (head, scope) ->
-       match quote_list scope [] args with
-       | Error _ as error -> error
-       | Ok (args, scope) -> Ok (TApply (head, args), scope))
+    let* head, scope = quote_term ~global scope head in
+    let* args, scope = quote_list scope [] args in
+    Ok (TApply (head, args), scope)
   | DArrow (domain, codomain) ->
-    (match quote_term ~global scope domain with
-     | Error _ as error -> error
-     | Ok (domain, scope) ->
-       match quote_term ~global scope codomain with
-       | Error _ as error -> error
-       | Ok (codomain, scope) -> Ok (TArrow (domain, codomain), scope))
+    let* domain, scope = quote_term ~global scope domain in
+    let* codomain, scope = quote_term ~global scope codomain in
+    Ok (TArrow (domain, codomain), scope)
   | DProd ((name, domain), body) ->
-    (match quote_term ~global scope domain with
-     | Error _ as error -> error
-     | Ok (domain, outer_scope) ->
-       let id, inner_scope = bind outer_scope name in
-       match quote_term ~global inner_scope body with
-       | Error _ as error -> error
-       | Ok (body, body_scope) ->
-         Ok (TProduct (id, domain, body),
-           { outer_scope with next = body_scope.next }))
+    let* domain, outer_scope = quote_term ~global scope domain in
+    let id, inner_scope = bind outer_scope name in
+    let* body, body_scope = quote_term ~global inner_scope body in
+    Ok (TProduct (id, domain, body), { outer_scope with next = body_scope.next })
   | DLambda (name, domain, body) ->
-    (match quote_term ~global scope domain with
-     | Error _ as error -> error
-     | Ok (domain, outer_scope) ->
-       let id, inner_scope = bind outer_scope name in
-       match quote_term ~global inner_scope body with
-       | Error _ as error -> error
-       | Ok (body, body_scope) ->
-         Ok (TLambda (id, domain, body),
-           { outer_scope with next = body_scope.next }))
+    let* domain, outer_scope = quote_term ~global scope domain in
+    let id, inner_scope = bind outer_scope name in
+    let* body, body_scope = quote_term ~global inner_scope body in
+    Ok (TLambda (id, domain, body), { outer_scope with next = body_scope.next })
   | DMatch (scrutinee, branches) ->
-    (match quote_term ~global scope scrutinee with
-     | Error _ as error -> error
-     | Ok (scrutinee, scope) ->
-       let rec loop next acc = function
-         | [] -> Ok (TMatch (scrutinee, List.rev acc), { scope with next })
-         | (pattern, body) :: rest ->
-           (match quote_pattern ~global { scope with next } pattern with
-            | Error _ as error -> error
-            | Ok (pattern, branch_scope) ->
-              match quote_term ~global branch_scope body with
-              | Error _ as error -> error
-              | Ok (body, branch_scope) ->
-                loop branch_scope.next ((pattern, body) :: acc) rest) in
-       loop scope.next [] branches)
+    let* scrutinee, scope = quote_term ~global scope scrutinee in
+    let rec loop next acc = function
+      | [] -> Ok (TMatch (scrutinee, List.rev acc), { scope with next })
+      | (pattern, body) :: rest ->
+        let* pattern, branch_scope = quote_pattern ~global { scope with next } pattern in
+        let* body, branch_scope = quote_term ~global branch_scope body in
+        loop branch_scope.next ((pattern, body) :: acc) rest in
+    loop scope.next [] branches
   | DNot body ->
-    (match quote_term ~global scope body with
-     | Error _ as error -> error
-     | Ok (body, scope) -> Ok (TNot body, scope))
+    let* body, scope = quote_term ~global scope body in
+    Ok (TNot body, scope)
   | DHole -> Ok (TImplicitHole, scope)
 
-(* Build a Rocq expression for the symbolic view. Constructor applications
-   are elaborated and checked in the current proof environment by the caller. *)
-let constructor name args =
-  GenericLib.gApp
-    (GenericLib.gInject ("QuickChick.SchedulingPolicy." ^ name)) args
-
-let rec pattern_expression = function
-  | PWild -> constructor "PWild" []
-  | PParameter -> constructor "PParameter" []
-  | PLocal id -> constructor "PLocal" [GenericLib.gInt id]
-  | PConstructor (name, args) ->
-    constructor "PConstructor"
-      [GenericLib.gStr name;
-       GenericLib.gList (List.map pattern_expression args)]
-
-let rec term_expression = function
-  | TLocal id -> constructor "TLocal" [GenericLib.gInt id]
-  | TGlobal name -> constructor "TGlobal" [GenericLib.gStr name]
-  | TSort name -> constructor "TSort" [GenericLib.gStr name]
-  | TGenerated name -> constructor "TGenerated" [GenericLib.gStr name]
-  | TImplicitHole -> constructor "TImplicitHole" []
-  | TApply (head, args) ->
-    constructor "TApply"
-      [term_expression head; GenericLib.gList (List.map term_expression args)]
-  | TArrow (domain, codomain) ->
-    constructor "TArrow" [term_expression domain; term_expression codomain]
-  | TProduct (id, domain, body) ->
-    constructor "TProduct"
-      [GenericLib.gInt id; term_expression domain; term_expression body]
-  | TLambda (id, domain, body) ->
-    constructor "TLambda"
-      [GenericLib.gInt id; term_expression domain; term_expression body]
-  | TMatch (scrutinee, branches) ->
-    constructor "TMatch"
-      [term_expression scrutinee;
-       GenericLib.gList (List.map (fun (pattern, body) ->
-         GenericLib.gPair (pattern_expression pattern, term_expression body))
-         branches)]
-  | TNot body -> constructor "TNot" [term_expression body]
-  | TOpaque handle -> constructor "TOpaque" [GenericLib.gInt handle]
+let quote_closed ~global scope term =
+  let* view, _ = quote_term ~global scope term in Ok view
 
 let local_id scope name =
   match lookup scope name with
@@ -204,20 +128,13 @@ let local_id scope name =
   | Ok _ -> assert false
   | Error _ as error -> error
 
-let rec collect_ids scope = function
-  | [] -> Ok []
-  | name :: rest ->
-    (match local_id scope name, collect_ids scope rest with
-     | Ok id, Ok ids -> Ok (id :: ids)
-     | Error _ as error, _ | _, (Error _ as error) -> error)
+let collect_ids scope names = map_result (local_id scope) names
 
-let int_list ids = GenericLib.gList (List.map GenericLib.gInt ids)
-
-let source_kind_expression = function
-  | SrcNonrec _ -> constructor "External" []
-  | SrcRec _ -> constructor "SelfRecursive" []
-  | SrcMutrec _ -> constructor "MutualRecursive" []
-  | SrcDef _ -> constructor "DefinedSource" []
+let source_kind = function
+  | SrcNonrec _ -> External
+  | SrcRec _ -> SelfRecursive
+  | SrcMutrec _ -> MutualRecursive
+  | SrcDef _ -> DefinedSource
 
 let rec free_vars_term = function
   | DTyVar name | DTyParam name -> [name]
@@ -250,11 +167,7 @@ let step_variables = function
 
 (* `inputs` is the set of variables already bound when the source runs.
    A producer's output variables are excluded by the caller. *)
-let source_expression ~global ~finite_pins scope ~outputs source =
-  let name_args = function
-    | SrcRec (name, args) | SrcMutrec (name, args) | SrcDef (name, args) ->
-      Some (name, args)
-    | SrcNonrec _ -> None in
+let quote_source ~global ~finite_pins scope ~outputs source =
   let args = match source with
     | SrcNonrec term -> [term]
     | SrcRec (_, args) | SrcMutrec (_, args) | SrcDef (_, args) -> args in
@@ -267,170 +180,219 @@ let source_expression ~global ~finite_pins scope ~outputs source =
       |> List.concat_map free_vars_term
       |> List.sort_uniq Stdlib.compare
     | _ -> [] in
-  let application = match name_args source with
-    | Some (name, args) ->
-      let rec loop acc = function
-        | [] -> Ok (TApply (TGenerated (var_to_string name), List.rev acc))
-        | arg :: rest ->
-          (match quote_term ~global scope arg with
-           | Ok (view, _) -> loop (view :: acc) rest
-           | Error _ as error -> error) in
-      loop [] args
-    | None ->
-      let term = match source with SrcNonrec term -> term | _ -> assert false in
-      (match quote_term ~global scope term with
-       | Ok (view, _) -> Ok view
-       | Error _ as error -> error) in
-  match application, collect_ids scope inputs, collect_ids scope pins with
-  | Ok application, Ok inputs, Ok pins ->
-    Ok (constructor "Build_source_view"
-      [source_kind_expression source; term_expression application;
-       int_list inputs; int_list pins])
-  | Error _ as error, _, _ | _, (Error _ as error), _
-  | _, _, (Error _ as error) -> error
+  let* application = match source with
+    | SrcRec (name, args) | SrcMutrec (name, args) | SrcDef (name, args) ->
+      let* args = map_result (quote_closed ~global scope) args in
+      Ok (TApply (TGenerated (chars (var_to_string name)), args))
+    | SrcNonrec term -> quote_closed ~global scope term in
+  let* inputs = collect_ids scope inputs in
+  let* pins = collect_ids scope pins in
+  Ok { source_category = source_kind source; source_application = application;
+       source_inputs = inputs; source_finite_pins = pins }
 
-let local_expression id typ =
-  constructor "Build_local_view" [GenericLib.gInt id; term_expression typ]
+let producer_mode = function
+  | PS_G -> Generator
+  | PS_E -> Enumerator
 
-let producer_expression = function
-  | PS_G -> constructor "Generator" []
-  | PS_E -> constructor "Enumerator" []
-
-let step_expression ~global ~finite_pins scope step =
-  let source ~outputs src = source_expression ~global ~finite_pins scope
-    ~outputs src in
+let quote_step ~global ~finite_pins scope step =
+  let source ~outputs src = quote_source ~global ~finite_pins scope ~outputs src in
   match step with
   | S_Check (src, positive) ->
-    (match source ~outputs:[] src with
-     | Ok src -> Ok (constructor "CheckStep"
-         [src; if positive then GenericLib.g_true else GenericLib.g_false])
-     | Error _ as error -> error)
+    let* src = source ~outputs:[] src in Ok (CheckStep (src, positive))
   | S_UC (name, src, mode) ->
-    (match local_id scope name, source ~outputs:[name] src with
-     | Ok id, Ok src_view ->
-       let typ = match src with
-         | SrcNonrec typ ->
-           (match quote_term ~global scope typ with
-            | Ok (view, _) -> Ok view
-            | Error _ as error -> error)
-         | _ -> Ok (TOpaque id) in
-       (match typ with
-        | Ok typ -> Ok (constructor "Unconstrained"
-            [local_expression id typ; src_view; producer_expression mode])
-        | Error _ as error -> error)
-     | Error _ as error, _ | _, (Error _ as error) -> error)
+    let* id = local_id scope name in
+    let* src_view = source ~outputs:[name] src in
+    let* typ = match src with
+      | SrcNonrec typ -> quote_closed ~global scope typ
+      | _ -> Ok (TOpaque id) in
+    Ok (Unconstrained ({ local_id = id; local_type = typ }, src_view, producer_mode mode))
   | S_ST (outputs, src, mode) ->
-    (match source ~outputs:(List.map fst outputs) src with
-     | Error _ as error -> error
-     | Ok src_view ->
-       let rec quote_outputs acc = function
-         | [] -> Ok (List.rev acc)
-         | (name, typ) :: rest ->
-           let quoted_type = match typ with
-             | DHole ->
-               (match local_id scope name with
-                | Ok id -> Ok (TOpaque id)
-                | Error _ as error -> error)
-             | _ ->
-               (match quote_term ~global scope typ with
-                | Ok (view, _) -> Ok view
-                | Error _ as error -> error) in
-           (match local_id scope name, quoted_type with
-            | Ok id, Ok typ ->
-              quote_outputs (local_expression id typ :: acc) rest
-            | Error _ as error, _ | _, (Error _ as error) -> error) in
-       (match quote_outputs [] outputs with
-        | Ok outputs -> Ok (constructor "SuchThat"
-            [GenericLib.gList outputs; src_view; producer_expression mode])
-        | Error _ as error -> error))
+    let* src_view = source ~outputs:(List.map fst outputs) src in
+    let* outputs = map_result (fun (name, typ) ->
+      let* id = local_id scope name in
+      let* typ = match typ with
+        | DHole -> Ok (TOpaque id)
+        | _ -> quote_closed ~global scope typ in
+      Ok { local_id = id; local_type = typ }) outputs in
+    Ok (SuchThat (outputs, src_view, producer_mode mode))
   | S_Match (name, pattern) ->
-    (match local_id scope name, quote_existing_pattern ~global scope pattern with
-     | Ok id, Ok pattern -> Ok (constructor "MatchStep"
-         [GenericLib.gInt id; pattern_expression pattern])
-     | Error _ as error, _ | _, (Error _ as error) -> error)
+    let* id = local_id scope name in
+    let* pattern = quote_existing_pattern ~global scope pattern in
+    Ok (MatchStep (id, pattern))
   | S_Let (name, value) ->
-    (match local_id scope name, quote_term ~global scope value with
-     | Ok id, Ok (value, _) -> Ok (constructor "LetStep"
-         [local_expression id (TOpaque id); term_expression value])
-     | Error _ as error, _ | _, (Error _ as error) -> error)
+    let* id = local_id scope name in
+    let* value = quote_closed ~global scope value in
+    Ok (LetStep ({ local_id = id; local_type = TOpaque id }, value))
 
-let schedule_expression ~global ~finite_pins ~grade_expression scope
-    steps result =
-  let rec quote_steps acc = function
-    | [] -> Ok (List.rev acc)
-    | (step, grade) :: rest ->
-      (match step_expression ~global ~finite_pins scope step with
-       | Ok view -> quote_steps
-           (GenericLib.gPair (view, grade_expression grade) :: acc) rest
-       | Error _ as error -> error) in
-  match quote_steps [] steps with
-  | Error _ as error -> error
-  | Ok steps ->
-    let result = match result with
-      | None -> Ok GenericLib.gNone'
-      | Some term ->
-        (match quote_term ~global scope term with
-         | Ok (view, _) -> Ok (GenericLib.gSome' (term_expression view))
-         | Error _ as error -> error) in
-    (match result with
-     | Ok result -> Ok (constructor "Build_schedule_view"
-         [GenericLib.gList steps; result])
-     | Error _ as error -> error)
+let quote_schedule ~global ~finite_pins ~grade scope steps result =
+  let* steps = map_result (fun (step, g) ->
+    let* view = quote_step ~global ~finite_pins scope step in
+    Ok (view, grade g)) steps in
+  let* result = match result with
+    | None -> Ok None
+    | Some term -> let* view = quote_closed ~global scope term in Ok (Some view) in
+  Ok { schedule_steps = steps; schedule_result = result }
 
-let derive_mode_expression = function
-  | D_Gen -> constructor "Generate" []
-  | D_Enum -> constructor "Enumerate" []
-  | D_Check -> constructor "Check" []
-  | D_Thm -> constructor "TestTheorem" []
+let derive_mode = function
+  | D_Gen -> Generate
+  | D_Enum -> Enumerate
+  | D_Check -> Check
+  | D_Thm -> TestTheorem
 
-let spec_expression ~global scope application outputs mode constrained =
-  match quote_term ~global scope application with
-  | Error _ as error -> error
-  | Ok (application, _) ->
-    Ok (constructor "Build_spec_view"
-      [term_expression application; int_list outputs;
-       derive_mode_expression mode;
-       if constrained then GenericLib.g_true else GenericLib.g_false])
+let quote_spec ~global scope application outputs mode constrained =
+  let* application = quote_closed ~global scope application in
+  Ok { spec_application = application; spec_outputs = outputs;
+       spec_mode = derive_mode mode; spec_constrained = constrained }
 
 type dependency_status = Supplied | Pending
 
-let dependency_context_expression ~global scope relation result_vars local_types
+(* The score context of a constructor of [relation], whose result arguments
+   are [result_vars] and outputs [outputs]. *)
+let quote_context ~global scope relation result_vars local_types
     outputs mode constrained dependencies =
   let application = DTyCtr (relation,
     List.map (fun (name, _) -> DTyVar name) result_vars) in
-  let rec quote_locals acc = function
-    | [] -> Ok (List.rev acc)
-    | (name, typ) :: rest ->
-      (match local_id scope name, quote_term ~global scope typ with
-       | Ok id, Ok (typ, _) ->
-         quote_locals (local_expression id typ :: acc) rest
-       | Error _ as error, _ | _, (Error _ as error) -> error) in
   let inputs = List.map fst result_vars
     |> List.filter (fun name -> not (List.mem name outputs)) in
   let root_output_indices = List.filter_map (fun (index, (name, _)) ->
     if List.mem name outputs then Some index else None)
     (List.mapi (fun index entry -> index, entry) result_vars) in
-  let rec quote_dependencies acc = function
-    | [] -> Ok (List.rev acc)
-    | ((application, outputs, mode, constrained), status) :: rest ->
-      (match spec_expression ~global scope application outputs mode constrained with
-       | Ok spec ->
-         let state = match status with
-           | Supplied -> constructor "SuppliedInstance" []
-           | Pending -> constructor "Pending" [] in
-         quote_dependencies (GenericLib.gPair (spec, state) :: acc) rest
-       | Error _ as error -> error) in
   if List.length root_output_indices <> List.length outputs then
     Error "SchedulingPolicy: an output is missing from the root telescope"
-  else match spec_expression ~global scope application root_output_indices
-      mode constrained,
-    collect_ids scope inputs, quote_locals [] local_types,
-    quote_dependencies [] dependencies with
-  | Ok spec, Ok inputs, Ok locals, Ok dependencies ->
-    Ok (spec, GenericLib.gList locals, int_list inputs,
-      GenericLib.gList dependencies)
-  | Error _ as error, _, _, _ | _, (Error _ as error), _, _
-  | _, _, (Error _ as error), _ | _, _, _, (Error _ as error) -> error
+  else
+    let* spec = quote_spec ~global scope application root_output_indices mode constrained in
+    let* inputs = collect_ids scope inputs in
+    let* locals = map_result (fun (name, typ) ->
+      let* id = local_id scope name in
+      let* typ = quote_closed ~global scope typ in
+      Ok { local_id = id; local_type = typ }) local_types in
+    let* dependencies = map_result
+      (fun ((application, outputs, mode, constrained), status) ->
+        let* spec = quote_spec ~global scope application outputs mode constrained in
+        Ok (spec, match status with
+          | Supplied -> PolicyViews.SuppliedInstance
+          | Pending -> PolicyViews.Pending)) dependencies in
+    Ok { current_spec = spec; locals; original_inputs = inputs; dependencies }
+
+(* Render views as Rocq expressions, for a policy evaluated in Rocq.
+   Constructor applications are elaborated and checked in the current proof
+   environment by the caller. *)
+let constructor name args =
+  GenericLib.gApp
+    (GenericLib.gInject ("QuickChick.SchedulingPolicy." ^ name)) args
+
+let str cs = GenericLib.gStr (string_of_chars cs)
+let int_list ids = GenericLib.gList (List.map GenericLib.gInt ids)
+let bool b = if b then GenericLib.g_true else GenericLib.g_false
+
+let rec pattern_expression = function
+  | PWild -> constructor "PWild" []
+  | PParameter -> constructor "PParameter" []
+  | PLocal id -> constructor "PLocal" [GenericLib.gInt id]
+  | PConstructor (name, args) ->
+    constructor "PConstructor"
+      [str name; GenericLib.gList (List.map pattern_expression args)]
+
+let rec term_expression = function
+  | TLocal id -> constructor "TLocal" [GenericLib.gInt id]
+  | TGlobal name -> constructor "TGlobal" [str name]
+  | TSort name -> constructor "TSort" [str name]
+  | TGenerated name -> constructor "TGenerated" [str name]
+  | TImplicitHole -> constructor "TImplicitHole" []
+  | TApply (head, args) ->
+    constructor "TApply"
+      [term_expression head; GenericLib.gList (List.map term_expression args)]
+  | TArrow (domain, codomain) ->
+    constructor "TArrow" [term_expression domain; term_expression codomain]
+  | TProduct (id, domain, body) ->
+    constructor "TProduct"
+      [GenericLib.gInt id; term_expression domain; term_expression body]
+  | TLambda (id, domain, body) ->
+    constructor "TLambda"
+      [GenericLib.gInt id; term_expression domain; term_expression body]
+  | TMatch (scrutinee, branches) ->
+    constructor "TMatch"
+      [term_expression scrutinee;
+       GenericLib.gList (List.map (fun (pattern, body) ->
+         GenericLib.gPair (pattern_expression pattern, term_expression body))
+         branches)]
+  | TNot body -> constructor "TNot" [term_expression body]
+  | TOpaque handle -> constructor "TOpaque" [GenericLib.gInt handle]
+
+let source_kind_expression = function
+  | External -> constructor "External" []
+  | SelfRecursive -> constructor "SelfRecursive" []
+  | MutualRecursive -> constructor "MutualRecursive" []
+  | DefinedSource -> constructor "DefinedSource" []
+
+let source_view_expression s =
+  constructor "Build_source_view"
+    [source_kind_expression s.source_category; term_expression s.source_application;
+     int_list s.source_inputs; int_list s.source_finite_pins]
+
+let local_expression l =
+  constructor "Build_local_view" [GenericLib.gInt l.local_id; term_expression l.local_type]
+
+let producer_expression = function
+  | Generator -> constructor "Generator" []
+  | Enumerator -> constructor "Enumerator" []
+
+let step_view_expression = function
+  | CheckStep (src, positive) -> constructor "CheckStep" [source_view_expression src; bool positive]
+  | Unconstrained (l, src, mode) ->
+    constructor "Unconstrained" [local_expression l; source_view_expression src; producer_expression mode]
+  | SuchThat (ls, src, mode) ->
+    constructor "SuchThat"
+      [GenericLib.gList (List.map local_expression ls); source_view_expression src;
+       producer_expression mode]
+  | MatchStep (id, pattern) -> constructor "MatchStep" [GenericLib.gInt id; pattern_expression pattern]
+  | LetStep (l, value) -> constructor "LetStep" [local_expression l; term_expression value]
+
+let density_expression = function
+  | Checking -> constructor "Checking" []
+  | Backtracking -> constructor "Backtracking" []
+  | Neutral -> constructor "Neutral" []
+  | Partial -> constructor "Partial" []
+  | Total -> constructor "Total" []
+
+let schedule_view_expression s =
+  constructor "Build_schedule_view"
+    [GenericLib.gList (List.map (fun (step, grade) ->
+       GenericLib.gPair (step_view_expression step, density_expression grade)) s.schedule_steps);
+     (match s.schedule_result with
+      | None -> GenericLib.gNone'
+      | Some term -> GenericLib.gSome' (term_expression term))]
+
+let derive_mode_expression = function
+  | Generate -> constructor "Generate" []
+  | Enumerate -> constructor "Enumerate" []
+  | Check -> constructor "Check" []
+  | TestTheorem -> constructor "TestTheorem" []
+
+let spec_view_expression s =
+  constructor "Build_spec_view"
+    [term_expression s.spec_application; int_list s.spec_outputs;
+     derive_mode_expression s.spec_mode; bool s.spec_constrained]
+
+(* The expression-producing interface used by the Rocq-evaluated probes. *)
+let step_expression ~global ~finite_pins scope step =
+  Result.map step_view_expression (quote_step ~global ~finite_pins scope step)
+
+let schedule_expression ~global ~finite_pins ~grade scope steps result =
+  Result.map schedule_view_expression
+    (quote_schedule ~global ~finite_pins ~grade scope steps result)
+
+let dependency_context_expression ~global scope relation result_vars local_types
+    outputs mode constrained dependencies =
+  let* context = quote_context ~global scope relation result_vars local_types
+    outputs mode constrained dependencies in
+  Ok (spec_view_expression context.current_spec,
+      GenericLib.gList (List.map local_expression context.locals),
+      int_list context.original_inputs,
+      GenericLib.gList (List.map (fun (spec, state) ->
+        GenericLib.gPair (spec_view_expression spec, match state with
+          | PolicyViews.SuppliedInstance -> constructor "SuppliedInstance" []
+          | _ -> constructor "Pending" [])) context.dependencies))
 
 let score_one_schedule_expression scorer (spec, locals, inputs, dependencies)
     schedule =

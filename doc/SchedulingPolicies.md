@@ -32,6 +32,34 @@ remaining ties. They follow search order, so among equal scores the first
 schedule the search finds wins.
 The former environment aliases remain accepted as names, such as `vars_density`.
 
+### Scorers written in Rocq
+
+Any other name must be a constant of type `QuickChick.SchedulingPolicy.policy`
+(`src/SchedulingPolicy.v`). A policy chooses its own score type `S`; its
+`scorer` scores each step of a candidate, combines them into a schedule score
+(`score_schedule` also sees the whole schedule), and compares scores. Lower is
+better, and among equal scores the first candidate found wins.
+
+`QC Scorer my_policy.` compiles the policy once. The plugin extracts the
+policy's scorer, comparison and bound, with the view types mapped onto the
+plugin's own OCaml types, compiles them with `ocamlfind ocamlopt -shared`, and
+loads the result with `Dynlink`. Scoring then runs at native speed. Compiled
+objects are cached in the system temporary directory, under
+`QuickChick-scorers`, by a digest of the extracted code and of the plugin.
+
+The policy receives read-only views of each candidate: its steps with their
+sources, grades and patterns, the constructor's locals and original inputs,
+and each dependency request marked `SuppliedInstance` when an instance
+resolves in context and `Pending` otherwise. Recursive steps add no request;
+the policy sees their source category. `test/compiled_density.v` writes the
+built-in `density_then_vars` ranking as a policy; on Cedar it makes the
+built-in's selection for all 862 constructor modes.
+
+A compiled policy currently searches each constructor jointly, without score
+pruning, under the 1,000-candidate cap. Declaring group fields for the
+grouped Pareto search, and pruning with the policy's `lower_bound`, are
+planned.
+
 ### Cardinality ranking (experimental)
 
 `QC Scorer cardinality` reads a schedule as a query plan. Counts
