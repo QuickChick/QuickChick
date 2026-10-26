@@ -298,27 +298,34 @@ let is_inductive' (ty_name : ty_ctr) : bool =
    resolution changes only with a declaration, which makes a new global
    environment. An Import between commands does not, so every derivation
    entry point also clears the cache. *)
-let inductive_name_cache : (string, Names.inductive option) Hashtbl.t = Hashtbl.create 64
+module QualidTbl = Hashtbl.Make(struct
+  type t = Libnames.qualid
+  let equal = Libnames.qualid_eq
+  let hash q =
+    let path, id = Libnames.repr_qualid q in
+    Hashtbl.hash (Names.DirPath.hash path, Names.Id.hash id)
+end)
+
+let inductive_name_cache : Names.inductive option QualidTbl.t = QualidTbl.create 64
 let inductive_name_cache_env = ref None
 
 let clear_inductive_name_cache () =
-  Hashtbl.reset inductive_name_cache;
+  QualidTbl.reset inductive_name_cache;
   inductive_name_cache_env := None
 
 let get_inductive_name name : Names.inductive option =
   let env = Global.env () in
   (match !inductive_name_cache_env with
    | Some cached when cached == env -> ()
-   | _ -> Hashtbl.reset inductive_name_cache; inductive_name_cache_env := Some env);
-  let key = Libnames.string_of_qualid name in
-  match Hashtbl.find_opt inductive_name_cache key with
+   | _ -> QualidTbl.reset inductive_name_cache; inductive_name_cache_env := Some env);
+  match QualidTbl.find_opt inductive_name_cache name with
   | Some result -> result
   | None ->
     let result = List.find_map (function
       | Names.GlobRef.IndRef ind -> Some ind
       | Names.GlobRef.ConstructRef constructor -> Some (Names.inductive_of_constructor constructor)
       | _ -> None) (Nametab.locate_all name) in
-    Hashtbl.add inductive_name_cache key result;
+    QualidTbl.add inductive_name_cache name result;
     result
   
 let rec extract_inductives_from_type (typ : rocq_constr) : Names.inductive list =
@@ -879,13 +886,23 @@ let has_intersection (xs : 'a list) (ys : 'a list) : bool =
 
 module RelationInstOrd = struct
   type t = ty_ctr * output_index list * derive_sort
+  (* Relations compare by resolved inductive, so that two names for one
+     inductive are one key. Names of one inductive share its basename, so the
+     order is by basename first, and only equal basenames under different
+     names need resolution. Resolution would otherwise run on every map step. *)
   let compare (ty, args, ds) (ty', args', ds') =
+    let rest () = match List.compare Int.compare args args' with
+      | 0 -> compare ds ds'
+      | c -> c in
+    match Names.Id.compare (Libnames.qualid_basename ty) (Libnames.qualid_basename ty') with
+    | c when c <> 0 -> c
+    | _ when Libnames.qualid_eq ty ty' -> rest ()
+    | _ ->
     match (get_inductive_name ty, get_inductive_name ty') with
-    | (Some ty, Some ty') -> (match compare ty ty' with
-                              | 0 -> (match compare args args' with
-                                      | 0 -> compare ds ds'
-                                      | c -> c)
-                              | c -> c)
+    | (Some ty, Some ty') ->
+      (match Names.Ind.CanOrd.compare ty ty' with
+       | 0 -> rest ()
+       | c -> c)
     | Some _, None when ty_ctr_to_string ty' = "theorem" -> -1
     | None, Some _ when ty_ctr_to_string ty = "theorem" -> 1
     | None, None when ty_ctr_to_string ty = "theorem" && ty_ctr_to_string ty' = "theorem" -> compare ds ds' 
