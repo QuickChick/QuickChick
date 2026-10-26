@@ -140,6 +140,9 @@ let fresh_name n =
 
 (** [define c] introduces a fresh constant name for the term [c]. *)
 let define c env evd =
+  (* Report an unresolved instance, such as a missing Show, as an
+     elaboration error rather than a kernel anomaly. *)
+  Pretyping.check_evars env evd c;
   let (evd,_) = Typing.type_of env evd c in
 #if COQ_VERSION >= (9, 2, 0)
   let univs = Evd.univ_entry ~poly:(PolyFlags.of_univ_poly true) evd in
