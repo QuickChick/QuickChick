@@ -20,3 +20,29 @@ Goal True.
   | _ => exact I
   end.
 Qed.
+
+(* QC Scorer applies to later derivations in the same file, without reusing
+   results scored by the previous scorer. *)
+QC Scorer budget_aware.
+Inductive root2 : nat -> nat -> Prop :=
+| Root2 : forall x y, loose x -> pinned x y -> root2 x y.
+QuickChick Derive Generator for (fun x y => root2 x y).
+Goal True.
+  lazymatch (eval unfold GenSizedSuchThatroot2 in GenSizedSuchThatroot2) with
+  | context [@decOpt (loose _)] => exact I
+  | _ => fail "BudgetAware scorer did not check loose x"
+  end.
+Qed.
+
+QuickChick Scorer density.
+Inductive root3 : nat -> nat -> Prop :=
+| Root3 : forall x y, loose x -> pinned x y -> root3 x y.
+QuickChick Derive Generator for (fun x y => root3 x y).
+Goal True.
+  lazymatch (eval unfold GenSizedSuchThatroot3 in GenSizedSuchThatroot3) with
+  | context [@decOpt (loose _)] => fail "density scorer unexpectedly checked loose x"
+  | _ => exact I
+  end.
+Qed.
+
+Fail QC Scorer no_such_scorer.

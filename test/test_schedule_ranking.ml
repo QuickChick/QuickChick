@@ -31,7 +31,7 @@ let () =
           {density_rank; density_counts; variable_uses; candidate_id}))
         [0;1;2;3]) histograms) [0;1;2;3;4] in
   List.iter (fun policy ->
-    assert (of_string (to_string policy) = policy);
+    assert (scorer_of_name (to_string policy) = Some (Feature policy));
     List.iter (fun prefer_dense ->
       List.iter (fun a -> List.iter (fun b ->
         let actual = compare ~prefer_dense policy a b in
@@ -42,13 +42,19 @@ let () =
       assert (ordered = List.sort (compare ~prefer_dense policy) unique);
       assert (ordered = List.sort (fun a b -> Stdlib.compare
         (key prefer_dense policy a) (key prefer_dense policy b)) unique)) [true;false]) policies;
-  List.iter (fun (name, expected) -> assert (of_string name = expected))
+  List.iter (fun (name, expected) ->
+      assert (scorer_of_name name = Some (Feature expected)))
     ["density-first", RankDensityThenVars;
      "density-counts-then-vars", RankDensityCountsThenVars;
      "density-only", RankDensityOnly;
      "var_density", RankVarsThenDensity; "vars_density", RankVarsThenDensity;
      "vars-first", RankVarsThenDensity; "var_only", RankVarsOnly;
-     "vars-only", RankVarsOnly; "unknown", RankDensityThenVars];
+     "vars-only", RankVarsOnly; "density", RankDensityThenVars];
+  (* An unknown name is not a scorer; the command reports it. *)
+  assert (scorer_of_name "unknown" = None);
+  assert (scorer_of_name "budget_aware" = Some BudgetAware);
+  assert (scorer_of_name "cardinality" = Some Cardinality);
+  assert (List.for_all (fun name -> scorer_of_name name <> None) (scorer_names ()));
   let grades = [0;1;2;3;4] in
   let possibilities = [None; Some 0; Some 1; Some 2; Some 3; Some 4] in
   List.iter (fun policy -> List.iter (fun prefer_dense ->

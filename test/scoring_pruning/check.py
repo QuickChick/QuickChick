@@ -23,13 +23,25 @@ WORK = re.compile(
 )
 
 
+def with_scorer(source, ranking, destination):
+    # The scorer is selected in the file, after the QuickChick import.
+    text = source.read_text()
+    marker = "From QuickChick Require Import QuickChick.\n"
+    if marker not in text:
+        raise AssertionError(f"{source.name} does not import QuickChick")
+    # coqc requires the source and output names to coincide.
+    selected = destination.parent / ranking / source.name
+    selected.parent.mkdir(exist_ok=True)
+    selected.write_text(text.replace(marker, marker + f"QC Scorer {ranking}.\n", 1))
+    return selected
+
+
 def run(mode, ranking, source, destination, reuse=True):
+    source = with_scorer(source, ranking, destination)
     environment = os.environ.copy()
     environment["QC_SCHEDULE_TRACE"] = "1"
-    environment["QC_SCHEDULE_RANKING"] = ranking
-    environment.pop("QC_SCHEDULE_SCORE_PRUNING", None)
-    if mode != "off":
-        environment["QC_SCHEDULE_SCORE_PRUNING"] = mode
+    # Pruning is on by default, so "off" must disable it explicitly.
+    environment["QC_SCHEDULE_SCORE_PRUNING"] = "0" if mode == "off" else mode
     if not reuse:
         environment["QC_SCHEDULE_REUSE_STABLE"] = "0"
     command = [

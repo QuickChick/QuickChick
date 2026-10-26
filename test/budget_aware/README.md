@@ -34,7 +34,7 @@ of silently receiving a score. The finite producer has selectivity zero, and
 the loose producer followed by a finite check has selectivity one. This
 diagnostic does not change public ranking or provide a search bound.
 
-`QC_SCHEDULE_RANKING=budget_aware` uses the library to select constructor
+`QC Scorer budget_aware.` uses the library to select constructor
 schedules; see `doc/SchedulingPolicies.md`. `S_Let` and `SrcDef` have no
 counterparts in the pinned Specimen schedule syntax and return an error
 instead of an invented score. Dependency scores come only from completed,

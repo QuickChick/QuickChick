@@ -1,4 +1,5 @@
 From QuickChick Require Import QuickChick.
+QC Scorer budget_aware.
 Require Import List. Import ListNotations.
 
 (* Connected hypotheses with a negated check, shaped like Cedar's TEqEntity,

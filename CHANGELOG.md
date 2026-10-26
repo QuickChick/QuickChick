@@ -27,6 +27,10 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
 - Schedule derivation shares completed dependency derivations between
   candidate schedules and caches instance checks up to variable renaming,
   which makes large relations derive several times faster.
+- `QuickChick Scorer <name>.` (or `QC Scorer`) selects the schedule scorer,
+  such as `density` (the default), `budget_aware` or `cardinality`, for later
+  derivations in the file. It replaces the `QC_SCHEDULE_RANKING` environment
+  variable, which is removed. `Scorer` is now a keyword.
 - Schedule selection is exact by default: score-based pruning, proved sound
   for the built-in rankings, replaces the 1,000-candidate cap. Set
   `QC_SCHEDULE_SCORE_PRUNING=0` to disable it. Cardinality ranking has no

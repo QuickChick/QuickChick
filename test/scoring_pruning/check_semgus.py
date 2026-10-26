@@ -36,12 +36,10 @@ LEAF = re.compile(
 def run(mode, directory, reuse=True):
     environment = os.environ.copy()
     environment["QC_SCHEDULE_TRACE"] = "1"
-    environment["QC_SCHEDULE_RANKING"] = "density_then_vars"
     if mode == "verify":
         environment["QC_SCHEDULE_TRACE_BOUNDS"] = "1"
-    environment.pop("QC_SCHEDULE_SCORE_PRUNING", None)
-    if mode != "off":
-        environment["QC_SCHEDULE_SCORE_PRUNING"] = mode
+    # Pruning is on by default, so "off" must disable it explicitly.
+    environment["QC_SCHEDULE_SCORE_PRUNING"] = "0" if mode == "off" else mode
     if not reuse:
         environment["QC_SCHEDULE_REUSE_STABLE"] = "0"
     command = [

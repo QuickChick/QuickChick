@@ -6,11 +6,16 @@ output of a selected positive hypothesis. It also removes redundant orders of
 independent plain hypotheses. `QC_SCHEDULE_POR=0` disables that order reduction
 for diagnosis; it does not change output selection.
 
-The existing `QC_SCHEDULE_RANKING` environment setting is preserved:
+`QuickChick Scorer <name>.` (or `QC Scorer <name>.`) selects the scorer for
+later derivations in the file. The choice follows undo and backtracking, is not
+exported to files that import this one, and a prepared `quickchick` test keeps
+the schedules it was prepared with. An unknown name is an error that lists the
+scorers. The `QC_SCHEDULE_RANKING` environment variable has been removed.
 
-| Value | Primary criterion | Secondary criterion |
+| Scorer | Primary criterion | Secondary criterion |
+
 | --- | --- | --- |
-| `density_then_vars` (default) | Density | Fewer uses of previously bound variables |
+| `density_then_vars` (default; also `density`) | Density | Fewer uses of previously bound variables |
 | `density_counts_then_vars` | Density | Fewer steps at each worse density, then fewer variable uses |
 | `density_only` | Density | None |
 | `vars_then_density` | Fewer uses of previously bound variables | Density |
@@ -25,11 +30,11 @@ a checker or enumerator uses the highest. An empty producer schedule is Total;
 an empty checker or enumerator schedule is Checking. Candidate identifiers break
 remaining ties. They follow search order, so among equal scores the first
 schedule the search finds wins.
-Existing aliases and unknown-value fallback to the default are unchanged.
+The former environment aliases remain accepted as names, such as `vars_density`.
 
 ### Cardinality ranking (experimental)
 
-`QC_SCHEDULE_RANKING=cardinality` reads a schedule as a query plan. Counts
+`QC Scorer cardinality` reads a schedule as a query plan. Counts
 are growth classes in the size bound (`1 < fin < poly < exp`). Type classes
 come from the inductive definitions. Each completed relation mode records its
 solution count for given inputs, from its constructors' chosen schedules: a
@@ -54,7 +59,7 @@ determines it. The prototype and Cedar measurements are in
 
 ### BudgetAware ranking
 
-`QC_SCHEDULE_RANKING=budget_aware` (or `budget-aware`) ranks each
+`QC Scorer budget_aware` ranks each
 constructor's candidate schedules by `BudgetAwareScore`, the port of
 Specimen's completed six-field score (selectivity, density, fabrication,
 locality, input-check dependencies, variable dependencies), compared
@@ -209,7 +214,7 @@ variable uses are additive. BudgetAware is also an instance
 counts are additive; density and locality are extremal. Its scorer is
 separable because each step naming a variable lies in that variable's group,
 so selectivity's per-variable sets do not overlap, and the shared steps
-produce no variable and pin none. It is used for selection under `QC_SCHEDULE_RANKING=budget_aware`.
+produce no variable and pin none. It is used for selection under `QC Scorer budget_aware`.
 The test `plugin/test_grouped_score.ml` checks the generic search against
 brute force on random policies, BudgetAware's laws and exactness, and
 separability on fixture schedules.

@@ -38,18 +38,42 @@ let compare_histogram ~prefer_dense (c, b, n, p, t) (c', b', n', p', t') =
   if prefer_dense then Stdlib.compare (c, b, n, p, t) (c', b', n', p', t')
   else Stdlib.compare (t, p, n, b, c) (t', p', n', b', c')
 
-let of_string = function
-  | "density_then_vars" | "density-vars" | "density-first" -> RankDensityThenVars
-  | "density_counts_then_vars" | "density-counts-then-vars" -> RankDensityCountsThenVars
-  | "density_only" | "density-only" -> RankDensityOnly
-  | "var_density" | "vars_density" | "vars_then_density" | "vars-density" | "vars-first" -> RankVarsThenDensity
-  | "var_only" | "vars_only" | "vars-only" -> RankVarsOnly
-  | _ -> RankDensityThenVars
+type scorer =
+  | Feature of policy
+  | BudgetAware
+  | Cardinality
 
+(* Built-in scorers by name, with the aliases the former environment setting
+   accepted. The first name of each entry is the one reported. *)
+let builtin_scorers = [
+  ["density_then_vars"; "density"; "density-vars"; "density-first"], Feature RankDensityThenVars;
+  ["density_counts_then_vars"; "density-counts-then-vars"], Feature RankDensityCountsThenVars;
+  ["density_only"; "density-only"], Feature RankDensityOnly;
+  ["vars_then_density"; "var_density"; "vars_density"; "vars-density"; "vars-first"],
+    Feature RankVarsThenDensity;
+  ["vars_only"; "var_only"; "vars-only"], Feature RankVarsOnly;
+  ["budget_aware"; "budget-aware"], BudgetAware;
+  ["cardinality"], Cardinality;
+]
+
+let scorer_of_name name =
+  List.find_map (fun (names, scorer) ->
+    if List.mem name names then Some scorer else None) builtin_scorers
+
+let scorer_names () = List.map (fun (names, _) -> List.hd names) builtin_scorers
+
+(* Set by the [QuickChick Scorer] command, whose state follows undo. *)
+let selected : (unit -> scorer) ref = ref (fun () -> Feature RankDensityThenVars)
+
+let current_scorer () = !selected ()
+
+(* The density policy used for feature comparisons. BudgetAware and
+   cardinality keep the default density policy for the parts of search that
+   compare features. *)
 let current () =
-  match Sys.getenv_opt "QC_SCHEDULE_RANKING" with
-  | Some name -> of_string name
-  | None -> RankDensityThenVars
+  match current_scorer () with
+  | Feature policy -> policy
+  | BudgetAware | Cardinality -> RankDensityThenVars
 
 let to_string = function
   | RankDensityThenVars -> "density_then_vars"

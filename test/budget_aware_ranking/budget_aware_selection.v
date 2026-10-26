@@ -1,4 +1,5 @@
 From QuickChick Require Import QuickChick.
+QC Scorer budget_aware.
 
 (* The density ranking prefers a schedule without checks: x from loose, then
    y from pinned with x as an input at its finitely pinned position.

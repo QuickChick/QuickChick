@@ -722,6 +722,32 @@ let qcFuzz prop fuzzLoop =
 }
 
 
+{
+(* The scorer that ranks schedules in later derivations. It is file-local
+   state that follows undo and backtracking, like an unexported option. *)
+let selected_scorer : string SummaryRef.t =
+  SummaryRef.ref ~name:"QC_selected_scorer" "density_then_vars"
+
+let () = ScheduleRanking.selected := (fun () ->
+  match ScheduleRanking.scorer_of_name (SummaryRef.(!) selected_scorer) with
+  | Some scorer -> scorer
+  | None -> ScheduleRanking.Feature ScheduleRanking.RankDensityThenVars)
+
+let select_scorer name =
+  let name = Libnames.string_of_qualid name in
+  match ScheduleRanking.scorer_of_name name with
+  | Some _ -> SummaryRef.(selected_scorer := name)
+  | None -> CErrors.user_err Pp.(str "Unknown scorer " ++ str name
+      ++ str ". The scorers are: "
+      ++ prlist_with_sep (fun () -> str ", ") str (ScheduleRanking.scorer_names ())
+      ++ str ".")
+}
+
+VERNAC COMMAND EXTEND QuickChickScorer CLASSIFIED AS SIDEFF
+  | ["QuickChick" "Scorer" reference(name)] -> { select_scorer name }
+  | ["QC" "Scorer" reference(name)] -> { select_scorer name }
+END
+
 #if COQ_VERSION >= (8, 20, 0)
 VERNAC COMMAND EXTEND QuickCheck CLASSIFIED AS QUERY STATE opaque_access
 #else

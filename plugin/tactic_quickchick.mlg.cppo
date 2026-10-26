@@ -1156,13 +1156,10 @@ let replay_contextual_derivation key record =
   record.context_value
 
 
-(* QC_SCHEDULE_RANKING=budget_aware ranks constructor schedules by Specimen's
-   completed BudgetAware score instead of the density ranking. Other values
-   keep their existing meaning. *)
+(* [QuickChick Scorer budget_aware] ranks constructor schedules by Specimen's
+   completed BudgetAware score instead of the density ranking. *)
 let budget_aware_ranking () =
-  match Sys.getenv_opt "QC_SCHEDULE_RANKING" with
-  | Some ("budget_aware" | "budget-aware") -> true
-  | _ -> false
+  ScheduleRanking.current_scorer () = ScheduleRanking.BudgetAware
 
 (* A dependency's completed BudgetAware score in the current memo. Only a
    completed, cycle-independent entry counts. Recursive, in-progress and
@@ -1181,10 +1178,10 @@ let budget_dependency_score (request : BudgetAwareScore.dependency_request) =
   | _, Some (DensityDone (_, true, Some score)) -> Some score
   | _ -> None
 
-(* QC_SCHEDULE_RANKING=cardinality ranks constructor schedules by
+(* [QuickChick Scorer cardinality] ranks constructor schedules by
    CardinalityScore: filters counted by acceptance class. *)
 let cardinality_ranking () =
-  Sys.getenv_opt "QC_SCHEDULE_RANKING" = Some "cardinality"
+  ScheduleRanking.current_scorer () = ScheduleRanking.Cardinality
 
 (* Growth class of an inductive type, given its parameters' classes. A
    constructor argument of the same mutual block is a recursive occurrence;

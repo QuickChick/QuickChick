@@ -1,8 +1,7 @@
-; Theories here are compiled with BudgetAware ranking and score pruning in
-; verification mode: every prefix bound is checked against each completed
-; descendant, and a violation aborts the derivation.
-(env (_ (env-vars (QC_SCHEDULE_RANKING budget_aware)
-                  (QC_SCHEDULE_SCORE_PRUNING verify) (QC_SCHEDULE_MAX_CANDIDATES 0))))
+; Theories here are compiled with score pruning in verification mode: every
+; prefix bound is checked against each completed descendant, and a violation
+; aborts the derivation. The theory selects the BudgetAware scorer.
+(env (_ (env-vars (QC_SCHEDULE_SCORE_PRUNING verify) (QC_SCHEDULE_MAX_CANDIDATES 0))))
 
 (alias
   (name runtest)

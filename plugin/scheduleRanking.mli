@@ -20,9 +20,26 @@ type features = {
 val histogram_of_ranks : int list -> density_histogram
 val histogram_to_string : density_histogram -> string
 
-(** Includes the existing environment aliases; unknown names select the default. *)
-val of_string : string -> policy
+(** A scorer selected by [QuickChick Scorer]: a density feature policy, or
+    one of the score libraries. *)
+type scorer =
+  | Feature of policy
+  | BudgetAware
+  | Cardinality
 
+(** A built-in scorer by name or alias. *)
+val scorer_of_name : string -> scorer option
+
+(** The built-in scorer names, without aliases. *)
+val scorer_names : unit -> string list
+
+(** Reads the selected scorer; the command that selects it sets this. *)
+val selected : (unit -> scorer) ref
+
+val current_scorer : unit -> scorer
+
+(** The feature policy for density comparisons; the default under the
+    score libraries. *)
 val current : unit -> policy
 val to_string : policy -> string
 

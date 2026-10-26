@@ -41,3 +41,13 @@ shared merely by their dependency key.
 The legacy `Merge` command emits a large debug log, so this test captures its
 output in temporary files. This is a stress test for bound correctness, and
 currently exposes the cost of cold recursive scoring and the gain from reuse.
+
+Status (2026-10-26): these scripts are not part of `dune @runtest`, and their
+exact work-count expectations are stale. Selections still agree across modes,
+but the counts changed with grouped search, the variable-use look-ahead and
+pruning on by default: `check.py` reports 6 or 7 pruned prefixes depending on
+the scorer, and `check_semgus.py`'s ordinary run uses grouped search and sees
+leaves of nested dependency derivations. The scripts select the scorer with
+`QC Scorer` in a copy of the probe, and "off" sets
+`QC_SCHEDULE_SCORE_PRUNING=0`. Re-derive their expectations before relying on
+them. The verify-mode suites in `test/pruning_verify*` cover bound soundness.

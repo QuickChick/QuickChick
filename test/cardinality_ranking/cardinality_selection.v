@@ -1,4 +1,5 @@
 From QuickChick Require Import QuickChick.
+QC Scorer cardinality.
 Require Import List.
 Import ListNotations.
 
