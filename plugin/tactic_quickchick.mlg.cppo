@@ -2505,7 +2505,17 @@ and constructor_valid_schedules (ind_name : ty_ctr) (ctr : rocq_ctr) (result_var
   Error.msg_debug (str "Constructor name: " ++ str (constructor_to_string ctr_name) ++ fnl ());
   Error.msg_debug (str "Constructor type: " ++ str (rocq_constr_to_string typ) ++ fnl ());
   let typ = if opt then typ else arrows_to_products typ in
-  let constructor_vars, _, _ = NewGenericLib.type_info typ in
+  let constructor_vars, hypotheses, _ = NewGenericLib.type_info typ in
+  (* The scheduler handles premises that are relations, possibly negated. An
+     implication, quantified or functional premise has no producer or
+     checker to schedule. *)
+  List.iter (fun hyp -> match hyp with
+    | DProd _ | DArrow _ | DLambda _ | DNot (DProd _ | DArrow _ | DLambda _) ->
+      CErrors.user_err (str ("QuickChick cannot schedule constructor "
+        ^ constructor_to_string ctr_name ^ ": its premise "
+        ^ rocq_constr_to_string hyp
+        ^ " is an implication or quantified statement, not a relation."))
+    | _ -> ()) hypotheses;
   let known_inputs = List.map fst !schedule_inputs in
   let constructor_inputs = List.filter_map (fun (name, ty) ->
     if List.mem name known_inputs then None
@@ -4622,7 +4632,22 @@ let derive_schedule ind ois ds opt =
 
 (* Public commands compile in a transaction so internal schedule names do not
    become a second public naming scheme or collide on repeated derivations. *)
-let compile_public ~mode ~outputs ~constrained ~all_mutual ind =
+(* Unavailable_mode and Noninductive_dependency reject one candidate inside
+   the search. One that reaches a command or the tactic means no candidate
+   was possible; report it instead of an anomaly. *)
+let with_schedule_errors f =
+  try f () with
+  | Unavailable_mode constructor -> CErrors.user_err (str (
+      "QuickChick could not schedule constructor " ^ constructor
+      ^ ": no mode of its hypotheses can be generated or checked from the given inputs."))
+  | Noninductive_dependency name -> CErrors.user_err (str (
+      "QuickChick cannot derive a dependency on " ^ ty_ctr_to_string name
+      ^ ", which is not an inductive relation; declare an instance for it."))
+
+let rec compile_public ~mode ~outputs ~constrained ~all_mutual ind =
+  with_schedule_errors (fun () -> compile_public_inner ~mode ~outputs ~constrained ~all_mutual ind)
+
+and compile_public_inner ~mode ~outputs ~constrained ~all_mutual ind =
   let ds = match mode with
     | "Gen" -> D_Gen | "Enum" -> D_Enum | "Check" -> D_Check
     | _ -> invalid_arg "compile_public mode" in
@@ -4793,7 +4818,7 @@ let quickchick_it size idx =
     let sigma, definitions = Vernacstate.System.protect (fun () ->
       Fun.protect ~finally:(fun () -> proof_definitions := previous) (fun () ->
         proof_definitions := Some (definitions, universes);
-        ignore (prepare ());
+        ignore (with_schedule_errors prepare);
         let env = Global.env () in
         let constants = List.filter_map (fun (_, reference) -> match reference with
           | Names.GlobRef.ConstRef c -> Some c | _ -> None) !definitions in
