@@ -65,8 +65,31 @@ the grouped result against joint search; set `QC_SCHEDULE_MAX_CANDIDATES=0`
 with it, since the capped joint search can miss the grouped winner. With
 `policy_grouping := None` each constructor is searched jointly.
 
-A compiled policy currently runs without score pruning, under the
-1,000-candidate cap. Pruning with the policy's `lower_bound` is planned.
+A policy is pruned with its `lower_bound` when `policy_bound_sound` proves
+that bound admissible: no complete schedule below a search node scores better
+than the bound (`bound_admissible`, over `completes` in
+`src/SchedulingPolicy.v`). A search node lists its committed steps, each with
+its grade and whether that grade is final, the remaining hypotheses, and how
+many of them must become positive checks. The plugin cuts a branch when the
+best schedule found so far is no worse than the bound; since the first of
+equal scores wins, the selection is unchanged. Without a proof the policy
+runs unpruned, under the 1,000-candidate cap. A proof that depends on axioms,
+such as an admitted lemma, still enables pruning, and selecting the policy
+warns about it. `QC_SCHEDULE_SCORE_PRUNING=verify` checks every bound against
+every completed descendant.
+
+`src/SchedulingPolicyLaws.v` builds policies with proved bounds.
+`fold_policy M f floor kind` combines step scores in an ordered monoid `M`
+(`nat_max` and `nat_sum` are provided); a step score may depend on the steps
+before it. Its bound combines the committed steps' scores, masking uncertain
+grades, and an optional `floor` that every positive check reaches, counted
+once per forced check (`fold_bound_admissible`). `lex_policy p q` compares
+two policies lexicographically, with a proved bound when both have one
+(`lex_bound_admissible`). Both declare their grouping.
+`test/compiled_density.v` builds `density_then_vars` this way; on Cedar it
+makes the built-in's selection on every key, pruned and in verify mode, with
+no bound violation. Its bound has no variable-use look-ahead, so it prunes
+less than the built-in: Cedar takes 50 s against 10 s.
 
 ### Cardinality ranking (experimental)
 

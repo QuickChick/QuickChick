@@ -33,7 +33,10 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
   variable, which is removed. `Scorer` is now a keyword.
 - A scorer can be written in Rocq, as a `QuickChick.SchedulingPolicy.policy`.
   `QC Scorer my_policy.` compiles it to native code once and loads it into the
-  plugin; see `doc/SchedulingPolicies.md`. Compiling needs `ocamlfind`.
+  plugin; see `doc/SchedulingPolicies.md`. Compiling needs `ocamlfind`. A
+  policy is pruned when it proves its bound admissible, and searched by groups
+  when it declares a grouping. `QuickChick.SchedulingPolicyLaws` builds
+  policies from step scores with both proofs supplied.
 - Schedule selection is exact by default: score-based pruning, proved sound
   for the built-in rankings, replaces the 1,000-candidate cap. Set
   `QC_SCHEDULE_SCORE_PRUNING=0` to disable it. Cardinality ranking has no

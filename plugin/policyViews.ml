@@ -1,9 +1,10 @@
 (* OCaml mirror of the view types in theories SchedulingPolicy.v, exactly as
    Coq extracts them with QuickChick's settings (nat as int, string as char
    list). A compiled Rocq scoring policy is extracted with its view types
-   mapped onto these, so the plugin and the policy share them. Keep this file
-   in step with SchedulingPolicy.v; a mismatch makes policy compilation fail.
-   [extraction_table] lists the Extract Inductive directives. *)
+   mapped onto these, so the plugin and the policy share them. Regenerate
+   this file from an extraction when SchedulingPolicy.v changes; a mismatch
+   makes policy compilation fail. [extraction_table] lists the Extract
+   Inductive directives. *)
 
 type comparison = Eq | Lt | Gt
 
@@ -90,34 +91,22 @@ type inductive_view = { inductive_spec : spec_view;
                         inductive_constructors : constructor_view list;
                         inductive_leaves : leaf_view list }
 
-type remaining_hypothesis_view = { hypothesis_id : int;
-                                   hypothesis_formula : term_view;
-                                   hypothesis_output_groups : int list list }
+type committed_step = { committed_view : step_view;
+                        committed_grade : density; committed_certain : 
+                        bool }
 
-type choice_view = { chosen_hypothesis : int; chosen_outputs : int list;
-                     chosen_position : int }
-
-type binding_origin =
-| OriginalInput
-| ForcedBy of int
-| ProducedBy of int
-| PatternBound of int
-
-type bound_local_view = { bound_id : int; bound_origin : binding_origin }
-
-type 's search_node_view = { node_current : schedule_view;
-                             node_remaining : remaining_hypothesis_view list;
-                             node_choices : choice_view list;
-                             node_bound_locals : bound_local_view list;
-                             node_dependencies : (spec_view * 's
-                                                 dependency_state) list }
+type search_node_view = { node_steps : committed_step list;
+                          node_forced_checks : int;
+                          node_remaining : (term_view * bool) list;
+                          node_bound : int list }
 
 type field_kind =
 | Additive
 | Extremal
 
 type 's grouping = { group_unit : 's; group_combine : ('s -> 's -> 's);
-                     group_fields : (field_kind * ('s -> 's -> comparison)) list }
+                     group_fields : (field_kind * ('s -> 's -> comparison))
+                                    list }
 
 (* (Rocq type, OCaml type, constructors, match function) *)
 let extraction_table = [
@@ -137,11 +126,8 @@ let extraction_table = [
   "QuickChick.SchedulingPolicy.constructor_view", "Quickchick_plugin.PolicyViews.constructor_view", ["(fun (a0, a1, a2) -> { Quickchick_plugin.PolicyViews.constructor_name = a0; Quickchick_plugin.PolicyViews.constructor_recursive = a1; Quickchick_plugin.PolicyViews.constructor_schedule = a2 })"], (Some "(fun f r -> f r.Quickchick_plugin.PolicyViews.constructor_name r.Quickchick_plugin.PolicyViews.constructor_recursive r.Quickchick_plugin.PolicyViews.constructor_schedule)");
   "QuickChick.SchedulingPolicy.leaf_view", "Quickchick_plugin.PolicyViews.leaf_view", ["(fun (a0, a1) -> { Quickchick_plugin.PolicyViews.leaf_pattern = a0; Quickchick_plugin.PolicyViews.leaf_covering = a1 })"], (Some "(fun f r -> f r.Quickchick_plugin.PolicyViews.leaf_pattern r.Quickchick_plugin.PolicyViews.leaf_covering)");
   "QuickChick.SchedulingPolicy.inductive_view", "Quickchick_plugin.PolicyViews.inductive_view", ["(fun (a0, a1, a2) -> { Quickchick_plugin.PolicyViews.inductive_spec = a0; Quickchick_plugin.PolicyViews.inductive_constructors = a1; Quickchick_plugin.PolicyViews.inductive_leaves = a2 })"], (Some "(fun f r -> f r.Quickchick_plugin.PolicyViews.inductive_spec r.Quickchick_plugin.PolicyViews.inductive_constructors r.Quickchick_plugin.PolicyViews.inductive_leaves)");
-  "QuickChick.SchedulingPolicy.remaining_hypothesis_view", "Quickchick_plugin.PolicyViews.remaining_hypothesis_view", ["(fun (a0, a1, a2) -> { Quickchick_plugin.PolicyViews.hypothesis_id = a0; Quickchick_plugin.PolicyViews.hypothesis_formula = a1; Quickchick_plugin.PolicyViews.hypothesis_output_groups = a2 })"], (Some "(fun f r -> f r.Quickchick_plugin.PolicyViews.hypothesis_id r.Quickchick_plugin.PolicyViews.hypothesis_formula r.Quickchick_plugin.PolicyViews.hypothesis_output_groups)");
-  "QuickChick.SchedulingPolicy.choice_view", "Quickchick_plugin.PolicyViews.choice_view", ["(fun (a0, a1, a2) -> { Quickchick_plugin.PolicyViews.chosen_hypothesis = a0; Quickchick_plugin.PolicyViews.chosen_outputs = a1; Quickchick_plugin.PolicyViews.chosen_position = a2 })"], (Some "(fun f r -> f r.Quickchick_plugin.PolicyViews.chosen_hypothesis r.Quickchick_plugin.PolicyViews.chosen_outputs r.Quickchick_plugin.PolicyViews.chosen_position)");
-  "QuickChick.SchedulingPolicy.binding_origin", "Quickchick_plugin.PolicyViews.binding_origin", ["Quickchick_plugin.PolicyViews.OriginalInput"; "Quickchick_plugin.PolicyViews.ForcedBy"; "Quickchick_plugin.PolicyViews.ProducedBy"; "Quickchick_plugin.PolicyViews.PatternBound"], None;
-  "QuickChick.SchedulingPolicy.bound_local_view", "Quickchick_plugin.PolicyViews.bound_local_view", ["(fun (a0, a1) -> { Quickchick_plugin.PolicyViews.bound_id = a0; Quickchick_plugin.PolicyViews.bound_origin = a1 })"], (Some "(fun f r -> f r.Quickchick_plugin.PolicyViews.bound_id r.Quickchick_plugin.PolicyViews.bound_origin)");
-  "QuickChick.SchedulingPolicy.search_node_view", "Quickchick_plugin.PolicyViews.search_node_view", ["(fun (a0, a1, a2, a3, a4) -> { Quickchick_plugin.PolicyViews.node_current = a0; Quickchick_plugin.PolicyViews.node_remaining = a1; Quickchick_plugin.PolicyViews.node_choices = a2; Quickchick_plugin.PolicyViews.node_bound_locals = a3; Quickchick_plugin.PolicyViews.node_dependencies = a4 })"], (Some "(fun f r -> f r.Quickchick_plugin.PolicyViews.node_current r.Quickchick_plugin.PolicyViews.node_remaining r.Quickchick_plugin.PolicyViews.node_choices r.Quickchick_plugin.PolicyViews.node_bound_locals r.Quickchick_plugin.PolicyViews.node_dependencies)");
+  "QuickChick.SchedulingPolicy.committed_step", "Quickchick_plugin.PolicyViews.committed_step", ["(fun (a0, a1, a2) -> { Quickchick_plugin.PolicyViews.committed_view = a0; Quickchick_plugin.PolicyViews.committed_grade = a1; Quickchick_plugin.PolicyViews.committed_certain = a2 })"], (Some "(fun f r -> f r.Quickchick_plugin.PolicyViews.committed_view r.Quickchick_plugin.PolicyViews.committed_grade r.Quickchick_plugin.PolicyViews.committed_certain)");
+  "QuickChick.SchedulingPolicy.search_node_view", "Quickchick_plugin.PolicyViews.search_node_view", ["(fun (a0, a1, a2, a3) -> { Quickchick_plugin.PolicyViews.node_steps = a0; Quickchick_plugin.PolicyViews.node_forced_checks = a1; Quickchick_plugin.PolicyViews.node_remaining = a2; Quickchick_plugin.PolicyViews.node_bound = a3 })"], (Some "(fun f r -> f r.Quickchick_plugin.PolicyViews.node_steps r.Quickchick_plugin.PolicyViews.node_forced_checks r.Quickchick_plugin.PolicyViews.node_remaining r.Quickchick_plugin.PolicyViews.node_bound)");
   "QuickChick.SchedulingPolicy.field_kind", "Quickchick_plugin.PolicyViews.field_kind", ["Quickchick_plugin.PolicyViews.Additive"; "Quickchick_plugin.PolicyViews.Extremal"], None;
   "QuickChick.SchedulingPolicy.grouping", "Quickchick_plugin.PolicyViews.grouping", ["(fun (a0, a1, a2) -> { Quickchick_plugin.PolicyViews.group_unit = a0; Quickchick_plugin.PolicyViews.group_combine = a1; Quickchick_plugin.PolicyViews.group_fields = a2 })"], (Some "(fun f r -> f r.Quickchick_plugin.PolicyViews.group_unit r.Quickchick_plugin.PolicyViews.group_combine r.Quickchick_plugin.PolicyViews.group_fields)");
   "Coq.Init.Datatypes.comparison", "Quickchick_plugin.PolicyViews.comparison", ["Quickchick_plugin.PolicyViews.Eq"; "Quickchick_plugin.PolicyViews.Lt"; "Quickchick_plugin.PolicyViews.Gt"], None;

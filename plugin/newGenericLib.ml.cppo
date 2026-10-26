@@ -3500,10 +3500,12 @@ type prefix_floor = {
   forced_checks : int;
   bound_argument_occurrences : var list;
   future_variable_uses : int;
+  remaining_hypotheses : (rocq_constr * bool) list;
 }
 
 let terminal_prefix_floor =
-  { forced_checks = 0; bound_argument_occurrences = []; future_variable_uses = 0 }
+  { forced_checks = 0; bound_argument_occurrences = []; future_variable_uses = 0;
+    remaining_hypotheses = [] }
 
 type prefix_search_stats = {
   mutable visited_nodes : int;
@@ -3614,7 +3616,8 @@ let enum_schedules_prefix_classified
       let check_floor = if needs_check_floor then
           { forced_checks = forced_checks state;
             bound_argument_occurrences = bound_argument_occurrences state;
-            future_variable_uses = future_variable_uses state }
+            future_variable_uses = future_variable_uses state;
+            remaining_hypotheses = List.map (fun (_, cls) -> cls.hyp) state.prefix_remaining }
         else terminal_prefix_floor in
       Option.iter (fun observe ->
         observe (List.rev state.prefix_decisions_rev) false check_floor

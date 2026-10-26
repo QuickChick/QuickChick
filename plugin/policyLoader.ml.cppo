@@ -71,6 +71,7 @@ let extract reference file =
       "qc_policy_compare", app "QuickChick.SchedulingPolicy.compare_scores" [scorer];
       "qc_policy_bound", app "QuickChick.SchedulingPolicy.lower_bound" [policy];
       "qc_policy_grouping", app "QuickChick.SchedulingPolicy.policy_grouping" [policy];
+      "qc_policy_proves_bound", app "QuickChick.SchedulingPolicy.proves_bound" [policy];
     ] in
     let names = List.map (fun (name, body) ->
       let id = NewGenericLib.fresh_name name in
@@ -103,6 +104,23 @@ let run command =
   | 0 -> ()
   | _ -> error (str "Compiling the Rocq scorer failed: " ++ str command)
 
+(* A policy that proves its bound with the help of axioms, such as an
+   admitted lemma, is pruned with all the same; say so. *)
+#if COQ_VERSION >= (8, 20, 0)
+let warn_axioms ~opaque_access reference =
+  let env = Global.env () in
+  let global = Nametab.global reference in
+  let sigma, term = Evd.fresh_global env (Evd.from_env env) global in
+  let assumptions = Assumptions.assumptions ~add_opaque:false ~add_transparent:false
+    opaque_access TransparentState.full global (EConstr.to_constr sigma term) in
+  let axioms = Printer.ContextObjectMap.filter (fun obj _ ->
+    match obj with Printer.Axiom _ -> true | _ -> false) assumptions in
+  if not (Printer.ContextObjectMap.is_empty axioms) then
+    Feedback.msg_warning (str "The scorer " ++ Libnames.pr_qualid reference
+      ++ str " depends on axioms; pruning trusts its bound:" ++ fnl ()
+      ++ Printer.pr_assumptionset env sigma axioms)
+#endif
+
 (* Compile and load [reference] if needed, and return its registry key. *)
 #if COQ_VERSION >= (8, 20, 0)
 let load ~opaque_access reference =
@@ -134,9 +152,9 @@ let load reference =
          "\nlet () = Quickchick_plugin.PolicyRegistry.register %S\n\
          \  { Quickchick_plugin.PolicyRegistry.score = Obj.magic %s;\n\
          \    compare = Obj.magic %s; bound = Obj.magic %s;\n\
-         \    grouping = Obj.magic %s }\n"
+         \    grouping = Obj.magic %s; proves_bound = %s }\n"
          key (entry "qc_policy_score") (entry "qc_policy_compare") (entry "qc_policy_bound")
-         (entry "qc_policy_grouping") in
+         (entry "qc_policy_grouping") (entry "qc_policy_proves_bound") in
        (* ExtrOcamlNatInt inlines Nat.compare with unqualified Eq, Lt and Gt;
           re-export them from the plugin's comparison type. *)
        let prelude = "type qc_comparison = Quickchick_plugin.PolicyViews.comparison = Eq | Lt | Gt\n" in
@@ -150,4 +168,9 @@ let load reference =
         error (str "Loading the compiled Rocq scorer failed: " ++ str (Dynlink.error_message e)));
      if PolicyRegistry.find key = None then
        error (str "The compiled Rocq scorer did not register itself."));
+#if COQ_VERSION >= (8, 20, 0)
+  (match PolicyRegistry.find key with
+   | Some policy when policy.PolicyRegistry.proves_bound -> warn_axioms ~opaque_access reference
+   | _ -> ());
+#endif
   key

@@ -104,43 +104,43 @@ Record inductive_view := {
   inductive_leaves : list leaf_view
 }.
 
-Record remaining_hypothesis_view := {
-  hypothesis_id : nat;
-  hypothesis_formula : term_view;
-  hypothesis_output_groups : list (list nat)
+(* A node of the schedule search. Its committed steps begin every complete
+   schedule below it, in order. A committed step's grade is [certain] unless
+   it depends on a derivation still in progress, in which case a schedule
+   below may grade it differently. [node_forced_checks] of the remaining
+   hypotheses have all their arguments bound, so every schedule below checks
+   them. *)
+Record committed_step := {
+  committed_view : step_view;
+  committed_grade : density;
+  committed_certain : bool
 }.
 
-Record choice_view := {
-  chosen_hypothesis : nat;
-  chosen_outputs : list nat;
-  chosen_position : nat
+Record search_node_view := {
+  node_steps : list committed_step;
+  node_forced_checks : nat;
+  node_remaining : list (term_view * bool);
+  node_bound : list nat
 }.
 
-Inductive binding_origin :=
-| OriginalInput
-| ForcedBy (hypothesis : nat)
-| ProducedBy (hypothesis : nat)
-| PatternBound (hypothesis : nat).
+(* A positive check: what a forced hypothesis becomes. *)
+Definition is_check (step : step_view) : bool :=
+  match step with CheckStep _ true => true | _ => false end.
 
-Record bound_local_view := {
-  bound_id : nat;
-  bound_origin : binding_origin
-}.
+Definition count_checks (steps : list (step_view * density)) : nat :=
+  List.length (filter (fun '(step, _) => is_check step) steps).
 
-(* The current schedule may be reconstructed after insertion; it is not
-   assumed to be a prefix of every completed descendant. *)
-Record search_node_view (S : Type) := {
-  node_current : schedule_view;
-  node_remaining : list remaining_hypothesis_view;
-  node_choices : list choice_view;
-  node_bound_locals : list bound_local_view;
-  node_dependencies : list (spec_view * dependency_state S)
-}.
-Arguments node_current {S} _.
-Arguments node_remaining {S} _.
-Arguments node_choices {S} _.
-Arguments node_bound_locals {S} _.
-Arguments node_dependencies {S} _.
+(* A step of a schedule below the node that comes from committed step [c]. *)
+Definition kept (c : committed_step) (step : step_view * density) : Prop :=
+  fst step = committed_view c /\
+  (committed_certain c = true -> snd step = committed_grade c).
+
+(* [s] is a complete schedule below [node]. *)
+Definition completes (node : search_node_view) (s : schedule_view) : Prop :=
+  exists committed extension,
+    Forall2 kept (node_steps node) committed /\
+    schedule_steps s = committed ++ extension /\
+    node_forced_checks node <= count_checks extension.
 
 Record scorer (S : Type) := {
   score_step : score_context S -> step_view -> density -> S;
@@ -176,27 +176,35 @@ Arguments group_unit {S} _.
 Arguments group_combine {S} _ _ _.
 Arguments group_fields {S} _.
 
-Record policy := {
-  score_type : Type;
-  policy_scorer : scorer score_type;
-  lower_bound : score_context score_type -> search_node_view score_type -> score_type;
-  (* None: the plugin searches each constructor jointly. *)
-  policy_grouping : option (grouping score_type)
-}.
-
-(* A search adapter must establish this against its actual descendant relation.
-   Merely providing a callback does not certify that pruning is sound. *)
-Definition admissible_bound (p : policy)
-    (completion : score_context (score_type p) ->
-      search_node_view (score_type p) -> score_type p -> Prop) : Prop :=
-  forall ctx node final_score, completion ctx node final_score ->
-    compare_scores (policy_scorer p) (lower_bound p ctx node) final_score <> Gt.
-
 Definition score_one_schedule {S} (p : scorer S) (ctx : score_context S)
     (schedule : schedule_view) : S :=
   score_schedule p ctx schedule
     (map (fun '(step, grade) => score_step p ctx step grade)
       (schedule_steps schedule)).
+
+(* Lower scores are better. *)
+Definition no_worse {S} (p : scorer S) (a b : S) : Prop :=
+  compare_scores p a b <> Gt.
+
+(* A bound is admissible when no complete schedule below a node scores
+   better than it. *)
+Definition bound_admissible {S} (p : scorer S)
+    (bound : score_context S -> search_node_view -> S) : Prop :=
+  forall ctx node s, completes node s ->
+    no_worse p (bound ctx node) (score_one_schedule p ctx s).
+
+Record policy := {
+  score_type : Type;
+  policy_scorer : scorer score_type;
+  lower_bound : score_context score_type -> search_node_view -> score_type;
+  (* None: the plugin searches each constructor jointly. *)
+  policy_grouping : option (grouping score_type);
+  (* The plugin prunes with [lower_bound] only when this proof is given. *)
+  policy_bound_sound : option (bound_admissible policy_scorer lower_bound)
+}.
+
+Definition proves_bound (p : policy) : bool :=
+  match policy_bound_sound p with Some _ => true | None => false end.
 
 Definition score_with_dependency_states {S} (p : scorer S)
     (spec : spec_view) (local_types : list local_view)
@@ -228,15 +236,6 @@ Definition score_one_inductive {S} (p : scorer S) (ctx : score_context S)
       existsb (String.eqb name) (leaf_covering leaf)) constructors in
     (leaf, score_leaf p ctx leaf covering)) (inductive_leaves inductive) in
   score_inductive p ctx inductive leaves.
-
-(* Equality is retained so candidate identifiers can break score ties. *)
-Definition strictly_prunable (p : policy) (incumbent : score_type p)
-    (ctx : score_context (score_type p))
-    (node : search_node_view (score_type p)) : bool :=
-  match compare_scores (policy_scorer p) incumbent (lower_bound p ctx node) with
-  | Lt => true
-  | Eq | Gt => false
-  end.
 
 Definition choose_best {S} (p : scorer S) (candidates : list (nat * S))
     : option (nat * S) :=

@@ -1,29 +1,36 @@
-From QuickChick Require Import QuickChick SchedulingPolicy.
-Require Import List Arith. Import ListNotations.
+From QuickChick Require Import QuickChick SchedulingPolicy SchedulingPolicyLaws.
+Require Import List Arith Lia. Import ListNotations.
 
-(* The built-in density_then_vars ranking written as a Rocq policy. Compiled
-   by QC Scorer, it must choose the same schedules as the built-in. *)
+(* The built-in density_then_vars ranking written as a Rocq policy, from the
+   proved builders: a maximum of flipped grade ranks, where a forced check
+   counts as Checking, then a sum of variable uses. Its pruning bound is
+   proved. Compiled by QC Scorer, it must choose the built-in's schedules. *)
 
 Definition grade_rank (d : density) : nat :=
-  match d with
-  | Checking => 0 | Backtracking => 1 | Neutral => 2 | Partial => 3 | Total => 4
-  end.
+  match d with Checking => 0 | Backtracking => 1 | Neutral => 2 | Partial => 3 | Total => 4 end.
 
-Definition prefers_dense (m : derive_mode) : bool :=
-  match m with Generate | TestTheorem => true | Enumerate | Check => false end.
+Definition prefers_dense (ctx : score_context nat) : bool :=
+  match spec_mode (current_spec ctx) with Generate | TestTheorem => true | _ => false end.
 
-(* A producer is as dense as its sparsest step; a checker or enumerator as
-   sparse as its densest. Lower scores are better, so a producer's rank is
-   flipped. *)
-Definition representative (dense : bool) (grades : list nat) : nat :=
-  match grades with
-  | [] => 0
-  | g :: gs =>
-    if dense then 4 - fold_left Nat.min gs g else fold_left Nat.max gs g
-  end.
+(* Lower is better, so a producer's rank is flipped. A positive check is
+   graded Checking; a negative check keeps its grade. *)
+Definition flipped (ctx : score_context nat) (d : density) : nat :=
+  if prefers_dense ctx then 4 - grade_rank d else grade_rank d.
 
-(* Variables occurring as relation or constructor arguments, as the engine
-   collects them: not under binders, arrows or negations. *)
+Definition grade_score : step_scorer nat nat_max.
+Proof.
+  refine {| step_score := fun ctx _ step d =>
+    match step with CheckStep _ true => flipped ctx Checking | _ => flipped ctx d end |}.
+  intros. nat_order.
+Defined.
+
+(* A forced check grades the schedule Checking. *)
+Definition forced_checks_count : check_floor nat nat_max grade_score.
+Proof.
+  refine {| floor_score := fun ctx => flipped ctx Checking |}.
+  intros. unfold grade_score; cbn [step_score]. nat_order.
+Defined.
+
 Fixpoint argument_locals (t : term_view) : list nat :=
   match t with
   | TLocal i => [i]
@@ -33,8 +40,8 @@ Fixpoint argument_locals (t : term_view) : list nat :=
 
 Definition distinct (ids : list nat) : list nat := nodup Nat.eq_dec ids.
 
-(* The engine counts a nonrecursive source's distinct variables, and a
-   generated call's distinct variables per argument. *)
+(* As the engine counts them: a source's distinct variables, or a generated
+   call's distinct variables per argument. *)
 Definition source_locals (s : source_view) : list nat :=
   match source_category s, source_application s with
   | External, t => distinct (argument_locals t)
@@ -49,14 +56,6 @@ Fixpoint pattern_locals (p : pattern_view) : list nat :=
   | _ => []
   end.
 
-Definition step_uses (bound : list nat) (step : step_view) : nat :=
-  let count ids := length (filter (fun i => existsb (Nat.eqb i) bound) ids) in
-  match step with
-  | Unconstrained _ s _ | SuchThat _ s _ | CheckStep s _ => count (source_locals s)
-  | LetStep _ value => count (distinct (argument_locals value))
-  | MatchStep _ _ => 0
-  end.
-
 Definition step_binds (step : step_view) : list nat :=
   match step with
   | Unconstrained l _ _ => [local_id l]
@@ -66,38 +65,26 @@ Definition step_binds (step : step_view) : list nat :=
   | CheckStep _ _ => []
   end.
 
-(* Uses of variables bound by earlier steps; the root's inputs do not count. *)
-Fixpoint variable_uses (bound : list nat) (steps : list step_view) : nat :=
-  match steps with
-  | [] => 0
-  | step :: rest => step_uses bound step + variable_uses (step_binds step ++ bound) rest
+(* Uses of variables that earlier steps bound. *)
+Definition uses (prev : list step_view) (step : step_view) : nat :=
+  let bound := flat_map step_binds prev in
+  let count ids := List.length (filter (fun i => existsb (Nat.eqb i) bound) ids) in
+  match step with
+  | Unconstrained _ s _ | SuchThat _ s _ | CheckStep s _ => count (source_locals s)
+  | LetStep _ value => count (distinct (argument_locals value))
+  | MatchStep _ _ => 0
   end.
 
-Definition density_scorer : scorer (nat * nat) := {|
-  score_step := fun _ _ _ => (0, 0);
-  score_schedule := fun ctx schedule _ =>
-    let steps := schedule_steps schedule in
-    (representative (prefers_dense (spec_mode (current_spec ctx)))
-       (map (fun '(_, g) => grade_rank g) steps),
-     variable_uses [] (map fst steps));
-  score_leaf := fun _ _ _ => (0, 0);
-  score_inductive := fun _ _ _ => (0, 0);
-  compare_scores := fun '(d, u) '(d', u') =>
-    match Nat.compare d d' with Eq => Nat.compare u u' | c => c end
-|}.
-
-(* The grade is a maximum of flipped ranks and the uses a sum, so the score
-   combines over independent hypothesis groups. *)
-Definition density_grouping : grouping (nat * nat) := {|
-  group_unit := (0, 0);
-  group_combine := fun '(d, u) '(d', u') => (Nat.max d d', u + u');
-  group_fields := [(Extremal, fun '(d, _) '(d', _) => Nat.compare d d');
-                   (Additive, fun '(_, u) '(_, u') => Nat.compare u u')]
-|}.
+Definition uses_score : step_scorer nat nat_sum.
+Proof. refine {| step_score := fun _ prev step _ => uses prev step |}. intros. nat_order. Defined.
 
 Definition density_policy : policy :=
-  {| score_type := nat * nat; policy_scorer := density_scorer;
-     lower_bound := fun _ _ => (0, 0); policy_grouping := Some density_grouping |}.
+  lex_policy (fold_policy nat_max grade_score (Some forced_checks_count) Extremal)
+             (fold_policy nat_sum uses_score None Additive).
+
+(* The policy's bound is proved, without axioms. *)
+Goal match policy_bound_sound density_policy with Some _ => True | None => False end.
+Proof. exact I. Qed.
 
 (* The built-in and the compiled policy choose the same schedule. Each
    relation is derived under both; the generated instances must be equal. *)

@@ -116,62 +116,48 @@ Definition demo_policy : policy := {|
   score_type := cost;
   policy_scorer := demo_scorer;
   lower_bound := fun _ _ => zero_cost;
-  policy_grouping := None
+  policy_grouping := None;
+  policy_bound_sound := None
 |}.
 
-Definition any_cost_completion (_ : score_context cost)
-    (_ : search_node_view cost) (_ : cost) : Prop := True.
-
+(* No cost is below zero, so the zero bound is admissible. *)
 Example zero_bound_is_admissible :
-  admissible_bound demo_policy any_cost_completion.
+  bound_admissible demo_scorer (fun _ _ => zero_cost).
 Proof.
-  intros ctx node [f w] _.
-  destruct f, w; vm_compute; discriminate.
+  intros ctx node s _. unfold no_worse.
+  generalize (score_one_schedule demo_scorer ctx s). intros [f w]. simpl.
+  destruct f; simpl; [destruct w|]; discriminate.
 Qed.
 
-Definition demo_node : search_node_view cost := {|
-  node_current := checked;
-  node_remaining := [{| hypothesis_id := 1;
-    hypothesis_formula := TGlobal "Demo.Remaining";
-    hypothesis_output_groups := [[2]] |}];
-  node_choices := [{| chosen_hypothesis := 0;
-    chosen_outputs := []; chosen_position := 0 |}];
-  node_bound_locals := [{| bound_id := 0; bound_origin := OriginalInput |}];
-  node_dependencies := [(demo_spec, InProgress)]
+Definition demo_node : search_node_view := {|
+  node_steps := [{| committed_view := MatchStep 0 PWild;
+                    committed_grade := Backtracking; committed_certain := true |}];
+  node_forced_checks := 1;
+  node_remaining := [(TApply (TGlobal "Demo.Remaining") [TLocal 0], true)];
+  node_bound := [0]
 |}.
 
-Example strict_pruning_preserves_equal_scores :
-  strictly_prunable demo_policy {| failures := 0; work := 0 |}
-    demo_context demo_node = false.
-Proof. vm_compute. reflexivity. Qed.
-
-Definition check_bound_policy : policy := {|
-  score_type := cost;
-  policy_scorer := demo_scorer;
-  lower_bound := fun _ _ => {| failures := 1; work := 1 |};
-  policy_grouping := None
-|}.
-
-Example strict_comparison_prunes_better_incumbent :
-  strictly_prunable check_bound_policy {| failures := 0; work := 0 |}
-    demo_context demo_node = true.
-Proof. vm_compute. reflexivity. Qed.
-
-Example strict_comparison_keeps_tied_incumbent :
-  strictly_prunable check_bound_policy {| failures := 1; work := 1 |}
-    demo_context demo_node = false.
-Proof. vm_compute. reflexivity. Qed.
+(* A schedule below the node keeps its committed step and checks the forced
+   hypothesis. *)
+Example below_demo_node :
+  completes demo_node {|
+    schedule_steps := [(MatchStep 0 PWild, Backtracking); (CheckStep demo_source true, Checking)];
+    schedule_result := None |}.
+Proof.
+  exists [(MatchStep 0 PWild, Backtracking)], [(CheckStep demo_source true, Checking)].
+  repeat split; repeat constructor.
+Qed.
 
 Definition view_bound_policy : policy := {|
   score_type := cost;
   policy_scorer := demo_scorer;
   lower_bound := fun ctx node =>
-    match node_remaining node, node_bound_locals node,
-      dependencies ctx, node_dependencies node with
-    | _ :: _, _ :: _, _ :: _, _ :: _ => zero_cost
-    | _, _, _, _ => {| failures := 1; work := 0 |}
+    match node_remaining node, node_bound node, dependencies ctx with
+    | _ :: _, _ :: _, _ :: _ => zero_cost
+    | _, _, _ => {| failures := 1; work := 0 |}
     end;
-  policy_grouping := None
+  policy_grouping := None;
+  policy_bound_sound := None
 |}.
 
 Example a_rocq_bound_can_inspect_search_state :

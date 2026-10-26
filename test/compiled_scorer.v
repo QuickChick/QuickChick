@@ -12,8 +12,8 @@ Definition count_checks (direction : bool) : scorer nat := {|
   score_leaf := fun _ _ xs => fold_left Nat.add (map snd xs) 0;
   score_inductive := fun _ _ xs => fold_left Nat.add (map snd xs) 0;
   compare_scores := Nat.compare |}.
-Definition fewest_checks : policy := {| score_type := nat; policy_scorer := count_checks true; lower_bound := fun _ _ => 0; policy_grouping := None |}.
-Definition most_checks : policy := {| score_type := nat; policy_scorer := count_checks false; lower_bound := fun _ _ => 0; policy_grouping := None |}.
+Definition fewest_checks : policy := {| score_type := nat; policy_scorer := count_checks true; lower_bound := fun _ _ => 0; policy_grouping := None; policy_bound_sound := None |}.
+Definition most_checks : policy := {| score_type := nat; policy_scorer := count_checks false; lower_bound := fun _ _ => 0; policy_grouping := None; policy_bound_sound := None |}.
 
 Inductive loose : nat -> Prop := Loose : forall x, loose x.
 Inductive pinned : nat -> nat -> Prop :=
@@ -43,3 +43,14 @@ Qed.
 (* A constant that is not a policy, and an unknown name, are rejected. *)
 Fail QC Scorer count_checks.
 Fail QC Scorer no_such_policy.
+
+(* A bound proved with an admitted lemma still enables pruning; selecting the
+   policy warns that pruning trusts it. *)
+Lemma trusted_bound : bound_admissible (count_checks true) (fun _ _ => 0).
+Admitted.
+Definition trusted_policy : policy := {| score_type := nat;
+  policy_scorer := count_checks true; lower_bound := fun _ _ => 0;
+  policy_grouping := None; policy_bound_sound := Some trusted_bound |}.
+QC Scorer trusted_policy.
+Inductive root3 : nat -> nat -> Prop := Root3 : forall x y, loose x -> pinned x y -> root3 x y.
+QuickChick Derive Generator for (fun x y => root3 x y).

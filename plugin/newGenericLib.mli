@@ -154,6 +154,8 @@ type prefix_floor = {
   forced_checks : int;
   bound_argument_occurrences : var list;
   future_variable_uses : int;
+  (* The hypotheses not yet scheduled, with their polarity. *)
+  remaining_hypotheses : (rocq_constr * bool) list;
 }
 
 type prefix_search_stats = {
