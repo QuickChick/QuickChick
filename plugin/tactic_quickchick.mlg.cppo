@@ -309,9 +309,12 @@ end)
 let inductive_name_cache : Names.inductive option QualidTbl.t = QualidTbl.create 64
 let inductive_name_cache_env = ref None
 
+let mutual_relation_cache = ref None
+
 let clear_inductive_name_cache () =
   QualidTbl.reset inductive_name_cache;
-  inductive_name_cache_env := None
+  inductive_name_cache_env := None;
+  mutual_relation_cache := None
 
 let get_inductive_name name : Names.inductive option =
   let env = Global.env () in
@@ -373,9 +376,9 @@ let rocq_relation_used_inductives' ((ind_name, params, rules, overall_type) : ro
   Names.Indset.of_list (extract_inductives_rocq_constr overall_type @ List.concat_map (fun (_,typ) -> extract_inductives_rocq_constr typ) rules)
 
 (* Every mode derivation walks the relations reachable from its root, so a
-   mutual block's parse is cached until the global environment changes. *)
-let mutual_relation_cache = ref None
-
+   mutual block's parse is cached until the global environment changes. The
+   parse also depends on the current module, which names constructors, so
+   derivation entry points clear it with the name cache. *)
 let inductive_to_rocq_relation ((mind,ix) : Names.inductive) : rocq_relation =
   let env = Global.env () in
   let cached = match !mutual_relation_cache with
