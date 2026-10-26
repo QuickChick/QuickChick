@@ -2549,9 +2549,12 @@ and constructor_valid_schedules (ind_name : ty_ctr) (ctr : rocq_ctr) (result_var
     (if cardinality_ranking () then None
      else Sys.getenv_opt "QC_SCHEDULE_SCORE_PRUNING") with
     | false, Some "baseline" -> `Baseline
-    | _, Some ("1" | "true" | "yes") -> `Prune
     | _, Some "verify" -> `Verify
-    | _ -> `Off in
+    | _, Some ("0" | "false" | "no" | "off") -> `Off
+    (* Exact selection without a candidate cap needs pruning to stay bounded,
+       so it is on unless disabled; cardinality ranking has no bounds. *)
+    | _, _ when cardinality_ranking () -> `Off
+    | _ -> `Prune in
   let prefer_dense = ds = D_Gen || ds = D_Thm in
   let policy = schedule_ranking_policy () in
   let reuse_stable = reuse_stable_entries () in

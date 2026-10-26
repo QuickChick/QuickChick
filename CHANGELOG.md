@@ -23,6 +23,10 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
 - Schedule derivation shares completed dependency derivations between
   candidate schedules and caches instance checks up to variable renaming,
   which makes large relations derive several times faster.
+- Schedule selection is exact by default: score-based pruning, proved sound
+  for the built-in rankings, replaces the 1,000-candidate cap. Set
+  `QC_SCHEDULE_SCORE_PRUNING=0` to disable it. Cardinality ranking has no
+  bounds and keeps the cap.
 - `quickchick` on a goal over an abstract type, and derivation of a
   constructor whose premise is an implication or quantified statement,
   report what is unsupported instead of failing with an anomaly.

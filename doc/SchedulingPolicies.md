@@ -375,8 +375,8 @@ schedules equal the returned candidates, that open corrected prefixes remain
 prefixes of their descendants, and that a nonempty match prelude is visible
 at this boundary.
 
-The constructor scorer now uses those callbacks when the internal
-`QC_SCHEDULE_SCORE_PRUNING` environment switch is set. It scores completed
+The constructor scorer now uses those callbacks unless the internal
+`QC_SCHEDULE_SCORE_PRUNING` environment switch disables them. It scores completed
 leaves with the ordinary scorer in a temporary memo session. For a committed
 step with a fixed grade it uses that grade; for a nonrecursive producer it
 resolves the dependency on demand and uses its grade only if the computation
@@ -392,9 +392,11 @@ names are corrected for display; it does not infer bindings from renamed steps.
 `QC_SCHEDULE_SCORE_PRUNING=verify` enumerates all leaves and checks each
 bound against every completed descendant, then compares the scores seen at
 the leaves with final candidate rescoring. Setting it to `1` enables cuts.
-The default is off. Cardinality ranking ignores the switch. With pruning on,
+Pruning is on by default, because exact selection without a candidate cap
+needs it to stay bounded; `0`, `false`, `no` or `off` disables it.
+Cardinality ranking has no bounds and ignores the switch. With pruning on,
 and in its verification mode, searches have no candidate cap; without pruning
-the 1000-candidate cap remains. With pruning on, a constructor whose
+(and under cardinality ranking) the 1000-candidate cap remains. With pruning on, a constructor whose
 hypotheses split into several independent groups is still searched group by
 group, without cuts; a single group is searched jointly and pruned.
 Verification mode always searches jointly.
