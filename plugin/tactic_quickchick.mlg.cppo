@@ -1025,11 +1025,22 @@ let memo_delta memo_at_start =
     | Some before when before == entry -> acc
     | _ -> (k, entry) :: acc) !density_inductive_memo []
 
-(* Add the shared completed entries to a memo, keeping its own bindings. *)
+(* Add the shared completed entries to a memo, keeping its own bindings.
+   Candidates of one search start from the same memo, and the shared entries
+   change only when a candidate completes a new one, so the last merge is
+   reused while both are physically unchanged. *)
+let stable_merge = ref None
+
 let with_stable_entries memo =
-  InductiveScheduleKeyMap.fold (fun key entry current ->
-    if InductiveScheduleKeyMap.mem key current then current
-    else InductiveScheduleKeyMap.add key entry current) !stable_density_entries memo
+  let stable = !stable_density_entries in
+  match !stable_merge with
+  | Some (base, shared, merged) when base == memo && shared == stable -> merged
+  | _ ->
+    let merged = InductiveScheduleKeyMap.fold (fun key entry current ->
+      if InductiveScheduleKeyMap.mem key current then current
+      else InductiveScheduleKeyMap.add key entry current) stable memo in
+    stable_merge := Some (memo, stable, merged);
+    merged
 
 (* Before code generation: add the closure of every entry in the memo, to a
    fixed point, since a closure can hold shared entries with closures. *)
@@ -1048,7 +1059,9 @@ let complete_stable_closures () =
   complete (List.map fst (InductiveScheduleKeyMap.bindings !density_inductive_memo))
 
 (* Share the completed, cycle-independent entries derived since [before]. *)
+(* A scoring run that derived nothing leaves the memo physically unchanged. *)
 let collect_stable_entries before =
+  if !density_inductive_memo != before then
   InductiveScheduleKeyMap.iter (fun key entry -> match entry with
     | DensityDone (_, true, _) when not (InductiveScheduleKeyMap.mem key before) ->
       stable_density_entries := InductiveScheduleKeyMap.add key entry !stable_density_entries
@@ -2510,7 +2523,8 @@ and constructor_valid_schedules (ind_name : ty_ctr) (ctr : rocq_ctr) (result_var
   (* Share only completed entries whose dependency walk read no provisional
      or cycle-dependent grade. Keep the caller's in-progress entries intact. *)
   let add_stable memo = if not reuse_stable then memo else with_stable_entries memo in
-  let collect_stable () = if reuse_stable then
+  let collect_stable () = if reuse_stable &&
+      !density_inductive_memo != add_stable initial_inductive_memo then
     InductiveScheduleKeyMap.iter (fun key entry -> match entry with
       | DensityDone (_, true, _) when
           not (InductiveScheduleKeyMap.mem key initial_inductive_memo) ->
@@ -3782,6 +3796,7 @@ let reset_density_inductive_memo () =
   clear_inductive_name_cache ();
   clear_schedule_instance_cache ();
   stable_density_entries := InductiveScheduleKeyMap.empty;
+  stable_merge := None;
   Hashtbl.reset contextual_derivations;
   density_inductive_memo := init_density_inductive_memo
 
