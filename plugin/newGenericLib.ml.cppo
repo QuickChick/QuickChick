@@ -1518,7 +1518,7 @@ let schedule_failure (name : string) (ds : derive_sort) (is_constrained : bool) 
             ^ " generator has nothing to produce when its fuel runs out.") ++ fnl ())
   | _ -> MFail
 
-let inductive_schedule_to_mexp (is : inductive_schedule) (ds : derive_sort) (is_constrained : bool) : mexp =
+let inductive_schedule_to_mexp ?fuel_zero_body (is : inductive_schedule) (ds : derive_sort) (is_constrained : bool) : mexp =
   let (name, inputs, param_deps, base_scheds, rec_scheds) = is in
   Error.msg_debug (str ("Compiling inductive schedule: " ^ name) ++ fnl());
   if ds = D_Thm && name = "theorem" then begin
@@ -1581,9 +1581,10 @@ let inductive_schedule_to_mexp (is : inductive_schedule) (ds : derive_sort) (is_
             MApp (MId fun_name,
                   [fuel_max; MId (var_of_string "size"); MId (var_of_string "size")]))) in
   let first = 
-    match base_scheds with
-    | [] -> schedule_failure name ds is_constrained
-    | (s, inp_pats, _, _) :: _ ->
+    match base_scheds, fuel_zero_body with
+    | [], Some body -> body
+    | [], None -> schedule_failure name ds is_constrained
+    | (s, inp_pats, _, _) :: _, _ ->
       let k = rec_count s in
       let sz' = child_size (MId (var_of_string "size")) k in
       match_pats inp_pats (MLet (var_of_string "size'", sz', schedule_to_mexp s (MId fuel_var) fuel_init_size sz')) in
@@ -1604,12 +1605,79 @@ let inductive_schedule_with_dependencies_to_mexp unconstrained_inds (ind_schds :
             (PCtr (constructor_of_string "Coq.Init.Datatypes.S", [PVar fuel_prime_var]), 
               all_k);
           ]) in
+  (* An unconstrained generator cannot fail, so when its fuel runs out it
+     must still produce a value. A member with no base schedule can, if one
+     of its schedules calls only members that can: each such call becomes
+     the callee's fuel-zero body, bound as a function of every local name
+     the body uses and applied to the call's arguments. Calls at unchanged fuel would not pass the
+     guard checker. Members are resolved until nothing changes. *)
+  let fuel_zero_bodies =
+    let members = List.filter_map (fun ((name, inputs, param_deps, base, recs), ds, c) ->
+      (* A call also passes the callee's class arguments after its inputs. *)
+      let params = inputs @ List.concat_map (fun (v, classes) ->
+        List.map (fun ty -> fresh_name ("H" ^ var_to_string v), ty) classes) param_deps in
+      if ds = D_Gen && not c then Some (name, params, base, recs) else None) ind_schds in
+    let sched_body (s, inp_pats, _, _) =
+      let k = rec_count_schedule s in
+      let sz' = child_size (MId (var_of_string "size")) k in
+      match_pats inp_pats (MLet (var_of_string "size'", sz', schedule_to_mexp s fuel_zero fuel_init_size sz')) in
+    let calls ((steps, _), _, _, _) = List.filter_map (function
+      | S_UC (_, (SrcRec (f, _) | SrcMutrec (f, _)), _)
+      | S_ST (_, (SrcRec (f, _) | SrcMutrec (f, _)), _)
+      | S_Check ((SrcRec (f, _) | SrcMutrec (f, _)), _) -> Some (var_to_string f)
+      | _ -> None) steps in
+    let rec inline known m =
+      let go = inline known in
+      match m with
+      | MApp (MId f, _fuel :: init :: sz :: args) when List.mem_assoc (var_to_string f) known ->
+        let (inputs, body) = List.assoc (var_to_string f) known in
+        let binders = List.map (fun v -> PVar (var_of_string v), Some (MConst "Coq.Init.Datatypes.nat"))
+          ["fuel"; "init_size"; "size"] @ List.map (fun (v, ty) -> PVar v, Some ty) inputs in
+        let callee = fresh_name ("fuel_zero_" ^ var_to_string f) in
+        MLet (callee, MFun (binders, body),
+              MApp (MId callee, fuel_zero :: go init :: go sz :: List.map go args))
+      | MBind (ms, m1, vs, k) -> MBind (ms, go m1, vs, go k)
+      | MRet m1 -> MRet (go m1)
+      | MApp (f, args) -> MApp (go f, List.map go args)
+      | MCtr (c, args) -> MCtr (c, List.map go args)
+      | MTyCtr (c, args) -> MTyCtr (c, List.map go args)
+      | MMatch (m1, cases) -> MMatch (go m1, List.map (fun (p, k) -> p, go k) cases)
+      | MLet (v, m1, k) -> MLet (v, go m1, go k)
+      | MBacktrack (d, cases, c, ds) -> MBacktrack (go d, List.map go cases, c, ds)
+      | MFun (bs, k) -> MFun (bs, go k)
+      | MArrow (a, b) -> MArrow (go a, go b)
+      | MFail | MOutOfFuel | MId _ | MConst _ | MEscape _ | MHole
+      | MFix _ | MMutFix _ | MProd _ -> m in
+    let rec resolve known =
+      let step = List.filter_map (fun (name, inputs, base, recs) ->
+        if List.mem_assoc name known then None else
+        match base with
+        | _ :: _ -> Some (name, (inputs, MBacktrack (sched_body (List.hd base),
+            List.map (fun ((_, _, _, weight) as r) -> backtrack_decoration ~weight D_Gen Base (sched_body r)) base,
+            false, D_Gen)))
+        | [] ->
+          let ready = List.filter (fun r ->
+            List.for_all (fun f -> f <> name && List.mem_assoc f known) (calls r)) recs in
+          match ready with
+          | [] -> None
+          | r :: _ -> Some (name, (inputs, MBacktrack (inline known (sched_body r),
+              List.map (fun ((_, _, _, weight) as r) ->
+                backtrack_decoration ~weight D_Gen Base (inline known (sched_body r))) ready,
+              false, D_Gen)))) members in
+      if step = [] then known else resolve (known @ step) in
+    resolve [] in
+  let fuel_zero_body name base_scheds =
+    if base_scheds <> [] then None
+    else Option.map snd (List.assoc_opt name fuel_zero_bodies) in
   let dependency_mexp ((ind_schd_name,inputs,param_deps,base_scheds,_) as is, ds, is_constrained) = 
     Feedback.msg_notice (str ("Compiling inductive schedule: " ^ ind_schd_name) ++ str " " ++ str (derive_sort_to_string ds) ++ str " " ++ str (if is_constrained then "constrained" else "unconstrained") ++ fnl());
+    let fuel_zero_body =
+      if ds = D_Gen && not is_constrained then fuel_zero_body ind_schd_name base_scheds else None in
     let first = 
-      match base_scheds with
-      | [] -> schedule_failure ind_schd_name ds is_constrained
-      | (s, inp_pats, _, _) :: _ ->
+      match base_scheds, fuel_zero_body with
+      | [], Some body -> body
+      | [], None -> schedule_failure ind_schd_name ds is_constrained
+      | (s, inp_pats, _, _) :: _, _ ->
         let k = rec_count_schedule s in
         let sz' = child_size (MId (var_of_string "size")) k in
         match_pats inp_pats (MLet (var_of_string "size'", sz', schedule_to_mexp s fuel_zero fuel_init_size sz')) in
@@ -1633,7 +1701,7 @@ let inductive_schedule_with_dependencies_to_mexp unconstrained_inds (ind_schds :
       | MLet (fun_name, fixp, MFun (_,body)) -> MLet (var_of_string "size", MCtr (constructor_of_string "Coq.Init.Datatypes.S", [MId (var_of_string "sizem")]), MLet (fun_name, fixp, body))
       | m -> failwith "Expected a let binding") in *)
     let mexp = 
-      (match inductive_schedule_to_mexp is ds is_constrained with
+      (match inductive_schedule_to_mexp ?fuel_zero_body is ds is_constrained with
       | MLet (fun_name, fixp, MFun (_,_)) -> 
         MLet (fun_name, fixp, 
           (MApp (MId fun_name,
