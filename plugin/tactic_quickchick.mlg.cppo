@@ -2892,6 +2892,7 @@ and constructor_valid_schedules (ind_name : ty_ctr) (ctr : rocq_ctr) (result_var
      certain when it is fixed, or derived without touching a derivation in
      progress, as for the density bound. *)
   let compiled_incumbent = ref None in
+  let compiled_grade_cache = Hashtbl.create 32 in
   let observed_compiled_bounds = ref [] in
   let compiled_leaf policy triple = with_candidate_density_state (fun () ->
     let match_steps, schedule = materialize triple in
@@ -2905,10 +2906,17 @@ and constructor_valid_schedules (ind_name : ty_ctr) (ctr : rocq_ctr) (result_var
       List.map (fun step -> match fixed_step_density ds step with
         | Some grade -> step, grade, true
         | None ->
-          let before = !density_uncertainty_events in
-          (match schedule_density [] ([step], sort) with
-           | ([(_, grade)], _) -> step, grade, !density_uncertainty_events = before
-           | _ -> step, neutral, false)) steps in
+          (* A step's grade within this constructor's derivation is the same
+             at every node, as for the density bound's cache. *)
+          match Hashtbl.find_opt compiled_grade_cache (step, sort) with
+          | Some (grade, certain) -> step, grade, certain
+          | None ->
+            let before = !density_uncertainty_events in
+            let grade, certain = match schedule_density [] ([step], sort) with
+              | ([(_, grade)], _) -> grade, !density_uncertainty_events = before
+              | _ -> neutral, false in
+            Hashtbl.add compiled_grade_cache (step, sort) (grade, certain);
+            step, grade, certain) steps in
     compiled_node_bound policy ind_name result_vars output_vars ds sort graded check_floor) in
   let compiled_better policy a b = policy.PolicyRegistry.compare a b = PolicyViews.Lt in
   let on_prefix = if score_pruning_mode = `Baseline then
