@@ -619,9 +619,9 @@ Declare Instance Dec_eq_list (A : Type)
     <x> is the value to be generated.
     <x1...xn> are (implicitly universally quantified) variable names.
     Implicit type arguments are elaborated before outputs are selected.
-    Term inputs must be distinct variables; outputs must occur once as whole
-    arguments, in predicate order. Fixed or repeated inputs and reordered
-    outputs require the legacy command. See doc/DerivationDispatch.md for
+    Inputs may be fixed terms or repeated variables. Outputs must each occur
+    once as a whole argument, in any order; an output that occurs more than
+    once or inside a term is unsupported and reported. See doc/DerivationDispatch.md for
     examples and compatibility details.
 *)
 

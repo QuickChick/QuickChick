@@ -56,10 +56,15 @@ premises, and collision errors.
 Implicit type arguments are elaborated before selecting output positions.
 A generated output must occur once as a whole predicate argument. Pair outputs
 can use `fun p => let '(x,y) := p in P x y` or `fun '(x,y) => P x y`.
-Term inputs must be distinct variables, and output order must match predicate
-argument order. Fixed or repeated term inputs and reordered outputs are rejected
-rather than silently generalized; use `QuickChick Derive Legacy` for those forms. Larger
-or nested output tuples have not been certified.
+Inputs may be fixed terms or repeated variables, as in `(le' 2 y)` or
+`(R x x)`. The command derives the instance for distinct input variables,
+which matches these requests by unification; it is not specialized to the
+fixed values. Outputs may be listed in any order. For
+`fun '(y, x) => R x y` the command derives the instance in predicate order and
+declares a second instance, typed as the request, that permutes its results.
+Output tuples are the left-nested pairs that `(a, b, c)` denotes. An output
+that occurs more than once or inside a term, as in `(fun x => R x x)`, would
+have to satisfy an equation. That is unsupported, and the command reports it.
 
 `QuickChick Derive Legacy` and `DeriveLegacy` accept the old command forms, including
 `using`, and issue the `quickchick-legacy-derive` warning. There is no automatic

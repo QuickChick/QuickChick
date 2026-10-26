@@ -17,9 +17,13 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
   the proof. A saved test can be rerun before the proof ends.
 - Testing works inside ordinary and nested modules and on properties exported
   by applied functors. An unapplied functor cannot run a test.
-- The scheduled engine still rejects some fixed/repeated inputs, reordered
-  outputs, and constructor applications. See the
-  [migration guide](doc/3.0Migration.md) for the explicit legacy path.
+- Public derivations accept fixed or repeated inputs, such as
+  `(le' 2 y)` or `(R x x)`, through the instance derived for distinct inputs,
+  and outputs out of predicate order, such as `(fun '(y, x) => R x y)`,
+  through a second instance typed as the request. An output that occurs
+  more than once or inside a term is rejected as unsupported. Some applied
+  functions in constructor conclusions still need the legacy command. See the
+  [migration guide](doc/3.0Migration.md).
 - Schedule derivation shares completed dependency derivations between
   candidate schedules and caches instance checks up to variable renaming,
   which makes large relations derive several times faster.

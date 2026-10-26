@@ -88,6 +88,13 @@ let derive_simple ~enumerator ind =
   publish ~mode ~constrained:false
     (Tactic_quickchick.compile_public ~mode ~outputs:[] ~constrained:false ~all_mutual:true ind)
 
+type reorder = {
+  free : Names.Id.t list;
+  user_order : Names.Id.t list;
+  in_order : Names.Id.t list;
+  body : Constrexpr.constr_expr;
+}
+
 (* Resolve implicit type arguments before deciding which relation positions are
    outputs. Unbound input names in the public syntax are schematic binders. *)
 let dependent_target ~mode expression =
@@ -156,7 +163,7 @@ let dependent_target ~mode expression =
         let env = EConstr.push_rel (Context.Rel.Declaration.LocalAssum (name, domain)) env in
         strip env (Context.binder_name name :: context) rest
     | _ -> env, context, term in
-  let argument_env, context, term = strip env [] term in
+  let _, context, term = strip env [] term in
   let head, args = EConstr.decompose_app sigma term in
   let relation = match EConstr.kind sigma head with
     | Constr.Ind (ind, _) -> Nametab.shortest_qualid_of_global Names.Id.Set.empty (Names.GlobRef.IndRef ind)
@@ -168,26 +175,121 @@ let dependent_target ~mode expression =
       | _ -> None) (Array.to_list args) |> List.filter_map Fun.id in
     match positions with
     | [position] -> position
-    | _ -> CErrors.user_err (Pp.str "Each output must occur once as a whole predicate argument.")) output_names in
-  let seen_inputs = ref [] in
-  Array.iteri (fun position argument ->
-    if not (List.mem position output_positions) then begin
-      let sigma, ty = Typing.type_of argument_env sigma argument in
-      let ty = Reductionops.whd_all argument_env sigma ty in
-      if not (EConstr.isSort sigma ty || Typeclasses.is_class_type sigma ty) then
-        match EConstr.kind sigma argument with
-        | Constr.Rel n when not (List.mem n !seen_inputs) -> seen_inputs := n :: !seen_inputs
-        | _ -> CErrors.user_err (Pp.str
-            "Use distinct variables for predicate inputs; fixed or repeated inputs require QuickChick Derive Legacy.")
-    end) args;
-  if output_positions <> List.sort compare output_positions then
-    CErrors.user_err (Pp.str "Output order must match predicate argument order; use QuickChick Derive Legacy for this form.");
-  CAst.make (CRef (relation, None)), output_positions
+    | [] -> CErrors.user_err Pp.(str "Unsupported output " ++ Names.Id.print id
+        ++ str ": it occurs inside an argument, not as a whole argument of the"
+        ++ str " relation. Derivations cannot generate an output that must satisfy"
+        ++ str " an equation; each output must be a whole argument.")
+    | _ -> CErrors.user_err Pp.(str "Unsupported output " ++ Names.Id.print id
+        ++ str ": it occurs in several arguments of the relation. Derivations"
+        ++ str " cannot generate an output that must satisfy an equation; each"
+        ++ str " output must occur once, as a whole argument.")) output_names in
+  (* Fixed or repeated inputs need no special mode: the instance derived for
+     distinct input variables matches them by unification. *)
+  let sorted = List.sort compare output_positions in
+  let reorder =
+    if output_positions = sorted then None
+    else
+      let in_order = List.map snd (List.sort compare (List.combine output_positions output_names)) in
+      Some { free; user_order = output_names; in_order; body } in
+  CAst.make (CRef (relation, None)), sorted, reorder
+
+(* A request whose outputs are not in predicate order, such as
+   [fun '(y, x) => R x y], is served by the instance derived in predicate
+   order: a second instance, typed as the request, maps the permutation over
+   its results. Tuples are the left-nested pairs that [(a, b, c)] denotes. *)
+let publish_reordered ~mode r =
+  let open Constrexpr in
+  let enumerator = mode = "Enum" in
+  let qualid s = Libnames.qualid_of_string (NewGenericLib.rocq_path s) in
+  let ref_ s = CAst.make (CRef (qualid s, None)) in
+  let var id = CAst.make (CRef (Libnames.qualid_of_ident id, None)) in
+  let hole = CAst.make (CHole (None
+#if COQ_VERSION < (8, 20, 0)
+    , Namegen.IntroAnonymous
+#endif
+    )) in
+  let app f args = CAst.make (CApp (f, List.map (fun a -> a, None) args)) in
+  let explicit f args = CAst.make (CAppExpl ((qualid f, None), args)) in
+  let pair_pat a b = CAst.make (CPatCstr (qualid "Coq.Init.Datatypes.pair",
+    Some [CAst.make (CPatAtom None); CAst.make (CPatAtom None); a; b], [])) in
+  let tuple_pat ids = match List.map (fun id ->
+      CAst.make (CPatAtom (Some (Libnames.qualid_of_ident id)))) ids with
+    | p :: ps -> List.fold_left pair_pat p ps
+    | [] -> assert false in
+  let tuple_term ids = match List.map var ids with
+    | t :: ts -> List.fold_left (fun a b -> explicit "Coq.Init.Datatypes.pair" [hole; hole; a; b]) t ts
+    | [] -> assert false in
+  let fun_match result =
+    let p = Names.Id.of_string "qc_reordered" in
+    CAst.make (CLambdaN ([CLocalAssum ([CAst.make (Names.Name p)],
+#if COQ_VERSION >= (8, 20, 0)
+      None,
+#endif
+      Default Glob_term.Explicit, hole)],
+      CAst.make (CCases (RegularStyle, None, [var p, None, None],
+        [CAst.make ([[tuple_pat r.in_order]], result)])))) in
+  let canonical = fun_match r.body in
+  let permute = fun_match (tuple_term r.user_order) in
+  (* The class predicate takes one tupled argument, so a curried request
+     [fun y x => R x y] is declared at its tupled form [fun '(y, x) => R x y]. *)
+  let request =
+    let p = Names.Id.of_string "qc_request" in
+    CAst.make (CLambdaN ([CLocalAssum ([CAst.make (Names.Name p)],
+#if COQ_VERSION >= (8, 20, 0)
+      None,
+#endif
+      Default Glob_term.Explicit, hole)],
+      CAst.make (CCases (RegularStyle, None, [var p, None, None],
+        [CAst.make ([[tuple_pat r.user_order]], r.body)])))) in
+  let cls, build, meth, bind, ret =
+    if enumerator then "QuickChick.DependentClasses.EnumSizedSuchThat",
+      "QuickChick.DependentClasses.Build_EnumSizedSuchThat",
+      "QuickChick.DependentClasses.enumSizeST",
+      "QuickChick.Enumerators.bindEnum", "QuickChick.Enumerators.returnEnum"
+    else "QuickChick.DependentClasses.GenSizedSuchThat",
+      "QuickChick.DependentClasses.Build_GenSizedSuchThat",
+      "QuickChick.DependentClasses.arbitrarySizeST",
+      "QuickChick.Generators.bindGen", "QuickChick.Generators.returnGen" in
+  let n = Names.Id.of_string "qc_size" and o = Names.Id.of_string "qc_result" in
+  let lambda id body = CAst.make (CLambdaN ([CLocalAssum ([CAst.make (Names.Name id)],
+#if COQ_VERSION >= (8, 20, 0)
+      None,
+#endif
+      Default Glob_term.Explicit, hole)], body)) in
+  let method_body = lambda n (app (ref_ bind)
+    [explicit meth [hole; canonical; hole; var n];
+     lambda o (app (ref_ ret)
+       [app (ref_ "Coq.Init.Datatypes.option_map") [permute; var o]])]) in
+  let instance = CAst.make (CCast (explicit build [hole; request; method_body],
+#if COQ_VERSION >= (8, 20, 0)
+    Some Constr.DEFAULTcast,
+#else
+    Glob_term.CastConv
+#endif
+    explicit cls [hole; request])) in
+  let binder id = CLocalAssum ([CAst.make (Names.Name id)],
+#if COQ_VERSION >= (8, 20, 0)
+      None,
+#endif
+      Default Glob_term.MaxImplicit, hole) in
+  let term = if r.free = [] then instance
+    else CAst.make (CLambdaN (List.map binder r.free, instance)) in
+  let env = Global.env () in
+  let sigma, body = Constrintern.interp_constr_evars env (Evd.from_env env) term in
+  Pretyping.check_evars env sigma body;
+  let name = NewGenericLib.fresh_name
+    ((if enumerator then "EnumSizedSuchThat" else "GenSizedSuchThat") ^ "_reordered") in
+  let cinfo = Declare.CInfo.make ~name ~typ:None () in
+  let info = Declare.Info.make () in
+  let reference = Declare.declare_definition ~info ~cinfo ~opaque:false ~body sigma in
+  Classes.existing_instance Hints.SuperGlobal reference
+    (Some { Typeclasses.hint_priority = Some 42; hint_pattern = None })
 
 let derive_dependent ~mode expression =
-  let ind, outputs = dependent_target ~mode expression in
+  let ind, outputs, reorder = dependent_target ~mode expression in
   publish ~mode ~constrained:true
-    (Tactic_quickchick.compile_public ~mode ~outputs ~constrained:true ~all_mutual:false ind)
+    (Tactic_quickchick.compile_public ~mode ~outputs ~constrained:true ~all_mutual:false ind);
+  Option.iter (publish_reordered ~mode) reorder
 
 let warn_legacy =
   let category =

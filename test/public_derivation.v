@@ -93,12 +93,44 @@ QuickChick Derive (GenSized, EnumSized) for mutual_left.
 Definition right_gen {A : Type} `{Gen A} : GenSized (mutual_right A) := GenSizedmutual_right.
 Definition right_enum {A : Type} `{Enum A} : EnumSized (mutual_right A) := EnumSizedmutual_right.
 
-(* Invalid modes must fail before emitting a generalized instance. *)
-Inductive input_guard : nat -> nat -> Prop := InputGuard : forall x y, input_guard x y.
-Fail QuickChick Derive Checker for (input_guard 0 y).
-Fail QuickChick Derive Checker for (input_guard x x).
-Fail QuickChick Derive Generator for (fun '(y,x) => input_guard x y).
-Fail Check DecOptinput_guard.
+(* Fixed and repeated inputs use the instance derived for distinct input
+   variables, which matches them by unification. *)
+Inductive input_guard : nat -> nat -> Prop := InputGuard : forall x, input_guard x (S x).
+QuickChick Derive Checker for (input_guard 0 y).
+Example fixed_input_checks : @decOpt (input_guard 0 1) _ 5 = Some true.
+Proof. reflexivity. Qed.
+Example fixed_input_rejects : @decOpt (input_guard 0 2) _ 5 = Some false.
+Proof. reflexivity. Qed.
+QuickChick Derive Checker for (input_guard x x).
+Example repeated_input_rejects : @decOpt (input_guard 3 3) _ 5 = Some false.
+Proof. reflexivity. Qed.
+
+From QuickChick Require Import LazyList.
+
+(* Outputs requested out of predicate order are served by the instance in
+   predicate order, through a second instance typed as the request. *)
+QuickChick Derive Generator for (fun '(y, x) => input_guard x y).
+Definition reordered_gen : GenSizedSuchThat _ (fun '(y, x) => input_guard x y) := _.
+QuickChick Derive Enumerator for (fun '(y, x) => input_guard x y).
+Definition reordered_enum : EnumSizedSuchThat _ (fun '(y, x) => input_guard x y) := _.
+Example reordered_pairs :
+  List.map (option_map (fun '(y, x) => (y, x)))
+    (LazyList_to_list (Enumerators.run
+      (@enumSizeST _ (fun '(y, x) => input_guard x y) _ 2) 2))
+  = List.map (option_map (fun '(x, y) => (y, x)))
+    (LazyList_to_list (Enumerators.run
+      (@enumSizeST _ (fun '(x, y) => input_guard x y) _ 2) 2)).
+Proof. reflexivity. Qed.
+(* The class predicate takes one tupled argument, so curried outputs are
+   declared at the tupled form. *)
+QuickChick Derive Enumerator for (fun y x => input_guard x y).
+Definition curried_reordered : EnumSizedSuchThat _ (fun '(y, x) => input_guard x y) := _.
+
+Example reordered_satisfies :
+  List.forallb (fun o => match o with Some (y, x) => Nat.eqb y (S x) | None => true end)
+    (LazyList_to_list (Enumerators.run
+      (@enumSizeST _ (fun '(y, x) => input_guard x y) _ 2) 2)) = true.
+Proof. reflexivity. Qed.
 
 (* Public checker/generator wrappers carry enumeration requirements through
    two dependency levels, without inventing a generator for the checker. *)
@@ -131,3 +163,8 @@ Proof. reflexivity. Qed.
 Example public_single_has_witness :
   @decOpt (PublicWitness bool false) (@DecOptPublicWitness bool false public_single_enum) 3 = Some true.
 Proof. reflexivity. Qed.
+
+(* An output that occurs more than once or inside a term would have to
+   satisfy an equation; the command reports it as unsupported. *)
+Fail QuickChick Derive Generator for (fun x => input_guard x x).
+Fail QuickChick Derive Generator for (fun x => input_guard (S x) 3).
