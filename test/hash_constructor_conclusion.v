@@ -11,7 +11,7 @@ Inductive HashesTo (A : Type) `{MyHashable A} : A -> nat -> Prop :=
 
 #[local] Instance nat_hash : MyHashable nat := {| myHash n := n + 1 |}.
 
-QCDerive Generator for (fun h => HashesTo nat x h).
+QuickChick Derive Generator for (fun h => HashesTo nat x h).
 
 Theorem hash_of_three : forall h, HashesTo nat 3 h -> h = 4.
 Proof. quickchick 3. Abort.

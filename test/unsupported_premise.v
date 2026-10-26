@@ -6,4 +6,4 @@ From QuickChick Require Import QuickChick.
 Inductive all_below : nat -> Prop :=
 | AllBelow n : (forall m, m <= n) -> all_below n.
 
-Fail QCDerive Generator for (fun n => all_below n).
+Fail QuickChick Derive Generator for (fun n => all_below n).

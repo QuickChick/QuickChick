@@ -147,7 +147,7 @@ let dependent_target ~mode expression =
         _, _) -> List.map (fun n -> match n.CAst.v with
           | Names.Name id -> id
           | Names.Anonymous -> CErrors.user_err (Pp.str "Name each generated argument.")) names
-    | _ -> CErrors.user_err (Pp.str "Unsupported output binder; use QCDeriveLegacy for this form.")) binders in
+    | _ -> CErrors.user_err (Pp.str "Unsupported output binder; use QuickChick Derive Legacy for this form.")) binders in
   let all_binders = List.map binder free @ binders in
   let wrapped = if all_binders = [] then body else CAst.make (CLambdaN (all_binders, body)) in
   let sigma, term = Constrintern.interp_constr_evars env (Evd.from_env env) wrapped in
@@ -178,10 +178,10 @@ let dependent_target ~mode expression =
         match EConstr.kind sigma argument with
         | Constr.Rel n when not (List.mem n !seen_inputs) -> seen_inputs := n :: !seen_inputs
         | _ -> CErrors.user_err (Pp.str
-            "Use distinct variables for predicate inputs; fixed or repeated inputs require QCDeriveLegacy.")
+            "Use distinct variables for predicate inputs; fixed or repeated inputs require QuickChick Derive Legacy.")
     end) args;
   if output_positions <> List.sort compare output_positions then
-    CErrors.user_err (Pp.str "Output order must match predicate argument order; use QCDeriveLegacy for this form.");
+    CErrors.user_err (Pp.str "Output order must match predicate argument order; use QuickChick Derive Legacy for this form.");
   CAst.make (CRef (relation, None)), output_positions
 
 let derive_dependent ~mode expression =
@@ -198,4 +198,4 @@ let warn_legacy =
 #endif
   in
   CWarnings.create ~name:"quickchick-legacy-derive" ~category
-    (fun () -> Pp.str "The legacy derivation engine is deprecated. Prefer QCDerive.")
+    (fun () -> Pp.str "The legacy derivation engine is deprecated. Prefer QuickChick Derive.")

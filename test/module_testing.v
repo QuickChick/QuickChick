@@ -3,7 +3,7 @@ Extract Constant defNumTests => "3".
 Module Outer.
   Module quickchick.
     Inductive flag := On | Off.
-    QCDerive (Arbitrary, Show) for flag.
+    QuickChick Derive (Arbitrary, Show) for flag.
     Sample (arbitrary : G flag).
     QuickChick (fun x : flag => match x with On | Off => true end).
     Goal forall n : nat, n = n.

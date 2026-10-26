@@ -96,12 +96,12 @@ Inductive typing' (e : env) : term -> type -> Prop :=
       typing' e t2 tau1 ->
       typing' e (App t1 t2) tau2.
 
-QCDerive Arbitrary for type.
+QuickChick Derive Arbitrary for type.
 #[global]
 Instance dec_type (t1 t2 : type) : Dec (t1 = t2).
 Proof. dec_eq. Defined.
-QCDerive ArbitrarySizedSuchThat for (fun x => bind e x tau).
-QCDerive ArbitrarySizedSuchThat for (fun t => typing' e t tau).
+QuickChick Derive ArbitrarySizedSuchThat for (fun x => bind e x tau).
+QuickChick Derive ArbitrarySizedSuchThat for (fun t => typing' e t tau).
 
 Inductive option_le : option nat -> option nat -> Prop :=
     | opt_le_1 : option_le None None

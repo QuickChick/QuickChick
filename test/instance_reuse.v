@@ -48,7 +48,7 @@ Unset Typeclasses Depth.
 
 
 Inductive fresh_input := FirstInput | SecondInput.
-QCDerive Show for fresh_input.
+QuickChick Derive Show for fresh_input.
 Inductive accepts_input : fresh_input -> Prop := AcceptsInput : forall x, accepts_input x.
 #[local] Instance input_checker (x : fresh_input) : DecOpt (accepts_input x) :=
   {| decOpt := fun _ => Some true |}.

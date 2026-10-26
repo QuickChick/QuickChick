@@ -39,4 +39,4 @@ Inductive demo_root : nat -> nat -> nat -> Prop :=
 
 (* With the probe enabled, candidate 3 wins under demo_score. The current
    built-in ranker still selects candidate 0. *)
-QCDerive Generator for (fun x y z => demo_root x y z).
+QuickChick Derive Generator for (fun x y z => demo_root x y z).

@@ -16,7 +16,7 @@ From Ltac2 Require Import Ltac2.
 Inductive square_of : nat -> nat -> Prop :=
   sq : forall n m, m = n * n -> square_of n m.
 
-QCDerive EnumSizedSuchThat for (fun x => square_of x n).
+QuickChick Derive EnumSizedSuchThat for (fun x => square_of x n).
 
 Inductive tree1 :=
 | Leaf1 : tree1
@@ -27,14 +27,14 @@ Inductive perfect' : nat -> tree1 -> Prop :=
 | PerfectNode : forall x l r n, perfect' n l -> perfect' n r ->
                                 perfect' (S n) (Node1 x l r).
 
-QCDerive DecOpt for (perfect' n t).
+QuickChick Derive DecOpt for (perfect' n t).
 
-QCDerive EnumSizedSuchThat for (fun n => perfect' n t).
+QuickChick Derive EnumSizedSuchThat for (fun n => perfect' n t).
 
 Inductive perfect : tree1 -> Prop :=
 | Perfect : forall n t, perfect' n t -> perfect t.
 
-QCDerive DecOpt for (perfect t).
+QuickChick Derive DecOpt for (perfect t).
 
 Lemma semProdSizeOpt_bicupNone A s (S : set A) :
   (\bigcup_(x in [:: returnEnum (@None A)]) semProdSizeOpt x s \subset S).
@@ -54,7 +54,7 @@ Inductive In' {A} : A -> list A -> Prop :=
     forall x y l, In' x l -> In' x (cons y l).
 
 
-QCDerive DecOpt for (In' a l).
+QuickChick Derive DecOpt for (In' a l).
  
 Instance DecOptIn'_listSizeMonotonic A {_ : Enum A} {_ : Dec_Eq A}
          (x : A) (l : list A) : DecOptSizeMonotonic (In' x l).
@@ -68,8 +68,8 @@ Instance DecOptIn'_list_complete A {_ : Enum A} {_ : Dec_Eq A} (x : A) (l : list
   DecOptCompletePos (In' x l).
 Proof. derive_complete (). Qed.
 
-QCDerive ArbitrarySizedSuchThat for (fun x => In' x l).
-QCDerive EnumSizedSuchThat for (fun x => In' x l).
+QuickChick Derive ArbitrarySizedSuchThat for (fun x => In' x l).
+QuickChick Derive EnumSizedSuchThat for (fun x => In' x l).
 
 Instance EnumSizedSuchThatIn'_SizedMonotonic A {_ : Enum A} {_ : Dec_Eq A} l :
   SizedMonotonicOpt (@enumSizeST A _ (EnumSizedSuchThatIn' l)).
@@ -86,7 +86,7 @@ Instance EnumSizedSuchThatIn'_Correct A {_ : Enum A}  {_ : Dec_Eq A}
   CorrectSizedST (fun x => In' x l) (@enumSizeST _ _ (EnumSizedSuchThatIn' l)).
 Proof. derive_enumST_Correct (). Admitted. (* TODO *)
  
-QCDerive EnumSizedSuchThat for (fun l => In' x l).
+QuickChick Derive EnumSizedSuchThat for (fun l => In' x l).
 
 
 Inductive bst : nat -> nat -> tree1 -> Prop :=
@@ -96,15 +96,15 @@ Inductive bst : nat -> nat -> tree1 -> Prop :=
     bst min n t1 -> bst n max t2 ->
     bst min max (Node1 n t1 t2).
 
-QCDerive DecOpt for (le min max).
-QCDerive EnumSizedSuchThat for (fun m => le n m).
+QuickChick Derive DecOpt for (le min max).
+QuickChick Derive EnumSizedSuchThat for (fun m => le n m).
 
-QCDerive EnumSizedSuchThat for (fun t => bst min max t).
+QuickChick Derive EnumSizedSuchThat for (fun t => bst min max t).
 
-QCDerive ArbitrarySizedSuchThat for (fun m => le n m).
-QCDerive ArbitrarySizedSuchThat for (fun t => bst min max t).
+QuickChick Derive ArbitrarySizedSuchThat for (fun m => le n m).
+QuickChick Derive ArbitrarySizedSuchThat for (fun t => bst min max t).
 
-QCDerive DecOpt for (bst min max t).
+QuickChick Derive DecOpt for (bst min max t).
   
 Instance EnumSizedSuchThatle_SizedAMonotonic n :
   SizedMonotonicOptFP (@enumSizeST _ _ (@EnumSizedSuchThatle n)).
@@ -165,10 +165,10 @@ Inductive ltest : list nat -> nat -> Prop :=
         ltest (x :: l) m.
 
 
-QCDerive EnumSizedSuchThat for (fun n => eq x n).
-QCDerive EnumSizedSuchThat for (fun n => eq n x).
+QuickChick Derive EnumSizedSuchThat for (fun n => eq x n).
+QuickChick Derive EnumSizedSuchThat for (fun n => eq n x).
 
-QCDerive DecOpt for (ltest l n).
+QuickChick Derive DecOpt for (ltest l n).
 
 Instance DecOptltest_listSizeMonotonic l x : DecOptSizeMonotonic (ltest l x).
 Proof. derive_mon (). Qed.
@@ -195,7 +195,7 @@ Inductive goodTree : nat -> tree nat  -> Prop :=
       goodTree n t1 ->
       goodTree (S n) (Node nat k t1 t2).
 
-QCDerive DecOpt for (goodTree n t).
+QuickChick Derive DecOpt for (goodTree n t).
 
 (* XXX this fails if tree has type param A ... *) 
 
@@ -208,7 +208,7 @@ Proof. derive_sound (). Qed.
 Instance DecOptgoodTree_list_complete n t : DecOptCompletePos (goodTree n t).
 Proof. derive_complete (). Qed.
 
-QCDerive EnumSizedSuchThat for (fun t => goodTree k t).
+QuickChick Derive EnumSizedSuchThat for (fun t => goodTree k t).
 
 
 

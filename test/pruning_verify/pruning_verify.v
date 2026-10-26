@@ -16,6 +16,6 @@ Inductive distinct_members : list nat -> nat -> nat -> Prop :=
     defined ets ns -> mem n1 ns -> mem n2 ns -> n1 <> n2 ->
     distinct_members ets n1 n2.
 
-QCDerive Generator for (fun p => let '(n1, n2) := p in distinct_members ets n1 n2).
-QCDerive Enumerator for (fun n2 => distinct_members ets n1 n2).
-QCDerive Checker for (distinct_members ets n1 n2).
+QuickChick Derive Generator for (fun p => let '(n1, n2) := p in distinct_members ets n1 n2).
+QuickChick Derive Enumerator for (fun n2 => distinct_members ets n1 n2).
+QuickChick Derive Checker for (distinct_members ets n1 n2).

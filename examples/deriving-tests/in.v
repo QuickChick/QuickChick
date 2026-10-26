@@ -11,9 +11,9 @@ Inductive merge {X:Type} : list X -> list X -> list X -> Prop :=
       merge l1 l2 l3 ->
       merge l1 (x::l2) (x::l3).
 
-QCDerive DecOpt for (merge l1 l2 l3).
-QCDerive ArbitrarySizedSuchThat for (fun l3 => merge l1 l2 l3).
-QCDerive EnumSizedSuchThat for (fun l3 => merge l1 l2 l3).
+QuickChick Derive DecOpt for (merge l1 l2 l3).
+QuickChick Derive ArbitrarySizedSuchThat for (fun l3 => merge l1 l2 l3).
+QuickChick Derive EnumSizedSuchThat for (fun l3 => merge l1 l2 l3).
 
 Inductive In' {A:Type} : A -> list A -> Prop :=
 | In_hd :
@@ -21,5 +21,5 @@ Inductive In' {A:Type} : A -> list A -> Prop :=
 | In_tl :
     forall x y l, In' x l -> In' x (cons y l).
 
-QCDerive EnumSizedSuchThat for (fun x => In' x l).
-QCDerive DecOpt for (In' x l).
+QuickChick Derive EnumSizedSuchThat for (fun x => In' x l).
+QuickChick Derive DecOpt for (In' x l).

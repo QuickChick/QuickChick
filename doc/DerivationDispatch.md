@@ -1,18 +1,18 @@
 # Derivation commands
 
-`QCDerive` uses the scheduled engine for generators, enumerators, and checkers.
+`QuickChick Derive` uses the scheduled engine for generators, enumerators, and checkers.
 Derived instances are registered for typeclass search. Type parameters and class
 dictionaries are implicit; ordinary value inputs remain explicit.
 
 | Command | Implementation |
 | --- | --- |
-| `QCDerive GenSized` / `EnumSized` | Scheduled, including mutual datatype blocks |
-| `QCDerive Arbitrary` | Scheduled generation and existing shrinking |
-| `QCDerive DecOpt` / `Checker` | Scheduled checking |
-| `QCDerive GenSizedSuchThat` / `ArbitrarySizedSuchThat` / `Generator` | Scheduled constrained generation |
-| `QCDerive EnumSizedSuchThat` / `Enumerator` | Scheduled constrained enumeration |
-| `QCDerive Show`, `Shrink`, `Sized` | Existing implementations |
-| `QCDeriveLegacy` / `DeriveLegacy` | Deprecated access to the old engines |
+| `QuickChick Derive GenSized` / `EnumSized` | Scheduled, including mutual datatype blocks |
+| `QuickChick Derive Arbitrary` | Scheduled generation and existing shrinking |
+| `QuickChick Derive DecOpt` / `Checker` | Scheduled checking |
+| `QuickChick Derive GenSizedSuchThat` / `ArbitrarySizedSuchThat` / `Generator` | Scheduled constrained generation |
+| `QuickChick Derive EnumSizedSuchThat` / `Enumerator` | Scheduled constrained enumeration |
+| `QuickChick Derive Show`, `Shrink`, `Sized` | Existing implementations |
+| `QuickChick Derive Legacy` / `DeriveLegacy` | Deprecated access to the old engines |
 
 The experimental `Testing` entry point and the `Fuzzy`/`Mutate` implementations
 are unchanged. Fuzzing repairs are outside this release-preparation work.
@@ -22,13 +22,13 @@ are unchanged. Fuzzing repairs are outside this release-preparation work.
 ```coq
 From QuickChick Require Import QuickChick.
 Inductive box (A : Type) := Box : A -> box A.
-QCDerive (GenSized, EnumSized) for box.
+QuickChick Derive (GenSized, EnumSized) for box.
 
 Inductive related {A B : Type} : A -> B -> Prop :=
 | Related : forall x y, related x y.
-QCDerive Checker for (@related A B x y).
-QCDerive Generator for (fun (y : B) => @related A B x y).
-QCDerive Enumerator for (fun y => related x y).
+QuickChick Derive Checker for (@related A B x y).
+QuickChick Derive Generator for (fun (y : B) => @related A B x y).
+QuickChick Derive Enumerator for (fun y => related x y).
 ```
 
 The generator instance for `box A` takes an implicit `Gen A` dictionary, as the
@@ -58,17 +58,17 @@ A generated output must occur once as a whole predicate argument. Pair outputs
 can use `fun p => let '(x,y) := p in P x y` or `fun '(x,y) => P x y`.
 Term inputs must be distinct variables, and output order must match predicate
 argument order. Fixed or repeated term inputs and reordered outputs are rejected
-rather than silently generalized; use `QCDeriveLegacy` for those forms. Larger
+rather than silently generalized; use `QuickChick Derive Legacy` for those forms. Larger
 or nested output tuples have not been certified.
 
-`QCDeriveLegacy` and `DeriveLegacy` accept the old command forms, including
+`QuickChick Derive Legacy` and `DeriveLegacy` accept the old command forms, including
 `using`, and issue the `quickchick-legacy-derive` warning. There is no automatic
 fallback to the old engine. Correctness tactics that recognize the old generated
 terms still need legacy derivation; `tutorials/DerivingProofs.v` demonstrates this
 workflow. Proof automation for scheduled terms remains future work.
 
 Bare `Derive` requires `From QuickChick Require Import LegacyDerive.` It aliases
-the new public dispatcher, not the legacy engine. Prefer `QCDerive`: bare
+the new public dispatcher, not the legacy engine. Prefer `QuickChick Derive`: bare
 `Derive` can conflict with Stdlib syntax.
 
 A mutual datatype with a member lacking a base constructor currently fails

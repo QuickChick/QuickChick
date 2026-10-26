@@ -28,7 +28,7 @@ Inductive sorted : list nat -> Prop :=
 | SOne x : sorted [x]
 | SCons x y l : x <= y -> sorted (y :: l) -> sorted (x :: y :: l).
 
-QCDerive Checker for (sorted l).
+QuickChick Derive Checker for (sorted l).
 
 Theorem short_sorted : forall l, sorted l -> length l < 3.
 Proof.
@@ -40,7 +40,7 @@ Proof.
 Abort.
 
 (* Shrinks of (n, m) are kept only when le' n m holds. *)
-QCDerive Checker for (le' n m).
+QuickChick Derive Checker for (le' n m).
 
 Example kept_shrinks :
   List.filter (fun '(n, m) => match theoremHypCheck (P := le' n m) 100 with

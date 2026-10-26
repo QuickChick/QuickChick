@@ -10,7 +10,7 @@ Inductive foo {A : Type} :=
 | baz : foo
 .
 
-QCDerive (Arbitrary, Show) for foo.
+QuickChick Derive (Arbitrary, Show) for foo.
 Sample (arbitrary : G foo).
 
 Section Sanity.

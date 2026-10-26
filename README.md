@@ -78,12 +78,12 @@ commands.
 
 - `QuickCheck c`
 - `Sample g`
-- `QCDerive Arbitrary for c`
-- `QCDerive Show for c`
-- `QCDerive ArbitrarySizedSuchThat for (fun x => p)`
-- `QCDerive DecOpt for p`
-- `QCDerive EnumSizedSuchThat for (fun x => p)`
-- `QCDerive ArbitrarySizedSuchThat for (fun x => let (x1,x2...) := x in p)`
+- `QuickChick Derive Arbitrary for c`
+- `QuickChick Derive Show for c`
+- `QuickChick Derive ArbitrarySizedSuchThat for (fun x => p)`
+- `QuickChick Derive DecOpt for p`
+- `QuickChick Derive EnumSizedSuchThat for (fun x => p)`
+- `QuickChick Derive ArbitrarySizedSuchThat for (fun x => let (x1,x2...) := x in p)`
 - `QuickCheckWith args c`
 - `MutateCheck c p`
 - `MutateCheckWith args c p`
@@ -92,8 +92,10 @@ commands.
 
 ### Older `Derive` commands
 
-Use `QCDerive` with the usual `From QuickChick Require Import QuickChick.`
-import. It avoids a parser conflict with Stdlib's `Derive` command.
+Use `QuickChick Derive`, or its short form `QC Derive`, with the usual
+`From QuickChick Require Import QuickChick.` import. The prefix avoids a parser
+conflict with Stdlib's `Derive` command. The import reserves `QC` as a keyword.
+`QCDerive`, the 2.x spelling, has been removed.
 
 To keep bare `Derive` commands in an older file, replace that import with:
 
@@ -102,9 +104,9 @@ From QuickChick Require Import LegacyDerive.
 ```
 
 This compatibility import enables the old spelling, including class lists and
-`using` clauses. It uses the same derivation engine as `QCDerive`. It can still
-conflict with other plugins' `Derive` commands, so prefer `QCDerive` when combining
-plugins. `Derive Inductive Schedule` and `Derive Valid Schedules` remain available
+`using` clauses. It uses the same derivation engine as `QuickChick Derive`. It
+can still conflict with other plugins' `Derive` commands, so prefer
+`QuickChick Derive` when combining plugins. `Derive Inductive Schedule` and `Derive Valid Schedules` remain available
 with the normal import.
 
 ### More resources

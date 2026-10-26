@@ -579,7 +579,7 @@ Declare Instance Dec_eq_list (A : Type)
 (** QuickChick allows the automatic derivation of typeclass instances
     for simple types:
 [[
-       QCDerive <class> for T.
+       QuickChick Derive <class> for T.
 ]]
     Here [<class>] must be one of [GenSized], [EnumSized], [Sized], [Shrink], [Arbitrary],
     or [Show], and [T] must be an inductive defined datatype (think
@@ -587,19 +587,19 @@ Declare Instance Dec_eq_list (A : Type)
 
     To derive multiple classes at once, write:
 [[
-       QCDerive (<class>,...,<class>) for T.
+       QuickChick Derive (<class>,...,<class>) for T.
 ]]
 
    Older files using bare [Derive] must import
    [From QuickChick Require Import LegacyDerive.]
    This enables a compatibility spelling for the same engine, including [using]
    clauses. It can conflict with Stdlib and other plugins' [Derive] commands.
-   Prefer [QCDerive] with the normal [QuickChick] import.
+   Prefer [QuickChick Derive] with the normal [QuickChick] import.
    The schedule-specific [Derive] commands do not require the compatibility import.
 
-   [QCDerive] uses the scheduled engine for generation, enumeration, and
+   [QuickChick Derive] uses the scheduled engine for generation, enumeration, and
    checking, including [DecOpt] and its [Checker] alias. The old engines remain
-   available through [QCDeriveLegacy] and [DeriveLegacy], which issue a
+   available through [QuickChick Derive Legacy] and [DeriveLegacy], which issue a
    deprecation warning. Correctness tactics written for the old generated terms
    require these legacy commands; see the DerivingProofs tutorial.
 
@@ -613,7 +613,7 @@ Declare Instance Dec_eq_list (A : Type)
 (** QuickChick also allows for the automatic derivation of generators
     satisfying preconditions in the form of inductive relations:
 [[
-     QCDerive ArbitrarySizedSuchThat for (fun x => P x1 ... x .... xn).
+     QuickChick Derive ArbitrarySizedSuchThat for (fun x => P x1 ... x .... xn).
 ]]
     <P> must be an inductively defined relation.
     <x> is the value to be generated.
@@ -687,7 +687,7 @@ Declare Instance Dec_eq_list (A : Type)
    produces shrinks with its type's [Shrink] instance; a shrunk value that
    breaks a later hypothesis is discarded. The outputs of a producing
    hypothesis shrink only when a checker for that hypothesis already exists,
-   for example from [QCDerive Checker], and each shrunk value must pass it.
+   for example from [QuickChick Derive Checker], and each shrunk value must pass it.
    Without a [Shrink] instance or such a checker, the value is reported
    unshrunk.
 *)

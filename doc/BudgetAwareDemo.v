@@ -10,4 +10,4 @@ Inductive budget_root : nat -> Prop :=
 
 (* The finite producer can supply x before the loose producer checks it, or
    loose can supply x before finite checks it. The latter costs selectivity 1. *)
-QCDerive Generator for (fun x => budget_root x).
+QuickChick Derive Generator for (fun x => budget_root x).

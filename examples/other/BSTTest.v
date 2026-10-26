@@ -7,7 +7,7 @@ Inductive Tree :=
 | Leaf : Tree
 | Node : nat -> Tree -> Tree -> Tree.
 
-QCDerive (Arbitrary, Show) for Tree.
+QuickChick Derive (Arbitrary, Show) for Tree.
 
 Inductive bst : nat -> nat -> Tree -> Prop :=
 | bst_leaf : forall lo hi, bst lo hi Leaf
@@ -16,14 +16,14 @@ Inductive bst : nat -> nat -> Tree -> Prop :=
     bst lo x l -> bst x hi r ->
     bst lo hi (Node x l r).
 
-QCDerive DecOpt for (le x y).
+QuickChick Derive DecOpt for (le x y).
 
-QCDerive ArbitrarySizedSuchThat for (fun x => le y x).
-QCDerive ArbitrarySizedSuchThat for (fun t => bst lo hi t).
+QuickChick Derive ArbitrarySizedSuchThat for (fun x => le y x).
+QuickChick Derive ArbitrarySizedSuchThat for (fun t => bst lo hi t).
 Derive Valid Schedules bst 2 consnum 1 derive "Gen".
 Derive Inductive Schedule bst 2 derive "Gen" opt "true".
 
-QCDerive DecOpt for (bst lo hi t).
+QuickChick Derive DecOpt for (bst lo hi t).
 
 Fixpoint is_bst (lo hi : nat) (t : Tree) :=
   match t with

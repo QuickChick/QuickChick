@@ -16,7 +16,7 @@ Inductive target : Z -> Prop :=
 
 (* The two-output bounded mode needs an unavailable generator for Z.lt.
    Search must continue to limit first, then use bounded_with_limit. *)
-QCDerive ArbitrarySizedSuchThat for (fun y => target y).
+QuickChick Derive ArbitrarySizedSuchThat for (fun y => target y).
 Definition target_generator : GenSizedSuchThat Z (fun y => target y) :=
   ltac:(typeclasses eauto).
 

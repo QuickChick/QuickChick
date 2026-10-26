@@ -6,7 +6,7 @@ Inductive scoped_checks : nat -> Prop :=
 | CheckNats : forall (key x y : nat), x = y -> scoped_checks key
 | CheckBools : forall (key : nat) (x y : bool), x = y -> scoped_checks key.
 
-QCDerive DecOpt for (scoped_checks subject).
+QuickChick Derive DecOpt for (scoped_checks subject).
 
 Definition scoped_dictionary (subject : nat) : DecOpt (scoped_checks subject) :=
   DecOptscoped_checks subject.

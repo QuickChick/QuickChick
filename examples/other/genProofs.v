@@ -22,7 +22,7 @@ Inductive tree A : Type :=
 | Node : A -> tree A -> tree A -> tree A.
 
 
-QCDerive GenSized for tree.
+QuickChick Derive GenSized for tree.
 
 
 Instance GenTree_SizedMonotonic A {_ : Gen A} :
@@ -52,12 +52,12 @@ Inductive bst : nat -> nat -> tree1 -> Prop :=
     bst min max (Node1 n t1 t2).
 
 
-QCDerive EnumSizedSuchThat for (fun m => le n m).
-QCDerive ArbitrarySizedSuchThat for (fun m => le n m).
+QuickChick Derive EnumSizedSuchThat for (fun m => le n m).
+QuickChick Derive ArbitrarySizedSuchThat for (fun m => le n m).
 
-QCDerive DecOpt for (bst min max t).
-QCDerive EnumSizedSuchThat for (fun t => bst min max t).
-QCDerive ArbitrarySizedSuchThat for (fun t => bst min max t).
+QuickChick Derive DecOpt for (bst min max t).
+QuickChick Derive EnumSizedSuchThat for (fun t => bst min max t).
+QuickChick Derive ArbitrarySizedSuchThat for (fun t => bst min max t).
 
 Instance GenSizedSuchThatbst_SizedMonotonic min max :
   SizedMonotonicOpt (@arbitrarySizeST _ _ (@GenSizedSuchThatbst min max)).

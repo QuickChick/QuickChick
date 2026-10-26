@@ -10,7 +10,7 @@ Inductive R : nat -> nat -> bool -> Prop :=
 | RC : forall a x t,
     R a x t -> R (mg a x) x t -> R a (S x) t.
 
-QCDerive Generator for (fun x => R a x t).
+QuickChick Derive Generator for (fun x => R a x t).
 
 Goal True.
   lazymatch (eval unfold GenSizedSuchThatR in GenSizedSuchThatR) with

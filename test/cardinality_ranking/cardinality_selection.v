@@ -22,7 +22,7 @@ Inductive pick : envt -> nat -> nat -> Prop :=
 | Pick : forall V ets ns a b,
     V = Env ets -> wf ns a -> wf ns b -> defd ets ns -> a <> b -> pick V a b.
 
-QCDerive Generator for (fun a b => pick V a b).
+QuickChick Derive Generator for (fun a b => pick V a b).
 
 Goal True.
   lazymatch (eval unfold GenSizedSuchThatpick in GenSizedSuchThatpick) with

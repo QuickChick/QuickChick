@@ -13,12 +13,12 @@ Inductive canonical_tree :=
 | CanonicalLeaf
 | CanonicalNode : canonical_tree -> canonical_tree -> canonical_tree.
 
-QCDerive (Arbitrary, Show, Sized) for canonical_tree.
+QuickChick Derive (Arbitrary, Show, Sized) for canonical_tree.
 
 Definition canonical_generator : GenSized canonical_tree := ltac:(typeclasses eauto).
 
 Inductive accepts : bool -> Prop := AcceptsTrue : accepts true.
-QCDerive DecOpt for (accepts b).
+QuickChick Derive DecOpt for (accepts b).
 Definition old_checker : DecOpt (accepts false) := ltac:(typeclasses eauto).
 Example old_checker_accepts : decOpt (P := accepts true) 3 = Some true.
 Proof. reflexivity. Qed.
@@ -38,7 +38,7 @@ Proof. reflexivity. Qed.
 (* Master derives instances for both members of a mutual block. *)
 Inductive left_tree := LeftLeaf | LeftNode : right_tree -> left_tree
 with right_tree := RightLeaf | RightNode : left_tree -> right_tree.
-QCDerive (Arbitrary, EnumSized, Show, Sized) for left_tree.
+QuickChick Derive (Arbitrary, EnumSized, Show, Sized) for left_tree.
 Definition right_generator : GenSized right_tree := ltac:(typeclasses eauto).
 Definition right_shrinker : Shrink right_tree := ltac:(typeclasses eauto).
 Definition right_enumerator : EnumSized right_tree := ltac:(typeclasses eauto).

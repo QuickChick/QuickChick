@@ -45,7 +45,7 @@ let dispatch_with ~legacy cn ind name1 name2 =
   let convert_reference_to_string c =
     match c with
     | {CAst.v = CRef (r, _) ; _} -> string_of_qualid r
-    | _ -> failwith "Usage: QCDerive <class_name> for <inductive_name>  OR  QCDerive (<class_name>, ... , <class_name>) for <inductive_name>" in
+    | _ -> failwith "Usage: QuickChick Derive <class_name> for <inductive_name>  OR  QuickChick Derive (<class_name>, ... , <class_name>) for <inductive_name>" in
 
   (* Class names may be a single reference or a tuple of references. *)
   let ss = match cn.CAst.v with
@@ -107,22 +107,35 @@ VERNAC COMMAND EXTEND MergeTest CLASSIFIED AS SIDEFF
     { merge_test ind1 }
 END
 
-(* To disambiguate from Derive in other plugins like Equations *)
-VERNAC COMMAND EXTEND QCDerive CLASSIFIED AS SIDEFF
-   | ["QCDerive" constr(class_name) "for" constr(inductive)] ->
+(* QuickChick Derive and QC Derive: prefixed so they do not clash with the
+   Derive commands of Stdlib or Equations. *)
+VERNAC COMMAND EXTEND QuickChickDerive CLASSIFIED AS SIDEFF
+   | ["QuickChick" "Derive" constr(class_name) "for" constr(inductive)] ->
      { dispatch class_name inductive "" "" }
-   | ["QCDerive" constr(class_name) "for" constr(inductive) "using" ident(genInst)] ->
+   | ["QuickChick" "Derive" constr(class_name) "for" constr(inductive) "using" ident(genInst)] ->
      { dispatch class_name inductive (Id.to_string genInst) ""}
-   | ["QCDerive" constr(class_name) "for" constr(inductive) "using" ident(genInst) "and" ident(monInst) ] ->
+   | ["QuickChick" "Derive" constr(class_name) "for" constr(inductive) "using" ident(genInst) "and" ident(monInst) ] ->
+     { dispatch class_name inductive (Id.to_string genInst) (Id.to_string monInst)}
+   | ["QC" "Derive" constr(class_name) "for" constr(inductive)] ->
+     { dispatch class_name inductive "" "" }
+   | ["QC" "Derive" constr(class_name) "for" constr(inductive) "using" ident(genInst)] ->
+     { dispatch class_name inductive (Id.to_string genInst) ""}
+   | ["QC" "Derive" constr(class_name) "for" constr(inductive) "using" ident(genInst) "and" ident(monInst) ] ->
      { dispatch class_name inductive (Id.to_string genInst) (Id.to_string monInst)}
 END
 
-VERNAC COMMAND EXTEND QCDeriveLegacy CLASSIFIED AS SIDEFF
-   | ["QCDeriveLegacy" constr(class_name) "for" constr(inductive)] ->
+VERNAC COMMAND EXTEND QuickChickDeriveLegacy CLASSIFIED AS SIDEFF
+   | ["QuickChick" "Derive" "Legacy" constr(class_name) "for" constr(inductive)] ->
      { dispatch_legacy class_name inductive "" "" }
-   | ["QCDeriveLegacy" constr(class_name) "for" constr(inductive) "using" ident(genInst)] ->
+   | ["QuickChick" "Derive" "Legacy" constr(class_name) "for" constr(inductive) "using" ident(genInst)] ->
      { dispatch_legacy class_name inductive (Id.to_string genInst) "" }
-   | ["QCDeriveLegacy" constr(class_name) "for" constr(inductive) "using" ident(genInst) "and" ident(monInst)] ->
+   | ["QuickChick" "Derive" "Legacy" constr(class_name) "for" constr(inductive) "using" ident(genInst) "and" ident(monInst)] ->
+     { dispatch_legacy class_name inductive (Id.to_string genInst) (Id.to_string monInst) }
+   | ["QC" "Derive" "Legacy" constr(class_name) "for" constr(inductive)] ->
+     { dispatch_legacy class_name inductive "" "" }
+   | ["QC" "Derive" "Legacy" constr(class_name) "for" constr(inductive) "using" ident(genInst)] ->
+     { dispatch_legacy class_name inductive (Id.to_string genInst) "" }
+   | ["QC" "Derive" "Legacy" constr(class_name) "for" constr(inductive) "using" ident(genInst) "and" ident(monInst)] ->
      { dispatch_legacy class_name inductive (Id.to_string genInst) (Id.to_string monInst) }
 END
 

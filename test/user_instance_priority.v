@@ -6,7 +6,7 @@ From QuickChick Require Import QuickChick.
 
 Inductive name := Named : nat -> list nat -> name.
 
-QCDerive (GenSized, EnumSized) for name.
+QuickChick Derive (GenSized, EnumSized) for name.
 
 Definition canonical_gen : G name := returnGen (Named 0 nil).
 Definition canonical_enum : E name := returnEnum (Named 0 nil).
@@ -24,7 +24,7 @@ Proof. reflexivity. Qed.
 
 Inductive small : nat -> Prop := Small : small 0.
 
-QCDerive DecOpt for (small n).
+QuickChick Derive DecOpt for (small n).
 
 #[global] Instance always_small n : DecOpt (small n) | 1 :=
   {| decOpt := fun _ => Some true |}.
@@ -35,7 +35,7 @@ Proof. reflexivity. Qed.
 (* The legacy engine already used this priority. *)
 Inductive old_name := OldNamed : nat -> old_name.
 
-QCDeriveLegacy GenSized for old_name.
+QuickChick Derive Legacy GenSized for old_name.
 
 #[global] Instance canonical_old : GenSized old_name | 1 :=
   {| arbitrarySized := fun _ => returnGen (OldNamed 0) |}.

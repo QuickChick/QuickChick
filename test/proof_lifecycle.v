@@ -67,7 +67,7 @@ Fail Check theorem.
 (* A retained test may contain freshly derived polymorphic helpers. *)
 Inductive payload (A : Type) := Payload : A -> payload A.
 Arguments Payload {A} _.
-QCDerive Show for payload.
+QuickChick Derive Show for payload.
 Goal forall x : payload bool, True.
   quickchick 2.
   exact (let saved := theorem 2 in fun _ => I).

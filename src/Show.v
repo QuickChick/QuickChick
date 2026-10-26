@@ -12,7 +12,7 @@ Local Open Scope string_scope.
 
 Export Coq.Strings.String.StringSyntax.
 
-(* This makes just the [%string] key available to [QCDerive Show]. *)
+(* This makes just the [%string] key available to [QuickChick Derive Show]. *)
 Delimit Scope string_scope with string.
 
 Record Time : Set := mkTime {time: nat}.

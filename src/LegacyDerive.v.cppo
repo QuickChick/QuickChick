@@ -1,6 +1,6 @@
-(** Compatibility spelling for pre-QCDerive source files.
+(** Compatibility spelling for source files written before QuickChick Derive.
     This enables a grammar that can conflict with Stdlib and other plugins.
-    Prefer QCDerive in new code. *)
+    Prefer QuickChick Derive in new code. *)
 From QuickChick Require Export QuickChick.
 
 #if COQ_VERSION >= (8, 16, 0)

@@ -11,7 +11,7 @@ Inductive pinned : nat -> nat -> Prop :=
 | PinOne : forall y, pinned 1 y.
 Inductive root : nat -> nat -> Prop :=
 | Root : forall x y, loose x -> pinned x y -> root x y.
-QCDerive Generator for (fun x y => root x y).
+QuickChick Derive Generator for (fun x y => root x y).
 
 (* Under the default density ranking, loose is a producer, not a check. *)
 Goal True.
