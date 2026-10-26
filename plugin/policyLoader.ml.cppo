@@ -70,6 +70,7 @@ let extract reference file =
       "qc_policy_score", app "QuickChick.SchedulingPolicy.score_one_schedule" [scorer];
       "qc_policy_compare", app "QuickChick.SchedulingPolicy.compare_scores" [scorer];
       "qc_policy_bound", app "QuickChick.SchedulingPolicy.lower_bound" [policy];
+      "qc_policy_grouping", app "QuickChick.SchedulingPolicy.policy_grouping" [policy];
     ] in
     let names = List.map (fun (name, body) ->
       let id = NewGenericLib.fresh_name name in
@@ -132,8 +133,10 @@ let load reference =
        let registration = Printf.sprintf
          "\nlet () = Quickchick_plugin.PolicyRegistry.register %S\n\
          \  { Quickchick_plugin.PolicyRegistry.score = Obj.magic %s;\n\
-         \    compare = Obj.magic %s; bound = Obj.magic %s }\n"
-         key (entry "qc_policy_score") (entry "qc_policy_compare") (entry "qc_policy_bound") in
+         \    compare = Obj.magic %s; bound = Obj.magic %s;\n\
+         \    grouping = Obj.magic %s }\n"
+         key (entry "qc_policy_score") (entry "qc_policy_compare") (entry "qc_policy_bound")
+         (entry "qc_policy_grouping") in
        (* ExtrOcamlNatInt inlines Nat.compare with unqualified Eq, Lt and Gt;
           re-export them from the plugin's comparison type. *)
        let prelude = "type qc_comparison = Quickchick_plugin.PolicyViews.comparison = Eq | Lt | Gt\n" in

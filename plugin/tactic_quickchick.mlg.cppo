@@ -1196,6 +1196,18 @@ let compiled_ranking () =
      | None -> CErrors.user_err (str "The selected Rocq scorer is not loaded."))
   | _ -> None
 
+(* A compiled policy's declared grouping, as the grouped search uses it. *)
+let compiled_group_policy (g : PolicyRegistry.score PolicyViews.grouping) =
+  { GroupedScore.unit = g.PolicyViews.group_unit;
+    combine = g.PolicyViews.group_combine;
+    fields = List.map (fun (kind, compare) ->
+      (match kind with
+       | PolicyViews.Additive -> GroupedScore.Additive
+       | PolicyViews.Extremal -> GroupedScore.Extremal),
+      (fun a b -> match compare a b with
+       | PolicyViews.Lt -> -1 | PolicyViews.Eq -> 0 | PolicyViews.Gt -> 1))
+      g.PolicyViews.group_fields }
+
 (* [QuickChick Scorer cardinality] ranks constructor schedules by
    CardinalityScore: filters counted by acceptance class. *)
 let cardinality_ranking () =
@@ -2926,8 +2938,18 @@ and constructor_valid_schedules (ind_name : ty_ctr) (ctr : rocq_ctr) (result_var
      before it searches. *)
   let select_groups = if group_mode = `Off ||
       (score_pruning_mode <> `Off && score_pruning_mode <> `Prune) then None
-    (* A compiled Rocq policy declares no group structure yet: search jointly. *)
-    else if compiled_ranking () <> None then None
+    (* A compiled Rocq policy is searched by groups only if it declares how
+       its score combines over them; otherwise jointly. *)
+    else if compiled_ranking () <> None then begin
+      let policy = Option.get (compiled_ranking ()) in
+      match policy.PolicyRegistry.grouping with
+      | None -> None
+      | Some grouping -> Some (fun groups ->
+        GroupedScore.select_combinations (compiled_group_policy grouping)
+          (score_group_candidates (schedule_density []) (fun _ scored ->
+            Some (compiled_schedule_score policy ind_name result_vars output_vars ds scored))
+            groups))
+    end
     else if cardinality_ranking () then Some (fun groups ->
       let context = cardinality_context (cardinality_recursive_count result_vars output_vars) in
       GroupedScore.select_combinations CardinalityScore.group_policy

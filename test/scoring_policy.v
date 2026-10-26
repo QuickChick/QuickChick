@@ -115,7 +115,8 @@ Proof. vm_compute. reflexivity. Qed.
 Definition demo_policy : policy := {|
   score_type := cost;
   policy_scorer := demo_scorer;
-  lower_bound := fun _ _ => zero_cost
+  lower_bound := fun _ _ => zero_cost;
+  policy_grouping := None
 |}.
 
 Definition any_cost_completion (_ : score_context cost)
@@ -147,7 +148,8 @@ Proof. vm_compute. reflexivity. Qed.
 Definition check_bound_policy : policy := {|
   score_type := cost;
   policy_scorer := demo_scorer;
-  lower_bound := fun _ _ => {| failures := 1; work := 1 |}
+  lower_bound := fun _ _ => {| failures := 1; work := 1 |};
+  policy_grouping := None
 |}.
 
 Example strict_comparison_prunes_better_incumbent :
@@ -168,7 +170,8 @@ Definition view_bound_policy : policy := {|
       dependencies ctx, node_dependencies node with
     | _ :: _, _ :: _, _ :: _, _ :: _ => zero_cost
     | _, _, _, _ => {| failures := 1; work := 0 |}
-    end
+    end;
+  policy_grouping := None
 |}.
 
 Example a_rocq_bound_can_inspect_search_state :

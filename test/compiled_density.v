@@ -86,9 +86,18 @@ Definition density_scorer : scorer (nat * nat) := {|
     match Nat.compare d d' with Eq => Nat.compare u u' | c => c end
 |}.
 
+(* The grade is a maximum of flipped ranks and the uses a sum, so the score
+   combines over independent hypothesis groups. *)
+Definition density_grouping : grouping (nat * nat) := {|
+  group_unit := (0, 0);
+  group_combine := fun '(d, u) '(d', u') => (Nat.max d d', u + u');
+  group_fields := [(Extremal, fun '(d, _) '(d', _) => Nat.compare d d');
+                   (Additive, fun '(_, u) '(_, u') => Nat.compare u u')]
+|}.
+
 Definition density_policy : policy :=
   {| score_type := nat * nat; policy_scorer := density_scorer;
-     lower_bound := fun _ _ => (0, 0) |}.
+     lower_bound := fun _ _ => (0, 0); policy_grouping := Some density_grouping |}.
 
 (* The built-in and the compiled policy choose the same schedule. Each
    relation is derived under both; the generated instances must be equal. *)

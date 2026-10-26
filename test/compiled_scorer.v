@@ -12,8 +12,8 @@ Definition count_checks (direction : bool) : scorer nat := {|
   score_leaf := fun _ _ xs => fold_left Nat.add (map snd xs) 0;
   score_inductive := fun _ _ xs => fold_left Nat.add (map snd xs) 0;
   compare_scores := Nat.compare |}.
-Definition fewest_checks : policy := {| score_type := nat; policy_scorer := count_checks true; lower_bound := fun _ _ => 0 |}.
-Definition most_checks : policy := {| score_type := nat; policy_scorer := count_checks false; lower_bound := fun _ _ => 0 |}.
+Definition fewest_checks : policy := {| score_type := nat; policy_scorer := count_checks true; lower_bound := fun _ _ => 0; policy_grouping := None |}.
+Definition most_checks : policy := {| score_type := nat; policy_scorer := count_checks false; lower_bound := fun _ _ => 0; policy_grouping := None |}.
 
 Inductive loose : nat -> Prop := Loose : forall x, loose x.
 Inductive pinned : nat -> nat -> Prop :=

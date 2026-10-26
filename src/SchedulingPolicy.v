@@ -155,10 +155,33 @@ Arguments score_leaf {S} _ _ _ _.
 Arguments score_inductive {S} _ _ _ _.
 Arguments compare_scores {S} _ _ _.
 
+(* How a policy's score combines over footprint-disjoint hypothesis groups,
+   which lets the plugin search each group separately and keep a Pareto set
+   per group. The score of a schedule built from independent groups must be
+   the [group_combine] of their scores, in any order, with [group_unit] as
+   the score of no steps. [compare_scores] must be lexicographic over
+   [group_fields], most significant first. An [Additive] field keeps its
+   strict order and ties when both sides are combined with the same score
+   (a sum); an [Extremal] field keeps only its non-strict order (a maximum
+   or minimum). The plugin trusts these laws; QC_SCHEDULE_GROUPS=verify
+   compares grouped with joint search. *)
+Inductive field_kind := Additive | Extremal.
+
+Record grouping (S : Type) := {
+  group_unit : S;
+  group_combine : S -> S -> S;
+  group_fields : list (field_kind * (S -> S -> comparison))
+}.
+Arguments group_unit {S} _.
+Arguments group_combine {S} _ _ _.
+Arguments group_fields {S} _.
+
 Record policy := {
   score_type : Type;
   policy_scorer : scorer score_type;
-  lower_bound : score_context score_type -> search_node_view score_type -> score_type
+  lower_bound : score_context score_type -> search_node_view score_type -> score_type;
+  (* None: the plugin searches each constructor jointly. *)
+  policy_grouping : option (grouping score_type)
 }.
 
 (* A search adapter must establish this against its actual descendant relation.

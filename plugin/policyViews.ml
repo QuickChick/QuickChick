@@ -112,6 +112,13 @@ type 's search_node_view = { node_current : schedule_view;
                              node_dependencies : (spec_view * 's
                                                  dependency_state) list }
 
+type field_kind =
+| Additive
+| Extremal
+
+type 's grouping = { group_unit : 's; group_combine : ('s -> 's -> 's);
+                     group_fields : (field_kind * ('s -> 's -> comparison)) list }
+
 (* (Rocq type, OCaml type, constructors, match function) *)
 let extraction_table = [
   "QuickChick.SchedulingPolicy.pattern_view", "Quickchick_plugin.PolicyViews.pattern_view", ["Quickchick_plugin.PolicyViews.PWild"; "Quickchick_plugin.PolicyViews.PParameter"; "Quickchick_plugin.PolicyViews.PLocal"; "Quickchick_plugin.PolicyViews.PConstructor"], None;
@@ -135,5 +142,7 @@ let extraction_table = [
   "QuickChick.SchedulingPolicy.binding_origin", "Quickchick_plugin.PolicyViews.binding_origin", ["Quickchick_plugin.PolicyViews.OriginalInput"; "Quickchick_plugin.PolicyViews.ForcedBy"; "Quickchick_plugin.PolicyViews.ProducedBy"; "Quickchick_plugin.PolicyViews.PatternBound"], None;
   "QuickChick.SchedulingPolicy.bound_local_view", "Quickchick_plugin.PolicyViews.bound_local_view", ["(fun (a0, a1) -> { Quickchick_plugin.PolicyViews.bound_id = a0; Quickchick_plugin.PolicyViews.bound_origin = a1 })"], (Some "(fun f r -> f r.Quickchick_plugin.PolicyViews.bound_id r.Quickchick_plugin.PolicyViews.bound_origin)");
   "QuickChick.SchedulingPolicy.search_node_view", "Quickchick_plugin.PolicyViews.search_node_view", ["(fun (a0, a1, a2, a3, a4) -> { Quickchick_plugin.PolicyViews.node_current = a0; Quickchick_plugin.PolicyViews.node_remaining = a1; Quickchick_plugin.PolicyViews.node_choices = a2; Quickchick_plugin.PolicyViews.node_bound_locals = a3; Quickchick_plugin.PolicyViews.node_dependencies = a4 })"], (Some "(fun f r -> f r.Quickchick_plugin.PolicyViews.node_current r.Quickchick_plugin.PolicyViews.node_remaining r.Quickchick_plugin.PolicyViews.node_choices r.Quickchick_plugin.PolicyViews.node_bound_locals r.Quickchick_plugin.PolicyViews.node_dependencies)");
+  "QuickChick.SchedulingPolicy.field_kind", "Quickchick_plugin.PolicyViews.field_kind", ["Quickchick_plugin.PolicyViews.Additive"; "Quickchick_plugin.PolicyViews.Extremal"], None;
+  "QuickChick.SchedulingPolicy.grouping", "Quickchick_plugin.PolicyViews.grouping", ["(fun (a0, a1, a2) -> { Quickchick_plugin.PolicyViews.group_unit = a0; Quickchick_plugin.PolicyViews.group_combine = a1; Quickchick_plugin.PolicyViews.group_fields = a2 })"], (Some "(fun f r -> f r.Quickchick_plugin.PolicyViews.group_unit r.Quickchick_plugin.PolicyViews.group_combine r.Quickchick_plugin.PolicyViews.group_fields)");
   "Coq.Init.Datatypes.comparison", "Quickchick_plugin.PolicyViews.comparison", ["Quickchick_plugin.PolicyViews.Eq"; "Quickchick_plugin.PolicyViews.Lt"; "Quickchick_plugin.PolicyViews.Gt"], None;
 ]

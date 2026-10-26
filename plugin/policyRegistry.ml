@@ -9,6 +9,7 @@ type compiled = {
   score : score PolicyViews.score_context -> PolicyViews.schedule_view -> score;
   compare : score -> score -> PolicyViews.comparison;
   bound : score PolicyViews.score_context -> score PolicyViews.search_node_view -> score;
+  grouping : score PolicyViews.grouping option;
 }
 
 let table : (string, compiled) Hashtbl.t = Hashtbl.create 4

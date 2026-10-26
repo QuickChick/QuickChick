@@ -55,10 +55,18 @@ the policy sees their source category. `test/compiled_density.v` writes the
 built-in `density_then_vars` ranking as a policy; on Cedar it makes the
 built-in's selection for all 862 constructor modes.
 
-A compiled policy currently searches each constructor jointly, without score
-pruning, under the 1,000-candidate cap. Declaring group fields for the
-grouped Pareto search, and pruning with the policy's `lower_bound`, are
-planned.
+A policy may declare, in `policy_grouping`, how its score combines over
+footprint-disjoint hypothesis groups: a unit, a combine function, and its
+comparison as a lexicographic list of fields, each `Additive` (a sum) or
+`Extremal` (a maximum or minimum). The plugin then searches each group
+separately and keeps a Pareto set per group, as it does for the built-in
+scorers. The plugin trusts these laws. `QC_SCHEDULE_GROUPS=verify` checks
+the grouped result against joint search; set `QC_SCHEDULE_MAX_CANDIDATES=0`
+with it, since the capped joint search can miss the grouped winner. With
+`policy_grouping := None` each constructor is searched jointly.
+
+A compiled policy currently runs without score pruning, under the
+1,000-candidate cap. Pruning with the policy's `lower_bound` is planned.
 
 ### Cardinality ranking (experimental)
 
