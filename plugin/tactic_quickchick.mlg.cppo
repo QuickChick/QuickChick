@@ -2108,19 +2108,105 @@ let clear_schedule_instance_cache () =
   Hashtbl.reset schedule_instance_cache;
   schedule_instance_cache_context := None
 
+(* Candidate schedules name their variables afresh, so the same instance
+   obligation recurs as alpha-variants. Key the cache on the obligation with
+   each variable not bound in the proof environment replaced by the index of
+   its first occurrence, across the inputs (in binding order), the relation
+   and the outputs. A variable named like a referenced constant's short name
+   could capture it when elaborated, so such a name is kept. Forms the key
+   does not cover keep their exact key. *)
+exception Opaque_obligation
+
+let canonical_obligation_key bound relation outputs ds constrained inputs =
+  let b = Buffer.create 256 in
+  let add = Buffer.add_string b in
+  let names = ref [] and next = ref 0 in
+  let referenced = ref Names.Id.Set.empty in
+  let var v =
+    if bound v || Names.Id.Set.mem v !referenced then
+      (add "E:"; add (Names.Id.to_string v); add " ")
+    else begin
+      let i = match List.find_opt (fun (w, _) -> Names.Id.equal v w) !names with
+        | Some (_, i) -> i
+        | None -> let i = !next in incr next; names := (v, i) :: !names; i in
+      add "#"; add (string_of_int i); add " "
+    end in
+  let qualid q = add (Libnames.string_of_qualid q); add " " in
+  let rec pat = function
+    | NewGenericLib.PCtr (c, ps) -> add "(C "; qualid c; List.iter pat ps; add ")"
+    | NewGenericLib.PVar v -> var v
+    | NewGenericLib.PParam -> add "P "
+    | NewGenericLib.PWild -> add "_ " in
+  let rec constr = function
+    | DArrow (a, c) -> add "(-> "; constr a; constr c; add ")"
+    | DLambda (p, a, c) -> add "(L "; var p; constr a; constr c; add ")"
+    | DProd ((v, a), c) -> add "(Pi "; var v; constr a; constr c; add ")"
+    | DTyParam p -> add "(Tp "; var p; add ")"
+    | DTyCtr (c, args) -> add "(T "; qualid c; List.iter constr args; add ")"
+    | DCtr (c, args) -> add "(K "; qualid c; List.iter constr args; add ")"
+    | DTyVar v -> add "(V "; var v; add ")"
+    | DApp (h, args) -> add "(A "; constr h; List.iter constr args; add ")"
+    | DMatch (scrutinee, branches) ->
+      add "(M "; constr scrutinee;
+      List.iter (fun (p, c) -> pat p; constr c) branches; add ")"
+    | DNot p -> add "(N "; constr p; add ")"
+    | DHole -> add "? " in
+  (* Input types come from product_free_rocq_type_to_mexp. *)
+  let rec ty = function
+    | MArrow (a, c) -> add "(-> "; ty a; ty c; add ")"
+    | MProd (binders, c) ->
+      add "(Pi "; List.iter (fun (v, a) -> var v; ty a) binders; ty c; add ")"
+    | MId v -> add "(V "; var v; add ")"
+    | MTyCtr (c, args) -> add "(T "; qualid c; List.iter ty args; add ")"
+    | MCtr (c, args) -> add "(K "; qualid c; List.iter ty args; add ")"
+    | MApp (h, args) -> add "(A "; ty h; List.iter ty args; add ")"
+    | MHole -> add "? "
+    | _ -> raise Opaque_obligation in
+  let rec refs_constr = function
+    | DArrow (a, c) | DLambda (_, a, c) | DProd ((_, a), c) -> refs_constr a; refs_constr c
+    | DTyCtr (q, args) | DCtr (q, args) -> refer q; List.iter refs_constr args
+    | DApp (h, args) -> List.iter refs_constr (h :: args)
+    | DMatch (scrutinee, branches) ->
+      refs_constr scrutinee; List.iter (fun (p, c) -> refs_pat p; refs_constr c) branches
+    | DNot p -> refs_constr p
+    | DTyParam _ | DTyVar _ | DHole -> ()
+  and refs_pat = function
+    | NewGenericLib.PCtr (q, ps) -> refer q; List.iter refs_pat ps
+    | NewGenericLib.(PVar _ | PParam | PWild) -> ()
+  and refs_ty = function
+    | MArrow (a, c) -> refs_ty a; refs_ty c
+    | MProd (binders, c) -> List.iter (fun (_, a) -> refs_ty a) binders; refs_ty c
+    | MTyCtr (q, args) | MCtr (q, args) -> refer q; List.iter refs_ty args
+    | MApp (h, args) -> List.iter refs_ty (h :: args)
+    | _ -> ()
+  and refer q = referenced := Names.Id.Set.add (Libnames.qualid_basename q) !referenced in
+  try
+    refs_constr relation; List.iter (fun (_, t) -> refs_ty t) inputs;
+    List.iter (fun (v, t) -> add "[in "; var v; ty t; add "]") inputs;
+    add "|"; constr relation; add "|";
+    List.iter var outputs;
+    Some (Buffer.contents b, ds, constrained)
+  with Opaque_obligation -> None
+
+let schedule_instance_canonical_cache = Hashtbl.create 256
+let schedule_instance_bound = ref (fun (_ : Names.Id.t) -> false)
+
 let rec has_schedule_instance ?(cached = true) relation outputs ds constrained =
-  if not cached then begin
+  let decide () =
     let env, sigma, goal, names = elaborate_obligation relation outputs ds constrained in
-    let answer = match instance_requirements
+    match instance_requirements
         ~allow_root:(match relation with DTyParam _ -> true | _ -> false)
         env sigma goal names with Some _ -> true | None -> false in
-    (if Sys.getenv_opt "QC_CHECK_INSTANCE_CACHE" <> None then
-       let key = (relation, outputs, ds, constrained, !schedule_inputs) in
-       match Hashtbl.find_opt schedule_instance_cache key with
-       | Some previous when previous <> answer ->
-         Feedback.msg_warning (str ("[instance-cache] stale answer for " ^
-           rocq_constr_to_string relation ^ ": cached " ^ string_of_bool previous ^
-           ", fresh " ^ string_of_bool answer))
+  let check = Sys.getenv_opt "QC_CHECK_INSTANCE_CACHE" <> None in
+  let report cached fresh =
+    Feedback.msg_warning (str ("[instance-cache] stale answer for " ^
+      rocq_constr_to_string relation ^ ": cached " ^ string_of_bool cached ^
+      ", fresh " ^ string_of_bool fresh)) in
+  let exact_key = (relation, outputs, ds, constrained, !schedule_inputs) in
+  if not cached then begin
+    let answer = decide () in
+    (if check then match Hashtbl.find_opt schedule_instance_cache exact_key with
+       | Some previous when previous <> answer -> report previous answer
        | _ -> ());
     answer
   end else
@@ -2130,17 +2216,30 @@ let rec has_schedule_instance ?(cached = true) relation outputs ds constrained =
        env == (let e, _, _ = context in e) &&
        locals == (let _, l, _ = context in l) &&
        universes == (let _, _, u = context in u) -> ()
-   | _ -> Hashtbl.reset schedule_instance_cache;
+   | _ ->
+     Hashtbl.reset schedule_instance_cache;
+     Hashtbl.reset schedule_instance_canonical_cache;
+     let env = schedule_env () in
+     let ids = List.fold_left (fun ids d ->
+       Names.Id.Set.add (Context.Named.Declaration.get_id d) ids)
+       Names.Id.Set.empty (Environ.named_context env) in
+     schedule_instance_bound := (fun v -> Names.Id.Set.mem v ids);
      schedule_instance_cache_context := Some context);
-  let key = (relation, outputs, ds, constrained, !schedule_inputs) in
-  match Hashtbl.find_opt schedule_instance_cache key with
+  match Hashtbl.find_opt schedule_instance_cache exact_key with
   | Some answer -> answer
   | None ->
-    let env, sigma, goal, names = elaborate_obligation relation outputs ds constrained in
-    let answer = match instance_requirements
-        ~allow_root:(match relation with DTyParam _ -> true | _ -> false)
-        env sigma goal names with Some _ -> true | None -> false in
-    Hashtbl.add schedule_instance_cache key answer;
+    let canonical = canonical_obligation_key !schedule_instance_bound
+      relation outputs ds constrained !schedule_inputs in
+    let answer = match Option.bind canonical (Hashtbl.find_opt schedule_instance_canonical_cache) with
+      | Some answer ->
+        (if check then let fresh = decide () in
+           if fresh <> answer then report answer fresh);
+        answer
+      | None ->
+        let answer = decide () in
+        Option.iter (fun key -> Hashtbl.replace schedule_instance_canonical_cache key answer) canonical;
+        answer in
+    Hashtbl.add schedule_instance_cache exact_key answer;
     answer
 
 (* A policy score may call a dependency SuppliedInstance only when the
