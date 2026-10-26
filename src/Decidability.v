@@ -8,7 +8,7 @@ From Coq Require Import
      ZArith
      ssreflect
      ssrbool.
-From QuickChick Require Import Checker Generators Producer.
+From QuickChick Require Import Checker Generators Producer Show Classes.
 
 Set Bullet Behavior "Strict Subproofs".
 
@@ -19,6 +19,28 @@ Set Bullet Behavior "Strict Subproofs".
 
 Class DecOpt (P : Prop) := { decOpt : nat -> option bool }.
 
+
+(* A theorem test shrinks the outputs of a producing hypothesis only when
+   an existing checker confirms the hypothesis for each shrunk value. Without
+   one the outputs are not shrunk. *)
+Class TheoremHypCheck (P : Prop) := { theoremHypCheck : nat -> option bool }.
+
+#[global] Instance TheoremHypCheckOfDecOpt {P} `{DecOpt P} : TheoremHypCheck P | 10 :=
+  {| theoremHypCheck := decOpt |}.
+
+#[global] Instance TheoremHypCheckNone {P} : TheoremHypCheck P | 100 :=
+  {| theoremHypCheck := fun _ => None |}.
+
+(* Bind a hypothesis's outputs, shrinking them on failure to values that
+   [snd gc] confirms still satisfy the hypothesis. *)
+Definition theoremForAllST {A} `{Show A} `{TheoremShrink A}
+           (gc : G (option A) * (A -> option bool)) (pf : A -> Checker) : Checker :=
+  forAllShrinkMaybe (fst gc)
+    (fun x => List.filter (fun x' => match snd gc x' with
+                                     | Some true => true
+                                     | _ => false
+                                     end) (theoremShrink x))
+    pf.
 
 Axiom checkable_size_limit : nat.
 Extract Constant checkable_size_limit => "10000".

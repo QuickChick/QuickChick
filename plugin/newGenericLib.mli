@@ -200,6 +200,7 @@ type monad_sort =
   | MG 
   | MGOpt
   | MGShrink
+  | MGOptShrink
   | ME
   | MEOpt
   | MC

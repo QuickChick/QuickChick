@@ -692,6 +692,8 @@ type monad_sort =
   | MG 
   | MGOpt
   | MGShrink (* a theorem test's unconstrained variable, shrunk on failure *)
+  | MGOptShrink (* a theorem test's hypothesis outputs, paired with the
+                   hypothesis check that filters their shrinks *)
   | ME
   | MEOpt
   | MC
@@ -1055,6 +1057,7 @@ let monad_sort_to_string (ms : monad_sort) : string =
   | MG -> "Gen"
   | MGOpt -> "GenOpt"
   | MGShrink -> "GenShrink"
+  | MGOptShrink -> "GenOptShrink"
   | ME -> "Enum"
   | MEOpt -> "EnumOpt"
   | MC -> "Check"
@@ -1079,6 +1082,8 @@ let c_bind (ms : monad_sort) (ds : derive_sort) (m1 : constr_expr) (vs : var lis
   | D_Thm, MG -> c_forAllChecker m1 k
   | D_Thm, MGOpt -> c_forAllMaybeChecker m1 k
   | D_Thm, MGShrink -> c_forAllShrinkChecker m1 k
+  | D_Thm, MGOptShrink ->
+    c_app (cInject "QuickChick.Decidability.theoremForAllST") [c_hole; c_hole; c_hole; m1; k]
   | _, _ -> failwith ("Invalid bind for derive_sort" ^ derive_sort_to_string ds ^ " and monad_sort " ^ monad_sort_to_string ms)
 
 let c_backtrack (ds : derive_sort) (is_constrained : bool) (first : constr_expr) (ms : constr_expr list) : constr_expr =
@@ -1306,6 +1311,15 @@ let schedule_to_mexp ((steps, s_sort) : schedule) (mfuel : mexp) (def_fuel : mex
     | TheoremSchedule _, S_UC (v, SrcNonrec ty, PS_G) ->
         let producer = m_theoremArbitrarySized (product_free_rocq_type_to_mexp ty) def_fuel in
         MBind (MGShrink, producer, [v], acc)
+    | TheoremSchedule _, S_ST (vars_tys, SrcNonrec ty, PS_G) ->
+        let vars = List.map fst vars_tys in
+        let hyp = product_free_rocq_type_to_mexp ty in
+        let producer = such_that_producer PS_G vars hyp def_fuel in
+        let check =
+          MFun ([pat_tuple_of_list (List.map (fun v -> PVar v) vars), None],
+                MApp (MConst "QuickChick.Decidability.theoremHypCheck", [hyp; MHole; m_fuel])) in
+        let paired = MApp (MConst "Coq.Init.Datatypes.pair", [MHole; MHole; producer; check]) in
+        MBind (MGOptShrink, paired, vars, acc)
     | _ -> schedule_step_to_mexp schd mfuel def_fuel child_sz acc) steps finally
 
 (* let type_of_schedule (ischd_name, inps, nonrec_schds, rec_schds : inductive_schedule) (ds : derive_sort) (is_constrained : bool) : mexp = *)
