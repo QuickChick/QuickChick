@@ -2764,8 +2764,24 @@ let outputs_not_constrained_by_function_application (hyp : rocq_constr) (output_
       check_under_func false arg) args
   | _ -> true
 
-(* Helper: Handle constrained outputs for a hypothesis *)
-let handle_constrained_outputs_advanced (hyp : rocq_constr) (output_vars : var list) : schedule_step list * rocq_constr * var list =
+(* Helper: Handle constrained outputs for a hypothesis. The search reaches
+   the same hypothesis with the same outputs in many candidates, which are
+   alternatives and never share a scope, so they share the generated match
+   variables. Making a fresh name interns a new identifier, which dominated
+   this function. Derivation entry points clear the table. *)
+let constrained_output_cache = Hashtbl.create 64
+let clear_constrained_output_cache () = Hashtbl.reset constrained_output_cache
+
+let rec handle_constrained_outputs_advanced (hyp : rocq_constr) (output_vars : var list) : schedule_step list * rocq_constr * var list =
+  let key = (hyp, output_vars) in
+  match Hashtbl.find_opt constrained_output_cache key with
+  | Some result -> result
+  | None ->
+    let result = handle_constrained_outputs_uncached hyp output_vars in
+    Hashtbl.add constrained_output_cache key result;
+    result
+
+and handle_constrained_outputs_uncached (hyp : rocq_constr) (output_vars : var list) : schedule_step list * rocq_constr * var list =
   match hyp with
   | DTyCtr (ind, args) ->
     let (matches, args', new_outputs) = split3 (List.map (fun arg -> 

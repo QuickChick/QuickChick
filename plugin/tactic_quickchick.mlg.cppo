@@ -3773,6 +3773,7 @@ let dec_eq_sched_phony = ("DecOpt_eq_III", [], [], [(([],CheckerSchedule),[],[])
 let init_density_inductive_memo = InductiveScheduleKeyMap.add (ty_ctr_of_string "Coq.Init.Logic.eq", [], D_Check, true) (DensityDone ((dec_eq_sched_phony, Checking), true, None)) InductiveScheduleKeyMap.empty
 
 let reset_density_inductive_memo () =
+  NewGenericLib.clear_constrained_output_cache ();
   Hashtbl.reset cardinality_counts;
   Hashtbl.reset cardinality_shapes;
   Hashtbl.reset cardinality_conditional_memo;

@@ -1033,7 +1033,10 @@ let () =
   test_small_footprints nat rec_call;
   Printf.printf "converted prefix pairs=%d alpha-renamed=%d\n"
     !converted_prefix_pairs !alpha_only_prefix_pairs;
-  assert (!alpha_only_prefix_pairs > 0)
+  (* Candidates share the match variables generated for one hypothesis and
+     outputs, so descendant prefixes now agree exactly; renamed ones are
+     still accepted above. *)
+  assert (!converted_prefix_pairs > 0)
 
 (* Self-recursive steps keep only inputs; the full request interleaves the
    step's outputs back at the derivation's output positions. *)

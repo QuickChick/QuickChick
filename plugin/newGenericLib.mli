@@ -300,6 +300,8 @@ end
 
 val fresh_name : string -> var 
 val make_up_name : unit -> var
+(* Clears the shared match variables of handle_constrained_outputs_advanced. *)
+val clear_constrained_output_cache : unit -> unit
 val make_up_name_str : string -> var
 val var_of_id : Names.Id.t -> var 
 val str_lst_to_string : string -> string list -> string
