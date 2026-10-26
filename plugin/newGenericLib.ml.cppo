@@ -1314,6 +1314,16 @@ let fuel_init_size = MId (var_of_string "size")
 
 let m_one = MApp (MConst "Coq.Init.Datatypes.S", [MConst "Coq.Init.Datatypes.O"])
 
+(* A nat literal written as a numeral in nat scope, as the legacy engine
+   writes weights, rather than a chain of successors. *)
+let m_nat_numeral n =
+  let number = Constrexpr.CPrim (Constrexpr.Number (NumTok.Signed.of_int_string (string_of_int n))) in
+#if COQ_VERSION >= (8, 19, 0)
+  MEscape (CAst.make @@ Constrexpr.CDelimiters (Constrexpr.DelimUnboundedScope, "nat", CAst.make number))
+#else
+  MEscape (CAst.make @@ Constrexpr.CDelimiters ("nat", CAst.make number))
+#endif
+
 let rec m_nat_of_int n =
   if n <= 0 then MConst "Coq.Init.Datatypes.O"
   else MApp (MConst "Coq.Init.Datatypes.S", [m_nat_of_int (n - 1)])
@@ -1456,7 +1466,7 @@ let backtrack_decoration ?(weight = WDefault) (ds : derive_sort) (rec_or_base : 
   match ds with
   | D_Gen ->
     let weight = (match weight, rec_or_base with
-                 | WNum n, _ -> m_nat_of_int n
+                 | WNum n, _ -> m_nat_numeral n
                  | WSize, _ -> MApp (MConst "Coq.Init.Datatypes.S", [MId (var_of_string "size")])
                  | WDefault, Rec -> MId (var_of_string "size")
                  | WDefault, Base -> MConst "Coq.Init.Nat.one") in
