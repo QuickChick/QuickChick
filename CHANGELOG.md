@@ -18,9 +18,19 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
 - The scheduled engine still rejects some fixed/repeated inputs, reordered
   outputs, and constructor applications. See the
   [migration guide](doc/3.0Migration.md) for the explicit legacy path.
+- Schedule derivation shares completed dependency derivations between
+  candidate schedules and caches instance checks up to variable renaming,
+  which makes large relations derive several times faster.
+- `quickchick` on a goal over an abstract type, and derivation of a
+  constructor whose premise is an implication or quantified statement,
+  report what is unsupported instead of failing with an anomaly.
+- Tested with Coq 8.20 and Rocq 9.1. Rocq 9.2 and later need a release of
+  `coq-simple-io` that supports them. During large derivations `coqc` has
+  occasionally aborted with "stack smashing detected" on OCaml 5.2 and, more
+  rarely, 5.4; rerunning succeeds. It did not occur in testing on OCaml 4.13.
 
-This section describes the candidate branch; its version support and final
-release scope have not been validated yet.
+This section describes the candidate branch; its final release scope has not
+been settled.
 
 ## [2.2.0] - 2026-05-26
 
