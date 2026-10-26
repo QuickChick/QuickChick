@@ -29,7 +29,9 @@ end
 
 module UnknownOrd = struct
   type t = Unknown.t
-  let compare x y = compare (Unknown.to_string x) (Unknown.to_string y)
+  (* Identifiers are strings; this is their usual order, without the
+     polymorphic comparison. *)
+  let compare = Names.Id.compare
 end
 
 type unknown = Unknown.t
@@ -1802,51 +1804,60 @@ let rec correct_var (umap : umap) (v : unknown) : unknown =
   | Some (Unknown u) -> correct_var umap u
   | _ -> v
 
-let rec correct_rocq_constr (umap : umap) (c : rocq_constr) : rocq_constr =
+(* The correction functions take the variable resolver, so that one search
+   can resolve each variable once instead of walking the map per occurrence. *)
+let rec correct_rocq_constr_with cv (c : rocq_constr) : rocq_constr =
   match c with
-  | DTyVar v -> DTyVar (correct_var umap v)
+  | DTyVar v -> DTyVar (cv v)
   | DTyParam p -> DTyParam p
   | DHole -> DHole
   | DCtr (c, args) ->
-    DCtr (c, List.map (correct_rocq_constr umap) args)
+    DCtr (c, List.map (correct_rocq_constr_with cv) args)
   | DTyCtr (c, args) ->
-    DTyCtr (c, List.map (correct_rocq_constr umap) args)
-  | DNot c -> DNot (correct_rocq_constr umap c)
+    DTyCtr (c, List.map (correct_rocq_constr_with cv) args)
+  | DNot c -> DNot (correct_rocq_constr_with cv c)
   | DApp (c, args) ->
-    DApp (correct_rocq_constr umap c, List.map (correct_rocq_constr umap) args)
+    DApp (correct_rocq_constr_with cv c, List.map (correct_rocq_constr_with cv) args)
   | DProd (v, c) ->
-    DProd (v, correct_rocq_constr umap c)
+    DProd (v, correct_rocq_constr_with cv c)
   | DArrow (c1, c2) ->
-    DArrow (correct_rocq_constr umap c1, correct_rocq_constr umap c2)
+    DArrow (correct_rocq_constr_with cv c1, correct_rocq_constr_with cv c2)
 
-let rec correct_pat (umap : umap) (p : pat) : pat =
+let rec correct_pat_with cv (p : pat) : pat =
   match p with
-  | PVar v -> PVar (correct_var umap v)
+  | PVar v -> PVar (cv v)
   | PCtr (c, args) ->
-    PCtr (c, List.map (correct_pat umap) args)
+    PCtr (c, List.map (correct_pat_with cv) args)
   | PParam -> PParam
   | PWild -> PWild
 
-let correct_src (umap : umap) (src : source) : source =
+let correct_src_with cv (src : source) : source =
   match src with
-  | SrcNonrec ty -> SrcNonrec (correct_rocq_constr umap ty)
-  | SrcRec (r, tys) -> SrcRec (r,List.map (correct_rocq_constr umap) tys)
-  | SrcMutrec (r, tys) -> SrcMutrec (r,List.map (correct_rocq_constr umap) tys)
-  | SrcDef (r, tys) -> SrcDef (r,List.map (correct_rocq_constr umap) tys)
+  | SrcNonrec ty -> SrcNonrec (correct_rocq_constr_with cv ty)
+  | SrcRec (r, tys) -> SrcRec (r,List.map (correct_rocq_constr_with cv) tys)
+  | SrcMutrec (r, tys) -> SrcMutrec (r,List.map (correct_rocq_constr_with cv) tys)
+  | SrcDef (r, tys) -> SrcDef (r,List.map (correct_rocq_constr_with cv) tys)
 
-let rec correct_variables (umap : umap) (scd : schedule_step list) : schedule_step list =
-  match scd with
-  | [] -> []
-  | S_Match (u, p) :: scd' ->
-    S_Match (correct_var umap u, correct_pat umap p) :: correct_variables umap scd'
-  | S_UC (u, src, dst) :: scd' ->
-    S_UC (correct_var umap u, correct_src umap src, dst) :: correct_variables umap scd'
-  | S_ST (uts, src, dst) :: scd' ->
-    S_ST (List.map (fun (v,t) -> correct_var umap v, t) uts, correct_src umap src, dst) :: correct_variables umap scd'
-  | S_Check (src,pol) :: scd' ->
-    S_Check (correct_src umap src, pol) :: correct_variables umap scd'
-  | S_Let (v, c) :: scd' ->
-    S_Let (correct_var umap v, correct_rocq_constr umap c) :: correct_variables umap scd'
+let correct_variables_with cv (scd : schedule_step list) : schedule_step list =
+  List.map (function
+    | S_Match (u, p) -> S_Match (cv u, correct_pat_with cv p)
+    | S_UC (u, src, dst) -> S_UC (cv u, correct_src_with cv src, dst)
+    | S_ST (uts, src, dst) ->
+      S_ST (List.map (fun (v,t) -> cv v, t) uts, correct_src_with cv src, dst)
+    | S_Check (src,pol) -> S_Check (correct_src_with cv src, pol)
+    | S_Let (v, c) -> S_Let (cv v, correct_rocq_constr_with cv c)) scd
+
+let correct_rocq_constr (umap : umap) = correct_rocq_constr_with (correct_var umap)
+let correct_pat (umap : umap) = correct_pat_with (correct_var umap)
+let correct_src (umap : umap) = correct_src_with (correct_var umap)
+let correct_variables (umap : umap) = correct_variables_with (correct_var umap)
+
+(* Resolution through a fixed map, memoized for one search. *)
+let cached_correct_var (umap : umap) =
+  let resolved = Hashtbl.create 64 in
+  fun v -> match Hashtbl.find_opt resolved v with
+    | Some r -> r
+    | None -> let r = correct_var umap v in Hashtbl.add resolved v r; r
 
 
 let type_to_schedules ?on_prepared ?select_groups ?on_prefix ?on_prefix_with_floor
@@ -1944,25 +1955,26 @@ let type_to_schedules ?on_prepared ?select_groups ?on_prefix ?on_prefix_with_flo
       let eq_checks = EqSet.elements eqs in
       let rec_name = match ind_name with Some n -> n | _ -> ty_ctr_of_string "nonsense" in
       Error.msg_debug (str ("Fixed vars: " ^ String.concat ", " (List.map var_to_string fixed_vars)) ++ fnl ());
+       let resolve = cached_correct_var umap in
        let corrected steps =
-         (correct_variables umap steps, sort), matches, eq_checks in
+         (correct_variables_with resolve steps, sort), matches, eq_checks in
        let on_prefix = Option.map (fun observe path terminal steps ->
          observe path terminal (corrected steps)) on_prefix in
        let should_prune_prefix = Option.map (fun prune path steps ->
          prune path (corrected steps)) should_prune_prefix in
        let corrected_floor floor = { floor with NewGenericLib.bound_argument_occurrences =
-         List.map (correct_var umap) floor.NewGenericLib.bound_argument_occurrences } in
+         List.map resolve floor.NewGenericLib.bound_argument_occurrences } in
        let on_prefix_with_floor = Option.map (fun observe path terminal floor steps ->
          observe path terminal (corrected_floor floor) (corrected steps)) on_prefix_with_floor in
        let should_prune_prefix_with_floor = Option.map (fun prune path floor steps ->
          prune path (corrected_floor floor) (corrected steps)) should_prune_prefix_with_floor in
        let select_groups = Option.map (fun select groups ->
          select (List.map (List.map (fun steps ->
-           correct_variables umap steps, sort)) groups)) select_groups in
+           correct_variables_with resolve steps, sort)) groups)) select_groups in
        let schedules = match on_prefix, on_prefix_with_floor,
          should_prune_prefix, should_prune_prefix_with_floor with
          | None, None, None, None ->
-           possible_schedules ~canon:(correct_var umap) ?select_groups
+           possible_schedules ~canon:resolve ?select_groups
              vars hyps fixed_vars (rec_name, output_indices) ds
          | _ ->
            (* Score pruning is exact, so it searches without a candidate cap;
@@ -1971,7 +1983,7 @@ let type_to_schedules ?on_prepared ?select_groups ?on_prefix ?on_prefix_with_flo
              | Some _ -> max_int
              | None -> NewGenericLib.unpruned_candidate_cap () in
            possible_schedules_with_advanced_pruning ~max_schedules
-             ~maximal_outputs:true ~canon:(correct_var umap) ?select_groups
+             ~maximal_outputs:true ~canon:resolve ?select_groups
              ~reduce_orderings:(ScheduleRanking.preserves_independent_swaps
                (ScheduleRanking.current ()))
              ?on_prefix ?on_prefix_with_floor
