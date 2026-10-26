@@ -1,42 +1,48 @@
-From Coq Require Import List String Arith.
-From QuickChick Require Import QuickChick SchedulingPolicy.
+From Coq Require Import List Arith Lia.
+From QuickChick Require Import QuickChick SchedulingPolicy SchedulingPolicyLaws.
 Import ListNotations.
-Open Scope string_scope.
 
-(* Experimental diagnostic: Rocq scores real schedule candidates, but the
-   public derivation still selects with its existing ranking policy. *)
-Record demo_cost := { source_priority : nat; schedule_work : nat }.
+(* A schedule scorer written in Rocq. It counts a schedule's positive
+   checks: fewer is better. Built with fold_policy, it comes with a proved
+   pruning bound and a grouping, so QC Scorer compiles it and the plugin
+   searches with pruning and by independent hypothesis groups. *)
 
-Definition ends_in (name suffix : string) : bool :=
-  String.eqb (String.substring (String.length name - String.length suffix)
-               (String.length suffix) name) suffix.
+Definition checks_score : step_scorer nat nat_sum.
+Proof.
+  refine {| step_score := fun _ _ step _ => if is_check step then 1 else 0 |}.
+  intros. nat_order.
+Defined.
 
-Definition demo_score (schedule : schedule_view) : demo_cost :=
-  let first_source := match schedule_steps schedule with
-    | (SuchThat _ source _, _) :: _ => Some (source_application source)
-    | (Unconstrained _ source _, _) :: _ => Some (source_application source)
-    | (CheckStep source _, _) :: _ => Some (source_application source)
-    | _ => None end in
-  let priority := match first_source with
-    | Some (TApply (TGlobal name) _) =>
-        if ends_in name "demo_c" then 0
-        else if ends_in name "demo_b" then 1 else 2
-    | _ => 3 end in
-  {| source_priority := priority;
-     schedule_work := List.length (schedule_steps schedule) |}.
+(* A remaining hypothesis whose arguments are all bound must become a
+   positive check, so each one counts in the bound. *)
+Definition forced_checks_cost : check_floor nat nat_sum checks_score.
+Proof.
+  refine {| floor_score := fun _ => 1 |}.
+  intros. unfold checks_score; cbn [step_score]. simpl. nat_order.
+Defined.
 
-Definition demo_compare (left right : demo_cost) : comparison :=
-  match Nat.compare (source_priority left) (source_priority right) with
-  | Eq => Nat.compare (schedule_work left) (schedule_work right)
-  | order => order end.
+Definition fewest_checks : policy :=
+  fold_policy nat_sum checks_score (Some forced_checks_cost) Additive.
 
-Inductive demo_a : nat -> Prop := DemoA : forall x, demo_a x.
-Inductive demo_b : nat -> nat -> Prop := DemoB : forall x y, demo_b x y.
-Inductive demo_c : nat -> nat -> Prop := DemoC : forall y z, demo_c y z.
-Inductive demo_root : nat -> nat -> nat -> Prop :=
-| DemoRoot : forall x y z,
-    demo_a x -> demo_b x y -> demo_c y z -> demo_root x y z.
+Inductive loose : nat -> Prop := Loose : forall x, loose x.
+Inductive pinned : nat -> nat -> Prop :=
+| PinZero : forall y, pinned 0 y
+| PinOne : forall y, pinned 1 y.
+Inductive root : nat -> nat -> Prop :=
+| Root : forall x y, loose x -> pinned x y -> root x y.
 
-(* With the probe enabled, candidate 3 wins under demo_score. The current
-   built-in ranker still selects candidate 0. *)
-QuickChick Derive Generator for (fun x y z => demo_root x y z).
+(* QC Scorer compiles the policy once; later derivations in this file rank
+   their schedules with it. *)
+QC Scorer fewest_checks.
+QuickChick Derive Generator for (fun x y => root x y).
+
+(* The selected schedule generates x from loose instead of checking it. *)
+Goal True.
+  lazymatch (eval unfold GenSizedSuchThatroot in GenSizedSuchThatroot) with
+  | context [@decOpt (loose _)] => fail "fewest_checks checked loose x"
+  | _ => exact I
+  end.
+Qed.
+
+(* Back to the default scorer. *)
+QC Scorer density.
