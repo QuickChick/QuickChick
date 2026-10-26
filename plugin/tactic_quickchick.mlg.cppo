@@ -372,14 +372,26 @@ let constructors_used_inductive_names ((ind_name, params, rules, overall_type) :
 let rocq_relation_used_inductives' ((ind_name, params, rules, overall_type) : rocq_relation) : Names.Indset.t =
   Names.Indset.of_list (extract_inductives_rocq_constr overall_type @ List.concat_map (fun (_,typ) -> extract_inductives_rocq_constr typ) rules)
 
+(* Every mode derivation walks the relations reachable from its root, so a
+   mutual block's parse is cached until the global environment changes. *)
+let mutual_relation_cache = ref None
+
 let inductive_to_rocq_relation ((mind,ix) : Names.inductive) : rocq_relation =
-  (* Lookup the mutual inductive body in the _global_ environment. *)
-  let mib = Environ.lookup_mind mind (Global.env ()) in
-  (* Parse each `one_inductive_body` into a rocq relation. All should succeed. *)
-  let rs = sequenceM oib_to_rocq_relation (Array.to_list mib.Declarations.mind_packets) in
-  match rs with
-  | None -> failwith ("Inductive not found: " ^ Names.MutInd.to_string mind)
-  | Some rs -> List.nth rs ix
+  let env = Global.env () in
+  let cached = match !mutual_relation_cache with
+    | Some (cached_env, table) when cached_env == env -> table
+    | _ -> let table = ref Names.Mindmap.empty in
+      mutual_relation_cache := Some (env, table); table in
+  let rs = match Names.Mindmap.find_opt mind !cached with
+    | Some rs -> rs
+    | None ->
+      (* Lookup the mutual inductive body in the _global_ environment. *)
+      let mib = Environ.lookup_mind mind env in
+      (* Parse each `one_inductive_body` into a rocq relation. All should succeed. *)
+      match sequenceM oib_to_rocq_relation (Array.to_list mib.Declarations.mind_packets) with
+      | None -> failwith ("Inductive not found: " ^ Names.MutInd.to_string mind)
+      | Some rs -> cached := Names.Mindmap.add mind rs !cached; rs in
+  List.nth rs ix
 
 let inductives_used_in_inductive (ind : Names.inductive) : Names.Indset.t =
   let rocq_relation = inductive_to_rocq_relation ind in
