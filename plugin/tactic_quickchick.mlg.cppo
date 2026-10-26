@@ -2446,8 +2446,20 @@ let compiled_node_bound (policy : PolicyRegistry.compiled) ind_name
         | S_Check _ -> []) steps
       |> List.sort_uniq Stdlib.compare in
     let* bound = ScoringView.collect_ids scope bound_names in
+    (* As the density bound's look-ahead: occurrences, in the remaining
+       hypotheses, of variables the committed steps bound, plus the floor's
+       count of variables that several remaining hypotheses share. *)
+    let step_bound = List.concat_map (function
+      | S_UC (v, _, _) | S_Let (v, _) -> [v]
+      | S_ST (outputs, _, _) -> List.map fst outputs
+      | S_Match (_, p) -> pat_vars p
+      | S_Check _ -> []) steps in
+    let future_uses = List.length (List.filter (fun v -> List.mem v step_bound)
+      floor.NewGenericLib.bound_argument_occurrences)
+      + floor.NewGenericLib.future_variable_uses in
     Ok { PolicyViews.node_steps = committed;
          node_forced_checks = floor.NewGenericLib.forced_checks;
+         node_future_uses = future_uses;
          node_remaining = remaining; node_bound = bound } in
   policy.PolicyRegistry.bound (quoted_or_fail context) (quoted_or_fail node)
 

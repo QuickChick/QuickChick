@@ -3,8 +3,9 @@ Require Import List Arith Lia. Import ListNotations.
 
 (* The built-in density_then_vars ranking written as a Rocq policy, from the
    proved builders: a maximum of flipped grade ranks, where a forced check
-   counts as Checking, then a sum of variable uses. Its pruning bound is
-   proved. Compiled by QC Scorer, it must choose the built-in's schedules. *)
+   counts as Checking, then the engine's variable uses, whose bound looks
+   ahead at the uses every completion incurs. Its pruning bound is proved.
+   Compiled by QC Scorer, it must choose the built-in's schedules. *)
 
 Definition grade_rank (d : density) : nat :=
   match d with Checking => 0 | Backtracking => 1 | Neutral => 2 | Partial => 3 | Total => 4 end.
@@ -31,56 +32,9 @@ Proof.
   intros. unfold grade_score; cbn [step_score]. nat_order.
 Defined.
 
-Fixpoint argument_locals (t : term_view) : list nat :=
-  match t with
-  | TLocal i => [i]
-  | TApply _ args => flat_map argument_locals args
-  | _ => []
-  end.
-
-Definition distinct (ids : list nat) : list nat := nodup Nat.eq_dec ids.
-
-(* As the engine counts them: a source's distinct variables, or a generated
-   call's distinct variables per argument. *)
-Definition source_locals (s : source_view) : list nat :=
-  match source_category s, source_application s with
-  | External, t => distinct (argument_locals t)
-  | _, TApply _ args => flat_map (fun a => distinct (argument_locals a)) args
-  | _, t => distinct (argument_locals t)
-  end.
-
-Fixpoint pattern_locals (p : pattern_view) : list nat :=
-  match p with
-  | PLocal i => [i]
-  | PConstructor _ args => flat_map pattern_locals args
-  | _ => []
-  end.
-
-Definition step_binds (step : step_view) : list nat :=
-  match step with
-  | Unconstrained l _ _ => [local_id l]
-  | SuchThat ls _ _ => map local_id ls
-  | MatchStep _ p => pattern_locals p
-  | LetStep l _ => [local_id l]
-  | CheckStep _ _ => []
-  end.
-
-(* Uses of variables that earlier steps bound. *)
-Definition uses (prev : list step_view) (step : step_view) : nat :=
-  let bound := flat_map step_binds prev in
-  let count ids := List.length (filter (fun i => existsb (Nat.eqb i) bound) ids) in
-  match step with
-  | Unconstrained _ s _ | SuchThat _ s _ | CheckStep s _ => count (source_locals s)
-  | LetStep _ value => count (distinct (argument_locals value))
-  | MatchStep _ _ => 0
-  end.
-
-Definition uses_score : step_scorer nat nat_sum.
-Proof. refine {| step_score := fun _ prev step _ => uses prev step |}. intros. nat_order. Defined.
-
 Definition density_policy : policy :=
   lex_policy (fold_policy nat_max grade_score (Some forced_checks_count) Extremal)
-             (fold_policy nat_sum uses_score None Additive).
+             uses_policy.
 
 (* The policy's bound is proved, without axioms. *)
 Goal match policy_bound_sound density_policy with Some _ => True | None => False end.

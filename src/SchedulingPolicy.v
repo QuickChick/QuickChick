@@ -1,5 +1,6 @@
-(* Experimental policy interface. The plugin does not select these policies yet. *)
-From Coq Require Import List String.
+(* The scoring-policy interface: the views a policy sees and the contract
+   its pruning bound must meet. QC Scorer compiles and selects a policy. *)
+From Coq Require Import List String Arith.
 Import ListNotations.
 
 Set Universe Polymorphism.
@@ -116,9 +117,63 @@ Record committed_step := {
   committed_certain : bool
 }.
 
+(* The engine's variable uses: at each step, the variables of its source
+   that earlier steps bound. A nonrecursive source counts its distinct
+   variables; a generated call counts each argument's distinct variables. *)
+Fixpoint argument_locals (t : term_view) : list nat :=
+  match t with
+  | TLocal i => [i]
+  | TApply _ args => flat_map argument_locals args
+  | _ => []
+  end.
+
+Definition distinct (ids : list nat) : list nat := nodup Nat.eq_dec ids.
+
+Definition source_locals (s : source_view) : list nat :=
+  match source_category s, source_application s with
+  | External, t => distinct (argument_locals t)
+  | _, TApply _ args => flat_map (fun a => distinct (argument_locals a)) args
+  | _, t => distinct (argument_locals t)
+  end.
+
+Fixpoint pattern_locals (p : pattern_view) : list nat :=
+  match p with
+  | PLocal i => [i]
+  | PConstructor _ args => flat_map pattern_locals args
+  | _ => []
+  end.
+
+Definition step_binds (step : step_view) : list nat :=
+  match step with
+  | Unconstrained l _ _ => [local_id l]
+  | SuchThat ls _ _ => map local_id ls
+  | MatchStep _ p => pattern_locals p
+  | LetStep l _ => [local_id l]
+  | CheckStep _ _ => []
+  end.
+
+Definition step_uses (prev : list step_view) (step : step_view) : nat :=
+  let bound := flat_map step_binds prev in
+  let count ids := List.length (filter (fun i => existsb (Nat.eqb i) bound) ids) in
+  match step with
+  | Unconstrained _ s _ | SuchThat _ s _ | CheckStep s _ => count (source_locals s)
+  | LetStep _ value => count (distinct (argument_locals value))
+  | MatchStep _ _ => 0
+  end.
+
+(* The uses of [steps], run after [prev]. *)
+Fixpoint uses_after (prev : list step_view) (steps : list (step_view * density)) : nat :=
+  match steps with
+  | [] => 0
+  | (step, _) :: rest => step_uses prev step + uses_after (prev ++ [step]) rest
+  end.
+
 Record search_node_view := {
   node_steps : list committed_step;
   node_forced_checks : nat;
+  (* Every schedule below the node incurs at least this many further
+     variable uses. *)
+  node_future_uses : nat;
   node_remaining : list (term_view * bool);
   node_bound : list nat
 }.
@@ -140,7 +195,8 @@ Definition completes (node : search_node_view) (s : schedule_view) : Prop :=
   exists committed extension,
     Forall2 kept (node_steps node) committed /\
     schedule_steps s = committed ++ extension /\
-    node_forced_checks node <= count_checks extension.
+    node_forced_checks node <= count_checks extension /\
+    node_future_uses node <= uses_after (map committed_view (node_steps node)) extension.
 
 Record scorer (S : Type) := {
   score_step : score_context S -> step_view -> density -> S;

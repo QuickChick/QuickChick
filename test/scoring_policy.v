@@ -133,6 +133,7 @@ Definition demo_node : search_node_view := {|
   node_steps := [{| committed_view := MatchStep 0 PWild;
                     committed_grade := Backtracking; committed_certain := true |}];
   node_forced_checks := 1;
+  node_future_uses := 0;
   node_remaining := [(TApply (TGlobal "Demo.Remaining") [TLocal 0], true)];
   node_bound := [0]
 |}.

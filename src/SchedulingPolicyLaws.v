@@ -165,7 +165,7 @@ Section FoldPolicy.
 
   Theorem fold_bound_admissible : bound_admissible fold_scorer fold_bound.
   Proof.
-    intros ctx node s (kept_steps & extension & Hkept & Hsteps & Hforced).
+    intros ctx node s (kept_steps & extension & Hkept & Hsteps & Hforced & _).
     unfold score_one_schedule, fold_bound; simpl.
     rewrite Hsteps, step_scores_app. unfold combine_all at 3. rewrite fold_left_app.
     destruct (committed_no_better ctx [] _ _ Hkept) as [Hle Hmap].
@@ -307,3 +307,64 @@ Ltac nat_order := unfold m_le in *;
 Lemma nat_above_zero (M : ordered_monoid nat) (n : nat) :
   m_compare M = Nat.compare -> m_unit M = 0 -> m_le M (m_unit M) n.
 Proof. intros Hc Hu. unfold m_le. rewrite Hc, Hu. destruct n; discriminate. Qed.
+
+(* The engine's variable uses, summed. Its bound counts the committed steps'
+   uses, which depend only on their views, plus the further uses every
+   schedule below the node incurs. *)
+Section Uses.
+  Definition committed_uses (node : search_node_view) : nat :=
+    uses_after [] (map (fun c => (committed_view c, committed_grade c)) (node_steps node)).
+
+  Definition uses_scorer : scorer nat := {|
+    score_step := fun _ step _ => step_uses [] step;
+    score_schedule := fun _ schedule _ => uses_after [] (schedule_steps schedule);
+    score_leaf := fun _ _ xs => fold_left Nat.add (map snd xs) 0;
+    score_inductive := fun _ _ xs => fold_left Nat.add (map snd xs) 0;
+    compare_scores := Nat.compare
+  |}.
+
+  Definition uses_bound (_ : score_context nat) (node : search_node_view) : nat :=
+    committed_uses node + node_future_uses node.
+
+  Lemma uses_after_app : forall prev xs ys,
+    uses_after prev (xs ++ ys) = uses_after prev xs + uses_after (prev ++ map fst xs) ys.
+  Proof.
+    intros prev xs. revert prev.
+    induction xs as [|[step grade] xs IH]; intros prev ys; simpl.
+    - now rewrite app_nil_r.
+    - rewrite IH, <- app_assoc. simpl. lia.
+  Qed.
+
+  (* Uses depend on step views only, so kept steps have the committed uses. *)
+  Lemma kept_uses : forall prev committed kept_steps,
+    Forall2 kept committed kept_steps ->
+    uses_after prev kept_steps =
+      uses_after prev (map (fun c => (committed_view c, committed_grade c)) committed)
+    /\ map fst kept_steps = map committed_view committed.
+  Proof.
+    intros prev committed kept_steps H. revert prev.
+    induction H as [|c [step grade] committed kept_steps [Hview _] _ IH]; intros prev;
+      simpl in *; [split; reflexivity|].
+    subst step. destruct (IH (prev ++ [committed_view c])) as [Hu Hm].
+    split; [now rewrite Hu | now rewrite Hm].
+  Qed.
+
+  Theorem uses_bound_admissible : bound_admissible uses_scorer uses_bound.
+  Proof.
+    intros ctx node s (kept_steps & extension & Hkept & Hsteps & _ & Hfuture).
+    unfold no_worse, score_one_schedule, uses_bound, committed_uses; simpl.
+    rewrite Hsteps, uses_after_app.
+    destruct (kept_uses [] _ _ Hkept) as [Hu Hm]. rewrite Hu, Hm. simpl.
+    intro H. apply Nat.compare_gt_iff in H. lia.
+  Qed.
+End Uses.
+
+(* Fewer variable uses first; a sum, so additive over groups. *)
+Definition uses_policy : policy := {|
+  score_type := nat;
+  policy_scorer := uses_scorer;
+  lower_bound := uses_bound;
+  policy_grouping := Some {| group_unit := 0; group_combine := Nat.add;
+                             group_fields := [(Additive, Nat.compare)] |};
+  policy_bound_sound := Some uses_bound_admissible
+|}.

@@ -69,8 +69,9 @@ A policy is pruned with its `lower_bound` when `policy_bound_sound` proves
 that bound admissible: no complete schedule below a search node scores better
 than the bound (`bound_admissible`, over `completes` in
 `src/SchedulingPolicy.v`). A search node lists its committed steps, each with
-its grade and whether that grade is final, the remaining hypotheses, and how
-many of them must become positive checks. The plugin cuts a branch when the
+its grade and whether that grade is final, the remaining hypotheses, how
+many of them must become positive checks, and how many further variable uses
+every schedule below incurs (`step_uses` defines the engine's count). The plugin cuts a branch when the
 best schedule found so far is no worse than the bound; since the first of
 equal scores wins, the selection is unchanged. Without a proof the policy
 runs unpruned, under the 1,000-candidate cap. A proof that depends on axioms,
@@ -85,11 +86,13 @@ before it. Its bound combines the committed steps' scores, masking uncertain
 grades, and an optional `floor` that every positive check reaches, counted
 once per forced check (`fold_bound_admissible`). `lex_policy p q` compares
 two policies lexicographically, with a proved bound when both have one
-(`lex_bound_admissible`). Both declare their grouping.
-`test/compiled_density.v` builds `density_then_vars` this way; on Cedar it
-makes the built-in's selection on every key, pruned and in verify mode, with
-no bound violation. Its bound has no variable-use look-ahead, so it prunes
-less than the built-in: Cedar takes 50 s against 10 s.
+(`lex_bound_admissible`). `uses_policy` sums `step_uses`; its bound adds the
+node's future uses to the committed ones (`uses_bound_admissible`). All
+declare their grouping. `test/compiled_density.v` builds `density_then_vars`
+as `lex_policy` of a maximum of grades and `uses_policy`. On Cedar it makes
+the built-in's selection on every key, pruned and in verify mode, with no
+bound violation, and it prunes exactly as much as the built-in. It takes
+20 s against 10 s, the cost of quoting each search node for the policy.
 
 ### Cardinality ranking (experimental)
 
