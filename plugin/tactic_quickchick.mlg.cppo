@@ -2191,11 +2191,26 @@ let schedule_instance_cache_context = ref None
 let supplied_instance_cache = Hashtbl.create 256
 let supplied_instance_context = ref None
 
+(* Local ids shown to compiled policies. A variable keeps its id for the
+   whole derivation, so a committed step has the same view at a search node
+   and in every schedule below it, as bound_admissible assumes. Binders
+   inside terms are numbered from [policy_binder_base]. *)
+let policy_local_ids : (var, int) Hashtbl.t = Hashtbl.create 64
+let policy_binder_base = 1_000_000
+
+let policy_scope names =
+  List.iter (fun name ->
+    if not (Hashtbl.mem policy_local_ids name) then
+      Hashtbl.add policy_local_ids name (Hashtbl.length policy_local_ids)) names;
+  { ScoringView.names = List.map (fun name -> name, Hashtbl.find policy_local_ids name) names;
+    next = policy_binder_base }
+
 let clear_schedule_instance_cache () =
   Hashtbl.reset schedule_instance_cache;
   schedule_instance_cache_context := None;
   Hashtbl.reset supplied_instance_cache;
-  supplied_instance_context := None
+  supplied_instance_context := None;
+  Hashtbl.reset policy_local_ids
 
 (* Candidate schedules name their variables afresh, so the same instance
    obligation recurs as alpha-variants. Key the cache on the obligation with
@@ -2368,7 +2383,7 @@ let compiled_context ind_name result_vars output_vars ds ~constrained steps term
     List.concat_map ScoringView.step_variables steps @
     List.concat_map ScoringView.free_vars_term terms
     |> List.sort_uniq Stdlib.compare in
-  let scope = ScoringView.scope names in
+  let scope = policy_scope names in
   let local_types = List.fold_left (fun locals step ->
     let outputs = match step with
       | S_UC (name, SrcNonrec typ, _) -> [name, typ]

@@ -10,4 +10,4 @@
 (coq.theory
   (name QuickChick.TestingPruningVerify)
   (theories QuickChick)
-  (modules pruning_verify))
+  (modules pruning_verify compiled_ids))

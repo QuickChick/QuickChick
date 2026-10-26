@@ -6,7 +6,9 @@ Import ListNotations.
 Set Universe Polymorphism.
 
 (* A symbolic snapshot of a schedule. Local identifiers are unique within one
-   snapshot; global names are qualified. Opaque handles preserve identity but
+   snapshot, and a variable keeps its identifier throughout one derivation;
+   binders inside terms are numbered from 1000000. Global names are
+   qualified. Opaque handles preserve identity but
    deliberately do not reveal a term's structure. *)
 Inductive pattern_view :=
 | PWild
