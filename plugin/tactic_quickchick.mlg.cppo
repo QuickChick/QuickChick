@@ -3947,7 +3947,7 @@ and inductive_best_valid_schedule (rel : rocq_relation) (output_idxs : int list)
         { PolicyViews.leaf_pattern = leaf_pattern p; leaf_covering = List.map name cs },
         cs) covered_patterns in
       let ( let* ) = Result.bind in
-      let quoted =
+      let quoted () =
         let* spec = ScoringView.quote_spec ~global scope
           (DTyCtr (ind_name, List.map (fun (v, _) -> DTyVar v) result_vars)) output_idxs ds opt in
         let* constructors = ScoringView.map_result (fun (((steps, sort), _, _, _) as schedule, (ctr_name, _)) ->
@@ -3958,7 +3958,8 @@ and inductive_best_valid_schedule (rel : rocq_relation) (output_idxs : int list)
                constructor_recursive = is_recursive schedule; constructor_schedule = view })
           (List.combine constructor_schedules densities) in
         Ok (spec, constructors) in
-      match (try quoted with Noninductive_dependency _ | Unavailable_mode _ -> Error "") with
+      match (try quoted () with
+        | Noninductive_dependency _ | Unavailable_mode _ | CErrors.UserError _ -> Error "") with
       | Error _ -> None
       | Ok (spec, constructors) ->
         let context = { PolicyViews.current_spec = spec; locals = []; original_inputs = [];
