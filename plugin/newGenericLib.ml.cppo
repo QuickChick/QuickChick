@@ -3950,6 +3950,15 @@ let independent_hypothesis_groups ~canon variables hypotheses fixed =
        compare (List.fold_left min max_int (List.map position a))
          (List.fold_left min max_int (List.map position b)))
 
+module ScheduleTbl = Hashtbl.Make(struct
+  type t = schedule_step list
+  let equal = ( = )
+  (* Every step, shallowly: steps embed large terms, which a deep hash
+     would traverse for every candidate. *)
+  let hash steps = List.fold_left (fun h step ->
+    h * 31 + Hashtbl.hash_param 8 32 step) 0 steps land max_int
+end)
+
 let possible_schedules_with_advanced_pruning ?(max_schedules=100000)
     ?(reduce_orderings=true)
     ?(maximal_outputs=false)
@@ -4079,11 +4088,13 @@ let possible_schedules_with_advanced_pruning ?(max_schedules=100000)
     |> Seq.map normalize_schedule_advanced in
   (* Candidate identifiers follow search order, so among equal scores the
      first schedule found wins. Score pruning relies on this: an incumbent
-     always precedes the candidates of a node explored after it. *)
-  let seen = Hashtbl.create 64 in
+     always precedes the candidates of a node explored after it. Schedules
+     share long prefixes, which the default hash's ten-node limit cannot
+     tell apart, so every step contributes to the hash. *)
+  let seen = ScheduleTbl.create 64 in
   take_limited candidate_stream |> List.filter (fun schedule ->
-    if Hashtbl.mem seen schedule then false
-    else (Hashtbl.add seen schedule (); true))
+    if ScheduleTbl.mem seen schedule then false
+    else (ScheduleTbl.add seen schedule (); true))
 
 (* QC_SCHEDULE_MAX_CANDIDATES overrides the unpruned search's candidate cap,
    for diagnosis; 0 removes it. *)
