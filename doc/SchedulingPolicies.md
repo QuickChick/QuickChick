@@ -75,8 +75,12 @@ than the bound (`bound_admissible`, over `completes` in
 `src/SchedulingPolicy.v`). The schedule below is scored in a context that
 may know more than the node's (`ctx_refines`): a pending or in-progress
 dependency may have completed. A step scorer must therefore score an unknown
-dependency no worse than any completed one (`step_refines`);
-`spec_step_scorer` builds scorers that read only the specification. A search node lists its committed steps, each with
+dependency no worse than any completed one (`step_refines`).
+`spec_step_scorer` builds scorers that read only the specification;
+`dependency_step_scorer` builds scorers that also read the completed score of
+the dependency a step calls (`step_dependency` in the context), given that
+an unknown dependency scores no worse than any completed one. Policies built
+from either have proved bounds. A search node lists its committed steps, each with
 its grade and whether that grade is final, the remaining hypotheses, how
 many of them must become positive checks, and how many further variable uses
 every schedule below incurs (`step_uses` defines the engine's count). The plugin cuts a branch when the

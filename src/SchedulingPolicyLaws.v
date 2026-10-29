@@ -213,6 +213,39 @@ Proof.
   intros ctx ctx' prev step grade (Hspec & _). rewrite Hspec. apply (m_refl M).
 Defined.
 
+(* The completed score of the dependency a step calls, if it has one. *)
+Definition completed_dependency {S} (ctx : score_context S) (step : step_view) : option S :=
+  match step_dependency ctx step with Completed x => Some x | _ => None end.
+
+(* A refined context keeps a completed score, or completes an unknown one. *)
+Lemma completed_dependency_refines {S} (c d : score_context S) step :
+  ctx_refines c d ->
+  completed_dependency c step = None \/ completed_dependency c step = completed_dependency d step.
+Proof.
+  intros (_ & _ & _ & _ & Hsteps). unfold completed_dependency.
+  destruct (Hsteps step) as [<- | ([-> | ->] & x & ->)]; auto.
+Qed.
+
+(* A step scorer that reads the specification and the completed score of the
+   step's dependency. An unknown dependency must score no worse than any
+   completed one. *)
+Definition dependency_step_scorer {S} (M : ordered_monoid S)
+    (g : spec_view -> list step_view -> step_view -> density -> option S -> S)
+    (above : forall spec prev step grade dep, m_le M (m_unit M) (g spec prev step grade dep))
+    (unknown_best : forall spec prev step grade x,
+       m_le M (g spec prev step grade None) (g spec prev step grade (Some x)))
+    : step_scorer S M.
+Proof.
+  refine {| step_score := fun ctx prev step grade =>
+              g (current_spec ctx) prev step grade (completed_dependency ctx step);
+            step_above_unit := fun ctx prev step grade => above _ _ _ _ _ |}.
+  intros ctx ctx' prev step grade Href.
+  destruct Href as (Hspec & Hrest) eqn:E. rewrite Hspec.
+  destruct (completed_dependency_refines ctx ctx' step Href) as [Hnone | Hsame].
+  - rewrite Hnone. destruct (completed_dependency ctx' step); [apply unknown_best | apply (m_refl M)].
+  - rewrite Hsame. apply (m_refl M).
+Defined.
+
 Section Lex.
   Variables A B : Type.
 
@@ -229,19 +262,27 @@ Section Lex.
     current_spec := current_spec ctx;
     locals := locals ctx;
     original_inputs := original_inputs ctx;
-    dependencies := map (fun '(spec, state) => (spec, map_state g state)) (dependencies ctx)
+    dependencies := map (fun '(spec, state) => (spec, map_state g state)) (dependencies ctx);
+    step_dependency := fun step => map_state g (step_dependency ctx step)
   |}.
+
+  Lemma map_state_refines {X Y} (g : X -> Y) (a b : dependency_state X) :
+    refines a b -> refines (map_state g a) (map_state g b).
+  Proof.
+    intros [<- | (Hp & x & ->)]; [now left | right].
+    split; [destruct Hp as [-> | ->]; auto | now exists (g x)].
+  Qed.
 
   Lemma map_refines {X Y} (g : X -> Y) (c d : score_context X) :
     ctx_refines c d -> ctx_refines (map_context g c) (map_context g d).
   Proof.
-    intros (Hspec & Hinputs & Hlocals & Hdeps). repeat split; simpl; auto.
+    intros (Hspec & Hinputs & Hlocals & Hdeps & Hsteps). repeat split; simpl; auto.
+    2: { intros step. apply map_state_refines, Hsteps. }
     intros spec state Hin. apply in_map_iff in Hin as ([spec0 state0] & Heq & Hin).
     injection Heq as <- <-. destruct (Hdeps _ _ Hin) as (state' & Hin' & Hr).
     exists (map_state g state'). split.
     - apply in_map_iff. now exists (spec0, state').
-    - destruct Hr as [<- | (Hp & x & ->)]; [now left | right].
-      split; [destruct Hp as [-> | ->]; auto | now exists (g x)].
+    - now apply map_state_refines.
   Qed.
 
   Definition lex_compare (ca : A -> A -> comparison) (cb : B -> B -> comparison)

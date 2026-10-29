@@ -83,12 +83,16 @@ Record score_context (S : Type) := {
   current_spec : spec_view;
   locals : list local_view;
   original_inputs : list nat;
-  dependencies : list (spec_view * dependency_state S)
+  dependencies : list (spec_view * dependency_state S);
+  (* The state of the dependency a step calls: the request of its source,
+     in the step's mode. *)
+  step_dependency : step_view -> dependency_state S
 }.
 Arguments current_spec {S} _.
 Arguments locals {S} _.
 Arguments original_inputs {S} _.
 Arguments dependencies {S} _.
+Arguments step_dependency {S} _ _.
 
 Record constructor_view := {
   constructor_name : string;
@@ -255,8 +259,9 @@ Definition ctx_refines {S} (c d : score_context S) : Prop :=
   current_spec d = current_spec c /\
   original_inputs d = original_inputs c /\
   incl (locals c) (locals d) /\
-  forall spec state, In (spec, state) (dependencies c) ->
-    exists state', In (spec, state') (dependencies d) /\ refines state state'.
+  (forall spec state, In (spec, state) (dependencies c) ->
+    exists state', In (spec, state') (dependencies d) /\ refines state state') /\
+  forall step, refines (step_dependency c step) (step_dependency d step).
 
 (* A bound is admissible when no complete schedule below a node scores
    better than it, however the context has refined since the node. *)
@@ -286,7 +291,8 @@ Definition score_with_dependency_states {S} (p : scorer S)
     current_spec := spec;
     locals := local_types;
     original_inputs := inputs;
-    dependencies := deps
+    dependencies := deps;
+    step_dependency := fun _ => Pending
   |} schedule.
 
 (* Compatibility helper for candidates whose source obligations all resolve

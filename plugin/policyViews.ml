@@ -79,7 +79,8 @@ type 's dependency_state =
 type 's score_context = { current_spec : spec_view; locals : local_view list;
                           original_inputs : int list;
                           dependencies : (spec_view * 's dependency_state)
-                                         list }
+                                         list;
+                          step_dependency : (step_view -> 's dependency_state) }
 
 type constructor_view = { constructor_name : char list;
                           constructor_recursive : bool;
@@ -96,8 +97,8 @@ type committed_step = { committed_view : step_view;
                         bool }
 
 type search_node_view = { node_steps : committed_step list;
-                          node_forced_checks : int; node_future_uses : int;
-                          node_remaining : (term_view * bool) list;
+                          node_forced_checks : int; node_future_uses : 
+                          int; node_remaining : (term_view * bool) list;
                           node_bound : int list }
 
 type field_kind =
@@ -122,7 +123,7 @@ let extraction_table = [
   "QuickChick.SchedulingPolicy.schedule_view", "Quickchick_plugin.PolicyViews.schedule_view", ["(fun (a0, a1) -> { Quickchick_plugin.PolicyViews.schedule_steps = a0; Quickchick_plugin.PolicyViews.schedule_result = a1 })"], (Some "(fun f r -> f r.Quickchick_plugin.PolicyViews.schedule_steps r.Quickchick_plugin.PolicyViews.schedule_result)");
   "QuickChick.SchedulingPolicy.spec_view", "Quickchick_plugin.PolicyViews.spec_view", ["(fun (a0, a1, a2, a3) -> { Quickchick_plugin.PolicyViews.spec_application = a0; Quickchick_plugin.PolicyViews.spec_outputs = a1; Quickchick_plugin.PolicyViews.spec_mode = a2; Quickchick_plugin.PolicyViews.spec_constrained = a3 })"], (Some "(fun f r -> f r.Quickchick_plugin.PolicyViews.spec_application r.Quickchick_plugin.PolicyViews.spec_outputs r.Quickchick_plugin.PolicyViews.spec_mode r.Quickchick_plugin.PolicyViews.spec_constrained)");
   "QuickChick.SchedulingPolicy.dependency_state", "Quickchick_plugin.PolicyViews.dependency_state", ["Quickchick_plugin.PolicyViews.SuppliedInstance"; "Quickchick_plugin.PolicyViews.Pending"; "Quickchick_plugin.PolicyViews.InProgress"; "Quickchick_plugin.PolicyViews.Completed"], None;
-  "QuickChick.SchedulingPolicy.score_context", "Quickchick_plugin.PolicyViews.score_context", ["(fun (a0, a1, a2, a3) -> { Quickchick_plugin.PolicyViews.current_spec = a0; Quickchick_plugin.PolicyViews.locals = a1; Quickchick_plugin.PolicyViews.original_inputs = a2; Quickchick_plugin.PolicyViews.dependencies = a3 })"], (Some "(fun f r -> f r.Quickchick_plugin.PolicyViews.current_spec r.Quickchick_plugin.PolicyViews.locals r.Quickchick_plugin.PolicyViews.original_inputs r.Quickchick_plugin.PolicyViews.dependencies)");
+  "QuickChick.SchedulingPolicy.score_context", "Quickchick_plugin.PolicyViews.score_context", ["(fun (a0, a1, a2, a3, a4) -> { Quickchick_plugin.PolicyViews.current_spec = a0; Quickchick_plugin.PolicyViews.locals = a1; Quickchick_plugin.PolicyViews.original_inputs = a2; Quickchick_plugin.PolicyViews.dependencies = a3; Quickchick_plugin.PolicyViews.step_dependency = a4 })"], (Some "(fun f r -> f r.Quickchick_plugin.PolicyViews.current_spec r.Quickchick_plugin.PolicyViews.locals r.Quickchick_plugin.PolicyViews.original_inputs r.Quickchick_plugin.PolicyViews.dependencies r.Quickchick_plugin.PolicyViews.step_dependency)");
   "QuickChick.SchedulingPolicy.constructor_view", "Quickchick_plugin.PolicyViews.constructor_view", ["(fun (a0, a1, a2) -> { Quickchick_plugin.PolicyViews.constructor_name = a0; Quickchick_plugin.PolicyViews.constructor_recursive = a1; Quickchick_plugin.PolicyViews.constructor_schedule = a2 })"], (Some "(fun f r -> f r.Quickchick_plugin.PolicyViews.constructor_name r.Quickchick_plugin.PolicyViews.constructor_recursive r.Quickchick_plugin.PolicyViews.constructor_schedule)");
   "QuickChick.SchedulingPolicy.leaf_view", "Quickchick_plugin.PolicyViews.leaf_view", ["(fun (a0, a1) -> { Quickchick_plugin.PolicyViews.leaf_pattern = a0; Quickchick_plugin.PolicyViews.leaf_covering = a1 })"], (Some "(fun f r -> f r.Quickchick_plugin.PolicyViews.leaf_pattern r.Quickchick_plugin.PolicyViews.leaf_covering)");
   "QuickChick.SchedulingPolicy.inductive_view", "Quickchick_plugin.PolicyViews.inductive_view", ["(fun (a0, a1, a2) -> { Quickchick_plugin.PolicyViews.inductive_spec = a0; Quickchick_plugin.PolicyViews.inductive_constructors = a1; Quickchick_plugin.PolicyViews.inductive_leaves = a2 })"], (Some "(fun f r -> f r.Quickchick_plugin.PolicyViews.inductive_spec r.Quickchick_plugin.PolicyViews.inductive_constructors r.Quickchick_plugin.PolicyViews.inductive_leaves)");

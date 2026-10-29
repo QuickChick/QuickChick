@@ -274,7 +274,24 @@ let quote_context ~global scope relation result_vars local_types
           | Pending -> PolicyViews.Pending
           | InProgress -> PolicyViews.InProgress
           | Completed score -> PolicyViews.Completed score)) dependencies in
-    Ok { current_spec = spec; locals; original_inputs = inputs; dependencies }
+    (* A step's dependency is the request with its source application, in
+       the step's mode. A step that calls nothing has a static state. *)
+    let step_dependency step =
+      let call = match step with
+        | Unconstrained (_, source, Generator) | SuchThat (_, source, Generator) ->
+          Some (source.source_application, Generate)
+        | Unconstrained (_, source, Enumerator) | SuchThat (_, source, Enumerator) ->
+          Some (source.source_application, Enumerate)
+        | CheckStep (source, _) -> Some (source.source_application, Check)
+        | MatchStep _ | LetStep _ -> None in
+      match call with
+      | None -> PolicyViews.SuppliedInstance
+      | Some (application, mode) ->
+        match List.find_opt (fun (spec, _) ->
+            spec.spec_application = application && spec.spec_mode = mode) dependencies with
+        | Some (_, state) -> state
+        | None -> PolicyViews.Pending in
+    Ok { current_spec = spec; locals; original_inputs = inputs; dependencies; step_dependency }
 
 (* Render views as Rocq expressions, for a policy evaluated in Rocq.
    Constructor applications are elaborated and checked in the current proof

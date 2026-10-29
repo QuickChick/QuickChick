@@ -3963,7 +3963,7 @@ and inductive_best_valid_schedule (rel : rocq_relation) (output_idxs : int list)
       | Error _ -> None
       | Ok (spec, constructors) ->
         let context = { PolicyViews.current_spec = spec; locals = []; original_inputs = [];
-                        dependencies = [] } in
+                        dependencies = []; step_dependency = (fun _ -> PolicyViews.SuppliedInstance) } in
         let scored_leaves = List.map (fun (leaf, cs) ->
           leaf, policy.PolicyRegistry.leaf context leaf
             (List.filter_map (fun c -> Option.map (fun s -> name c, s) (score_of c)) cs)) leaves in

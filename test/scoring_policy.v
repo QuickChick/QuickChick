@@ -58,7 +58,8 @@ Definition demo_context : score_context cost := {|
   current_spec := demo_spec;
   locals := [{| local_id := 0; local_type := TGlobal "Coq.Init.Datatypes.nat" |}];
   original_inputs := [0];
-  dependencies := [(demo_spec, Pending)]
+  dependencies := [(demo_spec, Pending)];
+  step_dependency := fun _ => Pending
 |}.
 
 Definition checked : schedule_view := {|
