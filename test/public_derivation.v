@@ -35,14 +35,6 @@ QuickChick Derive Enumerator for (fun y => related x y).
 Definition inferred_enumerator {A B : Type} `{Enum B} (x : A) :
   EnumSizedSuchThat B (fun y => related x y) := EnumSizedSuchThatrelated x.
 
-(* The legacy engine remains explicitly available without importing bare Derive. *)
-Inductive old_box (A : Type) := OldBox : A -> old_box A.
-Arguments OldBox {A} _.
-QuickChick Derive Legacy GenSized for old_box.
-DeriveLegacy EnumSized for old_box.
-Definition legacy_generation {A : Type} `{Gen A} : GenSized (old_box A) := GenSizedold_box.
-Definition legacy_enumeration {A : Type} `{Enum A} : EnumSized (old_box A) := EnumSizedold_box.
-
 Class Verdict (A : Type) := { verdict : bool }.
 Inductive leaf_check {A : Type} : A -> Prop := LeafCheck : forall x, leaf_check x.
 #[local] Instance supplied_checker {A : Type} `{Verdict A} (x : A) : DecOpt (leaf_check x) :=
@@ -60,13 +52,6 @@ Proof. reflexivity. Qed.
 Fail Check DecOpt_leaf_check_II.
 QuickChick Derive Checker for (check_parent x y).
 Check DecOptcheck_parent0.
-
-(* Old checker dispatch is available through both deprecated spellings. *)
-Inductive old_check : bool -> Prop := OldCheck : old_check true.
-QuickChick Derive Legacy DecOpt for (old_check b).
-DeriveLegacy Checker for (old_check b).
-Example old_checker_still_works : decOpt (P := old_check false) 3 = Some false.
-Proof. reflexivity. Qed.
 
 Inductive pair_relation {A B : Type} : A -> B -> Prop :=
 | PairRelation : forall x y, pair_relation x y.

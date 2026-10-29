@@ -6,14 +6,9 @@ SetLib
 UnifyQC
 Weightmap
 ArbitrarySized
-EnumSized
-ArbitrarySizedST
-EnumSizedST
 SizeUtils
 Sized
 SimplDriver
-CheckerSizedST
-DepDriver
 MergeTypes
 PublicDerive
 Driver

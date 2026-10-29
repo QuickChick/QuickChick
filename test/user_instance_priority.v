@@ -32,10 +32,10 @@ QuickChick Derive DecOpt for (small n).
 Goal forall n, @decOpt (small n) _ = fun _ => Some true.
 Proof. reflexivity. Qed.
 
-(* The legacy engine already used this priority. *)
+(* A plain-type generator registers at the same priority. *)
 Inductive old_name := OldNamed : nat -> old_name.
 
-QuickChick Derive Legacy GenSized for old_name.
+QuickChick Derive GenSized for old_name.
 
 #[global] Instance canonical_old : GenSized old_name | 1 :=
   {| arbitrarySized := fun _ => returnGen (OldNamed 0) |}.

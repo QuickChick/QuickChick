@@ -4,34 +4,28 @@ DECLARE PLUGIN "coq-quickchick.plugin"
 open Libnames
 open Util
 open Constrexpr
-open Names
 open Stdarg
 open Error
 
-type derivation = SimpleDer of SimplDriver.derivable list
-                | DepDer of DepDriver.derivable
+type derivation =
+  | Simple of [ `Gen | `Enum | `Simpl of SimplDriver.derivable ] list
+  | Dependent of string (* scheduling mode: Gen, Enum or Check *)
 
-let simpl_dispatch ~legacy ind classes name1 name2 =
-  List.iter (fun cn -> match legacy, cn with
-    | false, SimplDriver.GenSized -> PublicDerive.derive_simple ~enumerator:false ind
-    | false, SimplDriver.EnumSized -> PublicDerive.derive_simple ~enumerator:true ind
-    | _ -> SimplDriver.derive cn ind name1 name2) classes
-
-let class_assoc_opts = [ ("GenSized"                 , SimpleDer [SimplDriver.GenSized])
-                       ; ("EnumSized"                , SimpleDer [SimplDriver.EnumSized])                       
-                       ; ("Shrink"                   , SimpleDer [SimplDriver.Shrink])
-                       ; ("Arbitrary"                , SimpleDer [SimplDriver.GenSized; SimplDriver.Shrink])
-                       ; ("Fuzzy"                    , SimpleDer [SimplDriver.Fuzzy])
-                       ; ("Mutate"                   , SimpleDer [SimplDriver.Mutate])
-                       ; ("Show"                     , SimpleDer [SimplDriver.Show])
-                       ; ("Sized"                    , SimpleDer [SimplDriver.Sized])
-                       ; ("DecOpt"                   , DepDer DepDriver.DecOpt)
-                       ; ("ArbitrarySizedSuchThat"   , DepDer DepDriver.GenSizedSuchThat)
-                       ; ("GenSizedSuchThat"         , DepDer DepDriver.GenSizedSuchThat)                       
-                       ; ("EnumSizedSuchThat"        , DepDer DepDriver.EnumSizedSuchThat)
-                       ; ("Generator"                , DepDer DepDriver.GenSizedSuchThat)
-                       ; ("Enumerator"               , DepDer DepDriver.EnumSizedSuchThat)
-                       ; ("Checker"                  , DepDer DepDriver.DecOpt)
+let class_assoc_opts = [ ("GenSized"                 , Simple [`Gen])
+                       ; ("EnumSized"                , Simple [`Enum])
+                       ; ("Shrink"                   , Simple [`Simpl SimplDriver.Shrink])
+                       ; ("Arbitrary"                , Simple [`Gen; `Simpl SimplDriver.Shrink])
+                       ; ("Fuzzy"                    , Simple [`Simpl SimplDriver.Fuzzy])
+                       ; ("Mutate"                   , Simple [`Simpl SimplDriver.Mutate])
+                       ; ("Show"                     , Simple [`Simpl SimplDriver.Show])
+                       ; ("Sized"                    , Simple [`Simpl SimplDriver.Sized])
+                       ; ("DecOpt"                   , Dependent "Check")
+                       ; ("ArbitrarySizedSuchThat"   , Dependent "Gen")
+                       ; ("GenSizedSuchThat"         , Dependent "Gen")
+                       ; ("EnumSizedSuchThat"        , Dependent "Enum")
+                       ; ("Generator"                , Dependent "Gen")
+                       ; ("Enumerator"               , Dependent "Enum")
+                       ; ("Checker"                  , Dependent "Check")
                        ]
 
 let class_assoc_table =
@@ -39,7 +33,7 @@ let class_assoc_table =
   List.iter (fun (kwd, tok) -> Hashtbl.add h kwd tok) class_assoc_opts;
   h
 
-let dispatch_with ~legacy cn ind name1 name2 =
+let dispatch cn ind =
   let convert_reference_to_string c =
     match c with
     | {CAst.v = CRef (r, _) ; _} -> string_of_qualid r
@@ -56,36 +50,25 @@ let dispatch_with ~legacy cn ind name1 name2 =
 
   let get_class_names s =
     try Hashtbl.find class_assoc_table s
-    with Not_found -> begin
-        (* TODO: Figure out how to pretty print in a failwith... *)
-        failwith ( "Not a valid class name. Expected one of : " ^ (String.concat " , " (List.map fst class_assoc_opts)))
-      end
+    with Not_found ->
+      failwith ( "Not a valid class name. Expected one of : " ^ (String.concat " , " (List.map fst class_assoc_opts)))
   in
 
   let class_names =
     match ss with
     | s::ss -> List.fold_left (fun der s ->
                                match der, get_class_names s with
-                               | SimpleDer ds1, SimpleDer ds2 -> SimpleDer (ds1 @ ds2)
-                               | DepDer ds1, DepDer ds2 ->
-                                  qcfail "Implement dependent derive for multiple classes"
+                               | Simple ds1, Simple ds2 -> Simple (ds1 @ ds2)
+                               | _ -> qcfail "Derive one dependent class at a time"
                               ) (get_class_names s) ss
     | _ -> qcfail "At least one class name expected" in
 
   match class_names with
-  | SimpleDer classes -> simpl_dispatch ~legacy ind classes name1 name2
-  | DepDer class_name ->
-      if legacy then DepDriver.dep_dispatch ind class_name else
-      let mode = match class_name with
-        | DepDriver.DecOpt -> "Check"
-        | DepDriver.GenSizedSuchThat -> "Gen"
-        | DepDriver.EnumSizedSuchThat -> "Enum" in
-      PublicDerive.derive_dependent ~mode ind
-
-let dispatch = dispatch_with ~legacy:false
-let dispatch_legacy cn ind name1 name2 =
-  PublicDerive.warn_legacy ();
-  dispatch_with ~legacy:true cn ind name1 name2
+  | Simple classes -> List.iter (function
+      | `Gen -> PublicDerive.derive_simple ~enumerator:false ind
+      | `Enum -> PublicDerive.derive_simple ~enumerator:true ind
+      | `Simpl cn -> SimplDriver.derive cn ind) classes
+  | Dependent mode -> PublicDerive.derive_dependent ~mode ind
 
 let merge ind1 ind2 ind3 =
   MergeTypes.merge ind1 ind2 ind3
@@ -108,39 +91,7 @@ END
    Derive commands of Stdlib or Equations. *)
 VERNAC COMMAND EXTEND QuickChickDerive CLASSIFIED AS SIDEFF
    | ["QuickChick" "Derive" constr(class_name) "for" constr(inductive)] ->
-     { dispatch class_name inductive "" "" }
-   | ["QuickChick" "Derive" constr(class_name) "for" constr(inductive) "using" ident(genInst)] ->
-     { dispatch class_name inductive (Id.to_string genInst) ""}
-   | ["QuickChick" "Derive" constr(class_name) "for" constr(inductive) "using" ident(genInst) "and" ident(monInst) ] ->
-     { dispatch class_name inductive (Id.to_string genInst) (Id.to_string monInst)}
+     { dispatch class_name inductive }
    | ["QC" "Derive" constr(class_name) "for" constr(inductive)] ->
-     { dispatch class_name inductive "" "" }
-   | ["QC" "Derive" constr(class_name) "for" constr(inductive) "using" ident(genInst)] ->
-     { dispatch class_name inductive (Id.to_string genInst) ""}
-   | ["QC" "Derive" constr(class_name) "for" constr(inductive) "using" ident(genInst) "and" ident(monInst) ] ->
-     { dispatch class_name inductive (Id.to_string genInst) (Id.to_string monInst)}
-END
-
-VERNAC COMMAND EXTEND QuickChickDeriveLegacy CLASSIFIED AS SIDEFF
-   | ["QuickChick" "Derive" "Legacy" constr(class_name) "for" constr(inductive)] ->
-     { dispatch_legacy class_name inductive "" "" }
-   | ["QuickChick" "Derive" "Legacy" constr(class_name) "for" constr(inductive) "using" ident(genInst)] ->
-     { dispatch_legacy class_name inductive (Id.to_string genInst) "" }
-   | ["QuickChick" "Derive" "Legacy" constr(class_name) "for" constr(inductive) "using" ident(genInst) "and" ident(monInst)] ->
-     { dispatch_legacy class_name inductive (Id.to_string genInst) (Id.to_string monInst) }
-   | ["QC" "Derive" "Legacy" constr(class_name) "for" constr(inductive)] ->
-     { dispatch_legacy class_name inductive "" "" }
-   | ["QC" "Derive" "Legacy" constr(class_name) "for" constr(inductive) "using" ident(genInst)] ->
-     { dispatch_legacy class_name inductive (Id.to_string genInst) "" }
-   | ["QC" "Derive" "Legacy" constr(class_name) "for" constr(inductive) "using" ident(genInst) "and" ident(monInst)] ->
-     { dispatch_legacy class_name inductive (Id.to_string genInst) (Id.to_string monInst) }
-END
-
-VERNAC COMMAND EXTEND DeriveLegacy CLASSIFIED AS SIDEFF
-   | ["DeriveLegacy" constr(class_name) "for" constr(inductive)] ->
-     { dispatch_legacy class_name inductive "" "" }
-   | ["DeriveLegacy" constr(class_name) "for" constr(inductive) "using" ident(genInst)] ->
-     { dispatch_legacy class_name inductive (Id.to_string genInst) "" }
-   | ["DeriveLegacy" constr(class_name) "for" constr(inductive) "using" ident(genInst) "and" ident(monInst)] ->
-     { dispatch_legacy class_name inductive (Id.to_string genInst) (Id.to_string monInst) }
+     { dispatch class_name inductive }
 END

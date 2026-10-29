@@ -378,7 +378,7 @@ Inductive step : tm -> tm -> Prop :=
 
 where "t '-->' t'" := (step t t').
 
-QuickChick Derive Legacy DecOpt for (step before after).
+QuickChick Derive DecOpt for (step before after).
 
 Reserved Notation "Gamma '|--' t '\in' T"
             (at level 101,

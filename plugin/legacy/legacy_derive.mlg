@@ -2,16 +2,11 @@ DECLARE PLUGIN "coq-quickchick.legacy"
 
 {
 open Stdarg
-open Names
 let dispatch = Quickchick_plugin.Driver.dispatch
 }
 
 (* Compatibility alias for existing QuickChick developments. *)
 VERNAC COMMAND EXTEND QuickChickDerive CLASSIFIED AS SIDEFF
    | ["Derive" constr(class_name) "for" constr(inductive)] ->
-     { dispatch class_name inductive "" "" }
-   | ["Derive" constr(class_name) "for" constr(inductive) "using" ident(genInst)] ->
-     { dispatch class_name inductive (Id.to_string genInst) ""}
-   | ["Derive" constr(class_name) "for" constr(inductive) "using" ident(genInst) "and" ident(monInst) ] ->
-     { dispatch class_name inductive (Id.to_string genInst) (Id.to_string monInst)}
+     { dispatch class_name inductive }
 END

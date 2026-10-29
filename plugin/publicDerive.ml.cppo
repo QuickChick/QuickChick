@@ -154,7 +154,7 @@ let dependent_target ~mode expression =
         _, _) -> List.map (fun n -> match n.CAst.v with
           | Names.Name id -> id
           | Names.Anonymous -> CErrors.user_err (Pp.str "Name each generated argument.")) names
-    | _ -> CErrors.user_err (Pp.str "Unsupported output binder; use QuickChick Derive Legacy for this form.")) binders in
+    | _ -> CErrors.user_err (Pp.str "QuickChick Derive supports only variable and tuple output binders.")) binders in
   let all_binders = List.map binder free @ binders in
   let wrapped = if all_binders = [] then body else CAst.make (CLambdaN (all_binders, body)) in
   let sigma, term = Constrintern.interp_constr_evars env (Evd.from_env env) wrapped in
@@ -290,14 +290,3 @@ let derive_dependent ~mode expression =
   publish ~mode ~constrained:true
     (Tactic_quickchick.compile_public ~mode ~outputs ~constrained:true ~all_mutual:false ind);
   Option.iter (publish_reordered ~mode) reorder
-
-let warn_legacy =
-  let category =
-#if COQ_VERSION >= (8, 18, 0)
-    CWarnings.create_category ~name:"quickchick-derivation" ()
-#else
-    "quickchick"
-#endif
-  in
-  CWarnings.create ~name:"quickchick-legacy-derive" ~category
-    (fun () -> Pp.str "The legacy derivation engine is deprecated. Prefer QuickChick Derive.")

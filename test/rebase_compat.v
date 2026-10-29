@@ -45,10 +45,10 @@ Definition right_enumerator : EnumSized right_tree := ltac:(typeclasses eauto).
 Definition right_printer : Show right_tree := ltac:(typeclasses eauto).
 Definition right_size : Sized right_tree := ltac:(typeclasses eauto).
 
-(* Keep the single-class and using forms available through the legacy import. *)
+(* Keep the single-class form available through the legacy import. *)
 Inductive legacy_named_tree := LegacyNamedLeaf | LegacyNamedNode : legacy_named_tree -> legacy_named_tree.
-Derive Show for legacy_named_tree using legacy_hint.
-Derive Sized for legacy_named_tree using legacy_hint and legacy_other_hint.
+Derive Show for legacy_named_tree.
+Derive Sized for legacy_named_tree.
 Definition legacy_printer : Show legacy_named_tree := ltac:(typeclasses eauto).
 Definition legacy_size : Sized legacy_named_tree := ltac:(typeclasses eauto).
 

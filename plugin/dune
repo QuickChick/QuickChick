@@ -85,10 +85,6 @@
 (rule (action (write-file void_for_linking-plugin-ltac.empty "")))
 
 (rule
- (target depDriver.ml)
- (deps ../scripts/mycppo depDriver.ml.cppo)
- (action (run sh %{dep:../scripts/mycppo} %{dep:depDriver.ml.cppo} %{target})))
-(rule
  (target genericLib.ml)
  (deps ../scripts/mycppo genericLib.ml.cppo)
  (action (run sh %{dep:../scripts/mycppo} %{dep:genericLib.ml.cppo} %{target})))

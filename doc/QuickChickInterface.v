@@ -592,16 +592,15 @@ Declare Instance Dec_eq_list (A : Type)
 
    Older files using bare [Derive] must import
    [From QuickChick Require Import LegacyDerive.]
-   This enables a compatibility spelling for the same engine, including [using]
-   clauses. It can conflict with Stdlib and other plugins' [Derive] commands.
+   This enables a compatibility spelling for the same engine. It can conflict with Stdlib and other plugins' [Derive] commands.
    Prefer [QuickChick Derive] with the normal [QuickChick] import.
    The schedule-specific [Derive] commands do not require the compatibility import.
 
    [QuickChick Derive] uses the scheduled engine for generation, enumeration, and
-   checking, including [DecOpt] and its [Checker] alias. The old engines remain
-   available through [QuickChick Derive Legacy] and [DeriveLegacy], which issue a
-   deprecation warning. Correctness tactics written for the old generated terms
-   require these legacy commands; see the DerivingProofs tutorial.
+   checking, including [DecOpt] and its [Checker] alias. The old engines and
+   their [QuickChick Derive Legacy] and [DeriveLegacy] commands have been
+   removed, and correctness proofs for derived instances are no longer
+   generated.
 
    Public wrappers preserve [Gen A] and [Enum A] prerequisites and default
    instance names. Repeated explicit commands create fresh names. Type and

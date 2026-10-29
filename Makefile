@@ -74,11 +74,9 @@ tests:
 # This takes too long. 
 #	$(MAKE) -C examples/c-mutation test
 #	coqc examples/BSTTest.v
-	coqc examples/DependentTest.v
 	coqc examples/TacticExample.v
 
 COMPATFILES:= \
-	plugin/depDriver.ml \
 	plugin/genericLib.ml \
 	plugin/newGenericLib.ml \
 	plugin/publicDerive.ml \

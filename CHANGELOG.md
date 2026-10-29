@@ -9,8 +9,11 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
 - `QCDerive` is replaced by `QuickChick Derive` and its short form
   `QC Derive`; `QC` is now a keyword. They use the scheduled engine for
   generators, enumerators, and checkers, and register their typeclass
-  instances. `QuickChick Derive Legacy`, `QC Derive Legacy` and `DeriveLegacy`
-  explicitly select the deprecated engines; `Legacy` is now a keyword.
+  instances.
+- The old derivation engine is removed, with `DeriveLegacy` and the `using`
+  clauses of derivation commands. Correctness proofs for derived instances
+  are no longer generated: the proof tactics recognized only the old
+  engine's terms, and the `DerivingProofs` tutorial is removed.
 - Bare `Derive` is available through `QuickChick.LegacyDerive`; the normal
   import leaves Stdlib's `Derive` syntax alone.
 - The `quickchick` proof tactic keeps its generated test and helpers local to
@@ -21,8 +24,8 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
   `(le' 2 y)` or `(R x x)`, through the instance derived for distinct inputs,
   and outputs out of predicate order, such as `(fun '(y, x) => R x y)`,
   through a second instance typed as the request. An output that occurs
-  more than once or inside a term is rejected as unsupported. Some applied
-  functions in constructor conclusions still need the legacy command. See the
+  more than once or inside a term is rejected as unsupported. Constructor
+  conclusions may apply functions, as in `R n (double n)`. See the
   [migration guide](doc/3.0Migration.md).
 - Schedule derivation shares completed dependency derivations between
   candidate schedules and caches instance checks up to variable renaming,

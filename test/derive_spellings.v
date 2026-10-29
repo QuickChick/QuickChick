@@ -19,12 +19,5 @@ QC Derive Checker for (even n).
 Example short_checker : @decOpt (even 4) _ 10 = Some true.
 Proof. reflexivity. Qed.
 
-Inductive old_box := OldBox : nat -> old_box.
-QC Derive Legacy GenSized for old_box.
-Inductive older_box := OlderBox : nat -> older_box.
-QuickChick Derive Legacy GenSized for older_box.
-Definition old_gen : GenSized old_box := ltac:(typeclasses eauto).
-Definition older_gen : GenSized older_box := ltac:(typeclasses eauto).
-
 (* The test command still accepts a term after QuickChick. *)
 QuickChick (fun n : nat => Nat.eqb n n).

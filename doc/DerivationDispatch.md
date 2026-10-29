@@ -12,10 +12,10 @@ dictionaries are implicit; ordinary value inputs remain explicit.
 | `QuickChick Derive GenSizedSuchThat` / `ArbitrarySizedSuchThat` / `Generator` | Scheduled constrained generation |
 | `QuickChick Derive EnumSizedSuchThat` / `Enumerator` | Scheduled constrained enumeration |
 | `QuickChick Derive Show`, `Shrink`, `Sized` | Existing implementations |
-| `QuickChick Derive Legacy` / `DeriveLegacy` | Deprecated access to the old engines |
+| `QuickChick Derive Fuzzy`, `Mutate` | Existing implementations, unchanged |
 
-The experimental `Testing` entry point and the `Fuzzy`/`Mutate` implementations
-are unchanged. Fuzzing repairs are outside this release-preparation work.
+The old engine and its commands (`QuickChick Derive Legacy`, `DeriveLegacy`) have
+been removed.
 
 ## Examples
 
@@ -66,21 +66,21 @@ Output tuples are the left-nested pairs that `(a, b, c)` denotes. An output
 that occurs more than once or inside a term, as in `(fun x => R x x)`, would
 have to satisfy an equation. That is unsupported, and the command reports it.
 
-`QuickChick Derive Legacy` and `DeriveLegacy` accept the old command forms, including
-`using`, and issue the `quickchick-legacy-derive` warning. There is no automatic
-fallback to the old engine. Correctness tactics that recognize the old generated
-terms still need legacy derivation; `tutorials/DerivingProofs.v` demonstrates this
-workflow. Proof automation for scheduled terms remains future work.
+A constructor conclusion may apply functions to its variables, as in
+`R n (double n)` or `ev (n + 2)`. Each application outside constructors is read
+as a fresh variable with an equality premise, so the scheduler can match inputs
+against constructor patterns.
+
+QuickChick 3.0 does not generate correctness proofs for derived instances. The
+tactics in `EnumProofs` and `CheckerProofs` recognize terms of the removed old
+engine; proof automation for scheduled terms is future work.
 
 Bare `Derive` requires `From QuickChick Require Import LegacyDerive.` It aliases
 the new public dispatcher, not the legacy engine. Prefer `QuickChick Derive`: bare
 `Derive` can conflict with Stdlib syntax.
 
-A mutual datatype with a member lacking a base constructor currently fails
-unconstrained derivation; the legacy generator fails on the same example.
-Constructor applications such as the recorded Specimen hash example also remain
-a scheduler limitation. Neither case is a reason to silently choose a different
-engine.
+A mutual datatype whose member lacks a base constructor is derived by inlining
+that member at fuel zero.
 
 ## Validation
 
