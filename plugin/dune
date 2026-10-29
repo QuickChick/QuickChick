@@ -130,3 +130,8 @@
  (target publicDerive.ml)
  (deps ../scripts/mycppo publicDerive.ml.cppo)
  (action (run sh %{dep:../scripts/mycppo} %{dep:publicDerive.ml.cppo} %{target})))
+
+(rule
+ (target compat.ml)
+ (deps ../scripts/mycppo compat.ml.cppo)
+ (action (run sh %{dep:../scripts/mycppo} %{dep:compat.ml.cppo} %{target})))
