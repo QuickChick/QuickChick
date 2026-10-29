@@ -464,8 +464,94 @@ let dep_parse_type nparams param_names arity_ctxt oib =
   let (names, types) = List.split nts in
   Some (dep_arrowify (DTyCtr (constructor_of_string "Prop", [])) names types)
 
-(* Dependent version: 
-   nparams is numver of Type parameters 
+let eq_inductive () =
+#if COQ_VERSION >= (9, 0, 0)
+  let r = Rocqlib.lib_ref "core.eq.type" in
+#else
+  let r = Coqlib.lib_ref "core.eq.type" in
+#endif
+  Constr.mkIndU (Globnames.destIndRef r,
+#if COQ_VERSION >= (8, 19, 0)
+    UVars.Instance.empty
+#else
+    Univ.Instance.empty
+#endif
+  )
+
+let max_free_rel c =
+  let rec aux n acc c = match Constr.kind c with
+    | Constr.Rel i -> if i > n then max acc (i - n) else acc
+    | _ -> Constr.fold_constr_with_binders succ aux n acc c in
+  aux 0 0 c
+
+(* A constructor conclusion such as [R n (double n)] applies a function to its
+   variables. Scheduling needs constructor patterns there, so each maximal
+   function application [t : T] outside constructors becomes a fresh variable
+   [y : T] with the premise [y = t], which the scheduler handles like any
+   equality. Type-valued applications (parameters, indices of type families)
+   are left alone. [ctr_pats] is innermost first, as Term.decompose_prod
+   returns it, [param_pats] are the stripped parameters, and [ty_ctr] is the
+   whole constructor type, whose free variables are the block's inductives. *)
+let abstract_conclusion_calls ty_ctr nparams param_pats ctr_pats result =
+  match Constr.kind result with
+  | Constr.App (head, args) when Array.length args > nparams ->
+    let decls = List.map (fun (n, t) -> Context.Rel.Declaration.LocalAssum (n, t)) in
+    let outer = max_free_rel ty_ctr in
+    let dummy = Context.Rel.Declaration.LocalAssum (Context.annotR Names.Anonymous, Constr.mkProp) in
+    let env = Global.env ()
+      |> Environ.push_rel_context (List.init outer (fun _ -> dummy))
+      |> Environ.push_rel_context (decls param_pats)
+      |> Environ.push_rel_context (decls ctr_pats) in
+    let sigma = Evd.from_env env in
+    let call_type t =
+      match Constr.kind (fst (Constr.decompose_app_list t)) with
+      | Constr.Const _ | Constr.Proj _ ->
+        let ty = Retyping.get_type_of env sigma (EConstr.of_constr t) in
+        if Reductionops.is_arity env sigma ty then None
+        else Some (EConstr.Unsafe.to_constr ty)
+      | _ -> None in
+    let rec collect acc t =
+      match call_type t with
+      | Some ty -> (t, ty) :: acc
+      | None ->
+        let (h, xs) = Constr.decompose_app_list t in
+        if Constr.isConstruct h then List.fold_left collect acc xs else acc in
+    let indices = Array.to_list (Array.sub args nparams (Array.length args - nparams)) in
+    let calls = List.rev (List.fold_left collect [] indices) in
+    let k = List.length calls in
+    if k = 0 then (ctr_pats, result) else begin
+      let taken = List.filter_map (fun (n, _) -> match n.Context.binder_name with
+        | Names.Name id -> Some id | Names.Anonymous -> None) (ctr_pats @ param_pats) in
+      let rec fresh i taken =
+        let id = Names.Id.of_string (Printf.sprintf "qc_value%d" i) in
+        if List.mem id taken then fresh (i + 1) taken else id in
+      let names = List.rev (snd (List.fold_left (fun (taken, acc) _ ->
+        let id = fresh 0 taken in (id :: taken, id :: acc)) (taken, []) calls)) in
+      (* y_1 .. y_k, then y_j = t_j for each j; y_j is Rel k under e_1 .. e_(j-1). *)
+      let ys = List.mapi (fun i (id, (_, ty)) ->
+        (Context.annotR (Names.Name id), Vars.lift i ty)) (List.combine names calls) in
+      let eqs = List.mapi (fun j (t, ty) ->
+        let lift = Vars.lift (k + j) in
+        (Context.annotR Names.Anonymous,
+         Constr.mkApp (eq_inductive (), [| lift ty; Constr.mkRel k; lift t |]))) calls in
+      let next = ref 0 in
+      let rec replace t =
+        match call_type t with
+        | Some _ -> incr next; Constr.mkRel (2 * k - !next + 1)
+        | None ->
+          let (h, xs) = Constr.decompose_app_list t in
+          if Constr.isConstruct h && xs <> [] then
+            Constr.mkApp (h, Array.of_list (List.map replace xs))
+          else Vars.lift (2 * k) t in
+      let lifted = Array.mapi (fun i a ->
+        if i < nparams then Vars.lift (2 * k) a else replace a) args in
+      (List.rev eqs @ List.rev ys @ ctr_pats,
+       Constr.mkApp (Vars.lift (2 * k) head, lifted))
+    end
+  | _ -> (ctr_pats, result)
+
+(* Dependent version:
+   nparams is numver of Type parameters
    param_names are type parameters (length = nparams)
 
    Returns list of constructor representations 
@@ -475,15 +561,16 @@ let dep_parse_constructors nparams param_names oib : rocq_ctr list option =
   let parse_constructor branch : rocq_ctr option =
     let (ctr_id, ty_ctr) = branch in
 
-    let (_, ty) = Term.decompose_prod_n nparams ty_ctr in
-    
+    let (param_pats, ty) = Term.decompose_prod_n nparams ty_ctr in
+
     let (ctr_pats, result) = if Constr.isConst ty then ([],ty) else Term.decompose_prod ty in
+    let (ctr_pats, result) = abstract_conclusion_calls ty_ctr nparams param_pats ctr_pats result in
 
     let pat_names, pat_types = List.split (List.rev ctr_pats) in
 
     let pat_names = List.map (fun n -> n.Context.binder_name) pat_names in
-    let arg_names = 
-      List.map (fun x -> DTyParam x) param_names @ 
+    let arg_names =
+      List.map (fun x -> DTyParam x) param_names @
       List.map (fun n -> match n with
                          | Names.Name x -> DTyVar x 
                          | Names.Anonymous -> DTyVar (make_up_name ()) (* Make up a name, but probably can't be used *)
