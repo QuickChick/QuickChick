@@ -1,0 +1,11 @@
+; Proofs that the built-in schedule scorers' prefix bounds are admissible and
+; that pruning with them is exact. They model the OCaml bounds in
+; plugin/scheduleRanking.ml and plugin/budgetAwareScore.ml; verification mode checks the premises at run time.
+
+(alias
+  (name runtest)
+  (deps (alias_rec all)))
+
+(coq.theory
+  (name QuickChick.TestingBoundProofs)
+  (modules DensityPrefixBound BudgetAwarePrefixBound DensityLookahead))

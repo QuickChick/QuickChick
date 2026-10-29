@@ -491,8 +491,9 @@ replaces it; and an unbound variable that is a bare argument of k remaining
 positive hypotheses counts k - 1 times, since only one of them can produce it.
 `plugin/test_prefix_search.ml` checks these bounds against every completed
 descendant and checks that tie pruning selects the exhaustive winner for each
-built-in policy. Rocq proofs, not yet in this repository, establish them:
-`DensityPrefixBound.v` shows the bound
+built-in policy. Rocq proofs in `test/bound_proofs/`, checked by every
+build, establish them for a model of the OCaml bounds: `DensityPrefixBound.v`
+shows the bound
 admissible and cuts exact for every built-in policy, `BudgetAwarePrefixBound.v`
 does the same for BudgetAware, including selectivity and the look-ahead's
 counting argument, and `DensityLookahead.v` applies that argument to the
