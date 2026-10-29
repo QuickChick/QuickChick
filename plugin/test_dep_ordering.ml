@@ -1,11 +1,11 @@
 (*
-  Benchmark for advanced schedule pruning in newGenericLib
+  Benchmark for advanced schedule pruning in genericLib
   
   Based on the Lean benchmark structure - tests exact hypothesis dependencies
   and measures schedule quality with/without pruning.
 *)
 
-module NGL = Quickchick_plugin.NewGenericLib
+module NGL = Quickchick_plugin.GenericLib
 
 (* Test helper *)
 let var_of_string s = Names.Id.of_string s

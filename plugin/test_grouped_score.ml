@@ -1,5 +1,5 @@
 module G = Quickchick_plugin.GroupedScore
-module N = Quickchick_plugin.NewGenericLib
+module N = Quickchick_plugin.GenericLib
 module B = Quickchick_plugin.BudgetAwareScore
 
 let state = ref 271828

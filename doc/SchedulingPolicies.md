@@ -445,7 +445,7 @@ The bound adds one `Checking` grade per such hypothesis. Negative hypotheses
 are excluded because their check grade differs. Exhaustive typed search checks
 this floor against every descendant, including a nested-argument case.
 
-`NewUnifyQC.type_to_schedules` now forwards optional observation and pruning
+`UnifyQC.type_to_schedules` now forwards optional observation and pruning
 callbacks after its variable correction, together with the fixed match and
 equality preludes. The ordinary command path supplies neither callback and
 keeps its previous search behavior. A typed test checks that observed terminal

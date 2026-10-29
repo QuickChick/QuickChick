@@ -77,14 +77,14 @@ tests:
 	coqc examples/TacticExample.v
 
 COMPATFILES:= \
+	plugin/coqExpr.ml \
 	plugin/genericLib.ml \
-	plugin/newGenericLib.ml \
 	plugin/publicDerive.ml \
 	plugin/mergeTypes.ml \
 	plugin/quickChick.mli \
 	plugin/quickChick.mlg \
-	plugin/newUnifyQC.ml \
-	plugin/newUnifyQC.mli \
+	plugin/unifyQC.ml \
+	plugin/unifyQC.mli \
 	plugin/tactic_quickchick.mlg \
 	plugin/weightmap.mlg \
 	src/Compat.v \

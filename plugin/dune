@@ -85,9 +85,9 @@
 (rule (action (write-file void_for_linking-plugin-ltac.empty "")))
 
 (rule
- (target genericLib.ml)
- (deps ../scripts/mycppo genericLib.ml.cppo)
- (action (run sh %{dep:../scripts/mycppo} %{dep:genericLib.ml.cppo} %{target})))
+ (target coqExpr.ml)
+ (deps ../scripts/mycppo coqExpr.ml.cppo)
+ (action (run sh %{dep:../scripts/mycppo} %{dep:coqExpr.ml.cppo} %{target})))
 (rule
  (target mergeTypes.ml)
  (deps ../scripts/mycppo mergeTypes.ml.cppo)
@@ -109,22 +109,22 @@
  (deps ../scripts/mycppo tactic_quickchick.mlg.cppo)
  (action (run sh %{dep:../scripts/mycppo} %{dep:tactic_quickchick.mlg.cppo} %{target})))
 (rule
- (target newUnifyQC.ml)
- (deps ../scripts/mycppo newUnifyQC.ml.cppo)
- (action (run sh %{dep:../scripts/mycppo} %{dep:newUnifyQC.ml.cppo} %{target})))
+ (target unifyQC.ml)
+ (deps ../scripts/mycppo unifyQC.ml.cppo)
+ (action (run sh %{dep:../scripts/mycppo} %{dep:unifyQC.ml.cppo} %{target})))
 (rule
- (target newUnifyQC.mli)
- (deps ../scripts/mycppo newUnifyQC.mli.cppo)
- (action (run sh %{dep:../scripts/mycppo} %{dep:newUnifyQC.mli.cppo} %{target})))
+ (target unifyQC.mli)
+ (deps ../scripts/mycppo unifyQC.mli.cppo)
+ (action (run sh %{dep:../scripts/mycppo} %{dep:unifyQC.mli.cppo} %{target})))
 (rule
  (target weightmap.mlg)
  (deps ../scripts/mycppo weightmap.mlg.cppo)
  (action (run sh %{dep:../scripts/mycppo} %{dep:weightmap.mlg.cppo} %{target})))
 
 (rule
- (target newGenericLib.ml)
- (deps ../scripts/mycppo newGenericLib.ml.cppo)
- (action (run sh %{dep:../scripts/mycppo} %{dep:newGenericLib.ml.cppo} %{target})))
+ (target genericLib.ml)
+ (deps ../scripts/mycppo genericLib.ml.cppo)
+ (action (run sh %{dep:../scripts/mycppo} %{dep:genericLib.ml.cppo} %{target})))
 
 (rule
  (target publicDerive.ml)

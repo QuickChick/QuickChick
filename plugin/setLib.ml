@@ -1,4 +1,4 @@
-open GenericLib
+open CoqExpr
 
 let set_singleton (c : coq_expr) : coq_expr = gApp (gInject "set1") [c]
 let set_empty : coq_expr = gInject "set0"

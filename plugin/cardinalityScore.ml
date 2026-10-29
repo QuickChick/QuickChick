@@ -5,7 +5,7 @@
    counts filters by acceptance class. doc/SchedulingPolicies.md describes
    the rules and their limits. *)
 
-open NewGenericLib
+open GenericLib
 
 type cls = One | Fin | Poly | Exp
 

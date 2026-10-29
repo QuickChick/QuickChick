@@ -68,7 +68,7 @@ _CoqProject
 META
 examples/other/TacticExampleX.v
 
-plugin/newGenericLib.ml
+plugin/coqExpr.ml
 
 src/LegacyDerive.v
 plugin/legacy/legacy_derive.ml

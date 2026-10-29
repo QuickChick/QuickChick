@@ -1,0 +1,682 @@
+open Pp
+open Constr
+open Names
+open Declarations
+open Libnames
+open Util
+open Constrexpr
+open Constrexpr_ops
+open Ppconstr
+open Context
+open Error
+
+let cnt = ref 0 
+
+let fresh_name n : Id.t =
+    let base = Id.of_string n in
+
+  (* [is_visible_name id] returns [true] if [id] is already
+     used on the Coq side. *)
+    let is_visible_name id =
+      try
+        ignore (Nametab.locate (Libnames.qualid_of_ident id));
+        true
+      with Not_found -> false
+    in
+    (* Safe fresh name generation. *)
+    Namegen.next_ident_away_from base is_visible_name
+
+let make_up_name () : Id.t =
+  let id = fresh_name (Printf.sprintf "mu%d_" (!cnt)) in
+  cnt := !cnt + 1;
+  id
+       
+#if COQ_VERSION >= (8, 19, 0)
+let hole = CAst.make @@ CHole None
+#elif COQ_VERSION >= (8, 18, 0)
+let hole = CAst.make @@ CHole (None, Namegen.IntroAnonymous)
+#else
+let hole = CAst.make @@ CHole (None, Namegen.IntroAnonymous, None)
+#endif
+
+type coq_expr = constr_expr (* Opaque *)
+
+let interp_open_coq_expr env evd e = fst (Constrintern.interp_constr env evd e)
+
+let interp_coq_expr_evars env evd e =
+  Constrintern.interp_constr_evars env evd e
+
+let debug_coq_expr (c : coq_expr) : unit =
+  let env = Global.env () in
+  let sigma = Evd.from_env env in
+  msg_debug (pr_constr_expr
+#if COQ_VERSION >= (9, 2, 0)
+    ~flags:(Ppconstr.current_flags())
+#endif
+ env sigma c)
+
+type var = Id.t (* Opaque *)
+let var_to_string = Id.to_string
+let gVar (x : var) : coq_expr =
+  CAst.make @@ CRef (qualid_of_ident x,None)
+
+let qualid_to_coq_expr q = 
+  mkRefC q
+
+(* Standard library paths written with the Coq prefix. Rocq 9 names the
+   prelude Corelib and the rest of the library Stdlib, and the Coq prefix
+   no longer resolves in references. *)
+let rocq_path s =
+#if COQ_VERSION >= (9, 0, 0)
+  let starts p = String.length s >= String.length p && String.sub s 0 (String.length p) = p in
+  let swap p q = q ^ String.sub s (String.length p) (String.length s - String.length p) in
+  if starts "Coq.Init." then swap "Coq." "Corelib."
+  else if starts "Coq.Lists." || starts "Coq.Strings." then swap "Coq." "Stdlib."
+  else s
+#else
+  s
+#endif
+
+(* Whether [s] names the library object written [path] with the Coq prefix. *)
+let gInject s = 
+  if s = "" then failwith "Called gInject with empty string";
+  CAst.make @@ CRef (qualid_of_string (rocq_path s), None)
+
+         
+type ty_param = Id.t (* Opaque *)
+let ty_param_to_string (x : ty_param) = Id.to_string x
+let gTyParam = mkIdentC
+
+type ty_ctr   = qualid (* Opaque *)
+let ty_ctr_to_string (x : ty_ctr) = string_of_qualid x
+let gTyCtr = qualid_to_coq_expr
+let tyCtrToQualid x = x
+
+type arg = local_binder_expr
+let gArg ?assumName:(an=hole) ?assumType:(at=hole) ?assumImplicit:(ai=false) ?assumGeneralized:(ag=false) _ =
+  let n = match an with
+    | { CAst.v = CRef (qid, _); loc } -> (loc,Name (qualid_basename qid))
+    | { CAst.v = CHole _; loc } -> (loc,Anonymous)
+    | _a -> failwith "This expression should be a name" in
+  let max_implicit = Glob_term.MaxImplicit in
+  CLocalAssum ( [CAst.make ?loc:(fst n) @@ snd n],
+#if COQ_VERSION >= (8, 20, 0)
+                  None,
+#endif
+                  (if ag then Generalized (max_implicit, false)
+                   else if ai then Default max_implicit else Default Glob_term.Explicit),
+                  at )
+
+let str_lst_to_string sep (ss : string list) = 
+  List.fold_left (fun acc s -> acc ^ sep ^ s) "" ss
+
+type coq_type = 
+  | Arrow of coq_type * coq_type
+  | TyCtr of ty_ctr * coq_type list
+  | TyParam of ty_param
+
+let rec coq_type_size ct =
+  match ct with
+  | Arrow (_,ct') -> 1 + coq_type_size ct'
+  | _ -> 0
+
+type constructor = qualid (* Opaque *)
+let constructor_to_string (x : constructor) = string_of_qualid x
+let gCtr id = qualid_to_coq_expr id
+let injectCtr s = 
+  if s = "" then failwith "Called gInject with empty string";
+  qualid_of_string (rocq_path s)
+
+module type Ord_ty_ctr_type = sig
+  type t = ty_ctr 
+  val compare : t -> t -> int
+end
+
+module type Ord_ctr_type = sig
+  type t = constructor
+  val compare : t -> t -> int
+end
+
+module Ord_ty_ctr = struct 
+  type t = ty_ctr 
+  let compare x y = Stdlib.compare (string_of_qualid x) (string_of_qualid y)
+end
+
+module Ord_ctr = struct
+  type t = constructor
+  let compare x y = Stdlib.compare (string_of_qualid x) (string_of_qualid y)
+end
+
+type ctr_rep = constructor * coq_type 
+type sdt_rep = ty_ctr * ty_param list * ctr_rep list
+type dt_rep = sdt_rep list
+let (>>=) m f = 
+  match m with
+  | Some x -> f x 
+  | None -> None
+
+let isSome m = 
+  match m with 
+  | Some _ -> true
+  | None   -> false
+              
+let foldM f b l = List.fold_left (fun accm x -> 
+                                  accm >>= fun acc ->
+                                  f acc x
+                    ) b l
+
+let sequenceM f l = 
+  (foldM (fun acc x -> f x >>= fun x' -> Some (x' :: acc)) (Some []) l) >>= fun l -> Some (List.rev l)
+
+let parse_type_params arity_ctxt =
+  let param_names =
+    foldM (fun acc decl ->
+           match Rel.Declaration.get_name decl with 
+           | Name id -> Some (id :: acc)
+           | _ -> CErrors.user_err (str "Unnamed type parameter?" ++ fnl ())
+          ) (Some []) arity_ctxt in
+  param_names
+
+let rec arrowify terminal l = 
+  match l with
+  | [] -> terminal
+  | x::xs -> Arrow (x, arrowify terminal xs)
+
+let qualid_to_mib (r : qualid) : mutual_inductive_body =
+  let (mind, _) = Nametab.global_inductive r in
+  let env = Global.env () in
+  let mib = Environ.lookup_mind mind env in
+
+  mib
+
+(* Receives number of type parameters and one_inductive_body.
+   -> Possibly ty_param list as well? 
+   Returns list of constructor representations 
+ *)
+let parse_constructors nparams param_names result_ty oib : ctr_rep list option =
+  
+  let parse_constructor (branch : constructor * constr) =
+    let (ctr_id, ty_ctr) = branch in
+
+    let (_, ty) = Term.decompose_prod_n nparams ty_ctr in
+    
+    let ctr_pats = if isConst ty then [] else fst (Term.decompose_prod ty) in
+
+    let _, pat_types = List.split (List.rev ctr_pats) in
+
+    msg_debug (str (string_of_qualid ctr_id) ++ fnl ());
+    let rec aux i ty = 
+      if isRel ty then begin 
+        msg_debug (int (i + nparams) ++ str " Rel " ++ int (destRel ty) ++ fnl ());
+        let db = destRel ty in
+        if i + nparams = db then (* Current inductive, no params *)
+          Some (TyCtr (qualid_of_ident oib.mind_typename, []))
+        else (* [i + nparams - db]th parameter *)
+          try Some (TyParam (List.nth param_names (i + nparams - db - 1)))
+          with _ -> CErrors.user_err (str "nth failed: " ++ int (i + nparams - db - 1) ++ fnl ())
+      end 
+      else if isApp ty then begin
+#if COQ_VERSION >= (8, 18, 0)
+        let (ctr, tms) = decompose_app_list ty in
+#else
+        let (ctr, tms) = decompose_app ty in
+#endif
+        foldM (fun acc ty -> 
+               aux i ty >>= fun ty' -> Some (ty' :: acc)
+              ) (Some []) tms >>= fun tms' ->
+        begin match aux i ctr with
+        | Some (TyCtr (c, _)) -> Some (TyCtr (c, List.rev tms'))
+(*        | Some (TyParam p) -> Some (TyCtr (p, tms')) *)
+        | None -> CErrors.user_err (str "Aux failed?" ++ fnl ())
+        | _ -> failwith "aux failed to return a TyCtr"
+        end 
+      end
+      else if isInd ty then begin
+        let ((mind, i), _) = destInd ty in
+        let mib = qualid_to_mib @@ qualid_of_ident (Label.to_id (MutInd.label mind)) in
+        let oib = mib.mind_packets.(i) in
+        Some (TyCtr (qualid_of_ident @@ (oib.mind_typename), []))
+      end
+      else if isConst ty then begin
+        let (c,_) = destConst ty in 
+        (* TODO: Rethink this for constants? *)
+        Some (TyCtr (qualid_of_ident (Label.to_id (Constant.label c)), []))
+      end
+      else CErrors.user_err (str "Case Not Handled" ++ fnl())
+
+    in sequenceM (fun x -> x) (List.mapi aux (List.map (Vars.lift (-1)) pat_types)) >>= fun types ->
+       Some (ctr_id, arrowify result_ty types)
+  in
+
+  let (cns : qualid list) = List.map qualid_of_ident (Array.to_list oib.mind_consnames) in
+  let map (ctx, t) = Term.it_mkProd_or_LetIn t ctx in
+  let lc = Array.map_to_list map oib.mind_nf_lc in
+  sequenceM parse_constructor (List.combine cns lc)
+
+(* Convert mutual_inductive_body to this representation, if possible *)
+let dt_rep_from_mib (mib : mutual_inductive_body) : dt_rep option = 
+  let dt_rep_from_oib (oib : one_inductive_body) : sdt_rep option =
+    let ty_ctr = oib.mind_typename in
+    parse_type_params oib.mind_arity_ctxt >>= fun ty_params ->
+    let result_ctr = TyCtr (qualid_of_ident ty_ctr, List.map (fun x -> TyParam x) ty_params) in
+    parse_constructors mib.mind_nparams ty_params result_ctr oib >>= fun ctr_reps ->
+    Some (qualid_of_ident ty_ctr, ty_params, ctr_reps)
+  in
+
+  Array.fold_left
+    (fun dt oib -> dt >>= fun (dt : sdt_rep list) ->
+      dt_rep_from_oib oib >>=
+      fun (sdt : sdt_rep) -> Some (sdt::dt))
+    (Some [])
+    mib.mind_packets
+
+let qualid_to_mib r =
+  let env = Global.env () in
+  
+  let glob_ref = Nametab.global r in
+  let (mind,_) = Globnames.destIndRef glob_ref in
+  let mib = Environ.lookup_mind mind env in
+
+  mib
+
+(* Legacy dt_rep_from_mib that fails on mutually inductive definitions *)
+let sdt_rep_from_mib (mib : mutual_inductive_body) : sdt_rep option =
+  if Array.length mib.mind_packets > 1 then
+    CErrors.user_err (str "Mutual inductive types not supported yet." ++ fnl())
+  else
+    dt_rep_from_mib mib >>= fun dt -> Some (List.hd dt)
+
+let coerce_reference_to_dt_rep (c : constr_expr) : dt_rep option = 
+  let r = match c with
+    | { CAst.v = CRef (r,_);_ } -> r
+    | _ -> failwith "Not a reference"
+  in
+
+  let mib : mutual_inductive_body = qualid_to_mib r in
+  
+  dt_rep_from_mib mib
+
+(* Dependent derivations - lots of code reuse *)
+
+(* Input : arity_ctxt [Name, Body (option) {expected None}, Type] 
+   In reverse order.
+   ASSUME: all type parameters are first
+
+   Output: all type parameters (named arguments of type : Type)
+           in correct order *)
+let gApp ?explicit:(expl=false) c cs =
+  if expl then
+    let f c = match c with
+    | CRef (r,_) -> Constrexpr.CAppExpl((r, None), cs)
+    | _ -> failwith "invalid argument to gApp"
+    in CAst.map f c
+  else mkAppC (c, cs)
+
+let gProdWithArgs args f_body =
+#if COQ_VERSION >= (8, 20, 0)
+  let xvs = List.map (fun (CLocalAssum ([{CAst.v = n;_}], _, _, _)) ->
+#else
+  let xvs = List.map (fun (CLocalAssum ([{CAst.v = n;_}], _, _)) ->
+#endif
+                      match n with
+                      | Name x -> x
+                      | _ -> make_up_name ()
+                     ) args in
+  let fun_body = f_body xvs in
+  mkCProdN args fun_body
+
+let gFunWithArgs args f_body =
+#if COQ_VERSION >= (8, 20, 0)
+  let xvs = List.map (fun (CLocalAssum ([{CAst.v = n;_}], _, _, _)) ->
+#else
+  let xvs = List.map (fun (CLocalAssum ([{CAst.v = n;_}], _, _)) ->
+#endif
+                      match n with
+                      | Name x -> x
+                      | _ -> make_up_name ()
+                     ) args in
+  let fun_body = f_body xvs in
+  mkCLambdaN args fun_body
+
+let gIf b t f = CAst.make @@ CIf (b, (None, None) , t, f)
+
+let gFun xss (f_body : var list -> coq_expr) =
+  match xss with
+  | [] -> f_body []
+  | _ ->
+  let xvs = List.map (fun x -> fresh_name x) xss in
+  (* TODO: optional argument types for xss *)
+#if COQ_VERSION >= (8, 20, 0)
+  let binder_list = List.map (fun x -> CLocalAssum ([CAst.make @@ Name x], None, Default Glob_term.Explicit, hole)) xvs in
+#else
+  let binder_list = List.map (fun x -> CLocalAssum ([CAst.make @@ Name x], Default Glob_term.Explicit, hole)) xvs in
+#endif
+  let fun_body = f_body xvs in
+  mkCLambdaN binder_list fun_body 
+
+let gFunTyped xts (f_body : var list -> coq_expr) =
+  match xts with
+  | [] -> f_body []
+  | _ ->
+  let xvs = List.map (fun (x,t) -> (fresh_name x,t)) xts in
+  (* TODO: optional argument types for xss *)
+#if COQ_VERSION >= (8, 20, 0)
+  let binder_list = List.map (fun (x,t) -> CLocalAssum ([CAst.make @@ Name x], None, Default Glob_term.Explicit, t)) xvs in
+#else
+  let binder_list = List.map (fun (x,t) -> CLocalAssum ([CAst.make @@ Name x], Default Glob_term.Explicit, t)) xvs in
+#endif
+  let fun_body = f_body (List.map fst xvs) in
+  mkCLambdaN binder_list fun_body 
+
+(* with Explicit/Implicit annotations *)  
+let gRecFunInWithArgs ?structRec:(rec_id=None) ?assumType:(typ=hole) (fs : string) args (f_body : (var * var list) -> coq_expr) (let_body : var -> coq_expr) = 
+  let fv  = fresh_name fs in
+#if COQ_VERSION >= (8, 20, 0)
+  let xvs = List.map (fun (CLocalAssum ([{CAst.v = n;_}], _, _, _)) ->
+#else
+  let xvs = List.map (fun (CLocalAssum ([{CAst.v = n;_}], _, _)) ->
+#endif
+                      match n with
+                      | Name x -> x
+                      | _ -> make_up_name ()
+                     ) args in
+  let fix_body = f_body (fv, xvs) in
+  let rec_wf = match rec_id with
+    | None -> None
+    | Some id -> Some (CAst.make @@ CStructRec (CAst.make id)) in
+  CAst.make @@ CLetIn (CAst.make @@ Name fv,
+#if COQ_VERSION >= (8, 20, 0)
+    CAst.make @@ CFix(CAst.make fv,[(CAst.make fv, None, rec_wf, args, typ, fix_body)]), None,
+#else
+    CAst.make @@ CFix(CAst.make fv,[(CAst.make fv, rec_wf, args, typ, fix_body)]), None,
+#endif
+    let_body fv)
+             
+let gRecFunIn ?structRec:(rec_id=None) ?assumType:(typ = hole) (fs : string) (xss : string list) (f_body : (var * var list) -> coq_expr) (let_body : var -> coq_expr) =
+  let xss' = List.map (fun s -> fresh_name s) xss in
+  gRecFunInWithArgs ~structRec:rec_id ~assumType:typ fs (List.map (fun x -> gArg ~assumName:(gVar x) ()) xss') f_body let_body 
+
+let gMatch discr ?catchAll:(body=None) ?params:(holes=0) ?explicit_params (branches : (constructor * string list * (var list -> coq_expr)) list) : coq_expr =
+  CAst.make @@ CCases (MatchStyle,
+          None (* return *), 
+          [(discr, None, None)], (* single discriminee, no as/in *)
+          (List.map (fun (c, cs, bf) -> 
+                      let cvs : Id.t list = List.map fresh_name cs in
+                      let vars = List.map (fun s -> CAst.make @@ CPatAtom (Some (qualid_of_ident s))) cvs in
+                      let hole _ = CAst.make @@ CPatAtom None in
+                      let pat = match explicit_params with
+                        | Some n -> CPatCstr (c, Some (List.init n hole @ vars), [])
+                        | None -> CPatCstr (c, None, List.init holes hole @ vars) in
+                      CAst.make ([[CAst.make @@ pat
+                           ]],
+                       bf cvs)
+                   ) branches) @ match body with
+                                 | None -> []
+                                 | Some c' -> [CAst.make ([[CAst.make @@ CPatAtom None]], c')])
+
+let gMatchReturn (discr : coq_expr)
+      ?catchAll:(body=None)
+      (as_id : string)
+      (ret : var -> coq_expr)
+      (branches : (constructor * string list * (var list -> coq_expr)) list) : coq_expr =
+  let as_id' = fresh_name as_id in
+  CAst.make @@ CCases (MatchStyle,
+          Some (ret as_id'), (* return *)
+          [(discr, Some (CAst.make (Name as_id')), None)], (* single discriminee, no in *)
+          (List.map (fun (c, cs, bf) -> 
+                      let cvs : Id.t list = List.map fresh_name cs in
+                       CAst.make ([[CAst.make @@ CPatCstr (c,
+                                      None,
+                                      List.map (fun s -> CAst.make @@ CPatAtom (Some (qualid_of_ident s))) cvs (* Constructor applied to patterns *)
+                                  )]],
+                                  bf cvs)
+                   ) branches) @ (match body with
+                                  | None -> []
+                                  | Some c' -> [CAst.make ([([CAst.make @@ CPatAtom None])], c')])
+         )
+
+#if COQ_VERSION >= (9, 3, 0)
+let gRecord names_and_bodies =
+  CAst.make @@ CRecord (None, List.map (fun (n,b) -> (qualid_of_ident @@ Id.of_string n, b)) names_and_bodies)
+#else
+let gRecord names_and_bodies =
+  CAst.make @@ CRecord (List.map (fun (n,b) -> (qualid_of_ident @@ Id.of_string n, b)) names_and_bodies)
+#endif
+
+let get_type (id : Id.t) = 
+  msg_debug (str ("Trying to global:" ^ Id.to_string id) ++ fnl ());
+  let glob_ref = Nametab.global (qualid_of_ident id) in
+  let open GlobRef in
+  match glob_ref with 
+  | VarRef _ -> msg_debug  (str "Var" ++ fnl ())
+  | ConstRef _ -> msg_debug (str "Constant" ++ fnl ())
+  | IndRef _ -> msg_debug (str "Inductive" ++ fnl ())
+  | ConstructRef _ -> msg_debug (str "Constructor" ++ fnl ())
+
+let is_inductive c = 
+  let glob_ref = Nametab.global c in
+  match glob_ref with
+  | GlobRef.IndRef _ -> true
+  | _        -> false
+
+let list_nil = gInject "Coq.Lists.List.nil"
+let lst_append c1 c2 = gApp (gInject "Coq.Lists.List.app") [c1; c2]
+let rec lst_appends = function
+  | [] -> list_nil
+  | c::cs -> lst_append c (lst_appends cs)
+let gCons x xs = gApp (gInject "Coq.Lists.List.cons") [x; xs]                        
+let rec gList = function 
+  | [] -> gInject "Coq.Lists.List.nil"
+  | x::xs -> gCons x (gList xs)
+
+(* Generic String Manipulations *)
+#if COQ_VERSION >= (8, 19, 0)
+let string_scope ast = CAst.make @@ CDelimiters (DelimUnboundedScope, "string", ast)
+#else
+let string_scope ast = CAst.make @@ CDelimiters ("string", ast)
+#endif
+let gStr s = string_scope (CAst.make @@ CPrim (String s))
+let emptyString = gInject "Coq.Strings.String.EmptyString"
+let str_append c1 c2 = gApp (gInject "Coq.Strings.String.append") [c1; c2]
+let rec str_appends cs = 
+  match cs with 
+  | []  -> emptyString
+  | [c] -> c
+  | c1::cs' -> str_append c1 (str_appends cs')
+let smart_paren c = gApp (gInject "QuickChick.Show.smart_paren") [c]
+                  
+(* Pair *)
+let gPair (c1, c2) = gApp (gInject "Coq.Init.Datatypes.pair") [c1;c2]
+let gProd (c1, c2) = gApp (gInject "Coq.Init.Datatypes.prod") [c1;c2]
+
+
+(* Int *)
+
+#if COQ_VERSION >= (8, 19, 0)
+let nat_scope ast = CAst.make @@ CDelimiters (DelimUnboundedScope, "nat", ast)
+#else
+let nat_scope ast = CAst.make @@ CDelimiters ("nat", ast)
+#endif
+let gInt n =
+  let number =
+    Number (NumTok.Signed.of_int_string (string_of_int n))
+  in nat_scope (CAst.make @@ CPrim number)
+let gSucc x = gApp (gInject "Coq.Init.Datatypes.S") [x]
+let rec maximum = function
+  | [] -> failwith "maximum called with empty list"
+  | [c] -> c
+  | (c::cs) -> gApp (gInject "Coq.Init.Peano.max") [c; maximum cs]
+
+let gle x y = gApp (gInject "ssrnat.leq") [x; y]
+let gEq x y = gApp (gInject "Coq.Init.Logic.eq") [x; y]
+            
+(* option type in Coq *)
+let gNone typ = gApp ?explicit:(Some true) (gInject "Coq.Init.Datatypes.None") [typ]
+let gSome typ c = gApp ?explicit:(Some true) (gInject "Coq.Init.Datatypes.Some") [typ; c]
+        
+let gNone' = gInject "Coq.Init.Datatypes.None"
+let gSome' c = gApp (gInject "Coq.Init.Datatypes.Some") [c]
+
+let g_true  = gInject "Coq.Init.Datatypes.true"
+let g_false = gInject "Coq.Init.Datatypes.false"
+
+let decOptToBool c = 
+  gMatch c [ (injectCtr "Coq.Init.Datatypes.Some", ["res"], fun [res] -> gVar res)
+           ; (injectCtr "Coq.Init.Datatypes.None",       [], fun [] -> g_false)
+  ]
+
+(* Unit *)
+let gUnit = gInject "Coq.Init.Datatypes.unit"
+let gTT   = gInject "Coq.Init.Datatypes.tt"
+
+(* dec *)
+
+let g_decOpt typ n = gApp ?explicit:(Some true) (gInject "QuickChick.Decidability.decOpt") [typ; hole; n]
+let g_checker toCheck = gApp (gInject "QuickChick.Checker.checker") [toCheck]
+
+(* Gen combinators *)
+
+let g_forAll gen prop = gApp (gInject "QuickChick.Checker.forAll") [gen; prop]
+
+let g_arbitrary = gInject "QuickChick.Classes.arbitrary"
+
+let g_quickCheck p = gApp (gInject "QuickChick.Test.quickCheck") [p]
+
+let g_show typ = gApp (gInject "QuickChick.Show.show") [typ]
+
+(* Recursion combinators / fold *)
+(* fold_ty : ( a -> coq_type -> a ) -> ( ty_ctr * coq_type list -> a ) -> ( ty_param -> a ) -> coq_type -> a *)
+let rec fold_ty arrow_f ty_ctr_f ty_param_f ty = 
+  match ty with
+  | Arrow (ty1, ty2) -> 
+     let acc = fold_ty arrow_f ty_ctr_f ty_param_f ty2 in 
+     arrow_f acc ty1 
+  | TyCtr (ctr, tys) -> ty_ctr_f (ctr, tys)
+  | TyParam tp -> ty_param_f tp
+
+let fold_ty' arrow_f base ty = 
+  fold_ty arrow_f (fun _ -> base) (fun _ -> base) ty
+
+let generate_names_from_type base_name ty =
+  List.rev (snd (fold_ty' (fun (i, names) _ -> (i+1, (Printf.sprintf "%s%d" base_name i) :: names)) (0, []) ty))
+
+(* a := var list -> var -> a *)
+let fold_ty_vars (f : var list -> var -> coq_type -> 'a) (mappend : 'a -> 'a -> 'a) (base : 'a) ty : var list -> 'a =
+  fun allVars -> fold_ty' (fun acc ty -> fun (v::vs) -> mappend (f allVars v ty) (acc vs)) (fun _ -> base) ty allVars
+
+(* Declarations *)
+(* LEO : There used to be defineConstant stuff here. WHY? *)
+
+                          
+(* Declare an instance *)
+let create_names_for_anon a =
+  match a with 
+#if COQ_VERSION >= (8, 20, 0)
+  | CLocalAssum ([{CAst.v = n; loc}], r, x, y) ->
+#else
+  | CLocalAssum ([{CAst.v = n; loc}], x, y) ->
+#endif
+     begin match n with
+           | Name x -> (x, a)
+           | Anonymous -> let n = make_up_name () in
+#if COQ_VERSION >= (8, 20, 0)
+                          (n, CLocalAssum ([CAst.make ?loc:loc @@ Names.Name n], r, x, y))
+#else
+                          (n, CLocalAssum ([CAst.make ?loc:loc @@ Names.Name n], x, y))
+#endif
+     end
+  | _ -> failwith "Non RawAssum in create_names"
+
+let default_poly =
+#if COQ_VERSION >= (9, 2, 0)
+  PolyFlags.default
+#else
+  false
+#endif
+
+let declare_class_instance ?(global=true) ?(priority=42) instance_arguments instance_name instance_type instance_record =
+  msg_debug (str "Declaring class instance..." ++ fnl ());
+  msg_debug (str (Printf.sprintf "Total arguments: %d" (List.length instance_arguments)) ++ fnl ());
+  let (vars,iargs) = List.split (List.map create_names_for_anon instance_arguments) in
+  let instance_type_vars = instance_type vars in
+  msg_debug (str "Calculated instance_type_vars" ++ fnl ());
+  let instance_record_vars = instance_record vars in
+  msg_debug (str "Calculated instance_record_vars" ++ fnl ());
+  let cid =
+    Classes.new_instance
+#if COQ_VERSION >= (8, 15, 0)
+      ~locality:(if global then Hints.SuperGlobal else Hints.Local)
+#elif COQ_VERSION >= (8, 14, 0)
+      ~locality:(if global then Goptions.OptGlobal else Goptions.OptLocal)
+#else
+      ~global
+#endif
+              ~poly:default_poly
+              (CAst.make @@ Name (Id.of_string instance_name), None) iargs
+              instance_type_vars
+              (true, instance_record_vars) (* TODO: true or false? *)
+              { Typeclasses.hint_priority = Some priority; hint_pattern = None }
+  in
+#if COQ_VERSION >= (9, 1, 0)
+  let cid = cid.CAst.v in
+#endif
+  msg_debug (str (Id.to_string cid) ++ fnl ())
+
+let define_new_fixpoint (functions : (var * arg list * var * coq_expr * coq_expr) list) =
+  let open Vernacexpr in
+
+  let fixpoint_exprs = List.map
+    (fun (name, arguments, structural_wf_variable, return, body) ->
+      {
+#if COQ_VERSION < (9, 0, 0)
+        rec_order = Some (CAst.make @@ CStructRec (CAst.make @@ structural_wf_variable));
+#endif
+        fname = CAst.make name;
+        univs = None;
+        binders = arguments;
+        rtype = return;
+        body_def = Some body;
+        notations = []
+      }
+    ) functions in
+#if COQ_VERSION >= (9, 0, 0)
+  let rec_orders = List.map
+    (fun (_, _, structural_wf_variable, _, _) ->
+      Some (CAst.make @@ CStructRec (CAst.make @@ structural_wf_variable)))
+    functions in
+  let kind = Decls.(IsDefinition Fixpoint) in
+  ignore (ComFixpoint.do_mutually_recursive
+#if COQ_VERSION >= (9, 1, 0)
+  ~refine:false
+#endif
+  ~poly:default_poly ~kind ~program_mode:false (CFixRecOrder rec_orders, fixpoint_exprs))
+#elif COQ_VERSION >= (8, 20, 0)
+  ignore (ComFixpoint.do_fixpoint ~poly:default_poly fixpoint_exprs)
+#elif COQ_VERSION >= (8, 16, 0)
+  ComFixpoint.do_fixpoint ~poly:default_poly fixpoint_exprs
+#else
+  let default_scope = Locality.Global Locality.ImportDefaultBehavior in
+  ComFixpoint.do_fixpoint ~scope:default_scope ~poly:default_poly fixpoint_exprs
+#endif
+
+(* List Utils. Probably should move to a util file instead *)
+let list_drop_every n l =
+  let rec aux i = function
+    | [] -> []
+    | x::xs -> if i == n then aux 1 xs else x::aux (i+1) xs
+  in aux 1 l
+
+let list_keep_every n l =
+  let rec aux i = function
+    | [] -> []
+    | x::xs -> if i == n then x :: aux 1 xs else aux (i+1) xs
+  in aux n l
+
+let sameTypeCtr c_ctr = function
+  | TyCtr (ty_ctr', _) -> c_ctr = ty_ctr'
+  | _ -> false
+
+let isBaseBranch ty_ctr ty =
+  fold_ty' (fun b ty' -> b && not (sameTypeCtr ty_ctr ty')) true ty
+
+(* Look for typeclass instances *)

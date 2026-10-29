@@ -3,7 +3,7 @@
    renderers below turn them into Rocq terms for a policy evaluated in Rocq.
    Unknown local types remain opaque; names and binder identities are
    preserved. *)
-open NewGenericLib
+open GenericLib
 open PolicyViews
 
 (* Views hold strings as character lists, as Rocq extracts them. *)
@@ -41,14 +41,14 @@ let rec map_result f = function
   | [] -> Ok []
   | x :: rest -> let* y = f x in let* ys = map_result f rest in Ok (y :: ys)
 
-let rec quote_pattern ~global scope (pattern : NewGenericLib.pat) =
+let rec quote_pattern ~global scope (pattern : GenericLib.pat) =
   match pattern with
-  | NewGenericLib.PWild -> Ok (PWild, scope)
-  | NewGenericLib.PParam -> Ok (PParameter, scope)
-  | NewGenericLib.PVar name ->
+  | GenericLib.PWild -> Ok (PWild, scope)
+  | GenericLib.PParam -> Ok (PParameter, scope)
+  | GenericLib.PVar name ->
     let id, scope = bind scope name in
     Ok (PLocal id, scope)
-  | NewGenericLib.PCtr (name, arguments) ->
+  | GenericLib.PCtr (name, arguments) ->
     let rec loop scope acc = function
       | [] -> Ok (PConstructor (chars (global name), List.rev acc), scope)
       | pattern :: rest ->
@@ -59,14 +59,14 @@ let rec quote_pattern ~global scope (pattern : NewGenericLib.pat) =
 (* A completed schedule already gives every local a unique name. Pattern
    variables refer to those ids, including in steps following a match. *)
 let rec quote_existing_pattern ~global scope = function
-  | NewGenericLib.PWild -> Ok PWild
-  | NewGenericLib.PParam -> Ok PParameter
-  | NewGenericLib.PVar name ->
+  | GenericLib.PWild -> Ok PWild
+  | GenericLib.PParam -> Ok PParameter
+  | GenericLib.PVar name ->
     (match lookup scope name with
      | Ok (TLocal id) -> Ok (PLocal id)
      | Ok _ -> assert false
      | Error _ as error -> error)
-  | NewGenericLib.PCtr (name, arguments) ->
+  | GenericLib.PCtr (name, arguments) ->
     let* args = map_result (quote_existing_pattern ~global scope) arguments in
     Ok (PConstructor (chars (global name), args))
 
@@ -297,46 +297,46 @@ let quote_context ~global scope relation result_vars local_types
    Constructor applications are elaborated and checked in the current proof
    environment by the caller. *)
 let constructor name args =
-  GenericLib.gApp
-    (GenericLib.gInject ("QuickChick.SchedulingPolicy." ^ name)) args
+  CoqExpr.gApp
+    (CoqExpr.gInject ("QuickChick.SchedulingPolicy." ^ name)) args
 
-let str cs = GenericLib.gStr (string_of_chars cs)
-let int_list ids = GenericLib.gList (List.map GenericLib.gInt ids)
-let bool b = if b then GenericLib.g_true else GenericLib.g_false
+let str cs = CoqExpr.gStr (string_of_chars cs)
+let int_list ids = CoqExpr.gList (List.map CoqExpr.gInt ids)
+let bool b = if b then CoqExpr.g_true else CoqExpr.g_false
 
 let rec pattern_expression = function
   | PWild -> constructor "PWild" []
   | PParameter -> constructor "PParameter" []
-  | PLocal id -> constructor "PLocal" [GenericLib.gInt id]
+  | PLocal id -> constructor "PLocal" [CoqExpr.gInt id]
   | PConstructor (name, args) ->
     constructor "PConstructor"
-      [str name; GenericLib.gList (List.map pattern_expression args)]
+      [str name; CoqExpr.gList (List.map pattern_expression args)]
 
 let rec term_expression = function
-  | TLocal id -> constructor "TLocal" [GenericLib.gInt id]
+  | TLocal id -> constructor "TLocal" [CoqExpr.gInt id]
   | TGlobal name -> constructor "TGlobal" [str name]
   | TSort name -> constructor "TSort" [str name]
   | TGenerated name -> constructor "TGenerated" [str name]
   | TImplicitHole -> constructor "TImplicitHole" []
   | TApply (head, args) ->
     constructor "TApply"
-      [term_expression head; GenericLib.gList (List.map term_expression args)]
+      [term_expression head; CoqExpr.gList (List.map term_expression args)]
   | TArrow (domain, codomain) ->
     constructor "TArrow" [term_expression domain; term_expression codomain]
   | TProduct (id, domain, body) ->
     constructor "TProduct"
-      [GenericLib.gInt id; term_expression domain; term_expression body]
+      [CoqExpr.gInt id; term_expression domain; term_expression body]
   | TLambda (id, domain, body) ->
     constructor "TLambda"
-      [GenericLib.gInt id; term_expression domain; term_expression body]
+      [CoqExpr.gInt id; term_expression domain; term_expression body]
   | TMatch (scrutinee, branches) ->
     constructor "TMatch"
       [term_expression scrutinee;
-       GenericLib.gList (List.map (fun (pattern, body) ->
-         GenericLib.gPair (pattern_expression pattern, term_expression body))
+       CoqExpr.gList (List.map (fun (pattern, body) ->
+         CoqExpr.gPair (pattern_expression pattern, term_expression body))
          branches)]
   | TNot body -> constructor "TNot" [term_expression body]
-  | TOpaque handle -> constructor "TOpaque" [GenericLib.gInt handle]
+  | TOpaque handle -> constructor "TOpaque" [CoqExpr.gInt handle]
 
 let source_kind_expression = function
   | External -> constructor "External" []
@@ -350,7 +350,7 @@ let source_view_expression s =
      int_list s.source_inputs; int_list s.source_finite_pins]
 
 let local_expression l =
-  constructor "Build_local_view" [GenericLib.gInt l.local_id; term_expression l.local_type]
+  constructor "Build_local_view" [CoqExpr.gInt l.local_id; term_expression l.local_type]
 
 let producer_expression = function
   | Generator -> constructor "Generator" []
@@ -362,9 +362,9 @@ let step_view_expression = function
     constructor "Unconstrained" [local_expression l; source_view_expression src; producer_expression mode]
   | SuchThat (ls, src, mode) ->
     constructor "SuchThat"
-      [GenericLib.gList (List.map local_expression ls); source_view_expression src;
+      [CoqExpr.gList (List.map local_expression ls); source_view_expression src;
        producer_expression mode]
-  | MatchStep (id, pattern) -> constructor "MatchStep" [GenericLib.gInt id; pattern_expression pattern]
+  | MatchStep (id, pattern) -> constructor "MatchStep" [CoqExpr.gInt id; pattern_expression pattern]
   | LetStep (l, value) -> constructor "LetStep" [local_expression l; term_expression value]
 
 let density_expression = function
@@ -376,11 +376,11 @@ let density_expression = function
 
 let schedule_view_expression s =
   constructor "Build_schedule_view"
-    [GenericLib.gList (List.map (fun (step, grade) ->
-       GenericLib.gPair (step_view_expression step, density_expression grade)) s.schedule_steps);
+    [CoqExpr.gList (List.map (fun (step, grade) ->
+       CoqExpr.gPair (step_view_expression step, density_expression grade)) s.schedule_steps);
      (match s.schedule_result with
-      | None -> GenericLib.gNone'
-      | Some term -> GenericLib.gSome' (term_expression term))]
+      | None -> CoqExpr.gNone'
+      | Some term -> CoqExpr.gSome' (term_expression term))]
 
 let derive_mode_expression = function
   | Generate -> constructor "Generate" []
@@ -406,23 +406,23 @@ let dependency_context_expression ~global scope relation result_vars local_types
   let* context = quote_context ~global scope relation result_vars local_types
     outputs mode constrained dependencies in
   Ok (spec_view_expression context.current_spec,
-      GenericLib.gList (List.map local_expression context.locals),
+      CoqExpr.gList (List.map local_expression context.locals),
       int_list context.original_inputs,
-      GenericLib.gList (List.map (fun (spec, state) ->
-        GenericLib.gPair (spec_view_expression spec, match state with
+      CoqExpr.gList (List.map (fun (spec, state) ->
+        CoqExpr.gPair (spec_view_expression spec, match state with
           | PolicyViews.SuppliedInstance -> constructor "SuppliedInstance" []
           | _ -> constructor "Pending" [])) context.dependencies))
 
 let score_one_schedule_expression scorer (spec, locals, inputs, dependencies)
     schedule =
-  GenericLib.gApp
-    (GenericLib.gInject "QuickChick.SchedulingPolicy.score_with_dependency_states")
-    [GenericLib.gInject scorer; spec; locals; inputs; dependencies; schedule]
+  CoqExpr.gApp
+    (CoqExpr.gInject "QuickChick.SchedulingPolicy.score_with_dependency_states")
+    [CoqExpr.gInject scorer; spec; locals; inputs; dependencies; schedule]
 
 (* The result remains a typed Rocq term: the plugin need not know a user's
    score representation. The returned sigma carries elaboration constraints. *)
 let evaluate_term_in env sigma expression =
-  let sigma, term = GenericLib.interp_coq_expr_evars env sigma expression in
+  let sigma, term = CoqExpr.interp_coq_expr_evars env sigma expression in
   if Evd.has_undefined sigma then
     Error "SchedulingPolicy: the selected scorer left unresolved evars"
   else
@@ -430,15 +430,15 @@ let evaluate_term_in env sigma expression =
     Ok (sigma, Vnorm.cbv_vm env sigma term typ, typ)
 
 let evaluate_expression_in env sigma function_name argument =
-  let expression = GenericLib.gApp
-    (GenericLib.gInject function_name) [argument] in
+  let expression = CoqExpr.gApp
+    (CoqExpr.gInject function_name) [argument] in
   evaluate_term_in env sigma expression
 
 let evaluate_expression env function_name argument =
   evaluate_expression_in env (Evd.from_env env) function_name argument
 
 let compare_values_expression env sigma comparator_expression left right =
-  let sigma, comparator = GenericLib.interp_coq_expr_evars env sigma
+  let sigma, comparator = CoqExpr.interp_coq_expr_evars env sigma
     comparator_expression in
   let application = EConstr.mkApp (comparator, [|left; right|]) in
   let sigma, typ = Typing.type_of env sigma application in
@@ -469,13 +469,13 @@ let compare_values_expression env sigma comparator_expression left right =
     | _ -> Error "SchedulingPolicy: comparator must return comparison"
 
 let compare_values env sigma function_name left right =
-  compare_values_expression env sigma (GenericLib.gInject function_name)
+  compare_values_expression env sigma (CoqExpr.gInject function_name)
     left right
 
 let compare_record_scores env sigma scorer left right =
-  let comparator = GenericLib.gApp
-    (GenericLib.gInject "QuickChick.SchedulingPolicy.compare_scores")
-    [GenericLib.gInject scorer] in
+  let comparator = CoqExpr.gApp
+    (CoqExpr.gInject "QuickChick.SchedulingPolicy.compare_scores")
+    [CoqExpr.gInject scorer] in
   compare_values_expression env sigma comparator left right
 
 let evaluate env function_name view =

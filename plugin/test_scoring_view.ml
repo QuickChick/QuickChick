@@ -1,7 +1,7 @@
-module N = Quickchick_plugin.NewGenericLib
+module N = Quickchick_plugin.GenericLib
 module V = Quickchick_plugin.ScoringView
 module P = Quickchick_plugin.PolicyViews
-module U = Quickchick_plugin.NewUnifyQC
+module U = Quickchick_plugin.UnifyQC
 
 let v = N.var_of_string
 let global = N.ty_ctr_to_string

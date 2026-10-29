@@ -1,5 +1,5 @@
 open Util
-open GenericLib
+open CoqExpr
 open GenLib
 
 let rec replace v x = function

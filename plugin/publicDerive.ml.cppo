@@ -61,7 +61,7 @@ let publish ~mode ~constrained (sigma, bodies) =
     let body = adapt (EConstr.to_constr !sigma body) in
     let prefix = if mode = "Check" then "DecOpt"
       else sized_name ^ (if constrained then "SuchThat" else "") in
-    let instance_name = NewGenericLib.fresh_name (prefix ^ Names.Id.to_string root) in
+    let instance_name = GenericLib.fresh_name (prefix ^ Names.Id.to_string root) in
     let reference = declare instance_name body in
     (* The legacy engine's priority: user instances keep precedence. *)
     Classes.existing_instance Hints.SuperGlobal reference
@@ -79,7 +79,7 @@ let publish ~mode ~constrained (sigma, bodies) =
           let _, args = Constr.decompose_app (EConstr.to_constr next ty) in
           let projection = if enumerator then "enumSized" else "arbitrarySized" in
           Constr.mkApp (global (class_prefix ^ projection), [| args.(0); body |]) in
-    let helper_name = NewGenericLib.fresh_name (impl_prefix ^ Names.Id.to_string root) in
+    let helper_name = GenericLib.fresh_name (impl_prefix ^ Names.Id.to_string root) in
     ignore (declare helper_name (method_body env body))
     end) bodies
 
@@ -109,7 +109,7 @@ let dependent_target ~mode expression =
 #if COQ_VERSION >= (8, 20, 0)
       None,
 #endif
-      Default Glob_term.Explicit, NewGenericLib.mexp_to_constr_expr NewGenericLib.MHole NewGenericLib.D_Check) in
+      Default Glob_term.Explicit, GenericLib.mexp_to_constr_expr GenericLib.MHole GenericLib.D_Check) in
   let binders, body = if mode = "Check" then [], expression else
     match expression.CAst.v with
     | CLambdaN (binders, body) -> binders, body
@@ -200,7 +200,7 @@ let dependent_target ~mode expression =
 let publish_reordered ~mode r =
   let open Constrexpr in
   let enumerator = mode = "Enum" in
-  let qualid s = Libnames.qualid_of_string (NewGenericLib.rocq_path s) in
+  let qualid s = Libnames.qualid_of_string (GenericLib.rocq_path s) in
   let ref_ s = CAst.make (CRef (qualid s, None)) in
   let var id = CAst.make (CRef (Libnames.qualid_of_ident id, None)) in
   let hole = CAst.make (CHole (None
@@ -277,7 +277,7 @@ let publish_reordered ~mode r =
   let env = Global.env () in
   let sigma, body = Constrintern.interp_constr_evars env (Evd.from_env env) term in
   Pretyping.check_evars env sigma body;
-  let name = NewGenericLib.fresh_name
+  let name = GenericLib.fresh_name
     ((if enumerator then "EnumSizedSuchThat" else "GenSizedSuchThat") ^ "_reordered") in
   let cinfo = Declare.CInfo.make ~name ~typ:None () in
   let info = Declare.Info.make () in

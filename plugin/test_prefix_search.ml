@@ -1,5 +1,5 @@
-module N = Quickchick_plugin.NewGenericLib
-module U = Quickchick_plugin.NewUnifyQC
+module N = Quickchick_plugin.GenericLib
+module U = Quickchick_plugin.UnifyQC
 module Ranking = Quickchick_plugin.ScheduleRanking
 
 let v = N.var_of_string

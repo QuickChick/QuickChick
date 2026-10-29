@@ -1,7 +1,7 @@
 (* Derivation of the simple classes: Show, Shrink, Sized, Fuzzy and Mutate.
    Generators and enumerators for plain types go through PublicDerive. *)
 open Constrexpr
-open GenericLib
+open CoqExpr
 open Sized
 open ArbitrarySized
 

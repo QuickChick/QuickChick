@@ -47,7 +47,7 @@ let app f args =
 
 let set_view_extraction () =
   List.iter (fun (rocq, ocaml, constructors, matcher) ->
-    let rocq = NewGenericLib.rocq_path rocq in
+    let rocq = GenericLib.rocq_path rocq in
     Extraction_plugin.Table.extract_inductive
       (Libnames.qualid_of_string rocq) ocaml constructors matcher)
     PolicyViews.extraction_table
@@ -76,7 +76,7 @@ let extract reference file =
       "qc_policy_proves_bound", app "QuickChick.SchedulingPolicy.proves_bound" [policy];
     ] in
     let names = List.map (fun (name, body) ->
-      let id = NewGenericLib.fresh_name name in
+      let id = GenericLib.fresh_name name in
       declare id body; (name, id)) entries in
     set_view_extraction ();
     let qualids = List.map (fun (_, id) -> Libnames.qualid_of_ident id) names in

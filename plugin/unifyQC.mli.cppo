@@ -1,0 +1,69 @@
+type name_provider = { next_name : unit -> string; }
+val mk_name_provider : string -> name_provider
+module Unknown :
+  sig
+    type t = GenericLib.var
+    val to_string : GenericLib.var -> string
+    val from_string : string -> GenericLib.var
+    val from_var : 'a -> 'a
+    val from_id : Names.Id.t -> GenericLib.var
+    val undefined : GenericLib.var
+  end
+module UnknownOrd :
+  sig
+    type t = Unknown.t
+    val compare : GenericLib.var -> GenericLib.var -> int
+  end
+type unknown = Unknown.t
+type range =
+    Ctr of GenericLib.constructor * range list
+  | Unknown of unknown
+  | Undef of GenericLib.rocq_constr
+  | FixedInput
+  | Parameter of GenericLib.ty_param
+  | RangeHole
+val is_parameter : range -> bool
+val range_to_string : range -> string
+module UM : CMap.ExtS with type key = Unknown.t and module Set := Set.Make(UnknownOrd)
+type umap = range UM.t
+val umfind : UM.key -> 'a UM.t -> 'a
+val lookup : unknown -> umap -> range option
+module OrdTSS :
+  sig type t = unknown * unknown val compare : 'a -> 'a -> int end
+
+(** [select_groups] receives each independent hypothesis group's local
+    schedules, after unification renaming, and selects index combinations.
+    It is used only when no prefix callback is supplied. *)
+val type_to_schedules :
+            ?on_prepared:(GenericLib.var list -> unit) ->
+            ?select_groups:(GenericLib.schedule list list -> int list list) ->
+            ?on_prefix:((int * GenericLib.var list list) list -> bool ->
+              (GenericLib.schedule * (unknown * GenericLib.pat) list *
+                (unknown * unknown) list) -> unit) ->
+            ?on_prefix_with_floor:((int * GenericLib.var list list) list ->
+              bool -> GenericLib.prefix_floor ->
+              (GenericLib.schedule * (unknown * GenericLib.pat) list *
+                (unknown * unknown) list) -> unit) ->
+            ?should_prune_prefix:((int * GenericLib.var list list) list ->
+              (GenericLib.schedule * (unknown * GenericLib.pat) list *
+                (unknown * unknown) list) -> bool) ->
+            ?should_prune_prefix_with_floor:((int * GenericLib.var list list) list ->
+              GenericLib.prefix_floor ->
+              (GenericLib.schedule * (unknown * GenericLib.pat) list *
+                (unknown * unknown) list) -> bool) ->
+            GenericLib.rocq_constr ->
+            GenericLib.ty_ctr option ->
+            GenericLib.ty_ctr option ->
+            (unknown * GenericLib.rocq_constr) list ->
+            unknown list ->
+            GenericLib.derive_sort ->
+            bool ->
+            (GenericLib.schedule * (unknown * GenericLib.pat) list * (unknown * unknown) list) list
+
+val match_schedule_to_string : GenericLib.schedule ->
+            (unknown * GenericLib.pat) list ->
+            (unknown * unknown) list ->
+            string
+
+val match_schedule_as_pp_constr_expr : GenericLib.schedule -> (unknown * GenericLib.pat) list -> (unknown * unknown) list -> GenericLib.derive_sort -> Pp.t
+

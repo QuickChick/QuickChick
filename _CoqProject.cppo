@@ -9,7 +9,7 @@ plugin/quickChick.mli
 plugin/driver.mli
 plugin/tactic_quickchick.mli
 plugin/weightmap.mli
-plugin/genericLib.mli
+plugin/coqExpr.mli
 plugin/mergeTypes.mli
 plugin/error.mli
 plugin/simplDriver.mli
@@ -17,7 +17,7 @@ plugin/setLib.mli
 plugin/coqLib.mli
 plugin/arbitrarySized.mli
 plugin/genLib.mli
-plugin/newUnifyQC.mli
+plugin/unifyQC.mli
 plugin/sizeUtils.mli
 plugin/sized.mli
 
@@ -28,7 +28,7 @@ plugin/weightmap.mlg
 plugin/quickchick_plugin.mlpack
 plugin/legacy/legacy_derive.mlg
 plugin/legacy/quickchick_legacy_plugin.mlpack
-plugin/genericLib.ml
+plugin/coqExpr.ml
 plugin/error.ml
 plugin/simplDriver.ml
 plugin/mergeTypes.ml
@@ -36,7 +36,7 @@ plugin/setLib.ml
 plugin/coqLib.ml
 plugin/arbitrarySized.ml
 plugin/genLib.ml
-plugin/newUnifyQC.ml
+plugin/unifyQC.ml
 plugin/sizeUtils.ml
 plugin/sized.ml
 

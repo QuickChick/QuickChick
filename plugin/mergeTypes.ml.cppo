@@ -1,7 +1,7 @@
 open Constrexpr
 open Error
 
-open NewGenericLib
+open GenericLib
 open Pp
 
 open Libnames
@@ -431,7 +431,7 @@ let merge_relations ((tyctr1, ctrs1, ty1) : relation')
   ((tyctr, ctrs, ty) , param_sub)
 
 (* This represents an inductive relation in coq, e.g. "Inductive IsSorted (t : Type) : list t -> Prop := ...".
-This tuple is the representation returned by leo's wrapper around the coq internals, in genericLib. *)
+This tuple is the representation returned by leo's wrapper around the coq internals, in coqExpr. *)
 type relation
   = ty_ctr (* The name of the relation (e.g. IsSorted) *)
   * ty_param list (* The list of type parameters (e.g. "t" in IsSorted) *)
@@ -505,7 +505,7 @@ let rec removeFirstArgsOfVar (var : ty_ctr) (num : int) (term : rocq_constr) =
   | DNot d -> DNot (recurse d)
   | DHole -> DHole
 
-(* Inputs a dependent relation as outputted by genericLib, and removes the type parameters from all parts of
+(* Inputs a dependent relation as outputted by coqExpr, and removes the type parameters from all parts of
 the relation, so that they can be worked with as merely free variables. Specifically, this
 1) removes foralls from the front of ty
 2) removes foralls from the front of each constructor in ctrs

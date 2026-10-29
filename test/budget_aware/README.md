@@ -19,7 +19,7 @@ all six score fields, finite and loose production, repeated pins, dependency
 fabrication, recursive locality, and coverage aggregation.
 
 Separate OCaml tests score candidates returned by the real scheduler,
-including a match prelude. `NewUnifyQC.type_to_schedules` reports prepared
+including a match prelude. `UnifyQC.type_to_schedules` reports prepared
 fixed inputs through `on_prepared`; callers pass these inputs to the scorer
 after unification. `score_candidate` prepends the match and equality steps
 that compilation uses. Dependency requests retain full applied arguments,

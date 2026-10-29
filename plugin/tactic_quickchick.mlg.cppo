@@ -115,18 +115,18 @@ let quickchick_goal = Tacticals.tclIDTAC
     let ct = Constrextern.extern_constr e evd (EConstr.mkEvar (evar, [])) in
 #endif
  *)  
-  match NewGenericLib.parse_dependent_type (EConstr.to_constr evd c) with
+  match GenericLib.parse_dependent_type (EConstr.to_constr evd c) with
     | Some dt ->
       begin
-        msg_debug (str (NewGenericLib.rocq_constr_to_string dt) ++ fnl ());
-        let open NewGenericLib in 
+        msg_debug (str (GenericLib.rocq_constr_to_string dt) ++ fnl ());
+        let open GenericLib in 
         let decide prop = decOptToBool (g_decOpt prop (gInt 1000)) in
         let rec mkProperty = function
           | DProd ((var, _),body) -> 
               g_forAll g_arbitrary (gFun [var_to_string var] (fun [_] ->
                 mkProperty body
                 )) 
-          | DArrow (x,y) -> NewGenericLib.debug_coq_expr (gType' [] x); gIf (decide (gType' [] x)) (mkProperty y) (g_checker gTT)
+          | DArrow (x,y) -> GenericLib.debug_coq_expr (gType' [] x); gIf (decide (gType' [] x)) (mkProperty y) (g_checker gTT)
           | p -> g_checker (decide (gType' [] p)) 
               in
           
@@ -139,10 +139,10 @@ let quickchick_goal = Tacticals.tclIDTAC
           | DNot p -> *)
 (*Use decOpt, for every arrow, assume instacne exists and match on it *)
             
-        NewGenericLib.debug_coq_expr (mkProperty dt);
+        GenericLib.debug_coq_expr (mkProperty dt);
         (*run the generator called checker using QuickCheck.*)
         (*failwith "OUch!";*)
-        let to_run = NewGenericLib.interp_open_coq_expr e evd (g_show (g_quickCheck (mkProperty dt))) in
+        let to_run = GenericLib.interp_open_coq_expr e evd (g_show (g_quickCheck (mkProperty dt))) in
         (*failwith "Oucher!";*)
 #if COQ_VERSION >= (8, 20, 0)
         (* FRAGILE probably won't be allowed in the future? *)
@@ -285,7 +285,7 @@ let quickchick_goal = Tacticals.tclIDTAC
 
 *)
 
-open NewGenericLib
+open GenericLib
 
 let is_inductive' (ty_name : ty_ctr) : bool =
   let locate_result = Nametab.locate_all (ty_name) in
@@ -1420,7 +1420,7 @@ let cardinality_count_key rel outputs ds =
   | None -> None
 
 let cardinality_mode_count rel outputs ds =
-  if NewGenericLib.is_rocq_path (ty_ctr_to_string rel) "Coq.Init.Logic.eq" || ty_ctr_to_string rel = "eq" then
+  if GenericLib.is_rocq_path (ty_ctr_to_string rel) "Coq.Init.Logic.eq" || ty_ctr_to_string rel = "eq" then
     (if List.length outputs <= 1 then Some CardinalityScore.One else None)
   else if ds = D_Check then Some CardinalityScore.One
   else match cardinality_count_key rel outputs ds with
@@ -2023,7 +2023,7 @@ let distinct_variables xs =
   List.fold_left (fun acc v -> if List.mem v acc then acc else acc @ [v]) [] xs
 
 let schedule_obligation relation outputs ds constrained =
-  let open NewGenericLib in
+  let open GenericLib in
   let relation = match relation with DNot p when ds = D_Check -> p | p -> p in
   let term = product_free_rocq_type_to_mexp relation in
   let class_name, args = match ds, constrained with
@@ -2051,7 +2051,7 @@ let elaborate_schedule_expression variables outputs ds expression =
     not (in_env v || List.mem v outputs || List.mem v bound)) in
   let binders = inputs @ List.map (fun v -> v, MHole) vars in
   let expression = mexp_to_constr_expr
-    (MFun (List.map (fun (v,t) -> NewGenericLib.PVar v, Some t) binders, expression)) ds in
+    (MFun (List.map (fun (v,t) -> GenericLib.PVar v, Some t) binders, expression)) ds in
   let expression = match expression.CAst.v with
     | Constrexpr.CLambdaN (binders, body) -> CAst.make (Constrexpr.CProdN (binders, body))
     | _ -> expression in
@@ -2242,10 +2242,10 @@ let canonical_obligation_key bound relation outputs ds constrained inputs =
     end in
   let qualid q = add (Libnames.string_of_qualid q); add " " in
   let rec pat = function
-    | NewGenericLib.PCtr (c, ps) -> add "(C "; qualid c; List.iter pat ps; add ")"
-    | NewGenericLib.PVar v -> var v
-    | NewGenericLib.PParam -> add "P "
-    | NewGenericLib.PWild -> add "_ " in
+    | GenericLib.PCtr (c, ps) -> add "(C "; qualid c; List.iter pat ps; add ")"
+    | GenericLib.PVar v -> var v
+    | GenericLib.PParam -> add "P "
+    | GenericLib.PWild -> add "_ " in
   let rec constr = function
     | DArrow (a, c) -> add "(-> "; constr a; constr c; add ")"
     | DLambda (p, a, c) -> add "(L "; var p; constr a; constr c; add ")"
@@ -2280,8 +2280,8 @@ let canonical_obligation_key bound relation outputs ds constrained inputs =
     | DNot p -> refs_constr p
     | DTyParam _ | DTyVar _ | DHole -> ()
   and refs_pat = function
-    | NewGenericLib.PCtr (q, ps) -> refer q; List.iter refs_pat ps
-    | NewGenericLib.(PVar _ | PParam | PWild) -> ()
+    | GenericLib.PCtr (q, ps) -> refer q; List.iter refs_pat ps
+    | GenericLib.(PVar _ | PParam | PWild) -> ()
   and refs_ty = function
     | MArrow (a, c) -> refs_ty a; refs_ty c
     | MProd (binders, c) -> List.iter (fun (_, a) -> refs_ty a) binders; refs_ty c
@@ -2461,10 +2461,10 @@ let compiled_schedule_score (policy : PolicyRegistry.compiled) ind_name
    its grade and whether that grade is final, the remaining hypotheses, and
    how many of them must become checks. *)
 let compiled_node_bound (policy : PolicyRegistry.compiled) ind_name
-    result_vars output_vars ds sort graded (floor : NewGenericLib.prefix_floor) =
+    result_vars output_vars ds sort graded (floor : GenericLib.prefix_floor) =
   let _, constrained = schedule_result_and_constrained sort in
   let steps = List.map (fun (step, _, _) -> step) graded in
-  let remaining = floor.NewGenericLib.remaining_hypotheses in
+  let remaining = floor.GenericLib.remaining_hypotheses in
   let scope, context = compiled_context ind_name result_vars output_vars ds ~constrained
     steps (List.map fst remaining) in
   let ( let* ) = Result.bind in
@@ -2494,10 +2494,10 @@ let compiled_node_bound (policy : PolicyRegistry.compiled) ind_name
       | S_Match (_, p) -> pat_vars p
       | S_Check _ -> []) steps in
     let future_uses = List.length (List.filter (fun v -> List.mem v step_bound)
-      floor.NewGenericLib.bound_argument_occurrences)
-      + floor.NewGenericLib.future_variable_uses in
+      floor.GenericLib.bound_argument_occurrences)
+      + floor.GenericLib.future_variable_uses in
     Ok { PolicyViews.node_steps = committed;
-         node_forced_checks = floor.NewGenericLib.forced_checks;
+         node_forced_checks = floor.GenericLib.forced_checks;
          node_future_uses = future_uses;
          node_remaining = remaining; node_bound = bound } in
   policy.PolicyRegistry.bound (quoted_or_fail context) (quoted_or_fail node)
@@ -2701,7 +2701,7 @@ and constructor_valid_schedules (ind_name : ty_ctr) (ctr : rocq_ctr) (result_var
   Error.msg_debug (str "Constructor name: " ++ str (constructor_to_string ctr_name) ++ fnl ());
   Error.msg_debug (str "Constructor type: " ++ str (rocq_constr_to_string typ) ++ fnl ());
   let typ = if opt then typ else arrows_to_products typ in
-  let constructor_vars, hypotheses, _ = NewGenericLib.type_info typ in
+  let constructor_vars, hypotheses, _ = GenericLib.type_info typ in
   (* The scheduler handles premises that are relations, possibly negated. An
      implication, quantified or functional premise has no producer or
      checker to schedule. *)
@@ -2715,7 +2715,7 @@ and constructor_valid_schedules (ind_name : ty_ctr) (ctr : rocq_ctr) (result_var
   let known_inputs = List.map fst !schedule_inputs in
   let constructor_inputs = List.filter_map (fun (name, ty) ->
     if List.mem name known_inputs then None
-    else Some (name, NewGenericLib.product_free_rocq_type_to_mexp ty)) constructor_vars in
+    else Some (name, GenericLib.product_free_rocq_type_to_mexp ty)) constructor_vars in
   with_schedule_inputs (!schedule_inputs @ constructor_inputs) (fun () ->
   if Sys.getenv_opt "QC_POLICY_QUOTE_PROBE" = Some "1" then begin
     let view = match ScoringView.quote_term
@@ -2723,7 +2723,7 @@ and constructor_valid_schedules (ind_name : ty_ctr) (ctr : rocq_ctr) (result_var
       | Ok (view, _) -> view
       | Error message -> failwith message in
     let env = Global.env () in
-    ignore (GenericLib.interp_open_coq_expr env (Evd.from_env env)
+    ignore (CoqExpr.interp_open_coq_expr env (Evd.from_env env)
       (ScoringView.term_expression view));
     let report = match Sys.getenv_opt "QC_POLICY_SCORE_PROBE" with
       | None -> "checked Rocq term view"
@@ -2881,15 +2881,15 @@ and constructor_valid_schedules (ind_name : ty_ctr) (ctr : rocq_ctr) (result_var
              grade)) steps @
       (* Remaining positive hypotheses with all arguments bound must become
          checks, whose fixed density rank is Checking = 0. *)
-      List.init check_floor.NewGenericLib.forced_checks (fun _ -> Some 0) in
+      List.init check_floor.GenericLib.forced_checks (fun _ -> Some 0) in
     let annotations = List.map (fun step -> step, Total) (match_steps @ steps) in
     (* Variables bound by a committed step stay bound, so their occurrences in
        the fully bound arguments of remaining hypotheses will be counted. *)
     let step_bound = List.fold_left (fun env (step, density) ->
       add_bound_vars env step density) [] annotations in
     let future_uses = List.length (List.filter (fun v -> List.mem_assoc v step_bound)
-      check_floor.NewGenericLib.bound_argument_occurrences)
-      + check_floor.NewGenericLib.future_variable_uses in
+      check_floor.GenericLib.bound_argument_occurrences)
+      + check_floor.GenericLib.future_variable_uses in
     ScheduleRanking.prefix_bound ~prefer_dense ~known_grades
       ~variable_uses:(get_num_var_uses (annotations, sort) ds + future_uses))) in
   let budget_score ~optimistic steps =
@@ -2924,12 +2924,12 @@ and constructor_valid_schedules (ind_name : ty_ctr) (ctr : rocq_ctr) (result_var
        bound ones above. *)
     let future_var_deps = List.length (List.filter (fun v ->
       List.mem v bound_by_prefix && not (List.mem v !prepared_inputs))
-      check_floor.NewGenericLib.bound_argument_occurrences)
-      + check_floor.NewGenericLib.future_variable_uses in
+      check_floor.GenericLib.bound_argument_occurrences)
+      + check_floor.GenericLib.future_variable_uses in
     Option.map (fun score ->
       let score = { score with BudgetAwareScore.var_deps =
         score.BudgetAwareScore.var_deps + future_var_deps } in
-      if check_floor.NewGenericLib.forced_checks > 0 then
+      if check_floor.GenericLib.forced_checks > 0 then
         BudgetAwareScore.combine score
           { BudgetAwareScore.empty with BudgetAwareScore.density = BudgetAwareScore.Checking }
       else score)
@@ -3125,7 +3125,7 @@ and constructor_valid_schedules (ind_name : ty_ctr) (ctr : rocq_ctr) (result_var
         (score_group_candidates (schedule_density []) (fun (steps, _) _ ->
           Result.to_option (BudgetAwareScore.score_schedule context key steps)) groups))
     else Some (schedule_group_selector ds) in
-  let schedule_matches = NewUnifyQC.type_to_schedules
+  let schedule_matches = UnifyQC.type_to_schedules
     ~on_prepared:(fun inputs -> prepared_inputs := inputs) ?select_groups
     ?on_prefix ?on_prefix_with_floor ?should_prune_prefix_with_floor
     typ (Some ind_name) (Some ctr_name)
@@ -3223,7 +3223,7 @@ and constructor_valid_schedules (ind_name : ty_ctr) (ctr : rocq_ctr) (result_var
         List.map (fun ((i, _, _, _) as entry) ->
           if i = best_id then best_entry else entry) entries)) in
   if group_mode = `Verify && select_groups <> None then begin
-    let joint = NewUnifyQC.type_to_schedules typ (Some ind_name) (Some ctr_name)
+    let joint = UnifyQC.type_to_schedules typ (Some ind_name) (Some ctr_name)
       result_vars output_vars ds opt in
     (* Every grouped candidate must be an ordering the joint search admits
        when it does not merge swap-equivalent orderings. *)
@@ -3232,13 +3232,13 @@ and constructor_valid_schedules (ind_name : ty_ctr) (ctr : rocq_ctr) (result_var
       Unix.putenv "QC_SCHEDULE_POR" "0";
       Fun.protect ~finally:(fun () ->
         Unix.putenv "QC_SCHEDULE_POR" (Stdlib.Option.value ~default:"" previous))
-        (fun () -> NewUnifyQC.type_to_schedules typ (Some ind_name) (Some ctr_name)
+        (fun () -> UnifyQC.type_to_schedules typ (Some ind_name) (Some ctr_name)
           result_vars output_vars ds opt) in
     (* Conversion and unification draw fresh names from global counters;
        compare schedules up to a consistent renaming of generated identifiers
        (v..N_ and unkn_N_), by first occurrence. *)
     let canonical (schedule, ms, eqs) =
-      let text = NewUnifyQC.match_schedule_to_string schedule ms eqs in
+      let text = UnifyQC.match_schedule_to_string schedule ms eqs in
       let names = Hashtbl.create 8 in
       let ident c = c = '_' || ('a' <= c && c <= 'z') || ('A' <= c && c <= 'Z')
                     || ('0' <= c && c <= '9') in
@@ -3776,7 +3776,7 @@ and inductive_best_valid_schedule (rel : rocq_relation) (output_idxs : int list)
     | DProd ((v,t), b) -> DProd ((v, rename names t), rename (List.remove_assoc v names) b)
     | DLambda (v,t,b) -> DLambda (v, rename names t, rename (List.remove_assoc v names) b)
     | DMatch (t, branches) -> DMatch (rename names t, List.map (fun (pat, body) ->
-        pat, rename (List.filter (fun (v,_) -> not (List.mem v (NewGenericLib.pat_vars pat))) names) body) branches)
+        pat, rename (List.filter (fun (v,_) -> not (List.mem v (GenericLib.pat_vars pat))) names) body) branches)
     | (DTyParam _ | DHole) as t -> t in
   let rec get_result_vars names = function
   | DProd ((v,t), b) ->
@@ -3830,9 +3830,9 @@ and inductive_best_valid_schedule (rel : rocq_relation) (output_idxs : int list)
     | (ctr_name, None, _) -> raise (Unavailable_mode (constructor_to_string ctr_name))
     | (ctr_name, Some ((i, schd, density), binders), budget) ->
       let weight = match Weightmap.find_weight (constructor_to_string ctr_name) with
-        | Some (Weightmap.WNum n) -> NewGenericLib.WNum n
-        | Some Weightmap.WSize -> NewGenericLib.WSize
-        | None -> NewGenericLib.WDefault in
+        | Some (Weightmap.WNum n) -> GenericLib.WNum n
+        | Some Weightmap.WSize -> GenericLib.WSize
+        | None -> GenericLib.WDefault in
       Some ((schd, [], binders, weight), (ctr_name, density), (ctr_name, budget))) ctrs in
 
   let constructor_schedules = List.map (fun (s, _, _) -> s) constructor_schedules_with_density in
@@ -3848,7 +3848,7 @@ and inductive_best_valid_schedule (rel : rocq_relation) (output_idxs : int list)
 
   let (nonrecursive, recursive) = List.partition is_recursive constructor_schedules in
 
-  let result_vars_mexps = filter_mapi (fun i (v,t) -> if List.mem i output_idxs then None else Some (v, NewGenericLib.product_free_rocq_type_to_mexp t)) result_vars in 
+  let result_vars_mexps = filter_mapi (fun i (v,t) -> if List.mem i output_idxs then None else Some (v, GenericLib.product_free_rocq_type_to_mexp t)) result_vars in 
 
   Error.msg_debug (str "Result variables and their mexps: " ++ str (String.concat ", " (List.map (fun (v,mexp) -> var_to_string v ^ ": " ^ mexp_to_string mexp) result_vars_mexps)) ++ fnl ());
 
@@ -4099,7 +4099,7 @@ let all_theorem_schedules ?(best_only = false) (thm : rocq_type) =
       ((List.map fst schd_steps_density, schd_sort), density, num_var_uses,
        inductive_memo, density_memo_after)) ranked in
   let matches select_groups =
-    NewUnifyQC.type_to_schedules ?select_groups thm None None [] [] D_Thm true in
+    UnifyQC.type_to_schedules ?select_groups thm None None [] [] D_Thm true in
   let lazy_best = best_only && theorem_lazy_scoring () in
   let rank_exhaustive = rank ~lazy_best:false in
   let rank = rank ~lazy_best in
@@ -4280,7 +4280,7 @@ let dec_eq_sched_phony = ("DecOpt_eq_III", [], [], [(([],CheckerSchedule),[],[],
 let init_density_inductive_memo = InductiveScheduleKeyMap.add (ty_ctr_of_string "Coq.Init.Logic.eq", [], D_Check, true) (DensityDone ((dec_eq_sched_phony, Checking), true, None)) InductiveScheduleKeyMap.empty
 
 let reset_density_inductive_memo () =
-  NewGenericLib.clear_constrained_output_cache ();
+  GenericLib.clear_constrained_output_cache ();
   Hashtbl.reset cardinality_counts;
   Hashtbl.reset cardinality_shapes;
   Hashtbl.reset cardinality_conditional_memo;
@@ -4517,7 +4517,7 @@ let rec take_while (p : 'a -> bool) (l : 'a list) : ('a list) * ('a list) =
    by the actual call arguments. Keep raw schedules until this fixed point is
    reached: recursive call dictionaries depend on the final signatures. *)
 let propagate_schedule_requirements components =
-  let open NewGenericLib in
+  let open GenericLib in
   let all = ref (List.concat components) in
   let same_requirement inputs a b =
     (* Kernel conversion ignores bound-variable spelling. Comparing printed
@@ -4684,23 +4684,23 @@ let valid_schedules =
     let e = Proofview.Goal.env gl in
     let evd = Proofview.Goal.sigma gl in
     with_schedule_context e evd (fun () -> with_fresh_density_memo (fun () ->
-    match NewGenericLib.parse_dependent_type (EConstr.to_constr evd c) with
+    match GenericLib.parse_dependent_type (EConstr.to_constr evd c) with
     | Some dt -> 
       begin
-        let schedules = NewUnifyQC.type_to_schedules ?select_groups:(grouped_selector D_Thm)
+        let schedules = UnifyQC.type_to_schedules ?select_groups:(grouped_selector D_Thm)
           dt None None [] [] D_Thm false in
         let schedules' = List.map (fun ((steps, sort), ms, eqs) -> (List.map (fun (v,p) -> S_Match (v,p)) ms, (List.map check_eq eqs @ steps, sort))) schedules in
         let schedules_w_densities = List.mapi (fun i (ms_steps, schd) -> i, schedule_density ms_steps schd) schedules' in
         let sorted = sort_schedules_by_density_and_var_uses schedules_w_densities D_Thm in
 
-        if !NewGenericLib.debug_mode then begin
+        if !GenericLib.debug_mode then begin
           Feedback.msg_notice (str "Printing all bindings" ++ fnl ());
           List.iteri (fun i ((steps_ds, sort), density, num_var_uses, id) ->
             Feedback.msg_notice (str ("sorted id: " ^ string_of_int i ^ " orig id: " ^ string_of_int id ^ ":\n" ) ++ fnl ());
             Feedback.msg_notice (str ("# var uses: " ^ string_of_int num_var_uses ^ "; density:" ^ density_to_string density ^ "\n") ++
                                 str (schedule_with_densities_to_string (steps_ds, sort) ^ "\n") (*++  *)
                                 (* str "\nconstrexpr: \n" ++  *)
-                                (* NewUnifyQC.match_schedule_as_pp_constr_expr (List.map fst steps_ds, sort) [] [] D_Thm *)
+                                (* UnifyQC.match_schedule_as_pp_constr_expr (List.map fst steps_ds, sort) [] [] D_Thm *)
                                                             ++ str "\n==============================================\n")) sorted
         end;
         Tacticals.tclIDTAC
@@ -4716,11 +4716,11 @@ let theorem_dependencies =
     let e = Proofview.Goal.env gl in
     let evd = Evd.from_env e in
 
-    match NewGenericLib.parse_dependent_type (EConstr.to_constr evd c) with
+    match GenericLib.parse_dependent_type (EConstr.to_constr evd c) with
     | Some dt ->
       begin
-        msg_debug (str (NewGenericLib.rocq_constr_to_string dt) ++ fnl ());
-        let open NewGenericLib in
+        msg_debug (str (GenericLib.rocq_constr_to_string dt) ++ fnl ());
+        let open GenericLib in
         let rec printlist : (var * (int * int list list) list) list -> unit = function
           | [] -> ()
           | (var, rels) :: rest ->
@@ -4730,7 +4730,7 @@ let theorem_dependencies =
             msg_debug (str (var_to_string var) ++ str " : " ++ str (String.concat ", " (List.map (fun (i, j) -> (tuple_to_string (i, j))) rels)) ++ fnl ()); 
             printlist rest in
         
-        printlist (NewGenericLib.rocq_constr_var_relation_uses' dt);          
+        printlist (GenericLib.rocq_constr_var_relation_uses' dt);          
         Tacticals.tclIDTAC
       end
     | None -> failwith "Failed to Parse type"
@@ -4744,21 +4744,21 @@ let theorem_dependencies =
       let e = Proofview.Goal.env gl in
       let evd = Evd.from_env e in
   
-      match NewGenericLib.parse_dependent_type (EConstr.to_constr evd c) with
+      match GenericLib.parse_dependent_type (EConstr.to_constr evd c) with
       | Some dt ->
         begin
           density_memo := RelationInstMap.empty;
           clear_inductive_name_cache ();
           clear_schedule_instance_cache ();
-          msg_debug (str (NewGenericLib.rocq_constr_to_string dt) ++ fnl ());
-          let scheds = NewUnifyQC.type_to_schedules ?select_groups:(grouped_selector D_Thm)
+          msg_debug (str (GenericLib.rocq_constr_to_string dt) ++ fnl ());
+          let scheds = UnifyQC.type_to_schedules ?select_groups:(grouped_selector D_Thm)
             dt None None [] [] D_Thm false in
 
           List.iteri (fun i (sch,ms,eqs) -> Feedback.msg_notice (str (string_of_int i) 
                                                           ++ str ":\n" 
-                                                          ++ str (NewUnifyQC.match_schedule_to_string sch ms eqs) 
+                                                          ++ str (UnifyQC.match_schedule_to_string sch ms eqs) 
                                                           ++ str "\nconstrexpr: \n"
-                                                          ++ (NewUnifyQC.match_schedule_as_pp_constr_expr sch ms eqs D_Thm)
+                                                          ++ (UnifyQC.match_schedule_as_pp_constr_expr sch ms eqs D_Thm)
                                                           ++ str "\n\n===================\n" 
                                                           ++ fnl ())) scheds;
           
@@ -4862,7 +4862,7 @@ let define_all schedule_pieces =
 (* Register the class represented by each compiled schedule. The helper keeps
    its size-first interface; the instance moves size into the class method. *)
 let register_schedule_instances ~local components =
-  let open NewGenericLib in
+  let open GenericLib in
   List.iter (List.iter (fun ((name, inputs, param_deps, _, _), ds, constrained) ->
     if ds <> D_Thm then begin
       let ind, output_indices, _, _ = parse_ind_schd_name name in
@@ -4950,7 +4950,7 @@ let define_schedule_components ~local components pieces =
     register_schedule_instances ~local [component]) components pieces
 
 let derive_schedule ind ois ds opt =
-  match NewGenericLib.ind_reference_to_rocq_relations ind with
+  match GenericLib.ind_reference_to_rocq_relations ind with
     | Some (idx, rs) ->
       reset_density_inductive_memo ();
       inductive_set := inductive_set_init;
@@ -5005,7 +5005,7 @@ and compile_public_inner ~mode ~outputs ~constrained ~all_mutual ind =
   let ds = match mode with
     | "Gen" -> D_Gen | "Enum" -> D_Enum | "Check" -> D_Check
     | _ -> invalid_arg "compile_public mode" in
-  let roots = match NewGenericLib.ind_reference_to_rocq_relations ind with
+  let roots = match GenericLib.ind_reference_to_rocq_relations ind with
     | Some (index, roots) -> if all_mutual then roots else [List.nth roots index]
     | None -> CErrors.user_err (str "Expected an inductive datatype") in
   let initial = Evd.from_env (Global.env ()) in
@@ -5079,11 +5079,11 @@ let quickchick_it size idx =
     let definitions = ref [] in
     let universes = ref Univ.ContextSet.empty in
     let prepare () = with_schedule_context e evd (fun () ->
-    match NewGenericLib.parse_dependent_type (EConstr.to_constr evd c) with
+    match GenericLib.parse_dependent_type (EConstr.to_constr evd c) with
     | Some dt -> 
       begin
-        msg_debug (str (NewGenericLib.rocq_constr_to_string dt) ++ fnl ());
-        let open NewGenericLib in 
+        msg_debug (str (GenericLib.rocq_constr_to_string dt) ++ fnl ());
+        let open GenericLib in 
         reset_density_inductive_memo ();
         inductive_set := inductive_set_init;
         rocq_relation_memo := TyCtrMap.empty;
@@ -5316,7 +5316,7 @@ END
 VERNAC COMMAND EXTEND Print CLASSIFIED AS SIDEFF
  | ["Print" "Typeclasses" "for" ident(ind)] ->
     { let ind' = Libnames.qualid_of_ident ind in 
-      ignore (NewGenericLib.find_typeclass_bindings ind') }
+      ignore (GenericLib.find_typeclass_bindings ind') }
 END
 
 (*type rocq_relation
@@ -5327,9 +5327,9 @@ END
 
 VERNAC COMMAND EXTEND DeriveSchedules CLASSIFIED AS SIDEFF
    | ["Derive" "Schedules" constr(ind) int_list(ois) "consnum" int(ctr_idx) "derive" string(ds)] ->
-    { match NewGenericLib.ind_reference_to_rocq_relations ind with
+    { match GenericLib.ind_reference_to_rocq_relations ind with
     | Some (idx, rs) -> 
-      let open NewGenericLib in
+      let open GenericLib in
       let (ind_name, params, constructors, result_typ) = List.nth rs idx in
 
       (* Feedback.msg_notice (str "Inductive name: " 
@@ -5375,7 +5375,7 @@ VERNAC COMMAND EXTEND DeriveSchedules CLASSIFIED AS SIDEFF
 
       let output_vars = List.map fst (List.filteri (fun i _ -> List.mem i ois) result_vars) in
 
-      let scheds = NewUnifyQC.type_to_schedules ?select_groups:(grouped_selector ds) constructor (Some ind_name) (Some ctr) result_vars output_vars ds true in
+      let scheds = UnifyQC.type_to_schedules ?select_groups:(grouped_selector ds) constructor (Some ind_name) (Some ctr) result_vars output_vars ds true in
       
       let rec take n l =
         if n <= 0 then [] else
@@ -5396,9 +5396,9 @@ VERNAC COMMAND EXTEND DeriveSchedules CLASSIFIED AS SIDEFF
                         ++ str "\n Parameters: "
                         ++ str (String.concat ", " (List.map ty_param_to_string params))
                         ++ str "\n Constructor Type: "
-                        ++ str (NewGenericLib.rocq_constr_to_string constructor)
+                        ++ str (GenericLib.rocq_constr_to_string constructor)
                         ++ str "\n Result Type: "
-                        ++ str (NewGenericLib.rocq_constr_to_string (remake_result (drop (List.length params) result_vars) result_typ))
+                        ++ str (GenericLib.rocq_constr_to_string (remake_result (drop (List.length params) result_vars) result_typ))
                         ++ str "\n Output indices: "
                         ++ str (String.concat ", " (List.map string_of_int ois)) 
                         ++ str ("\n Derive Sort: " ^ ds_string) 
@@ -5406,9 +5406,9 @@ VERNAC COMMAND EXTEND DeriveSchedules CLASSIFIED AS SIDEFF
 
       List.iteri (fun i (sch,ms,eqs) -> Feedback.msg_notice (str (string_of_int i) 
                                                           ++ str ":\n" 
-                                                          ++ str (NewUnifyQC.match_schedule_to_string sch ms eqs) 
+                                                          ++ str (UnifyQC.match_schedule_to_string sch ms eqs) 
                                                           ++ str "\nconstrexpr: \n"
-                                                          ++ (NewUnifyQC.match_schedule_as_pp_constr_expr sch ms eqs ds)
+                                                          ++ (UnifyQC.match_schedule_as_pp_constr_expr sch ms eqs ds)
                                                           ++ str "\n\n===================\n" 
                                                           ++ fnl ())) (take 300 scheds) 
     | None -> failwith "Failed to parse inductive type" 
@@ -5417,9 +5417,9 @@ END
 
 VERNAC COMMAND EXTEND DeriveValidSchedules CLASSIFIED AS SIDEFF
    | ["Derive" "Valid" "Schedules" constr(ind) int_list(ois) "consnum" int(ctr_idx) "derive" string(ds)] ->
-    { match NewGenericLib.ind_reference_to_rocq_relations ind with
+    { match GenericLib.ind_reference_to_rocq_relations ind with
     | Some (idx, rs) -> 
-      let open NewGenericLib in
+      let open GenericLib in
       let (ind_name, params, constructors, result_typ) = List.nth rs idx in
       reset_density_inductive_memo ();
       Feedback.msg_notice (str "Inductive name: " 
@@ -5481,9 +5481,9 @@ VERNAC COMMAND EXTEND DeriveValidSchedules CLASSIFIED AS SIDEFF
                         ++ str "\n Parameters: "
                         ++ str (String.concat ", " (List.map ty_param_to_string params))
                         ++ str "\n Constructor Type: "
-                        ++ str (NewGenericLib.rocq_constr_to_string constructor)
+                        ++ str (GenericLib.rocq_constr_to_string constructor)
                         ++ str "\n Result Type: "
-                        ++ str (NewGenericLib.rocq_constr_to_string (remake_result (drop (List.length params) result_vars) result_typ))
+                        ++ str (GenericLib.rocq_constr_to_string (remake_result (drop (List.length params) result_vars) result_typ))
                         ++ str "\n Output indices: "
                         ++ str (String.concat ", " (List.map string_of_int ois)) 
                         ++ str "\n\n");
@@ -5500,7 +5500,7 @@ VERNAC COMMAND EXTEND DeriveValidSchedules CLASSIFIED AS SIDEFF
           |> List.map (fun (i, scored, _, _) -> i, scored)
           |> take 300
         | _ ->
-          let scheds = NewUnifyQC.type_to_schedules ?select_groups:(grouped_selector ds)
+          let scheds = UnifyQC.type_to_schedules ?select_groups:(grouped_selector ds)
             constructor (Some ind_name) (Some ctr) result_vars output_vars ds true in
           let schedules = take 300 scheds in
           let schedules' = List.map (fun ((steps, sort), ms, eqs) ->
@@ -5516,7 +5516,7 @@ VERNAC COMMAND EXTEND DeriveValidSchedules CLASSIFIED AS SIDEFF
         Feedback.msg_notice (str ("# var uses: " ^ string_of_int num_var_uses ^ "density:" ^ density_to_string density ^ "\n") ++
                             str (schedule_with_densities_to_string (steps_ds, sort) ^ "\n") ++                                           
                             str "\nconstrexpr: \n" ++ 
-                            NewUnifyQC.match_schedule_as_pp_constr_expr (List.map fst steps_ds, sort) [] [] ds
+                            UnifyQC.match_schedule_as_pp_constr_expr (List.map fst steps_ds, sort) [] [] ds
                                                         ++ str "\n==============================================\n")) sorted
 
     | None -> failwith "Failed to parse inductive type" 
@@ -5527,7 +5527,7 @@ END
 
 VERNAC COMMAND EXTEND DeriveUsedInds CLASSIFIED AS SIDEFF
    | ["Derive" "Used" "Inds" constr(ind)] ->
-    { match NewGenericLib.ind_reference_to_rocq_relations ind with
+    { match GenericLib.ind_reference_to_rocq_relations ind with
     | Some (idx, rs) ->
         let (ind_name, params, constructors, result_typ) = List.nth rs idx in
         (match get_inductive_name ind_name with
@@ -5539,7 +5539,7 @@ END
 
 VERNAC COMMAND EXTEND DeriveDensity CLASSIFIED AS SIDEFF
    | ["Derive" "Density" constr(ind) int_list(ois) "derive" string(ds)] ->
-    { match NewGenericLib.ind_reference_to_rocq_relations ind with
+    { match GenericLib.ind_reference_to_rocq_relations ind with
     | Some (idx, rs) ->
       (* density_memo := RelationInstMap.empty;
       let ds = (match ds with

@@ -1,6 +1,6 @@
-module N = Quickchick_plugin.NewGenericLib
+module N = Quickchick_plugin.GenericLib
 module B = Quickchick_plugin.BudgetAwareScore
-module U = Quickchick_plugin.NewUnifyQC
+module U = Quickchick_plugin.UnifyQC
 
 let v = N.var_of_string
 let relation name args =

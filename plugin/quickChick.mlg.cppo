@@ -492,20 +492,20 @@ let qcFuzz_main prop_def temp_dir execn prop_mlf prop_mlif warnings prop fuzzLoo
                                        ((match qualid_of_reference x with {CAst.v = q; _} -> q)))) SummaryRef.(!extract_manually);
                                        *)      
   List.iter (fun r ->
-      match GenericLib.sdt_rep_from_mib (GenericLib.qualid_to_mib r) with
+      match CoqExpr.sdt_rep_from_mib (CoqExpr.qualid_to_mib r) with
       | Some (ty_ctr, ty_params, ctrs) -> begin
           (*          print_endline "Extracting inductive..."; *)
-          let ty_ctr_name = qualify (String.uncapitalize_ascii (GenericLib.ty_ctr_to_string ty_ctr)) in
+          let ty_ctr_name = qualify (String.uncapitalize_ascii (CoqExpr.ty_ctr_to_string ty_ctr)) in
           (*          print_endline ty_ctr_name; *)
           let ctr_names =
             match ctrs with
             | [ctr,ctr_ty] ->
-               if GenericLib.coq_type_size ctr_ty = 1 then [""]
-               else [qualify (GenericLib.constructor_to_string ctr)]
-            | _ -> List.map (fun (ctr,_) -> qualify (GenericLib.constructor_to_string ctr)) ctrs in
+               if CoqExpr.coq_type_size ctr_ty = 1 then [""]
+               else [qualify (CoqExpr.constructor_to_string ctr)]
+            | _ -> List.map (fun (ctr,_) -> qualify (CoqExpr.constructor_to_string ctr)) ctrs in
           (* List.iter print_endline ctr_names; *)
           Extraction_plugin.Table.extract_inductive 
-            (GenericLib.tyCtrToQualid ty_ctr)
+            (CoqExpr.tyCtrToQualid ty_ctr)
             ty_ctr_name
             ctr_names
             None

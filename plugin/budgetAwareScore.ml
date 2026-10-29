@@ -1,7 +1,7 @@
 (* Completed BudgetAware scoring, following Specimen 121cf234/Scoring.lean.
    Search bounds are deliberately separate from this exact leaf scorer. *)
 
-open NewGenericLib
+open GenericLib
 
 type density = Total | Partial | Backtracking | Checking
 type locality = Internal | External | SameIndExt
