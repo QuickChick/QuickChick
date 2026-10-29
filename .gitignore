@@ -67,3 +67,8 @@ src/QuickChick.v
 _CoqProject
 META
 examples/other/TacticExampleX.v
+
+plugin/coqExpr.ml
+
+src/LegacyDerive.v
+plugin/legacy/legacy_derive.ml

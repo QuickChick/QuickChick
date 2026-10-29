@@ -39,6 +39,7 @@ let mutateCheckWith = mk_ref "QuickChick.MutateCheck.mutateCheckWith"
 let mutateCheckMany = mk_ref "QuickChick.MutateCheck.mutateCheckMany"
 let mutateCheckManyWith = mk_ref "QuickChick.MutateCheck.mutateCheckManyWith"
 let sample = mk_ref "QuickChick.Generators.sampleGen"
+let quickSample = mk_ref "QuickChick.Test.quickSample"
 let sample1 = mk_ref "QuickChick.Generators.sample1"
 
 (* Handle extra ocaml directory to be copied *)
@@ -139,6 +140,9 @@ let fresh_name n =
 
 (** [define c] introduces a fresh constant name for the term [c]. *)
 let define c env evd =
+  (* Report an unresolved instance, such as a missing Show, as an
+     elaboration error rather than a kernel anomaly. *)
+  Pretyping.check_evars env evd c;
   let (evd,_) = Typing.type_of env evd c in
 #if COQ_VERSION >= (9, 2, 0)
   let univs = Evd.univ_entry ~poly:(PolyFlags.of_univ_poly true) evd in
@@ -168,8 +172,20 @@ let define_and_run ~opaque_access c env evd =
 #else
 let define_and_run c env evd =
 #endif
-  (* Extract the term and its dependencies *)
-  let main = define c env evd in
+  (* Keep the output call in the extracted term. A handwritten reference to
+     [main] would miss module qualification and extraction's own renaming. *)
+  let evd, typ = Typing.type_of env evd c in
+  let emit = define (EConstr.mkLambda
+    (Context.make_annot Anonymous EConstr.ERelevance.relevant, typ, EConstr.mkRel 1)) env evd in
+  let print_result =
+    "(fun l -> let s = Stdlib.Bytes.create (Stdlib.List.length l) in " ^
+    "let rec copy i = function " ^
+    "| [] -> s | c :: l -> Stdlib.Bytes.set s i c; copy (i+1) l in " ^
+    "Stdlib.print_string (Stdlib.Bytes.to_string (copy 0 l)); l)" in
+  Extraction_plugin.Table.extract_constant_inline true (qualid_of_ident emit) [] print_result;
+  let evd, emit = Evd.fresh_global (Global.env ()) evd
+    (Nametab.locate (qualid_of_ident emit)) in
+  let main = define (EConstr.mkApp (emit, [|c|])) (Global.env ()) evd in
   let mlf   : string = new_ml_file () in
   let execn : string = Filename.chop_extension mlf ^ ".native" in
   let mlif  : string = Filename.chop_extension mlf ^ ".mli"    in
@@ -183,19 +199,6 @@ let define_and_run c env evd =
   Flags.silently (Extraction_plugin.Extract_env.full_extraction (Some mlf)) [qualid_of_ident main];
 #endif
   CWarnings.set_flags warnings;
-  (* Add a main function to get some output *)
-  let oc = open_out_gen [Open_append;Open_text] 0o666 mlf in
-  let for_output =
-    "\nlet _ = print_string (\n" ^
-    "let l = (" ^ (Id.to_string main) ^ ") in\n"^
-    "let s = Bytes.create (List.length l) in\n" ^
-    "let rec copy i = function\n" ^
-    "| [] -> s\n" ^
-    "| c :: l -> Bytes.set s i c; copy (i+1) l\n" ^
-    "in Bytes.to_string (copy 0 l))" in
-  Printf.fprintf oc "%s" for_output;
-  close_out oc;
-
   (* Add any modules that have been marked "open" *)
   let open_cmd s = Printf.sprintf "awk -v n=1 -v s=\"open %s\" 'NR == n {print s} {print}' %s > %s/__qc_tmp && mv %s/__qc_tmp %s" s mlf dir dir mlf in
   List.iter (fun s -> ignore (Sys.command (open_cmd s))) SummaryRef.(!modules_to_open);
@@ -297,8 +300,10 @@ let define_and_run c env evd =
         Feedback.msg_notice (Pp.str e);
         process_err_aux() in
 *)        
+      let received_output = ref false in
       let rec process_otl_aux () =
         let e = input_line p_out in
+        received_output := true;
         Feedback.msg_notice (Pp.str e);
         process_otl_aux() in
       try process_otl_aux ()
@@ -312,6 +317,8 @@ let define_and_run c env evd =
               let err descr = CErrors.user_err (str (execn ^ ": " ^ descr) ++ fnl () ++ fnl () ++ str err_msg ++ fnl ()) in
               let stat = Unix.close_process_full process in
               begin match stat with
+              | Unix.WEXITED 0 when not !received_output ->
+                  err "No test output; testing inside an unapplied module functor is unsupported"
               | Unix.WEXITED 0 -> ()
               | Unix.WEXITED i -> err (Printf.sprintf "Exited with status %d" i)
               | Unix.WSIGNALED i -> err (Printf.sprintf "Killed (%d)" i)
@@ -344,6 +351,12 @@ let runTest c env evd : unit =
   (*  Printf.printf "Before interp constr\n"; flush stdout; *)
 
   let (evd',c) = interp_constr_evars env evd c in
+  let c = List.fold_left (fun term -> function
+    | Context.Named.Declaration.LocalDef (name, body, _) ->
+        EConstr.Vars.replace_vars evd'
+          [Context.binder_name name, EConstr.of_constr body] term
+    | Context.Named.Declaration.LocalAssum _ -> term)
+    c (Environ.named_context env) in
 
   (* Printf.printf "So far so good?\n"; flush stdout; *)
 #if COQ_VERSION >= (8, 20, 0)
@@ -358,12 +371,13 @@ let rec last = function
   | _ :: xs -> last xs
 
 #if COQ_VERSION >= (8, 20, 0)
-let run ~opaque_access f args =
+let run ~opaque_access ?context f args =
 #else
-let run f args =
+let run ?context f args =
 #endif
-  let env = Global.env () in
-  let evd = Evd.from_env env in
+  let evd, env = match context with
+    | Some context -> context
+    | None -> let env = Global.env () in Evd.from_env env, env in
   begin match last args with
   | Some qc_text ->
     let msg = "QuickChecking " ^ Pp.string_of_ppcmds (Ppconstr.pr_constr_expr
@@ -380,6 +394,20 @@ let run f args =
   runTest ~opaque_access c env evd
 #else
   runTest c env evd
+#endif
+
+(* Testing commands are queries: replaying them as global side effects loses
+   proof-scoped test helpers. Extraction's temporary declarations must not leak. *)
+#if COQ_VERSION >= (8, 20, 0)
+let run_query ~opaque_access f args =
+  let context = try Some (Vernacstate.Declare.get_current_context ())
+    with Vernacstate.Declare.NoCurrentProof -> None in
+  Vernacstate.System.protect (fun () -> run ~opaque_access ?context f args) ()
+#else
+let run_query f args =
+  let context = try Some (Vernacstate.Declare.get_current_context ())
+    with Vernacstate.Declare.NoCurrentProof -> None in
+  Vernacstate.System.protect (fun () -> run ?context f args) ()
 #endif
 
 let flag_debug = SummaryRef.ref ~name:"QC_flag_debug" false
@@ -465,20 +493,20 @@ let qcFuzz_main prop_def temp_dir execn prop_mlf prop_mlif warnings prop fuzzLoo
                                        ((match qualid_of_reference x with {CAst.v = q; _} -> q)))) SummaryRef.(!extract_manually);
                                        *)      
   List.iter (fun r ->
-      match GenericLib.sdt_rep_from_mib (GenericLib.qualid_to_mib r) with
+      match CoqExpr.sdt_rep_from_mib (CoqExpr.qualid_to_mib r) with
       | Some (ty_ctr, ty_params, ctrs) -> begin
           (*          print_endline "Extracting inductive..."; *)
-          let ty_ctr_name = qualify (String.uncapitalize_ascii (GenericLib.ty_ctr_to_string ty_ctr)) in
+          let ty_ctr_name = qualify (String.uncapitalize_ascii (CoqExpr.ty_ctr_to_string ty_ctr)) in
           (*          print_endline ty_ctr_name; *)
           let ctr_names =
             match ctrs with
             | [ctr,ctr_ty] ->
-               if GenericLib.coq_type_size ctr_ty = 1 then [""]
-               else [qualify (GenericLib.constructor_to_string ctr)]
-            | _ -> List.map (fun (ctr,_) -> qualify (GenericLib.constructor_to_string ctr)) ctrs in
+               if CoqExpr.coq_type_size ctr_ty = 1 then [""]
+               else [qualify (CoqExpr.constructor_to_string ctr)]
+            | _ -> List.map (fun (ctr,_) -> qualify (CoqExpr.constructor_to_string ctr)) ctrs in
           (* List.iter print_endline ctr_names; *)
           Extraction_plugin.Table.extract_inductive 
-            (GenericLib.tyCtrToQualid ty_ctr)
+            (CoqExpr.tyCtrToQualid ty_ctr)
             ty_ctr_name
             ctr_names
             None
@@ -550,12 +578,14 @@ let qcFuzz_main prop_def temp_dir execn prop_mlf prop_mlif warnings prop fuzzLoo
   ignore (Sys.command echo_cmd);
 
   (* HORRIBLE. HORRIBLE. Perl hack to ensure tail recursion... *)
+  (*
   (* First copy them over from contrib... *)
   ignore (Sys.command (Printf.sprintf "cp %s/cmdprefix.pl %s" user_contrib temp_dir));
   ignore (Sys.command (Printf.sprintf "cp %s/cmdsuffix.pl %s" user_contrib temp_dir));
   (* ... then execute them ... *)
   ignore (Sys.command (Printf.sprintf "%s/cmdprefix.pl %s" temp_dir mlf));
   ignore (Sys.command (Printf.sprintf "%s/cmdsuffix.pl %s" temp_dir mlf));
+   *)
   
   (* Copy fuzz-related files to temp directory *)
   ignore (Sys.command (Printf.sprintf "cp %s/alloc-inl.h %s" user_contrib temp_dir));
@@ -693,22 +723,61 @@ let qcFuzz prop fuzzLoop =
 }
 
 
+{
+(* The scorer that ranks schedules in later derivations. It is file-local
+   state that follows undo and backtracking, like an unexported option. *)
+let selected_scorer : string SummaryRef.t =
+  SummaryRef.ref ~name:"QC_selected_scorer" "density_then_vars"
+
+let () = ScheduleRanking.selected := (fun () ->
+  match ScheduleRanking.scorer_of_name (SummaryRef.(!) selected_scorer) with
+  | Some scorer -> scorer
+  | None -> ScheduleRanking.Feature ScheduleRanking.RankDensityThenVars)
+
+(* A built-in name selects that scorer; any other name must be a Rocq
+   policy, which is compiled and loaded once. *)
 #if COQ_VERSION >= (8, 20, 0)
-VERNAC COMMAND EXTEND QuickCheck CLASSIFIED AS SIDEFF STATE opaque_access
+let select_scorer ~opaque_access reference =
 #else
-VERNAC COMMAND EXTEND QuickCheck CLASSIFIED AS SIDEFF
+let select_scorer reference =
 #endif
-  | ["QuickCheck" constr(c)] ->     {run quickCheck [c]}
-  | ["QuickCheckWith" constr(c1) constr(c2)] ->     {run quickCheckWith [c1;c2]}
+  let name = Libnames.string_of_qualid reference in
+  match ScheduleRanking.scorer_of_name name with
+  | Some (ScheduleRanking.Compiled _) | None ->
+#if COQ_VERSION >= (8, 20, 0)
+    let key = PolicyLoader.load ~opaque_access reference in
+#else
+    let key = PolicyLoader.load reference in
+#endif
+    SummaryRef.(selected_scorer := ScheduleRanking.compiled_prefix ^ key)
+  | Some _ -> SummaryRef.(selected_scorer := name)
+}
+
+#if COQ_VERSION >= (8, 20, 0)
+VERNAC COMMAND EXTEND QuickChickScorer CLASSIFIED AS SIDEFF STATE opaque_access
+#else
+VERNAC COMMAND EXTEND QuickChickScorer CLASSIFIED AS SIDEFF
+#endif
+  | ["QuickChick" "Scorer" reference(name)] -> { select_scorer name }
+  | ["QC" "Scorer" reference(name)] -> { select_scorer name }
 END
 
 #if COQ_VERSION >= (8, 20, 0)
-VERNAC COMMAND EXTEND QuickChick CLASSIFIED AS SIDEFF STATE opaque_access
+VERNAC COMMAND EXTEND QuickCheck CLASSIFIED AS QUERY STATE opaque_access
 #else
-VERNAC COMMAND EXTEND QuickChick CLASSIFIED AS SIDEFF
+VERNAC COMMAND EXTEND QuickCheck CLASSIFIED AS QUERY
 #endif
-  | ["QuickChick" constr(c)] ->     {run quickCheck [c]}
-  | ["QuickChickWith" constr(c1) constr(c2)] ->     {run quickCheckWith [c1;c2]}
+  | ["QuickCheck" constr(c)] ->     {run_query quickCheck [c]}
+  | ["QuickCheckWith" constr(c1) constr(c2)] ->     {run_query quickCheckWith [c1;c2]}
+END
+
+#if COQ_VERSION >= (8, 20, 0)
+VERNAC COMMAND EXTEND QuickChick CLASSIFIED AS QUERY STATE opaque_access
+#else
+VERNAC COMMAND EXTEND QuickChick CLASSIFIED AS QUERY
+#endif
+  | ["QuickChick" constr(c)] ->     {run_query quickCheck [c]}
+  | ["QuickChickWith" constr(c1) constr(c2)] ->     {run_query quickCheckWith [c1;c2]}
 END
 
 #if COQ_VERSION >= (8, 20, 0)
@@ -761,6 +830,15 @@ VERNAC COMMAND EXTEND Sample CLASSIFIED AS SIDEFF
 #endif
   | ["Sample" constr(c)] -> {run sample [c]}
 END
+
+#if COQ_VERSION >= (8, 20, 0)
+VERNAC COMMAND EXTEND QuickSample CLASSIFIED AS SIDEFF STATE opaque_access
+#else
+VERNAC COMMAND EXTEND QuickSample CLASSIFIED AS SIDEFF
+#endif
+  | ["QuickSample" constr(a) constr(c)] -> {run quickSample [a;c]}
+END
+
 
 #if COQ_VERSION >= (8, 20, 0)
 VERNAC COMMAND EXTEND Sample1 CLASSIFIED AS SIDEFF STATE opaque_access

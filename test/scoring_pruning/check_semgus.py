@@ -1,0 +1,105 @@
+"""Exercise score bounds on the doubly self-merged SemGuS relation."""
+
+import os
+import re
+import subprocess
+import tempfile
+import time
+from pathlib import Path
+
+
+HERE = Path(__file__).resolve().parent
+ROOT = HERE.parents[1]
+BUILD = Path(os.environ.get("QC_BUILD_DIR", ROOT / "_build-validated"))
+COQC = os.environ.get("COQC", "coqc")
+RANKING = re.compile(
+    r"^\[schedule-ranking\] policy=density_then_vars derive=Gen "
+    r"candidates=(\d+) selected-id=(\d+) "
+    r"selected-density=(\w+) selected-var-uses=(\d+)"
+)
+PRUNING = re.compile(
+    r"^\[schedule-pruning\] constructor=(\S+) mode=(\w+) "
+    r"prefixes=(\d+) leaves=(\d+) cuts=(\d+)"
+)
+WORK = re.compile(
+    r"^\[schedule-pruning-work\] constructor=(\S+) "
+    r"bound-cache-hits=(\d+) bound-cache-misses=(\d+) "
+    r"leaf-cache-hits=(\d+) mode-cache-hits=(\d+) "
+    r"stable-cache-entries=(\d+)"
+)
+LEAF = re.compile(
+    r"^\[schedule-bound-detail\] kind=leaf path=[\d,]+ "
+    r"density=(\d+) counts=([\d,]+) uses=(\d+)"
+)
+
+
+def run(mode, directory, reuse=True):
+    environment = os.environ.copy()
+    environment["QC_SCHEDULE_TRACE"] = "1"
+    if mode == "verify":
+        environment["QC_SCHEDULE_TRACE_BOUNDS"] = "1"
+    # Pruning is on by default, so "off" must disable it explicitly.
+    environment["QC_SCHEDULE_SCORE_PRUNING"] = "0" if mode == "off" else mode
+    if not reuse:
+        environment["QC_SCHEDULE_REUSE_STABLE"] = "0"
+    command = [
+        COQC,
+        "-I", str(BUILD / "install/default/lib"),
+        "-Q", str(BUILD / "default/src"), "QuickChick",
+        "-noglob", "-o", str(directory / "SemgusMerge.vo"),
+        str(HERE / "SemgusMerge.v"),
+    ]
+    log = directory / f"{mode}-{'warm' if reuse else 'cold'}.log"
+    started = time.monotonic()
+    with log.open("w") as stream:
+        result = subprocess.run(command, cwd=ROOT, env=environment,
+                                stdout=stream, stderr=subprocess.STDOUT,
+                                timeout=90)
+    if result.returncode:
+        raise AssertionError(f"SemGuS {mode} failed; see {log}")
+    rankings = []
+    root_searches = []
+    work = []
+    leaves = []
+    for line in log.open(errors="replace"):
+        if match := RANKING.match(line):
+            rankings.append(match.groups())
+        if match := PRUNING.match(line):
+            root_searches.append(match.groups())
+        if match := WORK.match(line):
+            work.append(match.groups())
+        if match := LEAF.match(line):
+            leaves.append(match.groups())
+    assert rankings, (mode, "missing ranking trace")
+    return rankings[-1], root_searches, work, leaves, time.monotonic() - started
+
+
+with tempfile.TemporaryDirectory() as temporary:
+    directory = Path(temporary)
+    ordinary, off_searches, off_work, _, off_seconds = run("off", directory)
+    cold, cold_searches, cold_work, _, cold_seconds = run("baseline", directory, False)
+    baseline, baseline_searches, baseline_work, _, baseline_seconds = run("baseline", directory)
+    verified, verify_searches, verify_work, leaves, verify_seconds = run("verify", directory)
+    bounded, prune_searches, prune_work, _, prune_seconds = run("1", directory)
+    assert ordinary == cold == baseline == verified == bounded, (
+        ordinary, cold, baseline, verified, bounded)
+    assert baseline[0] == "12", baseline
+    assert len(leaves) == 12 and set(leaves) == {("0", "1,0,0,3,0", "1")}, leaves
+    assert not off_searches, off_searches
+    assert not off_work, off_work
+    assert len(cold_searches) == len(baseline_searches) == len(verify_searches) == len(prune_searches) == 1
+    assert len(cold_work) == len(baseline_work) == len(verify_work) == len(prune_work) == 1
+    assert cold_searches[0][1:] == ("baseline", "0", "12", "0")
+    assert baseline_searches[0][1:] == ("baseline", "0", "12", "0")
+    assert cold_work[0][4:] == ("0", "0"), cold_work
+    assert int(baseline_work[0][4]) > 0, baseline_work
+    assert int(baseline_work[0][5]) > 0, baseline_work
+    verify_root, prune_root = verify_searches[0], prune_searches[0]
+    assert verify_root[1:] == ("verify", "25", "12", "0"), verify_root
+    assert prune_root[1:] == ("prune", "25", "12", "0"), prune_root
+    assert int(prune_work[0][1]) > 0 and int(prune_work[0][2]) > 0
+    assert prune_work[0][3] == "12", prune_work
+    print(f"double self-merge: 12 root leaves verified over 25 prefixes; "
+          f"same winner, zero cuts; seconds off/cold/warm/verify/prune: "
+          f"{off_seconds:.1f}/{cold_seconds:.1f}/{baseline_seconds:.1f}/"
+          f"{verify_seconds:.1f}/{prune_seconds:.1f}")

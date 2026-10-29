@@ -1,5 +1,5 @@
 open Util
-open GenericLib
+open CoqExpr
 
 (* Gen combinators *)
 let gGen c = gApp (gInject "G") [c]

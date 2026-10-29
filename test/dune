@@ -5,7 +5,7 @@
 (coq.theory
   (name QuickChick.Testing)
   (theories QuickChick)
-  (modules plugin derive extraction))
+  (modules plugin derive extraction rebase_compat elaboration derive_stdlib_first derive_quickchick_first scheduled_instances instance_reuse parameter_constraints specimen_constraints enum_constraint_chain implicit_constraints proof_lifecycle derivation_contracts public_derivation module_testing density_scoring_context pruning_bounds prefix_adapter_laws dependency_cycle_laws scoring_policy policy_quote_probe qualified_global_theorem typed_rule_context defined_relation_dependency defined_function_argument theorem_existing_gen theorem_groups density_ranking_selection user_instance_priority repeated_preparation theorem_negated_conclusion abstract_type_goal unsupported_premise constructor_weights hash_constructor_conclusion function_conclusion theorem_shrinking missing_show no_base_constructor parameter_patterns derive_spellings compiled_scorer compiled_density compiled_dependencies))
 
 (coq.extraction
   (prelude mutation)
@@ -17,3 +17,15 @@
   (modules mutation)
   (flags :standard -w -39-67 -alert --deprecated)
   (libraries zarith))
+
+(test
+  (name test_dependency_ordering)
+  (modules test_dependency_ordering)
+  (flags :standard -rectypes)
+  (libraries coq-quickchick.plugin))
+
+(test
+  (name test_schedule_ranking)
+  (modules test_schedule_ranking)
+  (flags :standard -rectypes)
+  (libraries coq-quickchick.plugin))

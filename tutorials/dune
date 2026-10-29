@@ -8,5 +8,5 @@
   (modules
     BasicUsage
     Automation
-    DerivingProofs
+    ProofScopedTests
   ))

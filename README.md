@@ -22,6 +22,8 @@ https://lemonidas.github.io/pdf/GeneratingGoodGenerators.pdf
 ## Tutorial
 
 - Small tutorials on Basic Usage and Automation can be found under `tutorials/`
+- [Testing a theorem inside a proof](tutorials/ProofScopedTests.v) shows how to
+  prepare and rerun a test without leaving global helpers behind.
 - An extended introduction can be found in [QuickChick: Property-Based Testing in Coq][sfqc] (Software Foundations, Volume 4)
 
 [sfqc]: https://softwarefoundations.cis.upenn.edu/qc-current/index.html
@@ -38,6 +40,25 @@ https://lemonidas.github.io/pdf/GeneratingGoodGenerators.pdf
 
 ## Simple Examples
 
+Test the current goal before proving it:
+
+```coq
+From QuickChick Require Import QuickChick.
+Goal forall n : nat, n = n.
+  quickchick 2.
+  QuickChick (theorem 4).
+  intros; reflexivity.
+Qed.
+```
+
+`quickchick` prepares a proof-local test called `theorem` and runs it at size 2.
+`QuickChick (theorem 4)` reruns that test at size 4 without deriving it again.
+The goal remains open after testing. The helpers disappear when the proof ends.
+The compiled [proof-scoped tutorial](tutorials/ProofScopedTests.v) also shows
+how to name a saved test and change execution settings.
+
+Other examples:
+
   - `examples/Tutorial.v`
   - `examples/RedBlack`
   - `examples/stlc`
@@ -48,23 +69,45 @@ If successful, you should see "success" at the end.
 
 ## Documentation
 
-The public API of QuickChick is summarized in `QuickChickInterface.v`.
+The public API is summarized in [QuickChickInterface.v](doc/QuickChickInterface.v).
+See the [derivation commands](doc/DerivationDispatch.md) and
+[3.0 migration guide](doc/3.0Migration.md) for the scheduled engine and legacy
+commands.
 
 ### Top-level Commands
 
 - `QuickCheck c`
 - `Sample g`
-- `QCDerive Arbitrary for c`
-- `QCDerive Show for c`
-- `QCDerive ArbitrarySizedSuchThat for (fun x => p)`
-- `QCDerive DecOpt for p`
-- `QCDerive EnumSizedSuchThat for (fun x => p)`
-- `QCDerive ArbitrarySizedSuchThat for (fun x => let (x1,x2...) := x in p)`
+- `QuickChick Derive Arbitrary for c`
+- `QuickChick Derive Show for c`
+- `QuickChick Derive ArbitrarySizedSuchThat for (fun x => p)`
+- `QuickChick Derive DecOpt for p`
+- `QuickChick Derive EnumSizedSuchThat for (fun x => p)`
+- `QuickChick Derive ArbitrarySizedSuchThat for (fun x => let (x1,x2...) := x in p)`
 - `QuickCheckWith args c`
 - `MutateCheck c p`
 - `MutateCheckWith args c p`
 - `MutateCheckMany c ps`
 - `MutateCheckManyWith args c ps`
+
+### Older `Derive` commands
+
+Use `QuickChick Derive`, or its short form `QC Derive`, with the usual
+`From QuickChick Require Import QuickChick.` import. The prefix avoids a parser
+conflict with Stdlib's `Derive` command. The import reserves `QC` as a keyword.
+`QCDerive`, the 2.x spelling, has been removed.
+
+To keep bare `Derive` commands in an older file, replace that import with:
+
+```coq
+From QuickChick Require Import LegacyDerive.
+```
+
+This compatibility import enables the old spelling, including class lists and
+`using` clauses. It uses the same derivation engine as `QuickChick Derive`. It
+can still conflict with other plugins' `Derive` commands, so prefer
+`QuickChick Derive` when combining plugins. `Derive Inductive Schedule` and `Derive Valid Schedules` remain available
+with the normal import.
 
 ### More resources
 
@@ -96,6 +139,18 @@ Dependencies are listed in [`coq-quickchick.opam`](./coq-quickchick.opam).
 ### Build
 
     dune build
+
+### Install from a checkout
+
+For a local checkout, install the dependencies and package into the active opam
+switch with:
+
+    opam install . --deps-only
+    dune build @install
+    dune install coq-quickchick
+
+For a normal user installation, `opam install .` performs the dependency
+installation, build, and package installation together.
 
 ## Run tests
 

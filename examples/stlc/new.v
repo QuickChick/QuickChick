@@ -97,11 +97,11 @@ Inductive typing' (e : env) : term -> type -> Prop :=
       tau12 = Arrow tau1 tau2 ->      
       typing' e (App t1 t2) tau2.
 
-QCDerive Arbitrary for type.
+QuickChick Derive Arbitrary for type.
 Instance dec_type (t1 t2 : type) : Dec (t1 = t2).
 Proof. dec_eq. Defined.
-QCDerive ArbitrarySizedSuchThat for (fun x => bind env x tau).
-QCDerive ArbitrarySizedSuchThat for (fun t => typing' env t tau).
+QuickChick Derive ArbitrarySizedSuchThat for (fun x => bind env x tau).
+QuickChick Derive ArbitrarySizedSuchThat for (fun t => typing' env t tau).
 
 Instance ESST_A2 (t t1 : type) : EnumSizedSuchThat _ (fun t2 => t = Arrow t1 t2) :=
   { enumSizeST := fun _ => match t with
@@ -112,13 +112,13 @@ Instance ESST_A2 (t t1 : type) : EnumSizedSuchThat _ (fun t2 => t = Arrow t1 t2)
                            | _ => returnEnum None
                            end }.
 
-QCDerive EnumSized for type.
-QCDerive EnumSizedSuchThat for (fun tau => bind env x tau).
-QCDerive EnumSizedSuchThat for
+QuickChick Derive EnumSized for type.
+QuickChick Derive EnumSizedSuchThat for (fun tau => bind env x tau).
+QuickChick Derive EnumSizedSuchThat for
        (fun tau => typing' env t tau).
 
-QCDerive DecOpt for (bind env t tau).
-QCDerive DecOpt for (typing' env t tau).
+QuickChick Derive DecOpt for (bind env t tau).
+QuickChick Derive DecOpt for (typing' env t tau).
 
 
 

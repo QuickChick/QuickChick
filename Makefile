@@ -74,12 +74,12 @@ tests:
 # This takes too long. 
 #	$(MAKE) -C examples/c-mutation test
 #	coqc examples/BSTTest.v
-	coqc examples/DependentTest.v
 	coqc examples/TacticExample.v
 
 COMPATFILES:= \
-	plugin/depDriver.ml \
+	plugin/coqExpr.ml \
 	plugin/genericLib.ml \
+	plugin/publicDerive.ml \
 	plugin/mergeTypes.ml \
 	plugin/quickChick.mli \
 	plugin/quickChick.mlg \
@@ -90,6 +90,7 @@ COMPATFILES:= \
 	src/Compat.v \
 	src/ExtractionQC.v \
 	src/QuickChick.v \
+	src/LegacyDerive.v \
 	src/TacticsUtil.v \
 	_CoqProject
 

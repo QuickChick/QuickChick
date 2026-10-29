@@ -12,8 +12,8 @@ Inductive Sorted : list nat -> Prop :=
     x <= y -> Sorted (y :: l) -> Sorted (x :: y :: l).
 
 (* We need to derive a checker for the <= relation as well. *)
-QCDerive DecOpt for (le x y).
-QCDerive DecOpt for (Sorted l).
+QuickChick Derive DecOpt for (le x y).
+QuickChick Derive DecOpt for (Sorted l).
 
 Instance DecOptsorted_sound  l : DecOptSoundPos (Sorted l).
 Proof. derive_sound. Qed.

@@ -10,8 +10,8 @@ Definition to_be_generated :=
   else checker tt)).
 
 (* QuickChickDebug Debug On. *)
-Theorem foo : forall (x y : nat) , x < 8.
-Proof. quickchick. Admitted.
+Theorem foo : forall (x y : nat) , x <= 8.
+Proof. quickchick 10. Admitted.
 
 Theorem add_comm : forall n m : nat,
   n + m = m + n.
@@ -35,7 +35,7 @@ Inductive bin : Type :=
   | B1 (n : bin)
 .
 
-QCDerive (Arbitrary, Show) for bin.
+QuickChick Derive (Arbitrary, Show) for bin.
 
 Fixpoint bineq (n m : bin) : bool :=
   match n, m with
@@ -77,8 +77,8 @@ Inductive natlist : Type :=
   | nil'
   | cons' (n : nat) (l : natlist).
 
-QCDerive Show for natlist.
-QCDerive Arbitrary for natlist.
+QuickChick Derive Show for natlist.
+QuickChick Derive Arbitrary for natlist.
 #[global] Instance Dec_eq_natlist (l l' : natlist) : Dec (l = l').
 Proof. dec_eq. Defined.
 
@@ -185,8 +185,8 @@ Inductive value_set : tm -> Set :=
 
 
 (*Derive show and Arbitrary*)
-QCDerive Show for ty.
-QCDerive Arbitrary for ty.
+QuickChick Derive Show for ty.
+QuickChick Derive Arbitrary for ty.
 Check elems_.
 #[export] Instance Gen_var : Gen string :=
   {arbitrary := elems_ x (cons x (cons y (cons z nil)))}.
@@ -198,8 +198,8 @@ Check elems_.
                       | _ => nil
                       end}.
 
-QCDerive Arbitrary for tm.
-QCDerive Show for tm.
+QuickChick Derive Arbitrary for tm.
+QuickChick Derive Show for tm.
 
 (*Create Dec eq instances*)
 #[export] Instance Dec_eq_ty (T T' : ty) : Dec (T = T').
@@ -378,7 +378,7 @@ Inductive step : tm -> tm -> Prop :=
 
 where "t '-->' t'" := (step t t').
 
-QCDerive DecOpt for (step t t').
+QuickChick Derive DecOpt for (step before after).
 
 Reserved Notation "Gamma '|--' t '\in' T"
             (at level 101,

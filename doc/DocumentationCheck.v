@@ -3,7 +3,7 @@ Set Warnings "-notation-overridden,-parsing".
 From mathcomp Require Import ssreflect ssrfun ssrbool.
 From Coq Require Import Relations ZArith Strings.Ascii Strings.String.
 From QuickChick Require Import LazyList QuickChick.
-From doc Require Import QuickChickInterface.
+From QuickChick.Doc Require Import QuickChickInterface.
 
 
 (* This module is just to keep the BasicInterface up-to-date with the implementation. *)

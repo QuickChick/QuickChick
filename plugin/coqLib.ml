@@ -1,4 +1,4 @@
-open GenericLib
+open CoqExpr
 
 let gExIntro_impl (witness : coq_expr) (proof : coq_expr) : coq_expr =
   gApp (gInject "ex_intro") [hole; witness; proof]

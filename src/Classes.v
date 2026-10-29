@@ -38,17 +38,46 @@ Class GenSized (A : Type) :=
 Class Gen (A : Type) := { arbitrary : G A }.
 (* end gen_class *)
 
+(* Theorem tests accept either sized generators or existing unsized ones.
+   Keep this bridge separate from GenSized to avoid a reverse instance cycle. *)
+Class TheoremGen (A : Type) := { theoremArbitrarySized : nat -> G A }.
+
+#[global] Instance TheoremGenOfGenSized {A} `{GenSized A} : TheoremGen A | 10 :=
+  {| theoremArbitrarySized := arbitrarySized |}.
+
+#[global] Instance TheoremGenOfGen {A} `{Gen A} : TheoremGen A | 20 :=
+  {| theoremArbitrarySized := fun _ => arbitrary |}.
+
 (** Shrink class *)
 Class Shrink (A : Type) :=
   { shrink : A -> list A }.
 
+(* Theorem tests shrink an unconstrained variable with its Shrink instance,
+   or not at all when the type has none. *)
+Class TheoremShrink (A : Type) := { theoremShrink : A -> list A }.
+
+#[global] Instance TheoremShrinkOfShrink {A} `{Shrink A} : TheoremShrink A | 10 :=
+  {| theoremShrink := shrink |}.
+
+#[global] Instance TheoremShrinkNone {A} : TheoremShrink A | 100 :=
+  {| theoremShrink := fun _ => nil |}.
+
 (** Arbitrary Class *)
 Class Arbitrary (A : Type) `{Gen A} `{Shrink A}.
 
+Class Fuzzy (A : Type) := { fuzz : A -> G A }.
+
+(* TODO: should be able to fail? i.e. outputs G (option A) instead *)
+Class Mutate (A : Type) := { mutate : A -> G A }.
+  
 Class EnumSized (A : Type) := { enumSized : nat -> E A }.
   
 Class Enum (A : Type) := { enum : E A }.
 
+Class Sized (A : Type) :=
+  { size : A -> nat }.
+
+  
 (* ZP: This is not longer usefull *) 
 (* 
 (** * Sizes of types *)

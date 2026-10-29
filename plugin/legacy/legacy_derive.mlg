@@ -1,0 +1,12 @@
+DECLARE PLUGIN "coq-quickchick.legacy"
+
+{
+open Stdarg
+let dispatch = Quickchick_plugin.Driver.dispatch
+}
+
+(* Compatibility alias for existing QuickChick developments. *)
+VERNAC COMMAND EXTEND QuickChickDerive CLASSIFIED AS SIDEFF
+   | ["Derive" constr(class_name) "for" constr(inductive)] ->
+     { dispatch class_name inductive }
+END

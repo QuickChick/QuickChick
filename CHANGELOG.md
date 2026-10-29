@@ -4,6 +4,72 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](http://keepachangelog.com/en/1.0.0/)
 and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html).
 
+## [Unreleased] — 3.0 candidate
+
+- `QCDerive` is replaced by `QuickChick Derive` and its short form
+  `QC Derive`; `QC` is now a keyword. They use the scheduled engine for
+  generators, enumerators, and checkers, and register their typeclass
+  instances.
+- The old derivation engine is removed, with `DeriveLegacy` and the `using`
+  clauses of derivation commands. Correctness proofs for derived instances
+  are no longer generated: the proof tactics recognized only the old
+  engine's terms, and the `DerivingProofs` tutorial is removed.
+- Bare `Derive` is available through `QuickChick.LegacyDerive`; the normal
+  import leaves Stdlib's `Derive` syntax alone.
+- The `quickchick` proof tactic keeps its generated test and helpers local to
+  the proof. A saved test can be rerun before the proof ends.
+- Testing works inside ordinary and nested modules and on properties exported
+  by applied functors. An unapplied functor cannot run a test.
+- Public derivations accept fixed or repeated inputs, such as
+  `(le' 2 y)` or `(R x x)`, through the instance derived for distinct inputs,
+  and outputs out of predicate order, such as `(fun '(y, x) => R x y)`,
+  through a second instance typed as the request. An output that occurs
+  more than once or inside a term is rejected as unsupported. Constructor
+  conclusions may apply functions, as in `R n (double n)`. See the
+  [migration guide](doc/3.0Migration.md).
+- Schedule derivation shares completed dependency derivations between
+  candidate schedules and caches instance checks up to variable renaming,
+  which makes large relations derive several times faster.
+- `QuickChick Scorer <name>.` (or `QC Scorer`) selects the schedule scorer,
+  such as `density` (the default), `budget_aware` or `cardinality`, for later
+  derivations in the file. It replaces the `QC_SCHEDULE_RANKING` environment
+  variable, which is removed. `Scorer` is now a keyword.
+- A scorer can be written in Rocq, as a `QuickChick.SchedulingPolicy.policy`.
+  `QC Scorer my_policy.` compiles it to native code once and loads it into the
+  plugin; see `doc/SchedulingPolicies.md`. Compiling needs `ocamlfind`. A
+  policy is pruned when it proves its bound admissible, and searched by groups
+  when it declares a grouping. It sees the scores of the dependencies already
+  derived, computed by its own leaf and relation scorers. `QuickChick.SchedulingPolicyLaws` builds
+  policies from step scores with both proofs supplied.
+- Schedule selection is exact by default: score-based pruning, proved sound
+  for the built-in rankings, replaces the 1,000-candidate cap. Set
+  `QC_SCHEDULE_SCORE_PRUNING=0` to disable it. Cardinality ranking has no
+  bounds and keeps the cap.
+- `quickchick` on a goal over an abstract type, and derivation of a
+  constructor whose premise is an implication or quantified statement,
+  report what is unsupported instead of failing with an anomaly.
+- `QuickChick` on a property with an unresolved instance, such as a missing
+  `Show`, reports the instance instead of a kernel anomaly.
+- A mutual type member with no base constructor gets an unconstrained
+  generator when a partner member has one: at fuel zero it builds on the
+  partner's base case. A type with no finite values, such as one whose only
+  constructor takes itself, is rejected with an error naming the type.
+- Derived `Show` and `Shrink` work for types with explicit parameters,
+  including mixes of implicit and explicit ones and mutual types.
+- `quickchick` shrinks a counterexample's unconstrained variables with their
+  `Shrink` instances, and leaves a variable unshrunk when its type has none.
+  A shrunk value that breaks a later hypothesis is discarded. The outputs of
+  a producing hypothesis are shrunk only when an existing checker for that
+  hypothesis (for example from `QuickChick Derive Checker`) confirms each shrunk
+  value; otherwise they are not shrunk.
+- Tested with Coq 8.20, Rocq 9.0 and Rocq 9.1. Rocq 9.2 and later need a release of
+  `coq-simple-io` that supports them. During large derivations `coqc` has
+  occasionally aborted with "stack smashing detected" on OCaml 5.2 and, more
+  rarely, 5.4; rerunning succeeds. It did not occur in testing on OCaml 4.13.
+
+This section describes the candidate branch; its final release scope has not
+been settled.
+
 ## [2.2.0] - 2026-05-26
 
 - Remove `Derive` in favor of `QCDerive` to avoid clash with Stdlib and Equations
