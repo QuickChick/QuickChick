@@ -3,7 +3,6 @@ GenericLib
 GenLib
 CoqLib
 SetLib
-UnifyQC
 Weightmap
 ArbitrarySized
 SizeUtils

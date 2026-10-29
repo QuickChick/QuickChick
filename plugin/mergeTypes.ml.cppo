@@ -5,7 +5,11 @@ open GenericLib
 open Pp
 
 open Libnames
-open UnifyQC
+
+module UnknownOrd = struct
+  type t = var
+  let compare x y = compare (var_to_string x) (var_to_string y)
+end
 
 type rec_arg = dep_type list * dep_type (*arguments to a recursive call. Separate term is the shared parameter*)
 type ctr_data =

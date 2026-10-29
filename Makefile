@@ -83,8 +83,6 @@ COMPATFILES:= \
 	plugin/mergeTypes.ml \
 	plugin/quickChick.mli \
 	plugin/quickChick.mlg \
-	plugin/unifyQC.ml \
-	plugin/unifyQC.mli \
 	plugin/newUnifyQC.ml \
 	plugin/newUnifyQC.mli \
 	plugin/tactic_quickchick.mlg \

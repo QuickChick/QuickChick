@@ -109,14 +109,6 @@
  (deps ../scripts/mycppo tactic_quickchick.mlg.cppo)
  (action (run sh %{dep:../scripts/mycppo} %{dep:tactic_quickchick.mlg.cppo} %{target})))
 (rule
- (target unifyQC.ml)
- (deps ../scripts/mycppo unifyQC.ml.cppo)
- (action (run sh %{dep:../scripts/mycppo} %{dep:unifyQC.ml.cppo} %{target})))
-(rule
- (target unifyQC.mli)
- (deps ../scripts/mycppo unifyQC.mli.cppo)
- (action (run sh %{dep:../scripts/mycppo} %{dep:unifyQC.mli.cppo} %{target})))
-(rule
  (target newUnifyQC.ml)
  (deps ../scripts/mycppo newUnifyQC.ml.cppo)
  (action (run sh %{dep:../scripts/mycppo} %{dep:newUnifyQC.ml.cppo} %{target})))

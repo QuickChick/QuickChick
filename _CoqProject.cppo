@@ -17,7 +17,6 @@ plugin/setLib.mli
 plugin/coqLib.mli
 plugin/arbitrarySized.mli
 plugin/genLib.mli
-plugin/unifyQC.mli
 plugin/newUnifyQC.mli
 plugin/sizeUtils.mli
 plugin/sized.mli
@@ -37,7 +36,6 @@ plugin/setLib.ml
 plugin/coqLib.ml
 plugin/arbitrarySized.ml
 plugin/genLib.ml
-plugin/unifyQC.ml
 plugin/newUnifyQC.ml
 plugin/sizeUtils.ml
 plugin/sized.ml
