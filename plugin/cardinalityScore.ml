@@ -2,8 +2,8 @@
    enumerate the solutions of a relation mode, and matches and checks filter
    them. Counts are growth classes in the size bound. A filter's acceptance is
    the class of what it admits over the class of what reaches it; the score
-   counts filters by acceptance class. See
-   audit/3.0-scoring/cardinality/README.md for the rules and their limits. *)
+   counts filters by acceptance class. doc/SchedulingPolicies.md describes
+   the rules and their limits. *)
 
 open NewGenericLib
 

@@ -56,8 +56,8 @@ the policy's `score_leaf` over each coverage leaf's constructors and its
 instance in context supplies is `SuppliedInstance`; any other is `Pending`.
 Recursive steps add no request; the policy sees their source category. A
 variable keeps its local id throughout a derivation. `test/compiled_density.v` writes the
-built-in `density_then_vars` ranking as a policy; on Cedar it makes the
-built-in's selection for all 862 constructor modes.
+built-in `density_then_vars` ranking as a policy; on a large typing relation
+it makes the built-in's selection for all 862 constructor modes.
 
 A policy may declare, in `policy_grouping`, how its score combines over
 footprint-disjoint hypothesis groups: a unit, a combine function, and its
@@ -97,8 +97,8 @@ two policies lexicographically, with a proved bound when both have one
 (`lex_bound_admissible`). `uses_policy` sums `step_uses`; its bound adds the
 node's future uses to the committed ones (`uses_bound_admissible`). All
 declare their grouping. `test/compiled_density.v` builds `density_then_vars`
-as `lex_policy` of a maximum of grades and `uses_policy`. On Cedar it makes
-the built-in's selection on every key, pruned and in verify mode, with no
+as `lex_policy` of a maximum of grades and `uses_policy`. On the same relation
+it makes the built-in's selection on every key, pruned and in verify mode, with no
 bound violation, and it prunes exactly as much as the built-in. It takes
 20 s against 10 s, the cost of quoting each search node for the policy.
 
@@ -124,8 +124,7 @@ lacks an instance is excluded. Score pruning does not apply yet, so the
 unpruned candidate cap does (`QC_SCHEDULE_MAX_CANDIDATES` overrides it for
 diagnosis; 0 removes it). `test/cardinality_ranking` checks the case that
 BudgetAware ties: inventing a list and then checking the relation that
-determines it. The prototype and Cedar measurements are in
-`audit/3.0-scoring/cardinality/`.
+determines it.
 
 ### BudgetAware ranking
 
@@ -488,8 +487,8 @@ replaces it; and an unbound variable that is a bare argument of k remaining
 positive hypotheses counts k - 1 times, since only one of them can produce it.
 `plugin/test_prefix_search.ml` checks these bounds against every completed
 descendant and checks that tie pruning selects the exhaustive winner for each
-built-in policy. The release audit proves them in Rocq
-(`audit/3.0-scoring/rocq-prototype/`): `DensityPrefixBound.v` shows the bound
+built-in policy. Rocq proofs, not yet in this repository, establish them:
+`DensityPrefixBound.v` shows the bound
 admissible and cuts exact for every built-in policy, `BudgetAwarePrefixBound.v`
 does the same for BudgetAware, including selectivity and the look-ahead's
 counting argument, and `DensityLookahead.v` applies that argument to the

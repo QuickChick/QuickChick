@@ -1,8 +1,8 @@
 From QuickChick Require Import QuickChick.
 Require Import List. Import ListNotations.
 
-(* Connected hypotheses with a negated check, shaped like Cedar's TEqEntity,
-   whose orderings are many and whose prefixes the bound must not overrate. *)
+(* Connected hypotheses with a negated check, shaped like an entity-equality
+   typing rule, whose orderings are many and whose prefixes the bound must not overrate. *)
 
 Inductive mem : nat -> list nat -> Prop :=
 | MemHere x l : mem x (x :: l)

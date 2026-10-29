@@ -6,8 +6,8 @@ Import ListNotations.
 (* [defd ets ns] determines ns from ets; [wf ns a] accepts any ns and a.
    Producing ns from wf and then checking defd ets ns is a filter that admits
    one list out of exponentially many, so cardinality ranking produces ns
-   from defd. The inequality a <> b almost always passes. As in Cedar, ets is
-   taken apart from an equality on the input V; BudgetAware then ties the two
+   from defd. The inequality a <> b almost always passes. As in typing rules
+   over an environment, ets is taken apart from an equality on the input V; BudgetAware then ties the two
    schedules (its density field is already Checking because of the
    inequality) and its lower candidate identifier checks defd. *)
 Inductive defd : list nat -> list nat -> Prop :=
