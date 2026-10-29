@@ -92,6 +92,8 @@ val constr_to_rocq_constr : Constr.constr -> rocq_constr option
 val qualid_to_rocq_relations : Libnames.qualid -> (int * rocq_relation list) option
 val ty_ctr_to_rocq_relations : ty_ctr -> (int * rocq_relation list) option
 val oib_to_rocq_relation :  Declarations.one_inductive_body -> rocq_relation option
+val ind_reference_to_unparameterized_relation : Constrexpr.constr_expr -> rocq_relation option
+val define_new_inductive : rocq_relation -> unit
 val ind_reference_to_rocq_relations : Constrexpr.constr_expr -> (int * rocq_relation list) option
 
 val parse_dependent_type : Constr.constr -> rocq_constr option

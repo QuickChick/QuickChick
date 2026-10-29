@@ -556,7 +556,7 @@ let abstract_conclusion_calls ty_ctr nparams param_pats ctr_pats result =
 
    Returns list of constructor representations 
  *)
-let dep_parse_constructors nparams param_names oib : rocq_ctr list option =
+let dep_parse_constructors ?(abstract_calls=true) nparams param_names oib : rocq_ctr list option =
   
   let parse_constructor branch : rocq_ctr option =
     let (ctr_id, ty_ctr) = branch in
@@ -564,7 +564,9 @@ let dep_parse_constructors nparams param_names oib : rocq_ctr list option =
     let (param_pats, ty) = Term.decompose_prod_n nparams ty_ctr in
 
     let (ctr_pats, result) = if Constr.isConst ty then ([],ty) else Term.decompose_prod ty in
-    let (ctr_pats, result) = abstract_conclusion_calls ty_ctr nparams param_pats ctr_pats result in
+    let (ctr_pats, result) =
+      if abstract_calls then abstract_conclusion_calls ty_ctr nparams param_pats ctr_pats result
+      else (ctr_pats, result) in
 
     let pat_names, pat_types = List.split (List.rev ctr_pats) in
 
@@ -593,7 +595,10 @@ let dep_parse_constructors nparams param_names oib : rocq_ctr list option =
 let constr_to_rocq_constr  (c : Constr.constr) : rocq_constr option =
   None
 
-let oib_to_rocq_relation (oib : Declarations.one_inductive_body) : rocq_relation option =
+(* The relation with constructor types that do not bind its parameters.
+   [abstract_calls] reads function applications in conclusions as equality
+   premises, as scheduling needs. *)
+let oib_to_unparameterized_relation ?abstract_calls (oib : Declarations.one_inductive_body) : rocq_relation option =
     (* An anonymous type input (Type -> ...) still binds a parameter used by
        constructor types. Give it a name before building the de Bruijn map. *)
     let oib = { oib with Declarations.mind_arity_ctxt =
@@ -602,15 +607,19 @@ let oib_to_rocq_relation (oib : Declarations.one_inductive_body) : rocq_relation
         | Names.Anonymous when Constr.is_Type (Context.Rel.Declaration.get_type decl) ->
           Context.Rel.Declaration.set_name (Names.Name (make_up_name ())) decl
         | _ -> decl) oib.Declarations.mind_arity_ctxt } in
-    let dtype = DTyCtr (ty_ctr_of_string "Type", []) in
     let ty_ctr = oib.Declarations.mind_typename in 
     dep_parse_type_params oib.Declarations.mind_arity_ctxt >>= fun ty_params ->
     List.iter (fun tp -> msg_debug (str (ty_param_to_string tp) ++ fnl ())) ty_params;
-    dep_parse_constructors (List.length ty_params) ty_params oib >>= fun ctr_reps ->
+    dep_parse_constructors ?abstract_calls (List.length ty_params) ty_params oib >>= fun ctr_reps ->
+    dep_parse_type (List.length ty_params) ty_params oib.Declarations.mind_arity_ctxt oib >>= fun result_ty -> 
+    Some (Libnames.qualid_of_ident ty_ctr, ty_params, ctr_reps, result_ty)
+
+let oib_to_rocq_relation (oib : Declarations.one_inductive_body) : rocq_relation option =
+    let dtype = DTyCtr (ty_ctr_of_string "Type", []) in
+    oib_to_unparameterized_relation oib >>= fun (ty_ctr, ty_params, ctr_reps, result_ty) ->
     let ctr_reps' = List.map (fun (ctr_name, ty) -> 
       ctr_name, dep_arrowify ty (List.map (fun n -> Names.Name n) ty_params) (List.init (List.length ty_params) (fun _ -> dtype))) ctr_reps in
-    dep_parse_type (List.length ty_params) ty_params oib.Declarations.mind_arity_ctxt oib >>= fun result_ty -> 
-    Some (Libnames.qualid_of_ident ty_ctr, ty_params, ctr_reps', result_ty)
+    Some (ty_ctr, ty_params, ctr_reps', result_ty)
     
 let qualid_to_rocq_relations (r : Libnames.qualid) : (int * rocq_relation list) option =
   (* Locate all returns _all_ definitions with this suffix *)
@@ -642,6 +651,112 @@ let ind_reference_to_rocq_relations (c : Constrexpr.constr_expr) : (int * rocq_r
     | _ -> failwith "Not a reference"
   in
   qualid_to_rocq_relations r
+
+(* A single inductive relation with constructor types that do not bind its
+   parameters, as Merge reads it: conclusions keep their function calls, so the
+   merged relation keeps the constructors' shapes. *)
+let ind_reference_to_unparameterized_relation (c : Constrexpr.constr_expr) : rocq_relation option =
+  let r = match c with
+    | { CAst.v = Constrexpr.CRef (r,_);_ } -> r
+    | _ -> failwith "Not a reference" in
+  let (mind, _) = Globnames.destIndRef (Nametab.global r) in
+  let mib = Environ.lookup_mind mind (Global.env ()) in
+  if Array.length mib.Declarations.mind_packets > 1 then
+    CErrors.user_err (str "Mutual inductive types are not supported here." ++ fnl ())
+  else oib_to_unparameterized_relation ~abstract_calls:false mib.Declarations.mind_packets.(0)
+
+let locate_ind c =
+  try match Nametab.locate c with
+    | Names.GlobRef.IndRef x -> Some x
+    | _ -> None
+  with Not_found -> None
+
+let locate_constructor c =
+  try match Nametab.locate c with
+    | Names.GlobRef.ConstructRef x -> x
+    | _ -> failwith ("Not a constructor: " ^ Libnames.string_of_qualid c)
+  with Not_found -> failwith ("Constructor not found: " ^ Libnames.string_of_qualid c)
+
+let locate_constant c =
+  try match Nametab.locate c with
+    | Names.GlobRef.ConstRef x -> Some x
+    | _ -> None
+  with Not_found -> None
+
+(* The kernel term of a constructor or arity type of relation [name], whose
+   parameters [ty_params] are bound outside it. *)
+let constr_of_relation_type name ty_params (rc : rocq_constr) : Constr.t =
+  let find_param x i =
+    let rec go j = function
+      | [] -> failwith ("Parameter not found: " ^ Names.Id.to_string x)
+      | p :: ps -> if Names.Id.equal p x then Constr.mkRel (i - j) else go (j + 1) ps in
+    go 1 ty_params in
+  let find_var x i vars =
+    let rec go j = function
+      | [] ->
+        (match locate_constant (Libnames.qualid_of_ident x) with
+         | Some c -> Constr.UnsafeMonomorphic.mkConst c
+         | None -> find_param x (List.length ty_params + i))
+      | y :: ys -> if Names.Id.equal x y then Constr.mkRel (i - j) else go (j - 1) ys in
+    go (List.length vars) vars in
+  let rec aux vars i rc =
+    match rc with
+    | DArrow (rc1, rc2) ->
+      Constr.mkProd (Context.anonR, aux vars i rc1, aux (make_up_name () :: vars) (i + 1) rc2)
+    | DProd ((x, rc1), rc2) ->
+      Constr.mkProd (Context.nameR x, aux vars i rc1, aux (x :: vars) (i + 1) rc2)
+    | DTyParam tp -> find_param tp i
+    | DTyCtr (c, rcs) ->
+      let cname = Libnames.string_of_qualid c in
+      let head =
+        if cname = "Prop" then Constr.mkProp
+        else if cname = "Type" then Constr.mkType Univ.Universe.type1
+        else if cname = name then Constr.mkRel i
+        else match locate_ind c with
+          | Some ind -> Constr.UnsafeMonomorphic.mkInd ind
+          | None -> match locate_constant c with
+            | Some k -> Constr.UnsafeMonomorphic.mkConst k
+            | None -> failwith ("Not found: " ^ cname) in
+      Constr.mkApp (head, Array.of_list (List.map (aux vars i) rcs))
+    | DCtr (c, rcs) ->
+      Constr.mkApp (Constr.UnsafeMonomorphic.mkConstruct (locate_constructor c),
+                    Array.of_list (List.map (aux vars i) rcs))
+    | DTyVar x -> find_var x (i - List.length ty_params) vars
+    | DApp (rc, rcs) -> Constr.mkApp (aux vars i rc, Array.of_list (List.map (aux vars i) rcs))
+    | DNot _ | DLambda _ | DMatch _ | DHole ->
+      failwith ("Unsupported in a declared relation: " ^ rocq_constr_to_string rc) in
+  List.fold_right (fun p t -> Constr.mkProd (Context.nameR p, Constr.mkType Univ.Universe.type1, t))
+    ty_params (aux [] (List.length ty_params + 1) rc)
+
+(* Declare a single, monomorphic inductive relation. *)
+let define_new_inductive ((ty_ctr, ty_params, ctrs, typ) : rocq_relation) =
+  let open Entries in
+  let name = Libnames.string_of_qualid ty_ctr in
+  let oie =
+    { mind_entry_typename = Names.Id.of_string name
+    ; mind_entry_arity = constr_of_relation_type name ty_params typ
+    ; mind_entry_consnames = List.map (fun (c, _) -> Names.Id.of_string (Libnames.string_of_qualid c)) ctrs
+    ; mind_entry_lc = List.map (fun (_, t) -> constr_of_relation_type name ty_params t) ctrs
+    } in
+  let entry =
+    { mind_entry_record = None
+    ; mind_entry_finite = Declarations.Finite
+    ; mind_entry_params = []
+    ; mind_entry_inds = [ oie ]
+    ; mind_entry_universes = Monomorphic_ind_entry
+    ; mind_entry_variance = None
+    ; mind_entry_private = None
+    } in
+  let evd = Evd.from_env (Global.env ()) in
+  let uentry = Evd.univ_entry ~poly:
+#if COQ_VERSION >= (9, 2, 0)
+    PolyFlags.default
+#else
+    false
+#endif
+    evd in
+  Flags.quiet := false;
+  ignore (DeclareInd.declare_mutual_inductive_with_eliminations entry uentry [])
 
 open Constrexpr
 
