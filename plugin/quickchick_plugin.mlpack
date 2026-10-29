@@ -2,7 +2,6 @@ Error
 GenericLib
 GenLib
 CoqLib
-SemLib
 SetLib
 UnifyQC
 Weightmap

@@ -10,7 +10,6 @@ open Error
 
 type derivation = SimpleDer of SimplDriver.derivable list
                 | DepDer of DepDriver.derivable
-                | NEW of DepDriver.derivable
 
 let simpl_dispatch ~legacy ind classes name1 name2 =
   List.iter (fun cn -> match legacy, cn with
@@ -33,7 +32,6 @@ let class_assoc_opts = [ ("GenSized"                 , SimpleDer [SimplDriver.Ge
                        ; ("Generator"                , DepDer DepDriver.GenSizedSuchThat)
                        ; ("Enumerator"               , DepDer DepDriver.EnumSizedSuchThat)
                        ; ("Checker"                  , DepDer DepDriver.DecOpt)
-                       ; ("Testing"                  , NEW DepDriver.GenSizedSuchThat)
                        ]
 
 let class_assoc_table =
@@ -83,7 +81,6 @@ let dispatch_with ~legacy cn ind name1 name2 =
         | DepDriver.GenSizedSuchThat -> "Gen"
         | DepDriver.EnumSizedSuchThat -> "Enum" in
       PublicDerive.derive_dependent ~mode ind
-  | NEW class_name -> NewDepDriver.dep_dispatch ind class_name
 
 let dispatch = dispatch_with ~legacy:false
 let dispatch_legacy cn ind name1 name2 =

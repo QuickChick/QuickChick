@@ -319,9 +319,7 @@ QuickChickDebug Debug On.
 Print Typeclasses for Fooish.
 
        
-Derive Testing for (fun '(x,y,z,w) => Fooish x y z). Locate Dec_Eq.
-Derive Testing for (Fooish x y). 
-Derive Testing for (fun x => Fooish x y). 
+ 
 
 
 
