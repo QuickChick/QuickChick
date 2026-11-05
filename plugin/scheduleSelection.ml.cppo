@@ -5,7 +5,10 @@ open RelationInfo
 open DensityMemo
 open ScheduleScoring
 open ScheduleContext
-let rec schedule_density neutral_prelude_steps schedule : schedule_with_density =
+(* Grade each step of a schedule (Total, Partial, Checking and so on),
+   deriving the modes its dependencies call. Every scorer reads these grades;
+   density is only one of them. *)
+let rec grade_schedule neutral_prelude_steps schedule : schedule_with_density =
   let fixed step ds = match fixed_step_density ds step with
     | Some grade -> grade
     | None -> assert false in
@@ -80,7 +83,7 @@ let rec schedule_density neutral_prelude_steps schedule : schedule_with_density 
 and schedule_group_selector ds groups =
   let prefer_dense = ds = D_Gen || ds = D_Thm in
   ScheduleRanking.select_group_combinations ~prefer_dense (schedule_ranking_policy ())
-    (score_group_candidates (schedule_density []) (fun _ scored ->
+    (score_group_candidates (grade_schedule []) (fun _ scored ->
       Some (ScheduleRanking.group_features_of (scored_schedule_features ds 0 scored))) groups)
 
 and constructor_valid_schedules (ind_name : ty_ctr) (ctr : rocq_ctr) (result_vars : (var * rocq_constr) list) (output_vars : var list) (ds : derive_sort) (opt : bool) =
@@ -143,7 +146,7 @@ and constructor_valid_schedules (ind_name : ty_ctr) (ctr : rocq_ctr) (result_var
   let prepared_inputs = ref [] in
   let budget_pruning = budget_aware_ranking () in
   let pruning = SchedulePruning.make_context ~ds ~prefer_dense
-    ~mode:score_pruning_mode ~reuse_stable ~grade:schedule_density in
+    ~mode:score_pruning_mode ~reuse_stable ~grade:grade_schedule in
   let stats = pruning.SchedulePruning.stats in
   let materialize = SchedulePruning.materialize in
   let score_schedule = SchedulePruning.score_schedule pruning in
@@ -186,20 +189,20 @@ and constructor_valid_schedules (ind_name : ty_ctr) (ctr : rocq_ctr) (result_var
       | None -> None
       | Some grouping -> Some (fun groups ->
         GroupedScore.select_combinations (compiled_group_policy grouping)
-          (score_group_candidates (schedule_density []) (fun _ scored ->
+          (score_group_candidates (grade_schedule []) (fun _ scored ->
             Some (compiled_schedule_score policy ind_name result_vars output_vars ds scored))
             groups))
     end
     else if cardinality_ranking () then Some (fun groups ->
       let context = cardinality_context (cardinality_recursive_count result_vars output_vars) in
       GroupedScore.select_combinations CardinalityScore.group_policy
-        (score_group_candidates (schedule_density []) (fun (steps, _) _ ->
+        (score_group_candidates (grade_schedule []) (fun (steps, _) _ ->
           Some (CardinalityScore.score_schedule context steps)) groups))
     else if budget_aware_ranking () then Some (fun groups ->
       let context = budget_context !prepared_inputs in
       let key = budget_key ind_name result_vars output_vars ds in
       GroupedScore.select_combinations BudgetAwareScore.group_policy
-        (score_group_candidates (schedule_density []) (fun (steps, _) _ ->
+        (score_group_candidates (grade_schedule []) (fun (steps, _) _ ->
           Result.to_option (BudgetAwareScore.score_schedule context key steps)) groups))
     else Some (schedule_group_selector ds) in
   let schedule_matches = UnifyQC.type_to_schedules
@@ -271,7 +274,7 @@ and constructor_valid_schedules (ind_name : ty_ctr) (ctr : rocq_ctr) (result_var
         density_inductive_memo := add_stable initial_inductive_memo;
         density_memo := initial_density_memo;
         let rescored = with_score_pruning_suspended (fun () ->
-          schedule_density ms_steps schd) in
+          grade_schedule ms_steps schd) in
         collect_stable ();
         if scored_schedule_features ds best_id cached <>
            scored_schedule_features ds best_id rescored then
@@ -281,7 +284,7 @@ and constructor_valid_schedules (ind_name : ty_ctr) (ctr : rocq_ctr) (result_var
         List.map (fun ((i, _, _, _) as entry) ->
           if i = best_id then best_entry else entry) entries)) in
   if group_mode = `Verify && select_groups <> None then
-    SelectionDiagnostics.verify_grouped_search ~schedule_density ~typ ~ind_name ~ctr_name
+    SelectionDiagnostics.verify_grouped_search ~grade_schedule ~typ ~ind_name ~ctr_name
       ~result_vars ~output_vars ~ds ~opt ~prefer_dense ~policy ~prepared_inputs
       ~initial_inductive_memo ~initial_density_memo schedule_matches schedules
       schedule_densities;
@@ -638,7 +641,7 @@ and inductive_best_valid_schedule (rel : rocq_relation) (output_idxs : int list)
         let* constructors = ScoringView.map_result (fun (((steps, sort), _, _, _) as schedule, (ctr_name, _)) ->
           let result, _ = schedule_result_and_constrained sort in
           let* view = ScoringView.quote_schedule ~global ~finite_pins:(derivation_finite_pins ())
-            ~grade:policy_grade scope (fst (schedule_density [] (steps, sort))) result in
+            ~grade:policy_grade scope (fst (grade_schedule [] (steps, sort))) result in
           Ok { PolicyViews.constructor_name = name ctr_name;
                constructor_recursive = is_recursive schedule; constructor_schedule = view })
           (List.combine constructor_schedules densities) in
@@ -720,7 +723,7 @@ let theorem_candidate_loses ~incumbent ms_steps ((steps, sort) : schedule) =
         | Some grade -> Some (density_rank grade)
         | None ->
           let before = !density_uncertainty_events in
-          (match schedule_density [] ([step], sort) with
+          (match grade_schedule [] ([step], sort) with
            | ([(_, grade)], _) when !density_uncertainty_events = before ->
              Some (density_rank grade)
            | _ -> None) in

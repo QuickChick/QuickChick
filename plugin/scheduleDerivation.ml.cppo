@@ -30,7 +30,7 @@ let all_theorem_schedules ?(best_only = false) (thm : rocq_type) =
             Feedback.msg_notice (str (Printf.sprintf "[theorem-lazy] candidate=%d skipped\n" i));
           None
         end else
-        let result = schedule_density ms_steps schd in
+        let result = grade_schedule ms_steps schd in
         if lazy_best then begin
           let features = scored_schedule_features D_Thm i result in
           if schedule_trace_enabled () then
@@ -570,7 +570,7 @@ let valid_schedules =
         let schedules = UnifyQC.type_to_schedules ?select_groups:(grouped_selector D_Thm)
           dt None None [] [] D_Thm false in
         let schedules' = List.map (fun ((steps, sort), ms, eqs) -> (List.map (fun (v,p) -> S_Match (v,p)) ms, (List.map check_eq eqs @ steps, sort))) schedules in
-        let schedules_w_densities = List.mapi (fun i (ms_steps, schd) -> i, schedule_density ms_steps schd) schedules' in
+        let schedules_w_densities = List.mapi (fun i (ms_steps, schd) -> i, grade_schedule ms_steps schd) schedules' in
         let sorted = sort_schedules_by_density_and_var_uses schedules_w_densities D_Thm in
 
         if !GenericLib.debug_mode then begin

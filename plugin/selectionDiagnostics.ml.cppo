@@ -59,7 +59,7 @@ let step_probe result_vars schedules =
 
 (* QC_SCHEDULE_GROUPS=verify: grouped search must produce only orderings the
    joint search admits and keep its best score. *)
-let verify_grouped_search ~schedule_density ~typ ~ind_name ~ctr_name ~result_vars
+let verify_grouped_search ~grade_schedule ~typ ~ind_name ~ctr_name ~result_vars
     ~output_vars ~ds ~opt ~prefer_dense ~policy ~prepared_inputs
     ~initial_inductive_memo ~initial_density_memo schedule_matches schedules
     schedule_densities =
@@ -115,7 +115,7 @@ let verify_grouped_search ~schedule_density ~typ ~ind_name ~ctr_name ~result_var
         density_inductive_memo := initial_inductive_memo;
         density_memo := initial_density_memo;
         let ms_steps, schd = materialize triple in
-        try Some (i, triple, scored_schedule_features ds i (schedule_density ms_steps schd))
+        try Some (i, triple, scored_schedule_features ds i (grade_schedule ms_steps schd))
         with Noninductive_dependency _ | Unavailable_mode _ -> None) joint
       |> List.filter_map Fun.id) in
     let scored_grouped = List.map (fun (i, scored, _, _) ->
@@ -140,7 +140,7 @@ let verify_grouped_search ~schedule_density ~typ ~ind_name ~ctr_name ~result_var
           density_inductive_memo := initial_inductive_memo;
           density_memo := initial_density_memo;
           let ms_steps, schd = materialize triple in
-          try score (List.map fst (fst (schedule_density ms_steps schd)))
+          try score (List.map fst (fst (grade_schedule ms_steps schd)))
           with Noninductive_dependency _ | Unavailable_mode _ -> None) joint)) in
       let grouped_best = with_temporary_density_state (fun () -> best_budget
         (List.map (fun (_, (steps, _), inductive_memo, density_memo_after) ->

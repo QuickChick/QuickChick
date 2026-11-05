@@ -35,7 +35,7 @@ type context = {
   prefer_dense : bool;
   mode : mode;
   reuse_stable : bool;
-  (* schedule_density, which grades a schedule's steps. *)
+  (* grade_schedule, which grades a schedule's steps. *)
   grade : schedule_step list -> schedule -> schedule_with_density;
   stats : stats;
   trace_bounds : bool;
@@ -86,7 +86,7 @@ let trace_score ctx kind path (score : ScheduleRanking.features) =
     (ScheduleRanking.histogram_to_string score.ScheduleRanking.density_counts)
     score.ScheduleRanking.variable_uses))
 
-(* schedule_density traverses steps in sorted order. Equal multisets thus
+(* grade_schedule traverses steps in sorted order. Equal multisets thus
    share mode grades within this constructor's fixed recursion context;
    restore each candidate's order for variable-use scoring. Duplicate steps
    are scored afresh because their occurrence grades need not be identical. *)
