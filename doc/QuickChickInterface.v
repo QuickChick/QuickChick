@@ -760,6 +760,15 @@ Record Args :=
 ]]
 *)
 
+(** Tests are extracted to OCaml and compiled in a fresh subdirectory of
+    [QuickChick] in the system temporary directory ([TMPDIR], or [/tmp]).
+    [QCExtractDir] sets another parent directory, for instance to keep the
+    generated sources for coverage tools. *)
+(** [[
+   QCExtractDir "path/to/dir".
+]]
+*)
+
 (* Semantics of Generators *)
 
 (* To reason about generators, we need to import the Proofs module 
