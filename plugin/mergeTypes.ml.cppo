@@ -237,7 +237,6 @@ and unifys_param (t1s : rocq_constr list) (t2s : rocq_constr list) : sub_param o
           Some (merge_disjoint_param s s2)))
       | _, _ -> failwith "error, shouldn't get here!"
 
-(* TODO: move the type to be used in def of ctr_data *)
 (* If a is in l, returns l with a removed *)
 let rec remove (l : rec_arg list) (shared_param_match : rocq_constr) : (rec_arg * rec_arg list) option =
   match l with
@@ -412,7 +411,7 @@ let merge_relations ((tyctr1, ctrs1, ty1) : relation')
   (* Merge each pair of remaining constructors *)
   let ctrs_regular = List.fold_left (fun acc (name1, ctr1) -> (List.fold_left (fun acc (name2, ctr2) -> 
     match merge_ctrs tyctr1 tyctr2 ctr1 ctr2 param_pos1 param_pos2 params1 params2 with
-    | Some ctr -> let new_ctr = convertBack tyctr ctr param_pos in (*TODO: think here later*)
+    | Some ctr -> let new_ctr = convertBack tyctr ctr param_pos in
         let new_name = (constructor_of_string (constructor_to_string name1 ^ constructor_to_string name2)) in
         (new_name, new_ctr) :: acc
     | None -> acc
@@ -594,12 +593,10 @@ let merge_test ind =
     
 (*
 
-TODO still:
-4) Generate the mappings back and forth P as x /\ Q bs x <-> PQ as bs x
-8) Add error checks with useful error messages for
-  - shared parameter types are different
-  - number of arguments is not same as number that the type family actually takes
-   
+Not yet supported: proofs relating a merged relation to its parts
+(P as x /\ Q bs x <-> PQ as bs x), and clear errors when the shared
+argument's types differ or a relation is applied to the wrong number of
+arguments.
 *)
 
 (*

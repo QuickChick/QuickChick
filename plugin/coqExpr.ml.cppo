@@ -238,7 +238,6 @@ let parse_constructors nparams param_names result_ty oib : ctr_rep list option =
       end
       else if isConst ty then begin
         let (c,_) = destConst ty in 
-        (* TODO: Rethink this for constants? *)
         Some (TyCtr (qualid_of_ident (Label.to_id (Constant.label c)), []))
       end
       else CErrors.user_err (str "Case Not Handled" ++ fnl())
@@ -344,7 +343,6 @@ let gFun xss (f_body : var list -> coq_expr) =
   | [] -> f_body []
   | _ ->
   let xvs = List.map (fun x -> fresh_name x) xss in
-  (* TODO: optional argument types for xss *)
 #if COQ_VERSION >= (8, 20, 0)
   let binder_list = List.map (fun x -> CLocalAssum ([CAst.make @@ Name x], None, Default Glob_term.Explicit, hole)) xvs in
 #else
@@ -358,7 +356,6 @@ let gFunTyped xts (f_body : var list -> coq_expr) =
   | [] -> f_body []
   | _ ->
   let xvs = List.map (fun (x,t) -> (fresh_name x,t)) xts in
-  (* TODO: optional argument types for xss *)
 #if COQ_VERSION >= (8, 20, 0)
   let binder_list = List.map (fun (x,t) -> CLocalAssum ([CAst.make @@ Name x], None, Default Glob_term.Explicit, t)) xvs in
 #else
@@ -613,7 +610,7 @@ let declare_class_instance ?(global=true) ?(priority=42) instance_arguments inst
               ~poly:default_poly
               (CAst.make @@ Name (Id.of_string instance_name), None) iargs
               instance_type_vars
-              (true, instance_record_vars) (* TODO: true or false? *)
+              (true, instance_record_vars)
               { Typeclasses.hint_priority = Some priority; hint_pattern = None }
   in
 #if COQ_VERSION >= (9, 1, 0)

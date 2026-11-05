@@ -72,7 +72,7 @@ type sdt_rep = ty_ctr * ty_param list * ctr_rep list
 type dt_rep = sdt_rep list
  
 
-(* Supertype of coq_type handling potentially dependent stuff - TODO : merge *)
+(* Supertype of coq_type that may be dependent. *)
 
 
 
@@ -105,7 +105,6 @@ val gApp : ?explicit:bool -> coq_expr -> coq_expr list -> coq_expr
 val gFun : string list -> (var list -> coq_expr) -> coq_expr
 val gRecFunIn : ?structRec:(var option) -> ?assumType:coq_expr -> string -> string list -> ((var * var list) -> coq_expr) -> (var -> coq_expr) -> coq_expr
 
-(* TODO: HOAS-ify *)
   
 val gMatch : coq_expr -> ?catchAll:(coq_expr option) -> ?params:(int) -> ?explicit_params:int -> ((constructor * string list * (var list -> coq_expr)) list) -> coq_expr
 val gMatchReturn : coq_expr -> ?catchAll:(coq_expr option) -> string -> (var -> coq_expr) ->

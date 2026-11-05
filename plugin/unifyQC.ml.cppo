@@ -3,7 +3,6 @@ open Util
 open GenericLib
 open Error
 
-(* TODO : move to utils or smth *)
 type name_provider = { next_name : unit -> string }
 
 let mk_name_provider s = 
@@ -154,7 +153,6 @@ let rec unify (k : umap) (r1 : range) (r2 : range) (eqs : EqSet.t)
      msg_debug (str (Printf.sprintf "Unifying two unknowns with ranges: %s %s" (range_to_string r1) (range_to_string r2)) ++ fnl ());
      begin match r1, r2 with 
      (* "Delay" cases - unknowns call unify again *)
-     (* TODO: rething return value *)
      | Unknown u1', _ -> 
         unify k (Unknown u1') (Unknown u2) eqs >>= fun (k', _r', eqs', ms') ->
         Some (k', Unknown u1, eqs', ms')
@@ -378,7 +376,6 @@ let type_to_schedules ?on_prepared ?select_groups ?on_prefix ?on_prefix_with_flo
     (result_vars : (var * rocq_constr) list) (output_vars : var list)
     (ds : derive_sort) opt :
     (schedule * (var * pat) list * (var * var) list) list =
-  (*TODO: handle parameters, need to distinguish them from remainder of result_vars*)
   (* Feedback.msg_debug (str ("Type to schedules: " ^ rocq_constr_to_string typ) ++ fnl ()); *)
   (* Feedback.msg_debug (str ("Result vars: " ^ String.concat ", " (List.map (fun (v, ty) -> var_to_string v ^ ": " ^ rocq_constr_to_string ty) result_vars)) ++ fnl ()); *)
   let vars, hyps, concl = type_info typ in

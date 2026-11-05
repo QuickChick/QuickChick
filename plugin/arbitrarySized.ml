@@ -296,7 +296,6 @@ let mutate_decl ty_ctr (ctrs : ctr_rep list) (iargs : var list) =
   in
 
   let coq_expr_to_thunk (e : coq_expr) : coq_expr = gFun ["_tt"] (fun [_] -> e) in
-   (* TODO: unnecessary *)
   
   let mutate_fun =
   
@@ -414,10 +413,8 @@ let mutate_decl ty_ctr (ctrs : ctr_rep list) (iargs : var list) =
                 (fun i arg_typ -> 
                   let ctr_arg = List.nth ctr_args i in
                   if isCurrentTyCtr arg_typ then
-                    (* TODO: weight by function of size *)
                     (* mutate child *)
                     (* return input where child is replaced *)
-                    (* TODO: choose weighting function of size for inductive children *)
                     ( weight_rec_ind (gApp (gInject "size") [ctr_arg]),
                       coq_expr_to_thunk @@
                       bindGen (gApp (gVar aux_mutate) [ctr_arg]) 
@@ -425,7 +422,6 @@ let mutate_decl ty_ctr (ctrs : ctr_rep list) (iargs : var list) =
                       returnGen (gApp ~explicit:true (gCtr ctr) 
                         (tyParams @ List.assign ctr_args i (gVar child')))))
                   else
-                    (* TODO: choose reasonable weight for non-inductive children *)
                     ( weight_rec_nonind,
                       coq_expr_to_thunk @@
                       bindGen (gApp (gInject "mutate") [ctr_arg])
@@ -435,8 +431,6 @@ let mutate_decl ty_ctr (ctrs : ctr_rep list) (iargs : var list) =
                 )
                 0 ctr_arg_typs
             in
-            (* TODO: should actually use freq, and so need to choose weights *)
-            (* TODO: used thunked version *)
             frequencyThunked @@
             regs @ rcms @ recs
         )

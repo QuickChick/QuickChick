@@ -169,7 +169,7 @@ let insert_mutrec_calls ?within ((schedule,matches) : schedule * (var * pat) lis
   let zero = DCtr (constructor_of_string "Coq.Init.Datatypes.O", []) in
   let succ n = DCtr (constructor_of_string "Coq.Init.Datatypes.S", [n]) in 
   let three = succ (succ (succ zero)) in
-  let mul n m = DCtr (constructor_of_string "Coq.Init.Nat.mul", [n; m]) in (*TODO: Add Constants to the language so I don't have to apply functions as if they are constructors.*)
+  let mul n m = DCtr (constructor_of_string "Coq.Init.Nat.mul", [n; m]) in (* The term language has no constants, so mul is written as a constructor. *)
   let updated_steps = List.map (fun (step,depopt) -> 
                                     (match (depopt >>= fun dep -> if resolved_dependency dep then None else
                                       (match lookup_and_remove_inductive_schedule dep false with
@@ -177,10 +177,7 @@ let insert_mutrec_calls ?within ((schedule,matches) : schedule * (var * pat) lis
                                            (match within with Some names when not (List.mem name names) -> None | _ -> found)
                                        | None -> None)) with
                                     | None -> step
-                                    | Some ((ind_schd_name,_,param_typeclasses,_,_),ds,opt) -> (*TODO: use the info from this inductive schedule to determine whether any 
-                                                                               arguments of Dec_Eq or Show or Gen are needed*)
-                                                                             (* Likely adding this explicitly to the definition of an inductive schedule
-                                                                                for ease of access.*)
+                                    | Some ((ind_schd_name,_,param_typeclasses,_,_),ds,opt) ->
                                       let Some (_,ois,_,_) = depopt in insert_mutrec_call ind_schd_name ois step opt param_typeclasses)) 
                         schedule_steps_deps in 
           

@@ -315,7 +315,8 @@ let parse_dependent_type_internal i nparams ty oibopt arg_names =
       Error.msg_debug (str (Printf.sprintf "ACONSTR: %s" (Names.MutInd.to_string mind)) ++ fnl ());
       let mib = Environ.lookup_mind mind env in
 
-      (* HACKY: figure out better way to qualify constructors *)
+      (* Qualify the constructor by its inductive's module path, unless that is the
+         current module. *)
       let names = String.split_on_char '.' (Names.MutInd.to_string mind) in
       let prefix = List.rev (List.tl (List.rev names)) in
       let qual = String.concat "." prefix in

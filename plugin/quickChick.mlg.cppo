@@ -150,7 +150,6 @@ let define c env evd =
   let univs = Evd.univ_entry ~poly:true evd in
 #endif
   let fn = fresh_name "quickchick" in
-  (* TODO: Maxime - which of the new internal flags should be used here? The names aren't as clear :) *)
   let _ : Constant.t = declare_constant ~name:fn ~kind:Decls.(IsDefinition Definition)
       (DefinitionEntry (definition_entry ~univs (EConstr.to_constr ~abort_on_undefined_evars:false evd c))) in
   fn
@@ -205,8 +204,7 @@ let define_and_run c env evd =
   
   (* Before compiling, fix stupid cyclic dependencies like "type int = int".
      Introduced by "Definition int := int." possibly inside a module, so just
-     removing it might break other definitions that depend on it.
-     TODO: Generalize (.) \g1\b or something *)
+     removing it might break other definitions that depend on it. *)
   sed_file mlf (fun line ->
     if Str.string_match tmp_int_re line 0 then
       "type tmptmptmp = int;; type int = tmptmptmp"
@@ -215,7 +213,6 @@ let define_and_run c env evd =
   (* Extraction sometimes produces ML code that does not implement its interface.
      We circumvent this problem by erasing the interface. **)
   Sys.remove mlif;
-  (* TODO: Maxime, thoughts? *)
   (* LEO: However, sometimes the inferred types are too abstract. So we touch the .mli to close the weak types. **)
   let _exit_code = Sys.command ("touch " ^ mlif) in
   (*
@@ -299,7 +296,6 @@ let define_and_run c env evd =
 
 ;;
 
-(* TODO: clean leftover files *)
 #if COQ_VERSION >= (8, 20, 0)
 let runTest ~opaque_access c env evd : unit =
 #else

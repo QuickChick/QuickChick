@@ -78,7 +78,6 @@ let gIsTrueTrue =
 let false_ind x1 x2 =
   gApp (gInject "False_ind") [x1; x2]
 
-(* TODO extend gMatch to write the return type? *)
 let discriminate h =
   false_ind hole
     (gMatch h [(injectCtr "Logic.eq_refl", [], fun [] -> gI)])

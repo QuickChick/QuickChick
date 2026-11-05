@@ -200,7 +200,6 @@ type monad_sort =
   | MC
   | MId
 
-(* TODO: Weights? *)
 (* Deep AST of Language that derivations target *)
 (* Continuation of mexp is always going to be of a particular monad sort.*)
 type mexp =

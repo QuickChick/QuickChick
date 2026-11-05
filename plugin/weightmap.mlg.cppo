@@ -87,7 +87,8 @@ let register_weights_object =
   Libobject.declare_object
     (Libobject.superglobal_object_nodischarge "QC_register_weights"
       ~cache:(fun ws -> register_weights ws)
-      ~subst:None (* XXX should this be substitutive? why are we using qualid instead of Names.constructor? *))
+      ~subst:None (* Weights are keyed by constructor name and not substituted
+                    through functor application. *))
 
 let add_weights w = Lib.add_leaf (register_weights_object w)
 #else
