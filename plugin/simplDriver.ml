@@ -81,7 +81,17 @@ let derive (cn : derivable) (c : constr_expr) =
          | _ -> failwith "Fuzzy and Mutate derivation do not support mutually inductive types")
   in
 
-  if functions_to_mutually_define <> [] then define_new_fixpoint @@ List.map (fun ((function_name, arguments, arg, return_type, body), instance_arguments) ->
+  (* A function that never calls the functions being defined is inlined into
+     its instance: Coq rejects a fixpoint over a record or a Variant. *)
+  let names = List.map (fun (name, _, _, _, _) -> name) functions_to_mutually_define in
+  let recursive = List.exists (fun (_, _, _, _, body) -> mentions names body)
+    functions_to_mutually_define in
+  let instance_record =
+    if recursive || functions_to_mutually_define = [] then instance_record else
+      let inlined = List.map (fun (name, arguments, _, _, body) -> name, (arguments, body))
+        functions_to_mutually_define in
+      fun ty_ctr iargs -> inline_functions inlined (instance_record ty_ctr iargs) in
+  if recursive then define_new_fixpoint @@ List.map (fun ((function_name, arguments, arg, return_type, body), instance_arguments) ->
     let arguments = instance_arguments @ arguments in
 
     (function_name, arguments, arg, return_type, body))

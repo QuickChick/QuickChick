@@ -618,6 +618,27 @@ let declare_class_instance ?(global=true) ?(priority=42) instance_arguments inst
 #endif
   msg_debug (str (Id.to_string cid) ++ fnl ())
 
+(* Whether an expression mentions any of the given names. *)
+let mentions names (e : coq_expr) =
+  let free = Constrexpr_ops.free_vars_of_constr_expr e in
+  List.exists (fun name -> Id.Set.mem name free) names
+
+(* Replace each reference to a function by its definition, as a lambda over
+   its arguments. The function is defined where its instance is, so an
+   explicit application to the instance's own parameters, [@f A H], is
+   replaced whole. A bound occurrence of the name is left alone. *)
+let inline_functions (functions : (var * (arg list * coq_expr)) list) (e : coq_expr) =
+  let inlined bound q =
+    if qualid_is_ident q && not (List.mem (qualid_basename q) bound) then
+      Option.map (fun (args, body) -> CAst.make (CLambdaN (args, body)))
+        (List.assoc_opt (qualid_basename q) functions)
+    else None in
+  let rec go bound e = match e.CAst.v with
+    | CRef (q, None) | CAppExpl ((q, None), _) when inlined bound q <> None ->
+      Option.get (inlined bound q)
+    | _ -> Constrexpr_ops.map_constr_expr_with_binders (fun id b -> id :: b) go bound e in
+  go [] e
+
 let define_new_fixpoint (functions : (var * arg list * var * coq_expr * coq_expr) list) =
   let open Vernacexpr in
 

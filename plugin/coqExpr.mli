@@ -210,6 +210,8 @@ val declare_class_instance
   -> unit
 
 
+val mentions : var list -> coq_expr -> bool
+val inline_functions : (var * (arg list * coq_expr)) list -> coq_expr -> coq_expr
 val define_new_fixpoint :
   (var * arg list * var * coq_expr * coq_expr) list -> unit
 
