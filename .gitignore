@@ -73,3 +73,6 @@ plugin/coqExpr.ml
 src/LegacyDerive.v
 plugin/legacy/legacy_derive.ml
 plugin/compat.mli
+plugin/rocqRelation.ml
+plugin/scheduleCode.ml
+plugin/scheduleSearch.ml

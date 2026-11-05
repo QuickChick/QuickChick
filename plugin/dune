@@ -125,6 +125,18 @@
  (target genericLib.ml)
  (deps ../scripts/mycppo genericLib.ml.cppo)
  (action (run sh %{dep:../scripts/mycppo} %{dep:genericLib.ml.cppo} %{target})))
+(rule
+ (target rocqRelation.ml)
+ (deps ../scripts/mycppo rocqRelation.ml.cppo)
+ (action (run sh %{dep:../scripts/mycppo} %{dep:rocqRelation.ml.cppo} %{target})))
+(rule
+ (target scheduleCode.ml)
+ (deps ../scripts/mycppo scheduleCode.ml.cppo)
+ (action (run sh %{dep:../scripts/mycppo} %{dep:scheduleCode.ml.cppo} %{target})))
+(rule
+ (target scheduleSearch.ml)
+ (deps ../scripts/mycppo scheduleSearch.ml.cppo)
+ (action (run sh %{dep:../scripts/mycppo} %{dep:scheduleSearch.ml.cppo} %{target})))
 
 (rule
  (target publicDerive.ml)
