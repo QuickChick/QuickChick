@@ -83,3 +83,4 @@ plugin/scheduleContext.ml
 plugin/scheduleSelection.ml
 plugin/scheduleDerivation.ml
 plugin/schedulePruning.ml
+plugin/selectionDiagnostics.ml

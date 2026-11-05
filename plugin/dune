@@ -179,3 +179,7 @@
  (target schedulePruning.ml)
  (deps ../scripts/mycppo schedulePruning.ml.cppo)
  (action (run sh %{dep:../scripts/mycppo} %{dep:schedulePruning.ml.cppo} %{target})))
+(rule
+ (target selectionDiagnostics.ml)
+ (deps ../scripts/mycppo selectionDiagnostics.ml.cppo)
+ (action (run sh %{dep:../scripts/mycppo} %{dep:selectionDiagnostics.ml.cppo} %{target})))
