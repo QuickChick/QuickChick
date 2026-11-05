@@ -42,6 +42,10 @@ Definition updMaxDiscard (a : Args) (x : nat) : Args :=
   let '(MkArgs r msc md msh msz c an) := a in 
   MkArgs r msc x msh msz c an.
 
+Definition updMaxShrinks (a : Args) (x : nat) : Args := 
+  let '(MkArgs r msc md msh msz c an) := a in 
+  MkArgs r msc md x msz c an.
+
 Definition updAnalysis (a : Args) (b : bool) : Args := 
   let '(MkArgs r msc md msh msz c an) := a in 
   MkArgs r msc md msh msz c b.
@@ -188,11 +192,15 @@ Fixpoint localMin (st : State) (r : Rose Checker.Result)
          {struct r} : (nat * Checker.Result) :=
   match r with
   | MkRose res ts =>
+    (* Shrinking stops at the end of the candidates, or once [maxShrinks]
+       successful shrinks have been made (by default [defNumShrinks]). *)
     let fix localMin' st ts {struct ts} :=
-        match ts return (nat * Checker.Result) with
-        | nil =>
+        let finish st :=
           let zero := callbackPostFinalFailure st res in
-          (numSuccessShrinks st + zero, res)
+          (numSuccessShrinks st + zero, res) in
+        if Nat.leb (maxShrinkNo st) (numSuccessShrinks st) then finish st else
+        match ts return (nat * Checker.Result) with
+        | nil => finish st
         | cons ((MkRose res' _) as r') ts' =>
           let zero := callbackPostTest st res in 
           match ok res' with
