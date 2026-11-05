@@ -479,13 +479,6 @@ and inductive_best_valid_schedule (rel : rocq_relation) (output_idxs : int list)
 
   let result_vars = List.map (fun p -> (p, dtype)) params @ get_result_vars [] result_typ in
 
-  let rec remake_result vars result = 
-  match vars, result with
-  | [], _ -> result
-  | (v,t) :: rest, DProd  (_, t') 
-  | (v,t) :: rest, DArrow (_, t') -> DProd ((v,t), remake_result rest t')
-  | _ -> failwith "remake_result failed" in
-
   with_schedule_inputs (List.map (fun (v,t) -> v, product_free_rocq_type_to_mexp t) result_vars) (fun () ->
   let output_vars = List.map fst (List.filteri (fun i _ -> List.mem i output_idxs) result_vars) in
 

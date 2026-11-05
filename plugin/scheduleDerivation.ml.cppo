@@ -351,13 +351,6 @@ let collect_all_used_inductive_schd_names ind_schd_name : string list * (((induc
       | DNot r -> extract_type_applications (r, output_idxs, ds, opt)
       | _ -> [] in
       
-    let parse_dependent (rocq, output_idxs, ds, opt) =
-      match rocq with
-      | DTyCtr (ind_name, args) -> ind_name, List.length args, output_idxs, ds, opt
-      | DNot (DTyCtr (ind_name, args)) -> ind_name, List.length args, output_idxs, ds, opt
-      | DTyParam v -> 
-        failwith "collect_all_used_inductive_schd_names: Need to handle instances of parameter type variables, like A in list A"
-      | _ -> failwith "collect_all_used_inductive_schd_names: not a DTyCtr" in
 
     match StringMap.find_opt ind_schd_name !inductive_dependency_map with
     | Some _ -> []

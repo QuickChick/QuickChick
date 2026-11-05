@@ -57,7 +57,6 @@ let rec range_to_string = function
   | RangeHole  -> "_"
   | Parameter p -> ty_param_to_string p
 
-let ranges_to_string rs = String.concat " " (List.map range_to_string rs)
 
 module UM = Map.Make(UnknownOrd)
 (* module US = Set.Make(UnknownOrd) *)
@@ -84,12 +83,7 @@ let eq_set_add u1 u2 eqs =
   let (u1', u2') = if u1 < u2 then (u1, u2) else (u2, u1) in
   EqSet.add (u1', u2') eqs
 
-module OrdTyp = struct 
-  type t = rocq_constr
-  let compare = compare
-end
 
-module ArbSet = Set.Make(OrdTyp)
 
 type unknown_provider = { next_unknown : unit -> Unknown.t }
 
@@ -256,22 +250,7 @@ let rec unify (k : umap) (r1 : range) (r2 : range) (eqs : EqSet.t)
       if p = q then Some (k, Parameter p, eqs, []) else None
    | _, _ -> failwith "QC Internal: TopLevel ranges should be Unknowns or Constructors"
 
-let rec fixRange (u : unknown) (r : range) (k : umap) : umap = 
-    match r with 
-    | FixedInput -> k
-    | Undef _ -> UM.add u FixedInput k 
-    | Unknown u' ->
-       begin
-         try fixRange u' (UM.find u' k) k
-         with Not_found -> UM.add u' FixedInput k
-       end
-    | Ctr (_, rs) -> List.fold_left (fun k r -> fixRange Unknown.undefined r k) k rs
-    | Parameter _p -> k
-    | RangeHole -> failwith "QC Internal: RangeHole in fixrange"
 
-let fixVariable (x : unknown) (k : umap) : umap =
-  try fixRange x (UM.find x k) k
-  with Not_found -> UM.add x FixedInput k
 
 (* Since this can fail - return an option *)
 let rec convert_to_range dt = 
@@ -286,27 +265,8 @@ let rec convert_to_range dt =
   | _ -> Feedback.msg_notice (str (Printf.sprintf "convert_to_range: %s" (rocq_constr_to_string dt)) ++ fnl ());
     None
 
-let rec is_fixed_range k = function
-    | Undef _ -> false
-    | FixedInput -> true
-    | Unknown u' -> is_fixed_range k (umfind u' k)
-    | Ctr (_, rs) -> List.for_all (is_fixed_range k) rs
-    | RangeHole -> true (*TODO *)
-    | Parameter _ -> true (* TODO *)
        
-let is_fixed k dt = 
-  option_map (is_fixed_range k) (convert_to_range dt)
   
-let rec is_rocq_constr = function
-  | DArrow (dt1, dt2) -> is_rocq_constr dt1 || is_rocq_constr dt2 
-  | DProd ((_, dt1), dt2) -> is_rocq_constr dt1 || is_rocq_constr dt2 
-  | DTyParam _ -> false
-  | DTyVar _ -> true
-  | DCtr _ -> true
-  | DTyCtr (_, dts) -> List.exists is_rocq_constr dts
-  | DApp (dt, dts) -> List.exists is_rocq_constr (dt::dts)
-  | DNot dt -> is_rocq_constr dt
-  | DHole -> false
 (* 
 type check = (coq_expr -> coq_expr) * int *)
 
@@ -423,7 +383,6 @@ let type_to_schedules ?on_prepared ?select_groups ?on_prefix ?on_prefix_with_flo
   (* Feedback.msg_debug (str ("Result vars: " ^ String.concat ", " (List.map (fun (v, ty) -> var_to_string v ^ ": " ^ rocq_constr_to_string ty) result_vars)) ++ fnl ()); *)
   let vars, hyps, concl = type_info typ in
 
-  let add_all vars range_f umap = List.fold_left (fun umap v -> UM.add v (range_f v) umap) umap vars in
 
   let is_Type ty = match ty with DTyCtr (c,_) -> ty_ctr_eq c (ty_ctr_of_string "Type") 
                                               || ty_ctr_eq c (ty_ctr_of_string "Prop") 
@@ -482,17 +441,11 @@ let type_to_schedules ?on_prepared ?select_groups ?on_prefix ?on_prefix_with_flo
     | Parameter _ -> true
     | r -> failwith ("Unexpected case in is_range_fixed" ^ range_to_string r) in
 
-  let eq_check (u1,u2) : schedule_step =
-    S_Check (SrcNonrec (DTyCtr (constructor_of_string "Coq.Init.Logic.eq", [DTyVar u1; DTyVar u2])), true) in
 
   let output_indices = filter_mapi (fun i (v,_) -> if List.mem v output_vars then Some i else None) result_vars in
 
   let is_fixed umap v = is_range_fixed umap (Unknown v) in
 
-  let rec take n lst = 
-    match lst with
-    | [] -> []
-    | x :: xs -> if n <= 0 then [] else x :: take (n - 1) xs in
     
 
   match state with

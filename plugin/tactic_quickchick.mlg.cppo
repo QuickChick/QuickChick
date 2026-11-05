@@ -126,7 +126,6 @@ let quickchick_it size idx =
         inductive_set := inductive_set_init;
         rocq_relation_memo := TyCtrMap.empty;
 
-        let e' = Global.env () in
 
         (* Index 0 needs only the best schedule; other indices need the full ranking. *)
         let theorem_schedules = all_theorem_schedules ~best_only:(idx = 0) dt in

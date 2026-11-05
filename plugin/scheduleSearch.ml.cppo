@@ -106,7 +106,7 @@ type hypothesis_classification = {
 }
 
 let rec construct_hypothesis (type_vars : var list) (hyp : rocq_constr) (hyp_vars : var list list) (polarity : bool) : hypothesis_classification =
-  let rec collect_repeated_names lists =
+  let collect_repeated_names lists =
     let all_names = List.concat lists in
     let counts = List.fold_left (fun acc name ->
       let count = try List.assoc name acc with Not_found -> 0 in

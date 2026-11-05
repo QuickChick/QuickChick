@@ -703,7 +703,6 @@ type inductive_schedule_with_dependencies = inductive_schedule list * string
 let inductive_schedule_to_string (is : inductive_schedule) : string =
   let (name, inputs, param_deps, base_scheds, rec_scheds) = is in
   let inputs_str = String.concat ", " (List.map (fun (v, ty) -> var_to_string v ^ " : " ^ mexp_to_string ty) inputs) in
-  let param_deps_str = String.concat ", " (List.map (fun (v, ty) -> var_to_string v ^ " : " ^ String.concat ", " (List.map mexp_to_string ty)) param_deps) in
   let base_scheds_str = String.concat " \n|\n\n " (List.map (fun (s, _, _, _) -> schedule_to_string s) base_scheds) in
   let rec_scheds_str = String.concat " \n|\n\n " (List.map (fun (s, _, _, _) -> schedule_to_string s) rec_scheds) in
   Printf.sprintf "Inductive %s (%s) :=\n  Base:\n %s\n  Rec: %s" name inputs_str base_scheds_str rec_scheds_str
@@ -1050,7 +1049,6 @@ let inductive_schedules_to_def_mexps (components : (inductive_schedule * derive_
       let names = List.map (fun (is,_,_) -> match is with (n,_,_,_,_) -> n) comp in
       let comp = List.map (fun (is, ds, is_constrained) -> turn_def_calls_into_mutrec_calls is names, ds, is_constrained) comp in
       let mut_body = inductive_schedule_with_dependencies_to_mexp [] comp "placeholder" in 
-      let body_to_mexp (name, arg_tys, body, ds) = name, MFix (name, arg_tys, body, ds), ds in
       let update_name n = function 
         | MLet (name, MMutFix (funs, _), ds) -> MLet (name, MMutFix (funs, var_of_string n), ds)
         | _ -> failwith "Expected a MLet with MMutFix body" in
@@ -1114,39 +1112,7 @@ let find_typeclass_bindings ctr =
     | _ -> failwith ("hint not a constant in search for " ^ Libnames.string_of_qualid ctr)
     in
 
-  let rec find_concl (typ : rocq_constr) : rocq_constr = 
-    match typ with
-    | DProd (v, t) -> find_concl t
-    | DArrow (v, t) -> find_concl t
-    | DApp _ -> typ
-  in
 
-  let rocq_eq_to_alpha (a : rocq_constr) (b : rocq_constr) : bool = 
-    let rec aux (a : rocq_constr) (b : rocq_constr) (m : (var, var) Hashtbl.t) : bool =
-      try
-      match a, b with
-      | DTyParam p1, DTyParam p2 -> String.equal (var_to_string p1) (var_to_string p2)
-      | DTyCtr (c1, ds1), DTyCtr (c2, ds2) -> 
-        String.equal (ty_ctr_to_string c1) (ty_ctr_to_string c2) && List.for_all2 (fun d1 d2 -> aux d1 d2 m) ds1 ds2
-      | DCtr (c1, ds1), DCtr (c2, ds2) -> 
-        String.equal (constructor_to_string c1) (constructor_to_string c2) && List.for_all2 (fun d1 d2 -> aux d1 d2 m) ds1 ds2
-      | DTyVar v1, DTyVar v2 -> 
-        (try 
-          let v2' = Hashtbl.find m v1 in
-          String.equal (var_to_string v2) (var_to_string v2')
-        with Not_found -> 
-          Hashtbl.add m v1 v2;
-          true)
-      | DApp (d1, ds1), DApp (d2, ds2) -> 
-        aux d1 d2 m && List.for_all2 (fun d1 d2 -> aux d1 d2 m) ds1 ds2
-      | DNot d1, DNot d2 -> aux d1 d2 m
-      | DHole, DHole -> true
-      | DArrow _, DArrow _ | DProd _, DProd _ | DMatch _, DMatch _ -> failwith ("equality not supported for arrows and products: " ^ rocq_constr_to_string a ^ " =? " ^ rocq_constr_to_string b)
-      | _ -> false
-      with Invalid_argument _ -> false
-    in
-    aux a b (Hashtbl.create 10)
-  in 
 
   let rec parse_pair_matches (ins : var list) (matches : rocq_constr) : (var list * rocq_constr) option =
     match matches with
