@@ -1,0 +1,369 @@
+(* Score-based pruning of one constructor's schedule search. Each scorer
+   supplies a pruner: it scores completed candidates, keeping the best as the
+   incumbent, and cuts a prefix whose bound cannot beat that incumbent. In
+   verification mode it records every bound and checks it against each
+   completed descendant instead of cutting. *)
+open Pp
+open GenericLib
+open RelationInfo
+open DensityMemo
+open ScheduleScoring
+open ScheduleContext
+
+type mode = [ `Prune | `Verify | `Baseline | `Off ]
+
+type candidate = schedule * (var * pat) list * (var * var) list
+
+type path = (int * var list list) list
+
+type stats = {
+  scored_leaves : int ref;
+  checked_prefixes : int ref;
+  pruned_prefixes : int ref;
+  bound_cache_hits : int ref;
+  bound_cache_misses : int ref;
+  leaf_cache_hits : int ref;
+  mode_cache_hits : int ref;
+  bound_cpu : float ref;
+  leaf_cpu : float ref;
+  final_cpu : float ref;
+}
+
+(* What every scorer's pruning shares within one constructor's search. *)
+type context = {
+  ds : derive_sort;
+  prefer_dense : bool;
+  mode : mode;
+  reuse_stable : bool;
+  (* schedule_density, which grades a schedule's steps. *)
+  grade : schedule_step list -> schedule -> schedule_with_density;
+  stats : stats;
+  trace_bounds : bool;
+  mode_grade_cache : (schedule_step list * schedule_sort,
+                      (schedule_step * rule_density) list) Hashtbl.t;
+  bound_grade_cache : (schedule_step * schedule_sort, int option) Hashtbl.t;
+  leaf_score_cache : (candidate, schedule_with_density) Hashtbl.t;
+  observed_leaf_scores : ScheduleRanking.features list ref;
+}
+
+let make_context ~ds ~prefer_dense ~mode ~reuse_stable ~grade = {
+  ds; prefer_dense; mode; reuse_stable; grade;
+  stats = { scored_leaves = ref 0; checked_prefixes = ref 0; pruned_prefixes = ref 0;
+            bound_cache_hits = ref 0; bound_cache_misses = ref 0;
+            leaf_cache_hits = ref 0; mode_cache_hits = ref 0;
+            bound_cpu = ref 0.; leaf_cpu = ref 0.; final_cpu = ref 0. };
+  trace_bounds = schedule_trace_enabled () &&
+    Sys.getenv_opt "QC_SCHEDULE_TRACE_BOUNDS" = Some "1";
+  mode_grade_cache = Hashtbl.create 32;
+  bound_grade_cache = Hashtbl.create 32;
+  leaf_score_cache = Hashtbl.create 32;
+  observed_leaf_scores = ref [];
+}
+
+let timed total f =
+  let before = Sys.time () in
+  Fun.protect ~finally:(fun () -> total := !total +. Sys.time () -. before) f
+
+let rec path_prefix prefix path = match prefix, path with
+  | [], _ -> true
+  | x :: xs, y :: ys when x = y -> path_prefix xs ys
+  | _ -> false
+
+let materialize ((steps, sort), ms, eqs) =
+  let match_steps = List.map (fun (v,p) -> S_Match (v,p)) ms in
+  match_steps, (List.map check_eq eqs @ steps, sort)
+
+(* The grade of a step that adds no constraint: a match on an input. *)
+let neutral_grade ds = match ds with
+  | D_Gen | D_Thm -> Total
+  | D_Check | D_Enum -> Checking
+
+let trace_score ctx kind path (score : ScheduleRanking.features) =
+  if ctx.trace_bounds then Feedback.msg_notice (str (Printf.sprintf
+    "[schedule-bound-detail] kind=%s path=%s density=%d counts=%s uses=%d\n"
+    kind (String.concat "," (List.map (fun (i, _) -> string_of_int i) path))
+    score.ScheduleRanking.density_rank
+    (ScheduleRanking.histogram_to_string score.ScheduleRanking.density_counts)
+    score.ScheduleRanking.variable_uses))
+
+(* schedule_density traverses steps in sorted order. Equal multisets thus
+   share mode grades within this constructor's fixed recursion context;
+   restore each candidate's order for variable-use scoring. Duplicate steps
+   are scored afresh because their occurrence grades need not be identical. *)
+let score_schedule ctx ~use_cache neutral_steps ((steps, sort) as schedule) =
+  if ctx.mode = `Off then ctx.grade neutral_steps schedule else
+  let ordered = List.sort Stdlib.compare steps in
+  let cacheable = List.length ordered =
+    List.length (List.sort_uniq Stdlib.compare ordered) in
+  let key = ordered, sort in
+  match (if use_cache && cacheable then Hashtbl.find_opt ctx.mode_grade_cache key
+         else None) with
+  | Some canonical ->
+    incr ctx.stats.mode_cache_hits;
+    let neutral = neutral_grade ctx.ds in
+    (List.map (fun step -> step, neutral) neutral_steps @
+     List.map (fun step -> step, List.assoc step canonical) steps), sort
+  | None ->
+    let scored = ctx.grade neutral_steps schedule in
+    if cacheable then begin
+      let graded_steps = List.filteri
+        (fun i _ -> i >= List.length neutral_steps) (fst scored) in
+      let canonical = List.sort (fun (left, _) (right, _) ->
+        Stdlib.compare left right) graded_steps in
+      (match Hashtbl.find_opt ctx.mode_grade_cache key with
+       | Some previous when ctx.mode = `Verify && previous <> canonical ->
+         failwith "same step multiset received different dependency grades"
+       | _ -> ());
+      Hashtbl.replace ctx.mode_grade_cache key canonical
+    end;
+    scored
+
+(* Leaf scores are cached for final ranking only in plain pruning mode. *)
+let leaf_cache_enabled ctx = ctx.mode = `Prune && ctx.reuse_stable
+
+let leaf_score ctx triple = timed ctx.stats.leaf_cpu (fun () ->
+  with_candidate_density_state (fun () ->
+    let match_steps, schedule = materialize triple in
+    let scored = score_schedule ctx ~use_cache:(leaf_cache_enabled ctx)
+      match_steps schedule in
+    Hashtbl.replace ctx.leaf_score_cache triple scored;
+    scored_schedule_features ctx.ds 0 scored))
+
+(* The density bound of a committed prefix: its steps' grades, Checking for
+   each forced check, and the variable uses the prefix and the floor imply. *)
+let bound_score ctx check_floor triple = timed ctx.stats.bound_cpu (fun () ->
+  with_candidate_density_state (fun () ->
+    let ds = ctx.ds in
+    let match_steps, (steps, sort) = materialize triple in
+    let known_grades =
+      List.map (fun _ -> Some (density_rank (neutral_grade ds))) match_steps @
+      List.map (fun step ->
+        match fixed_step_density ds step with
+        | Some grade -> Some (density_rank grade)
+        | None ->
+          (match Hashtbl.find_opt ctx.bound_grade_cache (step, sort) with
+           | Some cached -> incr ctx.stats.bound_cache_hits; cached
+           | None ->
+             incr ctx.stats.bound_cache_misses;
+             let before = !density_uncertainty_events in
+             let scored = ctx.grade [] ([step], sort) in
+             let grade = match scored with
+               | ([( _, grade)], _) when !density_uncertainty_events = before ->
+                 Some (density_rank grade)
+               | _ -> None in
+             Hashtbl.add ctx.bound_grade_cache (step, sort) grade;
+             grade)) steps @
+      (* Remaining positive hypotheses with all arguments bound must become
+         checks, whose fixed density rank is Checking = 0. *)
+      List.init check_floor.GenericLib.forced_checks (fun _ -> Some 0) in
+    let annotations = List.map (fun step -> step, Total) (match_steps @ steps) in
+    (* Variables bound by a committed step stay bound, so their occurrences in
+       the fully bound arguments of remaining hypotheses will be counted. *)
+    let step_bound = List.fold_left (fun env (step, density) ->
+      add_bound_vars env step density) [] annotations in
+    let future_uses = List.length (List.filter (fun v -> List.mem_assoc v step_bound)
+      check_floor.GenericLib.bound_argument_occurrences)
+      + check_floor.GenericLib.future_variable_uses in
+    ScheduleRanking.prefix_bound ~prefer_dense:ctx.prefer_dense ~known_grades
+      ~variable_uses:(get_num_var_uses (annotations, sort) ds + future_uses)))
+
+(* A scorer's pruning: score a completed candidate, and decide whether a
+   prefix can still beat the incumbent. *)
+type pruner = {
+  on_leaf : path -> candidate -> unit;
+  should_prune : path -> prefix_floor -> candidate -> bool;
+}
+
+(* A candidate whose dependencies cannot be derived is not scored. *)
+let attempt f = try f () with
+  | Noninductive_dependency _ | Unavailable_mode _ -> None
+
+let density_pruner ctx policy =
+  let prefer_dense = ctx.prefer_dense in
+  let incumbent = ref None in
+  let observed_bounds = ref [] in
+  let on_leaf path triple =
+    Option.iter (fun score ->
+      trace_score ctx "leaf" path score;
+      if ctx.mode = `Verify then begin
+        ctx.observed_leaf_scores := score :: !(ctx.observed_leaf_scores);
+        List.iter (fun (ancestor, bound) ->
+          if path_prefix ancestor path &&
+             ScheduleRanking.can_prune ~prefer_dense policy ~incumbent:score ~bound then
+            failwith "schedule score prefix bound exceeded a completed descendant")
+          !observed_bounds
+      end;
+      incumbent := Some (match !incumbent with
+        | None -> score
+        | Some best when ScheduleRanking.compare ~prefer_dense policy score best < 0 -> score
+        | Some best -> best))
+      (attempt (fun () -> Some (leaf_score ctx triple))) in
+  let should_prune path check_floor triple =
+    if ctx.mode = `Verify then begin
+      Option.iter (fun bound ->
+        trace_score ctx "bound" path bound;
+        observed_bounds := (path, bound) :: !observed_bounds)
+        (attempt (fun () -> Some (bound_score ctx check_floor triple)));
+      false
+    end else match !incumbent with
+      | None -> false
+      | Some best ->
+        (match attempt (fun () -> Some (bound_score ctx check_floor triple)) with
+         | None -> false
+         | Some bound ->
+           trace_score ctx "bound" path bound;
+           let cut = ScheduleRanking.can_prune_after ~prefer_dense policy
+             ~incumbent:best ~bound in
+           if cut then incr ctx.stats.pruned_prefixes;
+           cut) in
+  { on_leaf; should_prune }
+
+(* BudgetAware pruning. A step's score does not depend on its position, its
+   dependency scores are final once stable, and each variable is produced
+   once, so the committed prefix's score never improves on extension, field
+   by field: selectivity counts only variables a completion keeps, density
+   and locality take maxima, the rest add. An unstable dependency is scored
+   at its best, and a forced check adds Checking density. *)
+let budget_pruner ctx ~key ~prepared_inputs =
+  let incumbent = ref None in
+  let observed_bounds = ref [] in
+  let budget_score ~optimistic steps =
+    let context = budget_context !prepared_inputs in
+    let context = if not optimistic then context else
+      { context with BudgetAwareScore.completed_dependency = (fun request ->
+          match budget_dependency_score request with
+          | Some score -> Some score
+          | None -> Some BudgetAwareScore.empty) } in
+    Result.to_option (BudgetAwareScore.score_schedule context key steps) in
+  let budget_leaf triple = with_candidate_density_state (fun () ->
+    let match_steps, schedule = materialize triple in
+    let scored = score_schedule ctx ~use_cache:(leaf_cache_enabled ctx)
+      match_steps schedule in
+    budget_score ~optimistic:false (List.map fst (fst scored))) in
+  (* A variable the prefix binds stays bound, so it is never an output of a
+     remaining hypothesis: each such non-input variable that the floor lists
+     for a remaining hypothesis is a variable dependency of its step, or of
+     the equality check its constrained output becomes, in every completion. *)
+  let prefix_bound check_floor triple =
+    let match_steps, (steps, _) = materialize triple in
+    let committed = match_steps @ steps in
+    let bound_by_prefix = List.concat_map (function
+      | S_UC (v, _, _) | S_Let (v, _) -> [v]
+      | S_ST (outputs, _, _) -> List.map fst outputs
+      | S_Match (v, p) -> v :: pat_vars p
+      | S_Check _ -> []) committed in
+    (* An unbound variable that is a bare argument of k remaining hypotheses
+       is produced once, so the other k - 1 count it; the floor's
+       future_variable_uses sums these, over variables disjoint from the
+       bound ones above. *)
+    let future_var_deps = List.length (List.filter (fun v ->
+      List.mem v bound_by_prefix && not (List.mem v !prepared_inputs))
+      check_floor.GenericLib.bound_argument_occurrences)
+      + check_floor.GenericLib.future_variable_uses in
+    Option.map (fun score ->
+      let score = { score with BudgetAwareScore.var_deps =
+        score.BudgetAwareScore.var_deps + future_var_deps } in
+      if check_floor.GenericLib.forced_checks > 0 then
+        BudgetAwareScore.combine score
+          { BudgetAwareScore.empty with BudgetAwareScore.density = BudgetAwareScore.Checking }
+      else score)
+      (budget_score ~optimistic:true committed) in
+  (* Grading the prefix's steps derives their dependencies, so the bound
+     reads their scores instead of the optimistic default. *)
+  let derived_bound check_floor triple = with_candidate_density_state (fun () ->
+    ignore (bound_score ctx check_floor triple);
+    prefix_bound check_floor triple) in
+  let on_leaf path triple =
+    Option.iter (fun score ->
+      if ctx.mode = `Verify then
+        List.iter (fun (ancestor, bound) ->
+          if path_prefix ancestor path && BudgetAwareScore.compare score bound < 0 then
+            failwith "BudgetAware prefix bound exceeded a completed descendant")
+          !observed_bounds;
+      incumbent := Some (match !incumbent with
+        | Some best when BudgetAwareScore.compare best score <= 0 -> best
+        | _ -> score))
+      (attempt (fun () -> budget_leaf triple)) in
+  let should_prune path check_floor triple =
+    if ctx.mode = `Verify then begin
+      Option.iter (fun bound -> observed_bounds := (path, bound) :: !observed_bounds)
+        (attempt (fun () -> derived_bound check_floor triple));
+      false
+    end else match !incumbent with
+      | None -> false
+      | Some best ->
+        (* The bound without derived dependencies is already admissible.
+           Deriving them cannot change selectivity, the first field, so it
+           is worth doing only when selectivity ties. *)
+        let cut bound = let c = BudgetAwareScore.compare best bound <= 0 in
+          if c then incr ctx.stats.pruned_prefixes; c in
+        (match attempt (fun () -> prefix_bound check_floor triple) with
+         | None -> false
+         | Some cheap when cut cheap -> true
+         | Some cheap when cheap.BudgetAwareScore.selectivity
+                           < best.BudgetAwareScore.selectivity -> false
+         | Some _ -> (match attempt (fun () -> derived_bound check_floor triple) with
+           | None -> false
+           | Some bound -> cut bound)) in
+  { on_leaf; should_prune }
+
+(* A compiled policy that proves its bound. A committed step's grade is
+   certain when it is fixed, or derived without touching a derivation in
+   progress, as for the density bound. *)
+let compiled_pruner ctx policy ~ind_name ~result_vars ~output_vars =
+  let ds = ctx.ds in
+  let incumbent = ref None in
+  let grade_cache = Hashtbl.create 32 in
+  let observed_bounds = ref [] in
+  let better a b = policy.PolicyRegistry.compare a b = PolicyViews.Lt in
+  let leaf triple = with_candidate_density_state (fun () ->
+    let match_steps, schedule = materialize triple in
+    let scored = score_schedule ctx ~use_cache:(leaf_cache_enabled ctx)
+      match_steps schedule in
+    compiled_schedule_score policy ind_name result_vars output_vars ds scored) in
+  let bound check_floor triple = with_candidate_density_state (fun () ->
+    let match_steps, (steps, sort) = materialize triple in
+    let neutral = neutral_grade ds in
+    let graded = List.map (fun step -> step, neutral, true) match_steps @
+      List.map (fun step -> match fixed_step_density ds step with
+        | Some grade -> step, grade, true
+        | None ->
+          (* A step's grade within this constructor's derivation is the same
+             at every node, as for the density bound's cache. *)
+          match Hashtbl.find_opt grade_cache (step, sort) with
+          | Some (grade, certain) -> step, grade, certain
+          | None ->
+            let before = !density_uncertainty_events in
+            let grade, certain = match ctx.grade [] ([step], sort) with
+              | ([(_, grade)], _) -> grade, !density_uncertainty_events = before
+              | _ -> neutral, false in
+            Hashtbl.add grade_cache (step, sort) (grade, certain);
+            step, grade, certain) steps in
+    compiled_node_bound policy ind_name result_vars output_vars ds sort graded check_floor) in
+  let on_leaf path triple =
+    Option.iter (fun score ->
+      if ctx.mode = `Verify then
+        List.iter (fun (ancestor, bound) ->
+          if path_prefix ancestor path && better score bound then
+            failwith "a Rocq scorer's bound exceeded a completed descendant")
+          !observed_bounds;
+      incumbent := Some (match !incumbent with
+        | Some best when not (better score best) -> best
+        | _ -> score))
+      (attempt (fun () -> Some (leaf triple))) in
+  let should_prune path check_floor triple =
+    let bound () = attempt (fun () -> Some (bound check_floor triple)) in
+    if ctx.mode = `Verify then begin
+      Option.iter (fun bound -> observed_bounds := (path, bound) :: !observed_bounds)
+        (bound ());
+      false
+    end else match !incumbent with
+      | None -> false
+      | Some best ->
+        (* Exact: among equal scores the first found wins, so a branch
+           whose bound is no better than the incumbent cannot win. *)
+        (match bound () with
+         | Some bound when not (better bound best) ->
+           incr ctx.stats.pruned_prefixes; true
+         | _ -> false) in
+  { on_leaf; should_prune }

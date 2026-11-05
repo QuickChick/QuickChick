@@ -175,3 +175,7 @@
  (target scheduleDerivation.ml)
  (deps ../scripts/mycppo scheduleDerivation.ml.cppo)
  (action (run sh %{dep:../scripts/mycppo} %{dep:scheduleDerivation.ml.cppo} %{target})))
+(rule
+ (target schedulePruning.ml)
+ (deps ../scripts/mycppo schedulePruning.ml.cppo)
+ (action (run sh %{dep:../scripts/mycppo} %{dep:schedulePruning.ml.cppo} %{target})))
