@@ -88,7 +88,7 @@ let instances env gr =
 #endif
 
 let replace_vars sigma subst t =
-#if COQ_VERSION >= (8, 18, 0)
+#if COQ_VERSION >= (8, 17, 0)
   EConstr.Vars.replace_vars sigma subst t
 #else
   ignore sigma; EConstr.Vars.replace_vars subst t
