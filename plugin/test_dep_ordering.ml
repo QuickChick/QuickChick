@@ -60,26 +60,6 @@ let avg_score (scores : schedule_score list) : float =
     float_of_int total /. float_of_int (List.length scores)
 
 (* Moderately complex benchmark hypotheses with varied patterns *)
-(* let bench_hyps : hypothesis list =
-  [
-    (* Simple single dependencies *)
-    { name = "H1"; var_deps = [["a"]] };
-    { name = "H2"; var_deps = [["b"]] };
-    
-    (* Chain: a -> c -> d *)
-    { name = "H3"; var_deps = [["a"]; ["c"]] };
-    { name = "H4"; var_deps = [["c"]; ["d"]] };
-    
-    (* Convergence: a,b -> e *)
-    { name = "H5"; var_deps = [["a"; "e"]] };
-    { name = "H6"; var_deps = [["b"; "e"]] };
-    
-    (* Divergence: d -> f,g *)
-    { name = "H7"; var_deps = [["d"]; ["f"]] };
-    { name = "H8"; var_deps = [["d"]; ["g"]] };
-  ]
-
-let bench_vars = ["a"; "b"; "c"; "d"; "e"; "f"; "g"] *)
 
 let bench_hyps =
   [

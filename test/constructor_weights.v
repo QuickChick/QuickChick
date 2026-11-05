@@ -2,7 +2,7 @@ From QuickChick Require Import QuickChick.
 Require Import List. Import ListNotations.
 
 (* QuickChickWeights sets a constructor's weight in derived generators, as
-   it does for the legacy engine. The weight 13 occurs in no other part of
+   it did in QuickChick 2.x. The weight 13 occurs in no other part of
    the generated helpers, so finding it shows the weight was used. *)
 
 Inductive two : nat -> Prop :=

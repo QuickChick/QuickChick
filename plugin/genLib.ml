@@ -70,4 +70,3 @@ let checker_backtracking l = gApp (gInject "checker_backtrack") [gList (List.map
 module TyCtrMap = Map.Make(Ord_ty_ctr)
 module CtrMap   = Map.Make(Ord_ctr)
 
-(* let weight_map : int CtrMap.t TyCtrMap.t = ref *)

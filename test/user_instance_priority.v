@@ -1,6 +1,6 @@
 From QuickChick Require Import QuickChick.
 
-(* Derived instances are registered at priority 42, as the legacy engine
+(* Derived instances are registered at priority 42, as in QuickChick 2.x
    does, so a user instance with a better priority wins resolution even when
    it is declared after the derivation. *)
 

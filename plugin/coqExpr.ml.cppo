@@ -226,8 +226,7 @@ let parse_constructors nparams param_names result_ty oib : ctr_rep list option =
               ) (Some []) tms >>= fun tms' ->
         begin match aux i ctr with
         | Some (TyCtr (c, _)) -> Some (TyCtr (c, List.rev tms'))
-(*        | Some (TyParam p) -> Some (TyCtr (p, tms')) *)
-        | None -> CErrors.user_err (str "Aux failed?" ++ fnl ())
+        | None -> CErrors.user_err (str "QuickChick cannot read an application head." ++ fnl ())
         | _ -> failwith "aux failed to return a TyCtr"
         end 
       end

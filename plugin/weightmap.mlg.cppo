@@ -8,7 +8,6 @@ MAKE SURE TO EDIT THE .cppo SOURCE OF THIS FILE RATHER THAN THE GENERATED RESULT
 
 *)
 
-
 open CoqExpr
 open Stdarg
 open Error
@@ -141,8 +140,3 @@ VERNAC COMMAND EXTEND QuickChickWeights CLASSIFIED AS SIDEFF
      }
 END
 
-(*
-let s1' = Names.string_of_id s1 in
-       let s2' = Names.string_of_id s2 in 
-       Lib.add_anonymous_leaf (set_debug_flag s1' (s1',s2')) ]
- *)

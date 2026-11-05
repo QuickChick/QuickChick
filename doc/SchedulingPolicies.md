@@ -501,44 +501,8 @@ density bound. Their premises are what verification mode checks: committed
 steps and forced checks keep their grades in every completion, a variable is
 produced at most once, outputs are unbound when a hypothesis is scheduled,
 and a hypothesis's steps count each of its non-input, non-output variables.
-`test/pruning_verify` runs a fixture in that mode. The full test suite passes in verification mode. The maintained three-premise fixture scores four
-root candidates without cuts and one with the switch on, selecting the
-same best density and variable-use score under default and counted-density
-ranking. The connected mutual-cycle and public derivation fixtures pass the
-verification mode; see `test/scoring_pruning`. The five-premise saturation
-fixture makes no real-score cuts under either ranking. This adapter has not
-yet been proved sound for all typed unification and source rewrites, nor
-shown to reduce end-to-end derivation time. The extra leaf and prefix scoring
-can cost more than the cuts save. Keep the switch internal until wider
-correspondence and performance tests justify enabling it by default.
-
-The reduced SemGuS fixture merges `eval` with itself and merges the result
-with `eval` again. With the internal switch set, `Valid Schedules` now sends
-its selected constructor through the same bound-aware scheduler as derivation.
-The verifier checks all 12 root leaves over 25 prefixes, finds no bound
-violation, and selects the same candidate as the unpruned run. It makes zero
-cuts. The ordinary diagnostic
-shares dependency memo state across candidate scores and took 1.2 seconds in
-one local run. A comparable internal `baseline` uses the same search as
-pruning but no bounds. With all candidate reuse disabled it took 8.3 seconds.
-The scorer now shares completed, cycle-independent dependency entries across
-candidates. It also caches grades for equal multisets of scoring steps:
-`schedule_density` visits those steps in a fixed sorted order, then the cache
-restores each candidate's original order for ranking. Multisets with duplicate
-steps are scored afresh. Verification recomputes these scores independently
-and checks for disagreement. With reuse, the baseline took 2.3 seconds,
-verification 15.4 seconds, and pruning 2.5 seconds. The ordinary diagnostic's
-time is not a like-for-like pruning comparison.
-The bound-grade cache had 26 hits and 3 misses; the mode cache hit 10 times
-across 12 leaves, which had only two distinct step multisets. Pruned ranking
-reuses completed-leaf annotations and rescores only the winner to recover its
-dependency memo. In the reused run, bound, leaf, and final scoring cost 0.28,
-1.26, and 0.57 seconds of CPU time.
-The verifier still independently rescores all candidates. All 12 leaves have
-the same density, counted-density histogram, and variable-use score:
-`Checking`, `(1,0,0,3,0)`, and one use. This fixture stresses recursive score resolution, not discrimination between
-schedules; the bound makes no cuts. Recursive score resolution remains
-expensive.
+`test/pruning_verify` and `test/pruning_verify_budget` run their theories in
+that mode, and the full test suite also passes in it.
 
 `test/prefix_adapter_laws.v` proves the list-level adapter rule: stepwise
 conversion distributes over appended choices, and sorting unconstrained

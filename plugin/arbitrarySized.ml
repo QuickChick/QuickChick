@@ -122,7 +122,6 @@ let show_decl (types : (ty_ctr * ty_param list * ctr_rep list) list) : (ty_ctr -
                       else str_appends [s1; gStr " "; s2])
                     emptyString ty vs)
       ) in
-    (* match x with | Ctr p0 p1 ... pn -> "Ctr " ++ (...) ++ " " ++ (...) *)
     let body = gMatch (gVar arg) ~explicit_params:(List.length ty_params) (List.map branch ctors) in
 
     (function_name, [gArg ~assumName:(gVar arg) ~assumType:arg_type ()], arg, return_type, body) in
@@ -149,16 +148,6 @@ let fuzzy_decl ty_ctr ctrs iargs =
   let fuzzy_fun = 
     let fuzzy_body x =
 
-        (* Trying to convert an instance of ctr to ctr'.
-           Takes as argument vs (the values of ctr's parameters)
-           and converts to ctr' on the fly, producing values for types
-           as needed. 
-           UP   : ctr  subseq ctr'
-           DOWN : ctr' subseq ctr
-           INV: length vs = length ty
-           Keep a bool on up to track differences to avoid recomputing 
-           if similar sigs.
-         *)
         
         let rec convert_up b i ctr ty ctr' ty' vs vs_so_far =
           match (ty, ty', vs) with
@@ -307,31 +296,11 @@ let mutate_decl ty_ctr (ctrs : ctr_rep list) (iargs : var list) =
   in
 
   let coq_expr_to_thunk (e : coq_expr) : coq_expr = gFun ["_tt"] (fun [_] -> e) in
-  (* let coq_expr_of_thunk (e : coq_expr) : coq_expr = gApp e [gTT] in *) (* TODO: unnecessary *)
+   (* TODO: unnecessary *)
   
   let mutate_fun =
   
     let mutate_body x =
-
-      (*
-      mutation options:
-        - regenerate:
-          - weight is constant
-        - recombine:
-          - weight is constant (TODO: more inputs?)
-          - choose a new constructor
-          - for each argument required by the new constructor, try (i.e. check
-            if it has a compatible type) to use a given argument or the entire 
-            input. This will yield a tree of branching choices. Givens can be
-            used non-linearly.
-          - if no givens were used, then backtrack. (TODO: or not?)
-          - return the new constructor applied to the new arguments.  
-        - recurse:
-          - weight is a function of child size
-          - choose a given argument to mutate
-          - if the argument is of the same type then use aux else use arbitrary
-          - return input except with result of mutation
-      *)
 
       let weight_reg : coq_expr = 
         gInt 1

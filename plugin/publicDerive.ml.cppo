@@ -57,7 +57,7 @@ let publish ~mode ~constrained (sigma, bodies) =
       else sized_name ^ (if constrained then "SuchThat" else "") in
     let instance_name = GenericLib.fresh_name (prefix ^ Names.Id.to_string root) in
     let reference = declare instance_name body in
-    (* The legacy engine's priority: user instances keep precedence. *)
+    (* QuickChick 2.x's priority: user instances keep precedence. *)
     Compat.existing_instance Hints.SuperGlobal reference
       (Some { Typeclasses.hint_priority = Some 42; hint_pattern = None });
     if not constrained then begin

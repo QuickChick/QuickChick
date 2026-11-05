@@ -83,7 +83,6 @@ let discriminate h =
   false_ind hole
     (gMatch h [(injectCtr "Logic.eq_refl", [], fun [] -> gI)])
 
-
 let rewrite pred h hin =
   gApp ~explicit:true (gInject "eq_ind") [hole; hole; pred; hin; hole; h]
   (* gMatch h [(injectCtr "erefl", [], fun [] -> hin)] *)
@@ -109,7 +108,6 @@ let matchDecOpt c left right =
   gMatch c [ (injectCtr "left" , ["eq" ], left)
            ; (injectCtr "right", ["neq"], right)
            ]
-
 
   
 let plus x y =
@@ -160,10 +158,3 @@ let ltnOSn =
 let ltnOSn_pair =
   gApp ~explicit:true (gInject "ltn0Sn_pair") [hole; hole; hole]
 
-  (*
-let le_S_n hleq =
-  gApp (gInject "le_S_n") [hole; hole; hleq]
-
-let nle_succ_0 hleq =
-  gApp (gInject "PeanoNat.Nat.nle_succ_0") [hole; hleq]
-   *)

@@ -12,7 +12,6 @@ MAKE SURE TO EDIT THE .cppo SOURCE OF THIS FILE RATHER THAN THE GENERATED RESULT
   open Stdarg
   open Tacarg
   open Tacinterp
-  (* open Declare *)
 
 }
 
@@ -102,193 +101,7 @@ let remember_induct h =
 
 let quickchick_goal = Tacticals.tclIDTAC
   
-  (*Tacticals.tclIDTAC;
-  Proofview.Goal.enter begin fun gl ->
-
-    (* Convert goal to a constr_expr *)
-    let c = Proofview.Goal.concl gl in
-    let e = Proofview.Goal.env gl in
-    let evd = Evd.from_env e in
-(*
-    (* Make an evar with the goal as the type *)
-    let evd, evar = Evarutil.new_pure_evar (Environ.named_context_val e) evd c in
-    
-    (* Externalize it *)
-#if COQ_VERSION >= (8, 17, 0)
-    let ct = Constrextern.extern_constr e evd (EConstr.mkEvar (evar, SList.empty)) in
-#else
-    let ct = Constrextern.extern_constr e evd (EConstr.mkEvar (evar, [])) in
-#endif
- *)  
-  match GenericLib.parse_dependent_type (EConstr.to_constr evd c) with
-    | Some dt ->
-      begin
-        msg_debug (str (GenericLib.rocq_constr_to_string dt) ++ fnl ());
-        let open GenericLib in 
-        let decide prop = decOptToBool (g_decOpt prop (gInt 1000)) in
-        let rec mkProperty = function
-          | DProd ((var, _),body) -> 
-              g_forAll g_arbitrary (gFun [var_to_string var] (fun [_] ->
-                mkProperty body
-                )) 
-          | DArrow (x,y) -> GenericLib.debug_coq_expr (gType' [] x); gIf (decide (gType' [] x)) (mkProperty y) (g_checker gTT)
-          | p -> g_checker (decide (gType' [] p)) 
-              in
-          
-     (*     | DArrow (DTyCtr (tyctr, args), y) -> gIf (decide )
-          | DTyParam typaram -> gTyParam typaram
-          | DTyCtr (tyctr, args) -> gApp (gTyCtr tyctr) (List.map mkProperty args)
-          | DCtr (ctr, args) -> gApp (gCtr ctr) (List.map mkProperty args)
-          | DTyVar var -> gVar var
-          | DApp (f, args) -> gApp (mkProperty f) (List.map mkProperty args)
-          | DNot p -> *)
-(*Use decOpt, for every arrow, assume instacne exists and match on it *)
-            
-        GenericLib.debug_coq_expr (mkProperty dt);
-        (*run the generator called checker using QuickCheck.*)
-        (*failwith "OUch!";*)
-        let to_run = GenericLib.interp_open_coq_expr e evd (g_show (g_quickCheck (mkProperty dt))) in
-        (*failwith "Oucher!";*)
-#if COQ_VERSION >= (8, 20, 0)
-        (* FRAGILE probably won't be allowed in the future? *)
-        let opaque_access = Library.indirect_accessor[@@warning "-3"] in
-        QuickChick.define_and_run ~opaque_access to_run e evd;
-#else
-        QuickChick.define_and_run to_run e evd;
-#endif
-
-        Tacticals.tclIDTAC
-      end
-    | None -> failwith "Failed to Parse type"
-  end *)
 (*Create dependency graph, anything that lacks a dependency, print becuase we need it to *)
-(*    
-    (* Make an evar with the goal as the type *)
-    let evd, evar = Evarutil.new_pure_evar (Environ.named_context_val e) evd c in
-
-    Printf.printf "So far so good\n"; flush stdout;
-    
-    (* Externalize it *)
-#if COQ_VERSION >= (8, 17, 0)
-    let ct = Constrextern.extern_constr e evd (EConstr.mkEvar (evar, SList.empty)) in
-#else
-    let ct = Constrextern.extern_constr e evd (EConstr.mkEvar (evar, [])) in
-#endif
-
-    (* Construct : show (quickCheck (_ : ct)) *)
-    let  qct = CAst.make @@ Constrexpr.CApp (QuickChick.quickCheck, [ct, None]) in
-    let sqct = CAst.make @@ Constrexpr.CApp (QuickChick.show, [(qct,None)]) in
-
-    Printf.printf "So far so good2\n"; flush stdout;
-
-    (* From here on I've tried a couple of things. 
-       Calling run_test directly with qct. Fails.
-       Internalize here before calling define and run, fails.
-
-       It always seems to fail in the 'interp' phase, with an 
-       unknown existential variable error. So I'm probably doing something
-       stupid with the evar maps *)
-    let evd, to_run = Constrintern.interp_open_constr e evd sqct in
-
-    Printf.printf "So far so good 2.5\n"; flush stdout;
-    
-    QuickChick.define_and_run to_run e evd;
-
-    Printf.printf "So far so good3\n"; flush stdout;
-
-    (* TODO: This whole block doesn't look very monadic... *)
-    Tacticals.tclIDTAC
-  end
-
-    (*
-    (* Admit a constant with that type *)
-    let tmpid = QuickChick.fresh_name "temporary_constant" in
-    let _interp_st = Vernacentries.interp (CAst.make @@ Vernacexpr.VernacExpr ([],
-      (* TODO: NoDischarge or DoDischarge? *)
-      Vernacexpr.VernacAssumption ((NoDischarge, Decl_kinds.Conjectural),
-                        NoInline,
-                        [
-                          (false,
-                           (
-                             [CAst.make tmpid, None]
-                           ,
-                             ct
-                           )
-                          )
-                        ]
-                       ))) in
-
-    let s = QuickChick.runTest @@ CAst.make @@
-      Constrexpr.CApp (QuickChick.quickCheck, [CAst.make @@ CRef (Libnames.qualid_of_ident tmpid,None), None]) in
-    (* I need to create an existential of type Checkable ct, and then
-       call QuickChick.quickChick on that in the ast, before running
-       QuickChick.runTest on the constr_expr. *)
-
-    
-    (*
-
-       HACK (there *has* to be a better way): 
-         (\x : Checkable ct -> x) _ *)
-
-    let base = Names.Id.of_string "x" in
-    let is_visible_name id =
-      try
-        ignore (Nametab.locate (Libnames.qualid_of_ident id));
-        true
-      with Not_found -> false
-    in
-    (** Safe fresh name generation. *)
-    let xid = Namegen.next_ident_away_from base is_visible_name in
-
-    let binder_list = [CLocalAssum ([CAst.make @@ Names.Name xid], Default Explicit, ct)]  in
-    let f_body = CAst.make @@ CRef (CAst.make @@ Libnames.Ident xid,None) in
-    let f = mkCLambdaN binder_list f_body in
-    let hack_value = mkAppC (f , [ CAst.make @@ CEVarHole (None, Misctypes.IntroAnonymous, None) ] ) in
-     *)
-(*
-
-    (* Refactor - needs to see internals... *)
-    let base = Names.id_of_string "x" in
-    let is_visible_name id =
-      try
-        ignore (Nametab.locate (Libnames.qualid_of_ident id));
-        true
-      with Not_found -> false
-    in
-    (** Safe fresh name generation. *)
-    let xid = Namegen.next_ident_away_from base is_visible_name in
-
-
-    let f_body = mkAppC (QuickChick.show, [mkAppC (QuickChick.quickCheck, [mkAppC (QuickChick.mk_ref "checker", [ CRef (Ident ((Loc.dummy_loc, xid)),None) ])])]) in
-    let f = mkCLambdaN Loc.dummy_loc bind_list f_body in
-
-    let env = Global.env () in
-    let evd = Evd.from_env env in
-    let (cf,evd) = Constrintern.interp_constr env evd f in
-
-    let actual_term = Constr.mkApp (cf, Array.of_list [c]) in
- *)
-
-
-
-(*
-    let concl = Proofview.Goal.concl gl in
-    let sigma = Tacmach.project gl in
-    let hyps = named_context_val (Proofview.Goal.env gl) in
-    let store = Proofview.Goal.extra gl in
-    let env = Proofview.Goal.env gl in
-    let () = if check && mem_named_context_val id hyps then
-      errorlabstrm "Tactics.introduction"
-        (str "Variable " ++ pr_id id ++ str " is already declared.")
-    in
-    match kind_of_term (whd_evar sigma concl) with
-    | Prod (_, t, b) -> unsafe_intro env store (LocalAssum (id, t)) b
-    | LetIn (_, c, t, b) -> unsafe_intro env store (LocalDef (id, c, t)) b
-    | _ -> raise (RefinerError IntroNeedsProduct)
-  end
- *)
-
-*)
 
 open GenericLib
 
@@ -771,7 +584,6 @@ let print_coverage_tree (ind : ty_ctr) (tree : pattern_coverage_tree) (ois : out
     in
   print_tree 0 tree'
 
-
 (*Take in an inductive name and a rocq_ctr (a dependent constructor), and collect the hypotheses and conclusions*)
 let rule_of_rocq_ctr ind_name (ctr : rocq_ctr) : rule =
   let (name, ctr_typ) = ctr in
@@ -1164,7 +976,6 @@ let replay_contextual_derivation key record =
       | _ -> ()
     end) record.context_delta;
   record.context_value
-
 
 (* A step grade as a scoring policy sees it. *)
 let policy_grade = function
@@ -1574,10 +1385,6 @@ and final_density (dt : rocq_relation) ois (should_print : bool) (ds : derive_so
   let densities = analyze_rules (rocq_relation_rules dt) ois in
   if should_print then (Feedback.msg_notice (str ("Rule densities for: " ^ ty_ctr_to_string ind_name ^ " with output indices: " ^ List.fold_left (fun acc oi -> acc ^ " " ^ string_of_int oi) "" ois) ++ fnl ());
   print_rule_densities densities);
-  (* let filter_empty_constructors = List.map (fun (p, cs) -> p, List.filter (fun c -> match List.assoc c densities with | Checking -> false | Partial | Backtracking -> true) cs) covered_patterns in
-  let any_uncovered = List.exists (fun (p,cs) -> cs = []) filter_empty_constructors in
-  let all_has_partial = List.for_all (fun (p,cs) -> List.exists (fun c -> List.assoc c densities = Partial) cs) filter_empty_constructors in
-  let result = if any_uncovered then Checking else if all_has_partial then Partial else Backtracking in *)
   let filter_uncovered_patterns = List.filter (fun (p, cs) -> match cs with | [] -> false | _ -> true) covered_patterns in
   let all_covered_has_nonempty = List.for_all (fun (p,cs) -> List.exists (fun c -> List.assoc c densities <> Checking) cs) filter_uncovered_patterns in
   let result = if not all_covered_has_nonempty then 
@@ -1645,13 +1452,6 @@ let num_source_bound_vars env (s : source) ds : int =
     | Some density -> (*density_score density ds*) 1 + acc
     | None -> acc) variables 0
 
-(* let num_source_bound_vars env (s : source) : int =
-  List.length (match s with
-  | SrcNonrec (hyp) -> List.filter (fun v -> List.mem v env) (variables_in_hypothesis hyp)
-  | SrcRec (_, args) -> List.filter (fun v -> List.mem v env) (List.concat_map variables_in_hypothesis args)
-  | SrcMutrec (_, args) -> List.filter (fun v -> List.mem v env) (List.concat_map variables_in_hypothesis args)
-  | SrcDef (_, args) -> List.filter (fun v -> List.mem v env) (List.concat_map variables_in_hypothesis args)) *)
-
 let add_bound_vars env step density = 
   match step with
   | S_UC (v, _, _) -> (v,density) :: env
@@ -1667,9 +1467,6 @@ let get_num_var_uses ((steps, sort) : schedule_with_density) ds : int =
     | S_Check (s,_) -> num_source_bound_vars env s ds
     | S_ST (_, s, _) -> num_source_bound_vars env s ds
     | S_Match (v, _) -> 0
-      (* (match List.assoc_opt v env with
-      | Some density -> 1 (*density_score density ds*) 
-      | None -> 0) *)
 (*       
       (if List.mem v env then 1 else 0) *)
     | S_Let (_, c) -> num_source_bound_vars env (SrcNonrec c) ds (*Using srcnonrec because equivalent behavior, and it is always nonrecursive source.*)
@@ -1680,35 +1477,6 @@ let get_num_var_uses ((steps, sort) : schedule_with_density) ds : int =
     | (step,density) :: rest -> get_step_score env (step, density) + aux (add_bound_vars env step density) rest in
 
   aux [] steps
-
-
-(* let schedule_density schedule : schedule_with_density =
-  let step_density (step : schedule_step) ds : rule_density =
-    match step with
-    | S_UC _  -> Total (* For enumerations during a checker should unconstrained be empty? *)
-    | S_Check _  -> Checking
-    | S_ST (_, SrcRec _, _) -> (match ds with D_Gen | D_Thm -> Partial | D_Check | D_Enum -> Checking)
-    | S_Match _ -> Backtracking
-    | S_ST (output_var_tys, SrcNonrec (DTyCtr (ind,args)), _) -> 
-      let output_vars = List.map fst output_var_tys in
-      let rec is_output i = (function
-        | DTyVar j -> List.mem j output_vars
-        | DCtr (_, args) -> List.exists (is_output i) args
-        | _ -> false) in
-      let output_indices = filter_mapi (fun i arg -> if is_output i arg then Some i else None) args in
-      (match final_density (ty_ctr_to_rocq_relation ind) output_indices false with
-      | Checking -> Feedback.msg_notice (str ("Relation " ^ ty_ctr_to_string ind ^ " with ois: " ^ List.fold_left (fun acc oi -> acc ^ " " ^ string_of_int oi) "" output_indices ^ " is checking") ++ fnl ()); Checking
-      | d -> d)
-    | S_ST (_, SrcNonrec _, _) -> failwith "is_schedule_valid: Nonrecursive source should have DTyCtr at toplevel" 
-  in
-  let (steps, sort) = schedule in
-  let ds = match sort with
-    | TheoremSchedule _ -> D_Thm
-    | ProducerSchedule (_,PS_E,_) -> D_Enum
-    | ProducerSchedule (_,PS_G,_) -> D_Gen
-    | CheckerSchedule -> D_Check in
-  let step_densities = List.map (fun step -> (step, step_density step ds)) steps in
-  (step_densities, sort) *)
 
 let schedule_with_densities_to_string (s : schedule_with_density) =
   let (steps, sort) = s in
@@ -2670,26 +2438,6 @@ let rec schedule_density neutral_prelude_steps schedule : schedule_with_density 
   
 
   (step_densities, sort)
-
-
-(* let does_schedule_satisfy_heuristics ((steps, sort) : schedule) =
-  let rec aux (ois : output_index list) (outputs : var list) (inputs : var list) =
-    (* Need *)
-
-   *)
-
-(* let is_binding_selection_valid i ((bindings,unbound) : bindings_and_unbound) =
-  let is_binding_valid (v, ty, opt) =
-    match opt with
-    | None -> Some (v,ty,opt, Partial)
-    | Some (DTyCtr (ind,_), i) ->
-      (match final_density (ty_ctr_to_dep_dt ind) [i] false with
-      | Checking -> None
-      | d -> Some (v, ty, opt, d))
-    | _ -> failwith "is_binding_selection_valid: Binding relation should have DTyCtr at toplevel" in
-  match traverse is_binding_valid bindings with
-  | None -> None
-  | Some bs -> Some (i, (bs, unbound)) *)
 
 (* Create a map from types * outputs => inductive_schedules which can be reused and referenced. *)
 
@@ -3889,10 +3637,6 @@ and inductive_best_valid_schedule (rel : rocq_relation) (output_idxs : int list)
   let covered_patterns = collect_leaves tree in
   (* if should_print then (Feedback.msg_notice (str ("Rule densities for: " ^ ty_ctr_to_string ind_name ^ " with output indices: " ^ List.fold_left (fun acc oi -> acc ^ " " ^ string_of_int oi) "" ois) ++ fnl ()); *)
   (* print_rule_densities densities); *)
-  (* let filter_empty_constructors = List.map (fun (p, cs) -> p, List.filter (fun c -> match List.assoc c densities with | Checking -> false | Partial | Backtracking -> true) cs) covered_patterns in
-  let any_uncovered = List.exists (fun (p,cs) -> cs = []) filter_empty_constructors in
-  let all_has_partial = List.for_all (fun (p,cs) -> List.exists (fun c -> List.assoc c densities = Partial) cs) filter_empty_constructors in
-  let result = if any_uncovered then Checking else if all_has_partial then Partial else Backtracking in *)
   let filter_uncovered_patterns = List.filter (fun (p, cs) -> match cs with | [] -> false | _ -> true) covered_patterns in
   let best_density_in_patterns = List.map (fun (p, cs) -> best_density (List.map (fun c -> List.assoc c densities) cs)) filter_uncovered_patterns in
   let overall_density = worst_density ((if List.exists (function (_,[]) -> true | _ -> false) covered_patterns && (match ds with D_Gen | D_Thm -> true | _ -> false) then [Partial] else []) @ best_density_in_patterns) in
@@ -4331,29 +4075,8 @@ let inductive_set = ref inductive_set_init
 
 module StringMap = Map.Make(String)
 
-(* let inductive_dependency_map : (string list) StringMap.t ref = ref StringMap.empty *)
-
 let concat_pair_map (f : 'a -> ('b list * 'c list)) (l : 'a list) : ('b list * 'c list) =
   List.fold_left (fun (bs,cs) a -> let (b,c) = f a in (bs @ b, cs @ c)) ([],[]) l
-
-(* let rec collect_all_used_inductives ((ind_schd, ds, opt) : inductive_schedule * derive_sort * bool) : ((inductive_schedule * derive_sort * bool) list) * ((inductive_schedule * derive_sort * bool) list) =
-  if InductiveSchedSet.mem (ind_schd, ds, opt) !inductive_set then 
-    (Feedback.msg_debug (str ("Already collected inductive schedule: " ^ (match ind_schd with (name,_,_,_) -> name)) ++ fnl ());
-    ([],[]))
-  else begin
-  inductive_set := InductiveSchedSet.add (ind_schd, ds, opt) !inductive_set;
-  let (schedule_name, result_vars, nonrecursive_hyps, recursive_hyps) = ind_schd in
-  Feedback.msg_notice (str ("Collecting inductive schedule: " ^ schedule_name) ++ fnl ());
-  let fill_nonrecursive_dependents = (schedule_name, result_vars, (List.map insert_mutrec_calls nonrecursive_hyps), (List.map insert_mutrec_calls recursive_hyps)) in
-  let dependents = List.filter_map (fun dep -> lookup_and_remove_inductive_schedule dep false) (inductive_schedule_dependents ind_schd) in
-  let dependents_names = List.map (fun dep -> let ((name,_,_,_),_,_) = dep in name) dependents in
-  let deduplicate_dependents = List.sort_uniq compare dependents_names in
-  inductive_dependency_map := StringMap.add schedule_name deduplicate_dependents !inductive_dependency_map;
-  let (unconstrained_deps, constrained_deps) = concat_pair_map collect_all_used_inductives dependents in
-  Feedback.msg_notice (str ("Collected inductive schedule: " ^ schedule_name) ++ fnl ());
-  if opt then unconstrained_deps, constrained_deps @ [fill_nonrecursive_dependents, ds, opt]
-  else unconstrained_deps @ [fill_nonrecursive_dependents, ds, opt], constrained_deps
-  end *)
 
 let parse_ind_schd_name (ind_schd_name : string) : ty_ctr * int list * derive_sort * bool =
   if ind_schd_name = "theorem" then ty_ctr_of_string "theorem", [], D_Thm, true
@@ -4453,65 +4176,8 @@ let collect_all_used_inductive_schd_names ind_schd_name : string list * (((induc
     end in
 
   (List.sort_uniq compare @@ collect_all_used_inductive_schd_names' ind_schd_name), inductive_dependency_map
-(* 
-let collect_all_used_inductives_theorem (thm_schd : schedule) : ((inductive_schedule * derive_sort * bool) list) * ((inductive_schedule * derive_sort * bool) list) = 
-  let (thm_instantiated,_) = insert_mutrec_calls (thm_schd,[]) in
-  let dependents = List.filter_map (fun dep -> lookup_and_remove_inductive_schedule dep false) (schedule_dependents thm_schd) in
-  let (unconstrained_deps, constrained_deps) = concat_pair_map collect_all_used_inductives dependents in
-  let theorem_ind_schd = (("theorem", [], [thm_instantiated,[]],[]), D_Thm, true) in
-  inductive_dependency_map := StringMap.add "theorem" dependents !inductive_dependency_map;
-  unconstrained_deps, constrained_deps @ [theorem_ind_schd] *)
-(* 
-let collect_all_used_inductives_schd_names_theorem (thm_schd : schedule) : string list * (((inductive_schedule * derive_sort * bool) * string list) StringMap.t ref) =
-  let parse_dependent (rocq, output_idxs, ds, opt) =
-    match rocq with
-    | DTyCtr (ind_name, _) -> ind_name, output_idxs, ds, opt
-    | DTyVar v -> failwith "collect_all_used_inductives: Need to handle instances of parameter type variables, like A in list A"
-    | _ -> failwith "collect_all_used_inductives: not a DTyCtr" in
-  let (thm_instantiated,_) = insert_mutrec_calls (thm_schd,[]) in
-  let dependents = List.map parse_dependent @@ schedule_dependents thm_schd in
-
-  let deduplicate_dependents = List.sort_uniq compare dependents in
-
-  let dependents_names = List.map construct_ind_schd_name deduplicate_dependents in
-
-  let theorem_ind_schd = (("theorem", [], [thm_instantiated,[]],[]), D_Thm, true) in
-
-  let  *)
-
-
-
-
-
 
 module StringSet = Set.Make(String)
-
-(* let topological_sort_schedules_by_name (schedules : (inductive_schedule * derive_sort * bool) list) : (inductive_schedule * derive_sort * bool) list =
-  let top_sort (schedules : (inductive_schedule * derive_sort * bool) list) (sorted : (inductive_schedule * derive_sort * bool) list ref) : (inductive_schedule * derive_sort * bool) list =
-    let seen_scheds : StringSet.t ref = ref StringSet.empty in
-
-    let rec dfs (schedule : inductive_schedule * derive_sort * bool) : unit =
-      let ((schedule_name, _, _, _),_,_) = schedule in
-      if not (StringSet.mem schedule_name !seen_scheds) then
-        begin
-          seen_scheds := StringSet.add schedule_name !seen_scheds;
-          let dependents = StringMap.find schedule_name !inductive_dependency_map in
-          List.iter dfs dependents;
-          sorted := schedule :: !sorted
-        end in
-
-    List.iter dfs schedules;
-    !sorted in
-  
-  top_sort schedules (ref []) *)
-
-  (* let schedules_to_graph (schedules : (inductive_schedule * derive_sort * bool) list) : (int * int list) list =
-    List.mapi (fun i dep -> 
-      let dependents = InductiveSchedMap.find dep !inductive_dependency_map in
-      let dep_indices = List.map (fun dep' -> List.find_index (fun dep'' -> dep'' = dep') schedules) dependents in
-      i, dep_indices) schedules in
-  
-  let graph = schedules_to_graph schedules in *)
 
 let rec take_while (p : 'a -> bool) (l : 'a list) : ('a list) * ('a list) =
   match l with
@@ -4624,7 +4290,6 @@ let tarjan_schedules_by_name (schedules : string list) inductive_dependency_map
     let (v, dependent_names) = try StringMap.find v_name !inductive_dependency_map with Not_found -> failwith ("strong_connect: Could not find " ^ v_name) in
     stack := v :: !stack;
     index := !index + 1;
-
 
     (* Process each dependent of v *)
     Error.msg_debug (str ("Processing " ^ (let ((vn,_,_,_,_),_,_) = v in vn) ^ " with dependents: " ^ String.concat ", " dependent_names) ++ fnl ());
@@ -4778,7 +4443,6 @@ module VarSet = Set.Make(struct type t = var let compare = compare end)
   
 let defined_set = ref VarSet.empty
 
-
 let is_defined_global (id : Names.Id.t) : bool =
   let qualid = Libnames.qualid_of_ident id in
   try
@@ -4796,7 +4460,6 @@ let is_defined_local (id : Names.Id.t) env : bool =
       | Context.Named.Declaration.LocalDef (id', _, _) ->
           Names.Id.equal id (Context.binder_name id'))
     hyps
-
 
 (* Combined check: name is used anywhere *)
 let is_name_in_use (id : Names.Id.t) env : bool =
@@ -5106,7 +4769,6 @@ let quickchick_it size idx =
               idx (List.length theorem_schedules)
               (if List.length theorem_schedules = 1 then " is" else "s are")))) in
 
-        (* let theorem_schedule = best_theorem_schedule dt in *)
         Feedback.msg_notice (str "Theorem Schedule:\n" ++ str (schedule_to_string selected_schedule) ++ fnl ());
 
         (* Register theorem as a phony inductive schedule *)
@@ -5114,7 +4776,6 @@ let quickchick_it size idx =
         density_inductive_memo := InductiveScheduleKeyMap.add (ty_ctr_of_string "theorem", [], D_Thm, true) (DensityDone ((phony_theorem_ind_schd, Checking), true, None)) !density_inductive_memo;
 
         density_inductive_memo := InductiveScheduleKeyMap.remove (ty_ctr_of_string "eq", [], D_Check, true) !density_inductive_memo;
-        (* let (unconstrained_inductives, mut_used_inductives) = collect_all_used_inductives_theorem theorem_schedule in *)
         complete_stable_closures ();
         let dependents, inductive_dependency_map = collect_all_used_inductive_schd_names "theorem" in
         Error.msg_debug (str "Dependents: " ++ str (String.concat ", " dependents) ++ fnl ());
@@ -5134,13 +4795,11 @@ let quickchick_it size idx =
           | None -> failwith "quickchick_it: Could not find theorem in schedules pieces"
           end in
 
-
         define_schedule_components ~local:true components schedules_pieces;
 
         defined_set := VarSet.empty;
 
         let c_theorem = theorem_constr in
-        (* msg_debug (str "After constrained generator" ++ fnl ());*)
         let updated_env = schedule_env () in
         let updated_evd = schedule_sigma updated_env in
         let rec int_to_num i = 
@@ -5165,7 +4824,6 @@ let quickchick_it size idx =
   #else
           QuickChick.define_and_run to_run updated_env run_evd;
   #endif
-        (* let _ = (QuickChick.define_and_run  to_run updated_env run_evd) in *)
         Tacticals.tclIDTAC
         (* end  *)
       end
@@ -5206,14 +4864,12 @@ current directory*)
 (* This tactic uses the quickchick_it tactic to run all possible indices with size None,
    capturing the Message output and putting it into a file in the current directory *)
 
-
    open Proofview.Notations
    open Proofview
    open Feedback
 
 let capture_output tac : unit Proofview.tactic =
   let file = open_out_gen [Open_creat; Open_text; Open_append] 0o666 "quickchick_run_output.txt" in
-
 
   let feedback_hook fb =
     match fb.contents with
@@ -5229,7 +4885,7 @@ let capture_output tac : unit Proofview.tactic =
   
   let id = Feedback.add_feeder feedback_hook in
   output_string file "OUTSTART:::\n";
-  Printf.printf "Hook installed: %d\n" id;
+  ignore id;
   tac >>= fun () ->
   output_string file "OUTEND:::\n";
   Feedback.del_feeder id;
@@ -5250,8 +4906,6 @@ let try_all_quickchick_schedules : unit Proofview.tactic =
 #endif
           let s = Pp.string_of_ppcmds ppcmds in
           (*Print captured message to file*)
-
-
 
           captured_output := s :: !captured_output
       | _ -> () in
@@ -5351,7 +5005,6 @@ VERNAC COMMAND EXTEND DeriveSchedules CLASSIFIED AS SIDEFF
       | "Thm" -> D_Thm
       | "Enum" -> D_Enum
       | _ -> failwith ("Invalid derive sort " ^ ds)) in
-
 
       let rec get_result_vars = function
       | DProd ((v,t), b) ->
@@ -5543,13 +5196,6 @@ VERNAC COMMAND EXTEND DeriveDensity CLASSIFIED AS SIDEFF
    | ["Derive" "Density" constr(ind) int_list(ois) "derive" string(ds)] ->
     { match GenericLib.ind_reference_to_rocq_relations ind with
     | Some (idx, rs) ->
-      (* density_memo := RelationInstMap.empty;
-      let ds = (match ds with
-      | "Check" -> D_Check
-      | "Gen" -> D_Gen
-      | "Thm" -> D_Thm
-      | "Enum" -> D_Enum) in
-      ignore (final_density (List.nth rs idx) ois true ds) *)
       reset_density_inductive_memo ();
       inductive_set := inductive_set_init;
       rocq_relation_memo := TyCtrMap.empty;

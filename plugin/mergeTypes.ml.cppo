@@ -28,7 +28,6 @@ let rec separate_shared (terms : 'a list) (param_pos : int) : 'a list * 'a =
          (term :: ts, t)
   | [] -> failwith ("shouldn't get here: param_pos invalid in separate_shared. Param_pos is: " ^ (string_of_int param_pos))
 
-
 (* The reverse of separate_shared. param_pos should be the position where shared will end up in
 the resulting output list. *)
 let rec replace_shared ((terms, shared) : 'a list * 'a) (param_pos : int) : 'a list = 
@@ -47,12 +46,6 @@ let convertConstructor (me : ty_ctr) (ctr : rocq_constr) (param_pos : int) : ctr
       convertConstructorAux dt2 me vs rs (DTyCtr (c , dts) :: os) (* nonrecursive *)
     | DArrow (t, dt2) -> convertConstructorAux dt2 me vs rs (t :: os) (* Parse an argument of any form, definitely nonrecursive *)
     | _ -> failwith ("in convertConstructor, constructor contains unsupported thing: " ^ rocq_constr_to_string ctr)
-    (* | DNot dt -> 
-    | DTyParam tp -> 
-    | DCtr (c, dts) ->
-    | DTyVar v -> 
-    | DApp (dt, dts) ->
-    | DHole ->  *)
   in
   convertConstructorAux ctr me [] [] []
 
@@ -273,7 +266,6 @@ let generate_distinct_names (vs1 : (var * rocq_constr) list) (vs2 : (var * rocq_
   let rec name_starting_with (s : string) : string =
     if List.mem s names then name_starting_with (s ^ "'") else s
   in
-  (* List.map (fun (v, ty) -> (var_of_string (name_starting_with (var_to_string v)), ty)) vs2 *)
   let pairs = List.map (fun (v, ty) -> (v, var_of_string (name_starting_with (var_to_string v)))) vs2 in
   IdMap.of_seq (List.to_seq pairs)
   
@@ -438,14 +430,6 @@ type relation
   * rocq_ctr list (* A list of constructors. Each constructor is a pair (name, type) *)
   * rocq_constr (* The type of the overall relation (e.g. "list t -> Prop") *)
 
-(* let print_relation ((ty_ctr, ) : relation) =
-  msg_debug (str "printing a relation -------------------------------------------" ++ fnl ()) ;
-  List.iter (fun param -> msg_debug (str (ty_param_to_string param) ++ fnl ())) ty_params;
-  msg_debug (str "constr_of_type: " ++ str (rocq_constr_to_string typ) ++ fnl ());
-  (* msg_debug (str "me_arity ty_ctr: " ++ str (string_of_qualid ty_ctr) ++ fnl ()); *)
-  List.iter (fun (c, t) -> msg_debug (str "ctr: " ++ str (rocq_ctr_to_string (c,t)) ++ fnl ())) ctrs;
-  () *)
-
 let extract_relation ind : relation * int =
   match ind with 
 #if COQ_VERSION >= (8, 20, 0)
@@ -467,7 +451,6 @@ let extract_relation ind : relation * int =
     let param_pos = find (function | ({CAst.v = CRef (id,_) ; _} , _) -> qualid_basename id = id1) args1 in
     match ind_reference_to_unparameterized_relation p1 with
     | Some dt -> msg_debug (str (rocq_relation_to_string dt) ++ fnl());
-                 (*        let num_named_params = match dt with (_ , params , _ , _) -> List.length params in *)
         dt , param_pos (* - num_named_params *)
     | None -> failwith "Not supported type"
 
@@ -481,15 +464,6 @@ make the relation (and the parameters) easier to work with.
 In case I come back and am confused by this code later, a type parameter is e.g. "t" in 
 Inductive list (t : Type) : Type := ...
 *)
-(*
-let rec removeOuterForalls (ty : rocq_constr) (numToRemove : int) : rocq_constr =
-  if numToRemove = 0
-    then ty
-  else
-    match ty with
-    | DProd  ((v, dt1), dt2) -> removeOuterForalls dt2 (numToRemove - 1)
-    | _ -> failwith "if this is printed its a bug 1"
- *)                                
 let rec removeFirstArgsOfVar (var : ty_ctr) (num : int) (term : rocq_constr) =
   let rec drop n l = if n = 0 then l else (drop (n - 1) (List.tl l)) in
   let recurse = removeFirstArgsOfVar var num in
@@ -524,13 +498,6 @@ let removeTypeParameters ((ty_ctr, params, ctrs, ty) : relation) : relation' * t
     , ty)
   , params)
 
-  (*
-let rec replaceOuterForalls (ty : rocq_constr) (names : ty_param list) =
-  match names with
-  | [] -> ty
-  | name :: names -> DProd (((var_of_string (ty_param_to_string name))
-    ,(DTyCtr (ty_ctr_of_string "Type", []))), replaceOuterForalls ty names)
-   *)
 (* DTyCtr (constructor_of_string "Prop", []) *)
 
 let rec replaceFirstArgsOfVar (var : ty_ctr) (names : ty_param list) (term : rocq_constr) =
@@ -563,32 +530,6 @@ let insertTypeParameters ((ty_ctr, ctrs, ty) : relation') (params : ty_param lis
   , ty)
   (* , ty) *)
 
-  (*
-let rec applyVarToTerms (var : ty_ctr) (terms : rocq_constr list) (term : rocq_constr) =
-  let recurse = applyVarToTerms var terms in
-  match term with 
-  | DArrow (d1, d2) -> DArrow (recurse d1, recurse d2)
-  | DProd  ((x,d1), d2) -> DProd ((x, recurse d1), recurse d2)
-  | DTyCtr (ty_ctr, ds) ->
-    if ty_ctr = var then DTyCtr (ty_ctr, terms @ ds) else DTyCtr (ty_ctr, ds)
-  | DCtr (ctr, ds) -> DCtr (ctr, List.map recurse ds)
-  | DTyParam tp -> DTyParam tp
-  | DTyVar tv -> DTyVar tv
-  | DApp (d, ds) -> DApp (recurse d, List.map recurse ds)
-  | DNot d -> DNot (recurse d)
-  | DHole -> DHole
-
-let applyFunToRelation ((ty_ctr, params, ctrs, ty) : relation) (f : rocq_constr -> rocq_constr) : relation =
-  (ty_ctr
-  , params
-  , List.map
-      (fun (name, ty) ->
-        (name, f ty)) 
-      ctrs
-  , f ty)
-
-let name_of_rel ((name, _, _, _) : relation) : ty_ctr = name
-   *)
 let merge ind1 ind2 ind = 
   let rel1, param_pos1 = extract_relation ind1 in
   msg_debug (str "------------ First relation inputted: --------------------");
@@ -609,13 +550,7 @@ let merge ind1 ind2 ind =
   (* Get rid of substituted parameters *)
   let params = List.filter (fun param -> not (IdMap_param.mem param param_sub)) (params1 @ params2) in
   (* Re-insert the parameters *)
-(*  
-  let params1subbed = List.map (fun param -> sub_term_param param_sub (DTyParam param)) params1 in
-  let params2subbed = List.map (fun param -> sub_term_param param_sub (DTyParam param)) params2 in
- *)
   let rel = insertTypeParameters rel params in
-  (* let rel = applyFunToRelation rel (applyVarToTerms (name_of_rel rel1) params1subbed) in *)
-  (* let rel = applyFunToRelation rel (applyVarToTerms (name_of_rel rel2) params2subbed) in *)
   (* BUG TO STILL FIX: if P = Q, then they have the same name. Instead, I should probably keep
   the parameters in from the beggining and let them get subbed with everything else??? *)
   msg_debug (str "------------ Relation to be outputted: --------------------");
@@ -667,7 +602,6 @@ TODO still:
    
 *)
 
-
 (*
 
 The plan:
@@ -675,8 +609,6 @@ The plan:
 - Inductive type
 
 - Inductive type with free vars instead of type parameters
-
-
 
 function removeTypeParameters - 
 - removes first n foralls from contructors
