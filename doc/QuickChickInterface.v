@@ -784,10 +784,11 @@ Record Args :=
 
 (** Tests are extracted to OCaml and compiled in a fresh subdirectory of
     [QuickChick] in the system temporary directory ([TMPDIR], or [/tmp]).
-    [QCExtractDir] sets another parent directory, for instance to keep the
-    generated sources for coverage tools. *)
+    [QuickChick Extract Dir] (or [QC Extract Dir]) sets another parent
+    directory, for instance to keep the generated sources for coverage
+    tools. A relative path is resolved where the command is run. *)
 (** [[
-   QCExtractDir "path/to/dir".
+   QuickChick Extract Dir "path/to/dir".
 ]]
 *)
 

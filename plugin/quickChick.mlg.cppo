@@ -69,9 +69,10 @@ let add_extra_pkg s =
 
 let extract_dir : string option SummaryRef.t =
   SummaryRef.ref ~name:"QC_extract_dir" None
+(* A relative directory is taken from where the command is run. *)
 let set_extract_dir s =
   let open SummaryRef in
-  extract_dir := Some s
+  extract_dir := Some (if Filename.is_relative s then Filename.concat (Sys.getcwd ()) s else s)
 
 let dune_file : string option SummaryRef.t =
   SummaryRef.ref ~name:"QC_dune_file" None
@@ -809,7 +810,16 @@ VERNAC COMMAND EXTEND FuzzQC CLASSIFIED AS SIDEFF
 END
 #endif
 
+{
+(* [Dir] is read as an identifier so that it does not become a keyword. *)
+let extract_dir_command dir s =
+  if Id.to_string dir = "Dir" then set_extract_dir s
+  else CErrors.user_err Pp.(str "Expected QuickChick Extract Dir \"path\".")
+}
+
 VERNAC COMMAND EXTEND QCExtractDir CLASSIFIED AS SIDEFF
+  | ["QuickChick" "Extract" ident(dir) string(s)] -> { extract_dir_command dir s }
+  | ["QC" "Extract" ident(dir) string(s)] -> { extract_dir_command dir s }
   | ["QCExtractDir" string(s)] -> { set_extract_dir s }
 END
 
